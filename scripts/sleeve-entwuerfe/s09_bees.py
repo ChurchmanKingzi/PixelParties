@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
-"""09 Bomblebee-Wabe: Blick ins Innere eines Bomben-Bienenstocks.
-Alles in 1x-Leinwandpixeln gezeichnet (Waben, Honig, Bienen), nur die Dive Bomblebees stammen aus der Karte."""
+"""09 Bomblebee-Wabe: Flug durch einen Wabengang im Bienenstock, dem Licht des Fluglochs entgegen.
+Alles direkt in 1x-Leinwandpixeln gezeichnet (perspektivische Waben, Honig, Bienen nach den Kartenbildern
+"Bomblebee", "Dive Bomblebee", "Burning Fuse" usw.) – keine hochskalierten Sprites."""
 from lib import *
 
 SQ3 = math.sqrt(3)
@@ -21,12 +22,6 @@ def ramp(t, cols, thr):
     f = t - i
     i = np.where(f > thr, i + 1, i)
     return np.array(cols)[np.clip(i, 0, len(cols) - 1)]
-
-
-def put(a, m, col):
-    a[m, :3] = col[:3]
-    a[m, 3] = 255
-
 
 
 # ------------------------------------------------------------------ Waben-Tunnel (Perspektive)
@@ -62,7 +57,7 @@ def h2(a, b, s=0):
     return (np.sin(a * 12.9898 + b * 78.233 + s * 37.719) * 43758.5453) % 1.0
 
 
-def comb_surface(u, v, R, light, seed, thr, lu=(0.6, 0.8), pal_shift=0):
+def comb_surface(u, v, R, light, seed, thr, lu=(0.6, 0.8)):
     """Wabenfläche auf (u, v) rendern. light: Array 0..1+. Gibt RGB-Array und Zellinfos zurück."""
     hexd, pu, pv, rx, rz, apo = hexcells(u, v, R)
     de = (1 - hexd) * apo
@@ -119,7 +114,9 @@ def comb_surface(u, v, R, light, seed, thr, lu=(0.6, 0.8), pal_shift=0):
     out[wall] = wc[wall]
     sc = ramp(np.clip(lw - 0.3, 0, 1), WAXR, thr)
     out[seam & fine] = sc[seam & fine]
-    return out, dict(kind=kind, rx=rx, rz=rz, pu=pu, pv=pv, apo=apo, de=de, apo_px=apo_px)
+    return out
+
+
 # ------------------------------------------------------------------ Bomblebee (1x gezeichnet)
 BLACK = [(8, 6, 12), (18, 15, 24), (30, 27, 40), (46, 43, 60), (68, 66, 88), (104, 104, 128), (150, 152, 176)]
 GOLD = [(96, 50, 8), (160, 96, 14), (222, 156, 30), (252, 204, 60), (255, 240, 150)]
@@ -128,10 +125,9 @@ VEIN = (112, 82, 52)
 WEDGE = (84, 62, 44)
 
 
-def bee(R, tilt=0.0, flip=False, wing=0.0, fuse=1.0, rim=(214, 128, 36), eyes=True, spark=True, seed=0, brow=True):
+def bee(R, tilt=0.0, flip=False, wing=0.0, fuse=1.0, rim=(214, 128, 36), eyes=True, seed=0, brow=True):
     """Bomblebee mit Körperradius R (Pixel). tilt in Grad (+ = im Uhrzeigersinn).
     Rückgabe: RGBA-Sprite (Flügel halbtransparent) und Ankerpunkt (Körpermitte) sowie Funkenposition."""
-    rnd = random.Random(seed)
     S_ = int(R * 7) + 16
     cx0 = cy0 = S_ / 2
     ca, sa = math.cos(math.radians(tilt)), math.sin(math.radians(tilt))
@@ -150,7 +146,7 @@ def bee(R, tilt=0.0, flip=False, wing=0.0, fuse=1.0, rim=(214, 128, 36), eyes=Tr
             ux, uy = side * math.cos(a0), -math.sin(a0)
             vx, vy = -uy, ux
             bx, by = base[0] * R * side, base[1] * R
-            pts, pts_i = [], []
+            pts = []
             for k in range(48):
                 t = k / 48 * 2 * math.pi
                 u = (1 - math.cos(t)) / 2  # 0..1 entlang Achse
@@ -160,7 +156,6 @@ def bee(R, tilt=0.0, flip=False, wing=0.0, fuse=1.0, rim=(214, 128, 36), eyes=Tr
                 pts.append(T(x, y))
             dw.polygon(pts, fill=WINGC + (alpha,), outline=WEDGE + (255,))
             # Adern
-            tip = (bx + ux * L * R, by + uy * L * R)
             def P(u, v):
                 return T(bx + ux * u * L * R + vx * v * Wd * R, by + uy * u * L * R + vy * v * Wd * R)
             wlines.append([P(0.05, 0), P(0.5, 0.12), P(0.92, 0.05)])
@@ -187,27 +182,39 @@ def bee(R, tilt=0.0, flip=False, wing=0.0, fuse=1.0, rim=(214, 128, 36), eyes=Tr
     # ---- Beine ----
     body = Image.new('RGBA', (S_, S_), (0, 0, 0, 0))
     db = ImageDraw.Draw(body)
-    lw = 3 if R >= 16 else (2 if R >= 9 else 1)
-    for side in (-1, 1):
-        for i in range(3 if R < 12 else 4):
-            f = i / 3
-            att = (side * (0.62 - 0.1 * f) * R, (0.25 + 0.42 * f) * R)
-            knee = (side * (1.18 + 0.08 * i) * R, (0.05 + 0.34 * f) * R - 0.12 * R * (1 - f))
-            foot = (side * (1.22 + 0.05 * i - 0.02 * i * i) * R, (0.85 + 0.42 * f) * R)
-            claw = (foot[0] - side * 0.16 * R, foot[1] + 0.12 * R)
-            pts = [T(*att), T(*knee), T(*foot), T(*claw)]
-            db.line(pts[:2], fill=K + (255,), width=lw)
-            db.line(pts[1:3], fill=K + (255,), width=max(1, lw - 1))
-            db.line(pts[2:4], fill=K + (255,), width=1)
-            if R >= 9:
-                # Glanzlinie auf Oberschenkel
-                hk = T(knee[0] - side * 0.12 * R, knee[1] - 0.02 * R)
-                ha = T(att[0] + side * 0.1 * R, att[1] - 0.12 * R)
-                db.line([ha, hk], fill=BLACK[4] + (255,), width=1)
-                k2 = T(*knee)
-                db.point(k2, fill=BLACK[5] + (255,))
-                fx = T(foot[0] + side * 0.02 * R, foot[1] - 0.3 * R)
-                db.line([k2, fx], fill=BLACK[3] + (255,), width=1)
+    lw = 2 if R >= 9 else 1
+    nleg = 3 if R < 16 else 4
+    for i in reversed(range(nleg)):
+        for side in (-1, 1):
+            f = i / max(1, nleg - 1)
+            att = (side * (0.6 - 0.25 * f) * R, (0.42 + 0.35 * f) * R)
+            knee = (side * (1.32 - 0.6 * f) * R, (0.08 + 0.85 * f) * R)
+            ank = (side * (1.72 - 0.9 * f) * R, (0.58 + 0.85 * f) * R)
+            tip = (side * (1.64 - 0.98 * f) * R, (0.86 + 0.76 * f) * R)
+            P = [T(*att), T(*knee), T(*ank), T(*tip)]
+            if R >= 16:
+                fillc = BLACK[2] if i % 2 == 0 else BLACK[1]
+                db.line(P[:2], fill=K + (255,), width=lw + 2)
+                db.line(P[1:3], fill=K + (255,), width=lw + 1)
+                db.line(P[2:4], fill=K + (255,), width=3)
+                db.line(P[:2], fill=fillc + (255,), width=lw)
+                db.line(P[1:3], fill=fillc + (255,), width=max(1, lw - 1))
+                db.line(P[2:4], fill=fillc + (255,), width=1)
+                # Glanzlinien oben/links
+                db.line([(P[0][0] + side, P[0][1] - 1), (P[1][0] - side, P[1][1] - 1)], fill=BLACK[4] + (255,), width=1)
+                db.line([(P[1][0] - 1, P[1][1] + 1), (P[2][0] - 1, P[2][1] - 1)], fill=BLACK[3] + (255,), width=1)
+                db.point((round(P[1][0]), round(P[1][1]) - 1), fill=BLACK[5] + (255,))
+                db.point((round(P[2][0]), round(P[2][1])), fill=BLACK[4] + (255,))
+                # kleine Borsten
+                mx, my = (P[1][0] + P[2][0]) / 2, (P[1][1] + P[2][1]) / 2
+                db.point((round(mx + side * 2), round(my)), fill=K + (255,))
+            elif R >= 9:
+                db.line(P[:3], fill=BLACK[3] + (255,), width=1)
+                db.line(P[2:4], fill=BLACK[2] + (255,), width=1)
+                db.point((round(P[1][0]), round(P[1][1])), fill=BLACK[5] + (255,))
+            else:
+                db.line(P[:3], fill=K + (255,), width=1)
+                db.line(P[2:4], fill=K + (255,), width=1)
     # ---- Körper ----
     ba = np.array(body)
     Y, X = np.mgrid[0:S_, 0:S_].astype(float)
@@ -226,7 +233,7 @@ def bee(R, tilt=0.0, flip=False, wing=0.0, fuse=1.0, rim=(214, 128, 36), eyes=Tr
     tex = (value_noise(S_, S_, max(2, R // 5), seed=seed + 1, octaves=2) - 0.5) * 0.18
     shade = np.clip(0.18 + 0.62 * np.clip(dif, 0, 1) + tex, 0, 1)
     thr = bayer((S_, S_))
-    col = ramp(shade * 0.82, BLACK[:6], thr)
+    col = ramp(shade * 0.82, BLACK[:6], 0.5 + (thr - 0.5) * 0.7)
     # warmer Randlicht (Honigschein) unten rechts
     rimv = np.clip((nxx * 0.55 + nyy * 0.8), 0, 1) * (1 - nz) ** 1.4
     rm = ins & (rimv > 0.16 + thr * 0.25)
@@ -287,7 +294,7 @@ def bee(R, tilt=0.0, flip=False, wing=0.0, fuse=1.0, rim=(214, 128, 36), eyes=Tr
                 db.point((pxp - 1, e0[1] - 1), fill=(255, 255, 255, 255))
                 if brow:
                     b0 = T(ex - s_ * 0.17 * R, ey - 0.25 * R); b1 = T(ex + s_ * 0.13 * R, ey - 0.13 * R)
-                    db.line([b0, b1], fill=GOLD[3] + (255,), width=2)
+                    db.line([b0, b1], fill=BLACK[0] + (255,), width=2)
                     # Lid schneidet Augenoberkante
                     db.line([T(ex - s_ * 0.15 * R, ey - 0.17 * R), T(ex + s_ * 0.14 * R, ey - 0.05 * R)], fill=BLACK[1] + (255,), width=1)
             elif R >= 9:
@@ -353,11 +360,6 @@ def draw_spark(d, x, y, size, rnd):
     d.point((x, y), fill=cols[0])
 
 
-def slab_edge(xs, base, curve, amp, seed):
-    n = value_noise(W, 1, 18, seed=seed, octaves=3)[0]
-    return base + curve * ((xs - W / 2) / (W / 2)) ** 2 + (n - 0.5) * amp
-
-
 def honey_drip(d, x, y0, L, w=3, bulb=3):
     """Honigfaden mit Tropfen, x/y0 = Ansatz an der Wabenkante."""
     for yy_ in range(y0, y0 + L):
@@ -389,14 +391,6 @@ def falling_drop(d, x, y, r=2):
     d.point((x + r - 1, y + 1), fill=HONEY[1])
 
 
-def darken(a, m, col):
-    a[m, :3] = col
-
-
-def shade_mul(a, m, f):
-    a[m, :3] = (a[m, :3].astype(float) * f).astype(np.uint8)
-
-
 
 # ============================================================ Szene: Wabengang im Bienenstock
 VPX, VPY, F = 125.0, 118.0, 118.0
@@ -422,7 +416,7 @@ light = np.clip(0.5 + 0.13 * z - 0.42 * np.clip(vig - 0.35, 0, 1), 0, 1.2)
 a = np.zeros((H, W, 4), np.uint8); a[..., 3] = 255
 u = np.where(surf == 0, 1, -1) * 1.6 * np.log(np.maximum(z, 0.3))
 v = Y
-wallrgb, winfo = comb_surface(u * 1.0, v, 0.088, light, 5, thrs)
+wallrgb = comb_surface(u, v, 0.088, light, 5, thrs)
 m = surf <= 1
 a[m, :3] = wallrgb[m]
 # ---- Decke: Holzleisten (Rähmchen-Oberträger) ----
@@ -492,6 +486,8 @@ for (fx_, h_, kind_) in [(-9, 5, 1), (-6, 8, 0), (-3, 4, 2), (1, 7, 1), (4, 9, 0
 dl.line((HOX - HOR, int(HOY + HOR) - 1, HOX + HOR, int(HOY + HOR) - 1), fill=SIL)
 a = np.array(lh)
 a[~hole & (surf == 4) & (hd <= HOR + 0.8), :3] = (255, 250, 220)
+
+
 # Nebel/Licht in die Tiefe (weich, wenige Stufen)
 def blend_to(a, t, col, steps=6):
     t = np.clip(t, 0, 1)
@@ -509,18 +505,18 @@ blend_to(a, rt * ~hole, (255, 244, 200), 4)
 im = Image.fromarray(a)
 
 
-def tiny_bee(d, x, y, r, dark=(92, 58, 30), wingc=(255, 250, 230)):
+def tiny_bee(d, x, y, r, dark=(66, 38, 20), wingc=(255, 252, 236)):
+    """Winzige Gegenlicht-Biene (Silhouette) für die Ferne."""
     x, y = int(round(x)), int(round(y))
     if r <= 1:
-        d.point((x, y), fill=dark)
-        d.point([(x - 1, y - 1), (x + 1, y - 1)], fill=wingc)
+        d.point([(x, y), (x + 1, y)], fill=dark)
+        d.point([(x - 1, y - 1), (x + 2, y - 1)], fill=wingc)
         return
-    d.ellipse((x - r, y - r + 1, x + r, y + r), fill=dark)
-    d.point([(x - r - 1, y - 1), (x - r, y - 2), (x + r + 1, y - 1), (x + r, y - 2)], fill=wingc)
-    if r >= 3:
-        d.point([(x - r - 2, y - 2), (x + r + 2, y - 2), (x - r - 1, y - 2), (x + r + 1, y - 2)], fill=wingc)
-        d.point((x, y), fill=GOLD[3])
-    d.point((x + 1, y - r - 1), fill=(255, 200, 80))
+    d.rectangle((x - 1, y - 1, x + 1, y + 1), fill=dark)
+    d.point([(x - 2, y), (x + 2, y), (x, y - 2), (x, y + 2)], fill=dark)
+    d.point([(x - 3, y - 2), (x - 2, y - 3), (x - 3, y - 3), (x + 3, y - 2), (x + 2, y - 3), (x + 3, y - 3)], fill=wingc)
+    d.point((x, y), fill=GOLD[2])
+    d.point((x + 1, y - 3), fill=(255, 190, 70))
 
 
 def proj(Xw, Yw, zw):
@@ -543,21 +539,17 @@ for side in (-1, 1):
             yq = yj + k
             if 0 <= yq < H:
                 im.putpixel((x_, yq), (WAXR[5] if k <= 0 else WAXR[3] if k < th else WAXR[1]) + (255,))
+# (Wandseite, Tiefe z, Länge, Breite, Tropfengröße)
 drip_spots = [(-1, 1.02, 30, 3, 3), (-1, 1.2, 12, 2, 2), (-1, 1.45, 40, 2, 3), (-1, 1.8, 14, 2, 2), (-1, 2.3, 20, 1, 2), (-1, 3.0, 8, 1, 1),
               (1, 1.05, 44, 3, 4), (1, 1.3, 16, 2, 2), (1, 1.62, 26, 2, 3), (1, 2.1, 10, 1, 2), (1, 2.7, 14, 1, 1)]
-for (Xs, zs, L0, w0, b0) in drip_spots:
-    sgn = 1 if Xs > 0 else -1
-    sx = VPX + sgn * F / zs * 1.0 - sgn * (1.0 - abs(Xs)) * F / zs * 0.0
-    sx = VPX + sgn * F / zs * abs(Xs)
-    sy = VPY - HC * abs(sx - VPX) / abs(Xs) * 1.0
-    sy = VPY - HC * F / zs
-    sx = int(round(VPX + sgn * F / zs * abs(Xs)))
-    sy = int(round(sy)) + 1
+for (sgn, zs, L0, w0, b0) in drip_spots:
+    sx = int(round(VPX + sgn * F / zs))
+    sy = int(round(VPY - HC * F / zs)) + 1
     if sy < 0:
         continue
     d.ellipse((sx - w0 - 1, sy - 1, sx + w0 + 1, sy + 2), fill=HONEY[3])
     d.point((sx - w0, sy), fill=HONEY[5])
-    end = honey_drip(d, sx, sy + 1, L0, w=w0 + 1, bulb=b0)
+    end = honey_drip(d, sx, sy + 1, L0, w=w0 + 2, bulb=b0 + 1)
     if L0 > 24:
         falling_drop(d, sx, end + 12, 2)
 
@@ -566,12 +558,12 @@ d = ImageDraw.Draw(im)
 BR = 0.1
 # (X, Y, z, tilt, flip, wing)
 swarm3d = [
-    (0.08, -0.1, 6.4, 0, False, 0), (-0.1, 0.12, 6.0, 0, True, 0),
-    (-0.16, -0.02, 5.7, 0, False, 0), (0.2, 0.0, 5.4, 0, True, 0), (-0.25, 0.22, 5.0, 0, False, 0), (0.1, -0.18, 4.8, 0, True, 0),
+    (0.1, -0.12, 6.4, 0, False, 0),
+    (-0.22, 0.02, 5.7, 0, False, 0), (0.26, 0.06, 5.4, 0, True, 0), (-0.05, 0.3, 5.0, 0, False, 0),
     (0.3, 0.3, 4.4, 0, True, 0), (-0.32, -0.14, 4.0, 0, False, 0), (0.05, -0.3, 3.7, 0, False, 0), (0.36, -0.06, 3.5, 0, True, 0),
     (-0.45, 0.35, 3.2, 8, False, 0.2), (0.5, 0.42, 2.8, -8, True, 0.1), (-0.12, -0.46, 2.6, 4, False, 0.3), (0.42, -0.4, 2.3, -10, True, 0.2),
     (-0.58, -0.3, 2.0, 10, False, 0.1), (0.62, 0.2, 1.7, -12, True, 0.3), (-0.6, 0.5, 1.5, 12, False, 0.0), (-0.34, -0.72, 1.3, 6, False, 0.2),
-    (0.66, -0.66, 1.05, -14, True, 0.4), (-0.78, -0.2, 0.95, 14, False, 0.3), (0.8, 0.62, 0.9, -8, True, 0.1),
+    (-0.78, -0.2, 0.95, 14, False, 0.3), (0.8, 0.62, 0.9, -8, True, 0.1), (-0.72, 1.12, 0.72, 16, False, 0.2),
 ]
 swarm3d.sort(key=lambda s_: -s_[2])
 sparks = []
@@ -581,12 +573,12 @@ for i, (Xw, Yw, zw, tl, fl, wg) in enumerate(swarm3d):
     if R_ < 3.6:
         tiny_bee(d, sx, sy, int(R_ + 0.2))
     else:
-        b, c, sp = bee(int(round(R_)), tilt=tl, flip=fl, wing=wg, seed=20 + i, brow=True)
+        b, c, sp = bee(int(round(R_)), tilt=tl, flip=fl, wing=wg, seed=20 + i)
         # Dunst: entfernte Bienen aufhellen
         haze = float(np.clip((zw - 1.6) / 3.0, 0, 0.6))
         if haze > 0:
             ba_ = np.array(b).astype(float)
-            ba_[..., :3] = ba_[..., :3] * (1 - haze) + np.array(GLOWC) * haze * 0.8
+            ba_[..., :3] = ba_[..., :3] * (1 - haze) + np.array((196, 128, 56)) * haze
             b = Image.fromarray(ba_.clip(0, 255).astype(np.uint8))
         bx, by = int(sx - c[0]), int(sy - c[1])
         # Rauchspur der Zündschnur Richtung Flugloch
@@ -618,12 +610,11 @@ ha = np.array(hero)
 refl = np.zeros((H, W, 4), np.uint8)
 hh_, ww_ = ha.shape[:2]
 for ry_ in range(hh_):
-    src_y = ry_
     ty = int(2 * FLOOR_Y - (hy + ry_))
     if not (0 <= ty < H) or ty < FLOOR_Y - 4:
         continue
     shift = int(round(1.6 * math.sin(ty * 0.9)))
-    row = ha[src_y]
+    row = ha[ry_]
     for rx_ in range(ww_):
         tx = hx + rx_ + shift
         if 0 <= tx < W and row[rx_, 3] > 0:
@@ -639,10 +630,84 @@ mix = base[..., :3] * (1 - fq) + tgt * fq
 keep = rm_ & (yy >= FLOOR_Y)
 base[keep, :3] = np.clip(mix[keep], 0, 255).astype(np.uint8)
 im = Image.fromarray(base)
-solid = Image.fromarray(np.where(ha[..., 3:4] == 255, ha, 0).astype(np.uint8))
 paste(im, hero, (hx, hy))
 d = ImageDraw.Draw(im)
-draw_spark(d, hx + hsp[0], hy + hsp[1], 5, random.Random(4))
+sx_, sy_ = hx + hsp[0], hy + hsp[1]
+sg = Image.new('RGBA', (W, H), (0, 0, 0, 0)); ImageDraw.Draw(sg).ellipse((sx_ - 2, sy_ - 2, sx_ + 2, sy_ + 2), fill=(255, 255, 255, 255))
+gls, p = glow(sg, (255, 200, 90, 255), radius=4, strength=0.6)
+paste(im, gls, (-p, -p))
+d = ImageDraw.Draw(im)
+draw_spark(d, sx_, sy_, 6, random.Random(4))
+
+
+# ---- Dive Bomblebees (gestreifte Sturzflug-Bienen) ----
+def dive_bee(img, cx, cy, L, ang, seed=0):
+    ca_, sa_ = math.cos(math.radians(ang)), math.sin(math.radians(ang))
+    r_ = L * 0.2
+    S2 = int(L * 2.2)
+    x0_, y0_ = int(cx - S2 / 2), int(cy - S2 / 2)
+    Yq, Xq = np.mgrid[0:S2, 0:S2].astype(float)
+    ddx, ddy = Xq + x0_ + 0.5 - cx, Yq + y0_ + 0.5 - cy
+    u_ = ddx * ca_ + ddy * sa_          # entlang Körper (Nase bei +)
+    sv = -1 if ca_ < 0 else 1
+    v_ = sv * (-ddx * sa_ + ddy * ca_)  # quer (neg = oben/Licht)
+    half = L / 2
+    prof = np.where(u_ > half * 0.35, r_ * np.sqrt(np.clip(1 - ((u_ - half * 0.35) / (half * 0.65)) ** 2, 0, 1)),
+                    np.where(u_ < -half * 0.7, r_ * np.sqrt(np.clip(1 - ((u_ + half * 0.7) / (half * 0.3)) ** 2, 0, 1)), r_))
+    ins = (np.abs(v_) <= prof) & (np.abs(u_) <= half)
+    th = bayer((S2, S2))
+    shade = np.clip(0.75 - 0.5 * v_ / r_, 0, 1)
+    stripe = (np.floor((u_ + half) / (L / 7)) % 2 == 0) & (u_ < half * 0.4)
+    yel = ramp(np.clip(shade, 0, 1), [GOLD[0], GOLD[1], GOLD[2], GOLD[3], GOLD[4]], 0.5 + (th - 0.5) * 0.6)
+    blk = ramp(np.clip(shade * 0.7, 0, 1), BLACK[:5], 0.5 + (th - 0.5) * 0.6)
+    col = np.where(stripe[..., None], yel, blk)
+    # Gesichtsring an der Nase
+    ring_ = ins & (np.abs(u_ - half * 0.62) < 0.9) & (np.abs(v_) < prof - 0.5)
+    col[ring_] = GOLD[3]
+    eye = ins & (np.abs(u_ - half * 0.8) < 1.0) & (np.abs(v_ + r_ * 0.2) < 1.0)
+    col[eye] = (240, 240, 232)
+    spec = ins & (np.abs(v_ + r_ * 0.62) < 0.6) & (u_ > -half * 0.6) & (u_ < half * 0.5)
+    col[spec] = (255, 250, 214)
+    sp = np.zeros((S2, S2, 4), np.uint8)
+    sp[ins, :3] = col[ins]; sp[ins, 3] = 255
+    body_ = outline(Image.fromarray(sp), K + (255,))
+    layer = Image.new('RGBA', (S2, S2), (0, 0, 0, 0))
+    dl_ = ImageDraw.Draw(layer)
+
+    def T2(uu, vv):
+        return (cx - x0_ + uu * ca_ - sv * vv * sa_, cy - y0_ + uu * sa_ + sv * vv * ca_)
+    # Flügel nach hinten gefegt
+    for (wu, wl_, ww, wa_) in [(0.05, 0.62, 0.2, 200), (-0.1, 0.5, 0.16, 180)]:
+        pts = []
+        for k in range(24):
+            t_ = k / 24 * 2 * math.pi
+            uu = wu * L - (1 - math.cos(t_)) / 2 * wl_ * L
+            vv = -r_ - (1 - math.cos(t_)) / 2 * wl_ * L * 0.55 + math.sin(t_) * ww * L
+            pts.append(T2(uu, vv))
+        dl_.polygon(pts, fill=WINGC + (wa_,), outline=WEDGE + (255,))
+        dl_.line([T2(wu * L - 1, -r_ - 1), T2(wu * L - wl_ * L * 0.9, -r_ - wl_ * L * 0.5)], fill=VEIN + (255,))
+    # Heckflossen + Zündschnur
+    dl_.polygon([T2(-half + 1, 0), T2(-half - L * 0.12, -r_ * 1.4), T2(-half - L * 0.05, 0)], fill=K + (255,))
+    dl_.polygon([T2(-half + 1, 0), T2(-half - L * 0.12, r_ * 1.4), T2(-half - L * 0.05, 0)], fill=K + (255,))
+    fz = [T2(-half - 1, 0), T2(-half - L * 0.12, -r_ * 0.3), T2(-half - L * 0.2, 0.2 * r_)]
+    dl_.line(fz, fill=(70, 46, 28, 255))
+    layer.alpha_composite(body_)
+    # Tempolinien
+    dimg = ImageDraw.Draw(img)
+    for k, vv in enumerate((-r_ * 0.6, r_ * 0.1, r_ * 0.8)):
+        p0 = (cx + (-half - 3) * ca_ - vv * sa_, cy + (-half - 3) * sa_ + vv * ca_)
+        ln_ = L * (1.1 + 0.4 * (k % 2))
+        p1 = (p0[0] - ln_ * ca_, p0[1] - ln_ * sa_)
+        for t_ in np.linspace(0, 1, int(ln_)):
+            if t_ < 0.55 or (int(t_ * ln_) % 2 == 0):
+                dimg.point((round(p0[0] + (p1[0] - p0[0]) * t_), round(p0[1] + (p1[1] - p0[1]) * t_)), fill=(255, 240, 196) if t_ < 0.4 else (230, 190, 120))
+    img.alpha_composite(layer, (x0_, y0_))
+    tipx, tipy = x0_ + fz[-1][0], y0_ + fz[-1][1]
+    draw_spark(ImageDraw.Draw(img), tipx, tipy, 2, random.Random(seed))
+
+
+dive_bee(im, 198, 52, 30, 132, seed=1)
+dive_bee(im, 42, 150, 18, 66, seed=2)
 
 
 # ---- Explosion (eine Bombe ist schon hochgegangen) ----
@@ -655,41 +720,49 @@ def explosion(img, cx, cy, r, seed=1):
     f_ = (np.floor(fl_ * 4 + thr * 0.999) / 4)[..., None]
     a_[..., :3] = np.clip(a_[..., :3] * (1 - f_) + np.array((255, 170, 60)) * f_, 0, 255).astype(np.uint8)
     img = Image.fromarray(a_)
-    d = ImageDraw.Draw(img)
-    SM = [(40, 26, 22), (70, 48, 38), (108, 80, 60), (150, 118, 88), (196, 168, 130)]
+    SM = [(52, 32, 24), (84, 58, 42), (120, 88, 62), (160, 124, 88), (204, 170, 124)]
     puffs = []
-    for k in range(9):
-        ang_ = k / 9 * 2 * math.pi + rs.uniform(-0.25, 0.25)
-        dd = r * rs.uniform(0.62, 0.9)
-        puffs.append((cx + math.cos(ang_) * dd, cy + math.sin(ang_) * dd * 0.8 - r * 0.1, r * rs.uniform(0.3, 0.46)))
-    for k in range(4):
-        puffs.append((cx + rs.uniform(-0.4, 0.4) * r, cy - r * rs.uniform(0.8, 1.2), r * rs.uniform(0.3, 0.42)))
+    for k in range(14):
+        ang_ = rs.uniform(0, 2 * math.pi)
+        dd = r * rs.uniform(0.45, 0.95)
+        up_ = max(0.0, -math.sin(ang_)) * r * 0.35
+        puffs.append((cx + math.cos(ang_) * dd, cy + math.sin(ang_) * dd * 0.75 - up_, r * rs.uniform(0.26, 0.44)))
+    for k in range(5):
+        puffs.append((cx + rs.uniform(-0.5, 0.3) * r, cy - r * rs.uniform(0.9, 1.45), r * rs.uniform(0.2, 0.34)))
+    sm = Image.new('RGBA', img.size, (0, 0, 0, 0))
+    ds = ImageDraw.Draw(sm)
     for (px_, py_, pr) in puffs:
-        d.ellipse((px_ - pr - 1, py_ - pr, px_ + pr + 1, py_ + pr + 2), fill=SM[0])
+        ds.ellipse((px_ - pr, py_ - pr, px_ + pr, py_ + pr), fill=SM[1] + (255,))
     for (px_, py_, pr) in puffs:
-        d.ellipse((px_ - pr, py_ - pr, px_ + pr, py_ + pr), fill=SM[1])
-    for (px_, py_, pr) in puffs:
-        # Licht vom Feuer: Seite zur Mitte heller
         vx_, vy_ = cx - px_, cy - py_
         n_ = math.hypot(vx_, vy_) + 1e-6
-        ox_, oy_ = vx_ / n_ * pr * 0.3, vy_ / n_ * pr * 0.3
-        d.ellipse((px_ + ox_ - pr * 0.7, py_ + oy_ - pr * 0.7, px_ + ox_ + pr * 0.7, py_ + oy_ + pr * 0.7), fill=SM[2])
-        d.ellipse((px_ + ox_ * 1.8 - pr * 0.4, py_ + oy_ * 1.8 - pr * 0.4, px_ + ox_ * 1.8 + pr * 0.4, py_ + oy_ * 1.8 + pr * 0.4), fill=(186, 110, 50))
+        ox_, oy_ = vx_ / n_ * pr * 0.25, vy_ / n_ * pr * 0.25 - pr * 0.1
+        ds.ellipse((px_ + ox_ - pr * 0.72, py_ + oy_ - pr * 0.72, px_ + ox_ + pr * 0.72, py_ + oy_ + pr * 0.72), fill=SM[2] + (255,))
+        ds.ellipse((px_ + ox_ * 1.8 - pr * 0.42, py_ + oy_ * 1.8 - pr * 0.42, px_ + ox_ * 1.8 + pr * 0.42, py_ + oy_ * 1.8 + pr * 0.42), fill=SM[3] + (255,))
+        ds.point((px_ + ox_ * 2.2 - pr * 0.2, py_ + oy_ * 2.2 - pr * 0.2), fill=SM[4] + (255,))
+    # Unterseite dunkler
+    sa = np.array(sm)
+    smm = sa[..., 3] > 0
+    lower = smm & ~np.roll(smm, -2, 0)
+    sa[lower, :3] = SM[0]
+    sm = outline(Image.fromarray(sa), (30, 16, 12, 255))
+    img.alpha_composite(sm)
+    d = ImageDraw.Draw(img)
     # Feuerball aus Lappen
     FIRE = [(150, 30, 20), (214, 64, 22), (248, 130, 30), (255, 200, 60), (255, 244, 170), (255, 255, 240)]
-    for li, (rf, col) in enumerate([(0.95, FIRE[0]), (0.82, FIRE[1]), (0.66, FIRE[2]), (0.5, FIRE[3]), (0.32, FIRE[4]), (0.16, FIRE[5])]):
+    for li, (rf, col) in enumerate([(1.0, FIRE[0]), (0.86, FIRE[1]), (0.7, FIRE[2]), (0.52, FIRE[3]), (0.34, FIRE[4]), (0.17, FIRE[5])]):
         rs2 = random.Random(seed * 10 + li)
-        for k in range(7):
-            ang_ = k / 7 * 2 * math.pi + li * 0.4
-            rr_ = r * rf * 0.35
-            ox_ = cx + math.cos(ang_) * r * rf * 0.3 * rs2.uniform(0.7, 1.1)
-            oy_ = cy + math.sin(ang_) * r * rf * 0.28 * rs2.uniform(0.7, 1.1)
+        for k in range(8):
+            ang_ = k / 8 * 2 * math.pi + li * 0.4
+            rr_ = r * rf * 0.34
+            ox_ = cx + math.cos(ang_) * r * rf * 0.42 * rs2.uniform(0.7, 1.15)
+            oy_ = cy + math.sin(ang_) * r * rf * 0.38 * rs2.uniform(0.7, 1.15)
             d.ellipse((ox_ - rr_, oy_ - rr_, ox_ + rr_, oy_ + rr_), fill=col)
-        d.ellipse((cx - r * rf * 0.4, cy - r * rf * 0.38, cx + r * rf * 0.4, cy + r * rf * 0.38), fill=col)
+        d.ellipse((cx - r * rf * 0.5, cy - r * rf * 0.46, cx + r * rf * 0.5, cy + r * rf * 0.46), fill=col)
     # Strahlen
     for k in range(8):
         ang_ = k / 8 * 2 * math.pi + 0.3
-        r0, r1 = r * 0.55, r * rs.uniform(1.15, 1.45)
+        r0, r1 = r * 0.8, r * rs.uniform(1.25, 1.6)
         d.line((cx + math.cos(ang_) * r0, cy + math.sin(ang_) * r0, cx + math.cos(ang_) * r1, cy + math.sin(ang_) * r1), fill=FIRE[4] if k % 2 else FIRE[3])
     # Wabensplitter und Honigtropfen
     for k in range(18):
@@ -712,7 +785,8 @@ def explosion(img, cx, cy, r, seed=1):
     return img
 
 
-im = explosion(im, 218, 262, 21, seed=3)
+im = explosion(im, 216, 266, 20, seed=3)
+
 
 # ---- Titel ----
 def title(txt, size):
@@ -737,10 +811,10 @@ def title(txt, size):
     base_ = Image.new('RGBA', (w_ + 1, h_ + 2), (0, 0, 0, 0))
     base_.alpha_composite(sh_, (1, 2))
     base_.alpha_composite(img_, (0, 0))
-    return base_.crop(base_.getbbox()), m_
+    return base_.crop(base_.getbbox())
 
 
-t_img, tmask = title('BOMBLEBEES', 18)
+t_img = title('BOMBLEBEES', 18)
 tx, ty = W // 2 - t_img.width // 2, 318
 # dunkler Grund hinter dem Titel (weich)
 dd_ = np.hypot((xx - W / 2) / 90, (yy - (ty + 8)) / 18)
