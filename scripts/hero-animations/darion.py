@@ -2,8 +2,9 @@
 """Idle-Animation für Darion, the Blood-Crazy Groundskeeper (50x47).
 
 Völlig verrückter Hausmeister mit blutiger Kettensäge:
-* Die Kette läuft ständig um das Blatt: oben nach vorne, unten zurück
-  (neu gezeichnetes 4-px-Gliedermuster mit abstehenden Zähnen).
+* Vollständiges Sägeblatt mit abgerundeter Spitze (das Original war nur
+  verwischt); die Kette läuft ständig als Schleife herum: oben nach vorne,
+  um die Spitze, unten zurück – mit abstehenden Zähnen.
 * Ruhephase: er wippt, der Motor tuckert und pustet graue Wölkchen,
   Blut tropft vom Sägeblatt und bildet kleine Pfützen.
 * Zweimal pro Loop lässt er die Säge aufheulen: alles vibriert, dunkle
@@ -50,30 +51,68 @@ def face(a, i):
         a[21, 10] = SRC[21, 9]
 
 
-# ---------------------------------------------------------------- Kette
-# Die Kette wird neu gezeichnet: 4-px-Muster (Metallglanz, Blut, dunkle Glieder),
-# das oben nach vorne und unten zurück zum Motor läuft (1 px pro Frame),
-# dazu Zähne, die nach außen abstehen. Die Deckkraft des Originals (Bewegungs-
-# unschärfe zum Blattende hin) bleibt erhalten.
+# ---------------------------------------------------------------- Sägeblatt
+# Das Original zeigt nur ein nach rechts verwischtes Blatt ohne Spitze. Es wird
+# durch ein vollständiges Blatt mit abgerundeter Spitze ersetzt: die Blut-Textur
+# des Originals läuft bis zur Spitze weiter, die Kette läuft als geschlossene
+# Schleife herum (oben nach vorne, um die Spitze, unten zurück; 1 px pro Frame)
+# und die Zähne stehen überall nach außen ab.
+BLADE_X0 = 19                                # erste Blattspalte (davor: Motor)
+NOSE_X, MID_Y = 36, 26                       # Mittelpunkt der Spitze
 LINK = [(201, 184, 176), (138, 20, 20), (58, 15, 15), (74, 20, 20)]
 CHAIN_BASE = (70, 18, 18)
 TOOTH = (190, 170, 162)
-# (Kettenzeile, ruhige Zeile, Zahnzeile, Richtung)
-CHAINS = [(22, 23, 21, 1), (29, 30, 31, -1)]
-CHAIN_X = range(19, 42)
+L_TOP = NOSE_X - BLADE_X0
+L_ARC = 13                                   # ~ pi * 4
 
 
-def run_chain(a, i):
-    for line, inner, teeth, d in CHAINS:
-        for x in CHAIN_X:
-            k = (x - d * i) % 4
-            if SRC[line, x, 3] > 40:
-                a[line, x, :3] = LINK[k]
-            if SRC[inner, x, 3] > 40:
-                a[inner, x, :3] = CHAIN_BASE
-            if k == 0 and SRC[line, x, 3] > 40:
-                alpha = max(int(SRC[teeth, x, 3]), int(SRC[line, x, 3] * 0.8))
-                a[teeth, x] = (*TOOTH, alpha)
+def radial(x, y):
+    """Abstand von der Blatt-Mittellinie bzw. vom Mittelpunkt der Spitze."""
+    if x <= NOSE_X:
+        return abs(y - MID_Y)
+    return math.hypot(x - NOSE_X, y - MID_Y)
+
+
+def chain_pos(x, y):
+    """Laufweg entlang der Kette (oben 0.., Spitze, unten zurück)."""
+    if x <= NOSE_X:
+        return x - BLADE_X0 if y < MID_Y else L_TOP + L_ARC + (NOSE_X - x)
+    ang = math.atan2(y - MID_Y, x - NOSE_X)              # -pi/2 (oben) .. pi/2 (unten)
+    return L_TOP + (ang + math.pi / 2) / math.pi * L_ARC
+
+
+def plate_color(x, y):
+    sx = x if x <= 33 else 22 + (x - 22) % 12
+    return tuple(int(v) for v in SRC[y, sx, :3])
+
+
+def build_base():
+    base = SRC.copy()
+    for y in range(17, 34):                              # Unschärfe entfernen
+        for x in range(15, W):
+            if x >= BLADE_X0 or base[y, x, 3] < 255:
+                base[y, x] = 0
+    return base
+
+
+BASE = build_base()
+
+
+def draw_blade(a, i):
+    for y in range(MID_Y - 6, MID_Y + 7):
+        for x in range(BLADE_X0, W):
+            r = radial(x, y)
+            if r <= 2.5:
+                a[y, x] = (*plate_color(x, y), 255)
+            elif r <= 3.5:
+                a[y, x] = (*CHAIN_BASE, 255)
+            elif r <= 4.5:
+                k = int(round(chain_pos(x, y) - i)) % 4
+                a[y, x] = (*LINK[k], 255)
+            elif r <= 5.4:
+                k = int(round(chain_pos(x, y) - i)) % 4
+                if k == 0:
+                    a[y, x] = (*TOOTH, 255)
 
 
 # ---------------------------------------------------------------- Partikel
@@ -150,9 +189,9 @@ def smoke(out, i):
 
 
 def frame(i):
-    s = SRC.copy()
+    s = BASE.copy()
     face(s, i)
-    run_chain(s, i)
+    draw_blade(s, i)
     out = np.zeros_like(s)
     dy = body_dy(i)
     for y in range(H):
