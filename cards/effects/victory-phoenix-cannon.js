@@ -127,16 +127,25 @@ module.exports = {
         // hand-active reducers / per-slot offsets).
         const lvl = engine.effectiveCardLevel(cd, pi, { handIdx: i });
         if (lvl > 1) continue;
-        // Check hero has required spell schools for this spell. Caster-
-        // aware so when VPC itself is cast through a "as if school N"
-        // provider (Demon's Gate sets `gs._castSchoolOverride` for the
-        // duration of VPC's own onPlay), the bonus-spell eligibility
-        // honours the same elevated level rather than reading the host
-        // hero's actual stack count.
-        if (cd.spellSchool1
-            && engine.effectiveSchoolLevelForCaster(cd.spellSchool1, pi, heroIdx) < lvl) continue;
-        if (cd.spellSchool2
-            && engine.effectiveSchoolLevelForCaster(cd.spellSchool2, pi, heroIdx) < lvl) continue;
+        // ★ v1446 (Befund: VPC bot den Folgezauber nur bei echter
+        // Destruction Magic an). Die Spielbarkeit ist dieselbe wie beim
+        // Spielen von der Hand: `heroMeetsLevelReq` — Divinity, Wisdom,
+        // brettweite Senkungen, Helden-Bypaesse. Zusaetzlich bleibt der
+        // Caster-Weg: wird VPC selbst ueber einen „as if school N"-Geber
+        // gewirkt (Demon's Gate setzt `gs._castSchoolOverride` fuer die
+        // Dauer von VPCs onPlay), gilt dieselbe erhoehte Stufe.
+        const perOverride = (!cd.spellSchool1
+            || engine.effectiveSchoolLevelForCaster(cd.spellSchool1, pi, heroIdx) >= lvl)
+          && (!cd.spellSchool2
+            || engine.effectiveSchoolLevelForCaster(cd.spellSchool2, pi, heroIdx) >= lvl);
+        if (!perOverride && !engine.heroMeetsLevelReq(pi, heroIdx, cd, { handIdx: i })) continue;
+        // Wisdom-Bezahlbarkeit wie in den anderen Zusatzaktions-Prompts:
+        // reicht die Hand (ohne den Zauber selbst) nicht, faellt er weg.
+        if (!perOverride) {
+          const wisdomCost = engine.getWisdomDiscardCost(pi, heroIdx, cd);
+          if (wisdomCost > 0 && engine.handFodderFor(pi, cardName) < wisdomCost
+              && !engine.discardCostWaived(pi)) continue;
+        }
         seen.add(cardName);
         eligibleSpells.push({ name: cardName, source: 'hand' });
       }
