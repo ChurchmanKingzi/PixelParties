@@ -32,7 +32,7 @@ def in_sword(x, oy):
     if 18 <= oy <= 20:
         return 11 <= x <= 22 and c not in HAIR
     if 21 <= oy <= 23:
-        return 15 <= x <= 19 or x == 22
+        return 15 <= x <= 19
     if 24 <= oy <= 25:
         return 14 <= x <= 19
     return False
