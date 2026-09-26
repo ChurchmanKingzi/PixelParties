@@ -452,3 +452,28 @@ def save3(cv, fname, frame=None):
         for i, c in enumerate(frame):
             big.a[i, :] = c; big.a[-1 - i, :] = c; big.a[:, i] = c; big.a[:, -1 - i] = c
     return save(big, fname)
+
+
+def ren_mask_sprite():
+    """Totenmaske aus „Soul Shard Ren“: Kopfschmuck per Farbregel (Leuchten ist grünlicher als die
+    Goldstreifen, Himmel heller/ungesättigter als die blauen Streifen), Schädel per Flood-Fill."""
+    box = (14, 2, 54, 46)
+    def renrule(c):
+        R, G, B = c[..., 0], c[..., 1], c[..., 2]; v = c.max(-1); sat = v - c.min(-1)
+        halo = (v > 140) & (G >= R - 4) & (B < G)
+        sky = (B > R) & (v > 140) & ((B - R) < 75)
+        white = (sat < 25) & (v > 170)
+        return ~(halo | sky | white)
+    a = nat('Soul Shard Ren')
+    x0, y0, x1, y1 = box
+    m1 = renrule(a[y0:y1, x0:x1].astype(int))
+    m1 = pp.keep_largest(m1, 1)
+    sub = a[27:46, 27:49]
+    raw_m = pp.floodmask(sub, tol=22)
+    full = pp.keep_largest(raw_m, 1)
+    c = sub.astype(int)
+    halo = (c.max(-1) > 140) & (c[..., 1] >= c[..., 0] - 4) & (c[..., 2] < c[..., 1])
+    m1[27 - y0:46 - y0, 27 - x0:49 - x0] |= full & ~halo
+    out = np.zeros((y1 - y0, x1 - x0, 4), np.uint8)
+    out[..., :3] = a[y0:y1, x0:x1]; out[..., 3] = m1 * 255
+    return trim(fill_holes(out))

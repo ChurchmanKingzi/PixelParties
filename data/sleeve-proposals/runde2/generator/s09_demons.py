@@ -12,7 +12,7 @@ tile = up(np.dstack([t2, np.full(t2.shape[:2], 255, np.uint8)]), 2)
 fill_tiles(cv, hsv_shift(tile, 0, 1.0, 0.55))
 vignette(cv, 0.85, 0.2)
 
-CX, CY = 125, 170
+CX, CY = 125, 178
 # Pentagramm-Scheibe 4×; rote Linien kräftiger
 # Pentagramm: die dunklen Linien der Karte (v<70) als Maske, glühend rot nachgezogen, 4×
 K = 4
@@ -49,7 +49,6 @@ for i, (n, bx, by) in enumerate(demons):
     ring(cv, px, py, 0, 2 * R + 1, (70, 10, 10))
     paste(cv, m, int(px) - 2 * R, int(py) - 2 * R)
 
-text(cv, 'CYCLING DEMONS', 16, 125, 14, (230, 60, 40), outline_c=(30, 5, 5), center=True)
 for i, c in enumerate([(30, 5, 5), (150, 25, 20), (70, 10, 10), (30, 5, 5)]):
     cv.a[i, :] = c; cv.a[-1 - i, :] = c; cv.a[:, i] = c; cv.a[:, -1 - i] = c
 print(save(cv, '09_cycling_demons.png'))

@@ -19,7 +19,7 @@ def brickless(c):
 eye = cutrule('The Eye of Ren', (16, 7, 63, 43),
               lambda c: (c.max(-1) < 70) | ((c.max(-1) > 215) & ((c.max(-1) - c.min(-1)) < 40)) |
                         ((c[..., 0] > 200) & (c[..., 1] > 200) & (c[..., 2] < 120)), largest=0)
-ren = cutf('Soul Shard Ren', (15, 3, 52, 45), tol=22, largest=1, clear=[(15, 3, 18, 20)])
+ren = ren_mask_sprite()
 ush_f = cutrule('Ushabti of the Great Pharaoh', (30, 3, 49, 46), brickless)
 ush_l = cutrule('Ushabti of the Great Pharaoh', (3, 12, 23, 47), brickless)
 ush_r = cutrule('Ushabti of the Great Pharaoh', (55, 12, 75, 47), brickless)

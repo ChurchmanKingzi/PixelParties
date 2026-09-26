@@ -37,7 +37,7 @@ ray = np.array([bins[t] / cnt[t] if cnt[t] else 0 for t in range(360)])
 for t in range(360):
     if cnt[t] == 0: ray[t] = ray[(t - 1) % 360]
 RC = (255, 244, 170)
-rcx, rcy = NW // 2, 36
+rcx, rcy = NW // 2, 48
 on = ray > 0.5
 # kurze Winkel-Läufe (<5°) entfernen
 lab = np.zeros(360, int); k = 0
@@ -63,15 +63,18 @@ for y in range(NH):
 # --- Waage und Nebel aus Divine Gift of Balance
 bal = nat('Divine Gift of Balance')
 hb = hsv_of(bal.astype(int))
-gold = (hb[..., 0] > 20) & (hb[..., 0] < 50) & (hb[..., 1] > 140) & (bal.max(-1) > 150)
-grey = ((bal.max(-1) - bal.min(-1)) < 40) & (bal.max(-1) > 60) & (bal.max(-1) < 215)
+vb = bal.max(-1)
+gold = (hb[..., 0] > 15) & (hb[..., 0] < 60) & (vb > 150) & ((hb[..., 1] > 140) | (vb > 215))
+blue = bal[..., 2].astype(int) > bal[..., 0].astype(int) + 10
+gold |= cv2.morphologyEx(gold.astype(np.uint8), cv2.MORPH_CLOSE, np.ones((3, 3), np.uint8)).astype(bool) & ~blue
+grey = ((bal.max(-1).astype(int) - bal.min(-1)) < 30) & (bal.max(-1) > 50) & (bal.max(-1) < 215)
 chains = np.zeros_like(grey); chains[10:32, 7:22] = True; chains[10:32, 54:70] = True
 scale_m = gold | (grey & chains)
 neb = cv2.inpaint(bal, cv2.dilate(scale_m.astype(np.uint8) * 255, np.ones((3, 3), np.uint8)), 3, cv2.INPAINT_TELEA)
 neb = neb[1:49, 1:74]
 N2 = np.dstack([neb, np.full(neb.shape[:2], 255, np.uint8)])
 nh, nw = N2.shape[:2]
-ncx, ncy = NW // 2, 56
+ncx, ncy = NW // 2, 68
 for y in range(nh):
     for x in range(nw):
         X, Y = ncx - nw // 2 + x, ncy - nh // 2 + y
@@ -91,7 +94,7 @@ sx, sy = (NW - S2.shape[1]) // 2, ncy - S2.shape[0] // 2 - 4
 sun_full = cutrule('Light Ball', (30, 14, 68, 50),
                    lambda c: ((c[..., 0] > 200) & (c[..., 1] > 200) & (c[..., 2] < 200)) | (c.min(-1) > 235), largest=1)
 sun = np.array(Image.fromarray(sun_full).resize((11, 11), Image.NEAREST))
-moon = cutrule('The Cosmic Depths', (34, 1, 50, 17), lambda c: (c.max(-1) > 90) & ((c.max(-1) - c.min(-1)) < 70), largest=1)
+moon = fill_holes(cutrule('The Cosmic Depths', (34, 1, 50, 17), lambda c: (c.max(-1) > 90) & ((c.max(-1) - c.min(-1)) < 70), largest=1))
 lpx, rpx = sx + (14 - ox), sx + (61 - ox)
 pany = sy + (31 - oy)
 SU, MO = sun, moon
@@ -103,7 +106,6 @@ cv.paste(S2, sx, sy)
 big = Canvas(W, H)
 u = up(np.dstack([cv.a, np.full(cv.a.shape[:2], 255, np.uint8)]), 3)[..., :3]
 big.a[:] = u[:H, :W]
-text(big, 'DIVINE BALANCE', 16, 125, 296, (255, 230, 120), outline_c=(40, 25, 0), center=True)
 for i, c in enumerate([(40, 25, 0), (230, 160, 20), (255, 230, 120), (40, 25, 0)]):
     big.a[i, :] = c; big.a[-1 - i, :] = c; big.a[:, i] = c; big.a[:, -1 - i] = c
 print(save(big, '10_divine_balance.png'))

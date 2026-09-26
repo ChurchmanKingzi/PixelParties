@@ -25,12 +25,11 @@ for n, b, (px, py), cap in photos:
     a = nat(n)[b[1]:b[3], b[0]:b[2]]
     img = up(np.dstack([a, np.full(a.shape[:2], 255, np.uint8)]), 2)
     h, w = img.shape[:2]
-    fw, fh = w + 8, h + 20
+    fw, fh = w + 8, h + 16
     cv.paste(silhouette(np.full((fh, fw, 4), 255, np.uint8), (0, 0, 0)), px + 3, py + 3, alpha=0.45)
     cv.rect(px, py, px + fw, py + fh, PAPER)
     cv.rect(px, py + fh - 1, px + fw, py + fh, PAPER_S); cv.rect(px + fw - 1, py, px + fw, py + fh, PAPER_S)
     cv.paste(img, px + 4, py + 4)
-    text(cv, cap, 8, px + fw // 2, py + h + 8, INK, center=True)
     boxes.append((px, py, fw, fh))
 
 # rote Fäden zwischen Nadeln (Fadenfarben aus Crimson Skull Spider)

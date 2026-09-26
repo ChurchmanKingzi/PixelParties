@@ -38,11 +38,14 @@ HX, HY = ox + 25 * K + K // 2, oy + 38 * K + K // 2   # Nabe
 
 # --- Spinnen
 def sp(n, box, clear=()):
-    return cutrule(n, box, not_dirt, clear=clear)
-boss = cutrule('Crimson Skull Spider', (28, 14, 49, 40),
+    return fill_holes(cutrule(n, box, not_dirt, clear=clear))
+boss = cutrule('Crimson Skull Spider', (26, 12, 51, 41),
                lambda c: ((c.max(-1) < 115) & ((c.max(-1) - c.min(-1)) < 38)) |
-                         ((c[..., 0] > 2 * c[..., 1]) & (c[..., 0] > 70) & (c[..., 0] > 2 * c[..., 2])))
-boss = boss[:21]
+                         ((c[..., 0] > 2.2 * c[..., 1]) & (c[..., 0] > 40) & (c[..., 0] > 2.2 * c[..., 2])),
+               clear=[(26, 12, 32, 17)])
+boss = fill_holes(boss)
+_r = (boss[:6, :, 0].astype(int) > 2 * boss[:6, :, 1].astype(int) + 20) & (boss[:6, :, 3] > 0)
+THREAD_X = int(np.argmax(_r.sum(0)))   # Spalte des roten Fadens
 baby = sp('Crimson Skull Spider', (51, 27, 68, 38))
 baby2 = sp('Crimson Skull Spider', (20, 9, 34, 18))
 brain = sp('Brain Spider', (27, 17, 46, 36))
@@ -59,7 +62,7 @@ def put(s, x, y, k, fl=False, r=0, sh=(3, 3)):
 B = up(boss, 5)
 bx = HX - B.shape[1] // 2; by = HY - B.shape[0] // 2 + 6
 TH = [(149, 5, 3), (112, 2, 0)]
-tx = bx + 10 * 5
+tx = bx + THREAD_X * 5
 for y in range(0, by + 5):
     cv.rect(tx, y, tx + 5, y + 1, TH[(y // 5) % 2])
 cv.paste(silhouette(B, (0, 0, 0)), bx + 4, by + 4, alpha=0.5)
