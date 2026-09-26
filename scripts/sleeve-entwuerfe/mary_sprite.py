@@ -71,18 +71,19 @@ def ring_out(m):
 _WA = np.array(WING)
 
 
-def darken(sub, m, k=2):
-    """Pixel (aus der Flügelrampe) um k Stufen abdunkeln."""
+def darken(sub, m, k=2, pal=None, outl=OUTL):
+    """Pixel (aus der Rampe pal) um k Stufen abdunkeln."""
+    P_ = _WA if pal is None else np.array(pal)
     c = sub[m, :3].astype(int)
-    d = ((c[:, None, :] - _WA[None]) ** 2).sum(2)
+    d = ((c[:, None, :] - P_[None]) ** 2).sum(2)
     idx = np.argmin(d, 1)
-    isout = (np.abs(c - np.array(OUTL)).sum(1) < 20)
-    nc = _WA[np.clip(idx - k, 0, len(WING) - 1)]
-    nc[isout] = OUTL
+    isout = (np.abs(c - np.array(outl)).sum(1) < 20)
+    nc = P_[np.clip(idx - k, 0, len(P_) - 1)]
+    nc[isout] = outl
     sub[m, :3] = nc
 
 
-def feather(lay, B, D, L, w, bend=0.0, lift=0.0, tier=0, glob=None, side=1, rnd=None, tipfire=None, shadow=2):
+def feather(lay, B, D, L, w, bend=0.0, lift=0.0, tier=0, glob=None, side=1, rnd=None, tipfire=None, shadow=2, pal=WING, outl=OUTL, base=0.40, ugrad=0.2, tipb=0.2):
     """Eine Feder von B in Richtung D (Einheitsvektor), Länge L, halbe Breite w.
     bend: Krümmung der Spitze (Pixel, + = zur 'oberen' Seite). lift: Helligkeitsversatz."""
     dx, dy = D
@@ -121,7 +122,7 @@ def feather(lay, B, D, L, w, bend=0.0, lift=0.0, tier=0, glob=None, side=1, rnd=
     hwu = np.array([hw(float(t)) for t in np.linspace(0, 1, 64)])
     hh = np.maximum(hwu[(uc * 63).astype(int)], 0.6)
     v = np.clip(n / hh, -1, 1)  # +1 = oben
-    t = 0.40 + lift + 0.26 * v + 0.2 * (uc - 0.45) + (0.2 * np.clip((uc - 0.72) / 0.28, 0, 1))
+    t = base + lift + 0.26 * v + ugrad * (uc - 0.45) + (tipb * np.clip((uc - 0.72) / 0.28, 0, 1))
     if glob is not None:
         t = t + glob[y0:y1, x0:x1]
     # Fahnen-Struktur: feine schräge Rillen
@@ -131,12 +132,12 @@ def feather(lay, B, D, L, w, bend=0.0, lift=0.0, tier=0, glob=None, side=1, rnd=
     shaft = (np.abs(n + hh * 0.18) < 0.55) & (uc > 0.06) & (uc < 0.78) & (hh > 2.2)
     t = np.where(shaft, t - 0.12, t)
     thr = THR[y0:y1, x0:x1]
-    col = ramp(np.clip(t, 0, 1), WING, thr)
+    col = ramp(np.clip(t, 0, 1), pal, thr)
     # Glanzkante an der Oberseite
     e = edge(m)
     inner1 = m & ~e & ndimage.binary_dilation(e) & (v > 0.35) & (uc > 0.12)
-    col[inner1] = ramp(np.clip(t[inner1] + 0.2, 0, 1), WING, thr[inner1])
-    col[e] = OUTL
+    col[inner1] = ramp(np.clip(t[inner1] + 0.2, 0, 1), pal, thr[inner1])
+    col[e] = outl
     sub = lay[y0:y1, x0:x1]
     # Schlagschatten auf die darunterliegenden Federn (Seite gegenüber 'oben')
     if shadow:
@@ -147,7 +148,7 @@ def feather(lay, B, D, L, w, bend=0.0, lift=0.0, tier=0, glob=None, side=1, rnd=
             sh |= np.roll(np.roll(m, sy_, 0), sx_, 1)
         sh &= ~m & (sub[..., 3] > 0)
         if sh.any():
-            darken(sub, sh, shadow)
+            darken(sub, sh, shadow, pal, outl)
     sub[m, :3] = col[m]
     sub[m, 3] = 255
     if tipfire is not None:
@@ -546,3 +547,135 @@ def draw_mary(cx=125.0, hy=92.0, seed=3):
         put(cw, ring_out(g) & crown, GOLDC[0])
     allm |= crown | bow
     return dict(dress=lay, arms=armlay, head=hl, bow=cr, crown=cw), allm, dict(ntop=ntop, hem=hem, dress=dress, arms=armm, head=headm)
+
+
+# ---------------------------------------------------------------- Feuer
+def vnoise_stretch(w, h, sx, sy, seed, octaves=3):
+    """Wertrauschen, vertikal um sy/sx gestreckt (für Flammenzungen)."""
+    hh_ = max(8, int(h * sx / sy))
+    n = value_noise(w, hh_, sx, seed=seed, octaves=octaves)
+    return np.array(Image.fromarray((n * 255).astype(np.uint8)).resize((w, h), Image.BICUBIC)).astype(float) / 255
+
+
+def flames(I, lay, pal=FIRE, lo=0.1, outl=(120, 20, 18), soft=0.55):
+    """Intensitätsfeld I (0..1) als Pixel-Flammen mit Farbbändern malen."""
+    m = I > lo
+    thr = 0.5 + (THR - 0.5) * soft
+    t = np.clip((I - lo) / (1 - lo), 0, 1)
+    col = ramp(t * 0.98 + 0.02, pal[1:], thr)
+    put(lay, m, col)
+    if outl is not None:
+        put(lay, edge(m) & (I < lo + 0.12), outl)
+    return m
+
+
+# ---------------------------------------------------------------- Aura um das Kleid
+def aura(dress, ntop, hem, cx, seed=7):
+    d = ndimage.distance_transform_edt(~dress)
+    f = np.clip((yy + 0.5 - ntop - 18) / (hem - ntop - 18), 0, 1)
+    below = np.clip((yy + 0.5 - hem) / 10, 0, 1)
+    R = 1.5 + 10 * f ** 1.2 * (1 - 0.3 * below)
+    n = vnoise_stretch(W, H, 3, 11, seed)
+    # Zungen züngeln nach oben: Rauschen nach oben verschoben
+    I = 1 - d / np.maximum(R, 0.5) + (n - 0.5) * 1.1 * f
+    I = np.where(yy + 0.5 < ntop + 16, -1, I)
+    lay = layer()
+    flames(np.clip(I, -1, 1), lay, lo=0.0)
+    return lay, I > 0
+
+
+# ---------------------------------------------------------------- Cute Phoenix (steigt aus der Feuersäule auf)
+PHX = [(150, 30, 22), (214, 64, 30), (244, 118, 36), (252, 176, 50), (255, 220, 90), (255, 242, 160), (255, 252, 222)]
+PHXL = (128, 24, 22)
+
+
+def phoenix(cx, cy, seed=11):
+    """Körpermitte (cx, cy). Gibt (hintere Ebene, vordere Ebene, Maske) zurück."""
+    rnd = random.Random(seed)
+    X = xx + 0.5 - cx; Y = yy + 0.5 - cy
+    back = layer(); front = layer()
+    # ---- Schwanzfedern (lang, geschwungen, nach unten in die Flammen)
+    tails = [(-1, 0.0), (1, 0.0), (-1, 1.0), (1, 1.0), (0, 0.0)]
+    for (s_, k) in [(-1, 1), (1, 1), (-1, 0), (1, 0), (0, 0)]:
+        p0 = (cx + s_ * 2, cy + 6)
+        p1 = (cx + s_ * (10 + 8 * k), cy + 22 + 4 * k)
+        p2 = (cx + s_ * (4 + 16 * k), cy + 44 + 8 * k - (6 if s_ == 0 else 0))
+        L_, R_ = [], []
+        K_ = 24
+        for j in range(K_ + 1):
+            u = j / K_
+            x = (1 - u) ** 2 * p0[0] + 2 * (1 - u) * u * p1[0] + u * u * p2[0]
+            y = (1 - u) ** 2 * p0[1] + 2 * (1 - u) * u * p1[1] + u * u * p2[1]
+            dx_ = 2 * (1 - u) * (p1[0] - p0[0]) + 2 * u * (p2[0] - p1[0]); dy_ = 2 * (1 - u) * (p1[1] - p0[1]) + 2 * u * (p2[1] - p1[1])
+            n_ = math.hypot(dx_, dy_) or 1
+            w_ = 1.2 + 3.2 * math.sin(math.pi * min(1, u * 1.15)) ** 0.8
+            L_.append((x - dy_ / n_ * w_, y + dx_ / n_ * w_)); R_.append((x + dy_ / n_ * w_, y - dx_ / n_ * w_))
+        m = poly_mask(L_ + R_[::-1])
+        dist = ndimage.distance_transform_edt(m)
+        t = 0.35 + 0.35 * np.clip(dist / 2.5, 0, 1) - 0.25 * np.clip((Y - 20) / 30, 0, 1)
+        put(back, m, ramp(np.clip(t, 0, 1), PHX, THR))
+        put(back, edge(m), PHXL)
+        # Augenfleck am Federende
+        ex_, ey_ = L_[18][0] * 0.5 + R_[18][0] * 0.5, L_[18][1] * 0.5 + R_[18][1] * 0.5
+        put(back, ell_mask(ex_, ey_, 1.8, 1.8) & m, PHX[5]); put(back, ell_mask(ex_, ey_, 0.8, 0.8), PHX[1])
+    # ---- Flügel: erhoben, V-förmig (Federfächer)
+    wl = layer()
+    for s_ in (-1, 1):
+        S_ = (cx + s_ * 5, cy - 5)
+        # Ebenen: Handschwingen lang, dann Deckfedern
+        for ti, (lf, wd, n_, lift) in enumerate([(1.0, 4.6, 11, -0.08), (0.6, 4.2, 9, 0.05), (0.32, 3.4, 7, 0.14)]):
+            for j in reversed(range(n_)):
+                a = -78 + j * (100 / (n_ - 1))  # -78 = steil nach oben, +22 = leicht nach unten
+                r_ = math.radians(a)
+                D = (s_ * math.cos(r_), math.sin(r_))
+                L = (22 + 26 * math.sin(math.radians((j / (n_ - 1)) * 150 + 15))) * lf + 6
+                if ti == 0:
+                    L += 6 * (1 - j / (n_ - 1))
+                B = (S_[0] + D[0] * 2, S_[1] + D[1] * 2)
+                feather(wl, B, D, L, wd, bend=-2.0 * lf, lift=lift, side=s_, pal=PHX, outl=PHXL, base=0.62,
+                        ugrad=-0.35, tipb=-0.25, shadow=1)
+    # ---- Körper
+    body = ell_mask(cx, cy + 1, 7.5, 10)
+    nx_ = np.clip(X / 7.5, -1, 1); ny_ = np.clip((Y - 1) / 10, -1, 1)
+    dif, nz = lambert(nx_, ny_)
+    bt = 0.35 + 0.6 * dif
+    bl = layer()
+    put(bl, body, ramp(np.clip(bt, 0, 1), PHX, THR))
+    # Brustfedern (kleine Schuppen)
+    sc = body & (np.sin(X * 1.3 + (np.floor(Y / 2.5) % 2) * 1.6) > 0.7) & ((Y % 2.5) < 0.8) & (Y > -3)
+    put(bl, sc & ~edge(body), PHX[3])
+    put(bl, edge(body), PHXL)
+    # ---- Kopf
+    hx, hy = cx, cy - 12
+    head = ell_mask(hx, hy, 7, 6.5)
+    hnx = np.clip((xx + 0.5 - hx) / 7, -1, 1); hny = np.clip((yy + 0.5 - hy) / 6.5, -1, 1)
+    hd, _ = lambert(hnx, hny)
+    ht = 0.2 + 0.55 * hd
+    hlay = layer()
+    # Haube (orange-rot) oben, helles Gesicht unten
+    put(hlay, head, ramp(np.clip(ht, 0, 1), PHX, THR))
+    facem = ell_mask(hx, hy + 1.5, 5.2, 4.2) & head
+    put(hlay, facem, ramp(np.clip(0.6 + 0.35 * hd, 0, 1), PHX, THR))
+    # Haubenfedern (3 Flammen)
+    crest = np.zeros((H, W), bool)
+    for (ox, h_, lean) in [(-3, 7, -3), (0, 10, 0.5), (3, 7, 3)]:
+        crest |= poly_mask([(hx + ox - 2.2, hy - 4), (hx + ox + lean * 0.5 - 1.2, hy - 4 - h_ * 0.6), (hx + ox + lean, hy - 4 - h_),
+                            (hx + ox + lean * 0.3 + 1.4, hy - 4 - h_ * 0.5), (hx + ox + 2.2, hy - 4)])
+    crest &= ~head
+    ctt = 0.2 + 0.5 * np.clip(-(yy + 0.5 - hy + 4) / 10, 0, 1) + 0.15 * (xx + 0.5 < hx)
+    put(hlay, crest, ramp(np.clip(1 - ctt, 0, 1) * 0.6 + 0.1, PHX, THR))
+    put(hlay, crest & (np.abs(xx + 0.5 - hx) < 0.6) & (yy + 0.5 > hy - 11), PHX[4])
+    hm = head | crest
+    put(hlay, edge(hm), PHXL)
+    # Augen
+    for s_ in (-1, 1):
+        ex, ey = hx + s_ * 2.6, hy + 0.3
+        e = ell_mask(ex, ey, 1.2, 1.7)
+        put(hlay, e, (40, 16, 24))
+        put(hlay, (np.abs(xx + 0.5 - (ex - 0.5)) < 0.5) & (np.abs(yy + 0.5 - (ey - 0.6)) < 0.5), (255, 255, 255))
+        put(hlay, ell_mask(hx + s_ * 4.6, hy + 2.6, 1.2, 0.8) & head, (255, 150, 180))
+    # Schnabel
+    bk = poly_mask([(hx - 1.6, hy + 2.2), (hx + 1.6, hy + 2.2), (hx, hy + 5)])
+    put(hlay, bk, (250, 150, 40)); put(hlay, bk & (xx + 0.5 < hx), (255, 206, 90)); put(hlay, ring_out(bk) & ~head, PHXL)
+    put(hlay, (np.abs(xx + 0.5 - hx) < 0.5) & (np.abs(yy + 0.5 - hy - 5.3) < 0.5), PHXL)
+    return dict(tail=back, wings=wl, body=bl, head=hlay)
