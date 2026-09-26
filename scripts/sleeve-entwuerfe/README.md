@@ -1,6 +1,6 @@
 # Sleeve-Generatoren
 
-Python-Skripte, mit denen die Shop-Sleeves `sleeve4.png` bis `sleeve9.png` in `data/shop/sleeves/` erzeugt wurden.
+Python-Skripte, mit denen die Shop-Sleeves `sleeve4.png` bis `sleeve13.png` in `data/shop/sleeves/` erzeugt wurden.
 Die Skripte schreiben nach `data/shop/sleeve-entwuerfe/` (nicht eingecheckt, Pfad per `PP_OUT` änderbar). Übernommene Motive
 werden von dort nach `data/shop/sleeves/` kopiert.
 
@@ -16,6 +16,10 @@ sowie aus den Area-Sprites unter `public/areas/`.
 | `s05_cool.py` | `sleeve7.png` – Wowhalla |
 | `s08_chess.py` | `sleeve8.png` – King of Kings |
 | `s06_lunatic.py` | `sleeve9.png` – Lunatic Cycle |
+| `s12_temple.py` | `sleeve10.png` – Temple of Sacrifice |
+| `s13_big_gwen.py` | `sleeve11.png` – Big Gwen |
+| `s15_smugglers_pier.py` | `sleeve12.png` – Smuggler's Pier |
+| `s14_pangaia.py` | `sleeve13.png` – Pangaia |
 
 Benötigt Python 3 mit `pillow`, `numpy` und `scipy`:
 

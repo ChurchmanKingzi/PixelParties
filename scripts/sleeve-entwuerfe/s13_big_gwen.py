@@ -611,22 +611,6 @@ for x in (12, 16, 20, 24, 35):
             a[yy_, BX + x + rb.randint(-1, 1)] = rgba(WARM[2] if k < 5 else WARM[1])
 im = Image.fromarray(a)
 
-# ---------------------------------------------------------------- Titel
-tt = text_img('BIG GWEN', 18, (255, 214, 96, 255), outline_col=(56, 30, 14, 255), shadow=(8, 6, 22, 255))
-ta_ = np.array(tt)
-fill_m = (ta_[..., 0] == 255) & (ta_[..., 1] == 214)
-rows = np.where(fill_m.any(1))[0]
-r0, r1 = rows.min(), rows.max()
-for yy in range(r0, r1 + 1):
-    u = (yy - r0) / max(1, r1 - r0)
-    col = (255, 238, 170) if u < 0.2 else ((255, 214, 96) if u < 0.62 else (232, 164, 56))
-    ta_[yy][fill_m[yy]] = col + (255,)
-tt = Image.fromarray(ta_)
-comp(im, tt, W // 2 - tt.width // 2, 14)
-dd = ImageDraw.Draw(im)
-for (x, y) in [(W // 2 - tt.width // 2 - 9, 14 + tt.height // 2), (W // 2 + tt.width // 2 + 8, 14 + tt.height // 2)]:
-    sparkle(dd, x, y, 2, (230, 180, 80), core=(255, 240, 190))
-
 # ---------------------------------------------------------------- Rahmen
 bevel_frame(im, (8, 6, 18), (226, 184, 104), (122, 86, 48), (60, 40, 26), (8, 6, 18), width=6)
 d = ImageDraw.Draw(im)

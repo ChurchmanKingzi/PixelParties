@@ -440,10 +440,12 @@ bub = frames('bubble', 3)
 for (x, y, f) in [(153, 22, 1), (158, 25, 0)]:
     comp_sprite(img, bub[f], *bc(x - 1, y - 1))
 
-# Dinos (Spiel-Sprites, 1x): Brachio-Herde auf der großen Lichtung, Plesiosaurier in der Bucht
+# Dinos (Spiel-Sprites, 1x): zwei Brachios in verschiedenen Posen, ein T-Rex, Plesiosaurier in der Bucht
 brach = frames('brachio', 8)
 comp_sprite(img, brach[2], *bc(50, 41))
-comp_sprite(img, brach[3], *bc(70, 49))
+comp_sprite(img, brach[5].transpose(Image.FLIP_LEFT_RIGHT), *bc(70, 49))   # andere Pose, Blick zur Herde
+trex = frames('trex', 8)
+comp_sprite(img, trex[6], 56, 238)   # T-Rex auf der Südwest-Lichtung
 ples = frames('plesio', 8)
 comp_sprite(img, ples[0], 118, 258)
 

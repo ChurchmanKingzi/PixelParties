@@ -1071,32 +1071,6 @@ for (cx_, cy_, fx, fy) in [(0, 0, 1, 1), (W - 1, 0, -1, 1), (0, H - 1, 1, -1), (
         px(a, cx_ + fx * i, cy_ + fy * j, IRON[3])
         px(a, cx_ + fx * (i + 1), cy_ + fy * (j + 1), IRON[0])
 
-# Titel
-ti = text_img("SMUGGLER'S PIER", 13, (255, 214, 128, 255), (34, 16, 34, 255))
-ta = np.array(ti)
-# zweifarbig: untere Hälfte orange
-body = (ta[..., 3] > 0) & (np.abs(ta[..., :3].astype(int) - [255, 214, 128]).sum(2) < 10)
-hh_ = ta.shape[0]
-ys_ = np.nonzero(body.any(1))[0]
-mid = (ys_.min() + ys_.max()) / 2 + 1
-low = body & (np.arange(hh_)[:, None] > mid)
-ta[low, :3] = (246, 160, 84)
-ta[body & (np.arange(hh_)[:, None] == ys_.min()), :3] = (255, 240, 190)
-ti = Image.fromarray(ta, 'RGBA')
-tx = (W - ti.width) // 2
-tyy = 13
-shadow = silhouette(ti, (12, 6, 24, 255))
-img2 = Image.fromarray(a, 'RGBA')
-img2.alpha_composite(shadow, (tx + 1, tyy + 1))
-img2.alpha_composite(ti, (tx, tyy))
-a = np.array(img2)
-dd = ImageDraw.Draw(img2)
-for sx_ in (tx - 9, tx + ti.width + 8):
-    cy_ = tyy + ti.height // 2
-    img2 = Image.fromarray(a, 'RGBA'); dd = ImageDraw.Draw(img2)
-    sparkle(dd, sx_, cy_, 2, (246, 160, 84), core=(255, 240, 190))
-    a = np.array(img2)
-
 img = Image.fromarray(a, 'RGBA')
 if 'PP_TMP' in os.environ:
     img.convert('RGB').resize((W * 3, H * 3), Image.NEAREST).save(os.path.join(TMP, 'v.png'))
