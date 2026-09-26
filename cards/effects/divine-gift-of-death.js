@@ -157,9 +157,16 @@ module.exports = {
       for (const id of picked) {
         const t = targets.find(tt => tt.id === id);
         if (!t) continue;
+        // Eigene, grosse Erweckung statt des allgemeinen Heiligenscheins
+        // (Als Vorgabe 26.9.): der Tod selbst schenkt die Seele zurueck.
+        // Der Held bleibt tot, bis die Seele in ihn faehrt (≈1,25 s).
         const ok = await engine.actionReviveHero(t.owner, t.heroIdx, 50, {
           maxHpCap: 50,
           source: 'Divine Gift of Death',
+          animationType: 'todesgabe_erweckung',
+          animDuration: 2700,
+          lebenNachMs: 1250,
+          animDelay: 1900,
         });
         if (ok) revived++;
       }

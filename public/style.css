@@ -20129,6 +20129,128 @@ img, .card-tooltip-img img { image-rendering: pixelated; }
 }
 
 
+/* ★ „Petrifier" — dunkle Magie verwandelt das Ziel in Stein (Als Vorgabe
+   26.9.). Zeitplan im Kopf von `petrifier_fluch` (app-board.jsx). Der
+   Behaelter sitzt in der Zielmitte; alles ist um (0,0) gelegt. */
+.pfluch { position: fixed; width: 0; height: 0; pointer-events: none; z-index: 10105; }
+.pfluch > span, .pfluch > svg { position: absolute; display: block; }
+/* ① Runensiegel: zwei gegenlaeufige Ringe als flache Ellipse unter dem Ziel. */
+.pfluch-siegel {
+  left: 0; top: calc(var(--ph) * .42);
+  width: calc(var(--pw) * 1.5); height: calc(var(--pw) * .55);
+  border-radius: 50%;
+  border: 3px dashed rgba(190, 110, 255, .9);
+  box-shadow: 0 0 18px rgba(150, 60, 230, .8), inset 0 0 14px rgba(120, 40, 200, .7);
+  transform: translate(-50%, -50%) scale(.2) rotate(0deg); opacity: 0;
+  animation: pfSiegel 1.6s ease-out forwards;
+}
+.pfluch-siegel2 {
+  width: calc(var(--pw) * 1.15); height: calc(var(--pw) * .4);
+  border: 2px dotted rgba(230, 190, 255, .85);
+  animation-name: pfSiegel2;
+}
+/* Dunkler Dunst um das Ziel. */
+.pfluch-dunst {
+  left: 0; top: 0; width: calc(var(--pw) * 1.5); height: calc(var(--ph) * 1.3);
+  transform: translate(-50%, -50%); border-radius: 30%;
+  background: radial-gradient(ellipse at 50% 70%, rgba(60, 10, 90, .75) 0%, rgba(30, 5, 50, .45) 45%, transparent 75%);
+  opacity: 0; animation: pfDunst 1.6s ease-out forwards;
+}
+/* ② Ranken: wachsen von der Unterkante nach oben. */
+.pfluch-ranke {
+  width: 4px; border-radius: 3px;
+  background: linear-gradient(0deg, rgba(40, 0, 70, .95) 0%, rgba(140, 60, 220, .9) 60%, rgba(220, 170, 255, .8) 100%);
+  box-shadow: 0 0 8px rgba(150, 60, 230, .8);
+  transform-origin: 50% 100%;
+  transform: translate(-50%, -100%) rotate(var(--rdreh)) scaleY(0); opacity: 0;
+  animation: pfRanke 1.1s ease-out forwards;
+}
+/* ③ Stein: graut das Ziel darunter aus und steigt von unten hoch. */
+.pfluch-stein {
+  left: calc(var(--pw) / -2); top: calc(var(--ph) / -2);
+  width: var(--pw); height: var(--ph); border-radius: 4px;
+  -webkit-backdrop-filter: grayscale(1) contrast(1.15) brightness(.82);
+  backdrop-filter: grayscale(1) contrast(1.15) brightness(.82);
+  background:
+    repeating-linear-gradient(45deg, rgba(120,115,110,.22) 0 2px, transparent 2px 6px),
+    repeating-linear-gradient(-45deg, rgba(90,90,85,.16) 0 1px, transparent 1px 5px),
+    linear-gradient(135deg, rgba(150,150,155,.35), rgba(80,80,85,.4));
+  box-shadow: inset 0 0 14px rgba(40, 40, 45, .7);
+  clip-path: inset(100% 0 0 0);
+  animation: pfStein .75s cubic-bezier(.4,.1,.5,1) .35s forwards, pfSteinAus .45s ease-in 1.25s forwards;
+}
+/* Die glimmende Front, die mit dem Stein nach oben laeuft. */
+.pfluch-front {
+  left: calc(var(--pw) / -2); top: calc(var(--ph) / 2);
+  width: var(--pw); height: 4px; border-radius: 2px;
+  background: linear-gradient(90deg, transparent, rgba(220, 170, 255, .95) 20%, #fff 50%, rgba(220, 170, 255, .95) 80%, transparent);
+  box-shadow: 0 0 12px rgba(170, 80, 255, .95), 0 0 24px rgba(120, 40, 200, .7);
+  opacity: 0;
+  animation: pfFront .75s cubic-bezier(.4,.1,.5,1) .35s forwards;
+}
+/* ④ Risse: zeichnen sich ueber `stroke-dashoffset` ein. */
+.pfluch-risse { overflow: visible; }
+.pfluch-risse path {
+  fill: none; stroke: rgba(30, 20, 40, .9); stroke-width: 1.6;
+  stroke-linecap: round; stroke-linejoin: round;
+  filter: drop-shadow(0 0 1.5px rgba(210, 160, 255, .9));
+  stroke-dasharray: 100; stroke-dashoffset: 100; opacity: 0;
+  animation: pfRiss .3s ease-out forwards, pfAus .35s ease-in 1.35s forwards;
+}
+/* ⑤ Dumpfer Blitz, Splitter, dunkle Funken. */
+.pfluch-blitz {
+  left: 0; top: 0; width: calc(var(--pw) + 20px); height: calc(var(--ph) + 20px);
+  transform: translate(-50%, -50%) scale(.8); border-radius: 8px;
+  background: radial-gradient(ellipse at center, rgba(235, 225, 245, .8) 0%, rgba(150, 130, 170, .35) 45%, transparent 80%);
+  opacity: 0; animation: pfBlitz .45s ease-out 1.15s forwards;
+}
+.pfluch-splitter {
+  border-radius: 2px; box-shadow: 0 1px 2px rgba(0,0,0,.55);
+  transform: translate(-50%, -50%) rotate(0deg); opacity: 0;
+  animation: sbBrocken .6s cubic-bezier(.25,.6,.5,1) forwards;
+}
+.pfluch-funke {
+  width: 4px; height: 4px; border-radius: 50%;
+  background: #d9b3ff; box-shadow: 0 0 6px #8a3dd6;
+  transform: translate(-50%, -50%); opacity: 0;
+  animation: pfFunke .55s ease-out forwards;
+}
+@keyframes pfSiegel {
+  0%   { opacity: 0; transform: translate(-50%, -50%) scale(.2) rotate(0deg); }
+  25%  { opacity: 1; transform: translate(-50%, -50%) scale(1) rotate(90deg); }
+  80%  { opacity: .85; transform: translate(-50%, -50%) scale(1.05) rotate(260deg); }
+  100% { opacity: 0; transform: translate(-50%, -50%) scale(1.15) rotate(320deg); }
+}
+@keyframes pfSiegel2 {
+  0%   { opacity: 0; transform: translate(-50%, -50%) scale(.2) rotate(0deg); }
+  25%  { opacity: 1; transform: translate(-50%, -50%) scale(1) rotate(-80deg); }
+  80%  { opacity: .8; transform: translate(-50%, -50%) scale(1) rotate(-230deg); }
+  100% { opacity: 0; transform: translate(-50%, -50%) scale(.9) rotate(-280deg); }
+}
+@keyframes pfDunst { 0% { opacity: 0; } 20% { opacity: 1; } 75% { opacity: .8; } 100% { opacity: 0; } }
+@keyframes pfRanke {
+  0%   { opacity: 0; transform: translate(-50%, -100%) rotate(var(--rdreh)) scaleY(0); }
+  15%  { opacity: 1; }
+  55%  { opacity: 1; transform: translate(-50%, -100%) rotate(var(--rdreh)) scaleY(1); }
+  100% { opacity: 0; transform: translate(-50%, -100%) rotate(var(--rdreh)) scaleY(1); }
+}
+@keyframes pfStein { from { clip-path: inset(100% 0 0 0); } to { clip-path: inset(0 0 0 0); } }
+@keyframes pfSteinAus { from { opacity: 1; } to { opacity: 0; } }
+@keyframes pfFront {
+  0%   { opacity: 0; transform: translateY(0); }
+  10%  { opacity: 1; }
+  90%  { opacity: 1; transform: translateY(calc(var(--ph) * -1)); }
+  100% { opacity: 0; transform: translateY(calc(var(--ph) * -1)); }
+}
+@keyframes pfRiss { 0% { opacity: 1; stroke-dashoffset: 100; } 100% { opacity: 1; stroke-dashoffset: 0; } }
+@keyframes pfAus { to { opacity: 0; } }
+@keyframes pfBlitz { 0% { opacity: 0; } 25% { opacity: 1; } 100% { opacity: 0; transform: translate(-50%, -50%) scale(1.08); } }
+@keyframes pfFunke {
+  0%   { opacity: 0; transform: translate(-50%, -50%); }
+  20%  { opacity: 1; }
+  100% { opacity: 0; transform: translate(-50%, calc(-50% + var(--fh))); }
+}
+
 /* ★★ v1175 — „Memory Blast": Stoss aus negativer Energie vom Wirker zum
    Ziel. Der Flug bewegt nur `transform`; Kopf, Schweif und Ranken
    flackern an Ort und Stelle mit. */
@@ -22958,4 +23080,572 @@ body.pp-dialog-offen .foil-diamond-rare:not(.modal-overlay *) {
     url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 8' shape-rendering='crispEdges'%3E%3Cpath fill='%23fff' d='M7 0h1v1h-1zM7 1h1v1h-1zM7 2h1v1h-1zM5 3h1v1h-1zM7 3h1v1h-1zM5 4h1v1h-1zM7 4h1v1h-1zM2 5h4v1h-4zM7 5h1v1h-1zM6 6h2v1h-2zM0 7h8v1h-8z'/%3E%3C/svg%3E") right bottom / var(--eck-gr) var(--eck-gr) no-repeat,
     url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 4 7' shape-rendering='crispEdges'%3E%3Cpath fill='%23fff' d='M0 0h1v1h-1zM0 1h2v1h-2zM0 2h3v1h-3zM0 3h4v1h-4zM0 4h3v1h-3zM0 5h2v1h-2zM0 6h1v1h-1z'/%3E%3C/svg%3E") left center / calc(var(--eck-e) * 4) calc(var(--eck-e) * 7) no-repeat,
     url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 4 7' shape-rendering='crispEdges'%3E%3Cpath fill='%23fff' d='M3 0h1v1h-1zM2 1h2v1h-2zM1 2h3v1h-3zM0 3h4v1h-4zM1 4h3v1h-3zM2 5h2v1h-2zM3 6h1v1h-1z'/%3E%3C/svg%3E") right center / calc(var(--eck-e) * 4) calc(var(--eck-e) * 7) no-repeat;
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   EIGENE KARTENANIMATIONEN (Als Auswahl 26.9.)
+   Accusation, Baby Spider, Chaorc Interception, Crimson Web, Divine
+   Gift of Death, Forceful Revival, Gate to the Armory, Perilous
+   Journey, Telekinesis. Keyframes hier global (Regel ④).
+   ════════════════════════════════════════════════════════════════════ */
+
+/* Hilfsattribut: blendet den INHALT einer Brettzone aus, solange eine
+   Animation eine Kopie der Karte bewegt (Telekinesis, Chaorc-Wurf,
+   Gate to the Armory). Ein Datenattribut statt einer Klasse, weil React
+   `className` bei jedem Rendern neu setzt, fremde Attribute aber stehen
+   laesst. Die Zone selbst (Rahmen) bleibt sichtbar. */
+[data-pp-verborgen] > * { visibility: hidden !important; }
+
+/* ── Accusation: wuetende Sprechblase ─────────────────────────────── */
+.anklage { position: fixed; width: 0; height: 0; pointer-events: none; z-index: 10205; }
+.anklage-glut {
+  position: absolute; border-radius: 18%;
+  background: radial-gradient(ellipse at 50% 55%, rgba(255,40,40,.5) 0%, rgba(255,90,60,.22) 45%, transparent 70%);
+  opacity: 0; animation: anklageGlut 2200ms ease-out forwards;
+}
+.anklage-blase { position: absolute; width: 0; height: 0; transform-origin: -8px 10px; animation: anklageBlase 2200ms cubic-bezier(.2,.9,.3,1.2) forwards; }
+.anklage-zittern { position: absolute; left: 0; top: 0; width: 0; height: 0; animation: anklageZittern 2200ms linear forwards; }
+.anklage-ausruf { transform-origin: 50% 50%; animation: anklageAusruf 2200ms ease-out forwards; }
+.anklage-karte {
+  position: absolute; border-radius: 3px; overflow: hidden;
+  border: 2px solid #141414; box-shadow: 0 0 0 2px #fffdf6, 0 0 10px rgba(208,18,27,.7);
+  opacity: 0; transform: scale(.2) rotate(-12deg); animation: anklageKarte 2200ms cubic-bezier(.2,.9,.3,1.3) forwards;
+}
+.anklage-karte img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.anklage-strich {
+  position: absolute; margin-top: -4.5px; transform-origin: 0 50%;
+  background: #141414; clip-path: polygon(0 40%, 100% 0, 100% 100%, 0 60%);
+  transform: rotate(var(--ag)) translateX(var(--ar)) scaleX(0); opacity: 0;
+  animation: anklageStrich 420ms ease-out forwards;
+}
+.anklage-ader { position: absolute; opacity: 0; transform: scale(.2); animation: anklageAder 700ms cubic-bezier(.2,1.2,.4,1) forwards; overflow: visible; }
+@keyframes anklageGlut { 0% { opacity: 0; } 12% { opacity: 1; } 60% { opacity: .75; } 75% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes anklageBlase {
+  0% { transform: scale(0); opacity: 0; }
+  9% { transform: scale(1.18); opacity: 1; }
+  14% { transform: scale(.94); }
+  18%, 86% { transform: scale(1); opacity: 1; }
+  91% { transform: scale(1.12); opacity: 1; }
+  100% { transform: scale(0); opacity: 0; }
+}
+@keyframes anklageZittern {
+  0%, 56% { transform: translate(0, 0) rotate(0); }
+  58% { transform: translate(-4px, 1px) rotate(-3deg); }
+  60% { transform: translate(4px, -1px) rotate(3deg); }
+  62% { transform: translate(-4px, 0) rotate(-2deg); }
+  64% { transform: translate(3px, 1px) rotate(3deg); }
+  66% { transform: translate(-3px, -1px) rotate(-2deg); }
+  68% { transform: translate(3px, 0) rotate(2deg); }
+  70% { transform: translate(-2px, 1px) rotate(-1deg); }
+  72% { transform: translate(2px, 0) rotate(1deg); }
+  75%, 100% { transform: translate(0, 0) rotate(0); }
+}
+@keyframes anklageAusruf {
+  0% { transform: scale(.4); opacity: 0; }
+  8% { transform: scale(1.25); opacity: 1; }
+  13% { transform: scale(.95); }
+  18% { transform: scale(1.12); }
+  23% { transform: scale(.98); }
+  28% { transform: scale(1.08); opacity: 1; }
+  34% { transform: scale(0) rotate(40deg); opacity: 0; }
+  100% { transform: scale(0); opacity: 0; }
+}
+@keyframes anklageKarte {
+  0%, 29% { opacity: 0; transform: scale(.2) rotate(-12deg); }
+  38% { opacity: 1; transform: scale(1.12) rotate(4deg); }
+  44%, 100% { opacity: 1; transform: scale(1) rotate(0); }
+}
+@keyframes anklageStrich {
+  0% { opacity: 0; transform: rotate(var(--ag)) translateX(var(--ar)) scaleX(0); }
+  35% { opacity: 1; transform: rotate(var(--ag)) translateX(var(--ar)) scaleX(1); }
+  100% { opacity: 0; transform: rotate(var(--ag)) translateX(calc(var(--ar) + 14px)) scaleX(.6); }
+}
+@keyframes anklageAder {
+  0% { opacity: 0; transform: scale(.2) rotate(-20deg); }
+  35% { opacity: 1; transform: scale(1.25) rotate(8deg); }
+  55% { transform: scale(.95) rotate(0); }
+  70% { transform: scale(1.1); opacity: 1; }
+  100% { opacity: 0; transform: scale(1); }
+}
+
+/* ── Baby Spider: Kokon, Faden, Netz, Aktivierung ────────────────── */
+.bspinne { position: fixed; width: 0; height: 0; pointer-events: none; z-index: 10206; }
+.bspinne > span, .bspinne > div, .bspinne-quelle > span { position: absolute; display: block; }
+.bspinne-quelle { position: absolute; width: 0; height: 0; }
+.bspinne-kokon {
+  fill: none; stroke: #f4f1ff; stroke-width: 2.4; stroke-linecap: round;
+  filter: drop-shadow(0 0 2px rgba(255,255,255,.9));
+  stroke-dasharray: 100; stroke-dashoffset: 100; opacity: 0;
+  animation: bspinneKokon 1100ms ease-out forwards;
+}
+.bspinne-puff {
+  border-radius: 12%; background: radial-gradient(ellipse, rgba(255,255,255,.85) 0%, rgba(230,225,255,.45) 45%, transparent 72%);
+  opacity: 0; animation: bspinnePuff 900ms ease-out 360ms forwards;
+}
+.bspinne-faden line {
+  stroke: rgba(250,248,255,.95); stroke-width: 1.6; stroke-dasharray: 100; stroke-dashoffset: 100;
+  filter: drop-shadow(0 0 2px rgba(255,255,255,.8));
+  animation: bspinneFaden 1650ms ease-out forwards;
+}
+.bspinne-laeufer { position: absolute; left: 0; top: 0; width: 0; height: 0; opacity: 0; animation: bspinneLauf 1650ms linear forwards; }
+.ppspinne-bein { transform-origin: 0 0; animation: ppSpinneBein 140ms ease-in-out infinite alternate; }
+.ppspinne-bein1 { animation-delay: 70ms; }
+.bspinne-netzfaden {
+  fill: none; stroke: #f7f4ff; stroke-width: 1.5; stroke-linecap: round;
+  filter: drop-shadow(0 0 2px rgba(200,170,255,.9));
+  stroke-dasharray: 100; stroke-dashoffset: 100; opacity: 0;
+  animation: bspinneNetz 770ms ease-out forwards;
+}
+.bspinne-blitz {
+  border-radius: 20%; mix-blend-mode: screen;
+  background: radial-gradient(ellipse, rgba(255,255,255,.95) 0%, rgba(190,120,255,.7) 35%, rgba(120,40,200,.25) 60%, transparent 75%);
+  opacity: 0; animation: bspinneBlitz 520ms ease-out 1200ms forwards;
+}
+.bspinne-ring {
+  border-radius: 50%; border: 3px solid rgba(215,170,255,.95);
+  box-shadow: 0 0 12px rgba(170,90,255,.9), inset 0 0 10px rgba(170,90,255,.6);
+  opacity: 0; transform: scale(.3); animation: bspinneRing 560ms ease-out 1220ms forwards;
+}
+@keyframes bspinneKokon {
+  0% { stroke-dashoffset: 100; opacity: 0; }
+  10% { opacity: 1; }
+  45% { stroke-dashoffset: 0; opacity: 1; }
+  70% { stroke-dashoffset: 0; opacity: .9; }
+  100% { stroke-dashoffset: 0; opacity: 0; }
+}
+@keyframes bspinnePuff { 0% { opacity: 0; transform: scale(.7); } 30% { opacity: 1; transform: scale(1.05); } 100% { opacity: 0; transform: scale(1.35); } }
+@keyframes bspinneFaden {
+  0%, 22% { stroke-dashoffset: 100; opacity: 1; }
+  50% { stroke-dashoffset: 0; opacity: 1; }
+  74% { stroke-dashoffset: 0; opacity: .9; }
+  90%, 100% { stroke-dashoffset: 0; opacity: 0; }
+}
+@keyframes bspinneLauf {
+  0%, 22% { opacity: 0; transform: translate(var(--sx), var(--sy)) scale(.6); }
+  25% { opacity: 1; transform: translate(calc(var(--sx) * .96), calc(var(--sy) * .96 - 16px)) scale(1.1); }
+  30% { transform: translate(calc(var(--sx) * .88), calc(var(--sy) * .88)) scale(1); }
+  54% { transform: translate(0, 0) scale(1); }
+  60% { transform: translate(-6px, -5px) scale(1); }
+  66% { transform: translate(6px, 3px) scale(1); }
+  71% { opacity: 1; transform: translate(0, 0) scale(1); }
+  76%, 100% { opacity: 0; transform: translate(0, 0) scale(.3); }
+}
+@keyframes ppSpinneBein { 0% { transform: rotate(-9deg); } 100% { transform: rotate(9deg); } }
+@keyframes bspinneNetz {
+  0% { stroke-dashoffset: 100; opacity: 0; }
+  15% { opacity: 1; }
+  60% { stroke-dashoffset: 0; opacity: 1; }
+  100% { stroke-dashoffset: 0; opacity: 0; }
+}
+@keyframes bspinneBlitz { 0% { opacity: 0; transform: scale(.6); } 25% { opacity: 1; transform: scale(1.05); } 100% { opacity: 0; transform: scale(1.3); } }
+@keyframes bspinneRing { 0% { opacity: 0; transform: scale(.3); } 20% { opacity: 1; } 100% { opacity: 0; transform: scale(1.6); } }
+
+/* ── Chaorc Interception: geworfener Chaorc, Aufprall, Versengen ─── */
+.chaorc-wurf { border-radius: 6px; box-shadow: 0 6px 16px rgba(0,0,0,.55), 0 0 0 2px rgba(60,30,10,.7); }
+.chaorc-wurf-russ {
+  position: absolute; inset: 0; border-radius: 6px; pointer-events: none; opacity: 0;
+  background: radial-gradient(ellipse at 50% 55%, rgba(30,12,4,.2) 0%, rgba(40,14,4,.65) 60%, rgba(10,4,0,.85) 100%);
+  mix-blend-mode: multiply;
+}
+.chaorc-wurf-versengt { animation: chaorcVersengt 260ms ease-out forwards; }
+.chaorc-wurf-versengt .chaorc-wurf-russ { animation: chaorcRuss 260ms ease-out forwards; }
+.chaorc-klatsch > span { position: absolute; display: block; }
+.ck-ring {
+  left: -40px; top: -40px; width: 80px; height: 80px; border-radius: 50%;
+  border: 4px solid rgba(255,236,190,.95); box-shadow: 0 0 10px rgba(255,200,120,.8);
+  opacity: 0; transform: scale(.2); animation: ckRing 480ms ease-out forwards;
+}
+.ck-ring2 { border-color: rgba(190,150,110,.8); animation-delay: 70ms; }
+.ck-stern {
+  left: -5px; top: -5px; width: 10px; height: 10px; background: #fff3c4;
+  clip-path: polygon(50% 0,62% 38%,100% 50%,62% 62%,50% 100%,38% 62%,0 50%,38% 38%);
+  filter: drop-shadow(0 0 3px #ffd36a); opacity: 0;
+  transform: rotate(var(--ckw)) translateX(0) scale(.4);
+  animation: ckStern 560ms ease-out forwards;
+}
+@keyframes chaorcVersengt {
+  0% { filter: brightness(1); }
+  35% { filter: brightness(2.2) saturate(.4); }
+  100% { filter: brightness(.7) sepia(.6) saturate(1.4); }
+}
+@keyframes chaorcRuss { 0% { opacity: 0; } 100% { opacity: 1; } }
+@keyframes ckRing { 0% { opacity: 0; transform: scale(.2); } 20% { opacity: 1; } 100% { opacity: 0; transform: scale(1.5); } }
+@keyframes ckStern {
+  0% { opacity: 0; transform: rotate(var(--ckw)) translateX(0) scale(.4); }
+  25% { opacity: 1; }
+  100% { opacity: 0; transform: rotate(var(--ckw)) translateX(var(--ckd)) scale(1.1) rotate(160deg); }
+}
+
+/* ── Crimson Web: Netzschuss + bleibendes Netz ───────────────────── */
+.cweb { position: fixed; width: 0; height: 0; pointer-events: none; z-index: 10204; }
+.cweb > span, .cweb > div { position: absolute; display: block; }
+.cweb-faden line {
+  stroke: #9b0f1c; stroke-width: 2; stroke-dasharray: 100; stroke-dashoffset: 100;
+  filter: drop-shadow(0 0 3px rgba(255,40,60,.7));
+  animation: cwebFaden 1100ms ease-out forwards;
+}
+.cweb-ballen {
+  left: -11px; top: -11px; width: 22px; height: 22px; border-radius: 50%;
+  background: radial-gradient(circle at 40% 35%, #ff5a66 0%, #b0101f 45%, #4a040b 100%);
+  box-shadow: 0 0 10px rgba(255,40,60,.9), 0 0 22px rgba(160,0,20,.6);
+  opacity: 0; animation: cwebBallen 420ms cubic-bezier(.3,.1,.6,1) forwards;
+}
+.cweb-netz-huelle { left: 0; top: 0; width: 0; height: 0; animation: cwebRuck 1000ms ease-out forwards; }
+.cweb-netz path {
+  fill: none; stroke: #b3121f; stroke-width: 1.8; stroke-linecap: round;
+  filter: drop-shadow(0 0 2px rgba(255,50,70,.85)) drop-shadow(0 0 1px #2a0006);
+  stroke-dasharray: 100; stroke-dashoffset: 100;
+  animation: cwebNetz 1400ms ease-out forwards;
+}
+.cweb-verpufft .cweb-netz path { animation-name: cwebNetzVerpufft; animation-duration: 2000ms; }
+.cweb-glut {
+  border-radius: 16%; mix-blend-mode: screen;
+  background: radial-gradient(ellipse, rgba(255,40,60,.45) 0%, rgba(140,0,20,.2) 50%, transparent 72%);
+  opacity: 0; animation: cwebGlut 900ms ease-out 330ms forwards;
+}
+@keyframes cwebFaden {
+  0% { stroke-dashoffset: 100; opacity: 1; }
+  33% { stroke-dashoffset: 0; opacity: 1; }
+  60% { opacity: .7; }
+  100% { stroke-dashoffset: 0; opacity: 0; }
+}
+@keyframes cwebBallen {
+  0% { opacity: 1; transform: translate(var(--cx), var(--cy)) scale(.6); }
+  85% { opacity: 1; transform: translate(0, 0) scale(1.1); }
+  100% { opacity: 0; transform: translate(0, 0) scale(2.4); }
+}
+@keyframes cwebRuck {
+  0%, 60% { transform: scale(1); }
+  66% { transform: scale(1.06, .95); }
+  74% { transform: scale(.97, 1.03); }
+  82%, 100% { transform: scale(1); }
+}
+@keyframes cwebNetz {
+  0% { stroke-dashoffset: 100; opacity: 0; }
+  8% { opacity: 1; }
+  35% { stroke-dashoffset: 0; opacity: 1; }
+  70% { stroke-dashoffset: 0; opacity: 1; }
+  100% { stroke-dashoffset: 0; opacity: 0; }
+}
+@keyframes cwebNetzVerpufft {
+  0% { stroke-dashoffset: 100; opacity: 0; }
+  5% { opacity: 1; }
+  24% { stroke-dashoffset: 0; opacity: 1; }
+  40% { stroke-dashoffset: 0; opacity: 1; }
+  100% { stroke-dashoffset: 0; opacity: 0; }
+}
+@keyframes cwebGlut { 0% { opacity: 0; } 30% { opacity: 1; } 100% { opacity: 0; } }
+
+.crimson-web-overlay {
+  position: absolute; inset: 0; z-index: 5; pointer-events: none;
+  background: radial-gradient(ellipse at 50% 50%, rgba(120,0,15,.18) 0%, rgba(60,0,8,.28) 100%);
+  opacity: 0; animation: cwebOverlayAn 420ms ease-out 450ms forwards;
+}
+.crimson-web-overlay svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: hidden; }
+.crimson-web-overlay path {
+  fill: none; stroke: #b3121f; stroke-width: 1.8; stroke-linecap: round;
+  vector-effect: non-scaling-stroke;
+  filter: drop-shadow(0 0 2px rgba(255,50,70,.8));
+  animation: cwebSchimmer 2600ms ease-in-out infinite;
+}
+.crimson-web-overlay.crimson-web-weg { opacity: 1; animation: cwebOverlayWeg 1000ms ease-in forwards; }
+@keyframes cwebOverlayAn { 0% { opacity: 0; } 100% { opacity: 1; } }
+@keyframes cwebOverlayWeg { 0% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes cwebSchimmer { 0%, 100% { stroke: #a50f1c; } 50% { stroke: #d42535; } }
+
+/* ── Kartenflug-Stile 'flammen' (Perilous Journey) und 'gewaltsam'
+      (Forceful Revival) — siehe onPileTransfer. ─────────────────── */
+.pt-flammenzunge {
+  position: absolute; display: block; pointer-events: none; z-index: 2;
+  border-radius: 50% 50% 38% 38% / 72% 72% 28% 28%;
+  background: linear-gradient(to top, rgba(210,30,10,.95) 0%, #ff7a1a 40%, #ffd23a 78%, rgba(255,245,190,0) 100%);
+  filter: drop-shadow(0 0 4px rgba(255,120,20,.9));
+  transform-origin: 50% 100%;
+  animation-name: ptFlammenzunge; animation-timing-function: ease-in-out;
+  animation-iteration-count: infinite; animation-direction: alternate;
+}
+.pt-glutspur, .pt-energiespur {
+  position: fixed; display: block; pointer-events: none; z-index: 10199;
+  animation-name: ptGlutSpur; animation-timing-function: ease-out; animation-fill-mode: forwards;
+}
+.pt-energiespur { clip-path: polygon(50% 0, 64% 36%, 100% 50%, 64% 64%, 50% 100%, 36% 64%, 0 50%, 36% 36%); }
+@keyframes ptFlammenzunge {
+  0% { transform: scale(.8, .75) skewX(-6deg); opacity: .85; }
+  100% { transform: scale(1.1, 1.2) skewX(6deg); opacity: 1; }
+}
+@keyframes ptGlutSpur {
+  0% { opacity: 1; transform: translate(0, 0) scale(1); }
+  100% { opacity: 0; transform: translate(var(--gsx), var(--gsy)) scale(.2); }
+}
+
+/* ── Divine Gift of Death: die grosse Erweckung ─────────────────── */
+.tge { position: fixed; width: 0; height: 0; pointer-events: none; z-index: 10206; }
+.tge > span, .tge > svg { position: absolute; display: block; }
+.tge-dunkel {
+  border-radius: 50%; background: radial-gradient(circle, rgba(10,4,20,.0) 0%, rgba(10,4,20,.55) 18%, rgba(6,2,12,.35) 45%, transparent 70%);
+  opacity: 0; animation: tgeDunkel 2600ms ease-in-out forwards; z-index: -1;
+}
+.tge-wirbel {
+  border-radius: 50%;
+  background: conic-gradient(from 0deg, rgba(120,40,200,.0), rgba(150,60,230,.75), rgba(40,10,70,.2), rgba(190,120,255,.7), rgba(120,40,200,.0));
+  -webkit-mask: radial-gradient(circle, transparent 28%, #000 32%, #000 62%, transparent 70%);
+          mask: radial-gradient(circle, transparent 28%, #000 32%, #000 62%, transparent 70%);
+  opacity: 0; animation: tgeWirbel 1700ms ease-in-out forwards;
+}
+.tge-tod { overflow: visible; opacity: 0; filter: drop-shadow(0 0 8px rgba(160,90,255,.8)); animation: tgeTod 2600ms ease-in-out forwards; }
+.tge-auge { fill: #7ff3ff; animation: tgeAuge 600ms ease-in-out infinite alternate; }
+.tge-seele {
+  left: -9px; top: -9px; width: 18px; height: 18px; border-radius: 50%;
+  background: radial-gradient(circle, #ffffff 0%, #bff6ff 40%, rgba(120,220,255,.4) 70%, transparent 75%);
+  box-shadow: 0 0 14px #9ff0ff, 0 0 28px rgba(120,220,255,.7);
+  opacity: 0; animation: tgeSeele 2600ms ease-in forwards;
+}
+.tge-strahl {
+  border-radius: 40%; mix-blend-mode: screen;
+  background: linear-gradient(to top, rgba(255,246,208,.0) 0%, rgba(255,246,208,.85) 45%, rgba(190,245,255,.6) 80%, transparent 100%);
+  opacity: 0; transform-origin: 50% 100%; animation: tgeStrahl 1300ms ease-out 1250ms forwards;
+}
+.tge-blitz {
+  border-radius: 20%; mix-blend-mode: screen;
+  background: radial-gradient(ellipse, #ffffff 0%, rgba(255,246,208,.8) 35%, rgba(160,230,255,.3) 60%, transparent 75%);
+  opacity: 0; animation: tgeBlitz 700ms ease-out 1240ms forwards;
+}
+.tge-ring {
+  border-radius: 50%; border: 3px solid rgba(255,244,200,.95);
+  box-shadow: 0 0 14px rgba(255,230,150,.9), inset 0 0 12px rgba(160,230,255,.6);
+  opacity: 0; transform: scale(.2); animation: tgeRing 800ms ease-out 1250ms forwards;
+}
+.tge-ring2 { border-color: rgba(170,240,255,.85); animation-delay: 1400ms; }
+.tge-funke { border-radius: 50%; opacity: 0; animation: tgeFunke 1100ms ease-out forwards; }
+@keyframes tgeDunkel { 0% { opacity: 0; } 20% { opacity: 1; } 55% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes tgeWirbel { 0% { opacity: 0; transform: rotate(0) scale(.6); } 30% { opacity: 1; } 75% { opacity: .9; transform: rotate(420deg) scale(1.05); } 100% { opacity: 0; transform: rotate(560deg) scale(.4); } }
+@keyframes tgeTod {
+  0%, 5% { opacity: 0; transform: translateY(-34px) scale(.9); }
+  20% { opacity: .95; transform: translateY(0) scale(1); }
+  45% { opacity: .95; transform: translateY(4px) scale(1); }
+  62% { opacity: .9; transform: translateY(-4px) scale(1.02); }
+  76%, 100% { opacity: 0; transform: translateY(-40px) scale(1.08); }
+}
+@keyframes tgeAuge { 0% { fill: #7ff3ff; } 100% { fill: #e6fdff; } }
+@keyframes tgeSeele {
+  0%, 24% { opacity: 0; transform: translate(var(--sx0), var(--sy0)) scale(.4); }
+  30% { opacity: 1; transform: translate(var(--sx0), var(--sy0)) scale(1.1); }
+  47% { opacity: 1; transform: translate(0, 0) scale(.9); }
+  49%, 100% { opacity: 0; transform: translate(0, 0) scale(2.2); }
+}
+@keyframes tgeStrahl { 0% { opacity: 0; transform: scaleY(.1); } 20% { opacity: 1; transform: scaleY(1); } 70% { opacity: .7; } 100% { opacity: 0; transform: scaleY(1.05); } }
+@keyframes tgeBlitz { 0% { opacity: 0; transform: scale(.5); } 20% { opacity: 1; transform: scale(1.05); } 100% { opacity: 0; transform: scale(1.35); } }
+@keyframes tgeRing { 0% { opacity: 0; transform: scale(.2); } 15% { opacity: 1; } 100% { opacity: 0; transform: scale(2.2); } }
+@keyframes tgeFunke { 0% { opacity: 0; transform: translateY(0) scale(.6); } 15% { opacity: 1; } 100% { opacity: 0; transform: translateY(var(--fh)) scale(.3); } }
+
+/* ── Forceful Revival: gewaltsame Erweckung ─────────────────────── */
+.gwe { position: fixed; width: 0; height: 0; pointer-events: none; z-index: 10206; }
+.gwe > span, .gwe-held > span { position: absolute; display: block; }
+.gwe-held { position: absolute; width: 0; height: 0; }
+.gwe-schlag {
+  border-radius: 50%; mix-blend-mode: screen;
+  background: radial-gradient(circle, #fbffd0 0%, rgba(200,255,80,.8) 30%, rgba(120,220,40,.3) 55%, transparent 70%);
+  opacity: 0; animation: gweSchlag 460ms ease-out forwards;
+}
+.gwe-druck {
+  border-radius: 50%; border: 3px solid rgba(214,255,100,.95); box-shadow: 0 0 12px rgba(170,255,70,.8);
+  opacity: 0; transform: scale(.3); animation: gweDruck 480ms ease-out 40ms forwards;
+}
+.gwe-heldrot {
+  border-radius: 16%; mix-blend-mode: screen;
+  background: radial-gradient(ellipse, rgba(255,40,40,.55) 0%, rgba(200,0,20,.25) 50%, transparent 72%);
+  opacity: 0; animation: gweHeldRot 700ms ease-out 1150ms forwards;
+}
+.gwe-kette polyline {
+  fill: none; stroke: #e9ff7a; stroke-width: 3; stroke-linejoin: round;
+  filter: drop-shadow(0 0 4px #b6ff3a) drop-shadow(0 0 8px rgba(150,255,40,.7));
+  opacity: 0; animation: gweKette 900ms steps(1, end) 120ms forwards;
+}
+.gwe-riss path {
+  fill: none; stroke: #d7ff5a; stroke-width: 3; stroke-linecap: round;
+  filter: drop-shadow(0 0 4px #9dff2a);
+  stroke-dasharray: 100; stroke-dashoffset: 100; animation: gweRiss 1600ms ease-out 150ms forwards;
+}
+.gwe-saeule {
+  border-radius: 45%; mix-blend-mode: screen; transform-origin: 50% 100%;
+  background: linear-gradient(to top, rgba(210,255,90,.95) 0%, rgba(160,255,60,.7) 40%, rgba(240,255,170,.35) 75%, transparent 100%);
+  opacity: 0; animation: gweSaeule 700ms ease-out 1000ms forwards;
+}
+.gwe-ring {
+  border-radius: 50%; border: 3px solid rgba(200,255,90,.9); box-shadow: 0 0 10px rgba(160,255,60,.8);
+  opacity: 0; transform: scale(.3); animation: gweRing 600ms ease-out 1020ms forwards;
+}
+.gwe-brocken { opacity: 0; animation: gweBrocken 650ms cubic-bezier(.2,.7,.4,1) 1020ms forwards; }
+.gwe-blut {
+  left: -5px; top: -5px; width: 10px; height: 10px; border-radius: 50%;
+  background: radial-gradient(circle, #ffb0b0 0%, #e0101c 50%, #6a0008 100%);
+  box-shadow: 0 0 8px rgba(255,30,40,.9);
+  opacity: 0; animation: gweBlut 560ms ease-in forwards;
+}
+@keyframes gweSchlag { 0% { opacity: 0; transform: scale(.4); } 25% { opacity: 1; transform: scale(1); } 100% { opacity: 0; transform: scale(1.3); } }
+@keyframes gweDruck { 0% { opacity: 0; transform: scale(.3); } 20% { opacity: 1; } 100% { opacity: 0; transform: scale(1.9); } }
+@keyframes gweHeldRot { 0% { opacity: 0; } 30% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes gweKette {
+  0% { opacity: 1; transform: translate(0, 0); }
+  12% { opacity: .35; transform: translate(1px, -1px); }
+  24% { opacity: 1; transform: translate(-1px, 1px); }
+  40% { opacity: .5; transform: translate(0, 0); }
+  52% { opacity: 1; transform: translate(1px, 1px); }
+  70% { opacity: .6; }
+  85% { opacity: .9; }
+  100% { opacity: 0; }
+}
+@keyframes gweRiss { 0% { stroke-dashoffset: 100; opacity: 1; } 30% { stroke-dashoffset: 0; opacity: 1; } 75% { opacity: .9; } 100% { stroke-dashoffset: 0; opacity: 0; } }
+@keyframes gweSaeule { 0% { opacity: 0; transform: scaleY(.1); } 25% { opacity: 1; transform: scaleY(1); } 100% { opacity: 0; transform: scaleY(1.1); } }
+@keyframes gweRing { 0% { opacity: 0; transform: scale(.3); } 20% { opacity: 1; } 100% { opacity: 0; transform: scale(1.8); } }
+@keyframes gweBrocken { 0% { opacity: 1; transform: translate(0, 0) rotate(0); } 100% { opacity: 0; transform: translate(var(--bx), var(--by)) rotate(220deg); } }
+@keyframes gweBlut {
+  0% { opacity: 0; transform: translate(var(--sx), var(--sy)) scale(.6); }
+  15% { opacity: 1; }
+  55% { transform: translate(calc(var(--sx) * .45 + var(--seit)), calc(var(--sy) * .45)) scale(1); }
+  90% { opacity: 1; }
+  100% { opacity: 0; transform: translate(0, 0) scale(.4); }
+}
+
+/* ── Gate to the Armory: goldenes Portal ────────────────────────── */
+.rtor { position: fixed; width: 0; height: 0; pointer-events: none; z-index: 10206; }
+.rtor > span, .rtor > div, .rtor-portal > span { position: absolute; display: block; }
+.rtor-portal { position: absolute; width: 0; height: 0; transform: scaleY(0); animation: rtorPortal 2000ms cubic-bezier(.3,.9,.4,1.1) forwards; }
+.rtor-schein {
+  border-radius: 50%; mix-blend-mode: screen;
+  background: radial-gradient(ellipse, rgba(255,226,120,.55) 0%, rgba(255,190,60,.22) 45%, transparent 70%);
+  animation: rtorPuls 700ms ease-in-out infinite alternate;
+}
+.rtor-ring {
+  border-radius: 50%;
+  border: 5px solid #ffd54a;
+  box-shadow: 0 0 10px #ffcc33, 0 0 22px rgba(255,190,40,.8), inset 0 0 12px rgba(255,220,110,.9);
+  background: radial-gradient(ellipse, rgba(40,26,70,.85) 0%, rgba(70,45,20,.65) 55%, rgba(255,210,90,.25) 80%);
+}
+.rtor-wirbel {
+  border-radius: 50%; mix-blend-mode: screen;
+  background: conic-gradient(from 0deg, rgba(255,230,140,0), rgba(255,230,140,.8), rgba(255,190,60,0) 30%, rgba(255,245,200,.75) 50%, rgba(255,190,60,0) 70%, rgba(255,220,120,.7) 88%, rgba(255,230,140,0));
+  animation: rtorWirbel 900ms linear infinite;
+}
+.rtor-funke {
+  background: #fff3b0; box-shadow: 0 0 6px #ffd54a;
+  clip-path: polygon(50% 0,62% 38%,100% 50%,62% 62%,50% 100%,38% 62%,0 50%,38% 38%);
+  opacity: 0; animation: rtorFunke 700ms ease-out infinite;
+}
+.rtor-karte {
+  border-radius: 6px; overflow: hidden; opacity: 0;
+  box-shadow: 0 0 16px rgba(255,210,80,.95), 0 0 34px rgba(255,180,40,.55);
+  animation: rtorKarte 1650ms ease-in-out forwards;
+}
+.rtor-karte img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.rtor-karte-leer { position: absolute; inset: 0; background: linear-gradient(135deg, #5a4318, #2a1f0a); }
+.rtor-glanz {
+  position: absolute; inset: 0; pointer-events: none;
+  background: linear-gradient(115deg, transparent 30%, rgba(255,250,220,.75) 48%, transparent 62%);
+  transform: translateX(-120%); animation: rtorGlanz 600ms ease-in-out 880ms forwards;
+}
+.rtor-landung {
+  border-radius: 50%; mix-blend-mode: screen;
+  background: radial-gradient(ellipse, rgba(255,240,180,.95) 0%, rgba(255,200,70,.6) 40%, transparent 70%);
+  opacity: 0; animation: rtorLandung 520ms ease-out 1500ms forwards;
+}
+.rtor-landefunke {
+  background: #ffe27a; box-shadow: 0 0 6px #ffc93a;
+  clip-path: polygon(50% 0,62% 38%,100% 50%,62% 62%,50% 100%,38% 62%,0 50%,38% 38%);
+  opacity: 0; animation: rtorLandefunke 560ms ease-out 1500ms forwards;
+}
+@keyframes rtorPortal {
+  0% { transform: scaleY(0) scaleX(.3); opacity: 0; }
+  20% { transform: scaleY(1.08) scaleX(1); opacity: 1; }
+  26%, 80% { transform: scaleY(1) scaleX(1); opacity: 1; }
+  97% { transform: scaleY(.05) scaleX(1.1); opacity: 1; }
+  100% { transform: scaleY(0) scaleX(0); opacity: 0; }
+}
+@keyframes rtorPuls { 0% { opacity: .7; transform: scale(.96); } 100% { opacity: 1; transform: scale(1.04); } }
+@keyframes rtorWirbel { 0% { transform: rotate(0); } 100% { transform: rotate(360deg); } }
+@keyframes rtorFunke { 0% { opacity: 0; transform: translate(0, 0) scale(.4); } 25% { opacity: 1; } 100% { opacity: 0; transform: translate(var(--fx), var(--fy)) scale(1); } }
+@keyframes rtorKarte {
+  0%, 27% { opacity: 0; transform: translateY(var(--oben)) scale(.15) rotate(-10deg); }
+  42% { opacity: 1; transform: translateY(var(--oben)) scale(.95) rotate(3deg); }
+  52% { opacity: 1; transform: translateY(var(--oben)) scale(.86) rotate(0); }
+  70% { opacity: 1; transform: translateY(calc(var(--oben) - 6px)) scale(.9) rotate(0); }
+  88% { opacity: 1; transform: translateY(0) scale(1) rotate(0); }
+  92% { opacity: 1; transform: translateY(0) scale(1.05, .95) rotate(0); }
+  96% { opacity: 1; transform: translateY(0) scale(1) rotate(0); }
+  100% { opacity: 0; transform: translateY(0) scale(1) rotate(0); }
+}
+@keyframes rtorGlanz { 0% { transform: translateX(-120%); } 100% { transform: translateX(120%); } }
+@keyframes rtorLandung { 0% { opacity: 0; transform: scale(.4); } 25% { opacity: 1; transform: scale(1); } 100% { opacity: 0; transform: scale(1.4); } }
+@keyframes rtorLandefunke { 0% { opacity: 0; transform: translate(0, 0) scale(.4); } 20% { opacity: 1; } 100% { opacity: 0; transform: translate(var(--lx), var(--ly)) scale(1); } }
+
+/* ── Telekinesis: die schwebende Surprise ───────────────────────── */
+.tkin { position: fixed; width: 0; height: 0; pointer-events: none; z-index: 10206; }
+.tkin > span, .tkin > div, .tkin-heber > span, .tkin-heber > div { position: absolute; display: block; }
+.tkin-schatten {
+  /* Auf dem dunklen Brett braucht der Schatten einen hellen Saum, sonst
+     verschwindet er: schwarzer Kern, violetter Rand vom Kraftfeld. */
+  border-radius: 50%;
+  background: radial-gradient(ellipse, rgba(0,0,0,.92) 0%, rgba(8,0,20,.75) 45%, rgba(120,70,220,.35) 68%, transparent 74%);
+  box-shadow: 0 0 14px rgba(160,100,255,.35);
+  animation: tkinSchatten 2000ms ease-in-out forwards;
+}
+.tkin-staub {
+  border-radius: 50%; border: 3px solid rgba(220,210,240,.85); box-shadow: 0 0 8px rgba(190,160,255,.7);
+  opacity: 0; transform: scale(.3); animation: tkinStaub 480ms ease-out 1790ms forwards;
+}
+.tkin-heber { left: 0; top: 0; width: 0; height: 0; animation: tkinHeben 2000ms ease-in-out forwards; }
+.tkin-schein {
+  border-radius: 20%; mix-blend-mode: screen;
+  background: radial-gradient(ellipse, rgba(190,120,255,.55) 0%, rgba(120,60,230,.28) 45%, transparent 70%);
+  opacity: 0; animation: tkinSchein 2000ms ease-in-out forwards;
+}
+.tkin-stein {
+  background: #6d6480; border: 1px solid #3a3346; border-radius: 2px;
+  box-shadow: 0 0 6px rgba(190,130,255,.8);
+  opacity: 0; animation: tkinStein 1500ms ease-in-out forwards;
+}
+.tkin-wackler { left: 0; top: 0; width: 0; height: 0; animation: tkinWackeln 2000ms ease-in-out forwards; }
+.tkin-karte { position: absolute; perspective: 600px; }
+.tkin-dreher { position: absolute; inset: 0; transform-style: preserve-3d; animation: tkinDrehen 2000ms ease-in-out forwards; }
+.tkin-seite {
+  position: absolute; inset: 0; border-radius: 6px; overflow: hidden;
+  backface-visibility: hidden; -webkit-backface-visibility: hidden;
+  box-shadow: 0 0 14px rgba(180,110,255,.85), 0 8px 18px rgba(0,0,0,.45);
+}
+.tkin-seite img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.tkin-vorn { transform: rotateY(180deg); }
+@keyframes tkinSchatten {
+  0% { opacity: .9; transform: scale(1); }
+  22%, 72% { opacity: .45; transform: scale(.7); }
+  90%, 100% { opacity: .9; transform: scale(1); }
+}
+@keyframes tkinStaub { 0% { opacity: 0; transform: scale(.3); } 25% { opacity: 1; } 100% { opacity: 0; transform: scale(1.4); } }
+@keyframes tkinHeben {
+  0% { transform: translateY(0) scale(1); }
+  22% { transform: translateY(var(--hub)) scale(1.12); }
+  72% { transform: translateY(var(--hub)) scale(1.12); }
+  86% { transform: translateY(8px) scale(1.01); }
+  90% { transform: translateY(0) scale(1.03, .96); }
+  94%, 100% { transform: translateY(0) scale(1); }
+}
+@keyframes tkinSchein { 0% { opacity: 0; } 15% { opacity: 1; } 75% { opacity: .9; } 92%, 100% { opacity: 0; } }
+@keyframes tkinStein {
+  0% { opacity: 0; transform: rotate(var(--sw)) translateX(calc(var(--sr) * .6)) rotate(0); }
+  15% { opacity: 1; }
+  85% { opacity: 1; transform: rotate(calc(var(--sw) + 220deg)) translateX(var(--sr)) rotate(260deg); }
+  100% { opacity: 0; transform: rotate(calc(var(--sw) + 260deg)) translateX(calc(var(--sr) * 1.1)) rotate(300deg); }
+}
+@keyframes tkinWackeln {
+  0%, 22% { transform: rotate(0) translateX(0); }
+  27% { transform: rotate(-7deg) translateX(-4px); }
+  32% { transform: rotate(6deg) translateX(4px); }
+  37% { transform: rotate(-6deg) translateX(-3px); }
+  42% { transform: rotate(5deg) translateX(3px); }
+  47% { transform: rotate(-4deg) translateX(-2px); }
+  52%, 100% { transform: rotate(0) translateX(0); }
+}
+@keyframes tkinDrehen {
+  0%, 52% { transform: rotateY(0deg) scale(1); }
+  62% { transform: rotateY(90deg) scale(1.08); }
+  72%, 100% { transform: rotateY(180deg) scale(1); }
 }

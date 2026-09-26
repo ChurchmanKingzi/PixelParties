@@ -192,6 +192,14 @@ module.exports = {
     const inst = ctx.card;
 
     if (freeSlot < 0 || !inst) {
+      // Kein Platz zum Anlegen: das Netz trifft trotzdem sichtbar und
+      // blendet dann ueber eine Sekunde aus (Als Vorgabe 26.9.).
+      engine._broadcastEvent('play_zone_animation', {
+        type: 'crimson_web', owner: attackerOwner, heroIdx: attackerHi, zoneSlot: -1,
+        von: { owner: ownerIdx, heroIdx: ownerHi, zoneType: 'surprise' },
+        bleibt: false, duration: 2100,
+      });
+      await engine._delay(1100);
       // No room to attach — Surprise fizzles. Manually splice from
       // the owner's Surprise Zone and discard (mirrors the engine's
       // default cleanup, which `staysFaceUpOnActivation: true`
@@ -211,10 +219,16 @@ module.exports = {
       return null;
     }
 
-    // Web visual on the attacker before the card lands.
+    // Netzschuss aus der eigenen Surprise Zone auf den Angreifer (Als
+    // Vorgabe 26.9.; der Typ `crimson_web` hatte bis dahin gar keine
+    // Animation). Danach uebernimmt das bleibende Netz am Status
+    // `webbed` (`CrimsonWebOverlay` im Client) — es liegt, solange die
+    // Karte angelegt bleibt, und blendet beim Abnehmen aus.
     engine._broadcastEvent('play_zone_animation', {
       type: 'crimson_web', owner: attackerOwner,
       heroIdx: attackerHi, zoneSlot: -1,
+      von: { owner: ownerIdx, heroIdx: ownerHi, zoneType: 'surprise' },
+      bleibt: true, duration: 1500,
     });
     await engine._delay(500);
 

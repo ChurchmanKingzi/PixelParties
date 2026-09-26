@@ -189,18 +189,27 @@ module.exports = {
       owner: pi, controller: pi,
       heroIdx: babyInst.heroIdx, zoneSlot: babyInst.zoneSlot,
     };
-    await engine.runHooks('onCreatureSacrificed', {
-      creature: babyInst,
-      cardName: CARD_NAME,
-      owner: pi,
-      heroIdx: babyInst.heroIdx,
-      zoneSlot: babyInst.zoneSlot,
-      source,
-      _skipReactionCheck: true,
+    // Eigene Opfer-Animation STATT des allgemeinen Messers (Als Vorgabe
+    // 26.9.): die Baby Spider wird eingesponnen, eine kleine Spinne
+    // laeuft am Faden zur gewaehlten Surprise und webt ein Netz darueber.
+    // Angehaengt an die Surprise Zone, die Baby Spider kommt als `von`.
+    engine._broadcastEvent('play_zone_animation', {
+      type: 'baby_spider_opfer', owner: pi, heroIdx: surpriseHeroIdx,
+      zoneSlot: -1, zoneType: 'surprise', duration: 1900,
+      von: { owner: pi, heroIdx: babyInst.heroIdx, zoneSlot: babyInst.zoneSlot },
     });
-    await engine.actionDestroyCard(source, babyInst);
+    await engine._delay(620);
+    // Der gemeinsame Opfer-Weg (Hook + Zerstoerung als Opfer), nur ohne
+    // sein Messer-Bild — das hat die Spinne eben ersetzt. Wird das Opfer
+    // gerettet (Barrier of Undying), ist der Preis nicht bezahlt und der
+    // Effekt verpufft (Als Regel v1313) — verbraucht ist er trotzdem.
+    const bezahlt = await engine.opfereKreatur(babyInst, source, { animation: false });
     engine.sync();
-    await engine._delay(200);
+    if (!bezahlt) {
+      engine.log('sacrifice_fizzle', { card: CARD_NAME, player: gs.players[pi]?.username, reason: 'saved' });
+      return true;
+    }
+    await engine._delay(800);
 
     // ── Step 3: force-activate the chosen Surprise ──
     // `sourceInfo.telekinesis: true` is the canonical "no real
