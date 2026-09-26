@@ -33230,7 +33230,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     // Generic pile-to-pile flying card animation. Used for moves the
     // automatic hand → pile detector can't see — specifically
     // discard → deleted (Mass Multiplication's consumed source card).
-    const onPileTransfer = ({ owner, cardName, from, to, fromOwner, toOwner, fromHeroIdx, fromSlotIdx, fromHandIdx, fromPermId, toHandIdx, toHeroIdx, toSlotIdx, finalHandSize, flightStyle, faceDown, sfx }) => {
+    const onPileTransfer = ({ owner, cardName, from, to, fromOwner, toOwner, fromHeroIdx, fromSlotIdx, fromHandIdx, fromPermId, toHandIdx, toHeroIdx, toSlotIdx, finalHandSize, flightStyle, faceDown, sfx, landSfx }) => {
       // ★ v1122 (Al 15.9.: „fuer die 4 Karten, die vom Discard ins Deck
       // fliegen, fehlt jeweils ein Woosh-Sound-Effect (wie beim Ziehen
       // von Karten)"). Ein Flug konnte bisher keinen Klang mitbringen —
@@ -33910,6 +33910,16 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         // Selbstloesch-Transit. Mit `durationMs + 120` erschien die
         // Karte spuerbar zu spaet (Als Befund 19.8.).
         setTimeout(() => setHidden(prev => Math.max(0, prev - 1)),
+          (laneDelay || 0) + Math.round(durationMs * 0.8));
+      }
+      // ★ LANDEKLANG (Als Befund 26.9., Idej-Anlegen zu Spielbeginn war
+      // stumm). Gegenstueck zu `sfx` (Abflug): ein Flug darf auch einen
+      // Klang fuer die LANDUNG nennen. Er kommt, wenn die Karte ueber dem
+      // Ziel sitzt — bei 80 % der Flugdauer, s. oben —, samt Startversatz.
+      // `dedupe: 0`, weil Serien (mehrere Karten nacheinander) jede
+      // einzeln hoerbar landen sollen.
+      if (landSfx && window.playSFX) {
+        setTimeout(() => window.playSFX(landSfx, { dedupe: 0 }),
           (laneDelay || 0) + Math.round(durationMs * 0.8));
       }
       // ★ v1062: Start UND Weg auf ganze Pixel runden. `srcX`/`srcY`
