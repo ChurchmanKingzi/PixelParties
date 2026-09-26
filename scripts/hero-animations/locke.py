@@ -51,9 +51,11 @@ def stick_color(x, oy):
 STICK = [(x, oy, stick_color(x, oy)) for oy in range(9, 19) for x in range(18, 22)]
 HAND = [(x, oy) for oy in range(13, 18) for x in range(19, 23)
         if SRC[oy, x, 3] and px(SRC, x, oy) not in DYN]
-# Unterarm hinter der Stange (sonst schwebt die Hand, wenn die Stange fliegt)
+# Arm hinter der Stange (sonst schwebt die Hand, wenn die Stange fliegt)
 SLEEVE_OUT, SLEEVE, SLEEVE_HI = rgb('000000'), rgb('202020'), rgb('414141')
-ARM = [(x, 13, SLEEVE_OUT) for x in (18, 19)] + [(x, 14, SLEEVE_HI) for x in (18, 19)] + \
+# Oberarm von der Schulter (Zeile 9) herunter, Unterarm bis zur Hand
+ARM = [(18, oy, SLEEVE) for oy in range(9, 13)] + [(19, oy, SLEEVE_OUT) for oy in range(9, 13)] + \
+      [(x, 13, SLEEVE_HI) for x in (18, 19)] + [(x, 14, SLEEVE_HI) for x in (18, 19)] + \
       [(x, oy, SLEEVE) for oy in (15, 16) for x in (18, 19)] + [(x, 17, SLEEVE_OUT) for x in (18, 19)]
 
 

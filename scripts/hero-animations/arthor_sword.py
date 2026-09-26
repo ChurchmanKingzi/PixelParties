@@ -69,6 +69,8 @@ def in_sword(x, y):
         return 29 <= x <= 34
     if 104 <= y <= 105:                                       # Griffende + Knauf
         return 29 <= x <= 34
+    if 103 <= y <= 106 and 35 <= x <= 37:                     # Knaufstück rechts (rot/orange)
+        return True
     return 106 <= y <= 108 and 32 <= x <= 34                  # rechte Knaufseite
 
 

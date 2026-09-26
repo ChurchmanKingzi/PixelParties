@@ -2,8 +2,8 @@
 """Idle-Animation für Lilly, the Charming Infiltrator (20x27 + 8 px oben = 20x35).
 
 Süße Neck-Geste („Bäh!“):
-* Sie streckt die Zunge raus – im Takt weiter raus und wieder ein Stück rein,
-  die Zungenspitze wackelt hin und her.
+* Die Zunge (im Original halb draußen) geht im Takt ganz rein, halb raus
+  und weit raus; weit draußen wackelt die Spitze hin und her.
 * Im selben Takt zieht die gehobene Hand die Haut unter dem geschlossenen
   Auge herunter (Hand rutscht 1 px, rosa Innenlid wird sichtbar).
 * Sie wippt frech mit (Füße fest).
@@ -37,22 +37,40 @@ HEART = [(-2, 0, PINK_DK), (-1, 0, PINK_HI), (1, 0, PINK_DK), (2, 0, PINK_DK),
 SMALL_HEART = [(-1, 0, PINK_HI), (1, 0, PINK_DK), (-1, 1, PINK), (0, 1, PINK), (1, 1, PINK), (0, 2, PINK)]
 
 
+def tongue_state(i):
+    """Zunge im 12er-Takt: 'drin' -> 'halb' (Original) -> 'raus' -> 'halb' -> 'drin'."""
+    t = i % 12
+    if t in (0, 1, 10, 11):
+        return 'drin'
+    if t in (2, 9):
+        return 'halb'
+    return 'raus'
+
+
 def beat(i):
-    """Neck-Takt: 1 = voll raus (Zunge weit, Lid weit runter)."""
-    return 1 if (i % 12) in (2, 3, 4, 5, 6) else 0
+    """Neck-Takt: 1 = voll raus (Zunge weit, Lid runtergezogen)."""
+    return 1 if tongue_state(i) == 'raus' else 0
 
 
 def bob(i):
-    return -1 if (i % 12) in (3, 4, 5) else 0
+    return -1 if (i % 12) in (4, 5, 6, 7) else 0
+
+
+CHIN, COLLAR = rgb('f7bd9c'), rgb('403000')
 
 
 def face(a, i):
     y = PT
-    if beat(i):
-        a[16 + y, 9] = TONGUE                             # Zunge weiter raus
-        a[16 + y, 10] = TONGUE_DK
-        tip = 9 if (i // 2) % 2 == 0 else 10               # Spitze wackelt
-        a[17 + y, tip] = TONGUE_HI
+    st = tongue_state(i)
+    if st == 'drin':                                      # Zunge ganz drin
+        a[14 + y, 9] = CHIN
+        a[14 + y, 10] = CHIN
+        a[15 + y, 9] = COLLAR
+        a[15 + y, 10] = COLLAR
+    elif st == 'raus':                                    # Zunge weiter raus, Spitze wackelt
+        tip = 9 if (i // 2) % 2 == 0 else 10
+        a[16 + y, 9] = TONGUE_HI if tip == 9 else TONGUE_DK
+        a[16 + y, 10] = TONGUE_HI if tip == 10 else TONGUE
         # gehobene Hand zieht die Haut unter dem geschlossenen Auge runter:
         # Hand (samt Ärmelansatz) rutscht 1 px nach unten, rosa Innenlid sichtbar
         blk = a[12 + y:18 + y, 12:16].copy()
