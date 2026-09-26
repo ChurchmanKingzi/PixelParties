@@ -8819,35 +8819,58 @@ class GameEngine {
   // teilen sich den aeussersten Aufschub. Ausserhalb einer Klammer
   // (Einzeltreffer) aendert sich nichts.
 
+  //
+  // Kreaturen genauso (Als Vorgabe 26.9., „Erst Schaden, dann Tode"):
+  // `processCreatureDamageBatch` wickelt Tode erst nach dem letzten
+  // Eintrag ab, und in einer Klammer landen sie in derselben Liste wie
+  // die Heldentode (`_kreaturTodMelden`) — so trifft etwa Armageddon,
+  // das jede Kreatur einzeln trifft, wirklich alle, bevor eine stirbt.
+
   /** Aufschub oeffnen (verschachtelbar). */
-  _heldenTodAufschubBeginnen() {
-    const a = this._heldenTodAufschub;
+  _todesAufschubBeginnen() {
+    const a = this._todesAufschub;
     if (a) { a.tiefe += 1; return; }
-    this._heldenTodAufschub = { tiefe: 1, liste: [] };
+    this._todesAufschub = { tiefe: 1, liste: [] };
   }
 
-  /** Aufschub schliessen; der aeusserste wickelt alle vorgemerkten Tode ab. */
-  async _heldenTodAufschubAbschliessen() {
-    const a = this._heldenTodAufschub;
+  /** Aufschub schliessen; der aeusserste wickelt alle vorgemerkten Tode
+   *  ab — Helden und Kreaturen in der Reihenfolge, in der sie fielen. */
+  async _todesAufschubAbschliessen() {
+    const a = this._todesAufschub;
     if (!a) return;
     if (a.tiefe > 1) { a.tiefe -= 1; return; }
-    this._heldenTodAufschub = null;
-    for (const e of a.liste) {
-      // Zwischenzeitlich geheilt (oder schon abgewickelt): kein Tod mehr.
-      if (!(e.target.hp <= 0) || e.target._koProcessed) continue;
-      await this._heldKoAbwickeln(e.target, e.source, e.opts);
-    }
+    this._todesAufschub = null;
+    if (a.liste.length === 0) return;
+    // Ein Sammler um ALLE Kreaturentode des Schlags: „one or more of your
+    // Creatures are defeated" sieht die ganze Liste auf einmal.
+    await this._mitNiederlagenSammler(async () => {
+      const handLimitAffectedOwners = new Set();
+      for (const t of a.liste) {
+        if (t.art === 'kreatur') {
+          await this._kreaturTodAbwickeln(t.e, handLimitAffectedOwners);
+          this.sync();
+          await this._delay(200);
+          continue;
+        }
+        // Zwischenzeitlich geheilt (oder schon abgewickelt): kein Tod mehr.
+        if (!(t.target.hp <= 0) || t.target._koProcessed) continue;
+        await this._heldKoAbwickeln(t.target, t.source, t.opts);
+      }
+      for (const owner of handLimitAffectedOwners) {
+        await this._checkReactiveHandLimits(owner);
+      }
+    });
   }
 
   /** Ein Held ist auf 0 HP gefallen: sofort abwickeln oder vormerken. */
   async _heldKoMelden(target, source, opts = {}) {
-    const a = this._heldenTodAufschub;
+    const a = this._todesAufschub;
     if (a) {
-      if (!a.liste.some(e => e.target === target)) {
+      if (!a.liste.some(t => t.art === 'held' && t.target === target)) {
         // `diedOnTurn` sofort: der Held liegt ab jetzt am Boden, auch
         // wenn Hooks und Aufraeumen erst nach dem Schlag laufen.
         target.diedOnTurn = this.gs.turn;
-        a.liste.push({ target, source, opts });
+        a.liste.push({ art: 'held', target, source, opts });
       }
       return;
     }
@@ -35502,15 +35525,17 @@ this._deathWatch = (this._deathWatchStack || []).length
    */
   beginMultiHit(anzahl) {
     this._multiHitScope = { total: anzahl || 0, tiefe: (this._multiHitScope?.tiefe || 0) + 1 };
-    // Erst aller Schaden, dann alle Tode (Als Befund 26.9.): Heldentode
-    // innerhalb der Klammer werden nur vorgemerkt (`_heldKoMelden`).
-    this._heldenTodAufschubBeginnen();
+    // Erst aller Schaden, dann alle Tode (Als Befund/Vorgabe 26.9.):
+    // Helden- UND Kreaturentode innerhalb der Klammer werden nur
+    // vorgemerkt (`_heldKoMelden`, `_kreaturTodMelden`).
+    this._todesAufschubBeginnen();
     return this._multiHitScope;
   }
 
   /**
    * Klammer schliessen. ASYNCHRON seit dem Todes-Aufschub (26.9.): die
-   * aeusserste Klammer wickelt hier die vorgemerkten Heldentode ab —
+   * aeusserste Klammer wickelt hier die vorgemerkten Tode ab (Helden
+   * und Kreaturen, in Trefferreihenfolge) —
    * NACH dem letzten Treffer, noch innerhalb des Scopes (wie bisher, als
    * der Tod mitten in der Trefferschleife lief). Aufrufer muessen
    * `await engine.endMultiHit()` schreiben, sonst liefen die Tode
@@ -35519,7 +35544,7 @@ this._deathWatch = (this._deathWatchStack || []).length
   async endMultiHit() {
     if (!this._multiHitScope) return;
     try {
-      await this._heldenTodAufschubAbschliessen();
+      await this._todesAufschubAbschliessen();
     } finally {
       if (this._multiHitScope) {
         if ((this._multiHitScope.tiefe || 1) <= 1) this._multiHitScope = null;
@@ -42064,6 +42089,9 @@ this._deathWatch = (this._deathWatchStack || []).length
     // values from Royal Corgi) died in this batch. Rechecked after the
     // batch resolves so reactive deletion prompts fire immediately.
     const handLimitAffectedOwners = new Set();
+    // Kreaturen, die in diesem Durchgang auf 0 HP fallen — ihr Tod wird
+    // erst nach dem letzten Treffer abgewickelt (s. unten).
+    const sterbende = [];
 
     // Batch-level post-target hand-reaction window. Most spells /
     // attacks route their damage through `promptDamageTarget` /
@@ -42692,210 +42720,26 @@ this._deathWatch = (this._deathWatchStack || []).length
       }
 
       if (e.inst.counters.currentHp <= 0) {
-        // Stempel VOR jeder await-Kette setzen — der Riegel oben in
-        // dieser Schleife und die Filter der Karten lesen ihn, waehrend
-        // die Todes-Hooks noch laufen und die Instanz noch getrackt ist.
-        // Der Revive-Zweig weiter unten baut ueber
-        // `summonCreatureWithHooks` eine FRISCHE Instanz, der Stempel
-        // auf der alten steht dem also nicht im Weg.
+        // Stempel SOFORT setzen — der Riegel oben in dieser Schleife und
+        // die Filter der Karten lesen ihn, waehrend die Instanz noch
+        // getrackt ist (bis ihr Tod abgewickelt ist). Der Revive-Zweig
+        // baut ueber `summonCreatureWithHooks` eine FRISCHE Instanz, der
+        // Stempel auf der alten steht dem also nicht im Weg.
         e.inst._deathResolved = true;
-        // ── ANSPRUCHSFENSTER (v679b) ────────────────────────────────
-        // Laeuft VOR der Ablage und vor dem Flug dorthin. Wer den
-        // Kadaver beansprucht, stempelt `_deathClaim`; der Tod laeuft
-        // danach normal weiter (on-death feuert), aber die Karte wird
-        // NICHT abgelegt und fliegt auch nicht sichtbar dorthin.
-        await this.runHooks(HOOKS.ON_CREATURE_DEATH_CLAIM, {
-          creature: {
-            name: e.inst.name, owner: e.inst.owner,
-            originalOwner: e.inst.originalOwner,
-            controller: e.inst.controller ?? e.inst.owner,
-            heroIdx: e.inst.heroIdx, zoneSlot: e.inst.zoneSlot,
-            instId: e.inst.id,
-            turnPlayed: e.inst.turnPlayed,
-          },
-          source: e.source, type: e.type, _skipReactionCheck: true,
-        });
-        const _claim = e.inst._deathClaim || null;
-        if (_claim) this._sendDeathClaimHold(e.inst);
-        // PHYSICAL side is where the supportZones array actually contains
-        // the card name. Stays equal to `owner` for normal creatures and
-        // for temporary steals (Deepsea Succubus leaves the card on
-        // owner's board) — but flips to `controller` for permanent cross-
-        // side placements (Chilly Wizard). Without this distinction, the
-        // splice below failed silently and left the dead creature visible
-        // on opp's slot indefinitely.
-        const physicalSide = (e.inst.stolenBy != null)
-          ? e.inst.owner
-          : (e.inst.controller ?? e.inst.owner);
-        const ps = this.gs.players[physicalSide];
-        this.log('creature_destroyed', { card: e.inst.name, by: e.source?.name || e.type, owner: e.inst.owner, heroIdx: e.inst.heroIdx, zoneSlot: e.inst.zoneSlot });
-        // Store death info before cleanup. `instId` lets on-death listeners
-        // match the dying instance precisely (Hell Fox self-detect, etc.) —
-        // matching by owner+heroIdx+zoneSlot can be ambiguous if two
-        // dying-this-batch entries share a slot path. `controller` is
-        // included so "your opponent controls" listeners (Carpet Bomblebee,
-        // etc.) can attribute the death to the correct side — a cross-side
-        // placed Chilly Wizard dying counts as the CONTROLLER's creature,
-        // not the original owner's.
-        const deathInfo = { name: e.inst.name, owner: e.inst.owner, originalOwner: e.inst.originalOwner, controller: e.inst.controller ?? e.inst.owner, heroIdx: e.inst.heroIdx, zoneSlot: e.inst.zoneSlot, instId: e.inst.id, level: this.kreaturLevelJetzt(e.inst) };   // v1334: level
-        // If this creature contributed to hand-size math (e.g. Royal Corgi's
-        // -3 bonus, or a hypothetical reducer-creature), flag the owner for a
-        // hand-limit recheck once the batch settles.
-        if ((e.inst.counters.handLimitReduction || 0) !== 0) {
-          handLimitAffectedOwners.add(e.inst.owner);
-        }
-        const supSlot = ps?.supportZones?.[e.inst.heroIdx]?.[e.inst.zoneSlot];
-        if (supSlot) {
-          const idx = supSlot.indexOf(e.inst.name);
-          if (idx >= 0) supSlot.splice(idx, 1);
-        }
-        // ★ VERDECKTE KARTE AUFDECKEN (v775, Als Befund 5.9.) — vor dem
-        // Ablegen und vor dem Flug dorthin, damit „Monster Nest" schon
-        // im Platz steht, waehrend die getoetete Creature wegfliegt.
-        // Zwillingsstelle zu `_removeCardFromState`; dieser Pfad hat
-        // seinen eigenen Splice und laeuft dort nicht durch.
-        this._surfaceNestedUnder(e.inst);
-        // Cards return to their ORIGINAL owner's discard pile (Tokens go to deleted pile)
-        const creatureDiscardPs = this.gs.players[e.inst.originalOwner];
-        let _creatureDest = null;
-        // ★★ v1347: eingesogen (`_sogUrsprung`) → der Flug startet in der
-        // Brettmitte, nicht in der Zone. Der Merker wird HIER verbraucht,
-        // auch bei beanspruchtem Kadaver — so weiss `_sogAbschliessen`,
-        // dass diese Kreatur nicht zurueckfliegen darf.
-        const _ausDemSog = !!e.inst._sogUrsprung;
-        delete e.inst._sogUrsprung;
-        // Beanspruchter Kadaver: kein Stapel, kein Flug dorthin. Die
-        // Karte geht gleich in die Hand oder direkt in ihre neue Zone.
-        if (creatureDiscardPs && !_claim) {
-          const effectiveCd = this.getEffectiveCardData(e.inst);
-          // ★★ v1135 (Als Befund 15.9.: „Hell Fox fliegt jetzt visuell
-          // vom Board zum Discard, ehe es im Deleted Pile landet. Das
-          // ist falsch.").
-          //
-          // ★ ES GIBT ZWEI TODESPFADE, und ich hatte nur den einen
-          // (`actionDestroyCard`) auf `deletesSelfOnDeath` umgestellt.
-          // DIESER hier — der Schadens-Batch — routet voellig eigenes
-          // Ziel und eigenen Flug. Eine Karte, die sich bei ihrem Tod
-          // selbst loescht, landete darueber weiterhin erst in der
-          // Ablage und wurde danach umgebucht: zwei Bilder, genau der
-          // Fehler von v1134.
-          //
-          // Derselbe Fehler wie bei den acht Flugwegen (v1133): eine
-          // Absicherung an EINER Stelle ist keine Absicherung.
-          const _selbstLoeschend = !!loadCardEffect(e.inst.name)?.deletesSelfOnDeath;
-          if ((effectiveCd && hasCardType(effectiveCd, 'Token')) || _selbstLoeschend) {
-            creatureDiscardPs.deletedPile.push(e.inst.name);
-            _creatureDest = 'deleted';
-          } else {
-            creatureDiscardPs.discardPile.push(e.inst.name);
-            _creatureDest = 'discard';
-          }
-          // Broadcast a slot-specific fly-out so the client animates
-          // from THIS specific dying inst's support slot — without it,
-          // the diff-detector's name-keyed rect lookup falls back to
-          // FIFO order and always picks the leftmost copy when
-          // multiple same-named creatures share the board.
-          //
-          // `fromOwner` MUST be the inst's PHYSICAL side (where it
-          // actually renders), not raw owner. For temporary steals
-          // (Deepsea Succubus, Treacherous Crystal lend) physicalSide
-          // equals owner. For permanent cross-side placements (Chilly
-          // Wizard) physicalSide is the controller — without this the
-          // client queries an empty same-indexed slot on owner's board
-          // and animates a phantom card. The discard pile destination
-          // still routes to `originalOwner` so cards always go home.
-          this._broadcastEvent('play_pile_transfer', {
-            fromOwner: physicalSide,
-            toOwner:   e.inst.originalOwner,
-            cardName:  e.inst.name,
-            from:      _ausDemSog ? 'boardCenter' : 'support',
-            to:        _creatureDest,
-            fromHeroIdx: e.inst.heroIdx,
-            fromSlotIdx: e.inst.zoneSlot,
-            _creatureDeath: true,
-          });
-        }
-        // Attached Hero (Goff/Gon-style) follows the host Creature into
-        // the same original-owner's discard pile when the host dies.
-        // The Hero was never tracked as an instance — only stored as a
-        // name on `inst.counters.attachedHero` — so we just push the
-        // name into the discard.
-        const attachedHero = e.inst.counters?.attachedHero;
-        if (attachedHero && creatureDiscardPs) {
-          creatureDiscardPs.discardPile.push(attachedHero);
-          this.log('attached_hero_discarded', {
-            hero: attachedHero, creature: e.inst.name,
-            player: creatureDiscardPs.username,
-          });
-        }
-        // `_onlyCard: e.inst` — onCardLeaveZone fires ONLY the leaving
-        // card's own cleanup hook, not every tracked card's. Without this
-        // filter, every creature death made cards like Flying Island
-        // (whose onCardLeaveZone removes its island zones) mistakenly
-        // think THEY left. Other cards that want to react to creature
-        // deaths should hook onCreatureDeath instead.
-        //
-        // Order matters: runHooks filters listeners from cardInstances,
-        // so the dying card must still be tracked when the hook fires —
-        // otherwise its own leave hook never runs (Pollution Piranha's
-        // delete-a-card-on-leave, etc.). Untracking happens after.
-        // ★ ZUSTAND NACHZIEHEN, BEVOR DIE HOOKS LAUFEN (v901) ─────────
-        // Zone und Ablage sind oben schon umgebucht und der Flug ist
-        // angesagt — aber der Client hat den neuen Stand noch nicht.
-        // Ohne diesen `sync()` erfaehrt er vom Ablage-Zuwachs erst,
-        // wenn die Todes-Hooks fertig sind. Bei kurzen Hooks faellt das
-        // nicht auf; Tryses Handabwurf dauert fast eine Sekunde, und bis
-        // dahin ist die Vormerkung des Fluges abgelaufen: der
-        // Zuwachs-Erkenner haelt den Kadaver fuer einen NEUEN Eintrag
-        // und laesst ihn ein zweites Mal von seinem gemerkten Brettplatz
-        // losfliegen — Als „kurzes Aufblitzen in der Zone".
+        // ★ Erst aller Schaden, dann alle Tode (Als Vorgabe 26.9.): der
+        // Tod wird hier nur vorgemerkt und nach der Schleife abgewickelt
+        // — in einer Flaechenklammer sogar erst beim Schliessen der
+        // Klammer (s. `_kreaturTodMelden`).
+        sterbende.push(e);
+      } else {
         this.sync();
-        await this.runHooks('onCardLeaveZone', { _onlyCard: e.inst, leavingCard: e.inst, fromZone: 'support', fromOwner: e.inst.owner, fromHeroIdx: e.inst.heroIdx, fromZoneSlot: e.inst.zoneSlot, _skipReactionCheck: true });
-        if (!this._fastMode && todesWacheAn()) {
-          const wPs = this.gs.players[e.inst.controller ?? e.inst.owner];
-          const wSlot = wPs?.supportZones?.[e.inst.heroIdx]?.[e.inst.zoneSlot] || [];
-          console.log(`[TOD] „${e.inst.name}" stirbt (Schadens-Batch) — Zone=${JSON.stringify(wSlot)} `
-            + `Ablage=${(this.gs.players[e.inst.originalOwner]?.discardPile || []).length}`);
-          this._deathWatch = { name: e.inst.name, id: e.inst.id,
-            seite: e.inst.controller ?? e.inst.owner,
-            heroIdx: e.inst.heroIdx, slotIdx: e.inst.zoneSlot, syncs: 0, t0: Date.now() };
-        }
-        await this.runHooks(HOOKS.ON_CREATURE_DEATH, { creature: deathInfo, source: e.source, type: e.type, _skipReactionCheck: true });
-        if (this._deathWatch?.id === e.inst.id) {
-          console.log(`[TOD] Hooks fertig nach ${Date.now() - this._deathWatch.t0} ms, `
-            + `${this._deathWatch.syncs} sync(s) dazwischen`);
-  // ★ v1129: das naechstaeussere Fenster wird wieder das aktive.
-  this._deathWatch = (this._deathWatchStack || []).length
-    ? this._deathWatchStack[this._deathWatchStack.length - 1] : null;
-        }
-        // Capture revive-after-death intent BEFORE untracking. "Kill
-        // and revive" pre-defeat reactions (Loyal Bone Dog) stamp this
-        // on the dying instance during their resolver — letting the
-        // death proceed normally so onCreatureDeath listeners (Loyal
-        // Terrier's death-watch chain, etc.) all fire on the actual
-        // death event, then re-summoning a fresh instance into the
-        // same slot afterwards. The previous instance's counters are
-        // gone — this is intentional, matching the user's framing of
-        // "the Creature was actually killed and then revived, NOT
-        // protected".
-        const reviveAfterDeath = e.inst._reviveAfterDeath;
-        // ── EINLOESUNG DES ANSPRUCHS (v679b) ────────────────────────
-        // Laeuft nach ALLEN Todeslistenern und nach dem Untracking —
-        // die Creature war fuer jeden on-death-Effekt regulaer tot.
-        // Der Kadaver wurde oben NICHT abgelegt, es gibt also weder
-        // einen Zwischenstopp im Ablagestapel noch einen Flug dorthin.
-        const _claimHerkunft = {
-          owner: e.inst.controller ?? e.inst.owner,
-          heroIdx: e.inst.heroIdx, zoneSlot: e.inst.zoneSlot,
-          turnPlayed: e.inst.turnPlayed,
-          originalOwner: e.inst.originalOwner,
-        };
-        this._untrackCard(e.inst.id);
-        await this._redeemDeathClaim(_claim, _claimHerkunft);
-        await this._wiederbelebungNachTod(reviveAfterDeath);   // v1360: gemeinsamer Weg
+        await this._delay(200);
       }
-      this.sync();
-      await this._delay(200);
+    }
+
+    // ── Tode dieses Durchgangs (nach ALLEM Schaden) ──
+    for (const e of sterbende) {
+      await this._kreaturTodMelden(e, handLimitAffectedOwners);
     }
 
     await this.runHooks(HOOKS.AFTER_CREATURE_DAMAGE_BATCH, { entries, _skipReactionCheck: true });
@@ -42933,6 +42777,223 @@ this._deathWatch = (this._deathWatchStack || []).length
     for (const owner of handLimitAffectedOwners) {
       await this._checkReactiveHandLimits(owner);
     }
+  }
+
+  /**
+   * ★ Tod einer Kreatur aus dem Schadens-Durchgang (Als Vorgabe 26.9.:
+   * „Erst Schaden, dann Tode"). Innerhalb einer Flaechenklammer nur
+   * vorgemerkt — abgewickelt beim Schliessen der Klammer, zusammen mit
+   * den Heldentoden in Trefferreihenfolge (`_todesAufschubAbschliessen`).
+   * Sonst sofort, am Ende des Durchgangs. `handLimitAffectedOwners`
+   * sammelt Besitzer, deren Handlimit neu zu pruefen ist.
+   */
+  async _kreaturTodMelden(e, handLimitAffectedOwners) {
+    const a = this._todesAufschub;
+    if (a) {
+      a.liste.push({ art: 'kreatur', e });
+      return;
+    }
+    await this._kreaturTodAbwickeln(e, handLimitAffectedOwners);
+    this.sync();
+    await this._delay(200);
+  }
+
+  /** Der eigentliche Todeszweig einer Kreatur (bis v1400 inline im Batch). */
+  async _kreaturTodAbwickeln(e, handLimitAffectedOwners) {
+    // ── ANSPRUCHSFENSTER (v679b) ────────────────────────────────
+    // Laeuft VOR der Ablage und vor dem Flug dorthin. Wer den
+    // Kadaver beansprucht, stempelt `_deathClaim`; der Tod laeuft
+    // danach normal weiter (on-death feuert), aber die Karte wird
+    // NICHT abgelegt und fliegt auch nicht sichtbar dorthin.
+    await this.runHooks(HOOKS.ON_CREATURE_DEATH_CLAIM, {
+      creature: {
+        name: e.inst.name, owner: e.inst.owner,
+        originalOwner: e.inst.originalOwner,
+        controller: e.inst.controller ?? e.inst.owner,
+        heroIdx: e.inst.heroIdx, zoneSlot: e.inst.zoneSlot,
+        instId: e.inst.id,
+        turnPlayed: e.inst.turnPlayed,
+      },
+      source: e.source, type: e.type, _skipReactionCheck: true,
+    });
+    const _claim = e.inst._deathClaim || null;
+    if (_claim) this._sendDeathClaimHold(e.inst);
+    // PHYSICAL side is where the supportZones array actually contains
+    // the card name. Stays equal to `owner` for normal creatures and
+    // for temporary steals (Deepsea Succubus leaves the card on
+    // owner's board) — but flips to `controller` for permanent cross-
+    // side placements (Chilly Wizard). Without this distinction, the
+    // splice below failed silently and left the dead creature visible
+    // on opp's slot indefinitely.
+    const physicalSide = (e.inst.stolenBy != null)
+      ? e.inst.owner
+      : (e.inst.controller ?? e.inst.owner);
+    const ps = this.gs.players[physicalSide];
+    this.log('creature_destroyed', { card: e.inst.name, by: e.source?.name || e.type, owner: e.inst.owner, heroIdx: e.inst.heroIdx, zoneSlot: e.inst.zoneSlot });
+    // Store death info before cleanup. `instId` lets on-death listeners
+    // match the dying instance precisely (Hell Fox self-detect, etc.) —
+    // matching by owner+heroIdx+zoneSlot can be ambiguous if two
+    // dying-this-batch entries share a slot path. `controller` is
+    // included so "your opponent controls" listeners (Carpet Bomblebee,
+    // etc.) can attribute the death to the correct side — a cross-side
+    // placed Chilly Wizard dying counts as the CONTROLLER's creature,
+    // not the original owner's.
+    const deathInfo = { name: e.inst.name, owner: e.inst.owner, originalOwner: e.inst.originalOwner, controller: e.inst.controller ?? e.inst.owner, heroIdx: e.inst.heroIdx, zoneSlot: e.inst.zoneSlot, instId: e.inst.id, level: this.kreaturLevelJetzt(e.inst) };   // v1334: level
+    // If this creature contributed to hand-size math (e.g. Royal Corgi's
+    // -3 bonus, or a hypothetical reducer-creature), flag the owner for a
+    // hand-limit recheck once the batch settles.
+    if ((e.inst.counters.handLimitReduction || 0) !== 0) {
+      handLimitAffectedOwners.add(e.inst.owner);
+    }
+    const supSlot = ps?.supportZones?.[e.inst.heroIdx]?.[e.inst.zoneSlot];
+    if (supSlot) {
+      const idx = supSlot.indexOf(e.inst.name);
+      if (idx >= 0) supSlot.splice(idx, 1);
+    }
+    // ★ VERDECKTE KARTE AUFDECKEN (v775, Als Befund 5.9.) — vor dem
+    // Ablegen und vor dem Flug dorthin, damit „Monster Nest" schon
+    // im Platz steht, waehrend die getoetete Creature wegfliegt.
+    // Zwillingsstelle zu `_removeCardFromState`; dieser Pfad hat
+    // seinen eigenen Splice und laeuft dort nicht durch.
+    this._surfaceNestedUnder(e.inst);
+    // Cards return to their ORIGINAL owner's discard pile (Tokens go to deleted pile)
+    const creatureDiscardPs = this.gs.players[e.inst.originalOwner];
+    let _creatureDest = null;
+    // ★★ v1347: eingesogen (`_sogUrsprung`) → der Flug startet in der
+    // Brettmitte, nicht in der Zone. Der Merker wird HIER verbraucht,
+    // auch bei beanspruchtem Kadaver — so weiss `_sogAbschliessen`,
+    // dass diese Kreatur nicht zurueckfliegen darf.
+    const _ausDemSog = !!e.inst._sogUrsprung;
+    delete e.inst._sogUrsprung;
+    // Beanspruchter Kadaver: kein Stapel, kein Flug dorthin. Die
+    // Karte geht gleich in die Hand oder direkt in ihre neue Zone.
+    if (creatureDiscardPs && !_claim) {
+      const effectiveCd = this.getEffectiveCardData(e.inst);
+      // ★★ v1135 (Als Befund 15.9.: „Hell Fox fliegt jetzt visuell
+      // vom Board zum Discard, ehe es im Deleted Pile landet. Das
+      // ist falsch.").
+      //
+      // ★ ES GIBT ZWEI TODESPFADE, und ich hatte nur den einen
+      // (`actionDestroyCard`) auf `deletesSelfOnDeath` umgestellt.
+      // DIESER hier — der Schadens-Batch — routet voellig eigenes
+      // Ziel und eigenen Flug. Eine Karte, die sich bei ihrem Tod
+      // selbst loescht, landete darueber weiterhin erst in der
+      // Ablage und wurde danach umgebucht: zwei Bilder, genau der
+      // Fehler von v1134.
+      //
+      // Derselbe Fehler wie bei den acht Flugwegen (v1133): eine
+      // Absicherung an EINER Stelle ist keine Absicherung.
+      const _selbstLoeschend = !!loadCardEffect(e.inst.name)?.deletesSelfOnDeath;
+      if ((effectiveCd && hasCardType(effectiveCd, 'Token')) || _selbstLoeschend) {
+        creatureDiscardPs.deletedPile.push(e.inst.name);
+        _creatureDest = 'deleted';
+      } else {
+        creatureDiscardPs.discardPile.push(e.inst.name);
+        _creatureDest = 'discard';
+      }
+      // Broadcast a slot-specific fly-out so the client animates
+      // from THIS specific dying inst's support slot — without it,
+      // the diff-detector's name-keyed rect lookup falls back to
+      // FIFO order and always picks the leftmost copy when
+      // multiple same-named creatures share the board.
+      //
+      // `fromOwner` MUST be the inst's PHYSICAL side (where it
+      // actually renders), not raw owner. For temporary steals
+      // (Deepsea Succubus, Treacherous Crystal lend) physicalSide
+      // equals owner. For permanent cross-side placements (Chilly
+      // Wizard) physicalSide is the controller — without this the
+      // client queries an empty same-indexed slot on owner's board
+      // and animates a phantom card. The discard pile destination
+      // still routes to `originalOwner` so cards always go home.
+      this._broadcastEvent('play_pile_transfer', {
+        fromOwner: physicalSide,
+        toOwner:   e.inst.originalOwner,
+        cardName:  e.inst.name,
+        from:      _ausDemSog ? 'boardCenter' : 'support',
+        to:        _creatureDest,
+        fromHeroIdx: e.inst.heroIdx,
+        fromSlotIdx: e.inst.zoneSlot,
+        _creatureDeath: true,
+      });
+    }
+    // Attached Hero (Goff/Gon-style) follows the host Creature into
+    // the same original-owner's discard pile when the host dies.
+    // The Hero was never tracked as an instance — only stored as a
+    // name on `inst.counters.attachedHero` — so we just push the
+    // name into the discard.
+    const attachedHero = e.inst.counters?.attachedHero;
+    if (attachedHero && creatureDiscardPs) {
+      creatureDiscardPs.discardPile.push(attachedHero);
+      this.log('attached_hero_discarded', {
+        hero: attachedHero, creature: e.inst.name,
+        player: creatureDiscardPs.username,
+      });
+    }
+    // `_onlyCard: e.inst` — onCardLeaveZone fires ONLY the leaving
+    // card's own cleanup hook, not every tracked card's. Without this
+    // filter, every creature death made cards like Flying Island
+    // (whose onCardLeaveZone removes its island zones) mistakenly
+    // think THEY left. Other cards that want to react to creature
+    // deaths should hook onCreatureDeath instead.
+    //
+    // Order matters: runHooks filters listeners from cardInstances,
+    // so the dying card must still be tracked when the hook fires —
+    // otherwise its own leave hook never runs (Pollution Piranha's
+    // delete-a-card-on-leave, etc.). Untracking happens after.
+    // ★ ZUSTAND NACHZIEHEN, BEVOR DIE HOOKS LAUFEN (v901) ─────────
+    // Zone und Ablage sind oben schon umgebucht und der Flug ist
+    // angesagt — aber der Client hat den neuen Stand noch nicht.
+    // Ohne diesen `sync()` erfaehrt er vom Ablage-Zuwachs erst,
+    // wenn die Todes-Hooks fertig sind. Bei kurzen Hooks faellt das
+    // nicht auf; Tryses Handabwurf dauert fast eine Sekunde, und bis
+    // dahin ist die Vormerkung des Fluges abgelaufen: der
+    // Zuwachs-Erkenner haelt den Kadaver fuer einen NEUEN Eintrag
+    // und laesst ihn ein zweites Mal von seinem gemerkten Brettplatz
+    // losfliegen — Als „kurzes Aufblitzen in der Zone".
+    this.sync();
+    await this.runHooks('onCardLeaveZone', { _onlyCard: e.inst, leavingCard: e.inst, fromZone: 'support', fromOwner: e.inst.owner, fromHeroIdx: e.inst.heroIdx, fromZoneSlot: e.inst.zoneSlot, _skipReactionCheck: true });
+    if (!this._fastMode && todesWacheAn()) {
+      const wPs = this.gs.players[e.inst.controller ?? e.inst.owner];
+      const wSlot = wPs?.supportZones?.[e.inst.heroIdx]?.[e.inst.zoneSlot] || [];
+      console.log(`[TOD] „${e.inst.name}" stirbt (Schadens-Batch) — Zone=${JSON.stringify(wSlot)} `
+        + `Ablage=${(this.gs.players[e.inst.originalOwner]?.discardPile || []).length}`);
+      this._deathWatch = { name: e.inst.name, id: e.inst.id,
+        seite: e.inst.controller ?? e.inst.owner,
+        heroIdx: e.inst.heroIdx, slotIdx: e.inst.zoneSlot, syncs: 0, t0: Date.now() };
+    }
+    await this.runHooks(HOOKS.ON_CREATURE_DEATH, { creature: deathInfo, source: e.source, type: e.type, _skipReactionCheck: true });
+    if (this._deathWatch?.id === e.inst.id) {
+      console.log(`[TOD] Hooks fertig nach ${Date.now() - this._deathWatch.t0} ms, `
+        + `${this._deathWatch.syncs} sync(s) dazwischen`);
+  // ★ v1129: das naechstaeussere Fenster wird wieder das aktive.
+  this._deathWatch = (this._deathWatchStack || []).length
+? this._deathWatchStack[this._deathWatchStack.length - 1] : null;
+    }
+    // Capture revive-after-death intent BEFORE untracking. "Kill
+    // and revive" pre-defeat reactions (Loyal Bone Dog) stamp this
+    // on the dying instance during their resolver — letting the
+    // death proceed normally so onCreatureDeath listeners (Loyal
+    // Terrier's death-watch chain, etc.) all fire on the actual
+    // death event, then re-summoning a fresh instance into the
+    // same slot afterwards. The previous instance's counters are
+    // gone — this is intentional, matching the user's framing of
+    // "the Creature was actually killed and then revived, NOT
+    // protected".
+    const reviveAfterDeath = e.inst._reviveAfterDeath;
+    // ── EINLOESUNG DES ANSPRUCHS (v679b) ────────────────────────
+    // Laeuft nach ALLEN Todeslistenern und nach dem Untracking —
+    // die Creature war fuer jeden on-death-Effekt regulaer tot.
+    // Der Kadaver wurde oben NICHT abgelegt, es gibt also weder
+    // einen Zwischenstopp im Ablagestapel noch einen Flug dorthin.
+    const _claimHerkunft = {
+      owner: e.inst.controller ?? e.inst.owner,
+      heroIdx: e.inst.heroIdx, zoneSlot: e.inst.zoneSlot,
+      turnPlayed: e.inst.turnPlayed,
+      originalOwner: e.inst.originalOwner,
+    };
+    this._untrackCard(e.inst.id);
+    await this._redeemDeathClaim(_claim, _claimHerkunft);
+    await this._wiederbelebungNachTod(reviveAfterDeath);   // v1360: gemeinsamer Weg
   }
 
   /**
