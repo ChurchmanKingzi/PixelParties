@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """05 Wowhalla – Die Halle der Coolness auf ihrer Wolkeninsel, Bifab-Regenbogenbrücke mit Fackeln,
-Helden des Cool-Archetyps auf dem Weg zur Halle, Wowkyrie am Himmel."""
+Wowkyrie am Himmel."""
 from lib import *
 
 rnd = random.Random(5)
@@ -357,27 +357,9 @@ comp(im, mini_island(52, 16, 9, MIDP), GIX, GIY)
 comp(im, steamify(area('wowhalla/steam')), GIX + 12, GIY - 50)
 comp(im, cloud3d(64, 16, bank(64, 16, 6, 51, 4, 8), CL, rim=(118, 168, 200)), GIX - 8, GIY + 6)
 
-# Die Nornstellar auf einer Eisscholle (links)
-nvn = native('The Nornstellar, Foretellers of Coolness')
-
-
-def norn_bg(a):
-    r, g, b = a[..., 0], a[..., 1], a[..., 2]; L = a[..., :3].mean(2)
-    m = ((b > 200) & (L > 150)) | ((r - b > 70) & (g > 120)) | ((r > g) & (g > b) & (r - b > 40) & (L > 70) & (L < 170)) | ((b > r + 30) & (L < 120))
-    return m & ~((b < 40) & (r > 220))
-
-
-norn = cut_by(nvn, (14, 10, 68, 44), norn_bg)
-na = np.array(norn); nm = na[..., 3] > 0
-nL = na[..., :3].astype(int).mean(2)
-nm[0:4, 26:30] &= nL[0:4, 26:30] > 30
-nm[0:13, 36:45] &= nL[0:13, 36:45] > 30
-lab, k = ndimage.label(nm); sz = ndimage.sum(nm, lab, range(1, k + 1)); nm = np.isin(lab, np.where(sz > 10)[0] + 1)
-na[..., 3] = np.where(nm, 255, 0)
-norn = Image.fromarray(na); norn = norn.crop(norn.getbbox())
-norn = outline(norn, (24, 20, 46, 255))
+# Eisscholle (links)
 FX, FY = 14, 268
-floe_w = norn.width + 12
+floe_w = 56
 floe = mini_island(floe_w, 14, 13, MIDP)
 fa = np.array(floe)
 fy_, fx_ = np.mgrid[0:fa.shape[0], 0:fa.shape[1]]
@@ -386,7 +368,6 @@ fa[top & (((fx_ + fy_) // 2) % 2 == 0)] = (150, 214, 238, 255)
 fa[top & (((fx_ + fy_) // 2) % 2 == 1)] = (236, 248, 252, 255)
 fa[(fy_ == 4) & (fa[..., 3] > 0)] = (60, 110, 160, 255)
 comp(im, Image.fromarray(fa), FX, FY)
-comp(im, norn, FX + 6, FY - norn.height + 3)
 comp(im, cloud3d(floe_w + 16, 14, bank(floe_w + 16, 14, 6, 52, 3, 7), CL, rim=(118, 168, 200)), FX - 10, FY + 8)
 
 # ---------------------------------------------------------------- Bifab – Regenbogenbrücke (perspektivisch)
@@ -508,60 +489,12 @@ for _ in range(10):
     w = road_w(y); x = road_x(y) - w / 2 + rs2.uniform(0.1, 0.9) * w
     sparkle(dsp, int(x), y, 2 if w > 60 else 1, (255, 255, 230))
 
-# ---------------------------------------------------------------- Helden auf der Brücke
-
-
-def hero(name, box, bl, fix=None):
-    c = cut_native(native(name), box, barrier_lum=bl)
-    if fix:
-        c = fix(c)
-    c = keep_largest(c)
-    return c.crop(c.getbbox())
-
-
-def fix_sw(c):
-    a = np.array(c).astype(int)
-    a[0:2, :, 3] = 0
-    a[(a[..., 2] > a[..., 0] + 30), 3] = 0
-    return Image.fromarray(a.astype(np.uint8))
-
-
-def fix_th(c):
-    a = np.array(c).astype(int); L = a[..., :3].mean(2)
-    a[(a[..., 1] > a[..., 0] + 5) & (L < 95), 3] = 0
-    return Image.fromarray(a.astype(np.uint8))
-
-
-hip = hero('Hipdall, Protector of Coolness', (25, 8, 50, 36), 70)
-fre = hero('Freshya, Beauty of Coolness', (29, 13, 49, 41), 90)
-swa = hero('Swagdri, Forger of Coolness', (29, 20, 49, 42), 90, fix_sw)
-tho = hero('Thorad, Strength of Coolness', (33, 11, 54, 38), 70, fix_th)
-
-
-def on_road(sprite, y, f=0.5, flip=False, k=1):
-    w = road_w(y); x = road_x(y) - w / 2 + f * w
-    s = sprite.transpose(Image.FLIP_LEFT_RIGHT) if flip else sprite
-    if k > 1:
-        s = scale2x(s)
-    s = outline(s, (30, 24, 50, 255))
-    sh = Image.new('RGBA', (s.width + 2, 4), (0, 0, 0, 0))
-    ImageDraw.Draw(sh).ellipse((0, 0, s.width + 1, 3), fill=(50, 34, 96, 255))
-    shm = np.array(sh); shm[..., 3] = np.where(dither_mask(None, np.full(shm.shape[:2], 0.5)) & (shm[..., 3] > 0), 255, 0)
-    comp(im, Image.fromarray(shm), x - s.width // 2 - 1, y - 1)
-    comp(im, s, x - s.width // 2, y - s.height + 1)
-
-
 items = []
 for y in TORCH_ROWS:
     items.append((y, 'torch', None))
-items += [(Y0 + 12, 'hero', (hip, 0.5, False, 1)), (Y0 + 40, 'hero', (swa, 0.35, False, 1)),
-          (Y0 + 70, 'hero', (tho, 0.62, True, 1)), (Y0 + 136, 'hero', (fre, 0.38, False, 2))]
 items.sort(key=lambda it: it[0])
 for (y, kind, arg) in items:
-    if kind == 'torch':
-        torch_at(y, -1); torch_at(y, 1)
-    else:
-        on_road(arg[0], y, arg[1], arg[2], arg[3])
+    torch_at(y, -1); torch_at(y, 1)
 
 
 # ---------------------------------------------------------------- Vordergrund-Wolken
