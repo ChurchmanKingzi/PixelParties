@@ -13,4 +13,6 @@ als PNG (750×1050) in `data/sleeve-proposals/`.
 - `snowmen2.py` – Mischief-Militia-Schneemänner im Ingame-Stil
 - `art_*.py`, `skelking2.py`, `smugcoin.py` – handgepixelte Figuren/Icons
 - `sprites/` – aus den Kartenbildern freigestellte Figuren
-- `v2_01_…` bis `v2_10_…` – je ein Sleeve
+- `v2_01_…` bis `v2_05_…`, `v3_09_doomclock.py` – aktive Sleeves (Doom Clock in v3 komplett neu)
+- `v2_06_…`, `v2_07_…`, `v2_08_…`, `v2_10_…` – verworfene Entwürfe (Bilder in `../verworfen/`)
+- `art_barker_front.py` – Barker-Front-Sprite im Handheld-Stil; `detail_skull_king.py` – Krone, Schwert, Schädel in voller Auflösung
