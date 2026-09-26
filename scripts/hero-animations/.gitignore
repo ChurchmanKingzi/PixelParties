@@ -1,0 +1,4 @@
+# Arbeitsdateien der Generatoren
+*.gif
+*sheet*.png
+__pycache__/
