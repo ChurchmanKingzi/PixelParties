@@ -1,0 +1,10 @@
+{
+  "hero": "Rubin, the Dragoneer Champion",
+  "sheet": "rubin-the-dragoneer-champion.png",
+  "frameWidth": 60,
+  "frameHeight": 52,
+  "frames": 32,
+  "frameMs": 80,
+  "loop": true,
+  "layout": "horizontal"
+}
