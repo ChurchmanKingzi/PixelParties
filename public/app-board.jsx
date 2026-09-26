@@ -2512,6 +2512,7 @@ function AnklageEffect({ x, y, w = 80, h = 110, cardName }) {
     spiel('attack_ram', { rate: 1.4, volume: 0.5 }, 1260);
   }, []);
   // Blasenumriss mit Spitze nach unten links (zum Helden).
+  const uid = useMemo(() => 'ankl' + Math.random().toString(36).slice(2, 8), []);
   const r = H * 0.42;
   const pfad = `M ${-B / 2 + r} ${-H} H ${B / 2 - r} Q ${B / 2} ${-H} ${B / 2} ${-H + r} V ${-r} Q ${B / 2} 0 ${B / 2 - r} 0`
     + ` H ${-B * 0.02} L ${-B * 0.2} ${H * 0.34} L ${-B * 0.16} 0 H ${-B / 2 + r} Q ${-B / 2} 0 ${-B / 2} ${-r}`
@@ -2525,7 +2526,51 @@ function AnklageEffect({ x, y, w = 80, h = 110, cardName }) {
         <div className="anklage-zittern">
           <svg width={B + 12} height={H * 1.4 + 12} viewBox={`${-B / 2 - 6} ${-H - 6} ${B + 12} ${H * 1.4 + 12}`}
             style={{ position: 'absolute', left: -B / 2 - 6, top: -H - 6, overflow: 'visible' }}>
-            <path d={pfad} fill="#fffdf6" stroke="#141414" strokeWidth="3.2" strokeLinejoin="round" />
+            {/* Pixel-Schattierung (Als Wunsch 26.9.: „mehr Shading/Dithering"):
+                harter Versatzschatten, darin zwei Dither-Stufen, die zur
+                Ecke unten rechts dichter werden, und ein Lichtpunkt oben
+                links. Alles an der Blasenform abgeschnitten. */}
+            <defs>
+              <clipPath id={`${uid}-form`}><path d={pfad} /></clipPath>
+              <pattern id={`${uid}-d1`} width="4" height="4" patternUnits="userSpaceOnUse">
+                <rect x="0" y="0" width="2" height="2" fill="#c4baa5" />
+                <rect x="2" y="2" width="2" height="2" fill="#c4baa5" />
+              </pattern>
+              <pattern id={`${uid}-d2`} width="4" height="4" patternUnits="userSpaceOnUse">
+                <rect x="0" y="0" width="4" height="4" fill="#c4baa5" />
+                <rect x="2" y="0" width="2" height="2" fill="#8f8570" />
+                <rect x="0" y="2" width="2" height="2" fill="#8f8570" />
+              </pattern>
+              <pattern id={`${uid}-d3`} width="4" height="4" patternUnits="userSpaceOnUse">
+                <rect x="0" y="0" width="4" height="4" fill="#8f8570" />
+                <rect x="0" y="0" width="2" height="2" fill="#5e5647" />
+                <rect x="2" y="2" width="2" height="2" fill="#5e5647" />
+              </pattern>
+              <mask id={`${uid}-m1`} maskUnits="userSpaceOnUse" x={-B} y={-H * 2} width={B * 2} height={H * 3}>
+                <rect x={-B} y={-H * 2} width={B * 2} height={H * 3} fill="#fff" />
+                <ellipse cx={-B * 0.14} cy={-H * 0.66} rx={B * 0.42} ry={H * 0.44} fill="#000" />
+              </mask>
+              <mask id={`${uid}-m2`} maskUnits="userSpaceOnUse" x={-B} y={-H * 2} width={B * 2} height={H * 3}>
+                <rect x={-B} y={-H * 2} width={B * 2} height={H * 3} fill="#fff" />
+                <ellipse cx={-B * 0.16} cy={-H * 0.7} rx={B * 0.58} ry={H * 0.62} fill="#000" />
+              </mask>
+              <mask id={`${uid}-m3`} maskUnits="userSpaceOnUse" x={-B} y={-H * 2} width={B * 2} height={H * 3}>
+                <rect x={-B} y={-H * 2} width={B * 2} height={H * 3} fill="#fff" />
+                <ellipse cx={-B * 0.18} cy={-H * 0.74} rx={B * 0.7} ry={H * 0.78} fill="#000" />
+              </mask>
+            </defs>
+            <path d={pfad} fill="#141414" opacity=".55" transform="translate(3 4)" />
+            <path d={pfad} fill="#f4efe2" />
+            <g clipPath={`url(#${uid}-form)`} shapeRendering="crispEdges">
+              <rect x={-B} y={-H * 2} width={B * 2} height={H * 3} fill={`url(#${uid}-d1)`} mask={`url(#${uid}-m1)`} />
+              <rect x={-B} y={-H * 2} width={B * 2} height={H * 3} fill={`url(#${uid}-d2)`} mask={`url(#${uid}-m2)`} />
+              <rect x={-B} y={-H * 2} width={B * 2} height={H * 3} fill={`url(#${uid}-d3)`} mask={`url(#${uid}-m3)`} />
+              <ellipse cx={-B * 0.16} cy={-H * 0.7} rx={B * 0.22} ry={H * 0.2} fill="#fffef9" />
+              <rect x={-B * 0.38} y={-H * 0.88} width="8" height="4" fill="#ffffff" />
+              <rect x={-B * 0.38 + 10} y={-H * 0.88} width="4" height="4" fill="#ffffff" />
+              <rect x={-B * 0.38} y={-H * 0.88 + 6} width="4" height="6" fill="#ffffff" />
+            </g>
+            <path d={pfad} fill="none" stroke="#141414" strokeWidth="3.2" strokeLinejoin="round" />
           </svg>
           <svg className="anklage-ausruf" width={H} height={H} viewBox="-10 -10 20 20"
             style={{ position: 'absolute', left: -H / 2, top: -H * 0.5 - H / 2 }}>
