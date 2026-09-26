@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 """07 Feuer & Eis: Feuer- gegen Eis-Kartenmotive auf einer Yin-Yang-geteilten Landschaft.
-Links Vulkan/Lavasee/Basaltsäulen mit Phönix Duigno, Luna Pele und Burning Skeleton,
-rechts Gletscher/Polarlicht/Eiskristalle mit Iceage, Slippery Snowman, Icy Slime und Gon im Eisblock.
-In der Mitte die beiden Dracheneier im Nest."""
+Links Vulkan/Lavasee/Basaltsäulen mit Phönix Duigno, Luna Pele, Burning Skeleton und Red Dragoneer,
+rechts Gletscher/Polarlicht/Eiskristalle mit Slippery Whoolmoth, Polar, Pengu, Snowman und Gon, the Frostbringer.
+In der Mitte die beiden Dracheneier im Nest. Alle Figuren sind im Stil ihrer Kartensprites nachgepixelt."""
 from lib import *
 from scipy.spatial import cKDTree
 
@@ -338,118 +338,482 @@ def particles(lay_img):
 
 
 
-# ================================================================ Kartenfiguren
-def sat(a):
-    mx = a[..., :3].max(2); mn = a[..., :3].min(2)
-    return (mx - mn) / np.maximum(mx, 1)
+# ================================================================ Figuren (nachgezeichnet im Stil der Kartensprites)
+# Jede Figur ist eine handgepixelte Karte (ASCII + Palette) nach dem nativen Kartenbild als Vorlage,
+# bzw. (Duigno, Whoolmoth) aus sauberen Flächen und Linien aufgebaut. Skalierung nur ganzzahlig (2x NN).
+S = {}
+
+S['snowman'] = ("""
+.....kkkkk.....
+....kcccCCk....
+....kcccCCk....
+....kccccCk....
+....kccccCk....
+....kccccCk....
+...kkkkkkkkk...
+..kccccccCCCk..
+...kkkkkkkkk...
+...owwwwwwwo...
+...owkwwwkWo...
+...owwwnnwWo...
+...owkwkwkwo...
+...RRRRRRRRR...
+..rrrrrrrrrrr..
+..orrrwwwwwWo..
+..owrrwwwwwWo..
+.owwrrwwwwwwWo.
+.owwrrwwwwwwWo.
+.owwwrwwwwwsWo.
+.owwwwwwwwwsWo.
+..owwwwwwwsso..
+...ooooooooo...
+..owwwwwwwwWo..
+.owwwwwwwwwsWo.
+owwwwwwwwwwssWo
+owwwwwwwwwwwsWo
+owwwwwwwwwwwsWo
+owwwwwwwwwwssWo
+.owwwwwwwwwssWo
+.owwwwwwwwssWo.
+..osswwwwsssoo.
+...ooooooooo...
+""", {'k': (30, 28, 32), 'c': (58, 58, 60), 'C': (96, 96, 102), 'o': (86, 86, 96), 'w': (226, 226, 238),
+      'W': (252, 254, 253), 's': (178, 178, 200), 'n': (224, 112, 24), 'r': (120, 8, 6), 'R': (168, 30, 24)})
+
+S['skel'] = ("""
+.........y..........
+........yoy.........
+........oyo.........
+.......kkkkkk.......
+......kddddddk......
+.....kddmddmddk.....
+.....kdRrddrRdk.....
+.....kddddddddk.....
+.....kdmkmmkmdk.....
+...kkkkddddddkkkk...
+..kddddmddddmddddk..
+.kddmdddmmmmdddmddk.
+.kdmkdddmddmdddkmdk.
+.kdmkkddmmmmddkkmdk.
+.kdmk.kddmmddk.kmdk.
+.kddk.kdmddmdk.kddk.
+.odok.kddmmddk.kodo.
+.oook.kddddddk.kooo.
+..ok..kllllllk..ko..
+......kllLllLlk.....
+......kllk.kllk.....
+......kLlk.kLlk.....
+......klLk.klLk.....
+.....kkkkk.kkkkk....
+""", {'k': (14, 10, 10), 'd': (32, 22, 18), 'm': (62, 42, 24), 'r': (240, 12, 8), 'R': (255, 140, 70),
+      'o': (253, 110, 10), 'y': (253, 206, 40), 'l': (56, 44, 26), 'L': (86, 70, 40)})
+
+S['pele'] = ("""
+..........r...........
+....r....rr...r.r.....
+....r.r.ror..rorr.....
+.r..rrrrorr.rorrr..r..
+.r.rorrroooroorror.r..
+.rroyoorroyoroyooyorr.
+.royyooroyyoroyooyyor.
+.royyoooyyoyoyyooyyor.
+.royYyyyYyoyyYYyyYyor.
+.rooyYyyYyyYyyYyYyoor.
+..royyYyYYyYyyYYyyor..
+...royyYyYYyyYYyyor...
+....rooyYYYyYyyoor....
+...rokkkkkkkkkkkkor...
+..rroksssssssssskorr..
+..rookseesssseeskoor..
+..roykppssssssppkyor..
+.royykssspppsssskyyor.
+royyYYksssssssskYyyor.
+rroykksssssssssskkyr..
+r.oksskssssssssksskor.
+..okssk.ssssssss.kssko
+..okSk..kssssssk..kSko
+..okkk..kssssssk..kkko
+.roy..kGgGgGgGgGk.yor.
+roy...kGgGgGgGgGk..yor
+ry....kGgGgGgGgGk...yr
+.r....kGgGgGgGgGk...r.
+.......ksk..ksk.......
+.......ksk..ksk.......
+......kkkk..kkkk......
+""", {'k': (46, 30, 8), 'r': (205, 45, 40), 'o': (245, 121, 37), 'y': (245, 222, 12), 'Y': (250, 248, 190),
+      's': (150, 106, 74), 'S': (184, 140, 100), 'p': (236, 128, 118), 'e': (20, 10, 4), 'g': (98, 150, 48), 'G': (150, 206, 96)})
+
+S['gon'] = ("""
+....kkkkk.......
+..kkhhhhhkk.....
+.khhWWhhhhhk....
+khWWhhhhHhhhk...
+kkhhhhhhhHhhhk..
+.khhhhhhhhHhhk..
+.kHhhkhhhhhHhhk.
+.khkSSkhhhhhHhk.
+..kSEsshhhhhHk..
+..kSEssshhhHhk..
+..ksssssHhhHk...
+...kksskhhHk....
+..kBbbbbbbbk....
+.kBbbbbbbbbbk...
+kSSkbbbbbbBbk...
+kSskbbbbbbBbk...
+.kk.kbbbbbBBk...
+....kwwwwwwgk...
+....kwwwwwwgk...
+...kwwwwwwwggk..
+...kwwwwwwwggk..
+...kwwwwwwgggk..
+....kkBBkBBkkk..
+....kBBk.kBBk...
+....kkkk.kkkk...
+""", {'k': (52, 48, 72), 'h': (222, 224, 232), 'H': (168, 170, 186), 'W': (252, 254, 255), 's': (229, 189, 139),
+      'S': (251, 216, 175), 'E': (70, 190, 230), 'b': (67, 124, 216), 'B': (40, 78, 160), 'w': (222, 224, 238), 'g': (150, 152, 172)})
+
+S['polar'] = ("""
+.......kk.k........................
+......kwwkwk.......................
+.....kwwwwwwk......................
+....kwwwwwwwwkkkkkkkkkkkkkkkkkkk...
+...kwwwkwwwwwwwwwwwwwwwwwwwwwwwwkk.
+..kwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwk
+kkwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwk
+kkwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwk
+.kkkkssswwwwwwwwwwwwwwwwwwwwwwwwwsk
+..kssskkswwwwwwwwwwwwwwwwwwwwwwwssk
+...kkk.ksswwwwwwwwwwwwwwwwwwwwwsssk
+.......kssswwwwwwwwwwwwwwwwwwwwsssk
+........ksssswwwwwwwwwwwwwwwwssssk.
+.........kssssssssssssssssssssssk..
+..........kkkssskkkkkkkksssskkk....
+............kssk.......kssk........
+...........kkkkkk.....kkkkkk.......
+...........kgWgWk.....kgWgWk.......
+............kkkk.......kkkk........
+""", {'k': (39, 38, 37), 'w': (247, 243, 236), 's': (176, 174, 187), 'g': (90, 90, 96), 'W': (230, 230, 236)})
+
+S['pengu'] = ("""
+..........kkkkkk..............
+.........kbbcbcbkkkkkkkkk.....
+........kbWbbbbbybbbbbbbbkkk..
+...kkkkkbbbbbbbbybbbbbbbbbbbkk
+.knnnnnkbbbbbbbyybbbbbbbbbbbbk
+...kkkkkkbbbbbyywwwwwwwwwwwbbk
+........kkbbbywwwwwwwwwwwwwwwk
+.........kkkkwwwwwwwwwwwwwwwk.
+............kkkkkkkkkkkkkkkk..
+""", {'k': (25, 25, 24), 'b': (45, 44, 49), 'c': (80, 80, 88), 'W': (240, 240, 240), 'y': (235, 187, 20),
+      'n': (114, 81, 66), 'w': (220, 218, 229)})
+
+S['rd'] = ("""
+..kkkkkkk..................kkkkkkk
+...kkkrrrkkk............kkkrrrkkk.
+....kookkkrRkk........kkRrkkkook..
+.....koor.kkRRkk....kkRRkkkrook...
+......krkoorrRsRkkkkRsRrrookrk....
+.......kkorkkRkkkrRkkkRkkrokk.....
+........krkokk.kkrRkk.kkokrk......
+.........kookRkkrrRRkkRkook.......
+.........kookRkkrrrRkkRkook.......
+.........kokkRRkkkkkkRRkkok.......
+.........krrkkRrrRRrrRkkrrk.......
+..........kokRkprRRrpkRkok........
+..........kkrkkBpRRpBkkrkk........
+.........kRrkrkBsRRsBkrkrRk.......
+......WskRkkkrkrrRRrrkrkkkRksW....
+.......skskkkrkRRRRkrkkksks.......
+..........WrrkkkpRRpkkkrrW........
+..........krRrkkkrRkkkrRrk........
+.......k..krRrrkrkkrkrrRrk........
+.......kk.krrrrkrrrrkrrrrk........
+.......krkkkrrkkroorkkrrkk........
+.......krk.kkkrkooookrkkk.........
+.......krrkkrrrkooookrrrk.........
+.......krrrkrkrkooookrkrk.........
+........krokskskoookksksk.........
+.........kkWkWkrokk..kWkW.........
+...........kkkkkk.................
+""", {'k': (51, 25, 5), 'p': (1, 1, 3), 'r': (145, 46, 42), 'R': (197, 82, 83), 'o': (230, 132, 16), 's': (189, 195, 214),
+      'W': (245, 250, 248), 'B': (70, 130, 230)})
+
+S['fireball'] = ("""
+.......rrooo....
+....rrroooyyoo..
+.rrrooooyyyYyyo.
+rroooyyyYYYYYyyo
+.rrrooooyyyYyyo.
+....rrroooyyoo..
+.......rrooo....
+""", {'r': (190, 40, 20), 'o': (245, 124, 30), 'y': (252, 204, 40), 'Y': (255, 250, 190)})
+
+S['snowball'] = ("""
+.kkk.
+kWwwk
+kwwwk
+kswsk
+.kkk.
+""", {'k': (70, 80, 120), 'w': (232, 236, 248), 'W': (255, 255, 255), 's': (180, 190, 220)})
 
 
-def cutm(name, box, fn, close=0, fill=True, n=1):
-    """Figur aus nativem Kartenbild per Farbmaske ausschneiden."""
-    c = native(name).crop(box)
-    a = np.array(c).astype(int)
-    m = fn(a)
-    if close:
-        m = ndimage.binary_closing(m, iterations=close)
-    if fill:
-        m = ndimage.binary_fill_holes(m)
-    o = np.array(c); o[..., 3] = np.where(m, 255, 0)
-    im_ = keep_largest(Image.fromarray(o), n)
-    return im_.crop(im_.getbbox())
-
-
-def Lum(a): return a[..., :3].mean(2)
-
-
-def egg_cut(name, cx, cy, rx, ry):
-    a = np.array(native(name)); h, w = a.shape[:2]
-    a[..., 3] = np.where(egg_mask(w, h, cx, cy, rx, ry, 0.22), 255, 0)
-    e = Image.fromarray(a)
-    return e.crop(e.getbbox())
-
-
-def hero(spr, k, pal, rim, line_col, fade=0, fade_right=0):
-    """Kartenmotiv im Stil des Lunatic-Hawk (06): Helligkeit der Vorlage, k-fach, pro Pixel gedithert."""
-    a = np.array(spr).astype(float)
-    m = a[..., 3] > 0
-    Lm = a[..., :3].mean(2)
-    lo, hi = np.percentile(Lm[m], 5), np.percentile(Lm[m], 95)
-    t = np.clip((Lm - lo) / (hi - lo), 0, 1); t[~m] = 0
-    h, w = m.shape
-    T = np.array(Image.fromarray((t * 255).astype(np.uint8)).resize((w * k, h * k), Image.BILINEAR)) / 255
-    M = np.array(Image.fromarray((m * 255).astype(np.uint8)).resize((w * k, h * k), Image.BILINEAR)) > 110
-    line = m & (Lm < ndimage.uniform_filter(Lm, 3) - 10)
-    LN = np.kron(line, np.ones((k, k))).astype(bool) & M
-    hh, ww = M.shape
-    y_, x_ = np.mgrid[0:hh, 0:ww]
-    th = BAYER4[y_ % 4, x_ % 4]
-    idx = np.clip(np.floor(T * len(pal) + (th - 0.5)), 0, len(pal) - 1).astype(int)
-    out = np.zeros((hh, ww, 4), np.uint8)
-    out[M, :3] = np.array(pal)[idx][M]; out[M, 3] = 255
-    out[LN & (th < 0.75)] = line_col + (255,)
-    out[M & ~ndimage.binary_erosion(M)] = rim + (255,)
-    # hart abgeschnittene Kanten der Vorlage weich ausdithern
-    ft = np.ones((hh, ww))
-    if fade:
-        # Federspitzen statt gerader Schnittkante
-        yb = hh - 1 - fade * 0.6 * np.abs(np.sin(np.pi * x_ / 11.0))
-        ft = np.minimum(ft, np.clip((yb - y_) / fade, 0, 1))
-    if fade_right:
-        ft = np.minimum(ft, np.clip((ww - 1 - x_) / fade_right, 0, 1))
-    out[~(ft > th)] = 0
+def sprite(key):
+    txt, pal = S[key]
+    rows = txt.strip('\n').split('\n')
+    w = max(len(r) for r in rows); h = len(rows)
+    out = np.zeros((h, w, 4), np.uint8)
+    for y, row in enumerate(rows):
+        for x, c in enumerate(row):
+            if c in pal:
+                out[y, x, :3] = pal[c]; out[y, x, 3] = 255
     return Image.fromarray(out)
 
 
-def figure(spr, k, oc):
-    return outline(up(spr, k), oc + (255,))
+def grid_img(g, pal):
+    out = np.zeros(g.shape + (4,), np.uint8)
+    for c, col in pal.items():
+        m = g == c; out[m, :3] = col; out[m, 3] = 255
+    return Image.fromarray(out)
 
 
-def place(img, spr, x, y, glow_col=None, r=2, st=0.8):
-    if glow_col:
+DW, DH = 76, 46
+C = {'k': (86, 26, 44), 'K': (60, 14, 30), 'p': (222, 92, 84), 'P': (238, 122, 100), 'o': (242, 140, 56), 'y': (250, 196, 70),
+     'Y': (255, 234, 150), 'r': (206, 50, 40), 'W': (255, 252, 220), 'e': (30, 6, 12)}
+
+
+def dpm(pts):
+    m = Image.new('L', (DW, DH), 0); ImageDraw.Draw(m).polygon(pts, fill=255); return np.array(m) > 0
+
+
+def duigno():
+    g = np.full((DH, DW), '.', dtype='<U1')
+    yy, xx = np.mgrid[0:DH, 0:DW]
+    # Flügel links: steile Spitze, Sägezahn-Schwungfedern unten
+    top = [(36, 25), (31, 19), (25, 13), (17, 8), (13, 9), (8, 15), (3, 22), (0, 28)]
+    bot = []
+    x = 0
+    tips = [(0, 33), (4, 38), (8, 40), (12, 41), (16, 41), (20, 41), (24, 40), (28, 39), (32, 38)]
+    for i, (tx, ty) in enumerate(tips):
+        bot.append((tx, ty))
+        if i < len(tips) - 1:
+            nx_ = tips[i + 1][0]
+            bot.append(((tx + nx_) / 2 + 0.5, ty - 3))
+    poly = top + bot[::-1][::-1]
+    poly = top + [(0, 31)] + bot + [(35, 35), (37, 30)]
+    wingL = dpm(poly)
+    wing = wingL | wingL[:, ::-1]
+    # Farbverlauf: Abstand zur Oberkante
+    dtop = np.zeros((DH, DW))
+    for x in range(DW):
+        col = np.where(wing[:, x])[0]
+        if len(col): dtop[col, x] = col - col[0]
+    g[wing] = 'p'
+    g[wing & (dtop <= 5)] = 'P'
+    g[wing & (dtop <= 2)] = 'o'
+    g[wing & (dtop <= 0)] = 'y'
+    g[wing & (yy >= 31)] = 'o'
+    g[wing & (yy >= 35)] = 'y'
+    g[wing & (yy >= 38)] = 'Y'
+    # Deckfederbogen
+    for x in range(DW):
+        xl = x if x < DW / 2 else DW - 1 - x
+        if 2 <= xl <= 34:
+            y = int(round(30 - 12 * math.sin(math.pi * (xl + 4) / 44)))
+            if wing[y, x]: g[y, x] = 'k'
+    # Schwungfedern: Linien fächerförmig von oben zur Lücke zwischen zwei Spitzen
+    for i in range(len(tips) - 1):
+        gx = (tips[i][0] + tips[i + 1][0]) / 2 + 0.5
+        gy = min(tips[i][1], tips[i + 1][1]) - 3
+        ox, oy = 18, 14
+        for t in np.linspace(0.45, 1.0, 30):
+            px, py = ox + (gx - ox) * t, oy + (gy - oy) * t
+            for X, Y in ((int(round(px)), int(round(py))), (DW - 1 - int(round(px)), int(round(py)))):
+                if 0 <= Y < DH and wing[Y, X]: g[Y, X] = 'k'
+    # Körper mit Brustfedern
+    body = dpm([(33, 24), (43, 24), (45, 30), (43, 37), (38, 40), (33, 37), (31, 30)])
+    g[body] = 'y'; g[body & (xx >= 40)] = 'o'; g[body & (yy >= 36)] = 'o'
+    for (cx, cy) in [(36, 28), (40, 28), (38, 31), (36, 34), (40, 34)]:
+        g[cy, cx - 1] = 'o'; g[cy + 1, cx] = 'o'; g[cy, cx + 1] = 'o'
+    # Schwanzflammen
+    for (x0, x1, yb, xt) in [(32, 36, 45, 33), (36, 40, 46, 38), (40, 44, 45, 43), (30, 33, 42, 29), (43, 46, 43, 47)]:
+        fl = dpm([(x0, 37), (x1, 37), (xt, yb)])
+        new = fl & (g == '.')
+        g[new] = 'r'
+        g[new & (yy < yb - 4)] = 'o'
+        g[new & (yy < yb - 7)] = 'y'
+    # Hals + Kopf (Blick nach links)
+    neck = dpm([(34, 25), (40, 25), (39, 17), (36, 11), (31, 11), (34, 18)])
+    g[neck] = 'y'; g[neck & (xx >= 37)] = 'o'
+    head = dpm([(27, 9), (30, 6), (35, 6), (37, 9), (36, 13), (31, 14), (28, 13)])
+    g[head] = 'Y'; g[head & (yy >= 12)] = 'y'
+    beak = dpm([(28, 9.5), (20, 12), (28, 13)])
+    g[beak] = 'o'; g[beak & (yy >= 12)] = 'r'
+    g[10, 30] = 'e'; g[10, 31] = 'e'; g[9, 30] = 'W'
+    # Flammenkrone nach hinten oben
+    for pts, c in [([(31, 7), (31, 0), (34, 6)], 'o'), ([(34, 7), (38, 0), (37, 8)], 'y'), ([(36, 8), (43, 3), (38, 11)], 'o'),
+                   ([(37, 11), (45, 9), (38, 13)], 'r'), ([(32, 6), (33, 2), (34, 6)], 'Y')]:
+        g[dpm(pts) & (g == '.')] = c
+    fill = g != '.'
+    ol = ndimage.binary_dilation(fill) & ~fill
+    g[ol] = 'k'
+    return g
+
+
+MW, MH = 72, 48
+MC = {'k': (40, 18, 20), 'd': (84, 44, 38), 'm': (118, 66, 52), 'l': (150, 96, 76), 'L': (182, 130, 104),
+      't': (240, 232, 208), 'T': (196, 184, 160), 'e': (14, 8, 10), 'W': (255, 255, 255)}
+
+
+def mpm(pts, w=MW, h=MH):
+    m = Image.new('L', (w, h), 0); ImageDraw.Draw(m).polygon(pts, fill=255); return np.array(m) > 0
+
+
+def ell(cx, cy, rx, ry):
+    yy, xx = np.mgrid[0:MH, 0:MW]
+    return ((xx + 0.5 - cx) / rx) ** 2 + ((yy + 0.5 - cy) / ry) ** 2 <= 1
+
+
+def tube(pts, r0, r1):
+    yy, xx = np.mgrid[0:MH, 0:MW]
+    m = np.zeros((MH, MW), bool)
+    P = []
+    for i in range(len(pts) - 1):
+        for t in np.linspace(0, 1, 16, endpoint=False):
+            P.append((pts[i][0] + (pts[i + 1][0] - pts[i][0]) * t, pts[i][1] + (pts[i + 1][1] - pts[i][1]) * t))
+    P.append(pts[-1])
+    for i, (x, y) in enumerate(P):
+        r = r0 + (r1 - r0) * i / (len(P) - 1)
+        m |= (xx + 0.5 - x) ** 2 + (yy + 0.5 - y) ** 2 <= r * r
+    return m
+
+
+def whoolmoth():
+    g = np.full((MH, MW), '.', dtype='<U1')
+    yy, xx = np.mgrid[0:MH, 0:MW]
+    body = mpm([(26, 8), (32, 6), (38, 3), (46, 2), (54, 4), (63, 8), (72, 12), (72, 36), (62, 38), (44, 38), (32, 36), (26, 28)])
+    head = ell(21, 16, 11, 11) | ell(22, 9, 8, 7)
+    legs = mpm([(31, 30), (41, 30), (41, 43), (42, 46), (30, 46), (31, 43)]) | mpm([(56, 32), (66, 32), (66, 43), (67, 46), (55, 46), (56, 43)])
+    trunk = tube([(15, 20), (12, 28), (11, 36), (10, 42), (7, 45), (4, 44)], 4.2, 1.6)
+    a = body | head | legs | trunk
+    # Grundfell: oben hell, unten dunkel
+    g[a] = 'm'
+    wv = 1.5 * np.sin(xx / 2.3)
+    g[a & (yy < 13 + wv)] = 'l'
+    g[a & (yy < 7 + wv)] = 'L'
+    g[a & (yy > 28 + wv)] = 'd'
+    g[legs] = 'd'
+    # Kopf-Kuppel hell
+    g[head & (yy < 15) & (xx < 29)] = 'l'
+    g[head & (yy < 8) & (xx < 30)] = 'L'
+    g[head & (xx < 14) & (yy > 12)] = 'm'
+    g[trunk] = 'm'; g[trunk & (xx < 11)] = 'd'
+    # Rüssel-Ringe
+    for y in range(24, 44, 3):
+        row = np.where(trunk[y])[0]
+        if len(row) > 2: g[y, row[1]:row[-1]] = 'd'
+    # Fellsträhnen (senkrecht, versetzt)
+    r = random.Random(4)
+    for x in range(28, MW, 3):
+        y0 = r.randint(14, 22)
+        for y in range(y0, min(MH, y0 + r.randint(6, 14))):
+            if a[y, x] and not trunk[y, x]: g[y, x] = 'd'
+    for x in range(30, MW, 4):
+        y0 = r.randint(5, 10)
+        for y in range(y0, y0 + r.randint(3, 6)):
+            if a[y, x]: g[y, x] = 'm'
+    # Fransen unten an Bauch/Beinen
+    for x in range(26, MW):
+        col = np.where(a[:, x])[0]
+        if len(col):
+            yb = col[-1]
+            if (x % 3) == 0 and yb + 1 < MH and not legs[yb, x]:
+                g[yb + 1, x] = 'd'
+    # Zehennägel
+    for x0 in (31, 34, 37, 56, 59, 62):
+        g[45, x0:x0 + 2] = 't'
+    # Ohr
+    ear = ell(31, 16, 3.5, 6)
+    g[ear] = 'd'; g[ear & (xx < 30)] = 'm'
+    # Auge
+    g[12, 17] = 'e'; g[12, 18] = 'e'; g[13, 18] = 'e'; g[12, 16] = 'W'
+    g[10, 15:20] = 'd'; g[11, 19] = 'd'
+    # Stoßzähne (weit ausladend, nach vorne-oben gebogen)
+    t1 = tube([(17, 26), (12, 33), (6, 36), (2, 33), (1, 27)], 2.0, 1.1)
+    t2 = tube([(23, 27), (21, 34), (17, 37), (13, 36)], 1.6, 1.0)
+    g[t2 & ~trunk] = 'T'
+    g[t1] = 't'
+    g[t1 & (np.roll(t1, -1, axis=0) == False)] = 'T'
+    fill = g != '.'
+    g[ndimage.binary_dilation(fill) & ~fill] = 'k'
+    # Kontur zwischen Rüssel und Kopf
+    return g
+
+
+
+EGG_TILES = {
+    'fire': ["22333322",
+             "k233332k",
+             ".k2454k.",
+             "..k44k..",
+             "...kk..."],
+    'ice': [".3443.",
+            "334443",
+            "k3333k",
+            ".kkkk."],
+}
+
+
+def egg_clean(kind, w=28, h=36):
+    """Drachenei im Muster der Karte: Schuppen-Kacheln (Dachziegel), je Schuppe eine Lichtstufe, 1px-Konturen."""
+    P = {'fire': [(55, 7, 3), (120, 18, 12), (196, 50, 20), (240, 124, 24), (250, 204, 40), (252, 244, 150)],
+         'ice': [(40, 36, 92), (48, 86, 160), (82, 136, 206), (128, 184, 234), (188, 226, 250), (250, 254, 255)]}[kind]
+    tile = EGG_TILES[kind]
+    th_, tw = len(tile), len(tile[0])
+    step = 3 if kind == 'fire' else 3
+    k = np.full((h, w), 1, int)
+    cx, cy = (w - 1) / 2, (h - 1) / 2 + 1.5
+    rows_ = list(range(-1, h // step + 2))
+    for j in reversed(rows_):
+        off = (tw // 2) if j % 2 else 0
+        for i in range(-1, w // tw + 2):
+            x0, y0 = i * tw - off, j * step
+            lam = ((x0 + tw / 2 - cx) / w * -1.0 + (y0 + th_ / 2 - cy) / h * -1.2)
+            sh = 1 if lam > 0.3 else (0 if lam > -0.25 else (-1 if lam > -0.6 else -2))
+            for ty in range(th_):
+                for tx in range(tw):
+                    c = tile[ty][tx]
+                    X, Y = x0 + tx, y0 + ty
+                    if c == '.' or not (0 <= X < w and 0 <= Y < h):
+                        continue
+                    k[Y, X] = 0 if c == 'k' else int(np.clip(int(c) + sh, 1, 5))
+    m = egg_mask(w, h, cx, cy, w / 2 - 0.5, h / 2 - 1, 0.2)
+    out = np.zeros((h, w, 4), np.uint8)
+    out[m, :3] = np.array(P)[k][m]; out[m, 3] = 255
+    img = outline(Image.fromarray(out), P[0] + (255,))
+    d = ImageDraw.Draw(img)
+    gx, gy = int(w * 0.27), int(h * 0.17)
+    d.point([(gx, gy + 1), (gx + 1, gy), (gx, gy + 3)], fill=(255, 255, 240))
+    return img
+
+
+def place(img, spr, x, y, glow_col=None, r=2, st=0.8, rim=None):
+    """Figur setzen; rim = saubere 1px-Randlinie statt Schein."""
+    if rim:
+        spr = outline(spr, rim + (255,))
+        x -= 1; y -= 1
+    elif glow_col:
         g_, p_ = glow(spr, glow_col, radius=r, strength=st)
         img.alpha_composite(g_, (int(x) - p_, int(y) - p_))
     img.alpha_composite(spr, (int(x), int(y)))
 
 
-R_ = lambda a: a[..., 0]; G_ = lambda a: a[..., 1]; B_ = lambda a: a[..., 2]
-PHOENIX = cutm('Duigno the Flaming Phoenix', (0, 0, 76, 39), lambda a: R_(a) > G_(a) + 18, close=1)
-ICEAGE = cutm('Iceage', (18, 4, 76, 51), lambda a: (Lum(a) < 196) & (B_(a) > R_(a) + 25) & (Lum(a) > 120), close=1)
-SKELETON = cutm('Burning Skeleton', (24, 8, 52, 42), lambda a: (Lum(a) < 70) | ((G_(a) < 60) & (R_(a) < 130)))
-PELE = cutm('Luna Pele the Flame Dancer', (26, 8, 52, 46),
-            lambda a: ~((np.abs(R_(a) - 208) < 28) & (np.abs(G_(a) - 178) < 30) & (np.abs(B_(a) - 108) < 34)))
-FIREBALL = cutm('Chaorc Friendly Fireballer', (18, 14, 50, 34),
-                lambda a: (R_(a) > 200) & (G_(a) > 60) | ((R_(a) > 150) & (G_(a) < 80) & (B_(a) < 80)) & (Lum(a) > 80))
-SNOWMAN = cutm('Slippery Snowman', (34, 10, 52, 48),
-               lambda a: (Lum(a) < 80) | ((R_(a) > 150) & (G_(a) < 80)) | ((Lum(a) > 205) & (np.abs(R_(a) - B_(a)) < 22)))
-ISLIME = cutm('Icy Slime', (26, 16, 48, 38), lambda a: (G_(a) >= B_(a) - 14) & (G_(a) > R_(a) + 25) | (Lum(a) < 90))
-ICEBLOCK = cutm('Snow Cannon', (48, 10, 76, 48), lambda a: Lum(a) > 110)
-SNOWBALL = cutm('Snow Cannon', (26, 20, 38, 30), lambda a: Lum(a) > 180)
-CASTER = cutm('Flame Avalanche', (26, 0, 50, 22), lambda a: ~((R_(a) > 170) & (B_(a) < 100)))
-RUNE = cutm('Frost Rune', (26, 14, 48, 36), lambda a: G_(a) > R_(a) + 30)
-FEGG = egg_cut('Flaming Dragonegg', 38.3, 26.5, 16.8, 19.5)
-IEGG = adjust(egg_cut('Icy Dragonegg', 38.2, 26.8, 16.6, 19.5), contrast=1.2, sat=1.2)
-
-
 # ================================================================ Aufbau
 im = background()
 
-# Held Feuer: Phönix Duigno (oben links), Held Eis: Iceage-Bestie (rechts)
-ph = hero(PHOENIX, 2, [(120, 20, 14), (190, 56, 20), (236, 112, 30), (255, 176, 60), (255, 230, 140)], (255, 246, 200), (70, 8, 10), fade=12)
-ph = ph.transpose(Image.FLIP_LEFT_RIGHT)
-PHX, PHY = 4, 16
-place(im, ph, PHX, PHY, (150, 40, 16, 255), r=4, st=0.5)
-ic = hero(ICEAGE, 2, [(30, 50, 120), (60, 100, 180), (110, 160, 226), (170, 210, 246), (230, 246, 255)], (255, 255, 255), (16, 28, 80), fade=24, fade_right=16)
-ic = ic.transpose(Image.FLIP_LEFT_RIGHT)
-ICX, ICY = W - ic.width - 4, 90
-place(im, ic, ICX, ICY, (70, 130, 210, 255), r=4, st=0.5)
-rune = outline(RUNE, (10, 30, 50, 255))
-place(im, rune, 196, 24, (160, 255, 236, 255), r=4, st=0.9)
-sparkle(ImageDraw.Draw(im), 196 + rune.width // 2, 24 + rune.height // 2, 9, (200, 255, 240))
-im.alpha_composite(rune, (196, 24))
+# Held Feuer: Phönix Duigno (oben links, Blick zur Eisseite)
+ph = up(grid_img(duigno(), C), 2).transpose(Image.FLIP_LEFT_RIGHT)
+place(im, ph, 2, 6)
 
-
-cs = outline(CASTER, (30, 4, 8, 255))
-place(im, cs, 44, 150 - cs.height, (255, 150, 40, 255), r=2, st=0.6)
 
 # Fels: Basaltsäulen links, Eiskristalle rechts
 def top_fn(x):
@@ -464,48 +828,51 @@ for (bx, by, ang, ln, wd) in [(186, 300, 30, 44, 11), (176, 300, 14, 60, 13), (1
     crystal(cl, (bx, by), ang, ln, wd, CPAL, seed=int(bx))
 im.alpha_composite(cl)
 
-# Eier (Kartenmotive, 1x) im Nest – über Kreuz wie die Punkte im Yin-Yang
-IEX, FEX, EY = 125 - IEGG.width - 2, 127, 218 - FEGG.height
+# Held Eis: Slippery Whoolmoth (rechts, läuft aus dem Bild wie auf der Karte)
+# Eisscholle (Area-Sprite slippery-ice, 1x) als Boden für das Whoolmoth
+shelf = np.array(area('slippery-ice/tile').crop((0, 34, 128, 83)))
+sx_ = np.arange(shelf.shape[1]); top = (3 + 2 * np.sin(sx_ / 5.0) + np.sin(sx_ / 2.1)).astype(int)
+for x_ in range(shelf.shape[1]):
+    shelf[:top[x_], x_, 3] = 0
+    shelf[top[x_], x_] = (255, 255, 255, 255); shelf[top[x_] + 1, x_] = (226, 234, 252, 255)
+shelf = outline(Image.fromarray(shelf), (40, 50, 120, 255))
+im.alpha_composite(shelf, (W - shelf.width + 4, 178))
+wm = up(grid_img(whoolmoth(), MC), 2)
+place(im, wm, W - wm.width + 8, 88)
+
+# Eier im Nest (über Kreuz wie die Punkte im Yin-Yang)
+FEGG = egg_clean('fire'); IEGG = egg_clean('ice')
+IEX, FEX, EY = 125 - IEGG.width - 3, 128, 219 - FEGG.height
 im.alpha_composite(nest(front=False))
-fe = outline(FEGG, (30, 4, 8, 255)); ie = outline(IEGG, (10, 20, 58, 255))
-place(im, fe, FEX, EY, (255, 140, 40, 255), r=5, st=0.45)
-place(im, ie, IEX, 218 - IEGG.height, (150, 220, 255, 255), r=5, st=0.35)
+place(im, FEGG, FEX, EY, (255, 140, 40, 255), r=3, st=0.35)
+place(im, IEGG, IEX, EY, (150, 220, 255, 255), r=3, st=0.25)
 im.alpha_composite(nest(front=True))
-
-
-def dragonlings():
-    def bgr(a):
-        L_ = a[..., :3].mean(2); r, g, b = a[..., 0], a[..., 1], a[..., 2]
-        return (L_ > 45) | ((g < 45) & (b < 70) & (r > 70))
-    rd = keep_largest(cut_by(native('Red Dragoneer'), (20, 8, 54, 42), bgr)); rd = rd.crop(rd.getbbox())
-    bd = keep_largest(cut_native(native('Blue-Ice Dragon'), (18, 8, 58, 42), barrier_lum=70)); bd = bd.crop(bd.getbbox())
-    return outline(rd, (34, 4, 10, 255)), outline(bd.transpose(Image.FLIP_LEFT_RIGHT), (10, 16, 48, 255))
-
-
-RD, BD = dragonlings()
-place(im, RD, IEX - RD.width + 4, 224 - RD.height, (20, 6, 8, 255), r=2, st=0.9)
-place(im, BD, FEX + FEGG.width - 3, 225 - BD.height, (220, 240, 255, 255), r=2, st=0.9)
+rd = sprite('rd')
+place(im, rd, IEX - rd.width + 6, 224 - rd.height, rim=(255, 170, 60))
+pg = sprite('pengu')
+place(im, pg, FEX + FEGG.width - 2, 223 - pg.height)
+pb = sprite('polar')
+place(im, pb, 206, 236 - pb.height)
 
 im = particles(im)
 
-# Feuer-Truppe links unten, Eis-Truppe rechts unten
-pele = figure(PELE, 2, (40, 6, 10))
-place(im, pele, 8, 305 - pele.height, (255, 120, 30, 255), r=3, st=0.5)
-sk = figure(SKELETON, 2, (40, 6, 10))
-place(im, sk, 62, 305 - sk.height, (255, 150, 40, 255), r=2, st=0.6)
-sm = figure(SNOWMAN, 2, (10, 16, 48))
-place(im, sm, W - 10 - sm.width, 305 - sm.height, (180, 220, 255, 255), r=2, st=0.5)
-sl = figure(ISLIME, 2, (10, 16, 48))
-place(im, sl, 162, 305 - sl.height, (120, 240, 230, 255), r=2, st=0.5)
-blk = outline(ICEBLOCK, (10, 16, 48, 255))
-place(im, blk, 214, 212, (200, 236, 255, 255), r=2, st=0.5)
+# Feuer-Truppe links unten, Eis-Truppe rechts unten (2x)
+pele = up(sprite('pele'), 2)
+place(im, pele, 6, 306 - pele.height)
+sk = up(sprite('skel'), 2)
+place(im, sk, 58, 306 - sk.height, rim=(255, 150, 40))
+gon = up(sprite('gon'), 2)
+place(im, gon, 150, 306 - gon.height)
+sm = up(sprite('snowman'), 2)
+place(im, sm, W - 8 - sm.width, 306 - sm.height)
 # Geschosse treffen sich über der Grenze
-fb = outline(FIREBALL, (40, 6, 10, 255))
-place(im, fb, 96, 250, (255, 120, 30, 255), r=2, st=0.6)
-sb = outline(SNOWBALL, (10, 16, 48, 255))
-for (x_, y_) in [(140, 254), (152, 250), (147, 260)]:
+fb = up(sprite('fireball'), 2)
+place(im, fb, 90, 252)
+sb = sprite('snowball')
+for (x_, y_) in [(138, 256), (146, 250), (144, 262)]:
     im.alpha_composite(sb, (x_, y_))
-im.alpha_composite(clash(129, 257, 0.55))
+im.alpha_composite(clash(128, 259, 0.55))
+
 
 # ================================================================ Vordergrund-Sims + Titel
 def ledge():
