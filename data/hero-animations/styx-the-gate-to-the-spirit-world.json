@@ -1,0 +1,12 @@
+{
+  "hero": "Styx, the Gate to the Spirit World",
+  "sheet": "styx-the-gate-to-the-spirit-world.png",
+  "frameWidth": 42,
+  "frameHeight": 40,
+  "frames": 32,
+  "frameMs": 100,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 1,
+  "padBottom": 1
+}
