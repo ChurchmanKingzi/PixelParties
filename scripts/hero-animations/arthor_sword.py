@@ -67,10 +67,12 @@ def in_sword(x, y):
         return x >= 27
     if 100 <= y <= 103:
         return 29 <= x <= 34
-    return 104 <= y <= 105 and 29 <= x <= 32                 # Griffende + Knauf
+    if 104 <= y <= 105:                                       # Griffende + Knauf
+        return 29 <= x <= 34
+    return 106 <= y <= 108 and 32 <= x <= 34                  # rechte Knaufseite
 
 
-SWORD = [(x, y) for y in range(75, 106) for x in range(W) if in_sword(x, y)]
+SWORD = [(x, y) for y in range(75, 109) for x in range(W) if in_sword(x, y)]
 SWORD_SET = set(SWORD)
 
 
