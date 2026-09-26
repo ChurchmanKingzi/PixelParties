@@ -556,7 +556,39 @@ PUFFS = [CB.crop((s_[1].start, s_[0].start, s_[1].stop, s_[0].stop)) for s_ in n
 PUFFS.sort(key=lambda c: -c.width)
 BANK = CB.crop((0, 76, 256, 100))
 BIRD = A('bird')
-BIRDS = [BIRD.crop((k * 11, 0, k * 11 + 11, 7)) for k in range(4)]
+# Schwalben im Flug (von unten gesehen, Flügel ausgebreitet) in den Farben von bird.png.
+# Das seitliche Einzelbild des Spiels wirkt nur animiert; als Standbild liest es sich nicht als Vogel.
+_SW = {'#': (20, 26, 60, 255), 'b': (52, 72, 142, 255), 'r': (190, 44, 32, 255), 'w': (232, 238, 246, 255)}
+_SWALLOW = [
+    ['#...........#',
+     '##....#....##',
+     '.##b.#r#.b##.',
+     '..#bb#w#bb#..',
+     '....#www#....',
+     '.....#w#.....',
+     '.....#.#.....',
+     '....#...#....'],
+    ['......#......',
+     '.....#r#.....',
+     '...##www##...',
+     '.#bb#www#bb#.',
+     '##b..#w#..b##',
+     '#....#.#....#',
+     '....#...#....',
+     '.............'],
+]
+
+
+def _swallow(rows):
+    a = np.zeros((len(rows), len(rows[0]), 4), np.uint8)
+    for y, row in enumerate(rows):
+        for x, ch in enumerate(row):
+            if ch in _SW:
+                a[y, x] = _SW[ch]
+    return Image.fromarray(a, 'RGBA')
+
+
+BIRDS = [_swallow(_SWALLOW[0]), _swallow(_SWALLOW[1])] * 2
 FLY = A('butterfly')
 FLIES = [FLY.crop((k * 5, 0, k * 5 + 5, 4)) for k in range(2)]
 ISLE = {n: A('isle-' + n) for n in 'abcde'}
