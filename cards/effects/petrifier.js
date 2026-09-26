@@ -2,8 +2,16 @@
 //  CARD EFFECT: „Petrifier"
 //  Spell (Normal, Decay Magic Lv2)
 //
-//  "Choose a target and Stun it for 3 turns. Damage a target Stunned by
-//   this effect would take becomes 0."
+//  "Choose a target except the user and Stun it for 3 turns. Damage a
+//   target Stunned by this effect would take becomes 0."
+//
+//  ── „EXCEPT THE USER" (Als Aenderung 26.9.) ──────────────────────
+//  Der Wirker darf sich nicht selbst versteinern. „The user" ist, wer
+//  den Zauber wirkt: normalerweise der Held (auf SEINER Seite — bei
+//  einem geliehenen Helden also `cardHeroOwner`), und wenn eine Kreatur
+//  ihn wirkt (Wolflesia-Art ueber `_spellCasterOverride`, aus einem
+//  Kreatureffekt ueber `_spellCasterCreature`), diese Kreatur. Der Held
+//  dahinter bleibt dann ein legales Ziel.
 //
 //  ── DIE NULL HAENGT AM STUN, NICHT AN EINEM EIGENEN STATUS ────────
 //  „a target STUNNED BY THIS EFFECT" — laeuft die Betaeubung aus, faellt
@@ -37,6 +45,30 @@
 const CARD_NAME = 'Petrifier';
 const DAUER = 3;
 
+/**
+ * Liefert eine Pruefung „ist dieses Ziel der Wirker?" (s. Kopf).
+ * Ziele haben die Form von `promptDamageTarget`:
+ * `{ type, owner, heroIdx, slotIdx, cardInstance }`.
+ */
+function wirkerPruefer(ctx) {
+  const gs = ctx._engine.gs;
+  const ueber = gs._spellCasterOverride;           // Kreatur wirkt fuer ihren Helden
+  if (ueber) {
+    return (t) => t.type !== 'hero' && t.owner === ueber.owner
+      && t.heroIdx === ueber.heroIdx && t.slotIdx === ueber.zoneSlot;
+  }
+  const kreatur = gs._spellCasterCreature;          // Zauber aus einem Kreatureffekt
+  if (kreatur && kreatur.zone === 'support') {
+    return (t) => t.type !== 'hero' && (t.cardInstance
+      ? t.cardInstance.id === kreatur.id
+      : (t.heroIdx === kreatur.heroIdx && t.slotIdx === kreatur.zoneSlot
+        && t.owner === (kreatur.controller ?? kreatur.owner)));
+  }
+  const seite = ctx.cardHeroOwner ?? ctx.cardOwner;
+  const heroIdx = ctx.cardHeroIdx;
+  return (t) => t.type === 'hero' && t.owner === seite && t.heroIdx === heroIdx;
+}
+
 module.exports = {
   // ★★ v1181 — ENTKOPPELTE ZAUBERBILDER (Al 17.9.): Wird der Zauber
   // NEGIERT, laeuft sein Effekt-Rumpf nie — die Engine spielt dann diese
@@ -52,12 +84,15 @@ module.exports = {
       const gs = engine.gs;
       const pi = ctx.cardOwner;
 
+      const istWirker = wirkerPruefer(ctx);
       const target = await ctx.promptDamageTarget({
         side: 'any',
         types: ['hero', 'creature'],
         title: CARD_NAME,
         appliesStatus: 'stunned',
-        description: `Stun a target for ${DAUER} turns. While Stunned this way, all damage it would take becomes 0.`,
+        // „except the user" — der Wirker ist kein Ziel.
+        condition: (t) => !istWirker(t),
+        description: `Stun a target other than the caster for ${DAUER} turns. While Stunned this way, all damage it would take becomes 0.`,
         confirmLabel: '🗿 Petrify!',
         cancellable: true,
       });
