@@ -149,15 +149,30 @@ module.exports = {
       // ── Pop from discard and summon onto the user hero ───────────
       // v1389: Ablage → Feld über die EINE Stelle (Sperre, Lethe-Stempel,
       // Signal, Rückgabe bei Fehlschlag — alles in summonFromDiscard).
-      const summonRes = await engine.summonFromDiscard(pi, pi, dpIdx, heroIdx, -1, {
-        source: CARD_NAME, flug: false, hookExtras: { _isForcefulRevival: true },
+      // Eigene Animation (Als Auswahl 26.9.): der Held schlaegt zu, eine
+      // Energiekette reisst die Kreatur aus der Ablage auf den freien
+      // Platz, dort bricht der Boden auf — und dann stroemt die
+      // Lebenskraft des Helden in sie hinein (der Preis). Dafuer muss der
+      // Zielplatz VOR dem Flug feststehen.
+      const freiSlot = (ps.supportZones?.[heroIdx] || []).findIndex(sl => (sl || []).length === 0);
+      if (freiSlot < 0) { gs._spellCancelled = true; return; }
+      engine._broadcastEvent('play_zone_animation', {
+        type: 'gewaltsame_erweckung', owner: pi, heroIdx, zoneSlot: freiSlot,
+        von: { owner: pi, heroIdx, zoneSlot: -1 }, duration: 2000,
+      });
+      await engine._delay(300);
+
+      const summonRes = await engine.summonFromDiscard(pi, pi, dpIdx, heroIdx, freiSlot, {
+        source: CARD_NAME, flug: 720, flugStil: 'gewaltsam',
+        summonOpts: { playSummonAnim: false },   // die Landung zeigt die eigene Animation
+        hookExtras: { _isForcefulRevival: true },
       });
       if (!summonRes?.inst) {
         gs._spellCancelled = true;
         return;
       }
 
-      const { inst, actualSlot } = summonRes;
+      const { inst } = summonRes;
 
       // Bypass summoning sickness for THIS instance only — the card text
       // explicitly grants "may activate its active effect this turn."
@@ -171,9 +186,9 @@ module.exports = {
       if (!inst.counters) inst.counters = {};
       inst.counters._hasHaste = true;
 
-      engine._broadcastEvent('summon_effect', {
-        owner: pi, heroIdx, zoneSlot: actualSlot, cardName: chosenName,
-      });
+      // Die Landung zeigt `gewaltsame_erweckung` (statt summon_effect). Die
+      // Lebenskraft stroemt schon — der Schaden landet mitten darin.
+      await engine._delay(380);
 
       // ── Self-damage equal to the revived Creature's max HP ───────
       const maxHp = inst.counters?.maxHp ?? cd.hp ?? 0;

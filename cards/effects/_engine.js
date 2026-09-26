@@ -9651,6 +9651,19 @@ class GameEngine {
     });
     if (hero.hp > 0) return false;   // ein Fenster-Zuhoerer hat ihn schon zurueckgeholt
 
+    // ★ 26.9. — `opts.lebenNachMs`: die Animation laeuft ZUERST an, der
+    // Held kehrt erst nach dieser Frist in den Zustand zurueck (Divine
+    // Gift of Death: er bleibt tot, bis die Seele in ihn faehrt). Ohne
+    // das Feld unveraendert: Zustand sofort, Animation dazu.
+    const animType = opts.animationType || 'holy_revival';
+    const animDaten = { type: animType, owner: playerIdx, heroIdx, zoneSlot: -1, ...(opts.animDuration ? { duration: opts.animDuration } : {}) };
+    const vorlauf = opts.lebenNachMs > 0 ? opts.lebenNachMs : 0;
+    if (vorlauf) {
+      this._broadcastEvent('play_zone_animation', animDaten);
+      await this._delay(vorlauf);
+      if (hero.hp > 0 || !hero.name) return false;
+    }
+
     const maxHp = hero.maxHp || 400;
     const reviveHp = Math.min(hp, maxHp);
     hero.hp = reviveHp;
@@ -9673,12 +9686,11 @@ class GameEngine {
 
     this.log('hero_revived', { hero: hero.name, player: ps.username, hp: reviveHp, by: opts.source || 'unknown' });
 
-    const animType = opts.animationType || 'holy_revival';
     // `opts.animDuration` (v631): laengere Auftritte (Konzert der Hymne)
     // leben laenger als die 1000-ms-Vorgabe des Clients.
-    this._broadcastEvent('play_zone_animation', { type: animType, owner: playerIdx, heroIdx, zoneSlot: -1, ...(opts.animDuration ? { duration: opts.animDuration } : {}) });
+    if (!vorlauf) this._broadcastEvent('play_zone_animation', animDaten);
     this.sync();
-    await this._delay(opts.animDelay != null ? opts.animDelay : 1200);
+    await this._delay(Math.max(0, (opts.animDelay != null ? opts.animDelay : 1200) - vorlauf));
 
     await this.runHooks(HOOKS.ON_HERO_REVIVE, { playerIdx, heroIdx, hero, hp: reviveHp, source: opts.source });
     return true;
@@ -10182,6 +10194,7 @@ class GameEngine {
     const ok = await this.actionAddCardFromDeckToHand(playerIdx, cardName, {
       source: title,
       reveal: false,
+      ...(opts.flugStil ? { flugStil: opts.flugStil } : {}),   // 26.9.
     });
     if (!ok) return null;
 
@@ -22644,7 +22657,17 @@ this._deathWatch = (this._deathWatchStack || []).length
     // `_skipFlight`: der Aufrufer animiert die Bewegung selbst (Future
     // Tech Lamp faehrt das Show-Cards-Protokoll). Ohne den Schalter
     // liefen zwei Fluege fuer dieselbe Karte.
-    if (!opts._skipFlight) this._broadcastEvent('deck_search_add', { cardName, playerIdx: pi });
+    // ★ 26.9. — `opts.flugStil`: ein AUSDRUECKLICHER Flug Deck → Hand mit
+    // eigenem Aussehen (Perilous Journey: `'flammen'`). Er ersetzt die
+    // Zieh-Animation des Clients (Handschlag ueber `play_pile_transfer`)
+    // und damit auch die Gegnerseite von `deck_search_add`.
+    if (opts.flugStil && !opts._skipFlight) {
+      this._broadcastEvent('play_pile_transfer', {
+        owner: pi, cardName, from: 'deck', to: 'hand',
+        toHandIdx: ps.hand.length - 1, finalHandSize: ps.hand.length,
+        flightStyle: opts.flugStil,
+      });
+    } else if (!opts._skipFlight) this._broadcastEvent('deck_search_add', { cardName, playerIdx: pi });
     this.log('deck_search', {
       player: ps.username, card: cardName, by: opts.source || null,
     });
@@ -24581,7 +24604,10 @@ this._deathWatch = (this._deathWatchStack || []).length
             // an, das gerade als Tribut gewählte Greatmaw Remora zu
             // retten, NACHDEM der Sacrificial Dagger seinen Schaden
             // bereits ausgeteilt hatte).
-            { isSacrifice: true },
+            // ★ 26.9.: `spec.skipPileTransfer` — die Karte zeigt den Weg
+            // des Opfers zur Ablage selbst (Chaorc Interception wirft es
+            // aufs Ziel und laesst es von DORT abfliegen).
+            { isSacrifice: true, ...(spec.skipPileTransfer ? { skipPileTransfer: true } : {}) },
           );
         }
       } catch (err) {
@@ -30409,6 +30435,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       this._broadcastEvent('play_pile_transfer', {
         fromOwner: pileOwner, toOwner: pi, owner: pi, cardName: ab.name,
         from: 'discard', to: 'support', toHeroIdx: heroIdx, toSlotIdx: slotIdx,
+        ...(opts.flugStil ? { flightStyle: opts.flugStil } : {}),   // 26.9. (Forceful Revival)
       });
       if (typeof opts.flug === 'number' && opts.flug > 0) { this.sync(); await this._delay(opts.flug); }
     }
@@ -32492,6 +32519,13 @@ this._deathWatch = (this._deathWatchStack || []).length
         if (!this.gs._negatedEffectSources) this.gs._negatedEffectSources = new Set();
         this.gs._negatedEffectSources.add(key);
       }
+      // ★ 26.9.: auch HIER die Negationsbilder (v1180 „EIN Weg fuer JEDE
+      // Negation") — die Stelle fehlte bisher. Ohne sie blieb nicht nur
+      // der abgewehrte Zauber unsichtbar, auch der `nachBilder`-Nachlauf
+      // der Abwehrkarte lief nie (Chaorc Interception: der geworfene
+      // Chaorc fliegt erst darin zur Ablage). Keiner der Aufrufer spielt
+      // selbst Bilder nach einer Negation, doppelt wird also nichts.
+      await this.negationsBilder(source, normalized, ptResult);
     }
     return ptResult;
   }
@@ -33677,7 +33711,10 @@ this._deathWatch = (this._deathWatchStack || []).length
       // (no Surprise Zone to flip from — the card_reveal emit below
       // still shows opp what activated, and the trigger source emits
       // its own zone flourish to identify itself).
-      this._broadcastEvent('surprise_flip', { owner: playerIdx, heroIdx: hostHeroIdx, cardName, isBakhmSlot, bakhmZoneSlot });
+      // ★ 26.9.: `opts.ohneFlip` — die aufrufende Karte hat das Aufdecken
+      // schon selbst gezeigt (Telekinesis: die Karte schwebt hoch, dreht
+      // sich in der Luft um und landet offen).
+      if (!opts.ohneFlip) this._broadcastEvent('surprise_flip', { owner: playerIdx, heroIdx: hostHeroIdx, cardName, isBakhmSlot, bakhmZoneSlot });
     }
 
     // Reveal card to opponent and spectators

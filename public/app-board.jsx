@@ -1692,6 +1692,38 @@ function FrozenOverlay() {
   );
 }
 
+// ── Crimson Web: das bleibende Netz (Als Vorgabe 26.9.) ─────────────
+// „Ein tiefrotes Spinnennetz, das sich ueber den Angreifer legt und
+// dort bleibt, solange das Netz angelegt wird und bleibt. Wird es
+// entfernt …, blendet das Netz ueber eine Sekunde aus."
+// Haengt am Status `webbed` (nur Crimson Web setzt ihn) und ist deshalb
+// immer mit dem Zustand im Einklang — auch nach einem Neuladen. Faellt
+// der Status weg, spielt die Komponente noch 1 s ihr Ausblenden, statt
+// schlagartig zu verschwinden. Dieselbe Netzgeometrie wie die
+// Auftritts-Animation `crimson_web`, damit der Uebergang nahtlos ist.
+const CRIMSON_NETZ = ppNetzPfade(52, 72, 12, 6);
+function CrimsonWebOverlay({ aktiv }) {
+  const [phase, setPhase] = useState(aktiv ? 'an' : 'aus');
+  const phaseRef = useRef(phase);
+  phaseRef.current = phase;
+  useEffect(() => {
+    if (aktiv) { setPhase('an'); return undefined; }
+    if (phaseRef.current !== 'an') return undefined;
+    setPhase('weg');
+    const t = setTimeout(() => setPhase('aus'), 1000);
+    return () => clearTimeout(t);
+  }, [aktiv]);
+  if (phase === 'aus') return null;
+  return (
+    <div className={'crimson-web-overlay' + (phase === 'weg' ? ' crimson-web-weg' : '')} aria-hidden="true">
+      <svg viewBox="-50 -70 100 140" preserveAspectRatio="none">
+        {CRIMSON_NETZ.speichen.map((d, i) => <path key={'s' + i} d={d} />)}
+        {CRIMSON_NETZ.ringe.map((d, i) => <path key={'r' + i} d={d} />)}
+      </svg>
+    </div>
+  );
+}
+
 // Immune/Shielded status icon with instant custom tooltip
 function ImmuneIcon({ heroName, statusType }) {
   const tooltipKey = statusType === 'shielded' ? 'shielded' : 'immune';
@@ -2452,6 +2484,465 @@ function FuriousAngerEffect({ x, y, w = 80, h = 110 }) {
         <rect x={s * 0.1} y={-s * 0.42} width={s * 0.16} height={s * 0.55} fill="#8b0d0d" />
         <rect x={s * 0.1} y={s * 0.2} width={s * 0.16} height={s * 0.16} fill="#8b0d0d" />
       </svg>
+    </div>
+  );
+}
+
+// ── Wuetende Anklage (Accusation, Als Vorgabe 26.9.) ────────────────
+// „Wuetende Sprechblase ueber dem Nutzer, aehnlich wie Furious Anger".
+// Kartenbild als Vorlage: weisse Sprechblase mit rotem „!". Ablauf:
+//     0–280   die Blase ploppt ueber dem Helden auf, das „!" pocht
+//   300 / 1250 Zornesadern springen an der Blasenecke auf
+//   650–900   das „!" schrumpft weg, an seiner Stelle erscheint die
+//             ANGESAGTE Karte (`cardName`) in der Blase
+//  1250–1650  die Blase zittert vor Wut, Schreistriche blitzen
+//  1950–2200  sie ploppt weg
+// Der Held glueht dabei rot. Klang aus der Komponente (Regel ⑤),
+// Keyframes in style.css (Regel ④).
+function AnklageEffect({ x, y, w = 80, h = 110, cardName }) {
+  const B = Math.max(64, w * 0.95);                 // Blasenbreite
+  const H = B * 0.78;                              // Blasenhoehe (ohne Spitze)
+  const bild = cardName && window.cardImageUrl ? window.cardImageUrl(cardName) : null;
+  const striche = useMemo(() => [-32, 0, 32, 148, 180, 212].map((g, i) => ({ g, verzug: 1250 + (i % 3) * 45 })), []);
+  useEffect(() => {
+    const spiel = (name, opts, at) => setTimeout(() => { if (window.playSFX) window.playSFX(name, { ...opts, dedupe: 0 }); }, at);
+    spiel('ping', { rate: 0.75, volume: 0.8 }, 0);
+    spiel('critical_strike', { rate: 1.35, volume: 0.55 }, 60);
+    if (bild) spiel('reveal', { rate: 1.1, volume: 0.8 }, 660);
+    spiel('attack_ram', { rate: 1.4, volume: 0.5 }, 1260);
+  }, []);
+  // Blasenumriss mit Spitze nach unten links (zum Helden).
+  const r = H * 0.42;
+  const pfad = `M ${-B / 2 + r} ${-H} H ${B / 2 - r} Q ${B / 2} ${-H} ${B / 2} ${-H + r} V ${-r} Q ${B / 2} 0 ${B / 2 - r} 0`
+    + ` H ${-B * 0.02} L ${-B * 0.2} ${H * 0.34} L ${-B * 0.16} 0 H ${-B / 2 + r} Q ${-B / 2} 0 ${-B / 2} ${-r}`
+    + ` V ${-H + r} Q ${-B / 2} ${-H} ${-B / 2 + r} ${-H} Z`;
+  const kw = H * 0.62, kh = kw * 1.4;               // Kartenbild in der Blase
+  const oben = -h * 0.5 - H * 0.38;                // Blasenfuss knapp ueber dem Helden
+  return (
+    <div className="anklage" style={{ left: x, top: y }} aria-hidden="true">
+      <span className="anklage-glut" style={{ width: w * 1.25, height: h * 1.15, left: -w * 0.625, top: -h * 0.575 }} />
+      <div className="anklage-blase" style={{ left: 0, top: oben }}>
+        <div className="anklage-zittern">
+          <svg width={B + 12} height={H * 1.4 + 12} viewBox={`${-B / 2 - 6} ${-H - 6} ${B + 12} ${H * 1.4 + 12}`}
+            style={{ position: 'absolute', left: -B / 2 - 6, top: -H - 6, overflow: 'visible' }}>
+            <path d={pfad} fill="#fffdf6" stroke="#141414" strokeWidth="3.2" strokeLinejoin="round" />
+          </svg>
+          <svg className="anklage-ausruf" width={H} height={H} viewBox="-10 -10 20 20"
+            style={{ position: 'absolute', left: -H / 2, top: -H * 0.5 - H / 2 }}>
+            <rect x="-2.6" y="-8" width="5.2" height="10.5" fill="#d0121b" stroke="#5a0508" strokeWidth=".8" />
+            <rect x="-2.6" y="4.2" width="5.2" height="4.4" fill="#d0121b" stroke="#5a0508" strokeWidth=".8" />
+          </svg>
+          {bild && (
+            <div className="anklage-karte" style={{ width: kw, height: kh, left: -kw / 2, top: -H * 0.5 - kh / 2 }}>
+              <img src={bild} alt="" draggable="false" />
+            </div>
+          )}
+          {striche.map((s, i) => (
+            <span key={i} className="anklage-strich" style={{
+              left: 0, top: -H * 0.5, height: 9, width: H * 0.34,
+              '--ag': s.g + 'deg', '--ar': (B * 0.5 + 8) + 'px', animationDelay: s.verzug + 'ms',
+            }} />
+          ))}
+        </div>
+      </div>
+      {[300, 1250].map((t, i) => (
+        <svg key={'ad' + i} className="anklage-ader" width="34" height="34" viewBox="-17 -17 34 34"
+          style={{ left: (i ? -1 : 1) * B * 0.5 - 17, top: oben - H - 10 - 17 + i * 6, animationDelay: t + 'ms' }}>
+          {[0, 90, 180, 270].map(g => (
+            <path key={g} d="M 3 -13 Q 3 -4 12 -3" fill="none" stroke="#e0161f" strokeWidth="4.2" strokeLinecap="round"
+              transform={`rotate(${g})`} />
+          ))}
+        </svg>
+      ))}
+    </div>
+  );
+}
+
+// ── Spinnennetz-Geometrie (Baby Spider, Crimson Web) ───────────────
+// Radiales Netz um (0,0): `speichen` gerade Faeden nach aussen, dazu
+// `ringe` Querfaeden, die zwischen zwei Speichen leicht zur Mitte
+// durchhaengen (Quadratkurven) — das macht es zum Netz statt zum
+// Polygon. `rx`/`ry` erlauben ein hochkantes Netz ueber einer Karte.
+// Deterministisch (fester Streuwert je Index), damit ein neu
+// gerendertes Netz nicht springt.
+function ppNetzPfade(rx, ry, speichen = 10, ringe = 5) {
+  const winkel = Array.from({ length: speichen }, (_, i) =>
+    (i / speichen) * Math.PI * 2 + (((i * 37) % 10) - 5) * 0.025 - Math.PI / 2);
+  const sp = winkel.map(a => `M 0 0 L ${(Math.cos(a) * rx * 1.04).toFixed(1)} ${(Math.sin(a) * ry * 1.04).toFixed(1)}`);
+  const rg = [];
+  for (let k = 1; k <= ringe; k++) {
+    const f = k / ringe;
+    let d = '';
+    for (let i = 0; i <= speichen; i++) {
+      const a = winkel[i % speichen];
+      const s = f * (0.94 + (((i * 13 + k * 7) % 10) / 100));
+      const px = Math.cos(a) * rx * s, py = Math.sin(a) * ry * s;
+      if (i === 0) { d = `M ${px.toFixed(1)} ${py.toFixed(1)}`; continue; }
+      const am = (winkel[(i - 1) % speichen] + a + (i === speichen ? Math.PI * 2 : 0)) / 2;
+      const durch = s * 0.8;
+      const cx = Math.cos(am) * rx * durch, cy = Math.sin(am) * ry * durch;
+      d += ` Q ${cx.toFixed(1)} ${cy.toFixed(1)} ${px.toFixed(1)} ${py.toFixed(1)}`;
+    }
+    rg.push(d);
+  }
+  return { speichen: sp, ringe: rg };
+}
+
+// Kleine Pixel-Spinne (Baby Spider): Leib, Kopf, rote Augen, acht Beine.
+function PpSpinne({ g = 18, farbe = '#161018' }) {
+  const beine = [-1, 1].flatMap(s => [-0.55, -0.2, 0.15, 0.5].map((v, i) => ({ s, v, i })));
+  return (
+    <svg className="ppspinne" width={g * 2.2} height={g * 2.2} viewBox="-22 -22 44 44"
+      style={{ position: 'absolute', left: -g * 1.1, top: -g * 1.1, overflow: 'visible' }}>
+      {beine.map((b, k) => (
+        <path key={k} className={'ppspinne-bein ppspinne-bein' + (k % 2)}
+          d={`M ${b.s * 3} ${b.v * 10} L ${b.s * 11} ${b.v * 10 - 6} L ${b.s * 17} ${b.v * 14 + 4}`}
+          fill="none" stroke={farbe} strokeWidth="2.4" strokeLinejoin="round" strokeLinecap="round" />
+      ))}
+      <ellipse cx="0" cy="5" rx="7" ry="8.5" fill={farbe} stroke="#3a2a40" strokeWidth="1" />
+      <circle cx="0" cy="-6" r="5" fill={farbe} stroke="#3a2a40" strokeWidth="1" />
+      <rect x="-3.2" y="-8" width="2.2" height="2.2" fill="#ff2a3a" />
+      <rect x="1" y="-8" width="2.2" height="2.2" fill="#ff2a3a" />
+      <path d="M -4 2 L 4 2 M -3 6 L 3 6" stroke="#4a3450" strokeWidth="1.2" />
+    </svg>
+  );
+}
+
+// ── Baby Spider: Opfer fuer die Surprise (Als Vorgabe 26.9.) ────────
+// Ersetzt fuer Baby Spider die allgemeine Opfer-Animation (Messer).
+// Angehaengt an die gewaehlte SURPRISE ZONE; die Baby Spider selbst
+// kommt als `von` (→ `vonDx`/`vonDy`).
+//     0–520   Seide spinnt die Baby Spider ein (Kokon aus Faeden)
+//   380–900   eine kleine Spinne springt heraus und laeuft an einem
+//             frisch gesponnenen Faden hinueber zur Surprise
+//   880–1300  sie webt ein Netz ueber die verdeckte Karte
+//  1200–1600  Aktivierung: violetter Blitz, Ring, das Netz zerreisst
+// Danach laeuft das normale Aufdecken der Surprise.
+function BabySpiderOpferEffect({ x, y, w = 70, h = 100, vonDx = 0, vonDy = -140, vonW, vonH }) {
+  const sw = vonW || w, sh = vonH || h;
+  const netz = useMemo(() => ppNetzPfade(w * 0.62, h * 0.52, 9, 4), [w, h]);
+  const kokon = useMemo(() => Array.from({ length: 7 }, (_, i) => {
+    const yy = -sh * 0.42 + (i / 6) * sh * 0.84;
+    const kipp = (i % 2 ? 1 : -1) * sh * 0.14;
+    return `M ${(-sw * 0.52).toFixed(1)} ${(yy - kipp).toFixed(1)} Q 0 ${(yy + kipp * 1.6).toFixed(1)} ${(sw * 0.52).toFixed(1)} ${(yy + kipp).toFixed(1)}`;
+  }), [sw, sh]);
+  const dreh = Math.atan2(-vonDy, -vonDx) * 180 / Math.PI + 90;   // Kopf voraus
+  const lang = Math.hypot(vonDx, vonDy);
+  useEffect(() => {
+    const spiel = (name, opts, at) => setTimeout(() => { if (window.playSFX) window.playSFX(name, { ...opts, dedupe: 0 }); }, at);
+    spiel('debuff', { rate: 1.35, volume: 0.6 }, 0);
+    spiel('elem_wind', { rate: 1.9, volume: 0.45 }, 380);
+    spiel('slash', { rate: 1.7, volume: 0.35 }, 900);
+    spiel('elem_dark', { rate: 1.3, volume: 0.6 }, 1200);
+  }, []);
+  return (
+    <div className="bspinne" style={{ left: x, top: y }} aria-hidden="true">
+      {/* Kokon um die Baby Spider */}
+      <div className="bspinne-quelle" style={{ left: vonDx, top: vonDy }}>
+        <svg width={sw * 1.3} height={sh * 1.2} viewBox={`${-sw * 0.65} ${-sh * 0.6} ${sw * 1.3} ${sh * 1.2}`}
+          style={{ position: 'absolute', left: -sw * 0.65, top: -sh * 0.6, overflow: 'visible' }}>
+          {kokon.map((d, i) => (
+            <path key={i} d={d} pathLength="100" className="bspinne-kokon" style={{ animationDelay: (i * 55) + 'ms' }} />
+          ))}
+        </svg>
+        <span className="bspinne-puff" style={{ width: sw, height: sh, left: -sw / 2, top: -sh / 2 }} />
+      </div>
+      {/* Faden von der Baby Spider zur Surprise */}
+      <svg className="bspinne-faden" width="2" height="2" style={{ position: 'absolute', left: 0, top: 0, overflow: 'visible' }}>
+        <line x1={vonDx} y1={vonDy} x2="0" y2="0" pathLength="100" />
+      </svg>
+      {/* die kleine Spinne unterwegs */}
+      <div className="bspinne-laeufer" style={{ '--sx': vonDx + 'px', '--sy': vonDy + 'px', '--lang': lang }}>
+        <div style={{ position: 'absolute', transform: `rotate(${dreh}deg)` }}><PpSpinne g={Math.max(12, w * 0.2)} /></div>
+      </div>
+      {/* Netz ueber der Surprise, danach Aktivierung */}
+      <svg className="bspinne-netz" width={w * 1.4} height={h * 1.2} viewBox={`${-w * 0.7} ${-h * 0.6} ${w * 1.4} ${h * 1.2}`}
+        style={{ position: 'absolute', left: -w * 0.7, top: -h * 0.6, overflow: 'visible' }}>
+        {netz.speichen.map((d, i) => <path key={'s' + i} d={d} pathLength="100" className="bspinne-netzfaden" style={{ animationDelay: (880 + i * 18) + 'ms' }} />)}
+        {netz.ringe.map((d, i) => <path key={'r' + i} d={d} pathLength="100" className="bspinne-netzfaden" style={{ animationDelay: (1000 + i * 55) + 'ms' }} />)}
+      </svg>
+      <span className="bspinne-blitz" style={{ width: w * 1.5, height: h * 1.3, left: -w * 0.75, top: -h * 0.65 }} />
+      <span className="bspinne-ring" style={{ width: w * 1.2, height: w * 1.2, left: -w * 0.6, top: -w * 0.6 }} />
+    </div>
+  );
+}
+
+// ── Crimson Web: der Netzschuss (Als Vorgabe 26.9.) ────────────────
+// Angehaengt an den ANGREIFER; die Surprise Zone des Besitzers kommt
+// als `von`. Ablauf:
+//     0–360   ein dunkelroter Netzballen schiesst aus der Surprise Zone
+//             auf den Angreifer, ein Faden zieht hinterher
+//   340–950   das Netz spannt sich ueber den Helden: erst die Speichen,
+//             dann die Querfaeden; ein Ruck (der Held wird gefesselt)
+//   ab 950    `bleibt: true` → kurzes Ausblenden, das bleibende Netz
+//             (`CrimsonWebOverlay`, gleiche Geometrie) liegt da schon;
+//             `bleibt: false` (kein Platz zum Anlegen) → das Netz
+//             blendet ueber eine Sekunde aus.
+function CrimsonWebShotEffect({ x, y, w = 80, h = 110, vonDx = 0, vonDy = 160, bleibt = true }) {
+  const netz = useMemo(() => ppNetzPfade(w * 0.52, h * 0.514, 12, 6), [w, h]);
+  useEffect(() => {
+    const spiel = (name, opts, at) => setTimeout(() => { if (window.playSFX) window.playSFX(name, { ...opts, dedupe: 0 }); }, at);
+    spiel('projectile', { rate: 0.8, volume: 0.7 }, 0);
+    spiel('elem_dark', { rate: 1.25, volume: 0.6 }, 330);
+    spiel('debuff', { rate: 0.85, volume: 0.8 }, 420);
+    if (!bleibt) spiel('status_remove', { rate: 0.9, volume: 0.5 }, 1050);
+  }, []);
+  return (
+    <div className={'cweb' + (bleibt ? '' : ' cweb-verpufft')} style={{ left: x, top: y }} aria-hidden="true">
+      <svg className="cweb-faden" width="2" height="2" style={{ position: 'absolute', left: 0, top: 0, overflow: 'visible' }}>
+        <line x1={vonDx} y1={vonDy} x2="0" y2="0" pathLength="100" />
+      </svg>
+      <span className="cweb-ballen" style={{ '--cx': vonDx + 'px', '--cy': vonDy + 'px' }} />
+      <div className="cweb-netz-huelle">
+        <svg className="cweb-netz" width={w * 1.1} height={h * 1.1} viewBox={`${-w * 0.55} ${-h * 0.55} ${w * 1.1} ${h * 1.1}`}
+          style={{ position: 'absolute', left: -w * 0.55, top: -h * 0.55, overflow: 'visible' }}>
+          {netz.speichen.map((d, i) => <path key={'s' + i} d={d} pathLength="100" style={{ animationDelay: (340 + i * 16) + 'ms' }} />)}
+          {netz.ringe.map((d, i) => <path key={'r' + i} d={d} pathLength="100" style={{ animationDelay: (520 + i * 60) + 'ms' }} />)}
+        </svg>
+      </div>
+      <span className="cweb-glut" style={{ width: w * 1.3, height: h * 1.2, left: -w * 0.65, top: -h * 0.6 }} />
+    </div>
+  );
+}
+
+// ── Divine Gift of Death: die grosse Erweckung (Als Vorgabe 26.9.) ─
+// „Eine grosse Revival-Animation". Kartenbild als Vorlage: der Tod
+// selbst — Kapuze, weisser Schaedel, Klauenhand — gibt das Leben zurueck.
+//     0–600   das Brett um den Gefallenen verdunkelt sich, ein violetter
+//             Seelenwirbel oeffnet sich unter ihm
+//   150–1700  der Tod schwebt ueber dem Helden herab, die Augen gluehen
+//   650–1250  eine Seele loest sich aus seiner Klaue und sinkt in den Helden
+//  1250–2600  Lichtblitz, zwei Druckringe, eine Lichtsaeule, aufsteigende
+//             Seelenfunken; der Held glueht zurueck ins Leben
+// Handy: weniger Funken. Klang aus der Komponente (Regel ⑤).
+function TodesgabeErweckungEffect({ x, y, w = 80, h = 110 }) {
+  const funken = useMemo(() => Array.from({ length: ppFxN(18) }, (_, i) => ({
+    dx: (Math.random() - 0.5) * w * 1.1, hoch: h * (0.5 + Math.random() * 0.7),
+    g: 4 + Math.random() * 5, verzug: 1300 + Math.random() * 900,
+    farbe: ['#e8fbff', '#9ff0ff', '#fff6d0', '#c9b8ff'][i % 4],
+  })), [w, h]);
+  const T = Math.max(70, w * 1.05);                 // Groesse der Todesgestalt
+  useEffect(() => {
+    const spiel = (name, opts, at) => setTimeout(() => { if (window.playSFX) window.playSFX(name, { ...opts, dedupe: 0 }); }, at);
+    spiel('elem_dark', { rate: 0.7, volume: 0.8 }, 0);
+    spiel('doom_tick', { rate: 0.8, volume: 0.6 }, 380);
+    spiel('revive', { rate: 1.0, volume: 1 }, 1250);
+    spiel('elem_holy', { rate: 0.9, volume: 0.7 }, 1270);
+    spiel('ascension', { rate: 1.1, volume: 0.55 }, 1350);
+  }, []);
+  return (
+    <div className="tge" style={{ left: x, top: y }} aria-hidden="true">
+      <span className="tge-dunkel" style={{ width: w * 7, height: w * 7, left: -w * 3.5, top: -w * 3.5 }} />
+      <span className="tge-wirbel" style={{ width: w * 1.7, height: w * 1.7, left: -w * 0.85, top: -w * 0.85 }} />
+      <svg className="tge-tod" width={T * 2} height={T * 1.9} viewBox="-50 -52 100 95"
+        style={{ left: -T, top: -h * 0.5 - T * 1.55 }}>
+        {/* Umhang/Kapuze */}
+        <path d="M -30 38 Q -38 -8 -20 -34 Q 0 -54 20 -34 Q 38 -8 30 38 Q 18 30 10 40 Q 0 30 -10 40 Q -18 30 -30 38 Z"
+          fill="#1b1622" stroke="#050308" strokeWidth="2" />
+        <path d="M -20 -30 Q 0 -46 20 -30 Q 26 -10 18 6 Q 0 14 -18 6 Q -26 -10 -20 -30 Z" fill="#07050a" />
+        {/* Schaedel */}
+        <path d="M -12 -22 Q 0 -32 12 -22 Q 15 -10 9 -2 L 7 4 L -7 4 L -9 -2 Q -15 -10 -12 -22 Z" fill="#f2f0ea" stroke="#9a968c" strokeWidth="1" />
+        <rect className="tge-auge" x="-8" y="-17" width="5" height="5" />
+        <rect className="tge-auge" x="3" y="-17" width="5" height="5" />
+        <path d="M -1.5 -9 L 1.5 -9 L 0 -6 Z" fill="#1b1622" />
+        <path d="M -5 0 V 3 M -2 0 V 3 M 1 0 V 3 M 4 0 V 3" stroke="#6a665e" strokeWidth="1" />
+        {/* Klauenhand, nach unten greifend */}
+        <path d="M 16 14 Q 22 22 16 30 M 16 30 L 10 40 M 16 30 L 16 42 M 16 30 L 22 40 M 16 30 L 27 36"
+          fill="none" stroke="#e9e6de" strokeWidth="2.6" strokeLinecap="round" />
+      </svg>
+      <span className="tge-seele" style={{ '--sx0': (T * 0.32) + 'px', '--sy0': (-h * 0.5 - T * 0.2) + 'px' }} />
+      <span className="tge-strahl" style={{ width: w * 0.9, height: h * 2.6, left: -w * 0.45, top: -h * 2.1 }} />
+      <span className="tge-blitz" style={{ width: w * 1.8, height: h * 1.6, left: -w * 0.9, top: -h * 0.8 }} />
+      <span className="tge-ring" style={{ width: w * 1.4, height: w * 1.4, left: -w * 0.7, top: -w * 0.7 }} />
+      <span className="tge-ring tge-ring2" style={{ width: w * 1.4, height: w * 1.4, left: -w * 0.7, top: -w * 0.7 }} />
+      {funken.map((f, i) => (
+        <span key={i} className="tge-funke" style={{
+          left: f.dx - f.g / 2, top: h * 0.3, width: f.g, height: f.g, background: f.farbe,
+          boxShadow: `0 0 8px ${f.farbe}`, '--fh': -f.hoch + 'px', animationDelay: f.verzug + 'ms',
+        }} />
+      ))}
+    </div>
+  );
+}
+
+// ── Forceful Revival: gewaltsame Erweckung (Als Auswahl 26.9.) ─────
+// Kartenbild: gruen-gelbe Energie reisst eine Kreatur aus dem Boden,
+// daneben der Held mit erhobener Keule. Angehaengt an die ZIEL-Zone,
+// der Held (der den Preis zahlt) kommt als `von`.
+//     0–450   Schlag des Helden: gruen-gelber Blitz, Druckring
+//   120–900   eine zuckende Energiekette vom Helden zur Zone, der Boden
+//             reisst auf (die Karte fliegt derweil aus der Ablage heran)
+//  1000–1500  Landung: Lichtsaeule, Brocken, Ring
+//  1150–1800  der Preis: rote Lebenskraft stroemt vom Helden in die Kreatur
+function GewaltsameErweckungEffect({ x, y, w = 70, h = 100, vonDx = 0, vonDy = 140 }) {
+  const kette = useMemo(() => {
+    const n = 9, pts = [];
+    const lang = Math.hypot(vonDx, vonDy) || 1;
+    const nx = -vonDy / lang, ny = vonDx / lang;
+    for (let i = 0; i <= n; i++) {
+      const t = i / n, zack = (i === 0 || i === n) ? 0 : (i % 2 ? 1 : -1) * (8 + (i * 7) % 9);
+      pts.push(`${(vonDx * (1 - t) + nx * zack).toFixed(1)},${(vonDy * (1 - t) + ny * zack).toFixed(1)}`);
+    }
+    return pts.join(' ');
+  }, [vonDx, vonDy]);
+  const brocken = useMemo(() => Array.from({ length: ppFxN(12) }, (_, i) => ({
+    w: ((i * 360) / 12 + (i % 3) * 9) * Math.PI / 180, d: 30 + (i % 4) * 12, g: 4 + (i % 3) * 2,
+    ton: ['#6b4e2a', '#8a6a3a', '#4f3a20', '#a3843f'][i % 4],
+  })), []);
+  const blut = useMemo(() => Array.from({ length: ppFxN(8) }, (_, i) => ({ verzug: 1150 + i * 60, seit: (i % 2 ? 1 : -1) * (6 + (i * 5) % 14) })), []);
+  const riss = `M 0 ${h * 0.46} L ${-w * 0.12} ${h * 0.32} L ${w * 0.06} ${h * 0.2} L ${-w * 0.1} ${h * 0.05}`
+    + ` M ${-w * 0.12} ${h * 0.32} L ${-w * 0.34} ${h * 0.38} M ${w * 0.06} ${h * 0.2} L ${w * 0.32} ${h * 0.28}`;
+  useEffect(() => {
+    const spiel = (name, opts, at) => setTimeout(() => { if (window.playSFX) window.playSFX(name, { ...opts, dedupe: 0 }); }, at);
+    spiel('heavy_impact', { rate: 0.9, volume: 0.8 }, 0);
+    spiel('elem_lightning', { rate: 1.3, volume: 0.45 }, 140);
+    spiel('summon', { rate: 0.9, volume: 0.8 }, 1030);
+    spiel('attack_ram', { rate: 0.75, volume: 0.6 }, 1060);
+    spiel('elem_biomancy', { rate: 0.8, volume: 0.6 }, 1160);
+  }, []);
+  return (
+    <div className="gwe" style={{ left: x, top: y }} aria-hidden="true">
+      <div className="gwe-held" style={{ left: vonDx, top: vonDy }}>
+        <span className="gwe-schlag" style={{ width: w * 1.4, height: w * 1.4, left: -w * 0.7, top: -w * 0.7 }} />
+        <span className="gwe-druck" style={{ width: w * 1.2, height: w * 1.2, left: -w * 0.6, top: -w * 0.6 }} />
+        <span className="gwe-heldrot" style={{ width: w * 1.3, height: h * 1.2, left: -w * 0.65, top: -h * 0.6 }} />
+      </div>
+      <svg className="gwe-kette" width="2" height="2" style={{ position: 'absolute', left: 0, top: 0, overflow: 'visible' }}>
+        <polyline points={kette} />
+      </svg>
+      <svg className="gwe-riss" width="2" height="2" style={{ position: 'absolute', left: 0, top: 0, overflow: 'visible' }}>
+        <path d={riss} pathLength="100" />
+      </svg>
+      <span className="gwe-saeule" style={{ width: w * 0.95, height: h * 2.2, left: -w * 0.475, top: -h * 1.7 }} />
+      <span className="gwe-ring" style={{ width: w * 1.5, height: w * 0.6, left: -w * 0.75, top: h * 0.3 }} />
+      {brocken.map((b, i) => (
+        <span key={'b' + i} className="gwe-brocken" style={{
+          width: b.g, height: b.g, left: -b.g / 2, top: h * 0.35, background: b.ton,
+          '--bx': (Math.cos(b.w) * b.d) + 'px', '--by': (-Math.abs(Math.sin(b.w)) * b.d - 12) + 'px',
+        }} />
+      ))}
+      {blut.map((b, i) => (
+        <span key={'r' + i} className="gwe-blut" style={{
+          '--sx': vonDx + 'px', '--sy': vonDy + 'px', '--seit': b.seit + 'px', animationDelay: b.verzug + 'ms',
+        }} />
+      ))}
+    </div>
+  );
+}
+
+// ── Gate to the Armory: das goldene Portal (Als Vorgabe 26.9.) ──────
+// „Statt dass das gewaehlte Equip vom Deck reinfliegt, soll ueber dem
+//  Ziel ein goldenes Portal (siehe Kartenbild!) erscheinen und die
+//  Equip-Karte dort erscheinen und von dort in die Ziel-Support-Zone
+//  fliegen." Angehaengt an die ZIEL-Zone, `cardName` = das Equip.
+//     0–420   das Portal oeffnet sich ueber der Zone (hochkanter
+//             Goldring, darin ein kreisender Wirbel), Funken
+//   450–900   die Karte tritt aus dem Portal hervor
+//   900–1180  sie schwebt kurz, glaenzend
+//  1180–1500  sie faellt in die Zone — Landung mit Goldfunken
+//  1600–1950  das Portal schliesst sich
+// Der Server legt die echte Karte zum Landezeitpunkt in die Zone.
+function RuestkammerTorEffect({ x, y, w = 70, h = 100, cardName }) {
+  const bild = cardName && window.cardImageUrl ? window.cardImageUrl(cardName) : null;
+  const PW = w * 1.6, PH = h * 1.45;               // Portalmass — die Karte passt hinein
+  const oben = -h * 0.5 - PH * 0.46;               // Portalmitte ueber der Zone
+  const funken = useMemo(() => Array.from({ length: ppFxN(14) }, (_, i) => {
+    const a = (i / 14) * Math.PI * 2;
+    return { sx: Math.cos(a) * PW * 0.5, sy: Math.sin(a) * PH * 0.5, dx: Math.cos(a) * 22, dy: Math.sin(a) * 22, verzug: 120 + (i % 7) * 70, g: 3 + (i % 3) * 2 };
+  }), [PW, PH]);
+  const landung = useMemo(() => Array.from({ length: ppFxN(12) }, (_, i) => {
+    const a = (i / 12) * Math.PI * 2;
+    return { dx: Math.cos(a) * (26 + (i % 3) * 10), dy: Math.sin(a) * (18 + (i % 3) * 8), g: 4 + (i % 3) * 2 };
+  }), []);
+  useEffect(() => {
+    const spiel = (name, opts, at) => setTimeout(() => { if (window.playSFX) window.playSFX(name, { ...opts, dedupe: 0 }); }, at);
+    spiel('elem_holy', { rate: 1.2, volume: 0.7 }, 0);
+    spiel('ascension', { rate: 1.5, volume: 0.45 }, 60);
+    spiel('reveal', { rate: 1.0, volume: 0.8 }, 460);
+    spiel('elem_wind', { rate: 1.7, volume: 0.35 }, 1180);
+    spiel('placement', { volume: 1 }, 1480);
+    spiel('gold_gain', { rate: 1.25, volume: 0.45 }, 1500);
+  }, []);
+  return (
+    <div className="rtor" style={{ left: x, top: y }} aria-hidden="true">
+      <div className="rtor-portal" style={{ left: 0, top: oben }}>
+        <span className="rtor-schein" style={{ width: PW * 1.7, height: PH * 1.5, left: -PW * 0.85, top: -PH * 0.75 }} />
+        <span className="rtor-wirbel" style={{ width: PW * 0.9, height: PH * 0.9, left: -PW * 0.45, top: -PH * 0.45 }} />
+        <span className="rtor-ring" style={{ width: PW, height: PH, left: -PW / 2, top: -PH / 2 }} />
+        {funken.map((f, i) => (
+          <span key={i} className="rtor-funke" style={{
+            left: f.sx - f.g / 2, top: f.sy - f.g / 2, width: f.g, height: f.g,
+            '--fx': f.dx + 'px', '--fy': f.dy + 'px', animationDelay: f.verzug + 'ms',
+          }} />
+        ))}
+      </div>
+      <div className="rtor-karte" style={{ width: w, height: h, left: -w / 2, top: -h / 2, '--oben': oben + 'px' }}>
+        {bild ? <img src={bild} alt="" draggable="false" /> : <span className="rtor-karte-leer" />}
+        <span className="rtor-glanz" />
+      </div>
+      <span className="rtor-landung" style={{ width: w * 1.6, height: w * 0.7, left: -w * 0.8, top: h * 0.22 }} />
+      {landung.map((l, i) => (
+        <span key={'l' + i} className="rtor-landefunke" style={{
+          left: -l.g / 2, top: h * 0.4, width: l.g, height: l.g, '--lx': l.dx + 'px', '--ly': (-Math.abs(l.dy) - 6) + 'px',
+        }} />
+      ))}
+    </div>
+  );
+}
+
+// ── Telekinesis: die schwebende Surprise (Als Vorgabe 26.9.) ────────
+// „Die Surprise soll — mit Schatten! — hochschweben, in der Luft
+//  wackeln, dann in der Luft umgedreht werden und face-up wieder in
+//  ihrer Zone landen." Angehaengt an die Surprise Zone (bzw. Bakhms
+//  Support-Slot); die echte Karte ist waehrenddessen verdeckt
+//  (`data-pp-verborgen` an `ankerSel`). Kartenbild: violette Kraft und
+//  schwebende Steine.
+//     0–450   Abheben, der Schatten bleibt am Boden und wird blasser
+//   450–1050  Wackeln in der Luft, Steinchen kreisen, violetter Schein
+//  1050–1450  Umdrehen: Rueckseite → Kartenbild
+//  1450–1800  Sinken, Landung mit Staubring
+// Der Server deckt die Surprise genau zur Landung auf (ohne das
+// uebliche Aufdeck-Blitzen — das hier IST das Aufdecken).
+function TelekineseEffect({ x, y, w = 70, h = 100, cardName, ankerSel }) {
+  const bild = cardName && window.cardImageUrl ? window.cardImageUrl(cardName) : null;
+  const steine = useMemo(() => Array.from({ length: ppFxN(6) }, (_, i) => ({
+    winkel: i * 60 + ((i * 17) % 20), radius: w * (0.62 + (i % 3) * 0.08), g: 5 + (i % 3) * 3, verzug: 300 + i * 40,
+  })), [w]);
+  useEffect(() => {
+    const el = ankerSel ? document.querySelector(ankerSel) : null;
+    if (el) el.setAttribute('data-pp-verborgen', '1');
+    const frei = setTimeout(() => { if (el) el.removeAttribute('data-pp-verborgen'); }, 1960);
+    const spiel = (name, opts, at) => setTimeout(() => { if (window.playSFX) window.playSFX(name, { ...opts, dedupe: 0 }); }, at);
+    spiel('spell_cast', { rate: 0.8, volume: 0.7 }, 0);
+    spiel('elem_wind', { rate: 0.6, volume: 0.45 }, 80);
+    spiel('reveal', { rate: 1.0, volume: 0.9 }, 1120);
+    spiel('placement', { volume: 1 }, 1780);
+    spiel('heavy_impact', { rate: 1.6, volume: 0.35 }, 1790);
+    return () => { clearTimeout(frei); if (el) el.removeAttribute('data-pp-verborgen'); };
+  }, []);
+  return (
+    <div className="tkin" style={{ left: x, top: y }} aria-hidden="true">
+      <span className="tkin-schatten" style={{ width: w * 0.9, height: h * 0.62, left: -w * 0.45, top: -h * 0.31 }} />
+      <span className="tkin-staub" style={{ width: w * 1.5, height: w * 0.5, left: -w * 0.75, top: h * 0.3 }} />
+      <div className="tkin-heber" style={{ '--hub': (-h * 0.95) + 'px' }}>
+        <span className="tkin-schein" style={{ width: w * 1.6, height: h * 1.45, left: -w * 0.8, top: -h * 0.725 }} />
+        {steine.map((s, i) => (
+          <span key={i} className="tkin-stein" style={{
+            width: s.g, height: s.g * 0.8, left: -s.g / 2, top: -s.g / 2,
+            '--sw': s.winkel + 'deg', '--sr': s.radius + 'px', animationDelay: s.verzug + 'ms',
+          }} />
+        ))}
+        <div className="tkin-wackler">
+          <div className="tkin-karte" style={{ width: w, height: h, left: -w / 2, top: -h / 2 }}>
+            <div className="tkin-dreher">
+              <div className="tkin-seite tkin-rueck"><img src="/cardback.png" alt="" draggable="false" /></div>
+              <div className="tkin-seite tkin-vorn">
+                {bild ? <img src={bild} alt="" draggable="false" /> : <span className="rtor-karte-leer" />}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
@@ -6312,6 +6803,13 @@ const ANIM_REGISTRY = {
   core_explosion: CoreExplosionEffect,   // v1334
   memory_wipe: MemoryWipeEffect,         // v1335
   furious_anger: FuriousAngerEffect,     // v1336
+  anklage: AnklageEffect,                // Accusation, 26.9.
+  baby_spider_opfer: BabySpiderOpferEffect,   // Baby Spider, 26.9.
+  crimson_web: CrimsonWebShotEffect,          // Crimson Web, 26.9. (Name war ungenutzt vergeben)
+  todesgabe_erweckung: TodesgabeErweckungEffect,   // Divine Gift of Death, 26.9.
+  gewaltsame_erweckung: GewaltsameErweckungEffect, // Forceful Revival, 26.9.
+  ruestkammer_tor: RuestkammerTorEffect,           // Gate to the Armory, 26.9.
+  telekinese: TelekineseEffect,                    // Telekinesis, 26.9.
   super_aura: SuperAuraEffect,           // v1340 Cheat Chair
   meteor_crash: MeteorCrashEffect,
   venom_fog: VenomFogEffect,
@@ -23713,6 +24211,23 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   // catapult and a ram on different slots can coexist without
   // interfering with each other's masking.
   const [brackleSourceHidden, setBrackleSourceHidden] = useState(new Set());
+  // ★ 26.9. — Chaorc Interception: geworfene Chaorcs, die vor ihrem Ziel
+  // liegen, bis der Nachlauf sie zur Ablage schickt (`play_chaorc_wurf`).
+  // Schluessel = `key` des Servers. `stapelHalt` haelt die OBERSTE Karte
+  // eines Ablagestapels zurueck, solange ihr Flug noch aussteht — der
+  // Zustand kennt den toten Chaorc schon, sichtbar landet er erst mit
+  // dem Flug. Eintraege: {owner, cardName, id}.
+  const chaorcWurfRef = useRef(new Map());
+  const [stapelHalt, setStapelHalt] = useState([]);
+  // Sichtbarer Ablagestapel: erst die Zaehler-Verdeckung der Fluege
+  // (`…DiscardHidden`), dann die zurueckgehaltenen Chaorcs.
+  const ablageSicht = (stapel, besitzer, versteckt) => {
+    let sicht = versteckt > 0 ? stapel.slice(0, -versteckt) : stapel;
+    for (const h of stapelHalt) {
+      if (h.owner === besitzer && sicht.length && sicht[sicht.length - 1] === h.cardName) sicht = sicht.slice(0, -1);
+    }
+    return sicht;
+  };
   // Pusher: while the rammed Creature is "flung off-screen", mask its
   // real slot render so only the airborne fling overlay is visible
   // (same `[data-support-ramming]` CSS hide as a Creature ram /
@@ -28753,8 +29268,43 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       // Mount-Verzoegerung: siehe ZONE_ANIM_MOUNT_DELAY_MS in app-shared.jsx.
       // playSFXForZoneAnim rechnet exakt diesen Wert auf animationsrelative
       // SFX-Delays drauf — die beiden Zahlen muessen dieselbe bleiben.
-      setTimeout(() => playAnimation(type, sel, { duration: 1000, ...rest }),
-                 window.ZONE_ANIM_MOUNT_DELAY_MS ?? 100);
+      //
+      // ★ 26.9. — `von`: ein ZWEITER Brettplatz als Ausgangspunkt
+      // ({owner, heroIdx, zoneSlot, zoneType?}; zoneType 'surprise' fuer
+      // die Surprise Zone, sonst Support-Slot bzw. Heldenzone). Die
+      // Komponente bekommt den Abstand zur eigenen Mitte als
+      // `vonDx`/`vonDy` (plus `vonW`/`vonH`). Ein ABSTAND statt einer
+      // Fensterkoordinate, damit er in der Welt-Schicht genauso stimmt
+      // wie im Fenster (die Schicht verschiebt nur, sie skaliert nicht).
+      // Zuerst gebraucht fuer Baby Spider (Faden zur Surprise) und
+      // Crimson Web (Netzschuss aus der Surprise Zone).
+      const vonAufloesen = (ankerEl) => {
+        const v = rest.von;
+        if (!v || !ankerEl || (v.owner !== 0 && v.owner !== 1)) return null;
+        const lbl = v.owner === myIdx ? 'me' : 'opp';
+        const vSel = v.zoneType === 'surprise'
+          ? `[data-surprise-zone][data-surprise-owner="${lbl}"][data-surprise-hero="${v.heroIdx}"]`
+          : (v.zoneSlot != null && v.zoneSlot >= 0)
+            ? `[data-support-zone][data-support-owner="${lbl}"][data-support-hero="${v.heroIdx}"][data-support-slot="${v.zoneSlot}"]`
+            : `[data-hero-zone][data-hero-owner="${lbl}"][data-hero-idx="${v.heroIdx}"]`;
+        const vEl = document.querySelector(vSel);
+        if (!vEl) return null;
+        const a = ankerEl.getBoundingClientRect(), b = vEl.getBoundingClientRect();
+        if (!b.width) return null;
+        if (window.ppBattleCamFocus) window.ppBattleCamFocus(vEl);
+        return {
+          vonDx: (b.left + b.width / 2) - (a.left + a.width / 2),
+          vonDy: (b.top + b.height / 2) - (a.top + a.height / 2),
+          vonW: b.width, vonH: b.height,
+        };
+      };
+      setTimeout(() => {
+        const vonDaten = rest.von ? vonAufloesen(document.querySelector(sel)) : null;
+        // `ankerSel`: Komponenten, die ihre Zone selbst anfassen muessen
+        // (Telekinesis verdeckt die echte Karte, waehrend ihre Kopie
+        // schwebt), finden sie darueber wieder.
+        playAnimation(type, sel, { duration: 1000, ...rest, ...(vonDaten || {}), ankerSel: sel });
+      }, window.ZONE_ANIM_MOUNT_DELAY_MS ?? 100);
     };
     const onLevelChange = ({ delta, owner, heroIdx, zoneSlot }) => {
       const entry = { id: Date.now() + Math.random(), delta, owner, heroIdx, zoneSlot };
@@ -34195,6 +34745,71 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           }
         }, 45);
       }
+      // ★ 26.9. — zwei weitere Flugstile nach dem Glitzer-Muster:
+      //   'flammen'   (Perilous Journey, Als Vorgabe: „Die Karte … soll von
+      //               Flammen umgeben sein, bis sie in der Hand ankommt!")
+      //               — Flammenzungen am Kartenrand fliegen mit, dahinter
+      //               bleibt eine aufsteigende Glutspur zurueck;
+      //   'gewaltsam' (Forceful Revival) — gruen-gelbe Energie, die Karte
+      //               wird aus der Ablage gerissen; knisternde Funken.
+      if (flightStyle === 'flammen' || flightStyle === 'gewaltsam') {
+        const feuer = flightStyle === 'flammen';
+        card.style.overflow = 'visible';
+        card.style.boxShadow = feuer
+          ? '0 0 18px rgba(255,120,30,.95), 0 0 38px rgba(255,60,0,.55)'
+          : '0 0 18px rgba(170,255,90,.95), 0 0 36px rgba(230,255,80,.5)';
+        if (feuer) {
+          const zungen = ppFxN(14);
+          for (let i = 0; i < zungen; i++) {
+            const z = document.createElement('i');
+            const breit = 9 + Math.random() * 8, hoch = 16 + Math.random() * 16;
+            // Rundum verteilt: unten, links, rechts, oben — alle zuengeln nach oben.
+            const seite = i % 4;
+            const t = Math.random();
+            const lx = seite === 1 ? -breit * 0.55 : seite === 2 ? 100 : t * 100;
+            const ty = seite === 0 ? 100 : seite === 3 ? 0 : t * 100;
+            z.className = 'pt-flammenzunge';
+            z.style.cssText = [
+              `left:calc(${lx.toFixed(1)}% - ${seite === 2 ? breit * 0.45 : breit / 2}px)`,
+              `top:calc(${ty.toFixed(1)}% - ${hoch * 0.8}px)`,
+              `width:${breit.toFixed(1)}px`, `height:${hoch.toFixed(1)}px`,
+              `animation-duration:${Math.round(180 + Math.random() * 160)}ms`,
+              `animation-delay:${Math.round(Math.random() * 200)}ms`,
+            ].join(';');
+            card.appendChild(z);
+          }
+        }
+        const FARBEN = feuer
+          ? ['#ffd23a', '#ff9a1a', '#ff5a10', '#ffe9a0', '#ff7a14']
+          : ['#d8ff5a', '#9cff3a', '#f6ff9a', '#ffffff', '#c6ff2a'];
+        const spurStart = (laneDelay || 0);
+        const spurEnde = spurStart + Math.round(durationMs * 0.9);
+        const t0 = Date.now();
+        const spurTakt = setInterval(() => {
+          const t = Date.now() - t0;
+          if (t < spurStart) return;
+          if (t > spurEnde || !card.isConnected) { clearInterval(spurTakt); return; }
+          const r = card.getBoundingClientRect();
+          if (!r.width) return;
+          for (let k = 0; k < (feuer ? 3 : 2); k++) {
+            const s = document.createElement('i');
+            const g = feuer ? 4 + Math.random() * 5 : 3 + Math.random() * 4;
+            const farbe = FARBEN[Math.floor(Math.random() * FARBEN.length)];
+            s.className = feuer ? 'pt-glutspur' : 'pt-energiespur';
+            s.style.cssText = [
+              `left:${(r.left + Math.random() * r.width).toFixed(1)}px`,
+              `top:${(r.top + (feuer ? r.height * (0.3 + Math.random() * 0.7) : Math.random() * r.height)).toFixed(1)}px`,
+              `width:${g.toFixed(1)}px`, `height:${g.toFixed(1)}px`, `background:${farbe}`,
+              `box-shadow:0 0 6px ${farbe}`,
+              `--gsx:${((Math.random() - 0.5) * (feuer ? 16 : 30)).toFixed(1)}px`,
+              `--gsy:${(feuer ? -(14 + Math.random() * 22) : (Math.random() - 0.5) * 30).toFixed(1)}px`,
+              `animation-duration:${Math.round(380 + Math.random() * 280)}ms`,
+            ].join(';');
+            document.body.appendChild(s);
+            setTimeout(() => s.remove(), 720);
+          }
+        }, 40);
+      }
       const spawnFlight = () => {
         (_welt.welt && window.ppFxWeltSchicht ? window.ppFxWeltSchicht() : document.body).appendChild(card);
         setTimeout(() => card.remove(), durationMs + 100);
@@ -34726,6 +35341,163 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       }, totalMs + 250);
     };
     socket.on('play_brackle_catapult', onBrackleCatapult);
+
+    // ── Chaorc Interception: der Wurf (Als Vorgabe 26.9.) ──────────────
+    // „Der geopferte Chaorc wird STATT DER GENERISCHEN SACRIFICE-ANIMATION
+    //  auf das urspruengliche Ziel geworfen, klatscht dagegen, wird von
+    //  der Animation der Attack, des Spells oder des Effekts getroffen und
+    //  geht dann von der Position seiner Animation aus zum Discard."
+    // Zwei Phasen, verbunden ueber `key`:
+    //   'wurf' — Kopie der Karte fliegt im Bogen mit Drall vom Platz des
+    //            Chaorcs vor das Ziel, staucht beim Aufprall und bleibt
+    //            dort liegen. Die echte Karte ist solange verdeckt, der
+    //            Stapelflug des Zustands-Diffs unterdrueckt (Brackle-Weg).
+    //   'ende' — nach den Bildern des abgewehrten Effekts: kurz
+    //            angesengt, dann fliegt die Kopie von DORT zur Ablage.
+    //            `zurueck: true` (das Opfer wurde gerettet) schickt sie
+    //            stattdessen auf ihren Platz zurueck.
+    // Die Kopie liegt UNTER den Zonen-Animationen (z 10095), damit der
+    // Einschlag des abgewehrten Effekts sichtbar AUF ihr landet.
+    const onChaorcWurf = (d) => {
+      if (!d || !d.key) return;
+      const lbl = (o) => (o === myIdx ? 'me' : 'opp');
+      const spiel = (name, opts, at = 0) => setTimeout(() => { if (window.playSFX) window.playSFX(name, { ...opts, dedupe: 0 }); }, at);
+      const zonenEl = (o, h, z) => ((z != null && z >= 0)
+        ? document.querySelector(`[data-support-zone][data-support-owner="${lbl(o)}"][data-support-hero="${h}"][data-support-slot="${z}"]`)
+        : document.querySelector(`[data-hero-zone][data-hero-owner="${lbl(o)}"][data-hero-idx="${h}"]`));
+      const wuerfe = chaorcWurfRef.current;
+
+      if (d.phase === 'wurf') {
+        const srcEl = zonenEl(d.owner, d.heroIdx, d.zoneSlot);
+        const z = d.ziel || {};
+        const tgtEl = zonenEl(z.owner, z.heroIdx, z.zoneSlot);
+        if (!srcEl || !tgtEl) return;
+        if (window.ppBattleCamFocus) { window.ppBattleCamFocus(srcEl); window.ppBattleCamFocus(tgtEl); }
+        const sr = srcEl.getBoundingClientRect(), tr = tgtEl.getBoundingClientRect();
+        const wA = window.ppFxWeltAnker ? window.ppFxWeltAnker(tgtEl) : { welt: false, dx: 0, dy: 0 };
+        const cw = sr.width, ch = sr.height;
+        const sx = sr.left + cw / 2 + wA.dx, sy = sr.top + ch / 2 + wA.dy;
+        // Aufprallpunkt: Zielmitte, leicht zur Wurfseite versetzt — die
+        // Karte klatscht VOR das Ziel, nicht genau darauf.
+        const zx = tr.left + tr.width / 2 + wA.dx, zy = tr.top + tr.height / 2 + wA.dy;
+        const lang = Math.hypot(zx - sx, zy - sy) || 1;
+        const ex = zx - ((zx - sx) / lang) * Math.min(18, lang * 0.1);
+        const ey = zy - ((zy - sy) / lang) * Math.min(18, lang * 0.1);
+        const dx = ex - sx, dy = ey - sy;
+        const drall = dx >= 0 ? 1 : -1;
+        const bogen = Math.min(140, 50 + lang * 0.25);
+
+        const el = document.createElement('div');
+        el.className = 'chaorc-wurf';
+        el.style.cssText = `position:fixed;left:${sx}px;top:${sy}px;width:${cw}px;height:${ch}px;`
+          + `margin:${-ch / 2}px 0 0 ${-cw / 2}px;z-index:10095;pointer-events:none;will-change:transform;`;
+        const bild = window.cardImageUrl ? window.cardImageUrl(d.cardName) : null;
+        el.innerHTML = (bild
+          ? `<img src="${bild}" draggable="false" style="width:100%;height:100%;object-fit:cover;border-radius:6px;display:block" />`
+          : `<div style="width:100%;height:100%;border-radius:6px;background:#3a2a1a"></div>`)
+          + '<span class="chaorc-wurf-russ"></span>';
+        (wA.welt && window.ppFxWeltSchicht ? window.ppFxWeltSchicht() : document.body).appendChild(el);
+
+        // Echte Karte verdecken, doppelten Stapelflug unterdruecken,
+        // oberste Ablagekarte zurueckhalten (siehe `stapelHalt`).
+        const hideKey = `${d.owner}-${d.heroIdx}-${d.zoneSlot}`;
+        setBrackleSourceHidden(prev => { const n = new Set(prev); n.add(hideKey); return n; });
+        const ablageBesitzer = (d.discardOwner === 0 || d.discardOwner === 1) ? d.discardOwner : d.owner;
+        const sm = brackleDiscardSuppressRef.current;
+        const smKey = `${ablageBesitzer}-${d.cardName}`;
+        sm.set(smKey, (sm.get(smKey) || 0) + 1);
+        const pendingRef = ablageBesitzer === myIdx ? handToPilePendingMeRef : handToPilePendingOppRef;
+        const pendingEntry = { cardName: d.cardName };
+        pendingRef.current.discard.push(pendingEntry);
+        const haltId = Date.now() + Math.random();
+        setStapelHalt(prev => [...prev, { owner: ablageBesitzer, cardName: d.cardName, id: haltId }]);
+
+        const WURF_MS = 560;
+        const ruhe = `translate(${dx}px, ${dy}px) rotate(${drall * 9}deg) scale(0.94)`;
+        el.animate([
+          { transform: 'translate(0,0) rotate(0deg) scale(1)', offset: 0 },
+          { transform: `translate(${dx * 0.08}px, ${dy * 0.08 - 26}px) rotate(${-drall * 14}deg) scale(1.1)`, offset: 0.14 },
+          { transform: `translate(${dx * 0.5}px, ${dy * 0.5 - bogen}px) rotate(${drall * 250}deg) scale(1.18)`, offset: 0.55 },
+          { transform: `translate(${dx}px, ${dy}px) rotate(${drall * 372}deg) scale(1.02)`, offset: 1 },
+        ], { duration: WURF_MS, easing: 'cubic-bezier(.35,.1,.55,1)', fill: 'forwards' });
+        setTimeout(() => {
+          if (!el.isConnected) return;
+          el.animate([
+            { transform: `translate(${dx}px, ${dy}px) rotate(${drall * 12}deg) scale(1.3, 0.72)` },
+            { transform: `translate(${dx}px, ${dy}px) rotate(${drall * 6}deg) scale(0.86, 1.1)` },
+            { transform: ruhe },
+          ], { duration: 260, easing: 'ease-out', fill: 'forwards' });
+          // Aufprall: Staubring + Sterne + Wackeln
+          const knall = document.createElement('div');
+          knall.className = 'chaorc-klatsch';
+          knall.style.cssText = `position:fixed;left:${ex}px;top:${ey}px;width:0;height:0;z-index:10120;pointer-events:none;`;
+          knall.innerHTML = '<span class="ck-ring"></span><span class="ck-ring ck-ring2"></span>'
+            + Array.from({ length: 7 }, (_, i) => `<span class="ck-stern" style="--ckw:${i * 51 + 10}deg;--ckd:${38 + (i % 3) * 12}px;animation-delay:${i * 12}ms"></span>`).join('');
+          (wA.welt && window.ppFxWeltSchicht ? window.ppFxWeltSchicht() : document.body).appendChild(knall);
+          setTimeout(() => knall.remove(), 900);
+          const layout = document.querySelector('.game-layout');
+          if (layout) { layout.classList.remove('pp-wackeln'); void layout.offsetWidth; layout.classList.add('pp-wackeln'); setTimeout(() => layout.classList.remove('pp-wackeln'), 450); }
+        }, WURF_MS);
+        spiel('attack_ram', { rate: 0.9, volume: 0.8 });
+        spiel('elem_wind', { rate: 1.5, volume: 0.45 }, 60);
+        spiel('heavy_impact', { rate: 1.1, volume: 0.9 }, WURF_MS);
+        spiel('damage', { rate: 0.8, volume: 0.6 }, WURF_MS + 30);
+
+        const eintrag = { el, dx, dy, ruhe, sx, sy, welt: wA.welt, hideKey, smKey, pendingRef, pendingEntry, haltId, ablageBesitzer, cardName: d.cardName, zoneOwner: d.owner, heroIdx: d.heroIdx, zoneSlot: d.zoneSlot };
+        // Notnagel: kommt kein 'ende' (Verbindung, Sonderpfad), raeumt der
+        // Wurf nach 9 s selbst ab — dann eben mit Flug zur Ablage.
+        eintrag.notnagel = setTimeout(() => onChaorcWurf({ phase: 'ende', key: d.key }), 9000);
+        wuerfe.set(d.key, eintrag);
+        return;
+      }
+
+      if (d.phase === 'ende') {
+        const e = wuerfe.get(d.key);
+        if (!e) return;
+        wuerfe.delete(d.key);
+        clearTimeout(e.notnagel);
+        const aufraeumen = () => {
+          e.el.remove();
+          setBrackleSourceHidden(prev => {
+            if (!prev.has(e.hideKey)) return prev;
+            const n = new Set(prev); n.delete(e.hideKey); return n;
+          });
+          setStapelHalt(prev => prev.filter(h => h.id !== e.haltId));
+          const i = e.pendingRef.current.discard.indexOf(e.pendingEntry);
+          if (i >= 0) e.pendingRef.current.discard.splice(i, 1);
+          const smm = brackleDiscardSuppressRef.current;
+          const cur = smm.get(e.smKey) || 0;
+          if (cur <= 1) smm.delete(e.smKey); else smm.set(e.smKey, cur - 1);
+        };
+        if (!e.el.isConnected) { aufraeumen(); return; }
+        // Ziel des Abflugs: Ablage — oder beim geretteten Opfer der alte Platz.
+        const zielEl = d.zurueck
+          ? zonenEl(e.zoneOwner, e.heroIdx, e.zoneSlot)
+          : document.querySelector(e.ablageBesitzer === myIdx ? '[data-my-discard]' : '[data-opp-discard]');
+        if (!zielEl) { aufraeumen(); return; }
+        const zr = zielEl.getBoundingClientRect();
+        const off = e.welt && window.ppFxScrollOffset ? window.ppFxScrollOffset() : { dx: 0, dy: 0 };
+        const fx = zr.left + zr.width / 2 + (e.welt ? off.dx : 0) - e.sx;
+        const fy = zr.top + zr.height / 2 + (e.welt ? off.dy : 0) - e.sy;
+        const massstab = d.zurueck ? 1 : Math.max(0.35, Math.min(1, zr.width / (e.el.offsetWidth || zr.width)));
+        if (!d.zurueck) {
+          e.el.classList.add('chaorc-wurf-versengt');
+          spiel('creature_destroyed', { rate: 1.1, volume: 0.6 }, 180);
+        }
+        const START = d.zurueck ? 0 : 380;   // Treffer sichtbar stehen lassen
+        setTimeout(() => {
+          if (!e.el.isConnected) { aufraeumen(); return; }
+          e.el.animate([
+            { transform: e.ruhe, opacity: 1 },
+            { transform: `translate(${e.dx + (fx - e.dx) * 0.2}px, ${e.dy + (fy - e.dy) * 0.2 - 24}px) rotate(${-8}deg) scale(0.98)`, opacity: 1, offset: 0.22 },
+            { transform: `translate(${fx}px, ${fy}px) rotate(0deg) scale(${massstab})`, opacity: d.zurueck ? 1 : 0.9 },
+          ], { duration: 620, easing: 'cubic-bezier(.4,.1,.3,1)', fill: 'forwards' });
+          if (!d.zurueck) spiel('discard', { volume: 0.7 }, 560);
+          setTimeout(aufraeumen, 640);
+        }, START);
+      }
+    };
+    socket.on('play_chaorc_wurf', onChaorcWurf);
 
     // ── Birthday Present: Phase 1/2/3 — slide-in + flip + hold ──────────
     // Spawn the 3 floating reveal cards. They slide IN from the owner's
@@ -36297,6 +37069,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       socket.off('zone_fade', onZoneFade);
       socket.off('play_hand_card_animation', onHandCardAnim);
       socket.off('play_brackle_catapult', onBrackleCatapult);
+      socket.off('play_chaorc_wurf', onChaorcWurf);
       socket.off('birthday_present_reveal_start', onBdayPresentStart);
       socket.off('birthday_present_pick_resolved', onBdayPresentResolved);
       socket.off('timeless_king_reveal_clear', onTimelessKingRevealClear);
@@ -39079,7 +39852,11 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 })()}
                 {isDead && hero?.name && <div className="hero-dead-marker">🪦</div>}
                 {hero?.name && isFrozen && <FrozenOverlay />}
-                {hero?.name && isStunned && !isStunned._petrified && !isStunned._baihuPetrify && <div className="status-stunned-overlay"><div className="stun-bolt s1" /><div className="stun-bolt s2" /><div className="stun-bolt s3" /></div>}
+                {hero?.name && isStunned && !isStunned._petrified && !isStunned._baihuPetrify
+                  && (hero.statuses?.stunned || !hero.statuses?.webbed)
+                  && <div className="status-stunned-overlay"><div className="stun-bolt s1" /><div className="stun-bolt s2" /><div className="stun-bolt s3" /></div>}
+                {/* ★ 26.9.: Crimson Web — statt der Betaeubungsblitze das rote Netz. */}
+                {hero?.name && <CrimsonWebOverlay aktiv={!!hero.statuses?.webbed} />}
                 {hero?.name && (isStunned?._petrified || isStunned?._baihuPetrify) && <div className="baihu-petrify-overlay" />}
                 {hero?.name && isNegated && !isNegated._byWeakeningCrystal && <NegatedOverlay />}
                 {hero?.name && isBurned && <BurnedOverlay ticking={burnTickingHeroes.includes(`${pi}-${i}`)} />}
@@ -41272,7 +42049,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           })()}
           <div className="board-util board-util-left">
             <div className="board-util-side">
-              <div data-opp-discard="1"><BoardZone type="discard" cards={oppDiscardHidden > 0 ? opp.discardPile.slice(0, -oppDiscardHidden) : opp.discardPile} label="Discard" onClick={() => setPileViewer({ title: 'Opponent Discard', cards: opp.discardPile, ownerIdx: oppIdx, isDiscard: true })} onHoverCard={setHoveredPileCard} style={oppBoardZone('discard')} ownerLetheStamps={opp.letheStamps} pileIdentities={opp.discardEntries} /></div>
+              <div data-opp-discard="1"><BoardZone type="discard" cards={ablageSicht(opp.discardPile, oppIdx, oppDiscardHidden)} label="Discard" onClick={() => setPileViewer({ title: 'Opponent Discard', cards: opp.discardPile, ownerIdx: oppIdx, isDiscard: true })} onHoverCard={setHoveredPileCard} style={oppBoardZone('discard')} ownerLetheStamps={opp.letheStamps} pileIdentities={opp.discardEntries} /></div>
               <div data-opp-deleted="1"><BoardZone type="deleted" cards={oppDeletedHidden > 0 ? opp.deletedPile.slice(0, -oppDeletedHidden) : opp.deletedPile} label="Deleted" onClick={() => setPileViewer({ title: 'Opponent Deleted', cards: opp.deletedPile, ownerIdx: oppIdx })} onHoverCard={setHoveredPileCard} style={oppBoardZone('delete')} ownerLetheStamps={opp.letheStamps} /></div>
               <div className="board-util-spacer" />
             </div>
@@ -41280,7 +42057,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             <div className="board-util-side">
               <div className="board-util-spacer" />
               <div data-my-deleted="1"><BoardZone type="deleted" cards={myDeletedHidden > 0 ? me.deletedPile.slice(0, -myDeletedHidden) : me.deletedPile} label="Deleted" onClick={() => setPileViewer({ title: 'My Deleted', cards: me.deletedPile, ownerIdx: myIdx })} onHoverCard={setHoveredPileCard} style={myBoardZone('delete')} ownerLetheStamps={me.letheStamps} /></div>
-              <div data-my-discard="1"><BoardZone type="discard" cards={myDiscardHidden > 0 ? me.discardPile.slice(0, -myDiscardHidden) : me.discardPile} label="Discard" onClick={() => setPileViewer({ title: 'My Discard', cards: me.discardPile, ownerIdx: myIdx, isDiscard: true })} onHoverCard={setHoveredPileCard} style={myBoardZone('discard')} ownerLetheStamps={me.letheStamps} pileIdentities={me.discardEntries}
+              <div data-my-discard="1"><BoardZone type="discard" cards={ablageSicht(me.discardPile, myIdx, myDiscardHidden)} label="Discard" onClick={() => setPileViewer({ title: 'My Discard', cards: me.discardPile, ownerIdx: myIdx, isDiscard: true })} onHoverCard={setHoveredPileCard} style={myBoardZone('discard')} ownerLetheStamps={me.letheStamps} pileIdentities={me.discardEntries}
                 /* Liegt etwas Benutzbares in der Ablage (Future Tech
                    Prototypes), leuchtet der STAPEL — sonst muesste man
                    ihn jede Runde aufklappen, um nachzusehen. Das
