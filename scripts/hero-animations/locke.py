@@ -4,7 +4,8 @@
 * Die Zündschnur der Dynamitstange brennt: der Funke sprüht jedes Frame neu,
   Funken fliegen weg, kleine Rauchwölkchen steigen auf.
 * Lässiges Idle: er atmet ruhig (Füße fest) und wirft die Dynamitstange
-  einmal pro Loop locker hoch und fängt sie wieder.
+  einmal pro Loop locker hoch und fängt sie wieder (die Stange ist dabei
+  vollständig – der Teil hinter der Hand wird ergänzt).
 """
 import math
 import sys
@@ -31,6 +32,25 @@ def is_dyn(x, oy):
 
 
 DYNAMITE = [(x, oy) for oy in range(SRC.shape[0]) for x in range(W) if is_dyn(x, oy)]
+OUTL, DARK, RED, HI, DEEP = rgb('26030a'), rgb('4a0514'), rgb('be111a'), rgb('f23b1c'), rgb('870a23')
+
+
+def stick_color(x, oy):
+    """Vollständige Dynamitstange (auch der Teil hinter der Hand)."""
+    if px(SRC, x, oy) in DYN:
+        return px(SRC, x, oy)
+    if x == 18 or oy == 18:
+        return OUTL
+    if x == 21 or oy == 9:
+        return DARK
+    if x == 19:
+        return RED if oy <= 14 else DEEP
+    return HI if oy <= 14 else RED if oy <= 16 else DEEP
+
+
+STICK = [(x, oy, stick_color(x, oy)) for oy in range(9, 19) for x in range(18, 22)]
+HAND = [(x, oy) for oy in range(13, 18) for x in range(19, 23)
+        if SRC[oy, x, 3] and px(SRC, x, oy) not in DYN]
 
 
 def breath(i):
@@ -108,8 +128,10 @@ def frame(i):
                 out[feet - 1 + PT, x] = s[feet - 1 + PT, x]
     # Dynamit (+ Zündschnur): liegt in der Hand, fliegt kurz hoch
     dy = b + toss(i)
-    for x, oy in DYNAMITE:
-        out[oy + PT + dy, x] = s[oy + PT, x]
+    for x, oy, c in STICK:
+        out[oy + PT + dy, x] = c
+    for x, oy in HAND:                                   # Hand liegt immer vorne
+        out[oy + PT + b, x] = s[oy + PT, x]
     for x, oy in FUSE:
         out[oy + PT + dy, x] = FUSE_COL
     tx, ty = TIP[0], TIP[1] + PT + dy
