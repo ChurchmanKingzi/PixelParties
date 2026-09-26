@@ -59,9 +59,29 @@ t = np.clip((Lk - 120) / 110, 0, 1)
 # Goldlinien wie im Original (Helligkeit -> fest / gedithert)
 solid = Hk & (t > 0.72)
 half = Hk & ~solid & dither_mask(None, t * 0.9 + 0.1)
-# blasse Federflächen dazwischen: durchscheinend
-pale = Ak & ~Hk & dither_mask(None, np.full(Lk.shape, 0.26))
-out[pale] = (150, 136, 132, 255)
+# Flächen zwischen den Goldlinien: hellgelbe Mondlicht-Orbs (innen heller)
+paleN = alpha & ~hl
+dist = ndimage.distance_transform_cdt(np.pad(paleN, 1), metric='chessboard')[1:-1, 1:-1]
+orbcol = np.zeros(paleN.shape + (4,), np.uint8)
+orbcol[paleN & (dist == 1)] = (236, 214, 140, 255)
+orbcol[paleN & (dist == 2)] = (250, 238, 176, 255)
+orbcol[paleN & (dist >= 3)] = (255, 250, 214, 255)
+ok = np.kron(orbcol, np.ones((k, k, 1))).astype(np.uint8)
+pale = ok[..., 3] > 0
+out[pale] = ok[pale]
+# Glanzpunkt je Orb
+labo, no = ndimage.label(paleN)
+orb_centers = []
+for sl in ndimage.find_objects(labo):
+    y0_, x0_ = sl[0].start, sl[1].start
+    for yy_ in range(sl[0].start, sl[0].stop):
+        row = np.where(paleN[yy_, sl[1]])[0]
+        if len(row):
+            x0_ = sl[1].start + row[0]; y0_ = yy_; break
+    hy_, hx_ = y0_ * k + 2, x0_ * k + 2
+    if hy_ + 1 < out.shape[0] and hx_ + 1 < out.shape[1]:
+        out[hy_:hy_ + 2, hx_:hx_ + 2] = (255, 255, 244, 255)
+    orb_centers.append(ndimage.center_of_mass(labo[sl] > 0))
 out[half] = (214, 176, 96, 255)
 out[solid] = (250, 228, 150, 255)
 out[edge] = (255, 240, 180, 255)
