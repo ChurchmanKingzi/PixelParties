@@ -78,11 +78,16 @@ async function attachIdejCardToHero(engine, pi, heroIdx, cardName, opts = {}) {
   ps.supportZones[heroIdx][slot] = [cardName];
   const inst = engine._trackCard(cardName, pi, 'support', heroIdx, slot);
   // Flight: the card visibly travels from its source pile into the slot.
+  // Hoerbar wie jedes andere Anlegen (Als Befund 26.9.: zu Spielbeginn
+  // war es stumm): Abflug mit dem Zieh-Woosh, Landung mit `placement` —
+  // dieselben Cues wie das Ability-Anlegen vom Deck.
   if (opts.fromPile) {
     engine._broadcastEvent('play_pile_transfer', {
       owner: pi, cardName,
       from: opts.fromPile, to: 'support',
       toHeroIdx: heroIdx, toSlotIdx: slot,
+      ...(opts.fromPile === 'deck' ? { sfx: 'draw' } : {}),
+      landSfx: 'placement',
     });
   }
   engine.sync();
