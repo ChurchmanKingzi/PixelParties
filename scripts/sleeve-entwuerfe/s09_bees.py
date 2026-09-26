@@ -139,59 +139,40 @@ TONGUE = (236, 96, 108)
 
 
 def happy_face(db, T, R, fcx, fcy, eye_col=(240, 240, 232)):
-    """Fröhliches Gesicht im Goldring: große Augen mit Glanz oben / ^^-Augen, Grinsen, Wangenröte."""
+    """Zufriedenes Gesicht im Goldring: offene Augen mit Glanz oben, kleines geschlossenes Lächeln."""
     ec = tuple(eye_col) + (255,)
     if R >= 20:
         for s_ in (-1, 1):
-            e0 = T(fcx + s_ * 0.2 * R, fcy - 0.08 * R)
-            ew, eh = 0.11 * R, 0.14 * R
+            e0 = T(fcx + s_ * 0.2 * R, fcy - 0.06 * R)
+            ew, eh = 0.1 * R, 0.13 * R
             db.ellipse((e0[0] - ew, e0[1] - eh, e0[0] + ew, e0[1] + eh), fill=(206, 206, 218, 255))
             db.ellipse((e0[0] - ew, e0[1] - eh, e0[0] + ew, e0[1] + eh - 1), fill=(252, 252, 246, 255))
-            pw, ph = ew * 0.78, eh * 0.84
-            pc = (e0[0] + s_ * 0.4, e0[1] + 0.6)
+            pw, ph = ew * 0.72, eh * 0.8
+            pc = (e0[0] + s_ * 0.4, e0[1] + 0.8)
             db.ellipse((pc[0] - pw, pc[1] - ph, pc[0] + pw, pc[1] + ph), fill=(14, 10, 20, 255))
             db.ellipse((pc[0] - pw * 0.55, pc[1] - ph * 0.1, pc[0] + pw * 0.55, pc[1] + ph * 0.8), fill=(46, 34, 70, 255))
-            # Glanzlichter OBEN (fröhlich, lebendig)
-            hx_, hy_ = int(round(pc[0] - pw * 0.55)), int(round(pc[1] - ph * 0.65))
+            hx_, hy_ = int(round(pc[0] - pw * 0.5)), int(round(pc[1] - ph * 0.6))
             db.rectangle((hx_, hy_, hx_ + 1, hy_ + 1), fill=(255, 255, 255, 255))
-            db.point((int(round(pc[0] + pw * 0.35)), int(round(pc[1] - ph * 0.55))), fill=(255, 255, 255, 255))
-            # lachende Wangen schieben das Auge unten hoch
-            db.chord((e0[0] - ew - 1, e0[1] + eh * 0.55, e0[0] + ew + 1, e0[1] + eh * 2.2), 180, 360, fill=BLACK[1] + (255,))
-            # Wangenröte
-            b0 = T(fcx + s_ * 0.3 * R, fcy + 0.14 * R)
-            db.rectangle((b0[0] - 1.5, b0[1], b0[0] + 1.5, b0[1] + 1), fill=BLUSH + (255,))
-        # breites Grinsen: oben flach, unten rund, Zähne + Zunge
-        m0 = T(fcx, fcy + 0.16 * R)
-        mw, mh = 0.2 * R, 0.17 * R
-        box = (m0[0] - mw, m0[1] - mh, m0[0] + mw, m0[1] + mh)
-        db.chord(box, 0, 180, fill=MOUTH + (255,))
-        db.line((m0[0] - mw + 1, m0[1], m0[0] + mw - 1, m0[1]), fill=(250, 246, 236, 255))
-        db.ellipse((m0[0] - mw * 0.45, m0[1] + mh * 0.35, m0[0] + mw * 0.45, m0[1] + mh * 0.95), fill=TONGUE + (255,))
-        db.point((m0[0] - mw, m0[1] - 1), fill=SMILE + (255,)); db.point((m0[0] + mw, m0[1] - 1), fill=SMILE + (255,))
+        # kleines, geschlossenes Lächeln
+        m0 = T(fcx, fcy + 0.2 * R)
+        mw = 0.1 * R
+        db.arc((m0[0] - mw, m0[1] - mw * 0.9, m0[0] + mw, m0[1] + mw * 0.6), 20, 160, fill=SMILE + (255,), width=1)
     else:
         ri = 0.56 * R - max(1.2, 0.16 * R)   # Innenradius des Goldrings
         for s_ in (-1, 1):
-            e0 = T(fcx + s_ * 0.45 * ri, fcy - 0.3 * ri)
+            e0 = T(fcx + s_ * 0.45 * ri, fcy - 0.25 * ri)
             x_, y_ = int(round(e0[0])), int(round(e0[1]))
             if R >= 9:
-                pts = [(x_ - 1, y_ + 1), (x_, y_), (x_ + 1, y_ + 1)]   # ^-Auge
+                db.point([(x_, y_), (x_, y_ + 1)], fill=ec)   # offenes, aufrechtes Auge
             else:
-                pts = [(x_, y_)]
-            db.point(pts, fill=ec)
-            if R >= 9:
-                bl = T(fcx + s_ * 0.72 * ri, fcy + 0.2 * ri)
-                db.point((int(round(bl[0])), int(round(bl[1]))), fill=BLUSH + (255,))
-        if ri >= 2.5:
-            m0 = T(fcx, fcy + 0.36 * ri)
+                db.point((x_, y_), fill=ec)
+        if ri >= 3:
+            m0 = T(fcx, fcy + 0.4 * ri)
             mx, my = int(round(m0[0])), int(round(m0[1]))
-            w_ = max(1, int(round(0.38 * ri)))
+            w_ = max(1, int(round(0.25 * ri)))
             db.point([(mx - w_, my), (mx + w_, my)], fill=SMILE_S + (255,))
-            if w_ >= 2:
-                db.line((mx - w_ + 1, my + 1, mx + w_ - 1, my + 1), fill=SMILE_S + (255,))
-                if R >= 12:
-                    db.point((mx, my + 1), fill=TONGUE + (255,))
-            else:
-                db.point((mx, my + 1), fill=SMILE_S + (255,))
+            db.line((mx - w_ + 1, my + 1, mx + w_ - 1, my + 1), fill=SMILE_S + (255,))
+
 
 def bee(R, tilt=0.0, flip=False, wing=0.0, fuse=1.0, rim=(214, 128, 36), eyes=True, seed=0, brow=True,
         show_wings=True, show_legs=True, show_face=True, show_fuse=True, wing_R=None, fuse_dir=1, stripes=False,
@@ -464,8 +445,58 @@ def small_bomb(R, seed, fuse_dir=1):
     return b_, c_, sp_
 
 
+def insect_head(R, cols, eye='white', seed=0):
+    """Bienenkopf (keine Bombe): runder, schattierter Kopf, zwei Fühler, Augen.
+    cols: Farbrampe dunkel->hell. eye: 'white' (große weiße Augen mit Pupille) oder 'red'.
+    Rückgabe: Sprite, Mittelpunkt, Fühlerspitzen."""
+    S_ = int(R * 2 + 14)
+    im_ = Image.new('RGBA', (S_, S_), (0, 0, 0, 0))
+    cx_, cy_ = S_ / 2, S_ / 2 + 4
+    th_ = bayer((S_, S_))
+    Y_, X_ = np.mgrid[0:S_, 0:S_].astype(float)
+    nx_, ny_ = (X_ + 0.5 - cx_) / R, (Y_ + 0.5 - cy_) / (R * 0.92)
+    ins_ = nx_ ** 2 + ny_ ** 2 <= 1
+    sh_ = np.clip(0.62 - 0.38 * nx_ - 0.42 * ny_ - 0.15 * (nx_ ** 2 + ny_ ** 2), 0, 1)
+    col_ = ramp(sh_, cols, 0.5 + (th_ - 0.5) * 0.6)
+    a_ = np.array(im_); a_[ins_, :3] = col_[ins_]; a_[ins_, 3] = 255
+    im_ = Image.fromarray(a_)
+    d_ = ImageDraw.Draw(im_)
+    tips = []
+    # Fühler
+    for sd in (-1, 1):
+        b0 = (cx_ + sd * R * 0.35, cy_ - R * 0.8)
+        m1 = (cx_ + sd * R * 0.55, cy_ - R * 1.25)
+        t1 = (cx_ + sd * R * 0.95, cy_ - R * 1.45)
+        d_.line((b0, m1), fill=K + (255,), width=1)
+        d_.line((m1, t1), fill=K + (255,), width=1)
+        d_.ellipse((t1[0] - 1, t1[1] - 1, t1[0] + 1, t1[1] + 1), fill=cols[1] + (255,))
+        tips.append((t1[0], t1[1]))
+    # Augen
+    for sd in (-1, 1):
+        ex, ey = cx_ + sd * R * 0.38, cy_ - R * 0.05
+        if eye == 'white':
+            ew, eh = R * 0.3, R * 0.36
+            d_.ellipse((ex - ew, ey - eh, ex + ew, ey + eh), fill=(250, 250, 244, 255), outline=K + (255,))
+            px_ = ex + R * 0.1          # Blick zur Seite wie auf der Karte
+            d_.ellipse((px_ - ew * 0.5, ey - eh * 0.45, px_ + ew * 0.5, ey + eh * 0.55), fill=K + (255,))
+            d_.point((int(px_ - ew * 0.2), int(ey - eh * 0.25)), fill=(255, 255, 255, 255))
+        else:
+            ew, eh = R * 0.24, R * 0.3
+            d_.ellipse((ex - ew, ey - eh, ex + ew, ey + eh), fill=REDH[1] + (255,), outline=K + (255,))
+            d_.point((int(ex - ew * 0.3), int(ey - eh * 0.3)), fill=REDH[2] + (255,))
+            d_.point((int(ex - ew * 0.3) + 1, int(ey - eh * 0.3)), fill=(255, 220, 210, 255))
+    # kleines Lächeln
+    d_.arc((cx_ - R * 0.22, cy_ + R * 0.25, cx_ + R * 0.22, cy_ + R * 0.55), 20, 160, fill=K + (255,))
+    im_ = outline(im_, K + (255,))
+    return im_, (cx_, cy_), tips
+
+
+BEEHEAD = [(20, 16, 24), (36, 32, 44), (58, 54, 72), (90, 88, 110), (132, 132, 156)]
+BUMBLE = [(70, 30, 10), (120, 58, 18), (168, 92, 30), (208, 132, 52), (240, 176, 92)]
+
+
 def time_bomblebee_hd(Rc=20, seed=40):
-    """Uhr-Körper mit Flügeln und Spinnenbeinen, Bombenkopf mit Goldring, Taschenuhr, drei Bomben."""
+    """Uhr-Körper mit Flügeln und Spinnenbeinen, Bienenkopf mit Fellkragen, Taschenuhr, drei Bomben."""
     base, c_, _ = bee(Rc, show_face=False, show_fuse=False, wing_R=Rc * 0.9, seed=seed, wing=0.2)
     S_ = base.width
     PAD = 14
@@ -518,12 +549,21 @@ def time_bomblebee_hd(Rc=20, seed=40):
         px, py = int(cx + bx_ * Rc - bc_[0]), int(cy + by_ * Rc - bc_[1])
         img.alpha_composite(bm, (px, py))
         sparks.append((px + bsp[0], py + bsp[1], 2))
-    # Kopf: kleine Bombe mit Goldring-Gesicht
-    Rh = int(Rc * 0.48)
-    hd, hc_, hsp = bee(Rh, show_wings=False, show_legs=False, seed=seed + 5, fuse_dir=-1)
-    px, py = int(cx - 2 - hc_[0]), int(cy - Rc - Rh * 0.45 - hc_[1])
+    # Kopf: Bienenkopf mit Fühlern, großen weißen Augen und goldenem Fellkragen
+    Rh = Rc * 0.42
+    d = ImageDraw.Draw(img)
+    kx, ky = cx - 2, cy - Rc + 1
+    hd, hc_, tips = insect_head(Rh, BEEHEAD, eye='white', seed=seed + 5)
+    px, py = int(kx - hc_[0]), int(ky - Rh * 0.85 - hc_[1])
     img.alpha_composite(hd, (px, py))
-    sparks.append((px + hsp[0], py + hsp[1], 2))
+    d = ImageDraw.Draw(img)
+    for i in range(9):
+        an = i * math.pi / 8
+        fx, fy = kx + math.cos(an) * Rh * 0.95, ky - 1 + math.sin(an) * Rh * 0.3
+        d.ellipse((fx - 2.2, fy - 2.2, fx + 2.2, fy + 2.2), fill=GOLD[3] if i % 2 else GOLD[2], outline=GOLD[0])
+        d.point((int(fx - 1), int(fy - 1)), fill=GOLD[4])
+    for (tx, ty) in tips:
+        sparks.append((px + tx, py + ty, 1))
     # Taschenuhr oben rechts
     d = ImageDraw.Draw(img)
     wx, wy, wr = cx + Rc * 0.78, cy - Rc * 0.86, max(5, Rc * 0.3)
@@ -548,7 +588,7 @@ CARPET = [(70, 10, 18), (116, 18, 28), (166, 32, 36), (206, 58, 46), (236, 104, 
 
 
 def carpet_rider(seed=61):
-    """Humanoider Carpet Bomblebee: Bombenkopf mit Goldring, gestreifter Oberkörper, Arme (einer wirft eine Bombe),
+    """Humanoider Carpet Bomblebee: Hummelkopf mit roten Augen, gestreifter Oberkörper, Arme (einer wirft eine Bombe),
     im Schneidersitz, kleine Flügel. Rückgabe: Sprite, Sitzpunkt (unten Mitte), Funken."""
     CW_, CH_ = 48, 56
     im_ = Image.new('RGBA', (CW_, CH_), (0, 0, 0, 0))
@@ -604,11 +644,10 @@ def carpet_rider(seed=61):
         db_.point((a2[0] - 1, a2[1] - 1), fill=BLACK[5])
     body_ = outline(body_, K + (255,))
     im_.alpha_composite(body_)
-    # Kopf: Bombe mit Goldring-Gesicht (fröhlich), Zündschnur oben
-    hd_, hc_, hsp_ = bee(9, show_wings=False, show_legs=False, seed=seed, fuse_dir=1)
-    px_, py_ = int(cx_ + 1 - hc_[0]), int(sy_ - 27 - hc_[1])
+    # Kopf: orange-brauner Hummelkopf mit roten Augen und Fühlern
+    hd_, hc_, _t = insect_head(6.5, BUMBLE, eye='red', seed=seed)
+    px_, py_ = int(cx_ - hc_[0]), int(sy_ - 24 - hc_[1])
     im_.alpha_composite(hd_, (px_, py_))
-    sparks_.append((px_ + hsp_[0], py_ + hsp_[1], 2))
     # Bombe in der erhobenen Hand
     bm_, bc_, bsp_ = small_bomb(4, seed + 3, fuse_dir=-1)
     px_, py_ = int(hd_l[0] - bc_[0]), int(hd_l[1] - 4 - bc_[1])
