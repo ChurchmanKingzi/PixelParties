@@ -21342,10 +21342,9 @@ body.pp-dialog-offen .foil-diamond-rare:not(.modal-overlay *) {
   100% { opacity: 0; transform: translateY(-30px) scale(.95); }
 }
 
-/* ═══ KNOPFRAHMEN FUER ALLE MENUE-SCREENS ═══════════════════════════════
-   Dieselbe Tasten-Sprache wie im Hauptmenue, fuer JEDEN `.btn` ausserhalb
-   des Kampffelds (`.ui-noscale` traegt den ganzen Kampfbildschirm und
-   bleibt unberuehrt): schwarze Kontur, eingekerbte Pixel-Ecken, Licht-
+/* ═══ KNOPFRAHMEN FUER ALLE SCREENS (AUCH IM DUELL) ═══════════════════════════════
+   Dieselbe Tasten-Sprache wie im Hauptmenue, fuer JEDEN `.btn` — seit
+   Als Vorgabe auch im laufenden Duell (`.ui-noscale`): schwarze Kontur, eingekerbte Pixel-Ecken, Licht-
    und Schattenkante, Kopf-/Fussband mit je einer Dither-Pixelreihe als
    Uebergang (2 px, damit auch kleine Knoepfe wie „✕" lesbar bleiben),
    Sockel.
@@ -21360,7 +21359,7 @@ body.pp-dialog-offen .foil-diamond-rare:not(.modal-overlay *) {
    Hauptmenue und Login (weiter unten, eigene Regeln) weiter gewinnen.
    Der Hintergrund braucht `!important`, weil viele Knoepfe ihn inline
    setzen. */
-.btn:where(:not(.ui-noscale .btn)) {
+.btn {
   --kf-basis: var(--knopf-farbe, currentColor);
   --knopf-tiefe: 3px;
   --kf-oben: color-mix(in srgb, var(--kf-basis) 26%, var(--menu-surface));
@@ -21386,10 +21385,10 @@ body.pp-dialog-offen .foil-diamond-rare:not(.modal-overlay *) {
     var(--kf-schein);
   transition: transform .1s ease, box-shadow .1s ease, color .12s ease, border-color .12s ease;
 }
-.btn:where(:not(.ui-noscale .btn))::before,
-.btn:where(:not(.ui-noscale .btn)):active::before { background: none; }
+.btn::before,
+.btn:active::before { background: none; }
 /* Eingekerbte Ecken: die Eckpixel des Rahmens in Konturfarbe. */
-.btn:where(:not(.ui-noscale .btn))::after {
+.btn::after {
   inset: -3px;
   opacity: 1;
   transition: none;
@@ -21399,7 +21398,7 @@ body.pp-dialog-offen .foil-diamond-rare:not(.modal-overlay *) {
     linear-gradient(var(--pp-kontur) 0 0) left bottom / 3px 3px no-repeat,
     linear-gradient(var(--pp-kontur) 0 0) right bottom / 3px 3px no-repeat;
 }
-.btn:where(:not(.ui-noscale .btn)):hover:not(:disabled) {
+.btn:hover:not(:disabled) {
   --knopf-tiefe: 5px;
   --kf-oben: color-mix(in srgb, var(--kf-basis) 46%, var(--menu-surface));
   --kf-mitte: color-mix(in srgb, var(--kf-basis) 24%, var(--menu-surface));
@@ -21415,7 +21414,7 @@ body.pp-dialog-offen .foil-diamond-rare:not(.modal-overlay *) {
   transform: translateY(-2px);
   filter: none;
 }
-.btn:where(:not(.ui-noscale .btn)):active:not(:disabled) {
+.btn:active:not(:disabled) {
   --knopf-tiefe: 0px;
   box-shadow:
     inset 2px 2px 0 var(--kf-kante),
@@ -21426,22 +21425,22 @@ body.pp-dialog-offen .foil-diamond-rare:not(.modal-overlay *) {
   transform: translateY(3px);
   transition-duration: .04s;
 }
-.btn:where(:not(.ui-noscale .btn)):disabled {
+.btn:disabled {
   box-shadow: 0 0 0 2px var(--pp-kontur);
   transform: none;
 }
 /* Gefuellte Varianten: Zerstoeren (rot, dunkler Text) und aktive
    Format-/Auswahl-Pillen (gold, kraeftig getoent). */
-.btn-danger-solid:where(:not(.ui-noscale .btn)),
-.btn-danger-solid:where(:not(.ui-noscale .btn)):hover:not(:disabled) {
+.btn-danger-solid,
+.btn-danger-solid:hover:not(:disabled) {
   --knopf-farbe: var(--danger, #ff3366);
   --kf-oben: color-mix(in srgb, var(--kf-basis) 55%, #fff);
   --kf-mitte: var(--kf-basis);
   --kf-fuss: color-mix(in srgb, var(--kf-basis) 70%, #000);
   --kf-kante: rgba(255, 255, 255, .5);
 }
-.btn-format-active:where(:not(.ui-noscale .btn)),
-.btn-format-active:where(:not(.ui-noscale .btn)):hover:not(:disabled) {
+.btn-format-active,
+.btn-format-active:hover:not(:disabled) {
   --knopf-farbe: #ffd700;
   --kf-oben: color-mix(in srgb, var(--kf-basis) 55%, var(--menu-surface));
   --kf-mitte: color-mix(in srgb, var(--kf-basis) 32%, var(--menu-surface));
@@ -21477,7 +21476,7 @@ body.pp-dialog-offen .foil-diamond-rare:not(.modal-overlay *) {
 /* ── Modals: Pixelfenster ──────────────────────────────────────────── */
 /* Rahmenfarbe bleibt, wie jedes Modal sie setzt; dazu Kontur, Relief und
    ein harter Schatten. */
-.modal:where(:not(.ui-noscale .modal)) {
+.modal {
   border-width: 3px;
   border-style: solid;
   box-shadow:
@@ -21547,7 +21546,7 @@ body.pp-dialog-offen .foil-diamond-rare:not(.modal-overlay *) {
 /* Der Schliessen-Knopf liegt ueber den Ecken-Schnoerkeln. */
 .pp-fenster-kopf .btn { position: relative; z-index: 3; }
 
-.modal:where(:not(.ui-noscale .modal))::after {
+.modal::after {
   content: '';
   position: absolute;
   inset: 3px;
@@ -21571,7 +21570,7 @@ body.pp-dialog-offen .foil-diamond-rare:not(.modal-overlay *) {
     url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 4 7' shape-rendering='crispEdges'%3E%3Cpath fill='%23fff' d='M0 0h1v1h-1zM0 1h2v1h-2zM0 2h3v1h-3zM0 3h4v1h-4zM0 4h3v1h-3zM0 5h2v1h-2zM0 6h1v1h-1z'/%3E%3C/svg%3E") left center / calc(var(--eck-e) * 4) calc(var(--eck-e) * 7) no-repeat,
     url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 4 7' shape-rendering='crispEdges'%3E%3Cpath fill='%23fff' d='M3 0h1v1h-1zM2 1h2v1h-2zM1 2h3v1h-3zM0 3h4v1h-4zM1 4h3v1h-3zM2 5h2v1h-2zM3 6h1v1h-1z'/%3E%3C/svg%3E") right center / calc(var(--eck-e) * 4) calc(var(--eck-e) * 7) no-repeat;
 }
-.modal:where(:not(.ui-noscale .modal)) { position: relative; }
+.modal { position: relative; }
 
 /* ── Kaesten der Bildschirme ───────────────────────────────────────── */
 /* Deck-Sektionen, Profil-Sektionen, Puzzle-Handleisten:
@@ -21688,8 +21687,7 @@ body.pp-dialog-offen .foil-diamond-rare:not(.modal-overlay *) {
   flex: 1 1 auto;
   min-height: 0;
   display: flex;
-  width: calc(100% - 60px);
-  max-width: 1500px;
+  width: calc(100% - 44px);
   margin: 22px auto 34px;
   box-sizing: border-box;
 }
@@ -22615,8 +22613,183 @@ body.pp-dialog-offen .foil-diamond-rare:not(.modal-overlay *) {
     drop-shadow(0 3px 0 var(--titel-dunkel))
     drop-shadow(3px 3px 0 rgba(0, 0, 0, .8));
 }
-/* Die Unterstreichung (border-bottom) liegt ausserhalb der Glyphen und
-   bliebe mit `background-clip: text` unsichtbar — sie ist ein Rahmen,
-   kein Hintergrund, also bleibt sie sichtbar; hier nur etwas kraeftiger. */
+/* Keine Unterstreichung mehr (Als Vorgabe: „sieht nicht gut aus") —
+   dafuer ein Fuenftel groesser. `scale` statt `font-size`, weil die
+   Groessen inline je Bildschirm gesetzt sind (22/26 px); die Eigenschaft
+   verknuepft sich mit dem `translateX(-50%)` der Zentrierung. */
+.top-bar > h2,
+.title-outline:not(.menu-title) {
+  border-bottom: none !important;
+  padding-bottom: 0 !important;
+}
 .top-bar:where(:not(.ui-noscale .top-bar)) > h2,
-.pp-fenster-kopf > .title-outline { border-bottom-width: 4px; }
+.pp-fenster-kopf > .title-outline { scale: 1.22; }
+@media (max-height: 600px) {
+  .top-bar:where(:not(.ui-noscale .top-bar)) > h2,
+  .pp-fenster-kopf > .title-outline { scale: 1.08; }
+}
+
+/* ── Duell: Knoepfe und Fenster ───────────────────────────────────────
+   Die Knoepfe im Kampf nutzen das Pixel-System oben. Die kleinen Knoepfe
+   der Phasenspalte (mit dem Brett skaliert, 9 px Schrift) bekommen
+   weniger Tiefe, sonst wirkt der Sockel wuchtiger als die Taste. */
+.ui-noscale .phase-btn,
+.ui-noscale .hand-action-btn { --knopf-tiefe: 2px; }
+.ui-noscale .phase-btn:hover:not(:disabled),
+.ui-noscale .hand-action-btn:hover:not(:disabled) { --knopf-tiefe: 3px; transform: translateY(-1px); }
+.ui-noscale .hand-action-btn { opacity: 1; }
+/* Fenster im Kampf (Mulligan, Wahl-Dialoge, Bestaetigungen): Rahmen in
+   der Spielerfarbe mit Doppelring wie die Menuefenster; sie bleiben
+   halbtransparent (v1258). */
+.ui-noscale .modal {
+  border-color:
+    color-mix(in srgb, var(--player-color, var(--accent)) 68%, #fff)
+    color-mix(in srgb, var(--player-color, var(--accent)) 76%, #000)
+    color-mix(in srgb, var(--player-color, var(--accent)) 70%, #000)
+    color-mix(in srgb, var(--player-color, var(--accent)) 80%, #fff);
+  box-shadow:
+    0 0 0 2px var(--pp-kontur),
+    0 0 0 5px color-mix(in srgb, var(--player-color, var(--accent)) 22%, var(--pp-kontur)),
+    0 0 0 7px color-mix(in srgb, var(--player-color, var(--accent)) 75%, #000),
+    0 0 0 9px var(--pp-kontur),
+    inset 0 0 0 2px var(--pp-kontur),
+    12px 14px 0 rgba(0, 0, 0, .4);
+}
+
+/* ═══ PORTRAETRAHMEN IM DUELL ═══════════════════════════════════════════
+   Avatar bzw. Heldenbild jedes Spielers sitzt in einem verzierten
+   Pixelrahmen in SEINER Farbe (`--portraet`, inline aus player.color):
+   schwarze Kontur, 3-px-Rahmen mit Lichtkante (oben/links hell, unten/
+   rechts dunkel), dunkles Band, zweiter Farbring, Kontur; innen eine
+   schwarze Fuge. Darauf (::after der Zier-Ebene) Eck-Schnoerkel und je
+   ein Zierkeil oben und unten in der aufgehellten Farbe. Am Zug pulsiert
+   ein Schein in der Spielerfarbe (Deckkraft, nicht box-shadow). */
+.pp-portraet {
+  --pf: var(--portraet, var(--player-color, #00f0ff));
+  position: relative;
+  display: inline-flex;
+  flex-shrink: 0;
+  line-height: 0;
+  margin: 7px;
+  border: 3px solid;
+  border-color:
+    color-mix(in srgb, var(--pf) 60%, #fff)
+    color-mix(in srgb, var(--pf) 72%, #000)
+    color-mix(in srgb, var(--pf) 62%, #000)
+    color-mix(in srgb, var(--pf) 75%, #fff);
+  box-shadow:
+    inset 0 0 0 2px var(--pp-kontur),
+    0 0 0 2px var(--pp-kontur),
+    0 0 0 4px color-mix(in srgb, var(--pf) 25%, var(--pp-kontur)),
+    0 0 0 6px color-mix(in srgb, var(--pf) 80%, #000),
+    0 0 0 8px var(--pp-kontur),
+    5px 7px 0 6px rgba(0, 0, 0, .35);
+  background: var(--pp-kontur);
+}
+/* Das Bild selbst: ohne eigenen Rahmen (den traegt die Huelle). */
+.pp-portraet > .game-hand-avatar-big,
+.pp-portraet > .game-hand-avatar-crop {
+  border: 2px solid var(--pp-kontur) !important;
+  box-shadow: none;
+  animation: none;
+}
+.pp-portraet-zier {
+  position: absolute;
+  inset: -3px;
+  z-index: 2;
+  pointer-events: none;
+}
+.pp-portraet-zier::after {
+  content: '';
+  position: absolute;
+  inset: -6px;
+  --eck-e: 2px;
+  --eck-gr: calc(var(--eck-e) * 8);
+  background: color-mix(in srgb, var(--pf) 55%, #fff);
+  filter: drop-shadow(1px 1px 0 var(--pp-kontur));
+  -webkit-mask:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 8' shape-rendering='crispEdges'%3E%3Cpath fill='%23fff' d='M0 0h8v1h-8zM0 1h2v1h-2zM0 2h1v1h-1zM2 2h4v1h-4zM0 3h1v1h-1zM2 3h1v1h-1zM0 4h1v1h-1zM2 4h1v1h-1zM0 5h1v1h-1zM0 6h1v1h-1zM0 7h1v1h-1z'/%3E%3C/svg%3E") left top / var(--eck-gr) var(--eck-gr) no-repeat,
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 8' shape-rendering='crispEdges'%3E%3Cpath fill='%23fff' d='M0 0h8v1h-8zM6 1h2v1h-2zM2 2h4v1h-4zM7 2h1v1h-1zM5 3h1v1h-1zM7 3h1v1h-1zM5 4h1v1h-1zM7 4h1v1h-1zM7 5h1v1h-1zM7 6h1v1h-1zM7 7h1v1h-1z'/%3E%3C/svg%3E") right top / var(--eck-gr) var(--eck-gr) no-repeat,
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 8' shape-rendering='crispEdges'%3E%3Cpath fill='%23fff' d='M0 0h1v1h-1zM0 1h1v1h-1zM0 2h1v1h-1zM0 3h1v1h-1zM2 3h1v1h-1zM0 4h1v1h-1zM2 4h1v1h-1zM0 5h1v1h-1zM2 5h4v1h-4zM0 6h2v1h-2zM0 7h8v1h-8z'/%3E%3C/svg%3E") left bottom / var(--eck-gr) var(--eck-gr) no-repeat,
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 8' shape-rendering='crispEdges'%3E%3Cpath fill='%23fff' d='M7 0h1v1h-1zM7 1h1v1h-1zM7 2h1v1h-1zM5 3h1v1h-1zM7 3h1v1h-1zM5 4h1v1h-1zM7 4h1v1h-1zM2 5h4v1h-4zM7 5h1v1h-1zM6 6h2v1h-2zM0 7h8v1h-8z'/%3E%3C/svg%3E") right bottom / var(--eck-gr) var(--eck-gr) no-repeat,
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 7 4' shape-rendering='crispEdges'%3E%3Cpath fill='%23fff' d='M3 0h1v1H3zM2 1h3v1H2zM1 2h5v1H1zM0 3h7v1H0z'/%3E%3C/svg%3E") center top / 14px 8px no-repeat,
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 7 4' shape-rendering='crispEdges'%3E%3Cpath fill='%23fff' d='M0 0h7v1H0zM1 1h5v1H1zM2 2h3v1H2zM3 3h1v1H3z'/%3E%3C/svg%3E") center bottom / 14px 8px no-repeat;
+  mask:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 8' shape-rendering='crispEdges'%3E%3Cpath fill='%23fff' d='M0 0h8v1h-8zM0 1h2v1h-2zM0 2h1v1h-1zM2 2h4v1h-4zM0 3h1v1h-1zM2 3h1v1h-1zM0 4h1v1h-1zM2 4h1v1h-1zM0 5h1v1h-1zM0 6h1v1h-1zM0 7h1v1h-1z'/%3E%3C/svg%3E") left top / var(--eck-gr) var(--eck-gr) no-repeat,
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 8' shape-rendering='crispEdges'%3E%3Cpath fill='%23fff' d='M0 0h8v1h-8zM6 1h2v1h-2zM2 2h4v1h-4zM7 2h1v1h-1zM5 3h1v1h-1zM7 3h1v1h-1zM5 4h1v1h-1zM7 4h1v1h-1zM7 5h1v1h-1zM7 6h1v1h-1zM7 7h1v1h-1z'/%3E%3C/svg%3E") right top / var(--eck-gr) var(--eck-gr) no-repeat,
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 8' shape-rendering='crispEdges'%3E%3Cpath fill='%23fff' d='M0 0h1v1h-1zM0 1h1v1h-1zM0 2h1v1h-1zM0 3h1v1h-1zM2 3h1v1h-1zM0 4h1v1h-1zM2 4h1v1h-1zM0 5h1v1h-1zM2 5h4v1h-4zM0 6h2v1h-2zM0 7h8v1h-8z'/%3E%3C/svg%3E") left bottom / var(--eck-gr) var(--eck-gr) no-repeat,
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 8' shape-rendering='crispEdges'%3E%3Cpath fill='%23fff' d='M7 0h1v1h-1zM7 1h1v1h-1zM7 2h1v1h-1zM5 3h1v1h-1zM7 3h1v1h-1zM5 4h1v1h-1zM7 4h1v1h-1zM2 5h4v1h-4zM7 5h1v1h-1zM6 6h2v1h-2zM0 7h8v1h-8z'/%3E%3C/svg%3E") right bottom / var(--eck-gr) var(--eck-gr) no-repeat,
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 7 4' shape-rendering='crispEdges'%3E%3Cpath fill='%23fff' d='M3 0h1v1H3zM2 1h3v1H2zM1 2h5v1H1zM0 3h7v1H0z'/%3E%3C/svg%3E") center top / 14px 8px no-repeat,
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 7 4' shape-rendering='crispEdges'%3E%3Cpath fill='%23fff' d='M0 0h7v1H0zM1 1h5v1H1zM2 2h3v1H2zM3 3h1v1H3z'/%3E%3C/svg%3E") center bottom / 14px 8px no-repeat;
+}
+/* Am Zug: Schein in der Spielerfarbe, pulsiert ueber die Deckkraft. */
+.pp-portraet-zier::before {
+  content: '';
+  position: absolute;
+  inset: -8px;
+  opacity: 0;
+  box-shadow: 0 0 14px 3px var(--pf), 0 0 28px 6px color-mix(in srgb, var(--pf) 45%, transparent);
+  transition: opacity .3s ease;
+}
+.pp-portraet:has(> .avatar-active) .pp-portraet-zier::before {
+  animation: pp-portraet-puls 1.5s ease-in-out infinite;
+}
+@keyframes pp-portraet-puls {
+  0%, 100% { opacity: .45; }
+  50%      { opacity: 1; }
+}
+/* Nicht am Zug: Rahmen gedaempft, das Bild behaelt sein Grau. */
+.pp-portraet:has(> .avatar-inactive) { filter: saturate(.55) brightness(.8); }
+@media (prefers-reduced-motion: reduce) {
+  .pp-portraet:has(> .avatar-active) .pp-portraet-zier::before { animation: none; opacity: .8; }
+}
+/* Telefon: die Bildverkleinerung (scale) der Heldenausschnitte gilt
+   weiter; der Rahmen braucht dort weniger Aussenabstand. */
+@media (max-height: 600px) {
+  .pp-portraet { margin: 5px; }
+}
+
+/* ── Duell-Dialoge (`.first-choice-panel`: Mulligan, Wahl-Dialoge,
+   Bestaetigungen) ─────────────────────────────────────────────────────
+   Pixelfenster wie die Menue-Pop-ups. Die Hauptlinie behaelt ihre
+   Inline-Farbe (sie traegt Bedeutung: Gold = Wahl, Gruen = Heilung …),
+   die Ringe darum und die Ornamente kommen in der Spielerfarbe. Die
+   Flaeche bleibt halbtransparent (v1258). */
+.first-choice-panel {
+  border-width: 3px !important;
+  border-style: solid;
+  border-radius: 0;
+  box-shadow:
+    inset 2px 2px 0 rgba(255, 255, 255, .07),
+    inset -2px -2px 0 rgba(0, 0, 0, .45),
+    inset 0 0 0 1px var(--pp-kontur),
+    0 0 0 2px var(--pp-kontur),
+    0 0 0 5px color-mix(in srgb, var(--player-color, var(--accent)) 22%, var(--pp-kontur)),
+    0 0 0 7px color-mix(in srgb, var(--player-color, var(--accent)) 75%, #000),
+    0 0 0 9px var(--pp-kontur),
+    12px 14px 0 rgba(0, 0, 0, .4);
+}
+.first-choice-panel::after {
+  content: '';
+  position: absolute;
+  inset: 3px;
+  z-index: 2;
+  pointer-events: none;
+  --eck-e: 3px;
+  --eck-gr: calc(var(--eck-e) * 8);
+  background: color-mix(in srgb, var(--player-color, var(--accent)) 72%, #fff);
+  -webkit-mask:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 8' shape-rendering='crispEdges'%3E%3Cpath fill='%23fff' d='M0 0h8v1h-8zM0 1h2v1h-2zM0 2h1v1h-1zM2 2h4v1h-4zM0 3h1v1h-1zM2 3h1v1h-1zM0 4h1v1h-1zM2 4h1v1h-1zM0 5h1v1h-1zM0 6h1v1h-1zM0 7h1v1h-1z'/%3E%3C/svg%3E") left top / var(--eck-gr) var(--eck-gr) no-repeat,
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 8' shape-rendering='crispEdges'%3E%3Cpath fill='%23fff' d='M0 0h8v1h-8zM6 1h2v1h-2zM2 2h4v1h-4zM7 2h1v1h-1zM5 3h1v1h-1zM7 3h1v1h-1zM5 4h1v1h-1zM7 4h1v1h-1zM7 5h1v1h-1zM7 6h1v1h-1zM7 7h1v1h-1z'/%3E%3C/svg%3E") right top / var(--eck-gr) var(--eck-gr) no-repeat,
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 8' shape-rendering='crispEdges'%3E%3Cpath fill='%23fff' d='M0 0h1v1h-1zM0 1h1v1h-1zM0 2h1v1h-1zM0 3h1v1h-1zM2 3h1v1h-1zM0 4h1v1h-1zM2 4h1v1h-1zM0 5h1v1h-1zM2 5h4v1h-4zM0 6h2v1h-2zM0 7h8v1h-8z'/%3E%3C/svg%3E") left bottom / var(--eck-gr) var(--eck-gr) no-repeat,
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 8' shape-rendering='crispEdges'%3E%3Cpath fill='%23fff' d='M7 0h1v1h-1zM7 1h1v1h-1zM7 2h1v1h-1zM5 3h1v1h-1zM7 3h1v1h-1zM5 4h1v1h-1zM7 4h1v1h-1zM2 5h4v1h-4zM7 5h1v1h-1zM6 6h2v1h-2zM0 7h8v1h-8z'/%3E%3C/svg%3E") right bottom / var(--eck-gr) var(--eck-gr) no-repeat,
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 4 7' shape-rendering='crispEdges'%3E%3Cpath fill='%23fff' d='M0 0h1v1h-1zM0 1h2v1h-2zM0 2h3v1h-3zM0 3h4v1h-4zM0 4h3v1h-3zM0 5h2v1h-2zM0 6h1v1h-1z'/%3E%3C/svg%3E") left center / calc(var(--eck-e) * 4) calc(var(--eck-e) * 7) no-repeat,
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 4 7' shape-rendering='crispEdges'%3E%3Cpath fill='%23fff' d='M3 0h1v1h-1zM2 1h2v1h-2zM1 2h3v1h-3zM0 3h4v1h-4zM1 4h3v1h-3zM2 5h2v1h-2zM3 6h1v1h-1z'/%3E%3C/svg%3E") right center / calc(var(--eck-e) * 4) calc(var(--eck-e) * 7) no-repeat;
+  mask:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 8' shape-rendering='crispEdges'%3E%3Cpath fill='%23fff' d='M0 0h8v1h-8zM0 1h2v1h-2zM0 2h1v1h-1zM2 2h4v1h-4zM0 3h1v1h-1zM2 3h1v1h-1zM0 4h1v1h-1zM2 4h1v1h-1zM0 5h1v1h-1zM0 6h1v1h-1zM0 7h1v1h-1z'/%3E%3C/svg%3E") left top / var(--eck-gr) var(--eck-gr) no-repeat,
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 8' shape-rendering='crispEdges'%3E%3Cpath fill='%23fff' d='M0 0h8v1h-8zM6 1h2v1h-2zM2 2h4v1h-4zM7 2h1v1h-1zM5 3h1v1h-1zM7 3h1v1h-1zM5 4h1v1h-1zM7 4h1v1h-1zM7 5h1v1h-1zM7 6h1v1h-1zM7 7h1v1h-1z'/%3E%3C/svg%3E") right top / var(--eck-gr) var(--eck-gr) no-repeat,
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 8' shape-rendering='crispEdges'%3E%3Cpath fill='%23fff' d='M0 0h1v1h-1zM0 1h1v1h-1zM0 2h1v1h-1zM0 3h1v1h-1zM2 3h1v1h-1zM0 4h1v1h-1zM2 4h1v1h-1zM0 5h1v1h-1zM2 5h4v1h-4zM0 6h2v1h-2zM0 7h8v1h-8z'/%3E%3C/svg%3E") left bottom / var(--eck-gr) var(--eck-gr) no-repeat,
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 8' shape-rendering='crispEdges'%3E%3Cpath fill='%23fff' d='M7 0h1v1h-1zM7 1h1v1h-1zM7 2h1v1h-1zM5 3h1v1h-1zM7 3h1v1h-1zM5 4h1v1h-1zM7 4h1v1h-1zM2 5h4v1h-4zM7 5h1v1h-1zM6 6h2v1h-2zM0 7h8v1h-8z'/%3E%3C/svg%3E") right bottom / var(--eck-gr) var(--eck-gr) no-repeat,
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 4 7' shape-rendering='crispEdges'%3E%3Cpath fill='%23fff' d='M0 0h1v1h-1zM0 1h2v1h-2zM0 2h3v1h-3zM0 3h4v1h-4zM0 4h3v1h-3zM0 5h2v1h-2zM0 6h1v1h-1z'/%3E%3C/svg%3E") left center / calc(var(--eck-e) * 4) calc(var(--eck-e) * 7) no-repeat,
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 4 7' shape-rendering='crispEdges'%3E%3Cpath fill='%23fff' d='M3 0h1v1h-1zM2 1h2v1h-2zM1 2h3v1h-3zM0 3h4v1h-4zM1 4h3v1h-3zM2 5h2v1h-2zM3 6h1v1h-1z'/%3E%3C/svg%3E") right center / calc(var(--eck-e) * 4) calc(var(--eck-e) * 7) no-repeat;
+}

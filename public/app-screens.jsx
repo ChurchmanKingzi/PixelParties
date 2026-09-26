@@ -4759,7 +4759,7 @@ function SingleplayerScreen() {
           scrollt INNEN (`.vscpu-content`) — vorher scrollte die ganze
           Seite und der Kasten lief ohne Abschluss unten aus dem Bild. */}
       <div className="vscpu-rahmen ornate-frame pp-menuekasten">
-      <div className="vscpu-content" style={{ padding: '20px 40px 40px', boxSizing: 'border-box', width: '100%' }}>
+      <div className="vscpu-content" style={{ padding: '22px 22px 30px', boxSizing: 'border-box', width: '100%' }}>
         {!hasAnyLegal && (
           <div style={{ color: '#ff7777', textAlign: 'center', padding: '12px 16px', marginBottom: 20, border: '1px solid #ff7777', borderRadius: 4, background: 'rgba(255,119,119,.08)', fontSize: 12 }}>
             You need at least one legal deck to play. Edit a deck or pick a starter deck first.
@@ -4778,7 +4778,8 @@ function SingleplayerScreen() {
           <>
           <div style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, 264px)',
+            // Kachel 232 px (Bild 208): im breiten Rahmen passen 6 je Zeile.
+            gridTemplateColumns: 'repeat(auto-fill, 232px)',
             justifyContent: 'center',
             gap: 14,
           }}>
@@ -4810,7 +4811,7 @@ function SingleplayerScreen() {
                 onMouseLeave={e => { e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = '0 0 10px ' + racColor + '44'; }}
               >
                 <LotsenGlanz />
-                <HeroArtCrop heroName="Smug Mastermind Antonia" width={240} />
+                <HeroArtCrop heroName="Smug Mastermind Antonia" width={208} />
                 <div className="orbit-font" style={{ fontSize: 16, color: racColor, textAlign: 'center', fontWeight: 700, lineHeight: 1.2, minHeight: '2.4em', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   Tutorial Raccoon
                 </div>
@@ -4833,7 +4834,7 @@ function SingleplayerScreen() {
                     const op = opponents[Math.floor(Math.random() * opponents.length)];
                     if (op) startBattle(op.id);
                   }}
-                  bild={(schnell) => <ZufallsGegnerBild gegner={opponents} schnell={schnell} width={240} />}
+                  bild={(schnell) => <ZufallsGegnerBild gegner={opponents} schnell={schnell} width={208} />}
                   name="Random Opponent"
                   fuss={<span className="vscpu-chip">{opponents.length} unlocked</span>}
                 />
@@ -4845,7 +4846,7 @@ function SingleplayerScreen() {
                 <VsCpuKachel key={op.id} farbe="#ff4444"
                   disabled={!hasAnyLegal || starting}
                   onClick={() => startBattle(op.id)}
-                  bild={() => <HeroArtCrop heroName={op.middleHero} width={240} />}
+                  bild={() => <HeroArtCrop heroName={op.middleHero} width={208} />}
                   name={op.middleHero || op.name}
                   fuss={total > 0 ? (
                     <>

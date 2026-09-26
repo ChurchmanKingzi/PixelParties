@@ -40849,16 +40849,21 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               </button>
             )}
           <div className="game-hand-info" ref={speechOppRef} style={oppAvatarHighlight}>
-            {opp.avatar
-              /* `result ? '' : …` statt `!result && …`: der &&-Ausdruck liefert bei gesetztem Ergebnis das BOOLEAN false, und `'…-big' + false` haengt woertlich "false" an den Klassennamen. Aus `game-hand-avatar-crop` wurde `game-hand-avatar-cropfalse` — der quadratische Rahmen fiel weg und der HeroArtCrop lief auf seine volle 135px-Breite aus, der Avatar wurde also im End-Screen ploetzlich breiter. */
-              ? <img src={opp.avatar} className={'game-hand-avatar game-hand-avatar-big' + (result ? '' : ((isMyTurn && !oppBarking) ? ' avatar-inactive' : ' avatar-active'))} />
-              : opp.heroes?.[1]?.name && HeroArtCrop
-                ? (
-                  <div className={'game-hand-avatar-crop' + (result ? '' : ((isMyTurn && !oppBarking) ? ' avatar-inactive' : ' avatar-active'))}>
-                    <HeroArtCrop heroName={opp.heroes[1].name} width={135} />
-                  </div>
-                )
-                : null}
+            {/* Porträt im verzierten Pixelrahmen in der Farbe des Spielers
+                (`.pp-portraet`, style.css). */}
+            <span className="pp-portraet" style={{ '--portraet': opp.color || '#ff5577' }}>
+              {opp.avatar
+                /* `result ? '' : …` statt `!result && …`: der &&-Ausdruck liefert bei gesetztem Ergebnis das BOOLEAN false, und `'…-big' + false` haengt woertlich "false" an den Klassennamen. Aus `game-hand-avatar-crop` wurde `game-hand-avatar-cropfalse` — der quadratische Rahmen fiel weg und der HeroArtCrop lief auf seine volle 135px-Breite aus, der Avatar wurde also im End-Screen ploetzlich breiter. */
+                ? <img src={opp.avatar} className={'game-hand-avatar game-hand-avatar-big' + (result ? '' : ((isMyTurn && !oppBarking) ? ' avatar-inactive' : ' avatar-active'))} />
+                : opp.heroes?.[1]?.name && HeroArtCrop
+                  ? (
+                    <div className={'game-hand-avatar-crop' + (result ? '' : ((isMyTurn && !oppBarking) ? ' avatar-inactive' : ' avatar-active'))}>
+                      <HeroArtCrop heroName={opp.heroes[1].name} width={135} />
+                    </div>
+                  )
+                  : null}
+              <span className="pp-portraet-zier" aria-hidden="true" />
+            </span>
             <span className="orbit-font game-hand-name" style={{ fontSize: 18, fontWeight: 800, color: opp.color }}>{
               // CPU opponents are labelled "CPU" server-side; show their
               // middle Hero instead so they read as a character. Als
@@ -41761,15 +41766,20 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         <div className="game-hand game-hand-me" ref={isSpectator ? undefined : handRef} style={{ '--hand-accent': me.color || '#00f0ff' }}>
           <HandAmbiance color={me.color} />
           <div className="game-hand-info" ref={speechMeRef} style={meAvatarHighlight}>
-            {me.avatar
-              ? <img src={me.avatar} className={'game-hand-avatar game-hand-avatar-big' + (result ? '' : ((isMyTurn || meBarking) ? ' avatar-active' : ' avatar-inactive'))} />
-              : me.heroes?.[1]?.name && HeroArtCrop
-                ? (
-                  <div className={'game-hand-avatar-crop' + (result ? '' : ((isMyTurn || meBarking) ? ' avatar-active' : ' avatar-inactive'))}>
-                    <HeroArtCrop heroName={me.heroes[1].name} width={135} />
-                  </div>
-                )
-                : null}
+            {/* Porträt im verzierten Pixelrahmen in der Farbe des Spielers
+                (`.pp-portraet`, style.css). */}
+            <span className="pp-portraet" style={{ '--portraet': me.color || '#00f0ff' }}>
+              {me.avatar
+                ? <img src={me.avatar} className={'game-hand-avatar game-hand-avatar-big' + (result ? '' : ((isMyTurn || meBarking) ? ' avatar-active' : ' avatar-inactive'))} />
+                : me.heroes?.[1]?.name && HeroArtCrop
+                  ? (
+                    <div className={'game-hand-avatar-crop' + (result ? '' : ((isMyTurn || meBarking) ? ' avatar-active' : ' avatar-inactive'))}>
+                      <HeroArtCrop heroName={me.heroes[1].name} width={135} />
+                    </div>
+                  )
+                  : null}
+              <span className="pp-portraet-zier" aria-hidden="true" />
+            </span>
             <span className="orbit-font game-hand-name" style={{ fontSize: 18, fontWeight: 800, color: me.color }}>{me.username}</span>
             {meDisconnected && <span style={{ fontSize: 10, color: 'var(--danger)', animation: 'pulse 1.5s infinite' }}>DISCONNECTED</span>}
           </div>
