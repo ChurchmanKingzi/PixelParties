@@ -43,6 +43,7 @@ kopiert, daneben liegt eine JSON-Datei mit den Metadaten. Die erzeugten
 | `dante.py` | `final` | `dante_idle_final_sheet.png` | `dante-the-wanderer-of-hell` |
 | `zsos.py` | `final` | `zsos_idle_final_sheet.png` | `zsos-ssar-the-serpent-warlord` |
 | `baaliel.py` | `final` | `baaliel_idle_final_sheet.png` | `baaliel-the-demon-general` |
+| `inya.py` | `final` | `inya_idle_final_sheet.png` | `card-game-player-inya` |
 | `bubbles.py` | `final gross` | `bubbles_idle_final_gross_sheet.png` | `bubbles-the-bouncy-bunny` |
 
 `bubbles.py` ohne `gross` erzeugt eine auf Hero-Größe verkleinerte Variante

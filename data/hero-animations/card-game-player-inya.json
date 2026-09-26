@@ -1,0 +1,13 @@
+{
+  "hero": "Card Game Player Inya",
+  "sheet": "card-game-player-inya.png",
+  "frameWidth": 24,
+  "frameHeight": 33,
+  "frames": 48,
+  "frameMs": 90,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 4,
+  "padLeft": 1,
+  "padRight": 3
+}
