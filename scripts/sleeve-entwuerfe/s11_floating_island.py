@@ -558,25 +558,50 @@ BANK = CB.crop((0, 76, 256, 100))
 BIRD = A('bird')
 # Schwalben im Flug (von unten gesehen, Flügel ausgebreitet) in den Farben von bird.png.
 # Das seitliche Einzelbild des Spiels wirkt nur animiert; als Standbild liest es sich nicht als Vogel.
-_SW = {'#': (20, 26, 60, 255), 'b': (52, 72, 142, 255), 'r': (190, 44, 32, 255), 'w': (232, 238, 246, 255)}
-_SWALLOW = [
-    ['#...........#',
-     '##....#....##',
-     '.##b.#r#.b##.',
-     '..#bb#w#bb#..',
-     '....#www#....',
-     '.....#w#.....',
-     '.....#.#.....',
-     '....#...#....'],
-    ['......#......',
-     '.....#r#.....',
-     '...##www##...',
-     '.#bb#www#bb#.',
-     '##b..#w#..b##',
-     '#....#.#....#',
-     '....#...#....',
-     '.............'],
-]
+_SW = {'#': (20, 26, 60, 255), 'b': (52, 72, 142, 255), 'r': (190, 44, 32, 255), 'w': (236, 206, 168, 255)}
+_SWALLOW = {
+    # großer Gleitflug, Flügel V-förmig erhoben
+    'glide': ['#.............#',
+              '##...........##',
+              '.##b...#...b##.',
+              '..##b.#r#.b##..',
+              '...##b#w#b##...',
+              '.....#www#.....',
+              '......#w#......',
+              '......#.#......',
+              '.....#...#.....'],
+    # Flügelschlag nach unten
+    'beat':  ['......#......',
+              '.....#r#.....',
+              '...##www##...',
+              '.#bb#www#bb#.',
+              '##b..#w#..b##',
+              '#....#.#....#',
+              '....#...#....'],
+    # Schräglage in der Kurve (ein Flügel oben, einer unten)
+    'bank':  ['#............',
+              '##....#......',
+              '.##b.#r#.....',
+              '..##b#w#bb##.',
+              '....#www#..##',
+              '.....#w#....#',
+              '.....#.#.....',
+              '....#...#....'],
+    # Sturzflug, Flügel angelegt
+    'dive':  ['...#...',
+              '..#r#..',
+              '.#bwb#.',
+              '.#bwb#.',
+              '#b.w.b#',
+              '#.#.#.#',
+              '..#.#..'],
+    # klein und fern
+    'small': ['#.......#',
+              '.##.#.##.',
+              '...#r#...',
+              '...#w#...',
+              '...#.#...'],
+}
 
 
 def _swallow(rows):
@@ -588,7 +613,7 @@ def _swallow(rows):
     return Image.fromarray(a, 'RGBA')
 
 
-BIRDS = [_swallow(_SWALLOW[0]), _swallow(_SWALLOW[1])] * 2
+BIRDS = {k: _swallow(v) for k, v in _SWALLOW.items()}
 FLY = A('butterfly')
 FLIES = [FLY.crop((k * 5, 0, k * 5 + 5, 4)) for k in range(2)]
 ISLE = {n: A('isle-' + n) for n in 'abcde'}
@@ -778,8 +803,8 @@ comp(im, fg, FGX, FGY)
 draw_sea(SEA2[3:])
 
 # ---------------------------------------------------------------- Schwalben (mittlere Tiefe)
-for (k, x, y, fl) in [(0, 60, 86, False), (2, 78, 79, False), (0, 176, 94, True), (2, 132, 232, True),
-                      (2, 52, 300, False), (0, 70, 292, False)]:
+for (k, x, y, fl) in [('small', 62, 86, False), ('small', 76, 80, True), ('dive', 180, 92, False),
+                      ('bank', 132, 230, True), ('glide', 44, 296, False), ('beat', 72, 306, True)]:
     b = BIRDS[k]
     comp(im, flip(b) if fl else b, x, y)
 
