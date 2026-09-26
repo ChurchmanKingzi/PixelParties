@@ -51,6 +51,7 @@ kopiert, daneben liegt eine JSON-Datei mit den Metadaten. Die erzeugten
 | `darion.py` | `final 80` | `darion_idle_final_sheet.png` | `darion-the-blood-crazy-groundskeeper` |
 | `ghazma.py` | `final` | `ghazma_idle_final_sheet.png` | `ghazma-the-worm-feeder` |
 | `sid.py` | `final` | `sid_idle_final_sheet.png` | `sid-the-king-of-thieves` |
+| `beato.py` | `final` | `beato_idle_final_sheet.png` | `beato-the-butterfly-witch` |
 | `bubbles.py` | `final gross` | `bubbles_idle_final_gross_sheet.png` | `bubbles-the-bouncy-bunny` |
 
 `bubbles.py` ohne `gross` erzeugt eine auf Hero-Größe verkleinerte Variante

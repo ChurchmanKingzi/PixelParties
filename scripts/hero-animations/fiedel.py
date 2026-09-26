@@ -8,7 +8,6 @@
   1-px-Kontur); Stiefel, Arme und Handschuhe liegen darüber.
 * Dunkle Aura: violett-schwarze Schwaden steigen um ihn herum auf.
 * Das rote Auge im verdunkelten Gesicht glüht pulsierend.
-* Ruhiges Atmen von Kopf und Schultern.
 """
 import math
 import sys
@@ -118,10 +117,6 @@ def draw_cape(out, body, i):
     out[mm] = res[mm]
 
 
-def breath(i):
-    return -1 if 6 <= i % 24 < 16 else 0
-
-
 # Aura-Schwaden: (x, y, Startframe) in Originalkoordinaten
 AURA = [(3, 20, 0), (22, 21, 6), (5, 14, 12), (21, 13, 18), (1, 24, 24), (24, 24, 30),
         (7, 9, 36), (18, 8, 42)]
@@ -147,14 +142,12 @@ def frame(i):
     lv = max(0, min(3, int(round(1.5 + 1.8 * wave(i, 24, -0.8)))))
     s[11, 9 + PL] = EYE[lv]
     out = np.zeros_like(s)
-    b = breath(i)
-    # Körper ohne wehenden Umhang; Kopf/Schultern atmen
+    # Körper ohne wehenden Umhang (kein Atmen: sonst reißt eine Lücke zwischen
+    # Schultern und Umhangansatz auf)
     for y in range(H):
         for x in range(W):
-            sy = y - b if y <= 18 else y
-            ox = x - PL
-            if 0 <= sy < H and s[sy, x, 3] and not is_cape(ox, sy):
-                out[y, x] = s[sy, x]
+            if s[y, x, 3] and not is_cape(x - PL, y):
+                out[y, x] = s[y, x]
     draw_cape(out, out.copy(), i)
     aura(out, i)
     return out
