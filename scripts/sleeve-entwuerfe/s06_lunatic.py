@@ -45,6 +45,12 @@ ln = np.zeros(out.shape[:2], np.uint8); ln[lines] = 255
 hawk = mirror_left(Image.fromarray(out).crop((14, 5, 62, 47)), 24)
 hl = np.array(mirror_left(Image.fromarray(np.dstack([ln, ln, ln, ln])).crop((14, 5, 62, 47)), 24))[..., 0] > 0
 ha = np.array(hawk).astype(int)
+# Lücke unten an jedem Flügel schließen (wird zum Mondlicht-Orb)
+for (x_, y_) in [(6, 22), (5, 23), (6, 23), (7, 23), (8, 24), (7, 24)]:
+    for xx_ in (x_, ha.shape[1] - 1 - x_):
+        if ha[y_, xx_, 3] == 0:
+            ha[y_, xx_] = (200, 190, 150, 255)
+        hl[y_, xx_] = False
 L = ha[..., :3].mean(2)
 ylh = (ha[..., 0] + ha[..., 1]) / 2 - ha[..., 2]
 orbs = (ha[..., 3] > 0) & (ylh > 62)
