@@ -196,6 +196,44 @@ im = beam(im, 112, 150, -16, 3, 170, (90, 90, 30), 0.35)
 im = beam(im, 138, 150, 16, 3, 170, (40, 100, 50), 0.35)
 
 # =====================================================================
+# 3b) Skeleton King Skullmael als Geistererscheinung vor dem Mond (3x)
+# =====================================================================
+ksrc, kstr = SK.king_ghost_src()
+KS = 3
+ka = np.array(up(ksrc, KS)).astype(float)
+ks = np.kron(kstr, np.ones((KS, KS)))
+kh, kw = ks.shape
+# Gesichtsmitte: Schwerpunkt der obersten Kronen-/Schädelzeilen
+al = np.array(ksrc)[..., 3] > 0
+rows_ = np.where(al.any(1))[0]
+top_rows = al[rows_[0]:rows_[0] + 6]
+fx = np.where(top_rows.any(0))[0].mean()
+KX = int(round(CX - (fx + 0.5) * KS))
+KY = 108 - kh
+# Geisterfarbe: blass mondgrün, Gold/Rot der Krone gedämpft erhalten
+lum = ka[..., :3].mean(2, keepdims=True) / 255
+ghost = np.concatenate([120 + lum * 130, 150 + lum * 105, 190 + lum * 65], -1)
+warm = (ka[..., 0] - ka[..., 2] > 50)[..., None]
+ghost = np.where(warm, ka[..., :3] * 0.6 + np.array((255, 230, 150)) * 0.4, ghost)
+dark = (lum < 0.25)
+ghost = np.where(dark, np.array((46, 40, 100)), ghost)
+yk = np.mgrid[0:kh, 0:kw][0]
+fade = np.clip((kh - 2 - yk) / 16, 0, 1)
+alpha_t = np.where(ks > 0.2, 0.4 + 0.55 * ks, 0) * fade * (ka[..., 3] > 0)
+kmask = np.zeros((H, W), float)
+y0c, x0c = max(0, KY), max(0, KX)
+kmask[y0c:KY + kh, x0c:KX + kw] = alpha_t[y0c - KY:, x0c - KX:][:H - y0c, :W - x0c]
+gcol = np.zeros((H, W, 3))
+gcol[y0c:KY + kh, x0c:KX + kw] = ghost[y0c - KY:, x0c - KX:][:H - y0c, :W - x0c]
+# weicher Geister-Schein
+gl_ = np.array(Image.fromarray((np.clip(kmask, 0, 1) * 255).astype(np.uint8)).filter(ImageFilter.GaussianBlur(4))).astype(float) / 255
+im = blend_mask(im, dither_mask(None, np.clip(gl_ * 0.9 - kmask, 0, 0.5)) & (kmask == 0), (120, 150, 150), 0.35)
+m = dither_mask(None, kmask)
+a = np.array(im)
+a[m, :3] = (a[m, :3] * 0.25 + gcol[m] * 0.75).astype(np.uint8)
+im = Image.fromarray(a)
+
+# =====================================================================
 # 4) Gruft-Bühne
 # =====================================================================
 ST = dict(hl=(176, 166, 204), li=(132, 122, 164), mi=(98, 88, 130), da=(70, 60, 100), de=(46, 36, 70), ol=(20, 12, 30))
@@ -617,9 +655,6 @@ for (x, y, col, kind) in [(106, 166, (230, 214, 60), 0), (144, 160, (110, 220, 9
     rows = NOTE1 if kind == 0 else NOTE2
     nimg = rows_img(rows, {'A': col, 'B': tuple(int(v * 0.7) for v in col)})
     im.alpha_composite(nimg, (x, y))
-# König Skullmael (Karte) auf der Giebelspitze
-KING = up(SK.king(), 2)
-put(im, KING, CX + 4, PY - 3)
 im.save(os.path.join(TMP, 'p10_e.png'))
 print('stage ok')
 
@@ -699,8 +734,8 @@ for (x, y, spr) in row0:
     add(SK.tint_depth(spr, 0.34), x, y)
 row1 = [
     (38, 238, hat(ARup, BLUE, WHITE)),
-    (62, 236, SK.priest()),
-    (86, 238, SK.necromancer()),
+    (62, 236, WING.transpose(Image.FLIP_LEFT_RIGHT)),
+    (86, 238, HE.transpose(Image.FLIP_LEFT_RIGHT)),
     (106, 235, HEcup),
     (150, 236, hat(MA, GREEN, RED)),
     (174, 238, SK.archer_card().transpose(Image.FLIP_LEFT_RIGHT)),
@@ -709,49 +744,56 @@ row1 = [
 ]
 for (x, y, spr) in row1:
     add(SK.tint_depth(spr, 0.2), x, y)
-# Heiler-Sprite aus der Knochenmühle (1x) + Skeletthund
-hs = area('bonegrinder/healer')
-healer_fr = [hs.crop((i * 21, 0, i * 21 + 21, 32)) for i in range(3)]
-healer_fr = [f.crop(f.getbbox()) for f in healer_fr]
-add(SK.tint_depth(healer_fr[2], 0.12), 124, 248)
-dog = area('bonegrinder/dog').crop((0, 0, 25, 17)); dog = dog.crop(dog.getbbox())
-add(SK.tint_depth(dog, 0.12), 142, 250)
+# Treasure Skeleton in der Mitte der Tanzfläche
+TRE = SK.treasure()
+add(SK.tint_depth(TRE, 0.08), 126, 254)
 # Reihe 2
-BURN = SK.burning()
+MAcup = SK.trim(SK.cup(SK.canvas(MA.transpose(Image.FLIP_LEFT_RIGHT), 6, 3)[0], 4, 18, (120, 200, 255)))
 row2 = [
-    (14, 264, hat(HE, PINK, GOLDC, dx=3, dy=3).transpose(Image.FLIP_LEFT_RIGHT)),
-    (40, 268, SK.reaper()),
-    (70, 263, BURN),
+    (14, 264, HEup),
+    (40, 268, MAcup),
+    (68, 263, SK.archer_card()),
     (98, 266, ARcup),
-    (160, 268, SK.treasure()),
-    (186, 264, SK.death_knight()),
-    (210, 266, hat(AR.transpose(Image.FLIP_LEFT_RIGHT), PINK, GOLDC)),
+    (160, 268, HEboth.transpose(Image.FLIP_LEFT_RIGHT)),
+    (186, 264, hat(MA, PINK, GOLDC)),
+    (210, 266, hat(AR.transpose(Image.FLIP_LEFT_RIGHT), BLUE, WHITE)),
     (236, 264, hat(MA, BLUE, GOLDC).transpose(Image.FLIP_LEFT_RIGHT)),
 ]
 for (x, y, spr) in row2:
     add(SK.tint_depth(spr, 0.06), x, y)
 # Reihe 3 (vorne, zwischen den Stars)
-row3 = [(84, 296, hat(HEboth, GREEN, WHITE, dx=3, dy=3)), (170, 294, hat(MA, GOLDC, PINK).transpose(Image.FLIP_LEFT_RIGHT)), (238, 298, ARcup.transpose(Image.FLIP_LEFT_RIGHT))]
+row3 = [(170, 294, hat(MA, GOLDC, PINK).transpose(Image.FLIP_LEFT_RIGHT)), (238, 298, ARcup.transpose(Image.FLIP_LEFT_RIGHT))]
 for (x, y, spr) in row3:
     add(spr, x, y)
 # Grabsteine zwischen den Tänzern
 for (x, y, k) in [(8, 244, 0), (118, 270, 2), (230, 250, 3), (56, 276, 5), (140, 280, 1)]:
     add(STONES[k], x, y)
 
+# Boden-Kleinkram: Knochen, Schädel, Leuchtpilze, Ratte
+BONEC = {'1': (230, 220, 196), '2': (176, 162, 156), 'k': (40, 24, 46)}
+small_skull = rows_img([".111.", "11112", "1k1k2", ".1k2."], BONEC)
+small_bone = rows_img(["1....1", "122222", "1....1"], BONEC)
+small_bone2 = rows_img(["1..", ".2.", "..2", "..1"], BONEC)
+for (spr, x, y) in [(small_skull, 80, 336), (small_bone, 66, 326), (small_bone2, 92, 342), (small_bone, 180, 332), (small_skull, 232, 300),
+                    (small_bone2, 150, 286), (small_bone, 112, 282), (small_skull, 8, 276), (small_bone, 196, 318), (small_bone2, 34, 322)]:
+    im.alpha_composite(spr, (x, y))
+MUSH = {'c': (120, 240, 220), 'C': (60, 150, 160), 'w': (230, 255, 250), 's': (170, 160, 190)}
+mush = rows_img([".cc...", "cwcC..", ".s..cc", ".s.cwC", "....s."], MUSH)
+for (x, y) in [(40, 330), (104, 272), (180, 344 - 7)]:
+    im = add_light(im, x + 3, y + 3, 7, (10, 40, 40), 0.8)
+    im.alpha_composite(mush, (x, y))
+
+# Kerzen-Gruppen mit Lichtschein
+for (x, y, n) in [(8, 312, 3), (12, 346 - 36, 0), (92, 300, 2), (146, 292, 2), (240, 306, 3), (136, 344, 2)]:
+    if n == 0:
+        continue
+    im = add_light(im, x + n, y - 5, 12, (70, 50, 20), 1.0)
+    for k in range(n):
+        c = candle(3 + (k * 2) % 4)
+        put(im, c, x + k * 3, y)
 crowd.sort(key=lambda t: t[0])
 for (y, x, spr) in crowd:
     put(im, spr, x, y, shd=True)
-# Flammen-Sprite (Knochenmühle) auf dem brennenden Skelett + Funken
-fl = area('bonegrinder/flame')
-flames = [fl.crop((i * 5, 0, i * 5 + 5, 8)) for i in range(4)]
-bx_, by_ = 70, 263 - BURN.height
-im = add_light(im, 70, 246, 18, (70, 36, 0), 1.0)
-im.alpha_composite(up(flames[1], 1), (bx_ - 5, by_ - 5))
-im.alpha_composite(flames[2], (bx_ - 1, by_ - 7))
-im.alpha_composite(flames[3], (bx_ + 2, by_ - 4))
-d = ImageDraw.Draw(im)
-for (x, y) in [(60, 226), (72, 222), (64, 218), (70, 230), (58, 216)]:
-    d.point((x, y), fill=(255, 200, 80))
 im.save(os.path.join(TMP, 'p10_f.png'))
 print('crowd ok')
 
@@ -854,22 +896,6 @@ fg.sort(key=lambda t: t[0])
 for (y, x, spr) in fg:
     put(im, spr, x, y, shd=True)
 
-# Boden-Kleinkram: Knochen, Schädel, Leuchtpilze, Ratte
-BONEC = {'1': (230, 220, 196), '2': (176, 162, 156), 'k': (40, 24, 46)}
-small_skull = rows_img([".111.", "11112", "1k1k2", ".1k2."], BONEC)
-small_bone = rows_img(["1....1", "122222", "1....1"], BONEC)
-small_bone2 = rows_img(["1..", ".2.", "..2", "..1"], BONEC)
-for (spr, x, y) in [(small_skull, 80, 336), (small_bone, 66, 326), (small_bone2, 92, 342), (small_bone, 180, 332), (small_skull, 232, 300),
-                    (small_bone2, 150, 286), (small_bone, 112, 282), (small_skull, 8, 276), (small_bone, 196, 318), (small_bone2, 34, 322)]:
-    im.alpha_composite(spr, (x, y))
-MUSH = {'c': (120, 240, 220), 'C': (60, 150, 160), 'w': (230, 255, 250), 's': (170, 160, 190)}
-mush = rows_img([".cc...", "cwcC..", ".s..cc", ".s.cwC", "....s."], MUSH)
-for (x, y) in [(40, 330), (210, 286), (104, 272), (180, 344 - 7)]:
-    im = add_light(im, x + 3, y + 3, 7, (10, 40, 40), 0.8)
-    im.alpha_composite(mush, (x, y))
-rat = area('bonegrinder/rat').crop((0, 0, 9, 4)); rat = rat.crop(rat.getbbox())
-im.alpha_composite(rat, (86, 327))
-
 # Schatztruhe
 chest = Image.new('RGBA', (22, 16), (0, 0, 0, 0))
 cdd = ImageDraw.Draw(chest)
@@ -889,14 +915,6 @@ for (x, y) in [(147, 341), (150, 342), (172, 340), (175, 342), (153, 339)]:
 for (x, y, s_) in [(156, 322, 3), (168, 326, 2), (148, 330, 2)]:
     sparkle(d, x, y, s_, (255, 230, 120))
 
-# Kerzen-Gruppen mit Lichtschein
-for (x, y, n) in [(8, 312, 3), (12, 346 - 36, 0), (92, 300, 2), (190, 272, 2), (240, 306, 3), (136, 344, 2)]:
-    if n == 0:
-        continue
-    im = add_light(im, x + n, y - 5, 12, (70, 50, 20), 1.0)
-    for k in range(n):
-        c = candle(3 + (k * 2) % 4)
-        put(im, c, x + k * 3, y)
 im.save(os.path.join(TMP, 'p10_g.png'))
 print('fg ok')
 

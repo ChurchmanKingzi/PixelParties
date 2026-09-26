@@ -15,17 +15,30 @@ def minions():
             return _bg(a) | (redglow if i == 2 else False)
         s = keep_largest(cut_by(nv, box, bgf))
         s = s.crop(s.getbbox())
+        if i == 0:  # lose Stock-/Bodenpixel unten links entfernen
+            a = np.array(s); a[20:, :3, 3] = 0; a[23:, :9, 3] = 0; s = Image.fromarray(a); s = s.crop(s.getbbox())
         if i == 1:  # Hintergrundreste rechts oben entfernen
             a = np.array(s); a[:10, 16:, 3] = 0; s = Image.fromarray(a); s = s.crop(s.getbbox())
-        out.append(s)
+        out.append(clean(fill_dark(s)))
     return out
 
 
 def bard():
+    return _unpurple(_bard())
+
+
+def _bard():
     nb = native('Skeleton Bard')
     # Körper per Umriss-Barriere, Hut + Feder + Lautenhals ergänzt
-    return _fcut(nb, (26, 16, 52, 48), _notblack(12), add=[(35, 22, 41, 26), (32, 25, 45, 30), (31, 26, 32, 29), (41, 21, 43, 25), (45, 25, 51, 30)],
-                 rem=[(49, 26, 51, 27)])
+    return fill_dark(_fcut(nb, (26, 16, 52, 48), _notblack(12), add=[(35, 22, 41, 26), (32, 25, 45, 30), (31, 26, 32, 29), (41, 21, 43, 25), (45, 25, 51, 30)],
+                 rem=[(49, 26, 51, 27)], extra=None))
+
+
+def _unpurple(spr):
+    a = np.array(spr).astype(int)
+    purple = (a[..., 2] > a[..., 1] + 30) & (a[..., 0] > a[..., 1] + 10)
+    a[purple, 3] = 0
+    return clean(Image.fromarray(a.astype(np.uint8)))
 
 
 def king():
@@ -121,7 +134,7 @@ def _auto(nv, box, tol=40):
 
 
 def winged():
-    return _auto(native('Winged Skeleton'), (24, 6, 52, 36), 40)
+    return fill_dark(_auto(native('Winged Skeleton'), (24, 6, 52, 36), 40))
 
 
 def burning():
@@ -129,11 +142,11 @@ def burning():
 
 
 def priest():
-    return _auto(native('Skeleton Priest'), (28, 10, 48, 50), 50)
+    return fill_dark(_auto(native('Skeleton Priest'), (28, 10, 48, 50), 50))
 
 
 def treasure():
-    return _auto(native('Treasure Skeleton'), (22, 6, 54, 44), 50)
+    return fill_dark(_auto(native('Treasure Skeleton'), (22, 6, 54, 44), 50))
 
 
 def necromancer():
@@ -145,7 +158,7 @@ def death_knight():
 
 
 def archer_card():
-    return _fcut(native('Skeleton Archer'), (14, 6, 44, 36), _notblack(20), rem=[(33, 21, 44, 26)])
+    return clean(fill_dark(_fcut(native('Skeleton Archer'), (14, 6, 44, 36), _notblack(20), rem=[(33, 18, 44, 26), (36, 6, 44, 14)])))
 
 
 def reaper():
@@ -251,3 +264,37 @@ def tint_depth(spr, amt, col=(60, 40, 100)):
 def trim(spr):
     bb = spr.getbbox()
     return spr.crop(bb) if bb else spr
+
+
+def fill_dark(spr, col=(22, 12, 14, 255)):
+    """Eingeschlossene transparente Löcher (Augen, Rippenlücken) dunkel füllen."""
+    a = np.array(spr)
+    m = a[..., 3] > 0
+    holes = ndimage.binary_fill_holes(m) & ~m
+    a[holes] = col
+    return Image.fromarray(a)
+
+
+def clean(spr, min_size=3):
+    """Kleine abgetrennte Pixelinseln entfernen (4er-Nachbarschaft)."""
+    a = np.array(spr)
+    m = a[..., 3] > 0
+    lab, k = ndimage.label(m)
+    for i in range(1, k + 1):
+        if (lab == i).sum() < min_size:
+            a[lab == i, 3] = 0
+    out = Image.fromarray(a)
+    return out.crop(out.getbbox())
+
+
+def king_ghost_src():
+    """König Skullmael mit 'Stärke' je Pixel (für geisterhafte Darstellung)."""
+    nk = native('Skeleton King Skullmael')
+    k = _fcut(nk, (18, 2, 52, 25), _grey(64, 135, 70))
+    a = np.array(k).astype(int)
+    green = (a[..., 1] > a[..., 0] + 30); green[:-5] = False; a[green, 3] = 0
+    L = a[..., :3].mean(2); sat = a[..., :3].max(2) - a[..., :3].min(2)
+    strength = np.clip((np.abs(L - 92) - 14) / 30, 0, 1)
+    strength = np.maximum(strength, (sat > 60).astype(float))
+    strength[a[..., 3] == 0] = 0
+    return Image.fromarray(a.astype(np.uint8)), strength
