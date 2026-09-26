@@ -308,6 +308,15 @@ MATS = {
 fz, fig = fig_draw(cv, emperor, MATS)
 
 # ---------------------------------------------------------------- Details in voller Auflösung
+# Gesichtshaut: sauberer Verlauf, Schatten unter Pony und Mütze
+SKL = [(200, 124, 96), (232, 166, 132), (248, 200, 170), (255, 222, 198), (255, 240, 224)]
+for y in range(HY - 12, HY + 22):
+    for x in range(106, 145):
+        if fz.L[y, x] == 's' and tuple(cv.a[y, x]) != OUT and not fz.inner_mask[y, x]:
+            v = 0.8 - 0.32 * (y - HY + 6) / 26 - 0.14 * (x - 125) / 16
+            if fz.L[y - 1, x] in 'hC' or fz.L[y - 2, x] in 'hC':
+                v -= 0.35
+            px(cv, x, y, rampc(SKL, v, x, y))
 EYE = (54, 70, 110)
 big_eye(cv, 111, HY, EYE, w=7, h=9, lash2=(40, 30, 50))
 big_eye(cv, 132, HY, EYE, w=7, h=9, flip=True, lash2=(40, 30, 50))

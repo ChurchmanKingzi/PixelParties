@@ -359,6 +359,7 @@ for (x, y) in [(196, 170), (30, 200), (150, 132)]:
     sparkle(cv, x, y, (255, 252, 220), r=1)
 
 shift_layer(cv, BG, DXF)
-finish(cv, '0', 'TOBI', out='00_fool_tobi', emblem=emblem_generic(
+# Zahl: eigene „0“ ohne Innenmarkierung im Gold-Relief der Rahmenschrift
+finish_custom_numeral(cv, zero_mask(), 'TOBI', out='00_fool_tobi', emblem=emblem_generic(
     ["..#..", ".#.#.", "...#.", "..#..", ".....", "..#.."], {'#': (255, 240, 200)}))
 print('ok')

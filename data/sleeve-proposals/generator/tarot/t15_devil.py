@@ -257,8 +257,8 @@ f.part('uarmR'); f.limb(150, 128, 168, 144, 7.5, 6, 'r')
 f.part('farmR'); f.limb(168, 144, 176, 166, 6, 5, 'r')
 f.part('bracerR'); f.limb(170, 148, 174, 160, 6.6, 6.2, 'i')
 f.part('torch')
-ta, tb = (170, 160), (192, 204)
-f.limb(*ta, *tb, 2.6, 2.2, 'o')
+ta, tb = (173, 163), (192, 204)
+f.limb(*ta, *tb, 3.0, 2.6, 'o')
 f.part('torchhead'); f.limb(189, 197, 194, 207, 4.2, 3.8, 'i')
 f.part('handR'); f.ellipse(177, 170, 6, 6, 'r')
 # ---- Schulterpanzer
@@ -318,7 +318,7 @@ for i in range(9):
 EYE_W = (255, 252, 236)
 for (ex, sd) in [(117, -1), (133, 1)]:
     for i in range(-4, 5):
-        top = 98 + (i * sd) * 0.35
+        top = 98.5 - (i * sd) * 0.45
         for y in range(int(round(top)), 102):
             px(cv, ex + i, y, EYE_W if y < 101 else (255, 214, 170))
     px(cv, ex + sd, 99, (210, 20, 20)); px(cv, ex + sd, 100, (150, 10, 10))

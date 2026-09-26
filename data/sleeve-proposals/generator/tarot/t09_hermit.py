@@ -244,6 +244,17 @@ for _ in range(34):
         if rs.random() < 0.3:
             for (dx, dy) in ((1, 0), (-1, 0), (0, 1), (0, -1)):
                 blend_px(cv, x + dx, y + dy, c, 0.5)
+# blaue Sternchen auf dem dunklen Untergewand
+inner_m = (f.L == 'i')
+cands = list(zip(*np.where(inner_m)))
+for _ in range(14):
+    y, x = rs.choice(cands)
+    if inner_m[y - 1:y + 2, x - 1:x + 2].all():
+        px(cv, x, y, (150, 190, 255))
+# Finger um den Fernrohr-Stab
+for yf in (174, 177, 180):
+    for xf in range(167, 172):
+        px(cv, xf, yf, SKIN[1])
 # Goldborte an Saum und Vorderkante
 for x in range(88, 180):
     for y in range(262, 278):

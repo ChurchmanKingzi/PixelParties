@@ -245,3 +245,45 @@ def tree_canopy(cv, cx, cy, w, h, ramp, seed=0, n=None, clip=True):
         cv.a[edge] = ramp[0]
         M_all |= m
     return M_all
+
+
+def gold_mask(cv, m, cx, cy, ramp=GOLD, shadow=(8, 4, 10)):
+    """wie tlib.gold_text, aber für eine beliebige Maske (gleiche Relief-Technik, gleicher Schatten)"""
+    mh, mw = m.shape
+    y = int(round(cy - mh / 2)); x0 = int(cx - mw // 2)
+    TH2 = np.zeros((H, W), np.float32); TM2 = np.zeros((H, W), bool)
+    mm = np.pad(m, 1)
+    dist_ = cv2.distanceTransform(mm.astype(np.uint8), cv2.DIST_L2, 3)[1:-1, 1:-1]
+    for yy_ in range(mh):
+        for xx_ in range(mw):
+            if m[yy_, xx_]:
+                TM2[y + yy_, x0 + xx_] = True; TH2[y + yy_, x0 + xx_] = min(dist_[yy_, xx_], 2.5)
+    for yy_ in range(mh):
+        for xx_ in range(mw):
+            if m[yy_, xx_]:
+                cv.px(x0 + xx_ + 1, y + yy_ + 2, shadow)
+    relief(cv, TH2, np.zeros((H, W), np.int32), [ramp], TM2, k=1.2, bias=0.12, blur=0.4)
+
+
+def zero_mask(w=14, h=17, sx=5, sy=2):
+    """eigene Null ohne Innenmarkierung: abgerundetes Oval, Strichstärke wie die Rahmenschrift
+    (senkrechte Striche sx breit, waagrechte sy hoch)"""
+    yy, xx = np.indices((h, w)).astype(float)
+    cx_, cy_ = (w - 1) / 2, (h - 1) / 2
+    def se(ax, ay):
+        return (np.abs(xx - cx_) / ax) ** 3 + (np.abs(yy - cy_) / ay) ** 3 <= 1
+    return se(w / 2, h / 2) & ~se(w / 2 - sx, h / 2 - sy - 0.5)
+
+
+def finish_custom_numeral(cv, mask, name, out, emblem=None, **kw):
+    """finish() mit Platzhalter-Zahl aufrufen, dann die Zahlenfläche der oberen Platte neu füllen,
+    die eigene Zahl (Maske) im Gold-Relief daraufsetzen und erneut speichern."""
+    plate_cols = kw.get('plate_cols', ((24, 12, 30), (34, 18, 42)))
+    finish(cv, 'I', name, out, emblem=emblem, **kw)
+    for y in range(12, 36):                 # Innenfläche der oberen Platte (ohne Embleme)
+        for x in range(96, 155):
+            cv.px(x, y, plate_cols[1] if (x + y) % 2 else plate_cols[0])
+    gold_mask(cv, mask, 125, 24)
+    path = os.path.join(OUTDIR, out + '.png')
+    cv.img().resize((W * 3, H * 3), Image.NEAREST).save(path)
+    return path

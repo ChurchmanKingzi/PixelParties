@@ -310,23 +310,19 @@ cloud_mass([(50, 194, 50, 16, 11), (200, 196, 50, 14, 12), (82, 198, 60, 20, 16)
 # Lichtsaum auf den Wolken
 glow(cv, DX, 190, 50, (255, 230, 180), k=0.4, mix=0.25)
 
-# ---------------------------------------------------------------- Skelette erheben sich aus offenen Särgen
-WOOD = [(24, 12, 8), (50, 28, 16), (84, 50, 28), (120, 78, 44), (156, 108, 66)]
+# ---------------------------------------------------------------- Skelette erheben sich aus Sarg und Gräbern
+WOOD = [(22, 10, 8), (46, 24, 14), (78, 44, 24), (112, 70, 38), (150, 100, 58), (186, 136, 84)]
+WOOD_D = [(14, 6, 6), (30, 16, 10), (54, 30, 18), (80, 48, 28), (108, 70, 42)]
 HOOD_G = [(8, 24, 12), (18, 50, 22), (30, 84, 34), (50, 120, 50), (90, 160, 80)]
 HOOD_B = [(30, 16, 10), (60, 34, 18), (96, 58, 30), (134, 88, 50), (170, 124, 76)]
-
-def coffin(f, cx, y, w=30):
-    """offener Sarg in Aufsicht-Perspektive: y = Oberkante der Öffnung"""
-    f.part('lid%d' % cx)
-    f.poly([(cx + w * 0.5, y - 2), (cx + w * 0.5 + 12, y - 16), (cx + w * 0.5 + 16, y - 14), (cx + w * 0.5 + 5, y + 4)], 'l')
-    f.part('inside%d' % cx)
-    f.poly([(cx - w * 0.5, y), (cx + w * 0.5, y), (cx + w * 0.44, y + 7), (cx - w * 0.44, y + 7)], 'i')
-
-def coffin_front(f, cx, y, w=30):
-    f.part('front%d' % cx)
-    f.poly([(cx - w * 0.5 - 1, y + 4), (cx + w * 0.5 + 1, y + 4), (cx + w * 0.44, y + 18), (cx - w * 0.44, y + 18)], 'l')
-    f.part('rim%d' % cx)
-    f.poly([(cx - w * 0.5 - 2, y + 2), (cx + w * 0.5 + 2, y + 2), (cx + w * 0.5 + 1, y + 5), (cx - w * 0.5 - 1, y + 5)], 'l')
+SK = [(40, 32, 30), (96, 84, 72), (150, 138, 116), (200, 190, 164), (234, 228, 206), (252, 250, 238)]
+MATS_S = {'B': mat(SK, pillow=2, k=1.6, bias=0.12, spec=True, spec_col=(255, 255, 245)),
+          'l': mat(WOOD, pillow=2, k=1.5, folds=(0.05, 1.3, 0.3), noise=0.6, nscale=1),
+          'L': mat(WOOD_D, pillow=2, k=1.3, folds=(0.0, 1.1, 0.4), noise=0.5, nscale=1),
+          'i': mat([(8, 2, 4), (20, 8, 10), (36, 16, 16)], pillow=3, k=1),
+          'g': mat(HOOD_G, pillow=3, k=1.5, folds=(0.4, 0.2, 0.4)), 'h': mat(HOOD_B, pillow=3, k=1.5, folds=(0.4, 0.2, 0.4)),
+          'w': mat(BROWN, pillow=1.5, k=1.2), 'a': mat(SILVER, pillow=1, k=1.2),
+          'e': mat(EARTH, pillow=3, k=1.6, noise=1.2, nscale=1, bias=0.05)}
 
 def skeleton(f, cx, by, sc=1.0, pose='up', hood=None, flip=1):
     """Oberkörper eines Skeletts, das sich erhebt. by = Höhe des Sargrands"""
@@ -340,7 +336,7 @@ def skeleton(f, cx, by, sc=1.0, pose='up', hood=None, flip=1):
         yy = by - S(20) + S(i * 4.2)
         rw = S(8.5 - i * 0.6)
         for s in (-1, 1):
-            f.curve([(cx, yy), (cx + s * rw * 0.7, yy - S(0.5)), (cx + s * rw, yy + S(2.2)), (cx + s * rw * 0.8, yy + S(3.2))], 'B', w=S(1.8))
+            f.curve([(cx, yy), (cx + s * rw * 0.6, yy - S(1)), (cx + s * rw, yy + S(2)), (cx + s * rw * 0.85, yy + S(4.2))], 'B', w=S(1.6))
     f.part('sternum%d' % cx); f.limb(cx, by - S(21), cx, by - S(8), S(1.4), S(1.2), 'B')
     # Schlüsselbeine
     f.part('clav%d' % cx); f.line(cx - S(9), by - S(22), cx + S(9), by - S(22), 'B', w=max(2, int(S(2))))
@@ -368,65 +364,170 @@ def skeleton(f, cx, by, sc=1.0, pose='up', hood=None, flip=1):
     f.poly([(cx - S(5), by - S(27)), (cx + S(5), by - S(27)), (cx + S(4), by - S(22.5)), (cx - S(4), by - S(22.5))], 'B')
     if hood:
         f.part('hoodbrim%d' % cx)
-        f.ellipse(cx, by - S(36), S(11.5), S(8), hood, a0=180, a1=360, keep='.')
-        f.ellipse(cx, by - S(36), S(11.5), S(8), hood, a0=180, a1=360, only='B')
-        f.ellipse(cx, by - S(33), S(8.5), S(8), 'B', only=hood)
-        f.ellipse(cx, by - S(40), S(9), S(2.5), hood, only='B')
+        f.ellipse(cx, by - S(33), S(8.6), S(8.1), hood, only='B')
+        f.ellipse(cx, by - S(31), S(6.8), S(6.2), 'B', only=hood)
         f.part('cape%d' % cx)
         f.poly([(cx - S(9), by - S(24)), (cx + S(9), by - S(24)), (cx + S(11), by - S(19)), (cx + S(4), by - S(20)), (cx, by - S(17)),
                 (cx - S(4), by - S(20)), (cx - S(11), by - S(19))], hood)
     return (cx, by - S(33))
 
-SK = [(40, 32, 30), (96, 84, 72), (150, 138, 116), (200, 190, 164), (234, 228, 206), (252, 250, 238)]
-MATS_S = {'B': mat(SK, pillow=2, k=1.6, bias=0.12, spec=True, spec_col=(255, 255, 245)),
-          'l': mat(WOOD, pillow=2, k=1.4, folds=(0.0, 0.9, 0.35)), 'i': mat([(10, 4, 6), (24, 12, 12), (40, 22, 18)], pillow=2, k=1),
-          'g': mat(HOOD_G, pillow=3, k=1.5), 'h': mat(HOOD_B, pillow=3, k=1.5),
-          'w': mat(BROWN, pillow=1.5, k=1.2), 'a': mat(SILVER, pillow=1, k=1.2)}
-# Erdhügel um die Särge
-for (cx, y, w) in [(52, 266, 32), (126, 280, 36), (198, 266, 32)]:
-    for yy in range(y - 2, y + 24):
-        for xx in range(cx - w // 2 - 8, cx + w // 2 + 9):
-            dd = ((xx - cx) / (w / 2 + 8)) ** 2 + ((yy - y - 12) / 13) ** 2
-            if dd < 1 and in_art(xx, yy):
-                px(cv, xx, yy, rampc(EARTH, 0.75 - dd * 0.4 - (yy - y) / 40, xx, yy))
+
+def coffin_back(f, cx, by, w):
+    """Sarg in Perspektive (Längsachse in die Tiefe): Seitenwände, Rand und dunkles Inneres"""
+    hw_far, hw_sh, hw_near = w * 0.3, w * 0.5, w * 0.36
+    yf, ysh, yn = by - 14, by - 6, by + 9
+    f.part('cside%d' % cx)
+    f.poly([(cx - hw_sh - 1, ysh), (cx - hw_near - 1, yn + 1), (cx + hw_near + 1, yn + 1), (cx + hw_sh + 1, ysh),
+            (cx + hw_sh + 1, ysh + 7), (cx + hw_near + 1, yn + 9), (cx - hw_near - 1, yn + 9), (cx - hw_sh - 1, ysh + 7)], 'L')
+    f.part('crim%d' % cx)
+    f.poly([(cx - hw_far - 2, yf - 2), (cx + hw_far + 2, yf - 2), (cx + hw_sh + 2, ysh), (cx + hw_near + 2, yn + 2),
+            (cx - hw_near - 2, yn + 2), (cx - hw_sh - 2, ysh)], 'l')
+    f.part('cin%d' % cx)
+    f.poly([(cx - hw_far, yf), (cx + hw_far, yf), (cx + hw_sh - 1, ysh), (cx + hw_near - 1, yn),
+            (cx - hw_near + 1, yn), (cx - hw_sh + 1, ysh)], 'i')
+
+def coffin_front(f, cx, by, w):
+    """vorderer Rand über dem Becken, damit das Skelett im Sarg sitzt"""
+    hw_sh, hw_near = w * 0.5, w * 0.36
+    ysh, yn = by - 6, by + 9
+    f.part('cfront%d' % cx)
+    f.poly([(cx - hw_sh * 0.85, by - 1), (cx + hw_sh * 0.85, by - 1), (cx + hw_near + 2, yn + 2), (cx - hw_near - 2, yn + 2)], 'i')
+    f.poly([(cx - hw_near - 2, yn - 1), (cx + hw_near + 2, yn - 1), (cx + hw_near + 2, yn + 2), (cx - hw_near - 2, yn + 2)], 'l')
+    f.poly([(cx - hw_sh - 2, ysh), (cx - hw_sh + 1, ysh), (cx - hw_near + 1, yn), (cx - hw_near - 2, yn + 2)], 'l')
+    f.poly([(cx + hw_sh + 2, ysh), (cx + hw_sh - 1, ysh), (cx + hw_near - 1, yn), (cx + hw_near + 2, yn + 2)], 'l')
+
+def grave_hole(f, cx, by, w):
+    """aufgebrochener Grabhügel: Erdwall mit dunklem Loch"""
+    f.part('mound%d' % cx)
+    f.ellipse(cx, by + 3, w * 0.62, 10, 'e')
+    f.part('hole%d' % cx)
+    f.ellipse(cx, by + 1, w * 0.42, 5.5, 'i')
+
+def grave_front(f, cx, by, w):
+    f.part('lip%d' % cx)
+    f.ellipse(cx, by + 6, w * 0.5, 4.5, 'e', a0=0, a1=180)
+    f.ellipse(cx, by + 3, w * 0.42, 2.5, 'e', a0=0, a1=180)
+
+LAYOUT = [(52, 276, 36, 1.35, 'bow', 'g', 'grave'), (125, 286, 42, 1.6, 'up', None, 'coffin'), (199, 276, 36, 1.35, 'cast', 'h', 'grave')]
+# Sargdeckel, abgehoben und schräg neben den Sarg gekippt (mit geschnitztem Kreuz)
+lf = Fig(W, H)
+lc = (96, 290); la = math.radians(-24)
+hexl = [(-6, -17), (6, -17), (10, -9), (7, 17), (-7, 17), (-10, -9)]
+lf.part('lidside'); lf.poly([(lc[0] + (x * math.cos(la) - y * math.sin(la)) + 1.5, lc[1] + (x * math.sin(la) + y * math.cos(la)) + 3) for (x, y) in hexl], 'L')
+lf.part('lid'); lf.poly([(lc[0] + x * math.cos(la) - y * math.sin(la), lc[1] + x * math.sin(la) + y * math.cos(la)) for (x, y) in hexl], 'l')
+lf.outline()
+cv.paste(lf.render(MATS_S), 0, 0)
+for (x0, y0, x1, y1) in [(0, -11, 0, 9), (-5, -5, 5, -5)]:
+    for t_ in np.linspace(0, 1, 20):
+        x = x0 + (x1 - x0) * t_; y = y0 + (y1 - y0) * t_
+        X = lc[0] + x * math.cos(la) - y * math.sin(la); Y = lc[1] + x * math.sin(la) + y * math.cos(la)
+        px(cv, X, Y, WOOD[1]); px(cv, X + 1, Y, WOOD[4])
 heads = {}
-for (cx, y, w, sc, pose, hood) in [(52, 266, 30, 0.95, 'bow', 'g'), (126, 280, 34, 1.15, 'up', None), (198, 266, 30, 0.95, 'cast', 'h')]:
+for (cx, by, w, sc, pose, hood, kind) in LAYOUT:
     f = Fig(W, H)
-    coffin(f, cx, y, w)
-    heads[cx] = skeleton(f, cx, y + 3, sc, pose, hood)
+    if kind == 'coffin':
+        coffin_back(f, cx, by, w)
+    else:
+        grave_hole(f, cx, by, w)
+    heads[cx] = skeleton(f, cx, by + 3, sc, pose, hood, flip=(-1 if pose == 'cast' else 1))
     if pose == 'bow':
         # Bogen des Skeleton Archer (hoch erhoben)
-        hx, hy = cx - 24 * sc, y + 3 - 41 * sc
+        hx, hy = cx - 24 * sc, by + 3 - 41 * sc
         f.part('bow%d' % cx, line=True)
-        f.curve([(hx + 2, hy - 13), (hx - 4, hy - 4), (hx - 4, hy + 5), (hx + 3, hy + 13)], 'w', w=2)
-        f.part('string%d' % cx, line=False); f.line(hx + 2, hy - 13, hx + 3, hy + 13, 'a', w=1)
-        # Feder am Kapuzenzipfel
-        f.part('feather%d' % cx); f.curve([(cx + 6, y - 34), (cx + 11, y - 42), (cx + 16, y - 44)], 'g', w=2.4, w1=1)
-    coffin_front(f, cx, y, w)
+        f.curve([(hx + 3, hy - 17), (hx - 5, hy - 5), (hx - 5, hy + 6), (hx + 4, hy + 17)], 'w', w=2.6)
+        f.part('string%d' % cx, line=False); f.line(hx + 3, hy - 17, hx + 4, hy + 17, 'a', w=1)
+        f.part('feather%d' % cx); f.curve([(cx + 8, by - 44), (cx + 15, by - 54), (cx + 22, by - 57)], 'g', w=3.2, w1=1)
+    if kind == 'coffin':
+        coffin_front(f, cx, by, w)
+    else:
+        grave_front(f, cx, by, w)
     f.outline()
-    cv.paste(f.render(MATS_S), 0, 0)
+    rg = f.render(MATS_S)
+    cv.paste(rg, 0, 0)
+    # Holzmaserung / Erdschichten
+    if kind == 'coffin':
+        for y in range(by - 20, by + 20):
+            for x in range(cx - w // 2 - 3, cx + w // 2 + 4):
+                if f.L[y, x] in ('l', 'L') and tuple(cv.a[y, x]) != OUT:
+                    g = math.sin((x - cx) * 0.25 + math.sin(y * 0.7) * 1.6 + y * 0.05)
+                    if g > 0.85:
+                        px(cv, x, y, WOOD[1] if f.L[y, x] == 'l' else WOOD_D[0])
+        for (dx, dy) in [(-15, 3), (15, 3), (-10, 13), (10, 13), (0, 15)]:
+            px(cv, cx + dx, by + dy, GOLD[3]); px(cv, cx + dx + 1, by + dy + 1, GOLD[1])
+    else:
+        STRATA = [(90, 40, 30), (60, 30, 30), (120, 80, 50), (40, 20, 24)]
+        for y in range(by - 5, by + 6):
+            for x in range(cx - w // 2, cx + w // 2 + 1):
+                if f.L[y, x] == 'e' and y < by + 3 and tuple(cv.a[y, x]) != OUT:
+                    if (y + int(2 * math.sin(x * 0.4))) % 3 == 0:
+                        px(cv, x, y, STRATA[((y + x // 7) % 4)])
     # Augenhöhlen + leuchtende Augen
     hx, hy = heads[cx]
     eye = {'g': (90, 255, 90), 'h': (200, 140, 255), None: (255, 130, 60)}[hood]
-    for s in (-1, 1):
-        ex, ey = int(round(hx + s * 3.6 * sc)), int(round(hy + 1))
-        for (dx, dy) in [(-1, -1), (0, -1), (1, -1), (-1, 0), (0, 0), (1, 0), (-1, 1), (0, 1), (1, 1), (0, 2)]:
-            px(cv, ex + dx, ey + dy, (14, 8, 12))
-        glow(cv, ex, ey, 4, eye, k=0.6, mix=0.25)
-        px(cv, ex, ey, eye); px(cv, ex, ey + 1, lerp(eye, (0, 0, 0), 0.4))
-    px(cv, hx, hy + 5 * sc, (14, 8, 12)); px(cv, hx - 1, hy + 5 * sc + 1, (14, 8, 12)); px(cv, hx + 1, hy + 5 * sc + 1, (14, 8, 12))
-    for dx in range(-3, 4):
+    for s_ in (-1, 1):
+        ex, ey = int(round(hx + s_ * 3.6 * sc)), int(round(hy + 1))
+        glow(cv, ex, ey, 6, eye, k=0.6, mix=0.22)
+        rx_e, ry_e = 2.3 * sc / 1.35, 2.6 * sc / 1.35
+        for dy in range(-3, 4):
+            for dx in range(-3, 4):
+                if (dx / rx_e) ** 2 + ((dy - 0.5) / ry_e) ** 2 <= 1:
+                    px(cv, ex + dx, ey + dy, (14, 8, 12))
+        px(cv, ex, ey, eye); px(cv, ex, ey + 1, lerp(eye, (0, 0, 0), 0.4)); px(cv, ex + s_, ey, lerp(eye, (255, 255, 255), 0.4))
+    for (dx, dy) in [(0, 0), (-1, 1), (0, 1), (1, 1)]:
+        px(cv, hx + dx, hy + 5 * sc + dy, (14, 8, 12))
+    for dx in range(-4, 5):
         if dx % 2 == 0:
-            px(cv, hx + dx * sc, hy + 8 * sc, (60, 50, 44))
-    # Nägel/Beschläge am Sarg
-    for dx in (-10, 0, 10):
-        px(cv, cx + dx * w / 30, y + 11, GOLD[3])
-# Magie in der Hand des Skeleton Mage
-mx_, my_ = 198 + 25 * 0.95, 269 - 32 * 0.95
-glow(cv, mx_, my_ - 2, 12, (190, 110, 255), k=0.8, mix=0.4)
-twinkle(cv, mx_, my_ - 3, (240, 220, 255), r=3, c2=(170, 90, 240))
-for (dx, dy) in [(-6, -8), (5, -10), (8, -2), (-3, -13)]:
+            px(cv, hx + dx * sc * 0.8, hy + 8 * sc, (60, 50, 44))
+    # Risslinie im Schädel
+    px(cv, hx + 3 * sc, hy - 6 * sc, SK[1]); px(cv, hx + 4 * sc, hy - 5 * sc, SK[1]); px(cv, hx + 4 * sc, hy - 4 * sc, SK[1])
+
+# Erdbrocken fliegen aus den aufgebrochenen Gräbern
+CLOD = [(30, 14, 18), (70, 40, 36), (110, 70, 52), (150, 104, 72)]
+for (cx, by) in [(52, 276), (199, 276)]:
+    rr = random.Random(cx)
+    for i in range(9):
+        a = rr.uniform(-2.8, -0.35); d = rr.uniform(16, 30)
+        x = cx + math.cos(a) * d * 1.1; y = by + 2 + math.sin(a) * d * 0.8
+        r = rr.choice((1.3, 1.8, 2.3))
+        for yy in range(int(y - r) - 1, int(y + r) + 2):
+            for xx in range(int(x - r) - 1, int(x + r) + 2):
+                dd = math.hypot(xx - x, yy - y)
+                if dd <= r:
+                    px(cv, xx, yy, rampc(CLOD, 0.9 - (yy - y + r) / (2 * r + 0.1) * 0.8, xx, yy))
+                elif dd <= r + 1 and in_art(xx, yy):
+                    px(cv, xx, yy, (14, 8, 12))
+        # Bewegungsspur
+        for k in range(1, 3):
+            blend_px(cv, x - math.cos(a) * (r + 1 + k), y - math.sin(a) * (r + 1 + k) * 0.8, CLOD[2], 0.5)
+
+# verstreute Knochen und ein Schädel im Vordergrund
+def bone(x, y, ang_, L=7):
+    ca, sa = math.cos(ang_), math.sin(ang_)
+    for k in range(int(L) + 1):
+        px(cv, x + ca * k, y + sa * k, SK[4] if k % 3 else SK[3])
+        px(cv, x + ca * k + sa, y + sa * k - ca + 1, SK[2])
+    for (ex, ey) in [(x, y), (x + ca * L, y + sa * L)]:
+        for (dx, dy) in [(-1, -1), (1, -1), (-1, 1), (1, 1)]:
+            px(cv, ex + dx * 0.9 - sa * dy * 0.5, ey + dy * 0.9 + ca * dx * 0.3, SK[4] if dy < 0 else SK[2])
+    for k in range(int(L) + 1):
+        px(cv, x + ca * k - sa * 1.5, y + sa * k + ca * 1.5 + 1, (20, 10, 14))
+for (x, y, a_) in [(30, 296, 0.3), (160, 298, -0.2), (80, 300, 0.1), (216, 294, 2.8), (150, 284, 0.6)]:
+    bone(x, y, a_)
+sk_x, sk_y = 176, 292
+for (dx, dy, c) in [(dx, dy, SK[4] if dy < 0 else SK[2]) for dx in range(-3, 4) for dy in range(-3, 2) if dx * dx / 12 + (dy + 1) ** 2 / 6 <= 1]:
+    px(cv, sk_x + dx, sk_y + dy, c)
+for (dx, dy) in [(-1, -1), (1, -1), (0, 1)]:
+    px(cv, sk_x + dx, sk_y + dy, (14, 8, 12))
+for dx in range(-2, 3):
+    px(cv, sk_x + dx, sk_y + 2, SK[3] if dx % 2 else (14, 8, 12))
+# Magie in der Hand des Skeleton Mage (Zauberhand zur Mitte)
+mx_, my_ = 199 - 25 * 1.35, 279 - 32 * 1.35
+glow(cv, mx_, my_ - 3, 14, (190, 110, 255), k=0.8, mix=0.4)
+twinkle(cv, mx_, my_ - 4, (240, 220, 255), r=4, c2=(170, 90, 240))
+for (dx, dy) in [(-7, -9), (6, -12), (9, -3), (-4, -15), (-9, 0)]:
     sparkle(cv, mx_ + dx, my_ + dy, (220, 180, 255), r=1, c2=(140, 70, 200))
+# bodennaher Nebel vor allem (gedithert)
+fog(cv, 268, AY1, (150, 90, 100), k=1.2, seed=33, mix=0.22)
 
 # Staub + Funken
 for _ in range(40):
