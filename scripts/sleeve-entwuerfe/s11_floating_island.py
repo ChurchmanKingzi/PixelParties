@@ -583,17 +583,17 @@ comp(im, haze(flip(ISLE['e']), HAZE, 0.6), 212, 94)
 for (i, x, y, hz) in [(0, 6, 116, 0.05), (4, 150, 96, 0.12), (3, 58, 30, 0.25)]:
     comp(im, haze(PUFFS[i], HAZE, hz), x, y)
 
-# ferne Vogelschwärme (winzige Silhouetten)
+# ferne Vogelschwärme (kleine Möwen-Silhouetten, im Dunst)
 dv = ImageDraw.Draw(im)
-for (bx, by, n_, sd) in [(118, 78, 5, 1), (30, 150, 4, 2), (222, 140, 3, 3)]:
+for (bx, by, n_, sd) in [(116, 80, 3, 1), (26, 152, 3, 2), (220, 146, 2, 3)]:
     rb = random.Random(sd)
     for k in range(n_):
-        x, y = bx + k * 4 + rb.randint(-1, 1), by + rb.randint(-2, 2) + (k % 2)
-        c = (62, 96, 172)
-        if rb.random() < 0.5:
-            dv.point([(x - 1, y - 1), (x, y), (x + 1, y - 1)], fill=c)
-        else:
-            dv.point([(x - 1, y), (x, y), (x + 1, y)], fill=c)
+        x, y = bx + k * 7 + rb.randint(-1, 1), by + rb.randint(-2, 2) + (k % 2) * 2
+        c = (58, 92, 170)
+        if rb.random() < 0.5:   # Flügel oben
+            dv.point([(x - 2, y - 1), (x - 1, y), (x, y + 1), (x + 1, y), (x + 2, y - 1)], fill=c)
+        else:                   # Flügel waagrecht
+            dv.point([(x - 2, y + 1), (x - 1, y), (x, y + 1), (x + 1, y), (x + 2, y + 1)], fill=c)
 
 # ---------------------------------------------------------------- Wolkenmeer hinten
 comp(im, haze(BANK, HAZE, 0.3), -3, 228)
@@ -737,10 +737,11 @@ comp(im, haze(mid, HAZE, 0.12), 2, 238)
 draw_sea(SEA2[2:3])
 
 # ---------------------------------------------------------------- Vordergrund-Insel (rechts, angeschnitten)
-fg, (fox, foy), fpts = paint_islet(104, 34, 50, 61, trees=[(14, 12, 7), (30, 5, 8), (84, 6, 8), (96, 18, 7), (74, 24, 6), (22, 26, 6)],
-                                   rocks=[(64, 9, 3.5), (69, 12, 3), (59, 12, 2.5), (72, 7, 2.5)], bushes=5,
-                                   vines=6, flowers=12, stream=(46, 14, 22, 30), stones=3, roots=4)
-FGX, FGY = 150, 258
+fg, (fox, foy), fpts = paint_islet(110, 44, 50, 61, trees=[(12, 16, 7), (26, 7, 8), (44, 3, 7), (84, 5, 8),
+                                                         (98, 14, 8), (90, 30, 7), (104, 26, 5)],
+                                   rocks=[(62, 8, 4), (68, 11, 3.5), (57, 12, 3), (72, 6, 2.5)], bushes=6,
+                                   vines=6, flowers=14, stream=(60, 16, 38, 34), stones=3, roots=4)
+FGX, FGY = 146, 250
 comp(im, fg, FGX, FGY)
 draw_sea(SEA2[3:])
 
@@ -762,13 +763,6 @@ a_[..., :3] = a_[..., :3] * (1 - amt2[..., None]) + np.array([255, 250, 228]) * 
 a_[..., :3] = a_[..., :3] * (1 - warm[..., None]) + np.array([255, 246, 222]) * warm[..., None]
 a_[..., :3] = a_[..., :3] * (1 - cool[..., None]) + np.array([70, 104, 196]) * cool[..., None]
 im = Image.fromarray(a_.clip(0, 255).astype(np.uint8))
-
-# ---------------------------------------------------------------- Titel
-tt = text_img('FLOATING ISLAND', 16, (255, 236, 150, 255), outline_col=(70, 40, 12, 255), shadow=(14, 44, 120, 255))
-comp(im, tt, W // 2 - tt.width // 2, 12)
-dt = ImageDraw.Draw(im)
-for (x, y) in [(W // 2 - tt.width // 2 - 9, 12 + tt.height // 2), (W // 2 + tt.width // 2 + 8, 12 + tt.height // 2)]:
-    sparkle(dt, x, y, 3, (255, 226, 130))
 
 # ---------------------------------------------------------------- Rahmen
 bevel_frame(im, (48, 30, 12), (255, 234, 160), (218, 168, 64), (146, 94, 30), (48, 30, 12), width=6)
