@@ -40845,7 +40845,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             {/* Porträt im verzierten Pixelrahmen in der Farbe des Spielers
                 (`.pp-portraet`, style.css). Im Tutorial: Monia Bot bzw.
                 Antonia mit eigenem Bild und eigener Farbe. */}
-            <span className="pp-portraet" style={{ '--portraet': (tutorialGegner ? tutorialGegner.color : opp.color) || '#ff5577' }}>
+            <span className="pp-portraet" style={{ '--portraet': opp.color || '#ff5577' }}>
               {(tutorialGegner ? tutorialGegner.avatar : opp.avatar)
                 /* `result ? '' : …` statt `!result && …`: der &&-Ausdruck liefert bei gesetztem Ergebnis das BOOLEAN false, und `'…-big' + false` haengt woertlich "false" an den Klassennamen. Aus `game-hand-avatar-crop` wurde `game-hand-avatar-cropfalse` — der quadratische Rahmen fiel weg und der HeroArtCrop lief auf seine volle 135px-Breite aus, der Avatar wurde also im End-Screen ploetzlich breiter. */
                 ? <img key={tutorialGegner ? tutorialGegner.key : 'avatar'} src={tutorialGegner ? tutorialGegner.avatar : opp.avatar} className={'game-hand-avatar game-hand-avatar-big' + (tutorialGegner ? ' game-hand-avatar-tutorial' : '') + (result ? '' : ((isMyTurn && !oppBarking) ? ' avatar-inactive' : ' avatar-active'))} />
@@ -40858,11 +40858,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                   : null}
               <span className="pp-portraet-zier" aria-hidden="true" />
             </span>
-            {/* ★ Als Vorgabe 26.9.: Knopf RECHTS NEBEN dem Avatar (unter dem
-                Namen) statt darueber — der Stapel Knopf-ueber-Avatar hat die
-                Gegnerzeile hoeher gemacht als die eigene. */}
             <div className="game-hand-namensspalte">
-              <span className="orbit-font game-hand-name" style={{ fontSize: 18, fontWeight: 800, color: tutorialGegner ? tutorialGegner.color : opp.color }}>{
+              <span className="orbit-font game-hand-name" style={{ fontSize: 18, fontWeight: 800, color: opp.color }}>{
                 // CPU opponents are labelled "CPU" server-side; show their
                 // middle Hero instead so they read as a character. Als
                 // Ruling: nur der NAME, ohne Titel ("Bomb Berserker Bartas"
@@ -40875,23 +40872,6 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                   : opp.username
               }</span>
               {oppDisconnected && <span style={{ fontSize: 10, color: 'var(--danger)', animation: 'pulse 1.5s infinite' }}>DISCONNECTED</span>}
-              {isSpectator ? (
-                <button className="btn btn-danger game-hand-quit" onClick={handleLeave}>
-                  👁 ✕ LEAVE
-                </button>
-              ) : cubeMatchInfo && !result ? (
-                // Cube tournament match — surrender ends the WHOLE match (Bo-set
-                // included), not just the current game. Player keeps parent-room
-                // membership and becomes a spectator like other eliminated players.
-                <button className="btn btn-danger game-hand-quit"
-                  onClick={() => setShowSurrender(true)} title="Forfeit this match — you stay in the cube as a spectator">
-                  🏳 SURRENDER MATCH
-                </button>
-              ) : (
-                <button className="btn btn-danger game-hand-quit" onClick={() => result ? handleLeave() : setShowSurrender(true)}>
-                  {result ? '✕ LEAVE' : gameState.isPuzzle ? '✕ EXIT' : '⚑ SURRENDER'}
-                </button>
-              )}
             </div>
           </div>
           </div>{/* /game-hand-topleft (v1258) */}
@@ -41050,11 +41030,36 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               (siehe `.game-hand-topright` in style.css). Das
               `data-gold-player`-Merkmal bleibt, weil die aufsteigenden
               Goldzahlen es als Anker messen. */}
+          {/* ★ Als Vorgabe 26.9.: der Aufgabe-/Exit-Knopf steht in der
+              rechten Gruppe LINKS neben Lautstaerke und Gold — wie Sort/
+              Shuffle neben dem eigenen Gold (`.hand-rechts`). Neben dem
+              Avatar machte ein langes „SURRENDER" den Cluster zu breit. */}
           <div className="game-hand-topright">
-            <VolumeControl />
-            <div className="game-gold-display">
-              <span className="game-gold-icon">🪙</span>
-              <span className={'game-gold-value orbit-font' + (goldCrash ? (goldCrashTone === 'recover' ? ' gold-recovering' : ' gold-crashing') : '') + (goldIsNegative(goldCrash ? goldCrash[oppIdx] : opp.gold) ? ' gold-negative' : '')} data-gold-player={oppIdx}>{formatGold(goldCrash ? goldCrash[oppIdx] : opp.gold)}</span>
+            {isSpectator ? (
+              <button className="btn btn-danger game-hand-quit" onClick={handleLeave}>
+                👁 ✕ LEAVE
+              </button>
+            ) : cubeMatchInfo && !result ? (
+              // Cube tournament match — surrender ends the WHOLE match (Bo-set
+              // included), not just the current game. Player keeps parent-room
+              // membership and becomes a spectator like other eliminated players.
+              // Beschriftung kurz (26.9.): der Knopf muss in die Gold-Zone
+              // passen; dass es das ganze Match ist, sagen Tooltip und Box.
+              <button className="btn btn-danger game-hand-quit"
+                onClick={() => setShowSurrender(true)} title="Forfeit this match — you stay in the cube as a spectator">
+                🏳 SURRENDER
+              </button>
+            ) : (
+              <button className="btn btn-danger game-hand-quit" onClick={() => result ? handleLeave() : setShowSurrender(true)}>
+                {result ? '✕ LEAVE' : gameState.isPuzzle ? '✕ EXIT' : '⚑ SURRENDER'}
+              </button>
+            )}
+            <div className="game-hand-topright-spalte">
+              <VolumeControl />
+              <div className="game-gold-display">
+                <span className="game-gold-icon">🪙</span>
+                <span className={'game-gold-value orbit-font' + (goldCrash ? (goldCrashTone === 'recover' ? ' gold-recovering' : ' gold-crashing') : '') + (goldIsNegative(goldCrash ? goldCrash[oppIdx] : opp.gold) ? ' gold-negative' : '')} data-gold-player={oppIdx}>{formatGold(goldCrash ? goldCrash[oppIdx] : opp.gold)}</span>
+              </div>
             </div>
           </div>
         </div>

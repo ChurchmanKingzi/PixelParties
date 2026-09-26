@@ -3266,19 +3266,31 @@ body:has(.anim-backdrop) .pp-bg-particles { display: none; }
      4 px 12 px, rund 18 px hoch). Das Doppelte davon ist die Untergrenze,
      darueber waechst er mit dem Massstab mit — sonst waere er am Telefon
      (Floor 0.59) kleiner als vorher. */
-  padding: max(8px, calc(10px * var(--board-scale))) max(16px, calc(22px * var(--board-scale)));
+  /* 26.9.: seitlich 16 statt 22 — rechts in der Gold-Zone muss der
+     Knopf vor dem Trennstrich enden (auch bei 1366 px Breite). */
+  padding: max(8px, calc(10px * var(--board-scale))) max(12px, calc(16px * var(--board-scale)));
   font-size: max(13px, calc(16px * var(--board-scale)));
   white-space: nowrap;
 }
+/* ★ Als Vorgabe 26.9.: die rechte Gruppe ist jetzt das Gegenstueck zu
+   `.hand-rechts` der eigenen Zeile — links der Aufgabe-/Exit-Knopf
+   (wie Sort/Shuffle), rechts daneben Lautstaerke ueber Gold
+   (`.game-hand-topright-spalte`), mittig in der Zeile. */
 .game-hand-topright {
   position: absolute;
-  right: calc(12px * var(--board-scale));
-  top: calc(10px * var(--board-scale));
+  right: calc(16px * var(--board-scale));
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  gap: calc(12px * var(--board-scale));
+  z-index: 3;
+}
+.game-hand-topright-spalte {
   display: flex;
   flex-direction: column;
   align-items: flex-end;
   gap: calc(8px * var(--board-scale));
-  z-index: 3;
 }
 /* Dasselbe fuer die Goldanzeige: im Cluster steht sie in der Spalte,
    nicht mehr am rechten Rand der Zeile. */
@@ -16034,7 +16046,10 @@ body:has(.textbox-overlay) .tooltip {
   /* v1259: Knopf ueber dem Avatar — in der ~70-px-Zeile des Telefons
      etwas kleiner (Als Freigabe: „kannst du den Button auch etwas
      kleiner machen, bis es passt"). */
-  .game-hand-quit { padding: 4px 10px; font-size: 10px; }
+  /* 26.9.: der Knopf steht jetzt rechts in der 320er-Zone neben Regler
+     und Gold — so klein wie Sort/Shuffle, sonst laeuft er ueber den
+     Trennstrich. */
+  .game-hand-quit { padding: 3px 5px; font-size: 8px; }
   /* v1261: Am Telefon (Floor 0.59) passen Gold (~100 px) und Sort/Shuffle
      nicht in die 260er-Zone — Zone auf 320, Striche auf 306, Knoepfe
      kleiner und weiter innen. Beide Zeilen gleich, die Striche bleiben
@@ -16047,11 +16062,11 @@ body:has(.textbox-overlay) .tooltip {
   .hand-rechts { gap: calc(10px * var(--board-scale)); }
   .hand-actions { gap: 3px; }
   .hand-action-btn { font-size: 9px !important; padding: 3px 7px !important; min-height: 0 !important; }
-  /* Der linke Cluster bleibt mittig (Knopf neben dem Avatar, 26.9.). */
-  .game-hand-topright { top: 2px; }
-  .game-hand-topright .volume-btn { font-size: 22px; padding: 2px 6px; }
+  /* Beide Cluster bleiben mittig in ihrer Zeile (26.9.). */
+  .game-hand-topright .volume-btn { font-size: 22px; padding: 0 6px; }
   .game-hand-namensspalte { gap: 3px; }
-  .game-hand-topright { gap: 2px; }
+  .game-hand-topright { gap: 4px; }
+  .game-hand-topright-spalte { gap: 2px; }
   .game-hand-me {
     position: absolute; bottom: 0; left: 0; right: 0;
     background: rgba(12, 12, 20, .55) !important;
