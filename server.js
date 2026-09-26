@@ -10246,6 +10246,9 @@ async function doConfirmPotion(room, pi, { selectedIds }) {
         // v353: `'hand'` — der Spieler setzt die Karte gerade selbst aus
         // der Hand ein (Book of Doom & Co). Nur der GEGNER sieht sie.
         room.engine.announceActiveEffect(potionName, pi, 'hand');   // v347
+        // v1444: Defending the Gate, sobald ein Ziel in einer gegnerischen
+        // Support Zone liegt (Dark Gear & alle anderen zielenden Karten).
+        await room.engine.gateVorZielen(pi, potionName, selectedIds, validTargets);
         return await script.resolve(room.engine, pi, selectedIds, validTargets);
       } : null,
     });

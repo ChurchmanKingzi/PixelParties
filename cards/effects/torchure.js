@@ -1,45 +1,29 @@
 // ═══════════════════════════════════════════
 //  CARD EFFECT: "Torchure"
-//  Spell (Magic Arts Lv3) — Inherent additional
-//  Action, Main Phase 1 only.
-//  Inflict 2 Poison Stacks (permanent) on one
-//  of your own unpoisoned Heroes.
-//  Grants 1 bonus main Action during Action Phase.
+//  Spell (Magic Arts Lv1)
+//
+//  "Inflict 4 Stacks of Poison to a Hero you control that is not
+//   Poisoned to play this card. During your next turn, if that Hero
+//   is still Poisoned from this effect, you may perform an additional
+//   Action during your Action Phase. This counts as an additional
+//   Action."   (Text Al 26.9., v1444 — vorher Lv3, 2 Stacks, zweite
+//   Action im SELBEN Zug, nur in Main Phase 1)
+//
+//  Das Gift traegt die Marke `_torchure = { owner, turn }`. Den
+//  naechsten eigenen Zug haelt `engine._torchureZugMerken` fest, die
+//  Zusatz-Action (`_bonusMainActions`, zweiter Platz der Action Phase)
+//  gibt `engine._torchureZusatz` zu Beginn der Action Phase — nur wenn
+//  der Held dann noch lebt und DIESES Gift noch traegt.
 // ═══════════════════════════════════════════
+
+const POISON_STACKS = 4;
 
 module.exports = {
   requiresTarget: true,
   // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
 
-  // ── CPU-Bewertung ────────────────────────────────────────────────
-  // Als Trainings-Befund (Dance of the Butterflies, 1360 Spiele):
-  // Torchure lag in 960 Spielen auf der Hand und wurde 6× gespielt
-  // (0.01 Plays je Hand-Spiel — mit Abstand der niedrigste Wert des
-  // Decks). Der Grund ist eine Bewertungslücke: unmittelbar nach dem
-  // Cast sieht das Gate nur "eine Handkarte weniger". Die eigene
-  // Vergiftung ignoriert evaluateState bewusst, solange sie nicht
-  // tödlich ist, und der eigentliche Gewinn — `_bonusMainActions = 1`,
-  // also eine ZWEITE Action in der Action Phase — taucht in der
-  // Bewertung überhaupt nicht auf. Ergebnis: kleiner sichtbarer
-  // Nachteil, unsichtbarer Vorteil, das Gate skippt zuverlässig.
-  //
-  // `evaluateThroughTurnEnd` spielt vor der Bewertung den Rest des
-  // eigenen Zuges aus — die geschenkte Action wird dabei tatsächlich
-  // genutzt und ihr Gewinn damit sichtbar. Passt exakt, weil die
-  // Auszahlung im SELBEN Zug liegt (anders als bei Flashbang, wo nur
-  // alwaysCommit hilft). Die höhere Schwelle dieses Modus (30) ist
-  // hier erwünscht: die Vergiftung ist permanent, der Tausch soll sich
-  // also spürbar lohnen und nicht bei jedem Mini-Plus stattfinden.
-  cpuMeta: { evaluateThroughTurnEnd: true },
-
-  // Inherent only during Main Phase 1
-  inherentAction(gs) {
-    return gs.currentPhase === 2; // PHASES.MAIN1
-  },
-
-  // Gray out when not Main Phase 1 or no unpoisoned heroes
+  // Kosten: ein eigener, lebender, nicht vergifteter Held muss da sein.
   spellPlayCondition(gs, pi) {
-    if (gs.currentPhase !== 2) return false;
     const ps = gs.players[pi];
     return (ps.heroes || []).some(h => h?.name && h.hp > 0 && !h.statuses?.poisoned);
   },
@@ -65,7 +49,7 @@ module.exports = {
         // `stat:blocked`, damit `targetPriors` je Karte lernt, wie stark
         // das Haften die Schadens-Rangfolge verschiebt.
         appliesStatus: 'poisoned',
-        description: 'Choose one of your Heroes to Poison (2 stacks, permanent).',
+        description: `Choose one of your Heroes to Poison (${POISON_STACKS} stacks, permanent). If it is still Poisoned during your next turn, you get an additional Action.`,
         confirmLabel: '\u2620\uFE0F Torchure!',
         confirmClass: 'btn-danger',
         cancellable: true,
@@ -80,10 +64,11 @@ module.exports = {
         return;
       }
 
-      // Apply 2 stacks of permanent Poison
+      // 4 Stacks, dauerhaft; die Marke reitet am Gift-Status mit.
       await engine.addHeroStatus(pi, target.heroIdx, 'poisoned', {
-        stacks: 2,
+        stacks: POISON_STACKS,
         permanent: true,
+        _torchure: { owner: pi, turn: gs.turn },
         appliedBy: pi,   // v1067: eigener Held — loest korrekt KEINEN Gegner-Trigger aus
       });
 
@@ -91,12 +76,6 @@ module.exports = {
         player: ps.username,
         hero: ps.heroes[target.heroIdx]?.name,
       });
-
-      // Grant the second-action grace slot. Does NOT stack with itself —
-      // casting Torchure multiple times still only grants ONE bonus action
-      // (the second slot of Action Phase). Consumption and slot-position
-      // checks are handled by the server's action handlers + engine.
-      ps._bonusMainActions = 1;
     },
   },
 };

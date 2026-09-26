@@ -97,8 +97,8 @@ function piercingOf(entry) {
  *  • **Echter Schaden** (`canBeNegated: false`, wie ihn
  *    `actionDealTrueDamage` erzeugt — Acid Vial, Rockfall): umgeht
  *    Buff-Multiplikatoren, Charme, Submerged und Baihu-Versteinerung.
- *    Absolut bleiben nur der Spielstart-Schutz und Carris'
- *    Selbstschaden-Immunitaet.
+ *    Absolut bleibt nur der Spielstart-Schutz (Carris' Immunitaet
+ *    greift seit v1444 nicht mehr gegen durchschlagenden Schaden).
  *  • **Gewoehnlicher Schaden**: Multiplikatoren und alle pauschalen
  *    Sperren greifen; `magic_immune` blockt Zauber bis zur eigenen
  *    Stufe, sofern der Schaden nicht un-negierbar ist.
@@ -110,7 +110,9 @@ function predictedDamage(engine, hero, pi, entry, piercing) {
 
   // Fuer BEIDE Wege absolut.
   if (gs.firstTurnProtectedPlayer === pi) return 0;
-  if (engine._isHeroSelfDamageImmune?.(hero)) return 0;
+  // Carris (v1444): nur gegen Schaden, der sich verhindern laesst.
+  if (!piercing.trueDamage && !piercing.cannotBeNegated && !piercing.cannotBeReduced
+      && engine._isHeroSelfDamageImmune?.(hero)) return 0;
 
   if (piercing.trueDamage) return amount;      // alles Weitere umgeht er
 
