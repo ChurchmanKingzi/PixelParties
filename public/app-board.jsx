@@ -18493,6 +18493,89 @@ const ANIM_REGISTRY = {
       );
     };
   })(),
+  // ★ „Petrifier" (Als Vorgabe 26.9.: „eine dunkle Magie, die das Ziel
+  // in Stein verwandelt"). Laeuft NACH dem dunklen Stoss vom Wirker
+  // (`darkBlast`, siehe petrifier.js) auf dem Ziel, ~1,7 s:
+  //   0–450 ms   Runensiegel oeffnet sich unter dem Ziel, dunkler Dunst
+  //   150–800    violett-schwarze Ranken kriechen von unten hoch
+  //   350–1100   die Steinschicht steigt von unten nach oben — sie graut
+  //              das ECHTE Ziel darunter aus (`backdrop-filter`), eine
+  //              glimmende Front laeuft mit
+  //   1000–1300  Risse zeichnen sich ein
+  //   ab 1150    dumpfer Blitz, Splitter broeckeln ab, dunkle Funken
+  // Danach uebernimmt die bleibende Versteinerungs-Optik (`_petrified`).
+  // Liest `x`/`y` (Mitte) und `w`/`h` wie `stone_break`.
+  petrifier_fluch: (() => {
+    return function PetrifierFluchEffekt({ x, y, w, h }) {
+      const W = w || 100, H = h || 140;
+      const ranken = useMemo(() => {
+        const n = ppFxN(7);
+        return Array.from({ length: n }, (_, i) => ({
+        links: -W / 2 + W * (0.08 + (i / Math.max(1, n - 1)) * 0.84),
+        hoehe: H * (0.45 + ((i * 37) % 40) / 100),
+        dreh: (i % 2 ? 1 : -1) * (5 + ((i * 13) % 11)),
+        verzug: 150 + (i % 4) * 70,
+      }));
+      }, [W, H]);
+      const splitter = useMemo(() => Array.from({ length: ppFxN(14) }, (_, i) => ({
+        sx: -W / 2 + W * (((i * 41) % 100) / 100),
+        sy: -H / 2 + H * (((i * 67) % 100) / 100),
+        dx: ((i % 2 ? 1 : -1) * (6 + (i * 7) % 22)),
+        dy: 26 + ((i * 11) % 30),
+        g: 3 + (i % 4) * 2,
+        dreh: (i % 2 ? 1 : -1) * (90 + i * 20),
+        verzug: 1150 + (i % 5) * 50,
+        ton: ['#8e8e8e', '#6a6a6a', '#a3a3a3', '#767676'][i % 4],
+      })), [W, H]);
+      const funken = useMemo(() => Array.from({ length: ppFxN(10) }, (_, i) => ({
+        sx: -W / 2 + W * (((i * 29) % 100) / 100),
+        verzug: 1150 + (i % 6) * 60,
+        hoch: 40 + (i * 13) % 50,
+      })), [W, H]);
+      // Risse als SVG-Pfade im Kartenmass (0..100 x 0..140).
+      const risse = [
+        'M50 8 L44 30 L54 46 L40 70 L50 92 L42 118 L48 134',
+        'M44 30 L22 38 L12 56',
+        'M54 46 L78 52 L88 72',
+        'M40 70 L20 84 L8 100',
+        'M50 92 L72 104 L90 126',
+      ];
+      return (
+        <div className="pfluch" style={{ left: x, top: y, '--pw': W + 'px', '--ph': H + 'px' }} aria-hidden="true">
+          <span className="pfluch-siegel" />
+          <span className="pfluch-siegel pfluch-siegel2" />
+          <span className="pfluch-dunst" />
+          {ranken.map((r, i) => (
+            <span key={'pr' + i} className="pfluch-ranke" style={{
+              left: r.links, top: H / 2, height: r.hoehe,
+              '--rdreh': r.dreh + 'deg', animationDelay: r.verzug + 'ms',
+            }} />
+          ))}
+          <span className="pfluch-stein" />
+          <span className="pfluch-front" />
+          <svg className="pfluch-risse" viewBox="0 0 100 140" preserveAspectRatio="none"
+            style={{ left: -W / 2, top: -H / 2, width: W, height: H }}>
+            {risse.map((d, i) => (
+              <path key={'rs' + i} d={d} pathLength="100" style={{ animationDelay: (1000 + i * 45) + 'ms' }} />
+            ))}
+          </svg>
+          <span className="pfluch-blitz" />
+          {splitter.map((b, i) => (
+            <span key={'ps' + i} className="pfluch-splitter" style={{
+              left: b.sx, top: b.sy, width: b.g, height: b.g * 0.85, background: b.ton,
+              '--bx': b.dx + 'px', '--by': b.dy + 'px', '--bdreh': b.dreh + 'deg',
+              animationDelay: b.verzug + 'ms',
+            }} />
+          ))}
+          {funken.map((f, i) => (
+            <span key={'pf' + i} className="pfluch-funke" style={{
+              left: f.sx, top: H / 2 - 6, '--fh': -f.hoch + 'px', animationDelay: f.verzug + 'ms',
+            }} />
+          ))}
+        </div>
+      );
+    };
+  })(),
   petrify: (() => {
     return function PetrifyEffect({ x, y, w, h }) {
       const cw = w || 100;

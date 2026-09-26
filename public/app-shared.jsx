@@ -1438,6 +1438,13 @@ const ZONE_ANIM_SFX = {
   golden_ankh_revival:     { name: 'revive' },
   // Dark
   petrify:                 { name: 'elem_dark' },
+  // Petrifier (26.9.): dunkle Magie tief und sofort (Siegel + Ranken),
+  // dann der dumpfe Schlag, wenn der Stein oben ankommt (1150 ms minus
+  // 100 ms Einbau-Versatz). Zweite Lage ohne Kategorie (CARD_API ⑤).
+  petrifier_fluch: [
+    { name: 'elem_dark',    opts: { rate: 0.55, volume: 1.0 } },
+    { name: 'heavy_impact', opts: { rate: 0.7, volume: 0.9, delay: 1050, category: null, dedupe: 900 } },
+  ],
   stone_break:             { name: 'heavy_impact', opts: { rate: 1.2 } },   // v1164
   spooky_ghost:            { name: 'elem_dark' },
   death_skulls:            { name: 'elem_dark' },
