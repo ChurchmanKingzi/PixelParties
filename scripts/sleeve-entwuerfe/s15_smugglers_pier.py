@@ -43,7 +43,7 @@ def comp_occ(a, sprite, x, y, ycut):
     comp(a, Image.fromarray(sa, 'RGBA'), x, y)
 
 
-def dusk(sp, k=(0.74, 0.66, 0.82), add=(8, 4, 18), rim=(255, 150, 92), rim_amt=0.5):
+def dusk(sp, k=(0.84, 0.76, 0.86), add=(6, 2, 14), rim=(255, 156, 96), rim_amt=0.45):
     """Sprite in Abendlicht tauchen: dunkler/violetter, warme Lichtkante rechts (Sonne rechts)."""
     s_ = np.array(sp).astype(float)
     al = s_[..., 3] > 0
@@ -177,22 +177,25 @@ sea = np.clip(s2, 0, 255).astype(np.uint8)
 a[HY:] = sea[HY:]
 a[HY, :] = P((238, 150, 102))
 
-# Glitzerpfad unter der Sonne
-rg = random.Random(21)
-for y in range(HY + 1, H):
-    qq = (y - HY) / (H - HY)
-    half = 5 + qq * 60
-    cx = SUN_X + (y - HY) * 0.25
-    for _ in range(int(2 + half * 0.3)):
-        if rg.random() > 0.75 * (1 - qq) ** 1.2 + 0.1:
-            continue
-        x = int(cx + rg.gauss(0, half * 0.42))
-        if wave[y, min(W - 1, max(0, x))] < 0.5:
-            continue
-        ln = max(1, int(rg.uniform(1, 2 + qq * 7)))
-        col = (255, 228, 156) if abs(x - cx) < half * 0.4 else (250, 172, 112)
-        for i in range(ln):
-            px(a, x + i, y, col)
+# Glitzerpfad unter der Sonne: Wellenkämme leuchten in einer Bahn zum Betrachter auf
+qq = np.clip((YY - HY) / (H - HY), 0, 1)
+cxp = SUN_X + (YY - HY) * 0.22
+half = 7 + qq * 34
+g = np.exp(-((XX - cxp) / half) ** 2) * (1 - qq * 0.35)
+sea_m = YY > HY
+gl1 = sea_m & (wave > 1 - 0.5 * g)
+gl2 = sea_m & (wave > 1 - 0.36 * g)
+gl3 = sea_m & (wave > 1 - 0.26 * g) & (g > 0.5)
+setm(a, gl1, (212, 116, 112))
+setm(a, gl2, (250, 176, 112))
+setm(a, gl3, (255, 230, 160))
+# helle Säule direkt unter der Sonne
+for k in range(1, 9):
+    y = HY + k
+    hw = int(round(SUN_R * (1 - k / 10)))
+    for x in range(SUN_X - hw, SUN_X + hw + 1):
+        if (x + k * 3) % (2 + k // 3) != 0 and wave[y, x] > 0.35:
+            px(a, x, y, (255, 226, 152) if abs(x - SUN_X) < hw * 0.6 else (250, 180, 112))
 SEA_REF = a.copy()
 
 
@@ -327,65 +330,82 @@ px(a, LX, ty - 6, (34, 20, 44))
 LH_LIGHT = (LX, ty - 2)
 
 # ================================================================ SCHIFF
-def ship(a, x0, ybase):
-    D = (40, 22, 52)
-    RIM = (226, 124, 100)
-    m = np.zeros((40, 44), bool)
-    # Rumpf (Bug links)
-    for i in range(34):
-        top = 30 if i < 26 else 27
-        if i < 3:
-            top = 29 + (3 - i) // 2
-        bot = 34 if 3 <= i <= 31 else 33
-        m[top:bot + 1, 5 + i] = True
-    m[32:35, 5] = False; m[34, 6] = False
-    for i in range(6):                           # Bugspriet
-        m[28 - i // 2, i] = True
-    for mx, mh in ((16, 26), (30, 24)):          # Masten
-        m[30 - mh:30, mx] = True
-    # Rahsegel
-    for mx, mh, ww in ((16, 26, (5, 7, 8)), (30, 24, (5, 6, 7))):
-        y = 30 - mh + 2
-        for j, hw in enumerate(ww):
-            hs = 5 if j == 2 else 4
-            for k in range(hs):
-                bulge = 1 if 0 < k < hs - 1 else 0
-                m[y + k, mx - hw - bulge:mx + hw + 1 + bulge] = True
-            y += hs + 1
+def ship_img():
+    """Brigg-Silhouette (Bug links) mit geblähten Rahsegeln, Klüver, Wanten, Heckfenstern."""
+    Wd, Hd = 48, 42
+    mi = Image.new('L', (Wd, Hd), 0)
+    d = ImageDraw.Draw(mi)
+    HB = 38                                 # Wasserlinie
+    # Rumpf
+    hull = [(5, HB - 6), (9, HB - 5), (20, HB - 4), (32, HB - 4), (38, HB - 5), (38, HB - 8), (43, HB - 8),
+            (43, HB - 3), (41, HB), (11, HB), (7, HB - 3)]
+    d.polygon(hull, fill=1)
+    d.line([(0, HB - 9), (7, HB - 6)], fill=2)                      # Bugspriet
+    MASTS = [(15, 33), (31, 35)]
+    for mx, mh in MASTS:
+        d.line([(mx, HB - 4 - mh), (mx, HB - 5)], fill=1)
+    for (mx, mh), sails in zip(MASTS, [[(3, 4), (5, 5), (6, 6)], [(4, 4), (5, 5), (7, 6)]]):
+        y = HB - 4 - mh + 3
+        for hw, hs in sails:
+            d.line([(mx - hw - 1, y), (mx + hw + 1, y)], fill=1)          # Rah
+            poly = [(mx - hw, y), (mx + hw, y), (mx + hw + 2, y + hs * 0.55), (mx + hw, y + hs),
+                    (mx, y + hs + 1), (mx - hw, y + hs), (mx - hw + 1, y + hs * 0.5)]
+            d.polygon(poly, fill=1)
+            y += hs + 3
     # Klüver
-    for k in range(12):
-        m[17 + k, 1 + 5 - k // 3 + 4: 16] = True if k > 2 else False
-        m[17 + k, 16 - k // 1 - 1:16] = True
-    ys, xs = np.nonzero(m)
-    for y, x in zip(ys, xs):
-        px(a, x0 + x, ybase - 34 + y, D)
-    # Lichtkanten (Sonne rechts)
-    for y, x in zip(ys, xs):
-        if x + 1 >= m.shape[1] or not m[y, x + 1]:
-            if y < 30:
-                px(a, x0 + x, ybase - 34 + y, (146, 64, 92))
-    for i in range(6, 38):
-        if m[30 if i < 31 else 27, i]:
-            pass
-    for i in range(8, 38):
-        yt = min(np.nonzero(m[27:, i])[0]) + 27 if m[27:, i].any() else None
-        if yt is not None and yt >= 27:
-            px(a, x0 + i, ybase - 34 + yt, (120, 56, 84) if i < 30 else RIM)
-    # Heckfenster + Laterne
-    for (xx_, yy_) in ((33, 29), (35, 29), (37, 29)):
-        px(a, x0 + xx_, ybase - 34 + yy_, (255, 204, 120))
-    px(a, x0 + 39, ybase - 34 + 26, (255, 230, 160))
-    return m
+    d.polygon([(2, HB - 10), (13, HB - 32), (10, HB - 9)], fill=1)
+    # Wimpel
+    d.line([(31, HB - 40), (35, HB - 40)], fill=1)
+    d.line([(31, HB - 39), (33, HB - 39)], fill=1)
+    # Stage
+    d.line([(15, HB - 37), (31, HB - 39)], fill=2)
+    d.line([(31, HB - 39), (42, HB - 9)], fill=2)
+    m = np.array(mi)
+    for x in (37, 39, 41):
+        m[HB - 3, x] = 3
+    m[HB - 10, 43] = 3
+    return m, HB
 
 
-SHIP_X = 128
-ship(a, SHIP_X, HY + 1)
-# Spiegelung des Schiffs (gebrochen)
+def draw_ship(a, x0, ybase):
+    m, HB = ship_img()
+    D = (36, 18, 44)
+    FINE = (70, 34, 66)
+    for (y, x) in zip(*np.nonzero(m)):
+        X, Y = x0 + x, ybase - HB + y
+        v = m[y, x]
+        if v == 1:
+            px(a, X, Y, D)
+        elif v == 2:
+            px(a, X, Y, FINE)
+        elif v == 3:
+            px(a, X, Y, (255, 208, 124))
+    # Sonnenkante an den rechten Segelrändern
+    for (y, x) in zip(*np.nonzero(m == 1)):
+        if x + 1 < m.shape[1] and m[y, x + 1] == 0 and y < HB - 5:
+            px(a, x0 + x, ybase - HB + y, (120, 52, 82))
+    # Laternenschein
+    return m, HB
+
+
+SHIP_X = 126
+SHIPM, _ = draw_ship(a, SHIP_X, HY + 1)
+# Spiegelung des Schiffs (gespiegelt, von Wellen zerrissen)
 rsh = random.Random(31)
-for y in range(HY + 2, HY + 12):
-    for x in range(SHIP_X + 4, SHIP_X + 40):
-        if rsh.random() < 0.55 - (y - HY) * 0.045 and wave[y, x] < 0.6:
-            a[y, x, :3] = (a[y, x, :3].astype(int) * 0.4 + np.array([40, 22, 52]) * 0.6).astype(np.uint8)
+_, SHB = ship_img()
+for k in range(1, 22):
+    y = HY + 1 + k
+    my = SHB - k
+    if my < 0:
+        break
+    sh = rsh.choice([-1, 0, 0, 1]) if k > 3 else 0
+    for x in range(SHIPM.shape[1]):
+        if SHIPM[my, x] in (1, 3) and wave[y, SHIP_X + x] < 0.62 and rsh.random() > k / 22 * 0.7:
+            X = SHIP_X + x + sh
+            if SHIPM[my, x] == 3:
+                a[y, X, :3] = (250, 180, 110)
+            else:
+                a[y, X, :3] = (a[y, X, :3].astype(int) * 0.45 + np.array([40, 20, 52]) * 0.55).astype(np.uint8)
 
 # ================================================================ STEG
 Zd = np.where(YY > HY, DH / np.maximum(YY - HY, 1e-3), 1e9)
@@ -425,12 +445,43 @@ dkf = dk.astype(float)
 tintc = np.array([150, 84, 104])
 mix = dither_mask(None, far * 0.55)
 dkf[mix, :3] = dkf[mix, :3] * 0.55 + tintc * 0.45
-dkf[..., :3] = dkf[..., :3] * np.array([0.78, 0.7, 0.84]) + np.array([8, 4, 16])
+dkf[..., :3] = dkf[..., :3] * np.array([0.84, 0.76, 0.86]) + np.array([6, 2, 14])
 a[deck] = np.clip(dkf, 0, 255).astype(np.uint8)[deck]
 # Kanten: linke/rechte Deckkante dunkel, Stirnkante hell
 edgeL = deck & ~np.roll(deck, 1, 1)
 edgeR = deck & ~np.roll(deck, -1, 1)
 setm(a, edgeL | edgeR, (23, 12, 3))
+DECK_TMP = deck
+# Stirnbalken-Oberkante (heller Streifen innen an den Kanten)
+inL = deck & np.roll(edgeL, 1, 1)
+inR = deck & np.roll(edgeR, -1, 1)
+setm(a, inL & (YY > sy(ZEND) + 2), (122, 82, 44))
+setm(a, inR & (YY > sy(ZEND) + 2), (170, 112, 66))
+# Nägel an den Plankenstößen, etwas Moos in den Fugen
+pw = (XR - XL) / NPL
+rn = random.Random(12)
+for p_ in range(NPL):
+    zj = 1 - joints[p_]
+    while zj < ZEND:
+        if zj > 1.0:
+            y = int(round(sy(zj)))
+            xa = sx(zj, XL + p_ * pw); xb = sx(zj, XL + (p_ + 1) * pw)
+            if xb - xa >= 7 and y + 1 < H:
+                for xn in (int(xa) + 2, int(xb) - 2):
+                    if DECK_TMP[y + 1, xn]:
+                        px(a, xn, y + 1, (118, 120, 132))
+                    if xb - xa >= 11 and DECK_TMP[y + 1, xn] and y + 2 < H:
+                        px(a, xn, y + 2, (58, 56, 66))
+        zj += jl
+for _ in range(90):
+    y = rn.randrange(int(sy(ZEND)) + 2, H)
+    x = rn.randrange(0, W)
+    if (gap | joint)[y, x] and deck[y, x]:
+        px(a, x, y, (52, 74, 34) if rn.random() < 0.6 else (72, 104, 44))
+# Vignette unten
+vg = np.clip((YY - 290) / 60, 0, 1) * 0.55
+vm = deck & dither_mask(None, vg)
+a[vm, :3] = (a[vm, :3] * 0.82).astype(np.uint8)
 yend = int(round(sy(ZEND)))
 DECK = deck.copy()
 
@@ -609,10 +660,11 @@ water_sprite(a, ROCK, 206, 338)
 # ================================================================ LATERNEN
 LK = {'k': (28, 18, 26), 'K': (92, 66, 58), 'W': (255, 248, 214), 'Y': (255, 214, 120), 'y': (240, 150, 60)}
 LSPR = {
-    'big': ["...k...", "..kkk..", ".kkKkk.", ".kWYyk.", ".kYYyk.", ".kyyyk.", ".kkkkk.", "..kkk.."],
-    'med': ["..k..", ".kkk.", "kWYyk", "kYyyk", ".kkk."],
-    'small': [".k.", "kYk", "kyk"],
-    'tiny': ["k", "Y"],
+    'big': ["....k....", "...kKk...", "..kkkkk..", ".kkKKKkk.", ".kWWkYyk.", ".kWYkYyk.", ".kYYkyyk.",
+            ".kYykyyk.", ".kkkkkkk.", "..kKKKk..", "...kkk..."],
+    'med': ["...k...", "..kkk..", ".kKKKk.", ".kWYyk.", ".kYYyk.", ".kkkkk.", "..kkk.."],
+    'small': ["..k..", ".kkk.", "kWYyk", "kYyyk", ".kkk."],
+    'tiny': [".k.", "kYk", "kyk"],
 }
 
 
@@ -626,20 +678,32 @@ def lantern_img(kind):
     return Image.fromarray(o, 'RGBA')
 
 
-def warm_glow(a, cx, cy, r, strength, col=(255, 168, 86), amt=0.45, only=None):
-    d = np.hypot(XX - cx, (YY - cy) * 1.05)
-    t = np.clip(1 - d / r, 0, 1) ** 1.6 * strength
-    m = dither_mask(None, t) & (d < r)
+def warm_glow(a, cx, cy, r, strength=1.0, add=(200, 112, 24), only=None, water_glint=True):
+    """Weicher Laternenschein: additives warmes Licht in 4 geditherten Stufen auf Holz & Co.;
+    auf dem Wasser leuchten stattdessen die Wellenkämme orange auf."""
+    d = np.hypot(XX - cx, (YY - cy) * 1.05) / r
+    t = np.clip(1 - d, 0, 1) ** 1.5 * strength
+    lv = np.floor(t * 4 + BAYER4[YY % 4, XX % 4] * 0.999) / 4
+    ai = a[..., :3].astype(int)
+    isw = (ai[..., 2] > ai[..., 0] + 50) & (YY > HY) & ~DECK
+    m = (lv > 0) & (d < 1) & ~isw
     if only is not None:
         m &= only
+    amt = (lv * 0.55)[m][:, None]
     c = a[m, :3].astype(float)
-    a[m, :3] = np.clip(c * (1 - amt) + np.array(col) * amt, 0, 255).astype(np.uint8)
+    a[m, :3] = np.clip(c + np.array(add) * amt, 0, 255).astype(np.uint8)
+    if water_glint:
+        tw = np.clip(1 - d, 0, 1) * strength
+        g1 = isw & (d < 1) & (wave > 1 - 0.45 * tw)
+        g2 = isw & (d < 1) & (wave > 1 - 0.3 * tw)
+        setm(a, g1, (196, 104, 110))
+        setm(a, g2, (244, 150, 84))
 
 
 for (z, side, cx, y0, w) in sorted(LANT, key=lambda l: -l[0]):
     kind = 'big' if w >= 8 else 'med' if w >= 6 else 'small' if w >= 4 else 'tiny'
     li = lantern_img(kind)
-    arm = {'big': 5, 'med': 3, 'small': 2, 'tiny': 1}[kind]
+    arm = {'big': 6, 'med': 4, 'small': 3, 'tiny': 2}[kind]
     ay = y0 + max(1, w // 5) + 1
     if side == 'L':
         ax0, ax1 = int(round(cx - w / 2)) - arm, int(round(cx - w / 2)) - 1
@@ -654,25 +718,23 @@ for (z, side, cx, y0, w) in sorted(LANT, key=lambda l: -l[0]):
         px(a, ax0 if side == 'L' else ax1, ay - 1, (44, 24, 14))
     ly = ay + 1
     gx, gy = lx + li.width / 2, ly + li.height / 2
-    rr = {'big': 16, 'med': 11, 'small': 7, 'tiny': 5}[kind]
-    warm_glow(a, gx, gy, rr, 0.85)
-    warm_glow(a, gx, gy, rr * 0.5, 1.0, col=(255, 200, 120), amt=0.35)
+    rr = {'big': 30, 'med': 20, 'small': 13, 'tiny': 8}[kind]
+    warm_glow(a, gx, gy, rr, 1.5)
+    warm_glow(a, gx, gy, rr * 0.4, 1.2, add=(120, 90, 40), water_glint=False)
     comp(a, li, lx, ly)
-    # Spiegelung im Wasser
+    # Spiegelung im Wasser: Wellenkämme unter der Laterne leuchten auf
     yw = int(round(HY + (DH + WATER) / z))
-    rl = random.Random(int(z * 1000))
-    L = {'big': 34, 'med': 20, 'small': 10, 'tiny': 6}[kind]
-    for k in range(2, L):
-        y = yw + k
-        if y >= H - 7:
-            break
-        if rl.random() < 0.35 + k / L * 0.4:
-            continue
-        ln = max(1, int(rl.uniform(1, li.width * (1 - k / L) + 1)))
-        x = int(gx - ln / 2 + rl.choice([-1, 0, 0, 1]))
-        col = (255, 214, 130) if k < L * 0.4 else (236, 146, 80)
-        for i in range(ln):
-            wpx(a, x + i, y, col)
+    L = {'big': 46, 'med': 28, 'small': 16, 'tiny': 9}[kind]
+    hw = li.width * 0.9
+    for y in range(yw + 1, min(H - 6, yw + L)):
+        k = (y - yw) / L
+        for x in range(int(gx - hw * 2), int(gx + hw * 2) + 1):
+            if not (0 <= x < W) or DECK[y, x]:
+                continue
+            gg = np.exp(-((x - gx) / (hw * (0.7 + k))) ** 2) * (1 - k)
+            if wave[y, x] > 1 - 0.42 * gg:
+                a[y, x] = P((255, 214, 130) if gg > 0.55 else (236, 140, 72))
+
 
 # ================================================================ DECKLADUNG (Area-Sprites 1x)
 def crate():
@@ -733,6 +795,154 @@ comp(a, dusk(CRATE), 37, 272)
 shadow_on_deck(a, 68, 88, 318)
 comp(a, dusk(BTOP), 67, 299)
 comp(a, dusk(COIL), 128, 300)
+
+
+# ================================================================ RUDERBOOT (links, am Steg vertäut)
+def rowboat():
+    """Kleines Schmugglerboot, 3/4-Draufsicht wie die Area-Sprites (Bug rechts)."""
+    L, Wb, SIDE = 32, 11, 3
+    Hh = Wb + SIDE + 3
+    o = np.zeros((Hh, L + 2, 4), np.uint8)
+    top = np.zeros((Hh, L + 2), bool)
+    cy = Wb / 2
+    for x in range(L):
+        f = x / (L - 1)
+        hw = (Wb / 2) * (1 - max(0, (f - 0.5) / 0.5) ** 1.7) * (0.8 + 0.2 * min(1, f / 0.1))
+        for y in range(Wb):
+            if abs(y + 0.5 - cy) <= hw + 0.1:
+                top[y + 1, x + 1] = True
+    inner = ndimage.binary_erosion(top, iterations=1)
+    inner2 = ndimage.binary_erosion(top, iterations=2)
+    rim = top & ~inner
+    side = np.zeros_like(top)
+    for x in range(L + 2):
+        ys = np.nonzero(top[:, x])[0]
+        if len(ys):
+            yb = ys.max()
+            f = x / (L + 1)
+            n = SIDE if f < 0.8 else max(1, round(SIDE * (1 - (f - 0.8) / 0.25)))
+            side[yb + 1:yb + 1 + n, x] = True
+    body = top | side
+    outl = ndimage.binary_dilation(body) & ~body
+    for y, x in zip(*np.nonzero(inner)):
+        o[y, x] = P((61, 36, 12))
+    for y, x in zip(*np.nonzero(inner2)):
+        o[y, x] = P((79, 48, 15) if (x + (y // 2)) % 6 else (61, 36, 12))
+    for y, x in zip(*np.nonzero(rim)):
+        o[y, x] = P((191, 140, 74) if y <= cy + 1 else (142, 96, 43))
+    for y, x in zip(*np.nonzero(side)):
+        yb = np.nonzero(top[:, x])[0].max()
+        k = y - yb
+        o[y, x] = P([(126, 85, 36), (111, 74, 30), (94, 61, 23)][min(2, k - 1)])
+    for y, x in zip(*np.nonzero(outl)):
+        o[y, x] = P((23, 12, 3))
+    # Ruderbänke
+    for bx in (8, 19):
+        for y in range(Hh):
+            if inner[y, bx]:
+                o[y, bx] = P((160, 110, 52)); o[y, bx + 1] = P((111, 74, 30))
+    # Ladung: Sack (links) und Kistchen (rechts)
+    sack = [".ss.", "sSSs", "sSSs", ".ss."]
+    for j, row in enumerate(sack):
+        for i, ch in enumerate(row):
+            if ch != '.':
+                o[4 + j, 12 + i] = P((210, 182, 134) if ch == 'S' else (163, 130, 80))
+    o[3, 13] = P((133, 102, 54))
+    for y in range(4, 9):
+        for x in range(22, 27):
+            edge = y in (4, 8) or x in (22, 26)
+            o[y, x] = P((88, 57, 22) if edge else ((226, 184, 112) if y == 5 else (181, 129, 63)))
+    # Ruder (liegt längs)
+    for i in range(10):
+        o[7 + (i // 6), 3 + i] = P((210, 182, 134))
+    return Image.fromarray(o, 'RGBA')
+
+
+BOAT = rowboat()
+BX, BY = 18, 206
+# Spiegelung/Schatten unter dem Boot
+bm = np.array(BOAT)[..., 3] > 0
+for k in range(1, 7):
+    y = BY + BOAT.height - 1 + k
+    for x in range(BOAT.width):
+        col_has = bm[:, x].any()
+        if col_has and (x + k) % (1 + k // 2) == 0 and wave[y, BX + x] < 0.6:
+            X = BX + x
+            if not DECK[y, X]:
+                a[y, X, :3] = (a[y, X, :3].astype(int) * 0.5 + np.array([10, 8, 30]) * 0.5).astype(np.uint8)
+comp(a, dusk(BOAT), BX, BY)
+# Schaumkranz
+for x in range(BX, BX + BOAT.width):
+    ys = np.nonzero(bm[:, x - BX])[0]
+    if len(ys) and (x * 7 % 5) < 2:
+        wpx(a, x, BY + ys.max() + 1, (140, 196, 255) if x % 2 else (207, 230, 255))
+# Festmacherleine zum Pfahl
+post_z = [p_ for p_ in POSTS if p_[1] == 'L' and abs(p_[0] - 2.66) < 0.05][0][0]
+tx, ty = sx(post_z, XL - 5) - 2, sy(post_z, 10)
+fx, fy = BX + BOAT.width - 2, BY + 6
+n = int(max(abs(tx - fx), abs(ty - fy)))
+for i in range(n + 1):
+    t_ = i / n
+    x = fx + (tx - fx) * t_
+    y = fy + (ty - fy) * t_ + 3 * math.sin(t_ * math.pi)
+    px(a, round(x), round(y), (150, 118, 76))
+# Bootslaterne am Heck
+bl = lantern_img('small')
+warm_glow(a, BX + 3, BY + 1, 11, 1.2)
+comp(a, bl, BX + 1, BY - 3)
+
+
+# ================================================================ MÖWEN
+GULLS = {
+    'up': ["#.......#", ".##...##.", "...#.#...", "....#...."],
+    'glide': ["##.....##", "..##.##..", "....#...."],
+    'small': ["#...#", ".#.#.", "..#.."],
+}
+for (kind, x, y, col) in [('up', 62, 124, (64, 30, 64)), ('glide', 78, 112, (60, 28, 62)), ('small', 96, 120, (92, 40, 78)),
+                          ('glide', 196, 70, (46, 24, 58)), ('small', 212, 80, (60, 30, 66)), ('small', 186, 88, (70, 34, 70))]:
+    for j, row in enumerate(GULLS[kind]):
+        for i, ch in enumerate(row):
+            if ch == '#':
+                px(a, x + i, y + j, col)
+
+# Möwe auf dem vordersten rechten Pfahl (Area-Sprite gull-side, 1x)
+GS = area(AREA + 'gull-side').crop((0, 0, 24, 15))
+gp = [p_ for p_ in POSTS if p_[1] == 'R'][-1]
+gz = gp[0]
+gcx = sx(gz, XR + 5)
+gtop = int(round(sy(gz, PH_UP)))
+comp(a, dusk(GS, k=(0.86, 0.8, 0.9), add=(4, 2, 12)), int(round(gcx - 13)), gtop - 14)
+
+# ================================================================ RAHMEN + TITEL
+img = Image.fromarray(a, 'RGBA')
+bevel_frame(img, (18, 9, 3), (191, 140, 74), (111, 74, 30), (61, 36, 12), (23, 12, 3), width=6)
+a = np.array(img)
+# Holzmaserung im Rahmen
+rf = random.Random(44)
+for _ in range(120):
+    side = rf.randrange(4)
+    if side < 2:
+        x = rf.randrange(8, W - 8); y = rf.choice([2, 3]) if side == 0 else rf.choice([H - 4, H - 3])
+        for k in range(rf.randint(2, 6)):
+            px(a, x + k, y, (94, 61, 23))
+    else:
+        y = rf.randrange(8, H - 8); x = rf.choice([2, 3]) if side == 2 else rf.choice([W - 4, W - 3])
+        for k in range(rf.randint(2, 6)):
+            px(a, x, y + k, (94, 61, 23))
+# Eisenbeschläge in den Ecken (wie an der Kiste)
+IRON = [(38, 43, 49), (56, 63, 71), (107, 116, 125), (142, 152, 161)]
+for (cx_, cy_, fx, fy) in [(0, 0, 1, 1), (W - 1, 0, -1, 1), (0, H - 1, 1, -1), (W - 1, H - 1, -1, -1)]:
+    for i in range(12):
+        for j in range(12):
+            if i < 6 or j < 6:
+                if i + j < 17:
+                    x = cx_ + fx * i; y = cy_ + fy * j
+                    edge = (i == 0 or j == 0 or i + j == 16 or (i == 5 and j >= 6) or (j == 5 and i >= 6))
+                    c = IRON[0] if edge else (IRON[2] if (i + j) < 6 else IRON[1])
+                    px(a, x, y, c)
+    for (i, j) in [(2, 2), (8, 2), (2, 8)]:
+        px(a, cx_ + fx * i, cy_ + fy * j, IRON[3])
+        px(a, cx_ + fx * (i + 1), cy_ + fy * (j + 1), IRON[0])
 
 img = Image.fromarray(a, 'RGBA')
 img.convert('RGB').resize((W * 3, H * 3), Image.NEAREST).save(os.path.join(TMP, 'v.png'))

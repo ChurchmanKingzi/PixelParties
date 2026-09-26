@@ -44,6 +44,14 @@ def comp_sprite(img, spr, x, y, alpha_scale=1.0):
     img[y0:y1, x0:x1] = np.clip(dst * (1 - a) + sub[..., :3] * a + 0.5, 0, 255).astype(np.uint8)
 
 
+def shifted(m, dx, dy):
+    out = np.zeros_like(m)
+    ys, yd = (slice(0, H - dy), slice(dy, H)) if dy >= 0 else (slice(-dy, H), slice(0, H + dy))
+    xs, xd = (slice(-dx, W), slice(0, W + dx)) if dx < 0 else (slice(0, W - dx), slice(dx, W))
+    out[yd, xd] = m[ys, xs]
+    return out
+
+
 def frames(name, n):
     s = area(PG + name)
     fw = s.width // n
@@ -221,10 +229,22 @@ rs = np.random.RandomState(14)
 dland = ndimage.distance_transform_edt(~LAND)
 v = rs.rand(H, W) * 0.62 + value_noise(W, H, 9, seed=5, octaves=3) * 0.55 - 0.08
 v -= np.clip((dland - 30) / 140, 0, 0.18)
-img = np.array(SEA, np.uint8)[np.clip((v * 6.2).astype(int) - 1, 0, 5)]
+# Sonne oben rechts: dort glitzert das Meer, zu den Rändern hin tiefer und dunkler
+SUN = np.exp(-((XX - 222) ** 2 + (YY - 36) ** 2) / (2 * 48.0 ** 2))
+edge_d = np.minimum.reduce([XX, YY, W - 1 - XX, H - 1 - YY]).astype(float)
+VIG = np.clip(1 - edge_d / 70, 0, 1) ** 1.6 * (1 - SUN)
+v += SUN * 0.16 - VIG * 0.34
+SEA_X = [(9, 32, 90), (12, 39, 107)] + SEA
+img = np.array(SEA_X, np.uint8)[np.clip((v * 6.2).astype(int) + 1, 0, 7)]
 for _ in range(240):
     x, y = rs.randint(0, W - 3), rs.randint(0, H)
+    if rs.rand() < VIG[y, x] * 0.8:
+        continue
     img[y, x:x + rs.choice([1, 2, 2, 3])] = SEA_HI[rs.choice([0, 0, 1, 1, 2])]
+for _ in range(160):                        # Sonnenglitzern: mehr helle Striche oben rechts
+    x, y = int(rs.normal(222, 30)), int(rs.normal(40, 26))
+    if 0 <= x < W - 3 and 0 <= y < H:
+        img[y, x:x + rs.choice([1, 2, 3])] = SEA_HI[rs.choice([1, 2, 2])]
 
 WATER = ~LAND & ~B_INNER
 dn = (dland + (rs.rand(H, W) - 0.5) * 1.3 + nz_mid * 1.2) * np.clip(0.75 + nz_lo * 1.2, 0.55, 1.15)
@@ -330,9 +350,9 @@ m = mriv & (tile[..., 3] > 0)
 blend(img, m, (170, 215, 250), 150 / 255)
 # Glitzern auf dem Wasser (wie glitter.png, aber ohne Kachelwiederholung)
 gm = WATER | B_INNER
-for _ in range(330):
+for _ in range(900):
     x, y = rs.randint(6, W - 8), rs.randint(6, H - 6)
-    if not gm[y, x]:
+    if not gm[y, x] or rs.rand() > 0.22 + SUN[y, x] * 0.9 - VIG[y, x] * 0.2:
         continue
     if rs.rand() < 0.25 and gm[y, x + 1] and gm[y, x - 1]:
         blend(img, np.pad(np.ones((1, 3), bool), ((y, H - y - 1), (x - 1, W - x - 2))), (150, 200, 245), 120 / 255)
@@ -430,71 +450,118 @@ def billow(circles, light=(0.62, -0.62, 0.5)):
     return M, np.clip(lum, 0, 1), age, hgt
 
 
-# Rauchfahne: vom Krater nach oben rechts, wird breiter, heller und löst sich auf
+# Rauchfahne: einzelne Rauchballen wie smoke.png, vom Krater nach oben rechts treibend,
+# wachsend, heller und durchsichtiger werdend
 rr = random.Random(3)
-path = [(151, 140), (155, 128), (164, 112), (180, 94), (202, 76), (228, 58), (262, 40)]
-circ = []
-Np = 70
-for i in range(Np):
-    tt = i / (Np - 1)
+path = [(150, 140), (152, 127), (158, 111), (170, 95), (188, 80), (212, 66), (240, 52), (270, 40)]
+
+
+def along(tt):
     f = tt * (len(path) - 1); j = min(int(f), len(path) - 2); u = f - j
     (x0, y0), (x1, y1) = path[j], path[j + 1]
-    cx = x0 + (x1 - x0) * u; cy = y0 + (y1 - y0) * u
-    r0 = 3 + 16 * tt ** 0.8
-    z = tt * 30
-    circ.append((cx + rr.uniform(-1, 1) * r0 * 0.25, cy + rr.uniform(-1, 1) * r0 * 0.25, r0 * rr.uniform(0.7, 0.9), tt, z))
-    for _ in range(3 if tt > 0.05 else 1):
-        a_ = rr.uniform(0, 2 * math.pi)
-        rs_ = r0 * rr.uniform(0.3, 0.55)
-        circ.append((cx + math.cos(a_) * r0 * 0.62, cy + math.sin(a_) * r0 * 0.62, rs_, tt, z + r0 * 0.25))
-PM, pl, page, ph = billow(circ)
-pn = value_noise(W, H, 4, seed=12, octaves=2)
-fade = np.clip(1.6 - page * 1.25 + (pn - 0.5) * 0.9, 0, 1)
-PM &= dither_mask(None, fade) | (page < 0.6)
-PM = ndimage.binary_opening(PM, np.ones((2, 2))) | (PM & (page < 0.5))
-SMOKE = [(18, 16, 16), (30, 26, 25), (44, 38, 36), (60, 53, 51), (82, 74, 69), (110, 100, 92), (138, 130, 122), (166, 160, 152), (194, 190, 184), (222, 220, 216)]
-pv = np.clip(pl * 0.78 + page * 0.32 - 0.02, 0, 1)
-pidx = ordered(pv, len(SMOKE))
+    return x0 + (x1 - x0) * u, y0 + (y1 - y0) * u, x1 - x0, y1 - y0
+
+
+SMOKE = [(18, 16, 16), (30, 26, 25), (44, 38, 36), (60, 53, 51), (82, 74, 69), (110, 100, 92), (138, 130, 122), (166, 160, 152), (194, 190, 184), (222, 220, 216), (240, 240, 238)]
+PUFFS = []
+tt = 0.0
+while tt < 1.0:
+    r0 = (2.4 + 13 * tt ** 0.8) * rr.uniform(0.72, 1.3)
+    cx, cy, dx_, dy_ = along(tt)
+    nl = math.hypot(dx_, dy_); px_, py_ = -dy_ / nl, dx_ / nl      # quer zur Fahne
+    side = rr.uniform(-1, 1) * (1.5 + 9 * tt)
+    PUFFS.append((cx + px_ * side, cy + py_ * side, r0, tt, rr.uniform(-0.08, 0.08)))
+    if tt > 0.3 and rr.random() < 0.7:                              # Fahne fächert auf
+        side2 = -math.copysign(1, side) * rr.uniform(0.5, 1) * (4 + 12 * tt)
+        PUFFS.append((cx + px_ * side2 + rr.uniform(-2, 2), cy + py_ * side2, r0 * rr.uniform(0.55, 0.8), tt + 0.01, rr.uniform(-0.08, 0.08)))
+    tt += (r0 * rr.uniform(0.85, 1.25)) / 240.0
+
+
+def puff_layer(cx, cy, r0, tt, seed):
+    """Ein Rauchballen (Blumenkohl aus 1+3 Kugeln), gibt (maske, farbindex-wert) im Bild zurück."""
+    r_ = random.Random(seed)
+    balls = [(cx, cy, r0)]
+    for _ in range(3):
+        a_ = r_.uniform(-2.6, 0.6)            # eher oben rechts
+        balls.append((cx + math.cos(a_) * r0 * 0.55, cy + math.sin(a_) * r0 * 0.55, r0 * r_.uniform(0.45, 0.6)))
+    m = np.zeros((H, W), bool); val = np.zeros((H, W))
+    Lv = np.array([0.62, -0.62, 0.48]); Lv /= np.linalg.norm(Lv)
+    for (bx, by, br) in balls:
+        x0, x1 = max(0, int(bx - br - 1)), min(W, int(bx + br + 2))
+        y0, y1 = max(0, int(by - br - 1)), min(H, int(by + br + 2))
+        if x0 >= x1 or y0 >= y1:
+            continue
+        sx_, sy_ = XX[y0:y1, x0:x1], YY[y0:y1, x0:x1]
+        ux = (sx_ + 0.5 - bx) / br; uy = (sy_ + 0.5 - by) / br
+        q = ux * ux + uy * uy
+        ins = q < 1
+        uz = np.sqrt(np.clip(1 - q, 0, 1))
+        lum = ux * Lv[0] + uy * Lv[1] + uz * Lv[2]
+        v_ = np.clip(lum * 0.5 + 0.5, 0, 1)
+        v_ = np.where(q > 0.72, v_ - 0.12, v_)           # Rand etwas dunkler
+        m[y0:y1, x0:x1] |= ins
+        val[y0:y1, x0:x1] = np.where(ins, v_, val[y0:y1, x0:x1])
+    return m, val
+
 
 # Wolken
-CLOUD = [(96, 112, 132), (122, 138, 156), (152, 168, 184), (184, 196, 208), (212, 222, 230), (236, 242, 246), (252, 254, 255)]
+CLOUD = [(92, 110, 140), (120, 138, 166), (150, 168, 192), (182, 198, 216), (210, 222, 234), (234, 242, 248), (250, 253, 255)]
 
 
-def cloud_circles(cx, cy, rx, ry, seed, core):
+def balls_render(balls, light=(0.62, -0.62, 0.5)):
+    """Kugel-Ballen mit Z-Puffer, Kugel-Normalen je Ballen, Randabdunklung, Eigenschatten."""
+    Lv = np.array(light, float); Lv /= np.linalg.norm(Lv)
+    hz = np.full((H, W), -1e9); val = np.zeros((H, W))
+    for (bx, by, br, z) in balls:
+        x0, x1 = max(0, int(bx - br - 1)), min(W, int(bx + br + 2))
+        y0, y1 = max(0, int(by - br - 1)), min(H, int(by + br + 2))
+        if x0 >= x1 or y0 >= y1:
+            continue
+        sx_, sy_ = XX[y0:y1, x0:x1], YY[y0:y1, x0:x1]
+        ux = (sx_ + 0.5 - bx) / br; uy = (sy_ + 0.5 - by) / br
+        q = ux * ux + uy * uy
+        uz = np.sqrt(np.clip(1 - q, 0, 1))
+        hh = z + uz * br
+        cur = hz[y0:y1, x0:x1]
+        upd = (q < 1) & (hh > cur)
+        lum = ux * Lv[0] + uy * Lv[1] + uz * Lv[2]
+        lv = np.clip(lum * 0.55 + 0.45, 0, 1) - np.where(q > 0.8, 0.1, 0)
+        cur[upd] = hh[upd]
+        val[y0:y1, x0:x1][upd] = lv[upd]
+    M = hz > -1e8
+    hz2 = np.where(M, hz, 0)
+    sh = np.zeros((H, W))
+    for d in range(1, 7):
+        s_ = np.zeros((H, W)); s_[d:, :W - d] = hz2[:H - d, d:]
+        sh = np.maximum(sh, np.clip((s_ - hz2 - d * 0.8) / 2.5, 0, 1))
+    return M, np.clip(val - sh * 0.3, 0, 1)
+
+
+def cumulus(cx, cy, rx, ry, seed, big):
     r_ = random.Random(seed)
-    out = [(cx, cy, core, 0, 0)]
-    for _ in range(int(rx * ry / 14)):
-        a_ = r_.uniform(0, 2 * math.pi); d_ = r_.random() ** 0.5
+    out = []
+    n = int(rx * ry / (big * big) * 6) + 8
+    for i in range(n):
+        a_ = r_.uniform(0, 2 * math.pi); d_ = math.sqrt(r_.random())
         x = cx + math.cos(a_) * rx * d_; y = cy + math.sin(a_) * ry * d_
-        rad = core * r_.uniform(0.3, 0.6) * (1.15 - 0.6 * d_)
-        out.append((x, y, rad, 0, core * 0.55 * (1 - d_)))
-    for _ in range(int(rx * ry / 20)):   # kleine Blumenkohl-Ballen am Rand
-        a_ = r_.uniform(0, 2 * math.pi); d_ = r_.uniform(0.75, 1.05)
-        x = cx + math.cos(a_) * rx * d_; y = cy + math.sin(a_) * ry * d_
-        out.append((x, y, core * r_.uniform(0.15, 0.3), 0, core * 0.1))
+        rad = big * r_.uniform(0.5, 1.0) * (1.2 - 0.5 * d_)
+        out.append((x, y, rad, big * 0.9 * (1 - d_) + r_.uniform(0, 2)))
     return out
 
 
-clouds = []
-clouds += cloud_circles(26, 30, 36, 18, 51, 14)
-clouds += cloud_circles(226, 322, 38, 18, 52, 15)
-clouds += cloud_circles(4, 122, 14, 8, 53, 7)
-CM, cl_, _, _ = billow(clouds)
-cidx = ordered(cl_, len(CLOUD))
+clouds = cumulus(20, 70, 26, 11, 51, 10) + cumulus(226, 306, 28, 12, 52, 11)
+CM, cl_ = balls_render(clouds)
+holes_ = ndimage.binary_fill_holes(CM) & ~CM
+CM |= holes_; cl_[holes_] = 0.3
+cq = np.clip(cl_ * (len(CLOUD) - 1) + 0.5 + (BAYER4[YY % 4, XX % 4] - 0.5) * 0.5, 0, len(CLOUD) - 1).astype(int)
+cidx = cq
 
 # Schatten auf Land und Meer (Licht oben rechts -> Schatten unten links)
-def shifted(m, dx, dy):
-    out = np.zeros_like(m)
-    ys, yd = (slice(0, H - dy), slice(dy, H)) if dy >= 0 else (slice(-dy, H), slice(0, H + dy))
-    xs, xd = (slice(-dx, W), slice(0, W + dx)) if dx < 0 else (slice(0, W - dx), slice(dx, W))
-    out[yd, xd] = m[ys, xs]
-    return out
 
 
-SH_P = shifted(PM, -12, 14) & ~PM
 SH_C = shifted(CM, -18, 20) & ~CM
-shd = SH_P | SH_C
-img[shd] = (img[shd].astype(float) * np.array([0.52, 0.56, 0.66])).astype(np.uint8)
+shd = SH_C
+img[shd] = (img[shd].astype(float) * np.array([0.5, 0.55, 0.68])).astype(np.uint8)
 
 # Flugsaurier mit Schatten (Spiel-Sprites 1x)
 pt = frames('ptero', 6)
@@ -503,13 +570,22 @@ PTEROS = [(64, 36, 2), (176, 214, 4), (84, 292, 3)]
 for (x, y, f) in PTEROS:
     comp_sprite(img, pts_[f], x - 11, y + 15)
 
-# Rauch zeichnen
-img[PM] = np.array(SMOKE, np.uint8)[pidx[PM]]
-# Glut von unten am Fuß der Fahne
-gm_ = PM & (page < 0.14) & (pl < 0.5)
-img[gm_] = (110, 50, 30)
-gm2 = PM & (page < 0.07) & (pl < 0.35)
-img[gm2] = (170, 80, 36)
+# Rauch: erst alle Schatten (Höhe wächst mit dem Alter), dann die Ballen, alpha-gemischt
+imgf = img.astype(float)
+for k, (cx, cy, r0, tt, br_) in enumerate(PUFFS):
+    m, val = puff_layer(cx, cy, r0, tt, 100 + k)
+    dx, dy = int(round(-4 - 14 * tt)), int(round(5 + 15 * tt))
+    ms = shifted(m, dx, dy)
+    al = 0.55 * (1 - 0.45 * tt)
+    imgf[ms] *= (1 - al)
+for k, (cx, cy, r0, tt, br_) in enumerate(PUFFS):
+    m, val = puff_layer(cx, cy, r0, tt, 100 + k)
+    v_ = np.clip(val * 0.62 + tt * 0.42 + 0.05 + br_, 0, 1)
+    idx = ordered(v_, len(SMOKE))
+    col = np.array(SMOKE, float)[idx]
+    al = np.clip(min(0.55 + tt * 3, 0.92) - max(0, tt - 0.3) * 0.8, 0.28, 0.92)
+    imgf[m] = imgf[m] * (1 - al) + col[m] * al
+img = np.clip(imgf + 0.5, 0, 255).astype(np.uint8)
 
 for (x, y, f) in PTEROS:
     comp_sprite(img, pt[f], x, y)
@@ -517,8 +593,17 @@ for (x, y, f) in PTEROS:
 # Wolken zeichnen
 img[CM] = np.array(CLOUD, np.uint8)[cidx[CM]]
 
+# Licht: warm von oben rechts (Sonne), kühler/dunkler nach unten links
+imgf = img.astype(float)
+lt = np.clip(1.0 - np.hypot(XX - 250, (YY + 10) * 0.8) / 330, 0, 1)
+imgf *= (0.9 + 0.14 * lt)[..., None] * np.array([1.0, 0.99, 0.96])
+imgf += (lt ** 2 * 22)[..., None] * np.array([1.0, 0.72, 0.3])
+img = np.clip(imgf + 0.5, 0, 255).astype(np.uint8)
+
 dbg(img, 'v_all')
 im = Image.fromarray(img).convert('RGBA')
+tt_ = text_img('PANGAIA', 20, (255, 214, 120, 255), outline_col=(70, 26, 10, 255), shadow=(8, 20, 60, 255))
+im.alpha_composite(tt_, (W // 2 - tt_.width // 2 - 8, 16))
 
 # ------------------------------------------------------------------ Rahmen
 bevel_frame(im, (24, 12, 8), (255, 170, 70), (150, 64, 26), (84, 30, 14), (24, 12, 8), width=6)

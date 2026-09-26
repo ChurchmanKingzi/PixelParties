@@ -1,7 +1,9 @@
 # -*- coding: utf-8 -*-
 """13 Big Gwen – Nachtpanorama: der große Uhrturm „Big Gwen" über der viktorianischen Stadt am Fluss,
-Mond, Sterne, Smog, Schlote mit Warnlichtern, erleuchtete Fenster, Laternen und Spiegelungen im Wasser.
-Baut auf den Ebenen der Big-Gwen-Area auf (public/areas/big-gwen/)."""
+Mond, Sterne, Schleierwolken, Smog, Schlote mit Warnlichtern, erleuchtete Fenster, Laternen, ein kleiner
+Dampfer und Spiegelungen im Wasser. Baut auf den Ebenen der Big-Gwen-Area auf (public/areas/big-gwen/):
+city/lights/beacons/flowers/lamp-glow als Uferzeile (Kachel in Hausblöcke zerlegt und neu gereiht),
+tower/tower-glow mit verlängertem Schaft, hand-hour/hand-min, smog, smoke, daw."""
 from lib import *
 
 YY, XX = np.mgrid[0:H, 0:W]
@@ -70,7 +72,7 @@ CITY_Y = 180       # Oberkante der city.png-Kachel
 WALL = CITY_Y + 84  # Oberkante der Ufermauer
 WATER = WALL + 8   # Wasserlinie
 HOR = CITY_Y + 40  # Horizont (hinter der Stadt)
-MX, MY, MR = 190, 52, 14   # Mond
+MX, MY, MR = 195, 62, 14   # Mond
 
 # ---------------------------------------------------------------- Himmel
 nz = value_noise(W, H, 22, seed=3, octaves=3)
@@ -80,7 +82,7 @@ v = v + np.clip(1 - dm / 80, 0, 1) ** 1.8 * 0.34
 idx = noisy(np.clip(v, 0, 1), len(SKY))
 im = layer_idx(idx, np.ones((H, W), bool), SKY)
 # Mondhof: klare Ringe mit schmalen Dither-Übergängen
-for rad, col in [(38, (40, 34, 92)), (29, (54, 48, 110)), (22, (72, 66, 128))]:
+for rad, col in [(36, (40, 34, 92)), (28, (54, 48, 110)), (21, (72, 66, 128))]:
     t = np.clip((rad - dm) / 4.0, 0, 1)
     im = setc(im, dither_mask(None, t), col)
 
@@ -116,27 +118,32 @@ def streak_cloud(cx, cy, ww, hh, seed, pal):
 CLP = [(26, 22, 60), (36, 30, 76), (58, 50, 106), (96, 88, 146)]
 clouds = []
 for (cx, cy, ww, hh, sd, pal) in [
-        (196, 64, 40, 4, 31, [(44, 36, 88), (58, 50, 108), (92, 84, 142), (150, 140, 184)]),
+        (200, 73, 40, 4, 31, [(44, 36, 88), (58, 50, 108), (92, 84, 142), (150, 140, 184)]),
         (56, 92, 46, 5, 32, CLP), (232, 104, 30, 4, 33, [(40, 32, 84), (52, 44, 100), (78, 70, 128), (120, 112, 168)]),
         (150, 146, 44, 4, 34, [(52, 38, 90), (62, 46, 98), (80, 62, 116), (108, 90, 140)]),
         (18, 150, 32, 3, 35, [(56, 40, 94), (66, 48, 102), (84, 64, 118), (104, 84, 136)])]:
     clouds.append(streak_cloud(cx, cy, ww, hh, sd, pal))
 cloud_mask = np.zeros((H, W), bool)
+cloud_raw = np.zeros((H, W), bool)
 for _, m in clouds:
     cloud_mask |= ndimage.binary_dilation(m, iterations=2)
+    cloud_raw |= m
 
 # Sterne (wie sky.png: 1px + wenige Kreuze), nicht in Mondnähe
 rnd = random.Random(13)
 d = ImageDraw.Draw(im)
+CROSS = [(40, 38), (72, 58), (228, 120), (22, 112), (162, 46), (18, 70)]
 for _ in range(110):
     x, y = rnd.randrange(8, W - 8), rnd.randrange(8, 185)
     if math.hypot(x - MX, y - MY) < 40 or cloud_mask[y, x]:
         continue
-    if y / 185 > 0.55 and rnd.random() < 0.65:
+    if (56 < x < 194 and y < 36) or any(abs(x - cx_) < 4 and abs(y - cy_) < 4 for cx_, cy_ in CROSS):
+        continue
+    if y > 150 or (y / 185 > 0.5 and rnd.random() < 0.65):
         continue
     c = rnd.choice([(110, 106, 168), (110, 106, 168), (140, 134, 196), (190, 184, 230)])
     d.point((x, y), fill=c)
-for (x, y) in [(40, 30), (72, 58), (228, 120), (22, 112), (150, 18), (18, 64)]:
+for (x, y) in CROSS:
     d.point([(x - 1, y), (x + 1, y), (x, y - 1), (x, y + 1)], fill=(140, 134, 196))
     d.point((x, y), fill=(236, 232, 255))
 
@@ -162,11 +169,23 @@ ma = np.array(moon_img)
 edge = inside & ~ndimage.binary_erosion(inside)
 ma[edge & (sh < -0.1)] = rgba(MOON[1])
 ma[edge & (sh > 0.45)] = rgba(MOON[6])
+for (cx_, cy_) in [(MR + 5, MR - 6), (MR - 6, MR + 4), (MR + 2, MR + 7)]:
+    if inside[cy_, cx_] and inside[cy_ + 1, cx_ + 1]:
+        ma[cy_, cx_] = rgba(MOON[2]); ma[cy_, cx_ + 1] = rgba(MOON[3])
+        ma[cy_ + 1, cx_] = rgba(MOON[3]); ma[cy_ + 1, cx_ + 1] = rgba(MOON[5])
 moon_img = Image.fromarray(ma)
 comp(im, moon_img, MX - MR, MY - MR)
 for cimg, _ in clouds:
     comp(im, cimg, 0, 0)
 
+
+# Lichtglocke: der Smog über der Stadt glimmt warm von unten
+a = np.array(im).astype(float)
+tg = np.clip((YY - (CITY_Y - 30)) / 60.0, 0, 1) ** 1.2 * 0.8
+gm = nmask(tg) & (YY < CITY_Y + 60)
+mix = a[..., :3] * 0.7 + np.array([150, 92, 96]) * 0.3
+a[gm, :3] = mix[gm]
+im = Image.fromarray(a.clip(0, 255).astype(np.uint8))
 
 # ---------------------------------------------------------------- ferne Stadt (Silhouetten)
 def far_city(seed, base, hmin, hmax, body, rim, win, dens, spires=(), domes=(), stacks=()):
@@ -238,6 +257,16 @@ comp(im, alpha_mul(smog2, 0.8), 128, CITY_Y - 14)
 # ---------------------------------------------------------------- nahe Stadt (Segmente der Kachel)
 city = A('city')
 lights = [A('lights-a'), A('lights-b'), A('lights-c')]
+
+
+def drop_olive(l):
+    a = np.array(l).astype(int)
+    ol = (np.abs(a[..., 0] - a[..., 1]) < 12) & (a[..., 2] < a[..., 0] - 25) & (a[..., 3] == 255)
+    a[ol] = 0
+    return Image.fromarray(a.astype(np.uint8))
+
+
+lights = [drop_olive(l) for l in lights]
 beac = A('beacons')
 lamp = A('lamp-glow')
 flw = A('flowers').crop((0, 0, 128, 100))
@@ -386,6 +415,11 @@ fh, fm = 59, 52
 T.alpha_composite(hh.crop((fh * 23, 0, fh * 23 + 23, 23)), (32 - 11, 41 - 11))
 T.alpha_composite(hm.crop((fm * 23, 0, fm * 23 + 23, 23)), (32 - 11, 41 - 11))
 ImageDraw.Draw(T).point((32, 41), fill=(232, 184, 58))
+# warmer Schein des Zifferblatts im Himmel hinter dem Turm
+dcl = np.hypot(XX - (TX + 32), (YY - (TY + 41)) * 0.9)
+for rad, col in [(30, (46, 34, 84)), (22, (64, 44, 96)), (16, (86, 58, 104))]:
+    t = np.clip((rad - dcl) / 4.0, 0, 1)
+    im = setc(im, dither_mask(None, t) & (np.array(im)[..., 2] < 150) & ~cloud_raw, col)
 comp(im, T, TX, TY)
 comp(im, TG, TX, TY)
 
@@ -491,18 +525,18 @@ for y in range(WATER + 1, H):
         seg = rn.randint(2, 6)
         dxm = abs(x + seg / 2 - MX)
         wpath = 5 + tk * 16
-        pm = 0.03 + 0.75 * np.exp(-(dxm / wpath) ** 2)
+        pm = 0.07 + 0.75 * np.exp(-(dxm / wpath) ** 2)
         if rn.rand() < pm * (0.6 if y % 2 else 0.25):
             if dxm < wpath * 0.6:
                 c = MOON[6] if rn.rand() < 0.4 else MOON[4]
             elif dxm < wpath * 1.3:
                 c = MOON[1]
             else:
-                c = WP[6]
+                c = WP[5] if rn.rand() < 0.6 else WP[6]
             out[y, x:x + seg] = rgba(c)
         x += seg + rn.randint(1, 6)
 # Lichtsäulen der Straßenlaternen und hellsten Fenster
-lampx = sorted(set(np.where((scene[CITY_Y + 55:CITY_Y + 70, :, 0] == 255) & (scene[CITY_Y + 55:CITY_Y + 70, :, 1] >= 240))[1]))
+lampx = sorted(set(np.where((scene[CITY_Y + 59:CITY_Y + 68, :, 0] == 255) & (scene[CITY_Y + 59:CITY_Y + 68, :, 1] >= 240))[1]))
 cols_x = []
 for x in lampx:
     if not cols_x or x - cols_x[-1][-1] > 2:
@@ -527,14 +561,79 @@ for grp in cols_x:
         out[y, max(0, x0):min(W, x0 + hw)] = rgba(c)
 im = Image.fromarray(out)
 
+# ---------------------------------------------------------------- kleiner Dampfer auf dem Fluss
+def steamer():
+    w_, h_ = 44, 18
+    img = Image.new('RGBA', (w_, h_))
+    d = ImageDraw.Draw(img)
+    HULL, CAB, RIM, LIT = (12, 10, 26), (26, 22, 48), (78, 70, 122), (255, 204, 102)
+    dy = 12  # Deckslinie
+    d.polygon([(2, dy), (38, dy), (41, dy - 2), (42, dy - 2), (38, dy + 4), (5, dy + 4)], fill=HULL)
+    d.line((2, dy, 38, dy), fill=RIM); d.point([(39, dy - 1), (40, dy - 2), (41, dy - 2)], fill=RIM)
+    d.rectangle((9, dy - 5, 29, dy - 1), fill=CAB)
+    d.line((8, dy - 6, 30, dy - 6), fill=RIM)
+    d.rectangle((9, dy - 5, 29, dy - 5), fill=HULL)
+    for x in (12, 16, 20, 24):
+        d.point((x, dy - 3), fill=LIT); d.point((x + 1, dy - 3), fill=(200, 138, 58))
+    d.rectangle((17, dy - 11, 19, dy - 7), fill=HULL)
+    d.line((17, dy - 10, 19, dy - 10), fill=(120, 40, 44))
+    d.point((20, dy - 11), fill=RIM); d.line((20, dy - 10, 20, dy - 7), fill=RIM)
+    d.line((35, dy - 5, 35, dy - 1), fill=HULL)
+    d.point((35, dy - 6), fill=(255, 228, 154))
+    d.line((4, dy - 3, 4, dy - 1), fill=HULL); d.point((4, dy - 4), fill=(220, 60, 50))
+    return img, dy
+
+
+boat, bdy = steamer()
+BX, BY = 34, WATER + 38
+a = np.array(im)
+# ruhigeres Wasser um das Boot + Glanzkante an der Wasserlinie
+rb0 = np.random.RandomState(9)
+yl = BY + bdy + 5
+x = BX + 1
+while x < BX + 44:
+    seg = rb0.randint(3, 8)
+    a[yl, x:min(x + seg, BX + 44)] = rgba(WP[5] if rb0.rand() < 0.7 else WP[4])
+    x += seg + rb0.randint(1, 3)
+im = Image.fromarray(a)
+comp(im, boat, BX, BY)
+for cx_, cy_ in [(18, -1)]:
+    for i in range(2):
+        spr = smk if i else sms
+        comp(im, alpha_mul(spr, [0.7, 0.4][i]), BX + cx_ - spr.width // 2 - 2 - i * 5, BY + cy_ - 4 - i * 4)
+# Spiegelung der Bullaugen
+a = np.array(im)
+rb = np.random.RandomState(3)
+for x in (12, 16, 20, 24, 35):
+    for k in range(2, 10):
+        if rb.rand() < 0.55:
+            yy_ = BY + bdy + 4 + k
+            a[yy_, BX + x + rb.randint(-1, 1)] = rgba(WARM[2] if k < 5 else WARM[1])
+im = Image.fromarray(a)
+
 # ---------------------------------------------------------------- Titel
-if os.environ.get('GW_TITLE', '1') == '1':
-    tt = text_img('BIG GWEN', 18, (255, 214, 96, 255), outline_col=(56, 30, 14, 255), shadow=(8, 6, 22, 255))
-    comp(im, tt, W // 2 - tt.width // 2, 14)
-    dd = ImageDraw.Draw(im)
-    for (x, y) in [(W // 2 - tt.width // 2 - 9, 14 + tt.height // 2), (W // 2 + tt.width // 2 + 8, 14 + tt.height // 2)]:
-        sparkle(dd, x, y, 2, (230, 180, 80), core=(255, 240, 190))
+tt = text_img('BIG GWEN', 18, (255, 214, 96, 255), outline_col=(56, 30, 14, 255), shadow=(8, 6, 22, 255))
+ta_ = np.array(tt)
+fill_m = (ta_[..., 0] == 255) & (ta_[..., 1] == 214)
+rows = np.where(fill_m.any(1))[0]
+r0, r1 = rows.min(), rows.max()
+for yy in range(r0, r1 + 1):
+    u = (yy - r0) / max(1, r1 - r0)
+    col = (255, 238, 170) if u < 0.2 else ((255, 214, 96) if u < 0.62 else (232, 164, 56))
+    ta_[yy][fill_m[yy]] = col + (255,)
+tt = Image.fromarray(ta_)
+comp(im, tt, W // 2 - tt.width // 2, 14)
+dd = ImageDraw.Draw(im)
+for (x, y) in [(W // 2 - tt.width // 2 - 9, 14 + tt.height // 2), (W // 2 + tt.width // 2 + 8, 14 + tt.height // 2)]:
+    sparkle(dd, x, y, 2, (230, 180, 80), core=(255, 240, 190))
 
 # ---------------------------------------------------------------- Rahmen
-bevel_frame(im, (8, 6, 18), (214, 170, 96), (110, 78, 46), (54, 36, 26), (8, 6, 18), width=6)
+bevel_frame(im, (8, 6, 18), (226, 184, 104), (122, 86, 48), (60, 40, 26), (8, 6, 18), width=6)
+d = ImageDraw.Draw(im)
+for (x, y) in [(3, 3), (W - 4, 3), (3, H - 4), (W - 4, H - 4)]:
+    d.rectangle((x - 2, y - 2, x + 2, y + 2), fill=(56, 30, 14))
+    d.rectangle((x - 1, y - 1, x + 1, y + 1), fill=(232, 164, 56))
+    d.point((x - 1, y - 1), fill=(255, 238, 170))
+    d.point((x, y), fill=(255, 214, 96))
+
 print(save(im, '13_big_gwen'))

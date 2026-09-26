@@ -296,8 +296,10 @@ def clump_row(x0, x1, base, seed, rmin, rmax, step, jitter=2, flat=0.85):
     x = x0
     while x < x1:
         rr = r.uniform(rmin, rmax)
+        if r.random() < 0.18:
+            rr *= 1.35  # Urwaldriese
         b = base(x) if callable(base) else base
-        cy = b - rr * 0.5 + r.uniform(-jitter, jitter)
+        cy = b - rr * 0.5 + r.uniform(-jitter, jitter) - (rr - rmin) * 0.6
         out.append((x, cy, rr, rr * flat))
         for k in range(r.randint(1, 3)):
             a = r.uniform(-2.6, -0.5)
@@ -307,13 +309,16 @@ def clump_row(x0, x1, base, seed, rmin, rmax, step, jitter=2, flat=0.85):
     return out
 
 
-def forest_band(crowns, pal, edge, fy0, fy1, seed, body_col=None):
-    lay, m = treeline(crowns, pal, edge, seed=seed)
+def forest_band(crowns, pal, edge, fy0, fy1, seed, body_col=None, tex=0.25):
+    lay, m = treeline(crowns, pal, edge, seed=seed, tex=tex)
     # Waldkörper: alles unterhalb der Kronenlinie (je Spalte ab dem Kronen-Schwerpunkt) füllen
     body = np.zeros((H, W), bool)
     for (cx, cy, rx, ry) in crowns:
         body |= (np.abs(XX - cx) <= rx * 0.7) & (YY >= cy)
+    body |= m
     top = np.where(body.any(0), body.argmax(0), H)
+    top = ndimage.maximum_filter1d(top, 3)
+    top = np.minimum(top, ndimage.minimum_filter1d(np.where(body.any(0), body.argmax(0), H), 1))
     body = YY >= top[None, :]
     la = np.array(lay)
     la[body & ~m] = rgba(body_col or pal[0])
@@ -321,47 +326,68 @@ def forest_band(crowns, pal, edge, fy0, fy1, seed, body_col=None):
 
 
 # ---------------------------------------------------------------- Wasserfall am linken Karstturm
-def waterfall(img, x0, y0, y1, w, seed):
+def waterfall(img, segs, seed):
+    """Schmaler Wasserfall in Stufen: segs [(x, y0, y1, w)]; senkrechte Schlieren, Gischt am Fuß jeder Stufe."""
     a = np.array(img)
     r = np.random.RandomState(seed)
-    WF = [(126, 170, 156), (160, 196, 178), (196, 220, 198), (228, 240, 220)]
-    streak = r.rand(w + 2)
-    for y in range(y0, y1):
-        for i in range(w):
-            x = x0 + i + (1 if y - y0 > 2 and i == 0 and False else 0)
-            ph = (y * 0.9 + streak[i] * 13) % 5
-            k = 2 if ph < 2 else (3 if ph < 3 else 1)
-            if i == 0: k = max(0, k - 1)
-            if i == w - 1: k = min(3, k + 1)
-            if (y - y0) < 2: k = 3
-            a[y, x] = rgba(WF[k])
+    WF = [(118, 160, 146), (150, 188, 170), (184, 212, 192), (214, 232, 210)]
+    for (x0, y0, y1, w) in segs:
+        off = r.rand(w) * 7
+        for y in range(y0, y1):
+            fade = (y - y0) / max(1, y1 - y0)
+            for i in range(w):
+                ph = (y * 0.8 + off[i] * 3) % 6
+                k = 2 if ph < 3 else (3 if ph < 4 else 1)
+                k -= 1 if i == 0 else 0
+                k = max(0, k - (1 if fade > 0.7 and BAYER4[y % 4, (x0 + i) % 4] < (fade - 0.7) * 3 else 0))
+                a[y, x0 + i] = rgba(WF[k])
+        # Gischt
+        for (dx, dy, c) in [(-1, 0, 2), (w, 0, 2), (-2, 1, 1), (w + 1, 1, 1), (0, 0, 3), (w - 1, 0, 3)]:
+            a[y1 + dy - 1, x0 + dx] = rgba(WF[c])
     img = Image.fromarray(a)
-    # Gischt am Fuß
-    sp = np.hypot((XX - (x0 + w / 2)) / 7.0, (YY - y1) / 3.5)
-    img = setc(img, dither_mask(None, np.clip(1 - sp, 0, 1) * 1.3), (214, 228, 204))
     return img
 
 
 # ---------------------------------------------------------------- Waldstufen im Dunst
-TX, TY = 25, 243
+TX, TY = 25, 244
 C1P = [(96, 136, 106), (110, 150, 114), (126, 164, 122), (144, 178, 132)]
 lay, _ = forest_band(clump_row(-6, W + 8, 204, 21, 4, 8, 7), C1P, (86, 124, 98), 200, 224, 21)
 comp(im, lay, 0, 0)
-im = waterfall(im, 55, 150, 196, 3, 3)
+im = waterfall(im, [(56, 151, 170, 2), (55, 172, 200, 3)], 3)
 C2P = [(50, 92, 68), (62, 108, 76), (76, 124, 84), (94, 140, 94), (114, 156, 104)]
 base2 = lambda x: TY + 2 - 64 * (abs(x - 125) / 125) ** 1.5
-lay, _ = forest_band(clump_row(-6, W + 8, base2, 22, 5, 11, 9), C2P, (38, 72, 54), TY + 12, TY + 44, 22)
+lay, _ = forest_band(clump_row(-6, W + 8, base2, 22, 4, 11, 8, jitter=4), C2P, (38, 72, 54), TY + 12, TY + 44, 22, tex=0.45)
 comp(im, lay, 0, 0)
 C3P = [(30, 64, 46), (38, 78, 52), (50, 94, 60), (66, 112, 70)]
 base3 = lambda x: TY + 30 - 60 * (abs(x - 125) / 125) ** 1.2
-lay, _ = forest_band(clump_row(-6, W + 8, base3, 23, 6, 12, 10), C3P, (20, 44, 32), TY + 60, TY + 90, 23)
+lay, _ = forest_band(clump_row(-6, W + 8, base3, 23, 5, 12, 9, jitter=4), C3P, (20, 44, 32), TY + 150, TY + 160, 23, tex=0.45, body_col=(20, 44, 32))
 comp(im, lay, 0, 0)
-BG_DONE = np.array(im).copy()
+
+
+def god_rays(img, strength, mask=None):
+    """Lichtstrahlen von der Sonne oben rechts nach unten links, gedithert aufgehellt."""
+    ang = np.degrees(np.arctan2(YY - SY, XX - SX))
+    dist = np.hypot(XX - SX, YY - SY)
+    t = np.zeros((H, W))
+    for (a0, wdt, st) in [(108, 2.6, 0.8), (118, 1.6, 0.6), (127, 3.2, 1.0), (139, 2.0, 0.7), (150, 2.8, 0.55), (99, 1.5, 0.45)]:
+        t += np.exp(-((ang - a0) / wdt) ** 2) * st
+    t *= np.clip((dist - 20) / 50, 0, 1) * np.clip(1 - (dist - 120) / 220, 0, 1)
+    t = np.clip(t * strength, 0, 1)
+    q = np.floor(t * 4 + BAYER4[YY % 4, XX % 4]) / 4 * 0.5
+    if mask is not None:
+        q = np.where(mask, q, 0)
+    a = np.array(img).astype(float)
+    a[..., :3] = a[..., :3] * (1 - q[..., None]) + np.array([240, 236, 190]) * q[..., None]
+    return Image.fromarray(a.clip(0, 255).astype(np.uint8))
+
+
+im = god_rays(im, 0.55)
 
 # ---------------------------------------------------------------- Dschungelband seitlich (Kachel des Spiels)
 tile = area(TSP + 'tile')
-comp(im, tile.crop((0, 0, 72, 100)), 0, TY)
-comp(im, tile.crop((50, 0, 128, 100)), W - 78, TY)
+# nur ganz außen, die Schnittkanten liegen hinter den Stämmen der Tempelbäume
+comp(im, tile.crop((0, 0, 34, 100)), 0, TY)
+comp(im, tile.crop((90, 0, 128, 100)), 212, TY)
 
 
 def limb_field(chains):
@@ -473,15 +499,31 @@ def blob_mask(lobes, sy=1.1):
 
 
 # ---------------------------------------------------------------- Hecke über der Oberkante des Kachelbands
-hedge = [(x, TY + 2 + (abs(x - 125) < 70) * 6, 7) for x in range(-4, 80, 7)] + [(x, TY + 2, 7) for x in range(176, W + 6, 7)]
-hm = blob_mask(hedge) & (YY >= TY - 8) & (YY < TY + 14)
+hedge = [(x, TY + 2, 7) for x in range(-4, 40, 7)] + [(x, TY + 2, 7) for x in range(212, W + 6, 7)]
+hedge += [(44, TY + 22, 10), (58, TY + 34, 10), (50, TY + 52, 12), (66, TY + 58, 9),
+          (200, TY + 20, 10), (188, TY + 36, 10), (196, TY + 54, 12), (180, TY + 60, 9),
+          (36, TY + 78, 12), (62, TY + 82, 11), (86, TY + 90, 8), (206, TY + 78, 12), (186, TY + 84, 11), (164, TY + 92, 8)]
+hm = blob_mask(hedge) & (YY >= TY - 8)
 comp(im, foliage_mass(hm, 61), 0, 0)
 im = leafy(im, hm, 62, spacing=5, inner=10, tone_edge=(1, 2), tone_in=(0, 1), spread=4, n=9, Lr=(4, 7), Wr=(3.5, 5))
 
 # ---------------------------------------------------------------- Stämme (Tempelbäume nach oben verlängert) und Äste
-treesL = [[(33.5, TY + 14, 4.0), (33.5, TY - 40, 4.0), (35, 150, 4.3), (38, 80, 4.6), (40, 20, 5.0), (40, 0, 5.0)],
+def smooth_chain(ctrl, n=40):
+    """Kontrollpunkte (x, y, r) weich interpolieren (Catmull-Rom)."""
+    P = [ctrl[0]] + list(ctrl) + [ctrl[-1]]
+    out = []
+    for i in range(1, len(P) - 2):
+        p0, p1, p2, p3 = [np.array(q, float) for q in P[i - 1:i + 3]]
+        for k in range(n):
+            t = k / n
+            out.append(tuple(0.5 * ((2 * p1) + (-p0 + p2) * t + (2 * p0 - 5 * p1 + 4 * p2 - p3) * t * t + (-p0 + 3 * p1 - 3 * p2 + p3) * t ** 3)))
+    out.append(tuple(ctrl[-1]))
+    return out
+
+
+treesL = [smooth_chain([(33.5, TY + 14, 4.0), (33.5, TY - 30, 4.0), (35.5, 160, 4.2), (39, 100, 4.5), (39.5, 40, 4.8), (37, 0, 5.0)]),
           [(38, 72, 2.4), (52, 56, 1.9), (68, 46, 1.4)]]
-treesR = [[(211.5, TY + 14, 5.5), (211, TY - 50, 5.5), (208, 120, 5.8), (206, 60, 6.0), (205, 0, 6.0)],
+treesR = [smooth_chain([(211.5, TY + 14, 5.5), (211.5, TY - 30, 5.5), (209, 150, 5.7), (205.5, 90, 5.9), (205, 40, 6.0), (207, 0, 6.2)]),
           [(206, 80, 2.6), (188, 62, 1.9), (172, 54, 1.4)]]
 im, trunkL = paint_limbs(im, treesL, 5, moss=0.35)
 im, trunkR = paint_limbs(im, treesR, 6, moss=0.35)
@@ -520,8 +562,122 @@ for (x, key, dy) in [(56, vk[2], -10), (90, vk[4], -8), (118, vk[1], -6), (158, 
     comp(im, v, x - v.width // 2, canopy_bottom(x) + dy)
 im = leafy(im, canm, 51)
 
-# ---------------------------------------------------------------- Tempel
+# ---------------------------------------------------------------- Tempel mit Feuerschalen (wie im Spiel)
 temple = area(TSP + 'temple')
 comp(im, temple, TX, TY)
+TCX = TX + 100
+# Feuerschein (temple-glow.png) gedithert statt halbtransparent
+gl = np.array(area(TSP + 'temple-glow')).astype(float)
+ga = np.zeros((H, W)); ga[TY:TY + 100, TX:TX + 200] = gl[..., 3] / 96.0
+a_ = np.array(im).astype(float)
+q = np.floor(ga * 3 * 0.55 + BAYER4[YY % 4, XX % 4]) / 3 * 0.42
+tm = np.zeros((H, W), bool); tm[TY:TY + 100, TX:TX + 200] = np.array(temple)[..., 3] > 0
+q = np.where(tm, q, 0)
+a_[..., :3] = a_[..., :3] * (1 - q[..., None]) + np.array([255, 150, 50]) * q[..., None]
+im = Image.fromarray(a_.clip(0, 255).astype(np.uint8))
+fl = {'l': area(TSP + 'flames-l'), 'm': area(TSP + 'flames-m')}
+for (fx, fy, g, k) in [(-30, 23, 'l', 0), (30, 23, 'l', 2), (-50, 52, 'm', 1), (50, 52, 'm', 3)]:
+    w_ = 7 if g == 'l' else 5
+    fr = fl[g].crop((k * w_, 0, k * w_ + w_, fl[g].height))
+    comp(im, fr, TCX + fx - w_ // 2, TY + fy)
+im = god_rays(im, 0.4, mask=tm)
+# Ara auf dem Ast (wie im Spiel an x+60, y 35)
+macaw = area(TSP + 'macaw').crop((0, 0, 9, 14))
+comp(im, macaw, TCX + 60, TY + 35)
 
+# ---------------------------------------------------------------- Aras im Dunst
+mf = area(TSP + 'macaw-fly')
+f0, f1 = mf.crop((0, 0, 13, 8)), mf.crop((13, 0, 26, 8))
+comp(im, f0, 128, 104)
+comp(im, f1.transpose(Image.FLIP_LEFT_RIGHT), 156, 88)
+
+
+# ---------------------------------------------------------------- Details im Laub: rote Lianen (aus der Kachel), Blüten
+tl = np.array(tile).astype(int)
+redm = (tl[..., 0] > tl[..., 1] + 25)
+
+
+def red_vine(box):
+    x0, y0, x1, y1 = box
+    a_ = np.array(tile.crop(box))
+    a_[..., 3] = np.where(redm[y0:y1, x0:x1], 255, 0)
+    return Image.fromarray(a_)
+
+
+rv1 = red_vine((30, 3, 72, 37))
+rv2 = red_vine((98, 3, 124, 23))
+comp(im, rv1, 44, 14)
+comp(im, rv2.transpose(Image.FLIP_LEFT_RIGHT) if False else rv2, 150, 20)
+comp(im, rv2, 222, 96)
+
+
+def flower(img, x, y, kind='o'):
+    P = {'o': ((58, 18, 6), (168, 64, 26), (224, 106, 36), (240, 208, 96)),
+         'r': ((48, 6, 8), (138, 20, 24), (192, 42, 38), (240, 208, 96))}[kind]
+    pat = ['.d.d.', 'daba d'.replace(' ', ''), '.bcb.', 'dabad', '.d.d.']
+    a = np.array(img)
+    for j, row in enumerate(pat):
+        for i, ch in enumerate(row):
+            if ch == '.':
+                continue
+            c = P[{'d': 0, 'a': 1, 'b': 2, 'c': 3}[ch]]
+            a[y - 2 + j, x - 2 + i] = rgba(c)
+    return Image.fromarray(a)
+
+
+for (x, y, k) in [(22, 38, 'r'), (86, 24, 'o'), (136, 14, 'r'), (197, 36, 'o'), (238, 70, 'r'), (12, 100, 'o'), (240, 140, 'o'), (16, 176, 'r'), (72, 44, 'r')]:
+    im = flower(im, x, y, k)
+
+# ---------------------------------------------------------------- Kletterpflanzen an den Stämmen
+a_ = np.array(im)
+for (cx, hw, y0, y1, ph) in [(34, 4.3, 90, 200, 0.0), (208, 5.8, 70, 180, 1.3)]:
+    for y in range(y0, y1):
+        c = cx + (cx - 34) * 0 + 0
+        ch = treesL[0] if cx < 125 else treesR[0]
+        tcx = np.interp(y, [q[1] for q in ch[::-1]], [q[0] for q in ch[::-1]])
+        s_ = math.sin(y * 0.22 + ph)
+        if math.cos(y * 0.22 + ph) > -0.1:
+            x = int(round(tcx + s_ * (hw - 0.5)))
+            a_[y, x] = rgba(LEAF[3] if s_ > 0 else LEAF[1])
+            if y % 5 == 0:
+                d = 1 if s_ > 0 else -1
+                a_[y, x + d] = rgba(LEAF[4]); a_[y - 1, x + d] = rgba(LEAF[2]); a_[y, x + 2 * d] = rgba(OUTL)
+im = Image.fromarray(a_)
+# Aufsitzerpflanzen (Büschel) an den Stämmen
+a_ = np.array(im)
+for (x, y, n, sp, sd) in [(37, 132, 12, 5, 1), (31, 196, 9, 4, 2), (210, 118, 12, 5, 3), (214, 178, 10, 4, 4)]:
+    paint_leaves(a_, leaf_cluster(x, y, n, sp, sd, Lr=(4, 7), Wr=(3.5, 5), tone=(2, 4)), LEAF, OUTL)
+im = Image.fromarray(a_)
+im = flower(im, 39, 130, 'r')
+im = flower(im, 212, 116, 'o')
+
+# ---------------------------------------------------------------- Vordergrund: Farne (sway.png) und Blätter unten
+ferns = area(TSP + 'sway').crop((0, 90, 128, 100))
+flab, fn = ndimage.label(np.array(ferns)[..., 3] > 0, structure=np.ones((3, 3)))
+FERNS = []
+for i, sl in enumerate(ndimage.find_objects(flab)):
+    a_ = np.array(ferns.crop((sl[1].start, sl[0].start, sl[1].stop, sl[0].stop)))
+    a_[..., 3] = np.where(flab[sl] == i + 1, a_[..., 3], 0)
+    FERNS.append(Image.fromarray(a_))
+for (i, x) in [(0, 2), (1, 20), (2, 44), (3, 186), (0, 208), (2, 228)]:
+    f_ = FERNS[i % len(FERNS)]
+    comp(im, f_, x, H - 7 - f_.height + 2)
+
+# ---------------------------------------------------------------- Glühwürmchen im Unterholz
+a_ = np.array(im)
+for (x, y) in [(14, 262), (52, 284), (24, 318), (200, 270), (232, 300), (190, 318), (60, 250), (226, 252)]:
+    for (dx, dy) in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+        a_[y + dy, x + dx, :3] = (a_[y + dy, x + dx, :3] * 0.4 + np.array([150, 200, 80]) * 0.6).astype(np.uint8)
+    a_[y, x] = (244, 255, 154, 255)
+im = Image.fromarray(a_)
+
+# ---------------------------------------------------------------- Rahmen: Tempelstein mit Stufenmäander
+FR_OUT, FR_LIGHT, FR_MID, FR_DARK = (18, 11, 2), (186, 179, 112), (120, 109, 46), (52, 41, 9)
+bevel_frame(im, FR_OUT, FR_LIGHT, FR_MID, FR_DARK, OUTL, width=7)
+d = ImageDraw.Draw(im)
+for (x, y) in [(3, 3), (W - 4, 3), (3, H - 4), (W - 4, H - 4)]:
+    d.rectangle((x - 3, y - 3, x + 3, y + 3), fill=FR_OUT)
+    d.rectangle((x - 2, y - 2, x + 2, y + 2), fill=(142, 132, 64))
+    d.rectangle((x - 1, y - 1, x + 1, y + 1), fill=(122, 20, 16))
+    d.point((x - 1, y - 1), fill=(216, 72, 42))
 print(save(im, '12_temple_of_sacrifice'))
