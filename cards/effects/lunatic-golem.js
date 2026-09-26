@@ -39,7 +39,10 @@ const DMG_PER_CYCLE = 100;
 function reevalImmunity(engine, inst) {
   if (!inst || inst.zone !== 'support') return;
   if (!inst.counters.buffs) inst.counters.buffs = {};
-  const n = countDistinctLunaticCycle(engine);
+  // v1444 (Als Ruling 26.9.): Dark Gears und Diplomacys Negation ist unverhinderbar —
+  // solange sie liegt, hat der Golem KEINE seiner Stufen-Effekte, also
+  // auch keine Immunitaet.
+  const n = engine.istHartNegiert(inst) ? 0 : countDistinctLunaticCycle(engine);
   const cur = inst.counters.buffs.negative_status_immune;
   if (n >= 2) {
     if (!cur) {
@@ -78,6 +81,7 @@ module.exports = {
   canActivateCreatureEffect(ctx) {
     const inst = ctx.card;
     if (!inst || inst.zone !== 'support') return false;
+    if (ctx._engine.istHartNegiert(inst)) return false;   // v1444
     return countDistinctLunaticCycle(ctx._engine) >= 1;
   },
 
@@ -174,6 +178,12 @@ module.exports = {
     onGameStart: (ctx) => reevalImmunity(ctx._engine, ctx.card),
     onTurnStart: (ctx) => reevalImmunity(ctx._engine, ctx.card),
     onCardEnterZone: (ctx) => reevalImmunity(ctx._engine, ctx.card),
+    // v1444: trifft den Golem eine unverhinderbare Negation (Dark Gear, Diplomacy),
+    // faellt die Immunitaet sofort weg — nicht erst zum naechsten Zug.
+    // Das Ende der Negation holt `onTurnStart` ein (Ablauf vor dem Hook).
+    onStatusApplied: (ctx) => {
+      if (ctx.target === ctx.card) reevalImmunity(ctx._engine, ctx.card);
+    },
     onCardLeaveZone: (ctx) => {
       // A Lunatic Cycle equip leaving may drop us below tier 2.
       if (ctx.leavingCard?.id === ctx.card.id) return; // we're the one leaving
@@ -183,6 +193,7 @@ module.exports = {
     // ── Tier 3+: halve all damage THIS Creature takes ──
     beforeCreatureDamageBatch: (ctx) => {
       const engine = ctx._engine;
+      if (engine.istHartNegiert(ctx.card)) return;   // v1444
       if (countDistinctLunaticCycle(engine) < 3) return;
       const meId = ctx.card.id;
       for (const e of (ctx.entries || [])) {
@@ -196,6 +207,7 @@ module.exports = {
     beforeDamage: (ctx) => {
       if (ctx.cancelled) return;
       const engine = ctx._engine;
+      if (engine.istHartNegiert(ctx.card)) return;   // v1444
       if (countDistinctLunaticCycle(engine) < 4) return;
       const target = ctx.target;
       if (!target || target.maxHp === undefined) return; // hero targets only

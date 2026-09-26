@@ -2,20 +2,19 @@
 //  CARD EFFECT: "Carris, the Time Keeper"
 //  Hero — 1 HP / 60 ATK (Divinity + Premonition)
 //
-//  "Any damage this Hero would take becomes 0, including damage that
-//   could normally not be reduced or negated. At the end of each of
-//   your turns, place 1 Time Counter on this Hero. If there are 4 or
+//  "Any damage this Hero would take becomes 0. At the end of each of
+//   your turns, place 1 Time Counter on this Hero. If there are 3 or
 //   more Time Counters on this Hero, you lose the game. These effects
-//   cannot be negated."
+//   cannot be negated."   (Text Al 26.9., v1444 — vorher: „including
+//   damage that could normally not be reduced or negated", 4 Counter)
 //
 //  ── Wiring ──────────────────────────────────────────────────────
 //  ① Damage wall. `heroSelfDamageImmune: true` is the generic engine
-//     hook (read by `_isHeroSelfDamageImmune` in BOTH the normal
-//     damage path `_actionDealDamageImpl` AND the true-damage path
-//     `actionDealTrueDamage`). The engine zeroes EVERY incoming
-//     damage event — normal, status (burn / poison), and "cannot be
-//     reduced or negated" true damage alike — before any reaction /
-//     Surprise / BEFORE_DAMAGE side effects can fire. The probe is
+//     hook (read by `_isHeroSelfDamageImmune` in the normal damage
+//     path `_actionDealDamageImpl`, right after BEFORE_DAMAGE). It
+//     zeroes normal and status (burn / poison) damage. Since v1444
+//     damage that cannot be reduced or negated (`cannotBeNegated` /
+//     `cannotBeReduced`, true damage) goes THROUGH. The probe is
 //     deliberately NOT status-gated, so the wall holds even while
 //     Carris is Frozen / Stunned / Negated ("cannot be negated").
 //     Non-damage defeats (instant-defeat effects) are NOT blocked —
@@ -23,7 +22,7 @@
 //     Time-Counter clock below is the intended counterplay/clock.
 //
 //  ② Time-Counter clock. At the end of EACH of the controller's
-//     turns a Time Counter is placed; the 4th makes the controller
+//     turns a Time Counter is placed; the 3rd makes the controller
 //     lose immediately. `bypassStatusFilter: true` lets the
 //     onTurnEnd tick fire even when Carris is Frozen / Stunned /
 //     Negated, honouring "these effects cannot be negated".
@@ -33,7 +32,7 @@
 // ═══════════════════════════════════════════
 
 const CARD_NAME = 'Carris, the Time Keeper';
-const LOSE_AT   = 4;
+const LOSE_AT   = 3;   // v1444: vorher 4
 
 module.exports = {
   activeIn: ['hero'],
@@ -50,7 +49,7 @@ module.exports = {
   hooks: {
     /**
      * End of each of the controller's turns: +1 Time Counter, then
-     * lose at 4+. `ctx.activePlayer` is the player whose turn is
+     * lose at 3+. `ctx.activePlayer` is the player whose turn is
      * ending; only tick on Carris's controller's turns ("each of
      * YOUR turns").
      */

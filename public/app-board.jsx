@@ -40183,7 +40183,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                       border: 'calc(1.5px * var(--board-scale)) solid #2a1505',
                       zIndex: 6, pointerEvents: 'auto', cursor: 'help',
                     }}
-                    onMouseEnter={e => showGameTooltip(e, `Time Counters: ${hero._timeCounters}. At the end of each of your turns Carris gains 1; at 4 or more, you lose the game.`)}
+                    onMouseEnter={e => showGameTooltip(e, `Time Counters: ${hero._timeCounters}. At the end of each of your turns Carris gains 1; at 3 or more, you lose the game.`)}
                     onMouseLeave={hideGameTooltip}
                   >
                     ⏳{hero._timeCounters}

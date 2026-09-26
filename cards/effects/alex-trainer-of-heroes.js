@@ -2,6 +2,14 @@
 //  CARD EFFECT: "Alex, Trainer of Heroes"
 //  Hero (500 HP, 80 ATK — Fighting + Training)
 //
+//  v1444 (Als Vorgabe 26.9.): „Up to 2 times per
+//  turn, when you attach an Ability to this Hero:
+//  …" — gemeinsamer Rundenzaehler (`_charges`,
+//  Schluessel `AlexTutor`), verbucht erst, wenn der
+//  Spieler eine Ability waehlt (ein abgelehntes
+//  „you may" kostet nichts). Abzeichen am Portrait
+//  ueber `chargesPerTurn`/`chargeKey`.
+//
 //  Trigger: When an Ability is attached to Alex,
 //  the controller may search their deck for any
 //  Ability and attach it to one of their OTHER
@@ -39,8 +47,11 @@
 
 const { hasCardType } = require('./_hooks');
 const { loadCardEffect } = require('./_loader');
+const { usesLeft, spendUse, refundUse } = require('./_charges');
 
 const CARD_NAME = 'Alex, Trainer of Heroes';
+const MAX_USES_PER_TURN = 2;      // v1444
+const USE_KEY = 'AlexTutor';
 
 /** Pick the zone slot the tutored ability will land in on `targetHeroIdx`. */
 function findTargetZone(abZones, cardName, engine = null, pi = null, heroIdx = null, wunsch = -1) {
@@ -68,6 +79,10 @@ function findTargetZone(abZones, cardName, engine = null, pi = null, heroIdx = n
 
 module.exports = {
   activeIn: ['hero'],
+
+  // v1444: „Up to 2 times per turn" — Abzeichen am Heldenportrait.
+  chargesPerTurn: MAX_USES_PER_TURN,
+  chargeKey: USE_KEY,
 
   // ── CPU prompt overrides ─────────────────────────────────────────────
   // Alex fires TWO prompts in sequence: a cardGallery (pick which Ability
@@ -209,6 +224,9 @@ module.exports = {
 
       const alex = ctx.attachedHero;
       if (!alex?.name || alex.hp <= 0) return;
+      // v1444: hoechstens 2× pro Runde.
+      const zaehler = { key: USE_KEY, max: MAX_USES_PER_TURN };
+      if (usesLeft(alex, engine.gs, zaehler) <= 0) return;
 
       // Live "other heroes" on Alex's side.
       const otherHeroIndices = [];
@@ -248,16 +266,20 @@ module.exports = {
       });
       if (!picked || picked.cancelled || !picked.cardName) return;
       const chosenAbility = picked.cardName;
+      // Ab hier gilt die Nutzung als angetreten; jeder Abbruch weiter
+      // unten gibt sie zurueck.
+      if (!spendUse(alex, engine.gs, zaehler)) return;
+      const zurueck = () => refundUse(alex, engine.gs, zaehler);
 
       // Re-verify — the deck state might have shifted during the prompt
       // (unlikely mid-hook, but cheap to check).
-      if ((ps.mainDeck || []).indexOf(chosenAbility) < 0) return;
+      if ((ps.mainDeck || []).indexOf(chosenAbility) < 0) { zurueck(); return; }
 
       // Which other heroes can host THIS specific ability?
       const eligibleHeroes = otherHeroIndices.filter(hi =>
         engine.canAttachAbilityToHero(pi, chosenAbility, hi)
       );
-      if (eligibleHeroes.length === 0) return;
+      if (eligibleHeroes.length === 0) { zurueck(); return; }
 
       // Hero / zone pick. The `abilityAttachTarget` prompt hijacks the same
       // client-side click-to-attach machinery used for hand-driven attach
@@ -293,8 +315,8 @@ module.exports = {
           description: `Attach ${chosenAbility} to one of your other Heroes.`,
           cancellable: true,
         });
-        if (!pickRes || pickRes.cancelled) return;
-        if (typeof pickRes.heroIdx !== 'number' || !eligibleHeroes.includes(pickRes.heroIdx)) return;
+        if (!pickRes || pickRes.cancelled) { zurueck(); return; }
+        if (typeof pickRes.heroIdx !== 'number' || !eligibleHeroes.includes(pickRes.heroIdx)) { zurueck(); return; }
         targetHeroIdx = pickRes.heroIdx;
         explicitZone = typeof pickRes.zoneSlot === 'number' ? pickRes.zoneSlot : -1;
       }
@@ -306,7 +328,7 @@ module.exports = {
       // difference that we deliberately do NOT flip `abilityGivenThisTurn`
       // — this is explicitly an "additional attachment" per card text.
       const _taken_deckIdx = await engine.takeFromPile(ps, 'deck', chosenAbility, { source: CARD_NAME });   // v820: Stapel-Schicht
-      if (!_taken_deckIdx) return;
+      if (!_taken_deckIdx) { zurueck(); return; }
 
       const abZones = ps.abilityZones[targetHeroIdx] || [[], [], []];
       ps.abilityZones[targetHeroIdx] = abZones;
@@ -318,6 +340,7 @@ module.exports = {
         // Race: the target zone filled between canAttach check and now.
         ps.mainDeck.push(chosenAbility);
         engine.shuffleDeck(pi, 'main');
+        zurueck();
         return;
       }
       if (!abZones[targetZone]) abZones[targetZone] = [];

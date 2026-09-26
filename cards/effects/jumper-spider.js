@@ -175,7 +175,7 @@ module.exports = {
       // Defending the Gate check (card text is unconditional).
       const result = await engine.actionTransferCreature(
         inst, activePlayer, chosenZone.heroIdx, chosenZone.slotIdx,
-        { sourceName: CARD_NAME },
+        { sourceName: CARD_NAME, ignoreGateShield: true },   // v1444: Transfer fragt sonst das Tor
       );
       if (!result?.success) return;
 

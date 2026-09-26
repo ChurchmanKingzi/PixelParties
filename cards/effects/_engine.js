@@ -6083,12 +6083,11 @@ class GameEngine {
    *
    * A Hero whose own effect script exports `heroSelfDamageImmune`
    * (boolean `true`, or a `(engine, ownerIdx, heroIdx) → bool`
-   * predicate) nullifies ALL incoming damage to itself — normal,
-   * status (burn / poison), AND true damage that "could normally not
-   * be reduced or negated" (Acid Vial / Rockfall tier). This is the
-   * engine hook behind Carris, the Time Keeper: it sits BESIDE the
-   * other absolute hero protections (firstTurnProtectedPlayer, Charme
-   * Lv3, Baihu petrify) so true-damage callers respect it too.
+   * predicate) nullifies incoming damage to itself — normal and status
+   * (burn / poison). Seit v1444 NICHT mehr durchschlagenden Schaden
+   * (`cannotBeNegated` / `cannotBeReduced`) und NICHT True Damage —
+   * Carris' neuer Text nimmt diese Klausel heraus. Der Aufrufer im
+   * Schadenspfad prueft die Piercing-Marken selbst.
    *
    * Deliberately NOT gated on Frozen / Stunned / Negated — Carris's
    * card text says the damage-prevention "cannot be negated", so the
@@ -7762,19 +7761,8 @@ class GameEngine {
       return { dealt: 0, cancelled: true, effectNegated: true };
     }
 
-    // ── Absolute self-damage immunity (Carris, the Time Keeper) ──
-    // "Any damage this Hero would take becomes 0, including damage that
-    // could normally not be reduced or negated." Checked here, BEFORE
-    // the Anti Magic / Surprise windows and BEFORE_DAMAGE — nothing
-    // happens to the Hero at all, so no would-take-damage side effects
-    // fire. The matching guard in actionDealTrueDamage covers the
-    // true-damage path.
-    if (target && target.hp !== undefined && amount > 0
-        && this._isHeroSelfDamageImmune(target)) {
-      this.log('damage_blocked', { target: this._heroLabel(target), reason: 'self_damage_immune' });
-      this._flashHeroDamageZero(target);
-      return { dealt: 0, cancelled: true };
-    }
+    // (Carris, the Time Keeper — seit v1444 weiter unten, hinter
+    // BEFORE_DAMAGE: erst dort steht fest, ob der Schaden durchschlaegt.)
     // ── damage_proof (Storm Piano, v628) ────────────────────────────
     // „prevent any damage the Hero would take until the end of your next
     // turn": ein positiver Heldenstatus, der JEDEN normalen Schaden
@@ -8197,6 +8185,23 @@ class GameEngine {
     // since strictly "only fire if the attack hits exactly 1 target"
     // would require deferring the boost past AFTER_SPELL_RESOLVED.
     this._applyEmpoweredStrikeIfApplicable(hookCtx);
+
+    // ── Carris, the Time Keeper (v1444, neuer Text Al 26.9.) ─────────
+    // „Any damage this Hero would take becomes 0." Die fruehere Klausel
+    // „including damage that could normally not be reduced or negated"
+    // ist GESTRICHEN: durchschlagender Schaden (`cannotBeNegated` /
+    // `cannotBeReduced` — Ida, Club of Gobbo, Empowered Strike, Monia-
+    // Bot-Umleitung, Tempeste …) trifft Carris jetzt. Deshalb steht die
+    // Pruefung HIER, nachdem BEFORE_DAMAGE und Empowered Strike ihre
+    // Piercing-Marken gesetzt haben. True Damage (`actionDealTrueDamage`)
+    // prueft sie gar nicht mehr.
+    if (target?.hp !== undefined && hookCtx.amount > 0
+        && !hookCtx.cannotBeNegated && !hookCtx.cannotBeReduced
+        && this._isHeroSelfDamageImmune(target)) {
+      this.log('damage_blocked', { target: this._heroLabel(target), reason: 'self_damage_immune' });
+      this._flashHeroDamageZero(target);
+      return { dealt: 0, cancelled: true };
+    }
 
     // Armed-arrow attack modifiers (flat damage bumps and hard-zero from
     // Hydra Blood). Runs AFTER beforeDamage hooks so Sacred Hammer / any
@@ -8734,15 +8739,9 @@ class GameEngine {
         return { dealt: 0 };
       }
 
-      // Absolute self-damage immunity (Carris, the Time Keeper) — the
-      // card's "including damage that could normally not be reduced or
-      // negated" carve-out explicitly covers true damage. Sits beside
-      // first-turn protection as a non-reducible, non-negatable wall.
-      if (this._isHeroSelfDamageImmune(target)) {
-        this.log('damage_blocked', { target: this._heroLabel(target), reason: 'self_damage_immune' });
-        this._flashHeroDamageZero(target);
-        return { dealt: 0 };
-      }
+      // (Carris' Immunitaet gilt seit v1444 NICHT mehr fuer True Damage —
+      // der Kartentext nimmt „damage that could normally not be reduced
+      // or negated" nicht mehr aus.)
 
       const hpBefore = target.hp;
       target.hp = Math.max(0, target.hp - amount);
@@ -14145,6 +14144,26 @@ this._deathWatch = (this._deathWatchStack || []).length
       });
       return { success: false, omniImmune: true };
     }
+    // ★ v1444 (Als Befund 26.9.: „Defending the Gate reagiert nicht auf
+    // Dark Gear"): Kontrollwechsel ist ein Effekt auf eine Karte in der
+    // Support Zone des bisherigen Kontrolleurs. Hier, am EINEN Weg fuer
+    // alle Uebernahmen (Dark Gear, Diplomacy, Spirit of the Heart Bow,
+    // Molinda, Memory Blast, Liberation …), wird das Tor gefragt. Quelle
+    // ist der Uebernehmende, sofern nicht ausdruecklich anders angegeben;
+    // `_triggerGateCheck` laesst eigene Effekte ohnehin durch.
+    // Opt-out `ignoreGateShield` fuer Texte ohne Gegner-Effekt (Jumper
+    // Spider wechselt aus eigenem Text).
+    if (!opts.ignoreGateShield && fromPlayerIdx !== toPlayerIdx && inst.zone === 'support') {
+      const quelle = typeof opts.sourceOwner === 'number' ? opts.sourceOwner : toPlayerIdx;
+      await this._triggerGateCheck(fromPlayerIdx, opts.sourceName || this._effectSourceName(), quelle);
+      if (this._isGateShielded(fromPlayerIdx, quelle)) {
+        this.log('transfer_fizzle', {
+          creature: inst.name, reason: 'defending_the_gate',
+          from: fromPs.username, to: toPs.username,
+        });
+        return { success: false, gateShielded: true };
+      }
+    }
     // ★ v1021: „Control of this Creature cannot change."
     if (this.controlIsLocked(inst)) {
       this.log('transfer_fizzle', {
@@ -16519,6 +16538,14 @@ this._deathWatch = (this._deathWatchStack || []).length
   async actionNegateCreature(inst, source, opts = {}) {
     if (!inst) return;
     if (inst.faceDown) return; // Face-down surprises cannot be negated
+    // ★ v1444 (Als Ruling 26.9.): `opts.unpreventable` — eine Negation,
+    // die NICHT verhindert werden kann (Dark Gear, Diplomacy). Sie ist
+    // kein Statuseffekt: weder „immune to negative status effects"
+    // (Lunatic Golem) noch ein Negations-Waechter heben sie auf. Sie
+    // traegt dafuer die Marke `_negatedHard` (s. `istHartNegiert`).
+    // Defending the Gate bleibt davon unberuehrt — das Tor negiert den
+    // ganzen Effekt, bevor er die Kreatur erreicht.
+    const hart = !!opts.unpreventable;
     // Defending the Gate: trigger for opp-applied negations only.
     // `selfInflicted` negations are the negating player's own cost
     // (Necromancy / Dark Gear / Diplomacy / Soul Shard Ka / Omikron /
@@ -16543,7 +16570,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // v818 (Queen of Kings [B], Als Ruling): solange ein Negations-
     // Waechter steht, wird `negated`/`nulled` durch den Gegner gar nicht
     // erst angelegt. Eigene Negationen (Platzierungen) bleiben moeglich.
-    {
+    if (!hart) {
       const negOwner = source?.owner ?? source?.controller;
       if (negOwner !== (inst.controller ?? inst.owner) && this._creatureNegationProof(inst)) {
         this.log('negation_blocked', { creature: inst.name, source: source?.name || 'effect', reason: 'negation_proof' });
@@ -16552,6 +16579,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     }
     const statusKey = opts.statusKey || 'negated';
     inst.counters[statusKey] = 1;
+    if (hart) inst.counters._negatedHard = 1;
     // Per-instance cleansable override (Unwanted Audience). Normally
     // `negated` / `nulled` are uncleansable (STATUS_EFFECTS), keeping
     // Dark Gear / Diplomacy permanent — `opts.cleansable` opts THIS
@@ -16588,9 +16616,11 @@ this._deathWatch = (this._deathWatchStack || []).length
     inst.counters.buffs[buffKey] = {
       expiresAtTurn: opts.expiresAtTurn,
       expiresForPlayer: opts.expiresForPlayer,
-      clearCountersOnExpire: opts.cleansable
-        ? [statusKey, statusKey + 'Cleansable']
-        : [statusKey],
+      clearCountersOnExpire: [
+        statusKey,
+        ...(opts.cleansable ? [statusKey + 'Cleansable'] : []),
+        ...(hart ? ['_negatedHard'] : []),
+      ],
       source,
       // Mirror hero post-cleanse immunity: when this buff expires
       // naturally (start of expiresForPlayer's turn), the creature
@@ -16916,7 +16946,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // creature carrying the `negative_status_immune` buff in
     // `counters.buffs` can't receive ANY negative status (Lunatic
     // Golem tier 2+, and any future creature granting it).
-    if (statusDef?.negative && inst.counters?.buffs?.negative_status_immune) return false;
+    if (statusDef?.negative && this._creatureNegStatusImmune(inst)) return false;   // v1444: nicht bei harter Negation
     // Light Ball — Attachment Spell on the controller's Hero protects
     // ALL other own targets (creatures included) from negative status
     // effects. Creatures are inherently "other" than the host Hero,
@@ -16947,7 +16977,19 @@ this._deathWatch = (this._deathWatchStack || []).length
    * gates here + server-side doActivateCreatureEffect.
    */
   _creatureNegStatusImmune(inst) {
-    return !!inst?.counters?.buffs?.negative_status_immune;
+    // v1444: eine unverhinderbare Negation (Dark Gear) schaltet auch diese
+    // Immunitaet ab — sie ist ein Effekt der Kreatur selbst (Lunatic Golem).
+    return !!inst?.counters?.buffs?.negative_status_immune && !this.istHartNegiert(inst);
+  }
+
+  /**
+   * ★ v1444: Unverhinderbar negiert (Dark Gear, Diplomacy — s.
+   * `actionNegateCreature` mit `unpreventable`). Keine Immunitaet und
+   * kein Negations-Waechter hebt das auf.
+   */
+  istHartNegiert(inst) {
+    const c = inst?.counters;
+    return !!(c && c._negatedHard && (c.negated || c.nulled));
   }
 
   /**
@@ -17127,6 +17169,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       && !this._isChillyDogActiveFor(inst.controller ?? inst.owner);
     const hasCC = !!(c.negated || c.nulled || c.stunned || c.magic_silenced || frostStillt);
     if (!hasCC) return false;
+    if (this.istHartNegiert(inst)) return true;   // v1444: unverhinderbar
     if (opts.honorNegStatusImmune !== false && this._creatureNegStatusImmune(inst)) return false;
     if (this._creatureNegationProof(inst)) return false;
     return true;
@@ -20581,6 +20624,10 @@ this._deathWatch = (this._deathWatchStack || []).length
     // Process regular buff expiry (Cloudy, etc.) AFTER status damage
     await this._processBuffExpiry({ beforeStatusDamage: false });
 
+    // v1444 Torchure: „During your NEXT turn" — der erste eigene Zug nach
+    // dem Wirken wird hier am Gift-Status festgehalten (s. `_torchureZusatz`).
+    this._torchureZugMerken(this.gs.activePlayer);
+
     // Now fire turn-start hooks (Barker, Slime level-ups, Rancher restore, etc.)
     await this.runHooks(HOOKS.ON_TURN_START, { turn: this.gs.turn, activePlayer: this.gs.activePlayer });
     this.sync();
@@ -20672,6 +20719,8 @@ this._deathWatch = (this._deathWatchStack || []).length
         for (const ps of this.gs.players) {
           if (ps) ps._actionsPlayedThisPhase = 0;
         }
+        // v1444 Torchure: Zusatz-Action, solange der Held noch vergiftet ist.
+        this._torchureZusatz(this.gs.activePlayer);
         // Compute which creatures have custom summon conditions that block them
         this.gs.summonBlocked = this.getSummonBlocked(this.gs.activePlayer);
         // Opp-Action-Phase hand reaction window (Burning Fuse, etc.).
@@ -20925,6 +20974,38 @@ this._deathWatch = (this._deathWatchStack || []).length
    * action resolves, where the grace gate KEEPS the player in Action
    * Phase so a freshly-granted bonus isn't accidentally skipped.
    */
+  // ─── TORCHURE (v1444, Als Vorgabe 26.9.) ─────────────────────────
+  // „Inflict 4 Stacks of Poison to a Hero you control that is not
+  //  Poisoned to play this card. During your next turn, if that Hero is
+  //  still Poisoned from this effect, you may perform an additional
+  //  Action during your Action Phase."
+  // Die Marke `_torchure = { owner, turn }` liegt AM Gift-Status des
+  // Helden: wird das Gift geheilt oder stirbt der Held, ist sie mit weg —
+  // genau „still Poisoned from this effect". Die Karte selbst liegt da
+  // laengst in der Ablage und hoert keine Hooks mehr, deshalb stehen die
+  // zwei Schritte hier.
+
+  /** Zugbeginn: den ersten eigenen Zug nach dem Wirken festhalten. */
+  _torchureZugMerken(pi) {
+    for (const hero of (this.gs.players[pi]?.heroes || [])) {
+      const m = hero?.statuses?.poisoned?._torchure;
+      if (!m || m.owner !== pi) continue;
+      if (m.naechsterZug == null && m.turn < this.gs.turn) m.naechsterZug = this.gs.turn;
+    }
+  }
+
+  /** Beginn der Action Phase: Zusatz-Action (zweiter Platz) gewaehren. */
+  _torchureZusatz(pi) {
+    const ps = this.gs.players[pi];
+    if (!ps) return;
+    const hero = (ps.heroes || []).find(h => h?.name && h.hp > 0
+      && h.statuses?.poisoned?._torchure?.owner === pi
+      && h.statuses.poisoned._torchure.naechsterZug === this.gs.turn);
+    if (!hero) return;
+    ps._bonusMainActions = Math.max(1, ps._bonusMainActions || 0);
+    this.log('torchure_bonus_action', { player: ps.username, hero: hero.name });
+  }
+
   async advanceToPhase(playerIdx, targetPhase, opts = {}) {
     if (playerIdx !== this.gs.activePlayer) return false;
 
@@ -28260,6 +28341,33 @@ this._deathWatch = (this._deathWatchStack || []).length
   /**
    * Sync check: is this player's support zone currently shielded by Defending the Gate?
    */
+  /**
+   * ★ v1444 (Als Befund 26.9.: „Defending the Gate reagiert nicht auf
+   * Dark Gear — und vielleicht Artifacts allgemein"). Zielende Artifacts
+   * und Potions loesen ueber `script.resolve` auf; das Tor meldete sich
+   * nur, wenn der Rumpf zufaellig ein Aktions-Primitiv mit Tor-Pruefung
+   * traf (Schaden, Zerstoeren, Status …) — Kontrollwechsel, Kosten-
+   * Berechnungen und Eigenbau-Effekte liefen daran vorbei. Hier wird das
+   * Tor gefragt, SOBALD ein gewaehltes Ziel in einer gegnerischen Support
+   * Zone liegt, noch bevor der Rumpf laeuft. Die Primitive sehen danach
+   * `_gateShieldActive` und fragen nicht erneut.
+   */
+  async gateVorZielen(pi, sourceName, selectedIds, validTargets) {
+    const seiten = new Set();
+    for (const id of (selectedIds || [])) {
+      const t = (validTargets || []).find(v => v && v.id === id);
+      if (!t) continue;
+      const inst = t.cardInstance || (t.type === 'equip' || t.type === 'creature'
+        ? this.cardInstances.find(c => c.zone === 'support' && (c.controller ?? c.owner) === t.owner
+          && c.heroIdx === t.heroIdx && c.zoneSlot === t.slotIdx)
+        : null);
+      if (!inst || inst.zone !== 'support' || inst.faceDown) continue;
+      const seite = inst.controller ?? inst.owner;
+      if (seite !== pi) seiten.add(seite);
+    }
+    for (const seite of seiten) await this._triggerGateCheck(seite, sourceName || null, pi);
+  }
+
   _isGateShielded(targetOwnerIdx, quelleBesitzer = undefined) {
     if (this.gs._gateShieldActive !== targetOwnerIdx) return false;
     return this._gateQuelleIstGegner(targetOwnerIdx, quelleBesitzer);   // v1377
@@ -38243,6 +38351,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         // turn the creature is being fired on.
         // Universal negative-status immunity (Lunatic Golem 2+) keeps
         // the creature activatable despite the CC it still carries.
+        if (this.istHartNegiert(inst)) continue;   // v1444
         if (!this._creatureNegStatusImmune(inst)
             && (inst.counters?.frozen || inst.counters?.stunned
                 || inst.counters?.negated || inst.counters?.nulled)) continue;

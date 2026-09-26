@@ -10,13 +10,13 @@
 //     board" — der EIGENE Spieler hat Schaden
 //     ausgeteilt (Held ODER Creature als Ziel,
 //     beide Seiten; Status-Ticks zaehlen laut
-//     Fensterkonvention nicht). Wirkung: 100
+//     Fensterkonvention nicht). Wirkung: 80
 //     zusaetzlicher Schaden auf DASSELBE Ziel.
 //     Ein bereits am Ausloeser gestorbenes Ziel
 //     laesst den Trigger aus (nichts mehr zu
 //     treffen).
 //
-//  2. DISCARD-RIDER (v697-Fenster): "deal 100
+//  2. DISCARD-RIDER (v697-Fenster): "deal 80
 //     damage to any target on the board" — freie
 //     Zielwahl, beide Seiten. Danach der geteilte
 //     Aquatic-Nachschub.
@@ -26,7 +26,7 @@ const { hasCardType } = require('./_hooks');
 const { offerAquaticReplacement, cpuPickReplacement } = require('./_aquatic-shared');
 
 const CARD_NAME = 'Aquatic Spear';
-const DAMAGE = 100;
+const DAMAGE = 80;   // v1444 (Als Vorgabe 26.9.): vorher 100
 
 /** Zielpool des Riders: alle lebenden Helden + offenen Creatures. */
 function allBoardTargets(engine) {
@@ -55,7 +55,7 @@ function allBoardTargets(engine) {
   return out;
 }
 
-/** 100 Spell-Schaden auf ein Helden- oder Kreaturenziel. */
+/** 80 Spell-Schaden auf ein Helden- oder Kreaturenziel. */
 async function strike(engine, pi, hostHeroIdx, tgt) {
   const source = { name: CARD_NAME, owner: pi, heroIdx: hostHeroIdx };
   const zoneSlot = tgt.kind === 'creature' || tgt.type === 'equip' ? (tgt.slotIdx ?? -1) : -1;
@@ -120,7 +120,7 @@ module.exports = {
     return undefined;
   },
 
-  // ── AUFLOESUNG: 100 auf das getroffene Ziel ───────────────────────
+  // ── AUFLOESUNG: 80 auf das getroffene Ziel ───────────────────────
   async onSurpriseActivate(ctx, sourceInfo) {
     const engine = ctx._engine;
     const pi = ctx.cardOwner;
@@ -142,7 +142,7 @@ module.exports = {
     return { activated: true };
   },
 
-  // ── DISCARD-RIDER: 100 auf ein beliebiges Ziel + Nachschub ───────
+  // ── DISCARD-RIDER: 80 auf ein beliebiges Ziel + Nachschub ───────
   async onBoardSentToDiscard(ctx) {
     const engine = ctx._engine;
     const pi = ctx.cardOwner;
@@ -154,7 +154,7 @@ module.exports = {
         description: `Deal ${DAMAGE} damage to any target on the board.`,
         confirmLabel: '🔱 Pierce!',
         confirmClass: 'btn-danger',
-        cancellable: false, // "deal 100 damage" ohne "you may" — Pflicht
+        cancellable: false, // "deal 80 damage" ohne "you may" — Pflicht
         maxTotal: 1,
         minRequired: 1,
         dealsDamage: true,
