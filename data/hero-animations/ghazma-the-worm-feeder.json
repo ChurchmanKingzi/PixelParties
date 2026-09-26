@@ -1,0 +1,10 @@
+{
+  "hero": "Ghazma, the Worm Feeder",
+  "sheet": "ghazma-the-worm-feeder.png",
+  "frameWidth": 29,
+  "frameHeight": 30,
+  "frames": 48,
+  "frameMs": 90,
+  "loop": true,
+  "layout": "horizontal"
+}
