@@ -1,7 +1,7 @@
 from px2 import *
 from font35 import text35, width35
 import art_barker_back as BB
-import art_barker_front as BF
+import barker_ingame as BI
 random.seed(1)
 W,H=W2,H2
 cv=C2((20,16,32))
@@ -116,6 +116,19 @@ def gbq_classes(rgba):
     a[...,:3]=np.array(GB)[lev]
     # eyes: add a light glint so they read as eyes, not holes
     return a
+def despeckle(rgba,passes=2):
+    a=rgba.copy(); pal=[tuple(c) for c in GB]
+    for _ in range(passes):
+        src=a.copy(); h,w=a.shape[:2]
+        for y in range(1,h-1):
+            for x in range(1,w-1):
+                if not src[y,x,3]: continue
+                nb=[tuple(src[y+dy,x+dx,:3]) for dx,dy in ((1,0),(-1,0),(0,1),(0,-1)) if src[y+dy,x+dx,3]]
+                me=tuple(src[y,x,:3])
+                if len(nb)==4 and me not in nb:
+                    best=max(set(nb),key=nb.count)
+                    if nb.count(best)>=3: a[y,x,:3]=best
+    return a
 gq=gbq_classes(gi)
 # retouch the three heads so each reads clearly: outlined face, light skin, dark eyes, small mouth
 def head(cx,cy,rx,ry):
@@ -130,13 +143,18 @@ def head(cx,cy,rx,ry):
     for ex in (int(round(cx-1.5)),int(round(cx+1.5))):
         gq[int(cy),ex,:3]=GB[0]
     gq[int(cy)+2,int(cx),:3]=GB[1]; gq[int(cy)+2,int(cx)+ (1 if rx>3 else 0),:3]=GB[1]
+gq=despeckle(gq)
 head(9.5,9.2,3.3,3.3); head(26.5,9.2,3.3,3.3); head(18,5.6,3.4,3.0)
 g4=scale2x(outline(gq,GB[0]))
 cv.paste(g4,170-g4.shape[1]//2,98-g4.shape[0]+1)
 # player platform
 gellipse(88,148,40,7,2,1)
-bb=scale2x(BF.to_rgba(BF.build(),GB))
-cv.paste(bb,62,150-bb.shape[0])
+bs=BI.sprite()
+L_=lum(bs[...,:3].astype(float)); op_=bs[...,3]>0
+q_=np.quantile(L_[op_],[0.3,0.62,0.86]); lev_=np.digitize(L_,q_)
+bs[...,:3]=np.array(GB)[lev_]
+bb=scale2x(outline(despeckle(bs,1),GB[0]))
+cv.paste(bb,86-bb.shape[1]//2,150-bb.shape[0])
 # ---------- HUDs ----------
 def hpbar(x,y,w,frac):
     for i in range(w):
@@ -152,14 +170,14 @@ def gtext(t,x,y,size=9,v=0):
     for yy,xx in zip(ys,xs): gpx(x+xx,y+yy,v)
     return m.shape[1]
 gtext('3-HEADED GIANT',48,44)
-gtext(':L50',60,56)
+gtext('Lv50',60,56)
 text35(cv,'HP',50,65,GB[0]); hpbar(60,65,58,0.85)
 for x in range(48,126): gpx(x,72,0)
 for y in range(56,73): gpx(48,y,0)
 gpx(126,72,0); gpx(127,71,0); gpx(128,70,0)
 PX=150; PY=104
 gtext('BARKER',PX,PY)
-gtext(':L42',PX+20,PY+11)
+gtext('Lv42',PX+20,PY+11)
 text35(cv,'HP',PX,PY+22,GB[0]); hpbar(PX+10,PY+22,44,0.72)
 gtext('87/120',PX+10,PY+30)
 for x in range(PX-4,PX+56): gpx(x,PY+41,0)
@@ -176,12 +194,6 @@ gtext('A wild 3-HEADED GIANT',SX0+8,TY+8)
 gtext('appeared!',SX0+8,TY+21)
 for i,w in enumerate([4,3,2,1]):
     for k in range(-w+1,w): gpx(SX1-14+k,SY1-13+i,0)
-# screen glass glare
-for k in range(26):
-    x=SX1-40+k; y=SY0+2+k//2
-for y in range(SY0,SY1):
-    for x in range(SX0,SX1):
-        if 0<(x-SX0)-(y-SY0)*0.9-110<3 and y<SY0+30: cv.px(x,y,lerp(tuple(cv.a[y,x]),(255,255,255),0.18))
 # ---------- logo ----------
 wa=text_mask('PIXEL',16).shape[1]; wb=text_mask('POCKET',16).shape[1]
 x0=125-(wa+wb+8)//2
