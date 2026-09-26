@@ -253,12 +253,12 @@ f.part('paulL'); f.ellipse(100, 128, 7.5, 6.5, 'a')
 f.poly([(106, 124), (110, 116), (102, 121)], 'a')
 # ---- Kopf mit Helm, Visierband und Maske
 f.part('neck'); f.rect(83, 116, 91, 126, 'n')
-f.part('helm'); f.ellipse(87, 106, 14, 13, 'a')
-f.poly([(76, 98), (83, 88), (91, 88), (98, 98)], 'a')
-f.part('crest'); f.poly([(85, 92), (89, 92), (95, 76), (91, 78), (87, 86)], 'v')
-f.part('visor'); f.poly([(73, 101), (101, 101), (101, 105), (73, 105)], 'g')
-f.part('eyes'); f.poly([(76, 105), (98, 105), (97, 111), (77, 111)], 'e')
-f.part('mask'); f.poly([(74, 111), (100, 111), (98, 117), (91, 121), (83, 121), (76, 117)], 'n')
+f.part('helm'); f.ellipse(87, 104, 15.5, 14.5, 'a')
+f.poly([(75, 96), (82, 85), (92, 85), (99, 96)], 'a')
+f.part('crest'); f.poly([(85, 90), (89, 90), (96, 72), (91, 74), (87, 84)], 'v')
+f.part('visor'); f.poly([(71, 98), (103, 98), (103, 103), (71, 103)], 'g')
+f.part('eyes'); f.poly([(74, 103), (100, 103), (99, 110), (75, 110)], 'e')
+f.part('mask'); f.poly([(72, 110), (102, 110), (100, 117), (92, 122), (82, 122), (74, 117)], 'n')
 f.outline()
 MATS = {
     'a': mat(ARM, pillow=3, k=1.9, bias=0.02, spec=True, spec_col=(230, 220, 255)),
@@ -276,21 +276,21 @@ for y, x in zip(*np.where((d_out > 0) & (d_out < 7))):
     if in_art(x, y) and BAYER4[y % 4, x % 4] + 0.03 < (1 - d_out[y, x] / 7) * 0.9:
         blend_px(cv, x, y, (160, 120, 255), 0.4)
 cv.paste(fig, 0, 0)
-# Augen im Sehschlitz (Detail direkt im Endbild, Positionen über S())
+# Augen im Sehschlitz: grimmig, weiß leuchtend mit violetter Iris
 for (ex, sd) in [(81, 1), (93, -1)]:
-    for i in range(-3, 4):
-        for j in range(0, 4):
-            x, y = S(ex + i * 0.8, 106.5 + j * 0.9)
-            hi = (i * sd) * 0.5 + 1.2
-            if j >= hi:
-                px(cv, x, y, (250, 248, 255) if j < 3 else (200, 190, 240))
-    x, y = S(ex + sd * 0.8, 108.3)
-    px(cv, x, y, (110, 50, 220)); px(cv, x, y + 1, (60, 24, 140))
-    glow2(cv, *S(ex, 108), 5, (220, 200, 255), k=0.4, mix=0.3)
-# Brauenfalte (grimmig)
-for (a_, b_) in [((77, 105.5), (84, 107.5)), ((97, 105.5), (90, 107.5))]:
-    p0, p1 = S(*a_), S(*b_)
-    bline(cv, p0[0], p0[1], p1[0], p1[1], (40, 20, 40))
+    cx_, cy_ = S(ex, 106.8)
+    cx_, cy_ = int(round(cx_)), int(round(cy_))
+    shape = [(-3, 0), (-2, 0), (-1, 0), (0, 0), (1, 0), (2, 0), (3, 0), (-3, 1), (-2, 1), (-1, 1), (0, 1), (1, 1), (2, 1), (3, 1),
+             (-2, 2), (-1, 2), (0, 2), (1, 2), (2, 2)]
+    for (dx, dy) in shape:
+        if dy == 0 and dx * sd < -1:
+            continue                           # schräg zur Mitte abfallendes Oberlid
+        px(cv, cx_ + dx, cy_ + dy, (252, 250, 255) if dy < 2 else (210, 200, 246))
+    for (dx, dy, c) in [(sd, 0, (120, 60, 230)), (sd, 1, (80, 30, 170)), (sd * 2, 1, (120, 60, 230)), (sd * 2, 0, (160, 110, 255))]:
+        px(cv, cx_ + dx, cy_ + dy, c)
+    for dx in range(-4, 5):                    # dunkle Lidlinie
+        yl = cy_ - 1 + (1 if dx * sd < -1 else 0)
+        px(cv, cx_ + dx, yl, (30, 16, 40))
 # Schachbrett-Emblem auf der Brust (weiß/violett wie auf der Karte)
 EM = f.L == 'v'
 ys_, xs_ = np.where(EM)
@@ -317,6 +317,12 @@ sparkle(cv, 182, 90, (255, 255, 255), r=5, c2=(200, 180, 255))
 for i in range(14):
     a = rnd.uniform(0, 2 * math.pi); L = rnd.uniform(5, 12)
     bline(cv, 182 + math.cos(a) * 3, 90 + math.sin(a) * 3, 182 + math.cos(a) * L, 90 + math.sin(a) * L, (255, 240, 200), 0.7)
+# Faust wieder vor den Blitz setzen
+fx0, fy0 = int(FIST[0]), int(FIST[1])
+for y in range(fy0 - 9, fy0 + 10):
+    for x in range(fx0 - 9, fx0 + 10):
+        if 0 <= y < H and 0 <= x < W and FM[y, x] and y > fy0 - 7:
+            cv.a[y, x] = fig[y, x, :3]
 # Knistern um die Faust
 for sd in range(3):
     a = -math.pi / 2 + (sd - 1) * 0.9
@@ -358,7 +364,8 @@ for (x, y, s_) in [(160, 118, 1.2), (206, 140, 1.0), (142, 214, 1.0), (218, 232,
     fire_drop(x, y, s_)
 
 # ---------------------------------------------------------------- Regen (vor allem, schräg vom Sturm)
-rain(cv, 380, cols=((120, 116, 180), (170, 166, 220), (200, 200, 240)), ang=0.35, L=(4, 8), seed=3, k=0.45)
+rain(cv, 380, cols=((120, 116, 180), (170, 166, 220), (200, 200, 240)), ang=0.35, L=(4, 8), seed=3, k=0.45,
+     mask=lambda x, y: not FM[y, x] or (x * 7 + y) % 5 == 0)
 
 vignette2(cv, color=(6, 4, 14), strength=0.55, protect=lambda x, y: FM[y, x])
 emblem = emblem_generic(["..##.", ".##..", "####.", "..##.", ".##..", "#...."], {'#': (190, 160, 255)})
