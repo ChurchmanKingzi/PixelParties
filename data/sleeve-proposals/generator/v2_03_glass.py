@@ -68,7 +68,7 @@ def cell(x,y):
         a=(math.atan2(y-ry,x-rx)+math.pi)/(2*math.pi)*12
         return ('rose',int(a)%12, r>16)
     if r<=rr+3: return ('rr',0)
-    if 262<=y<=280 and 40<=x<=210: return ('banner',0)
+    if 256<=y<=290 and 46<=x<=204: return ('banner',0)
     r2=math.hypot(x-JCX,(y-JCY)*0.9)
     if r2<86 and y<256:
         a=(math.atan2(y-JCY,x-JCX)+math.pi)/(2*math.pi)*28
@@ -126,6 +126,27 @@ for y in range(fh):
 for y in range(FY+130,FY+fh-8,22):
     for x in range(fw):
         if chars[A3[y-FY if False else y-FY,x]] in 'Dd' if 0<=y-FY<fh else False: pass
+# ---------- shard subdivision of the figure (stained-glass pieces) ----------
+srng=np.random.RandomState(77)
+fig_mask=lab>=FIG
+fys,fxs=np.where(fig_mask)
+face_ch=cid['F'] if 'F' in cid else -1
+body_pts=[]
+while len(body_pts)<95:
+    i=srng.randint(len(fys)); y,x=fys[i],fxs[i]
+    if lab[y,x]-FIG!=face_ch: body_pts.append((x,y))
+body_pts=np.array(body_pts,float)
+face_pts=np.array([(FX+fw/2-14,FY+40),(FX+fw/2+14,FY+38),(FX+fw/2,FY+54)],float)
+pid=lab.copy()
+for y,x in zip(fys,fxs):
+    L_=lab[y,x]
+    pts=face_pts if L_-FIG==face_ch else body_pts
+    k=int(np.argmin(((pts-[x,y])**2).sum(1)))
+    pid[y,x]=L_*1000+k+ (500 if L_-FIG==face_ch else 0)
+piece_off={}
+def poff(p):
+    if p not in piece_off: piece_off[p]=srng.uniform(-0.16,0.2)
+    return piece_off[p]
 # ---------- leads + pane shading ----------
 lead=np.zeros((H,W),bool)
 for y in range(H):
@@ -133,7 +154,7 @@ for y in range(H):
         if lab[y,x]<0: continue
         for dx,dy in ((1,0),(0,1)):
             X,Y=x+dx,y+dy
-            if X<W and Y<H and lab[Y,X]>=0 and lab[Y,X]!=lab[y,x]: lead[y,x]=True
+            if X<W and Y<H and lab[Y,X]>=0 and pid[Y,X]!=pid[y,x]: lead[y,x]=True
         if not (win[y,x-1] and win[y,x+1] and win[y-1,x] and win[y+1,x]): lead[y,x]=True
 # thicker leads around the figure silhouette
 for y in range(1,H-1):
@@ -141,18 +162,6 @@ for y in range(1,H-1):
         if lab[y,x]>=FIG:
             for dx,dy in ((1,0),(-1,0),(0,1),(0,-1)):
                 if 0<=lab[y+dy,x+dx]<FIG: lead[y,x]=True
-# hair strand leads (wavy, follow the hair flow)
-for y in range(fh):
-    for x in range(fw):
-        ch=chars[A3[y,x]]
-        if ch in 'Hh':
-            X,Y=FX+x,FY+y
-            if y<24:
-                a=math.atan2(y-26,x-fw/2)
-                if int((a+4)*9)%4==0 and int((a+4)*90)%10==0: lead[Y,X]=True
-            elif (abs(x-fw/2)+int(2*math.sin(y*0.2)))%9==0: lead[Y,X]=True
-        if ch in 'Aa' and (y%12==0): lead[FY+y,FX+x]=True
-        if ch=='P' and ((x+y)%11==0): lead[FY+y,FX+x]=True
 # halo ring behind the head
 for y in range(FY-20,FY+60):
     for x in range(FX,FX+fw):
@@ -160,10 +169,6 @@ for y in range(FY-20,FY+60):
         if 40.5<=d<42 and lab[y,x]>=0 and lab[y,x]<FIG: lead[y,x]=True
         if 42<=d<46 and lab[y,x]>=0 and lab[y,x]<FIG: lab[y,x]=keys.setdefault(('halo',0),len(keys)); inv[lab[y,x]]=('halo',0); colmap[lab[y,x]]=(255,236,150)
         if 46<=d<47.5 and lab[y,x]>=0 and lab[y,x]<FIG: lead[y,x]=True
-# horizontal dress leads
-for yy in range(120,fh-6,18):
-    for x in range(fw):
-        if chars[A3[yy,x]] in 'Dd': lead[FY+yy,FX+x]=True
 ld=cv2.distanceTransform((~lead&win).astype(np.uint8),cv2.DIST_L2,3)
 mott=noise(H,W,4,seed=21,octaves=2)
 LEAD=(24,20,30); LEADL=(70,66,84)
@@ -176,12 +181,37 @@ for y in range(H):
         base=JCOL[chars[L_-FIG]] if L_>=FIG else color_for(L_)
         ramp=glass_ramp(base)
         d=ld[y,x]
-        v=0.25+min(d,6)/6*0.45+(mott[y,x]-0.5)*0.5
+        if L_>=FIG:
+            v=0.5+poff(pid[y,x])+(mott[y,x]-0.5)*0.18-(0.14 if d<1.5 else 0)
+        else:
+            v=0.25+min(d,6)/6*0.45+(mott[y,x]-0.5)*0.5
         # light glows through the upper-left more
         v+= (0.06 if (x+y)<260 else -0.04)
         n=len(ramp)-1; vv=min(0.999,max(0,v))*n; i=int(vv); f=vv-i
         c=ramp[min(n,i+1)] if f>BAYER4[y%4,x%4] else ramp[i]
         cv.px(x,y,c)
+# hairline cracks through some of Johanna's shards
+crng=np.random.RandomState(9)
+plist=sorted(set(pid[fig_mask&~lead].ravel().tolist()))
+for p in crng.choice(plist,26,replace=False):
+    ys_,xs_=np.where((pid==p)&~lead)
+    if len(ys_)<40: continue
+    i=crng.randint(len(ys_)); x,y=float(xs_[i]),float(ys_[i])
+    ang=crng.uniform(0,math.pi*2); L=crng.randint(8,20)
+    for step in range(L):
+        ang+=crng.uniform(-0.6,0.6)
+        x+=math.cos(ang); y+=math.sin(ang)
+        X,Y=int(round(x)),int(round(y))
+        if not (0<=X<W and 0<=Y<H) or pid[Y,X]!=p or lead[Y,X]: break
+        base=tuple(int(v) for v in cv.a[Y,X])
+        cv.px(X,Y,lerp(base,(30,20,36),0.55))
+        if pid[Y-1,X]==p and not lead[Y-1,X]: cv.px(X,Y-1,lerp(tuple(int(v) for v in cv.a[Y-1,X]),(255,255,245),0.45))
+        if crng.rand()<0.12:   # small side branch
+            bx,by=X,Y; ba=ang+crng.choice([-1.2,1.2])
+            for _ in range(crng.randint(2,5)):
+                bx+=math.cos(ba); by+=math.sin(ba); BX,BY=int(round(bx)),int(round(by))
+                if pid[BY,BX]!=p or lead[BY,BX]: break
+                cv.px(BX,BY,lerp(tuple(int(v) for v in cv.a[BY,BX]),(30,20,36),0.45))
 # painted details on glass (grisaille lines)
 def paint(x,y,c=(40,30,40)):
     if win[y,x] and not lead[y,x]: cv.px(x,y,c)
@@ -204,33 +234,9 @@ for sgn in (-1,1):
         cv.px(ex+dx,yy,EYE)
     cv.px(ex+sgn*6,oy+37,EYE); cv.px(ex+sgn*7,oy+36,EYE)
     for dx in range(-4,5): cv.px(ex+dx,oy+31-(1 if abs(dx)<3 else 0),(160,50,44))
-    for dx in range(-3,4):
-        for dy in range(0,3):
-            if (dx+dy)%2==0: cv.px(ex+dx,oy+43+dy,(248,150,150))
 cv.px(fcx,oy+42,(214,160,130)); cv.px(fcx+1,oy+43,(214,160,130))
 for dx in range(-3,4): cv.px(fcx+dx,oy+49+(1 if abs(dx)<2 else 0),(196,70,76))
 for dx in range(-1,2): cv.px(fcx+dx,oy+51,(236,130,130))
-# hair strands
-for k in range(14):
-    x0=ox+28+k*3+ (0 if k<7 else 20)
-for s in (-1,1):
-    for k in range(5):
-        x=fcx+s*(18+k*3)
-        for y in range(oy+30+k*2,oy+100):
-            if 0<=x<W and lab[y,x]>=FIG and chars[lab[y,x]-FIG] in 'Hh' and (y+k)%7<5:
-                cv.px(x,y,lerp(tuple(cv.a[y,x]),(255,150,130),0.35))
-# painted dress motifs: small gold crosses/stars + right-side shading
-for y in range(fh):
-    for x in range(fw):
-        X,Y=FX+x,FY+y
-        ch=chars[A3[y,x]]
-        if ch in 'Dd' and not lead[Y,X]:
-            if (x%14==7 and y%16==8):
-                for k in range(-2,3): cv.px(X+k,Y,(255,220,120)); cv.px(X,Y+k,(255,220,120))
-                cv.px(X,Y,(255,255,230))
-            if x>fw*0.62 and BAYER4[Y%4,X%4]<0.35: cv.px(X,Y,lerp(tuple(cv.a[Y,X]),(20,10,40),0.3))
-        if ch in 'G' and not lead[Y,X] and (x+y)%4==0: cv.px(X,Y,(255,250,210))
-        if ch in 'P' and not lead[Y,X] and x>fw*0.6 and BAYER4[Y%4,X%4]<0.4: cv.px(X,Y,lerp(tuple(cv.a[Y,X]),(40,30,10),0.3))
 # orb glow
 ocx,ocy=fcx,oy+100
 for y in range(ocy-26,ocy+27):
@@ -242,9 +248,12 @@ for y in range(ocy-26,ocy+27):
 for (sx,sy) in [(60,96),(190,92),(56,196),(196,204),(86,70),(168,66)]:
     for k in range(-3,4): paint(sx+k,sy,(255,255,240)); paint(sx,sy+k,(255,255,240))
 # ---------- banner text ----------
-m=text_mask('THE CHURCH OF THE LIGHT',9); mh,mw=m.shape
-ys,xs=np.where(m)
-for yy,xx in zip(ys,xs): cv.px(125-mw//2+xx,266+yy,(80,30,40))
+for t_,yo in (('THE CHURCH',261),('OF THE LIGHT',276)):
+    m=text_mask(t_,16); mh,mw=m.shape
+    for yy_,xx_ in zip(*np.where(m)):
+        cv.px(125-mw//2+xx_+1,yo+yy_+1,(196,170,140)); 
+    for yy_,xx_ in zip(*np.where(m)):
+        cv.px(125-mw//2+xx_,yo+yy_,(90,28,40))
 # ---------- coloured light falling on the sill ----------
 SILL_Y=BOT+6
 SH=np.zeros((H,W),np.float32); SMk=np.zeros((H,W),bool)
