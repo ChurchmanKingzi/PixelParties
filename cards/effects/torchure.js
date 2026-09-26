@@ -14,11 +14,20 @@
 //  Zusatz-Action (`_bonusMainActions`, zweiter Platz der Action Phase)
 //  gibt `engine._torchureZusatz` zu Beginn der Action Phase — nur wenn
 //  der Held dann noch lebt und DIESES Gift noch traegt.
+//
+//  Torchure selbst ist eine INHAERENTE Zusatz-Action (Als Vorgabe 26.9.)
+//  und verbraucht die Action des Zuges nicht.
+//
+//  Animation `torchure` (app-board.jsx, Kartenbild als Vorlage): das
+//  Schwein frisst die Fackel und foltert damit mental seine Aufpasserin
+//  — Fackel faellt ein, Schwein kaut, violette Gedankenringe ziehen sich
+//  um den Kopf des Helden zusammen, dann greift das Gift.
 // ═══════════════════════════════════════════
 
 const POISON_STACKS = 4;
 
 module.exports = {
+  inherentAction: true,   // v1444: Zusatz-Action, verbraucht die Action nicht
   requiresTarget: true,
   // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
 
@@ -63,6 +72,13 @@ module.exports = {
         gs._spellCancelled = true;
         return;
       }
+
+      // Torch + Torture: erst die Szene, dann das Gift.
+      engine._broadcastEvent('play_zone_animation', {
+        type: 'torchure', owner: pi, heroIdx: target.heroIdx, zoneSlot: -1,
+        duration: 2000,
+      });
+      await engine._delay(1250);
 
       // 4 Stacks, dauerhaft; die Marke reitet am Gift-Status mit.
       await engine.addHeroStatus(pi, target.heroIdx, 'poisoned', {

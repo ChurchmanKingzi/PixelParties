@@ -2539,6 +2539,111 @@ const PP_PIXELFLAMME = (() => {
   return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
 })();
 
+// ── Torchure: das Schwein frisst die Fackel (Als Vorgabe 26.9.) ─────
+// Kartenbild als Vorlage: ein Schwein frisst eine Fackel und foltert
+// damit mental seine Aufpasserin (Torch + Torture). Ablauf am vergifteten
+// Helden:
+//     0–350   eine brennende Fackel faellt ueber dem Helden ein
+//   300–600   das Schwein ploppt daneben auf
+//   600–900   die Fackel fliegt ins Maul, zwei Bissen (Kauen)
+//   900–1250  die Flamme brennt im Schwein giftig violett weiter
+//  1000–1700  violette Gedankenringe ziehen sich um den Kopf zusammen,
+//             der Held glueht giftig
+//  1250–2000  Giftblasen steigen auf, alles blendet aus
+// Klang aus der Komponente (Regel ⑤), Keyframes in style.css (Regel ④).
+function TorchureEffect({ x, y, w = 80, h = 110 }) {
+  const P = 3;                                        // Pixelgroesse
+  // Schwein 14×11 Pixel: . leer, r rosa, d dunkelrosa, s Schnauze,
+  // n Nasenloch, k Auge, o Ohr (dunkel), m Maul.
+  const schwein = [
+    '..o......o....',
+    '.odr....rdo...',
+    '.rrrrrrrrrr...',
+    'rrrrrrrrrrrr..',
+    'rrkrrrrrkrrr..',
+    'rrrrssssrrrr..',
+    'rrrsnssnsrrr..',
+    'drrrssssrrrd..',
+    '.drrmmmmrrd...',
+    '..ddrrrrdd....',
+    '...dddddd.....',
+  ];
+  const FARBE = { r: '#f4a2b4', d: '#c86a82', s: '#ff8fa6', n: '#6b2436', k: '#1a1016', o: '#9c4a60', m: '#4a1422' };
+  const fackel = [
+    '..y..',
+    '.yoy.',
+    'yooor',
+    '.oro.',
+    '..b..',
+    '..b..',
+    '..b..',
+    '..B..',
+  ];
+  const FF = { y: '#ffe36b', o: '#ff9a2e', r: '#e8421c', b: '#8a5a2e', B: '#5a3a1c' };
+  const TP = 4;                                       // Fackel etwas groeber
+  const pixel = (zeilen, farben, key, q = P) => zeilen.flatMap((z, zy) => [...z].map((c, zx) => (
+    farben[c] ? <rect key={key + zx + '-' + zy} x={zx * q} y={zy * q} width={q} height={q} fill={farben[c]} /> : null
+  )));
+  const blasen = useMemo(() => Array.from({ length: ppFxN(14) }, () => ({
+    xOff: -w * 0.3 + Math.random() * w * 0.6,
+    size: 4 + Math.random() * 7,
+    delay: 1250 + Math.random() * 350,
+    dur: 500 + Math.random() * 400,
+    color: ['#9933cc', '#7722aa', '#bb55ee', '#5fbf3a', '#8fdc4a'][Math.floor(Math.random() * 5)],
+    wobble: -8 + Math.random() * 16,
+  })), []);
+  useEffect(() => {
+    const spiel = (name, opts, at) => setTimeout(() => { if (window.playSFX) window.playSFX(name, { ...opts, dedupe: 0 }); }, at);
+    spiel('elem_fire', { rate: 1.2, volume: 0.55 }, 0);
+    spiel('ping', { rate: 0.6, volume: 0.5 }, 330);
+    spiel('slash', { rate: 1.6, volume: 0.6 }, 640);
+    spiel('slash', { rate: 1.4, volume: 0.6 }, 800);
+    spiel('elem_dark', { rate: 0.85, volume: 0.7 }, 1000);
+    spiel('poison', { rate: 1.0, volume: 0.7 }, 1260);
+  }, []);
+  const kopfY = -h * 0.28;                             // Kopfhoehe des Helden
+  const sx = w * 0.42, sy = -h * 0.62;                 // Schwein oben rechts
+  // Flugbahn der Fackel: Flamme voran (70° gedreht) ins Maul des Schweins.
+  // Drehpunkt 50%/80% der Fackel; die Flammenmitte liegt 4.4 Fackelpixel
+  // darueber und wandert durch die Drehung nach rechts oben.
+  const fx = -w * 0.2, fy = -h * 0.8;                  // Fackel links oben
+  const drehX = fx + 2.5 * TP, drehY = fy + 6.4 * TP;
+  const maulX = sx - 1.5 * P, maulY = sy + 3 * P;
+  const rad = 70 * Math.PI / 180;
+  const zx = maulX - drehX - 4.4 * TP * Math.sin(rad);
+  const zy = maulY - drehY + 4.4 * TP * Math.cos(rad);
+  return (
+    <div className="torchure" style={{ left: x, top: y }} aria-hidden="true">
+      <span className="torchure-glut" style={{ width: w * 1.25, height: h * 1.15, left: -w * 0.625, top: -h * 0.575 }} />
+      {[0, 1, 2].map(i => (
+        <span key={'w' + i} className="torchure-ring" style={{
+          width: w * 0.9, height: w * 0.9, left: -w * 0.45, top: kopfY - w * 0.45,
+          animationDelay: (1000 + i * 180) + 'ms',
+        }} />
+      ))}
+      <div className="torchure-fackel" style={{
+        left: fx, top: fy, '--zx': zx + 'px', '--zy': zy + 'px',
+      }}>
+        <svg width={5 * TP} height={8 * TP} shapeRendering="crispEdges" className="torchure-flackern">
+          {pixel(fackel, FF, 'f', TP)}
+        </svg>
+      </div>
+      <div className="torchure-schwein" style={{ left: sx - 7 * P, top: sy - 5.5 * P }}>
+        <svg width={14 * P} height={11 * P} shapeRendering="crispEdges" className="torchure-kauen">
+          {pixel(schwein, FARBE, 's')}
+        </svg>
+        <span className="torchure-giftflamme" style={{ left: 5 * P, top: -3 * P }} />
+      </div>
+      {blasen.map((b, i) => (
+        <div key={'tb' + i} className="anim-beer-bubble" style={{
+          '--xOff': b.xOff + 'px', '--size': b.size + 'px', '--wobble': b.wobble + 'px',
+          '--color': b.color, animationDelay: b.delay + 'ms', animationDuration: b.dur + 'ms',
+        }} />
+      ))}
+    </div>
+  );
+}
+
 // ── Wuetende Anklage (Accusation, Als Vorgabe 26.9.) ────────────────
 // „Wuetende Sprechblase ueber dem Nutzer, aehnlich wie Furious Anger".
 // Kartenbild als Vorlage: weisse Sprechblase mit rotem „!". Ablauf:
@@ -6939,6 +7044,7 @@ const ANIM_REGISTRY = {
   memory_wipe: MemoryWipeEffect,         // v1335
   furious_anger: FuriousAngerEffect,     // v1336
   anklage: AnklageEffect,                // Accusation, 26.9.
+  torchure: TorchureEffect,              // Torchure, 26.9.
   baby_spider_opfer: BabySpiderOpferEffect,   // Baby Spider, 26.9.
   crimson_web: CrimsonWebShotEffect,          // Crimson Web, 26.9. (Name war ungenutzt vergeben)
   todesgabe_erweckung: TodesgabeErweckungEffect,   // Divine Gift of Death, 26.9.
