@@ -217,9 +217,12 @@ ink_text('BLACKSTACHE',20,125,232,INK,shadow=MD)
 ink_text('SCOURGE OF THE PIXEL SEAS',9,125,254,DK)
 rule(268,60,190,DK)
 ink_text('REWARD',14,125,274,INK)
-w,h=ink_text('999.999',22,113,292,INK,shadow=MD)
-coin=smug_coin(12)
-cv.paste(outline(coin,INK),113+w//2+5,290)
+coin=outline(smug_coin(12),INK)
+nm=text_mask('999.999',22); w,h=nm.shape[1],nm.shape[0]
+GAP=6
+x0=125-(w+GAP+coin.shape[1])//2          # centre the whole group (number + coin)
+ink_text('999.999',22,x0+w//2,292,INK,shadow=MD)
+cv.paste(coin,x0+w+GAP,292+h//2-coin.shape[0]//2)   # coin vertically centred on the digits
 star(52,306); star(198,306)
 ink_text('PAYABLE IN SMUG COINS',9,125,316,DK)
 # ---------- red stamp ----------
@@ -247,7 +250,7 @@ def hole(cx,cy):
     for k in range(6):
         a=random.random()*6.28; L=random.randint(4,7)
         for r in range(3,L): cv.px(int(cx+math.cos(a)*r),int(cy+math.sin(a)*r),DK if r<5 else MD)
-hole(200,56); hole(70,150); hole(186,286)
+hole(200,56); hole(70,150); hole(206,248)
 # ---------- dagger (top-right) ----------
 BL=[(90,96,112),(150,158,176),(206,212,226),(244,248,252)]
 tipx,tipy=192,58
