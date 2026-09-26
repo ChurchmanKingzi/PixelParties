@@ -7,6 +7,8 @@ Völlig verrückter Hausmeister mit blutiger Kettensäge:
   um die Spitze, unten zurück – mit abstehenden Zähnen.
 * Ruhephase: er wippt, der Motor tuckert und pustet graue Wölkchen,
   Blut tropft vom Sägeblatt und bildet kleine Pfützen.
+* Die Säge ist voller Blutspritzer, blutige Zähne; die rasende Kette
+  schleudert ständig Tropfen von der Spitze.
 * Zweimal pro Loop lässt er die Säge aufheulen: alles vibriert, dunkle
   Abgaswolken, Blut spritzt vom Blatt, und er lacht irre (Mund weit offen).
 * Die Augen zucken unabhängig voneinander hin und her.
@@ -55,13 +57,20 @@ def face(a, i):
 # Das Original zeigt nur ein nach rechts verwischtes Blatt ohne Spitze. Es wird
 # durch ein vollständiges Blatt mit abgerundeter Spitze ersetzt: die Blut-Textur
 # des Originals läuft bis zur Spitze weiter, die Kette läuft als geschlossene
-# Schleife herum (oben nach vorne, um die Spitze, unten zurück; 1 px pro Frame)
-# und die Zähne stehen überall nach außen ab.
+# Schleife herum (oben nach vorne, um die Spitze, unten zurück) und die Zähne
+# stehen überall nach außen ab. Tempo: 3 px pro Frame bei 8-px-Muster (unter der
+# halben Periode, damit die Laufrichtung eindeutig bleibt), jeder Zahn zieht eine
+# 2-px-Bewegungsspur hinter sich her.
 BLADE_X0 = 19                                # erste Blattspalte (davor: Motor)
 NOSE_X, MID_Y = 36, 26                       # Mittelpunkt der Spitze
-LINK = [(201, 184, 176), (138, 20, 20), (58, 15, 15), (74, 20, 20)]
+CHAIN_P, CHAIN_V = 8, 3                      # Musterperiode, px pro Frame (48*3 = 18*8)
+# Glieder je Musterposition k; k=7 und k=6 sind die Bewegungsspur hinter k=0
+LINK = [(206, 190, 182), (58, 15, 15), (138, 20, 20), (58, 15, 15),
+        (96, 14, 14), (58, 15, 15), (104, 52, 50), (150, 112, 106)]
 CHAIN_BASE = (70, 18, 18)
-TOOTH = (190, 170, 162)
+TOOTH = (196, 176, 168)
+TOOTH_BLOODY = (176, 38, 34)
+TOOTH_TRAIL = [(150, 120, 114, 190), (120, 70, 66, 120)]
 L_TOP = NOSE_X - BLADE_X0
 L_ARC = 13                                   # ~ pi * 4
 
@@ -98,6 +107,22 @@ def build_base():
 BASE = build_base()
 
 
+# getrocknete Blutspritzer auf Blatt und Motor (x, y, Farbe)
+SPLAT_DARK, SPLAT, SPLAT_HI = (74, 4, 4), (128, 8, 8), (186, 30, 26)
+SPLATTER = [(21, 25, SPLAT), (22, 25, SPLAT_DARK), (22, 26, SPLAT), (26, 27, SPLAT_HI),
+            (27, 27, SPLAT), (27, 28, SPLAT_DARK), (30, 24, SPLAT), (31, 25, SPLAT_HI),
+            (31, 26, SPLAT), (32, 25, SPLAT_DARK), (35, 27, SPLAT), (36, 26, SPLAT_HI),
+            (37, 27, SPLAT_DARK), (38, 25, SPLAT), (34, 24, SPLAT_DARK), (24, 28, SPLAT),
+            (13, 26, SPLAT), (14, 25, SPLAT_HI), (16, 27, SPLAT_DARK), (17, 28, SPLAT),
+            (12, 28, SPLAT_DARK)]
+
+
+def chain_k(x, y, i):
+    """Musterposition und Zahn-Nummer an dieser Stelle der Kette."""
+    q = int(round(chain_pos(x, y))) - CHAIN_V * i
+    return q % CHAIN_P, q // CHAIN_P
+
+
 def draw_blade(a, i):
     for y in range(MID_Y - 6, MID_Y + 7):
         for x in range(BLADE_X0, W):
@@ -107,12 +132,17 @@ def draw_blade(a, i):
             elif r <= 3.5:
                 a[y, x] = (*CHAIN_BASE, 255)
             elif r <= 4.5:
-                k = int(round(chain_pos(x, y) - i)) % 4
+                k, _ = chain_k(x, y, i)
                 a[y, x] = (*LINK[k], 255)
             elif r <= 5.4:
-                k = int(round(chain_pos(x, y) - i)) % 4
+                k, n = chain_k(x, y, i)
                 if k == 0:
-                    a[y, x] = (*TOOTH, 255)
+                    a[y, x] = (*(TOOTH_BLOODY if n % 3 == 0 else TOOTH), 255)
+                elif k in (7, 6):
+                    a[y, x] = TOOTH_TRAIL[7 - k]
+    for x, y, c in SPLATTER:
+        if a[y, x, 3]:
+            a[y, x, :3] = c
 
 
 # ---------------------------------------------------------------- Partikel
@@ -167,6 +197,24 @@ def spray(out, i):
             blend(out, x, y, BLOOD if t < 4 else BLOOD_DARK, 235 - t * 30)
 
 
+FLING = [(40, 23, 1.6, -1.2), (41, 26, 2.0, -0.4), (40, 29, 1.7, 0.6),
+         (39, 22, 1.2, -1.6), (41, 27, 2.2, 0.0), (38, 30, 1.3, 1.0)]
+
+
+def fling(out, i):
+    """Die schnelle Kette schleudert ständig Blut von der Spitze."""
+    for k, (x0, y0, vx, vy) in enumerate(FLING):
+        for start in range(k * 2, N, 12):
+            t = (i - start) % N
+            if t >= 5:
+                continue
+            x = x0 + vx * t
+            y = y0 + vy * t + 0.3 * t * t
+            blend(out, x, y, BLOOD if t < 3 else BLOOD_DARK, 240 - t * 40)
+            if t >= 1:                                   # kurze Spur
+                blend(out, x - vx * 0.6, y - vy * 0.6, BLOOD_DARK, 120 - t * 20)
+
+
 def smoke(out, i):
     """Abgaswölkchen steigen hinter dem Griff auf und treiben nach rechts."""
     rev = revving(i)
@@ -202,6 +250,7 @@ def frame(i):
     smoke(out, i)
     drips(out, i)
     spray(out, i)
+    fling(out, i)
     return out
 
 
