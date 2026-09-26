@@ -1815,18 +1815,43 @@ function CardRevealEntry({ cardName, onDone, fizzled }) {
 }
 
 function ExplosionEffect({ x, y, opacity }) {
-  const particles = useMemo(() => Array.from({ length: ppFxN(24) }, () => {
+  // ★ v1446 (Als Befund 26.9.: „Explosion nutzt relativ wenige Pixel —
+  // stelle sicher, dass die Animationen eindrucksvoll genug aussehen"):
+  // weisser Kern, Druckwelle, deutlich mehr Splitter, schwere Truemmer,
+  // aufsteigende Glut und Rauch. Alles laeuft durch den Pixelierer.
+  const particles = useMemo(() => Array.from({ length: ppFxN(38) }, () => {
     const angle = Math.random() * Math.PI * 2;
-    const speed = 25 + Math.random() * 55;
+    const speed = 30 + Math.random() * 75;
     return {
       dx: Math.cos(angle) * speed,
       dy: Math.sin(angle) * speed,
-      size: 3 + Math.random() * 8,
-      color: ['#ff4400','#ff8800','#ffcc00','#ff2200','#ffaa00','#fff'][Math.floor(Math.random() * 6)],
+      size: 4 + Math.random() * 9,
+      color: ['#ff4400','#ff8800','#ffcc00','#ff2200','#ffaa00','#fff','#ffe98a'][Math.floor(Math.random() * 7)],
       delay: Math.random() * 80,
-      dur: 350 + Math.random() * 400,
+      dur: 380 + Math.random() * 420,
     };
   }), []);
+  const brocken = useMemo(() => Array.from({ length: ppFxN(8) }, () => {
+    const angle = -Math.PI * (0.15 + Math.random() * 0.7);   // nach oben weg, fallen zurueck
+    const speed = 45 + Math.random() * 45;
+    return {
+      dx: Math.cos(angle) * speed, dy: Math.sin(angle) * speed,
+      size: 6 + Math.random() * 6, dreh: (Math.random() < 0.5 ? -1 : 1) * (180 + Math.random() * 360),
+      farbe: ['#5a2a1a', '#7a3a20', '#3a2a2a', '#c04a18'][Math.floor(Math.random() * 4)],
+      delay: 40 + Math.random() * 60, dur: 620 + Math.random() * 200,
+    };
+  }), []);
+  const glut = useMemo(() => Array.from({ length: ppFxN(12) }, () => ({
+    dx: -34 + Math.random() * 68, dy: -(30 + Math.random() * 45),
+    size: 3 + Math.random() * 3,
+    farbe: ['#ffe066', '#ffaa22', '#ff6a00'][Math.floor(Math.random() * 3)],
+    delay: 220 + Math.random() * 180, dur: 450 + Math.random() * 250,
+  })), []);
+  const rauch = useMemo(() => Array.from({ length: ppFxN(7) }, (_, i) => ({
+    dx: -26 + Math.random() * 52, dy: -(22 + Math.random() * 30),
+    size: 30 + Math.random() * 22, delay: 180 + i * 35, dur: 560 + Math.random() * 160,
+    ton: Math.random() < 0.5 ? '#5a5560' : '#3e3a44',
+  })), []);
   // Optional `opacity` prop — passed through from playAnimation options
   // so callers can dim the burst (Laser Volley wants its impacts more
   // ghostly than a regular hit explosion). Defaults to 1 / fully
@@ -1834,11 +1859,33 @@ function ExplosionEffect({ x, y, opacity }) {
   const wrapperOpacity = (typeof opacity === 'number' && opacity >= 0 && opacity <= 1) ? opacity : 1;
   return (
     <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100, opacity: wrapperOpacity }}>
+      {rauch.map((r, i) => (
+        <div key={'r' + i} className="anim-exp-rauch" style={{
+          width: r.size, height: r.size, left: -r.size / 2, top: -r.size / 2,
+          background: `radial-gradient(circle, ${r.ton} 0%, ${r.ton}cc 40%, transparent 72%)`,
+          '--dx': r.dx + 'px', '--dy': r.dy + 'px', animationDelay: r.delay + 'ms', animationDuration: r.dur + 'ms',
+        }} />
+      ))}
       <div className="anim-explosion-flash" />
+      <div className="anim-exp-welle" />
+      <div className="anim-exp-kern" />
       {particles.map((p, i) => (
         <div key={i} className="anim-explosion-particle" style={{
           '--dx': p.dx + 'px', '--dy': p.dy + 'px', '--size': p.size + 'px',
           '--color': p.color, animationDelay: p.delay + 'ms', animationDuration: p.dur + 'ms',
+        }} />
+      ))}
+      {brocken.map((b, i) => (
+        <div key={'b' + i} className="anim-exp-brocken" style={{
+          width: b.size, height: b.size, left: -b.size / 2, top: -b.size / 2, background: b.farbe,
+          '--dx': b.dx + 'px', '--dy': b.dy + 'px', '--dreh': b.dreh + 'deg',
+          animationDelay: b.delay + 'ms', animationDuration: b.dur + 'ms',
+        }} />
+      ))}
+      {glut.map((g, i) => (
+        <div key={'g' + i} className="anim-exp-glut" style={{
+          width: g.size, height: g.size, left: -g.size / 2, top: -g.size / 2, background: g.farbe,
+          '--dx': g.dx + 'px', '--dy': g.dy + 'px', animationDelay: g.delay + 'ms', animationDuration: g.dur + 'ms',
         }} />
       ))}
     </div>
@@ -21793,12 +21840,21 @@ function ZielMarkenEbene({ marken, blitze, myIdx }) {
 
 function GameAnimationRenderer({ type, x, y, w, h, ...rest }) {
   const Component = ANIM_REGISTRY[type];
+  // ★ v1446: Pixelart-Umstellung — der Pixelierer (app-shared.jsx) setzt
+  // die Grafiken der Animation einmal beim Einblenden in Pixelart mit
+  // Dithering um, vor dem ersten Bild (useLayoutEffect).
+  const huelle = useRef(null);
+  useLayoutEffect(() => window.ppPixeliererAnhaengen ? window.ppPixeliererAnhaengen(huelle.current) : undefined, []);
   if (!Component) return null;
   // Forward extra props (intensity, custom payload, etc.) so animations
   // that key off broadcast-side parameters can scale themselves. Extras
   // come from `play_zone_animation` payloads via `onZoneAnim` →
   // `playAnimation(..., options)` → setGameAnims spread → here.
-  return <Component x={x} y={y} w={w} h={h} {...rest} />;
+  return (
+    <div ref={huelle} style={{ display: 'contents' }}>
+      <Component x={x} y={y} w={w} h={h} {...rest} />
+    </div>
+  );
 }
 
 // Renders a Creature card with an "underneath" overlay card revealed
