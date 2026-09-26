@@ -3524,6 +3524,13 @@ body:has(.anim-backdrop) .pp-bg-particles { display: none; }
   object-fit: cover;
   border: 1px solid var(--bg4);
 }
+/* Tutorial-Gegner (Monia Bot / Antonia): freigestelltes Pixel-Sprite —
+   ganz zeigen, scharf skalieren, auf dunklem Lichthof in seiner Farbe. */
+.game-hand-avatar-tutorial {
+  object-fit: contain !important;
+  image-rendering: pixelated;
+  background: radial-gradient(circle at 50% 42%, color-mix(in srgb, var(--pf, #00f0ff) 35%, #14112a) 0%, #0a0914 72%);
+}
 .game-hand-avatar-big {
   /* ★ v1234: feste 88 px statt `--hand-min-h * 0.86`. Das war bis
      v1233 derselbe Wert (102 × 0.86 ≈ 88); seit die Leiste für die
@@ -14628,19 +14635,39 @@ body:has(.textbox-overlay) .tooltip {
   z-index: 90003 !important;
 }
 
+/* ★ PIXEL-TEXTBOX (Als Vorgabe 26.9.) ──────────────────────────────
+   Dieselbe Rahmensprache wie die Menue-Fenster (`.pp-fenster`: Licht-
+   kante, Doppelring, Eck-Schnoerkel, harter Schatten), aber in der
+   Farbe des GERADE SPRECHENDEN (`--tb-farbe`, inline aus der Textbox;
+   Monia cyan, Antonia rot, Kampagne ueber `speakerColor`). Jede
+   Portraetseite traegt ihre eigene Farbe (`--tb-links` / `--tb-rechts`)
+   fuer Portraetrahmen und Namensschild. Beim Sprecherwechsel blendet
+   der Rahmen ueber — dafuer ist `--tb-farbe` als Farbe registriert,
+   sonst sprang der Wert hart um. */
+@property --tb-farbe {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: #00f0ff;
+}
 .textbox {
+  --tb-farbe: var(--accent);
   display: flex;
   align-items: stretch;
   gap: 0;
-  width: min(720px, calc(92 * var(--vw)));
-  background: linear-gradient(135deg, var(--bg2) 0%, var(--bg3) 100%);
-  border: 2px solid var(--accent);
-  border-radius: 10px;
-  box-shadow: 0 0 24px rgba(0,240,255,.15), 0 8px 32px rgba(0,0,0,.6);
+  width: min(760px, calc(92 * var(--vw)));
+  background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='2' height='2'%3E%3Crect width='1' height='1' fill='%23ffffff' fill-opacity='0.035'/%3E%3Crect x='1' y='1' width='1' height='1' fill='%23ffffff' fill-opacity='0.035'/%3E%3C/svg%3E") 0 0 / 4px 4px,
+    linear-gradient(180deg, color-mix(in srgb, var(--tb-farbe) 12%, #0d0c18) 0%, #07060e 100%);
   overflow: hidden;
   animation: textbox-slide-in .3s ease-out;
   pointer-events: auto;
   cursor: pointer;
+  transition: --tb-farbe .35s ease;
+}
+/* Rahmen aus `.pp-fenster`, eingefaerbt mit der Sprecherfarbe. */
+.textbox.pp-fenster {
+  --zier: var(--tb-farbe);
+  border-radius: 0;
 }
 @keyframes textbox-slide-in {
   from { opacity: 0; transform: translateY(-20px); }
@@ -14648,26 +14675,34 @@ body:has(.textbox-overlay) .tooltip {
 }
 
 .textbox-portrait {
-  width: 110px;
+  --tb-seite: var(--tb-links, var(--accent));
+  position: relative;
+  width: 128px;
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  background: rgba(0,0,0,.3);
-  border-right: 1px solid var(--bg4);
-  padding: 10px 8px 6px;
-  gap: 4px;
+  gap: 9px;
+  padding: 12px 10px 10px;
+  background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='2' height='2'%3E%3Crect width='1' height='1' fill='%23ffffff' fill-opacity='0.035'/%3E%3Crect x='1' y='1' width='1' height='1' fill='%23ffffff' fill-opacity='0.035'/%3E%3C/svg%3E") 0 0 / 4px 4px,
+    linear-gradient(180deg, color-mix(in srgb, var(--tb-seite) 16%, transparent) 0%, rgba(0,0,0,.35) 100%);
+  border-right: 3px solid color-mix(in srgb, var(--tb-farbe) 70%, #000);
+  box-shadow: 2px 0 0 var(--pp-kontur);
   transition: opacity .3s, filter .3s;
 }
 .textbox-portrait-right {
+  --tb-seite: var(--tb-rechts, var(--accent));
   border-right: none;
-  border-left: 1px solid var(--bg4);
+  border-left: 3px solid color-mix(in srgb, var(--tb-farbe) 70%, #000);
+  box-shadow: -2px 0 0 var(--pp-kontur);
   animation: textbox-portrait-enter .5s ease-out;
 }
+/* Wer gerade schweigt, tritt zurueck: entsaettigt und abgedunkelt. */
 .textbox-portrait-inactive {
-  opacity: 0.4;
-  filter: brightness(0.6) saturate(0.5);
+  opacity: 0.5;
+  filter: grayscale(.75) brightness(.6);
 }
 .textbox-portrait-exit {
   animation: textbox-portrait-leave .5s ease-in forwards;
@@ -14689,32 +14724,50 @@ body:has(.textbox-overlay) .tooltip {
   from { transform: translateX(0); opacity: 1; }
   to   { transform: translateX(-100%); opacity: 0; }
 }
+/* Portraet im Pixelrahmen wie die Duell-Portraets (`.pp-portraet`):
+   Kontur, 3-px-Rahmen mit Lichtkante, dunkles Band, harter Schatten.
+   Innen ein Lichthof in der Sprecherfarbe, auf dem das freigestellte
+   Sprite steht. */
 .textbox-portrait-frame {
   position: relative;
-  width: 80px;
-  height: 80px;
+  width: 84px;
+  height: 84px;
+  border: 3px solid;
+  border-color:
+    color-mix(in srgb, var(--tb-seite) 60%, #fff)
+    color-mix(in srgb, var(--tb-seite) 72%, #000)
+    color-mix(in srgb, var(--tb-seite) 62%, #000)
+    color-mix(in srgb, var(--tb-seite) 75%, #fff);
+  box-shadow:
+    inset 0 0 0 2px var(--pp-kontur),
+    0 0 0 2px var(--pp-kontur),
+    0 0 0 4px color-mix(in srgb, var(--tb-seite) 28%, var(--pp-kontur)),
+    0 0 0 6px var(--pp-kontur),
+    5px 5px 0 5px rgba(0, 0, 0, .4);
+  background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='2' height='2'%3E%3Crect width='1' height='1' fill='%23ffffff' fill-opacity='0.035'/%3E%3Crect x='1' y='1' width='1' height='1' fill='%23ffffff' fill-opacity='0.035'/%3E%3C/svg%3E") 0 0 / 4px 4px,
+    radial-gradient(circle at 50% 42%, color-mix(in srgb, var(--tb-seite) 38%, #14112a) 0%, #0a0914 72%);
 }
 .textbox-portrait img {
-  width: 72px;
-  height: 72px;
-  border-radius: 50%;
-  object-fit: cover;
-  border: 2px solid var(--accent);
-  box-shadow: 0 0 10px rgba(0,240,255,.25);
   position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
+  inset: 5px;
+  width: calc(100% - 10px);
+  height: calc(100% - 10px);
+  object-fit: contain;
+  image-rendering: pixelated;
+  filter: drop-shadow(2px 2px 0 rgba(0, 0, 0, .55));
 }
+/* Funken als Pixel-Kreuze statt weicher Punkte. */
 .textbox-sparkle {
   position: absolute;
   width: 6px;
   height: 6px;
-  border-radius: 50%;
-  background: #fff;
-  box-shadow: 0 0 6px 1px rgba(0,240,255,.7), 0 0 12px 2px rgba(0,240,255,.3);
+  background:
+    linear-gradient(#fff, #fff) center / 2px 6px no-repeat,
+    linear-gradient(#fff, #fff) center / 6px 2px no-repeat;
+  filter: drop-shadow(0 0 2px color-mix(in srgb, var(--tb-seite) 85%, transparent));
   pointer-events: none;
-  animation: textbox-sparkle-anim 2.1s ease-in-out infinite;
+  animation: textbox-sparkle-anim 2.1s steps(7, end) infinite;
   opacity: 0;
 }
 @keyframes textbox-sparkle-anim {
@@ -14724,23 +14777,33 @@ body:has(.textbox-overlay) .tooltip {
   70%  { opacity: 0.4; transform: scale(0.5) translateY(-10px); }
   100% { opacity: 0; transform: scale(0) translateY(-14px); }
 }
+/* Namensschild: kleines Pixel-Plaettchen in der Seitenfarbe. */
 .textbox-speaker-name {
   font-family: 'Pixel Intv', 'Press Start 2P', monospace;
   font-size: 10px;
+  line-height: 1.35;
   letter-spacing: 2px;
-  color: var(--accent);
+  color: color-mix(in srgb, var(--tb-seite) 72%, #fff);
   text-transform: uppercase;
   text-align: center;
+  text-shadow: 1px 1px 0 #000;
+  max-width: 100%;
+  padding: 4px 6px 3px;
+  background: #0a0914;
+  border: 2px solid color-mix(in srgb, var(--tb-seite) 75%, #000);
+  box-shadow: 0 0 0 2px var(--pp-kontur), 3px 3px 0 2px rgba(0, 0, 0, .4);
 }
 
 .textbox-body {
   flex: 1;
   display: flex;
   align-items: flex-start;
-  padding: 14px 20px 8px;
-  height: 110px;
+  padding: 16px 22px 10px;
+  height: 116px;
   position: relative;
   overflow: hidden;
+  /* Feine Zeilenstruktur wie auf einem alten Bildschirm. */
+  background: repeating-linear-gradient(180deg, rgba(255,255,255,.022) 0 2px, transparent 2px 4px);
 }
 .textbox-text {
   font-family: 'Pixel Intv', 'Press Start 2P', monospace;
@@ -14750,6 +14813,7 @@ body:has(.textbox-overlay) .tooltip {
   white-space: pre-wrap;
   display: block;
   width: 100%;
+  text-shadow: 2px 2px 0 rgba(0, 0, 0, .7);
 }
 .textbox-text strong {
   color: var(--accent);
@@ -14791,34 +14855,59 @@ body:has(.textbox-overlay) .tooltip {
   30%  { transform: scale(1.35); filter: brightness(1.4); box-shadow: 0 0 30px rgba(255,200,0,.6); }
   100% { transform: scale(1); filter: brightness(1); box-shadow: none; }
 }
+/* Weiter-/Schliessen-Pfeil: gezeichnete Pixel-Dreiecke statt der
+   Schriftzeichen ▶/▼, in der Sprecherfarbe, im Zweitakt blinkend. */
 .textbox-advance {
   position: absolute;
-  right: 12px;
-  bottom: 8px;
-  font-size: 12px;
-  color: var(--accent);
-  animation: textbox-bounce 0.8s ease-in-out infinite;
+  right: 14px;
+  bottom: 11px;
+  width: 8px;
+  height: 14px;
+  background: color-mix(in srgb, var(--tb-farbe) 80%, #fff);
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 4 7' shape-rendering='crispEdges'%3E%3Cpath fill='%23fff' d='M0 0h1v7H0zM1 1h1v5H1zM2 2h1v3H2zM3 3h1v1H3z'/%3E%3C/svg%3E") center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 4 7' shape-rendering='crispEdges'%3E%3Cpath fill='%23fff' d='M0 0h1v7H0zM1 1h1v5H1zM2 2h1v3H2zM3 3h1v1H3z'/%3E%3C/svg%3E") center / contain no-repeat;
+  filter: drop-shadow(2px 2px 0 #000);
+  animation: textbox-advance-weiter .8s steps(1, end) infinite;
+}
+.textbox-advance-ende {
+  width: 14px;
+  height: 8px;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 7 4' shape-rendering='crispEdges'%3E%3Cpath fill='%23fff' d='M0 0h7v1H0zM1 1h5v1H1zM2 2h3v1H2zM3 3h1v1H3z'/%3E%3C/svg%3E") center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 7 4' shape-rendering='crispEdges'%3E%3Cpath fill='%23fff' d='M0 0h7v1H0zM1 1h5v1H1zM2 2h3v1H2zM3 3h1v1H3z'/%3E%3C/svg%3E") center / contain no-repeat;
+  animation: textbox-bounce .8s steps(1, end) infinite;
+}
+@keyframes textbox-advance-weiter {
+  0%, 100% { transform: translateX(0); }
+  50%      { transform: translateX(3px); }
 }
 @keyframes textbox-bounce {
   0%, 100% { transform: translateY(0); }
-  50%      { transform: translateY(4px); }
+  50%      { transform: translateY(3px); }
 }
 .textbox-footer {
   position: absolute;
-  right: 28px;
-  bottom: 6px;
+  right: 34px;
+  bottom: 8px;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
 }
 .textbox-page-indicator {
   font-family: 'Pixel Intv', 'Press Start 2P', monospace;
   font-size: 10px;
-  color: var(--text2);
+  letter-spacing: 1px;
+  color: color-mix(in srgb, var(--tb-farbe) 55%, #fff);
+  padding: 3px 6px 2px;
+  background: rgba(0, 0, 0, .5);
+  border: 2px solid color-mix(in srgb, var(--tb-farbe) 45%, #000);
 }
 .textbox-back {
-  font-size: 12px;
-  color: var(--accent);
+  width: 8px;
+  height: 14px;
+  background: color-mix(in srgb, var(--tb-farbe) 80%, #fff);
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 4 7' shape-rendering='crispEdges'%3E%3Cpath fill='%23fff' d='M3 0h1v7H3zM2 1h1v5H2zM1 2h1v3H1zM0 3h1v1H0z'/%3E%3C/svg%3E") center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 4 7' shape-rendering='crispEdges'%3E%3Cpath fill='%23fff' d='M3 0h1v7H3zM2 1h1v5H2zM1 2h1v3H1zM0 3h1v1H0z'/%3E%3C/svg%3E") center / contain no-repeat;
+  filter: drop-shadow(2px 2px 0 #000);
   cursor: pointer;
   opacity: 0.7;
   transition: opacity .15s;
@@ -14880,11 +14969,10 @@ body:has(.textbox-overlay) .tooltip {
 @media (max-height: 500px) {
   .textbox-overlay { padding-top: 6px; }
   .textbox { width: min(600px, calc(94 * var(--vw))); }
-  .textbox-portrait { width: 80px; padding: 6px 4px 4px; }
-  .textbox-portrait-frame { width: 60px; height: 60px; }
-  .textbox-portrait img { width: 48px; height: 48px; }
+  .textbox-portrait { width: 88px; padding: 8px 6px 6px; gap: 6px; }
+  .textbox-portrait-frame { width: 56px; height: 56px; }
   .textbox-sparkle { width: 4px; height: 4px; }
-  .textbox-speaker-name { font-size: 7px; }
+  .textbox-speaker-name { font-size: 7px; letter-spacing: 1px; padding: 3px 4px 2px; }
   .textbox-body { padding: 10px 14px 6px; height: 80px; }
   .textbox-text { font-size: 14px; }
 }

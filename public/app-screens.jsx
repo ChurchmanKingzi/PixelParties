@@ -112,10 +112,20 @@ function useTutorialFlow(open) {
   const tutorialIntroShownRef = useRef(null);
   const tutorialRoomIdRef = useRef(null);
   useEffect(() => {
-    if (!tutorialAttemptState || tutorialAttemptState.result) return;
+    if (!tutorialAttemptState) {
+      // Kein Tutorial mehr: der angezeigte Gegner faellt zurueck auf "CPU".
+      tutorialRoomIdRef.current = null;
+      if (window.setTutorialGegner) window.setTutorialGegner(null);
+      return;
+    }
+    if (tutorialAttemptState.result) return;
     if (tutorialAttemptState.roomId !== tutorialRoomIdRef.current) {
       tutorialRoomIdRef.current = tutorialAttemptState.roomId;
       tutorialIntroShownRef.current = null;
+      // Neuer Durchgang (auch ein Retry): Gegner ist, wer zuerst spricht.
+      if (window.setTutorialGegner && window.tutorialErsterSprecher) {
+        window.setTutorialGegner(window.tutorialErsterSprecher(window._currentTutorialNum));
+      }
     }
     const num = window._currentTutorialNum;
     if (!num || tutorialIntroShownRef.current === num) return;

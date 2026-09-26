@@ -22577,6 +22577,12 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     };
   }, [playAnimations]);
 
+  // ── Tutorial-Gegner: Monia Bot oder Antonia statt "CPU" ──
+  // Wer gerade angezeigt wird, entscheiden die Gespraechsszenen
+  // (`setTutorialGegner` in app-shared). Nur im Tutorial ausgewertet.
+  const tutorialGegnerDaten = (window.useTutorialGegner || (() => null))();
+  const tutorialGegner = gameState?.isTutorial ? tutorialGegnerDaten : null;
+
   // ── Tutorial outro: show textbox before victory screen ──
   const [tutorialOutroPending, setTutorialOutroPending] = useState(false);
   const [resultFading, setResultFading] = useState(false);
@@ -40850,11 +40856,12 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             )}
           <div className="game-hand-info" ref={speechOppRef} style={oppAvatarHighlight}>
             {/* Porträt im verzierten Pixelrahmen in der Farbe des Spielers
-                (`.pp-portraet`, style.css). */}
-            <span className="pp-portraet" style={{ '--portraet': opp.color || '#ff5577' }}>
-              {opp.avatar
+                (`.pp-portraet`, style.css). Im Tutorial: Monia Bot bzw.
+                Antonia mit eigenem Bild und eigener Farbe. */}
+            <span className="pp-portraet" style={{ '--portraet': (tutorialGegner ? tutorialGegner.color : opp.color) || '#ff5577' }}>
+              {(tutorialGegner ? tutorialGegner.avatar : opp.avatar)
                 /* `result ? '' : …` statt `!result && …`: der &&-Ausdruck liefert bei gesetztem Ergebnis das BOOLEAN false, und `'…-big' + false` haengt woertlich "false" an den Klassennamen. Aus `game-hand-avatar-crop` wurde `game-hand-avatar-cropfalse` — der quadratische Rahmen fiel weg und der HeroArtCrop lief auf seine volle 135px-Breite aus, der Avatar wurde also im End-Screen ploetzlich breiter. */
-                ? <img src={opp.avatar} className={'game-hand-avatar game-hand-avatar-big' + (result ? '' : ((isMyTurn && !oppBarking) ? ' avatar-inactive' : ' avatar-active'))} />
+                ? <img key={tutorialGegner ? tutorialGegner.key : 'avatar'} src={tutorialGegner ? tutorialGegner.avatar : opp.avatar} className={'game-hand-avatar game-hand-avatar-big' + (tutorialGegner ? ' game-hand-avatar-tutorial' : '') + (result ? '' : ((isMyTurn && !oppBarking) ? ' avatar-inactive' : ' avatar-active'))} />
                 : opp.heroes?.[1]?.name && HeroArtCrop
                   ? (
                     <div className={'game-hand-avatar-crop' + (result ? '' : ((isMyTurn && !oppBarking) ? ' avatar-inactive' : ' avatar-active'))}>
@@ -40864,14 +40871,15 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                   : null}
               <span className="pp-portraet-zier" aria-hidden="true" />
             </span>
-            <span className="orbit-font game-hand-name" style={{ fontSize: 18, fontWeight: 800, color: opp.color }}>{
+            <span className="orbit-font game-hand-name" style={{ fontSize: 18, fontWeight: 800, color: tutorialGegner ? tutorialGegner.color : opp.color }}>{
               // CPU opponents are labelled "CPU" server-side; show their
               // middle Hero instead so they read as a character. Als
               // Ruling: nur der NAME, ohne Titel ("Bomb Berserker Bartas"
               // → "Bartas", "Maya, the Nature Fairy" → "Maya") — siehe
               // heroDisplayName in app-shared.jsx. Falls back to the
               // first living Hero, then CPU.
-              (gameState.isCpuBattle && opp.username === 'CPU')
+              tutorialGegner ? tutorialGegner.name
+              : (gameState.isCpuBattle && opp.username === 'CPU')
                 ? heroDisplayName(opp.heroes?.[1]?.name || opp.heroes?.find(h => h?.name)?.name || opp.username)
                 : opp.username
             }</span>
