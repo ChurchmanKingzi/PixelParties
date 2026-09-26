@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """09 Bomblebee-Wabe „Welcome to the Hive!“: Flug durch einen Wabengang im Bienenstock, dem Licht des Fluglochs entgegen.
-Waben, Honig, Bomblebees und Dive Bomblebees sind direkt in 1x-Leinwandpixeln gezeichnet (nach den Kartenbildern).
-Time Bomblebee und Carpet Bomblebee sind aus den nativen Kartenpixeln (native()) ausgeschnitten."""
+Alles direkt in 1x-Leinwandpixeln gezeichnet (keine hochskalierten Sprites): perspektivische Waben, Honig und die
+Bomblebee-Arten nach ihren Kartenbildern – Bomblebee, Dive Bomblebee, Time Bomblebee und Carpet Bomblebee."""
 from lib import *
 
 SQ3 = math.sqrt(3)
@@ -125,10 +125,13 @@ VEIN = (112, 82, 52)
 WEDGE = (84, 62, 44)
 
 
-def bee(R, tilt=0.0, flip=False, wing=0.0, fuse=1.0, rim=(214, 128, 36), eyes=True, seed=0, brow=True):
+def bee(R, tilt=0.0, flip=False, wing=0.0, fuse=1.0, rim=(214, 128, 36), eyes=True, seed=0, brow=True,
+        show_wings=True, show_legs=True, show_face=True, show_fuse=True, wing_R=None, fuse_dir=1, stripes=False,
+        eye_col=(240, 240, 232)):
     """Bomblebee mit Körperradius R (Pixel). tilt in Grad (+ = im Uhrzeigersinn).
     Rückgabe: RGBA-Sprite (Flügel halbtransparent) und Ankerpunkt (Körpermitte) sowie Funkenposition."""
-    S_ = int(R * 7) + 16
+    WR = wing_R or R
+    S_ = int(max(R, WR) * 7) + 16
     cx0 = cy0 = S_ / 2
     ca, sa = math.cos(math.radians(tilt)), math.sin(math.radians(tilt))
 
@@ -140,7 +143,7 @@ def bee(R, tilt=0.0, flip=False, wing=0.0, fuse=1.0, rim=(214, 128, 36), eyes=Tr
     wl = Image.new('RGBA', (S_, S_), (0, 0, 0, 0))
     dw = ImageDraw.Draw(wl)
     wlines = []
-    for side in (-1, 1):
+    for side in ((-1, 1) if show_wings else ()):
         for (L, Wd, ang, base, alpha) in [(1.25, 0.36, -8 + wing * 12, (0.62, -0.18), 180), (1.72, 0.5, 24 + wing * 22, (0.55, -0.48), 196)]:
             a0 = math.radians(ang)
             ux, uy = side * math.cos(a0), -math.sin(a0)
@@ -150,19 +153,19 @@ def bee(R, tilt=0.0, flip=False, wing=0.0, fuse=1.0, rim=(214, 128, 36), eyes=Tr
             for k in range(48):
                 t = k / 48 * 2 * math.pi
                 u = (1 - math.cos(t)) / 2  # 0..1 entlang Achse
-                prof = math.sin(t) * (0.55 + 0.45 * u) * Wd * R  # Tropfenform, außen breiter
-                x = bx + ux * u * L * R + vx * prof
-                y = by + uy * u * L * R + vy * prof
+                prof = math.sin(t) * (0.55 + 0.45 * u) * Wd * WR  # Tropfenform, außen breiter
+                x = bx + ux * u * L * WR + vx * prof
+                y = by + uy * u * L * WR + vy * prof
                 pts.append(T(x, y))
             dw.polygon(pts, fill=WINGC + (alpha,), outline=WEDGE + (255,))
             # Adern
             def P(u, v):
-                return T(bx + ux * u * L * R + vx * v * Wd * R, by + uy * u * L * R + vy * v * Wd * R)
+                return T(bx + ux * u * L * WR + vx * v * Wd * WR, by + uy * u * L * WR + vy * v * Wd * WR)
             wlines.append([P(0.05, 0), P(0.5, 0.12), P(0.92, 0.05)])
             wlines.append([P(0.1, 0.05), P(0.45, 0.55), P(0.8, 0.62)])
             wlines.append([P(0.1, -0.05), P(0.5, -0.5), P(0.82, -0.62)])
             wlines.append([P(0.45, 0.55), P(0.5, 0.12), P(0.5, -0.5)])
-            if R >= 14:
+            if WR >= 14:
                 wlines.append([P(0.72, 0.6), P(0.75, 0.08), P(0.74, -0.6)])
                 wlines.append([P(0.25, 0.35), P(0.3, 0.02), P(0.28, -0.3)])
     if R >= 7:
@@ -184,7 +187,7 @@ def bee(R, tilt=0.0, flip=False, wing=0.0, fuse=1.0, rim=(214, 128, 36), eyes=Tr
     db = ImageDraw.Draw(body)
     lw = 2 if R >= 9 else 1
     nleg = 3 if R < 16 else 4
-    for i in reversed(range(nleg)):
+    for i in reversed(range(nleg if show_legs else 0)):
         for side in (-1, 1):
             f = i / max(1, nleg - 1)
             att = (side * (0.6 - 0.25 * f) * R, (0.42 + 0.35 * f) * R)
@@ -248,93 +251,105 @@ def bee(R, tilt=0.0, flip=False, wing=0.0, fuse=1.0, rim=(214, 128, 36), eyes=Tr
     if R >= 16:
         spc = ins & (np.hypot(nxx + 0.42, nyy + 0.46) < 0.05)
         col[spc] = (236, 236, 250)
+    if stripes:
+        # Hummel-Streifen (Carpet Bomblebee): goldene Bänder im unteren Körper
+        lr_ = ly / ry
+        band_ = ins & (((lr_ > -0.8) & (lr_ < -0.6)) | ((lr_ > 0.63) & (lr_ < 0.77)) | ((lr_ > 0.86) & (lr_ < 0.97)))
+        gcol_ = ramp(np.clip(shade * 1.25, 0, 1), GOLD, 0.5 + (thr - 0.5) * 0.7)
+        col[band_] = gcol_[band_]
     bm = ins | fringe
     col[fringe] = BLACK[1]
     ba[bm, :3] = col[bm]; ba[bm, 3] = 255
     body = Image.fromarray(ba)
     db = ImageDraw.Draw(body)
-    # ---- Gesicht: goldener Achteck-Ring ----
-    fcx, fcy = 0.08 * R, 0.08 * R
-    rr = 0.56 * R
-    oct_o = [T(fcx + rr * math.cos(math.radians(22.5 + 45 * k)), fcy + rr * 0.92 * math.sin(math.radians(22.5 + 45 * k))) for k in range(8)]
-    ri = rr - max(1.2, 0.16 * R)
-    oct_i = [T(fcx + ri * math.cos(math.radians(22.5 + 45 * k)), fcy + ri * 0.92 * math.sin(math.radians(22.5 + 45 * k))) for k in range(8)]
-    ring = Image.new('L', (S_, S_), 0)
-    dr = ImageDraw.Draw(ring)
-    dr.polygon(oct_o, fill=255)
-    dr.polygon(oct_i, fill=0)
-    rmk = np.array(ring) > 0
-    ang = np.arctan2(ly - fcy, lx - fcx)
-    gl = 0.55 - 0.4 * np.sin(ang + math.radians(45)) * 1.0
-    gcol = ramp(np.clip(gl, 0, 1), GOLD, thr)
-    face = Image.new('L', (S_, S_), 0)
-    ImageDraw.Draw(face).polygon(oct_i, fill=255)
-    fm = (np.array(face) > 0) & ~rmk
-    ba = np.array(body)
-    # Innenfläche: leicht gewölbt, dunkler
-    fsh = np.clip(0.3 - 0.25 * ((lx - fcx) + (ly - fcy)) / R, 0, 1)
-    fc = ramp(fsh, BLACK[:4], thr)
-    ba[fm, :3] = fc[fm]
-    ba[rmk, :3] = gcol[rmk]; ba[rmk, 3] = 255
-    # Innenkante des Rings: dunkler Schatten oben links
-    fe = fm & ndimage.binary_dilation(rmk) & ((ly - fcy) + (lx - fcx) < 0)
-    ba[fe, :3] = BLACK[0]
-    body = Image.fromarray(ba)
-    db = ImageDraw.Draw(body)
-    if eyes:
-        for s_ in (-1, 1):
-            ex, ey = fcx + s_ * 0.2 * R, fcy + 0.04 * R
-            e0 = T(ex, ey)
-            if R >= 20:
-                ew, eh = 0.12 * R, 0.13 * R
-                db.ellipse((e0[0] - ew, e0[1] - eh, e0[0] + ew, e0[1] + eh), fill=(236, 234, 222, 255))
-                db.ellipse((e0[0] - ew + 1, e0[1] - eh + 2, e0[0] + ew - 1, e0[1] + eh), fill=(250, 250, 244, 255))
-                pxp = e0[0] - s_ * ew * 0.25
-                db.rectangle((pxp - 1, e0[1] - 1, pxp + 1, e0[1] + eh - 1), fill=(12, 10, 16, 255))
-                db.point((pxp - 1, e0[1] - 1), fill=(255, 255, 255, 255))
-                if brow:
-                    b0 = T(ex - s_ * 0.17 * R, ey - 0.25 * R); b1 = T(ex + s_ * 0.13 * R, ey - 0.13 * R)
-                    db.line([b0, b1], fill=BLACK[0] + (255,), width=2)
-                    # Lid schneidet Augenoberkante
-                    db.line([T(ex - s_ * 0.15 * R, ey - 0.17 * R), T(ex + s_ * 0.14 * R, ey - 0.05 * R)], fill=BLACK[1] + (255,), width=1)
-            elif R >= 9:
-                x0, y0 = int(round(e0[0])) - (1 if s_ < 0 else 0), int(round(e0[1])) - 1
-                db.rectangle((x0, y0, x0 + 1, y0 + 2), fill=(240, 240, 232, 255))
-                db.point((x0 + (1 if s_ < 0 else 0), y0 + 2), fill=(12, 10, 16, 255))
-                db.point((x0 + (1 if s_ < 0 else 0), y0 + 1), fill=(12, 10, 16, 255))
-            else:
-                db.point((round(e0[0]), round(e0[1])), fill=(240, 240, 232, 255))
-    # ---- Zündschnur ----
-    neck_h = max(2, 0.2 * R); neck_w = max(2, 0.3 * R)
-    ntop = -ry - neck_h + 1
-    npoly = [T(-neck_w / 2, -ry + 1.5), T(neck_w / 2, -ry + 1.5), T(neck_w / 2, ntop), T(-neck_w / 2, ntop)]
-    db.polygon(npoly, fill=BLACK[4] + (255,), outline=K + (255,))
-    if R >= 12:
-        db.line([T(-neck_w / 2 + 1, -ry + 1), T(-neck_w / 2 + 1, ntop + 1)], fill=BLACK[6] + (255,))
-        db.line([T(-neck_w / 2 + 1, ntop + 0.5), T(neck_w / 2 - 1, ntop + 0.5)], fill=BLACK[5] + (255,))
-    # Bezier
-    p0 = (0, ntop); p1 = (0.05 * R, ntop - 0.45 * R * fuse); p2 = (0.55 * R * fuse, ntop - 0.35 * R * fuse); p3 = (0.62 * R * fuse, ntop - 0.75 * R * fuse)
-    fpts = []
-    for k in range(40):
-        t = k / 39
-        x = (1 - t) ** 3 * p0[0] + 3 * (1 - t) ** 2 * t * p1[0] + 3 * (1 - t) * t * t * p2[0] + t ** 3 * p3[0]
-        y = (1 - t) ** 3 * p0[1] + 3 * (1 - t) ** 2 * t * p1[1] + 3 * (1 - t) * t * t * p2[1] + t ** 3 * p3[1]
-        fpts.append(T(x, y))
-    fw = 2 if R >= 14 else 1
-    db.line(fpts, fill=(58, 38, 24, 255), width=fw)
-    if R >= 14:
-        for k in range(0, 39, 3):
-            db.point((round(fpts[k][0] - 0.5), round(fpts[k][1] - 0.5)), fill=(170, 124, 70, 255))
-    tipx, tipy = fpts[-1]
+    if show_face:
+        # ---- Gesicht: goldener Achteck-Ring ----
+        fcx, fcy = 0.08 * R, 0.08 * R
+        rr = 0.56 * R
+        oct_o = [T(fcx + rr * math.cos(math.radians(22.5 + 45 * k)), fcy + rr * 0.92 * math.sin(math.radians(22.5 + 45 * k))) for k in range(8)]
+        ri = rr - max(1.2, 0.16 * R)
+        oct_i = [T(fcx + ri * math.cos(math.radians(22.5 + 45 * k)), fcy + ri * 0.92 * math.sin(math.radians(22.5 + 45 * k))) for k in range(8)]
+        ring = Image.new('L', (S_, S_), 0)
+        dr = ImageDraw.Draw(ring)
+        dr.polygon(oct_o, fill=255)
+        dr.polygon(oct_i, fill=0)
+        rmk = np.array(ring) > 0
+        ang = np.arctan2(ly - fcy, lx - fcx)
+        gl = 0.55 - 0.4 * np.sin(ang + math.radians(45)) * 1.0
+        gcol = ramp(np.clip(gl, 0, 1), GOLD, thr)
+        face = Image.new('L', (S_, S_), 0)
+        ImageDraw.Draw(face).polygon(oct_i, fill=255)
+        fm = (np.array(face) > 0) & ~rmk
+        ba = np.array(body)
+        # Innenfläche: leicht gewölbt, dunkler
+        fsh = np.clip(0.3 - 0.25 * ((lx - fcx) + (ly - fcy)) / R, 0, 1)
+        fc = ramp(fsh, BLACK[:4], thr)
+        ba[fm, :3] = fc[fm]
+        ba[rmk, :3] = gcol[rmk]; ba[rmk, 3] = 255
+        # Innenkante des Rings: dunkler Schatten oben links
+        fe = fm & ndimage.binary_dilation(rmk) & ((ly - fcy) + (lx - fcx) < 0)
+        ba[fe, :3] = BLACK[0]
+        body = Image.fromarray(ba)
+        db = ImageDraw.Draw(body)
+        if eyes:
+            for s_ in (-1, 1):
+                ex, ey = fcx + s_ * 0.2 * R, fcy + 0.04 * R
+                e0 = T(ex, ey)
+                if R >= 20:
+                    ew, eh = 0.12 * R, 0.13 * R
+                    db.ellipse((e0[0] - ew, e0[1] - eh, e0[0] + ew, e0[1] + eh), fill=(236, 234, 222, 255))
+                    db.ellipse((e0[0] - ew + 1, e0[1] - eh + 2, e0[0] + ew - 1, e0[1] + eh), fill=(250, 250, 244, 255))
+                    pxp = e0[0] - s_ * ew * 0.25
+                    db.rectangle((pxp - 1, e0[1] - 1, pxp + 1, e0[1] + eh - 1), fill=(12, 10, 16, 255))
+                    db.point((pxp - 1, e0[1] - 1), fill=(255, 255, 255, 255))
+                    if brow:
+                        b0 = T(ex - s_ * 0.17 * R, ey - 0.25 * R); b1 = T(ex + s_ * 0.13 * R, ey - 0.13 * R)
+                        db.line([b0, b1], fill=BLACK[0] + (255,), width=2)
+                        # Lid schneidet Augenoberkante
+                        db.line([T(ex - s_ * 0.15 * R, ey - 0.17 * R), T(ex + s_ * 0.14 * R, ey - 0.05 * R)], fill=BLACK[1] + (255,), width=1)
+                elif R >= 9:
+                    x0, y0 = int(round(e0[0])) - (1 if s_ < 0 else 0), int(round(e0[1])) - 1
+                    db.rectangle((x0, y0, x0 + 1, y0 + 2), fill=tuple(eye_col) + (255,))
+                    db.point((x0 + (1 if s_ < 0 else 0), y0 + 2), fill=(12, 10, 16, 255))
+                    db.point((x0 + (1 if s_ < 0 else 0), y0 + 1), fill=(12, 10, 16, 255))
+                else:
+                    db.point((round(e0[0]), round(e0[1])), fill=(240, 240, 232, 255))
+    tipx = tipy = None
+    if show_fuse:
+        # ---- Zündschnur ----
+        neck_h = max(2, 0.2 * R); neck_w = max(2, 0.3 * R)
+        ntop = -ry - neck_h + 1
+        npoly = [T(-neck_w / 2, -ry + 1.5), T(neck_w / 2, -ry + 1.5), T(neck_w / 2, ntop), T(-neck_w / 2, ntop)]
+        db.polygon(npoly, fill=BLACK[4] + (255,), outline=K + (255,))
+        if R >= 12:
+            db.line([T(-neck_w / 2 + 1, -ry + 1), T(-neck_w / 2 + 1, ntop + 1)], fill=BLACK[6] + (255,))
+            db.line([T(-neck_w / 2 + 1, ntop + 0.5), T(neck_w / 2 - 1, ntop + 0.5)], fill=BLACK[5] + (255,))
+        # Bezier
+        p0 = (0, ntop); p1 = (fuse_dir * 0.05 * R, ntop - 0.45 * R * fuse); p2 = (fuse_dir * 0.55 * R * fuse, ntop - 0.35 * R * fuse); p3 = (fuse_dir * 0.62 * R * fuse, ntop - 0.75 * R * fuse)
+        fpts = []
+        for k in range(40):
+            t = k / 39
+            x = (1 - t) ** 3 * p0[0] + 3 * (1 - t) ** 2 * t * p1[0] + 3 * (1 - t) * t * t * p2[0] + t ** 3 * p3[0]
+            y = (1 - t) ** 3 * p0[1] + 3 * (1 - t) ** 2 * t * p1[1] + 3 * (1 - t) * t * t * p2[1] + t ** 3 * p3[1]
+            fpts.append(T(x, y))
+        fw = 2 if R >= 14 else 1
+        db.line(fpts, fill=(58, 38, 24, 255), width=fw)
+        if R >= 14:
+            for k in range(0, 39, 3):
+                db.point((round(fpts[k][0] - 0.5), round(fpts[k][1] - 0.5)), fill=(170, 124, 70, 255))
+        tipx, tipy = fpts[-1]
     body = outline(body, K + (255,))
     img.alpha_composite(body)
     d = ImageDraw.Draw(img)
-    d.point((round(tipx), round(tipy)), fill=(255, 90, 30, 255))
-    spark_at = (tipx, tipy)
+    spark_at = None
+    if tipx is not None:
+        d.point((round(tipx), round(tipy)), fill=(255, 90, 30, 255))
+        spark_at = (tipx, tipy)
     img = Image.fromarray(np.array(img))
     if flip:
         img = img.transpose(Image.FLIP_LEFT_RIGHT)
-        spark_at = (S_ - 1 - tipx, tipy)
+        if spark_at:
+            spark_at = (S_ - 1 - tipx, tipy)
     return img, (cx0, cy0), spark_at
 
 
@@ -392,57 +407,178 @@ def falling_drop(d, x, y, r=2):
 
 
 
-# ------------------------------------------------------------------ Figuren aus den Karten (native Pixel, 1x)
-def _cardcut(name, box, is_bg, nkeep=1, minsz=20):
-    nv = native(name).crop(box)
-    a = np.array(nv).astype(int)
-    bg = is_bg(a)
-    lab, k = ndimage.label(~bg)
-    sz = ndimage.sum(~bg, lab, range(1, k + 1))
-    keep = np.isin(lab, np.argsort(sz)[::-1][:nkeep] + 1) & np.isin(lab, np.where(sz >= minsz)[0] + 1)
-    keep = ndimage.binary_fill_holes(keep)
-    o = np.array(nv)
-    o[..., 3] = np.where(keep, 255, 0)
-    im_ = Image.fromarray(o)
-    return im_.crop(im_.getbbox())
+# ------------------------------------------------------------------ Time & Carpet Bomblebee (1x neu gezeichnet)
+CLOCKW = [(128, 136, 164), (170, 178, 202), (206, 212, 230), (232, 236, 246), (250, 251, 255)]
+REDH = [(120, 16, 24), (196, 34, 42), (240, 84, 80)]
 
 
-def _bg_nature(a):
-    r, g, b = a[..., 0], a[..., 1], a[..., 2]
-    L = a[..., :3].mean(2)
-    blue = (b - r > 50) & (L < 175)
-    brown = (r - b > 30) & (L < 135) & (g > 0.5 * r) & (r < 205)
-    grass = (g > r + 8) & (g > b)
-    return blue | brown | grass
+def small_bomb(R, seed, fuse_dir=1):
+    b_, c_, sp_ = bee(R, show_wings=False, show_legs=False, show_face=False, seed=seed, fuse_dir=fuse_dir)
+    return b_, c_, sp_
 
 
-def time_bomblebee():
-    s_ = _cardcut('Time Bomblebee', (0, 0, 76, 51), _bg_nature, nkeep=6)
-    a_ = np.array(s_).astype(int)
-    r, g, b = a_[..., 0], a_[..., 1], a_[..., 2]
-    L = a_[..., :3].mean(2)
-    # Flügel über Wasser sind bläulich -> neutral beige wie auf der Holzseite
-    wingish = (a_[..., 3] > 0) & (b > r) & (L > 110) & (L < 215) & (np.abs(r - g) < 40)
-    a_[wingish, :3] = np.clip(np.stack([L[wingish] * 1.02 + 6, L[wingish] * 0.96, L[wingish] * 0.84 - 4], -1), 0, 255)
-    # Rinden-Reste (dunkles Braun außerhalb der Figur) entfernen
-    bark = (a_[..., 3] > 0) & (r - b > 25) & (g > 0.45 * r) & (L < 110) & (r > 60)
-    a_[bark, 3] = 0
-    a_[:16, 50:, 3] = 0                                   # Rindenstücke oben rechts
-    a_[(a_[..., 2] - a_[..., 0] > 40), 3] = 0             # Wasserpixel
-    out = Image.fromarray(a_.clip(0, 255).astype(np.uint8))
-    out = keep_largest(out, 5)
-    return out.crop(out.getbbox())
+def time_bomblebee_hd(Rc=20, seed=40):
+    """Uhr-Körper mit Flügeln und Spinnenbeinen, Bombenkopf mit Goldring, Taschenuhr, drei Bomben."""
+    base, c_, _ = bee(Rc, show_face=False, show_fuse=False, wing_R=Rc * 0.9, seed=seed, wing=0.2)
+    S_ = base.width
+    PAD = 14
+    img = Image.new('RGBA', (S_ + 2 * PAD, S_ + 2 * PAD), (0, 0, 0, 0))
+    img.alpha_composite(base, (PAD, PAD))
+    cx, cy = c_[0] + PAD, c_[1] + PAD
+    sparks = []
+    a_ = np.array(img)
+    hh, ww = a_.shape[:2]
+    Y_, X_ = np.mgrid[0:hh, 0:ww].astype(float)
+    dx_, dy_ = X_ - cx + 0.5, Y_ - cy + 0.5
+    r_ = np.hypot(dx_, dy_)
+    rf = Rc * 0.8
+    th = bayer((hh, ww))
+    face = r_ <= rf
+    bez = (r_ > rf) & (r_ <= rf + 1.2)
+    # Zifferblatt: leicht gewölbt, Licht von oben links, Schatten des Rands oben links
+    sh = np.clip(0.95 - 0.25 * (dx_ + dy_) / rf * 0.5 - 0.35 * (r_ / rf) ** 4, 0, 1)
+    rimsh = face & (r_ > rf - 2.2) & ((dx_ + dy_) < 0)
+    sh = np.where(rimsh, sh - 0.35, sh)
+    fc = ramp(np.clip(sh, 0, 1), CLOCKW, 0.5 + (th - 0.5) * 0.6)
+    a_[face, :3] = fc[face]; a_[face, 3] = 255
+    bc = ramp(np.clip(0.6 - 0.35 * (dx_ + dy_) / rf, 0, 1), GOLD, th)
+    a_[bez, :3] = bc[bez]; a_[bez, 3] = 255
+    img = Image.fromarray(a_)
+    d = ImageDraw.Draw(img)
+    # Stundenstriche
+    for k in range(12):
+        an = math.radians(k * 30 - 90)
+        big = k % 3 == 0
+        r0, r1 = rf - (4.5 if big else 3.2), rf - 1.6
+        d.line((cx + math.cos(an) * r0, cy + math.sin(an) * r0, cx + math.cos(an) * r1, cy + math.sin(an) * r1),
+               fill=(40, 42, 62) if big else (96, 100, 126), width=2 if big else 1)
+    # Zeiger (12 und 9 Uhr, wie auf der Karte)
+    for (an, ln, wd) in [(-90, rf * 0.72, 2), (180, rf * 0.5, 2)]:
+        a0 = math.radians(an)
+        ex, ey = cx + math.cos(a0) * ln, cy + math.sin(a0) * ln
+        d.line((cx, cy, ex, ey), fill=REDH[1], width=wd)
+        ox, oy = (-math.sin(a0), math.cos(a0))
+        d.line((cx - ox, cy - oy, ex - ox, ey - oy), fill=REDH[2], width=1)
+        d.point((round(ex), round(ey)), fill=REDH[0])
+    d.ellipse((cx - 2, cy - 2, cx + 2, cy + 2), fill=K)
+    d.point((cx - 1, cy - 1), fill=GOLD[3])
+    # Glas-Glanz
+    d.arc((cx - rf + 2.5, cy - rf + 2.5, cx + rf - 2.5, cy + rf - 2.5), 200, 250, fill=(255, 255, 255))
+    d.line((cx + rf * 0.25, cy - rf * 0.6, cx + rf * 0.45, cy - rf * 0.4), fill=(255, 255, 255))
+    # Bomben an drei Ecken (vierte Ecke: Taschenuhr)
+    for (bx_, by_, fd) in [(-1, -0.72, -1), (-1.02, 0.82, -1), (1.02, 0.82, 1)]:
+        bm, bc_, bsp = small_bomb(int(Rc * 0.36), seed + int(bx_ * 10 + by_ * 7), fuse_dir=fd)
+        px, py = int(cx + bx_ * Rc - bc_[0]), int(cy + by_ * Rc - bc_[1])
+        img.alpha_composite(bm, (px, py))
+        sparks.append((px + bsp[0], py + bsp[1], 2))
+    # Kopf: kleine Bombe mit Goldring-Gesicht
+    Rh = int(Rc * 0.48)
+    hd, hc_, hsp = bee(Rh, show_wings=False, show_legs=False, seed=seed + 5, fuse_dir=-1)
+    px, py = int(cx - 2 - hc_[0]), int(cy - Rc - Rh * 0.45 - hc_[1])
+    img.alpha_composite(hd, (px, py))
+    sparks.append((px + hsp[0], py + hsp[1], 2))
+    # Taschenuhr oben rechts
+    d = ImageDraw.Draw(img)
+    wx, wy, wr = cx + Rc * 0.78, cy - Rc * 0.86, max(5, Rc * 0.3)
+    d.ellipse((wx - 1.5, wy - wr - 3.5, wx + 1.5, wy - wr - 0.5), outline=GOLD[2])
+    d.rectangle((wx - 1, wy - wr - 1, wx + 1, wy - wr + 1), fill=GOLD[1])
+    d.ellipse((wx - wr - 1, wy - wr - 1, wx + wr + 1, wy + wr + 1), fill=K)
+    d.ellipse((wx - wr, wy - wr, wx + wr, wy + wr), fill=GOLD[1])
+    d.ellipse((wx - wr, wy - wr, wx + wr - 1, wy + wr - 1), fill=GOLD[3])
+    d.ellipse((wx - wr + 2, wy - wr + 2, wx + wr - 2, wy + wr - 2), fill=CLOCKW[3])
+    d.ellipse((wx - wr + 2, wy - wr + 2, wx + wr - 3, wy + wr - 3), fill=CLOCKW[4])
+    d.line((wx, wy, wx, wy - wr + 3), fill=K)
+    d.line((wx, wy, wx + wr - 3, wy), fill=REDH[1])
+    d.point((wx - wr + 1, wy - wr + 2), fill=GOLD[4])
+    img = outline(img, K + (255,)) if False else img
+    bb = img.getbbox()
+    img = img.crop(bb)
+    sparks = [(x - bb[0], y - bb[1], s) for (x, y, s) in sparks]
+    return img, sparks
 
 
-def carpet_bomblebee():
-    s_ = _cardcut('Carpet Bomblebee', (12, 8, 66, 36), _bg_nature)
-    a_ = np.array(s_).astype(int)
-    r, g, b = a_[..., 0], a_[..., 1], a_[..., 2]
-    pink = (r > 180) & (b > 120) & (g < r - 30)
-    grn = (g > r + 5)
-    a_[pink | grn, 3] = 0
-    out = keep_largest(Image.fromarray(a_.astype(np.uint8)), 1)
-    return out.crop(out.getbbox())
+CARPET = [(70, 10, 18), (116, 18, 28), (166, 32, 36), (206, 58, 46), (236, 104, 72)]
+
+
+def carpet_bomblebee_hd(Wc=64, Dc=20, seed=50):
+    """Fliegender Teppich (rot, Goldborte, Quasten) mit Hummel-Bomblebee und vier Bomben."""
+    CW, CH = Wc + 28, Dc + 46
+    img = Image.new('RGBA', (CW, CH), (0, 0, 0, 0))
+    a_ = np.array(img)
+    top = np.full(CW, 10 ** 6); bot = np.full(CW, -1)
+    ox, oy = 12, 28
+    cols_done = {}
+    for vi in range(int(Dc * 3) + 1):
+        v = vi / (Dc * 3)
+        for ui in range(int(Wc * 3) + 1):
+            u = ui / (Wc * 3)
+            wv = 2.6 * math.sin(u * 2 * math.pi * 1.25 + 0.6) * (0.55 + 0.45 * v)
+            x = ox + Wc / 2 + (u - 0.5) * Wc * (0.84 + 0.16 * v) + (1 - v) * 6
+            y = oy + v * Dc + wv
+            xi, yi = int(round(x)), int(round(y))
+            if not (0 <= xi < CW and 0 <= yi < CH):
+                continue
+            slope = math.cos(u * 2 * math.pi * 1.25 + 0.6)
+            shade = 0.58 + 0.28 * slope - 0.1 * (1 - v)
+            border = (u < 0.055) or (u > 0.945) or (v < 0.13) or (v > 0.87)
+            inner_line = (0.055 <= u < 0.075) or (0.925 < u <= 0.945) or (0.13 <= v < 0.18) or (0.82 < v <= 0.87)
+            t_ = BAYER4[yi % 4, xi % 4]
+            if border:
+                cidx = min(4, max(0, int(shade * 4 + (t_ - 0.5) * 0.6)))
+                c = GOLD[cidx]
+                if ((u * 40) % 2 < 0.5) and 0.13 <= v <= 0.87:
+                    c = GOLD[max(0, cidx - 2)]
+            elif inner_line:
+                c = CARPET[0]
+            else:
+                cidx = min(4, max(0, int(shade * 4 + (t_ - 0.5) * 0.6)))
+                c = CARPET[cidx]
+                du, dv = abs(((u - 0.1) * 7) % 1 - 0.5), abs(((v - 0.2) * 1.6) % 1 - 0.5)
+                if abs(du + dv - 0.32) < 0.06:
+                    c = GOLD[1] if shade < 0.55 else GOLD[2]
+                if du + dv < 0.08:
+                    c = GOLD[3]
+            a_[yi, xi, :3] = c; a_[yi, xi, 3] = 255
+            top[xi] = min(top[xi], yi); bot[xi] = max(bot[xi], yi)
+    # Unterseite / Dicke an der Vorderkante
+    for xi in range(CW):
+        if bot[xi] >= 0:
+            for k in (1, 2):
+                if bot[xi] + k < CH:
+                    a_[bot[xi] + k, xi, :3] = CARPET[0] if k == 1 else (40, 6, 12)
+                    a_[bot[xi] + k, xi, 3] = 255
+    img = Image.fromarray(a_)
+    d = ImageDraw.Draw(img)
+    # Quasten an den Seiten
+    for side in (0, 1):
+        for v in (0.1, 0.35, 0.6, 0.85):
+            u = 0 if side == 0 else 1
+            wv = 2.6 * math.sin(u * 2 * math.pi * 1.25 + 0.6) * (0.55 + 0.45 * v)
+            x = ox + Wc / 2 + (u - 0.5) * Wc * (0.84 + 0.16 * v) + (1 - v) * 6
+            y = oy + v * Dc + wv
+            dxs = -1 if side == 0 else 1
+            d.line((x, y, x + 3 * dxs, y + 1), fill=GOLD[2])
+            d.point((x + 4 * dxs, y + 1), fill=GOLD[3])
+            d.point((x + 4 * dxs, y + 2), fill=GOLD[1])
+    img = outline(img, K + (255,))
+    sparks = []
+    # Bomben: zwei links, zwei rechts (gestapelt wie auf der Karte)
+    for (bx_, by_, R_, fd) in [(0.1, 0.1, 5, -1), (0.86, 0.08, 5, 1), (0.2, 0.55, 6, -1), (0.76, 0.52, 6, 1)]:
+        bm, bc_, bsp = small_bomb(R_, seed + int(bx_ * 100), fuse_dir=fd)
+        cxb = ox + bx_ * Wc + (1 - by_) * 5
+        cyb = oy + by_ * Dc - R_ * 0.6
+        px, py = int(cxb - bc_[0]), int(cyb - bc_[1])
+        img.alpha_composite(bm, (px, py))
+        sparks.append((px + bsp[0], py + bsp[1], 2))
+    # Hummel-Bomblebee in der Mitte (rote Augen wie auf der Karte)
+    hb, hc_, hsp = bee(9, stripes=True, eye_col=(255, 60, 50), seed=seed + 1, wing=0.3, brow=False, show_legs=False)
+    px, py = int(ox + Wc * 0.5 + 4 - hc_[0]), int(oy + Dc * 0.45 - 6 - hc_[1])
+    img.alpha_composite(hb, (px, py))
+    sparks.append((px + hsp[0], py + hsp[1], 2))
+    bb = img.getbbox()
+    img = img.crop(bb)
+    sparks = [(x - bb[0], y - bb[1], s) for (x, y, s) in sparks]
+    return img, sparks
 
 # ============================================================ Szene: Wabengang im Bienenstock
 VPX, VPY, F = 125.0, 118.0, 118.0
@@ -680,12 +816,12 @@ def put_sprite(img, spr, xy, glowc=None, ol=None, **kw):
 
 
 # Time Bomblebee (groß, nah, links oben)
-tb = time_bomblebee()
-TBX, TBY = 4, 58
-put_sprite(im, tb, (TBX, TBY), (255, 214, 120, 255), ol=K + (255,), strength=0.3)
+tb, tb_sparks = time_bomblebee_hd()
+TBX, TBY = 3, 56
+put_sprite(im, tb, (TBX, TBY), (255, 214, 120, 255), strength=0.3)
 d = ImageDraw.Draw(im)
-for (x_, y_) in [(TBX + 15, TBY + 8), (TBX + 34, TBY + 2), (TBX + 15, TBY + 36), (TBX + 48, TBY + 36)]:
-    draw_spark(d, x_, y_, 2, random.Random(x_))
+for (x_, y_, s_) in tb_sparks:
+    draw_spark(d, TBX + x_, TBY + y_, s_, random.Random(int(x_ * 3 + y_)))
 
 # ---- Held ----
 hero, hc, hsp = bee(33, tilt=-5, seed=3, wing=0.15)
@@ -797,26 +933,20 @@ dive_bee(im, 198, 52, 30, 132, seed=1)
 dive_bee(im, 58, 148, 18, 66, seed=2)
 
 # ---- Carpet Bomblebee auf fliegendem Teppich (vorne links) ----
-cb = carpet_bomblebee()
-CBX, CBY = 6, 258
-put_sprite(im, cb, (CBX, CBY), (255, 200, 110, 255), ol=K + (255,), strength=0.3)
+cb, cb_sparks = carpet_bomblebee_hd()
+CBX, CBY = 3, 262
+put_sprite(im, cb, (CBX, CBY), (255, 200, 110, 255), strength=0.3)
 d = ImageDraw.Draw(im)
-# Tempolinien hinter dem Teppich + abgeworfene Bombe
-for k_, yl in enumerate((CBY + 14, CBY + 19, CBY + 23)):
-    x1 = CBX + cb.width + 2
-    for xq in range(x1, x1 + 14 + 5 * (k_ % 2)):
-        if (xq - x1) < 8 or (xq % 2 == 0):
-            d.point((xq, yl), fill=(255, 236, 190))
-bxx, byy = CBX + 30, CBY + 40
-d.ellipse((bxx - 4, byy - 4, bxx + 4, byy + 4), fill=K)
-d.ellipse((bxx - 3, byy - 3, bxx + 3, byy + 3), fill=BLACK[2])
-d.ellipse((bxx - 3, byy - 3, bxx + 1, byy + 1), fill=BLACK[3])
-d.point([(bxx - 2, byy - 2), (bxx - 1, byy - 2)], fill=BLACK[6])
-d.rectangle((bxx - 1, byy - 6, bxx + 1, byy - 5), fill=BLACK[4])
-d.line((bxx, byy - 7, bxx + 2, byy - 9), fill=(90, 60, 36))
-draw_spark(d, bxx + 3, byy - 10, 1, random.Random(5))
-for k_ in range(3):
-    d.point((bxx - 1 + k_, byy - 12 - 3 * k_), fill=(255, 236, 190))
+for (x_, y_, s_) in cb_sparks:
+    draw_spark(d, CBX + x_, CBY + y_, s_, random.Random(int(x_ * 5 + y_)))
+# abgeworfene Bombe
+fb, fbc, fbsp = small_bomb(5, 91, fuse_dir=1)
+fb = fb.rotate(-25, resample=Image.NEAREST, expand=False)
+bxx, byy = CBX + 40, CBY + cb.height + 8
+paste(im, fb, (int(bxx - fbc[0]), int(byy - fbc[1])))
+d = ImageDraw.Draw(im)
+for k_ in range(4):
+    d.point((bxx - 2 + k_, byy - 10 - 3 * k_), fill=(255, 236, 190))
 
 
 # ---- Explosion (eine Bombe ist schon hochgegangen) ----
