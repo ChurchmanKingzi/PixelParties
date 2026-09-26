@@ -189,6 +189,32 @@ function _meControlsBigGwenGuard(me) {
   return false;
 }
 
+/**
+ * ★ Zielheld-Rabatt einer Ausruestung (Als Befund 26.9., Tsu'Ki:
+ * Lunatic Cycles −10, wenn sie an SIE gehen). Der Server schickt ihn je
+ * Handkarte und Held (`me.handEquipHeroReductions`), weil er — anders
+ * als Play Money oder Shu'Chaku — erst mit dem Ziel feststeht.
+ * `besterEquipHeldRabatt` ist der groesste davon: eine Ausruestung ist
+ * spielbar, sobald sie auf IRGENDEINEM Helden bezahlbar ist.
+ */
+function equipHeldRabatt(me, handIdx, heroIdx) {
+  return (((me && me.handEquipHeroReductions) || {})[handIdx] || {})[heroIdx] || 0;
+}
+function besterEquipHeldRabatt(me, handIdx) {
+  const m = ((me && me.handEquipHeroReductions) || {})[handIdx];
+  return m ? Math.max(0, ...Object.values(m)) : 0;
+}
+/** Ist die Ausruestung `cardName` (Handplatz `handIdx`) auf dem Helden
+ *  `heroIdx` der Seite `ownerIdx` bezahlbar? Zielheld-Rabatte gibt es
+ *  nur fuer eigene Helden — so rechnet auch der Server. */
+function equipBezahlbarAuf(me, myIdx, cardName, card, handIdx, ownerIdx, heroIdx) {
+  if (!card || goldSelfFinanced(me, cardName)) return true;
+  const preis = applyCrystalCostMods(me, cardName, card.cost || 0)
+    - ((me.handCostReductions || {})[handIdx] || 0)
+    - (ownerIdx === myIdx ? equipHeldRabatt(me, handIdx, heroIdx) : 0);
+  return (Math.max(0, me.gold || 0) + (me.goldOverdraft || 0)) >= Math.max(0, preis);
+}
+
 function applyCrystalCostMods(me, cardName, baseCost) {
   if (!me || cardName === 'Rusting Crystal') return baseCost;
   if (!(me.hand || []).includes('Rusting Crystal')) return baseCost;
@@ -25098,7 +25124,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         // affordability, which the server already caps but the UI hint
         // should match.
         {
-          const handReduction = (me.handCostReductions || {})[handIdx] || 0;
+          // + bester Zielheld-Rabatt (Tsu'Ki): grau nur, wenn KEIN Held
+          // die Ausruestung bezahlbar macht.
+          const handReduction = ((me.handCostReductions || {})[handIdx] || 0)
+            + besterEquipHeldRabatt(me, handIdx);
           // Rusting Crystal aura: base cost doubled BEFORE reductions
           // (mirrors `applyRustingCrystalCostMultiplier` server-side).
           const baseAfterCrystal = applyCrystalCostMods(me, cardName, card.cost || 0);
@@ -26285,7 +26314,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       // Ohne beides graut die Oberflaeche Karten aus, die der Server
       // laengst erlaubt.
       && (goldSelfFinanced(me, card.name)
-          || (Math.max(0, me.gold || 0) + (me.goldOverdraft || 0)) >= Math.max(0, applyCrystalCostMods(me, card.name, card.cost || 0) - ((me.handCostReductions || {})[idx] || 0)));
+          || (Math.max(0, me.gold || 0) + (me.goldOverdraft || 0)) >= Math.max(0, applyCrystalCostMods(me, card.name, card.cost || 0) - ((me.handCostReductions || {})[idx] || 0) - besterEquipHeldRabatt(me, idx)));
     // "Artifact-activatable" is click-to-use (potions / Wheels-style). It
     // excludes Equipment AND Artifact-Creatures — both of those are drag-
     // to-hero plays instead. Reaction-subtype Artifacts (Invisibility
@@ -26822,6 +26851,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         // text; free-side & normal equips need an alive host (the
         // server's equip gate also enforces this).
         const hostAliveNeeded = !isCrossSideEquip;
+        // Nur Helden, auf denen die Ausruestung bezahlbar ist (Tsu'Ki-
+        // Rabatt gilt nur fuer SIE, Als Befund 26.9.).
+        const bezahlbarAuf = (owner, hi) => equipBezahlbarAuf(me, myIdx, cardName, card, idx, owner, hi);
         let targetHero = -1, targetSlot = -1, targetOwner;
         // Check hero zones first (auto-place in first free base support zone)
         const heroEls = document.querySelectorAll('[data-hero-zone]');
@@ -26832,7 +26864,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             if (side) {
               const hi = parseInt(el.dataset.heroIdx);
               const hero = side.ps?.heroes?.[hi];
-              const hostOk = hero && hero.name && (!hostAliveNeeded || hero.hp > 0);
+              const hostOk = hero && hero.name && (!hostAliveNeeded || hero.hp > 0) && bezahlbarAuf(side.owner, hi);
               if (hostOk) {
                 const supZones = side.ps.supportZones?.[hi] || [];
                 for (let z = 0; z < 3; z++) {
@@ -26854,7 +26886,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               const isIsland = el.dataset.supportIsland === 'true';
               if (side && !isIsland && si < 3) { // Can only equip to base zones
                 const hero = side.ps?.heroes?.[hi];
-                const hostOk = hero && hero.name && (!hostAliveNeeded || hero.hp > 0);
+                const hostOk = hero && hero.name && (!hostAliveNeeded || hero.hp > 0) && bezahlbarAuf(side.owner, hi);
                 if (hostOk) {
                   const slotCards = (side.ps.supportZones?.[hi] || [])[si] || [];
                   if (slotCards.length === 0) { targetHero = hi; targetSlot = si; targetOwner = side.owner; }
@@ -38768,7 +38800,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           const _csppIsEquip = !!crossSidePlayPick?.isEquip;
           const _csppIsFreeSideEquip = !!crossSidePlayPick?.isFreeSideEquip;
           const _csppHeroEligible = !!crossSidePlayPick && hero?.hp > 0
-            && (!_csppIsEquip || ((!isOpp || _csppIsFreeSideEquip) && !hero?.statuses?.frozen));
+            && (!_csppIsEquip || ((!isOpp || _csppIsFreeSideEquip) && !hero?.statuses?.frozen
+              && equipBezahlbarAuf(me, myIdx, crossSidePlayPick.cardName, crossSidePlayPick.card, crossSidePlayPick.handIndex, pi, i)));
           const _csppHeroFreeSlot = _csppHeroEligible
             ? (() => {
                 const zones = _csppHeroSide.supportZones?.[i] || [];
@@ -40116,7 +40149,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 && cards.length === 0
                 && (_csppSide.heroes?.[i]?.hp > 0)
                 && z < ((_csppSide.supportZones?.[i] || []).length || 3)
-                && (!_csppSlotIsEquip || ((!isOpp || _csppSlotIsFreeSideEquip) && !_csppSide.heroes?.[i]?.statuses?.frozen && z < 3));
+                && (!_csppSlotIsEquip || ((!isOpp || _csppSlotIsFreeSideEquip) && !_csppSide.heroes?.[i]?.statuses?.frozen && z < 3
+                  && equipBezahlbarAuf(me, myIdx, crossSidePlayPick.cardName, crossSidePlayPick.card, crossSidePlayPick.handIndex, pi, i)));
               // Creature-originated ram (Bear Rider's dash, etc.) —
               // hide the Creature inside this Support Zone for the
               // duration of the flight so the player only sees ONE

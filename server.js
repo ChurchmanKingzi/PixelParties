@@ -4482,6 +4482,29 @@ function sendGameState(room, playerIdx, extra) {
         });
         return merged;
       })() : {},
+      // ★ Zielheld-Rabatte fuer Ausruestungen (Als Befund 26.9., Tsu'Ki:
+      // Lunatic Cycles −10, wenn sie an SIE gehen). Anders als die Rabatte
+      // oben haengen sie am Zielhelden, passen also nicht in
+      // `handCostReductions`. Form: { handIdx: { heroIdx: Rabatt } }, nur
+      // Eintraege > 0, nur eigene Helden. Der Client graut damit eine
+      // Ausruestung nur aus, wenn sie auf KEINEM Helden bezahlbar ist, und
+      // nimmt sie beim Ziehen nur an Helden an, auf denen sie es ist.
+      // Dieselbe Rechnung wie beim Spielen (`engine.artifactPlayCost`).
+      handEquipHeroReductions: (pi === playerIdx && room.engine) ? (() => {
+        const out = {};
+        const db = room.engine._getCardDB();
+        (ps.hand || []).forEach((n, i) => {
+          const cd = db[n];
+          if (cd?.cardType !== 'Artifact' || (cd.subtype || '').toLowerCase() !== 'equipment') return;
+          for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
+            if (!ps.heroes[hi]?.name) continue;
+            let r = 0;
+            try { r = room.engine.artifactPlayCost(pi, n, i, { heroIdx: hi, heroOwner: pi }).heroEquipReduction || 0; } catch {}
+            if (r > 0) (out[i] = out[i] || {})[hi] = r;
+          }
+        });
+        return out;
+      })() : {},
       supportSpellLocked: ps.supportSpellLocked || false,
       comboLockHeroIdx: ps.comboLockHeroIdx ?? null,
       heroesActedThisTurn: ps.heroesActedThisTurn || [],
