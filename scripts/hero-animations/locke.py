@@ -51,6 +51,10 @@ def stick_color(x, oy):
 STICK = [(x, oy, stick_color(x, oy)) for oy in range(9, 19) for x in range(18, 22)]
 HAND = [(x, oy) for oy in range(13, 18) for x in range(19, 23)
         if SRC[oy, x, 3] and px(SRC, x, oy) not in DYN]
+# Unterarm hinter der Stange (sonst schwebt die Hand, wenn die Stange fliegt)
+SLEEVE_OUT, SLEEVE, SLEEVE_HI = rgb('000000'), rgb('202020'), rgb('414141')
+ARM = [(x, 13, SLEEVE_OUT) for x in (18, 19)] + [(x, 14, SLEEVE_HI) for x in (18, 19)] + \
+      [(x, oy, SLEEVE) for oy in (15, 16) for x in (18, 19)] + [(x, 17, SLEEVE_OUT) for x in (18, 19)]
 
 
 def breath(i):
@@ -128,6 +132,8 @@ def frame(i):
                 out[feet - 1 + PT, x] = s[feet - 1 + PT, x]
     # Dynamit (+ Zündschnur): liegt in der Hand, fliegt kurz hoch
     dy = b + toss(i)
+    for x, oy, c in ARM:                                 # Unterarm (liegt hinter der Stange)
+        out[oy + PT + b, x] = c
     for x, oy, c in STICK:
         out[oy + PT + dy, x] = c
     for x, oy in HAND:                                   # Hand liegt immer vorne
