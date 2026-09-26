@@ -39,7 +39,7 @@ const DMG_PER_CYCLE = 100;
 function reevalImmunity(engine, inst) {
   if (!inst || inst.zone !== 'support') return;
   if (!inst.counters.buffs) inst.counters.buffs = {};
-  // v1444 (Als Ruling 26.9.): Dark Gears Negation ist unverhinderbar —
+  // v1444 (Als Ruling 26.9.): Dark Gears und Diplomacys Negation ist unverhinderbar —
   // solange sie liegt, hat der Golem KEINE seiner Stufen-Effekte, also
   // auch keine Immunitaet.
   const n = engine.istHartNegiert(inst) ? 0 : countDistinctLunaticCycle(engine);
@@ -178,7 +178,7 @@ module.exports = {
     onGameStart: (ctx) => reevalImmunity(ctx._engine, ctx.card),
     onTurnStart: (ctx) => reevalImmunity(ctx._engine, ctx.card),
     onCardEnterZone: (ctx) => reevalImmunity(ctx._engine, ctx.card),
-    // v1444: trifft den Golem eine unverhinderbare Negation (Dark Gear),
+    // v1444: trifft den Golem eine unverhinderbare Negation (Dark Gear, Diplomacy),
     // faellt die Immunitaet sofort weg — nicht erst zum naechsten Zug.
     // Das Ende der Negation holt `onTurnStart` ein (Ablauf vor dem Hook).
     onStatusApplied: (ctx) => {

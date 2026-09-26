@@ -9,6 +9,11 @@
 //  negated for the rest of the turn (Dark Gear
 //  style negation).
 //
+//  v1444 (Als Ruling 26.9.): wie bei Dark Gear ist
+//  die Negation UNVERHINDERBAR (`unpreventable`) —
+//  kein Statuseffekt, Lunatic Golems Immunitaet und
+//  Negations-Waechter heben sie nicht auf.
+//
 //  Lv1: max Lv1, costs 20 Gold
 //  Lv2: max Lv2, costs 10 Gold
 //  Lv3: max Lv3, costs 5 Gold
@@ -229,7 +234,8 @@ module.exports = {
     const destSi = chosenZone.slotIdx;
 
     // Transfer creature to player's control (handles zone move, animation, hooks, guardian sync)
-    const transferResult = await engine.actionTransferCreature(inst, pi, destHi, destSi);
+    const transferResult = await engine.actionTransferCreature(inst, pi, destHi, destSi,
+      { sourceName: 'Diplomacy', sourceOwner: pi });
     if (!transferResult.success) return false;
 
     // Apply negation until end of turn (same as Dark Gear)
@@ -237,6 +243,7 @@ module.exports = {
       expiresAtTurn: gs.turn + 1,
       expiresForPlayer: pi === 0 ? 1 : 0,
       selfInflicted: true,
+      unpreventable: true,   // v1444: kann NICHT verhindert werden
     });
 
     engine.log('diplomacy', {

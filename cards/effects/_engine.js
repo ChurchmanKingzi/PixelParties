@@ -16539,7 +16539,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (!inst) return;
     if (inst.faceDown) return; // Face-down surprises cannot be negated
     // ★ v1444 (Als Ruling 26.9.): `opts.unpreventable` — eine Negation,
-    // die NICHT verhindert werden kann (Dark Gear). Sie ist
+    // die NICHT verhindert werden kann (Dark Gear, Diplomacy). Sie ist
     // kein Statuseffekt: weder „immune to negative status effects"
     // (Lunatic Golem) noch ein Negations-Waechter heben sie auf. Sie
     // traegt dafuer die Marke `_negatedHard` (s. `istHartNegiert`).
@@ -16983,7 +16983,7 @@ this._deathWatch = (this._deathWatchStack || []).length
   }
 
   /**
-   * ★ v1444: Unverhinderbar negiert (Dark Gear — s.
+   * ★ v1444: Unverhinderbar negiert (Dark Gear, Diplomacy — s.
    * `actionNegateCreature` mit `unpreventable`). Keine Immunitaet und
    * kein Negations-Waechter hebt das auf.
    */
