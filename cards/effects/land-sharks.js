@@ -144,7 +144,7 @@ module.exports = {
       }
     }
     } finally {
-      engine.endMultiHit();
+      await engine.endMultiHit();
     }
 
     engine.log('land_sharks_bite', {

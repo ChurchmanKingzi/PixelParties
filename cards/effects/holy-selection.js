@@ -327,7 +327,7 @@ module.exports = {
         );
       }
       } finally {
-        engine.endMultiHit();
+        await engine.endMultiHit();
       }
 
       engine.log('holy_selection_resolved', {

@@ -72,7 +72,7 @@ module.exports = {
       }
     }
     } finally {
-      engine.endMultiHit();
+      await engine.endMultiHit();
     }
 
     await engine._delay(600); // Beams finish

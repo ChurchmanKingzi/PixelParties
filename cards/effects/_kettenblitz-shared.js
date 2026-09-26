@@ -104,7 +104,7 @@ async function kettenblitz(engine, cfg) {
       vorher = { owner: tgt.owner, heroIdx: tgt.heroIdx, zoneSlot: tgtZoneSlot };
     }
   } finally {
-    engine.endMultiHit();
+    await engine.endMultiHit();
   }
   return treffer;
 }

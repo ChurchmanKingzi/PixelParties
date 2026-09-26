@@ -125,7 +125,7 @@ module.exports = {
         }
       }
       } finally {
-        engine.endMultiHit();
+        await engine.endMultiHit();
       }
 
       engine.log('explosion', {

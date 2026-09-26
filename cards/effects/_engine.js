@@ -8622,32 +8622,16 @@ class GameEngine {
       }
     }
 
-    // Check for hero KO
+    // Check for hero KO — sofort oder, mitten in einem Mehrfachtreffer,
+    // erst nach dem ganzen Schlag (s. `_heldKoMelden`).
     if (target && target.hp !== undefined && target.hp <= 0) {
-      target.diedOnTurn = this.gs.turn;
-      this.log('hero_ko', { hero: this._heroLabel(target), source: source?.name || 'damage' });
-      // Store KO context for reaction cards (Loot the Leftovers, etc.)
-      const targetOwner = this.gs.players.findIndex(ps => (ps.heroes || []).includes(target));
       // `type` mitgeben (v557): der KO-Hook trug bisher NUR Held und
       // Quelle. Karten, die „defeats a target with an Attack" pruefen
       // muessen (Future Tech Bazooka), hatten damit keine Grundlage —
       // der Schadenstyp steht hier aber laengst im Geltungsbereich.
-      this.gs._heroKOContext = { hero: target, source, heroOwner: targetOwner, killerOwner: source?.owner ?? -1, type };
-      await this.runHooks(HOOKS.ON_HERO_KO, { hero: target, source, type, _bypassDeadHeroFilter: true });
-      delete this.gs._heroKOContext;
-
-      // Generic "extra life" mark consumer (Trial of Coolness, etc.).
-      // Runs AFTER onHeroKO so cards like Guardian Angel still get
-      // priority — `_extraLife` is the last automatic safety net.
-      // Persists across turns until consumed; stamped by the granting
-      // card with `{ by: 'CardName' }` for log attribution.
-      // Hat ein Hook (Guardian Angel) die HP wiederhergestellt, ist der
-      // Tod VERHINDERT worden — kein Ablauf, keine Ausruestungsverluste.
-      if (target.hp > 0) {
-        delete target.diedOnTurn;
-      } else {
-        await this._runHeroDefeatSequence(target, source, targetOwner);
-      }
+      await this._heldKoMelden(target, source, {
+        type, killerOwner: source?.owner ?? -1, logQuelle: source?.name || 'damage',
+      });
     }
 
     return { dealt: actualAmount, cancelled: false };
@@ -8780,25 +8764,12 @@ class GameEngine {
         }
       }
 
-      // Hero KO — same flow as the normal damage path.
+      // Hero KO — same flow as the normal damage path (inkl. Aufschub
+      // im Mehrfachtreffer, s. `_heldKoMelden`).
       if (target.hp <= 0) {
-        target.diedOnTurn = this.gs.turn;
-        this.log('hero_ko', { hero: this._heroLabel(target), source: source?.name || 'true damage' });
-        this.gs._heroKOContext = {
-          hero: target, source, heroOwner: targetOwner, killerOwner: sourceOwner,
-        };
-        await this.runHooks(HOOKS.ON_HERO_KO, { hero: target, source, _bypassDeadHeroFilter: true });
-        delete this.gs._heroKOContext;
-
-        // Generic "extra life" mark consumer — see actionDealDamage for
-        // rationale. True-damage path mirrors the normal-damage path so
-        // a Trial-of-Coolness-protected hero survives Acid Vial / Rockfall
-        // / etc. just as it survives an attack.
-        if (target.hp > 0) {
-          delete target.diedOnTurn;
-        } else {
-          await this._runHeroDefeatSequence(target, source, targetOwner);
-        }
+        await this._heldKoMelden(target, source, {
+          killerOwner: sourceOwner, logQuelle: source?.name || 'true damage',
+        });
       }
 
       return { dealt };
@@ -8825,6 +8796,93 @@ class GameEngine {
     }
 
     return { dealt: 0 };
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  //  ★ ERST ALLER SCHADEN, DANN ALLE TODE (Als Befund 26.9.)
+  // ═══════════════════════════════════════════════════════════════
+  // Ein Flaechenschlag trifft Helden und Kreaturen im selben Moment. Bis
+  // hierhin starb ein Held aber SOFORT bei seinem Einzeltreffer — samt
+  // KO-Hooks und Aufraeumen (Ausruestung in die Ablage) —, und erst
+  // DANACH bekamen die Kreaturen ihren Schaden. Wirkungen, die an dieser
+  // Ausruestung haengen, waren fuer die Kreaturen damit schon weg.
+  // Beispiel: Lunatic Golem halbiert ab 3 verschiedenen Lunatic Cycles
+  // seinen Schaden; stirbt ein Held mit einem Lunatic Cycle im selben
+  // Schlag, sank die Zahl, bevor der Golem getroffen wurde.
+  //
+  // Jetzt haengt ein Aufschub an der Flaechenklammer (`beginMultiHit` /
+  // `beginAoeStrike` … `await endMultiHit()`), die jeder Mehrfachtreffer
+  // setzt — `dealDamageToTargets` ebenso wie die Karten mit eigenem
+  // Schadensweg. Ein Heldentod waehrenddessen wird nur vorgemerkt;
+  // abgewickelt wird er erst beim Schliessen der Klammer, wenn aller
+  // Schaden verteilt ist — in Trefferreihenfolge. Geschachtelte Schlaege
+  // teilen sich den aeussersten Aufschub. Ausserhalb einer Klammer
+  // (Einzeltreffer) aendert sich nichts.
+
+  /** Aufschub oeffnen (verschachtelbar). */
+  _heldenTodAufschubBeginnen() {
+    const a = this._heldenTodAufschub;
+    if (a) { a.tiefe += 1; return; }
+    this._heldenTodAufschub = { tiefe: 1, liste: [] };
+  }
+
+  /** Aufschub schliessen; der aeusserste wickelt alle vorgemerkten Tode ab. */
+  async _heldenTodAufschubAbschliessen() {
+    const a = this._heldenTodAufschub;
+    if (!a) return;
+    if (a.tiefe > 1) { a.tiefe -= 1; return; }
+    this._heldenTodAufschub = null;
+    for (const e of a.liste) {
+      // Zwischenzeitlich geheilt (oder schon abgewickelt): kein Tod mehr.
+      if (!(e.target.hp <= 0) || e.target._koProcessed) continue;
+      await this._heldKoAbwickeln(e.target, e.source, e.opts);
+    }
+  }
+
+  /** Ein Held ist auf 0 HP gefallen: sofort abwickeln oder vormerken. */
+  async _heldKoMelden(target, source, opts = {}) {
+    const a = this._heldenTodAufschub;
+    if (a) {
+      if (!a.liste.some(e => e.target === target)) {
+        // `diedOnTurn` sofort: der Held liegt ab jetzt am Boden, auch
+        // wenn Hooks und Aufraeumen erst nach dem Schlag laufen.
+        target.diedOnTurn = this.gs.turn;
+        a.liste.push({ target, source, opts });
+      }
+      return;
+    }
+    await this._heldKoAbwickeln(target, source, opts);
+  }
+
+  /** KO-Hooks, Extra-Leben-Pruefung und Niederlage-Ablauf eines Helden. */
+  async _heldKoAbwickeln(target, source, opts = {}) {
+    target.diedOnTurn = this.gs.turn;
+    this.log('hero_ko', { hero: this._heroLabel(target), source: opts.logQuelle || source?.name || 'damage' });
+    // Store KO context for reaction cards (Loot the Leftovers, etc.)
+    const targetOwner = this.gs.players.findIndex(ps => (ps.heroes || []).includes(target));
+    this.gs._heroKOContext = {
+      hero: target, source, heroOwner: targetOwner,
+      killerOwner: opts.killerOwner ?? source?.owner ?? -1,
+      ...(opts.type !== undefined ? { type: opts.type } : {}),
+    };
+    await this.runHooks(HOOKS.ON_HERO_KO, {
+      hero: target, source, ...(opts.type !== undefined ? { type: opts.type } : {}),
+      _bypassDeadHeroFilter: true,
+    });
+    delete this.gs._heroKOContext;
+
+    // Generic "extra life" mark consumer (Trial of Coolness, etc.).
+    // Runs AFTER onHeroKO so cards like Guardian Angel still get
+    // priority — `_extraLife` is the last automatic safety net.
+    // Persists across turns until consumed; stamped by the granting
+    // card with `{ by: 'CardName' }` for log attribution.
+    // Hat ein Hook (Guardian Angel) die HP wiederhergestellt, ist der
+    // Tod VERHINDERT worden — kein Ablauf, keine Ausruestungsverluste.
+    if (target.hp > 0) {
+      delete target.diedOnTurn;
+    } else {
+      await this._runHeroDefeatSequence(target, source, targetOwner);
+    }
   }
 
   /**
@@ -8879,6 +8937,7 @@ class GameEngine {
    *
    * @returns {boolean} true, wenn eingeloest wurde (Held lebt wieder)
    */
+
   /**
    * Der vollstaendige Todesablauf, NACHDEM `ON_HERO_KO` gelaufen ist
    * und der Held immer noch bei 0 HP steht.
@@ -35443,13 +35502,30 @@ this._deathWatch = (this._deathWatchStack || []).length
    */
   beginMultiHit(anzahl) {
     this._multiHitScope = { total: anzahl || 0, tiefe: (this._multiHitScope?.tiefe || 0) + 1 };
+    // Erst aller Schaden, dann alle Tode (Als Befund 26.9.): Heldentode
+    // innerhalb der Klammer werden nur vorgemerkt (`_heldKoMelden`).
+    this._heldenTodAufschubBeginnen();
     return this._multiHitScope;
   }
 
-  endMultiHit() {
+  /**
+   * Klammer schliessen. ASYNCHRON seit dem Todes-Aufschub (26.9.): die
+   * aeusserste Klammer wickelt hier die vorgemerkten Heldentode ab —
+   * NACH dem letzten Treffer, noch innerhalb des Scopes (wie bisher, als
+   * der Tod mitten in der Trefferschleife lief). Aufrufer muessen
+   * `await engine.endMultiHit()` schreiben, sonst liefen die Tode
+   * nebenher weiter.
+   */
+  async endMultiHit() {
     if (!this._multiHitScope) return;
-    if ((this._multiHitScope.tiefe || 1) <= 1) this._multiHitScope = null;
-    else this._multiHitScope.tiefe -= 1;
+    try {
+      await this._heldenTodAufschubAbschliessen();
+    } finally {
+      if (this._multiHitScope) {
+        if ((this._multiHitScope.tiefe || 1) <= 1) this._multiHitScope = null;
+        else this._multiHitScope.tiefe -= 1;
+      }
+    }
   }
 
   /**
@@ -35487,7 +35563,7 @@ this._deathWatch = (this._deathWatchStack || []).length
    *     creatures, source: quelle, amount: dmg, type: 'destruction_spell',
    *     sourceOwner: pi,
    *   });
-   *   try { …Einzeltreffer wie bisher… } finally { engine.endMultiHit(); }
+   *   try { …Einzeltreffer wie bisher… } finally { await engine.endMultiHit(); }
    *
    * @returns {Promise<Set<string>>} ids der abgewehrten Instanzen
    */
@@ -41581,6 +41657,8 @@ this._deathWatch = (this._deathWatchStack || []).length
         source: quellObjekt, amount: damage, type: damageType, sourceOwner: pi,
         canBeNegated: opts.canBeNegated !== false,
       });
+      // (Die Klammer schiebt auch die Heldentode bis nach dem Schlag auf,
+      // s. `_heldKoMelden`.)
       try {
         for (const { hero, amount } of hitHeroes) {
           if (hero.hp <= 0 || !(amount > 0)) continue; // May have died from a previous hit this loop
@@ -41597,7 +41675,8 @@ this._deathWatch = (this._deathWatchStack || []).length
         const mitSchaden = creatureEntries.filter(e => e.amount > 0);
         if (mitSchaden.length > 0) await this.processCreatureDamageBatch(mitSchaden);
       } finally {
-        this.endMultiHit();
+        // Vorgemerkte Heldentode JETZT — nach dem letzten Treffer.
+        await this.endMultiHit();
       }
     }
 
