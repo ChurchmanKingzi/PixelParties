@@ -138,12 +138,13 @@ for (wx, wy, sd) in WINS:
 FL = Fig(W, H)
 FL.part('f', line=False)
 for (wx, wy, sd) in WINS:
-    for i, dx in enumerate((-3, -1, 1, 3)):
-        L = [13, 17, 15, 11][i] + rnd.uniform(-2, 2)
-        bend = sd * (1.5 + i * 0.6)
-        base = wy - 5
-        FL.poly([(wx + dx - 2, base + 2), (wx + dx + 2, base + 2), (wx + dx + bend * 0.6 + 1, base - L * 0.5),
-                 (wx + dx + bend, base - L), (wx + dx + bend * 0.4 - 1.5, base - L * 0.45)], 'f')
+    base = wy - 4
+    for i, dx in enumerate((-2, 0, 2)):
+        L = [12, 18, 11][i] + rnd.uniform(-2, 2)
+        wob = rnd.uniform(-1.5, 1.5)
+        FL.curve([(wx + dx, base + 2), (wx + dx + sd * 2 + wob, base - L * 0.4), (wx + dx + sd * 4 - wob, base - L * 0.75),
+                  (wx + dx + sd * 5, base - L)], 'f', w=4.5 if i == 1 else 3.5, w1=0.8)
+    FL.ellipse(wx, base + 1, 4.5, 3, 'f')
 FL.outline(k='K')
 frgba = FL.render({'f': mat(FIRE, pillow=3, k=1.2, bias=0.2, noise=1.2, nscale=2)}, outline_col=(110, 20, 6))
 cv.paste(frgba, 0, 0)
@@ -357,6 +358,10 @@ def faller(x, y, flip):
     cv.paste(rg, 0, 0)
     # entsetzte Augen/Mund (kopfüber)
     px(cv, x, y + 23, (20, 10, 10)); px(cv, x + 2, y + 23, (20, 10, 10)); px(cv, x + 1, y + 21, (90, 20, 20))
+
+
+faller(146, 166, 1)
+faller(222, 190, -1)
 
 
 def fire_drop(x, y, s=1.0):

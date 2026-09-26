@@ -100,9 +100,11 @@ VELVET = [(50, 6, 16), (96, 14, 28), (146, 26, 40), (196, 52, 58), (232, 100, 90
 IVORY = [(150, 130, 100), (200, 184, 150), (232, 222, 196), (248, 244, 228), (255, 255, 246)]
 
 MATS = {
-    's': mat(SKINV, pillow=4, k=1.0, bias=0.14),
+    's': mat(SKINV, pillow=5, k=0.9, bias=0.06),
     'h': mat(HAIRV, pillow=4, k=1.8, noise=0.9, nscale=2, bias=0.05),
     'r': mat(ROBEB, pillow=5, k=1.5, folds=(0.3, 0.03, 0.7), bias=0.05),
+    'q': mat(ROBEB[:4], pillow=1, k=1.0, bias=-0.25),
+    'u': mat(ROBEB[2:], pillow=1, k=1.0, bias=0.1),
     'l': mat(LAV, pillow=2, k=1.3, bias=0.1),
     'p': mat(PINK, pillow=5, k=1.6, bias=0.05),
     'g': mat(GOLD, pillow=2, k=1.7, spec=True, spec_col=(255, 255, 230), bias=0.05),
@@ -162,37 +164,58 @@ f = Fig(W, H)
 # Haare hinten (lang, dunkeltürkis)
 f.part('hairB')
 f.poly([(104, 120), (146, 120), (156, 150), (158, 186), (150, 196), (100, 196), (92, 186), (94, 150)], 'h')
-# Kleid: Rock fällt über den Sitz
+# Kleid: Schoß (Oberschenkel nach vorn), Knie, dann fällt der Rock in Falten bis auf den Sockel
+hem = []
+for i in range(25):
+    x = 76 + i * (174 - 76) / 24
+    hem.append((x, 262 + 2 * math.sin(i * 1.4)))
 f.part('skirt')
-f.poly([(104, 184), (146, 184), (160, 210), (168, 246), (176, 264), (74, 264), (82, 246), (90, 210)], 'r')
-f.part('knees'); f.ellipse(111, 214, 15, 9, 'r'); f.ellipse(139, 214, 15, 9, 'r')
-f.part('hem'); f.poly([(76, 258), (174, 258), (177, 265), (73, 265)], 'l')
-f.part('panelL'); f.line(121, 190, 114, 258, 'l', w=2)
-f.part('panelR'); f.line(129, 190, 136, 258, 'l', w=2)
-# Oberkörper
+f.poly([(106, 186), (144, 186), (156, 200), (162, 222), (168, 246), (174, 262)] + hem[::-1] + [(76, 262), (82, 246), (88, 222), (94, 200)], 'r')
+f.part('lap', line=False); f.poly([(100, 196), (150, 196), (152, 214), (98, 214)], 'r')
+f.part('kneeL'); f.ellipse(110, 216, 13, 8, 'r')
+f.part('kneeR'); f.ellipse(140, 216, 13, 8, 'r')
+# Faltenwurf unterhalb der Knie: Täler (dunkel) und Grate (hell)
+f.part('folds', line=False)
+for (x0, y0, x1, y1, w0) in [(99, 224, 88, 258, 2.4), (111, 225, 106, 262, 1.8), (139, 225, 144, 262, 1.8), (151, 224, 162, 258, 2.4),
+                             (92, 232, 81, 258, 1.4), (158, 232, 169, 258, 1.4)]:
+    f.limb(x0, y0, x1, y1, 0.6, w0, 'q')
+for (x0, y0, x1, y1, w0) in [(105, 225, 97, 260, 1.4), (145, 225, 153, 260, 1.4), (116, 226, 113, 262, 1.0), (134, 226, 137, 262, 1.0)]:
+    f.limb(x0, y0, x1, y1, 0.5, w0, 'u')
+f.curve([(114, 222), (119, 230), (125, 233), (131, 230), (136, 222)], 'q', w=1.6)     # Mulde zwischen den Knien
+f.curve([(100, 212), (108, 208), (118, 208)], 'u', w=1.3); f.curve([(132, 208), (142, 208), (150, 212)], 'u', w=1.3)
+f.curve([(104, 198), (114, 202), (124, 204)], 'q', w=1.0); f.curve([(126, 204), (136, 202), (146, 198)], 'q', w=1.0)
+# goldene Borten: Saum und vordere Kante der Schleppe
+f.part('hemBorder'); f.curve([(hx, hy - 2) for hx, hy in hem], 'g', w=3)
+f.part('panelL'); f.curve([(119, 190), (117, 214), (113, 240), (110, 260)], 'g', w=2)
+f.part('panelR'); f.curve([(131, 190), (133, 214), (137, 240), (140, 260)], 'g', w=2)
+# Oberkörper (Mieder)
 f.part('torso')
-f.poly([(106, 150), (144, 150), (146, 166), (142, 188), (108, 188), (104, 166)], 'r')
+f.poly([(106, 150), (144, 150), (146, 166), (142, 190), (108, 190), (104, 166)], 'r')
+f.part('tfolds', line=False)
+f.limb(111, 170, 113, 186, 0.4, 1.0, 'q'); f.limb(139, 170, 137, 186, 0.4, 1.0, 'q')
 f.part('collarL'); f.line(107, 150, 124, 162, 'l', w=2)
 f.part('collarR'); f.line(143, 150, 126, 162, 'l', w=2)
 f.part('emblem'); f.rect(118, 164, 132, 178, 'g')
 f.part('emblemIn'); f.rect(121, 167, 129, 175, 'r')
-f.part('belt'); f.poly([(106, 184), (144, 184), (144, 189), (106, 189)], 'l')
+f.part('belt'); f.poly([(106, 185), (144, 185), (144, 190), (106, 190)], 'g')
 # Puffärmel (rosa-rot wie auf der Karte)
 f.part('puffL'); f.ellipse(101, 160, 12, 11, 'p')
 f.part('puffR'); f.ellipse(149, 160, 12, 11, 'p')
-# linker Arm (Betrachter): hält das Zepter
-f.part('armLl'); f.limb(96, 168, 88, 190, 6, 5.5, 'r')
-f.part('foreLl'); f.limb(88, 190, 96, 206, 5.5, 5, 'r')
-f.part('cuffLl'); f.limb(94, 202, 97, 207, 5.5, 5.5, 'l')
-f.part('scepter'); f.limb(98, 232, 88, 108, 1.8, 1.8, 'g')
+# linker Arm (Betrachter): Ellbogen nach außen, Hand umfasst das Zepter vor dem Knie
+f.part('armLl'); f.limb(95, 168, 86, 190, 6, 5.5, 'r')
+f.part('armLf', line=False); f.limb(92, 172, 87, 186, 0.4, 1.2, 'q')
+f.part('foreLl'); f.limb(86, 190, 96, 202, 5.5, 5, 'r')
+f.part('cuffLl'); f.limb(93, 198, 96, 202, 5.5, 5.5, 'g')
+f.part('scepter'); f.limb(102, 238, 88, 108, 1.8, 1.8, 'g')
 f.part('scepterOrb'); f.ellipse(88, 104, 5, 5, 'g')
 f.part('scepterCross'); f.rect(87, 92, 89, 99, 'g'); f.rect(85, 95, 91, 96, 'g')
-f.part('handLl'); f.ellipse(97, 209, 5, 5, 's')
-# rechter Arm: ruht auf dem Knie
-f.part('armRr'); f.limb(154, 168, 160, 192, 6, 5.5, 'r')
-f.part('foreRr'); f.limb(160, 192, 146, 210, 5.5, 5, 'r')
-f.part('cuffRr'); f.limb(150, 206, 146, 210, 5.5, 5.5, 'l')
-f.part('handRr'); f.ellipse(142, 212, 5, 4.5, 's')
+f.part('handLl'); f.poly([(95, 199), (103, 198), (105, 203), (104, 209), (97, 210), (94, 205)], 's')
+# rechter Arm: Unterarm liegt auf dem Oberschenkel, Hand ruht auf dem Knie
+f.part('armRr'); f.limb(155, 168, 162, 192, 6, 5.5, 'r')
+f.part('armRf', line=False); f.limb(158, 172, 162, 188, 0.4, 1.2, 'q')
+f.part('foreRr'); f.limb(162, 192, 148, 208, 5.5, 5, 'r')
+f.part('cuffRr'); f.limb(152, 204, 149, 207, 5.5, 5.5, 'g')
+f.part('handRr'); f.poly([(146, 203), (140, 206), (135, 212), (136, 215), (142, 214), (148, 211), (150, 206)], 's')
 # Kopf
 f.part('neck'); f.rect(121, 141, 129, 151, 's')
 cx, cy = 125, 128
@@ -202,8 +225,8 @@ f.poly([(cx - 15, cy + 3), (cx + 15, cy + 3), (cx + 12, cy + 11), (cx + 5, cy + 
 f.part('bangs')      # gerader Pony (Hime-Schnitt)
 f.poly([(cx - 18, cy + 2), (cx - 18, cy - 7), (cx - 12, cy - 11), (cx + 12, cy - 11), (cx + 18, cy - 7), (cx + 18, cy + 2),
         (cx + 15, cy - 2), (cx + 10, cy - 3), (cx + 5, cy - 2), (cx, cy - 3), (cx - 5, cy - 2), (cx - 10, cy - 3), (cx - 15, cy - 2)], 'h')
-f.part('lockL'); f.poly([(cx - 20, cy - 4), (cx - 15, cy - 2), (cx - 15, cy + 22), (cx - 21, cy + 22)], 'h')
-f.part('lockR'); f.poly([(cx + 20, cy - 4), (cx + 15, cy - 2), (cx + 15, cy + 22), (cx + 21, cy + 22)], 'h')
+f.part('lockL'); f.poly([(cx - 21, cy - 4), (cx - 16, cy - 2), (cx - 16, cy + 22), (cx - 22, cy + 22)], 'h')
+f.part('lockR'); f.poly([(cx + 21, cy - 4), (cx + 16, cy - 2), (cx + 16, cy + 22), (cx + 22, cy + 22)], 'h')
 # Krone: hohe rote Haube mit goldenen Spangen
 f.part('crown')
 f.poly([(cx - 16, cy - 8), (cx - 18, cy - 18), (cx - 14, cy - 28), (cx - 6, cy - 35), (cx, cy - 36), (cx + 6, cy - 35), (cx + 14, cy - 28),
@@ -225,19 +248,28 @@ def inside(x, y):
     return fig[int(y), int(x), 3] > 0 and tuple(cv.a[int(y), int(x)]) != OUT
 
 # ---------------------------------------------------------------- Gesicht (geisterhaft blau, leuchtende Augen)
-EYE = (40, 220, 230)
-big_eye(cv, 112, 129, EYE, w=6, h=8, glow_=True)
-big_eye(cv, 132, 129, EYE, w=6, h=8, flip=True, glow_=True)
+EYE = (30, 200, 214)
+big_eye(cv, 112, 128, EYE, w=6, h=9, glow_=True)
+big_eye(cv, 132, 128, EYE, w=6, h=9, flip=True, glow_=True)
 for (ex, ey) in [(115, 133), (135, 133)]:
-    glow(cv, ex, ey, 7, (120, 255, 250), k=0.5, mix=0.25)
-for x in range(113, 119): px(cv, x, 125, HAIRV[1])
-for x in range(132, 138): px(cv, x, 125, HAIRV[1])
-px(cv, 125, 138, SKINV[2]); px(cv, 126, 139, SKINV[1])
-# königliches, leicht spöttisches Lächeln
-for x in range(122, 129): px(cv, x, 143, (90, 40, 90))
-px(cv, 129, 142, (90, 40, 90)); px(cv, 121, 143, (90, 40, 90))
-for x in range(123, 128): px(cv, x, 144, (200, 110, 170))
-blush(cv, 113, 140, (170, 150, 240)); blush(cv, 135, 140, (170, 150, 240))
+    glow(cv, ex, ey, 7, (120, 255, 250), k=0.45, mix=0.22)
+# Brauen: elegant geschwungen, leicht hochmütig
+for (bx, d) in [(112, 1), (132, -1)]:
+    for i in range(6):
+        yb = 124 - (1 if (d > 0 and i >= 3) or (d < 0 and i <= 2) else 0)
+        px(cv, bx + i, yb, HAIRV[0])
+# Nase, Mund (spöttisches Lächeln, dunkles Lila), Wangen-/Kinnkontur
+px(cv, 126, 139, SKINV[1]); px(cv, 125, 140, SKINV[2])
+MC = (70, 30, 80)
+for x in range(122, 129): px(cv, x, 143, MC)
+px(cv, 129, 142, MC); px(cv, 130, 141, MC); px(cv, 121, 142, MC)
+for x in range(123, 128): px(cv, x, 144, (190, 110, 170))
+for (x, y) in [(113, 139), (112, 138), (114, 141), (137, 139), (138, 138), (136, 141), (118, 145), (132, 145), (121, 146), (129, 146)]:
+    px(cv, x, y, SKINV[1])
+for (bx, by) in [(113, 139), (133, 139)]:
+    for dx in range(5):
+        if (bx + dx + by) % 2 == 0:
+            blend_px(cv, bx + dx, by, (200, 150, 240), 0.6)
 # Krone: Rautenmuster + Spangen + Juwelen (wie das Karomuster auf der Karte)
 for y in range(cy - 40, cy - 12):
     for x in range(cx - 18, cx + 19):
@@ -255,9 +287,9 @@ for (x, y, c) in [(cx - 12, cy - 9, AMETH), (cx, cy - 9, RUBY), (cx + 12, cy - 9
 for (dx, dy, c) in [(0, 0, SAPH[2]), (1, 0, SAPH[2]), (0, 1, SAPH[1]), (1, 1, SAPH[1]), (0, -1, SAPH[3]), (-1, 0, SAPH[3])]:
     px(cv, 125 + dx - 1, 171 + dy - 1, c)
 # Sterne auf dem Rock (Lavendel)
-for (x, y) in [(96, 236), (152, 236), (104, 250), (146, 250), (92, 222), (158, 222)]:
+for (x, y) in [(97, 240), (153, 240), (125, 250), (90, 228), (160, 228)]:
     if inside(x, y):
-        sparkle(cv, x, y, LAV[3], r=1, c2=LAV[1])
+        sparkle(cv, x, y, GOLD[4], r=1, c2=GOLD[2])
 # Venus-Zeichen auf dem Schild (gold auf rotem Email)
 VX, VY = SHX, SHY - 7
 for (col, off) in [(GOLD7[1], 1), (GOLD7[5], 0)]:
@@ -278,8 +310,17 @@ for (tx, ty) in [(61, 200), (189, 200), (66, 250), (184, 250)]:
         px(cv, tx, ty + k, GOLD[3] if k < 3 else GOLD[1])
     px(cv, tx - 1, ty + 3, GOLD[2]); px(cv, tx + 1, ty + 3, GOLD[2])
 # Finger
-for (fx, fy) in [(100, 207), (100, 210), (139, 211), (139, 214)]:
-    px(cv, fx, fy, SKINV[1])
+# Finger um das Zepter (quer über den Stab) und auf dem Knie
+for fy in (201, 204, 207):
+    for fx in range(96, 104):
+        if (fx + fy) % 3 != 0 and inside(fx, fy):
+            px(cv, fx, fy, SKINV[1]) if fx in (96, 103) or fy == 207 else None
+for fy in (201, 204, 207):
+    px(cv, 98, fy, SKINV[1]); px(cv, 101, fy, SKINV[1])
+px(cv, 100, 199, SKINV[4]); px(cv, 101, 199, SKINV[4])
+for (x0, y0) in [(139, 209), (141, 210), (143, 209)]:
+    px(cv, x0, y0, SKINV[1]); px(cv, x0 - 1, y0 + 1, SKINV[1]); px(cv, x0 - 2, y0 + 2, SKINV[1])
+px(cv, 147, 205, SKINV[4]); px(cv, 145, 206, SKINV[4])
 
 # ---------------------------------------------------------------- Weizenfeld (vorne)
 WHEAT = [(110, 60, 10), (160, 100, 18), (204, 144, 30), (234, 184, 56), (250, 214, 100), (255, 238, 160)]
@@ -328,7 +369,7 @@ nw = noise(H, W, 3, seed=44)
 FIELD = [(70, 44, 12), (120, 80, 20), (170, 120, 30), (212, 164, 50), (240, 206, 100)]
 for y in range(250, AY1):
     for x in range(AX0, AX1):
-        top = 252 + math.sin(x * 0.45) * 1.5 + math.sin(x * 1.3) * 1.0
+        top = 252 + math.sin(x * 0.45) * 1.5 + math.sin(x * 1.3) * 1.0 + 16 * math.exp(-((x - 125) / 46) ** 4)
         if y >= top:
             # dichte senkrechte Halme: helle/dunkle Striche, oben heller
             ph = (x * 0.9 + math.sin(x * 0.37) * 3) % 3
@@ -342,8 +383,10 @@ for (yb, L, wd, n) in rows:
         x0 = AX0 + (i + 0.2 + rnd.random() * 0.6) * (AX1 - AX0) / n
         lean = rnd.uniform(-0.35, 0.35)
         hgt = (yb - 244) * rnd.uniform(0.45, 0.7)
-        if abs(x0 - 125) < 40 and yb < 290:
-            hgt *= 0.4
+        if abs(x0 - 125) < 46:
+            if yb < 280:
+                continue                     # vor dem Saum keine hohen Ähren
+            hgt *= 0.2
         ex, ey = x0 + math.sin(lean) * hgt, yb - hgt
         stalk(x0, min(AY1 - 1, yb), ex, ey)
         ear(int(ex), int(ey), L, wd, lean * 0.3)
