@@ -1,11 +1,16 @@
 # Sleeve-Entwürfe – Generator
 
-Die Sleeves werden per Python (Pillow, NumPy, OpenCV) als Pixel-Art erzeugt.
-Aus diesem Ordner ausführen, z. B. `python3 s04_slimejar.py` – das Ergebnis landet
+Die Sleeves werden per Python (Pillow, NumPy, OpenCV) als Pixel-Art erzeugt – auf einem
+250×350-Raster (3 px pro Pixel, wie die bestehenden Deepsea-/Wowhalla-Sleeves).
+Aus diesem Ordner ausführen, z. B. `python3 v2_04_slimejar.py` – das Ergebnis landet
 als PNG (750×1050) in `data/sleeve-proposals/`.
 
-- `pp.py` – Hilfsfunktionen (Kartenart auf natives Pixelraster zurückrechnen, Freistellen, Canvas, Text)
+- `pp.py` – Basis: Kartenart auf natives Pixelraster zurückrechnen, Freistellen, Canvas, Text
+- `px2.py` – v2-Werkzeuge: Scale2x/Scale3x, Form-Schattierung mit Dithering, Relief-Shader
+  (Höhenkarte → Licht), Flächen-Renderer für Figuren
 - `font35.py` – 3×5-Pixelschrift
-- `art_*.py`, `slimes.py`, `snowmen.py` – handgepixelte bzw. prozedurale Figuren
+- `slimes2.py` – Slimes im Ingame-Stil (5 Original-Sprites in `sprites/slimes/` + abgeleitete)
+- `snowmen2.py` – Mischief-Militia-Schneemänner im Ingame-Stil
+- `art_*.py`, `skelking2.py`, `smugcoin.py` – handgepixelte Figuren/Icons
 - `sprites/` – aus den Kartenbildern freigestellte Figuren
-- `s01_…` bis `s10_…` – je ein Sleeve
+- `v2_01_…` bis `v2_10_…` – je ein Sleeve
