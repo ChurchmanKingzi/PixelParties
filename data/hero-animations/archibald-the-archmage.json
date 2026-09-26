@@ -1,0 +1,11 @@
+{
+  "hero": "Archibald, the Archmage",
+  "sheet": "archibald-the-archmage.png",
+  "frameWidth": 21,
+  "frameHeight": 34,
+  "frames": 40,
+  "frameMs": 90,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 2
+}

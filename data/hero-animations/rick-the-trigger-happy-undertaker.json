@@ -1,0 +1,11 @@
+{
+  "hero": "Rick, the Trigger Happy Undertaker",
+  "sheet": "rick-the-trigger-happy-undertaker.png",
+  "frameWidth": 31,
+  "frameHeight": 39,
+  "frames": 32,
+  "frameMs": 50,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 6
+}
