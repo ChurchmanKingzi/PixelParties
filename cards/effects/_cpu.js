@@ -2761,6 +2761,35 @@ async function playArtifacts(engine, helpers) {
   _entschaerfen();
 }
 
+/**
+ * ★ Was kostet diese Artefakt-Handkarte JETZT? (Als Befund 26.9.)
+ * Liest dieselbe Rechnung wie der Server (`engine.artifactPlayCost`):
+ * Rusting Crystal, Shu'Chaku, Play Money, Lunatic Cycle - New Moon,
+ * Misfire, Dajan, Laser Cannon und — mit `opts.heroIdx` — Tsu'Ki.
+ * Vorher sah die CPU nur Shu'Chaku und liess verbilligte Artefakte
+ * liegen. Ohne `handIdx` die guenstigste Kopie dieses Namens in der
+ * Hand (Rabatte haengen an der physischen Kopie).
+ */
+function cpuArtifactCost(engine, pi, cardName, handIdx, opts) {
+  const cd = engine._getCardDB()[cardName];
+  const fallback = cd?.cost || 0;
+  if (typeof engine.artifactPlayCost !== 'function') return fallback;
+  try {
+    if (handIdx != null) return engine.artifactPlayCost(pi, cardName, handIdx, opts).cost;
+    const hand = engine.gs.players[pi]?.hand || [];
+    let best = null;
+    for (let i = 0; i < hand.length; i++) {
+      if (hand[i] !== cardName) continue;
+      const c = engine.artifactPlayCost(pi, cardName, i, opts).cost;
+      if (best == null || c < best) best = c;
+    }
+    return best ?? fallback;
+  } catch (err) {
+    console.error(`[cpu] artifactPlayCost ${cardName} warf:`, err.message);
+    return fallback;
+  }
+}
+
 function planArtifactPlay(engine, pi, cardName, handIdx, cardData) {
   const gs = engine.gs;
   const ps = gs.players[pi];
@@ -2768,8 +2797,6 @@ function planArtifactPlay(engine, pi, cardName, handIdx, cardData) {
   if (ps.itemLocked && (ps.hand || []).length < 2) return null;
   if (ps._creationLockedNames?.has(baseCardName(cardName))) return null;   // v876
 
-  const rawCost = cardData.cost || 0;
-  const costReduction = ps._nextArtifactCostReduction || 0;
   // v657: scharfgestellter Gratis-Kauf (Dajan, Conqueror) — Artefakte
   // mit festem Preis kosten 0; die mit selbstgerechnetem Preis
   // (manualGoldCost) sind waehrenddessen gar nicht spielbar (Server
@@ -2777,11 +2804,28 @@ function planArtifactPlay(engine, pi, cardName, handIdx, cardData) {
   const _freiScharf = !!engine.freeArtifactArmed?.(pi);
   const _manualCost = !!loadCardEffect(cardName)?.manualGoldCost;
   if (_freiScharf && _manualCost) return null;
-  const cost = _freiScharf ? 0 : Math.max(0, rawCost - costReduction);
-  if ((ps.gold || 0) < cost) return null;
 
   const subLower = (cardData.subtype || '').toLowerCase();
   const isEquip = subLower === 'equipment';
+
+  // ★ Preis wie der Server ihn nimmt (alle Rabatte, Kreditrahmen).
+  // `manualGoldCost`-Artefakte rechnen ihren Preis selbst — der Server
+  // prueft fuer sie keinen Grundpreis, ihr `canActivate` filtert.
+  // Eine Ausruestung, die NUR mit dem Rabatt eines Zielhelden (Tsu'Ki)
+  // bezahlbar ist, darf nur an genau solche Helden.
+  let _equipHelden = null;
+  if (!_manualCost) {
+    const cost = cpuArtifactCost(engine, pi, cardName, handIdx);
+    if (!engine.canAffordGold(pi, cost, cardName)) {
+      if (!isEquip) return null;
+      _equipHelden = [];
+      for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
+        const c = cpuArtifactCost(engine, pi, cardName, handIdx, { heroIdx: hi, heroOwner: pi });
+        if (engine.canAffordGold(pi, c, cardName)) _equipHelden.push(hi);
+      }
+      if (_equipHelden.length === 0) return null;
+    }
+  }
   const isArtifactCreature = subLower.split('/').some(t => t.trim() === 'creature');
 
   // Load the script up-front so the subtype dispatch can consult
@@ -2795,7 +2839,7 @@ function planArtifactPlay(engine, pi, cardName, handIdx, cardData) {
   const isTargetingArtifact = !!script?.isTargetingArtifact;
 
   if (isEquip) {
-    const heroIdx = pickHeroForEquip(engine, pi, cardName, cardData);
+    const heroIdx = pickHeroForEquip(engine, pi, cardName, cardData, _equipHelden);
     if (heroIdx < 0) return null;
     return { kind: 'equipment', cardName, handIdx, heroIdx };
   }
@@ -2849,7 +2893,7 @@ function planArtifactPlay(engine, pi, cardName, handIdx, cardData) {
 // pick instead of re-running the MCTS hero valuation.
 let _inEquipHeroValuation = false;
 
-function pickHeroForEquip(engine, pi, cardName, cardData) {
+function pickHeroForEquip(engine, pi, cardName, cardData, nurHelden = null) {
   const gs = engine.gs;
   const ps = gs.players[pi];
   const script = loadCardEffect(cardName);
@@ -2866,6 +2910,8 @@ function pickHeroForEquip(engine, pi, cardName, cardData) {
     if (hero.statuses?.frozen) continue;
     if (hero.statuses?.charmed) continue;
     if (script?.canEquipToHero && !script.canEquipToHero(gs, pi, hi, engine)) continue;
+    // Nur mit Zielheld-Rabatt bezahlbar → nur diese Helden (planArtifactPlay).
+    if (Array.isArray(nurHelden) && !nurHelden.includes(hi)) continue;
     const zones = ps.supportZones?.[hi] || [[], [], []];
     let hasFree = false;
     for (let z = 0; z < 3; z++) {
@@ -10332,7 +10378,8 @@ function estimateHandCardValueFor(engine, pi, cardName, seenCount = 0) {
   if (!cd) return 15;
   const ps = engine.gs.players[pi];
   const gold = ps?.gold || 0;
-  const cost = cd.cost || 0;
+  // Artefakte: Preis nach Rabatten (guenstigste Kopie in der Hand).
+  const cost = cd.cardType === 'Artifact' ? cpuArtifactCost(engine, pi, cardName) : (cd.cost || 0);
   const typeLocked =
     (cd.cardType === 'Potion' && engine.arePotionsLockedFor(pi)) ||
     (cd.cardType === 'Artifact' && ps?.itemLocked) ||
@@ -10843,9 +10890,7 @@ function computeGoldDemand(engine, pi) {
       const plan = planArtifactPlay(engine, pi, name, handIdx, cd);
       if (!plan) continue;
       seenArtifact.add(name);
-      const rawCost = cd.cost || 0;
-      const reduction = ps._nextArtifactCostReduction || 0;
-      demand += Math.max(0, rawCost - reduction);
+      demand += cpuArtifactCost(engine, pi, name, handIdx);
     }
   } finally {
     ps.gold = origGold;
@@ -13630,7 +13675,7 @@ function shouldMulliganStartingHand(engine, pi) {
         playable++;
         break;
       case 'Artifact': {
-        const cost = cd.cost || 0;
+        const cost = cpuArtifactCost(engine, pi, cardName);
         if (cost <= gold + 4) playable++; // allow room for 1 turn of gold gain
         break;
       }

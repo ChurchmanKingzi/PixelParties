@@ -6473,47 +6473,16 @@ async function doPlayArtifact(room, pi, { cardName, handIndex, heroIdx, zoneSlot
   const _isCrossSideArtifact = !!_script?.placesOnOpponentBoard;
   if (_script?.isTargetingArtifact && !_isCrossSideArtifact) return false;
 
-  // Rusting Crystal aura — doubles the base cost BEFORE reductions
-  // so discounts apply to the already-doubled price. Idempotent for
-  // multi-copy / suppressed cases (see helper).
-  const rawCost = applyRustingCrystalCostMultiplier(
-    gs, pi, cardName, cardData.cost || 0, room.engine,
-  );
-  // Player-wide next-artifact discount (Shu'Chaku) AND per-hand-index
-  // discounts (Play Money) both stack, capped at 0.
-  const playerReduction = ps._nextArtifactCostReduction || 0;
-  const handReduction = (ps._handCostReductions?.[handIndex] || 0)
-    + (ps._handCostReductionsPermanent?.[handIndex] || 0)
-    // ★ Namensweiter Nullpreis (Misfire, Als Ruling 21.8.): „das
-    // NAECHSTE Artefakt mit diesem Namen diese Runde" — egal welche
-    // Kopie, also NICHT ueber den Handindex. Der Eintrag wird beim
-    // tatsaechlichen Spielen verbraucht und beim Zugbeginn geloescht.
-    + ((ps._freeArtifactNames && ps._freeArtifactNames[cardName]) ? rawCost : 0)
-    // v656: scharfgestellter Gratis-Kauf (Dajan, Conqueror) — voller
-    // Grundpreis weg, egal welches Artefakt.
-    + (room.engine.freeArtifactArmed(pi) ? rawCost : 0)
-    // ★ `selfCostReduction(gs, pi, cardData, engine)` — eine Karte
-    // verbilligt SICH SELBST (Future Tech Laser Cannon: −20 je Kopie in
-    // der Ablage). Bewusst ein eigener Vertrag und nicht `dynamicCost`:
-    // den liest der Server NUR bei Reaktionen. Additiv und
-    // rueckwaertskompatibel — kein Artefakt exportiert ihn per Default.
-    + (typeof _script?.selfCostReduction === 'function'
-      ? (_script.selfCostReduction(gs, pi, cardData, room.engine) || 0) : 0);
-  // Target-Hero equip discount: a Hero script may export
-  // `equipCostReduction(gs, pi, heroIdx, cardData, engine)` to discount
-  // Artifacts equipped ONTO it (Tsu'Ki: Lunatic Cycle cards −10).
-  // Additive + backward-compatible — no Hero exports it by default.
-  let heroEquipReduction = 0;
-  {
-    const _eqOwner = _isCrossSideArtifact ? (pi === 0 ? 1 : 0) : pi;
-    const _eqHero = gs.players[_eqOwner]?.heroes?.[heroIdx];
-    const _eqHeroScript = _eqHero?.name ? loadCardEffect(_eqHero.name) : null;
-    if (typeof _eqHeroScript?.equipCostReduction === 'function') {
-      heroEquipReduction = _eqHeroScript.equipCostReduction(gs, pi, heroIdx, cardData, room.engine) || 0;
-    }
-  }
-  const costReduction = playerReduction + handReduction + heroEquipReduction;
-  const cost = Math.max(0, rawCost - costReduction);
+  // Preis dieser Handkarte: Rusting Crystal verdoppelt den Grundpreis,
+  // danach alle Rabatte (Shu'Chaku, Play Money, New Moon, Misfire,
+  // Dajan, Laser Cannon, Tsu'Ki am Zielhelden), Boden 0. Die Rechnung
+  // steht seit Als Befund 26.9. in `engine.artifactPlayCost` — dieselbe,
+  // die auch die CPU liest.
+  // For cross-side artifacts the equip target hero sits on the
+  // opponent's side (Tsu'Ki's `equipCostReduction` reads that hero).
+  const { costReduction, cost } = room.engine.artifactPlayCost(pi, cardName, handIndex, {
+    heroIdx, heroOwner: _isCrossSideArtifact ? (pi === 0 ? 1 : 0) : pi,
+  });
   if (!room.engine.canAffordGold(pi, cost, cardName)) return false;
 
   // For cross-side artifacts (Powder Keg etc.), the client's `heroIdx`
@@ -10940,40 +10909,11 @@ async function doUseArtifactEffect(room, pi, { cardName, handIndex, fromCreation
   }
   if ((cardData.subtype || '').toLowerCase() === 'equipment') return false;
 
-  // Rusting Crystal aura — doubles the base cost BEFORE reductions.
-  const rawCost = applyRustingCrystalCostMultiplier(
-    gs, pi, cardName, cardData.cost || 0, room.engine,
-  );
-  // Same stacked discount as the equip path: Shu'Chaku's next-artifact
-  // reduction + Play Money's per-hand-index reduction, capped at 0.
-  const playerReduction = ps._nextArtifactCostReduction || 0;
-  const handReduction = (ps._handCostReductions?.[handIndex] || 0)
-    + (ps._handCostReductionsPermanent?.[handIndex] || 0)
-    // ★ Namensweiter Nullpreis (Misfire, Als Ruling 21.8.): „das
-    // NAECHSTE Artefakt mit diesem Namen diese Runde" — egal welche
-    // Kopie, also NICHT ueber den Handindex. Der Eintrag wird beim
-    // tatsaechlichen Spielen verbraucht und beim Zugbeginn geloescht.
-    + ((ps._freeArtifactNames && ps._freeArtifactNames[cardName]) ? rawCost : 0)
-    // v656: scharfgestellter Gratis-Kauf (Dajan, Conqueror) — voller
-    // Grundpreis weg, egal welches Artefakt.
-    + (room.engine.freeArtifactArmed(pi) ? rawCost : 0)
-    // ★ `selfCostReduction(gs, pi, cardData, engine)` — eine Karte
-    // verbilligt SICH SELBST (Future Tech Laser Cannon: −20 je Kopie in
-    // der Ablage). Bewusst ein eigener Vertrag und nicht `dynamicCost`:
-    // den liest der Server NUR bei Reaktionen. Additiv und
-    // rueckwaertskompatibel — kein Artefakt exportiert ihn per Default.
-    // ★ EIGENE Nachladung statt der Konstante `script` weiter unten:
-    // die wird ERST NACH dieser Rechnung deklariert, ein Zugriff hier
-    // wirft `Cannot access 'script' before initialization` und legt
-    // JEDE Artefakt-Aktivierung lahm (Als Fehlerbericht 21.8.).
-    // `loadCardEffect` ist gecached, der zweite Aufruf kostet nichts.
-    + (() => {
-      const sk = loadCardEffect(cardName);
-      return typeof sk?.selfCostReduction === 'function'
-        ? (sk.selfCostReduction(gs, pi, cardData, room.engine) || 0) : 0;
-    })();
-  const costReduction = playerReduction + handReduction;
-  const cost = Math.max(0, rawCost - costReduction);
+  // Preis dieser Handkarte — dieselbe Rechnung wie im Ausruest-Pfad
+  // und in der CPU (`engine.artifactPlayCost`, Als Befund 26.9.):
+  // Rusting Crystal, Shu'Chaku, Play Money, New Moon, Misfire, Dajan,
+  // Laser Cannon. Kein Zielheld, also kein Tsu'Ki-Rabatt.
+  const { costReduction, cost } = room.engine.artifactPlayCost(pi, cardName, handIndex);
 
   const script = loadCardEffect(cardName);
   if (!script) return false;

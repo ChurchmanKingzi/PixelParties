@@ -11045,7 +11045,7 @@
     "hp": null,
     "atk": null,
     "cost": 4,
-    "effect": "Play this card immediately when a Hero you control would take damage equal to or greater than their max HP. \nNegate that damage and any effects associated with it on that Hero.",
+    "effect": "Play this card immediately when a Hero you control would take damage equal to or greater than its max HP or be defeated by an effect. Negate that damage or effect and any effects associated with it to that Hero.",
     "archetype": "",
     "setID": "PP THW",
     "banned": "",

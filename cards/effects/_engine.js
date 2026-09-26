@@ -21905,6 +21905,63 @@ this._deathWatch = (this._deathWatchStack || []).length
     return this._payCardCost(this._rxOwnerIdx(ps, '_rxPay'), cost, opts);
   }
 
+  /**
+   * ★ ARTEFAKT-PREIS AUS EINER HAND (Als Befund 26.9.)
+   *
+   * Einzige Rechnung fuer „was kostet DIESE Handkarte jetzt?". Vorher
+   * stand sie zweimal im Server (Ausruest- und Effekt-Pfad) und die
+   * CPU rechnete nur `cost − Shu'Chaku` — Play Money, New Moon,
+   * Misfire, Laser Cannon, Tsu'Ki, Rusting Crystal und der Kredit-
+   * rahmen fehlten ihr. Folge: sie liess verbilligte Artefakte liegen
+   * (oder versuchte verteuerte, die der Server dann ablehnte).
+   *
+   * Reihenfolge wie im Server: Rusting Crystal verdoppelt den
+   * GRUNDPREIS, danach werden alle Rabatte abgezogen, Boden 0.
+   *
+   * @param {number} playerIdx
+   * @param {string} cardName
+   * @param {number} handIdx   - Handindex (Rabatte je physischer Kopie)
+   * @param {object} [opts]
+   *   heroIdx, heroOwner — Zielheld einer Ausruestung (Tsu'Ki-Rabatt
+   *   `equipCostReduction` des Zielhelden). Ohne heroIdx kein Heldrabatt.
+   * @returns {{ rawCost, playerReduction, handReduction,
+   *             heroEquipReduction, costReduction, cost }}
+   */
+  artifactPlayCost(playerIdx, cardName, handIdx, opts = {}) {
+    const gs = this.gs;
+    const ps = gs.players[playerIdx] || {};
+    const cardData = this._getCardDB()[cardName] || {};
+    const { applyRustingCrystalCostMultiplier } = require('./_crystals-shared');
+    const rawCost = applyRustingCrystalCostMultiplier(gs, playerIdx, cardName, cardData.cost || 0, this);
+    // Shu'Chaku: Rabatt aufs naechste Artefakt, egal welches.
+    const playerReduction = ps._nextArtifactCostReduction || 0;
+    let sk = null;
+    try { sk = loadCardEffect(cardName); } catch { sk = null; }
+    const handReduction = (ps._handCostReductions?.[handIdx] || 0)          // Play Money, New Moon
+      + (ps._handCostReductionsPermanent?.[handIdx] || 0)
+      // Misfire: namensweiter Nullpreis fuer das naechste dieses Namens.
+      + ((ps._freeArtifactNames && ps._freeArtifactNames[cardName]) ? rawCost : 0)
+      // Dajan, Conqueror: scharfgestellter Gratis-Kauf.
+      + (this.freeArtifactArmed(playerIdx) ? rawCost : 0)
+      // Selbstrabatt der Karte (Future Tech Laser Cannon).
+      + (typeof sk?.selfCostReduction === 'function'
+        ? (sk.selfCostReduction(gs, playerIdx, cardData, this) || 0) : 0);
+    // Zielheld-Rabatt (Tsu'Ki: Lunatic Cycles −10).
+    let heroEquipReduction = 0;
+    if (opts.heroIdx != null) {
+      const eqOwner = opts.heroOwner ?? playerIdx;
+      const eqHero = gs.players[eqOwner]?.heroes?.[opts.heroIdx];
+      let hs = null;
+      try { hs = eqHero?.name ? loadCardEffect(eqHero.name) : null; } catch { hs = null; }
+      if (typeof hs?.equipCostReduction === 'function') {
+        heroEquipReduction = hs.equipCostReduction(gs, playerIdx, opts.heroIdx, cardData, this) || 0;
+      }
+    }
+    const costReduction = playerReduction + handReduction + heroEquipReduction;
+    const cost = Math.max(0, rawCost - costReduction);
+    return { rawCost, playerReduction, handReduction, heroEquipReduction, costReduction, cost };
+  }
+
   canAffordGold(playerIdx, cost, cardName) {
     const ps = this.gs?.players?.[playerIdx];
     if (!ps) return false;
