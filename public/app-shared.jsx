@@ -356,43 +356,54 @@ function _ppStopps(teile) {
 function _ppAlphaStufe(a, x, y) {
   if (a >= 1) return 1;
   if (a <= 0) return 0;
-  return Math.pow(a, 0.8) > ppBayer(x + 2, y + 1) ? 1 : 0;
+  // v1446 (Als Befund 26.9.: „Explosion nutzt relativ wenige Pixel"):
+  // kraeftiger angehoben — Scheine sollen dicht und leuchtend wirken.
+  return Math.pow(a, 0.62) > ppBayer(x + 2, y + 1) ? 1 : 0;
 }
 
-/** Pixelzahl je Seite: ~3 Bildschirmpunkte pro Pixel, schmale Baender (Ringe) bekommen mehr. */
-function _ppAufloesung(v, breitePx) {
+/** Pixelgroesse in Bildschirmpunkten (v1446: 2 statt 3 — mehr, feinere Pixel). */
+const PP_PX_GROESSE = 2;
+
+/** Pixelzahl fuer eine Seite: ~PP_PX_GROESSE px pro Pixel, schmale Baender (Ringe) bekommen mehr. */
+function _ppAufloesung(v, laengePx) {
   let minLuecke = 1;
   for (let i = 1; i < v.stopps.length; i++) {
     const d = v.stopps[i].p - v.stopps[i - 1].p;
     if (d > 0.001 && d < minLuecke) minLuecke = d;
   }
-  const fuerRinge = Math.ceil(2.2 / (minLuecke * 0.707));
-  const fuerGroesse = breitePx > 0 ? Math.round(breitePx / 3) : 24;
-  return Math.max(4, Math.min(72, Math.max(fuerGroesse, Math.min(fuerRinge, 72)))) & ~1;
+  const fuerRinge = Math.min(96, Math.ceil(2.2 / (minLuecke * 0.707)));
+  const fuerGroesse = laengePx > 0 ? Math.round(laengePx / PP_PX_GROESSE) : 32;
+  return Math.max(2, Math.min(160, Math.max(fuerGroesse, laengePx > 0 && laengePx < 24 ? 0 : fuerRinge)));
 }
 
 /**
- * Radialen Verlauf als Pixelbild. Zwischen zwei Farbstopps wird nicht
- * gemischt, sondern per Bayer-Matrix zwischen BEIDEN Stoppfarben
- * gewaehlt — das ist das Dithering. Aufloesung passt sich an: schmale
- * Baender (Ringe) bekommen mehr Pixel, damit sie nicht verschwinden.
+ * Radialen oder linearen Verlauf als Pixelbild. Zwischen zwei Farbstopps
+ * wird nicht gemischt, sondern per Bayer-Matrix zwischen BEIDEN
+ * Stoppfarben gewaehlt — das ist das Dithering. `breitePx`/`hoehePx`
+ * (Elementgroesse) halten die Pixel quadratisch und ~2 px gross; ohne
+ * Angabe wird ein Quadrat angenommen.
  */
-function ppPxVerlaufUrl(gradient, breitePx = 0) {
+function ppPxVerlaufUrl(gradient, breitePx = 0, hoehePx = 0) {
   const v = ppVerlaufLesen(gradient);
   if (!v) return '';
-  const n = _ppAufloesung(v, breitePx);
-  return ppPxBild('vl:' + n + ':' + gradient, n, n, (setze) => {
+  const W = breitePx > 0 ? breitePx : (hoehePx > 0 ? hoehePx : 1);
+  const H = hoehePx > 0 ? hoehePx : W;
+  const q = (x) => Math.max(1, Math.round(x / 4) * 4);           // Merk-Schluessel groeber
+  const nx = _ppAufloesung(v, breitePx > 0 ? q(W) : 0);
+  const ny = breitePx > 0 || hoehePx > 0 ? Math.max(2, Math.round(nx * H / W)) : nx;
+  return ppPxBild('vl:' + nx + 'x' + ny + ':' + gradient, nx, ny, (setze) => {
     const cx = v.linear ? 0.5 : v.cx, cy = v.linear ? 0.5 : v.cy;
-    const rx = Math.SQRT2 * Math.max(cx, 1 - cx), ry = Math.SQRT2 * Math.max(cy, 1 - cy);
-    const rk = Math.hypot(Math.max(cx, 1 - cx), Math.max(cy, 1 - cy));
+    const fx = Math.max(cx, 1 - cx) * W, fy = Math.max(cy, 1 - cy) * H;
+    const rk = Math.hypot(fx, fy);                                  // Kreis: fernste Ecke
+    const rx = Math.SQRT2 * fx, ry = Math.SQRT2 * fy;               // Ellipse: fernste Ecke
     // Linear: CSS-Winkel (0deg = nach oben, 90deg = nach rechts); die
-    // Verlaufslinie ist |sin| + |cos| lang (Quadrat).
+    // Verlaufslinie ist |W sin| + |H cos| lang.
     const wr = (v.winkel || 0) * Math.PI / 180, sn = Math.sin(wr), cs = Math.cos(wr);
-    const laenge = Math.abs(sn) + Math.abs(cs);
+    const laenge = Math.abs(W * sn) + Math.abs(H * cs) || 1;
     const S = v.stopps;
-    for (let y = 0; y < n; y++) {
-      for (let x = 0; x < n; x++) {
-        const u = (x + 0.5) / n - cx, w = (y + 0.5) / n - cy;
+    for (let y = 0; y < ny; y++) {
+      for (let x = 0; x < nx; x++) {
+        const u = ((x + 0.5) / nx - cx) * W, w = ((y + 0.5) / ny - cy) * H;
         const t = v.linear ? 0.5 + (u * sn - w * cs) / laenge
           : v.kreis ? Math.hypot(u, w) / rk : Math.hypot(u / rx, w / ry);
         let f;
@@ -423,10 +434,10 @@ function _ppRandDeckend(gradient) {
  * breitePx) }}` — `breitePx` (Elementbreite) haelt die Pixel bei ~3 px.
  * Andere Werte (Farben, mehrere Ebenen) gehen unveraendert durch.
  */
-function pxHintergrund(gradient, breitePx = 0) {
+function pxHintergrund(gradient, breitePx = 0, hoehePx = 0) {
   const url = typeof gradient === 'string' && /(radial|linear)-gradient/.test(gradient)
     && !/,\s*(radial|linear)-gradient/.test(gradient)          // mehrere Ebenen: nicht anfassen
-    ? ppPxVerlaufUrl(gradient, breitePx) : '';
+    ? ppPxVerlaufUrl(gradient, breitePx, hoehePx) : '';
   if (!url) return { background: gradient };
   const stil = {
     backgroundImage: `url(${url})`, backgroundSize: '100% 100%',
@@ -490,6 +501,17 @@ const PP_PX_SPRITES = {
   flamme_schwarz: { pal: { W: '#8a3ab0', Y: '#5a1a7a', O: '#34104a', R: '#180424', D: '#000000' }, z: [
     '....R....', '...ROR...', '...ROR..R', '..ROYOR.R', '..ROYYORR', '.ROYWYYOR',
     '.ROYWWYOR', 'ROYYWWYOR', 'ROYWWWYOR', 'DROYYYORD', '.DRROORD.'] },
+  herz_gruen: { pal: { R: '#3fbf5a', D: '#1f7a34', P: '#a8f0b4' }, z: [
+    '.RR...RR.', 'RPPR.RRRR', 'RPRRRRRRD', 'RRRRRRRRD', '.RRRRRRD.', '..RRRRD..',
+    '...RRD...', '....D....'] },
+  herz_rosa: { pal: { R: '#ff6fa8', D: '#c83a78', P: '#ffd0e4' }, z: [
+    '.RR...RR.', 'RPPR.RRRR', 'RPRRRRRRD', 'RRRRRRRRD', '.RRRRRRD.', '..RRRRD..',
+    '...RRD...', '....D....'] },
+  wut: { pal: { R: '#e8243a', D: '#9a1020' }, z: [
+    '.RR...RR.', 'RRD...DRR', 'RD.....DR', '.........', '.........', 'RD.....DR', 'RRD...DRR', '.RR...RR.'] },
+  tropfen: { pal: { W: '#e8f6ff', B: '#4aa8ff', D: '#1f5fb8' }, z: [
+    '...B...', '...B...', '..BBB..', '.BWBBB.', 'BWBBBBD', 'BBBBBBD', '.BBBBD.', '..DDD..'] },
+  kreuz: { mono: true, z: ['..###..', '..#+#..', '###+###', '#++++##', '###+###', '..#+#..', '..###..'] },
   funke4: { mono: true, z: ['...#...', '...#...', '..###..', '#######', '..###..', '...#...', '...#...'] },
   funke4hohl: { mono: true, z: ['...#...', '...#...', '..#+#..', '##+.+##', '..#+#..', '...#...', '...#...'] },
   stern5: { mono: true, z: ['....#....', '....#....', '...###...', '#########', '.#######.', '..#####..', '..##.##..', '.##...##.', '.#.....#.'] },
@@ -510,20 +532,58 @@ const PP_PX_ZEICHEN = {
   '❄': 'schnee', '❆': 'schnee', '❅': 'schnee', '❄️': 'schnee',
   '♪': 'note', '♩': 'note', '♫': 'noten', '♬': 'noten', '🎵': 'note', '🎶': 'noten',
   '▲': 'dreieck', '◆': 'raute', '⬢': 'raute',
+  '💚': 'herz_gruen', '💕': 'herz_rosa', '💘': 'herz_rosa', '💝': 'herz_rosa', '💓': 'herz_rosa', '🩷': 'herz_rosa',
+  '💢': 'wut', '💧': 'tropfen', '💦': 'tropfen', '✚': 'kreuz', '✙': 'kreuz', '➕': 'kreuz',
 };
 
-function ppPxSpriteUrl(name) {
+/**
+ * Scale2x (EPX): verdoppelt ein Zeichenraster und rundet Diagonalen ab,
+ * ohne den Pixel-Charakter zu verlieren — fuer grosse Darstellungen,
+ * damit ein 9×11-Sprite bei 90 px nicht aus 10-px-Kloetzen besteht.
+ */
+function _ppScale2x(z) {
+  const h = z.length, w = Math.max(...z.map(r => r.length));
+  const at = (x, y) => (y < 0 || y >= h || x < 0 || x >= w) ? '.' : (z[y][x] || '.');
+  const out = Array.from({ length: h * 2 }, () => []);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const P = at(x, y), A = at(x, y - 1), B = at(x + 1, y), C = at(x - 1, y), D = at(x, y + 1);
+    let e0 = P, e1 = P, e2 = P, e3 = P;
+    if (C === A && C !== D && A !== B) e0 = A;
+    if (A === B && A !== C && B !== D) e1 = B;
+    if (D === C && D !== B && C !== A) e2 = C;
+    if (B === D && B !== A && D !== C) e3 = D;
+    out[2 * y][2 * x] = e0; out[2 * y][2 * x + 1] = e1;
+    out[2 * y + 1][2 * x] = e2; out[2 * y + 1][2 * x + 1] = e3;
+  }
+  return out.map(r => r.join(''));
+}
+function _ppSpriteRaster(s, stufe) {
+  let z = s.z;
+  for (let i = 0; i < stufe; i++) z = _ppScale2x(z);
+  return z;
+}
+/** Stufe fuer eine Darstellungsgroesse (px): ~3 px pro Sprite-Pixel anstreben. */
+function ppPxSpriteStufe(name, groessePx) {
+  const s = PP_PX_SPRITES[name];
+  if (!s || !(groessePx > 0)) return 0;
+  const n = Math.max(s.z.length, ...s.z.map(r => r.length));
+  const proPixel = groessePx / n;
+  return proPixel > 9 ? 2 : proPixel > 4.5 ? 1 : 0;
+}
+
+function ppPxSpriteUrl(name, stufe = 0) {
   const s = PP_PX_SPRITES[name];
   if (!s) return '';
-  const h = s.z.length, w = Math.max(...s.z.map(z => z.length));
-  return ppPxBild('spr:' + name, w, h, (setze) => {
-    s.z.forEach((z, y) => [...z].forEach((c, x) => {
+  const z = _ppSpriteRaster(s, stufe);
+  const h = z.length, w = Math.max(...z.map(r => r.length));
+  return ppPxBild('spr:' + name + ':' + stufe, w, h, (setze) => {
+    z.forEach((r, y) => [...r].forEach((c, x) => {
       if (s.mono) {
         if (c === '#') setze(x, y, [255, 255, 255, 1]);
         else if (c === '+') setze(x, y, [255, 255, 255, 0.5]);
       } else if (s.pal[c]) setze(x, y, ppFarbe(s.pal[c]));
     }));
-  });
+  }, stufe ? 2 : 4);
 }
 
 /**
@@ -596,13 +656,13 @@ function _ppPxRegelnBauen() {
       probe.className = sel.replace(/^\./, '').split('.').join(' ');
       const cs = getComputedStyle(probe);
       const bg = cs.backgroundImage;
-      if (bg && /(radial|linear)-gradient/.test(bg)) verlaufVon[sel] = { g: bg, b: parseFloat(cs.width) || 0 };
+      if (bg && /(radial|linear)-gradient/.test(bg)) verlaufVon[sel] = { g: bg, b: parseFloat(cs.width) || 0, h: parseFloat(cs.height) || 0 };
     }
     probe.remove();
   } catch {}
   for (const sel of PP_PX_KLASSEN.verlauf) {
     const g = verlaufVon[sel]?.g;
-    const url = g ? ppPxVerlaufUrl(g, verlaufVon[sel].b) : '';
+    const url = g ? ppPxVerlaufUrl(g, verlaufVon[sel].b, verlaufVon[sel].h) : '';
     if (!url) continue;
     let r = `${sel}{background:url(${url}) center/100% 100% no-repeat;image-rendering:pixelated;box-shadow:none;`;
     if (_ppRandDeckend(g)) {
@@ -635,6 +695,378 @@ function ppPxRegelnAnwenden() {
     el.textContent = _ppPxRegelnBauen();
   } catch {}
 }
+// ═══════════════════════════════════════════════════════════════════
+//  ★ v1446 — DER PIXELIERER (Paket 2 der Pixelart-Umstellung)
+//
+//  Die 276 Animationen bestehen aus einer Handvoll Bausteinen: weiche
+//  Verlaeufe, runde Punkte mit Leuchtschein, Rahmen mit weichem Schein,
+//  Emoji und leuchtender Text. Statt jede Animation einzeln umzuschreiben,
+//  laeuft beim Einblenden EINMAL dieser Durchgang ueber ihre Elemente
+//  (kein Filter, nichts pro Bild) und setzt die Bausteine in Pixelart um:
+//
+//    Verlauf (radial/linear)  → Pixelbild mit Dithering (Elementgroesse)
+//    runder Einfarb-Punkt     → Pixelpartikel mit Lichtpunkt und Schatten
+//    Rahmen (border)          → Pixelrahmen/-ring in der Randfarbe
+//    Leuchtschein (box-shadow, drop-shadow)
+//                             → geditherter Pixel-Halo als Kind-Element
+//    Emoji/Glyphe             → Pixel-Sprite (PP_PX_ZEICHEN)
+//    Text mit weichem Schein  → Pixelschrift mit harter Kontur
+//
+//  Ausgenommen: SVG (bekommt nur harte Kanten), Elemente mit Maske oder
+//  Bild-URL (schon Pixelart) und alles mit `data-pp-px="aus"`.
+//  Gelesen wird zuerst ALLES, geschrieben danach — sonst erzwingt jeder
+//  Schreibzugriff ein neues Layout.
+// ═══════════════════════════════════════════════════════════════════
+
+/** Farbe mischen: t=0 → a, t=1 → b. */
+function _ppMisch(a, b, t) { return [0, 1, 2].map(i => a[i] + (b[i] - a[i]) * t).concat([a[3]]); }
+
+/** Runder Pixelpartikel in fester Farbe: Lichtpunkt oben links, geditherter Schatten unten rechts. */
+function ppPxPartikelUrl(farbe) {
+  const f = ppFarbe(farbe);
+  if (!(f[3] > 0)) return '';
+  const hell = _ppMisch(f, [255, 255, 255], 0.55), dunkel = _ppMisch(f, [0, 0, 0], 0.35);
+  hell[3] = dunkel[3] = 1;
+  const voll = [f[0], f[1], f[2], 1];
+  const Z = ['..####..', '.######.', '########', '########', '########', '########', '.######.', '..####..'];
+  return ppPxBild('pt:' + f.join(','), 8, 8, (setze) => {
+    Z.forEach((z, y) => [...z].forEach((c, x) => {
+      if (c !== '#') return;
+      const hl = (x === 2 && y === 1) || (x === 3 && y === 1) || (x === 1 && y === 2) || (x === 2 && y === 2);
+      const sch = x + y >= 10 || (x + y >= 8 && (x + y) % 2 === 0);
+      setze(x, y, hl ? hell : sch ? dunkel : voll);
+    }));
+  });
+}
+
+/**
+ * Pixelrahmen: Band der Dicke `dicke` (px) an der Innenkante eines
+ * Rechtecks mit Eckradius `radius` (px; >= halbe Seite = Ellipse).
+ */
+function ppPxRahmenUrl(farbe, dicke, w, h, radius) {
+  const f = ppFarbe(farbe);
+  const P = PP_PX_GROESSE;
+  const nx = Math.max(2, Math.round(w / P)), ny = Math.max(2, Math.round(h / P));
+  const d = Math.max(1, Math.round(dicke / P));
+  const rund = radius >= Math.min(w, h) / 2 - 0.5;
+  const r = Math.min(radius, w / 2, h / 2) / P;
+  const hell = _ppMisch(f, [255, 255, 255], 0.45); hell[3] = f[3];
+  return ppPxBild(`rf:${f.join(',')}:${d}:${nx}x${ny}:${rund ? 'o' : Math.round(r)}`, nx, ny, (setze) => {
+    for (let y = 0; y < ny; y++) for (let x = 0; x < nx; x++) {
+      let innen;                                   // Abstand zur Aussenkante in Pixeln
+      const px = x + 0.5, py = y + 0.5;
+      if (rund) {
+        const ex = (px - nx / 2) / (nx / 2), ey = (py - ny / 2) / (ny / 2);
+        const q = Math.hypot(ex, ey);
+        if (q > 1) continue;
+        innen = (1 - q) * Math.min(nx, ny) / 2;
+      } else {
+        const dx = Math.min(px, nx - px), dy = Math.min(py, ny - py);
+        if (dx < r && dy < r) {
+          const k = r - Math.hypot(r - dx, r - dy);
+          if (k < 0) continue;
+          innen = k;
+        } else innen = Math.min(dx, dy);
+      }
+      if (innen > d) continue;
+      // Oben links eine Lichtkante, damit der Rahmen nicht flach wirkt.
+      const licht = (x + y) < (nx + ny) * 0.35 && innen <= 1;
+      setze(x, y, licht ? hell : f);
+    }
+  });
+}
+
+/**
+ * Geditherter Leuchtschein um eine Form (w×h, `rund` = Ellipse) mit
+ * `rand` px Ausdehnung. Innen bleibt leer — die Form selbst deckt ihn.
+ */
+function ppPxHaloUrl(farbe, w, h, rand, rund) {
+  const f = ppFarbe(farbe);
+  const P = PP_PX_GROESSE;
+  const W = w + 2 * rand, H = h + 2 * rand;
+  const nx = Math.max(2, Math.round(W / P)), ny = Math.max(2, Math.round(H / P));
+  const qr = Math.max(1, Math.round(rand / 2) * 2);
+  return ppPxBild(`hl:${f.join(',')}:${Math.round(w / 4)}x${Math.round(h / 4)}:${qr}:${rund ? 1 : 0}`, nx, ny, (setze) => {
+    for (let y = 0; y < ny; y++) for (let x = 0; x < nx; x++) {
+      const u = (x + 0.5) * P - W / 2, v = (y + 0.5) * P - H / 2;   // px relativ zur Mitte
+      let abstand;
+      if (rund) {
+        const q = Math.hypot(u / (w / 2 || 1), v / (h / 2 || 1));
+        if (q <= 1) continue;
+        abstand = (q - 1) * Math.min(w, h) / 2;
+      } else {
+        const ax = Math.abs(u) - w / 2, ay = Math.abs(v) - h / 2;
+        if (ax <= 0 && ay <= 0) continue;
+        abstand = Math.hypot(Math.max(ax, 0), Math.max(ay, 0));
+      }
+      const a = f[3] * Math.max(0, 1 - abstand / (rand || 1));
+      if (_ppAlphaStufe(a, x, y)) setze(x, y, [f[0], f[1], f[2], 1]);
+    }
+  });
+}
+
+/** Pixelige Ellipse als Maske in Elementgroesse (runde Flaechen behalten ihre Form). */
+function ppPxEllipseUrl(w, h) {
+  const P = PP_PX_GROESSE;
+  const nx = Math.max(2, Math.round(w / P / 2) * 2), ny = Math.max(2, Math.round(h / P / 2) * 2);
+  return ppPxBild('el:' + nx + 'x' + ny, nx, ny, (setze) => {
+    for (let y = 0; y < ny; y++) for (let x = 0; x < nx; x++) {
+      const ex = (x + 0.5 - nx / 2) / (nx / 2), ey = (y + 0.5 - ny / 2) / (ny / 2);
+      if (ex * ex + ey * ey <= 1) setze(x, y, [255, 255, 255, 1]);
+    }
+  }, 2);
+}
+
+/** Aeussere Leuchtscheine aus `box-shadow` / `filter: drop-shadow()` lesen → [{farbe, blur}]. */
+function _ppScheine(wert) {
+  const out = [];
+  if (!wert || wert === 'none') return out;
+  for (const teil of _ppTeile(wert.replace(/drop-shadow\(/g, '(').replace(/^\(|\)$/g, ''))) {
+    if (/inset/.test(teil)) continue;
+    const farbeM = teil.match(/(rgba?\([^)]*\)|#[0-9a-f]{3,8}|\b[a-z]+\b)/i);
+    const zahlen = (teil.replace(/rgba?\([^)]*\)/g, '').match(/-?[\d.]+px/g) || []).map(parseFloat);
+    const blur = zahlen[2] || 0, streu = zahlen[3] || 0;
+    if (!farbeM || (blur + streu) < 2) continue;
+    out.push({ farbe: farbeM[1], blur: blur + streu });
+  }
+  return out;
+}
+
+/** `filter` ohne drop-shadow()/blur() — der Rest (brightness, hue-rotate …) bleibt. */
+function _ppFilterOhneSchein(f) {
+  if (!f || f === 'none') return f;
+  const rest = f.replace(/drop-shadow\((?:[^()]|\([^()]*\))*\)/g, '').replace(/blur\([^)]*\)/g, '').trim();
+  return rest || 'none';
+}
+
+let _ppKeyframeCache = new Map();
+/** Veraendert eine @keyframes-Regel Breite/Hoehe? (Dann Rahmen nicht einbacken.) */
+function _ppKeyframesAendernGroesse(name) {
+  if (!name || name === 'none') return false;
+  if (_ppKeyframeCache.has(name)) return _ppKeyframeCache.get(name);
+  let ja = false;
+  try {
+    for (const blatt of Array.from(document.styleSheets)) {
+      let liste; try { liste = blatt.cssRules; } catch { continue; }
+      for (const r of Array.from(liste || [])) {
+        if (r.type === 7 && r.name === name && /(^|[\s;{])(width|height)\s*:/.test(r.cssText)) { ja = true; break; }
+      }
+      if (ja) break;
+    }
+  } catch {}
+  _ppKeyframeCache.set(name, ja);
+  return ja;
+}
+
+const PP_PX_SCHRIFT = "'Press Start 2P', monospace";
+const _ppPxErledigt = new WeakSet();
+
+/** Einen Knoten (und seine Nachfahren) pixelieren. */
+function ppPixelieren(wurzel) {
+  if (!wurzel || typeof wurzel.querySelectorAll !== 'function') return;
+  const elemente = [wurzel, ...wurzel.querySelectorAll('*')];
+  const auftraege = [];
+  // ── Lesen ────────────────────────────────────────────────────────
+  for (const el of elemente) {
+    if (_ppPxErledigt.has(el)) continue;
+    _ppPxErledigt.add(el);
+    if (el.closest && el.closest('[data-pp-px="aus"]')) continue;
+    if (el.namespaceURI === 'http://www.w3.org/2000/svg') {
+      if (el.tagName.toLowerCase() === 'svg') auftraege.push({ el, svg: true });
+      continue;
+    }
+    if (!(el instanceof HTMLElement) || el.tagName === 'STYLE' || el.tagName === 'IMG') continue;
+    const cs = getComputedStyle(el);
+    if (cs.maskImage && cs.maskImage !== 'none') continue;
+    if (cs.webkitMaskImage && cs.webkitMaskImage !== 'none') continue;
+    const a = { el, w: el.offsetWidth, h: el.offsetHeight };
+    const bg = cs.backgroundImage;
+    if (bg && bg !== 'none' && !/url\(/.test(bg) && /(radial|linear)-gradient/.test(bg)) a.verlauf = bg;
+    const bgf = ppFarbe(cs.backgroundColor);
+    const rad = parseFloat(cs.borderTopLeftRadius) || 0;
+    const radProzent = /%/.test(cs.borderTopLeftRadius);
+    const rundGross = radProzent ? parseFloat(cs.borderTopLeftRadius) >= 45 : rad >= Math.min(a.w, a.h) / 2 - 1;
+    a.rund = rundGross;
+    a.radius = radProzent ? Math.min(a.w, a.h) * parseFloat(cs.borderTopLeftRadius) / 100 : rad;
+    if (!a.verlauf && (!bg || bg === 'none') && bgf[3] > 0.05 && rundGross && a.w > 0 && a.w <= 40) a.partikel = cs.backgroundColor;
+    const bw = parseFloat(cs.borderTopWidth) || 0;
+    if (bw > 0 && cs.borderTopStyle === 'solid' && ppFarbe(cs.borderTopColor)[3] > 0.05
+        && !_ppKeyframesAendernGroesse(cs.animationName)) {
+      a.rahmen = { farbe: cs.borderTopColor, dicke: bw };
+    }
+    const scheine = _ppScheine(cs.boxShadow).concat(_ppScheine((cs.filter || '').match(/drop-shadow\(.*\)/)?.[0] || ''));
+    if (scheine.length) a.schein = scheine.sort((p, q) => q.blur - p.blur)[0];
+    if (cs.boxShadow && cs.boxShadow !== 'none') a.ohneSchatten = true;
+    if (/drop-shadow|blur\(/.test(cs.filter || '')) a.filter = _ppFilterOhneSchein(cs.filter);
+    // Emoji/Glyphe: genau ein Textkind, das eine Sprite-Entsprechung hat.
+    const kinder = Array.from(el.childNodes);
+    if (kinder.length === 1 && kinder[0].nodeType === 3) {
+      const z = kinder[0].nodeValue.trim();
+      if (PP_PX_ZEICHEN[z]) { a.zeichen = z; a.farbe = cs.color; a.schrift = parseFloat(cs.fontSize) || 16; }
+      else if (PP_EMOJI_MUSTER.test(z)) { a.emoji = z; a.schrift = parseFloat(cs.fontSize) || 16; }
+      else if (z.length > 1 && /\S/.test(z) && cs.textShadow && cs.textShadow !== 'none') {
+        a.text = { schatten: cs.textShadow, groesse: parseFloat(cs.fontSize) || 16 };
+      }
+    }
+    if (a.verlauf || a.partikel || a.rahmen || a.schein || a.ohneSchatten || a.filter || a.zeichen || a.emoji || a.text) auftraege.push(a);
+  }
+  // ── Schreiben ────────────────────────────────────────────────────
+  for (const a of auftraege) {
+    const el = a.el, st = el.style;
+    if (a.svg) { el.setAttribute('shape-rendering', 'crispEdges'); continue; }
+    const ebenen = [];
+    if (a.rahmen && a.w > 0 && a.h > 0) {
+      const u = ppPxRahmenUrl(a.rahmen.farbe, a.rahmen.dicke, a.w, a.h, a.radius);
+      if (u) { ebenen.push(`url(${u})`); st.borderColor = 'transparent'; }
+    }
+    if (a.verlauf) {
+      const u = ppPxVerlaufUrl(a.verlauf, a.w, a.h);
+      if (u) {
+        ebenen.push(`url(${u})`);
+        // Runde Flaechen: die weiche `border-radius`-Kante wird eine
+        // pixelige Ellipse (sonst stuenden die Ecken des Bildes da).
+        if (a.rund && a.w > 0 && a.h > 0) {
+          const m = `url(${ppPxEllipseUrl(a.w, a.h)}) center / 100% 100% no-repeat`;
+          st.webkitMask = m; st.mask = m;
+        }
+      } else if (a.verlauf) ebenen.push(a.verlauf);
+    }
+    if (a.partikel) {
+      const u = ppPxPartikelUrl(a.partikel);
+      if (u) { ebenen.push(`url(${u})`); st.backgroundColor = 'transparent'; }
+    }
+    if (a.zeichen) {
+      const name = PP_PX_ZEICHEN[a.zeichen];
+      const s = PP_PX_SPRITES[name];
+      const stufe = ppPxSpriteStufe(name, a.schrift);
+      const u = s && s.mono ? ppPxSpriteGefaerbtUrl(name, a.farbe, stufe) : ppPxSpriteUrl(name, stufe);
+      if (u) {
+        st.backgroundImage = `url(${u})`;
+        st.backgroundSize = '1em 1em'; st.backgroundRepeat = 'no-repeat'; st.backgroundPosition = 'center';
+        st.color = 'transparent'; st.textShadow = 'none';
+        st.imageRendering = 'pixelated';
+      }
+    }
+    if (a.emoji) {
+      const u = ppPxEmojiUrl(a.emoji, a.schrift);
+      if (u) {
+        st.backgroundImage = `url(${u})`;
+        st.backgroundSize = '1.1em 1.1em'; st.backgroundRepeat = 'no-repeat'; st.backgroundPosition = 'center';
+        st.color = 'transparent'; st.textShadow = 'none'; st.imageRendering = 'pixelated';
+      }
+    }
+    if (ebenen.length) {
+      st.backgroundImage = ebenen.join(', ');
+      st.backgroundSize = '100% 100%'; st.backgroundRepeat = 'no-repeat';
+      st.backgroundPosition = 'center'; st.backgroundOrigin = 'border-box';
+      st.imageRendering = 'pixelated';
+      if (a.rund || a.partikel) st.borderRadius = '0';
+    }
+    if (a.text) {
+      // Pixelschrift, weicher Schein → harte 2-px-Kontur in der dunkelsten Schattenfarbe.
+      const farben = _ppTeile(a.text.schatten).map(t => (t.match(/(rgba?\([^)]*\)|#[0-9a-f]{3,8})/i) || [])[1]).filter(Boolean);
+      const dunkel = farben.map(ppFarbe).sort((p, q) => (p[0] + p[1] + p[2]) - (q[0] + q[1] + q[2]))[0] || [0, 0, 0, 1];
+      const k = `rgb(${dunkel[0]},${dunkel[1]},${dunkel[2]})`;
+      st.fontFamily = PP_PX_SCHRIFT;
+      st.fontSize = Math.round(a.text.groesse * 0.72) + 'px';
+      st.textShadow = `2px 0 0 ${k}, -2px 0 0 ${k}, 0 2px 0 ${k}, 0 -2px 0 ${k}, 3px 3px 0 ${k}`;
+      st.webkitFontSmoothing = 'none';
+    }
+    if (a.ohneSchatten) st.boxShadow = 'none';
+    if (a.filter !== undefined) st.filter = a.filter;
+    if (a.schein && a.w > 0 && a.h > 0) {
+      // Halo als erstes Kind, hinter dem Inhalt.
+      const rand = Math.min(40, Math.max(3, Math.round(a.schein.blur * 0.8)));
+      const u = ppPxHaloUrl(a.schein.farbe, a.w, a.h, rand, a.rund || !!a.zeichen || !!a.emoji);
+      if (u) {
+        const halo = document.createElement('i');
+        halo.setAttribute('aria-hidden', 'true');
+        halo.className = 'pp-px-halo';
+        halo.style.cssText = `position:absolute;left:${-rand}px;top:${-rand}px;width:${a.w + 2 * rand}px;height:${a.h + 2 * rand}px;`
+          + `background:url(${u}) center/100% 100% no-repeat;image-rendering:pixelated;pointer-events:none;z-index:-1;`;
+        _ppPxErledigt.add(halo);
+        if (getComputedStyle(el).position === 'static') st.position = 'relative';
+        el.insertBefore(halo, el.firstChild);
+      }
+    }
+  }
+}
+
+/**
+ * Beliebiges Emoji als Pixel-Sprite: klein auf ein Canvas gezeichnet
+ * (10–28 Pixel je nach Darstellungsgroesse), Kanten per Bayer-Matrix
+ * gedithert, eine dunkle Kontur fuer den Pixelart-Umriss — dann hart
+ * vergroessert. Rueckfall fuer alle Zeichen ohne eigenes Sprite.
+ */
+const PP_EMOJI_SCHRIFT = '"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji","Twemoji Mozilla",sans-serif';
+function ppPxEmojiUrl(z, groessePx) {
+  const n = Math.max(10, Math.min(28, Math.round((groessePx || 16) / 2.4)));
+  return ppPxBild('em:' + n + ':' + z, n + 2, n + 2, (setze) => {
+    const c = document.createElement('canvas');
+    c.width = n; c.height = n;
+    const ctx = c.getContext('2d');
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.font = `${Math.round(n * 0.92)}px ${PP_EMOJI_SCHRIFT}`;
+    ctx.fillText(z, n / 2, n / 2 + n * 0.06);
+    const d = ctx.getImageData(0, 0, n, n).data;
+    const deckt = (x, y) => x >= 0 && y >= 0 && x < n && y < n && d[(y * n + x) * 4 + 3] > 0
+      && Math.pow(d[(y * n + x) * 4 + 3] / 255, 0.8) > ppBayer(x, y);
+    for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
+      if (!deckt(x, y)) continue;
+      const i = (y * n + x) * 4;
+      setze(x + 1, y + 1, [d[i], d[i + 1], d[i + 2], 1]);
+    }
+    // Kontur: leere Pixel neben gedeckten werden dunkel.
+    if (n >= 14) {
+      for (let y = -1; y <= n; y++) for (let x = -1; x <= n; x++) {
+        if (deckt(x, y)) continue;
+        if (deckt(x + 1, y) || deckt(x - 1, y) || deckt(x, y + 1) || deckt(x, y - 1)) setze(x + 1, y + 1, [24, 14, 26, 1]);
+      }
+    }
+  }, 2);
+}
+const PP_EMOJI_MUSTER = /^\p{Extended_Pictographic}(\uFE0F|\u200D\p{Extended_Pictographic}|\p{Emoji_Modifier})*$/u;
+
+/** Einfarbiges Sprite in fester Farbe (fuer Glyphen, deren Farbe aus `color` kommt). */
+function ppPxSpriteGefaerbtUrl(name, farbe, stufe = 0) {
+  const s = PP_PX_SPRITES[name];
+  if (!s) return '';
+  const f = ppFarbe(farbe);
+  const zz = _ppSpriteRaster(s, stufe);
+  const h = zz.length, w = Math.max(...zz.map(z => z.length));
+  const hell = _ppMisch(f, [255, 255, 255], 0.5);
+  return ppPxBild('sg:' + name + ':' + stufe + ':' + f.join(','), w, h, (setze) => {
+    zz.forEach((z, y) => [...z].forEach((c, x) => {
+      if (c === '#') setze(x, y, [f[0], f[1], f[2], 1]);
+      else if (c === '+') setze(x, y, [hell[0], hell[1], hell[2], 1]);
+    }));
+  });
+}
+
+/**
+ * Pixelierer an eine Animations-Wurzel haengen: einmal sofort, dann fuer
+ * jeden spaeter eingehaengten Knoten (Phasen, die erst nach Zeit
+ * erscheinen). Gibt die Abmeldung zurueck.
+ */
+function ppPixeliererAnhaengen(wurzel) {
+  if (!wurzel) return () => {};
+  try { ppPixelieren(wurzel); } catch (err) { console.warn('[Pixelierer]', err?.message); }
+  let wartend = null;
+  const neue = new Set();
+  const beobachter = new MutationObserver((liste) => {
+    for (const m of liste) for (const n of m.addedNodes) if (n.nodeType === 1) neue.add(n);
+    if (wartend || !neue.size) return;
+    wartend = requestAnimationFrame(() => {
+      wartend = null;
+      const jetzt = Array.from(neue); neue.clear();
+      for (const n of jetzt) { try { ppPixelieren(n); } catch {} }
+    });
+  });
+  beobachter.observe(wurzel, { childList: true, subtree: true });
+  return () => { beobachter.disconnect(); if (wartend) cancelAnimationFrame(wartend); };
+}
+window.ppPixeliererAnhaengen = ppPixeliererAnhaengen;
+
 window.PxZeichen = PxZeichen;
 window.pxHintergrund = pxHintergrund;
 window.ppPxVerlaufUrl = ppPxVerlaufUrl;
