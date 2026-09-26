@@ -208,7 +208,7 @@ async function _explode(ctx, excludeKey) {
   }
 
   } finally {
-    engine.endMultiHit();
+    await engine.endMultiHit();
   }
 
   engine.log('explosivo_sword', {

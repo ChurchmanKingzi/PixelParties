@@ -141,7 +141,7 @@ module.exports = {
           );
         }
       }
-    } finally { engine.endMultiHit(); }
+    } finally { await engine.endMultiHit(); }
 
     engine.log('ft_fists', {
       player: gs.players[pi]?.username, hits: ids.length,

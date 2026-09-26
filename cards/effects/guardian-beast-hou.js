@@ -148,7 +148,7 @@ module.exports = {
           );
         }
       }
-    } finally { engine.endMultiHit(); }
+    } finally { await engine.endMultiHit(); }
 
     engine.log('guardian_beast_hou_strike', {
       player: engine.gs.players[pi]?.username, hits: tgtIds.length, deleted: deleted.length,

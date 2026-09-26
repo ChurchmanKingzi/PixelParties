@@ -187,7 +187,7 @@ module.exports = {
           );
         }
         } finally {
-          engine.endMultiHit();
+          await engine.endMultiHit();
         }
       } finally {
         gs._deferGameOverCheck = Math.max(0, (gs._deferGameOverCheck || 1) - 1);

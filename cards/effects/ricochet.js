@@ -244,7 +244,7 @@ module.exports = {
           schaden = Math.ceil(schaden / 2);
         }
       } finally {
-        engine.endMultiHit();
+        await engine.endMultiHit();
         engine.loescheZielMarken(CARD_NAME);   // v1150: Kette abgefeuert
       }
 

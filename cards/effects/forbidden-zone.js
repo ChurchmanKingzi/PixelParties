@@ -194,7 +194,7 @@ module.exports = {
         });
       }
       } finally {
-        engine.endMultiHit();
+        await engine.endMultiHit();
       }
 
       // ── Step 5: route the spell into the deleted pile ──
