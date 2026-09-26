@@ -47,10 +47,21 @@ cv.paste(rain, (NW - rain.shape[1]) // 2, FLOOR - rain.shape[0] + 1)
 BY = 12 + ad.shape[0] - 2
 pos = {'saras': (saras, 4, 50), 'shishi': (shishi, 46, 46), 'brammi': (brammi, 92, 48),
        'pavi': (pavi, 2, 90), 'laki': (laki, 55, FLOOR - laki.shape[0] - 8), 'vinny': (vinny, 92, 94)}
+# Jeder Faden läuft von der Tribüne eines Puppenspielers schräg zur Puppe (Pixel-Linie in Fadenfarben)
+def line(x0, y0, x1, y1):
+    n = max(abs(x1 - x0), abs(y1 - y0))
+    for i in range(n + 1):
+        x = round(x0 + (x1 - x0) * i / n); y = round(y0 + (y1 - y0) * i / n)
+        cv.px(x, y, STR[i % 2])
+AD_X0, AD_X1 = 2 + 4, 2 + ad.shape[1] - 4                 # Unterkante der linken Tribüne
+FE_X0, FE_X1 = NW - fecta.shape[1] - 2 + 4, NW - 2 - 4    # Unterkante der rechten Tribüne
+owner = {'saras': 'ad', 'pavi': 'ad', 'shishi': 'ad', 'brammi': 'fe', 'vinny': 'fe', 'laki': 'fe'}
 for k, (s, x, y) in pos.items():
     w = s.shape[1]
-    for fx in (2, w // 2, w - 3):
-        string(x + fx, BY, y + top_of(s, fx))
+    lo, hi = (AD_X0, AD_X1) if owner[k] == 'ad' else (FE_X0, FE_X1)
+    for j, fx in enumerate((2, w // 2, w - 3)):
+        bx = lo + (hi - lo) * (j + 1) // 4
+        line(bx, BY, x + fx, y + top_of(s, fx))
 for k, (s, x, y) in pos.items():
     put(s, x, y)
 put(ad, 2, 12, sh=0.3); put(fecta, NW - fecta.shape[1] - 2, 12, sh=0.3)

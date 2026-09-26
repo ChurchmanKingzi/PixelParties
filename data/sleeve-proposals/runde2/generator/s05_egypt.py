@@ -4,14 +4,14 @@ MotiveEgypt.xcf (Repo PixelPartiesSprites): Ren, Auge von Ren, Ushabti, Royal Mu
 goldene Urnen, Ziegelwand und Sandplatte."""
 import numpy as np
 from kit import Canvas, up, flip, silhouette, save
-from xcfkit import sprite, parts, split_x
+from xcfkit import sprite, parts, split_x, scene_sprite
 
 B = 'MotiveEgypt'
 NW, NH = 125, 175
 cv = Canvas(NW, NH)
 
 wall = sprite('eg_wall', B, [185])[0:16, 0:16]          # Ziegelwand (Periode 16×8 → 16×16-Kachel)
-sand = sprite('eg_sand', B, [93])[0:16, 0:16]           # Sandplatte der Eye-of-Ren-Karte
+sand = scene_sprite('eg_eyeofren_wall', B, 61, (431, 332), (0, 0, 76, 10))   # Mauer der Eye-of-Ren-Karte
 for y in range(NH):
     for x in range(NW):
         cv.a[y, x] = wall[y % 16, x % 16, :3]
@@ -35,7 +35,7 @@ def put(s, x, y, fl=False, sh=0.45, anchor='tl'):
 PY0, PY1 = 4, 44
 for y in range(PY0, PY1):
     for x in range(4, NW - 4):
-        cv.a[y, x] = sand[y % 16, x % 16, :3]
+        cv.a[y, x] = sand[2 + y % 4, 8 + x % 8, :3]
 for x in range(3, NW - 3):
     cv.a[PY0 - 1, x] = (60, 30, 10); cv.a[PY1, x] = (60, 30, 10)
 for y in range(PY0 - 1, PY1 + 1):
