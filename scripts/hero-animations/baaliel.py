@@ -41,16 +41,22 @@ def menace(i):
     return 22 <= i % N < 32
 
 
+def is_arm(x, oy):
+    """Ausgestreckte Arme (ohne Schulter)."""
+    return 17 <= oy <= 20 and (x <= 8 or x >= 20)
+
+
+def arm_lift(x, i):
+    """Hubhöhe pro Spalte: an der Schulter 0, an der Faust bis 2 px."""
+    reach = (9 - x) / 5 if x <= 9 else (x - 19) / 4
+    return int(round(min(1.0, max(0.0, reach)) * 2.0 * flex(i)))
+
+
 def offset(x, y, i):
     oy = y - PT
     if oy >= 26:
         return 0, 0                                        # breitbeinig, fest
-    up = inhale(i, 1 if oy <= 15 else 0)
-    dy = -up
-    if 17 <= oy <= 20 and (x <= 9 or x >= 20):             # Arme spannen sich
-        reach = (9 - x) / 5 if x <= 9 else (x - 20) / 3.5
-        dy -= int(round(min(1.0, max(0.0, reach)) * 2.0 * flex(i)))
-    return 0, dy
+    return 0, -inhale(i, 1 if oy <= 15 else 0)
 
 
 def face(a, i):
@@ -91,8 +97,15 @@ def frame(i):
         for x in range(W):
             dx, dy = offset(x, y, i)
             sx, sy = x - dx, y - dy
-            if 0 <= sx < W and 0 <= sy < H and s[sy, sx, 3]:
+            if 0 <= sx < W and 0 <= sy < H and s[sy, sx, 3] and not is_arm(sx, sy - PT):
                 out[y, x] = s[sy, sx]
+    # Arme als Ganzes verschieben (Vorwärts-Mapping), damit nichts abgeschnitten wird
+    up = inhale(i)
+    for y in range(PT + 17, PT + 21):
+        for x in range(W):
+            if is_arm(x, y - PT) and s[y, x, 3]:
+                ty = y - up - arm_lift(x, i)
+                out[ty, x] = s[y, x]
     embers(out, i)
     return out
 
