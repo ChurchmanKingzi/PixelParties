@@ -11996,6 +11996,35 @@ body:has(.modal-overlay) .tooltip {
   50% { box-shadow: 0 0 10px rgba(100,180,255,.5); }
 }
 
+/* ★ v1448 — PIXEL-ABZEICHEN (Paket 3, `PxIcon` in app-shared.jsx).
+   Das Symbol folgt der Schriftgroesse wie das Emoji vorher. In den runden
+   Plaketten fuellt es 75 %: die Plakette hat ein 12er-Raster, die Symbole
+   ein 9er — so sind die Pixel beider gleich gross. Die Plaketten selbst
+   erzeugt `ppPxRegelnAnwenden` aus den Farben dieser Datei. */
+.pp-px-icon {
+  display: inline-block;
+  flex: none;
+  width: 1em;
+  height: 1em;
+  vertical-align: middle;
+  object-fit: contain;
+  image-rendering: pixelated;
+  pointer-events: none;
+}
+.status-badge > .pp-px-icon,
+.buff-icon > .pp-px-icon,
+.status-action-blocked-icon > .pp-px-icon,
+.status-stealth-icon > .pp-px-icon,
+.status-damage-proof-icon > .pp-px-icon,
+.status-cheat-chair-icon > .pp-px-icon {
+  width: 75%;
+  height: 75%;
+}
+@keyframes ppPxBuffPuls {
+  0%, 100% { filter: drop-shadow(1px 1px 0 rgba(0,0,0,.75)); }
+  50% { filter: drop-shadow(1px 1px 0 rgba(0,0,0,.75)) brightness(1.22); }
+}
+
 /* ===== CLOUD GATHER ANIMATION ===== */
 
 @keyframes cloudGather {

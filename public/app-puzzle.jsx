@@ -4,7 +4,7 @@
 //  game-engine-compatible data structures.
 // ═══════════════════════════════════════════
 const { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo, useContext } = React;
-const { AppContext, cardImageUrl, VolumeControl, CARDS_BY_NAME, CardTooltipContent, useCardTooltip, StatusBadges, BuffColumn, GameTooltip, socket } = window;
+const { AppContext, cardImageUrl, VolumeControl, CARDS_BY_NAME, CardTooltipContent, useCardTooltip, StatusBadges, BuffColumn, GameTooltip, socket, PxIcon } = window;
 
 // Groesse des Galerie-Sichtfensters und der Nachlade-Schwelle. 120 deckt
 // bei 3 bzw. 5 Spalten mehrere Bildschirmhoehen ab, ist also nie sichtbar
@@ -3520,7 +3520,7 @@ function PuzzleCreator() {
                     const l = allianceLinks.find(x => x.allySi === si && x.allyHi === hi);
                     if (!l) return null;
                     return <div className="status-immune-icon status-alliance-icon"
-                      title={`Allied with ${l.userName}`}>🤝</div>;
+                      title={`Allied with ${l.userName}`}><PxIcon z="🤝" /></div>;
                   })()}
                 </> : <div className="board-zone-empty">Hero</div>}
               </div>
