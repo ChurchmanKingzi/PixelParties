@@ -177,14 +177,14 @@ def shand(ang_deg,L,w0):
             d_=math.hypot(x-mx,y-my)
             if 2.2<d_<3.6: cv.px(x,y,SILV[3] if (x-mx)+(y-my)<0 else SILV[1])
             elif d_<=2.2: cv.px(x,y,WINE[1])
-shand(0,RIM0-30,1.6)     # minute hand -> 12
-shand(-90,RIM0-34,2.2)   # hour hand -> 9
+shand(-60,RIM0-28,1.6)   # minute hand -> 10  (11:50)
+shand(-5,RIM0-46,1.9)    # hour hand: just before 12, shorter
 # centre pivot: small skull like on the card
 skull(CX,CY+1)
 # ---------------- temple platform ----------------
 TOP=250
 PH=np.zeros((H,W),np.float32); PM=np.zeros((H,W),np.int32); PMk=np.zeros((H,W),bool)
-for (y0,h,hw) in [(TOP,16,70),(TOP+16,16,96),(TOP+32,16,124)]:
+for (y0,h,hw) in [(TOP,16,70),(TOP+16,16,96),(TOP+32,H-(TOP+32),126)]:
     for y in range(y0,min(H,y0+h)):
         for x in range(max(0,CX-hw),min(W,CX+hw)):
             PMk[y,x]=True; ly=y-y0

@@ -190,7 +190,8 @@ def burst(cx,cy,r1,r2,c,cd):
             if d<=rr: cv.px(x,y,c)
             elif d<=rr+1.2: cv.px(x,y,cd)
 burst(46,34,20,30,(255,226,90),(150,60,40))
-draw_text(cv,'POP!',16,46,24,(255,255,255),center=True,outline_c=(150,60,40),shadow=(1,1))
+_pm=text_mask('POP!',16)
+draw_text(cv,'POP!',16,46,34-_pm.shape[0]//2,(255,255,255),center=True,outline_c=(150,60,40),shadow=(1,1))   # centred in the burst
 # ---------- label ----------
 LB=[(150,120,86),(206,180,136),(236,218,178),(248,236,206)]
 lx0,lx1,ly0,ly1=74,178,196,252
