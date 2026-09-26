@@ -1,0 +1,10 @@
+{
+  "hero": "Elana, the Rocky Rebel",
+  "sheet": "elana-the-rocky-rebel.png",
+  "frameWidth": 25,
+  "frameHeight": 25,
+  "frames": 32,
+  "frameMs": 80,
+  "loop": true,
+  "layout": "horizontal"
+}
