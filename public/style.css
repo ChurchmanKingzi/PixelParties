@@ -23355,16 +23355,38 @@ body.pp-dialog-offen .foil-diamond-rare:not(.modal-overlay *) {
 /* ── Kartenflug-Stil 'flammen' (Perilous Journey): Pixel-Flammen ── */
 .pt-pixelflamme {
   position: absolute; display: block; pointer-events: none; z-index: 2;
-  background-repeat: no-repeat; background-size: 300% 100%;
+  background-repeat: no-repeat; background-size: 500% 100%;
   image-rendering: pixelated; image-rendering: crisp-edges;
-  animation-name: ptPixelFlamme; animation-timing-function: steps(3, jump-none);
-  animation-iteration-count: infinite;
+  transform-origin: 50% 100%;
+  animation-name: ptPixelFlamme, ptFlammeTanz;
+  animation-timing-function: steps(5, jump-none), steps(4, end);
+  animation-iteration-count: infinite, infinite;
+}
+/* Abgeloeste, aufsteigende Flamme (fliegt nicht mit der Karte). */
+.pt-zuengel {
+  z-index: 10199;
+  animation-name: ptPixelFlamme, ptZuengel;
+  animation-duration: 180ms, 540ms;
+  animation-timing-function: steps(5, jump-none), steps(6, end);
+  animation-iteration-count: infinite, 1;
+  animation-fill-mode: none, forwards;
 }
 .pt-glutpixel {
   position: fixed; display: block; pointer-events: none; z-index: 10199;
   animation-name: ptGlutPixel; animation-timing-function: steps(5, end); animation-fill-mode: forwards;
 }
 @keyframes ptPixelFlamme { 0% { background-position: 0% 0; } 100% { background-position: 100% 0; } }
+@keyframes ptFlammeTanz {
+  0%   { transform: translate(0, 0) scale(1, 1); }
+  25%  { transform: translate(-1px, -3px) scale(.9, 1.22) skewX(-6deg); }
+  50%  { transform: translate(1px, -1px) scale(1.08, .9) skewX(4deg); }
+  75%  { transform: translate(0, -4px) scale(.95, 1.3) skewX(7deg); }
+  100% { transform: translate(0, 0) scale(1, 1); }
+}
+@keyframes ptZuengel {
+  0%   { opacity: 1; transform: translate(0, 0) scale(1); }
+  100% { opacity: 0; transform: translate(var(--zx), -26px) scale(.4, .7); }
+}
 @keyframes ptGlutPixel {
   0% { opacity: 1; transform: translate(0, 0); }
   100% { opacity: 0; transform: translate(var(--gsx), var(--gsy)); }
