@@ -5837,15 +5837,81 @@ function tutorialStartsWithAntonia(num) {
  * nach — das Highlight erbt Neigung, Skalierung und Fluchtpunkt.
  *
  * Ziele AUSSERHALB der Ebene (Handkarten, Buttons, Menues) haben keine
- * Projektion; fuer sie bleibt es beim einfachen Bildschirm-Rechteck.
+ * Projektion; fuer sie bleibt es beim einfachen Bildschirm-Rechteck —
+ * AUSSER das Element ist selbst gedreht (Handkarten im Faecher, siehe
+ * `highlightZiel`). Dann gilt dasselbe wie oben im Kleinen: die Huelle
+ * waere zu gross und stuende gerade. Gemessen wird deshalb die
+ * Layout-Groesse, und Drehung samt Skalierung reisen mit.
  */
 const TB_FLAT_CLASS = 'tb-flat-probe';
+
+/**
+ * Welches Element ein Highlight wirklich nachzeichnet.
+ *
+ * Handkarten werden per `.hand-slot` (bzw. `.creation-slot`) adressiert
+ * — dort haengen `data-card-name` und `data-hand-idx`. Der PLATZ ist
+ * aber nicht die Karte: seit dem Handfaecher (v1233/v1242) ist er
+ * schmaler als seine Karte (die Nachbarn ueberlappen), um den Bogen
+ * verschoben und traegt Plakette & Co. Sichtbar ist die `.board-card`
+ * darin, und nur die hat Groesse und Neigung der echten Karte. Der
+ * Klon des Platzes landete ausserdem ausserhalb von `.game-hand`, wo
+ * die Handkarten-Groesse (`--hand-card-w/h`) nicht greift — heraus kam
+ * eine geschrumpfte Brettkarte links oben in einem zu schmalen Kasten
+ * (Als Befund 26.9., Tutorial 1, Seite 3). */
+function highlightZiel(el) {
+  if (el.matches && el.matches('.hand-slot, .creation-slot')) {
+    const karte = el.querySelector(':scope > .board-card');
+    if (karte) return karte;
+  }
+  return el;
+}
+
+/** Eigene Drehung eines Elements in Grad: `rotate` (Faecherwinkel) plus
+ *  der Drehanteil von `transform` (Zieh-Neigung, `.flipped`). */
+function eigeneDrehung(el) {
+  const cs = getComputedStyle(el);
+  let grad = 0;
+  const rot = cs.rotate;
+  if (rot && rot !== 'none') {
+    // Nur die z-Drehung kommt vor; "12deg" bzw. "z 12deg".
+    const m = /(-?[\d.]+)deg/.exec(rot);
+    if (m) grad += parseFloat(m[1]);
+  }
+  const tf = cs.transform;
+  if (tf && tf !== 'none') {
+    const m = /matrix\(([^)]+)\)/.exec(tf);
+    if (m) {
+      const [a, b] = m[1].split(',').map(parseFloat);
+      grad += Math.atan2(b, a) * 180 / Math.PI;
+    }
+  }
+  return grad;
+}
+
 function measureHighlight(el) {
   const plane = el.closest && (el.closest('.board-plane') || el.closest('.pz-board-plane'));
   const clip = plane && plane.parentElement;
   if (!plane || !clip) {
     const r = el.getBoundingClientRect();
-    return { flat: true, rect: { left: r.left, top: r.top, width: r.width, height: r.height } };
+    const w = el.offsetWidth, h = el.offsetHeight;
+    const grad = w && h ? eigeneDrehung(el) : 0;
+    if (!w || !h || Math.abs(grad) < 0.05) {
+      return { flat: true, rect: { left: r.left, top: r.top, width: r.width, height: r.height } };
+    }
+    // Gedrehtes Element: die Mitte der Huelle IST die Kartenmitte (egal
+    // um welchen Punkt gedreht wurde), die Groesse kommt aus dem Layout.
+    // Eine zusaetzliche Skalierung (Hover-Zoom) steckt im Verhaeltnis von
+    // Huelle zu gedrehter Layout-Box.
+    const rad = grad * Math.PI / 180;
+    const huelle = w * Math.abs(Math.cos(rad)) + h * Math.abs(Math.sin(rad));
+    const skala = huelle > 0 ? r.width / huelle : 1;
+    const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+    return {
+      flat: true,
+      rect: { left: cx - w / 2, top: cy - h / 2, width: w, height: h },
+      drehung: grad,
+      skala,
+    };
   }
   // Transform kurz aus -> beide Rects sind jetzt Layout-Koordinaten.
   clip.classList.add(TB_FLAT_CLASS);
@@ -6000,10 +6066,14 @@ function TextBox() {
       const sel = typeof h === 'string' ? h : h.selector;
       const pulse = typeof h === 'object' && h.pulse;
       if (!sel) continue;
-      document.querySelectorAll(sel).forEach(el => {
+      document.querySelectorAll(sel).forEach(treffer => {
+        const el = highlightZiel(treffer);
         const m = measureHighlight(el);
         const box = m.flat ? m.rect : m.local;
-        if (box.width > 0 && box.height > 0) rects.push({ ...m, pulse, html: el.outerHTML });
+        // Handkarten: die Stapelfolge des Faechers (linke Karte ueber der
+        // rechten, `--fan-z`) gilt auch fuer ihre Highlights.
+        const z = parseInt(getComputedStyle(el).zIndex, 10);
+        if (box.width > 0 && box.height > 0) rects.push({ ...m, pulse, handkarte: el !== treffer, stapel: Number.isFinite(z) ? z : 0, html: el.outerHTML });
       });
     }
     setHighlightRects(rects);
@@ -6126,15 +6196,31 @@ function TextBox() {
   return (
     <div className={'textbox-overlay' + (fading ? ' textbox-fading' : '')}>
       {highlightRects.map((h, i) => {
+        const gedreht = h.flat && (h.drehung != null || h.handkarte);
         const inner = (
-          <div className={'textbox-highlight' + (h.pulse ? ' textbox-highlight-pulse' : '')}
-            style={h.flat
+          <div className={'textbox-highlight' + (h.pulse ? ' textbox-highlight-pulse' : '') + (h.handkarte ? ' textbox-highlight-hand' : '')}
+            style={gedreht
+              ? { position: 'absolute', left: 0, top: 0, width: '100%', height: '100%', pointerEvents: 'none' }
+              : h.flat
               ? { position: 'fixed', left: h.rect.left, top: h.rect.top,
                   width: h.rect.width, height: h.rect.height, pointerEvents: 'none' }
               : { position: 'absolute', left: h.local.left, top: h.local.top,
                   width: h.local.width, height: h.local.height, pointerEvents: 'none' }}>
             <div className="textbox-highlight-clone" dangerouslySetInnerHTML={{ __html: h.html }} />
           </div>
+        );
+        // Gedrehtes Ziel / Handkarte: Drehung und Skalierung sitzen auf
+        // einer eigenen Huelle — die Puls-Animation schreibt `transform`
+        // auf `.textbox-highlight` und wuerde sie dort ueberschreiben. Die
+        // Huelle traegt auch die Stapelfolge des Faechers.
+        if (gedreht) return (
+          <div key={i} style={{
+            position: 'fixed',
+            left: h.rect.left, top: h.rect.top,
+            width: h.rect.width, height: h.rect.height,
+            transform: `rotate(${h.drehung || 0}deg) scale(${h.skala || 1})`,
+            pointerEvents: 'none', zIndex: 90001 + h.stapel,
+          }}>{inner}</div>
         );
         if (h.flat) return <div key={i} style={{ display: 'contents' }}>{inner}</div>;
         // Projektionskette der Ebene nachbauen: aeusseres Fenster sitzt auf
