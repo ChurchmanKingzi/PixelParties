@@ -1,13 +1,15 @@
 # -*- coding: utf-8 -*-
 """Idle-Animation für Beato, the Butterfly Witch (21x28 + je 3 px links/rechts = 27x28).
 
-Elegante Hexe und Tänzerin:
-* Sie hebt sich auf der Fußspitze (Standbein streckt sich, Fuß bleibt stehen).
-* Die ausgestreckten Arme schweben wie beim Tanz im Wechsel auf und ab
-  (Hände bis 2 px, an der Schulter fest).
-* Der Rocksaum schwingt sanft mit.
+Elegante Hexe und Tänzerin – sie tanzt richtig:
+* Tanzschritt (zweimal pro Loop): Standbein links, das rechte Bein winkelt an
+  und kickt zur Seite (sie hebt sich dabei auf die Spitze), kleiner Hüpfer,
+  Standbeinwechsel, dasselbe gespiegelt. Die Beine werden pro Frame neu
+  gezeichnet, der Standfuß bleibt am Boden.
+* Der Oberkörper wiegt sich über das Standbein, der Arm auf der Kick-Seite
+  schwingt hoch, der Rocksaum schwingt gegenläufig nach.
+* Beide Augen offen; ab und zu zwinkert sie, einmal blinzelt sie.
 * Goldene Schmetterlinge umkreisen sie flatternd und ziehen eine Glitzerspur.
-* Das offene (türkise) Auge blinzelt ab und zu – das zwinkernde bleibt zu.
 """
 import math
 import sys
@@ -24,11 +26,69 @@ H, W = BASE.shape[:2]
 N = 48
 
 SKIN, LASH = rgb('f7bc97'), rgb('000200')
+EYE_R = [((11, 12), rgb('031f35')), ((12, 12), rgb('00fbfc')),      # rechtes Auge geöffnet
+         ((11, 13), rgb('33576d')), ((12, 13), rgb('f2ffff'))]
+OUT = rgb('000200')
+LEGS = {'L': (6, rgb('f4f7f3'), rgb('474946')),       # (linke Spalte, Strumpf, Schuh)
+        'R': (10, rgb('474946'), rgb('1a0607'))}
 
 
-def rise(i):
-    """Auf die Fußspitze heben (0 / -1)."""
-    return -1 if 6 <= i % 24 < 17 else 0
+# ---------------------------------------------------------------- Tanz
+def step(i):
+    """Standbein und Pose des Spielbeins: (stand, spiel_pose)."""
+    t = i % 24
+    if t < 6:
+        return 'L', 'kurz'
+    if t < 11:
+        return 'L', 'kick'
+    if t == 11:
+        return None, 'kurz'                                  # Hüpfer
+    if t < 18:
+        return 'R', 'kurz'
+    if t < 23:
+        return 'R', 'kick'
+    return None, 'kurz'
+
+
+def body_dy(i):
+    stand, pose = step(i)
+    if stand is None:
+        return -1                                            # in der Luft
+    return -1 if pose == 'kick' and 1 <= (i % 24) % 12 - 6 + 1 <= 4 else 0
+
+
+def sway(i):
+    """Oberkörper wiegt sich über das Standbein (-1 links, +1 rechts)."""
+    return -int(round(1.1 * math.sin(2 * math.pi * (i + 2) / 24)))
+
+
+def draw_leg(out, name, pose, dy, dx, grounded):
+    x0, stock, shoe = LEGS[name]
+    x0 += PL
+    d = -1 if name == 'L' else 1                              # nach außen
+    hip = 25 + dy
+    rows = []
+    if pose == 'lang':
+        for y in range(hip, 26):
+            rows.append((y, dx if y == hip and dx else 0, 'strumpf'))
+        rows += [(26, 0, 'schuh'), (27, 0, 'spitze')]
+        if not grounded:
+            rows = [(y - 1, o, k) for y, o, k in rows]
+    elif pose == 'kurz':
+        rows = [(hip, dx, 'schuh'), (hip + 1, dx, 'spitze')]
+    else:                                                     # Kick zur Seite
+        rows = [(hip, dx, 'strumpf'), (hip + 1, dx + d, 'strumpf'),
+                (hip + 2, dx + 2 * d, 'schuh'), (hip + 3, dx + 2 * d, 'spitze')]
+    for y, o, kind in rows:
+        xs = x0 + o
+        if kind == 'spitze':
+            pix = [(1, OUT), (2, OUT)]
+        else:
+            fill = stock if kind == 'strumpf' else shoe
+            pix = [(0, OUT), (1, fill), (2, fill), (3, OUT)]
+        for k, c in pix:
+            if 0 <= y < H and 0 <= xs + k < W:
+                out[y, xs + k] = c
 
 
 def is_arm(ox, oy):
@@ -36,23 +96,32 @@ def is_arm(ox, oy):
 
 
 def arm_lift(ox, i):
+    """Arm auf der Kick-Seite schwingt hoch (rechts um Frame 8, links um Frame 20)."""
     if ox <= 4:
-        reach, ph = (5 - ox) / 4, 0.0
+        reach, ph = (5 - ox) / 4, -0.654 + math.pi
     else:
-        reach, ph = (ox - 15) / 4, math.pi
-    lift = int(round(1 + wave(i, 24, ph)))                 # 0..2, im Wechsel
+        reach, ph = (ox - 15) / 4, -0.654
+    lift = int(round(1 + wave(i, 24, ph)))                 # 0..2
     return int(round(lift * min(1.0, reach)))
 
 
-def is_foot(ox, oy):
-    """Standbein (Fußspitze) bleibt stehen."""
-    return oy >= 26 and 5 <= ox <= 10
-
-
 def skirt_dx(oy, i):
-    if not 20 <= oy <= 23:
+    if not 20 <= oy <= 24:
         return 0
-    return int(round(1.3 * (oy - 19) / 4 * wave(i, 24, 1.1)))
+    return -int(round(1.2 * min(1.0, (oy - 19) / 4) * math.sin(2 * math.pi * (i - 1) / 24)))
+
+
+def eyes(a, i):
+    t = i % N
+    if t in (30, 31):                                        # blinzeln (beide)
+        for x in (7, 8, 11, 12):
+            a[12, x + PL] = SKIN
+            a[13, x + PL] = LASH
+        return
+    if 18 <= t < 23 or 42 <= t < 47:                         # zwinkern (Original)
+        return
+    for (x, y), c in EYE_R:
+        a[y, x + PL] = c
 
 
 # ---------------------------------------------------------------- Schmetterlinge
@@ -91,36 +160,32 @@ def draw_butterfly(out, x, y, i, flap_off, front):
 
 def frame(i):
     s = BASE.copy()
-    if i % N in (30, 31, 44):                              # Blinzeln (türkises Auge)
-        for x in (7, 8):
-            s[12, x + PL] = SKIN
-            s[13, x + PL] = LASH
+    eyes(s, i)
     out = np.zeros_like(s)
-    r = rise(i)
-    # Standfuß fest, das Bein darüber streckt sich beim Anheben
-    for oy in range(SH):
+    dy, dx = body_dy(i), sway(i)
+    stand, pose = step(i)
+    # Beine neu zeichnen (Standbein zuerst, Spielbein davor)
+    for name in ('L', 'R'):
+        if name == stand:
+            draw_leg(out, name, 'lang', dy, dx, True)
+    for name in ('L', 'R'):
+        if name != stand:
+            draw_leg(out, name, pose, dy, dx, False)
+    # Körper (ohne Arme und Original-Beine): wiegt sich, Rock schwingt nach
+    for oy in range(25):
         for ox in range(SW):
-            if s[oy, ox + PL, 3] and is_foot(ox, oy):
-                out[oy, ox + PL] = s[oy, ox + PL]
-    if r < 0:
-        for ox in range(5, 11):
-            if s[25, ox + PL, 3]:
-                out[25, ox + PL] = s[25, ox + PL]
-    # Körper (ohne Arme): hebt sich, der Rocksaum schwingt
-    for oy in range(SH):
-        for ox in range(SW):
-            if not s[oy, ox + PL, 3] or is_foot(ox, oy) or is_arm(ox, oy):
+            if not s[oy, ox + PL, 3] or is_arm(ox, oy):
                 continue
-            ty, tx = oy + r, ox + PL + skirt_dx(oy, i)
+            ty, tx = oy + dy, ox + PL + dx + skirt_dx(oy, i)
             if 0 <= ty < H and 0 <= tx < W:
                 out[ty, tx] = s[oy, ox + PL]
-    # Arme: schweben im Wechsel (als Ganzes, an der Schulter verbunden)
+    # Arme: schwingen im Tanz (als Ganzes, an der Schulter verbunden)
     for oy in range(14, 19):
         for ox in range(SW):
             if s[oy, ox + PL, 3] and is_arm(ox, oy):
-                ty = oy + r - arm_lift(ox, i)
-                if 0 <= ty < H:
-                    out[ty, ox + PL] = s[oy, ox + PL]
+                ty = oy + dy - arm_lift(ox, i)
+                if 0 <= ty < H and 0 <= ox + PL + dx < W:
+                    out[ty, ox + PL + dx] = s[oy, ox + PL]
     # Schmetterlinge mit Glitzerspur
     for b in BUTTERFLIES:
         x, y, front = butterfly_pos(b, i)
