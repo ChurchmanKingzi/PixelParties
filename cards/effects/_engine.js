@@ -753,9 +753,10 @@ class GameEngine {
     // Cleared at turn start by the per-turn cleanup block alongside
     // Luna Kiai's `_revealedHandIndices`.
     this.registerHandIndexedField('_handCostReductions', { kind: 'value' });
-    // PERMANENT per-instance cost reductions (Lunatic Cycle - New
-    // Moon's searched card "Cost becomes 4 while it remains in your
-    // hand"). Same lookup/remap semantics as `_handCostReductions` —
+    // PERMANENT per-instance cost reductions (frueher Lunatic Cycle -
+    // New Moon; die nutzt seit Als Befund 26.9. das Zug-Feld
+    // `_handCostReductions`, ihr Rabatt gilt nur „for the rest of the
+    // turn"). Same lookup/remap semantics as `_handCostReductions` —
     // follows the physical copy through hand splices/reorders and
     // drops the entry the moment the card leaves hand — but it is NOT
     // in the per-turn cleanup block, so it survives turn boundaries

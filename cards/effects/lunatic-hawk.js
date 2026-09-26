@@ -22,16 +22,67 @@
 //  of each of the controller's turns while ≥5
 //  (the engine's _second-action-shared lifecycle
 //  hooks handle fizzle / cleanup).
+//
+//  ★ Tier 5 greift auch im Zug der Beschwoerung
+//  (Als Befund 26.9.): wird Hawk selbst mit der
+//  ersten Aktion der Action Phase beschworen und
+//  liegen ≥5 verschiedene Lunatic Cycles, muss die
+//  zweite Aktion sofort da sein — genau wie bei
+//  Duigno. Bisher gab es den Zuschlag NUR in
+//  `onTurnStart`; der war zu dem Zeitpunkt laengst
+//  vorbei, und die Phase lief nach der ersten
+//  Aktion normal ab. Jetzt wird zusaetzlich beim
+//  Beschwoeren (`onPlay`), zu Beginn der Action
+//  Phase und beim Erreichen von Stufe 5 mitten im
+//  Zug (5. Lunatic Cycle kommt aufs Brett)
+//  vergeben. Der gemeinsame `onActionUsed`-Hook
+//  haelt den Spieler danach in der Action Phase.
 // ═══════════════════════════════════════════
 
 const { hasCardType } = require('./_hooks');
 const {
   countDistinctLunaticCycle,
   isLunaticCreature,
+  isLunaticCycle,
 } = require('./_lunatic-shared');
 const { secondActionGrant, secondActionHooks } = require('./_second-action-shared');
 
 const CARD_NAME = 'Lunatic Hawk';
+const AKTIONSPHASE = 3;
+
+/**
+ * Stufe-5-Zuschlag setzen, wenn er JETZT noch etwas nuetzt: Hawk liegt
+ * im Support, es ist unser Zug, ≥5 verschiedene Lunatic Cycles liegen
+ * und die zweite Aktion der Action Phase ist noch erreichbar (vor der
+ * Action Phase oder hoechstens eine Aktion darin gespielt).
+ * `secondActionGrant` ist idempotent — mehrfaches Aufrufen kostet nichts.
+ */
+async function tier5Grant(ctx) {
+  const engine = ctx._engine;
+  const gs = engine.gs;
+  const inst = ctx.card;
+  if (!inst || inst.zone !== 'support') return;
+  const pi = ctx.cardOwner;
+  if (gs.activePlayer !== pi) return;                          // our turn
+  if (countDistinctLunaticCycle(engine) < 5) return;           // tier 5
+  const phase = gs.currentPhase || 0;
+  if (phase > AKTIONSPHASE) return;                            // Action Phase vorbei
+  if (phase === AKTIONSPHASE
+      && (gs.players[pi]?._actionsPlayedThisPhase || 0) > 1) return; // zweite Aktion schon weg
+  // No double-grant guard needed — `secondActionGrant` is idempotent
+  // (no-ops if THIS inst's second-action grant is already live) and
+  // ADDITIVE (a co-resident tier-4 grant on the same Hawk inst is
+  // preserved, not clobbered).
+  await secondActionGrant(ctx, {
+    sourceLabel: CARD_NAME,
+    animationType: 'soul_shard_dark_grant',
+    // "perform a second Action" — ANY Hero may cash it in, not just
+    // Hawk's host Hero (unlike Soul Shard Ba's hero-locked grant). The
+    // engine's findAdditionalActionForCard drops the per-Hero match
+    // when heroRestricted is false.
+    heroRestricted: false,
+  });
+}
 
 /** Does player `pi` control NO Creatures (support-zone Creature insts)? */
 function controlsNoCreatures(engine, pi) {
@@ -150,24 +201,22 @@ module.exports = {
 
     // ── Tier 5: persistent second Action each of the controller's turns ──
     onTurnStart: async (ctx) => {
-      const engine = ctx._engine;
-      const inst = ctx.card;
-      if (!inst || inst.zone !== 'support') return;
       if (ctx.activePlayer !== ctx.cardOwner) return;            // our turn
-      if (countDistinctLunaticCycle(engine) < 5) return;          // tier 5
-      // No double-grant guard needed — `secondActionGrant` is
-      // idempotent (no-ops if THIS inst's second-action grant is
-      // already live) and ADDITIVE (a co-resident tier-4 grant on the
-      // same Hawk inst is preserved, not clobbered).
-      await secondActionGrant(ctx, {
-        sourceLabel: CARD_NAME,
-        animationType: 'soul_shard_dark_grant',
-        // "perform a second Action" — ANY Hero may cash it in, not
-        // just Hawk's host Hero (unlike Soul Shard Ba's hero-locked
-        // grant). The engine's findAdditionalActionForCard drops the
-        // per-Hero match when heroRestricted is false.
-        heroRestricted: false,
-      });
+      await tier5Grant(ctx);
+    },
+
+    // ── Tier 5: Hawk kommt selbst aufs Brett (z.B. als erste Aktion
+    //    der Action Phase) — der Zuschlag muss noch im selben Zug greifen.
+    onPlay: async (ctx) => {
+      if (ctx.playedCard?.id !== ctx.card?.id) return;
+      await tier5Grant(ctx);
+    },
+
+    // ── Tier 5: zu Beginn jeder eigenen Action Phase neu (Stufe 5 kann
+    //    erst in der Main Phase 1 erreicht worden sein).
+    onPhaseStart: async (ctx) => {
+      if (ctx.phaseIndex !== AKTIONSPHASE) return;
+      await tier5Grant(ctx);
     },
 
     // ── Tier 4 cleanup: an UNUSED Lunatic-summon grant must not carry
@@ -198,6 +247,9 @@ module.exports = {
       const cardDB = engine._getCardDB();
       const cd = cardDB[entering.name];
       if (!cd) return;
+
+      // ── Tier 5: ein Lunatic Cycle hebt die Zahl mitten im Zug auf 5 ──
+      if (n >= 5 && isLunaticCycle(entering.name)) await tier5Grant(ctx);
 
       // ── Tier 2+: an Artifact equipped to a Hero → its controller
       //    (= you, the equipper) draws 1. Only when YOU equip. ──

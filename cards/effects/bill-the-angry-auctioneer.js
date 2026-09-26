@@ -7,6 +7,18 @@
 //  gets at most 1 Artifact from this effect.
 //  Max equips = number of other living Heroes.
 //  No gold cost.
+//
+//  ★ SPIELBEDINGUNGEN GELTEN (Als Befund 26.9.):
+//  „Artifacts that can be equipped to Heroes"
+//  heisst: nur, was JETZT legal an einen der
+//  anderen Helden darf. Bisher bot Bill jede
+//  Ausruestung an — auch „Lunatic Cycle - Full
+//  Moon" ohne Gibbous Moon auf dem Brett. Jetzt
+//  laeuft jede Wahl ueber die Engine-Anlaufstelle
+//  `canEquipCardToHero` (die `canEquipToHero`-
+//  Gates der Karten): beim Aufbau der Galerie,
+//  bei den Zielen und nochmals direkt vor dem
+//  Anlegen.
 // ═══════════════════════════════════════════
 
 const { hasCardType } = require('./_hooks');
@@ -113,17 +125,35 @@ module.exports = {
 
       const maxEquips = Math.min(2, otherHeroes.length);
 
-      // Find eligible Equipment Artifacts in deck (cost ≤ 20)
+      /** Hat Held `hi` eine freie Support-Zone? */
+      const hasFreeZone = (hi) => {
+        const supZones = ps.supportZones[hi] || [[], [], []];
+        for (let s = 0; s < 3; s++) {
+          if ((supZones[s] || []).length === 0) return true;
+        }
+        return false;
+      };
+      /** Die anderen Helden, an die `equipName` JETZT legal darf
+       *  (Spielbedingung der Karte + freie Support-Zone). */
+      const legalHeroesFor = (equipName, excludeHeroIndices = []) => otherHeroes
+        .map(h => h.heroIdx)
+        .filter(hi => !excludeHeroIndices.includes(hi)
+          && hasFreeZone(hi)
+          && engine.canEquipCardToHero(equipName, pi, hi));
+
+      // Find eligible Equipment Artifacts in deck (cost ≤ 20) that can
+      // legally be equipped to at least one of the other Heroes.
       const cardDB = engine._getCardDB();
       const seen = new Set();
       const eligibleCards = [];
       for (const cardName of (ps.mainDeck || [])) {
         if (seen.has(cardName)) continue;
+        seen.add(cardName);
         const cd = cardDB[cardName];
         if (!cd || !hasCardType(cd, 'Artifact')) continue;
         if ((cd.subtype || '').toLowerCase() !== 'equipment') continue;
         if ((cd.cost || 0) > 20) continue;
-        seen.add(cardName);
+        if (legalHeroesFor(cardName).length === 0) continue;
         eligibleCards.push({ name: cardName, source: 'deck', cost: cd.cost || 0 });
       }
 
@@ -169,16 +199,44 @@ module.exports = {
 
       if (!selection || !selection.selectedCards || selection.selectedCards.length === 0) { gs.heroEffectPending = null; engine.sync(); return; }
 
-      const selectedNames = selection.selectedCards;
+      // Nur Namen aus der angebotenen Liste, ohne Doppelte — und nie
+      // mehr als erlaubt (die Antwort kommt vom Client).
+      const eligibleNames = new Set(eligibleCards.map(c => c.name));
+      let selectedNames = [...new Set(selection.selectedCards)]
+        .filter(n => eligibleNames.has(n))
+        .slice(0, maxEquips);
+      if (selectedNames.length === 0) { gs.heroEffectPending = null; engine.sync(); return; }
+
+      // Kostengrenze auch serverseitig: zusammen hoechstens 20.
+      const kosten = (n) => eligibleCards.find(c => c.name === n)?.cost || 0;
+      if (selectedNames.length === 2 && kosten(selectedNames[0]) + kosten(selectedNames[1]) > 20) {
+        selectedNames = [selectedNames[0]];
+      }
+
+      // Zwei Ausruestungen brauchen zwei VERSCHIEDENE legale Traeger.
+      // Gibt es keine solche Verteilung, bleibt es bei der ersten.
+      if (selectedNames.length === 2) {
+        const [a, b] = selectedNames;
+        const paarbar = legalHeroesFor(a)
+          .some(hi => legalHeroesFor(b, [hi]).length > 0);
+        if (!paarbar) selectedNames = [a];
+      }
 
       /**
        * Build targets: both hero cards AND their free support zones.
-       * Excludes heroes already assigned an equip by this effect.
+       * Excludes heroes already assigned an equip by this effect and
+       * heroes `equipName` may not legally be equipped to. With
+       * `partnerName`, only heroes that still leave a legal hero for
+       * the partner equip are offered.
        */
-      const buildTargets = (excludeHeroIndices = []) => {
+      const buildTargets = (excludeHeroIndices = [], equipName = null, partnerName = null) => {
         const targets = [];
         for (const h of otherHeroes) {
           if (excludeHeroIndices.includes(h.heroIdx)) continue;
+          if (!hasFreeZone(h.heroIdx)) continue;
+          if (equipName && !engine.canEquipCardToHero(equipName, pi, h.heroIdx)) continue;
+          if (partnerName
+              && legalHeroesFor(partnerName, [...excludeHeroIndices, h.heroIdx]).length === 0) continue;
           // Hero target
           targets.push({
             id: `hero-${pi}-${h.heroIdx}`, type: 'hero',
@@ -218,12 +276,15 @@ module.exports = {
       const assignments = []; // [{ equipName, heroIdx, slotIdx }]
 
       if (selectedNames.length === 1) {
-        // One equip — auto-assign if only 1 hero, else prompt
-        if (otherHeroes.length === 1) {
-          const parsed = parseTarget(`hero-${pi}-${otherHeroes[0].heroIdx}`, buildTargets());
+        // One equip — auto-assign if only 1 legal hero, else prompt
+        const legal = legalHeroesFor(selectedNames[0]);
+        if (legal.length === 0) { gs.heroEffectPending = null; engine.sync(); return; }
+        if (legal.length === 1) {
+          const targets = buildTargets([], selectedNames[0]);
+          const parsed = parseTarget(`hero-${pi}-${legal[0]}`, targets);
           if (parsed) assignments.push({ equipName: selectedNames[0], ...parsed });
         } else {
-          const targets = buildTargets();
+          const targets = buildTargets([], selectedNames[0]);
           const picked = await ctx.promptTarget(targets, {
             title: 'Bill, the Angry Auctioneer',
             description: `Choose a Hero or Support Zone to equip «${selectedNames[0]}» to.`,
@@ -239,7 +300,7 @@ module.exports = {
         }
       } else {
         // Two equips — pick target for first, second auto-assigned to remaining hero
-        const targets = buildTargets();
+        const targets = buildTargets([], selectedNames[0], selectedNames[1]);
         const picked = await ctx.promptTarget(targets, {
           title: 'Bill, the Angry Auctioneer',
           description: `Choose a Hero or Support Zone to equip «${selectedNames[0]}» to.\n«${selectedNames[1]}» will go to the other Hero.`,
@@ -254,7 +315,7 @@ module.exports = {
         if (firstParsed) {
           assignments.push({ equipName: selectedNames[0], ...firstParsed });
           // Auto-assign second to the other hero's first free zone
-          const remaining = buildTargets([firstParsed.heroIdx]);
+          const remaining = buildTargets([firstParsed.heroIdx], selectedNames[1]);
           const heroTarget = remaining.find(t => t.type === 'hero');
           if (heroTarget) {
             const secondParsed = parseTarget(heroTarget.id, remaining);
@@ -264,6 +325,11 @@ module.exports = {
       }
 
       for (const { equipName, heroIdx, slotIdx } of assignments) {
+        // Letzte Pruefung direkt vor dem Anlegen: Spielbedingung und
+        // freie Zone muessen JETZT noch stimmen.
+        if (!engine.canEquipCardToHero(equipName, pi, heroIdx)) continue;
+        if (((ps.supportZones[heroIdx] || [])[slotIdx] || []).length > 0) continue;
+
         // Remove from deck
         const _taken_deckIdx = await engine.takeFromPile(ps, 'deck', equipName, { source: 'bill-the-angry-auctioneer' });   // v820: Stapel-Schicht
         if (!_taken_deckIdx) continue;

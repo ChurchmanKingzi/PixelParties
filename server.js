@@ -4456,10 +4456,18 @@ function sendGameState(room, playerIdx, extra) {
         const frei = ps._freeArtifactNames || {};
         const db = room.engine._getCardDB();
         const armed = !!room.engine.freeArtifactArmed(pi);
+        const nextArtRabatt = ps._nextArtifactCostReduction || 0;
         (ps.hand || []).forEach((n, i) => {
           if (frei[n]) merged[i] = Math.max(merged[i] || 0, db[n]?.cost || 0);
           // v656: scharfgestellter Gratis-Kauf — jedes Artefakt zeigt 0.
           if (armed && db[n]?.cardType === 'Artifact' && !loadCardEffect(n)?.manualGoldCost) merged[i] = Math.max(merged[i] || 0, db[n]?.cost || 0);
+          // Shu'Chakus Rabatt aufs NAECHSTE Artefakt (Als Befund 26.9.):
+          // der Server zieht ihn beim Spielen ab (`playerReduction`), der
+          // Client kannte ihn aber nicht — er graute das zurueckgeholte
+          // Artefakt aus, sobald der VOLLE Preis nicht bezahlbar war.
+          if (nextArtRabatt > 0 && db[n]?.cardType === 'Artifact' && !loadCardEffect(n)?.manualGoldCost) {
+            merged[i] = (merged[i] || 0) + nextArtRabatt;
+          }
           // Selbstrabatt der Karte (Laser Cannon) fuer die ANZEIGE
           // mitrechnen — sonst zeigt die Hand 60 an, der Server nimmt
           // aber 20, und die Oberflaeche graut die Karte faelschlich aus.

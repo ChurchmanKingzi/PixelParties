@@ -13745,7 +13745,7 @@
     "hp": null,
     "atk": null,
     "cost": 12,
-    "effect": "Equip this card to a Hero you control. While you control a Hero equipped with this card, you may once per turn discard a card from your hand to search a \"Lunatic Cycle\" card from your deck, reveal it and add it to your hand. If you do, that card's Cost becomes 4 while it remains in your hand.",
+    "effect": "Equip this card to a Hero you control. While you control a Hero equipped with this card, you may once per turn discard a card from your hand to search a \"Lunatic Cycle\" card from your deck, reveal it and add it to your hand. If you do, that card's Cost becomes 4 for the rest of the turn.",
     "archetype": "Lunatic",
     "setID": "PP MBS1",
     "banned": "",

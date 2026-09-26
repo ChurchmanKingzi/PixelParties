@@ -22,16 +22,18 @@
 //  `equip-effect:<instId>` HOPT (returning `false`
 //  rolls it back). Main Phase, free.
 //
-//  "Cost becomes 4 while it remains in your hand"
-//  uses the PERMANENT per-instance reduction field
-//  `_handCostReductionsPermanent` (the engine's
+//  "Cost becomes 4 for the rest of the turn"
+//  (Als Befund 26.9.: der Rabatt galt bisher
+//  dauerhaft) uses the PER-TURN per-instance
+//  reduction field `_handCostReductions` — the
+//  same one Play Money uses. The engine's
 //  registerHandIndexedField system auto-remaps it
 //  through hand splices/reorders so it follows the
-//  physical copy, and it survives turn boundaries —
-//  the value-field analogue of Bamboo Shield's
-//  `_permanentlyRevealedHandIndices`). The entry
-//  is dropped automatically the moment the card
-//  leaves the hand.
+//  physical copy, drops the entry the moment the
+//  card leaves the hand, and the turn-start
+//  cleanup block wipes it at the next turn start.
+//  (Vorher: `_handCostReductionsPermanent`, das
+//  den Zugwechsel ueberlebt.)
 // ═══════════════════════════════════════════
 
 const { isLunaticCycle } = require('./_lunatic-shared');
@@ -134,18 +136,19 @@ module.exports = {
       return true;
     }
 
-    // ── Step 4: that card's Cost becomes 4 while it remains in hand ──
-    // Permanent (survives turn boundaries) + follows the physical copy
-    // through hand mutations via the engine's hand-indexed-field remap.
+    // ── Step 4: that card's Cost becomes 4 for the rest of the turn ──
+    // Per-turn field (wiped at the next turn start) that follows the
+    // physical copy through hand mutations via the engine's
+    // hand-indexed-field remap.
     const cardDB = engine._getCardDB();
     const baseCost = cardDB[chosen]?.cost || 0;
     const reduction = Math.max(0, baseCost - 4);
     if (reduction > 0) {
       const idx = ps.hand.lastIndexOf(chosen); // the freshly-added copy
       if (idx >= 0) {
-        if (!ps._handCostReductionsPermanent) ps._handCostReductionsPermanent = {};
-        ps._handCostReductionsPermanent[idx] =
-          Math.max(ps._handCostReductionsPermanent[idx] || 0, reduction);
+        if (!ps._handCostReductions) ps._handCostReductions = {};
+        ps._handCostReductions[idx] =
+          Math.max(ps._handCostReductions[idx] || 0, reduction);
       }
     }
 
