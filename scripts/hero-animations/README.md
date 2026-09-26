@@ -48,6 +48,7 @@ kopiert, daneben liegt eine JSON-Datei mit den Metadaten. Die erzeugten
 | `night.py` | `final` | `night_idle_final_sheet.png` | `night-the-herald-of-chess` |
 | `kasparov.py` | `final 90 b` | `kasparov_b_idle_final_sheet.png` | `kasparov-the-king-of-kings-b` |
 | `kasparov.py` | `final 90 w` | `kasparov_w_idle_final_sheet.png` | `kasparov-the-king-of-kings-w` |
+| `darion.py` | `final 80` | `darion_idle_final_sheet.png` | `darion-the-blood-crazy-groundskeeper` |
 | `bubbles.py` | `final gross` | `bubbles_idle_final_gross_sheet.png` | `bubbles-the-bouncy-bunny` |
 
 `bubbles.py` ohne `gross` erzeugt eine auf Hero-Größe verkleinerte Variante
@@ -90,3 +91,6 @@ pixelgenau.
 * Keine Silhouetten-Verbreiterung oder -Dellen durch Wind/Schlackern
   (Wind in eine Richtung, nur lose Strähnen bewegen).
 * Outline-Pixel von Armen/Händen nie für Gesten übermalen.
+* Laufende Muster (Kettensäge): Periode deutlich größer als 2x Tempo und
+  Bewegungsspuren, sonst wirkt es wie Hin-und-her oder läuft rückwärts.
+  Unvollständige/verwischte Objekte dürfen komplett neu gezeichnet werden.
