@@ -44135,8 +44135,16 @@ this._deathWatch = (this._deathWatchStack || []).length
       }
       case ZONES.SUPPORT: {
         if (inst.heroIdx >= 0 && inst.zoneSlot >= 0) {
-          const arr = ps.supportZones?.[inst.heroIdx]?.[inst.zoneSlot];
-          if (arr) { const idx = arr.indexOf(inst.name); if (idx >= 0) arr.splice(idx, 1); }
+          // ★ 26.9. (Als Befund: Crimson Web nach The Yeeting blieb als
+          // Geist in der Zone stehen): zuerst auf der Seite suchen, auf der
+          // die Karte LIEGT (`physicalSide` — Crimson Web haengt beim
+          // Gegner ihres Besitzers), dann wie bisher beim Besitzer.
+          const seiten = [this.physicalSide(inst), inst.owner].filter((v, i, a) => v != null && v >= 0 && a.indexOf(v) === i);
+          for (const s of seiten) {
+            const arr = this.gs.players[s]?.supportZones?.[inst.heroIdx]?.[inst.zoneSlot];
+            const idx = arr ? arr.indexOf(inst.name) : -1;
+            if (idx >= 0) { arr.splice(idx, 1); break; }
+          }
         }
         // ★ VERDECKTE KARTE AUFDECKEN (v775, Als Befund 5.9.).
         // Der Platz ist gerade frei geworden, der Flug zum Stapel /
