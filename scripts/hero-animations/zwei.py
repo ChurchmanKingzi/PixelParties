@@ -4,7 +4,7 @@
 Idle in seiner Pose mit dem geklauten pinken Glas-Dreizack:
 * Ruhiges Atmen: der ganze Oberkörper samt Dreizack hebt sich als Einheit,
   die Füße bleiben stehen (keine Nähte, die Brille oder Arme zerreißen).
-* Windstöße: Haarsträhnen links/rechts und der Hoodie hinten wehen kurz mit.
+* Windstöße von rechts: die Haarsträhnen links und rechts wehen kurz nach links.
 * Glas-Dreizack: Lichtband wandert über das Glas, dazu Glitzersterne.
 * Glanz huscht über die Brillengläser.
 """
@@ -58,12 +58,12 @@ def offset(x, y, i):
     if is_leg(x, oy):
         return 0, 0                          # Füße bleiben stehen
     dx = 0
-    if 4 <= oy <= 6 and x <= 10 and gust(i):            # Strähne links weht
+    # Wind von rechts: beide Strähnen wehen nach links (die rechte legt sich an,
+    # die linke weht aus) – die Silhouette wird dadurch nicht breiter
+    if 4 <= oy <= 6 and x <= 10 and gust(i):
         dx = -1
-    elif 3 <= oy <= 7 and x >= 20 and x <= 23 and gust(i, 1):   # Strähne rechts
-        dx = 1
-    elif 15 <= oy <= 19 and x <= 11 and gust(i, 1) and not is_glass(x, y):
-        dx = -1                              # Hoodie hinten weht
+    elif 3 <= oy <= 7 and 20 <= x <= 23 and gust(i, 1):
+        dx = -1
     return dx, -inhale(i)
 
 

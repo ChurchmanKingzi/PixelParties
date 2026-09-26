@@ -4,8 +4,8 @@
 Sie denkt sehr scharf nach:
 * Die vier weißen Federn an der Baskenmütze schwingen einzeln
   (Spitze am stärksten, jede mit eigenem Takt).
-* Die Augen huschen hin und her, die Stirn legt sich in Falten,
-  der Finger tippt ans Kinn, sie blinzelt.
+* Die Augen huschen hin und her, die Stirn legt sich in Falten, sie blinzelt.
+  Arm und Hand am Kinn bleiben unverändert (Outline nie übermalen).
 * Ab und zu steigt ein kleines Fragezeichen auf; ruhiges Atmen.
 """
 import math
@@ -89,10 +89,6 @@ def face(a, i):
     if t in (30, 31, 45):                              # blinzeln
         for x in (7, 8, 11, 12):
             a[y, x + PL] = SKIN
-    if t % 8 in (2, 3):                                # Finger tippt ans Kinn
-        # nur die Fingerlinie im Inneren der Hand wandert, der braune Rand bleibt
-        a[16 + PT, 9 + PL] = rgb('3a2409')
-        a[16 + PT, 10 + PL] = rgb('f6bc97')
 
 
 QUESTION = ["###", "..#", ".##", "...", ".#."]      # 3x5-Fragezeichen
