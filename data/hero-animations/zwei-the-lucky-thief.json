@@ -1,0 +1,11 @@
+{
+  "hero": "Zwei, the Lucky Thief",
+  "sheet": "zwei-the-lucky-thief.png",
+  "frameWidth": 38,
+  "frameHeight": 31,
+  "frames": 48,
+  "frameMs": 90,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 2
+}

@@ -44,6 +44,7 @@ kopiert, daneben liegt eine JSON-Datei mit den Metadaten. Die erzeugten
 | `zsos.py` | `final` | `zsos_idle_final_sheet.png` | `zsos-ssar-the-serpent-warlord` |
 | `baaliel.py` | `final` | `baaliel_idle_final_sheet.png` | `baaliel-the-demon-general` |
 | `inya.py` | `final` | `inya_idle_final_sheet.png` | `card-game-player-inya` |
+| `zwei.py` | `final` | `zwei_idle_final_sheet.png` | `zwei-the-lucky-thief` |
 | `bubbles.py` | `final gross` | `bubbles_idle_final_gross_sheet.png` | `bubbles-the-bouncy-bunny` |
 
 `bubbles.py` ohne `gross` erzeugt eine auf Hero-Größe verkleinerte Variante
@@ -81,4 +82,8 @@ pixelgenau.
 * Gas soll fließen/wehen (aufsteigende Schlieren, Randwellen, Wind) statt zu
   „wabbeln“, aus seiner Quelle entstehen und Augen/Gesichter nicht überdecken.
 * Bewegungen lieber etwas lebendiger/übertriebener; Idle-Haltung aber nicht
-  „tänzerisch“.
+  „tänzerisch“. Wippen mit dem ganzen Körper wirkt besser als Einzelbewegungen
+  im Gesicht (Gesichter nicht „drehen“).
+* Keine Silhouetten-Verbreiterung oder -Dellen durch Wind/Schlackern
+  (Wind in eine Richtung, nur lose Strähnen bewegen).
+* Outline-Pixel von Armen/Händen nie für Gesten übermalen.
