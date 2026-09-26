@@ -15998,7 +15998,7 @@
     "hp": null,
     "atk": null,
     "cost": null,
-    "effect": "Choose a target and Stun it for 3 turns. Damage a target Stunned by this effect would take becomes 0.",
+    "effect": "Choose a target except the user and Stun it for 3 turns. Damage a target Stunned by this effect would take becomes 0.",
     "archetype": "",
     "setID": "PP SET01",
     "banned": "",
