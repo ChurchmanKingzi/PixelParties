@@ -556,10 +556,10 @@ im.save(os.path.join(TMP, 'p10_d.png'))
 # Figuren aus den Karten (native Auflösung)
 HE, AR, MA = SK.minions()
 WING = SK.winged()
-w1 = SK.party_hat(WING, (236, 70, 110), (255, 214, 72), dy=3)
-im = add_light(im, 46, 62, 22, (26, 20, 40), 0.8)
-put(im, w1, 46, 84)
-put(im, WING.transpose(Image.FLIP_LEFT_RIGHT), 208, 70)
+w1 = up(SK.trim(SK.party_hat(WING, (236, 70, 110), (255, 214, 72), dy=3)), 2)
+im = add_light(im, 44, 58, 30, (26, 20, 40), 0.8)
+put(im, w1, 44, 96)
+put(im, WING.transpose(Image.FLIP_LEFT_RIGHT), 210, 64)
 d = ImageDraw.Draw(im)
 # Fledermäuse
 def bat(x, y, c=(26, 14, 40)):
@@ -618,8 +618,8 @@ for (x, y, col, kind) in [(106, 166, (230, 214, 60), 0), (144, 160, (110, 220, 9
     nimg = rows_img(rows, {'A': col, 'B': tuple(int(v * 0.7) for v in col)})
     im.alpha_composite(nimg, (x, y))
 # König Skullmael (Karte) auf der Giebelspitze
-KING = SK.king()
-put(im, KING, CX + 2, PY - 3)
+KING = up(SK.king(), 2)
+put(im, KING, CX + 4, PY - 3)
 im.save(os.path.join(TMP, 'p10_e.png'))
 print('stage ok')
 
@@ -691,38 +691,51 @@ PINK, GOLDC, BLUE, WHITE, GREEN, RED = (236, 70, 110), (255, 214, 72), (90, 170,
 ARup = arm_up(AR, (17, 23, 21, 32))
 HEup = arm_up(HE, (17, 21, 22, 30))
 d1 = 0.22  # Tiefen-Tönung Reihe 1
+HEboth = SK.trim(SK.raise_arm(SK.raise_arm(SK.canvas(HE, 10, 3)[0], (17, 21, 22, 30)), (3, 21, 8, 30)))
+ARcup = SK.trim(SK.cup(SK.raise_arm(SK.canvas(AR, 10, 3)[0], (17, 23, 21, 32)), 19, 16, (120, 230, 120)))
+HEcup = SK.trim(SK.cup(SK.canvas(HEup, 4, 2)[0], 19, 7))
+row0 = [(62, 222, MA.transpose(Image.FLIP_LEFT_RIGHT)), (84, 224, HEboth), (170, 223, ARup.transpose(Image.FLIP_LEFT_RIGHT)), (192, 221, hat(MA, PINK, WHITE))]
+for (x, y, spr) in row0:
+    add(SK.tint_depth(spr, 0.34), x, y)
 row1 = [
-    (54, 234, hat(ARup, BLUE, WHITE)),
-    (78, 236, SK.priest()),
-    (100, 233, SK.necromancer()),
-    (152, 233, hat(MA, GREEN, RED)),
-    (176, 236, SK.archer_card().transpose(Image.FLIP_LEFT_RIGHT)),
-    (198, 234, HEup.transpose(Image.FLIP_LEFT_RIGHT)),
+    (38, 238, hat(ARup, BLUE, WHITE)),
+    (62, 236, SK.priest()),
+    (86, 238, SK.necromancer()),
+    (106, 235, HEcup),
+    (150, 236, hat(MA, GREEN, RED)),
+    (174, 238, SK.archer_card().transpose(Image.FLIP_LEFT_RIGHT)),
+    (198, 236, HEup.transpose(Image.FLIP_LEFT_RIGHT)),
+    (220, 238, hat(AR, GOLDC, PINK).transpose(Image.FLIP_LEFT_RIGHT)),
 ]
 for (x, y, spr) in row1:
-    add(SK.tint_depth(spr, d1), x, y)
+    add(SK.tint_depth(spr, 0.2), x, y)
 # Heiler-Sprite aus der Knochenmühle (1x) + Skeletthund
 hs = area('bonegrinder/healer')
 healer_fr = [hs.crop((i * 21, 0, i * 21 + 21, 32)) for i in range(3)]
 healer_fr = [f.crop(f.getbbox()) for f in healer_fr]
-add(SK.tint_depth(healer_fr[2], 0.12), 122, 244)
+add(SK.tint_depth(healer_fr[2], 0.12), 124, 248)
 dog = area('bonegrinder/dog').crop((0, 0, 25, 17)); dog = dog.crop(dog.getbbox())
-add(SK.tint_depth(dog, 0.12), 140, 246)
+add(SK.tint_depth(dog, 0.12), 142, 250)
 # Reihe 2
 BURN = SK.burning()
 row2 = [
-    (16, 262, hat(HE, PINK, GOLDC).transpose(Image.FLIP_LEFT_RIGHT)),
-    (42, 266, SK.reaper()),
-    (70, 261, BURN),
-    (160, 266, SK.treasure()),
-    (186, 262, SK.death_knight()),
-    (210, 264, hat(AR.transpose(Image.FLIP_LEFT_RIGHT), PINK, GOLDC)),
-    (236, 262, hat(MA, BLUE, GOLDC).transpose(Image.FLIP_LEFT_RIGHT)),
+    (14, 264, hat(HE, PINK, GOLDC, dx=3, dy=3).transpose(Image.FLIP_LEFT_RIGHT)),
+    (40, 268, SK.reaper()),
+    (70, 263, BURN),
+    (98, 266, ARcup),
+    (160, 268, SK.treasure()),
+    (186, 264, SK.death_knight()),
+    (210, 266, hat(AR.transpose(Image.FLIP_LEFT_RIGHT), PINK, GOLDC)),
+    (236, 264, hat(MA, BLUE, GOLDC).transpose(Image.FLIP_LEFT_RIGHT)),
 ]
 for (x, y, spr) in row2:
-    add(SK.tint_depth(spr, 0.08), x, y)
+    add(SK.tint_depth(spr, 0.06), x, y)
+# Reihe 3 (vorne, zwischen den Stars)
+row3 = [(84, 296, hat(HEboth, GREEN, WHITE, dx=3, dy=3)), (170, 294, hat(MA, GOLDC, PINK).transpose(Image.FLIP_LEFT_RIGHT)), (238, 298, ARcup.transpose(Image.FLIP_LEFT_RIGHT))]
+for (x, y, spr) in row3:
+    add(spr, x, y)
 # Grabsteine zwischen den Tänzern
-for (x, y, k) in [(8, 240, 0), (116, 262, 2), (224, 242, 3), (92, 266, 5), (246, 272, 1)]:
+for (x, y, k) in [(8, 244, 0), (118, 270, 2), (230, 250, 3), (56, 276, 5), (140, 280, 1)]:
     add(STONES[k], x, y)
 
 crowd.sort(key=lambda t: t[0])
@@ -731,7 +744,7 @@ for (y, x, spr) in crowd:
 # Flammen-Sprite (Knochenmühle) auf dem brennenden Skelett + Funken
 fl = area('bonegrinder/flame')
 flames = [fl.crop((i * 5, 0, i * 5 + 5, 8)) for i in range(4)]
-bx_, by_ = 70, 261 - BURN.height
+bx_, by_ = 70, 263 - BURN.height
 im = add_light(im, 70, 246, 18, (70, 36, 0), 1.0)
 im.alpha_composite(up(flames[1], 1), (bx_ - 5, by_ - 5))
 im.alpha_composite(flames[2], (bx_ - 1, by_ - 7))

@@ -30,7 +30,13 @@ def bard():
 
 def king():
     nk = native('Skeleton King Skullmael')
-    return _fcut(nk, (18, 2, 64, 25), _grey(64, 135, 70))
+    k = _fcut(nk, (18, 2, 64, 25), _grey(64, 135, 70))
+    a = np.array(k).astype(int)
+    green = (a[..., 1] > a[..., 0] + 30)
+    green[:-5] = False  # nur das Blatt des Minion-Huts unten entfernen
+    a[green, 3] = 0
+    k = Image.fromarray(a.astype(np.uint8))
+    return k.crop(k.getbbox())
 
 
 def notes():
