@@ -4415,6 +4415,41 @@ const BuffColumn = window.BuffColumn;
 // next to the hand in-game using the same cropped hero art.
 const HeroArtCrop = window.HeroArtCrop;
 
+/**
+ * ★ v1447 — PORTRAET NEBEN DER HAND, mit zwei Rueckfaellen
+ * (Als Befund 27.9.: „Der Avatar des Gegners (Bill, the Angry
+ * Auctioneer) laedt nicht" — der Rahmen blieb leer).
+ *
+ *   ① Kein Avatar → Heldenbild. Bisher NUR der mittlere Held; ist der
+ *     Platz leer, blieb der Rahmen leer, obwohl der Name daneben schon
+ *     auf den ersten vorhandenen Helden zurueckfiel. Jetzt dieselbe
+ *     Reihenfolge wie beim Namen: Mitte, sonst der erste mit Namen.
+ *   ② Avatar-Bild laedt nicht (hochgeladene Avatare kommen ueber den
+ *     Speicher-Cache `/api/img/<hash>` — nach einem Server-Neustart oder
+ *     einer Verdraengung antwortet er 404) → ebenfalls das Heldenbild
+ *     statt eines kaputten Bildes.
+ */
+function portraetHeld(spieler) {
+  const helden = spieler?.heroes || [];
+  return helden[1]?.name || helden.find(h => h?.name)?.name || null;
+}
+function HandPortraet({ src, bildKey, heroName, zustand, extraKlasse }) {
+  const [kaputt, setKaputt] = useState(false);
+  useEffect(() => { setKaputt(false); }, [src]);
+  if (src && !kaputt) {
+    return <img key={bildKey || 'avatar'} src={src} onError={() => setKaputt(true)}
+      className={'game-hand-avatar game-hand-avatar-big' + (extraKlasse || '') + zustand} />;
+  }
+  if (heroName && HeroArtCrop) {
+    return (
+      <div className={'game-hand-avatar-crop' + zustand}>
+        <HeroArtCrop heroName={heroName} width={135} />
+      </div>
+    );
+  }
+  return null;
+}
+
 // Status badges — small icons showing active negative statuses at a glance
 // StatusBadges and BuffColumn — now defined in app-shared.jsx
 
@@ -42063,16 +42098,13 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 (`.pp-portraet`, style.css). Im Tutorial: Monia Bot bzw.
                 Antonia mit eigenem Bild und eigener Farbe. */}
             <span className="pp-portraet" style={{ '--portraet': opp.color || '#ff5577' }}>
-              {(tutorialGegner ? tutorialGegner.avatar : opp.avatar)
-                /* `result ? '' : …` statt `!result && …`: der &&-Ausdruck liefert bei gesetztem Ergebnis das BOOLEAN false, und `'…-big' + false` haengt woertlich "false" an den Klassennamen. Aus `game-hand-avatar-crop` wurde `game-hand-avatar-cropfalse` — der quadratische Rahmen fiel weg und der HeroArtCrop lief auf seine volle 135px-Breite aus, der Avatar wurde also im End-Screen ploetzlich breiter. */
-                ? <img key={tutorialGegner ? tutorialGegner.key : 'avatar'} src={tutorialGegner ? tutorialGegner.avatar : opp.avatar} className={'game-hand-avatar game-hand-avatar-big' + (tutorialGegner ? ' game-hand-avatar-tutorial' : '') + (result ? '' : ((isMyTurn && !oppBarking) ? ' avatar-inactive' : ' avatar-active'))} />
-                : opp.heroes?.[1]?.name && HeroArtCrop
-                  ? (
-                    <div className={'game-hand-avatar-crop' + (result ? '' : ((isMyTurn && !oppBarking) ? ' avatar-inactive' : ' avatar-active'))}>
-                      <HeroArtCrop heroName={opp.heroes[1].name} width={135} />
-                    </div>
-                  )
-                  : null}
+              {/* `result ? '' : …` statt `!result && …`: der &&-Ausdruck liefert bei gesetztem Ergebnis das BOOLEAN false, und `'…-big' + false` haengt woertlich "false" an den Klassennamen. Aus `game-hand-avatar-crop` wurde `game-hand-avatar-cropfalse` — der quadratische Rahmen fiel weg und der HeroArtCrop lief auf seine volle 135px-Breite aus, der Avatar wurde also im End-Screen ploetzlich breiter. */}
+              <HandPortraet
+                src={tutorialGegner ? tutorialGegner.avatar : opp.avatar}
+                bildKey={tutorialGegner ? tutorialGegner.key : 'avatar'}
+                extraKlasse={tutorialGegner ? ' game-hand-avatar-tutorial' : ''}
+                heroName={portraetHeld(opp)}
+                zustand={result ? '' : ((isMyTurn && !oppBarking) ? ' avatar-inactive' : ' avatar-active')} />
               <span className="pp-portraet-zier" aria-hidden="true" />
             </span>
             <div className="game-hand-namensspalte">
@@ -43008,15 +43040,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             {/* Porträt im verzierten Pixelrahmen in der Farbe des Spielers
                 (`.pp-portraet`, style.css). */}
             <span className="pp-portraet" style={{ '--portraet': me.color || '#00f0ff' }}>
-              {me.avatar
-                ? <img src={me.avatar} className={'game-hand-avatar game-hand-avatar-big' + (result ? '' : ((isMyTurn || meBarking) ? ' avatar-active' : ' avatar-inactive'))} />
-                : me.heroes?.[1]?.name && HeroArtCrop
-                  ? (
-                    <div className={'game-hand-avatar-crop' + (result ? '' : ((isMyTurn || meBarking) ? ' avatar-active' : ' avatar-inactive'))}>
-                      <HeroArtCrop heroName={me.heroes[1].name} width={135} />
-                    </div>
-                  )
-                  : null}
+              <HandPortraet src={me.avatar} heroName={portraetHeld(me)}
+                zustand={result ? '' : ((isMyTurn || meBarking) ? ' avatar-active' : ' avatar-inactive')} />
               <span className="pp-portraet-zier" aria-hidden="true" />
             </span>
             <span className="orbit-font game-hand-name" style={{ fontSize: 18, fontWeight: 800, color: me.color }}>{me.username}</span>
