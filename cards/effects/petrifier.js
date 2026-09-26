@@ -90,8 +90,10 @@ module.exports = {
         types: ['hero', 'creature'],
         title: CARD_NAME,
         appliesStatus: 'stunned',
-        // „except the user" — der Wirker ist kein Ziel.
+        // „except the user" — der Wirker ist kein Ziel; er bleibt aber
+        // AUSGEGRAUT sichtbar (Als Vorgabe 26.9.), statt zu verschwinden.
         condition: (t) => !istWirker(t),
+        dimUnmetCondition: true,
         description: `Stun a target other than the caster for ${DAUER} turns. While Stunned this way, all damage it would take becomes 0.`,
         confirmLabel: '🗿 Petrify!',
         cancellable: true,
