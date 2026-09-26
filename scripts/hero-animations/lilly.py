@@ -4,8 +4,8 @@
 Süße Neck-Geste („Bäh!“):
 * Sie streckt die Zunge raus – im Takt weiter raus und wieder ein Stück rein,
   die Zungenspitze wackelt hin und her.
-* Das Unterlid unter dem Auge wird im selben Takt weiter heruntergezogen
-  (mehr rosa Innenlid sichtbar).
+* Im selben Takt zieht die gehobene Hand die Haut unter dem geschlossenen
+  Auge herunter (Hand rutscht 1 px, rosa Innenlid wird sichtbar).
 * Sie wippt frech mit (Füße fest).
 * Das Herzchen steigt wackelnd auf und verblasst; ein neues ploppt am Kopf auf.
 """
@@ -28,6 +28,7 @@ HEART_FILL = {(14, 7): rgb('ffbe4a'), (14, 8): rgb('ffdb52'),    # Haar/Kontur h
 PINK, PINK_HI, PINK_DK = rgb('ff00ff'), rgb('ffb3ff'), rgb('ff60ff')
 TONGUE, TONGUE_HI, TONGUE_DK = rgb('e30000'), rgb('ff4c4c'), rgb('a40000')
 LID_PINK = rgb('ff9c9c')
+SKIN_PULL = rgb('f7bd9c')
 
 # großes Herz (5x4) zum Aufsteigen: (dx, dy, Farbe) relativ zur Mitte oben
 HEART = [(-2, 0, PINK_DK), (-1, 0, PINK_HI), (1, 0, PINK_DK), (2, 0, PINK_DK),
@@ -52,8 +53,15 @@ def face(a, i):
         a[16 + y, 10] = TONGUE_DK
         tip = 9 if (i // 2) % 2 == 0 else 10               # Spitze wackelt
         a[17 + y, tip] = TONGUE_HI
-        a[12 + y, 8] = LID_PINK                           # Lid weiter runter
-        a[13 + y, 7] = LID_PINK
+        # gehobene Hand zieht die Haut unter dem geschlossenen Auge runter:
+        # Hand (samt Ärmelansatz) rutscht 1 px nach unten, rosa Innenlid sichtbar
+        blk = a[12 + y:18 + y, 12:16].copy()
+        a[13 + y:19 + y, 12:16] = np.where(blk[:, :, 3:4] > 0, blk, a[13 + y:19 + y, 12:16])
+        a[12 + y, 12] = SKIN_PULL
+        a[12 + y, 13] = SKIN_PULL
+        a[12 + y, 14] = SKIN_PULL
+        a[11 + y, 12] = LID_PINK
+        a[11 + y, 13] = LID_PINK
 
 
 def draw_heart(out, cx, cy, shape, alpha):
