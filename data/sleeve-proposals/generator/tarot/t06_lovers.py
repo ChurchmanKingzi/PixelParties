@@ -165,6 +165,7 @@ fft, ftr = fig_draw(cv, flame_tree, {'t': mat(BARK, pillow=2.5, k=1.4, noise=0.8
                                      'F': mat(FIRE[3:], pillow=2, k=1.0, bias=0.2)})
 glow(cv, 206, 162, 40, (255, 190, 90), k=0.3, mix=0.3)
 
+vignette(cv, (60, 20, 70), strength=0.3, r0=0.78)      # nur auf den Hintergrund
 # ---------------------------------------------------------------- Molinda
 HAIR = [(6, 6, 12), (18, 18, 28), (34, 34, 50), (60, 60, 84), (104, 104, 140)]
 DRESS = [(30, 70, 130), (50, 110, 180), (90, 160, 226), (150, 206, 246), (210, 238, 255)]
@@ -482,6 +483,5 @@ for (x, y) in [(125, 262)]:
 # Funkeln
 for (x, y) in [(66, 110), (186, 112), (40, 220), (210, 226), (82, 170), (168, 160)]:
     sparkle(cv, x, y, (255, 255, 255), r=2, c2=(255, 190, 220))
-vignette(cv, (60, 20, 70), strength=0.3, r0=0.78)
 p = finish(cv, 'VI', 'MOLINDA', out='06_lovers_molinda', emblem=emblem_heart)
 print(p)
