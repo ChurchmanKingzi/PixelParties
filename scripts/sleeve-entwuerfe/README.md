@@ -10,7 +10,7 @@ sowie aus den Area-Sprites unter `public/areas/`.
 | Skript | Sleeve |
 |---|---|
 | `s01_deepsea.py` | 01 Tiefsee-Abgrund |
-| `s02_mary.py` | 02 Engelsherz (Cute) |
+| `s02_mary.py` (+ `mary_parts.py`) | 02 Engelsherz (Cute) |
 | `s03_blueprint.py` | 03 Future-Tech-Blaupause |
 | `s04_cosmic.py` | 04 Kosmische Tiefen |
 | `s05_cool.py` | 05 Wowhalla-Regenbogen |
@@ -18,7 +18,7 @@ sowie aus den Area-Sprites unter `public/areas/`.
 | `s07_eggs.py` | 07 Feuer & Eis |
 | `s08_chess.py` | 08 König der Könige |
 | `s09_bees.py` | 09 Bomblebee-Wabe |
-| `s10_party.py` | 10 Skelett-Party |
+| `s10_party.py` (+ `skel_sprites.py`) | 10 Skelett-Party |
 
 Benötigt Python 3 mit `pillow`, `numpy` und `scipy`:
 

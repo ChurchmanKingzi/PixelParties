@@ -5,7 +5,6 @@ Oben prallen Feueratem und Frostatem aufeinander."""
 from lib import *
 from scipy.spatial import cKDTree
 
-STAGE = int(os.environ.get('S07_STAGE', '99'))
 yy, xx = np.mgrid[0:H, 0:W]
 THR = BAYER4[yy % 4, xx % 4]
 
@@ -18,8 +17,8 @@ I_OUT = (10, 16, 48)
 ICE_PAL = [I_OUT, (28, 46, 108), (50, 86, 162), (90, 142, 212), (152, 200, 244), (224, 244, 255)]
 ICE_BELLY = [(88, 120, 182), (144, 180, 224), (196, 222, 248), (244, 252, 255)]
 ICE_SPK = [I_OUT + (255,), (104, 176, 236, 255), (200, 236, 255, 255), (255, 255, 255, 255)]
-FW_PAL = [(30, 4, 10), (62, 8, 16), (98, 16, 20), (140, 32, 22), (186, 62, 28), (226, 108, 40)]
-IW_PAL = [(8, 14, 44), (20, 34, 86), (34, 60, 128), (60, 100, 172), (100, 150, 214), (160, 204, 244)]
+FW_PAL = [(30, 4, 10), (56, 8, 16), (92, 14, 20), (138, 30, 22), (188, 62, 28), (236, 118, 44)]
+IW_PAL = [(8, 14, 44), (18, 30, 80), (32, 56, 124), (58, 98, 170), (100, 150, 214), (170, 212, 248)]
 
 
 # ---------------------------------------------------------------- Helfer
@@ -106,12 +105,30 @@ def fire_side():
     put(a, dith(np.clip(1 - cr / 30, 0, 1) * 0.9) & ~vol, (206, 90, 28))
     put(a, dith(np.clip(1 - cr / 13, 0, 1)) & ~vol, (255, 190, 70))
     put(a, (np.abs(xx - 63) < 6) & (np.abs(yy - 137) < 1.5) & vol, (255, 220, 110))
+    # Rauchfahne aus dem Krater (unten angeglüht)
+    rp = random.Random(8)
+    for k in range(7):
+        pcx = 63 + k * 3.2 + math.sin(k * 1.3) * 2
+        pcy = 128 - k * 5.2
+        rad = 4.5 + k * 1.3
+        dd = np.hypot(xx - pcx, (yy - pcy) * 1.15)
+        t = np.clip(1 - dd / rad, 0, 1) * (1.0 - k * 0.09) * 3.2
+        pm_ = dith(t)
+        put(a, pm_, (70, 30, 30))
+        put(a, pm_ & dith(np.clip(t - 1.0, 0, 1)), (98, 48, 42))
+        put(a, pm_ & ~np.roll(pm_, 1, axis=0) & (yy < pcy), (122, 66, 54))
+        lit = pm_ & ~np.roll(pm_, -1, axis=0) & (yy > pcy)
+        put(a, lit, (230, 110, 36) if k < 3 else (160, 64, 30))
     r = random.Random(3)
-    for sx0, n_ in [(58, 80), (64, 100), (69, 70), (61, 120)]:
+    for sx0, tx, n_ in [(58, 26, 90), (61, 44, 110), (66, 88, 100), (69, 104, 70)]:
         x, y = sx0, 138
         for _ in range(n_):
             y += 1
-            x += r.choice([-1, 0, 0, 1, 1])
+            goal = sx0 + (tx - sx0) * min(1.0, (y - 138) / 70.0)
+            if r.random() < 0.55:
+                x += int(np.sign(goal - x))
+            else:
+                x += r.choice([-1, 0, 0, 1])
             if not (0 <= x < W - 1 and 0 <= y < H) or not vol[y, x]:
                 break
             a[y, x, :3] = (255, 200, 70)
@@ -185,13 +202,12 @@ def background():
     a = np.where(FIRE[..., None], fire_side(), ice_side())
     a[..., 3] = 255
     dist = xx - BX
-    put(a, (dist > -1.5) & (dist <= -0.5), (255, 196, 90))
-    put(a, (dist > -0.5) & (dist <= 0.5), (255, 250, 232))
-    put(a, (dist > 0.5) & (dist <= 1.5), (200, 236, 255))
     steam_n = value_noise(W, H, 7, seed=77, octaves=2)
-    st = np.clip(1 - np.abs(dist) / 8, 0, 1) * (0.25 + steam_n * 0.8)
-    put(a, dith(st * 0.8) & (np.abs(dist) > 1.5), (226, 220, 222))
-    put(a, dith(np.clip(st - 0.45, 0, 1) * 2) & (np.abs(dist) > 1.5), (255, 255, 255))
+    st = np.clip(1 - np.abs(dist) / 7, 0, 1) * (0.15 + steam_n * 0.7)
+    put(a, dith(st * 0.7), (150, 140, 156))
+    put(a, dith(np.clip(st - 0.4, 0, 1) * 1.6), (214, 210, 222))
+    put(a, (dist > -1.0) & (dist <= 0.0), (255, 190, 90))
+    put(a, (dist > 0.0) & (dist <= 1.0), (200, 236, 255))
     return Image.fromarray(a.astype(np.uint8))
 
 
@@ -265,32 +281,39 @@ def rbody(u):
 
 # ================================================================ Drachenkopf (handgepixelt, Blick nach rechts)
 HEAD = """
-.ooo....................................
-oJJHoo..................................
-.ohJJHoo................................
-..ohhJJHoo..............................
-...oohhJJHoo............................
-.....oohhJJHo.oo........................
-.......oohhHo.o45oo.....................
-...ooo..oohho4455oo.....................
-..ofFfoo.o3o44555444oo..................
-...offFfo33334444444444oooo.............
-....ooffo2333ooo33444444444ooo..........
-...ooo.o223oEeeo33333344444445oo........
-..ofFfoo2223oppoo3333333333444455oo.....
-...offFo21222oo22223333333333333345o....
-....ooo122122212222222333333333nn3333o..
-..ooo.o1122122122222222222222222222223o.
-.ofFfo111221212222211111111111111111122o
-..offo1112121222111owwoooowooowoooowwoo.
-...oo.o1111111111omwmmmmmmmmmmmmmmmwmo..
-....ooo111211121ommmttttttmmmmmmmmoo....
-...ofFfo11211211oammmmmTttttmmmmwo......
-....offo1111111oabbbwmmmmwmmmmwoo.......
-.....oo.o11111oabbbbbbbbbbbbboo.........
-........o1111oabbbccccccccbboo..........
-.........o11oaabbbbbbbbbbboo............
-..........oooooooooooooooo..............
+oo....................................................
+oJJoo.................................................
+.ohJJJoo..............................................
+..oohhHHHHJJJoo.......................................
+....oohhhHHHHJJoo.....................................
+......ooohhHHHHJJoo...................................
+.........oohHHHHHJJoo.................................
+...........ohhHHHHHJJoo......o........................
+............oohHHHHHHJJoooooo5o.......................
+...oooooooo...ohhHHHhhh55555545oo.....................
+..oJJJJJJJJooo.oohhh5554444444455ooo..................
+...oooohhhHJJJooo5554444445555444555oooo........o.....
+.......ooohhHHJJ232133213oooooooo4445555oooooooo5o....
+...oo.....oohhh122213221323oEEeo344444445555555545oo..
+..offoooo...oo1121112111212oepeo3333444444444444nn55o.
+...ooffffoooo122213321332122oo12233333334444444414445o
+.....ooffffff1222132213221322222222233333333333333444o
+.......ooffff1211121112111212222222222223333333323334o
+.........ooff2212321332133212222222221111111111111111o
+...........o22212221322132211111111111111111111111111o
+.........ooo2111211121112111mmwmmmwmmmwmmmwmmmwmmwwmo.
+......ooofff2122212221222122mwmmmmmmmmmmmmmmmmmmmmwo..
+..ooooffffff11111111111111cccccmmmwtttTtttmmmmmmmmo...
+.offffffffffff11111111111bbbbbbccccccmmwmmmmmmmmmmo...
+..ooooooooooooo111111bbbabbbabbbabbbaccccccmwmmmmo....
+...............of1bbabbbabbbabbbabbbabbbabbcccccco....
+.............oofabbbabbbabbbabbbabbbabbbabbbabccco....
+............offfaaaaabbbabbbabbbabbbabbbabbbabbo......
+..........oofffffoaaaaaaaaaaaaaaaaaaaaaaaaaaao........
+.........offffoo...oooooooooooooooooooooooooo.........
+.......ooffoo.........................................
+......offoo...........................................
+.......oo.............................................
 """
 
 
@@ -315,60 +338,79 @@ def head(pal, belly, horn, eye, frill, mouth=((60, 8, 18), (150, 36, 50), (220, 
 
 # ================================================================ Flügel
 def wing(shoulder, elbow, wrist, tips, back, pal, bone, seed=0):
+    """Fledermausflügel: Arm (Schulter-Ellbogen-Handgelenk), Finger fächern vom Handgelenk aus.
+    Jedes Membranfeld ist vom vorderen zum hinteren Finger hin verlaufend schattiert (Faltenwirkung)."""
     a = np.zeros((H, W, 4), np.uint8)
     wx, wy = wrist
     chain = list(tips) + [back]
-    panels = []
+    n = value_noise(W, H, 5, seed=seed, octaves=2)
+    dw = np.hypot(xx - wx, yy - wy)
+    ang = np.arctan2(yy - wy, xx - wx)
+    mem = np.zeros((H, W), bool)
     for i in range(len(chain) - 1):
         p0 = np.array(chain[i], float); p1 = np.array(chain[i + 1], float)
         mid = (p0 + p1) / 2
-        ctrl = mid + (np.array(wrist, float) - mid) * 0.3
-        arc = [tuple((1 - t) ** 2 * p0 + 2 * (1 - t) * t * ctrl + t * t * p1) for t in np.linspace(0, 1, 18)]
+        ctrl = mid + (np.array(wrist, float) - mid) * 0.28
+        arc = [tuple((1 - t) ** 2 * p0 + 2 * (1 - t) * t * ctrl + t * t * p1) for t in np.linspace(0, 1, 20)]
         extra = [shoulder, elbow] if i == len(chain) - 2 else []
-        panels.append(poly_mask([wrist] + arc + extra))
-    mem = np.zeros((H, W), bool)
-    n = value_noise(W, H, 6, seed=seed, octaves=2)
-    dw = np.hypot(xx - wx, yy - wy)
-    for i, pm in enumerate(panels):
-        lam = np.clip(0.12 + dw / 170 + (n - 0.5) * 0.3 + (i % 2) * 0.08, 0, 1)
-        col = tones(lam, pal[1:], 0.9)
-        new_ = pm & ~mem
-        a[new_, :3] = col[new_]; a[new_, 3] = 255
+        pm = poly_mask([wrist] + arc + extra) & ~mem
+        a0 = math.atan2(p0[1] - wy, p0[0] - wx); a1 = math.atan2(p1[1] - wy, p1[0] - wx)
+        da = (a1 - a0 + np.pi) % (2 * np.pi) - np.pi
+        raw = ((ang - a0 + np.pi) % (2 * np.pi) - np.pi) / (da if abs(da) > 1e-3 else 1)
+        frac = np.where((raw < -0.05) | (raw > 1.05), 0.15, np.clip(raw, 0, 1))
+        lam = np.clip(-0.04 + frac * 0.5 + dw / 300 + (n - 0.5) * 0.25, 0, 1)
+        col = tones(lam, pal[1:], 1.0)
+        a[pm, :3] = col[pm]; a[pm, 3] = 255
         mem |= pm
     lay = Image.fromarray(a)
     dr = ImageDraw.Draw(lay)
+    # Adern: leicht gebogene Linien parallel zu den Fingern
     r = random.Random(seed)
-    for tp in tips:
-        for _ in range(3):
-            t0 = r.uniform(0.25, 0.75)
-            px = wx + (tp[0] - wx) * t0; py = wy + (tp[1] - wy) * t0
-            ang = math.atan2(tp[1] - wy, tp[0] - wx) + r.choice([-1, 1]) * r.uniform(0.3, 0.55)
-            ln = r.uniform(6, 14)
-            q = (px + math.cos(ang) * ln, py + math.sin(ang) * ln)
-            if 0 <= int(q[1]) < H and 0 <= int(q[0]) < W and mem[int(q[1]), int(q[0])]:
-                dr.line([(px, py), q], fill=pal[1])
+    for i in range(len(chain) - 1):
+        p0 = np.array(chain[i], float); p1 = np.array(chain[i + 1], float)
+        for f in (0.35, 0.7):
+            tgt = p0 + (p1 - p0) * f
+            ln = r.uniform(0.55, 0.8)
+            q0 = np.array(wrist, float) + (tgt - wrist) * 0.12
+            q1 = np.array(wrist, float) + (tgt - wrist) * ln
+            mid = (q0 + q1) / 2 + np.array([-(q1 - q0)[1], (q1 - q0)[0]]) * 0.06
+            pts = [tuple((1 - t) ** 2 * q0 + 2 * (1 - t) * t * mid + t * t * q1) for t in np.linspace(0, 1, 12)]
+            dr.line(pts, fill=pal[2])
+            for k in range(2):
+                bp = np.array(pts[r.randint(5, 10)])
+                dd = (q1 - q0) / np.linalg.norm(q1 - q0)
+                side = np.array([-dd[1], dd[0]]) * r.choice([-1, 1])
+                dr.line([tuple(bp), tuple(bp + dd * 4 + side * 4)], fill=pal[2])
     la = np.array(lay)
     edge = mem & ~ndimage.binary_erosion(mem)
-    put(la, edge, pal[0])
     edge2 = mem & ~edge & ~ndimage.binary_erosion(mem, iterations=2)
-    put(la, edge2 & (dw > 40), pal[5])
+    put(la, edge2 & (dw > 30), pal[5])
+    put(la, edge, pal[0])
     lay = Image.fromarray(la)
     dr = ImageDraw.Draw(lay)
 
-    def bonel(p, q, w_):
+    def bonel(p, q, w_, hi=True):
         dr.line([p, q], fill=bone[0], width=w_ + 2)
         dr.line([p, q], fill=bone[1], width=w_)
+        if hi:
+            dr.line([p, q], fill=bone[2], width=1)
 
     for tp in tips:
-        bonel(wrist, tp, 1)
-    bonel(shoulder, elbow, 3); bonel(elbow, wrist, 2)
-    dr.line([shoulder, elbow], fill=bone[2]); dr.line([elbow, wrist], fill=bone[2])
-    for tp in tips:
+        bonel(wrist, tp, 2)
+        # Knöchel in der Mitte
+        kx, ky = (wx + tp[0]) / 2, (wy + tp[1]) / 2
+        dr.ellipse((kx - 1.5, ky - 1.5, kx + 1.5, ky + 1.5), fill=bone[1], outline=bone[0])
         dr.point(tp, fill=bone[2])
-    dr.ellipse((elbow[0] - 2, elbow[1] - 2, elbow[0] + 2, elbow[1] + 2), fill=bone[1], outline=bone[0])
-    sgn = 1 if elbow[0] < wx else -1
-    dr.polygon([(wx - 2, wy + 1), (wx + 2, wy + 1), (wx + sgn * 4, wy - 5)], fill=bone[2], outline=bone[0])
-    dr.ellipse((wx - 2, wy - 2, wx + 2, wy + 2), fill=bone[1], outline=bone[0])
+        # Krallenspitze
+        ddx, ddy = tp[0] - wx, tp[1] - wy; L = math.hypot(ddx, ddy)
+        dr.line([tp, (tp[0] + ddx / L * 3, tp[1] + ddy / L * 3)], fill=bone[0], width=2)
+    bonel(shoulder, elbow, 4); bonel(elbow, wrist, 3)
+    for jnt in (elbow, wrist):
+        dr.ellipse((jnt[0] - 2.5, jnt[1] - 2.5, jnt[0] + 2.5, jnt[1] + 2.5), fill=bone[1], outline=bone[0])
+        dr.point((jnt[0] - 1, jnt[1] - 1), fill=bone[2])
+    # Daumenkralle am Handgelenk
+    sgn = 1 if elbow[0] > wx else -1
+    dr.polygon([(wx - 1, wy - 2), (wx + 2 * sgn, wy - 2), (wx + 5 * sgn, wy - 8)], fill=bone[2], outline=bone[0])
     return lay
 
 
@@ -402,11 +444,11 @@ def egg(w, h, kind):
         f1 = (a + b) % 1; f2 = (a - b) % 1
         line = (f1 < 0.15) | (f2 < 0.15)
         cc = np.abs(f1 - 0.45) + np.abs(f2 - 0.45)
-        Pl = [(36, 28, 78), (58, 66, 136), (88, 116, 186), (136, 176, 228), (192, 226, 250), (250, 255, 255)]
+        Pl = [(16, 34, 84), (36, 84, 150), (66, 136, 200), (116, 188, 236), (186, 234, 252), (250, 255, 255)]
         k = np.clip(np.floor((1 - cc) * 2.2 + lam * 3.0 - 0.5 + (th - 0.5) * 0.5), 1, 5).astype(int)
         k = np.where(line, np.where(lam > 0.75, 2, 0), k)
         col = np.array(Pl)[k]
-        oc = (18, 16, 54)
+        oc = (10, 20, 58)
     out[m, :3] = col[m]; out[m, 3] = 255
     img = outline(Image.fromarray(out), oc + (255,))
     d = ImageDraw.Draw(img)
@@ -533,7 +575,7 @@ def breath():
         dx = (xx - x0) * sgn
         span = abs(CLASH[0] - x0)
         t = dx / span
-        wv = 1.5 + 8.5 * np.clip(t, 0, 1) ** 0.8
+        wv = 2.2 + 9.0 * np.clip(t, 0, 1) ** 0.7
         wobble = np.sin(xx * 0.55 + (0 if side == 'fire' else 2)) * 1.2 * np.clip(t, 0, 1)
         dy = np.abs(yy - cy - wobble)
         core = np.clip(1 - dy / wv, 0, 1) * (dx >= 0) * (t <= 1.03)
@@ -560,26 +602,62 @@ def clash():
     put(a, burst, (255, 236, 200))
     put(a, dith(np.clip(t - 0.3, 0, 1) * 2.5), (255, 255, 255))
     out = Image.fromarray(a)
-    sparkle(ImageDraw.Draw(out), cx, cy, 6, (255, 255, 220))
+    d = ImageDraw.Draw(out)
+    r = random.Random(23)
+    for k in range(22):
+        an = r.uniform(0, 2 * math.pi)
+        r0, r1 = r.uniform(14, 20), r.uniform(22, 34)
+        p0 = (cx + math.cos(an) * r0, cy + math.sin(an) * r0 * 0.8)
+        p1 = (cx + math.cos(an) * r1, cy + math.sin(an) * r1 * 0.8)
+        left = p1[0] < cx
+        c0, c1 = ((255, 120, 30), (255, 220, 120)) if left else ((90, 170, 240), (230, 250, 255))
+        d.line([p0, p1], fill=c0)
+        d.point(p1, fill=c1)
+    sparkle(d, cx, cy, 6, (255, 255, 220))
     return out
+
+
+# ================================================================ Partikel: Glut und Schneeflocken
+def particles(lay_img):
+    d = ImageDraw.Draw(lay_img)
+    r = random.Random(17)
+    for _ in range(70):
+        x, y = r.randrange(8, W - 8), r.randrange(10, 300)
+        f = FIRE[y, x]
+        # im Mittelband mischen sich beide
+        if abs(x - BX[y, x]) < 26 and r.random() < 0.5:
+            f = not f
+        if f:
+            c = r.choice([(255, 220, 120), (255, 170, 60), (255, 120, 30)])
+            d.point((x, y), fill=c)
+            if r.random() < 0.6:
+                d.point((x - 1, y + 1), fill=(170, 50, 20))
+        else:
+            s = r.random()
+            if s < 0.6:
+                d.point((x, y), fill=(240, 250, 255))
+            elif s < 0.85:
+                d.point([(x, y), (x - 1, y), (x + 1, y), (x, y - 1), (x, y + 1)], fill=(200, 230, 255)); d.point((x, y), fill=(255, 255, 255))
+            else:
+                sparkle(d, x, y, 2, (180, 220, 255))
+                d.point([(x - 1, y - 1), (x + 1, y + 1), (x - 1, y + 1), (x + 1, y - 1)], fill=(150, 200, 250))
+    return lay_img
 
 
 # ================================================================ Aufbau
 im = background()
-if STAGE <= 1:
-    up(im, 3).save(os.path.join(TMP, 's07_stage.png')); raise SystemExit
 
-HX, HY = 38, 66
-NECK = (HX + 11, HY + 21)
-MOUTH_F = (HX + 38, HY + 19)
+HX, HY = 40, 66
+NECK = (HX + 19, HY + 27)
+MOUTH_F = (HX + 50, HY + 21)
 MOUTH_I = (W - 1 - MOUTH_F[0], MOUTH_F[1])
 CLASH = (125, MOUTH_F[1] + 1)
 
-fire_ctrl = [NECK, (40, 100), (31, 118), (26, 142), (24, 172), (28, 204), (40, 232), (62, 256), (92, 271), (125, 280), (158, 288), (188, 292), (210, 286), (220, 272), (214, 260), (205, 262)]
+fire_ctrl = [NECK, (46, 108), (35, 124), (28, 146), (24, 172), (28, 204), (40, 232), (62, 256), (92, 271), (125, 280), (158, 288), (188, 292), (210, 286), (220, 272), (214, 260), (205, 262)]
 ice_ctrl = mirror_pts(fire_ctrl)
 
 # Flügel (ganz hinten)
-FW = dict(shoulder=(22, 124), elbow=(40, 56), wrist=(72, 12), tips=[(8, 6), (3, 34), (4, 66), (10, 98)], back=(16, 128))
+FW = dict(shoulder=(28, 118), elbow=(80, 50), wrist=(58, 11), tips=[(8, 7), (3, 40), (5, 76), (12, 108)], back=(18, 128))
 im.alpha_composite(wing(FW['shoulder'], FW['elbow'], FW['wrist'], FW['tips'], FW['back'], FW_PAL, [(30, 4, 10), (196, 80, 34), (255, 196, 110)], seed=3))
 im.alpha_composite(wing(*[mirror_pts([FW[k]])[0] for k in ('shoulder', 'elbow', 'wrist')], mirror_pts(FW['tips']), mirror_pts([FW['back']])[0],
                         IW_PAL, [(8, 14, 44), (120, 176, 236), (240, 252, 255)], seed=4))
@@ -587,10 +665,10 @@ im.alpha_composite(wing(*[mirror_pts([FW[k]])[0] for k in ('shoulder', 'elbow', 
 
 # Fels: Basaltsäulen links, Eiskristalle rechts
 def top_fn(x):
-    return 214 + (abs(x - 125) / 60.0) ** 1.6 * 44
+    return 221 + max(0.0, abs(x - 125) - 50) ** 1.3 * 1.1
 
 
-im.alpha_composite(basalt(62, 126, top_fn))
+im.alpha_composite(basalt(48, 126, top_fn))
 cl = layer()
 CPAL = [(10, 18, 56, 255), (60, 104, 180, 255), (110, 162, 226, 255), (176, 216, 248, 255), (236, 250, 255, 255)]
 for (bx, by, ang, ln, wd) in [(186, 300, 30, 44, 11), (176, 300, 14, 60, 13), (162, 300, 4, 70, 12), (150, 300, -6, 64, 11),
@@ -604,6 +682,10 @@ ie = egg(EW, EH, 'ice'); fe = egg(EW, EH, 'fire')
 fe = crack(fe, [(2, 20), (7, 17), (10, 21), (15, 15), (19, 19), (24, 14), (29, 17), (34, 13)], (255, 250, 210), (255, 150, 40))
 fe = crack(fe, [(15, 15), (16, 10), (14, 7)], (255, 250, 210), (255, 150, 40))
 fe = crack(fe, [(19, 19), (20, 25), (18, 29)], (255, 250, 210), (255, 150, 40))
+_d = ImageDraw.Draw(fe)
+_d.polygon([(13, 5), (15, 3), (17, 4), (19, 3), (22, 5), (21, 8), (18, 9), (15, 8)], fill=(20, 2, 6))
+_d.line([(13, 5), (15, 3), (17, 4), (19, 3), (22, 5)], fill=(255, 190, 80))
+_d.point([(16, 6), (19, 6)], fill=(255, 236, 90)); _d.point([(16, 7), (19, 7)], fill=(255, 150, 20))
 IEX, FEX, EY = 106 - EW // 2, 145 - EW // 2, 172
 im.alpha_composite(nest(front=False))
 gl, pp = glow(fe, (255, 140, 40, 255), radius=5, strength=0.45)
@@ -613,8 +695,12 @@ im.alpha_composite(gl, (IEX - pp, EY - pp))
 im.alpha_composite(ie, (IEX, EY))
 im.alpha_composite(fe, (FEX, EY))
 im.alpha_composite(nest(front=True))
+_d = ImageDraw.Draw(im)
+for (sx_, sy_) in [(116, 223), (131, 224), (137, 221)]:
+    _d.polygon([(sx_, sy_), (sx_ + 2, sy_ - 1), (sx_ + 3, sy_ + 1), (sx_ + 1, sy_ + 2)], fill=(200, 60, 20), outline=(40, 4, 8))
 
 # Drachen
+im = particles(im)
 ice_lay, ICE_G = serpent(ice_ctrl, rbody, ICE_PAL, ICE_BELLY, ICE_SPK, dorsal=-1, crystal=True)
 fire_lay, FIRE_G = serpent(fire_ctrl, rbody, FIRE_PAL, FIRE_BELLY, FIRE_SPK, dorsal=1)
 im.alpha_composite(ice_lay)
@@ -625,5 +711,122 @@ im.alpha_composite(breath())
 im.alpha_composite(clash())
 im.alpha_composite(FH, (HX, HY))
 im.alpha_composite(IH, (W - HX - IH.width, HY))
-if STAGE <= 2:
-    up(im, 3).save(os.path.join(TMP, 's07_stage.png')); im.save(os.path.join(TMP, 's07_base.png')); raise SystemExit
+
+# ---------------------------------------------------------------- Kartenfiguren (1x, nativ)
+def cut_sprites():
+    nv = native('Red Dragoneer')
+
+    def bgr(a):
+        L = a[..., :3].mean(2); r, g, b = a[..., 0], a[..., 1], a[..., 2]
+        return (L > 45) | ((g < 45) & (b < 70) & (r > 70))
+    rd = keep_largest(cut_by(nv, (20, 8, 54, 42), bgr)); rd = rd.crop(rd.getbbox())
+    bd = keep_largest(cut_native(native('Blue-Ice Dragon'), (18, 8, 58, 42), barrier_lum=70)); bd = bd.crop(bd.getbbox())
+    sb = keep_largest(cut_by(native('Sorbereus the Adapting Dragon'), (6, 6, 70, 40),
+                             lambda a: (a[..., 2] > a[..., 0] + 40) & (a[..., 2] > a[..., 1] + 10) & ~((a[..., 1] > 150) & (a[..., 0] > 120))))
+    sb = sb.crop(sb.getbbox())
+    return rd, bd, sb
+
+
+RD, BD, SB = cut_sprites()
+sp = outline(SB, (10, 14, 40, 255))
+im.alpha_composite(sp, (134, 22))
+
+
+# Drachlinge neben den Eiern (1x)
+rd = outline(RD, (34, 4, 10, 255))
+bd = outline(BD.transpose(Image.FLIP_LEFT_RIGHT), (10, 16, 48, 255))
+for spr, (sx_, sy_), gc in [(rd, (57, 226 - rd.height), (20, 6, 8, 255)), (bd, (163, 227 - bd.height), (220, 240, 255, 255))]:
+    g_, pp = glow(spr, gc, radius=2, strength=0.9)
+    im.alpha_composite(g_, (sx_ - pp, sy_ - pp))
+    im.alpha_composite(spr, (sx_, sy_))
+
+
+# ================================================================ Vordergrund-Sims + Titel
+def ledge():
+    a = np.zeros((H, W, 4), np.uint8)
+    n = value_noise(W, H, 5, seed=91, octaves=2)
+    top = 306 + 2.5 * np.sin(xx / 6.0) + (value_noise(W, 1, 6, seed=92)[0] - 0.5) * 6
+    m = yy >= top
+    # Feuerseite: Basaltplatte mit Glutrissen
+    lam = np.clip(0.45 + (n - 0.5) * 0.8 - (yy - top) / 60, 0, 1)
+    fc = tones(lam, [(18, 6, 10), (30, 10, 14), (46, 16, 18), (64, 24, 22)], 0.8)
+    ic = tones(lam, [(20, 34, 76), (34, 56, 110), (54, 86, 150), (80, 120, 184)], 0.8)
+    a[m, :3] = np.where(FIRE[..., None], fc, ic)[m]; a[m, 3] = 255
+    pts = [(random.Random(i).uniform(0, W), random.Random(i + 99).uniform(300, H)) for i in range(34)]
+    d1, d2, _ = voronoi(pts)
+    seam = m & ((d2 - d1) < 1.0) & (yy > top + 2)
+    put(a, seam & FIRE, (150, 40, 18))
+    put(a, seam & FIRE & ((d2 - d1) < 0.45), (255, 150, 40))
+    put(a, seam & ~FIRE, (16, 26, 62))
+    put(a, seam & ~FIRE & ((d2 - d1) < 0.45), (150, 196, 240))
+    # Oberkante: Glutsaum links, Schneekappe rechts
+    e1 = m & ~np.roll(m, 1, axis=0)
+    e2 = m & ~np.roll(m, 2, axis=0) & ~e1
+    e3 = m & ~np.roll(m, 3, axis=0) & ~e1 & ~e2
+    put(a, e1 & FIRE, (255, 170, 60)); put(a, e2 & FIRE, (170, 56, 20)); put(a, e3 & FIRE & (THR < 0.5), (110, 32, 18))
+    put(a, e1 & ~FIRE, (255, 255, 255)); put(a, e2 & ~FIRE, (226, 242, 255)); put(a, e3 & ~FIRE & (THR < 0.6), (170, 206, 240))
+    # Schnee-Tropfnasen
+    r = random.Random(4)
+    for x in range(W):
+        if not FIRE[310, x] and r.random() < 0.3:
+            y0 = int(top[0, x]) + 3
+            for k in range(r.randint(1, 3)):
+                if y0 + k < H: a[y0 + k, x, :3] = (200, 228, 250)
+    return Image.fromarray(a)
+
+
+def title():
+    # eigenes "&" (das der Spielschrift ähnelt einem "$")
+    AMP = ['..######..', '.###..###.', '.###..###.', '.###.###..', '..#####...', '.#####..##',
+           '###.###.##', '###..####.', '###...###.', '###..#####', '.#####..##']
+    amp = np.array([[c == '#' for c in row] for row in AMP])
+    t1 = text_img('FIRE', 16, (255, 255, 255, 255)); t2 = text_img('ICE', 16, (255, 255, 255, 255))
+    gh = max(t1.height, t2.height, amp.shape[0])
+    t = Image.new('RGBA', (t1.width + t2.width + amp.shape[1] + 10, gh), (0, 0, 0, 0))
+    t.alpha_composite(t1, (0, gh - t1.height))
+    am = np.zeros(amp.shape + (4,), np.uint8); am[amp] = (255, 255, 255, 255)
+    t.alpha_composite(Image.fromarray(am), (t1.width + 5, gh - amp.shape[0]))
+    t.alpha_composite(t2, (t1.width + amp.shape[1] + 10, gh - t2.height))
+    a = np.array(t).astype(int)
+    h_, w_ = a.shape[:2]
+    x0, y0 = (W - w_) // 2, 320
+    ty = np.mgrid[0:h_, 0:w_][0] / max(1, h_ - 1)
+    fire = FIRE[y0:y0 + h_, x0:x0 + w_]
+    m = a[..., 3] > 0
+    fcol = np.where((ty < 0.45)[..., None], np.array((255, 236, 140)), np.where((ty < 0.75)[..., None], np.array((255, 164, 48)), np.array((230, 84, 24))))
+    icol = np.where((ty < 0.45)[..., None], np.array((250, 255, 255)), np.where((ty < 0.75)[..., None], np.array((170, 220, 250)), np.array((96, 156, 226))))
+    col = np.where(fire[..., None], fcol, icol)
+    a[m, :3] = col[m]
+    img = Image.fromarray(a.astype(np.uint8))
+    o = outline(img, (255, 0, 255, 255))
+    oa = np.array(o); om = (oa[..., 0] == 255) & (oa[..., 1] == 0) & (oa[..., 2] == 255)
+    oa[om & fire] = (40, 6, 10, 255); oa[om & ~fire] = (8, 14, 44, 255)
+    o = Image.fromarray(oa)
+    sh = Image.new('RGBA', (w_ + 1, h_ + 1), (0, 0, 0, 0))
+    sh.alpha_composite(silhouette(o, (6, 4, 10)), (1, 1)); sh.alpha_composite(o, (0, 0))
+    return sh, (x0, y0)
+
+
+# ================================================================ Rahmen
+def split_frame():
+    fr = layer()
+    bevel_frame(fr, (40, 6, 8), (255, 190, 80), (170, 50, 20), (96, 18, 12), (40, 6, 8), width=5)
+    fr2 = layer()
+    bevel_frame(fr2, (8, 14, 46), (236, 248, 255), (110, 160, 220), (48, 80, 150), (8, 14, 46), width=5)
+    fa = np.array(fr); fb = np.array(fr2)
+    fa[~FIRE] = fb[~FIRE]
+    img = Image.fromarray(fa)
+    d = ImageDraw.Draw(img)
+    for (x, y) in [(2, 2), (W - 3, 2), (2, H - 3), (W - 3, H - 3)]:
+        f = FIRE[y, x]
+        c1, c2, c3 = ((120, 20, 10), (255, 110, 30), (255, 240, 170)) if f else ((20, 40, 110), (110, 190, 250), (255, 255, 255))
+        d.polygon([(x - 3, y), (x, y - 3), (x + 3, y), (x, y + 3)], fill=c2, outline=c1)
+        d.point((x, y), fill=c3); d.point((x - 1, y - 1), fill=c3)
+    return img
+
+
+im.alpha_composite(ledge())
+t, txy = title()
+im.alpha_composite(t, txy)
+im.alpha_composite(split_frame())
+print(save(im, '07_feuer_und_eis'))
