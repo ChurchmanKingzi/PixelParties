@@ -127,19 +127,25 @@ for (x, y) in [(TX, 132), (TX, 131), (TX, 130), (TX, 129), (TX, 128), (TX, 127),
     px(cv, x, y, (20, 16, 24))
 for (a, b) in [((TX + 2, 124), (TX - 1, 131)), ((TX - 1, 131), (TX - 7, 134)), ((TX - 1, 131), (TX + 3, 140)), ((TX + 2, 124), (TX + 7, 128))]:
     bline(cv, a[0], a[1], b[0], b[1], (120, 120, 150))
-# Fenster: Flammen schlagen heraus
+# Fenster: innen lodert es, Flammenzungen schlagen nach oben heraus
+WINS = [(TX - 7, 164, -1), (TX + 7, 184, 1), (TX - 7, 204, -1)]
+for (wx, wy, sd) in WINS:
+    glow2(cv, wx, wy - 4, 20, (255, 140, 40), k=0.65, mix=0.35)
+    for y in range(wy - 6, wy + 7):
+        for x in range(wx - 3, wx + 4):
+            if TM[y, x] and tuple(cv.a[y, x]) != OUT and (y >= wy - 3 or math.hypot(x - wx, y - wy + 3) <= 3):
+                px(cv, x, y, rampc(FIRE[1:], 0.95 - (y - wy + 6) / 14, x, y))
 FL = Fig(W, H)
 FL.part('f', line=False)
-for (wx, wy, sd) in [(TX - 7, 164, -1), (TX + 7, 184, 1), (TX - 7, 204, -1)]:
-    for i in range(4):
-        L = rnd.uniform(9, 16)
-        a = -math.pi / 2 + sd * rnd.uniform(0.2, 0.9)
-        FL.poly([(wx - 3, wy + 4), (wx + 3, wy + 4), (wx + math.cos(a) * L + sd * 2, wy + math.sin(a) * L)], 'f')
-    FL.ellipse(wx, wy + 1, 4, 5, 'f')
+for (wx, wy, sd) in WINS:
+    for i, dx in enumerate((-3, -1, 1, 3)):
+        L = [13, 17, 15, 11][i] + rnd.uniform(-2, 2)
+        bend = sd * (1.5 + i * 0.6)
+        base = wy - 5
+        FL.poly([(wx + dx - 2, base + 2), (wx + dx + 2, base + 2), (wx + dx + bend * 0.6 + 1, base - L * 0.5),
+                 (wx + dx + bend, base - L), (wx + dx + bend * 0.4 - 1.5, base - L * 0.45)], 'f')
 FL.outline(k='K')
-frgba = FL.render({'f': mat(FIRE, pillow=3, k=1.2, bias=0.25, noise=1.2, nscale=2)}, outline_col=(110, 20, 6))
-for (wx, wy, sd) in [(TX - 7, 164, -1), (TX + 7, 184, 1), (TX - 7, 204, -1)]:
-    glow2(cv, wx, wy, 18, (255, 140, 40), k=0.6, mix=0.35)
+frgba = FL.render({'f': mat(FIRE, pillow=3, k=1.2, bias=0.2, noise=1.2, nscale=2)}, outline_col=(110, 20, 6))
 cv.paste(frgba, 0, 0)
 # Rauch über den Fenstern
 for (sx_, sy_) in [(TX - 16, 150), (TX + 14, 170)]:
@@ -283,13 +289,13 @@ for (ex, sd) in [(81, 1), (93, -1)]:
     shape = [(-3, 0), (-2, 0), (-1, 0), (0, 0), (1, 0), (2, 0), (3, 0), (-3, 1), (-2, 1), (-1, 1), (0, 1), (1, 1), (2, 1), (3, 1),
              (-2, 2), (-1, 2), (0, 2), (1, 2), (2, 2)]
     for (dx, dy) in shape:
-        if dy == 0 and dx * sd < -1:
+        if dy == 0 and dx * sd > 1:
             continue                           # schräg zur Mitte abfallendes Oberlid
         px(cv, cx_ + dx, cy_ + dy, (252, 250, 255) if dy < 2 else (210, 200, 246))
     for (dx, dy, c) in [(sd, 0, (120, 60, 230)), (sd, 1, (80, 30, 170)), (sd * 2, 1, (120, 60, 230)), (sd * 2, 0, (160, 110, 255))]:
         px(cv, cx_ + dx, cy_ + dy, c)
     for dx in range(-4, 5):                    # dunkle Lidlinie
-        yl = cy_ - 1 + (1 if dx * sd < -1 else 0)
+        yl = cy_ - 1 + (1 if dx * sd > 1 else 0)
         px(cv, cx_ + dx, yl, (30, 16, 40))
 # Schachbrett-Emblem auf der Brust (weiß/violett wie auf der Karte)
 EM = f.L == 'v'
@@ -332,21 +338,25 @@ for sd in range(3):
 # ---------------------------------------------------------------- stürzende Gestalten + Feuertropfen
 
 
-def faller(x, y, flip, col=(40, 30, 50), rim=(255, 150, 60)):
-    """kleine kopfüber stürzende Figur (Silhouette, vom Feuer angeleuchtet)"""
+def faller(x, y, flip):
+    """kopfüber stürzende Figur (vom Feuer angeleuchtet); x, y = Füße oben"""
     g = Fig(W, H)
-    g.part('b'); g.ellipse(x, y + 7, 3.2, 4.5, 'b')                                   # Körper
-    g.part('h'); g.ellipse(x - flip * 1, y + 13, 2.6, 2.6, 's')                       # Kopf (unten)
-    g.part('l'); g.limb(x - 1, y + 3, x - 4 * flip, y - 4, 1.4, 1.1, 'b'); g.limb(x + 1, y + 3, x + 5 * flip, y - 2, 1.4, 1.1, 'b')
-    g.part('a'); g.limb(x - 2, y + 9, x - 7 * flip, y + 8, 1.1, 0.9, 'b'); g.limb(x + 2, y + 9, x + 6 * flip, y + 14, 1.1, 0.9, 'b')
+    g.part('legs')
+    g.limb(x, y + 10, x - 6 * flip, y + 1, 2.2, 1.8, 'b'); g.limb(x + 2, y + 10, x + 7 * flip, y + 3, 2.2, 1.8, 'b')
+    g.part('body'); g.ellipse(x + 1, y + 15, 4.2, 6.5, 'c')
+    g.part('arms')
+    g.limb(x - 1, y + 18, x - 9 * flip, y + 17, 1.7, 1.4, 'c'); g.limb(x + 3, y + 18, x + 9 * flip, y + 24, 1.7, 1.4, 'c')
+    g.part('hands'); g.ellipse(x - 9 * flip, y + 17, 1.8, 1.8, 's'); g.ellipse(x + 9 * flip, y + 24, 1.8, 1.8, 's')
+    g.part('head'); g.ellipse(x + 1, y + 24, 3.8, 3.8, 's')
+    g.part('hair'); g.ellipse(x + 1, y + 26, 3.8, 2.4, 'h')
     g.outline()
-    rg = g.render({'b': mat([(30, 20, 40), (60, 40, 70), (110, 70, 90), (200, 120, 80)], pillow=1.5, k=1.5, bias=0.1),
-                   's': mat(SKIN, pillow=1.5, k=1.2, bias=0.1)}, light=(0.6, 0.6, 0.5))
+    rg = g.render({'b': mat(BROWN, pillow=1.5, k=1.4, bias=0.05),
+                   'c': mat([(60, 20, 20), (110, 40, 36), (170, 70, 50), (220, 120, 80)], pillow=2, k=1.4, bias=0.05),
+                   's': mat(SKIN, pillow=1.5, k=1.2, bias=0.1),
+                   'h': mat(hair_ramp((90, 60, 30)), pillow=1.5, k=1.2)}, light=(0.6, 0.6, 0.5))
     cv.paste(rg, 0, 0)
-
-
-faller(150, 178, 1)
-faller(222, 196, -1)
+    # entsetzte Augen/Mund (kopfüber)
+    px(cv, x, y + 23, (20, 10, 10)); px(cv, x + 2, y + 23, (20, 10, 10)); px(cv, x + 1, y + 21, (90, 20, 20))
 
 
 def fire_drop(x, y, s=1.0):
