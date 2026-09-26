@@ -15,10 +15,8 @@ sowie aus den Area-Sprites unter `public/areas/`.
 | `s04_cosmic.py` | 04 Kosmische Tiefen |
 | `s05_cool.py` | 05 Wowhalla-Regenbogen |
 | `s06_lunatic.py` | 06 Mondzyklus |
-| `s07_eggs.py` | 07 Feuer & Eis |
 | `s08_chess.py` | 08 König der Könige |
 | `s09_bees.py` | 09 Bomblebee-Wabe |
-| `s10_party.py` (+ `skel_sprites.py`) | 10 Skelett-Party |
 
 Benötigt Python 3 mit `pillow`, `numpy` und `scipy`:
 
