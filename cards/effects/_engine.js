@@ -4658,6 +4658,12 @@ class GameEngine {
           }
         }
 
+        // ★ `config.dimUnmetCondition` (Als Vorgabe 26.9.): Ziele, die an
+        // `config.condition` scheitern, bleiben AUSGEGRAUT in der Liste
+        // (`ineligible`) statt zu verschwinden — der Spieler sieht, dass es
+        // sie gibt, aber nicht waehlen kann (Petrifier: „except the user").
+        // Ohne die Flagge bleibt es beim Weglassen. CPU, Auto-Wahl und
+        // Antwortpruefung ueberspringen `ineligible` ohnehin.
         const addHeroes = (playerIdx) => {
           const ps2 = gs.players[playerIdx];
           for (let hi = 0; hi < (ps2.heroes || []).length; hi++) {
@@ -4666,7 +4672,10 @@ class GameEngine {
             // Skip heroes charmed by the caster (they're on the caster's side)
             if (hero.charmedBy === pi && playerIdx !== pi) continue;
             const t = { id: `hero-${playerIdx}-${hi}`, type: 'hero', owner: playerIdx, heroIdx: hi, cardName: hero.name };
-            if (config.condition && !config.condition(t, engine)) continue;
+            if (config.condition && !config.condition(t, engine)) {
+              if (!config.dimUnmetCondition) continue;
+              t.ineligible = true;   // ausgegraut statt weg (s. dimUnmetCondition)
+            }
             targets.push(t);
           }
         };
@@ -4693,7 +4702,10 @@ class GameEngine {
               if (!cd || !engine.isChoosableAsCreature(inst, cd)) continue;
               if (inst?.faceDown) continue; // Face-down Bakhm surprises are not targetable
               const t = { id: `equip-${playerIdx}-${hi}-${si}`, type: 'equip', owner: playerIdx, heroIdx: hi, slotIdx: si, cardName: creatureName, cardInstance: inst };
-              if (config.condition && !config.condition(t, engine)) continue;
+              if (config.condition && !config.condition(t, engine)) {
+              if (!config.dimUnmetCondition) continue;
+              t.ineligible = true;   // ausgegraut statt weg (s. dimUnmetCondition)
+            }
               targets.push(t);
             }
           }
@@ -4709,7 +4721,10 @@ class GameEngine {
               const h = charmedOps.heroes[hi];
               if (!h?.name || h.hp <= 0 || h.charmedBy !== pi) continue;
               const t = { id: `hero-${oppIdx}-${hi}`, type: 'hero', owner: oppIdx, heroIdx: hi, cardName: h.name };
-              if (config.condition && !config.condition(t, engine)) continue;
+              if (config.condition && !config.condition(t, engine)) {
+              if (!config.dimUnmetCondition) continue;
+              t.ineligible = true;   // ausgegraut statt weg (s. dimUnmetCondition)
+            }
               if (!targets.some(x => x.id === t.id)) targets.push(t);
             }
           }
@@ -5229,7 +5244,10 @@ class GameEngine {
             if (!hero?.name || hero.hp <= 0) continue;
             if (hero.charmedBy === pi && playerIdx !== pi) continue;
             const t = { id: `hero-${playerIdx}-${hi}`, type: 'hero', owner: playerIdx, heroIdx: hi, cardName: hero.name };
-            if (config.condition && !config.condition(t, engine)) continue;
+            if (config.condition && !config.condition(t, engine)) {
+              if (!config.dimUnmetCondition) continue;
+              t.ineligible = true;   // ausgegraut statt weg (s. dimUnmetCondition)
+            }
             targets.push(t);
           }
         };
@@ -5254,7 +5272,10 @@ class GameEngine {
               if (!cd || !engine.isChoosableAsCreature(inst2, cd)) continue;
               if (inst2?.faceDown) continue; // Face-down Bakhm surprises are not targetable
               const t = { id: `equip-${playerIdx}-${hi}-${si}`, type: 'equip', owner: playerIdx, heroIdx: hi, slotIdx: si, cardName: creatureName, cardInstance: inst2 };
-              if (config.condition && !config.condition(t, engine)) continue;
+              if (config.condition && !config.condition(t, engine)) {
+              if (!config.dimUnmetCondition) continue;
+              t.ineligible = true;   // ausgegraut statt weg (s. dimUnmetCondition)
+            }
               targets.push(t);
             }
           }
@@ -5269,7 +5290,10 @@ class GameEngine {
               const h = charmedOps2.heroes[hi];
               if (!h?.name || h.hp <= 0 || h.charmedBy !== pi) continue;
               const t = { id: `hero-${oppIdx}-${hi}`, type: 'hero', owner: oppIdx, heroIdx: hi, cardName: h.name };
-              if (config.condition && !config.condition(t, engine)) continue;
+              if (config.condition && !config.condition(t, engine)) {
+              if (!config.dimUnmetCondition) continue;
+              t.ineligible = true;   // ausgegraut statt weg (s. dimUnmetCondition)
+            }
               if (!targets.some(x => x.id === t.id)) targets.push(t);
             }
           }
