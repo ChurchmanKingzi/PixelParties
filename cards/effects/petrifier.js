@@ -44,6 +44,39 @@
 
 const CARD_NAME = 'Petrifier';
 const DAUER = 3;
+const FLUG_MS = 650;          // dunkler Stoss vom Wirker zum Ziel
+const FLUCH_MS = 1700;        // `petrifier_fluch` auf dem Ziel (Client)
+const STEIN_OBEN_MS = 1150;   // ab hier ist das Ziel ganz Stein
+
+/**
+ * ★ Bildfolge (Als Vorgabe 26.9.: „eine dunkle Magie, die das Ziel in
+ * Stein verwandelt"): ein Stoss negativer Energie fliegt vom Wirker zum
+ * Ziel (`darkBlast`, wie Memory Blast), dort oeffnet sich ein Runensiegel,
+ * Ranken kriechen hoch und das Ziel versteinert von unten nach oben
+ * (`petrifier_fluch`). Wartet, bis der Stein oben angekommen ist — erst
+ * dann setzt `onPlay` den Stun, und die bleibende Versteinerungs-Optik
+ * uebernimmt nahtlos. Dieselbe Folge spielt die Engine, wenn der Zauber
+ * negiert wird (`spellVisual`). Wirkt eine Kreatur, lenkt die Engine
+ * den Startpunkt selbst auf sie um (`_spellCasterOverride`).
+ */
+async function petrifierBilder(engine, { owner, heroIdx, ziel, negiert }) {
+  if (!ziel) return;
+  const zielSlot = ziel.type === 'hero' ? -1 : ziel.slotIdx;
+  engine._broadcastEvent('play_projectile_animation', {
+    sourceOwner: owner, sourceHeroIdx: heroIdx ?? -1,
+    targetOwner: ziel.owner, targetHeroIdx: ziel.heroIdx,
+    targetZoneSlot: ziel.type === 'hero' ? undefined : ziel.slotIdx,
+    projectileShape: 'darkBlast', noTrail: true,
+    power: 0.35, duration: FLUG_MS, sfx: 'elem_dark',
+  });
+  await engine._delay(FLUG_MS);
+  if (negiert) return;   // abgewehrt: der Stoss kommt an, versteinert aber nicht
+  engine._broadcastEvent('play_zone_animation', {
+    type: 'petrifier_fluch', duration: FLUCH_MS,
+    owner: ziel.owner, heroIdx: ziel.heroIdx, zoneSlot: zielSlot,
+  });
+  await engine._delay(STEIN_OBEN_MS);
+}
 
 /**
  * Liefert eine Pruefung „ist dieses Ziel der Wirker?" (s. Kopf).
@@ -74,7 +107,13 @@ module.exports = {
   // NEGIERT, laeuft sein Effekt-Rumpf nie — die Engine spielt dann diese
   // Bilder, damit der abgewehrte Zauber trotzdem zu sehen ist. Im
   // normalen Weg bleibt es bei den Broadcasts im Effekt selbst.
-  spellVisual: { impact: { type: 'petrify' }, impactMs: 260 },
+  // Dieselbe Bildfolge fuer die Engine (Negation: nur der Stoss zum Ziel).
+  async spellVisual(engine, info) {
+    const ziel = (info.targets || [])[0];
+    await petrifierBilder(engine, {
+      owner: info.owner, heroIdx: info.heroIdx, ziel, negiert: !!info.negiert,
+    });
+  },
 
   requiresTarget: true,
 
@@ -100,12 +139,9 @@ module.exports = {
       });
       if (!target) { gs._spellCancelled = true; return; }
 
-      engine._broadcastEvent('play_zone_animation', {
-        type: 'petrify',
-        owner: target.owner, heroIdx: target.heroIdx,
-        zoneSlot: target.type === 'hero' ? -1 : target.slotIdx,
+      await petrifierBilder(engine, {
+        owner: ctx.cardHeroOwner ?? pi, heroIdx: ctx.cardHeroIdx, ziel: target,
       });
-      await engine._delay(420);
 
       if (target.type === 'hero') {
         const hero = gs.players[target.owner]?.heroes?.[target.heroIdx];

@@ -20129,6 +20129,128 @@ img, .card-tooltip-img img { image-rendering: pixelated; }
 }
 
 
+/* ★ „Petrifier" — dunkle Magie verwandelt das Ziel in Stein (Als Vorgabe
+   26.9.). Zeitplan im Kopf von `petrifier_fluch` (app-board.jsx). Der
+   Behaelter sitzt in der Zielmitte; alles ist um (0,0) gelegt. */
+.pfluch { position: fixed; width: 0; height: 0; pointer-events: none; z-index: 10105; }
+.pfluch > span, .pfluch > svg { position: absolute; display: block; }
+/* ① Runensiegel: zwei gegenlaeufige Ringe als flache Ellipse unter dem Ziel. */
+.pfluch-siegel {
+  left: 0; top: calc(var(--ph) * .42);
+  width: calc(var(--pw) * 1.5); height: calc(var(--pw) * .55);
+  border-radius: 50%;
+  border: 3px dashed rgba(190, 110, 255, .9);
+  box-shadow: 0 0 18px rgba(150, 60, 230, .8), inset 0 0 14px rgba(120, 40, 200, .7);
+  transform: translate(-50%, -50%) scale(.2) rotate(0deg); opacity: 0;
+  animation: pfSiegel 1.6s ease-out forwards;
+}
+.pfluch-siegel2 {
+  width: calc(var(--pw) * 1.15); height: calc(var(--pw) * .4);
+  border: 2px dotted rgba(230, 190, 255, .85);
+  animation-name: pfSiegel2;
+}
+/* Dunkler Dunst um das Ziel. */
+.pfluch-dunst {
+  left: 0; top: 0; width: calc(var(--pw) * 1.5); height: calc(var(--ph) * 1.3);
+  transform: translate(-50%, -50%); border-radius: 30%;
+  background: radial-gradient(ellipse at 50% 70%, rgba(60, 10, 90, .75) 0%, rgba(30, 5, 50, .45) 45%, transparent 75%);
+  opacity: 0; animation: pfDunst 1.6s ease-out forwards;
+}
+/* ② Ranken: wachsen von der Unterkante nach oben. */
+.pfluch-ranke {
+  width: 4px; border-radius: 3px;
+  background: linear-gradient(0deg, rgba(40, 0, 70, .95) 0%, rgba(140, 60, 220, .9) 60%, rgba(220, 170, 255, .8) 100%);
+  box-shadow: 0 0 8px rgba(150, 60, 230, .8);
+  transform-origin: 50% 100%;
+  transform: translate(-50%, -100%) rotate(var(--rdreh)) scaleY(0); opacity: 0;
+  animation: pfRanke 1.1s ease-out forwards;
+}
+/* ③ Stein: graut das Ziel darunter aus und steigt von unten hoch. */
+.pfluch-stein {
+  left: calc(var(--pw) / -2); top: calc(var(--ph) / -2);
+  width: var(--pw); height: var(--ph); border-radius: 4px;
+  -webkit-backdrop-filter: grayscale(1) contrast(1.15) brightness(.82);
+  backdrop-filter: grayscale(1) contrast(1.15) brightness(.82);
+  background:
+    repeating-linear-gradient(45deg, rgba(120,115,110,.22) 0 2px, transparent 2px 6px),
+    repeating-linear-gradient(-45deg, rgba(90,90,85,.16) 0 1px, transparent 1px 5px),
+    linear-gradient(135deg, rgba(150,150,155,.35), rgba(80,80,85,.4));
+  box-shadow: inset 0 0 14px rgba(40, 40, 45, .7);
+  clip-path: inset(100% 0 0 0);
+  animation: pfStein .75s cubic-bezier(.4,.1,.5,1) .35s forwards, pfSteinAus .45s ease-in 1.25s forwards;
+}
+/* Die glimmende Front, die mit dem Stein nach oben laeuft. */
+.pfluch-front {
+  left: calc(var(--pw) / -2); top: calc(var(--ph) / 2);
+  width: var(--pw); height: 4px; border-radius: 2px;
+  background: linear-gradient(90deg, transparent, rgba(220, 170, 255, .95) 20%, #fff 50%, rgba(220, 170, 255, .95) 80%, transparent);
+  box-shadow: 0 0 12px rgba(170, 80, 255, .95), 0 0 24px rgba(120, 40, 200, .7);
+  opacity: 0;
+  animation: pfFront .75s cubic-bezier(.4,.1,.5,1) .35s forwards;
+}
+/* ④ Risse: zeichnen sich ueber `stroke-dashoffset` ein. */
+.pfluch-risse { overflow: visible; }
+.pfluch-risse path {
+  fill: none; stroke: rgba(30, 20, 40, .9); stroke-width: 1.6;
+  stroke-linecap: round; stroke-linejoin: round;
+  filter: drop-shadow(0 0 1.5px rgba(210, 160, 255, .9));
+  stroke-dasharray: 100; stroke-dashoffset: 100; opacity: 0;
+  animation: pfRiss .3s ease-out forwards, pfAus .35s ease-in 1.35s forwards;
+}
+/* ⑤ Dumpfer Blitz, Splitter, dunkle Funken. */
+.pfluch-blitz {
+  left: 0; top: 0; width: calc(var(--pw) + 20px); height: calc(var(--ph) + 20px);
+  transform: translate(-50%, -50%) scale(.8); border-radius: 8px;
+  background: radial-gradient(ellipse at center, rgba(235, 225, 245, .8) 0%, rgba(150, 130, 170, .35) 45%, transparent 80%);
+  opacity: 0; animation: pfBlitz .45s ease-out 1.15s forwards;
+}
+.pfluch-splitter {
+  border-radius: 2px; box-shadow: 0 1px 2px rgba(0,0,0,.55);
+  transform: translate(-50%, -50%) rotate(0deg); opacity: 0;
+  animation: sbBrocken .6s cubic-bezier(.25,.6,.5,1) forwards;
+}
+.pfluch-funke {
+  width: 4px; height: 4px; border-radius: 50%;
+  background: #d9b3ff; box-shadow: 0 0 6px #8a3dd6;
+  transform: translate(-50%, -50%); opacity: 0;
+  animation: pfFunke .55s ease-out forwards;
+}
+@keyframes pfSiegel {
+  0%   { opacity: 0; transform: translate(-50%, -50%) scale(.2) rotate(0deg); }
+  25%  { opacity: 1; transform: translate(-50%, -50%) scale(1) rotate(90deg); }
+  80%  { opacity: .85; transform: translate(-50%, -50%) scale(1.05) rotate(260deg); }
+  100% { opacity: 0; transform: translate(-50%, -50%) scale(1.15) rotate(320deg); }
+}
+@keyframes pfSiegel2 {
+  0%   { opacity: 0; transform: translate(-50%, -50%) scale(.2) rotate(0deg); }
+  25%  { opacity: 1; transform: translate(-50%, -50%) scale(1) rotate(-80deg); }
+  80%  { opacity: .8; transform: translate(-50%, -50%) scale(1) rotate(-230deg); }
+  100% { opacity: 0; transform: translate(-50%, -50%) scale(.9) rotate(-280deg); }
+}
+@keyframes pfDunst { 0% { opacity: 0; } 20% { opacity: 1; } 75% { opacity: .8; } 100% { opacity: 0; } }
+@keyframes pfRanke {
+  0%   { opacity: 0; transform: translate(-50%, -100%) rotate(var(--rdreh)) scaleY(0); }
+  15%  { opacity: 1; }
+  55%  { opacity: 1; transform: translate(-50%, -100%) rotate(var(--rdreh)) scaleY(1); }
+  100% { opacity: 0; transform: translate(-50%, -100%) rotate(var(--rdreh)) scaleY(1); }
+}
+@keyframes pfStein { from { clip-path: inset(100% 0 0 0); } to { clip-path: inset(0 0 0 0); } }
+@keyframes pfSteinAus { from { opacity: 1; } to { opacity: 0; } }
+@keyframes pfFront {
+  0%   { opacity: 0; transform: translateY(0); }
+  10%  { opacity: 1; }
+  90%  { opacity: 1; transform: translateY(calc(var(--ph) * -1)); }
+  100% { opacity: 0; transform: translateY(calc(var(--ph) * -1)); }
+}
+@keyframes pfRiss { 0% { opacity: 1; stroke-dashoffset: 100; } 100% { opacity: 1; stroke-dashoffset: 0; } }
+@keyframes pfAus { to { opacity: 0; } }
+@keyframes pfBlitz { 0% { opacity: 0; } 25% { opacity: 1; } 100% { opacity: 0; transform: translate(-50%, -50%) scale(1.08); } }
+@keyframes pfFunke {
+  0%   { opacity: 0; transform: translate(-50%, -50%); }
+  20%  { opacity: 1; }
+  100% { opacity: 0; transform: translate(-50%, calc(-50% + var(--fh))); }
+}
+
 /* ★★ v1175 — „Memory Blast": Stoss aus negativer Energie vom Wirker zum
    Ziel. Der Flug bewegt nur `transform`; Kopf, Schweif und Ranken
    flackern an Ort und Stelle mit. */
