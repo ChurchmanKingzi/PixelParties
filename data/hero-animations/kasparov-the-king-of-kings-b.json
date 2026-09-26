@@ -1,0 +1,11 @@
+{
+  "hero": "Kasparov, the King of Kings [B]",
+  "sheet": "kasparov-the-king-of-kings-b.png",
+  "frameWidth": 23,
+  "frameHeight": 35,
+  "frames": 48,
+  "frameMs": 90,
+  "loop": true,
+  "layout": "horizontal",
+  "padLeft": 2
+}

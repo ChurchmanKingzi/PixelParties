@@ -2,7 +2,8 @@
 """Idle-Animation für Darion, the Blood-Crazy Groundskeeper (50x47).
 
 Völlig verrückter Hausmeister mit blutiger Kettensäge:
-* Die Kette läuft ständig (obere und untere Zahnreihe gegenläufig).
+* Die Kette läuft ständig um das Blatt: oben nach vorne, unten zurück
+  (neu gezeichnetes 4-px-Gliedermuster mit abstehenden Zähnen).
 * Ruhephase: er wippt, der Motor tuckert und pustet graue Wölkchen,
   Blut tropft vom Sägeblatt und bildet kleine Pfützen.
 * Zweimal pro Loop lässt er die Säge aufheulen: alles vibriert, dunkle
@@ -50,19 +51,29 @@ def face(a, i):
 
 
 # ---------------------------------------------------------------- Kette
-CHAIN_TOP = (21, 22, 23)
-CHAIN_BOT = (29, 30, 31)
+# Die Kette wird neu gezeichnet: 4-px-Muster (Metallglanz, Blut, dunkle Glieder),
+# das oben nach vorne und unten zurück zum Motor läuft (1 px pro Frame),
+# dazu Zähne, die nach außen abstehen. Die Deckkraft des Originals (Bewegungs-
+# unschärfe zum Blattende hin) bleibt erhalten.
+LINK = [(201, 184, 176), (138, 20, 20), (58, 15, 15), (74, 20, 20)]
+CHAIN_BASE = (70, 18, 18)
+TOOTH = (190, 170, 162)
+# (Kettenzeile, ruhige Zeile, Zahnzeile, Richtung)
+CHAINS = [(22, 23, 21, 1), (29, 30, 31, -1)]
+CHAIN_X = range(19, 42)
 
 
 def run_chain(a, i):
-    ph = i % 2
-    for rows, d in ((CHAIN_TOP, 1), (CHAIN_BOT, -1)):
-        for y in rows:
-            row = a[y].copy()
-            for x in range(19, W):
-                sx = x - d * ph
-                if 19 <= sx < W:
-                    a[y, x] = row[sx]
+    for line, inner, teeth, d in CHAINS:
+        for x in CHAIN_X:
+            k = (x - d * i) % 4
+            if SRC[line, x, 3] > 40:
+                a[line, x, :3] = LINK[k]
+            if SRC[inner, x, 3] > 40:
+                a[inner, x, :3] = CHAIN_BASE
+            if k == 0 and SRC[line, x, 3] > 40:
+                alpha = max(int(SRC[teeth, x, 3]), int(SRC[line, x, 3] * 0.8))
+                a[teeth, x] = (*TOOTH, alpha)
 
 
 # ---------------------------------------------------------------- Partikel

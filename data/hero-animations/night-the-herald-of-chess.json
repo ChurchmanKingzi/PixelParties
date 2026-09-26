@@ -1,0 +1,10 @@
+{
+  "hero": "Night, the Herald of Chess",
+  "sheet": "night-the-herald-of-chess.png",
+  "frameWidth": 40,
+  "frameHeight": 45,
+  "frames": 48,
+  "frameMs": 90,
+  "loop": true,
+  "layout": "horizontal"
+}

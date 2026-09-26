@@ -45,6 +45,9 @@ kopiert, daneben liegt eine JSON-Datei mit den Metadaten. Die erzeugten
 | `baaliel.py` | `final` | `baaliel_idle_final_sheet.png` | `baaliel-the-demon-general` |
 | `inya.py` | `final` | `inya_idle_final_sheet.png` | `card-game-player-inya` |
 | `zwei.py` | `final` | `zwei_idle_final_sheet.png` | `zwei-the-lucky-thief` |
+| `night.py` | `final` | `night_idle_final_sheet.png` | `night-the-herald-of-chess` |
+| `kasparov.py` | `final 90 b` | `kasparov_b_idle_final_sheet.png` | `kasparov-the-king-of-kings-b` |
+| `kasparov.py` | `final 90 w` | `kasparov_w_idle_final_sheet.png` | `kasparov-the-king-of-kings-w` |
 | `bubbles.py` | `final gross` | `bubbles_idle_final_gross_sheet.png` | `bubbles-the-bouncy-bunny` |
 
 `bubbles.py` ohne `gross` erzeugt eine auf Hero-Größe verkleinerte Variante
