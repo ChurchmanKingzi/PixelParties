@@ -191,8 +191,8 @@ def beam(im, x0, y0, ang, spread, length, col, st=0.35):
     a = np.array(im).astype(int)
     a[m, :3] = np.clip(a[m, :3] + np.array(col), 0, 255)
     return Image.fromarray(a.astype(np.uint8))
-im = beam(im, 96, 150, -38, 4.5, 190, (40, 100, 110), 0.5)
-im = beam(im, 154, 150, 38, 4.5, 190, (110, 40, 100), 0.5)
+im = beam(im, 96, 150, -38, 4.5, 175, (40, 100, 110), 0.42)
+im = beam(im, 154, 150, 38, 4.5, 175, (110, 40, 100), 0.42)
 im = beam(im, 112, 150, -16, 3, 170, (90, 90, 30), 0.35)
 im = beam(im, 138, 150, 16, 3, 170, (40, 100, 50), 0.35)
 
@@ -652,7 +652,7 @@ im.save(os.path.join(TMP, 'p10_d.png'))
 def bone_wing(span=14, seed=0):
     """Gefiederter Knochenflügel (rechter Flügel, Ansatz links unten)."""
     N_ = span + 8
-    G = np.full((N_, N_ + 4), '.', dtype='<U1')
+    G = np.full((N_ + 4, 2 * N_ + 4), '.', dtype='<U1')
     ox, oy = 1, span // 2 + 2
     tip = (ox + span, 1)
     nf = 5
@@ -660,8 +660,9 @@ def bone_wing(span=14, seed=0):
     for k in range(nf + 1):
         t = k / nf
         bx = ox + (tip[0] - ox) * t; by = oy + (tip[1] - oy) * t
-        L_ = span * (0.30 + 0.55 * math.sin(math.pi * (0.25 + 0.6 * t)))
-        heads.append((bx, by)); tails.append((bx + L_ * 0.35, by + L_))
+        L_ = span * (0.40 + 0.50 * t)
+        ang = math.radians(15 + 60 * t)
+        heads.append((bx, by)); tails.append((bx + L_ * math.sin(ang), by + L_ * math.cos(ang)))
     mem = Image.new('L', (G.shape[1], G.shape[0]), 0)
     md = ImageDraw.Draw(mem)
     md.polygon(heads + tails[::-1], fill=1)
@@ -741,8 +742,8 @@ mageS = skeleton('m', dict(la=(-60, -20), ra=(150, 170), ll=(-10, 0), rl=(30, 10
 put(im, mageS, 162, 200, shd=True)
 im = add_light(im, 168, 170, 12, (70, 30, 80), 1.0)
 # Musiknoten (Farben wie auf "Skeleton Bard")
-NOTE1 = ["..AA", "..AB", "..A.", "..A.", "AAA.", "AAA."]
-NOTE2 = ["AAAAA", "A...A", "A...A", "A..AA", "AA.AA", "AA..."]
+NOTE1 = ["..AA.", "..A.B", "..A..", "..A..", "AAA..", "AAA.."]
+NOTE2 = ["..AAAAA", "..A...A", "..A...A", "..A...A", "AAA.AAA", "AAA.AAA"]
 for (x, y, col, kind) in [(106, 166, (230, 214, 60), 0), (144, 160, (110, 220, 90), 1), (100, 150, (190, 90, 230), 1), (150, 176, (240, 80, 80), 0), (62, 176, (230, 214, 60), 0), (196, 168, (190, 90, 230), 0)]:
     rows = NOTE1 if kind == 0 else NOTE2
     nimg = rows_img(rows, {'A': col, 'B': tuple(int(v * 0.7) for v in col)})
@@ -951,6 +952,22 @@ addf(reap, 30, 296)
 fg.sort(key=lambda t: t[0])
 for (y, x, spr) in fg:
     put(im, spr, x, y, shd=True)
+
+# Boden-Kleinkram: Knochen, Schädel, Leuchtpilze, Ratte
+BONEC = {'1': (230, 220, 196), '2': (176, 162, 156), 'k': (40, 24, 46)}
+small_skull = rows_img([".111.", "11112", "1k1k2", ".1k2."], BONEC)
+small_bone = rows_img(["1....1", "122222", "1....1"], BONEC)
+small_bone2 = rows_img(["1..", ".2.", "..2", "..1"], BONEC)
+for (spr, x, y) in [(small_skull, 80, 336), (small_bone, 66, 326), (small_bone2, 92, 342), (small_bone, 180, 332), (small_skull, 232, 300),
+                    (small_bone2, 150, 286), (small_bone, 112, 282), (small_skull, 8, 276), (small_bone, 196, 318), (small_bone2, 34, 322)]:
+    im.alpha_composite(spr, (x, y))
+MUSH = {'c': (120, 240, 220), 'C': (60, 150, 160), 'w': (230, 255, 250), 's': (170, 160, 190)}
+mush = rows_img([".cc...", "cwcC..", ".s..cc", ".s.cwC", "....s."], MUSH)
+for (x, y) in [(40, 330), (210, 286), (104, 272), (180, 344 - 7)]:
+    im = add_light(im, x + 3, y + 3, 7, (10, 40, 40), 0.8)
+    im.alpha_composite(mush, (x, y))
+rat = area('bonegrinder/rat').crop((0, 0, 9, 4)); rat = rat.crop(rat.getbbox())
+im.alpha_composite(rat, (86, 327))
 
 # Schatztruhe
 chest = Image.new('RGBA', (22, 16), (0, 0, 0, 0))
