@@ -58,10 +58,6 @@ def dusk(sp, k=(0.84, 0.76, 0.86), add=(6, 2, 14), rim=(255, 156, 96), rim_amt=0
     return Image.fromarray(np.clip(s_, 0, 255).astype(np.uint8), 'RGBA')
 
 
-def darken(col, f):
-    return tuple(int(round(c * f)) for c in col[:3])
-
-
 # ---------------------------------------------------------------- Geometrie
 HY = 136            # Horizont
 VPX = 104           # Fluchtpunkt x
@@ -174,6 +170,9 @@ fine = streaks(5, 6, 6)
 # Rang-Transformation -> gleichverteilte Schwelle; Übergänge folgen den Wellenstreifen statt Bayer-Karos
 rk = np.argsort(np.argsort(fine[HY + 1:].ravel())).reshape(fine[HY + 1:].shape) / fine[HY + 1:].size
 thr = np.zeros((H, W)); thr[HY + 1:] = rk
+# nahe am Horizont längere Streifen statt feinem Rauschen
+rkw = np.argsort(np.argsort(wave[HY + 1:HY + 12].ravel())).reshape((11, W)) / (11 * W)
+thr[HY + 1:HY + 12] = rkw
 tw = np.clip(q ** 0.85 + (wave - 0.5) * 0.16, 0, 1)
 sea = np.zeros((H, W, 4), np.uint8); sea[..., 3] = 255
 for i in range(len(WAT) - 1):
@@ -207,13 +206,12 @@ setm(a, gl1, (212, 116, 112))
 setm(a, gl2, (250, 176, 112))
 setm(a, gl3, (255, 230, 160))
 # helle Säule direkt unter der Sonne
-for k in range(1, 9):
+for k in range(1, 10):
     y = HY + k
-    hw = int(round(SUN_R * (1 - k / 10)))
+    hw = int(round(SUN_R * (1 - k / 11)))
     for x in range(SUN_X - hw, SUN_X + hw + 1):
-        if (x + k * 3) % (2 + k // 3) != 0 and wave[y, x] > 0.35:
-            px(a, x, y, (255, 226, 152) if abs(x - SUN_X) < hw * 0.6 else (250, 180, 112))
-SEA_REF = a.copy()
+        if wave[y, x] > 0.46 + k * 0.012:
+            px(a, x, y, (255, 226, 152) if abs(x - SUN_X) < hw * 0.55 else (250, 180, 112))
 
 
 # ================================================================ KÜSTE (links)
@@ -254,6 +252,15 @@ cliff_p = profile([(0, 72), (8, 70), (16, 74), (24, 73), (30, 78), (38, 84), (44
                    (62, 104), (68, 112), (74, 118), (82, 126), (90, 134), (98, 141), (104, 146)], 0, 106, 8, jag=1)
 CB = 146
 CLIFF = fill_profile(cliff_p, CB)
+# unregelmäßiger Felsfuß
+rfo = random.Random(41)
+ext = 0
+for x in range(0, 104):
+    if rfo.random() < 0.35:
+        ext = int(np.clip(ext + rfo.choice([-1, 1]), 0, 2))
+    if x > 98:
+        ext = 0
+    CLIFF[CB + 1:CB + 1 + ext, x] = True
 CL = [(28, 16, 40), (40, 23, 54), (54, 31, 68), (70, 40, 82), (92, 50, 92)]
 # Gegenlicht-Klippe: dunkle Masse, oben vom Himmel etwas aufgehellt, Felsbänder als Simse
 nc = value_noise(W, H, 6, seed=13, octaves=2)
@@ -388,7 +395,6 @@ dl = np.hypot(XX - lx_, YY - ly_)
 ang = np.abs((YY - ly_) / np.maximum(lx_ - XX, 1e-3))
 beam = (XX < lx_ - 3) & (ang < 0.16) & (YY < CB)
 bt = np.clip(1 - (lx_ - XX) / 40, 0, 1) * 0.5
-setm(a, beam & dither_mask(None, bt) & ~CLIFF & ~TOWER, (228, 170, 150))
 for rad, col in ((6.5, (206, 112, 120)), (4.5, (240, 160, 128))):
     ring = (dl <= rad) & (dl > 2.2) & ~CLIFF & ~TOWER & dither_mask(None, np.full((H, W), 0.5 if rad > 5 else 1.0))
     setm(a, ring, col)
@@ -734,7 +740,6 @@ for (z, side, X, i) in POSTS:
 # ---------------------------------------------------------------- Wasser-Sprites setzen
 water_sprite(a, STUMP, 226, 196)
 water_sprite(a, DALBEN, 196, 238)
-fa = np.array(FASS)
 water_sprite(a, FASS, 186, 292, refl=False, foam=False)
 water_sprite(a, ROCK, 206, 338)
 
@@ -815,7 +820,7 @@ for (z, side, cx, y0, w) in sorted(LANT, key=lambda l: -l[0]):
             if not (0 <= x < W) or DECK[y, x]:
                 continue
             gg = np.exp(-((x - gx) / (hw * (0.7 + k))) ** 2) * (1 - k)
-            if CREST[y, x] and wave[y, x] > 1 - 0.5 * gg:
+            if CREST[y, x] and wave[y, x] > 1 - 0.5 * gg and int(a[y, x, 2]) > int(a[y, x, 0]) + 50:
                 a[y, x] = P((255, 214, 130) if gg > 0.55 else (236, 140, 72))
 
 
@@ -875,6 +880,38 @@ def shadow_on_deck(a, x0, x1, y, h=2):
                 a[y + k, x, :3] = (a[y + k, x, :3] * 0.6).astype(np.uint8)
 
 
+
+# Schmugglerluke (Area-Sprite aus pier.png) und Pfütze, die den Abendhimmel spiegelt
+def hatch():
+    c = np.array(PIER.crop((31, 58, 54, 75)))
+    c[:, 0, 3] = 0
+    for yy_ in (3, 4, 12, 13):
+        c[yy_, 0, 3] = 255
+    return Image.fromarray(c, 'RGBA')
+
+
+def puddle_sky():
+    c = np.array(area(AREA + 'puddle').crop((56, 0, 84, 18))).astype(int)
+    al = c[..., 3] > 0
+    L = c[..., :3].mean(2)
+    lo, hi = np.percentile(L[al], 5), np.percentile(L[al], 95)
+    t = np.clip((L - lo) / max(1, hi - lo), 0, 1)
+    PAL = [(12, 40, 140), (22, 56, 166), (60, 50, 140), (150, 70, 116), (236, 150, 108)]
+    yy_ = np.mgrid[0:c.shape[0], 0:c.shape[1]][0]
+    tt = np.clip(t * 0.25 + (1 - yy_ / c.shape[0]) ** 1.3 * 0.9 - 0.05, 0, 0.999)   # hinten spiegelt der Horizont
+    idx_ = np.floor(tt * len(PAL)).astype(int)
+    out = np.zeros_like(c)
+    out[..., :3] = np.clip(np.array(PAL)[idx_] * 0.82 + c[..., :3] * 0.18, 0, 255).astype(int)
+    out[L > hi + 20, :3] = (255, 226, 170)
+    edge = al & ~ndimage.binary_erosion(al)
+    out[edge, :3] = (64, 34, 40)
+    out[..., 3] = np.where(al, 255, 0)
+    return Image.fromarray(out.astype(np.uint8), 'RGBA')
+
+
+comp(a, dusk(hatch(), rim_amt=0), 82, 249)
+comp(a, puddle_sky(), 104, 222)
+
 shadow_on_deck(a, 46, 78, 316)
 comp(a, dusk(CRATE), 46, 283)
 comp(a, dusk(CRATE), 49, 272)
@@ -928,19 +965,15 @@ def rowboat():
             if inner[y, bx]:
                 o[y, bx] = P((160, 110, 52)); o[y, bx + 1] = P((111, 74, 30))
     # Ladung: Sack (links) und Kistchen (rechts)
-    sack = [".ss.", "sSSs", "sSSs", ".ss."]
+    sack = [".ooo.", "oSSso", "oSsso", ".ooo."]
     for j, row in enumerate(sack):
         for i, ch in enumerate(row):
             if ch != '.':
-                o[4 + j, 12 + i] = P((210, 182, 134) if ch == 'S' else (163, 130, 80))
-    o[3, 13] = P((133, 102, 54))
+                o[4 + j, 12 + i] = P({'S': (226, 196, 146), 's': (189, 157, 108), 'o': (88, 62, 30)}[ch])
     for y in range(4, 9):
         for x in range(22, 27):
             edge = y in (4, 8) or x in (22, 26)
             o[y, x] = P((88, 57, 22) if edge else ((226, 184, 112) if y == 5 else (181, 129, 63)))
-    # Ruder (liegt längs)
-    for i in range(10):
-        o[7 + (i // 6), 3 + i] = P((210, 182, 134))
     return Image.fromarray(o, 'RGBA')
 
 
@@ -961,7 +994,7 @@ comp(a, dusk(BOAT), BX, BY)
 # Schaumkranz
 for x in range(BX, BX + BOAT.width):
     ys = np.nonzero(bm[:, x - BX])[0]
-    if len(ys) and (x * 7 % 5) < 2:
+    if len(ys) and random.Random(x * 17).random() < 0.45:
         wpx(a, x, BY + ys.max() + 1, (178, 168, 220) if x % 2 else (236, 216, 230))
 # Festmacherleine zum Pfahl
 post_z = [p_ for p_ in POSTS if p_[1] == 'L' and abs(p_[0] - 2.66) < 0.05][0][0]
@@ -975,7 +1008,7 @@ for i in range(n + 1):
     px(a, round(x), round(y), (150, 118, 76))
 # Bootslaterne am Heck
 bl = lantern_img('small')
-warm_glow(a, BX + 3, BY + 1, 11, 1.2)
+warm_glow(a, BX + 3, BY - 1, 9, 1.1)
 comp(a, bl, BX + 1, BY - 3)
 
 
@@ -1002,7 +1035,7 @@ comp(a, dusk(GS, k=(0.86, 0.8, 0.9), add=(4, 2, 12)), int(round(gcx - 13)), gtop
 
 # Funkeln auf dem Glitzerpfad und am Steg
 dsp = ImageDraw.Draw(img_tmp := Image.fromarray(a, 'RGBA'))
-for (x, y, sz) in [(176, 152, 2), (196, 178, 1), (236, 214, 1), (224, 262, 2), (228, 300, 1), (150, 142, 1)]:
+for (x, y, sz) in [(176, 152, 2), (196, 178, 1), (236, 214, 1), (224, 262, 2), (228, 300, 1), (166, 146, 1)]:
     if not DECK[y, x]:
         sparkle(dsp, x, y, sz, (255, 214, 140), core=(255, 250, 226))
 a = np.array(img_tmp)
@@ -1065,5 +1098,6 @@ for sx_ in (tx - 9, tx + ti.width + 8):
     a = np.array(img2)
 
 img = Image.fromarray(a, 'RGBA')
-img.convert('RGB').resize((W * 3, H * 3), Image.NEAREST).save(os.path.join(TMP, 'v.png'))
+if 'PP_TMP' in os.environ:
+    img.convert('RGB').resize((W * 3, H * 3), Image.NEAREST).save(os.path.join(TMP, 'v.png'))
 print(save(img, '15_smugglers_pier'))
