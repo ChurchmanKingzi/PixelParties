@@ -7,7 +7,10 @@
   Frame als Stoffflächen neu gezeichnet (Falten von der Schulter aus, frische
   1-px-Kontur); Stiefel, Arme und Handschuhe liegen darüber.
 * Dunkle Aura: violett-schwarze Schwaden steigen um ihn herum auf.
-* Das rote Auge im verdunkelten Gesicht glüht pulsierend.
+* Er blinzelt ab und zu (das eine sichtbare Auge im verdunkelten Gesicht).
+* Leichtes Squash & Stretch: zweimal pro Loop streckt er sich 1 px und
+  staucht sich danach 1 px (etwas breiter) – als Zeilen-/Spaltenoperation
+  auf das fertige Bild, damit nirgends Lücken entstehen.
 """
 import math
 import sys
@@ -26,7 +29,9 @@ N = 48
 CAPE_COLS = {rgb(c) for c in ('0a0a0a', '3b3b3b', '141414', '202020', '070707', '282828', '373737', '000000')}
 LEFT_IN, RIGHT_IN = 8, 18                     # Ansatz des Umhangs (Originalspalten)
 TOP = 19                                      # ab hier weht der Umhang
-EYE = [rgb('801416'), rgb('b01c1c'), rgb('e8322a'), rgb('ff6a50')]
+LID, LASH = rgb('d5a462'), rgb('66311e')
+EYE_PX = [(9, 10), (10, 10), (9, 11), (10, 11)]      # sichtbares Auge
+SS_ROW, SS_COL = 19, 13                               # Weste: Zeile/Spalte zum Dehnen
 
 
 def is_cape(ox, oy):
@@ -117,6 +122,39 @@ def draw_cape(out, body, i):
     out[mm] = res[mm]
 
 
+def ss_level(i):
+    """+1 gestreckt, -1 gestaucht (zweimal pro Loop)."""
+    t = i % 24
+    if 3 <= t < 9:
+        return 1
+    if 14 <= t < 19:
+        return -1
+    return 0
+
+
+def squash_stretch(img, i):
+    """Auf das fertige Bild: Westenzeile doppeln (Strecken) bzw. streichen
+    (Stauchen, dann eine Spalte in der Mitte doppeln = etwas breiter).
+    Die Füße bleiben unten, es entstehen keine Lücken."""
+    lv = ss_level(i)
+    if lv == 0:
+        return img
+    r = SS_ROW
+    res = np.zeros_like(img)
+    if lv > 0:
+        res[:r] = img[1:r + 1]                             # alles darüber 1 px hoch
+        res[r:] = img[r:]
+    else:
+        res[1:r + 1] = img[:r]                             # Zeile r entfällt
+        res[r + 1:] = img[r + 1:]
+        c = SS_COL + PL
+        wide = np.zeros_like(res)
+        wide[:, :c] = res[:, 1:c + 1]                      # linke Hälfte 1 px nach links
+        wide[:, c:] = res[:, c:]
+        res = wide
+    return res
+
+
 # Aura-Schwaden: (x, y, Startframe) in Originalkoordinaten
 AURA = [(3, 20, 0), (22, 21, 6), (5, 14, 12), (21, 13, 18), (1, 24, 24), (24, 24, 30),
         (7, 9, 36), (18, 8, 42)]
@@ -139,8 +177,9 @@ def aura(out, i):
 
 def frame(i):
     s = BASE.copy()
-    lv = max(0, min(3, int(round(1.5 + 1.8 * wave(i, 24, -0.8)))))
-    s[11, 9 + PL] = EYE[lv]
+    if i % N in (20, 21, 40):                              # blinzeln
+        for x, y in EYE_PX:
+            s[y, x + PL] = LID if y == 10 else LASH
     out = np.zeros_like(s)
     # Körper ohne wehenden Umhang (kein Atmen: sonst reißt eine Lücke zwischen
     # Schultern und Umhangansatz auf)
@@ -149,6 +188,7 @@ def frame(i):
             if s[y, x, 3] and not is_cape(x - PL, y):
                 out[y, x] = s[y, x]
     draw_cape(out, out.copy(), i)
+    out = squash_stretch(out, i)
     aura(out, i)
     return out
 
