@@ -3236,7 +3236,9 @@ body:has(.anim-backdrop) .pp-bg-particles { display: none; }
    eigene Avatar mittig in seiner Zeile. */
 .game-hand-topleft {
   position: absolute;
-  left: calc(12px * var(--board-scale));
+  /* Fest 12 px wie `.game-hand-me .game-hand-info` — beide Avatare
+     stehen genau uebereinander. */
+  left: 12px;
   top: 50%;
   transform: translateY(-50%);
   display: flex;
@@ -3257,6 +3259,10 @@ body:has(.anim-backdrop) .pp-bg-particles { display: none; }
   transform: none;
   left: auto;
   top: auto;
+  /* Derselbe Abstand Portraet→Name wie in der eigenen Zeile
+     (`.game-hand-me .game-hand-info`), damit beide Namen
+     uebereinander stehen (Als Befund 26.9.). */
+  gap: calc(22px * var(--board-scale));
 }
 /* „der dabei auch gut doppelt so groß werden soll wie bisher"
    (Al, 19.9.) — die alte Kopfzeile hatte 4/12 px Polster bei
@@ -15985,6 +15991,16 @@ body:has(.textbox-overlay) .tooltip {
     width: 28px !important; height: 28px !important;
   }
   .game-hand-me .orbit-font { font-size: 11px !important; }
+  /* Heldenausschnitt statt Avatar (CPU-Gegner, Spieler ohne Avatar):
+     dasselbe 28-px-Quadrat wie `.game-hand-avatar-big` — sonst war das
+     Portraet groesser und der Name stand weiter rechts als gegenueber
+     (Als Befund 26.9.). Der innere 135-px-Ausschnitt wird mitverkleinert,
+     damit das Quadrat dasselbe Motiv zeigt wie auf dem Desktop. */
+  .game-hand .game-hand-avatar-crop {
+    width: 28px !important; height: 28px !important;
+    transform: none !important;
+  }
+  .game-hand .game-hand-avatar-crop > div { transform: scale(.33); }
 
   /* Make BOARD-CENTER scroll, not the whole game-board — sidebars stay fixed.
      ★ v1257: `overflow-x` von hidden auf auto — mit dem Massstab-Floor
