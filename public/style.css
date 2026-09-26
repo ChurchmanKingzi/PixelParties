@@ -14629,6 +14629,16 @@ body:has(.reaction-chain-overlay) .board-tooltip-token {
 }
 @keyframes textbox-fade-out { from { opacity: 1; } to { opacity: 0; } }
 
+/* UI-Fenster, die ueber ALLEM liegen muessen — auch ueber der Textbox
+   (90000) und ihren Highlight-Klonen (90001 + Faecherstapel). Die
+   Surrender-/Tutorial-Box traegt die Klasse (Als Befund 26.9.). */
+/* Mit `.screen-full:has(> .game-layout)` davor, sonst gewinnt die
+   spezifischere Kampf-Regel (z-index 10085, s. „SUBMENUES IM KAMPF"). */
+.modal-overlay.modal-overlay-ueber-textbox,
+.screen-full:has(> .game-layout) .modal-overlay.modal-overlay-ueber-textbox {
+  z-index: 95000;
+}
+
 /* Boost tooltip above textbox overlay when active */
 body:has(.textbox-overlay) .board-tooltip,
 body:has(.textbox-overlay) .tooltip {

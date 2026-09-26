@@ -6244,9 +6244,15 @@ function TextBox() {
     }
   }, [pageIdx]);
 
+  // Liegt ein UI-Fenster UEBER der Textbox (Surrender-/Tutorial-Box,
+  // `.modal-overlay-ueber-textbox`), gehoeren Klicks und Tasten ihm —
+  // sonst blaettert z.B. „Cancel" nebenbei die Textbox weiter.
+  const fensterDarueber = () => !!document.querySelector('.modal-overlay-ueber-textbox');
+
   useEffect(() => {
     if (!opts) return;
     const onKey = (e) => {
+      if (fensterDarueber()) return;
       if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation(); handleAdvance(); }
       else if ((e.key === 'ArrowLeft' || e.key === 'Backspace') && pageIdx > 0) { e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation(); handleBack(); }
     };
@@ -6258,6 +6264,7 @@ function TextBox() {
     if (!opts) return;
     const onClick = (e) => {
       if (e.target.closest('.textbox-back')) return;
+      if (fensterDarueber()) return;
       handleAdvance();
     };
     window.addEventListener('mousedown', onClick);

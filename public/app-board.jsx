@@ -36739,7 +36739,11 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
       e.preventDefault();
       e.stopImmediatePropagation();
-      if (showSurrender) { handleSurrender(); return; }
+      // Puzzle-/Tutorial-Box: drei gleichrangige Knoepfe (Retry / Give Up /
+      // Cancel) — Enter darf dort nicht stillschweigend „aufgeben". Seit die
+      // Textbox Tasten an die Box abgibt (26.9.), kaeme ein Enter zum
+      // Weiterblaettern sonst genau hier an.
+      if (showSurrender) { if (!gameState.isPuzzle) handleSurrender(); return; }
       if (showEndTurnConfirm) { confirmEndTurn(); return; }
       if (isMyPrompt && (ep.type === 'confirm' || ep.type === 'deckSearchReveal')) {
         socket.emit('effect_prompt_response', { roomId: gameState.roomId, response: { confirmed: true } }); return;
@@ -43247,7 +43251,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           socket.emit('retry_puzzle', { roomId: gameState.roomId });
         };
         return (
-        <div className="modal-overlay" onClick={() => setShowSurrender(false)}>
+        // `modal-overlay-ueber-textbox` (Als Befund 26.9.): die Box liegt
+        // ueber ALLEM, auch ueber Tutorial-Textbox und ihren Highlights —
+        // und die Textbox nimmt waehrenddessen keine Klicks/Tasten an.
+        <div className="modal-overlay modal-overlay-ueber-textbox" onClick={() => setShowSurrender(false)}>
           <div className="modal animate-in" onClick={e => e.stopPropagation()} style={{ maxWidth: 380, textAlign: 'center' }}>
             <div className="pixel-font" style={{ fontSize: 14, color: isPuzzleMode ? '#ff8800' : 'var(--danger)', marginBottom: 16 }}>
               {isPuzzleMode ? (gameState.isTutorial ? 'TUTORIAL' : 'PUZZLE') : 'SURRENDER?'}
