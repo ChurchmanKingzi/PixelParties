@@ -1,0 +1,10 @@
+{
+  "hero": "Damus, the Prophet of Apocalypse",
+  "sheet": "damus-the-prophet-of-apocalypse.png",
+  "frameWidth": 20,
+  "frameHeight": 29,
+  "frames": 40,
+  "frameMs": 80,
+  "loop": true,
+  "layout": "horizontal"
+}

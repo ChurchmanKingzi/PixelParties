@@ -1,0 +1,13 @@
+{
+  "hero": "Kazena, the Storming Rebel",
+  "sheet": "kazena-the-storming-rebel.png",
+  "frameWidth": 31,
+  "frameHeight": 40,
+  "frames": 48,
+  "frameMs": 70,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 3,
+  "padLeft": 1,
+  "padRight": 4
+}
