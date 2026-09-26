@@ -57,6 +57,7 @@ kopiert, daneben liegt eine JSON-Datei mit den Metadaten. Die erzeugten
 | `arthor_king.py` | `final` | `arthor_king_idle_final_sheet.png` | `arthor-the-king-of-blackport` |
 | `lilly.py` | `final` | `lilly_idle_final_sheet.png` | `lilly-the-charming-infiltrator` |
 | `arthor_sword.py` | `final` | `arthor_sword_idle_final_sheet.png` | `arthor-inheritor-of-the-barbarian-sword` |
+| `locke.py` | `final 80` | `locke_idle_final_sheet.png` | `locke-the-unseen-saboteur` |
 | `bubbles.py` | `final gross` | `bubbles_idle_final_gross_sheet.png` | `bubbles-the-bouncy-bunny` |
 
 `bubbles.py` ohne `gross` erzeugt eine auf Hero-Größe verkleinerte Variante
@@ -102,3 +103,7 @@ pixelgenau.
 * Laufende Muster (Kettensäge): Periode deutlich größer als 2x Tempo und
   Bewegungsspuren, sonst wirkt es wie Hin-und-her oder läuft rückwärts.
   Unvollständige/verwischte Objekte dürfen komplett neu gezeichnet werden.
+* Wird ein Objekt bewegt/weggeworfen, alles ergänzen, was es in Ruhe verdeckt
+  (Arm, Handecke, Handgelenk) – sonst schweben Hände oder entstehen Kerben.
+* Bewegte Teile (Schwert, Knauf) vollständig maskieren und per Pixelvergleich
+  über alle Frames prüfen; Freigelegtes nie mit Teilen des Objekts selbst füllen.
