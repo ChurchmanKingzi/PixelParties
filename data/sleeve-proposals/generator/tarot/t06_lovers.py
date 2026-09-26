@@ -279,35 +279,59 @@ MATS = {
     'p': mat(PRIM, pillow=3, k=1.5, bias=0.02),
     'c': mat(COV, pillow=3, k=1.5, bias=0.06),
 }
-fm, fig = fig_draw(cv, molinda, MATS)
+# Molinda wird als Materialkarte gezeichnet und vor dem Rendern um SK vergrößert
+SK, SCX, SCY = 1.18, 125, 112
+
+
+def T(x, y):
+    return SCX + (x - SCX) * SK, SCY + (y - SCY) * SK
+
+
+fm = Fig(W, H)
+molinda(fm)
+scale_fig(fm, SK, SCX, SCY)
+fm.outline()
+fm.inner_mask = fm.inner_lines()
+fig = fm.render(MATS)
+fig[:AY0, :, 3] = 0; fig[AY1:, :, 3] = 0; fig[:, :AX0, 3] = 0; fig[:, AX1:, 3] = 0      # nur im Bildfeld
+cv.paste(fig, 0, 0)
 # Bogensehne
-for y in range(88, 149):
-    if not (116 <= y <= 122):
-        px(cv, 94, y, (255, 250, 240))
-# Gesicht: helle Haut neu verlaufen lassen (Schatten unter dem Pony), große Augen
+bx_, _ = T(94, 0)
+_, by0 = T(0, 88); _, by1 = T(0, 149); _, bh0 = T(0, 115); _, bh1 = T(0, 123)
+for y in range(int(by0), int(by1) + 1):
+    if not (bh0 <= y <= bh1):
+        px(cv, bx_, y, (255, 250, 240))
+# Gesicht: helle Haut neu verlaufen lassen (Schatten unter dem Pony)
 SKL = [(214, 136, 110), (240, 176, 146), (252, 208, 180), (255, 226, 204), (255, 242, 228)]
-for y in range(MY - 16, MY + 18):
-    for x in range(106, 145):
+fx0, fy0 = T(104, MY - 17); fx1, fy1 = T(146, MY + 19)
+_, fmy = T(0, MY)
+for y in range(int(fy0), int(fy1)):
+    for x in range(int(fx0), int(fx1)):
         if fm.L[y, x] == 's' and tuple(cv.a[y, x]) != OUT and not fm.inner_mask[y, x]:
-            v = 0.78 - 0.3 * (y - MY + 8) / 26 - 0.12 * (x - 125) / 16
+            v = 0.78 - 0.3 * (y - fmy + 9) / 30 - 0.12 * (x - 125) / 18
             if fm.L[y - 1, x] == 'h' or fm.L[y - 2, x] == 'h':
                 v -= 0.35
             px(cv, x, y, rampc(SKL, v, x, y))
 # Arme ebenso heller
-for y in range(95, 125):
-    for x in range(84, 166):
-        if fm.L[y, x] == 's' and tuple(cv.a[y, x]) != OUT and not fm.inner_mask[y, x] and not (106 <= x <= 144 and y < 104):
-            v = 0.62 - 0.4 * ((y - 95) % 7) / 10
+ax0, ay0 = T(80, 95); ax1, ay1 = T(170, 125)
+for y in range(int(ay0), int(ay1)):
+    for x in range(int(ax0), int(ax1)):
+        if fm.L[y, x] == 's' and tuple(cv.a[y, x]) != OUT and not fm.inner_mask[y, x] and not (fx0 <= x <= fx1 and y < T(0, 104)[1]):
             c = tuple(int(q) for q in cv.a[y, x])
             px(cv, x, y, SKL[1] if sum(c) < 420 else SKL[2] if sum(c) < 560 else SKL[3])
 EYE = (236, 60, 150)
-big_eye(cv, 111, MY + 1, EYE, w=7, h=9, lash2=(60, 20, 50))
-big_eye(cv, 132, MY + 1, EYE, w=7, h=9, flip=True, lash2=(60, 20, 50))
-blush(cv, 112, MY + 10, (250, 120, 160)); blush(cv, 136, MY + 10, (250, 120, 160))
-blush(cv, 113, MY + 11, (250, 120, 160)); blush(cv, 135, MY + 11, (250, 120, 160))
+ex_, ey_ = T(111, MY + 1)
+big_eye(cv, int(ex_), int(ey_), EYE, w=8, h=10, lash2=(60, 20, 50))
+ex2, _ = T(139, MY + 1)
+big_eye(cv, int(ex2) - 8 + 1, int(ey_), EYE, w=8, h=10, flip=True, lash2=(60, 20, 50))
+for (bxx, byy) in [(111, MY + 11), (137, MY + 11)]:
+    X_, Y_ = T(bxx, byy)
+    blush(cv, X_, Y_, (250, 120, 160)); blush(cv, X_ + 1, Y_ + 1, (250, 120, 160)); blush(cv, X_ - 1, Y_ + 1, (250, 120, 160))
+mx_, my_ = T(125, MY + 13)
 for (dx, dy) in [(-2, 0), (-1, 1), (0, 1), (1, 1), (2, 0)]:
-    px(cv, 125 + dx, MY + 12 + dy, (170, 60, 80))
-px(cv, 125, MY + 8, SKIN[3])
+    px(cv, mx_ + dx, my_ + dy, (170, 60, 80))
+nx_, ny_ = T(125, MY + 8)
+px(cv, nx_, ny_, SKIN[3])
 # Federkiele auf den Schwungfedern
 for side in (-1, 1):
     X = (lambda x: x) if side < 0 else (lambda x: 250 - x)
@@ -319,16 +343,19 @@ for side in (-1, 1):
         th = math.radians(196 + 72 * t)
         dx, dy = math.cos(th), -math.sin(th)
         L = 46 - 24 * t
-        for s_ in range(int(L * 0.66), int(L - 3)):
-            recolor_on(cv, fm, X(sx + dx * s_), sy + dy * s_, PRIM[3], 'p')
+        for s_ in np.arange(L * 0.66, L - 3, 0.5):
+            qx, qy = T(X(sx + dx * s_), sy + dy * s_)
+            recolor_on(cv, fm, qx, qy, PRIM[3], 'p')
 # Haarglanz
-for (x, y) in [(116, MY - 11), (117, MY - 11), (118, MY - 12), (132, MY - 12), (133, MY - 11), (134, MY - 11)]:
-    px(cv, x, y, HAIR[4])
+for (x, y) in [(115, MY - 11), (117, MY - 11), (119, MY - 12), (131, MY - 12), (133, MY - 11), (135, MY - 11)]:
+    X_, Y_ = T(x, y)
+    px(cv, X_, Y_, HAIR[4]); px(cv, X_ + 1, Y_, HAIR[3])
 # Rüschenpunkte auf dem Rock
-for x in range(102, 150, 4):
-    recolor_on(cv, fm, x, 143, WHITE[4], 'D')
-sparkle(cv, 124, 105, (255, 255, 255), r=1, c2=PINK[3])
-sparkle(cv, 181, 66, (255, 255, 240), r=2, c2=PINK[3])
+for x in range(100, 152, 3):
+    X_, Y_ = T(x, 143)
+    recolor_on(cv, fm, X_, Y_, WHITE[4], 'D')
+sparkle(cv, *T(124, 105), (255, 255, 255), r=1, c2=PINK[3])
+sparkle(cv, *T(181, 66), (255, 255, 240), r=2, c2=PINK[3])
 
 # ---------------------------------------------------------------- Die Liebenden: Cute Bunny und Cute Cat
 FURW = [(120, 120, 170), (176, 176, 214), (218, 218, 240), (242, 242, 252), (255, 255, 255)]
@@ -419,8 +446,8 @@ for (x, y) in [(125, 262)]:
     sparkle(cv, x, y, (255, 255, 255), r=2, c2=(255, 180, 210))
 
 # Funkeln
-for (x, y) in [(66, 110), (186, 112), (40, 220), (210, 226), (125, 44 + 8), (82, 170), (168, 160)]:
+for (x, y) in [(66, 110), (186, 112), (40, 220), (210, 226), (82, 170), (168, 160)]:
     sparkle(cv, x, y, (255, 255, 255), r=2, c2=(255, 190, 220))
-vignette(cv, (60, 20, 70), strength=0.3)
+vignette(cv, (60, 20, 70), strength=0.3, r0=0.78)
 p = finish(cv, 'VI', 'MOLINDA', out='06_lovers_molinda', emblem=emblem_heart)
 print(p)

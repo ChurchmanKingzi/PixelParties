@@ -146,7 +146,7 @@ for i in range(12):
     star_px(cv, x, y, (255, 214, 70), r=3, c2=(210, 130, 30))
     px(cv, x, y, (255, 255, 220))
 # Zeiger (ragen seitlich hinter dem Kopf hervor): ewig kurz vor zwölf
-for (a, L, w_) in [(-math.pi / 2 - math.pi / 6 * 0.4, 36, 1), (-math.pi / 2 + math.pi / 6 * 3.6, 26, 2)]:
+for (a, L, w_) in [(-math.pi / 2 - math.pi / 6 * 2.2, 34, 1), (-math.pi / 2 + math.pi / 6 * 1.8, 26, 2)]:
     for s_ in np.linspace(0, L, 80):
         for o in range(w_):
             x = CLX + math.cos(a) * s_ + o; y = CLY + math.sin(a) * s_
@@ -172,7 +172,8 @@ f.part('panelR'); f.line(129, 190, 136, 258, 'l', w=2)
 # Oberkörper
 f.part('torso')
 f.poly([(106, 150), (144, 150), (146, 166), (142, 188), (108, 188), (104, 166)], 'r')
-f.part('collar'); f.poly([(108, 148), (142, 148), (138, 156), (125, 162), (112, 156)], 'l')
+f.part('collarL'); f.line(107, 150, 124, 162, 'l', w=2)
+f.part('collarR'); f.line(143, 150, 126, 162, 'l', w=2)
 f.part('emblem'); f.rect(118, 164, 132, 178, 'g')
 f.part('emblemIn'); f.rect(121, 167, 129, 175, 'r')
 f.part('belt'); f.poly([(106, 184), (144, 184), (144, 189), (106, 189)], 'l')
@@ -193,16 +194,16 @@ f.part('foreRr'); f.limb(160, 192, 146, 210, 5.5, 5, 'r')
 f.part('cuffRr'); f.limb(150, 206, 146, 210, 5.5, 5.5, 'l')
 f.part('handRr'); f.ellipse(142, 212, 5, 4.5, 's')
 # Kopf
-f.part('neck'); f.rect(120, 140, 130, 151, 's')
+f.part('neck'); f.rect(121, 141, 129, 151, 's')
 cx, cy = 125, 128
 f.part('face')
-f.ellipse(cx, cy + 1, 15, 14, 's')
-f.poly([(cx - 14, cy + 3), (cx + 14, cy + 3), (cx + 10, cy + 12), (cx + 4, cy + 17), (cx - 4, cy + 17), (cx - 10, cy + 12)], 's')
-f.part('bangs')
-f.poly([(cx - 17, cy + 14), (cx - 18, cy - 2), (cx - 12, cy - 10), (cx + 12, cy - 10), (cx + 18, cy - 2), (cx + 17, cy + 14),
-        (cx + 14, cy + 2), (cx + 10, cy - 3), (cx + 4, cy - 1), (cx, cy - 5), (cx - 4, cy - 1), (cx - 10, cy - 3), (cx - 14, cy + 2)], 'h')
-f.part('lockL'); f.poly([(cx - 17, cy), (cx - 12, cy + 4), (cx - 12, cy + 26), (cx - 18, cy + 36), (cx - 21, cy + 20)], 'h')
-f.part('lockR'); f.poly([(cx + 17, cy), (cx + 12, cy + 4), (cx + 12, cy + 26), (cx + 18, cy + 36), (cx + 21, cy + 20)], 'h')
+f.ellipse(cx, cy + 1, 16, 14, 's')
+f.poly([(cx - 15, cy + 3), (cx + 15, cy + 3), (cx + 12, cy + 11), (cx + 5, cy + 16), (cx, cy + 17), (cx - 5, cy + 16), (cx - 12, cy + 11)], 's')
+f.part('bangs')      # gerader Pony (Hime-Schnitt)
+f.poly([(cx - 18, cy + 2), (cx - 18, cy - 7), (cx - 12, cy - 11), (cx + 12, cy - 11), (cx + 18, cy - 7), (cx + 18, cy + 2),
+        (cx + 15, cy - 2), (cx + 10, cy - 3), (cx + 5, cy - 2), (cx, cy - 3), (cx - 5, cy - 2), (cx - 10, cy - 3), (cx - 15, cy - 2)], 'h')
+f.part('lockL'); f.poly([(cx - 20, cy - 4), (cx - 15, cy - 2), (cx - 15, cy + 22), (cx - 21, cy + 22)], 'h')
+f.part('lockR'); f.poly([(cx + 20, cy - 4), (cx + 15, cy - 2), (cx + 15, cy + 22), (cx + 21, cy + 22)], 'h')
 # Krone: hohe rote Haube mit goldenen Spangen
 f.part('crown')
 f.poly([(cx - 16, cy - 8), (cx - 18, cy - 18), (cx - 14, cy - 28), (cx - 6, cy - 35), (cx, cy - 36), (cx + 6, cy - 35), (cx + 14, cy - 28),
@@ -210,7 +211,7 @@ f.poly([(cx - 16, cy - 8), (cx - 18, cy - 18), (cx - 14, cy - 28), (cx - 6, cy -
 f.part('crownBand'); f.poly([(cx - 17, cy - 12), (cx + 17, cy - 12), (cx + 16, cy - 6), (cx - 16, cy - 6)], 'g')
 f.part('crownTip'); f.rect(cx - 1, cy - 43, cx + 1, cy - 36, 'd'); f.ellipse(cx, cy - 44, 2.5, 2.5, 'g')
 # Herzschild mit Venus-Zeichen (lehnt rechts am Thron)
-SHX, SHY = 194, 238
+SHX, SHY = 196, 230
 f.part('shield')
 f.ellipse(SHX - 8, SHY - 7, 10, 10, 'G'); f.ellipse(SHX + 8, SHY - 7, 10, 10, 'G')
 f.poly([(SHX - 17, SHY - 3), (SHX + 17, SHY - 3), (SHX, SHY + 20)], 'G')
@@ -281,43 +282,41 @@ for (fx, fy) in [(100, 207), (100, 210), (139, 211), (139, 214)]:
     px(cv, fx, fy, SKINV[1])
 
 # ---------------------------------------------------------------- Weizenfeld (vorne)
-WHEAT = [(110, 60, 10), (164, 104, 20), (210, 152, 36), (240, 196, 70), (255, 228, 130), (255, 248, 200)]
+WHEAT = [(110, 60, 10), (160, 100, 18), (204, 144, 30), (234, 184, 56), (250, 214, 100), (255, 238, 160)]
 STALK = [(96, 90, 24), (140, 128, 44), (186, 170, 76)]
 EAR_OUT = (84, 44, 10)
-def ear(bx, by, L, wd, lean):
-    """eine Weizenähre: Körner abwechselnd links/rechts, links hell, rechts dunkel, dunkle Kontur, Grannen"""
-    ax, ay = math.sin(lean), -math.cos(lean)          # Richtung nach oben
-    nx_, ny_ = -ay, ax
-    m = np.zeros((H, W), bool); val = {}
-    for s_ in np.linspace(0, L, int(L * 3)):
-        prof = math.sin(math.pi * min(1, (s_ + 1) / (L + 1))) ** 0.6
-        hw = wd / 2 * prof + 0.3
-        k = int(s_ / 2)
-        for t in np.linspace(-hw, hw, 7):
-            x = int(round(bx + ax * s_ + nx_ * t)); y = int(round(by + ay * s_ + ny_ * t))
-            if not in_art(x, y):
-                continue
-            m[y, x] = True
-            side = t / (hw + 0.01)
-            grain = ((s_ % 2) / 2 + (0.5 if (k % 2) == (t > 0) else 0)) * 0.25
-            val[(y, x)] = 0.75 - side * 0.3 - s_ / L * 0.1 + grain
-    for (y, x), v in val.items():
-        px(cv, x, y, rampc(WHEAT, v, x, y))
-    ring = outline_mask(cv, m, EAR_OUT) if False else None
-    g = m.copy(); g[1:] |= m[:-1]; g[:-1] |= m[1:]; g[:, 1:] |= m[:, :-1]; g[:, :-1] |= m[:, 1:]
-    r_ = g & ~m & art_mask()
-    for y, x in zip(*np.where(r_)):
-        # Kontur nur rechts/unten kräftig, links/oben weicher (Licht von links oben)
-        if x > bx + ax * (by - y) / max(0.01, -ay) - 0.5 or y > by - 2:
-            px(cv, x, y, EAR_OUT)
-        else:
-            blend_px(cv, x, y, EAR_OUT, 0.5)
-    # Grannen
-    for q in range(-1, 2):
-        for s_ in range(int(L * 0.5)):
-            x = bx + ax * (L + s_) + nx_ * (q * (1 + s_ * 0.18)); y = by + ay * (L + s_) + ny_ * (q * (1 + s_ * 0.18))
+def ear(bx, by, n, sc, lean):
+    """Weizenähre aus Körnern im Fischgrätmuster: n Kornpaare, sc = Korngröße (1 oder 2 px)"""
+    def blk(x, y, c):
+        for dy in range(sc):
+            for dx in range(sc):
+                if in_art(x + dx, y + dy):
+                    px(cv, x + dx, y + dy, c)
+    pts = []
+    for k in range(n):
+        pts.append((bx + lean * k * 2 * sc, by - k * 2 * sc))
+    # Kontur: dunkler Rand um alle Körner
+    for (xk, yk) in pts + [(pts[-1][0], pts[-1][1] - sc * 2)]:
+        for (ox, oy) in [(-sc, -sc), (sc, 0), (0, 0), (0, sc)]:
+            for dy in range(-1, sc + 1):
+                for dx in range(-1, sc + 1):
+                    if in_art(xk + ox + dx, yk + oy + dy):
+                        px(cv, xk + ox + dx, yk + oy + dy, EAR_OUT)
+    for k, (xk, yk) in enumerate(pts):
+        blk(xk, yk + sc, WHEAT[1])                                  # Fuge
+        blk(xk - sc, yk - sc, WHEAT[4] if k < n - 1 else WHEAT[3])   # linkes Korn (Licht)
+        blk(xk + sc, yk, WHEAT[2])                                  # rechtes Korn (Schatten)
+        blk(xk, yk, WHEAT[3])                                       # Mitte
+        if sc > 1:
+            px(cv, xk - sc, yk - sc, WHEAT[5])
+    # Spitze + Grannen
+    xt, yt = pts[-1]
+    blk(xt, yt - sc * 2, WHEAT[4]); blk(xt, yt - sc * 3, EAR_OUT)
+    for q in (-1, 0, 1):
+        for s_ in range(n + 3):
+            x = xt + q * (1 + s_ * 0.35) + lean * s_; y = yt - sc * 2 - s_
             if in_art(x, y) and s_ % 2 == 0:
-                blend_px(cv, x, y, WHEAT[4], 0.7)
+                blend_px(cv, x, y, WHEAT[5], 0.65)
 def stalk(x0, y0, x1, y1):
     for tt in np.linspace(0, 1, int(abs(y1 - y0)) + 2):
         x = x0 + (x1 - x0) * tt; y = y0 + (y1 - y0) * tt
@@ -331,25 +330,32 @@ for y in range(250, AY1):
     for x in range(AX0, AX1):
         top = 252 + math.sin(x * 0.45) * 1.5 + math.sin(x * 1.3) * 1.0
         if y >= top:
-            streak = 0.12 if (x * 7 + (y // 3)) % 5 == 0 else 0.0
-            v = 0.62 - (y - 252) / 70 + (nw[y, x] - 0.5) * 0.45 + streak
+            # dichte senkrechte Halme: helle/dunkle Striche, oben heller
+            ph = (x * 0.9 + math.sin(x * 0.37) * 3) % 3
+            streak = 0.22 if ph < 1 else (-0.12 if ph > 2 else 0.05)
+            v = 0.5 - (y - 252) / 110 + (nw[y, x] - 0.5) * 0.35 + streak
             px(cv, x, y, rampc(FIELD, v, x, y))
 # Ähren in vier Reihen, hinten klein, vorne groß; in der Mitte etwas niedriger
-rows = [(264, 7, 2.6, 30), (276, 9, 3.0, 22), (290, 12, 3.6, 16), (306, 15, 4.2, 11)]
+rows = [(262, 4, 1, 24), (274, 5, 1, 19), (288, 5, 2, 13), (304, 6, 2, 10), (316, 6, 2, 9)]
 for (yb, L, wd, n) in rows:
     for i in range(n):
         x0 = AX0 + (i + 0.2 + rnd.random() * 0.6) * (AX1 - AX0) / n
         lean = rnd.uniform(-0.35, 0.35)
-        hgt = (yb - 250) * rnd.uniform(0.35, 0.55)
+        hgt = (yb - 244) * rnd.uniform(0.45, 0.7)
         if abs(x0 - 125) < 40 and yb < 290:
             hgt *= 0.4
         ex, ey = x0 + math.sin(lean) * hgt, yb - hgt
         stalk(x0, min(AY1 - 1, yb), ex, ey)
-        ear(ex, ey, L, wd, lean)
+        ear(int(ex), int(ey), L, wd, lean * 0.3)
 # Kornblumen + Mohn im Feld
 for _ in range(22):
     x = rnd.randint(AX0 + 2, AX1 - 3); y = rnd.randint(262, AY1 - 3)
     small_flower(cv, x, y, rnd.choice([(80, 120, 240), (230, 50, 50)]), center=(40, 20, 40))
+# Vögel am Himmel
+for (bx, by) in [(150, 60), (160, 66), (142, 70)]:
+    for dx, dy in [(-2, -1), (-1, 0), (1, 0), (2, -1)]:
+        px(cv, bx + dx, by + dy, (60, 70, 110))
+    px(cv, bx, by + 1, (60, 70, 110))
 # Schmetterlinge / Glanz
 for (x, y) in [(60, 120), (196, 150), (150, 90), (70, 250), (210, 262)]:
     sparkle(cv, x, y, (255, 250, 220), r=1)

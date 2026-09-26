@@ -21,8 +21,8 @@ for (cx_, cy_, w_, h_, sd) in [(40, 66, 70, 16, 1), (120, 54, 80, 14, 2), (206, 
 # ferne Vulkane mit Lavaströmen
 VOL = [(20, 6, 10), (34, 10, 14), (50, 16, 18), (70, 24, 22)]
 for (vx, vy, vw, top_w) in [(46, 142, 60, 6), (206, 132, 66, 7)]:
-    for y in range(vy, 202):
-        hw = top_w + (y - vy) * vw / (202 - vy)
+    for y in range(vy, 186):
+        hw = top_w + (y - vy) * vw / (186 - vy)
         for x in range(int(vx - hw), int(vx + hw) + 1):
             if in_art(x, y):
                 v = 0.4 + (vx - x) / (hw + 1) * 0.3 - (y - vy) * 0.002
@@ -34,48 +34,53 @@ for (vx, vy, vw, top_w) in [(46, 142, 60, 6), (206, 132, 66, 7)]:
     rl = random.Random(vx)
     for s_ in range(2):
         x = vx + rl.uniform(-3, 3)
-        for y in range(vy, 202):
+        for y in range(vy, 186):
             x += rl.uniform(-0.8, 0.8) + (0.35 if s_ else -0.35)
             px(cv, x, y, (255, 150, 40) if y % 5 else (255, 220, 110))
             blend_px(cv, x + 1, y, (200, 60, 20), 0.6)
 # Lavasee am Horizont
-for y in range(196, 214):
+for y in range(184, 214):
     for x in range(AX0, AX1):
-        v = 0.55 + 0.3 * math.sin(x * 0.2 + y * 0.9) * math.sin(x * 0.05) + (y - 196) * 0.01
-        px(cv, x, y, rampc(FIRE[1:], v, x, y))
+        v = 0.35 + 0.12 * math.sin(x * 0.2 + y * 0.9) * math.sin(x * 0.05) + (y - 184) * 0.02
+        px(cv, x, y, rampc([(120, 24, 10), (190, 56, 14), (236, 110, 26), (255, 170, 60), (255, 220, 120)], v, x, y))
 
 # ---------------------------------------------------------------- die Armee in der Ferne (Silhouetten mit glühenden Augen)
 ARMY = [(30, 12, 12), (44, 18, 16), (58, 26, 20)]
 
 
-def army_row(y0, sc, n, x0, x1, seed):
+def army_row(y0, sc, n, x0, x1, seed, col=(24, 8, 8), eye=(255, 190, 90)):
+    """Reihe gehörnter Dämonen-Silhouetten mit Speeren vor dem Lavasee"""
     r_ = random.Random(seed)
     for i in range(n):
-        x = x0 + (x1 - x0) * (i + r_.uniform(-0.2, 0.2)) / max(1, n - 1)
-        hh = int(12 * sc)
-        for y in range(y0 - hh, y0 + 2):
-            t = (y - (y0 - hh)) / hh
-            w = (3 + 3 * t) * sc if t > 0.35 else 3.2 * sc
-            for xq in range(int(x - w), int(x + w) + 1):
-                if in_art(xq, y):
-                    px(cv, xq, y, ARMY[0] if xq > x + w * 0.3 else ARMY[1])
-        # Hörner
-        for s in (-1, 1):
-            for k in range(int(5 * sc)):
-                px(cv, x + s * (2 * sc + k * 0.5), y0 - hh - k * 0.8 + (k * k * 0.05), ARMY[2])
-        # Augen
-        ey = y0 - hh + int(4 * sc)
-        px(cv, x - sc, ey, (255, 170, 80)); px(cv, x + sc, ey, (255, 170, 80))
-        # Speerspitze
-        if r_.random() < 0.6:
-            sx_ = x + 5 * sc
-            for y in range(int(y0 - hh - 10 * sc), y0 - int(4 * sc)):
-                px(cv, sx_, y, ARMY[1])
-            px(cv, sx_, int(y0 - hh - 10 * sc) - 1, (160, 150, 150))
+        x = x0 + (x1 - x0) * (i + r_.uniform(-0.15, 0.15)) / max(1, n - 1)
+        hh = 14 * sc                       # Höhe bis Scheitel
+        M = np.zeros((H, W), np.uint8)
+        # Kopf, Schultern/Rumpf, Beine
+        cv2.circle(M, (int(x), int(y0 - hh + 2.5 * sc)), int(2.6 * sc), 1, -1)
+        body = [(x - 4.8 * sc, y0 - hh + 6 * sc), (x + 4.8 * sc, y0 - hh + 6 * sc), (x + 3.2 * sc, y0 - 4 * sc),
+                (x + 3.4 * sc, y0), (x - 3.4 * sc, y0), (x - 3.2 * sc, y0 - 4 * sc)]
+        cv2.fillPoly(M, [np.round(np.array(body)).astype(np.int32)], 1)
+        for sd in (-1, 1):                 # Hörner nach oben geschwungen
+            for k in range(int(6 * sc)):
+                hx = x + sd * (1.8 * sc + k * 0.35 - (k * k) * 0.02 * sc)
+                hy = y0 - hh + 1.5 * sc - k * 0.9
+                M[int(round(hy)), int(round(hx))] = 1
+                M[int(round(hy)), int(round(hx)) + (1 if sd < 0 else -1)] = 1 if k < 4 * sc else M[int(round(hy)), int(round(hx))]
+        if r_.random() < 0.7:              # Speer
+            sx_ = int(x + 5.5 * sc)
+            M[int(y0 - hh - 8 * sc):int(y0 - 2), sx_] = 1
+        for yq, xq in zip(*np.where(M)):
+            if in_art(xq, yq):
+                px(cv, xq, yq, col)
+        if r_.random() < 0.7:
+            px(cv, int(x + 5.5 * sc), int(y0 - hh - 8 * sc) - 1, (200, 170, 150))
+        ey = int(y0 - hh + 2.5 * sc)
+        px(cv, int(x - 1 * sc), ey, eye); px(cv, int(x + 1 * sc), ey, eye)
 
 
-army_row(204, 1.0, 14, 18, 232, 3)
-army_row(214, 1.3, 11, 12, 240, 7)
+army_row(193, 0.85, 17, 22, 228, 3, col=(60, 16, 12), eye=(255, 220, 140))
+for (ax, sd) in [(28, 1), (48, 2), (68, 3), (182, 4), (202, 5), (222, 6)]:
+    army_row(213, 1.45, 1, ax, ax, sd)
 
 # ---------------------------------------------------------------- Boden: Basalt mit glühenden Lavarissen (Voronoi)
 GY0 = 214
@@ -155,7 +160,7 @@ for x in range(RX - 3, RX + 4):
     px(cv, x, RY - 7, IRON[3]); px(cv, x, RY - 8, IRON[4])
 
 # ---------------------------------------------------------------- Pentagramm (umgedreht) über dem Kopf
-PCX, PCY, PR = 125, 64, 17
+PCX, PCY, PR = 125, 60, 16
 glow2(cv, PCX, PCY, 34, (255, 60, 20), k=0.6, mix=0.35)
 star = [(PCX + math.cos(math.radians(90 + k * 72)) * PR, PCY + math.sin(math.radians(90 + k * 72)) * PR) for k in range(5)]
 order = [0, 2, 4, 1, 3, 0]
@@ -272,12 +277,12 @@ for i in range(9):
     f.poly([(x - 1.6, y - 1), (x + 1.6, y - 1), (x, y + 4)], 't')
 # ---- Kopf
 f.part('head')
-f.ellipse(125, 99, 16, 15, 'r')
-f.poly([(110, 100), (140, 100), (138, 110), (131, 116), (125, 117), (119, 116), (112, 110)], 'r')
-f.part('ears'); f.poly([(110, 96), (100, 90), (106, 102)], 'r'); f.poly([(140, 96), (150, 90), (144, 102)], 'r')
-f.part('brow'); f.poly([(111, 94), (125, 99), (139, 94), (139, 90), (125, 93), (111, 90)], 'r')
-f.part('hornL'); f.curve([(114, 88), (104, 82), (96, 72), (96, 60), (102, 50)], 'h', w=8, w1=2)
-f.part('hornR'); f.curve([(136, 88), (146, 82), (154, 72), (154, 60), (148, 50)], 'h', w=8, w1=2)
+f.ellipse(125, 98, 17, 16, 'r')
+f.poly([(109, 100), (141, 100), (139, 111), (132, 118), (125, 120), (118, 118), (111, 111)], 'r')
+f.part('ears'); f.poly([(110, 96), (98, 88), (106, 103)], 'r'); f.poly([(140, 96), (152, 88), (144, 103)], 'r')
+f.part('goatee'); f.poly([(120, 118), (130, 118), (125, 126)], 'k')
+f.part('hornL'); f.curve([(114, 86), (104, 80), (96, 70), (95, 58), (101, 48)], 'h', w=8, w1=2)
+f.part('hornR'); f.curve([(136, 86), (146, 80), (154, 70), (155, 58), (149, 48)], 'h', w=8, w1=2)
 f.outline()
 MATS = {
     'r': mat(RSKIN, pillow=4, k=1.7, bias=0.02, spec=True, spec_col=(255, 180, 150)),
@@ -291,34 +296,45 @@ MATS = {
     'b': mat(GOLD, pillow=2, k=1.8, spec=True),
     't': mat(BONEW, pillow=1.2, k=1.2, bias=0.1),
     'o': mat(BROWN, pillow=1.5, k=1.3),
+    'k': mat([(10, 4, 6), (26, 8, 12), (44, 14, 18), (66, 24, 26)], pillow=1.5, k=1.4),
 }
 fig = f.render(MATS, light=(-0.55, -0.7, 0.45))
 FM = fig[..., 3] > 0
 cv.paste(fig, 0, 0)
 
 # ---- Gesicht
-# weiße, glühende, schräge Augen
-for (ex, fl) in [(116, 1), (134, -1)]:
-    for i in range(6):
-        for j in range(3):
-            if j == 0 and i < 2:
-                continue
-            X = ex + (i if fl == 1 else -i) - (0 if fl == 1 else 0)
-            Y = 100 + j - (1 if (i >= 4 and j == 0) else 0)
-            px(cv, X, Y, (255, 250, 230) if j < 2 else (255, 200, 150))
-    px(cv, ex + (3 if fl == 1 else -3), 101, (200, 20, 20))
-    px(cv, ex + (3 if fl == 1 else -3), 100, (255, 80, 60))
-    glow2(cv, ex + (3 if fl == 1 else -3), 101, 5, (255, 220, 160), k=0.5, mix=0.3, clip=True)
+DK = (40, 4, 10)
+# dunkle Augenhöhlen
+for (ex, sd) in [(117, -1), (133, 1)]:
+    for i in range(-5, 6):
+        for j in range(-3, 3):
+            if (i / 5.5) ** 2 + (j / 3.2) ** 2 <= 1:
+                blend_px(cv, ex + i, 99 + j, (70, 8, 14), 0.55)
+# Brauen als kräftige Linien, zur Mitte hin abfallend
+for i in range(9):
+    px(cv, 109 + i, 92 + i * 0.5, DK); px(cv, 109 + i, 93 + i * 0.5, RSKIN[4] if i % 2 else RSKIN[3])
+    px(cv, 141 - i, 92 + i * 0.5, DK); px(cv, 141 - i, 93 + i * 0.5, RSKIN[4] if i % 2 else RSKIN[3])
+# glühende weiße Augen (schräg), rote Pupille
+EYE_W = (255, 252, 236)
+for (ex, sd) in [(117, -1), (133, 1)]:
+    for i in range(-4, 5):
+        top = 98 + (i * sd) * 0.35
+        for y in range(int(round(top)), 102):
+            px(cv, ex + i, y, EYE_W if y < 101 else (255, 214, 170))
+    px(cv, ex + sd, 99, (210, 20, 20)); px(cv, ex + sd, 100, (150, 10, 10))
+    glow2(cv, ex, 99, 7, (255, 230, 180), k=0.45, mix=0.3)
 # Nase
-px(cv, 124, 106, RSKIN[1]); px(cv, 126, 106, RSKIN[1])
-# breites Grinsen mit Reißzähnen
-for x in range(115, 136):
-    yb = 110 + int(round(((x - 125) / 10) ** 2 * -2.5))
-    px(cv, x, yb, (40, 4, 8))
-    px(cv, x, yb + 1, (250, 244, 228) if (x % 3) else (200, 190, 176))
-    px(cv, x, yb + 2, (60, 6, 10))
+px(cv, 123, 106, RSKIN[1]); px(cv, 127, 106, RSKIN[1]); px(cv, 124, 105, RSKIN[4]); px(cv, 126, 105, RSKIN[4])
+# breites Grinsen mit Zahnreihe und Reißzähnen
+for x in range(113, 138):
+    yb = 110 + int(round(((x - 125) / 12) ** 2 * -3.5))
+    px(cv, x, yb, DK)
+    px(cv, x, yb + 1, (250, 244, 228) if (x % 3) else (190, 180, 166))
+    px(cv, x, yb + 2, (250, 244, 228) if (x % 3) else (190, 180, 166))
+    px(cv, x, yb + 3, DK)
 for x in (116, 134):
-    px(cv, x, 111, (255, 250, 236)); px(cv, x, 112, (220, 214, 200))
+    yb = 110 + int(round(((x - 125) / 12) ** 2 * -3.5))
+    px(cv, x, yb + 4, (255, 250, 236)); px(cv, x, yb + 5, (210, 200, 186))
 # Schulterflecken (wie auf der Karte: rosa Stellen) als Rubine im Panzer
 for (x, y) in [(100, 124), (150, 124)]:
     for (dx, dy, c) in [(0, 0, RUBY[2]), (-1, 0, RUBY[3]), (0, -1, RUBY[4]), (1, 0, RUBY[1]), (0, 1, RUBY[1])]:
@@ -352,35 +368,42 @@ MHORN = [(34, 26, 24), (70, 56, 48), (110, 92, 78), (152, 134, 116), (196, 180, 
 GREY = [(20, 20, 26), (40, 40, 50), (66, 66, 80), (100, 100, 116), (150, 150, 166)]
 
 
+SC = 1.15
+
+
 def minion(g, cx, by, flip=1):
-    """brauner Dämonensoldat, cx = Mitte, by = Fußsohle; flip=1 schaut nach rechts (zum Sockel)"""
-    def X(v):
-        return cx + v * flip
+    """brauner Dämonensoldat von vorn, leicht zum Sockel gedreht; cx = Mitte, by = Fußsohle"""
+    def P(dx, dy):
+        return (cx + dx * flip * SC, by - dy * SC)
     # Schwanz
-    g.part('mtail%d' % cx); g.curve([(X(-8), by - 26), (X(-18), by - 18), (X(-22), by - 6), (X(-16), by - 2)], 'r', w=3.5, w1=1.5)
-    g.poly([(X(-16), by - 5), (X(-11), by - 1), (X(-17), by + 1)], 'r')
-    # Beine + Stiefel
+    g.part('mtail%d' % cx)
+    g.curve([P(-8, 22), P(-18, 20), P(-24, 10), P(-20, 2)], 'r', w=3.5, w1=1.5)
+    g.poly([P(-20, 5), P(-15, 1), P(-22, -1)], 'r')
+    # Beine + Stiefel (grau wie auf der Karte)
     g.part('mlegs%d' % cx)
-    g.limb(X(-5), by - 26, X(-7), by - 8, 5, 4, 'r'); g.limb(X(5), by - 26, X(7), by - 8, 5, 4, 'r')
-    g.part('mboots%d' % cx)
-    g.poly([(X(-12), by - 10), (X(-2), by - 10), (X(-1), by), (X(-13), by)], 'g')
-    g.poly([(X(2), by - 10), (X(12), by - 10), (X(14), by), (X(1), by)], 'g')
-    # Körper (massig, gebückt)
+    g.limb(*P(-6, 24), *P(-7, 8), 5 * SC, 4 * SC, 'r'); g.limb(*P(6, 24), *P(8, 8), 5 * SC, 4 * SC, 'r')
+    g.part('mbootL%d' % cx); g.poly([P(-12, 10), P(-3, 10), P(-2, 0), P(-13, 0)], 'g')
+    g.part('mbootR%d' % cx); g.poly([P(3, 10), P(12, 10), P(14, 0), P(2, 0)], 'g')
+    # massiger Körper mit hellerer Brust
     g.part('mbody%d' % cx)
-    g.ellipse(cx, by - 38, 15, 15, 'r')
-    g.part('mloin%d' % cx); g.poly([(X(-11), by - 30), (X(11), by - 30), (X(9), by - 20), (X(0), by - 17), (X(-9), by - 20)], 'l')
-    # Arme (hängend, Hände vor dem Bauch gefesselt)
-    g.part('marmB%d' % cx); g.limb(X(-12), by - 48, X(-10), by - 30, 5, 4.2, 'r')
-    g.part('marmF%d' % cx); g.limb(X(12), by - 48, X(6), by - 32, 5, 4.2, 'r')
-    g.part('mband%d' % cx); g.limb(X(8), by - 36, X(6), by - 32, 4.8, 4.6, 'g'); g.limb(X(-10), by - 36, X(-10), by - 32, 4.8, 4.6, 'g')
-    # Kopf (etwas gesenkt)
+    g.ellipse(*P(0, 36), 14 * SC, 14 * SC, 'r')
+    g.part('mchest%d' % cx); g.ellipse(*P(1, 38), 8 * SC, 8 * SC, 'n')
+    g.part('mloin%d' % cx); g.poly([P(-12, 27), P(12, 27), P(9, 16), P(0, 13), P(-9, 16)], 'l')
+    g.part('mbelt%d' % cx); g.poly([P(-12, 29), P(12, 29), P(12, 26), P(-12, 26)], 'g')
+    # Arme vorn, Hände in Handschellen vor dem Bauch
+    g.part('marmL%d' % cx); g.limb(*P(-14, 44), *P(-12, 30), 5 * SC, 4.2 * SC, 'r'); g.limb(*P(-12, 30), *P(-4, 24), 4.2 * SC, 3.6 * SC, 'r')
+    g.part('marmR%d' % cx); g.limb(*P(14, 44), *P(13, 30), 5 * SC, 4.2 * SC, 'r'); g.limb(*P(13, 30), *P(5, 24), 4.2 * SC, 3.6 * SC, 'r')
+    g.part('mcuffs%d' % cx); g.ellipse(*P(-4, 24), 3.2 * SC, 3.6 * SC, 'g'); g.ellipse(*P(5, 24), 3.2 * SC, 3.6 * SC, 'g')
+    g.part('mfists%d' % cx); g.ellipse(*P(0.5, 21), 4 * SC, 3 * SC, 'r')
+    # eisernes Halsband
+    g.part('mcollar%d' % cx); g.ellipse(*P(0, 47), 9 * SC, 3.4 * SC, 'g')
+    # Kopf (leicht gesenkt)
     g.part('mhead%d' % cx)
-    g.ellipse(X(2), by - 56, 11, 10, 'r')
+    g.ellipse(*P(1, 56), 10 * SC, 9 * SC, 'r')
+    g.poly([P(-8, 54), P(10, 54), P(7, 48), P(1, 46), P(-5, 48)], 'r')
     g.part('mhorn%d' % cx)
-    g.curve([(X(-5), by - 63), (X(-9), by - 72), (X(-8), by - 82), (X(-4), by - 88)], 'h', w=4.5, w1=1.2)
-    g.curve([(X(9), by - 63), (X(13), by - 72), (X(12), by - 82), (X(8), by - 88)], 'h', w=4.5, w1=1.2)
-    # Halsband
-    g.part('mcollar%d' % cx); g.rect(X(-6) if flip == 1 else X(8), by - 49, X(8) if flip == 1 else X(-6), by - 45, 'g')
+    g.curve([P(-5, 62), P(-11, 70), P(-12, 80), P(-8, 88)], 'h', w=4.5 * SC, w1=1.2)
+    g.curve([P(7, 62), P(13, 70), P(14, 80), P(10, 88)], 'h', w=4.5 * SC, w1=1.2)
 
 
 g = Fig(W, H)
@@ -392,24 +415,36 @@ MMATS = {
     'h': mat(MHORN, pillow=2, k=1.7, bias=0.05),
     'g': mat(GREY, pillow=2, k=1.8, spec=True, spec_col=(220, 220, 240)),
     'l': mat(LOIN, pillow=2, k=1.4),
+    'n': mat([(60, 34, 22), (96, 60, 38), (136, 92, 60), (176, 128, 88), (210, 166, 120)], pillow=3, k=1.4, bias=0.04),
 }
 mg = g.render(MMATS, light=(0.3, -0.8, 0.5))
 cv.paste(mg, 0, 0)
 MGM = mg[..., 3] > 0
 for (cx, flip) in [(52, 1), (198, -1)]:
     by = 298
-    # glühende Augen, Hauer
-    for dx in (-2, 5):
-        x = cx + (dx + 1) * flip; y = by - 57
-        px(cv, x, y, (255, 214, 140)); px(cv, x + flip, y, (255, 170, 80))
-    for dx in (-1, 6):
-        x = cx + dx * flip; y = by - 50
-        px(cv, x, y, (250, 246, 236)); px(cv, x, y - 1, (250, 246, 236)); px(cv, x, y + 1, (180, 170, 160))
-    # Mund
-    for dx in range(0, 6):
-        px(cv, cx + dx * flip, by - 52, (40, 10, 8))
-    # Glanz auf den Stiefeln (graue Rüstteile wie auf der Karte)
-    px(cv, cx - 9 * flip, by - 8, GREY[4]); px(cv, cx + 5 * flip, by - 8, GREY[4])
+
+    def Q(dx, dy):
+        return (int(round(cx + dx * flip * SC)), int(round(by - dy * SC)))
+    # Stirnwulst-Schatten, glühende Augen
+    for dx in range(-7, 10):
+        px(cv, *Q(dx, 59), MSK[1])
+    for dx in (-4, 5):
+        x, y = Q(dx, 57)
+        glow2(cv, x, y + 1, 5, (255, 190, 90), k=0.6, mix=0.35)
+        for (qx, qy, c) in [(-1, 0, (255, 200, 110)), (0, 0, (255, 250, 210)), (1, 0, (255, 236, 170)), (2, 0, (255, 190, 90)),
+                            (0, 1, (255, 170, 80)), (1, 1, (230, 110, 40))]:
+            px(cv, x + qx * flip, y + qy, c)
+    # Mund + Hauer
+    for dx in range(-3, 7):
+        px(cv, *Q(dx, 50), (40, 10, 8))
+    for dx in (-3, 6):
+        x, y = Q(dx, 50)
+        px(cv, x, y - 1, (250, 246, 236)); px(cv, x, y - 2, (250, 246, 236)); px(cv, x, y - 3, (220, 214, 204))
+    # Nasenlöcher
+    px(cv, *Q(0, 53), MSK[0]); px(cv, *Q(2, 53), MSK[0])
+    # Glanz auf den Stiefeln
+    px(cv, *Q(-9, 8), GREY[4]); px(cv, *Q(6, 8), GREY[4])
+
 
 # ---------------------------------------------------------------- Ketten vom Halsband zum Ring
 CH = Fig(W, H)
@@ -440,8 +475,8 @@ def chain(p0, p1, sagk, name):
                     1.3, 1.3, 'i')
 
 
-chain((60, 251), (RX - 5, RY + 2), 10, 'cL')
-chain((190, 251), (RX + 5, RY + 2), 10, 'cR')
+chain((62, 245), (RX - 5, RY + 2), 8, 'cL')
+chain((188, 245), (RX + 5, RY + 2), 8, 'cR')
 CH.outline()
 chg = CH.render({'i': mat(IRON, pillow=1.2, k=2.2, bias=0.12, spec=True, spec_col=(255, 230, 210))}, inner=True)
 cv.paste(chg, 0, 0)

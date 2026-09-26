@@ -279,11 +279,13 @@ def tiger_eye(x0, y0, w, flip=False):
     for i in range(w):
         ii = (w - 1 - i) if flip else i
         X = x0 + ii
-        hgt = 4 if 1 < i < w - 2 else (3 if 0 < i < w - 1 else 2)
+        hgt = 5 if 2 < i < w - 3 else (4 if 0 < i < w - 1 else 2)
         yo = 0 if 0 < i < w - 1 else 1
         for j in range(hgt):
             Y = y0 + yo + j
             c = EYEI[1] if j == 0 else (EYEI[2] if j < 3 else EYEI[3])
+            if j == hgt - 1 and hgt >= 4:
+                c = EYEI[3]
             if i in (w // 2, w // 2 - 1) and j < hgt:
                 c = (10, 10, 20) if j > 0 else EYEI[0]
             px(cv, X, Y, c)
@@ -427,6 +429,14 @@ for i in range(7):
     px(cv, HX + 8 + i, yb, HAIR[0]); px(cv, HX + 8 + i, yb - 1, HAIR[2])
 # Nase
 px(cv, HX + 5, HY + 6, SKIN[2]); px(cv, HX + 5, HY + 7, SKIN[1]); px(cv, HX + 6, HY + 8, SKIN[1]); px(cv, HX + 4, HY + 8, SKIN[2])
+# Finger an beiden Händen
+for yf in (177, 179):
+    for xf in range(131, 139):
+        px(cv, xf, yf, SKIN[1])
+for yf in (206, 208):
+    for xf in range(142, 150):
+        px(cv, xf, yf, SKIN[1])
+px(cv, 124, 185, SKIN[1]); px(cv, 125, 186, SKIN[1])          # Daumen
 # breites Grinsen mit Zähnen unter dem Schnurrbart
 for x in range(HX, HX + 9):
     px(cv, x, HY + 14, (250, 248, 240) if x not in (HX, HX + 8) else (200, 190, 190))

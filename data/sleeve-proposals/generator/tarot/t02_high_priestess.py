@@ -103,6 +103,21 @@ def pillar(x0, x1, ramp, letter, lcol):
             Hc[:, x] += math.sin((x - x0) * 0.8) * 0.6
         relief(cv, Hc, np.zeros((H, W), np.int32), [ramp], Mc & art_mask(), k=1.6, bias=0.05)
         outline_mask(cv, Mc & art_mask(), OUT)
+        # goldene Ringe über/unter dem Wulst
+        for x in range(x0, x1):
+            for yr in (yc - hh // 2 - 2, yc + hh // 2 + 1):
+                if in_art(x, yr):
+                    px(cv, x, yr, GOLD[3] if x % 2 else GOLD[2])
+    # Lotusblätter am Kapitell
+    for i in range(4):
+        lx = x0 + 3 + i * (x1 - x0 - 6) / 3
+        for yy_ in range(AY0 + 26, AY0 + 36):
+            wv = (AY0 + 36 - yy_) * 0.35
+            for x in range(int(lx - wv), int(lx + wv) + 1):
+                if in_art(x, yy_):
+                    px(cv, x, yy_, rampc(ramp, 0.75 - (x - lx + wv) / (2 * wv + 1) * 0.5, x, yy_))
+            if in_art(int(lx - wv) - 1, yy_):
+                px(cv, int(lx - wv) - 1, yy_, OUT)
     outline_mask(cv, Mp & art_mask(), OUT)
     glyph(cv, letter, 22, cxp, 100, lcol, outline=OUT)
 PB = [(8, 8, 18), (18, 18, 34), (30, 30, 52), (46, 46, 74), (66, 68, 100), (92, 96, 130)]
@@ -162,10 +177,6 @@ STONE_T = [(40, 46, 80), (70, 78, 116), (104, 112, 150), (140, 148, 184), (180, 
 SCROLL = [(120, 100, 70), (180, 160, 120), (224, 210, 170), (246, 238, 210), (255, 252, 236)]
 
 f = Fig(W, H)
-# ---- Thron (Steinwürfel) hinter ihr
-f.part('throne')
-f.poly([(82, 178), (168, 178), (172, 266), (78, 266)], 't')
-f.part('throneTop'); f.poly([(78, 172), (172, 172), (170, 180), (80, 180)], 't')
 # ---- Mantel (blau mit silbernem Saum), fällt von den Schultern weit auf den Boden
 f.part('cape')
 f.poly([(98, 150), (152, 150), (166, 186), (176, 240), (184, 272), (160, 278), (90, 278), (66, 272), (74, 240), (84, 186)], 'c')
@@ -253,15 +264,17 @@ for (hx, hy, L) in [(110, 116, 6), (118, 112, 7), (130, 112, 7), (138, 116, 6)]:
             px(cv, x, y, HAIR[4])
 # Mondsichel am Stirnreif
 px(cv, 124, 114, (255, 255, 255)); px(cv, 126, 115, (200, 220, 255))
-# Schriftrolle: Zeichen (TORA)
-for (x0, word) in [(104, 'TORA')]:
-    pass
-for i, x in enumerate(range(104, 148, 3)):
-    if not inside(x, 207):
-        continue
-    for y in range(205, 212):
-        if (i * 7 + y) % 3 == 0 and inside(x, y):
-            px(cv, x, y, (90, 70, 50))
+# Schriftrolle: „TORA“ in winzigen Lettern + Zeilen
+GL = {'T': ["###", ".#.", ".#.", ".#.", ".#."], 'O': ["###", "#.#", "#.#", "#.#", "###"],
+      'R': ["##.", "#.#", "##.", "#.#", "#.#"], 'A': [".#.", "#.#", "###", "#.#", "#.#"]}
+for i, ch in enumerate("TORA"):
+    for j, row in enumerate(GL[ch]):
+        for k, c in enumerate(row):
+            if c == '#':
+                px(cv, 118 + i * 4 + k, 203 + j, (70, 50, 40))
+for x in range(108, 143):
+    if x % 5 != 0 and inside(x, 210):
+        px(cv, x, 210, (170, 150, 110))
 # Finger
 for (fx, fy) in [(103, 202), (103, 205), (147, 202), (147, 205)]:
     px(cv, fx, fy, SKIN[1])
@@ -286,10 +299,8 @@ for (x0, y0, x1, y1) in [(104, 222, 97, 278), (116, 224, 114, 281), (134, 224, 1
             px(cv, x, y, ROBE[1]); 
             if t > 0.1 and inside(x - 1, y):
                 px(cv, x - 1, y, ROBE[4] if (int(y) % 3) else ROBE[3])
-# Stola: goldene Sechsecke (Barrieren-Zeichen) und Saum
+# Stola: goldene Sechsecke (Barrieren-Zeichen)
 for (ex_, ey_) in [(125, 232), (125, 252), (125, 272)]:
-    for t in np.linspace(0, 2 * math.pi, 7)[:-1]:
-        pass
     hexp = [(ex_ + math.cos(math.pi / 6 + i * math.pi / 3) * 4, ey_ + math.sin(math.pi / 6 + i * math.pi / 3) * 4) for i in range(7)]
     for i in range(6):
         (x0, y0), (x1, y1) = hexp[i], hexp[i + 1]
@@ -333,6 +344,5 @@ for _ in range(26):
     if y < FY and not inside(x, y):
         sparkle(cv, x, y, (255, 250, 210), r=rnd.choice([1, 1, 2]), c2=(255, 200, 90))
 
-emblem_hex = emblem_generic([".###.", "#...#", "#.#.#", "#...#", ".###."], {'#': (255, 220, 120)})
 finish(cv, 'II', 'NAO', out='02_high_priestess_nao', emblem=emblem_moon)
 print('ok')

@@ -171,3 +171,17 @@ def taper(M, pts, w0, w1=0.6, steps=50):
             cv2.circle(m, (int(round(x)), int(round(y))), int(round(r)), 1, -1)
     M |= m.astype(bool)
     return M
+
+
+def lidded_eye(cv, x, y, iris, flip=False, lid=(90, 50, 60), lash=OUT):
+    """6x5-Auge mit schwerem Oberlid (ruhig, würdevoll/lässig): Iris-Verlauf, Pupille, Glanzpunkt"""
+    I = hair_ramp(iris)
+    rows = ["KKKKKK", "LDDDDL", "wDPPDw", "wIPPIw", ".IjjI."]
+    cols = {'K': lash, 'L': lid, 'D': I[0], 'I': I[2], 'j': I[3], 'P': (14, 10, 20), 'w': (244, 244, 250)}
+    for j, r in enumerate(rows):
+        for i, ch in enumerate(r):
+            if ch in cols:
+                px(cv, x + (5 - i if flip else i), y + j, cols[ch])
+    px(cv, x + (3 if flip else 2), y + 2, (255, 255, 255))
+    px(cv, x + (6 if flip else -1), y, lash)
+    px(cv, x + (7 if flip else -2), y - 1, lash)

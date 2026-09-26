@@ -155,7 +155,7 @@ def big_eye(cv, x, y, iris, w=6, h=9, flip=False, lash=OUT, white=(250, 250, 255
             t = (j - 2) / max(1, h - 3)
             c = I[0] if t < 0.2 else I[1] if t < 0.45 else I[2] if t < 0.75 else I[3]
             # Pupille
-            if 1 <= i <= w - 3 and 0.2 <= t <= 0.6 and w >= 5:
+            if abs(i - (w - 2) / 2) <= (1.0 if w >= 7 else 0.6) and 0.15 <= t <= 0.65 and w >= 5:
                 c = I[0]
             # Rand unten/seitlich leicht dunkel
             if j == h - 1:
@@ -206,4 +206,17 @@ def recolor_on(cv, f, x, y, c, keys):
 def prep_inner(f):
     """innere Konturpixel merken (für recolor_on)"""
     f.inner_mask = f.inner_lines()
+    return f
+
+
+def scale_fig(f, k, cx, cy):
+    """Materialkarte (vor dem Rendern) um (cx,cy) mit Faktor k skalieren (nächster Nachbar auf Labels,
+    Schattierung entsteht erst danach -> keine verzerrten Dither-Muster)"""
+    yy, xx = np.indices((f.h, f.w))
+    sx = np.round(cx + (xx - cx) / k).astype(int)
+    sy = np.round(cy + (yy - cy) / k).astype(int)
+    ok = (sx >= 0) & (sx < f.w) & (sy >= 0) & (sy < f.h)
+    L = np.full_like(f.L, '.'); P = np.zeros_like(f.P)
+    L[ok] = f.L[sy[ok], sx[ok]]; P[ok] = f.P[sy[ok], sx[ok]]
+    f.L, f.P = L, P
     return f

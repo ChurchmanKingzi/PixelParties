@@ -37,77 +37,122 @@ cloud_mass([(214, 70, 46, 16, 2), (192, 60, 40, 16, 7), (226, 56, 26, 11, 8)], C
 cloud_mass([(30, 136, 44, 12, 3), (220, 130, 44, 12, 4)], CL_D)
 
 # ---------------------------------------------------------------- Berge und Meer am Horizont
-MTN = [(30, 10, 26), (54, 20, 38), (84, 34, 48), (130, 60, 60)]
+MTN = [(26, 8, 24), (46, 16, 34), (72, 28, 44), (110, 50, 56), (180, 96, 70)]
+def mtn_top(x):
+    return HOR - max(0, 34 - abs(x - 28) * 0.75) - max(0, 28 - abs(x - 222) * 0.7) - max(0, 10 - abs(x - 70) * 0.4) \
+        - max(0, 9 - abs(x - 178) * 0.35) - 2.5 * math.sin(x * 0.31)
 for x in range(AX0, AX1):
-    top = HOR - max(0, 24 - abs(x - 30) * 0.7) - max(0, 20 - abs(x - 220) * 0.6) - 3 * math.sin(x * 0.3)
+    top = mtn_top(x)
     for y in range(int(top), HOR + 1):
-        px(cv, x, y, rampc(MTN, 0.8 - (y - top) / 26, x, y))
-SEA = [(30, 12, 30), (70, 26, 44), (130, 56, 56), (210, 120, 80), (255, 210, 150)]
+        v = 0.7 - (y - top) / 22 + (0.18 if (x - 28) * (x - 222) < 0 and x < 125 else 0)
+        px(cv, x, y, rampc(MTN, v, x, y))
+    # vom Himmelslicht angestrahlte Grate
+    px(cv, x, int(top), MTN[4]); px(cv, x, int(top) + 1, MTN[3] if x % 2 else MTN[2])
+SEA = [(24, 8, 26), (60, 20, 40), (120, 50, 54), (200, 110, 76), (255, 200, 140), (255, 240, 200)]
 SEA_Y1 = HOR + 14
-for y in range(HOR - 2, SEA_Y1):
+for y in range(HOR - 4, SEA_Y1):
     for x in range(AX0, AX1):
-        top = HOR - max(0, 24 - abs(x - 30) * 0.7) - max(0, 20 - abs(x - 220) * 0.6)
-        if y < HOR and y < top:
+        if y < mtn_top(x) + 0 and y < HOR:
             continue
-        v = 0.55 - (y - HOR) / 14 * 0.35
-        if math.sin(y * 2.1 + math.sin(x * 0.2) * 2) > 0.8:
-            v += 0.3
-        # Glanzpfad des Lichts
-        if abs(x - DX) < 26 - (y - HOR) and (x + y) % 3 == 0:
-            v += 0.3
+        if y < HOR and y >= mtn_top(x):
+            continue
+        v = 0.5 - (y - HOR) / 14 * 0.3
+        if math.sin(y * 2.3 + math.sin(x * 0.25) * 2.2) > 0.75:
+            v += 0.3                        # Wellenkämme
+        if abs(x - DX) < 30 - (y - HOR) * 0.8 and (x + 2 * y) % 3 != 0:
+            v += 0.35                       # Glanzpfad des göttlichen Lichts
         px(cv, x, y, rampc(SEA, v, x, y))
+# Brandung an der Küstenlinie
+for x in range(AX0, AX1):
+    if x % 3:
+        px(cv, x, SEA_Y1 - 1, SEA[4] if (x // 3) % 2 else SEA[3])
 
 # ---------------------------------------------------------------- Friedhofsboden
-EARTH = [(20, 10, 16), (40, 20, 26), (64, 34, 36), (94, 54, 48), (130, 80, 60)]
+EARTH = [(18, 8, 14), (36, 18, 24), (58, 30, 32), (86, 48, 42), (120, 74, 56), (160, 108, 76)]
 gn = noise(H, W, 4, seed=5)
+gn2 = noise(H, W, 9, seed=6)
 for y in range(SEA_Y1, AY1):
     for x in range(AX0, AX1):
-        v = 0.55 - (y - SEA_Y1) / (AY1 - SEA_Y1) * 0.3 + (gn[y, x] - 0.5) * 0.55
+        t_ = (y - SEA_Y1) / (AY1 - SEA_Y1)
+        v = 0.5 - t_ * 0.18 + (gn[y, x] - 0.5) * 0.5 + (gn2[y, x] - 0.5) * 0.3
         px(cv, x, y, rampc(EARTH, v, x, y))
 for x in range(AX0, AX1):
-    px(cv, x, SEA_Y1, (30, 14, 22))
-# spärliches, verdorrtes Gras
-for _ in range(220):
-    x = rnd.randint(AX0, AX1 - 1); y = rnd.randint(SEA_Y1 + 2, AY1 - 1)
-    for k in range(rnd.randint(1, 3)):
-        px(cv, x + (k if rnd.random() < 0.3 else 0), y - k, (110, 90, 50) if k else (70, 56, 36))
-# Grabsteine (lavendelgrau wie in den Skelett-Karten)
-TOMB = [(40, 30, 50), (76, 66, 88), (120, 110, 134), (170, 160, 182), (214, 206, 224)]
-def tombstone(x, y, w, h, cross=False, tilt=0):
-    f = Fig(W, H)
-    if cross:
-        f.part('c')
-        f.rect(x - 1.5, y - h, x + 1.5, y, 's')
-        f.rect(x - w / 2, y - h + h * 0.25, x + w / 2, y - h + h * 0.25 + 2.5, 's')
-    else:
-        f.part('t')
-        f.poly([(x - w / 2 + tilt, y - h + w / 2), (x - w / 2, y), (x + w / 2, y), (x + w / 2 + tilt, y - h + w / 2)], 's')
-        f.ellipse(x + tilt, y - h + w / 2, w / 2, w / 2, 's')
-    f.part('base'); f.rect(x - w / 2 - 1, y - 1, x + w / 2 + 1, y + 1, 's')
-    f.outline()
-    cv.paste(f.render({'s': mat(TOMB, pillow=2, k=1.5, noise=0.8, nscale=2)}), 0, 0)
-    if not cross:
-        for k in range(3):     # eingraviertes Kreuz
-            px(cv, x + tilt * 0.5, y - h + w / 2 - 1 + k, TOMB[1])
-        px(cv, x - 1 + tilt * 0.5, y - h + w / 2, TOMB[1]); px(cv, x + 1 + tilt * 0.5, y - h + w / 2, TOMB[1])
-for (x, y, w, h, c, tl) in [(28, 248, 10, 16, False, -1), (94, 244, 8, 12, True, 0), (156, 246, 9, 13, False, 1), (224, 252, 10, 18, True, 0),
-                            (70, 240, 6, 9, False, 0), (182, 240, 6, 9, True, 0)]:
-    tombstone(x, y, w, h, c, tl)
+    px(cv, x, SEA_Y1, (30, 12, 20)); px(cv, x, SEA_Y1 + 1, EARTH[4] if x % 2 else EARTH[3])
+# Steinchen im Boden
+for _ in range(90):
+    x = rnd.randint(AX0, AX1 - 1); y = rnd.randint(SEA_Y1 + 3, AY1 - 1)
+    px(cv, x, y, EARTH[4]); px(cv, x + 1, y + 1, EARTH[0])
 
-# kleine, ferne Skelette, die sich aus der Erde recken
-def tiny_skel(x, y):
-    B = BONE
-    for k in range(5):
-        px(cv, x, y - k, B[3])
-    for (dx, dy) in [(-1, -7), (0, -7), (1, -7), (-1, -8), (0, -8), (1, -8), (0, -9)]:
-        px(cv, x + dx, y + dy, B[4])
-    px(cv, x - 1, y - 7, OUT); px(cv, x + 1, y - 7, OUT)
-    for k in range(1, 5):
-        px(cv, x - 1 - k // 2, y - 3 - k, B[3]); px(cv, x + 1 + k // 2, y - 3 - k, B[3])
-    for dx in range(-3, 4):
-        px(cv, x + dx, y + 1, EARTH[1])
-for (x, y) in [(52, 244), (120, 242), (200, 246)]:
-    tiny_skel(x, y)
+GRASS_D = [(40, 30, 16), (72, 60, 28), (110, 96, 40), (156, 132, 60), (206, 170, 90)]
+def tuft(x, y, n=5, h=6, seed=0):
+    """Grasbüschel: fächerförmige, verdorrte Halme mit Streiflicht"""
+    rr = random.Random(seed)
+    for i in range(n):
+        a = -math.pi / 2 + (i - (n - 1) / 2) * 0.32 + rr.uniform(-0.1, 0.1)
+        L = h * rr.uniform(0.6, 1.0)
+        for k in range(int(L) + 1):
+            t_ = k / max(1, L)
+            bx = x + math.cos(a) * k + (t_ ** 2) * (i - n / 2) * 0.6; by = y + math.sin(a) * k
+            px(cv, bx, by, GRASS_D[1 + min(3, int(t_ * 3.5))] if (i % 2 == 0) else GRASS_D[min(3, int(t_ * 3))])
+    px(cv, x - 1, y + 1, GRASS_D[0]); px(cv, x, y + 1, GRASS_D[0]); px(cv, x + 1, y + 1, GRASS_D[0])
+
+TOMB = [(34, 26, 44), (64, 56, 80), (100, 92, 118), (142, 134, 158), (188, 180, 202), (226, 220, 236)]
+def tomb_relief(x, y, w, h, kind='round', tilt=0.0, seed=0, moss=True):
+    """Grabstein als Relief: gewölbte Platte mit eingraviertem Kreuz und Randrille"""
+    M = np.zeros((H, W), np.uint8)
+    if kind == 'cross':
+        cv2.rectangle(M, (int(x - w * 0.18), int(y - h)), (int(x + w * 0.18), int(y)), 1, -1)
+        cv2.rectangle(M, (int(x - w / 2), int(y - h * 0.75)), (int(x + w / 2), int(y - h * 0.75 + w * 0.34)), 1, -1)
+    else:
+        cv2.rectangle(M, (int(x - w / 2), int(y - h + w / 2)), (int(x + w / 2), int(y)), 1, -1)
+        cv2.ellipse(M, (int(x), int(y - h + w / 2)), (int(w / 2), int(w / 2)), 0, 180, 360, 1, -1)
+    if tilt:
+        ys, xs = np.where(M > 0)
+        M2 = np.zeros_like(M)
+        xs2 = np.clip(np.round(xs + (y - ys) * tilt).astype(int), 0, W - 1)
+        M2[ys, xs2] = 1
+        M = cv2.morphologyEx(M2, cv2.MORPH_CLOSE, np.ones((2, 2), np.uint8))
+    d = cv2.distanceTransform(np.pad(M, 1), cv2.DIST_L2, 3)[1:-1, 1:-1]
+    Hh = np.sqrt(np.minimum(d, 3) / 3) * 2.2
+    Hh += (noise(H, W, 2, seed=seed) - 0.5) * 0.9
+    if kind != 'cross':
+        # eingraviertes Kreuz + Randrille
+        cx_ = x + tilt * h * 0.45
+        yy, xx = np.indices((H, W))
+        cross = ((np.abs(xx - cx_) < 1.0) & (yy > y - h + w * 0.45) & (yy < y - h * 0.3)) | \
+                ((np.abs(yy - (y - h + w * 0.8)) < 1.0) & (np.abs(xx - cx_) < w * 0.22))
+        Hh -= cross * 1.4
+        Hh -= ((d > 2.2) & (d < 3.2)) * 0.6
+    Mb = (M > 0) & (np.indices((H, W))[0] >= AY0)
+    relief(cv, Hh, np.zeros((H, W), np.int32), [TOMB], Mb, k=1.5, bias=0.02)
+    ring = cv2.dilate(M, np.ones((3, 3), np.uint8)) > 0
+    for yy_, xx_ in zip(*np.where(ring & ~Mb)):
+        if in_art(xx_, yy_):
+            px(cv, xx_, yy_, (14, 8, 16))
+    rr = random.Random(seed)
+    if moss:
+        for _ in range(int(w * 1.4)):
+            ys, xs = np.where(Mb)
+            i = rr.randrange(len(ys))
+            if ys[i] > y - h * 0.4 or rr.random() < 0.2:
+                px(cv, xs[i], ys[i], rr.choice([(60, 80, 40), (90, 110, 50), (40, 58, 30)]))
+    # Erdsockel + Gras
+    for k in range(-w // 2 - 3, w // 2 + 4):
+        px(cv, x + k, y + 1, EARTH[1]); px(cv, x + k, y + 2, EARTH[0] if k % 2 else EARTH[1])
+    tuft(x - w // 2 - 1, y + 1, 4, 5, seed); tuft(x + w // 2 + 1, y + 1, 3, 4, seed + 1)
+
+# hintere Grabsteine (klein, im Dunst) und vordere (groß, mit Relief)
+for (x, y, w, h, kd, tl, sd) in [(40, 244, 8, 12, 'round', 0.1, 1), (86, 241, 7, 10, 'cross', 0, 2), (112, 243, 7, 10, 'round', -0.1, 3),
+                                 (148, 242, 8, 11, 'round', 0.08, 4), (170, 241, 7, 11, 'cross', 0, 5), (214, 244, 8, 12, 'round', -0.12, 6)]:
+    tomb_relief(x, y, w, h, kd, tl, sd, moss=False)
+fog(cv, SEA_Y1 - 2, SEA_Y1 + 22, (200, 120, 110), k=1.8, seed=21, mix=0.35)
+for (x, y, w, h, kd, tl, sd) in [(24, 268, 12, 22, 'round', -0.12, 7), (92, 262, 11, 18, 'cross', 0.06, 8),
+                                 (160, 262, 12, 19, 'round', 0.1, 9), (228, 270, 12, 24, 'cross', -0.08, 10)]:
+    tomb_relief(x, y, w, h, kd, tl, sd)
+# Grasbüschel über den Boden verteilt
+for i in range(46):
+    x = rnd.randint(AX0 + 2, AX1 - 3); y = rnd.randint(SEA_Y1 + 6, AY1 - 1)
+    tuft(x, y, rnd.randint(3, 6), rnd.randint(3, 7), 100 + i)
 
 # ---------------------------------------------------------------- Wolkenbank unter Damus
 CL = [(70, 30, 54), (120, 60, 74), (186, 110, 96), (236, 170, 126), (255, 222, 176), (255, 244, 220)]
@@ -260,8 +305,8 @@ for r in (8, 13, 18, 23):
             blend_px(cv, x, y, (255, 240, 200), 0.6 if r < 16 else 0.4)
 
 # Wolken vor dem unteren Körper
-cloud_mass([(44, 192, 56, 18, 11), (206, 196, 56, 16, 12), (80, 200, 60, 20, 16), (168, 202, 64, 20, 17), (122, 208, 90, 22, 13),
-            (60, 214, 50, 12, 14), (186, 216, 50, 12, 15)], CL, shade=(70, 20, 40), k=0.7)
+cloud_mass([(50, 194, 50, 16, 11), (200, 196, 50, 14, 12), (82, 198, 60, 20, 16), (166, 200, 64, 20, 17), (122, 206, 92, 22, 13)],
+           CL, shade=(70, 20, 40), k=0.7)
 # Lichtsaum auf den Wolken
 glow(cv, DX, 190, 50, (255, 230, 180), k=0.4, mix=0.25)
 

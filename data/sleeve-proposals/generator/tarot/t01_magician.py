@@ -214,9 +214,6 @@ for (bx, by, L, d) in [(112, 164, 20, 0.35), (118, 168, 30, 0.2), (125, 166, 40,
         if inside(x, y) and k % 7 < 5:
             px(cv, x, y, BEARD[1])
 # Sterne auf Hut und Robe
-def star5(x, y, c=(255, 230, 90), c2=(240, 180, 40)):
-    px(cv, x, y, (255, 255, 200)); px(cv, x - 1, y, c); px(cv, x + 1, y, c); px(cv, x, y - 1, c); px(cv, x, y + 1, c2)
-    px(cv, x - 1, y + 1, c2); px(cv, x + 1, y + 1, c2)
 for (x, y) in [(116, 110), (128, 96), (136, 80), (152, 82), (134, 112), (112, 124), (138, 124)]:
     if inside(x, y) and tuple(cv.a[y, x]) not in set(tuple(c) for c in GOLD):
         sparkle(cv, x, y, (255, 236, 120), r=1, c2=(240, 190, 60)); px(cv, x, y, (255, 255, 220))
@@ -382,7 +379,6 @@ def vine(pts, n_roses, seed):
         x, y = path[int((k + 0.5) / n_roses * len(path))]
         rose(int(x), int(y) + r_.randint(-2, 2), r_.choice([3, 4]))
 # Girlande entlang der Oberkante (durchhängend) und an den Säulen hinab
-top = [(AX0, 48)] + [(x, 44 + 10 * math.sin(math.pi * (x - AX0) / (AX1 - AX0)) ** 0.8 * (1 if 60 < x < 190 else 0.6)) for x in range(AX0 + 10, AX1, 12)] + [(AX1 - 1, 48)]
 vine([(AX0 + 1, 48), (40, 52), (70, 56), (100, 54)], 3, 1)
 vine([(150, 54), (180, 56), (210, 52), (AX1 - 2, 48)], 3, 2)
 vine([(AX0 + 8, 48), (AX0 + 10, 90), (AX0 + 6, 130), (AX0 + 10, 170)], 3, 3)

@@ -328,34 +328,42 @@ TX, TY = 125, 156          # Kopfmitte
 glow(cv, TX, TY + 10, 74, (255, 236, 160), k=0.5, mix=0.26)
 glow(cv, TX, TY - 10, 46, (255, 246, 200), k=0.55, mix=0.28)
 t = Fig(W, H)
-# Geisterkleid: fällt weit und läuft in Flammenzungen aus
-t.part('dress')
-dress = []
-for i in range(13):                       # Glockenform, außen weich geschwungen
+# Geistergewand: schlank an der Taille, fließt lang nach unten und weht leicht nach rechts aus
+def robe_edge(u, side):
+    """Kante des Gewands bei Höhe u (0 = Taille, 1 = Saum)"""
+    w = 7 + 20 * u ** 0.75 + 2.5 * math.sin(u * 7 + (0 if side < 0 else 1.5)) * u
+    sway = 6 * u ** 2
+    return TX + side * w + sway
+RL = TY + 32; RH = 62
+robe = [(robe_edge(i / 16, -1), RL + i / 16 * RH) for i in range(17)]
+hem = []
+for i in range(13):
     u = i / 12
-    dress.append((TX + 10 + 17 * math.sin(u * math.pi / 2) ** 1.4, TY + 30 + u * 34))
-tongues = [(TX + 24, TY + 76), (TX + 17, TY + 66), (TX + 12, TY + 86), (TX + 6, TY + 70), (TX + 1, TY + 92), (TX - 4, TY + 70),
-           (TX - 10, TY + 86), (TX - 15, TY + 66), (TX - 23, TY + 78)]
-dress += tongues + [(2 * TX - x, y) for (x, y) in dress[::-1]]
-t.poly(dress, 'g')
-# lange, fließende Ärmel (hängen unter den leicht erhobenen Armen)
+    x = robe_edge(1, -1) + (robe_edge(1, 1) - robe_edge(1, -1)) * u
+    hem.append((x, RL + RH + (7 if i % 2 else -3) + 4 * math.sin(u * math.pi)))
+robe += hem + [(robe_edge(i / 16, 1), RL + i / 16 * RH) for i in range(16, -1, -1)]
+t.part('robe')
+t.poly(robe, 'g')
+# lange, schmale Hängeärmel
 for s_ in (-1, 1):
     X = lambda x, s_=s_: TX + s_ * x
     t.part('sleeve%d' % s_, line=False)
-    t.poly([(X(11), TY + 17), (X(26), TY + 14), (X(40), TY + 9), (X(43), TY + 15), (X(42), TY + 24), (X(39), TY + 34),
-            (X(37), TY + 42), (X(33), TY + 32), (X(26), TY + 26), (X(14), TY + 28)], 'g')
+    t.poly([(X(12), TY + 16), (X(28), TY + 12), (X(40), TY + 7), (X(40), TY + 13), (X(28), TY + 20), (X(14), TY + 23)], 'g')
+    t.curve([(X(22), TY + 18), (X(27), TY + 26), (X(25), TY + 35), (X(29), TY + 44)], 'g', w=9, w1=1.5)
+    t.curve([(X(34), TY + 13), (X(38), TY + 21), (X(36), TY + 30), (X(39), TY + 37)], 'g', w=6, w1=1)
     t.part('arm%d' % s_)
-    t.limb(X(15), TY + 17, X(30), TY + 13, 4.2, 3.4, 'b')
-    t.limb(X(30), TY + 13, X(44), TY + 7, 3.2, 2.6, 'b')
+    t.limb(X(13), TY + 17, X(28), TY + 14, 3, 2.5, 'b')
+    t.limb(X(28), TY + 14, X(42), TY + 8, 2.5, 1.9, 'b')
     t.part('hand%d' % s_)
-    t.ellipse(X(46), TY + 6, 3.4, 3, 'b')
-    t.limb(X(47), TY + 4, X(51), TY + 0, 1.2, 1, 'b')
-    t.limb(X(48), TY + 6, X(54), TY + 4, 1.2, 1, 'b')
-    t.limb(X(48), TY + 8, X(53), TY + 9, 1.2, 1, 'b')
+    t.ellipse(X(44), TY + 7, 2.6, 2.3, 'b')
+    t.line(X(45), TY + 5, X(49), TY + 2, 'b', w=1)
+    t.line(X(46), TY + 7, X(51), TY + 5, 'b', w=1)
+    t.line(X(46), TY + 8, X(50), TY + 9, 'b', w=1)
+    t.line(X(43), TY + 5, X(45), TY + 2, 'b', w=1)
 t.part('torso')
-t.poly([(TX - 11, TY + 13), (TX + 11, TY + 13), (TX + 13, TY + 20), (TX + 9, TY + 34), (TX - 9, TY + 34), (TX - 13, TY + 20)], 'b')
+t.poly([(TX - 9, TY + 13), (TX + 9, TY + 13), (TX + 10, TY + 20), (TX + 7, TY + 34), (TX - 7, TY + 34), (TX - 10, TY + 20)], 'b')
 t.part('collar', line=False)
-t.poly([(TX - 12, TY + 13), (TX, TY + 22), (TX + 12, TY + 13), (TX + 8, TY + 12), (TX, TY + 17), (TX - 8, TY + 12)], 'g')
+t.poly([(TX - 10, TY + 13), (TX, TY + 21), (TX + 10, TY + 13), (TX + 7, TY + 12), (TX, TY + 17), (TX - 7, TY + 12)], 'g')
 t.part('neck'); t.rect(TX - 4, TY + 6, TX + 4, TY + 13, 'b')
 # Haar: lodernde, hochstehende Flammenmähne (hinter dem Kopf)
 t.part('hair')
@@ -383,17 +391,35 @@ TM = {
     'k': mat(MASK, pillow=2, k=1.5, bias=0.1, spec=True),
 }
 trgba = t.render(TM, outline_col=(110, 64, 14))
-# geisterhaft: das Kleid löst sich nach unten hin auf (gedithert ausblenden)
-for y in range(TY + 22, TY + 46):
-    fade = (y - (TY + 22)) / 20.0
-    for x in list(range(TX - 45, TX - 22)) + list(range(TX + 23, TX + 46)):
+# Faltenwurf im Gewand: helle und dunkle Bahnen, die an der Taille zusammenlaufen
+RM = t.L == 'g'
+for i, u0 in enumerate(np.linspace(-0.8, 0.8, 7)):
+    for y in range(RL + 3, RL + RH + 8):
+        u = (y - RL) / RH
+        xl, xr = robe_edge(min(u, 1), -1), robe_edge(min(u, 1), 1)
+        x = int(round((xl + xr) / 2 + u0 * (xr - xl) / 2 * 0.9 + math.sin(y * 0.12 + i) * 1.2))
+        if RM[y, x] and tuple(trgba[y, x, :3]) != (110, 64, 14):
+            trgba[y, x, :3] = GH[5] if i % 2 == 0 else GH[1]
+            if i % 2 == 0 and RM[y, x + 1]:
+                trgba[y, x + 1, :3] = GH[4]
+# geisterhaft: Ärmel und Gewand lösen sich nach unten hin im Dither-Schleier auf
+for y in range(TY + 24, TY + 46):
+    fade = (y - (TY + 24)) / 20.0
+    for x in list(range(TX - 45, TX - 20)) + list(range(TX + 21, TX + 46)):
         if trgba[y, x, 3] and BAYER4[y % 4, x % 4] < fade * 0.8:
             trgba[y, x, 3] = 0
-for y in range(TY + 56, H):
-    fade = (y - (TY + 56)) / 34.0
-    for x in range(TX - 30, TX + 31):
-        if trgba[y, x, 3] and BAYER4[y % 4, x % 4] < fade * 0.9:
+for y in range(TY + 62, H):
+    fade = (y - (TY + 62)) / 38.0
+    for x in range(TX - 40, TX + 45):
+        if trgba[y, x, 3] and BAYER4[y % 4, x % 4] < fade * 1.05:
             trgba[y, x, 3] = 0
+# halbdurchsichtiger Schleier um das Gewand (nur Lichtschimmer)
+for y in range(RL + 10, RL + RH + 14):
+    u = min(1, (y - RL) / RH)
+    xl, xr = robe_edge(u, -1) - 4 - 6 * u, robe_edge(u, 1) + 4 + 6 * u
+    for x in range(int(xl), int(xr) + 1):
+        if not trgba[y, x, 3] and BAYER4[y % 4, x % 4] < 0.35 * (1 - u * 0.7):
+            blend_px(cv, x, y, (255, 236, 170), 0.35)
 cv.paste(trgba, 0, 0)
 TMk = trgba[..., 3] > 0
 # Strähnen im Flammenhaar: helle und dunkle Linien, die nach oben zusammenlaufen
@@ -411,10 +437,10 @@ glow(cv, TX - 7, TY + 3, 5, (255, 240, 120), k=0.7, mix=0.35)
 px(cv, TX - 1, TY + 10, (170, 110, 30)); px(cv, TX, TY + 10, (170, 110, 30)); px(cv, TX + 1, TY + 10, (170, 110, 30))
 # helle Lichtbälle an den Händen (wie die weißen Lichter im Sprite)
 for s in (-1, 1):
-    hx = TX + s * 51
-    glow(cv, hx, TY + 4, 14, (255, 255, 236), k=0.8, mix=0.4)
-    glow(cv, hx, TY + 4, 7, (255, 255, 255), k=1.0, mix=0.55)
-    twinkle(cv, hx, TY + 4, (255, 255, 255), r=4, c2=(255, 230, 150))
+    hx = TX + s * 50
+    glow(cv, hx, TY + 3, 13, (255, 255, 236), k=0.7, mix=0.35)
+    glow(cv, hx, TY + 3, 6, (255, 255, 255), k=0.9, mix=0.5)
+    twinkle(cv, hx, TY + 3, (255, 255, 255), r=4, c2=(255, 230, 150))
 # Mondsichel-Diadem über der Maske
 for a in np.linspace(math.pi * 0.25, math.pi * 1.35, 22):
     px(cv, TX + 0.5 + math.cos(a) * 3.4, TY - 18 + math.sin(a) * 3.4, (255, 255, 236))
