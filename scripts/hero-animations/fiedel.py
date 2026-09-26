@@ -8,9 +8,9 @@
   1-px-Kontur); Stiefel, Arme und Handschuhe liegen darüber.
 * Dunkle Aura: violett-schwarze Schwaden steigen um ihn herum auf.
 * Er blinzelt ab und zu (das eine sichtbare Auge im verdunkelten Gesicht).
-* Leichtes Squash & Stretch: zweimal pro Loop streckt er sich 1 px und
-  staucht sich danach 1 px (etwas breiter) – als Zeilen-/Spaltenoperation
-  auf das fertige Bild, damit nirgends Lücken entstehen.
+* Leichtes Squash & Stretch (nur die Höhe): zweimal pro Loop streckt er sich
+  1 px und staucht sich danach 1 px – als Zeilenoperation auf das fertige
+  Bild, damit nirgends Lücken entstehen.
 """
 import math
 import sys
@@ -31,7 +31,7 @@ LEFT_IN, RIGHT_IN = 8, 18                     # Ansatz des Umhangs (Originalspal
 TOP = 19                                      # ab hier weht der Umhang
 LID, LASH = rgb('d5a462'), rgb('66311e')
 EYE_PX = [(9, 10), (10, 10), (9, 11), (10, 11)]      # sichtbares Auge
-SS_ROW, SS_COL = 19, 13                               # Weste: Zeile/Spalte zum Dehnen
+SS_ROW = 19                                           # Westenzeile zum Dehnen/Stauchen
 
 
 def is_cape(ox, oy):
@@ -134,8 +134,8 @@ def ss_level(i):
 
 def squash_stretch(img, i):
     """Auf das fertige Bild: Westenzeile doppeln (Strecken) bzw. streichen
-    (Stauchen, dann eine Spalte in der Mitte doppeln = etwas breiter).
-    Die Füße bleiben unten, es entstehen keine Lücken."""
+    (Stauchen). Nur die Höhe ändert sich, die Breite bleibt gleich; die Füße
+    bleiben unten, es entstehen keine Lücken."""
     lv = ss_level(i)
     if lv == 0:
         return img
@@ -147,11 +147,6 @@ def squash_stretch(img, i):
     else:
         res[1:r + 1] = img[:r]                             # Zeile r entfällt
         res[r + 1:] = img[r + 1:]
-        c = SS_COL + PL
-        wide = np.zeros_like(res)
-        wide[:, :c] = res[:, 1:c + 1]                      # linke Hälfte 1 px nach links
-        wide[:, c:] = res[:, c:]
-        res = wide
     return res
 
 
