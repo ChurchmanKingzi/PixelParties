@@ -91,26 +91,27 @@ def build(props=True):
         for y in range(37,66): g[y+OY][24]='S'
     # ---- neck ----
     rect(21,16,23,18,'b')
-    # ---- skull ----
-    for y in range(4,17):
-        for x in range(14,24):
-            d=((x-23.5)/9.5)**2+((y-10)/6.8)**2
-            if y>13: d=((x-23.5)/6.5)**2+((y-10)/6.8)**2
-            if d<=1: P(x,y,'B')
-    # skull shading
-    for y in range(4,17):
-        for x in range(14,24):
-            if g[y+OY][x]=='B' and (x<16 or y>14): P(x,y,'b')
-    # eye sockets
-    rect(17,9,20,11,'X'); P(17,9,'b'); P(16,10,'X'); P(20,12,'X')
-    P(18,10,'R'); P(19,10,'r'); P(18,9,'r')
-    # nose
-    P(23,12,'X'); P(22,13,'X')
-    # teeth
-    for x in range(19,24): P(x,15,'X' if x%2 else 'B')
-    rect(19,14,23,14,'b'); rect(19,16,23,16,'c')
-    # cheekbone
-    P(16,12,'c'); P(17,13,'c')
+    if props:
+        # ---- skull ----
+        for y in range(4,17):
+            for x in range(14,24):
+                d=((x-23.5)/9.5)**2+((y-10)/6.8)**2
+                if y>13: d=((x-23.5)/6.5)**2+((y-10)/6.8)**2
+                if d<=1: P(x,y,'B')
+        # skull shading
+        for y in range(4,17):
+            for x in range(14,24):
+                if g[y+OY][x]=='B' and (x<16 or y>14): P(x,y,'b')
+        # eye sockets
+        rect(17,9,20,11,'X'); P(17,9,'b'); P(16,10,'X'); P(20,12,'X')
+        P(18,10,'R'); P(19,10,'r'); P(18,9,'r')
+        # nose
+        P(23,12,'X'); P(22,13,'X')
+        # teeth
+        for x in range(19,24): P(x,15,'X' if x%2 else 'B')
+        rect(19,14,23,14,'b'); rect(19,16,23,16,'c')
+        # cheekbone
+        P(16,12,'c'); P(17,13,'c')
     # ---- crown ----
     if props:
         rect(13,3,23,5,'G'); rect(13,6,23,6,'g')

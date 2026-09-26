@@ -28,7 +28,7 @@ def gem(cv,cx,cy,rx,ry,R):
             elif d<=1.45: px(cv,x,y,GOLD[1] if (x+y)%2 else GOLD[2])  # bezel
     px(cv,cx-rx*0.4,cy-ry*0.45,R[4]); px(cv,cx-rx*0.4+1,cy-ry*0.45,R[3]); px(cv,cx+rx*0.35,cy+ry*0.4,R[3])
 def draw_crown(cv):
-    CX=125
+    CX=124.5
     # velvet cap behind the points
     for y in range(80,98):
         for x in range(97,154):
@@ -37,7 +37,8 @@ def draw_crown(cv):
     # points (fleur spikes)
     pts=[(96,88),(110,80),(125,72),(140,80),(154,88)]
     for (tx,ty) in pts:
-        base=98; hw=6 if tx!=CX else 7
+        base=98; hw=6 if tx!=125 else 7
+        tx0=tx
         for y in range(ty,base+1):
             t=(y-ty)/(base-ty); w=max(1,hw*t**0.9)
             for x in range(int(tx-w),int(tx+w)+1):
@@ -70,8 +71,8 @@ def draw_crown(cv):
     for x in range(89,162): px(cv,x,95,OUT); px(cv,x,110,OUT)
     for y in range(95,111): px(cv,89,y,OUT); px(cv,161,y,OUT)
     # gems
-    gem(cv,CX,102.5,4.5,4.2,RUBY); gem(cv,106,102.5,2.8,2.8,SAPH); gem(cv,144,102.5,2.8,2.8,SAPH); gem(cv,95.5,102.5,2,2.4,EMER); gem(cv,154.5,102.5,2,2.4,EMER)
-    gem(cv,125,86,2.5,3,RUBY)
+    gem(cv,CX,102.5,4.5,4.2,RUBY); gem(cv,CX-19,102.5,2.8,2.8,SAPH); gem(cv,CX+19,102.5,2.8,2.8,SAPH); gem(cv,CX-29,102.5,2,2.4,EMER); gem(cv,CX+29,102.5,2,2.4,EMER)
+    gem(cv,CX,86,2.5,3,RUBY)
     # glints
     for (gx,gy) in [(100,97),(132,97),(118,80)]:
         for k in range(-2,3): px(cv,gx+k,gy,GOLD[6]); px(cv,gx,gy+k,GOLD[6])
@@ -101,7 +102,7 @@ def draw_sword(cv):
         for k in range(4):
             fy=hy+k*2
             for x in range(117,133):
-                if (x+k)%5==0: continue
+                if (x in (120,129) and k%2==0) or (x in (124,125) and k%2==1): continue
                 px(cv,x,fy,rampc(BONE,0.75-0.3*(x-117)/16,x,fy))
             px(cv,116,fy,OUT); px(cv,133,fy,OUT); 
         for x in range(117,133,5): px(cv,x,hy+7,BONE[1])
@@ -144,7 +145,15 @@ def draw_sword(cv):
                 if u<-0.85: c=STEEL[6]
                 if u>0.85: c=STEEL[0]
                 px(cv,x,y,c)
-        px(cv,CX-hw-1.5,y,OUT); px(cv,CX+hw+1.5,y,OUT)
+    # outline hugging the blade (computed from the drawn pixels)
+    bm=np.zeros((cv.h,cv.w),bool)
+    for y in range(196,293):
+        hw=7.0 if y<280 else 7.0*(292-y)/12
+        for x in range(int(CX-hw)-1,int(CX+hw)+2):
+            if abs((x-CX)/max(0.8,hw))<=1: bm[y,x]=True
+    ring=(cv2.dilate(bm.astype(np.uint8),np.array([[0,1,0],[1,1,1],[0,1,0]],np.uint8))>0)&~bm
+    for y,x in zip(*np.where(ring)):
+        if y>=196: px(cv,x,y,OUT)
     # diagonal specular glints on the blade
     for y0 in (204,236):
         for k in range(10): px(cv,CX-6+k*0.6,y0+k,STEEL[6]) if k%3!=2 else None
@@ -204,19 +213,77 @@ def draw_skull(cv):
     # cheekbone shadows
     for sx in (-1,1):
         for k in range(7): px(cv,CX+sx*(15+k*0.6),127+k*0.5,BONE[1])
-    # teeth
-    for y in (132,136):
-        for x in range(112,138):
-            if abs(x-CX)<=13-(y-132)*0.6: px(cv,x,y,(30,18,20))
-    for x in range(113,138,3):
-        for y in range(133,136):
-            if abs(x-CX)<=12: px(cv,x,y,(40,26,26))
-    for x in range(114,137,3): px(cv,x,133,BONE[5])
     # cracks
     crack=[(104,112),(105,113),(105,114),(106,115),(107,115),(107,116),(108,117)]
     for (x,y) in crack: px(cv,x,y,BONE[0]); px(cv,x+1,y,BONE[4])
     for (x,y) in [(145,111),(144,112),(144,113),(143,114),(144,115)]: px(cv,x,y,BONE[0])
+def bone_seg(cv,p0,p1,w):
+    m=np.zeros((cv.h,cv.w),bool)
+    n=int(max(abs(p1[0]-p0[0]),abs(p1[1]-p0[1]))*2)+1
+    for i in range(n):
+        t=i/(n-1); x=p0[0]+(p1[0]-p0[0])*t; y=p0[1]+(p1[1]-p0[1])*t
+        for yy in range(int(y-w)-1,int(y+w)+2):
+            for xx in range(int(x-w)-1,int(x+w)+2):
+                if (xx-x)**2+(yy-y)**2<=w*w: m[yy,xx]=True
+    return m
+def draw_forearms(cv):
+    for side in (-1,1):
+        el=(124.5+side*39,190.0); wr=(124.5+side*9,167.0)
+        dx,dy=wr[0]-el[0],wr[1]-el[1]; L=math.hypot(dx,dy); nx,ny=-dy/L,dx/L
+        mA=bone_seg(cv,(el[0]+nx*2.2,el[1]+ny*2.2),(wr[0]+nx*1.6,wr[1]+ny*1.6),1.9)   # ulna
+        mB=bone_seg(cv,(el[0]-nx*2.2,el[1]-ny*2.2),(wr[0]-nx*1.6,wr[1]-ny*1.6),1.7)   # radius
+        knob=np.zeros_like(mA); yy,xx=np.indices(knob.shape)
+        knob|=np.hypot(xx-el[0],yy-el[1])<=4.6
+        knob|=np.hypot(xx-wr[0],yy-wr[1])<=3.2
+        m=mA|mB|knob
+        ring=(cv2.dilate(m.astype(np.uint8),np.ones((3,3),np.uint8))>0)&~m
+        for y,x in zip(*np.where(ring)): px(cv,x,y,OUT)
+        for y,x in zip(*np.where(m)):
+            t=0.9-0.25*(y-167)/24
+            c=rampc(BONE,t,x,y)
+            px(cv,x,y,c)
+        # gap between the two bones
+        for i in range(4,int(L)-4):
+            t=i/L; x=el[0]+dx*t; y=el[1]+dy*t
+            px(cv,x,y,BONE[1])
+        px(cv,el[0]-1,el[1]-2,BONE[5]); px(cv,wr[0]-1,wr[1]-1,BONE[5])
+def draw_mouth(cv):
+    CX=124.5
+    DARK=(30,14,20)
+    # mouth cavity
+    for y in range(130,141):
+        for x in range(108,142):
+            u=abs(x-CX)
+            if u<=14-max(0,y-135)*1.4: px(cv,x,y,DARK)
+    # upper row: 8 teeth, individually outlined, lit from above
+    for i in range(7):
+        x0=int(round(CX-12+i*3.5))
+        for y in range(131,135):
+            for x in range(x0,x0+2):
+                c=BONE[5] if y==131 else (BONE[4] if y<134 else BONE[3])
+                if x==x0+1 and y>131: c=BONE[3]
+                px(cv,x,y,c)
+    # lower row: 7 teeth, slightly smaller, a bit darker (in shadow)
+    for i in range(6):
+        x0=int(round(CX-10.25+i*3.5))
+        for y in range(136,139):
+            for x in range(x0,x0+2):
+                c=BONE[4] if y==136 else BONE[3]
+                if x==x0+1: c=BONE[2]
+                px(cv,x,y,c)
+    # jaw bone under the lower teeth
+    for y in range(139,142):
+        for x in range(110,140):
+            u=abs(x-CX)
+            if u<=12-(y-139)*2: px(cv,x,y,rampc(BONE,0.55-0.1*(y-139),x,y))
+    for x in range(108,142):
+        if abs(x-CX)<=12: px(cv,x,142,OUT)
+    # jaw hinges
+    for side in (-1,1):
+        for k in range(6): px(cv,CX+side*(15-k*0.2),129+k,BONE[1])
 def draw_all(cv,KX,KY):
     draw_skull(cv)
+    draw_mouth(cv)
     draw_crown(cv)
     draw_sword(cv)
+    draw_forearms(cv)

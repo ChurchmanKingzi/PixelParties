@@ -89,6 +89,7 @@ for y in range(AY0,AY1):
         if dd<95 and BAYER4[y%4,x%4]<(1-dd/95)*0.35:
             cv.px(x,y,lerp(tuple(cv.a[y,x]),(150,60,200),0.3))
 # ---------- king ----------
+_bg=cv.a.copy()
 king=SK2.build_rgba(props=False)
 kh,kw=king.shape[:2]
 KX,KY=125-kw//2,AY1-kh+2
@@ -106,6 +107,14 @@ for y in range(kh):
 # ---------- detailed parts (drawn at full resolution) ----------
 import detail_skull_king as DK
 DK.draw_all(cv,KX,KY)
+# symmetry: copy the left half of the figure (only pixels the figure pass changed) onto the right half
+_drawn=cv.a.copy(); _chg=np.any(_drawn!=_bg,axis=2)
+for y in range(H):
+    for x in range(125,KX+kw+2):
+        xm=249-x
+        if 0<=xm<W:
+            if _chg[y,xm]: cv.a[y,x]=_drawn[y,xm]
+            elif _chg[y,x]: cv.a[y,x]=_bg[y,x]
 # ---------- soul wisps ----------
 def wisp(x,y,s=1):
     F=[(220,255,245),(120,236,214),(50,170,176),(30,100,120)]
@@ -186,7 +195,7 @@ def gold_text(t,size,cx,cy):
             if m[yy_,xx_]: cv.px(x0+xx_+1,y+yy_+2,(8,4,10))
     relief(cv,TH2,np.zeros((H,W),np.int32),[GOLD],TM2,k=1.2,bias=0.12,blur=0.4)
 gold_text('XIII',24,125,24)
-gold_text('HAIL SKULLMAEL!',16,125,323)
+gold_text('DEATH',24,125,323)
 # plate ornaments: small skulls
 def tiny_skull(x,y):
     S=[".###.","#####","#.#.#","#####",".#.#."]
