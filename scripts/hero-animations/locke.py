@@ -56,7 +56,9 @@ SLEEVE_OUT, SLEEVE, SLEEVE_HI = rgb('000000'), rgb('202020'), rgb('414141')
 # Arm von der Schulter (Zeile 9) bis zum Mantel (Zeile 18): innen Ärmel,
 # außen Kontur, am Unterarm Glanz zur Hand hin
 ARM = [(18, oy, SLEEVE) for oy in range(9, 19)] + \
-      [(19, oy, SLEEVE_HI if 13 <= oy <= 16 else SLEEVE_OUT) for oy in range(9, 19)]
+      [(19, oy, SLEEVE_HI if 13 <= oy <= 16 else SLEEVE_OUT) for oy in range(9, 19)] + \
+      [(20, 16, rgb('311800')),                          # untere linke Ecke der Hand
+       (20, 17, SLEEVE), (21, 17, SLEEVE_OUT), (20, 18, SLEEVE_OUT)]   # Handgelenk
 
 
 def breath(i):
