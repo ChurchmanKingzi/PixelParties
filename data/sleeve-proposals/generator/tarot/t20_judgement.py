@@ -317,7 +317,7 @@ HOOD_G = [(8, 24, 12), (18, 50, 22), (30, 84, 34), (50, 120, 50), (90, 160, 80)]
 HOOD_B = [(30, 16, 10), (60, 34, 18), (96, 58, 30), (134, 88, 50), (170, 124, 76)]
 SK = [(40, 32, 30), (96, 84, 72), (150, 138, 116), (200, 190, 164), (234, 228, 206), (252, 250, 238)]
 MATS_S = {'B': mat(SK, pillow=2, k=1.6, bias=0.12, spec=True, spec_col=(255, 255, 245)),
-          'l': mat(WOOD, pillow=2, k=1.5, folds=(0.05, 1.3, 0.3), noise=0.6, nscale=1),
+          'l': mat(WOOD, pillow=2, k=1.5, folds=(0.05, 1.3, 0.3), noise=0.6, nscale=1, bias=0.12),
           'L': mat(WOOD_D, pillow=2, k=1.3, folds=(0.0, 1.1, 0.4), noise=0.5, nscale=1),
           'i': mat([(8, 2, 4), (20, 8, 10), (36, 16, 16)], pillow=3, k=1),
           'g': mat(HOOD_G, pillow=3, k=1.5, folds=(0.4, 0.2, 0.4)), 'h': mat(HOOD_B, pillow=3, k=1.5, folds=(0.4, 0.2, 0.4)),
@@ -475,9 +475,10 @@ for (cx, by, w, sc, pose, hood, kind) in LAYOUT:
         px(cv, ex, ey, eye); px(cv, ex, ey + 1, lerp(eye, (0, 0, 0), 0.4)); px(cv, ex + s_, ey, lerp(eye, (255, 255, 255), 0.4))
     for (dx, dy) in [(0, 0), (-1, 1), (0, 1), (1, 1)]:
         px(cv, hx + dx, hy + 5 * sc + dy, (14, 8, 12))
+    ty_ = hy + (8 if hood is None else 5.2) * sc
     for dx in range(-4, 5):
         if dx % 2 == 0:
-            px(cv, hx + dx * sc * 0.8, hy + 8 * sc, (60, 50, 44))
+            px(cv, hx + dx * sc * (0.8 if hood is None else 0.55), ty_, (60, 50, 44))
     # Risslinie im Schädel
     px(cv, hx + 3 * sc, hy - 6 * sc, SK[1]); px(cv, hx + 4 * sc, hy - 5 * sc, SK[1]); px(cv, hx + 4 * sc, hy - 4 * sc, SK[1])
 

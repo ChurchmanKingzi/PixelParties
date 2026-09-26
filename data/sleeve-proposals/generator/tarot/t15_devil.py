@@ -349,7 +349,13 @@ for (x, y) in [(101, 77), (100, 66), (149, 77), (150, 66)]:
 
 # ---------------------------------------------------------------- Fackel-Flamme (brennt nach oben)
 FX, FY = 194, 208
-glow2(cv, FX, FY - 8, 30, (255, 140, 40), k=0.7, mix=0.4)
+for y in range(FY - 40, FY + 24):          # Fackelschein, aber nicht über der Figur
+    for x in range(FX - 32, FX + 32):
+        d = math.hypot(x - FX, y - FY + 8)
+        if d < 30 and in_art(x, y) and not FM[y, x] and BAYER4[y % 4, x % 4] + 0.03 < (1 - d / 30) * 1.4:
+            blend_px(cv, x, y, (255, 140, 40), 0.4)
+        elif d < 30 and in_art(x, y) and FM[y, x] and d < 16 and (x + y) % 2 == 0:
+            blend_px(cv, x, y, (255, 170, 80), 0.25)
 FL = Fig(W, H)
 FL.part('fl', line=False)
 for (dx, h_, w_) in [(-5, 16, 4), (0, 24, 5), (5, 14, 4), (-2, 20, 3), (3, 19, 3)]:
