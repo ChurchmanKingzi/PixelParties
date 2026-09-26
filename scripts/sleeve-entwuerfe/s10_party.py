@@ -1,8 +1,7 @@
 # -*- coding: utf-8 -*-
 """10 Skelett-Party: Friedhofs-Rave vor einer Gruft-Bühne im Vollmond."""
 from lib import *
-from skel_sprites import *
-from skel_sprites import _stamp, _bone
+import skel_sprites as SK
 
 rnd = random.Random(10)
 yy, xx = np.mgrid[0:H, 0:W]
@@ -372,12 +371,6 @@ print('crypt ok')
 # =====================================================================
 # 5) Requisiten & Figuren-Helfer
 # =====================================================================
-GOLD = {'1': (255, 230, 120), '2': (236, 176, 64), '3': (176, 104, 40), 'k': (70, 34, 20)}
-CHAR = {'1': (130, 104, 100), '2': (96, 72, 76), '3': (64, 44, 56), 'k': (255, 170, 40)}
-FAR = {'1': (150, 130, 178), '2': (120, 100, 150), '3': (96, 80, 128), 'k': (40, 26, 60)}
-MIDP = {'1': (222, 212, 196), '2': (190, 178, 166), '3': (136, 122, 136)}
-
-
 def rows_img(rows, cmap, outl=(20, 11, 28)):
     h, w = len(rows), max(len(r) for r in rows)
     a = np.zeros((h, w, 4), np.uint8)
@@ -387,81 +380,6 @@ def rows_img(rows, cmap, outl=(20, 11, 28)):
                 a[j, i, :3] = cmap[ch][:3]; a[j, i, 3] = 255
     img = Image.fromarray(a)
     return outline(pad(img, 1), outl + (255,)) if outl else img
-
-
-def sword(ctx, which):
-    hx, hy = ctx['hands'][which]
-    _stamp(ctx['G'], ["s", "w", "s", "s", "s", "s", "s", "s", "S", "yyy", ".Y.", ".y."][::-1][::-1], hx, hy - 10)
-
-
-def king_sword(ctx, which):
-    hx, hy = ctx['hands'][which]
-    _stamp(ctx['G'], [".w.", ".s.", ".s.", ".s.", ".s.", ".s.", ".S.", ".s.", "yry", ".Y.", ".y."], hx - 1, hy - 9)
-
-
-def orb(ctx, which):
-    hx, hy = ctx['hands'][which]
-    _stamp(ctx['G'], [".mm.", "mwmM", "mmMM", ".MM."], hx - 1, hy - 4)
-
-
-def staff(ctx, which):
-    hx, hy = ctx['hands'][which]
-    _stamp(ctx['G'], [".c.", "cwc", ".c.", ".P.", ".n.", ".n.", ".n.", ".n.", ".n.", ".n.", ".n.", ".n."], hx - 1, hy - 5)
-
-
-def bow(ctx, which):
-    hx, hy = ctx['hands'][which]
-    _stamp(ctx['G'], ["nn.", "..n", "..n", "..n", "..n", "..n", "nn."], hx - 1, hy - 3)
-
-
-def scythe(ctx, which):
-    hx, hy = ctx['hands'][which]
-    _stamp(ctx['G'], ["ssssss...", "S....sss.", ".......ss", "........n", "........n", ".......n.", ".......n.", ".......n.", "......n..", "......n..", "......n..", ".....n...", ".....n...", ".....n...", "....n...."], hx - 8, hy - 5)
-
-
-def knight_helm(ctx):
-    h = ctx['head']; G = ctx['G']
-    if ctx['size'] == 'm':
-        rows = ["..rrr..", ".xxxxx.", "xxxxxxx", "xEExEEx", "xXxXxXx", ".xXXXx."]
-    else:
-        rows = ["....rrr....", "..xxxxxxx..", ".xxxxxxxxx.", "xxxxxxxxxxx", "xXXXXXXXXXx", "xkEEkxkEEkx", "xxxxxxxxxxx", "xXxXxXxXxXx", ".xXxXxXxXx.", "..xxxxxxx.."]
-    _stamp(G, rows, h['x'] + (h['w'] - len(rows[0])) // 2, h['y'] - 1)
-
-
-def dark_hood(ctx):
-    hood('x', 'X')(ctx)
-
-
-def lute_extra(ctx):
-    rx, top, rw, rh = ctx['ribs']
-    _stamp(ctx['G'], [".........nN",
-                      "........nN.",
-                      ".......nN..",
-                      "......nN...",
-                      ".nnnnN.....",
-                      "nynnnnn....",
-                      "nnkknNn....",
-                      "nnkkNNn....",
-                      ".nnNNn.....",
-                      "..NNN......"], rx - 3, top + 1)
-
-
-def wings(size='m', col=((226, 218, 200), (170, 158, 160))):
-    """Knochenflügel (gespreizt)."""
-    if size == 'm':
-        rows = ["1.........",
-                "11........",
-                "1.1.......",
-                "1..11.....",
-                "1....11...",
-                "1.1....111",
-                "1..1......",
-                "1...1.....",
-                ".1...1....",
-                "..1..1....",
-                "...1.1...."]
-    img = rows_img(rows, {'1': col[0]})
-    return img
 
 
 def coffin_speaker():
@@ -609,22 +527,8 @@ garland((187, 113), (243, 100), 12, lanterns=True, step=8, seed=2)
 garland((68, 136), (182, 136), 14, lanterns=False, step=8, seed=1)
 
 # =====================================================================
-# 6) Ferne Tänzer auf den Hügeln
+# 6) Ferne Gräber, Nebel
 # =====================================================================
-POSES = [
-    dict(la=(-150, -170), ra=(150, 170), ll=(-15, 0), rl=(15, 0)),
-    dict(la=(-60, 20), ra=(160, 140), ll=(-30, 10), rl=(60, 10), lean=2),
-    dict(la=(-100, -150), ra=(40, 100), ll=(-5, 30), rl=(20, 0), lean=-2),
-    dict(la=(-40, -120), ra=(40, 120), ll=(-40, 20), rl=(40, -20)),
-    dict(la=(-120, -160), ra=(60, 20), ll=(-20, -5), rl=(70, 30), lean=1),
-    dict(la=(-80, -150), ra=(80, 20), ll=(-25, 10), rl=(25, -10)),
-    dict(la=(-20, 40), ra=(140, 190), ll=(-10, 10), rl=(40, -40), lean=-1),
-    dict(la=(-160, -130), ra=(-10, -60), ll=(10, 30), rl=(30, 0), lean=2),
-]
-far_pos = [(16, 194), (27, 196), (40, 193), (52, 197), (63, 195), (188, 198), (199, 196), (211, 199), (223, 197), (235, 199)]
-for i, (x, y) in enumerate(far_pos):
-    s_ = skeleton('s', POSES[(i * 3) % len(POSES)], pal=FAR, flip=i % 2 == 1)
-    put(im, s_, x, y)
 d = ImageDraw.Draw(im)
 # Kerzen / Irrlichter bei den fernen Gräbern
 for (x, y) in [(22, 195), (58, 196), (204, 198), (230, 198)]:
@@ -649,57 +553,13 @@ im.save(os.path.join(TMP, 'p10_d.png'))
 # =====================================================================
 # 6b) Himmel-Deko: Flügelskelette, Fledermäuse, Seelen, Krähen
 # =====================================================================
-def bone_wing(span=14, seed=0):
-    """Gefiederter Knochenflügel (rechter Flügel, Ansatz links unten)."""
-    N_ = span + 8
-    G = np.full((N_ + 4, 2 * N_ + 4), '.', dtype='<U1')
-    ox, oy = 1, span // 2 + 2
-    tip = (ox + span, 1)
-    nf = 5
-    heads, tails = [], []
-    for k in range(nf + 1):
-        t = k / nf
-        bx = ox + (tip[0] - ox) * t; by = oy + (tip[1] - oy) * t
-        L_ = span * (0.40 + 0.50 * t)
-        ang = math.radians(15 + 60 * t)
-        heads.append((bx, by)); tails.append((bx + L_ * math.sin(ang), by + L_ * math.cos(ang)))
-    mem = Image.new('L', (G.shape[1], G.shape[0]), 0)
-    md = ImageDraw.Draw(mem)
-    md.polygon(heads + tails[::-1], fill=1)
-    for k in range(nf):
-        md.polygon([heads[k], heads[k + 1], tails[k + 1], tails[k]], fill=2 + (k % 2))
-    mm = np.array(mem)
-    G[mm == 2] = '1'; G[mm == 3] = '2'; G[mm == 1] = '2'
-    # Federenden gezackt
-    for k in range(nf + 1):
-        _bone(G, heads[k], tails[k], 1, '3', outl=False)
-    _bone(G, (ox, oy), tip, 1, '1', outl=False)
-    _bone(G, (ox, oy + 1), (tip[0] - 1, tip[1] + 1), 1, 'w', outl=False)
-    cm = dict(PAL)
-    a = np.zeros(G.shape + (4,), np.uint8)
-    for ch, col in cm.items():
-        m_ = G == ch; a[m_, :3] = col[:3]; a[m_, 3] = 255
-    img = Image.fromarray(a)
-    img = outline(img, (20, 11, 28, 255))
-    return img.crop(img.getbbox())
-
-
-def winged(size_span=14, pose=None, hat=None):
-    body = skeleton('m', pose or dict(la=(-120, -160), ra=(120, 160), ll=(-10, 20), rl=(15, 30)), hat=hat)
-    wr = bone_wing(size_span)
-    wl = wr.transpose(Image.FLIP_LEFT_RIGHT)
-    Wd = body.width + 2 * wr.width + 4
-    out = Image.new('RGBA', (Wd, max(body.height, wr.height) + 4), (0, 0, 0, 0))
-    bx = wr.width
-    out.alpha_composite(wl, (bx - wl.width + body.width // 2 - 2, 2))
-    out.alpha_composite(wr, (bx + body.width // 2 + 2, 2))
-    out.alpha_composite(body, (bx, 0))
-    return out.crop(out.getbbox())
-w1 = winged(16, hat=party_hat('m', 'y'))
-im = add_light(im, 46, 58, 20, (26, 20, 40), 0.8)
-put(im, w1, 46, 78)
-w2 = winged(12, pose=dict(la=(-100, -150), ra=(150, 170), ll=(-20, 10), rl=(20, 40)))
-put(im, w2, 208, 66)
+# Figuren aus den Karten (native Auflösung)
+HE, AR, MA = SK.minions()
+WING = SK.winged()
+w1 = SK.party_hat(WING, (236, 70, 110), (255, 214, 72), dy=3)
+im = add_light(im, 46, 62, 22, (26, 20, 40), 0.8)
+put(im, w1, 46, 84)
+put(im, WING.transpose(Image.FLIP_LEFT_RIGHT), 208, 70)
 d = ImageDraw.Draw(im)
 # Fledermäuse
 def bat(x, y, c=(26, 14, 40)):
@@ -730,17 +590,26 @@ im.alpha_composite(crows[2].transpose(Image.FLIP_LEFT_RIGHT), (224, 128))
 spk = coffin_speaker()
 put(im, spk, 30, 226, shd=True)
 put(im, spk.transpose(Image.FLIP_LEFT_RIGHT), 220, 226, shd=True)
-# Schlagzeuger hinter dem Drumset
-drummer = skeleton('m', dict(la=(-150, -110), ra=(150, 110), ll=(-20, 0), rl=(20, 0)), hat=cross_cap, item=bone_club(), item2=bone_club())
-put(im, drummer, 88, 196)
+# Schlagzeuger: Heiler-Minion mit beiden Armen hoch + Knochen-Sticks
+dr, ox, oy = SK.canvas(HE, 10, 3)
+dr = SK.raise_arm(dr, (17, 21, 22, 30))
+dr = SK.raise_arm(dr, (3, 21, 8, 30))
+dr = SK.trim(dr)
+put(im, dr, 88, 196)
+d = ImageDraw.Draw(im)
+for (x0, y0, x1, y1) in [(76, 168, 81, 173), (99, 168, 94, 173)]:
+    d.line((x0, y0, x1, y1), fill=(240, 232, 206)); d.point((x0, y0 - 1), fill=(240, 232, 206))
 put(im, drumkit(), 88, 202)
-# Barde mit Laute in der Tür
-bardS = skeleton('m', dict(la=(-40, 60), ra=(40, -50), ll=(-25, 10), rl=(15, 0), lean=1), hat=top_hat, extra=lute_extra)
-put(im, bardS, CX, 200, shd=True)
-# Magier rechts mit Orb
-mageS = skeleton('m', dict(la=(-60, -20), ra=(150, 170), ll=(-10, 0), rl=(30, 10), lean=-1), hat=hood('p', 'P'), item2=orb)
-put(im, mageS, 162, 200, shd=True)
-im = add_light(im, 168, 170, 12, (70, 30, 80), 1.0)
+# Barde (Karte) in der Tür
+BARD = SK.bard()
+im = add_light(im, CX, 185, 16, (40, 20, 40), 0.9)
+put(im, BARD, CX, 200, shd=True)
+# Magier-Minion rechts mit leuchtendem Orb
+put(im, MA.transpose(Image.FLIP_LEFT_RIGHT), 162, 200, shd=True)
+im = add_light(im, 170, 178, 12, (70, 30, 80), 1.0)
+d = ImageDraw.Draw(im)
+d.rectangle((170, 175, 172, 177), fill=(255, 110, 200)); d.point((170, 175), fill=(255, 230, 250)); d.point((171, 178), fill=(170, 40, 130))
+sparkle(d, 176, 172, 2, (255, 170, 230))
 # Musiknoten (Farben wie auf "Skeleton Bard")
 NOTE1 = ["..AA.", "..A.B", "..A..", "..A..", "AAA..", "AAA.."]
 NOTE2 = ["..AAAAA", "..A...A", "..A...A", "..A...A", "AAA.AAA", "AAA.AAA"]
@@ -748,9 +617,9 @@ for (x, y, col, kind) in [(106, 166, (230, 214, 60), 0), (144, 160, (110, 220, 9
     rows = NOTE1 if kind == 0 else NOTE2
     nimg = rows_img(rows, {'A': col, 'B': tuple(int(v * 0.7) for v in col)})
     im.alpha_composite(nimg, (x, y))
-# König auf der Giebelspitze
-kingS = skeleton('m', dict(la=(-60, -10), ra=(160, 175), ll=(-15, 0), rl=(15, 0)), hat=crown, item2=king_sword)
-put(im, kingS, CX, PY - 4)
+# König Skullmael (Karte) auf der Giebelspitze
+KING = SK.king()
+put(im, KING, CX + 2, PY - 3)
 im.save(os.path.join(TMP, 'p10_e.png'))
 print('stage ok')
 
@@ -813,30 +682,45 @@ crowd = []  # (y, x, sprite)
 def add(spr, x, y):
     crowd.append((y, x, spr))
 
-hats = [party_hat('m', 'y'), party_hat('b', 'w'), party_hat('g', 'r'), None, party_hat('p', 'y')]
-row1 = [(52, 234, 0, hats[0], goblet()), (74, 236, 1, hood('g', 'G'), bow), (98, 233, 4, halo, None),
-        (152, 233, 5, hats[1], bottle()), (175, 236, 2, cross_cap, None), (197, 234, 7, hats[4], maraca())]
-for i, (x, y, pi, hat, it) in enumerate(row1):
-    add(skeleton('m', POSES[pi], hat=hat, item=it, pal=MIDP, flip=i % 2 == 0), x, y)
+def hat(spr, c1, c2, **kw):
+    return SK.trim(SK.party_hat(spr, c1, c2, **kw))
+def arm_up(spr, box, top=10, side=3):
+    c, _, _ = SK.canvas(spr, top, side)
+    return SK.trim(SK.raise_arm(c, box))
+PINK, GOLDC, BLUE, WHITE, GREEN, RED = (236, 70, 110), (255, 214, 72), (90, 170, 255), (255, 255, 255), (110, 220, 90), (240, 80, 80)
+ARup = arm_up(AR, (17, 23, 21, 32))
+HEup = arm_up(HE, (17, 21, 22, 30))
+d1 = 0.22  # Tiefen-Tönung Reihe 1
+row1 = [
+    (54, 234, hat(ARup, BLUE, WHITE)),
+    (78, 236, SK.priest()),
+    (100, 233, SK.necromancer()),
+    (152, 233, hat(MA, GREEN, RED)),
+    (176, 236, SK.archer_card().transpose(Image.FLIP_LEFT_RIGHT)),
+    (198, 234, HEup.transpose(Image.FLIP_LEFT_RIGHT)),
+]
+for (x, y, spr) in row1:
+    add(SK.tint_depth(spr, d1), x, y)
 # Heiler-Sprite aus der Knochenmühle (1x) + Skeletthund
 hs = area('bonegrinder/healer')
 healer_fr = [hs.crop((i * 21, 0, i * 21 + 21, 32)) for i in range(3)]
 healer_fr = [f.crop(f.getbbox()) for f in healer_fr]
-add(healer_fr[2], 118, 240)
+add(SK.tint_depth(healer_fr[2], 0.12), 122, 244)
 dog = area('bonegrinder/dog').crop((0, 0, 25, 17)); dog = dog.crop(dog.getbbox())
-add(dog, 136, 244)
+add(SK.tint_depth(dog, 0.12), 140, 246)
 # Reihe 2
-burning = skeleton('m', POSES[0], hat=flame_head, pal=CHAR)
-row2 = [(14, 262, 3, hats[2], goblet()), (40, 264, 6, dark_hood, scythe), (66, 261, None, None, None),
-        (184, 261, 1, knight_helm, 'dk'), (208, 264, 4, hats[0], bone_club()), (234, 262, 5, hood('p', 'P'), None)]
-for i, (x, y, pi, hat, it) in enumerate(row2):
-    if pi is None:
-        add(burning, x, y); continue
-    if it == 'dk':
-        add(skeleton('m', POSES[pi], hat=hat, under=robe('x', 'X', trim='r'), item=king_sword, flip=True), x, y); continue
-    add(skeleton('m', POSES[pi], hat=hat, item=it, flip=i % 2 == 1), x, y)
-# Schatz-Skelett (gold)
-add(skeleton('m', POSES[7], pal=GOLD, eyes='e', hat=crown), 160, 266)
+BURN = SK.burning()
+row2 = [
+    (16, 262, hat(HE, PINK, GOLDC).transpose(Image.FLIP_LEFT_RIGHT)),
+    (42, 266, SK.reaper()),
+    (70, 261, BURN),
+    (160, 266, SK.treasure()),
+    (186, 262, SK.death_knight()),
+    (210, 264, hat(AR.transpose(Image.FLIP_LEFT_RIGHT), PINK, GOLDC)),
+    (236, 262, hat(MA, BLUE, GOLDC).transpose(Image.FLIP_LEFT_RIGHT)),
+]
+for (x, y, spr) in row2:
+    add(SK.tint_depth(spr, 0.08), x, y)
 # Grabsteine zwischen den Tänzern
 for (x, y, k) in [(8, 240, 0), (116, 262, 2), (224, 242, 3), (92, 266, 5), (246, 272, 1)]:
     add(STONES[k], x, y)
@@ -847,8 +731,8 @@ for (y, x, spr) in crowd:
 # Flammen-Sprite (Knochenmühle) auf dem brennenden Skelett + Funken
 fl = area('bonegrinder/flame')
 flames = [fl.crop((i * 5, 0, i * 5 + 5, 8)) for i in range(4)]
-bx_, by_ = 66, 261 - burning.height
-im = add_light(im, 66, 244, 18, (70, 36, 0), 1.0)
+bx_, by_ = 70, 261 - BURN.height
+im = add_light(im, 70, 246, 18, (70, 36, 0), 1.0)
 im.alpha_composite(up(flames[1], 1), (bx_ - 5, by_ - 5))
 im.alpha_composite(flames[2], (bx_ - 1, by_ - 7))
 im.alpha_composite(flames[3], (bx_ + 2, by_ - 4))
@@ -916,10 +800,11 @@ ld.line((2, 8, 3, 27), fill=(130, 84, 64)); ld.line((13, 8, 12, 27), fill=(66, 3
 lid = lid.rotate(18, expand=True, resample=Image.NEAREST)
 put(im, lid, 90, 316)
 
-# Skelett steigt aus dem Grab (nur Oberkörper)
-riser = skeleton('l', dict(la=(-150, -175), ra=(80, 150), ll=(0, 0), rl=(0, 0), lean=2), hat=party_hat('m', 'y'), item=goblet('l'), jaw=1)
-riser = riser.crop((0, 0, riser.width, int(riser.height * 0.60)))
-put(im, riser, 124, 321)
+# Magier-Minion steigt aus dem Grab (2x, nur Oberkörper) mit Partyhut
+rs = hat(MA, PINK, GOLDC)
+riser = up(rs, 2)
+riser = riser.crop((0, 0, riser.width, int(riser.height * 0.62)))
+put(im, riser, 125, 321)
 # vordere Grabkante über dem Riser
 a = np.array(im)
 front = (yy >= 321) & gm
@@ -941,14 +826,17 @@ addf(bigL, 16, 346)
 addf(bigR, 238, 346)
 addf(crossS, 196, 300)
 addf(STONES[4], 64, 304)
-# große Tänzer
-bigA = skeleton('l', dict(la=(-140, -170), ra=(70, 20), ll=(-20, 0), rl=(50, 5), lean=2), hat=party_hat('r', 'w'), item=goblet('l'), jaw=1)
+# Vordergrund-Stars (2x): Heiler mit Becher, Bogenschütze mit Partyhut
+bigA = SK.canvas(HE, 12, 4)[0]
+bigA = SK.raise_arm(bigA, (18, 23, 23, 32))
+bigA = SK.cup(bigA, 20, 17)
+bigA = up(SK.trim(bigA), 2)
 addf(bigA, 50, 344)
-bigB = skeleton('l', dict(la=(-60, -140), ra=(150, 120), ll=(-40, -10), rl=(15, 0), lean=-2), hat=party_hat('c', 'm'), item2=bottle('l'), flip=True)
-addf(bigB, 206, 344)
-# Sensenmann (Robe)
-reap = skeleton('m', dict(la=(-40, -150), ra=(40, 100), ll=(-5, 0), rl=(5, 0)), hat=hood('x', 'X'), item=scythe, under=robe('x', 'X'))
-addf(reap, 30, 296)
+bigB = SK.canvas(AR, 12, 4)[0]
+bigB = SK.raise_arm(bigB, (4, 25, 9, 34))
+bigB = SK.party_hat(SK.trim(bigB), PINK, GOLDC)
+bigB = up(SK.trim(bigB), 2)
+addf(bigB, 204, 344)
 fg.sort(key=lambda t: t[0])
 for (y, x, spr) in fg:
     put(im, spr, x, y, shd=True)
