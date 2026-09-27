@@ -10,9 +10,7 @@ src/<slug>-<teil>.png.
   the-throne-robber                 ???, the Throne Robber: die gekrönte Figur mit
                                     Hellebarde aus „Ascended ???“ auf dem „Thron“
   bow-sniper-darge                  „Darge“ + Bogen (das mittlere Stück aus
-                                    „Darge #1“); die drei Geschosse aus „Darge #2“
-                                    getrennt als Teile shot0..2 (nicht im Sprite,
-                                    sie werden animiert abgeschossen)
+                                    „Darge #1“), ohne Pfeile
   jean-the-pillaging-knight         „Jean“ mit seinen Geldsäcken
   layn-defender-of-deri             die Figur aus „Layn“ + Hände „Layn #1“ + ein
                                     schmales Stück Zinnen („Layn“/„Zinnen“, 2 px
@@ -82,33 +80,13 @@ def near(a, x, y):
     return only(a, lab == k)
 
 
-def split_shots(a):
-    """Die drei Geschosse trennen: deckende Kerne als Komponenten, halbtransparente
-    Schweife zum nächsten Kern."""
-    core = a[:, :, 3] == 255
-    n, lab = cv2.connectedComponents(core.astype(np.uint8), connectivity=8)
-    big = sorted(range(1, n), key=lambda k: -(lab == k).sum())[:3]
-    big.sort(key=lambda k: np.nonzero(lab == k)[1].mean())
-    cores = [np.argwhere(lab == k) for k in big]
-    parts = [np.zeros_like(a) for _ in big]
-    for y, x in np.argwhere(a[:, :, 3] > 0):
-        j = min(range(len(big)), key=lambda j: ((cores[j] - (y, x)) ** 2).sum(1).min())
-        parts[j][y, x] = a[y, x]
-    return parts
-
-
 def main(path):
     doc = GimpDocument(path)
     L = doc.raw_layers
     g = lambda n: layer(doc, L, n)
     save_parts('the-shapeshifter', [('arm', g('??? #7')), ('body', near(g('??? #1'), 470, 400))])
     save_parts('the-throne-robber', [('throne', g('Thron')), ('body', near(g('Ascended ???'), 260, 210))])
-    darge = g('Darge')
-    save_parts('bow-sniper-darge', [('bow', near(g('Darge #1'), 246, 290)), ('body', darge)])
-    ys, xs = np.nonzero(darge[:, :, 3])
-    for k, shot in enumerate(split_shots(g('Darge #2'))):      # Geschosse (nicht im Sprite)
-        sy, sx = np.nonzero(shot[:, :, 3])
-        Image.fromarray(shot[sy.min():sy.max() + 1, sx.min():sx.max() + 1]).save(f'{OUT}/bow-sniper-darge-shot{k}.png')
+    save_parts('bow-sniper-darge', [('bow', near(g('Darge #1'), 246, 290)), ('body', g('Darge'))])
     save_parts('jean-the-pillaging-knight', [('body', g('Jean'))])
     fig = near(g('Layn'), 237, 285)
     ys, xs = np.nonzero(fig[:, :, 3])
