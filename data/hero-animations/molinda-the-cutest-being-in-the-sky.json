@@ -1,0 +1,15 @@
+{
+  "hero": "Molinda, the Cutest Being in the Sky",
+  "sheet": "molinda-the-cutest-being-in-the-sky.png",
+  "frameWidth": 57,
+  "frameHeight": 40,
+  "frames": 40,
+  "frameMs": 80,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 12,
+  "padLeft": 15,
+  "padRight": 14,
+  "padBottom": 1,
+  "faceX": 30
+}

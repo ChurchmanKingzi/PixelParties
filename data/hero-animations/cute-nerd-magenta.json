@@ -1,0 +1,15 @@
+{
+  "hero": "Cute Nerd Magenta",
+  "sheet": "cute-nerd-magenta.png",
+  "frameWidth": 66,
+  "frameHeight": 44,
+  "frames": 32,
+  "frameMs": 70,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 10,
+  "padLeft": 3,
+  "padRight": 3,
+  "padBottom": 7,
+  "faceX": 32
+}

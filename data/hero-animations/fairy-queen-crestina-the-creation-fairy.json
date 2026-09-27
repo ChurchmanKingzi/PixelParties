@@ -1,0 +1,15 @@
+{
+  "hero": "Fairy Queen Crestina, the Creation Fairy",
+  "sheet": "fairy-queen-crestina-the-creation-fairy.png",
+  "frameWidth": 28,
+  "frameHeight": 34,
+  "frames": 32,
+  "frameMs": 90,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 5,
+  "padLeft": 5,
+  "padRight": 5,
+  "padBottom": 5,
+  "faceX": 14
+}

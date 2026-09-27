@@ -1,0 +1,15 @@
+{
+  "hero": "Cute Starlet Megu",
+  "sheet": "cute-starlet-megu.png",
+  "frameWidth": 58,
+  "frameHeight": 37,
+  "frames": 32,
+  "frameMs": 80,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 6,
+  "padLeft": 4,
+  "padRight": 4,
+  "padBottom": 2,
+  "faceX": 28.5
+}

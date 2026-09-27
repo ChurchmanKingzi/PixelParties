@@ -1,0 +1,15 @@
+{
+  "hero": "Cool Rescuer Monia",
+  "sheet": "cool-rescuer-monia.png",
+  "frameWidth": 36,
+  "frameHeight": 37,
+  "frames": 32,
+  "frameMs": 70,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 5,
+  "padLeft": 3,
+  "padRight": 3,
+  "padBottom": 6,
+  "faceX": 18
+}
