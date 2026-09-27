@@ -2226,6 +2226,31 @@ function getRank(elo) {
   return RANK_TIERS[0];
 }
 
+// v1464: Schalter in der Optik von „Play Animations" (Pille mit Knopf),
+// für alle Einstellungen im Profil. `gesperrt`: ausgegraut, nicht bedienbar
+// (Dynamic Heroes ohne Display Heroes). Erklärung als Hover-Tooltip.
+function ProfilSchalter({ an, gesperrt, onToggle, label, tipp, zeigeTipp, versteckeTipp }) {
+  const klick = () => { if (!gesperrt) onToggle(); };
+  return (
+    <div className={'profile-schalter' + (gesperrt ? ' profile-schalter-aus' : '')}
+      onMouseEnter={e => tipp && zeigeTipp && zeigeTipp(e, tipp)}
+      onMouseLeave={() => versteckeTipp && versteckeTipp()}
+      onClick={klick} role="switch" aria-checked={!!an} aria-disabled={!!gesperrt}>
+      <div style={{
+        width: 40, height: 22, borderRadius: 11, background: an ? 'var(--accent)' : 'var(--bg4)',
+        position: 'relative', transition: 'background 0.2s', flexShrink: 0,
+      }}>
+        <div style={{
+          width: 18, height: 18, borderRadius: '50%', background: '#fff',
+          position: 'absolute', top: 2, left: an ? 20 : 2,
+          transition: 'left 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,.4)',
+        }} />
+      </div>
+      <span>{label}</span>
+    </div>
+  );
+}
+
 function ProfileScreen() {
   const { user, setUser, setScreen, notify } = useContext(AppContext);
   const [color, setColor] = useState(user.color || '#00f0ff');
@@ -2967,48 +2992,51 @@ function ProfileScreen() {
             </div>
           )}
 
+          {/* v1464: SETTINGS (links) und CHANGE PASSWORD (rechts) teilen sich
+              eine Zeile — sonst passt das Profil nicht auf einen Bildschirm. */}
+          <div className="profile-zweispaltig">
           {/* Settings */}
           <div className="profile-section profile-section-wide">
             <div className="profile-section-label">SETTINGS</div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', fontSize: 12, color: 'var(--text)' }}>
-                <div
-                  onClick={togglePlayAnimations}
-                  style={{
-                    width: 40, height: 22, borderRadius: 11, background: playAnimations ? 'var(--accent)' : 'var(--bg4)',
-                    position: 'relative', cursor: 'pointer', transition: 'background 0.2s', flexShrink: 0
-                  }}
-                >
-                  <div style={{
-                    width: 18, height: 18, borderRadius: '50%', background: '#fff',
-                    position: 'absolute', top: 2, left: playAnimations ? 20 : 2,
-                    transition: 'left 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,.4)'
-                  }} />
-                </div>
-                <span onClick={togglePlayAnimations}>Play Animations</span>
-              </label>
-              <span style={{ fontSize: 9, color: 'var(--text2)' }}>Disable to skip battle animations — faster gameplay on low-power devices</span>
-            </div>
-            {/* v1463: Helden-Anzeige */}
-            <div className="profile-checks">
-              <label className="profile-check"
-                onMouseEnter={e => zeigeTipp(e, 'Animated Heroes stand on their cards on the board. Off: cards only — status effects are shown on the cards again.')}
-                onMouseLeave={versteckeTipp}>
-                <input type="checkbox" checked={displayHeroes}
-                  onChange={e => saveHeroDisplay(e.target.checked, e.target.checked ? dynamicHeroes || true : false)} />
-                <span>Display Heroes</span>
-              </label>
-              <label className={'profile-check' + (displayHeroes ? '' : ' profile-check-aus')}
-                onMouseEnter={e => zeigeTipp(e, displayHeroes
+            <div className="profile-schalter-spalte">
+              <ProfilSchalter an={playAnimations} onToggle={togglePlayAnimations}
+                label="Play Animations"
+                tipp="Disable to skip battle animations — faster gameplay on low-power devices."
+                zeigeTipp={zeigeTipp} versteckeTipp={versteckeTipp} />
+              {/* v1463: Helden-Anzeige */}
+              <ProfilSchalter an={displayHeroes}
+                onToggle={() => saveHeroDisplay(!displayHeroes, !displayHeroes)}
+                label="Display Heroes"
+                tipp="Shows animated Heroes standing on their cards on the board."
+                zeigeTipp={zeigeTipp} versteckeTipp={versteckeTipp} />
+              <ProfilSchalter an={dynamicHeroes} gesperrt={!displayHeroes}
+                onToggle={() => saveHeroDisplay(displayHeroes, !dynamicHeroes)}
+                label="Dynamic Heroes"
+                tipp={displayHeroes
                   ? 'Heroes fold back into their cards while you choose a target, so nothing blocks your view.'
-                  : 'Heroes fold back into their cards while you choose a target. Needs "Display Heroes".')}
-                onMouseLeave={versteckeTipp}>
-                <input type="checkbox" checked={dynamicHeroes} disabled={!displayHeroes}
-                  onChange={e => saveHeroDisplay(displayHeroes, e.target.checked)} />
-                <span>Dynamic Heroes</span>
-              </label>
+                  : 'Heroes fold back into their cards while you choose a target. Needs "Display Heroes".'}
+                zeigeTipp={zeigeTipp} versteckeTipp={versteckeTipp} />
             </div>
             {GameTooltipProfil && <GameTooltipProfil />}
+          </div>
+
+          {/* Change Password */}
+          <div className="profile-section profile-section-wide">
+            <div className="profile-section-label">CHANGE PASSWORD</div>
+            <div className="profile-passwort-spalte">
+              <input className="input" type="password" placeholder="Current password" value={oldPw}
+                onChange={e => setOldPw(e.target.value)} />
+              <input className="input" type="password" placeholder="New password" value={newPw}
+                onChange={e => setNewPw(e.target.value)} />
+              <input className="input" type="password" placeholder="Repeat new password" value={confirmPw}
+                onChange={e => setConfirmPw(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && changePassword()} />
+              <button className="btn" style={{ padding: '8px 18px', fontSize: 11, whiteSpace: 'nowrap', alignSelf: 'flex-end' }}
+                onClick={changePassword} disabled={pwSaving}>
+                {pwSaving ? '...' : 'CHANGE'}
+              </button>
+            </div>
+          </div>
           </div>
 
           {/* Email & recovery */}
@@ -3056,24 +3084,6 @@ function ProfileScreen() {
                 )}
               </div>
             )}
-          </div>
-
-          {/* Change Password */}
-          <div className="profile-section profile-section-wide">
-            <div className="profile-section-label">CHANGE PASSWORD</div>
-            <div style={{ display: 'flex', gap: 10 }}>
-              <input className="input" type="password" placeholder="Current password" value={oldPw}
-                onChange={e => setOldPw(e.target.value)} style={{ flex: 1 }} />
-              <input className="input" type="password" placeholder="New password" value={newPw}
-                onChange={e => setNewPw(e.target.value)} style={{ flex: 1 }} />
-              <input className="input" type="password" placeholder="Repeat new password" value={confirmPw}
-                onChange={e => setConfirmPw(e.target.value)} style={{ flex: 1 }}
-                onKeyDown={e => e.key === 'Enter' && changePassword()} />
-              <button className="btn" style={{ padding: '8px 18px', fontSize: 11, whiteSpace: 'nowrap' }}
-                onClick={changePassword} disabled={pwSaving}>
-                {pwSaving ? '...' : 'CHANGE'}
-              </button>
-            </div>
           </div>
 
         </div>

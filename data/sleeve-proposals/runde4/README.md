@@ -65,3 +65,21 @@ mindestens einmal überarbeitet.
 | 48 | Projection | projection.png | cosmic/cosmic/amethyst |
 | 49 | First Bloom | first-bloom.png | twist/wood/rose/pearl |
 | 50 | Great Wave | great-wave.png | wave/sea/sapphire/pearl |
+
+## Nachträge
+- 31 Feathered Serpent: Quetzahuitls Schlangenleib ergänzt – die frontale Gestalt in MotiveSteamDwarfs Ebene 218
+  hat nur Kopf, Schwingen und Fühler; der Leib steigt jetzt hinter dem Kopf zwischen den Schwingenarmen auf und
+  läuft vor der Sonne in einer S-Kurve in die Schwanzspitze aus (selbst gezeichnet in Farben und Schuppen der
+  seitlichen Quetzahuitl derselben Ebene, gleiche Pixelgröße).
+- Die vier Himmelswächter als Reihe: „Autumn Tiger“ (Baihu, Westen/Herbst), „Black Tortoise“ (Xuanwu,
+  Norden/Winter) und neu:
+
+| Nr | Name | Shop-Datei | Rahmen |
+|---|---|---|---|
+| 51 | Spring Thunder | spring-thunder.png | meander/lacquer/jade/cyan |
+| 52 | Summer Blaze | summer-blaze.png | arch/lacquer/lava/topaz |
+
+  51 – Qinglong (Osten/Frühling) windet sich im Morgengrauen aus der Gewitterwolke, vollständig mit goldenem
+  Blitzhorn (Motive 1522) und Barteln (1521) zu 1526, Blitze 1525, Wolke 1527; Himmel, Hügel, Regen 2×, Drache 3×.
+  52 – Zhuque (Süden/Sommer, MotiveEgypt 4) steigt vor der Mittagssonne auf, Flammenzungen an den Schwingen;
+  Himmel, Sonne, Dünen 2×, Zhuque und Flammen 3×.
