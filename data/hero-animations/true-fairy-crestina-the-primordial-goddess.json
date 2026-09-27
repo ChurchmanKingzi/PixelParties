@@ -1,0 +1,14 @@
+{
+  "hero": "True Fairy Crestina, the Primordial Goddess",
+  "sheet": "true-fairy-crestina-the-primordial-goddess.png",
+  "frameWidth": 62,
+  "frameHeight": 50,
+  "frames": 24,
+  "frameMs": 80,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 8,
+  "padLeft": 8,
+  "padRight": 8,
+  "padBottom": 9
+}

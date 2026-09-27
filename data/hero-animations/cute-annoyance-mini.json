@@ -1,0 +1,14 @@
+{
+  "hero": "Cute Annoyance Mini",
+  "sheet": "cute-annoyance-mini.png",
+  "frameWidth": 44,
+  "frameHeight": 35,
+  "frames": 32,
+  "frameMs": 70,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 5,
+  "padLeft": 5,
+  "padRight": 5,
+  "padBottom": 5
+}

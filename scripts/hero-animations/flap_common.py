@@ -95,3 +95,20 @@ def shear_flap(src, mask, pivot_x, side, lift, squeeze, out, offset=(0, 0), curv
                 if 0 <= oy < H:
                     out[oy, ox] = src[y, cs]
     return out
+
+
+def fill_pinholes(part):
+    """Einzelne leere Pixel im gedrehten Teil (von allen 4 Nachbarn umgeben)
+    mit der häufigsten Nachbarfarbe schließen."""
+    h, w = part.shape[:2]
+    a = part[:, :, 3] > 0
+    fix = []
+    for y in range(1, h - 1):
+        for x in range(1, w - 1):
+            if not a[y, x] and a[y - 1, x] and a[y + 1, x] and a[y, x - 1] and a[y, x + 1]:
+                nb = Counter(tuple(int(v) for v in part[yy, xx])
+                             for xx, yy in ((x - 1, y), (x + 1, y), (x, y - 1), (x, y + 1)))
+                fix.append((x, y, nb.most_common(1)[0][0]))
+    for x, y, c in fix:
+        part[y, x] = c
+    return part

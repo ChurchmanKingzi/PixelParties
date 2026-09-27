@@ -1,0 +1,14 @@
+{
+  "hero": "Mirjam, the Fallen Cute Angel",
+  "sheet": "mirjam-the-fallen-cute-angel.png",
+  "frameWidth": 32,
+  "frameHeight": 42,
+  "frames": 48,
+  "frameMs": 80,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 8,
+  "padLeft": 5,
+  "padRight": 5,
+  "padBottom": 1
+}

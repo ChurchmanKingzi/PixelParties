@@ -1,0 +1,14 @@
+{
+  "hero": "Cute Ditz Monami",
+  "sheet": "cute-ditz-monami.png",
+  "frameWidth": 92,
+  "frameHeight": 69,
+  "frames": 32,
+  "frameMs": 70,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 13,
+  "padLeft": 8,
+  "padRight": 8,
+  "padBottom": 8
+}

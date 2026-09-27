@@ -9,17 +9,19 @@ Amor-Schuss im Loop:
   mit rosa Spur und aufsteigenden Herzchen; die Sehne schwingt nach. Der Teil
   des Bogens hinter dem Schaft wird ergänzt.
 * Nachladen: ein neuer Pfeil materialisiert sich auf der Sehne.
-Dazu schwebt sie leicht.
+Dazu schwebt sie leicht und schlägt mit ihrem Flügel (Drehung um die
+Schulter, flap_common.rotate_part, die Spitze schwingt nach).
 """
 import math
 import sys
 from PIL import Image
 import numpy as np
 from anim_common import rgb, save_outputs
+from flap_common import rotate_part, over, fill_pinholes
 
 SRC = np.array(Image.open('src/molinda-the-cutest-being-in-the-sky.png').convert('RGBA')).astype(int)
 SH, SW = SRC.shape[:2]
-PL, PR, PT, PB = 18, 2, 3, 3
+PL, PR, PT, PB = 18, 9, 5, 4
 H, W = SH + PT + PB, SW + PL + PR
 N = 40
 
@@ -27,6 +29,18 @@ STRING = rgb('c9c9c9')
 B_OUT, B_MID = rgb('822a42'), rgb('f75981')
 HEART_Y = range(10, 17)
 SHAFT_Y = range(12, 15)
+
+
+WING_COLS = {rgb(c) for c in ('9999ff', 'ccccff', 'f6ffff', '9966ff', '292929')}
+WING = np.array([[SRC[y, x, 3] > 0 and tuple(SRC[y, x]) in WING_COLS and (x >= 18 or (y <= 3 and x >= 15))
+                  for x in range(SW)] for y in range(SH)])
+PIVOT = (18.0, 7.0)
+
+
+def wing_angle(i, r):
+    p = 2 * math.pi * i / 16 - 0.03 * r
+    s = math.sin(p)
+    return -0.14 + 0.2 * (s * (1.2 if s < 0 else 0.9))    # negativ = nach außen
 
 
 def is_arrow(x, y):
@@ -81,12 +95,14 @@ def frame(i):
     ax, alpha, wob = state(i)
     dy = bob(i)
     oy, ox = PT + dy, PL
+    over(out, fill_pinholes(rotate_part(SRC, WING, PIVOT, lambda r: wing_angle(i, r), (H, W), (ox, oy))))
     for y in range(SH):
         for x in range(SW):
-            if SRC[y, x, 3] and not is_arrow(x, y) and not is_string(x, y):
+            if SRC[y, x, 3] and not is_arrow(x, y) and not is_string(x, y) and not WING[y, x]:
                 out[y + oy, x + ox] = SRC[y, x]
     for (x, y), c in BOW_FILL.items():
         out[y + oy, x + ox] = c
+    fill_pinholes(out)                                  # Lücken zwischen Flügel und Kleid
     for x, y in STRING_PX:                              # Sehne (schwingt nach dem Schuss)
         sx = x + (wob if (x, y) != (x, 4) and 8 <= y <= 18 else 0)
         if not out[y + oy, sx + ox, 3] or sx == x:

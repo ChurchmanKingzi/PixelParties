@@ -59,6 +59,18 @@ kopiert, daneben liegt eine JSON-Datei mit den Metadaten. Die erzeugten
 | `arthor_sword.py` | `final` | `arthor_sword_idle_final_sheet.png` | `arthor-inheritor-of-the-barbarian-sword` |
 | `locke.py` | `final 80` | `locke_idle_final_sheet.png` | `locke-the-unseen-saboteur` |
 | `mary.py` | `final 70` | `mary_idle_final_sheet.png` | `cute-princess-mary` |
+| `mini.py` | `final` | `mini_idle_final_sheet.png` | `cute-annoyance-mini` |
+| `tarleinn.py` | `final` | `tarleinn_idle_final_sheet.png` | `tarleinn-the-traveler` |
+| `crestina_fq.py` | `final` | `crestina_fq_idle_final_sheet.png` | `fairy-queen-crestina-the-creation-fairy` |
+| `mirjam.py` | `final` | `mirjam_idle_final_sheet.png` | `mirjam-the-fallen-cute-angel` |
+| `crestina_true.py` (+ `crestina_wings.py`) | `final` | `crestina_true_idle_final_sheet.png` | `true-fairy-crestina-the-primordial-goddess` |
+| `megu.py` | `final` | `megu_idle_final_sheet.png` | `cute-starlet-megu` |
+| `vena.py` | `final` | `vena_idle_final_sheet.png` | `vena-the-bounty-huntress` |
+| `monia.py` | `final` | `monia_idle_final_sheet.png` | `cool-rescuer-monia` |
+| `monami.py` | `final` | `monami_idle_final_sheet.png` | `cute-ditz-monami` |
+| `magenta.py` | `final` | `magenta_idle_final_sheet.png` | `cute-nerd-magenta` |
+| `jenny.py` | `final` | `jenny_idle_final_sheet.png` | `jenny-the-class-fairy` |
+| `molinda.py` | `final` | `molinda_idle_final_sheet.png` | `molinda-the-cutest-being-in-the-sky` |
 | `bubbles.py` | `final gross` | `bubbles_idle_final_gross_sheet.png` | `bubbles-the-bouncy-bunny` |
 
 `bubbles.py` ohne `gross` erzeugt eine auf Hero-Größe verkleinerte Variante
@@ -83,6 +95,13 @@ python3 xcf_extract.py MotiveMoe.xcf assemble src/cute-princess-mary.png "Mary-K
 | Sprite in `src/` | Datei | Ebenen |
 |---|---|---|
 | `cute-princess-mary.png` | `MotiveMoe.xcf` | `Mary-Kopie` (goldene Mary mit Krone) + `Mary #1` (Flügel) |
+| alle übrigen MotiveMoe-Heroes | `MotiveMoe.xcf` | reproduzierbar per `python3 assemble_moe.py <MotiveMoe.xcf>` (Zuordnung im Skriptkopf) |
+
+`assemble_moe.py` speichert bewegliche Teile zusätzlich deckungsgleich als
+`src/<slug>-<teil>.png` (z. B. `-body`, `-wings`, `-arm`, `-flames`, `-fist`),
+damit Flügel, Arme oder Feuer getrennt animiert werden können.
+Achtung: nicht jede Ebene mit Namen des Heroes ist die richtige – Ascended
+Molinda liegt z. B. in `Ascended Molinda-Kopie`, nicht in `Ascended Molinda`.
 
 Abgleich immer mit der Karte in `cards/<Kartenname>.png`: dieselbe Figur liegt
 oft in mehreren Farb-/Kostümvarianten in der Datei (z. B. `Mary` = rote
@@ -98,7 +117,9 @@ Variante ohne Krone/Flügel), Hintergründe/Auren der Karte gehören nicht zum S
   `layout` und – falls die Leinwand gegenüber dem Original vergrößert wurde –
   `padTop`/`padLeft`/`padRight`/`padBottom`. Um diesen Rand muss die Animation
   verschoben werden, damit sie deckungsgleich mit dem statischen Sprite liegt.
-* Gemeinsame Helfer (Glitzersterne, Lichtschimmer, Speichern) in `anim_common.py`.
+* Gemeinsame Helfer (Glitzersterne, Lichtschimmer, Speichern, 1-px-Ring) in
+  `anim_common.py`, Flügelschlag (Drehung ums Schultergelenk bzw. spaltentreue
+  Scherung für sehr kleine Flügel, Lochfüller) in `flap_common.py`.
 
 ## Stil-Lektionen aus dem Feedback
 
@@ -129,3 +150,13 @@ Variante ohne Krone/Flügel), Hintergründe/Auren der Karte gehören nicht zum S
   (Arm, Handecke, Handgelenk) – sonst schweben Hände oder entstehen Kerben.
 * Bewegte Teile (Schwert, Knauf) vollständig maskieren und per Pixelvergleich
   über alle Frames prüfen; Freigelegtes nie mit Teilen des Objekts selbst füllen.
+* **Nichts darf je abgeschnitten sein**: Partikel (Glitzer, Noten, Blitze,
+  Herzchen, Pfeile) liegen komplett im Bild oder werden weggelassen bzw.
+  blenden vorher aus; `save_outputs(..., check_edges=True)` bricht ab, sobald
+  ein Frame den Bildrand berührt. Partikel auch nie halb hinter der Figur
+  anschneiden – ganz oder gar nicht zeichnen.
+* Auren, die im Original genau die Silhouette umgeben (Jenny), bei bewegten
+  Flügeln jedes Frame neu als Ring um die aktuelle Silhouette berechnen.
+* Vorhandene Mimik genau ansehen: ein roter Fleck unten im Gesicht ist oft
+  schon ein offener Mund (Vena) – Brüllen dann nur dezent verstärken. Ein
+  Strich-Auge kann schon ein Zwinkern sein (Monia).

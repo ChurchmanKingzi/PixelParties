@@ -10,6 +10,9 @@ Ebenen: Körper („Monia“ ohne das alte Düsenfeuer) und das Jetpack-Feuer au
 * Der weiße Glitzerstern an ihrem Kopf ist richtig animiert: er wächst,
   wechselt zwischen +- und x-Form und zieht sich wieder zusammen.
 * Ihre Beine schlackern leicht (die Füße schwingen abwechselnd 1 px aus).
+* Sie zwinkert: im Sprite ist ihr rechtes Auge ein geschlossener Strich – es
+  wird hier offen gezeichnet (wie das linke) und schließt sich einmal pro
+  Loop zum Zwinkern.
 """
 import math
 import sys
@@ -35,6 +38,10 @@ for (x, y), c in {(20, 6): HAIR, (20, 7): HAIR, (18, 8): HAIR, (19, 8): rgb('014
 WHITE, CYAN = rgb('ffffff'), rgb('b4f6ff')
 # Stern-Phasen: (Armlänge +, Armlänge x)
 STAR = [(0, 0), (1, 0), (2, 0), (3, 1), (2, 1), (1, 2), (0, 2), (0, 1), (0, 0), (0, 0)]
+# rechtes Auge offen (Farben wie das linke Auge); Original = Zwinkern
+EYE_OPEN = {(16, 9): rgb('00fbfc'), (17, 9): rgb('000082'), (16, 10): rgb('f2ffff'), (17, 10): rgb('1000c5')}
+EYE_WINK = {p: tuple(int(v) for v in BODY[p[1], p[0]]) for p in EYE_OPEN}
+WINK = range(20, 25)
 # Beine: Füße (Zeilen 23–25), links x10–13, rechts x14–17
 FEET_Y = range(23, 26)
 
@@ -72,6 +79,8 @@ def frame(i):
             yy = y0 + j + oy
             if 0 <= yy < H:
                 out[yy, x + P] = c
+    for (x, y), c in (EYE_WINK if i in WINK else EYE_OPEN).items():
+        BODY[y, x] = c
     # Körper, Füße schlackern gegenläufig
     ph = 2 * math.pi * i / 16
     dl = -1 if math.sin(ph) > 0.5 else 0
