@@ -5,11 +5,13 @@
 Runde 2b (technische Angleichung, Konzept/Anordnung unverändert):
 - Tiefenebene „Wand“ (Ziegelwand, Polaroids, Fotos, Fäden, Nadeln, Schatten, Vignette) komplett auf einem
   125×175-Raster gebaut und 2× hochskaliert → alles 2× auf dem 250er-Raster (6 px in der Ausgabe).
-  Fäden 1 px, Polaroid-Ränder 2 px (unten 8 px), Nadelköpfe 3×3 – alles im Raster der Fotos.
-- Tiefenebene „Lupe“ (Vordergrund): Doqs Lupe (Ebene „Doq“, Motive.xcf #1437) 6× auf dem 250er-Raster.
-  Ring vollständig nachgezogen (Kreis mit den drei Blautönen der Original-Lupe, Glanz oben links), Griff
-  aus den Originalpixeln (Diagonale hell/blau/dunkel), das von Doqs Hand verdeckte Griffstück mit demselben
-  Muster ergänzt. Die Linse zeigt die Wand 3× vergrößert → Linseninhalt hat dieselbe Pixelgröße (6) wie der Ring.
+  Fäden 1 px, Polaroid-Ränder 2 px (unten 8 px), Nadelköpfe 4×4 – alles im Raster der Fotos.
+- Tiefenebene „Lupe“ (Vordergrund): Doqs Lupe (Ebene „Doq“, Motive.xcf #1437) 4× auf dem 250er-Raster.
+  Ring vollständig und geschlossen nachgezogen (je 1 px dunkler Umriss + blauer Innenring in den Blautönen der
+  Original-Lupe, Glanz oben links; Ø auf 15 px geweitet), Griff aus den Originalpixeln (Diagonale dunkel/hell/blau
+  + Endkappe), das von Doqs Hand verdeckte Griffstück mit demselben Muster ergänzt; Griff zeigt nach links oben,
+  damit die Lupe ganz im Bild bleibt. Die Linse zeigt die Wand 2× vergrößert → Linseninhalt hat dieselbe
+  Pixelgröße (4) wie Ring und Griff.
 - Kein eigener Rahmen (kommt später per Skript).
 Quellen: Fotos pixelgenau aus den „Sichtbar“-Szenen (Motive #109/#849, MotiveDeepsea #46, MotiveGrailWar #182,
 MotiveIndia #26, MotiveMoe #590) der Karten Great Detective Doq, Kaito Sid the Phantom Thief, Rakah the Loan Shark,
