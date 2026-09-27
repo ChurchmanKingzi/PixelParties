@@ -3,7 +3,8 @@
 vor dem der Nerdy Cheese mit seinen Fledermausflügeln wie eine Fledermaus vorbeizieht.
 
 Quellen (MotiveMoe.xcf, Karten „Holy Cheese“, „Nerdy Cheese“):
-  Ebene 312 „Holy Cheese“   – Käse mit Engelsflügeln + Heiligenschein (ohne den losen weißen Balken)
+  Ebene 312 „Holy Cheese“   – Käse mit Engelsflügeln + Heiligenschein (ohne den losen weißen Balken;
+                              der Ring ist 2 Pixel tiefer gesetzt, direkt über den Kopf)
   Ebene 310 „Nerdy Cheese“  – violetter Käse mit Brille und hohen Fledermausflügeln
 Selbst gezeichnet: Nachthimmel, Sterne, Mond mit Emmentaler-Löchern (Farben aus der Holy-Cheese-Palette).
 
@@ -59,12 +60,26 @@ xs = np.where(cols > 0)[0]
 gap = [x for x in range(1, len(xs)) if xs[x] - xs[x - 1] > 3]
 HOLY = full[:, :xs[gap[0] - 1] + 1] if gap else full
 HOLY = HOLY[:, :]; b = bbox(HOLY); HOLY = HOLY[b[1]:b[3], b[0]:b[2]]
+# Heiligenschein 2 Pixel tiefer setzen, damit er direkt über dem Kopf sitzt (nicht als loser Ring)
+halo_rows = 10
+H2 = HOLY.copy(); H2[:halo_rows] = 0
+halo = HOLY[:halo_rows].copy()
+body_top = HOLY[:halo_rows].copy()
+# Flügelspitzen liegen ebenfalls in den oberen Zeilen: nur den Ring (mittlere Spalten 12–54) verschieben
+ring = np.zeros_like(halo); ring[:, 12:54] = halo[:, 12:54]
+rest = halo.copy(); rest[:, 12:54] = 0
+H2[:halo_rows] = rest
+m = ring[..., 3] > 0
+yy_, xx_ = np.where(m)
+for y_, x_ in zip(yy_, xx_):
+    H2[y_ + 2, x_] = ring[y_, x_]
+b = bbox(H2); HOLY = H2[b[1]:b[3], b[0]:b[2]]
 NERD = sprite('e21_nerdy', M, [310])
 
 # ---------- Ebene 1: Himmel + Mond (2×) ----------
 g = Canvas(125, 175)
 vgrad(g, [(0, (6, 8, 30)), (0.5, (14, 20, 58)), (1, (24, 30, 80))])
-MX, MY, MR = 62.5, 56, 41
+MX, MY, MR = 62.5, 52, 38
 radial(g, MX, MY, MR + 26, (24, 32, 84), 0.9, power=0.9)
 radial(g, MX, MY, MR + 12, (46, 52, 110), 0.8, power=0.8)
 rng = np.random.RandomState(21)
@@ -113,7 +128,7 @@ cv.a[:] = lift(g.a, 2)
 
 # ---------- Ebene 2: Nerdy Cheese quer vor dem Mond (2×) ----------
 L2 = rgba(125, 175)
-put(L2, NERD, 62 - NERD.shape[1] // 2, 24)
+put(L2, NERD, 62 - NERD.shape[1] // 2, 22)
 cv.paste(lift(L2, 2), 0, 0)
 
 # ---------- Ebene 3: vorderer Holy Cheese (3×) ----------

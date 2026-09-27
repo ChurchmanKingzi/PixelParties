@@ -19,9 +19,9 @@
 | 25 | E | Balloon Drift | Reise: der Creepy Clown schwebt an seinem Bündel aus Clownsgesicht-Ballons vor der untergehenden Sonne über ein rosa Wolkenmeer in den Abendhimmel (Moe). |
 | 01 | A | Open Lead | Luftbild aufs Packeis: durch eine dunkle Rinne im Eis gleitet der Narwal (Slippery Narw), am Rand rutscht Snobbit bäuchlings mit langer Spur (Draufsicht, Motive). |
 | 02 | A | Night Watch | Der Candlestick Squire geht mit erhobener Fackel durch einen stockdunklen Burggang; sein Lichtkegel erhellt Mauer und Boden, im Dunkel dahinter glimmen Augen (Licht im Dunkeln, Motive). |
-| 03 | A | End of the Rainbow | Willy der Kobold steht am Fuß eines großen Regenbogens auf grüner Wiese neben seinem Goldhaufen, darüber Frühlingshimmel mit Wolken (fröhliche Szene, Motive). |
+| 03 | A | End of the Rainbow | Ein runder Regenbogen spannt sich über Willy den Kobold und fällt direkt in seinen Goldtopf; beide stehen groß auf der Frühlingswiese (fröhliche Szene, MotiveBritain). |
 | 04 | A | Cracked Keeper | Chaos-Diamond, der violette Kristallwächter, steht breitbeinig und frontal in einer dunklen Höhle, der rote Riss-Kristall in seiner Brust leuchtet (Heldenporträt, Motive). |
-| 05 | A | Stone Vigil | Drei steinerne Engelsstatuen halten nachts auf dem Friedhofshügel Wache um den Thron der Undead Guardian Angel, hinter ihnen Vollmond im Nebel (Silhouette vor Himmel, Motive). |
+| 05 | A | Stone Vigil | Drei steinerne Engelsstatuen halten nachts auf dem Friedhofsplatz Wache, eine Betende kniet davor, die Undead Guardian Angel schwebt als Erscheinung vor dem Vollmond (Nachtszene, Motive). |
 | 46 | J | Dragon Gate | Ein Karpfen springt einen hohen, selbst gezeichneten Wasserfall hinauf, unten im Becken lauert der Scavenging Crane, oben im Abenddunst zeichnet sich schemenhaft der Drache ab, der er werden will (Legende vom Drachentor, Japan + GuardianBeasts). |
 | 47 | J | Bamboo Sentinel | Nahaufnahme: Xiong, der Bambuswächter, steht groß und frontal mit quer gehaltenem Bambusstab in einem dichten, nach hinten dunkler werdenden Bambushain (Porträt, China). |
 | 48 | J | Projection | Nachts wirft der Idej Projector vom Dachfirst der violetten Pagode einen Lichtkegel in den Himmel, darin schwebt riesig das Hologramm des vermummten Idej mit Scanlinien (Licht/Hologramm, Japan). |

@@ -119,6 +119,7 @@ woman = stack[36:].copy()
 r_, g_, b_ = [woman[..., i].astype(int) for i in range(3)]
 purple = ((r_ == 45) & (g_ == 0) & (b_ == 105)) | ((r_ >= 43) & (r_ <= 79) & (g_ >= 24) & (g_ <= 44) & (b_ >= 90) & (b_ <= 166))
 woman[purple] = 0
+woman[:3, :4] = 0; woman[:3, -4:] = 0           # Flügelspitzen der verdeckten Mittelstatue entfernen
 woman = woman[:, :][np.any(woman[..., 3] > 0, 1)]
 woman = woman[:, np.any(woman[..., 3] > 0, 0)]
 sh, sw = statue.shape[:2]
@@ -133,22 +134,22 @@ def put(spr, x, y, t=0.12):
     m = s2[..., 3] > 0
     fg[y:y + spr.shape[0], x:x + spr.shape[1]][m] = s2[m]
 # Mittelstatue weiter hinten (höher), Seitenstatuen weiter vorn: Dreieck in die Tiefe
-CB, SB = 84, 96
+CB, SB = 82, 96
 shadow(42, CB, 10, 1.8); put(statue, 42 - sw // 2, CB - sh)
 shadow(16, SB, 10, 2.0); put(statue, 16 - sw // 2, SB - sh)
 shadow(68, SB, 10, 2.0); put(statue, 68 - sw // 2, SB - sh)
 # Betende kniet mit Abstand vor der Mittelstatue
 wh, ww = woman.shape[:2]
-WB = 106
+WB = 107
 shadow(42, WB, 8, 1.6); put(woman, 42 - ww // 2, WB - wh, 0.08)
 # Untote Engelin schwebt über der Mittelstatue vor dem Mond, der Unterleib verblasst (geordnet gedithert)
 ah, aw = angel.shape[:2]
-AX, AY = 42 - aw // 2, 24
+AX, AY = 42 - aw // 2, 26
 for j in range(ah):
     for i in range(aw):
         if not angel[j, i, 3]: continue
         X, Y = AX + i, AY + j
-        t = 1.0 if j < ah - 8 else 1 - (j - (ah - 8) + 1) / 9.0
+        t = 1.0 if j < ah - 6 else 1 - (j - (ah - 6) + 1) / 7.0
         if t > BAYER4[Y % 4, X % 4]:
             fg[Y, X, :3] = angel[j, i, :3]; fg[Y, X, 3] = 255
 big = up(fg, K)[1:351, 1:251]

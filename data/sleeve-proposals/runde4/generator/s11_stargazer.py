@@ -47,6 +47,7 @@ for sx, sy, r in [(22, 20, 2), (60, 12, 1), (36, 52, 1), (112, 110, 1), (14, 88,
             sky.px(sx + dx, sy + dy, (150, 180, 255) if d == r else (220, 230, 255))
 cv = Canvas(W, H)
 cv.a[:] = up(np.dstack([sky.a, np.full((175, 125), 255, np.uint8)]), 2)[:H, :W, :3]
+vignette_grid(cv, 0.5, 0.6, g=2)                    # Vignette nur auf dem 2×-Himmel
 
 # ---------------------------------------------------------------- Vordergrund (4×)
 fw, fh = 63, 88
@@ -67,13 +68,11 @@ for x in range(fw):
 fig = sprite('c11_star_scope', D, [101, 103])       # Sterndeuter + Monokel + Fernrohr (36×30)
 fx, foot = FX, FOOT
 # Schatten auf dem Hügel (nach links, Licht von rechts oben)
-sh = silhouette(fig, (0, 0, 0))
 for j in range(3):
     for i in range(fig.shape[1] + 4):
         X, Y = fx - 3 + i, foot - 1 + j
         if 0 <= X < fw and (i + j) % 2 == 0 and fg[Y, X, 3]:
             fg[Y, X, :3] = (fg[Y, X, :3] * 0.45).astype(np.uint8)
-fcv = Canvas(fw, fh); fcv.a[:] = 0
 def over_rgba(dst, s, x, y):
     h, w = s.shape[:2]
     for j in range(h):
@@ -84,6 +83,4 @@ over_rgba(fg, fig, fx, foot - fig.shape[0] + 1)
 
 FG = up(fg, G)[:H, :W]
 cv.paste(FG, 0, 0)
-
-vignette_grid(cv, 0.5, 0.6, g=2)
 print(save(cv, '11_stargazer.png'))

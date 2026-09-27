@@ -8,7 +8,8 @@ Quellen (MotiveHawaii.xcf):
       geprüft; die Figur ist schon im Original eine Halbfigur (endet an der Robe) → vom unteren Bildrand
       angeschnitten wie der Vampir in „Count of the Deep“.
   Ebene 233 „Curse“ – Karians Dämonengestalt mit Flügeln und Heiligenschein (Karte „Curse“), als Schattenriss;
-      nur der rote Heiligenschein bleibt farbig.
+      nur der rote Heiligenschein und die zwei roten Augen
+      (Original-Pixel) bleiben farbig und glühen.
   Ebene 250 „Ebene #5“ – Kirchenmauer (violette Ziegel, Kachel 16×8), nach Licht umgefärbt.
 Selbst gezeichnet: Licht-/Schattenverlauf, Verbindung des Schattens nach unten (gestreckter Schatten des Körpers).
 
@@ -34,13 +35,16 @@ def lightv(x, y):
 curse = sprite('f30_curse', HW, [233])          # 54 × 176, Figurmitte x≈87.5
 cm = curse[..., 3] > 0
 halo = (curse[..., 0] > 200) & (curse[..., 1] < 60) & cm
+# die beiden roten Augen der Dämonengestalt (Sprite-Pixel a70001) glühen im Schatten wie der Heiligenschein
+eyes = (curse[..., 0] > 150) & (curse[..., 1] < 10) & (curse[..., 2] < 10) & cm
+eyes[:30] = False
 SX, SY = int(round(42 - 87.5)), 4              # Lage im Raster
 shadow = np.zeros((gh, gw), bool); halo_m = np.zeros((gh, gw), bool)
 for j in range(curse.shape[0]):
     for i in range(curse.shape[1]):
         X, Y = SX + i, SY + j
         if 0 <= X < gw and 0 <= Y < gh:
-            if halo[j, i]: halo_m[Y, X] = True
+            if halo[j, i] or eyes[j, i]: halo_m[Y, X] = True
             elif cm[j, i]: shadow[Y, X] = True
 # gestreckter Schatten des Unterkörpers: von der Figur bis hinter Karian nach unten (verjüngt, Robe)
 bot = SY + curse.shape[0]
@@ -64,7 +68,7 @@ for y in range(gh):
     for x in range(gw):
         if halo_m[y, x]: G.a[y, x, :3] = (236, 30, 36)
 # schwacher roter Schein um den Heiligenschein
-hy, hx = np.where(halo_m)
+hy, hx = np.where(halo_m[:SY + 25])
 if len(hy):
     cy, cx = hy.mean(), hx.mean()
     for y in range(int(cy) - 4, int(cy) + 5):
