@@ -1,0 +1,14 @@
+{
+  "hero": "Cute Princess Mary",
+  "sheet": "cute-princess-mary.png",
+  "frameWidth": 92,
+  "frameHeight": 70,
+  "frames": 32,
+  "frameMs": 70,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 10,
+  "padLeft": 7,
+  "padRight": 7,
+  "padBottom": 3
+}

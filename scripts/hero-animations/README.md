@@ -58,6 +58,7 @@ kopiert, daneben liegt eine JSON-Datei mit den Metadaten. Die erzeugten
 | `lilly.py` | `final` | `lilly_idle_final_sheet.png` | `lilly-the-charming-infiltrator` |
 | `arthor_sword.py` | `final` | `arthor_sword_idle_final_sheet.png` | `arthor-inheritor-of-the-barbarian-sword` |
 | `locke.py` | `final 80` | `locke_idle_final_sheet.png` | `locke-the-unseen-saboteur` |
+| `mary.py` | `final 70` | `mary_idle_final_sheet.png` | `cute-princess-mary` |
 | `bubbles.py` | `final gross` | `bubbles_idle_final_gross_sheet.png` | `bubbles-the-bouncy-bunny` |
 
 `bubbles.py` ohne `gross` erzeugt eine auf Hero-Größe verkleinerte Variante
