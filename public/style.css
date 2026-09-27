@@ -5925,7 +5925,21 @@ body:has(.anim-backdrop) .pp-bg-particles { display: none; }
      die Karten ihren Platz. */
   overflow-y: hidden;
   scrollbar-width: thin;
-  --fan-pad-x: calc(var(--hand-card-w) * 0.45);
+  /* ★★ v1452 (Als Befund 27.9.: „wenn die Hand sehr voll ist und ich
+     über die rechteste Handkarte hovere, ändert sich das Layout des
+     ganzen Boards — es erhält weniger Platz").
+     Ein Scrollbereich zählt TRANSFORMIERTE Kästen mit (siehe v1243).
+     Die gehoverte rechte Randkarte — 9° Fächerwinkel, Drehpunkt 50 % 85 %,
+     ×1,42 — reicht bis 0,967 Kartenbreiten + ~3 px rechts ihrer Mitte,
+     also 0,467 Breiten + 3 px über den Inhaltskasten hinaus. Das alte
+     Polster (0,45) fasste das nicht: bei voller Reihe erschien die
+     waagerechte Bildlaufleiste, die Leiste wurde um deren Höhe höher,
+     und das Brett schrumpfte (bzw. flackerte, weil der Hover dabei
+     verloren ging). 0,55 fasst Hover samt Drehung mit Luft; das Polster
+     wird wie bisher per negativem Rand wieder eingezogen, der
+     Inhaltskasten bleibt also, wo er war. Wer `--hand-hover-scale`
+     oder `FAECHER.maxGrad` anhebt, muss diese Zahl mitrechnen. */
+  --fan-pad-x: calc(var(--hand-card-w) * 0.55);
   --fan-pad-unten: calc(var(--hand-card-h) * 0.14);
   padding: calc(var(--hand-card-h) * 0.8 + 20px) var(--fan-pad-x) var(--fan-pad-unten);
   margin-top: calc(var(--hand-card-h) * -0.8 - 20px);
@@ -14298,7 +14312,17 @@ body:has(.reaction-chain-overlay) .board-tooltip-token {
    der Ablagebereich bleibt kartengross, die Leiste springt beim ersten
    Karteneinwurf nicht mehr. */
 .pz-hand-cards[data-pz-hand="hand"]::after,
-.pz-hand-cards[data-pz-hand="oppHand"]::after { height: auto; }
+.pz-hand-cards[data-pz-hand="oppHand"]::after {
+  height: auto;
+  /* ★ v1452: seitlich nur ueber dem Inhalt, nicht ueber dem Polster.
+     Das Polster reicht seit heute eine knappe halbe Kartenbreite unter
+     die Nebenspalte (Gold, Debuffs) bzw. den Vorrat; der Streifen hat
+     `pointer-events: auto` und haette dort Klicks geschluckt. Ablegen
+     ueber der Nebenspalte geht trotzdem — sie liegt in `.pz-hand`, und
+     deren `dragover` faengt den Zug. */
+  left: var(--fan-pad-x, 0px);
+  right: var(--fan-pad-x, 0px);
+}
 .pz-hand-cards[data-pz-hand="hand"]::after {
   top: calc(var(--hand-card-h) * 0.8 + 20px);
   bottom: var(--fan-pad-unten, 0px);
@@ -14513,7 +14537,13 @@ body:has(.reaction-chain-overlay) .board-tooltip-token {
      volle Leistenbreite, das Polster fängt Drehüberhang und
      Hover-Vergrößerung weiterhin ab. Etwas schmaler darf es auch
      sein — der Editor fächert mit kleinerem Winkel. */
-  --fan-pad-x: calc(var(--hand-card-w) * 0.3);
+  /* ★★ v1452: 0,3 → 0,45. Der Editor fächert mit DEMSELBEN Winkel
+     (9° am Rand), dreht aber um die Mitte: die gehoverte Randkarte ragt
+     0,357 Kartenbreiten + ~3 px über den Inhaltskasten hinaus — mehr als
+     das alte Polster. Folge wie im Duell (siehe `.game-hand-cards`):
+     Hover über der rechtesten Karte einer vollen Hand → Bildlaufleiste →
+     Leiste höher → der Scaler verkleinert das Brett. */
+  --fan-pad-x: calc(var(--hand-card-w) * 0.45);
   --fan-pad-unten: calc(var(--hand-card-h) * 0.14);
   margin-inline: calc(var(--fan-pad-x) * -1);
   --hand-ueberstand: max(0px,

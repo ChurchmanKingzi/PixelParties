@@ -595,6 +595,10 @@ function PuzzleCreator() {
   // leer aussehen laesst.
   const [pileSuche, setPileSuche] = useState('');
   const boardWrapRef = useRef(null);
+  // ★ v1452: die jeweils aktuelle `magnetZiel` (siehe dort) — die
+  // Touch-Griffe sind Callbacks ohne passende Abhaengigkeiten und
+  // lesen sie deshalb ueber den Ref, nicht aus ihrem Closure.
+  const magnetZielRef = useRef(null);
   const dragEntityData = useRef(null);
   const searchResultsRef = useRef(null);
   const customScrollRef = useRef(null);
@@ -838,8 +842,11 @@ function PuzzleCreator() {
       td.ghost.style.display = 'none';
       const el = document.elementFromPoint(t.clientX, t.clientY);
       td.ghost.style.display = '';
-      const zoneEl = el?.closest('[data-pz-zone]') || el?.closest('[data-pz-hand]');
-      const zoneKey = zoneEl?.dataset?.pzZone || (zoneEl?.dataset?.pzHand ? 'hand:' + zoneEl.dataset.pzHand : null);
+      // ★ v1452: Brettzonen magnetisch, wie beim Ziehen mit der Maus.
+      const handEl = el?.closest('[data-pz-hand]');
+      const zoneKey = handEl
+        ? 'hand:' + handEl.dataset.pzHand
+        : magnetZielRef.current?.(t.clientX, t.clientY, td.cardName, el);
       setDragOverZone(zoneKey || null);
     }
   }, []);
@@ -853,25 +860,27 @@ function PuzzleCreator() {
     setDragOverZone(null);
     const t = e.changedTouches[0];
     const el = document.elementFromPoint(t.clientX, t.clientY);
-    const zoneEl = el?.closest('[data-pz-zone]');
     const handEl = el?.closest('[data-pz-hand]');
-    if (zoneEl) {
-      const [si, zt, hi, slot] = zoneEl.dataset.pzZone.split('-');
+    // ★ v1452: die Zone kommt aus der magnetischen Suche — sie liefert
+    // nur Zonen, die die Karte annehmen (mit dem AKTUELLEN Brett; der
+    // Callback hier sieht wegen seiner Abhaengigkeiten sonst nur einen
+    // alten Stand).
+    const zoneKey = handEl ? null : magnetZielRef.current?.(t.clientX, t.clientY, td.cardName, el);
+    if (zoneKey) {
+      const [si, zt, hi, slot] = zoneKey.split('-');
       const siN = parseInt(si), hiN = parseInt(hi), slotN = parseInt(slot);
       // Same-zone drop → no-op (don't wipe ability/support zones, no SFX).
       if (td.sourceZone && td.sourceZone.zt === zt && td.sourceZone.si === siN && td.sourceZone.hi === hiN && td.sourceZone.slot === slotN) return;
-      if (canDrop(td.cardName, zt, siN, hiN, slotN)) {
-        // Remove from source
-        if (td.handIdx != null) { if (td.handSource === 'oppHand') removeFromOppHand(td.handIdx); else removeFromHand(td.handIdx); }
-        if (td.sourceZone) clearZone(td.sourceZone.zt, td.sourceZone.si, td.sourceZone.hi, td.sourceZone.slot);
-        // Place
-        if (zt === 'hero') placeHero(td.cardName, siN, hiN);
-        else if (zt === 'ability') placeAbility(td.cardName, siN, hiN, slotN);
-        else if (zt === 'support') placeSupport(td.cardName, siN, hiN, slotN);
-        else if (zt === 'surprise') placeSurprise(td.cardName, siN, hiN);
-        else if (zt === 'area') placeArea(td.cardName, siN);
-        else if (zt === 'permanent') placePermanent(td.cardName, siN);
-      }
+      // Remove from source
+      if (td.handIdx != null) { if (td.handSource === 'oppHand') removeFromOppHand(td.handIdx); else removeFromHand(td.handIdx); }
+      if (td.sourceZone) clearZone(td.sourceZone.zt, td.sourceZone.si, td.sourceZone.hi, td.sourceZone.slot);
+      // Place
+      if (zt === 'hero') placeHero(td.cardName, siN, hiN);
+      else if (zt === 'ability') placeAbility(td.cardName, siN, hiN, slotN);
+      else if (zt === 'support') placeSupport(td.cardName, siN, hiN, slotN);
+      else if (zt === 'surprise') placeSurprise(td.cardName, siN, hiN);
+      else if (zt === 'area') placeArea(td.cardName, siN);
+      else if (zt === 'permanent') placePermanent(td.cardName, siN);
     } else if (handEl) {
       const handType = handEl.dataset.pzHand;
       // Dropping back on the same hand it came from → do nothing
@@ -2114,6 +2123,104 @@ function PuzzleCreator() {
     setDragCardName(null); setDragHandIdx(null); setDragSource(null); setDragHandSource(null); setDragOverZone(null); dragEntityData.current = null;
   }, [dragCardName, dragHandIdx, dragHandSource, dragSource, canDrop, clearZone, placeHero, placeAbility, placeSupport, placeSurprise, placeArea, placePermanent, removeFromHand, removeFromOppHand, entferneAusHandquelle, updatePlayer]);
 
+  // ══ MAGNETISCHE ABLAGE (v1452) ══════════════════════════════════
+  // Als Befund 27.9.: „Im Puzzle-Editor sind die Board-Zonen so klein,
+  // dass es schwierig sein kann, dort Karten reinzuplatzieren. Die
+  // Drop-Zonen fuer Karten muessten deutlich groesser sein als die
+  // sichtbaren Kartenzonen selbst."
+  //
+  // Bis hier trug jede Zone ihre eigenen Ablage-Griffe; getroffen wurde
+  // nur, was exakt unter dem Zeiger lag. Jetzt faengt `.pz-board-wrap`
+  // jeden Zug ab, den kein anderes Ziel (Hand, Stapel, Vorrat,
+  // Permanents) genommen hat, und sucht die NAECHSTE Zone, die die
+  // Karte auch annimmt:
+  //   ① Liegt der Zeiger auf einer passenden Zone, ist sie es — genau
+  //     wie bisher.
+  //   ② Sonst gewinnt die passende Zone mit dem kleinsten Abstand vom
+  //     Zeiger zu ihrem Kasten, sofern er hoechstens `MAGNET_ANTEIL`
+  //     ihrer groesseren Seite betraegt.
+  // „Naechste passende" statt „vergroesserter Kasten": vergroesserte
+  // Kaesten wuerden einander ueberlappen, und dann entschiede die
+  // DOM-Reihenfolge. So teilt sich die Luecke zwischen zwei Zonen von
+  // selbst in der Mitte — und eine Zone, die die Karte ohnehin abweist
+  // (Creature ueber einer Ability-Zone), leitet an die passende daneben
+  // weiter, statt den Zug zu schlucken. Welche Zone gemeint ist, zeigt
+  // wie bisher ihr Leuchten (`hl`).
+  //
+  // Gemessen wird mit `getBoundingClientRect` — das liefert den
+  // PROJIZIERTEN Kasten auf der gekippten Brettebene, also genau das,
+  // was man sieht. Rund 60 Zonen je `dragover` sind billig; es wird
+  // nichts geschrieben, nur gelesen.
+  const MAGNET_ANTEIL = 0.75;
+  /** Die aeusserste Zonen-Huelle — Area-Stapelkarten tragen ihre eigene
+   *  Kennung, abgelegt wird aber auf der Huelle (siehe `pz-area-zone`). */
+  const zonenHuelle = (el) => {
+    let z = el?.closest?.('[data-pz-zone]') || null;
+    while (z && z.parentElement) {
+      const aussen = z.parentElement.closest('[data-pz-zone]');
+      if (!aussen) break;
+      z = aussen;
+    }
+    return z;
+  };
+  const zonenSchluessel = (key) => {
+    const [si, zt, hi, slot] = key.split('-');
+    return { zt, si: parseInt(si), hi: parseInt(hi), slot: parseInt(slot) };
+  };
+  const magnetZiel = (x, y, cardName, trefferEl) => {
+    if (cardName == null) return null;
+    const wrap = boardWrapRef.current;
+    if (!wrap) return null;
+    const passt = (key) => {
+      const z = zonenSchluessel(key);
+      return canDrop(cardName, z.zt, z.si, z.hi, z.slot);
+    };
+    const direkt = zonenHuelle(trefferEl);
+    if (direkt && wrap.contains(direkt) && passt(direkt.dataset.pzZone)) return direkt.dataset.pzZone;
+    let bestKey = null, bestAbst = Infinity, bestMitte = Infinity;
+    for (const el of wrap.querySelectorAll('[data-pz-zone]')) {
+      if (zonenHuelle(el) !== el) continue;
+      const r = el.getBoundingClientRect();
+      if (!r.width || !r.height) continue;
+      const dx = Math.max(r.left - x, 0, x - r.right);
+      const dy = Math.max(r.top - y, 0, y - r.bottom);
+      const abst = Math.hypot(dx, dy);
+      if (abst > MAGNET_ANTEIL * Math.max(r.width, r.height)) continue;
+      // Gleichstand (Zeiger in zwei projizierten Kaesten zugleich):
+      // die Zone, deren Mitte naeher liegt.
+      const mitte = Math.hypot(x - (r.left + r.right) / 2, y - (r.top + r.bottom) / 2);
+      if (abst > bestAbst || (abst === bestAbst && mitte >= bestMitte)) continue;
+      const key = el.dataset.pzZone;
+      if (!passt(key)) continue;
+      bestKey = key; bestAbst = abst; bestMitte = mitte;
+    }
+    return bestKey;
+  };
+  magnetZielRef.current = magnetZiel;
+  // Die Griffe an `.pz-board-wrap`. Was ein anderes Ziel schon
+  // angenommen hat (`preventDefault` in Hand, Stapel, Vorrat,
+  // Permanents), bleibt dessen Sache.
+  const brettDragOver = (e) => {
+    if (e.nativeEvent.defaultPrevented || dragCardName == null) return;
+    const key = magnetZiel(e.clientX, e.clientY, dragCardName, e.target);
+    if (key) { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; }
+    setDragOverZone(key);
+  };
+  const brettDragLeave = (e) => {
+    // Kindwechsel ist kein Verlassen (siehe eigene Hand).
+    if (e.currentTarget.contains(e.relatedTarget)) return;
+    setDragOverZone(null);
+  };
+  const brettDrop = (e) => {
+    if (e.nativeEvent.defaultPrevented || dragCardName == null) return;
+    const key = magnetZiel(e.clientX, e.clientY, dragCardName, e.target);
+    if (!key) return;
+    e.preventDefault();
+    setDragOverZone(null);
+    const z = zonenSchluessel(key);
+    handleDrop(z.zt, z.si, z.hi, z.slot);
+  };
+
   // Drop onto player hand zone
   /**
    * ★ Als Vorgabe 28.8.: die zweigeteilte Hand erscheint im Editor,
@@ -3296,9 +3403,10 @@ function PuzzleCreator() {
         } else e.preventDefault();
       },
       onDragEnd,
-      onDragOver: (e) => { e.preventDefault(); if (dragCardName && canDrop(dragCardName, zt, si, hi, slot)) { e.dataTransfer.dropEffect = 'move'; setDragOverZone(`${si}-${zt}-${hi}-${slot}`); } },
-      onDragLeave: () => setDragOverZone(null),
-      onDrop: (e) => { e.preventDefault(); setDragOverZone(null); handleDrop(zt, si, hi, slot); },
+      // ★ v1452: Ablegen laeuft nicht mehr ueber die Zone selbst, sondern
+      // ueber `.pz-board-wrap` (`brettDragOver`/`brettDrop`) — dort wird
+      // auch die NAECHSTE passende Zone gefunden, wenn der Zeiger knapp
+      // daneben liegt.
       onContextMenu: (e) => {
         if (hasCard) { e.preventDefault(); removeCard(si, zt, hi, slot); }
       },
@@ -4020,7 +4128,8 @@ function PuzzleCreator() {
             arbitrary scroll containers, only the window, so leaving
             overflow as the default doesn't reintroduce any unwanted
             scrolling during drag. */}
-        <div className="pz-board-wrap" ref={boardWrapRef}>
+        <div className="pz-board-wrap" ref={boardWrapRef}
+          onDragOver={brettDragOver} onDragLeave={brettDragLeave} onDrop={brettDrop}>
           {/* ── Opponent Hand (always revealed, behind tooltips) ── */}
           <div className="pz-hand pz-hand-opp" style={{ position: 'relative', zIndex: 1, marginBottom: 'calc(4px * var(--board-scale))' }}
             onDragOver={(e) => {
