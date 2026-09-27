@@ -48,6 +48,27 @@ cmask[31:] = cmask[31:] & (mx[31:] - mn[31:] > 30)
 clock = rgba(clock); clock[~cmask, 3] = 0
 from xcfkit import parts as _parts
 clock = max(_parts(clock, dil=0), key=lambda p: (p[..., 3] > 0).sum())
+# Ziffernblatt: seine grauen Pixel fallen durch die Farbmaske – alle vom Uhrgehäuse umschlossenen Löcher
+# werden mit den Originalpixeln wieder aufgefüllt
+import cv2 as _cv2
+src = rgba(hall[70:102, 636:651])
+ys, xs = np.where(clock[..., 3] > 0)
+fullm = np.zeros(src.shape[:2], np.uint8)
+oy, ox = None, None
+for dy in range(src.shape[0] - clock.shape[0] + 1):          # Lage des Teilstücks im Ausschnitt suchen
+    for dx in range(src.shape[1] - clock.shape[1] + 1):
+        sub = src[dy:dy + clock.shape[0], dx:dx + clock.shape[1]]
+        m = clock[..., 3] > 0
+        if (sub[m][:, :3] == clock[m][:, :3]).all(): oy, ox = dy, dx; break
+    if oy is not None: break
+fullm[oy:oy + clock.shape[0], ox:ox + clock.shape[1]] = (clock[..., 3] > 0).astype(np.uint8)
+ff = fullm.copy(); pad = np.zeros((ff.shape[0] + 2, ff.shape[1] + 2), np.uint8)
+_cv2.floodFill(ff, pad, (0, 0), 2)                             # Außenraum markieren
+holes = ff == 0
+fullm[holes] = 1
+clock = src.copy(); clock[fullm == 0, 3] = 0
+ys, xs = np.where(fullm > 0)
+clock = clock[ys.min():ys.max() + 1, xs.min():xs.max() + 1]
 put(cv, clock, 196, FLOOR, K, 'bl')
 # obere Mauer: Steinreihen der Wand, dunkler
 bricks = up(rgba(hall[86:94, 570:594]), K)
