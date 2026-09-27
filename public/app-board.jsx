@@ -2165,7 +2165,10 @@ function HeroIdleSprite({ cardName, angehalten, versteinert, unsichtbar }) {
   // deutlich kleiner als normale Menschen wie Lilly") — ein Sprite-Pixel
   // ist bei jedem Helden gleich groß, Bubbles & Co. stehen also in ihrer
   // echten Größe neben den anderen.
-  const s = 2.8125;
+  // ★ v1455: `boardScale` im Sheet-JSON ist ein Faktor für Einzelfälle
+  // (Als Vorgabe 27.9.: Bubbles in voller Größe „geht so gar nicht, der
+  // sitzt viel zu hoch und wird fast komplett abgeschnitten").
+  const s = 2.8125 * (Number(meta.boardScale) > 0 ? Number(meta.boardScale) : 1);
   const bs = (n) => `${+n.toFixed(3)}px * var(--board-scale)`;
   // ★ v1452 (Als Vorgabe 27.9.): „Sofern nicht anders angegeben, bildet
   // immer das GESICHT des Heroes den Bildmittelpunkt." Reihenfolge:
