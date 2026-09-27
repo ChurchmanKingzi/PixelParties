@@ -4,6 +4,8 @@
 * Sie trägt ihre weiße Maske (Ebene „Thalia #1“) und flattert mit den
   Feenflügeln (spaltentreu geschert, flap_common.shear_flap), dabei schwebt
   sie sanft auf und ab.
+* Sie winkt mit dem gehobenen Arm: der Arm wird um die Schulter hin- und
+  hergeschert (jede Zeile als Ganzes – der Arm bleibt pixelgenau).
 * Feuerwerk: drei Raketen pro Loop steigen neben/über ihr auf und zerplatzen
   zu bunten Sternen (Farben wie das Feuerwerk der Karte); die Funken fliegen
   aus, sinken leicht und verglimmen. Alles liegt vollständig im Bild.
@@ -13,7 +15,7 @@ import sys
 from PIL import Image
 import numpy as np
 from anim_common import rgb, save_outputs
-from flap_common import shear_flap
+from flap_common import shear_flap, fill_pinholes
 
 BODY = np.array(Image.open('src/thalia-the-fun-fairy.png').convert('RGBA')).astype(int)   # inkl. Maske
 SH, SW = BODY.shape[:2]
@@ -26,6 +28,16 @@ WING = np.array([[BODY[y, x, 3] > 0 and tuple(BODY[y, x]) in WING_COLS and (x <=
 FIG = BODY.copy()
 FIG[WING] = 0
 PIVOT = {-1: 5, 1: 12}
+# gehobener Arm (links im Bild): Kontur + Haut von der Schulter (Zeile 12) bis zur Hand
+ARM_COLS = {rgb('311800'), rgb('ffd5a4'), rgb('bd5a39'), rgb('ee9c7b')}
+ARM = [(x, y) for y in range(9, 12) for x in range(1, 6)
+       if BODY[y, x, 3] and tuple(BODY[y, x]) in ARM_COLS]
+SHOULDER_Y = 12
+
+
+def wave_k(i):
+    """Scherung: Hand schwingt zwischen außen (-) und zum Kopf hin (+)."""
+    return [-0.6, -0.3, 0.0, 0.3, 0.0, -0.3][i % 6]
 
 # (Startframe, Mitte x, Mitte y, Farbe hell, Farbe, Farbe dunkel)
 BURSTS = [(0, 8, 10, 'ffd0d0', 'ff4a4a', 'b02020'),
@@ -81,8 +93,15 @@ def frame(i):
     for side in (-1, 1):
         m = WING & ((cols <= 8) if side < 0 else (cols >= 9))
         shear_flap(BODY, m, PIVOT[side], side, lift, sq, out, (PX, PT + dy), curve=1.0)
-    m = FIG[:, :, 3] > 0
-    out[PT + dy:PT + dy + SH, PX:PX + SW][m] = FIG[m]
+    fig = FIG.copy()
+    for x, y in ARM:                                 # Arm lösen (Flügel darunter flattert selbst)
+        fig[y, x] = 0
+    m = fig[:, :, 3] > 0
+    out[PT + dy:PT + dy + SH, PX:PX + SW][m] = fig[m]
+    k = wave_k(i)
+    for x, y in ARM:
+        out[y + PT + dy, x + PX + int(round(k * (SHOULDER_Y - y)))] = BODY[y, x]
+    fill_pinholes(out)
     fireworks(out, i)
     return out
 

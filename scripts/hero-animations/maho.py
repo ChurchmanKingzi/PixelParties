@@ -5,14 +5,14 @@ rechte Figur aus „Ebene #49“, gespiegelt).
 * Das Herzchen in ihrem Haar ploppt auf, löst sich, steigt wackelnd auf und
   verblasst – wie bei Lilly (darunter werden Haar und Kontur ergänzt).
 * Sie wippt fröhlich (Füße bleiben stehen, die Zeile darüber wird gedehnt).
-* Ihre großen roten Schleifen flattern abwechselnd nach außen.
+* Ihre großen roten Schleifen schlagen abwechselnd nach außen aus (die
+  Spitzen werden verlängert, nichts reißt ab).
 """
 import math
 import sys
 from PIL import Image
 import numpy as np
 from anim_common import rgb, save_outputs
-from flap_common import fill_pinholes
 
 SRC = np.array(Image.open('src/maho-the-cute-magical-girl.png').convert('RGBA')).astype(int)
 SH, SW = SRC.shape[:2]
@@ -35,11 +35,19 @@ def bob(i):
     return -1 if (i % 12) in (3, 4, 5, 6, 7) else 0
 
 
-def ribbon_dx(x, y, i):
-    if y > 3 or tuple(SRC[y, x]) not in RIBBON or 4 <= x <= 17:
-        return 0                                       # nur die äußeren Schleifenspitzen
-    side = -1 if x < SW / 2 else 1
-    return side if ((i // 3) % 2 == (0 if side < 0 else 1)) else 0
+def ribbon_flare(out, s, i, b):
+    """Schleifenspitzen (Zeilen 0–3) schlagen abwechselnd 1 px nach außen aus:
+    der äußerste Pixel jeder Reihe wird nach außen verlängert (kein Riss)."""
+    for side in (-1, 1):
+        if (i // 3) % 2 != (0 if side < 0 else 1):
+            continue
+        for y in range(0, 4):
+            xs = [x for x in range(SW) if s[y, x, 3] and tuple(s[y, x]) in RIBBON
+                  and (x < SW / 2 if side < 0 else x >= SW / 2)]
+            if not xs:
+                continue
+            x0 = min(xs) if side < 0 else max(xs)
+            out[y + PT + b, x0 + side + P] = s[y, x0]
 
 
 def draw_heart(out, cx, cy, shape, alpha):
@@ -73,13 +81,13 @@ def frame(i):
     for y in range(SH):
         for x in range(SW):
             if s[y, x, 3]:
-                out[y + PT + (b if y < FEET else 0), x + P + ribbon_dx(x, y, i)] = s[y, x]
+                out[y + PT + (b if y < FEET else 0), x + P] = s[y, x]
     if b:
         y = FEET - 1
         for x in range(SW):
             if s[y, x, 3] and not out[y + PT, x + P, 3]:
                 out[y + PT, x + P] = s[y, x]
-    fill_pinholes(out)                                # Schleifen-Flattern: keine Löcher
+    ribbon_flare(out, s, i, b)
     hearts(out, i, b)
     return out
 
