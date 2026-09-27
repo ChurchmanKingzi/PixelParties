@@ -60,15 +60,24 @@
 //      1-action-per-turn rule, so Coffee / Psychic
 //      Scout / Ghuanjun combo can't lift it.
 //
-//   3) `beforeHeroEffect` cancels every `heal`
-//      effect targeting Mirjam. `increaseMaxHp`
-//      flows through a separate engine path
-//      (line 5060 — direct `hero.maxHp` / `hp`
-//      mutation, no `beforeHeroEffect` fire), so
-//      "they can still be increased" works as
-//      authored. Revival (`actionReviveHero`)
-//      also bypasses the heal hook chain, so
-//      Mirjam can be revived after a KO.
+//   3) „HP cannot be healed in any way" — der
+//      Vertrag `hpCannotBeHealed` (v1467). Die
+//      Engine fragt ihn an EINER Stelle
+//      (`_heroHealBlocked`, dieselbe wie Curse
+//      of Aging): normale Heilung fizzelt,
+//      Wiederbelebungen, die heilen (Cheat Chair,
+//      Elixir of Immortality, Hymn of Rebirth,
+//      Soul Transmigration Ritual, Reincarnation,
+//      Trial of Coolness), bieten Mirjam gar
+//      nicht erst an bzw. verpuffen. Bis v1466
+//      sass die Sperre in einem eigenen
+//      `beforeHeroEffect`-Hook — der deckte nur
+//      `actionHealHero` ab, Cheat Chair kam
+//      daran vorbei (Als Befund 27.9.).
+//      Wiederbelebung MIT FESTEN HP (Resuscitation
+//      Potion, Golden Ankh …) heilt nicht und
+//      bleibt moeglich; `increaseMaxHp` erhoeht
+//      nur („they can still be increased").
 // ═══════════════════════════════════════════
 
 const { hasCardType } = require('./_hooks');
@@ -77,6 +86,9 @@ const CARD_NAME = 'Mirjam, the Fallen Cute Angel';
 
 module.exports = {
   activeIn: ['hero'],
+
+  // „This Hero's HP cannot be healed in any way" — s. Kopf, Punkt 3.
+  hpCannotBeHealed: true,
 
   /**
    * Block additional Attacks beyond the first per turn — applies in
@@ -140,25 +152,6 @@ module.exports = {
         hero: target.name, amount, newAtk: target.atk,
       });
       engine.sync();
-    },
-
-    /**
-     * Heal block. `beforeHeroEffect` cancels via `ctx.cancel()`;
-     * the engine then short-circuits the heal in `_actionHealHeroImpl`
-     * (line 4748). `increaseMaxHp` doesn't fire this hook — it
-     * mutates `hero.maxHp` / `hp` directly — so HP-pool expansions
-     * still work as the card text promises.
-     */
-    beforeHeroEffect: (ctx) => {
-      if (ctx.effectType !== 'heal') return;
-      if (ctx.playerIdx !== ctx.cardOriginalOwner) return;
-      if (ctx.heroIdx !== ctx.cardHeroIdx) return;
-      ctx.cancel();
-      const engine = ctx._engine;
-      const heroName = engine.gs.players[ctx.playerIdx]?.heroes?.[ctx.heroIdx]?.name;
-      engine.log('mirjam_heal_blocked', {
-        hero: heroName, amount: ctx.amount,
-      });
     },
 
     /**

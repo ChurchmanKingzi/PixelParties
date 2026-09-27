@@ -64,7 +64,8 @@ function waehlbareHelden(engine, pi) {
     const h = ps.heroes[hi];
     if (!h?.name || h.hp > 0) continue;
     // v1466: volle Heilung — bei 0 max HP kein Ziel (s. _revive-shared).
-    if (!engine.canReviveHero(h)) continue;
+    // v1467: „healing its HP completely" — nicht heilbare Helden auch nicht.
+    if (!engine.canReviveHero(h, { heilt: true })) continue;
     if (engine._isHeroSpellProtected?.(h, CARD_NAME)) continue;
     out.push(hi);
   }
@@ -182,6 +183,7 @@ module.exports = {
       }
       const ok = await engine.actionReviveHero(pi, ziel.heroIdx, held.maxHp || 0, {
         source: CARD_NAME, animationType: 'undead_revival', animDelay: 900,
+        heilt: true,   // v1467
       });
       if (!ok) {
         engine.log('soul_transmigration_fizzle', { player: ps.username, reason: 'revive_failed' });
