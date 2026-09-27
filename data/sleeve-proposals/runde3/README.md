@@ -36,3 +36,69 @@ zum Motiv passenden Palette mit Edelsteinen. Rahmenpixel = 6 Bildpixel. Übersic
 Erzeugt mit `generator/frames2.py` (Tabelle `R3`: Nr. → Name, Bauform, Palette, Steine).
 Die Shop-Sleeves 2–15 (`data/shop/sleeves/`) haben mit `python3 frames2.py shop` ebenfalls Rahmen bekommen
 (Tabelle `SHOP_FR`; gerendert immer vom Original aus Commit bd5a7c5, sleeve1 unverändert).
+
+## Im Shop
+Alle 60 gerahmten Sleeves liegen als `data/shop/sleeves/sleeve16.png` … `sleeve75.png` im Shop:
+
+| Datei | Name |
+|---|---|
+| sleeve16.png | Lunar New Year |
+| sleeve17.png | Heavenly Throne |
+| sleeve18.png | Guardian Niu |
+| sleeve19.png | Yokai Parade |
+| sleeve20.png | Moonlit Duel |
+| sleeve21.png | Fox Pond |
+| sleeve22.png | Porthole |
+| sleeve23.png | Into the Deep |
+| sleeve24.png | Sirens Song |
+| sleeve25.png | Luau |
+| sleeve26.png | Fire and Storm |
+| sleeve27.png | Aquatic Crest |
+| sleeve28.png | Count of the Deep |
+| sleeve29.png | Lava Diver |
+| sleeve30.png | Steam Crest |
+| sleeve31.png | Dwarf King |
+| sleeve32.png | Hydra Duel |
+| sleeve33.png | White Parade |
+| sleeve34.png | Poison Card |
+| sleeve35.png | T-Rex Breach |
+| sleeve36.png | Skulltop Storm |
+| sleeve37.png | The Summoning |
+| sleeve38.png | Generals Duel |
+| sleeve39.png | Crossing the Alps |
+| sleeve40.png | Blackstaches Bow |
+| sleeve41.png | Weapon Storm |
+| sleeve42.png | Rift in the Sky |
+| sleeve43.png | Fun Fun Circus |
+| sleeve44.png | Dragon Flight |
+| sleeve45.png | Close Encounter |
+| sleeve46.png | Rise of the Phoenix |
+| sleeve47.png | Ladder to the Sky |
+| sleeve48.png | Life Serum |
+| sleeve49.png | Blood Eclipse |
+| sleeve50.png | Rotten Mastermind |
+| sleeve51.png | Vanitas |
+| sleeve52.png | Travelers Portal |
+| sleeve53.png | Class Photo |
+| sleeve54.png | Inferno |
+| sleeve55.png | Angel Mirror |
+| sleeve56.png | Raise the Minions |
+| sleeve57.png | Slime Drive |
+| sleeve58.png | Cybug Case |
+| sleeve59.png | Dragons Hoard |
+| sleeve60.png | Last Round |
+| sleeve61.png | Midnight in London |
+| sleeve62.png | Frozen Throne |
+| sleeve63.png | Trojan Gift |
+| sleeve64.png | Curtain Call |
+| sleeve65.png | Nile Night |
+| sleeve66.png | Circle of Fuses |
+| sleeve67.png | Trident Shrine |
+| sleeve68.png | Dragon Pilot |
+| sleeve69.png | Witching Hour |
+| sleeve70.png | Twin Reapers |
+| sleeve71.png | Heart Bow |
+| sleeve72.png | Exploding Skull |
+| sleeve73.png | Mammoth Trek |
+| sleeve74.png | Qinglong Storm |
+| sleeve75.png | Bone Wyrm |
