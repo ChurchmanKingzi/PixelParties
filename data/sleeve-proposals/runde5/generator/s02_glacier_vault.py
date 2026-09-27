@@ -12,12 +12,13 @@ Quellen:
   MotiveGrailWar.xcf  Ebene 476 „Ebene #139“ – Eisfels-Textur (Eisgrate aus derselben Broghan-Szene), senkrecht
                       16-px-periodisch, daraus die Gewölbewand.
   Motive.xcf          Ebene 739 „Heart of Ice“ – das Artefakt (Karte „Heart of Ice“, Sichtbar Ebene 736).
+  MotiveGrailWar.xcf  Ebene 506 „Ebene #390“ – Eisfunkeln (Karte „Iceage“), zwei der Funken-Sprites.
 Selbst gezeichnet: Lichtführung/Verdunklung der Eiswand, Eiszapfen, Spiegeleis-Boden mit Spiegelungen, Lichthof und
-Strahlen des Herzens, Verlängerung der beiden oberen Ketten bis zur Decke (Kettenglieder im Muster der Figur).
+Lichtsäule des Herzens, Verlängerung der beiden oberen Ketten bis zur Decke (Kettenglieder im Muster der Figur).
 
 Skalierung (Tiefenebenen):
   Hintergrund (Eiswand, Eiszapfen, Spiegeleis hinten)       – 2×-Raster (125×175)
-  Mittelgrund (Heart of Ice mit Lichthof und Strahlen)      – 3×-Raster (84×117)
+  Mittelgrund (Heart of Ice, Lichthof, Lichtsäule, Funkeln) – 3×-Raster (84×117)
   Vordergrund (Broghan, Ketten, seine Spiegelung, Boden)    – 5×-Raster (51×71, um 3 px nach links versetzt,
                                                              damit Broghans Symmetrieachse mittig liegt)
 """
@@ -60,66 +61,73 @@ def comp(dst, src_rgba, k, ox=0, oy=0):
 # ================================================================== Hintergrund 2× (125×175)
 W2, H2 = 125, 175
 HX, HY = 62.5, 39.0           # Herzmitte im 2×-Raster (125, 78 im 250er-Raster)
-HOR = 117                     # Horizont: Wand trifft Spiegeleis (y 234)
-T = ice_texture()
+HOR = 126                     # Horizont: Wand trifft Spiegeleis (y 252, auf Hüfthöhe hinter Broghan)
+T = ice_texture().astype(float)
+T = T.mean((0, 1)) + (T - T.mean((0, 1))) * 0.45          # ruhigere Wand: Kontrast der Kristalle gedämpft
 tex = np.tile(T[:, 96:96 + W2], (H2 // 16 + 2, 1, 1))[:H2]
 bg = np.zeros((H2, W2, 4), np.uint8); bg[..., 3] = 255
 
-NAVY = np.array((10, 14, 34))
+NAVY = np.array((9, 12, 30))
+
+
+def arch(x):
+    """Unterkante der Gewölbedecke (Spitzbogen um das Herz)."""
+    t = abs(x + 0.5 - HX) / HX
+    return 4 + 58 * t ** 2.0
 
 
 def light(x, y):
-    d = math.hypot((x + 0.5 - HX) / 1.0, (y + 0.5 - HY) / 1.15)
-    L = max(0.0, 1 - d / 78.0) ** 1.6
-    return L
+    d = math.hypot((x + 0.5 - HX) / 1.0, (y + 0.5 - HY) / 1.25)
+    return max(0.0, 1 - d / 74.0) ** 1.7
 
 
 for y in range(HOR):
     for x in range(W2):
-        L = light(x, y)
-        # untere Wandzone etwas heller (Gegenlicht vom Spiegeleis)
-        L += 0.10 * max(0, (y - 80) / 37)
-        f = 0.16 + 0.95 * L
-        q = math.floor(f * 6 + BAY[y % 4, x % 4] - 0.5) / 6
-        q = min(max(q, 0.12), 1.05)
-        c = tex[y, x].astype(float)
-        col = NAVY * (1 - q) + c * q
+        L = light(x, y) + 0.07 * max(0, (y - 95) / 31)       # Gegenlicht vom Spiegeleis am Wandfuß
+        f = 0.14 + 1.0 * L
+        if y < arch(x): f *= 0.35                             # Decke liegt im Schatten
+        q = math.floor(f * 10 + BAY[y % 4, x % 4] - 0.5) / 10
+        q = min(max(q, 0.10), 1.05)
+        col = NAVY * (1 - q) + tex[y, x] * q
         bg[y, x, :3] = np.clip(col, 0, 255)
 
-# Eiszapfen an der Gewölbedecke (Silhouetten mit heller Kante)
-top = np.zeros(W2, int)
+# Eiszapfen an der Bogenkante (in der Mitte kurz, zu den Seiten länger)
 x = 0
 while x < W2:
-    w = rnd.choice((3, 4, 5, 6))
-    ln = rnd.choice((4, 6, 8, 10, 13)) + (6 if abs(x - 62) > 34 else 0)
+    w = rnd.choice((3, 4, 5))
+    e = arch(x + w / 2)
+    ln = int(3 + e * 0.30 + rnd.choice((0, 2, 4, 7)))
     for i in range(w):
         xx = x + i
         if xx >= W2: break
         t = abs(i - (w - 1) / 2) / (w / 2)
-        top[xx] = int(ln * (1 - t) + 2)
+        yb = int(arch(xx) + ln * (1 - t))
+        for y in range(0, yb):
+            if y >= arch(xx) - 1 or y < arch(xx):
+                if y >= int(arch(xx)) - 1:
+                    bg[y, xx, :3] = (14, 19, 44)
+        if 0 < yb < H2:
+            bg[yb - 1, xx, :3] = (58, 84, 144) if t < 0.5 else (30, 42, 86)   # Glanzspitze
     x += w
-for x in range(W2):
-    for y in range(0, top[x] + 3):
-        bg[y, x, :3] = (8, 11, 28) if y < top[x] else (18, 26, 58)
-    if 0 < top[x] < H2: bg[top[x] - 1, x, :3] = (46, 70, 128)       # Glanzkante
+for x in range(W2):                                           # Bogenkante: feiner Glanzsaum
+    y = int(arch(x)) - 1
+    if 0 <= y < H2 and light(x, y) > 0.05: bg[y, x, :3] = (40, 60, 112)
 
 # Spiegeleis: Wand gespiegelt, abgedunkelt, mit waagerechten Schlieren
 for y in range(HOR, H2):
     k = y - HOR
     sy = HOR - 1 - k
     for x in range(W2):
-        c = bg[max(sy, 0), x, :3].astype(float) if sy >= 0 else NAVY
-        fade = 0.55 - 0.012 * k
-        col = NAVY * (1 - max(fade, 0.18)) + c * max(fade, 0.18)
-        # glatte Bänder
-        if (k + (x // 9) % 3) % 7 == 0 and k < 40: col = col * 1.18
+        c = bg[max(sy, 0), x, :3].astype(float)
+        fade = max(0.5 - 0.011 * k, 0.16)
+        col = NAVY * (1 - fade) + c * fade
+        if (k + (x // 11) % 3) % 8 == 0 and 2 < k < 36: col = col * 1.15 + 4
         bg[y, x, :3] = np.clip(col, 0, 255)
-# Horizontkante: dünner heller Saum (Schneerand am Wandfuß)
+# Wandfuß: dünner Schneesaum, nur im Lichtkegel hell
 for x in range(W2):
     L = light(x, HOR)
-    c = (150, 176, 226) if L > 0.18 else (86, 110, 170)
-    bg[HOR, x, :3] = c
-    bg[HOR - 1, x, :3] = (62, 88, 150) if (x % 4) else c
+    bg[HOR, x, :3] = (118, 146, 204) if L > 0.12 else (60, 82, 140)
+    bg[HOR + 1, x, :3] = (40, 56, 104)
 
 # ================================================================== Mittelgrund 3× (84×117)
 W3, H3 = 84, 117
@@ -131,19 +139,23 @@ for y in range(H3):
         dx, dy = x + 0.5 - hx3, y + 0.5 - hy3
         d = math.hypot(dx, dy * 1.05)
         a = 0.0
-        if d < 15: a = max(a, 0.55 * (1 - d / 15) ** 1.2)
-        # vier weiche Strahlen (diagonal + senkrecht)
-        ang = math.atan2(dy, dx)
-        for base in (math.pi / 2, -math.pi / 2, math.pi / 4, 3 * math.pi / 4, -math.pi / 4, -3 * math.pi / 4):
-            da = abs((ang - base + math.pi) % (2 * math.pi) - math.pi)
-            wdt = 0.07 if base in (math.pi / 2, -math.pi / 2) else 0.05
-            if da < wdt and 6 < d < 34: a = max(a, 0.28 * (1 - d / 34))
+        if d < 19: a = 0.30 * (1 - d / 19) ** 0.8          # weiter Lichthof
+        if d < 9: a = max(a, 0.62 * (1 - d / 9) ** 0.7)     # heller Kern
+        # zwei breite, weiche Lichtbahnen nach oben/unten (Säule aus Kaltlicht)
+        if abs(dx) < 2.2 - d * 0.02 and 8 < d < 30: a = max(a, 0.22 * (1 - d / 30))
         if a <= 0: continue
         q = math.floor(a * 4 + BAY[y % 4, x % 4]) / 4
         if q <= 0: continue
         col = CY1 if d > 6 else CW
         mid[y, x, :3] = col
         mid[y, x, 3] = int(255 * min(q, 0.75))
+# Eisfunkeln um das Herz (Funken-Sprites aus „Iceage“, MotiveGrailWar Ebene 506)
+sparks = parts(compose('MotiveGrailWar', [506]), dil=0)
+plus, cross = sparks[0], sparks[1]
+for (sp, dx, dy, col) in [(plus, -13, -9, CW), (cross, 10, -12, CY1), (plus, 12, 5, CY1), (cross, -12, 7, CY1)]:
+    y0, x0 = int(hy3 + dy - 2), int(hx3 + dx - 2)
+    mm = sp[..., 3] > 0
+    mid[y0:y0 + 5, x0:x0 + 5][mm] = list(col) + [255]
 # Herz selbst
 hy0, hx0 = int(round(hy3 - 4)), int(round(hx3 - 5))
 m = heart[..., 3] > 0
@@ -158,25 +170,30 @@ FEET = BY + 30                        # Sprite-Zeile 29 = Fußsohle, Zeile 30 = 
 
 # Kettenverlängerung nach oben (Glieder im Muster der Figur: Seitenschienen, Einschnürung alle 4 Zeilen)
 B_, C_, D_ = (89, 89, 89), (137, 137, 137), (160, 160, 160)
-LINK = [  # 4 Zeilen, Spalten 0..3 (entspricht Sprite-Spalten 1..4 links oben)
+LINK = [  # von unten nach oben: flaches Glied (Oval, 4 breit) + hochkant stehendes Glied (1 Spalte)
     [None, B_, C_, None],
-    [C_, None, None, D_],
-    [C_, None, None, D_],
     [B_, None, None, C_],
+    [C_, None, None, D_],
+    [None, B_, C_, None],
+    [None, None, C_, None],
+    [None, None, B_, None],
 ]
 
 
-def chain_up(col0, y_bottom, mirror=False):
+def chain_up(col0, y_bottom, mirror=False, start=0):
     for k, y in enumerate(range(y_bottom, -1, -1)):
-        row = LINK[k % 4]
+        row = LINK[(k + start) % 6]
         if mirror: row = row[::-1]
+        # nach oben ins Dunkel des Gewölbes abgedunkelt (je Glied eine Stufe)
+        f = max(0.40, 1.0 - 0.13 * ((k + start) // 6))
         for i, c in enumerate(row):
             if c is not None and 0 <= y < H5:
-                fg[y, col0 + i, :3] = c; fg[y, col0 + i, 3] = 255
+                col = np.array(c) * f + np.array((14, 20, 44)) * (1 - f) * 0.6
+                fg[y, col0 + i, :3] = np.clip(col, 0, 255); fg[y, col0 + i, 3] = 255
 
 
-chain_up(BX + 1, BY + 0)             # links: über dem Querriegel (Sprite-Zeile 1) weiter nach oben
-chain_up(BX + 38, BY - 1, mirror=True)   # rechts: über dem obersten Glied (Sprite-Zeile 0)
+chain_up(BX + 1, BY + 0, start=4)             # links: über dem Querriegel (Sprite-Zeile 1) weiter nach oben
+chain_up(BX + 38, BY - 1, mirror=True, start=4)   # rechts: über dem obersten Glied (Sprite-Zeile 0)
 
 # Spiegelung im Eis (unter der Fußlinie, gespiegelt, blau abgedunkelt, halbdurchsichtig)
 ref = broghan[:30][::-1]
