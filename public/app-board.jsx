@@ -2375,7 +2375,8 @@ function HeroStatusPartikel({ effekte, kern, s, mitteX, fw, fh, saat }) {
       const z = heroFxZufall(saat + 'gift');
       const n = 5;
       for (let i = 0; i < n; i++) {
-        aus.push({ art: 'schaedel', x: kern.x0 + cw * (0.15 + 0.7 * ((i + z() * 0.8) / n)), y: kern.y0 + ch * (0.12 + z() * 0.2),
+        // v1461: tiefer am Körper (Mitte) statt am Kopf entstehen
+        aus.push({ art: 'schaedel', x: kern.x0 + cw * (0.15 + 0.7 * ((i + z() * 0.8) / n)), y: kern.y0 + ch * (0.4 + z() * 0.25),
           groesse: 10 + z() * 4, dauer: 2.2 + z() * 1.2, verz: (i / n) * 2.6 + z() * 0.4 });
       }
     }
@@ -2397,7 +2398,7 @@ function HeroStatusPartikel({ effekte, kern, s, mitteX, fw, fh, saat }) {
         for (let i = 0; i < n; i++) {
           const zeichen = art === 'cursed' ? (i % 2 ? '💀' : '👻') : (z() < 0.5 ? '❤' : '💕');
           aus.push({ art: 'schaedel', zeichen, x: kern.x0 + cw * (0.12 + 0.76 * ((i + z() * 0.8) / n)),
-            y: kern.y0 + ch * (0.15 + z() * 0.35), groesse: 10 + z() * 5,
+            y: kern.y0 + ch * (0.4 + z() * 0.3), groesse: 10 + z() * 5,
             dauer: 2.0 + z() * 1.2, verz: (i / n) * 2.4 + z() * 0.4 });
         }
       }
@@ -2425,6 +2426,9 @@ function HeroStatusPartikel({ effekte, kern, s, mitteX, fw, fh, saat }) {
         const stil = { ...lage(t.x, t.y), animationDuration: t.dauer + 's', animationDelay: t.verz + 's' };
         if (t.art === 'tropfen') return <span key={i} className="hfx hfx-tropfen" style={stil} />;
         if (t.dreh != null) stil['--hfx-dreh'] = t.dreh + 'deg';
+        // Aufsteigende Schädel/Geister/Herzen (v1461): Steighöhe vom
+        // Entstehungspunkt bis gut über den Kopf, in Kartenpixeln
+        if (t.art === 'schaedel') stil['--hfx-hub'] = Math.round(Math.max(0, t.y - kern.y0) * s + 22);
         if (t.farbe) stil.color = t.farbe;
         const zeichen = t.zeichen || (t.art === 'blitz' ? '⚡' : t.art === 'flamme' ? '🔥' : t.art === 'schaedel' ? '💀' : '✦');
         return (

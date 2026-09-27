@@ -3779,7 +3779,7 @@ body:has(.anim-backdrop) .pp-bg-particles { display: none; }
 @keyframes hfxAufsteigen {
   0%   { opacity: 0; transform: translate(-50%, -50%) scale(.7); }
   15%  { opacity: 1; transform: translate(-50%, -80%) scale(1); }
-  100% { opacity: 0; transform: translate(-50%, calc(-50% - 32px * var(--board-scale))) scale(.9); }
+  100% { opacity: 0; transform: translate(-50%, calc(-50% - var(--hfx-hub, 32) * 1px * var(--board-scale))) scale(.9); }
 }
 /* Berserked / Heal Reversed: Funken steigen auf */
 .hfx-funke { transform: translate(-50%, -50%); animation: hfxFunke 1.8s ease-out infinite; opacity: 0; }
