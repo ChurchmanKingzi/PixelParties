@@ -24027,3 +24027,40 @@ body.pp-dialog-offen .foil-diamond-rare:not(.modal-overlay *) {
   62% { transform: rotateY(90deg) scale(1.08); }
   72%, 100% { transform: rotateY(180deg) scale(1); }
 }
+
+/* ── KOPFZEILEN-KNOEPFE: EINE HOEHE (v1463) ───────────────────────────
+   Als Befund 27.9.: „Die Kopfzeilen-Buttons sind nicht alle gleich hoch —
+   spezifisch ‚Reset‘ und ‚Test Puzzle‘. Alle Buttons, die in einer
+   Kopfzeile existieren, sollen gleich hoch sein!"
+
+   Die Knoepfe hatten keine Hoehe, nur Polster — die Hoehe kam aus dem
+   INHALT. Ein Farb-Emoji (⚔️ in „Test Puzzle") ist in der Emoji-Schrift
+   von Windows hoeher als eine Textzeile, der Knopf wuchs mit; der
+   Lautsprecher (34-px-Icon, eigenes Polster) lag bei 37 px statt 41.
+   Jetzt tragen alle Knoepfe einer Kopfzeile dieselbe feste Hoehe, der
+   Inhalt wird darin senkrecht mittig gesetzt. Das senkrechte Polster
+   faellt weg (`!important`, weil einzelne Knoepfe es inline setzen) —
+   die Hoehe allein bestimmt den Kasten, der waagerechte Abstand bleibt.
+   41 px ist die Hoehe, die ein Standardknopf ohnehin hat (13 px Schrift,
+   10 px Polster, 3 px Rand oben und unten). */
+.top-bar { --kopf-knopf-h: 41px; }
+.top-bar .btn,
+.top-bar .volume-btn {
+  box-sizing: border-box;
+  height: var(--kopf-knopf-h);
+  min-height: 0;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  flex-shrink: 0;
+}
+/* Telefon/schmale Fenster: die Knoepfe sind dort 8 px klein (siehe
+   „Top bar: allow wrapping"); der Lautsprecher zieht mit, sonst
+   ueberragte er die Zeile wie vorher. */
+@media (max-width: 850px) {
+  .top-bar { --kopf-knopf-h: 24px; }
+  .top-bar .volume-btn { font-size: 18px; }
+}
