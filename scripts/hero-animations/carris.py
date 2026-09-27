@@ -57,7 +57,7 @@ CHAIN_X, CHAIN_Y = 4, 8                              # herabhängendes Kettenend
 BLINK = {14: 'halb', 15: 'zu', 16: 'zu', 17: 'halb', 38: 'halb', 39: 'zu', 40: 'zu', 41: 'halb'}
 EAR_TWITCH = {6: 'l', 7: 'l', 30: 'r', 31: 'r'}
 TAP = {20, 21, 24, 25}                               # Fuß hebt sich (hero)
-TAIL = [(x, y) for y in range(9, 15) for x in range(0, 5)] if V == 'little' else []   # senkrechter Teil
+TAIL = [(x, y) for y in range(9, 15) for x in range(0, 4)] if V == 'little' else []   # senkrechter Teil (x4 = Umriss der Hand)
 
 
 def breath(i):
