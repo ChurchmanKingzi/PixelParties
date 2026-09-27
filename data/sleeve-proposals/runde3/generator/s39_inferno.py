@@ -3,18 +3,19 @@
 Felsvorsprung; hinter ihm steigt über dem Lavasee der Dämon aus „Demons Gate“ mit weit ausgebreiteten Flügeln
 auf (Flügel laufen aus dem Bild). Klare Tiefenstaffelung wie in „Count of the Deep“:
   vorne   Dante + Felsvorsprung            5×
-  Mitte   Dämon + Flügel, Lavasee, Flammen 3×
+  Mitte   Dämon + Flügel, Lavasee, Flamme  3×
   hinten  Höhlenhimmel (Dither-Verlauf, selbst erstellt)
 
 Vollständigkeit (Regel B): Die Ebene „DANTE“ [503] (und ihre Kopien 501/502) zeigt Dante ohne Arme. Gesucht
 über alle Ebenen der Datei (Palette/Template-Abgleich, nicht nur Nachbarebenen): Ebene „Ebene #727“ [270]
-ist der vollständige Dante mit Ärmeln und Händen (liegt weit entfernt im Stapel bei „Masters Order“);
-Kopf, Umhang, Gürtel stimmen pixelgleich mit [503] überein. Verwendet wird daher [270].
+(weit oben im Stapel, bei „Masters Order“) ist der vollständige Dante mit Ärmeln und Händen; Haare, Umhang,
+Schärpe und Gürtel entsprechen [503] (Mund geöffnet). Verwendet wird daher [270].
 Der Dämon ist „Demons Gate“ [1496] + Flügel „Demons Gate #2“ [1497], genau so wie in der Kartenszene
 „Sichtbar“ [116] zusammengesetzt (gleiches Koordinatensystem).
 
 Quellen (Motive.xcf): 270 „Ebene #727“ (Dante komplett), 1496 „Demons Gate“, 1497 „Demons Gate #2“ (Flügel),
-1536 „Fireball #3“ (Flammen), 1550 „Lava“ (Lavasee-Textur), 1044 „Hell“ (Felstextur).
+1536 „Fireball #3“ (Flamme). Lavasee und Felsvorsprung selbst gezeichnet (Regel D) in der Palette von
+1550 „Lava“ bzw. 1044 „Hell“.
 """
 import math
 from g_util import *

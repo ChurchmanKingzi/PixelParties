@@ -1,4 +1,4 @@
-# Sleeve-Entwürfe – Runde 3 (50 Stück)
+# Sleeve-Entwürfe – Runde 3 (60 Stück)
 
 Alle Motive sind aus den xcf-Ebenen des Repos **PixelPartiesSprites** gebaut (Figuren pixelgenau, ganzzahlig
 skaliert); Hintergründe stammen aus den xcf-Dateien oder sind schlichte, selbst geditherte Verläufe in Spielfarben.
@@ -15,6 +15,11 @@ mit Idee und Quellen je Sleeve.
 | 33–38 | F | MotiveGN, MotiveArcanum (+ Motive) |
 | 39–45 | G | Motive |
 | 46–50 | H | MotiveBritain, MotiveCoolhalla, MotiveDeri, MotiveIndia, MotiveEgypt |
+| 51–60 | A–H | Runde 3b: zehn neue (51 A, 52 B, 53 C, 54 D, 55–56 E, 57 F, 58–59 G, 60 H) |
+
+Runde 3b: alle Sleeves außer den Nutzer-Favoriten 07, 13, 34 und 43 nach den Regeln in `BRIEF.md`
+(„Runde 3b“: einheitliche Pixelgröße, vollständige Figuren, korrekte Positionierung, eigene Effekte)
+überarbeitet; die Notizdateien nennen pro Sleeve die Skalierung.
 
 ## Generator
 `generator/sNN_*.py` erzeugt jeweils ein Sleeve (aus `generator/` ausführen). `common.py` bindet die Werkzeuge
