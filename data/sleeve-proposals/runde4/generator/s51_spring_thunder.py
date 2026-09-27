@@ -73,41 +73,39 @@ def put(s, x, y):
     m = src[..., 3] > 0; dst[m] = src[m]
 
 drag = sprite('r4q_qinglong', B, [1521, 1522, 1526])   # Ursprung (230, 247) in Motive
-# Bart: in der Ebene am Kartenrand flach abgeschnitten (Zeile 54) – hier als langer, wallender Bart aus
-# einzelnen Strähnen weitergezeichnet, in den Grautönen des Originalbarts (Kontur 128, Strähnen 179/204,
-# Glanz 242), im Raster des Drachen. Die Strähnen schwingen gemeinsam in einer S-Welle und laufen spitz aus.
-BEARD_LEN = 34
+# Bart: in der Ebene am Kartenrand flach abgeschnitten (Zeile 54). Ab Zeile 50 wird er als eine durchgehende,
+# wallende Form weitergezeichnet, die nahtlos an Breite und Zeilenaufbau des Originals anschließt
+# (je Zeile: Kontur 128 | 2× Mittelgrau 179 | heller Kern 204 | Mittelgrau | Kontur): die Mittellinie schwingt
+# ohne Knick aus der Senkrechten in eine S-Welle, die Breite nimmt gleichmäßig bis zu einer 1-Pixel-Spitze ab.
+# Im hellen Kern laufen zwei Strähnenlinien (Glanz 242, Mittelgrau) mit der Welle mit.
+BEARD_LEN = 28
 ext = np.zeros((drag.shape[0] + BEARD_LEN, drag.shape[1], 4), np.uint8)
 ext[:drag.shape[0]] = drag
-ext[53:, 16:36] = 0                                     # abgeschnittenes Bartende entfernen (inkl. Einzelstrang)
-G_OUT, G_MID, G_LIGHT, G_HI = (128, 128, 128), (179, 179, 179), (204, 204, 204), (242, 242, 242)
 Y0 = 50
-starts = np.arange(21, 31)                              # Strähnenansätze über die Bartbreite (Zeile 50)
-for j, x0 in enumerate(starts):
-    length = BEARD_LEN + 1 - abs(j - 4.5) * 1.6 - (j % 3) * 2
-    col = [G_LIGHT, G_MID, G_LIGHT, G_HI, G_MID][j % 5]
-    for y in range(Y0, int(Y0 + length)):
-        t = (y - Y0) / BEARD_LEN
-        spread = 0.55 * np.sin(np.pi * min(1, t * 1.4)) - 0.75 * t    # unterm Kinn aufbauschen, dann zusammen
-        sway = 6.0 * np.sin(t * 5.6 - 0.5 + j * 0.05) * t ** 0.8        # wallende S-Welle, unten stärker
-        x = int(round(x0 + (x0 - 25.5) * spread + sway))
-        if 0 <= x < ext.shape[1]:
-            if ext[y, x, 3] == 0 or y >= 53:
-                ext[y, x, :3] = col; ext[y, x, 3] = 255
-# Lücken zwischen den Strähnen schließen (Bart ist eine Fläche), dann dunkle Kontur außen
-m = ext[..., 3] > 0
-reg = np.zeros_like(m); reg[53:] = True
-for y in range(53, 53 + int(BEARD_LEN * 0.62)):
-    xs = np.where(m[y, 8:44])[0] + 8
-    if len(xs) > 1:
-        for x in range(xs.min(), xs.max() + 1):
-            if not m[y, x]:
-                ext[y, x, :3] = G_MID; ext[y, x, 3] = 255
-m = ext[..., 3] > 0
-edge = np.zeros_like(m)
-edge[1:] |= m[:-1]; edge[:-1] |= m[1:]; edge[:, 1:] |= m[:, :-1]; edge[:, :-1] |= m[:, 1:]
-edge &= ~m & reg
-ext[edge, :3] = G_OUT; ext[edge, 3] = 255
+ext[Y0:, 16:36] = 0                                     # Original ab Zeile 50 (inkl. abgeschnittenem Ende) ersetzen
+G_OUT, G_MID, G_LIGHT, G_HI = (128, 128, 128), (179, 179, 179), (204, 204, 204), (242, 242, 242)
+N = BEARD_LEN + (drag.shape[0] - Y0) - 1                # Anzahl neuer Zeilen
+for i in range(N):
+    y = Y0 + i
+    t = i / (N - 1)
+    c = 24.5 + 6.5 * np.sin(2 * np.pi * 0.85 * t) * t ** 1.3       # Mittellinie: startet senkrecht, schwingt aus
+    h = 5.0 * (1 - t) ** 0.75 + 0.5 * t                              # halbe Breite: 5 (wie Zeile 50) → 0,5 (Spitze)
+    L, R = int(round(c - h)), int(round(c + h)) - 1
+    if R < L: R = L
+    w = R - L + 1
+    for x in range(L, R + 1):
+        k = x - L
+        if w <= 2: col = G_OUT if (w == 1 or k == 0) else G_MID
+        elif k == 0 or k == w - 1: col = G_OUT
+        elif k <= 2 and w >= 7 or k == 1: col = G_MID
+        elif k == w - 2: col = G_MID
+        else: col = G_LIGHT
+        ext[y, x, :3] = col; ext[y, x, 3] = 255
+    # Strähnen im hellen Kern: Glanzlinie und Mittelgrau-Linie laufen mit der Welle
+    if w >= 7 and 3 < i < N - 6:
+        u1, u2 = L + int(round((w - 1) * 0.45)), L + int(round((w - 1) * 0.68))
+        if (i // 5) % 3 != 2: ext[y, u1, :3] = G_HI
+        if (i // 4) % 3 == 1: ext[y, u2, :3] = G_MID
 drag = ext
 bolts = sprite('r4q_bolts', B, [1525])                  # Ursprung (234, 253)
 cloud = sprite('r4q_cloud', B, [1527])                  # Ursprung (218, 234)
