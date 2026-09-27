@@ -1,0 +1,380 @@
+{
+  "_comment": "Anzeigenamen der Shop-Sleeves (id = Dateiname ohne .png). formerId = alte Nummern-ID; der Server migriert gekaufte/ausgerüstete Sleeves beim Start einmalig auf die neue ID.",
+  "sleeves": [
+    {
+      "id": "pixel-parties",
+      "name": "Pixel Parties",
+      "formerId": "sleeve1"
+    },
+    {
+      "id": "monster-handler",
+      "name": "Monster Handler",
+      "formerId": "sleeve2"
+    },
+    {
+      "id": "blue-grin",
+      "name": "Blue Grin",
+      "formerId": "sleeve3"
+    },
+    {
+      "id": "deepsea-awakening",
+      "name": "Deepsea Awakening",
+      "formerId": "sleeve4"
+    },
+    {
+      "id": "the-eye-sees-you",
+      "name": "The Eye Sees You",
+      "formerId": "sleeve5"
+    },
+    {
+      "id": "future-tech-blueprint",
+      "name": "Future Tech Blueprint",
+      "formerId": "sleeve6"
+    },
+    {
+      "id": "wowhalla",
+      "name": "Wowhalla",
+      "formerId": "sleeve7"
+    },
+    {
+      "id": "king-of-kings",
+      "name": "King of Kings",
+      "formerId": "sleeve8"
+    },
+    {
+      "id": "lunatic-cycle",
+      "name": "Lunatic Cycle",
+      "formerId": "sleeve9"
+    },
+    {
+      "id": "pixel-pocket",
+      "name": "Pixel Pocket",
+      "formerId": "sleeve10"
+    },
+    {
+      "id": "wanted-blackstache",
+      "name": "Wanted: Blackstache",
+      "formerId": "sleeve11"
+    },
+    {
+      "id": "the-church-of-the-light",
+      "name": "The Church of the Light",
+      "formerId": "sleeve12"
+    },
+    {
+      "id": "slime-jar",
+      "name": "Slime Jar",
+      "formerId": "sleeve13"
+    },
+    {
+      "id": "skullmael-xiii",
+      "name": "Skullmael XIII",
+      "formerId": "sleeve14"
+    },
+    {
+      "id": "doom-clock",
+      "name": "Doom Clock",
+      "formerId": "sleeve15"
+    },
+    {
+      "id": "lunar-new-year",
+      "name": "Lunar New Year",
+      "formerId": "sleeve16"
+    },
+    {
+      "id": "heavenly-throne",
+      "name": "Heavenly Throne",
+      "formerId": "sleeve17"
+    },
+    {
+      "id": "guardian-niu",
+      "name": "Guardian Niu",
+      "formerId": "sleeve18"
+    },
+    {
+      "id": "yokai-parade",
+      "name": "Yokai Parade",
+      "formerId": "sleeve19"
+    },
+    {
+      "id": "moonlit-duel",
+      "name": "Moonlit Duel",
+      "formerId": "sleeve20"
+    },
+    {
+      "id": "fox-pond",
+      "name": "Fox Pond",
+      "formerId": "sleeve21"
+    },
+    {
+      "id": "porthole",
+      "name": "Porthole",
+      "formerId": "sleeve22"
+    },
+    {
+      "id": "into-the-deep",
+      "name": "Into the Deep",
+      "formerId": "sleeve23"
+    },
+    {
+      "id": "sirens-song",
+      "name": "Siren's Song",
+      "formerId": "sleeve24"
+    },
+    {
+      "id": "luau",
+      "name": "Luau",
+      "formerId": "sleeve25"
+    },
+    {
+      "id": "fire-and-storm",
+      "name": "Fire and Storm",
+      "formerId": "sleeve26"
+    },
+    {
+      "id": "aquatic-crest",
+      "name": "Aquatic Crest",
+      "formerId": "sleeve27"
+    },
+    {
+      "id": "count-of-the-deep",
+      "name": "Count of the Deep",
+      "formerId": "sleeve28"
+    },
+    {
+      "id": "lava-diver",
+      "name": "Lava Diver",
+      "formerId": "sleeve29"
+    },
+    {
+      "id": "steam-crest",
+      "name": "Steam Crest",
+      "formerId": "sleeve30"
+    },
+    {
+      "id": "dwarf-king",
+      "name": "Dwarf King",
+      "formerId": "sleeve31"
+    },
+    {
+      "id": "hydra-duel",
+      "name": "Hydra Duel",
+      "formerId": "sleeve32"
+    },
+    {
+      "id": "white-parade",
+      "name": "White Parade",
+      "formerId": "sleeve33"
+    },
+    {
+      "id": "poison-card",
+      "name": "Poison Card",
+      "formerId": "sleeve34"
+    },
+    {
+      "id": "t-rex-breach",
+      "name": "T-Rex Breach",
+      "formerId": "sleeve35"
+    },
+    {
+      "id": "skulltop-storm",
+      "name": "Skulltop Storm",
+      "formerId": "sleeve36"
+    },
+    {
+      "id": "the-summoning",
+      "name": "The Summoning",
+      "formerId": "sleeve37"
+    },
+    {
+      "id": "generals-duel",
+      "name": "Generals' Duel",
+      "formerId": "sleeve38"
+    },
+    {
+      "id": "crossing-the-alps",
+      "name": "Crossing the Alps",
+      "formerId": "sleeve39"
+    },
+    {
+      "id": "blackstaches-bow",
+      "name": "Blackstache's Bow",
+      "formerId": "sleeve40"
+    },
+    {
+      "id": "weapon-storm",
+      "name": "Weapon Storm",
+      "formerId": "sleeve41"
+    },
+    {
+      "id": "rift-in-the-sky",
+      "name": "Rift in the Sky",
+      "formerId": "sleeve42"
+    },
+    {
+      "id": "fun-fun-circus",
+      "name": "Fun-Fun Circus",
+      "formerId": "sleeve43"
+    },
+    {
+      "id": "dragon-flight",
+      "name": "Dragon Flight",
+      "formerId": "sleeve44"
+    },
+    {
+      "id": "close-encounter",
+      "name": "Close Encounter",
+      "formerId": "sleeve45"
+    },
+    {
+      "id": "rise-of-the-phoenix",
+      "name": "Rise of the Phoenix",
+      "formerId": "sleeve46"
+    },
+    {
+      "id": "ladder-to-the-sky",
+      "name": "Ladder to the Sky",
+      "formerId": "sleeve47"
+    },
+    {
+      "id": "life-serum",
+      "name": "Life Serum",
+      "formerId": "sleeve48"
+    },
+    {
+      "id": "blood-eclipse",
+      "name": "Blood Eclipse",
+      "formerId": "sleeve49"
+    },
+    {
+      "id": "rotten-mastermind",
+      "name": "Rotten Mastermind",
+      "formerId": "sleeve50"
+    },
+    {
+      "id": "vanitas",
+      "name": "Vanitas",
+      "formerId": "sleeve51"
+    },
+    {
+      "id": "travelers-portal",
+      "name": "Traveler's Portal",
+      "formerId": "sleeve52"
+    },
+    {
+      "id": "class-photo",
+      "name": "Class Photo",
+      "formerId": "sleeve53"
+    },
+    {
+      "id": "inferno",
+      "name": "Inferno",
+      "formerId": "sleeve54"
+    },
+    {
+      "id": "angels-mirror",
+      "name": "Angel's Mirror",
+      "formerId": "sleeve55"
+    },
+    {
+      "id": "raise-the-minions",
+      "name": "Raise the Minions",
+      "formerId": "sleeve56"
+    },
+    {
+      "id": "slime-drive",
+      "name": "Slime Drive",
+      "formerId": "sleeve57"
+    },
+    {
+      "id": "cybug-case",
+      "name": "Cybug Case",
+      "formerId": "sleeve58"
+    },
+    {
+      "id": "dragons-hoard",
+      "name": "Dragon's Hoard",
+      "formerId": "sleeve59"
+    },
+    {
+      "id": "last-round",
+      "name": "Last Round",
+      "formerId": "sleeve60"
+    },
+    {
+      "id": "midnight-in-london",
+      "name": "Midnight in London",
+      "formerId": "sleeve61"
+    },
+    {
+      "id": "frozen-throne",
+      "name": "Frozen Throne",
+      "formerId": "sleeve62"
+    },
+    {
+      "id": "trojan-gift",
+      "name": "Trojan Gift",
+      "formerId": "sleeve63"
+    },
+    {
+      "id": "curtain-call",
+      "name": "Curtain Call",
+      "formerId": "sleeve64"
+    },
+    {
+      "id": "nile-night",
+      "name": "Nile Night",
+      "formerId": "sleeve65"
+    },
+    {
+      "id": "circle-of-fuses",
+      "name": "Circle of Fuses",
+      "formerId": "sleeve66"
+    },
+    {
+      "id": "trident-shrine",
+      "name": "Trident Shrine",
+      "formerId": "sleeve67"
+    },
+    {
+      "id": "dragon-pilot",
+      "name": "Dragon Pilot",
+      "formerId": "sleeve68"
+    },
+    {
+      "id": "witching-hour",
+      "name": "Witching Hour",
+      "formerId": "sleeve69"
+    },
+    {
+      "id": "twin-reapers",
+      "name": "Twin Reapers",
+      "formerId": "sleeve70"
+    },
+    {
+      "id": "heart-bow",
+      "name": "Heart Bow",
+      "formerId": "sleeve71"
+    },
+    {
+      "id": "exploding-skull",
+      "name": "Exploding Skull",
+      "formerId": "sleeve72"
+    },
+    {
+      "id": "mammoth-trek",
+      "name": "Mammoth Trek",
+      "formerId": "sleeve73"
+    },
+    {
+      "id": "qinglong-storm",
+      "name": "Qinglong Storm",
+      "formerId": "sleeve74"
+    },
+    {
+      "id": "bone-wyrm",
+      "name": "Bone Wyrm",
+      "formerId": "sleeve75"
+    }
+  ]
+}

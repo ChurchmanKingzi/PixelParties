@@ -1140,6 +1140,17 @@ async function initDatabase() {
     UNIQUE(user_id, item_type, item_id)
   )`);
   await db.execute('CREATE INDEX IF NOT EXISTS idx_shop_items_user ON user_shop_items(user_id)');
+  // Sleeves heißen nicht mehr "sleeveN", sondern tragen englische Namen
+  // (data/shop/sleeve-names.json). Gekaufte und ausgerüstete Sleeves auf die
+  // neue ID umschreiben — idempotent, läuft bei jedem Start ohne Wirkung weiter.
+  for (const e of loadSleeveNames()) {
+    if (!e.formerId || e.formerId === e.id) continue;
+    try {
+      await db.run("UPDATE OR IGNORE user_shop_items SET item_id = ? WHERE item_type = 'sleeve' AND item_id = ?", [e.id, e.formerId]);
+      await db.run("DELETE FROM user_shop_items WHERE item_type = 'sleeve' AND item_id = ?", [e.formerId]);
+      await db.run('UPDATE users SET cardback = ? WHERE cardback = ?', ['/data/shop/sleeves/' + e.id + '.png', '/data/shop/sleeves/' + e.formerId + '.png']);
+    } catch (err) { console.error('[Shop] Sleeve-Migration', e.formerId, '->', e.id, 'fehlgeschlagen:', err.message); }
+  }
 
   // Puzzle completions table
   await db.execute(`CREATE TABLE IF NOT EXISTS puzzle_completions (
@@ -3468,6 +3479,21 @@ const STRUCTURE_DECK_PRICE = 50;
 const STRUCTURE_DECK_RANDOM_PRICE = 25;
 
 // Scan a shop directory and return available items
+// Anzeigenamen der Shop-Sleeves (data/shop/sleeve-names.json: id -> name,
+// formerId = alte Nummern-ID "sleeveN"). Fehlt ein Eintrag, wird der Name
+// aus der ID gebildet ("blood-eclipse" -> "Blood Eclipse").
+function loadSleeveNames() {
+  try {
+    const doc = JSON.parse(fs.readFileSync(path.join(__dirname, 'data', 'shop', 'sleeve-names.json'), 'utf8'));
+    return Array.isArray(doc.sleeves) ? doc.sleeves : [];
+  } catch { return []; }
+}
+const SLEEVE_NAME_ENTRIES = loadSleeveNames();
+const SLEEVE_NAMES = Object.fromEntries(SLEEVE_NAME_ENTRIES.map(e => [e.id, e.name]));
+function sleeveDisplayName(id) {
+  return SLEEVE_NAMES[id] || String(id).split(/[-_ ]+/).map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+}
+
 function scanShopDir(subdir) {
   const dir = path.join(__dirname, 'data', 'shop', subdir);
   try {
@@ -3512,7 +3538,10 @@ function getAvailableSkins() {
 // GET /api/shop/catalog — all available shop items
 app.get('/api/shop/catalog', (req, res) => {
   const avatars = scanShopDir('avatars').map(f => ({ id: path.basename(f, path.extname(f)), file: f }));
-  const sleeves = scanShopDir('sleeves').map(f => ({ id: path.basename(f, path.extname(f)), file: f }));
+  const sleeves = scanShopDir('sleeves').map(f => {
+    const id = path.basename(f, path.extname(f));
+    return { id, file: f, name: sleeveDisplayName(id) };
+  }).sort((a, b) => a.name.localeCompare(b.name));
   const boards = scanShopDir('boards').filter(f => /^board\d+\./i.test(f)).map(f => ({ id: path.basename(f, path.extname(f)), file: f }));
 
   // Skins: only for heroes whose cards exist in ./cards
@@ -3552,7 +3581,8 @@ app.get('/api/shop/owned', authMiddleware, async (req, res) => {
   for (const r of rows) {
     if (owned[r.item_type]) owned[r.item_type].push(r.item_id);
   }
-  res.json({ owned });
+  const names = { sleeve: Object.fromEntries(owned.sleeve.map(id => [id, sleeveDisplayName(id)])) };
+  res.json({ owned, names });
 });
 
 // POST /api/shop/buy — buy a specific item

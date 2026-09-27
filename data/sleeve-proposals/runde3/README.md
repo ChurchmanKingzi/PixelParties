@@ -38,67 +38,69 @@ Die Shop-Sleeves 2–15 (`data/shop/sleeves/`) haben mit `python3 frames2.py sho
 (Tabelle `SHOP_FR`; gerendert immer vom Original aus Commit bd5a7c5, sleeve1 unverändert).
 
 ## Im Shop
-Alle 60 gerahmten Sleeves liegen als `data/shop/sleeves/sleeve16.png` … `sleeve75.png` im Shop:
+Alle Shop-Sleeves tragen englische Namen: Datei `data/shop/sleeves/<id>.png`, Anzeigename in
+`data/shop/sleeve-names.json` (dort auch die alte Nummern-ID `formerId`; der Server migriert Käufe und
+ausgerüstete Sleeves beim Start). Die 60 Sleeves dieser Runde:
 
 | Datei | Name |
 |---|---|
-| sleeve16.png | Lunar New Year |
-| sleeve17.png | Heavenly Throne |
-| sleeve18.png | Guardian Niu |
-| sleeve19.png | Yokai Parade |
-| sleeve20.png | Moonlit Duel |
-| sleeve21.png | Fox Pond |
-| sleeve22.png | Porthole |
-| sleeve23.png | Into the Deep |
-| sleeve24.png | Sirens Song |
-| sleeve25.png | Luau |
-| sleeve26.png | Fire and Storm |
-| sleeve27.png | Aquatic Crest |
-| sleeve28.png | Count of the Deep |
-| sleeve29.png | Lava Diver |
-| sleeve30.png | Steam Crest |
-| sleeve31.png | Dwarf King |
-| sleeve32.png | Hydra Duel |
-| sleeve33.png | White Parade |
-| sleeve34.png | Poison Card |
-| sleeve35.png | T-Rex Breach |
-| sleeve36.png | Skulltop Storm |
-| sleeve37.png | The Summoning |
-| sleeve38.png | Generals Duel |
-| sleeve39.png | Crossing the Alps |
-| sleeve40.png | Blackstaches Bow |
-| sleeve41.png | Weapon Storm |
-| sleeve42.png | Rift in the Sky |
-| sleeve43.png | Fun Fun Circus |
-| sleeve44.png | Dragon Flight |
-| sleeve45.png | Close Encounter |
-| sleeve46.png | Rise of the Phoenix |
-| sleeve47.png | Ladder to the Sky |
-| sleeve48.png | Life Serum |
-| sleeve49.png | Blood Eclipse |
-| sleeve50.png | Rotten Mastermind |
-| sleeve51.png | Vanitas |
-| sleeve52.png | Travelers Portal |
-| sleeve53.png | Class Photo |
-| sleeve54.png | Inferno |
-| sleeve55.png | Angel Mirror |
-| sleeve56.png | Raise the Minions |
-| sleeve57.png | Slime Drive |
-| sleeve58.png | Cybug Case |
-| sleeve59.png | Dragons Hoard |
-| sleeve60.png | Last Round |
-| sleeve61.png | Midnight in London |
-| sleeve62.png | Frozen Throne |
-| sleeve63.png | Trojan Gift |
-| sleeve64.png | Curtain Call |
-| sleeve65.png | Nile Night |
-| sleeve66.png | Circle of Fuses |
-| sleeve67.png | Trident Shrine |
-| sleeve68.png | Dragon Pilot |
-| sleeve69.png | Witching Hour |
-| sleeve70.png | Twin Reapers |
-| sleeve71.png | Heart Bow |
-| sleeve72.png | Exploding Skull |
-| sleeve73.png | Mammoth Trek |
-| sleeve74.png | Qinglong Storm |
-| sleeve75.png | Bone Wyrm |
+| lunar-new-year.png | Lunar New Year |
+| heavenly-throne.png | Heavenly Throne |
+| guardian-niu.png | Guardian Niu |
+| yokai-parade.png | Yokai Parade |
+| moonlit-duel.png | Moonlit Duel |
+| fox-pond.png | Fox Pond |
+| porthole.png | Porthole |
+| into-the-deep.png | Into the Deep |
+| sirens-song.png | Siren's Song |
+| luau.png | Luau |
+| fire-and-storm.png | Fire and Storm |
+| aquatic-crest.png | Aquatic Crest |
+| count-of-the-deep.png | Count of the Deep |
+| lava-diver.png | Lava Diver |
+| steam-crest.png | Steam Crest |
+| dwarf-king.png | Dwarf King |
+| hydra-duel.png | Hydra Duel |
+| white-parade.png | White Parade |
+| poison-card.png | Poison Card |
+| t-rex-breach.png | T-Rex Breach |
+| skulltop-storm.png | Skulltop Storm |
+| the-summoning.png | The Summoning |
+| generals-duel.png | Generals' Duel |
+| crossing-the-alps.png | Crossing the Alps |
+| blackstaches-bow.png | Blackstache's Bow |
+| weapon-storm.png | Weapon Storm |
+| rift-in-the-sky.png | Rift in the Sky |
+| fun-fun-circus.png | Fun-Fun Circus |
+| dragon-flight.png | Dragon Flight |
+| close-encounter.png | Close Encounter |
+| rise-of-the-phoenix.png | Rise of the Phoenix |
+| ladder-to-the-sky.png | Ladder to the Sky |
+| life-serum.png | Life Serum |
+| blood-eclipse.png | Blood Eclipse |
+| rotten-mastermind.png | Rotten Mastermind |
+| vanitas.png | Vanitas |
+| travelers-portal.png | Traveler's Portal |
+| class-photo.png | Class Photo |
+| inferno.png | Inferno |
+| angels-mirror.png | Angel's Mirror |
+| raise-the-minions.png | Raise the Minions |
+| slime-drive.png | Slime Drive |
+| cybug-case.png | Cybug Case |
+| dragons-hoard.png | Dragon's Hoard |
+| last-round.png | Last Round |
+| midnight-in-london.png | Midnight in London |
+| frozen-throne.png | Frozen Throne |
+| trojan-gift.png | Trojan Gift |
+| curtain-call.png | Curtain Call |
+| nile-night.png | Nile Night |
+| circle-of-fuses.png | Circle of Fuses |
+| trident-shrine.png | Trident Shrine |
+| dragon-pilot.png | Dragon Pilot |
+| witching-hour.png | Witching Hour |
+| twin-reapers.png | Twin Reapers |
+| heart-bow.png | Heart Bow |
+| exploding-skull.png | Exploding Skull |
+| mammoth-trek.png | Mammoth Trek |
+| qinglong-storm.png | Qinglong Storm |
+| bone-wyrm.png | Bone Wyrm |
