@@ -1799,7 +1799,30 @@ const HeroIdleAnims = (() => {
           if (ly < kopfBis) { summe += lx + 0.5; n++; }
         }
       }
-      return { x0, y0, x1, y1, kopfX: n ? summe / n : (x0 + x1) / 2 };
+      // ★ v1459: Körperpunkte für Status-Partikel (Flammen, Tropfen):
+      // Pixel, die in mindestens 60 % der Frames deckend sind — dort ist
+      // die Figur „fest", Partikel bleiben also auf dem Körper, auch wenn
+      // sie sich bewegt. Höchstens 400, fest verwürfelt.
+      const frames = Math.max(1, meta.frames | 0);
+      const zaehler = new Uint16Array(fw * fh);
+      for (let y = 0; y < h; y++) {
+        for (let x = 0; x < w; x++) {
+          if (d[(y * w + x) * 4 + 3] < 160) continue;
+          const lx = vertikal ? x : x % fw, ly = vertikal ? y % fh : y;
+          zaehler[ly * fw + lx]++;
+        }
+      }
+      let punkte = [];
+      const schwelle = Math.max(1, Math.round(frames * 0.6));
+      for (let i = 0; i < zaehler.length; i++) if (zaehler[i] >= schwelle) punkte.push([i % fw, Math.floor(i / fw)]);
+      let saat = (fw * 2654435761) ^ (fh * 40503);
+      for (let i = punkte.length - 1; i > 0; i--) {
+        saat = (Math.imul(saat, 1103515245) + 12345) | 0;
+        const j = ((saat >>> 8) & 0xffffff) % (i + 1);
+        const t = punkte[i]; punkte[i] = punkte[j]; punkte[j] = t;
+      }
+      punkte = punkte.slice(0, 400);
+      return { x0, y0, x1, y1, kopfX: n ? summe / n : (x0 + x1) / 2, punkte };
     } catch { return rueckfall; }
   }
 
@@ -2221,6 +2244,177 @@ function HeroEiskruste({ quelleRef, breite, hoehe, fussY, stil, schmilzt }) {
     className={'hero-idle-eis' + (schmilzt ? ' hero-idle-eis-schmilzt' : '')} style={stil} />;
 }
 
+// ═══════════════════════════════════════════
+//  ★ v1459 — STATUSEFFEKTE AN DEN FIGUREN (Als Vorgabe 27.9.: „auch die
+//  anderen Statuseffekte auf die Sprites anwenden. Stunned kleine Blitze
+//  um den Sprite herum, Burned Flammen überall auf dem Sprite, Poisoned
+//  ein lilaner Tint und kleine Totenschädel, die über dem Sprite
+//  aufsteigen usw.").
+//  Die Karten-Overlays bleiben; große Figuren verdecken sie aber, darum
+//  zeigt die Figur ihre Status selbst:
+//    Tönung (im Canvas, nur auf den Pixeln der Figur): Poisoned lila,
+//      Burned warm-orange, Berserked rot, Heal Reversed giftgrün,
+//      Negated entsättigt.
+//    Partikel (Effekt-Ebene, steht aufrecht wie die Figur, schneidet
+//      nichts ab): Stunned Blitze um Kopf und Oberkörper, Burned Flammen
+//      auf dem Körper, Poisoned aufsteigende Totenschädel, Bleeding
+//      fallende Blutstropfen, Berserked dunkle Funken, Heal Reversed
+//      grün-violette Funken mit Schädeln, Webbed ein rotes Netz.
+//  Frozen (Eiskruste) und Petrified (Stein) haben eigene Wege.
+// ═══════════════════════════════════════════
+const HERO_TOENUNGEN = [
+  { status: 'negated',      grau: 0.8 },
+  { status: 'poisoned',     farbe: 'rgba(150,60,215,0.38)' },
+  { status: 'burned',       farbe: 'rgba(255,110,30,0.2)' },
+  { status: 'berserked',    farbe: 'rgba(205,25,40,0.24)' },
+  { status: 'healReversed', farbe: 'rgba(110,255,150,0.14)' },
+];
+
+// kleiner fester Zufall je Figur und Effekt
+function heroFxZufall(saatText) {
+  let h = 2166136261;
+  for (const ch of saatText) { h ^= ch.charCodeAt(0); h = Math.imul(h, 16777619); }
+  return () => {
+    h = (h + 0x6D2B79F5) | 0;
+    let t = Math.imul(h ^ (h >>> 15), 1 | h);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+// Pixel-Spinnennetz über dem Umriss der Figur (Webbed)
+function maleNetz(ctx, w, h, kern, mitteX) {
+  const bild = ctx.createImageData(w, h);
+  const d = bild.data;
+  const setze = (x, y, a) => {
+    x = Math.round(x); y = Math.round(y);
+    if (x < 0 || y < 0 || x >= w || y >= h) return;
+    const i = (y * w + x) * 4;
+    d[i] = 200; d[i + 1] = 24; d[i + 2] = 44; d[i + 3] = Math.max(d[i + 3], Math.round(a * 255));
+  };
+  const linie = (x0, y0, x1, y1, a) => {
+    const n = Math.max(1, Math.ceil(Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0))));
+    for (let k = 0; k <= n; k++) setze(x0 + (x1 - x0) * k / n, y0 + (y1 - y0) * k / n, a);
+  };
+  const bx0 = Math.max(0, kern.x0 - 2), bx1 = Math.min(w - 1, kern.x1 + 1);
+  const by0 = Math.max(0, kern.y0 - 2), by1 = Math.min(h - 1, kern.y1);
+  const cx = Math.min(bx1, Math.max(bx0, mitteX)), cy = by0 + (by1 - by0) * 0.38;
+  const speichen = 10, enden = [];
+  for (let k = 0; k < speichen; k++) {
+    const a = (k / speichen) * Math.PI * 2 + 0.2;
+    const dx = Math.cos(a), dy = Math.sin(a);
+    // bis zum Rand des Kastens
+    const tx = dx > 0 ? (bx1 - cx) / dx : dx < 0 ? (bx0 - cx) / dx : 1e9;
+    const ty = dy > 0 ? (by1 - cy) / dy : dy < 0 ? (by0 - cy) / dy : 1e9;
+    const t = Math.min(tx, ty);
+    enden.push([cx + dx * t, cy + dy * t]);
+    linie(cx, cy, cx + dx * t, cy + dy * t, 0.85);
+  }
+  for (const f of [0.22, 0.45, 0.7, 0.92]) {
+    for (let k = 0; k < speichen; k++) {
+      const [ax, ay] = enden[k], [bx, by] = enden[(k + 1) % speichen];
+      const p0 = [cx + (ax - cx) * f, cy + (ay - cy) * f], p1 = [cx + (bx - cx) * f, cy + (by - cy) * f];
+      // leicht durchhängend: über einen zur Mitte gezogenen Zwischenpunkt
+      const mx = (p0[0] + p1[0]) / 2, my = (p0[1] + p1[1]) / 2;
+      const zx = mx + (cx - mx) * 0.12, zy = my + (cy - my) * 0.12;
+      linie(p0[0], p0[1], zx, zy, 0.7);
+      linie(zx, zy, p1[0], p1[1], 0.7);
+    }
+  }
+  ctx.putImageData(bild, 0, 0);
+}
+function HeroNetz({ fw, fh, kern, mitteX, stil }) {
+  const ref = useRef(null);
+  useEffect(() => {
+    const cv = ref.current;
+    if (!cv) return;
+    try { maleNetz(cv.getContext('2d'), fw, fh, kern, mitteX); } catch {}
+  }, [fw, fh, kern, mitteX]);
+  return <canvas ref={ref} width={fw} height={fh} className="hfx-netz" style={stil} />;
+}
+
+// Die Partikel. Lagen in Frame-Pixeln (× Maßstab), Größen in Karten-
+// pixeln (× --board-scale), damit sie bei allen Figuren gleich groß sind.
+function HeroStatusPartikel({ effekte, kern, s, mitteX, fw, fh, saat }) {
+  const cw = Math.max(1, kern.x1 - kern.x0), ch = Math.max(1, kern.y1 - kern.y0);
+  const punkte = kern.punkte && kern.punkte.length ? kern.punkte : [[mitteX, kern.y0 + ch / 2]];
+  const px = (n) => `calc(${+n.toFixed(3)}px * var(--board-scale))`;
+  const lage = (x, y) => ({ left: px(x * s), top: px(y * s) });
+  const flaeche = cw * ch * s * s;
+  const teile = useMemo(() => {
+    const aus = [];
+    const hat = (k) => effekte.includes(k);
+    if (hat('stunned')) {
+      const z = heroFxZufall(saat + 'stun');
+      // Anzahl und Größe wachsen mit der Figur (bei Bubbles sonst winzig)
+      const breitePx = cw * s, mass = Math.max(1, Math.min(2, breitePx / 70));
+      const n = Math.max(6, Math.min(12, Math.round(breitePx / 12)));
+      const cy = kern.y0 + ch * 0.28, rx = cw * 0.5 + 4, ry = ch * 0.28 + 3;
+      for (let i = 0; i < n; i++) {
+        const a = (i / n) * Math.PI * 2 + z() * 0.6;
+        aus.push({ art: 'blitz', x: mitteX + Math.cos(a) * rx, y: cy + Math.sin(a) * ry,
+          groesse: (14 + z() * 8) * mass, dauer: 0.9 + z() * 0.7, verz: z() * 1.4, dreh: (z() - 0.5) * 70 });
+      }
+    }
+    if (hat('burned')) {
+      const z = heroFxZufall(saat + 'feuer');
+      const n = Math.max(5, Math.min(18, Math.round(flaeche / 1100)));
+      const auswahl = punkte.filter(p => p[1] < kern.y1 - 1).slice(0, n);
+      for (const [x, y] of auswahl) {
+        aus.push({ art: 'flamme', x: x + 0.5, y: y + 1, groesse: 11 + z() * 7, dauer: 0.45 + z() * 0.4, verz: z() * 0.8 });
+      }
+    }
+    if (hat('poisoned')) {
+      const z = heroFxZufall(saat + 'gift');
+      const n = 5;
+      for (let i = 0; i < n; i++) {
+        aus.push({ art: 'schaedel', x: kern.x0 + cw * (0.15 + 0.7 * ((i + z() * 0.8) / n)), y: kern.y0 + ch * (0.12 + z() * 0.2),
+          groesse: 10 + z() * 4, dauer: 2.2 + z() * 1.2, verz: (i / n) * 2.6 + z() * 0.4 });
+      }
+    }
+    if (hat('bleeding')) {
+      const z = heroFxZufall(saat + 'blut');
+      const n = Math.max(4, Math.min(9, Math.round(cw * s / 12)));
+      const auswahl = punkte.filter(p => p[1] < kern.y0 + ch * 0.75).slice(0, n);
+      for (const [x, y] of auswahl) {
+        aus.push({ art: 'tropfen', x: x + 0.5, y: y + 0.5, dauer: 1.3 + z() * 0.9, verz: z() * 2 });
+      }
+    }
+    if (hat('berserked') || hat('healReversed')) {
+      const bers = hat('berserked');
+      const z = heroFxZufall(saat + (bers ? 'wut' : 'umkehr'));
+      const n = 8;
+      for (let i = 0; i < n; i++) {
+        const farbe = bers ? (z() < 0.5 ? '#9b3cff' : '#ff3a2a') : (z() < 0.5 ? '#66ff99' : '#cc66ff');
+        const schaedel = !bers && z() < 0.25;
+        aus.push({ art: schaedel ? 'schaedel' : 'funke', farbe, x: kern.x0 + cw * z(), y: kern.y0 + ch * (0.3 + z() * 0.6),
+          groesse: schaedel ? 9 : 6 + z() * 4, dauer: 1.4 + z() * 1.0, verz: z() * 2.4 });
+      }
+    }
+    return aus;
+  }, [effekte, kern, s, mitteX, saat]);
+  return (
+    <>
+      {effekte.includes('webbed') && (
+        <HeroNetz fw={fw} fh={fh} kern={kern} mitteX={mitteX}
+          stil={{ left: 0, top: 0, width: px(fw * s), height: px(fh * s) }} />
+      )}
+      {teile.map((t, i) => {
+        const stil = { ...lage(t.x, t.y), animationDuration: t.dauer + 's', animationDelay: t.verz + 's' };
+        if (t.art === 'tropfen') return <span key={i} className="hfx hfx-tropfen" style={stil} />;
+        if (t.dreh != null) stil['--hfx-dreh'] = t.dreh + 'deg';
+        if (t.farbe) stil.color = t.farbe;
+        const zeichen = t.art === 'blitz' ? '⚡' : t.art === 'flamme' ? '🔥' : t.art === 'schaedel' ? '💀' : '✦';
+        return (
+          <span key={i} className={'hfx hfx-' + t.art} style={stil}>
+            <PxZeichen z={zeichen} groesse={px(t.groesse)} einfarbig={t.art === 'funke'} />
+          </span>
+        );
+      })}
+    </>
+  );
+}
+
 // Eine Idle-Animation, die auf dem oberen Kartendrittel einer Heldenzone
 // steht. In der Zone selbst liegt nur ein unsichtbarer Anker; die Figur
 // wird in die Sprite-Ebene portiert und folgt der Zone dort (Lage,
@@ -2228,7 +2422,8 @@ function HeroEiskruste({ quelleRef, breite, hoehe, fussY, stil, schmilzt }) {
 // `angehalten`: Frame bleibt stehen (Frozen/Stunned/Webbed).
 // `versteinert`: zusätzlich Steinoptik (kriecht von unten nach oben).
 // `eingefroren`: zusätzlich eine Eiskruste um die Figur (v1457/v1458).
-function HeroIdleSprite({ cardName, angehalten, versteinert, eingefroren, unsichtbar }) {
+// `effekte`: weitere Status als Leerzeichen-Liste (Tönung + Partikel, v1459).
+function HeroIdleSprite({ cardName, angehalten, versteinert, eingefroren, effekte, unsichtbar }) {
   const key = HeroIdleAnims.slug(cardName);
   // Eisblock: 'da' solange Frozen, danach kurz 'schmilzt' (zerspringt),
   // dann 'weg'.
@@ -2258,6 +2453,7 @@ function HeroIdleSprite({ cardName, angehalten, versteinert, eingefroren, unsich
   const zustand = useRef({ angehalten, versteinert });
   zustand.current.angehalten = !!angehalten;
   zustand.current.versteinert = !!versteinert;
+  zustand.current.effekte = effekte || '';
 
   useEffect(() => {
     const cv = canvasRef.current, platz = platzRef.current, anker = ankerRef.current;
@@ -2297,8 +2493,32 @@ function HeroIdleSprite({ cardName, angehalten, versteinert, eingefroren, unsich
           ctx.restore();
         }
       }
+      // ★ v1459: Status-Tönungen, nur auf den Pixeln der Figur
+      // (`source-atop`); Negated entsättigt. Nicht über Stein.
+      const eff = zustand.current.effekte || '';
+      if (eff && !stein) {
+        ctx.save();
+        for (const t of HERO_TOENUNGEN) {
+          if (!eff.includes(t.status)) continue;
+          if (t.grau) {
+            ctx.globalCompositeOperation = 'saturation';
+            ctx.fillStyle = `rgba(128,128,128,${t.grau})`;
+            ctx.fillRect(0, 0, fw, fh);
+            // die Sättigungs-Mischung malt auch leere Pixel an —
+            // zurück auf die Form der Figur
+            ctx.globalCompositeOperation = 'destination-in';
+            ctx.drawImage(img, sx, sy, fw, fh, 0, 0, fw, fh);
+          } else {
+            ctx.globalCompositeOperation = 'source-atop';
+            ctx.fillStyle = t.farbe;
+            ctx.fillRect(0, 0, fw, fh);
+          }
+        }
+        ctx.restore();
+      }
       st.gemalt = st.frame;
       st.steinGemalt = st.stein;
+      st.effekteGemalt = eff;
     };
     // Der Platz deckt sich in der Sprite-Ebene mit der Zone in der
     // Brettebene; die Hover-Vergrößerung der Zone (`--board-hover-scale`)
@@ -2371,7 +2591,8 @@ function HeroIdleSprite({ cardName, angehalten, versteinert, eingefroren, unsich
       if (z.versteinert) { if (st.stein < 1) st.stein = Math.min(1, st.stein + dt / 900); }
       else st.stein = 0;
       sicher('Zonenlage', folgeZone);
-      if (st.frame !== st.gemalt || st.stein !== st.steinGemalt) sicher('Malen', male);
+      if (st.frame !== st.gemalt || st.stein !== st.steinGemalt
+        || (zustand.current.effekte || '') !== st.effekteGemalt) sicher('Malen', male);
     }, { held: meta.hero || '?', frames, st, zustand });
     sicher('Zonenlage', folgeZone);
     sicher('Malen', male);
@@ -2447,6 +2668,10 @@ function HeroIdleSprite({ cardName, angehalten, versteinert, eingefroren, unsich
   // Eiskruste: deckungsgleich mit dem Sprite-Canvas, Drehpunkt an den
   // Füßen (dort wächst sie beim Einfrieren hoch)
   const eisStil = { ...canvasStil, left: 0, top: 0, transformOrigin: drehpunkt };
+  // Effekt-Ebene (v1459): gleiche Lage und Drehung wie der Steher, aber
+  // ohne Beschnitt — Schädel steigen über den Kopf, Blitze umkreisen ihn.
+  const fxStil = { left: steherStil.left, top: steherStil.top, width: steherStil.width,
+    height: steherStil.height, transformOrigin: drehpunkt };
   const schattenBreite = Math.max(8, cw * s * 0.8);
   const schattenStil = {
     width: `calc(${bs(schattenBreite)})`,
@@ -2468,6 +2693,12 @@ function HeroIdleSprite({ cardName, angehalten, versteinert, eingefroren, unsich
               )}
             </div>
           </div>
+          {effekte && (
+            <div className="hero-idle-fx" style={fxStil}>
+              <HeroStatusPartikel effekte={effekte} kern={kern} s={s} mitteX={mitteX}
+                fw={fw} fh={fh} saat={key} />
+            </div>
+          )}
         </div>,
         ebene)}
     </>
@@ -40994,6 +41225,17 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                       && CARDS_BY_NAME[formPreview.cardName]) ? formPreview.cardName : hero.name}
                     angehalten={!!(isFrozen || isStunned)}
                     eingefroren={!!isFrozen}
+                    effekte={[
+                      // v1459: dieselben Bedingungen wie die Karten-Overlays
+                      hero.statuses?.stunned && !isStunned?._petrified && !isStunned?._baihuPetrify ? 'stunned' : '',
+                      hero.statuses?.webbed ? 'webbed' : '',
+                      isBurned ? 'burned' : '',
+                      isPoisoned ? 'poisoned' : '',
+                      isBleeding ? 'bleeding' : '',
+                      isNegated && !isNegated._byWeakeningCrystal ? 'negated' : '',
+                      isBerserked ? 'berserked' : '',
+                      isHealReversed ? 'healReversed' : '',
+                    ].filter(Boolean).join(' ')}
                     versteinert={!!(isStunned?._petrified || isStunned?._baihuPetrify)}
                     unsichtbar={!!isInvisible} />
                 )}
