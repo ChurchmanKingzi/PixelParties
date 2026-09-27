@@ -13,7 +13,6 @@ Aufruf: python3 teocuilatl.py <tag> [ms] [hero|platinum]
 * Die rechte Hand lag unter einem Stern und war nach dem Entfernen nur
   geschätzt; sie wird als Spiegelbild der vollständigen linken Hand
   ergänzt (die Figur ist symmetrisch um x = 11,5).
-* hero: sein Flammenkörper flackert (einzelne Glutpixel werden heller/dunkler).
 """
 import math
 import sys
@@ -77,7 +76,6 @@ YEL, YEL2 = rgb('ffef72'), rgb('f3c042')
 RED, DARK = rgb('c92d00'), rgb('941b00')
 # Sterne: (Mitte x, y, größte Armlänge, Periode, Phase, klein)
 STARS = [(22, 11, 5, 24, 0, False), (4, 15, 3, 16, 6, False), (20, 26, 3, 12, 4, False), (2, 29, 1, 16, 11, True)]
-FIRE = [rgb(c) for c in ('e43600', 'ffae00', 'ffe739', 'fffa55', 'fffe84')]
 
 
 def star_pixels(cx, cy, arm, small):
@@ -116,20 +114,8 @@ def star_arm(i, amax, period, phase):
     return life[t]
 
 
-def rnd(k, i):
-    v = math.sin(k * 12.9898 + i * 78.233) * 43758.5453
-    return v - math.floor(v)
-
-
 def frame(i):
     s = BODY.copy()
-    if V == 'hero':                                  # Glut flackert
-        for y in range(SH):
-            for x in range(SW):
-                c = tuple(s[y, x])
-                if c in FIRE and rnd(x * 31 + y, i) > 0.78:
-                    k = FIRE.index(c)
-                    s[y, x] = FIRE[min(len(FIRE) - 1, k + 1)] if rnd(x, i + 5) > 0.5 else FIRE[max(0, k - 1)]
     out = np.zeros((H, W, 4), int)
     b = BOUNCE12[i % 12]
     draw_bounce(out, s, b, KNEE, PT, P)
