@@ -1,0 +1,16 @@
+{
+  "hero": "Dark Maho",
+  "sheet": "dark-maho.png",
+  "frameWidth": 32,
+  "frameHeight": 40,
+  "frames": 48,
+  "frameMs": 90,
+  "loop": true,
+  "layout": "horizontal",
+  "skinOf": "Maho, the Cute Magical Girl",
+  "padTop": 7,
+  "padLeft": 5,
+  "padRight": 5,
+  "padBottom": 3,
+  "faceX": 16
+}

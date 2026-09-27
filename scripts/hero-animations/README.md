@@ -95,6 +95,7 @@ kopiert, daneben liegt eine JSON-Datei mit den Metadaten. Die erzeugten
 | `tapu_jenny.py` | `final` | `tapu_jenny_idle_final_sheet.png` | `tapu-jenny` (Skin) |
 | `winged.py` | `final 80 melissa` | `cute_meanie_melissa_idle_final_sheet.png` | `cute-meanie-melissa` |
 | `winged.py` | `final 80 molinda` | `cute_angel_molinda_idle_final_sheet.png` | `cute-angel-molinda` |
+| `dark_maho.py` | `final` | `dark_maho_idle_final_sheet.png` | `dark-maho` (Skin) |
 | `bubbles.py` | `final gross` | `bubbles_idle_final_gross_sheet.png` | `bubbles-the-bouncy-bunny` |
 
 `bubbles.py` ohne `gross` erzeugt eine auf Hero-Größe verkleinerte Variante
