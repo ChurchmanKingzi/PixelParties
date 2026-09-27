@@ -1,0 +1,15 @@
+{
+  "hero": "Rakah, the Loan Shark",
+  "sheet": "rakah-the-loan-shark.png",
+  "frameWidth": 34,
+  "frameHeight": 37,
+  "frames": 48,
+  "frameMs": 90,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 4,
+  "padLeft": 3,
+  "padRight": 3,
+  "padBottom": 5,
+  "faceX": 15.0
+}
