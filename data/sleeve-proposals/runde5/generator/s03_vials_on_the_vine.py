@@ -1,6 +1,31 @@
 # -*- coding: utf-8 -*-
-"""03 (Arbeitsstand v1) – Kyli, the Deceptive Sapling."""
-import math, random
+"""03 Vials on the Vine – Kyli, the Deceptive Sapling (Base-Heldin).
+
+Idee: Nachts auf der Steinlichtung ihrer Kartenszene steht Kyli groß im kerzenbeleuchteten Opferring
+(Occultism), hinter ihr ein fahler Vollmond, vor dem sich ihr Zweig-Geweih abzeichnet. Aus den drei
+Spitzen ihres Geweihs wachsen Ranken, die drei zurückgeholte Tränke wie Früchte tragen (Biomancy: bis zu
+3 gelöschte Potions werden nach einem Opfer zu lebenden Tokens in ihren Support Zones). Zwei Augenbäume
+mit rotem Auge und Zahnmaul (der „trügerische“ Baum aus ihrem Kartenbild) rahmen die Szene gespiegelt.
+
+Quellen:
+  MotiveGrailWar.xcf  Ebene 149 „Kyli“ – Base-Kyli, pixelgleich (0 px Abweichung) mit Szene 147 „Sichtbar #7“
+                      (Kartenausschnitt Lage 237,48); einzige Kyli-Ebene aller xcf-Dateien, keine Variante.
+                      Ebene 150 „Ebene #431“ – Augenbaum aus derselben Szene (99,5 % Treffer; die Kopie
+                      160 „Occultism“ weicht in 20 px ab und wurde nicht genommen), rechts gespiegelt,
+                      abgedunkelt/violett getönt, Zähne gedämpft, rotes Auge unverändert.
+                      Ebene 161 „Ebene #421“ – 16×16-Kachel des Steinbodens (Kontrast beruhigt).
+                      Ebene 159 „Ebene #423“ – Kerze aus dem Ritualkreis (Asriel-/Chara-Szenen), 2×.
+  MotiveSteamDwarfs.xcf Ebene 134 „Biomancy“ – runde Korkflaschen grün, türkis, rot (Karte „Biomancy“).
+Selbst gezeichnet: Himmel, Sterne, Mond mit Sichelschatten und Lichthof, Horizontsaum, Opferring mit
+Runenkerben (ohne Pentagramm), roter Schein im Ring, Kylis Bodenschatten, Ranken (1 Zelle, hell/dunkel
+abwechselnd) mit Fruchtstiel-Umgriff, schwacher Lichtsaum der Tränke.
+
+Skalierung (Tiefenebenen):
+  Hintergrund (Himmel, Sterne, Mond)                    – 2×-Raster (125×175)
+  Mittelgrund (Steinboden, Ringschein, zwei Augenbäume) – 3×-Raster (84×117)
+  Vordergrund (Kyli, Tränke, Ranken, Ring, Kerzen)      – 5×-Raster (50×70); Kyli 120×165 px im 250er-Raster
+"""
+import math, os, random
 import numpy as np
 from common import *  # noqa
 
@@ -12,14 +37,34 @@ SD = 'MotiveSteamDwarfs'
 # ---------------- Sprites ----------------------------------------------------------------
 kyli = sprite('h03_kyli', GW, [149])                    # 24×33, Base-Kyli (Szene Sichtbar #7)
 tree = sprite('h03_eyetree', GW, [150])                 # 33×44, Augenbaum aus Kylis Kartenszene
-_pots = parts(layer(SD, 134)[400:540, 70:400], dil=0, minpx=10)
-pot_green, pot_teal, pot_red = _pots[12], _pots[13], _pots[16]              # runde Korkflaschen (Biomancy-Szene)
-_circ = compose(GW, [159], crop=False)[91:139, 271:319]  # Ritualkreis mit Kerzen (Asriel/Chara-Szene)
-candle = _circ[3:14, 14:18].copy()
-_rc = ((candle[..., 0] == 91) & (candle[..., 1] == 3)) | ((candle[..., 0] == 130) & (candle[..., 1] == 0))
-candle[_rc] = 0
-candle = candle[np.ix_(*[np.where(candle[..., 3].any(ax))[0] for ax in (1, 0)])]
+from PIL import Image
+import xcfkit
 
+
+def cached(key, fn):
+    """Aus Ebenen geschnittene Teilsprites unter sprites5/<key>.png ablegen (ohne xcf-Export: von dort laden)."""
+    path = os.path.join(xcfkit.CACHE, key + '.png')
+    try:
+        s = fn(); Image.fromarray(s).save(path); return s
+    except Exception:
+        return np.array(Image.open(path).convert('RGBA'))
+
+
+def _pots():
+    return parts(layer(SD, 134)[400:540, 70:400], dil=0, minpx=10)     # runde Korkflaschen (Biomancy-Szene)
+
+
+def _candle():
+    c = compose(GW, [159], crop=False)[91:139, 271:319][3:14, 14:18].copy()   # Kerze aus dem Ritualkreis
+    rc = ((c[..., 0] == 91) & (c[..., 1] == 3)) | ((c[..., 0] == 130) & (c[..., 1] == 0))   # Kreislinie weg
+    c[rc] = 0
+    return c[np.ix_(*[np.where(c[..., 3].any(ax))[0] for ax in (1, 0)])]
+
+
+pot_green = cached('h03_pot_green', lambda: _pots()[12])
+pot_teal = cached('h03_pot_teal', lambda: _pots()[13])
+pot_red = cached('h03_pot_red', lambda: _pots()[16])
+candle = cached('h03_candle', _candle)
 
 def grid(k):
     return -(-W // k), -(-H // k)
@@ -53,22 +98,6 @@ def bands(cv, y0, y1, stops, soft=0.4):
         a, b = np.array(stops[i]), np.array(stops[i + 1])
         for x in range(cv.w):
             cv.a[y, x] = b if f > BAYER4[y % 4, x % 4] else a
-
-
-def glow_rgba(arr, cx, cy, r, col, strength=0.5, ry=None):
-    """Lichthof auf ein RGBA-Array (nur dort, wo schon etwas ist, sonst halbtransparente Pixel)."""
-    col = np.array(col, float); ry = ry or r
-    for y in range(max(0, int(cy - ry)), min(arr.shape[0], int(cy + ry) + 1)):
-        for x in range(max(0, int(cx - r)), min(arr.shape[1], int(cx + r) + 1)):
-            d = math.hypot((x + .5 - cx) / r, (y + .5 - cy) / ry)
-            if d >= 1: continue
-            t = (1 - d) ** 1.5 * strength
-            q = min(math.floor(t * 4 + BAYER4[y % 4, x % 4]) / 4, strength)
-            if q <= 0: continue
-            if arr[y, x, 3] > 0:
-                arr[y, x, :3] = (arr[y, x, :3] * (1 - q) + col * q).astype(np.uint8)
-            else:
-                arr[y, x] = list(col.astype(np.uint8)) + [int(255 * q)]
 
 
 def glow(cv, cx, cy, r, col, strength=0.5, ry=None):
@@ -244,4 +273,4 @@ cv = Canvas(W, H)
 blit(cv, bg, 2)
 blit(cv, mg, 3)
 blit(cv, fg, 5)
-print(save(cv, '03_sapling_vials.png'))
+print(save(cv, '03_vials_on_the_vine.png'))

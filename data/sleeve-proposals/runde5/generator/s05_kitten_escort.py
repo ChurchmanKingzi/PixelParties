@@ -1,22 +1,23 @@
 # -*- coding: utf-8 -*-
-"""05 Cute Backup – Held: Cute Annoyance Mini.
-Mini schwebt mit ihren grauen Federflügeln und dem frechen Grinsen groß im Vordergrund über einem Wolkenmeer;
-hinter ihr steigt – nur als dunstiger Riese im rosa Abendschein – ihr größter „Cute“-Freund aus den Wolken:
-die fünfköpfige Cute Hydra mit leuchtenden Herzaugen, zwei Herzchen (Charme) steigen über ihr auf.
-Die kleine Nervensäge hat Verstärkung gerufen (Kartentext: sucht und beschwört „Cute“-Kreaturen; Summoning Magic).
+"""05 Kitten Escort – Held: Cute Annoyance Mini (Base-Version).
+Mini schwebt mit grauen Federflügeln und frechem Grinsen groß vor einem großen, weichen Herz in ihrem Kartenlila
+über einem Wolkenmeer im Abendhimmel; ihre zwei geflügelten Cute Cats (die Katzen ihrer Base-Karte, Summoning Magic)
+eskortieren sie diagonal versetzt – links oben und rechts unten –, kleine rosa Herzchen (Charme) füllen die Gegenecken.
 
 Quellen (MotiveMoe.xcf):
   Ebene 497 „Mini #2“ + 498 „Mini“ (Flügelpaar) – Base-Mini, pixelgenau identisch mit Sichtbar #124
       (Ebene 101, Kartenausschnitt Lage 100,259 der Karte „Cute Annoyance Mini“; 0 abweichende Pixel).
-      Nicht verwendet: 495 (Schatten, nicht in der Kartenszene), 326 „Trial of Annoyance“ (Variante mit offenem Mund).
-  Ebene 190 „Cute Hydra“ – Karte „Cute Hydra“ (Sichtbar #81, Lage 256,158; vollständig, einzige Ebene)
-  Ebene 499 „Mini #1“ – das kleine Herzchen (5×4) aus Minis Kartenszene, rosa umgefärbt
-Selbst gezeichnet: Himmel mit Abendschein und Sternen, Wolkenschlieren, Wolkenbank, Wolkenmeer, Vordergrundwolken.
+      Nicht verwendet: 495 (Schatten, nicht in der Kartenszene), 326 „Trial of Annoyance“ (Variante).
+  Ebene 494 „Mini #5“ – die zwei Flügelkatzen der Mini-Karte (je 23×14; per Vorlagenvergleich in Sichtbar #124
+      gefunden, Abweichungen nur dort, wo der Kartenausschnitt sie abschneidet).
+  Ebene 499 „Mini #1“ – das kleine Herzchen (5×4) aus Minis Kartenszene, rosa umgefärbt.
+Selbst gezeichnet: Himmel, Sterne, Wolkenschlieren, großes Herz mit Schein und Glanzlicht (nach dem Kartenherz),
+Wolkenmeer, Vordergrundwolken.
 
 Skalierung (Tiefenebenen, Ausgabe = 250×350-Raster × 3):
-  Himmel, Schein, Sterne, Schlieren             – 1× (250×350)
-  Cute Hydra (gedunstet), Herzchen, Wolkenbank, Wolkenmeer – 3× (84×117)
-  Mini, Vordergrundwolken                        – 5× (50×70)
+  Himmel, Sterne, Schlieren                          – 1× (250×350)
+  großes Herz, Herzchen, Wolkenmeer                  – 2× (125×175)
+  Mini, beide Cute Cats, Vordergrundwolken           – 4× (63×88)
 """
 import math, random
 from common import *  # noqa

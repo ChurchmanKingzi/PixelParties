@@ -109,9 +109,9 @@ for y in range(175):
             g = math.floor((t ** 1.5) * 4 + bay(x, y)) / 4          # violetter Schein in Stufen, gedithert
             c = c * f + GLOW * g * 0.55 + (1 - f) * np.array([4, 1, 12])
         # warmer Schein der Ofenglut (rechts) und kalter Schein des Spiegelgeists (links)
-        for (gx_, gy_, r_, col_, k_) in ((329 - RX0, 316.5 - RY0, 15, (255, 120, 40), 0.55),
-                                        (231.5 - RX0, 296 - RY0, 10, (150, 190, 230), 0.30)):
-            dd = math.hypot(x + .5 - gx_, (y + .5 - gy_) * 1.2) / r_
+        for (gx_, gy_, r_, col_, k_) in ((329 - RX0, 317 - RY0, 9, (255, 110, 40), 0.32),
+                                        (231.5 - RX0, 296 - RY0, 8, (150, 190, 230), 0.22)):
+            dd = math.hypot(x + .5 - gx_, (y + .5 - gy_) * 1.5) / r_
             if dd < 1 and not emis[y, x]:
                 st = math.floor(((1 - dd) ** 1.5) * 3 + bay(x, y)) / 3   # 3 Stufen, gedithert
                 c = c + np.array(col_) * st * k_
