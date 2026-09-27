@@ -66,6 +66,23 @@ kopiert, daneben liegt eine JSON-Datei mit den Metadaten. Die erzeugten
 Alle Skripte sind deterministisch und reproduzieren die eingecheckten Sheets
 pixelgenau.
 
+## Sprites aus den xcf-Arbeitsdateien
+
+Die GIMP-Arbeitsdateien liegen im Repo `PixelPartiesSprites` (Git LFS).
+`xcf_extract.py` listet Ebenen, zeigt sie einzeln an und setzt ausgewählte
+Ebenen (in Stapelreihenfolge, mit Deckkraft) zu einem zugeschnittenen Sprite
+zusammen:
+
+```bash
+python3 xcf_extract.py MotiveMoe.xcf list mary                 # Ebenen suchen
+python3 xcf_extract.py MotiveMoe.xcf preview vorschau.png 485 489
+python3 xcf_extract.py MotiveMoe.xcf assemble src/cute-princess-mary.png Mary "Ebene #14"
+```
+
+| Sprite in `src/` | Datei | Ebenen |
+|---|---|---|
+| `cute-princess-mary.png` | `MotiveMoe.xcf` | `Mary` + `Ebene #14` (Arme) |
+
 ## Konventionen
 
 * **Dateiname** = Kartenname wie bei den Effekt-Skripten:
