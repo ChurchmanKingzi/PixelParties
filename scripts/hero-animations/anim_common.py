@@ -120,3 +120,24 @@ def ring8(mask):
                 mask[max(0, -dy):h + min(0, -dy), max(0, -dx):w + min(0, -dx)]
             d |= s
     return d & ~mask
+
+
+def draw_bounce(out, s, b, knee, oy, ox, dx_fn=None):
+    """Sprite s in out malen: Zeilen oberhalb von knee um b verschieben
+    (-1 = gestreckt, +1 = gestaucht), die Beine darunter bleiben stehen.
+    Beim Strecken wird die Zeile über dem Knie gedehnt (keine Lücke).
+    dx_fn(x, y) -> waagrechter Versatz einzelner Pixel (optional)."""
+    sh, sw = s.shape[:2]
+    for y in range(sh):
+        for x in range(sw):
+            if s[y, x, 3]:
+                dx = dx_fn(x, y) if dx_fn else 0
+                out[y + oy + (b if y < knee else 0), x + ox + dx] = s[y, x]
+    if b < 0:
+        y = knee - 1
+        for x in range(sw):
+            if s[y, x, 3] and not out[y + oy, x + ox, 3]:
+                out[y + oy, x + ox] = s[y, x]
+
+
+BOUNCE12 = [0, 0, -1, -1, -1, 0, 0, 1, 1, 1, 0, 0]      # Federn im 12er-Takt
