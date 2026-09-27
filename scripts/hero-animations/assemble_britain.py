@@ -18,6 +18,7 @@ src/<slug>-<teil>.png.
                                   Pixel über ihrem Kopf entfällt
   jack-the-crooked-killer         Jack + langes Messer (Ebene #80) in der linken
                                   Hand, gespiegelt ein zweites in der rechten
+                                  (an seine Faust angepasst: 1 px tiefer/innen)
                                   (Hero-Karte noch ohne Bild)
 """
 import sys
@@ -110,7 +111,7 @@ def main(path):
     cx2 = xs.min() + xs.max()                             # Spiegelachse = Körpermitte
     knife_r = np.zeros_like(knife)
     ys, xk = np.nonzero(knife[:, :, 3])
-    knife_r[ys, cx2 - xk] = knife[ys, xk]
+    knife_r[ys + 1, cx2 - xk - 1] = knife[ys, xk]         # rechte Faust sitzt 1 px tiefer, 1 px weiter innen
     save_parts('jack-the-crooked-killer', [('body', jack), ('knife_l', knife), ('knife_r', knife_r)])
 
 

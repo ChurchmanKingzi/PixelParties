@@ -8,9 +8,10 @@ Aufruf: python3 britain_royals.py <tag> [ms] <willy|george|hatmaker|victorica|em
   Loop: das Lid senkt sich in Hautfarbe, geschlossen ist das Auge ein 2 px
   breiter schwarzer Strich.
 * george / victorica: die Capes links und rechts flattern – sie bauschen sich
-  nach außen, unten stärker als an der Schulter, und eine Welle läuft den
-  Stoff hinunter (zeilenweise verschoben, die Innenkante wird nachgezogen,
-  damit keine Lücke zum Körper entsteht).
+  nach außen, unten stärker als an der Schulter; der untere Teil samt
+  weißem/hellblauem Saum bewegt sich als Ganzes, der Saum bleibt immer der
+  Rand (zeilenweise verschoben, die Innenkante wird nachgezogen, damit keine
+  Lücke zum Körper entsteht).
 * Kronen (George, Victorica, Empress of Hearts) und Willys Hutschnalle
   blitzen einmal pro Loop auf.
 """
@@ -64,11 +65,14 @@ def cape_side(x, y):
 
 
 def billow(y, side, i):
-    """Wie weit eine Cape-Zeile nach außen weht (0 an der Schulter, bis 2)."""
+    """Wie weit eine Cape-Zeile nach außen weht (0 an der Schulter, bis 2).
+    Nach unten nie weniger als darüber; die untersten Zeilen samt Saum
+    bewegen sich gemeinsam, damit der Saum immer der untere Rand bleibt."""
     y0, y1 = C['cape'][:2]
-    f = (y - y0) / (y1 - y0)
-    ph = 2 * math.pi * i / 24 - 0.7 * (y - y0) + (0.9 if side > 0 else 0.0)
-    return int(round(2.2 * f ** 1.2 * (0.5 + 0.5 * math.sin(ph))))
+    f = min(1.0, (y - y0) / (y1 - y0 - 2))
+    ph = 2 * math.pi * i / 24 + (0.9 if side > 0 else 0.0)
+    amp = 2.2 * (0.5 + 0.5 * math.sin(ph)) * (0.85 + 0.15 * math.sin(3 * ph))
+    return int(round(amp * f ** 1.2))
 
 
 def frame(i):

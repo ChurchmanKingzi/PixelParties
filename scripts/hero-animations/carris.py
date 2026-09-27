@@ -7,12 +7,15 @@ Aufruf: python3 carris.py <tag> [ms] [hero|little]
 * Er atmet (der Oberkörper hebt sich im Rhythmus um 1 px, die Füße bleiben).
 * Er blinzelt zweimal pro Loop: der Glanz im Auge erlischt, geschlossen
   rutscht der schwarze Lidstrich eine Zeile tiefer und ist 2 px breit.
-* Die Ohren zucken ab und zu (die Spitzen kippen 1 px).
+* Die Ohren zucken ab und zu: hero – das linke Ohr kippt oben 1 px (ganze
+  Zeilen), die Spitze des rechten sackt 1 px ab (ganze Spalten), so
+  entstehen keine Lücken; little – die Ohrspitzen kippen 1 px nach außen.
 * hero:   die große Taschenuhr neben ihm tickt (der lange Zeiger springt alle
           4 Frames eine Stunde weiter, die Uhr läuft einmal pro Loop herum),
           das herabhängende Kettenende schwingt sachte (zeilenweise, unten
           stärker); er tippt ungeduldig mit dem rechten Fuß.
-* little: der Mäuseschwanz schwingt hin und her (zur Spitze hin stärker).
+* little: der Mäuseschwanz schwingt hin und her (der senkrechte Teil als
+          Ganzes, die Krümmung am Körper bleibt stehen – kein Knick).
 """
 import math
 import sys
@@ -28,7 +31,8 @@ if V == 'hero':
     PREFIX = 'carris'
     LID_ROW, EYE_XS, GLINT = 9, (20, 21, 24, 25), [(21, 10), (25, 10)]
     FEET_Y = 21
-    EAR_TIPS = [(x, y) for y in range(0, 3) for x in range(15, 20)] + [(x, y) for y in range(2, 5) for x in range(28, 32)]
+    EAR_L = [(x, y) for y in range(0, 3) for x in range(0, 22)]          # obere Zeilen, ganz
+    EAR_R = [(x, y) for y in range(2, 6) for x in range(29, 32)]         # Spitze, ganze Spalten
     FOOT = [(x, y) for y in (21, 22) for x in range(23, 28)]
 else:
     BODY = np.array(Image.open('src/little-carris.png').convert('RGBA')).astype(int)
@@ -36,7 +40,8 @@ else:
     PREFIX = 'little_carris'
     LID_ROW, EYE_XS, GLINT = 6, (8, 9, 12, 13), [(9, 7), (13, 7)]
     FEET_Y = 18
-    EAR_TIPS = [(x, y) for y in range(0, 2) for x in list(range(3, 8)) + list(range(14, 19))]
+    EAR_L = [(x, y) for y in range(0, 2) for x in range(3, 8)]
+    EAR_R = [(x, y) for y in range(0, 2) for x in range(14, 19)]
     FOOT = []
 SH, SW = BODY.shape[:2]
 P, PT, PB = 4, 4, 3
@@ -49,9 +54,9 @@ DIAL_C = (12, 15)                                    # Mitte des Zifferblatts
 SHORT_HAND = [(13, 16), (14, 16)]
 CHAIN_X, CHAIN_Y = 4, 8                              # herabhängendes Kettenende
 BLINK = {14: 'halb', 15: 'zu', 16: 'zu', 17: 'halb', 38: 'halb', 39: 'zu', 40: 'zu', 41: 'halb'}
-EAR_TWITCH = {6: 1, 7: 1, 30: -1, 31: -1}
+EAR_TWITCH = {6: 'l', 7: 'l', 30: 'r', 31: 'r'}
 TAP = {20, 21, 24, 25}                               # Fuß hebt sich (hero)
-TAIL = [(x, y) for y in range(9, 18) for x in range(0, 5)] if V == 'little' else []
+TAIL = [(x, y) for y in range(9, 15) for x in range(0, 5)] if V == 'little' else []   # senkrechter Teil
 
 
 def breath(i):
@@ -79,8 +84,7 @@ def watch(i):
 
 
 def tail_dx(y, i):
-    f = (17 - y) / 8                                 # Spitze oben schwingt stärker
-    return int(round(1.3 * f * math.sin(2 * math.pi * i / 16)))
+    return int(round(math.sin(2 * math.pi * i / 16)))   # senkrechter Teil als Ganzes
 
 
 def frame(i):
@@ -99,14 +103,19 @@ def frame(i):
         w = watch(i)
         m = w[:, :, 3] > 0
         out[m] = w[m]
-    ear, tail, foot = set(EAR_TIPS), set(TAIL), set(FOOT)
+    ear_l, ear_r, tail, foot = set(EAR_L), set(EAR_R), set(TAIL), set(FOOT)
+    tw = EAR_TWITCH.get(i)
     for y in range(SH):
         for x in range(SW):
             if not s[y, x, 3]:
                 continue
             dx, dy = 0, (b if y < FEET_Y else 0)
-            if (x, y) in ear and i in EAR_TWITCH:
-                dx = EAR_TWITCH[i] if x < SW / 2 else -EAR_TWITCH[i]
+            if V == 'hero' and tw == 'l' and (x, y) in ear_l:
+                dx = 1
+            elif V == 'hero' and tw == 'r' and (x, y) in ear_r:
+                dy += 1
+            elif V == 'little' and tw and ((x, y) in ear_l or (x, y) in ear_r):
+                dx = -1 if (x, y) in ear_l else 1
             if (x, y) in tail:
                 dx = tail_dx(y, i)
             if (x, y) in foot and i in TAP:

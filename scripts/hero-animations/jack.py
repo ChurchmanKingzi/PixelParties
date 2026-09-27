@@ -35,8 +35,9 @@ DROP_PHASE = [0, 7, 3, 10]
 
 
 def hand_mask(left):
+    """Faust um den Griff: links Zeilen 24–27, rechts (sitzt 1 px tiefer) 25–28."""
     m = np.zeros((SH, SW), bool)
-    for y in range(24, 28):
+    for y in (range(24, 28) if left else range(25, 29)):
         for x in range(SW):
             if BODY[y, x, 3] and ((left and x <= 11) or (not left and x >= SW - 1 - 11)):
                 m[y, x] = True
@@ -101,7 +102,7 @@ def frame(i):
             if r is None:
                 continue
             x = DROP_X[k] if side == 0 else SW - 1 - DROP_X[k]
-            out[row + r + PT + dy, x + P] = BLOOD[0] if r < 3 else BLOOD[1]
+            out[row + side + r + PT + dy, x + P] = BLOOD[0] if r < 3 else BLOOD[1]   # rechts 1 px tiefer
     fill_pinholes(out)
     return out
 

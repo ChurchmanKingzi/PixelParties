@@ -7,8 +7,11 @@ Teile: src/alice-the-puppeteer-girl-{body,puppets}.png (deckungsgleich).
   nach außen und hüpfen (links im 24er-, rechts im 16er-Takt), die Fäden
   werden jedes Frame gespannt von Alices Hand zur Puppe neu gezogen; die Puppe unten watschelt hin
   und her und macht ab und zu einen Hüpfer.
-* Alice atmet (Kopf und Haare heben sich im Rhythmus um 1 px) und blinzelt
-  zweimal pro Loop (geschlossen: 2 px breite schwarze Striche).
+* Alice atmet: der ganze Oberkörper samt Händen hebt sich im Rhythmus um
+  1 px, gedehnt wird das Kleid (Zeile 20), nicht der Hals.
+* Ihre Augen sind im Sprite lächelnd geschlossen (^-förmig). Zweimal pro
+  Loop gehen sie auf und zeigen ihre blauen Augen (Wimpernstrich oben, darunter
+  Blau mit hellem Glanz); dazwischen kurz ein gerader Lidstrich als Übergang.
 """
 import math
 import sys
@@ -63,10 +66,14 @@ def puppet_mask(left):
 
 PUP_L, PUP_R = puppet_mask(True), puppet_mask(False)
 STR_L, STR_R = set(STRING_L), set(STRING_R)
-HEAD_Y = 12                                          # bis hier atmet der Oberkörper mit
-BLINK = {14: 'halb', 15: 'zu', 16: 'zu', 17: 'halb', 38: 'halb', 39: 'zu', 40: 'zu', 41: 'halb'}
-LIDS = [(17, 8), (22, 8)]
-CLOSED = {(16, 9): BLACK, (17, 9): BLACK, (18, 9): SKIN, (21, 9): SKIN, (22, 9): BLACK, (23, 9): BLACK}
+BREATH_Y = 20                                        # bis hier hebt sich der Oberkörper
+BLUE, BLUE_HI = rgb('2f6fe8'), rgb('9fd8ff')
+EYE_STATES = {'strich': {(17, 8): SKIN, (22, 8): SKIN, (16, 9): BLACK, (17, 9): BLACK, (18, 9): SKIN,
+                         (21, 9): SKIN, (22, 9): BLACK, (23, 9): BLACK},
+              'offen': {(17, 8): BLACK, (18, 8): BLACK, (21, 8): BLACK, (22, 8): BLACK,
+                        (17, 9): BLUE, (18, 9): BLUE_HI, (21, 9): BLUE_HI, (22, 9): BLUE}}
+EYES = {10: 'strich', 20: 'strich', 34: 'strich', 42: 'strich'}
+EYES.update({i: 'offen' for i in list(range(11, 20)) + list(range(35, 42))})
 
 
 def hop(t, start):
@@ -92,13 +99,8 @@ def breath(i):
 
 def frame(i):
     s = BODY.copy()
-    st = BLINK.get(i)
-    if st:
-        for x, y in LIDS:
-            s[y, x] = SKIN
-        if st == 'zu':
-            for (x, y), c in CLOSED.items():
-                s[y, x] = c
+    for (x, y), c in EYE_STATES.get(EYES.get(i), {}).items():
+        s[y, x] = c
     out = np.zeros((H, W, 4), int)
     b = breath(i)
     lx, ly = pose_l(i)
@@ -107,14 +109,14 @@ def frame(i):
         for x in range(SW):
             if not s[y, x, 3] or PUP_L[y, x] or PUP_R[y, x] or (x, y) in STR_L or (x, y) in STR_R:
                 continue
-            if y <= HEAD_Y:
-                if b:                                # Zeile unter dem Kopf gedehnt
+            if y <= BREATH_Y:
+                if b and y == BREATH_Y:              # Kleid gedehnt
                     out[y + PT, x + P] = s[y, x]
                 out[y + PT + b, x + P] = s[y, x]
             else:
                 out[y + PT, x + P] = s[y, x]
     for ((hx, hy), (ex, ey), cols), (dx, dy) in zip(THREADS, ((lx, ly), (rx, ry))):   # Fäden gespannt
-        for x, y in line(hx, hy, ex + dx, ey + dy):
+        for x, y in line(hx, hy + b, ex + dx, ey + dy):
             out[y + PT, x + P] = cols[x % 2]
     for mask, (dx, dy) in ((PUP_L, (lx, ly)), (PUP_R, (rx, ry))):
         for y, x in zip(*np.nonzero(mask)):
