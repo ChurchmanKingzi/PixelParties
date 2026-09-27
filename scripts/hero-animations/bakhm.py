@@ -42,9 +42,9 @@ def seg_worm(x, y):
 
 
 def worm_jaw_line(x):
-    upper = 11 + (15 - x) * 8 / 15                   # oberer Stoßzahn
-    lower = 12 + (22 - x) * 10 / 17                  # unterer Hauer
-    return (upper + lower) / 2
+    """Trennlinie zwischen oberem Stoßzahn (Kante Zeile 19 an der Spitze, 16 bei
+    x13) und unterem Hauer (Zeile 22 an der Spitze x5, 16 bei x18)."""
+    return 20.5 if x <= 5 else 20.5 - 0.35 * (x - 5)
 
 
 CFG = {
