@@ -8,7 +8,7 @@ Quellen (MotiveHawaii.xcf), nachgebaut nach der Karte „Tempeluna the Convergen
   Ebene 89  „Ebene #99“ – Steinfelsen unter der Fee, 7× (links warm, rechts kalt getönt)
   Ebene 269 „Ebene #4“  – Inselkarte mit Lavafall: Lava-Kachel (16 px Periode), 3×
   Ebene 193 „Ebene #21“ – Inselkarte mit Wasserfall: Wasser-Kachel + braune Klippe, 3×
-    Ebene 260 „Ebene #18“ – Feuersäulen/Flammen, 3×;  Ebene 149 „Ebene #46“ – Blitz, 3×
+  Ebene 260 „Ebene #18“ – Feuersäulen/Flammen, 3×;  Ebene 149 „Ebene #46“ – Blitz, 3×
   Ebene 176 „Ebene #101“ – Regen, 3×
 Skalierung: Hintergrund-Ebene (Klippe, Lava-/Wasserfall, Flammen, Blitze, Regen) einheitlich 3×;
   Vordergrund (Felsen + Fee) einheitlich 7×.
