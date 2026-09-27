@@ -13,6 +13,8 @@ src/<slug>-<teil>.png.
                                       Stück an seinem Arm) + Partikel (Null #5)
   maho-the-cute-magical-girl          rechte Figur aus Ebene #49, gespiegelt
   atta-speaker-of-desires             Atta (für eine künftige Hero-Karte)
+  dark-maho                           Skin Dark Maho: linke Figur aus Ebene #72
+                                      (nicht gespiegelt – so zeigt sie die Karte)
 """
 import sys
 import numpy as np
@@ -95,6 +97,16 @@ def main(path):
             keep |= lab == k
     save_parts('maho-the-cute-magical-girl', [('body', only(m, keep))], mirror=True)
     save_parts('atta-speaker-of-desires', [('body', layer(doc, L, 'Atta'))])
+    # Skin Dark Maho: linke Figur aus „Ebene #72“
+    m = layer(doc, L, 'Ebene #72')
+    n, lab = components(m)
+    xs_all = np.nonzero(m[:, :, 3])[1]
+    mid = (xs_all.min() + xs_all.max()) / 2
+    keep = np.zeros(m.shape[:2], bool)
+    for k in range(1, n):
+        if np.nonzero(lab == k)[1].mean() < mid:
+            keep |= lab == k
+    save_parts('dark-maho', [('body', only(m, keep))])
 
 
 if __name__ == '__main__':

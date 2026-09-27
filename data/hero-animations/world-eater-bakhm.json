@@ -1,0 +1,16 @@
+{
+  "hero": "World Eater Bakhm",
+  "sheet": "world-eater-bakhm.png",
+  "frameWidth": 67,
+  "frameHeight": 49,
+  "frames": 48,
+  "frameMs": 90,
+  "loop": true,
+  "layout": "horizontal",
+  "skinOf": "Bakhm, the Desert Digger",
+  "padTop": 3,
+  "padLeft": 7,
+  "padRight": 7,
+  "padBottom": 1,
+  "faceX": 20
+}
