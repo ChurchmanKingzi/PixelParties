@@ -50,12 +50,13 @@ fill_tiles(bd, hsv_shift(tile, 0, 0.9, 0.78))
 vignette(bd, 0.55, 0.35)
 
 PAPER = (236, 230, 214); PAPER_S = (190, 180, 160)
+# Fotos so tief gesetzt, dass auch die Nadel des obersten Fotos unter dem Rahmen (bis y 11) sichtbar bleibt
 photos = [  # (Karte, Ausschnitt in Kartenpixeln, Position auf dem 125er-Raster, Cache-Key)
-    ('Kaito Sid the Phantom Thief', (24, 2, 64, 36), (7, 7), 'r2_08_photo_kaito'),
-    ('Rakah the Loan Shark', (12, 8, 58, 40), (70, 17), 'r2_08_photo_rakah'),
-    ('Devlin the Masked Butcher', (24, 3, 68, 35), (5, 70), 'r2_08_photo_devlin'),
-    ('Criminal Monkee', (8, 9, 52, 43), (71, 76), 'r2_08_photo_monkee'),
-    ('Black Marketeer', (16, 10, 56, 44), (31, 125), 'r2_08_photo_marketeer'),
+    ('Kaito Sid the Phantom Thief', (24, 2, 64, 36), (7, 13), 'r2_08_photo_kaito'),
+    ('Rakah the Loan Shark', (12, 8, 58, 40), (70, 22), 'r2_08_photo_rakah'),
+    ('Devlin the Masked Butcher', (24, 3, 68, 35), (5, 74), 'r2_08_photo_devlin'),
+    ('Criminal Monkee', (8, 9, 52, 43), (71, 79), 'r2_08_photo_monkee'),
+    ('Black Marketeer', (16, 10, 56, 44), (31, 127), 'r2_08_photo_marketeer'),
 ]
 boxes = []
 for n, b, (px, py), key in photos:
@@ -140,7 +141,7 @@ for (i, j) in ((E, E), (E + 1, E), (E, E + 1), (E + 1, E + 1), (E + 1, E + 2)):
 K = 4                                                      # Pixelgröße der Lupe auf dem 250er-Raster (= 2 auf 125)
 # Linse über dem maskierten Monkee-Gesicht (Wand-Raster 125: (tx, ty)); jedes Lupen-Pixel zeigt genau ein
 # Wand-Pixel → 2× vergrößert, Linseninhalt in derselben Pixelgröße wie Ring und Griff
-tx, ty = 100, 97
+tx, ty = 100, 100
 mx, my = 2 * tx - K * CX, 2 * ty - K * CY
 for j in range(N):
     for i in range(N):
