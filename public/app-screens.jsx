@@ -3007,7 +3007,7 @@ function ProfileScreen() {
               <ProfilSchalter an={displayHeroes}
                 onToggle={() => saveHeroDisplay(!displayHeroes, !displayHeroes)}
                 label="Display Heroes"
-                tipp="Animated Heroes stand on their cards on the board. Off: cards only — status effects are shown on the cards again."
+                tipp="Shows animated Heroes standing on their cards on the board."
                 zeigeTipp={zeigeTipp} versteckeTipp={versteckeTipp} />
               <ProfilSchalter an={dynamicHeroes} gesperrt={!displayHeroes}
                 onToggle={() => saveHeroDisplay(displayHeroes, !dynamicHeroes)}
