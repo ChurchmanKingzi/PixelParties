@@ -21,7 +21,8 @@ Aufruf:  python3 assemble_moe_skins.py <pfad/zu/MotiveMoe.xcf>
   tapu-jenny                (Skin)  nur die Fee (linke 15 Spalten aus „Tapu Koko“;
                                     Fee und Gitarrenspieler berühren sich)
   cute-meanie-melissa               rechte Figur aus „Melissa“ (ohne Herzen) +
-                                    Flügel „Melissa #1“; Teile -body/-wings
+                                    Flügel „Melissa #1“ (1 px nach links, damit
+                                    sie mittig sitzt); Teile -body/-wings
   cute-angel-molinda                linke Figur aus „Melissa“ (ohne Herzen)
 """
 import sys
@@ -172,7 +173,9 @@ def main(path):
     me = layer(doc, L, 'Melissa')
     mel = biggest(me, 'right')
     wings = layer(doc, L, 'Melissa #1')
-    save_parts('cute-meanie-melissa', [('wings', only(wings, near(wings, mel, 6))), ('body', only(me, mel))])
+    # die (in sich symmetrischen) Flügel liegen im xcf 1 px zu weit rechts -> mittig unter sie
+    wings = np.roll(only(wings, near(wings, mel, 6)), -1, axis=1)
+    save_parts('cute-meanie-melissa', [('wings', wings), ('body', only(me, mel))])
     save(only(me, biggest(me, 'left')), 'cute-angel-molinda')
 
 

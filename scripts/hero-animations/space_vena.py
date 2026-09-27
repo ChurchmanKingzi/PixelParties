@@ -9,6 +9,9 @@ Teile: src/space-huntress-vena-{jet,body,fistflame}.png (deckungsgleich).
 * Die Flamme über der Raketenhand züngelt nach oben und flackert.
 * Das Fähnchen auf dem Helm weht (die Tuchspalten wellen sich), über die
   Helmkuppel läuft ein Glanz.
+* Im Sprite fehlt zwischen Schulter und Raketenfaust der Arm – er wird hier
+  als gepanzerter Oberarm (Schulterstück + Armschiene in den Farben von Helm
+  und Brustpanzer) dazugezeichnet; die Faustflamme liegt darüber.
 """
 import math
 import sys
@@ -21,6 +24,14 @@ JET = np.array(Image.open('src/space-huntress-vena-jet.png').convert('RGBA')).as
 BODY = np.array(Image.open('src/space-huntress-vena-body.png').convert('RGBA')).astype(int)
 FF = np.array(Image.open('src/space-huntress-vena-fistflame.png').convert('RGBA')).astype(int)
 SH, SW = BODY.shape[:2]
+# Arm der Raketenhand ergänzen (Schulter x7–9, Armschiene bis zur Flamme)
+_O, _M, _H, _T, _D = rgb('273122'), rgb('404c42'), rgb('747871'), rgb('51726c'), rgb('283936')
+ARM = {(7, 17): _O, (7, 18): _O, (8, 18): _H, (7, 19): _O, (8, 19): _M, (9, 19): _H,
+       (7, 20): _O, (8, 20): _M, (9, 20): _T, (10, 20): _D,
+       (6, 21): _O, (7, 21): _M, (8, 21): _T, (9, 21): _M, (10, 21): _D, (11, 21): _O}
+for (_x, _y), _c in ARM.items():
+    assert not BODY[_y, _x, 3], (_x, _y)
+    BODY[_y, _x] = _c
 P, PT, PB = 3, 4, 7
 H, W = SH + PT + PB, SW + 2 * P
 N = 32
