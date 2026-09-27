@@ -3716,14 +3716,14 @@ body:has(.anim-backdrop) .pp-bg-particles { display: none; }
   80%  { transform: scaleY(1.03); }
   100% { opacity: 1; transform: none; }
 }
-/* ── Eisblock um eingefrorene Figuren (v1457) ─────────────────────────
-   Pixelbild in Sprite-Auflösung (maleEisblock), liegt IN der Figur-
-   Hülle: steht mit ihr aufrecht und zieht sich beim Hover mit zurück.
-   Wächst beim Einfrieren von den Füßen hoch, zerspringt beim Auftauen. */
+/* ── Eiskruste um eingefrorene Figuren (v1457, Kruste seit v1458) ─────
+   Pixelbild in Sprite-Auflösung (maleEiskruste), deckungsgleich mit der
+   Figur und IN ihrer Hülle: steht mit ihr aufrecht und zieht sich beim
+   Hover mit zurück. Wächst beim Einfrieren von den Füßen hoch (Drehpunkt
+   inline), zerspringt beim Auftauen. */
 .hero-idle-eis {
   position: absolute;
   image-rendering: pixelated;
-  transform-origin: 50% 100%;
   animation: heroEisBilden .45s steps(6, end) backwards;
 }
 .hero-idle-eis.hero-idle-eis-schmilzt { animation: heroEisZerspringen .45s ease-in forwards; }

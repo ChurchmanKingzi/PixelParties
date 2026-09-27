@@ -2057,78 +2057,166 @@ function HeroSpriteEbene() {
   return <div className="hero-sprite-ebene" ref={HeroIdleAnims.setzeEbene} aria-hidden="true" />;
 }
 
-// ★ v1457 — EISBLOCK um eingefrorene Figuren (Als Vorgabe 27.9.: „bei
-// Frozen Heroes sollte ein visueller Eisblock um sie herum gezeichnet
-// werden"). Nötig, weil große Figuren das Eis-Overlay und das Abzeichen
-// ihrer Karte verdecken — Waflav stand eingefroren still und sah aus wie
-// ein Fehler. Gemalt in Sprite-Auflösung (Pixel für Pixel, Bayer-
-// Dithering wie die übrige Pixelkunst): halbtransparenter Block, der die
-// Figur bläulich tönt, helle Kante oben/links, dunkle unten/rechts,
-// diagonale Glanzlinien, ein paar Risse, Raureif am Fuß.
+// ★ v1457 — EIS um eingefrorene Figuren (Als Vorgabe 27.9.: „bei Frozen
+// Heroes sollte ein visueller Eisblock um sie herum gezeichnet werden").
+// Nötig, weil große Figuren das Eis-Overlay und das Abzeichen ihrer Karte
+// verdecken — Waflav stand eingefroren still und sah aus wie ein Fehler.
+//
+// ★ v1458 (Als Befund 27.9.: „Besonders bei großen Figuren sieht der
+// Eisblock noch gar nicht gut aus — Eistextur oder detailreicher"): statt
+// eines Rechtecks eine EISKRUSTE, die der Silhouette folgt. Eingefrorene
+// Figuren stehen ohnehin in ihrem Frame still, also wird die Kruste genau
+// auf diesen Frame zugeschnitten:
+//   • Silhouette des Frames, rund um 3 px verbreitert, oben ein paar
+//     Eiszacken;
+//   • kristalline Facetten (Voronoi, feste Pixelgröße — große Figuren
+//     bekommen also MEHR Facetten statt größerer Flächen), jede mit
+//     eigenem Blauton, von oben links beleuchtet, Bayer-gedithert;
+//   • helle Facettenkanten, Glanzstriche, Raureif am Fuß;
+//   • Pixelkontur: hell, wo Licht von oben/links kommt, sonst dunkel.
+// Über der Figur halbtransparent (tönt sie bläulich), im Rand daneben
+// dichter, damit das Eis als Körper lesbar ist.
 const EIS_BAYER = [[0, 8, 2, 10], [12, 4, 14, 6], [3, 11, 1, 9], [15, 7, 13, 5]];
-function maleEisblock(ctx, w, h) {
-  const bild = ctx.createImageData(w, h);
-  const d = bild.data;
-  const setze = (x, y, r, g, b, a) => {
-    if (x < 0 || y < 0 || x >= w || y >= h) return;
-    const i = (y * w + x) * 4;
-    d[i] = r; d[i + 1] = g; d[i + 2] = b; d[i + 3] = Math.round(a * 255);
-  };
-  const bayer = (x, y) => (EIS_BAYER[y & 3][x & 3] + 0.5) / 16;
-  // Füllung: oben etwas dichter, ein geditherter Lichtstreifen links
+const EIS_TOENE = [[58, 112, 182], [96, 160, 226], [142, 202, 246], [192, 232, 255], [238, 250, 255]];
+function maleEiskruste(ctx, quelle, w, h, fussY) {
+  const a = quelle.data;
+  const N = w * h;
+  const figur = new Uint8Array(N);
+  for (let i = 0; i < N; i++) figur[i] = a[i * 4 + 3] > 60 ? 1 : 0;
+  // 1) Silhouette um R = 3 px verbreitern (runder Pinsel)
+  const R = 3, maske = new Uint8Array(N);
+  const pinsel = [];
+  for (let dy = -R; dy <= R; dy++) for (let dx = -R; dx <= R; dx++) if (dx * dx + dy * dy <= R * R + 1) pinsel.push([dx, dy]);
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
-      const oben = y < h * 0.35;
-      const streifen = x > w * 0.16 && x < w * 0.3 && bayer(x, y) < 0.5;
-      if (streifen) setze(x, y, 205, 238, 255, 0.36);
-      else setze(x, y, 160, 214, 255, oben ? 0.3 : 0.24);
+      if (!figur[y * w + x]) continue;
+      for (const [dx, dy] of pinsel) {
+        const nx = x + dx, ny = y + dy;
+        if (nx >= 0 && ny >= 0 && nx < w && ny < h) maske[ny * w + nx] = 1;
+      }
     }
   }
-  // Glanzlinien: zwei Diagonalen im oberen linken Bereich
-  const k1 = Math.max(4, Math.round(Math.min(w, h) * 0.32));
-  for (let y = 2; y < h * 0.6; y++) {
-    for (let x = 2; x < w * 0.6; x++) {
-      if (x + y === k1) setze(x, y, 255, 255, 255, 0.75);
-      else if (x + y === k1 + 3) setze(x, y, 255, 255, 255, 0.45);
-    }
-  }
-  // Risse: kurze Zickzack-Linien, fest aus der Größe gesät
-  let saat = (w * 73856093) ^ (h * 19349663);
+  // Unter der Standlinie kein Eis (die Kruste steht auf der Karte)
+  const boden = Math.min(h, Math.max(1, Math.round(fussY)));
+  for (let y = boden; y < h; y++) for (let x = 0; x < w; x++) maske[y * w + x] = 0;
+  // 2) Eiszacken auf der Oberkante, fest aus der Größe gesät
+  let saat = (w * 73856093) ^ (h * 19349663) ^ 0x5bd1e995;
   const zufall = () => { saat = (Math.imul(saat, 1103515245) + 12345) | 0; return ((saat >>> 8) & 0xffff) / 65536; };
-  const nRisse = Math.max(2, Math.round((w * h) / 520));
-  for (let r = 0; r < nRisse; r++) {
-    let x = 3 + Math.floor(zufall() * (w - 6));
-    let y = Math.floor(h * 0.3 + zufall() * h * 0.55);
-    const richtung = zufall() < 0.5 ? -1 : 1;
-    const laenge = 4 + Math.floor(zufall() * 6);
-    for (let k = 0; k < laenge; k++) {
-      setze(x, y, 95, 150, 205, 0.7);
-      y += 1;
-      if (zufall() < 0.6) x += richtung;
+  const oben = new Int32Array(w).fill(-1);
+  for (let x = 0; x < w; x++) for (let y = 0; y < h; y++) if (maske[y * w + x]) { oben[x] = y; break; }
+  const spalten = [];
+  for (let x = 2; x < w - 2; x++) if (oben[x] >= 0) spalten.push(x);
+  const nZacken = Math.min(9, Math.max(2, Math.round(spalten.length / 11)));
+  for (let z = 0; z < nZacken && spalten.length; z++) {
+    const cx = spalten[Math.floor(zufall() * spalten.length)];
+    const hoch = 3 + Math.floor(zufall() * 4), halb = 1 + Math.floor(zufall() * 2);
+    const fuss = oben[cx];
+    for (let k = 0; k < hoch; k++) {
+      const y = fuss - k - 1, breite = Math.max(0, Math.round(halb * (1 - k / hoch)));
+      if (y < 0) break;
+      for (let dx = -breite; dx <= breite; dx++) { const x = cx + dx; if (x >= 0 && x < w) maske[y * w + x] = 1; }
     }
   }
-  // Raureif am Fuß
-  for (let y = h - 3; y < h - 1; y++) {
-    for (let x = 1; x < w - 1; x++) {
-      if (bayer(x, y) < (y === h - 2 ? 0.7 : 0.4)) setze(x, y, 240, 250, 255, 0.85);
+  // 3) Facetten: Voronoi auf verwürfeltem Raster
+  const zelle = w * h > 6000 ? 12 : (w * h > 2500 ? 9 : 7);
+  const gx = Math.ceil(w / zelle) + 1, gy = Math.ceil(h / zelle) + 1;
+  const kx = new Float32Array(gx * gy), ky = new Float32Array(gx * gy), kt = new Float32Array(gx * gy);
+  for (let j = 0; j < gy; j++) for (let i = 0; i < gx; i++) {
+    const n = j * gx + i;
+    kx[n] = (i + 0.15 + zufall() * 0.7) * zelle;
+    ky[n] = (j + 0.15 + zufall() * 0.7) * zelle;
+    kt[n] = zufall();
+  }
+  const bild = ctx.createImageData(w, h);
+  const d = bild.data;
+  const setze = (i, f, al) => { d[i * 4] = f[0]; d[i * 4 + 1] = f[1]; d[i * 4 + 2] = f[2]; d[i * 4 + 3] = Math.round(al * 255); };
+  const drin = (x, y) => x >= 0 && y >= 0 && x < w && y < h && maske[y * w + x];
+  let yMin = h, yMax = 0;
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) if (maske[y * w + x]) { if (y < yMin) yMin = y; if (y > yMax) yMax = y; }
+  const hoehe = Math.max(1, yMax - yMin);
+  const facette = new Int32Array(N).fill(-1);
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const i = y * w + x;
+      if (!maske[i]) continue;
+      const ci = Math.floor(x / zelle), cj = Math.floor(y / zelle);
+      let d1 = 1e9, d2 = 1e9, n1 = -1;
+      for (let dj = -1; dj <= 1; dj++) for (let di = -1; di <= 1; di++) {
+        const ii = ci + di, jj = cj + dj;
+        if (ii < 0 || jj < 0 || ii >= gx || jj >= gy) continue;
+        const n = jj * gx + ii, ex = x + 0.5 - kx[n], ey = y + 0.5 - ky[n], q = ex * ex + ey * ey;
+        if (q < d1) { d2 = d1; d1 = q; n1 = n; } else if (q < d2) d2 = q;
+      }
+      facette[i] = n1;
+      const kante = Math.sqrt(d2) - Math.sqrt(d1) < 1.05;
+      // Helligkeit: Grundton der Facette + Licht von oben links + Höhe
+      const lx = (kx[n1] - x) / zelle, ly = (ky[n1] - y) / zelle;
+      let t = 0.3 + kt[n1] * 0.38 + (lx + ly) * 0.1 + (1 - (y - yMin) / hoehe) * 0.18;
+      t = Math.max(0, Math.min(1, t));
+      const stufe = t * 3;
+      let k = Math.floor(stufe);
+      if (stufe - k > (EIS_BAYER[y & 3][x & 3] + 0.5) / 16) k++;
+      k = Math.min(3, k);
+      const ueberFigur = figur[i] === 1;
+      // Über der Figur zurückhaltend (sie soll lesbar bleiben), im Rand
+      // daneben dichter, damit das Eis als Körper lesbar ist.
+      if (kante) setze(i, EIS_TOENE[4], ueberFigur ? 0.32 : 0.75);
+      else setze(i, EIS_TOENE[k], ueberFigur ? 0.3 : 0.58);
     }
   }
-  // Kanten: hell oben/links, dunkel unten/rechts, innen ein Lichtsaum
-  for (let x = 0; x < w; x++) { setze(x, 0, 235, 250, 255, 0.95); setze(x, h - 1, 85, 140, 200, 0.9); }
-  for (let y = 0; y < h; y++) { setze(0, y, 235, 250, 255, 0.95); setze(w - 1, y, 85, 140, 200, 0.9); }
-  for (let x = 1; x < w - 1; x++) setze(x, 1, 255, 255, 255, 0.45);
-  for (let y = 1; y < h - 1; y++) setze(1, y, 255, 255, 255, 0.45);
-  // Funkeln an den Ecken
-  setze(2, 2, 255, 255, 255, 1); setze(w - 3, 2, 255, 255, 255, 1); setze(w - 4, 3, 255, 255, 255, 0.7);
+  // 4) Glanzstriche in jeder dritten Facette der oberen zwei Drittel
+  for (let n = 0; n < gx * gy; n++) {
+    if (kt[n] > 0.34) continue;
+    const sx = Math.round(kx[n] - 2), sy = Math.round(ky[n] + 1);
+    if (sy > yMin + hoehe * 0.7) continue;
+    const laenge = 2 + Math.round(kt[n] * 6);
+    for (let q = 0; q < laenge; q++) {
+      const x = sx + q, y = sy - q;
+      if (drin(x, y) && facette[y * w + x] === n) setze(y * w + x, EIS_TOENE[4], 0.9);
+    }
+  }
+  // 5) Raureif am Fuß
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      if (!maske[y * w + x]) continue;
+      if (!drin(x, y + 2) && (EIS_BAYER[y & 3][x & 3] + 0.5) / 16 < 0.55) setze(y * w + x, EIS_TOENE[4], 0.85);
+    }
+  }
+  // 6) Kontur: hell, wo oben/links frei ist, sonst dunkel
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      if (!maske[y * w + x]) continue;
+      const obenFrei = !drin(x, y - 1), linksFrei = !drin(x - 1, y);
+      const untenFrei = !drin(x, y + 1) && y + 1 < boden, rechtsFrei = !drin(x + 1, y);
+      if (obenFrei || linksFrei) setze(y * w + x, [226, 248, 255], 0.95);
+      else if (untenFrei || rechtsFrei) setze(y * w + x, EIS_TOENE[0], 0.95);
+    }
+  }
   ctx.putImageData(bild, 0, 0);
 }
-function HeroEisblock({ breite, hoehe, stil, schmilzt }) {
+// Die Kruste wird aus dem gerade stehenden Frame der Figur gemalt. Beim
+// Aufbau laufen Kind-Effekte VOR dem Effekt, der den ersten Frame malt —
+// deshalb wird gewartet, bis die Figur sichtbar ist.
+function HeroEiskruste({ quelleRef, breite, hoehe, fussY, stil, schmilzt }) {
   const ref = useRef(null);
   useEffect(() => {
-    const cv = ref.current;
-    if (!cv) return;
-    try { maleEisblock(cv.getContext('2d'), breite, hoehe); } catch {}
-  }, [breite, hoehe]);
+    let versuche = 0, raf = 0, aus = false;
+    const male = () => {
+      raf = 0;
+      if (aus) return;
+      const cv = ref.current, quelle = quelleRef.current;
+      if (!cv || !quelle) return;
+      try {
+        const q = quelle.getContext('2d').getImageData(0, 0, breite, hoehe);
+        let sichtbar = false;
+        for (let i = 3; i < q.data.length; i += 16) if (q.data[i] > 60) { sichtbar = true; break; }
+        if (!sichtbar && versuche++ < 30) { raf = requestAnimationFrame(male); return; }
+        maleEiskruste(cv.getContext('2d'), q, breite, hoehe, fussY);
+      } catch {}
+    };
+    male();
+    return () => { aus = true; if (raf) cancelAnimationFrame(raf); };
+  }, [quelleRef, breite, hoehe, fussY]);
   return <canvas ref={ref} width={breite} height={hoehe}
     className={'hero-idle-eis' + (schmilzt ? ' hero-idle-eis-schmilzt' : '')} style={stil} />;
 }
@@ -2139,7 +2227,7 @@ function HeroEisblock({ breite, hoehe, stil, schmilzt }) {
 // Hover-Vergrößerung).
 // `angehalten`: Frame bleibt stehen (Frozen/Stunned/Webbed).
 // `versteinert`: zusätzlich Steinoptik (kriecht von unten nach oben).
-// `eingefroren`: zusätzlich ein Eisblock um die Figur (v1457).
+// `eingefroren`: zusätzlich eine Eiskruste um die Figur (v1457/v1458).
 function HeroIdleSprite({ cardName, angehalten, versteinert, eingefroren, unsichtbar }) {
   const key = HeroIdleAnims.slug(cardName);
   // Eisblock: 'da' solange Frozen, danach kurz 'schmilzt' (zerspringt),
@@ -2356,18 +2444,9 @@ function HeroIdleSprite({ cardName, angehalten, versteinert, eingefroren, unsich
     width: `calc(${bs(fw * s)})`,
     height: `calc(${bs(fh * s)})`,
   };
-  // Eisblock: Umriss der Figur plus Rand, unten bis zur Standlinie —
-  // auf den Frame begrenzt, damit der Steher (overflow: hidden) keine
-  // Kante abschneidet (Bubbles reicht bis an den Frame-Rand).
-  const eisX0 = Math.max(0, Math.floor(kern.x0) - 2), eisY0 = Math.max(0, Math.floor(kern.y0) - 3);
-  const eisX1 = Math.min(fw, Math.ceil(kern.x1) + 2);
-  const eisY1 = Math.min(Math.ceil(unterkante), Math.ceil(fussY) + 1);
-  const eisStil = {
-    left: `calc(${bs(eisX0 * s)})`,
-    top: `calc(${bs(eisY0 * s)})`,
-    width: `calc(${bs((eisX1 - eisX0) * s)})`,
-    height: `calc(${bs((eisY1 - eisY0) * s)})`,
-  };
+  // Eiskruste: deckungsgleich mit dem Sprite-Canvas, Drehpunkt an den
+  // Füßen (dort wächst sie beim Einfrieren hoch)
+  const eisStil = { ...canvasStil, left: 0, top: 0, transformOrigin: drehpunkt };
   const schattenBreite = Math.max(8, cw * s * 0.8);
   const schattenStil = {
     width: `calc(${bs(schattenBreite)})`,
@@ -2384,8 +2463,8 @@ function HeroIdleSprite({ cardName, angehalten, versteinert, eingefroren, unsich
             <div className="hero-idle-holo" style={{ transformOrigin: drehpunkt }}>
               <canvas ref={canvasRef} width={fw} height={fh} className="hero-idle-canvas" style={canvasStil} />
               {eisPhase !== 'weg' && (
-                <HeroEisblock breite={eisX1 - eisX0} hoehe={eisY1 - eisY0} stil={eisStil}
-                  schmilzt={eisPhase === 'schmilzt'} />
+                <HeroEiskruste quelleRef={canvasRef} breite={fw} hoehe={fh} fussY={fussY}
+                  stil={eisStil} schmilzt={eisPhase === 'schmilzt'} />
               )}
             </div>
           </div>
