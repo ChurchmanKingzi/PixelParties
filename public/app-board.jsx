@@ -1727,7 +1727,11 @@ function DraggablePanel({ children, className, style }) {
 //  dass sie unverzerrt zum Betrachter zeigt (Drehachse an den Füßen,
 //  Winkel aus der gemessenen Matrix der Brettebene). Ohne Neigung
 //  (Telefon, Engpass-Rückfall) ist er 0° — die Figur liegt dann flach.
-//  Seit v1451 außerdem 1,5× größer (Als Vorgabe 27.9.: „zu klein").
+//  Seit v1451 außerdem 1,5× größer (Als Vorgabe 27.9.: „zu klein"),
+//  seit v1452 nochmals 1,5× (2,25 Kartenpixel je Sprite-Pixel), am
+//  Gesicht ausgerichtet (`faceX`), und beim Hover über die Heldenkarte
+//  zieht sich die Figur wie ein Hologramm zurück, damit die
+//  Status-Icons frei sichtbar sind.
 // ═══════════════════════════════════════════
 const HeroIdleAnims = (() => {
   // Slug-Regel wie bei den Effekt-Skripten und den Sheet-Dateinamen.
@@ -1779,7 +1783,22 @@ const HeroIdleAnims = (() => {
           if (ly < y0) y0 = ly; if (ly >= y1) y1 = ly + 1;
         }
       }
-      return x1 > x0 && y1 > y0 ? { x0, y0, x1, y1 } : rueckfall;
+      if (!(x1 > x0 && y1 > y0)) return rueckfall;
+      // Rückfall für die Waagrechte, falls ein Sheet (noch) kein `faceX`
+      // hat: Schwerpunkt der deckenden Pixel im obersten Drittel der
+      // Figur — dort sitzt meist der Kopf. Schwerpunkt statt Mitte des
+      // Umrisses, weil Waffen, Haare und Umhänge den Umriss einseitig
+      // verbreitern (genau das verschob Kazena und Locke).
+      const kopfBis = y0 + Math.max(1, Math.round((y1 - y0) / 3));
+      let summe = 0, n = 0;
+      for (let y = 0; y < h; y++) {
+        for (let x = 0; x < w; x++) {
+          if (d[(y * w + x) * 4 + 3] < 160) continue;
+          const lx = vertikal ? x : x % fw, ly = vertikal ? y % fh : y;
+          if (ly < kopfBis) { summe += lx + 0.5; n++; }
+        }
+      }
+      return { x0, y0, x1, y1, kopfX: n ? summe / n : (x0 + x1) / 2 };
     } catch { return rueckfall; }
   }
 
@@ -2081,9 +2100,20 @@ function HeroIdleSprite({ cardName, angehalten, versteinert, unsichtbar }) {
         && !l.plane.hasAttribute('data-pp-dragging'));
       if (hover !== st.hover) {
         st.hover = hover;
+        // ★ v1452 (Als Vorgabe 27.9.): Hovert man die Heldenkarte, zieht
+        // sich die Figur wie ein Hologramm in die Karte zurück — die
+        // Status-Icons darunter werden frei. Beim Verlassen taucht sie
+        // wieder auf. `hero-idle-zurueck` trägt nur die Auftauch-
+        // Animation und fällt an deren Ende weg (siehe animationend).
         platz.classList.toggle('hero-idle-hover', hover);
+        platz.classList.toggle('hero-idle-zurueck', !hover);
       }
     };
+    const holo = platz.querySelector('.hero-idle-holo');
+    const auftauchenFertig = (e) => {
+      if (e.animationName === 'heroHoloAuftauchen') platz.classList.remove('hero-idle-zurueck');
+    };
+    if (holo) holo.addEventListener('animationend', auftauchenFertig);
     folgeZone();
     male();
     // Scharfe Pixel beim Vergrößern, weiches Verkleinern (`pixelated`
@@ -2114,7 +2144,11 @@ function HeroIdleSprite({ cardName, angehalten, versteinert, unsichtbar }) {
       else st.stein = 0;
       if (st.frame !== st.gemalt || st.stein !== st.steinGemalt) male();
     });
-    return () => { abmelden(); if (ro) ro.disconnect(); };
+    return () => {
+      abmelden();
+      if (ro) ro.disconnect();
+      if (holo) holo.removeEventListener('animationend', auftauchenFertig);
+    };
   }, [eintrag, ebene]);
 
   const anker = <span ref={ankerRef} className="hero-idle-anker" />;
@@ -2122,41 +2156,49 @@ function HeroIdleSprite({ cardName, angehalten, versteinert, unsichtbar }) {
   const { meta, kern } = eintrag;
   const fw = meta.frameWidth, fh = meta.frameHeight;
   const cw = Math.max(1, kern.x1 - kern.x0), ch = Math.max(1, kern.y1 - kern.y0);
-  // Maßstab: 1,5 Kartenpixel je Sprite-Pixel (v1451, vorher 1), große
-  // Sprites eingepasst in 90 × 45 — die halbe Kartenhöhe, weil die Figur
-  // jetzt aufrecht über der Karte steht statt das Drittel zu bedecken.
-  const s = Math.min(1.5, 90 / cw, 45 / ch);
+  // Maßstab: 2,25 Kartenpixel je Sprite-Pixel (v1452; v1451: 1,5,
+  // v1450: 1 — Als Vorgabe 27.9. zweimal „mindestens 50 % größer"),
+  // große Sprites eingepasst in 135 × 67,5 (drei Viertel der Kartenhöhe;
+  // die Figur steht aufrecht über der Karte).
+  const s = Math.min(2.25, 135 / cw, 67.5 / ch);
   const bs = (n) => `${+n.toFixed(3)}px * var(--board-scale)`;
+  // ★ v1452 (Als Vorgabe 27.9.): „Sofern nicht anders angegeben, bildet
+  // immer das GESICHT des Heroes den Bildmittelpunkt." Reihenfolge:
+  // `anchorX` (ausdrücklich anders angegeben) → `faceX` (Gesichtsmitte,
+  // je Sheet vermessen) → Kopf-Schwerpunkt (Rückfall). Alle in
+  // Frame-Pixeln, gemessen von der linken Frame-Kante.
+  const zahl = (v) => (typeof v === 'number' && Number.isFinite(v) ? v : null);
+  const mitteX = zahl(meta.anchorX) ?? zahl(meta.faceX) ?? zahl(kern.kopfX) ?? (kern.x0 + cw / 2);
   // Kartenoberkante = Zonenmitte − 45; die Füße stehen auf der
-  // Drittellinie (Oberkante + 30), die Figur ist waagrecht mittig.
+  // Drittellinie (Oberkante + 30), das Gesicht über der Kartenmitte.
   // Der Steher reicht vom oberen Sheet-Rand bis zu den Füßen; seine
   // Unterkante ist die Drehachse, darunter wird abgeschnitten.
   const steherStil = {
     width: `calc(${bs(fw * s)})`,
     height: `calc(${bs(kern.y1 * s)})`,
-    left: `calc(50% - ${bs((kern.x0 + cw / 2) * s)})`,
+    left: `calc(50% - ${bs(mitteX * s)})`,
     top: `calc(50% - ${bs(15 + kern.y1 * s)})`,
-    ...(unsichtbar ? { opacity: 0.4 } : null),
   };
   const canvasStil = {
     width: `calc(${bs(fw * s)})`,
     height: `calc(${bs(fh * s)})`,
   };
-  const schattenBreite = Math.max(8, cw * s * 0.8);
+  const schattenBreite = Math.max(8, Math.min(cw * s * 0.8, 70));
   const schattenStil = {
     width: `calc(${bs(schattenBreite)})`,
     left: `calc(50% - ${bs(schattenBreite / 2)})`,
-    ...(unsichtbar ? { opacity: 0.4 } : null),
   };
   return (
     <>
       {anker}
       {ReactDOM.createPortal(
         <div ref={platzRef} data-held={cardName}
-          className={'hero-idle-platz' + (versteinert ? ' hero-idle-stein' : '') + (angehalten ? ' hero-idle-angehalten' : '')}>
+          className={'hero-idle-platz' + (versteinert ? ' hero-idle-stein' : '') + (angehalten ? ' hero-idle-angehalten' : '') + (unsichtbar ? ' hero-idle-unsichtbar' : '')}>
           <div className="hero-idle-schatten" style={schattenStil} />
           <div className="hero-idle-steher" style={steherStil}>
-            <canvas ref={canvasRef} width={fw} height={fh} className="hero-idle-canvas" style={canvasStil} />
+            <div className="hero-idle-holo">
+              <canvas ref={canvasRef} width={fw} height={fh} className="hero-idle-canvas" style={canvasStil} />
+            </div>
           </div>
         </div>,
         ebene)}
