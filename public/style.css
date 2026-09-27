@@ -24067,3 +24067,190 @@ body.pp-dialog-offen .foil-diamond-rare:not(.modal-overlay *) {
   .top-bar { --kopf-knopf-h: 24px; }
   .top-bar .volume-btn { font-size: 18px; }
 }
+
+/* ═══ SHOP-KACHELN: ZIERRAHMEN (v1468) ════════════════════════════════
+   Als Vorgabe 27.9.: „Im Shop sind die Rahmen um Shop-Items aktuell noch
+   nicht aufgehuebscht."
+
+   Bis hier trug jede Kachel nur Kontur, Relief und Schatten — eine
+   duenne Linie in der Zustandsfarbe. Jetzt dieselbe Rahmensprache wie
+   die Menuefenster (`.pp-fenster`), fuer viele kleine Kacheln etwas
+   leiser:
+     • abgeschraegter 3-px-Rand in der Zustandsfarbe `--zier`
+       (Licht oben/links, Schatten unten/rechts),
+     • Doppelring aussen (Kontur · Farbring · Kontur), harter Schatten,
+     • Pixel-Eckschnoerkel — dieselben Masken wie `.pp-fenster`, halb so
+       gross — auf einem eigenen Zier-Element (`.shop-item-zier`), weil
+       `::before`/`::after` der Kachel schon Regenbogenring, Goldglanz und
+       Funken tragen.
+   Zustandsfarben wie bisher: Regenbogen (nicht gekauft — die Schnoerkel
+   wandern durch die Farben), Gold (besitzt / ausgewaehlt), Gruen
+   (ausgeruestet / aktives Structure Deck), sonst die Spielerfarbe.
+   ALLE Zustaende haben jetzt 3 px Rand — vorher 2 oder 3, und weil das
+   Raster jede Zeile auf die hoechste Kachel streckt, sprang eine Zeile
+   beim Zustandswechsel um 2 px (s. Kommentar bei `.structure-deck-item`). */
+.shop-item {
+  --zier: var(--player-color, var(--accent));
+  --zier-schein: transparent;
+  position: relative;
+  overflow: visible;
+  border-width: 3px;
+  border-style: solid;
+  border-color:
+    color-mix(in srgb, var(--zier) 70%, #fff)
+    color-mix(in srgb, var(--zier) 72%, #000)
+    color-mix(in srgb, var(--zier) 62%, #000)
+    color-mix(in srgb, var(--zier) 82%, #fff);
+  box-shadow:
+    0 0 0 2px var(--pp-kontur),
+    0 0 0 4px color-mix(in srgb, var(--zier) 50%, #000),
+    0 0 0 6px var(--pp-kontur),
+    inset 0 0 0 1px var(--pp-kontur),
+    inset 0 0 18px color-mix(in srgb, var(--zier) 10%, transparent),
+    8px 9px 0 rgba(0, 0, 0, .45),
+    0 0 14px var(--zier-schein);
+}
+.shop-item.shop-owned {
+  box-shadow:
+    0 0 0 2px var(--pp-kontur),
+    0 0 0 4px color-mix(in srgb, var(--zier) 50%, #000),
+    0 0 0 6px var(--pp-kontur),
+    inset 0 0 0 1px var(--pp-kontur),
+    inset 0 0 18px color-mix(in srgb, var(--zier) 10%, transparent),
+    8px 9px 0 rgba(0, 0, 0, .45),
+    0 0 14px var(--zier-schein);
+}
+/* Hover: dieselben Selektoren wie die aelteren, spezifischeren Regeln
+   (`.shop-item.shop-owned:hover`, `.structure-deck-item:hover`), sonst
+   setzten die ihren Schatten ohne Ringe. */
+.shop-item:hover,
+.shop-item.shop-owned:hover,
+.structure-deck-item:hover:not([disabled]) {
+  --zier-schein: color-mix(in srgb, var(--zier) 40%, transparent);
+  box-shadow:
+    0 0 0 2px var(--pp-kontur),
+    0 0 0 4px color-mix(in srgb, var(--zier) 65%, #000),
+    0 0 0 6px var(--pp-kontur),
+    inset 0 0 0 1px var(--pp-kontur),
+    inset 0 0 22px color-mix(in srgb, var(--zier) 16%, transparent),
+    8px 9px 0 rgba(0, 0, 0, .45),
+    0 0 22px var(--zier-schein);
+}
+/* Zustaende: nur die Farbe. `!important` bei der Randfarbe, weil die
+   alten Zustandsregeln sie mit `!important` flach setzen. */
+.shop-item.shop-owned,
+.shop-item.shop-selected { --zier: #ffd700; --zier-schein: rgba(255, 215, 0, .3); }
+.shop-item.shop-equipped,
+.shop-item.structure-deck-default { --zier: #33ff88; --zier-schein: rgba(51, 255, 136, .35); }
+.shop-item.shop-owned,
+.shop-item.shop-selected,
+.shop-item.shop-equipped,
+.shop-item.structure-deck-default {
+  border-width: 3px;
+  border-color:
+    color-mix(in srgb, var(--zier) 70%, #fff)
+    color-mix(in srgb, var(--zier) 72%, #000)
+    color-mix(in srgb, var(--zier) 62%, #000)
+    color-mix(in srgb, var(--zier) 82%, #fff) !important;
+}
+.shop-item.shop-selected {
+  --zier-schein: rgba(255, 215, 0, .5);
+  box-shadow:
+    0 0 0 2px var(--pp-kontur),
+    0 0 0 4px color-mix(in srgb, var(--zier) 70%, #000),
+    0 0 0 6px var(--pp-kontur),
+    inset 0 0 0 1px var(--pp-kontur),
+    inset 0 0 22px color-mix(in srgb, var(--zier) 18%, transparent),
+    8px 9px 0 rgba(0, 0, 0, .45),
+    0 0 24px var(--zier-schein) !important;
+}
+/* Goldglanz laeuft genau auf dem 3-px-Rand. */
+.shop-item.shop-owned::before { inset: -3px; border-width: 3px; }
+
+/* Nicht gekauft: der Regenbogenring deckt den Rand (3 px), Relief und
+   Schnoerkel liegen darueber. */
+.shop-item:not(.shop-owned):not(.structure-deck-default):not(.shop-selected):not(.shop-equipped) {
+  --zier: #b86bff;
+  border-color: transparent;
+}
+.shop-item:not(.shop-owned):not(.structure-deck-default):not(.shop-selected)::before {
+  inset: -3px;
+  border-width: 3px;
+}
+
+/* Der Puls der Zustaende traegt die Ringe mit (die alten Bilder setzten
+   `box-shadow` komplett und haetten sie geloescht). */
+@keyframes shop-unowned-glow {
+  0%, 100% { box-shadow: 0 0 0 2px var(--pp-kontur), 0 0 0 4px #3a1f55, 0 0 0 6px var(--pp-kontur), inset 0 0 0 1px var(--pp-kontur), 8px 9px 0 rgba(0, 0, 0, .45), 0 0 10px rgba(0,240,255,.25), 0 0 18px rgba(196,75,255,.14); }
+  50%      { box-shadow: 0 0 0 2px var(--pp-kontur), 0 0 0 4px #5a2f86, 0 0 0 6px var(--pp-kontur), inset 0 0 0 1px var(--pp-kontur), 8px 9px 0 rgba(0, 0, 0, .45), 0 0 22px rgba(0,240,255,.55), 0 0 36px rgba(255,73,176,.35); }
+}
+@keyframes structure-deck-equipped-pulse {
+  0%, 100% { box-shadow: 0 0 0 2px var(--pp-kontur), 0 0 0 4px #1a7a45, 0 0 0 6px var(--pp-kontur), inset 0 0 0 1px var(--pp-kontur), 8px 9px 0 rgba(0, 0, 0, .45), 0 0 16px rgba(51,255,136,.55); }
+  50%      { box-shadow: 0 0 0 2px var(--pp-kontur), 0 0 0 4px #25a45e, 0 0 0 6px var(--pp-kontur), inset 0 0 0 1px var(--pp-kontur), 8px 9px 0 rgba(0, 0, 0, .45), 0 0 28px rgba(80,255,160,.8); }
+}
+
+/* Das Zier-Element: Eckschnoerkel (::before) und Lichtkante (::after). */
+.shop-item-zier {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+}
+.shop-item-zier::before {
+  content: '';
+  position: absolute;
+  inset: 2px;
+  --eck-e: 2px;
+  --eck-gr: calc(var(--eck-e) * 8);
+  background: color-mix(in srgb, var(--zier) 70%, #fff);
+  filter: drop-shadow(1px 1px 0 rgba(0, 0, 0, .7));
+  -webkit-mask:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 8' shape-rendering='crispEdges'%3E%3Cpath fill='%23fff' d='M0 0h8v1h-8zM0 1h2v1h-2zM0 2h1v1h-1zM2 2h4v1h-4zM0 3h1v1h-1zM2 3h1v1h-1zM0 4h1v1h-1zM2 4h1v1h-1zM0 5h1v1h-1zM0 6h1v1h-1zM0 7h1v1h-1z'/%3E%3C/svg%3E") left top / var(--eck-gr) var(--eck-gr) no-repeat,
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 8' shape-rendering='crispEdges'%3E%3Cpath fill='%23fff' d='M0 0h8v1h-8zM6 1h2v1h-2zM2 2h4v1h-4zM7 2h1v1h-1zM5 3h1v1h-1zM7 3h1v1h-1zM5 4h1v1h-1zM7 4h1v1h-1zM7 5h1v1h-1zM7 6h1v1h-1zM7 7h1v1h-1z'/%3E%3C/svg%3E") right top / var(--eck-gr) var(--eck-gr) no-repeat,
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 8' shape-rendering='crispEdges'%3E%3Cpath fill='%23fff' d='M0 0h1v1h-1zM0 1h1v1h-1zM0 2h1v1h-1zM0 3h1v1h-1zM2 3h1v1h-1zM0 4h1v1h-1zM2 4h1v1h-1zM0 5h1v1h-1zM2 5h4v1h-4zM0 6h2v1h-2zM0 7h8v1h-8z'/%3E%3C/svg%3E") left bottom / var(--eck-gr) var(--eck-gr) no-repeat,
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 8' shape-rendering='crispEdges'%3E%3Cpath fill='%23fff' d='M7 0h1v1h-1zM7 1h1v1h-1zM7 2h1v1h-1zM5 3h1v1h-1zM7 3h1v1h-1zM5 4h1v1h-1zM7 4h1v1h-1zM2 5h4v1h-4zM7 5h1v1h-1zM6 6h2v1h-2zM0 7h8v1h-8z'/%3E%3C/svg%3E") right bottom / var(--eck-gr) var(--eck-gr) no-repeat;
+  mask:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 8' shape-rendering='crispEdges'%3E%3Cpath fill='%23fff' d='M0 0h8v1h-8zM0 1h2v1h-2zM0 2h1v1h-1zM2 2h4v1h-4zM0 3h1v1h-1zM2 3h1v1h-1zM0 4h1v1h-1zM2 4h1v1h-1zM0 5h1v1h-1zM0 6h1v1h-1zM0 7h1v1h-1z'/%3E%3C/svg%3E") left top / var(--eck-gr) var(--eck-gr) no-repeat,
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 8' shape-rendering='crispEdges'%3E%3Cpath fill='%23fff' d='M0 0h8v1h-8zM6 1h2v1h-2zM2 2h4v1h-4zM7 2h1v1h-1zM5 3h1v1h-1zM7 3h1v1h-1zM5 4h1v1h-1zM7 4h1v1h-1zM7 5h1v1h-1zM7 6h1v1h-1zM7 7h1v1h-1z'/%3E%3C/svg%3E") right top / var(--eck-gr) var(--eck-gr) no-repeat,
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 8' shape-rendering='crispEdges'%3E%3Cpath fill='%23fff' d='M0 0h1v1h-1zM0 1h1v1h-1zM0 2h1v1h-1zM0 3h1v1h-1zM2 3h1v1h-1zM0 4h1v1h-1zM2 4h1v1h-1zM0 5h1v1h-1zM2 5h4v1h-4zM0 6h2v1h-2zM0 7h8v1h-8z'/%3E%3C/svg%3E") left bottom / var(--eck-gr) var(--eck-gr) no-repeat,
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 8' shape-rendering='crispEdges'%3E%3Cpath fill='%23fff' d='M7 0h1v1h-1zM7 1h1v1h-1zM7 2h1v1h-1zM5 3h1v1h-1zM7 3h1v1h-1zM5 4h1v1h-1zM7 4h1v1h-1zM2 5h4v1h-4zM7 5h1v1h-1zM6 6h2v1h-2zM0 7h8v1h-8z'/%3E%3C/svg%3E") right bottom / var(--eck-gr) var(--eck-gr) no-repeat;
+}
+/* Innere Lichtkante des Rahmens — auch ueber dem Regenbogenring. */
+.shop-item-zier::after {
+  content: '';
+  position: absolute;
+  inset: -3px;
+  box-shadow:
+    inset 1px 1px 0 rgba(255, 255, 255, .35),
+    inset -1px -1px 0 rgba(0, 0, 0, .45);
+}
+/* Nicht gekauft: die Schnoerkel wandern durch den Regenbogen. */
+.shop-item:not(.shop-owned):not(.structure-deck-default):not(.shop-selected):not(.shop-equipped) .shop-item-zier::before {
+  background: #6fe8ff;
+  animation: shop-zier-regenbogen 6s linear infinite;
+}
+@keyframes shop-zier-regenbogen {
+  from { filter: drop-shadow(1px 1px 0 rgba(0, 0, 0, .7)) hue-rotate(0deg); }
+  to   { filter: drop-shadow(1px 1px 0 rgba(0, 0, 0, .7)) hue-rotate(360deg); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .shop-item-zier::before { animation: none !important; }
+}
+
+/* Plaketten (OWNED / EQUIPPED) bleiben oben rechts, ruecken aber neben
+   den Eckschnoerkel (der belegt die aeusseren 18 px). Oben mittig
+   verdeckten sie bei Skins die Mitte des Kartennamens. Eckig wie der
+   Rahmen. */
+.shop-owned-badge {
+  top: 5px;
+  right: 20px;
+  border-radius: 0;
+  box-shadow: 0 0 0 1px var(--pp-kontur), 2px 2px 0 rgba(0, 0, 0, .5);
+  z-index: 4;
+}
+/* Das Schloss der nicht gekauften Skins ebenso, eckig. */
+.shop-lock-overlay { padding: 5px 20px 0 0; }
+.shop-lock-badge {
+  border-radius: 0;
+  box-shadow: 0 0 0 1px var(--pp-kontur), 2px 2px 0 rgba(0, 0, 0, .5);
+}
