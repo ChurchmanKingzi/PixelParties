@@ -32,7 +32,8 @@ q = np.floor(t + TH * 0.999).clip(0, len(cols) - 1).astype(int)
 for k, c in enumerate(cols):
     cv.a[q == k] = c
 
-SX, SY = 62, 48            # Sonnenmitte (hinter dem Kopf der Schlange)
+QS = 22                    # Quetzahuitl so weit hochgesetzt, dass die Oberkante der Schwingen unter dem Rahmen liegt
+SX, SY = 62, 48 - QS       # Sonnenmitte (hinter dem Kopf der Schlange)
 d = np.sqrt((xx + .5 - SX) ** 2 + (yy + .5 - SY) ** 2)
 ang = np.degrees(np.arctan2(yy + .5 - SY, xx + .5 - SX))
 # Strahlen: 16 Sektoren, jeder zweite heller (gedithert, nach außen schwächer)
@@ -87,7 +88,7 @@ def bez(p0, p1, p2, p3, n=200):
     t = np.linspace(0, 1, n)[:, None]
     return ((1 - t) ** 3) * p0 + 3 * ((1 - t) ** 2) * t * p1 + 3 * (1 - t) * t * t * p2 + t ** 3 * p3
 
-P = [np.array(v, float) for v in [(63, 64), (63, 42), (63, 38), (57, 31), (48, 24), (57, 16), (66, 16),
+P = [np.array(v, float) - (0, QS) for v in [(63, 64), (63, 42), (63, 38), (57, 31), (48, 24), (57, 16), (66, 16),
                                    (73, 16), (76, 13), (79, 13)]]
 C = np.concatenate([bez(P[0], P[1], P[1], P[2], 80), bez(P[2], P[3], P[4], P[5], 120)[1:],
                     bez(P[5], P[6], P[7], P[8], 120)[1:], bez(P[8], P[8], P[9], P[9], 20)[1:]])
@@ -125,7 +126,7 @@ cv.a[inside] = body[inside]
 serp = sprite('g31_serpent', B, [218])
 fr = serp[:, :100].copy()
 fr = max(parts(fr, dil=1), key=lambda p: (p[..., 3] > 0).sum())   # Streupixel weg
-cv.paste(fr, 62 - 49, 12)                         # Fühlerspitzen 24 px, Flügelspitzen 26/224 px vom Rand
+cv.paste(fr, 62 - 49, 12 - QS)                    # Oberkante der Schwingen bei y 4 (Rahmen deckt bis y 7)
 
 out = Canvas(250, 350)
 out.a[:] = up(np.dstack([cv.a, np.full((H, W), 255, np.uint8)]), 2)[..., :3]
