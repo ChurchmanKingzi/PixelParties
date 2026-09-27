@@ -7,15 +7,17 @@ src/<slug>-<teil>.png.
 
   bravo-arnold                           Skin: „Arnold-Kopie“ + Haartolle „Ebene #5“
   kit-the-shark-researcher               „Kit-Kopie“ + Hut „Ebene #49“
-  lolek-the-shard-knight                 „Lolek“ + ausgestreckter Arm „Lolek #2“;
+  lolek-the-shard-knight                 „Lolek“ + ausgestreckter Arm „Lolek #2“ +
+                                         Schulterstücke „Ebene #74“;
                                          Teil shards = türkise Scherben „Ebene #75“
                                          (Vorlagen für die Partikel)
   division-captain-lolek                 Skin: „Byakuya“; Teil shards = pinke
                                          Scherben „Ebene #78“
   lolek-mender-of-the-shattered-trident  „Ascended Lolek“ + Dreizack „Ebene #108“
   rakah-the-loan-shark                   „Rakah“ + Rückenflosse „Rakah #4“, Glas
-                                         „Rakah #5“ und Schwanzflosse (das kleine
-                                         Stück aus „Rakah #8“ neben ihm)
+                                         „Rakah #5“, Schwanzflosse (das Stück aus
+                                         „Rakah #3“ neben ihm) und das türkise
+                                         Stück aus „Rakah #8“
   rha-bi-the-living-skeleton             „The Light Brigade Marches #8“
   saya-the-plant-princess                „Saya“ + Flügel „Saya #1“ + Arme „Ebene #114“
   saya-the-grass-princess                Skin: „ERIKA“ + Busch „Ebene #113“ (verdeckt
@@ -106,14 +108,15 @@ def main(path):
     g = lambda n: layer(doc, L, n)
     save_parts('bravo-arnold', [('body', g('Arnold-Kopie')), ('hair', g('Ebene #5'))])
     save_parts('kit-the-shark-researcher', [('body', g('Kit-Kopie')), ('hat', g('Ebene #49'))])
-    save_parts('lolek-the-shard-knight', [('arm', g('Lolek #2')), ('body', g('Lolek'))])
+    save_parts('lolek-the-shard-knight', [('arm', g('Lolek #2')), ('shoulders', g('Ebene #74')), ('body', g('Lolek'))])
     # Scherben-Vorlagen separat (gehören nicht ins Sprite)
     Image.fromarray(g('Ebene #75')).crop(Image.fromarray(g('Ebene #75')).getbbox()).save(f'{OUT}/lolek-the-shard-knight-shards.png')
     save_parts('division-captain-lolek', [('body', g('Byakuya'))])
     Image.fromarray(g('Ebene #78')).crop(Image.fromarray(g('Ebene #78')).getbbox()).save(f'{OUT}/division-captain-lolek-shards.png')
     save_parts('lolek-mender-of-the-shattered-trident', [('body', g('Ascended Lolek')), ('trident', g('Ebene #108'))])
     rakah = g('Rakah')
-    save_parts('rakah-the-loan-shark', [('fin', g('Rakah #4')), ('tail', near(g('Rakah #8'), rakah)), ('body', rakah), ('glass', g('Rakah #5'))])
+    save_parts('rakah-the-loan-shark', [('fin', g('Rakah #4')), ('tail', near(g('Rakah #3'), rakah)),
+                                        ('blob', near(g('Rakah #8'), rakah)), ('body', rakah), ('glass', g('Rakah #5'))])
     save_parts('rha-bi-the-living-skeleton', [('body', g('The Light Brigade Marches #8'))])
     save_parts('saya-the-plant-princess', [('wings', g('Saya #1')), ('body', g('Saya')), ('arms', g('Ebene #114'))])
     save_parts('saya-the-grass-princess', [('body', g('ERIKA')), ('bush', g('Ebene #113'))])
