@@ -1,20 +1,21 @@
 # -*- coding: utf-8 -*-
 """10 Breaking Free – Im abendlichen Statuengarten des Petrifiers zerspringt die versteinerte Statue eines
-rothaarigen Mädchens: Die obere Hälfte ist schon aufgebrochen, ihr farbiges Gesicht und Haar kommen hervor,
-Risse laufen durch den restlichen Stein, Splitter fliegen, dahinter ein warmer Lichtschein. Zwei noch starre,
+rothaarigen Mädchens: Eine schräge, gezackte Bruchkante läuft von der linken Schulter zur rechten Hüfte – darüber
+ist sie wieder lebendig und farbig, darunter noch Stein in ihrer eigenen Körperform, Risse laufen zur Kante hinauf,
+an der Kante platzen Splitter ab, dahinter ein warmer Lichtschein. Zwei noch starre,
 versteinerte Opfer stehen weiter hinten auf Sockeln, dahinter eine dunkle Hecke mit Formschnitt-Büschen.
 
 Quellen (Motive.xcf, alle aus den Karten „Petrifier“ / „Petrification Break“):
-  1458 „Petrifier“ – linker Teil: Steinstatue des Mädchens (deckungsgleich mit 1457), 6×
-  1457 „Petrification Break #1“ – das Mädchen in Farbe (oberhalb der Bruchkante sichtbar), 6×
-  1456 „Petrification Break“ – linker Teil: zerbrochene Statuenhülle; nur ihr Sockel (untere 5 Zeilen), 6× und 2×
+  1457 „Petrification Break #1“ – das Mädchen: oberhalb der Bruchkante in Farbe, darunter in ihrer eigenen Silhouette zu Stein
+       umgefärbt (Palette der Steinstatue 1458 „Petrifier“, linker Teil), 5×
+  1456 „Petrification Break“ – linker Teil: zerbrochene Statuenhülle; nur ihr Sockel (untere 5 Zeilen), 5× und 2×
   1455 „Petrification Break #3“ (blonder Held mit Spiegelschild) und 1453 „Petrifier #1“ (brauner Mantel) –
        beide zu Stein umgefärbt, als Seitenstatuen weit hinten, 2×
   1450 „Petrifier #4“ (Formschnitt-Busch), 2× und als Heckentextur 2×
 Selbst gezeichnet: Abendhimmel, Lichtschein, Risse, Bruchkante, Splitter (Steinfarben der Statue), Kiesweg, Schatten.
 
 Skalierung:
-  Vordergrund (Statue/Mädchen, Sockel, Risse, Splitter, Schatten): 6× (Raster 42×59, beschnitten)
+  Vordergrund (Statue/Mädchen, Sockel, Risse, Splitter, Schatten): 5× (Raster 50×70)
   Hintergrund (Himmel, Schein, Hecke, Kiesweg, Seitenstatuen mit Sockeln, Büsche): 2× (Raster 125×175)
 """
 from common import *  # noqa
@@ -104,7 +105,7 @@ cv = Canvas(250, 350)
 cv.a[:] = up(bg.a, 2)
 
 # ---------------- Vordergrund 5×: die zerspringende Statue auf ihrem Sockel ----------------
-FW, FH = 42, 59
+FW, FH = 50, 70
 fg = np.zeros((FH, FW, 4), np.uint8)
 
 
@@ -113,58 +114,61 @@ def dot(x, y, c, a=255):
         fg[y, x, :3] = c; fg[y, x, 3] = a
 
 
-# Bruchkante: gezackte Linie quer über die Brust; darüber Farbe (Mädchen), darunter Stein
-brk = [9, 10, 11, 10, 12, 13, 12, 11, 12, 13, 14, 13, 12, 11, 12, 13, 12, 11, 10, 11]
-SH, SWd = statue.shape[:2]
-fig = statue.copy()
+SH, SWd = girl.shape[:2]
+gm = girl[..., 3] > 0                                       # Silhouette der Figur (Kleid, Arme, Beine, Haar)
+stone = petrify(girl)                                       # derselbe Körper in Stein (Helligkeit bleibt -> Falten, Beine lesbar)
+# Steinpalette auf die der Statuen-Ebene 1458 ziehen (dunkelster/hellster Ton)
+lum = stone[..., :3].astype(float).mean(-1, keepdims=True) / 255
+stone[..., :3] = np.where(gm[..., None], pal[0] + (pal[-1] - pal[0]) * np.clip(0.25 + lum * 0.85, 0, 1), 0).astype(np.uint8)
+# Bruchkante: schräg und gezackt von der linken Schulter (Zeile 10) zur rechten Hüfte (Zeile 17)
+brk = [int(round(10 + 7 * i / (SWd - 1) + (1 if i % 3 == 1 else (-1 if i % 4 == 2 else 0)))) for i in range(SWd)]
+fig = np.zeros_like(girl)
 for j in range(SH):
     for i in range(SWd):
-        if j < brk[i] and girl[j, i, 3] > 0:
-            fig[j, i] = girl[j, i]
-        elif j < brk[i] and girl[j, i, 3] == 0:
-            fig[j, i] = 0
-# Kante: Steinpixel direkt unter der Bruchlinie hell (frische Bruchfläche), darunter ein dunkler Saum
+        if not gm[j, i]: continue
+        fig[j, i] = girl[j, i] if j < brk[i] else stone[j, i]
+FRESH, CR, CRL = (236, 228, 240), (26, 20, 34), (200, 192, 210)
+# frische Bruchfläche (hell) direkt an der Kante, eine Zeile darunter dunkler Saum
 for i in range(SWd):
     j = brk[i]
-    if j < SH and fig[j, i, 3]:
-        fig[j, i, :3] = (230, 222, 236)
-    if j + 1 < SH and fig[j + 1, i, 3]:
-        fig[j + 1, i, :3] = pal[1] if len(pal) > 1 else pal[0]
-# Risse im restlichen Stein (von der Bruchkante nach unten verzweigt)
-cracks = [[(4, 11), (5, 14), (4, 16), (5, 19)], [(15, 13), (14, 16), (15, 18), (14, 21)],
-          [(9, 12), (10, 15)], [(5, 14), (7, 15)], [(14, 16), (12, 17)]]
-CR = (22, 18, 30)
+    if j < SH and gm[j, i]: fig[j, i, :3] = FRESH
+    if j + 1 < SH and gm[j + 1, i] and i % 2 == 0: fig[j + 1, i, :3] = pal[0]
+# Risse: laufen von unten (Kleid/Beine) nach oben zur Bruchkante
+cracks = [[(3, 22), (4, 19), (3, 16), (4, 13)], [(9, 21), (8, 18), (9, 16)], [(15, 22), (16, 19), (14, 17)],
+          [(4, 19), (6, 18)], [(16, 19), (18, 20)]]
 for c in cracks:
     for (x0, y0), (x1, y1) in zip(c, c[1:]):
         n = max(abs(x1 - x0), abs(y1 - y0))
-        for s in range(n + 1):
-            x = round(x0 + (x1 - x0) * s / n); y = round(y0 + (y1 - y0) * s / n)
-            if 0 <= y < SH and 0 <= x < SWd and fig[y, x, 3] and y > brk[x]:
+        for st in range(n + 1):
+            x = round(x0 + (x1 - x0) * st / n); y = round(y0 + (y1 - y0) * st / n)
+            if 0 <= y < SH and 0 <= x < SWd and gm[y, x] and y > brk[x]:
                 fig[y, x, :3] = CR
-                if x - 1 >= 0 and fig[y, x - 1, 3] and tuple(fig[y, x - 1, :3]) != CR:
-                    fig[y, x - 1, :3] = (206, 198, 214)
-BASE = 53                                                           # Standlinie des Sockels
-SX, SY = FW // 2 - SWd // 2, BASE - plinth.shape[0] - SH + 1
-# Schatten am Boden und Sockel
-for i in range(-2, SWd + 2):
-    dot(SX + i, BASE, (34, 28, 40))
-    if 0 < i < SWd - 1: dot(SX + i, BASE + 1, (46, 40, 52))
+BASE = 64                                                   # Standlinie des Sockels
 PX = FW // 2 - plinth.shape[1] // 2
+SX, SY = FW // 2 - SWd // 2, BASE - plinth.shape[0] - SH + 1
+# Schatten am Boden
+for i in range(-3, plinth.shape[1] + 3):
+    dot(PX + i, BASE, (34, 28, 40))
+    if 0 < i < plinth.shape[1] - 1: dot(PX + i, BASE + 1, (46, 40, 52))
 for j in range(plinth.shape[0]):
     for i in range(plinth.shape[1]):
         if plinth[j, i, 3] >= 128:
-            c = tuple(plinth[j, i, :3]) if j else (200, 192, 208)
-            dot(PX + i, BASE - plinth.shape[0] + j, c)
+            dot(PX + i, BASE - plinth.shape[0] + j, tuple(plinth[j, i, :3]) if j else (150, 140, 160))
 for j in range(SH):
     for i in range(SWd):
         if fig[j, i, 3] >= 128: dot(SX + i, SY + j, tuple(fig[j, i, :3]))
-# Splitter: Steinbrocken (2×2 bzw. 2×1, hell oben links, dunkel unten rechts) fliegen von der Bruchkante weg
-chunks = [(-5, 5, 2, 2), (-8, 1, 2, 1), (SWd + 3, 4, 2, 2), (SWd + 6, 0, 2, 1), (-4, -3, 1, 1), (SWd + 2, -4, 1, 1)]
-LITE, MIDC, DARK = (214, 206, 222), (150, 140, 160), (60, 52, 70)
+# abplatzende Splitter: starten an der Bruchkante und fliegen schräg nach außen/oben (kleiner werdend)
+LITE, MIDC, DARK = (220, 212, 228), (150, 140, 160), (60, 52, 70)
+chunks = [(-2, brk[0] - 1, 2, 2), (-5, brk[0] - 4, 2, 1), (-7, brk[0] - 8, 1, 1),
+          (SWd, brk[-1] - 2, 2, 2), (SWd + 3, brk[-1] - 6, 2, 1), (SWd + 5, brk[-1] - 11, 1, 1),
+          (8, brk[8] - 13, 1, 1), (13, brk[13] - 15, 1, 1)]
 for (cx, cy, w, h) in chunks:
     for j in range(h):
         for i in range(w):
             c = LITE if (i, j) == (0, 0) else (DARK if (i == w - 1 and j == h - 1 and w * h > 1) else MIDC)
             dot(SX + cx + i, SY + cy + j, c)
-cv.paste(up(fg, 6)[2:352, 1:251], 0, 0)
+# Staubkrümel an der Kante
+for (cx, cy) in [(-1, brk[0] + 1), (SWd, brk[-1] + 1), (SWd + 1, brk[-1] - 4), (-3, brk[0] - 2)]:
+    dot(SX + cx, SY + cy, (184, 174, 190))
+cv.paste(up(fg, 5), 0, 0)
 print(save(cv, '10_breaking_free.png'))

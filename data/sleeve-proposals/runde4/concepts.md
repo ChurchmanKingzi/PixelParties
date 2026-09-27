@@ -13,10 +13,10 @@
 | 14 | C | All-Seeing | Porträt: Kassaran, der Seher von Allem, mit weiß glühenden Augen im Zentrum konzentrischer Trance-Ringe – jeder Ring ein Fenster in eine andere Welt (Sterne, Wald, Dorfteich, Wüste, Labor) (MotiveGN; ersetzt „Lightning Rod“). |
 | 15 | C | Birthday Wish | Stillleben: große Geburtstagstorte mit brennenden Kerzen auf dem Tisch, dahinter Monia beim Wünschen, Geschenk und blaue Luftballons flankieren symmetrisch (MotiveGN). |
 | 21 | E | Cheese Moon | Nachthimmel mit riesigem Vollmond aus Emmentaler: der Nerdy Cheese zieht mit Fledermausflügeln wie eine Fledermaus vor dem Mond vorbei, groß im Vordergrund fliegt der Holy Cheese mit Heiligenschein heim (Moe). |
-| 22 | E | Earthrise | Nomu, der Wanderer der Welten, steht groß im Vordergrund auf grauem Mondboden, hinter ihm geht riesig die Erde über dem Mondhorizont auf (Boons). |
+| 22 | E | Earthrise | Nomu, der Wanderer der Welten, steht groß im Vordergrund auf dem Mond und zeigt auf die riesige Erde, die über dem Mondhorizont aufgeht (Boons). |
 | 23 | E | Root of all Presents | Weihnachtsnacht: der böse Wurzelbaum, mit Lichterketten und Weihnachtsmützen geschmückt, grinst mitten im Schnee, zwei Geschenke flankieren seine Wurzeln, Schneefall (Moe). |
-| 24 | E | Odd One Out | Der „unauffällige“ Gartenzwerg mit Sonnenbrille steht auf einem leeren Sockel mitten in der Reihe steinerner Wächterbüsten des Himmelsheiligtums, dahinter Säulen, Büsten und Himmel (Moe). |
-| 25 | E | Balloon Drift | Reise: der Creepy Clown schwebt an seinem Bündel aus Clownsgesicht-Ballons vor der untergehenden Sonne über ein rosa Wolkenmeer in den Abendhimmel (Moe). |
+| 24 | E | Odd One Out | Allee steinerner Wächterbüsten in drei Tiefenstaffeln; ganz vorn im Licht steht der „unauffällige“ Gartenzwerg mit Sonnenbrille auf einem leeren Sockel, als wäre er eine Statue (Moe). |
+| 25 | E | Balloon Drift | Reise: der Creepy Clown schwebt vor der untergehenden Sonne über ein rosa Wolkenmeer, darüber seine Clownsgesicht-Ballons, alle Schnüre in seiner Faust (Moe). |
 | 01 | A | Open Lead | Luftbild aufs Packeis: durch eine dunkle Rinne im Eis gleitet der Narwal (Slippery Narw), am Rand rutscht Snobbit bäuchlings mit langer Spur (Draufsicht, Motive). |
 | 02 | A | Night Watch | Der Candlestick Squire geht mit erhobener Fackel durch einen stockdunklen Burggang; sein Lichtkegel erhellt Mauer und Boden, im Dunkel dahinter glimmen Augen (Licht im Dunkeln, Motive). |
 | 03 | A | End of the Rainbow | Ein runder Regenbogen spannt sich über Willy den Kobold und fällt direkt in seinen Goldtopf; beide stehen groß auf der Frühlingswiese (fröhliche Szene, MotiveBritain). |

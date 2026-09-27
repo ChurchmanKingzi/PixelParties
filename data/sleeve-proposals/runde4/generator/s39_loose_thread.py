@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
-"""39 Loose Thread – Kalypso, die weiße Katze mit der goldenen Mähne, liegt im Sonnenfleck auf dem Dielenboden
-auf dem Rücken und hat das große Wollknäuel mit hochgereckten Pfoten in die Luft geschleudert; der abgewickelte
-Faden fällt vom Knäuel herab, zieht eine Schlaufe über den Boden und endet verheddert an ihren Pfoten.
+"""39 Loose Thread – Kalypso, die weiße Katze mit der goldenen Mähne, liegt im Sonnenfleck unter dem Fenster
+auf dem Dielenboden auf dem Rücken und hält mit hochgereckten Pfoten den Faden des großen Wollknäuels, das
+hinter ihr auf dem Boden liegt; der Faden läuft in einer weichen Kurve über die Dielen zu ihren Pfoten.
+An der Wand hängt ein gerahmtes Affenporträt.
 
 Quellen (MotiveIndia.xcf, Karte „Kalypso“, Szene Sichtbar #70 [18]):
   Ebene 175 „KALYPSO“    – Katze auf dem Rücken (Körper, Kopf, Schwanz)
@@ -10,10 +11,11 @@ Quellen (MotiveIndia.xcf, Karte „Kalypso“, Szene Sichtbar #70 [18]):
                            derselben Stelle Ebene 174 mit angezogenen Pfoten)
   Ebene 173 „KALYPSO #3“ – Wollknäuel mit Fadenende
   Ebene 296 „Non-Fungible Monkee #1“ – gerahmtes Porträt an der Wand (Sichtbar #62)
-Selbst gezeichnet: Wand, Fußleiste, Dielenboden, Sonnenlicht aus dem (unsichtbaren) Fenster, Schatten,
-Nagel + Bilderschnur, der weitere Wollfaden (1 Zelle breit, Farben des Originalfadens hell/dunkel abwechselnd).
+Selbst gezeichnet: Wand, Fußleiste, Dielenboden, Sonnenfleck mit Fensterkreuz-Schatten, Nagel + Bilderschnur,
+der weitere Wollfaden (1 Zelle breit, lückenlos 4er-verbunden, Fadenfarben hell/dunkel Zelle für Zelle).
 
-Skalierung: EIN Raster 3× (84×117 Zellen) für alles; einmal hochskaliert.
+Skalierung: EIN Raster 4× (63×88 Zellen) für alles; einmal hochskaliert. Schwanzspitze links und Mähnenende
+rechts laufen in die Rahmenzone (Kopf/Augen ≥ 38 px vom Rand).
 """
 import sys, os, math
 from common import *  # noqa  (Runde-4-common zuerst laden)
@@ -21,87 +23,87 @@ sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '
 from a_util import lowres, blow  # noqa
 
 B = 'MotiveIndia'
-G = 3
-lo = lowres(G)                      # 84×117
+G = 4
+lo = lowres(G)                      # 63×88
 W, H = lo.w, lo.h
 
-cat = sprite('h39_cat', B, [172, 176, 175])        # Ursprung (380,133)
+cat = sprite('h39_cat', B, [172, 176, 175])        # Ursprung (380,133), 63×33
 ball = sprite('h39_ball', B, [173])                # 28×27, Fadenende unten rechts bei (23,26)
-T1, T2 = (255, 0, 210), (170, 0, 140)              # Fadenfarben aus dem Knäuel (hell/dunkel)
+T1, T2 = (250, 10, 206), (196, 0, 158)             # Fadenfarben (hell/dunkel, aus dem Knäuel)
 
 # --- Wand ----------------------------------------------------------------------------------------------
-FLOOR = 66
-WALL1, WALL2 = (58, 40, 70), (50, 34, 62)
+FLOOR = 36
+WALL1, WALL2 = (58, 40, 70), (52, 36, 64)
 for y in range(FLOOR):
     for x in range(W):
-        lo.px(x, y, WALL1 if (x // 4) % 2 == 0 else WALL2)
-# Fußleiste
-for y in range(FLOOR - 4, FLOOR):
-    for x in range(W):
-        lo.px(x, y, (86, 54, 40) if y == FLOOR - 4 else ((64, 40, 30) if y < FLOOR - 1 else (40, 24, 20)))
+        lo.px(x, y, WALL1 if (x // 3) % 2 == 0 else WALL2)
+for x in range(W):                                   # Fußleiste
+    lo.px(x, FLOOR - 3, (92, 58, 42)); lo.px(x, FLOOR - 2, (66, 42, 30)); lo.px(x, FLOOR - 1, (40, 24, 20))
 
 # Bild an der Wand: gerahmtes Affenporträt (Ebene 296), an Schnur und Nagel
 pic = sprite('h39_picture', B, [296])
-PX0, PY0 = 11, 16
-NX, NY = PX0 + pic.shape[1] // 2, PY0 - 6
-for i in range(1, 7):                                   # zwei Schnurhälften vom Nagel zu den Rahmenecken
-    lo.px(NX - i, NY + i, (150, 120, 90) if i % 2 else (96, 74, 56))
-    lo.px(NX + i, NY + i, (150, 120, 90) if i % 2 else (96, 74, 56))
-lo.px(NX, NY, (200, 200, 210)); lo.px(NX, NY + 1, (90, 90, 100))   # Nagel
-for y in range(PY0 + 1, PY0 + pic.shape[0] + 1):        # Schlagschatten des Rahmens
+PX0, PY0 = 8, 11
+NX, NY = PX0 + pic.shape[1] // 2, PY0 - 5
+for i in range(1, 6):
+    c = (150, 120, 90) if i % 2 else (96, 74, 56)
+    lo.px(NX - i, NY + i, c); lo.px(NX + i, NY + i, c)
+lo.px(NX, NY, (200, 200, 210))
+for y in range(PY0 + 1, PY0 + pic.shape[0] + 1):
     lo.a[y, PX0 + pic.shape[1]] = (lo.a[y, PX0 + pic.shape[1]] * 0.6).astype(np.uint8)
 for x in range(PX0 + 1, PX0 + pic.shape[1] + 1):
     lo.a[PY0 + pic.shape[0], x] = (lo.a[PY0 + pic.shape[0], x] * 0.6).astype(np.uint8)
 lo.paste(pic, PX0, PY0)
 
-# --- Dielenboden ---------------------------------------------------------------------------------------
-P1, P2, SEAM = (140, 92, 54), (126, 82, 48), (84, 52, 32)
-yy, k, rows = FLOOR, 0, []
+# --- Dielenboden (Bretter nach vorn breiter) --------------------------------------------------------------
+P1, P2, SEAM = (140, 92, 54), (128, 84, 49), (84, 52, 32)
+yy, k = FLOOR, 0
 while yy < H:
-    hgt = 4 + k
-    rows.append((yy, hgt))
+    hgt = 3 + k
     for y in range(yy, min(H, yy + hgt)):
-        for x in range(W):
-            lo.px(x, y, P1 if k % 2 == 0 else P2)
+        for x in range(W): lo.px(x, y, P1 if k % 2 == 0 else P2)
     for x in range(W): lo.px(x, yy, SEAM)
-    off = (k * 23) % 37
-    for x in range(off, W, 37):                     # Stoßfugen
+    for x in range((k * 17) % 29, W, 29):
         for y in range(yy, min(H, yy + hgt)): lo.px(x, y, SEAM)
     yy += hgt; k += 1
 
-# --- Sonnenlicht: Schacht von rechts oben, heller Fleck am Boden um die Katze ---------------------------
-def lighten(x, y, t, col=(255, 214, 150)):
-    # ohne Dithering: jede Zelle gleichmäßig zur Lichtfarbe gemischt (zwei Stufen: Kern/Rand)
+# --- Sonnenfleck vom (links außerhalb liegenden) Fenster: Parallelogramm mit Fensterkreuz-Schatten ---------
+SUN = np.array((255, 212, 140))
+def lit(x, y, t):
     if 0 <= x < W and 0 <= y < H:
-        lo.a[y, x] = (lo.a[y, x] * (1 - t) + np.array(col) * t).astype(np.uint8)
-for y in range(H):
+        lo.a[y, x] = (lo.a[y, x] * (1 - t) + SUN * t).astype(np.uint8)
+Y0, Y1 = 60, 87                                     # Fleck auf dem Boden
+for y in range(Y0, Y1):
+    s = (y - Y0) / (Y1 - Y0)
+    xa = int(round(3 + s * 8)); xb = int(round(47 + s * 12))       # schräg nach rechts vorn
+    xm = (xa + xb) // 2; ym = 76                   # Querholz vor der Katze sichtbar
+    for x in range(xa, xb):
+        bar = abs(x - xm) <= 0 or abs(y - ym) <= 0             # Fensterkreuz (1 Zelle breit)
+        edge = x in (xa, xb - 1) or y in (Y0, Y1 - 1)
+        if not bar: lit(x, y, 0.28 if edge else 0.52)
+        else: lo.a[y, x] = (lo.a[y, x] * 0.8).astype(np.uint8)   # Schatten des Fensterkreuzes
+# schwacher Lichtschacht in der Luft (von links oben zum Fleck)
+for y in range(0, Y0):
     for x in range(W):
-        # Lichtschacht: Band zwischen zwei parallelen Schrägen
-        u = x - (86 - y * 0.62)
-        if 0 < u < 44 and y < FLOOR:
-            lighten(x, y, 0.13 if 3 < u < 41 else 0.07)
-        # Lichtfleck auf dem Boden (Fensterform, perspektivisch)
-        if y >= FLOOR + 6:
-            fx = (x - 42) / 40.0; fy = (y - 94) / 17.0
-            if abs(fx) < 1 and abs(fy) < 1:
-                lighten(x, y, 0.26 if (abs(fx) < 0.93 and abs(fy) < 0.86) else 0.12)
+        u = x - (-24 + y * 0.62)
+        if 0 < u < 40 and y >= FLOOR: lit(x, y, 0.08)
 
-# --- Katze ------------------------------------------------------------------------------------------
-CX0, CY0 = 42 - cat.shape[1] // 2, 104 - cat.shape[0]     # Rücken liegt auf Zeile 104
-# Schatten unter dem Körper
-for x in range(CX0 + 2, CX0 + cat.shape[1] - 6):
-    for y in (104, 105):
-        lo.a[y, x] = (lo.a[y, x] * (0.6 if y == 104 else 0.8)).astype(np.uint8)
-# Pfotenspitzen (Ebene 176 liegt bei x 392–411, y 133 → relativ 12–31, 0)
-paw_l = (CX0 + 14, CY0 + 1)
-paw_r = (CX0 + 28, CY0 + 1)
-
-# --- Wollknäuel in der Luft ----------------------------------------------------------------------------
-BX, BY = 44, 22
+# --- Wollknäuel: liegt hinten rechts auf dem Boden -------------------------------------------------------------
+BX, BY = 28, FLOOR + 4 - ball.shape[0]             # Unterkante knapp hinter der Fußleiste auf den Dielen
+for x in range(BX + 3, BX + 23):                   # Kontaktschatten
+    lo.a[BY + ball.shape[0], x] = (lo.a[BY + ball.shape[0], x] * 0.62).astype(np.uint8)
+lo.paste(ball, BX, BY)
 tail = (BX + 23, BY + 26)
 
-# --- Faden: vom Knäuelende herab, Schlaufe über den Boden, zurück zu den Pfoten ---------------------------
-def catmull(pts, n=24):
+# --- Katze vorn ---------------------------------------------------------------------------------------------
+CX0, CY0 = 2, 72 - cat.shape[0]                     # Rücken liegt auf Zeile 72
+for x in range(CX0 + 3, CX0 + cat.shape[1] - 8):
+    lo.a[72, x] = (lo.a[72, x] * 0.6).astype(np.uint8)
+    lo.a[73, x] = (lo.a[73, x] * 0.82).astype(np.uint8)
+paw_l = (CX0 + 14, CY0 + 1)                        # Pfotenspitzen (Ebene 176 relativ 12–31, 0)
+paw_r = (CX0 + 28, CY0 + 1)
+
+# --- Faden: vom Knäuel in weicher Kurve über den Boden (hinter der Katze) zu den Pfoten ----------------------
+def catmull(pts, n=40):
     out = []
     P = [pts[0]] + pts + [pts[-1]]
     for i in range(1, len(P) - 2):
@@ -112,39 +114,32 @@ def catmull(pts, n=24):
     out.append(np.array(P[-2], float))
     return out
 
-def thread(pts, start=0):
+def thread_cells(pts):
+    """Lückenlos 4er-verbundene Zellenkette (keine reinen Diagonalschritte → durchgehende Linie)."""
     cells = []
-    for p in catmull(pts, 40):
+    for p in catmull(pts):
         c = (int(round(p[0])), int(round(p[1])))
-        if not cells or c != cells[-1]:
-            # 8er-Nachbarschaft ohne Lücken
-            if cells:
-                px, py = cells[-1]
-                while max(abs(c[0] - px), abs(c[1] - py)) > 1:
-                    px += (c[0] > px) - (c[0] < px); py += (c[1] > py) - (c[1] < py)
-                    cells.append((px, py))
-            cells.append(c)
-    # doppelte Ecken (L-Stufen) entfernen → sauberer 1-Zellen-Faden
-    clean = []
-    for c in cells:
-        if len(clean) >= 2 and abs(c[0] - clean[-2][0]) <= 1 and abs(c[1] - clean[-2][1]) <= 1:
-            clean[-1] = c
+        if cells and c == cells[-1]: continue
+        if cells:
+            px, py = cells[-1]
+            while (px, py) != c:
+                if px != c[0] and (abs(c[0] - px) >= abs(c[1] - py)): px += 1 if c[0] > px else -1
+                else: py += 1 if c[1] > py else -1
+                cells.append((px, py))
         else:
-            clean.append(c)
-    for i, (x, y) in enumerate(clean):
-        lo.px(x, y, T1 if (i + start) % 2 == 0 else T2)
-    return clean
+            cells.append(c)
+    return cells
 
+path = [tail, (tail[0] + 1, tail[1] + 3), (54, FLOOR + 8), (44, FLOOR + 10), (35, FLOOR + 8),
+        (paw_r[0] + 1, paw_r[1] + 3), paw_r, (paw_r[0] - 6, paw_r[1] + 1), paw_l]
+cells = thread_cells(path)
+for i, (x, y) in enumerate(cells):
+    lo.px(x, y, T1 if i % 2 == 0 else T2)
 lo.paste(cat, CX0, CY0)
-# EIN durchgehender Faden: Knäuelende → rechts über die Mähne herab → vorne über den Boden nach links →
-# über den Schwanz hinauf → um beide Pfoten gewickelt
-path = [tail, (tail[0] + 3, tail[1] + 10), (71, 72), (70, 90), (62, 104), (40, 107), (20, 106), (11, 100),
-        (12, 90), (17, 84), (paw_l[0] - 2, paw_l[1] + 7), paw_l, (paw_l[0] + 7, paw_l[1] + 5), paw_r]
-thread(path)
-# Schatten des Knäuels am Boden (klein, weit unten = hoch in der Luft)
-for x in range(BX + 6, BX + 22):
-    lo.a[FLOOR + 8, x] = (lo.a[FLOOR + 8, x] * 0.7).astype(np.uint8)
-lo.paste(ball, BX, BY)
+# Fadenstück, das um die Pfoten geschlungen vor der Katze liegt (nochmals obenauf)
+on_paws = [c for c in cells if c[1] <= paw_r[1] + 4 and c[0] <= paw_r[0] + 2]
+for i, (x, y) in enumerate(on_paws):
+    lo.px(x, y, T1 if i % 2 == 0 else T2)
 
 cv = Canvas(250, 350)
 blow(cv, lo, G)

@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """06 Djinn's Lamp – Stillleben mit Magie: Aus der Tülle einer goldenen Öllampe steigt Rauch auf, windet sich
-nach oben und wird zum Leib von Sol Rym, dem Donner-Dschinn, der mit verschränkten Armen darüber schwebt; von
-seinen Ellbogen zucken verästelte Blitze. Die Lampe steht auf einem roten Teppich mit Goldbordüre und Falten.
+nach oben und wird zum Leib von Sol Rym, dem Donner-Dschinn, der mit verschränkten Armen darüber schwebt; um
+Schultern und Hände knistern schlanke, verästelte Blitze. Die Lampe steht auf einem roten Teppich mit Goldbordüre und Falten.
 
 Quellen (Motive.xcf):
   Ebene 1509 „Sol Rym“ (Sol Rym, the Thunder Djinn – Halbfigur, wie auf der Karte aus der Wolke ragend)
@@ -11,7 +11,8 @@ Quellen (Motive.xcf):
 Selbst gezeichnet: Hintergrund (Verlauf, Schein, Sterne, Dielenboden), Rauchschweif, Blitze, Faltenwurf.
 
 Skalierung:
-  Vordergrund (Lampe, Teppich, Rauchschweif, Blitze, Dschinn): 6× (Raster 42×59, beschnitten auf 250×350)
+  Vordergrund (Lampe, Teppich, Rauchschweif, Dschinn): 6× (Raster 42×59, beschnitten auf 250×350)
+  Effekt-Ebene (Blitze, vor dem Himmel, nie über Figurteilen): 3× (Raster 84×117)
   Hintergrund (Nachthimmel-Verlauf, Schein, Sterne, Dielenboden): 2× (Raster 125×175)
 """
 from common import *  # noqa
@@ -160,43 +161,66 @@ for (bx, by, br) in [(-6, 0, 2.0), (-3, 1, 2.3), (0, 1, 2.4), (3, 1, 2.3), (6, 0
             else: c = sm_cols['base']
             dot(i, j, c)
 
-# Blitze: verästelt, von den Ellbogen des Dschinns ausgehend, spiegelsymmetrisch.
-# Heller Kern (1 Rasterpixel) + goldener Rand rechts/unten, Äste nur mit Kern.
-CORE, RIM = (255, 252, 214), (232, 190, 44)
-ax = 2 * DX + 11                                          # Spiegelachse ×2 (Dschinn-Mitte)
-main = [(DX, DY + 15), (DX - 3, DY + 13), (DX - 4, DY + 10), (DX - 7, DY + 8), (DX - 8, DY + 4)]
-branch = [(DX - 4, DY + 10), (DX - 7, DY + 12), (DX - 9, DY + 11), (DX - 10, DY + 14)]
-twig = [(DX - 7, DY + 8), (DX - 10, DY + 7)]
+# ---------------- Effekt-Ebene 3×: Blitze um Schultern und Hände ----------------
+# Eigenes 3×-Raster (84×117), Bildschirmkoordinaten = 3·Zelle. Schlanke, diagonal gezackte Blitze (Zufalls-Mittelpunkt-
+# verschiebung), 1 Zelle Kern + helles Glühen; nur vor dem Himmel, nie über dem Dschinn/Rauch/Lampe.
+EW, EH = 84, 117
+F6 = up(fg, G)[2:352, 1:251]                             # Deckmaske der 6×-Ebene in Bildschirmpixeln
+cover = np.zeros((EH, EW), bool)
+for j in range(EH):
+    for i in range(EW):
+        y0, x0 = 3 * j, 3 * i
+        cover[j, i] = F6[y0:y0 + 3, x0:x0 + 3, 3].any() if y0 < 350 and x0 < 250 else False
+eff = np.zeros((EH, EW, 4), np.uint8)
+rngb = np.random.RandomState(16)
 
 
-def seg_pixels(path):
+def jag(p0, p1, depth, rough):
+    if depth == 0: return [p0, p1]
+    mx, my = (p0[0] + p1[0]) / 2, (p0[1] + p1[1]) / 2
+    dx, dy = p1[0] - p0[0], p1[1] - p0[1]
+    L = math.hypot(dx, dy) or 1
+    off = rngb.uniform(-1, 1) * rough * L
+    m = (mx - dy / L * off, my + dx / L * off)
+    return jag(p0, m, depth - 1, rough)[:-1] + jag(m, p1, depth - 1, rough)
+
+
+def raster(path):
     out = []
     for (x0, y0), (x1, y1) in zip(path, path[1:]):
-        n = max(abs(x1 - x0), abs(y1 - y0))
+        n = int(max(abs(x1 - x0), abs(y1 - y0))) + 1
         for st in range(n + 1):
-            out.append((round(x0 + (x1 - x0) * st / max(n, 1)), round(y0 + (y1 - y0) * st / max(n, 1))))
+            out.append((int(round(x0 + (x1 - x0) * st / n)), int(round(y0 + (y1 - y0) * st / n))))
     return out
 
 
-for side in (0, 1):
-    mir = (lambda p: [(ax - x, y) for x, y in p]) if side else (lambda p: p)
-    core = seg_pixels(mir(main))
-    thin = seg_pixels(mir(branch)) + seg_pixels(mir(twig))
-    cs = set(core) | set(thin)
-    for x, y in core:                                     # Rand zuerst (unten und zur Außenseite)
-        for dx, dy in [(0, 1), (-1, 0) if side == 0 else (1, 0)]:
-            if (x + dx, y + dy) not in cs and not (DX <= x + dx < DX + 12 and fg[y + dy, x + dx, 3]):
-                dot(x + dx, y + dy, RIM)
-    for x, y in core + thin:
-        dot(x, y, CORE)
-    ex, ey = mir(main)[-1]                                # Funken an den Spitzen
-    dot(ex, ey - 1, RIM)
-    bx, by = mir(branch)[-1]
-    dot(bx, by + 1, RIM)
+# Djinn-Ränder in Effektzellen: links x≈30, rechts x≈54; Schultern y≈35, Ellbogen y≈42
+starts = [((29, 36), (12, 22)), ((29, 43), (10, 50)), ((55, 35), (73, 19)), ((55, 42), (75, 47))]
+cores = []
+for (sx, sy), (ex, ey) in starts:
+    path = jag((sx, sy), (ex, ey), 4, 0.22)
+    cores.append(raster(path))
+    # 1–2 kurze Verästelungen von zufälligen Punkten des Hauptblitzes
+    for _ in range(1 + rngb.randint(0, 2)):
+        k = rngb.randint(len(path) // 3, len(path) - 2)
+        bx, by = path[k]
+        ang = math.atan2(ey - sy, ex - sx) + rngb.choice([-1, 1]) * rngb.uniform(0.5, 1.0)
+        ln = rngb.uniform(3, 6)
+        cores.append(raster(jag((bx, by), (bx + math.cos(ang) * ln, by + math.sin(ang) * ln), 2, 0.3)))
+coreset = {c for cs in cores for c in cs}
+GLOW, CORE = (238, 190, 48), (255, 255, 214)
+for (x, y) in coreset:
+    for dx, dy in [(0, 1), (1, 0) if x >= 42 else (-1, 0)]:    # Glühsaum unten und zur Außenseite
+        X, Y = x + dx, y + dy
+        if 0 <= X < EW and 0 <= Y < EH and (X, Y) not in coreset and not cover[Y, X]:
+            eff[Y, X] = (*GLOW, 255)
+for (x, y) in coreset:
+    if 0 <= x < EW and 0 <= y < EH and not cover[y, x]:
+        eff[y, x] = (*CORE, 255)
 
 # ---------------- Zusammensetzen ----------------
 cv = Canvas(250, 350)
 cv.a[:] = up(np.dstack([bg.a, np.full((175, 125), 255, np.uint8)]), 2)[..., :3]
-F = up(fg, G)[2:352, 1:251]
-cv.paste(F, 0, 0)
+cv.paste(up(eff, 3)[:350, :250], 0, 0)
+cv.paste(F6, 0, 0)
 print(save(cv, '06_djinns_lamp.png'))

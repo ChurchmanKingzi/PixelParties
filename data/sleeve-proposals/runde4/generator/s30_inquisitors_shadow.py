@@ -9,8 +9,9 @@ Quellen (MotiveHawaii.xcf):
   Ebene 240 „Karian“ – der Großinquisitor (Karte „Grand Inquisitor Karian“), gegen „Sichtbar #47“/„#46“
       geprüft; die Figur ist schon im Original eine Halbfigur (endet an der Robe) → vom unteren Bildrand
       angeschnitten wie der Vampir in „Count of the Deep“. Außerdem Umriss für den Schattenkörper.
-  Ebene 238 „Karian #6“ – Karians Dämonengestalt (gleiche Karte): Kopf mit Hörnern, Heiligenschein und
-      türkisen Augen als Schattenkopf (Heiligenschein + Augen in Originalfarbe, glühend).
+  Ebene 238 „Karian #6“ – Karians Dämonengestalt (gleiche Karte): Kopf mit Hörnern und Heiligenschein als
+      Schattenkopf (Heiligenschein in Originalrot); die glühenden Augen sind ein gezeichneter Lichteffekt in der
+      Türkisfarbe seiner Augen, symmetrisch gesetzt (im Original ist der Kopf leicht gedreht).
   Ebene 233 „Curse“ – die Fledermausflügel der Dämonengestalt (Karte „Curse“), nur die Flügel, als Schattenriss.
   Ebene 250 „Ebene #5“ – Kirchenmauer (violette Ziegel, Kachel 16×8), nach Fackellicht umgefärbt.
 Selbst gezeichnet: Fackelschein, Licht/Schatten. Der vergrößerte Schatten ist ein gezeichneter Effekt: die Umrisse
@@ -69,27 +70,34 @@ NECK_D = 13
 head = demon[:NECK_D, :, 3] > 0
 hm = smooth_mask(head, SF)
 col = demon[:NECK_D].copy()
-red = (col[..., 0] > 150) & (col[..., 1] < 60)                     # Heiligenschein
+red = (col[..., 0] > 150) & (col[..., 1] < 60)
+red[3:] = False                                                   # nur der Heiligenschein (Zeilen 0–2), nicht das rote Haar
 cyan = (col[..., 2] > 200) & (col[..., 0] < 180)                   # Augen
-keep = np.zeros_like(col); keep[red] = col[red]; keep[cyan] = col[cyan]
-keep[red, :3] = (236, 30, 36); keep[cyan, :3] = (120, 255, 255)
+keep = np.zeros_like(col); keep[red] = col[red]
+keep[red, :3] = (236, 30, 36)
 kbig = cv2.resize(keep, (hm.shape[1], hm.shape[0]), interpolation=cv2.INTER_NEAREST)
 HX = CX - int(round(10 * SF))
 HY = neck_y - hm.shape[0] + 2
 stamp(hm | (kbig[..., 3] > 0), HX, HY, kbig)
+# glühende Augen (Lichteffekt, Farbe der türkisen Dämonenaugen aus Ebene 238), symmetrisch auf Augenhöhe
+EYE_Y = HY + int(round(8.2 * SF))
+for ex in (CX - 6, CX + 4):
+    for (dx, dy) in ((0, 0), (1, 0), (0, 1), (1, 1)):
+        glow[EYE_Y + dy, ex + dx] = (120, 255, 255); glow_m[EYE_Y + dy, ex + dx] = True
 
 # (c) Flügel = Flügel der Curse-Gestalt (ohne ihren Körper), 1 Original-Pixel = 1 Zelle, Wurzeln an den Schultern
 cm = curse[..., 3] > 0
-cm[:, 72:104] = False                           # Körper der Curse-Figur weglassen, Flügel bleiben
-# Flügelwurzeln liegen in der Curse-Figur bei y≈40; auf Schulterhöhe des Schattens setzen (+ leicht darüber)
-WY = neck_y + int(1.5 * SF) - 40
-WX = CX - 88
-stamp(cm, WX, WY)
-# Verbindung Flügelwurzel → Schulter (die Flügelarme laufen in die Schultern hinein)
-for Y in range(neck_y - 2, neck_y + int(5 * SF)):
-    for X in range(CX - 34, CX + 35):
-        if abs(X - CX) > 12 and abs(X - CX) < 30 and Y > neck_y + (30 - abs(X - CX)) * 0.25 - 2:
-            if 0 <= X < gw and 0 <= Y < gh: shadow[Y, X] = True
+left, right = cm[:, :74].copy(), cm[:, 102:].copy()   # linker / rechter Flügel ohne den Körper der Curse-Figur
+# Flügelwurzel (innen, Curse-y≈38) an die Schulterspitzen des Schattens setzen
+SH_L = BX + 1; SH_R = BX + bm.shape[1] - 1
+WY = neck_y + 4 - 38
+GAP = 7                                          # Flügel etwas nach außen, damit Kopf + Hörner frei vor der hellen Wand stehen
+stamp(left, SH_L - 74 + 4 - GAP, WY)
+stamp(right, SH_R - 4 + GAP, WY)
+# Flügelansatz: kurze Schattenbrücke von der Schulterspitze zur Flügelwurzel
+for Y in range(neck_y + 1, neck_y + 6):
+    for X in list(range(SH_L - GAP - 1, SH_L + 3)) + list(range(SH_R - 3, SH_R + GAP + 2)):
+        if 0 <= X < gw and 0 <= Y < gh: shadow[Y, X] = True
 
 # ---------------------------------------------------------------- Mauer mit Fackellicht von unten
 tile = layer(HW, 250)[312:320, 352:368, :3].astype(float)     # 8 × 16 Ziegel
@@ -110,9 +118,9 @@ for y in range(gh):
 for y in range(gh - 14, gh):
     for x in range(gw):
         t = (y - (gh - 14)) / 14                # 0 oben … 1 unten
-        a = t * t * (1 - abs(x + .5 - CX) / 60)
+        a = t ** 1.5 * (1 - abs(x + .5 - CX) / 70)
         if a > B4[y % 4, x % 4] * 0.9 and not shadow[y, x]:
-            G.a[y, x, :3] = mix(G.a[y, x, :3], (255, 170, 80), 0.45)
+            G.a[y, x, :3] = mix(G.a[y, x, :3], (255, 170, 80), 0.55)
 # glühender Heiligenschein + Augen, schwacher roter Hof um den Heiligenschein
 for y in range(gh):
     for x in range(gw):
