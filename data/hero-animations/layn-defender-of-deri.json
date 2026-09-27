@@ -1,0 +1,15 @@
+{
+  "hero": "Layn, Defender of Deri",
+  "sheet": "layn-defender-of-deri.png",
+  "frameWidth": 32,
+  "frameHeight": 38,
+  "frames": 48,
+  "frameMs": 90,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 4,
+  "padLeft": 3,
+  "padRight": 3,
+  "padBottom": 2,
+  "faceX": 17.5
+}

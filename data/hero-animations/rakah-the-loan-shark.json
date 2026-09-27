@@ -11,5 +11,6 @@
   "padLeft": 3,
   "padRight": 3,
   "padBottom": 5,
-  "faceX": 15.0
+  "faceX": 15.0,
+  "footY": 32
 }

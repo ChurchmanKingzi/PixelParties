@@ -1,0 +1,15 @@
+{
+  "hero": "???, the Throne Robber",
+  "sheet": "the-throne-robber.png",
+  "frameWidth": 50,
+  "frameHeight": 39,
+  "frames": 48,
+  "frameMs": 90,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 4,
+  "padLeft": 3,
+  "padRight": 3,
+  "padBottom": 2,
+  "faceX": 31.5
+}
