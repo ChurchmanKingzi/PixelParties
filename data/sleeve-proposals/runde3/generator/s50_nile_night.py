@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
-"""50 Nile Night – Pyramide vor dem Vollmond, gespiegelt im Nil; am Ufer halten Anubis und Sobek Wache.
+"""50 Nile Night – Pyramide vor dem Vollmond, gespiegelt im Nil; am Ufer halten Anubis und Sobek
+Wache neben dem goldenen Sarkophag.
 
 Quellen (MotiveEgypt.xcf):
   Himmel mit Mond: Ebene #13 (i235), 2×, Ausschnitt um den Mond.
@@ -8,7 +9,8 @@ Quellen (MotiveEgypt.xcf):
   Ebenen vertikal gespiegelt, in 2-px-Blöcken wellig versetzt.
   Nil: Wassertextur aus „Hintergrund“ (i234, x120–152 = eine 32-px-Periode), 2×; Ufer: Sand Ebene #91 (i93), 2×.
   Wächter am Ufer (Einzel-Ebenen, vollständig laut Sichtbar-Szenen): Khet (i214, Anubis-Mumie, 4×),
-  Ebene #1 (i230, Krokodil-Mumie mit Anch, 4×), mondblau getönt.
+  Ebene #1 (i230, Krokodil-Mumie mit Anch, 4×), mondblau getönt;
+  dazwischen der goldene „Sarcophagus of Sea“ (i174), 3×.
 """
 from common import *
 import numpy as np
@@ -84,26 +86,12 @@ for y in range(W1, 350):
     cv.a[y] = (sand[(y + 30) % sand.shape[0], :250] * np.array([0.40, 0.36, 0.42])).astype(np.uint8)
 cv.a[W1] = (14, 14, 26)
 
-# --- Silhouetten der Götter am Ufer ---------------------------------------------------------------------
-SIL = (10, 10, 22)
-
-def sil(key, ids, cx, feet, k, keep_gold=False, fl=False):
-    s = sprite('h50_' + key, B, ids)
-    if fl: s = flip(s)
-    o = silhouette(s, SIL)
-    if keep_gold:                      # goldenes Anch bleibt sichtbar (vom Mond angeleuchtet)
-        c = s[..., :3].astype(int)
-        gold = (c[..., 0] > 150) & (c[..., 1] > 110) & (c[..., 2] < 90)
-        o[gold, :3] = (s[gold, :3] * 0.85).astype(np.uint8)
-    o = up(o, k)
-    h, w = o.shape[:2]
-    cv.paste(o, cx - w // 2, feet - h)
-
-def god(key, ids, cx, feet, k, fl=False):
+# --- Wächter am Ufer: Anubis links, Sobek rechts (4×, mondblau getönt) ----------------------------------
+def god(key, ids, cx, feet, k, fl=False, tint=(0.78, 0.8, 0.95)):
     s = sprite('h50_' + key, B, ids)
     if fl: s = flip(s)
     s = up(s, k)
-    s = s.copy(); s[..., :3] = (s[..., :3] * np.array([0.78, 0.8, 0.95]) + np.array([4, 6, 18])).clip(0, 255).astype(np.uint8)
+    s = s.copy(); s[..., :3] = (s[..., :3] * np.array(tint) + np.array([4, 6, 18])).clip(0, 255).astype(np.uint8)
     h, w = s.shape[:2]
     sh = np.zeros((k, w - 2 * k, 4), np.uint8); sh[..., 3] = 255
     cv.paste(sh, cx - w // 2 + k, feet - k, alpha=0.5)
@@ -111,6 +99,7 @@ def god(key, ids, cx, feet, k, fl=False):
 
 god('khet', [214], 50, 348, 4, fl=True)
 god('sobek', [230], 200, 348, 4)
+god('sarcophagus', [174], 126, 346, 3, tint=(0.95, 0.92, 0.92))
 
 vignette(cv, 0.5, 0.6)
 save(cv, '50_nile_night.png')

@@ -5,8 +5,7 @@ Quellen (MotiveIndia.xcf):
   Bühne/Vorhang: Ebene #88 (i215, roter Vorhang + Bretterboden), Spot-Ellipse Ebene #81 (i210, nur Lichtfarbe).
   Katzen (je alle Teil-Ebenen, geprüft gegen die „Sichtbar“-Bühnenszenen):
     ASHOKA i56–59 (Sichtbar #62), ARCHIMAUDES i60–63 (Sichtbar #86), MORIARTY i189 (Sichtbar #81),
-    ACHILLES i121–122 (Sichtbar #75), SON WUKONG i181–185 (Sichtbar #72),
-    HERAKLES i138–140 (Sichtbar #85).
+    ACHILLES i121–122 (Sichtbar #75), SON WUKONG i181–185 (Sichtbar #72).
 Aufbau: hintere Reihe 2× auf einem Podest, vordere Reihe 3× im Spotlicht → Tiefe wie ein Gruppenfoto.
 """
 from common import *
