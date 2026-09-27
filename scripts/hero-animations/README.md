@@ -90,6 +90,9 @@ pixelgenau.
   dieser Teil wird nicht abgeschnitten, sondern liegt vor dem Helden.
 * **`boardScale`** (optional): Größenfaktor auf dem Brett für Ausreißer
   (Bubbles: `0.5`). Sonst stehen alle Helden im selben Maßstab.
+* **`alphaScale`** (optional): Faktor auf die Deckkraft aller
+  halbtransparenten Pixel (Gas, Rauch, Auren) auf dem Brett; voll deckende
+  Pixel bleiben, wie sie sind. `< 1` = durchsichtiger (Medea: `0.55`).
 * Gemeinsame Helfer (Glitzersterne, Lichtschimmer, Speichern) in `anim_common.py`.
 
 ## Stil-Lektionen aus dem Feedback
