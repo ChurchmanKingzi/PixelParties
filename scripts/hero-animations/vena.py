@@ -64,7 +64,7 @@ MOUTH_D = rgb('4f0000')
 ROAR_MOUTH = {(12, 12): MOUTH_D, (13, 12): MOUTH_D}
 SKIN = rgb('f6bd98')
 CLOSED_MOUTH = {(12, 10): SKIN, (13, 10): SKIN, (12, 11): SKIN, (13, 11): SKIN}   # zu = unsichtbar
-MOUTH_OPEN = range(16, 33)                        # davor/danach geschlossen
+MOUTH_OPEN = range(2, 31)                         # nur kurz nach dem Schrei geschlossen
 SHOUT = rgb('ffe6d5')
 
 

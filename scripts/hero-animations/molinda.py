@@ -9,17 +9,19 @@ Amor-Schuss im Loop:
   mit rosa Spur und aufsteigenden Herzchen; die Sehne schwingt nach. Der Teil
   des Bogens hinter dem Schaft wird ergänzt.
 * Nachladen: ein neuer Pfeil materialisiert sich auf der Sehne.
-Dazu schwebt sie leicht und schlägt mit ihren Flügeln. Der gefaltete
-Flügel des Sprites wirkte bewegt wie ein wehendes Cape; er ist durch ein neu
-gezeichnetes Engelsflügel-Paar ersetzt (molinda_wings.py), das in jedem
-Frame in der aktuellen Schlagstellung neu gerastert wird.
+Dazu schwebt sie leicht. Flügel: beim Zielen und nach dem Nachladen trägt
+sie ihren Original-Flügel (gefaltet, wie im Sprite). Mit dem Schuss entfaltet
+er sich (Zwischenstellung: Original leicht ausgestellt) zu einem neu
+gezeichneten Engelsflügel-Paar (molinda_wings.py, pro Frame in der
+Schlagstellung gerastert), schlägt dreimal und faltet sich wieder zum
+Original zusammen – so passt die Animation zum statischen Sprite.
 """
 import math
 import sys
 from PIL import Image
 import numpy as np
 from anim_common import rgb, save_outputs
-from flap_common import fill_pinholes
+from flap_common import fill_pinholes, rotate_part, over
 from molinda_wings import render_wing
 
 SRC = np.array(Image.open('src/molinda-the-cutest-being-in-the-sky.png').convert('RGBA')).astype(int)
@@ -40,10 +42,18 @@ WING = np.array([[SRC[y, x, 3] > 0 and tuple(SRC[y, x]) in WING_COLS and (x >= 1
 ROOT = (18.0, 9.0)                                   # Schulter (Sprite-Koordinaten)
 
 
-def wing_lift(i):
-    """Schlagwinkel: kräftiger Abschlag, ruhiger Aufschlag."""
-    s = math.sin(2 * math.pi * i / 16)
-    return 0.30 * s if s > 0 else 0.42 * s
+ORIG_PIVOT = (18.0, 7.0)
+OPEN_START, FLAP_PERIOD, FLAPS = 13, 6, 3
+
+
+def wing_pose(i):
+    """('orig', Winkel) = Original-Flügel (gedreht), ('drawn', Schlagwinkel)."""
+    t = i - OPEN_START
+    if 0 <= t <= FLAP_PERIOD * FLAPS:
+        return 'drawn', -0.06 - 0.36 * math.cos(2 * math.pi * t / FLAP_PERIOD)
+    if i in (OPEN_START - 1, OPEN_START + FLAP_PERIOD * FLAPS + 1):
+        return 'orig', -0.12                             # halb entfaltet
+    return 'orig', 0.0
 
 
 def is_arrow(x, y):
@@ -98,10 +108,15 @@ def frame(i):
     ax, alpha, wob = state(i)
     dy = bob(i)
     oy, ox = PT + dy, PL
-    lift = wing_lift(i)
-    span = 0.95 + 0.05 * math.cos(2 * math.pi * i / 16)
-    render_wing(out, (ROOT[0] + ox + 2, ROOT[1] + oy - 1), lift + 0.12, span * 0.92, far=True)
-    render_wing(out, (ROOT[0] + ox, ROOT[1] + oy), lift, span)
+    kind, ang = wing_pose(i)
+    if kind == 'drawn':
+        render_wing(out, (ROOT[0] + ox + 2, ROOT[1] + oy - 1), ang + 0.12, 0.92, far=True)
+        render_wing(out, (ROOT[0] + ox, ROOT[1] + oy), ang)
+    elif ang:
+        over(out, rotate_part(SRC, WING, ORIG_PIVOT, ang, (H, W), (ox, oy)))
+    else:
+        m = WING
+        out[oy:oy + SH, ox:ox + SW][m] = SRC[m]
     for y in range(SH):
         for x in range(SW):
             if SRC[y, x, 3] and not is_arrow(x, y) and not is_string(x, y) and not WING[y, x]:
