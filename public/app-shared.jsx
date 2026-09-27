@@ -870,39 +870,49 @@ function _ppVerlaufBei(v, px, py, x, y) {
 }
 
 /**
- * Runde Pixel-Plakette, 12×12: 1 Pixel dunkle Kontur, 1 Pixel Rand
- * (oben links heller), Flaeche aus Farbe oder Verlauf mit Glanzpunkt
- * oben links und gedithertem Schatten unten rechts.
+ * Runde Pixel-Plakette im 21er-Raster (v1449, vorher 12 — Als Befund
+ * 27.9.: „sehen noch sehr grob aus"): 1 Pixel dunkle Kontur, 2 Pixel Rand
+ * mit Lichtkante oben links und Schattenkante unten rechts, Flaeche aus
+ * Farbe oder Verlauf, darauf ein Glanzbogen oben links und ein
+ * geditherter Schatten unten rechts. Ein Symbol mit 16 Pixeln fuellt 76 %
+ * der Plakette — dann sind die Pixel beider gleich gross.
  */
+const PP_PX_PLAKETTE_N = 21;
 function ppPxPlaketteUrl(flaeche, rand) {
-  const N = 12, M = N / 2;
+  const N = PP_PX_PLAKETTE_N, M = N / 2;
   const v = /gradient/.test(flaeche || '') ? ppVerlaufLesen(flaeche) : null;
   const voll = v ? null : _ppAufGrund(ppFarbe(flaeche));
   const r = ppFarbe(rand);
   const randF = _ppAufGrund([r[0], r[1], r[2], Math.max(r[3], 0.85)]);
-  const randHell = _ppMisch(randF, [255, 255, 255], 0.4);
+  const randHell = _ppMisch(randF, [255, 255, 255], 0.45);
+  const randDunkel = _ppMisch(randF, [0, 0, 0], 0.3);
   const kontur = [14, 9, 18, 1];
-  return ppPxBild('pl:' + flaeche + '|' + rand, N, N, (setze) => {
+  return ppPxBild('pl' + N + ':' + flaeche + '|' + rand, N, N, (setze) => {
     for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
-      const d = Math.hypot(x + 0.5 - M, y + 0.5 - M);
-      if (d > 6) continue;
-      if (d > 5) { setze(x, y, kontur); continue; }
-      if (d > 4) { setze(x, y, x + y <= 8 ? randHell : randF); continue; }
+      const dx = x + 0.5 - M, dy = y + 0.5 - M;
+      const d = Math.hypot(dx, dy);
+      if (d > M) continue;
+      if (d > M - 1) { setze(x, y, kontur); continue; }
+      const diag = (dx + dy) / (d || 1);                  // −√2 oben links … +√2 unten rechts
+      if (d > M - 3) { setze(x, y, diag < -0.7 ? randHell : diag > 0.9 ? randDunkel : randF); continue; }
       let f = v ? _ppAufGrund(_ppVerlaufBei(v, (x + 0.5) / N, (y + 0.5) / N, x, y)) : voll;
-      if ((y === 3 && (x === 3 || x === 4)) || (x === 3 && y === 4)) f = _ppMisch(f, [255, 255, 255], 0.35);
-      else if (x + y >= 14 && (x + y) % 2 === 0) f = _ppMisch(f, [0, 0, 0], 0.3);
+      if (d > M - 5.2 && d <= M - 3.6 && diag < -0.95) f = _ppMisch(f, [255, 255, 255], 0.3);
+      else if (diag > 0.5 && d > M - 6 && ppBayer(x, y) < (d - (M - 6)) / 3) f = _ppMisch(f, [0, 0, 0], 0.28);
       setze(x, y, f);
     }
   });
 }
 
-/** Pixel-Schraegstrich fuer „Blinded" (ueber der Plakette, 12×12). */
+/** Pixel-Schraegstrich fuer „Blinded" (ueber der Plakette, gleiches Raster). */
 function ppPxSchraegstrichUrl() {
-  return ppPxBild('schraeg', 12, 12, (setze) => {
-    for (let i = 2; i <= 9; i++) {
-      setze(i, 11 - i, [255, 80, 80, 1]);
-      setze(i + 1, 11 - i, [200, 30, 40, 1]);
-      setze(i, 10 - i, [255, 235, 235, 1]);
+  const N = PP_PX_PLAKETTE_N;
+  return ppPxBild('schraeg' + N, N, N, (setze) => {
+    for (let i = 3; i <= N - 4; i++) {
+      const y = N - 1 - i;
+      setze(i - 1, y, [40, 6, 10, 1]);
+      setze(i, y, [255, 90, 90, 1]);
+      setze(i + 1, y, [220, 30, 44, 1]);
+      setze(i + 2, y, [40, 6, 10, 1]);
     }
   });
 }
@@ -1017,10 +1027,10 @@ function _ppPxRegelnBauen() {
     if (!url) continue;
     regeln.push(`${p.sel}{background:url(${url}) center/100% 100% no-repeat!important;background-origin:border-box!important;`
       + 'border-color:transparent!important;border-radius:0!important;box-shadow:none!important;'
-      + 'filter:drop-shadow(1px 1px 0 rgba(0,0,0,.75));image-rendering:pixelated;}');
+      + 'filter:drop-shadow(1px 1px 0 rgba(0,0,0,.75));image-rendering:auto;}');
   }
   for (const r of PP_PX_KLASSEN.abzeichenExtra || []) regeln.push(r);
-  regeln.push(`.status-badge.status-blinded::after{background:url(${ppPxSchraegstrichUrl()}) center/100% 100% no-repeat;border-radius:0;image-rendering:pixelated;}`);
+  regeln.push(`.status-badge.status-blinded::after{background:url(${ppPxSchraegstrichUrl()}) center/100% 100% no-repeat;border-radius:0;image-rendering:auto;}`);
   regeln.push('.pp-px{image-rendering:pixelated;}');
   return regeln.join('\n');
 }
