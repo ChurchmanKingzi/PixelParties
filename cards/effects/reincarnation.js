@@ -44,7 +44,7 @@ const FREE_ZONES_FOR_RESTORE = 3;
 const MAX_CREATURE_LEVEL = 4;
 
 /** Caster's defeated heroes that Reincarnation hasn't already revived. */
-function getReviveTargets(gs, pi) {
+function getReviveTargets(gs, pi, engine) {
   const ps = gs.players[pi];
   if (!ps) return [];
   const out = [];
@@ -54,7 +54,9 @@ function getReviveTargets(gs, pi) {
     if (hero.hp > 0) continue;
     if (hero.reincarnationRevived) continue;
     // v1466: volle Heilung — bei 0 max HP kein Ziel (s. _revive-shared).
-    if (!canReviveHero(hero)) continue;
+    // v1467: „fully healing its HP" — auch kein nicht heilbarer Held
+    // (Mirjam, Curse of Aging); das weiss nur die Engine.
+    if (engine ? !engine.canReviveHero(hero, { heilt: true }) : !canReviveHero(hero)) continue;
     out.push({ heroIdx: hi, hero });
   }
   return out;
@@ -118,7 +120,7 @@ module.exports = {
 
     const canRevive =
       freeZones >= FREE_ZONES_FOR_REVIVE &&
-      getReviveTargets(gs, pi).length > 0;
+      getReviveTargets(gs, pi, engine || gs._engineRef).length > 0;
 
     // Without an engine reference we can't introspect card levels, so fall
     // back to a permissive "there's at least something in the discard" check.
@@ -147,7 +149,7 @@ module.exports = {
       const cardDB = engine._getCardDB();
       const freeZones = countFreeZones(gs, pi);
 
-      const reviveTargets  = getReviveTargets(gs, pi);
+      const reviveTargets  = getReviveTargets(gs, pi, engine);
       const restoreCounts  = getRestoreCandidates(ps, cardDB, engine, pi);
       const restoreNames   = Object.keys(restoreCounts);
 
@@ -225,7 +227,7 @@ module.exports = {
         await engine._delay(900);
 
         const maxHp = targetHero.maxHp || cardDB[targetHero.name]?.hp || 1;
-        await engine.actionReviveHero(pi, chosen.heroIdx, maxHp, { source: 'Reincarnation' });
+        await engine.actionReviveHero(pi, chosen.heroIdx, maxHp, { source: 'Reincarnation', heilt: true });
 
         engine.log('reincarnation_revive', {
           player: ps.username, hero: targetHero.name, heroIdx: chosen.heroIdx,

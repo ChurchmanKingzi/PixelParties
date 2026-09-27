@@ -6347,7 +6347,45 @@ class GameEngine {
   }
 
   _heroHealBlocked(pi, heroIdx) {
-    return !!this._hostAttachmentWith(pi, heroIdx, 'blocksHostHeal');
+    if (this._hostAttachmentWith(pi, heroIdx, 'blocksHostHeal')) return true;
+    return this._heroOwnHealBlock(pi, heroIdx);
+  }
+
+  /**
+   * ★ v1467 — HEILSPERRE AUS DEM EIGENEN HELDENTEXT (Als Befund 27.9.:
+   * „Die HP von Mirjam sollten NICHT HEILBAR sein. MINDESTENS Cheat Chair
+   * kommt da drumrum! Die Karte sollte für Mirjam nicht mal ANGEBOTEN
+   * werden, wenn sie stirbt, und alle sonstige Heilung muss bei ihr
+   * fizzeln.")
+   *
+   * Bis hier sperrte Mirjam ihre Heilung ueber einen eigenen
+   * `beforeHeroEffect`-Hook — der sitzt aber nur in `actionHealHero`.
+   * Wiederbelebungen mit Heilung (Cheat Chair, Elixir, Hymn …) und das
+   * Extra Life laufen daran vorbei. Jetzt traegt das Heldenskript den
+   * Vertrag `hpCannotBeHealed`, und ALLE Heilwege fragen diese eine
+   * Stelle (`_heroHealBlocked`) — dieselbe, die schon Curse of Aging
+   * bedient und die auch die CPU liest.
+   *
+   * Lebend verhaelt sich die Sperre wie jeder Heldeneffekt: Stun,
+   * Freeze und Negation schalten sie stumm (so war es auch mit dem
+   * Hook). Fuer einen TOTEN Helden gilt sie immer — ein beim Tod
+   * zurueckgebliebener Status darf keine Heil-Wiederbelebung freigeben.
+   * `heroScript` schliesst gewonnene Effekte ein (Initiation Ritual).
+   */
+  _heroOwnHealBlock(pi, heroIdx) {
+    const hero = this.gs.players[pi]?.heroes?.[heroIdx];
+    if (!hero?.name) return false;
+    if (!this.heroScript(hero)?.hpCannotBeHealed) return false;
+    if (hero.hp > 0 && this._isHeroEffectSilenced(pi, heroIdx)) return false;
+    return true;
+  }
+
+  /** `_heroHealBlocked` fuer ein Heldenobjekt (v1467). */
+  _heroHealBlockedObj(hero) {
+    const pi = this._findHeroOwner(hero);
+    if (pi < 0) return false;
+    const hi = (this.gs.players[pi].heroes || []).indexOf(hero);
+    return hi >= 0 && this._heroHealBlocked(pi, hi);
   }
 
   /**
@@ -9202,7 +9240,15 @@ class GameEngine {
   _consumeExtraLife(target, knownOwnerIdx) {
     if (!target || target.hp > 0 || !target._extraLife) return false;
     const lifeMark = this._popExtraLife(target);
-    target.hp = target.maxHp || 400;
+    // ★ v1467: „revive it and fully heal its HP" (Trial of Coolness) —
+    // bei einem nicht heilbaren Helden (Mirjam) oder 0 max HP (v1466)
+    // verpufft das Extra Life. Verbraucht ist es trotzdem: es galt „the
+    // next time that target is defeated", und das ist jetzt.
+    if (!this.canReviveHero(target, { heilt: true })) {
+      this.log('extra_life_fizzle', { hero: target.name, by: lifeMark?.by || 'Extra Life' });
+      return false;
+    }
+    target.hp = this.reviveMaxHp(target);
     const ownerIdx = (knownOwnerIdx != null && knownOwnerIdx >= 0)
       ? knownOwnerIdx
       : this.gs.players.findIndex(ps => (ps.heroes || []).includes(target));
@@ -9423,7 +9469,8 @@ class GameEngine {
       const owner = this._findHeroOwner(target);
       const hi = owner >= 0 ? (this.gs.players[owner].heroes || []).indexOf(target) : -1;
       if (owner >= 0 && hi >= 0 && this._heroHealBlocked(owner, hi)) {
-        this.log('heal_blocked', { target: this._heroLabel(target), amount, reason: 'curse_of_aging' });
+        this.log('heal_blocked', { target: this._heroLabel(target), amount,
+          reason: this._heroOwnHealBlock(owner, hi) ? 'hero_effect' : 'curse_of_aging' });
         return;
       }
     }
@@ -9671,7 +9718,11 @@ class GameEngine {
    * @param {object} opts  `{ maxHpCap }`, wenn die Karte die max HP fest setzt
    */
   canReviveHero(hero, opts = {}) {
-    return require('./_revive-shared').canReviveHero(hero, opts);
+    if (!require('./_revive-shared').canReviveHero(hero, opts)) return false;
+    // ★ v1467: „revive and heal" ist eine Heilung — ein nicht heilbarer
+    // Held (Mirjam, Curse of Aging) steht dafuer nicht zur Wahl.
+    if (opts.heilt && this._heroHealBlockedObj(hero)) return false;
+    return true;
   }
 
   async actionReviveHero(playerIdx, heroIdx, hp, opts = {}) {
@@ -9680,6 +9731,7 @@ class GameEngine {
     if (!hero?.name) return false;
     if (hero.hp > 0) return false;
     // v1466: 0 max HP → keine Wiederbelebung, auch kein Fenster davor.
+    // v1467: `opts.heilt` (voll/halb heilen) → auch nicht bei Heilsperre.
     if (!this.canReviveHero(hero, opts)) return false;
     // ★ v1288 — Fenster UNMITTELBAR vor jeder Wiederbelebung. Alles, was
     // an den Tod dieses Helden anknuepft und noch aussteht (Pseudonias

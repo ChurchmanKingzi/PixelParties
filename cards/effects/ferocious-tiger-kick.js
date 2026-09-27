@@ -129,9 +129,15 @@ module.exports = {
       if (is2nd && dealt > 0 && hero.hp > 0) {
         const healAmount = Math.min(dealt, hero.maxHp - hero.hp);
         if (healAmount > 0) {
-          hero.hp += healAmount;
-          engine._broadcastEvent('play_zone_animation', { type: 'heal_sparkle', owner: ctx.cardHeroOwner, heroIdx, zoneSlot: -1 });
-          engine.log('tiger_kick_heal', { hero: hero.name, amount: healAmount });
+          // ★ v1467: ueber `actionHealHero` statt direkt `hero.hp +=` — nur
+          // so greifen Heilsperren (Mirjam, Curse of Aging), Heilumkehr
+          // und die Heil-Hooks. Bild und Log nur, wenn wirklich geheilt.
+          const vorher = hero.hp;
+          await engine.actionHealHero(ctx.card, hero, healAmount);
+          if (hero.hp > vorher) {
+            engine._broadcastEvent('play_zone_animation', { type: 'heal_sparkle', owner: ctx.cardHeroOwner, heroIdx, zoneSlot: -1 });
+            engine.log('tiger_kick_heal', { hero: hero.name, amount: hero.hp - vorher });
+          }
         }
       }
 
