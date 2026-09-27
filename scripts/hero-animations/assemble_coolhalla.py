@@ -5,9 +5,8 @@ Aufruf:  python3 assemble_coolhalla.py <pfad/zu/MotiveCoolhalla.xcf>
 Schreibt src/<slug>.png.
 
   freshya-beauty-of-coolness          Freshya („Ebene #5“)
-  thorad-strength-of-coolness         Thorad („Ebene #197“); Mund und
-                                      Zigarettenstiel eine Zeile höher gesetzt,
-                                      darunter Bart ergänzt
+  thorad-strength-of-coolness         Thorad („Ebene #197“); Mund 2 px hoch
+                                      (Zeile darüber ergänzt)
   cooldin-king-of-coolness            Cooldin in seiner Kartenpose auf dem
                                       Skateboard: gibt es nur in den Szenen –
                                       ausgeschnitten als Unterschied zwischen
@@ -76,13 +75,12 @@ def bbox(a):
 
 
 def fix_thorad(a):
-    """Mund (dunkelrot) und Zigarettenstiel eine Zeile höher, darunter Bart."""
+    """Mund 2 px hoch: die dunkelrote Mundzeile wird um die Zeile darüber
+    ergänzt (Zigarette bleibt, wo sie ist)."""
     x0, y0 = bbox(a)
     a = a.copy()
-    for x in (10, 11, 12, 13):
+    for x in (10, 11):
         a[y0 + 11, x0 + x] = a[y0 + 12, x0 + x]
-    for x, c in ((10, (0x98, 0x27, 0x15)), (11, (0xbc, 0x33, 0x09)), (12, (0x98, 0x27, 0x15)), (13, (0x98, 0x27, 0x15))):
-        a[y0 + 12, x0 + x] = (*c, 255)
     return a
 
 
