@@ -309,5 +309,19 @@
   "sea",
   "sapphire",
   "pearl"
+ ],
+ "51_spring_thunder.png": [
+  "Spring Thunder",
+  "meander",
+  "lacquer",
+  "jade",
+  "cyan"
+ ],
+ "52_summer_blaze.png": [
+  "Summer Blaze",
+  "arch",
+  "lacquer",
+  "lava",
+  "topaz"
  ]
 }

@@ -607,6 +607,14 @@
     {
       "id": "great-wave",
       "name": "Great Wave"
+    },
+    {
+      "id": "spring-thunder",
+      "name": "Spring Thunder"
+    },
+    {
+      "id": "summer-blaze",
+      "name": "Summer Blaze"
     }
   ]
 }
