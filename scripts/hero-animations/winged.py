@@ -81,6 +81,22 @@ else:
                     WING[y, x] = True
     BODY = SRC.copy()
     BODY[WING] = 0
+# Beim Spreizen der Original-Flügel dürfen dort, wo Arme/Hände davor liegen,
+# keine Löcher mitwandern: diese Stellen im Flügel mit der Flügelfarbe von
+# oben/unten füllen (die Arme werden ohnehin darübergezeichnet).
+WING_FULL, WINGSRC_FULL = WING.copy(), WINGSRC.copy()
+if CFG['mode'] == 'drawn':
+    _gap = (SRC[:, :, 3] > 0) & ~WING & ((np.arange(SW)[None, :] <= CFG['left']) | (np.arange(SW)[None, :] >= CFG['right']))
+    while _gap.any():
+        _done = False
+        for y, x in zip(*np.nonzero(_gap)):
+            for dx, dy in ((0, -1), (0, 1), (-1, 0), (1, 0)):
+                yy, xx = y + dy, x + dx
+                if 0 <= yy < SH and 0 <= xx < SW and WING_FULL[yy, xx]:
+                    WINGSRC_FULL[y, x] = WINGSRC_FULL[yy, xx]
+                    WING_FULL[y, x], _gap[y, x], _done = True, False, True
+                    break
+        assert _done
 AURA = rgb(CFG['aura']) if CFG.get('aura') else None
 if AURA:                                             # Aura wird pro Frame neu gelegt
     BODY[(BODY[:, :, :3] == AURA[:3]).all(2)] = 0
@@ -177,7 +193,8 @@ def draw_wings(out, i, off):
     if kind == 'orig':
         for side in (-1, 1):
             m = WING & ((cols < MID_X) if side < 0 else (cols >= MID_X))
-            over(out, rotate_part(WINGSRC, m, CFG['pivots'][side], -side * a, (H, W), off))
+            m = WING_FULL & ((cols < MID_X) if side < 0 else (cols >= MID_X))
+            over(out, rotate_part(WINGSRC_FULL, m, CFG['pivots'][side], -side * a, (H, W), off))
         return
     pal = tuple(rgb(c)[:3] for c in CFG['palette'])
     for side in (-1, 1):
