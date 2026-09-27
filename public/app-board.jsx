@@ -1692,6 +1692,326 @@ function DraggablePanel({ children, className, style }) {
   );
 }
 
+// ═══════════════════════════════════════════
+//  HELDEN-IDLE-ANIMATION (v1450)
+//  „Lebende Heroes zeigen ihre Idle-Animation über dem oberen Drittel
+//   der Karte in Dauerschleife — wie in Yu-Gi-Oh!, als kämen sie aus
+//   ihren Karten." (Als Vorgabe 27.9.)
+//
+//  • Tot → keine Animation (die Komponente wird gar nicht gerendert);
+//    bei der Wiederbelebung steigt der Held erneut aus der Karte.
+//  • Frozen / Stunned / Webbed (die `paralysisLike`-Status) → der Held
+//    bleibt in seinem AKTUELLEN Frame stehen und läuft danach an
+//    derselben Stelle weiter.
+//  • Versteinert (gemeinsamer Marker `_petrified` am Stun — Petrifier,
+//    Petrifying Potion, Baihu) → zusätzlich Steinfarbe und -textur, die
+//    von den Füßen aufwärts über den Körper kriecht.
+//
+//  Daten: `data/hero-animations/<slug>.png|json`, Liste über
+//  `/api/hero-animations` (einmal je Seitenaufbau). Gezeichnet wird in
+//  ein Canvas in Sprite-Auflösung, das CSS hochskaliert; EINE gemeinsame
+//  requestAnimationFrame-Schleife für alle Helden, gemalt wird nur, wenn
+//  sich der Frame wirklich ändert.
+// ═══════════════════════════════════════════
+const HeroIdleAnims = (() => {
+  // Slug-Regel wie bei den Effekt-Skripten und den Sheet-Dateinamen.
+  const slug = (n) => String(n || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+  let liste = null;          // { slug: meta } sobald geladen
+  let listeLaedt = null;
+  const eintraege = new Map(); // slug → Promise<{ meta, img } | null>
+  const fertig = new Map();    // slug → { meta, img } | null (für den ersten Render)
+
+  function ladeListe() {
+    if (!listeLaedt) {
+      listeLaedt = fetch('/api/hero-animations', { credentials: 'same-origin' })
+        .then(r => (r.ok ? r.json() : null))
+        .then(d => { liste = (d && d.animations) || {}; return liste; })
+        .catch(() => {
+          // Netzfehler: beim nächsten Helden erneut versuchen statt
+          // für die ganze Sitzung ohne Animationen zu bleiben.
+          listeLaedt = null;
+          return {};
+        });
+    }
+    return listeLaedt;
+  }
+
+  // Umriss der DECKENDEN Figur über alle Frames (Alpha ≥ 160), in
+  // Frame-Koordinaten. Eingepasst und ausgerichtet wird nach ihm, nicht
+  // nach der Rahmengröße: halbtransparente Auren, Gas und Rauch (Arthors
+  // Blutsäule, Medeas Schwaden) würden die Figur sonst winzig machen —
+  // sie dürfen über den Kasten hinausragen. Rückfall ohne Pixelzugriff:
+  // Rahmen minus padTop/padBottom/padLeft/padRight.
+  function kernRahmen(meta, img) {
+    const fw = meta.frameWidth, fh = meta.frameHeight;
+    const pL = meta.padLeft || 0, pR = meta.padRight || 0, pT = meta.padTop || 0, pB = meta.padBottom || 0;
+    const rueckfall = { x0: pL, y0: pT, x1: fw - pR, y1: fh - pB };
+    try {
+      const w = img.naturalWidth, h = img.naturalHeight;
+      const c = document.createElement('canvas');
+      c.width = w; c.height = h;
+      const ctx = c.getContext('2d', { willReadFrequently: true });
+      ctx.drawImage(img, 0, 0);
+      const d = ctx.getImageData(0, 0, w, h).data;
+      const vertikal = meta.layout === 'vertical';
+      let x0 = fw, y0 = fh, x1 = 0, y1 = 0;
+      for (let y = 0; y < h; y++) {
+        for (let x = 0; x < w; x++) {
+          if (d[(y * w + x) * 4 + 3] < 160) continue;
+          const lx = vertikal ? x : x % fw, ly = vertikal ? y % fh : y;
+          if (lx < x0) x0 = lx; if (lx >= x1) x1 = lx + 1;
+          if (ly < y0) y0 = ly; if (ly >= y1) y1 = ly + 1;
+        }
+      }
+      return x1 > x0 && y1 > y0 ? { x0, y0, x1, y1 } : rueckfall;
+    } catch { return rueckfall; }
+  }
+
+  function hole(key) {
+    if (!key) return Promise.resolve(null);
+    if (eintraege.has(key)) return eintraege.get(key);
+    const p = ladeListe().then(l => {
+      const meta = l[key];
+      if (!meta) { if (liste) fertig.set(key, null); else eintraege.delete(key); return null; }
+      return new Promise(res => {
+        const img = new Image();
+        img.onload = () => { const e = { meta, img, kern: kernRahmen(meta, img) }; fertig.set(key, e); res(e); };
+        img.onerror = () => { fertig.set(key, null); res(null); };
+        img.src = meta.sheetUrl;
+      });
+    });
+    eintraege.set(key, p);
+    return p;
+  }
+
+  // ── Gemeinsame Schleife ──────────────────────────────────────
+  const schritte = new Set();
+  let raf = 0;
+  function tick(now) {
+    raf = 0;
+    for (const s of schritte) { try { s(now); } catch {} }
+    if (schritte.size) raf = requestAnimationFrame(tick);
+  }
+  function anmelden(schritt) {
+    schritte.add(schritt);
+    if (!raf) raf = requestAnimationFrame(tick);
+    return () => { schritte.delete(schritt); };
+  }
+
+  // ── Steinfassung eines Sheets ────────────────────────────────
+  // Einmal je Sheet (beim ersten Versteinern) Pixel für Pixel umgefärbt:
+  // Helligkeit → fünf warme Grautöne mit Bayer-Dithering, grobe Flecken
+  // und feines Korn als Textur, von oben beleuchtete Kanten und ein paar
+  // Risse. Die Kontur bleibt dunkel, die Deckkraft bleibt erhalten.
+  // Die Textur hängt an Frame-Koordinaten, damit sie auf jedem Frame
+  // gleich liegt.
+  const STEIN = [[46, 43, 41], [82, 78, 73], [111, 106, 99], [141, 135, 126], [172, 166, 156], [203, 197, 186]];
+  const BAYER = [[0, 8, 2, 10], [12, 4, 14, 6], [3, 11, 1, 9], [15, 7, 13, 5]];
+  const hash = (x, y, s) => {
+    let h = (x * 374761393 + y * 668265263 + s * 2147483647) | 0;
+    h = Math.imul(h ^ (h >>> 13), 1274126177);
+    return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
+  };
+  // Weiche Flecken: Wertrauschen auf 4-px-Zellen, bilinear.
+  const flecken = (x, y, s) => {
+    const gx = x / 4, gy = y / 4, x0 = Math.floor(gx), y0 = Math.floor(gy), fx = gx - x0, fy = gy - y0;
+    const a = hash(x0, y0, s), b = hash(x0 + 1, y0, s), c = hash(x0, y0 + 1, s), d = hash(x0 + 1, y0 + 1, s);
+    return (a * (1 - fx) + b * fx) * (1 - fy) + (c * (1 - fx) + d * fx) * fy;
+  };
+  const steinCache = new WeakMap();
+  function steinSheet(e) {
+    if (steinCache.has(e)) return steinCache.get(e);
+    let cv = null;
+    try {
+      const { img, meta } = e;
+      const w = img.naturalWidth, h = img.naturalHeight;
+      const fw = meta.frameWidth, fh = meta.frameHeight;
+      const vertikal = meta.layout === 'vertical';
+      cv = document.createElement('canvas');
+      cv.width = w; cv.height = h;
+      const ctx = cv.getContext('2d');
+      ctx.drawImage(img, 0, 0);
+      const bild = ctx.getImageData(0, 0, w, h);
+      const px = bild.data;
+      const seed = [...String(meta.hero || meta.sheet || '')].reduce((a, ch) => (a * 31 + ch.charCodeAt(0)) | 0, 7);
+      // Risse: kurze Zickzack-Linien in Frame-Koordinaten.
+      const riss = new Uint8Array(fw * fh);
+      const nRisse = Math.max(2, Math.round((fw * fh) / 260));
+      for (let r = 0; r < nRisse; r++) {
+        let x = Math.floor(hash(r, 1, seed) * fw), y = Math.floor(hash(r, 2, seed) * fh);
+        const len = 4 + Math.floor(hash(r, 3, seed) * 6);
+        const dx = hash(r, 4, seed) < 0.5 ? -1 : 1;
+        for (let k = 0; k < len; k++) {
+          if (x >= 0 && x < fw && y >= 0 && y < fh) riss[y * fw + x] = 1;
+          y += 1;
+          if (hash(r, 10 + k, seed) < 0.55) x += dx;
+        }
+      }
+      const alphaBei = (x, y) => (x < 0 || y < 0 || x >= w || y >= h) ? 0 : px[(y * w + x) * 4 + 3];
+      const aus = new Uint8ClampedArray(px.length);
+      for (let y = 0; y < h; y++) {
+        for (let x = 0; x < w; x++) {
+          const i = (y * w + x) * 4;
+          const a = px[i + 3];
+          if (!a) continue;
+          const lx = vertikal ? x : x % fw, ly = vertikal ? y % fh : y;
+          const lum = (0.3 * px[i] + 0.59 * px[i + 1] + 0.11 * px[i + 2]) / 255;
+          let f;
+          if (lum < 0.14) {
+            f = STEIN[0];                       // Kontur bleibt Kontur
+          } else {
+            let t = 0.12 + lum * 0.78
+              + (flecken(lx, ly, seed) - 0.5) * 0.22
+              + (hash(lx, ly, seed + 1) - 0.5) * 0.10;
+            // von oben beleuchtet: Kante unter Transparenz heller,
+            // Kante über Transparenz dunkler (lokale Frame-Grenzen beachten)
+            const obenFrei = (vertikal ? ly === 0 : y === 0) || alphaBei(x, y - 1) === 0;
+            const untenFrei = (vertikal ? ly === fh - 1 : y === h - 1) || alphaBei(x, y + 1) === 0;
+            if (obenFrei) t += 0.16;
+            else if (untenFrei) t -= 0.12;
+            t = Math.max(0, Math.min(1, t));
+            const stufe = t * 4;
+            let k = Math.floor(stufe);
+            if (stufe - k > (BAYER[ly & 3][lx & 3] + 0.5) / 16) k++;
+            k = Math.min(4, k);
+            if (riss[ly * fw + lx] && !obenFrei) k = Math.max(0, k - 3);
+            f = STEIN[1 + k];
+          }
+          aus[i] = f[0]; aus[i + 1] = f[1]; aus[i + 2] = f[2]; aus[i + 3] = a;
+        }
+      }
+      ctx.putImageData(new ImageData(aus, w, h), 0, 0);
+    } catch { cv = null; }
+    steinCache.set(e, cv);
+    return cv;
+  }
+
+  return { slug, hole, schonDa: (key) => fertig.get(key), anmelden, steinSheet };
+})();
+
+// Eine Idle-Animation über dem oberen Kartendrittel einer Heldenzone.
+// `angehalten`: Frame bleibt stehen (Frozen/Stunned/Webbed).
+// `versteinert`: zusätzlich Steinoptik (kriecht von unten nach oben).
+function HeroIdleSprite({ cardName, angehalten, versteinert, unsichtbar }) {
+  const key = HeroIdleAnims.slug(cardName);
+  const [eintrag, setEintrag] = useState(() => HeroIdleAnims.schonDa(key) || null);
+  useEffect(() => {
+    let lebt = true;
+    setEintrag(HeroIdleAnims.schonDa(key) || null);
+    HeroIdleAnims.hole(key).then(e => { if (lebt) setEintrag(e || null); });
+    return () => { lebt = false; };
+  }, [key]);
+
+  const canvasRef = useRef(null);
+  const zustand = useRef({ angehalten, versteinert });
+  zustand.current.angehalten = !!angehalten;
+  zustand.current.versteinert = !!versteinert;
+
+  useEffect(() => {
+    const cv = canvasRef.current;
+    if (!eintrag || !cv) return;
+    const ctx = cv.getContext('2d');
+    const { meta, img } = eintrag;
+    const fw = meta.frameWidth, fh = meta.frameHeight;
+    const frames = Math.max(1, meta.frames | 0);
+    const ms = Math.max(16, Number(meta.frameMs) || 90);
+    const vertikal = meta.layout === 'vertical';
+    const st = {
+      // Zufälliger Startframe: mehrere Helden laufen nicht im Gleichtakt.
+      frame: Math.floor(Math.random() * frames),
+      rest: 0, zuletzt: null,
+      // Beim Aufbau schon versteinert (Neuladen, Beitritt) → sofort Stein.
+      stein: zustand.current.versteinert ? 1 : 0,
+      gemalt: -1, steinGemalt: -1,
+    };
+    const quelle = (f) => (vertikal ? [0, f * fh] : [f * fw, 0]);
+    const male = () => {
+      const [sx, sy] = quelle(st.frame);
+      ctx.clearRect(0, 0, fw, fh);
+      if (st.stein < 1) ctx.drawImage(img, sx, sy, fw, fh, 0, 0, fw, fh);
+      if (st.stein > 0) {
+        const stein = HeroIdleAnims.steinSheet(eintrag);
+        if (stein) {
+          // Die Versteinerung steigt von den Füßen auf; eine hellere
+          // Staubkante markiert die Front, solange sie wandert.
+          const top = st.stein >= 1 ? 0 : Math.round(fh * (1 - st.stein));
+          if (top < fh) ctx.drawImage(stein, sx, sy + top, fw, fh - top, 0, top, fw, fh - top);
+          if (st.stein < 1 && top > 0) {
+            ctx.save();
+            ctx.globalCompositeOperation = 'source-atop';
+            ctx.fillStyle = 'rgba(225,220,210,0.85)';
+            ctx.fillRect(0, top, fw, 1);
+            ctx.restore();
+          }
+        }
+      }
+      st.gemalt = st.frame;
+      st.steinGemalt = st.stein;
+    };
+    male();
+    // Scharfe Pixel beim Vergrößern, weiches Verkleinern (`pixelated`
+    // verschluckt beim Verkleinern ganze Pixelzeilen, vgl. v1449). Der
+    // tatsächliche Maßstab hängt an `--board-scale` und der Bildschirm-
+    // dichte, deshalb gemessen statt gerechnet.
+    const pruefeSchaerfe = () => {
+      const breite = cv.getBoundingClientRect().width * (window.devicePixelRatio || 1);
+      cv.style.imageRendering = breite >= fw * 0.98 ? 'pixelated' : 'auto';
+    };
+    pruefeSchaerfe();
+    const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(pruefeSchaerfe) : null;
+    if (ro) ro.observe(cv);
+    const abmelden = HeroIdleAnims.anmelden((now) => {
+      const dt = st.zuletzt == null ? 0 : Math.min(now - st.zuletzt, 1000);
+      st.zuletzt = now;
+      const z = zustand.current;
+      if (!z.angehalten) {
+        st.rest += dt;
+        if (st.rest >= ms) {
+          const n = Math.floor(st.rest / ms);
+          st.rest -= n * ms;
+          st.frame = (st.frame + n) % frames;
+        }
+      }
+      if (z.versteinert) { if (st.stein < 1) st.stein = Math.min(1, st.stein + dt / 900); }
+      else st.stein = 0;
+      if (st.frame !== st.gemalt || st.stein !== st.steinGemalt) male();
+    });
+    return () => { abmelden(); if (ro) ro.disconnect(); };
+  }, [eintrag]);
+
+  if (!eintrag) return null;
+  const { meta, kern } = eintrag;
+  const fw = meta.frameWidth, fh = meta.frameHeight;
+  const cw = Math.max(1, kern.x1 - kern.x0), ch = Math.max(1, kern.y1 - kern.y0);
+  // Kasten = oberes Drittel der Karte (64 × 90 → 30 hoch), 2 px Rand
+  // seitlich. Nie vergrößert: 1 Sprite-Pixel = 1 Kartenpixel, damit alle
+  // Helden dieselbe Pixeldichte haben; große Sprites werden eingepasst.
+  const s = Math.min(1, 60 / cw, 30 / ch);
+  const bs = (n) => `${+n.toFixed(3)}px * var(--board-scale)`;
+  // Kartenoberkante = Zonenmitte − 45; die Füße stehen auf der
+  // Drittellinie (Oberkante + 30), die Figur ist waagrecht mittig.
+  const spriteStil = {
+    width: `calc(${bs(fw * s)})`,
+    height: `calc(${bs(fh * s)})`,
+    left: `calc(50% - ${bs((kern.x0 + cw / 2) * s)})`,
+    top: `calc(50% - ${bs(15 + kern.y1 * s)})`,
+  };
+  const schattenBreite = Math.max(8, cw * s * 0.8);
+  const schattenStil = {
+    width: `calc(${bs(schattenBreite)})`,
+    left: `calc(50% - ${bs(schattenBreite / 2)})`,
+  };
+  return (
+    <div className={'hero-idle-sprite' + (versteinert ? ' hero-idle-stein' : '') + (angehalten ? ' hero-idle-angehalten' : '')}
+      style={unsichtbar ? { opacity: 0.4 } : undefined} aria-hidden="true">
+      <div className="hero-idle-schatten" style={schattenStil} />
+      <div className="hero-idle-auftritt">
+        <canvas ref={canvasRef} width={fw} height={fh} className="hero-idle-canvas" style={spriteStil} />
+      </div>
+    </div>
+  );
+}
+
 // Frozen overlay with animated snowflake particles
 function FrozenOverlay() {
   const particles = useMemo(() => Array.from({ length: ppFxN(14) }, () => ({
@@ -40201,6 +40521,19 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                   );
                 })()}
                 {isDead && hero?.name && <div className="hero-dead-marker">🪦</div>}
+                {/* ★ v1450: Idle-Animation lebender Helden über dem oberen
+                    Kartendrittel. Tot oder im Rammflug → gar nicht da.
+                    Gelähmt (Frozen/Stunned/Webbed) → Frame steht still;
+                    versteinert → zusätzlich Steinoptik. Name wie auf der
+                    Karte (vorgezogene Gestalt, Shapeshifter-Kopie). */}
+                {hero?.name && !isDead && !isRamming && (
+                  <HeroIdleSprite
+                    cardName={(formPreview && formPreview.owner === pi && formPreview.heroIdx === i
+                      && CARDS_BY_NAME[formPreview.cardName]) ? formPreview.cardName : hero.name}
+                    angehalten={!!(isFrozen || isStunned)}
+                    versteinert={!!(isStunned?._petrified || isStunned?._baihuPetrify)}
+                    unsichtbar={!!isInvisible} />
+                )}
                 {hero?.name && isFrozen && <FrozenOverlay />}
                 {hero?.name && isStunned && !isStunned._petrified && !isStunned._baihuPetrify
                   && (hero.statuses?.stunned || !hero.statuses?.webbed)

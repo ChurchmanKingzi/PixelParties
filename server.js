@@ -3424,6 +3424,39 @@ let SKINS_DATA = {};
 try { SKINS_DATA = JSON.parse(fs.readFileSync(path.join(__dirname, 'data', 'skins.json'), 'utf-8')); } catch {}
 app.get('/api/skins', (req, res) => res.json({ skins: SKINS_DATA }));
 
+// ===== HELDEN-IDLE-ANIMATIONEN =====
+// ★ v1450: Verzeichnis der Spritesheets in `data/hero-animations/`
+// (je Held `<slug>.png` + `<slug>.json`, Slug = Kartenname wie bei den
+// Effekt-Skripten). Der Client holt die Liste EINMAL und weiß danach,
+// welche Helden auf dem Brett animiert werden — ohne je Held eine
+// JSON-Datei auf gut Glück anzufragen (404-Rauschen).
+// Bewusst bei jedem Aufruf frisch gelesen: ~40 kleine Dateien, ein
+// Aufruf je Seitenaufbau, und neue Animationen gelten sofort (siehe
+// die maxAge-Vorgabe bei den statischen Routen).
+const HERO_ANIM_DIR = path.join(__dirname, 'data', 'hero-animations');
+app.get('/api/hero-animations', async (req, res) => {
+  const animations = {};
+  try {
+    const files = (await fs.promises.readdir(HERO_ANIM_DIR)).filter(f => f.endsWith('.json'));
+    await Promise.all(files.map(async (f) => {
+      try {
+        const meta = JSON.parse(await fs.promises.readFile(path.join(HERO_ANIM_DIR, f), 'utf-8'));
+        const sheet = typeof meta.sheet === 'string' ? meta.sheet : f.replace(/\.json$/, '.png');
+        const st = await fs.promises.stat(path.join(HERO_ANIM_DIR, sheet));
+        if (!(meta.frameWidth > 0 && meta.frameHeight > 0 && meta.frames > 0)) return;
+        animations[f.replace(/\.json$/, '')] = {
+          ...meta,
+          // Zeitstempel als Cache-Brecher: ein neu erzeugtes Sheet
+          // ersetzt das alte sofort, auch unter demselben Namen.
+          sheetUrl: '/data/hero-animations/' + encodeURIComponent(sheet) + '?v=' + Math.floor(st.mtimeMs),
+        };
+      } catch {}
+    }));
+  } catch {}
+  res.set('Cache-Control', 'no-cache');
+  res.json({ animations });
+});
+
 // ===== SHOP SYSTEM =====
 // ★ v1384 (Als Vorgabe 24.9.): alle Shop-Preise auf das FUENFFACHE —
 // Gegenstueck zum Wegfall der SC-Tageskappe und den vielen neuen
