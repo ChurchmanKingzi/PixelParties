@@ -31,9 +31,11 @@ schwarzer Strich). Dazu:
 * asgore:  Monster King Siphem: der Umhang weht nach außen, der rote Dreizack
            glitzert, und er schaut immer wieder zum Dreizack hinüber; blinzelt.
 * sorin:   Wippen und Blinzeln.
-* tryse:   er sticht zu: Arm, Hand und Schwert holen aus und stoßen vor; an
-           der Schulter bleibt der Ärmel mit seinem eigenen Muster stehen, der
-           vorgestoßene Teil schließt an (keine Lücke); er blinzelt.
+* tryse:   er sticht zu: Arm, Hand und Schwert holen aus und stoßen vor. Die
+           schwarze Kante des Schulter-Capes am Gesicht bleibt immer an ihrem
+           Platz; beim Zustoßen wird die Lücke dahinter in Stoffgrau gefüllt
+           (Ober- und Unterkante schwarz weiter), beim Ausholen verschwindet der
+           Arm hinter der Kante. Er blinzelt.
 """
 import math
 import sys
@@ -149,6 +151,7 @@ if V == 'tryse':
     ARM = (load('arm')[:, :, 3] > 0) | (load('hand')[:, :, 3] > 0) | (load('sword')[:, :, 3] > 0)
     ARM &= ~((load('body')[:, :, 3] > 0) & (np.arange(SW)[None, :] < 12))
     ARM &= np.arange(SH)[:, None] <= 14              # nur Arm, Hand und Schwert (nicht der Unterkörper)
+    ARM_FIRST = {y: int(np.nonzero(ARM[y])[0].min()) for y in range(SH) if ARM[y].any()}   # Kante am Gesicht
 if V == 'rhabi':
     GOLD = [rgb(c) for c in ('732910', 'd56210', 'ffb418', 'ffde5a', 'fff6ac')]
     EYE_GLOW = [rgb(c) for c in ('550808', '7a1010', 'a81818', '7a1010')]
@@ -215,7 +218,7 @@ def extra(x, y, i, b, sx):
             dy -= 1
         if ((x, y) in ARM_UR or (x, y) in ARM_LL) and up == 2:
             dy -= 1
-    if V == 'tryse' and ARM[y, x]:
+    if V == 'tryse' and ARM[y, x] and x != ARM_FIRST[y]:   # die Kante am Gesicht bleibt stehen
         dx += sx
     return dx, dy
 
@@ -277,6 +280,8 @@ def frame(i, particles=True):
                 dy += br
             if V == 'tryse' and ARM[y, x]:
                 arm_rows.setdefault(y, []).append(x)
+                if x != ARM_FIRST[y] and x + sx <= ARM_FIRST[y]:
+                    continue                         # beim Ausholen hinter der Kante verschwinden
             out[y + PT + dy, x + P + dx] = s[y, x]
     if b < 0:                                        # Zeile über dem Knie dehnen – nur über den Beinen,
         y = KNEE - 1                                 # mit demselben Versatz wie das Pixel
@@ -301,17 +306,21 @@ def frame(i, particles=True):
                     xx, yy = xin + P + side * k, y + PT + (b if y < KNEE else 0)
                     if not out[yy, xx, 3]:
                         out[yy, xx] = s[y, xin]
-    if V == 'tryse' and sx > 0:                      # Schulter: Lücke mit dem Innenmuster des Ärmels
-        top, bot = min(arm_rows), max(arm_rows)      # füllen (die schwarze Kante links nicht verdoppeln;
-        for y, xs in arm_rows.items():               # Schwarz nur an Ober- und Unterkante)
+    if V == 'tryse':                                 # Kante am Gesicht immer obenauf und an ihrem Platz
+        for y, x0 in ARM_FIRST.items():
+            out[y + PT + (b if y < KNEE else 0), x0 + P] = s[y, x0]
+    if V == 'tryse' and sx > 0:                      # Lücke hinter der festen Kante: Stoffgrau,
+        top, bot = min(arm_rows), max(arm_rows)      # an Ober- und Unterkante schwarz weiter
+        for y, xs in arm_rows.items():
             xs = sorted(xs)
             inner = [s[y, x] for x in xs[1:]] or [s[y, xs[0]]]
+            grey = [v for v in inner if max(v[:3]) >= 0x10 and max(v[:3]) - min(v[:3]) < 0x14]
             for k in range(sx):
-                c = inner[min(k, len(inner) - 1)]
-                if y not in (top, bot):              # Mitte: nur Stoffgrau (kein Schwarz, kein Braun der Hand)
-                    grey = [v for v in inner if max(v[:3]) >= 0x10 and max(v[:3]) - min(v[:3]) < 0x14]
-                    c = grey[min(k, len(grey) - 1)] if grey else c
-                xx, yy = xs[0] + P + k, y + PT + (b if y < KNEE else 0)
+                if y in (top, bot):
+                    c = s[y, xs[0]]
+                else:
+                    c = grey[min(k, len(grey) - 1)] if grey else inner[min(k, len(inner) - 1)]
+                xx, yy = xs[0] + 1 + k + P, y + PT + (b if y < KNEE else 0)
                 if not out[yy, xx, 3]:
                     out[yy, xx] = c
     fill_pinholes(out)
