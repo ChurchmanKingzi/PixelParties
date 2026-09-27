@@ -9,8 +9,9 @@ Loop: das Lid senkt sich, geschlossen ist das Auge ein 2 px breiter schwarzer
 Strich. Dazu:
 * freshya:  ihr Zopf weht nach außen (unten stärker, die Innenkante wird
             nachgezogen – keine Lücke zum Körper).
-* thorad:   die Glut seiner Zigarette glimmt auf und ab, Rauch steigt in
-            kleinen, halbtransparenten Wölkchen schräg nach oben und vergeht.
+* thorad:   er trinkt aus seinem Bierhelm: zweimal pro Loop wandert aus beiden
+            Dosen ein goldener Schluck die weißen Strohhalme entlang (hinter
+            dem Hut verdeckt) bis zum Halmende an seinem Mund.
 * cooldin:  er rollt auf dem Skateboard sachte vor und zurück (Brett und
             Figur gemeinsam), die Räder drehen sich dabei; die Krone blitzt.
 * lolki:    sein roter Umhang weht nach außen (unten stärker, der Saum bleibt
@@ -31,7 +32,7 @@ VARIANTS = {
                     lid=[((5, 9), '5a2000'), ((10, 9), '5a2000')],
                     line=[(5, 9), (6, 9), (9, 9), (10, 9)],
                     cape=dict(side=1, rows=(20, 23), x=lambda y: 12, amp=1.8)),
-    'thorad': dict(slug='thorad-strength-of-coolness', knee=23, pr=4,
+    'thorad': dict(slug='thorad-strength-of-coolness', knee=23,
                    lid=[((9, 9), 'f6cd8b'), ((13, 9), 'f6cd8b')],
                    line=[(8, 10), (9, 10), (12, 10), (13, 10)]),
     'cooldin': dict(slug='cooldin-king-of-coolness', knee=26,
@@ -55,7 +56,7 @@ C = VARIANTS[V]
 SRC = np.array(Image.open(f"src/{C['slug']}.png").convert('RGBA')).astype(int)
 SH, SW = SRC.shape[:2]
 P, PT, PB = 3, 4, 2
-PR = C.get('pr', P)                                  # rechter Rand (Thorads Rauch braucht mehr)
+PR = C.get('pr', P)                                  # rechter Rand
 H, W = SH + PT + PB, SW + P + PR
 N = 48
 KNEE = C['knee']
@@ -89,12 +90,13 @@ def roll(i):
     return int(round(math.sin(2 * math.pi * i / 24))) if V == 'cooldin' else 0
 
 
-# --- Thorad: Glut und Rauch --------------------------------------------------
-EMBER = [(14, 10), (13, 11)]
-EMBER_COLS = [rgb('de5c1e'), rgb('f07a2e'), rgb('ffa04a'), rgb('f07a2e')]
-SMOKE_PATH = [(15, 9), (16, 8), (17, 7), (18, 6), (19, 5), (20, 4), (21, 3), (22, 2), (23, 1), (23, 0)]
-SMOKE_ALPHA = [220, 215, 205, 195, 180, 160, 135, 105, 75, 45]
-SMOKE_SIZE = [1, 1, 1, 2, 2, 2, 3, 3, 3, 3]          # Wölkchen wachsen beim Aufsteigen
+# --- Thorad: Bier durch die Strohhalme -------------------------------------
+# sichtbare Halmstücke in Fließrichtung; None = hinter Hut/Feder verdeckt
+STRAW_L = [(4, 3), (4, 2), (5, 1), (6, 0), (7, 0), (8, 0), (9, 1), None, None, None, (14, 11), (13, 12), (12, 12)]
+STRAW_R = [(17, 3), (17, 2), None, None, (13, 0), (12, 1), None, None, None, None, (14, 11), (13, 12), (12, 12)]
+BEER, FOAM = rgb('f4b82a'), rgb('ffe9a0')
+SIPS = (4, 28)
+
 
 # --- Peter: Lichtreflex auf der Klinge --------------------------------------
 BLADE = {(x, y) for y in range(0, 24) for x in range(0, 8)
@@ -127,9 +129,14 @@ def frame(i):
                 s[y, x] = rgb('9a9a9a')
             elif d < 1.8:
                 s[y, x] = rgb('5c5c5c')
-    if V == 'thorad':
-        for k, (x, y) in enumerate(EMBER):
-            s[y, x] = EMBER_COLS[(i // 3 + k) % 4]
+    if V == 'thorad':                                # Schluck wandert durch die Halme
+        for start in SIPS:
+            t = i - start
+            for path, lag in ((STRAW_L, 0), (STRAW_R, 1)):
+                for k, col in ((t - lag, BEER), (t - lag - 1, FOAM)):
+                    if 0 <= k < len(path) and path[k] is not None:
+                        x, y = path[k]
+                        s[y, x] = col
     if V == 'cooldin' and roll(i) != roll(i - 1):   # Räder drehen sich beim Rollen
         for y in range(SH):
             for x in range(SW):
@@ -171,16 +178,6 @@ def frame(i):
                 if not out[yy, xx, 3]:
                     out[yy, xx] = s[y, xin]
     fill_pinholes(out)
-    if V == 'thorad':                                # Rauch
-        for start in (4, 12, 20, 28, 36, 44):       # Frame 0: nur ein Wölkchen, noch im Sprite
-            t = (i - start) % 48
-            if t < len(SMOKE_PATH):
-                x, y = SMOKE_PATH[t]
-                cells = {1: [(0, 0)], 2: [(0, 0), (1, 0), (0, -1)], 3: [(0, 0), (1, 0), (0, -1), (1, -1), (-1, 0)]}[SMOKE_SIZE[t]]
-                for k, (ox, oy) in enumerate(cells):
-                    xx, yy = x + ox + P + rx, y + oy + PT + b
-                    a = SMOKE_ALPHA[t] if k == 0 else SMOKE_ALPHA[t] * 2 // 3
-                    out[yy, xx] = blend(out[yy, xx], rgb('eeeeee' if k == 0 else 'd6d6d6'), a)
     if 'glint' in C:
         gx, gy, start = C['glint']
         for (x, y), c in sparkle_pixels(i, N, [(gx + P + rx, gy + PT + b, start)], GOLD0, GOLD1).items():
