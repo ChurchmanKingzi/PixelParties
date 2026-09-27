@@ -35,8 +35,8 @@ shade_rows(cv, 0, 150, 0.6, 0.0, (8, 12, 40))          # Sturmdunkel über dem M
 
 # ---------- Hydra: aus dem Meer aufsteigend (hinter der Uferlinie)
 hydra = sprite('c17_hydra', RU, [9])
-Hy = up(hydra, 2)
-WL = 176                                               # Wasserlinie im hellen Meer vor dem Ufer
+Hy = up(hydra, 3)
+WL = 198                                               # Wasserlinie im hellen Meer vor dem Ufer
 hx, hy = (W - Hy.shape[1]) // 2, WL + 12 - Hy.shape[0]
 vis = Hy[:WL - hy]                                     # nur der Teil über dem Wasser
 cv.paste(silhouette(vis, (10, 16, 50)), hx + 4, hy + 6, alpha=0.5)

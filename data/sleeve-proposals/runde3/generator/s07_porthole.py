@@ -21,7 +21,7 @@ W, H = 250, 350
 cv = Canvas(W, H)
 
 # ---------- Wand ----------
-wall = compose('MotiveDeepsea', [197])
+wall = sprite('b07_ds197', 'MotiveDeepsea', [197])
 tile = wall[56:72, 112:128]
 cv.a[:] = up(np.dstack([tile_rgb(tile, W // 2 + 1, H // 2 + 1), np.full((H // 2 + 1, W // 2 + 1), 255, np.uint8)]), 2)[:H, :W, :3]
 shade(cv, 0.62)
@@ -50,9 +50,9 @@ for y in range(CY - R, CY + R):
 inside = Canvas(W, H); inside.a[:] = cv.a
 
 # Hintergrund-Fauna (klein, abgedunkelt, nur im Glas)
-siren = parts(compose('MotiveDeepsea', [84]))[0]
+siren = parts(sprite('b07_ds84', 'MotiveDeepsea', [84]))[0]
 siren = lum_tint(siren, (10, 22, 55), (55, 105, 160))
-remora = parts(compose('MotiveDeepsea', [88]), dil=1)
+remora = parts(sprite('b07_ds88', 'MotiveDeepsea', [88]), dil=1)
 bg = Canvas(W, H); bg.a[:] = cv.a
 bg.paste(flip(siren), CX - 78, CY - 70)
 for r in remora[1:3]:
@@ -60,17 +60,17 @@ for r in remora[1:3]:
 rem = [p for p in remora if p.shape[1] < 30]
 for i, r in enumerate(rem[:2]):
     bg.paste(up(lum_tint(r, (12, 30, 70), (45, 90, 140)), 1), CX + 30 + i * 22, CY + 62 + i * 5)
-bubbles = compose('MotiveDeepsea', [200])
+bubbles = sprite('b07_ds200', 'MotiveDeepsea', [200])
 bg.paste(up(bubbles, 1), 150, 58)
 cv.a[glass] = bg.a[glass]
 
 # Hai – groß, über das Glas hinaus angeschnitten (nur innerhalb des Glases sichtbar)
-shark = compose('MotiveDeepsea', [93])
+shark = sprite('b07_ds93', 'MotiveDeepsea', [93])
 S4 = up(flip(shark), 4)                # 200×116, Maul nach rechts
 fg = Canvas(W, H); fg.a[:] = cv.a
 fg.paste(S4, CX - 118, CY - 38)
 # Fischchen flieht vor dem Maul
-fish = parts(compose('MotiveDeepsea', [85]))
+fish = parts(sprite('b07_ds85', 'MotiveDeepsea', [85]))
 f0 = up(fish[0], 3)
 fg.paste(f0, CX + 50, CY - 58)
 f1 = up(flip(fish[-1]), 2)
@@ -124,7 +124,7 @@ cv.a[FY:] = (fl[:H - FY, :W, :3] * 0.7).astype(np.uint8)
 # Schattenkante am Übergang
 cv.a[FY:FY + 2] = (cv.a[FY:FY + 2] * 0.5).astype(np.uint8)
 
-kit_s = compose('MotiveDeepsea', [40, 38])
+kit_s = sprite('b07_ds40_38', 'MotiveDeepsea', [40, 38])
 K = up(kit_s, 5)
 kx, ky = 20, H - 14 - K.shape[0]
 # Bodenschatten
@@ -136,7 +136,7 @@ for y in range(H - 20, H - 8):
 cv.paste(K, kx, ky)
 
 # Taucher (Karte „Dive Down“) rechts, frisch aus dem Wasser zurück
-diver = compose('MotiveDeepsea', [207])
+diver = sprite('b07_ds207', 'MotiveDeepsea', [207])
 D = up(diver, 4)
 dx, dy = W - 18 - D.shape[1], H - 12 - D.shape[0]
 for y in range(H - 18, H - 6):

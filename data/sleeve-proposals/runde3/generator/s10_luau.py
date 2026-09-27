@@ -34,7 +34,7 @@ for y in range(SY - SR, HOR):
             cv.a[y, x] = (252, 228, 120) if y < SY - 26 else (250, 190, 80)
 
 # Vulkan (Silhouette aus dem Deepsea-Felshang, gespiegelt)
-slope = compose('MotiveDeepsea', [385])            # 109×103, steigt nach rechts
+slope = sprite('b10_ds385', 'MotiveDeepsea', [385])            # 109×103, steigt nach rechts
 half = np.transpose(slope, (1, 0, 2))[::-1, ::-1].copy()   # Hang quer gelegt …
 half[..., 3] = 255 - half[..., 3]                          # … und Fläche unter der Kurve: konkave Flanke
 cone = np.concatenate([half, flip(half)], 1)
@@ -43,7 +43,7 @@ cone = silhouette(cone, (40, 16, 44))
 vx = 8
 cv.paste(cone, vx - 40, HOR - cone.shape[0] + 1)
 # Lavaglühen im Krater + Feuer
-flames = parts(compose(HW, [262]), dil=0)
+flames = parts(sprite('b10_hw262', HW, [262]), dil=0)
 tall = [p for p in flames if p.shape[0] >= 60]
 mid = [p for p in flames if p.shape == (35, 14, 4)]
 cx_crater = vx - 40 + cone.shape[1] // 2
@@ -62,7 +62,7 @@ for x in range(W):
 
 # ---------- Strand ----------
 SAND0 = 206
-sand = layer(HW, 193)[384:400, 532:548]
+sand = sprite('b10_hw193_sand', HW, [193], box=(532, 384, 548, 400))
 st = tile_rgb(sand, W // 2 + 1, (H - SAND0) // 2 + 1)
 st = np.repeat(np.repeat(st, 2, 0), 2, 1)[:H - SAND0, :W]
 st = (st.astype(float) * np.array([0.92, 0.72, 0.62])).clip(0, 255).astype(np.uint8)   # Abendlicht
@@ -79,7 +79,7 @@ for y in range(SAND0 + 60, H):
             cv.a[y, x] = (cv.a[y, x] * 0.72).astype(np.uint8)
 
 # ---------- Idol + Feuersäulen ----------
-idol = compose(HW, [254])
+idol = sprite('b10_hw254', HW, [254])
 I4 = up(idol, 4)
 IB = 244
 # Feuerschein auf dem Sand
@@ -89,15 +89,15 @@ pb(cv, up(tall[1], 2), 44, 250)
 pb(cv, up(flip(tall[0]), 2), 206, 250)
 
 # Trompeterin hinten rechts neben dem Idol
-notes = parts(compose(HW, [170]), dil=1)
+notes = parts(sprite('b10_hw170', HW, [170]), dil=1)
 
 # ---------- Vordergrund ----------
 pele = [p for p in flames if p.shape[:2] == (32, 22)][0]
 P4 = up(pele, 4)
 pb(cv, P4, 125, 340)
-moana = compose(HW, [189])
+moana = sprite('b10_hw189', HW, [189])
 pb(cv, up(moana, 4), 40, 346)
-gtr = compose(HW, [159])
+gtr = sprite('b10_hw159', HW, [159])
 pb(cv, up(flip(gtr), 4), 212, 346)
 
 for p, (x, y) in zip(notes, [(88, 196), (176, 190), (192, 150), (60, 150)]):

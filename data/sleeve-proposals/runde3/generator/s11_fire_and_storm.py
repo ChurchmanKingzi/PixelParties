@@ -17,8 +17,8 @@ W, H = 250, 350
 HW = 'MotiveHawaii'
 cv = Canvas(W, H)
 
-lava = compose(HW, [265])[0:16, 0:16]
-wat = compose(HW, [264])[0:16, 0:16]
+lava = sprite('b11_hw265', HW, [265])[0:16, 0:16]
+wat = sprite('b11_hw264', HW, [264])[0:16, 0:16]
 LV = np.repeat(np.repeat(tile_rgb(lava, W, H), 2, 0), 2, 1)[:H, :W]
 WT = np.repeat(np.repeat(tile_rgb(wat, W, H, oy=5), 2, 0), 2, 1)[:H, :W]
 
@@ -41,7 +41,7 @@ for y in range(H):
     cv.a[y, :s] = (cv.a[y, :s] * np.array([0.82, 0.66, 0.6])).astype(np.uint8)
 
 # Regen nur rechts
-rain = compose(HW, [176])
+rain = sprite('b11_hw176', HW, [176])
 rn = Canvas(W, H); rn.a[:] = cv.a
 rn.paste(rain, W // 2 - 20, 0); rn.paste(rain, W // 2 - 60, 170)
 for y in range(H):
@@ -49,7 +49,7 @@ for y in range(H):
     cv.a[y, s:] = rn.a[y, s:]
 
 # Feuersäulen links
-fl = parts(compose(HW, [260]), dil=0)
+fl = parts(sprite('b11_hw260', HW, [260]), dil=0)
 tall = [p for p in fl if p.shape[0] >= 70]
 small = [p for p in fl if p.shape[0] < 30]
 cv.paste(up(tall[0], 2), -6, 188)
@@ -58,7 +58,7 @@ cv.paste(up(small[0], 2), 20, 146)
 cv.paste(up(small[1], 2), 84, 186)
 
 # Blitze rechts
-bolts = parts(compose(HW, [149]), dil=1)
+bolts = parts(sprite('b11_hw149', HW, [149]), dil=1)
 cv.paste(up(bolts[0], 2), 176, 168)
 cv.paste(up(flip(bolts[1]), 2), 190, 282)
 
@@ -70,14 +70,14 @@ for y in range(H):
     cv.a[y, s + 1] = (160, 230, 255)
 
 # Feen
-luna = compose(HW, [147])
-temp = compose(HW, [150])
+luna = sprite('b11_hw147', HW, [147])
+temp = sprite('b11_hw150', HW, [150])
 L5 = up(luna, 5); T5 = up(flip(temp), 5)
 cv.paste(L5, 10, 24)
 cv.paste(T5, W - 10 - T5.shape[1], 30)
 
 # Tempeluna an der Naht, unten
-tl = compose(HW, [90])
+tl = sprite('b11_hw90', HW, [90])
 T6 = up(tl, 6)
 pb(cv, T6, 125, H - 12)
 

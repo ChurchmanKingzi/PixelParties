@@ -28,7 +28,7 @@ for y in range(0, HOR):
         if d < 84: cv.a[y, x] = (110, 50, 72)
         elif d < 94 and 0.5 > BAYER4[y % 4, x % 4]: cv.a[y, x] = (110, 50, 72)
         elif d < 106 and 0.25 > BAYER4[y % 4, x % 4]: cv.a[y, x] = (70, 50, 96)
-moon = up(compose(D, [363]), 3)
+moon = up(sprite('b09_ds363', D, [363]), 3)
 pc(cv, moon, MX, MY)
 
 # ---------- ferne See ----------
@@ -47,7 +47,7 @@ for j, y in enumerate(range(HOR + 2, H, 4)):
 cv.a[HOR] = (60, 110, 165)
 
 # ---------- Klippe ----------
-rock = compose(D, [386])
+rock = sprite('b09_ds386', D, [386])
 hill = np.concatenate([rock, flip(rock)], 1)          # 218×103, Gipfel in der Mitte
 hill = lum_tint(hill, (8, 8, 26), (96, 76, 128))
 Hh = up(hill[:, 109 - 70:109 + 70], 2)                # 280×206
@@ -66,12 +66,12 @@ for j in range(sub.shape[0]):
             if Y + 1 < WL: cv.a[Y + 1, X] = (110, 60, 96)
 
 # ---------- Sirene ----------
-siren = compose(D, [327])
+siren = sprite('b09_ds327', D, [327])
 S = up(siren, 4)
 sx, sy = MX - S.shape[1] // 2 - 4, 182 - S.shape[0] + 16
 cv.paste(S, sx, sy)
 # Noten
-notes = parts(compose(D, [324]), dil=1)
+notes = parts(sprite('b09_ds324', D, [324]), dil=1)
 pos = [(40, 150), (22, 92), (58, 38), (178, 44), (206, 96), (192, 150)]
 for p, (x, y) in zip(notes, pos):
     cv.paste(up(p, 3), x, y)
@@ -86,19 +86,19 @@ for x in range(W):
     cv.a[WL, x] = (70, 120, 175) if (x // 4) % 2 else (47, 101, 159)
 
 # Haiflossen
-fins = [p for p in parts(compose(D, [50]), dil=0) if p.shape[:2] == (10, 10)]
+fins = [p for p in parts(sprite('b09_ds50', D, [50]), dil=0) if p.shape[:2] == (10, 10)]
 cv.paste(up(fins[0], 3), 6, WL - 22)
 cv.paste(up(flip(fins[1]), 2), 64, WL - 12)
 
 # Wrackteile
-deb = parts(compose('MotiveSteamDwarfs', [211]), dil=0, minpx=6)
+deb = parts(sprite('b09_sd211', 'MotiveSteamDwarfs', [211]), dil=0, minpx=6)
 barrels = [p for p in deb if p.shape[0] >= 13 and p.shape[1] >= 12]
 planks = [p for p in deb if p.shape[0] < 12 and p.shape[1] >= 8]
 cv.paste(up(planks[0], 2), 22, 326)
 cv.paste(up(flip(planks[1]), 2), 214, 332)
 
 # Schiffbrüchiger am Fass
-pir = compose('MotiveGrailWar', [559])
+pir = sprite('b09_gw559', 'MotiveGrailWar', [559])
 P = up(pir, 4)
 px, py = 142, 252
 cut = 322 - py                        # bis zur Wasserlinie sichtbar

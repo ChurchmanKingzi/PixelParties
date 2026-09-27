@@ -7,11 +7,12 @@ Quellen (MotiveDeepsea.xcf):
   Ebene 207 „Dive Down“ – Taucher (Karte „Dive Down“), 4×
   Ebene 200 „Ebene #93“ – Luftblasen (Karte „Dive Down“), 1×/2×
   Ebene 363 „Ebene #182“ – Blutmond, 1×  (Glanz selbst gedithert in Mondfarbe)
-  Ebene 386 „Ebene #194“ – Felsklippe (Deepsea-Küste), 2×, gespiegelt; als Meeresboden abgedunkelt
+  Ebene 386 „Ebene #194“ – Felsklippe (Deepsea-Küste), 1×, gespiegelt; als Meeresboden abgedunkelt
   Ebene 93  „Greatmaw Shawk“ – Hai, 2×, blau abgedunkelt
   Ebene 196 „Deepsea Treasure“ – Schatztruhe, 2×
   Ebene 375 „Siphem #3“ – Deepsea-Burg (Karte „Siphem“), 1×, abgedunkelt
-  Ebene 388/390 „Ebene #14/#11“ – Tiefsee-Gewächse
+  Ebene 388 „Ebene #14“ – Tiefsee-Gewächse, 2×
+  Ebene 84 „Greatmaw Siren“ – Angler-Hai im Halbdunkel, 2×
   Ebene 295 „Ebene #19“ – grün leuchtende Augen (Karte „Deepsea Reaper“)
   Farben: Ebene 391 „Hintergrund“ (Himmel/Meer).
 """
@@ -32,12 +33,12 @@ for y in range(0, SURF):
         if d < 31: cv.a[y, x] = (120, 56, 78)
         elif d < 37 and 0.5 > BAYER4[y % 4, x % 4]: cv.a[y, x] = (120, 56, 78)
         elif d < 44 and 0.25 > BAYER4[y % 4, x % 4]: cv.a[y, x] = (84, 62, 108)
-moon = compose(D, [363])
+moon = sprite('b08_ds363', D, [363])
 pc(cv, moon, MX, MY)
 # Wasser unterhalb der Oberfläche überdeckt Glanz später
 
 # Felsküste links (Klippe aus der Deepsea-Szene, gespiegelt)
-rock = compose(D, [386])
+rock = sprite('b08_ds386', D, [386])
 R2 = up(flip(rock), 1)
 cv.paste(R2, -34, SURF - 70)
 
@@ -66,11 +67,11 @@ for y in range(SURF + 2, 250):
                 cv.a[y, x] = np.clip(c + (30, 40, 45), 0, 255)
 
 # ---------- Mittlere Tiefe: Hai ----------
-shark = compose(D, [93])
+shark = sprite('b08_ds93', D, [93])
 sh2 = up(lum_tint(shark, (8, 20, 50), (60, 100, 150)), 2)
 cv.paste(flip(sh2), -14, 196)
 # Greatmaw-Siren (Angler-Hai) rechts im Halbdunkel, der Köder glimmt
-siren = parts(compose(D, [84]))[0]
+siren = parts(sprite('b08_ds84', D, [84]))[0]
 lure = (siren[..., 0] > 150) & (siren[..., 1] < 80) & (siren[..., 3] > 0); lure[12:] = False
 sr = lum_tint(siren, (8, 18, 46), (46, 84, 134))
 sr[lure, :3] = (220, 70, 80)
@@ -79,7 +80,7 @@ cv.paste(S2, W - S2.shape[1] + 34, 150)
 
 # ---------- Grund ----------
 GY = 300
-castle = compose(D, [375])
+castle = sprite('b08_ds375', D, [375])
 c1 = lum_tint(castle, (6, 12, 34), (36, 54, 104))
 # Fenster weiter rot glimmen lassen
 red = (castle[..., 0] > 150) & (castle[..., 1] < 90)
@@ -91,26 +92,26 @@ cv.paste(up(bed, 1), W - 109 + 20, GY - 30)
 cv.paste(up(flip(bed), 1), -30, GY - 20)
 vgrad(cv, [(0, (10, 20, 44)), (1, (4, 8, 20))], 0, GY + 14, W, H)
 # Gewächse
-weed = compose(D, [388]); weed2 = compose(D, [390])
+weed = sprite('b08_ds388', D, [388])
 for i, (p, x) in enumerate(zip(parts(weed), (8, 60, 150, 205, 228))):
     pb(cv, up(p, 2), x, GY + 18)
 # Augen im Dunkel
-eyes = compose(D, [295])
+eyes = sprite('b08_ds295', D, [295])
 cv.paste(up(eyes, 1), 10, GY - 40)
 
 # Schatz mit Glanz
-chest = compose(D, [196])
+chest = sprite('b08_ds196', D, [196])
 radial(cv, 125, GY + 8, 70, (70, 70, 60), 0.7, power=1.6)
 radial(cv, 125, GY + 8, 46, (140, 120, 60), 0.6, power=1.8)
 C2 = up(chest, 2)
 pb(cv, C2, 125, GY + 36)
 
 # ---------- Taucher + Blasenspur ----------
-bub = compose(D, [200])
+bub = sprite('b08_ds200', D, [200])
 bp = parts(bub, dil=0, minpx=1)
 # Blasenkette über dem Helm bis zur Oberfläche
 rng = np.random.RandomState(7)
-diver = compose(D, [207])
+diver = sprite('b08_ds207', D, [207])
 DV = up(diver, 4)
 dx, dy = 125 - DV.shape[1] // 2, 112
 by = dy - 4
