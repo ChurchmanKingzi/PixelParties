@@ -40,7 +40,7 @@ CFG = {
                      pivots={-1: 9, 1: 16}, period=8, amp=0.4, pad=5, parts='snow'),
     'mary': dict(slug='sickly-mary', prefix='sickly_mary', mode='drawn',
                  wing_cols=('f6ffff', 'd2d5d2', '586665', '292929'), left=5, right=16,
-                 pivots={-1: (5.5, 6.0), 1: (15.5, 6.0)}, period=12, amp=0.30, pad=22, parts=None,
+                 pivots={-1: (5.5, 6.0), 1: (15.5, 6.0)}, period=12, amp=0.30, pad=22, parts=None, spread=0.3,
                  roots={-1: (6.5, 11.0), 1: (15.5, 11.0)}, crop=True,
                  palette=('292929', 'f6ffff', 'd2d5d2', '586665', 'd2d5d2'),
                  shape=(4.5, 5.0, 7.0, 5.0, 8, 2.6),
@@ -181,9 +181,10 @@ def drawn_pose(i):
         return 'orig', 0.0, 0
     if t in (2, 11):
         return 'orig', CFG.get('spread', 0.4), 0
-    # Aufschlag langsam, Abschlag kräftig; Spannweite: entfaltet sich, faltet zurück
-    lift = (-0.5, -0.15, 0.2, 0.4, 0.2, -0.25, -0.55, -0.6)[t - 3]
-    span = (0.72, 0.83, 0.9, 0.9, 0.9, 0.9, 0.86, 0.74)[t - 3]
+    # erster/letzter gezeichneter Frame: halb geöffnet und nach unten hängend
+    # (Übergang zur angelegten Form); Aufschlag langsam, Abschlag kräftig
+    lift = (-1.2, -0.55, 0.05, 0.4, 0.2, -0.35, -0.75, -1.2)[t - 3]
+    span = (0.66, 0.82, 0.9, 0.9, 0.9, 0.9, 0.84, 0.68)[t - 3]
     return 'drawn', lift, span
 
 
