@@ -146,6 +146,14 @@ kopiert, daneben liegt eine JSON-Datei mit den Metadaten. Die erzeugten
 | `deepsea.py` | `final 90 sorin` | `sorin_idle_final_sheet.png` | `sorin-the-warden-of-blood-rock` |
 | `deepsea.py` | `final 90 tryse` | `tryse_idle_final_sheet.png` | `tryse-the-shadow-slayer` |
 | `toras.py` | `final` | `toras_idle_final_sheet.png` | `toras-master-of-all-weapons` |
+| `deri.py` | `final 90 shapeshifter` | `shapeshifter_idle_final_sheet.png` | `the-shapeshifter` |
+| `deri.py` | `final 90 robber` | `robber_idle_final_sheet.png` | `the-throne-robber` |
+| `deri.py` | `final 90 darge` | `darge_idle_final_sheet.png` | `bow-sniper-darge` |
+| `deri.py` | `final 90 jean` | `jean_idle_final_sheet.png` | `jean-the-pillaging-knight` |
+| `deri.py` | `final 90 layn` | `layn_idle_final_sheet.png` | `layn-defender-of-deri` |
+| `deri.py` | `final 90 summoner` | `summoner_idle_final_sheet.png` | `layn-summonr-of-weapons` (Skin) |
+| `deri.py` | `final 90 ascended` | `ascended_idle_final_sheet.png` | `layn-master-of-deri-s-relic` |
+| `deri.py` | `final 90 tharx` | `tharx_idle_final_sheet.png` | `tharx-the-never-losing-general` |
 | `bubbles.py` | `final gross` | `bubbles_idle_final_gross_sheet.png` | `bubbles-the-bouncy-bunny` |
 
 `bubbles.py` ohne `gross` erzeugt eine auf Hero-Größe verkleinerte Variante
@@ -180,6 +188,7 @@ python3 xcf_extract.py MotiveMoe.xcf assemble src/cute-princess-mary.png "Mary-K
 | MotiveChina-Heroes | `MotiveChina.xcf` | reproduzierbar per `python3 assemble_china.py <MotiveChina.xcf>` (Zuordnung im Skriptkopf) |
 | MotiveCoolhalla-Heroes und Skin | `MotiveCoolhalla.xcf` | reproduzierbar per `python3 assemble_coolhalla.py <MotiveCoolhalla.xcf>` (Zuordnung im Skriptkopf; Cooldin wird aus zwei Szenen-Ebenen ausgeschnitten) |
 | MotiveDeepsea-Heroes und -Skins | `MotiveDeepsea.xcf` | reproduzierbar per `python3 assemble_deepsea.py <MotiveDeepsea.xcf>` (Zuordnung im Skriptkopf; Scherben-Vorlagen für die Lolek-Partikel als `-shards.png`) |
+| MotiveDeri-Heroes und -Skin | `MotiveDeri.xcf` | reproduzierbar per `python3 assemble_deri.py <MotiveDeri.xcf>` (Zuordnung im Skriptkopf; Thron, Arm, Bogen, Hände und Zinnen als bewegliche Teile `-<teil>.png`) |
 
 Neue Datei durchsuchen: `xcf_scan.py dump` legt alle Ebenen einzeln ab,
 `xcf_scan.py match <ordner> --heroes` gleicht sie mit allen noch nicht
