@@ -595,7 +595,7 @@ function PuzzleCreator() {
   // leer aussehen laesst.
   const [pileSuche, setPileSuche] = useState('');
   const boardWrapRef = useRef(null);
-  // ★ v1451: die jeweils aktuelle `magnetZiel` (siehe dort) — die
+  // ★ v1452: die jeweils aktuelle `magnetZiel` (siehe dort) — die
   // Touch-Griffe sind Callbacks ohne passende Abhaengigkeiten und
   // lesen sie deshalb ueber den Ref, nicht aus ihrem Closure.
   const magnetZielRef = useRef(null);
@@ -842,7 +842,7 @@ function PuzzleCreator() {
       td.ghost.style.display = 'none';
       const el = document.elementFromPoint(t.clientX, t.clientY);
       td.ghost.style.display = '';
-      // ★ v1451: Brettzonen magnetisch, wie beim Ziehen mit der Maus.
+      // ★ v1452: Brettzonen magnetisch, wie beim Ziehen mit der Maus.
       const handEl = el?.closest('[data-pz-hand]');
       const zoneKey = handEl
         ? 'hand:' + handEl.dataset.pzHand
@@ -861,7 +861,7 @@ function PuzzleCreator() {
     const t = e.changedTouches[0];
     const el = document.elementFromPoint(t.clientX, t.clientY);
     const handEl = el?.closest('[data-pz-hand]');
-    // ★ v1451: die Zone kommt aus der magnetischen Suche — sie liefert
+    // ★ v1452: die Zone kommt aus der magnetischen Suche — sie liefert
     // nur Zonen, die die Karte annehmen (mit dem AKTUELLEN Brett; der
     // Callback hier sieht wegen seiner Abhaengigkeiten sonst nur einen
     // alten Stand).
@@ -2123,7 +2123,7 @@ function PuzzleCreator() {
     setDragCardName(null); setDragHandIdx(null); setDragSource(null); setDragHandSource(null); setDragOverZone(null); dragEntityData.current = null;
   }, [dragCardName, dragHandIdx, dragHandSource, dragSource, canDrop, clearZone, placeHero, placeAbility, placeSupport, placeSurprise, placeArea, placePermanent, removeFromHand, removeFromOppHand, entferneAusHandquelle, updatePlayer]);
 
-  // ══ MAGNETISCHE ABLAGE (v1451) ══════════════════════════════════
+  // ══ MAGNETISCHE ABLAGE (v1452) ══════════════════════════════════
   // Als Befund 27.9.: „Im Puzzle-Editor sind die Board-Zonen so klein,
   // dass es schwierig sein kann, dort Karten reinzuplatzieren. Die
   // Drop-Zonen fuer Karten muessten deutlich groesser sein als die
@@ -3403,7 +3403,7 @@ function PuzzleCreator() {
         } else e.preventDefault();
       },
       onDragEnd,
-      // ★ v1451: Ablegen laeuft nicht mehr ueber die Zone selbst, sondern
+      // ★ v1452: Ablegen laeuft nicht mehr ueber die Zone selbst, sondern
       // ueber `.pz-board-wrap` (`brettDragOver`/`brettDrop`) — dort wird
       // auch die NAECHSTE passende Zone gefunden, wenn der Zeiger knapp
       // daneben liegt.
