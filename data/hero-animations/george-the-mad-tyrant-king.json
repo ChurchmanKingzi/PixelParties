@@ -1,0 +1,15 @@
+{
+  "hero": "George, the Mad Tyrant King",
+  "sheet": "george-the-mad-tyrant-king.png",
+  "frameWidth": 28,
+  "frameHeight": 31,
+  "frames": 48,
+  "frameMs": 90,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 4,
+  "padLeft": 4,
+  "padRight": 4,
+  "padBottom": 2,
+  "faceX": 13.5
+}

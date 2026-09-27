@@ -1,0 +1,16 @@
+{
+  "hero": "Hatmaker George",
+  "sheet": "hatmaker-george.png",
+  "frameWidth": 30,
+  "frameHeight": 39,
+  "frames": 48,
+  "frameMs": 90,
+  "loop": true,
+  "layout": "horizontal",
+  "skinOf": "George, the Mad Tyrant King",
+  "padTop": 4,
+  "padLeft": 4,
+  "padRight": 4,
+  "padBottom": 2,
+  "faceX": 14.5
+}

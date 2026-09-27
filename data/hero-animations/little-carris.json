@@ -1,0 +1,16 @@
+{
+  "hero": "Little Carris",
+  "sheet": "little-carris.png",
+  "frameWidth": 27,
+  "frameHeight": 27,
+  "frames": 48,
+  "frameMs": 90,
+  "loop": true,
+  "layout": "horizontal",
+  "skinOf": "Carris, the Time Keeper",
+  "padTop": 4,
+  "padLeft": 4,
+  "padRight": 4,
+  "padBottom": 3,
+  "faceX": 14.5
+}

@@ -2,7 +2,9 @@
 """Idle-Animation für Mirjam, the Fallen Cute Angel (Sprite aus MotiveMoe.xcf).
 
 * Sie schlägt mit ihren dunklen Flügeln (Drehung um die Schultern,
-  flap_common.rotate_part, Spitzen schwingen nach).
+  flap_common.rotate_part, Spitzen schwingen nach). Die hinter ihr verdeckten
+  Flügelteile werden in Flügelfarbe ergänzt, kleine Lücken im gedrehten
+  Flügel geschlossen – die Flügel bleiben geschlossene Flächen.
 * Sie schwebt: die Figur samt Flügeln hebt und senkt sich (0..2 px),
   ihr Schatten am Boden bleibt liegen und wird kleiner/blasser, je höher sie ist.
 * Lila Blitze als Partikel: kurze Zickzack-Blitze zucken aus ihrer
@@ -14,7 +16,7 @@ import sys
 from PIL import Image
 import numpy as np
 from anim_common import rgb, save_outputs
-from flap_common import rotate_part, over
+from flap_common import rotate_part, over, fill_pinholes
 
 SRC = np.array(Image.open('src/mirjam-the-fallen-cute-angel.png').convert('RGBA')).astype(int)
 SH, SW = SRC.shape[:2]
@@ -39,6 +41,46 @@ WING = {rgb(c) for c in ('16133a', '0a081a', '0c0b20', '272267', '0f0d28')}
 WING_MASK = np.array([[SRC[y, x, 3] > 0 and y < SHADOW_Y and (x <= 6 or x >= 15) and tuple(SRC[y, x]) in WING
                        for x in range(SW)] for y in range(SH)])
 PIVOTS = {-1: (6.0, 9.0), 1: (15.0, 9.0)}
+WING_FILL = rgb('0a081a')                            # Innenfarbe der Flügel
+
+
+def full_wing(side):
+    """Flügel vervollständigen: was im Sprite hinter Mirjam liegt, wird von der
+    Innenkante bis zur Körpermitte in Flügelfarbe ergänzt – nur solange Mirjam
+    davor liegt (in Ruhe unsichtbar, beim Schlagen sonst ein Loch an der Wurzel)."""
+    xs = np.arange(SW)[None, :]
+    m = WING_MASK & ((xs <= 10) if side < 0 else (xs >= 11))
+    img = SRC.copy()
+    full = m.copy()
+    for y in range(SH):
+        row = np.nonzero(m[y])[0]
+        if not len(row):
+            continue
+        rng = range(row.max() + 1, 11) if side < 0 else range(row.min() - 1, 10, -1)
+        for x in rng:                                # nach innen, solange Mirjam davor liegt
+            if not SRC[y, x, 3]:
+                break
+            img[y, x] = WING_FILL
+            full[y, x] = True
+    return img, full
+
+
+WINGS = {side: full_wing(side) for side in (-1, 1)}
+
+
+def close_gaps(part):
+    """Leere Pixel mit mindestens drei Flügel-Nachbarn (4er) schließen."""
+    a = part[:, :, 3] > 0
+    for _ in range(2):
+        fix = []
+        for y in range(1, part.shape[0] - 1):
+            for x in range(1, part.shape[1] - 1):
+                if not a[y, x] and a[y - 1, x] + a[y + 1, x] + a[y, x - 1] + a[y, x + 1] >= 3:
+                    fix.append((x, y))
+        for x, y in fix:
+            part[y, x] = WING_FILL
+            a[y, x] = True
+    return part
 
 
 def wing_angle(i, r):
@@ -103,13 +145,14 @@ def frame(i):
             out[y + PT, x + P] = (*SRC[y, x, :3], max(90, SRC[y, x, 3] - 30 * L))
     # Flügel (schlagen) und Figur
     for side in (-1, 1):
-        m = WING_MASK & ((np.arange(SW)[None, :] <= 10) if side < 0 else (np.arange(SW)[None, :] >= 11))
-        over(out, rotate_part(SRC, m, PIVOTS[side], lambda r, s=side: s * wing_angle(i, r),
-                              (H, W), (P, PT - L)))
+        img, m = WINGS[side]
+        over(out, close_gaps(rotate_part(img, m, PIVOTS[side], lambda r, s=side: s * wing_angle(i, r),
+                                         (H, W), (P, PT - L))))
     for y in range(SHADOW_Y):
         for x in range(SW):
             if SRC[y, x, 3] and not WING_MASK[y, x]:
                 out[y + PT - L, x + P] = SRC[y, x]
+    fill_pinholes(out)                               # keine Einzellöcher zwischen Arm und Flügel
     # Blitze dürfen vor den Flügeln zucken, nicht vor ihr
     free = np.array([[out[y, x, 3] == 0 or tuple(out[y, x]) in WING for x in range(W)] for y in range(H)])
     # Blitze
@@ -152,6 +195,7 @@ def frame(i):
             sy = hy - int(rnd(i, 70 + s) * 3)
             if 1 <= sx < W - 1 and 1 <= sy < H - 1 and free[sy, sx]:
                 out[sy, sx] = BOLT[1 if s else 0]
+    fill_pinholes(out)                               # Einzellöcher in Blitz-Zickzacks
     return out
 
 

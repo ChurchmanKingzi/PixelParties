@@ -114,6 +114,15 @@ kopiert, daneben liegt eine JSON-Datei mit den Metadaten. Die erzeugten
 | `bloom.py` | `final` | `bloom_idle_final_sheet.png` | `bloom-the-maniacal-botanist` |
 | `maya.py` | `final` | `maya_idle_final_sheet.png` | `maya-the-nature-fairy` |
 | `diamond.py` | `final` | `diamond_idle_final_sheet.png` | `diamond-the-keeper-of-peace` |
+| `carris.py` | `final 90 hero` | `carris_idle_final_sheet.png` | `carris-the-time-keeper` |
+| `carris.py` | `final 90 little` | `little_carris_idle_final_sheet.png` | `little-carris` (Skin) |
+| `britain_royals.py` | `final 90 willy` | `willy_idle_final_sheet.png` | `willy-the-valiant-leprechaun` |
+| `britain_royals.py` | `final 90 george` | `george_idle_final_sheet.png` | `george-the-mad-tyrant-king` |
+| `britain_royals.py` | `final 90 hatmaker` | `hatmaker_idle_final_sheet.png` | `hatmaker-george` (Skin) |
+| `britain_royals.py` | `final 90 victorica` | `victorica_idle_final_sheet.png` | `victorica-the-eternal-empress` |
+| `britain_royals.py` | `final 90 empress` | `empress_idle_final_sheet.png` | `empress-of-hearts-victorica` (Skin) |
+| `alice_puppeteer.py` | `final` | `alice_puppeteer_idle_final_sheet.png` | `alice-the-puppeteer-girl` |
+| `jack.py` | `final` | `jack_idle_final_sheet.png` | `jack-the-crooked-killer` |
 | `bubbles.py` | `final gross` | `bubbles_idle_final_gross_sheet.png` | `bubbles-the-bouncy-bunny` |
 
 `bubbles.py` ohne `gross` erzeugt eine auf Hero-Größe verkleinerte Variante
@@ -144,6 +153,7 @@ python3 xcf_extract.py MotiveMoe.xcf assemble src/cute-princess-mary.png "Mary-K
 | MotiveBoons-Heroes und -Skins | `MotiveBoons.xcf` | reproduzierbar per `python3 assemble_boons.py <MotiveBoons.xcf>` (Zuordnung im Skriptkopf) |
 | MotiveEgypt-Heroes und -Skins | `MotiveEgypt.xcf` | reproduzierbar per `python3 assemble_egypt.py <MotiveEgypt.xcf>` (Zuordnung im Skriptkopf) |
 | MotiveSteamDwarfs-Heroes und -Skins | `MotiveSteamDwarfs.xcf` | reproduzierbar per `python3 assemble_steamdwarfs.py <MotiveSteamDwarfs.xcf>` (Zuordnung im Skriptkopf; die Datei braucht `xcf_scan.patch_gimpformats`) |
+| MotiveBritain-Heroes und -Skins | `MotiveBritain.xcf` | reproduzierbar per `python3 assemble_britain.py <MotiveBritain.xcf>` (Zuordnung im Skriptkopf) |
 
 Neue Datei durchsuchen: `xcf_scan.py dump` legt alle Ebenen einzeln ab,
 `xcf_scan.py match <ordner> --heroes` gleicht sie mit allen noch nicht
