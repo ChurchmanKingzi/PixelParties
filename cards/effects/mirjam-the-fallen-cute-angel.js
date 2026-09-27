@@ -30,11 +30,30 @@
 //      play from Mirjam's column past the first
 //      per turn. Counts via `onActionUsed`
 //      (fires for both standard and additional-
-//      action paths), reset by `onTurnStart`.
-//      Per-turn counter lives on the hero object
-//      as `_mirjamAttacksUsed` so it travels with
-//      Mirjam across control changes (steals
-//      can't reset the cap).
+//      action paths). Per-turn counter lives on
+//      the hero object as `_mirjamAttacksUsed`
+//      so it travels with Mirjam across control
+//      changes (steals can't reset the cap).
+//
+//      ★ v1465 (Als Befund 27.9.: „Wird Mirjam
+//      wiederbelebt, kann sie danach nicht
+//      angreifen"). Der Zaehler wurde bis hier in
+//      `onTurnStart` zurueckgesetzt — aber die
+//      Engine laesst Hooks TOTER Helden aus
+//      (`hero.hp <= 0`, Filter in runHooks). Lag
+//      Mirjam zu Beginn ihres Zuges tot da, blieb
+//      der Zaehler aus ihrem letzten Angriff
+//      stehen; `actionReviveHero` setzt nur HP und
+//      Status zurueck. In ihrem Wiederbelebungszug
+//      galt das Angriffs-Limit damit als schon
+//      verbraucht.
+//      Jetzt traegt der Zaehler den Zug, in dem er
+//      zaehlt (`_mirjamAttackTurn` = `gs.turn`),
+//      und gilt nur in genau diesem Zug. Kein
+//      Reset-Hook mehr, der ausfallen kann. Wer im
+//      selben Zug angreift, stirbt und
+//      wiederbelebt wird, bleibt gesperrt — das
+//      eine Attack dieses Zuges ist verbraucht.
 //
 //      Bonus-action Attacks count too — the cap
 //      is a HARDER ceiling than the standard
@@ -74,6 +93,8 @@ module.exports = {
     if (!hasCardType(cardData, 'Attack')) return true;
     const hero = gs.players[pi]?.heroes?.[heroIdx];
     if (!hero) return true;
+    // Nur ein Zaehler aus DIESEM Zug sperrt (v1465, siehe Kopf).
+    if (hero._mirjamAttackTurn !== gs.turn) return true;
     return (hero._mirjamAttacksUsed || 0) < 1;
   },
 
@@ -154,17 +175,14 @@ module.exports = {
       if (ctx.playerIdx !== ctx.cardOwner) return;
       const hero = ctx.attachedHero;
       if (!hero) return;
-      hero._mirjamAttacksUsed = (hero._mirjamAttacksUsed || 0) + 1;
-    },
-
-    /**
-     * Reset on Mirjam's owner's turn start. `isMyTurn` is the
-     * standard "this is the active player I belong to" check.
-     */
-    onTurnStart: async (ctx) => {
-      if (!ctx.isMyTurn) return;
-      const hero = ctx.attachedHero;
-      if (hero) hero._mirjamAttacksUsed = 0;
+      // Neuer Zug → neuer Zaehler. Ersetzt den frueheren Reset in
+      // `onTurnStart`, der bei toter Mirjam ausfiel (v1465).
+      const turn = ctx._engine.gs.turn;
+      if (hero._mirjamAttackTurn !== turn) {
+        hero._mirjamAttackTurn = turn;
+        hero._mirjamAttacksUsed = 0;
+      }
+      hero._mirjamAttacksUsed += 1;
     },
   },
 };
