@@ -63,22 +63,21 @@ for k in ('arrow2',):
     s = up_[k]
     if s[:4, ..., :3].sum() < s[-4:, ..., :3].sum(): up_[k] = s[::-1]
 
-def speed(x, y0, y1, col=(250, 170, 110)):
-    """Tempo-Linie unter einer Waffe: unterbrochene 1-px-Linie, nach unten ausdünnend."""
+def speed(x, y0, y1, col=(226, 92, 52)):
+    """Tempo-Linie unter einer Waffe: 1-px-Linie, nach unten geditherte Ausdünnung."""
     for y in range(y0, min(y1, H)):
         f = (y - y0) / max(1, y1 - y0)
-        if BAYER8[y % 8, x % 8] > f * 1.1 and (y // 3) % 3 != 2:
+        if BAYER8[y % 8, x % 8] > f * 1.05:
             nc.a[y, x] = col
 
 # Salve: (Waffe, x-Mitte, obere Kante) – gestaffelt, nicht spiegelgleich
-volley = [('halbA', 12, 6), ('sword2', 26, 22), ('arrow2', 38, 2), ('swordA', 49, 14),
-          ('arrow3', 60, 28), ('halb2', 72, 10)]
+volley = [('halbA', 11, 22), ('sword2', 25, 38), ('arrow2', 38, 8), ('swordA', 50, 26),
+          ('arrow3', 61, 44), ('halb2', 73, 20)]
 for k, cx, top in volley:
     s = up_[k]
     x = cx - s.shape[1] // 2
     y = top
-    for dx in (s.shape[1] // 2 - 1, s.shape[1] // 2 + 1):
-        speed(x + dx, y + s.shape[0] + 1, y + s.shape[0] + 22)
+    speed(x + s.shape[1] // 2, y + s.shape[0] + 1, y + s.shape[0] + 30)
     nc.paste(silhouette(s, (40, 4, 8)), x + 1, y + 1, alpha=0.6)
     nc.paste(s, x, y)
 
