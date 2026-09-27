@@ -41,14 +41,20 @@ def seg_worm(x, y):
     return 1 + sum(y >= y0 for y0 in (24, 31, 38))
 
 
+def worm_jaw_line(x):
+    upper = 11 + (15 - x) * 8 / 15                   # oberer Stoßzahn
+    lower = 12 + (22 - x) * 10 / 17                  # unterer Hauer
+    return (upper + lower) / 2
+
+
 CFG = {
     'hero': dict(slug='bakhm-the-desert-digger', prefix='bakhm', P=3,
                  jaw=lambda x, y: 17 <= y <= 23 and x <= 22, hinge=22, seg=seg_hero, head_follows=False),
-    # die Zähne, die vom Oberkiefer über die Maulkante hängen, bleiben am Kopf:
-    # der dünne vorn (x5–7, bis Zeile 15) und der hintere (x13–16, bis Zeile 14)
+    # Unterkiefer = der untere lange Hauer (von x22/y12 schräg zur Spitze x5/y22)
+    # samt Maul darunter; der obere Stoßzahn (x15/y11 -> x0/y19) und der dünne
+    # Zahn vorn hängen am Oberkiefer. Trennlinie: Mitte zwischen beiden Hauern.
     'worm': dict(slug='world-eater-bakhm', prefix='world_eater_bakhm', P=7,
-                 jaw=lambda x, y: 13 <= y <= 22 and x <= 24 and not (x <= 7 and y <= 15)
-                 and not (13 <= x <= 16 and y <= 14), hinge=24,
+                 jaw=lambda x, y: 13 <= y <= 22 and x <= 24 and y > worm_jaw_line(x), hinge=24,
                  seg=seg_worm, head_follows=True),
 }[V]
 SRC = np.array(Image.open(f"src/{CFG['slug']}.png").convert('RGBA')).astype(int)
@@ -107,6 +113,19 @@ def tusk_flash(x, y, i):
     return 0.0
 
 
+MOUTH = rgb('2a1e12')
+
+
+def mouth_fill(out, oy, ox):
+    """Pixel, die der aufklappende Unterkiefer freigibt (im Sprite deckend,
+    jetzt leer), mit Maulfarbe füllen – nur im Maul, nicht zwischen den Zinken."""
+    for x in range(0, 25):
+        for y in range(13, 23):
+            X, Y = x + ox, y + oy
+            if SRC[y, x, 3] and not out[Y, X, 3]:
+                out[Y, X] = MOUTH
+
+
 def frame(i):
     s = SRC.copy()
     st = BLINK.get(i) if V == 'worm' else None
@@ -134,6 +153,9 @@ def frame(i):
                 dy = int(round(op * 2 * (CFG['hinge'] - x) / CFG['hinge'])) if CFG['jaw'](x, y) else 0
                 out[y + oy + dy + dys[k], x + P + dxs[k]] = s[y, x]
     fill_pinholes(out)
+    if V == 'worm' and op:                           # geöffnetes Maul innen dunkel füllen
+        mouth_fill(out, oy + dys[0], P + dxs[0])
+        fill_pinholes(out)
     if V == 'worm':                                  # Glitzerstern an der Zahnspitze
         sx, sy = TUSK_STAR
         for t0 in TUSK_FLASH:
