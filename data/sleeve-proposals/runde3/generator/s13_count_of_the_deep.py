@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""13 Count of the Deep – Porträt-Plakat: Teppes, der Deepsea-Vampir, breitet vor seinem blutroten Schloss
+"""13 Count of the Deep – Porträt-Plakat: Teppes, der Deepsea-Vampir, breitet vor dem Deepsea Castle
 auf dem Meeresgrund den Umhang aus; zwei Fledermäuse flankieren ihn, weitere umkreisen die Türme, tote
 Tiefsee-Bäume rahmen das Bild.
 
@@ -7,7 +7,7 @@ Quellen (MotiveDeepsea.xcf):
   Ebene 335 „TEPPES“ – Vampir (Karte „Teppes the Deepsea Vampire“), 5×
   Ebene 336 „Teppes“ – die zwei Fledermäuse neben ihm (gleiche Karte), 3×
   Ebene 346 „Bats“ – Fledermäuse (Karte „Deepsea Bats“), 2×
-  Ebene 75 „Blood Rock“ – rotes Schloss, 1× (in der Ferne)
+  Ebene 205 „Deepsea Castle“ – Schloss (Karte „Deepsea Castle“), 2× wie Boden und Fledermäuse (in der Ferne)
   Ebene 74 „Ebene #207“ – tote Bäume, 4×, als Silhouetten
   Ebene 77 „Ebene #206“ – rote Erde + Pflasterweg (Kacheln), 2×
   Ebene 341 „Ebene #150“ – Blasen;  Farben: Deepsea-Meer (Ebene 391)
@@ -20,15 +20,15 @@ D = 'MotiveDeepsea'
 cv = Canvas(W, H)
 
 vgrad(cv, [(0, (6, 12, 34)), (0.5, (18, 36, 84)), (1, (10, 16, 40))])
-# rötlicher Schein hinter dem Schloss
-radial(cv, 125, 150, 150, (54, 26, 60), 0.8, power=0.8)
-radial(cv, 125, 150, 100, (96, 34, 60), 0.6, power=1.0)
+# violetter Schein hinter dem Schloss (Farben des Deepsea Castle)
+radial(cv, 125, 150, 150, (40, 30, 78), 0.8, power=0.8)
+radial(cv, 125, 150, 100, (76, 46, 120), 0.6, power=1.0)
 
-# Schloss (ganz, 1×, in der Ferne)
-castle = sprite('b13_ds75', D, [75])
-cx0, cy0 = 125 - castle.shape[1] // 2, 52
+# Schloss (Deepsea Castle, ganz, 2×, in der Ferne)
+castle = up(max(parts(sprite('b13_ds205', D, [205]), dil=1), key=lambda p: (p[..., 3] > 0).sum()), 2)
+cx0, cy0 = 125 - castle.shape[1] // 2, 96
 GY = cy0 + castle.shape[0] - 4
-# Grund: rote Erde + Pflasterweg aus der Blood-Rock-Karte
+# Grund: rote Erde + Pflasterweg (Kacheln aus Ebene 77)
 soil = sprite('b13_ds77_soil', D, [77], box=(152, 255, 168, 271))
 path = sprite('b13_ds77_path', D, [77], box=(104, 200, 120, 216))
 gt = np.repeat(np.repeat(tile_rgb(soil, W // 2 + 1, (H - GY) // 2 + 1), 2, 0), 2, 1)[:H - GY, :W]

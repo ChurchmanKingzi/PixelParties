@@ -46,6 +46,14 @@ module.exports = {
 
   heroDefeatedCondition(gs, pi, engine, info) {
     if (!info?.letzterHeld) return false;
+    // ★ v1466: „heal its HP completely" — ein Held mit 0 max HP bekaeme
+    // 0 HP zurueck. Die Karte wird dann gar nicht erst angeboten
+    // (s. _revive-shared).
+    // ★ v1467: „heal its HP completely" ist eine Heilung — ein nicht
+    // heilbarer Held (Mirjam, Curse of Aging) bekommt die Karte gar nicht
+    // erst angeboten.
+    const held = info.hero || gs.players[pi]?.heroes?.[info.heroIdx];
+    if (!engine.canReviveHero(held, { heilt: true })) return false;
     if (info.sourceOwner == null || info.sourceOwner === pi) return false;
     return (gs.turn || 1) <= engine.zugIndexVon(pi, LETZTER_ZUG);
   },
@@ -60,6 +68,7 @@ module.exports = {
       // v1341: `animDuration` — ohne Angabe lebt eine Zonen-Animation im
       // Client nur 1000 ms; die Aura braucht 2,2 s.
       source: CARD_NAME, animationType: 'super_aura', animDuration: 2200, animDelay: 1500,
+      heilt: true,   // v1467
     });
     if (!ok || held.hp <= 0) return false;
 

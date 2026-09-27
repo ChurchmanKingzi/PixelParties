@@ -22,7 +22,9 @@ function defeatedHeroTargets(engine) {
     const ps = engine.gs.players[pi];
     for (let hi = 0; hi < (ps?.heroes || []).length; hi++) {
       const h = ps.heroes[hi];
-      if (h?.name && h.hp <= 0) out.push({ id: `hero-${pi}-${hi}`, type: 'hero', owner: pi, heroIdx: hi, cardName: h.name });
+      // v1466: volle Heilung — bei 0 max HP kein Ziel (s. _revive-shared).
+      // v1467: „healing its HP completely" — nicht heilbare Helden auch nicht.
+      if (h?.name && h.hp <= 0 && engine.canReviveHero(h, { heilt: true })) out.push({ id: `hero-${pi}-${hi}`, type: 'hero', owner: pi, heroIdx: hi, cardName: h.name });
     }
   }
   return out;
@@ -73,7 +75,7 @@ module.exports = {
       if (!hero) return;
       // v631: eigener Konzert-Auftritt (`concert_revival`, Notenwolke +
       // Lichtkegel + Scheinwerfer), laengerer Nachlauf als der Standard.
-      const ok = await engine.actionReviveHero(sel.owner, sel.heroIdx, hero.maxHp || 400, { source: CARD_NAME, animationType: 'concert_revival', animDelay: 1900, animDuration: 2200 });
+      const ok = await engine.actionReviveHero(sel.owner, sel.heroIdx, hero.maxHp || 400, { source: CARD_NAME, animationType: 'concert_revival', animDelay: 1900, animDuration: 2200, heilt: true });
       engine.log('hymn_of_rebirth', { player: gs.players[pi]?.username, hero: hero.name, owner: gs.players[sel.owner]?.username, revived: !!ok });
       engine.sync();
     },

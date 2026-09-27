@@ -30,26 +30,54 @@
 //      play from Mirjam's column past the first
 //      per turn. Counts via `onActionUsed`
 //      (fires for both standard and additional-
-//      action paths), reset by `onTurnStart`.
-//      Per-turn counter lives on the hero object
-//      as `_mirjamAttacksUsed` so it travels with
-//      Mirjam across control changes (steals
-//      can't reset the cap).
+//      action paths). Per-turn counter lives on
+//      the hero object as `_mirjamAttacksUsed`
+//      so it travels with Mirjam across control
+//      changes (steals can't reset the cap).
+//
+//      ★ v1465 (Als Befund 27.9.: „Wird Mirjam
+//      wiederbelebt, kann sie danach nicht
+//      angreifen"). Der Zaehler wurde bis hier in
+//      `onTurnStart` zurueckgesetzt — aber die
+//      Engine laesst Hooks TOTER Helden aus
+//      (`hero.hp <= 0`, Filter in runHooks). Lag
+//      Mirjam zu Beginn ihres Zuges tot da, blieb
+//      der Zaehler aus ihrem letzten Angriff
+//      stehen; `actionReviveHero` setzt nur HP und
+//      Status zurueck. In ihrem Wiederbelebungszug
+//      galt das Angriffs-Limit damit als schon
+//      verbraucht.
+//      Jetzt traegt der Zaehler den Zug, in dem er
+//      zaehlt (`_mirjamAttackTurn` = `gs.turn`),
+//      und gilt nur in genau diesem Zug. Kein
+//      Reset-Hook mehr, der ausfallen kann. Wer im
+//      selben Zug angreift, stirbt und
+//      wiederbelebt wird, bleibt gesperrt — das
+//      eine Attack dieses Zuges ist verbraucht.
 //
 //      Bonus-action Attacks count too — the cap
 //      is a HARDER ceiling than the standard
 //      1-action-per-turn rule, so Coffee / Psychic
 //      Scout / Ghuanjun combo can't lift it.
 //
-//   3) `beforeHeroEffect` cancels every `heal`
-//      effect targeting Mirjam. `increaseMaxHp`
-//      flows through a separate engine path
-//      (line 5060 — direct `hero.maxHp` / `hp`
-//      mutation, no `beforeHeroEffect` fire), so
-//      "they can still be increased" works as
-//      authored. Revival (`actionReviveHero`)
-//      also bypasses the heal hook chain, so
-//      Mirjam can be revived after a KO.
+//   3) „HP cannot be healed in any way" — der
+//      Vertrag `hpCannotBeHealed` (v1467). Die
+//      Engine fragt ihn an EINER Stelle
+//      (`_heroHealBlocked`, dieselbe wie Curse
+//      of Aging): normale Heilung fizzelt,
+//      Wiederbelebungen, die heilen (Cheat Chair,
+//      Elixir of Immortality, Hymn of Rebirth,
+//      Soul Transmigration Ritual, Reincarnation,
+//      Trial of Coolness), bieten Mirjam gar
+//      nicht erst an bzw. verpuffen. Bis v1466
+//      sass die Sperre in einem eigenen
+//      `beforeHeroEffect`-Hook — der deckte nur
+//      `actionHealHero` ab, Cheat Chair kam
+//      daran vorbei (Als Befund 27.9.).
+//      Wiederbelebung MIT FESTEN HP (Resuscitation
+//      Potion, Golden Ankh …) heilt nicht und
+//      bleibt moeglich; `increaseMaxHp` erhoeht
+//      nur („they can still be increased").
 // ═══════════════════════════════════════════
 
 const { hasCardType } = require('./_hooks');
@@ -58,6 +86,9 @@ const CARD_NAME = 'Mirjam, the Fallen Cute Angel';
 
 module.exports = {
   activeIn: ['hero'],
+
+  // „This Hero's HP cannot be healed in any way" — s. Kopf, Punkt 3.
+  hpCannotBeHealed: true,
 
   /**
    * Block additional Attacks beyond the first per turn — applies in
@@ -74,6 +105,8 @@ module.exports = {
     if (!hasCardType(cardData, 'Attack')) return true;
     const hero = gs.players[pi]?.heroes?.[heroIdx];
     if (!hero) return true;
+    // Nur ein Zaehler aus DIESEM Zug sperrt (v1465, siehe Kopf).
+    if (hero._mirjamAttackTurn !== gs.turn) return true;
     return (hero._mirjamAttacksUsed || 0) < 1;
   },
 
@@ -122,25 +155,6 @@ module.exports = {
     },
 
     /**
-     * Heal block. `beforeHeroEffect` cancels via `ctx.cancel()`;
-     * the engine then short-circuits the heal in `_actionHealHeroImpl`
-     * (line 4748). `increaseMaxHp` doesn't fire this hook — it
-     * mutates `hero.maxHp` / `hp` directly — so HP-pool expansions
-     * still work as the card text promises.
-     */
-    beforeHeroEffect: (ctx) => {
-      if (ctx.effectType !== 'heal') return;
-      if (ctx.playerIdx !== ctx.cardOriginalOwner) return;
-      if (ctx.heroIdx !== ctx.cardHeroIdx) return;
-      ctx.cancel();
-      const engine = ctx._engine;
-      const heroName = engine.gs.players[ctx.playerIdx]?.heroes?.[ctx.heroIdx]?.name;
-      engine.log('mirjam_heal_blocked', {
-        hero: heroName, amount: ctx.amount,
-      });
-    },
-
-    /**
      * Attack-per-turn counter. Fires for both standard and
      * additional-action paths (server.js:3924 and 3929 both
      * fire `onActionUsed`), so bonus-action Attacks still count
@@ -154,17 +168,14 @@ module.exports = {
       if (ctx.playerIdx !== ctx.cardOwner) return;
       const hero = ctx.attachedHero;
       if (!hero) return;
-      hero._mirjamAttacksUsed = (hero._mirjamAttacksUsed || 0) + 1;
-    },
-
-    /**
-     * Reset on Mirjam's owner's turn start. `isMyTurn` is the
-     * standard "this is the active player I belong to" check.
-     */
-    onTurnStart: async (ctx) => {
-      if (!ctx.isMyTurn) return;
-      const hero = ctx.attachedHero;
-      if (hero) hero._mirjamAttacksUsed = 0;
+      // Neuer Zug → neuer Zaehler. Ersetzt den frueheren Reset in
+      // `onTurnStart`, der bei toter Mirjam ausfiel (v1465).
+      const turn = ctx._engine.gs.turn;
+      if (hero._mirjamAttackTurn !== turn) {
+        hero._mirjamAttackTurn = turn;
+        hero._mirjamAttacksUsed = 0;
+      }
+      hero._mirjamAttacksUsed += 1;
     },
   },
 };

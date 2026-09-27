@@ -45,6 +45,7 @@
 // ═══════════════════════════════════════════
 
 const { deleteCybugFuel, recoverCybugFuel, hasCybugFuel } = require('./_cybug-shared');
+const { canReviveHero } = require('./_revive-shared');
 
 const CARD_NAME = 'Cybug SCARAB';
 const FUEL_CARD = 'Golden Ankh';
@@ -69,6 +70,9 @@ module.exports = {
     // Angel) kann ihn zwischenzeitlich gerettet haben.
     const gefallen = gs.players[ownerIdx]?.heroes?.[info.defeatedHeroIdx];
     if (!gefallen?.name || gefallen.hp > 0) return false;
+    // ★ v1466: „mit 100 HP" wird auf die max HP gedeckelt — bei 0 max HP
+    // loest die Falle gar nicht erst aus (s. _revive-shared).
+    if (!canReviveHero(gefallen)) return false;
     return hasCybugFuel(gs, ownerIdx, FUEL_CARD);
   },
 

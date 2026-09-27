@@ -140,6 +140,13 @@ module.exports = {
 
       const heroIdx = ps.heroes.findIndex(h => h === hero);
       if (heroIdx < 0) return;
+      // ★ v1466: „heal that target's HP for half their maximum" — bei 0
+      // max HP gaebe es nichts zu heilen. Der Held wird nicht vorgemerkt,
+      // das Elixir loest fuer ihn nicht aus und bleibt liegen
+      // (s. _revive-shared).
+      // ★ v1467: „revive and heal" — auch nicht fuer einen nicht heilbaren
+      // Helden (Mirjam, Curse of Aging).
+      if (!engine.canReviveHero(hero, { heilt: true })) return;
 
       // Match THIS card instance's perm (by permId) rather than by name —
       // with `cardOriginalOwner`/duplicate protection this keeps each
@@ -327,6 +334,7 @@ async function resolveElixirPending(engine, pi, perm) {
   if (chosen.deathType === 'hero') {
     await engine.actionReviveHero(pi, chosen.heroIdx, Math.ceil(chosen.maxHp / 2), {
       source: 'Elixir of Immortality',
+      heilt: true,   // v1467
       animDelay: 800,
     });
   } else {
