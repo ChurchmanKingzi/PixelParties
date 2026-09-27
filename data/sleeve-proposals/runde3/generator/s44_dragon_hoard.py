@@ -23,32 +23,23 @@ cv = Canvas(W2, H2)
 gro = layer(B, 1081)[75:315, 39:359, :3]
 
 
-def dglow(col, cx, cy, r, amt, y1=H2, sy=1.0):
-    """Lichtschein im 3×-Raster gedithert"""
-    for by in range(max(0, (cy - r) // K), min(y1, cy + r) // K + 1):
-        for bx in range(max(0, (cx - r) // K), min(W2, cx + r) // K + 1):
-            d = math.hypot(bx * K + 1 - cx, (by * K + 1 - cy) * sy) / r
-            a = max(0.0, 1 - d) * amt
-            q = math.floor(a * 4 + BAYER4[by % 4, bx % 4]) / 4
-            if q > 0:
-                y0, x0 = by * K, bx * K
-                sub = cv.a[y0:y0 + K, x0:x0 + K].astype(float)
-                cv.a[y0:y0 + K, x0:x0 + K] = (sub * (1 - q) + np.array(col) * q).astype(np.uint8)
+def dglow(col, cx, cy, r, amt, sy=1.0):
+    """Lichtschein, fein gedithert (wie der Himmel in 13/34)"""
+    dither_blend(cv, col, lambda x, y: max(0.0, 1 - math.hypot(x - cx, (y - cy) * sy) / r) * amt,
+                 x0=cx - r, y0=int(cy - r / sy), x1=cx + r, y1=int(cy + r / sy))
 
 
 # ---------------------------------------------------------------- Ziegelwand (3×), im Dunkeln
 brick = gro[80:110, 210:254]
 wall = mirror_tile(brick, W2 // K + 2, H2 // K + 2, ox=4)
 cv.a[:] = up(rgba(wall), K)[:H2, :W2, :3]
-cv.a[:] = hsv_shift(rgba(cv.a), 0, 0.6, 0.3)[..., :3]
-# nach oben ins Schwarze
-for by in range(0, 60):
-    t = 1 - by / 60
-    for bx in range(W2 // K + 1):
-        if t * 1.1 > BAYER4[by % 4, bx % 4]:
-            cv.rect(bx * K, by * K, bx * K + K, by * K + K, (10, 6, 4))
+cv.a[:] = hsv_shift(rgba(cv.a), 0, 0.6, 0.5)[..., :3]
+# nach oben ins Dunkle: Abdunkelung in Stufen je Ziegelreihe-Drittel (3er-Bänder, kein Raster-Muster)
+for by in range(H2 // K + 1):
+    f = min(1.0, 0.18 + 0.82 * (by * K / 230) ** 1.4)
+    cv.a[by * K:by * K + K] = (cv.a[by * K:by * K + K] * f).astype(np.uint8)
 
-EGX, EGY = 125, 200
+EGX, EGY = 125, 190
 dglow((255, 160, 40), EGX, EGY, 150, 0.55, sy=0.9)
 
 # ---------------------------------------------------------------- Schätze
@@ -64,21 +55,21 @@ for n, s in dict(egg=egg, mimic=mimic, heap=heap, chest=chest).items():
 
 H3 = up(heap, K)                                    # 357×105
 # hinterer Goldberg (etwas dunkler), Ei, Goldberg davor, vorderer Goldberg
-cv.paste(darken(H3, 0.8), (W2 - H3.shape[1]) // 2 + 20, 262 - H3.shape[0])
+cv.paste(darken(H3, 0.75), (W2 - H3.shape[1]) // 2 + 20, 180)
 E = up(egg, K)
-ex, ey = EGX - E.shape[1] // 2, 272 - E.shape[0]
+ex, ey = EGX - E.shape[1] // 2, 262 - E.shape[0]
 cv.paste(E, ex, ey)
 c3 = up(chest, K)
-cv.paste(silhouette(c3, (30, 12, 0)), 14 + K, 268 - c3.shape[0] + K, alpha=0.5)
-cv.paste(c3, 14, 268 - c3.shape[0])
+cv.paste(silhouette(c3, (30, 12, 0)), 12 + K, 262 - c3.shape[0] + K, alpha=0.5)
+cv.paste(c3, 12, 262 - c3.shape[0])
 m3 = up(mimic, K)
-cv.paste(silhouette(m3, (30, 12, 0)), 186 + K, 262 - m3.shape[0] + K, alpha=0.5)
-cv.paste(m3, 186, 262 - m3.shape[0])
-cv.paste(flip(H3), (W2 - H3.shape[1]) // 2 - 30, 300 - H3.shape[0] + 26)    # bettet Ei, Truhe, Mimic ein
+cv.paste(silhouette(m3, (30, 12, 0)), 184 + K, 258 - m3.shape[0] + K, alpha=0.5)
+cv.paste(m3, 184, 258 - m3.shape[0])
+cv.paste(flip(H3), (W2 - H3.shape[1]) // 2 - 30, 240)    # bettet Ei, Truhe, Mimic ein
 cv.paste(H3, (W2 - H3.shape[1]) // 2 + 6, H2 + 30 - H3.shape[0])             # vorderer Haufen, unten angeschnitten
 
 # Edelsteine (3×) vorn, jeder mit farbigem Schein
-spots = [(40, 318), (92, 338), (150, 322), (206, 336), (238, 300)]
+spots = [(28, 326), (78, 344), (132, 330), (184, 344), (230, 328)]
 for col, (gx, gy) in zip(glows, spots):
     dglow(col, gx, gy - 18, 34, 0.7)
 for g, (gx, gy) in zip(gems, spots):

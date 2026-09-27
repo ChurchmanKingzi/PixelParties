@@ -31,14 +31,14 @@ petals = [q for q in parts(sprite('a05_petals', B, [52]), dil=0) if 2 <= q.shape
 print(nob.shape, shog.shape, [t.shape for t in trees])
 
 # --- Nachthimmel + Sterne ---------------------------------------------------------------------------------
-vgrad(lo, 0, H_, [(6, 6, 24), (14, 14, 46), (34, 26, 78), (60, 36, 92)])
+sgrad(lo, 0, H_, [(6, 6, 24), (14, 14, 46), (34, 26, 78), (60, 36, 92)])
 rng = np.random.RandomState(5)
 for _ in range(22):
     lo.px(rng.randint(0, W_), rng.randint(0, 40), (180, 180, 230) if rng.rand() < .4 else (100, 100, 160))
 
 # --- Vollmond (hinter Nobunakin) ---------------------------------------------------------------------------
-MX, MY, MR = 17, 36, 17
-glow(lo, MX, MY, MR * 1.6, (200, 190, 255), 0.28)
+MX, MY, MR = 17, 40, 19
+sglow(lo, MX, MY, MR * 1.7, (190, 180, 255), 0.3)
 for y in range(MY - MR, MY + MR):
     for x in range(MX - MR, MX + MR):
         d = math.hypot(x + .5 - MX, y + .5 - MY)
@@ -47,7 +47,7 @@ for y in range(MY - MR, MY + MR):
             if d > MR - 1.6: c = (226, 216, 196)
             lo.a[y, x] = c
 # Mondflecken (Mare) als ruhige Flächen
-for (cx, cy, r) in [(10, 28, 3.5), (22, 25, 2.5), (26, 34, 2), (6, 40, 2)]:
+for (cx, cy, r) in [(9, 30, 3.5), (22, 27, 2.5), (29, 38, 2), (4, 44, 2)]:
     for y in range(int(cy - r), int(cy + r) + 1):
         for x in range(int(cx - r), int(cx + r) + 1):
             if math.hypot(x + .5 - cx, y + .5 - cy) < r: lo.a[y, x] = (232, 224, 204)
@@ -71,7 +71,7 @@ ny = GY + int(round(((NX - 25) / 25.0) ** 2 * 3))
 lo.paste(nob, NX - 7, ny - nob.shape[0] + 1)
 SXc = 38
 sy = GY + int(round(((SXc - 25) / 25.0) ** 2 * 3))
-glow(lo, SXc, sy - 15, 13, (80, 200, 255), 0.35)
+sglow(lo, SXc, sy - 15, 13, (80, 200, 255), 0.35)
 lo.paste(shog, SXc - shog.shape[1] // 2, sy - shog.shape[0] - 2)   # schwebt über dem Kamm
 
 # Blütenblätter im Wind

@@ -113,3 +113,25 @@ def rim_light(s, col, dx, dy, t=0.55):
     sel = (ys[empty], xs[empty])
     out[sel[0], sel[1], :3] = (out[sel[0], sel[1], :3] * (1 - t) + np.array(col) * t).astype(np.uint8)
     return out
+
+
+def sgrad(cv, y0, y1, stops, x0=0, x1=None):
+    """Senkrechter Verlauf ohne Dithering (jede Rasterzeile eine Farbe) – für grobe Raster (4×/5×)."""
+    x1 = cv.w if x1 is None else x1
+    n = len(stops) - 1
+    for y in range(max(0, y0), min(cv.h, y1)):
+        t = (y - y0) / max(1, (y1 - y0 - 1)) * n
+        i = min(int(t), n - 1); f = t - i
+        c = np.array(stops[i]) * (1 - f) + np.array(stops[i + 1]) * f
+        cv.a[y, max(0, x0):min(cv.w, x1)] = c.astype(np.uint8)
+
+
+def sglow(cv, cx, cy, r, col, strength=0.4):
+    """Lichthof ohne Dithering: jede Rasterzelle wird einheitlich zur Lichtfarbe gemischt."""
+    col = np.array(col, float)
+    for y in range(max(0, int(cy - r)), min(cv.h, int(cy + r) + 1)):
+        for x in range(max(0, int(cx - r)), min(cv.w, int(cx + r) + 1)):
+            d = math.hypot(x + 0.5 - cx, y + 0.5 - cy) / r
+            if d < 1:
+                t = (1 - d) ** 1.5 * strength
+                cv.a[y, x] = (cv.a[y, x] * (1 - t) + col * t).astype(np.uint8)

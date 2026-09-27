@@ -6,12 +6,13 @@ farbigen Lichtsäulen der Fenster.
 
 Quellen (MotiveBoons.xcf):
   - Ebene 62 „Ebene #12“: Kathedralen-Innenraum mit Orgel, Altar, rotem Läufer und Lichtsäulen
-    (Hintergrund der Karte „Lizbeth, the Reaper of the Light“), Ausschnitt Mittelschiff
+    (Hintergrund der Karte „Lizbeth, the Reaper of the Light“), Ausschnitt Mittelschiff; die kleine eingebackene
+    Nebenfigur neben dem Altar ist durch Spiegeln der linken Altarseite entfernt
   - Ebene 60 „Ebene #13“ + 59 „Ebene #15“: Lizbeth mit goldener Sense (Szene „Sichtbar #4“; Regel B:
     Figur + Sense vollständig; die weißen Funkenstriche der Sense-Ebene sind in der Szene nicht sichtbar und
     werden weggelassen – es bleiben genau die in der Szene sichtbaren Sense-Pixel)
   - Ebene 57 „Ebene #16“: dunkle Schnitterin mit roter Sense (Szenen „Sichtbar #5–#7“; vollständig)
-Skalierung: Kathedrale 2× (Hintergrund, weit hinten), beide Schnitterinnen 4× (Vordergrund, stehen am unteren
+Skalierung: Kathedrale 2× (Hintergrund, weit hinten), beide Schnitterinnen 5× (Vordergrund, stehen am unteren
 Bildrand auf dem Läufer, überdecken Altar und Bänke) – wie Vampir/Schloss in „Count of the Deep“.
 """
 from common import *
@@ -19,7 +20,7 @@ from e_util import upcanvas, small_canvas, trim_
 import numpy as np
 
 B = 'MotiveBoons'
-K = 4                                               # Pixelgröße der Schnitterinnen
+K = 5                                               # Pixelgröße der Schnitterinnen
 
 
 def lizbeth():
@@ -43,7 +44,11 @@ def lizbeth():
 def build():
     bg = small_canvas(2)                            # 125×175
     a = layer(B, 62); b = bbox(a)
-    cath = a[b[1]:b[3], b[0]:b[2], :3]              # 240×320
+    cath = a[b[1]:b[3], b[0]:b[2], :3].copy()       # 240×320
+    # die im Hintergrund eingebackene Nebenfigur rechts neben dem Altar entfernen: Spalten 177–192 aus der
+    # spiegelbildlichen linken Altarseite (Achse x = 160) übernehmen – Läufer/Lichtschein sind dort symmetrisch
+    for x in range(177, 193):
+        cath[100:131, x] = cath[100:131, 320 - x]
     bg.a[:] = cath[0:175, 98:223]
     # Innenraum abdunkeln (reine Farbmultiplikation, kein Dithering → ruhiger Hintergrund)
     H, W = bg.a.shape[:2]
@@ -56,8 +61,8 @@ def build():
     # (gespiegelt, Sense nach außen rechts); die beiden Sensenstiele stehen innen nebeneinander.
     D = up(compose(B, [57]), K)
     L = up(flip(lizbeth()), K)
-    cv.paste(D, 125 - D.shape[1] - 4, 348 - D.shape[0])
-    cv.paste(L, 125 + 4, 348 - L.shape[0])
+    cv.paste(D, 125 - D.shape[1] - 3, 352 - D.shape[0])
+    cv.paste(L, 125 + 3, 352 - L.shape[0])
     return cv
 
 
