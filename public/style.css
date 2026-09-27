@@ -17255,6 +17255,16 @@ img, .card-tooltip-img img { image-rendering: pixelated; }
      Overlays und Kartenfluegen. */
   z-index: 10085;
 }
+/* ★ v1453 (Als Befund 27.9.: „das Menü, um im Puzzle-Creator
+   Statuseffekte, HP usw. zu setzen, muss VOR der Hand angezeigt werden,
+   aktuell überdecken Handkarten es"). Derselbe Fall wie v1259 im Duell:
+   die Editor-Hand trägt `zIndex: 10000` (Inline-Stil in app-puzzle), die
+   Dialoge des Editors lagen mit dem Grundwert 1000 darunter. Gilt für
+   alle drei Editor-Dialoge (Stat-Editor, Stapel-Ansicht, Doom Clock) —
+   nur die Höhe, der Hintergrund bleibt der des Editors. */
+.screen-full:has(> .pz-layout) .modal-overlay {
+  z-index: 10085;
+}
 .screen-full:has(> .game-layout) .modal,
 .first-choice-panel {
   background: rgba(12, 12, 20, .72) !important;
