@@ -39,7 +39,26 @@ def card_file(name):
     return 'cards/' + re.sub(r'[\\/:*?"<>|,]', '', name).strip() + '.png'
 
 
+def patch_gimpformats():
+    """gimpformats bricht bei alten Farbmesspunkten (PROP_OLD_SAMPLE_POINTS,
+    z. B. MotiveSteamDwarfs.xcf) ab – die Eigenschaft ist für die Ebenen
+    bedeutungslos und wird übersprungen (ihre Daten sind da schon gelesen)."""
+    from gimpformats import GimpIOBase as gio
+    if getattr(gio.GimpIOBase, '_sample_points_patched', False):
+        return
+    orig = gio.GimpIOBase._propertyDecode
+    old_sp = gio.ImageProperties.PROP_OLD_SAMPLE_POINTS
+
+    def decode(self, prop, data):
+        if gio._prop_cmp(prop, old_sp):
+            return data
+        return orig(self, prop, data)
+    gio.GimpIOBase._propertyDecode = decode
+    gio.GimpIOBase._sample_points_patched = True
+
+
 def dump(xcf, out):
+    patch_gimpformats()
     from gimpformats.gimpXcfDocument import GimpDocument
     os.makedirs(out, exist_ok=True)
     doc = GimpDocument(xcf)

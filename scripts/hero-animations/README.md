@@ -105,6 +105,15 @@ kopiert, daneben liegt eine JSON-Datei mit den Metadaten. Die erzeugten
 | `bakhm.py` | `final 90 worm` | `world_eater_bakhm_idle_final_sheet.png` | `world-eater-bakhm` (Skin) |
 | `serket.py` | `final 90 hero` | `serket_idle_final_sheet.png` | `serket-dread-of-the-desert` |
 | `serket.py` | `final 90 et` | `extraterrestrial_serket_idle_final_sheet.png` | `extraterrestrial-serket` (Skin) |
+| `teocuilatl.py` | `final 90 hero` | `teocuilatl_idle_final_sheet.png` | `teocuilatl-the-embodiment-of-gods` |
+| `teocuilatl.py` | `final 90 platinum` | `platinum_star_idle_final_sheet.png` | `teocuilatl-the-platinum-star` (Skin) |
+| `idej.py` | `final` | `idej_idle_final_sheet.png` | `idej-lord-daiyo` |
+| `heragas.py` | `final` | `heragas_idle_final_sheet.png` | `heragas-the-monster-slayer` |
+| `pseudonia.py` | `final 90 hero` | `pseudonia_idle_final_sheet.png` | `pseudonia-the-skill-devourer` |
+| `pseudonia.py` | `final 90 imperfect` | `imperfect_pseudonia_idle_final_sheet.png` | `imperfect-pseudonia` (Skin) |
+| `bloom.py` | `final` | `bloom_idle_final_sheet.png` | `bloom-the-maniacal-botanist` |
+| `maya.py` | `final` | `maya_idle_final_sheet.png` | `maya-the-nature-fairy` |
+| `diamond.py` | `final` | `diamond_idle_final_sheet.png` | `diamond-the-keeper-of-peace` |
 | `bubbles.py` | `final gross` | `bubbles_idle_final_gross_sheet.png` | `bubbles-the-bouncy-bunny` |
 
 `bubbles.py` ohne `gross` erzeugt eine auf Hero-Größe verkleinerte Variante
@@ -134,6 +143,7 @@ python3 xcf_extract.py MotiveMoe.xcf assemble src/cute-princess-mary.png "Mary-K
 | MotiveArcanum-Heroes und Skin Dark Maho | `MotiveArcanum.xcf` | reproduzierbar per `python3 assemble_arcanum.py <MotiveArcanum.xcf>` (Zuordnung im Skriptkopf) |
 | MotiveBoons-Heroes und -Skins | `MotiveBoons.xcf` | reproduzierbar per `python3 assemble_boons.py <MotiveBoons.xcf>` (Zuordnung im Skriptkopf) |
 | MotiveEgypt-Heroes und -Skins | `MotiveEgypt.xcf` | reproduzierbar per `python3 assemble_egypt.py <MotiveEgypt.xcf>` (Zuordnung im Skriptkopf) |
+| MotiveSteamDwarfs-Heroes und -Skins | `MotiveSteamDwarfs.xcf` | reproduzierbar per `python3 assemble_steamdwarfs.py <MotiveSteamDwarfs.xcf>` (Zuordnung im Skriptkopf; die Datei braucht `xcf_scan.patch_gimpformats`) |
 
 Neue Datei durchsuchen: `xcf_scan.py dump` legt alle Ebenen einzeln ab,
 `xcf_scan.py match <ordner> --heroes` gleicht sie mit allen noch nicht

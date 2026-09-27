@@ -1,0 +1,16 @@
+{
+  "hero": "Imperfect Pseudonia",
+  "sheet": "imperfect-pseudonia.png",
+  "frameWidth": 41,
+  "frameHeight": 38,
+  "frames": 48,
+  "frameMs": 90,
+  "loop": true,
+  "layout": "horizontal",
+  "skinOf": "Pseudonia, the Skill Devourer",
+  "padTop": 4,
+  "padLeft": 4,
+  "padRight": 4,
+  "padBottom": 3,
+  "faceX": 17.5
+}
