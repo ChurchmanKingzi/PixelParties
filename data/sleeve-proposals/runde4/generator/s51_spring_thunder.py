@@ -10,6 +10,7 @@ Skalierung (zwei Tiefenebenen):
 Quellen (Motive.xcf, Karte „Cardinal Beast Qinglong“, Szene 149 „Sichtbar #251“):
   Drache vollständig = 1526 „QINLONG #1“ (Kopf + Leib) + 1522 „QINLONG #3“ (goldenes Blitzhorn mit Funken)
   + 1521 „QINLONG #2“ (lange Barteln); Blitze 1525 „QINLONG #5“; Gewitterwolke 1527 „QINLONG“.
+  Der am Kartenrand abgeschnittene Bart ist als langer, wallender Bart in seinen Grautönen weitergezeichnet.
   Lage von Drache, Horn, Barteln und Blitzen zueinander wie in der Kartenszene.
 """
 from common import *
@@ -72,6 +73,42 @@ def put(s, x, y):
     m = src[..., 3] > 0; dst[m] = src[m]
 
 drag = sprite('r4q_qinglong', B, [1521, 1522, 1526])   # Ursprung (230, 247) in Motive
+# Bart: in der Ebene am Kartenrand flach abgeschnitten (Zeile 54) – hier als langer, wallender Bart aus
+# einzelnen Strähnen weitergezeichnet, in den Grautönen des Originalbarts (Kontur 128, Strähnen 179/204,
+# Glanz 242), im Raster des Drachen. Die Strähnen schwingen gemeinsam in einer S-Welle und laufen spitz aus.
+BEARD_LEN = 34
+ext = np.zeros((drag.shape[0] + BEARD_LEN, drag.shape[1], 4), np.uint8)
+ext[:drag.shape[0]] = drag
+ext[53:, 16:36] = 0                                     # abgeschnittenes Bartende entfernen (inkl. Einzelstrang)
+G_OUT, G_MID, G_LIGHT, G_HI = (128, 128, 128), (179, 179, 179), (204, 204, 204), (242, 242, 242)
+Y0 = 50
+starts = np.arange(21, 31)                              # Strähnenansätze über die Bartbreite (Zeile 50)
+for j, x0 in enumerate(starts):
+    length = BEARD_LEN + 1 - abs(j - 4.5) * 1.6 - (j % 3) * 2
+    col = [G_LIGHT, G_MID, G_LIGHT, G_HI, G_MID][j % 5]
+    for y in range(Y0, int(Y0 + length)):
+        t = (y - Y0) / BEARD_LEN
+        spread = 0.55 * np.sin(np.pi * min(1, t * 1.4)) - 0.75 * t    # unterm Kinn aufbauschen, dann zusammen
+        sway = 6.0 * np.sin(t * 5.6 - 0.5 + j * 0.05) * t ** 0.8        # wallende S-Welle, unten stärker
+        x = int(round(x0 + (x0 - 25.5) * spread + sway))
+        if 0 <= x < ext.shape[1]:
+            if ext[y, x, 3] == 0 or y >= 53:
+                ext[y, x, :3] = col; ext[y, x, 3] = 255
+# Lücken zwischen den Strähnen schließen (Bart ist eine Fläche), dann dunkle Kontur außen
+m = ext[..., 3] > 0
+reg = np.zeros_like(m); reg[53:] = True
+for y in range(53, 53 + int(BEARD_LEN * 0.62)):
+    xs = np.where(m[y, 8:44])[0] + 8
+    if len(xs) > 1:
+        for x in range(xs.min(), xs.max() + 1):
+            if not m[y, x]:
+                ext[y, x, :3] = G_MID; ext[y, x, 3] = 255
+m = ext[..., 3] > 0
+edge = np.zeros_like(m)
+edge[1:] |= m[:-1]; edge[:-1] |= m[1:]; edge[:, 1:] |= m[:, :-1]; edge[:, :-1] |= m[:, 1:]
+edge &= ~m & reg
+ext[edge, :3] = G_OUT; ext[edge, 3] = 255
+drag = ext
 bolts = sprite('r4q_bolts', B, [1525])                  # Ursprung (234, 253)
 cloud = sprite('r4q_cloud', B, [1527])                  # Ursprung (218, 234)
 DX, DY = 8, 20                                          # Lage des Drachen (Ursprung 230,247) im 3×-Raster
