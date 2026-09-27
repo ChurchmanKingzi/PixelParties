@@ -5,8 +5,8 @@
   oder niedriger (Spalten gestreckt/gekappt), die Seitenflammen schlagen
   nach außen, die Flammenfarben flackern; Glutfunken steigen auf.
 * Das Auge blinzelt: zwei Lider (Flammenhaut mit dunkler Lidkante) schließen
-  sich entlang der Mandelform von oben und unten, bleiben kurz zu und
-  öffnen sich wieder.
+  sich langsam entlang der Mandelform von oben und unten, bleiben kurz zu
+  und öffnen sich ebenso langsam wieder.
 """
 import math
 import sys
@@ -28,7 +28,7 @@ LID, LID_EDGE = rgb('eec29f'), rgb('4e240e')
 EYE_COLS_X = {x: (min(np.nonzero(IS_EYE[:, x])[0]), max(np.nonzero(IS_EYE[:, x])[0]))
               for x in range(SW) if IS_EYE[:, x].any()}
 MID_Y = 18
-BLINK = {26: 0.5, 27: 1.0, 28: 1.0, 29: 0.5}
+BLINK = {23: 0.2, 24: 0.4, 25: 0.6, 26: 0.8, 27: 1.0, 28: 1.0, 29: 1.0, 30: 0.8, 31: 0.6, 32: 0.4, 33: 0.2}
 
 
 def rnd(k, i):

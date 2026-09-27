@@ -7,8 +7,9 @@ Lovecraft-Wesen, das Auge sitzt in ihrer Mitte.
 * Die Wolke ist ein Feld aus einem pulsierenden Kern (Rand wogt über
   überlagerte Sinuswellen) und sieben langen, tentakelartigen Pseudopoden,
   die sich schlängeln, dabei länger und kürzer werden und spitz zulaufen.
-* Zwei Töne: fast schwarzer, dichter Kern, halbtransparenter violett-
-  schwarzer Rand; von den Tentakelspitzen lösen sich Schattenfetzen.
+* Schattierung in vier Stufen: halbtransparenter violett-schwarzer Rand,
+  dunkler Körper, noch dunklere Tiefe und tiefschwarzes Zentrum (auch die
+  dicken Tentakelwurzeln werden innen dunkler); von den Tentakelspitzen lösen sich Schattenfetzen.
 * Das Auge schwebt mit dem Kern leicht auf und ab.
 """
 import math
@@ -22,7 +23,8 @@ EH, EW = EYE.shape[:2]
 W, H = 134, 172
 CX, CY = W / 2, H / 2
 N = 48
-CORE, RIM = (7, 5, 12, 235), (30, 16, 42, 165)
+CORE, RIM = (14, 9, 22, 235), (34, 18, 48, 165)
+DEEP, ABYSS = (5, 3, 9, 245), (0, 0, 0, 252)          # Schattierung nach innen
 # Tentakel: (Winkel in Grad, Länge, Wurzelradius, Phase)
 TENTACLES = [(-150, 36, 6.0, 0.0), (-100, 30, 5.2, 1.3), (-40, 38, 6.0, 2.6), (10, 42, 6.4, 3.9),
              (65, 36, 5.8, 5.1), (120, 42, 6.4, 0.7), (175, 34, 5.6, 2.0)]
@@ -68,6 +70,8 @@ def frame(i):
     out = np.zeros((H, W, 4), int)
     out[f > 0] = RIM
     out[f > 1.0] = CORE
+    out[f > 3.2] = DEEP                              # innen dunkler …
+    out[f > 7.0] = ABYSS                             # … im Zentrum tiefschwarz
     # Schattenfetzen lösen sich von den Tentakelspitzen
     p = 2 * math.pi * i / N
     for k, (a0, L, r0, ph) in enumerate(TENTACLES):

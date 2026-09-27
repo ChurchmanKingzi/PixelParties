@@ -5,7 +5,7 @@ abgelegt.
 
 Aufruf:  python3 assemble_boons.py <pfad/zu/MotiveBoons.xcf>
 
-  nomu-wanderer-of-worlds          Nomu
+  nomu-wanderer-of-worlds          Nomu (+ Portal „Nomu #1“ als Teil -portal)
   argos-the-eye-of-the-cosmos      Argos (Auge, Pupille schwarz gefüllt); der
                                    Schattenkörper ist neu gezeichnet (argos.py)
   the-eye-of-argos        (Skin)   Sauron
@@ -58,6 +58,12 @@ def main(path):
     doc = GimpDocument(path)
     L = doc.raw_layers
     save(layer(doc, L, 'Nomu'), 'nomu-wanderer-of-worlds')
+    # Portal hinter Nomu (halbtransparent) als eigenes Teil; Lage relativ zu Nomu
+    nomu = Image.fromarray(layer(doc, L, 'Nomu')).getbbox()
+    portal = Image.fromarray(layer(doc, L, 'Nomu #1'))
+    pb = portal.getbbox()
+    portal.crop(pb).save(f'{OUT}/nomu-wanderer-of-worlds-portal.png')
+    print('Portal-Versatz zu Nomu:', pb[0] - nomu[0], pb[1] - nomu[1], 'Größe', portal.crop(pb).size)
     save(fill_holes(layer(doc, L, 'Argos'), (0, 0, 0, 255)), 'argos-the-eye-of-the-cosmos')
     save(layer(doc, L, 'Sauron'), 'the-eye-of-argos')
     save(layer(doc, L, 'KerThwack'), 'kerthwack-the-reality-breaker')
