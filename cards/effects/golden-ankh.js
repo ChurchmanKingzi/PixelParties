@@ -12,6 +12,8 @@
 //  end-of-turn death.
 // ═══════════════════════════════════════════
 
+const { canReviveHero } = require('./_revive-shared');
+
 module.exports = {
   isTargetingArtifact: true,
 
@@ -58,6 +60,7 @@ module.exports = {
     for (let hi = 0; hi < heroes.length; hi++) {
       const hero = heroes[hi];
       if (!hero?.name || hero.hp > 0) continue;
+      if (!canReviveHero(hero)) continue;   // v1466
 
       const savedHp = hero.hp;
       hero.hp = 100;
@@ -88,7 +91,9 @@ module.exports = {
   canActivate(gs, pi) {
     const ps = gs.players[pi];
     // Must have at least one dead hero
-    return (ps.heroes || []).some(h => h?.name && h.hp <= 0);
+    // ★ v1466: „revive it with 100 HP" wird auf die max HP gedeckelt —
+    // ein Held mit 0 max HP bliebe bei 0 und zaehlt nicht (s. _revive-shared).
+    return (ps.heroes || []).some(h => h?.name && h.hp <= 0 && canReviveHero(h));
   },
 
   getValidTargets(gs, pi) {
@@ -98,6 +103,7 @@ module.exports = {
       const hero = ps.heroes[hi];
       if (!hero?.name) continue;
       if (hero.hp > 0) continue;
+      if (!canReviveHero(hero)) continue;   // v1466
       targets.push({
         id: `hero-${pi}-${hi}`, type: 'hero', owner: pi,
         heroIdx: hi, cardName: hero.name,

@@ -63,6 +63,8 @@ function waehlbareHelden(engine, pi) {
   for (let hi = 0; hi < (ps?.heroes || []).length; hi++) {
     const h = ps.heroes[hi];
     if (!h?.name || h.hp > 0) continue;
+    // v1466: volle Heilung — bei 0 max HP kein Ziel (s. _revive-shared).
+    if (!engine.canReviveHero(h)) continue;
     if (engine._isHeroSpellProtected?.(h, CARD_NAME)) continue;
     out.push(hi);
   }
