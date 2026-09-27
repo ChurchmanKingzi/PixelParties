@@ -2,11 +2,11 @@
 """Idle-Animation für Thep, the Court Scribe (MotiveEgypt.xcf, Ebene „Thep“).
 
 * Er schreibt wirklich: Er greift mit Hand und Feder zur Schriftrolle, die
-  Federspitze kritzelt zwei Zeilen darauf (die Tinte bleibt als krakelige
-  dunkle Linie stehen), dann zieht er die Hand zurück. Beim Hinübergreifen
-  kippt die Feder etwas und liegt hinter Kopf und Körper – nur über der
-  Rolle liegen Hand und Federspitze vorn. In der Pause zieht die Tinte ein
-  (verblasst), damit der Loop nahtlos ist.
+  Federspitze kritzelt zwei kurze Zeilen darauf (hin und her, die Tinte
+  bleibt als krakelige dunkle Linie stehen), dann zieht er die Hand zurück.
+  Die Feder liegt vor ihm; beim Hinübergreifen neigt sie sich so weit nach
+  links, dass ihre Fahne sein Gesicht frei lässt. In der Pause zieht die
+  Tinte ein (verblasst), damit der Loop nahtlos ist.
 * Er atmet: Kopf und Oberkörper heben sich im Rhythmus um 1 px (die Zeile
   darunter wird gedehnt, die Füße bleiben stehen).
 * Er blinzelt einmal pro Loop in der Schreibpause (halb -> zu -> halb).
@@ -21,7 +21,7 @@ from flap_common import rotate_part
 
 SRC = np.array(Image.open('src/thep-the-court-scribe.png').convert('RGBA')).astype(int)
 SH, SW = SRC.shape[:2]
-P, PT, PB = 3, 3, 2
+P, PT, PB = 6, 3, 2
 H, W = SH + PT + PB, SW + 2 * P
 N = 48
 QUILL_COLS = {rgb(c) for c in ('9e9e9e', '6c6c6c', 'e2e2e2')}
@@ -32,26 +32,41 @@ NIB = (3, 24)
 PIVOT = (3.5, 23.5)
 SCROLL = {rgb(c) for c in ('bbad9f', 'a69482', 'd1c5bd', 'c7bab0', '817264')}
 INK = rgb('4a2c0a')
-REACH = (9, -1, -0.25)                               # Versatz der Spitze an der Rolle, Neigung der Feder
-JITTER = [0, -1, 0, 0, -1, 0, -1, 0]                 # krakelige Schrift
+LINE1 = [11, 12, 11, 12, 13, 12, 13, 14]              # Federspitze x (Zeile 1, y 23), hin und her
+LINE2 = [11, 12, 13, 12, 13, 14, 14]                  # Zeile 2 (y 26)
+JITTER = [0, -1, 0, 0, -1, 0, -1, 0]                  # krakelige Schrift
+
+
+def tilt(nx):
+    """Neigung, bei der die Federfahne links vom Gesicht bleibt."""
+    return -math.atan2(nx - 1, 12)
+
+
+def nib(i):
+    """Position der Federspitze (x, y) und Neigung."""
+    if 6 <= i <= 9:                                  # hinübergreifen
+        f = (i - 5) / 4
+        x, y = NIB[0] + (LINE1[0] - NIB[0]) * f, NIB[1] + (23 - NIB[1]) * f
+        return int(round(x)), int(round(y)), tilt(LINE1[0]) * f
+    if 10 <= i <= 17:
+        x = LINE1[i - 10]
+        return x, 23 + JITTER[i - 10], tilt(x)
+    if i == 18:                                      # neue Zeile
+        return LINE2[0], 26, tilt(LINE2[0])
+    if 19 <= i <= 25:
+        x = LINE2[i - 19]
+        return x, 26 + JITTER[i - 19], tilt(x)
+    if 26 <= i <= 29:                                # zurückziehen
+        f = (30 - i) / 5
+        x, y = NIB[0] + (LINE2[-1] - NIB[0]) * f, NIB[1] + (26 - NIB[1]) * f
+        return int(round(x)), int(round(y)), tilt(LINE2[-1]) * f
+    return NIB[0], NIB[1], 0.0
 
 
 def pose(i):
     """(dx, dy, Winkel) der Feder-Hand-Gruppe."""
-    rx, ry, ra = REACH
-    if 6 <= i <= 9:                                  # hinübergreifen
-        f = (i - 5) / 4
-        return int(round(rx * f)), int(round(ry * f)), ra * f
-    if 10 <= i <= 17:                                # Zeile 1
-        return rx + (i - 10), ry + JITTER[i - 10], ra
-    if i == 18:                                      # neue Zeile
-        return rx, ry + 3, ra
-    if 19 <= i <= 25:                                # Zeile 2
-        return rx + (i - 19), ry + 3 + JITTER[i - 19], ra
-    if 26 <= i <= 29:                                # zurückziehen
-        f = (30 - i) / 5
-        return int(round((rx + 3) * f)), int(round((ry + 3) * f)), ra * f
-    return 0, 0, 0.0
+    x, y, a = nib(i)
+    return x - NIB[0], y - NIB[1], a
 
 
 WRITE = [k for k in range(10, 26) if k != 18]
@@ -94,14 +109,12 @@ def frame(i):
             s[y, x, :3] = (np.array(INK[:3]) * fade + SRC[y, x, :3] * (1 - fade)).astype(int)
     out = np.zeros((H, W, 4), int)
     b = breath(i)
-    front = np.zeros((H, W), bool)                   # hier darf die Hand vorn liegen (Rolle)
     for y in range(SH):
         for x in range(SW):
             if not s[y, x, 3] or GROUP[y, x]:
                 continue
             yy = y + PT + (b if y < BODY_Y else 0)
             out[yy, x + P] = shine(s[y, x], x, y, i)
-            front[yy, x + P] = tuple(SRC[y, x]) in SCROLL
     if b:
         y = BODY_Y - 1
         for x in range(SW):
@@ -109,7 +122,7 @@ def frame(i):
                 out[y + PT, x + P] = s[y, x]
     dx, dy, ang = pose(i)
     part = rotate_part(SRC, GROUP, PIVOT, ang, (H, W), (P + dx, PT + b + dy))
-    m = (part[:, :, 3] > 0) & ((out[:, :, 3] == 0) | front)
+    m = part[:, :, 3] > 0                            # Feder und Hand liegen vorn
     out[m] = part[m]
     return out
 
