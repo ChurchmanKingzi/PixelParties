@@ -301,13 +301,19 @@ def frame(i, particles=True):
                     xx, yy = xin + P + side * k, y + PT + (b if y < KNEE else 0)
                     if not out[yy, xx, 3]:
                         out[yy, xx] = s[y, xin]
-    if V == 'tryse' and sx > 0:                      # Schulter: der Ärmel bleibt dort, wo er war,
-        for y, xs in arm_rows.items():               # der vorgestoßene Teil schließt daran an
-            xin = min(xs)
+    if V == 'tryse' and sx > 0:                      # Schulter: Lücke mit dem Innenmuster des Ärmels
+        top, bot = min(arm_rows), max(arm_rows)      # füllen (die schwarze Kante links nicht verdoppeln;
+        for y, xs in arm_rows.items():               # Schwarz nur an Ober- und Unterkante)
+            xs = sorted(xs)
+            inner = [s[y, x] for x in xs[1:]] or [s[y, xs[0]]]
             for k in range(sx):
-                xx, yy = xin + P + k, y + PT + (b if y < KNEE else 0)
-                if not out[yy, xx, 3] and s[y, xin + k, 3]:
-                    out[yy, xx] = s[y, xin + k]
+                c = inner[min(k, len(inner) - 1)]
+                if y not in (top, bot):              # Mitte: nur Stoffgrau (kein Schwarz, kein Braun der Hand)
+                    grey = [v for v in inner if max(v[:3]) >= 0x10 and max(v[:3]) - min(v[:3]) < 0x14]
+                    c = grey[min(k, len(grey) - 1)] if grey else c
+                xx, yy = xs[0] + P + k, y + PT + (b if y < KNEE else 0)
+                if not out[yy, xx, 3]:
+                    out[yy, xx] = c
     fill_pinholes(out)
     if V == 'rakah':                                 # Tropfen lösen sich unten und fallen
         for x, ph in DRIPS:
