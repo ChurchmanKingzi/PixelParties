@@ -375,6 +375,38 @@
       "id": "bone-wyrm",
       "name": "Bone Wyrm",
       "formerId": "sleeve75"
+    },
+    {
+      "id": "guardian-zodiac",
+      "name": "Guardian Zodiac"
+    },
+    {
+      "id": "puppet-theater",
+      "name": "Puppet Theater"
+    },
+    {
+      "id": "spider-nest",
+      "name": "Spider Nest"
+    },
+    {
+      "id": "pharaohs-tomb",
+      "name": "Pharaoh's Tomb"
+    },
+    {
+      "id": "gigantisaur-comic",
+      "name": "Gigantisaur Comic"
+    },
+    {
+      "id": "detective-board",
+      "name": "Detective Board"
+    },
+    {
+      "id": "cycling-demons",
+      "name": "Cycling Demons"
+    },
+    {
+      "id": "divine-balance",
+      "name": "Divine Balance"
     }
   ]
 }

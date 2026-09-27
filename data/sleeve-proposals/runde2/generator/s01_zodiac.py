@@ -1,71 +1,135 @@
 # -*- coding: utf-8 -*-
-"""Sleeve: Kreis der zwölf Guardian Beasts – Medaillons aus den 12 Kartenbildern,
-Mitte: Yin-Yang aus „Charm of Balance“, Boden/Ziegel aus „Guard Duty“/„Guardian Beast Yang“."""
+"""Sleeve 01 „Guardian Zodiac“: die zwölf Guardian Beasts stehen im Tierkreis (Shu oben, im Uhrzeigersinn)
+auf kleinen Graskuppen im Oval um eine Tierkreis-Scheibe (Ziegelring mit zwölf Feldern) mit Yin-Yang.
+
+Alles auf EINEM Raster 125×175 gebaut und am Ende 2× auf 250×350 skaliert (Ausgabe 6 px je Grafikpixel):
+Figuren, Ring-/Kantenlinien, Yin-Yang und Texturen haben dieselbe Pixelgröße. Kein Rahmen.
+
+Quellen (MotiveGuardianBeasts.xcf, jeweils gegen die „Sichtbar“-Szene der Karte geprüft):
+  Shu = Ebene 71 „Shu“ · Niu = 82 „Niu #1“ (mit Klingen; „Niu #3“ ist eine größer
+  gezeichnete Fassung) · Hu = 75 „Hu“ · Tu = 109 „Tu-Kopie“ ·
+  Long = 105 „Long-Kopie“ · She = 95 „She #1“ + 92 „She #5“ + 96 „She #4“ + 94 „She #3“ (Kobra + Dreizack) ·
+  Ma = 66 „Ma #3“ · Yang = 62 „Yang #1“ · Hou = 124 „Hou“ + 122 „Hou #2“ + roter Stab aus 123 „Hou #1“ ·
+  Ji = 88 „Ji #1“ · Gou = 118 „Gou #1“ · Zhu = 56 „Zhu #1“.
+  Texturen: dunkler Fels, Ziegel und Gras (je 8×8) aus der Labyrinth-Ebene 64 „Ebene #28“.
+  Yin-Yang: nach „Charm of Balance“ (Motive.xcf, Ebene 698) in dessen Graustufen-Palette sauber nachgezeichnet.
+"""
 import math, numpy as np
 from kit import *
+from xcfkit import sprite, layer
 
-cv = Canvas(W, H)
-# Hintergrund: dunkles Mauerwerk aus Guardian Beast Yang (links, x0..16), 2× skaliert
-# Hintergrund: das Labyrinth-Muster aus „Guardian Beast Tu“, gespiegelt gekachelt und abgedunkelt
-tu = nat('Guardian Beast Tu')[:, 0:26]
-t2 = np.concatenate([tu, tu[:, ::-1]], 1)
-t2 = np.concatenate([t2, t2[::-1]], 0)
-tile = up(np.dstack([t2, np.full(t2.shape[:2], 255, np.uint8)]), 2)
-tile = hsv_shift(tile, 0, 1.1, 0.33)
-fill_tiles(cv, tile, ox=7, oy=11)
-vignette(cv, 0.6, 0.3)
+B = 'MotiveGuardianBeasts'
+w, h = 125, 175                                   # Arbeitsraster (Endskalierung 2×)
+cv = Canvas(w, h)
 
-# Ziegelband (Guard Duty, gelbe Ziegel oben) entlang der Ellipse
-gd = nat('Guard Duty')
-brick = up(np.dstack([gd[0:10, 0:20], np.full((10, 20), 255, np.uint8)]), 1)
-CX, CY, AX, AY = 125, 175, 92, 136
-for y in range(H):
-    for x in range(W):
-        d = math.hypot((x + .5 - CX) / AX, (y + .5 - CY) / AY)
-        r = d * 1.0
-        if abs(d - 1) < 4.2 / 115:
-            cv.a[y, x] = brick[y % 10, x % 20][:3]
-        elif abs(d - 1) < 5.6 / 115:
-            cv.a[y, x] = (40, 18, 8)
 
-# Mitte: Steinboden-Scheibe aus Charm of Balance mit Yin-Yang, 3×
-cob = nat('Charm of Balance')
-yy = cut('Charm of Balance', (32, 23, 44, 36), bg=[(32, 23), (43, 23), (32, 35), (43, 35)], tol=60)
-# nur Schwarz/Weiß behalten
-m = (yy[..., :3].max(-1) < 60) | (yy[..., :3].min(-1) > 200)
-yy[..., 3] = np.where(m, 255, 0)
-yy = trim(yy)
-fsrc = cob[20:38, 48:66]
-f2 = np.concatenate([fsrc, fsrc[:, ::-1]], 1); f2 = np.concatenate([f2, f2[::-1]], 0)
-floor = disc(f2, 18, 18, 17)
-fl = up(floor, 3)
-for r in ((54, (40, 18, 8)), (53, (250, 190, 70)), (51, (200, 110, 30)), (50, (40, 18, 8))):
-    ring(cv, CX, CY - 8, 0, r[0], r[1])
-paste(cv, fl[3:-3, 3:-3], CX, CY - 8, 'c')
-Y = up(outline(yy, (70, 60, 80)), 5)
-drop_shadow(cv, Y, CX - Y.shape[1] // 2, CY - 8 - Y.shape[0] // 2, 3, 3, (30, 20, 30), 0.6)
+def tex(key, x, y):
+    """8×8-Kachel aus der Labyrinth-Ebene (Cache über sprite-Mechanismus)."""
+    return sprite(key, B, [64], box=(x, y, x + 8, y + 8))
 
-# Zwölf Medaillons (Reihenfolge des Tierkreises, oben beginnend im Uhrzeigersinn)
-beasts = [('Shu', 36, 24), ('Niu', 38, 22), ('Hu', 37, 24), ('Tu', 37, 20), ('Long', 38, 18), ('She', 41, 26),
-          ('Ma', 37, 24), ('Yang', 38, 27), ('Hou', 37, 27), ('Ji', 38, 30), ('Gou', 37, 28), ('Zhu', 31, 27)]
-R = 12
-# gleichmäßige Bogenlänge auf der Ellipse
-ts = np.linspace(0, 2 * math.pi, 4000)
-pts = np.stack([CX + AX * np.sin(ts), CY - AY * np.cos(ts)], 1)
-seg = np.r_[0, np.cumsum(np.hypot(*np.diff(pts, axis=0).T))]
-L = seg[-1]
-for i, (n, bx, by) in enumerate(beasts):
-    j = np.searchsorted(seg, L * i / 12)
-    px, py = pts[j]
-    a = nat('Guardian Beast ' + n)
-    d = up(disc(a, bx, by, R), 2)
-    ring(cv, px, py, 0, 2 * R + 3, (40, 18, 8))
-    ring(cv, px, py, 0, 2 * R + 2, (250, 190, 70))
-    ring(cv, px, py, 0, 2 * R + 1, (200, 110, 30))
-    paste(cv, d, int(px) - 2 * R, int(py) - 2 * R)
-    ring(cv, px, py, 2 * R - 1, 2 * R, (40, 18, 8))
 
-# Rahmen
-for i, c in enumerate([(40, 18, 8), (200, 110, 30), (250, 190, 70), (40, 18, 8)]):
-    cv.a[i, :] = c; cv.a[-1 - i, :] = c; cv.a[:, i] = c; cv.a[:, -1 - i] = c
-print(save(cv, '01_guardian_zodiac.png'))
+rock = tex('r2_01_rock', 113, 137)
+brick = tex('r2_01_brick', 203, 175)
+grass = tex('r2_01_grass', 137, 136)
+
+# Hintergrund: dunkler Fels, zusätzlich abgedunkelt + Vignette
+fill_tiles(cv, darken(rock, 0.75))
+vignette(cv, 0.8, 0.12)
+
+EDGE_D, EDGE_L = (48, 20, 6), (214, 104, 40)       # Kantenfarben (Ziegel-Palette)
+yy, xx = np.mgrid[0:h, 0:w] + 0.5
+bt = np.tile(brick[..., :3], (h // 8 + 1, w // 8 + 1, 1))[:h, :w]
+gt = np.tile(grass[..., :3], (h // 8 + 1, w // 8 + 1, 1))[:h, :w]
+GRASS_L = (66, 134, 0)
+
+# Mitte: Tierkreis-Scheibe – Ziegelring mit zwölf Feldern um das Yin-Yang
+R = 20
+YX, YY = 62, 86
+rr = np.hypot(xx - YX, yy - YY)
+ang = (np.degrees(np.arctan2(xx - YX, -(yy - YY))) + 360 + 15) % 360
+disc_m = rr < R + 11
+cv.a[disc_m] = bt[disc_m]
+alt = disc_m & (rr >= R + 2) & ((ang // 30) % 2 == 1)          # jedes zweite Feld dunkler
+cv.a[alt] = (bt[alt] * 0.72).astype(np.uint8)
+cv.a[disc_m & (rr >= R + 2) & ((ang % 30) < 360 / (2 * math.pi * rr + 1e-6) * 1.0)] = EDGE_D   # Feldgrenzen
+cv.a[(rr >= R + 1) & (rr < R + 2)] = EDGE_D
+cv.a[(rr >= R + 10) & (rr < R + 11)] = EDGE_L
+cv.a[(rr >= R + 11) & (rr < R + 12)] = EDGE_D
+BLK, D1, D2, D3, WHT = (0, 0, 0), (38, 38, 38), (77, 77, 77), (116, 116, 116), (255, 255, 255)
+dx, dy = xx - YX, yy - YY
+dark = dx > 0
+top = np.hypot(dx, dy + R / 2) < R / 2
+bot = np.hypot(dx, dy - R / 2) < R / 2
+dark = np.where(top, True, np.where(bot, False, dark))
+dark = np.where(np.hypot(dx, dy + R / 2) < R / 6, False, dark)
+dark = np.where(np.hypot(dx, dy - R / 2) < R / 6, True, dark)
+inside = rr < R
+col = np.where(dark[..., None], np.array(BLK), np.array(WHT))
+# leichte Schattierung wie beim Anhänger: helle Hälfte unten rechts grau, dunkle oben links angehellt
+shade_w = (~dark) & inside & (dx + dy > R * 0.55) & (rr > R - 4)
+shade_b = dark & inside & (dx + dy < -R * 0.55) & (rr > R - 4)
+cv.a[inside] = col[inside]
+cv.a[shade_w] = D3
+cv.a[shade_b] = D1
+cv.a[(rr >= R) & (rr < R + 1)] = D2
+
+# Figuren
+S = {
+    'Shu': sprite('r2_01_shu', B, [71]),
+    'Niu': sprite('r2_01_niu', B, [82]),
+    'Hu': sprite('r2_01_hu', B, [75]),
+    'Tu': sprite('r2_01_tu', B, [109]),
+    'Long': sprite('r2_01_long', B, [105]),
+    'She': sprite('r2_01_she', B, [95, 92, 96, 94]),
+    'Ma': sprite('r2_01_ma', B, [66]),
+    'Yang': sprite('r2_01_yang', B, [62]),
+    'Ji': sprite('r2_01_ji', B, [88]),
+    'Gou': sprite('r2_01_gou', B, [118]),
+    'Zhu': sprite('r2_01_zhu', B, [56]),
+}
+
+
+def hou_sprite():
+    """Hou (124) + Hand (122) + nur der rote Stab aus „Hou #1“ (123, Komponente x 161–164, y 122–154);
+    die Bomben derselben Ebene bleiben weg. Stapelreihenfolge wie in der Szene: 122 über 123 über 124."""
+    import os
+    from PIL import Image
+    from xcfkit import over, bbox, CACHE, EXP
+    p = os.path.join(CACHE, 'r2_01_hou.png')
+    if not os.path.exists(os.path.join(EXP, B, 'layers.json')):
+        return np.array(Image.open(p).convert('RGBA'))
+    st = layer(B, 123).copy()
+    keep = np.zeros(st.shape[:2], bool); keep[122:155, 161:165] = True
+    st[~keep] = 0
+    acc = over(over(layer(B, 124), st), layer(B, 122))
+    acc[..., 3] = np.where(acc[..., 3] >= 128, 255, 0)
+    x0, y0, x1, y1 = bbox(acc)
+    acc = acc[y0:y1, x0:x1]
+    Image.fromarray(acc).save(p)
+    return acc
+
+
+S['Hou'] = hou_sprite()
+
+# Zwölf Plätze im Oval um die Scheibe, im Uhrzeigersinn ab Shu (oben mittig) bis Zhu; Ma steht unten mittig.
+# (Name, Fußmitte x, Fußlinie y) – Abstände so gewählt, dass sich keine Figuren gegenseitig verdecken.
+FOOT = 2
+SPOTS = [('Shu', 63, 33), ('Niu', 88, 36), ('Hu', 108, 50),
+         ('Tu', 107, 83), ('Long', 106, 122),
+         ('She', 93, 164), ('Ma', 62, 166), ('Yang', 36, 164), ('Hou', 16, 149),
+         ('Ji', 17, 113), ('Gou', 17, 78), ('Zhu', 30, 45)]
+
+# von hinten (oben) nach vorn: je Figur erst ihre flache Graskuppe (Aufsicht), dann die Figur
+for n, px, py in sorted(SPOTS, key=lambda t: t[2]):
+    sp = S[n]
+    rx_, ry_ = min(sp.shape[1], 30) / 2 + 2, 3.3
+    e = ((xx - px) / rx_) ** 2 + ((yy - (py + FOOT - 0.5)) / ry_) ** 2
+    rim = ((xx - px) / (rx_ + 1)) ** 2 + ((yy - (py + FOOT + 0.5)) / (ry_ + 1)) ** 2
+    cv.a[rim < 1] = EDGE_D
+    cv.a[e < 1] = gt[e < 1]
+    cv.a[(e < 1) & (e >= 0.72) & (yy > py + FOOT)] = GRASS_L
+    cv.paste(sp, int(round(px - sp.shape[1] / 2)), py + FOOT - sp.shape[0])
+
+big = Canvas(W, H)
+big.a[:] = up(np.dstack([cv.a, np.full((h, w), 255, np.uint8)]), 2)[..., :3]
+print(save(big, '01_guardian_zodiac.png'))
