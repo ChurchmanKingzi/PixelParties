@@ -1,21 +1,22 @@
 # -*- coding: utf-8 -*-
 """Sleeve 01 „Guardian Zodiac“: die zwölf Guardian Beasts stehen im Tierkreis (Shu oben, im Uhrzeigersinn)
-auf einem Ziegelring um ein Yin-Yang.
+auf kleinen Graskuppen im Oval um eine Tierkreis-Scheibe (Ziegelring mit zwölf Feldern) mit Yin-Yang.
 
 Alles auf EINEM Raster 125×175 gebaut und am Ende 2× auf 250×350 skaliert (Ausgabe 6 px je Grafikpixel):
-Figuren, Ringlinien, Yin-Yang und Texturen haben dieselbe Pixelgröße.
+Figuren, Ring-/Kantenlinien, Yin-Yang und Texturen haben dieselbe Pixelgröße. Kein Rahmen.
 
 Quellen (MotiveGuardianBeasts.xcf, jeweils gegen die „Sichtbar“-Szene der Karte geprüft):
-  Shu = Ebene 71 „Shu“ · Niu = 82 „Niu #1“ (mit Klingen; gleiche Figurengröße wie die übrigen, „Niu #3“ ist eine vergrößerte Fassung) · Hu = 75 „Hu“ · Tu = 109 „Tu-Kopie“ ·
+  Shu = Ebene 71 „Shu“ · Niu = 82 „Niu #1“ (mit Klingen; „Niu #3“ ist eine größer
+  gezeichnete Fassung) · Hu = 75 „Hu“ · Tu = 109 „Tu-Kopie“ ·
   Long = 105 „Long-Kopie“ · She = 95 „She #1“ + 92 „She #5“ + 96 „She #4“ + 94 „She #3“ (Kobra + Dreizack) ·
   Ma = 66 „Ma #3“ · Yang = 62 „Yang #1“ · Hou = 124 „Hou“ + 122 „Hou #2“ + roter Stab aus 123 „Hou #1“ ·
   Ji = 88 „Ji #1“ · Gou = 118 „Gou #1“ · Zhu = 56 „Zhu #1“.
-  Texturen: dunkler Fels (8×8) und Ziegel (8×8) aus der Labyrinth-Ebene 64 „Ebene #28“.
+  Texturen: dunkler Fels, Ziegel und Gras (je 8×8) aus der Labyrinth-Ebene 64 „Ebene #28“.
   Yin-Yang: nach „Charm of Balance“ (Motive.xcf, Ebene 698) in dessen Graustufen-Palette sauber nachgezeichnet.
 """
 import math, numpy as np
 from kit import *
-from xcfkit import sprite, part_at, layer
+from xcfkit import sprite, layer
 
 B = 'MotiveGuardianBeasts'
 w, h = 125, 175                                   # Arbeitsraster (Endskalierung 2×)
@@ -35,18 +36,8 @@ grass = tex('r2_01_grass', 137, 136)
 fill_tiles(cv, darken(rock, 0.75))
 vignette(cv, 0.8, 0.12)
 
-# Tierkreis-Ring: abgerundetes Rechteck (nutzt das Hochformat besser als eine Ellipse),
-# die Füße der Figuren stehen auf dem Ziegelband.
-Lx, Rx, T, Bm, RC = 17, 107, 35, 167, 10          # Bandmitte links/rechts/oben/unten, Eckradius
-CX, CY = (Lx + Rx) / 2, (T + Bm) / 2
-BAND = 4                                          # halbe Bandbreite (Rasterpixel)
-EDGE_D, EDGE_L = (48, 20, 6), (214, 104, 40)
+EDGE_D, EDGE_L = (48, 20, 6), (214, 104, 40)       # Kantenfarben (Ziegel-Palette)
 yy, xx = np.mgrid[0:h, 0:w] + 0.5
-qx = np.abs(xx - CX) - ((Rx - Lx) / 2 - RC)
-qy = np.abs(yy - CY) - ((Bm - T) / 2 - RC)
-sd = np.hypot(np.maximum(qx, 0), np.maximum(qy, 0)) + np.minimum(np.maximum(qx, qy), 0) - RC
-dist = np.abs(sd)
-
 bt = np.tile(brick[..., :3], (h // 8 + 1, w // 8 + 1, 1))[:h, :w]
 gt = np.tile(grass[..., :3], (h // 8 + 1, w // 8 + 1, 1))[:h, :w]
 GRASS_L = (66, 134, 0)
@@ -96,6 +87,8 @@ S = {
     'Gou': sprite('r2_01_gou', B, [118]),
     'Zhu': sprite('r2_01_zhu', B, [56]),
 }
+
+
 def hou_sprite():
     """Hou (124) + Hand (122) + nur der rote Stab aus „Hou #1“ (123, Komponente x 161–164, y 122–154);
     die Bomben derselben Ebene bleiben weg. Stapelreihenfolge wie in der Szene: 122 über 123 über 124."""
@@ -118,23 +111,16 @@ def hou_sprite():
 
 S['Hou'] = hou_sprite()
 
-# Zwölf Plätze wie auf einem Zifferblatt, je drei pro Seite des abgerundeten Rings (Shu = 12 Uhr, Ma = 6 Uhr):
-# (Name, Fußmitte x, Fußlinie y) – die Fußlinie liegt auf dem Ziegelband.
+# Zwölf Plätze im Oval um die Scheibe, im Uhrzeigersinn ab Shu (oben mittig) bis Zhu; Ma steht unten mittig.
+# (Name, Fußmitte x, Fußlinie y) – Abstände so gewählt, dass sich keine Figuren gegenseitig verdecken.
 FOOT = 2
-# Oben und unten je vier Figuren (Ecken eingeschlossen), an den Seiten je zwei – Shu steht oben, Ma unten mittig.
 SPOTS = [('Shu', 63, 33), ('Niu', 88, 36), ('Hu', 108, 50),
          ('Tu', 107, 83), ('Long', 106, 122),
          ('She', 93, 164), ('Ma', 62, 166), ('Yang', 36, 164), ('Hou', 16, 149),
          ('Ji', 17, 113), ('Gou', 17, 78), ('Zhu', 30, 45)]
-place = []
-for n, fx, fy in SPOTS:
-    sp = S[n]
-    # Füße = unterste deckende Zeile, Mitte = Schwerpunkt der untersten Zeilen
-    place.append((fy, n, int(round(fx - sp.shape[1] / 2)), fy + FOOT - sp.shape[0], fx))
-py_of = {n: fy for fy, n, *_ in place}
 
-# Sockel: runde Ziegelplatte unter jeder Figur (Aufsicht, flach), gezeichnet vor den Figuren
-for py, n, fx, fy, px in sorted(place):
+# von hinten (oben) nach vorn: je Figur erst ihre flache Graskuppe (Aufsicht), dann die Figur
+for n, px, py in sorted(SPOTS, key=lambda t: t[2]):
     sp = S[n]
     rx_, ry_ = min(sp.shape[1], 30) / 2 + 2, 3.3
     e = ((xx - px) / rx_) ** 2 + ((yy - (py + FOOT - 0.5)) / ry_) ** 2
@@ -142,9 +128,7 @@ for py, n, fx, fy, px in sorted(place):
     cv.a[rim < 1] = EDGE_D
     cv.a[e < 1] = gt[e < 1]
     cv.a[(e < 1) & (e >= 0.72) & (yy > py + FOOT)] = GRASS_L
-for py, n, fx, fy, px in sorted(place):  # von hinten (oben) nach vorn
-    sp = S[n]
-    cv.paste(sp, fx, fy)
+    cv.paste(sp, int(round(px - sp.shape[1] / 2)), py + FOOT - sp.shape[0])
 
 big = Canvas(W, H)
 big.a[:] = up(np.dstack([cv.a, np.full((h, w), 255, np.uint8)]), 2)[..., :3]

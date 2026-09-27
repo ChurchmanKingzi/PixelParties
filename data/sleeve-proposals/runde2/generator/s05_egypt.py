@@ -10,27 +10,27 @@ Runde 2b: EINE Pixelgröße für alles – die ganze Szene wird im Originalraste
   der Ushabti-/Mummy-Guards-Karten), Kacheln 48×16 bzw. 16×16.
 - Figuren (vollständig, gegen die Sichtbar-Szenen geprüft): Soul Shard Ren (#188), zwei Ushabti mit Flamme
   (#168, mittlere Figur, einmal gespiegelt), Royal Mummy Guards (#183, beide Wächter), Soul Shard Khet (#214).
-- Selbst gezeichnet (Regel D): warmer Fackelschein der Ushabti-Flammen und Vignette als geordnetes Dithering
-  im selben Raster."""
+- Schlagschatten als Abdunklung ganzer Rasterpixel im selben Raster.
+- Weggelassen (passen in 3× nicht mehr): schlichte Ushabti und Urnen."""
 import numpy as np
-from kit import Canvas, up, flip, silhouette, save, BAYER4
+from kit import Canvas, up, flip, silhouette, save
 from xcfkit import sprite, parts
 
 B = 'MotiveEgypt'
 NW, NH = 84, 117
 cv = Canvas(NW, NH)
 
-room = sprite('eg_room', B, [185])                       # Grabkammer-Textur (Ebene #48), zugeschnitten ab (293,317)
+room = sprite('r2_05_room', B, [185])                       # Grabkammer-Textur (Ebene #48), zugeschnitten ab (293,317)
 WALL = room[38:54, 178:226, :3]                          # waagrechte Ziegel, Periode 48×16
 FLOOR = room[80:96, 190:206, :3]                         # Flechtverband, Periode 16×16
-PYR = sprite('eg_pyr_tile', B, [121], box=(440, 336, 443, 342))[..., :3]   # Pyramiden-Mauerwerk (3×6)
+PYR = sprite('r2_05_pyr_tile', B, [121], box=(440, 336, 443, 342))[..., :3]   # Pyramiden-Mauerwerk (3×6)
 
-ren = sprite('eg_ren', B, [188])
-eye = sprite('eg_eye', B, [99])
-ush = parts(sprite('eg_ushabti', B, [168]))             # links, Mitte (mit Flamme), rechts
-grd = parts(sprite('eg_guards', B, [183]), dil=0)        # zwei Wächter (mit Sensen)
+ren = sprite('r2_05_ren', B, [188])
+eye = sprite('r2_05_eye', B, [99])
+ush = parts(sprite('r2_05_ushabti', B, [168]))             # links, Mitte (mit Flamme), rechts
+grd = parts(sprite('r2_05_guards', B, [183]), dil=0)        # zwei Wächter (mit Sensen)
 assert len(grd) == 2
-khet = sprite('eg_khet', B, [214])
+khet = sprite('r2_05_khet', B, [214])
 
 FLOOR_Y = 80                                             # Übergang Wand → Boden
 for y in range(NH):
@@ -52,22 +52,13 @@ def put(s, x, y, fl=False, sh=0.45, anchor='tl'):
     cv.paste(s2, x, y)
     return x, y, w, h
 
-# Fackelschein der beiden Flammen-Ushabti (geordnetes Dithering, warm aufgehellt)
 fl = ush[1]
 UX = (3, NW - 3 - fl.shape[1])
 UY = FLOOR_Y + 1 - fl.shape[0]                           # Ushabti stehen hinten auf dem Boden
-glow = [(ux + fl.shape[1] // 2, UY + 3) for ux in UX]
 yy, xx = np.mgrid[:NH, :NW]
-t = np.zeros((NH, NW))
-for gx, gy in glow:
-    d = np.hypot(xx - gx, (yy - gy) * 1.1)
-    t = np.maximum(t, np.clip(1 - d / 20, 0, 1))
-q = t * 0.9 > BAYER4[yy % 4, xx % 4]
-warm = np.clip(cv.a * 1.18 + np.array([22, 10, 0]), 0, 255).astype(np.uint8)
-cv.a[q] = warm[q]
 
 # Tafel mit dem Auge (Pyramiden-Mauerwerk), 1 px dunkle Kante, Schlagschatten auf der Wand
-TX0, TX1, TY0, TY1 = 4, NW - 4, 2, 37
+TX0, TX1, TY0, TY1 = 4, NW - 4, 3, 38
 shade(TX0 + 1, TY0 + 1, TX1 + 1, TY1 + 1, 0.55)
 for y in range(TY0, TY1):
     for x in range(TX0, TX1):
@@ -84,12 +75,6 @@ GY = NH - 5
 put(grd[0], 6, GY - grd[0].shape[0], sh=0.5)
 put(grd[1], NW - 6 - grd[1].shape[1], GY - grd[1].shape[0], sh=0.5)
 put(khet, NW // 2, GY + 1, anchor='b', sh=0.5)
-
-# Vignette (geordnetes Dithering im selben Raster)
-d = np.sqrt(((xx - NW / 2) / (NW / 2)) ** 2 + ((yy - NH / 2) / (NH / 2)) ** 2) / np.sqrt(2)
-v = np.clip((d - 0.45) / 0.55, 0, 1) * 0.55
-qv = (np.floor(v * 4 + BAYER4[yy % 4, xx % 4]) / 4).clip(0, 1)
-cv.a[:] = (cv.a * (1 - qv[..., None])).astype(np.uint8)
 
 big = Canvas(250, 350)
 big.a[:] = up(cv.a, 3)[0:350, 1:251]

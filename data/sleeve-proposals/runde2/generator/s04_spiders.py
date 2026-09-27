@@ -106,7 +106,7 @@ hang(boss, HX - bcol, HY - boss.shape[0] + 13, seglen=4)
 hang(brain, 42, 2)
 put(cute, 2, 3)
 put(dia, 1, 45, r=1); put(dia, 46, 64, r=3)
-put(hive[0], 25, 8); put(hive[5], 6, 27, True, 1); put(hive[3], 13, 66)
+put(hive[0], 34, 11); put(hive[5], 6, 27, True, 1); put(hive[3], 13, 66)
 put(hive[2], 30, 78); put(hive[0], 49, 80, False, 2)
 
 # --- einheitlich 4× hochskalieren, auf 250×350 beschneiden

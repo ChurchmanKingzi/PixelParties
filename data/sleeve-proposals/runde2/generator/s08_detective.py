@@ -43,17 +43,17 @@ def shade(cv, s, x, y, f=0.55):
 # ---------------------------------------------------------------- Wand-Ebene: 125×175, 1 px = 2 auf 250
 BW, BH = 125, 175
 bd = Canvas(BW, BH)
-tile = scene('Great Detective Doq', (14, 2, 30, 10), 'mo_doq_wall')
+tile = scene('Great Detective Doq', (14, 2, 30, 10), 'r2_08_doq_wall')
 fill_tiles(bd, hsv_shift(tile, 0, 0.9, 0.78))
 vignette(bd, 0.55, 0.35)
 
 PAPER = (236, 230, 214); PAPER_S = (190, 180, 160)
 photos = [  # (Karte, Ausschnitt in Kartenpixeln, Position auf dem 125er-Raster, Cache-Key)
-    ('Kaito Sid the Phantom Thief', (24, 2, 64, 36), (7, 7), 'photo_kaito'),
-    ('Rakah the Loan Shark', (12, 8, 58, 40), (70, 17), 'photo_rakah'),
-    ('Devlin the Masked Butcher', (24, 3, 68, 35), (5, 70), 'photo_devlin'),
-    ('Criminal Monkee', (8, 9, 52, 43), (71, 76), 'photo_monkee'),
-    ('Black Marketeer', (16, 10, 56, 44), (31, 125), 'photo_marketeer'),
+    ('Kaito Sid the Phantom Thief', (24, 2, 64, 36), (7, 7), 'r2_08_photo_kaito'),
+    ('Rakah the Loan Shark', (12, 8, 58, 40), (70, 17), 'r2_08_photo_rakah'),
+    ('Devlin the Masked Butcher', (24, 3, 68, 35), (5, 70), 'r2_08_photo_devlin'),
+    ('Criminal Monkee', (8, 9, 52, 43), (71, 76), 'r2_08_photo_monkee'),
+    ('Black Marketeer', (16, 10, 56, 44), (31, 125), 'r2_08_photo_marketeer'),
 ]
 boxes = []
 for n, b, (px, py), key in photos:
@@ -103,7 +103,7 @@ cv = Canvas(W, H)
 cv.a[:] = up(bd.a, 2)
 
 # ---------------------------------------------------------------- Lupe (Vordergrund): 6 px auf 250
-doq = sprite('mo_doq_layer', 'Motive', [1437])            # Ebene „Doq“ (zugeschnitten, Ursprung = (128,171))
+doq = sprite('r2_08_doq_layer', 'Motive', [1437])            # Ebene „Doq“ (zugeschnitten, Ursprung = (128,171))
 def dpx(x, y):  # Pixel der Doq-Ebene in Motive-Koordinaten
     return tuple(int(v) for v in doq[y - 171, x - 128, :3])
 RO = 7.6                                                   # Außenradius des Rings (Original Ø 13, hier auf Ø 15
