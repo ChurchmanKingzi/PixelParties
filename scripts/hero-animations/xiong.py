@@ -2,12 +2,11 @@
 """Idle-Animation für Xiong, the Bamboo Guardian (MotiveChina.xcf: „Xiong“).
 
 * Er federt in den Knien (die Füße bleiben stehen).
-* Sein Bambusstab federt: beide Enden schwingen gemeinsam auf und ab wie
-  elastischer Bambus (spaltenweise verschoben, zu den Enden hin stärker;
-  die Hände halten die Mitte).
+* Der Bambusstab bleibt gerade und federt nur mit ihm mit.
+* Seine Ohren zucken ab und zu: die Spitze klappt 1 px ein (erst links,
+  später rechts, einmal beide).
 * Er blinzelt zweimal pro Loop (geschlossen: 2 px breite schwarze Striche).
 """
-import math
 import sys
 from PIL import Image
 import numpy as np
@@ -25,14 +24,10 @@ LID = rgb('a16033')
 BLINK = {14: 'halb', 15: 'zu', 16: 'zu', 17: 'halb', 38: 'halb', 39: 'zu', 40: 'zu', 41: 'halb'}
 WHITES = [(12, 10), (19, 10)]                        # helles Fell neben den Augen
 LINE = [(12, 10), (13, 10), (18, 10), (19, 10)]
-# Stabenden außerhalb der Hände
-STAFF_L = {(x, y) for y in range(16, 19) for x in range(0, 6) if SRC[y, x, 3]}
-STAFF_R = {(x, y) for y in range(11, 16) for x in range(26, SW) if SRC[y, x, 3]}
-
-
-def tilt(i):
-    """Federn der Stabenden (-2..2, beide gleich), Frame 0 = Ruhelage."""
-    return 1.8 * math.sin(2 * math.pi * i / 24)
+# Ohrspitzen (Spalten, Zeilen 2–3): zucken nach unten
+EAR_L = {(x, y) for y in (2, 3) for x in (9, 10) if SRC[y, x, 3]}
+EAR_R = {(x, y) for y in (2, 3) for x in (21, 22) if SRC[y, x, 3]}
+TWITCH = {6: 'l', 7: 'l', 22: 'r', 23: 'r', 36: 'lr', 37: 'lr'}
 
 
 def frame(i):
@@ -46,16 +41,14 @@ def frame(i):
                 s[y, x] = BLACK
     out = np.zeros((H, W, 4), int)
     b = BOUNCE12[i % 12]
-    t = tilt(i)
+    tw = TWITCH.get(i, '')
     for y in range(SH):
         for x in range(SW):
             if not s[y, x, 3]:
                 continue
             dy = b if y < KNEE else 0
-            if (x, y) in STAFF_L:
-                dy += int(round(t * (6 - x) / 6))
-            elif (x, y) in STAFF_R:
-                dy += int(round(t * (x - 25) / (SW - 26)))
+            if ((x, y) in EAR_L and 'l' in tw) or ((x, y) in EAR_R and 'r' in tw):
+                dy += 1
             out[y + PT + dy, x + P] = s[y, x]
     if b < 0:                                        # Zeile über dem Knie dehnen
         y = KNEE - 1
