@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""06 – Alice, the Puppeteer Girl (Entwurf v3).
+"""06 – Alice, the Puppeteer Girl (Entwurf v6).
 Idee: Nachts in Alices Zimmer im Herrenhaus. Alice steht groß auf dem violetten Läufer, die Arme
 ausgebreitet, an ihren Fäden sitzen ihre zwei Puppen. Der Raum dahinter liegt im Dunkeln – nur ihr
 eigener violetter Magieschein; in der Finsternis glühen die roten Puppenaugen (im Schrank, im Spiegel ...).
@@ -76,28 +76,45 @@ gm = gh8[291:302, 227:237, 3] > 0
 ghost[291 - RY0:302 - RY0, 227 - RX0:237 - RX0] = gm
 
 # Licht: violetter Schein um Alice, nach außen Finsternis (weich, im 2×-Raster)
-LX, LY = 62.5, 112
+LX, LY = 62.5, 106
 GLOW = np.array([64, 16, 104])
 dollm = np.zeros(bg.shape[:2], bool)                       # Puppen im Hintergrund (bleiben blass sichtbar)
 for sp in (ward, bed):
     dollm |= sp[RY0:RY0 + 175, RX0:RX0 + 125, 3] > 0
 for (px, py) in ((248, 311), (2 * AX - 248 - 8, 311)):
     dollm[py - RY0:py - RY0 + 12, px - RX0:px - RX0 + 8] |= stand[..., 3] > 0 if px == 248 else flip(stand)[..., 3] > 0
+ledge = np.zeros(bg.shape[:2], bool)
+pict = np.zeros(bg.shape[:2], bool); pict[257 - RY0:272 - RY0, 272 - RX0:289 - RX0] = True
 out = rgb.astype(float)
+EYE = np.array([255, 36, 56])
 for y in range(175):
     for x in range(125):
-        d = math.hypot((x + .5 - LX) / 52, (y + .5 - LY) / 50)
+        d = math.hypot((x + .5 - LX) / 54, (y + .5 - LY) / 58)
         t = max(0.0, 1 - d)
-        f = 0.13 + 0.80 * t ** 1.1
+        f = 0.07 + 0.88 * t ** 1.25
         c = out[y, x]
-        if emis[y, x]:
-            c = c * 1.0
+        if emis[y, x] and not ledge[y, x]:
+            c = c * 0.35 + EYE * 0.65 if c[0] > 200 else c * 1.1
+        elif emis[y, x]:
+            c = EYE * 0.8
         elif ghost[y, x]:
             c = c * 0.85 + np.array([0, 10, 20])
+        elif ledge[y, x]:
+            c = c * 0.16 + np.array([4, 2, 12])
         elif dollm[y, x]:
             c = c * max(f, 0.42) + np.array([4, 4, 16])
+        elif pict[y, x]:
+            c = c * max(f, 0.4)
         else:
-            c = c * f + GLOW * (t ** 2) * 0.4 + (1 - f) * np.array([5, 2, 14])
+            g = math.floor((t ** 1.5) * 4 + bay(x, y)) / 4          # violetter Schein in Stufen, gedithert
+            c = c * f + GLOW * g * 0.55 + (1 - f) * np.array([4, 1, 12])
+        # warmer Schein der Ofenglut (rechts) und kalter Schein des Spiegelgeists (links)
+        for (gx_, gy_, r_, col_, k_) in ((329 - RX0, 316.5 - RY0, 15, (255, 120, 40), 0.55),
+                                        (231.5 - RX0, 296 - RY0, 10, (150, 190, 230), 0.30)):
+            dd = math.hypot(x + .5 - gx_, (y + .5 - gy_) * 1.2) / r_
+            if dd < 1 and not emis[y, x]:
+                st = math.floor(((1 - dd) ** 1.5) * 3 + bay(x, y)) / 3   # 3 Stufen, gedithert
+                c = c + np.array(col_) * st * k_
         out[y, x] = c
 bgl = np.dstack([out.clip(0, 255).astype(np.uint8), np.full((175, 125), 255, np.uint8)])
 

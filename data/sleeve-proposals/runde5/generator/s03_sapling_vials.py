@@ -112,18 +112,34 @@ mw, mh = grid(3)
 mg = rgba(mw, mh)
 floor = layer(GW, 161)[140:156, 240:256]                 # 16×16-Kachel des Steinbodens
 HZ = 85
+FM = floor[..., :3].reshape(-1, 3).mean(0)
 for y in range(HZ, mh):
     for x in range(mw):
         c = floor[(y - HZ) % 16, x % 16, :3].astype(float)
+        c = FM + (c - FM) * 0.6                               # Steinkörnung beruhigen
         f = 0.42 + 0.3 * (y - HZ) / (mh - HZ)
         c = c * f * np.array([0.95, 0.9, 1.08])
         mg[y, x] = list(c.clip(0, 255).astype(np.uint8)) + [255]
 for x in range(mw):                                       # Nebelsaum am Horizont
     mg[HZ, x, :3] = (mg[HZ, x, :3] * 0.6 + np.array([90, 60, 110]) * 0.4).astype(np.uint8)
+# Lichtschein auf dem Boden: rotes Glimmen im Ritualring, warmes Kerzenlicht (auf dem 3×-Boden gedithert)
+def glow_a(arr, cx, cy, r, col, strength, ry=None):
+    col = np.array(col, float); ry = ry or r
+    for y in range(max(0, int(cy - ry)), min(arr.shape[0], int(cy + ry) + 1)):
+        for x in range(max(0, int(cx - r)), min(arr.shape[1], int(cx + r) + 1)):
+            d = math.hypot((x + .5 - cx) / r, (y + .5 - cy) / ry)
+            if d >= 1 or arr[y, x, 3] == 0: continue
+            q = min(math.floor((1 - d) ** 1.2 * strength * 4 + BAYER4[y % 4, x % 4]) / 4, strength)
+            if q > 0: arr[y, x, :3] = (arr[y, x, :3] * (1 - q) + col * q).astype(np.uint8)
+
+
+glow_a(mg, 41.7, 100.5, 30, (140, 20, 34), 0.35, ry=8)
 red = (tree[..., 0] > 120) & (tree[..., 1] < 60)
 treeD = tree.copy()
 treeD[..., :3] = np.where(red[..., None], tree[..., :3],
                           (tree[..., :3] * 0.72 + np.array([40, 20, 60]) * 0.28)).astype(np.uint8)
+teeth = tree[..., :3].min(-1) > 200
+treeD[teeth, :3] = (treeD[teeth, :3] * 0.72).astype(np.uint8)
 tx = -5
 put(mg, treeD, tx, HZ + 2 - tree.shape[0])
 put(mg, flip(treeD), mw - tx - tree.shape[1], HZ + 2 - tree.shape[0])
@@ -135,25 +151,37 @@ KX, KF = 13, 61                                          # Kyli links oben x, Fu
 ky = KF - kyli.shape[0]
 
 
-def ell(cx, cy, rx, ry, col, a=255, fill=False):
+def ell_outline(cx, cy, rx, ry, col):
+    """Ellipsenlinie, 1 Zelle breit, lückenlos (4-verbunden)."""
+    pts = []
+    for i in range(720):
+        t = math.radians(i / 2)
+        p = (int(math.floor(cx + rx * math.cos(t))), int(math.floor(cy + ry * math.sin(t))))
+        if not pts or p != pts[-1]:
+            if pts and abs(p[0] - pts[-1][0]) + abs(p[1] - pts[-1][1]) == 2: pts.append((p[0], pts[-1][1]))
+            pts.append(p)
+    for x, y in pts:
+        if 0 <= x < fw and 0 <= y < fh: fg[y, x] = list(col) + [255]
+    return pts
+
+
+def ell_fill(cx, cy, rx, ry, col, a):
     for y in range(int(cy - ry) - 1, int(cy + ry) + 2):
         for x in range(int(cx - rx) - 1, int(cx + rx) + 2):
-            d = ((x + .5 - cx) / rx) ** 2 + ((y + .5 - cy) / ry) ** 2
-            if 0 <= x < fw and 0 <= y < fh and d < 1:
-                if fill: fg[y, x] = list(col) + [a]
-                elif d > (1 - 1.9 / ry) and d > (1 - 1.9 / rx): fg[y, x] = list(col) + [a]
+            if 0 <= x < fw and 0 <= y < fh and ((x + .5 - cx) / rx) ** 2 + ((y + .5 - cy) / ry) ** 2 < 1:
+                fg[y, x] = list(col) + [a]
 
 
 # Ritualring (selbst gezeichnet, nach dem Kreis aus Kylis Occultism-Umfeld, ohne Pentagramm)
-RCX, RCY, RX, RY = 25, KF - 1.5, 17.5, 4.5
-ell(RCX, RCY, RX, RY, (96, 4, 2))
-for a in range(0, 360, 30):                               # Runenkerben innen
-    t = math.radians(a + 15)
-    x = int(RCX + (RX - 2.2) * math.cos(t)); y = int(RCY + (RY - 1.6) * math.sin(t))
-    if 0 <= y < fh: fg[y, x] = [140, 10, 10, 255]
-ell(KX + 12, KF, 8, 1.6, (8, 6, 14), 200, fill=True)      # Schatten unter Kyli
-put(fg, candle, int(RCX - RX) + 1, int(RCY) - 7)
-put(fg, candle, int(RCX + RX) - 3, int(RCY) - 7)
+RCX, RCY, RX, RY = 25, KF - 0.5, 17.5, 4.2
+ring_pts = ell_outline(RCX, RCY, RX, RY, (104, 6, 4))
+for k, a in enumerate(range(0, 360, 24)):                 # Runenkerben innen
+    t = math.radians(a + 12)
+    x = int(math.floor(RCX + (RX - 2) * math.cos(t))); y = int(math.floor(RCY + (RY - 1.3) * math.sin(t)))
+    if 0 <= y < fh and fg[y, x, 3] == 0: fg[y, x] = [150, 14, 12, 255] if k % 2 else [70, 2, 2, 255]
+ell_fill(KX + 12, KF - 0.2, 7, 1.3, (6, 4, 12), 150)       # Schatten unter Kyli
+put(fg, candle, int(RCX - RX), int(RCY) - 7)
+put(fg, candle, int(RCX + RX) - 1, int(RCY) - 7)
 put(fg, kyli, KX, ky)
 
 # Tränke: Ranken wachsen aus Kylis Geweih-Spitzen und halten die schwebenden Flaschen
@@ -178,7 +206,7 @@ def vine(pts):
         if fg[y, x, 3] == 0 or i > 0: fg[y, x] = list(VL if i % 2 == 0 else VD) + [255]
 
 
-def halo(s, x, y, col, alphas=(110, 50)):
+def halo(s, x, y, col, alphas=(48,)):
     h, w = s.shape[:2]
     m = np.zeros((h + 6, w + 6), bool); m[3:-3, 3:-3] = s[..., 3] > 0
     prev = m
@@ -204,6 +232,13 @@ vine([(tipC[0], tipC[1] - 1), (tipC[0] + 2, tipC[1] - 4), (PC[0] + 5, PC[1] + 12
 put(fg, pot_green, *PL)
 put(fg, pot_red, *PR)
 put(fg, pot_teal, *PC)
+# Rankenenden umgreifen die Flaschen wie ein Fruchtstiel (seitlich hochgebogen)
+CURL = [(4, 12), (3, 12), (2, 12), (1, 12), (1, 11), (0, 11), (0, 10), (-1, 10), (-1, 9), (-1, 8), (-1, 7),
+        (-1, 6), (-2, 6), (-2, 5)]
+for (bx_, by_), mirror in [(PL, False), (PR, True), (PC, False)]:
+    for i, (cx_, cy_) in enumerate(CURL):
+        X = bx_ + (9 - cx_ if mirror else cx_); Y = by_ + cy_
+        if fg[Y, X, 3] < 255: fg[Y, X] = list(VD if i % 2 == 0 else VL) + [255]
 
 cv = Canvas(W, H)
 blit(cv, bg, 2)

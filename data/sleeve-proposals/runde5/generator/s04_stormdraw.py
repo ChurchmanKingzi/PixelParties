@@ -11,13 +11,17 @@ Quellen:
   MotiveJapan.xcf  Ebene 112 „Gate to the Armory“ (falsch benannt: der Tornado aus dem Kartenbild).
   Motive.xcf       Ebene 584 „Ebene #696“ – Spielkarten vom Tisch aus „Card Game Player Inya“
                    (lila Heldenkarten, blaue, goldene und rote Karten).
-Selbst gezeichnet: Sturmhimmel, Wolkendecke, Regen, ferner Blitz, Ebene mit Fluss, Hügelkuppe, Windbänder,
-Staubwirbel, Bodenschatten.
+Selbst gezeichnet: Sturmhimmel mit heller Wolkenlücke, eingedrehte Mutterwolke, Wolkenkragen am Trichter,
+Regen, ferner Blitz, Ebene mit Fluss (wie im Kartenbild), Hügelkuppe, Windbahn (1 px, hell/dunkel),
+Staubwolke am Rüssel, Bodenschatten.
+Karten: nur drei (lila Heldenkarte = eigene Hand, blaue Karte = Gegner, goldene Karte oben = neu gezogen),
+nur um 90° gedreht, auf der Windbahn aufgereiht.
 
 Skalierung (Tiefenebenen):
-  Hintergrund (Himmel, Wolken, Regen, Blitz, Ebene, Fluss)             – 2×-Raster (125×175)
-  Mittelgrund (Tornado, Karten, Windbänder, Staub, Hügelkuppe)         – 4×-Raster (63×88)
-  Vordergrund (Champion + Schatten)                                    – 6×-Raster (42×59)
+  Hintergrund (Himmel, Wolken, Regen, Blitz, Ebene, Fluss)                  – 2×-Raster (125×175)
+  Mittelgrund (Tornado 32×50 → 96×150, Karten 8×11 → 24×33, Windbahn,
+               Wolkenkragen, Staub, Hügelkuppe)                            – 3×-Raster (84×117)
+  Vordergrund (Champion 28×31 → 168×186, Bodenschatten)                    – 6×-Raster (42×59)
 """
 import math, random
 import numpy as np
@@ -170,6 +174,20 @@ for x in range(bw):
     h = int(3 + 2.2 * math.sin(x * .07 + 1) + 1.5 * math.sin(x * .19))
     for y in range(HOR - h, HOR): bg.a[y, x] = (56, 72, 68) if y > HOR - h else (74, 92, 86)
 
+# Fluss aus dem Kartenbild: windet sich vom Horizont nach links vorn (spiegelt das Sturmlicht)
+for y in range(HOR + 1, bh):
+    d = (y - HOR) / (bh - HOR)
+    cx = 50 - 44 * d + 6 * math.sin(d * 6.5)
+    w = 0.8 + 11 * d ** 1.3
+    for x in range(int(cx - w - 1), int(cx + w) + 2):
+        if not 0 <= x < bw: continue
+        e = abs(x + .5 - cx) / w
+        if e > 1: continue
+        if e > .78: c = (38, 56, 66)
+        elif (x * 3 + y * 5) % 11 == 0 and e < .6: c = (140, 164, 160)
+        else: c = (56, 82, 98) if bayer(x, y) > d * .6 else (48, 70, 86)
+        bg.a[y, x] = c
+
 # Regen (2×-Raster, schräg, dezent aufgehellt)
 for _ in range(150):
     x, y = rnd.randrange(bw), rnd.randrange(0, bh)
@@ -208,7 +226,7 @@ def spiral(t):
 
 N = 1400
 path = [spiral(i / N) for i in range(N)]
-wind_f = [(206, 226, 218), (126, 152, 150)]
+wind_f = [(210, 230, 222), (58, 74, 80)]
 wind_b = [(80, 98, 102), (60, 76, 82)]
 
 
@@ -232,26 +250,30 @@ def card_at(t, key, rot=0, dark=0.0, dx=0, dy=0):
 
 
 draw_wind(False)
-card_at(0.36, 'red', 1, 0.55)                     # hinter dem Trichter
 put(mid, tornado, TX, TY)
-dust = [(78, 88, 82), (106, 114, 104), (136, 142, 128)]
-for n_, (rx, ry) in enumerate(((6, 1.2), (9, 2.0))):
-    for i in range(64):
-        a = i / 64 * math.pi * 2
-        if (i + n_) % 4 == 0: continue
-        setp(mid, int(round(tip[0] + math.cos(a) * rx)), int(round(tip[1] - 1 + math.sin(a) * ry)), dust[(i + n_) % 3])
+# Staubwolke am Fuß des Rüssels (flache, gewölbte Wolke, von links beleuchtet)
+dust = [(56, 66, 60), (80, 90, 82), (110, 118, 106), (140, 146, 130)]
+for x in range(tip[0] - 9, tip[0] + 10):
+    u = (x - tip[0]) / 9.5
+    h = (1 - u * u) * 3.2 + 0.8 * math.sin(x * 1.7)
+    top = tip[1] + 1 - h
+    for y in range(int(math.floor(top)), tip[1] + 2):
+        d = y - top
+        c = dust[3] if d < 1 and u < .2 else (dust[2] if d < 1.6 + bayer(x, y) else (dust[1] if d < 3 + bayer(x, y) else dust[0]))
+        setp(mid, x, y, c)
 # Wolkenkragen: der Trichter wächst aus der Mutterwolke (Wolkenwülste über den oberen Zeilen)
 ccol = [(34, 37, 52), (46, 51, 68), (66, 73, 90), (96, 106, 120)]
 for x in range(-1, TX + 40):
-    base = TY + 3 + 1.6 * math.sin(x * .55) + 1.2 * math.sin(x * 1.3 + 1)
+    u = (x - (TX + 15)) / 20
+    base = TY + 6 - 3 * abs(u) + 1.3 * math.sin(x * .55) + 1.0 * math.sin(x * 1.3 + 1)
     if x > TX + 30: base -= (x - TX - 30) * .7
     for y in range(TY - 14, int(base) + 1):
         d = int(base) - y
         c = ccol[3] if d == 0 else (ccol[2] if d < 2 + bayer(x, y) * 1.2 else (ccol[1] if d < 5 + bayer(x, y) * 2 else ccol[0]))
         setp(mid, x, y, c)
 draw_wind(True)
-card_at(0.17, 'purple0', 0)
-card_at(0.51, 'blue0', 1, dy=-3)
+card_at(0.17, 'purple0', 0, dx=2)
+card_at(0.51, 'blue0', 1, dx=-2, dy=-6)
 card_at(0.99, 'gold', 0)
 
 # Hügelkuppe rechts unten (Standfläche des Helden)

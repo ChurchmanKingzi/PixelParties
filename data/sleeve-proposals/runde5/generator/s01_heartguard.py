@@ -14,8 +14,9 @@ Quellen (MotiveMoe.xcf):
   - Cute Cat (Flügelkatze): Ebene 492 „Cute Cat“.
   - MOE-Bomb-Herz: Ebene 376 „MOE Bomb“ (Kartenausschnitt Szene 78), „M“-Emblem rot übermalt (kein Text).
   - Himmel: Ebene 553 „Hintergrund“ (MOE-Himmel mit Wölkchen), Wolkenfarben daraus.
-Selbst gezeichnet: Herzschild (Füllung, Ränder, Glanz, Aufprall-Leuchten), Explosionswolke, Fallspur,
-Wolkenbank, Himmelsverlauf.
+Selbst gezeichnet: Herzschild (Füllung, Ränder, Glanz, Gegenlicht, Aufprall-Leuchten), Explosion mit Rauchpuffs,
+Zündschnur-Rauch, Wolkenbank (Wulste von hinten nach vorn), Himmelsverlauf.
+Rahmen-Vorschlag: ornate / silver / rose / sapphire.
 
 Skalierung:  Hintergrund-Ebene (Himmel, Wolken, Herzschild, Kreaturen, Bomben, Effekte) 2× (125×175-Raster);
              Monia 5× (Vordergrund).
@@ -66,7 +67,7 @@ def heart_mask(cx, top, w):
 
 # ---------------------------------------------------------------- Himmel 2×
 bg = Canvas(W2, H2)
-bg.a[:] = layer(F, 553)[190:190 + H2, 60:60 + W2, :3]
+bg.a[:] = layer(F, 553)[270:270 + H2, 190:190 + W2, :3]
 # oben ins Tiefblaue (ruhig, lenkt zur Mitte): 6 Stufen, nur zwischen Nachbarstufen gedithert
 DARK = np.array([10, 26, 92])
 t = np.clip((84 - yy) / 84, 0, 1) ** 1.1 * 5
@@ -76,12 +77,20 @@ bg.a[:] = (bg.a * (1 - lv[..., None] / 5 * 0.85) + DARK * (lv[..., None] / 5 * 0
 # ---------------------------------------------------------------- Herzschild
 HX, HTOP, HW = 62.5, 32, 100
 hm = heart_mask(HX, HTOP, HW)
+# im Schild keine Himmelswölkchen (ruhige Fläche hinter Monias Kopf)
+f = (lv[hm] / 5 * 0.85)[:, None]
+bg.a[hm] = (np.array([0, 76, 199]) * (1 - f) + DARK * f).astype(np.uint8)
 inner = heart_mask(HX, HTOP + 1.1, HW - 2.4)
 rim = hm & ~inner
 outer = heart_mask(HX, HTOP - 1.1, HW + 2.4) & ~hm
 dist = cv2.distanceTransform(hm.astype(np.uint8), cv2.DIST_L2, 5)
 alpha = np.where(hm, 0.30 + 0.40 * np.clip(1 - dist / 10, 0, 1) ** 1.5, 0)
 bg.a[:] = (bg.a * (1 - alpha[..., None]) + np.array(PINK) * alpha[..., None]).astype(np.uint8)
+# Gegenlicht hinter Monia: hellerer Kern im Schild (3 Stufen, gedithert)
+gd = np.hypot((xx - HX) / 1.0, (yy - (HTOP + 42)) / 1.15)
+gt = np.clip(1 - gd / 34, 0, 1) * 3
+gl_lv = np.floor(gt + B4[yy % 4, xx % 4] - 0.5).clip(0, 3) * inner
+bg.a[:] = (bg.a * (1 - gl_lv[..., None] * 0.15) + np.array(PINK_L) * (gl_lv[..., None] * 0.15)).astype(np.uint8)
 # Glanz: Sichelband im linken Lappen und kleiner Punkt im rechten (wie beim Kartenherz)
 g1 = inner & heart_mask(HX - 3, HTOP + 3, HW - 12) & ~heart_mask(HX + 1, HTOP + 6, HW - 12) & (xx < HX - 6) & (yy < HTOP + 40)
 bg.a[g1] = (bg.a[g1] * 0.35 + np.array(WHITE) * 0.65).astype(np.uint8)
@@ -129,12 +138,13 @@ for k in range(10):
 
 # ---------------------------------------------------------------- fallende Herzbombe oben rechts
 bx, by = 86, 13
-for k in range(9):          # Fallspur: zwei Striche, nach oben ausdünnend
-    y = by - 1 - k
-    if k < 6 or k % 2 == 0:
-        bg.px(bx + 7, y, (170, 200, 250))
-    if k < 4 or (k < 7 and k % 2 == 0):
-        bg.px(bx + 11, y + 2, (120, 165, 235))
+# Zündschnur-Rauch: drei kleiner werdende Wölkchen, die hinter der fallenden Bombe zurückbleiben
+for (px0, py0, shape, col) in ((bx + 1, by - 3, 'plus', (215, 225, 245)), (bx - 1, by - 7, 'quad', (170, 195, 240)),
+                               (bx, by - 10, 'dot', (120, 160, 230))):
+    pts = {'plus': [(0, 0), (1, 0), (-1, 0), (0, 1), (0, -1)], 'quad': [(0, 0), (1, 0), (0, 1), (1, 1)],
+           'dot': [(0, 0)]}[shape]
+    for dx, dy in pts:
+        bg.px(px0 + dx, py0 + dy, col)
 bg.paste(bomb, bx, by)
 
 # ---------------------------------------------------------------- Deko-Herzen (Kartenmotiv), symmetrisch
