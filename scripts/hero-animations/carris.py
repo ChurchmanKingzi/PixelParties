@@ -10,8 +10,9 @@ Aufruf: python3 carris.py <tag> [ms] [hero|little]
 * Die Ohren zucken ab und zu: hero – das linke Ohr kippt oben 1 px (ganze
   Zeilen), die Spitze des rechten sackt 1 px ab (ganze Spalten), so
   entstehen keine Lücken; little – die Ohrspitzen kippen 1 px nach außen.
-* hero:   die große Taschenuhr in seiner Hand hebt und senkt sich mit ihr
-          beim Atmen und tickt (der lange Zeiger springt alle
+* hero:   die große Taschenuhr in seiner Pfote hebt und senkt sich mit ihr
+          beim Atmen; einmal pro Loop hebt er Pfote samt Uhr 2 px an, hält sie
+          kurz (schaut nach der Zeit) und senkt sie wieder. Die Uhr tickt (der lange Zeiger springt alle
           4 Frames eine Stunde weiter, die Uhr läuft einmal pro Loop herum),
           das herabhängende Kettenende schwingt sachte (zeilenweise, unten
           stärker); er tippt ungeduldig mit dem rechten Fuß.
@@ -35,6 +36,7 @@ if V == 'hero':
     EAR_L = [(x, y) for y in range(0, 3) for x in range(0, 22)]          # obere Zeilen, ganz
     EAR_R = [(x, y) for y in range(2, 6) for x in range(29, 32)]         # Spitze, ganze Spalten
     FOOT = [(x, y) for y in (21, 22) for x in range(23, 28)]
+    PAW = [(x, y) for y in range(12, 16) for x in range(15, 18)]       # Pfote an der Uhr
 else:
     BODY = np.array(Image.open('src/little-carris.png').convert('RGBA')).astype(int)
     WATCH = None
@@ -44,6 +46,7 @@ else:
     EAR_L = [(x, y) for y in range(0, 2) for x in range(3, 8)]
     EAR_R = [(x, y) for y in range(0, 2) for x in range(14, 19)]
     FOOT = []
+    PAW = []
 SH, SW = BODY.shape[:2]
 P, PT, PB = 4, 4, 3
 H, W = SH + PT + PB, SW + 2 * P
@@ -58,6 +61,13 @@ BLINK = {14: 'halb', 15: 'zu', 16: 'zu', 17: 'halb', 38: 'halb', 39: 'zu', 40: '
 EAR_TWITCH = {6: 'l', 7: 'l', 30: 'r', 31: 'r'}
 TAP = {20, 21, 24, 25}                               # Fuß hebt sich (hero)
 TAIL = [(x, y) for y in range(9, 15) for x in range(0, 4)] if V == 'little' else []   # senkrechter Teil (x4 = Umriss der Hand)
+
+
+def raise_watch(i):
+    """Pfote samt Uhr anheben (nur hero): hoch, ansehen, wieder senken."""
+    if WATCH is None:
+        return 0
+    return {24: -1, 25: -2, 26: -2, 27: -2, 28: -2, 29: -2, 30: -2, 31: -2, 32: -2, 33: -1}.get(i, 0)
 
 
 def breath(i):
@@ -101,14 +111,14 @@ def frame(i):
     out = np.zeros((H, W, 4), int)
     b = breath(i)
     if WATCH is not None:                            # Taschenuhr in seiner Hand, hebt sich mit
-        w = watch(i, b)
+        w = watch(i, b + raise_watch(i))
         m = w[:, :, 3] > 0
         out[m] = w[m]
-    ear_l, ear_r, tail, foot = set(EAR_L), set(EAR_R), set(TAIL), set(FOOT)
+    ear_l, ear_r, tail, foot, paw = set(EAR_L), set(EAR_R), set(TAIL), set(FOOT), set(PAW)
     tw = EAR_TWITCH.get(i)
     for y in range(SH):
         for x in range(SW):
-            if not s[y, x, 3]:
+            if not s[y, x, 3] or (x, y) in paw:
                 continue
             dx, dy = 0, (b if y < FEET_Y else 0)
             if V == 'hero' and tw == 'l' and (x, y) in ear_l:
@@ -127,6 +137,9 @@ def frame(i):
         for x in range(SW):
             if s[y, x, 3] and not out[y + PT, x + P, 3]:
                 out[y + PT, x + P] = s[y, x]
+    for x, y in PAW:                                 # Pfote liegt auf der Uhr
+        if s[y, x, 3]:
+            out[y + PT + b + raise_watch(i), x + P] = s[y, x]
     fill_pinholes(out)
     return out
 

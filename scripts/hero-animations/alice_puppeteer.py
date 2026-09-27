@@ -10,8 +10,9 @@ Teile: src/alice-the-puppeteer-girl-{body,puppets}.png (deckungsgleich).
 * Alice atmet: der ganze Oberkörper samt Händen hebt sich im Rhythmus um
   1 px, gedehnt wird das Kleid (Zeile 20), nicht der Hals.
 * Ihre Augen sind im Sprite lächelnd geschlossen (^-förmig). Zweimal pro
-  Loop gehen sie auf und zeigen ihre blauen Augen (Wimpernstrich oben, darunter
-  Blau mit hellem Glanz); dazwischen kurz ein gerader Lidstrich als Übergang.
+  Loop gehen sie auf und zeigen ihre blauen Augen (wie überall in Pixel
+  Parties je eine Spalte Weiß und eine Spalte Farbe); dazwischen kurz ein
+  gerader Lidstrich als Übergang.
 """
 import math
 import sys
@@ -67,11 +68,12 @@ def puppet_mask(left):
 PUP_L, PUP_R = puppet_mask(True), puppet_mask(False)
 STR_L, STR_R = set(STRING_L), set(STRING_R)
 BREATH_Y = 20                                        # bis hier hebt sich der Oberkörper
-BLUE, BLUE_HI = rgb('2f6fe8'), rgb('9fd8ff')
+WHITE, BLUE, BLUE_DK = rgb('f6ffff'), rgb('2f6fe8'), rgb('1f4fc0')
+# offene Augen wie überall in Pixel Parties: links eine Spalte Weiß, rechts eine Spalte Farbe
 EYE_STATES = {'strich': {(17, 8): SKIN, (22, 8): SKIN, (16, 9): BLACK, (17, 9): BLACK, (18, 9): SKIN,
                          (21, 9): SKIN, (22, 9): BLACK, (23, 9): BLACK},
-              'offen': {(17, 8): BLACK, (18, 8): BLACK, (21, 8): BLACK, (22, 8): BLACK,
-                        (17, 9): BLUE, (18, 9): BLUE_HI, (21, 9): BLUE_HI, (22, 9): BLUE}}
+              'offen': {(17, 8): WHITE, (17, 9): WHITE, (18, 8): BLUE_DK, (18, 9): BLUE,
+                        (21, 8): WHITE, (21, 9): WHITE, (22, 8): BLUE_DK, (22, 9): BLUE}}
 EYES = {10: 'strich', 20: 'strich', 34: 'strich', 42: 'strich'}
 EYES.update({i: 'offen' for i in list(range(11, 20)) + list(range(35, 42))})
 
