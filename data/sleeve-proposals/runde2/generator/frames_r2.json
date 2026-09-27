@@ -1,0 +1,52 @@
+{
+ "01_guardian_zodiac.png": [
+  "Guardian Zodiac",
+  "ornate",
+  "lacquer",
+  "jade",
+  "topaz"
+ ],
+ "03_puppet_theater.png": [
+  "Puppet Theater",
+  "arch",
+  "lacquer",
+  "topaz"
+ ],
+ "04_spider_nest.png": [
+  "Spider Nest",
+  "bone",
+  "bone",
+  "ruby"
+ ],
+ "05_pharaoh_tomb.png": [
+  "Pharaoh's Tomb",
+  "meander",
+  "gold",
+  "sapphire"
+ ],
+ "07_gigantisaur_comic.png": [
+  "Gigantisaur Comic",
+  "double",
+  "bronze",
+  "emerald"
+ ],
+ "08_detective_board.png": [
+  "Detective Board",
+  "moulding",
+  "wood",
+  "ruby"
+ ],
+ "09_cycling_demons.png": [
+  "Cycling Demons",
+  "twist",
+  "gothic",
+  "ruby"
+ ],
+ "10_divine_balance.png": [
+  "Divine Balance",
+  "filigree",
+  "gold",
+  "topaz",
+  "sapphire"
+ ]
+}

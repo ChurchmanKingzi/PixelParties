@@ -1727,7 +1727,12 @@ function DraggablePanel({ children, className, style }) {
 //  dass sie unverzerrt zum Betrachter zeigt (Drehachse an den Füßen,
 //  Winkel aus der gemessenen Matrix der Brettebene). Ohne Neigung
 //  (Telefon, Engpass-Rückfall) ist er 0° — die Figur liegt dann flach.
-//  Seit v1451 außerdem 1,5× größer (Als Vorgabe 27.9.: „zu klein").
+//  Seit v1451 außerdem 1,5× größer (Als Vorgabe 27.9.: „zu klein"),
+//  seit v1452 nochmals 1,5× (2,25 Kartenpixel je Sprite-Pixel), am
+//  Gesicht ausgerichtet (`faceX`), und beim Hover über die Heldenkarte
+//  zieht sich die Figur wie ein Hologramm zurück, damit die
+//  Status-Icons frei sichtbar sind. v1453: nochmals +25 %, Füße auf
+//  der Kartenmitte, Zurückziehen ohne Hologramm-Optik.
 // ═══════════════════════════════════════════
 const HeroIdleAnims = (() => {
   // Slug-Regel wie bei den Effekt-Skripten und den Sheet-Dateinamen.
@@ -1763,7 +1768,7 @@ const HeroIdleAnims = (() => {
     const pL = meta.padLeft || 0, pR = meta.padRight || 0, pT = meta.padTop || 0, pB = meta.padBottom || 0;
     const rueckfall = { x0: pL, y0: pT, x1: fw - pR, y1: fh - pB };
     try {
-      const w = img.naturalWidth, h = img.naturalHeight;
+      const w = img.naturalWidth || img.width, h = img.naturalHeight || img.height;
       const c = document.createElement('canvas');
       c.width = w; c.height = h;
       const ctx = c.getContext('2d', { willReadFrequently: true });
@@ -1779,8 +1784,71 @@ const HeroIdleAnims = (() => {
           if (ly < y0) y0 = ly; if (ly >= y1) y1 = ly + 1;
         }
       }
-      return x1 > x0 && y1 > y0 ? { x0, y0, x1, y1 } : rueckfall;
+      if (!(x1 > x0 && y1 > y0)) return rueckfall;
+      // Rückfall für die Waagrechte, falls ein Sheet (noch) kein `faceX`
+      // hat: Schwerpunkt der deckenden Pixel im obersten Drittel der
+      // Figur — dort sitzt meist der Kopf. Schwerpunkt statt Mitte des
+      // Umrisses, weil Waffen, Haare und Umhänge den Umriss einseitig
+      // verbreitern (genau das verschob Kazena und Locke).
+      const kopfBis = y0 + Math.max(1, Math.round((y1 - y0) / 3));
+      let summe = 0, n = 0;
+      for (let y = 0; y < h; y++) {
+        for (let x = 0; x < w; x++) {
+          if (d[(y * w + x) * 4 + 3] < 160) continue;
+          const lx = vertikal ? x : x % fw, ly = vertikal ? y % fh : y;
+          if (ly < kopfBis) { summe += lx + 0.5; n++; }
+        }
+      }
+      // ★ v1459: Körperpunkte für Status-Partikel (Flammen, Tropfen):
+      // Pixel, die in mindestens 60 % der Frames deckend sind — dort ist
+      // die Figur „fest", Partikel bleiben also auf dem Körper, auch wenn
+      // sie sich bewegt. Höchstens 400, fest verwürfelt.
+      const frames = Math.max(1, meta.frames | 0);
+      const zaehler = new Uint16Array(fw * fh);
+      for (let y = 0; y < h; y++) {
+        for (let x = 0; x < w; x++) {
+          if (d[(y * w + x) * 4 + 3] < 160) continue;
+          const lx = vertikal ? x : x % fw, ly = vertikal ? y % fh : y;
+          zaehler[ly * fw + lx]++;
+        }
+      }
+      let punkte = [];
+      const schwelle = Math.max(1, Math.round(frames * 0.6));
+      for (let i = 0; i < zaehler.length; i++) if (zaehler[i] >= schwelle) punkte.push([i % fw, Math.floor(i / fw)]);
+      let saat = (fw * 2654435761) ^ (fh * 40503);
+      for (let i = punkte.length - 1; i > 0; i--) {
+        saat = (Math.imul(saat, 1103515245) + 12345) | 0;
+        const j = ((saat >>> 8) & 0xffffff) % (i + 1);
+        const t = punkte[i]; punkte[i] = punkte[j]; punkte[j] = t;
+      }
+      punkte = punkte.slice(0, 400);
+      return { x0, y0, x1, y1, kopfX: n ? summe / n : (x0 + x1) / 2, punkte };
     } catch { return rueckfall; }
+  }
+
+  // ★ v1456 (Als Vorgabe 27.9.: „Das Gas von Medea sollte sogar noch
+  // transparenter sein"): `alphaScale` im Sheet-JSON multipliziert die
+  // Deckkraft aller HALBtransparenten Pixel (Gas, Rauch, Auren); voll
+  // deckende Pixel — Körper, Gesicht — bleiben unberührt. Einmal beim
+  // Laden; die PNGs bleiben unangetastet.
+  function halbtransparenzSkalieren(meta, img) {
+    const f = Number(meta.alphaScale);
+    if (!(f > 0) || f === 1) return img;
+    try {
+      const w = img.naturalWidth || img.width, h = img.naturalHeight || img.height;
+      const c = document.createElement('canvas');
+      c.width = w; c.height = h;
+      const ctx = c.getContext('2d', { willReadFrequently: true });
+      ctx.drawImage(img, 0, 0);
+      const bild = ctx.getImageData(0, 0, w, h);
+      const d = bild.data;
+      for (let i = 3; i < d.length; i += 4) {
+        const a = d[i];
+        if (a > 0 && a < 255) d[i] = Math.max(1, Math.min(254, Math.round(a * f)));
+      }
+      ctx.putImageData(bild, 0, 0);
+      return c;
+    } catch { return img; }
   }
 
   function hole(key) {
@@ -1791,7 +1859,12 @@ const HeroIdleAnims = (() => {
       if (!meta) { if (liste) fertig.set(key, null); else eintraege.delete(key); return null; }
       return new Promise(res => {
         const img = new Image();
-        img.onload = () => { const e = { meta, img, kern: kernRahmen(meta, img) }; fertig.set(key, e); res(e); };
+        img.onload = () => {
+          // Geometrie aus dem ORIGINAL, damit `alphaScale` nichts verschiebt
+          const kern = kernRahmen(meta, img);
+          const e = { meta, img: halbtransparenzSkalieren(meta, img), kern };
+          fertig.set(key, e); res(e);
+        };
         img.onerror = () => { fertig.set(key, null); res(null); };
         img.src = meta.sheetUrl;
       });
@@ -1809,11 +1882,28 @@ const HeroIdleAnims = (() => {
     for (const s of schritte) { try { s(now); } catch {} }
     if (schritte.size) raf = requestAnimationFrame(tick);
   }
-  function anmelden(schritt) {
+  const diagnose = new Map();   // Schritt → { held, frames, st, zustand }
+  function anmelden(schritt, info) {
     schritte.add(schritt);
+    if (info) diagnose.set(schritt, info);
     try { ebeneAbgleichen(); } catch {}
     if (!raf) raf = requestAnimationFrame(tick);
-    return () => { schritte.delete(schritt); };
+    return () => { schritte.delete(schritt); diagnose.delete(schritt); };
+  }
+  // Konsolenhilfe (v1456): Zustand aller Figuren auf dem Brett.
+  if (typeof window !== 'undefined') {
+    window.ppHeldenAnimationen = () => {
+      const zeilen = [...diagnose.values()].map(d => ({
+        Held: d.held,
+        Frame: `${d.st.frame + 1}/${d.frames}`,
+        Schritte: d.st.schritte,
+        angehalten: !!d.zustand.current.angehalten,
+        versteinert: !!d.zustand.current.versteinert,
+        Fehler: d.st.fehler || '',
+      }));
+      try { console.table(zeilen); } catch {}
+      return zeilen;
+    };
   }
 
   // ── Sprite-Ebene (v1451) ─────────────────────────────────────
@@ -1915,7 +2005,7 @@ const HeroIdleAnims = (() => {
     let cv = null;
     try {
       const { img, meta } = e;
-      const w = img.naturalWidth, h = img.naturalHeight;
+      const w = img.naturalWidth || img.width, h = img.naturalHeight || img.height;
       const fw = meta.frameWidth, fh = meta.frameHeight;
       const vertikal = meta.layout === 'vertical';
       cv = document.createElement('canvas');
@@ -1990,14 +2080,382 @@ function HeroSpriteEbene() {
   return <div className="hero-sprite-ebene" ref={HeroIdleAnims.setzeEbene} aria-hidden="true" />;
 }
 
+// ★ v1457 — EIS um eingefrorene Figuren (Als Vorgabe 27.9.: „bei Frozen
+// Heroes sollte ein visueller Eisblock um sie herum gezeichnet werden").
+// Nötig, weil große Figuren das Eis-Overlay und das Abzeichen ihrer Karte
+// verdecken — Waflav stand eingefroren still und sah aus wie ein Fehler.
+//
+// ★ v1458 (Als Befund 27.9.: „Besonders bei großen Figuren sieht der
+// Eisblock noch gar nicht gut aus — Eistextur oder detailreicher"): statt
+// eines Rechtecks eine EISKRUSTE, die der Silhouette folgt. Eingefrorene
+// Figuren stehen ohnehin in ihrem Frame still, also wird die Kruste genau
+// auf diesen Frame zugeschnitten:
+//   • Silhouette des Frames, rund um 3 px verbreitert, oben ein paar
+//     Eiszacken;
+//   • kristalline Facetten (Voronoi, feste Pixelgröße — große Figuren
+//     bekommen also MEHR Facetten statt größerer Flächen), jede mit
+//     eigenem Blauton, von oben links beleuchtet, Bayer-gedithert;
+//   • helle Facettenkanten, Glanzstriche, Raureif am Fuß;
+//   • Pixelkontur: hell, wo Licht von oben/links kommt, sonst dunkel.
+// Über der Figur halbtransparent (tönt sie bläulich), im Rand daneben
+// dichter, damit das Eis als Körper lesbar ist.
+const EIS_BAYER = [[0, 8, 2, 10], [12, 4, 14, 6], [3, 11, 1, 9], [15, 7, 13, 5]];
+const EIS_TOENE = [[58, 112, 182], [96, 160, 226], [142, 202, 246], [192, 232, 255], [238, 250, 255]];
+function maleEiskruste(ctx, quelle, w, h, fussY) {
+  const a = quelle.data;
+  const N = w * h;
+  const figur = new Uint8Array(N);
+  for (let i = 0; i < N; i++) figur[i] = a[i * 4 + 3] > 60 ? 1 : 0;
+  // 1) Silhouette um R = 3 px verbreitern (runder Pinsel)
+  const R = 3, maske = new Uint8Array(N);
+  const pinsel = [];
+  for (let dy = -R; dy <= R; dy++) for (let dx = -R; dx <= R; dx++) if (dx * dx + dy * dy <= R * R + 1) pinsel.push([dx, dy]);
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      if (!figur[y * w + x]) continue;
+      for (const [dx, dy] of pinsel) {
+        const nx = x + dx, ny = y + dy;
+        if (nx >= 0 && ny >= 0 && nx < w && ny < h) maske[ny * w + nx] = 1;
+      }
+    }
+  }
+  // Unter der Standlinie kein Eis (die Kruste steht auf der Karte)
+  const boden = Math.min(h, Math.max(1, Math.round(fussY)));
+  for (let y = boden; y < h; y++) for (let x = 0; x < w; x++) maske[y * w + x] = 0;
+  // 2) Eiszacken auf der Oberkante, fest aus der Größe gesät
+  let saat = (w * 73856093) ^ (h * 19349663) ^ 0x5bd1e995;
+  const zufall = () => { saat = (Math.imul(saat, 1103515245) + 12345) | 0; return ((saat >>> 8) & 0xffff) / 65536; };
+  const oben = new Int32Array(w).fill(-1);
+  for (let x = 0; x < w; x++) for (let y = 0; y < h; y++) if (maske[y * w + x]) { oben[x] = y; break; }
+  const spalten = [];
+  for (let x = 2; x < w - 2; x++) if (oben[x] >= 0) spalten.push(x);
+  const nZacken = Math.min(9, Math.max(2, Math.round(spalten.length / 11)));
+  for (let z = 0; z < nZacken && spalten.length; z++) {
+    const cx = spalten[Math.floor(zufall() * spalten.length)];
+    const hoch = 3 + Math.floor(zufall() * 4), halb = 1 + Math.floor(zufall() * 2);
+    const fuss = oben[cx];
+    for (let k = 0; k < hoch; k++) {
+      const y = fuss - k - 1, breite = Math.max(0, Math.round(halb * (1 - k / hoch)));
+      if (y < 0) break;
+      for (let dx = -breite; dx <= breite; dx++) { const x = cx + dx; if (x >= 0 && x < w) maske[y * w + x] = 1; }
+    }
+  }
+  // 3) Facetten: Voronoi auf verwürfeltem Raster
+  const zelle = w * h > 6000 ? 12 : (w * h > 2500 ? 9 : 7);
+  const gx = Math.ceil(w / zelle) + 1, gy = Math.ceil(h / zelle) + 1;
+  const kx = new Float32Array(gx * gy), ky = new Float32Array(gx * gy), kt = new Float32Array(gx * gy);
+  for (let j = 0; j < gy; j++) for (let i = 0; i < gx; i++) {
+    const n = j * gx + i;
+    kx[n] = (i + 0.15 + zufall() * 0.7) * zelle;
+    ky[n] = (j + 0.15 + zufall() * 0.7) * zelle;
+    kt[n] = zufall();
+  }
+  const bild = ctx.createImageData(w, h);
+  const d = bild.data;
+  const setze = (i, f, al) => { d[i * 4] = f[0]; d[i * 4 + 1] = f[1]; d[i * 4 + 2] = f[2]; d[i * 4 + 3] = Math.round(al * 255); };
+  const drin = (x, y) => x >= 0 && y >= 0 && x < w && y < h && maske[y * w + x];
+  let yMin = h, yMax = 0;
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) if (maske[y * w + x]) { if (y < yMin) yMin = y; if (y > yMax) yMax = y; }
+  const hoehe = Math.max(1, yMax - yMin);
+  const facette = new Int32Array(N).fill(-1);
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const i = y * w + x;
+      if (!maske[i]) continue;
+      const ci = Math.floor(x / zelle), cj = Math.floor(y / zelle);
+      let d1 = 1e9, d2 = 1e9, n1 = -1;
+      for (let dj = -1; dj <= 1; dj++) for (let di = -1; di <= 1; di++) {
+        const ii = ci + di, jj = cj + dj;
+        if (ii < 0 || jj < 0 || ii >= gx || jj >= gy) continue;
+        const n = jj * gx + ii, ex = x + 0.5 - kx[n], ey = y + 0.5 - ky[n], q = ex * ex + ey * ey;
+        if (q < d1) { d2 = d1; d1 = q; n1 = n; } else if (q < d2) d2 = q;
+      }
+      facette[i] = n1;
+      const kante = Math.sqrt(d2) - Math.sqrt(d1) < 1.05;
+      // Helligkeit: Grundton der Facette + Licht von oben links + Höhe
+      const lx = (kx[n1] - x) / zelle, ly = (ky[n1] - y) / zelle;
+      let t = 0.3 + kt[n1] * 0.38 + (lx + ly) * 0.1 + (1 - (y - yMin) / hoehe) * 0.18;
+      t = Math.max(0, Math.min(1, t));
+      const stufe = t * 3;
+      let k = Math.floor(stufe);
+      if (stufe - k > (EIS_BAYER[y & 3][x & 3] + 0.5) / 16) k++;
+      k = Math.min(3, k);
+      const ueberFigur = figur[i] === 1;
+      // Über der Figur zurückhaltend (sie soll lesbar bleiben), im Rand
+      // daneben dichter, damit das Eis als Körper lesbar ist.
+      if (kante) setze(i, EIS_TOENE[4], ueberFigur ? 0.32 : 0.75);
+      else setze(i, EIS_TOENE[k], ueberFigur ? 0.3 : 0.58);
+    }
+  }
+  // 4) Glanzstriche in jeder dritten Facette der oberen zwei Drittel
+  for (let n = 0; n < gx * gy; n++) {
+    if (kt[n] > 0.34) continue;
+    const sx = Math.round(kx[n] - 2), sy = Math.round(ky[n] + 1);
+    if (sy > yMin + hoehe * 0.7) continue;
+    const laenge = 2 + Math.round(kt[n] * 6);
+    for (let q = 0; q < laenge; q++) {
+      const x = sx + q, y = sy - q;
+      if (drin(x, y) && facette[y * w + x] === n) setze(y * w + x, EIS_TOENE[4], 0.9);
+    }
+  }
+  // 5) Raureif am Fuß
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      if (!maske[y * w + x]) continue;
+      if (!drin(x, y + 2) && (EIS_BAYER[y & 3][x & 3] + 0.5) / 16 < 0.55) setze(y * w + x, EIS_TOENE[4], 0.85);
+    }
+  }
+  // 6) Kontur: hell, wo oben/links frei ist, sonst dunkel
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      if (!maske[y * w + x]) continue;
+      const obenFrei = !drin(x, y - 1), linksFrei = !drin(x - 1, y);
+      const untenFrei = !drin(x, y + 1) && y + 1 < boden, rechtsFrei = !drin(x + 1, y);
+      if (obenFrei || linksFrei) setze(y * w + x, [226, 248, 255], 0.95);
+      else if (untenFrei || rechtsFrei) setze(y * w + x, EIS_TOENE[0], 0.95);
+    }
+  }
+  ctx.putImageData(bild, 0, 0);
+}
+// Die Kruste wird aus dem gerade stehenden Frame der Figur gemalt. Beim
+// Aufbau laufen Kind-Effekte VOR dem Effekt, der den ersten Frame malt —
+// deshalb wird gewartet, bis die Figur sichtbar ist.
+function HeroEiskruste({ quelleRef, breite, hoehe, fussY, stil, schmilzt }) {
+  const ref = useRef(null);
+  useEffect(() => {
+    let versuche = 0, raf = 0, aus = false;
+    const male = () => {
+      raf = 0;
+      if (aus) return;
+      const cv = ref.current, quelle = quelleRef.current;
+      if (!cv || !quelle) return;
+      try {
+        const q = quelle.getContext('2d').getImageData(0, 0, breite, hoehe);
+        let sichtbar = false;
+        for (let i = 3; i < q.data.length; i += 16) if (q.data[i] > 60) { sichtbar = true; break; }
+        if (!sichtbar && versuche++ < 30) { raf = requestAnimationFrame(male); return; }
+        maleEiskruste(cv.getContext('2d'), q, breite, hoehe, fussY);
+      } catch {}
+    };
+    male();
+    return () => { aus = true; if (raf) cancelAnimationFrame(raf); };
+  }, [quelleRef, breite, hoehe, fussY]);
+  return <canvas ref={ref} width={breite} height={hoehe}
+    className={'hero-idle-eis' + (schmilzt ? ' hero-idle-eis-schmilzt' : '')} style={stil} />;
+}
+
+// ═══════════════════════════════════════════
+//  ★ v1459 — STATUSEFFEKTE AN DEN FIGUREN (Als Vorgabe 27.9.: „auch die
+//  anderen Statuseffekte auf die Sprites anwenden. Stunned kleine Blitze
+//  um den Sprite herum, Burned Flammen überall auf dem Sprite, Poisoned
+//  ein lilaner Tint und kleine Totenschädel, die über dem Sprite
+//  aufsteigen usw.").
+//  Die Karten-Overlays bleiben; große Figuren verdecken sie aber, darum
+//  zeigt die Figur ihre Status selbst:
+//    Tönung (im Canvas, nur auf den Pixeln der Figur): Poisoned lila,
+//      Burned warm-orange, Berserked rot, Heal Reversed giftgrün,
+//      Negated entsättigt.
+//    Partikel (Effekt-Ebene, steht aufrecht wie die Figur, schneidet
+//      nichts ab): Stunned Blitze um Kopf und Oberkörper, Burned Flammen
+//      auf dem Körper, Poisoned aufsteigende Totenschädel, Bleeding
+//      fallende Blutstropfen, Berserked dunkle Funken, Heal Reversed
+//      grün-violette Funken mit Schädeln, Webbed ein rotes Netz.
+//    v1460: Cursed flasht lila, Geister und Schädel steigen auf;
+//      Charmed flasht pink, Herzen steigen auf.
+//  Frozen (Eiskruste) und Petrified (Stein) haben eigene Wege.
+// ═══════════════════════════════════════════
+const HERO_TOENUNGEN = [
+  { status: 'negated',      grau: 0.8 },
+  { status: 'poisoned',     farbe: 'rgba(150,60,215,0.38)' },
+  { status: 'burned',       farbe: 'rgba(255,110,30,0.2)' },
+  { status: 'berserked',    farbe: 'rgba(205,25,40,0.24)' },
+  { status: 'healReversed', farbe: 'rgba(110,255,150,0.14)' },
+  // ★ v1460 (Als Vorgabe 27.9.): Cursed „flasht lila", Charmed pink —
+  // pulsierende Tönung (Stärke zwischen min und max, siehe `puls` im
+  // Zeichenschritt).
+  { status: 'cursed',       puls: [150, 40, 225], min: 0.06, max: 0.55 },
+  { status: 'charmed',      puls: [255, 85, 190], min: 0.06, max: 0.5 },
+];
+
+// kleiner fester Zufall je Figur und Effekt
+function heroFxZufall(saatText) {
+  let h = 2166136261;
+  for (const ch of saatText) { h ^= ch.charCodeAt(0); h = Math.imul(h, 16777619); }
+  return () => {
+    h = (h + 0x6D2B79F5) | 0;
+    let t = Math.imul(h ^ (h >>> 15), 1 | h);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+// Pixel-Spinnennetz über dem Umriss der Figur (Webbed)
+function maleNetz(ctx, w, h, kern, mitteX) {
+  const bild = ctx.createImageData(w, h);
+  const d = bild.data;
+  const setze = (x, y, a) => {
+    x = Math.round(x); y = Math.round(y);
+    if (x < 0 || y < 0 || x >= w || y >= h) return;
+    const i = (y * w + x) * 4;
+    d[i] = 200; d[i + 1] = 24; d[i + 2] = 44; d[i + 3] = Math.max(d[i + 3], Math.round(a * 255));
+  };
+  const linie = (x0, y0, x1, y1, a) => {
+    const n = Math.max(1, Math.ceil(Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0))));
+    for (let k = 0; k <= n; k++) setze(x0 + (x1 - x0) * k / n, y0 + (y1 - y0) * k / n, a);
+  };
+  const bx0 = Math.max(0, kern.x0 - 2), bx1 = Math.min(w - 1, kern.x1 + 1);
+  const by0 = Math.max(0, kern.y0 - 2), by1 = Math.min(h - 1, kern.y1);
+  const cx = Math.min(bx1, Math.max(bx0, mitteX)), cy = by0 + (by1 - by0) * 0.38;
+  const speichen = 10, enden = [];
+  for (let k = 0; k < speichen; k++) {
+    const a = (k / speichen) * Math.PI * 2 + 0.2;
+    const dx = Math.cos(a), dy = Math.sin(a);
+    // bis zum Rand des Kastens
+    const tx = dx > 0 ? (bx1 - cx) / dx : dx < 0 ? (bx0 - cx) / dx : 1e9;
+    const ty = dy > 0 ? (by1 - cy) / dy : dy < 0 ? (by0 - cy) / dy : 1e9;
+    const t = Math.min(tx, ty);
+    enden.push([cx + dx * t, cy + dy * t]);
+    linie(cx, cy, cx + dx * t, cy + dy * t, 0.85);
+  }
+  for (const f of [0.22, 0.45, 0.7, 0.92]) {
+    for (let k = 0; k < speichen; k++) {
+      const [ax, ay] = enden[k], [bx, by] = enden[(k + 1) % speichen];
+      const p0 = [cx + (ax - cx) * f, cy + (ay - cy) * f], p1 = [cx + (bx - cx) * f, cy + (by - cy) * f];
+      // leicht durchhängend: über einen zur Mitte gezogenen Zwischenpunkt
+      const mx = (p0[0] + p1[0]) / 2, my = (p0[1] + p1[1]) / 2;
+      const zx = mx + (cx - mx) * 0.12, zy = my + (cy - my) * 0.12;
+      linie(p0[0], p0[1], zx, zy, 0.7);
+      linie(zx, zy, p1[0], p1[1], 0.7);
+    }
+  }
+  ctx.putImageData(bild, 0, 0);
+}
+function HeroNetz({ fw, fh, kern, mitteX, stil }) {
+  const ref = useRef(null);
+  useEffect(() => {
+    const cv = ref.current;
+    if (!cv) return;
+    try { maleNetz(cv.getContext('2d'), fw, fh, kern, mitteX); } catch {}
+  }, [fw, fh, kern, mitteX]);
+  return <canvas ref={ref} width={fw} height={fh} className="hfx-netz" style={stil} />;
+}
+
+// Die Partikel. Lagen in Frame-Pixeln (× Maßstab), Größen in Karten-
+// pixeln (× --board-scale), damit sie bei allen Figuren gleich groß sind.
+function HeroStatusPartikel({ effekte, kern, s, mitteX, fw, fh, saat }) {
+  const cw = Math.max(1, kern.x1 - kern.x0), ch = Math.max(1, kern.y1 - kern.y0);
+  const punkte = kern.punkte && kern.punkte.length ? kern.punkte : [[mitteX, kern.y0 + ch / 2]];
+  const px = (n) => `calc(${+n.toFixed(3)}px * var(--board-scale))`;
+  const lage = (x, y) => ({ left: px(x * s), top: px(y * s) });
+  const flaeche = cw * ch * s * s;
+  const teile = useMemo(() => {
+    const aus = [];
+    const hat = (k) => effekte.includes(k);
+    if (hat('stunned')) {
+      const z = heroFxZufall(saat + 'stun');
+      // Anzahl und Größe wachsen mit der Figur (bei Bubbles sonst winzig)
+      const breitePx = cw * s, mass = Math.max(1, Math.min(2, breitePx / 70));
+      const n = Math.max(6, Math.min(12, Math.round(breitePx / 12)));
+      const cy = kern.y0 + ch * 0.28, rx = cw * 0.5 + 4, ry = ch * 0.28 + 3;
+      for (let i = 0; i < n; i++) {
+        const a = (i / n) * Math.PI * 2 + z() * 0.6;
+        aus.push({ art: 'blitz', x: mitteX + Math.cos(a) * rx, y: cy + Math.sin(a) * ry,
+          groesse: (14 + z() * 8) * mass, dauer: 0.9 + z() * 0.7, verz: z() * 1.4, dreh: (z() - 0.5) * 70 });
+      }
+    }
+    if (hat('burned')) {
+      const z = heroFxZufall(saat + 'feuer');
+      const n = Math.max(5, Math.min(18, Math.round(flaeche / 1100)));
+      const auswahl = punkte.filter(p => p[1] < kern.y1 - 1).slice(0, n);
+      for (const [x, y] of auswahl) {
+        aus.push({ art: 'flamme', x: x + 0.5, y: y + 1, groesse: 11 + z() * 7, dauer: 0.45 + z() * 0.4, verz: z() * 0.8 });
+      }
+    }
+    if (hat('poisoned')) {
+      const z = heroFxZufall(saat + 'gift');
+      const n = 5;
+      for (let i = 0; i < n; i++) {
+        aus.push({ art: 'schaedel', x: kern.x0 + cw * (0.15 + 0.7 * ((i + z() * 0.8) / n)), y: kern.y0 + ch * (0.12 + z() * 0.2),
+          groesse: 10 + z() * 4, dauer: 2.2 + z() * 1.2, verz: (i / n) * 2.6 + z() * 0.4 });
+      }
+    }
+    if (hat('bleeding')) {
+      const z = heroFxZufall(saat + 'blut');
+      const n = Math.max(4, Math.min(9, Math.round(cw * s / 12)));
+      const auswahl = punkte.filter(p => p[1] < kern.y0 + ch * 0.75).slice(0, n);
+      for (const [x, y] of auswahl) {
+        aus.push({ art: 'tropfen', x: x + 0.5, y: y + 0.5, dauer: 1.3 + z() * 0.9, verz: z() * 2 });
+      }
+    }
+    // ★ v1460: Cursed — kleine Geister und Totenschädel steigen auf;
+    // Charmed — Herzen steigen auf.
+    if (hat('cursed') || hat('charmed')) {
+      for (const art of ['cursed', 'charmed']) {
+        if (!hat(art)) continue;
+        const z = heroFxZufall(saat + art);
+        const n = 7;
+        for (let i = 0; i < n; i++) {
+          const zeichen = art === 'cursed' ? (i % 2 ? '💀' : '👻') : (z() < 0.5 ? '❤' : '💕');
+          aus.push({ art: 'schaedel', zeichen, x: kern.x0 + cw * (0.12 + 0.76 * ((i + z() * 0.8) / n)),
+            y: kern.y0 + ch * (0.15 + z() * 0.35), groesse: 10 + z() * 5,
+            dauer: 2.0 + z() * 1.2, verz: (i / n) * 2.4 + z() * 0.4 });
+        }
+      }
+    }
+    if (hat('berserked') || hat('healReversed')) {
+      const bers = hat('berserked');
+      const z = heroFxZufall(saat + (bers ? 'wut' : 'umkehr'));
+      const n = 8;
+      for (let i = 0; i < n; i++) {
+        const farbe = bers ? (z() < 0.5 ? '#9b3cff' : '#ff3a2a') : (z() < 0.5 ? '#66ff99' : '#cc66ff');
+        const schaedel = !bers && z() < 0.25;
+        aus.push({ art: schaedel ? 'schaedel' : 'funke', farbe, x: kern.x0 + cw * z(), y: kern.y0 + ch * (0.3 + z() * 0.6),
+          groesse: schaedel ? 9 : 6 + z() * 4, dauer: 1.4 + z() * 1.0, verz: z() * 2.4 });
+      }
+    }
+    return aus;
+  }, [effekte, kern, s, mitteX, saat]);
+  return (
+    <>
+      {effekte.includes('webbed') && (
+        <HeroNetz fw={fw} fh={fh} kern={kern} mitteX={mitteX}
+          stil={{ left: 0, top: 0, width: px(fw * s), height: px(fh * s) }} />
+      )}
+      {teile.map((t, i) => {
+        const stil = { ...lage(t.x, t.y), animationDuration: t.dauer + 's', animationDelay: t.verz + 's' };
+        if (t.art === 'tropfen') return <span key={i} className="hfx hfx-tropfen" style={stil} />;
+        if (t.dreh != null) stil['--hfx-dreh'] = t.dreh + 'deg';
+        if (t.farbe) stil.color = t.farbe;
+        const zeichen = t.zeichen || (t.art === 'blitz' ? '⚡' : t.art === 'flamme' ? '🔥' : t.art === 'schaedel' ? '💀' : '✦');
+        return (
+          <span key={i} className={'hfx hfx-' + t.art} style={stil}>
+            <PxZeichen z={zeichen} groesse={px(t.groesse)} einfarbig={t.art === 'funke'} />
+          </span>
+        );
+      })}
+    </>
+  );
+}
+
 // Eine Idle-Animation, die auf dem oberen Kartendrittel einer Heldenzone
 // steht. In der Zone selbst liegt nur ein unsichtbarer Anker; die Figur
 // wird in die Sprite-Ebene portiert und folgt der Zone dort (Lage,
 // Hover-Vergrößerung).
 // `angehalten`: Frame bleibt stehen (Frozen/Stunned/Webbed).
 // `versteinert`: zusätzlich Steinoptik (kriecht von unten nach oben).
-function HeroIdleSprite({ cardName, angehalten, versteinert, unsichtbar }) {
+// `eingefroren`: zusätzlich eine Eiskruste um die Figur (v1457/v1458).
+// `effekte`: weitere Status als Leerzeichen-Liste (Tönung + Partikel, v1459).
+function HeroIdleSprite({ cardName, angehalten, versteinert, eingefroren, effekte, unsichtbar }) {
   const key = HeroIdleAnims.slug(cardName);
+  // Eisblock: 'da' solange Frozen, danach kurz 'schmilzt' (zerspringt),
+  // dann 'weg'.
+  const [eisPhase, setEisPhase] = useState(eingefroren ? 'da' : 'weg');
+  useEffect(() => {
+    if (eingefroren) { setEisPhase('da'); return undefined; }
+    setEisPhase(p => (p === 'da' ? 'schmilzt' : p));
+    const t = setTimeout(() => setEisPhase('weg'), 450);
+    return () => clearTimeout(t);
+  }, [eingefroren]);
   const [eintrag, setEintrag] = useState(() => HeroIdleAnims.schonDa(key) || null);
   useEffect(() => {
     let lebt = true;
@@ -2017,6 +2475,7 @@ function HeroIdleSprite({ cardName, angehalten, versteinert, unsichtbar }) {
   const zustand = useRef({ angehalten, versteinert });
   zustand.current.angehalten = !!angehalten;
   zustand.current.versteinert = !!versteinert;
+  zustand.current.effekte = effekte || '';
 
   useEffect(() => {
     const cv = canvasRef.current, platz = platzRef.current, anker = ankerRef.current;
@@ -2056,8 +2515,38 @@ function HeroIdleSprite({ cardName, angehalten, versteinert, unsichtbar }) {
           ctx.restore();
         }
       }
+      // ★ v1459: Status-Tönungen, nur auf den Pixeln der Figur
+      // (`source-atop`); Negated entsättigt. Nicht über Stein.
+      const eff = zustand.current.effekte || '';
+      if (eff && !stein) {
+        ctx.save();
+        for (const t of HERO_TOENUNGEN) {
+          if (!eff.includes(t.status)) continue;
+          if (t.grau) {
+            ctx.globalCompositeOperation = 'saturation';
+            ctx.fillStyle = `rgba(128,128,128,${t.grau})`;
+            ctx.fillRect(0, 0, fw, fh);
+            // die Sättigungs-Mischung malt auch leere Pixel an —
+            // zurück auf die Form der Figur
+            ctx.globalCompositeOperation = 'destination-in';
+            ctx.drawImage(img, sx, sy, fw, fh, 0, 0, fw, fh);
+          } else {
+            ctx.globalCompositeOperation = 'source-atop';
+            if (t.puls) {
+              const [r, g, b] = t.puls;
+              ctx.fillStyle = `rgba(${r},${g},${b},${(t.min + (t.max - t.min) * (st.puls || 0) / 8).toFixed(3)})`;
+            } else {
+              ctx.fillStyle = t.farbe;
+            }
+            ctx.fillRect(0, 0, fw, fh);
+          }
+        }
+        ctx.restore();
+      }
       st.gemalt = st.frame;
       st.steinGemalt = st.stein;
+      st.effekteGemalt = eff;
+      st.pulsGemalt = st.puls;
     };
     // Der Platz deckt sich in der Sprite-Ebene mit der Zone in der
     // Brettebene; die Hover-Vergrößerung der Zone (`--board-hover-scale`)
@@ -2081,26 +2570,43 @@ function HeroIdleSprite({ cardName, angehalten, versteinert, unsichtbar }) {
         && !l.plane.hasAttribute('data-pp-dragging'));
       if (hover !== st.hover) {
         st.hover = hover;
+        // ★ v1452 (Als Vorgabe 27.9.): Hovert man die Heldenkarte, zieht
+        // sich die Figur wie ein Hologramm in die Karte zurück — die
+        // Status-Icons darunter werden frei. Beim Verlassen taucht sie
+        // wieder auf. Seit v1453 nur noch die BEWEGUNG einer Projektion,
+        // ohne Hologramm-Optik (Tönung, Scanlines, Flackern). `hero-idle-zurueck` trägt nur die Auftauch-
+        // Animation und fällt an deren Ende weg (siehe animationend).
         platz.classList.toggle('hero-idle-hover', hover);
+        platz.classList.toggle('hero-idle-zurueck', !hover);
       }
     };
-    folgeZone();
-    male();
-    // Scharfe Pixel beim Vergrößern, weiches Verkleinern (`pixelated`
-    // verschluckt beim Verkleinern ganze Pixelzeilen, vgl. v1449). Der
-    // tatsächliche Maßstab hängt an `--board-scale`, Projektion und
-    // Bildschirmdichte, deshalb gemessen statt gerechnet.
-    const pruefeSchaerfe = () => {
-      const breite = cv.getBoundingClientRect().width * (window.devicePixelRatio || 1);
-      cv.style.imageRendering = breite >= fw * 0.98 ? 'pixelated' : 'auto';
+    const holo = platz.querySelector('.hero-idle-holo');
+    const auftauchenFertig = (e) => {
+      if (e.animationName === 'heroHoloAuftauchen') platz.classList.remove('hero-idle-zurueck');
     };
-    pruefeSchaerfe();
-    const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(pruefeSchaerfe) : null;
-    if (ro) ro.observe(cv);
+    if (holo) holo.addEventListener('animationend', auftauchenFertig);
+    // ★ v1456 (Als Befund 27.9.: Swampborne Waflav „beginnt auf einem
+    // Frame — nicht jedes Mal demselben — und bleibt dort"): genau das
+    // Bild, wenn der erste Frame gemalt wird, die Schleife aber nie
+    // weiterschaltet. Deshalb: ZUERST anmelden, im Schritt ZUERST den
+    // Frame weiterzählen, und alles Übrige (Zonenlage, Malen, Schärfe)
+    // einzeln abgesichert — ein Fehler dort darf die Animation nicht
+    // mehr anhalten. Tritt einer auf, meldet die Konsole ihn einmal mit
+    // Heldennamen; `ppHeldenAnimationen()` zeigt den Zustand aller Figuren.
+    const sicher = (was, fn) => {
+      try { fn(); } catch (err) {
+        st.fehler = was + ': ' + (err && err.message ? err.message : String(err));
+        if (!st.gewarnt) {
+          st.gewarnt = true;
+          try { console.warn('[Helden-Animation] ' + (meta.hero || '?') + ' — ' + st.fehler, err); } catch {}
+        }
+      }
+    };
+    st.schritte = 0;
     const abmelden = HeroIdleAnims.anmelden((now) => {
       const dt = st.zuletzt == null ? 0 : Math.min(now - st.zuletzt, 1000);
       st.zuletzt = now;
-      folgeZone();
+      st.schritte++;
       const z = zustand.current;
       if (!z.angehalten) {
         st.rest += dt;
@@ -2112,9 +2618,39 @@ function HeroIdleSprite({ cardName, angehalten, versteinert, unsichtbar }) {
       }
       if (z.versteinert) { if (st.stein < 1) st.stein = Math.min(1, st.stein + dt / 900); }
       else st.stein = 0;
-      if (st.frame !== st.gemalt || st.stein !== st.steinGemalt) male();
-    });
-    return () => { abmelden(); if (ro) ro.disconnect(); };
+      sicher('Zonenlage', folgeZone);
+      // Pulsierende Tönung (Cursed/Charmed): kurzes Aufflashen je
+      // 1,2 s, in acht Stufen — gemalt wird nur beim Stufenwechsel.
+      const effNun = zustand.current.effekte || '';
+      if (effNun.includes('cursed') || effNun.includes('charmed')) {
+        const phase = (now % 1200) / 1200;
+        const welle = Math.pow(Math.max(0, Math.sin(phase * Math.PI * 2)), 2);
+        st.puls = Math.round(welle * 8);
+      } else st.puls = 0;
+      if (st.frame !== st.gemalt || st.stein !== st.steinGemalt
+        || effNun !== st.effekteGemalt || st.puls !== st.pulsGemalt) sicher('Malen', male);
+    }, { held: meta.hero || '?', frames, st, zustand });
+    sicher('Zonenlage', folgeZone);
+    sicher('Malen', male);
+    // Scharfe Pixel beim Vergrößern, weiches Verkleinern (`pixelated`
+    // verschluckt beim Verkleinern ganze Pixelzeilen, vgl. v1449). Der
+    // tatsächliche Maßstab hängt an `--board-scale`, Projektion und
+    // Bildschirmdichte, deshalb gemessen statt gerechnet.
+    const pruefeSchaerfe = () => {
+      const breite = cv.getBoundingClientRect().width * (window.devicePixelRatio || 1);
+      cv.style.imageRendering = breite >= fw * 0.98 ? 'pixelated' : 'auto';
+    };
+    sicher('Schärfe', pruefeSchaerfe);
+    let ro = null;
+    try {
+      ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(() => sicher('Schärfe', pruefeSchaerfe)) : null;
+      if (ro) ro.observe(cv);
+    } catch { ro = null; }
+    return () => {
+      abmelden();
+      if (ro) ro.disconnect();
+      if (holo) holo.removeEventListener('animationend', auftauchenFertig);
+    };
   }, [eintrag, ebene]);
 
   const anker = <span ref={ankerRef} className="hero-idle-anker" />;
@@ -2122,42 +2658,83 @@ function HeroIdleSprite({ cardName, angehalten, versteinert, unsichtbar }) {
   const { meta, kern } = eintrag;
   const fw = meta.frameWidth, fh = meta.frameHeight;
   const cw = Math.max(1, kern.x1 - kern.x0), ch = Math.max(1, kern.y1 - kern.y0);
-  // Maßstab: 1,5 Kartenpixel je Sprite-Pixel (v1451, vorher 1), große
-  // Sprites eingepasst in 90 × 45 — die halbe Kartenhöhe, weil die Figur
-  // jetzt aufrecht über der Karte steht statt das Drittel zu bedecken.
-  const s = Math.min(1.5, 90 / cw, 45 / ch);
+  // Maßstab: 2,8125 Kartenpixel je Sprite-Pixel für ALLE Helden (v1453:
+  // nochmals +25 %; v1452: 2,25, v1451: 1,5, v1450: 1 — Als Vorgabe
+  // 27.9.). ★ v1454: keine Einpassung großer Sprites mehr (Als Vorgabe
+  // 27.9.: „Größere Sprites werden runterskaliert und wirken dadurch
+  // deutlich kleiner als normale Menschen wie Lilly") — ein Sprite-Pixel
+  // ist bei jedem Helden gleich groß, Bubbles & Co. stehen also in ihrer
+  // echten Größe neben den anderen.
+  // ★ v1455: `boardScale` im Sheet-JSON ist ein Faktor für Einzelfälle
+  // (Als Vorgabe 27.9.: Bubbles in voller Größe „geht so gar nicht, der
+  // sitzt viel zu hoch und wird fast komplett abgeschnitten").
+  const s = 2.8125 * (Number(meta.boardScale) > 0 ? Number(meta.boardScale) : 1);
   const bs = (n) => `${+n.toFixed(3)}px * var(--board-scale)`;
-  // Kartenoberkante = Zonenmitte − 45; die Füße stehen auf der
-  // Drittellinie (Oberkante + 30), die Figur ist waagrecht mittig.
-  // Der Steher reicht vom oberen Sheet-Rand bis zu den Füßen; seine
-  // Unterkante ist die Drehachse, darunter wird abgeschnitten.
+  // ★ v1452 (Als Vorgabe 27.9.): „Sofern nicht anders angegeben, bildet
+  // immer das GESICHT des Heroes den Bildmittelpunkt." Reihenfolge:
+  // `anchorX` (ausdrücklich anders angegeben) → `faceX` (Gesichtsmitte,
+  // je Sheet vermessen) → Kopf-Schwerpunkt (Rückfall). Alle in
+  // Frame-Pixeln, gemessen von der linken Frame-Kante.
+  const zahl = (v) => (typeof v === 'number' && Number.isFinite(v) ? v : null);
+  const mitteX = zahl(meta.anchorX) ?? zahl(meta.faceX) ?? zahl(kern.kopfX) ?? (kern.x0 + cw / 2);
+  // ★ v1453 (Als Vorgabe 27.9.: „weiter nach unten, auf die Mitte der
+  // Karten"): die Füße stehen auf der KARTENMITTE (= Zonenmitte), nicht
+  // mehr auf der Drittellinie; das Gesicht steht waagrecht über der Mitte.
+  // ★ v1455 — Standlinie `footY` (Frame-Pixel von oben), das Gegenstück
+  // zu `faceX` für die Senkrechte (Als Vorgabe 27.9.: Medea „sitzt
+  // deutlich zu hoch auf der Karte, wegen der SCHLANGEN unten um sie
+  // herum"). Ohne Angabe gilt wie bisher das unterste deckende Pixel.
+  // Was UNTER der Standlinie liegt (Medeas Schlangen), wird nicht mehr
+  // abgeschnitten: der Steher reicht bis zum untersten deckenden Pixel,
+  // gedreht wird aber um die Standlinie.
+  const fussY = zahl(meta.footY) ?? kern.y1;
+  const unterkante = Math.max(fussY, kern.y1);
+  const drehpunkt = `50% calc(${bs(fussY * s)})`;
   const steherStil = {
     width: `calc(${bs(fw * s)})`,
-    height: `calc(${bs(kern.y1 * s)})`,
-    left: `calc(50% - ${bs((kern.x0 + cw / 2) * s)})`,
-    top: `calc(50% - ${bs(15 + kern.y1 * s)})`,
-    ...(unsichtbar ? { opacity: 0.4 } : null),
+    height: `calc(${bs(unterkante * s)})`,
+    left: `calc(50% - ${bs(mitteX * s)})`,
+    top: `calc(50% - ${bs(fussY * s)})`,
+    transformOrigin: drehpunkt,
   };
   const canvasStil = {
     width: `calc(${bs(fw * s)})`,
     height: `calc(${bs(fh * s)})`,
   };
+  // Eiskruste: deckungsgleich mit dem Sprite-Canvas, Drehpunkt an den
+  // Füßen (dort wächst sie beim Einfrieren hoch)
+  const eisStil = { ...canvasStil, left: 0, top: 0, transformOrigin: drehpunkt };
+  // Effekt-Ebene (v1459): gleiche Lage und Drehung wie der Steher, aber
+  // ohne Beschnitt — Schädel steigen über den Kopf, Blitze umkreisen ihn.
+  const fxStil = { left: steherStil.left, top: steherStil.top, width: steherStil.width,
+    height: steherStil.height, transformOrigin: drehpunkt };
   const schattenBreite = Math.max(8, cw * s * 0.8);
   const schattenStil = {
     width: `calc(${bs(schattenBreite)})`,
     left: `calc(50% - ${bs(schattenBreite / 2)})`,
-    ...(unsichtbar ? { opacity: 0.4 } : null),
   };
   return (
     <>
       {anker}
       {ReactDOM.createPortal(
         <div ref={platzRef} data-held={cardName}
-          className={'hero-idle-platz' + (versteinert ? ' hero-idle-stein' : '') + (angehalten ? ' hero-idle-angehalten' : '')}>
+          className={'hero-idle-platz' + (versteinert ? ' hero-idle-stein' : '') + (angehalten ? ' hero-idle-angehalten' : '') + (unsichtbar ? ' hero-idle-unsichtbar' : '')}>
           <div className="hero-idle-schatten" style={schattenStil} />
           <div className="hero-idle-steher" style={steherStil}>
-            <canvas ref={canvasRef} width={fw} height={fh} className="hero-idle-canvas" style={canvasStil} />
+            <div className="hero-idle-holo" style={{ transformOrigin: drehpunkt }}>
+              <canvas ref={canvasRef} width={fw} height={fh} className="hero-idle-canvas" style={canvasStil} />
+              {eisPhase !== 'weg' && (
+                <HeroEiskruste quelleRef={canvasRef} breite={fw} hoehe={fh} fussY={fussY}
+                  stil={eisStil} schmilzt={eisPhase === 'schmilzt'} />
+              )}
+            </div>
           </div>
+          {effekte && (
+            <div className="hero-idle-fx" style={fxStil}>
+              <HeroStatusPartikel effekte={effekte} kern={kern} s={s} mitteX={mitteX}
+                fw={fw} fh={fh} saat={key} />
+            </div>
+          )}
         </div>,
         ebene)}
     </>
@@ -40683,6 +41260,23 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     cardName={(formPreview && formPreview.owner === pi && formPreview.heroIdx === i
                       && CARDS_BY_NAME[formPreview.cardName]) ? formPreview.cardName : hero.name}
                     angehalten={!!(isFrozen || isStunned)}
+                    eingefroren={!!isFrozen}
+                    effekte={[
+                      // v1459: dieselben Bedingungen wie die Karten-Overlays
+                      hero.statuses?.stunned && !isStunned?._petrified && !isStunned?._baihuPetrify ? 'stunned' : '',
+                      hero.statuses?.webbed ? 'webbed' : '',
+                      isBurned ? 'burned' : '',
+                      isPoisoned ? 'poisoned' : '',
+                      isBleeding ? 'bleeding' : '',
+                      isNegated && !isNegated._byWeakeningCrystal ? 'negated' : '',
+                      isBerserked ? 'berserked' : '',
+                      isHealReversed ? 'healReversed' : '',
+                      // v1460: nur der echte Status, nicht die dauerhafte
+                      // Übernahme (permaControlBy), die ebenfalls als
+                      // „charmed" gerahmt wird
+                      isCursed ? 'cursed' : '',
+                      hero.statuses?.charmed ? 'charmed' : '',
+                    ].filter(Boolean).join(' ')}
                     versteinert={!!(isStunned?._petrified || isStunned?._baihuPetrify)}
                     unsichtbar={!!isInvisible} />
                 )}

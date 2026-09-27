@@ -9,5 +9,7 @@
   "layout": "horizontal",
   "padTop": 24,
   "padLeft": 9,
-  "padRight": 9
+  "padRight": 9,
+  "faceX": 68,
+  "boardScale": 0.5
 }

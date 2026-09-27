@@ -6,5 +6,6 @@
   "frames": 32,
   "frameMs": 90,
   "loop": true,
-  "layout": "horizontal"
+  "layout": "horizontal",
+  "faceX": 15.5
 }

@@ -117,6 +117,23 @@ Variante ohne Krone/Flügel), Hintergründe/Auren der Karte gehören nicht zum S
   `layout` und – falls die Leinwand gegenüber dem Original vergrößert wurde –
   `padTop`/`padLeft`/`padRight`/`padBottom`. Um diesen Rand muss die Animation
   verschoben werden, damit sie deckungsgleich mit dem statischen Sprite liegt.
+* **`faceX`** (Pflicht für neue Sheets): waagrechte Mitte des **Gesichts** in
+  Frame-Pixeln, gemessen von der linken Frame-Kante (Kommazahlen erlaubt,
+  z. B. `12.5`). Auf dem Brett steht das Gesicht genau über der Kartenmitte –
+  Haare, Waffen oder Umhänge verschieben den Helden dadurch nicht mehr.
+  Fehlt `faceX`, nimmt das Brett den Schwerpunkt des obersten Figurendrittels.
+* **`anchorX`** (optional): ausdrücklich abweichender Bildmittelpunkt in
+  denselben Einheiten; hat Vorrang vor `faceX` („sofern nicht anders
+  angegeben, ist das Gesicht die Mitte").
+* **`footY`** (optional): Standlinie in Frame-Pixeln von oben – hier steht
+  der Held auf der Kartenmitte. Ohne Angabe gilt das unterste deckende
+  Pixel. Nötig, wenn unter den Füßen noch etwas liegt (Medeas Schlangen);
+  dieser Teil wird nicht abgeschnitten, sondern liegt vor dem Helden.
+* **`boardScale`** (optional): Größenfaktor auf dem Brett für Ausreißer
+  (Bubbles: `0.5`). Sonst stehen alle Helden im selben Maßstab.
+* **`alphaScale`** (optional): Faktor auf die Deckkraft aller
+  halbtransparenten Pixel (Gas, Rauch, Auren) auf dem Brett; voll deckende
+  Pixel bleiben, wie sie sind. `< 1` = durchsichtiger (Medea: `0.55`).
 * Gemeinsame Helfer (Glitzersterne, Lichtschimmer, Speichern, 1-px-Ring) in
   `anim_common.py`, Flügelschlag (Drehung ums Schultergelenk bzw. spaltentreue
   Scherung für sehr kleine Flügel, Lochfüller) in `flap_common.py`.

@@ -10,7 +10,7 @@ Verworfen (Bilder in `verworfen/`, Skripte bleiben im Generator): 02 Army of the
 
 | Nr. | Sleeve | Verwendete Karten |
 |---|---|---|
-| 01 | **Guardian Zodiac** – die zwölf Guardian Beasts als Tierkreis-Medaillons (Ratte oben, im Uhrzeigersinn), Yin-Yang in der Mitte | alle 12 „Guardian Beast …“, Charm of Balance (Yin-Yang, Steinboden), Guard Duty (Ziegelband), Guardian Beast Tu (Labyrinthmuster) |
+| 01 | **Guardian Zodiac** – die zwölf Guardian Beasts spiegelsymmetrisch im Oval um die Yin-Yang-Scheibe, nach Größe gepaart (Shu oben, Zhu unten, She und Ma an den Seiten) | alle 12 „Guardian Beast …“, Charm of Balance (Yin-Yang, Steinboden), Guard Duty (Ziegelband), Guardian Beast Tu (Labyrinthmuster) |
 | 03 | **Puppet Theater** – Tri Ad & Tri Fecta auf ihren Brücken, sechs Puppets an Fäden, Laki unter dem Regenbogen | alle 6 Puppet-Karten, Tri Ad the Puppet Mistress, Tri Fecta the Puppet Master (Vorhang, Bordüre, Bühne, Fadenfarben) |
 | 04 | **Spider Nest** – Crimson Skull Spider am roten Faden in der Netzmitte, dazu Baby-, Brain-, Diamond- und Cute Spider | Trapping (Netz, Viertel gespiegelt), Crimson Skull Spider, Brain/Diamond/Cute Spider, Spider Hive (Höhlenboden) |
 | 05 | **Pharaoh Tomb** – Grabwand mit dem Auge von Ren, Totenmaske, Ushabti, Mumienwächtern, Anubis und Urnen | Ushabti of the Great Pharaoh, The Eye of Ren, Soul Shard Ren, Noble Mummy Guards, Soul Shard Khet, Sarcophagus of Sealed Magic |
@@ -28,3 +28,10 @@ z. B. `python3 s03_puppets.py`; das PNG landet in diesem Ordner.
   Flood-Fill (`cutf`), Farbregel (`cutrule`), Farbproben (`cut2`), Fäden entfernen (`string_mask`),
   Medaillons (`disc`), Spiegeln/Kacheln, Umfärben, Speichern
 - `s01_zodiac.py` … `s10_balance.py` – je ein Sleeve
+
+## Überarbeitung (Runde 2b) und Shop
+Alle acht Sleeves wurden nach den Runde-3-Regeln neu gebaut (xcf-Sprites, einheitliche Pixelgröße, vollständige
+Figuren; Details in `notes_R2b.md`, Vorgaben in `BRIEF_R2b.md`), mit `runde3/generator/frames2.py` gerahmt
+(Zuordnung in `generator/frames_r2.json`, Skript `generator/frame_r2.py`) und liegen unter englischem Namen in `final/` und im Shop:
+guardian-zodiac, puppet-theater, spider-nest, pharaohs-tomb, gigantisaur-comic, detective-board, cycling-demons,
+divine-balance (Anzeigenamen in `data/shop/sleeve-names.json`). Übersicht: `00_overview_final.png`.

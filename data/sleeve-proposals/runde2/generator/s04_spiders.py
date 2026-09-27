@@ -1,80 +1,137 @@
 # -*- coding: utf-8 -*-
-"""Sleeve: Spinnennest – das Netz aus „Trapping“ (Viertel gespiegelt, gedreht), darin die Spinnen direkt
-aus den Ebenen von MotiveGN.xcf (Repo PixelPartiesSprites): Crimson Skull Spider am roten Faden, Brain-,
-Diamond- und Cute Spider, kleine Spinnen aus „Spider Hive“. Felsboden: Ebene „Klippen“."""
+"""Sleeve: Spinnennest – ein großes Radnetz vor dunklem Fels, in der Nabe die Crimson Skull Spider an
+ihrem roten Faden, ringsum Brain-, Diamond- und Cute Spider sowie kleine Spinnen aus „SPODDERS“.
+Quellen (Repo PixelPartiesSprites):
+  Netz      MotiveGrailWar.xcf „Trapping #1“ (273): weiße Netzpixel der oberen Hälfte, senkrecht
+            gespiegelt (untere Hälfte ist dort von der gefangenen Figur verdeckt), um 90° gedreht;
+            Haltefäden = verlängerte Speichen des Netzes (1 Kartenpixel breit); alle hellen Fäden (Netz,
+            Brain-Spider-Faden) hell-dunkel gedithert wie die Puppenfäden, der rote Faden ist es auf der Karte schon
+  Spinnen   MotiveGN.xcf: Crimson Skull Spider „Ebene #178“ (259, mit rotem Faden), Brain Spider
+            „Ebene #246“ (251, weißer Faden) + Glanz „Ebene #248“ (250), Diamond Spider „Ebene #181“ (260),
+            Cute Spider „Ebene #309/#308/#310“ (264–266), kleine Spinnen „SPODDERS“ (267)
+  Fels      MotiveGN.xcf „Klippen“ (421), abgedunkelt
+Skalierung: ALLES (Fels, Netz, Fäden, alle Spinnen, Schatten) auf einem 63×88-Kartenpixel-Raster,
+am Ende einheitlich 4× (→ 252×352, auf 250×350 beschnitten; Ausgabe 12 px je Kartenpixel). Keine eigenen Rahmenlinien."""
+import math
 import numpy as np
-from kit import *
-from xcfkit import sprite, parts
+from kit import Canvas, up, flip, rot90, hsv_shift, silhouette, vignette, save
+from xcfkit import sprite, parts, layer, bbox
 
 G = 'MotiveGN'
-cv = Canvas(W, H)
-# --- Felsboden der Spinnenkarten (Ebene „Klippen“), 2×, abgedunkelt
-kl = sprite('gn_klippen', G, [421])
-band = kl[150:240, 100:225]                          # Felsband ohne Büsche
-bg = up(np.concatenate([band[::-1], band], 0)[:175], 2)
-cv.a[:] = hsv_shift(bg, 0, 0.95, 0.62)[..., :3]
-vignette(cv, 0.8, 0.3)
+NW, NH, K = 63, 88, 4
+cv = Canvas(NW, NH)
 
-# --- Netz: oberes linkes Viertel aus Trapping, zu vollem Rad gespiegelt, um 90° gedreht, 5×
-tr = nat('Trapping').astype(int)
-wm = ((tr.max(-1) > 200) & ((tr.max(-1) - tr.min(-1)) < 50))
-q = wm[0:26, 0:39]
-top = np.concatenate([q, q[:, :-1][:, ::-1]], 1)
-full = np.concatenate([top, top[:-1][::-1]], 0)       # 51 × 77
-full = np.rot90(full)                                  # 77 × 51
-K = 5
-fh, fw = full.shape
-ox = (W - fw * K) // 2; oy = (H - fh * K) // 2
-WEB = (214, 212, 222); WEBS = (40, 26, 16)
-for y in range(fh):
-    for x in range(fw):
-        if full[y, x]:
-            cv.rect(ox + x * K + 2, oy + y * K + 2, ox + x * K + K + 2, oy + y * K + K + 2, WEBS)
-for y in range(fh):
-    for x in range(fw):
-        if full[y, x]:
-            cv.rect(ox + x * K, oy + y * K, ox + x * K + K, oy + y * K + K, WEB)
-HX, HY = ox + 25 * K + K // 2, oy + 38 * K + K // 2   # Nabe
+# --- Fels (Ebene „Klippen“), Kartenpixel 1:1, gespiegelt auf Höhe gebracht, abgedunkelt
+kl = sprite('r2_04_klippen', G, [421])
+band = kl[150:240, 130:130 + NW]
+bg = np.concatenate([band[::-1], band], 0)[:NH]
+bg = hsv_shift(bg, 0, 0.8, 0.8)[..., :3].astype(float)
+bg = bg.mean((0, 1)) + (bg - bg.mean((0, 1))) * 0.6          # Kontrast zurücknehmen → ruhiger Hintergrund
+cv.a[:] = bg.clip(0, 255).astype(np.uint8)
+vignette(cv, 0.55, 0.35)
 
-# --- Spinnen (xcf-Ebenen)
-boss = sprite('gn_crimson_skull_spider', G, [259])      # mit rotem Faden
-brain = sprite('gn_brain_spider', G, [251])             # mit weißem Faden
-dia = sprite('gn_diamond_spider', G, [260])
-cute = sprite('gn_cute_spider', G, [264, 265, 266])     # Flügel + Körper + Herzaugen
-hive = [p for p in parts(sprite('gn_spodders', G, [267]), dil=1) if p.shape[0] >= 8 and p.shape[1] >= 10]
-baby, baby2 = hive[0], hive[5]
+# --- Netz aus „Trapping #1“
+try:
+    t = layer('MotiveGrailWar', 273); b = bbox(t); t = t[b[1]:b[3], b[0]:b[2]]
+    wm = (t[..., 3] > 0) & (t[..., :3].min(-1) > 235)
+    from PIL import Image; import os
+    from xcfkit import CACHE
+    Image.fromarray((wm * 255).astype(np.uint8)).save(os.path.join(CACHE, 'r2_04_web_mask.png'))
+except Exception:
+    from PIL import Image; import os
+    from xcfkit import CACHE
+    wm = np.array(Image.open(os.path.join(CACHE, 'r2_04_web_mask.png'))) > 0
+HUB_Y, HUB_X = 44, 51
+top = wm[:HUB_Y + 1]
+web = np.concatenate([top, top[:-1][::-1]], 0)          # 89 × 91, Nabe (44, 51)
+web = np.rot90(web)                                     # 91 × 89, Nabe (39, 44)
+wy, wx = 91 - 1 - HUB_X, HUB_Y
+HX, HY = NW // 2, NH // 2 - 2                            # Nabe auf der Leinwand
+ox, oy = HX - wx, HY - wy
+M = np.zeros((NH, NW), bool)
+for y, x in zip(*np.where(web)):
+    if 0 <= y + oy < NH and 0 <= x + ox < NW: M[y + oy, x + ox] = True
 
-def put(s, x, y, k, fl=False, r=0, sh=(3, 3)):
-    s2 = up(rot90(flip(s) if fl else s, r), k)
-    cv.paste(silhouette(s2, (0, 0, 0)), x + sh[0], y + sh[1], alpha=0.45)
+# Speichen finden (Winkelhistogramm um die Nabe) und als Haltefäden bis zum Rand verlängern
+ang = np.zeros(360)
+ys, xs = np.where(M)
+for y, x in zip(ys, xs):
+    r = math.hypot(x - HX, y - HY)
+    if r > 20: ang[int(math.degrees(math.atan2(y - HY, x - HX))) % 360] += 1
+spokes = [a for a in range(360) if ang[a] >= 12 and ang[a] == max(ang[(a + d) % 360] for d in range(-6, 7))]
+for a in spokes:
+    # äußerstes Netzpixel dieser Speiche suchen, dann gerade weiter bis zum Rand
+    th = math.radians(a + 0.5); r = 20; last = None
+    while True:
+        x = round(HX + r * math.cos(th)); y = round(HY + r * math.sin(th))
+        if not (0 <= x < NW and 0 <= y < NH): break
+        if M[max(0, y - 1):y + 2, max(0, x - 1):x + 2].any(): last = r
+        r += 0.5
+    if last is None: continue
+    r = last
+    while True:
+        x = round(HX + r * math.cos(th)); y = round(HY + r * math.sin(th))
+        if not (0 <= x < NW and 0 <= y < NH): break
+        M[y, x] = True; r += 0.5
+
+# Fäden hell-dunkel gedithert wie die Puppenfäden (Fadenfarben der Puppet-Karten): entlang jedes Fadens wechseln
+# sich die beiden Grautöne Pixel für Pixel ab (Parität des Wegabstands von der Nabe, 8er-Nachbarschaft)
+STR = [(176, 176, 176), (227, 227, 227)]
+WEBS = (24, 16, 10)
+from collections import deque
+par = np.full(M.shape, -1, np.int8)
+seeds = [(HY, HX)] + list(zip(*np.where(M)))
+for sy, sx in seeds:
+    if not M[sy, sx] or par[sy, sx] >= 0: continue
+    par[sy, sx] = 1; q = deque([(sy, sx)])
+    while q:
+        y, x = q.popleft()
+        for dy in (-1, 0, 1):
+            for dx in (-1, 0, 1):
+                v, u = y + dy, x + dx
+                if 0 <= v < NH and 0 <= u < NW and M[v, u] and par[v, u] < 0:
+                    par[v, u] = 1 - par[y, x]; q.append((v, u))
+for y, x in zip(*np.where(M)):
+    cv.px(x + 1, y + 1, WEBS)
+for y, x in zip(*np.where(M)):
+    cv.px(x, y, STR[par[y, x]])
+
+# --- Spinnen (xcf-Ebenen, Kartenpixel 1:1)
+boss = sprite('r2_04_crimson_skull_spider', G, [259])      # mit rotem Faden
+brain = sprite('r2_04_brain_spider', G, [250, 251])        # mit weißem Faden + Glanz
+bcol_ = int(np.argmax(brain[0, :, 3] > 0))                  # weißer Faden → hell-dunkel wie die übrigen Fäden
+for j in range(brain.shape[0]):
+    if not brain[j, bcol_ - 1, 3] and not brain[j, bcol_ + 1, 3] and brain[j, bcol_, 3] and brain[j, bcol_, :3].min() > 200:
+        brain[j, bcol_, :3] = STR[j % 2]
+dia = sprite('r2_04_diamond_spider', G, [260])
+cute = sprite('r2_04_cute_spider', G, [264, 265, 266])     # Flügel + Körper + Herzaugen
+hive = [p for p in parts(sprite('r2_04_spodders', G, [267]), dil=1) if p.shape[0] >= 8 and p.shape[1] >= 10]
+
+def put(s, x, y, fl=False, r=0):
+    s2 = rot90(flip(s) if fl else s, r)
+    cv.paste(silhouette(s2, (0, 0, 0)), x + 1, y + 1, alpha=0.5)
     cv.paste(s2, x, y)
     return s2
 
-# Crimson Skull Spider an der Nabe; ihr Faden (Kartenpixel) wird nach oben bis zum Rand verlängert
-B = up(boss, 5)
-tcol = int(np.argmax(boss[0, :, 3] > 0))
-bx = HX - B.shape[1] // 2; by = HY - B.shape[0] + 12 * 5
-thread = up(boss[0:4, tcol:tcol + 1], 5)
-y = by
-while y > 0:
-    y -= thread.shape[0]; cv.paste(thread, bx + tcol * 5, y)
-cv.paste(silhouette(B, (0, 0, 0)), bx + 4, by + 4, alpha=0.5)
-cv.paste(B, bx, by)
-
-def hang(s, x, y, k):
-    """Spinne mit eigenem Faden; Faden (oberste Pixelzeilen) bis zum oberen Rand verlängern."""
-    S = up(s, k); col = int(np.argmax(s[0, :, 3] > 0))
-    seg = up(s[0:2, col:col + 1], k); yy = y
+def hang(s, x, y, seglen=2):
+    """Spinne am eigenen Faden (oberste Pixelzeilen der Ebene), Faden bis zum oberen Rand verlängert."""
+    col = int(np.argmax(s[0, :, 3] > 0))
+    seg = s[0:seglen, col:col + 1]; yy = y
     while yy > 0:
-        yy -= seg.shape[0]; cv.paste(seg, x + col * k, yy)
-    cv.paste(silhouette(S, (0, 0, 0)), x + 3, y + 3, alpha=0.45); cv.paste(S, x, y)
+        yy -= seg.shape[0]; cv.paste(seg, x + col, yy)
+    put(s, x, y)
 
-hang(brain, 186, 30, 3)
-put(cute, 14, 18, 3)
-put(dia, 24, 168, 3, r=1); put(dia, 196, 214, 3, r=3)
-put(baby, 110, 30, 3); put(baby2, 30, 110, 3, True, 1); put(baby, 190, 300, 3, False, 2); put(baby2, 26, 296, 3, False, 3)
-put(hive[2], 120, 300, 3); put(hive[8], 210, 176, 2, r=1); put(hive[3], 70, 250, 2); put(hive[9], 140, 110, 2, r=3)
+# Crimson Skull Spider: Körper auf der Nabe, roter Faden nach oben
+bcol = int(np.argmax(boss[0, :, 3] > 0))
+hang(boss, HX - bcol, HY - boss.shape[0] + 13, seglen=4)
+hang(brain, 42, 2)
+put(cute, 2, 3)
+put(dia, 1, 45, r=1); put(dia, 46, 64, r=3)
+put(hive[0], 34, 11); put(hive[5], 6, 27, True, 1); put(hive[3], 13, 66)
+put(hive[2], 30, 78); put(hive[0], 49, 80, False, 2)
 
-for i, c in enumerate([(20, 12, 8), (120, 0, 0), (170, 10, 5), (20, 12, 8)]):
-    cv.a[i, :] = c; cv.a[-1 - i, :] = c; cv.a[:, i] = c; cv.a[:, -1 - i] = c
-print(save(cv, '04_spider_nest.png'))
+# --- einheitlich 4× hochskalieren, auf 250×350 beschneiden
+u = up(np.dstack([cv.a, np.full(cv.a.shape[:2], 255, np.uint8)]), K)[..., :3]
+big = Canvas(250, 350)
+big.a[:] = u[1:351, 1:251]
+print(save(big, '04_spider_nest.png'))

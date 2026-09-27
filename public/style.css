@@ -3645,7 +3645,7 @@ body:has(.anim-backdrop) .pp-bg-particles { display: none; }
   animation: announceShort 2s ease-out forwards;
 }
 
-/* ═══ Helden-Idle-Animation (v1450, echtes 3D seit v1451) ═══
+/* ═══ Helden-Idle-Animation (v1450, echtes 3D seit v1451, Zurückziehen v1452) ═══
    Die Figuren leben in `.hero-sprite-ebene`, einem Zwilling von
    `.board-plane` (Box und Transformation kopiert `HeroIdleAnims` live).
    Nur diese Ebene hat preserve-3d: jede Figur steht dort auf ihrer
@@ -3671,9 +3671,9 @@ body:has(.anim-backdrop) .pp-bg-particles { display: none; }
 /* drei Achsen: die aufrechte Figur liegt größtenteils in der z-Achse
    der Ebene — ein zweiachsiges `scale` ließe sie gedrungen wirken */
 .hero-idle-platz.hero-idle-hover { scale: var(--board-hover-scale) var(--board-hover-scale) var(--board-hover-scale); }
-/* Die aufrechte Figur. Unterkante = Drittellinie der Karte = Drehachse;
-   darunter wird abgeschnitten — daraus steigt der Held beim Auftritt
-   empor, als käme er aus der Karte. */
+/* Die aufrechte Figur. Unterkante = Kartenmitte (seit v1453, vorher
+   Drittellinie) = Drehachse; darunter wird abgeschnitten — daraus steigt
+   der Held beim Auftritt empor, als käme er aus der Karte. */
 .hero-idle-steher {
   position: absolute;
   overflow: hidden;
@@ -3687,28 +3687,150 @@ body:has(.anim-backdrop) .pp-bg-particles { display: none; }
   position: absolute;
   left: 0; top: 0;
   display: block;
-  animation: heroIdleAuftritt .55s steps(10, end) both;
+  /* `backwards`, nicht `both`: nach dem Auftritt gilt wieder der
+     normale Stil (sonst hielte das Animationsende Werte fest) */
+  animation: heroIdleAuftritt .55s steps(10, end) backwards;
 }
+/* ── Zurückziehen beim Hover (v1452, schlicht seit v1453) ──────────────
+   Hovert man die Heldenkarte, zieht sich die Figur wie eine Projektion
+   in die Karte zurück — zur waagrechten Linie zusammengezogen und weg —,
+   die Status-Icons liegen frei. Beim Verlassen zieht sie sich auf
+   demselben Weg wieder auf. Als Vorgabe 27.9.: „soll wie ein Hologramm
+   aussehen, aber keines SEIN" — also nur die Bewegung, keine Tönung,
+   keine Scanlines, kein Flackern. Drehpunkt sind die Füße. */
+.hero-idle-holo {
+  position: absolute;
+  inset: 0;
+  transform-origin: 50% 100%;
+}
+.hero-idle-hover .hero-idle-holo { animation: heroHoloRueckzug .32s ease-in forwards; }
+.hero-idle-zurueck .hero-idle-holo { animation: heroHoloAuftauchen .36s ease-out both; }
+@keyframes heroHoloRueckzug {
+  0%   { opacity: 1; transform: none; }
+  70%  { opacity: 1; transform: scaleX(1.06) scaleY(.12); }
+  100% { opacity: 0; transform: scaleX(.3) scaleY(0); }
+}
+@keyframes heroHoloAuftauchen {
+  0%   { opacity: 0; transform: scaleX(.3) scaleY(0); }
+  30%  { opacity: 1; transform: scaleX(1.06) scaleY(.12); }
+  80%  { transform: scaleY(1.03); }
+  100% { opacity: 1; transform: none; }
+}
+/* ── Eiskruste um eingefrorene Figuren (v1457, Kruste seit v1458) ─────
+   Pixelbild in Sprite-Auflösung (maleEiskruste), deckungsgleich mit der
+   Figur und IN ihrer Hülle: steht mit ihr aufrecht und zieht sich beim
+   Hover mit zurück. Wächst beim Einfrieren von den Füßen hoch (Drehpunkt
+   inline), zerspringt beim Auftauen. */
+.hero-idle-eis {
+  position: absolute;
+  image-rendering: pixelated;
+  animation: heroEisBilden .45s steps(6, end) backwards;
+}
+.hero-idle-eis.hero-idle-eis-schmilzt { animation: heroEisZerspringen .45s ease-in forwards; }
+@keyframes heroEisBilden {
+  0%   { transform: scaleY(0);  opacity: 0; filter: brightness(2); }
+  60%  { opacity: 1; }
+  100% { transform: none;       opacity: 1; filter: none; }
+}
+@keyframes heroEisZerspringen {
+  0%   { transform: none;        opacity: 1; filter: none; }
+  30%  { transform: scale(1.03); opacity: 1; filter: brightness(1.8); }
+  100% { transform: scale(1.12); opacity: 0; filter: brightness(1.4); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hero-idle-eis { animation: none; }
+  .hero-idle-eis.hero-idle-eis-schmilzt { animation: none; opacity: 0; transition: opacity .2s ease; }
+}
+/* ── Statuseffekte an der Figur (v1459) ───────────────────────────────
+   Effekt-Ebene: gleiche Lage und Drehung wie `.hero-idle-steher`, aber
+   ohne Beschnitt; ein halbes Pixel vor der Figur. Beim Hover blendet sie
+   mit der Figur aus. Partikel sitzen mit ihrem Fußpunkt auf der Lage. */
+.hero-idle-fx {
+  position: absolute;
+  pointer-events: none;
+  transform: rotateX(calc(-1 * var(--sprite-kipp, 0deg))) scaleY(var(--sprite-streck, 1)) translateZ(.5px);
+  transition: opacity .25s ease;
+}
+.hero-idle-hover .hero-idle-fx { opacity: 0; }
+.hero-idle-unsichtbar .hero-idle-fx { opacity: .4; }
+.hfx { position: absolute; display: block; line-height: 0; pointer-events: none; }
+.hfx .pp-px { display: block !important; }
+.hfx-netz { position: absolute; image-rendering: pixelated; animation: hfxEinblenden .5s ease-out backwards; }
+@keyframes hfxEinblenden { from { opacity: 0; } to { opacity: 1; } }
+/* Stunned: Blitze zucken um Kopf und Oberkörper */
+.hfx-blitz { transform: translate(-50%, -50%); animation: hfxBlitz 1.2s steps(1, end) infinite; opacity: 0; }
+@keyframes hfxBlitz {
+  0%   { opacity: 0; transform: translate(-50%, -50%) rotate(var(--hfx-dreh, 0deg)) scale(.6); }
+  8%   { opacity: 1; transform: translate(-50%, -50%) rotate(var(--hfx-dreh, 0deg)) scale(1.15); }
+  16%  { opacity: .6; transform: translate(-50%, -50%) rotate(calc(var(--hfx-dreh, 0deg) * -1)) scale(.9); }
+  24%  { opacity: 1; transform: translate(-50%, -50%) rotate(var(--hfx-dreh, 0deg)) scale(1); }
+  40%  { opacity: .7; transform: translate(-50%, -50%) rotate(calc(var(--hfx-dreh, 0deg) * -1)) scale(1.05); }
+  52%  { opacity: 1; transform: translate(-50%, -50%) rotate(var(--hfx-dreh, 0deg)) scale(.95); }
+  60%, 100% { opacity: 0; transform: translate(-50%, -50%) rotate(var(--hfx-dreh, 0deg)) scale(.6); }
+}
+/* Burned: Flammen lodern auf dem Körper (Fußpunkt unten mittig) */
+.hfx-flamme { transform: translate(-50%, -100%); transform-origin: 50% 100%; animation: hfxFlamme .6s ease-in-out infinite alternate; }
+@keyframes hfxFlamme {
+  from { transform: translate(-50%, -100%) scale(.85, .8);  opacity: .75; }
+  to   { transform: translate(-50%, -110%) scale(1.05, 1.15); opacity: 1; }
+}
+/* Poisoned / Heal Reversed: Schädel steigen über die Figur auf */
+.hfx-schaedel { transform: translate(-50%, -50%); animation: hfxAufsteigen 2.6s ease-out infinite; opacity: 0; }
+@keyframes hfxAufsteigen {
+  0%   { opacity: 0; transform: translate(-50%, -50%) scale(.7); }
+  15%  { opacity: 1; transform: translate(-50%, -80%) scale(1); }
+  100% { opacity: 0; transform: translate(-50%, calc(-50% - 32px * var(--board-scale))) scale(.9); }
+}
+/* Berserked / Heal Reversed: Funken steigen auf */
+.hfx-funke { transform: translate(-50%, -50%); animation: hfxFunke 1.8s ease-out infinite; opacity: 0; }
+@keyframes hfxFunke {
+  0%   { opacity: 0; transform: translate(-50%, -50%) scale(.5); }
+  20%  { opacity: 1; transform: translate(-50%, -70%) scale(1); }
+  100% { opacity: 0; transform: translate(-50%, calc(-50% - 22px * var(--board-scale))) scale(.6); }
+}
+/* Bleeding: Blutstropfen rinnen herab (Pixel-Tropfen mit Glanzpunkt) */
+.hfx-tropfen {
+  width: calc(2px * var(--board-scale)); height: calc(5px * var(--board-scale));
+  background: linear-gradient(#ff6a6a 0 20%, #c0101e 20% 80%, #6a0008 80%);
+  transform: translateX(-50%); animation: hfxTropfen 1.6s ease-in infinite; opacity: 0;
+}
+@keyframes hfxTropfen {
+  0%   { opacity: 0; transform: translateX(-50%) scaleY(.3); }
+  15%  { opacity: 1; transform: translateX(-50%) scaleY(1); }
+  100% { opacity: 0; transform: translate(-50%, calc(20px * var(--board-scale))) scaleY(1.2); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hfx { animation: none !important; opacity: 1 !important; }
+}
+/* Unsichtbare Helden: halbtransparent wie ihre Karte */
+.hero-idle-unsichtbar .hero-idle-steher,
+.hero-idle-unsichtbar .hero-idle-schatten { opacity: .4; }
 @keyframes heroIdleAuftritt {
   0%   { transform: translateY(100%); filter: brightness(2.2); }
   70%  { transform: translateY(0);    filter: brightness(1.5); }
   100% { transform: translateY(0);    filter: none; }
 }
-/* Pixel-Bodenschatten, flach auf der Karte unter den Füßen */
+/* Pixel-Bodenschatten, flach auf der Kartenmitte unter den Füßen */
 .hero-idle-schatten {
   position: absolute;
-  top: calc(50% - 16.5px * var(--board-scale));
+  top: calc(50% - 1.5px * var(--board-scale));
   height: calc(3px * var(--board-scale));
   background: radial-gradient(ellipse at center, rgba(0,0,0,.5) 0 45%, rgba(0,0,0,.22) 46% 70%, transparent 71%);
-  animation: heroIdleSchatten .55s ease-out both;
-  transition: opacity .4s ease;
+  animation: heroIdleSchatten .55s ease-out backwards;
+  transition: opacity .3s ease;
 }
+.hero-idle-platz.hero-idle-hover .hero-idle-schatten { opacity: 0; }
 @keyframes heroIdleSchatten {
   from { opacity: 0; transform: scaleX(.3); }
   to   { opacity: 1; transform: none; }
 }
 @media (prefers-reduced-motion: reduce) {
   .hero-idle-canvas, .hero-idle-schatten { animation: none; }
+  /* ohne Bewegung: einfach aus- und einblenden */
+  .hero-idle-hover .hero-idle-holo,
+  .hero-idle-zurueck .hero-idle-holo { animation: none; }
+  .hero-idle-holo { transition: opacity .2s ease; }
+  .hero-idle-hover .hero-idle-holo { opacity: 0; }
 }
 
 /* ═══ Status Effect Visuals ═══ */
@@ -5925,7 +6047,21 @@ body:has(.anim-backdrop) .pp-bg-particles { display: none; }
      die Karten ihren Platz. */
   overflow-y: hidden;
   scrollbar-width: thin;
-  --fan-pad-x: calc(var(--hand-card-w) * 0.45);
+  /* ★★ v1452 (Als Befund 27.9.: „wenn die Hand sehr voll ist und ich
+     über die rechteste Handkarte hovere, ändert sich das Layout des
+     ganzen Boards — es erhält weniger Platz").
+     Ein Scrollbereich zählt TRANSFORMIERTE Kästen mit (siehe v1243).
+     Die gehoverte rechte Randkarte — 9° Fächerwinkel, Drehpunkt 50 % 85 %,
+     ×1,42 — reicht bis 0,967 Kartenbreiten + ~3 px rechts ihrer Mitte,
+     also 0,467 Breiten + 3 px über den Inhaltskasten hinaus. Das alte
+     Polster (0,45) fasste das nicht: bei voller Reihe erschien die
+     waagerechte Bildlaufleiste, die Leiste wurde um deren Höhe höher,
+     und das Brett schrumpfte (bzw. flackerte, weil der Hover dabei
+     verloren ging). 0,55 fasst Hover samt Drehung mit Luft; das Polster
+     wird wie bisher per negativem Rand wieder eingezogen, der
+     Inhaltskasten bleibt also, wo er war. Wer `--hand-hover-scale`
+     oder `FAECHER.maxGrad` anhebt, muss diese Zahl mitrechnen. */
+  --fan-pad-x: calc(var(--hand-card-w) * 0.55);
   --fan-pad-unten: calc(var(--hand-card-h) * 0.14);
   padding: calc(var(--hand-card-h) * 0.8 + 20px) var(--fan-pad-x) var(--fan-pad-unten);
   margin-top: calc(var(--hand-card-h) * -0.8 - 20px);
@@ -14298,7 +14434,17 @@ body:has(.reaction-chain-overlay) .board-tooltip-token {
    der Ablagebereich bleibt kartengross, die Leiste springt beim ersten
    Karteneinwurf nicht mehr. */
 .pz-hand-cards[data-pz-hand="hand"]::after,
-.pz-hand-cards[data-pz-hand="oppHand"]::after { height: auto; }
+.pz-hand-cards[data-pz-hand="oppHand"]::after {
+  height: auto;
+  /* ★ v1452: seitlich nur ueber dem Inhalt, nicht ueber dem Polster.
+     Das Polster reicht seit heute eine knappe halbe Kartenbreite unter
+     die Nebenspalte (Gold, Debuffs) bzw. den Vorrat; der Streifen hat
+     `pointer-events: auto` und haette dort Klicks geschluckt. Ablegen
+     ueber der Nebenspalte geht trotzdem — sie liegt in `.pz-hand`, und
+     deren `dragover` faengt den Zug. */
+  left: var(--fan-pad-x, 0px);
+  right: var(--fan-pad-x, 0px);
+}
 .pz-hand-cards[data-pz-hand="hand"]::after {
   top: calc(var(--hand-card-h) * 0.8 + 20px);
   bottom: var(--fan-pad-unten, 0px);
@@ -14513,7 +14659,13 @@ body:has(.reaction-chain-overlay) .board-tooltip-token {
      volle Leistenbreite, das Polster fängt Drehüberhang und
      Hover-Vergrößerung weiterhin ab. Etwas schmaler darf es auch
      sein — der Editor fächert mit kleinerem Winkel. */
-  --fan-pad-x: calc(var(--hand-card-w) * 0.3);
+  /* ★★ v1452: 0,3 → 0,45. Der Editor fächert mit DEMSELBEN Winkel
+     (9° am Rand), dreht aber um die Mitte: die gehoverte Randkarte ragt
+     0,357 Kartenbreiten + ~3 px über den Inhaltskasten hinaus — mehr als
+     das alte Polster. Folge wie im Duell (siehe `.game-hand-cards`):
+     Hover über der rechtesten Karte einer vollen Hand → Bildlaufleiste →
+     Leiste höher → der Scaler verkleinert das Brett. */
+  --fan-pad-x: calc(var(--hand-card-w) * 0.45);
   --fan-pad-unten: calc(var(--hand-card-h) * 0.14);
   margin-inline: calc(var(--fan-pad-x) * -1);
   --hand-ueberstand: max(0px,
@@ -17172,6 +17324,16 @@ img, .card-tooltip-img img { image-rendering: pixelated; }
      die Quere." Der Verdunkler lag bei 1000, die eigene Hand bei 10000.
      Jetzt ueber Hand und Wahl-Panels (10080), unter den Ergebnis-
      Overlays und Kartenfluegen. */
+  z-index: 10085;
+}
+/* ★ v1453 (Als Befund 27.9.: „das Menü, um im Puzzle-Creator
+   Statuseffekte, HP usw. zu setzen, muss VOR der Hand angezeigt werden,
+   aktuell überdecken Handkarten es"). Derselbe Fall wie v1259 im Duell:
+   die Editor-Hand trägt `zIndex: 10000` (Inline-Stil in app-puzzle), die
+   Dialoge des Editors lagen mit dem Grundwert 1000 darunter. Gilt für
+   alle drei Editor-Dialoge (Stat-Editor, Stapel-Ansicht, Doom Clock) —
+   nur die Höhe, der Hintergrund bleibt der des Editors. */
+.screen-full:has(> .pz-layout) .modal-overlay {
   z-index: 10085;
 }
 .screen-full:has(> .game-layout) .modal,

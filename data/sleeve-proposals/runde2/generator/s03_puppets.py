@@ -1,70 +1,101 @@
 # -*- coding: utf-8 -*-
-"""Sleeve: Puppentheater – Bühne, Puppets, Tri Ad & Tri Fecta mit Brücke, Regenbogen und Fäden
-direkt aus den Ebenen von MotiveIndia.xcf (Repo PixelPartiesSprites)."""
+"""Sleeve: Puppentheater – Tri Ad (links) und Tri Fecta (rechts) führen von ihren Tribünen aus sechs
+Marionetten vor Bühne und Vorhang. Alles aus MotiveIndia.xcf (Repo PixelPartiesSprites):
+  Bühne/Vorhang  „Ebene #100“ (212), auf 125 px gespiegelt verbreitert, Vorhang verlängert
+  Tri Ad         „Triad“ (345) + „Tribüne“ (346)     – Kontrollkreuze (rosa) an den Händen
+  Tri Fecta      „TriFecta“ (344) + „Tribüne“ (346)  – Funken an den Händen
+  Saras (330), Laki (331), Pavi (332 + Hammerkopf aus „Ebene #50“ 324), Brammi (334),
+  Shishi (336), Vinny (Teilfigur aus „Vinny“ 326), Regenbogen „Ebene #61“ (327).
+Alles liegt auf EINEM 125×175-Raster (Kartenpixel 1:1) und wird am Ende 2× auf 250×350 skaliert:
+Figuren, Bühne und Fäden haben dieselbe Pixelgröße (Fäden = 1 Kartenpixel, zweifarbig wie auf den
+Karten). Jeder Faden beginnt an einer Hand (Kontrollkreuz/Funke) von Tri Ad bzw. Tri Fecta, läuft
+sichtbar über die Tribünenbrüstung und endet am oberen Rand einer Puppe (Kopf, Hände, Hammer).
+Die Fäden sind halbtransparent (55 % Deckkraft, pro ganzem Pixel gemischt)."""
 import numpy as np
 from kit import Canvas, up, flip, silhouette, save, widen
-from xcfkit import sprite, parts, part_at
+from xcfkit import sprite, parts, part_at, compose
 
 B = 'MotiveIndia'
 NW, NH = 125, 175
 cv = Canvas(NW, NH)
 
 # --- Bühne (Ebene „Ebene #100“, 118×126): auf 125 Breite gespiegelt ergänzt, Vorhang in der Höhe verlängert
-st = sprite('in_stage', B, [212])[..., :3]
-st = widen(st[:, 3:113], NW)                        # Seitenrahmen weg, Vorhang gespiegelt auf 125 Breite
+st = sprite('r2_03_stage', B, [212])[..., :3]
+st = widen(st[:, 3:113], NW)
 top, body, fringe, floor = st[0:14], st[14:40], st[76:88], np.concatenate([st[88:104], st[118:126]], 0)
 n_body = NH - len(top) - len(fringe) - len(floor)
-body_col = np.concatenate([body, body[::-1]] * 5, 0)[:n_body]   # Falten gespiegelt → nahtlos
-col = np.concatenate([top, body_col, fringe, floor], 0)
-cv.a[:] = col[:NH]
-FLOOR = NH - len(floor) - 4      # Oberkante der Bühnenbretter
+body_col = np.concatenate([body, body[::-1]] * 5, 0)[:n_body]
+cv.a[:] = np.concatenate([top, body_col, fringe, floor], 0)[:NH]
+FLOOR = NH - len(floor) - 4
 
-# --- Figuren
-saras = parts(sprite('in_saras', B, [330]))[0]
-laki = parts(sprite('in_laki', B, [331]))[0]
-pavi = parts(sprite('in_pavi', B, [332]))[0]
-vinny = part_at(sprite('in_vinny_scene', B, [326]), 85, 57)
-brammi = sprite('in_brammi', B, [334])
-shishi = sprite('in_shishi', B, [336])
-fecta = sprite('in_trifecta', B, [344, 346])        # Tri Fecta auf der Tribüne
-ad = sprite('in_triad', B, [345, 346])              # Tri Ad auf der Tribüne
-rain = sprite('in_rainbow', B, [327])
+# --- Figuren (Ebenen)
+saras = parts(sprite('r2_03_saras', B, [330]))[0]
+laki = parts(sprite('r2_03_laki', B, [331]))[0]
+try:   # Pavi mit ihrem Hammer (Stiel in „Pavi“, Kopf in „Ebene #50“)
+    pavi = part_at(compose(B, [324, 332], crop=False)[88:145, 378:440], 30, 35)
+    from PIL import Image; import os
+    from xcfkit import CACHE
+    Image.fromarray(pavi).save(os.path.join(CACHE, 'r2_03_pavi_hammer.png'))
+except Exception:
+    pavi = sprite('r2_03_pavi_hammer')
+vinny = part_at(sprite('r2_03_vinny_scene', B, [326]), 85, 57)
+brammi = sprite('r2_03_brammi', B, [334])
+shishi = sprite('r2_03_shishi', B, [336])
+fecta = sprite('r2_03_trifecta', B, [344, 346])
+ad = sprite('r2_03_triad', B, [345, 346])
+rain = sprite('r2_03_rainbow', B, [327])
 
 STR = [(176, 176, 176), (227, 227, 227)]            # Fadenpixel der Kartenebenen
-def string(x, y0, y1):
-    for y in range(y0, y1):
-        cv.px(x, y, STR[(y // 2 + y) % 2])
+AX, FX, TY = 2, NW - fecta.shape[1] - 2, 12         # Lage der Tribünen
+# Hände: äußere Kontrollkreuze/Funken und innere Hände (Sprite-Koordinaten → Leinwand)
+# Hände (Leinwandkoordinaten): äußere Kontrollkreuze (Tri Ad rosa, Tri Fecta Funken) und innere Hände.
+# Alle Fäden einer Puppe laufen (wie bei einem Spielkreuz) von einem Handpunkt aus auseinander.
+HA = {'L': (AX + 12, TY + 18), 'l': (AX + 19, TY + 21), 'r': (AX + 31, TY + 21), 'R': (AX + 37, TY + 18)}
+HF = {'L': (FX + 14, TY + 17), 'l': (FX + 19, TY + 21), 'r': (FX + 31, TY + 21), 'R': (FX + 36, TY + 17)}
+TRIB_BOTTOM = TY + ad.shape[0]
 
 def top_of(s, cx):
-    c = s[:, cx, 3]; return int(np.argmax(c > 0))
+    return int(np.argmax(s[:, cx, 3] > 0))
 
-def put(s, x, y, fl=False, sh=0.45):
-    s2 = flip(s) if fl else s
-    cv.paste(silhouette(s2, (20, 10, 40)), x + 1, y + 2, alpha=sh)
-    cv.paste(s2, x, y)
+# Puppe: (Sprite, x, y, [(Ansatzspalte, Hand), ...])  – Ansatz an Kopf, Händen bzw. Hammer
+pup = {
+    'saras': (saras, 3, 46, [(6, HA['L']), (15, HA['L']), (25, HA['L'])]),
+    'pavi': (pavi, 2, 85, [(5, HA['l']), (25, HA['l']), (36, HA['l'])]),
+    'shishi': (shishi, 44, 46, [(4, HA['r']), (17, HA['R']), (29, HA['R'])]),
+    'brammi': (brammi, 85, 52, [(4, HF['r']), (14, HF['r']), (23, HF['r'])]),
+    'vinny': (vinny, 96, 98, [(3, HF['R']), (17, HF['R']), (25, HF['R'])]),
+    'laki': (laki, 53, FLOOR - laki.shape[0] - 8, [(4, HF['L']), (10, HF['L']), (16, HF['l'])]),
+}
 
-cv.paste(rain, (NW - rain.shape[1]) // 2, FLOOR - rain.shape[0] + 1)
-BY = 12 + ad.shape[0] - 2
-pos = {'saras': (saras, 4, 50), 'shishi': (shishi, 46, 46), 'brammi': (brammi, 92, 48),
-       'pavi': (pavi, 2, 90), 'laki': (laki, 55, FLOOR - laki.shape[0] - 8), 'vinny': (vinny, 92, 94)}
-# Jeder Faden läuft von der Tribüne eines Puppenspielers schräg zur Puppe (Pixel-Linie in Fadenfarben)
+# Fäden als Maske (1 Kartenpixel breit, Farben abwechselnd wie auf den Karten)
+smask = np.zeros((NH, NW), np.int8) - 1
 def line(x0, y0, x1, y1):
     n = max(abs(x1 - x0), abs(y1 - y0))
     for i in range(n + 1):
         x = round(x0 + (x1 - x0) * i / n); y = round(y0 + (y1 - y0) * i / n)
-        cv.px(x, y, STR[i % 2])
-AD_X0, AD_X1 = 2 + 4, 2 + ad.shape[1] - 4                 # Unterkante der linken Tribüne
-FE_X0, FE_X1 = NW - fecta.shape[1] - 2 + 4, NW - 2 - 4    # Unterkante der rechten Tribüne
-owner = {'saras': 'ad', 'pavi': 'ad', 'shishi': 'ad', 'brammi': 'fe', 'vinny': 'fe', 'laki': 'fe'}
-for k, (s, x, y) in pos.items():
-    w = s.shape[1]
-    lo, hi = (AD_X0, AD_X1) if owner[k] == 'ad' else (FE_X0, FE_X1)
-    for j, fx in enumerate((2, w // 2, w - 3)):
-        bx = lo + (hi - lo) * (j + 1) // 4
-        line(bx, BY, x + fx, y + top_of(s, fx))
-for k, (s, x, y) in pos.items():
+        if 0 <= x < NW and 0 <= y < NH: smask[y, x] = i % 2
+for s, x, y, ss in pup.values():
+    for c, (hx, hy) in ss:
+        line(hx, hy, x + c, y + top_of(s, c))
+
+STR_A = 0.55                                         # Fäden halbtransparent (ganze Pixel, gleiches Raster)
+def draw_strings(rows=None, only=None):
+    for yy, xx in zip(*np.where(smask >= 0)):
+        if (rows is None or rows[0] <= yy < rows[1]) and (only is None or only[yy, xx]):
+            cv.a[yy, xx] = np.round(cv.a[yy, xx] * (1 - STR_A) + np.array(STR[smask[yy, xx]]) * STR_A)
+
+def put(s, x, y, sh=0.45):
+    cv.paste(silhouette(s, (20, 10, 40)), x + 1, y + 2, alpha=sh)
+    cv.paste(s, x, y)
+
+cv.paste(rain, (NW - rain.shape[1]) // 2, FLOOR - rain.shape[0] + 1)
+draw_strings()                                       # Fäden hinter den Puppen …
+for k, (s, x, y, _) in pup.items():
     put(s, x, y)
-put(ad, 2, 12, sh=0.3); put(fecta, NW - fecta.shape[1] - 2, 12, sh=0.3)
+snap = cv.a.copy()
+put(ad, AX, TY, sh=0.3); put(fecta, FX, TY, sh=0.3)
+trib = (cv.a != snap).any(-1)                        # nur dort neu, wo die Tribünen die Fäden überdeckt haben
+draw_strings((TY + 17, TRIB_BOTTOM + 1), trib)       # … aber vor der Tribünenbrüstung (von den Händen aus)
 
 big = Canvas(250, 350)
 big.a[:] = up(np.dstack([cv.a, np.full(cv.a.shape[:2], 255, np.uint8)]), 2)[..., :3]
