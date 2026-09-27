@@ -1,14 +1,14 @@
 # -*- coding: utf-8 -*-
 """Sleeve 19 – Matrjoschka-Turm der Dream Landers.
 
-Die Dream Landers stehen einander auf den Schultern – und werden dabei wie Matrjoschka-Puppen
-nach oben hin Stufe um Stufe kleiner (5×, 4×, 3×, 2×, 1×): unten Stellin, darauf Smug Mastermind
-Antonia mit Krone, dann Vullary, Rafflesia und ganz oben der winzige Clausss. Dahinter der
+Die Dream Landers stehen einander auf den Köpfen – und werden dabei wie Matrjoschka-Puppen
+nach oben hin Stufe um Stufe kleiner (5×, 4×, 3×, 2×, 1×): unten Smug Mastermind Antonia mit
+Krone, darauf Vullary, Rafflesia, Smugbeth und ganz oben der winzige Clausss. Dahinter der
 verschneite Nadelwald des Nordens im Schneetreiben, ein fahler Lichtkranz hebt den Turm hervor.
 
 Quellen (MotiveRussia.xcf):
-  Stellin   = Ebene 142 „Ebene #97“          Antonia  = Ebene 218 „MONIA“
-  Vullary   = Ebene 215 „MARY“               Rafflesia = Ebene 228 „RAFFLESIA“
+  Antonia   = Ebene 218 „MONIA“              Vullary   = Ebene 215 „MARY“
+  Rafflesia = Ebene 228 „RAFFLESIA“          Smugbeth  = Ebene 204 „SMUGBETH“
   Clausss   = Ebene 210 „CLAUSSS“
   Wald/Schnee = Ebene 221 „Ebene #6“ (Kulisse der Dream-Lander-Karten)
   Schneeflocken = Ebene 64 „Ebene #122“ (nur deckende Pixel)
@@ -36,14 +36,14 @@ for y in range(H):
             cv.a[y, x] = (cv.a[y, x] * (1 - q * 0.6) + np.array((210, 214, 250)) * q * 0.6).astype(np.uint8)
 
 # ---------- Turm: von unten nach oben, jede Figur steht auf dem Kopf/den Schultern der darunter
-figs = [('c19_stellin', [142], 5), ('c19_antonia', [218], 4), ('c19_vullary', [215], 3),
-        ('c19_raff', [228], 2), ('c19_clausss', [210], 1)]
+figs = [('c19_antonia', [218], 5, None), ('c19_vullary', [215], 4, None), ('c19_raff', [228], 3, None),
+        ('c19_smugbeth', [204], 2, (280, 205, 305, 235)), ('c19_clausss', [210], 1, None)]
 # Zeilen (nativ) über dem Gesicht, auf denen die nächste Figur mit den Füßen steht
-head_top = {'c19_stellin': 4, 'c19_antonia': 5, 'c19_vullary': 3, 'c19_raff': 5, 'c19_clausss': 0}
+head_top = {'c19_antonia': 5, 'c19_vullary': 3, 'c19_raff': 5, 'c19_smugbeth': 3, 'c19_clausss': 0}
 placed = []
-base = H + 10                     # Stellins Füße ragen unten aus dem Bild
-for key, idx, k in figs:
-    s = sprite(key, RU, idx)
+base = H + 14                     # Antonias Füße ragen unten aus dem Bild
+for key, idx, k, box in figs:
+    s = sprite(key, RU, idx, box=box)
     S = up(s, k)
     y = base - S.shape[0]
     x = CX - S.shape[1] // 2
