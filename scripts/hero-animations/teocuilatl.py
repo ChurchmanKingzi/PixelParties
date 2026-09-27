@@ -8,7 +8,11 @@ Aufruf: python3 teocuilatl.py <tag> [ms] [hero|platinum]
   entfernt (wo sie die Figur überdecken, wird mit der häufigsten
   Nachbarfarbe ergänzt) und neu gezeichnet – jeder eigenständig: eigener
   Takt, eigene Größe, er wächst auf, funkelt und vergeht.
-* Er schwebt (sanftes Auf und Ab).
+* Er steht und atmet: der Oberkörper federt im 12er-Takt 1 px hoch und
+  herunter, die Beine bleiben stehen (Steh-Idle).
+* Die rechte Hand lag unter einem Stern und war nach dem Entfernen nur
+  geschätzt; sie wird als Spiegelbild der vollständigen linken Hand
+  ergänzt (die Figur ist symmetrisch um x = 11,5).
 * hero: sein Flammenkörper flackert (einzelne Glutpixel werden heller/dunkler).
 """
 import math
@@ -16,7 +20,7 @@ import sys
 from collections import Counter
 from PIL import Image
 import numpy as np
-from anim_common import rgb, save_outputs
+from anim_common import rgb, save_outputs, draw_bounce, BOUNCE12
 
 V = next((v for v in sys.argv[2:] if v in ('hero', 'platinum')), 'hero')
 SLUG, PREFIX = {'hero': ('teocuilatl-the-embodiment-of-gods', 'teocuilatl'),
@@ -55,7 +59,19 @@ def strip_stars(src):
     return s
 
 
-BODY = strip_stars(SRC)
+def mirror_hand(body):
+    """Arm/Hand rechts (Zeilen 18–27) = Spiegelbild der linken (x <= 6), Achse x = 11,5."""
+    b = body.copy()
+    for y in range(18, 28):
+        b[y, 18:] = 0
+        for x in range(0, 7):
+            if b[y, x, 3]:
+                b[y, 23 - x] = b[y, x]
+    return b
+
+
+BODY = mirror_hand(strip_stars(SRC))
+KNEE = 27                                            # ab hier stehen die Beine
 WHITE, PEACH, ORANGE = rgb('fafafa'), rgb('ffb179'), rgb('ff883c')
 YEL, YEL2 = rgb('ffef72'), rgb('f3c042')
 RED, DARK = rgb('c92d00'), rgb('941b00')
@@ -115,16 +131,13 @@ def frame(i):
                     k = FIRE.index(c)
                     s[y, x] = FIRE[min(len(FIRE) - 1, k + 1)] if rnd(x, i + 5) > 0.5 else FIRE[max(0, k - 1)]
     out = np.zeros((H, W, 4), int)
-    oy = PT + int(round(math.sin(2 * math.pi * i / 24)))
-    for y in range(SH):
-        for x in range(SW):
-            if s[y, x, 3]:
-                out[y + oy, x + P] = s[y, x]
+    b = BOUNCE12[i % 12]
+    draw_bounce(out, s, b, KNEE, PT, P)
     for cx, cy, amax, period, phase, small in STARS:
         arm = star_arm(i, amax, period, phase)
         if arm is None:
             continue
-        for (x, y), c in star_pixels(cx + P, cy + oy, arm, small).items():
+        for (x, y), c in star_pixels(cx + P, cy + PT + (b if cy < KNEE else 0), arm, small).items():
             assert 1 <= x < W - 1 and 1 <= y < H - 1, 'Stern ragt an den Rand'
             out[y, x] = c
     return out
