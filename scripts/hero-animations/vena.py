@@ -9,7 +9,7 @@ deckungsgleich in src/vena-the-bounty-huntress-{body,fist}.png.
 * Beim Stoß ruckt Vena 1 px zurück (nach oben), ihr Cyborg-Auge glüht auf.
 * Das Jetpack-Feuer links und rechts lodert: jede Flammenspalte wird pro
   Frame zufällig gestreckt (Spitzen züngeln nach unten), der Kern flackert.
-* Sie brüllt: anfangs ist ihr Mund geschlossen (schmaler roter Strich), dann
+* Sie brüllt: anfangs ist ihr Mund geschlossen (gar nicht zu sehen, nur Haut), dann
   geht er auf (so wie im Sprite), beim Brüllen noch 1 px weiter; sie wirft den
   Kopf 1 px zurück (Hals gedehnt, keine Lücke), neben dem Kopf zucken kurze
   Schrei-Striche. Danach schließt sie den Mund wieder.
@@ -63,7 +63,7 @@ MOUTH_D = rgb('4f0000')
 # ihn nur 1 px weiter nach unten auf.
 ROAR_MOUTH = {(12, 12): MOUTH_D, (13, 12): MOUTH_D}
 SKIN = rgb('f6bd98')
-CLOSED_MOUTH = {(12, 10): SKIN, (13, 10): SKIN, (12, 11): MOUTH_D, (13, 11): rgb('7a0000')}
+CLOSED_MOUTH = {(12, 10): SKIN, (13, 10): SKIN, (12, 11): SKIN, (13, 11): SKIN}   # zu = unsichtbar
 MOUTH_OPEN = range(16, 33)                        # davor/danach geschlossen
 SHOUT = rgb('ffe6d5')
 
