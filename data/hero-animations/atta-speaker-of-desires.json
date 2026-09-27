@@ -1,0 +1,15 @@
+{
+  "hero": "Atta, Speaker of Desires",
+  "sheet": "atta-speaker-of-desires.png",
+  "frameWidth": 23,
+  "frameHeight": 29,
+  "frames": 32,
+  "frameMs": 90,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 2,
+  "padLeft": 1,
+  "padRight": 1,
+  "padBottom": 1,
+  "faceX": 11
+}
