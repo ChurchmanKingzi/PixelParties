@@ -1712,6 +1712,22 @@ function DraggablePanel({ children, className, style }) {
 //  ein Canvas in Sprite-Auflösung, das CSS hochskaliert; EINE gemeinsame
 //  requestAnimationFrame-Schleife für alle Helden, gemalt wird nur, wenn
 //  sich der Frame wirklich ändert.
+//
+//  ★ v1451 — ECHTES 3D (Als Vorgabe 27.9.): Die Helden liegen nicht mehr
+//  flach auf der gekippten Karte, sondern STEHEN auf ihr, dem Betrachter
+//  zugewandt, wie die Monster in Yu-Gi-Oh!. Dazu leben sie nicht in der
+//  Heldenzone (die schneidet mit `overflow: hidden` ab und plättet damit
+//  jedes 3D), sondern in einer eigenen Sprite-Ebene (`HeroSpriteEbene`):
+//  Geschwister von `.board-plane` in `.board-plane-clip`, gleiche Box,
+//  gleiche Transformation (live aus der Brettebene kopiert), und NUR sie
+//  hat `transform-style: preserve-3d`. Die Brettebene selbst bleibt
+//  unangetastet — sonst würden deren eigene 3D-Animationen (Surprise-
+//  Flip u. a.) plötzlich echt räumlich und klappten halb hinters Brett.
+//  Jede Figur steht an der Stelle ihrer Zone und ist so zurückgedreht,
+//  dass sie unverzerrt zum Betrachter zeigt (Drehachse an den Füßen,
+//  Winkel aus der gemessenen Matrix der Brettebene). Ohne Neigung
+//  (Telefon, Engpass-Rückfall) ist er 0° — die Figur liegt dann flach.
+//  Seit v1451 außerdem 1,5× größer (Als Vorgabe 27.9.: „zu klein").
 // ═══════════════════════════════════════════
 const HeroIdleAnims = (() => {
   // Slug-Regel wie bei den Effekt-Skripten und den Sheet-Dateinamen.
@@ -1789,13 +1805,88 @@ const HeroIdleAnims = (() => {
   let raf = 0;
   function tick(now) {
     raf = 0;
+    if (schritte.size) { try { ebeneAbgleichen(); } catch {} }
     for (const s of schritte) { try { s(now); } catch {} }
     if (schritte.size) raf = requestAnimationFrame(tick);
   }
   function anmelden(schritt) {
     schritte.add(schritt);
+    try { ebeneAbgleichen(); } catch {}
     if (!raf) raf = requestAnimationFrame(tick);
     return () => { schritte.delete(schritt); };
+  }
+
+  // ── Sprite-Ebene (v1451) ─────────────────────────────────────
+  // Die Ebene übernimmt Lage, Größe und Transformation der Brettebene.
+  // Abgeglichen wird in jedem Bild, solange Figuren stehen — aber nur
+  // geschrieben, wenn sich etwas geändert hat (Maßstab, Scroll-Modus,
+  // Kamera, Telefon-Rückfall). Die Neigung wird wie bei den Flugkarten
+  // (`readBoardTiltDeg`) aus der tatsächlich gerenderten Matrix gelesen.
+  let ebeneEl = null, ebenePlane = null, ebeneStand = '';
+  const ebeneHoerer = new Set();
+  function setzeEbene(el) {
+    if (el === ebeneEl) return;
+    ebeneEl = el;
+    ebenePlane = null;
+    ebeneStand = '';
+    ebeneHoerer.forEach(f => { try { f(el); } catch {} });
+  }
+  function abonniereEbene(f) {
+    ebeneHoerer.add(f);
+    return () => { ebeneHoerer.delete(f); };
+  }
+  function ebeneAbgleichen() {
+    const el = ebeneEl;
+    if (!el || !el.isConnected) return;
+    if (!ebenePlane || !ebenePlane.isConnected) {
+      ebenePlane = el.parentElement ? el.parentElement.querySelector(':scope > .board-plane') : null;
+    }
+    const plane = ebenePlane;
+    if (!plane) return;
+    const cs = getComputedStyle(plane);
+    const t = cs.transform || 'none', o = cs.transformOrigin;
+    const stand = `${plane.offsetLeft}|${plane.offsetTop}|${plane.offsetWidth}|${plane.offsetHeight}|${t}|${o}`;
+    if (stand === ebeneStand) return;
+    ebeneStand = stand;
+    const st = el.style;
+    st.left = plane.offsetLeft + 'px';
+    st.top = plane.offsetTop + 'px';
+    st.width = plane.offsetWidth + 'px';
+    st.height = plane.offsetHeight + 'px';
+    st.transform = t;
+    st.transformOrigin = o;
+    // Aufrichten: die Ebene ist `rotateX(θ) scale(z)` — und `scale()`
+    // streckt nur x/y, NICHT z. Einfach um −θ zurückdrehen ließe die
+    // Figur deshalb noch schräg (bei 29°/1,26 gut 8 % gestaucht). Gesucht
+    // ist die lokale Richtung (0, −cos φ, sin φ), deren Bild keinen
+    // z-Anteil hat: Spalte 2 (Bild von y) = (v4, v5, v6), Spalte 3 (Bild
+    // von z) = (v8, v9, v10) → tan φ = v6 / v10. Die dann noch fehlende
+    // Höhe gleicht `--sprite-streck` aus (Breite v0 : Höhe des Bildes),
+    // damit die Figur unverzerrt dasteht.
+    let kipp = 0, streck = 1;
+    if (t.indexOf('matrix3d(') === 0) {
+      const v = t.slice(9, -1).split(',').map(parseFloat);
+      if (v.length === 16 && v.every(Number.isFinite)) {
+        const phi = Math.atan2(v[6], v[10]);
+        const hoehe = Math.cos(phi) * v[5] - Math.sin(phi) * v[9];
+        if (Number.isFinite(phi) && phi > 0 && phi < 1.4) {
+          kipp = phi * 180 / Math.PI;
+          if (hoehe > 0.01) streck = Math.max(0.5, Math.min(2, Math.abs(v[0]) / hoehe));
+        }
+      }
+    }
+    st.setProperty('--sprite-kipp', kipp.toFixed(3) + 'deg');
+    st.setProperty('--sprite-streck', streck.toFixed(4));
+  }
+  // Lage einer Zone in Koordinaten der Brettebene (Layout, also ohne
+  // Projektion — genau das, was die gleich transformierte Sprite-Ebene
+  // braucht). null, wenn die Zone nicht in der Ebene hängt.
+  function lageInEbene(zone) {
+    const plane = ebenePlane;
+    if (!zone || !plane) return null;
+    let x = 0, y = 0, e = zone;
+    while (e && e !== plane) { x += e.offsetLeft; y += e.offsetTop; e = e.offsetParent; }
+    return e === plane ? { x, y, w: zone.offsetWidth, h: zone.offsetHeight, plane } : null;
   }
 
   // ── Steinfassung eines Sheets ────────────────────────────────
@@ -1886,10 +1977,23 @@ const HeroIdleAnims = (() => {
     return cv;
   }
 
-  return { slug, hole, schonDa: (key) => fertig.get(key), anmelden, steinSheet };
+  return {
+    slug, hole, schonDa: (key) => fertig.get(key), anmelden, steinSheet,
+    setzeEbene, abonniereEbene, ebene: () => ebeneEl, lageInEbene,
+  };
 })();
 
-// Eine Idle-Animation über dem oberen Kartendrittel einer Heldenzone.
+// Die Sprite-Ebene selbst — letztes Kind von `.board-plane-clip`, direkt
+// hinter `.board-plane` (siehe Kopfkommentar). Stabiler Ref-Callback,
+// damit React ihn nicht bei jedem Render ab- und wieder anmeldet.
+function HeroSpriteEbene() {
+  return <div className="hero-sprite-ebene" ref={HeroIdleAnims.setzeEbene} aria-hidden="true" />;
+}
+
+// Eine Idle-Animation, die auf dem oberen Kartendrittel einer Heldenzone
+// steht. In der Zone selbst liegt nur ein unsichtbarer Anker; die Figur
+// wird in die Sprite-Ebene portiert und folgt der Zone dort (Lage,
+// Hover-Vergrößerung).
 // `angehalten`: Frame bleibt stehen (Frozen/Stunned/Webbed).
 // `versteinert`: zusätzlich Steinoptik (kriecht von unten nach oben).
 function HeroIdleSprite({ cardName, angehalten, versteinert, unsichtbar }) {
@@ -1901,15 +2005,23 @@ function HeroIdleSprite({ cardName, angehalten, versteinert, unsichtbar }) {
     HeroIdleAnims.hole(key).then(e => { if (lebt) setEintrag(e || null); });
     return () => { lebt = false; };
   }, [key]);
+  const [ebene, setEbene] = useState(() => HeroIdleAnims.ebene());
+  useEffect(() => {
+    setEbene(HeroIdleAnims.ebene());
+    return HeroIdleAnims.abonniereEbene(setEbene);
+  }, []);
 
+  const ankerRef = useRef(null);
+  const platzRef = useRef(null);
   const canvasRef = useRef(null);
   const zustand = useRef({ angehalten, versteinert });
   zustand.current.angehalten = !!angehalten;
   zustand.current.versteinert = !!versteinert;
 
   useEffect(() => {
-    const cv = canvasRef.current;
-    if (!eintrag || !cv) return;
+    const cv = canvasRef.current, platz = platzRef.current, anker = ankerRef.current;
+    if (!eintrag || !ebene || !cv || !platz || !anker) return;
+    const zone = anker.parentElement;
     const ctx = cv.getContext('2d');
     const { meta, img } = eintrag;
     const fw = meta.frameWidth, fh = meta.frameHeight;
@@ -1923,36 +2035,61 @@ function HeroIdleSprite({ cardName, angehalten, versteinert, unsichtbar }) {
       // Beim Aufbau schon versteinert (Neuladen, Beitritt) → sofort Stein.
       stein: zustand.current.versteinert ? 1 : 0,
       gemalt: -1, steinGemalt: -1,
+      lage: '', hover: false,
     };
     const quelle = (f) => (vertikal ? [0, f * fh] : [f * fw, 0]);
     const male = () => {
       const [sx, sy] = quelle(st.frame);
       ctx.clearRect(0, 0, fw, fh);
-      if (st.stein < 1) ctx.drawImage(img, sx, sy, fw, fh, 0, 0, fw, fh);
-      if (st.stein > 0) {
-        const stein = HeroIdleAnims.steinSheet(eintrag);
-        if (stein) {
-          // Die Versteinerung steigt von den Füßen auf; eine hellere
-          // Staubkante markiert die Front, solange sie wandert.
-          const top = st.stein >= 1 ? 0 : Math.round(fh * (1 - st.stein));
-          if (top < fh) ctx.drawImage(stein, sx, sy + top, fw, fh - top, 0, top, fw, fh - top);
-          if (st.stein < 1 && top > 0) {
-            ctx.save();
-            ctx.globalCompositeOperation = 'source-atop';
-            ctx.fillStyle = 'rgba(225,220,210,0.85)';
-            ctx.fillRect(0, top, fw, 1);
-            ctx.restore();
-          }
+      const stein = st.stein > 0 ? HeroIdleAnims.steinSheet(eintrag) : null;
+      // Die Versteinerung steigt von den Füßen auf; oberhalb der Front
+      // das farbige Bild, darunter Stein, dazwischen eine helle Staubkante.
+      const top = !stein ? fh : (st.stein >= 1 ? 0 : Math.round(fh * (1 - st.stein)));
+      if (top > 0) ctx.drawImage(img, sx, sy, fw, top, 0, 0, fw, top);
+      if (stein && top < fh) {
+        ctx.drawImage(stein, sx, sy + top, fw, fh - top, 0, top, fw, fh - top);
+        if (st.stein < 1 && top > 0) {
+          ctx.save();
+          ctx.globalCompositeOperation = 'source-atop';
+          ctx.fillStyle = 'rgba(225,220,210,0.85)';
+          ctx.fillRect(0, top, fw, 1);
+          ctx.restore();
         }
       }
       st.gemalt = st.frame;
       st.steinGemalt = st.stein;
     };
+    // Der Platz deckt sich in der Sprite-Ebene mit der Zone in der
+    // Brettebene; die Hover-Vergrößerung der Zone (`--board-hover-scale`)
+    // macht er mit, damit die Figur auf der angehobenen Karte stehen bleibt.
+    const folgeZone = () => {
+      const l = HeroIdleAnims.lageInEbene(zone);
+      const stand = l ? `${l.x},${l.y},${l.w},${l.h}` : 'weg';
+      if (stand !== st.lage) {
+        st.lage = stand;
+        if (l) {
+          platz.style.left = l.x + 'px';
+          platz.style.top = l.y + 'px';
+          platz.style.width = l.w + 'px';
+          platz.style.height = l.h + 'px';
+          platz.style.display = '';
+        } else {
+          platz.style.display = 'none';
+        }
+      }
+      const hover = !!(l && zone.classList.contains('zone-has-card') && zone.matches(':hover')
+        && !l.plane.hasAttribute('data-pp-dragging'));
+      if (hover !== st.hover) {
+        st.hover = hover;
+        platz.classList.toggle('hero-idle-hover', hover);
+      }
+    };
+    folgeZone();
     male();
     // Scharfe Pixel beim Vergrößern, weiches Verkleinern (`pixelated`
     // verschluckt beim Verkleinern ganze Pixelzeilen, vgl. v1449). Der
-    // tatsächliche Maßstab hängt an `--board-scale` und der Bildschirm-
-    // dichte, deshalb gemessen statt gerechnet.
+    // tatsächliche Maßstab hängt an `--board-scale`, Projektion und
+    // Bildschirmdichte, deshalb gemessen statt gerechnet.
     const pruefeSchaerfe = () => {
       const breite = cv.getBoundingClientRect().width * (window.devicePixelRatio || 1);
       cv.style.imageRendering = breite >= fw * 0.98 ? 'pixelated' : 'auto';
@@ -1963,6 +2100,7 @@ function HeroIdleSprite({ cardName, angehalten, versteinert, unsichtbar }) {
     const abmelden = HeroIdleAnims.anmelden((now) => {
       const dt = st.zuletzt == null ? 0 : Math.min(now - st.zuletzt, 1000);
       st.zuletzt = now;
+      folgeZone();
       const z = zustand.current;
       if (!z.angehalten) {
         st.rest += dt;
@@ -1977,38 +2115,52 @@ function HeroIdleSprite({ cardName, angehalten, versteinert, unsichtbar }) {
       if (st.frame !== st.gemalt || st.stein !== st.steinGemalt) male();
     });
     return () => { abmelden(); if (ro) ro.disconnect(); };
-  }, [eintrag]);
+  }, [eintrag, ebene]);
 
-  if (!eintrag) return null;
+  const anker = <span ref={ankerRef} className="hero-idle-anker" />;
+  if (!eintrag || !ebene) return anker;
   const { meta, kern } = eintrag;
   const fw = meta.frameWidth, fh = meta.frameHeight;
   const cw = Math.max(1, kern.x1 - kern.x0), ch = Math.max(1, kern.y1 - kern.y0);
-  // Kasten = oberes Drittel der Karte (64 × 90 → 30 hoch), 2 px Rand
-  // seitlich. Nie vergrößert: 1 Sprite-Pixel = 1 Kartenpixel, damit alle
-  // Helden dieselbe Pixeldichte haben; große Sprites werden eingepasst.
-  const s = Math.min(1, 60 / cw, 30 / ch);
+  // Maßstab: 1,5 Kartenpixel je Sprite-Pixel (v1451, vorher 1), große
+  // Sprites eingepasst in 90 × 45 — die halbe Kartenhöhe, weil die Figur
+  // jetzt aufrecht über der Karte steht statt das Drittel zu bedecken.
+  const s = Math.min(1.5, 90 / cw, 45 / ch);
   const bs = (n) => `${+n.toFixed(3)}px * var(--board-scale)`;
   // Kartenoberkante = Zonenmitte − 45; die Füße stehen auf der
   // Drittellinie (Oberkante + 30), die Figur ist waagrecht mittig.
-  const spriteStil = {
+  // Der Steher reicht vom oberen Sheet-Rand bis zu den Füßen; seine
+  // Unterkante ist die Drehachse, darunter wird abgeschnitten.
+  const steherStil = {
     width: `calc(${bs(fw * s)})`,
-    height: `calc(${bs(fh * s)})`,
+    height: `calc(${bs(kern.y1 * s)})`,
     left: `calc(50% - ${bs((kern.x0 + cw / 2) * s)})`,
     top: `calc(50% - ${bs(15 + kern.y1 * s)})`,
+    ...(unsichtbar ? { opacity: 0.4 } : null),
+  };
+  const canvasStil = {
+    width: `calc(${bs(fw * s)})`,
+    height: `calc(${bs(fh * s)})`,
   };
   const schattenBreite = Math.max(8, cw * s * 0.8);
   const schattenStil = {
     width: `calc(${bs(schattenBreite)})`,
     left: `calc(50% - ${bs(schattenBreite / 2)})`,
+    ...(unsichtbar ? { opacity: 0.4 } : null),
   };
   return (
-    <div className={'hero-idle-sprite' + (versteinert ? ' hero-idle-stein' : '') + (angehalten ? ' hero-idle-angehalten' : '')}
-      style={unsichtbar ? { opacity: 0.4 } : undefined} aria-hidden="true">
-      <div className="hero-idle-schatten" style={schattenStil} />
-      <div className="hero-idle-auftritt">
-        <canvas ref={canvasRef} width={fw} height={fh} className="hero-idle-canvas" style={spriteStil} />
-      </div>
-    </div>
+    <>
+      {anker}
+      {ReactDOM.createPortal(
+        <div ref={platzRef} data-held={cardName}
+          className={'hero-idle-platz' + (versteinert ? ' hero-idle-stein' : '') + (angehalten ? ' hero-idle-angehalten' : '')}>
+          <div className="hero-idle-schatten" style={schattenStil} />
+          <div className="hero-idle-steher" style={steherStil}>
+            <canvas ref={canvasRef} width={fw} height={fh} className="hero-idle-canvas" style={canvasStil} />
+          </div>
+        </div>,
+        ebene)}
+    </>
   );
 }
 
@@ -43079,6 +43231,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             </div>
             <div className="board-player-side board-side-me">{renderPlayerSide(me, false)}</div>
             </div>{/* /board-plane */}
+            {/* ★ v1451: Sprite-Ebene der Helden-Idle-Animationen —
+                Zwilling der Brettebene, in dem die Figuren in echtem 3D
+                aufrecht stehen (siehe HeroIdleAnims). */}
+            <HeroSpriteEbene />
             {/* ★ v1257: Die Permanents-Spalten (Extra-Zonen: Elixir of
                 Immortality & Co. + Coolness Stack) sind von .board-center in
                 DIESE Huelle (.board-plane-clip) umgezogen — derselbe Umzug,
