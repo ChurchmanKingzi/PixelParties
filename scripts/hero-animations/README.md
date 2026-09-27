@@ -97,6 +97,18 @@ python3 xcf_extract.py MotiveMoe.xcf assemble src/cute-princess-mary.png "Mary-K
 | `cute-princess-mary.png` | `MotiveMoe.xcf` | `Mary-Kopie` (goldene Mary mit Krone) + `Mary #1` (Flügel) |
 | alle übrigen MotiveMoe-Heroes | `MotiveMoe.xcf` | reproduzierbar per `python3 assemble_moe.py <MotiveMoe.xcf>` (Zuordnung im Skriptkopf) |
 
+Neue Datei durchsuchen: `xcf_scan.py dump` legt alle Ebenen einzeln ab,
+`xcf_scan.py match <ordner> --heroes` gleicht sie mit allen noch nicht
+animierten Hero-Karten ab (Fehler relativ zum Kontrast der Ebene – Werte
+um 0,2–0,4 sind echte Treffer, ab ~0,45 Rauschen) und `xcf_scan.py sheet`
+zeigt Karte und beste Ebenen nebeneinander. Aus dem Repo-Wurzelordner:
+
+```bash
+python3 scripts/hero-animations/xcf_scan.py dump MotiveArcanum.xcf /tmp/arc
+python3 scripts/hero-animations/xcf_scan.py match /tmp/arc --heroes
+python3 scripts/hero-animations/xcf_scan.py sheet /tmp/arc /tmp/arc_treffer.png 0.45
+```
+
 `assemble_moe.py` speichert bewegliche Teile zusätzlich deckungsgleich als
 `src/<slug>-<teil>.png` (z. B. `-body`, `-wings`, `-arm`, `-flames`, `-fist`),
 damit Flügel, Arme oder Feuer getrennt animiert werden können.
