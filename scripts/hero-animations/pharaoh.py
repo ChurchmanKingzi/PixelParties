@@ -4,10 +4,9 @@ Champion Pharaoh (MotiveEgypt.xcf: „Pharaoh“ bzw. „Yugi“).
 
 Aufruf: python3 pharaoh.py <tag> [ms] [hero|gamer]
 
-* Er atmet: der Oberkörper hebt sich im Rhythmus um 1 px (die Beine bleiben
-  stehen, die Zeile über den Beinen wird gedehnt).
-* Er wiegt den Oberkörper sanft hin und her (Kopf 1 px, Rumpf nur im
-  Umkehrpunkt, die Beine bleiben stehen).
+* Er wippt auf und ab: der Oberkörper federt im 12er-Takt 1 px hoch und
+  1 px herunter (die Beine bleiben stehen; beim Strecken wird die Zeile
+  über den Beinen gedehnt).
 * Er blinzelt einmal pro Loop (halb -> zu -> halb); beide Augen sind 2 px
   breit (Weiß + Iris) und schließen sich ganz.
 * hero:  das Kopftuch schimmert nicht, nur das goldene Schmuckstück in der
@@ -21,17 +20,17 @@ import math
 import sys
 from PIL import Image
 import numpy as np
-from anim_common import rgb, save_outputs, sparkle_pixels
+from anim_common import rgb, save_outputs, sparkle_pixels, BOUNCE12
 from flap_common import fill_pinholes
 
 V = next((v for v in sys.argv[2:] if v in ('hero', 'gamer')), 'hero')
 CFG = {
     'hero': dict(slug='pharaoh-the-lone-living-being', prefix='pharaoh', feet=20,
-                 eyes=[((5, 6), 8, 9), ((9, 10), 8, 9)], skin='a76e28', lash='000000', head_y=12,
+                 eyes=[((5, 6), 8, 9), ((9, 10), 8, 9)], skin='a76e28', lash='000000',
                  shine_cols=(), shine_y=(0, 0), jewel=[(7, 2), (8, 2), (7, 3), (8, 3), (7, 4), (8, 4)],
                  jewel_star=(7, 3)),
     'gamer': dict(slug='gamer-champion-pharaoh', prefix='gamer_pharaoh', feet=27,
-                  eyes=[((9, 10), 15, 16), ((13, 14), 15, 16)], skin='d09961', lash='000000', head_y=18,
+                  eyes=[((9, 10), 15, 16), ((13, 14), 15, 16)], skin='d09961', lash='000000',
                   shine_cols=('ccab37', 'ebcd49', 'fff4a3', '583e00'), shine_y=(23, 27)),
 }[V]
 SRC = np.array(Image.open(f"src/{CFG['slug']}.png").convert('RGBA')).astype(int)
@@ -52,13 +51,6 @@ GL_WHITE, GL_YEL = rgb('ffffff'), rgb('fff4a3')
 JEWEL_RAMP = {6: 0.3, 7: 0.6, 8: 0.6, 9: 0.3}
 
 
-def sway(y, i):
-    if y >= FEET:
-        return 0
-    a = 1.4 if y <= CFG['head_y'] else 0.6
-    return int(round(a * math.sin(2 * math.pi * i / 24)))
-
-
 def hair(x, y, i):
     """gamer: (dx, dy) der Haarzacken."""
     if V != 'gamer':
@@ -75,7 +67,7 @@ def hair(x, y, i):
 
 
 def breath(i):
-    return -1 if (i % 16) in range(5, 12) else 0
+    return BOUNCE12[i % 12]
 
 
 def shine(c, x, y, i):
@@ -110,8 +102,8 @@ def frame(i):
         for x in range(SW):
             if s[y, x, 3]:
                 hx, hy = hair(x, y, i)
-                out[y + PT + hy + (b if y < FEET else 0), x + P + sway(y, i) + hx] = shine(s[y, x], x, y, i)
-    if b:                                            # Zeile über den Beinen dehnen
+                out[y + PT + hy + (b if y < FEET else 0), x + P + hx] = shine(s[y, x], x, y, i)
+    if b < 0:                                        # Zeile über den Beinen dehnen
         y = FEET - 1
         for x in range(SW):
             if s[y, x, 3] and not out[y + PT, x + P, 3]:
@@ -119,14 +111,14 @@ def frame(i):
     fill_pinholes(out)
     if 'jewel_star' in CFG:                          # Glitzerstern auf dem Schmuckstück
         jx, jy = CFG['jewel_star']
-        for (x, y), c in sparkle_pixels(i % 24, 24, [(jx + P + sway(jy, i), jy + PT + b, 6)],
+        for (x, y), c in sparkle_pixels(i % 24, 24, [(jx + P, jy + PT + b, 6)],
                                         rgb('fff4a3'), rgb('e6c42b')).items():
             out[y, x] = c
     if V == 'gamer':
         for t0, gx, gy in GLINTS:
             t = i - t0
             if 0 <= t < 3:
-                cx, cy = gx + P + sway(gy, i), gy + PT + b
+                cx, cy = gx + P, gy + PT + b
                 out[cy, cx] = GL_WHITE
                 if t == 1:
                     for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
