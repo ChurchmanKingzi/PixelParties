@@ -132,6 +132,20 @@ kopiert, daneben liegt eine JSON-Datei mit den Metadaten. Die erzeugten
 | `coolhalla.py` | `final 90 lolki` | `lolki_idle_final_sheet.png` | `lolki-trickstar-of-coolness` |
 | `coolhalla.py` | `final 90 peter` | `peter_idle_final_sheet.png` | `peter-r-ll-the-protagonist` |
 | `coolhalla.py` | `final 90 prodigy` | `prodigy_idle_final_sheet.png` | `shrunken-prodigy-peter-r-ll` (Skin) |
+| `deepsea.py` | `final 90 arnold` | `arnold_idle_final_sheet.png` | `bravo-arnold` (Skin) |
+| `deepsea.py` | `final 90 kit` | `kit_idle_final_sheet.png` | `kit-the-shark-researcher` |
+| `deepsea.py` | `final 90 lolek` | `lolek_idle_final_sheet.png` | `lolek-the-shard-knight` |
+| `deepsea.py` | `final 90 captain` | `captain_idle_final_sheet.png` | `division-captain-lolek` (Skin) |
+| `deepsea.py` | `final 90 mender` | `mender_idle_final_sheet.png` | `lolek-mender-of-the-shattered-trident` |
+| `deepsea.py` | `final 90 rakah` | `rakah_idle_final_sheet.png` | `rakah-the-loan-shark` |
+| `deepsea.py` | `final 90 rhabi` | `rhabi_idle_final_sheet.png` | `rha-bi-the-living-skeleton` |
+| `deepsea.py` | `final 90 saya` | `saya_idle_final_sheet.png` | `saya-the-plant-princess` |
+| `deepsea.py` | `final 90 grass` | `grass_idle_final_sheet.png` | `saya-the-grass-princess` (Skin) |
+| `deepsea.py` | `final 90 siphem` | `siphem_idle_final_sheet.png` | `siphem-the-deepsea-demon` |
+| `deepsea.py` | `final 90 asgore` | `asgore_idle_final_sheet.png` | `monster-king-siphem` (Skin) |
+| `deepsea.py` | `final 90 sorin` | `sorin_idle_final_sheet.png` | `sorin-the-warden-of-blood-rock` |
+| `deepsea.py` | `final 90 tryse` | `tryse_idle_final_sheet.png` | `tryse-the-shadow-slayer` |
+| `toras.py` | `final` | `toras_idle_final_sheet.png` | `toras-master-of-all-weapons` |
 | `bubbles.py` | `final gross` | `bubbles_idle_final_gross_sheet.png` | `bubbles-the-bouncy-bunny` |
 
 `bubbles.py` ohne `gross` erzeugt eine auf Hero-Größe verkleinerte Variante
@@ -165,6 +179,7 @@ python3 xcf_extract.py MotiveMoe.xcf assemble src/cute-princess-mary.png "Mary-K
 | MotiveBritain-Heroes und -Skins | `MotiveBritain.xcf` | reproduzierbar per `python3 assemble_britain.py <MotiveBritain.xcf>` (Zuordnung im Skriptkopf) |
 | MotiveChina-Heroes | `MotiveChina.xcf` | reproduzierbar per `python3 assemble_china.py <MotiveChina.xcf>` (Zuordnung im Skriptkopf) |
 | MotiveCoolhalla-Heroes und Skin | `MotiveCoolhalla.xcf` | reproduzierbar per `python3 assemble_coolhalla.py <MotiveCoolhalla.xcf>` (Zuordnung im Skriptkopf; Cooldin wird aus zwei Szenen-Ebenen ausgeschnitten) |
+| MotiveDeepsea-Heroes und -Skins | `MotiveDeepsea.xcf` | reproduzierbar per `python3 assemble_deepsea.py <MotiveDeepsea.xcf>` (Zuordnung im Skriptkopf; Scherben-Vorlagen für die Lolek-Partikel als `-shards.png`) |
 
 Neue Datei durchsuchen: `xcf_scan.py dump` legt alle Ebenen einzeln ab,
 `xcf_scan.py match <ordner> --heroes` gleicht sie mit allen noch nicht

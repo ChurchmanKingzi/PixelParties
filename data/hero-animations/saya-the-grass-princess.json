@@ -1,0 +1,16 @@
+{
+  "hero": "Saya the Grass Princess",
+  "sheet": "saya-the-grass-princess.png",
+  "frameWidth": 22,
+  "frameHeight": 32,
+  "frames": 48,
+  "frameMs": 90,
+  "loop": true,
+  "layout": "horizontal",
+  "skinOf": "Saya, the Plant Princess",
+  "padTop": 4,
+  "padLeft": 3,
+  "padRight": 3,
+  "padBottom": 2,
+  "faceX": 10.5
+}

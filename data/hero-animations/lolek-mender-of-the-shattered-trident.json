@@ -1,0 +1,15 @@
+{
+  "hero": "Lolek, Mender of the Shattered Trident",
+  "sheet": "lolek-mender-of-the-shattered-trident.png",
+  "frameWidth": 27,
+  "frameHeight": 44,
+  "frames": 48,
+  "frameMs": 90,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 4,
+  "padLeft": 3,
+  "padRight": 3,
+  "padBottom": 2,
+  "faceX": 12.5
+}

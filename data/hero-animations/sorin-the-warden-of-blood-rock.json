@@ -1,0 +1,15 @@
+{
+  "hero": "Sorin, the Warden of Blood Rock",
+  "sheet": "sorin-the-warden-of-blood-rock.png",
+  "frameWidth": 22,
+  "frameHeight": 29,
+  "frames": 48,
+  "frameMs": 90,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 4,
+  "padLeft": 3,
+  "padRight": 3,
+  "padBottom": 2,
+  "faceX": 10.5
+}

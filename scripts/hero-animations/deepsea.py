@@ -135,7 +135,7 @@ if V == 'rakah':
     BLOOD_COLS = [rgb('0f4d3d'), rgb('18775e')]
     BLOOD = np.array([[bool(SRC[y, x, 3]) and tuple(SRC[y, x]) in BLOOD_COLS for x in range(SW)] for y in range(SH)])
     BLOOD_HI = rgb('3fbf96')
-    DRIPS = [(19, 0), (21, 7)]                       # (x, Phase) – Tropfen lösen sich unten
+    DRIPS = [(19, 5), (21, 11)]                      # (x, Phase) – Tropfen lösen sich unten (Frame 0: keiner)
 if V == 'asgore':
     TRIDENT = load('trident')[:, :, 3] > 0
     CAPE_L = {(x, y) for y in range(15, 29) for x in range(0, 18) if SRC[y, x, 3] and not TRIDENT[y, x]}
