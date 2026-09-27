@@ -1731,7 +1731,8 @@ function DraggablePanel({ children, className, style }) {
 //  seit v1452 nochmals 1,5× (2,25 Kartenpixel je Sprite-Pixel), am
 //  Gesicht ausgerichtet (`faceX`), und beim Hover über die Heldenkarte
 //  zieht sich die Figur wie ein Hologramm zurück, damit die
-//  Status-Icons frei sichtbar sind.
+//  Status-Icons frei sichtbar sind. v1453: nochmals +25 %, Füße auf
+//  der Kartenmitte, Zurückziehen ohne Hologramm-Optik.
 // ═══════════════════════════════════════════
 const HeroIdleAnims = (() => {
   // Slug-Regel wie bei den Effekt-Skripten und den Sheet-Dateinamen.
@@ -2103,7 +2104,8 @@ function HeroIdleSprite({ cardName, angehalten, versteinert, unsichtbar }) {
         // ★ v1452 (Als Vorgabe 27.9.): Hovert man die Heldenkarte, zieht
         // sich die Figur wie ein Hologramm in die Karte zurück — die
         // Status-Icons darunter werden frei. Beim Verlassen taucht sie
-        // wieder auf. `hero-idle-zurueck` trägt nur die Auftauch-
+        // wieder auf. Seit v1453 nur noch die BEWEGUNG einer Projektion,
+        // ohne Hologramm-Optik (Tönung, Scanlines, Flackern). `hero-idle-zurueck` trägt nur die Auftauch-
         // Animation und fällt an deren Ende weg (siehe animationend).
         platz.classList.toggle('hero-idle-hover', hover);
         platz.classList.toggle('hero-idle-zurueck', !hover);
@@ -2156,11 +2158,11 @@ function HeroIdleSprite({ cardName, angehalten, versteinert, unsichtbar }) {
   const { meta, kern } = eintrag;
   const fw = meta.frameWidth, fh = meta.frameHeight;
   const cw = Math.max(1, kern.x1 - kern.x0), ch = Math.max(1, kern.y1 - kern.y0);
-  // Maßstab: 2,25 Kartenpixel je Sprite-Pixel (v1452; v1451: 1,5,
-  // v1450: 1 — Als Vorgabe 27.9. zweimal „mindestens 50 % größer"),
-  // große Sprites eingepasst in 135 × 67,5 (drei Viertel der Kartenhöhe;
-  // die Figur steht aufrecht über der Karte).
-  const s = Math.min(2.25, 135 / cw, 67.5 / ch);
+  // Maßstab: 2,8125 Kartenpixel je Sprite-Pixel (v1453: nochmals +25 %;
+  // v1452: 2,25, v1451: 1,5, v1450: 1 — Als Vorgabe 27.9.), große
+  // Sprites eingepasst in 168,75 × 84,375 (Kartenhöhe 90; die Figur
+  // steht aufrecht über der Karte).
+  const s = Math.min(2.8125, 168.75 / cw, 84.375 / ch);
   const bs = (n) => `${+n.toFixed(3)}px * var(--board-scale)`;
   // ★ v1452 (Als Vorgabe 27.9.): „Sofern nicht anders angegeben, bildet
   // immer das GESICHT des Heroes den Bildmittelpunkt." Reihenfolge:
@@ -2169,21 +2171,22 @@ function HeroIdleSprite({ cardName, angehalten, versteinert, unsichtbar }) {
   // Frame-Pixeln, gemessen von der linken Frame-Kante.
   const zahl = (v) => (typeof v === 'number' && Number.isFinite(v) ? v : null);
   const mitteX = zahl(meta.anchorX) ?? zahl(meta.faceX) ?? zahl(kern.kopfX) ?? (kern.x0 + cw / 2);
-  // Kartenoberkante = Zonenmitte − 45; die Füße stehen auf der
-  // Drittellinie (Oberkante + 30), das Gesicht über der Kartenmitte.
+  // ★ v1453 (Als Vorgabe 27.9.: „weiter nach unten, auf die Mitte der
+  // Karten"): die Füße stehen auf der KARTENMITTE (= Zonenmitte), nicht
+  // mehr auf der Drittellinie; das Gesicht steht waagrecht über der Mitte.
   // Der Steher reicht vom oberen Sheet-Rand bis zu den Füßen; seine
   // Unterkante ist die Drehachse, darunter wird abgeschnitten.
   const steherStil = {
     width: `calc(${bs(fw * s)})`,
     height: `calc(${bs(kern.y1 * s)})`,
     left: `calc(50% - ${bs(mitteX * s)})`,
-    top: `calc(50% - ${bs(15 + kern.y1 * s)})`,
+    top: `calc(50% - ${bs(kern.y1 * s)})`,
   };
   const canvasStil = {
     width: `calc(${bs(fw * s)})`,
     height: `calc(${bs(fh * s)})`,
   };
-  const schattenBreite = Math.max(8, Math.min(cw * s * 0.8, 70));
+  const schattenBreite = Math.max(8, Math.min(cw * s * 0.8, 88));
   const schattenStil = {
     width: `calc(${bs(schattenBreite)})`,
     left: `calc(50% - ${bs(schattenBreite / 2)})`,

@@ -3645,7 +3645,7 @@ body:has(.anim-backdrop) .pp-bg-particles { display: none; }
   animation: announceShort 2s ease-out forwards;
 }
 
-/* ═══ Helden-Idle-Animation (v1450, echtes 3D seit v1451, Hologramm v1452) ═══
+/* ═══ Helden-Idle-Animation (v1450, echtes 3D seit v1451, Zurückziehen v1452) ═══
    Die Figuren leben in `.hero-sprite-ebene`, einem Zwilling von
    `.board-plane` (Box und Transformation kopiert `HeroIdleAnims` live).
    Nur diese Ebene hat preserve-3d: jede Figur steht dort auf ihrer
@@ -3671,9 +3671,9 @@ body:has(.anim-backdrop) .pp-bg-particles { display: none; }
 /* drei Achsen: die aufrechte Figur liegt größtenteils in der z-Achse
    der Ebene — ein zweiachsiges `scale` ließe sie gedrungen wirken */
 .hero-idle-platz.hero-idle-hover { scale: var(--board-hover-scale) var(--board-hover-scale) var(--board-hover-scale); }
-/* Die aufrechte Figur. Unterkante = Drittellinie der Karte = Drehachse;
-   darunter wird abgeschnitten — daraus steigt der Held beim Auftritt
-   empor, als käme er aus der Karte. */
+/* Die aufrechte Figur. Unterkante = Kartenmitte (seit v1453, vorher
+   Drittellinie) = Drehachse; darunter wird abgeschnitten — daraus steigt
+   der Held beim Auftritt empor, als käme er aus der Karte. */
 .hero-idle-steher {
   position: absolute;
   overflow: hidden;
@@ -3691,45 +3691,30 @@ body:has(.anim-backdrop) .pp-bg-particles { display: none; }
      normale Stil (sonst hielte das Animationsende Werte fest) */
   animation: heroIdleAuftritt .55s steps(10, end) backwards;
 }
-/* ── Hologramm beim Hover (v1452) ────────────────────────────────────
-   Hovert man die Heldenkarte, zieht sich die Figur wie ein Hologramm
-   in die Karte zurück: cyan eingefärbt, Scanlines, Flackern, dann zur
-   Linie zusammengezogen und weg — die Status-Icons liegen frei. Beim
-   Verlassen spielt dasselbe rückwärts. Drehpunkt sind die Füße. */
+/* ── Zurückziehen beim Hover (v1452, schlicht seit v1453) ──────────────
+   Hovert man die Heldenkarte, zieht sich die Figur wie eine Projektion
+   in die Karte zurück — zur waagrechten Linie zusammengezogen und weg —,
+   die Status-Icons liegen frei. Beim Verlassen zieht sie sich auf
+   demselben Weg wieder auf. Als Vorgabe 27.9.: „soll wie ein Hologramm
+   aussehen, aber keines SEIN" — also nur die Bewegung, keine Tönung,
+   keine Scanlines, kein Flackern. Drehpunkt sind die Füße. */
 .hero-idle-holo {
   position: absolute;
   inset: 0;
   transform-origin: 50% 100%;
 }
-.hero-idle-hover .hero-idle-holo,
-.hero-idle-zurueck .hero-idle-holo {
-  -webkit-mask-image: repeating-linear-gradient(to bottom, #000 0 calc(1px * var(--board-scale)), rgba(0,0,0,.45) calc(1px * var(--board-scale)) calc(2px * var(--board-scale)));
-          mask-image: repeating-linear-gradient(to bottom, #000 0 calc(1px * var(--board-scale)), rgba(0,0,0,.45) calc(1px * var(--board-scale)) calc(2px * var(--board-scale)));
-}
-.hero-idle-hover .hero-idle-holo { animation: heroHoloRueckzug .4s linear forwards; }
-.hero-idle-zurueck .hero-idle-holo { animation: heroHoloAuftauchen .45s linear both; }
+.hero-idle-hover .hero-idle-holo { animation: heroHoloRueckzug .32s ease-in forwards; }
+.hero-idle-zurueck .hero-idle-holo { animation: heroHoloAuftauchen .36s ease-out both; }
 @keyframes heroHoloRueckzug {
-  0%   { opacity: 1;   transform: none; filter: none; }
-  12%  { opacity: .55; transform: scaleX(1.04);
-         filter: sepia(1) hue-rotate(140deg) saturate(3) brightness(1.3) drop-shadow(0 0 2px rgba(80,240,255,.9)); }
-  24%  { opacity: .95; }
-  34%  { opacity: .4; }
-  46%  { opacity: .9;  transform: scaleY(.85); }
-  74%  { opacity: .8;  transform: scaleX(1.08) scaleY(.18); }
-  90%  { opacity: .9;  transform: scaleX(1.25) scaleY(.04); }
-  100% { opacity: 0;   transform: scaleX(.2) scaleY(0);
-         filter: sepia(1) hue-rotate(140deg) saturate(3) brightness(1.3) drop-shadow(0 0 2px rgba(80,240,255,.9)); }
+  0%   { opacity: 1; transform: none; }
+  70%  { opacity: 1; transform: scaleX(1.06) scaleY(.12); }
+  100% { opacity: 0; transform: scaleX(.3) scaleY(0); }
 }
 @keyframes heroHoloAuftauchen {
-  0%   { opacity: 0;   transform: scaleX(.2) scaleY(0);
-         filter: sepia(1) hue-rotate(140deg) saturate(3) brightness(1.3) drop-shadow(0 0 2px rgba(80,240,255,.9)); }
-  15%  { opacity: .9;  transform: scaleX(1.25) scaleY(.04); }
-  42%  { opacity: .75; transform: scaleY(1.05); }
-  55%  { opacity: .35; transform: none; }
-  66%  { opacity: .9; }
-  80%  { opacity: .6;
-         filter: sepia(1) hue-rotate(140deg) saturate(3) brightness(1.3) drop-shadow(0 0 2px rgba(80,240,255,.9)); }
-  100% { opacity: 1;   transform: none; filter: none; }
+  0%   { opacity: 0; transform: scaleX(.3) scaleY(0); }
+  30%  { opacity: 1; transform: scaleX(1.06) scaleY(.12); }
+  80%  { transform: scaleY(1.03); }
+  100% { opacity: 1; transform: none; }
 }
 /* Unsichtbare Helden: halbtransparent wie ihre Karte */
 .hero-idle-unsichtbar .hero-idle-steher,
@@ -3739,10 +3724,10 @@ body:has(.anim-backdrop) .pp-bg-particles { display: none; }
   70%  { transform: translateY(0);    filter: brightness(1.5); }
   100% { transform: translateY(0);    filter: none; }
 }
-/* Pixel-Bodenschatten, flach auf der Karte unter den Füßen */
+/* Pixel-Bodenschatten, flach auf der Kartenmitte unter den Füßen */
 .hero-idle-schatten {
   position: absolute;
-  top: calc(50% - 16.5px * var(--board-scale));
+  top: calc(50% - 1.5px * var(--board-scale));
   height: calc(3px * var(--board-scale));
   background: radial-gradient(ellipse at center, rgba(0,0,0,.5) 0 45%, rgba(0,0,0,.22) 46% 70%, transparent 71%);
   animation: heroIdleSchatten .55s ease-out backwards;
@@ -3757,7 +3742,7 @@ body:has(.anim-backdrop) .pp-bg-particles { display: none; }
   .hero-idle-canvas, .hero-idle-schatten { animation: none; }
   /* ohne Bewegung: einfach aus- und einblenden */
   .hero-idle-hover .hero-idle-holo,
-  .hero-idle-zurueck .hero-idle-holo { animation: none; -webkit-mask-image: none; mask-image: none; }
+  .hero-idle-zurueck .hero-idle-holo { animation: none; }
   .hero-idle-holo { transition: opacity .2s ease; }
   .hero-idle-hover .hero-idle-holo { opacity: 0; }
 }
