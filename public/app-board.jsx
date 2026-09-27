@@ -2180,13 +2180,22 @@ function HeroIdleSprite({ cardName, angehalten, versteinert, unsichtbar }) {
   // ★ v1453 (Als Vorgabe 27.9.: „weiter nach unten, auf die Mitte der
   // Karten"): die Füße stehen auf der KARTENMITTE (= Zonenmitte), nicht
   // mehr auf der Drittellinie; das Gesicht steht waagrecht über der Mitte.
-  // Der Steher reicht vom oberen Sheet-Rand bis zu den Füßen; seine
-  // Unterkante ist die Drehachse, darunter wird abgeschnitten.
+  // ★ v1455 — Standlinie `footY` (Frame-Pixel von oben), das Gegenstück
+  // zu `faceX` für die Senkrechte (Als Vorgabe 27.9.: Medea „sitzt
+  // deutlich zu hoch auf der Karte, wegen der SCHLANGEN unten um sie
+  // herum"). Ohne Angabe gilt wie bisher das unterste deckende Pixel.
+  // Was UNTER der Standlinie liegt (Medeas Schlangen), wird nicht mehr
+  // abgeschnitten: der Steher reicht bis zum untersten deckenden Pixel,
+  // gedreht wird aber um die Standlinie.
+  const fussY = zahl(meta.footY) ?? kern.y1;
+  const unterkante = Math.max(fussY, kern.y1);
+  const drehpunkt = `50% calc(${bs(fussY * s)})`;
   const steherStil = {
     width: `calc(${bs(fw * s)})`,
-    height: `calc(${bs(kern.y1 * s)})`,
+    height: `calc(${bs(unterkante * s)})`,
     left: `calc(50% - ${bs(mitteX * s)})`,
-    top: `calc(50% - ${bs(kern.y1 * s)})`,
+    top: `calc(50% - ${bs(fussY * s)})`,
+    transformOrigin: drehpunkt,
   };
   const canvasStil = {
     width: `calc(${bs(fw * s)})`,
@@ -2205,7 +2214,7 @@ function HeroIdleSprite({ cardName, angehalten, versteinert, unsichtbar }) {
           className={'hero-idle-platz' + (versteinert ? ' hero-idle-stein' : '') + (angehalten ? ' hero-idle-angehalten' : '') + (unsichtbar ? ' hero-idle-unsichtbar' : '')}>
           <div className="hero-idle-schatten" style={schattenStil} />
           <div className="hero-idle-steher" style={steherStil}>
-            <div className="hero-idle-holo">
+            <div className="hero-idle-holo" style={{ transformOrigin: drehpunkt }}>
               <canvas ref={canvasRef} width={fw} height={fh} className="hero-idle-canvas" style={canvasStil} />
             </div>
           </div>
