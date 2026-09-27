@@ -1,0 +1,15 @@
+{
+  "hero": "Null, the Mage Slayer",
+  "sheet": "null-the-mage-slayer.png",
+  "frameWidth": 59,
+  "frameHeight": 34,
+  "frames": 32,
+  "frameMs": 80,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 3,
+  "padLeft": 3,
+  "padRight": 3,
+  "padBottom": 1,
+  "faceX": 41
+}
