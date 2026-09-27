@@ -3,11 +3,12 @@
 
     python3 xcf_scan.py dump <datei.xcf> <arbeitsordner>
         -> jede Ebene zugeschnitten als NNN.png + meta.json (Index, Name, BBox)
-    python3 xcf_scan.py match <arbeitsordner> [--heroes] [Kartenname ...]
+    python3 xcf_scan.py match <arbeitsordner> [--heroes|--skins] [Kartenname ...]
         -> für jede Karte (Standard mit --heroes: alle noch nicht animierten
            Hero-Karten mit Bild) die Ebenen, die am besten in die Kartenkunst
            passen. Grob auf Kartenauflösung/7.8 vorsortiert, dann in voller
            Auflösung (maskiertes Template-Matching) verfeinert.
+           Mit --skins: alle Skin-Karten aus cards/skins (Name mit „skins/“).
            Ergebnis: <arbeitsordner>/matches.json
     python3 xcf_scan.py sheet <arbeitsordner> <ausgabe.png> [min_score]
         -> Übersicht: Karte | beste Ebenen, für den Abgleich mit dem Auge
@@ -33,6 +34,8 @@ def slug(n):
 
 
 def card_file(name):
+    if name.startswith('skins/'):                       # Skin-Karten: cards/skins/<Name>.png
+        return 'cards/' + name + '.png'
     return 'cards/' + re.sub(r'[\\/:*?"<>|,]', '', name).strip() + '.png'
 
 
@@ -148,7 +151,11 @@ if __name__ == '__main__':
         dump(sys.argv[2], sys.argv[3])
     elif cmd == 'match':
         out, rest = sys.argv[2], sys.argv[3:]
-        if '--heroes' in rest:
+        if '--skins' in rest:
+            done = {f[:-5] for f in os.listdir('data/hero-animations') if f.endswith('.json')}
+            rest = ['skins/' + f[:-4] for f in sorted(os.listdir('cards/skins'))
+                    if f.endswith('.png') and slug(f[:-4]) not in done]
+        elif '--heroes' in rest:
             cards = json.load(open('data/cards.json', encoding='utf-8'))
             done = {f[:-5] for f in os.listdir('data/hero-animations') if f.endswith('.json')}
             rest = [c['name'] for c in cards if 'Hero' in (c.get('cardType') or '')

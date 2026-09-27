@@ -46,8 +46,8 @@ kopiert, daneben liegt eine JSON-Datei mit den Metadaten. Die erzeugten
 | `inya.py` | `final` | `inya_idle_final_sheet.png` | `card-game-player-inya` |
 | `zwei.py` | `final` | `zwei_idle_final_sheet.png` | `zwei-the-lucky-thief` |
 | `night.py` | `final` | `night_idle_final_sheet.png` | `night-the-herald-of-chess` |
-| `kasparov.py` | `final 90 b` | `kasparov_b_idle_final_sheet.png` | `kasparov-the-king-of-kings-b` |
-| `kasparov.py` | `final 90 w` | `kasparov_w_idle_final_sheet.png` | `kasparov-the-king-of-kings-w` |
+| `kasparov.py` | `final 90 b` | `kasparov_b_idle_final_sheet.png` | `kasperov-the-king-of-kings-b` |
+| `kasparov.py` | `final 90 w` | `kasparov_w_idle_final_sheet.png` | `kasperov-the-king-of-kings-w` |
 | `darion.py` | `final 80` | `darion_idle_final_sheet.png` | `darion-the-blood-crazy-groundskeeper` |
 | `ghazma.py` | `final` | `ghazma_idle_final_sheet.png` | `ghazma-the-worm-feeder` |
 | `sid.py` | `final` | `sid_idle_final_sheet.png` | `sid-the-king-of-thieves` |
