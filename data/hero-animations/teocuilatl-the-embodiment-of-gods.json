@@ -1,0 +1,15 @@
+{
+  "hero": "Teocuilatl, the Embodiment of Gods",
+  "sheet": "teocuilatl-the-embodiment-of-gods.png",
+  "frameWidth": 34,
+  "frameHeight": 39,
+  "frames": 48,
+  "frameMs": 90,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 3,
+  "padLeft": 3,
+  "padRight": 3,
+  "padBottom": 3,
+  "faceX": 14.5
+}
