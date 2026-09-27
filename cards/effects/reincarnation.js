@@ -33,6 +33,7 @@
 
 const { placePollutionTokens, countFreeZones, getFreeZones } = require('./_pollution-shared');
 const { hasCardType, isOwnSideSummonableCreature } = require('./_hooks');
+const { canReviveHero } = require('./_revive-shared');
 
 // Free-zone requirements per mode. Reincarnation always costs 2 Pollution
 // Tokens, but the Creature-restore path ALSO needs a zone for the creature
@@ -52,6 +53,8 @@ function getReviveTargets(gs, pi) {
     if (!hero?.name) continue;
     if (hero.hp > 0) continue;
     if (hero.reincarnationRevived) continue;
+    // v1466: volle Heilung — bei 0 max HP kein Ziel (s. _revive-shared).
+    if (!canReviveHero(hero)) continue;
     out.push({ heroIdx: hi, hero });
   }
   return out;

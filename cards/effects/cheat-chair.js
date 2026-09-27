@@ -36,6 +36,8 @@
 //    anders als bei Carris steht die Ausnahme hier nicht im Text.
 // ═══════════════════════════════════════════
 
+const { canReviveHero } = require('./_revive-shared');
+
 const CARD_NAME = 'Cheat Chair';
 const LETZTER_ZUG = 3;
 
@@ -46,6 +48,11 @@ module.exports = {
 
   heroDefeatedCondition(gs, pi, engine, info) {
     if (!info?.letzterHeld) return false;
+    // ★ v1466: „heal its HP completely" — ein Held mit 0 max HP bekaeme
+    // 0 HP zurueck. Die Karte wird dann gar nicht erst angeboten
+    // (s. _revive-shared).
+    const held = info.hero || gs.players[pi]?.heroes?.[info.heroIdx];
+    if (!canReviveHero(held)) return false;
     if (info.sourceOwner == null || info.sourceOwner === pi) return false;
     return (gs.turn || 1) <= engine.zugIndexVon(pi, LETZTER_ZUG);
   },

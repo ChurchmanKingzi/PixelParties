@@ -140,6 +140,11 @@ module.exports = {
 
       const heroIdx = ps.heroes.findIndex(h => h === hero);
       if (heroIdx < 0) return;
+      // ★ v1466: „heal that target's HP for half their maximum" — bei 0
+      // max HP gaebe es nichts zu heilen. Der Held wird nicht vorgemerkt,
+      // das Elixir loest fuer ihn nicht aus und bleibt liegen
+      // (s. _revive-shared).
+      if (!engine.canReviveHero(hero)) return;
 
       // Match THIS card instance's perm (by permId) rather than by name —
       // with `cardOriginalOwner`/duplicate protection this keeps each

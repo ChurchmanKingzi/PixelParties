@@ -59,6 +59,9 @@ function revivableHeroes(engine, pi) {
   for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
     const h = ps.heroes[hi];
     if (!h?.name || h.hp > 0) continue;
+    // v1466: „with 100 HP" wird auf die max HP gedeckelt — bei 0 max HP
+    // kein Ziel (s. _revive-shared).
+    if (!engine.canReviveHero(h)) continue;
     if (cardDB[h.name]?.cardType !== 'Ascended Hero') continue;
     out.push({ heroIdx: hi, hero: h });
   }

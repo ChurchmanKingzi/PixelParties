@@ -9655,11 +9655,32 @@ class GameEngine {
    * @param {string} [opts.source] - Source card name for logging
    * @returns {boolean} true if revived
    */
+  // ─── HELDEN MIT 0 MAX HP (v1466) ──────────────────────────────────
+  // Die Regel steht in `_revive-shared.js` (Als Vorgabe 27.9.): ein Held,
+  // der nach der Wiederbelebung 0 max HP hätte, ist für sie unerreichbar.
+  // Bis hier stand in `actionReviveHero` `hero.maxHp || 400` — eine 0
+  // galt als „fehlt“ und wurde zu 400.
+  /** Die max HP, die `hero` nach einer Wiederbelebung mit `opts` hätte. */
+  reviveMaxHp(hero, opts = {}) {
+    return require('./_revive-shared').reviveMaxHp(hero, opts);
+  }
+
+  /**
+   * Kann dieser Held überhaupt wiederbelebt werden (max HP > 0)? Karten,
+   * die Ziele anbieten oder ihre Aktivierung erfragen, filtern hiermit.
+   * @param {object} opts  `{ maxHpCap }`, wenn die Karte die max HP fest setzt
+   */
+  canReviveHero(hero, opts = {}) {
+    return require('./_revive-shared').canReviveHero(hero, opts);
+  }
+
   async actionReviveHero(playerIdx, heroIdx, hp, opts = {}) {
     const ps = this.gs.players[playerIdx];
     const hero = ps?.heroes?.[heroIdx];
     if (!hero?.name) return false;
     if (hero.hp > 0) return false;
+    // v1466: 0 max HP → keine Wiederbelebung, auch kein Fenster davor.
+    if (!this.canReviveHero(hero, opts)) return false;
     // ★ v1288 — Fenster UNMITTELBAR vor jeder Wiederbelebung. Alles, was
     // an den Tod dieses Helden anknuepft und noch aussteht (Pseudonias
     // vorgemerkte Aufnahme), wird hier entschieden — solange der Held noch
@@ -9685,8 +9706,11 @@ class GameEngine {
       if (hero.hp > 0 || !hero.name) return false;
     }
 
-    const maxHp = hero.maxHp || 400;
+    // v1466: die max HP NACH der Wiederbelebung (fester Wert der Karte
+    // oder die eigene) — vorher `hero.maxHp || 400`, s. `reviveMaxHp`.
+    const maxHp = this.reviveMaxHp(hero, opts);
     const reviveHp = Math.min(hp, maxHp);
+    if (!(reviveHp > 0)) return false;
     hero.hp = reviveHp;
     hero.statuses = {};
     delete hero._koProcessed; // Allow death cleanup to fire again if hero dies again

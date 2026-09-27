@@ -22,7 +22,8 @@ function defeatedHeroTargets(engine) {
     const ps = engine.gs.players[pi];
     for (let hi = 0; hi < (ps?.heroes || []).length; hi++) {
       const h = ps.heroes[hi];
-      if (h?.name && h.hp <= 0) out.push({ id: `hero-${pi}-${hi}`, type: 'hero', owner: pi, heroIdx: hi, cardName: h.name });
+      // v1466: volle Heilung — bei 0 max HP kein Ziel (s. _revive-shared).
+      if (h?.name && h.hp <= 0 && engine.canReviveHero(h)) out.push({ id: `hero-${pi}-${hi}`, type: 'hero', owner: pi, heroIdx: hi, cardName: h.name });
     }
   }
   return out;
