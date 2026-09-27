@@ -1,0 +1,16 @@
+{
+  "hero": "Extra Edgy Cuberto",
+  "sheet": "extra-edgy-cuberto.png",
+  "frameWidth": 33,
+  "frameHeight": 40,
+  "frames": 36,
+  "frameMs": 90,
+  "loop": true,
+  "layout": "horizontal",
+  "skinOf": "Cuberto, Supreme Lord of Edges",
+  "padTop": 5,
+  "padLeft": 5,
+  "padRight": 5,
+  "padBottom": 5,
+  "faceX": 16
+}
