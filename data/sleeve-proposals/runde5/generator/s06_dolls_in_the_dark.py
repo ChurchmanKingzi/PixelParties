@@ -1,9 +1,29 @@
 # -*- coding: utf-8 -*-
-"""06 – Alice, the Puppeteer Girl (Entwurf v7).
-Idee: Nachts in Alices Zimmer im Herrenhaus. Alice steht groß auf dem violetten Läufer, die Arme
-ausgebreitet, an ihren Fäden sitzen ihre zwei Puppen. Der Raum dahinter liegt im Dunkeln – nur ihr
-eigener violetter Magieschein; in der Finsternis glühen die roten Puppenaugen (im Schrank, im Spiegel ...).
+"""06 Dolls in the Dark – Held: Alice, the Puppeteer Girl (Base-Karte, NICHT „Transfer Student“).
+
+Idee (Porträt/Ruhemoment, Grusel): Nachts in Alices Zimmer im Herrenhaus. Alice steht groß und frontal auf
+dem violetten Läufer, die Arme ausgebreitet; an ihren Fäden sitzen ihre zwei Puppen. Das Zimmer dahinter liegt
+im Dunkeln, nur ihr eigener violetter Magieschein beleuchtet Säulen, Bett und ihr Porträt an der Wand. In der
+Finsternis glühen die roten Puppenaugen: die Geisterpuppe im Spiegel des Frisiertischs, eine Puppe, die im
+offenen Schrank lauert, die Puppe auf dem Schrank, die auf dem Bett und zwei am Fuß der Säulen. Rechts glimmt
+der Ofen. (Ihre Kreaturen = ihre Macht: Kartentext zählt die Kreaturen, Destruction + Summoning Magic.)
+
+Quellen (MotiveBritain.xcf, Kartenszene „Sichtbar #53“ = Ebene 5, Lage 218,288, 76×50):
+  Ebene 8 „Alice #6“  – Alice (dunkle Augen, Arme ausgebreitet) + ihre 2 Puppen + violette Fäden,
+                        Box x 236–275, y 303–330, pixelgleich mit der Kartenszene geprüft (0 Abweichungen);
+                        ohne den Kopf der Puppe darunter und ohne die rote Punktlinie über ihr. (Die Alice
+                        links auf derselben Ebene mit türkisen Augen gehört zu „Mr. Jiggles“ – nicht verwendet.)
+                      – außerdem: Geisterpuppe im Spiegel (alpha 76), liegende Puppe auf dem Schrank,
+                        Puppe auf dem Bett (ohne roten Faden), stehende + sitzende Puppe (verdunkelt im Schrank)
+  Ebene 60 „Ebene #173“ – Zimmer (Wände, Säulen, Frisiertisch, Schrank, Bett, Standuhr, Regal, Ofen, Teppich)
+  Ebene 59 „Alice #7“   – violetter Läufer (Mittelstück, Periode 9, nach vorn verlängert)
+  Ebene 56 „Ebene #224“ – Alice-Porträt im Bilderrahmen, Kristallkugel
+Skalierung: Zimmer mit allen Hintergrundpuppen und Licht 2× (Raster 125×175);
+            Alice + ihre zwei Puppen + Fäden + Schatten 5× (Raster 50×70). Keine anderen Pixelgrößen.
+Fäden: Originalpixel (1 px im 5×-Raster, dunkel/hell abwechselnd), außerhalb von Alice halbtransparent;
+       sie beginnen an Alices Händen und enden an den Köpfen der Puppen.
 """
+
 import math
 from common import *  # noqa
 import numpy as np
@@ -92,8 +112,10 @@ for sp in (ward, bed):
     dollm |= sp[RY0:RY0 + 175, RX0:RX0 + 125, 3] > 0
 for (px, py) in ((248, 311), (2 * AX - 248 - 8, 311)):
     dollm[py - RY0:py - RY0 + 12, px - RX0:px - RX0 + 8] |= stand[..., 3] > 0 if px == 248 else flip(stand)[..., 3] > 0
-ledge = np.zeros(bg.shape[:2], bool)
-pict = np.zeros(bg.shape[:2], bool); pict[257 - RY0:272 - RY0, 272 - RX0:289 - RX0] = True
+pict = np.zeros(bg.shape[:2], bool)                          # Bild (Rahmen + Alice-Porträt) leicht beleuchtet
+_b = bg[257 - RY0:272 - RY0, 272 - RX0:289 - RX0, :3].astype(int)
+pict[257 - RY0:272 - RY0, 272 - RX0:289 - RX0] = ((((_b[..., 0] - _b[..., 2] > 25) & (_b.min(-1) < 110)) | (_b[..., 2] - _b[..., 0] > 25))
+                                                  | (layer(D, 56)[257:272, 272:289, 3] > 0))
 out = rgb.astype(float)
 EYE = np.array([255, 36, 56])
 for y in range(175):
@@ -102,18 +124,14 @@ for y in range(175):
         t = max(0.0, 1 - d)
         f = 0.07 + 0.88 * t ** 1.25
         c = out[y, x]
-        if emis[y, x] and not ledge[y, x]:
+        if emis[y, x]:                                            # glühende Augen
             c = c * 0.35 + EYE * 0.65 if c[0] > 200 else c * 1.1
-        elif emis[y, x]:
-            c = EYE * 0.8
         elif ghost[y, x]:
             c = c * 0.85 + np.array([0, 10, 20])
-        elif ledge[y, x]:
-            c = c * 0.16 + np.array([4, 2, 12])
         elif dollm[y, x]:
             c = c * max(f, 0.42) + np.array([4, 4, 16])
         elif pict[y, x]:
-            c = c * max(f, 0.4)
+            c = c * max(f, 0.5)
         else:
             g = math.floor((t ** 1.5) * 4 + bay(x, y)) / 4          # violetter Schein in Stufen, gedithert
             c = c * f + GLOW * g * 0.55 + (1 - f) * np.array([4, 1, 12])
@@ -131,7 +149,8 @@ cv = Canvas(W, H)
 cv.paste(up(bgl, 2), 0, 0)
 
 # ---------------------------------------------------------------- Alice mit ihren Puppen (5×)
-grp = l8[303:331, 236:276].copy()                  # Alice #6, Base-Karte (Sichtbar #53, Lage 218,288)
+grp = sprite('h06_alice_group', D, [8], box=(236, 303, 276, 331)).copy()   # Alice #6 (Base-Karte)
+assert grp.shape[:2] == (28, 40)
 grp[24:, 249 - 236:265 - 236] = 0                  # Kopf der Puppe darunter (gehört nicht dazu)
 grp = part_at(grp, 20, 10, dil=0)
 gh, gw = grp.shape[:2]

@@ -12,16 +12,18 @@ Quellen:
   Motive.xcf       Ebene 584 „Ebene #696“ – Spielkarten vom Tisch aus „Card Game Player Inya“
                    (lila Heldenkarten, blaue, goldene und rote Karten).
 Selbst gezeichnet: Sturmhimmel mit heller Wolkenlücke, eingedrehte Mutterwolke, Wolkenkragen am Trichter,
-Regen, ferner Blitz, Ebene mit Fluss (wie im Kartenbild), Hügelkuppe, Windbahn (1 px, hell/dunkel),
-Staubwolke am Rüssel, Bodenschatten.
-Karten: nur drei (lila Heldenkarte = eigene Hand, blaue Karte = Gegner, goldene Karte oben = neu gezogen),
-nur um 90° gedreht, auf der Windbahn aufgereiht.
+Regen, ferner Blitz, Ebene mit Fluss (wie im Kartenbild), Hügelkuppe, gebogene Windstreifen (1 px hell
+mit 1 px dunkler Schattenlinie, spiralig um den Trichter, hinten vom Trichter verdeckt), Staub- und
+Trümmerwolke am Rüssel, Bodenschatten.
+Karten: fünf gleich große Karten (lila Heldenkarten, rote, blaue, goldene), ungedreht bzw. um 90° gedreht,
+im Wechsel vorn rechts/vorn links die Spirale hinauf gestaffelt – unten eben aus der Hand gerissen,
+oben in der Wolke verschwindend.
 
 Skalierung (Tiefenebenen):
   Hintergrund (Himmel, Wolken, Regen, Blitz, Ebene, Fluss)                  – 2×-Raster (125×175)
-  Mittelgrund (Tornado 32×50 → 96×150, Karten 8×11 → 24×33, Windbahn,
+  Mittelgrund (Tornado 32×50 → 96×150, Karten 8×11 → 24×33, Windstreifen,
                Wolkenkragen, Staub, Hügelkuppe)                            – 3×-Raster (84×117)
-  Vordergrund (Champion 28×31 → 168×186, Bodenschatten)                    – 6×-Raster (42×59)
+  Vordergrund (Champion 28×31 → 140×155, Bodenschatten)                    – 5×-Raster (50×70)
 """
 import math, random
 import numpy as np
@@ -196,11 +198,11 @@ for _ in range(150):
         if 0 <= xx < bw and 0 <= yy < bh:
             bg.a[yy, xx] = np.clip(bg.a[yy, xx].astype(int) + 18, 0, 255)
 
-# ================= Mittelgrund 3× (Tornado, Karten, Windbänder, Hügel) ===================
+# ================= Mittelgrund 3× (Tornado, Karten, Windstreifen, Hügel) =================
 K3 = 3
 mw, mh = grid(K3)                      # 84×117
 mid = rgba(mw, mh)
-TX, TY = 2, 37                        # Tornado (Rüsselspitze auf dem Horizont)
+TX, TY = 5, 28                         # Tornado: Scheitel in der Wolke (y 84), Rüssel in der Staubwolke
 th, tw = tornado.shape[:2]
 tm = tornado[..., 3] > 0
 rows = {}
@@ -208,6 +210,7 @@ for r in range(th):
     xs = np.where(tm[r])[0]
     rows[TY + r] = (TX + (xs.min() + xs.max() + 1) / 2, (xs.max() - xs.min() + 1) / 2)
 tip = (TX + 15, TY + th - 1)
+GROUND = 83                            # Aufsetzpunkt der Staubwolke (y 249–252, knapp vor dem Horizont)
 
 
 def funnel(y):
@@ -215,85 +218,113 @@ def funnel(y):
     return rows[y]
 
 
-def spiral(t):
-    """Windbahn: von der Hand des Helden um den Trichter herum hinauf in die Wolke."""
-    y = tip[1] - 6 - t * (th + 14)
+A0, TURNS = 0.75, 2.0
+Y_LO, Y_HI = 73, TY - 5
+
+
+def spiral(t, dr=0.0, da=0.0):
+    """Sog um den Trichter: unten eng, oben weit; sin(a) > 0 = vordere Hälfte."""
+    y = Y_LO + (Y_HI - Y_LO) * t
     c, hw = funnel(y)
-    a = 0.2 + t * math.pi * 2 * 2.1
-    r = hw + 3 + t * 7
-    return c + math.cos(a) * r, y + math.sin(a) * (2.5 + t * 7), math.sin(a)
+    a = A0 + da + t * math.pi * 2 * TURNS
+    r = hw + 4 + t * 6 + dr
+    return c + math.cos(a) * r, y + math.sin(a) * (5 + t * 9), math.sin(a)
 
 
-N = 1400
-path = [spiral(i / N) for i in range(N)]
-wind_f = [(210, 230, 222), (58, 74, 80)]
-wind_b = [(80, 98, 102), (60, 76, 82)]
+def arc(t0, a0, a1, dr=0.0):
+    """Punkte eines kurzen, gebogenen Windstreifens: Winkel a0→a1, steigt dabei spiralig an."""
+    pts = []
+    for i in range(160):
+        a = a0 + (a1 - a0) * i / 159
+        t = t0 + 0.4 * (a - a0) / (math.pi * 2 * TURNS)
+        y = Y_LO + (Y_HI - Y_LO) * t
+        c, hw = funnel(y)
+        r = hw + 4 + t * 6 + dr
+        p_ = (int(round(c + math.cos(a) * r)), int(round(y + math.sin(a) * (5 + t * 9))))
+        if not pts or pts[-1] != p_: pts.append(p_)
+    return pts
 
 
-def draw_wind(front):
-    seen = []
-    for x, y, s_ in path:
-        p = (int(round(x)), int(round(y)))
-        if (s_ >= 0) == front and (not seen or seen[-1] != p):
-            seen.append(p)
-    for j, (x, y) in enumerate(dict.fromkeys(seen)):
-        if j % 9 == 8: continue           # kleine Lücken: Böen
-        setp(mid, x, y, (wind_f if front else wind_b)[j % 2])
+def streak(pts, front=True):
+    """1-px-Streifen im 3×-Raster: helle Linie, darunter eine dunkle Schattenlinie (hell/dunkel),
+    Enden eine Stufe matter – liest sich als Böe, nicht als Punktkette."""
+    hi, mid_, lo = ((218, 236, 228), (160, 186, 182), (46, 60, 68)) if front else \
+                   ((104, 122, 124), (84, 100, 104), (40, 50, 58))
+    S_ = set(pts)
+    for j, (x, y) in enumerate(pts):
+        if (x, y + 1) not in S_: setp(mid, x, y + 1, lo)
+    for j, (x, y) in enumerate(pts):
+        setp(mid, x, y, mid_ if j < 2 or j >= len(pts) - 2 else hi)
 
 
-def card_at(t, key, rot=0, dark=0.0, dx=0, dy=0):
+# vordere Streifen: (Höhe t, Startwinkel, Endwinkel, Radius-Versatz) – abwechselnd rechts und links vorn
+FRONT = [(0.06, 0.35, 1.9, 0), (0.17, 1.5, 2.9, 1), (0.30, 0.25, 1.55, 0), (0.33, 0.9, 1.9, 3),
+         (0.45, 1.45, 2.85, 0), (0.58, 0.2, 1.45, 1), (0.62, 0.8, 1.7, 4), (0.74, 1.5, 2.8, 0),
+         (0.88, 0.25, 1.6, 2)]
+BACK = [(0.12, 3.6, 4.4, 0), (0.25, 5.2, 5.9, 0), (0.40, 3.4, 4.2, 1), (0.53, 5.1, 5.9, 0),
+        (0.69, 3.5, 4.3, 1), (0.82, 5.0, 5.8, 0)]
+
+
+def card_at(t, key, rot=0, dx=0, dy=0):
     c = CARDS[key]
     if rot: c = rot90(c, rot)
-    if dark: c = darken(c, dark)
     x, y, _ = spiral(t)
     put(mid, c, int(round(x)) - c.shape[1] // 2 + dx, int(round(y)) - c.shape[0] // 2 + dy)
 
 
-draw_wind(False)
+for t0, a0, a1, dr in BACK: streak(arc(t0, a0, a1, dr), False)   # hinten (vom Trichter verdeckt)
 put(mid, tornado, TX, TY)
-# Staubwolke am Fuß des Rüssels (flache, gewölbte Wolke, von links beleuchtet)
-dust = [(56, 66, 60), (80, 90, 82), (110, 118, 106), (140, 146, 130)]
-for x in range(tip[0] - 9, tip[0] + 10):
-    u = (x - tip[0]) / 9.5
-    h = (1 - u * u) * 3.2 + 0.8 * math.sin(x * 1.7)
-    top = tip[1] + 1 - h
-    for y in range(int(math.floor(top)), tip[1] + 2):
+
+# Staub- und Trümmerwolke, in der der Rüssel aufsetzt
+dust = [(52, 62, 58), (76, 86, 80), (104, 112, 102), (134, 140, 126)]
+for x in range(tip[0] - 13, tip[0] + 14):
+    u = (x - tip[0]) / 13.5
+    h = (1 - u * u) * 6.5 + 1.0 * math.sin(x * 1.3) + 0.6 * math.sin(x * 2.7)
+    top = GROUND - h
+    for y in range(int(math.floor(top)), GROUND + 1):
         d = y - top
-        c = dust[3] if d < 1 and u < .2 else (dust[2] if d < 1.6 + bayer(x, y) else (dust[1] if d < 3 + bayer(x, y) else dust[0]))
+        c = dust[3] if d < 1 and u < .3 else (dust[2] if d < 2 + bayer(x, y) * 1.5 else (dust[1] if d < 4.5 + bayer(x, y) * 1.5 else dust[0]))
         setp(mid, x, y, c)
-# Wolkenkragen: der Trichter wächst aus der Mutterwolke (Wolkenwülste über den oberen Zeilen)
+
+# Wolkenkragen: der Trichter wächst aus der Mutterwolke
 ccol = [(34, 37, 52), (46, 51, 68), (66, 73, 90), (96, 106, 120)]
-for x in range(-1, TX + 40):
+for x in range(-1, TX + 42):
     u = (x - (TX + 15)) / 20
     base = TY + 6 - 3 * abs(u) + 1.3 * math.sin(x * .55) + 1.0 * math.sin(x * 1.3 + 1)
     if x > TX + 30: base -= (x - TX - 30) * .7
-    for y in range(TY - 14, int(base) + 1):
+    for y in range(0, int(base) + 1):
         d = int(base) - y
+        if d > 9 and mid[y, x, 3] == 0: continue
         c = ccol[3] if d == 0 else (ccol[2] if d < 2 + bayer(x, y) * 1.2 else (ccol[1] if d < 5 + bayer(x, y) * 2 else ccol[0]))
         setp(mid, x, y, c)
-draw_wind(True)
-card_at(0.17, 'purple0', 0, dx=2)
-card_at(0.51, 'blue0', 1, dx=-2, dy=-6)
-card_at(0.99, 'gold', 0)
+
+for t0, a0, a1, dr in FRONT: streak(arc(t0, a0, a1, dr), True)   # vorn über dem Trichter
+# Karten im Sog, gleich groß, gestaffelt die Spirale hinauf (vorn rechts / vorn links im Wechsel)
+card_at(0.03, 'purple0', 0, dx=1)      # eben aus der Hand gerissen
+card_at(0.14, 'red', 0, dx=-1)
+card_at(0.50, 'blue0', 1)
+card_at(0.64, 'purple1', 3, dx=9)
+card_at(0.99, 'gold', 0, dy=2)
 
 # Hügelkuppe rechts unten (Standfläche des Helden)
 grass = [(24, 40, 32), (34, 56, 40), (48, 76, 50), (72, 104, 64)]
 def hill_top(x):
-    return 98.5 + ((x - 56) / 34) ** 2 * 4 if x >= 26 else 98.5 + ((26 - 56) / 34) ** 2 * 4 + (26 - x) * .9
+    return 98.5 + ((x - 56) / 34) ** 2 * 4 if x >= 30 else 98.5 + ((30 - 56) / 34) ** 2 * 4 + (30 - x) * .9
 for x in range(mw):
     top = hill_top(x)
     for y in range(int(top), mh):
         d = y - top
         cc = grass[3] if d < 1 else (grass[2] if d < 2.5 + bayer(x, y) * 1.5 else (grass[1] if d < 7 + bayer(x, y) * 4 else grass[0]))
         mid[y, x, :3] = cc; mid[y, x, 3] = 255
-for x in range(24, mw, 4):             # windgebeugte Halme
+for x in range(28, mw, 4):             # windgebeugte Halme
     top = int(hill_top(x))
     setp(mid, x, top - 1, grass[3]); setp(mid, x - 1, top - 2, grass[2])
 
-# ================= Vordergrund 6× (Champion) ============================================
-fw, fh = grid(6)                       # 42×59
+# ================= Vordergrund 5× (Champion) ============================================
+K5 = 5
+fw, fh = W // K5, H // K5              # 50×70
 fg = rgba(fw, fh)
-CXf, CYf = 10, 24                      # Füße auf Zeile CYf+25 (y 294–300)
+CXf, CYf = 18, 34                      # x 90–230; Füße auf Zeile CYf+25 (y 295–300)
 sh = (18, 30, 24)
 for x in range(CXf + 6, CXf + 24): setp(fg, x, CYf + 26, sh)
 for x in range(CXf + 18, CXf + 24): setp(fg, x, CYf + 31, sh)
@@ -302,6 +333,6 @@ put(fg, champ, CXf, CYf)
 cv = Canvas(W, H)
 blit(cv, bg, 2)
 blit(cv, mid, K3)
-blit(cv, fg, 6)
+blit(cv, fg, K5)
 p = save(cv, '04_stormdraw.png')
 print(p)
