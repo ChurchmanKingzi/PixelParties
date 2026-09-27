@@ -60,7 +60,7 @@ def burst(cx, cy, R, col, rays=16):
     glow(lo, cx + .5, cy + .5, R * 1.7, col, 0.42)
     core = mix(col, (255, 255, 255), 0.55)
     for k in range(rays):
-        a = 2 * math.pi * k / rays + (0.5 if k % 2 else 0) * 0
+        a = 2 * math.pi * k / rays
         L = R if k % 2 == 0 else R * 0.72
         r = 2.0
         while r <= L:
@@ -121,12 +121,8 @@ blow(cv, lo, G)
 # --- Vordergrund (5×) ------------------------------------------------------------------------------
 K = 5
 GY = 344                                        # Standlinie
-# Lichtschein der Zündung um die Kiste
 bx, by = 6, GY - box.shape[0] * K
 # Raketen steigen aus den drei Rohren (Rohrmitten der Kiste bestimmen)
-tube_cols = []
-dark_top = box[0, :, 3] > 0
-xs_ = np.where(box[1, :, 3] > 0)[0]
 # Rohre: drei Gruppen deckender Pixel in der obersten Zeile
 row = box[0, :, 3] > 0
 groups, cur = [], []
@@ -144,7 +140,7 @@ for g, r, dy in zip(groups[:3], rockets, lift):
     cx = bx + int((g[0] + g[-1] + 1) / 2 * K) - K // 2 - 2
     for i, yy in enumerate(range(by - dy, by, K)):
         if (i + g[0]) % 2 == 0:
-            cv.rect(cx + ((i % 3) - 1) * K // 2 * 0, yy, cx + K, yy + K, (255, 230, 40) if i % 4 else (255, 150, 30))
+            cv.rect(cx, yy, cx + K, yy + K, (255, 230, 40) if i % 4 else (255, 150, 30))
 put(cv, box, bx, GY, K, anchor='bl', shadow=0.45, sdx=1, sdy=0)
 # Junshi mit Ärmeln (Ohren zugehalten), rechts neben der Kiste: Ebene [32] + Ärmel-Teil von [31]
 put(cv, junshi_full, 248 - junshi_full.shape[1] * K, GY - junshi_full.shape[0] * K, K,

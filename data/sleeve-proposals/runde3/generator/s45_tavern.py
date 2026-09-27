@@ -1,79 +1,94 @@
 # -*- coding: utf-8 -*-
-"""Sleeve 45 – „Last Round“: Gruppenbild in der Taverne. Hinter der Theke der Wirt im Anzug und die blonde
-Kellnerin, dahinter die Rückwand der Taverne mit Gläserregal, Flaschen, Ofen und Schrank; vor der Theke prostet
-Chuck mit dem Bierkrug, rechts sitzt der Alte mit dem Schwert auf seinem Stuhl, in der Mitte Kohta mit seinem Glas; seine Flasche steht
-auf der Theke.
+"""Sleeve 45 – „Last Round“ (Runde 3b überarbeitet): Letzte Runde in der Taverne. Hinter der Theke der Wirt im
+Anzug und die blonde Kellnerin vor dem Regal mit Gläsern und Flaschen; vor der Theke prostet Chuck mit dem
+Bierkrug, Kohta sitzt mit seinem Glas auf dem Stuhl (seine Flasche steht auf der Theke), rechts der Alte mit dem
+langen Bart auf seinem Stuhl.
 
-Quellen (Motive.xcf): 1010 „Ebene #213“ (Tavernenraum: Rückwand, Regal, Dielen), 987 „Lilly #7“ (Theke mit Krug),
-988 „Chuck #2“ (Krüge), 991 „Chuck #1“ (Wirt), 992 „Haste #5“ (Kellnerin), 982 „Chuck“ (Chuck mit Bier),
-999 „Old Couple“ (Alter mit Schwert auf Stuhl), 1007 „Kohta #3“ (Kohta mit Glas und Flasche, Stuhl).
+Skalierung (Regel A): ALLES 3× – Tavernenraum (Regal, Theke, Hocker, Dielen aus der Raumkarte), alle Figuren,
+Krüge, Flasche, Stuhl. (Die alte Fassung mischte 2×/3×/4× – verworfen.)
+
+Vollständigkeit (Regel B), geprüft gegen die Kartenszenen:
+  Wirt [991] in „Sichtbar #110“ nur von der Theke verdeckt (Ebene vollständig, inkl. Beine);
+  Kellnerin [992] in „Sichtbar #303“ (0.95, Rest = davorliegende Effekt-Ebenen);
+  Chuck + Alter [982] in „Sichtbar #110“ (1.0); Alter auf dem Stuhl [999] in „Sichtbar #260“ (1.0);
+  Kohta [1007] in „Sichtbar #261“ (0.9, nur Tischkante davor) – Stuhl und Flasche sind Teile derselben Ebene.
+
+Quellen (Motive.xcf): 1010 „Ebene #213“ (Tavernenraum), 991 „Chuck #1“ (Wirt), 992 „Haste #5“ (Kellnerin),
+982 „Chuck“ (Chuck mit Bier), 999 „Old Couple“ (Alter auf Stuhl), 1007 „Kohta #3“ (Kohta, Stuhl, Flasche),
+988 „Chuck #2“ (Krüge).
 """
 from g_util import *
 
 B = 'Motive'
 W2, H2 = 250, 350
-K = 4
+K = 3
 cv = Canvas(W2, H2)
-room = layer(B, 1010)[76:316, 118:420, :3]
 
-# Rückwand (2×): Ziegel, Gläserregal, Flaschen, Ofen, Schrank
-wall = room[12:62, 80:205]
-WALL_H = 100
-cv.a[:WALL_H] = up(rgba(wall), 2)[..., :3][:WALL_H, :W2]
-# darunter Holzvertäfelung aus den Dielen (2×)
-planks = room[118:178, 100:200]
-cv.a[WALL_H:] = mirror_tile(up(rgba(planks), 2)[..., :3], W2, H2 - WALL_H)
-# warmes Licht von oben/Ofen, Schatten nach unten
-dither_blend(cv, (255, 190, 90), lambda x, y: max(0.0, 1 - ((x - 40) ** 2 + (y - 60) ** 2) ** 0.5 / 110) * 0.35)
-dither_blend(cv, (20, 10, 5), lambda x, y: max(0.0, (y - 200) / 200) * 0.6, y0=200)
+# ---------------------------------------------------------------- Raum (3×) aus der Raumkarte
+AX, AY = 226, 86                                   # linke obere Ecke des Kartenausschnitts
+room = layer(B, 1010)[..., :3]
+crop = room[AY:AY + H2 // K + 1, AX:AX + W2 // K + 1]
+bg = up(rgba(crop), K)[:H2, :W2, :3]
+cv.a[:] = bg
 
 
-def fig(name, idx, part=None):
-    s = lay(B, idx)
-    if part is not None: s = parts(s, dil=1)[part]
+def Y(cy):                                          # Kartenzeile -> Bildzeile
+    return (cy - (AY - 84)) * K
+
+
+COUNTER = Y(71)                                     # Oberkante Theke (Kartenzeile 71)
+
+# warmes Licht von oben links, zur Kante dunkler
+dither_blend(cv, (255, 200, 110), lambda x, y: max(0.0, 1 - ((x - 70) ** 2 + (y - 40) ** 2) ** 0.5 / 170) * 0.25)
+
+
+def fig(name, s):
     Image.fromarray(s).save(os.path.join(xcfkit.CACHE, 'g45_%s.png' % name))
     return s
 
 
-host = fig('host', 991)
-maid = fig('maid', 992)
-counter = fig('counter', 987, 1)
+host = fig('host', lay(B, 991))
+maid = fig('maid', lay(B, 992))
+p982 = parts(lay(B, 982), dil=0)
+chuck = fig('chuck', p982[0])
+p999 = parts(lay(B, 999), dil=0)
+oldman = fig('oldman', p999[-1])
+p1007 = parts(lay(B, 1007), dil=0)
+bottle = fig('bottle', [p for p in p1007 if p.shape[:2] == (13, 5)][0])
+kohta = fig('kohta', [p for p in p1007 if p.shape[:2] == (23, 17)][0])
+chair = fig('chair', [p for p in p1007 if p.shape[:2] == (15, 9)][0])
 mugs = parts(lay(B, 988), dil=1)
-chuck = fig('chuck', 982, 0)
-oldman = fig('oldman', 999, 1)
-kohta_all = fig('kohta', 1007, 0)
-kp = sorted(parts(kohta_all, dil=0), key=lambda p: p.shape[0])
-bottle, kohta = kp[0], kp[-1]           # Flasche vom Tisch getrennt -> auf die Theke
-chair = fig('chair', 1007, 1)
 
-CTOP = 214                                     # Oberkante Theke
-# hinter der Theke
-h = up(host, K); cv.paste(h, 64, CTOP - h.shape[0] + 24)
-m = up(maid, K); cv.paste(m, 150, CTOP - m.shape[0] + 22)
-# Theke 3× über die ganze Breite
-c = up(counter, 3)
-cw = c.shape[1]
-cv.paste(c, (W2 - cw) // 2, CTOP)
-if cw < W2:                                    # Enden mit gespiegeltem Stück füllen
-    cv.paste(flip(c[:, :(W2 - cw) // 2 + 2]), 0, CTOP)
-# zusätzliche Krüge auf der Theke
-for mg, x in zip(mugs, (28, 190)):
-    u = up(mg, 3); cv.paste(u, x, CTOP + 6 - u.shape[0] + 12)
+# hinter der Theke: Wirt und Kellnerin, Füße auf dem Boden hinter der Theke, von der Theke verdeckt
+for s, cx in ((host, 78), (maid, 172)):
+    u = up(s, K)
+    cv.paste(u, cx - u.shape[1] // 2, Y(76) - u.shape[0])
+cv.a[COUNTER:Y(90)] = bg[COUNTER:Y(90)]             # Theke wieder davor
+# Krüge und Kohtas Flasche auf der Theke
+for mg, x in zip(mugs, (24, 206)):
+    u = up(mg, K); cv.paste(u, x, Y(79) - u.shape[0])
+b = up(bottle, K); cv.paste(b, 132, Y(80) - b.shape[0])
 
 
-def front(s, cx, feet, k=K, fl=False):
-    u = up(flip(s) if fl else s, k)
-    x, y = int(cx - u.shape[1] / 2), feet - u.shape[0]
-    sh = silhouette(u, (15, 8, 3))[::4]
-    cv.paste(sh, x + 4, feet - sh.shape[0] + 3, alpha=0.4)
+def front(s, cx, feet):
+    u = up(s, K)
+    x, y = cx - u.shape[1] // 2, feet - u.shape[0]
+    sh = silhouette(u, (30, 16, 6))
+    sh = np.concatenate([sh[r:r + K] for r in range(0, sh.shape[0], 4 * K)], 0)
+    cv.paste(sh, x + K, feet - sh.shape[0] + K, alpha=0.45)
     cv.paste(u, x, y)
+    return x, y
 
 
-front(kohta, 128, 318, k=3)
-b = up(bottle, 3); cv.paste(b, 112, CTOP + 14 - b.shape[0])
-front(chuck, 52, 344)
-front(oldman, 204, 344, fl=True)
+FEET = 336
+front(chuck, 44, FEET)
+# Kohta sitzt auf seinem Stuhl (Stuhl hinter ihm, Sitzfläche auf Hüfthöhe)
+cu = up(chair, K)
+kx = 128
+cv.paste(silhouette(cu, (30, 16, 6))[::4], kx + 12, FEET - 4, alpha=0.4)
+cv.paste(cu, kx + 6, FEET - cu.shape[0])
+front(kohta, kx, FEET - 3)
+front(flip(oldman), 208, FEET)
 
 vignette(cv, 0.45, 0.6)
-frame(cv, ((20, 10, 4), (120, 72, 30), (220, 170, 100), (20, 10, 4)))
 print(save(cv, '45_tavern.png'))

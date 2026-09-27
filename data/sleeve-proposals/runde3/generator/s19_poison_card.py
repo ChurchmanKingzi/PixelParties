@@ -28,12 +28,12 @@ star = figure('c19_star', RU, [217])
 
 # Halbbild (unten) auf 50×70-Zellenraster zeichnen, die obere Hälfte ist die um 180° gedrehte
 # zweite Variante. Diagonale durch die Mitte: Zelle (x, y) gehört zur unteren Hälfte, wenn
-# y > 35 + (25 - x) * 0.3 (native Zellen).
+# y > 35 - (25 - x) * 0.3 (native Zellen): links (über der unteren Figur) liegt die Linie höher.
 GW, GH = W // K, H // K
 
 
 def diag(x):
-    return GH / 2 + (GW / 2 - x) * 0.3
+    return GH / 2 - (GW / 2 - x) * 0.3
 
 
 def half(cols_bg, fig, bubbles, bub_cols, stars):
@@ -48,7 +48,8 @@ def half(cols_bg, fig, bubbles, bub_cols, stars):
             k_ = int(q) + (1 if (q - int(q)) > BAYER4[j % 4, i % 4] else 0)
             c.rect(i * K, j * K, (i + 1) * K, (j + 1) * K, cols_bg[min(k_, n)])
     # Giftblasen (Zellen): Ring mit Glanzpunkt
-    shapes = {1: ["o"], 2: ["oo", "oo"], 3: [".o.", "oLo", ".o."], 4: [".oo.", "oLMo", "oMMo", ".oo."]}
+    shapes = {3: [".o.", "oLo", ".o."], 4: [".oo.", "oLMo", "oMMo", ".oo."],
+              5: [".ooo.", "oLMMo", "oMMMo", "oMMMo", ".ooo."]}
     for (i, j, r) in bubbles:
         for dj, row in enumerate(shapes[r]):
             for di, ch in enumerate(row):
@@ -59,7 +60,7 @@ def half(cols_bg, fig, bubbles, bub_cols, stars):
         c.paste(up(star, K), i * K, j * K)
     # Figur: steht auf der unteren Kante des Innenfelds, leicht links der Mitte
     fh, fw = fig.shape[:2]
-    fx, fy = 8, GH - 3 - fh
+    fx, fy = 5, GH - 3 - fh
     put(c, fig, fx * K, fy * K, K, ol=(26, 10, 30), shadow=(20, 6, 30), sdx=1, sdy=0, salpha=0.6)
     return c.a.copy()
 
@@ -69,10 +70,10 @@ DRM = [(20, 14, 40), (34, 24, 64), (52, 36, 90), (70, 50, 110)]         # welker
 B_BLOOM = [(96, 200, 90), (220, 255, 200), (150, 230, 120)]             # Giftgrüne Blasen
 B_DREAM = [(200, 120, 170), (255, 230, 245), (230, 170, 210)]           # rosa Traumblasen
 
-lower = half(VIO, bloom, [(33, 50, 4), (39, 42, 3), (35, 37, 2), (41, 33, 1), (30, 60, 2), (44, 56, 3)], B_BLOOM,
-             [(40, 62), (32, 46)])
-upper = half(DRM, wilt, [(33, 50, 4), (39, 42, 3), (35, 37, 2), (41, 33, 1), (30, 60, 2), (44, 56, 3)], B_DREAM,
-             [(40, 62), (32, 46)])
+lower = half(VIO, bloom, [(36, 52, 5), (41, 44, 4), (35, 40, 3), (42, 58, 3)], B_BLOOM,
+             [(38, 62)])
+upper = half(DRM, wilt, [(36, 52, 5), (41, 44, 4), (35, 40, 3), (42, 58, 3)], B_DREAM,
+             [(38, 62)])
 upper = upper[::-1, ::-1]                                               # 180° gedreht
 jj, ii = np.mgrid[0:H, 0:W]
 low_mask = (jj // K) > np.vectorize(diag)(ii // K)
