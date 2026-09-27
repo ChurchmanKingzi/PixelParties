@@ -9,6 +9,8 @@ Pseudonia hält ihr Opfer und hat sich in seinen Hals verbissen.
   Opfer), das Opfer zuckt zurück, die Bisswunde leuchtet auf und Blut spritzt
   in kleinen Tropfen heraus (nur ins Freie, einzelne Pixel).
 * Ihre Flügel schlagen langsam (spaltentreu geschert).
+* hero: ihr eigenes Gesicht steckt im Biss; das Opfer blinzelt mit seinem
+  blauen Auge (zweimal pro Loop, kurz nach einem Biss).
 * imperfect: der grüne Schwanzring (liegt vor ihr) pendelt sachte hin und her.
 """
 import math
@@ -46,6 +48,9 @@ VICTIM = [(x, y) for y in range(OY + 2, OY + 9) for x in range(14, 19) if BODY[y
 HEAD_SET, VICTIM_SET = set(HEAD), set(VICTIM)
 BITE = (14, OY + 5)                                  # Bisswunde
 BLOOD = [rgb('930200'), rgb('b30000'), rgb('ff3030')]
+BLINK = {3: 'halb', 4: 'zu', 5: 'zu', 6: 'halb', 27: 'halb', 28: 'zu', 29: 'zu', 30: 'halb'}
+VIC_EYE_TOP, VIC_EYE_BOT = [(16, 4), (17, 4)], [(16, 5), (17, 5)]   # Auge des Opfers (hero)
+VIC_SKIN, VIC_LASH = rgb('f7bc97'), rgb('311800')
 SPRAY = [(1, -2), (2, -3), (-1, -3), (3, -2)]        # Flugbahnen der Tropfen (Endpunkte)
 
 
@@ -62,12 +67,20 @@ def frame(i):
     lift, sq = 0.28 * math.sin(ph), 0.88 + 0.12 * math.cos(ph)
     shear_flap(BODY, WING_L, 7.5, -1, lift, sq, out, (P, PT))
     shear_flap(BODY, WING_R, 19.0, 1, lift, sq, out, (P, PT))
+    body = BODY.copy()
+    st = BLINK.get(i) if V == 'hero' else None
+    if st:
+        for x, y in VIC_EYE_TOP:
+            body[y, x] = VIC_LASH if st == 'halb' else VIC_SKIN
+        if st == 'zu':
+            for x, y in VIC_EYE_BOT:
+                body[y, x] = VIC_LASH
     for y in range(SH):
         for x in range(SW):
-            if not BODY[y, x, 3] or WING_L[y, x] or WING_R[y, x]:
+            if not body[y, x, 3] or WING_L[y, x] or WING_R[y, x]:
                 continue
             dx = head_dx if (x, y) in HEAD_SET else (vic_dx if (x, y) in VICTIM_SET else 0)
-            out[y + PT, x + P + dx] = BODY[y, x]
+            out[y + PT, x + P + dx] = body[y, x]
     fill_pinholes(out)
     bx, by = BITE[0] + P, BITE[1] + PT
     if t in (0, 1, 2):                               # Bisswunde leuchtet

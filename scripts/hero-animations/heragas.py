@@ -3,7 +3,8 @@
 „Ebene #64“ + der blutige Hydrakopf „Ebene #66“).
 
 Teile: src/heragas-the-monster-slayer-{body,hydra}.png (deckungsgleich).
-* Heragas federt in den Knien (Füße bleiben stehen) und blinzelt.
+* Heragas federt in den Knien (Füße bleiben stehen) und blinzelt zweimal
+  pro Loop.
 * Er präsentiert seine Beute: zweimal pro Loop hebt er den Arm mit dem
   abgeschlagenen Hydrakopf (Drehung um die Schulter), hält ihn oben mit
   einem stolzen Rucken und senkt ihn wieder. Der Kopf zuckt ab und zu noch.
@@ -30,7 +31,7 @@ H, W = SH + PT + PB, SW + 2 * P
 N = 48
 KNEE = 24
 SKIN, LASH = rgb('f6bd7b'), rgb('190c00')
-BLINK = {30: 'halb', 31: 'zu', 32: 'zu', 33: 'halb'}
+BLINK = {14: 'halb', 15: 'zu', 16: 'zu', 17: 'halb', 38: 'halb', 39: 'zu', 40: 'zu', 41: 'halb'}
 EYES = [(9, 10), (10, 10), (9, 11), (10, 11), (13, 10), (14, 10), (13, 11), (14, 11)]
 BLOOD = [rgb('25b300'), rgb('2ede00'), rgb('34f900')]
 BLOOD_HI = rgb('9dff6a')

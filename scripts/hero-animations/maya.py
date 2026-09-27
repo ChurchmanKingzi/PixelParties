@@ -4,7 +4,7 @@ Figur mit weißen Flügeln aus „Maya #5“).
 
 * Sie flattert: die weißen Flügelchen schlagen schnell (spaltentreu geschert,
   zwölf Schläge pro Loop).
-* Sie schwebt (sanftes Auf und Ab).
+* Sie schwebt (sanftes Auf und Ab) und blinzelt zweimal pro Loop.
 * Um sie tanzen kleine grüne Blattfunken (nur ganz, nur neben der Figur).
 """
 import math
@@ -26,6 +26,9 @@ WING_L = _w & (_xs <= 6)
 WING_R = _w & (_xs >= 15)
 BODY = SRC.copy()
 BODY[WING_L | WING_R] = 0
+BLINK = {14: 'halb', 15: 'zu', 16: 'zu', 17: 'halb', 38: 'halb', 39: 'zu', 40: 'zu', 41: 'halb'}
+EYES = [(9, 8), (12, 8)]
+HALF, LASH = rgb('bd5a39'), rgb('311800')
 LEAF = [rgb('7fd35a'), rgb('3fae3a'), rgb('c6f28a')]
 LEAVES = [(-3, 4, 0), (SW + 2, 9, 12), (-2, 15, 24), (SW + 1, 2, 36)]   # (x, y, Startframe)
 
@@ -42,10 +45,14 @@ def frame(i):
     lift, sq = 0.45 * math.sin(ph), 0.8 + 0.2 * math.cos(ph)
     shear_flap(SRC, WING_L, 6.5, -1, lift, sq, out, (P, oy))
     shear_flap(SRC, WING_R, 14.5, 1, lift, sq, out, (P, oy))
+    body = BODY.copy()
+    st = BLINK.get(i)
+    for x, y in EYES if st else ():
+        body[y, x] = HALF if st == 'halb' else LASH
     for y in range(SH):
         for x in range(SW):
-            if BODY[y, x, 3]:
-                out[y + oy, x + P] = BODY[y, x]
+            if body[y, x, 3]:
+                out[y + oy, x + P] = body[y, x]
     fill_pinholes(out)
     for k, (lx, ly, t0) in enumerate(LEAVES):        # Blattfunken steigen auf
         t = (i - t0) % N

@@ -5,7 +5,8 @@
 Teile: src/bloom-the-maniacal-botanist-{body,roses}.png (deckungsgleich).
 * Die Blutblumen wiegen sich: oben 1 px, zum Stiel hin weniger (zeilenweise,
   so reißt nichts auf); aus den Blüten tropft Blut.
-* Bloom atmet (der Oberkörper hebt sich im Rhythmus um 1 px).
+* Bloom atmet (der Oberkörper hebt sich im Rhythmus um 1 px) und blinzelt
+  zweimal pro Loop mit dem Auge unter der Kapuze.
 """
 import math
 import sys
@@ -22,6 +23,9 @@ H, W = SH + PT + PB, SW + 2 * P
 N = 48
 KNEE = 20
 BLOOD = [rgb('b30000'), rgb('7a0000')]
+BLINK = {14: 'halb', 15: 'zu', 16: 'zu', 17: 'halb', 38: 'halb', 39: 'zu', 40: 'zu', 41: 'halb'}
+EYE_TOP, EYE_BOT = (15, 8), (15, 9)                 # rotes Auge unter der Kapuze
+LID, LASH = rgb('cc9d7c'), rgb('000000')
 
 
 def rose_dx(y, i):
@@ -42,8 +46,14 @@ DRIPS = [(9, 9, 0), (20, 8, 16), (23, 12, 32)]
 
 
 def frame(i):
+    body = BODY.copy()
+    st = BLINK.get(i)
+    if st:
+        body[EYE_TOP[1], EYE_TOP[0]] = LASH if st == 'halb' else LID
+        if st == 'zu':
+            body[EYE_BOT[1], EYE_BOT[0]] = LASH
     out = np.zeros((H, W, 4), int)
-    draw_bounce(out, BODY, breath(i), KNEE, PT, P)
+    draw_bounce(out, body, breath(i), KNEE, PT, P)
     for y in range(SH):
         for x in range(SW):
             if ROSES[y, x, 3]:
