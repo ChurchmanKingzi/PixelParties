@@ -5,9 +5,8 @@ draußen auf dem Meer dreht sich unter der Gewitterwolke eine Wasserhose aus dem
 Quellen (MotiveHawaii.xcf):
   Ebene 189 „Tempeste Moana“ – Karte „Tempeste Moana, the Rain Singer“ (vollständige Figur, singend)
   Ebene 57  „Ebene #121“ – dunkler Lavafelsen (oberer Teil, flache Kuppe als Standfläche)
-  Ebene 174 „Ebene #158“ – Wirbelsturm / Wasserhose
   Ebene 158 „Ebene #40“  – Regenstriche (gekachelt, umgefärbt)
-Selbst gezeichnet: Himmel, Gewitterwolke, Dämmerungsstreif, Meer, Gischt am Fuß der Wasserhose.
+Selbst gezeichnet: Himmel, Gewitterwolke, Dämmerungsstreif, Meer, die Wasserhose (Schlauch, Gischt, Schaumring).
 
 Skalierung:
   Hintergrund (Himmel, Wolken, Meer, Wasserhose, Regen): 3× (84×117-Raster)
@@ -43,24 +42,41 @@ for _ in range(120):
     for i in range(rng.randint(2, 5)):
         if 0 <= x + i < gw: G.a[y, x + i, :3] = col
 
-# Wasserhose (rechts, von der Wolke bis aufs Meer)
-tor = sprite('f28_tornado', HW, [174])          # 46 × 32
-th, tw = tor.shape[:2]
-TX = 47
-TY = HOR - th + 1
-# Gischt am Fuß (selbst gezeichnet): Kuppel mit unregelmäßiger, nach oben ausfransender Oberkante
-gcx = TX + tw * 0.45
+# Wasserhose (selbst gezeichnet): schlanker, leicht S-förmig geschwungener Schlauch von der Wolkenunterseite
+# (Trichter, verschwindet in der Wallwolke) bis auf die Meeresfläche; links vom Dämmerlicht aufgehellt,
+# rechts im Schatten, im Inneren schräge Drallstreifen. Unten Gischtwolke und Schaumring auf dem Wasser.
+SP_TOP, SP_BOT = 26, HOR
+def sp_x(t): return 64 - 7 * t + 3 * math.sin(math.pi * t)
+def sp_w(t): return 1.6 + 8 * (1 - t) ** 2.6 + 1.2 * t ** 8
+for yy in range(SP_TOP, SP_BOT + 1):
+    t = (yy - SP_TOP) / (SP_BOT - SP_TOP)
+    xc, w = sp_x(t), sp_w(t)
+    xs = [xx for xx in range(gw) if abs(xx + .5 - xc) < w]
+    for k, xx in enumerate(xs):
+        if k == 0: c = (192, 184, 200)
+        elif k == len(xs) - 1: c = (84, 90, 118)
+        elif (xx + yy) % 4 == 0: c = (176, 182, 202)
+        else: c = (138, 146, 172)
+        G.px(xx, yy, c)
+BX = sp_x(1.0)
+# Schaumring auf der Wasserfläche
+for xx in range(int(BX - 14), int(BX + 15)):
+    for yy in range(HOR, HOR + 4):
+        d = ((xx + .5 - BX) / 13) ** 2 + ((yy + .5 - (HOR + 1.5)) / 2.2) ** 2
+        if 0.55 < d < 1.0 and B4[yy % 4, xx % 4] < 0.75: G.px(xx, yy, (200, 212, 226))
+        elif d <= 0.55 and B4[yy % 4, xx % 4] < 0.3: G.px(xx, yy, (120, 136, 166))
+# Gischtwolke am Fuß: Kuppel, nach oben ausfransend (geordnet gedithert)
 gr = np.random.RandomState(3)
-for xx in range(int(gcx - 11), int(gcx + 12)):
-    e = 1 - ((xx + .5 - gcx) / 11) ** 2
+for xx in range(int(BX - 12), int(BX + 13)):
+    e = 1 - ((xx + .5 - BX) / 12) ** 2
     if e <= 0: continue
-    hgt = 11 * e ** 0.7 * (0.7 + 0.3 * gr.rand())
-    for yy in range(int(HOR - hgt), HOR + 2):
+    hgt = 11 * e ** 0.9 * (0.75 + 0.25 * gr.rand())
+    for yy in range(int(HOR - hgt), HOR + 1):
         t = (HOR + 1 - yy) / max(1, hgt)          # 0 unten … 1 oben
-        dens = 1.0 if t < 0.35 else (1 - t) * 1.3
+        dens = 1.0 if t < 0.35 else (1 - t) * 1.35
         if dens > B4[yy % 4, xx % 4]:
-            G.px(xx, yy, (186, 196, 212) if t < 0.3 else ((150, 162, 186) if t < 0.65 else (118, 130, 160)))
-G.paste(tint(tor, (60, 64, 90), 0.18), TX, TY)
+            G.px(xx, yy, (196, 204, 218) if t < 0.3 else ((158, 168, 190) if t < 0.65 else (126, 136, 164)))
+TX, TY, tw = 57, SP_TOP, 14                     # für die Wallwolke darüber
 
 # Gewitterwolke (nach der Wasserhose gezeichnet, damit deren Trichter in der Wolke verschwindet):
 # Unterkante aus hängenden Wolkenballen, über der Wasserhose eine tiefer hängende Wallwolke;
@@ -71,7 +87,7 @@ x = -3.0
 while x < gw + 6:
     r = 4 + rs.rand() * 3.5
     lobes.append((x, 24 + (x / gw) * 8 + rs.rand() * 2, r)); x += r * 1.25
-lobes.append((TX + tw * 0.5, TY + 3, 13))                  # Wallwolke über dem Trichter
+lobes.append((63, 22, 11))                                  # Wallwolke über dem Trichter
 base = np.zeros(gw)
 for xx in range(gw):
     b = 18 + (xx / gw) * 8

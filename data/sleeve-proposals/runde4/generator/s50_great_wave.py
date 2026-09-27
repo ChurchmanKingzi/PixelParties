@@ -3,10 +3,11 @@
 Gischtkrallen über das Bild; davor kämpft sich das Segelschiff über die Dünung, in der Ferne der Schneeberg.
 
 Quellen (MotiveJapan.xcf):
-  Ebene 11 „Ebene #168“ – Segelschiff (aus der Kranich-/Flussszene „Sichtbar #34/#36“), 3×
+  Ebene 11 „Ebene #168“ – Segelschiff (aus der Kranich-/Flussszene „Sichtbar #34/#36“), 4×
 Selbst gezeichnet (Regel 2: Wasser, Himmel, Berg): Welle mit Gischt, Dünung, Himmel, Schneeberg, Gischttropfen.
 Farben aus den Wasser- und Himmelsflächen der Japan-Karten.
-Skalierung: Himmel, ferner Berg, ferne See 2× (125×175); große Welle, Dünung, Schiff, Tropfen 3× (84×117).
+Skalierung: Himmel, ferner Berg, ferne See 2× (125×175); große Welle mit Gischt 3× (84×117);
+Schiff + vordere Dünung (klar im Vordergrund, unten) 4× (63×88).
 """
 import math, random
 from j_util_46_50 import *  # noqa
@@ -77,18 +78,32 @@ for y in range(wv.h):
         t = shade[y, x]
         c = PALE if t < 0.12 else (LIGHT if t < 0.4 else (MIDB if t < 0.75 else DEEP))
         wv.px(x, y, c)
-# helle Strömungslinien parallel zur Rolle
-for rr in (R0 + 4, R0 + 7.5):
-    for k in range(260):
-        a = -0.5 + k * (A_END + 0.4) / 260
-        x, y = CX + rr * math.cos(a), CY - rr * math.sin(a)
-        if (k // 9) % 3 != 2 and 0 <= int(x) < wv.w and 0 <= int(y) < wv.h and body[int(y), int(x)]:
-            wv.px(x, y, PALE)
-for i in range(4):                               # senkrechte Linien im Wellenrücken
-    x0 = CX + R0 + 4 + i * 5
-    for y in range(int(CY) + 2, wv.h):
-        x = x0 - (y - CY) * 0.33 + 1.5 * math.sin(y / 5 + i)
-        if (y // 6 + i) % 3 and 0 <= int(x) < wv.w and body[y, int(x)]: wv.px(x, y, LIGHT)
+# Strömungsstreifen parallel zur Rolle (wie Hokusais helle Linien): gestrichelt, abwechselnd hell/mittel
+for n, rr in enumerate([R0 + 2.2, R0 + 4.4, R0 + 6.6, R0 + 8.8, R0 + 11.0]):
+    ph = random.randint(0, 20)
+    for k in range(320):
+        a = -0.6 + k * (A_END + 0.6) / 320
+        r0k = R0 + max(0.0, (a - math.radians(115)) / (A_END - math.radians(115))) * 6
+        r = r0k + (rr - R0) * (R1 - r0k) / (R1 - R0)          # folgt der Verjüngung
+        x, y = CX + r * math.cos(a), CY - r * math.sin(a)
+        if ((k + ph) // (7 + n)) % 3 == 2: continue
+        if 0 <= int(x) < wv.w and 0 <= int(y) < wv.h and body[int(y), int(x)]:
+            wv.px(x, y, PALE if n < 2 else (LIGHT if n < 4 else MIDB))
+# Streifen im Wellenrücken/-hang: folgen dem Hang nach unten links
+for i in range(9):
+    x0 = CX + R0 + 2 + i * 3.2
+    ph = random.randint(0, 9)
+    for y in range(int(CY) - 6, wv.h):
+        x = x0 - (y - CY) * 0.33 + 1.3 * math.sin(y / 5 + i)
+        if ((y + ph) // 5) % 3 == 2: continue
+        if 0 <= int(x) < wv.w and 0 <= y < wv.h and body[y, int(x)] and ang(x, y + .5) > -0.7 and math.hypot(x - CX, y - CY) > R0:
+            wv.px(x, y, LIGHT if i % 2 == 0 else MIDB)
+# dunkle Schattenkante direkt unter der Lippe (Innenseite der Rolle)
+for k in range(300):
+    a = math.radians(-10) + k * (A_END - math.radians(-10)) / 300
+    r0k = R0 + max(0.0, (a - math.radians(115)) / (A_END - math.radians(115))) * 6
+    x, y = CX + (r0k + 0.4) * math.cos(a), CY - (r0k + 0.4) * math.sin(a)
+    if a > math.radians(20): wv.px(x, y, LIGHT)
 # Gischtkamm: weiße Kante außen an der Lippe, mit Krallen
 for k in range(400):
     a = math.radians(40) + k * (A_END - math.radians(40)) / 400
@@ -96,8 +111,8 @@ for k in range(400):
         x, y = CX + (R1 - dr) * math.cos(a), CY - (R1 - dr) * math.sin(a)
         wv.px(x, y, FOAM if dr < 1.5 else PALE)
 # Krallen: kleine gekrümmte Finger, die nach außen/vorn greifen
-for k in range(10):
-    a = math.radians(70) + k * (A_END - math.radians(70)) / 9.5
+for k in range(17):
+    a = math.radians(60) + k * (A_END - math.radians(60)) / 16.5
     bx, by = CX + R1 * math.cos(a), CY - R1 * math.sin(a)
     nx, ny = math.cos(a), -math.sin(a)             # nach außen
     tx, ty = -math.sin(a), -math.cos(a)            # entlang der Lippe (Brechrichtung)
@@ -108,6 +123,8 @@ for k in range(10):
         y = by + ny * (s * 0.8) + ty * (u * u * 3.5)
         wv.px(x, y, FOAM)
         if s < L - 1: wv.px(x - nx * 0.9, y - ny * 0.9, FOAM)
+        if s == L - 2 and k % 2: wv.px(x + tx * 1.2, y + ty * 1.2, FOAM)      # Nebenfinger
+    wv.px(bx - nx * 2.6, by - ny * 2.6, PALE)                                  # Schaumwurzel
 # Spitze der Lippe: Gischt tropft
 tipx, tipy = CX + R0 * math.cos(A_END), CY - R0 * math.sin(A_END)
 for (dx, dy) in [(0, 1), (-1, 2), (1, 3), (-2, 5), (0, 6), (-1, 8), (2, 9), (-3, 11)]:
@@ -118,8 +135,8 @@ for _ in range(30):
     r = R1 + random.uniform(2, 9)
     wv.px(CX + r * math.cos(a), CY - r * math.sin(a), FOAM)
 
-# Dünung im Vordergrund mit Schiff
-SEA = 98                                         # Wasserlinie Schiff (→ 294 px)
+# Wellental hinter dem Schiff (3×)
+SEA = 96                                         # Wasserspiegel im Wellental (→ 288 px)
 for x in range(wv.w):
     top = SEA - 3 + int(2.5 * math.sin(x / 9.0 + 1)) + int(1.2 * math.sin(x / 3.7))
     for y in range(top, wv.h):
@@ -128,17 +145,23 @@ for x in range(wv.w):
         if y == top and (x // 3) % 2 == 0: c = FOAM
         if y > top + 2 and (x * 3 + y * 7) % 17 == 0: c = LIGHT
         wv.px(x, y, c)
+# Schiff im Vordergrund (eigene, nähere Ebene 4×) im Wellental, vorne von einer Dünung mit Gischt überspült
+sp = Lay(4)
 ship = sprite('j50_ship', J, [11])
 sw, sh = ship.shape[1], ship.shape[0]
-SX = 18
-wv.paste(ship, SX, SEA + 2 - sh)
-# Wasser vor dem Rumpf + Bugwelle
-for x in range(SX - 2, SX + sw + 3):
-    top = SEA + 1 + int(1.2 * math.sin(x / 3.7))
-    wv.px(x, top, FOAM if (x - SX) % 4 < 2 else PALE)
-    wv.px(x, top + 1, LIGHT)
-for (dx, dy) in [(sw + 1, -1), (sw + 3, -2), (sw + 2, -3), (-2, -1), (-3, -2)]:
-    wv.px(SX + dx, SEA + dy, FOAM)
+SX, SEA4 = 6, 79                                  # Wasserlinie im 4×-Raster (→ 316 px)
+sp.paste(ship, SX, SEA4 - sh + 3)
+for x in range(sp.w):
+    top = SEA4 + int(1.6 * math.sin(x / 5.0 + 0.5)) - (2 if SX + sw - 2 < x < SX + sw + 6 else 0)
+    for y in range(top, sp.h):
+        c = FOAM if y == top and (x // 2) % 3 else (LIGHT if y <= top + 1 else (MIDB if y < top + 5 else DEEP))
+        if y > top + 2 and (x * 3 + y * 7) % 13 == 0: c = LIGHT
+        sp.px(x, y, c)
+# Bugwelle und Gischt am Bug (rechts) und Heck
+for (dx, dy) in [(sw, -4), (sw + 1, -5), (sw + 2, -3), (sw - 1, -6), (sw + 3, -6), (sw + 1, -8), (-1, -2), (-2, -3), (0, -4)]:
+    sp.px(SX + dx, SEA4 + dy, FOAM)
+for (dx, dy) in [(sw + 4, -9), (sw + 2, -11), (-3, -6)]:
+    sp.px(SX + dx, SEA4 + dy, PALE)
 
-cv = flatten([bg, wv])
+cv = flatten([bg, wv, sp])
 print(save(cv, '50_great_wave.png'))

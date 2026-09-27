@@ -3,13 +3,13 @@
 des blühenden Kirschhains auf dem Hügel begeistert die Arme hoch; Blütenblätter treiben über das Bild.
 
 Quellen (MotiveJapan.xcf):
-  Ebene 177 „Tanuki-Kopie“ – Tanuki von hinten mit erhobenen Armen (Karte „Tanuki Escape“, Szene „Sichtbar #23“), mit Randlicht + Kontur, 4×
+  Ebene 177 „Tanuki-Kopie“ – Tanuki von hinten mit erhobenen Armen (Karte „Tanuki Escape“, Szene „Sichtbar #23“), mit Randlicht + Kontur, 3×
   Ebene 183 „Ebene #17“ – Kirschbaum (unterster, vollständiger Baum einer Baumspalte), dreimal zum Hain gesetzt (Seiten gespiegelt), 3×
-  Ebene 245 „Ebene #13“ – rosa Blütenteppich (Textur), 3× auf dem Hügel, 4× im Vordergrund
+  Ebene 245 „Ebene #13“ – rosa Blütenteppich (Textur), 3× auf dem Hügel und im Vordergrund
   Ebene 244 „Ebene #139“ – Grastextur für den Hügel, 3×
 Selbst gezeichnet: Himmel, Wolken, ferne Hügel mit Hainen, Hügelform, Gras, fallende Blütenblätter, Schatten.
 Skalierung: Himmel + ferne Hügel 2× (125×175); Hügel + Kirschhain + Blütenblätter über dem Bild 3× (84×117);
-Vordergrund-Böschung, Tanuki, nahe Blütenblätter 4× (63×88).
+Vordergrund-Böschung, Tanuki, nahe Blütenblätter ebenfalls 3× (eigene Ebene davor).
 """
 import math, random
 from j_util_46_50 import *  # noqa
@@ -44,7 +44,8 @@ GT = tile_rgb(sprite('j49_grass', J, [244], box=(0, 112, 60, 152)), mid.w, mid.h
 
 
 def hill_top(x):
-    return int(CREST_Y + ((x - CREST_X) / 26.0) ** 2 * 7)
+    """Breite Kuppe (Plateau für den Hain), danach abfallende Hänge."""
+    return int(CREST_Y + (abs(x - CREST_X) / 22.0) ** 2 * 5 + (max(0.0, abs(x - CREST_X) - 26) / 10.0) ** 2 * 4)
 
 
 for x in range(mid.w):
@@ -69,14 +70,13 @@ tw3, th3 = tree.shape[1], tree.shape[0]
 PET = [(255, 176, 222), (240, 120, 196)]
 for (dx, tr) in [(-19, flip(tree)), (19, tree)]:
     x0 = CREST_X + dx - tw3 // 2
-    base = hill_top(CREST_X + dx) + 1
-    for x in range(x0 + 5, x0 + tw3 - 5): mid.px(x, base, (200, 120, 170))
+    base = max(hill_top(x) for x in range(x0 + 8, x0 + tw3 - 8)) - 1     # Wurzeln stecken im Hang
+    for x in range(x0 + 6, x0 + tw3 - 6):
+        if base >= hill_top(x): mid.px(x, base, (200, 120, 170))
     mid.paste(darken(tr, 0.9), x0, base - th3)
 TX = CREST_X - tw3 // 2
-TY = CREST_Y + 1 - th3 - 4                  # Mittelbaum steht auf einer kleinen Kuppe (Wurzeln im Blütenteppich)
-for x in range(TX + 4, TX + tw3 - 4):
-    for y in range(TY + th3 - 1, CREST_Y + 1):
-        if abs(x - CREST_X) < (tw3 // 2 - 4) - (CREST_Y - y) * 2: mid.px(x, y, PT[y, x])
+TY = CREST_Y + 1 - th3
+for x in range(TX + 5, TX + tw3 - 5): mid.px(x, CREST_Y + 1, (200, 120, 170))
 mid.paste(tree, TX, TY)
 # Blütenblätter über das ganze Bild, vom Hain nach links unten treibend
 for _ in range(70):
@@ -85,12 +85,12 @@ for _ in range(70):
     mid.px(x, y, PET[random.random() < 0.4])
     if random.random() < 0.5: mid.px(x + 1, y, PET[1])
 
-# ---------------- 4×: Böschung + Tanuki ----------------
-fg = Lay(4)
+# ---------------- 3×: Böschung + Tanuki (Vordergrund) ----------------
+fg = Lay(3)
 fgt = tile_rgb(quant(sprite('j49_petals', J, [245], box=(40, 150, 80, 180)), [(206, 110, 170), (232, 150, 200), (248, 190, 222)]), fg.w, fg.h)
-BANK = 79
+BANK = 106
 for x in range(fg.w):
-    top = BANK + int(1.2 * math.sin(x / 6.0)) + (1 if x > 40 else 0)
+    top = BANK + int(1.2 * math.sin(x / 6.0)) + (1 if x > 54 else 0)
     for y in range(top, fg.h):
         c = fgt[y, x].astype(float) * (0.9 if y > top else 1.0)
         if y == top: c = np.array((255, 206, 232.0))
@@ -107,13 +107,13 @@ for j in range(th):
         side = (i == tw - 1 or not tm[j, i + 1]) or (i == 0 or not tm[j, i - 1])
         if up_ or (side and j < th - 6):
             rim[j, i, :3] = (236, 178, 170) if up_ else (196, 136, 128)
-TNX, FEET = 6, 81
+TNX, FEET = 12, 109
 for x in range(TNX + 5, TNX + tw - 5): fg.px(x, FEET, (170, 90, 140))
 for x in range(TNX + 8, TNX + tw - 8): fg.px(x, FEET + 1, (190, 110, 156))
 fg.paste(outline_sil(silhouette(tan, (70, 30, 56)), (70, 30, 56)), TNX - 1, FEET - th)
 fg.paste(rim, TNX, FEET + 1 - th)
 # nahe Blütenblätter
-for (x, y) in [(44, 30), (50, 44), (40, 56), (56, 20), (34, 12), (12, 40), (52, 64)]:
+for (x, y) in [(58, 70), (66, 84), (50, 92), (72, 60), (8, 76), (16, 60)]:
     fg.px(x, y, PET[0]); fg.px(x + 1, y, PET[1])
 
 cv = flatten([sky, mid, fg])

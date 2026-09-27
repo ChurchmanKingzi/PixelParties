@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """13 Wingshadow – Luftbild: Thunderstruck Waflav gleitet mit ausgebreiteten Flügeln und knisternder
-Ladung über ein Dorf in Draufsicht; tief unter ihm fällt sein kleiner Schatten auf Weg und Treppe.
+Ladung über ein Dorf in Draufsicht; tief unter ihm fällt sein kleinerer Schatten genau auf den Dorfteich.
 
 Quellen (MotiveGN.xcf):
   Ebene 13 „Thunder-Struck Waflav“ (Körper) + Ebene 14 „Thunder-Struck Waflav #1“ (Flügel)
