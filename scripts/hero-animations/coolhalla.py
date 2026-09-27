@@ -46,7 +46,7 @@ VARIANTS = {
     'peter': dict(slug='peter-r-ll-the-protagonist', knee=37,
                   lid=[((11, 26), '370000'), ((14, 26), '370000')],
                   line=[(10, 26), (11, 26), (14, 26), (15, 26)], sword=True),
-    'prodigy': dict(slug='shrunken-prodigy-peter-r-ll', knee=37,
+    'prodigy': dict(slug='shrunken-prodigy-peter-r-ll', knee=36,   # Schuhe (ab Zeile 36) bleiben ganz stehen
                     lid=[((11, 26), '24426a'), ((14, 26), '24426a')],
                     line=[], closed=[((11, 25), '112550'), ((11, 26), '112550'), ((14, 25), '112550'), ((14, 26), '112550')],
                     sword=True),
