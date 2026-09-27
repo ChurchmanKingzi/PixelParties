@@ -4,12 +4,15 @@
 Im Sprite ist das Schwert mitten im Hieb: an der Faust die goldene
 Parierstange, die Klinge selbst ist nur als grauer Keil (die Schwungspur) zu
 sehen. Hier schwingt er es tatsächlich:
-* Die Klinge wird gezeichnet (3 px breit, heller Grat) und dreht sich samt
+* Die Klinge wird gezeichnet (3 px breit mit Kanten, heller Grat, setzt direkt
+  an der Parierstange an, spitz zulaufend) und dreht sich samt
   Parierstange um die Faust: in Ruhe schräg nach oben gehalten, kurz
   ausholen, dann in drei Frames nach unten durchgezogen.
 * Der Keil aus dem Sprite ist die Schwungspur: er erscheint hinter der Klinge,
   soweit sie schon geschwungen ist, und schrumpft danach zur Klinge hin weg.
 * Danach hebt er das Schwert langsam wieder.
+* Die Faust mit der goldenen Manschette geht mit: beim gehobenen Schwert
+  1 px höher, nach dem Hieb 1 px tiefer (das Schwert dreht um die Faust).
 * Er wippt in den Knien und blinzelt zweimal pro Loop.
 Frame 0 zeigt das gehobene Schwert (nicht den Hieb aus dem Sprite); die
 Figur selbst liegt deckungsgleich wie im Sprite.
@@ -38,18 +41,19 @@ WEDGE = np.array([[bool(SRC[y, x, 3]) and x >= 21 and y >= 13 and tuple(SRC[y, x
                    for x in range(SW)] for y in range(SH)])
 GUARD = (SRC[:, :, 3] > 0) & (_xs >= 25) & (_xs <= 28) & (_ys >= 9) & (_ys <= 21) & ~WEDGE
 BODY = (SRC[:, :, 3] > 0) & ~WEDGE & ~GUARD
+ARM = BODY & (_xs >= 20) & (_xs <= 25) & (_ys >= 12) & (_ys <= 16)   # Faust mit goldener Manschette
 # Schwert (Parierstange + gezeichnete Klinge nach rechts)
 SWORD = np.zeros((SH, SW, 4), int)
-SWORD[GUARD] = SRC[GUARD]
-for x in range(29, SW):
-    tip = x >= SW - 2
+for x in range(28, SW):                              # Klinge setzt direkt an der Parierstange an
+    if x == SW - 1:                                  # Spitze
+        SWORD[14, x] = rgb('dedede')
+        continue
     for y, c in ((13, 'dedede'), (14, 'ffffff'), (15, 'a7a7a7')):
-        if tip and y != 14:
-            continue
         SWORD[y, x] = rgb(c)
-    if not tip:
+    if x < SW - 2:
         SWORD[12, x] = rgb('808080')
         SWORD[16, x] = rgb('717171')
+SWORD[GUARD] = SRC[GUARD]
 SWORD_M = SWORD[:, :, 3] > 0
 ANG = np.arctan2(_ys + 0.5 - PIVOT[1], _xs + 0.5 - PIVOT[0])   # Winkel jedes Keil-Pixels
 RAISED, WIND, DOWN = -1.0, -1.25, 1.5
@@ -84,13 +88,23 @@ def frame(i):
         m = WEDGE & ((ANG <= a) if kind == 'bis' else (ANG >= a))
         for y, x in zip(*np.nonzero(m)):
             out[y + PT + (b if y < KNEE else 0), x + P] = s[y, x]
-    sword = rotate_part(SWORD, SWORD_M, PIVOT, ang, (H, W), (P, PT + b))
+    ad = max(-1, min(1, int(round(ang))))            # Faust folgt dem Schwert (hoch/runter)
+    sword = rotate_part(SWORD, SWORD_M, PIVOT, ang, (H, W), (P, PT + b + ad))
     msk = sword[:, :, 3] > 0
     out[msk] = sword[msk]
     for y in range(SH):                              # Figur (Faust liegt über dem Griff)
         for x in range(SW):
-            if BODY[y, x]:
+            if BODY[y, x] and not ARM[y, x]:
                 out[y + PT + (b if y < KNEE else 0), x + P] = s[y, x]
+    for y in range(SH):
+        for x in range(SW):
+            if ARM[y, x]:
+                out[y + PT + b + ad, x + P] = s[y, x]
+    if ad:                                           # freie Zeile unter/über der Faust füllen
+        yb = 16 if ad < 0 else 12
+        for x in range(20, 26):
+            if ARM[yb, x] and not out[yb + PT + b, x + P, 3]:
+                out[yb + PT + b, x + P] = s[yb, x]
     if b < 0:
         y = KNEE - 1
         for x in range(SW):

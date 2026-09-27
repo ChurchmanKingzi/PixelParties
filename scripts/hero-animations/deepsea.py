@@ -38,7 +38,7 @@ import sys
 from PIL import Image
 import numpy as np
 import cv2
-from anim_common import rgb, save_outputs, sparkle_pixels, BOUNCE12
+from anim_common import rgb, save_outputs, sparkle_pixels, sweep_level, BOUNCE12
 from flap_common import fill_pinholes, shear_flap
 
 BLACK = (0, 0, 0, 255)
@@ -55,7 +55,7 @@ V_ = {
                     lid=[((5, 6), 'f6bd7b'), ((6, 6), 'f6bd7b'), ((9, 6), 'f6bd7b'), ((10, 6), 'f6bd7b')],
                     line=[(5, 7), (6, 7), (9, 7), (10, 7)]),
     'mender': dict(slug='lolek-mender-of-the-shattered-trident', knee=34),
-    'rakah': dict(slug='rakah-the-loan-shark', knee=21,
+    'rakah': dict(slug='rakah-the-loan-shark', knee=21, pb=5,
                   lid=[((10, 6), '1c1c20'), ((14, 6), '1c1c20')],
                   line=[(10, 7), (11, 7), (14, 7), (15, 7)]),
     'rhabi': dict(slug='rha-bi-the-living-skeleton', knee=21),
@@ -90,13 +90,14 @@ SRC = load()
 SH, SW = SRC.shape[:2]
 P = C.get('pad', 3)
 PR = C.get('pad_r', P)
-PT, PB = C.get('pad', 4), 2
+PT, PB = C.get('pad', 4), C.get('pb', 2)
 H, W = SH + PT + PB, SW + P + PR
 N = 48
 KNEE = C.get('knee', SH)
 
 # --- Teile / Masken ----------------------------------------------------------
 if V == 'arnold':
+    HAIR = load('hair')[:, :, 3] > 0
     GILL = rgb('e440d8')
     _m = (SRC[:, :, :3] == GILL[:3]).all(2) & (SRC[:, :, 3] > 0)
     _n, _lab = cv2.connectedComponents(_m.astype(np.uint8), connectivity=8)
@@ -126,6 +127,10 @@ if V == 'mender':
     GLOW_COLS = [rgb(c) for c in ('fd51fe', 'f7a5fe', 'f9c0fe', 'fbd8fe', 'ffffff')]
 if V == 'rakah':
     TAIL = load('tail')[:, :, 3] > 0
+    BLOOD_COLS = [rgb('0f4d3d'), rgb('18775e')]
+    BLOOD = np.array([[bool(SRC[y, x, 3]) and tuple(SRC[y, x]) in BLOOD_COLS for x in range(SW)] for y in range(SH)])
+    BLOOD_HI = rgb('3fbf96')
+    DRIPS = [(19, 0), (21, 7)]                       # (x, Phase) – Tropfen lösen sich unten
 if V == 'asgore':
     TRIDENT = load('trident')[:, :, 3] > 0
     CAPE_L = {(x, y) for y in range(15, 29) for x in range(0, 18) if SRC[y, x, 3] and not TRIDENT[y, x]}
@@ -141,7 +146,7 @@ if V == 'tryse':
     ARM = (load('arm')[:, :, 3] > 0) | (load('hand')[:, :, 3] > 0) | (load('sword')[:, :, 3] > 0)
     ARM &= ~((load('body')[:, :, 3] > 0) & (np.arange(SW)[None, :] < 12))
 if V == 'rhabi':
-    FLAME = [rgb(c) for c in ('732910', 'd56210', 'ffb418', 'ffde5a')]
+    GOLD = [rgb(c) for c in ('732910', 'd56210', 'ffb418', 'ffde5a', 'fff6ac')]
     EYE_GLOW = [rgb(c) for c in ('550808', '7a1010', 'a81818', '7a1010')]
     ARM_UL = {(x, y) for y in range(10, 16) for x in range(0, 7)}
     ARM_UR = {(x, y) for y in range(10, 16) for x in range(19, SW)}
@@ -178,6 +183,37 @@ def stab(i):
     return {6: -1, 7: -2, 8: -2, 9: 1, 10: 3, 11: 3, 12: 3, 13: 2, 14: 1}.get(t, 0)
 
 
+def extra(x, y, i, b, sx):
+    """Zusätzlicher Versatz eines Pixels (ohne Wippen/Atmen)."""
+    dx, dy = 0, 0
+    if V == 'arnold' and HAIR[y, x]:                 # Tolle wippt nach
+        dy += max(-1, min(1, BOUNCE12[(i - 2) % 12] - b))
+    if V == 'arnold' and GILL_LAB[y, x]:
+        k = GILL_LAB[y, x]
+        dy += int(round(math.sin(2 * math.pi * i / 12 + k * 1.7) - math.sin(k * 1.7)))
+    if V == 'rakah' and TAIL[y, x]:
+        dy += wave(max(0, x - 18), 9, i, 0.8)
+    if V == 'siphem':
+        d = 13 - x if x <= 12 else (x - 23 if x >= 23 else 0)
+        if d > 0:
+            dy += wave(d, 13, i, 1.1)
+    if V == 'asgore':
+        if (x, y) in CAPE_L:
+            dx -= billow(y, 15, 28, i)
+        elif (x, y) in CAPE_R:
+            dx += billow(y, 15, 28, i, period=16)
+    if V == 'rhabi':
+        t = i % 12
+        up = 1 if t in (2, 3) else (2 if t in (8, 9) else 0)
+        if ((x, y) in ARM_UL or (x, y) in ARM_LR) and up == 1:
+            dy -= 1
+        if ((x, y) in ARM_UR or (x, y) in ARM_LL) and up == 2:
+            dy -= 1
+    if V == 'tryse' and ARM[y, x]:
+        dx += sx
+    return dx, dy
+
+
 def frame(i, particles=True):
     s = SRC.copy()
     st = BLINK.get(i)
@@ -196,16 +232,20 @@ def frame(i, particles=True):
             k = GLOW.get(tuple(s[y, x]))
             if k is not None:
                 s[y, x] = GLOW_COLS[min(4, k + lvl)]
-    if V == 'rhabi':
+    if V == 'rhabi':                                 # Lichtband über die goldene Krone
         for y in range(0, 6):
             for x in range(SW):
                 c = tuple(s[y, x])
-                if c in FLAME:
-                    k = FLAME.index(c)
-                    step = [0, 1, 0, -1][(i // 2 + x + y) % 4]
-                    s[y, x] = FLAME[max(0, min(3, k + step))]
+                if c in GOLD[:4]:
+                    lv = sweep_level(x, y, i, N, speed=0.9, slope=0.8, offset=-6.0)
+                    if lv:
+                        s[y, x] = GOLD[min(4, GOLD.index(c) + lv)]
         for y, x in zip(*np.nonzero((SRC[:, :, :3] == (0x55, 0x08, 0x08)).all(2))):
             s[y, x] = EYE_GLOW[(i // 4) % 4]
+    if V == 'rakah':                                 # grünes Blut fließt
+        for y, x in zip(*np.nonzero(BLOOD)):
+            if (y - i // 2) % 4 == 0:
+                s[y, x] = BLOOD_HI
     out = np.zeros((H, W, 4), int)
     b = BOUNCE12[i % 12] if 'knee' in C else 0
     br = breath(i) if 'breath' in C else 0
@@ -225,39 +265,20 @@ def frame(i, particles=True):
                 continue
             if V == 'saya' and WINGS[y, x, 3] and not (SRC[y, x] != WINGS[y, x]).any():
                 continue                             # Flügelpixel schon gezeichnet
-            dx, dy = 0, (b if y < KNEE else 0)
+            dx, dy = extra(x, y, i, b, sx)
+            dy += b if y < KNEE else 0
             if 'breath' in C and y <= C['breath']:
-                dy = br
-            if V == 'arnold' and GILL_LAB[y, x]:
-                k = GILL_LAB[y, x]
-                dy += int(round(math.sin(2 * math.pi * i / 12 + k * 1.7) - math.sin(k * 1.7)))
-            if V == 'rakah' and TAIL[y, x]:
-                dy += wave(max(0, x - 18), 9, i, 0.8)
-            if V == 'siphem':
-                d = 13 - x if x <= 12 else (x - 23 if x >= 23 else 0)
-                if d > 0:
-                    dy += wave(d, 13, i, 1.1)
-            if V == 'asgore':
-                if (x, y) in CAPE_L:
-                    dx -= billow(y, 15, 28, i)
-                elif (x, y) in CAPE_R:
-                    dx += billow(y, 15, 28, i, period=16)
-            if V == 'rhabi':
-                t = i % 12
-                up = 1 if t in (2, 3) else (2 if t in (8, 9) else 0)
-                if ((x, y) in ARM_UL or (x, y) in ARM_LR) and up == 1:
-                    dy -= 1
-                if ((x, y) in ARM_UR or (x, y) in ARM_LL) and up == 2:
-                    dy -= 1
+                dy += br
             if V == 'tryse' and ARM[y, x]:
-                dx += sx
                 arm_rows.setdefault(y, []).append(x)
             out[y + PT + dy, x + P + dx] = s[y, x]
-    if b < 0:                                        # Zeile über dem Knie dehnen
-        y = KNEE - 1
+    if b < 0:                                        # Zeile über dem Knie dehnen – nur über den Beinen,
+        y = KNEE - 1                                 # mit demselben Versatz wie das Pixel
         for x in range(SW):
-            if s[y, x, 3] and not out[y + PT, x + P, 3]:
-                out[y + PT, x + P] = s[y, x]
+            if s[y, x, 3] and KNEE < SH and s[KNEE, x, 3]:
+                dx, dy = extra(x, y, i, b, sx)
+                if not out[y + PT + dy, x + P + dx, 3]:
+                    out[y + PT + dy, x + P + dx] = s[y, x]
     if br:                                           # Atmen: Zeile gedehnt
         y = C['breath']
         for x in range(SW):
@@ -277,11 +298,29 @@ def frame(i, particles=True):
     if V == 'tryse' and sx > 0:                      # Schulter nachziehen
         for y, xs in arm_rows.items():
             xin = min(xs)
+            row = [s[y, x] for x in sorted(xs)]
+            light = [c for c in row if max(c[:3]) > 0x30]
+            fill = light[0] if light and len(row) > 2 else s[y, xin]   # Stoffgrau, Außenkante bleibt schwarz
             for k in range(sx):
                 xx, yy = xin + P + k, y + PT + (b if y < KNEE else 0)
                 if not out[yy, xx, 3]:
-                    out[yy, xx] = s[y, xin]
+                    out[yy, xx] = fill
     fill_pinholes(out)
+    if V == 'rakah':                                 # Tropfen lösen sich unten und fallen
+        for x, ph in DRIPS:
+            t = (i + ph) % 16
+            ys = [y for y in range(SH) if BLOOD[y, x]]
+            if not ys or t > 3:
+                continue
+            y = max(ys) + 1 + t
+            yy = y + PT
+            if 0 < yy < H - 1:
+                out[yy, x + P] = BLOOD_COLS[1] if t < 3 else BLOOD_COLS[0]
+    if V == 'rhabi':                                 # Krone glitzert
+        for (x, y, start) in ((8, 2, 6), (13, 1, 22), (17, 2, 38)):
+            for (px, py), c in sparkle_pixels(i, N, [(x + P, y + PT + b, start)], rgb('ffb418'), rgb('fff6ac')).items():
+                assert 0 < px < W - 1 and 0 < py < H - 1, 'Glanz am Rand'
+                out[py, px] = c
     if V == 'mender':                                # Funkeln an den Spitzen
         for (x, y, start) in ((16, 1, 6), (14, 3, 22), (18, 3, 38)):
             for (px, py), c in sparkle_pixels(i, N, [(x + P, y + PT + b, start)], rgb('fd51fe'), rgb('fbd8fe')).items():
@@ -293,7 +332,7 @@ def frame(i, particles=True):
                 assert 0 < px < W - 1 and 0 < py < H - 1, 'Glanz am Rand'
                 out[py, px] = c
     if particles and V in ('lolek', 'captain'):      # Scherben
-        fig = out[:, :, 3] > 0
+        fig = cv2.dilate((out[:, :, 3] > 0).astype(np.uint8), np.ones((3, 3), np.uint8)) > 0   # 1 px Abstand zur Figur
         for k, ax, ay, px, py, ph in PARTS:
             t = SHARDS[k % len(SHARDS)]
             x0 = ax + int(round(1.4 * math.sin(2 * math.pi * (i + ph) / px)))
@@ -309,7 +348,7 @@ def frame(i, particles=True):
             if (i + ph * 3) % 24 in (0, 1):          # funkeln
                 sh[m] = np.array([255, 255, 255, 255])
             region[m] = sh[m]
-        fill_pinholes(out)
+            fig[y0:y0 + th, x0:x0 + tw] |= m
     return out
 
 
