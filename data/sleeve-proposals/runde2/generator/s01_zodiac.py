@@ -43,8 +43,8 @@ gt = np.tile(grass[..., :3], (h // 8 + 1, w // 8 + 1, 1))[:h, :w]
 GRASS_L = (66, 134, 0)
 
 # Mitte: Tierkreis-Scheibe – Ziegelring mit zwölf Feldern um das Yin-Yang
-R = 20
-YX, YY = 62, 86
+R = 19
+YX, YY = 62, 82
 rr = np.hypot(xx - YX, yy - YY)
 ang = (np.degrees(np.arctan2(xx - YX, -(yy - YY))) + 360 + 15) % 360
 disc_m = rr < R + 11
@@ -111,18 +111,35 @@ def hou_sprite():
 
 S['Hou'] = hou_sprite()
 
-# Zwölf Plätze im Oval um die Scheibe, im Uhrzeigersinn ab Shu (oben mittig) bis Zhu; Ma steht unten mittig.
-# (Name, Fußmitte x, Fußlinie y) – Abstände so gewählt, dass sich keine Figuren gegenseitig verdecken.
+# Zwölf gleich große Graskuppen symmetrisch im Oval um die Scheibe, im Uhrzeigersinn ab Shu (oben mittig) bis
+# Zhu; Ma unten mittig. Die Kuppen liegen auf einer abgerundet-eckigen Ellipse (Superellipse EX, EY, ERX, ERY, EP)
+# und sind an der Senkrechten gespiegelt (Niu ↔ Zhu, Hu ↔ Gou, Tu ↔ Ji, Long ↔ Hou, She ↔ Yang). Die Bogenabstände
+# sind gleich (je 1/12 des Umfangs); nur die beiden großen unteren Paare (Long/Hou, She/Yang) rücken ein wenig
+# nach unten, damit sich keine Figuren verdecken. Die Ellipse sitzt tiefer als die Scheibe, weil die Figuren von
+# ihren Kuppen aus nach oben stehen. (Name, Fußmitte x, Fußlinie y)
 FOOT = 2
-SPOTS = [('Shu', 63, 33), ('Niu', 88, 36), ('Hu', 108, 50),
-         ('Tu', 107, 83), ('Long', 106, 122),
-         ('She', 93, 164), ('Ma', 62, 166), ('Yang', 36, 164), ('Hou', 16, 149),
-         ('Ji', 17, 113), ('Gou', 17, 78), ('Zhu', 30, 45)]
+ORDER = ['Shu', 'Niu', 'Hu', 'Tu', 'Long', 'She', 'Ma', 'Yang', 'Hou', 'Ji', 'Gou', 'Zhu']
+EX, EY, ERX, ERY, EP = 62.5, 95, 42, 64, 3.5
+HALF = [0, 0.081, 0.164, 0.248, 0.350, 0.430, 0.5]      # Anteile am Umfang: Shu … Ma (rechte Hälfte)
+FRAC = HALF + [1 - f for f in HALF[5:0:-1]]              # linke Hälfte gespiegelt: Yang … Zhu
+
+
+def ellipse_spots(fracs):
+    """Punkte an den Umfangsanteilen fracs auf |x/ERX|^EP + |y/ERY|^EP = 1, ab oben im Uhrzeigersinn."""
+    ts = np.linspace(0, 2 * math.pi, 3601)
+    sx, cy_ = np.sin(ts), np.cos(ts)
+    pts = np.stack([EX + ERX * np.sign(sx) * abs(sx) ** (2 / EP), EY - ERY * np.sign(cy_) * abs(cy_) ** (2 / EP)], 1)
+    arc = np.concatenate([[0], np.cumsum(np.hypot(*np.diff(pts, axis=0).T))])
+    return [pts[np.argmin(abs(arc - arc[-1] * f))] for f in fracs]
+
+
+SPOTS = [(n, c[0], int(round(c[1]))) for n, c in zip(ORDER, ellipse_spots(FRAC))]
+PAD_RX = 12                                       # alle Kuppen gleich groß
 
 # von hinten (oben) nach vorn: je Figur erst ihre flache Graskuppe (Aufsicht), dann die Figur
 for n, px, py in sorted(SPOTS, key=lambda t: t[2]):
     sp = S[n]
-    rx_, ry_ = min(sp.shape[1], 30) / 2 + 2, 3.3
+    rx_, ry_ = PAD_RX, 3.3
     e = ((xx - px) / rx_) ** 2 + ((yy - (py + FOOT - 0.5)) / ry_) ** 2
     rim = ((xx - px) / (rx_ + 1)) ** 2 + ((yy - (py + FOOT + 0.5)) / (ry_ + 1)) ** 2
     cv.a[rim < 1] = EDGE_D

@@ -9,7 +9,8 @@ Marionetten vor Bühne und Vorhang. Alles aus MotiveIndia.xcf (Repo PixelParties
 Alles liegt auf EINEM 125×175-Raster (Kartenpixel 1:1) und wird am Ende 2× auf 250×350 skaliert:
 Figuren, Bühne und Fäden haben dieselbe Pixelgröße (Fäden = 1 Kartenpixel, zweifarbig wie auf den
 Karten). Jeder Faden beginnt an einer Hand (Kontrollkreuz/Funke) von Tri Ad bzw. Tri Fecta, läuft
-sichtbar über die Tribünenbrüstung und endet am oberen Rand einer Puppe (Kopf, Hände, Hammer)."""
+sichtbar über die Tribünenbrüstung und endet am oberen Rand einer Puppe (Kopf, Hände, Hammer).
+Die Fäden sind halbtransparent (55 % Deckkraft, pro ganzem Pixel gemischt)."""
 import numpy as np
 from kit import Canvas, up, flip, silhouette, save, widen
 from xcfkit import sprite, parts, part_at, compose
@@ -77,10 +78,11 @@ for s, x, y, ss in pup.values():
     for c, (hx, hy) in ss:
         line(hx, hy, x + c, y + top_of(s, c))
 
-def draw_strings(rows=None):
+STR_A = 0.55                                         # Fäden halbtransparent (ganze Pixel, gleiches Raster)
+def draw_strings(rows=None, only=None):
     for yy, xx in zip(*np.where(smask >= 0)):
-        if rows is None or rows[0] <= yy < rows[1]:
-            cv.a[yy, xx] = STR[smask[yy, xx]]
+        if (rows is None or rows[0] <= yy < rows[1]) and (only is None or only[yy, xx]):
+            cv.a[yy, xx] = np.round(cv.a[yy, xx] * (1 - STR_A) + np.array(STR[smask[yy, xx]]) * STR_A)
 
 def put(s, x, y, sh=0.45):
     cv.paste(silhouette(s, (20, 10, 40)), x + 1, y + 2, alpha=sh)
@@ -90,8 +92,10 @@ cv.paste(rain, (NW - rain.shape[1]) // 2, FLOOR - rain.shape[0] + 1)
 draw_strings()                                       # Fäden hinter den Puppen …
 for k, (s, x, y, _) in pup.items():
     put(s, x, y)
+snap = cv.a.copy()
 put(ad, AX, TY, sh=0.3); put(fecta, FX, TY, sh=0.3)
-draw_strings((TY + 17, TRIB_BOTTOM + 1))             # … aber vor der Tribünenbrüstung (von den Händen aus)
+trib = (cv.a != snap).any(-1)                        # nur dort neu, wo die Tribünen die Fäden überdeckt haben
+draw_strings((TY + 17, TRIB_BOTTOM + 1), trib)       # … aber vor der Tribünenbrüstung (von den Händen aus)
 
 big = Canvas(250, 350)
 big.a[:] = up(np.dstack([cv.a, np.full(cv.a.shape[:2], 255, np.uint8)]), 2)[..., :3]
