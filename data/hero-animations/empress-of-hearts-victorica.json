@@ -1,0 +1,16 @@
+{
+  "hero": "Empress of Hearts Victorica",
+  "sheet": "empress-of-hearts-victorica.png",
+  "frameWidth": 32,
+  "frameHeight": 36,
+  "frames": 48,
+  "frameMs": 90,
+  "loop": true,
+  "layout": "horizontal",
+  "skinOf": "Victorica, the Eternal Empress",
+  "padTop": 4,
+  "padLeft": 4,
+  "padRight": 4,
+  "padBottom": 2,
+  "faceX": 15.5
+}

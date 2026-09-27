@@ -70,8 +70,8 @@ def billow(y, side, i):
     bewegen sich gemeinsam, damit der Saum immer der untere Rand bleibt."""
     y0, y1 = C['cape'][:2]
     f = min(1.0, (y - y0) / (y1 - y0 - 2))
-    ph = 2 * math.pi * i / 24 + (0.9 if side > 0 else 0.0)
-    amp = 2.2 * (0.5 + 0.5 * math.sin(ph)) * (0.85 + 0.15 * math.sin(3 * ph))
+    ph = 2 * math.pi * i / (16 if side > 0 else 24)     # eigene Takte, Frame 0 = Ruhelage
+    amp = 2.2 * (0.5 - 0.5 * math.cos(ph)) * (0.85 + 0.15 * math.sin(3 * ph))
     return int(round(amp * f ** 1.2))
 
 

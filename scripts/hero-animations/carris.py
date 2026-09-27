@@ -89,7 +89,7 @@ def watch(i, b):
     for y, x in zip(*np.nonzero(w[:, :, 3])):
         dx = 0
         if x < CHAIN_X and y >= CHAIN_Y:
-            dx = int(round(1.4 * (y - CHAIN_Y) / 21 * math.sin(2 * math.pi * i / 24 - (y - CHAIN_Y) * 0.15)))
+            dx = int(round(1.4 * (y - CHAIN_Y) / 21 * math.sin(2 * math.pi * i / 24)))   # Frame 0 = Ruhelage
         out[y + PT + b, x + P + dx] = w[y, x]
     return out
 

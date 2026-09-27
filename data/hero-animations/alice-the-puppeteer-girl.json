@@ -1,0 +1,15 @@
+{
+  "hero": "Alice, the Puppeteer Girl",
+  "sheet": "alice-the-puppeteer-girl.png",
+  "frameWidth": 48,
+  "frameHeight": 42,
+  "frames": 48,
+  "frameMs": 90,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 4,
+  "padLeft": 4,
+  "padRight": 4,
+  "padBottom": 2,
+  "faceX": 23.5
+}

@@ -1,0 +1,15 @@
+{
+  "hero": "Willy, the Valiant Leprechaun",
+  "sheet": "willy-the-valiant-leprechaun.png",
+  "frameWidth": 24,
+  "frameHeight": 31,
+  "frames": 48,
+  "frameMs": 90,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 4,
+  "padLeft": 4,
+  "padRight": 4,
+  "padBottom": 2,
+  "faceX": 11.5
+}

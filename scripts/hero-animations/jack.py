@@ -5,7 +5,8 @@ lange Sägemesser „Ebene #80“ in der linken Hand, gespiegelt in der rechten)
 Teile: src/jack-the-crooked-killer-{body,knife_l,knife_r}.png (deckungsgleich).
 * Jack federt in den Knien (die Füße bleiben stehen).
 * Er hebt abwechselnd die Messer (Hand und Messer als Einheit, 2 px hoch,
-  kurz halten, wieder senken) – links und rechts um einen halben Takt versetzt.
+  kurz halten, wieder senken) – jedes einmal pro Loop, um einen halben Loop
+  versetzt.
 * Über jede Klinge läuft einmal pro Loop ein heller Lichtreflex nach unten.
 * Blut tropft von den Zähnen der Sägen: unter jedem Zahn bildet sich ein
   Tropfen, fällt drei Zeilen und vergeht, bevor er den nächsten Zahn erreicht
@@ -84,7 +85,7 @@ def frame(i):
             if BODY[y, x, 3] and not out[y + PT, x + P, 3]:
                 out[y + PT, x + P] = BODY[y, x]
     for side, knife in enumerate(KNIVES):
-        dy = b + lift((i + 12 * side) % 24)
+        dy = b + lift((i + 24 * side) % 48)          # links Frames 8–19, rechts 32–43
         kn = knife.copy()
         pos = (i * 22 / N + 11 * side) % 22 - 1      # Lichtreflex wandert die Klinge hinab
         for y, x in zip(*np.nonzero((kn[:, :, :3] == BLADE[:3]).all(2) & (kn[:, :, 3] > 0))):
