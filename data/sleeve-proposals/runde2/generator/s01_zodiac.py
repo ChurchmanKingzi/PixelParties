@@ -112,11 +112,14 @@ def hou_sprite():
 
 
 S['Hou'] = hou_sprite()
+# She steht rechts: gespiegelt, damit ihr Körper außen und der Dreizack zur Scheibe hin steht
+S['She'] = flip(S['She'])
 
 # Zwölf gleich große Graskuppen im Oval um die Scheibe, spiegelsymmetrisch zur Senkrechten. Die Plätze sind nach
 # Größe gepaart, damit sich links und rechts ähnlich große Figuren gegenüberstehen: Shu oben, Zhu (liegend, flach)
 # unten mittig; die beiden größten Figuren She ↔ Ma stehen mittig an den Seiten, wo das Oval am meisten Höhe hat;
-# dazu Niu ↔ Yang, Hou ↔ Long, Tu ↔ Ji, Gou ↔ Hu. So liegt der Schwerpunkt aller Figuren in der Bildmitte (keine
+# dazu Niu ↔ Yang, Hou ↔ Long, Tu ↔ Ji, Gou ↔ Hu. She und Ma stehen so weit außen wie ihre Nachbarn (She
+# gespiegelt, ihr breiter Umriss wird an der Rahmeninnenkante gehalten). So liegt der Schwerpunkt aller Figuren in der Bildmitte (keine
 # schwere untere Reihe mehr). Grundform ist eine abgerundet-eckige Ellipse (Superellipse EX, EY, ERX, ERY, EP);
 # HALF gibt die Umlaufanteile der rechten Hälfte (von oben bis unten, fast gleichmäßig je 1/12), RAD je Platz einen
 # Abstandsfaktor zur Mitte (leichtes Vor/Zurück, damit zwischen allen Figuren Luft bleibt). (Name, Fußmitte x, Fußlinie y)
@@ -124,7 +127,7 @@ FOOT = 2
 ORDER = ['Shu', 'Niu', 'Hou', 'She', 'Tu', 'Gou', 'Zhu', 'Hu', 'Ji', 'Ma', 'Long', 'Yang']   # im Uhrzeigersinn ab oben
 EX, EY, ERX, ERY, EP = 62.5, 96.3, 41.3, 61.2, 2.26
 HALF = [0, 0.077, 0.166, 0.268, 0.338, 0.415, 0.5]
-RAD = [1.03, 0.993, 1.104, 0.9, 1.119, 0.9, 1.036]
+RAD = [1.03, 0.993, 1.104, 0.95, 1.119, 0.9, 1.036]
 
 
 def place(k):
@@ -149,7 +152,9 @@ for n, px, py in sorted(SPOTS, key=lambda t: t[2]):
     cv.a[rim < 1] = EDGE_D
     cv.a[e < 1] = gt[e < 1]
     cv.a[(e < 1) & (e >= 0.72) & (yy > py + FOOT)] = GRASS_L
-    cv.paste(sp, int(round(px - sp.shape[1] / 2)), py + FOOT - sp.shape[0])
+    # Figur mittig über ihrer Kuppe, aber nie über den Rahmen hinaus (Rahmeninnenkante x 9 … 116)
+    x0 = min(max(int(round(px - sp.shape[1] / 2)), 9), 116 - sp.shape[1])
+    cv.paste(sp, x0, py + FOOT - sp.shape[0])
 
 big = Canvas(W, H)
 big.a[:] = up(np.dstack([cv.a, np.full((h, w), 255, np.uint8)]), 2)[..., :3]
