@@ -1,29 +1,27 @@
 # -*- coding: utf-8 -*-
-"""Sleeve 01 – „Coolness Race“ (Cool Rescuer Monia, Base): Monia jagt mit feuerndem Jetpack waagrecht durch den
-Abendhimmel, hinter ihr eine Kette aus Rauchbällchen; weiter hinten und tiefer versucht ihre geflügelte Rivalin aus
-„Trial of Coolness“ mitzuhalten. Nach der Karte „Trial of Coolness“ (Wettflug durch den rosa-blauen Abendhimmel).
+"""Sleeve 01 – „Coolness Race“ (Cool Rescuer Monia, Base): ein Wettflug senkrecht hinauf durch den Abendhimmel,
+nach der Karte „Trial of Coolness“. Vorn und in Führung Monia mit ihren beiden feuernden Rückendüsen (so wie auf
+ihrer Base-Karte und „Cool Tech Jetpack“), dahinter und darunter die Konkurrenz: das Rocket-Fist-Mädchen mit
+seinen Düsen, die Victory-Phoenix-Heldin auf Flammenflügeln und ein Red Dragoneer, der aus den Wolken aufsteigt.
 
-Skalierung (drei Tiefenebenen):
-  Hintergrund 2× (125×175): Abendhimmel (Palette der Kartenszene), Sterne, Fahrtstreifen, Wolkenmeer – selbst gezeichnet
-  Rivalin 3× (84×117): weiter hinten, kleiner, mit gestrichelter Federspur
-  Monia 5× (50×70): Vordergrund, mit ihrer eigenen Jet-Flamme und der daran anschließenden Rauchspur
-Quellen (MotiveMoe.xcf, Karte „Trial of Coolness“, Szene 60 „Sichtbar“): Ebene 320 „Trial of Coolness #1“ –
-Monia (Base: blaue Haare, schwarzer Anzug, Jet-Flamme) und die Rivalin, Kopf an Kopf. Die Ebene liegt als
-3×-Vergrößerung vor; die Originalpixel werden aus den Blockmitten gelesen und die Figuren an ihrer
-Berührungsstelle getrennt; die Rivalin ist gespiegelt, damit beide in dieselbe Richtung fliegen.
+Skalierung (Tiefenebenen, weiter hinten = kleiner):
+  Hintergrund 2× (125×175): Abendhimmel (Palette von „Trial of Coolness“), Sterne, Fahrtstreifen, Wolkenmeer –
+                            selbst gezeichnet; dazu weit hinten Victory-Phoenix-Heldin und Red Dragoneer
+  Mittelgrund 3× (84×117):  Rocket-Fist-Mädchen
+  Vordergrund 5× (50×70):   Monia
+Quellen (MotiveMoe.xcf): Monia = 511 „Monia“ + 510 „Monia #2“ (Base, Düsenflammen; vgl. Szene „Sichtbar #157“),
+  Rocket-Fist-Mädchen = untere Figur aus 240 „Rocket Fist“, Victory-Phoenix-Heldin = 215 „Victory Phoenix Cannon #1“
+  + Flamme 219 „Victory Phoenix Cannon #2“, Red Dragoneer = 5 „Red Dragoneer“ (Szene „Sichtbar #178“, vollständig).
 """
 from common import *
 import numpy as np
 
 B = 'MotiveMoe'
-raw = layer(B, 320)
-b = bbox(raw)
-nat = raw[b[1]:b[3], b[0]:b[2]][1::3, 1::3].copy()        # 18×57 Originalpixel
-SPLIT = 27                                                 # Spalte zwischen Monias Gesicht und dem Kopf der Rivalin
-def largest(s):
-    return max(parts(s, dil=0), key=lambda p: (p[..., 3] > 0).sum())
-monia = largest(nat[:, :SPLIT])                          # fliegt nach rechts, Flamme hinten links
-rival = flip(largest(nat[:, SPLIT:]))                    # gespiegelt: fliegt ebenfalls nach rechts, hinterher
+monia = sprite('h01_monia_base', B, [510, 511])            # 26×30
+phoenix = sprite('h01_phoenix', B, [215, 219])             # 72×78
+dragon = sprite('h01_red_dragoneer', B, [5])               # 27×32
+rf = layer(B, 240); b = bbox(rf)
+rocket = max(parts(rf[b[1]:b[3], b[0]:b[2]], dil=1), key=lambda p: p.shape[0] * p.shape[1])   # untere Figur, 24×26
 
 # ---------------------------------------------------------------- Hintergrund 2×
 W2, H2 = 125, 175
@@ -37,17 +35,19 @@ q = np.floor(t + TH * 0.999).clip(0, len(sky) - 1).astype(int)
 for k, c in enumerate(sky):
     bg.a[q == k] = c
 rng = np.random.RandomState(1)
-for _ in range(40):                                        # Sterne im oberen, dunklen Himmel
+for _ in range(40):
     x, y = rng.randint(0, W2), rng.randint(0, 60)
     bg.px(x, y, (220, 226, 255) if rng.rand() < 0.4 else (130, 140, 210))
-# Fahrtstreifen: waagrechte, helle Striche (die beiden rasen nach rechts, der Himmel zieht nach links vorbei)
-for _ in range(40):
-    y = rng.randint(8, 140); x0 = rng.randint(-10, W2); n = rng.randint(6, 18)
+# Fahrtstreifen: senkrecht (alle steigen, der Himmel zieht nach unten vorbei)
+for _ in range(36):
+    x = rng.randint(2, W2 - 2); y0 = rng.randint(4, 140); n = rng.randint(6, 16)
     for i in range(n):
-        X = x0 + i
-        if 0 <= X < W2:
-            bg.a[y, X] = np.clip(bg.a[y, X].astype(int) * 0.55 + np.array((255, 240, 250)) * 0.45, 0, 255)
-# Wolkenmeer unten: drei Reihen Wolkenbuckel, hinten rosa, vorne weiß
+        Y = y0 + i
+        if Y < H2:
+            bg.a[Y, x] = np.clip(bg.a[Y, x].astype(int) * 0.55 + np.array((255, 240, 250)) * 0.45, 0, 255)
+# weit hinten: Victory-Phoenix-Heldin (links unten) und Red Dragoneer (rechts unten, aus den Wolken)
+bg.paste(phoenix, 4, 82)
+bg.paste(dragon, 88, 121)
 def cloud_row(base, r, step, col, rim, phase):
     for cx in range(-r + phase, W2 + r, step):
         cy = base + ((cx * 7) % 5) - 2
@@ -56,56 +56,21 @@ def cloud_row(base, r, step, col, rim, phase):
         bg.a[m] = col
         top = m & ~np.roll(m, 1, 0)
         bg.a[top] = rim
-cloud_row(146, 9, 13, (238, 170, 196), (252, 214, 226), 0)
-cloud_row(156, 10, 15, (246, 206, 222), (255, 236, 242), 6)
-cloud_row(166, 11, 17, (252, 236, 244), (255, 255, 255), 2)
+cloud_row(152, 9, 13, (238, 170, 196), (252, 214, 226), 0)
+cloud_row(160, 10, 15, (246, 206, 222), (255, 236, 242), 6)
+cloud_row(168, 11, 17, (252, 236, 244), (255, 255, 255), 2)
 
-# ---------------------------------------------------------------- Rivalin 3× (weiter hinten, unten links)
+# ---------------------------------------------------------------- Rocket-Fist-Mädchen 3×
 W3, H3 = 84, 117
 mid = np.zeros((H3, W3, 4), np.uint8)
-RX, RY = 20, 72
-# ihre Flugspur: hellblaue, gestrichelte Streifen, die an den Federspitzen ihrer Schwinge ansetzen
-FEATHER = [(214, 232, 255), (160, 196, 246), (120, 150, 230)]
-wing_rows = [y for y in range(rival.shape[0]) if (rival[y, :, 3] > 0).any() and y < rival.shape[0] // 2]
-for j, yy_ in enumerate(wing_rows[1::2]):
-    xs_ = np.where(rival[yy_, :, 3] > 0)[0]
-    x_end = RX + xs_.min() - 1
-    length = 16 - 3 * j
-    for i in range(length):
-        x = x_end - i
-        if x < 0: break
-        if i > length * 0.55 and i % 2: continue            # nach hinten gestrichelt auslaufend
-        mid[RY + yy_, x, :3] = FEATHER[min(2, i * 3 // max(1, length))]; mid[RY + yy_, x, 3] = 255
-m = rival[..., 3] > 0
-mid[RY:RY + rival.shape[0], RX:RX + rival.shape[1]][m] = rival[m]
+RX, RY = 54, 58
+m = rocket[..., 3] > 0
+mid[RY:RY + rocket.shape[0], RX:RX + rocket.shape[1]][m] = rocket[m]
 
-# ---------------------------------------------------------------- Monia 5× (vorn, führt)
+# ---------------------------------------------------------------- Monia 5× (vorn, in Führung)
 W5, H5 = 50, 70
 fg = np.zeros((H5, W5, 4), np.uint8)
-MX, MY = W5 - monia.shape[1] - 7, 16
-# Abgasspur hinter der Flamme: kurzes Flammenstück, dann eine Kette lockerer Rauchbällchen, die nach hinten
-# (links) größer, blasser und lückenhafter werden (Farben: Flamme der Figur, Rauch weiß-lila)
-FL = [(255, 250, 200), (250, 226, 60), (244, 128, 40), (206, 44, 40)]
-SMOKE = [(252, 248, 252), (230, 220, 238), (200, 186, 218)]
-ys = np.where(monia[:, :3, 3] > 0)[0]                     # Flammenspitze am linken Rand der Figur
-fy = MY + int(round(ys.mean())) if len(ys) else MY + 12
-for i in (1, 2):
-    for dy in (-1, 0, 1)[:3 - i + 1]:
-        fg[fy + dy, MX - i, :3] = FL[i + abs(dy)]; fg[fy + dy, MX - i, 3] = 255
-x, r = MX - 3, 1.7
-rng2 = np.random.RandomState(7)
-while x > -6:
-    cy = fy + rng2.randint(-1, 2)
-    for yy_ in range(int(cy - r - 1), int(cy + r + 2)):
-        for xx_ in range(int(x - r - 1), int(x + r + 2)):
-            if not (0 <= xx_ < W5 and 0 <= yy_ < H5): continue
-            d = np.hypot(xx_ + .5 - x, yy_ + .5 - cy) / r
-            if d > 1: continue
-            if d > 0.7 and (xx_ + yy_) % 2 and r > 2: continue
-            k = 0 if (yy_ < cy - r * 0.2 and d < 0.7) else 1 if d < 0.8 else 2
-            if fg[yy_, xx_, 3] == 0: fg[yy_, xx_, :3] = SMOKE[k]; fg[yy_, xx_, 3] = 255
-    x -= r * 1.05 + 0.6
-    r = min(r + 0.4, 4.5)
+MX, MY = (W5 - monia.shape[1]) // 2 - 3, 9
 m = monia[..., 3] > 0
 fg[MY:MY + monia.shape[0], MX:MX + monia.shape[1]][m] = monia[m]
 
