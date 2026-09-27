@@ -33,7 +33,7 @@ brick = bg[169:185, 70:86].copy(); brick[..., 3] = 255
 cob = bg[169 + 40:169 + 56, 185:217].copy(); cob[..., 3] = 255
 brick = tint(darken(brick, 0.42), (20, 30, 60), 0.3)
 cob = tint(darken(cob, 0.40), (20, 30, 60), 0.3)
-FLOOR = 150
+FLOOR = 142
 fill_tiles(lo, brick, 0, 0, W, FLOOR)
 fill_tiles(lo, cob, 0, FLOOR, W, H)
 for x in range(W):                                           # Fußkante
@@ -48,7 +48,7 @@ def glow(cx, cy, r, col, s):
                 t = (1 - d) ** 1.3 * s
                 q = math.floor(t * 4 + BAYER4[y % 4, x % 4]) / 4
                 if q > 0: lo.a[y, x] = (lo.a[y, x] * (1 - q * .6) + np.array(col) * q * .6).astype(np.uint8)
-glow(62, 70, 70, (60, 170, 200), 0.75)
+glow(62, 62, 66, (60, 170, 200), 0.7)
 
 # --- Spulen (links Original, rechts gespiegelt) ----------------------------------------------------
 CB = FLOOR + 10                                             # Unterkante der Spulen (Schattenellipse)
@@ -71,14 +71,15 @@ lo.paste(cat, KX, KY)
 # --- Lichtbögen (selbst gezeichnet, 1 Zelle breit) ----------------------------------------------------
 rng = np.random.RandomState(40)
 
-def bolt(p0, p1, jag=4.0, seg=5, branch=0):
+def bolt(p0, p1, jag=4.0, seg=5, branch=0, arch=0.0):
     (x0, y0), (x1, y1) = p0, p1
     L = math.hypot(x1 - x0, y1 - y0); n = max(2, int(L / seg))
     nx, ny = -(y1 - y0) / L, (x1 - x0) / L
     pts = [(x0, y0)]
     for i in range(1, n):
         t = i / n; o = rng.uniform(-jag, jag) * math.sin(math.pi * t)
-        pts.append((x0 + (x1 - x0) * t + nx * o, y0 + (y1 - y0) * t + ny * o))
+        ay = -arch * 4 * t * (1 - t)                      # Bogen nach oben
+        pts.append((x0 + (x1 - x0) * t + nx * o, y0 + (y1 - y0) * t + ny * o + ay))
     pts.append((x1, y1))
     cells = []
     for (ax, ay), (bx, by) in zip(pts, pts[1:]):
@@ -98,12 +99,12 @@ def bolt(p0, p1, jag=4.0, seg=5, branch=0):
             lo.px(int(round(x + math.cos(a) * j)), int(round(y + math.sin(a) * j + j * .3)), CYAN)
 
 # Bogen zwischen den Spulenköpfen über dem Kater
-bolt(hl, hr, jag=9, seg=6, branch=3)
+bolt(hl, hr, jag=4, seg=6, branch=2, arch=16)
 # von jedem Spulenkopf in die erhobenen Pfoten des Katers
 paw_l = (KX + 7, KY + 26)
 paw_r = (KX + cat.shape[1] - 8, KY + 26)
-bolt(hl, paw_l, jag=4, seg=5, branch=1)
-bolt(hr, paw_r, jag=4, seg=5, branch=1)
+bolt(hl, paw_l, jag=3, seg=5, branch=0, arch=-6)
+bolt(hr, paw_r, jag=3, seg=5, branch=0, arch=-6)
 # Funken an den Spulenköpfen
 for (x, y) in (hl, hr):
     for dx, dy in ((0, 0), (1, 0), (-1, 0), (0, -1), (0, 1)):

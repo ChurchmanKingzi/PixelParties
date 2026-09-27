@@ -27,7 +27,11 @@ W, H = 84, 117
 cv = Canvas(W, H)
 
 # ---------- Wabe ----------
-src = layer(RU, 180)[..., :3]
+src = layer(RU, 180)[..., :3].copy()
+# ruhigere Wabe: weiße Glanzkanten -> weiches Honiggelb, Brutdeckel einfarbig (nur Umriss bleibt dunkel)
+wht = (src == (255, 255, 255)).all(-1); src[wht] = (244, 184, 96)
+for c in [(97, 39, 33), (65, 39, 33)]:
+    src[(src == c).all(-1)] = (84, 40, 34)
 STAMP = {'honey': (126, 234), 'brood': (108, 104)}
 CX, CY = 42, 58                                     # Bildmitte = Gitterpunkt unter der Königin
 OX, OY = CX % 18, CY % 13
@@ -59,50 +63,70 @@ for k, (x, y) in enumerate(centers):
     m = idx == k
     if not m.any(): continue
     sx, sy = STAMP[cell_type(x, y)]
-    f = 1 - 0.14 * max(0, hexdist(x, y) - 2)          # Zellen zum Rand hin ringweise dunkler (ohne Dithering)
-    cv.a[m] = (src[yy[m] - y + sy, xx[m] - x + sx] * f).astype(np.uint8)
+    hd = hexdist(x, y)
+    px = src[yy[m] - y + sy, xx[m] - x + sx].astype(float)
+    if hd <= 1:                                     # Honigglanz unter der Königin: volle Farbe
+        f, sat = (1.0 if hd == 0 else 0.9), 1.0
+    else:                                           # übrige Wabe als ruhiger Hintergrund
+        f, sat = max(0.4, 0.62 - 0.06 * (hd - 2)), 0.78
+    g = px.mean(-1, keepdims=True)
+    cv.a[m] = ((g + (px - g) * sat) * f).clip(0, 255).astype(np.uint8)
 
-# ---------- Figuren ----------
+# ---------- Figuren: eigenes 4×-Raster (64×88, beschnitten auf 250×350) ----------
+W4, H4 = 64, 88
+fg = np.zeros((H4, W4, 4), np.uint8)
+sh = np.zeros((H4, W4, 4), np.uint8)                # Schatten getrennt, damit Flügel nicht darauf mischen
 queen = compose(RU, [175, 176, 177])
-# Arbeiterin wie in den Szenen 144/147: Körper (160) mit rotem Rückenfleck (159), darüber durchscheinende
-# Flügel (158, in den Szenen ca. 65 % deckend) – linke der drei Bienen
-body = compose(RU, [159, 160], crop=False)
+# Arbeiterin: Körper (160) + Flügel (158, in den Szenen durchscheinend -> 70 % Deckkraft auf ganzen Pixeln),
+# linke der drei Bienen; der rote Fleck (159) entfällt
+body = compose(RU, [160], crop=False)
 wing = compose(RU, [158], crop=False)
 un = (body[..., 3] > 0) | (wing[..., 3] > 0)
 import cv2
 n, lab = cv2.connectedComponents(un.astype(np.uint8), connectivity=8)
-k = lab[np.nonzero(un)[0][np.argmin(np.nonzero(un)[1])], np.nonzero(un)[1].min()]   # linkeste Biene
+ys0, xs0 = np.nonzero(un)
+k = lab[ys0[np.argmin(xs0)], xs0.min()]            # linkeste Biene
 ys, xs = np.nonzero(lab == k)
 box = (ys.min(), ys.max() + 1, xs.min(), xs.max() + 1)
 bee = body[box[0]:box[1], box[2]:box[3]].copy()
 wg = wing[box[0]:box[1], box[2]:box[3]]
 wm = wg[..., 3] > 0
-bee[wm, :3] = np.where(bee[wm, 3:4] > 0,
-                       (wg[wm, :3] * 0.65 + bee[wm, :3] * 0.35), wg[wm, :3]).astype(np.uint8)
-bee[wm & (bee[..., 3] == 0), 3] = 166                # Flügel über Wabe: 65 % deckend
-bee[wm & (bee[..., 3] == 255), 3] = 255
+over = wm & (bee[..., 3] > 0)
+bee[over, :3] = (wg[over, :3] * 0.7 + bee[over, :3] * 0.3).astype(np.uint8)
+free = wm & (bee[..., 3] == 0)
+bee[free, :3] = wg[free, :3]; bee[free, 3] = 178
 
-def shadow(s, x, y, dx=1, dy=1):
-    m = s[..., 3] > 200                             # nur deckende Teile werfen Schatten
+def put(s, x, y):
+    """Schlagschatten (1 Rasterpunkt nach rechts unten, 50 %) + Figur ins 4×-Raster."""
+    m = s[..., 3] > 170
     h, w = m.shape
     for j in range(h):
         for i in range(w):
-            if m[j, i] and 0 <= y + j + dy < H and 0 <= x + i + dx < W:
-                cv.a[y + j + dy, x + i + dx] = (cv.a[y + j + dy, x + i + dx] * 0.45).astype(np.uint8)
+            if m[j, i] and 0 <= y + j + 1 < H4 and 0 <= x + i + 1 < W4:
+                sh[y + j + 1, x + i + 1] = (20, 8, 4, 128)
+    for j in range(h):
+        for i in range(w):
+            a_ = s[j, i, 3]
+            if a_ and 0 <= y + j < H4 and 0 <= x + i < W4:
+                if a_ == 255 or fg[y + j, x + i, 3] == 0:
+                    fg[y + j, x + i] = s[j, i]
+                else:
+                    fg[y + j, x + i, :3] = (s[j, i, :3] * a_ / 255 + fg[y + j, x + i, :3] * (1 - a_ / 255)).astype(np.uint8)
+                    fg[y + j, x + i, 3] = 255
 
-def place(s, cx, cy):
-    x, y = cx - s.shape[1] // 2, cy - s.shape[0] // 2
-    shadow(s, x, y)
-    cv.paste(s, x, y)
-
-place(queen, CX, CY)
-RY, RX = 26, 23
-place(np.rot90(bee, 2).copy(), CX, CY - RY)         # oben, schaut nach unten
-place(bee, CX, CY + RY)                             # unten, schaut nach oben
-place(np.rot90(bee, -1).copy(), CX - RX, CY)        # links, schaut nach rechts
-place(np.rot90(bee, 1).copy(), CX + RX, CY)         # rechts, schaut nach links
-
+qh, qw = queen.shape[:2]
+QX, QY = 32 - qw // 2, 44 - qh // 2                 # Mitte -> (125, 175) px
+put(queen, QX, QY)
+bh, bw = bee.shape[:2]
+top = np.rot90(bee, 2).copy()                       # oben: schaut nach unten zur Königin
+BL = 7                                              # linke Bienen ab x=7 (25 px vom Rand)
+BT = QY - 2 - bh                                    # obere Reihe
+BB = QY + qh + 2                                    # untere Reihe
+put(top, BL, BT); put(flip(top), W4 - BL - bw, BT)
+put(bee, BL, BB); put(flip(bee), W4 - BL - bw, BB)
 
 out = Canvas(250, 350)
 out.a[:] = up(np.dstack([cv.a, np.full((H, W), 255, np.uint8)]), 3)[1:351, 1:251, :3]
+out.paste(up(sh, 4)[1:351, 3:253], 0, 0)
+out.paste(up(fg, 4)[1:351, 3:253], 0, 0)
 print(save(out, '34_heart_of_the_hive.png'))

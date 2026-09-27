@@ -1,21 +1,23 @@
 # -*- coding: utf-8 -*-
 """07 Sword in the Stone – Silhouette vor Himmel: Das Legendäre Schwert eines Barbarenkönigs steckt senkrecht in der
-Spitze eines mächtigen Felsbrockens. Über ihm reißt die Morgendämmerung eine Lücke in die Wolkendecke, ein
-goldener Lichtstrahl fällt genau auf den Griff; dahinter liegen ferne Hügel im Dunst.
+Spitze eines gedrungenen, bemoosten Felsens. Über ihm reißt die Morgendämmerung eine unregelmäßige Öffnung in die
+Wolkendecke, ein Strahlenbündel fällt auf das Schwert; dahinter liegen ferne Hügel im Dunst.
 
-Quellen (Motive.xcf):
-  Ebene 911 „Legendary Sword“ (Karte „Legendary Sword of a Barbarian King“), um 90° gedreht
-  Ebene 1274 „Sabrina #5“ (Felsbrocken; nur der obere Teil sichtbar, warm getönt)
-Selbst gezeichnet: Dämmerungshimmel, Wolkenbänder, Lichtstrahl, Hügelkämme, Funkeln am Griff, Einstichschatten.
+Quellen:
+  Motive 911 „Legendary Sword“ (Karte „Legendary Sword of a Barbarian King“), um 90° gedreht
+  Motive 1274 „Sabrina #5“ (Felsbrocken) – nur als Umriss seiner oberen 20 Zeilen (gedrungene Kuppe)
+  MotiveGN 421 „Klippen“ – Felswand-Textur mit Spalten und Moosranken (Texel 1:1, entsättigt zu Grau, Moos bleibt grün)
+Selbst gezeichnet: Dämmerungshimmel, Wolkendecke mit Öffnung, Strahlenbündel, Wolkenbänder, Hügelkämme,
+  Lichtkanten/Schatten am Fels, Grasbüschel auf der Kuppe, Riss am Einstich, Funkeln.
 
 Skalierung:
-  Vordergrund (Fels + Schwert + Funkeln + Einstichschatten): 5× (Raster 50×70)
-  Hintergrund (Himmel, Wolken, Lichtstrahl, Hügel): 2× (Raster 125×175)
+  Vordergrund (Fels, Moos, Gras, Schwert, Funkeln, Riss): 5× (Raster 50×70)
+  Hintergrund (Himmel, Wolken, Strahlen, Hügel): 2× (Raster 125×175)
 """
 from common import *  # noqa
-import numpy as np, math
+import numpy as np, math, cv2
 
-M = 'Motive'
+M, G = 'Motive', 'MotiveGN'
 BW, BH = 125, 175
 yy, xx = np.mgrid[0:BH, 0:BW]
 th = BAYER4[yy % 4, xx % 4]
@@ -28,9 +30,6 @@ q = np.floor(t + th * 0.999).clip(0, len(sky) - 1).astype(int)
 for k, c in enumerate(sky):
     bg.a[q == k] = c
 
-# Wolkendecke oben mit rundem Loch (Lichtquelle) und zwei lockere Wolkenbänder darunter
-rng = np.random.RandomState(7)
-
 
 def bumpy(x0, x1, base, amp, seed):
     r = np.random.RandomState(seed); out = np.zeros(BW); x = x0
@@ -42,28 +41,49 @@ def bumpy(x0, x1, base, amp, seed):
     return out
 
 
-# Decke: Unterkante gewellt (nach unten ausgebeult)
-low = bumpy(0, BW, 26, 4.5, 11)
-HX, HY, HRX, HRY = 62.5, 17, 11, 6.5
-for x in range(BW):
-    for y in range(0, int(low[x]) + 1):
-        dh = ((x + 0.5 - HX) / HRX) ** 2 + ((y + 0.5 - HY) / HRY) ** 2
-        if dh < 1: continue
-        if dh < 1.35: bg.a[y, x] = (255, 214, 150)         # heller Rand des Wolkenlochs
-        elif y >= low[x] - 1: bg.a[y, x] = (176, 108, 132)    # angestrahlte Unterkante
-        elif dh < 2.2: bg.a[y, x] = (132, 88, 128)
-        else: bg.a[y, x] = (62, 46, 94) if (y < low[x] - 4 or (x + y) % 2) else (96, 66, 112)
-# Loch: helles Inneres
-for x in range(BW):
-    for y in range(0, 30):
-        dh = ((x + 0.5 - HX) / HRX) ** 2 + ((y + 0.5 - HY) / HRY) ** 2
-        if dh < 1: bg.a[y, x] = (255, 236, 186) if dh < 0.45 else (250, 206, 150)
+# Wolkendecke: gewellte Unterkante; unregelmäßige Öffnung aus mehreren versetzten Ellipsen, Rand ausgefranst
+low = bumpy(0, BW, 30, 5, 11)
+deck = yy <= low[None, :].repeat(BH, 0)
+hole = np.zeros((BH, BW), bool)
+for hx, hy, rx, ry in [(62, 17, 10, 4.5), (54, 20, 6, 3.5), (71, 14, 7, 3.5), (65, 22, 6, 3), (47, 17, 4, 2.5),
+                       (78, 18, 4, 2.5)]:
+    hole |= ((xx + 0.5 - hx) / rx) ** 2 + ((yy + 0.5 - hy) / ry) ** 2 < 1
+rnd = np.random.RandomState(3).rand(BH, BW)
+er = cv2.dilate(hole.astype(np.uint8), np.ones((3, 3), np.uint8)) > 0
+hole |= er & (rnd < 0.35)                                  # ausgefranster Rand
+deck &= ~hole
+rim = deck & (cv2.dilate(hole.astype(np.uint8), np.ones((3, 3), np.uint8)) > 0)
+rim2 = deck & ~rim & (cv2.dilate(hole.astype(np.uint8), np.ones((7, 7), np.uint8)) > 0)
+lowedge = deck & ~np.roll(deck, -1, 0)
+bg.a[deck] = (62, 46, 94)
+bg.a[deck & (yy > low[None, :] - 5) & ((xx + yy) % 2 == 0)] = (88, 62, 110)   # untere Wolkenzone heller (Muster)
+bg.a[rim2] = (132, 88, 128)
+bg.a[rim] = (250, 206, 150)
+bg.a[lowedge] = (176, 108, 132)
+# Blick durch die Öffnung: heller Himmel mit Verlauf (kein Scheibenkörper)
+hy_ = np.clip((yy - 10) / 14, 0, 1)
+bg.a[hole] = np.where((hy_[hole] > 0.5)[:, None], (255, 232, 176), (255, 244, 208))
+
+# Strahlenbündel: fünf divergierende Strahlen von der Öffnung nach unten (gedithert aufhellen)
+SX0, SY0 = 62.5, 22
+rays = [(-14, 0.18), (-6, 0.26), (0, 0.42), (7, 0.26), (15, 0.18)]      # (Zielversatz bei y=70, Stärke)
+for dxr, s in rays:
+    for y in range(SY0, 128):
+        tt = (y - SY0) / (70 - SY0)
+        cx = SX0 + dxr * tt + (dxr * 0.25)
+        half = 1.2 + 3.2 * tt if dxr else 2.5 + 6 * tt
+        fade = 1.0 if y < 76 else max(0.0, 1 - (y - 76) / 40)
+        for x in range(int(cx - half - 1), int(cx + half + 2)):
+            if not (0 <= x < BW) or deck[y, x]: continue
+            d = abs(x + 0.5 - cx)
+            if d < half and s * fade * (1 - 0.5 * d / half) > th[y, x] * 0.8:
+                c = bg.a[y, x].astype(int)
+                bg.a[y, x] = np.clip(c + (np.array([255, 224, 156]) - c) * 0.5, 0, 255).astype(np.uint8)
 
 
 def wisp(x0, x1, yb, thick, seed, top_col, body_col, low_col):
     top = bumpy(x0, x1, 0, 3.2, seed)
     for x in range(max(0, x0), min(BW, x1)):
-        # an den Enden ausdünnen
         e = min(x - x0, x1 - 1 - x)
         tk = min(thick, 1 + e // 2)
         yt = int(round(yb - top[x] * min(1, e / 6)))
@@ -72,32 +92,17 @@ def wisp(x0, x1, yb, thick, seed, top_col, body_col, low_col):
                 bg.a[y, x] = top_col if y == yt else (low_col if y == yb + tk - 1 else body_col)
 
 
-wisp(-4, 44, 50, 4, 21, (236, 150, 130), (150, 86, 114), (118, 68, 104))
-wisp(82, 130, 46, 4, 22, (236, 150, 130), (150, 86, 114), (118, 68, 104))
-wisp(-2, 34, 80, 3, 23, (252, 196, 150), (208, 124, 116), (180, 104, 112))
-wisp(92, 128, 84, 3, 24, (252, 196, 150), (208, 124, 116), (180, 104, 112))
+wisp(-4, 36, 58, 4, 21, (236, 150, 130), (150, 86, 114), (118, 68, 104))
+wisp(90, 130, 54, 4, 22, (236, 150, 130), (150, 86, 114), (118, 68, 104))
+wisp(-2, 28, 88, 3, 23, (252, 196, 150), (208, 124, 116), (180, 104, 112))
+wisp(98, 128, 92, 3, 24, (252, 196, 150), (208, 124, 116), (180, 104, 112))
 
 # Ferne Hügelkämme (zwei Schichten, dunstig)
-for base, amp, freq, ph, col in [(118, 6, 0.06, 0.5, (150, 92, 118)), (128, 7, 0.045, 2.0, (104, 66, 104))]:
+for base, amp, freq, ph, col in [(122, 6, 0.06, 0.5, (150, 92, 118)), (132, 7, 0.045, 2.0, (104, 66, 104))]:
     for x in range(BW):
         h = base - amp * (0.6 * math.sin(x * freq + ph) + 0.4 * math.sin(x * freq * 2.3 + ph * 1.7))
         bg.a[int(h):, x] = col
-bg.a[134:] = (70, 46, 84)
-
-# Lichtstrahl aus der Wolkenlücke auf den Griff (geordnet gedithert, zwei Stufen)
-SX, TOPY, HITY = 62.5, 20, 64
-for y in range(TOPY, HITY + 18):
-    tt = (y - TOPY) / (HITY - TOPY)
-    half = 7 + 8 * tt
-    core = 2 + 3 * tt
-    for x in range(BW):
-        d = abs(x + 0.5 - SX)
-        if d < half:
-            a = 0.55 if d < core else 0.3 * (1 - (d - core) / (half - core))
-            a *= 1.0 if y <= HITY else max(0, 1 - (y - HITY) / 18)
-            if a > th[y, x]:
-                c = bg.a[y, x].astype(int)
-                bg.a[y, x] = np.clip(c + (np.array([255, 222, 150]) - c) * 0.6, 0, 255).astype(np.uint8)
+bg.a[142:] = (70, 46, 84)
 vignette(bg, 0.45, 0.6)
 
 # ---------------- Vordergrund 5× ----------------
@@ -119,27 +124,55 @@ def dot(x, y, c):
 
 
 sword = rot90(sprite('b07_sword', M, [911]), 3)          # Knauf oben, Spitze unten (11×32)
-rock = sprite('b07_rock', M, [1274])                    # 52×69
-# Fels warm tönen (Morgenlicht), obere Kante heller
-rk = tint(rock, (120, 70, 80), 0.18)
-m = rk[..., 3] > 0
-topedge = m & ~np.vstack([np.zeros((1, m.shape[1]), bool), m[:-1]])
-rk[topedge, :3] = np.clip(rk[topedge, :3].astype(int) + (60, 40, 10), 0, 255).astype(np.uint8)
-# Licht von oben: obere Felszeilen aufhellen (Stufen)
-for j in range(rk.shape[0]):
-    f = 1.25 - 0.4 * min(1, j / 18)
-    rk[j, :, :3] = np.clip(rk[j, :, :3].astype(float) * f, 0, 255).astype(np.uint8)
-RY = 44                                                  # Felsspitze (Rasterzeile)
+rock = sprite('b07_rock', M, [1274])                    # 52×69 – nur Umriss der Kuppe
+ROWS = 20
+shape = rock[:ROWS, :, 3] > 0
+# Felstextur: Klippenwand aus MotiveGN 421 (Spalten + Moosranken), Brauntöne → kühles Grau, Moos bleibt
+cl = layer(G, 421)
+tex = cl[228 + 176:228 + 176 + ROWS, 70 + 90:70 + 90 + shape.shape[1], :3].astype(float)
+hsv = cv2.cvtColor(tex.astype(np.uint8).reshape(-1, 1, 3), cv2.COLOR_RGB2HSV).reshape(tex.shape).astype(float)
+green = (hsv[..., 0] > 30) & (hsv[..., 0] < 90) & (hsv[..., 1] > 60)
+lumv = tex.mean(-1, keepdims=True)
+grey = lumv * np.array([0.92, 0.92, 1.02]) + 18
+tex = np.where(green[..., None], tex * np.array([0.85, 1.0, 0.8]), grey)
+RY = 50
 peak_x = 23
 RX = FW // 2 - peak_x
-BURY = 8                                                 # im Fels steckende Klingenlänge
+for j in range(ROWS):
+    for i in range(shape.shape[1]):
+        if not shape[j, i]: continue
+        c = tex[j, i].copy()
+        up_empty = j == 0 or not shape[j - 1, i]
+        left_empty = i == 0 or not shape[j, i - 1]
+        right_empty = i == shape.shape[1] - 1 or not shape[j, i + 1]
+        f = 1.0 - 0.02 * j                                   # nach unten dunkler
+        if up_empty:
+            c = c * 0.4 + np.array([250, 210, 150]) * 0.6        # Licht von oben (Strahl)
+        elif j >= 1 and (not shape[j - 2, i] if j >= 2 else True):
+            c = c * 1.25 + 10
+        elif left_empty:
+            c = c * 1.1
+        elif right_empty or i > peak_x + 6 + j * 0.6:
+            f *= 0.72                                         # Schattenseite
+        dot(RX + i, RY + j, tuple(np.clip(c * f, 0, 255).astype(np.uint8)))
+# Grasbüschel/Moos auf der Kuppe und den Kanten
+for (i, j) in [(17, 3), (18, 2), (29, 3), (30, 4), (11, 7), (12, 6), (36, 8), (37, 7), (6, 12), (42, 12)]:
+    x, y = RX + i, RY + j - 1
+    if fg[y + 1, x, 3] and not fg[y, x, 3]:
+        dot(x, y, (104, 150, 70))
+        dot(x, y + 1, (70, 112, 52))
+# Schwert
+BURY = 8
 SWX = FW // 2 - 5
 SWY = RY + 2 + BURY - 32
+# Schwert wird VOR dem Fels gesetzt und dann vom Fels verdeckt: Fels erneut auf eigene Ebene
+rockpix = fg.copy()
 put(sword, SWX, SWY)
-put(rk, RX, RY)
-# Einstich: feiner Riss unter der Klinge, Schlagschatten rechts der Klinge auf dem Fels
-for (dx, dy) in [(4, 2), (5, 3), (5, 4), (6, 5)]:
-    dot(SWX + dx, RY + dy, (46, 34, 42))
+m = rockpix[..., 3] > 0
+fg[m] = rockpix[m]
+# Einstich: Riss unter der Klinge und dunkle Spalte
+for (dx, dy) in [(4, 2), (5, 3), (5, 4), (6, 5), (2, 3), (1, 4)]:
+    dot(SWX + dx, RY + dy, (38, 30, 40))
 # Funkeln am Griff (Kreuzsterne)
 for (x, y, s) in [(SWX - 3, SWY + 3, 1), (SWX + 13, SWY + 8, 1), (SWX + 12, SWY - 1, 0)]:
     dot(x, y, (255, 250, 220))

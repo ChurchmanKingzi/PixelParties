@@ -25,15 +25,11 @@ RB = [(248, 18, 20), (255, 167, 25), (255, 233, 25), (37, 237, 43), (34, 76, 236
 
 GROUND = 61
 # ---- Himmel: drei Farbstufen mit je einer geditherten Übergangszone ----
-SKY = [(84, 144, 236), (112, 170, 244), (150, 200, 250)]
-for y in range(GROUND):
+SKY = [(84, 144, 236), (104, 164, 242), (128, 184, 248), (156, 204, 252)]
+for y in range(GROUND):                          # harte Farbstufen (Pixel-Art-Himmel), zum Horizont heller
+    k = 0 if y < 16 else 1 if y < 30 else 2 if y < 42 else 3
     for x in range(GW):
-        t = y / 44.0 * 2
-        k = int(t); f = t - k
-        k = min(k, 2)
-        c = SKY[k]
-        if k < 2 and f > 0.7 and (f - 0.7) / 0.3 > BAYER4[y % 4, x % 4]: c = SKY[k + 1]
-        g.a[y, x] = c
+        g.a[y, x] = SKY[k]
 # ---- Wolken ----
 def cloud(cx, cy, blobs):
     yy, xx = np.mgrid[0:GH, 0:GW]
@@ -45,9 +41,8 @@ def cloud(cx, cy, blobs):
         for x in range(GW):
             if m[y, x]:
                 g.a[y, x] = (206, 222, 246) if (y + 1 < GH and not m[y + 1, x]) or y == cy + 1 else (255, 255, 255)
-cloud(38, 9, [(0, 0, 3.5), (3.5, -1, 3), (-3.5, 0.5, 2.6), (6.5, 0.8, 2)])
-cloud(9, 7, [(0, 0, 2.6), (2.8, 0.4, 2.2), (-2.6, 0.6, 1.8)])
-cloud(44, 30, [(0, 0, 2.4), (-2.6, 0.6, 2.0), (2.2, 0.6, 1.6)])
+cloud(36, 9, [(0, 0, 3.4), (3.6, 0.8, 2.6), (-3.4, 1.0, 2.4), (6.4, 1.4, 1.8), (-6, 1.6, 1.4)])
+cloud(41, 28, [(0, 0, 2.4), (-2.6, 0.8, 2.0), (2.4, 0.8, 1.8)])
 # ---- Hügel ----
 for x in range(GW):
     top = int(round(47 - 4 * math.sin(x / 7.0 + 0.4) - 1.5 * math.sin(x / 3.1)))
@@ -78,7 +73,8 @@ wh, ww = willy.shape[:2]
 WX, WY = 8, GROUND - wh + 1
 
 # ---- Regenbogen: Kreisbogen, dessen rechtes Ende senkrecht in die Topföffnung (Spalten 5–11) fällt ----
-CX, CY, R = PX + 11.5 - 28 + 1, MOUTH, 28.0      # Außenradius 28, Bänder nach innen
+R = 31.0                                      # Außenradius, Bänder nach innen
+CX, CY = PX + 12 - R, MOUTH                    # Außenkante fällt senkrecht bei Spalte 11 in den Topf
 def band(x, y):
     d = math.hypot(x + .5 - CX, y + .5 - CY)
     k = int(R - d)

@@ -13,10 +13,10 @@
 | 14 | C | All-Seeing | Porträt: Kassaran, der Seher von Allem, mit weiß glühenden Augen im Zentrum konzentrischer Trance-Ringe – jeder Ring ein Fenster in eine andere Welt (Sterne, Wald, Dorfteich, Wüste, Labor) (MotiveGN; ersetzt „Lightning Rod“). |
 | 15 | C | Birthday Wish | Stillleben: große Geburtstagstorte mit brennenden Kerzen auf dem Tisch, dahinter Monia beim Wünschen, Geschenk und blaue Luftballons flankieren symmetrisch (MotiveGN). |
 | 21 | E | Cheese Moon | Nachthimmel mit riesigem Vollmond aus Emmentaler: der Nerdy Cheese zieht mit Fledermausflügeln wie eine Fledermaus vor dem Mond vorbei, groß im Vordergrund fliegt der Holy Cheese mit Heiligenschein heim (Moe). |
-| 22 | E | Earthrise | Nomu, der Wanderer der Welten, steht groß im Vordergrund auf grauem Mondboden und blickt auf die riesige aufgehende Erde im Sternenhimmel (Boons). |
+| 22 | E | Earthrise | Nomu, der Wanderer der Welten, steht groß im Vordergrund auf grauem Mondboden, hinter ihm geht riesig die Erde über dem Mondhorizont auf (Boons). |
 | 23 | E | Root of all Presents | Weihnachtsnacht: der böse Wurzelbaum, mit Lichterketten und Weihnachtsmützen geschmückt, grinst mitten im Schnee, zwei Geschenke flankieren seine Wurzeln, Schneefall (Moe). |
 | 24 | E | Odd One Out | Der „unauffällige“ Gartenzwerg mit Sonnenbrille steht auf einem leeren Sockel mitten in der Reihe steinerner Wächterbüsten des Himmelsheiligtums, dahinter Säulen, Büsten und Himmel (Moe). |
-| 25 | E | Balloon Drift | Reise: der Creepy Clown schwebt an seinem bunten Ballonbündel über ein rosa Wolkenmeer in den Abendhimmel, tief unten eine kleine fliegende Insel (Moe, Pink Sky). |
+| 25 | E | Balloon Drift | Reise: der Creepy Clown schwebt an seinem Bündel aus Clownsgesicht-Ballons vor der untergehenden Sonne über ein rosa Wolkenmeer in den Abendhimmel (Moe). |
 | 01 | A | Open Lead | Luftbild aufs Packeis: durch eine dunkle Rinne im Eis gleitet der Narwal (Slippery Narw), am Rand rutscht Snobbit bäuchlings mit langer Spur (Draufsicht, Motive). |
 | 02 | A | Night Watch | Der Candlestick Squire geht mit erhobener Fackel durch einen stockdunklen Burggang; sein Lichtkegel erhellt Mauer und Boden, im Dunkel dahinter glimmen Augen (Licht im Dunkeln, Motive). |
 | 03 | A | End of the Rainbow | Willy der Kobold steht am Fuß eines großen Regenbogens auf grüner Wiese neben seinem Goldhaufen, darüber Frühlingshimmel mit Wolken (fröhliche Szene, Motive). |
@@ -46,7 +46,7 @@
 | 17 | D | Under the Bed | Nachts im Schlafgemach: die Prinzessin schläft friedlich im großen Bett im Mondlicht, während unter dem Bett ein Schattenwesen mit roten Augen hervorkriecht (Grusel-Idylle, MotiveGrailWar). |
 | 18 | D | Autumn Tiger | Baihu, die weiße Tiger-Kardinalsbestie des Westens, steht frontal brüllend auf einem Felsgrat, hinter ihr ein goldener Herbstabend über gestaffelten Bergkämmen, Laub wirbelt im Westwind (Jahreszeit, MotiveGrailWar). |
 | 19 | D | World on a Shell | Geteilter Blick über/unter Wasser: die riesige Inselschildkröte schwimmt durchs Meer und trägt Wald und Städtchen auf ihrem Panzer, unter Wasser rudern ihre Flossen (Split-View, MotiveGrailWar). |
-| 20 | D | Harvest Dusk | Die Country-Harpyie sitzt auf einem großen Heuhaufen im abendlichen Stoppelfeld und spielt ein Ständchen, hinten Heuhaufen, Pferde und Hof im Sonnenuntergang (Jahreszeit/Ernte, MotiveGrailWar). |
+| 20 | D | Harvest Dusk | Nach Sonnenuntergang sitzt die Country-Harpyie groß auf ihrem Heuhaufen im Stoppelfeld und spielt ein Ständchen, hinter ihr Abendrot über dem Waldsaum, oben der blasse Erntemond (Jahreszeit/Ernte, MotiveGrailWar). |
 | 36 | H | Dune Maw | Ein riesiger Sandwurm bricht mit aufgerissenem Maul aus einem Sandtrichter in der Wüste, im Vordergrund flieht der Forscher Iman mit Blick zurück (Egypt). |
 | 37 | H | Holy Cow | Ikonenbild: die heilige Kuh mit Heiligenschein steht erhöht auf einem Podest vor aufgehenden Sonnenstrahlen, zwei gespiegelte Verehrer knien symmetrisch zu ihren Seiten (Deri). |
 | 38 | H | Thing in the Hull | Luftbild: das grüne Geisterschiff treibt nachts auf schwarzem Meer, ein gewaltiger Tentakel wölbt sich aus dem Wasser über das Deck auf den winzigen Kapitän zu (India). |

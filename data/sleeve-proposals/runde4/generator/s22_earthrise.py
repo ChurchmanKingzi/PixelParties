@@ -46,11 +46,7 @@ space = layer(B, 80)[206:446, 119:439]          # 240×320 Weltraum, Erde bei x 
 EX, EY, ER = 160, 120, 50                        # Erdmittelpunkt/-radius im Weltraum-Ausschnitt
 g = Canvas(125, 175)
 ox, oy = EX - 62, EY - 76                        # Erde im 125er-Raster bei (62, 76)
-g.a[:] = space[oy:oy + 175, ox:ox + 125][..., :3] if oy >= 0 else 0
-if oy < 0:
-    g.a[-oy:] = space[0:175 + oy, ox:ox + 125][..., :3]
-    # fehlende Zeilen oben mit gespiegeltem Sternhimmel auffüllen
-    g.a[:-oy] = space[-oy - 1::-1][:, ox:ox + 125][..., :3][: -oy]
+g.a[:] = space[oy:oy + 175, ox:ox + 125][..., :3]
 
 # ---------- Mondboden (2×) ----------
 M_L, M_1, M_2, M_3, M_4, M_D = (189, 197, 171), (158, 171, 133), (139, 150, 117), (115, 125, 96), (93, 100, 80), (58, 62, 50)
@@ -72,7 +68,6 @@ for y in range(175):
         g.a[y, x] = c
 # Horizontkante
 for x in range(125):
-    y = int(math.ceil(horizon[0, x] + 0 * x))
     y = int(math.ceil(HZ + ((x + .5 - 62.5) / 62.5) ** 2 * 7))
     g.px(x, y, M_L)
 # Krater: flache Ellipsen (Perspektive), Rand oben dunkel / unten hell
