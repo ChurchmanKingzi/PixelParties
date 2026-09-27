@@ -1,62 +1,82 @@
 # -*- coding: utf-8 -*-
-"""Sleeve 05 – Mondduell der Idej-Lords.
+"""Sleeve 05 – Mondduell der Idej-Lords (Runde 3b überarbeitet).
 
-Vor einem riesigen Vollmond kreuzen Nobunakin (rot, mit der geschwungenen Klinge) und
-Todugawin (violett, mit Stangenwaffe) auf einem Hügel aus Kirschblüten die Waffen; eine rote
-Schnittspur („Idej Sword – Muras“) zieht quer durch den Mond. Kirschbäume rahmen die Szene.
-Quellen (MotiveJapan.xcf): Ebene #34 [150] + #41 [152] + #39 [154] + #40 [155] (Nobunakin mit
-Klinge), ARBEITE HIER [224] (Todugawin mit Stangenwaffe), Ebene #17 [183] (Kirschbäume),
-Ebene #13 [245] (Blütenboden), Ebene #49 [189] (Schnittspur), Ebene #75 [52] (Blütenblätter).
-Nachthimmel und Mond: selbst erstellt (geditherter Verlauf / Scheibe).
+Auf einem Hügel unter einem Kirschbaum stehen sich vor dem riesigen Vollmond Nobunakin (rot, mit
+erhobener geschwungener Klinge) und der geisterhaft schwebende Shoguwana (blau leuchtend) gegenüber.
+Der helle Mond steht direkt hinter Nobunakin, damit der dunkelrote Lord als klare Form vor hellem
+Grund steht (statt als „rote Masse“ vor rotem/rosa Grund); Shoguwana leuchtet vor dem Nachthimmel.
+(Todugawin entfällt: seine Ebene „ARBEITE HIER“ ist unfertig, die Stangenwaffe läuft verwaschen aus.)
+
+Skalierung: ALLES einheitlich 5× (Szene im 5×-Raster = 50×70 Zellen): Himmel, Sterne, Mond,
+Kirschbäume, Hügel, beide Lords, Lichtschein, Blütenblätter.
+
+Quellen (MotiveJapan.xcf): Ebene #34 [150] (Klinge) + Ebene #41 [152] + Ebene #39 [154] (Körper) +
+Ebene #40 [155] (Augen) = Nobunakin mit Klinge (vgl. Karte „Idej Blade – Hakai“), Shoguwana [61]
+(vollständig, geisterhafter Schweif statt Füßen), Ebene #60 [174] (Kirschbäume), Ebene #75 [52]
+(Blütenblätter). Himmel, Mond, Hügel und Lichtschein: selbst erstellt im 5×-Raster.
 """
 from a_util import *  # noqa
 
 B = 'MotiveJapan'
 cv = Canvas(250, 350)
+G = 5
+lo = lowres(G)                                         # 50×70
+W_, H_ = lo.w, lo.h
 
-nob = sprite('a05_nobunakin', B, [150, 152, 154, 155])
-todu = sprite('a05_todugawin', B, [224])
-pairs = parts(sprite('a05_cherries', B, [174]), dil=0)        # zwei Baumpaare
-grove = parts(sprite('a05_cherries3', B, [181]), dil=0)[0]      # Dreiergruppe
-bank = layer(B, 245)
-slash = sprite('a05_slash', B, [189])
-petals = [q for q in parts(sprite('a05_petals', B, [52]), dil=0) if q.shape[0] * q.shape[1] >= 4]
-print(nob.shape, todu.shape, [t.shape for t in pairs], grove.shape)
+nob = sprite('a05_nobunakin', B, [150, 152, 154, 155])  # 23×37
+shog = sprite('a05_shoguwana', B, [61])                 # 16×29
+trees = parts(sprite('a05_cherries', B, [174]), dil=0)
+tree = max(trees, key=lambda p: p.shape[0])
+petals = [q for q in parts(sprite('a05_petals', B, [52]), dil=0) if 2 <= q.shape[0] * q.shape[1] <= 4]
+print(nob.shape, shog.shape, [t.shape for t in trees])
 
-# --- Nachthimmel + Mond ---------------------------------------------------------------------------
-vgrad(cv, 0, 260, [(8, 8, 30), (18, 20, 58), (40, 34, 90), (70, 44, 104)])
-MX, MY, MR = 112, 138, 78
-glow(cv, MX, MY, MR * 1.45, (200, 190, 255), 0.3)
+# --- Nachthimmel + Sterne ---------------------------------------------------------------------------------
+vgrad(lo, 0, H_, [(6, 6, 24), (14, 14, 46), (34, 26, 78), (60, 36, 92)])
+rng = np.random.RandomState(5)
+for _ in range(22):
+    lo.px(rng.randint(0, W_), rng.randint(0, 40), (180, 180, 230) if rng.rand() < .4 else (100, 100, 160))
+
+# --- Vollmond (hinter Nobunakin) ---------------------------------------------------------------------------
+MX, MY, MR = 17, 36, 17
+glow(lo, MX, MY, MR * 1.6, (200, 190, 255), 0.28)
 for y in range(MY - MR, MY + MR):
     for x in range(MX - MR, MX + MR):
         d = math.hypot(x + .5 - MX, y + .5 - MY)
-        if d < MR and 0 <= x < 250 and 0 <= y < 350:
-            # Rand etwas dunkler (gedithert), Mondfarbe aus Himmel/Wolken der Japan-Karten
-            t = d / MR
-            c = (246, 240, 214) if t + (BAYER4[y % 4, x % 4] - .5) * .3 < 0.8 else (222, 212, 196)
-            cv.a[y, x] = c
+        if d < MR and 0 <= x < W_:
+            c = (246, 240, 214)
+            if d > MR - 1.6: c = (226, 216, 196)
+            lo.a[y, x] = c
+# Mondflecken (Mare) als ruhige Flächen
+for (cx, cy, r) in [(10, 28, 3.5), (22, 25, 2.5), (26, 34, 2), (6, 40, 2)]:
+    for y in range(int(cy - r), int(cy + r) + 1):
+        for x in range(int(cx - r), int(cx + r) + 1):
+            if math.hypot(x + .5 - cx, y + .5 - cy) < r: lo.a[y, x] = (232, 224, 204)
 
-# Schnittspur quer durch den Mond
-put(cv, slash, -36, 30, 2)
+# --- Kirschbäume links/rechts (nachtdunkel) ------------------------------------------------------------------
+GY = 60                                                  # Hügelkamm
+dk = lambda s, f: tint(darken(s, f), (40, 10, 60), 0.3)
+lo.paste(dk(tree, 0.5), W_ - tree.shape[1] // 2 + 4, GY - tree.shape[0] + 2)
 
-# --- Kirschbäume (Rahmen, Tiefe) ------------------------------------------------------------------
-put(cv, darken(grove, 0.4), 125 - grove.shape[1], 262, 2, anchor='bl')
-put(cv, darken(pairs[0], 0.55), -70, 262, 3, anchor='bl')
-put(cv, darken(pairs[1], 0.55), 250 - pairs[1].shape[1] * 3 + 60, 258, 3, anchor='bl', fl=True)
+# --- Hügel (selbst gezeichnet, flacher Bogen) -----------------------------------------------------------------
+for x in range(W_):
+    top = GY + int(round(((x - 25) / 25.0) ** 2 * 3))
+    for y in range(top, H_):
+        t = (y - top) / 20
+        lo.a[y, x] = (38, 16, 44) if t < 0.15 else (24, 10, 30)
+    lo.px(x, top, (88, 40, 88))                           # Kante im Mondlicht
 
-# --- Blütenhügel -----------------------------------------------------------------------------------
-hill = bank[99:160, 130:255].copy(); hill[..., 3] = 255
-put(cv, darken(hill, 0.8), 0, 244, 2)
+# --- die beiden Lords --------------------------------------------------------------------------------------
+NX = 13                                                   # Mitte Nobunakin (Körper)
+ny = GY + int(round(((NX - 25) / 25.0) ** 2 * 3))
+lo.paste(nob, NX - 7, ny - nob.shape[0] + 1)
+SXc = 38
+sy = GY + int(round(((SXc - 25) / 25.0) ** 2 * 3))
+glow(lo, SXc, sy - 15, 13, (80, 200, 255), 0.35)
+lo.paste(shog, SXc - shog.shape[1] // 2, sy - shog.shape[0] - 2)   # schwebt über dem Kamm
 
-# --- Kämpfer ---------------------------------------------------------------------------------------
-OUT = (20, 6, 24)
-put(cv, outline(nob, OUT), 6, 336, 5, anchor='bl', shadow=0.4, sdx=1, sdy=0)
-tod_o = outline(todu, OUT)
-put(cv, tod_o, 250 - tod_o.shape[1] * 5 + 28, 350, 5, anchor='bl', shadow=0.4, sdx=1, sdy=0)
+# Blütenblätter im Wind
+for (x, y), i in zip([(32, 16), (28, 47), (42, 8), (22, 66)], [1, 9, 19, 30]):
+    lo.paste(petals[i % len(petals)], x, y)
 
-for (x, y), i in zip([(20, 40), (200, 60), (230, 150), (180, 20), (40, 190), (206, 214), (14, 120)],
-                     [3, 11, 25, 40, 57, 70, 90]):
-    put(cv, petals[i % len(petals)], x, y, 2)
-
-frame(cv, [(10, 6, 20), (90, 40, 110), (230, 200, 150), (10, 6, 20)])
+blow(cv, lo, G)
 print(save(cv, '05_idej_mondduell.png'))

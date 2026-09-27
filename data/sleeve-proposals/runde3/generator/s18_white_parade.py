@@ -1,16 +1,15 @@
 # -*- coding: utf-8 -*-
 """Sleeve 18 – Parade der weißen Armee, überarbeitet für Runde 3b.
 
-Stellin, der ruhige Diktator, nimmt im Vordergrund die Parade ab. Hinter ihm stehen die
-Schneemann-Soldaten der „White Army“ (mit geschulterten Schneekanonen) in Reih und Glied vor dem
-Eiskristall-Wall, in dessen Mitte der leuchtende Eisobelisk aufragt (wie auf der Karte „The White
-Army“). Zwei Bannerträger flankieren die Formation, zwei Heli-Trooper kreisen über dem Wall.
+Stellin, der ruhige Diktator, nimmt im Vordergrund die Parade ab. Hinter ihm marschieren die
+Schneemann-Soldaten der „White Army“ (mit geschulterten Schneekanonen) in zwei Kolonnen vor dem
+Eiskristall-Wall heran, in dessen Mitte der leuchtende Eisobelisk aufragt (Aufstellung wie auf der
+Karte „The White Army“). Zwei Heli-Trooper kreisen über dem Wall.
 
 Skalierung / Tiefenstaffelung (zwei Ebenen, statt der früheren 1×–4×-Staffelung):
   Vordergrund 6×: Stellin
-  Hintergrund 3×: Soldaten, Bannerträger, Heli-Trooper, Eiswall mit Obelisk, Schneefeld, Himmel-Dithering
-  (Soldaten in der hinteren Reihe, Bannerträger etwas weiter vorn – gleiche Skalierung, nur
-  gestaffelte Standlinien; Stellin steht klar davor und überdeckt die Formation.)
+  Hintergrund 3×: Soldaten, Heli-Trooper, Eiswall mit Obelisk, Schneefeld, Himmel-Dithering
+  (Kolonnen mit gestaffelten Standlinien wie auf der Karte; Stellins Standlinie liegt klar davor.)
 
 Quellen (MotiveRussia.xcf):
   Stellin       = Ebene 142 „Ebene #97“ (vollständig, vgl. Ebene 224/225)
@@ -18,7 +17,6 @@ Quellen (MotiveRussia.xcf):
                   gestapelt und verdecken sich; ein vollständiger Soldat wird aus Kopf des obersten
                   (Zeilen 202–212) und Unterteil des untersten (Zeilen 235–238) zusammengesetzt –
                   die Zwischenzeilen sind bei allen identisch.
-  Bannerträger  = Ebene 91 „Ebene #102“ (Karte „Mischief Militia - Banner Bearer“)
   Heli-Trooper  = Ebene 12 „Ebene #170“ (Karte „Mischief Militia - Heli Troopers“)
   Eiswall, Obelisk, Schnee = Ebene 230 „Hintergrund“ (Kulisse von „The White Army“)
 """
@@ -40,7 +38,6 @@ if os.path.exists(os.path.join(X.EXP, RU, 'layers.json')):
 else:
     sold = np.array(Image.open(p).convert('RGBA'))
 stellin = figure('c18_stellin', RU, [142])
-banner = figure('c18_banner', RU, [91])
 heli = figure('c18_heli', RU, [12])
 
 # ---------- Kulisse 3×: Eiswall mit Obelisk (Ebene 230), darüber Nachthimmel, darunter Schnee
@@ -73,20 +70,17 @@ for y in range(0, TOPY + WY1 * 0 + (WY1 - WY0) * KB, KB):
 for (x, y, fl) in [(14, 6, False), (196, 18, True)]:
     put(cv, heli, x, y, KB, fl=fl, ol=(40, 40, 90))
 
-# ---------- Formation 3×: hintere Reihe Soldaten, vorn außen die Bannerträger
+# ---------- Formation 3×: zwei Marschkolonnen wie auf der Karte (je 4 Soldaten, Reihenabstand
+# 11 native Zeilen, der vordere verdeckt den Unterkörper des hinteren), Kanonen nach außen
 Sw, Sh = sold.shape[1] * KB, sold.shape[0] * KB
-ROW = 206                                             # Standlinie der Soldaten
-for x, fl in [(-6, False), (52, False), (134, True), (192, True)]:
-    xx = x if not fl else x
-    for j in range(2):                               # Schatten im Schnee (3×)
-        cv.rect(xx + 4 * KB, ROW - KB + j * KB, xx + Sw - 4 * KB, ROW + j * KB, (184, 184, 226))
-    put(cv, sold, xx, ROW - Sh, KB, fl=fl, ol=(60, 56, 100))
-Bw, Bh = banner.shape[1] * KB, banner.shape[0] * KB
-BROW = 250
-for x, fl in [(-2, True), (W - Bw + 2, False)]:
-    for j in range(2):
-        cv.rect(x + 3 * KB, BROW - KB + j * KB, x + Bw - 3 * KB, BROW + j * KB, (184, 184, 226))
-    put(cv, banner, x, BROW - Bh, KB, fl=fl, ol=(60, 56, 100))
+STEP = 11 * KB
+FOOT = 252                                            # Standlinie des vordersten Soldaten
+for x0, fl in [(2, False), (W - Sw - 2, True)]:
+    for r in range(4):                                # von hinten nach vorn
+        y = FOOT - Sh - (3 - r) * STEP
+        for j in range(2):                            # Schatten im Schnee (3×)
+            cv.rect(x0 + 5 * KB, y + Sh - KB + j * KB, x0 + Sw - 5 * KB, y + Sh + j * KB, (184, 184, 226))
+        put(cv, sold, x0, y, KB, fl=fl, ol=(60, 56, 100))
 
 # ---------- Stellin 6× im Vordergrund
 Tw, Th = stellin.shape[1] * KF, stellin.shape[0] * KF
