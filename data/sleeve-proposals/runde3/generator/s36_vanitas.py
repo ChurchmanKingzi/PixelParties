@@ -3,11 +3,11 @@
 
 Idee: Stillleben wie ein altes Gemälde – auf einem Holztisch stehen große Trankflaschen (6×), eine
 Giftflasche mit Totenkopf, ein Mörser mit Stößel, ein aufgeschlagenes Buch und ein Explosionsschädel mit
-brennender Lunte; aus den Flaschen steigen farbige Dämpfe. Dahinter ein Weinkeller-Regal (3×) vor der
+brennender Lunte. Dahinter ein Weinkeller-Regal (3×) vor der
 Steinwand, Licht fällt von vorn auf den Tisch, die Ränder versinken im Dunkel.
 
 Quellen:
-  Motive        1217 „Alchemy #2“ (Trankflaschen, Mörser), 1214 „Alchemy #7“ (Dämpfe), 979 „Elixir of Mana #2“ (Tischplatte)
+  Motive        1217 „Alchemy #2“ (Trankflaschen, Mörser), 979 „Elixir of Mana #2“ (Tischplatte)
   MotiveArcanum 172 „WEINKELLER“ (Regale, Steinwand), 65 „Ebene #73“ (Giftflasche), 180 „Ebene #4“ (Buch),
                 105 „Ebene #46“ (Explosionsschädel mit Lunte)
 """
@@ -28,10 +28,9 @@ for y0 in range(-6, 350, 48):
     for x0 in range(-10, 250, 48):
         cv.paste(darken(brick, 0.7), x0, y0)
 # ---------- Weinregal (3×) ----------
-shelf = rgba(cel[166:198, 296:480])
+shelf = rgba(np.concatenate([cel[166:198, 296:360], cel[166:198, 380:420], cel[166:198, 296:360]], 1))  # Steinpfeiler ausgespart
 S3 = up(shelf, 3)
-cv.paste(darken(S3, 0.85), -40, 22)
-cv.paste(darken(S3[:, 3 * 84:], 0.85), 190, 22)
+cv.paste(darken(S3, 0.85), -60, 22)
 
 TABLE_Y = 224
 # Licht: heller Fleck auf dem Tisch, Ränder dunkel
@@ -74,7 +73,6 @@ skull = sprite('f36_skull', A, [105]).copy()
 c = skull[..., :3].astype(int)
 trail = (np.arange(skull.shape[1])[None, :] <= 9) & (c[..., 0] >= 0x58) & (c[..., 0] <= 0x90) & (c[..., 0] - c[..., 2] >= 0x18)
 skull[trail, 3] = 0
-vap = parts(sprite('f36_vapour', M, [1214]), dil=1)
 
 def stand(s, k, x, bottom, dark=1.0, shadow=True):
     S = up(s, k)

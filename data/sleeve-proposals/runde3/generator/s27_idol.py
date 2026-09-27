@@ -39,7 +39,7 @@ def glowfans(f, dark):
     sat = c.max(-1) - c.min(-1)
     h, w = f.shape[:2]
     Y, X = np.mgrid[0:h, 0:w]
-    stick = (X < 4) & (Y < 12) & ((sat > 60) | (c.min(-1) > 150)) & (f[..., 3] > 0)
+    stick = (X < 2) & (Y < 12) & ((sat > 60) | (c.min(-1) > 150)) & (f[..., 3] > 0)
     out[stick] = f[stick]
     return out
 
@@ -76,9 +76,8 @@ def build():
     cv.a[floor_y:floor_y + wood.shape[0]] = wood[:min(wood.shape[0], H_ - floor_y)]
 
     # Scheinwerfer von oben
-    cone(cv, (20, -10), 70, 150, (255, 150, 220), 0.55, 215)
-    cone(cv, (230, -10), 100, 180, (150, 220, 255), 0.55, 215)
-    cone(cv, (125, -30), 85, 165, (255, 250, 190), 0.45, 215)
+    cone(cv, (-10, -10), 95, 170, (255, 150, 220), 0.6, 222)
+    cone(cv, (260, -10), 80, 155, (150, 220, 255), 0.6, 222)
 
     # Musiknoten
     notes = parts(sprite('e27_notes', F, [126]), dil=0)
@@ -90,25 +89,16 @@ def build():
     I = up(idol, 4)
     paste(cv, I, 125, floor_y + 18, anchor='b')
 
-    # Publikum von hinten: hintere Reihe 2x, mittlere 3x, vordere Reihe 4x
+    # Publikum von hinten: hintere Reihe 3x, vordere Reihe 4x (dunkle Silhouetten, Leuchtstäbe hell)
     fans = parts(sprite('e27_fans', F, [474]), dil=0)[:6]
-    for j in range(7):
-        f = fans[(j * 2 + 1) % 6]
-        s2 = glowfans(up(f if j % 2 else flip(f), 2), 0.3)
-        cv.paste(s2, -6 + j * 38, 246)
-    for j in range(5):
-        f = fans[(j * 5 + 2) % 6]
-        s3 = glowfans(up(f if j % 2 == 0 else flip(f), 3), 0.22)
-        cv.paste(s3, -20 + j * 58, 268)
-    for j, idx in enumerate((0, 3)):
-        s4 = glowfans(up(fans[idx], 4), 0.14)
-        cv.paste(s4 if j else flip(s4), [-12, 70][j], 296)
-
-    # Jubelstriche (Ebene 437 „Ebene #99“) über der Menge, 2x
-    cheer = parts(sprite('e27_cheer', F, [437]), dil=0)
-    for (n, x, y) in [(0, 16, 226), (2, 96, 232), (4, 150, 224)]:
-        if n < len(cheer): cv.paste(up(cheer[n], 2), x, y)
-
+    for j in range(6):
+        f = fans[(j * 5 + 1) % 6]
+        s3 = up(glowfans(f, 0.25), 3)
+        s3 = s3 if j % 2 == 0 else flip(s3)
+        cv.paste(s3, -16 + j * 46, 240 + (j % 2) * 4)
+    for j, (idx, x) in enumerate(((2, -20), (4, 58))):
+        s4 = up(glowfans(fans[idx], 0.13), 4)
+        cv.paste(s4 if j else flip(s4), x, 286 + j * 4)
     # Superfan rechts vorn, 5x, mit Bewegungsstrichen
     sup = sprite('e27_superfan', F, [463])
     # Fan-Teil (größte Komponente) abdunkeln, Bewegungsstriche bleiben

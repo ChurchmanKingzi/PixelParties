@@ -34,8 +34,8 @@ for _ in range(40):
 
 # ---------- Boden: Friedhof aus „Dark Land“ (grauer Grund) 2×, nach hinten violett verblasst
 dl = layer(B, 1286)[80:320, 101:420, :3]
-ground = up(rgba(dl[120:200, 110:240]), 2)[..., :3]
-GY = 212
+ground = up(rgba(dl[98:162, 80:192]), 2)[..., :3]
+GY = 200
 cv.a[GY:] = mirror_tile(ground, W2, H2 - GY, ox=10)
 dither_blend(cv, (60, 30, 90), lambda x, y: max(0.0, 1 - (y - GY) / 70) * 0.8, y0=GY)
 cv.a[GY] = (30, 20, 45)
@@ -79,20 +79,20 @@ def stand(s, cx, feet, k, shadow=True):
 
 
 # hinterste Reihe: Chor hinter Grabsteinen (3×)
-stand(witch, 92, 250, 3)
-stand(flip(hat), 162, 252, 3)
+stand(witch, 96, 206, 3)
+stand(flip(hat), 158, 208, 3)
 # Gitarrist links, Lautenspieler rechts (4×)
-x, y, u = stand(knight, 44, 292, 4)
+x, y, u = stand(knight, 46, 244, 3)
 g = up(guitar, 3)
-cv.paste(g, x + 10, y + 50)
-x, y, u = stand(flip(horned), 206, 292, 4)
+cv.paste(g, x + 2, y + 34)
+x, y, u = stand(flip(horned), 204, 244, 3)
 lu = up(flip(lute), 2)
-cv.paste(lu, x + 2, y + 18)
+cv.paste(lu, x - 2, y + 8)
 # Noten
-for nt, (nx, ny), k in zip(notes, [(34, 70), (198, 52), (224, 150), (20, 150)], [4, 4, 3, 3]):
+for nt, (nx, ny), k in zip(notes, [(30, 60), (196, 44), (212, 130), (14, 132)], [4, 4, 3, 3]):
     u = up(nt, k); paste_shadow(cv, u, nx, ny, dx=2, dy=2, col=(10, 5, 30), alpha=0.5)
 # Sänger vorn (6×)
-stand(bard, 125, 334, 6)
+stand(bard, 125, 338, 5)
 # Grabsteine als Bühnenrampe (3×) links/rechts vorn
 gr = up(grave, 3)
 paste_shadow(cv, gr, 2, H2 - gr.shape[0] + 8, dx=3, dy=0, alpha=0.4)
