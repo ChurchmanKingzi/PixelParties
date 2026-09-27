@@ -9,9 +9,10 @@ deckungsgleich in src/vena-the-bounty-huntress-{body,fist}.png.
 * Beim Stoß ruckt Vena 1 px zurück (nach oben), ihr Cyborg-Auge glüht auf.
 * Das Jetpack-Feuer links und rechts lodert: jede Flammenspalte wird pro
   Frame zufällig gestreckt (Spitzen züngeln nach unten), der Kern flackert.
-* Sie brüllt: in der zweiten Loop-Hälfte öffnet sich ihr (ohnehin offener)
-  Mund 1 px weiter, sie wirft den Kopf 1 px zurück (Hals gedehnt, keine
-  Lücke), neben dem Kopf zucken kurze Schrei-Striche.
+* Sie brüllt: anfangs ist ihr Mund geschlossen (schmaler roter Strich), dann
+  geht er auf (so wie im Sprite), beim Brüllen noch 1 px weiter; sie wirft den
+  Kopf 1 px zurück (Hals gedehnt, keine Lücke), neben dem Kopf zucken kurze
+  Schrei-Striche. Danach schließt sie den Mund wieder.
 """
 import math
 import sys
@@ -61,6 +62,9 @@ MOUTH_D = rgb('4f0000')
 # Ihr Mund (Rot unten im Gesicht) ist schon offen – beim Brüllen reißt sie
 # ihn nur 1 px weiter nach unten auf.
 ROAR_MOUTH = {(12, 12): MOUTH_D, (13, 12): MOUTH_D}
+SKIN = rgb('f6bd98')
+CLOSED_MOUTH = {(12, 10): SKIN, (13, 10): SKIN, (12, 11): MOUTH_D, (13, 11): rgb('7a0000')}
+MOUTH_OPEN = range(16, 33)                        # davor/danach geschlossen
 SHOUT = rgb('ffe6d5')
 
 
@@ -73,6 +77,9 @@ def frame(i):
     body = BODY.copy()
     if roar:
         for (x, y), c in ROAR_MOUTH.items():
+            body[y, x] = c
+    elif i not in MOUTH_OPEN:
+        for (x, y), c in CLOSED_MOUTH.items():
             body[y, x] = c
     lift = 1 if roar and i not in (ROAR[0], ROAR[-1]) else 0
     # Körper (ohne Jetpack-Feuer); beim Brüllen Kopf 1 px zurück, Hals gedehnt
