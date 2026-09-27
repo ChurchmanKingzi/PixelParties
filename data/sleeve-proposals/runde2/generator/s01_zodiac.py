@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
-"""Sleeve 01 „Guardian Zodiac“: die zwölf Guardian Beasts stehen im Tierkreis (Shu oben, im Uhrzeigersinn)
-auf kleinen Graskuppen im Oval um eine Tierkreis-Scheibe (Ziegelring mit zwölf Feldern) mit Yin-Yang.
+"""Sleeve 01 „Guardian Zodiac“: die zwölf Guardian Beasts stehen auf gleich großen Graskuppen spiegelsymmetrisch
+im Oval um eine Tierkreis-Scheibe (Ziegelring mit zwölf Feldern) mit Yin-Yang; die Plätze sind nach Größe gepaart
+(Shu oben, Zhu unten, She und Ma mittig an den Seiten), damit das Bild ausgewogen ist.
 
 Alles auf EINEM Raster 125×175 gebaut und am Ende 2× auf 250×350 skaliert (Ausgabe 6 px je Grafikpixel):
 Figuren, Ring-/Kantenlinien, Yin-Yang und Texturen haben dieselbe Pixelgröße. Kein Rahmen.
@@ -43,18 +44,19 @@ gt = np.tile(grass[..., :3], (h // 8 + 1, w // 8 + 1, 1))[:h, :w]
 GRASS_L = (66, 134, 0)
 
 # Mitte: Tierkreis-Scheibe – Ziegelring mit zwölf Feldern um das Yin-Yang
-R = 19
-YX, YY = 62, 82
+R = 17
+RING = 10                                         # Außenkante des Ziegelrings (Abstand zu R)
+YX, YY = 62, 90
 rr = np.hypot(xx - YX, yy - YY)
 ang = (np.degrees(np.arctan2(xx - YX, -(yy - YY))) + 360 + 15) % 360
-disc_m = rr < R + 11
+disc_m = rr < R + RING
 cv.a[disc_m] = bt[disc_m]
 alt = disc_m & (rr >= R + 2) & ((ang // 30) % 2 == 1)          # jedes zweite Feld dunkler
 cv.a[alt] = (bt[alt] * 0.72).astype(np.uint8)
 cv.a[disc_m & (rr >= R + 2) & ((ang % 30) < 360 / (2 * math.pi * rr + 1e-6) * 1.0)] = EDGE_D   # Feldgrenzen
 cv.a[(rr >= R + 1) & (rr < R + 2)] = EDGE_D
-cv.a[(rr >= R + 10) & (rr < R + 11)] = EDGE_L
-cv.a[(rr >= R + 11) & (rr < R + 12)] = EDGE_D
+cv.a[(rr >= R + RING - 1) & (rr < R + RING)] = EDGE_L
+cv.a[(rr >= R + RING) & (rr < R + RING + 1)] = EDGE_D
 BLK, D1, D2, D3, WHT = (0, 0, 0), (38, 38, 38), (77, 77, 77), (116, 116, 116), (255, 255, 255)
 dx, dy = xx - YX, yy - YY
 dark = dx > 0
@@ -110,31 +112,36 @@ def hou_sprite():
 
 
 S['Hou'] = hou_sprite()
+# She steht rechts: gespiegelt, damit ihr Körper außen und der Dreizack zur Scheibe hin steht
+S['She'] = flip(S['She'])
 
-# Zwölf gleich große Graskuppen symmetrisch im Oval um die Scheibe, im Uhrzeigersinn ab Shu (oben mittig) bis
-# Zhu; Ma unten mittig. Die Kuppen liegen auf einer abgerundet-eckigen Ellipse (Superellipse EX, EY, ERX, ERY, EP)
-# und sind an der Senkrechten gespiegelt (Niu ↔ Zhu, Hu ↔ Gou, Tu ↔ Ji, Long ↔ Hou, She ↔ Yang). Die Bogenabstände
-# sind gleich (je 1/12 des Umfangs); nur die beiden großen unteren Paare (Long/Hou, She/Yang) rücken ein wenig
-# nach unten, damit sich keine Figuren verdecken. Die Ellipse sitzt tiefer als die Scheibe, weil die Figuren von
-# ihren Kuppen aus nach oben stehen. (Name, Fußmitte x, Fußlinie y)
+# Zwölf gleich große Graskuppen im Oval um die Scheibe, spiegelsymmetrisch zur Senkrechten. Die Plätze sind nach
+# Größe gepaart, damit sich links und rechts ähnlich große Figuren gegenüberstehen: Shu oben, Zhu (liegend, flach)
+# unten mittig; die beiden größten Figuren She ↔ Ma stehen mittig an den Seiten, wo das Oval am meisten Höhe hat;
+# dazu Niu ↔ Yang, Hou ↔ Long, Tu ↔ Ji, Gou ↔ Hu. She und Ma stehen so weit außen wie ihre Nachbarn (She
+# gespiegelt, ihr breiter Umriss wird an der Rahmeninnenkante gehalten). So liegt der Schwerpunkt aller Figuren in der Bildmitte (keine
+# schwere untere Reihe mehr). Grundform ist eine abgerundet-eckige Ellipse (Superellipse EX, EY, ERX, ERY, EP);
+# HALF gibt die Umlaufanteile der rechten Hälfte (von oben bis unten, fast gleichmäßig je 1/12), RAD je Platz einen
+# Abstandsfaktor zur Mitte (leichtes Vor/Zurück, damit zwischen allen Figuren Luft bleibt). (Name, Fußmitte x, Fußlinie y)
 FOOT = 2
-ORDER = ['Shu', 'Niu', 'Hu', 'Tu', 'Long', 'She', 'Ma', 'Yang', 'Hou', 'Ji', 'Gou', 'Zhu']
-EX, EY, ERX, ERY, EP = 62.5, 95, 42, 64, 3.5
-HALF = [0, 0.081, 0.164, 0.248, 0.350, 0.430, 0.5]      # Anteile am Umfang: Shu … Ma (rechte Hälfte)
-FRAC = HALF + [1 - f for f in HALF[5:0:-1]]              # linke Hälfte gespiegelt: Yang … Zhu
+ORDER = ['Shu', 'Niu', 'Hou', 'She', 'Tu', 'Gou', 'Zhu', 'Hu', 'Ji', 'Ma', 'Long', 'Yang']   # im Uhrzeigersinn ab oben
+EX, EY, ERX, ERY, EP = 62.5, 96.3, 41.3, 61.2, 2.26
+HALF = [0, 0.077, 0.166, 0.268, 0.338, 0.415, 0.5]
+RAD = [1.03, 0.993, 1.104, 0.95, 1.119, 0.9, 1.036]
 
 
-def ellipse_spots(fracs):
-    """Punkte an den Umfangsanteilen fracs auf |x/ERX|^EP + |y/ERY|^EP = 1, ab oben im Uhrzeigersinn."""
-    ts = np.linspace(0, 2 * math.pi, 3601)
-    sx, cy_ = np.sin(ts), np.cos(ts)
-    pts = np.stack([EX + ERX * np.sign(sx) * abs(sx) ** (2 / EP), EY - ERY * np.sign(cy_) * abs(cy_) ** (2 / EP)], 1)
-    arc = np.concatenate([[0], np.cumsum(np.hypot(*np.diff(pts, axis=0).T))])
-    return [pts[np.argmin(abs(arc - arc[-1] * f))] for f in fracs]
+def place(k):
+    i = k if k <= 6 else 12 - k                           # linke Hälfte: Spiegelbild des rechten Platzes
+    t = 2 * math.pi * HALF[i] * (1 if k <= 6 else -1)
+    sx, cy_ = math.sin(t), math.cos(t)
+    x = EX + RAD[i] * ERX * np.sign(sx) * abs(sx) ** (2 / EP)
+    y = EY - RAD[i] * ERY * np.sign(cy_) * abs(cy_) ** (2 / EP)
+    return x, y
 
 
-SPOTS = [(n, c[0], int(round(c[1]))) for n, c in zip(ORDER, ellipse_spots(FRAC))]
-PAD_RX = 12                                       # alle Kuppen gleich groß
+SPOTS = [(n, *place(k)) for k, n in enumerate(ORDER)]
+SPOTS = [(n, x, int(round(y))) for n, x, y in SPOTS]
+PAD_RX = 9                                       # alle Kuppen gleich groß
 
 # von hinten (oben) nach vorn: je Figur erst ihre flache Graskuppe (Aufsicht), dann die Figur
 for n, px, py in sorted(SPOTS, key=lambda t: t[2]):
@@ -145,7 +152,9 @@ for n, px, py in sorted(SPOTS, key=lambda t: t[2]):
     cv.a[rim < 1] = EDGE_D
     cv.a[e < 1] = gt[e < 1]
     cv.a[(e < 1) & (e >= 0.72) & (yy > py + FOOT)] = GRASS_L
-    cv.paste(sp, int(round(px - sp.shape[1] / 2)), py + FOOT - sp.shape[0])
+    # Figur mittig über ihrer Kuppe, aber nie über den Rahmen hinaus (Rahmeninnenkante x 9 … 116)
+    x0 = min(max(int(round(px - sp.shape[1] / 2)), 9), 116 - sp.shape[1])
+    cv.paste(sp, x0, py + FOOT - sp.shape[0])
 
 big = Canvas(W, H)
 big.a[:] = up(np.dstack([cv.a, np.full((h, w), 255, np.uint8)]), 2)[..., :3]
