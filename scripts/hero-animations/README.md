@@ -96,6 +96,15 @@ kopiert, daneben liegt eine JSON-Datei mit den Metadaten. Die erzeugten
 | `winged.py` | `final 80 melissa` | `cute_meanie_melissa_idle_final_sheet.png` | `cute-meanie-melissa` |
 | `winged.py` | `final 80 molinda` | `cute_angel_molinda_idle_final_sheet.png` | `cute-angel-molinda` |
 | `dark_maho.py` | `final` | `dark_maho_idle_final_sheet.png` | `dark-maho` (Skin) |
+| `thep.py` | `final` | `thep_idle_final_sheet.png` | `thep-the-court-scribe` |
+| `lethe.py` | `final 90 hero` | `lethe_idle_final_sheet.png` | `lethe-the-forgetful-fixer` |
+| `lethe.py` | `final 90 reaping` | `reaping_lethe_idle_final_sheet.png` | `reaping-lethe` (Skin) |
+| `pharaoh.py` | `final 90 hero` | `pharaoh_idle_final_sheet.png` | `pharaoh-the-lone-living-being` |
+| `pharaoh.py` | `final 90 gamer` | `gamer_pharaoh_idle_final_sheet.png` | `gamer-champion-pharaoh` (Skin) |
+| `bakhm.py` | `final 90 hero` | `bakhm_idle_final_sheet.png` | `bakhm-the-desert-digger` |
+| `bakhm.py` | `final 90 worm` | `world_eater_bakhm_idle_final_sheet.png` | `world-eater-bakhm` (Skin) |
+| `serket.py` | `final 90 hero` | `serket_idle_final_sheet.png` | `serket-dread-of-the-desert` |
+| `serket.py` | `final 90 et` | `extraterrestrial_serket_idle_final_sheet.png` | `extraterrestrial-serket` (Skin) |
 | `bubbles.py` | `final gross` | `bubbles_idle_final_gross_sheet.png` | `bubbles-the-bouncy-bunny` |
 
 `bubbles.py` ohne `gross` erzeugt eine auf Hero-Größe verkleinerte Variante
@@ -122,8 +131,9 @@ python3 xcf_extract.py MotiveMoe.xcf assemble src/cute-princess-mary.png "Mary-K
 | `cute-princess-mary.png` | `MotiveMoe.xcf` | `Mary-Kopie` (goldene Mary mit Krone) + `Mary #1` (Flügel) |
 | alle übrigen MotiveMoe-Heroes | `MotiveMoe.xcf` | reproduzierbar per `python3 assemble_moe.py <MotiveMoe.xcf>` (Zuordnung im Skriptkopf) |
 | MotiveMoe-Skins und weitere Heroes (2. Durchgang) | `MotiveMoe.xcf` | reproduzierbar per `python3 assemble_moe_skins.py <MotiveMoe.xcf>` (Zuordnung im Skriptkopf) |
-| MotiveArcanum-Heroes | `MotiveArcanum.xcf` | reproduzierbar per `python3 assemble_arcanum.py <MotiveArcanum.xcf>` (Zuordnung im Skriptkopf) |
+| MotiveArcanum-Heroes und Skin Dark Maho | `MotiveArcanum.xcf` | reproduzierbar per `python3 assemble_arcanum.py <MotiveArcanum.xcf>` (Zuordnung im Skriptkopf) |
 | MotiveBoons-Heroes und -Skins | `MotiveBoons.xcf` | reproduzierbar per `python3 assemble_boons.py <MotiveBoons.xcf>` (Zuordnung im Skriptkopf) |
+| MotiveEgypt-Heroes und -Skins | `MotiveEgypt.xcf` | reproduzierbar per `python3 assemble_egypt.py <MotiveEgypt.xcf>` (Zuordnung im Skriptkopf) |
 
 Neue Datei durchsuchen: `xcf_scan.py dump` legt alle Ebenen einzeln ab,
 `xcf_scan.py match <ordner> --heroes` gleicht sie mit allen noch nicht

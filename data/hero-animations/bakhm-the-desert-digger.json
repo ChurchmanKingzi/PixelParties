@@ -1,0 +1,15 @@
+{
+  "hero": "Bakhm, the Desert Digger",
+  "sheet": "bakhm-the-desert-digger.png",
+  "frameWidth": 65,
+  "frameHeight": 68,
+  "frames": 48,
+  "frameMs": 90,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 3,
+  "padLeft": 3,
+  "padRight": 3,
+  "padBottom": 1,
+  "faceX": 13
+}
