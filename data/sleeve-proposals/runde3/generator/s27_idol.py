@@ -6,7 +6,7 @@ Quellen (MotiveMoe.xcf):
   - Ebene 474 „Singing #3“: Fans von hinten mit Leuchtstäben (Karte „Singing“), als dunkle Silhouetten,
     Leuchtstäbe bleiben hell
   - Ebene 463 „Megu #3“: Superfan mit Bewegungsstrichen (Karte „Cute Starlet Megu“)
-  - Ebene 263 „Ebene #82“: weiße Strahlenlinien (Lichtkranz hinter der Sängerin, rosa eingefärbt)
+  - Ebene 263 „Ebene #82“ + 264 „Ebene #81“: weiße Strahlenlinien (Lichtkranz hinter der Sängerin, rosa/violett eingefärbt)
   - Ebene 129 „Ebene #174“ (Weihnachtsdorf): Holzdielen der Bühne (Karte „Harpyformer Choir“)
   - Ebene 126 „Ebene #178“: Musiknoten (Karte „Harpyformer Choir“)
   Scheinwerferkegel: gedithert aufgehellte Dreiecke (selbst erstellt).
