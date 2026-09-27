@@ -1,82 +1,90 @@
 # -*- coding: utf-8 -*-
-"""Sleeve 17 – Duell im Schneesturm (Blick über die Schulter).
+"""Sleeve 17 – Duell im Schneesturm (Blick über die Schulter), überarbeitet für Runde 3b.
 
-Der Mischief-Militia-Bärenreiter steht – von hinten gesehen – am verschneiten Ufer des Nordmeers;
-vor ihm erhebt sich die dreiköpfige Nothern Hydra aus dem eisigen Wasser. Schneeflocken wehen quer
-über das Bild.
+Der Mischief-Militia-Bärenreiter steht – von hinten gesehen – auf der verschneiten Eiskante des
+Nordmeers; vor ihm erhebt sich die dreiköpfige Nothern Hydra aus dem dunklen Wasser. Schneeflocken
+treiben quer durchs Bild.
+
+Skalierung / Tiefenstaffelung (zwei klar getrennte Ebenen):
+  Vordergrund 4×: Bärenreiter, Eiskante (Schraffur), Schneefeld, Schneeflocken
+  Mittelgrund 3×: Nothern Hydra, Meer (Wellenkacheln), Schaumkranz an der Wasserlinie
+  Die frühere 2×-Uferkulisse mit Tannen neben dem 4×-Bären ist entfallen (Regel A).
 
 Quellen (MotiveRussia.xcf):
-  Bärenreiter von hinten = Ebene 76 „Ebene #109“ (Karte „Mischief Invasion“)
-  Nothern Hydra          = Ebene 9 „Nothern Hydra“
-  Meer / Ufer / Wald     = Ebene 221 „Ebene #6“ (Karte mit Nothern Hydra), nach oben mit der
-                           Meereskachel derselben Ebene verlängert
-  Schneeflocken          = Ebene 64 „Ebene #122“ (Schneerauschen), nur die deckenden Pixel
+  Bärenreiter von hinten = Ebene 76 „Ebene #109“ (Karte „Mischief Invasion“, Szene 40: vollständig)
+  Nothern Hydra          = Ebene 9 „Nothern Hydra“ (Szene 1: vollständig inkl. Hörnerbögen)
+  Meer / Eiskante / Schnee = Ebene 221 „Ebene #6“ (Kulisse der Hydra-Karte), Kacheln daraus
+  Schaumkranz, Flocken   = selbst gezeichnet in den Farben der Eiskante
 """
 from c_util import *
 
 cv = Canvas(W, H)
+KF, KM = 4, 3                                   # Vorder- / Mittelgrund
 
-# ---------- Hintergrund: Ebene 221, nach oben um Meereskacheln verlängert, 2×
-L = layer(RU, 221)[..., :3] if os.path.exists(os.path.join(XK.EXP, RU)) else None
-bgkey = 'c17_bg'
-if L is not None:
-    X0, X1 = 376, 501
-    Y0, Y1 = 372, 470                     # Ausschnitt mit Uferlinie, Eisschollen, Wald
-    part = L[Y0:Y1, X0:X1]
-    sea = L[328:344, X0:X1]               # 16 Zeilen dunkles Meer (periodisch)
-    ext = 175 - part.shape[0]
-    top = np.concatenate([sea] * (ext // 16 + 2), 0)[-ext:]
-    bg = np.concatenate([top, part], 0)
-    Image.fromarray(bg).save(os.path.join(XK.CACHE, bgkey + '.png'))
-else:
-    bg = np.array(Image.open(os.path.join(XK.CACHE, bgkey + '.png')).convert('RGB'))
-cv.a[:] = up(np.dstack([bg, np.full(bg.shape[:2], 255, np.uint8)]), 2)[:H, :W, :3]
-shade_rows(cv, 0, 150, 0.6, 0.0, (8, 12, 40))          # Sturmdunkel über dem Meer
+dark = tex('c17_sea_dark', RU, 221, (380, 330, 396, 346))     # 16×16 dunkles Meer
+bright = tex('c17_sea_bright', RU, 221, (392, 382, 408, 398))  # 16×16 helles Meer
+snow = tex('c17_snow', RU, 221, (520, 374, 564, 386))          # 44×12 Schneefeld
+snow = np.concatenate([snow, snow[:, ::-1]], 1)                 # gespiegelt gekachelt (nahtlos)
+hatch = tex('c17_hatch', RU, 221, (506, 358, 570, 368))        # 64×10 schraffierte Eiskante
 
-# ---------- Hydra: aus dem Meer aufsteigend (hinter der Uferlinie)
-hydra = sprite('c17_hydra', RU, [9])
-Hy = up(hydra, 3)
-WL = 198                                               # Wasserlinie im hellen Meer vor dem Ufer
-hx, hy = (W - Hy.shape[1]) // 2, WL + 12 - Hy.shape[0]
-vis = Hy[:WL - hy]                                     # nur der Teil über dem Wasser
-cv.paste(silhouette(vis, (10, 16, 50)), hx + 4, hy + 6, alpha=0.5)
+SHORE = 236                                     # Oberkante der Eiskante (Vordergrund)
+
+# ---------- Meer (3×): oben dunkel, zur Küste hin heller, geordnet übergeblendet im 3×-Raster
+def tiled(t, k):
+    T = up(np.dstack([t, np.full(t.shape[:2], 255, np.uint8)]), k)[..., :3]
+    return np.tile(T, (H // T.shape[0] + 1, W // T.shape[1] + 1, 1))[:H, :W]
+D3, B3 = tiled(dark, KM), tiled(bright, KM)
+yy, xx = np.mgrid[0:H, 0:W]
+tb = (yy // KM * KM - 90) / 110
+useb = tb > BAYER4[(yy // KM) % 4, (xx // KM) % 4]
+sea = np.where(useb[..., None], B3, D3)
+cv.a[:SHORE + KM] = sea[:SHORE + KM]
+shade_rows(cv, 0, 120, 0.6, 0.0, (8, 12, 40), k=KM)            # Sturmdunkel
+
+# ---------- Hydra (3×), steigt hinter der Eiskante aus dem Wasser
+hydra = figure('c17_hydra', RU, [9])
+Hy = up(hydra, KM)
+WL = SHORE - 5 * KM                                             # Wasserlinie (knapp vor der Kante sichtbar)
+hx, hy = (W - Hy.shape[1]) // 2 + 3, WL + 10 * KM - Hy.shape[0]
+vis = Hy[:WL - hy].copy()
+cv.paste(silhouette(vis, (10, 16, 50)), hx + KM, hy + 2 * KM, alpha=0.5)
 cv.paste(vis, hx, hy)
-# Schaumkante, wo die Hydra ins Wasser taucht, und Wellenringe daneben
+# Schaumkranz an der Wasserlinie (3×)
 cols = np.nonzero(Hy[WL - hy - 1, :, 3] > 0)[0]
-c0, c1 = hx + cols.min(), hx + cols.max()
 FOAM, FOAM2 = (236, 240, 255), (150, 176, 250)
-for x in range(c0 - 2, c1 + 3):
-    cv.px(x, WL, FOAM)
-    cv.px(x, WL + 1, FOAM if (x - c0) % 4 else FOAM2)
-for (x0, x1, dy) in [(c0 - 14, c0 - 5, 2), (c1 + 5, c1 + 15, 2), (c0 - 26, c0 - 18, 5), (c1 + 18, c1 + 27, 5),
-                     (c0 + 6, c0 + 20, 4), (c1 - 22, c1 - 8, 4)]:
-    for x in range(x0, x1):
-        cv.px(x, WL + dy, FOAM2 if (x % 3 == 0) else FOAM)
+c0, c1 = (hx + cols.min()) // KM * KM, (hx + cols.max()) // KM * KM
+for x in range(c0 - 2 * KM, c1 + 3 * KM, KM):
+    cv.rect(x, WL, x + KM, WL + KM, FOAM)
+    cv.rect(x, WL + KM, x + KM, WL + 2 * KM, FOAM if (x // KM) % 3 else FOAM2)
+for (x0, x1, dy) in [(c0 - 12 * KM, c0 - 4 * KM, 2), (c1 + 5 * KM, c1 + 12 * KM, 2), (c0 + 6 * KM, c0 + 14 * KM, 3)]:
+    for x in range(x0, x1, KM):
+        cv.rect(x, WL + dy * KM, x + KM, WL + (dy + 1) * KM, FOAM2 if (x // KM) % 3 == 0 else FOAM)
 
-# ---------- Bärenreiter von hinten, groß im Vordergrund
-bear = sprite('c17_bear_back', RU, [76])
-K = 4
-B = up(bear, K)
-bx, by = (W - B.shape[1]) // 2, H - B.shape[0] + 6
-cv.paste(silhouette(up(outline(bear), K), (20, 24, 60)), bx - K + 3, by - K + 3, alpha=0.5)
-cv.paste(up(outline(bear, (24, 22, 40)), K), bx - K, by - K)
-cv.paste(B, bx, by)
+# ---------- Eiskante + Schneefeld (4×)
+tile_fill(cv, hatch, 0, SHORE, W, SHORE + 10 * KF, k=KF, ox=8)
+cv.rect(0, SHORE, W, SHORE + KF, (250, 252, 255))
+tile_fill(cv, snow, 0, SHORE + 9 * KF, W, H, k=KF)
+cv.rect(0, SHORE + 9 * KF, W, SHORE + 10 * KF, (196, 196, 236))
+shade_rows(cv, SHORE + 10 * KF, H, 0.0, 0.25, (60, 60, 120), k=KF)
 
-# ---------- Schneegestöber: deckende Pixel des Schneerauschens (Ebene 64), 1× und 2×
-snow = layer(RU, 64) if L is not None else None
-if snow is not None:
-    fl = (snow[..., 3] >= 250)
-    np.save(os.path.join(XK.CACHE, 'c17_flakes.npy'), fl[:H, :W])
-else:
-    fl = np.load(os.path.join(XK.CACHE, 'c17_flakes.npy'))
-ys, xs = np.nonzero(fl[:H, :W])
-for y, x in zip(ys, xs):
-    if (x * 7 + y * 13) % 5 == 0:                      # ausdünnen
-        cv.px(x, y, (236, 240, 255))
-fl2 = fl[200:200 + H // 2, 300:300 + W // 2]
-ys, xs = np.nonzero(fl2)
-for y, x in zip(ys, xs):
-    if (x * 5 + y * 11) % 9 == 0:
-        cv.rect(2 * x, 2 * y, 2 * x + 2, 2 * y + 2, (248, 250, 255))
+# ---------- Bärenreiter von hinten (4×), steht auf dem Schneefeld
+bear = figure('c17_bear_back', RU, [76])
+Bw, Bh = bear.shape[1] * KF, bear.shape[0] * KF
+bx, by = (W - Bw) // 2, H - Bh - 2 * KF
+# Schatten im Schnee (flache Ellipse, 4×)
+for j in range(3):
+    w_ = (bear.shape[1] // 2 - 2 * j) * KF
+    cv.rect(bx + Bw // 2 - w_, by + Bh - KF + j * KF, bx + Bw // 2 + w_, by + Bh + j * KF, (170, 170, 214))
+put(cv, bear, bx, by, KF, ol=(24, 22, 40))
+
+# ---------- Schneeflocken (4×, einzelne Pixel und kleine Kreuze), deterministisch verteilt
+rng = np.random.RandomState(17)
+for n in range(34):
+    x = rng.randint(0, W // KF) * KF; y = rng.randint(0, H // KF) * KF
+    if bx - 4 < x < bx + Bw and y > by: continue
+    cv.rect(x, y, x + KF, y + KF, (244, 246, 255))
+    if n % 6 == 0:
+        for dx_, dy_ in ((-1, 0), (1, 0), (0, -1), (0, 1)):
+            cv.rect(x + dx_ * KF, y + dy_ * KF, x + (dx_ + 1) * KF, y + (dy_ + 1) * KF, (200, 206, 250))
 
 print(save(cv, '17_hydra_duel.png'))

@@ -1,80 +1,91 @@
 # -*- coding: utf-8 -*-
-"""Sleeve 20 – „Trex Breach“: Der Gigantisaurier-T-Rex bricht durch das Burgtor, Steine und Torbretter
-fliegen, Stadtwachen fliehen.
+"""Sleeve 20 – „Trex Breach“: Der Gigantisaurier-König (T-Rex mit Flammenkrone) bricht durch das Burgtor.
+Der hintere Körper steckt noch im zertrümmerten Torbogen, Kopf und Brust sind schon vor dem rechten Turm,
+Torbretter und Mauersteine fliegen, unten fliehen Stadtwache und Bürger über den Weg.
 
-Quellen (MotiveGrailWar.xcf): Ebene 706 „Schloss Front“ (Burgfassade mit Türmen, Tor, Bannern – Hintergrund 2×,
-Mauersteine/Torbretter als Trümmer), Ebene 513 „Trex“ (3×), Ebene 676 „Doomed Town Guard“ und 593 „Ebene #52“
-(Städter, je 3×). Loch/Bruchkante: Pixel der Fassade abgedunkelt bzw. umgefärbt.
+Runde 3b: ALLES in einheitlicher Skalierung 2× – die Szene wird im nativen Raster (125×175) der Burgkarte
+komponiert und erst am Ende verdoppelt. Kein Element hat eine andere Pixelgröße.
+
+Quellen (MotiveGrailWar.xcf): Ebene 706 „Schloss Front“ (Burgfassade mit Türmen, Tor, Bannern, Weg, Wiese;
+auch Quelle der Trümmerstücke), 513 „Trex“ + 512 „Ebene #335“ (Flammenkrone – gehört laut Szene
+„Sichtbar #120“ zur Figur), 676 „Doomed Town Guard“, 593 „Ebene #52“ (Bürger).
+Loch/Bruchkante, Innendunkel und Schatten: selbst gezeichnet (geordnetes Dithering im nativen Raster).
 Karten: Gigantisaur King Trex, Doomed Town Guard.
 """
 import numpy as np
+import cv2
 from d_util import *  # noqa
 
-cv = Canvas(250, 350)
-BX, BY = 204, 166                                  # linke obere Ecke des Fassadenausschnitts (nativ)
-wall = region(B, [706], (BX, BY, BX + 125, BY + 175))
-fill_bg(cv, wall, 2)
+K = 2
+BX, BY = 203, 140                                   # native linke obere Ecke des Burgausschnitts
+nc = native(K)
+wall = region(B, [706], (BX, BY, BX + nc.w, BY + nc.h))
+nc.a[:] = wall[..., :3]
 
-# --- Loch in der Mauer um das Tor (natives Raster, gezackt) ---------------------------------
-rng = np.random.RandomState(7)
-hole = np.zeros((350, 250), bool)
-top = {}
-for x in range(236, 298):
-    d = min(x - 236, 297 - x)
-    t = 222 - min(d, 16) + rng.randint(0, 4)        # oben bogenförmig, gezackt
-    top[x] = t
-for x, t in top.items():
-    y1 = 276 if 241 < x < 292 else 276 - rng.randint(3, 10)
-    hole[(t - BY) * 2:(y1 - BY) * 2, (x - BX) * 2:(x - BX + 1) * 2] = True
-# Innenraum: sehr dunkel, nach unten leicht heller (Staub)
-ys, xs = np.where(hole)
-for y, x in zip(ys, xs):
-    f = (y - 100) / 160.0
-    th = BAYER8[(y // 2) % 8, (x // 2) % 8]
-    cv.a[y, x] = (38, 24, 16) if f * 0.7 > th else (16, 10, 12)
-# Bruchkante: 1 natives Pixel dunkler Rand + helle Steinkante darüber
-import cv2
+# --- Bruch im Torbogen (natives Raster, gezackt) ------------------------------------------------------
+rng = np.random.RandomState(11)
+hole = np.zeros((nc.h, nc.w), bool)
+X0, X1 = 238 - BX, 294 - BX
+for x in range(X0, X1):
+    d = min(x - X0, X1 - 1 - x)
+    top = 212 - BY + max(0, 8 - d) + rng.randint(0, 3)       # oben gezackt, an den Rändern tiefer
+    if d < 2: top += 6 + rng.randint(0, 5)
+    hole[top:279 - BY, x] = True
+yy, xx = np.mgrid[0:nc.h, 0:nc.w]
+# Innendunkel des Torgangs: nach unten etwas heller (Staub, Fackelschein aus dem Hof)
+t = np.clip((yy - (212 - BY)) / 70.0, 0, 1)
+dark = np.where((t * 0.8 > BAYER8[yy % 8, xx % 8])[..., None], np.array((44, 28, 22)), np.array((18, 12, 16)))
+nc.a[hole] = dark[hole]
+# Reste der Torflügel: an den Seiten stehen gesplitterte Bretter
+door = region(B, [706], (BX, BY, BX + nc.w, BY + nc.h))[..., :3]
+for x, h in [(X0 + 3, 16), (X0 + 4, 11), (X0 + 5, 7), (X1 - 4, 14), (X1 - 5, 18), (X1 - 6, 9)]:
+    nc.a[279 - BY - h:279 - BY, x] = door[279 - BY - h:279 - BY, x]
+# Bruchkante: 1 px dunkle Fuge + darüber hellere, abgesplitterte Steinkante
 hm = hole.astype(np.uint8)
-ring1 = (cv2.dilate(hm, np.ones((5, 5), np.uint8)) > 0) & ~hole
-ring2 = (cv2.dilate(hm, np.ones((9, 9), np.uint8)) > 0) & ~hole & ~ring1
-cv.a[ring2] = (cv.a[ring2].astype(int) * 0.75).astype(np.uint8)
-cv.a[ring1] = (48, 36, 58)
+r1 = (cv2.dilate(hm, np.ones((3, 3), np.uint8)) > 0) & ~hole
+r2 = (cv2.dilate(hm, np.ones((5, 5), np.uint8)) > 0) & ~hole & ~r1
+r1[279 - BY:] = False; r2[279 - BY:] = False
+nc.a[r2] = np.clip(nc.a[r2].astype(int) + 26, 0, 255)
+nc.a[r1] = (40, 30, 50)
 
-# --- T-Rex: hinterer Teil steckt noch in der Mauer ------------------------------------------
-trex = sprite('d20_trex', B, [513])
-TX, TY = 4, 80
-k = 3
-T = up(trex, k)
-hx = (266 - BX) * 2                                   # Mitte des Lochs
-vis = hole.copy(); vis[:, hx:] = True
-vis[(270 - BY) * 2:, (241 - BX) * 2:] = True                         # Füße treten auf den Weg
-shv = np.zeros_like(vis); shv[:(268 - BY) * 2, hx:] = True; shv &= ~hole
-mask_paste(cv, silhouette(T, (18, 10, 24)), TX + 6, TY + 6, shv)    # Schlagschatten auf der Mauer
-mask_paste(cv, T, TX, TY, vis)
+# --- T-Rex mit Krone: hinterer Körper noch im Tor, Kopf schon draußen -----------------------------------
+trex = keep('d20_trex_king', compose(B, [512, 513]))          # bbox nativ ab (165, 233)
+TX, TY = 230 - BX, 233 - 15 - BY                               # Füße auf dem Weg vor der Schwelle
+th, tw = trex.shape[:2]
+# Schatten auf dem Weg
+blob(nc, TX + 40, TY + th - 1, 30, 4, (58, 50, 62), 1.0)
+vis = hole | (xx >= 266 - BX) | (yy >= 279 - BY)
+mask_paste(nc, trex, TX, TY, vis)
 
-# --- Trümmer: Mauersteine und Torbretter --------------------------------------------------------
-def chunk(x0, y0, w, h):
+# --- Trümmer: Torbretter und Mauersteine fliegen aus dem Loch (gleiche Pixelgröße) -------------------
+def chunk(x0, y0, w, h, col=(40, 30, 52)):
     c = region(B, [706], (x0, y0, x0 + w, y0 + h)).copy()
-    c[0, 0, 3] = c[0, -1, 3] = c[-1, 0, 3] = 0
-    return outline(c, (40, 30, 52))
+    c[0, 0, 3] = c[-1, -1, 3] = 0
+    return outline(c, col)
 
-stones = [chunk(323, 214, 5, 4), chunk(324, 230, 4, 3), chunk(200, 236, 6, 4), chunk(325, 240, 5, 3),
-          chunk(201, 220, 4, 4), chunk(323, 222, 3, 3)]
-planks = [region(B, [706], (250, 205, 252, 216)), region(B, [706], (270, 208, 272, 218))]
-planks = [outline(p, (40, 22, 10)) for p in planks]
-for (s, x, y, kk) in [(stones[0], 58, 118, 3), (stones[1], 196, 96, 2), (stones[2], 30, 200, 3),
-                      (stones[3], 214, 176, 3), (stones[4], 100, 106, 2), (stones[5], 150, 96, 2),
-                      (stones[1], 18, 150, 2), (stones[4], 226, 238, 2)]:
-    put(cv, s, x, y, kk, shadow=(20, 14, 20), sh_off=(1, 2), sh_alpha=0.45)
-put(cv, rot90(planks[0]), 104, 300, 3, shadow=(20, 14, 20), sh_off=(1, 2))
-put(cv, rot90(planks[1]), 40, 96, 2, shadow=(20, 14, 20), sh_off=(1, 2))
+planks = [chunk(252, 236, 2, 9, (40, 22, 10)), chunk(262, 240, 2, 7, (40, 22, 10)),
+          chunk(275, 238, 3, 6, (40, 22, 10))]
+stones = [chunk(241, 199, 7, 6), chunk(249, 199, 6, 5), chunk(258, 199, 5, 6)]  # Zinnenquader über dem Tor
+S = dict(shadow=(20, 14, 24), sh_off=(1, 1), sh_alpha=0.5)
+put(nc, rot90(planks[0]), 18, 62, **S)
+put(nc, planks[1], 100, 56, **S)
+put(nc, rot90(planks[2], 3), 30, 150, **S)
+put(nc, stones[0], 38, 56, **S)
+put(nc, rot90(stones[1]), 90, 60, **S)
+put(nc, stones[0], 112, 100, fl=True, **S)
+put(nc, rot90(stones[2]), 96, 160, **S)
+# Staubwolken um die Füße (selbst gezeichnet, gleiche Pixelgröße)
+for cx, cy, rx, ry in [(40, 146, 8, 3), (84, 146, 9, 3), (26, 143, 5, 2)]:
+    blob(nc, cx, cy, rx, ry, (150, 140, 150), 0.55)
 
-# --- fliehende Wachen im Vordergrund -------------------------------------------------------------
+# --- Fliehende: Stadtwache links, Bürger rechts, auf dem Weg vorn ---------------------------------------
 guard = sprite('d20_guard', B, [676])
 man = sprite('d20_townsman', B, [593])
-put(cv, guard, 14, 272, 3, shadow=(20, 30, 10), sh_off=(2, 1))
-put(cv, man, 184, 266, 3, shadow=(20, 30, 10), sh_off=(-2, 1))
+blob(nc, 17, 173, 8, 2, (30, 44, 24), 1.0)
+put(nc, guard, 17, 173, anchor='b')
+blob(nc, 106, 172, 9, 2, (30, 44, 24), 1.0)
+put(nc, man, 106, 172, anchor='b', fl=True)
 
-vignette(cv, 0.45, 0.6)
-frame(cv, [(20, 14, 26), (120, 96, 150), (60, 44, 80)])
+vignette(nc, 0.45, 0.6)
+cv = finish(nc, K)
 print(save(cv, '20_trex_breach.png'))

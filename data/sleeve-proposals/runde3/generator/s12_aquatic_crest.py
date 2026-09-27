@@ -1,16 +1,18 @@
 # -*- coding: utf-8 -*-
-"""12 Aquatic Crest – Wappen-Komposition ohne Text: der riesige Wasserschild (mit Eiszapfen) hängt wie ein
-Wappen an der weißen Burgmauer zwischen zwei Bannern; davor steigt die Aquatic-Heldin auf einer Wasserfontäne
-empor, links und rechts regnen Wasserpfeile.
+"""12 Aquatic Crest – Wappen-Komposition ohne Text: Die Aquatic-Heldin steht auf einer Wasserfontäne und reckt
+beide Fäuste – über ihr formt sich der große Wasserschild mit Eiskante wie ein Wappenschild. Zwei Paar
+Wasserpfeile flankieren sie wie die Lanzen eines Wappens; dahinter, weit zurück, die weiße Burgmauer mit
+zwei grünen Bannern im Lichtkranz.
 
 Quellen (MotiveDeepsea.xcf):
-  Ebene 16 „Aquatic Shield #2“ + 14 „Aquatic Shield #4“ (Schild + Eiszapfen, Karte „Aquatic Shield“), 4×
-  Ebene 8 „Aquatic Arrows #3“ + 7 „Aquatic Arrows #4“ (Heldin mit leuchtenden Augen + Arme, Karte „Aquatic Arrows“), 5×
-  Ebene 23 „Aquatic Spear“ – Wasserfontäne (Karte „Aquatic Spear“), 4×
-  Ebene 5 „Aquatic Arrows #9“ – Wasserpfeile (Karte „Aquatic Arrows“), 3×
-  Ebene 11 „Aquatic Arrows“ – Gischt (Karte „Aquatic Arrows“), 2×
-  Ebene 260 „Lolek #1“ – grüne Banner, 3×
-  Ebene 263 „Castle“ – weiße Ziegelmauer (Kachel 16×16, 2×) und Wasserbecken-Kachel (2×)
+  Ebene 16 „Aquatic Shield #2“ + 14 „Aquatic Shield #4“ – Wasserschild + Eiskante (Karte „Aquatic Shield“), 5×
+  Ebene 8 „Aquatic Arrows #3“ + 7 „Aquatic Arrows #4“ – Heldin mit erhobenen Fäusten (gleiche Pose wie in der
+    Karte „Aquatic Shield“: Ebenen 18+17), vollständig geprüft, 5×
+  Ebene 23 „Aquatic Spear“ – Wasserfontäne/Gischtwolke (Karte „Aquatic Spear“), 5×
+  Ebene 5 „Aquatic Arrows #9“ – lange Wasserpfeile (Karte „Aquatic Arrows“), 5×
+  Ebene 260 „Lolek #1“ – grüne Banner, 2×;  Ebene 263 „Castle“ – weiße Ziegelmauer (Kachel 16×16), 2×
+Skalierung: Hintergrund (Mauer, Banner, Lichtkranz) 2× und abgedunkelt; Schild, Heldin, Fontäne, Pfeile
+  einheitlich 5×.
 """
 from common import *  # noqa
 from bkit import *    # noqa
@@ -18,55 +20,56 @@ from bkit import *    # noqa
 W, H = 250, 350
 D = 'MotiveDeepsea'
 cv = Canvas(W, H)
+F = 5
 
+# ---------- Hintergrund 2× ----------
+NW, NH = 125, 175
+bg = Canvas(NW, NH)
 brick = sprite('b12_ds263_brick', D, [263], box=(88, 208, 104, 224))
-cv.a[:] = np.repeat(np.repeat(tile_rgb(brick, W, H), 2, 0), 2, 1)[:H, :W]
-cv.a[:] = (cv.a.astype(float) * np.array([0.62, 0.66, 0.78])).astype(np.uint8)     # kühles Dämmerlicht
-# Wasserbecken unten
-WY = 300
-water = sprite('b12_ds263_water', D, [263], box=(96, 286, 112, 302))
-wt = np.repeat(np.repeat(tile_rgb(water, W, H - WY), 2, 0), 2, 1)[:H - WY, :W]
-cv.a[WY:] = wt
-cv.a[WY - 4:WY] = (170, 170, 185); cv.a[WY - 4] = (220, 220, 230); cv.a[WY - 1] = (90, 90, 110)   # Beckenrand
-
-# Lichtkranz hinter dem Schild (gedithert, Wasserfarben)
-radial(cv, 125, 200, 112, (120, 160, 215), 0.7, power=0.7)
-radial(cv, 125, 200, 76, (190, 220, 250), 0.6, power=0.9)
-
-# Banner
+bg.a[:] = tile_rgb(brick, NW, NH)
+bg.a[:] = (bg.a.astype(float) * np.array([0.36, 0.33, 0.42])).astype(np.uint8)     # Dämmerlicht, weit hinten
+# Strahlenkranz hinter dem Schild: harte Sektoren in drei Abstufungen (2×-Raster, kein Dithering)
+CX, CY = 62, 50
+LIGHT = np.array((236, 214, 150))           # goldener Schein (Bannergold)
+for y in range(NH):
+    for x in range(NW):
+        ang = math.atan2(y + .5 - CY, x + .5 - CX)
+        d = math.hypot(x + .5 - CX, y + .5 - CY)
+        ray = (int((ang + math.pi) / (2 * math.pi) * 20) % 2 == 0)
+        ring = 0 if d < 46 else (1 if d < 70 else (2 if d < 96 else 3))
+        f = [0.55, 0.38, 0.22, 0.0][ring] * (1.0 if ray else 0.35)
+        c = bg.a[y, x].astype(float)
+        bg.a[y, x] = np.clip(c * (1 - f) + LIGHT * f, 0, 255)
 ban = [p for p in parts(sprite('b12_ds260', D, [260]), dil=0, minpx=30) if p.shape[0] > 20]
-B3 = up(ban[0], 3)
-cv.paste(B3, 6, 0)
-cv.paste(flip(B3), W - 6 - B3.shape[1], 0)
+B2 = darken(ban[0], 0.8)
+bg.paste(B2, 6, 0)
+bg.paste(flip(B2), NW - 6 - B2.shape[1], 0)
+# Mauerfuß
+bg.a[150:] = (bg.a[150:].astype(float) * 0.7).astype(np.uint8)
+bg.a[150] = (150, 160, 190)
+cv.a[:] = up(np.dstack([bg.a, np.full((NH, NW), 255, np.uint8)]), 2)[:H, :W, :3]
 
-# Schild + Eiszapfen
+# ---------- Vordergrund 5× ----------
 shield = sprite('b12_ds16_14', D, [16, 14])
-S5 = up(shield, 4)
-sx, sy = 125 - S5.shape[1] // 2, 8
-cv.paste(S5, sx, sy)
+S5 = up(shield, F)
+pc(cv, S5, 125, 12 + S5.shape[0] // 2)
 
-# Wasserpfeile links/rechts
+geyser = sprite('b12_ds23', D, [23])
+G5 = up(geyser, F)
+her = sprite('b12_ds8_7', D, [8, 7])
+H5 = up(her, F)
+gy = H - G5.shape[0] + 44
+hy = gy - H5.shape[0] + F                # Füße stehen auf der Gischtkrone
+cv.paste(H5, 125 - H5.shape[1] // 2, hy)
+cv.paste(G5, 125 - G5.shape[1] // 2, gy)
+
+# Wasserpfeile als Lanzen links/rechts (5×, Spitze nach unten)
 arrows = parts(sprite('b12_ds5', D, [5]), dil=0, minpx=10)
 arrows.sort(key=lambda p: -p.shape[0])
-a0 = up(arrows[0], 3)
-for x, y in ((14, 130), (50, 176), (W - 14 - a0.shape[1], 130), (W - 50 - a0.shape[1], 176)):
-    cv.paste(a0, x, y)
+A5 = up(arrows[0], F)
+for x in (10, 38):
+    cv.paste(A5, x, 150 - (x - 10))
+    cv.paste(A5, W - x - A5.shape[1], 150 - (x - 10))
 
-# Fontäne + Heldin
-geyser = sprite('b12_ds23', D, [23])
-G5 = up(geyser, 4)
-her = sprite('b12_ds8_7', D, [8, 7])
-H5 = up(her, 5)
-gx, gy = 125 - G5.shape[1] // 2, H - G5.shape[0] + 16
-hx, hy = 125 - H5.shape[1] // 2 + 1, gy - H5.shape[0] + 3 * 5
-cv.paste(H5, hx, hy)
-cv.paste(G5, gx, gy)
-
-# Gischt an der Wasserlinie
-foam = sprite('b12_ds11', D, [11])
-F2 = up(foam, 2)
-cv.paste(F2, -20, WY + 14)
-cv.paste(flip(F2), W - F2.shape[1] + 20, WY + 18)
-
-vignette(cv, 0.45, 0.6)
+vignette_grid(cv, 0.45, 0.6, 2)
 print(save(cv, '12_aquatic_crest.png'))

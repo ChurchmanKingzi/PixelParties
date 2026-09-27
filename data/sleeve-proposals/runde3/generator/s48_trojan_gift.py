@@ -1,66 +1,94 @@
 # -*- coding: utf-8 -*-
-"""48 Trojan Gift – das hölzerne Pferd steht vor dem Burgtor; ein Soldat klettert über die Leiter in den
-Bauch, während die Bogenschützen auf der Mauer ratlos herunterstarren.
+"""48 Trojan Gift – das hölzerne Pferd rollt vor das Burgtor; ein Soldat klettert über die Leiter in den Bauch,
+ein zweiter hält unten die Leiter. Zwei Torwachen starren ratlos („?“) auf das Geschenk, oben auf den Zinnen
+schauen die Bogenschützen herab.
 
 Quellen (MotiveDeri.xcf):
-  Pferd mit Leiter und Soldat: „Masterpiece“ (i201), 3× (eine vollständige Ebene).
-  Burgmauer mit Bannern und Holztor + Erdboden: „Hintergrund“ (i253), Ausschnitt 2×.
-  Bogenschützen auf den Zinnen: „Archer“ (i184, nur die Figurenzeile über ihrem Mauerstück), 2×.
-  Fragezeichen: aus „See throug the Ruse“ (i199) herausgelöst, 2×.
-  Himmel: eigener Abendverlauf (Bayer-Dithering).
+  Pferd mit Leiter und beiden Soldaten: „Masterpiece“ (i201, eine vollständige Ebene).
+  Ratlose Torwachen mit Fragezeichen: aus „See throug the Ruse“ (i199) die beiden Wachen samt „?“ (Teilfigur).
+  Burgmauer mit Banner, Holztor und Erdboden: „Hintergrund“ (i253), Ausschnitt x 318–443.
+  Bogenschützen: „Archer“ (i184, nur die Figurenzeile über ihrem Mauerstück), gespiegelt → blicken zum Pferd.
+  Himmel: eigener Abendverlauf (Bayer-Dithering, 1×, ganz hinten).
+
+Skalierung: ALLES 2× (Mauer, Boden, Pferd, Soldaten, Wachen, Bogenschützen) – eine Bildebene; nur der Himmel 1×.
 """
 from common import *
 import numpy as np
 
 B = 'MotiveDeri'
 cv = Canvas(250, 350)
+N = np.zeros((175, 125, 4), np.uint8)          # native Bildebene, wird 2× hochskaliert
+WT = 50                                        # Oberkante der Mauer (native)
 
-# --- Abendhimmel ------------------------------------------------------------------------------------------
+# --- Abendhimmel (1×) ----------------------------------------------------------------------------------------
 cols = [np.array(c) for c in ((16, 18, 48), (34, 28, 72), (70, 40, 90), (128, 62, 88), (196, 104, 78))]
-WT = 92                                           # Oberkante der Mauer
-for y in range(WT + 2):
-    t = y / WT * (len(cols) - 1)
+for y in range(2 * WT + 4):
+    t = y / (2 * WT) * (len(cols) - 1)
     i = int(t); fr = t - i
     for x in range(250):
         cv.a[y, x] = cols[min(len(cols) - 1, i + (1 if fr > BAYER4[y % 4, x % 4] else 0))]
+rng = np.random.default_rng(48)
+for _ in range(12):
+    x, y = rng.integers(2, 248), rng.integers(2, 40)
+    cv.a[y, x] = (200, 190, 220)
 
-# --- Mauer mit Tor und Boden (Hintergrund i253, 2×) --------------------------------------------------------
-bg = compose(B, [253])[..., :3]
-X0 = 308                                          # Tor (x 369–431) rechts im Bild
-L0 = 60                                           # Mauer ab Zeile 46 (Sims), Tor-Unterkante bei 128
-wall = up(bg[L0:L0 + (350 - WT + 1) // 2 + 1, X0:X0 + 125], 2)
-cv.a[WT:350] = wall[:350 - WT, :250]
-GY = WT + (128 - L0) * 2                           # Bodenlinie auf dem Canvas
-# Boden leicht abendlich abdunkeln, Mauer kühler
-cv.a[WT:GY] = (cv.a[WT:GY] * np.array([0.78, 0.76, 0.88])).astype(np.uint8)
-for y in range(GY, 350):
-    f = 0.7 + 0.25 * (y - GY) / (350 - GY)
-    cv.a[y] = (cv.a[y] * np.array([f, f * 0.95, f * 0.9])).astype(np.uint8)
+def put(s, x, y):
+    """Sprite in die native Ebene setzen (harte Alpha)."""
+    h, w = s.shape[:2]
+    for j in range(h):
+        for i in range(w):
+            X, Y = x + i, y + j
+            if s[j, i, 3] > 0 and 0 <= X < 125 and 0 <= Y < 175:
+                N[Y, X] = s[j, i]
 
-# --- das Pferd (3×) vor dem Tor, der Kopf ragt über die Mauerkrone -------------------------------------
-horse = sprite('h48_horse', B, [201])
-h3 = up(horse, 3)
-hx, hy = 128 - h3.shape[1] // 2, 349 - h3.shape[0]
-
-# --- Bogenschützen auf der Mauer (nur die Figuren über ihrem Mauerstück), 2×, gespiegelt → blicken zum Pferd ------------
+# --- Bogenschützen hinter der Brustwehr (werden von der Mauer unten verdeckt) -----------------------------------
 arch = compose(B, [184])[:21]
 figs = parts(arch, dil=0)
-AX = (20, 58, 96)
-for p, cx in zip(figs[:3], AX):
-    p2 = up(flip(darken(p, 0.85)), 2)
-    cv.paste(p2, cx - p2.shape[1] // 2, WT + 2 - p2.shape[0])
+for p, x in zip(figs[:3], (70, 86, 102)):
+    put(flip(p), x, WT + 3 - p.shape[0])
 
-cv.paste(h3, hx, hy)
+# --- Mauer mit Tor + Boden (Hintergrund i253) ----------------------------------------------------------------
+bg = compose(B, [253])
+L0, X0 = 58, 318                                # Zinnenkante / linke Kante des Ausschnitts
+wall = bg[L0:L0 + 175 - WT, X0:X0 + 125].copy()
+GYn = 128 - L0                                   # Bodenlinie im Ausschnitt
+dirt = bg[130:168, X0:X0 + 125]                  # sauberer Erdstreifen (ohne Steinbrocken), nach unten gekachelt
+for j in range(GYn + 2, wall.shape[0]):
+    wall[j] = dirt[(j - GYn - 2) % dirt.shape[0]]
+wall[..., 3] = 255
+# Mauer abendlich kühler, Boden wärmer-dunkel
+wall[:GYn, :, :3] = (wall[:GYn, :, :3] * np.array([0.78, 0.76, 0.88])).astype(np.uint8)
+for j in range(GYn, wall.shape[0]):
+    f = 0.5 + 0.22 * (j - GYn) / (wall.shape[0] - GYn)
+    wall[j, :, :3] = (wall[j, :, :3] * np.array([f, f * 0.95, f * 0.9])).astype(np.uint8)
+put(wall, 0, WT)
+GY = WT + GYn                                    # Bodenlinie native
 
-# Fragezeichen / Ausrufezeichen aus „See throug the Ruse“ (i199) über den Schützen
-from xcfkit import bbox as _bb
-ruse = parts(compose(B, [199]), dil=1)
-def trim_(q):
-    b = _bb(q); return q[b[1]:b[3], b[0]:b[2]]
-qm = trim_(ruse[1][0:11].copy())          # „?“ samt Punkt
-for q, (cx, y0) in ((qm, (AX[0], 36)), (qm, (AX[2] + 4, 30))):
-    q2 = up(q, 2)
-    cv.paste(q2, cx - q2.shape[1] // 2 + 6, y0)
+# --- Schatten + Pferd ------------------------------------------------------------------------------------
+horse = sprite('h48_horse', B, [201])
+HX, HB = 6, 157                                  # Radunterkante (Zeile 83 im Sprite) bei HB
+hy = HB - 83
+for y in range(HB - 2, HB + 2):
+    for x in range(HX + 2, HX + 70):
+        if ((x - HX - 36) / 36) ** 2 + ((y - HB) / 2.5) ** 2 < 1:
+            N[y, x, :3] = (N[y, x, :3] * 0.55).astype(np.uint8)
+put(horse, HX, hy)
 
-vignette(cv, 0.45, 0.62)
+# --- ratlose Torwachen vor dem Tor ----------------------------------------------------------------------------
+ruse = parts(compose(B, [199]), dil=1)[1]       # beide Wachen samt „?“ (hängen zusammen)
+import cv2
+lab = cv2.connectedComponentsWithStats((ruse[..., 3] > 0).astype(np.uint8), connectivity=8)[1]
+q1 = np.isin(lab, [1, 2])                        # „?“ der oberen Wache
+q2 = np.zeros_like(q1); q2[21:, 7:] = q1[:-21, :-7]   # gleiches „?“ der unteren Wache (liegt über der oberen)
+g1 = ruse.copy(); g1[~(np.isin(lab, [1, 2, 3]) & ~q2)] = 0
+g2 = ruse.copy(); g2[~(np.isin(lab, [4, 5]) | q2)] = 0
+g1, g2 = trim(g1), trim(g2)
+for g, x, feet in ((g1, 86, 150), (g2, 103, 156)):
+    for y in (feet - 1, feet):
+        for xx in range(x + 1, x + g.shape[1] - 1):
+            N[y, xx, :3] = (N[y, xx, :3] * 0.6).astype(np.uint8)
+    put(g, x, feet - g.shape[0])
+
+cv.paste(up(N, 2), 0, 0)
+vignette(cv, 0.4, 0.62)
 save(cv, '48_trojan_gift.png')

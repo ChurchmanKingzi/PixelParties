@@ -100,3 +100,36 @@ def keep(key, s):
     from PIL import Image
     Image.fromarray(s).save(os.path.join(xcfkit.CACHE, key + '.png'))
     return s
+
+
+# --- Runde 3b: auf dem nativen Raster komponieren, dann einheitlich hochskalieren ---------------------
+def native(k, color=(0, 0, 0)):
+    """Leinwand im nativen Raster für Skalierung k (250×350 / k, aufgerundet)."""
+    return Canvas(-(-250 // k), -(-350 // k), color)
+
+
+def finish(nc, k, cx=None, cy=None):
+    """Native Leinwand k-fach vergrößern und mittig (bzw. um cx/cy) auf 250×350 zuschneiden."""
+    u = np.repeat(np.repeat(nc.a, k, 0), k, 1)
+    h, w = u.shape[:2]
+    x0 = (w - 250) // 2 if cx is None else cx
+    y0 = (h - 350) // 2 if cy is None else cy
+    cv = Canvas(250, 350)
+    cv.a[:] = u[y0:y0 + 350, x0:x0 + 250]
+    return cv
+
+
+def dgrad(nc, y0, y1, cols, x0=0, x1=None):
+    """Geditherter Verlauf direkt im nativen Raster (Pixelgröße = Skalierung der Ebene)."""
+    dither_grad(nc, y0, y1, cols, x0=x0, x1=x1, pix=1)
+
+
+def blob(nc, cx, cy, rx, ry, col, strength=1.0, bayer=None):
+    """Geditherte Ellipse (weicher Rand über geordnetes Dithering) im Raster der Leinwand."""
+    bayer = BAYER8 if bayer is None else bayer
+    yy, xx = np.mgrid[0:nc.h, 0:nc.w]
+    d = np.hypot((xx - cx) / rx, (yy - cy) / ry)
+    t = np.clip(1 - d, 0, 1) * strength
+    m = t * 2.2 > bayer[yy % 8, xx % 8] + 0.05
+    nc.a[m] = col
+    return m

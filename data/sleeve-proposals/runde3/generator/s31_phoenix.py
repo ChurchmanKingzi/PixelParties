@@ -1,69 +1,64 @@
 # -*- coding: utf-8 -*-
-"""31 Phönix-Aufstieg – Prinzessin Mary steigt mit Phönixflügeln aus einer Flammensäule in den rosa Himmel.
+"""31 Phönix-Aufstieg – Prinzessin Mary steigt in Phönixgestalt aus einer Feuersäule über dem Altar der
+Tempelinsel in den rosa Himmel, Feuervögel begleiten sie, ein Strahlenkranz leuchtet hinter ihr.
+
+Runde 3b: vorher Mary 3×, Flammenkranz 2×, Feuerschweif 3× (gedreht, wirkte wie Blutstropfen), Vögel 3×+2×,
+Insel/Himmel 1×. Jetzt alles einheitlich 3×; die Feuersäule ist der Flammenkranz „Mary #3“ selbst, der vom Altar
+aufsteigt (kein zweckentfremdeter Schweif mehr). Strahlen im selben 3×-Raster gedithert.
 
 Quellen (MotiveMoe.xcf):
   - Ebene 556 „Hintergrund-Kopie #1“: rosa Wolkenhimmel (Karte „Cute Princess Mary“)
-  - Ebene 486 „Mary-Kopie“ + 487 „Mary #1“: Mary in Phönixgestalt mit Flügeln (Karte „Cute Princess Mary“), 3x
-  - Ebene 488 „Mary #3“: Flammenkranz, 2x (etwas röter umgefärbt)
-  - Ebene 417 „Phoenix Tackle #2“: Feuerschweif (Karte „Phoenix Tackle“), um 90° gedreht, 3x
-  - Ebene 478 „Relic-Insel“: schwebende Tempelinsel unten (rosa getönt)
-  - Ebene 220 „Ebene #105“: kleine Feuervögel (Karte „Victory Phoenix Cannon“), 3x
-  Strahlenkranz: gedithert, selbst erstellt in den Orangetönen der Karte.
+  - Ebene 486 „Mary-Kopie“ + 487 „Mary #1“: Mary mit Phönixflügeln (Karte „Cute Princess Mary“;
+    Regel-B-Vergleich mit „Sichtbar #169“: vollständig)
+  - Ebene 488 „Mary #3“: Flammenkranz/Feuersäule
+  - Ebene 478 „Relic-Insel“: Tempelplatz mit Säulen und Altarstein (leicht rosa getönt)
+  - Ebene 220 „Ebene #105“: kleine Feuervögel (Karte „Victory Phoenix Cannon“)
+Skalierung: alles 3× (Szene im nativen Raster 84×117 gebaut und als Ganzes verdreifacht).
 """
 from common import *
+from e_util import upcanvas, small_canvas
 import numpy as np, math
 
 F = 'MotiveMoe'
-W_, H_ = 250, 350
+K = 3
 
 
 def build():
-    cv = Canvas(W_, H_)
-    sky = layer(F, 556)[63:376, 100:350, :3]           # 313 Zeilen
-    ext = sky[::-1][:H_ - sky.shape[0]]
-    cv.a[:] = np.concatenate([sky, ext], 0)
-
-    # Strahlenkranz um die Mitte (Farbe wie im Kartenhintergrund)
-    CX, CY = 125, 128
-    Y, X = np.mgrid[0:H_, 0:W_]
+    cv = small_canvas(K)                           # 84×117
+    H, W = cv.a.shape[:2]
+    sky = layer(F, 556)[64:64 + H, 150:150 + W, :3]
+    cv.a[:] = sky
+    CX, CY = 42, 40
+    Y, X = np.mgrid[0:H, 0:W]
+    # Strahlenkranz
     ang = np.arctan2(Y - CY, X - CX)
     r = np.hypot(X - CX, Y - CY)
-    wedge = (np.floor((ang + math.pi) / (2 * math.pi / 24)).astype(int) % 2) == 0
-    t = np.clip(1 - r / 230.0, 0, 1) * 0.85
+    wedge = (np.floor((ang + math.pi) / (2 * math.pi / 20)).astype(int) % 2) == 0
+    t = np.clip(1 - r / 90.0, 0, 1) * 0.9
     lit = wedge & (t > BAYER4[Y % 4, X % 4])
     a = cv.a.astype(float)
-    a[lit] = a[lit] * 0.45 + np.array((255, 170, 80)) * 0.55
+    a[lit] = a[lit] * 0.45 + np.array((255, 176, 90)) * 0.55
     cv.a[:] = a.astype(np.uint8)
 
-    # Relic-Insel unten (dunstig rosa), von der Mary aufsteigt
+    # Tempelinsel unten: Mary ist bereits über den Säulen des Tempelplatzes aufgestiegen
     relic = compose(F, [478])
-    cv.paste(tint(relic, (240, 90, 200), 0.3), CX - relic.shape[1] // 2, 256)
+    relic = tint(relic, (240, 110, 200), 0.18)
+    cv.paste(relic, CX - 105, 80)
 
-    # Flammenkranz 2x hinter Mary
-    burst = compose(F, [488])
-    burst = hsv_shift(burst, -8, 1.0, 0.92)            # etwas röter/dunkler, damit die Flügel abheben
-    B2 = up(burst, 2)
-    cv.paste(B2, CX - B2.shape[1] // 2, CY - 150)
+    # Flammenkranz hinter Mary (die offene Mitte wird von ihrem Körper gefüllt)
+    burst = hsv_shift(compose(F, [488]), -10, 1.05, 0.86)   # 104×152, röter/dunkler: Flügel heben sich ab
+    cv.paste(burst, CX - burst.shape[1] // 2, 70 - burst.shape[0])
 
-    # Feuerschweif unter Mary (3x, gedreht)
-    trail = rot90(compose(F, [417]), -1)                # Feuerschweif, helles Ende oben
-    T3 = up(trail, 3)
-    cv.paste(T3, CX - T3.shape[1] // 2 + 2, CY + 72)
+    # Feuervögel
+    bird = sprite('e31_firebird', F, [220])        # 12×20
+    cv.paste(bird, 3, 70)
+    cv.paste(flip(bird), 61, 62)
 
-    # kleine Feuervögel begleiten sie
-    bird = sprite('e31_firebird', F, [220])
-    b3 = up(bird, 3)
-    cv.paste(b3, 16, 214)
-    cv.paste(flip(b3), 176, 196)
-    cv.paste(up(bird, 2), 44, 258)
-    cv.paste(flip(up(bird, 2)), 176, 244)
-
-    # Mary mit Phönixflügeln 3x
-    mary = sprite('e31_mary_phoenix', F, [486, 487])
-    M4 = up(mary, 3)
-    cv.paste(M4, CX - M4.shape[1] // 2, CY - 80)
+    # Mary mit Phönixflügeln
+    mary = sprite('e31_mary_phoenix', F, [486, 487])   # 57×78
+    cv.paste(mary, CX - mary.shape[1] // 2, 8)
     vignette(cv, 0.3, 0.62)
-    return cv
+    return upcanvas(cv, K)
 
 
 if __name__ == '__main__':

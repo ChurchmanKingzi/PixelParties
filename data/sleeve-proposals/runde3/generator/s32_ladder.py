@@ -1,51 +1,57 @@
 # -*- coding: utf-8 -*-
-"""32 Leiter zum Himmel – am Rand der Hausinsel hängt eine Strickleiter ins Nichts; ein Kletterer steigt
-herauf, der Himmelsarchäologe wartet oben mit der Spitzhacke, tief unten treiben Wolken und Inseln.
+"""32 Leiter zum Himmel – Vertigo-Blick über die Kante der Hausinsel: die Leiter hängt ins Nichts, ein
+Kletterer steigt herauf, oben gräbt der Himmelsarchäologe auf festem Grasboden, unten nur Himmel, Wolken und
+Fledermaus-Häschen.
+
+Runde 3b: Archäologe schlug vorher mit erhobener Spitzhacke über die Inselkante ins Leere. Jetzt die
+grabende Pose aus „Mine Mine Mine“ (Spitzhacke unten, Spitze steckt im Gras) auf der Grasfläche links vom
+Steinpfad, deutlich von der Kante entfernt. Einheitlich 3× (vorher Himmel/Wolken 1×, Häschen 2×/1×).
 
 Quellen (MotiveMoe.xcf):
   - Ebene 457 „Hausinsel“ + 449 „Ladder to the Sky“ (Leiter mit Kletterer) in Originallage zusammengesetzt,
-    wie auf der Karte „Ladder to the Sky“, 3x
-  - Ebene 553 „Hintergrund“: Himmel mit Wolken (1x); Ebene 122 „Ebene #64“: Wolken unter der Insel
-  - Ebene 461 „Sky Archeologist“: Archäologe mit Spitzhacke (Karte „Sky Archeologist“), 3x
-  - Ebene 429 „Cute Bunny #1“: fliegende Fledermaus-Häschen
+    wie auf der Karte „Ladder to the Sky“
+  - Ebene 459 „Mine Mine Mine“: rechter Teil = Sky Archeologist beim Graben (Szene „Sichtbar #14“; Regel-B-
+    Prüfung: Figur vollständig, einzige Nachbarebene 467 ist der Herz-Bogen einer anderen Figur)
+  - Ebene 553 „Hintergrund“: Himmel mit Wolken; Ebene 122 „Ebene #64“: einzelne Wolke unter der Insel
+  - Ebene 429 „Cute Bunny #1“: Fledermaus-Häschen (Karte „Cute Bunny“)
+Skalierung: alles 3× (Szene im nativen Raster 84×117 gebaut und als Ganzes verdreifacht).
 """
 from common import *
+from e_util import upcanvas, small_canvas
 import numpy as np
 
 F = 'MotiveMoe'
-W_, H_ = 250, 350
+K = 3
 
 
 def build():
-    cv = Canvas(W_, H_)
+    cv = small_canvas(K)                              # 84×117
+    H, W = cv.a.shape[:2]
     sky = layer(F, 553)
-    cv.a[:] = sky[220:220 + H_, 20:20 + W_, :3]
+    cv.a[:] = sky[300:300 + H, 250:250 + W, :3]
     SKY = tuple(int(v) for v in sky[300, 5, :3])
 
-    # tief unten: Wolken (Ebene 122) treiben unter der Insel
-    cl = compose(F, [122])
-    cv.paste(tint(cl, SKY, 0.15), 120, 300)
-    cv.paste(flip(tint(cl, SKY, 0.3)), -70, 236)
+    # eine Wolke tief unten, leicht im Dunst
+    cl = compose(F, [122])                           # 36×133
+    cv.paste(tint(cl, SKY, 0.2), -30, 96)
 
-    # Insel mit Leiter 3x: Ausschnitt so, dass der Pfad zur Kante und die Leiter im Bild sind
-    comp = compose(F, [449, 457], crop=False)
-    x0, y0 = 177, 326
-    win = comp[y0:y0 + 117, x0:x0 + 84]
-    W3 = up(win, 3)
-    cv.paste(W3, 0, 0)
-
-    # Archäologe wartet an der Kante (3x), schaut hinunter
-    arch = sprite('e32_archeologist', F, [461])
-    A3 = up(arch, 3)
-    cv.paste(A3, 148, 6)
-
-    # fliegende Häschen
+    # Fledermaus-Häschen unter der Insel (hinter der Leiter)
     bun = parts(sprite('e32_batbunnies', F, [429]), dil=0)
-    cv.paste(up(bun[0], 2), 12, 270)
-    cv.paste(flip(up(bun[1], 2)), 176, 214)
-    cv.paste(up(bun[2], 1), 200, 318)
+    cv.paste(flip(bun[2]), 48, 72)
+    cv.paste(bun[0], 4, 92)
+
+    # Insel mit Leiter (Originallage)
+    comp = compose(F, [449, 457], crop=False)
+    x0, y0 = 169, 309
+    win = comp[y0:y0 + H, x0:x0 + W]
+    cv.paste(win, 0, 0)
+
+    # Archäologe gräbt auf dem Gras links vom Pfad (Spitzhacke trifft Grasboden)
+    arch = parts(sprite('e32_archeologist_dig', F, [459]), dil=1)[2]   # 29×17
+    cv.paste(arch, 6, 2)
+
     vignette(cv, 0.3, 0.62)
-    return cv
+    return upcanvas(cv, K)
 
 
 if __name__ == '__main__':

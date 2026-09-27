@@ -1,59 +1,75 @@
 # -*- coding: utf-8 -*-
-"""Sleeve 23 – „Generals' Duel“: Spiegelkomposition – Garius (Rom) und Tharx (Sparta) stehen sich vor dem
-Tempel gegenüber, Tharx fordert mit ausgestrecktem Arm heraus; im Vordergrund sieht man die Legion von hinten.
+"""Sleeve 23 – „Generals' Duel“: Tharx steht oben in der Loggia des Tempels und zeigt herausfordernd auf
+Garius (rechts); der römische Feldherr hält unten vor der Säulenhalle Schild und Speer bereit, vorn steht seine Legion
+(von hinten, dem Tempel zugewandt) – dieselbe Anordnung Legion-vor-Garius wie auf seiner Karte.
 
-Quellen (MotiveGrailWar.xcf): Ebene 228 „Ebene #298“ (Himmel mit Wolken und Pflasterplateau, 2×),
-227 „Ebene #301“ (Tempel, 2×), 216 „Garius“ (5×), 224 „Tharx-Kopie“ (Tharx mit ausgestrecktem Arm; die
-Zeilen mit dem grauen Sockelbalken durch die Füße aus 225 „Tharx“ ersetzt, gespiegelt, 5×),
-214 „Legionäre“ (von hinten, 3×). Karten: Garius the Great Reformer, Tharx the Never-Losing General.
+Runde 3b: ALLES einheitlich 3× (natives Raster 84×117, am Ende verdreifacht). Vorher standen 5×-Generäle
+hinter einer 3×-Legion (Vordergrund kleiner als Mittelgrund) – das ist behoben: Legion, Garius, Tharx,
+Tempel und Himmel haben dieselbe Pixelgröße, die Staffelung entsteht nur durch Überdeckung.
+
+Quellen (MotiveGrailWar.xcf): Ebene 226 „Ebene #304“ (Tempel mit Loggia; Dachziegel in Draufsicht entfernt,
+damit der Giebel vor dem Himmel steht), 224 „Tharx-Kopie“ (Tharx mit Zeigearm, in seiner Original-Lage zur
+Loggia aus der xcf, gespiegelt mit dem Tempel), 216 „Garius“ (mit Schild und Speer), 214 „Legionäre“,
+228 „Ebene #298“ (Himmel mit Wolken). Karten: Garius the Great Reformer, Tharx the Never-Losing General.
 """
 import numpy as np
+import cv2
 from d_util import *  # noqa
 
-cv = Canvas(250, 350)
-sky = region(B, [228], (408, 200, 533, 375))
-fill_bg(cv, sky, 2)
-# Pflaster-Plateau als Boden
-floor = region(B, [228], (95, 100, 220, 200))
-fill_bg(cv, floor, 2, 0, 190)
-# Kante zwischen Tempelstufe und Platz: dunkle Linie
-cv.a[190:192, :] = (70, 60, 70)
+K = 3
+nc = native(K)
+W, H = nc.w, nc.h
+TX0, TY0 = 302, 12                 # Tempel 226, native Ecke
+OX, OY = -20, -20                  # Lage des Tempels: Loggia links der Mitte
+yy, xx = np.mgrid[0:H, 0:W]
 
-temple = sprite('d23_temple', B, [227]).copy()
-# Dachziegel (Draufsicht) entfernen → nur Giebel + Säulenhalle als Frontansicht vor dem Himmel
-import cv2
+# --- Himmel: Verlauf + Wolken aus Ebene 228 -------------------------------------------------------------
+dgrad(nc, 0, 70, [(0, 60, 180), (0, 82, 200), (40, 120, 220)])
+sky = region(B, [228], (440, 196, 440 + W, 196 + 20))
+cl = sky[..., :3].astype(int).min(-1) > 120                   # nur die Wolkenpixel
+for (dx, dy) in [(-10, 0), (30, 12)]:
+    ys, xs = np.where(cl)
+    ok = (ys + dy >= 0) & (ys + dy < H) & (xs + dx >= 0) & (xs + dx < W)
+    nc.a[ys[ok] + dy, xs[ok] + dx] = sky[ys[ok], xs[ok], :3]
+
+# --- Tempel: Dachziegel (orange Draufsicht) entfernen → Giebel vor dem Himmel ---------------------------
+temple = region(B, [226], (TX0, TY0, TX0 + 106, TY0 + 115)).copy()
 hsv = cv2.cvtColor(temple[..., :3].reshape(-1, 1, 3), cv2.COLOR_RGB2HSV_FULL).reshape(temple.shape[:2] + (3,))
 roof = (hsv[..., 1] > 90) & (temple[..., 0].astype(int) > temple[..., 2].astype(int) + 30)
 n, lab, st, _ = cv2.connectedComponentsWithStats(roof.astype(np.uint8), connectivity=8)
-big = [i for i in range(1, n) if st[i, cv2.CC_STAT_AREA] > 30]
-roofm = np.isin(lab, big)
-# auch die dunklen Fugen zwischen den Ziegeln (umschlossen von Dach) entfernen
+roofm = np.isin(lab, [i for i in range(1, n) if st[i, cv2.CC_STAT_AREA] > 30])
 roofm = cv2.morphologyEx(roofm.astype(np.uint8), cv2.MORPH_CLOSE, np.ones((3, 3), np.uint8)) > 0
-temple[roofm, 3] = 0
-temple = hsv_shift(temple, 0, 0.9, 0.95)
+# alles oberhalb der Giebelkante weg (auch dunkle Fugen)
+for x in range(temple.shape[1]):
+    ys = np.where(roofm[:, x])[0]
+    if len(ys): temple[:ys.max() + 1, x, 3] = 0
 keep('d23_temple_front', temple)
-put(cv, temple, 125, 200, 2, anchor='b')
+# Säulenhalle nach unten bis zum Platz verlängern ist nicht nötig: Unterkante liegt bei y = 115 + OY
+nc.paste(temple, OX, OY)
+# Pflaster-Platz unter der Säulenhalle (Ebene 228, Pflasterfläche)
+pl = region(B, [228], (100, 108, 100 + W, 108 + 30))
+py0 = OY + 115
+nc.a[py0:, :] = pl[:H - py0, :, :3]
+nc.a[py0, :] = (70, 60, 70)
 
-# Tharx: Oberkörper mit Zeigearm (224), Beine ohne Sockelbalken (225)
-L224 = compose(B, [224], crop=False); L225 = compose(B, [225], crop=False)
-th = L224.copy(); th[92:] = L225[92:]
-th = th[60:99, 343:370]
-th = th[:, np.where(th[..., 3].any(0))[0].min():np.where(th[..., 3].any(0))[0].max() + 1]
-keep('d23_tharx', th)
+# --- Tharx in der Loggia (Original-Lage 224 relativ zu 226) ---------------------------------------------
+tharx = compose(B, [224], crop=False)[TY0:TY0 + 115, TX0:TX0 + 106].copy()
+# Beine unterhalb der Brüstung (grauer Balken) verdeckt die Loggia-Brüstung → abschneiden
+g = tharx[..., :3].astype(int)
+bar = (tharx[..., 3] > 0) & (np.abs(g[..., 0] - g[..., 2]) < 12) & (g.max(-1) > 110)
+bar_rows = np.where(bar.sum(1) >= 8)[0]
+tharx[bar_rows.max() + 1:] = 0
+keep('d23_tharx_loggia', tharx)
+nc.paste(tharx, OX, OY)
+
+# --- Garius vor der Säulenhalle, rechts; die Legion davor (von hinten) --------------------------------------
 garius = sprite('d23_garius', B, [216])
-
-k = 5
-GY = 300                                          # Standlinie
-put(cv, garius, 0, GY - garius.shape[0] * k, k, shadow=(40, 34, 40), sh_off=(2, 1), sh_alpha=0.45)
-tx = 250 - th.shape[1] * k + 6
-put(cv, th, tx, GY - th.shape[0] * k, k, fl=True, shadow=(40, 34, 40), sh_off=(-2, 1), sh_alpha=0.45)
-
-# Legion von hinten als Vordergrund-Reihe (symmetrisch zugeschnitten)
+gx, gy = W - 29, H - 36 - 22
+blob(nc, gx + 13, gy + 33, 11, 2, (60, 52, 60), 1.0)
+nc.paste(garius, gx, gy)
 leg = sprite('d23_legion', B, [214])
-L = up(leg, 3)
-off = (L.shape[1] - 250) // 2
-cv.paste(L[:, off:off + 250], 0, 350 - 74)
+nc.paste(leg, (W - leg.shape[1]) // 2, H - leg.shape[0])
 
-vignette(cv, 0.35, 0.65)
-frame(cv, [(40, 10, 10), (220, 180, 70), (150, 30, 30)])
+vignette(nc, 0.3, 0.7)
+cv = finish(nc, K)
 print(save(cv, '23_generals_duel.png'))

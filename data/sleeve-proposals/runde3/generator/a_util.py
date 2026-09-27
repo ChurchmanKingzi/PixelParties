@@ -83,3 +83,33 @@ def glow_seg(cv, x0, y0, x1, y1, r, col, strength=0.4):
             q = math.floor((1 - d) ** 1.5 * strength * 4 + BAYER4[y % 4, x % 4]) / 4
             q = min(q, strength)
             if q > 0: cv.a[y, x] = (cv.a[y, x] * (1 - q) + col * q).astype(np.uint8)
+
+
+# --- Runde 3b: einheitliches Pixelraster ------------------------------------------------------
+def lowres(G):
+    """Leinwand im Raster G (jede Zelle = G×G Pixel des 250×350-Rasters)."""
+    return Canvas(-(-250 // G), -(-350 // G))
+
+
+def blow(cv, lo, G, alpha_keep=False):
+    """Raster-G-Leinwand ganzzahlig vergrößert auf die 250×350-Leinwand übertragen."""
+    big = np.repeat(np.repeat(lo.a, G, 0), G, 1)[:cv.h, :cv.w]
+    cv.a[:big.shape[0], :big.shape[1]] = big[..., :3]
+
+
+def rim_light(s, col, dx, dy, t=0.55):
+    """Kantenlicht: deckende Pixel, deren Nachbar in Richtung (dx,dy) leer ist, zur Lichtfarbe hin mischen."""
+    a = s[..., 3] > 0
+    sh = np.zeros_like(a)
+    h, w = a.shape
+    ys, xs = np.nonzero(a)
+    ny, nx = ys + dy, xs + dx
+    ok = (ny < 0) | (ny >= h) | (nx < 0) | (nx >= w)
+    inside = ~ok
+    empty = np.zeros(len(ys), bool)
+    empty[ok] = True
+    empty[inside] = ~a[ny[inside], nx[inside]]
+    out = s.copy()
+    sel = (ys[empty], xs[empty])
+    out[sel[0], sel[1], :3] = (out[sel[0], sel[1], :3] * (1 - t) + np.array(col) * t).astype(np.uint8)
+    return out

@@ -1,61 +1,65 @@
 # -*- coding: utf-8 -*-
-"""Sleeve 03 – Niu hält Wache (Close-up vor der Palastmauer).
+"""Sleeve 03 – Niu hält Wache (Runde 3b überarbeitet: Porträt-Anschnitt statt schwebender Halbfigur).
 
-Guardian Beast Niu hat ihre beiden Lichtklingen in den Boden des Palasthofes gerammt, der
-Boden reißt schwarz auf. Hinter ihr die orangefarbene Hofmauer mit dem vergitterten Tor und
-der Nachthimmel. Großes Close-up (6×), wie sleeve2.
-Quellen (MotiveGuardianBeasts.xcf): Niu #3 [80] (Niu mit Klingen), Niu #2 [81] (Bodenrisse),
-Guard Duty #1 [54] (Himmel, Hofmauer, vergittertes Tor, Hofboden – ohne die FPS-Einblendung).
+Brustbild der Guardian Beast Niu mit ihren zwei Lichtklingen, unten vom Bildrand angeschnitten wie ein
+Porträt (der Rumpf endet – wie auf der Karte – am Rand; diese Kante liegt jetzt auf dem Bildrand).
+Hinter ihr die nächtliche Hofmauer mit dem vergitterten Tor (Karte „Guard Duty“); die Klingen werfen
+kaltes Licht auf das Mauerwerk.
+
+Skalierung: Niu 6× (Vordergrund, einziges Element in dieser Tiefe). Hintergrund einheitlich 3×
+(Himmel, Sterne, Hofmauer, Tor, Hofboden, Lichtschein der Klingen – alles im 3×-Raster gebaut).
+Die Bodenrisse der alten Fassung (3× neben 6×-Klingen) sind entfernt.
+
+Quellen (MotiveGuardianBeasts.xcf): Niu #3 [80] (Niu mit Klingen, vollständig lt. Sichtbar #27 – dort
+ebenfalls unten vom Kartenrand angeschnitten), Guard Duty #1 [54] (Hofmauer, Tor, Hofboden).
+Himmel/Sterne/Lichtschein: selbst erstellt (Himmel der Vorlage ist weichgezeichnet → ersetzt).
 """
 from a_util import *  # noqa
 
 B = 'MotiveGuardianBeasts'
 cv = Canvas(250, 350)
+G = 3
+lo = lowres(G)                                   # 84×117
 
 court = compose(B, [54], crop=False)
-niu = sprite('a03_niu', B, [80])               # Niu mit beiden Lichtklingen (26×45)
-cracks = parts(sprite('a03_cracks', B, [81]), dil=1)   # zwei Bodenrisse (links, rechts)
+niu = sprite('a03_niu', B, [80])                 # 26×45
 
-# --- Himmel (2×), Nachtstimmung ----------------------------------------------------------
-sky = court[22:84, 0:125].copy()              # 125×62, mit Wolken
-blit_rgb(cv, sky, 0, -20, 2)
+# --- Himmel (3×-Raster) ------------------------------------------------------------------------------
+vgrad(lo, 0, 36, [(4, 6, 24), (10, 16, 48), (22, 34, 82)])
+rng = np.random.RandomState(11)
+for _ in range(34):
+    x, y = rng.randint(0, 84), rng.randint(0, 30)
+    lo.px(x, y, (200, 210, 255) if rng.rand() < .3 else (110, 120, 180))
 
-# --- Hofmauer (3×): Zinnenband + Ziegel, Tor rechts ----------------------------------------
-band = court[98:144, 52:136].copy()           # 84×46, sauber (rechts vom FPS-Text)
-blit_rgb(cv, band, -1, 96, 3)
-gate = court[110:144, 146:164].copy()         # vergittertes Tor mit Schädelwappen
-blit_rgb(cv, gate, 196, 138, 3)
+# --- Hofmauer, Tor, Boden (Originalpixel, 3×) ------------------------------------------------------------
+WY = 32
+band = court[98:144, 52:136].copy()               # 84×46 Mauerband mit Zinnenkante (ohne FPS-Anzeige)
+lo.paste(np.dstack([band[..., :3], np.full(band.shape[:2], 255, np.uint8)]), 0, WY)
+gate = court[110:144, 146:164].copy(); gate[..., 3] = 255
+lo.paste(gate, 84 - 16, WY + 12)
+floor = court[146:186, 118:202].copy(); floor[..., 3] = 255
+lo.paste(floor, 0, WY + 46)
 
-# --- Hofboden (3×) --------------------------------------------------------------------------
-floor = court[146:186, 118:202].copy()      # Hofboden ohne Rasen
-blit_rgb(cv, floor, -1, 234, 3)
+# Nacht: Mauer/Boden abdunkeln und bläulich tönen
+reg = lo.a[WY:].astype(float)
+reg = reg * 0.3 + np.array([14, 20, 60]) * 0.3
+lo.a[WY:] = reg.clip(0, 255).astype(np.uint8)
 
-# Nachtstimmung: Mauer und Boden abdunkeln und bläulich tönen, zur Mitte hin etwas heller
-yy, xx = np.mgrid[0:350, 0:250]
-d = np.hypot((xx - 125) / 125, (yy - 200) / 175)
-f = np.clip(0.78 - 0.35 * d, 0.38, 0.8)
-night = cv.a * f[..., None] * 0.8 + np.array([18, 24, 70]) * 0.2
-cv.a[96:] = night[96:].astype(np.uint8)
-cv.a[:96] = (cv.a[:96] * 0.8).astype(np.uint8)
-
-# --- Niu ---------------------------------------------------------------------------------------
+# --- Lichtschein der Klingen (im 3×-Raster) --------------------------------------------------------------
 K = 6
-x0, y0, _, _ = put(cv, niu, 125, 300, K, anchor='b')
-# Klingenspitzen finden, Bodenrisse (3×) dort ansetzen
+nx0 = 125 - niu.shape[1] * K // 2
+ny0 = 350 - 42 * K                               # Rumpf endet in Zeile 41 → liegt auf dem Bildrand (Klingen laufen darüber hinaus)
 white = (niu[..., :3].min(-1) > 170) & (niu[..., 3] > 0)
-cols = np.where(white.sum(0) >= 10)[0]           # nur lange, helle Klingen-Spalten
-tipL, tipR = cols[cols < niu.shape[1] // 2], cols[cols >= niu.shape[1] // 2]
-tips = []
-for tc in (tipL, tipR):
-    tx = x0 + int((tc.min() + tc.max() + 1) / 2 * K)
+cols = np.where(white.sum(0) >= 10)[0]
+for tc in (cols[cols < niu.shape[1] // 2], cols[cols >= niu.shape[1] // 2]):
+    tx = (nx0 + (tc.min() + tc.max() + 1) / 2 * K) / G
     rows = np.where(white[:, tc].any(1))[0]
-    tips.append((tx, y0 + rows.min() * K, y0 + (rows.max() + 1) * K))
-for tx, top, ty in tips:
-    glow_seg(cv, tx, top, tx, ty, 30, (235, 220, 255), 0.42)
-for (tx, top, ty), cr in zip(tips, cracks):
-    put(cv, cr, tx - cr.shape[1] * 3 // 2, ty - 10, 3)
-# Niu nochmals darüber, damit die Klingen vor den Rissen liegen
-put(cv, niu, 125, 300, K, anchor='b')
+    t0, t1 = (ny0 + rows.min() * K) / G, (ny0 + (rows.max() + 1) * K) / G
+    glow_seg(lo, tx, t0, tx, t1, 14, (200, 215, 255), 0.5)
 
-frame(cv, [(20, 10, 4), (120, 60, 20), (240, 190, 90), (20, 10, 4)])
+blow(cv, lo, G)
+
+# --- Niu (6×) ----------------------------------------------------------------------------------------------
+put(cv, niu, nx0, ny0, K)
+
 print(save(cv, '03_niu_wache.png'))

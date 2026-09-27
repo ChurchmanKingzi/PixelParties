@@ -1,102 +1,123 @@
 # -*- coding: utf-8 -*-
-"""Sleeve 33 – „Life Serum“: Blick über die Schulter des Genies Heinz auf seinen größten Versuch.
+"""Sleeve 33 – „Life Serum“: Es lebt! – Heinz' größter Versuch.
 
-Idee: Heinz (jubelnd, Arme hoch, 5×) steht im Vordergrund neben dem riesigen rosa Lebensserum-Tank (4×), in dem
-Chibi-Monia schläft; Blitze schlagen in den Tank, links und rechts weitere Tanks – dazu Batterie und roter Knopf.
-Labor-Wand (Mäander-Paneele) und gestreifter Boden aus dem Labor-Hintergrund.
+Idee: Frankenstein-Moment im Labor. In der Mitte der rosa Lebensserum-Tank, in dem Chibi-Monia schläft; Strom
+knistert an seiner Leitung hinab (selbst gezeichnete Entladungen im 4×-Raster). Links und rechts angeschnittene
+graue Tanks derselben Reihe. Vorn links jubelt Heinz mit erhobenen Armen, vorn rechts Batterie und roter Knopf.
+Rosa Schein des Tanks auf dem Laborboden, Ränder dunkel.
+
+Skalierung: alles 4× (Wand-/Bodenfliesen, Mäanderfries, alle drei Tanks, Monia, Heinz, Batterie, Knopf, Blitze).
+Heinz steht auf demselben Boden etwas vor der Tankreihe (Füße tiefer), nicht daneben in anderer Größe.
 
 Quellen (MotiveGN):
-  - 559 „Hintergrund“: Laborwand (Mäander, y 202–246) und Bodenfliese (16×16)
-  - 551 „Life Serum“: Tanks (rosa x161–190, grau x129–158)
-  - 547 „Chibi-Monia“: Mädchen im Tank (Karte Life Serum)
-  - 500 „Ebene #45“: Heinz jubelnd
-  - 374 „Ebene #118“: Blitze
-  - 555/556 „Ebene #24/#25“: Zahnräder, 504 „Ebene #22“: Laborgeräte (roter Knopf, Batterie)
+  559 „Hintergrund“ (Laborfliese 16×16 bei x176/y272, Mäanderfries y206–222), 551 „Life Serum“ (rosa Tank x274–303,
+  grauer Tank x129–158), 547 „Chibi-Monia“ (liegt im rosa Tank x274, vgl. Karte Life Serum), 500 „Ebene #45“ (Heinz
+  jubelnd), 504 „Ebene #22“ (Laborgeräte: roter Knopf, Batterie)
 """
 from common import *
+from f_util import *
 import numpy as np
 
-B = 'MotiveGN'
-cv = Canvas(250, 350)
-
-# ---------- Hintergrund ----------
-bg = layer(B, 559)
-wall = bg[202:246, 136:136 + 64, :3]           # 2 Perioden Mäander
-floor = bg[272:288, 176:192, :3]               # eine Bodenfliese 16×16
-wall3 = up(np.dstack([wall, np.full(wall.shape[:2], 255, np.uint8)]), 3)
-floor3 = up(np.dstack([floor, np.full(floor.shape[:2], 255, np.uint8)]), 3)
-FLOOR_Y = 236
-# Wand: zwei Paneelreihen übereinander (oben abgedunkelt)
-for r, y0 in enumerate([FLOOR_Y - 132 * 2, FLOOR_Y - 132]):
-    for x0 in range(-20, 250, wall3.shape[1]):
-        cv.paste(darken(wall3, 0.55 if r == 0 else 0.8), x0, y0)
-# dunkle Fußleiste
-cv.rect(0, FLOOR_Y - 3, 250, FLOOR_Y, (40, 40, 44))
-for y0 in range(FLOOR_Y, 350, 48):
-    for x0 in range(-8, 250, 48):
-        cv.paste(darken(floor3, 0.85), x0, y0)
-
-# rosa Schein des Tanks auf Wand/Boden (Dithering)
-CX, CY = 125, 200
-glow = np.array([255, 160, 185])
-yy, xx = np.mgrid[0:350, 0:250]
-d = np.sqrt(((xx - CX) / 1.0) ** 2 + ((yy - CY) / 1.6) ** 2)
-t = np.clip(1 - d / 115, 0, 1) ** 1.5 * 0.5
-q = (np.floor(t * 4 + BAYER4[yy % 4, xx % 4]) / 4)
-cv.a[:] = (cv.a * (1 - q[..., None]) + glow * q[..., None]).clip(0, 255).astype(np.uint8)
-
-# Zahnräder an der Wand
-gears = sprite('f33_gears', B, [555])
-cv.paste(up(darken(gears, 0.75), 2), 196, 60)
-g2 = sprite('f33_gears2', B, [556])
-cv.paste(up(darken(parts(g2)[0], 0.75), 2), 6, 70)
-
-# ---------- Tanks ----------
-tanks = layer(B, 551)
-def tube(x0):
-    t = tanks[150:270, x0:x0 + 30].copy()
-    ys, xs = np.where(t[..., 3] > 0)
-    return t[ys.min():ys.max() + 1, xs.min():xs.max() + 1], ys.min()
-pink, top = tube(161); grey, _ = tube(129)
-GLASS0, GLASS1 = 74 - top, 101 - top          # rosa Glasbereich (Zeilen im zugeschnittenen Tank)
-# Seitentanks (3×, weiter hinten, abgedunkelt)
-gL = up(darken(grey, 0.72), 3)
-cv.paste(gL, -30, FLOOR_Y + 14 - gL.shape[0])
-gR = up(darken(flip(grey), 0.72), 3)
-cv.paste(gR, 250 - gR.shape[1] + 30, FLOOR_Y + 14 - gR.shape[0])
-
-vignette(cv, 0.6, 0.45)   # nur Hintergrund + Seitentanks
-
-# ---------- Blitze (schlagen oben in die Leitung) ----------
-b2 = sprite('f33_bolt2', B, [374])
-cv.paste(up(b2, 2), 125 - 44 - 70 + 30, 8)
-cv.paste(up(flip(b2), 2), 125 + 44 - 30, 0)
-
-# Haupttank 4× mit Mädchen
+G = 'MotiveGN'
 K = 4
-T = up(pink, K)
-TX = 125 - T.shape[1] // 2; TY = 300 - T.shape[0]
-cv.paste(T, TX, TY)
-girl = sprite('f33_girl', B, [547])
-G = up(girl, K)
-gx = 125 - G.shape[1] // 2
-gy = TY + K * (GLASS0 + GLASS1) // 2 - G.shape[0] // 2
-# Mädchen hinter Glas: mit Tankfarbe mischen (harte Maske, keine Halbtransparenz an den Kanten)
-sub = cv.a[gy:gy + G.shape[0], gx:gx + G.shape[1]].astype(float)
-m = G[..., 3] > 0
-mix = G[..., :3] * 0.62 + sub * 0.38
-cv.a[gy:gy + G.shape[0], gx:gx + G.shape[1]][m] = mix[m].astype(np.uint8)
+cv = Canvas(W, H)
+bg = layer(G, 559)
 
-# ---------- Laborgeräte rechts vorn ----------
-tl = parts(sprite('f33_tools', B, [504]), dil=0)
+# ---------- Wand + Boden (4×) ----------
+tile = up(rgba(bg[272:288, 176:192]), K)
+FLOOR = 262                                    # Unterkante der Tanksockel
+WALL = FLOOR - 44                              # Wandfuß (Tanks stehen davor auf dem Boden)
+for y0 in range(WALL, H, 64):
+    for x0 in range(-2, W, 64):
+        cv.paste(darken(tile, 0.62), x0, y0)
+# Wand: ruhige dunkle Laborpaneele (Farbe aus der Fliese), Fugen im 4×-Raster
+cv.rect(0, 0, W, WALL, (44, 44, 50))
+for x0 in range(30, W, 64):
+    cv.rect(x0, 0, x0 + K, WALL, (30, 30, 35))
+    cv.rect(x0 + K, 0, x0 + 2 * K, WALL, (58, 58, 64))
+# Mäanderfries als Wandband (4×)
+frieze = up(rgba(bg[206:222, 136:136 + 32]), K)
+FY = 130
+for x0 in range(-10, W, frieze.shape[1]):
+    cv.paste(darken(frieze, 0.5), x0, FY)
+cv.rect(0, FY - K, W, FY, (24, 24, 28)); cv.rect(0, FY + frieze.shape[0], W, FY + frieze.shape[0] + K, (24, 24, 28))
+cv.rect(0, WALL - K, W, WALL, (22, 22, 26))
+
+# ---------- Tanks (4×) ----------
+tanks = layer(G, 551)
+def tank(x0, x1):
+    t = tanks[161:266, x0:x1].copy()
+    b = bbox(t); return t[b[1]:b[3], b[0]:b[2]]
+pink = tank(274, 304)
+grey = tank(129, 159)
+P = up(pink, K)
+PX, PY = 125 - P.shape[1] // 2, FLOOR - P.shape[0]
+Gr = up(darken(grey, 0.8), K)
+cv.paste(Gr, PX - Gr.shape[1] - 14, FLOOR - Gr.shape[0])
+cv.paste(up(darken(flip(grey), 0.8), K), PX + P.shape[1] + 14, FLOOR - Gr.shape[0])
+
+# rosa Schein (auf dem 4×-Raster gedithert) auf Wand und Boden
+cx, cy, th = grid(K, ox=PX % K, oy=PY % K)
+d = np.sqrt(((cx - 125) / 1.0) ** 2 + ((cy - 180) / 1.4) ** 2)
+shade(cv, np.clip(1 - d / 125, 0, 1) ** 1.2 * 0.4, th * 0 + 0.5, col=(255, 140, 175), levels=6)
+
+cv.paste(P, PX, PY)
+# Monia im Tank (hinter dem Glas: mit Tankfarbe gemischt, harte Maske)
+girl = sprite('f33_girl', G, [547])
+Gm = up(girl, K)
+gx, gy = PX + (282 - 274) * K, PY + (230 - 161) * K - 2 * K
+sub = cv.a[gy:gy + Gm.shape[0], gx:gx + Gm.shape[1]].astype(float)
+m = Gm[..., 3] > 0
+mix = Gm[..., :3] * 0.66 + sub * 0.34
+cv.a[gy:gy + Gm.shape[0], gx:gx + Gm.shape[1]][m] = mix[m].astype(np.uint8)
+
+# ---------- Strom an der Leitung (selbst gezeichnet, 4×-Raster) ----------
+rng = np.random.default_rng(11)
+def cells_line(a, b):
+    (x0, y0), (x1, y1) = a, b
+    n = max(abs(x1 - x0), abs(y1 - y0))
+    return [(round(x0 + (x1 - x0) * i / n), round(y0 + (y1 - y0) * i / n)) for i in range(n + 1)] if n else [a]
+def bolt(x0, y0, x1, y1, amp=3, branch=True):
+    """Zickzack-Blitz aus ganzen 4×-Pixeln von (x0,y0) nach (x1,y1): heller Kern, cyanfarbener Saum."""
+    A_, B_ = (x0 // K, y0 // K), (x1 // K, y1 // K)
+    n = max(2, (B_[1] - A_[1]) // 4)
+    way = [A_]
+    for i in range(1, n):
+        t = i / n
+        way.append((round(A_[0] + (B_[0] - A_[0]) * t + (amp if i % 2 else -amp) * rng.uniform(0.5, 1.0)),
+                    round(A_[1] + (B_[1] - A_[1]) * t)))
+    way.append(B_)
+    pts = []
+    for p0, p1 in zip(way, way[1:]): pts += cells_line(p0, p1)
+    if branch:
+        bx, by = way[n // 2]
+        side = 1 if B_[0] > A_[0] else -1
+        pts_b = cells_line((bx, by), (bx - side * 4, by + 3)) + cells_line((bx - side * 4, by + 3), (bx - side * 3, by + 6))
+        pts += pts_b
+    for (px, py) in pts:
+        for ddx, ddy in [(-1, 0), (1, 0)]:
+            cv.rect((px + ddx) * K, (py + ddy) * K, (px + ddx + 1) * K, (py + ddy + 1) * K, (60, 190, 215))
+    for (px, py) in pts:
+        cv.rect(px * K, py * K, (px + 1) * K, (py + 1) * K, (235, 255, 255))
+CAP = PY + 57 * K                                # Oberkante der Tankkappe (Leitungsanschluss)
+bolt(4, 0, PX + 5 * K, CAP - 2 * K)
+bolt(W - 8, 0, PX + P.shape[1] - 6 * K, CAP - 2 * K)
+
+# ---------- Rand dunkel ----------
+cx, cy, th = grid(K)
+dd = np.sqrt(((cx - 125) / 1.0) ** 2 + ((cy - 200) / 1.35) ** 2)
+shade(cv, np.clip((dd - 110) / 110, 0, 1) * 0.7, th)
+
+# ---------- Vordergrund: Heinz (4×) und Laborgeräte (4×) ----------
+tl = parts(sprite('f33_tools', G, [504]), dil=0)
 btn, bat = tl[1], tl[4]
-cv.paste(up(bat, 4), 192, 236)
-cv.paste(up(btn, 4), 170, 290)
-
-# ---------- Heinz von hinten (Vordergrund) ----------
-heinz = sprite('f33_heinz', B, [500])        # jubelnd, Arme hoch
-Hs = up(heinz, 5)
-cv.paste(silhouette(Hs, (20, 16, 20)), 8 + 3, 342 - Hs.shape[0] + 3, alpha=0.5)
-cv.paste(Hs, 8, 342 - Hs.shape[0])
+B = up(bat, K); ellipse_shadow(cv, 206, 322, 30, 6, K, alpha=0.45); cv.paste(B, 180, 322 - B.shape[0])
+Bt = up(btn, K); ellipse_shadow(cv, 206, 342, 30, 6, K, alpha=0.45)
+put(cv, btn, 176, 344, K, 'bl')
+heinz = sprite('f33_heinz', G, [500])
+Hs = up(heinz, K)
+HX = 20
+ellipse_shadow(cv, HX + Hs.shape[1] / 2, 338, 34, 7, K, alpha=0.45)
+cv.paste(Hs, HX, 340 - Hs.shape[0])
 
 save(cv, '33_life_serum.png')

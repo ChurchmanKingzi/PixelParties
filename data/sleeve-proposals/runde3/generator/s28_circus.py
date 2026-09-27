@@ -1,25 +1,38 @@
 # -*- coding: utf-8 -*-
-"""28 Fun-Fun Manege – der Zirkusdirektor präsentiert seine (unheimlichen) Artisten.
+"""28 Fun-Fun Manege – der Totenkopf-Direktor (Vordergrund) präsentiert seine unheimlichen Artisten in der
+Manege: den blutenden Masken-Elefanten auf seiner Trommel, den Clown auf dem Ball und den Strongman.
+
+Runde 3b:
+  - Zelt, Manege, Lichtkegel und Ballons liegen jetzt im selben 3×-Raster wie die Artisten (vorher 1×-Dithering
+    und 2×-Ballons neben 3×-Figuren). Direktor 6× bleibt – er steht eindeutig im Vordergrund, vom unteren
+    Bildrand angeschnitten, vor der Manege-Bande (Perspektive).
+  - Regel B: Elefant jetzt mit seiner Zirkustrommel (Teil von Ebene 15 „Fun-Fun Elephant #4“), auf der er in der
+    Szene „Sichtbar #176“ sitzt – vorher hingen die Blutspuren in der Luft. Strongman jetzt vollständig: vorher
+    fehlten die Keule (Teil von Ebene 20 „#2“), die Hand (21 „#3“) und die Kette (17 „#4“) – der erhobene Arm
+    endete in einer freischwebenden Faust. Die Aufschrift „1T“ auf der Keulenkugel ist übermalt (kein Text).
 
 Quellen (MotiveMoe.xcf):
-  - Direktor: Ebenen 25 „Fun-Fun Director #2“ (Zylinder), 27 „Fun-Fun Director #1“ (Totenkopfmaske),
-    28 „Fun-Fun Director“ (Körper) – Karte „Fun-Fun Circus Director“
-  - Elefant: Ebenen 10, 11, 12, 13, 14 („Fun-Fun Elephant“, „#1“ Blut, „#2“ Maske, „#3“, „#5“) – Karte „Fun-Fun Circus Elephant“
-  - Strongman: Ebenen 18 „Fun-Fun Strongman #1“ (Maske) + 19 „Fun-Fun Strongman“ – Karte „Fun-Fun Circus Strongman“
+  - Direktor: Ebenen 25 „Fun-Fun Director #2“ (Zylinder), 27 „#1“ (Totenkopfmaske), 28 (Körper) – Karte
+    „Fun-Fun Circus Director“ (Regel B: vollständig lt. „Sichtbar #175“)
+  - Elefant: Ebenen 10–14 + Trommel aus Ebene 15 (Box 241,153–257,162) – Karte „Fun-Fun Circus Elephant“
+  - Strongman: Ebenen 17, 18, 19, 21 + Keule aus Ebene 20 (Box 328,95–345,117) – Karte „Fun-Fun Circus Strongman“
   - Clown auf Ball: Ebene 36 „Fun Circus Clown #1“ – Karte „Fun-Fun Circus Clown“
-  - Luftballons: Ebene 23 „Fun-Fun Strongman #6“
-  Zelt (Streifen), Manege und Scheinwerfer: selbst erstellt in Farben der Karten.
+  - Luftballons: einzelne Ballons aus Ebene 23 „Fun-Fun Strongman #6“, zur Zeltkuppel aufgestiegen
+  Zeltbahnen, Manege, Lichtkegel: selbst erstellt in Kartenfarben (3×-Raster).
+Skalierung: Zelt/Manege/Licht/Ballons/Elefant/Clown/Strongman 3×; Direktor 6× (Vordergrund).
 """
 from common import *
+from e_util import upcanvas, small_canvas, compose_boxes
 import numpy as np, math
 
 F = 'MotiveMoe'
-W_, H_ = 250, 350
+K = 3
 
 
 def cone(cv, apex, left, right, col, t, y1):
+    H, W = cv.a.shape[:2]
     ax, ay = apex
-    Y, X = np.mgrid[0:H_, 0:W_]
+    Y, X = np.mgrid[0:H, 0:W]
     f = (Y - ay) / max(1, (y1 - ay))
     xl = ax + (left - ax) * f; xr = ax + (right - ax) * f
     inside = (Y >= ay) & (Y < y1) & (X >= np.minimum(xl, xr)) & (X <= np.maximum(xl, xr))
@@ -29,71 +42,79 @@ def cone(cv, apex, left, right, col, t, y1):
     cv.a[:] = a.clip(0, 255).astype(np.uint8)
 
 
+def elephant():
+    return compose_boxes(F, [(10, None), (11, None), (12, None), (13, None), (14, None),
+                             (15, (241, 153, 257, 162))])
+
+
+def strongman():
+    s = compose_boxes(F, [(17, None), (18, None), (19, None), (20, (328, 95, 345, 117)), (21, None)])
+    # „1T“ auf der Kugel übermalen: helle Pixel im Kugelbereich (links unten) in Kugelfarbe
+    h, w = s.shape[:2]
+    reg = s[13:24, 0:11]
+    c = reg[..., :3].astype(int)
+    white = (reg[..., 3] > 0) & (c.min(-1) > 170)
+    dark = (reg[..., 3] > 0) & (c.max(-1) < 90) & (c.max(-1) > 25)
+    col = np.median(c[dark], 0).astype(np.uint8) if dark.any() else np.array((40, 40, 40), np.uint8)
+    reg[white, :3] = col
+    return s
+
+
 def build():
-    cv = Canvas(W_, H_, (20, 6, 12))
+    cv = small_canvas(K)                             # 84×117
+    H, W = cv.a.shape[:2]
     RED, DRED, CREAM, DCREAM = (150, 28, 40), (92, 14, 26), (226, 196, 150), (150, 118, 90)
-    # Zeltplane: Bahnen, die zur Zeltspitze (125, -60) zusammenlaufen
-    Y, X = np.mgrid[0:H_, 0:W_]
-    ang = np.arctan2(X - 125, Y + 60)
-    stripe = (np.floor(ang / 0.16).astype(int) % 2) == 0
-    shade = np.clip((Y) / 190.0, 0, 1)   # nach unten dunkler (Zeltwand im Schatten)
+    Y, X = np.mgrid[0:H, 0:W]
     th = BAYER4[Y % 4, X % 4]
+    # Zeltbahnen laufen zur Zeltspitze über dem Bild zusammen
+    ang = np.arctan2(X - 42, Y + 20)
+    stripe = (np.floor(ang / 0.17).astype(int) % 2) == 0
+    shade = np.clip(Y / 63.0, 0, 1)
     col_a = np.where(stripe[..., None], np.array(RED), np.array(CREAM))
     col_b = np.where(stripe[..., None], np.array(DRED), np.array(DCREAM))
-    tent = np.where((shade > th)[..., None], col_b, col_a)
-    cv.a[:] = tent.astype(np.uint8)
-    # Tiefe: Zeltwand unten fast schwarz
-    ordered(cv, 0, 110, W_, 200, (0, 0, 0), (0, 0, 0), lambda x, y: 0)
-    a = cv.a.astype(float)
-    Yd = np.clip((Y - 60) / 110.0, 0, 1)
+    cv.a[:] = np.where((shade > th)[..., None], col_b, col_a).astype(np.uint8)
+    Yd = np.clip((Y - 20) / 37.0, 0, 1)
     q = (np.floor(Yd * 4 + th) / 4).clip(0, 1) * 0.85
-    cv.a[:] = (a * (1 - q[..., None])).astype(np.uint8)
+    cv.a[:] = (cv.a * (1 - q[..., None])).astype(np.uint8)
 
     # Manege: ovaler Sägemehlboden mit rot-weißer Bande
-    cx, cy, rx, ry = 125, 214, 150, 62
+    cx, cy, rx, ry = 42, 72, 52, 21
     d = ((X - cx) / rx) ** 2 + ((Y - cy) / ry) ** 2
     floor = d <= 1
-    saw = np.where((((X + Y) % 7 == 0) | ((X * 3 + Y * 5) % 11 == 0))[..., None], np.array((150, 104, 66)), np.array((176, 128, 82)))
+    saw = np.where((((X + Y) % 5 == 0) | ((X * 3 + Y * 5) % 11 == 0))[..., None],
+                   np.array((150, 104, 66)), np.array((176, 128, 82)))
     cv.a[floor] = saw[floor]
-    band = (d > 1) & (d <= 1.22) & (Y > cy - ry - 16)
-    seg = (np.floor((np.arctan2((Y - cy) / ry, (X - cx) / rx) + math.pi) / 0.22).astype(int) % 2) == 0
-    upper = Y < cy
+    band = (d > 1) & (d <= 1.25)
+    seg = (np.floor((np.arctan2((Y - cy) / ry, (X - cx) / rx) + math.pi) / 0.3).astype(int) % 2) == 0
     bcol = np.where(seg[..., None], np.array((196, 36, 44)), np.array((236, 226, 206)))
-    bcol = np.where((upper & ~((Y - cy) < -ry * 1.02))[..., None], bcol, bcol)
     cv.a[band] = bcol[band]
-    top_edge = band & (d > 1.16)
-    cv.a[top_edge] = (60, 10, 20)
+    cv.a[band & (d > 1.17)] = (60, 10, 20)
 
-    # Scheinwerfer auf die Artisten
-    cone(cv, (125, -20), 70, 180, (255, 240, 190), 0.4, 200)
-    cone(cv, (-20, -20), 14, 80, (255, 200, 230), 0.4, 222)
-    cone(cv, (270, -20), 176, 244, (200, 230, 255), 0.4, 222)
+    # Scheinwerfer
+    cone(cv, (42, -7), 23, 60, (255, 240, 190), 0.4, 67)
+    cone(cv, (-7, -7), 4, 27, (255, 200, 230), 0.4, 74)
+    cone(cv, (90, -7), 58, 82, (200, 230, 255), 0.4, 74)
 
-    # Luftballons oben (zur Zeltkuppel aufgestiegen)
-    bal = sprite('e28_balloons', F, [23])
-    B2 = up(bal, 2)
-    cv.paste(B2, -86, -60)
-    cv.paste(flip(B2), W_ - B2.shape[1] + 90, -66)
+    # Ballons an der Zeltkuppel (einzelne Ballons mit Schnur)
+    bl = [p for p in parts(sprite('e28_balloons', F, [23]), dil=0) if p.shape == (17, 7, 4)]
+    for j, (x, y) in enumerate([(2, 4), (9, -2), (15, 7), (64, 2), (72, -3), (77, 8)]):
+        cv.paste(bl[j % len(bl)], x, y)
 
-    # Elefant in der Mitte 3x
-    ele = sprite('e28_elephant', F, [10, 11, 12, 13, 14])
-    E = up(ele, 3)
-    paste(cv, E, 125, 196, anchor='b')
+    # Artisten 3× (= 1× im nativen Raster)
+    E = elephant()
+    cv.paste(E, 42 - E.shape[1] // 2, 66 - E.shape[0])
+    C = sprite('e28_clown', F, [36])
+    cv.paste(C, 2, 76 - C.shape[0])
+    S = flip(strongman())
+    cv.paste(S, W - S.shape[1] - 2, 77 - S.shape[0])
+    vignette(cv, 0.35, 0.62)
+    big = upcanvas(cv, K)
 
-    # Clown auf dem Ball links 3x, Strongman rechts 3x
-    clown = sprite('e28_clown', F, [36])
-    C = up(clown, 3)
-    cv.paste(C, 2, 222 - C.shape[0])
-    strong = sprite('e28_strongman', F, [18, 19])
-    S = up(flip(strong), 3)
-    cv.paste(S, W_ - S.shape[1] - 4, 226 - S.shape[0])
-
-    # Direktor im Vordergrund 6x
+    # Direktor im Vordergrund 6×
     dire = sprite('e28_director', F, [25, 27, 28])
     D = up(dire, 6)
-    paste(cv, D, 125, H_ + 24, anchor='b')
-    vignette(cv, 0.35, 0.62)
-    return cv
+    paste(big, D, 125, 350 + 24, anchor='b')
+    return big
 
 
 if __name__ == '__main__':

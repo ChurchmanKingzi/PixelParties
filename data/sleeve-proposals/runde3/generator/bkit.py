@@ -102,3 +102,18 @@ def lum_tint(s, dark, light):
     for c in range(3):
         out[..., c] = (dark[c] + (light[c] - dark[c]) * v).clip(0, 255).astype(np.uint8)
     return out
+
+
+def vignette_grid(cv, strength=0.5, r0=0.55, g=2, box=None):
+    """Vignette wie kit.vignette, aber das Dithering im g×g-Raster (passend zur Pixelgröße der Szene).
+    box=(x0,y0,x1,y1) beschränkt die Wirkung auf einen Bereich."""
+    h, w = cv.h, cv.w
+    yy, xx = np.mgrid[0:h, 0:w]
+    d = np.sqrt(((xx - w / 2) / (w / 2)) ** 2 + ((yy - h / 2) / (h / 2)) ** 2) / math.sqrt(2)
+    t = np.clip((d - r0) / (1 - r0), 0, 1) * strength
+    th = BAYER4[(yy // g) % 4, (xx // g) % 4]
+    q = (np.floor(t * 4 + th) / 4).clip(0, 1)
+    if box is not None:
+        m = np.zeros((h, w), bool); x0, y0, x1, y1 = box; m[y0:y1, x0:x1] = True
+        q = np.where(m, q, 0)
+    cv.a[:] = (cv.a * (1 - q[..., None])).astype(np.uint8)
