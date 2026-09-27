@@ -2301,6 +2301,12 @@ function ProfileScreen() {
   // reads this on game start and gates every animation + transition
   // when off.
   const [playAnimations, setPlayAnimations] = useState(user.play_animations == null ? true : !!user.play_animations);
+  // v1463: animierte Helden (Display Heroes) und ihr Einklappen während
+  // Zielwahl-Dialogen (Dynamic Heroes). Fehlt der Wert, gelten beide als an;
+  // ohne Display gibt es kein Dynamic.
+  const [displayHeroes, setDisplayHeroes] = useState(user.display_heroes == null ? true : !!user.display_heroes);
+  const [dynamicHeroes, setDynamicHeroes] = useState(
+    (user.display_heroes == null ? true : !!user.display_heroes) && (user.dynamic_heroes == null ? true : !!user.dynamic_heroes));
 
   // Dirty tracking — compare against original user values
   const isDirty = color !== (user.color || '#00f0ff')
@@ -2522,6 +2528,19 @@ function ProfileScreen() {
       setUser(data.user);
     } catch (e) { notify(e.message, 'error'); setPlayAnimations(!newVal); }
   };
+
+  const saveHeroDisplay = async (display, dynamic) => {
+    const vorher = [displayHeroes, dynamicHeroes];
+    const dyn = display && dynamic;
+    setDisplayHeroes(display); setDynamicHeroes(dyn);
+    try {
+      const data = await api('/profile/hero-display', { method: 'PUT', body: JSON.stringify({ display_heroes: display, dynamic_heroes: dyn }) });
+      setUser(data.user);
+    } catch (e) { notify(e.message, 'error'); setDisplayHeroes(vorher[0]); setDynamicHeroes(vorher[1]); }
+  };
+  const GameTooltipProfil = window.GameTooltip;
+  const zeigeTipp = (e, text) => window.showGameTooltip && window.showGameTooltip(e, text);
+  const versteckeTipp = () => window.hideGameTooltip && window.hideGameTooltip();
 
   // Build card image URL for deck wall
   const getCardImage = (cardName) => {
@@ -2970,6 +2989,26 @@ function ProfileScreen() {
               </label>
               <span style={{ fontSize: 9, color: 'var(--text2)' }}>Disable to skip battle animations — faster gameplay on low-power devices</span>
             </div>
+            {/* v1463: Helden-Anzeige */}
+            <div className="profile-checks">
+              <label className="profile-check"
+                onMouseEnter={e => zeigeTipp(e, 'Animated Heroes stand on their cards on the board. Off: cards only — status effects are shown on the cards again.')}
+                onMouseLeave={versteckeTipp}>
+                <input type="checkbox" checked={displayHeroes}
+                  onChange={e => saveHeroDisplay(e.target.checked, e.target.checked ? dynamicHeroes || true : false)} />
+                <span>Display Heroes</span>
+              </label>
+              <label className={'profile-check' + (displayHeroes ? '' : ' profile-check-aus')}
+                onMouseEnter={e => zeigeTipp(e, displayHeroes
+                  ? 'Heroes fold back into their cards while you choose a target, so nothing blocks your view.'
+                  : 'Heroes fold back into their cards while you choose a target. Needs "Display Heroes".')}
+                onMouseLeave={versteckeTipp}>
+                <input type="checkbox" checked={dynamicHeroes} disabled={!displayHeroes}
+                  onChange={e => saveHeroDisplay(displayHeroes, e.target.checked)} />
+                <span>Dynamic Heroes</span>
+              </label>
+            </div>
+            {GameTooltipProfil && <GameTooltipProfil />}
           </div>
 
           {/* Email & recovery */}
