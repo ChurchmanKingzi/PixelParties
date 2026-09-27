@@ -1768,7 +1768,7 @@ const HeroIdleAnims = (() => {
     const pL = meta.padLeft || 0, pR = meta.padRight || 0, pT = meta.padTop || 0, pB = meta.padBottom || 0;
     const rueckfall = { x0: pL, y0: pT, x1: fw - pR, y1: fh - pB };
     try {
-      const w = img.naturalWidth, h = img.naturalHeight;
+      const w = img.naturalWidth || img.width, h = img.naturalHeight || img.height;
       const c = document.createElement('canvas');
       c.width = w; c.height = h;
       const ctx = c.getContext('2d', { willReadFrequently: true });
@@ -1803,6 +1803,31 @@ const HeroIdleAnims = (() => {
     } catch { return rueckfall; }
   }
 
+  // ★ v1456 (Als Vorgabe 27.9.: „Das Gas von Medea sollte sogar noch
+  // transparenter sein"): `alphaScale` im Sheet-JSON multipliziert die
+  // Deckkraft aller HALBtransparenten Pixel (Gas, Rauch, Auren); voll
+  // deckende Pixel — Körper, Gesicht — bleiben unberührt. Einmal beim
+  // Laden; die PNGs bleiben unangetastet.
+  function halbtransparenzSkalieren(meta, img) {
+    const f = Number(meta.alphaScale);
+    if (!(f > 0) || f === 1) return img;
+    try {
+      const w = img.naturalWidth || img.width, h = img.naturalHeight || img.height;
+      const c = document.createElement('canvas');
+      c.width = w; c.height = h;
+      const ctx = c.getContext('2d', { willReadFrequently: true });
+      ctx.drawImage(img, 0, 0);
+      const bild = ctx.getImageData(0, 0, w, h);
+      const d = bild.data;
+      for (let i = 3; i < d.length; i += 4) {
+        const a = d[i];
+        if (a > 0 && a < 255) d[i] = Math.max(1, Math.min(254, Math.round(a * f)));
+      }
+      ctx.putImageData(bild, 0, 0);
+      return c;
+    } catch { return img; }
+  }
+
   function hole(key) {
     if (!key) return Promise.resolve(null);
     if (eintraege.has(key)) return eintraege.get(key);
@@ -1811,7 +1836,12 @@ const HeroIdleAnims = (() => {
       if (!meta) { if (liste) fertig.set(key, null); else eintraege.delete(key); return null; }
       return new Promise(res => {
         const img = new Image();
-        img.onload = () => { const e = { meta, img, kern: kernRahmen(meta, img) }; fertig.set(key, e); res(e); };
+        img.onload = () => {
+          // Geometrie aus dem ORIGINAL, damit `alphaScale` nichts verschiebt
+          const kern = kernRahmen(meta, img);
+          const e = { meta, img: halbtransparenzSkalieren(meta, img), kern };
+          fertig.set(key, e); res(e);
+        };
         img.onerror = () => { fertig.set(key, null); res(null); };
         img.src = meta.sheetUrl;
       });
@@ -1829,11 +1859,28 @@ const HeroIdleAnims = (() => {
     for (const s of schritte) { try { s(now); } catch {} }
     if (schritte.size) raf = requestAnimationFrame(tick);
   }
-  function anmelden(schritt) {
+  const diagnose = new Map();   // Schritt → { held, frames, st, zustand }
+  function anmelden(schritt, info) {
     schritte.add(schritt);
+    if (info) diagnose.set(schritt, info);
     try { ebeneAbgleichen(); } catch {}
     if (!raf) raf = requestAnimationFrame(tick);
-    return () => { schritte.delete(schritt); };
+    return () => { schritte.delete(schritt); diagnose.delete(schritt); };
+  }
+  // Konsolenhilfe (v1456): Zustand aller Figuren auf dem Brett.
+  if (typeof window !== 'undefined') {
+    window.ppHeldenAnimationen = () => {
+      const zeilen = [...diagnose.values()].map(d => ({
+        Held: d.held,
+        Frame: `${d.st.frame + 1}/${d.frames}`,
+        Schritte: d.st.schritte,
+        angehalten: !!d.zustand.current.angehalten,
+        versteinert: !!d.zustand.current.versteinert,
+        Fehler: d.st.fehler || '',
+      }));
+      try { console.table(zeilen); } catch {}
+      return zeilen;
+    };
   }
 
   // ── Sprite-Ebene (v1451) ─────────────────────────────────────
@@ -1935,7 +1982,7 @@ const HeroIdleAnims = (() => {
     let cv = null;
     try {
       const { img, meta } = e;
-      const w = img.naturalWidth, h = img.naturalHeight;
+      const w = img.naturalWidth || img.width, h = img.naturalHeight || img.height;
       const fw = meta.frameWidth, fh = meta.frameHeight;
       const vertikal = meta.layout === 'vertical';
       cv = document.createElement('canvas');
@@ -2116,23 +2163,28 @@ function HeroIdleSprite({ cardName, angehalten, versteinert, unsichtbar }) {
       if (e.animationName === 'heroHoloAuftauchen') platz.classList.remove('hero-idle-zurueck');
     };
     if (holo) holo.addEventListener('animationend', auftauchenFertig);
-    folgeZone();
-    male();
-    // Scharfe Pixel beim Vergrößern, weiches Verkleinern (`pixelated`
-    // verschluckt beim Verkleinern ganze Pixelzeilen, vgl. v1449). Der
-    // tatsächliche Maßstab hängt an `--board-scale`, Projektion und
-    // Bildschirmdichte, deshalb gemessen statt gerechnet.
-    const pruefeSchaerfe = () => {
-      const breite = cv.getBoundingClientRect().width * (window.devicePixelRatio || 1);
-      cv.style.imageRendering = breite >= fw * 0.98 ? 'pixelated' : 'auto';
+    // ★ v1456 (Als Befund 27.9.: Swampborne Waflav „beginnt auf einem
+    // Frame — nicht jedes Mal demselben — und bleibt dort"): genau das
+    // Bild, wenn der erste Frame gemalt wird, die Schleife aber nie
+    // weiterschaltet. Deshalb: ZUERST anmelden, im Schritt ZUERST den
+    // Frame weiterzählen, und alles Übrige (Zonenlage, Malen, Schärfe)
+    // einzeln abgesichert — ein Fehler dort darf die Animation nicht
+    // mehr anhalten. Tritt einer auf, meldet die Konsole ihn einmal mit
+    // Heldennamen; `ppHeldenAnimationen()` zeigt den Zustand aller Figuren.
+    const sicher = (was, fn) => {
+      try { fn(); } catch (err) {
+        st.fehler = was + ': ' + (err && err.message ? err.message : String(err));
+        if (!st.gewarnt) {
+          st.gewarnt = true;
+          try { console.warn('[Helden-Animation] ' + (meta.hero || '?') + ' — ' + st.fehler, err); } catch {}
+        }
+      }
     };
-    pruefeSchaerfe();
-    const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(pruefeSchaerfe) : null;
-    if (ro) ro.observe(cv);
+    st.schritte = 0;
     const abmelden = HeroIdleAnims.anmelden((now) => {
       const dt = st.zuletzt == null ? 0 : Math.min(now - st.zuletzt, 1000);
       st.zuletzt = now;
-      folgeZone();
+      st.schritte++;
       const z = zustand.current;
       if (!z.angehalten) {
         st.rest += dt;
@@ -2144,8 +2196,25 @@ function HeroIdleSprite({ cardName, angehalten, versteinert, unsichtbar }) {
       }
       if (z.versteinert) { if (st.stein < 1) st.stein = Math.min(1, st.stein + dt / 900); }
       else st.stein = 0;
-      if (st.frame !== st.gemalt || st.stein !== st.steinGemalt) male();
-    });
+      sicher('Zonenlage', folgeZone);
+      if (st.frame !== st.gemalt || st.stein !== st.steinGemalt) sicher('Malen', male);
+    }, { held: meta.hero || '?', frames, st, zustand });
+    sicher('Zonenlage', folgeZone);
+    sicher('Malen', male);
+    // Scharfe Pixel beim Vergrößern, weiches Verkleinern (`pixelated`
+    // verschluckt beim Verkleinern ganze Pixelzeilen, vgl. v1449). Der
+    // tatsächliche Maßstab hängt an `--board-scale`, Projektion und
+    // Bildschirmdichte, deshalb gemessen statt gerechnet.
+    const pruefeSchaerfe = () => {
+      const breite = cv.getBoundingClientRect().width * (window.devicePixelRatio || 1);
+      cv.style.imageRendering = breite >= fw * 0.98 ? 'pixelated' : 'auto';
+    };
+    sicher('Schärfe', pruefeSchaerfe);
+    let ro = null;
+    try {
+      ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(() => sicher('Schärfe', pruefeSchaerfe)) : null;
+      if (ro) ro.observe(cv);
+    } catch { ro = null; }
     return () => {
       abmelden();
       if (ro) ro.disconnect();

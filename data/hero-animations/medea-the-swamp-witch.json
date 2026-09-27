@@ -9,5 +9,6 @@
   "layout": "horizontal",
   "padTop": 6,
   "faceX": 51,
-  "footY": 64
+  "footY": 64,
+  "alphaScale": 0.55
 }
