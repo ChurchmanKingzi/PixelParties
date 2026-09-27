@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """24 Odd One Out – eine Allee steinerner Wächterbüsten führt in die Tiefe des Himmelsheiligtums; ganz vorn,
-im Sonnenstrahl, steht auf einem leeren Sockel der „unauffällige“ Gartenzwerg mit Sonnenbrille – als wäre er
+im Licht, steht auf einem leeren Sockel der „unauffällige“ Gartenzwerg mit Sonnenbrille – als wäre er
 eine der Statuen.
 
 Quellen (MotiveMoe.xcf):
@@ -12,8 +12,8 @@ Quellen (MotiveMoe.xcf):
   Ebene 496 „Oracle of Heaven #5“ – Säulen (hinten), 2×
   Ebene 534 „Ebene #30“ – Rasen, Pflaster (16×16-Kachel, sandsteinfarben umgefärbt), Blumenbüsche, 2×
   Ebene 553 „Hintergrund“ – Himmel mit Wolken, Ebene 122 „Ebene #64“ – Wolke, 2×
-Selbst gezeichnet (2×-Raster): perspektivischer Pflasterweg, Schatten, Sonnenstrahl und Lichtfleck um den
-Zwerg (geordnetes Dithering).
+Selbst gezeichnet (2×-Raster): perspektivischer Pflasterweg, Schatten, Lichtfleck um den Sockel und eine
+geditherte Abdunklung des Bodens zum Rand hin (Licht auf dem Zwerg).
 
 Tiefenebenen / Skalierung (Allee in drei Staffeln, je Staffel ein Raster):
   Himmel, Boden, Weg, hintere Staffel (Säulen, Büsten, Büsche) ... 125×175-Raster, 2×
@@ -136,15 +136,12 @@ for y in range(int(fy - 9), int(fy + 8)):
         if e < 1 and 0 <= y < 175 and (1 - e) * 1.4 > BAYER4[y % 4, x % 4]:
             g.a[y, x] = np.minimum(255, g.a[y, x].astype(int) * 1.22 + 14).astype(np.uint8)
 shadow(g, fx + 5, fy - 0.5, 22, 3.2, 0.5)
-# Sonnenstrahl schräg von links oben auf den Zwerg (geordnetes Dithering, nur aufhellend)
-for y in range(0, int(fy)):
-    for x in range(125):
-        # Mittellinie des Strahls von (10, 0) nach (fx, fy)
-        cxl = 10 + (fx - 10) * y / fy
-        wdt = 5 + 13 * y / fy
-        d = abs(x + .5 - cxl) / wdt
-        if d < 1 and (1 - d) * 0.30 > BAYER4[y % 4, x % 4]:
-            g.a[y, x] = np.minimum(255, g.a[y, x].astype(int) * 1.1 + 26).astype(np.uint8)
+# Licht auf den Zwerg: Umgebung zum Rand hin gedithert abdunkeln (Vignette im 2×-Raster)
+sys.path.append(os.path.join(HERE, '..', '..', 'runde3', 'generator'))
+from bkit import vignette_grid  # noqa
+cvv = Canvas(125, 175); cvv.a[:] = g.a
+vignette_grid(cvv, 0.55, 0.42, g=1, box=(0, HZ, 125, 175))
+g.a[:] = cvv.a
 
 out = Canvas(W, H)
 out.a[:] = lift(g.a, 2)

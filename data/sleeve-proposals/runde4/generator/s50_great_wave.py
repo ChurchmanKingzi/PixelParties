@@ -149,8 +149,8 @@ for x in range(wv.w):
 sp = Lay(4)
 ship = sprite('j50_ship', J, [11])
 sw, sh = ship.shape[1], ship.shape[0]
-SX, SEA4 = 6, 79                                  # Wasserlinie im 4×-Raster (→ 316 px)
-sp.paste(ship, SX, SEA4 - sh + 3)
+SX, SEA4 = 12, 78                                 # Wasserlinie im 4×-Raster (→ 312 px)
+sp.paste(ship, SX, SEA4 - sh + 2)
 for x in range(sp.w):
     top = SEA4 + int(1.6 * math.sin(x / 5.0 + 0.5)) - (2 if SX + sw - 2 < x < SX + sw + 6 else 0)
     for y in range(top, sp.h):

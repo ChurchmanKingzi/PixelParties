@@ -36,6 +36,7 @@ hull_thing = sprite('h38_hullthing', B, [390], box=(430, 240, 490, 277))   # Urs
 
 # --- Meer (Periode 76 senkrecht, waagrecht gespiegelt verbreitert) ---------------------------------
 sea = widen(layer(B, 403)[130:206, 330:505, :3], W)
+sea = (sea.astype(float) * 1.35 + np.array([6, 14, 18])).clip(0, 255).astype(np.uint8)   # etwas aufgehellt, damit der Schatten lesbar ist
 for y in range(H):
     lo.a[y] = sea[y % 76]
 
@@ -114,13 +115,23 @@ darkc = tuple(int(v) for v in u[np.argmin(u.sum(1))])
 inner = []
 for y in range(h):
     xs = np.where(m[y])[0]
-    if len(xs) and y > 8: inner.append((xs[-1] - 3, y))     # rechte Innenkante
-for i, (x, y) in enumerate(inner[::5]):
-    if dist[y, x] < 2.5: continue
-    for dx, dy in ((0, 0), (1, 0), (0, 1), (1, 1)):
-        T[y + dy, x + dx, :3] = light
-    T[y, x, :3] = darkc
-TX, TY = -2, 4
+    if len(xs) and y > 4: inner.append((xs[-1], y))        # rechte Kante = Unterseite der Krümmung
+mid = tuple(int(v) for v in (np.array(light) * 0.6 + np.array(darkc) * 0.4))
+for i, (xr, y) in enumerate(inner[::4]):
+    # Saugnapf 3×3: heller Ring, dunkle Mitte; zwei versetzte Reihen, zur Spitze hin kleiner
+    x = xr - (3 if i % 2 == 0 else 7)
+    if y + 2 >= h or x < 1 or dist[y + 1, x + 1] < 2.5: continue
+    small = y > h * 0.75
+    for dx in range(3 if not small else 2):
+        for dy in range(3 if not small else 2):
+            T[y + dy, x + dx, :3] = light if (dx, dy) != (1, 1) else darkc
+    if not small: T[y + 1, x + 1, :3] = darkc
+    else: T[y + 1, x + 1, :3] = mid
+# Spitze (unterstes Pixel) knapp links über den Kopf des Kapitäns setzen; der dicke Ansatz ragt oben links aus dem Bild
+ys_t, xs_t = np.where(m)
+tip = (xs_t[np.argmax(ys_t)], ys_t.max())
+TX, TY = CX - capt.shape[1] // 2 - 3 - tip[0], CY - capt.shape[0] - 3 - tip[1]
+print('tentacle at', TX, TY)
 lo.paste(silhouette(T, (2, 6, 12)), TX + 3, TY + 4, alpha=0.5)
 lo.paste(T, TX, TY)
 # Schaum an der Wasserlinie (linke gerade Kante), nur im Wasser
@@ -131,7 +142,7 @@ for y in range(TY + col0.min() - 2, TY + col0.max() + 3):
             lo.px(x, y, FOAM if (x + y) % 2 == 0 else FOAM2)
 
 vig = Canvas(W, H); vig.a[:] = lo.a
-vignette(vig, 0.4, 0.6)
+vignette(vig, 0.3, 0.65)
 lo.a[:] = vig.a
 cv = Canvas(250, 350)
 blow(cv, lo, G)

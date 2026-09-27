@@ -1,14 +1,20 @@
 # -*- coding: utf-8 -*-
-"""43 Threads of Fate – die drei verhüllten Nornen stehen nachts auf dem Eisplateau über Coolhalla um die
-leuchtende Kristallkugel; die linke Norne spinnt den goldenen Schicksalsfaden über die Kugel hinweg zur rechten.
+"""43 Threads of Fate – die drei verhüllten Nornen stehen nachts auf dem Eisplateau nebeneinander: die linke
+spinnt aus ihrem Faserbausch den goldenen Schicksalsfaden, er hängt locker durch zur mittleren, die ihn zwischen
+ihren Händen gespannt hält (misst), und weiter zur rechten, in deren Hand er endet – ein abgeschnittenes Stück
+hängt herab. Vorn und tiefer, ohne eine Norne zu verdecken, leuchtet die Kristallkugel; am Himmel mit Milchstraße
+steht das Sternbild der Weltenschlange.
 
 Quellen (MotiveCoolhalla.xcf):
-  Ebene 167 „Ebene #52“ – linke Norne mit Faden in den Händen (Karte „The Nornstellar Foretellers of Coolness“)  4×
-  Ebene 171 „Ebene #44“ – mittlere (frontal) und rechte Norne, per parts() getrennt (gleiche Karte)            4×
-  Ebene 165 „Ebene #93“ – Kristallkugel auf goldenem Fuß (Karte „Prophecy of Coolness“)                      4×
-  Ebene 256/255 „Ebene #2/#3“ – Eisboden mit Schrägstreifen, nächtlich umgefärbt                               2×
-Himmel mit Milchstraße, Sterne, ferne Schneehügel, Lichtteich, Schicksalsfaden (1 Zelle, Gold hell/dunkel im Wechsel) selbst gezeichnet.
-Skalierung: Himmel/Hügel/Eisboden 2×, Nornen + Kugel + Faden 4×.
+  Ebene 167 „Ebene #52“ – linke Norne mit Faserbausch in den Händen (Karte „The Nornstellar Foretellers of Coolness“)  3×
+  Ebene 171 „Ebene #44“ – mittlere (frontal) und rechte Norne, per parts() getrennt (pixelgleich mit „Sichtbar #16“);
+                          ergänzt: je 1 schwarzes Handpixel an den Ärmelenden (Farbe der Hände der linken Norne)       3×
+  Ebene 165 „Ebene #93“ – Kristallkugel auf goldenem Fuß (Karte „Prophecy of Coolness“)                            3×
+  Ebene 256/255 „Ebene #2/#3“ – Eisboden mit Schrägstreifen, nächtlich umgefärbt                                     2×
+Himmel mit Milchstraße, Sterne, Sternbild, ferne Schneehügel, Lichtteich und der Schicksalsfaden (1 Pixel im 3×-Raster,
+hell/dunkel Pixel für Pixel abwechselnd, durchhängende Parabeln) selbst gezeichnet. Kein Schneidwerkzeug in den
+Coolhalla-Ebenen vorhanden – das Schneiden zeigt das abgeschnittene, herabhängende Fadenende.
+Skalierung: Himmel/Hügel/Eisboden/Sternbild 2×, Nornen + Faden + Kugel 3×.
 """
 import math
 import numpy as np
@@ -23,7 +29,7 @@ ice = compose(C, [255, 256], crop=False)
 # ---------------------------------------------------------------- Hintergrund (2×)
 bg = G(2)
 W2, H2 = bg.w, bg.h
-HOR = 112                                            # Horizont im 2×-Raster (y=224 im 250er-Bild)
+HOR = 96                                            # Horizont im 2×-Raster (y=224 im 250er-Bild)
 yy, xx = np.mgrid[0:H2, 0:W2]
 bg.vgrad([(0, (8, 10, 30)), (0.5, (14, 22, 56)), (0.85, (26, 44, 86)), (1, (44, 72, 112))], 0, HOR)
 # Milchstraße: schräges Band, zwei gedämpfte Stufen
@@ -67,40 +73,79 @@ for y in range(HOR, H2):
         p = row[(x + 40) % fl.shape[1]]
         bg.a[y, x] = (p[0], p[1], p[2], 255) if p[3] > 0 else (56, 84, 124, 255)
 bg.rect(0, HOR, W2, HOR + 1, (100, 132, 176))
-# Lichtteich der Kugel auf dem Eis (stufig, ohne Dither)
+# Lichtteich der Kugel auf dem Eis (stufig, ohne Dither); Kugelmitte x = 3·46/2
+LPX = 69
 for (rx, ry, f) in ((42, 11, 1.14), (29, 7, 1.14), (17, 4, 1.12)):
-    m = bg.ellipse_mask(62.5, 160, rx, ry) & (yy >= HOR)
+    m = bg.ellipse_mask(LPX, 158, rx, ry) & (yy >= HOR)
     bg.a[m, :3] = np.clip(bg.a[m, :3] * np.array([f, f, f * 1.08]) + np.array([6, 4, 14]), 0, 255).astype(np.uint8)
 
-# ---------------------------------------------------------------- Nornen, Faden, Kugel (4×)
-fg = G(4)
-FL = 66                                                # Fußlinie der äußeren Nornen (y=264)
-fg.pb(mid, 32, FL - 2)                                  # mittlere Norne einen Schritt weiter hinten
-LX = 6
-fg.pb(left, LX + left.shape[1] // 2, FL)
-RX = 63 - 6 - right.shape[1]
-fg.paste(right, RX, FL - right.shape[0])
-shadow = grid_mask(4)
-for (cx, cy, w) in ((LX + 7, FL, 6.5), (RX + 7, FL, 6.5), (32, FL - 2, 6)):
-    shadow |= G(4).ellipse_mask(cx, cy, w, 1.4)
-# Faden: von den Händen der linken Norne (wie auf der Karte) über die Brust der mittleren zur Hand der rechten
-lx, ly = LX + left.shape[1] - 1, FL - 11
-rx, ry = RX + 1, FL - 11
-pts = []
-for i in range(61):
-    t = i / 60
-    pts.append((lx + (rx - lx) * t, ly - 2.4 * math.sin(math.pi * t) ** 0.6))
-fg.poly(pts, (255, 214, 90), alt=(200, 140, 40))
-# Kugel vorn auf dem Eis, heller (sie leuchtet) + Glanzlicht auf dem Glas
-BB = 81
+# ---------------------------------------------------------------- Nornen, Faden, Kugel (3×)
+fg = G(3)
+W3, H3 = fg.w, fg.h
+BLACK, GLOVE = (0, 0, 0, 255), (32, 32, 32, 255)
+# Mittlere Norne: die über der Brust verschränkten Ärmel enden in zwei schwarzen Händen links/rechts
+# (je 1 Pixel breit ergänzt, Farben aus der Handpartie der linken Norne) – sie hält den Faden gespannt: misst.
+midh = np.zeros((mid.shape[0], mid.shape[1] + 2, 4), np.uint8); midh[:, 1:-1] = mid
+for y in (15, 16):
+    midh[y, 0] = BLACK; midh[y, -1] = BLACK
+# Rechte Norne (blickt nach links): Ärmelende in Zeile 14/15 bekommt eine schwarze Hand – dort endet der Faden.
+righth = np.zeros((right.shape[0], right.shape[1] + 1, 4), np.uint8); righth[:, 1:] = right
+for y in (14, 15):
+    righth[y, 0] = BLACK
+FL = 78                                                # Fußlinie (y=234)
+LX = 9                                                 # linke Norne: Körper x 9–23, Faserbausch bis x 28
+RX = 63                                                # rechte Norne: Hand bei x 63
+lx, ly = LX + 19, FL - 25 + 12                         # Faserbausch der linken Norne (Zeile 12, Spalte 19)
+rx, ry = RX, FL - 25 + 14                              # Hand der rechten Norne
+MC = (lx + rx) // 2                                    # mittlere Norne genau zwischen beiden Fadenenden
+mx0 = MC - midh.shape[1] // 2
+m1x, m2x, my = mx0, mx0 + midh.shape[1] - 1, FL - 25 + 15
+fg.paste(midh, mx0, FL - 25)
+fg.paste(left, LX, FL - 25)
+fg.paste(righth, RX, FL - 25)
+shadow = grid_mask(3)
+for cx in (LX + 7, MC, RX + 8):
+    shadow |= G(3).ellipse_mask(cx, FL, 7.5, 1.3)
+
+
+def sag(x0, y0, x1, y1, depth, n=80):
+    """Durchhängender Faden zwischen zwei Punkten (Parabel), als Punktliste."""
+    return [(x0 + (x1 - x0) * t, y0 + (y1 - y0) * t + depth * 4 * t * (1 - t)) for t in np.linspace(0, 1, n)]
+
+
+LIGHT, DARK = (255, 214, 90), (176, 116, 30)
+
+
+def thread(pts):
+    """Kurve pixelweise rastern (ohne Doppelpixel, 8-zusammenhängend), Pixel für Pixel hell/dunkel."""
+    cells = []
+    for (x, y) in pts:
+        c = (int(round(x)), int(round(y)))
+        if not cells or c != cells[-1]:
+            if cells and abs(c[0] - cells[-1][0]) <= 1 and abs(c[1] - cells[-1][1]) <= 1 and len(cells) > 1 \
+                    and abs(c[0] - cells[-2][0]) <= 1 and abs(c[1] - cells[-2][1]) <= 1:
+                cells[-1] = c                              # Ecke abkürzen (keine L-Treppen)
+            else:
+                cells.append(c)
+    for i, (x, y) in enumerate(cells):
+        fg.px(x, y, LIGHT if i % 2 == 0 else DARK)
+
+
+line = sag(lx, ly, m1x - 1, my, 4, 400) + [(x, my) for x in np.linspace(m1x - 1, m2x + 1, 200)] + \
+    sag(m2x + 1, my, rx - 1, ry, 4, 400)
+thread(line)                                                        # spinnen → messen → schneiden
+# abgeschnittenes Ende: ein kurzes Stück hängt unter der Hand der rechten Norne herab
+thread([(rx - 1, ry + 1 + t) for t in np.linspace(0, 4, 20)])
+# Kristallkugel vorn und tiefer, verdeckt keine Norne
+BX, BB = MC, 108
 glow_ball = hsv_shift(ball, 0, 1.0, 1.35)
-fg.pb(outline(glow_ball, (14, 10, 30)), 32, BB + 1)
-bx0, by0 = 32 - (ball.shape[1] + 2) // 2, BB + 1 - (ball.shape[0] + 2)
+fg.pb(outline(glow_ball, (14, 10, 30)), BX + 1, BB + 1)
+bx0, by0 = BX + 1 - (ball.shape[1] + 2) // 2, BB + 1 - (ball.shape[0] + 2)
 for (x, y) in ((6, 4), (5, 5), (5, 6), (7, 3)):
     fg.px(bx0 + x, by0 + y, (236, 236, 255))
-shadow |= G(4).ellipse_mask(32, BB, 11, 1.2)
+shadow |= G(3).ellipse_mask(BX + 0.5, BB, 11, 1.2)
 shadow &= ~fg.mask()
 
 cv = flatten([bg, fg])
-shade_final(cv, shadow, 4, 0.6)
+shade_final(cv, shadow, 3, 0.6)
 print(save(cv, '43_threads_of_fate.png'))
