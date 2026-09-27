@@ -25,3 +25,9 @@ Runde 3b: alle Sleeves außer den Nutzer-Favoriten 07, 13, 34 und 43 nach den Re
 `generator/sNN_*.py` erzeugt jeweils ein Sleeve (aus `generator/` ausführen). `common.py` bindet die Werkzeuge
 aus Runde 2 ein (`kit.py`, `xcfkit.py`). Die verwendeten Sprites liegen zusätzlich unter `generator/sprites3/`,
 damit die Skripte auch ohne die exportierten xcf-Ebenen laufen. xcf-Export: `../runde2/generator/export_xcf.py`.
+
+## Final: gerahmt, englische Namen
+`final/<Name>.png` – alle 60 Sleeves mit verziertem Rahmen (Band mit Fase und Stilmuster, Eckplatten und
+Kartuschen mit Edelsteinen; Stil und Steine passend zum Motiv, z. B. Lack/Gold für China, Messing für Steam
+Dwarfs, Eis für den Norden, Knochen für Skelett-Motive). Rahmenpixel = 6 Bildpixel. Übersicht:
+`00_overview_final.png`. Erzeugt mit `generator/frames.py` (Tabelle Nr. → Name, Stil, Edelsteine).
