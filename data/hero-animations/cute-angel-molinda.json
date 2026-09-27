@@ -1,0 +1,15 @@
+{
+  "hero": "Cute Angel Molinda",
+  "sheet": "cute-angel-molinda.png",
+  "frameWidth": 54,
+  "frameHeight": 40,
+  "frames": 36,
+  "frameMs": 80,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 6,
+  "padLeft": 15,
+  "padRight": 15,
+  "padBottom": 7,
+  "faceX": 27
+}

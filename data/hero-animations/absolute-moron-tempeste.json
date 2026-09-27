@@ -1,0 +1,16 @@
+{
+  "hero": "Absolute Moron Tempeste",
+  "sheet": "absolute-moron-tempeste.png",
+  "frameWidth": 36,
+  "frameHeight": 33,
+  "frames": 48,
+  "frameMs": 80,
+  "loop": true,
+  "layout": "horizontal",
+  "skinOf": "Tempeste, the Weather Fairy",
+  "padTop": 5,
+  "padLeft": 5,
+  "padRight": 5,
+  "padBottom": 5,
+  "faceX": 18
+}

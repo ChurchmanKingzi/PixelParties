@@ -1,0 +1,16 @@
+{
+  "hero": "Space Huntress Vena",
+  "sheet": "space-huntress-vena.png",
+  "frameWidth": 32,
+  "frameHeight": 40,
+  "frames": 32,
+  "frameMs": 80,
+  "loop": true,
+  "layout": "horizontal",
+  "skinOf": "Vena, the Bounty Huntress",
+  "padTop": 4,
+  "padLeft": 3,
+  "padRight": 3,
+  "padBottom": 7,
+  "faceX": 16
+}

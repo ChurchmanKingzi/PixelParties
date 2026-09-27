@@ -1,0 +1,16 @@
+{
+  "hero": "Tapu Jenny",
+  "sheet": "tapu-jenny.png",
+  "frameWidth": 27,
+  "frameHeight": 39,
+  "frames": 32,
+  "frameMs": 80,
+  "loop": true,
+  "layout": "horizontal",
+  "skinOf": "Jenny, the Class Fairy",
+  "padTop": 6,
+  "padLeft": 6,
+  "padRight": 6,
+  "padBottom": 6,
+  "faceX": 15.5
+}

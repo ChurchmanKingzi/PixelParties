@@ -1,0 +1,15 @@
+{
+  "hero": "Cute Meanie Melissa",
+  "sheet": "cute-meanie-melissa.png",
+  "frameWidth": 44,
+  "frameHeight": 43,
+  "frames": 36,
+  "frameMs": 80,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 7,
+  "padLeft": 7,
+  "padRight": 7,
+  "padBottom": 7,
+  "faceX": 22
+}

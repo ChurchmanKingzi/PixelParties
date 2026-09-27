@@ -1,0 +1,16 @@
+{
+  "hero": "SOS Crestina",
+  "sheet": "sos-crestina.png",
+  "frameWidth": 28,
+  "frameHeight": 30,
+  "frames": 48,
+  "frameMs": 80,
+  "loop": true,
+  "layout": "horizontal",
+  "skinOf": "Fairy Queen Crestina, the Creation Fairy",
+  "padTop": 5,
+  "padLeft": 5,
+  "padRight": 5,
+  "padBottom": 5,
+  "faceX": 14
+}

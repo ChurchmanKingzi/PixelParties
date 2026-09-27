@@ -85,6 +85,16 @@ kopiert, daneben liegt eine JSON-Datei mit den Metadaten. Die erzeugten
 | `lizbeth.py` | `final` | `lizbeth_idle_final_sheet.png` | `lizbeth-the-hunter-of-souls` (Skin) |
 | `cuberto.py` | `final 90 hero` | `cuberto_hero_idle_final_sheet.png` | `cuberto-supreme-lord-of-edges` |
 | `cuberto.py` | `final 90 edgy` | `cuberto_edgy_idle_final_sheet.png` | `extra-edgy-cuberto` (Skin) |
+| `monia.py` | `final 70 delusional` | `delusional_monia_idle_final_sheet.png` | `delusional-monia` (Skin) |
+| `monia.py` | `final 70 lightning` | `lightning_monia_idle_final_sheet.png` | `lightning-fast-monia` (Skin) |
+| `monia.py` | `final 70 birthday` | `birthday_monia_idle_final_sheet.png` | `cool-birthday-girl-monia` |
+| `winged.py` | `final 80 tempeste` | `tempeste_skin_idle_final_sheet.png` | `absolute-moron-tempeste` (Skin) |
+| `winged.py` | `final 80 mary` | `sickly_mary_idle_final_sheet.png` | `sickly-mary` (Skin) |
+| `winged.py` | `final 80 crestina` | `sos_crestina_idle_final_sheet.png` | `sos-crestina` (Skin) |
+| `space_vena.py` | `final` | `space_vena_idle_final_sheet.png` | `space-huntress-vena` (Skin) |
+| `tapu_jenny.py` | `final` | `tapu_jenny_idle_final_sheet.png` | `tapu-jenny` (Skin) |
+| `winged.py` | `final 80 melissa` | `cute_meanie_melissa_idle_final_sheet.png` | `cute-meanie-melissa` |
+| `winged.py` | `final 80 molinda` | `cute_angel_molinda_idle_final_sheet.png` | `cute-angel-molinda` |
 | `bubbles.py` | `final gross` | `bubbles_idle_final_gross_sheet.png` | `bubbles-the-bouncy-bunny` |
 
 `bubbles.py` ohne `gross` erzeugt eine auf Hero-Größe verkleinerte Variante
@@ -110,6 +120,7 @@ python3 xcf_extract.py MotiveMoe.xcf assemble src/cute-princess-mary.png "Mary-K
 |---|---|---|
 | `cute-princess-mary.png` | `MotiveMoe.xcf` | `Mary-Kopie` (goldene Mary mit Krone) + `Mary #1` (Flügel) |
 | alle übrigen MotiveMoe-Heroes | `MotiveMoe.xcf` | reproduzierbar per `python3 assemble_moe.py <MotiveMoe.xcf>` (Zuordnung im Skriptkopf) |
+| MotiveMoe-Skins und weitere Heroes (2. Durchgang) | `MotiveMoe.xcf` | reproduzierbar per `python3 assemble_moe_skins.py <MotiveMoe.xcf>` (Zuordnung im Skriptkopf) |
 | MotiveArcanum-Heroes | `MotiveArcanum.xcf` | reproduzierbar per `python3 assemble_arcanum.py <MotiveArcanum.xcf>` (Zuordnung im Skriptkopf) |
 | MotiveBoons-Heroes und -Skins | `MotiveBoons.xcf` | reproduzierbar per `python3 assemble_boons.py <MotiveBoons.xcf>` (Zuordnung im Skriptkopf) |
 
