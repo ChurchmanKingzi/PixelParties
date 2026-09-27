@@ -1,27 +1,51 @@
 # -*- coding: utf-8 -*-
-"""Sleeve: Grabkammer des Pharaos – alle Figuren und Texturen direkt aus den Ebenen von
-MotiveEgypt.xcf (Repo PixelPartiesSprites): Ren, Auge von Ren, Ushabti, Royal Mummy Guards, Khet,
-goldene Urnen, Ziegelwand und Sandplatte."""
+"""Sleeve: Grabkammer des Pharaos – alle Figuren und Texturen direkt aus den Ebenen von MotiveEgypt.xcf
+(Repo PixelPartiesSprites).
+
+Runde 2b: EINE Pixelgröße für alles – die ganze Szene wird im Originalraster (84×117) gebaut und am Ende
+3× hochskaliert (auf dem 250er-Raster, Rand um 1 Rasterpixel beschnitten). Kein eigener Rahmen.
+- Tafel mit dem Auge von Ren: Ebene „Ebene #130“ (#99) auf der Mauertextur der Eye-of-Ren-Karte
+  (Pyramiden-Mauerwerk, Ebene „Pyramid“ #121, Kachel 3×6) – wie auf der Karte in derselben Pixelgröße.
+- Wand: waagrechtes Ziegelmauerwerk, Boden: Flechtverband – beides aus Ebene „Ebene #48“ (#185, Grabkammer
+  der Ushabti-/Mummy-Guards-Karten), Kacheln 48×16 bzw. 16×16.
+- Figuren (vollständig, gegen die Sichtbar-Szenen geprüft): Soul Shard Ren (#188), zwei Ushabti mit Flamme
+  (#168, mittlere Figur, einmal gespiegelt), Royal Mummy Guards (#183, beide Wächter), Soul Shard Khet (#214).
+- Selbst gezeichnet (Regel D): warmer Fackelschein der Ushabti-Flammen und Vignette als geordnetes Dithering
+  im selben Raster."""
 import numpy as np
-from kit import Canvas, up, flip, silhouette, save
-from xcfkit import sprite, parts, split_x, scene_sprite
+from kit import Canvas, up, flip, silhouette, save, BAYER4
+from xcfkit import sprite, parts, layer
 
 B = 'MotiveEgypt'
-NW, NH = 125, 175
+NW, NH = 84, 117
 cv = Canvas(NW, NH)
 
-wall = sprite('eg_wall', B, [185])[0:16, 0:16]          # Ziegelwand (Periode 16×8 → 16×16-Kachel)
-sand = scene_sprite('eg_eyeofren_wall', B, 61, (431, 332), (0, 0, 76, 10))   # Mauer der Eye-of-Ren-Karte
-for y in range(NH):
-    for x in range(NW):
-        cv.a[y, x] = wall[y % 16, x % 16, :3]
+room = sprite('eg_room', B, [185])                       # Grabkammer-Textur (Ebene #48), zugeschnitten ab (293,317)
+WALL = room[38:54, 178:226, :3]                          # waagrechte Ziegel, Periode 48×16
+FLOOR = room[80:96, 190:206, :3]                         # Flechtverband, Periode 16×16
+try:
+    PYR = layer(B, 121)[336:342, 440:443, :3].copy()     # Pyramiden-Mauerwerk der Eye-of-Ren-Karte (3×6)
+    np.save(__import__('os').path.join(__import__('os').path.dirname(__file__), 'sprites2', 'eg_pyr_tile.npy'), PYR)
+except Exception:
+    PYR = np.load(__import__('os').path.join(__import__('os').path.dirname(__file__), 'sprites2', 'eg_pyr_tile.npy'))
 
 ren = sprite('eg_ren', B, [188])
 eye = sprite('eg_eye', B, [99])
 ush = parts(sprite('eg_ushabti', B, [168]))             # links, Mitte (mit Flamme), rechts
-grd = split_x(sprite('eg_guards', B, [183]))            # zwei Wächter
+grd = parts(sprite('eg_guards', B, [183]), dil=1)        # zwei Wächter (mit Sensen)
+assert len(grd) == 2
 khet = sprite('eg_khet', B, [214])
-urns = parts(sprite('eg_urns', B, [181]), dil=0)             # vier Urnen
+
+FLOOR_Y = 80                                             # Übergang Wand → Boden
+for y in range(NH):
+    for x in range(NW):
+        cv.a[y, x] = WALL[y % 16, (x + 6) % 48] if y < FLOOR_Y else FLOOR[(y - FLOOR_Y) % 16, (x + 2) % 16]
+# Sockelkante: Boden direkt an der Wand etwas dunkler (Schatten der Wand)
+cv.a[FLOOR_Y:FLOOR_Y + 1] = (cv.a[FLOOR_Y:FLOOR_Y + 1] * 0.55).astype(np.uint8)
+cv.a[FLOOR_Y + 1:FLOOR_Y + 2] = (cv.a[FLOOR_Y + 1:FLOOR_Y + 2] * 0.8).astype(np.uint8)
+
+def shade(x0, y0, x1, y1, f):
+    cv.a[y0:y1, x0:x1] = (cv.a[y0:y1, x0:x1] * f).astype(np.uint8)
 
 def put(s, x, y, fl=False, sh=0.45, anchor='tl'):
     s2 = flip(s) if fl else s
@@ -30,28 +54,47 @@ def put(s, x, y, fl=False, sh=0.45, anchor='tl'):
     if anchor == 'b': x -= w // 2; y -= h
     if sh: cv.paste(silhouette(s2, (40, 12, 0)), x + 1, y + 1, alpha=sh)
     cv.paste(s2, x, y)
+    return x, y, w, h
 
-# Sandsteintafel mit dem Auge
-PY0, PY1 = 4, 44
-for y in range(PY0, PY1):
-    for x in range(4, NW - 4):
-        cv.a[y, x] = sand[2 + y % 4, 8 + x % 8, :3]
-for x in range(3, NW - 3):
-    cv.a[PY0 - 1, x] = (60, 30, 10); cv.a[PY1, x] = (60, 30, 10)
-for y in range(PY0 - 1, PY1 + 1):
-    cv.a[y, 3] = (60, 30, 10); cv.a[y, NW - 4] = (60, 30, 10)
-put(eye, NW // 2, PY0 + (PY1 - PY0 - eye.shape[0]) // 2, anchor='c', sh=0)
+# Fackelschein der beiden Flammen-Ushabti (geordnetes Dithering, warm aufgehellt)
+fl = ush[1]
+UX = (3, NW - 3 - fl.shape[1])
+UY = FLOOR_Y + 1 - fl.shape[0]                           # Ushabti stehen hinten auf dem Boden
+glow = [(ux + fl.shape[1] // 2, UY + 3) for ux in UX]
+yy, xx = np.mgrid[:NH, :NW]
+t = np.zeros((NH, NW))
+for gx, gy in glow:
+    d = np.hypot(xx - gx, (yy - gy) * 1.1)
+    t = np.maximum(t, np.clip(1 - d / 20, 0, 1))
+q = (t * 1.6 > (BAYER4[yy % 4, xx % 4] + 0.5) / 16 * 1.0 + 0.35)
+warm = np.clip(cv.a * 1.18 + np.array([22, 10, 0]), 0, 255).astype(np.uint8)
+cv.a[q] = warm[q]
 
-X0 = NW // 2
-put(up(ren, 2), X0, 50, anchor='c', sh=0.5)
-put(ush[1], 10, 58, sh=0.5); put(ush[1], NW - 10 - ush[1].shape[1], 58, fl=True, sh=0.5)
-put(ush[0], 4, 104); put(ush[2], NW - 4 - ush[2].shape[1], 104)
-put(grd[0], 26, 126); put(grd[1], NW - 26 - grd[1].shape[1], 126)
-put(khet, X0, 160, anchor='b')
-put(urns[0], 5, 159); put(urns[1], 17, 161); put(urns[-1], NW - 5 - urns[-1].shape[1], 159); put(urns[-2], NW - 17 - urns[-2].shape[1], 161)
+# Tafel mit dem Auge (Pyramiden-Mauerwerk), 1 px dunkle Kante, Schlagschatten auf der Wand
+TX0, TX1, TY0, TY1 = 4, NW - 4, 2, 37
+shade(TX0 + 1, TY0 + 1, TX1 + 1, TY1 + 1, 0.55)
+for y in range(TY0, TY1):
+    for x in range(TX0, TX1):
+        cv.a[y, x] = PYR[(y - TY0) % 6, (x - TX0) % 3]
+EDGE = (60, 30, 10)
+cv.a[TY0, TX0:TX1] = EDGE; cv.a[TY1 - 1, TX0:TX1] = EDGE; cv.a[TY0:TY1, TX0] = EDGE; cv.a[TY0:TY1, TX1 - 1] = EDGE
+put(eye, NW // 2, TY0 + (TY1 - TY0 - eye.shape[0]) // 2, anchor='c', sh=0)
+
+# hintere Reihe: Ushabti mit Flammen links/rechts, dazwischen Ren schwebend vor der Wand
+put(fl, UX[0], UY, sh=0.5); put(fl, UX[1], UY, fl=True, sh=0.5)
+put(ren, NW // 2, TY1 + 3, anchor='c', sh=0.5)
+# vordere Reihe auf dem Boden: zwei Mumienwächter, Khet in der Mitte
+GY = NH - 5
+put(grd[0], 6, GY - grd[0].shape[0], sh=0.5)
+put(grd[1], NW - 6 - grd[1].shape[1], GY - grd[1].shape[0], sh=0.5)
+put(khet, NW // 2, GY + 1, anchor='b', sh=0.5)
+
+# Vignette (geordnetes Dithering im selben Raster)
+d = np.sqrt(((xx - NW / 2) / (NW / 2)) ** 2 + ((yy - NH / 2) / (NH / 2)) ** 2) / np.sqrt(2)
+v = np.clip((d - 0.45) / 0.55, 0, 1) * 0.55
+qv = (np.floor(v * 4 + BAYER4[yy % 4, xx % 4]) / 4).clip(0, 1)
+cv.a[:] = (cv.a * (1 - qv[..., None])).astype(np.uint8)
 
 big = Canvas(250, 350)
-big.a[:] = up(np.dstack([cv.a, np.full(cv.a.shape[:2], 255, np.uint8)]), 2)[..., :3]
-for i, c in enumerate([(40, 20, 5), (180, 130, 20), (240, 200, 60), (40, 20, 5)]):
-    big.a[i, :] = c; big.a[-1 - i, :] = c; big.a[:, i] = c; big.a[:, -1 - i] = c
+big.a[:] = up(cv.a, 3)[0:350, 1:251]
 print(save(big, '05_pharaoh_tomb.png'))
