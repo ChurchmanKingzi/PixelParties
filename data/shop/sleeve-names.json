@@ -407,6 +407,206 @@
     {
       "id": "divine-balance",
       "name": "Divine Balance"
+    },
+    {
+      "id": "open-lead",
+      "name": "Open Lead"
+    },
+    {
+      "id": "night-watch",
+      "name": "Night Watch"
+    },
+    {
+      "id": "end-of-the-rainbow",
+      "name": "End of the Rainbow"
+    },
+    {
+      "id": "cracked-keeper",
+      "name": "Cracked Keeper"
+    },
+    {
+      "id": "stone-vigil",
+      "name": "Stone Vigil"
+    },
+    {
+      "id": "djinns-lamp",
+      "name": "Djinn's Lamp"
+    },
+    {
+      "id": "sword-in-the-stone",
+      "name": "Sword in the Stone"
+    },
+    {
+      "id": "mimics-lure",
+      "name": "Mimic's Lure"
+    },
+    {
+      "id": "first-snowfall",
+      "name": "First Snowfall"
+    },
+    {
+      "id": "breaking-free",
+      "name": "Breaking Free"
+    },
+    {
+      "id": "stargazer",
+      "name": "Stargazer"
+    },
+    {
+      "id": "afterburner",
+      "name": "Afterburner"
+    },
+    {
+      "id": "wingshadow",
+      "name": "Wingshadow"
+    },
+    {
+      "id": "all-seeing",
+      "name": "All-Seeing"
+    },
+    {
+      "id": "birthday-wish",
+      "name": "Birthday Wish"
+    },
+    {
+      "id": "buried-giant",
+      "name": "Buried Giant"
+    },
+    {
+      "id": "under-the-bed",
+      "name": "Under the Bed"
+    },
+    {
+      "id": "autumn-tiger",
+      "name": "Autumn Tiger"
+    },
+    {
+      "id": "world-on-a-shell",
+      "name": "World on a Shell"
+    },
+    {
+      "id": "harvest-dusk",
+      "name": "Harvest Dusk"
+    },
+    {
+      "id": "cheese-moon",
+      "name": "Cheese Moon"
+    },
+    {
+      "id": "earthrise",
+      "name": "Earthrise"
+    },
+    {
+      "id": "root-of-all-presents",
+      "name": "Root of All Presents"
+    },
+    {
+      "id": "odd-one-out",
+      "name": "Odd One Out"
+    },
+    {
+      "id": "balloon-drift",
+      "name": "Balloon Drift"
+    },
+    {
+      "id": "loan-shark",
+      "name": "Loan Shark"
+    },
+    {
+      "id": "lure-of-the-abyss",
+      "name": "Lure of the Abyss"
+    },
+    {
+      "id": "rain-singer",
+      "name": "Rain Singer"
+    },
+    {
+      "id": "maximum-lotl",
+      "name": "Maximum Lotl"
+    },
+    {
+      "id": "the-inquisitors-shadow",
+      "name": "The Inquisitor's Shadow"
+    },
+    {
+      "id": "feathered-serpent",
+      "name": "Feathered Serpent"
+    },
+    {
+      "id": "garden-of-gold",
+      "name": "Garden of Gold"
+    },
+    {
+      "id": "ember-hooves",
+      "name": "Ember Hooves"
+    },
+    {
+      "id": "heart-of-the-hive",
+      "name": "Heart of the Hive"
+    },
+    {
+      "id": "black-tortoise",
+      "name": "Black Tortoise"
+    },
+    {
+      "id": "dune-maw",
+      "name": "Dune Maw"
+    },
+    {
+      "id": "holy-cow",
+      "name": "Holy Cow"
+    },
+    {
+      "id": "thing-in-the-hull",
+      "name": "Thing in the Hull"
+    },
+    {
+      "id": "loose-thread",
+      "name": "Loose Thread"
+    },
+    {
+      "id": "live-wire",
+      "name": "Live Wire"
+    },
+    {
+      "id": "down-the-rabbit-hole",
+      "name": "Down the Rabbit Hole"
+    },
+    {
+      "id": "through-the-keyhole",
+      "name": "Through the Keyhole"
+    },
+    {
+      "id": "threads-of-fate",
+      "name": "Threads of Fate"
+    },
+    {
+      "id": "frost-nest",
+      "name": "Frost Nest"
+    },
+    {
+      "id": "crystal-heist",
+      "name": "Crystal Heist"
+    },
+    {
+      "id": "dragon-gate",
+      "name": "Dragon Gate"
+    },
+    {
+      "id": "bamboo-sentinel",
+      "name": "Bamboo Sentinel"
+    },
+    {
+      "id": "projection",
+      "name": "Projection"
+    },
+    {
+      "id": "first-bloom",
+      "name": "First Bloom"
+    },
+    {
+      "id": "great-wave",
+      "name": "Great Wave"
     }
   ]
 }
