@@ -2158,11 +2158,14 @@ function HeroIdleSprite({ cardName, angehalten, versteinert, unsichtbar }) {
   const { meta, kern } = eintrag;
   const fw = meta.frameWidth, fh = meta.frameHeight;
   const cw = Math.max(1, kern.x1 - kern.x0), ch = Math.max(1, kern.y1 - kern.y0);
-  // Maßstab: 2,8125 Kartenpixel je Sprite-Pixel (v1453: nochmals +25 %;
-  // v1452: 2,25, v1451: 1,5, v1450: 1 — Als Vorgabe 27.9.), große
-  // Sprites eingepasst in 168,75 × 84,375 (Kartenhöhe 90; die Figur
-  // steht aufrecht über der Karte).
-  const s = Math.min(2.8125, 168.75 / cw, 84.375 / ch);
+  // Maßstab: 2,8125 Kartenpixel je Sprite-Pixel für ALLE Helden (v1453:
+  // nochmals +25 %; v1452: 2,25, v1451: 1,5, v1450: 1 — Als Vorgabe
+  // 27.9.). ★ v1454: keine Einpassung großer Sprites mehr (Als Vorgabe
+  // 27.9.: „Größere Sprites werden runterskaliert und wirken dadurch
+  // deutlich kleiner als normale Menschen wie Lilly") — ein Sprite-Pixel
+  // ist bei jedem Helden gleich groß, Bubbles & Co. stehen also in ihrer
+  // echten Größe neben den anderen.
+  const s = 2.8125;
   const bs = (n) => `${+n.toFixed(3)}px * var(--board-scale)`;
   // ★ v1452 (Als Vorgabe 27.9.): „Sofern nicht anders angegeben, bildet
   // immer das GESICHT des Heroes den Bildmittelpunkt." Reihenfolge:
@@ -2186,7 +2189,7 @@ function HeroIdleSprite({ cardName, angehalten, versteinert, unsichtbar }) {
     width: `calc(${bs(fw * s)})`,
     height: `calc(${bs(fh * s)})`,
   };
-  const schattenBreite = Math.max(8, Math.min(cw * s * 0.8, 88));
+  const schattenBreite = Math.max(8, cw * s * 0.8);
   const schattenStil = {
     width: `calc(${bs(schattenBreite)})`,
     left: `calc(50% - ${bs(schattenBreite / 2)})`,
