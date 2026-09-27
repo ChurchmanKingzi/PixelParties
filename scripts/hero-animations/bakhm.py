@@ -7,8 +7,13 @@ Aufruf: python3 bakhm.py <tag> [ms] [hero|worm]
 Beide kommen „aus dem Boden“: die untersten Zeilen laufen in die Transparenz
 aus. Der Übergang ist am Bild fest (der Boden bewegt sich nicht), so taucht
 beim Heben etwas mehr von ihnen auf.
-* Der Körper wiegt sich hin und her: je höher, desto stärker, der Teil im
-  Boden bleibt stehen.
+* hero: das Skelett besteht aus einzelnen Segmenten (Schädel mit Hals, drei
+  Wirbel, der unterste im Boden). Jedes bewegt sich in eigenem Takt: es
+  staucht sich um bis zu 2 px in das Segment darunter (die Stauchungen
+  addieren sich nach oben) und pendelt seitlich – benachbarte Segmente höchstens
+  1 px gegeneinander. Obere Segmente liegen über den unteren.
+* worm: der Körper wiegt sich hin und her: je höher, desto stärker, der Teil
+  im Boden bleibt stehen.
 * Er hebt und senkt sich um 1 px (taucht ein Stück auf und wieder ein).
 * Der Unterkiefer klappt zweimal pro Loop auf und zu (vorne weiter als am
   Gelenk).
@@ -24,7 +29,8 @@ from flap_common import fill_pinholes
 V = next((v for v in sys.argv[2:] if v in ('hero', 'worm')), 'hero')
 CFG = {
     'hero': dict(slug='bakhm-the-desert-digger', prefix='bakhm', sway=2.0,
-                 jaw=lambda x, y: 17 <= y <= 23 and x <= 22, hinge=22),
+                 jaw=lambda x, y: 17 <= y <= 23 and x <= 22, hinge=22,
+                 segments=[0, 24, 32, 42, 54]),     # Startzeilen: Schädel+Hals, Wirbel …, Boden
     'worm': dict(slug='world-eater-bakhm', prefix='world_eater_bakhm', sway=2.0,
                  jaw=lambda x, y: 13 <= y <= 22 and x <= 24, hinge=24),
 }[V]
@@ -47,6 +53,21 @@ def sway(y, i):
     return int(round(CFG['sway'] * h ** 1.3 * math.sin(2 * math.pi * i / 24)))
 
 
+SEG_PERIOD, SEG_PHASE = 12, [0.0, 1.2, 2.4, 3.6]  # Stauchtakt je Segment (Schädel zuerst)
+SEG_SWAY = [2.0, 1.5, 1.0, 0.5]                     # seitliches Pendeln je Segment
+
+
+def seg_motion(i):
+    """(dy, dx) je Segment; das unterste (im Boden) bleibt stehen."""
+    n = len(CFG['segments'])
+    own = [int(round(1 + math.sin(2 * math.pi * i / SEG_PERIOD - SEG_PHASE[k]))) for k in range(n - 1)] + [0]
+    dys = [sum(own[k:]) for k in range(n)]           # Stauchungen addieren sich nach oben
+    dxs = [int(round(SEG_SWAY[k] * math.sin(2 * math.pi * i / 24 - 0.6 * k))) for k in range(n - 1)] + [0]
+    for k in range(n - 2, -1, -1):                   # höchstens 1 px gegen das Segment darunter
+        dxs[k] = max(dxs[k + 1] - 1, min(dxs[k + 1] + 1, dxs[k]))
+    return dys, dxs
+
+
 def rise(i):
     return -1 if (i % 24) in range(6, 18) else 0
 
@@ -67,12 +88,23 @@ def frame(i):
     out = np.zeros((H, W, 4), int)
     oy = PT + rise(i)
     op = jaw_open(i)
-    for y in range(SH):
-        for x in range(SW):
-            if not s[y, x, 3]:
-                continue
-            dy = int(round(op * 2 * (CFG['hinge'] - x) / CFG['hinge'])) if CFG['jaw'](x, y) else 0
-            out[y + oy + dy, x + P + sway(y, i)] = s[y, x]
+    if 'segments' in CFG:
+        dys, dxs = seg_motion(i)
+        segs = CFG['segments'] + [SH]
+        for k in range(len(CFG['segments']) - 1, -1, -1):   # unten zuerst, obere liegen darüber
+            for y in range(segs[k], segs[k + 1]):
+                for x in range(SW):
+                    if not s[y, x, 3]:
+                        continue
+                    dy = int(round(op * 2 * (CFG['hinge'] - x) / CFG['hinge'])) if CFG['jaw'](x, y) else 0
+                    out[y + oy + dy + dys[k], x + P + dxs[k]] = s[y, x]
+    else:
+        for y in range(SH):
+            for x in range(SW):
+                if not s[y, x, 3]:
+                    continue
+                dy = int(round(op * 2 * (CFG['hinge'] - x) / CFG['hinge'])) if CFG['jaw'](x, y) else 0
+                out[y + oy + dy, x + P + sway(y, i)] = s[y, x]
     fill_pinholes(out)
     for y in range(GROUND - FADE, GROUND):           # unten in den Boden auslaufen lassen
         f = (GROUND - y) / (FADE + 1)
