@@ -617,10 +617,6 @@
       "name": "Summer Blaze"
     },
     {
-      "id": "heartguard",
-      "name": "Heartguard"
-    },
-    {
       "id": "glacier-vault",
       "name": "Glacier Vault"
     },
@@ -639,6 +635,11 @@
     {
       "id": "dolls-in-the-dark",
       "name": "Dolls in the Dark"
+    },
+    {
+      "id": "coolness-race",
+      "name": "Coolness Race",
+      "formerId": "heartguard"
     }
   ]
 }
