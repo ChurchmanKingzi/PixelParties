@@ -2456,7 +2456,7 @@ function HeroStatusPartikel({ effekte, kern, s, mitteX, fw, fh, saat }) {
 // `versteinert`: zusätzlich Steinoptik (kriecht von unten nach oben).
 // `eingefroren`: zusätzlich eine Eiskruste um die Figur (v1457/v1458).
 // `effekte`: weitere Status als Leerzeichen-Liste (Tönung + Partikel, v1459).
-function HeroIdleSprite({ cardName, angehalten, versteinert, eingefroren, effekte, unsichtbar }) {
+function HeroIdleSprite({ cardName, angehalten, versteinert, eingefroren, effekte, unsichtbar, eingeklappt }) {
   const key = HeroIdleAnims.slug(cardName);
   // Eisblock: 'da' solange Frozen, danach kurz 'schmilzt' (zerspringt),
   // dann 'weg'.
@@ -2487,6 +2487,7 @@ function HeroIdleSprite({ cardName, angehalten, versteinert, eingefroren, effekt
   zustand.current.angehalten = !!angehalten;
   zustand.current.versteinert = !!versteinert;
   zustand.current.effekte = effekte || '';
+  zustand.current.eingeklappt = !!eingeklappt;
 
   useEffect(() => {
     const cv = canvasRef.current, platz = platzRef.current, anker = ankerRef.current;
@@ -2505,7 +2506,7 @@ function HeroIdleSprite({ cardName, angehalten, versteinert, eingefroren, effekt
       // Beim Aufbau schon versteinert (Neuladen, Beitritt) → sofort Stein.
       stein: zustand.current.versteinert ? 1 : 0,
       gemalt: -1, steinGemalt: -1,
-      lage: '', hover: false,
+      lage: '', skaliert: false, weg: false,
     };
     const quelle = (f) => (vertikal ? [0, f * fh] : [f * fw, 0]);
     const male = () => {
@@ -2579,16 +2580,26 @@ function HeroIdleSprite({ cardName, angehalten, versteinert, eingefroren, effekt
       }
       const hover = !!(l && zone.classList.contains('zone-has-card') && zone.matches(':hover')
         && !l.plane.hasAttribute('data-pp-dragging'));
-      if (hover !== st.hover) {
-        st.hover = hover;
+      // v1463 (Dynamic Heroes): während eines Zielwahl-Dialogs klappt die
+      // Figur ein wie beim Hover — aber ohne die Hover-Vergrößerung, die
+      // nur mit der Karte selbst mitgehen soll.
+      if (hover !== st.skaliert) {
+        st.skaliert = hover;
+        platz.classList.toggle('hero-idle-hover', hover);
+      }
+      const weg = hover || !!zustand.current.eingeklappt;
+      if (weg !== st.weg) {
+        st.weg = weg;
         // ★ v1452 (Als Vorgabe 27.9.): Hovert man die Heldenkarte, zieht
         // sich die Figur wie ein Hologramm in die Karte zurück — die
         // Status-Icons darunter werden frei. Beim Verlassen taucht sie
         // wieder auf. Seit v1453 nur noch die BEWEGUNG einer Projektion,
-        // ohne Hologramm-Optik (Tönung, Scanlines, Flackern). `hero-idle-zurueck` trägt nur die Auftauch-
-        // Animation und fällt an deren Ende weg (siehe animationend).
-        platz.classList.toggle('hero-idle-hover', hover);
-        platz.classList.toggle('hero-idle-zurueck', !hover);
+        // ohne Hologramm-Optik (Tönung, Scanlines, Flackern).
+        // `hero-idle-weg` trägt das Einklappen (Hover ODER Zielwahl),
+        // `hero-idle-zurueck` nur die Auftauch-Animation und fällt an
+        // deren Ende weg (siehe animationend).
+        platz.classList.toggle('hero-idle-weg', weg);
+        platz.classList.toggle('hero-idle-zurueck', !weg);
       }
     };
     const holo = platz.querySelector('.hero-idle-holo');
@@ -24404,6 +24415,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   // davon hängt ab, ob die Karten ihre Status-Overlays noch selbst zeigen.
   const [, setHeldenAnimListe] = useState(0);
   useEffect(() => { HeroIdleAnims.ladeListe().then(() => setHeldenAnimListe(n => n + 1)); }, []);
+  // v1463: Profil-Optionen „Display Heroes" / „Dynamic Heroes" (beide
+  // standardmäßig an; ohne Display kein Dynamic).
+  const heldenAnzeigen = user?.display_heroes == null ? true : !!user.display_heroes;
+  const heldenDynamisch = heldenAnzeigen && (user?.dynamic_heroes == null ? true : !!user.dynamic_heroes);
   const isSpectator = gameState.isSpectator || false;
   const myIdx = gameState.myIndex;
   const oppIdx = myIdx === 0 ? 1 : 0;
@@ -41063,7 +41078,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           // Helden ohne Spritesheet behalten ihre Karten-Overlays.
           const figurName = (formPreview && formPreview.owner === pi && formPreview.heroIdx === i
             && CARDS_BY_NAME[formPreview.cardName]) ? formPreview.cardName : hero?.name;
-          const figurDa = !!(hero?.name && !isDead && !isRamming && HeroIdleAnims.hatAnimation(figurName));
+          const figurDa = !!(heldenAnzeigen && hero?.name && !isDead && !isRamming && HeroIdleAnims.hatAnimation(figurName));
           // Chain target pick
           const isChainPickValid = chainPickValidIds.has(heroTargetId);
           const isChainPickSelected = chainPickSelectedIds.has(heroTargetId);
@@ -41284,9 +41299,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     Gelähmt (Frozen/Stunned/Webbed) → Frame steht still;
                     versteinert → zusätzlich Steinoptik. Name wie auf der
                     Karte (vorgezogene Gestalt, Shapeshifter-Kopie). */}
-                {hero?.name && !isDead && !isRamming && (
+                {heldenAnzeigen && hero?.name && !isDead && !isRamming && (
                   <HeroIdleSprite
                     cardName={figurName}
+                    eingeklappt={heldenDynamisch && (isTargeting || !!chainPickData)}
                     angehalten={!!(isFrozen || isStunned)}
                     eingefroren={!!isFrozen}
                     effekte={[

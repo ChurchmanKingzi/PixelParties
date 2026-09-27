@@ -3703,7 +3703,7 @@ body:has(.anim-backdrop) .pp-bg-particles { display: none; }
   inset: 0;
   transform-origin: 50% 100%;
 }
-.hero-idle-hover .hero-idle-holo { animation: heroHoloRueckzug .32s ease-in forwards; }
+.hero-idle-weg .hero-idle-holo { animation: heroHoloRueckzug .32s ease-in forwards; }
 .hero-idle-zurueck .hero-idle-holo { animation: heroHoloAuftauchen .36s ease-out both; }
 @keyframes heroHoloRueckzug {
   0%   { opacity: 1; transform: none; }
@@ -3751,7 +3751,7 @@ body:has(.anim-backdrop) .pp-bg-particles { display: none; }
   transform: rotateX(calc(-1 * var(--sprite-kipp, 0deg))) scaleY(var(--sprite-streck, 1)) translateZ(.5px);
   transition: opacity .25s ease;
 }
-.hero-idle-hover .hero-idle-fx { opacity: 0; }
+.hero-idle-weg .hero-idle-fx { opacity: 0; }
 .hero-idle-unsichtbar .hero-idle-fx { opacity: .4; }
 .hfx { position: absolute; display: block; line-height: 0; pointer-events: none; }
 .hfx .pp-px { display: block !important; }
@@ -3819,7 +3819,7 @@ body:has(.anim-backdrop) .pp-bg-particles { display: none; }
   animation: heroIdleSchatten .55s ease-out backwards;
   transition: opacity .3s ease;
 }
-.hero-idle-platz.hero-idle-hover .hero-idle-schatten { opacity: 0; }
+.hero-idle-platz.hero-idle-weg .hero-idle-schatten { opacity: 0; }
 @keyframes heroIdleSchatten {
   from { opacity: 0; transform: scaleX(.3); }
   to   { opacity: 1; transform: none; }
@@ -3827,11 +3827,21 @@ body:has(.anim-backdrop) .pp-bg-particles { display: none; }
 @media (prefers-reduced-motion: reduce) {
   .hero-idle-canvas, .hero-idle-schatten { animation: none; }
   /* ohne Bewegung: einfach aus- und einblenden */
-  .hero-idle-hover .hero-idle-holo,
+  .hero-idle-weg .hero-idle-holo,
   .hero-idle-zurueck .hero-idle-holo { animation: none; }
   .hero-idle-holo { transition: opacity .2s ease; }
-  .hero-idle-hover .hero-idle-holo { opacity: 0; }
+  .hero-idle-weg .hero-idle-holo { opacity: 0; }
 }
+
+/* v1463: Checkboxen der Helden-Anzeige im Profil */
+.profile-checks { display: flex; flex-wrap: wrap; gap: 8px 22px; margin-top: 12px; }
+.profile-check {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 12px; color: var(--text); cursor: pointer; user-select: none;
+}
+.profile-check input { width: 15px; height: 15px; accent-color: var(--accent); cursor: pointer; margin: 0; }
+.profile-check.profile-check-aus { color: var(--text2); opacity: .55; cursor: default; }
+.profile-check.profile-check-aus input { cursor: default; }
 
 /* ═══ Status Effect Visuals ═══ */
 
