@@ -11,7 +11,7 @@ steht vor/unter der Stufe und überdeckt sie).
 
 Quellen (MotiveArcanum):
   154 „GEHEIMRAUM“ (Thronsaal x650–733 / y126–243), 153 „Mithuru“ + 152 „Ebene #29“ (Glas) + 151 „Ebene #30“
-  (Wein) – zusammen wie in Szene „Sichtbar #33“ (Karte Lord Mithuru, the Rotten Mastermind),
+  (Wein) – zusammen wie in Szene „Sichtbar #32“ (Karte Lord Mithuru, the Rotten Mastermind),
   63 „Ebene #75“ (Celia von hinten, vgl. „Sichtbar #18“)
 """
 from common import *

@@ -1,82 +1,101 @@
 # -*- coding: utf-8 -*-
-"""Sleeve 04 – Nächtliche Yokai-Parade (Hyakki Yagyō der Rebelliokai).
+"""Sleeve 04 – Yokai-Parade über die rote Brücke (Runde 3b überarbeitet).
 
-Unter violettem Nachthimmel zieht die Rebelliokai-Bande über die rote Bogenbrücke: die Bakus
-trippeln auf der Brücke, der Tengu schwebt mit seinem Fächer voraus, vorne am Ufer aus
-Kirschblüten tanzen Tanuki, Kitsune (mit Fuchsfeuer-Schwänzen) und der Oni mit seiner
-Keule. Brücke und Himmel spiegeln sich dunkel im Fluss, Blütenblätter wehen.
-Quellen (MotiveJapan.xcf): Ebene #137 [246] (Nachthimmel), Brücke [84], Ebene #13 [245]
-(Kirschblüten-Ufer), Ebene #75 [52] (Blütenblätter), Backup Bakus [30], Ebene #171 [209] +
-Ebene #173 [205] (Tengu + Fächer), Kitsune [223] + Ebene #129 [222] (Fuchsfeuer), Tanuki [182],
-Ebene #115 [107] + Ebene #118 [101] (Oni + Keule), Kirin [166].
-Wasser: gespiegelter, abgedunkelter Himmel/Brücke (selbst erstellt).
+Bei Sonnenuntergang zieht die Rebelliokai-Bande über die rote Bogenbrücke: vorneweg fliegt der Tengu
+mit seinem Fächer, dahinter trippeln ein Baku, der jubelnde Tanuki, der Oni (seine Stachelkeule steht
+wie auf der Karte neben ihm) und ein zweiter Baku. Unter der Brücke lauert der getarnte Kappa mit
+gezogenem Schwert halb im Wasser (halbtransparent wie auf seiner Karte), das Wasser spiegelt Brücke
+und Abendhimmel. Kitsune und Kirin sind entfernt (nur noch in Sleeve 06 → Doppelung aufgelöst).
+
+Skalierung: ALLES einheitlich 3× (Szene im 3×-Raster = 84×117 Zellen): Himmel, Sonne, Brücke,
+alle Figuren, Wasser, Spiegelung, Blütenblätter. Die Figuren stehen auf dem Brückendeck
+(Fußlinie folgt dem Bogen), das vordere Geländer verdeckt die Füße.
+
+Quellen (MotiveJapan.xcf): Brücke [84], Ebene #171 [209] + Ebene #173 [205] (Tengu + Fächer, geprüft
+gegen Sichtbar #37), Ebene #115 [107] + Ebene #118 [101] (Oni + Keule, Sichtbar #20), Tanuki [182]
+(Sichtbar #17), Backup Bakus [30] (Sichtbar #20), Kappa [42] (Karte „Rebelliokai Camouflaged Kappa“),
+Ebene #75 [52] (Blütenblätter). Himmel, Sonne, Wasser und Spiegelung: selbst erstellt im 3×-Raster.
 """
 from a_util import *  # noqa
 
 B = 'MotiveJapan'
 cv = Canvas(250, 350)
+G = 3
+lo = lowres(G)                                       # 84×117
 
-sky = layer(B, 246)[220:460, 181:460]               # 279×240 violetter Himmel
-bridge = sprite('a04_bridge', B, [84])
-bank = layer(B, 245)
-petals = sprite('a04_petals', B, [52])
+bridge = sprite('a04_bridge', B, [84])              # 109×42
 bakus = [p for p in parts(sprite('a04_bakus', B, [30]), dil=1) if p.shape == (20, 20, 4)]
 tengu = sprite('a04_tengu', B, [209, 205])
-kitsune = sprite('a04_kitsune', B, [223, 222])
 tanuki = sprite('a04_tanuki', B, [182])
-oni = sprite('a04_oni', B, [107, 101])
-kirin = sprite('a04_kirin', B, [166])
-print('bakus', [b.shape for b in bakus], 'tengu', tengu.shape, 'oni', oni.shape)
+oni = sprite('a04_oni', B, [107])
+club = sprite('a04_club', B, [101])
+kappa = sprite('a04_kappa', B, [42])
+petals = [q for q in parts(sprite('a04_petals', B, [52]), dil=0) if 2 <= q.shape[0] * q.shape[1] <= 6]
 
-# --- Himmel ------------------------------------------------------------------------------------
-HOR = 196                                            # Wasserlinie
-blit_rgb(cv, darken(sky[0:100, 40:165], 0.78), 0, 0, 2)
+BX, BY = (84 - 109) // 2, 60                         # Brücke links oben (Raster)
+WL = BY + 34                                         # Wasserlinie (Fuß der Pfeiler)
 
-# --- Brücke (2×) ---------------------------------------------------------------------------------
-BX, BY = 16, HOR - bridge.shape[0] * 2 + 10
-# Bakus laufen über die Brücke (zwischen hinterem und vorderem Geländer ist kein eigener Layer →
-# Figuren hinter die Brücke setzen, Köpfe schauen über das Geländer)
-deck = []
-walkers = [(kirin, 1)] + [(b, 0) for b in bakus[:3]]
-xs = [BX + 150, BX + 110, BX + 80, BX + 50]
-for (bk, _), x in zip(walkers, xs):
-    # Höhe der Brückenoberkante an dieser Stelle (erste deckende Zeile der Spalte)
-    col = (x - BX) // 2
-    top = np.where(bridge[:, min(col, bridge.shape[1] - 1), 3] > 0)[0].min()
-    deck.append((bk, x, BY + top * 2 + 10))
-for bk, x, y in deck:
-    put(cv, bk, x, y, 2, anchor='b', fl=True)
-put(cv, bridge, BX, BY, 2)
 
-# --- Wasser: Spiegelung von Himmel + Brücke --------------------------------------------------------
-refl = cv.a[HOR - (350 - HOR):HOR][::-1].copy()
-water = (refl.astype(float) * 0.45 + np.array([10, 10, 40]) * 0.55).astype(np.uint8)
-cv.a[HOR:350] = water[:350 - HOR]
-# waagerechte Wellenlinien (Dither), heller Himmelston
-for y in range(HOR + 2, 350, 5):
-    for x in range(250):
-        if (x // 3 + y) % 7 in (0, 1): cv.a[y, x] = (np.array(cv.a[y, x], float) * 0.6 + np.array([150, 120, 220]) * 0.4).astype(np.uint8)
+def deck(cx):
+    """Zeile der Standfläche auf dem Brückendeck an Rasterspalte cx (Bogenform aus der Ebene gemessen)."""
+    col = cx - BX
+    return BY + 8 + ((col - 56) / 35.0) ** 2 * 5 + 3
 
-# --- Tengu schwebt voraus ---------------------------------------------------------------------------
-put(cv, tengu, 120, 8, 3)
 
-# --- Ufer mit Kirschblüten ----------------------------------------------------------------------------
-shore = bank[99:160, 0:125].copy()                    # Grasrand + Blütenteppich
-shore[..., 3] = 255
-put(cv, shore, 0, 262, 2)
+# --- Abendhimmel + Sonne ---------------------------------------------------------------------------------
+vgrad(lo, 0, WL, [(26, 12, 52), (70, 26, 86), (150, 50, 96), (232, 110, 80), (250, 170, 90)])
+SX, SY, SR = 21, 30, 13
+for y in range(SY - SR, SY + SR):
+    for x in range(SX - SR, SX + SR):
+        d = math.hypot(x + .5 - SX, y + .5 - SY)
+        if d < SR and 0 <= x < 84 and 0 <= y < WL:
+            lo.a[y, x] = (255, 214, 120) if d < SR - 2 else (252, 180, 100)
+# waagerechte Wolkenstreifen vor der Sonne
+for (y, x0, x1, c) in [(SY + 3, 2, 34, (200, 90, 110)), (SY + 4, 8, 44, (200, 90, 110)),
+                       (SY - 5, 16, 40, (170, 70, 110)), (SY + 12, 26, 60, (190, 84, 104))]:
+    lo.rect(x0, y, x1, y + 1, c)
 
-# --- Vordergrund-Parade ---------------------------------------------------------------------------------
-put(cv, kitsune, 58, 322, 4, anchor='b', shadow=0.4)
-put(cv, oni, 190, 334, 4, anchor='b', shadow=0.4)
-put(cv, tanuki, 116, 352, 4, anchor='b', shadow=0.4)
+# --- Figuren auf dem Deck (hinter dem vorderen Geländer) --------------------------------------------------------
+lo.paste(bridge, BX, BY)
+walkers = [(bakus[0], 11), (tanuki, 29), (oni, 49), (bakus[2], 74)]
+for s, cx in walkers:
+    fy = int(round(deck(cx)))
+    lo.paste(s, cx - s.shape[1] // 2, fy - s.shape[0] + 1)
+fy = int(round(deck(60)))
+lo.paste(club, 60 - club.shape[1] // 2, fy - club.shape[0] + 1)
+# vorderes Geländer (alles unterhalb der Standfläche) wieder darüber → verdeckt die Füße
+front = bridge.copy()
+for col in range(front.shape[1]):
+    cut = int(round(deck(col + BX) - BY)) - 1
+    front[:max(0, cut), col] = 0
+lo.paste(front, BX, BY)
 
-# Blütenblätter wehen quer durchs Bild
-pp_ = [q for q in parts(petals, dil=0) if q.shape[0] * q.shape[1] >= 4]
-rng = np.random.RandomState(7)
-spots = [(20, 60), (60, 84), (96, 40), (30, 150), (214, 150), (238, 124), (80, 176), (100, 226),
-         (150, 120), (116, 250 - 90), (10, 110), (190, 180)]
-for (x, y), i in zip(spots, rng.choice(len(pp_), len(spots), replace=False)):
-    put(cv, pp_[i], x, y, 2)
+# --- Tengu fliegt voraus ------------------------------------------------------------------------------------------
+lo.paste(tengu, 84 - tengu.shape[1] - 3, 3)
 
-frame(cv, [(14, 4, 20), (140, 30, 40), (240, 150, 190), (14, 4, 20)])
+# --- Wasser mit Spiegelung ----------------------------------------------------------------------------------------
+refl = lo.a[WL - (117 - WL):WL][::-1].astype(float)
+water = refl * 0.5 + np.array([30, 20, 70]) * 0.5
+lo.a[WL:] = water[:117 - WL].astype(np.uint8)
+for y in range(WL + 1, 117, 3):
+    for x in range(84):
+        if (x + 2 * y) % 9 < 3:
+            lo.a[y, x] = (lo.a[y, x] * 0.55 + np.array([255, 190, 150]) * 0.45 * (1 - (y - WL) / 60)).clip(0, 255)
+lo.rect(0, WL, 84, WL + 1, (60, 30, 70))
+
+# Kappa lauert halb im Wasser (untere Hälfte durchscheinend, Tarnung wie auf der Karte)
+KX, KY = 6, WL + 3
+top = kappa.copy(); top[11:] = 0
+bot = kappa.copy(); bot[:11] = 0
+lo.paste(bot, KX, KY, alpha=0.4)
+lo.paste(top, KX, KY)
+for dx in (-3, -2, 17, 18, 19):                                    # Kräuselwellen links/rechts vom Körper
+    lo.px(KX + 6 + dx, KY + 11, (230, 170, 160))
+
+# Blütenblätter
+for (x, y), i in zip([(30, 10), (8, 24), (40, 30), (12, 44), (22, 4), (70, 50), (4, 60)],
+                     [2, 9, 15, 22, 30, 38, 45]):
+    lo.paste(petals[i % len(petals)], x, y)
+
+blow(cv, lo, G)
 print(save(cv, '04_yokai_parade.png'))
