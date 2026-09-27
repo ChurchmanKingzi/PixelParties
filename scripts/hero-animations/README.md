@@ -71,6 +71,12 @@ kopiert, daneben liegt eine JSON-Datei mit den Metadaten. Die erzeugten
 | `magenta.py` | `final` | `magenta_idle_final_sheet.png` | `cute-nerd-magenta` |
 | `jenny.py` | `final` | `jenny_idle_final_sheet.png` | `jenny-the-class-fairy` |
 | `molinda.py` (+ `molinda_wings.py`) | `final` | `molinda_idle_final_sheet.png` | `molinda-the-cutest-being-in-the-sky` |
+| `alice.py` | `final` | `alice_idle_final_sheet.png` | `alice-the-transfer-student` |
+| `mithuru.py` | `final` | `mithuru_idle_final_sheet.png` | `lord-mithuru-the-rotten-mastermind` |
+| `thalia.py` | `final` | `thalia_idle_final_sheet.png` | `thalia-the-fun-fairy` |
+| `null.py` | `final` | `null_idle_final_sheet.png` | `null-the-mage-slayer` |
+| `maho.py` | `final` | `maho_idle_final_sheet.png` | `maho-the-cute-magical-girl` |
+| `atta.py` | `final` | `atta_idle_final_sheet.png` | `atta-speaker-of-desires` |
 | `bubbles.py` | `final gross` | `bubbles_idle_final_gross_sheet.png` | `bubbles-the-bouncy-bunny` |
 
 `bubbles.py` ohne `gross` erzeugt eine auf Hero-Größe verkleinerte Variante
@@ -96,6 +102,7 @@ python3 xcf_extract.py MotiveMoe.xcf assemble src/cute-princess-mary.png "Mary-K
 |---|---|---|
 | `cute-princess-mary.png` | `MotiveMoe.xcf` | `Mary-Kopie` (goldene Mary mit Krone) + `Mary #1` (Flügel) |
 | alle übrigen MotiveMoe-Heroes | `MotiveMoe.xcf` | reproduzierbar per `python3 assemble_moe.py <MotiveMoe.xcf>` (Zuordnung im Skriptkopf) |
+| MotiveArcanum-Heroes | `MotiveArcanum.xcf` | reproduzierbar per `python3 assemble_arcanum.py <MotiveArcanum.xcf>` (Zuordnung im Skriptkopf) |
 
 Neue Datei durchsuchen: `xcf_scan.py dump` legt alle Ebenen einzeln ab,
 `xcf_scan.py match <ordner> --heroes` gleicht sie mit allen noch nicht
@@ -189,3 +196,7 @@ Variante ohne Krone/Flügel), Hintergründe/Auren der Karte gehören nicht zum S
 * Vorhandene Mimik genau ansehen: ein roter Fleck unten im Gesicht ist oft
   schon ein offener Mund (Vena) – Brüllen dann nur dezent verstärken. Ein
   Strich-Auge kann schon ein Zwinkern sein (Monia).
+* **Loop-Längen**: jede Teilbewegung muss N glatt teilen (Federn alle 12
+  Frames -> N = 36, nicht 32), sonst bricht am Loop-Ende eine Bewegung ab
+  und es entstehen z. B. zwei schnelle Bounces hintereinander. Zufalls-
+  Partikel mit Generationen: Generation modulo (N / Periode) nehmen.

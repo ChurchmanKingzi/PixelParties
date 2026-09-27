@@ -1,0 +1,15 @@
+{
+  "hero": "Maho, the Cute Magical Girl",
+  "sheet": "maho-the-cute-magical-girl.png",
+  "frameWidth": 26,
+  "frameHeight": 34,
+  "frames": 48,
+  "frameMs": 90,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 10,
+  "padLeft": 2,
+  "padRight": 2,
+  "padBottom": 1,
+  "faceX": 13
+}

@@ -1,0 +1,15 @@
+{
+  "hero": "Lord Mithuru, the Rotten Mastermind",
+  "sheet": "lord-mithuru-the-rotten-mastermind.png",
+  "frameWidth": 20,
+  "frameHeight": 33,
+  "frames": 36,
+  "frameMs": 90,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 3,
+  "padLeft": 2,
+  "padRight": 2,
+  "padBottom": 1,
+  "faceX": 10
+}
