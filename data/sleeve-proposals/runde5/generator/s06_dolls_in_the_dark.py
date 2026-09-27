@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""06 – Alice, the Puppeteer Girl (Entwurf v6).
+"""06 – Alice, the Puppeteer Girl (Entwurf v7).
 Idee: Nachts in Alices Zimmer im Herrenhaus. Alice steht groß auf dem violetten Läufer, die Arme
 ausgebreitet, an ihren Fäden sitzen ihre zwei Puppen. Der Raum dahinter liegt im Dunkeln – nur ihr
 eigener violetter Magieschein; in der Finsternis glühen die roten Puppenaugen (im Schrank, im Spiegel ...).
@@ -53,10 +53,19 @@ rug2[341 + E:] = rug[341:rug.shape[0] - E]
 acc = over(room, rug2)
 acc = over(acc, layer(D, 56))                               # Bild im Rahmen (Alice-Porträt), Kristallkugel
 gh8 = keep_boxes(l8, [(227, 291, 237, 302)])                # Geister-Puppe im Spiegel (alpha 76)
-ward = keep_boxes(l8, [(243, 283, 256, 303)])               # liegende Puppe auf dem Schrank + rote Augen darin
+ward = keep_boxes(l8, [(243, 283, 256, 295)])               # liegende Puppe auf dem Schrank
+ward[np.all(ward[..., :3] == (209, 0, 0), -1)] = 0             # (ohne die gepunkteten roten Fäden)
 bed = keep_boxes(l8, [(276, 283, 288, 295)])                # Puppe auf dem Bett (ohne ihren roten Faden)
 bed[np.all(bed[..., :3] == (209, 0, 0), -1)] = 0
 acc = over(acc, gh8); acc = over(acc, ward); acc = over(acc, bed)
+# im offenen, schwarzen Schrank (x 242–253, y 295–305) lauert eine Puppe: fast schwarz, nur die Augen glühen
+sit = [p for p in parts(l8, dil=0, minpx=2) if p.shape[:2] == (12, 12)][0]
+lurk = sit.copy()
+isred = np.zeros(lurk.shape[:2], bool)
+for c in EMIS: isred |= np.all(lurk[..., :3] == c, -1)
+lurk[~isred, :3] = (lurk[~isred, :3] * 0.12).astype(np.uint8)
+lurk = lurk[:11]
+acc = put(acc, lurk, 242, 295)
 # zwei stehende Puppen am Fuß der hinteren Säulen (gespiegelt, symmetrisch zur Achse)
 dolls = parts(l8, dil=0, minpx=2)
 stand = [p for p in dolls if p.shape[:2] == (12, 8)][0]
@@ -136,7 +145,7 @@ AL = rgba(50, 70)
 gx, gyb = 5, 61                                    # Gruppe x 236–275 (Alice 248–263) genau mittig, Unterkante y 61
 for y in range(70):
     for x in range(50):
-        d = ((x + .5 - 25) / 18) ** 2 + ((y + .5 - (gyb - 1.2)) / 2.4) ** 2
+        d = ((x + .5 - 25) / 19) ** 2 + ((y + .5 - (gyb - 2.5)) / 3.6) ** 2
         if d < 1 and 0.6 > bay(x, y):
             AL[y, x] = (8, 0, 18, 170)
 tmp = rgba(50, 70)
