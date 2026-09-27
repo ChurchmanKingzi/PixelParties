@@ -74,7 +74,7 @@ def put(s, x, y):
 drag = sprite('r4q_qinglong', B, [1521, 1522, 1526])   # Ursprung (230, 247) in Motive
 bolts = sprite('r4q_bolts', B, [1525])                  # Ursprung (234, 253)
 cloud = sprite('r4q_cloud', B, [1527])                  # Ursprung (218, 234)
-DX, DY = 8, 36                                          # Lage des Drachen (Ursprung 230,247) im 3×-Raster
+DX, DY = 8, 20                                          # Lage des Drachen (Ursprung 230,247) im 3×-Raster
 # Wolke hinten, quer über den oberen Rand (zweimal gesetzt, damit die Wolkendecke die Breite füllt)
 put(cloud, -40, DY - 13 - 6)
 put(cloud, DX - 12, DY - 13)
