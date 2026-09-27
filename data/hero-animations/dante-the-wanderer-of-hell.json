@@ -9,5 +9,6 @@
   "layout": "horizontal",
   "padTop": 1,
   "padLeft": 1,
-  "padRight": 1
+  "padRight": 1,
+  "faceX": 12.5
 }

@@ -76,6 +76,14 @@ pixelgenau.
   `layout` und – falls die Leinwand gegenüber dem Original vergrößert wurde –
   `padTop`/`padLeft`/`padRight`/`padBottom`. Um diesen Rand muss die Animation
   verschoben werden, damit sie deckungsgleich mit dem statischen Sprite liegt.
+* **`faceX`** (Pflicht für neue Sheets): waagrechte Mitte des **Gesichts** in
+  Frame-Pixeln, gemessen von der linken Frame-Kante (Kommazahlen erlaubt,
+  z. B. `12.5`). Auf dem Brett steht das Gesicht genau über der Kartenmitte –
+  Haare, Waffen oder Umhänge verschieben den Helden dadurch nicht mehr.
+  Fehlt `faceX`, nimmt das Brett den Schwerpunkt des obersten Figurendrittels.
+* **`anchorX`** (optional): ausdrücklich abweichender Bildmittelpunkt in
+  denselben Einheiten; hat Vorrang vor `faceX` („sofern nicht anders
+  angegeben, ist das Gesicht die Mitte").
 * Gemeinsame Helfer (Glitzersterne, Lichtschimmer, Speichern) in `anim_common.py`.
 
 ## Stil-Lektionen aus dem Feedback

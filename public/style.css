@@ -3645,7 +3645,7 @@ body:has(.anim-backdrop) .pp-bg-particles { display: none; }
   animation: announceShort 2s ease-out forwards;
 }
 
-/* ═══ Helden-Idle-Animation (v1450, echtes 3D seit v1451) ═══
+/* ═══ Helden-Idle-Animation (v1450, echtes 3D seit v1451, Zurückziehen v1452) ═══
    Die Figuren leben in `.hero-sprite-ebene`, einem Zwilling von
    `.board-plane` (Box und Transformation kopiert `HeroIdleAnims` live).
    Nur diese Ebene hat preserve-3d: jede Figur steht dort auf ihrer
@@ -3671,9 +3671,9 @@ body:has(.anim-backdrop) .pp-bg-particles { display: none; }
 /* drei Achsen: die aufrechte Figur liegt größtenteils in der z-Achse
    der Ebene — ein zweiachsiges `scale` ließe sie gedrungen wirken */
 .hero-idle-platz.hero-idle-hover { scale: var(--board-hover-scale) var(--board-hover-scale) var(--board-hover-scale); }
-/* Die aufrechte Figur. Unterkante = Drittellinie der Karte = Drehachse;
-   darunter wird abgeschnitten — daraus steigt der Held beim Auftritt
-   empor, als käme er aus der Karte. */
+/* Die aufrechte Figur. Unterkante = Kartenmitte (seit v1453, vorher
+   Drittellinie) = Drehachse; darunter wird abgeschnitten — daraus steigt
+   der Held beim Auftritt empor, als käme er aus der Karte. */
 .hero-idle-steher {
   position: absolute;
   overflow: hidden;
@@ -3687,28 +3687,64 @@ body:has(.anim-backdrop) .pp-bg-particles { display: none; }
   position: absolute;
   left: 0; top: 0;
   display: block;
-  animation: heroIdleAuftritt .55s steps(10, end) both;
+  /* `backwards`, nicht `both`: nach dem Auftritt gilt wieder der
+     normale Stil (sonst hielte das Animationsende Werte fest) */
+  animation: heroIdleAuftritt .55s steps(10, end) backwards;
 }
+/* ── Zurückziehen beim Hover (v1452, schlicht seit v1453) ──────────────
+   Hovert man die Heldenkarte, zieht sich die Figur wie eine Projektion
+   in die Karte zurück — zur waagrechten Linie zusammengezogen und weg —,
+   die Status-Icons liegen frei. Beim Verlassen zieht sie sich auf
+   demselben Weg wieder auf. Als Vorgabe 27.9.: „soll wie ein Hologramm
+   aussehen, aber keines SEIN" — also nur die Bewegung, keine Tönung,
+   keine Scanlines, kein Flackern. Drehpunkt sind die Füße. */
+.hero-idle-holo {
+  position: absolute;
+  inset: 0;
+  transform-origin: 50% 100%;
+}
+.hero-idle-hover .hero-idle-holo { animation: heroHoloRueckzug .32s ease-in forwards; }
+.hero-idle-zurueck .hero-idle-holo { animation: heroHoloAuftauchen .36s ease-out both; }
+@keyframes heroHoloRueckzug {
+  0%   { opacity: 1; transform: none; }
+  70%  { opacity: 1; transform: scaleX(1.06) scaleY(.12); }
+  100% { opacity: 0; transform: scaleX(.3) scaleY(0); }
+}
+@keyframes heroHoloAuftauchen {
+  0%   { opacity: 0; transform: scaleX(.3) scaleY(0); }
+  30%  { opacity: 1; transform: scaleX(1.06) scaleY(.12); }
+  80%  { transform: scaleY(1.03); }
+  100% { opacity: 1; transform: none; }
+}
+/* Unsichtbare Helden: halbtransparent wie ihre Karte */
+.hero-idle-unsichtbar .hero-idle-steher,
+.hero-idle-unsichtbar .hero-idle-schatten { opacity: .4; }
 @keyframes heroIdleAuftritt {
   0%   { transform: translateY(100%); filter: brightness(2.2); }
   70%  { transform: translateY(0);    filter: brightness(1.5); }
   100% { transform: translateY(0);    filter: none; }
 }
-/* Pixel-Bodenschatten, flach auf der Karte unter den Füßen */
+/* Pixel-Bodenschatten, flach auf der Kartenmitte unter den Füßen */
 .hero-idle-schatten {
   position: absolute;
-  top: calc(50% - 16.5px * var(--board-scale));
+  top: calc(50% - 1.5px * var(--board-scale));
   height: calc(3px * var(--board-scale));
   background: radial-gradient(ellipse at center, rgba(0,0,0,.5) 0 45%, rgba(0,0,0,.22) 46% 70%, transparent 71%);
-  animation: heroIdleSchatten .55s ease-out both;
-  transition: opacity .4s ease;
+  animation: heroIdleSchatten .55s ease-out backwards;
+  transition: opacity .3s ease;
 }
+.hero-idle-platz.hero-idle-hover .hero-idle-schatten { opacity: 0; }
 @keyframes heroIdleSchatten {
   from { opacity: 0; transform: scaleX(.3); }
   to   { opacity: 1; transform: none; }
 }
 @media (prefers-reduced-motion: reduce) {
   .hero-idle-canvas, .hero-idle-schatten { animation: none; }
+  /* ohne Bewegung: einfach aus- und einblenden */
+  .hero-idle-hover .hero-idle-holo,
+  .hero-idle-zurueck .hero-idle-holo { animation: none; }
+  .hero-idle-holo { transition: opacity .2s ease; }
+  .hero-idle-hover .hero-idle-holo { opacity: 0; }
 }
 
 /* ═══ Status Effect Visuals ═══ */
@@ -17202,6 +17238,16 @@ img, .card-tooltip-img img { image-rendering: pixelated; }
      die Quere." Der Verdunkler lag bei 1000, die eigene Hand bei 10000.
      Jetzt ueber Hand und Wahl-Panels (10080), unter den Ergebnis-
      Overlays und Kartenfluegen. */
+  z-index: 10085;
+}
+/* ★ v1453 (Als Befund 27.9.: „das Menü, um im Puzzle-Creator
+   Statuseffekte, HP usw. zu setzen, muss VOR der Hand angezeigt werden,
+   aktuell überdecken Handkarten es"). Derselbe Fall wie v1259 im Duell:
+   die Editor-Hand trägt `zIndex: 10000` (Inline-Stil in app-puzzle), die
+   Dialoge des Editors lagen mit dem Grundwert 1000 darunter. Gilt für
+   alle drei Editor-Dialoge (Stat-Editor, Stapel-Ansicht, Doom Clock) —
+   nur die Höhe, der Hintergrund bleibt der des Editors. */
+.screen-full:has(> .pz-layout) .modal-overlay {
   z-index: 10085;
 }
 .screen-full:has(> .game-layout) .modal,
