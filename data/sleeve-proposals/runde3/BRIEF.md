@@ -62,3 +62,45 @@ Skripte in /home/user/PixelParties/data/sleeve-proposals/runde3/generator/ ableg
 - Zusätzlich `runde3/notes_<Block>.md`: je Sleeve eine Zeile „NN | Titel | Idee | Quellen“.
 - **Keine git-Befehle** (kein commit/push) und keine Dateien außerhalb von runde3/ ändern. Andere Agenten arbeiten
   parallel in denselben Ordnern, fasse fremde Dateien nicht an.
+
+---
+
+# Runde 3b – Überarbeitung + 10 neue (Feedback des Nutzers, VERBINDLICH)
+
+**Lob:** „Blood Eclipse“ (34), „Count of the Deep“ (13), „Porthole“ (07), „Cybug Case“ (43) — „hier stimmt einfach die
+Komposition“. Diese vier werden NICHT verändert. Sie sind der Maßstab für alle anderen: ein klares Hauptmotiv, ruhiger
+Hintergrund, klare Tiefenstaffelung, einheitliche Pixelgröße.
+
+## Neue harte Regeln
+A. **Einheitliche Pixelgröße = sofortiges Ausschlusskriterium.** Alle Elemente, die auf derselben Bildebene/Tiefe
+   stehen, müssen dieselbe Skalierung haben (z. B. alle 3×). Unterschiedliche Pixelgrößen sind NUR erlaubt, wenn sie
+   klar aus der Perspektive folgen: Das größer skalierte Element steht eindeutig im Vordergrund (wie der Vampir in 13
+   vor dem 2×-Schloss). Nie zwei Figuren nebeneinander/auf derselben Höhe mit verschiedenen Skalierungen (Negativbeispiel:
+   „Tavern“ 45). Hintergründe/Kacheln zählen mit: ein 2×-Hintergrund hinter 5×-Figuren nur, wenn er klar weit hinten
+   liegt. Im Zweifel: alles in derselben Skalierung. Kein 1×-Element neben 3×-Elementen.
+B. **Vollständige Figuren.** Figuren bestehen oft aus mehreren Ebenen, die NICHT direkt übereinander im Ebenenstapel
+   liegen (Beispiel: Dantes Arme liegen in einer weiter oben gelegenen Ebene). Prüfe jede Figur gegen ihre
+   „Sichtbar“-Szene: Suche ALLE Ebenen der Datei, deren Pixel im Szenen-Abzug innerhalb der Figuren-Bounding-Box
+   sichtbar sind (match_frac/scene_layers mit großem Radius, nicht nur Nachbarebenen), und vergleiche dein
+   zusammengesetztes Sprite pixelweise mit dem Ausschnitt der Szene. Fehlt etwas Offensichtliches (Arme, Pompom-Stück,
+   Waffe), ergänze es aus der Szene oder – falls es in der Vorlage fehlt/verdeckt war – editiere es plausibel nach
+   (spiegeln/kopieren vorhandener Pixel der Figur).
+C. **Korrekte Positionierung/Logik.** Figuren stehen auf festem Boden, Werkzeuge treffen sinnvolle Ziele (Negativbeispiel:
+   Archäologe schlägt mit der Spitzhacke über die Inselkante ins Leere), Fäden/Strahlen verbinden, was sie verbinden
+   sollen, Schatten/Füße passen zum Untergrund.
+D. **Effekte und Hintergrundelemente** (Feuer, Rauch, Licht, Vulkan, Wasser, Himmel) dürfen und sollen selbst gezeichnet
+   oder deutlich editiert werden, wenn ein vorhandenes Sprite zweckentfremdet schlecht aussieht (Negativbeispiel: Luau
+   nutzt ein Feuer-Sprite als Vulkanausbruch). Selbst gezeichnete Effekte in sauberer Pixel-Art (harte Kanten,
+   begrenzte Palette, gleiche Pixelgröße wie die Umgebung!).
+E. Halbtransparenz ist für Geister/Spiegelungen erlaubt (geordnetes Dithering oder echtes Alpha-Blending auf ganze
+   Pixel), z. B. soll Hel, der Schulgeist, im Klassenfoto (38) halbtransparent im Hintergrund schweben.
+F. Doppelungen vermeiden: Konzert/Bühne gibt es schon 4× (27, 41, 47, 49), Bibliothek 2× (02, 35), Blutmond 3× (08, 09,
+   34). Beim Überarbeiten dürfen Motive geändert werden, wenn das die Doppelung auflöst. Neue Sleeves: keine Konzerte,
+   keine Bibliotheken, kein Blutmond.
+
+## Ablauf je Agent
+1. Eigene Sleeves (außer 07/13/34/43) nacheinander kritisch prüfen: Pixelgrößen, Vollständigkeit (Regel B – bei JEDER
+   Figur prüfen!), Positionierung, Komposition. Verbessern (Datei/Skript gleichen Namens überschreiben). Wenn ein Sleeve
+   nicht zu retten ist, darf es komplett neu gedacht werden (gleiche Nummer, neuer Kurzname; alte PNG/Skript löschen).
+2. Die neuen Sleeves des Blocks (Nummern s. Auftrag) nach denselben Regeln bauen.
+3. `notes_<Block>.md` aktualisieren: pro Sleeve eine Zeile inkl. „Skalierung: …“ (welche Elemente in welcher Größe).
