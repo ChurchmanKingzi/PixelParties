@@ -25,19 +25,21 @@ def _seg_dist(px, py, ax, ay, bx, by):
     return math.hypot(px - (ax + t * vx), py - (ay + t * vy)), t
 
 
-def wing_parts(root, lift, span=1.0, mirror_scale=1.0):
+def wing_parts(root, lift, span=1.0, mirror_scale=1.0, shape=None):
     """Geometrie eines Flügels: Liste (Art, Punkt A, Punkt B, Radius, Nummer).
 
     lift: Drehung in Bogenmaß (positiv = Flügel nach oben geschlagen).
+    shape: optionale Proportionen (Oberarm, Hand, Feder-Grundlänge,
+    Feder-Zuwachs, Federanzahl, Federbreite); Standard = Molinda.
     """
+    arm1, arm2, f0, f1, n, fw = shape or (7, 7, 4.5, 5.0, 6, 2.2)
     rx, ry = root
     a1 = math.radians(-58) - lift              # Oberarm (nach oben rechts)
     a2 = math.radians(-22) - lift * 1.25       # Hand
     s = span * mirror_scale
-    wx, wy = rx + math.cos(a1) * 7 * s, ry + math.sin(a1) * 7 * s
-    tx, ty = wx + math.cos(a2) * 7 * s, wy + math.sin(a2) * 7 * s
+    wx, wy = rx + math.cos(a1) * arm1 * s, ry + math.sin(a1) * arm1 * s
+    tx, ty = wx + math.cos(a2) * arm2 * s, wy + math.sin(a2) * arm2 * s
     parts = [('arm', (rx, ry), (wx, wy), 2.0, -1), ('arm', (wx, wy), (tx, ty), 1.6, -1)]
-    n = 6
     for k in range(n):
         t = k / (n - 1)
         if t < 0.5:
@@ -48,16 +50,18 @@ def wing_parts(root, lift, span=1.0, mirror_scale=1.0):
             bx, by = wx + (tx - wx) * u, wy + (ty - wy) * u
         # Richtung: nahe der Wurzel nach unten, zur Spitze in Armrichtung
         fa = math.radians(95 - 105 * t ** 1.2) - lift * (0.3 + 0.9 * t)
-        L = (4.5 + 5.0 * t ** 0.8) * s
+        L = (f0 + f1 * t ** 0.8) * s
         ex, ey = bx + math.cos(fa) * L, by + math.sin(fa) * L
-        parts.append(('feather', (bx, by), (ex, ey), 2.2 - 0.5 * t, k))
+        parts.append(('feather', (bx, by), (ex, ey), fw - 0.5 * t, k))
     return parts
 
 
-def render_wing(out, root, lift, span=1.0, far=False, skip=None):
-    """Flügel in out (H x W x 4) malen; skip(x, y) -> True = Pixel nicht malen."""
+def render_wing(out, root, lift, span=1.0, far=False, skip=None, palette=None, shape=None):
+    """Flügel in out (H x W x 4) malen; skip(x, y) -> True = Pixel nicht malen.
+    palette: (Kontur, hell, mittel, dunkel, Federgrenze), Standard = Molinda."""
+    outline, light, mid, dark, shade = palette or (OUTLINE, LIGHT, MID, DARK, SHADE)
     H, W = out.shape[:2]
-    parts = wing_parts(root, lift, span)
+    parts = wing_parts(root, lift, span, shape=shape)
     xs = [p[1][0] for p in parts] + [p[2][0] for p in parts]
     ys = [p[1][1] for p in parts] + [p[2][1] for p in parts]
     x0, x1 = max(0, int(min(xs)) - 3), min(W, int(max(xs)) + 4)
@@ -94,11 +98,11 @@ def render_wing(out, root, lift, span=1.0, far=False, skip=None):
                      and lab[(x + dx, y + dy)][0][0] == 'f' and lab[(x + dx, y + dy)][0][1] > key[1]
                      for dx, dy in ((1, 0), (0, 1), (-1, 0), (0, -1)))
         if edge:
-            c = OUTLINE
+            c = outline
         elif border:
-            c = SHADE
+            c = shade
         elif key[0] == 'arm':
-            c = MID if far else LIGHT
+            c = mid if far else light
         else:
-            c = (DARK if t > 0.6 else MID) if far else (MID if t > 0.65 else LIGHT)
+            c = (dark if t > 0.6 else mid) if far else (mid if t > 0.65 else light)
         out[y, x] = (*c, 255)

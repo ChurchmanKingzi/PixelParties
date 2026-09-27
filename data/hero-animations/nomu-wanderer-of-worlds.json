@@ -1,0 +1,15 @@
+{
+  "hero": "Nomu, Wanderer of Worlds",
+  "sheet": "nomu-wanderer-of-worlds.png",
+  "frameWidth": 37,
+  "frameHeight": 44,
+  "frames": 36,
+  "frameMs": 90,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 9,
+  "padLeft": 9,
+  "padRight": 9,
+  "padBottom": 9,
+  "faceX": 18
+}

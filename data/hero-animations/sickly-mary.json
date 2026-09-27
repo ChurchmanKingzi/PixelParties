@@ -1,0 +1,16 @@
+{
+  "hero": "Sickly Mary",
+  "sheet": "sickly-mary.png",
+  "frameWidth": 52,
+  "frameHeight": 36,
+  "frames": 36,
+  "frameMs": 80,
+  "loop": true,
+  "layout": "horizontal",
+  "skinOf": "Cute Princess Mary",
+  "padTop": 7,
+  "padLeft": 15,
+  "padRight": 15,
+  "padBottom": 3,
+  "faceX": 26
+}

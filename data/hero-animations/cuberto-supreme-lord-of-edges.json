@@ -1,0 +1,15 @@
+{
+  "hero": "Cuberto, Supreme Lord of Edges",
+  "sheet": "cuberto-supreme-lord-of-edges.png",
+  "frameWidth": 28,
+  "frameHeight": 39,
+  "frames": 36,
+  "frameMs": 90,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 5,
+  "padLeft": 5,
+  "padRight": 5,
+  "padBottom": 5,
+  "faceX": 14
+}

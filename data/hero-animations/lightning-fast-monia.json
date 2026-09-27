@@ -1,0 +1,16 @@
+{
+  "hero": "Lightning-Fast Monia",
+  "sheet": "lightning-fast-monia.png",
+  "frameWidth": 36,
+  "frameHeight": 38,
+  "frames": 32,
+  "frameMs": 70,
+  "loop": true,
+  "layout": "horizontal",
+  "skinOf": "Cool Rescuer Monia",
+  "padTop": 5,
+  "padLeft": 3,
+  "padRight": 3,
+  "padBottom": 6,
+  "faceX": 18
+}

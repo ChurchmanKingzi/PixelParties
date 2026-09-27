@@ -1,0 +1,16 @@
+{
+  "hero": "The Eye of Argos",
+  "sheet": "the-eye-of-argos.png",
+  "frameWidth": 64,
+  "frameHeight": 38,
+  "frames": 40,
+  "frameMs": 80,
+  "loop": true,
+  "layout": "horizontal",
+  "skinOf": "Argos, the Eye of the Cosmos",
+  "padTop": 6,
+  "padLeft": 5,
+  "padRight": 5,
+  "padBottom": 2,
+  "faceX": 32
+}

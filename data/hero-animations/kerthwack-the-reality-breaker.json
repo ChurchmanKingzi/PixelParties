@@ -1,0 +1,15 @@
+{
+  "hero": "Kerthwack, the Reality Breaker",
+  "sheet": "kerthwack-the-reality-breaker.png",
+  "frameWidth": 28,
+  "frameHeight": 40,
+  "frames": 40,
+  "frameMs": 80,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 7,
+  "padLeft": 7,
+  "padRight": 7,
+  "padBottom": 7,
+  "faceX": 14
+}

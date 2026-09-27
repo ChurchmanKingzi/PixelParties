@@ -14,7 +14,7 @@ import numpy as np
 from anim_common import rgb, px, wave, sparkle_pixels, save_outputs
 
 VARIANT = 'w' if 'w' in sys.argv[1:] else 'b'
-SLUG = {'b': 'kasparov-the-king-of-kings-b', 'w': 'kasparov-the-king-of-kings-w'}[VARIANT]
+SLUG = {'b': 'kasperov-the-king-of-kings-b', 'w': 'kasperov-the-king-of-kings-w'}[VARIANT]  # Kartenname: Kasperov
 SRC = np.array(Image.open(f'src/{SLUG}.png').convert('RGBA')).astype(int)
 SH, SW = SRC.shape[:2]
 PL = 2

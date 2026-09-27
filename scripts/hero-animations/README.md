@@ -46,8 +46,8 @@ kopiert, daneben liegt eine JSON-Datei mit den Metadaten. Die erzeugten
 | `inya.py` | `final` | `inya_idle_final_sheet.png` | `card-game-player-inya` |
 | `zwei.py` | `final` | `zwei_idle_final_sheet.png` | `zwei-the-lucky-thief` |
 | `night.py` | `final` | `night_idle_final_sheet.png` | `night-the-herald-of-chess` |
-| `kasparov.py` | `final 90 b` | `kasparov_b_idle_final_sheet.png` | `kasparov-the-king-of-kings-b` |
-| `kasparov.py` | `final 90 w` | `kasparov_w_idle_final_sheet.png` | `kasparov-the-king-of-kings-w` |
+| `kasparov.py` | `final 90 b` | `kasparov_b_idle_final_sheet.png` | `kasperov-the-king-of-kings-b` |
+| `kasparov.py` | `final 90 w` | `kasparov_w_idle_final_sheet.png` | `kasperov-the-king-of-kings-w` |
 | `darion.py` | `final 80` | `darion_idle_final_sheet.png` | `darion-the-blood-crazy-groundskeeper` |
 | `ghazma.py` | `final` | `ghazma_idle_final_sheet.png` | `ghazma-the-worm-feeder` |
 | `sid.py` | `final` | `sid_idle_final_sheet.png` | `sid-the-king-of-thieves` |
@@ -77,6 +77,24 @@ kopiert, daneben liegt eine JSON-Datei mit den Metadaten. Die erzeugten
 | `null.py` | `final` | `null_idle_final_sheet.png` | `null-the-mage-slayer` |
 | `maho.py` | `final` | `maho_idle_final_sheet.png` | `maho-the-cute-magical-girl` |
 | `atta.py` | `final` | `atta_idle_final_sheet.png` | `atta-speaker-of-desires` |
+| `nomu.py` | `final` | `nomu_idle_final_sheet.png` | `nomu-wanderer-of-worlds` |
+| `argos.py` | `final` | `argos_idle_final_sheet.png` | `argos-the-eye-of-the-cosmos` |
+| `eye_of_argos.py` | `final` | `eye_of_argos_idle_final_sheet.png` | `the-eye-of-argos` (Skin) |
+| `kerthwack.py` | `final 80 hero` | `kerthwack_hero_idle_final_sheet.png` | `kerthwack-the-reality-breaker` |
+| `kerthwack.py` | `final 80 wd` | `kerthwack_wd_idle_final_sheet.png` | `w-d-kerthwack` (Skin) |
+| `lizbeth.py` | `final` | `lizbeth_idle_final_sheet.png` | `lizbeth-the-hunter-of-souls` (Skin) |
+| `cuberto.py` | `final 90 hero` | `cuberto_hero_idle_final_sheet.png` | `cuberto-supreme-lord-of-edges` |
+| `cuberto.py` | `final 90 edgy` | `cuberto_edgy_idle_final_sheet.png` | `extra-edgy-cuberto` (Skin) |
+| `monia.py` | `final 70 delusional` | `delusional_monia_idle_final_sheet.png` | `delusional-monia` (Skin) |
+| `monia.py` | `final 70 lightning` | `lightning_monia_idle_final_sheet.png` | `lightning-fast-monia` (Skin) |
+| `monia.py` | `final 70 birthday` | `birthday_monia_idle_final_sheet.png` | `cool-birthday-girl-monia` |
+| `winged.py` | `final 80 tempeste` | `tempeste_skin_idle_final_sheet.png` | `absolute-moron-tempeste` (Skin) |
+| `winged.py` | `final 80 mary` | `sickly_mary_idle_final_sheet.png` | `sickly-mary` (Skin) |
+| `winged.py` | `final 80 crestina` | `sos_crestina_idle_final_sheet.png` | `sos-crestina` (Skin) |
+| `space_vena.py` | `final` | `space_vena_idle_final_sheet.png` | `space-huntress-vena` (Skin) |
+| `tapu_jenny.py` | `final` | `tapu_jenny_idle_final_sheet.png` | `tapu-jenny` (Skin) |
+| `winged.py` | `final 80 melissa` | `cute_meanie_melissa_idle_final_sheet.png` | `cute-meanie-melissa` |
+| `winged.py` | `final 80 molinda` | `cute_angel_molinda_idle_final_sheet.png` | `cute-angel-molinda` |
 | `bubbles.py` | `final gross` | `bubbles_idle_final_gross_sheet.png` | `bubbles-the-bouncy-bunny` |
 
 `bubbles.py` ohne `gross` erzeugt eine auf Hero-Größe verkleinerte Variante
@@ -102,7 +120,9 @@ python3 xcf_extract.py MotiveMoe.xcf assemble src/cute-princess-mary.png "Mary-K
 |---|---|---|
 | `cute-princess-mary.png` | `MotiveMoe.xcf` | `Mary-Kopie` (goldene Mary mit Krone) + `Mary #1` (Flügel) |
 | alle übrigen MotiveMoe-Heroes | `MotiveMoe.xcf` | reproduzierbar per `python3 assemble_moe.py <MotiveMoe.xcf>` (Zuordnung im Skriptkopf) |
+| MotiveMoe-Skins und weitere Heroes (2. Durchgang) | `MotiveMoe.xcf` | reproduzierbar per `python3 assemble_moe_skins.py <MotiveMoe.xcf>` (Zuordnung im Skriptkopf) |
 | MotiveArcanum-Heroes | `MotiveArcanum.xcf` | reproduzierbar per `python3 assemble_arcanum.py <MotiveArcanum.xcf>` (Zuordnung im Skriptkopf) |
+| MotiveBoons-Heroes und -Skins | `MotiveBoons.xcf` | reproduzierbar per `python3 assemble_boons.py <MotiveBoons.xcf>` (Zuordnung im Skriptkopf) |
 
 Neue Datei durchsuchen: `xcf_scan.py dump` legt alle Ebenen einzeln ab,
 `xcf_scan.py match <ordner> --heroes` gleicht sie mit allen noch nicht
@@ -136,6 +156,11 @@ Variante ohne Krone/Flügel), Hintergründe/Auren der Karte gehören nicht zum S
   `layout` und – falls die Leinwand gegenüber dem Original vergrößert wurde –
   `padTop`/`padLeft`/`padRight`/`padBottom`. Um diesen Rand muss die Animation
   verschoben werden, damit sie deckungsgleich mit dem statischen Sprite liegt.
+* **Skins** (Karten in `cards/skins`, Zuordnung in `data/skins.json`): Datei
+  unter dem Slug des Skin-Namens, im JSON `hero` = Skin-Name und `skinOf` =
+  Name der Hero-Karte. (Das Brett lädt Animationen bisher nur über den
+  Hero-Namen – Skin-Sheets werden dort erst angezeigt, wenn es den Skin
+  berücksichtigt.)
 * **`faceX`** (Pflicht für neue Sheets): waagrechte Mitte des **Gesichts** in
   Frame-Pixeln, gemessen von der linken Frame-Kante (Kommazahlen erlaubt,
   z. B. `12.5`). Auf dem Brett steht das Gesicht genau über der Kartenmitte –

@@ -1,0 +1,16 @@
+{
+  "hero": "Lizbeth the Hunter of Souls",
+  "sheet": "lizbeth-the-hunter-of-souls.png",
+  "frameWidth": 30,
+  "frameHeight": 38,
+  "frames": 36,
+  "frameMs": 90,
+  "loop": true,
+  "layout": "horizontal",
+  "skinOf": "Lizbeth, the Reaper of the Light",
+  "padTop": 4,
+  "padLeft": 5,
+  "padRight": 5,
+  "padBottom": 1,
+  "faceX": 12
+}
