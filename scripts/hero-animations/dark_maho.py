@@ -6,7 +6,9 @@
 * Die kleinen grauen Flügel schlagen (spaltentreu geschert, 6 Schläge pro Loop).
 * Die Spitze ihres Zauberhuts wippt dem Schweben etwas nach (oben 1 px,
   die Reihen darunter nur im Umkehrpunkt).
-* Sie blinzelt einmal pro Loop (halb -> zu -> halb), beide Augen.
+* Sie blinzelt einmal pro Loop (halb -> zu -> halb, beide Augen) und
+  zwinkert einmal mit dem rechten Auge (halb -> zu, kurz gehalten -> halb);
+  dazwischen sind beide Augen offen.
 * Aus dem Herzchen in ihrem Haar steigen – wie bei Maho – Herzchen wackelnd
   auf und verblassen (nur ganz und nur neben die Figur gezeichnet).
 """
@@ -34,7 +36,8 @@ TIP = {(x, y) for y in range(0, 4) for x in range(12, SW) if SRC[y, x, 3]}
 # Augen (links x8–9, rechts x12–13, Reihen 13–15)
 SKIN, LASH = rgb('f7caa1'), rgb('010101')
 EYES = [(8, 9), (12, 13)]
-BLINK = {30: 'halb', 31: 'zu', 32: 'zu', 33: 'halb'}
+BLINK = {30: 'halb', 31: 'zu', 32: 'zu', 33: 'halb'}           # beide Augen
+WINK = {10: 'halb', 11: 'zu', 12: 'zu', 13: 'zu', 14: 'halb'}   # nur ihr rechtes Auge (im Bild rechts)
 PINK, PINK_HI, PINK_DK = rgb('ff4dc5'), rgb('ff8eda'), rgb('c6188e')
 HEART = [(-2, 0, PINK_DK), (-1, 0, PINK_HI), (1, 0, PINK_DK), (2, 0, PINK_DK),
          (-2, 1, PINK), (-1, 1, PINK_DK), (0, 1, PINK_DK), (1, 1, PINK), (2, 1, PINK),
@@ -79,9 +82,9 @@ def hearts(out, i, oy):
 
 def frame(i):
     s = BODY.copy()
-    st = BLINK.get(i)
+    st, eyes = (BLINK[i], EYES) if i in BLINK else (WINK.get(i), EYES[1:])
     if st:
-        for x0, x1 in EYES:
+        for x0, x1 in eyes:
             for x in (x0, x1):
                 s[13, x] = SKIN
                 s[14, x] = LASH if st == 'halb' else SKIN
