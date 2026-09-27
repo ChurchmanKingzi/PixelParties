@@ -9,19 +9,22 @@ Amor-Schuss im Loop:
   mit rosa Spur und aufsteigenden Herzchen; die Sehne schwingt nach. Der Teil
   des Bogens hinter dem Schaft wird ergänzt.
 * Nachladen: ein neuer Pfeil materialisiert sich auf der Sehne.
-Dazu schwebt sie leicht und schlägt mit ihrem Flügel (Drehung um die
-Schulter, flap_common.rotate_part, die Spitze schwingt nach).
+Dazu schwebt sie leicht und schlägt mit ihren Flügeln. Der gefaltete
+Flügel des Sprites wirkte bewegt wie ein wehendes Cape; er ist durch ein neu
+gezeichnetes Engelsflügel-Paar ersetzt (molinda_wings.py), das in jedem
+Frame in der aktuellen Schlagstellung neu gerastert wird.
 """
 import math
 import sys
 from PIL import Image
 import numpy as np
 from anim_common import rgb, save_outputs
-from flap_common import rotate_part, over, fill_pinholes
+from flap_common import fill_pinholes
+from molinda_wings import render_wing
 
 SRC = np.array(Image.open('src/molinda-the-cutest-being-in-the-sky.png').convert('RGBA')).astype(int)
 SH, SW = SRC.shape[:2]
-PL, PR, PT, PB = 18, 9, 5, 4
+PL, PR, PT, PB = 20, 20, 20, 8                       # großzügig, wird danach beschnitten
 H, W = SH + PT + PB, SW + PL + PR
 N = 40
 
@@ -34,13 +37,13 @@ SHAFT_Y = range(12, 15)
 WING_COLS = {rgb(c) for c in ('9999ff', 'ccccff', 'f6ffff', '9966ff', '292929')}
 WING = np.array([[SRC[y, x, 3] > 0 and tuple(SRC[y, x]) in WING_COLS and (x >= 18 or (y <= 3 and x >= 15))
                   for x in range(SW)] for y in range(SH)])
-PIVOT = (18.0, 7.0)
+ROOT = (18.0, 9.0)                                   # Schulter (Sprite-Koordinaten)
 
 
-def wing_angle(i, r):
-    p = 2 * math.pi * i / 16 - 0.03 * r
-    s = math.sin(p)
-    return -0.14 + 0.2 * (s * (1.2 if s < 0 else 0.9))    # negativ = nach außen
+def wing_lift(i):
+    """Schlagwinkel: kräftiger Abschlag, ruhiger Aufschlag."""
+    s = math.sin(2 * math.pi * i / 16)
+    return 0.30 * s if s > 0 else 0.42 * s
 
 
 def is_arrow(x, y):
@@ -95,7 +98,10 @@ def frame(i):
     ax, alpha, wob = state(i)
     dy = bob(i)
     oy, ox = PT + dy, PL
-    over(out, fill_pinholes(rotate_part(SRC, WING, PIVOT, lambda r: wing_angle(i, r), (H, W), (ox, oy))))
+    lift = wing_lift(i)
+    span = 0.95 + 0.05 * math.cos(2 * math.pi * i / 16)
+    render_wing(out, (ROOT[0] + ox + 2, ROOT[1] + oy - 1), lift + 0.12, span * 0.92, far=True)
+    render_wing(out, (ROOT[0] + ox, ROOT[1] + oy), lift, span)
     for y in range(SH):
         for x in range(SW):
             if SRC[y, x, 3] and not is_arrow(x, y) and not is_string(x, y) and not WING[y, x]:
@@ -138,5 +144,11 @@ def frame(i):
 if __name__ == '__main__':
     tag = sys.argv[1] if len(sys.argv) > 1 else 'v'
     frames = [frame(i) for i in range(N)]
+    # auf die Vereinigung aller Frames beschneiden (1 px Rand) und Pads melden
+    ys, xs = np.nonzero(np.any([f[:, :, 3] > 0 for f in frames], axis=0))
+    y0, y1, x0, x1 = ys.min() - 1, ys.max() + 2, xs.min() - 1, xs.max() + 2
+    frames = [f[y0:y1, x0:x1] for f in frames]
+    print('Pads (oben, links, rechts, unten):', PT - y0, PL - x0, x1 - (PL + SW), y1 - (PT + SH),
+          'Frame', x1 - x0, 'x', y1 - y0)
     save_outputs(f'molinda_idle_{tag}', frames, int(sys.argv[2]) if len(sys.argv) > 2 else 80, scale=8,
                  check_edges=True)

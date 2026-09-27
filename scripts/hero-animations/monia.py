@@ -10,6 +10,9 @@ Ebenen: Körper („Monia“ ohne das alte Düsenfeuer) und das Jetpack-Feuer au
 * Der weiße Glitzerstern an ihrem Kopf ist richtig animiert: er wächst,
   wechselt zwischen +- und x-Form und zieht sich wieder zusammen.
 * Ihre Beine schlackern leicht (die Füße schwingen abwechselnd 1 px aus).
+* Ihr Seitenzopf (oben rechts, über dem blauen Haarband) wippt leicht und
+  hängt der Schwebebewegung etwas nach: die Spitze pendelt 1 px, der Ansatz
+  bleibt fest.
 * Sie zwinkert: im Sprite ist ihr rechtes Auge ein geschlossener Strich – es
   wird hier offen gezeichnet (wie das linke) und schließt sich einmal pro
   Loop zum Zwinkern.
@@ -19,6 +22,7 @@ import sys
 from PIL import Image
 import numpy as np
 from anim_common import rgb, save_outputs
+from flap_common import fill_pinholes
 
 BODY = np.array(Image.open('src/cool-rescuer-monia-body.png').convert('RGBA')).astype(int)
 FIRE = np.array(Image.open('src/cool-rescuer-monia-flames.png').convert('RGBA')).astype(int)
@@ -42,6 +46,17 @@ STAR = [(0, 0), (1, 0), (2, 0), (3, 1), (2, 1), (1, 2), (0, 2), (0, 1), (0, 0), 
 EYE_OPEN = {(16, 9): rgb('00fbfc'), (17, 9): rgb('000082'), (16, 10): rgb('f2ffff'), (17, 10): rgb('1000c5')}
 EYE_WINK = {p: tuple(int(v) for v in BODY[p[1], p[0]]) for p in EYE_OPEN}
 WINK = range(20, 25)
+# Seitenzopf: Spitze (Zeilen 0–1) und Mittelstück (Zeile 2, rechts vom Kopf)
+TAIL = {(x, y) for y in range(0, 3) for x in range(17, 23)
+        if BODY[y, x, 3] and (y <= 1 or x >= 19)}
+
+
+def tail_shift(i, y):
+    s = math.sin(2 * math.pi * i / 16 - 1.6)          # hängt dem Schweben nach
+    return (int(round(1.2 * s)) if y <= 1 else (1 if s > 0.85 else -1 if s < -0.85 else 0),
+            1 if y <= 1 and math.cos(2 * math.pi * i / 16 - 1.6) > 0.8 else 0)
+
+
 # Beine: Füße (Zeilen 23–25), links x10–13, rechts x14–17
 FEET_Y = range(23, 26)
 
@@ -89,10 +104,16 @@ def frame(i):
         for x in range(SW):
             if not BODY[y, x, 3]:
                 continue
-            dx = 0
+            dx = ddy = 0
             if y in FEET_Y and 10 <= x <= 17:
                 dx = dl if x <= 13 else dr
-            out[y + oy, x + P + dx] = BODY[y, x]
+            if (x, y) in TAIL:
+                continue
+            out[y + oy + ddy, x + P + dx] = BODY[y, x]
+    for x, y in sorted(TAIL, key=lambda p: -p[1]):     # Zopf zuletzt, Spitze obenauf
+        dx, ddy = tail_shift(i, y)
+        out[y + oy + ddy, x + P + dx] = BODY[y, x]
+    fill_pinholes(out)                                  # keine Lücke am Zopfansatz
     # Glitzerstern
     plus, diag = STAR[(i // 2) % len(STAR)]
     cx, cy = STAR_C[0] + P, STAR_C[1] + oy

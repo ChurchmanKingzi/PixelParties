@@ -70,7 +70,7 @@ kopiert, daneben liegt eine JSON-Datei mit den Metadaten. Die erzeugten
 | `monami.py` | `final` | `monami_idle_final_sheet.png` | `cute-ditz-monami` |
 | `magenta.py` | `final` | `magenta_idle_final_sheet.png` | `cute-nerd-magenta` |
 | `jenny.py` | `final` | `jenny_idle_final_sheet.png` | `jenny-the-class-fairy` |
-| `molinda.py` | `final` | `molinda_idle_final_sheet.png` | `molinda-the-cutest-being-in-the-sky` |
+| `molinda.py` (+ `molinda_wings.py`) | `final` | `molinda_idle_final_sheet.png` | `molinda-the-cutest-being-in-the-sky` |
 | `bubbles.py` | `final gross` | `bubbles_idle_final_gross_sheet.png` | `bubbles-the-bouncy-bunny` |
 
 `bubbles.py` ohne `gross` erzeugt eine auf Hero-Größe verkleinerte Variante
