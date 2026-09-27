@@ -10,7 +10,8 @@ Aufruf: python3 carris.py <tag> [ms] [hero|little]
 * Die Ohren zucken ab und zu: hero – das linke Ohr kippt oben 1 px (ganze
   Zeilen), die Spitze des rechten sackt 1 px ab (ganze Spalten), so
   entstehen keine Lücken; little – die Ohrspitzen kippen 1 px nach außen.
-* hero:   die große Taschenuhr neben ihm tickt (der lange Zeiger springt alle
+* hero:   die große Taschenuhr in seiner Hand hebt und senkt sich mit ihr
+          beim Atmen und tickt (der lange Zeiger springt alle
           4 Frames eine Stunde weiter, die Uhr läuft einmal pro Loop herum),
           das herabhängende Kettenende schwingt sachte (zeilenweise, unten
           stärker); er tippt ungeduldig mit dem rechten Fuß.
@@ -63,7 +64,7 @@ def breath(i):
     return -1 if (i % 16) in range(5, 12) else 0
 
 
-def watch(i):
+def watch(i, b):
     """Uhr: langer Zeiger (Länge 3) in 12 Stufen, Kettenende schwingt."""
     w = WATCH.copy()
     for y, x in zip(*np.nonzero((w[:, :, :3] == HAND[:3]).all(2) & (w[:, :, 3] > 0))):
@@ -79,7 +80,7 @@ def watch(i):
         dx = 0
         if x < CHAIN_X and y >= CHAIN_Y:
             dx = int(round(1.4 * (y - CHAIN_Y) / 21 * math.sin(2 * math.pi * i / 24 - (y - CHAIN_Y) * 0.15)))
-        out[y + PT, x + P + dx] = w[y, x]
+        out[y + PT + b, x + P + dx] = w[y, x]
     return out
 
 
@@ -99,8 +100,8 @@ def frame(i):
                 s[LID_ROW + 1, x] = BLACK
     out = np.zeros((H, W, 4), int)
     b = breath(i)
-    if WATCH is not None:                            # Taschenuhr steht neben ihm
-        w = watch(i)
+    if WATCH is not None:                            # Taschenuhr in seiner Hand, hebt sich mit
+        w = watch(i, b)
         m = w[:, :, 3] > 0
         out[m] = w[m]
     ear_l, ear_r, tail, foot = set(EAR_L), set(EAR_R), set(TAIL), set(FOOT)
