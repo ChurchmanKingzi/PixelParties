@@ -3,8 +3,9 @@
 
 * Er federt in den Knien (die Füße bleiben stehen).
 * Er gibt Anweisungen: zweimal pro Loop hebt er den ausgestreckten Arm ein
-  Stück (spaltenweise gehoben, zur Hand hin stärker – der Ärmel bleibt an der
-  Schulter), hält ihn kurz und senkt ihn wieder.
+  Stück (nur der blaue Ärmel, spaltenweise gehoben, zur Hand hin stärker –
+  er bleibt an der Schulter; Hutkrempe und Schnurrbartspitzen bleiben am
+  Gesicht), hält ihn kurz und senkt ihn wieder.
 * Er blinzelt zweimal pro Loop (geschlossen: 2 px breite schwarze Striche).
 """
 import sys
@@ -19,7 +20,8 @@ P, PT, PB = 3, 4, 2
 H, W = SH + PT + PB, SW + 2 * P
 N = 48
 KNEE = 24
-ARM_X = 16                                           # ab hier ist alles Ärmel
+ARM_X = 16                                           # ab hier liegt der Ärmel
+SLEEVE = {rgb(c) for c in ('17203f', '2e3e68', '1f2852', '273462')}   # nur das Blau (nicht Hut/Bart)
 BLACK = (0, 0, 0, 255)
 SKIN, LID = rgb('ffd5a4'), rgb('d0a983')
 BLINK = {14: 'halb', 15: 'zu', 16: 'zu', 17: 'halb', 38: 'halb', 39: 'zu', 40: 'zu', 41: 'halb'}
@@ -53,7 +55,7 @@ def frame(i):
             if not s[y, x, 3]:
                 continue
             dy = b if y < KNEE else 0
-            if x >= ARM_X:
+            if x >= ARM_X and tuple(s[y, x]) in SLEEVE:
                 dy -= int(round(lift * (x - ARM_X + 1) / (SW - ARM_X)))
             out[y + PT + dy, x + P] = s[y, x]
     if b < 0:                                        # Zeile über dem Knie dehnen

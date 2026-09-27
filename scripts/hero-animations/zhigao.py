@@ -3,8 +3,11 @@
 auf dem Thron „Palace“).
 
 Teile: src/zhigao-the-heavenly-emperor-{throne,body}.png (deckungsgleich).
-* Der Thron steht fest; Zhigao sitzt und atmet (Kopf, Hut und Oberkörper
-  heben sich im Rhythmus um 1 px, gedehnt wird die Brust).
+* Der Thron steht fest; Zhigao sitzt und atmet (Kopf, Hut, Oberkörper und
+  Arme heben sich im Rhythmus um 1 px, gedehnt wird die Schärpe über dem
+  Schoß – nicht der Hals).
+* Er wippt mit den Füßen: abwechselnd hebt sich der linke und der rechte
+  Fuß um 1 px.
 * Die vier Troddeln seines Huts pendeln sachte (unten stärker, jede 1 px
   breit und zusammenhängend).
 * Der Schmuck an seinem Hut blitzt einmal pro Loop auf.
@@ -24,7 +27,9 @@ SH, SW = BODY.shape[:2]
 P, PT, PB = 2, 2, 1
 H, W = SH + PT + PB, SW + 2 * P
 N = 48
-CHEST_Y = 20                                         # bis hier atmet er (Zeile 20 wird gedehnt)
+CHEST_Y = 24                                         # bis hier atmet er (Schärpe Zeile 24 wird gedehnt, nicht der Hals)
+FOOT_L = {(x, y) for y in (27, 28) for x in range(12, 16)}
+FOOT_R = {(x, y) for y in (27, 28, 29) for x in range(16, 20)}
 TASSELS = {9, 11, 23, 25}                            # Spalten der Troddeln (Zeilen 10–19)
 TASSEL_Y0 = 10
 BLACK = (0, 0, 0, 255)
@@ -38,6 +43,15 @@ GOLD0, GOLD1 = rgb('ccb98e'), rgb('fff6c5')
 
 def breath(i):
     return -1 if (i % 16) in range(5, 12) else 0
+
+
+def foot_dy(x, y, i):
+    t = i % 12
+    if (x, y) in FOOT_L and t in (3, 4, 5):
+        return -1
+    if (x, y) in FOOT_R and t in (9, 10, 11):
+        return -1
+    return 0
 
 
 def tassel_dx(y, i):
@@ -74,7 +88,9 @@ def frame(i):
                 dy = b
                 if x in TASSELS and TASSEL_Y0 <= y:
                     dx = tassel_dx(y, i)
-            if b and y == CHEST_Y:                   # Brust gedehnt
+            elif s[y, x, 3] == 255:
+                dy = foot_dy(x, y, i)
+            if b and y == CHEST_Y:                   # Schärpe gedehnt
                 fig[y + PT, x + P] = s[y, x]
             fig[y + PT + dy, x + P + dx] = s[y, x]
     fill_pinholes(fig)

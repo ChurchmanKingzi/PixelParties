@@ -2,9 +2,9 @@
 """Idle-Animation für Xiong, the Bamboo Guardian (MotiveChina.xcf: „Xiong“).
 
 * Er federt in den Knien (die Füße bleiben stehen).
-* Er schwingt seinen Bambusstab: der Stab kippt in seinen Händen wie eine
-  Wippe – das linke Ende senkt sich, während das rechte steigt, und umgekehrt
-  (spaltenweise verschoben, zu den Enden hin stärker; die Hände bleiben).
+* Sein Bambusstab federt: beide Enden schwingen gemeinsam auf und ab wie
+  elastischer Bambus (spaltenweise verschoben, zu den Enden hin stärker;
+  die Hände halten die Mitte).
 * Er blinzelt zweimal pro Loop (geschlossen: 2 px breite schwarze Striche).
 """
 import math
@@ -31,7 +31,7 @@ STAFF_R = {(x, y) for y in range(11, 16) for x in range(26, SW) if SRC[y, x, 3]}
 
 
 def tilt(i):
-    """Kippen des Stabs an den Enden (-2..2), Frame 0 = Ruhelage."""
+    """Federn der Stabenden (-2..2, beide gleich), Frame 0 = Ruhelage."""
     return 1.8 * math.sin(2 * math.pi * i / 24)
 
 
@@ -55,7 +55,7 @@ def frame(i):
             if (x, y) in STAFF_L:
                 dy += int(round(t * (6 - x) / 6))
             elif (x, y) in STAFF_R:
-                dy -= int(round(t * (x - 25) / (SW - 26)))
+                dy += int(round(t * (x - 25) / (SW - 26)))
             out[y + PT + dy, x + P] = s[y, x]
     if b < 0:                                        # Zeile über dem Knie dehnen
         y = KNEE - 1
