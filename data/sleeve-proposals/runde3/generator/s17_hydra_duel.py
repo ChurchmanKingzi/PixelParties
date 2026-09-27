@@ -36,10 +36,18 @@ shade_rows(cv, 0, 150, 0.6, 0.0, (8, 12, 40))          # Sturmdunkel über dem M
 # ---------- Hydra: aus dem Meer aufsteigend (hinter der Uferlinie)
 hydra = sprite('c17_hydra', RU, [9])
 Hy = up(hydra, 2)
-hx, hy = (W - Hy.shape[1]) // 2, 22
-SHORE = 2 * (175 - (Y1 - Y0) + 26) if L is not None else 190   # grobe Uferzeile (nur für Wasserlinie)
-cv.paste(silhouette(Hy, (10, 16, 50)), hx + 4, hy + 6, alpha=0.5)
-cv.paste(Hy, hx, hy)
+WL = 176                                               # Wasserlinie im hellen Meer vor dem Ufer
+hx, hy = (W - Hy.shape[1]) // 2, WL + 12 - Hy.shape[0]
+vis = Hy[:WL - hy]                                     # nur der Teil über dem Wasser
+cv.paste(silhouette(vis, (10, 16, 50)), hx + 4, hy + 6, alpha=0.5)
+cv.paste(vis, hx, hy)
+# Schaumkante, wo die Hydra ins Wasser taucht
+cols = np.nonzero(Hy[WL - hy - 1, :, 3] > 0)[0]
+for c in cols:
+    cv.px(hx + c, WL, (226, 232, 255))
+    if c % 3: cv.px(hx + c, WL + 1, (160, 180, 250))
+for c in (cols.min() - 3, cols.min() - 2, cols.max() + 2, cols.max() + 3):
+    cv.px(hx + c, WL + 1, (226, 232, 255))
 
 # ---------- Bärenreiter von hinten, groß im Vordergrund
 bear = sprite('c17_bear_back', RU, [76])

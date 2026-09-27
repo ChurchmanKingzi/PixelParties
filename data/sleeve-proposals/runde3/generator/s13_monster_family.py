@@ -6,7 +6,8 @@ Hexe, vorne Mumie, Zombie und Deepsea-Stein; Fledermäuse und Poltergeister schw
 Quellen (MotiveDeepsea.xcf, jeweils Karte „Deepsea …“):
   Ebene 294 „Succubus“, 301 „Siphem“, 298 „Reaper“ – 2×, abgedunkelt
   Ebene 329 „Werewolf“, 335 „TEPPES“ (Vampir-Teil), 309 „Witch #1“ – 3×
-  Ebene 304 „Mummy“, 322 „Zombie“, 362 „Deepsea Stein“ – 4×
+  Ebene 304 „Mummy“, 322 „Zombie“, 362 „Deepsea Stein“ – 3×
+  Ebene 386 „Ebene #194“ – Felstextur für die Stufen
   Ebene 346 „Bats“ (2×), 331 „Poltergeister“ (2×), 381 „Ebene #160“ (Blutmond, 3×),
   Ebene 341 „Ebene #150“ (Blasen, Karte „Blood Moon under the Sea“)
   Farben: Deepsea-Meer (Ebene 391) und Blutmond-Rot.
@@ -57,28 +58,39 @@ def row(items, k, bottom, xs, dim):
         pb(cv, S, x, bottom)
 
 
+# Felsstufen (wie Tribünen), aus der Deepsea-Felstextur
+rock = compose(D, [386])
+rt = rock[40:103, 60:109]                     # voll deckender Ausschnitt der Textur
+
+
+def ledge(y0, y1, dim, ox=0):
+    t = tile_rgb(rt, W, y1 - y0, ox=ox)
+    t = (t.astype(float) * dim * np.array([0.55, 0.6, 0.95])).astype(np.uint8)
+    cv.a[y0:y1] = t
+    # Stufenkante: oben Mondlicht, darunter ein dunkler Schlagschatten
+    cv.a[y0] = (int(170 * dim), int(90 * dim), int(120 * dim))
+    cv.a[y0 + 1] = (int(120 * dim), int(70 * dim), int(100 * dim))
+    for y in range(y0 + 8, y1):
+        f = 1 - 0.5 * (y - y0 - 8) / max(1, y1 - y0 - 8)
+        cv.a[y] = (cv.a[y] * f).astype(np.uint8)
+
+
+ledge(184, 268, 0.5, ox=7)
+ledge(264, H, 0.62, ox=23)
+
 # hintere Reihe
 succ = compose(D, [294]); siph = compose(D, [301]); reap = compose(D, [298])
-row([succ, reap], 2, 196, [46, 204], 0.72)
-row([siph], 2, 190, [125], 0.8)
-# Boden/Lichtkante der Reihen: dunkler Schleier nach unten
-for y in range(196, H):
-    t = min(0.5, (y - 196) / 300)
-    for x in range(W):
-        if t > BAYER4[y % 4, x % 4]:
-            cv.a[y, x] = (cv.a[y, x] * 0.7).astype(np.uint8)
+row([succ, siph, reap], 2, 190, [46, 125, 206], 0.75)
 
 # mittlere Reihe
 wolf = compose(D, [329])
 tep = [p for p in parts(compose(D, [335]), dil=1) if p.shape[:2] == (23, 24)][0]
 witch = compose(D, [309])
-row([wolf], 3, 268, [44], 0.9)
-row([witch], 3, 266, [212], 0.9)
-row([tep], 3, 262, [125], 0.92)
+row([wolf, tep, witch], 3, 272, [50, 128, 208], 0.9)
 
 # vordere Reihe
 mum = compose(D, [304]); zom = compose(D, [322]); stein = compose(D, [362])
-row([mum, zom, flip(stein)], 4, 346, [42, 126, 208], 1.0)
+row([mum, zom, flip(stein)], 3, 344, [52, 126, 200], 1.0)
 
 vignette(cv, 0.5, 0.58)
 print(save(cv, '13_deepsea_family.png'))
