@@ -4131,6 +4131,8 @@ body:has(.anim-backdrop) .pp-bg-particles { display: none; }
   70% { opacity: .4; transform: translateY(-2px) scale(0.7); }
   100% { transform: translateY(-6px) scale(0.5); opacity: 0; }
 }
+/* v1462: nur die Stapelzahl, wenn eine animierte Figur das Gift zeigt */
+.status-poisoned-zahl { position: absolute; inset: 0; z-index: 5; pointer-events: none; }
 .poison-stack-count {
   position: absolute;
   top: 50%;
