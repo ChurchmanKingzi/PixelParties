@@ -123,6 +123,9 @@ kopiert, daneben liegt eine JSON-Datei mit den Metadaten. Die erzeugten
 | `britain_royals.py` | `final 90 empress` | `empress_idle_final_sheet.png` | `empress-of-hearts-victorica` (Skin) |
 | `alice_puppeteer.py` | `final` | `alice_puppeteer_idle_final_sheet.png` | `alice-the-puppeteer-girl` |
 | `jack.py` | `final` | `jack_idle_final_sheet.png` | `jack-the-crooked-killer` |
+| `junshi.py` | `final` | `junshi_idle_final_sheet.png` | `junshi-the-tactical-genius` |
+| `xiong.py` | `final` | `xiong_idle_final_sheet.png` | `xiong-the-bamboo-guardian` |
+| `zhigao.py` | `final` | `zhigao_idle_final_sheet.png` | `zhigao-the-heavenly-emperor` |
 | `bubbles.py` | `final gross` | `bubbles_idle_final_gross_sheet.png` | `bubbles-the-bouncy-bunny` |
 
 `bubbles.py` ohne `gross` erzeugt eine auf Hero-Größe verkleinerte Variante
@@ -154,6 +157,7 @@ python3 xcf_extract.py MotiveMoe.xcf assemble src/cute-princess-mary.png "Mary-K
 | MotiveEgypt-Heroes und -Skins | `MotiveEgypt.xcf` | reproduzierbar per `python3 assemble_egypt.py <MotiveEgypt.xcf>` (Zuordnung im Skriptkopf) |
 | MotiveSteamDwarfs-Heroes und -Skins | `MotiveSteamDwarfs.xcf` | reproduzierbar per `python3 assemble_steamdwarfs.py <MotiveSteamDwarfs.xcf>` (Zuordnung im Skriptkopf; die Datei braucht `xcf_scan.patch_gimpformats`) |
 | MotiveBritain-Heroes und -Skins | `MotiveBritain.xcf` | reproduzierbar per `python3 assemble_britain.py <MotiveBritain.xcf>` (Zuordnung im Skriptkopf) |
+| MotiveChina-Heroes | `MotiveChina.xcf` | reproduzierbar per `python3 assemble_china.py <MotiveChina.xcf>` (Zuordnung im Skriptkopf) |
 
 Neue Datei durchsuchen: `xcf_scan.py dump` legt alle Ebenen einzeln ab,
 `xcf_scan.py match <ordner> --heroes` gleicht sie mit allen noch nicht
