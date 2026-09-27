@@ -44,9 +44,11 @@ def seg_worm(x, y):
 CFG = {
     'hero': dict(slug='bakhm-the-desert-digger', prefix='bakhm', P=3,
                  jaw=lambda x, y: 17 <= y <= 23 and x <= 22, hinge=22, seg=seg_hero, head_follows=False),
-    # der dünne Zahn vorn am Oberkiefer (x5–7, bis Zeile 15) bleibt am Kopf
+    # die Zähne, die vom Oberkiefer über die Maulkante hängen, bleiben am Kopf:
+    # der dünne vorn (x5–7, bis Zeile 15) und der hintere (x13–16, bis Zeile 14)
     'worm': dict(slug='world-eater-bakhm', prefix='world_eater_bakhm', P=7,
-                 jaw=lambda x, y: 13 <= y <= 22 and x <= 24 and not (x <= 7 and y <= 15), hinge=24,
+                 jaw=lambda x, y: 13 <= y <= 22 and x <= 24 and not (x <= 7 and y <= 15)
+                 and not (13 <= x <= 16 and y <= 14), hinge=24,
                  seg=seg_worm, head_follows=True),
 }[V]
 SRC = np.array(Image.open(f"src/{CFG['slug']}.png").convert('RGBA')).astype(int)
