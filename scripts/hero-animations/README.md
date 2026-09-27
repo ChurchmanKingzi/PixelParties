@@ -76,12 +76,16 @@ zusammen:
 ```bash
 python3 xcf_extract.py MotiveMoe.xcf list mary                 # Ebenen suchen
 python3 xcf_extract.py MotiveMoe.xcf preview vorschau.png 485 489
-python3 xcf_extract.py MotiveMoe.xcf assemble src/cute-princess-mary.png Mary "Ebene #14"
+python3 xcf_extract.py MotiveMoe.xcf assemble src/cute-princess-mary.png "Mary-Kopie" "Mary #1"
 ```
 
 | Sprite in `src/` | Datei | Ebenen |
 |---|---|---|
-| `cute-princess-mary.png` | `MotiveMoe.xcf` | `Mary` + `Ebene #14` (Arme) |
+| `cute-princess-mary.png` | `MotiveMoe.xcf` | `Mary-Kopie` (goldene Mary mit Krone) + `Mary #1` (Flügel) |
+
+Abgleich immer mit der Karte in `cards/<Kartenname>.png`: dieselbe Figur liegt
+oft in mehreren Farb-/Kostümvarianten in der Datei (z. B. `Mary` = rote
+Variante ohne Krone/Flügel), Hintergründe/Auren der Karte gehören nicht zum Sprite.
 
 ## Konventionen
 
