@@ -3,7 +3,7 @@ Name: Structure Deck: Dance of the Butterflies
 Cover: Beato, the Eternal Butterfly
 
 == HEROES ==
-Alleria, the Queen of Spiders
+Elana, the Rocky Rebel
 Beato, the Butterfly Witch
 Willy, the Valiant Leprechaun
 

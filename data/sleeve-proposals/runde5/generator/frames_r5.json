@@ -1,0 +1,44 @@
+{
+ "01_coolness_race.png": [
+  "Coolness Race",
+  "ornate",
+  "silver",
+  "sapphire",
+  "rose"
+ ],
+ "02_glacier_vault.png": [
+  "Glacier Vault",
+  "double",
+  "ice",
+  "sapphire",
+  "ruby"
+ ],
+ "03_vials_on_the_vine.png": [
+  "Vials on the Vine",
+  "bone",
+  "ebony",
+  "emerald",
+  "ruby"
+ ],
+ "04_stormdraw.png": [
+  "Stormdraw",
+  "twist",
+  "silver",
+  "amethyst",
+  "cyan"
+ ],
+ "05_kitten_escort.png": [
+  "Kitten Escort",
+  "card",
+  "silver",
+  "amethyst",
+  "rose"
+ ],
+ "06_dolls_in_the_dark.png": [
+  "Dolls in the Dark",
+  "arch",
+  "gothic",
+  "amethyst",
+  "ruby"
+ ]
+}

@@ -615,6 +615,31 @@
     {
       "id": "summer-blaze",
       "name": "Summer Blaze"
+    },
+    {
+      "id": "glacier-vault",
+      "name": "Glacier Vault"
+    },
+    {
+      "id": "vials-on-the-vine",
+      "name": "Vials on the Vine"
+    },
+    {
+      "id": "stormdraw",
+      "name": "Stormdraw"
+    },
+    {
+      "id": "kitten-escort",
+      "name": "Kitten Escort"
+    },
+    {
+      "id": "dolls-in-the-dark",
+      "name": "Dolls in the Dark"
+    },
+    {
+      "id": "coolness-race",
+      "name": "Coolness Race",
+      "formerId": "heartguard"
     }
   ]
 }
