@@ -41,7 +41,7 @@ for oy, ox in [(0, 0), (0, 160), (80, 80), (80, -80), (150, 20)]:
 
 # ---------- Hügelkamm (2×, flache Silhouette weit hinten) ----------
 ridge = layer(G, 353)[190:260, 83:403].copy()
-ridge[..., :3] = (12, 22, 26)
+ridge[..., :3] = (14, 26, 34)
 R2 = up(ridge[:, 30:160], 2)
 cv.paste(R2, 0, HOR - 36)
 cv.rect(0, HOR + R2.shape[0] - 36, W, H, (12, 22, 26))
@@ -63,7 +63,7 @@ RX, RY = 125 - RW // 2, HOR + 44 - RH           # Portalfuß steht auf der Licht
 # goldener Schein um das Portal und auf dem Boden davor (fein gedithert)
 pcx, pcy = 125, RY + RH // 2
 d = np.sqrt(((xx - pcx) / 1.0) ** 2 + ((yy - pcy) / 1.3) ** 2)
-gl = np.clip(1 - np.abs(d - RW * 0.55) / 40, 0, 1) * 0.45
+gl = np.clip(1 - np.abs(d - RW * 0.5) / 22, 0, 1) * 0.35
 gd = np.sqrt(((xx - 125) / 1.0) ** 2 + ((yy - (HOR + 44)) / 0.35) ** 2)
 gl = np.maximum(gl, np.clip(1 - gd / 120, 0, 1) * 0.55 * (yy > HOR))
 qq = np.floor(gl * 4 + BAYER4[yy % 4, xx % 4]) / 4

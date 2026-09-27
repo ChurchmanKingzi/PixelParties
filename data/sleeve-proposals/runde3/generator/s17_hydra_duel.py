@@ -45,7 +45,7 @@ shade_rows(cv, 0, 120, 0.6, 0.0, (8, 12, 40), k=KM)            # Sturmdunkel
 hydra = figure('c17_hydra', RU, [9])
 Hy = up(hydra, KM)
 WL = SHORE - 5 * KM                                             # Wasserlinie (knapp vor der Kante sichtbar)
-hx, hy = (W - Hy.shape[1]) // 2 + 3, WL + 10 * KM - Hy.shape[0]
+hx, hy = (W - Hy.shape[1]) // 2 + 3, WL + 4 * KM - Hy.shape[0]
 vis = Hy[:WL - hy].copy()
 cv.paste(silhouette(vis, (10, 16, 50)), hx + KM, hy + 2 * KM, alpha=0.5)
 cv.paste(vis, hx, hy)
@@ -65,7 +65,6 @@ tile_fill(cv, hatch, 0, SHORE, W, SHORE + 10 * KF, k=KF, ox=8)
 cv.rect(0, SHORE, W, SHORE + KF, (250, 252, 255))
 tile_fill(cv, snow, 0, SHORE + 9 * KF, W, H, k=KF)
 cv.rect(0, SHORE + 9 * KF, W, SHORE + 10 * KF, (196, 196, 236))
-shade_rows(cv, SHORE + 10 * KF, H, 0.0, 0.25, (60, 60, 120), k=KF)
 
 # ---------- Bärenreiter von hinten (4×), steht auf dem Schneefeld
 bear = figure('c17_bear_back', RU, [76])
