@@ -5,8 +5,9 @@ Idee (Porträt/Ruhemoment, Grusel): Nachts in Alices Zimmer im Herrenhaus. Alice
 dem violetten Läufer, die Arme ausgebreitet; an ihren Fäden sitzen ihre zwei Puppen. Das Zimmer dahinter liegt
 im Dunkeln, nur ihr eigener violetter Magieschein beleuchtet Säulen, Bett und ihr Porträt an der Wand. In der
 Finsternis glühen die roten Puppenaugen: die Geisterpuppe im Spiegel des Frisiertischs, eine Puppe, die im
-offenen Schrank lauert, die Puppe auf dem Schrank, die auf dem Bett und zwei am Fuß der Säulen. Rechts glimmt
-der Ofen. (Ihre Kreaturen = ihre Macht: Kartentext zählt die Kreaturen, Destruction + Summoning Magic.)
+offenen Schrank lauert, die Puppe auf dem Schrank, zwei auf den Säulenkapitellen neben ihrem Porträt und zwei am
+Fuß der Säulen. Rechts glimmt der Ofen. Alice steht in der Bildmitte (Gesicht bei ~43 % der Höhe), der Läufer
+läuft vor ihr bis zur Goldborte weiter. (Ihre Kreaturen = ihre Macht: Kartentext zählt die Kreaturen, Destruction + Summoning Magic.)
 
 Quellen (MotiveBritain.xcf, Kartenszene „Sichtbar #53“ = Ebene 5, Lage 218,288, 76×50):
   Ebene 8 „Alice #6“  – Alice (dunkle Augen, Arme ausgebreitet) + ihre 2 Puppen + violette Fäden,
@@ -14,7 +15,7 @@ Quellen (MotiveBritain.xcf, Kartenszene „Sichtbar #53“ = Ebene 5, Lage 218,2
                         ohne den Kopf der Puppe darunter und ohne die rote Punktlinie über ihr. (Die Alice
                         links auf derselben Ebene mit türkisen Augen gehört zu „Mr. Jiggles“ – nicht verwendet.)
                       – außerdem: Geisterpuppe im Spiegel (alpha 76), liegende Puppe auf dem Schrank,
-                        Puppe auf dem Bett (ohne roten Faden), stehende + sitzende Puppe (verdunkelt im Schrank)
+                        stehende Puppe (2× an den Säulenfüßen), sitzende Puppe (2× auf den Kapitellen, 1× verdunkelt im Schrank)
   Ebene 60 „Ebene #173“ – Zimmer (Wände, Säulen, Frisiertisch, Schrank, Bett, Standuhr, Regal, Ofen, Teppich)
   Ebene 59 „Alice #7“   – violetter Läufer (Mittelstück, Periode 9, nach vorn verlängert)
   Ebene 56 „Ebene #224“ – Alice-Porträt im Bilderrahmen, Kristallkugel
@@ -64,7 +65,7 @@ l8 = layer(D, 8)
 room = layer(D, 60).copy()
 # Läufer (Ebene 59) nach vorn verlängert: Mittelstück (Periode 9) wiederholt, Endborte nach unten versetzt
 rug = layer(D, 59)
-E = 36
+E = 24
 rug2 = np.zeros_like(rug)
 rug2[:341] = rug[:341]
 for y in range(341, 341 + E):
@@ -75,9 +76,7 @@ acc = over(acc, layer(D, 56))                               # Bild im Rahmen (Al
 gh8 = keep_boxes(l8, [(227, 291, 237, 302)])                # Geister-Puppe im Spiegel (alpha 76)
 ward = keep_boxes(l8, [(243, 283, 256, 295)])               # liegende Puppe auf dem Schrank
 ward[np.all(ward[..., :3] == (209, 0, 0), -1)] = 0             # (ohne die gepunkteten roten Fäden)
-bed = keep_boxes(l8, [(276, 283, 288, 295)])                # Puppe auf dem Bett (ohne ihren roten Faden)
-bed[np.all(bed[..., :3] == (209, 0, 0), -1)] = 0
-acc = over(acc, gh8); acc = over(acc, ward); acc = over(acc, bed)
+acc = over(acc, gh8); acc = over(acc, ward)
 # im offenen, schwarzen Schrank (x 242–253, y 295–305) lauert eine Puppe: fast schwarz, nur die Augen glühen
 sit = [p for p in parts(l8, dil=0, minpx=2) if p.shape[:2] == (12, 12)][0]
 lurk = sit.copy()
@@ -91,6 +90,10 @@ dolls = parts(l8, dil=0, minpx=2)
 stand = [p for p in dolls if p.shape[:2] == (12, 8)][0]
 acc = put(acc, stand, 248, 311)
 acc = put(acc, flip(stand), 2 * AX - 248 - 8, 311)
+# zwei sitzende Puppen oben auf den Kapitellen der hinteren Säulen (x 259–268 / 291–300, Oberkante y 273)
+TOPS = [(258, 261, sit), (290, 261, flip(sit))]
+for px, py, sp in TOPS:
+    acc = put(acc, sp, px, py)
 bg = acc[RY0:RY0 + 175, RX0:RX0 + 125].copy()
 bg[..., 3] = 255
 
@@ -105,13 +108,15 @@ gm = gh8[291:302, 227:237, 3] > 0
 ghost[291 - RY0:302 - RY0, 227 - RX0:237 - RX0] = gm
 
 # Licht: violetter Schein um Alice, nach außen Finsternis (weich, im 2×-Raster)
-LX, LY = 62.5, 106
+LX, LY = 62.5, 84
 GLOW = np.array([64, 16, 104])
 dollm = np.zeros(bg.shape[:2], bool)                       # Puppen im Hintergrund (bleiben blass sichtbar)
-for sp in (ward, bed):
+for sp in (ward,):
     dollm |= sp[RY0:RY0 + 175, RX0:RX0 + 125, 3] > 0
 for (px, py) in ((248, 311), (2 * AX - 248 - 8, 311)):
     dollm[py - RY0:py - RY0 + 12, px - RX0:px - RX0 + 8] |= stand[..., 3] > 0 if px == 248 else flip(stand)[..., 3] > 0
+for px, py, sp in TOPS:
+    dollm[py - RY0:py - RY0 + 12, px - RX0:px - RX0 + 12] |= sp[..., 3] > 0
 pict = np.zeros(bg.shape[:2], bool)                          # Bild (Rahmen + Alice-Porträt) leicht beleuchtet
 _b = bg[257 - RY0:272 - RY0, 272 - RX0:289 - RX0, :3].astype(int)
 pict[257 - RY0:272 - RY0, 272 - RX0:289 - RX0] = ((((_b[..., 0] - _b[..., 2] > 25) & (_b.min(-1) < 110)) | (_b[..., 2] - _b[..., 0] > 25))
@@ -120,7 +125,7 @@ out = rgb.astype(float)
 EYE = np.array([255, 36, 56])
 for y in range(175):
     for x in range(125):
-        d = math.hypot((x + .5 - LX) / 54, (y + .5 - LY) / 58)
+        d = math.hypot((x + .5 - LX) / 56, (y + .5 - LY) / (76 if y < LY else 96))
         t = max(0.0, 1 - d)
         f = 0.07 + 0.88 * t ** 1.25
         c = out[y, x]
@@ -161,7 +166,7 @@ for y in range(gh):
         if grp[y, x, 3] and tuple(grp[y, x, :3]) in (F1, F2) and not (248 <= x + 236 <= 263):
             grp[y, x, 3] = 185
 AL = rgba(50, 70)
-gx, gyb = 5, 61                                    # Gruppe x 236–275 (Alice 248–263) genau mittig, Unterkante y 61
+gx, gyb = 5, 49                                    # Gruppe x 236–275 (Alice 248–263) genau mittig, Oberkante y 21 → Gesicht bei ~43 % der Höhe
 for y in range(70):
     for x in range(50):
         d = ((x + .5 - 25) / 19) ** 2 + ((y + .5 - (gyb - 2.5)) / 3.6) ** 2
