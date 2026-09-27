@@ -10,7 +10,9 @@ Aufruf: python3 teocuilatl.py <tag> [ms] [hero|platinum]
   Takt, eigene Größe, er wächst auf, funkelt und vergeht.
 * Er blinzelt zweimal pro Loop mit den Augen im Gesicht (x10 und x13,
   Zeilen 14–15; beim normalen die roten, beim Skin an derselben Stelle):
-  das Lid senkt sich in Gesichtsfarbe, geschlossen bleibt eine dunkle Linie.
+  das Lid senkt sich in Gesichtsfarbe, geschlossen ist das Auge ein 2 px
+  breiter schwarzer Strich (x9–10 bzw. x13–14, Zeile 15) wie bei den
+  anderen menschlichen Heroes.
 * Er steht und atmet: der Oberkörper federt im 12er-Takt 1 px hoch und
   herunter, die Beine bleiben stehen (Steh-Idle).
 * Die rechte Hand lag unter einem Stern und war nach dem Entfernen nur
@@ -76,7 +78,7 @@ BODY = mirror_hand(strip_stars(SRC))
 KNEE = 27                                            # ab hier stehen die Beine
 BLINK = {14: 'halb', 15: 'zu', 16: 'zu', 17: 'halb', 38: 'halb', 39: 'zu', 40: 'zu', 41: 'halb'}
 EYE_XS = [10, 13]                                    # Augen: Zeile 14 (oben) und 15
-LID, LID_LINE = {'hero': (rgb('fffa55'), rgb('b01100')), 'platinum': (rgb('9490cf'), rgb('1f1b25'))}[V]
+LID = {'hero': rgb('fffa55'), 'platinum': rgb('9490cf')}[V]
 WHITE, PEACH, ORANGE = rgb('fafafa'), rgb('ffb179'), rgb('ff883c')
 YEL, YEL2 = rgb('ffef72'), rgb('f3c042')
 RED, DARK = rgb('c92d00'), rgb('941b00')
@@ -126,8 +128,11 @@ def frame(i):
     if st:
         for x in EYE_XS:
             s[14, x] = LID
-            if st == 'zu':
-                s[15, x] = LID_LINE
+        if st == 'zu':                               # geschlossen: 2 px breiter schwarzer Strich
+            for x in (9, 10, 13, 14):
+                s[15, x] = (0, 0, 0, 255)
+            for x in EYE_XS:
+                s[14, x] = LID
     out = np.zeros((H, W, 4), int)
     b = BOUNCE12[i % 12]
     draw_bounce(out, s, b, KNEE, PT, P)
