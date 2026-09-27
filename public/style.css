@@ -3645,29 +3645,47 @@ body:has(.anim-backdrop) .pp-bg-particles { display: none; }
   animation: announceShort 2s ease-out forwards;
 }
 
-/* ═══ Helden-Idle-Animation (v1450) ═══
-   Der Held steht über dem oberen Kartendrittel, die Füße auf der
-   Drittellinie (Kartenoberkante + 30 bzw. Zonenmitte − 15). Über der
-   Karte (z 3), unter Status-Overlays (z 4–5) und Abzeichen (z 8).
-   Maße und Lage setzt `HeroIdleSprite` je Sheet inline. */
-.hero-idle-sprite {
+/* ═══ Helden-Idle-Animation (v1450, echtes 3D seit v1451) ═══
+   Die Figuren leben in `.hero-sprite-ebene`, einem Zwilling von
+   `.board-plane` (Box und Transformation kopiert `HeroIdleAnims` live).
+   Nur diese Ebene hat preserve-3d: jede Figur steht dort auf ihrer
+   Zone, um die Brettneigung zurückgedreht, also dem Betrachter
+   zugewandt. Als späteres Geschwister liegt die Ebene immer ÜBER dem
+   Brett; untereinander sortieren sich die Figuren nach Tiefe.
+   Wichtig: keine gruppierenden Eigenschaften (opacity < 1, filter,
+   overflow, clip-path) auf Ebene und Platz — die würden das 3D plätten.
+   Deckkraft und Schatten sitzen deshalb erst auf dem Steher. */
+.hero-sprite-ebene {
   position: absolute;
-  inset: 0;
-  z-index: 3;
+  left: 0; top: 0; width: 0; height: 0;
   pointer-events: none;
-  transition: opacity .4s ease;
+  transform-style: preserve-3d;
 }
-/* Unterhalb der Drittellinie wird abgeschnitten — daraus steigt der
-   Held beim Auftritt empor, als käme er aus der Karte. */
-.hero-idle-auftritt {
+.hero-idle-anker { display: none; }
+.hero-idle-platz {
   position: absolute;
-  inset: 0;
-  clip-path: inset(0 0 calc(50% + 15px * var(--board-scale)) 0);
-  /* harter 1-px-Pixelschatten löst die Figur von der Kartenkunst */
+  transform-style: preserve-3d;
+  /* folgt der Hover-Vergrößerung der Zone (gleiches Timing) */
+  transition: scale .14s ease-out;
+}
+/* drei Achsen: die aufrechte Figur liegt größtenteils in der z-Achse
+   der Ebene — ein zweiachsiges `scale` ließe sie gedrungen wirken */
+.hero-idle-platz.hero-idle-hover { scale: var(--board-hover-scale) var(--board-hover-scale) var(--board-hover-scale); }
+/* Die aufrechte Figur. Unterkante = Drittellinie der Karte = Drehachse;
+   darunter wird abgeschnitten — daraus steigt der Held beim Auftritt
+   empor, als käme er aus der Karte. */
+.hero-idle-steher {
+  position: absolute;
+  overflow: hidden;
+  transform-origin: 50% 100%;
+  transform: rotateX(calc(-1 * var(--sprite-kipp, 0deg))) scaleY(var(--sprite-streck, 1));
+  /* harter 1-px-Pixelschatten löst die Figur von der Kulisse */
   filter: drop-shadow(0 calc(1px * var(--board-scale)) 0 rgba(0,0,0,.6));
+  transition: opacity .4s ease;
 }
 .hero-idle-canvas {
   position: absolute;
+  left: 0; top: 0;
   display: block;
   animation: heroIdleAuftritt .55s steps(10, end) both;
 }
@@ -3676,13 +3694,14 @@ body:has(.anim-backdrop) .pp-bg-particles { display: none; }
   70%  { transform: translateY(0);    filter: brightness(1.5); }
   100% { transform: translateY(0);    filter: none; }
 }
-/* Pixel-Bodenschatten auf der Drittellinie */
+/* Pixel-Bodenschatten, flach auf der Karte unter den Füßen */
 .hero-idle-schatten {
   position: absolute;
   top: calc(50% - 16.5px * var(--board-scale));
   height: calc(3px * var(--board-scale));
   background: radial-gradient(ellipse at center, rgba(0,0,0,.5) 0 45%, rgba(0,0,0,.22) 46% 70%, transparent 71%);
   animation: heroIdleSchatten .55s ease-out both;
+  transition: opacity .4s ease;
 }
 @keyframes heroIdleSchatten {
   from { opacity: 0; transform: scaleX(.3); }
