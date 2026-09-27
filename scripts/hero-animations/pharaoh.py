@@ -13,8 +13,9 @@ Aufruf: python3 pharaoh.py <tag> [ms] [hero|gamer]
   Mitte glitzert (hellt auf, ein Glitzerstern blitzt darauf).
 * gamer: das goldene Puzzle um seinen Hals funkelt – ein Glanz läuft darüber,
   dazu blitzen nacheinander kleine Glitzerkreuze auf dem Gold auf. Seine
-  Haare wehen leicht: die Seitenzacken wippen auf und ab (links und rechts
-  versetzt, zur Spitze hin stärker), die obere Spitze pendelt.
+  Haare wehen leicht: die äußeren Haarspalten links und rechts wippen
+  versetzt auf und ab (jeweils als Ganzes, so reißt nichts auf), die obere
+  Spitze pendelt.
 """
 import math
 import sys
@@ -58,11 +59,9 @@ def hair(x, y, i):
     ph = 2 * math.pi * i / 12
     if y <= 3:                                       # obere Spitze pendelt
         return int(round(0.9 * math.sin(ph))), 0
-    if 5 <= y <= 10 and (x <= 5 or x >= SW - 6):     # Seitenzacken wippen
-        sv = math.sin(ph + (0.8 if x <= 5 else 0.8 + math.pi / 2))
-        if x <= 3 or x >= SW - 4:
-            return 0, int(round(sv))
-        return 0, (1 if sv > 0.85 else (-1 if sv < -0.85 else 0))
+    if y <= 18 and (x <= 3 or x >= SW - 4):          # Seitenzacken wippen: ganze Spalten,
+        sv = math.sin(ph + (0.8 if x <= 3 else 0.8 + math.pi / 2))   # damit nichts aufreißt
+        return 0, int(round(sv))
     return 0, 0
 
 
