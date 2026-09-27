@@ -85,8 +85,7 @@ for x0, fl in [(2, False), (W - Sw - 2, True)]:
 # ---------- Stellin 6× im Vordergrund
 Tw, Th = stellin.shape[1] * KF, stellin.shape[0] * KF
 tx, ty = (W - Tw) // 2, H - Th - 10
-for j in range(2):
-    cv.rect(tx + 2 * KF, ty + Th - KF // 2 + j * KF // 2 * 2, tx + Tw - 2 * KF, ty + Th + KF // 2 + j * KF // 2 * 2, (176, 176, 220))
+cv.rect(tx + 2 * KF, ty + Th - KF, tx + Tw - 2 * KF, ty + Th + KF, (176, 176, 220))   # Schatten (6×-Raster)
 put(cv, stellin, tx, ty, KF, ol=(30, 20, 30))
 
 print(save(cv, '18_white_parade.png'))
