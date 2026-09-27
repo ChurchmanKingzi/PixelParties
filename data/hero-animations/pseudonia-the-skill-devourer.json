@@ -1,0 +1,15 @@
+{
+  "hero": "Pseudonia, the Skill Devourer",
+  "sheet": "pseudonia-the-skill-devourer.png",
+  "frameWidth": 34,
+  "frameHeight": 31,
+  "frames": 48,
+  "frameMs": 90,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 4,
+  "padLeft": 4,
+  "padRight": 4,
+  "padBottom": 3,
+  "faceX": 17.5
+}
