@@ -1,0 +1,15 @@
+{
+  "hero": "Alice, the Transfer Student",
+  "sheet": "alice-the-transfer-student.png",
+  "frameWidth": 25,
+  "frameHeight": 30,
+  "frames": 40,
+  "frameMs": 90,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 6,
+  "padLeft": 4,
+  "padRight": 4,
+  "padBottom": 1,
+  "faceX": 12
+}

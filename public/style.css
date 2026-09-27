@@ -3833,15 +3833,18 @@ body:has(.anim-backdrop) .pp-bg-particles { display: none; }
   .hero-idle-weg .hero-idle-holo { opacity: 0; }
 }
 
-/* v1463: Checkboxen der Helden-Anzeige im Profil */
-.profile-checks { display: flex; flex-wrap: wrap; gap: 8px 22px; margin-top: 12px; }
-.profile-check {
-  display: flex; align-items: center; gap: 8px;
+/* v1464: Profil — SETTINGS und CHANGE PASSWORD nebeneinander, je die
+   halbe Breite; auf schmalen Bildschirmen wieder untereinander. */
+.profile-zweispaltig { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+@media (max-width: 760px) { .profile-zweispaltig { grid-template-columns: 1fr; } }
+.profile-schalter-spalte { display: flex; flex-direction: column; gap: 12px; }
+.profile-schalter {
+  display: flex; align-items: center; gap: 10px;
   font-size: 12px; color: var(--text); cursor: pointer; user-select: none;
+  align-self: flex-start;
 }
-.profile-check input { width: 15px; height: 15px; accent-color: var(--accent); cursor: pointer; margin: 0; }
-.profile-check.profile-check-aus { color: var(--text2); opacity: .55; cursor: default; }
-.profile-check.profile-check-aus input { cursor: default; }
+.profile-schalter.profile-schalter-aus { color: var(--text2); opacity: .5; cursor: default; }
+.profile-passwort-spalte { display: flex; flex-direction: column; gap: 8px; }
 
 /* ═══ Status Effect Visuals ═══ */
 
