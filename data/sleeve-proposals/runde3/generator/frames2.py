@@ -5,7 +5,7 @@ Alle Rahmen entstehen im 125×175-Raster (1 Rahmenpixel = 6 Bildpixel) und werde
 Bauformen: ornate, double, twist, industrial, arch, icicle, bamboo, moulding, card, bone, cosmic, meander,
 wave, stone, filigree.  Paletten/Edelsteine aus frames.py.
 Aufruf: python3 frames2.py [nr ...]      – Runde 3 → runde3/final/<Name>.png
-        python3 frames2.py shop          – Shop-Sleeves 2–15 → data/shop/sleeves/sleeveN.png (Original: git)
+        python3 frames2.py shop          – Shop-Sleeves 2–15 → data/shop/sleeves/<id>.png (Original: git)
 """
 import os, sys, glob, math, hashlib
 import numpy as np
@@ -465,7 +465,9 @@ if __name__ == '__main__':
     if args and args[0] == 'shop':
         import subprocess
         for n, (form, pal, gem, *rest) in SHOP_FR.items():
-            orig = os.path.join(SHOP, f'sleeve{n}.png')
+            import json
+            ids = {e['formerId']: e['id'] for e in json.load(open(os.path.join(ROOT, 'data', 'shop', 'sleeve-names.json'), encoding='utf-8'))['sleeves']}
+            orig = os.path.join(SHOP, ids.get(f'sleeve{n}', f'sleeve{n}') + '.png')
             # immer vom Original aus git rendern (idempotent)
             data = subprocess.run(['git', '-C', ROOT, 'show', f'bd5a7c5:data/shop/sleeves/sleeve{n}.png'],
                                   capture_output=True, check=True).stdout

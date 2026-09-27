@@ -2281,6 +2281,7 @@ function ProfileScreen() {
   const [showSleeveGallery, setShowSleeveGallery] = useState(false);
   const [uploadedCardbacks, setUploadedCardbacks] = useState([]);
   const [ownedSleeves, setOwnedSleeves] = useState([]);
+  const [sleeveNames, setSleeveNames] = useState({});
 
   // Avatar gallery
   const [showAvatarGallery, setShowAvatarGallery] = useState(false);
@@ -2329,6 +2330,7 @@ function ProfileScreen() {
     api('/shop/owned').then(d => {
       setOwnedAvatars(d.owned?.avatar || []);
       setOwnedSleeves(d.owned?.sleeve || []);
+      setSleeveNames(d.names?.sleeve || {});
       setOwnedBoards(d.owned?.board || []);
     }).catch(() => {});
   }, []);
@@ -2838,7 +2840,7 @@ function ProfileScreen() {
                         <div className="profile-cb-gallery-card">
                           <img src={'/data/shop/sleeves/' + encodeURIComponent(sleeveId) + '.png'} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                         </div>
-                        <div className="profile-cb-gallery-label">{sleeveId}</div>
+                        <div className="profile-cb-gallery-label">{sleeveNames[sleeveId] || sleeveId}</div>
                       </div>
                     ))}
                     {/* Previously uploaded cardbacks (legacy) */}
@@ -3413,7 +3415,7 @@ function ShopScreen() {
       const subdir = itemType === 'avatar' ? 'avatars' : 'sleeves';
       setRandomReveal({
         imgUrl: '/data/shop/' + subdir + '/' + encodeURIComponent(data.itemId) + '.png',
-        label: null,
+        label: itemType === 'sleeve' ? ((catalog.sleeves || []).find(s => s.id === data.itemId)?.name || null) : null,
         subtitle: itemType === 'avatar' ? 'New Avatar!' : 'New Sleeve!'
       });
     } catch (e) { notify(e.message, 'error'); }
@@ -3473,6 +3475,7 @@ function ShopScreen() {
                   {equipped ? <div className="shop-owned-badge shop-equipped-badge">EQUIPPED</div>
                     : isOwned ? <div className="shop-owned-badge">OWNED</div> : null}
                 </div>
+                {item.name && <div className="shop-item-name" title={item.name}>{item.name}</div>}
                 {!isOwned && (
                   <button className="btn shop-buy-btn" disabled={buying || !((user.sc || 0) >= prices[type])}
                     onClick={(e) => buyItem(type, item.id, prices[type], e)}>
