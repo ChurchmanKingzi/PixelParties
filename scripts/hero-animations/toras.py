@@ -8,8 +8,9 @@ sehen. Hier schwingt er es tatsächlich:
   an der Parierstange an, spitz zulaufend) und dreht sich samt
   Parierstange um die Faust: in Ruhe schräg nach oben gehalten, kurz
   ausholen, dann in drei Frames nach unten durchgezogen.
-* Der Keil aus dem Sprite ist die Schwungspur: er erscheint hinter der Klinge,
-  soweit sie schon geschwungen ist, und schrumpft danach zur Klinge hin weg.
+* Der Keil aus dem Sprite ist die Schwungspur: er erscheint nur hinter der
+  Klinge (nie weiter, als sie gerade steht) und schrumpft danach zur Klinge
+  hin weg.
 * Danach hebt er das Schwert langsam wieder.
 * Die Faust mit der goldenen Manschette geht mit: beim gehobenen Schwert
   1 px höher, nach dem Hieb 1 px tiefer (das Schwert dreht um die Faust).
@@ -56,7 +57,8 @@ for x in range(28, SW):                              # Klinge setzt direkt an de
 SWORD[GUARD] = SRC[GUARD]
 SWORD_M = SWORD[:, :, 3] > 0
 ANG = np.arctan2(_ys + 0.5 - PIVOT[1], _xs + 0.5 - PIVOT[0])   # Winkel jedes Keil-Pixels
-RAISED, WIND, DOWN = -1.0, -1.25, 1.5
+RAISED, WIND = -1.0, -1.25
+DOWN = float(ANG[WEDGE].max()) + 0.02                # Klinge endet am Ende der Schwungspur
 
 
 def pose(i):
@@ -85,7 +87,7 @@ def frame(i):
     ang, trail = pose(i)
     if trail:                                        # Schwungspur hinter der Klinge
         kind, a = trail
-        m = WEDGE & ((ANG <= a) if kind == 'bis' else (ANG >= a))
+        m = WEDGE & ((ANG <= a) if kind == 'bis' else (ANG >= a)) & (ANG <= ang - 0.05)   # nie vor der Klinge
         for y, x in zip(*np.nonzero(m)):
             out[y + PT + (b if y < KNEE else 0), x + P] = s[y, x]
     ad = max(-1, min(1, int(round(ang))))            # Faust folgt dem Schwert (hoch/runter)

@@ -9,8 +9,9 @@ Varianten: arnold kit lolek captain mender rakah rhabi saya grass siphem
 Allen gemeinsam: Wippen in den Knien (Füße bleiben stehen) bzw. Atmen, und
 menschliche Figuren blinzeln zweimal pro Loop (geschlossen: 2 px breiter
 schwarzer Strich). Dazu:
-* arnold:  Bravo Arnold (Sonnenbrille, kein Blinzeln); seine Axolotl-Kiemen
-           wackeln, jede für sich.
+* arnold:  Bravo Arnold (Sonnenbrille, kein Blinzeln); seine Tolle weht im
+           Wind (zeilenweise, Spitze stärker, Wurzel fest am Kopf); seine
+           Axolotl-Kiemen wackeln, jede für sich.
 * kit:     Wippen und Blinzeln.
 * lolek / captain: türkise bzw. pinke Scherben schweben als Partikel um ihn,
            jede auf eigener Bahn und mit eigenem Takt; sie funkeln ab und zu.
@@ -30,8 +31,9 @@ schwarzer Strich). Dazu:
 * asgore:  Monster King Siphem: der Umhang weht nach außen, der rote Dreizack
            glitzert, und er schaut immer wieder zum Dreizack hinüber; blinzelt.
 * sorin:   Wippen und Blinzeln.
-* tryse:   er sticht zu: Arm, Hand und Schwert holen aus und stoßen vor
-           (die Schulter wird nachgezogen, keine Lücke); er blinzelt.
+* tryse:   er sticht zu: Arm, Hand und Schwert holen aus und stoßen vor; an
+           der Schulter bleibt der Ärmel mit seinem eigenen Muster stehen, der
+           vorgestoßene Teil schließt an (keine Lücke); er blinzelt.
 """
 import math
 import sys
@@ -98,6 +100,7 @@ KNEE = C.get('knee', SH)
 # --- Teile / Masken ----------------------------------------------------------
 if V == 'arnold':
     HAIR = load('hair')[:, :, 3] > 0
+    HAIR_ROOT = 9                                    # ab hier sitzt die Tolle auf dem Kopf
     GILL = rgb('e440d8')
     _m = (SRC[:, :, :3] == GILL[:3]).all(2) & (SRC[:, :, 3] > 0)
     _n, _lab = cv2.connectedComponents(_m.astype(np.uint8), connectivity=8)
@@ -145,6 +148,7 @@ if V == 'saya':
 if V == 'tryse':
     ARM = (load('arm')[:, :, 3] > 0) | (load('hand')[:, :, 3] > 0) | (load('sword')[:, :, 3] > 0)
     ARM &= ~((load('body')[:, :, 3] > 0) & (np.arange(SW)[None, :] < 12))
+    ARM &= np.arange(SH)[:, None] <= 14              # nur Arm, Hand und Schwert (nicht der Unterkörper)
 if V == 'rhabi':
     GOLD = [rgb(c) for c in ('732910', 'd56210', 'ffb418', 'ffde5a', 'fff6ac')]
     EYE_GLOW = [rgb(c) for c in ('550808', '7a1010', 'a81818', '7a1010')]
@@ -186,8 +190,10 @@ def stab(i):
 def extra(x, y, i, b, sx):
     """Zusätzlicher Versatz eines Pixels (ohne Wippen/Atmen)."""
     dx, dy = 0, 0
-    if V == 'arnold' and HAIR[y, x]:                 # Tolle wippt nach
-        dy += max(-1, min(1, BOUNCE12[(i - 2) % 12] - b))
+    if V == 'arnold' and HAIR[y, x]:                 # Tolle weht im Wind (Spitze stärker, Wurzel fest)
+        f = max(0.0, (HAIR_ROOT - y) / HAIR_ROOT)
+        ph = 2 * math.pi * i / 24
+        dx += int(round(2.2 * f * (0.5 - 0.5 * math.cos(ph)) * (0.85 + 0.15 * math.sin(3 * ph))))
     if V == 'arnold' and GILL_LAB[y, x]:
         k = GILL_LAB[y, x]
         dy += int(round(math.sin(2 * math.pi * i / 12 + k * 1.7) - math.sin(k * 1.7)))
@@ -295,16 +301,13 @@ def frame(i, particles=True):
                     xx, yy = xin + P + side * k, y + PT + (b if y < KNEE else 0)
                     if not out[yy, xx, 3]:
                         out[yy, xx] = s[y, xin]
-    if V == 'tryse' and sx > 0:                      # Schulter nachziehen
-        for y, xs in arm_rows.items():
+    if V == 'tryse' and sx > 0:                      # Schulter: der Ärmel bleibt dort, wo er war,
+        for y, xs in arm_rows.items():               # der vorgestoßene Teil schließt daran an
             xin = min(xs)
-            row = [s[y, x] for x in sorted(xs)]
-            light = [c for c in row if max(c[:3]) > 0x30]
-            fill = light[0] if light and len(row) > 2 else s[y, xin]   # Stoffgrau, Außenkante bleibt schwarz
             for k in range(sx):
                 xx, yy = xin + P + k, y + PT + (b if y < KNEE else 0)
-                if not out[yy, xx, 3]:
-                    out[yy, xx] = fill
+                if not out[yy, xx, 3] and s[y, xin + k, 3]:
+                    out[yy, xx] = s[y, xin + k]
     fill_pinholes(out)
     if V == 'rakah':                                 # Tropfen lösen sich unten und fallen
         for x, ph in DRIPS:
