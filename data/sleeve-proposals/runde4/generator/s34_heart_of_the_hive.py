@@ -1,23 +1,24 @@
 # -*- coding: utf-8 -*-
-"""Sleeve 34 – „Heart of the Hive“: Draufsicht auf eine Honigwabe als Mosaik. In der Mitte sitzt die gekrönte
-Bienenkönigin, um sie herum liegen die verdeckelten Brutzellen (braun), außen die Honigzellen (gold). Wie der
-Hofstaat eines echten Bienenvolks sind Arbeiterinnen ihr zugewandt – je eine oben, unten, links und rechts
-(gespiegelte bzw. um 90° gedrehte Plätze, streng symmetrisch).
+"""Sleeve 34 – „Heart of the Hive“: Draufsicht auf eine Honigwabe. In der Mitte sitzt die gekrönte Bienenkönigin
+auf einer Blüte aus hell glänzenden Honigzellen; ringsum liegen verdeckelte Brutzellen, die übrige Wabe tritt als
+ruhiger, abgedunkelter Hintergrund zurück. Vier Arbeiterinnen bilden ihren Hofstaat: je zwei oben und unten,
+spiegelsymmetrisch, die Köpfe zur Königin gewandt.
 
-Skalierung: EINE Ebene (die Wabenoberfläche), alles im 84×117-Raster gebaut und einmal 3× hochskaliert –
-Wabe (zum Rand hin zellenweise abgedunkelt), Königin, Arbeiterinnen, Schlagschatten.
+Skalierung / Tiefenstaffelung (zwei Raster, je einmal hochskaliert):
+  Wabe 3× (84×117): Honig- und Brutzellen, Honigglanz der 7 Mittelzellen, übrige Zellen entsättigt/abgedunkelt
+                    (ringweise, ohne Dithering); weiße Glanzkanten der Vorlage zu Honiggelb beruhigt,
+                    Brutdeckel einfarbig.
+  Tiere 4× (64×88):  Königin, vier Arbeiterinnen, ihre Schlagschatten (1 Rasterpunkt, 50 %).
 
 Quellen (MotiveRussia.xcf, Karte „Hive's Crown“, Szenen 145 „Sichtbar #13“ / 147 „Sichtbar #11“):
   Wabe        = Ebene 180 „Ebene #42“: Honigzelle (Zentrum x126/y234) und Brutzelle (x108/y104) als Stempel;
                 das Wabengitter (18 px Spaltenabstand, 13 px Reihenabstand, Versatz 9) wird Zelle für Zelle
                 (Voronoi-Bereich um jeden Gitterpunkt) mit dem passenden Stempel neu gesetzt.
-  Königin     = Ebenen 177 „Ebene #45“ (Körper) + 176 „Ebene #47“ (Beine) + 175 „Ebene #46“ (Krone), in der Lage
-                wie in Szene 145 (Krone auf dem Kopf); der Thron aus Ebene 178 und die Auswahl-Leuchten
-                (170/171/173/174) bleiben weg.
-  Arbeiterin  = Ebenen 160 „Ebene #62“ (Körper) + 159 „Ebene #60“ (roter Rückenfleck) + 158 „Ebene #61“
-                (Flügel, wie in den Szenen 144/147 durchscheinend: 65 % Deckkraft auf ganzen Pixeln), linke der
-                drei Bienen; gegen Szene 147 (Bienen 161–163, gleiche Zeichnung) geprüft.
-  Schlagschatten, ringweise Randabdunklung: selbst gezeichnet.
+  Königin     = Ebenen 177 „Ebene #45“ (Körper) + 176 „Ebene #47“ (Beine) + 175 „Ebene #46“ (Krone), Lage wie in
+                Szene 145; Thron (178) und Auswahl-Leuchten (170/171/173/174) bleiben weg.
+  Arbeiterin  = Ebenen 160 „Ebene #62“ (Körper) + 158 „Ebene #61“ (Flügel, wie in den Szenen durchscheinend:
+                70 % Deckkraft auf ganzen Pixeln), linke der drei Bienen; der rote Fleck (159) entfällt.
+  Schatten, Abdunklung, Honigglanz: selbst gezeichnet.
 """
 from common import *
 import numpy as np
@@ -70,7 +71,8 @@ for k, (x, y) in enumerate(centers):
     else:                                           # übrige Wabe als ruhiger Hintergrund
         f, sat = max(0.4, 0.62 - 0.06 * (hd - 2)), 0.78
     g = px.mean(-1, keepdims=True)
-    cv.a[m] = ((g + (px - g) * sat) * f).clip(0, 255).astype(np.uint8)
+    warm = np.array([1.0, 1.0, 1.0]) if hd <= 1 else np.array([1.08, 0.94, 0.78])   # Hintergrund warm, nicht grünlich
+    cv.a[m] = ((g + (px - g) * sat) * f * warm).clip(0, 255).astype(np.uint8)
 
 # ---------- Figuren: eigenes 4×-Raster (64×88, beschnitten auf 250×350) ----------
 W4, H4 = 64, 88

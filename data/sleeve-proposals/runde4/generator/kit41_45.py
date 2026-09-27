@@ -188,3 +188,10 @@ def vbands(g, cols, edges, x0=0, x1=None, m=None, soft=2.0):
         pick = band & (t > B4[yy % 4, xx % 4])
         out[band & ~pick] = cols[k]; out[pick] = cols[k + 1]
     g.a[sel, :3] = out[sel]; g.a[sel, 3] = 255
+
+
+def tint_final(cv, m, k, col, t, lift=1.0):
+    """Nach dem Verschmelzen: Bereich m (Raster k) aufhellen/einfärben – z. B. Glas vor dem Hintergrund."""
+    u = np.repeat(np.repeat(m, k, 0), k, 1)[:350, :250]
+    v = cv.a[u].astype(float) * lift
+    cv.a[u] = np.clip(v * (1 - t) + np.array(col) * t, 0, 255).astype(np.uint8)

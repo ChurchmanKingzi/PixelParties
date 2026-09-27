@@ -55,23 +55,35 @@ deck &= ~hole
 rim = deck & (cv2.dilate(hole.astype(np.uint8), np.ones((3, 3), np.uint8)) > 0)
 rim2 = deck & ~rim & (cv2.dilate(hole.astype(np.uint8), np.ones((7, 7), np.uint8)) > 0)
 lowedge = deck & ~np.roll(deck, -1, 0)
-bg.a[deck] = (62, 46, 94)
-bg.a[deck & (yy > low[None, :] - 5) & ((xx + yy) % 2 == 0)] = (88, 62, 110)   # untere Wolkenzone heller (Muster)
-bg.a[rim2] = (132, 88, 128)
+# Wolkenmasse: Helligkeit nach Abstand zur Öffnung (4 Stufen), Wolkenballen als Buckelreihen mit dunkler Unterlinie
+dh = cv2.distanceTransform((~hole).astype(np.uint8), cv2.DIST_L2, 3)
+lv = np.clip(3 - dh / 9, 0, 3).astype(int)
+deck_cols = [(58, 42, 86), (84, 60, 108), (118, 80, 124), (160, 108, 136)]
+for k, c in enumerate(deck_cols):
+    bg.a[deck & (lv == k)] = c
+for row_base, seed in [(8, 31), (16, 32), (24, 33)]:
+    bl = bumpy(0, BW, row_base, 3.0, seed)
+    for x in range(BW):
+        y = int(round(bl[x]))
+        if 0 <= y < BH and deck[y, x] and not rim[y, x] and not rim2[y, x]:
+            bg.a[y, x] = np.clip(bg.a[y, x].astype(int) - 22, 0, 255)
+        if 0 <= y - 1 < BH and deck[y - 1, x] and not rim[y - 1, x]:
+            bg.a[y - 1, x] = np.clip(bg.a[y - 1, x].astype(int) + 18, 0, 255)
+bg.a[rim2] = (176, 116, 136)
 bg.a[rim] = (250, 206, 150)
-bg.a[lowedge] = (176, 108, 132)
+bg.a[lowedge] = (190, 118, 136)
 # Blick durch die Öffnung: heller Himmel mit Verlauf (kein Scheibenkörper)
 hy_ = np.clip((yy - 10) / 14, 0, 1)
 bg.a[hole] = np.where((hy_[hole] > 0.5)[:, None], (255, 232, 176), (255, 244, 208))
 
 # Strahlenbündel: fünf divergierende Strahlen von der Öffnung nach unten (gedithert aufhellen)
 SX0, SY0 = 62.5, 22
-rays = [(-14, 0.18), (-6, 0.26), (0, 0.42), (7, 0.26), (15, 0.18)]      # (Zielversatz bei y=70, Stärke)
+rays = [(-16, 0.34), (-7, 0.42), (0, 0.55), (8, 0.42), (17, 0.34)]      # (Zielversatz bei y=70, Stärke)
 for dxr, s in rays:
     for y in range(SY0, 128):
         tt = (y - SY0) / (70 - SY0)
         cx = SX0 + dxr * tt + (dxr * 0.25)
-        half = 1.2 + 3.2 * tt if dxr else 2.5 + 6 * tt
+        half = 1.5 + 2.8 * tt if dxr else 2.5 + 5 * tt
         fade = 1.0 if y < 76 else max(0.0, 1 - (y - 76) / 40)
         for x in range(int(cx - half - 1), int(cx + half + 2)):
             if not (0 <= x < BW) or deck[y, x]: continue

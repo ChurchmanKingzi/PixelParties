@@ -5,13 +5,13 @@ verschneite kahle Bäume. Dichter Schneefall – die Flocken jeder Tiefenebene i
 
 Quellen:
   Motive 800 „Snowman“ (Karte „Slippery Snowman“), 6×
-  Motive 797 „Sichtbar #36“ (Eisläuferin der Karte „Slippery Skates“ – trotz des Namens ein einzelnes Sprite), 3×
+  Motive 797 „Sichtbar #36“ (Eisläuferin der Karte „Slippery Skates“ – trotz des Namens ein einzelnes Sprite), 2×
   MotiveRussia 90 „Ebene #106“ und 137 „Ebene #94“ (verschneite kahle Bäume), 2×
 Selbst gezeichnet: Nachthimmel, Hügel, Teich (Eis, Glanz, Kufenspuren), Schneewehe, Schatten, Schneeflocken.
 
 Skalierung:
-  Hintergrund (Himmel, Hügel, Bäume, Teich, ferne Flocken): 2× (Raster 125×175)
-  Mittelgrund (Eisläuferin, ihre Kufenspur, mittlere Flocken): 3× (Raster 84×117, beschnitten)
+  Hintergrund (Himmel, Mond, Hügel, Bäume, Teich, Eisläuferin + Spur, ferne Flocken): 2× (Raster 125×175)
+  Mittelgrund (mittlere Schneeflocken): 3× (Raster 84×117, beschnitten)
   Vordergrund (Schneemann, Schneewehe, Schatten, nahe Flocken): 6× (Raster 42×59, beschnitten)
 """
 from common import *  # noqa
@@ -67,6 +67,21 @@ t1 = sprite('b09_tree1', R, [90]); t2 = sprite('b09_tree2', R, [137])
 t1 = tint(t1, (40, 50, 110), 0.25); t2 = tint(t2, (40, 50, 110), 0.25)
 for spr, x in [(t1, 4), (flip(t2), 22), (t2, 96), (flip(t1), 108)]:
     bg.paste(spr, x, SHORE + 2 - spr.shape[0])
+# Eisläuferin weit hinten am linken Teichrand (2×-Raster = Originalgröße) mit Kufenspur und Schatten
+sk = sprite('b09_skater', M, [797])                               # 13×23
+SKX, SKY = 17, 84                                                 # Kufen bei y = SKY + 22
+fx, fy = SKX + 7, SKY + 22
+for k in range(220):
+    s_ = k / 219
+    x = fx + 3 + s_ * 52
+    y = fy + 11 * math.sin(s_ * math.pi * 0.85)
+    X, Y = int(round(x)), int(round(y))
+    if 0 <= X < BW and 0 <= Y < BH and ice[Y, X]:
+        bg.a[Y, X] = (206, 222, 248)
+for i in range(-1, 10):
+    X, Y = SKX + 2 + i, SKY + 23
+    if 0 <= X < BW and ice[Y, X]: bg.a[Y, X] = (48, 64, 110)
+bg.paste(sk, SKX, SKY)
 # ferne Flocken (1 Rasterpixel)
 rng = np.random.RandomState(9)
 for _ in range(90):
@@ -78,27 +93,9 @@ vignette(bg, 0.45, 0.55)
 cv = Canvas(250, 350)
 cv.a[:] = up(bg.a, 2)
 
-# ---------------- Mittelgrund 3×: Eisläuferin + Spur ----------------
+# ---------------- Mittelgrund 3×: nur Schneeflocken ----------------
 MW, MH = 84, 117
 mid = np.zeros((MH, MW, 4), np.uint8)
-sk = sprite('b09_skater', M, [797])                               # 13×23
-SKX, SKY = 20, 57                                                 # linke obere Ecke; Kufen auf dem Eis
-# Kufenspur: geschwungene Linie von rechts hinten zur Läuferin (1 Rasterpixel, hell)
-foot_x, foot_y = SKX + 7, SKY + 22
-for k in range(160):
-    s = k / 159
-    x = foot_x + 3 + s * 30 + 7 * math.sin(s * math.pi * 1.2)
-    y = foot_y - s * 17 + 2.5 * math.sin(s * math.pi * 2)
-    X, Y = int(round(x)), int(round(y))
-    if 0 <= X < MW and 0 <= Y < MH:
-        mid[Y, X] = (214, 230, 252, 255)
-# Schatten der Läuferin auf dem Eis
-for i in range(-1, 9):
-    X, Y = SKX + 3 + i, SKY + 23
-    if 0 <= X < MW: mid[Y, X] = (44, 58, 104, 255)
-for j in range(sk.shape[0]):
-    for i in range(sk.shape[1]):
-        if sk[j, i, 3] >= 128: mid[SKY + j, SKX + i] = sk[j, i]
 # mittlere Flocken
 for _ in range(26):
     x, y = rng.randint(0, MW), rng.randint(0, MH)
