@@ -1,9 +1,8 @@
 # -*- coding: utf-8 -*-
 """Sleeve 58 – „Mammoth Trek“ (Runde 3b, neu): Eiszeit. Ein Wollmammut stapft im Schneetreiben durch die
-Schneeebene und zieht eine Spur tiefer Fußstapfen hinter sich her, die sich bis zum Schneekamm zurückverfolgen
-lässt; am Horizont schneebedeckte Berge im Abendlicht.
+Schneeebene, vorne eine Schneewehe, am Horizont schneebedeckte Berge im Abendlicht.
 
-Skalierung (Regel A): Mammut, Schneefeld, Fußspuren, Schneeflocken 3×; Berge als Silhouette im 3×-Raster, Himmel Dither-Verlauf (selbst erstellt).
+Skalierung (Regel A): Mammut, Schneefeld, Schneewehe, Schneeflocken 3×; Berge als Silhouette im 3×-Raster, Himmel Dither-Verlauf (selbst erstellt).
 
 Vollständigkeit (Regel B): Ebene „Ebene #367“ [773] ist das ganze Mammut; in der Kartenszene „Sichtbar #51“ [771]
 liegt darüber nur die Bewegungsunschärfe „Whoolmoth“ [774] (Angriffs-Effekt) – ohne sie ist die Figur vollständig.
@@ -62,20 +61,9 @@ for i in range(W2 // K + 1):
 mam = lay(B, 773)
 Image.fromarray(mam).save(os.path.join(xcfkit.CACHE, 'g58_mammoth.png'))
 
-# ---------------------------------------------------------------- Mammut vorne (3×) + Fußspuren
+# ---------------------------------------------------------------- Mammut vorne (3×) 
 M = up(mam, K)
 mx, feet = 28, 300
-# Spur: Fußstapfen (3×3 Blöcke) von rechts hinten zum Mammut
-# Spur zieht sich vom Kamm (rechts hinten) in Schlangenlinie bis zu den Hinterbeinen
-pts = []
-for j in range(14):
-    t = j / 13
-    fx = int(214 + 22 * math.sin(t * 5.0) + 20 * t) // K * K
-    fy = int(HOR + 20 + t * 104) // K * K
-    pts.append((fx + (K if j % 2 else -K), fy))
-for fx, fy in pts:
-    cv.rect(fx, fy, fx + 2 * K, fy + K, (126, 140, 190))
-    cv.rect(fx, fy + K, fx + 2 * K, fy + 2 * K, (170, 182, 222))
 # Schatten unter dem Mammut (flach, 3×-Raster)
 for i in range(-26, 28):
     w = int(4 * math.sqrt(max(0.0, 1 - (i / 28) ** 2)))
@@ -87,10 +75,18 @@ for fx in range(mx + 6, mx + M.shape[1] - 6, 6):
     if cv.a[feet - 2, fx].sum() < 400:
         cv.rect(fx - K, feet - K, fx + K, feet, (232, 238, 250))
 
+# Schneewehe im Vordergrund (3×-Raster), verdeckt die Fußsohlen nicht
+for i in range(W2 // K + 1):
+    top = 318 + int(round(5 * math.sin(i / 6.0 + 1.0) + 3 * math.sin(i / 2.7))) // 1 * 1
+    top = top // K * K
+    cv.rect(i * K, top, i * K + K, H2, (246, 248, 255))
+    cv.rect(i * K, top, i * K + K, top + K, (255, 255, 255))
+    cv.rect(i * K, top + 2 * K, i * K + K, top + 3 * K, (226, 232, 248))
+
 # ---------------------------------------------------------------- Schneetreiben (3×3-Flocken, schräg)
 for i in range(70):
     x, y = rng.randint(0, W2 // K) * K, rng.randint(0, H2 // K) * K
     c = (250, 250, 255) if rng.rand() < 0.7 else (214, 220, 240)
     cv.rect(x, y, x + K, y + K, c)
-vignette(cv, 0.2, 0.7)
+
 print(save(cv, '58_mammoth_trek.png'))

@@ -4,15 +4,16 @@
 Querschnitt durch einen Lavasee: oben links steht der Steam Dwarf Brewer mit seinem angezapften
 Fass auf einem Krustenvorsprung über der Glut und wartet; unten stapft der Steam Dwarf Diver über
 den Seegrund. Aus seinen Helmrohren steigen Dampfblasen durch die Lava nach oben und brechen an der
-Oberfläche als Dampfsäulen hervor, die aus dem Bild hinausschießen.
+Oberfläche als Dampfsäule hervor, die aus dem Bild hinausschießt. (Der frühere Miner rechts oben
+ist entfallen – bei einheitlicher 4×-Skalierung hätte er den Aufbau überladen.)
 
 Einheitliche Pixelgröße: ALLES 4× (Figuren, Fass, Dampf, Lava-, Krusten- und Felstexturen,
-selbst gezeichnete Blasen) – Querschnitt = eine Bildebene.
+selbst gezeichnete Blasen, Dithering der Verläufe im 4×-Raster) – Querschnitt = eine Bildebene.
 
 Quellen (MotiveSteamDwarfs.xcf):
   Diver   = Ebenen 420 (nur Helm-Teil, Box), 421–424          (Karte „Steam Dwarf Diver“, Szene 402)
   Brewer  = Ebenen 440–442 + liegendes Fass aus Ebene 443     (Karte „Steam Dwarf Brewer“, Szene 15)
-  Dampf   = Ebene 414 „STEAM“ (Doppelsäule, untere Hälfte)
+  Dampf   = Ebene 415 (Dampfsäule, 4×; nur der untere Teil ragt ins Bild)
   Texturen = Lava + Felsnadeln (Ebene 444), Kruste + Felswand (Ebene 445)
   Blasen  = selbst gezeichnet (Palette aus Lava/Dampf)
 Vollständigkeit (Regel B) mit c_util.fig_check gegen die Szenen 402 bzw. 15 geprüft.

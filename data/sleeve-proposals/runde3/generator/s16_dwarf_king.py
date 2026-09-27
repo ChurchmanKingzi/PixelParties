@@ -1,21 +1,18 @@
 # -*- coding: utf-8 -*-
 """Sleeve 16 – Der Zwergenkönig vor seinem Stollen, überarbeitet für Runde 3b.
 
-Güldefaber, der König der Zwerge, steht groß im Vordergrund neben seinem aufrecht gestellten,
-funkelnden Fass-Hammer (Anordnung wie auf seiner Karte), daneben ein Fass. Weit hinter ihm führt
-der Pfad zwischen Wiesen und Bäumen zum dunklen Stolleneingang in der Felswand – der Blick geht
-über den König hinweg in die Tiefe (Aufbau wie „Count of the Deep“).
+Güldefaber, der König der Zwerge, steht groß vor dem holzverschalten Eingang seines Stollens,
+neben ihm – wie auf seiner Karte – der aufrecht gestellte, funkelnde Fass-Hammer. Hinter ihm führt
+der Stollen ins Dunkel; Felswand und Boden stammen aus der Kulisse seiner Karte.
 
-Skalierung / Tiefenstaffelung:
-  Vordergrund 5×: König, Fass-Hammer, Glitzer, Fass (alle auf derselben Ebene, alle 5×)
-  Hintergrund 2×: Felswand mit Stolleneingang, Pfad, Bäume (weit hinten, durch Abdunkeln und
-                  Dunst zusätzlich zurückgesetzt). Der König wird unten vom Bildrand angeschnitten,
-                  sein Standpunkt liegt also vor der gesamten Kulisse.
-  Die frühere Garde (Dragon Pilots 4× neben dem 7×-König) ist entfallen (Regel A).
+Einheitliche Pixelgröße: ALLES 6× (König, Fass-Hammer, Glitzer, Felswand- und Bodentextur,
+Holzausbau und Stollen-Dithering). Die frühere Garde (Dragon Pilots 4× neben dem 7×-König) und der
+4×-Hammer über dem König sind entfallen (Regel A); der Hammer steht jetzt wie auf der Karte neben ihm.
 
 Quellen (Motive.xcf, Karte „Güldefaber, the King of Dwarfs“, Szene 262):
-  König = Ebene 266 „Güldefaber“; Fass-Hammer + Fass = Ebene 265; Glitzer = Ebene 264
-  Kulisse = Ebene 874 „Ebene #264“ (Felswand mit Stolleneingang, Pfad, Wiese, Bäume)
+  König = Ebene 266 „Güldefaber“; Fass-Hammer = Ebene 265; Glitzer = Ebene 264
+  Felswand + Boden = Ebene 874 „Ebene #264“ (Kulisse der Karte); Holzausbau selbst gezeichnet in
+  den Holzfarben der Fässer aus Ebene 265
 Vollständigkeit (Regel B): fig_check gegen Szene 262 – alle sichtbaren Figurpixel stammen aus
 264/265/266; das graue Stück hinter der Krone gehört zur Felswand (874), nicht zur Figur.
 """
@@ -34,26 +31,32 @@ rock = tex('c16_rock', M, 874, (282, 152, 314, 200))       # Felswand (Kluftfels
 dirt = tex('c16_dirt', M, 874, (320, 170, 346, 181))      # Pfad/Stollenboden, 26×11
 
 FLOOR = 300                                               # Standlinie (Canvas-y, Vielfaches von 6)
-# ---------- Felswand 6× und dunkle Stollennische (Rundbogen) im 6×-Raster
+# ---------- Felswand 6× mit Stolleneingang: dunkler Stollen, Holzausbau (Stempel + Kappe) in den
+# Holzfarben der Fässer aus Ebene 265, alles im 6×-Raster
 tile_fill(cv, rock, 0, 0, W, FLOOR, k=K, ox=2 * K)
-shade_rows(cv, 0, FLOOR, 0.45, 0.2, (20, 10, 6), k=K)
-NX, NTOP = W // 2, 36                                    # Nischenmitte, Scheitel
-NR = 96
-def niche(x, y, pad=0):
-    cy = NTOP + NR
-    if y >= cy: return abs(x + K / 2 - NX) < NR + pad
-    return math.hypot(x + K / 2 - NX, y + K / 2 - cy) < NR + pad
-for y in range(0, FLOOR, K):
-    for x in range(0, W, K):
-        if niche(x, y):
-            t = min(1, max(0, (y - NTOP) / (FLOOR - NTOP)))
-            c = [(12, 7, 5), (24, 14, 8), (40, 24, 12), (58, 36, 18)]
-            i = int(t * 3 + BAYER4[(y // K) % 4, (x // K) % 4] * 0.999)
-            cv.rect(x, y, x + K, y + K, c[min(i, 3)])
-        elif niche(x, y, K):
-            cv.rect(x, y, x + K, y + K, (150, 104, 60))           # Bogenkante (Licht)
-        elif niche(x, y, 2 * K):
-            cv.rect(x, y, x + K, y + K, (28, 14, 6))              # Fuge
+shade_rows(cv, 0, FLOOR, 0.45, 0.25, (20, 10, 6), k=K)
+WD = [(72, 44, 22), (103, 64, 32), (136, 95, 49), (175, 127, 64), (199, 159, 97)]   # Holz dunkel→hell
+OX0, OX1, OTOP = 5 * K, W - 5 * K, 7 * K                  # Stollenöffnung
+for y in range(OTOP, FLOOR, K):                            # Stollen: dunkel, nach hinten schwarz
+    for x in range(OX0, OX1, K):
+        t = (y - OTOP) / (FLOOR - OTOP)
+        c = [(10, 6, 4), (22, 13, 7), (38, 23, 11), (56, 34, 16)]
+        i = int(t * 3 + BAYER4[(y // K) % 4, (x // K) % 4] * 0.999)
+        cv.rect(x, y, x + K, y + K, c[min(i, 3)])
+def post(x0):                                              # Stempel: 3 Zellen breit
+    for y in range(OTOP, FLOOR, K):
+        cv.rect(x0, y, x0 + K, y + K, WD[3])
+        cv.rect(x0 + K, y, x0 + 2 * K, y + K, WD[2])
+        cv.rect(x0 + 2 * K, y, x0 + 3 * K, y + K, WD[1])
+        if (y // K) % 7 == 3: cv.rect(x0 + K, y, x0 + 2 * K, y + K, WD[1])     # Astloch
+    cv.rect(x0 - K, OTOP - 4 * K, x0 + 4 * K, OTOP - 3 * K, WD[0])           # Schatten unter der Kappe
+post(OX0 - 3 * K); post(OX1)
+for x in range(OX0 - 5 * K, OX1 + 5 * K, K):               # Kappe (Querbalken), 3 Zellen hoch
+    cv.rect(x, OTOP - 3 * K, x + K, OTOP - 2 * K, WD[4])
+    cv.rect(x, OTOP - 2 * K, x + K, OTOP - K, WD[3] if (x // K) % 9 else WD[1])
+    cv.rect(x, OTOP - K, x + K, OTOP, WD[1])
+for xe in (OX0 - 5 * K, OX1 + 4 * K):                      # Balkenenden (Hirnholz)
+    cv.rect(xe, OTOP - 3 * K, xe + K, OTOP, WD[2])
 # Boden 6×
 tile_fill(cv, dirt, 0, FLOOR, W, H, k=K)
 cv.rect(0, FLOOR, W, FLOOR + K, (70, 44, 22))
