@@ -180,7 +180,7 @@ module.exports = {
         }
       }
       } finally {
-        engine.endMultiHit();
+        await engine.endMultiHit();
       }
 
       engine.log('dance_of_flame_pillars_multi', {

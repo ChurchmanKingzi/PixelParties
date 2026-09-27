@@ -6,6 +6,13 @@
 
 const { v4: uuidv4 } = require('uuid');
 const { SPEED, HOOKS, PHASES, PHASE_NAMES, ZONES, STATUS_EFFECTS, getNegativeStatuses, BUFF_EFFECTS, hasCardType, hasSpellSchool, isArtifactCreature, POISON_BASE_DAMAGE, BURN_BASE_DAMAGE, baseCardName, BLIND_STATUSES, getCleansableStatuses } = require('./_hooks');
+// v1443: Hooks, deren Kontext die ausloesende Karte mitbekommt
+// (`ausloeserName`, s. `runHooks`) — fuer Reaktionen, die zeigen, worauf
+// sie reagieren.
+const AUSLOESER_HOOKS = new Set([
+  HOOKS.BEFORE_DRAW_BATCH, HOOKS.ON_CARD_ADDED_TO_HAND,
+  HOOKS.ON_CARD_ADDED_FROM_DISCARD_TO_HAND, HOOKS.BEFORE_CREATURE_DAMAGE_BATCH,
+]);
 const { handSizeWithoutResolving } = require('./_hand-resolve');   // v1288
 const { loadCardEffect } = require('./_loader');
 const { gainedNames, heroScriptsOf, heroScriptOf, eigenesHeldenSkript } = require('./_gained-effects-shared');
@@ -2723,6 +2730,15 @@ class GameEngine {
     // derselben Regel wie `pileOutAllowed`: ausdrueckliche Quelle, sonst
     // die laufende Effektquelle, sonst die aktivierende Karte, sonst der
     // Zugspieler.
+    // ★ v1443 — WELCHE KARTE LOEST AUS? (Als Befund 26.9.: Skeleton Demon
+    // und Cool Rescuer Monia zeigten nicht, worauf sie reagieren.) Aus
+    // demselben Grund wie oben hier VOR der Zuhoerer-Runde festgehalten:
+    // waehrend ein Zuhoerer laeuft, ist `_currentEffectSource` er selbst.
+    // Reagierende Karten reichen `ctx.ausloeserName` als
+    // `triggerCardName` an ihren Prompt weiter.
+    if (hookCtx && hookCtx.ausloeserName === undefined && AUSLOESER_HOOKS.has(hookName)) {
+      hookCtx.ausloeserName = this._effectSourceName();
+    }
     if (hookName === HOOKS.ON_CARD_LEAVE_ZONE && hookCtx && hookCtx.entferntVon === undefined) {
       const q = hookCtx.source;
       const qOwner = (typeof hookCtx.sourceOwner === 'number') ? hookCtx.sourceOwner
@@ -4658,6 +4674,12 @@ class GameEngine {
           }
         }
 
+        // ★ `config.dimUnmetCondition` (Als Vorgabe 26.9.): Ziele, die an
+        // `config.condition` scheitern, bleiben AUSGEGRAUT in der Liste
+        // (`ineligible`) statt zu verschwinden — der Spieler sieht, dass es
+        // sie gibt, aber nicht waehlen kann (Petrifier: „except the user").
+        // Ohne die Flagge bleibt es beim Weglassen. CPU, Auto-Wahl und
+        // Antwortpruefung ueberspringen `ineligible` ohnehin.
         const addHeroes = (playerIdx) => {
           const ps2 = gs.players[playerIdx];
           for (let hi = 0; hi < (ps2.heroes || []).length; hi++) {
@@ -4666,7 +4688,10 @@ class GameEngine {
             // Skip heroes charmed by the caster (they're on the caster's side)
             if (hero.charmedBy === pi && playerIdx !== pi) continue;
             const t = { id: `hero-${playerIdx}-${hi}`, type: 'hero', owner: playerIdx, heroIdx: hi, cardName: hero.name };
-            if (config.condition && !config.condition(t, engine)) continue;
+            if (config.condition && !config.condition(t, engine)) {
+              if (!config.dimUnmetCondition) continue;
+              t.ineligible = true;   // ausgegraut statt weg (s. dimUnmetCondition)
+            }
             targets.push(t);
           }
         };
@@ -4693,7 +4718,10 @@ class GameEngine {
               if (!cd || !engine.isChoosableAsCreature(inst, cd)) continue;
               if (inst?.faceDown) continue; // Face-down Bakhm surprises are not targetable
               const t = { id: `equip-${playerIdx}-${hi}-${si}`, type: 'equip', owner: playerIdx, heroIdx: hi, slotIdx: si, cardName: creatureName, cardInstance: inst };
-              if (config.condition && !config.condition(t, engine)) continue;
+              if (config.condition && !config.condition(t, engine)) {
+              if (!config.dimUnmetCondition) continue;
+              t.ineligible = true;   // ausgegraut statt weg (s. dimUnmetCondition)
+            }
               targets.push(t);
             }
           }
@@ -4709,7 +4737,10 @@ class GameEngine {
               const h = charmedOps.heroes[hi];
               if (!h?.name || h.hp <= 0 || h.charmedBy !== pi) continue;
               const t = { id: `hero-${oppIdx}-${hi}`, type: 'hero', owner: oppIdx, heroIdx: hi, cardName: h.name };
-              if (config.condition && !config.condition(t, engine)) continue;
+              if (config.condition && !config.condition(t, engine)) {
+              if (!config.dimUnmetCondition) continue;
+              t.ineligible = true;   // ausgegraut statt weg (s. dimUnmetCondition)
+            }
               if (!targets.some(x => x.id === t.id)) targets.push(t);
             }
           }
@@ -4976,6 +5007,9 @@ class GameEngine {
           // card; a caller can override (e.g. preview the equip it's
           // offering) by passing `previewCardName` explicitly.
           previewCardName: config.previewCardName || cardInstance.name,
+          // v1443: die AUSLOESENDE Karte einer Reaktion (Skeleton Demon) —
+          // links im Zielpanel, „Triggered by".
+          triggerCardName: config.triggerCardName,
           _callerHandlesSurprise: true,   // v920: dieser Weg oeffnet das Fenster selbst
           // Optional override for the cancel button label. Used when
           // cancelling means "step back" rather than "abort" — e.g.
@@ -5229,7 +5263,10 @@ class GameEngine {
             if (!hero?.name || hero.hp <= 0) continue;
             if (hero.charmedBy === pi && playerIdx !== pi) continue;
             const t = { id: `hero-${playerIdx}-${hi}`, type: 'hero', owner: playerIdx, heroIdx: hi, cardName: hero.name };
-            if (config.condition && !config.condition(t, engine)) continue;
+            if (config.condition && !config.condition(t, engine)) {
+              if (!config.dimUnmetCondition) continue;
+              t.ineligible = true;   // ausgegraut statt weg (s. dimUnmetCondition)
+            }
             targets.push(t);
           }
         };
@@ -5254,7 +5291,10 @@ class GameEngine {
               if (!cd || !engine.isChoosableAsCreature(inst2, cd)) continue;
               if (inst2?.faceDown) continue; // Face-down Bakhm surprises are not targetable
               const t = { id: `equip-${playerIdx}-${hi}-${si}`, type: 'equip', owner: playerIdx, heroIdx: hi, slotIdx: si, cardName: creatureName, cardInstance: inst2 };
-              if (config.condition && !config.condition(t, engine)) continue;
+              if (config.condition && !config.condition(t, engine)) {
+              if (!config.dimUnmetCondition) continue;
+              t.ineligible = true;   // ausgegraut statt weg (s. dimUnmetCondition)
+            }
               targets.push(t);
             }
           }
@@ -5269,7 +5309,10 @@ class GameEngine {
               const h = charmedOps2.heroes[hi];
               if (!h?.name || h.hp <= 0 || h.charmedBy !== pi) continue;
               const t = { id: `hero-${oppIdx}-${hi}`, type: 'hero', owner: oppIdx, heroIdx: hi, cardName: h.name };
-              if (config.condition && !config.condition(t, engine)) continue;
+              if (config.condition && !config.condition(t, engine)) {
+              if (!config.dimUnmetCondition) continue;
+              t.ineligible = true;   // ausgegraut statt weg (s. dimUnmetCondition)
+            }
               if (!targets.some(x => x.id === t.id)) targets.push(t);
             }
           }
@@ -5537,6 +5580,9 @@ class GameEngine {
           cancellable: config.cancellable !== false,
           // General rule: show the source card's image in the picker.
           previewCardName: config.previewCardName || cardInstance.name,
+          // v1443: die AUSLOESENDE Karte einer Reaktion (Skeleton Demon) —
+          // links im Zielpanel, „Triggered by".
+          triggerCardName: config.triggerCardName,
           _callerHandlesSurprise: true,   // v920: dieser Weg oeffnet das Fenster selbst
           maxTotal: max,
           minRequired: min,
@@ -6037,12 +6083,11 @@ class GameEngine {
    *
    * A Hero whose own effect script exports `heroSelfDamageImmune`
    * (boolean `true`, or a `(engine, ownerIdx, heroIdx) → bool`
-   * predicate) nullifies ALL incoming damage to itself — normal,
-   * status (burn / poison), AND true damage that "could normally not
-   * be reduced or negated" (Acid Vial / Rockfall tier). This is the
-   * engine hook behind Carris, the Time Keeper: it sits BESIDE the
-   * other absolute hero protections (firstTurnProtectedPlayer, Charme
-   * Lv3, Baihu petrify) so true-damage callers respect it too.
+   * predicate) nullifies incoming damage to itself — normal and status
+   * (burn / poison). Seit v1444 NICHT mehr durchschlagenden Schaden
+   * (`cannotBeNegated` / `cannotBeReduced`) und NICHT True Damage —
+   * Carris' neuer Text nimmt diese Klausel heraus. Der Aufrufer im
+   * Schadenspfad prueft die Piercing-Marken selbst.
    *
    * Deliberately NOT gated on Frozen / Stunned / Negated — Carris's
    * card text says the damage-prevention "cannot be negated", so the
@@ -7716,19 +7761,8 @@ class GameEngine {
       return { dealt: 0, cancelled: true, effectNegated: true };
     }
 
-    // ── Absolute self-damage immunity (Carris, the Time Keeper) ──
-    // "Any damage this Hero would take becomes 0, including damage that
-    // could normally not be reduced or negated." Checked here, BEFORE
-    // the Anti Magic / Surprise windows and BEFORE_DAMAGE — nothing
-    // happens to the Hero at all, so no would-take-damage side effects
-    // fire. The matching guard in actionDealTrueDamage covers the
-    // true-damage path.
-    if (target && target.hp !== undefined && amount > 0
-        && this._isHeroSelfDamageImmune(target)) {
-      this.log('damage_blocked', { target: this._heroLabel(target), reason: 'self_damage_immune' });
-      this._flashHeroDamageZero(target);
-      return { dealt: 0, cancelled: true };
-    }
+    // (Carris, the Time Keeper — seit v1444 weiter unten, hinter
+    // BEFORE_DAMAGE: erst dort steht fest, ob der Schaden durchschlaegt.)
     // ── damage_proof (Storm Piano, v628) ────────────────────────────
     // „prevent any damage the Hero would take until the end of your next
     // turn": ein positiver Heldenstatus, der JEDEN normalen Schaden
@@ -8151,6 +8185,23 @@ class GameEngine {
     // since strictly "only fire if the attack hits exactly 1 target"
     // would require deferring the boost past AFTER_SPELL_RESOLVED.
     this._applyEmpoweredStrikeIfApplicable(hookCtx);
+
+    // ── Carris, the Time Keeper (v1444, neuer Text Al 26.9.) ─────────
+    // „Any damage this Hero would take becomes 0." Die fruehere Klausel
+    // „including damage that could normally not be reduced or negated"
+    // ist GESTRICHEN: durchschlagender Schaden (`cannotBeNegated` /
+    // `cannotBeReduced` — Ida, Club of Gobbo, Empowered Strike, Monia-
+    // Bot-Umleitung, Tempeste …) trifft Carris jetzt. Deshalb steht die
+    // Pruefung HIER, nachdem BEFORE_DAMAGE und Empowered Strike ihre
+    // Piercing-Marken gesetzt haben. True Damage (`actionDealTrueDamage`)
+    // prueft sie gar nicht mehr.
+    if (target?.hp !== undefined && hookCtx.amount > 0
+        && !hookCtx.cannotBeNegated && !hookCtx.cannotBeReduced
+        && this._isHeroSelfDamageImmune(target)) {
+      this.log('damage_blocked', { target: this._heroLabel(target), reason: 'self_damage_immune' });
+      this._flashHeroDamageZero(target);
+      return { dealt: 0, cancelled: true };
+    }
 
     // Armed-arrow attack modifiers (flat damage bumps and hard-zero from
     // Hydra Blood). Runs AFTER beforeDamage hooks so Sacred Hammer / any
@@ -8622,32 +8673,16 @@ class GameEngine {
       }
     }
 
-    // Check for hero KO
+    // Check for hero KO — sofort oder, mitten in einem Mehrfachtreffer,
+    // erst nach dem ganzen Schlag (s. `_heldKoMelden`).
     if (target && target.hp !== undefined && target.hp <= 0) {
-      target.diedOnTurn = this.gs.turn;
-      this.log('hero_ko', { hero: this._heroLabel(target), source: source?.name || 'damage' });
-      // Store KO context for reaction cards (Loot the Leftovers, etc.)
-      const targetOwner = this.gs.players.findIndex(ps => (ps.heroes || []).includes(target));
       // `type` mitgeben (v557): der KO-Hook trug bisher NUR Held und
       // Quelle. Karten, die „defeats a target with an Attack" pruefen
       // muessen (Future Tech Bazooka), hatten damit keine Grundlage —
       // der Schadenstyp steht hier aber laengst im Geltungsbereich.
-      this.gs._heroKOContext = { hero: target, source, heroOwner: targetOwner, killerOwner: source?.owner ?? -1, type };
-      await this.runHooks(HOOKS.ON_HERO_KO, { hero: target, source, type, _bypassDeadHeroFilter: true });
-      delete this.gs._heroKOContext;
-
-      // Generic "extra life" mark consumer (Trial of Coolness, etc.).
-      // Runs AFTER onHeroKO so cards like Guardian Angel still get
-      // priority — `_extraLife` is the last automatic safety net.
-      // Persists across turns until consumed; stamped by the granting
-      // card with `{ by: 'CardName' }` for log attribution.
-      // Hat ein Hook (Guardian Angel) die HP wiederhergestellt, ist der
-      // Tod VERHINDERT worden — kein Ablauf, keine Ausruestungsverluste.
-      if (target.hp > 0) {
-        delete target.diedOnTurn;
-      } else {
-        await this._runHeroDefeatSequence(target, source, targetOwner);
-      }
+      await this._heldKoMelden(target, source, {
+        type, killerOwner: source?.owner ?? -1, logQuelle: source?.name || 'damage',
+      });
     }
 
     return { dealt: actualAmount, cancelled: false };
@@ -8704,15 +8739,9 @@ class GameEngine {
         return { dealt: 0 };
       }
 
-      // Absolute self-damage immunity (Carris, the Time Keeper) — the
-      // card's "including damage that could normally not be reduced or
-      // negated" carve-out explicitly covers true damage. Sits beside
-      // first-turn protection as a non-reducible, non-negatable wall.
-      if (this._isHeroSelfDamageImmune(target)) {
-        this.log('damage_blocked', { target: this._heroLabel(target), reason: 'self_damage_immune' });
-        this._flashHeroDamageZero(target);
-        return { dealt: 0 };
-      }
+      // (Carris' Immunitaet gilt seit v1444 NICHT mehr fuer True Damage —
+      // der Kartentext nimmt „damage that could normally not be reduced
+      // or negated" nicht mehr aus.)
 
       const hpBefore = target.hp;
       target.hp = Math.max(0, target.hp - amount);
@@ -8780,25 +8809,12 @@ class GameEngine {
         }
       }
 
-      // Hero KO — same flow as the normal damage path.
+      // Hero KO — same flow as the normal damage path (inkl. Aufschub
+      // im Mehrfachtreffer, s. `_heldKoMelden`).
       if (target.hp <= 0) {
-        target.diedOnTurn = this.gs.turn;
-        this.log('hero_ko', { hero: this._heroLabel(target), source: source?.name || 'true damage' });
-        this.gs._heroKOContext = {
-          hero: target, source, heroOwner: targetOwner, killerOwner: sourceOwner,
-        };
-        await this.runHooks(HOOKS.ON_HERO_KO, { hero: target, source, _bypassDeadHeroFilter: true });
-        delete this.gs._heroKOContext;
-
-        // Generic "extra life" mark consumer — see actionDealDamage for
-        // rationale. True-damage path mirrors the normal-damage path so
-        // a Trial-of-Coolness-protected hero survives Acid Vial / Rockfall
-        // / etc. just as it survives an attack.
-        if (target.hp > 0) {
-          delete target.diedOnTurn;
-        } else {
-          await this._runHeroDefeatSequence(target, source, targetOwner);
-        }
+        await this._heldKoMelden(target, source, {
+          killerOwner: sourceOwner, logQuelle: source?.name || 'true damage',
+        });
       }
 
       return { dealt };
@@ -8825,6 +8841,116 @@ class GameEngine {
     }
 
     return { dealt: 0 };
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  //  ★ ERST ALLER SCHADEN, DANN ALLE TODE (Als Befund 26.9.)
+  // ═══════════════════════════════════════════════════════════════
+  // Ein Flaechenschlag trifft Helden und Kreaturen im selben Moment. Bis
+  // hierhin starb ein Held aber SOFORT bei seinem Einzeltreffer — samt
+  // KO-Hooks und Aufraeumen (Ausruestung in die Ablage) —, und erst
+  // DANACH bekamen die Kreaturen ihren Schaden. Wirkungen, die an dieser
+  // Ausruestung haengen, waren fuer die Kreaturen damit schon weg.
+  // Beispiel: Lunatic Golem halbiert ab 3 verschiedenen Lunatic Cycles
+  // seinen Schaden; stirbt ein Held mit einem Lunatic Cycle im selben
+  // Schlag, sank die Zahl, bevor der Golem getroffen wurde.
+  //
+  // Jetzt haengt ein Aufschub an der Flaechenklammer (`beginMultiHit` /
+  // `beginAoeStrike` … `await endMultiHit()`), die jeder Mehrfachtreffer
+  // setzt — `dealDamageToTargets` ebenso wie die Karten mit eigenem
+  // Schadensweg. Ein Heldentod waehrenddessen wird nur vorgemerkt;
+  // abgewickelt wird er erst beim Schliessen der Klammer, wenn aller
+  // Schaden verteilt ist — in Trefferreihenfolge. Geschachtelte Schlaege
+  // teilen sich den aeussersten Aufschub. Ausserhalb einer Klammer
+  // (Einzeltreffer) aendert sich nichts.
+
+  //
+  // Kreaturen genauso (Als Vorgabe 26.9., „Erst Schaden, dann Tode"):
+  // `processCreatureDamageBatch` wickelt Tode erst nach dem letzten
+  // Eintrag ab, und in einer Klammer landen sie in derselben Liste wie
+  // die Heldentode (`_kreaturTodMelden`) — so trifft etwa Armageddon,
+  // das jede Kreatur einzeln trifft, wirklich alle, bevor eine stirbt.
+
+  /** Aufschub oeffnen (verschachtelbar). */
+  _todesAufschubBeginnen() {
+    const a = this._todesAufschub;
+    if (a) { a.tiefe += 1; return; }
+    this._todesAufschub = { tiefe: 1, liste: [] };
+  }
+
+  /** Aufschub schliessen; der aeusserste wickelt alle vorgemerkten Tode
+   *  ab — Helden und Kreaturen in der Reihenfolge, in der sie fielen. */
+  async _todesAufschubAbschliessen() {
+    const a = this._todesAufschub;
+    if (!a) return;
+    if (a.tiefe > 1) { a.tiefe -= 1; return; }
+    this._todesAufschub = null;
+    if (a.liste.length === 0) return;
+    // Ein Sammler um ALLE Kreaturentode des Schlags: „one or more of your
+    // Creatures are defeated" sieht die ganze Liste auf einmal.
+    await this._mitNiederlagenSammler(async () => {
+      const handLimitAffectedOwners = new Set();
+      for (const t of a.liste) {
+        if (t.art === 'kreatur') {
+          await this._kreaturTodAbwickeln(t.e, handLimitAffectedOwners);
+          this.sync();
+          await this._delay(200);
+          continue;
+        }
+        // Zwischenzeitlich geheilt (oder schon abgewickelt): kein Tod mehr.
+        if (!(t.target.hp <= 0) || t.target._koProcessed) continue;
+        await this._heldKoAbwickeln(t.target, t.source, t.opts);
+      }
+      for (const owner of handLimitAffectedOwners) {
+        await this._checkReactiveHandLimits(owner);
+      }
+    });
+  }
+
+  /** Ein Held ist auf 0 HP gefallen: sofort abwickeln oder vormerken. */
+  async _heldKoMelden(target, source, opts = {}) {
+    const a = this._todesAufschub;
+    if (a) {
+      if (!a.liste.some(t => t.art === 'held' && t.target === target)) {
+        // `diedOnTurn` sofort: der Held liegt ab jetzt am Boden, auch
+        // wenn Hooks und Aufraeumen erst nach dem Schlag laufen.
+        target.diedOnTurn = this.gs.turn;
+        a.liste.push({ art: 'held', target, source, opts });
+      }
+      return;
+    }
+    await this._heldKoAbwickeln(target, source, opts);
+  }
+
+  /** KO-Hooks, Extra-Leben-Pruefung und Niederlage-Ablauf eines Helden. */
+  async _heldKoAbwickeln(target, source, opts = {}) {
+    target.diedOnTurn = this.gs.turn;
+    this.log('hero_ko', { hero: this._heroLabel(target), source: opts.logQuelle || source?.name || 'damage' });
+    // Store KO context for reaction cards (Loot the Leftovers, etc.)
+    const targetOwner = this.gs.players.findIndex(ps => (ps.heroes || []).includes(target));
+    this.gs._heroKOContext = {
+      hero: target, source, heroOwner: targetOwner,
+      killerOwner: opts.killerOwner ?? source?.owner ?? -1,
+      ...(opts.type !== undefined ? { type: opts.type } : {}),
+    };
+    await this.runHooks(HOOKS.ON_HERO_KO, {
+      hero: target, source, ...(opts.type !== undefined ? { type: opts.type } : {}),
+      _bypassDeadHeroFilter: true,
+    });
+    delete this.gs._heroKOContext;
+
+    // Generic "extra life" mark consumer (Trial of Coolness, etc.).
+    // Runs AFTER onHeroKO so cards like Guardian Angel still get
+    // priority — `_extraLife` is the last automatic safety net.
+    // Persists across turns until consumed; stamped by the granting
+    // card with `{ by: 'CardName' }` for log attribution.
+    // Hat ein Hook (Guardian Angel) die HP wiederhergestellt, ist der
+    // Tod VERHINDERT worden — kein Ablauf, keine Ausruestungsverluste.
+    if (target.hp > 0) {
+      delete target.diedOnTurn;
+    } else {
+      await this._runHeroDefeatSequence(target, source, targetOwner);
+    }
   }
 
   /**
@@ -8879,6 +9005,7 @@ class GameEngine {
    *
    * @returns {boolean} true, wenn eingeloest wurde (Held lebt wieder)
    */
+
   /**
    * Der vollstaendige Todesablauf, NACHDEM `ON_HERO_KO` gelaufen ist
    * und der Held immer noch bei 0 HP steht.
@@ -9545,6 +9672,19 @@ class GameEngine {
     });
     if (hero.hp > 0) return false;   // ein Fenster-Zuhoerer hat ihn schon zurueckgeholt
 
+    // ★ 26.9. — `opts.lebenNachMs`: die Animation laeuft ZUERST an, der
+    // Held kehrt erst nach dieser Frist in den Zustand zurueck (Divine
+    // Gift of Death: er bleibt tot, bis die Seele in ihn faehrt). Ohne
+    // das Feld unveraendert: Zustand sofort, Animation dazu.
+    const animType = opts.animationType || 'holy_revival';
+    const animDaten = { type: animType, owner: playerIdx, heroIdx, zoneSlot: -1, ...(opts.animDuration ? { duration: opts.animDuration } : {}) };
+    const vorlauf = opts.lebenNachMs > 0 ? opts.lebenNachMs : 0;
+    if (vorlauf) {
+      this._broadcastEvent('play_zone_animation', animDaten);
+      await this._delay(vorlauf);
+      if (hero.hp > 0 || !hero.name) return false;
+    }
+
     const maxHp = hero.maxHp || 400;
     const reviveHp = Math.min(hp, maxHp);
     hero.hp = reviveHp;
@@ -9567,12 +9707,11 @@ class GameEngine {
 
     this.log('hero_revived', { hero: hero.name, player: ps.username, hp: reviveHp, by: opts.source || 'unknown' });
 
-    const animType = opts.animationType || 'holy_revival';
     // `opts.animDuration` (v631): laengere Auftritte (Konzert der Hymne)
     // leben laenger als die 1000-ms-Vorgabe des Clients.
-    this._broadcastEvent('play_zone_animation', { type: animType, owner: playerIdx, heroIdx, zoneSlot: -1, ...(opts.animDuration ? { duration: opts.animDuration } : {}) });
+    if (!vorlauf) this._broadcastEvent('play_zone_animation', animDaten);
     this.sync();
-    await this._delay(opts.animDelay != null ? opts.animDelay : 1200);
+    await this._delay(Math.max(0, (opts.animDelay != null ? opts.animDelay : 1200) - vorlauf));
 
     await this.runHooks(HOOKS.ON_HERO_REVIVE, { playerIdx, heroIdx, hero, hp: reviveHp, source: opts.source });
     return true;
@@ -10076,6 +10215,7 @@ class GameEngine {
     const ok = await this.actionAddCardFromDeckToHand(playerIdx, cardName, {
       source: title,
       reveal: false,
+      ...(opts.flugStil ? { flugStil: opts.flugStil } : {}),   // 26.9.
     });
     if (!ok) return null;
 
@@ -14004,6 +14144,26 @@ this._deathWatch = (this._deathWatchStack || []).length
       });
       return { success: false, omniImmune: true };
     }
+    // ★ v1444 (Als Befund 26.9.: „Defending the Gate reagiert nicht auf
+    // Dark Gear"): Kontrollwechsel ist ein Effekt auf eine Karte in der
+    // Support Zone des bisherigen Kontrolleurs. Hier, am EINEN Weg fuer
+    // alle Uebernahmen (Dark Gear, Diplomacy, Spirit of the Heart Bow,
+    // Molinda, Memory Blast, Liberation …), wird das Tor gefragt. Quelle
+    // ist der Uebernehmende, sofern nicht ausdruecklich anders angegeben;
+    // `_triggerGateCheck` laesst eigene Effekte ohnehin durch.
+    // Opt-out `ignoreGateShield` fuer Texte ohne Gegner-Effekt (Jumper
+    // Spider wechselt aus eigenem Text).
+    if (!opts.ignoreGateShield && fromPlayerIdx !== toPlayerIdx && inst.zone === 'support') {
+      const quelle = typeof opts.sourceOwner === 'number' ? opts.sourceOwner : toPlayerIdx;
+      await this._triggerGateCheck(fromPlayerIdx, opts.sourceName || this._effectSourceName(), quelle);
+      if (this._isGateShielded(fromPlayerIdx, quelle)) {
+        this.log('transfer_fizzle', {
+          creature: inst.name, reason: 'defending_the_gate',
+          from: fromPs.username, to: toPs.username,
+        });
+        return { success: false, gateShielded: true };
+      }
+    }
     // ★ v1021: „Control of this Creature cannot change."
     if (this.controlIsLocked(inst)) {
       this.log('transfer_fizzle', {
@@ -16378,6 +16538,14 @@ this._deathWatch = (this._deathWatchStack || []).length
   async actionNegateCreature(inst, source, opts = {}) {
     if (!inst) return;
     if (inst.faceDown) return; // Face-down surprises cannot be negated
+    // ★ v1444 (Als Ruling 26.9.): `opts.unpreventable` — eine Negation,
+    // die NICHT verhindert werden kann (Dark Gear, Diplomacy). Sie ist
+    // kein Statuseffekt: weder „immune to negative status effects"
+    // (Lunatic Golem) noch ein Negations-Waechter heben sie auf. Sie
+    // traegt dafuer die Marke `_negatedHard` (s. `istHartNegiert`).
+    // Defending the Gate bleibt davon unberuehrt — das Tor negiert den
+    // ganzen Effekt, bevor er die Kreatur erreicht.
+    const hart = !!opts.unpreventable;
     // Defending the Gate: trigger for opp-applied negations only.
     // `selfInflicted` negations are the negating player's own cost
     // (Necromancy / Dark Gear / Diplomacy / Soul Shard Ka / Omikron /
@@ -16402,7 +16570,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // v818 (Queen of Kings [B], Als Ruling): solange ein Negations-
     // Waechter steht, wird `negated`/`nulled` durch den Gegner gar nicht
     // erst angelegt. Eigene Negationen (Platzierungen) bleiben moeglich.
-    {
+    if (!hart) {
       const negOwner = source?.owner ?? source?.controller;
       if (negOwner !== (inst.controller ?? inst.owner) && this._creatureNegationProof(inst)) {
         this.log('negation_blocked', { creature: inst.name, source: source?.name || 'effect', reason: 'negation_proof' });
@@ -16411,6 +16579,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     }
     const statusKey = opts.statusKey || 'negated';
     inst.counters[statusKey] = 1;
+    if (hart) inst.counters._negatedHard = 1;
     // Per-instance cleansable override (Unwanted Audience). Normally
     // `negated` / `nulled` are uncleansable (STATUS_EFFECTS), keeping
     // Dark Gear / Diplomacy permanent — `opts.cleansable` opts THIS
@@ -16447,9 +16616,11 @@ this._deathWatch = (this._deathWatchStack || []).length
     inst.counters.buffs[buffKey] = {
       expiresAtTurn: opts.expiresAtTurn,
       expiresForPlayer: opts.expiresForPlayer,
-      clearCountersOnExpire: opts.cleansable
-        ? [statusKey, statusKey + 'Cleansable']
-        : [statusKey],
+      clearCountersOnExpire: [
+        statusKey,
+        ...(opts.cleansable ? [statusKey + 'Cleansable'] : []),
+        ...(hart ? ['_negatedHard'] : []),
+      ],
       source,
       // Mirror hero post-cleanse immunity: when this buff expires
       // naturally (start of expiresForPlayer's turn), the creature
@@ -16775,7 +16946,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // creature carrying the `negative_status_immune` buff in
     // `counters.buffs` can't receive ANY negative status (Lunatic
     // Golem tier 2+, and any future creature granting it).
-    if (statusDef?.negative && inst.counters?.buffs?.negative_status_immune) return false;
+    if (statusDef?.negative && this._creatureNegStatusImmune(inst)) return false;   // v1444: nicht bei harter Negation
     // Light Ball — Attachment Spell on the controller's Hero protects
     // ALL other own targets (creatures included) from negative status
     // effects. Creatures are inherently "other" than the host Hero,
@@ -16806,7 +16977,19 @@ this._deathWatch = (this._deathWatchStack || []).length
    * gates here + server-side doActivateCreatureEffect.
    */
   _creatureNegStatusImmune(inst) {
-    return !!inst?.counters?.buffs?.negative_status_immune;
+    // v1444: eine unverhinderbare Negation (Dark Gear) schaltet auch diese
+    // Immunitaet ab — sie ist ein Effekt der Kreatur selbst (Lunatic Golem).
+    return !!inst?.counters?.buffs?.negative_status_immune && !this.istHartNegiert(inst);
+  }
+
+  /**
+   * ★ v1444: Unverhinderbar negiert (Dark Gear, Diplomacy — s.
+   * `actionNegateCreature` mit `unpreventable`). Keine Immunitaet und
+   * kein Negations-Waechter hebt das auf.
+   */
+  istHartNegiert(inst) {
+    const c = inst?.counters;
+    return !!(c && c._negatedHard && (c.negated || c.nulled));
   }
 
   /**
@@ -16986,6 +17169,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       && !this._isChillyDogActiveFor(inst.controller ?? inst.owner);
     const hasCC = !!(c.negated || c.nulled || c.stunned || c.magic_silenced || frostStillt);
     if (!hasCC) return false;
+    if (this.istHartNegiert(inst)) return true;   // v1444: unverhinderbar
     if (opts.honorNegStatusImmune !== false && this._creatureNegStatusImmune(inst)) return false;
     if (this._creatureNegationProof(inst)) return false;
     return true;
@@ -17115,8 +17299,12 @@ this._deathWatch = (this._deathWatchStack || []).length
     const ps = this.gs.players[pi];
     const arr = this._pileArray(ps, pile);
     if (!arr) return null;
+    // Nach Namen: bei Lethe-Stempeln die Kopie mit dem niedrigsten —
+    // dieselbe, die die Level-Tore als waehlbar sahen (v1443).
     const idx = typeof what === 'number' ? what
-      : (opts.last ? arr.lastIndexOf(what) : arr.indexOf(what));
+      : (opts.last ? arr.lastIndexOf(what)
+        : (pile === 'discard' || pile === 'deleted') ? this._letheLowestStampIdx(ps, pile, what)
+          : arr.indexOf(what));
     if (idx < 0 || idx >= arr.length) return null;
     const name = arr[idx];
     if ((pile === 'deck' || pile === 'discard') && !this.pileOutAllowed(pi, pile, opts)) {
@@ -17164,8 +17352,12 @@ this._deathWatch = (this._deathWatchStack || []).length
     const ps = this.gs.players[pi];
     const arr = this._pileArray(ps, pile);
     if (!arr) return null;
+    // Nach Namen: bei Lethe-Stempeln die Kopie mit dem niedrigsten —
+    // dieselbe, die die Level-Tore als waehlbar sahen (v1443).
     const idx = typeof what === 'number' ? what
-      : (opts.last ? arr.lastIndexOf(what) : arr.indexOf(what));
+      : (opts.last ? arr.lastIndexOf(what)
+        : (pile === 'discard' || pile === 'deleted') ? this._letheLowestStampIdx(ps, pile, what)
+          : arr.indexOf(what));
     if (idx < 0 || idx >= arr.length) return null;
     const name = arr[idx];
     if ((pile === 'deck' || pile === 'discard') && !this.pileOutAllowed(pi, pile, opts)) {
@@ -17190,6 +17382,7 @@ this._deathWatch = (this._deathWatchStack || []).length
   }
 
   _takeFromPileCore(pi, ps, arr, pile, idx, name, opts) {
+    this._letheTakeAt(ps, pile, idx);   // v1443: Stempel GENAU dieses Platzes
     arr.splice(idx, 1);
     // ★★ v1222: Verlaesst eine Karte die HAND, wird sofort abgeglichen.
     // Der Client verdeckt den Startplatz einer abfliegenden Handkarte
@@ -20431,6 +20624,10 @@ this._deathWatch = (this._deathWatchStack || []).length
     // Process regular buff expiry (Cloudy, etc.) AFTER status damage
     await this._processBuffExpiry({ beforeStatusDamage: false });
 
+    // v1444 Torchure: „During your NEXT turn" — der erste eigene Zug nach
+    // dem Wirken wird hier am Gift-Status festgehalten (s. `_torchureZusatz`).
+    this._torchureZugMerken(this.gs.activePlayer);
+
     // Now fire turn-start hooks (Barker, Slime level-ups, Rancher restore, etc.)
     await this.runHooks(HOOKS.ON_TURN_START, { turn: this.gs.turn, activePlayer: this.gs.activePlayer });
     this.sync();
@@ -20522,6 +20719,8 @@ this._deathWatch = (this._deathWatchStack || []).length
         for (const ps of this.gs.players) {
           if (ps) ps._actionsPlayedThisPhase = 0;
         }
+        // v1444 Torchure: Zusatz-Action, solange der Held noch vergiftet ist.
+        this._torchureZusatz(this.gs.activePlayer);
         // Compute which creatures have custom summon conditions that block them
         this.gs.summonBlocked = this.getSummonBlocked(this.gs.activePlayer);
         // Opp-Action-Phase hand reaction window (Burning Fuse, etc.).
@@ -20775,6 +20974,38 @@ this._deathWatch = (this._deathWatchStack || []).length
    * action resolves, where the grace gate KEEPS the player in Action
    * Phase so a freshly-granted bonus isn't accidentally skipped.
    */
+  // ─── TORCHURE (v1444, Als Vorgabe 26.9.) ─────────────────────────
+  // „Inflict 4 Stacks of Poison to a Hero you control that is not
+  //  Poisoned to play this card. During your next turn, if that Hero is
+  //  still Poisoned from this effect, you may perform an additional
+  //  Action during your Action Phase."
+  // Die Marke `_torchure = { owner, turn }` liegt AM Gift-Status des
+  // Helden: wird das Gift geheilt oder stirbt der Held, ist sie mit weg —
+  // genau „still Poisoned from this effect". Die Karte selbst liegt da
+  // laengst in der Ablage und hoert keine Hooks mehr, deshalb stehen die
+  // zwei Schritte hier.
+
+  /** Zugbeginn: den ersten eigenen Zug nach dem Wirken festhalten. */
+  _torchureZugMerken(pi) {
+    for (const hero of (this.gs.players[pi]?.heroes || [])) {
+      const m = hero?.statuses?.poisoned?._torchure;
+      if (!m || m.owner !== pi) continue;
+      if (m.naechsterZug == null && m.turn < this.gs.turn) m.naechsterZug = this.gs.turn;
+    }
+  }
+
+  /** Beginn der Action Phase: Zusatz-Action (zweiter Platz) gewaehren. */
+  _torchureZusatz(pi) {
+    const ps = this.gs.players[pi];
+    if (!ps) return;
+    const hero = (ps.heroes || []).find(h => h?.name && h.hp > 0
+      && h.statuses?.poisoned?._torchure?.owner === pi
+      && h.statuses.poisoned._torchure.naechsterZug === this.gs.turn);
+    if (!hero) return;
+    ps._bonusMainActions = Math.max(1, ps._bonusMainActions || 0);
+    this.log('torchure_bonus_action', { player: ps.username, hero: hero.name });
+  }
+
   async advanceToPhase(playerIdx, targetPhase, opts = {}) {
     if (playerIdx !== this.gs.activePlayer) return false;
 
@@ -22538,7 +22769,17 @@ this._deathWatch = (this._deathWatchStack || []).length
     // `_skipFlight`: der Aufrufer animiert die Bewegung selbst (Future
     // Tech Lamp faehrt das Show-Cards-Protokoll). Ohne den Schalter
     // liefen zwei Fluege fuer dieselbe Karte.
-    if (!opts._skipFlight) this._broadcastEvent('deck_search_add', { cardName, playerIdx: pi });
+    // ★ 26.9. — `opts.flugStil`: ein AUSDRUECKLICHER Flug Deck → Hand mit
+    // eigenem Aussehen (Perilous Journey: `'flammen'`). Er ersetzt die
+    // Zieh-Animation des Clients (Handschlag ueber `play_pile_transfer`)
+    // und damit auch die Gegnerseite von `deck_search_add`.
+    if (opts.flugStil && !opts._skipFlight) {
+      this._broadcastEvent('play_pile_transfer', {
+        owner: pi, cardName, from: 'deck', to: 'hand',
+        toHandIdx: ps.hand.length - 1, finalHandSize: ps.hand.length,
+        flightStyle: opts.flugStil,
+      });
+    } else if (!opts._skipFlight) this._broadcastEvent('deck_search_add', { cardName, playerIdx: pi });
     this.log('deck_search', {
       player: ps.username, card: cardName, by: opts.source || null,
     });
@@ -23413,7 +23654,8 @@ this._deathWatch = (this._deathWatchStack || []).length
       // dieser Zweig selbst. `opts.pileOwner` = fremde Ablage.
       const _pileOwner = opts.pileOwner ?? playerIdx;
       const _pile = gs.players[_pileOwner]?.discardPile || [];
-      const idx = opts.sourceIdx != null ? opts.sourceIdx : _pile.indexOf(cardName);
+      const idx = opts.sourceIdx != null ? opts.sourceIdx
+        : this._letheLowestStampIdx(gs.players[_pileOwner], 'discard', cardName);
       if (idx < 0 || _pile[idx] !== cardName) return null;
       if (!this.darfAusAblageAufsFeld(cardName)) {
         this.log('revive_blocked', { card: cardName, by: opts.sourceName || 'Placement' });
@@ -24475,7 +24717,10 @@ this._deathWatch = (this._deathWatchStack || []).length
             // an, das gerade als Tribut gewählte Greatmaw Remora zu
             // retten, NACHDEM der Sacrificial Dagger seinen Schaden
             // bereits ausgeteilt hatte).
-            { isSacrifice: true },
+            // ★ 26.9.: `spec.skipPileTransfer` — die Karte zeigt den Weg
+            // des Opfers zur Ablage selbst (Chaorc Interception wirft es
+            // aufs Ziel und laesst es von DORT abfliegen).
+            { isSacrifice: true, ...(spec.skipPileTransfer ? { skipPileTransfer: true } : {}) },
           );
         }
       } catch (err) {
@@ -25350,6 +25595,7 @@ this._deathWatch = (this._deathWatchStack || []).length
           // a placement is fronting, etc.) so the player has visual
           // confirmation of what their click will do.
           previewCardName: config.previewCardName,
+          triggerCardName: config.triggerCardName,   // v1443
           // Auto-confirm: when set, the first click that fills the
           // selection up to `maxTotal` commits immediately, skipping
           // the Confirm-button step. Used by direct-click pickers
@@ -28095,6 +28341,33 @@ this._deathWatch = (this._deathWatchStack || []).length
   /**
    * Sync check: is this player's support zone currently shielded by Defending the Gate?
    */
+  /**
+   * ★ v1444 (Als Befund 26.9.: „Defending the Gate reagiert nicht auf
+   * Dark Gear — und vielleicht Artifacts allgemein"). Zielende Artifacts
+   * und Potions loesen ueber `script.resolve` auf; das Tor meldete sich
+   * nur, wenn der Rumpf zufaellig ein Aktions-Primitiv mit Tor-Pruefung
+   * traf (Schaden, Zerstoeren, Status …) — Kontrollwechsel, Kosten-
+   * Berechnungen und Eigenbau-Effekte liefen daran vorbei. Hier wird das
+   * Tor gefragt, SOBALD ein gewaehltes Ziel in einer gegnerischen Support
+   * Zone liegt, noch bevor der Rumpf laeuft. Die Primitive sehen danach
+   * `_gateShieldActive` und fragen nicht erneut.
+   */
+  async gateVorZielen(pi, sourceName, selectedIds, validTargets) {
+    const seiten = new Set();
+    for (const id of (selectedIds || [])) {
+      const t = (validTargets || []).find(v => v && v.id === id);
+      if (!t) continue;
+      const inst = t.cardInstance || (t.type === 'equip' || t.type === 'creature'
+        ? this.cardInstances.find(c => c.zone === 'support' && (c.controller ?? c.owner) === t.owner
+          && c.heroIdx === t.heroIdx && c.zoneSlot === t.slotIdx)
+        : null);
+      if (!inst || inst.zone !== 'support' || inst.faceDown) continue;
+      const seite = inst.controller ?? inst.owner;
+      if (seite !== pi) seiten.add(seite);
+    }
+    for (const seite of seiten) await this._triggerGateCheck(seite, sourceName || null, pi);
+  }
+
   _isGateShielded(targetOwnerIdx, quelleBesitzer = undefined) {
     if (this.gs._gateShieldActive !== targetOwnerIdx) return false;
     return this._gateQuelleIstGegner(targetOwnerIdx, quelleBesitzer);   // v1377
@@ -30303,6 +30576,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       this._broadcastEvent('play_pile_transfer', {
         fromOwner: pileOwner, toOwner: pi, owner: pi, cardName: ab.name,
         from: 'discard', to: 'support', toHeroIdx: heroIdx, toSlotIdx: slotIdx,
+        ...(opts.flugStil ? { flightStyle: opts.flugStil } : {}),   // 26.9. (Forceful Revival)
       });
       if (typeof opts.flug === 'number' && opts.flug > 0) { this.sync(); await this._delay(opts.flug); }
     }
@@ -32386,6 +32660,13 @@ this._deathWatch = (this._deathWatchStack || []).length
         if (!this.gs._negatedEffectSources) this.gs._negatedEffectSources = new Set();
         this.gs._negatedEffectSources.add(key);
       }
+      // ★ 26.9.: auch HIER die Negationsbilder (v1180 „EIN Weg fuer JEDE
+      // Negation") — die Stelle fehlte bisher. Ohne sie blieb nicht nur
+      // der abgewehrte Zauber unsichtbar, auch der `nachBilder`-Nachlauf
+      // der Abwehrkarte lief nie (Chaorc Interception: der geworfene
+      // Chaorc fliegt erst darin zur Ablage). Keiner der Aufrufer spielt
+      // selbst Bilder nach einer Negation, doppelt wird also nichts.
+      await this.negationsBilder(source, normalized, ptResult);
     }
     return ptResult;
   }
@@ -33571,7 +33852,10 @@ this._deathWatch = (this._deathWatchStack || []).length
       // (no Surprise Zone to flip from — the card_reveal emit below
       // still shows opp what activated, and the trigger source emits
       // its own zone flourish to identify itself).
-      this._broadcastEvent('surprise_flip', { owner: playerIdx, heroIdx: hostHeroIdx, cardName, isBakhmSlot, bakhmZoneSlot });
+      // ★ 26.9.: `opts.ohneFlip` — die aufrufende Karte hat das Aufdecken
+      // schon selbst gezeigt (Telekinesis: die Karte schwebt hoch, dreht
+      // sich in der Luft um und landet offen).
+      if (!opts.ohneFlip) this._broadcastEvent('surprise_flip', { owner: playerIdx, heroIdx: hostHeroIdx, cardName, isBakhmSlot, bakhmZoneSlot });
     }
 
     // Reveal card to opponent and spectators
@@ -35443,13 +35727,32 @@ this._deathWatch = (this._deathWatchStack || []).length
    */
   beginMultiHit(anzahl) {
     this._multiHitScope = { total: anzahl || 0, tiefe: (this._multiHitScope?.tiefe || 0) + 1 };
+    // Erst aller Schaden, dann alle Tode (Als Befund/Vorgabe 26.9.):
+    // Helden- UND Kreaturentode innerhalb der Klammer werden nur
+    // vorgemerkt (`_heldKoMelden`, `_kreaturTodMelden`).
+    this._todesAufschubBeginnen();
     return this._multiHitScope;
   }
 
-  endMultiHit() {
+  /**
+   * Klammer schliessen. ASYNCHRON seit dem Todes-Aufschub (26.9.): die
+   * aeusserste Klammer wickelt hier die vorgemerkten Tode ab (Helden
+   * und Kreaturen, in Trefferreihenfolge) —
+   * NACH dem letzten Treffer, noch innerhalb des Scopes (wie bisher, als
+   * der Tod mitten in der Trefferschleife lief). Aufrufer muessen
+   * `await engine.endMultiHit()` schreiben, sonst liefen die Tode
+   * nebenher weiter.
+   */
+  async endMultiHit() {
     if (!this._multiHitScope) return;
-    if ((this._multiHitScope.tiefe || 1) <= 1) this._multiHitScope = null;
-    else this._multiHitScope.tiefe -= 1;
+    try {
+      await this._todesAufschubAbschliessen();
+    } finally {
+      if (this._multiHitScope) {
+        if ((this._multiHitScope.tiefe || 1) <= 1) this._multiHitScope = null;
+        else this._multiHitScope.tiefe -= 1;
+      }
+    }
   }
 
   /**
@@ -35487,7 +35790,7 @@ this._deathWatch = (this._deathWatchStack || []).length
    *     creatures, source: quelle, amount: dmg, type: 'destruction_spell',
    *     sourceOwner: pi,
    *   });
-   *   try { …Einzeltreffer wie bisher… } finally { engine.endMultiHit(); }
+   *   try { …Einzeltreffer wie bisher… } finally { await engine.endMultiHit(); }
    *
    * @returns {Promise<Set<string>>} ids der abgewehrten Instanzen
    */
@@ -38048,6 +38351,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         // turn the creature is being fired on.
         // Universal negative-status immunity (Lunatic Golem 2+) keeps
         // the creature activatable despite the CC it still carries.
+        if (this.istHartNegiert(inst)) continue;   // v1444
         if (!this._creatureNegStatusImmune(inst)
             && (inst.counters?.frozen || inst.counters?.stunned
                 || inst.counters?.negated || inst.counters?.nulled)) continue;
@@ -39530,8 +39834,8 @@ this._deathWatch = (this._deathWatchStack || []).length
     // pass `opts.pileSide`). Stacks across the standard gap-coverage
     // walk below — same as if the printed level were higher, so
     // Divinity / Wisdom can still pay it off.
-    if (opts.pileSide && cardData.cardType === 'Creature' && cardData.name) {
-      const bonus = this._getLetheStampBonus(playerIdx, cardData.name);
+    if (opts.pileSide && opts.pileSide !== 'deck' && cardData.cardType === 'Creature' && cardData.name) {
+      const bonus = this._getLetheStampBonus(playerIdx, cardData.name, opts.pileSide);
       if (bonus > 0) rawLevel += bonus;
     }
     if (rawLevel <= 0 && !cardData.spellSchool1) return true;
@@ -39931,7 +40235,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // text: stamps wipe only on move-to-hand/deck). Returns the highest
     // stamp on any current occupant of `cardName` across both piles.
     if (pileSide && pileSide !== 'deck' && cardData.cardType === 'Creature' && cardData.name && ps) {
-      const bonus = this._getLetheStampBonus(playerIdx, cardData.name);
+      const bonus = this._getLetheStampBonus(playerIdx, cardData.name, pileSide);
       if (bonus > 0) raw += bonus;
     }
 
@@ -39941,107 +40245,250 @@ this._deathWatch = (this._deathWatchStack || []).length
   }
 
   // ─── LETHE PILE LEVEL STAMPS ─────────────────
+  //
+  // ★ PRO KARTE, NICHT PRO NAME (Als Befund 26.9.: „Lethes Effekt erhoeht
+  //   auch die Level von Creatures, die erst NACHTRAEGLICH in den Discard
+  //   kommen.")
+  //
+  // Vorher lag je NAME eine Stempelliste ueber beide Stapel, gelesen wurde
+  // das MAXIMUM, und abgeglichen wurde nur faul beim Lesen. Zwei Luecken:
+  //   • eine spaeter abgelegte zweite Kopie zeigte den Stempel der ersten
+  //     (Maximum ueber alle Kopien);
+  //   • verliess eine gestempelte Karte den Stapel ohne Abgleich (Hand,
+  //     Brett) und kam wieder, stimmte die Anzahl — der alte Stempel
+  //     klebte an der Neuankunft.
+  //
+  // Jetzt: `ps._letheStamps = { discard: { [name]: [s, …] }, deleted: … }`
+  // — je Stapel und Name die Stempel der Vorkommen in STAPELREIHENFOLGE
+  // (aelteste zuerst; Neuankuenfte werden hinten angehaengt). Abgeglichen
+  // wird bei jedem `sync()`, vor jeder Welle, vor jeder Entnahme und bei
+  // jedem Lesen. Eine Neuankunft beginnt bei 0 — ausser sie ist im selben
+  // Schritt aus dem ANDEREN Stapel herueber gewandert (Ablage ↔ Geloescht
+  // behaelt die Stempel, Kartentext: sie enden nur auf Hand/Deck).
+  //
+  // Die Stapel sind Namenslisten; welche von zwei GLEICHNAMIGEN Kopien ging,
+  // weiss nur `takeFromPile` genau (es kennt den Index). Wo das nicht
+  // bekannt ist, gilt die Kopie mit dem NIEDRIGSTEN Stempel als die, die
+  // ging — dieselbe, die die Level-Tore (Minimum) als waehlbar ansehen.
+
+  /** Normalisierte Stempelablage oder null (auch Altform migrieren). */
+  _letheStampStore(ps, create = false) {
+    if (!ps) return null;
+    let st = ps._letheStamps;
+    if (st && !(st.discard && typeof st.discard === 'object' && !Array.isArray(st.discard))) {
+      // Altform `{ [name]: [...] }` — als Ablage-Stempel uebernehmen,
+      // der Abgleich schneidet sie auf die wirklichen Vorkommen zu.
+      const alt = st;
+      st = { discard: {}, deleted: {} };
+      for (const [n, arr] of Object.entries(alt)) {
+        if (Array.isArray(arr)) st.discard[n] = arr.slice();
+      }
+      ps._letheStamps = st;
+    }
+    if (!st && create) st = ps._letheStamps = { discard: {}, deleted: {} };
+    if (st) { st.discard = st.discard || {}; st.deleted = st.deleted || {}; }
+    return st || null;
+  }
+
+  /** Creature-Vorkommen je Name in einem Stapel. */
+  _letheCreatureCounts(pile) {
+    const cardDB = this._getCardDB();
+    const counts = {};
+    for (const name of (pile || [])) {
+      const cd = cardDB[name];
+      if (!cd || cd.cardType !== 'Creature') continue;
+      counts[name] = (counts[name] || 0) + 1;
+    }
+    return counts;
+  }
+
   /**
-   * Reconcile `ps._letheStamps` against the COMBINED contents of both
-   * piles (discard + deleted). Per-name arrays are resized to the
-   * total occurrence count across both piles — keeping the highest
-   * stamps when shrinking (player-friendly: the unstamped occurrence
-   * is treated as the one that left) and padding with `0` when
-   * growing. Non-Creature pile entries are ignored entirely (per the
-   * card text: Creatures only). Called lazily from every stamp read/
-   * write so we don't have to intercept every pile mutation across
-   * the codebase. The unified model is what lets stamps survive a
-   * discard↔deleted move: the total occupancy count is unchanged, so
-   * no shrink fires.
-   *
+   * Stempel gegen die aktuellen Stapel abgleichen (s. Kopfkommentar).
+   * Gegangene Vorkommen verlieren ihren Stempel (niedrigster zuerst),
+   * neue beginnen bei 0 bzw. erben einen im selben Schritt aus dem
+   * anderen Stapel gegangenen Stempel gleichen Namens.
    * @param {object} ps - Player state.
    */
   _reconcileLetheStamps(ps) {
-    if (!ps) return;
-    if (!ps._letheStamps) ps._letheStamps = {};
-    const cardDB = this._getCardDB();
-    const counts = {};
-    const piles = [ps.discardPile || [], ps.deletedPile || []];
-    for (const pile of piles) {
-      for (const name of pile) {
-        const cd = cardDB[name];
-        if (!cd || cd.cardType !== 'Creature') continue;
-        counts[name] = (counts[name] || 0) + 1;
+    const st = this._letheStampStore(ps);
+    if (!st) return;
+    const PILES = { discard: ps.discardPile || [], deleted: ps.deletedPile || [] };
+    const counts = {
+      discard: this._letheCreatureCounts(PILES.discard),
+      deleted: this._letheCreatureCounts(PILES.deleted),
+    };
+    const gegangen = { discard: {}, deleted: {} };
+    for (const pile of ['discard', 'deleted']) {
+      for (const name of Object.keys(st[pile])) {
+        const arr = st[pile][name];
+        const want = counts[pile][name] || 0;
+        while (arr.length > want) {
+          let mi = 0;
+          for (let i = 1; i < arr.length; i++) if (arr[i] < arr[mi]) mi = i;
+          (gegangen[pile][name] = gegangen[pile][name] || []).push(arr.splice(mi, 1)[0]);
+        }
       }
     }
-    const stamps = ps._letheStamps;
-    for (const name of Object.keys(stamps)) {
-      const want = counts[name] || 0;
-      if (want === 0) { delete stamps[name]; continue; }
-      if (stamps[name].length > want) {
-        // Keep highest-stamp entries when shrinking.
-        stamps[name].sort((a, b) => b - a);
-        stamps[name] = stamps[name].slice(0, want);
+    for (const pile of ['discard', 'deleted']) {
+      const anderer = pile === 'discard' ? 'deleted' : 'discard';
+      for (const name of Object.keys(counts[pile])) {
+        const want = counts[pile][name];
+        const arr = st[pile][name] || [];
+        const herueber = gegangen[anderer][name] || [];
+        herueber.sort((a, b) => a - b);
+        while (arr.length < want) arr.push(herueber.length ? herueber.pop() : 0);
+        st[pile][name] = arr;
+      }
+      // Reine Nullen tragen nichts — weg damit (Nullen sind der Normalfall).
+      for (const name of Object.keys(st[pile])) {
+        if (!st[pile][name].some(v => v > 0)) delete st[pile][name];
       }
     }
-    for (const name of Object.keys(counts)) {
-      if (!stamps[name]) stamps[name] = [];
-      while (stamps[name].length < counts[name]) stamps[name].push(0);
+    if (!Object.keys(st.discard).length && !Object.keys(st.deleted).length) {
+      delete ps._letheStamps;
     }
   }
 
   /**
-   * Highest stamp on any current pile occurrence of `cardName` across
-   * either of `playerIdx`'s piles. Returns 0 when there is none.
+   * Lethe-Aufschlag fuer `cardName` in den Stapeln von `playerIdx`. Die
+   * Stapel werden nach Namen gewaehlt — waehlbar ist also die Kopie mit
+   * dem NIEDRIGSTEN Stempel (eine frisch abgelegte Kopie hat 0). `pile`
+   * ('discard' | 'deleted') grenzt auf einen Stapel ein, sonst beide.
    */
-  _getLetheStampBonus(playerIdx, cardName) {
+  _getLetheStampBonus(playerIdx, cardName, pile = null) {
     const ps = this.gs.players[playerIdx];
-    if (!ps || !cardName) return 0;
-    if (!ps._letheStamps) return 0;
+    if (!ps || !cardName || !ps._letheStamps) return 0;
     this._reconcileLetheStamps(ps);
-    const arr = ps._letheStamps[cardName];
-    if (!arr || arr.length === 0) return 0;
-    let best = 0;
-    for (const v of arr) if (v > best) best = v;
-    return best;
+    const st = this._letheStampStore(ps);
+    if (!st) return 0;
+    const stapel = (pile === 'discard' || pile === 'deleted') ? [pile] : ['discard', 'deleted'];
+    let best = null;
+    for (const p of stapel) {
+      const n = this._letheCreatureCounts(p === 'discard' ? ps.discardPile : ps.deletedPile)[cardName] || 0;
+      if (n === 0) continue;
+      const arr = st[p][cardName] || [];
+      for (let k = 0; k < n; k++) {
+        const v = arr[k] || 0;
+        if (best == null || v < best) best = v;
+      }
+    }
+    return best || 0;
   }
 
   /**
-   * Consume one Lethe stamp on `cardName` for `playerIdx`. Called by
-   * every revival path (Necromancy, Forceful Revival, Reincarnation,
-   * Xuanwu, …) AFTER it splices the Creature out of its pile but
-   * BEFORE reconciliation. The HIGHEST stamp leaves with the revived
-   * Creature so the player gets the value they see on the badge, and
-   * the remaining same-named copies in the piles keep their (lower or
-   * equal) stamps intact. Returns the consumed stamp (or 0 if none).
-   * Caller is responsible for stashing the return value onto the new
-   * board instance (`inst.counters._letheLevelBonus = stamp`) so the
-   * bonus follows the Creature onto the board.
+   * Stempel je Stapelplatz fuer den Client:
+   * `{ discard: [s0, s1, …], deleted: […] }` parallel zu den Stapeln,
+   * oder null, wenn nichts gestempelt ist.
+   */
+  getLetheStampView(playerIdx) {
+    const ps = this.gs.players[playerIdx];
+    if (!ps?._letheStamps) return null;
+    this._reconcileLetheStamps(ps);
+    const st = this._letheStampStore(ps);
+    if (!st) return null;
+    const view = {};
+    for (const pile of ['discard', 'deleted']) {
+      const seen = {};
+      view[pile] = ((pile === 'discard' ? ps.discardPile : ps.deletedPile) || []).map(name => {
+        const k = seen[name] = (seen[name] ?? -1) + 1;
+        return st[pile][name]?.[k] || 0;
+      });
+    }
+    return view;
+  }
+
+  /**
+   * Stapelplatz der Kopie von `cardName` mit dem niedrigsten Stempel —
+   * fuer Entnahmen nach NAMEN, damit sie dieselbe Kopie treffen, die die
+   * Level-Tore als waehlbar gesehen haben. -1, wenn nicht vorhanden.
+   */
+  _letheLowestStampIdx(ps, pile, cardName) {
+    const arr = pile === 'discard' ? ps?.discardPile : pile === 'deleted' ? ps?.deletedPile : null;
+    if (!arr) return -1;
+    const first = arr.indexOf(cardName);
+    if (first < 0 || !ps._letheStamps) return first;
+    this._reconcileLetheStamps(ps);
+    const stamps = this._letheStampStore(ps)?.[pile]?.[cardName];
+    if (!stamps) return first;
+    let bestIdx = first, bestVal = Infinity, k = 0;
+    for (let i = 0; i < arr.length; i++) {
+      if (arr[i] !== cardName) continue;
+      const v = stamps[k++] || 0;
+      if (v < bestVal) { bestVal = v; bestIdx = i; }
+    }
+    return bestIdx;
+  }
+
+  /**
+   * Von `_takeFromPileCore` VOR dem Splice gerufen: den Stempel genau
+   * dieses Stapelplatzes herausnehmen und fuer `consumeLetheStamp`
+   * bereitlegen (die Entnahme kennt den Index, der Abgleich nicht).
+   */
+  _letheTakeAt(ps, pile, idx) {
+    if (!ps?._letheStamps || (pile !== 'discard' && pile !== 'deleted')) return;
+    this._reconcileLetheStamps(ps);
+    const st = this._letheStampStore(ps);
+    const arr = pile === 'discard' ? ps.discardPile : ps.deletedPile;
+    const name = arr?.[idx];
+    if (!st || !name) return;
+    let k = 0;
+    for (let i = 0; i < idx; i++) if (arr[i] === name) k++;
+    const stamps = st[pile][name];
+    const stamp = stamps && k < stamps.length ? stamps.splice(k, 1)[0] : 0;
+    if (stamps && !stamps.some(v => v > 0)) delete st[pile][name];
+    ps._letheTaken = { pile, name, stamp: stamp || 0 };
+  }
+
+  /**
+   * Consume the Lethe stamp of a Creature that just LEFT a pile for the
+   * board. Called by every revival path AFTER it took the Creature out.
+   * Went it through `takeFromPile`, the exact stamp of that pile slot is
+   * waiting; otherwise the pile that is one short gives up its LOWEST
+   * stamp (s. Kopfkommentar). Returns the consumed stamp (or 0). Caller
+   * stashes it onto the new board instance
+   * (`inst.counters._letheLevelBonus = stamp`).
    */
   consumeLetheStamp(playerIdx, cardName) {
     const ps = this.gs.players[playerIdx];
     if (!ps || !cardName) return 0;
-    if (!ps._letheStamps) return 0;
-    const arr = ps._letheStamps[cardName];
-    if (!Array.isArray(arr) || arr.length === 0) return 0;
-    // Pop the highest entry — the revival took the most-stamped copy.
-    arr.sort((a, b) => b - a);
-    const consumed = arr.shift() || 0;
-    if (arr.length === 0) delete ps._letheStamps[cardName];
-    return consumed;
+    const taken = ps._letheTaken;
+    delete ps._letheTaken;
+    if (taken && taken.name === cardName) return taken.stamp || 0;
+    const st = this._letheStampStore(ps);
+    if (!st) return 0;
+    for (const pile of ['discard', 'deleted']) {
+      const stamps = st[pile][cardName];
+      if (!stamps) continue;
+      const n = this._letheCreatureCounts(pile === 'discard' ? ps.discardPile : ps.deletedPile)[cardName] || 0;
+      if (stamps.length <= n) continue;
+      let mi = 0;
+      for (let i = 1; i < stamps.length; i++) if (stamps[i] < stamps[mi]) mi = i;
+      const consumed = stamps.splice(mi, 1)[0] || 0;
+      this._reconcileLetheStamps(ps);
+      return consumed;
+    }
+    return 0;
   }
 
   /**
-   * Apply a Lethe stamp wave: +1 to every existing Creature occurrence
-   * across BOTH of `playerIdx`'s piles. Fired by Lethe after each of
-   * her own Necromancy resolutions. Reconciles first so newly-arrived
-   * Creatures (without stamps yet) start at 0 and then receive their
-   * first +1 from this wave.
+   * Apply a Lethe stamp wave: +1 to every Creature occurrence CURRENTLY
+   * in either of `playerIdx`'s piles. Fired by Lethe after each of her
+   * own Necromancy resolutions. Creatures that arrive later start at 0.
    */
   applyLetheStampWave(playerIdx) {
     const ps = this.gs.players[playerIdx];
     if (!ps) return;
-    if (!ps._letheStamps) ps._letheStamps = {};
     this._reconcileLetheStamps(ps);
-    const stamps = ps._letheStamps;
-    for (const name of Object.keys(stamps)) {
-      for (let i = 0; i < stamps[name].length; i++) stamps[name][i] += 1;
+    const st = this._letheStampStore(ps, true);
+    for (const pile of ['discard', 'deleted']) {
+      const counts = this._letheCreatureCounts(pile === 'discard' ? ps.discardPile : ps.deletedPile);
+      for (const [name, n] of Object.entries(counts)) {
+        const arr = st[pile][name] || (st[pile][name] = []);
+        while (arr.length < n) arr.push(0);
+        for (let i = 0; i < arr.length; i++) arr[i] += 1;
+      }
     }
+    if (!Object.keys(st.discard).length && !Object.keys(st.deleted).length) delete ps._letheStamps;
   }
 
   /**
@@ -41581,6 +42028,8 @@ this._deathWatch = (this._deathWatchStack || []).length
         source: quellObjekt, amount: damage, type: damageType, sourceOwner: pi,
         canBeNegated: opts.canBeNegated !== false,
       });
+      // (Die Klammer schiebt auch die Heldentode bis nach dem Schlag auf,
+      // s. `_heldKoMelden`.)
       try {
         for (const { hero, amount } of hitHeroes) {
           if (hero.hp <= 0 || !(amount > 0)) continue; // May have died from a previous hit this loop
@@ -41597,7 +42046,8 @@ this._deathWatch = (this._deathWatchStack || []).length
         const mitSchaden = creatureEntries.filter(e => e.amount > 0);
         if (mitSchaden.length > 0) await this.processCreatureDamageBatch(mitSchaden);
       } finally {
-        this.endMultiHit();
+        // Vorgemerkte Heldentode JETZT — nach dem letzten Treffer.
+        await this.endMultiHit();
       }
     }
 
@@ -41985,6 +42435,9 @@ this._deathWatch = (this._deathWatchStack || []).length
     // values from Royal Corgi) died in this batch. Rechecked after the
     // batch resolves so reactive deletion prompts fire immediately.
     const handLimitAffectedOwners = new Set();
+    // Kreaturen, die in diesem Durchgang auf 0 HP fallen — ihr Tod wird
+    // erst nach dem letzten Treffer abgewickelt (s. unten).
+    const sterbende = [];
 
     // Batch-level post-target hand-reaction window. Most spells /
     // attacks route their damage through `promptDamageTarget` /
@@ -42613,210 +43066,26 @@ this._deathWatch = (this._deathWatchStack || []).length
       }
 
       if (e.inst.counters.currentHp <= 0) {
-        // Stempel VOR jeder await-Kette setzen — der Riegel oben in
-        // dieser Schleife und die Filter der Karten lesen ihn, waehrend
-        // die Todes-Hooks noch laufen und die Instanz noch getrackt ist.
-        // Der Revive-Zweig weiter unten baut ueber
-        // `summonCreatureWithHooks` eine FRISCHE Instanz, der Stempel
-        // auf der alten steht dem also nicht im Weg.
+        // Stempel SOFORT setzen — der Riegel oben in dieser Schleife und
+        // die Filter der Karten lesen ihn, waehrend die Instanz noch
+        // getrackt ist (bis ihr Tod abgewickelt ist). Der Revive-Zweig
+        // baut ueber `summonCreatureWithHooks` eine FRISCHE Instanz, der
+        // Stempel auf der alten steht dem also nicht im Weg.
         e.inst._deathResolved = true;
-        // ── ANSPRUCHSFENSTER (v679b) ────────────────────────────────
-        // Laeuft VOR der Ablage und vor dem Flug dorthin. Wer den
-        // Kadaver beansprucht, stempelt `_deathClaim`; der Tod laeuft
-        // danach normal weiter (on-death feuert), aber die Karte wird
-        // NICHT abgelegt und fliegt auch nicht sichtbar dorthin.
-        await this.runHooks(HOOKS.ON_CREATURE_DEATH_CLAIM, {
-          creature: {
-            name: e.inst.name, owner: e.inst.owner,
-            originalOwner: e.inst.originalOwner,
-            controller: e.inst.controller ?? e.inst.owner,
-            heroIdx: e.inst.heroIdx, zoneSlot: e.inst.zoneSlot,
-            instId: e.inst.id,
-            turnPlayed: e.inst.turnPlayed,
-          },
-          source: e.source, type: e.type, _skipReactionCheck: true,
-        });
-        const _claim = e.inst._deathClaim || null;
-        if (_claim) this._sendDeathClaimHold(e.inst);
-        // PHYSICAL side is where the supportZones array actually contains
-        // the card name. Stays equal to `owner` for normal creatures and
-        // for temporary steals (Deepsea Succubus leaves the card on
-        // owner's board) — but flips to `controller` for permanent cross-
-        // side placements (Chilly Wizard). Without this distinction, the
-        // splice below failed silently and left the dead creature visible
-        // on opp's slot indefinitely.
-        const physicalSide = (e.inst.stolenBy != null)
-          ? e.inst.owner
-          : (e.inst.controller ?? e.inst.owner);
-        const ps = this.gs.players[physicalSide];
-        this.log('creature_destroyed', { card: e.inst.name, by: e.source?.name || e.type, owner: e.inst.owner, heroIdx: e.inst.heroIdx, zoneSlot: e.inst.zoneSlot });
-        // Store death info before cleanup. `instId` lets on-death listeners
-        // match the dying instance precisely (Hell Fox self-detect, etc.) —
-        // matching by owner+heroIdx+zoneSlot can be ambiguous if two
-        // dying-this-batch entries share a slot path. `controller` is
-        // included so "your opponent controls" listeners (Carpet Bomblebee,
-        // etc.) can attribute the death to the correct side — a cross-side
-        // placed Chilly Wizard dying counts as the CONTROLLER's creature,
-        // not the original owner's.
-        const deathInfo = { name: e.inst.name, owner: e.inst.owner, originalOwner: e.inst.originalOwner, controller: e.inst.controller ?? e.inst.owner, heroIdx: e.inst.heroIdx, zoneSlot: e.inst.zoneSlot, instId: e.inst.id, level: this.kreaturLevelJetzt(e.inst) };   // v1334: level
-        // If this creature contributed to hand-size math (e.g. Royal Corgi's
-        // -3 bonus, or a hypothetical reducer-creature), flag the owner for a
-        // hand-limit recheck once the batch settles.
-        if ((e.inst.counters.handLimitReduction || 0) !== 0) {
-          handLimitAffectedOwners.add(e.inst.owner);
-        }
-        const supSlot = ps?.supportZones?.[e.inst.heroIdx]?.[e.inst.zoneSlot];
-        if (supSlot) {
-          const idx = supSlot.indexOf(e.inst.name);
-          if (idx >= 0) supSlot.splice(idx, 1);
-        }
-        // ★ VERDECKTE KARTE AUFDECKEN (v775, Als Befund 5.9.) — vor dem
-        // Ablegen und vor dem Flug dorthin, damit „Monster Nest" schon
-        // im Platz steht, waehrend die getoetete Creature wegfliegt.
-        // Zwillingsstelle zu `_removeCardFromState`; dieser Pfad hat
-        // seinen eigenen Splice und laeuft dort nicht durch.
-        this._surfaceNestedUnder(e.inst);
-        // Cards return to their ORIGINAL owner's discard pile (Tokens go to deleted pile)
-        const creatureDiscardPs = this.gs.players[e.inst.originalOwner];
-        let _creatureDest = null;
-        // ★★ v1347: eingesogen (`_sogUrsprung`) → der Flug startet in der
-        // Brettmitte, nicht in der Zone. Der Merker wird HIER verbraucht,
-        // auch bei beanspruchtem Kadaver — so weiss `_sogAbschliessen`,
-        // dass diese Kreatur nicht zurueckfliegen darf.
-        const _ausDemSog = !!e.inst._sogUrsprung;
-        delete e.inst._sogUrsprung;
-        // Beanspruchter Kadaver: kein Stapel, kein Flug dorthin. Die
-        // Karte geht gleich in die Hand oder direkt in ihre neue Zone.
-        if (creatureDiscardPs && !_claim) {
-          const effectiveCd = this.getEffectiveCardData(e.inst);
-          // ★★ v1135 (Als Befund 15.9.: „Hell Fox fliegt jetzt visuell
-          // vom Board zum Discard, ehe es im Deleted Pile landet. Das
-          // ist falsch.").
-          //
-          // ★ ES GIBT ZWEI TODESPFADE, und ich hatte nur den einen
-          // (`actionDestroyCard`) auf `deletesSelfOnDeath` umgestellt.
-          // DIESER hier — der Schadens-Batch — routet voellig eigenes
-          // Ziel und eigenen Flug. Eine Karte, die sich bei ihrem Tod
-          // selbst loescht, landete darueber weiterhin erst in der
-          // Ablage und wurde danach umgebucht: zwei Bilder, genau der
-          // Fehler von v1134.
-          //
-          // Derselbe Fehler wie bei den acht Flugwegen (v1133): eine
-          // Absicherung an EINER Stelle ist keine Absicherung.
-          const _selbstLoeschend = !!loadCardEffect(e.inst.name)?.deletesSelfOnDeath;
-          if ((effectiveCd && hasCardType(effectiveCd, 'Token')) || _selbstLoeschend) {
-            creatureDiscardPs.deletedPile.push(e.inst.name);
-            _creatureDest = 'deleted';
-          } else {
-            creatureDiscardPs.discardPile.push(e.inst.name);
-            _creatureDest = 'discard';
-          }
-          // Broadcast a slot-specific fly-out so the client animates
-          // from THIS specific dying inst's support slot — without it,
-          // the diff-detector's name-keyed rect lookup falls back to
-          // FIFO order and always picks the leftmost copy when
-          // multiple same-named creatures share the board.
-          //
-          // `fromOwner` MUST be the inst's PHYSICAL side (where it
-          // actually renders), not raw owner. For temporary steals
-          // (Deepsea Succubus, Treacherous Crystal lend) physicalSide
-          // equals owner. For permanent cross-side placements (Chilly
-          // Wizard) physicalSide is the controller — without this the
-          // client queries an empty same-indexed slot on owner's board
-          // and animates a phantom card. The discard pile destination
-          // still routes to `originalOwner` so cards always go home.
-          this._broadcastEvent('play_pile_transfer', {
-            fromOwner: physicalSide,
-            toOwner:   e.inst.originalOwner,
-            cardName:  e.inst.name,
-            from:      _ausDemSog ? 'boardCenter' : 'support',
-            to:        _creatureDest,
-            fromHeroIdx: e.inst.heroIdx,
-            fromSlotIdx: e.inst.zoneSlot,
-            _creatureDeath: true,
-          });
-        }
-        // Attached Hero (Goff/Gon-style) follows the host Creature into
-        // the same original-owner's discard pile when the host dies.
-        // The Hero was never tracked as an instance — only stored as a
-        // name on `inst.counters.attachedHero` — so we just push the
-        // name into the discard.
-        const attachedHero = e.inst.counters?.attachedHero;
-        if (attachedHero && creatureDiscardPs) {
-          creatureDiscardPs.discardPile.push(attachedHero);
-          this.log('attached_hero_discarded', {
-            hero: attachedHero, creature: e.inst.name,
-            player: creatureDiscardPs.username,
-          });
-        }
-        // `_onlyCard: e.inst` — onCardLeaveZone fires ONLY the leaving
-        // card's own cleanup hook, not every tracked card's. Without this
-        // filter, every creature death made cards like Flying Island
-        // (whose onCardLeaveZone removes its island zones) mistakenly
-        // think THEY left. Other cards that want to react to creature
-        // deaths should hook onCreatureDeath instead.
-        //
-        // Order matters: runHooks filters listeners from cardInstances,
-        // so the dying card must still be tracked when the hook fires —
-        // otherwise its own leave hook never runs (Pollution Piranha's
-        // delete-a-card-on-leave, etc.). Untracking happens after.
-        // ★ ZUSTAND NACHZIEHEN, BEVOR DIE HOOKS LAUFEN (v901) ─────────
-        // Zone und Ablage sind oben schon umgebucht und der Flug ist
-        // angesagt — aber der Client hat den neuen Stand noch nicht.
-        // Ohne diesen `sync()` erfaehrt er vom Ablage-Zuwachs erst,
-        // wenn die Todes-Hooks fertig sind. Bei kurzen Hooks faellt das
-        // nicht auf; Tryses Handabwurf dauert fast eine Sekunde, und bis
-        // dahin ist die Vormerkung des Fluges abgelaufen: der
-        // Zuwachs-Erkenner haelt den Kadaver fuer einen NEUEN Eintrag
-        // und laesst ihn ein zweites Mal von seinem gemerkten Brettplatz
-        // losfliegen — Als „kurzes Aufblitzen in der Zone".
+        // ★ Erst aller Schaden, dann alle Tode (Als Vorgabe 26.9.): der
+        // Tod wird hier nur vorgemerkt und nach der Schleife abgewickelt
+        // — in einer Flaechenklammer sogar erst beim Schliessen der
+        // Klammer (s. `_kreaturTodMelden`).
+        sterbende.push(e);
+      } else {
         this.sync();
-        await this.runHooks('onCardLeaveZone', { _onlyCard: e.inst, leavingCard: e.inst, fromZone: 'support', fromOwner: e.inst.owner, fromHeroIdx: e.inst.heroIdx, fromZoneSlot: e.inst.zoneSlot, _skipReactionCheck: true });
-        if (!this._fastMode && todesWacheAn()) {
-          const wPs = this.gs.players[e.inst.controller ?? e.inst.owner];
-          const wSlot = wPs?.supportZones?.[e.inst.heroIdx]?.[e.inst.zoneSlot] || [];
-          console.log(`[TOD] „${e.inst.name}" stirbt (Schadens-Batch) — Zone=${JSON.stringify(wSlot)} `
-            + `Ablage=${(this.gs.players[e.inst.originalOwner]?.discardPile || []).length}`);
-          this._deathWatch = { name: e.inst.name, id: e.inst.id,
-            seite: e.inst.controller ?? e.inst.owner,
-            heroIdx: e.inst.heroIdx, slotIdx: e.inst.zoneSlot, syncs: 0, t0: Date.now() };
-        }
-        await this.runHooks(HOOKS.ON_CREATURE_DEATH, { creature: deathInfo, source: e.source, type: e.type, _skipReactionCheck: true });
-        if (this._deathWatch?.id === e.inst.id) {
-          console.log(`[TOD] Hooks fertig nach ${Date.now() - this._deathWatch.t0} ms, `
-            + `${this._deathWatch.syncs} sync(s) dazwischen`);
-  // ★ v1129: das naechstaeussere Fenster wird wieder das aktive.
-  this._deathWatch = (this._deathWatchStack || []).length
-    ? this._deathWatchStack[this._deathWatchStack.length - 1] : null;
-        }
-        // Capture revive-after-death intent BEFORE untracking. "Kill
-        // and revive" pre-defeat reactions (Loyal Bone Dog) stamp this
-        // on the dying instance during their resolver — letting the
-        // death proceed normally so onCreatureDeath listeners (Loyal
-        // Terrier's death-watch chain, etc.) all fire on the actual
-        // death event, then re-summoning a fresh instance into the
-        // same slot afterwards. The previous instance's counters are
-        // gone — this is intentional, matching the user's framing of
-        // "the Creature was actually killed and then revived, NOT
-        // protected".
-        const reviveAfterDeath = e.inst._reviveAfterDeath;
-        // ── EINLOESUNG DES ANSPRUCHS (v679b) ────────────────────────
-        // Laeuft nach ALLEN Todeslistenern und nach dem Untracking —
-        // die Creature war fuer jeden on-death-Effekt regulaer tot.
-        // Der Kadaver wurde oben NICHT abgelegt, es gibt also weder
-        // einen Zwischenstopp im Ablagestapel noch einen Flug dorthin.
-        const _claimHerkunft = {
-          owner: e.inst.controller ?? e.inst.owner,
-          heroIdx: e.inst.heroIdx, zoneSlot: e.inst.zoneSlot,
-          turnPlayed: e.inst.turnPlayed,
-          originalOwner: e.inst.originalOwner,
-        };
-        this._untrackCard(e.inst.id);
-        await this._redeemDeathClaim(_claim, _claimHerkunft);
-        await this._wiederbelebungNachTod(reviveAfterDeath);   // v1360: gemeinsamer Weg
+        await this._delay(200);
       }
-      this.sync();
-      await this._delay(200);
+    }
+
+    // ── Tode dieses Durchgangs (nach ALLEM Schaden) ──
+    for (const e of sterbende) {
+      await this._kreaturTodMelden(e, handLimitAffectedOwners);
     }
 
     await this.runHooks(HOOKS.AFTER_CREATURE_DAMAGE_BATCH, { entries, _skipReactionCheck: true });
@@ -42854,6 +43123,223 @@ this._deathWatch = (this._deathWatchStack || []).length
     for (const owner of handLimitAffectedOwners) {
       await this._checkReactiveHandLimits(owner);
     }
+  }
+
+  /**
+   * ★ Tod einer Kreatur aus dem Schadens-Durchgang (Als Vorgabe 26.9.:
+   * „Erst Schaden, dann Tode"). Innerhalb einer Flaechenklammer nur
+   * vorgemerkt — abgewickelt beim Schliessen der Klammer, zusammen mit
+   * den Heldentoden in Trefferreihenfolge (`_todesAufschubAbschliessen`).
+   * Sonst sofort, am Ende des Durchgangs. `handLimitAffectedOwners`
+   * sammelt Besitzer, deren Handlimit neu zu pruefen ist.
+   */
+  async _kreaturTodMelden(e, handLimitAffectedOwners) {
+    const a = this._todesAufschub;
+    if (a) {
+      a.liste.push({ art: 'kreatur', e });
+      return;
+    }
+    await this._kreaturTodAbwickeln(e, handLimitAffectedOwners);
+    this.sync();
+    await this._delay(200);
+  }
+
+  /** Der eigentliche Todeszweig einer Kreatur (bis v1400 inline im Batch). */
+  async _kreaturTodAbwickeln(e, handLimitAffectedOwners) {
+    // ── ANSPRUCHSFENSTER (v679b) ────────────────────────────────
+    // Laeuft VOR der Ablage und vor dem Flug dorthin. Wer den
+    // Kadaver beansprucht, stempelt `_deathClaim`; der Tod laeuft
+    // danach normal weiter (on-death feuert), aber die Karte wird
+    // NICHT abgelegt und fliegt auch nicht sichtbar dorthin.
+    await this.runHooks(HOOKS.ON_CREATURE_DEATH_CLAIM, {
+      creature: {
+        name: e.inst.name, owner: e.inst.owner,
+        originalOwner: e.inst.originalOwner,
+        controller: e.inst.controller ?? e.inst.owner,
+        heroIdx: e.inst.heroIdx, zoneSlot: e.inst.zoneSlot,
+        instId: e.inst.id,
+        turnPlayed: e.inst.turnPlayed,
+      },
+      source: e.source, type: e.type, _skipReactionCheck: true,
+    });
+    const _claim = e.inst._deathClaim || null;
+    if (_claim) this._sendDeathClaimHold(e.inst);
+    // PHYSICAL side is where the supportZones array actually contains
+    // the card name. Stays equal to `owner` for normal creatures and
+    // for temporary steals (Deepsea Succubus leaves the card on
+    // owner's board) — but flips to `controller` for permanent cross-
+    // side placements (Chilly Wizard). Without this distinction, the
+    // splice below failed silently and left the dead creature visible
+    // on opp's slot indefinitely.
+    const physicalSide = (e.inst.stolenBy != null)
+      ? e.inst.owner
+      : (e.inst.controller ?? e.inst.owner);
+    const ps = this.gs.players[physicalSide];
+    this.log('creature_destroyed', { card: e.inst.name, by: e.source?.name || e.type, owner: e.inst.owner, heroIdx: e.inst.heroIdx, zoneSlot: e.inst.zoneSlot });
+    // Store death info before cleanup. `instId` lets on-death listeners
+    // match the dying instance precisely (Hell Fox self-detect, etc.) —
+    // matching by owner+heroIdx+zoneSlot can be ambiguous if two
+    // dying-this-batch entries share a slot path. `controller` is
+    // included so "your opponent controls" listeners (Carpet Bomblebee,
+    // etc.) can attribute the death to the correct side — a cross-side
+    // placed Chilly Wizard dying counts as the CONTROLLER's creature,
+    // not the original owner's.
+    const deathInfo = { name: e.inst.name, owner: e.inst.owner, originalOwner: e.inst.originalOwner, controller: e.inst.controller ?? e.inst.owner, heroIdx: e.inst.heroIdx, zoneSlot: e.inst.zoneSlot, instId: e.inst.id, level: this.kreaturLevelJetzt(e.inst) };   // v1334: level
+    // If this creature contributed to hand-size math (e.g. Royal Corgi's
+    // -3 bonus, or a hypothetical reducer-creature), flag the owner for a
+    // hand-limit recheck once the batch settles.
+    if ((e.inst.counters.handLimitReduction || 0) !== 0) {
+      handLimitAffectedOwners.add(e.inst.owner);
+    }
+    const supSlot = ps?.supportZones?.[e.inst.heroIdx]?.[e.inst.zoneSlot];
+    if (supSlot) {
+      const idx = supSlot.indexOf(e.inst.name);
+      if (idx >= 0) supSlot.splice(idx, 1);
+    }
+    // ★ VERDECKTE KARTE AUFDECKEN (v775, Als Befund 5.9.) — vor dem
+    // Ablegen und vor dem Flug dorthin, damit „Monster Nest" schon
+    // im Platz steht, waehrend die getoetete Creature wegfliegt.
+    // Zwillingsstelle zu `_removeCardFromState`; dieser Pfad hat
+    // seinen eigenen Splice und laeuft dort nicht durch.
+    this._surfaceNestedUnder(e.inst);
+    // Cards return to their ORIGINAL owner's discard pile (Tokens go to deleted pile)
+    const creatureDiscardPs = this.gs.players[e.inst.originalOwner];
+    let _creatureDest = null;
+    // ★★ v1347: eingesogen (`_sogUrsprung`) → der Flug startet in der
+    // Brettmitte, nicht in der Zone. Der Merker wird HIER verbraucht,
+    // auch bei beanspruchtem Kadaver — so weiss `_sogAbschliessen`,
+    // dass diese Kreatur nicht zurueckfliegen darf.
+    const _ausDemSog = !!e.inst._sogUrsprung;
+    delete e.inst._sogUrsprung;
+    // Beanspruchter Kadaver: kein Stapel, kein Flug dorthin. Die
+    // Karte geht gleich in die Hand oder direkt in ihre neue Zone.
+    if (creatureDiscardPs && !_claim) {
+      const effectiveCd = this.getEffectiveCardData(e.inst);
+      // ★★ v1135 (Als Befund 15.9.: „Hell Fox fliegt jetzt visuell
+      // vom Board zum Discard, ehe es im Deleted Pile landet. Das
+      // ist falsch.").
+      //
+      // ★ ES GIBT ZWEI TODESPFADE, und ich hatte nur den einen
+      // (`actionDestroyCard`) auf `deletesSelfOnDeath` umgestellt.
+      // DIESER hier — der Schadens-Batch — routet voellig eigenes
+      // Ziel und eigenen Flug. Eine Karte, die sich bei ihrem Tod
+      // selbst loescht, landete darueber weiterhin erst in der
+      // Ablage und wurde danach umgebucht: zwei Bilder, genau der
+      // Fehler von v1134.
+      //
+      // Derselbe Fehler wie bei den acht Flugwegen (v1133): eine
+      // Absicherung an EINER Stelle ist keine Absicherung.
+      const _selbstLoeschend = !!loadCardEffect(e.inst.name)?.deletesSelfOnDeath;
+      if ((effectiveCd && hasCardType(effectiveCd, 'Token')) || _selbstLoeschend) {
+        creatureDiscardPs.deletedPile.push(e.inst.name);
+        _creatureDest = 'deleted';
+      } else {
+        creatureDiscardPs.discardPile.push(e.inst.name);
+        _creatureDest = 'discard';
+      }
+      // Broadcast a slot-specific fly-out so the client animates
+      // from THIS specific dying inst's support slot — without it,
+      // the diff-detector's name-keyed rect lookup falls back to
+      // FIFO order and always picks the leftmost copy when
+      // multiple same-named creatures share the board.
+      //
+      // `fromOwner` MUST be the inst's PHYSICAL side (where it
+      // actually renders), not raw owner. For temporary steals
+      // (Deepsea Succubus, Treacherous Crystal lend) physicalSide
+      // equals owner. For permanent cross-side placements (Chilly
+      // Wizard) physicalSide is the controller — without this the
+      // client queries an empty same-indexed slot on owner's board
+      // and animates a phantom card. The discard pile destination
+      // still routes to `originalOwner` so cards always go home.
+      this._broadcastEvent('play_pile_transfer', {
+        fromOwner: physicalSide,
+        toOwner:   e.inst.originalOwner,
+        cardName:  e.inst.name,
+        from:      _ausDemSog ? 'boardCenter' : 'support',
+        to:        _creatureDest,
+        fromHeroIdx: e.inst.heroIdx,
+        fromSlotIdx: e.inst.zoneSlot,
+        _creatureDeath: true,
+      });
+    }
+    // Attached Hero (Goff/Gon-style) follows the host Creature into
+    // the same original-owner's discard pile when the host dies.
+    // The Hero was never tracked as an instance — only stored as a
+    // name on `inst.counters.attachedHero` — so we just push the
+    // name into the discard.
+    const attachedHero = e.inst.counters?.attachedHero;
+    if (attachedHero && creatureDiscardPs) {
+      creatureDiscardPs.discardPile.push(attachedHero);
+      this.log('attached_hero_discarded', {
+        hero: attachedHero, creature: e.inst.name,
+        player: creatureDiscardPs.username,
+      });
+    }
+    // `_onlyCard: e.inst` — onCardLeaveZone fires ONLY the leaving
+    // card's own cleanup hook, not every tracked card's. Without this
+    // filter, every creature death made cards like Flying Island
+    // (whose onCardLeaveZone removes its island zones) mistakenly
+    // think THEY left. Other cards that want to react to creature
+    // deaths should hook onCreatureDeath instead.
+    //
+    // Order matters: runHooks filters listeners from cardInstances,
+    // so the dying card must still be tracked when the hook fires —
+    // otherwise its own leave hook never runs (Pollution Piranha's
+    // delete-a-card-on-leave, etc.). Untracking happens after.
+    // ★ ZUSTAND NACHZIEHEN, BEVOR DIE HOOKS LAUFEN (v901) ─────────
+    // Zone und Ablage sind oben schon umgebucht und der Flug ist
+    // angesagt — aber der Client hat den neuen Stand noch nicht.
+    // Ohne diesen `sync()` erfaehrt er vom Ablage-Zuwachs erst,
+    // wenn die Todes-Hooks fertig sind. Bei kurzen Hooks faellt das
+    // nicht auf; Tryses Handabwurf dauert fast eine Sekunde, und bis
+    // dahin ist die Vormerkung des Fluges abgelaufen: der
+    // Zuwachs-Erkenner haelt den Kadaver fuer einen NEUEN Eintrag
+    // und laesst ihn ein zweites Mal von seinem gemerkten Brettplatz
+    // losfliegen — Als „kurzes Aufblitzen in der Zone".
+    this.sync();
+    await this.runHooks('onCardLeaveZone', { _onlyCard: e.inst, leavingCard: e.inst, fromZone: 'support', fromOwner: e.inst.owner, fromHeroIdx: e.inst.heroIdx, fromZoneSlot: e.inst.zoneSlot, _skipReactionCheck: true });
+    if (!this._fastMode && todesWacheAn()) {
+      const wPs = this.gs.players[e.inst.controller ?? e.inst.owner];
+      const wSlot = wPs?.supportZones?.[e.inst.heroIdx]?.[e.inst.zoneSlot] || [];
+      console.log(`[TOD] „${e.inst.name}" stirbt (Schadens-Batch) — Zone=${JSON.stringify(wSlot)} `
+        + `Ablage=${(this.gs.players[e.inst.originalOwner]?.discardPile || []).length}`);
+      this._deathWatch = { name: e.inst.name, id: e.inst.id,
+        seite: e.inst.controller ?? e.inst.owner,
+        heroIdx: e.inst.heroIdx, slotIdx: e.inst.zoneSlot, syncs: 0, t0: Date.now() };
+    }
+    await this.runHooks(HOOKS.ON_CREATURE_DEATH, { creature: deathInfo, source: e.source, type: e.type, _skipReactionCheck: true });
+    if (this._deathWatch?.id === e.inst.id) {
+      console.log(`[TOD] Hooks fertig nach ${Date.now() - this._deathWatch.t0} ms, `
+        + `${this._deathWatch.syncs} sync(s) dazwischen`);
+  // ★ v1129: das naechstaeussere Fenster wird wieder das aktive.
+  this._deathWatch = (this._deathWatchStack || []).length
+? this._deathWatchStack[this._deathWatchStack.length - 1] : null;
+    }
+    // Capture revive-after-death intent BEFORE untracking. "Kill
+    // and revive" pre-defeat reactions (Loyal Bone Dog) stamp this
+    // on the dying instance during their resolver — letting the
+    // death proceed normally so onCreatureDeath listeners (Loyal
+    // Terrier's death-watch chain, etc.) all fire on the actual
+    // death event, then re-summoning a fresh instance into the
+    // same slot afterwards. The previous instance's counters are
+    // gone — this is intentional, matching the user's framing of
+    // "the Creature was actually killed and then revived, NOT
+    // protected".
+    const reviveAfterDeath = e.inst._reviveAfterDeath;
+    // ── EINLOESUNG DES ANSPRUCHS (v679b) ────────────────────────
+    // Laeuft nach ALLEN Todeslistenern und nach dem Untracking —
+    // die Creature war fuer jeden on-death-Effekt regulaer tot.
+    // Der Kadaver wurde oben NICHT abgelegt, es gibt also weder
+    // einen Zwischenstopp im Ablagestapel noch einen Flug dorthin.
+    const _claimHerkunft = {
+      owner: e.inst.controller ?? e.inst.owner,
+      heroIdx: e.inst.heroIdx, zoneSlot: e.inst.zoneSlot,
+      turnPlayed: e.inst.turnPlayed,
+      originalOwner: e.inst.originalOwner,
+    };
+    this._untrackCard(e.inst.id);
+    await this._redeemDeathClaim(_claim, _claimHerkunft);
+    await this._wiederbelebungNachTod(reviveAfterDeath);   // v1360: gemeinsamer Weg
   }
 
   /**
@@ -43934,8 +44420,16 @@ this._deathWatch = (this._deathWatchStack || []).length
       }
       case ZONES.SUPPORT: {
         if (inst.heroIdx >= 0 && inst.zoneSlot >= 0) {
-          const arr = ps.supportZones?.[inst.heroIdx]?.[inst.zoneSlot];
-          if (arr) { const idx = arr.indexOf(inst.name); if (idx >= 0) arr.splice(idx, 1); }
+          // ★ 26.9. (Als Befund: Crimson Web nach The Yeeting blieb als
+          // Geist in der Zone stehen): zuerst auf der Seite suchen, auf der
+          // die Karte LIEGT (`physicalSide` — Crimson Web haengt beim
+          // Gegner ihres Besitzers), dann wie bisher beim Besitzer.
+          const seiten = [this.physicalSide(inst), inst.owner].filter((v, i, a) => v != null && v >= 0 && a.indexOf(v) === i);
+          for (const s of seiten) {
+            const arr = this.gs.players[s]?.supportZones?.[inst.heroIdx]?.[inst.zoneSlot];
+            const idx = arr ? arr.indexOf(inst.name) : -1;
+            if (idx >= 0) { arr.splice(idx, 1); break; }
+          }
         }
         // ★ VERDECKTE KARTE AUFDECKEN (v775, Als Befund 5.9.).
         // Der Platz ist gerade frei geworden, der Flug zum Stapel /
@@ -44315,6 +44809,14 @@ this._deathWatch = (this._deathWatchStack || []).length
     // it, and MCTS rollouts that call sync() should count as progress too.
     this._hookProgressTick = (this._hookProgressTick || 0) + 1;
     this._refreshAscensionReadiness();
+    // v1443: Lethe-Stempel je Karte — bei jedem Abgleich nachziehen, damit
+    // eine gegangene und wiedergekommene Karte nicht den alten Stempel
+    // erbt. Kostet nichts, solange niemand gestempelt ist.
+    for (const _lps of (this.gs.players || [])) {
+      if (!_lps) continue;
+      delete _lps._letheTaken;
+      if (_lps._letheStamps) this._reconcileLetheStamps(_lps);
+    }
     // Re-apply Weakening Crystal's negation aura before every state
     // push. Runs in fast mode too — MCTS rollouts need the negated
     // status visible to the hook gates so a simulated Hero with a

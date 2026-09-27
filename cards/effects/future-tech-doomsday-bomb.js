@@ -200,7 +200,7 @@ module.exports = {
             );
           }
           } finally {
-            engine.endMultiHit();
+            await engine.endMultiHit();
           }
         }
       } finally {

@@ -131,11 +131,27 @@ module.exports = {
         ];
       }
 
+      // v1443 (Als Befund 26.9.): WORAUF reagiert Monia? Die ausloesende
+      // Karte steht links im Panel (`triggerCardName`), rechts bleibt
+      // Monia selbst (automatisches `showCard`). Quelle: `runHooks` haelt
+      // sie VOR der Zuhoerer-Runde fest; sonst die Schadensquelle.
+      const trigger = ctx.ausloeserName || (() => {
+        for (const e of promptable) {
+          const q = e.source;
+          const n = typeof q === 'string' ? q : (q?.cardName || q?.name);
+          if (n) return n;
+        }
+        return null;
+      })();
+
       // Show prompt to Monia's player
       const result = await engine.promptGeneric(pi, {
         type: 'optionPicker',
         title: `${hero.name} — Cool Rescue!`,
-        description: 'Creatures are in danger! Discard 1 card to protect them.',
+        description: trigger
+          ? `Creatures are in danger from ${trigger}! Discard 1 card to protect them.`
+          : 'Creatures are in danger! Discard 1 card to protect them.',
+        triggerCardName: trigger || undefined,
         options,
         cancellable: true,
         // Gerrymander only redirects when 2+ options (the multi-side

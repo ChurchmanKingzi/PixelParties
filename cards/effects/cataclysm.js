@@ -166,7 +166,7 @@ module.exports = {
 
       engine.sync();
       } finally {
-        engine.endMultiHit();
+        await engine.endMultiHit();
       }
       await engine._delay(300);
 

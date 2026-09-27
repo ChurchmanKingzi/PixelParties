@@ -84,6 +84,20 @@ module.exports = {
       cardHeroIdx: -1,
     };
 
+    // ── Bilder (Als Vorgabe 26.9.) ──────────────────────────────────
+    // STATT des Opfermessers wird der Chaorc auf das urspruengliche Ziel
+    // geworfen und klatscht davor. Die Engine spielt danach die Bilder
+    // des abgewehrten Effekts auf genau dieses Ziel — sie treffen also
+    // den Chaorc — und erst im Nachlauf (`nachBilder`) fliegt er von
+    // dort zur Ablage. Sein eigener Flug vom Brett entfaellt dafuer
+    // (`skipPileTransfer`).
+    const zielT = (targetedHeroes || []).find(t => t?.owner === pi);
+    const ziel = zielT
+      ? { owner: pi, heroIdx: zielT.heroIdx, zoneSlot: zielT.type === 'hero' ? -1 : (zielT.slotIdx ?? -1) }
+      : null;
+    const wurfKey = `ci-${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
+    let geworfen = false;
+
     const paid = await engine.resolveSacrificeCost(shimCtx, {
       minCount: 1,
       maxCount: 1,
@@ -93,13 +107,42 @@ module.exports = {
       confirmClass: 'btn-danger',
       cancellable: false,
       filter: (c) => tributeIds.has(c.inst.id),
+      ...(ziel ? {
+        sacrificeAnimation: false,
+        skipPileTransfer: true,
+        onTributesChosen: async (_ctx, picked) => {
+          const inst = picked?.[0]?.cardInstance;
+          if (!inst || inst.zone !== 'support') return;
+          engine._broadcastEvent('play_chaorc_wurf', {
+            phase: 'wurf', key: wurfKey, cardName: inst.name,
+            owner: inst.owner, heroIdx: inst.heroIdx, zoneSlot: inst.zoneSlot,
+            discardOwner: inst.originalOwner ?? inst.owner,
+            ziel,
+          });
+          geworfen = true;
+          await engine._delay(800);
+        },
+      } : {}),
     });
-    if (!paid) return null;
+    if (!paid) {
+      // Gerettet (Barrier of Undying): der Chaorc fliegt zurueck auf
+      // seinen Platz, die Negation findet nicht statt.
+      if (geworfen) engine._broadcastEvent('play_chaorc_wurf', { phase: 'ende', key: wurfKey, zurueck: true });
+      return null;
+    }
 
     engine.log('chaorc_interception_negate', {
       player: engine.gs.players[pi]?.username,
       source: sourceCard?.name || '?',
     });
-    return { effectNegated: true };
+    return {
+      effectNegated: true,
+      ...(geworfen ? {
+        nachBilder: async (eng) => {
+          eng._broadcastEvent('play_chaorc_wurf', { phase: 'ende', key: wurfKey });
+          await eng._delay(900);
+        },
+      } : {}),
+    };
   },
 };

@@ -28,18 +28,25 @@
 //    `cancellable: false` because the slot was
 //    already committed in stage 1; the player can
 //    still pick "1" to bounce a single copy.
-//  • For each picked slot with chosen count K:
-//      – Pop the top K copies off
-//        ps.abilityZones[hi][si] (LIFO; doesn't
-//        matter mathematically since stacked
-//        copies are interchangeable).
-//      – Untrack the K ability insts that were
-//        most recently added at that slot, so
-//        cardInstances stays coherent.
-//      – Push K copies of the ability name into
-//        ps.hand and track each as a new hand
-//        inst — same shape any other recover-to-
-//        hand path uses.
+//  • For each picked slot with chosen count K,
+//    the copies leave ONE AT A TIME (top of the
+//    stack first), each with:
+//      – a zone-anchored `play_pile_transfer`
+//        (ability → hand) emitted BEFORE the sync,
+//        so the card visibly flies from its slot
+//        into the hand (Befund 26.9.: vorher kein Flug,
+//        die Karte tauchte nur in der Hand auf),
+//      – the regular `onCardLeaveZone` pass with
+//        `leavingCard`, so Toughness / Fighting &
+//        Co. revoke their stack bonus (26.9.:
+//        vorher nur `_untrackCard` — HP/ATK
+//        blieben stehen),
+//      – splice + untrack + `handZugangSync`,
+//      – a short pause before the next copy.
+//    Support-Zone entries that count as Abilities
+//    (Cloak of Edge, Xalibur stacks) go through
+//    `actionMoveCard(inst, 'hand')` — the engine's
+//    support→hand path brings flight + hooks.
 //  • Draw N cards via `actionDrawCards` (which
 //    already gates on `handLocked`, so order
 //    matters: draw FIRST, then lock).
@@ -99,6 +106,78 @@ function buildAbilityTargets(engine, pi) {
   return targets;
 }
 
+/** Tracked instances in one of the controller's Support Zone slots. */
+function supportSlotInsts(engine, pi, heroIdx, slotIdx) {
+  return engine.cardInstances.filter(c => c.zone === 'support' && c.owner === pi
+    && c.heroIdx === heroIdx && c.zoneSlot === slotIdx);
+}
+
+/**
+ * Recall the TOP copy of an Ability Zone stack to its owner's hand.
+ * Order matters:
+ *   1. Flight broadcast while the client still shows the copy in its
+ *      slot (`handZugangSync` syncs — after that the slot is shorter).
+ *   2. `onCardLeaveZone` with `leavingCard` while the inst is still
+ *      tracked in the ability zone — Toughness / Fighting read the
+ *      stack via `abgangsBetrag` and revoke the top level's bonus.
+ *   3. Splice, untrack, add to hand (fresh hand inst + sync).
+ * @returns {boolean} whether a copy was recalled.
+ */
+async function recallAbilityCopy(engine, pi, heroIdx, slotIdx) {
+  const ps = engine.gs.players[pi];
+  const slot = ps?.abilityZones?.[heroIdx]?.[slotIdx];
+  if (!Array.isArray(slot) || slot.length === 0) return false;
+  const name = slot[slot.length - 1];
+  const inst = engine.cardInstances
+    .filter(c => c.zone === 'ability' && c.owner === pi && c.name === name
+                 && c.heroIdx === heroIdx && c.zoneSlot === slotIdx)
+    .pop() || null;
+
+  engine._broadcastEvent('play_pile_transfer', {
+    fromOwner: pi, toOwner: pi, cardName: name,
+    from: 'ability', to: 'hand',
+    fromHeroIdx: heroIdx, fromSlotIdx: slotIdx,
+    toHandIdx: ps.hand.length, finalHandSize: ps.hand.length + 1,
+  });
+
+  if (inst) {
+    await engine.runHooks('onCardLeaveZone', {
+      card: inst, leavingCard: inst,
+      fromZone: 'ability', fromHeroIdx: heroIdx, fromZoneSlot: slotIdx,
+      fromOwner: pi, toZone: 'hand',
+      source: CARD_NAME, sourceOwner: pi,
+    });
+  }
+
+  // Re-read the slot: a hook may have touched it in the meantime.
+  const live = ps.abilityZones?.[heroIdx]?.[slotIdx];
+  if (Array.isArray(live)) {
+    const idx = live.lastIndexOf(name);
+    if (idx >= 0) live.splice(idx, 1);
+  }
+  if (inst) engine._untrackCard(inst.id);
+  engine.handZugangSync(ps, name, { von: 'brett', source: CARD_NAME });
+  return true;
+}
+
+/**
+ * Recall the top copy of a Support Zone entry that counts as an Ability
+ * (Cloak of Edge, a real Ability stack under Xalibur). `actionMoveCard`
+ * owns the support→hand flight and the leave hooks for this zone.
+ */
+async function recallSupportCopy(engine, pi, heroIdx, slotIdx) {
+  const ps = engine.gs.players[pi];
+  const names = ps?.supportZones?.[heroIdx]?.[slotIdx] || [];
+  const insts = supportSlotInsts(engine, pi, heroIdx, slotIdx);
+  if (insts.length === 0) return false;
+  const top = names[names.length - 1];
+  const inst = [...insts].reverse().find(c => c.name === top) || insts[insts.length - 1];
+  await engine.actionMoveCard(inst, 'hand', -1, -1, { source: CARD_NAME, sourceOwner: pi });
+  if (inst.zone !== 'hand') return false; // Move blocked (immovable etc.).
+  engine.sync();
+  return true;
+}
+
 module.exports = {
   requiresTarget: true,
   // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
@@ -151,9 +230,11 @@ module.exports = {
     for (const sid of selectedIds) {
       const t = targets.find(x => x.id === sid);
       if (!t) continue;
-      const slot = ps.abilityZones?.[t.heroIdx]?.[t.slotIdx] || [];
-      if (slot.length === 0) continue;
-      const stackSize = slot.length;
+      const zone = t.type === 'equip' ? 'support' : 'ability';
+      const stackSize = zone === 'ability'
+        ? (ps.abilityZones?.[t.heroIdx]?.[t.slotIdx] || []).length
+        : supportSlotInsts(engine, pi, t.heroIdx, t.slotIdx).length;
+      if (stackSize === 0) continue;
       let count = stackSize;
       if (stackSize > 1) {
         const heroName = ps.heroes?.[t.heroIdx]?.name || `Hero ${t.heroIdx + 1}`;
@@ -175,35 +256,32 @@ module.exports = {
         if (Number.isInteger(parsed) && parsed >= 1 && parsed <= stackSize) count = parsed;
         else count = 1; // Defensive default if the picker dismissed unexpectedly.
       }
-      slotPlans.push({ heroIdx: t.heroIdx, slotIdx: t.slotIdx, ability: t.cardName, count });
+      slotPlans.push({ zone, heroIdx: t.heroIdx, slotIdx: t.slotIdx, ability: t.cardName, count });
     }
 
-    // ── Recall picked stacks back to hand ─────────────────────────
+    // ── Recall picked stacks back to hand — one copy at a time ────
+    // Pause between two flights so they read as a sequence (also
+    // within one stack) instead of a wall of cards leaving at once.
+    const STAGGER_MS = 420;
     let totalRecalled = 0;
     const recallLog = [];
     for (const plan of slotPlans) {
-      const slot = ps.abilityZones?.[plan.heroIdx]?.[plan.slotIdx] || [];
-      if (slot.length === 0) continue; // Defensive — slot might've been cleared mid-prompt.
-      const k = Math.min(plan.count, slot.length);
-      if (k <= 0) continue;
-      // Pop the top K names (LIFO). Stacked copies are interchangeable.
-      const recallNames = slot.splice(slot.length - k, k);
-      // Untrack the K most-recent ability insts at this slot before
-      // mutating cardInstances (keeps the inst pool coherent).
-      const slotInsts = engine.cardInstances
-        .filter(c => c.zone === 'ability' && c.owner === pi
-                     && c.heroIdx === plan.heroIdx && c.zoneSlot === plan.slotIdx)
-        .slice(-k);
-      for (const inst of slotInsts) engine._untrackCard(inst.id);
-      // If the entire stack was recalled, normalize the slot to [].
-      if (slot.length === 0) ps.abilityZones[plan.heroIdx][plan.slotIdx] = [];
-      // Push each copy into hand and track a fresh hand inst per copy.
-      for (const name of recallNames) {
-        engine.handZugangSync(ps, name, { von: 'brett', source: CARD_NAME });
+      let recalled = 0;
+      for (let n = 0; n < plan.count; n++) {
+        if (totalRecalled > 0) await engine._delay(STAGGER_MS);
+        const ok = plan.zone === 'support'
+          ? await recallSupportCopy(engine, pi, plan.heroIdx, plan.slotIdx)
+          : await recallAbilityCopy(engine, pi, plan.heroIdx, plan.slotIdx);
+        if (!ok) break; // Slot emptied mid-resolve (defensive).
+        recalled++;
         totalRecalled++;
       }
-      recallLog.push({ heroIdx: plan.heroIdx, slotIdx: plan.slotIdx, ability: plan.ability, count: recallNames.length });
+      if (recalled > 0) {
+        recallLog.push({ heroIdx: plan.heroIdx, slotIdx: plan.slotIdx, ability: plan.ability, count: recalled });
+      }
     }
+    // v1365: Arbeit, die an den Abgang einer Karte gehaengt wurde.
+    await engine._nachAbgangAbarbeiten?.();
 
     if (totalRecalled === 0) return false;
 

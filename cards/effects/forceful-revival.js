@@ -149,15 +149,38 @@ module.exports = {
       // ── Pop from discard and summon onto the user hero ───────────
       // v1389: Ablage → Feld über die EINE Stelle (Sperre, Lethe-Stempel,
       // Signal, Rückgabe bei Fehlschlag — alles in summonFromDiscard).
-      const summonRes = await engine.summonFromDiscard(pi, pi, dpIdx, heroIdx, -1, {
-        source: CARD_NAME, flug: false, hookExtras: { _isForcefulRevival: true },
+      // Eigene Animation (Als Vorgabe 26.9.): der Held RAMMT den freien
+      // Support-Platz, im Moment des Aufpralls erscheint dort die Kreatur
+      // und beide krachen zusammen (`gewaltsame_erweckung`). Der Rueckstoss
+      // ist der Schaden am Helden. Dafuer muss der Zielplatz VOR dem
+      // Anlauf feststehen; die Kreatur fliegt nicht aus der Ablage heran,
+      // sie ERSCHEINT mit dem Aufprall.
+      const freiSlot = (ps.supportZones?.[heroIdx] || []).findIndex(sl => (sl || []).length === 0);
+      if (freiSlot < 0) { gs._spellCancelled = true; return; }
+      engine._broadcastEvent('play_ram_animation', {
+        sourceOwner: pi, sourceHeroIdx: heroIdx,
+        targetOwner: pi, targetHeroIdx: heroIdx, targetZoneSlot: freiSlot,
+        cardName: userHero.name, duration: 1600,
+      });
+      // Aufprall bei 12 % des Anlaufs (≈190 ms); Zonen-Animationen haben
+      // 100 ms Einhaengeverzug — also 90 ms vorher senden.
+      await engine._delay(90);
+      engine._broadcastEvent('play_zone_animation', {
+        type: 'gewaltsame_erweckung', owner: pi, heroIdx, zoneSlot: freiSlot, duration: 900,
+      });
+      await engine._delay(100);
+
+      const summonRes = await engine.summonFromDiscard(pi, pi, dpIdx, heroIdx, freiSlot, {
+        source: CARD_NAME, flug: false,
+        summonOpts: { playSummonAnim: false },   // die Landung zeigt die eigene Animation
+        hookExtras: { _isForcefulRevival: true },
       });
       if (!summonRes?.inst) {
         gs._spellCancelled = true;
         return;
       }
 
-      const { inst, actualSlot } = summonRes;
+      const { inst } = summonRes;
 
       // Bypass summoning sickness for THIS instance only — the card text
       // explicitly grants "may activate its active effect this turn."
@@ -171,9 +194,9 @@ module.exports = {
       if (!inst.counters) inst.counters = {};
       inst.counters._hasHaste = true;
 
-      engine._broadcastEvent('summon_effect', {
-        owner: pi, heroIdx, zoneSlot: actualSlot, cardName: chosenName,
-      });
+      // Der Held ist zurueck auf seinem Platz (Anlauf 1600 ms, Rueckkehr
+      // bei 30 %), dann trifft ihn der Rueckstoss.
+      await engine._delay(420);
 
       // ── Self-damage equal to the revived Creature's max HP ───────
       const maxHp = inst.counters?.maxHp ?? cd.hp ?? 0;

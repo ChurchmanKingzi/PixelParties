@@ -64,6 +64,17 @@ module.exports = {
       const declared = result.cardName;
       const trifft = (n) => baseCardName(n) === baseCardName(declared);   // v875
 
+      // Wuetende Anklage ueber dem Wirker (Als Vorgabe 26.9.): Sprechblase
+      // mit rotem „!", darin erscheint dann die angesagte Karte. Der
+      // Aufdeck-Teil wartet, bis die Blase zu zittern beginnt.
+      if (ctx.cardHeroIdx != null && ctx.cardHeroIdx >= 0) {
+        engine._broadcastEvent('play_zone_animation', {
+          type: 'anklage', owner: pi, heroIdx: ctx.cardHeroIdx, zoneSlot: -1,
+          cardName: declared, duration: 2200,
+        });
+        await engine._delay(1500);
+      }
+
       // Reaktionsfenster (Ambush the Scout), Kategorie 'reveal': das
       // Aufdecken ist bereits die Hand-Interaktion und passiert VOR
       // dem Abwurf — hier ist also der richtige Moment. Wird negiert,

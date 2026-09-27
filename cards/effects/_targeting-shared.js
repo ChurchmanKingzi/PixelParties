@@ -50,6 +50,14 @@ function areaTargetId(owner, stapelPlatz) {
   return `area-${owner}-${stapelPlatz}`;
 }
 
+
+/** Seite, auf der eine Brettkarte physisch liegt (s. `engine.physicalSide`). */
+function _brettSeite(engine, inst) {
+  if (typeof engine?.physicalSide === 'function') return engine.physicalSide(inst);
+  if (inst.stolenBy != null) return inst.owner;
+  return inst.controller ?? inst.owner;
+}
+
 function collectNonHeroBoardTargets(gs, engine) {
   const targets = [];
   const seen = new Set();
@@ -77,8 +85,12 @@ function collectNonHeroBoardTargets(gs, engine) {
 
     if (inst.zone === 'support') {
       targets.push({
-        id: `equip-${inst.owner}-${inst.heroIdx}-${inst.zoneSlot}`,
-        type: 'equip', owner: inst.owner, heroIdx: inst.heroIdx, slotIdx: inst.zoneSlot,
+        // ★ 26.9. (Als Befund, Crimson Web): ID und `owner` nennen die Seite, auf
+        // der die Zone LIEGT — sonst findet der Client sie nicht. Eine an
+        // den Angreifer angelegte Crimson Web gehoert dem Verteidiger,
+        // steckt aber in einer Support Zone des Angreifers.
+        id: `equip-${_brettSeite(engine, inst)}-${inst.heroIdx}-${inst.zoneSlot}`,
+        type: 'equip', owner: _brettSeite(engine, inst), heroIdx: inst.heroIdx, slotIdx: inst.zoneSlot,
         cardName: inst.name, _cardInstance: inst,
       });
     } else if (inst.zone === 'ability') {

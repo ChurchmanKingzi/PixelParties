@@ -256,6 +256,6 @@ async function _spreadDamage(engine, pi, targetCtrlPi, source, amount, type) {
     );
   }
   } finally {
-    engine.endMultiHit();
+    await engine.endMultiHit();
   }
 }

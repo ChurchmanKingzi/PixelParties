@@ -176,7 +176,7 @@ module.exports = {
         await engine.processCreatureDamageBatch(allCreatureEntries);
       }
       } finally {
-        engine.endMultiHit();
+        await engine.endMultiHit();
       }
 
       // Wait for ram return + spin down

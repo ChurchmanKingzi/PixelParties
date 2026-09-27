@@ -214,7 +214,7 @@ module.exports = {
             { sourceOwner: pi, canBeNegated: true });
         }
       } finally {
-        if (zielzahl >= 2) engine.endMultiHit();
+        if (zielzahl >= 2) await engine.endMultiHit();
         gs._deferGameOverCheck = Math.max(0, (gs._deferGameOverCheck || 1) - 1);
       }
 

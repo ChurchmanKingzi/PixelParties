@@ -102,7 +102,10 @@ module.exports = {
       }
 
       // Aufdecken + Splice + Mischen + Handzugang — der Standardweg.
-      const geholt = await engine.searchDeckForNamedCard(pi, gewaehlt, CARD_NAME, {});
+      // Die gesuchte Karte fliegt von Flammen umgeben in die Hand (Als
+      // Vorgabe 26.9.) — der Preis der Reise, die Verbrennung, kuendigt
+      // sich an.
+      const geholt = await engine.searchDeckForNamedCard(pi, gewaehlt, CARD_NAME, { flugStil: 'flammen' });
       if (!geholt) {
         engine.log('perilous_journey_search_failed', { player: ps.username, card: gewaehlt });
         engine.sync();

@@ -143,8 +143,11 @@ module.exports = {
     const ps = gs.players[pi];
     if (!ps) return { cancelled: true };
 
-    // HOPT claim
-    if (!engine.claimHOPT('the-yeeting', pi)) return { cancelled: true };
+    // HOPT: hier nur PRUEFEN. Beansprucht wird erst, wenn das Ziel
+    // feststeht (s.u.) — sonst blieb die Sperre nach einem Abbruch der
+    // Zielwahl stehen und die Karte war in der Hand unspielbar (Als
+    // Befund 26.9.).
+    if (engine.gs.hoptUsed?.[`the-yeeting:${pi}`] === engine.gs.turn) return { cancelled: true };
 
     // Parse selected hero
     const match = (selectedIds[0] || '').match(/^hero-(\d+)-(\d+)$/);
@@ -191,8 +194,13 @@ module.exports = {
       return { aborted: true };
     }
 
+    // Ab hier ist die Karte gespielt: jetzt erst „1 pro Zug" beanspruchen.
+    if (!engine.claimHOPT('the-yeeting', pi)) return { cancelled: true };
+
     // ── Ram animation ──
-    const tgtOwner = targetInst.owner;
+    // Die Seite, auf der die Karte LIEGT (Crimson Web haengt beim Gegner
+    // des Besitzers) — dorthin laeuft der Dash, dort explodiert es.
+    const tgtOwner = typeof engine.physicalSide === 'function' ? engine.physicalSide(targetInst) : targetInst.owner;
     const tgtHeroIdx = targetInst.heroIdx;
     const tgtZoneSlot = targetInst.zoneSlot;
     const tgtZoneType = targetInst.zone; // 'support', 'ability', 'permanent', etc.

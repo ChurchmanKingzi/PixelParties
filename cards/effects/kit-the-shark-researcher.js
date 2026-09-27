@@ -399,7 +399,7 @@ async function _runModeB(engine, pi, oppPi, kitHeroIdx) {
         );
       }
     }
-  } finally { engine.endMultiHit(); }
+  } finally { await engine.endMultiHit(); }
 
   engine.log('kit_mode_b', {
     player: ps.username,

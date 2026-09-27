@@ -154,7 +154,7 @@ async function schiessen(ctx) {
       );
       getroffen++;
     }
-  } finally { engine.endMultiHit(); }
+  } finally { await engine.endMultiHit(); }
 
   engine.log('ft_bazooka', {
     player: gs.players[pi]?.username, hits: getroffen, max: grenze,

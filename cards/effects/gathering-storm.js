@@ -332,7 +332,7 @@ module.exports = {
             }
           }
         }
-      } finally { engine.endMultiHit(); }
+      } finally { await engine.endMultiHit(); }
 
       engine.log('gathering_storm_tick', {
         player: gs.players[ownerIdx]?.username,

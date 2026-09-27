@@ -182,41 +182,14 @@ module.exports = {
       const pickedEntry = eligible.find(e => e.name === pickedName);
       if (!pickedEntry) { gs._spellCancelled = true; return; }
 
-      // Remove the chosen copy from its source pile.
-      const sourcePile = pickedEntry.source === 'deck' ? ps.mainDeck : ps.discardPile;
-      const idx = sourcePile.indexOf(pickedName);
-      if (idx < 0) { gs._spellCancelled = true; return; }
-      sourcePile.splice(idx, 1);
-
-      // Reshuffle the deck after a deck-tutor (standard convention so
-      // the opponent doesn't gain free knowledge of the deck order).
-      if (pickedEntry.source === 'deck') {
-        engine.shuffleDeck(pi);
-      }
-
-      // Add the tutored Artifact to the caster's hand.
-      engine.handZugangSync(ps, pickedName, { source: CARD_NAME });
-      // Track the new hand instance so subsequent hooks have an
-      // instance to fire on (some Artifacts listen from hand).
-
-      // v734: Diese Karte bucht ihren Zugriff historisch von Hand.
-      // Damit Verdoppler (Koperniko) sie sehen, wird die Strichliste
-      // nachgetragen — nur fuer den DECK-Zweig, aus der Ablage ist es
-      // kein Decksuchen.
-      if (pickedEntry.source === 'deck') {
-        engine.noteDeckTutor(pi, pickedName, 'Gate to the Armory', {
-          label: 'Artifact', filter: (cd) => hasCardType(cd, 'Artifact'),
-        });
-      }
-
-      engine._broadcastEvent('card_reveal', { cardName: pickedName, playerIdx: pi });
-      engine.log('gate_to_armory_tutor', {
-        player: ps.username, card: pickedName, source: pickedEntry.source,
-      });
-      engine.sync();
-      await engine._delay(450);
-
-      // ── Direct-equip clause ──
+      // ── Direct-equip clause — JETZT VOR dem Weg auf die Hand ──
+      // (Als Vorgabe 26.9.) Die Frage haengt nur an Karte und Held, nicht
+      // an der Hand. Wird direkt ausgeruestet, fliegt die Karte gar nicht
+      // erst vom Deck in die Hand und wieder heraus: ueber dem Zielplatz
+      // oeffnet sich ein goldenes Portal (Kartenbild), die Karte tritt
+      // daraus hervor und faellt in die Support Zone. Spielerisch
+      // aendert sich nichts — der Handweg loeste keinen Hook aus
+      // (`handZugangSync` feuert kein ON_CARD_ADDED_TO_HAND).
       const cardDB = engine._getCardDB();
       const pickedData = cardDB[pickedName];
       const isEquipment = !!(pickedData
@@ -254,63 +227,89 @@ module.exports = {
         return true;
       })();
 
+      let direkt = false;
       if (canOfferEquip) {
-        const confirmed = await ctx.promptConfirmEffect({
+        direkt = !!(await ctx.promptConfirmEffect({
           title: CARD_NAME,
           message: `Equip ${pickedName} directly to ${userHero.name}?`,
           confirmLabel: '⚔️ Equip!',
           cancelLabel: 'No',
+        }));
+      }
+
+      // Remove the chosen copy from its source pile.
+      const sourcePile = pickedEntry.source === 'deck' ? ps.mainDeck : ps.discardPile;
+      const idx = sourcePile.indexOf(pickedName);
+      if (idx < 0) { gs._spellCancelled = true; return; }
+      sourcePile.splice(idx, 1);
+
+      // Reshuffle the deck after a deck-tutor (standard convention so
+      // the opponent doesn't gain free knowledge of the deck order).
+      if (pickedEntry.source === 'deck') {
+        engine.shuffleDeck(pi);
+      }
+
+      // v734: Diese Karte bucht ihren Zugriff historisch von Hand.
+      // Damit Verdoppler (Koperniko) sie sehen, wird die Strichliste
+      // nachgetragen — nur fuer den DECK-Zweig, aus der Ablage ist es
+      // kein Decksuchen.
+      if (pickedEntry.source === 'deck') {
+        engine.noteDeckTutor(pi, pickedName, 'Gate to the Armory', {
+          label: 'Artifact', filter: (cd) => hasCardType(cd, 'Artifact'),
         });
-        if (confirmed) {
-          const freeSlot = _firstFreeSlot(ps, heroIdx);
-          if (freeSlot >= 0) {
-            // Pull the just-tutored copy out of hand (untrack the hand
-            // instance so it doesn't double-track once we place it in
-            // support).
-            const handIdx = ps.hand.lastIndexOf(pickedName);
-            if (handIdx >= 0) engine.takeFromPileSync(ps, 'hand', handIdx);
-            const handInst = engine.cardInstances.find(c =>
-              c.owner === pi && c.zone === 'hand' && c.name === pickedName,
-            );
-            if (handInst) engine._untrackCard(handInst.id);
+      }
+      engine.log('gate_to_armory_tutor', {
+        player: ps.username, card: pickedName, source: pickedEntry.source,
+      });
 
-            // Place in the caster's first free Support Zone. Gold
-            // cost is skipped per card text ("without paying its
-            // cost"). `safePlaceInSupport` returns the new
-            // CardInstance; the caller (us) fires onPlay +
-            // onCardEnterZone as per the API contract.
-            const placed = engine.safePlaceInSupport(pickedName, pi, heroIdx, freeSlot);
-            if (placed?.inst) {
-              engine._broadcastEvent('summon_effect', {
-                owner: pi, heroIdx, zoneSlot: placed.actualSlot, cardName: pickedName,
-              });
+      const freeSlot = direkt ? _firstFreeSlot(ps, heroIdx) : -1;
+      let placed = null;
+      if (direkt && freeSlot >= 0) {
+        engine._broadcastEvent('play_zone_animation', {
+          type: 'ruestkammer_tor', owner: pi, heroIdx, zoneSlot: freeSlot,
+          cardName: pickedName, duration: 2050,
+        });
+        engine.sync();
+        await engine._delay(1500);
+        // Place in the caster's free Support Zone. Gold cost is skipped
+        // per card text ("without paying its cost"). `safePlaceInSupport`
+        // returns the new CardInstance; the caller (us) fires onPlay +
+        // onCardEnterZone as per the API contract.
+        placed = engine.safePlaceInSupport(pickedName, pi, heroIdx, freeSlot);
+      }
 
-              await engine.runHooks('onPlay', {
-                _onlyCard: placed.inst, playedCard: placed.inst,
-                cardName: pickedName, zone: 'support', heroIdx,
-                zoneSlot: placed.actualSlot,
-                _skipReactionCheck: true,
-              });
-              await engine.runHooks('onCardEnterZone', {
-                enteringCard: placed.inst, toZone: 'support',
-                toHeroIdx: heroIdx, _skipReactionCheck: true,
-              });
+      if (placed?.inst) {
+        engine.sync();
+        await engine.runHooks('onPlay', {
+          _onlyCard: placed.inst, playedCard: placed.inst,
+          cardName: pickedName, zone: 'support', heroIdx,
+          zoneSlot: placed.actualSlot,
+          _skipReactionCheck: true,
+        });
+        await engine.runHooks('onCardEnterZone', {
+          enteringCard: placed.inst, toZone: 'support',
+          toHeroIdx: heroIdx, _skipReactionCheck: true,
+        });
 
-              const equipScript = loadCardEffect(pickedName);
-              if (equipScript?.oncePerGame) {
-                const opgKey = equipScript.oncePerGameKey || pickedName;
-                if (!ps._oncePerGameUsed) ps._oncePerGameUsed = new Set();
-                ps._oncePerGameUsed.add(opgKey);
-              }
-
-              engine.log('gate_to_armory_equip', {
-                player: ps.username, equip: pickedName, hero: userHero.name,
-              });
-              engine.sync();
-              await engine._delay(350);
-            }
-          }
+        const equipScript = loadCardEffect(pickedName);
+        if (equipScript?.oncePerGame) {
+          const opgKey = equipScript.oncePerGameKey || pickedName;
+          if (!ps._oncePerGameUsed) ps._oncePerGameUsed = new Set();
+          ps._oncePerGameUsed.add(opgKey);
         }
+
+        engine.log('gate_to_armory_equip', {
+          player: ps.username, equip: pickedName, hero: userHero.name,
+        });
+        engine.sync();
+        await engine._delay(350);
+      } else {
+        // Auf die Hand (keine Ausruestung gewaehlt — oder der Platz war
+        // im letzten Moment doch weg).
+        engine.handZugangSync(ps, pickedName, { source: CARD_NAME });
+        engine._broadcastEvent('card_reveal', { cardName: pickedName, playerIdx: pi });
+        engine.sync();
+        await engine._delay(450);
       }
 
       // ── End-turn clause ──

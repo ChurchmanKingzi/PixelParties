@@ -277,7 +277,7 @@ module.exports = {
         // already played, which matches the user's spec).
       }
       } finally {
-        engine.endMultiHit();
+        await engine.endMultiHit();
         // Restore the AoE flag. Defensive: only delete if WE set it —
         // a parent path that already had it set keeps it (currently
         // no such caller, but cheap idempotent cleanup).

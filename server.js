@@ -4218,13 +4218,13 @@ function sendGameState(room, playerIdx, extra) {
       discardIdentities: require('./cards/effects/_future-tech-shared')
         .ablageIdentitaeten(gs, pi),
       discardEntries: room.engine ? room.engine.getDiscardEntries(pi) : [],
-      // Lethe per-pile +1 stamps — `{ [cardName]: [stampCount, ...] }`
-      // sized to combined discard+deleted occurrences. Forwarded to the
-      // client so pile-viewer / cardGallery / BoardCard renderings can
+      // Lethe per-pile +1 stamps — `{ discard: [s, …], deleted: [s, …] }`,
+      // ein Eintrag je STAPELPLATZ (v1443: pro Karte, nicht pro Name).
+      // Forwarded to the client so pile-viewer / cardGallery / BoardCard renderings can
       // surface the effective level on stamped Creatures. Shared with
       // both sides (no hidden-info concern: stamps are derived from
       // public actions — every Lethe Necromancy resolution is logged).
-      letheStamps: ps._letheStamps || {},
+      letheStamps: (room.engine && room.engine.getLetheStampView(pi)) || {},
       disconnected: ps.disconnected || false, left: ps.left || false,
       // Gold display can be temporarily frozen for cost-bypass flows
       // (Swagdri's free-play of an X-cost Artifact bumps gold by a
@@ -4481,6 +4481,29 @@ function sendGameState(room, playerIdx, extra) {
           }
         });
         return merged;
+      })() : {},
+      // ★ Zielheld-Rabatte fuer Ausruestungen (Als Befund 26.9., Tsu'Ki:
+      // Lunatic Cycles −10, wenn sie an SIE gehen). Anders als die Rabatte
+      // oben haengen sie am Zielhelden, passen also nicht in
+      // `handCostReductions`. Form: { handIdx: { heroIdx: Rabatt } }, nur
+      // Eintraege > 0, nur eigene Helden. Der Client graut damit eine
+      // Ausruestung nur aus, wenn sie auf KEINEM Helden bezahlbar ist, und
+      // nimmt sie beim Ziehen nur an Helden an, auf denen sie es ist.
+      // Dieselbe Rechnung wie beim Spielen (`engine.artifactPlayCost`).
+      handEquipHeroReductions: (pi === playerIdx && room.engine) ? (() => {
+        const out = {};
+        const db = room.engine._getCardDB();
+        (ps.hand || []).forEach((n, i) => {
+          const cd = db[n];
+          if (cd?.cardType !== 'Artifact' || (cd.subtype || '').toLowerCase() !== 'equipment') return;
+          for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
+            if (!ps.heroes[hi]?.name) continue;
+            let r = 0;
+            try { r = room.engine.artifactPlayCost(pi, n, i, { heroIdx: hi, heroOwner: pi }).heroEquipReduction || 0; } catch {}
+            if (r > 0) (out[i] = out[i] || {})[hi] = r;
+          }
+        });
+        return out;
       })() : {},
       supportSpellLocked: ps.supportSpellLocked || false,
       comboLockHeroIdx: ps.comboLockHeroIdx ?? null,
@@ -5197,7 +5220,7 @@ function sendSpectatorGameState(room) {
       discardIdentities: require('./cards/effects/_future-tech-shared')
         .ablageIdentitaeten(gs, spi),
       discardEntries: room.engine ? room.engine.getDiscardEntries(spi) : [],
-      letheStamps: ps._letheStamps || {},
+      letheStamps: (room.engine && room.engine.getLetheStampView(spi)) || {},
       disconnected: ps.disconnected || false, left: ps.left || false,
       // Gold display can be temporarily frozen for cost-bypass flows
       // (Swagdri's free-play of an X-cost Artifact bumps gold by a
@@ -10223,6 +10246,9 @@ async function doConfirmPotion(room, pi, { selectedIds }) {
         // v353: `'hand'` — der Spieler setzt die Karte gerade selbst aus
         // der Hand ein (Book of Doom & Co). Nur der GEGNER sieht sie.
         room.engine.announceActiveEffect(potionName, pi, 'hand');   // v347
+        // v1444: Defending the Gate, sobald ein Ziel in einer gegnerischen
+        // Support Zone liegt (Dark Gear & alle anderen zielenden Karten).
+        await room.engine.gateVorZielen(pi, potionName, selectedIds, validTargets);
         return await script.resolve(room.engine, pi, selectedIds, validTargets);
       } : null,
     });
