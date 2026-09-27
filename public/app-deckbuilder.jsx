@@ -1414,7 +1414,7 @@ function DeckBuilder() {
     <div className="screen-full">
       {/* ── TOP BAR ── */}
       <div className="top-bar">
-        {/* ★ v1462: Standardknopf wie „← BACK" auf allen anderen Bildschirmen
+        {/* ★ v1463: Standardknopf wie „← BACK" auf allen anderen Bildschirmen
             (vorher 9 px Schrift und 24 px hoch, siehe style.css
             „KOPFZEILEN-KNOEPFE"). */}
         <button className="btn" onClick={() => hasUnsaved && !isSampleMode ? setShowLeaveConfirm(true) : setScreen('menu')}>← MENU</button>
