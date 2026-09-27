@@ -7,7 +7,7 @@ Skripte `generator/sNN_*.py`, Rahmen + Shop: `generator/frame_r5.py` mit `genera
 
 | Nr | Name | Held | Shop-Datei | Rahmen |
 |---|---|---|---|---|
-| 01 | Heartguard | Cool Rescuer Monia | heartguard.png | ornate/silver/rose/sapphire |
+| 01 | Coolness Race | Cool Rescuer Monia | coolness-race.png (ersetzt heartguard, formerId) | ornate/silver/sapphire/rose |
 | 02 | Glacier Vault | Broghan, the Frozen Guardian of the North | glacier-vault.png | double/ice/sapphire/ruby |
 | 03 | Vials on the Vine | Kyli, the Deceptive Sapling | vials-on-the-vine.png | bone/ebony/emerald/ruby |
 | 04 | Stormdraw | Champion, the Stormbringer | stormdraw.png | twist/silver/amethyst/cyan |

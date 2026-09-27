@@ -170,8 +170,18 @@ treeD[..., :3] = np.where(red[..., None], tree[..., :3],
 teeth = tree[..., :3].min(-1) > 200
 treeD[teeth, :3] = (treeD[teeth, :3] * 0.72).astype(np.uint8)
 tx = -5
-put(mg, treeD, tx, HZ + 2 - tree.shape[0])
-put(mg, flip(treeD), mw - tx - tree.shape[1], HZ + 2 - tree.shape[0])
+TB = 97                                                   # Fußlinie der Bäume auf der Steinlichtung (nicht am Horizont)
+# Bodenschatten unter den Wurzeln, damit die Bäume fest auf dem Boden stehen
+for x0 in (tx, mw - tx - tree.shape[1]):
+    cxs = x0 + tree.shape[1] / 2
+    for y in range(TB - 3, TB + 3):
+        for x in range(int(cxs - 16), int(cxs + 17)):
+            if 0 <= x < mw and 0 <= y < mh:
+                d = ((x + .5 - cxs) / 15) ** 2 + ((y + .5 - TB) / 2.6) ** 2
+                if d < 1 and (1 - d) * 1.6 > BAYER4[y % 4, x % 4]:
+                    mg[y, x, :3] = (mg[y, x, :3] * 0.5).astype(np.uint8)
+put(mg, treeD, tx, TB - tree.shape[0])
+put(mg, flip(treeD), mw - tx - tree.shape[1], TB - tree.shape[0])
 
 # ---------------- Vordergrund 5× (50×70): Kyli, Ritualring, Tränke -------------------------
 fw, fh = grid(5)

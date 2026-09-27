@@ -120,22 +120,13 @@ def glow(cv, cx, cy, r, col, strength=0.5, ry=None):
 # heller Wolkenriss hinter dem Helden (Blickpunkt), zum Horizont hin
 glow(bg, 76, 84, 50, (150, 170, 160), 0.6, ry=46)
 
-# Mutterwolke: flache, eingedrehte Wolkenscheibe über dem Tornado + Wolkendecke am oberen Rand
-cl = [(22, 24, 36), (32, 35, 50), (46, 51, 68), (66, 73, 90), (96, 106, 120)]
-CX, CY, RX, RY = 26, 38, 80, 20
-for y in range(0, 62):
+# Wolkendecke am oberen Rand (schlicht, ohne eigene Ergänzung am Tornado – der Tornado bleibt wie im Kartenbild)
+cl = [(22, 24, 36), (32, 35, 50), (46, 51, 68)]
+for y in range(0, 16):
     for x in range(bw):
-        e = math.hypot((x - CX) / RX, (y - CY) / RY)
-        top = 7 + 2.5 * math.sin(x * .21) + 1.5 * math.sin(x * .53 + 1)     # Decke am oberen Rand
-        if e >= 1 and y > top: continue
-        ang = math.atan2((y - CY) / RY, (x - CX) / RX)
-        v = math.sin(ang * 2 + e * 11)                    # Spiralbänder
-        k = 1 + (1 if v > .1 + (bayer(x, y) - .5) * .5 else 0)
-        if e >= 1: k = 0
-        # beleuchtete Unterkante der Scheibe
-        if e < 1 and y > CY and e > .86: k = 3 + (1 if e > .95 and bayer(x, y) > .4 else 0)
-        elif e < 1 and y > CY and e > .74 and bayer(x, y) > .5: k = 3
-        bg.a[y, x] = cl[k]
+        top = 7 + 2.5 * math.sin(x * .21) + 1.5 * math.sin(x * .53 + 1)
+        if y > top: continue
+        bg.a[y, x] = cl[1 + (1 if bayer(x, y) > .55 and y > top - 2 else 0)] if y > top - 3 else cl[0]
 
 
 # ferner Blitz rechts (schlägt am Horizont ein)
@@ -272,33 +263,8 @@ def card_at(t, key, rot=0, dx=0, dy=0):
     put(mid, c, int(round(x)) - c.shape[1] // 2 + dx, int(round(y)) - c.shape[0] // 2 + dy)
 
 
-for t0, a0, a1, dr in BACK: streak(arc(t0, a0, a1, dr), False)   # hinten (vom Trichter verdeckt)
 put(mid, tornado, TX, TY)
 
-# Staub- und Trümmerwolke, in der der Rüssel aufsetzt
-dust = [(52, 62, 58), (76, 86, 80), (104, 112, 102), (134, 140, 126)]
-for x in range(tip[0] - 13, tip[0] + 14):
-    u = (x - tip[0]) / 13.5
-    h = (1 - u * u) * 6.5 + 1.0 * math.sin(x * 1.3) + 0.6 * math.sin(x * 2.7)
-    top = GROUND - h
-    for y in range(int(math.floor(top)), GROUND + 1):
-        d = y - top
-        c = dust[3] if d < 1 and u < .3 else (dust[2] if d < 2 + bayer(x, y) * 1.5 else (dust[1] if d < 4.5 + bayer(x, y) * 1.5 else dust[0]))
-        setp(mid, x, y, c)
-
-# Wolkenkragen: der Trichter wächst aus der Mutterwolke
-ccol = [(34, 37, 52), (46, 51, 68), (66, 73, 90), (96, 106, 120)]
-for x in range(-1, TX + 42):
-    u = (x - (TX + 15)) / 20
-    base = TY + 6 - 3 * abs(u) + 1.3 * math.sin(x * .55) + 1.0 * math.sin(x * 1.3 + 1)
-    if x > TX + 30: base -= (x - TX - 30) * .7
-    for y in range(0, int(base) + 1):
-        d = int(base) - y
-        if d > 9 and mid[y, x, 3] == 0: continue
-        c = ccol[3] if d == 0 else (ccol[2] if d < 2 + bayer(x, y) * 1.2 else (ccol[1] if d < 5 + bayer(x, y) * 2 else ccol[0]))
-        setp(mid, x, y, c)
-
-for t0, a0, a1, dr in FRONT: streak(arc(t0, a0, a1, dr), True)   # vorn über dem Trichter
 # Karten im Sog, gleich groß, gestaffelt die Spirale hinauf (vorn rechts / vorn links im Wechsel)
 card_at(0.03, 'purple0', 0, dx=1)      # eben aus der Hand gerissen
 card_at(0.14, 'red', 0, dx=-1)
