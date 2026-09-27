@@ -41,13 +41,17 @@ hx, hy = (W - Hy.shape[1]) // 2, WL + 12 - Hy.shape[0]
 vis = Hy[:WL - hy]                                     # nur der Teil über dem Wasser
 cv.paste(silhouette(vis, (10, 16, 50)), hx + 4, hy + 6, alpha=0.5)
 cv.paste(vis, hx, hy)
-# Schaumkante, wo die Hydra ins Wasser taucht
+# Schaumkante, wo die Hydra ins Wasser taucht, und Wellenringe daneben
 cols = np.nonzero(Hy[WL - hy - 1, :, 3] > 0)[0]
-for c in cols:
-    cv.px(hx + c, WL, (226, 232, 255))
-    if c % 3: cv.px(hx + c, WL + 1, (160, 180, 250))
-for c in (cols.min() - 3, cols.min() - 2, cols.max() + 2, cols.max() + 3):
-    cv.px(hx + c, WL + 1, (226, 232, 255))
+c0, c1 = hx + cols.min(), hx + cols.max()
+FOAM, FOAM2 = (236, 240, 255), (150, 176, 250)
+for x in range(c0 - 2, c1 + 3):
+    cv.px(x, WL, FOAM)
+    cv.px(x, WL + 1, FOAM if (x - c0) % 4 else FOAM2)
+for (x0, x1, dy) in [(c0 - 14, c0 - 5, 2), (c1 + 5, c1 + 15, 2), (c0 - 26, c0 - 18, 5), (c1 + 18, c1 + 27, 5),
+                     (c0 + 6, c0 + 20, 4), (c1 - 22, c1 - 8, 4)]:
+    for x in range(x0, x1):
+        cv.px(x, WL + dy, FOAM2 if (x % 3 == 0) else FOAM)
 
 # ---------- Bärenreiter von hinten, groß im Vordergrund
 bear = sprite('c17_bear_back', RU, [76])
