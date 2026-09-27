@@ -1,0 +1,15 @@
+{
+  "hero": "Diamond, the Keeper of Peace",
+  "sheet": "diamond-the-keeper-of-peace.png",
+  "frameWidth": 48,
+  "frameHeight": 57,
+  "frames": 48,
+  "frameMs": 90,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 7,
+  "padLeft": 3,
+  "padRight": 3,
+  "padBottom": 2,
+  "faceX": 22
+}
