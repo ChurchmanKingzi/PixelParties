@@ -8,7 +8,8 @@ Quellen (MotiveGN.xcf):
       (geprüft gegen Szene 11 „Sichtbar #141“, Karte „Thunderstruck Waflav“: 1173/1184 Pixel identisch)
   Ebene 97 „Ebene #279“ – Dorfkarte (Häuser, Weg, Treppen), Ausschnitt ohne „PUB“-Schild und FPS-Anzeige
 Tiefenebenen / Skalierung (250×350-Raster, Ausgabe ×3):
-  Dorfkarte + Schatten 2× (Raster 125×175) – der Schatten liegt auf dem Boden und hat dessen Pixelgröße;
+  Dorfkarte + Schatten 2× (Raster 125×175) – der Schatten (Silhouette auf 70 % verkleinert, Rand gedithert)
+  liegt auf dem Boden und hat dessen Pixelgröße;
   Waflav 3× (Raster 84×117), hoch über dem Dorf, eindeutig im Vordergrund.
 """
 import sys, os, math
@@ -31,16 +32,24 @@ gcv.a[:] = ground.clip(0, 255).astype(np.uint8)
 
 body = sprite('c13_waflav', D, [13, 14])            # Körper + Flügel (76×38)
 
-# Schatten (2×): Silhouette von Körper + Flügeln, nach rechts unten versetzt
-SX, SY = 74, 122                                    # Mitte des Schattens im 125er-Raster
-sh = body[..., 3] > 0
+# Schatten (2×): Silhouette von Körper + Flügeln, auf 70 % verkleinert (größere Entfernung zum Boden),
+# nach rechts unten versetzt; weich: Kern dunkel, Rand (1 Rasterpixel) nur gedithert abgedunkelt
+import cv2
+SX, SY = 72, 124                                    # Mitte des Schattens im 125er-Raster
+m0 = (body[..., 3] > 0).astype(np.uint8)
+sw, shh = int(round(m0.shape[1] * 0.7)), int(round(m0.shape[0] * 0.7))
+sh = cv2.resize(m0, (sw, shh), interpolation=cv2.INTER_NEAREST) > 0
+core = cv2.erode(sh.astype(np.uint8), np.ones((3, 3), np.uint8)) > 0
 h, w = sh.shape
 for j in range(h):
     for i in range(w):
-        if sh[j, i]:
-            X, Y = SX - w // 2 + i, SY - h // 2 + j
-            if 0 <= X < 125 and 0 <= Y < 175:
-                gcv.a[Y, X] = (gcv.a[Y, X] * 0.42).astype(np.uint8)
+        if not sh[j, i]: continue
+        X, Y = SX - w // 2 + i, SY - h // 2 + j
+        if not (0 <= X < 125 and 0 <= Y < 175): continue
+        if core[j, i]:
+            gcv.a[Y, X] = (gcv.a[Y, X] * 0.55).astype(np.uint8)
+        elif (X + Y) % 2 == 0:
+            gcv.a[Y, X] = (gcv.a[Y, X] * 0.7).astype(np.uint8)
 cv = Canvas(W, H)
 cv.a[:] = up(np.dstack([gcv.a, np.full((175, 125), 255, np.uint8)]), 2)[:H, :W, :3]
 vignette_grid(cv, 0.55, 0.55, g=2)

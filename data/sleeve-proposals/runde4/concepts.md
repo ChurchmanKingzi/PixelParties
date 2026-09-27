@@ -8,7 +8,7 @@
 | 34 | G | Heart of the Hive | Draufsicht auf eine goldene Honigwabe als Mosaik: in der Mitte die gekrönte Bienenkönigin, verdeckelte Brutzellen ringsum, wenige Arbeiterinnen symmetrisch am Rand (Russia). |
 | 35 | G | Black Tortoise | Xuanwu, die schwarze Schildkröte, watet nachts durch einen stillen Bergsee und spiegelt sich im Wasser, hinter ihr schneebedeckte Gipfel (Spiegelung, Russia). |
 | 11 | C | Stargazer | Ein Sterndeuter im Sternenmantel steht nachts auf einem Hügelkamm am Fernrohr, das auf eine riesige Spiralgalaxie am Himmel zielt (Blick in den Himmel, MotiveGN). |
-| 12 | C | Afterburner | Andras, die menschliche Waffe, steigt nachts über ein Wolkenmeer auf: seine Armkanonen feuern als Triebwerke schräg nach unten, ihr Feuerschein färbt die Wolkenkämme orange (Start/Aktion, MotiveGN). |
+| 12 | C | Afterburner | Andras, die menschliche Waffe, steigt nachts über ein Wolkenmeer auf: aus seinen Armkanonen schießen zwei Schubflammen senkrecht nach unten, die Wolkenkämme darunter glühen orange (Start/Aktion, MotiveGN). |
 | 13 | C | Wingshadow | Luftbild: Thunderstruck Waflav gleitet mit ausgebreiteten Flügeln über ein Dorf in Draufsicht, sein Schatten fällt klein auf Dächer, Wege und Teich (Draufsicht, MotiveGN). |
 | 14 | C | All-Seeing | Porträt: Kassaran, der Seher von Allem, mit weiß glühenden Augen im Zentrum konzentrischer Trance-Ringe – jeder Ring ein Fenster in eine andere Welt (Sterne, Wald, Dorfteich, Wüste, Labor) (MotiveGN; ersetzt „Lightning Rod“). |
 | 15 | C | Birthday Wish | Stillleben: große Geburtstagstorte mit brennenden Kerzen auf dem Tisch, dahinter Monia beim Wünschen, Geschenk und blaue Luftballons flankieren symmetrisch (MotiveGN). |

@@ -1,0 +1,313 @@
+{
+ "01_open_lead.png": [
+  "Open Lead",
+  "icicle",
+  "ice",
+  "sapphire"
+ ],
+ "02_night_watch.png": [
+  "Night Watch",
+  "stone",
+  "iron",
+  "amber"
+ ],
+ "03_end_of_the_rainbow.png": [
+  "End of the Rainbow",
+  "twist",
+  "gold",
+  "emerald"
+ ],
+ "04_cracked_keeper.png": [
+  "Cracked Keeper",
+  "industrial",
+  "iron",
+  "amethyst",
+  "ruby"
+ ],
+ "05_stone_vigil.png": [
+  "Stone Vigil",
+  "arch",
+  "gothic",
+  "amethyst"
+ ],
+ "06_djinns_lamp.png": [
+  "Djinn's Lamp",
+  "filigree",
+  "gold",
+  "sapphire",
+  "ruby"
+ ],
+ "07_sword_in_the_stone.png": [
+  "Sword in the Stone",
+  "arch",
+  "bronze",
+  "amber"
+ ],
+ "08_mimics_lure.png": [
+  "Mimic's Lure",
+  "industrial",
+  "iron",
+  "ruby"
+ ],
+ "09_first_snowfall.png": [
+  "First Snowfall",
+  "icicle",
+  "ice",
+  "pearl"
+ ],
+ "10_breaking_free.png": [
+  "Breaking Free",
+  "moulding",
+  "stone",
+  "amethyst"
+ ],
+ "11_stargazer.png": [
+  "Stargazer",
+  "filigree",
+  "silver",
+  "sapphire"
+ ],
+ "12_afterburner.png": [
+  "Afterburner",
+  "industrial",
+  "brass",
+  "lava"
+ ],
+ "13_wingshadow.png": [
+  "Wingshadow",
+  "moulding",
+  "wood",
+  "sapphire"
+ ],
+ "14_all_seeing.png": [
+  "All-Seeing",
+  "cosmic",
+  "cosmic",
+  "emerald"
+ ],
+ "15_birthday_wish.png": [
+  "Birthday Wish",
+  "card",
+  "lacquer",
+  "rose",
+  "pearl"
+ ],
+ "16_buried_giant.png": [
+  "Buried Giant",
+  "stone",
+  "stone",
+  "amber"
+ ],
+ "17_under_the_bed.png": [
+  "Under the Bed",
+  "moulding",
+  "ebony",
+  "ruby"
+ ],
+ "18_autumn_tiger.png": [
+  "Autumn Tiger",
+  "arch",
+  "lacquer",
+  "amethyst",
+  "amber"
+ ],
+ "19_world_on_a_shell.png": [
+  "World on a Shell",
+  "wave",
+  "sea",
+  "pearl"
+ ],
+ "20_harvest_dusk.png": [
+  "Harvest Dusk",
+  "twist",
+  "wood",
+  "topaz"
+ ],
+ "21_cheese_moon.png": [
+  "Cheese Moon",
+  "cosmic",
+  "cosmic",
+  "topaz"
+ ],
+ "22_earthrise.png": [
+  "Earthrise",
+  "industrial",
+  "silver",
+  "sapphire"
+ ],
+ "23_root_of_all_presents.png": [
+  "Root of All Presents",
+  "icicle",
+  "ice",
+  "ruby",
+  "emerald"
+ ],
+ "24_odd_one_out.png": [
+  "Odd One Out",
+  "stone",
+  "stone",
+  "jade"
+ ],
+ "25_balloon_drift.png": [
+  "Balloon Drift",
+  "twist",
+  "lacquer",
+  "magenta",
+  "amber"
+ ],
+ "26_loan_shark.png": [
+  "Loan Shark",
+  "wave",
+  "sea",
+  "pearl"
+ ],
+ "27_lure_of_the_abyss.png": [
+  "Lure of the Abyss",
+  "cosmic",
+  "cosmic",
+  "rose"
+ ],
+ "28_rain_singer.png": [
+  "Rain Singer",
+  "stone",
+  "stone",
+  "cyan"
+ ],
+ "29_maximum_lotl.png": [
+  "Maximum Lotl",
+  "bamboo",
+  "bamboo",
+  "amber"
+ ],
+ "30_inquisitors_shadow.png": [
+  "The Inquisitor's Shadow",
+  "arch",
+  "gothic",
+  "ruby",
+  "amethyst"
+ ],
+ "31_feathered_serpent.png": [
+  "Feathered Serpent",
+  "stone",
+  "bronze",
+  "jade"
+ ],
+ "32_garden_of_gold.png": [
+  "Garden of Gold",
+  "filigree",
+  "gold",
+  "topaz"
+ ],
+ "33_ember_hooves.png": [
+  "Ember Hooves",
+  "icicle",
+  "ice",
+  "lava"
+ ],
+ "34_heart_of_the_hive.png": [
+  "Heart of the Hive",
+  "moulding",
+  "wood",
+  "amber"
+ ],
+ "35_black_tortoise.png": [
+  "Black Tortoise",
+  "meander",
+  "lacquer",
+  "onyx",
+  "sapphire"
+ ],
+ "36_dune_maw.png": [
+  "Dune Maw",
+  "stone",
+  "stone",
+  "amber"
+ ],
+ "37_holy_cow.png": [
+  "Holy Cow",
+  "arch",
+  "gold",
+  "amber",
+  "rose"
+ ],
+ "38_thing_in_the_hull.png": [
+  "Thing in the Hull",
+  "wave",
+  "sea",
+  "sapphire"
+ ],
+ "39_loose_thread.png": [
+  "Loose Thread",
+  "moulding",
+  "wood",
+  "amethyst"
+ ],
+ "40_live_wire.png": [
+  "Live Wire",
+  "industrial",
+  "iron",
+  "cyan"
+ ],
+ "41_rabbit_hole.png": [
+  "Down the Rabbit Hole",
+  "moulding",
+  "wood",
+  "amber"
+ ],
+ "42_keyhole.png": [
+  "Through the Keyhole",
+  "double",
+  "ebony",
+  "ruby"
+ ],
+ "43_threads_of_fate.png": [
+  "Threads of Fate",
+  "cosmic",
+  "cosmic",
+  "topaz"
+ ],
+ "44_frost_nest.png": [
+  "Frost Nest",
+  "icicle",
+  "ice",
+  "sapphire"
+ ],
+ "45_crystal_heist.png": [
+  "Crystal Heist",
+  "industrial",
+  "iron",
+  "amethyst"
+ ],
+ "46_dragon_gate.png": [
+  "Dragon Gate",
+  "arch",
+  "lacquer",
+  "jade"
+ ],
+ "47_bamboo_sentinel.png": [
+  "Bamboo Sentinel",
+  "bamboo",
+  "bamboo",
+  "emerald"
+ ],
+ "48_projection.png": [
+  "Projection",
+  "cosmic",
+  "cosmic",
+  "amethyst"
+ ],
+ "49_first_bloom.png": [
+  "First Bloom",
+  "twist",
+  "wood",
+  "rose",
+  "pearl"
+ ],
+ "50_great_wave.png": [
+  "Great Wave",
+  "wave",
+  "sea",
+  "sapphire",
+  "pearl"
+ ]
+}

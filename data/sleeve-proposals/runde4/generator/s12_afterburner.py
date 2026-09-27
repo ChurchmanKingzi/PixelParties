@@ -5,8 +5,8 @@ die Wolkenkämme direkt darunter glühen orange.
 
 Quellen (MotiveGN.xcf):
   Ebene 448 „Andras“ – Andras mit Armkanonen (Karte „Andras, the Human Weapon“)
-  Ebene 445 „Andras #2“ – Flamme der Armkanone (rechte Flamme, um 90° gedreht und für die linke
-      Kanone gespiegelt, damit der Schub nach unten geht)
+  Ebene 445 „Andras #2“ – nur die Farbpalette der Kanonenflammen (Weiß/Gelb/Orange); die senkrechten
+      Schubflammen sind selbst gezeichnet (der seitliche Flammen-Sprite passt nicht zum Aufsteigen)
       (geprüft gegen Szene 7 „Sichtbar #145“: Andras + Flammen vollständig; die Rakete 446/447 der Szene
        ist ein eigenes Geschoss und bleibt weg – Szene 5 „Sichtbar #147“ zeigt Andras ebenfalls ohne sie)
 Tiefenebenen / Skalierung (250×350-Raster, Ausgabe ×3):
@@ -44,7 +44,7 @@ for y in range(175):
 HALO = [(30, 26, 70), (48, 38, 96), (66, 52, 120)]
 for y in range(175):
     for x in range(125):
-        g = 1 - math.hypot(x + .5 - 62.5, (y + .5 - 52) * 1.15) / 34
+        g = 1 - math.hypot(x + .5 - 62.5, (y + .5 - 56) * 1.15) / 34
         if g <= 0: continue
         t = g * len(HALO); i = int(t); f = t - i
         if f > BAYER4[y % 4, x % 4]: i += 1
@@ -57,21 +57,32 @@ vignette_grid(cv, 0.5, 0.6, g=2)
 G = 4
 fw, fh = 63, 88
 andras = sprite('c12_andras_body', D, [448])          # 28×32, Armkanonen unten links/rechts
-fl = [p for p in parts(sprite('c12_flames', D, [445]), dil=1)]
-R = fl[1]                                             # rechte Flamme: Ansatz oben links, weht nach rechts unten
-down = rot90(R, -1)                                   # 90° im Uhrzeigersinn: Ansatz oben rechts, weht nach unten (leicht links)
-FLL = down                                            # linke Kanone: Schub nach unten, leicht nach außen (links)
-FLR = flip(down)                                      # rechte Kanone: gespiegelt
-AX, AY = (fw - 32) // 2, 14                           # Andras: x 60..188, y 56..168
+AX, AY = (fw - 32) // 2, 16                           # Andras: x 60..188, y 64..176
 yy, xx = np.mgrid[0:fh, 0:fw]
 out = np.zeros((fh, fw, 4), np.uint8)
-# Flammen-Ansatz an den Mündungen (Kanonenenden Zeile 24/25, Spalte 1 bzw. 30)
-fh_, fw_ = FLL.shape[:2]
-LXp, LYp = AX + 3 - fw_, AY + 23
-RXp, RYp = AX + 29, AY + 23
-PL = (LXp + fw_ // 2 - 2, LYp + fh_)                  # Flammenenden (für den Glutschein auf den Wolken)
-PR = (RXp + fw_ // 2 + 2, RYp + fh_)
-
+# Schubflammen: selbst gezeichnet im 4×-Raster, Palette der Kanonenflammen (Ebene 445)
+FW, FY, FO, FR = (255, 255, 255), (255, 255, 0), (255, 167, 24), (214, 84, 22)
+L = 26
+NOZ = [(AX + 2.5, AY + 25, -1), (AX + 29.5, AY + 25, 1)]     # Mündungen der Armkanonen, Seite
+PL = (NOZ[0][0] - 3, NOZ[0][1] + L)
+PR = (NOZ[1][0] + 3, NOZ[1][1] + L)
+rngf = np.random.RandomState(12)
+flick = rngf.uniform(-0.55, 0.55, (2, L + 2))
+def jets(o):
+    for k, (nx, ny, sd) in enumerate(NOZ):
+        for t in range(L + 1):
+            u = t / L
+            w = 1.3 + 3.1 * math.sin(math.pi * min(u, 1) * 0.86) ** 0.8 + flick[k, t] * (0.3 + u)
+            cx = nx + sd * 0.12 * t
+            y = int(ny + t)
+            for x in range(int(cx - w - 1), int(cx + w + 2)):
+                r = abs(x + .5 - cx) / max(w, 0.5)
+                if r >= 1 or not (0 <= x < fw and 0 <= y < fh): continue
+                if u < 0.72:
+                    c = FW if r < 0.38 else (FY if r < 0.7 else FO)
+                else:
+                    c = FY if r < 0.4 else (FO if r < 0.8 else FR)
+                o[y, x] = c + (255,)
 # Wolkenbank: Vereinigung von Kreisen, von oben angestrahlt; direkt unter den Flammen glühend
 puffs = [(-4, 72, 13), (10, 68, 11), (25, 71, 10), (38, 70, 10), (52, 68, 11), (66, 72, 13),
          (2, 84, 12), (18, 81, 11), (32, 83, 11), (46, 81, 11), (62, 84, 12)]
@@ -85,7 +96,7 @@ for cx, cy, r in puffs:
     light = np.where(m, np.maximum(light, l), light)
 for (px, py) in (PL, PR):                             # Glut direkt unter den Flammen
     d = np.hypot(xx + .5 - px, (yy + .5 - py) * 1.4) / 16
-    light = np.maximum(light, np.where(smoke, np.clip(1.15 - d, 0, 1), 0))
+    light = np.maximum(light, np.where(smoke, np.clip(1.2 - d, 0, 1), 0))
 light = light ** 1.1
 SM = [(24, 18, 38), (44, 36, 62), (72, 58, 88), (116, 84, 98), (190, 120, 82), (244, 180, 100), (255, 226, 150)]
 for y in range(fh):
@@ -100,8 +111,7 @@ def put(s, x0, y0):
         for i in range(s.shape[1]):
             if s[j, i, 3] and 0 <= x0 + i < fw and 0 <= y0 + j < fh:
                 out[y0 + j, x0 + i] = s[j, i]
-put(FLL, LXp, LYp)
-put(FLR, RXp, RYp)
+jets(out)
 put(andras, AX, AY)
 
 FG = up(out, G)
