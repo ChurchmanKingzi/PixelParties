@@ -10,7 +10,7 @@ Zuordnung (Ebenen-Index bzw. Name in MotiveMoe.xcf):
   cute-annoyance-mini            Mini #2 + Mini (acht Flügel)
   cute-ditz-monami               rechte Figur aus „Monami“ + das Flügelpaar aus
                                  „Monami #1“, das hinter ihr liegt
-  molinda-the-cutest-being-in-the-sky   Ascended Molinda
+  molinda-the-cutest-being-in-the-sky   Figur aus „Ascended Molinda-Kopie“
   mirjam-the-fallen-cute-angel   Mirjam
   vena-the-bounty-huntress       Vena + Ebene #59 (abgefeuerte Raketenfaust)
   tarleinn-the-traveler          Tarleinn (nur die Figur, ohne Noten/Herzen)
@@ -124,9 +124,23 @@ def main(path):
         wy, wx = np.nonzero(lab == k)
         if wx.min() <= fx.max() + 25 and wx.max() >= fx.min() - 25 and wy.min() <= fy.max() and wy.max() >= fy.min() - 25:
             wkeep |= lab == k
+    # verirrter gelber Pixel am Fragezeichen entfernen
+    qy, qx = np.nonzero(fig[:, :, 3])
+    for y, x in zip(qy, qx):
+        r, g, b = (int(v) for v in fig[y, x, :3])
+        if r > 200 and g > 150 and b < 100 and y < fy.min() + 25:
+            fig[y, x] = 0
     save_parts('cute-ditz-monami', [('wings', np.where(wkeep[:, :, None], wings, 0).astype(np.uint8)),
                                     ('body', fig)])
-    save(compose(doc, layers, ['Ascended Molinda']), 'molinda-the-cutest-being-in-the-sky')
+    # Ascended Molinda: die richtige Figur liegt in „Ascended Molinda-Kopie“
+    # (neben einem großen Herz in derselben Ebene -> kleinere Komponente)
+    mol = layer(doc, layers, 'Ascended Molinda-Kopie')
+    n, lab = components(mol)
+    sizes = [(lab == k).sum() for k in range(1, n)]
+    big = [k + 1 for k, v in enumerate(sizes) if v > 100]
+    fig_k = min(big, key=lambda k: sizes[k - 1])
+    save(Image.fromarray(np.where((lab == fig_k)[:, :, None], mol, 0).astype(np.uint8)),
+         'molinda-the-cutest-being-in-the-sky')
     save(compose(doc, layers, ['Mirjam']), 'mirjam-the-fallen-cute-angel')
     save_parts('vena-the-bounty-huntress', [('body', layer(doc, layers, 'Vena')),
                                             ('fist', layer(doc, layers, 'Ebene #59'))])

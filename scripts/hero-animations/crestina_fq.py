@@ -10,11 +10,11 @@
 import sys
 from PIL import Image
 import numpy as np
-from anim_common import rgb, save_outputs, sparkle_pixels, wave
+from anim_common import rgb, save_outputs, draw_sparkles, wave
 
 SRC = np.array(Image.open('src/fairy-queen-crestina-the-creation-fairy.png').convert('RGBA')).astype(int)
 SH, SW = SRC.shape[:2]
-P = 4
+P = 5
 H, W = SH + 2 * P, SW + 2 * P
 N = 32
 
@@ -23,7 +23,7 @@ SMILE = [((7, 10), D), ((10, 10), D), ((6, 11), D), ((11, 11), D),      # ^ ^
          ((8, 11), S2), ((9, 11), S2), ((7, 11), S), ((10, 11), S)]
 WING_W, WING_C = rgb('f6ffff'), rgb('b4f6ff')
 AURA, AURA_HI = rgb('bb99ff'), rgb('d9c8ff')
-SPARKLES = [(2, 6, 0), (SW + 5, 9, 9), (1, 20, 17), (SW + 6, 22, 25), (SW // 2 + P, 1, 13)]
+SPARKLES = [(3, 4, 0), (SW + 6, 5, 9), (3, SH + 2, 17), (SW + 6, SH + 3, 25), (SW + 6, SH // 2 - 2, 13)]
 
 
 def smiling(i):
@@ -53,13 +53,11 @@ def frame(i):
     dy = bob(i)
     m = s[:, :, 3] > 0
     out[P + dy:P + dy + SH, P:P + SW][m] = s[m]
-    for (x, y), c in sparkle_pixels(i, N, SPARKLES, rgb('d9c8ff'), rgb('bb99ff')).items():
-        if 0 <= x < W and 0 <= y < H and out[y, x, 3] == 0:
-            out[y, x] = c
+    draw_sparkles(out, i, N, SPARKLES, rgb('d9c8ff'), rgb('bb99ff'))
     return out
 
 
 if __name__ == '__main__':
     tag = sys.argv[1] if len(sys.argv) > 1 else 'v'
     frames = [frame(i) for i in range(N)]
-    save_outputs(f'crestina_fq_idle_{tag}', frames, int(sys.argv[2]) if len(sys.argv) > 2 else 90, scale=8)
+    save_outputs(f'crestina_fq_idle_{tag}', frames, int(sys.argv[2]) if len(sys.argv) > 2 else 90, scale=8, check_edges=True)

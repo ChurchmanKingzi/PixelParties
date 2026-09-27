@@ -7,7 +7,11 @@ deckungsgleich in src/vena-the-bounty-huntress-{body,fist}.png.
   ihr Düsenfeuer wird dabei in die Länge gezogen und flackert jedes Frame,
   Rauchwölkchen steigen auf.
 * Beim Stoß ruckt Vena 1 px zurück (nach oben), ihr Cyborg-Auge glüht auf.
-* Die orangen Stulpen glimmen (einzelne Pixel flackern heller).
+* Das Jetpack-Feuer links und rechts lodert: jede Flammenspalte wird pro
+  Frame zufällig gestreckt (Spitzen züngeln nach unten), der Kern flackert.
+* Sie brüllt: in der zweiten Loop-Hälfte reißt sie den Mund weit auf (Zähne
+  oben), wirft den Kopf 1 px zurück (Hals gedehnt, keine Lücke), neben dem
+  Kopf zucken Schrei-Striche.
 """
 import math
 import sys
@@ -18,7 +22,7 @@ from anim_common import rgb, save_outputs
 BODY = np.array(Image.open('src/vena-the-bounty-huntress-body.png').convert('RGBA')).astype(int)
 FIST = np.array(Image.open('src/vena-the-bounty-huntress-fist.png').convert('RGBA')).astype(int)
 SH, SW = BODY.shape[:2]
-PT, PB, P = 4, 4, 2
+PT, PB, P = 4, 8, 4
 H, W = SH + PT + PB, SW + 2 * P
 N = 36
 PERIOD = 12
@@ -38,7 +42,26 @@ def thrust(i):
 
 EYE = {rgb('de4b4b'): rgb('ff8a7a'), rgb('ba2121'): rgb('ff4b4b')}
 FIRE = [rgb('ff6800'), rgb('ff9100'), rgb('ffa500'), rgb('ffd84a')]
-GAUNTLET = {rgb('ff9100'), rgb('ff6800')}
+JET = {rgb(c) for c in ('874401', 'ff6800', 'ff9100', 'ffa500')}
+JET_CORE = [rgb('ff6800'), rgb('ff9100'), rgb('ffa500'), rgb('ffd84a')]
+
+
+def is_jet(x, y):
+    return y >= 11 and (x <= 6 or x >= 19) and BODY[y, x, 3] and tuple(BODY[y, x]) in JET
+
+
+JET_COLS = {}
+for _x in range(SW):
+    _ys = [y for y in range(SH) if is_jet(_x, y)]
+    if _ys:
+        JET_COLS[_x] = (min(_ys), max(_ys))
+ROAR = range(18, 31)
+HEAD_MAX_Y = 11
+TEETH, MOUTH_D, MOUTH_M = rgb('f6ffff'), rgb('4f0000'), rgb('7a0000')
+ROAR_MOUTH = {(11, 10): MOUTH_M, (12, 10): TEETH, (13, 10): TEETH, (14, 10): MOUTH_M,
+              (11, 11): MOUTH_D, (12, 11): rgb('b30000'), (13, 11): rgb('b30000'), (14, 11): MOUTH_D,
+              (12, 12): MOUTH_D, (13, 12): MOUTH_D}
+SHOUT = rgb('ffe6d5')
 
 
 def frame(i):
@@ -46,16 +69,47 @@ def frame(i):
     d = thrust(i)
     recoil = -1 if d >= 3 else 0
     glow = d >= 3
-    # Körper
+    roar = i in ROAR
+    body = BODY.copy()
+    if roar:
+        for (x, y), c in ROAR_MOUTH.items():
+            body[y, x] = c
+    lift = 1 if roar and i not in (ROAR[0], ROAR[-1]) else 0
+    # Körper (ohne Jetpack-Feuer); beim Brüllen Kopf 1 px zurück, Hals gedehnt
     for y in range(SH):
         for x in range(SW):
-            if BODY[y, x, 3]:
-                c = tuple(BODY[y, x])
-                if glow and c in EYE:
-                    c = EYE[c]
-                elif c in GAUNTLET and rnd(x * 31 + y, i) > 0.9:
-                    c = rgb('ffa500')
+            if not body[y, x, 3] or is_jet(x, y):
+                continue
+            c = tuple(body[y, x])
+            if glow and c in EYE:
+                c = EYE[c]
+            head = y <= HEAD_MAX_Y and 7 <= x <= 18
+            out[y + PT + recoil - (lift if head else 0), x + P] = c
+            if head and lift and y == HEAD_MAX_Y:
                 out[y + PT + recoil, x + P] = c
+    # Jetpack-Feuer: Spalten gestreckt, Kern flackert
+    for x, (y0, y1) in JET_COLS.items():
+        n = y1 - y0 + 1
+        grow = 1.0 + 0.4 * rnd(x + 3, i) - 0.1 * rnd(x + 70, i)
+        m = max(1, int(round(n * grow)))
+        for j in range(m):
+            sy = y0 + min(n - 1, int(j * n / m))
+            if not is_jet(x, sy):
+                continue
+            c = tuple(BODY[sy, x])
+            if c in JET_CORE[:3] and rnd(x * 13 + sy, i) > 0.6:
+                k = JET_CORE.index(c)
+                c = JET_CORE[k + 1] if rnd(x, i + 9) > 0.45 else JET_CORE[max(0, k - 1)]
+            out[y0 + j + PT + recoil, x + P] = c
+    # Schrei-Striche neben dem Kopf
+    if roar:
+        jit = i % 2
+        for side, x0 in ((-1, 6), (1, 19)):
+            for dx, dy in ((0, 0), (1, -1), (0, 2), (1, 2), (0, 4), (1, 5)):   # drei Striche
+                xx = x0 + side * (dx + jit) + P
+                yy = 3 + dy + PT + recoil - lift
+                if out[yy, xx, 3] == 0:
+                    out[yy, xx] = SHOUT
     # Faust: Körper der Faust wandert um d nach unten
     for y in range(FIST_TOP, SH):
         for x in range(SW):
@@ -94,4 +148,4 @@ def frame(i):
 if __name__ == '__main__':
     tag = sys.argv[1] if len(sys.argv) > 1 else 'v'
     frames = [frame(i) for i in range(N)]
-    save_outputs(f'vena_idle_{tag}', frames, int(sys.argv[2]) if len(sys.argv) > 2 else 80, scale=8)
+    save_outputs(f'vena_idle_{tag}', frames, int(sys.argv[2]) if len(sys.argv) > 2 else 80, scale=8, check_edges=True)

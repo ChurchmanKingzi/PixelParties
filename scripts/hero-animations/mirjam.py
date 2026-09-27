@@ -1,7 +1,9 @@
 # -*- coding: utf-8 -*-
 """Idle-Animation für Mirjam, the Fallen Cute Angel (Sprite aus MotiveMoe.xcf).
 
-* Sie schwebt: die Figur samt dunkler Flügel hebt und senkt sich (0..2 px),
+* Sie schlägt mit ihren dunklen Flügeln (Drehung um die Schultern,
+  flap_common.rotate_part, Spitzen schwingen nach).
+* Sie schwebt: die Figur samt Flügeln hebt und senkt sich (0..2 px),
   ihr Schatten am Boden bleibt liegen und wird kleiner/blasser, je höher sie ist.
 * Lila Blitze als Partikel: kurze Zickzack-Blitze zucken aus ihrer
   erhobenen Hand und um sie herum auf (grell -> lila -> dunkellila, dann
@@ -12,6 +14,7 @@ import sys
 from PIL import Image
 import numpy as np
 from anim_common import rgb, save_outputs
+from flap_common import rotate_part, over
 
 SRC = np.array(Image.open('src/mirjam-the-fallen-cute-angel.png').convert('RGBA')).astype(int)
 SH, SW = SRC.shape[:2]
@@ -33,6 +36,15 @@ def lift(i):
 
 
 WING = {rgb(c) for c in ('16133a', '0a081a', '0c0b20', '272267', '0f0d28')}
+WING_MASK = np.array([[SRC[y, x, 3] > 0 and y < SHADOW_Y and (x <= 6 or x >= 15) and tuple(SRC[y, x]) in WING
+                       for x in range(SW)] for y in range(SH)])
+PIVOTS = {-1: (6.0, 9.0), 1: (15.0, 9.0)}
+
+
+def wing_angle(i, r):
+    p = 2 * math.pi * i / 16 - 0.04 * r
+    s = math.sin(p)
+    return 0.05 + 0.27 * (s * (1.2 if s < 0 else 0.9))
 BOLT = [rgb('ffffff'), rgb('d9a8ff'), rgb('a15cff'), rgb('5a2a9e')]
 GLOW = rgb('7a3cdc', 150)
 
@@ -64,7 +76,18 @@ def bolt_path(k):
     return pts
 
 
-BOLTS = [(k * 3 + int(rnd(k, 7) * 2), bolt_path(k)) for k in range(N // 3)]
+def inside(pts, m=2):
+    return all(m <= x < W - m and m <= y < H - m for x, y in pts)
+
+
+# nur Blitze, die samt Leuchten komplett ins Bild passen (nichts abgeschnitten)
+BOLTS = []
+for k in range(N // 3):
+    for tries in range(12):
+        path = bolt_path(k + 100 * tries)
+        if inside(path):
+            BOLTS.append((k * 3 + int(rnd(k, 7) * 2), path))
+            break
 
 
 def frame(i):
@@ -78,13 +101,17 @@ def frame(i):
         x0, x1 = min(xs) + (L + 1) // 2, max(xs) - (L + 1) // 2
         for x in range(x0, x1 + 1):
             out[y + PT, x + P] = (*SRC[y, x, :3], max(90, SRC[y, x, 3] - 30 * L))
-    # Figur (Flügelpixel merken: Blitze dürfen vor den Flügeln zucken)
-    free = np.ones((H, W), bool)
+    # Flügel (schlagen) und Figur
+    for side in (-1, 1):
+        m = WING_MASK & ((np.arange(SW)[None, :] <= 10) if side < 0 else (np.arange(SW)[None, :] >= 11))
+        over(out, rotate_part(SRC, m, PIVOTS[side], lambda r, s=side: s * wing_angle(i, r),
+                              (H, W), (P, PT - L)))
     for y in range(SHADOW_Y):
         for x in range(SW):
-            if SRC[y, x, 3]:
+            if SRC[y, x, 3] and not WING_MASK[y, x]:
                 out[y + PT - L, x + P] = SRC[y, x]
-                free[y + PT - L, x + P] = tuple(SRC[y, x]) in WING
+    # Blitze dürfen vor den Flügeln zucken, nicht vor ihr
+    free = np.array([[out[y, x, 3] == 0 or tuple(out[y, x]) in WING for x in range(W)] for y in range(H)])
     # Blitze
     for start, pts in BOLTS:
         t = (i - start) % N
@@ -115,7 +142,7 @@ def frame(i):
             for s in range(2):
                 sx = ex + int(round((rnd(start, 30 + s) - 0.5) * 4))
                 sy = ey + int(round((rnd(start, 40 + s) - 0.5) * 4))
-                if 0 <= sx < W and 0 <= sy < H and out[sy, sx, 3] == 0:
+                if 1 <= sx < W - 1 and 1 <= sy < H - 1 and out[sy, sx, 3] == 0:
                     out[sy, sx] = BOLT[1]
     # Knistern an der Hand (bewegt sich mit)
     hx, hy = HAND[0] + P + 1, HAND[1] + PT - 1 - L
@@ -123,7 +150,7 @@ def frame(i):
         if rnd(i, 50 + s) > 0.45:
             sx = hx + int(round((rnd(i, 60 + s) - 0.3) * 3))
             sy = hy - int(rnd(i, 70 + s) * 3)
-            if 0 <= sx < W and 0 <= sy < H and free[sy, sx]:
+            if 1 <= sx < W - 1 and 1 <= sy < H - 1 and free[sy, sx]:
                 out[sy, sx] = BOLT[1 if s else 0]
     return out
 
@@ -131,4 +158,4 @@ def frame(i):
 if __name__ == '__main__':
     tag = sys.argv[1] if len(sys.argv) > 1 else 'v'
     frames = [frame(i) for i in range(N)]
-    save_outputs(f'mirjam_idle_{tag}', frames, int(sys.argv[2]) if len(sys.argv) > 2 else 80, scale=8)
+    save_outputs(f'mirjam_idle_{tag}', frames, int(sys.argv[2]) if len(sys.argv) > 2 else 80, scale=8, check_edges=True)

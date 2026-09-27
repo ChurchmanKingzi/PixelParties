@@ -21,8 +21,8 @@ from flap_common import rotate_part, over
 WINGS = np.array(Image.open('src/cute-ditz-monami-wings.png').convert('RGBA')).astype(int)
 BODY = np.array(Image.open('src/cute-ditz-monami-body.png').convert('RGBA')).astype(int)
 SH, SW = BODY.shape[:2]
-PL = PR = 6
-PT, PB = 12, 6
+PL = PR = 8
+PT, PB = 13, 8
 H, W = SH + PT + PB, SW + PL + PR
 N = 32
 FLAP = 16
@@ -70,4 +70,4 @@ def frame(i):
 if __name__ == '__main__':
     tag = sys.argv[1] if len(sys.argv) > 1 else 'v'
     frames = [frame(i) for i in range(N)]
-    save_outputs(f'monami_idle_{tag}', frames, int(sys.argv[2]) if len(sys.argv) > 2 else 70, scale=4)
+    save_outputs(f'monami_idle_{tag}', frames, int(sys.argv[2]) if len(sys.argv) > 2 else 70, scale=4, check_edges=True)

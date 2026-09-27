@@ -17,8 +17,8 @@ from anim_common import rgb, save_outputs
 
 SRC = np.array(Image.open('src/tarleinn-the-traveler.png').convert('RGBA')).astype(int)
 SH, SW = SRC.shape[:2]
-PT, PL, PR = 8, 7, 7
-H, W = SH + PT, SW + PL + PR
+PT, PL, PR, PB = 8, 7, 7, 1
+H, W = SH + PT + PB, SW + PL + PR
 BEAT = 8
 N = BEAT * 4
 
@@ -69,7 +69,7 @@ def notes(out, i):
         col = NOTE_COLS[k % 4]
         a = 255 if t < LIFE - 4 else int(255 * (LIFE - t) / 5)
         pts = [(int(round(x)) + dx, int(round(y)) + dy) for dx, dy in glyph]
-        if any(not (0 <= xx < W and 0 <= yy < H) or out[yy, xx, 3] for xx, yy in pts):
+        if any(not (1 <= xx < W - 1 and 1 <= yy < H - 1) or out[yy, xx, 3] for xx, yy in pts):
             continue                                   # nur ganze Noten, nie angeschnitten
         for xx, yy in pts:
             out[yy, xx] = (*col[:3], a)
@@ -104,4 +104,4 @@ def frame(i):
 if __name__ == '__main__':
     tag = sys.argv[1] if len(sys.argv) > 1 else 'v'
     frames = [frame(i) for i in range(N)]
-    save_outputs(f'tarleinn_idle_{tag}', frames, int(sys.argv[2]) if len(sys.argv) > 2 else 65, scale=8)
+    save_outputs(f'tarleinn_idle_{tag}', frames, int(sys.argv[2]) if len(sys.argv) > 2 else 65, scale=8, check_edges=True)

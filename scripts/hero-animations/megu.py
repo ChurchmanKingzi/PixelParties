@@ -14,7 +14,7 @@ import math
 import sys
 from PIL import Image
 import numpy as np
-from anim_common import rgb, save_outputs, sparkle_pixels
+from anim_common import rgb, save_outputs, draw_sparkles
 from flap_common import rotate_part, over
 
 WINGS = np.array(Image.open('src/cute-starlet-megu-wings.png').convert('RGBA')).astype(int)
@@ -40,7 +40,7 @@ def bob(i):
     return -1 if math.sin(2 * math.pi * i / 16 - 1.2) > 0 else 0
 
 
-SPARKLES = [(2, 4, 0), (SW + 3, 6, 7), (4, SH - 2, 14), (SW + 1, SH, 21), (SW // 2 + 9, 0, 26)]
+SPARKLES = [(3, 4, 0), (SW + 4, 6, 7), (4, SH + 2, 14), (SW + 3, SH + 3, 21), (SW // 2 + 12, 3, 26)]
 
 
 def frame(i):
@@ -59,13 +59,11 @@ def frame(i):
         for x in range(SW):
             if ARM[y, x, 3]:
                 out[y + PT + dy, x + P + sh] = ARM[y, x]
-    for (x, y), c in sparkle_pixels(i, N, SPARKLES, rgb('ffaad2'), rgb('ff63d2')).items():
-        if 0 <= x < W and 0 <= y < H and out[y, x, 3] == 0:
-            out[y, x] = c
+    draw_sparkles(out, i, N, SPARKLES, rgb('ffaad2'), rgb('ff63d2'))
     return out
 
 
 if __name__ == '__main__':
     tag = sys.argv[1] if len(sys.argv) > 1 else 'v'
     frames = [frame(i) for i in range(N)]
-    save_outputs(f'megu_idle_{tag}', frames, int(sys.argv[2]) if len(sys.argv) > 2 else 80, scale=6)
+    save_outputs(f'megu_idle_{tag}', frames, int(sys.argv[2]) if len(sys.argv) > 2 else 80, scale=6, check_edges=True)

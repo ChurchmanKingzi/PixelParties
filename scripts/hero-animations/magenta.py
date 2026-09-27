@@ -81,4 +81,4 @@ def frame(i):
 if __name__ == '__main__':
     tag = sys.argv[1] if len(sys.argv) > 1 else 'v'
     frames = [frame(i) for i in range(N)]
-    save_outputs(f'magenta_idle_{tag}', frames, int(sys.argv[2]) if len(sys.argv) > 2 else 70, scale=6)
+    save_outputs(f'magenta_idle_{tag}', frames, int(sys.argv[2]) if len(sys.argv) > 2 else 70, scale=6, check_edges=True)
