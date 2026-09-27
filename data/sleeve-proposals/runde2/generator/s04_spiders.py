@@ -24,10 +24,10 @@ cv = Canvas(NW, NH)
 kl = sprite('r2_04_klippen', G, [421])
 band = kl[150:240, 130:130 + NW]
 bg = np.concatenate([band[::-1], band], 0)[:NH]
-bg = hsv_shift(bg, 0, 0.8, 0.62)[..., :3].astype(float)
+bg = hsv_shift(bg, 0, 0.8, 0.8)[..., :3].astype(float)
 bg = bg.mean((0, 1)) + (bg - bg.mean((0, 1))) * 0.6          # Kontrast zurücknehmen → ruhiger Hintergrund
 cv.a[:] = bg.clip(0, 255).astype(np.uint8)
-vignette(cv, 0.8, 0.3)
+vignette(cv, 0.55, 0.35)
 
 # --- Netz aus „Trapping #1“
 try:
@@ -103,11 +103,11 @@ def hang(s, x, y, seglen=2):
 # Crimson Skull Spider: Körper auf der Nabe, roter Faden nach oben
 bcol = int(np.argmax(boss[0, :, 3] > 0))
 hang(boss, HX - bcol, HY - boss.shape[0] + 13, seglen=4)
-hang(brain, 46, 2)
+hang(brain, 42, 2)
 put(cute, 2, 3)
 put(dia, 1, 45, r=1); put(dia, 46, 64, r=3)
 put(hive[0], 25, 8); put(hive[5], 6, 27, True, 1); put(hive[3], 13, 66)
-put(hive[2], 30, 78); put(hive[5], 53, 36, False, 3); put(hive[0], 49, 80, False, 2)
+put(hive[2], 30, 78); put(hive[0], 49, 80, False, 2)
 
 # --- einheitlich 4× hochskalieren, auf 250×350 beschneiden
 u = up(np.dstack([cv.a, np.full(cv.a.shape[:2], 255, np.uint8)]), K)[..., :3]

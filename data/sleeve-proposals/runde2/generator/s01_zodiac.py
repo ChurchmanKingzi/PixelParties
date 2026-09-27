@@ -32,8 +32,8 @@ brick = tex('r2_01_brick', 203, 175)
 grass = tex('r2_01_grass', 137, 136)
 
 # Hintergrund: dunkler Fels, zusätzlich abgedunkelt + Vignette
-fill_tiles(cv, darken(rock, 0.8))
-vignette(cv, 0.75, 0.35)
+fill_tiles(cv, darken(rock, 0.75))
+vignette(cv, 0.8, 0.12)
 
 # Tierkreis-Ring: abgerundetes Rechteck (nutzt das Hochformat besser als eine Ellipse),
 # die Füße der Figuren stehen auf dem Ziegelband.

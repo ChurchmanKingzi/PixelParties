@@ -14,7 +14,7 @@ Runde 2b: EINE Pixelgröße für alles – die ganze Szene wird im Originalraste
   im selben Raster."""
 import numpy as np
 from kit import Canvas, up, flip, silhouette, save, BAYER4
-from xcfkit import sprite, parts, layer
+from xcfkit import sprite, parts
 
 B = 'MotiveEgypt'
 NW, NH = 84, 117
@@ -23,16 +23,12 @@ cv = Canvas(NW, NH)
 room = sprite('eg_room', B, [185])                       # Grabkammer-Textur (Ebene #48), zugeschnitten ab (293,317)
 WALL = room[38:54, 178:226, :3]                          # waagrechte Ziegel, Periode 48×16
 FLOOR = room[80:96, 190:206, :3]                         # Flechtverband, Periode 16×16
-try:
-    PYR = layer(B, 121)[336:342, 440:443, :3].copy()     # Pyramiden-Mauerwerk der Eye-of-Ren-Karte (3×6)
-    np.save(__import__('os').path.join(__import__('os').path.dirname(__file__), 'sprites2', 'eg_pyr_tile.npy'), PYR)
-except Exception:
-    PYR = np.load(__import__('os').path.join(__import__('os').path.dirname(__file__), 'sprites2', 'eg_pyr_tile.npy'))
+PYR = sprite('eg_pyr_tile', B, [121], box=(440, 336, 443, 342))[..., :3]   # Pyramiden-Mauerwerk (3×6)
 
 ren = sprite('eg_ren', B, [188])
 eye = sprite('eg_eye', B, [99])
 ush = parts(sprite('eg_ushabti', B, [168]))             # links, Mitte (mit Flamme), rechts
-grd = parts(sprite('eg_guards', B, [183]), dil=1)        # zwei Wächter (mit Sensen)
+grd = parts(sprite('eg_guards', B, [183]), dil=0)        # zwei Wächter (mit Sensen)
 assert len(grd) == 2
 khet = sprite('eg_khet', B, [214])
 
@@ -66,7 +62,7 @@ t = np.zeros((NH, NW))
 for gx, gy in glow:
     d = np.hypot(xx - gx, (yy - gy) * 1.1)
     t = np.maximum(t, np.clip(1 - d / 20, 0, 1))
-q = (t * 1.6 > (BAYER4[yy % 4, xx % 4] + 0.5) / 16 * 1.0 + 0.35)
+q = t * 0.9 > BAYER4[yy % 4, xx % 4]
 warm = np.clip(cv.a * 1.18 + np.array([22, 10, 0]), 0, 255).astype(np.uint8)
 cv.a[q] = warm[q]
 
