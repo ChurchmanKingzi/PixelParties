@@ -1,0 +1,10 @@
+{
+  "hero": "Nao, the Barrier Priestess",
+  "sheet": "nao-the-barrier-priestess.png",
+  "frameWidth": 35,
+  "frameHeight": 32,
+  "frames": 40,
+  "frameMs": 80,
+  "loop": true,
+  "layout": "horizontal"
+}

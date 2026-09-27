@@ -3645,6 +3645,53 @@ body:has(.anim-backdrop) .pp-bg-particles { display: none; }
   animation: announceShort 2s ease-out forwards;
 }
 
+/* ═══ Helden-Idle-Animation (v1450) ═══
+   Der Held steht über dem oberen Kartendrittel, die Füße auf der
+   Drittellinie (Kartenoberkante + 30 bzw. Zonenmitte − 15). Über der
+   Karte (z 3), unter Status-Overlays (z 4–5) und Abzeichen (z 8).
+   Maße und Lage setzt `HeroIdleSprite` je Sheet inline. */
+.hero-idle-sprite {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+  transition: opacity .4s ease;
+}
+/* Unterhalb der Drittellinie wird abgeschnitten — daraus steigt der
+   Held beim Auftritt empor, als käme er aus der Karte. */
+.hero-idle-auftritt {
+  position: absolute;
+  inset: 0;
+  clip-path: inset(0 0 calc(50% + 15px * var(--board-scale)) 0);
+  /* harter 1-px-Pixelschatten löst die Figur von der Kartenkunst */
+  filter: drop-shadow(0 calc(1px * var(--board-scale)) 0 rgba(0,0,0,.6));
+}
+.hero-idle-canvas {
+  position: absolute;
+  display: block;
+  animation: heroIdleAuftritt .55s steps(10, end) both;
+}
+@keyframes heroIdleAuftritt {
+  0%   { transform: translateY(100%); filter: brightness(2.2); }
+  70%  { transform: translateY(0);    filter: brightness(1.5); }
+  100% { transform: translateY(0);    filter: none; }
+}
+/* Pixel-Bodenschatten auf der Drittellinie */
+.hero-idle-schatten {
+  position: absolute;
+  top: calc(50% - 16.5px * var(--board-scale));
+  height: calc(3px * var(--board-scale));
+  background: radial-gradient(ellipse at center, rgba(0,0,0,.5) 0 45%, rgba(0,0,0,.22) 46% 70%, transparent 71%);
+  animation: heroIdleSchatten .55s ease-out both;
+}
+@keyframes heroIdleSchatten {
+  from { opacity: 0; transform: scaleX(.3); }
+  to   { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hero-idle-canvas, .hero-idle-schatten { animation: none; }
+}
+
 /* ═══ Status Effect Visuals ═══ */
 
 /* Frozen — ice overlay */
@@ -8039,6 +8086,55 @@ body.pp-dragging-card.pp-dragging-card.pp-dragging-card * {
   100% { transform: translate(var(--dx), var(--dy)) scale(0); opacity: 0; }
 }
 
+/* ★ v1446: Explosion — Kern, Druckwelle, Truemmer, Glut, Rauch (Pixelierer macht Pixelart daraus) */
+.anim-exp-kern {
+  position: absolute; width: 56px; height: 56px; left: -28px; top: -28px; border-radius: 50%;
+  background: radial-gradient(circle, #ffffff 0%, #fff6c0 35%, #ffd040 60%, transparent 72%);
+  animation: animExpKern 300ms ease-out forwards;
+}
+@keyframes animExpKern {
+  0% { transform: scale(.2); opacity: 1; }
+  45% { transform: scale(1.35); opacity: 1; }
+  100% { transform: scale(1.6); opacity: 0; }
+}
+.anim-exp-welle {
+  position: absolute; width: 64px; height: 64px; left: -32px; top: -32px; border-radius: 50%;
+  border: 5px solid #ffb020; box-shadow: 0 0 10px #ff6a00;
+  opacity: 0; animation: animExpWelle 460ms ease-out 40ms forwards;
+}
+@keyframes animExpWelle {
+  0% { transform: scale(.25); opacity: 1; }
+  70% { opacity: .9; }
+  100% { transform: scale(2.6); opacity: 0; }
+}
+.anim-exp-brocken {
+  position: absolute; opacity: 0;
+  animation-name: animExpBrocken; animation-timing-function: cubic-bezier(.2,.6,.5,1); animation-fill-mode: forwards;
+}
+@keyframes animExpBrocken {
+  0% { transform: translate(0, 0) rotate(0); opacity: 1; }
+  55% { transform: translate(var(--dx), var(--dy)) rotate(calc(var(--dreh) * .6)); opacity: 1; }
+  100% { transform: translate(calc(var(--dx) * 1.3), calc(var(--dy) * .2 + 40px)) rotate(var(--dreh)); opacity: 0; }
+}
+.anim-exp-glut {
+  position: absolute; opacity: 0;
+  animation-name: animExpGlut; animation-timing-function: ease-out; animation-fill-mode: forwards;
+}
+@keyframes animExpGlut {
+  0% { transform: translate(0, 0); opacity: 1; }
+  70% { opacity: 1; }
+  100% { transform: translate(var(--dx), var(--dy)); opacity: 0; }
+}
+.anim-exp-rauch {
+  position: absolute; border-radius: 50%; opacity: 0;
+  animation-name: animExpRauch; animation-timing-function: ease-out; animation-fill-mode: forwards;
+}
+@keyframes animExpRauch {
+  0% { transform: translate(0, 0) scale(.4); opacity: 0; }
+  30% { opacity: .9; }
+  100% { transform: translate(var(--dx), var(--dy)) scale(1.5); opacity: 0; }
+}
+
 /* Creature death animation — flash + rising souls + red sparks */
 .anim-creature-death-flash {
   position: absolute;
@@ -11945,6 +12041,39 @@ body:has(.modal-overlay) .tooltip {
 @keyframes buffIconPulse {
   0%, 100% { box-shadow: 0 0 6px rgba(100,180,255,.3); }
   50% { box-shadow: 0 0 10px rgba(100,180,255,.5); }
+}
+
+/* ★ v1448 — PIXEL-ABZEICHEN (Paket 3, `PxIcon` in app-shared.jsx).
+   Das Symbol folgt der Schriftgroesse wie das Emoji vorher.
+   ★ v1449 (Als Befund 27.9.: „sehen noch sehr grob aus"): Symbole im
+   16er-, Plaketten im 21er-Raster. In der Plakette fuellt das Symbol
+   76 % — dann sind die Pixel beider gleich gross. Die Bilder sind
+   vierfach vorgerendert und werden VERKLEINERT gezeigt; dafuer
+   `image-rendering: auto` (glaettet) statt `pixelated` (verschluckt beim
+   Verkleinern ganze Pixelzeilen). */
+.pp-px-icon,
+.pp-px.pp-px-icon {
+  display: inline-block;
+  flex: none;
+  width: 1em;
+  height: 1em;
+  vertical-align: middle;
+  object-fit: contain;
+  image-rendering: auto;
+  pointer-events: none;
+}
+.status-badge > .pp-px-icon,
+.buff-icon > .pp-px-icon,
+.status-action-blocked-icon > .pp-px-icon,
+.status-stealth-icon > .pp-px-icon,
+.status-damage-proof-icon > .pp-px-icon,
+.status-cheat-chair-icon > .pp-px-icon {
+  width: 76%;
+  height: 76%;
+}
+@keyframes ppPxBuffPuls {
+  0%, 100% { filter: drop-shadow(1px 1px 0 rgba(0,0,0,.75)); }
+  50% { filter: drop-shadow(1px 1px 0 rgba(0,0,0,.75)) brightness(1.22); }
 }
 
 /* ===== CLOUD GATHER ANIMATION ===== */
@@ -23094,6 +23223,74 @@ body.pp-dialog-offen .foil-diamond-rare:not(.modal-overlay *) {
    statt einer Klasse, weil React `className` bei jedem Rendern neu setzt,
    fremde Attribute aber stehen laesst. Die Zone (Rahmen) bleibt sichtbar. */
 [data-pp-karte-weg] { visibility: hidden !important; }
+
+/* ── Torchure: das Schwein frisst die Fackel ──────────────────────── */
+.torchure { position: fixed; width: 0; height: 0; pointer-events: none; z-index: 10205; }
+.torchure-glut {
+  position: absolute; border-radius: 18%;
+  background: radial-gradient(ellipse at 50% 40%, rgba(150,40,210,.5) 0%, rgba(90,190,60,.22) 45%, transparent 70%);
+  opacity: 0; animation: torchureGlut 2000ms ease-out forwards;
+}
+.torchure-ring {
+  position: absolute; border-radius: 50%; box-sizing: border-box;
+  border: 3px solid rgba(190,90,255,.9); box-shadow: 0 0 8px rgba(160,60,230,.8), inset 0 0 6px rgba(120,220,90,.5);
+  opacity: 0; transform: scale(2.4); animation: torchureRing 700ms ease-in forwards;
+}
+.torchure-fackel {
+  position: absolute; opacity: 0; transform-origin: 50% 80%;
+  animation: torchureFackel 2000ms cubic-bezier(.3,.8,.4,1) forwards;
+}
+.torchure-flackern { display: block; animation: torchureFlackern 160ms steps(2) infinite; }
+.torchure-schwein {
+  position: absolute; opacity: 0; transform: scale(0); transform-origin: 50% 90%;
+  animation: torchureSchwein 2000ms cubic-bezier(.2,.9,.3,1.25) forwards;
+}
+.torchure-kauen { display: block; transform-origin: 50% 100%; animation: torchureKauen 2000ms linear forwards; }
+.torchure-giftflamme {
+  position: absolute; width: 12px; height: 16px; border-radius: 50% 50% 40% 40%;
+  background: radial-gradient(ellipse at 50% 70%, #d9ff7a 0%, #7fd63a 35%, #9b3ad6 75%, transparent 100%);
+  opacity: 0; transform: scale(.2); transform-origin: 50% 100%;
+  animation: torchureGiftflamme 2000ms ease-out forwards;
+}
+@keyframes torchureGlut { 0%, 45% { opacity: 0; } 58% { opacity: 1; } 80% { opacity: .8; } 100% { opacity: 0; } }
+@keyframes torchureRing {
+  0% { opacity: 0; transform: scale(2.4); }
+  25% { opacity: 1; }
+  100% { opacity: 0; transform: scale(.35); }
+}
+@keyframes torchureFackel {
+  0% { opacity: 0; transform: translate(0, -24px) rotate(-18deg); }
+  12% { opacity: 1; transform: translate(0, 0) rotate(8deg); }
+  18%, 30% { opacity: 1; transform: translate(0, 0) rotate(-4deg); }
+  40% { opacity: 1; transform: translate(var(--zx), var(--zy)) rotate(70deg); }
+  44% { opacity: 1; transform: translate(var(--zx), var(--zy)) rotate(70deg) scaleY(.4); }
+  46%, 100% { opacity: 0; transform: translate(var(--zx), var(--zy)) rotate(70deg) scale(.1); }
+}
+@keyframes torchureFlackern { 0% { filter: brightness(1); } 100% { filter: brightness(1.35); } }
+@keyframes torchureSchwein {
+  0%, 14% { opacity: 0; transform: scale(0); }
+  22% { opacity: 1; transform: scale(1.15); }
+  27%, 86% { opacity: 1; transform: scale(1); }
+  100% { opacity: 0; transform: scale(.6) translateY(-6px); }
+}
+@keyframes torchureKauen {
+  0%, 30% { transform: scaleY(1) scaleX(1); }
+  34% { transform: scaleY(.8) scaleX(1.12); }
+  38% { transform: scaleY(1.05) scaleX(.96); }
+  42% { transform: scaleY(.8) scaleX(1.12); }
+  46% { transform: scaleY(1) scaleX(1); filter: none; }
+  52%, 70% { filter: drop-shadow(0 0 4px #9b3ad6) hue-rotate(-40deg); }
+  60% { transform: scaleY(1.06); }
+  78%, 100% { transform: scaleY(1); filter: none; }
+}
+@keyframes torchureGiftflamme {
+  0%, 44% { opacity: 0; transform: scale(.2); }
+  52% { opacity: 1; transform: scale(1.2); }
+  60% { transform: scale(.9) translateY(-2px); }
+  68% { transform: scale(1.15) translateY(-4px); }
+  80% { opacity: .9; transform: scale(1) translateY(-6px); }
+  100% { opacity: 0; transform: scale(.6) translateY(-12px); }
+}
 
 /* ── Accusation: wuetende Sprechblase ─────────────────────────────── */
 .anklage { position: fixed; width: 0; height: 0; pointer-events: none; z-index: 10205; }

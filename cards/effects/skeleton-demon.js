@@ -16,13 +16,24 @@
 //  All prompts are cancellable ("you may"). The damage source is the
 //  Demon's coordinates so animations and source-aware reactions paint
 //  on the right side.
+//
+//  v1443 (Als Befund 26.9.): das Zielpanel zeigt links die Karte, die
+//  den Demon ausgeloest hat (`ctx.ausloeserName`, von `runHooks` VOR der
+//  Zuhoerer-Runde festgehalten).
 // ═══════════════════════════════════════════
 
 const CARD_NAME = 'Skeleton Demon';
 const PER_CARD = 50;
 
+/** Die Karte, deren Effekt den Gegner ziehen / aufnehmen liess. */
+function ausloeser(ctx) {
+  if (ctx.ausloeserName) return ctx.ausloeserName;
+  return typeof ctx.source === 'string' ? ctx.source : null;
+}
+
 async function offerDamage(ctx, multiplier) {
   if (multiplier <= 0) return;
+  const trigger = ausloeser(ctx);
   const engine = ctx._engine;
   const pi = ctx.cardOwner;
   const heroIdx = ctx.cardHeroIdx;
@@ -34,7 +45,9 @@ async function offerDamage(ctx, multiplier) {
     damageType: 'creature',
     baseDamage: damage,
     title: CARD_NAME,
-    description: `Deal ${damage} damage (${PER_CARD} × ${multiplier}) to a target.`,
+    description: (trigger ? `Triggered by ${trigger}. ` : '')
+      + `Deal ${damage} damage (${PER_CARD} × ${multiplier}) to a target.`,
+    triggerCardName: trigger || undefined,
     confirmLabel: `🩸 Strike! (${damage})`,
     confirmClass: 'btn-danger',
     cancellable: true,

@@ -192,6 +192,1455 @@ function ppFxN(n) {
 }
 window.ppFxN = ppFxN;
 
+// ═══════════════════════════════════════════════════════════════════
+//  ★ v1445 — PIXEL-BAUKASTEN FUER ANIMATIONEN
+//  (Als Vorgabe 26.9.: „Diese und sicher auch andere Animationen nutzen
+//   einfarbige Flaechen, was aussieht wie Vektorillustrationen. Stelle
+//   alle solchen Grafiken auf Pixelart mit Dithering um!")
+//
+//  Ein globaler SVG-Filter ueber alle Animationen war der erste Versuch —
+//  verworfen: im Test 60 → 21 fps schon bei EINER Animation, und feine
+//  Partikel gingen verloren. Stattdessen werden die Grafiken hier EINMAL
+//  als kleine Pixelbilder gemalt (Canvas → data-URL, gemerkt) und dann
+//  wie jedes Bild gezeigt. Kostet zur Laufzeit praktisch nichts.
+//
+//  Bausteine:
+//    ppPxVerlaufUrl(gradient)  radial-gradient(...) → Pixelbild mit
+//                              Bayer-Dithering zwischen den Farbstopps
+//                              und gestufter, geditherter Deckkraft.
+//    pxHintergrund(gradient)   dasselbe als Style-Objekt fuer Inline-
+//                              `background` (Rueckfall: der Verlauf).
+//    ppPxScheibeUrl / ppPxSchattenUrl
+//                              Maske + Schattierung fuer runde Partikel
+//                              (Farbe bleibt `var(--color)`).
+//    PxZeichen                 Emoji/Glyphe → Pixel-Sprite (🔥 💀 ✦ ❄ …),
+//                              einfarbige Glyphen folgen `color`.
+//    PP_PX_KLASSEN             Freigabeliste der CSS-Klassen, deren
+//                              Verlauf/Partikel zur Laufzeit ersetzt
+//                              werden. Die Umstellung laeuft in Paketen
+//                              (Als Wahl 26.9.) — jedes Paket traegt hier
+//                              seine Klassen ein.
+// ═══════════════════════════════════════════════════════════════════
+const PP_BAYER4 = [[0, 8, 2, 10], [12, 4, 14, 6], [3, 11, 1, 9], [15, 7, 13, 5]];
+function ppBayer(x, y) { return (PP_BAYER4[y & 3][x & 3] + 0.5) / 16; }
+
+const _ppPxCache = new Map();
+const PP_PX_CACHE_MAX = 800;
+/**
+ * Pixelbild malen und merken. `male(setze)` ruft `setze(x, y, [r,g,b,a])`
+ * je Pixel. Gemalt wird `faktor`-fach vergroessert mit harten Kanten, damit
+ * das Bild auch ohne `image-rendering: pixelated` scharf bleibt (Masken
+ * und manche Browser ignorieren die Eigenschaft).
+ */
+function ppPxBild(key, w, h, male, faktor = 4) {
+  const hit = _ppPxCache.get(key);
+  if (hit !== undefined) return hit;
+  let url = '';
+  try {
+    const c = document.createElement('canvas');
+    c.width = w * faktor; c.height = h * faktor;
+    const ctx = c.getContext('2d');
+    male((x, y, f) => {
+      if (!f || !(f[3] > 0)) return;
+      ctx.fillStyle = `rgba(${f[0] | 0},${f[1] | 0},${f[2] | 0},${f[3]})`;
+      ctx.fillRect(x * faktor, y * faktor, faktor, faktor);
+    });
+    url = c.toDataURL('image/png');
+  } catch { url = ''; }
+  if (_ppPxCache.size >= PP_PX_CACHE_MAX) _ppPxCache.delete(_ppPxCache.keys().next().value);
+  _ppPxCache.set(key, url);
+  return url;
+}
+
+let _ppFarbCtx = null;
+/** Beliebige CSS-Farbe → [r, g, b, a]. */
+function ppFarbe(s) {
+  if (Array.isArray(s)) return s;
+  s = String(s || '').trim().toLowerCase();
+  if (!s || s === 'transparent') return [0, 0, 0, 0];
+  let m = s.match(/^#([0-9a-f]{3,8})$/);
+  if (m) {
+    let h = m[1];
+    if (h.length === 3 || h.length === 4) h = [...h].map(c => c + c).join('');
+    const n = parseInt(h.slice(0, 6), 16);
+    return [(n >> 16) & 255, (n >> 8) & 255, n & 255, h.length === 8 ? parseInt(h.slice(6), 16) / 255 : 1];
+  }
+  m = s.match(/^rgba?\(([^)]*)\)$/);
+  if (m) {
+    const p = m[1].split(/[\s,/]+/).filter(Boolean).map(v => v.endsWith('%') ? parseFloat(v) / 100 : parseFloat(v));
+    return [p[0] || 0, p[1] || 0, p[2] || 0, p[3] == null || isNaN(p[3]) ? 1 : p[3]];
+  }
+  try {
+    _ppFarbCtx = _ppFarbCtx || document.createElement('canvas').getContext('2d');
+    _ppFarbCtx.fillStyle = '#000'; _ppFarbCtx.fillStyle = s;
+    const n = _ppFarbCtx.fillStyle;
+    if (n && n !== s) return ppFarbe(n);
+  } catch {}
+  return [255, 255, 255, 1];
+}
+
+/** Oberste Ebene an Kommas trennen (Klammern beachten). */
+function _ppTeile(s) {
+  const out = []; let tiefe = 0, akt = '';
+  for (const ch of s) {
+    if (ch === '(') tiefe++;
+    if (ch === ')') tiefe--;
+    if (ch === ',' && tiefe === 0) { out.push(akt.trim()); akt = ''; } else akt += ch;
+  }
+  if (akt.trim()) out.push(akt.trim());
+  return out;
+}
+
+/**
+ * `radial-gradient(...)` / `linear-gradient(...)` zerlegen →
+ * { linear, winkel, kreis, cx, cy, stopps:[{f, p}] } oder null.
+ */
+function ppVerlaufLesen(g) {
+  const lin = String(g || '').match(/linear-gradient\((.*)\)\s*$/s);
+  if (lin) {
+    const teile = _ppTeile(lin[1]);
+    let winkel = 180;
+    const RICHTUNG = { 'to top': 0, 'to right': 90, 'to bottom': 180, 'to left': 270,
+      'to top right': 45, 'to right top': 45, 'to bottom right': 135, 'to right bottom': 135,
+      'to bottom left': 225, 'to left bottom': 225, 'to top left': 315, 'to left top': 315 };
+    if (teile.length && /^-?[\d.]+deg$/.test(teile[0])) winkel = parseFloat(teile.shift());
+    else if (teile.length && RICHTUNG[teile[0]] != null) winkel = RICHTUNG[teile.shift()];
+    const stopps = _ppStopps(teile);
+    return stopps ? { linear: true, winkel, stopps } : null;
+  }
+  const m = String(g || '').match(/radial-gradient\((.*)\)\s*$/s);
+  if (!m) return null;
+  const teile = _ppTeile(m[1]);
+  let kreis = false, cx = 0.5, cy = 0.5;
+  const istForm = (t) => /^(circle|ellipse|closest|farthest|at\s)/.test(t) || /\sat\s/.test(' ' + t);
+  if (teile.length && istForm(teile[0])) {
+    const kopf = teile.shift();
+    kreis = /circle/.test(kopf);
+    const at = kopf.match(/at\s+(-?[\d.]+)%\s+(-?[\d.]+)%/);
+    if (at) { cx = parseFloat(at[1]) / 100; cy = parseFloat(at[2]) / 100; }
+    else if (/at\s+center/.test(kopf)) { cx = 0.5; cy = 0.5; }
+  }
+  const stopps = _ppStopps(teile);
+  return stopps ? { kreis, cx, cy, stopps } : null;
+}
+
+/** Farbstopps lesen und ohne Lage gleichmaessig verteilen (CSS-Regel, vereinfacht). */
+function _ppStopps(teile) {
+  const stopps = teile.map(t => {
+    // „<farbe> <lage>" — die Lage steht am Ende; px wird wie % gelesen
+    // (die Kaestchen sind um die 100 px gross).
+    const pm = t.match(/^(.*\S)\s+(-?[\d.]+)(%|px)?$/);
+    if (pm) return { f: ppFarbe(pm[1]), p: parseFloat(pm[2]) / 100 };
+    return { f: ppFarbe(t), p: null };
+  });
+  if (!stopps.length) return null;
+  // Stopps ohne Angabe gleichmaessig verteilen (CSS-Regel, vereinfacht).
+  if (stopps[0].p == null) stopps[0].p = 0;
+  if (stopps[stopps.length - 1].p == null) stopps[stopps.length - 1].p = 1;
+  for (let i = 1; i < stopps.length - 1; i++) {
+    if (stopps[i].p != null) continue;
+    let j = i; while (stopps[j].p == null) j++;
+    const a = stopps[i - 1].p, b = stopps[j].p;
+    for (let k = i; k < j; k++) stopps[k].p = a + (b - a) * (k - i + 1) / (j - i + 1);
+  }
+  for (let i = 1; i < stopps.length; i++) stopps[i].p = Math.max(stopps[i].p, stopps[i - 1].p);
+  return stopps;
+}
+
+/**
+ * Deckkraft → deckend oder leer, per Bayer-Matrix gedithert. Halbe
+ * Deckkraft sah ueber dunklem Grund matschig aus (Orange zu 50 % wird
+ * Braun) — Pixelart setzt stattdessen deckende Punkte in wechselnder
+ * Dichte. Leicht angehoben, damit schwache Scheine nicht verschwinden.
+ */
+function _ppAlphaStufe(a, x, y) {
+  if (a >= 1) return 1;
+  if (a <= 0) return 0;
+  // v1446 (Als Befund 26.9.: „Explosion nutzt relativ wenige Pixel"):
+  // kraeftiger angehoben — Scheine sollen dicht und leuchtend wirken.
+  return Math.pow(a, 0.62) > ppBayer(x + 2, y + 1) ? 1 : 0;
+}
+
+/** Pixelgroesse in Bildschirmpunkten (v1446: 2 statt 3 — mehr, feinere Pixel). */
+const PP_PX_GROESSE = 2;
+
+/** Pixelzahl fuer eine Seite: ~PP_PX_GROESSE px pro Pixel, schmale Baender (Ringe) bekommen mehr. */
+function _ppAufloesung(v, laengePx) {
+  let minLuecke = 1;
+  for (let i = 1; i < v.stopps.length; i++) {
+    const d = v.stopps[i].p - v.stopps[i - 1].p;
+    if (d > 0.001 && d < minLuecke) minLuecke = d;
+  }
+  const fuerRinge = Math.min(96, Math.ceil(2.2 / (minLuecke * 0.707)));
+  const fuerGroesse = laengePx > 0 ? Math.round(laengePx / PP_PX_GROESSE) : 32;
+  return Math.max(2, Math.min(160, Math.max(fuerGroesse, laengePx > 0 && laengePx < 24 ? 0 : fuerRinge)));
+}
+
+/**
+ * Radialen oder linearen Verlauf als Pixelbild. Zwischen zwei Farbstopps
+ * wird nicht gemischt, sondern per Bayer-Matrix zwischen BEIDEN
+ * Stoppfarben gewaehlt — das ist das Dithering. `breitePx`/`hoehePx`
+ * (Elementgroesse) halten die Pixel quadratisch und ~2 px gross; ohne
+ * Angabe wird ein Quadrat angenommen.
+ */
+function ppPxVerlaufUrl(gradient, breitePx = 0, hoehePx = 0) {
+  const v = ppVerlaufLesen(gradient);
+  if (!v) return '';
+  const W = breitePx > 0 ? breitePx : (hoehePx > 0 ? hoehePx : 1);
+  const H = hoehePx > 0 ? hoehePx : W;
+  const q = (x) => Math.max(1, Math.round(x / 4) * 4);           // Merk-Schluessel groeber
+  const nx = _ppAufloesung(v, breitePx > 0 ? q(W) : 0);
+  const ny = breitePx > 0 || hoehePx > 0 ? Math.max(2, Math.round(nx * H / W)) : nx;
+  return ppPxBild('vl:' + nx + 'x' + ny + ':' + gradient, nx, ny, (setze) => {
+    const cx = v.linear ? 0.5 : v.cx, cy = v.linear ? 0.5 : v.cy;
+    const fx = Math.max(cx, 1 - cx) * W, fy = Math.max(cy, 1 - cy) * H;
+    const rk = Math.hypot(fx, fy);                                  // Kreis: fernste Ecke
+    const rx = Math.SQRT2 * fx, ry = Math.SQRT2 * fy;               // Ellipse: fernste Ecke
+    // Linear: CSS-Winkel (0deg = nach oben, 90deg = nach rechts); die
+    // Verlaufslinie ist |W sin| + |H cos| lang.
+    const wr = (v.winkel || 0) * Math.PI / 180, sn = Math.sin(wr), cs = Math.cos(wr);
+    const laenge = Math.abs(W * sn) + Math.abs(H * cs) || 1;
+    const S = v.stopps;
+    for (let y = 0; y < ny; y++) {
+      for (let x = 0; x < nx; x++) {
+        const u = ((x + 0.5) / nx - cx) * W, w = ((y + 0.5) / ny - cy) * H;
+        const t = v.linear ? 0.5 + (u * sn - w * cs) / laenge
+          : v.kreis ? Math.hypot(u, w) / rk : Math.hypot(u / rx, w / ry);
+        let f;
+        if (t <= S[0].p) f = S[0].f;
+        else if (t >= S[S.length - 1].p) f = S[S.length - 1].f;
+        else {
+          let i = 1; while (i < S.length - 1 && S[i].p < t) i++;
+          const a = S[i - 1], b = S[i];
+          const anteil = b.p > a.p ? (t - a.p) / (b.p - a.p) : 1;
+          f = anteil > ppBayer(x, y) ? b.f : a.f;
+        }
+        const alpha = _ppAlphaStufe(f[3], x, y);
+        if (alpha > 0) setze(x, y, [f[0], f[1], f[2], alpha]);
+      }
+    }
+  });
+}
+
+/** Ist der Verlauf bis zum Rand deckend (dann braucht er eine Pixel-Scheibe als Umriss)? */
+function _ppRandDeckend(gradient) {
+  const v = ppVerlaufLesen(gradient);
+  return !!v && !v.linear && v.stopps[v.stopps.length - 1].f[3] > 0.05;
+}
+
+/**
+ * Inline-`background: radial-/linear-gradient(...)` → Pixelbild. Aufruf an
+ * Stelle der Eigenschaft: `style={{ ...pxHintergrund('radial-gradient(...)',
+ * breitePx) }}` — `breitePx` (Elementbreite) haelt die Pixel bei ~3 px.
+ * Andere Werte (Farben, mehrere Ebenen) gehen unveraendert durch.
+ */
+function pxHintergrund(gradient, breitePx = 0, hoehePx = 0) {
+  const url = typeof gradient === 'string' && /(radial|linear)-gradient/.test(gradient)
+    && !/,\s*(radial|linear)-gradient/.test(gradient)          // mehrere Ebenen: nicht anfassen
+    ? ppPxVerlaufUrl(gradient, breitePx, hoehePx) : '';
+  if (!url) return { background: gradient };
+  const stil = {
+    backgroundImage: `url(${url})`, backgroundSize: '100% 100%',
+    backgroundRepeat: 'no-repeat', backgroundPosition: 'center', imageRendering: 'pixelated',
+  };
+  if (_ppRandDeckend(gradient)) {
+    const m = `url(${ppPxScheibeUrl()}) center / 100% 100% no-repeat`;
+    Object.assign(stil, { borderRadius: 0, WebkitMask: m, mask: m });
+  }
+  return stil;
+}
+
+/** Runde Pixel-Scheibe (Maske) — 8×8 mit abgeschnittenen Ecken. */
+function ppPxScheibeUrl() {
+  const Z = ['..####..', '.######.', '########', '########', '########', '########', '.######.', '..####..'];
+  return ppPxBild('scheibe', 8, 8, (setze) => {
+    Z.forEach((z, y) => [...z].forEach((c, x) => { if (c === '#') setze(x, y, [255, 255, 255, 1]); }));
+  });
+}
+/** Schattierung fuer Pixel-Partikel: Lichtpunkt oben links, geditherter Schatten unten rechts. */
+function ppPxSchattenUrl() {
+  return ppPxBild('schatten', 8, 8, (setze) => {
+    [[2, 1], [3, 1], [1, 2], [2, 2], [1, 3]].forEach(([x, y]) => setze(x, y, [255, 255, 255, 0.75]));
+    for (let y = 0; y < 8; y++) for (let x = 0; x < 8; x++) {
+      const s = x + y;
+      if (s >= 10 || (s >= 8 && (x + y) % 2 === 0)) setze(x, y, [0, 0, 0, 0.35]);
+    }
+  });
+}
+
+// ── Pixel-Sprites fuer Emoji/Glyphen ──────────────────────────────
+// Farbig: eigene Palette. Einfarbig (`mono`): '#' voll, '+' halb — die
+// Farbe kommt aus `color` des Elements (wie bei der Glyphe vorher).
+const PP_PX_SPRITES = {
+  flamme: { pal: { W: '#fff6c8', Y: '#ffd23e', O: '#ff8a1e', R: '#e03a12', D: '#9c1e0a' }, z: [
+    '....R....', '...ROR...', '...ROR..R', '..ROYOR.R', '..ROYYORR', '.ROYWYYOR',
+    '.ROYWWYOR', 'ROYYWWYOR', 'ROYWWWYOR', 'DROYYYORD', '.DRROORD.'] },
+  schaedel: { pal: { W: '#f4f1e6', G: '#bdb6a2', K: '#1a1414' }, z: [
+    '..WWWWW..', '.WWWWWWW.', 'WWWWWWWWG', 'WKKWWWKKG', 'WKKWWWKKG', 'WWWWKWWWG',
+    '.WWWWWWG.', '..WKWKWG.', '..WGWGWG.'] },
+  knall: { pal: { W: '#ffffff', Y: '#ffe36b', O: '#ff8a1e', R: '#e03a12' }, z: [
+    'R...R...R', '.R.RYR.R.', '..RYOYR..', '.RYOWOYR.', 'RYOWWWOYR', '.RYOWOYR.',
+    '..RYOYR..', '.R.RYR.R.', 'R...R...R'] },
+  herz: { pal: { R: '#e8324a', D: '#a01a30', P: '#ff9aa8' }, z: [
+    '.RR...RR.', 'RPPR.RRRR', 'RPRRRRRRD', 'RRRRRRRRD', '.RRRRRRD.', '..RRRRD..',
+    '...RRD...', '....D....'] },
+  blatt: { pal: { G: '#5fbf3a', D: '#2e7d22', L: '#a8e070' }, z: [
+    '......DG', '....DGGG', '..DGLGGG', '.DGLGGGD', 'DGLGGGD.', 'DGGGGD..', '.DGDD...', 'D.......'] },
+  spinne: { pal: { K: '#1a1016', R: '#c0283c' }, z: [
+    'K.K...K.K', '.K.KKK.K.', '..KKKKK..', 'KKKRKRKKK', '..KKKKK..', '.K.KKK.K.', 'K.K...K.K'] },
+  knochen: { pal: { W: '#f4f1e6', G: '#bdb6a2' }, z: [
+    'WW.....WW', 'WWWWWWWWG', '.WWWWWWG.', 'WWWWWWWWG', 'GG.....GG'] },
+  wolke: { pal: { W: '#ffffff', G: '#cfd8e6', S: '#9aa8bc' }, z: [
+    '...WWW....', '.WWWWWWW..', 'WWWWWWWWWW', 'WWWWWWWWWG', 'GWWWWWWWGS', '.GGSGGSGS.'] },
+  geist: { pal: { W: '#f4f6ff', G: '#b8c0d8', K: '#1a1a2a' }, z: [
+    '..WWWW..', '.WWWWWW.', 'WWKWWKWW', 'WWKWWKWW', 'WWWWWWWG', 'WWWKKWWG', 'WWWWWWWG', 'WWWWWWGG', 'W.WW.WG.'] },
+  blitz: { pal: { W: '#ffffff', Y: '#ffe36b', O: '#f0a000' }, z: [
+    '....YY.', '...YY..', '..YYW..', '.YYW...', 'YYYYYYO', '..YWYO.', '..YYO..', '.YYO...', '.YO....', 'YO.....', 'O......'] },
+  blitz_mono: { mono: true, z: [
+    '....##.', '...##..', '..##+..', '.##+...', '#######', '..#+#..', '..##...', '.##....', '.#.....', '##.....', '#......'] },
+  flamme_schwarz: { pal: { W: '#8a3ab0', Y: '#5a1a7a', O: '#34104a', R: '#180424', D: '#000000' }, z: [
+    '....R....', '...ROR...', '...ROR..R', '..ROYOR.R', '..ROYYORR', '.ROYWYYOR',
+    '.ROYWWYOR', 'ROYYWWYOR', 'ROYWWWYOR', 'DROYYYORD', '.DRROORD.'] },
+  herz_gruen: { pal: { R: '#3fbf5a', D: '#1f7a34', P: '#a8f0b4' }, z: [
+    '.RR...RR.', 'RPPR.RRRR', 'RPRRRRRRD', 'RRRRRRRRD', '.RRRRRRD.', '..RRRRD..',
+    '...RRD...', '....D....'] },
+  herz_rosa: { pal: { R: '#ff6fa8', D: '#c83a78', P: '#ffd0e4' }, z: [
+    '.RR...RR.', 'RPPR.RRRR', 'RPRRRRRRD', 'RRRRRRRRD', '.RRRRRRD.', '..RRRRD..',
+    '...RRD...', '....D....'] },
+  wut: { pal: { R: '#e8243a', D: '#9a1020' }, z: [
+    '.RR...RR.', 'RRD...DRR', 'RD.....DR', '.........', '.........', 'RD.....DR', 'RRD...DRR', '.RR...RR.'] },
+  tropfen: { pal: { W: '#e8f6ff', B: '#4aa8ff', D: '#1f5fb8' }, z: [
+    '...B...', '...B...', '..BBB..', '.BWBBB.', 'BWBBBBD', 'BBBBBBD', '.BBBBD.', '..DDD..'] },
+  kreuz: { mono: true, z: ['..###..', '..#+#..', '###+###', '#++++##', '###+###', '..#+#..', '..###..'] },
+  funke4: { mono: true, z: ['...#...', '...#...', '..###..', '#######', '..###..', '...#...', '...#...'] },
+  funke4hohl: { mono: true, z: ['...#...', '...#...', '..#+#..', '##+.+##', '..#+#..', '...#...', '...#...'] },
+  stern5: { mono: true, z: ['....#....', '....#....', '...###...', '#########', '.#######.', '..#####..', '..##.##..', '.##...##.', '.#.....#.'] },
+  punkt: { mono: true, z: ['.#.', '###', '.#.'] },
+  kugel: { mono: true, z: ['.###.', '#####', '#####', '#####', '.###.'] },
+  schnee: { mono: true, z: ['....#....', '.#..#..#.', '..#.#.#..', '...###...', '#########', '...###...', '..#.#.#..', '.#..#..#.', '....#....'] },
+  note: { mono: true, z: ['...##.', '...#.#', '...#..', '...#..', '...#..', '.###..', '####..', '.##...'] },
+  noten: { mono: true, z: ['..######', '..#....#', '..#....#', '..#....#', '..#..###', '###.####', '####.##.', '.##.....'] },
+  dreieck: { mono: true, z: ['....#....', '...###...', '...###...', '..#####..', '..#####..', '.#######.', '#########'] },
+  raute: { mono: true, z: ['...#...', '..###..', '.#####.', '#######', '.#####.', '..###..', '...#...'] },
+};
+const PP_PX_ZEICHEN = {
+  '🔥': 'flamme', '💀': 'schaedel', '☠️': 'schaedel', '☠': 'schaedel', '💥': 'knall',
+  '❤️': 'herz', '❤': 'herz', '♥': 'herz', '💗': 'herz', '💖': 'herz', '🍃': 'blatt', '🕷': 'spinne', '🕷️': 'spinne',
+  '🦴': 'knochen', '☁': 'wolke', '☁️': 'wolke', '👻': 'geist', '⚡': 'blitz',
+  '✦': 'funke4', '✧': 'funke4hohl', '⋆': 'funke4', '✶': 'funke4', '✺': 'funke4', '✨': 'funke4',
+  '★': 'stern5', '⭐': 'stern5', '☆': 'stern5', '·': 'punkt', '•': 'punkt', '●': 'kugel',
+  '❄': 'schnee', '❆': 'schnee', '❅': 'schnee', '❄️': 'schnee',
+  '♪': 'note', '♩': 'note', '♫': 'noten', '♬': 'noten', '🎵': 'note', '🎶': 'noten',
+  '▲': 'dreieck', '◆': 'raute', '⬢': 'raute',
+  '💚': 'herz_gruen', '💕': 'herz_rosa', '💘': 'herz_rosa', '💝': 'herz_rosa', '💓': 'herz_rosa', '🩷': 'herz_rosa',
+  '💢': 'wut', '💧': 'tropfen', '💦': 'tropfen', '✚': 'kreuz', '✙': 'kreuz', '➕': 'kreuz',
+};
+
+// ── Pixel-Sprites fuer Status-, Buff- und Debuff-Abzeichen ──────────
+// ★ v1449 (Als Befund 27.9.: „sehen noch sehr grob aus"): 16×16 statt 9×9,
+// je Material drei Tonstufen, Licht von oben links, 1 Pixel dunkle Kontur
+// fuer die farbigen Plaketten. Eigener Namensraum `ab_…` in PP_PX_SPRITES,
+// damit die Animations-Sprites gleichen Namens unberuehrt bleiben.
+const PP_PX_ABZEICHEN_SPRITES = {
+  flamme: { pal: { K: '#3a0a04', D: '#b8200c', R: '#e8461a', O: '#ff8a1e', Y: '#ffd23e', W: '#fff6c8' }, z: [
+    '.......K........', '......KRK.......', '......KRK....K..', '.....KROK...KRK.',
+    '.....KROOK..KRK.', '....KROYOK.KROK.', '...KRROYYOKKROK.', '..KRROYYYOORROK.',
+    '..KROOYWWYOOROK.', '.KRROYWWWYYOORK.', '.KROYYWWWWYYORK.', '.KROYWWWWWWYORK.',
+    '.KDROYWWWWYYORK.', '..KDROYYYYOORDK.', '...KDDRRRRRDDK..', '....KKKKKKKKK...',
+  ] },
+  schild: { pal: { K: '#141a2a', S: '#c8ccd8', G: '#8a90a0', B: '#4a7ad0', L: '#8ab4ff', D: '#2a4a90', W: '#ffffff' }, z: [
+    '................', '.KKKKKKKKKKKKKK.', '.KSSSSSSSSSSSGK.', '.KSLLLBBBBBBBGK.',
+    '.KSLWLBBBBBBDGK.', '.KSLLBBBBBBBDGK.', '.KSLBBBBBBBBDGK.', '.KSBBBBBBBBBDGK.',
+    '.KSBBBBBBBBBDGK.', '..KSBBBBBBBDGK..', '..KSBBBBBBBDGK..', '...KSBBBBBDGK...',
+    '....KSBBBDGK....', '.....KSBDGK.....', '......KGGK......', '.......KK.......',
+  ] },
+  eis: { pal: { K: '#0c1a3a', D: '#3a6cc0', B: '#78b4f0', L: '#c4ecff', W: '#ffffff' }, z: [
+    '.......K........', '.....KKWKK......', '...KKWKWKLKK....', '.KKWKKWLLKKLKK..',
+    'KWWWK.KLK.KBBBK.', '.KKWWKKLKKBBKK..', '.KWKKLLLLBKKBK..', '..K..KLWBK..K...',
+    '.KLKKLLBBBKKDK..', '.KKLLKKBKKBDKK..', 'KLLLK.KBK.KDDDK.', '.KKLKKBBBKKDKK..',
+    '...KKBKBKDKK....', '.....KKDKK......', '.......K........', '................',
+  ] },
+  blitz: { pal: { K: '#3a1a04', O: '#f08a10', Y: '#ffdc2a', W: '#fff8c0' }, z: [
+    '.........KKKKKK.', '........KWYYYOK.', '.......KWYYYOK..', '......KWYYYOK...',
+    '.....KWYYYOK....', '....KWYYYOK.....', '...KWYYYYYKKKK..', '..KWYYYYYYYYYOK.',
+    '..KKKOOOWYYYOK..', '.......KWYYOK...', '......KWYYOK....', '.....KWYYOK.....',
+    '....KWYOOK......', '...KWYOK........', '..KYOK..........', '..KKK...........',
+  ] },
+  moai: { pal: { K: '#16161a', W: '#e0dcd4', L: '#b4b0a8', M: '#88847c', D: '#5c5852', E: '#383632' }, z: [
+    '...KKKKKKKKKK...', '..KLLLLLLLLLMK..', '..KLWLLLLLLMMK..', '..KLLLLLLLLMDK..',
+    '.KLLLLLLLLLLMDK.', '.KEEEEELLEEEEDK.', 'KMKMMMMLLDMMMKDK', 'KMKMMMMLLDMMMKDK',
+    'KMKMMMMLLDMMMKDK', 'KMKMMMLLLLDMMKDK', 'KMKMMMLDDDDMMKDK', '.KKMMMMMMMMMDKK.',
+    '..KMEEEEEEEEDK..', '..KMMMMMMMMMDK..', '..KKMMMMMMMDDK..', '...KKKKKKKKKK...',
+  ] },
+  verbot: { pal: { K: '#3a0606', R: '#e42424', L: '#ff6a5a', D: '#a40c10', W: '#ffd8d0' }, z: [
+    '....KKLLLKK.....', '..KKLLLLRRRKK...', '.KLLLLLRRRRRRK..', '.KLWLKKKKKRRRK..',
+    'KLLLLLK...KRRRK.', 'KLLKLLRK...KRRK.', 'LLLKKRRRK..KRRDK', 'LLRK.KRRRK.KRDDK',
+    'LRRK..KRRRKKDDDK', 'KRRK...KRDDKDDK.', 'KRRRK...KDDDDDK.', '.KRRRKKKKKDDDK..',
+    '.KRRRRRRDDDDDK..', '..KKRRRDDDDKK...', '....KKDDDKK.....', '......KKK.......',
+  ] },
+  fels: { pal: { K: '#18181c', W: '#f2f2f4', L: '#c4c4ca', M: '#94949c', D: '#686870', E: '#46464e' }, z: [
+    '................', '................', '.....KKKKKKK....', '...KKLLLLLLLKK..',
+    '..KLWWLLLLLLLMK.', '.KLWLLLLLLLLMMDK', '.KLLLLLLLLLLMMDK', 'KMMLLLLLLLLMMDDK',
+    'KMMMMMLLLLMMDDDK', 'KMMMMMMMLMDDDDDK', 'KMMMMMMMMDDDDDEK', 'KMMMMMMMMDDDDDEK',
+    'KDMMMMMMMDDDDEEK', '.KDDMMMMMDDDEEK.', '..KKEEEEEEEEKK..', '....KKKKKKKK....',
+  ] },
+  blut: { pal: { K: '#2a0408', R: '#d8182a', L: '#ff5a64', D: '#8c0c1c', W: '#ffe0e0' }, z: [
+    '.......K........', '......KLK.......', '......KLK.......', '......KLK.......',
+    '.....KLLRK......', '....KLLRRRK.....', '...KLLRRRRRK....', '..KLLLRRRRRRK...',
+    '..KLLWRRRRRDK...', '.KLLWWRRRRRDDK..', '.KLLWRRRRRDDDK..', '..KRRRRRRDDDK...',
+    '..KRRRRRRDDDK...', '...KDDDDDDDK....', '....KDDDDDK.....', '.....KKKKK......',
+  ] },
+  schaedel_gift: { pal: { K: '#0e1e0c', W: '#eaffe2', B: '#b4dca0', S: '#6e9e5c' }, z: [
+    '..KK........KK..', '.KWBKKKKKKKKWBK.', 'KWBKWWBBBBBBKBBK', 'KBKWWBBBBBBBSKSK',
+    '.KKWBBBBBBBBSKK.', '..KBKKKBBKKKSK..', '..KBKKKBBKKKSK..', '..KBBBBKKBBBSK..',
+    '...KSBBBBBBSK...', '....KBKBKBSK....', '...KKKKKKKKKK...', '.KKWBSK..KBBBKK.',
+    'KWWBSK....KBBWBK', 'KBBSK......KWBSK', '.KBSK......KBSK.', '..KK........KK..',
+  ] },
+  schaedel: { pal: { K: '#1c1410', W: '#ffffff', B: '#ece4d2', S: '#b0a488' }, z: [
+    '................', '....KKKKKKKK....', '...KWWBBBBBBK...', '..KWWBBBBBBBBK..',
+    '.KWBBBBBBBBBBSK.', '.KWBBBBBBBBBBSK.', '.KBKKKBBBBKKKSK.', '.KBKKKKBBKKKKSK.',
+    '.KBKKKKBBKKKKSK.', '.KBBKKBBBBKKBSK.', '..KBBBBKKBBBSK..', '...KSBBKKBBSK...',
+    '...KBKBKBKBSK...', '...KBKBKBKBSK...', '....KSSSSSSK....', '.....KKKKKK.....',
+  ] },
+  mund_zu: { pal: { K: '#3a1c04', L: '#ffe46a', Y: '#ffc42a', O: '#e08810', W: '#fff8d0', S: '#dcdce4', G: '#8a8a96' }, z: [
+    '....KKKLKKK.....', '...KLLLLLLLK....', '..KLWWYYYYYYK...', '.KLLLYYYYYYYYK..',
+    'KLLLYKYYYYKYYOK.', 'KLLYYKYYYYKYYOK.', 'KLYYYYYYYYYYYOK.', 'LLYYYYYYYYYYYOOK',
+    'KLYKKKKKKKKKKOK.', 'KLYKSGSGSGSGSKK.', 'KLYKKKKKKKKKKSK.', '.KYYYYYYYYOOKK..',
+    '..KYYYYYYOOOK...', '...KOOOOOOOK....', '....KKKOKKK.....', '.......K........',
+  ] },
+  stumm: { pal: { K: '#141420', W: '#ffffff', L: '#d4d4e0', M: '#9a9aae', D: '#606078', R: '#e82222', P: '#ff7a6a', Q: '#a00c10' }, z: [
+    '.......K........', '......KLK.......', '.....KLLK.......', '....KLLLK.......',
+    '.KKKLLLLKKK..KK.', 'KWWLLLLLKPPKKRRK', 'KWLLLLLLKKPRRRK.', 'KLLLLLLMK.KRRK..',
+    'KLLLLLMMK.KRRK..', 'KLLLLMMMKKRRRQK.', 'KMMMMMMMKRRKKQQK', '.KKKMMMDKKK..KK.',
+    '....KMDDK.......', '.....KDDK.......', '......KDK.......', '.......K........',
+  ] },
+  glocke_aus: { pal: { K: '#2a1604', Y: '#ffc42a', L: '#ffe680', O: '#d8860e', D: '#8e5006', R: '#e82020', W: '#fffbe0' }, z: [
+    'KKK...KKKK......', 'KRRK.KYYYYK.....', '.KRRKYWYYYYK....', '..KRRKYYYYYOK...',
+    '...KRRKYYYYOK...', '..KLKRRKYYYOOK..', '..KLLKRRKYYOOK..', '..KLLYKRRKYOOK..',
+    '..KLLYYKRRKOOK..', '.KLLLYYYKRRKOOK.', 'KLLLLYYYYKRRKOOK', 'KOOOOOOOOOKRRKDK',
+    '.KKKKKOOOOKKRRK.', '......KOOK..KRRK', '.......KK....KRK', '.............KKK',
+  ] },
+  schreck: { pal: { K: '#2a1606', L: '#ffe46a', Y: '#ffc42a', O: '#e08810', W: '#ffffff', C: '#5aa8f0', N: '#2a64c0', D: '#6a1a10' }, z: [
+    '.....KKKKKK.....', '...KKCCCCCCKK...', '..KCWCCCCCCCNK..', '.KCCCCCCCCCCCNK.',
+    '.KCCCCCCCCCCNNK.', 'KYYYWWYYYYWWYYOK', 'KYYWKKWYYWKKWYOK', 'KYYYWWYYYYWWYYOK',
+    'KYYYYYYKKYYYYYOK', 'KKKYYYKDDKYYYKKK', 'KLYKYKDDDDKYKLOK', 'KLYKYKDDDDKYKLOK',
+    'KLYKYKDDDDKYKLOK', 'KLYKYYKDDKYYKLOK', 'KLOKKYYKKYYOKLOK', '.KKK.KKKKKK.KKK.',
+  ] },
+  wut_gesicht: { pal: { K: '#2a0404', L: '#ff7a5a', R: '#e8342a', D: '#a8141a' }, z: [
+    '....KKKLKKK.....', '...KLLLLLLLK....', '..KLLLRRRRRRK...', '.KLKKRRRRRRKKK..',
+    'KLLLKKKRRKKKRDK.', 'KLLRRRKRRKRRRDK.', 'KLRRRKKRRKKRRDK.', 'LLRRRKKRRKKRRDDK',
+    'KLRRRRRRRRRRRDK.', 'KLRRRRRRRRRRDDK.', 'KLRRRKKKKKKDDDK.', '.KRRKKRRRRKKDK..',
+    '..KRRRRRRDDDK...', '...KDDDDDDDK....', '....KKKDKKK.....', '.......K........',
+  ] },
+  nazar: { pal: { K: '#070a1e', D: '#0e1e70', B: '#1e40b4', L: '#4a7ae8', W: '#ffffff', S: '#c4d4e8', C: '#60c4f4' }, z: [
+    '....KKLLBKK.....', '..KKLLLBBBBKK...', '.KLLWLBBBBBBBK..', '.KLWLWWWWWBBBK..',
+    'KLLLWWCCCWWBBBK.', 'KLLWWCCCCCWWBBK.', 'LLBWCCWKKCCWBBDK', 'LBBWCCKKKCCSBDDK',
+    'BBBWCCKKKCCSDDDK', 'KBBWWCCCCCSSDDK.', 'KBBBWWCCCSSDDDK.', '.KBBBWWSSSDDDK..',
+    '.KBBBBBBDDDDDK..', '..KKBBBDDDDKK...', '....KKDDDKK.....', '......KKK.......',
+  ] },
+  kerze: { pal: { K: '#1e1410', W: '#ffffff', C: '#e4ded2', S: '#aea493', Y: '#ffe04a', O: '#ff8a1e' }, z: [
+    '.......K........', '......KOK.......', '......KOOK......', '.....KOYYOK.....',
+    '.....KOYWOK.....', '.....KOYYOK.....', '....KKKKKKKK....', '...KWWWWCCCSK...',
+    '...KWWCCCCCSK...', '...KWCCCCCSSK...', '...KWCCCCCSSK...', '...KWCCCCCSSK...',
+    '...KWCCCCCSSK...', '...KWCCCCCSSK...', '...KSSSSSSSSK...', '....KKKKKKKK....',
+  ] },
+  sanduhr: { pal: { K: '#1e1008', H: '#d08a4a', B: '#8a4e22', G: '#cfe8f4', W: '#ffffff', S: '#f4c64c', O: '#c8861e' }, z: [
+    'KKKKKKKKKKKKKKKK', 'KHHHHHHHHHHHHHHK', 'KBBBBBBBBBBBBBBK', 'KHK.KGGGGGGK.KBK',
+    'KHK.KWGGGGGK.KBK', 'KHK.KSSSSSOK.KBK', 'KHK..KSSSOK..KBK', 'KHK...KSOK...KBK',
+    'KHK...KGSK...KBK', 'KHK..KGGSGK..KBK', 'KHK.KGGGSGGK.KBK', 'KHK.KGGSSSGK.KBK',
+    'KHK.KSSSSSOK.KBK', 'KHHHHHHHHHHHHHHK', 'KBBBBBBBBBBBBBBK', 'KKKKKKKKKKKKKKKK',
+  ] },
+  kette: { pal: { K: '#14161e', W: '#ffffff', L: '#dde2ec', M: '#aab2c2', S: '#7a8292', D: '#4c5464' }, z: [
+    '...........KK...', '.........KKWLK..', '........KWMSSSK.', '.......KWMDKKSDK',
+    '......KWMDK.KMDK', '......KMDK.KLSK.', '....KKWSK.KLSDK.', '...KWKLSSKLSDK..',
+    '..KWMDKKSDKDK...', '.KWMDK.KMDKK....', '.KMDK.KLSK......', 'KWSK.KLSDK......',
+    'KLSKKLSDK.......', '.KSSMSDK........', '..KDDKK.........', '...KK...........',
+  ] },
+  auge: { pal: { K: '#141018', W: '#ffffff', E: '#dcdce8', G: '#a0a0b8', B: '#3a8ae0', D: '#1e4ea0', L: '#8ac8ff' }, z: [
+    '................', '................', '................', '.....KKKKKK.....',
+    '...KKWDDDDEKK...', '..KWWDLLBBDEEK..', '.KWWDLWKKBBDEEK.', 'KWWWDBKKKKBDEEEK',
+    'KEWWDBKKKKBDEGGK', '.KEEDBBKKBDDGGK.', '..KEEDBBDDDGGK..', '...KKEDDDDGKK...',
+    '.....KKKKKK.....', '................', '................', '................',
+  ] },
+  nebel: { pal: { K: '#1c2230', W: '#ffffff', L: '#dde3ec', M: '#b0bac8', S: '#7e8898' }, z: [
+    '........KK......', '...K..KKWWKK....', '..KWKKWWMMWWKK..', '.KWMWWMMKKMMWMK.',
+    '..KKMMKK..KKMK..', '....KK..KK..K...', '.KKK..KKLLKK..K.', 'KLLLKKLLMMLLKKMK',
+    '.KMMLLMMKKMMLLK.', '..KKMMKK..KKMMK.', '....KK..KK..KK..', '......KKLLKK....',
+    '...KKKLLSSLLK...', '..KLLLSSKKSSSK..', '...KSSKK..KKK...', '....KK..........',
+  ] },
+  flagge: { mono: true, z: [
+    '..##............', '..#####+........', '..#########+....', '..############+.',
+    '..#############+', '..##########++..', '..########++....', '..#####+++......',
+    '..###++.........', '..##............', '..##............', '..##............',
+    '..##............', '..##............', '..##............', '.####...........',
+  ] },
+  blasen: { pal: { K: '#0c2238', W: '#ffffff', L: '#bfeaff', B: '#6cc4f0', D: '#2e7fbf' }, z: [
+    '..KKK...........', '.KWLBK....KKKK..', '.KLBDK...KLLBBK.', '.KBDDK..KLWLBBBK',
+    '..KKK...KWLBBBDK', '........KLBBBBDK', '...KKKK.KBBBBDDK', '.KKLLBBKKKBDDDK.',
+    '.KLWLBBBK.KKKK..', 'KLWBBBBBDK......', 'KLBBBBBBDK......', 'KBBBBBBBDK..KK..',
+    'KBBBBBBDDK.KWBK.', '.KBBBBDDK..KBDK.', '.KKDDDDKK...KK..', '...KKKK.........',
+  ] },
+  zweig: { pal: { K: '#0e2410', D: '#1f6b2a', G: '#3fa044', L: '#8ad85a', H: '#d8ffb0' }, z: [
+    '......KKK...KKKK', '.....KHLGK.KHLGK', '.....KLLGKKHLGDK', '...K.KLLGDKLGDK.',
+    '..KLKKGGGDKDDK..', '.KLLGKKGDDKKK...', '.KLLGDKDDKHLLKK.', '.KLLGDKKKLLLLGGK',
+    '..KGGDKGDKGGGGDK', '..KGGDKKKKKDDDDK', '...KDKHLLLKKKKK.', '....KKLLLLGK....',
+    '...KGKGGGGGDK...', '...KDKKDDDDDK...', '..KGDK.KKKKK....', '..KKK...........',
+  ] },
+  geist: { pal: { K: '#1a1428', W: '#ffffff', L: '#e4e4f2', S: '#b4b4cc', D: '#8484a4' }, z: [
+    '.....KKKKKK.....', '...KKWWWWLLKK...', '..KWWWWWWWWLSK..', '.KWWWWWWWWWWLSK.',
+    '.KWWWWWWWWWWLSK.', '.KWWWKKWWKKWLSK.', '.KWWWKKWWKKWLSK.', 'KLWWWKKWWKKWLSSK',
+    'KSWWWWWWWWWLLSDK', '.KLWWWWKKWWLSSK.', '.KLWWWWKKWLLSSK.', '.KLWWWWWLLLSSDK.',
+    '.KSLLLLLLSSSDDK.', '.KSSDKKSDKKSDDK.', '..KKK..KK..KKK..', '................',
+  ] },
+  welle: { pal: { K: '#061a30', D: '#1a5ab0', B: '#2a8ae0', L: '#6ac4ff', F: '#cfeeff', W: '#ffffff' }, z: [
+    '................', '.......KKKK.....', '.....KKWWWWKK...', '....KWWFFFLBBK..',
+    '...KWFLBBBBBBDK.', '...KWLBDKKKDBBDK', '..KWLBDK...KBBDK', '..KWBDK....KBBDK',
+    '..KWBDK.KK.KBBDK', '..KFBBKKWFKKBBDK', '.KKFBBBWFKKKBBDK', 'KFWWFWBBBBBBBBDK',
+    'KLBBBBBBBBBBBBDK', 'KDBBBBBBBBBBBDDK', '.KDDDDDDDDDDDDK.', '..KKKKKKKKKKKK..',
+  ] },
+  herz: { pal: { K: '#3a0a18', D: '#b01848', R: '#f0386a', L: '#ff90b0', W: '#ffffff', Y: '#ffe070' }, z: [
+    '................', '.............K..', '............KYK.', '...........KYWYK',
+    '..KKK...KKK.KYK.', '.KLLLK.KLLRK.K..', 'KLWLRRKRRRRDK...', 'KLWRRRRRRRRDK...',
+    'KLRRRRRRRRRDK...', 'KRRRRRRRRRDDK...', '.KRRRRRRRRDK.K..', '..KRRRRRRDK.KYK.',
+    '...KRRRRDK.KYWYK', '....KRRDK...KYK.', '.....KDK.....K..', '......K.........',
+  ] },
+  herz_rosa: { pal: { K: '#3a0a24', D: '#c0287a', P: '#ff5aa8', L: '#ffa8d4', W: '#ffffff', A: '#ffd05a', B: '#b07a1a' }, z: [
+    '...........KKKKK', '...........KAAAK', '....KKK...KKKABK', '...KLLLK.KLLAKBK',
+    '..KLWLPPKPPAKDK.', '..KLWPPPPPAKPDK.', '..KLPPPPPAKPPDK.', '..KPPPPPAKPPDDK.',
+    '...KPPPAKPPPDK..', '....KPAKPPPDK...', '....KAKPPPDK....', '...KAKKPPDK.....',
+    '.KLAK..KDK......', 'KLALK...K.......', 'KALK............', '.KK.............',
+  ] },
+  note: { pal: { K: '#1a0a2a', D: '#5a2a9a', V: '#9050e0', L: '#c8a0ff', W: '#ffffff' }, z: [
+    '.............KK.', '..........KKKLLK', '.......KKKLLLVVK', '.....KKLLLVVVVDK',
+    '....KLLVVVDDDVDK', '....KVVDDDKKKVDK', '....KVDKKK..KVDK', '....KVDK....KVDK',
+    '....KVDK..KKKVDK', '....KVDK.KLWVVDK', '..KKKVDKKLVVVVDK', '.KLWVVDKKVVVDDDK',
+    'KLVVVVDK.KDDDDK.', 'KVVVDDDK..KKKK..', '.KDDDDK.........', '..KKKK..........',
+  ] },
+  glanz: { pal: { K: '#3a2404', D: '#c07a10', Y: '#ffc21e', L: '#ffe680', W: '#ffffff' }, z: [
+    '............K...', '...........KYK..', '..........KKLKK.', '......K..KLLWYDK',
+    '.....KLK..KKDKK.', '.....KLK...KDK..', '....KLLYK...K...', '...KKLLYKK......',
+    '.KKLLLWYYDKK....', 'KLLLLWWYYYDDK...', '.KKYYYYDDDKKK...', '...KKYYDKK.KYK..',
+    '....KYDDK.KYWDK.', '.....KDK...KDK..', '.....KDK....K...', '......K.........',
+  ] },
+  falter: { pal: { K: '#0a1428', D: '#1a4ab0', B: '#3a8af0', L: '#8ad0ff', W: '#ffffff', G: '#7a6a90', H: '#3a2a50' }, z: [
+    '................', '..KK.H....H.KK..', '.KDDKKHKKHKKDDK.', 'KDWBDDKGHKDDBWDK',
+    'KDBLLBBGHBBLLBDK', 'KWBLBBBGHBBBLBWK', '.KDBBBBGHBBBBDK.', '..KDBBDGHDBBDK..',
+    '...KDDDGHDDDK...', '..KDBBDGHDBBDK..', '.KDLBBDGHDBBLDK.', '.KWBBBDGHDBBBWK.',
+    '.KDBBDKGHKDBBDK.', '..KDWDKGHKDWDK..', '...KKK.KK.KKK...', '................',
+  ] },
+  hut: { pal: { K: '#08080e', E: '#a8a8c8', M: '#565670', D: '#2c2c3c', W: '#e4e4f4', Y: '#ffc81e', O: '#b07a10' }, z: [
+    '................', '.......KK.......', '.....KKEEKK.....', '...KKEEMMEEKK...',
+    '.KKEEMMWYMMEEKK.', 'KEEMMMMYOYYYYYEK', '.KKDMMMMMMMMDYK.', '...KKDMMMMDKKYK.',
+    '...KKKKDDKKKKYK.', '...KMMDDDDDDKYK.', '...KMDDDDDDDKYYK', '...KEEEEEEEEKYOK',
+    '....KKKKKKKKKOOK', '.............KK.', '................', '................',
+  ] },
+  wolke: { pal: { K: '#1a2030', W: '#ffffff', G: '#d4dae6', S: '#9aa6ba' }, z: [
+    '................', '................', '................', '.....KKK........',
+    '....KWWWK.KK....', '...KWWWWWKWWK...', '..KWWWWWWWWWGK..', '.KKWWWWWWWWWWGK.',
+    'KWWKWWWWWWWWGGK.', 'KWWWWWWWWWWWWGGK', 'KWWWWWWWWWWWGGSK', 'KGWWWGGWWWWGGGSK',
+    '.KGGGGGGGGGGGSK.', '..KSSSSSSSSSSK..', '...KKKKKKKKKK...', '................',
+  ] },
+  zahnrad: { pal: { K: '#1a1a24', W: '#ffffff', L: '#dce0e8', M: '#a4aab6', D: '#666c7a' }, z: [
+    '......KKKK......', '..KK..KLLK..KK..', '.KLLKKLLLMKKMDK.', '.KLWLLLLLMMMMDK.',
+    '..KLLLLMMMMMDK..', '..KLLMKKKKMMDK..', 'KKKLLK....KMDKKK', 'KLLLLK....KMMMDK',
+    'KLLMMK....KMDDDK', 'KKKMMK....KDDKKK', '..KMMMKKKKDDDK..', '..KMMMMMMDDDDK..',
+    '.KMMMMMMDDDDDDK.', '.KMDKKMDDDKKDDK.', '..KK..KDDK..KK..', '......KKKK......',
+  ] },
+  taube: { pal: { K: '#1a1c2a', W: '#ffffff', L: '#e2e6ee', G: '#a8b0c2', Y: '#f0a020', O: '#7ac040', N: '#3a7a22' }, z: [
+    '.............KK.', '...........KKWLK', '.........KKWWLGK', '........KWWLLLGK',
+    '..KKK..KWWLLLGK.', '.KWWWK.KWLLLGGK.', 'KWWKWLKWLLLGGK..', 'YKWWLLKWLLGGK...',
+    'YYKWLLLKLGGKKK..', '.KKWLLLLKKKLLLKK', '.N.KWLLLLLLLLLGK', 'NON.KGLLLLLLGGK.',
+    '.ONO.KKGGGGGKGGK', '..N...KKKKKK.KKK', '................', '................',
+  ] },
+  katze: { pal: { K: '#2a1408', L: '#ffc070', O: '#f08a2a', D: '#b8561a', P: '#ff8aa0', W: '#ffffff', G: '#58c040' }, z: [
+    '.KK..........KK.', '.KLK........KOK.', '.KLPK......KPDK.', '.KLPPKKKKKKPPDK.',
+    'KLLOOODOODOOOODK', 'KLOOOOODDOOOOODK', 'KLOOOOOOOOOOOODK', 'KLOGKOOOOOOKGODK',
+    'KOOGKOOOOOOKGODK', 'KOOOOOOPPOOOOODK', 'KWWOOOOKKOOOOWWK', 'KOOWWOKOOKOWWODK',
+    '.KOOOOOOOOOOODK.', '..KDOOOOOOOODK..', '...KKDDDDDDKK...', '.....KKKKKK.....',
+  ] },
+  schloss: { pal: { K: '#20140a', Y: '#ffd23e', G: '#e8a020', B: '#a8640c', S: '#dde0e8', M: '#8a90a0', W: '#ffffff' }, z: [
+    '....KKKKKKKK....', '...KSWSSSSSMK...', '..KSSKKKKKKSMK..', '..KSSK....KSMK..',
+    '..KSSK....KSMK..', '..KSMK....KSMK..', '.KKKKKKKKKKKKKK.', '.KYYYYYYYYYYYGK.',
+    '.KYWYYYYYYYYGBK.', '.KYYYYYKKYYYGBK.', '.KYYYYKKKKGGGBK.', '.KYYYYYKKGGGGBK.',
+    '.KGYYYYKKGGGGBK.', '.KGGGGGGGGGGBBK.', '.KBBBBBBBBBBBBK.', '.KKKKKKKKKKKKKK.',
+  ] },
+  sonnenbrille: { pal: { K: '#2a1a08', Y: '#ffd23e', L: '#fff08a', O: '#e89a20', B: '#5a6a8a', W: '#ffffff' }, z: [
+    '.....KKKKKK.....', '...KKLLYYYYKK...', '..KLWLYYYYYYOK..', '.KLLYYYYYYYYYOK.',
+    '.KLYYYYYYYYYYOK.', 'KKKKKKKKKKKKKKKK', 'KKBBKKKYYKBBKKKK', 'KKBKKKKYYKBKKKKK',
+    'KYKKKKYYYYKKKKOK', 'KYYYYYYYYYYYYYOK', 'KYYKYYYYYYYYKYOK', '.KYYKWWWWWWKYOK.',
+    '.KOYYKKKKKKYYOK.', '..KOYYYYYYYYOK..', '...KKOOOOOOKK...', '.....KKKKKK.....',
+  ] },
+  fluegel: { pal: { K: '#3a2204', W: '#ffffff', L: '#fff0a0', Y: '#ffd23e', G: '#e8a020', B: '#a8640c' }, z: [
+    '..........KKKK..', '.......KKKLLLLKK', '.....KKLLLYYYYK.', '....KLWYYYYGGK..',
+    '...KLYYYGGKKKKK.', '..KLYYGKKKLLYYYK', '..KLYGKLLYYYGGK.', '.KLYGKLYYGGKKK..',
+    '.KLYGKYYGKKKKKK.', '.KLYKLYGKLYYYYGK', 'KLYGKYGKLYYGGKK.', 'KLYGKYGKYGGKK...',
+    'KLYYKGKYGKK.....', 'KLYYGKKGKK......', '.KGGGBBK........', '..KKKKK.........',
+  ] },
+  zielscheibe: { pal: { K: '#200a0a', R: '#e82828', L: '#ff6a5a', D: '#a01414', W: '#ffffff', G: '#d0ccd8', A: '#7a4a1a', F: '#ffd23e' }, z: [
+    '......KKKK..KFK.', '....KKLRRRKKFFFK', '..KKLRRWWRRRAKKK', '..KRRWWWWWWAKK..',
+    '.KLRWWWRRWAKRRK.', '.KRWWRRRRAKWWRK.', 'KLRWWRRWAKRWWRDK', 'KRWWRRWRRWRRGGDK',
+    'KRWWRRWRRWRRGGDK', 'KRRWWRRWWRRGGDDK', '.KRWWRRRRRRGGDK.', '.KRRWWWRRGGGDDK.',
+    '..KRRWWGGGGDDK..', '..KKRRRGGDDDKK..', '....KKDDDDKK....', '......KKKK......',
+  ] },
+  bueffel: { pal: { K: '#101014', G: '#6a6e7a', L: '#9aa0ac', D: '#3e4048', H: '#e8dcc0', N: '#a8987a', W: '#ffffff' }, z: [
+    'K..............K', 'KK............KK', 'KHK..........KNK', 'KHHK........KNNK',
+    '.KHHKK....KKNNK.', '..KHHHKKKKHNNK..', '...KKHHHHNNKK...', 'KKKKLGGGGGGGDKKK',
+    'KLGKLGGGGGGGDKDK', '.KKKLWGGGGWGDKK.', '...KLKGGGGKGDK..', '...KLGGGGGGDK...',
+    '...KLLLLLLLGK...', '...KLKLLLLKGK...', '...KGLLLLLGDK...', '....KKKKKKKK....',
+  ] },
+  hund: { pal: { K: '#2a1408', D: '#6a3e16', B: '#b87838', L: '#e0a868', C: '#f6dcb0', T: '#ff6a88', W: '#ffffff' }, z: [
+    '....KKKKKKKK....', '..KKLLLLBBBBKK..', '.KDKLWLBBBBBKDK.', 'KDDKLLLBBBBBKDDK',
+    'KDDKLLBBBBBBKDDK', 'KDDKLWKBBWKBKDDK', 'KDDKLKKBBKKBKDDK', 'KDDKBBBBBBBBKDDK',
+    'KDDKBCCKKCCBKDDK', 'KDDKCCKKKKCCKDDK', '.KDKCCCKKCCCKDK.', '.KKKCCKCCKCCKKK.',
+    '...KCCKTTKCCK...', '....KCKTTKCK....', '.....KKTTKK.....', '......KKKK......',
+  ] },
+  neumond: { pal: { K: '#0a0a14', M: '#5a5a74', D: '#3a3a4c', S: '#24242e', C: '#f0e6b0', Y: '#c8b870' }, z: [
+    '......KKKK......', '....KKMMDCKK....', '..KKMMMDDDDCKK..', '..KMMMDDDDDDCK..',
+    '.KMMMSSDDDDDCCK.', '.KMMSSMDDSDDDCK.', 'KMMDDMDDDDMDDCCK', 'KMDDDDDDDDDDDCCK',
+    'KDDDDDDDDDDDSCCK', 'KDDDDDDDSSDSSCCK', '.KDDDDDSSMSSSCK.', '.KDDDDDDMSSSCCK.',
+    '..KDDDDDSSSSCK..', '..KKDDDSSSSCKK..', '....KKSSSCKK....', '......KKKK......',
+  ] },
+  arm: { pal: { K: '#3a1a08', Y: '#ffc83a', L: '#ffe48a', O: '#e0902a', W: '#ffffff' }, z: [
+    '.....KKKKKK.....', '....KLLLLYYKK...', '...KLWLLYYYYOK..', '...KKKKKKYYYOK..',
+    '...KLLYYKYYYOOK.', '...KKKKKKYYYYOK.', '....KLYYKYYYYOK.', '.....KKKKLYYYOK.',
+    '..KKKK..KLYYYOK.', '.KLLLLK.KLYYOOK.', 'KLLWLYYKKLYYOOK.', 'KLYYYYYYKYYYOOK.',
+    'KYYYYYYYYYYYOOK.', 'KOYYYYYYYYYOOK..', 'KOOOOOOOOOOOK...', '.KKKKKKKKKKKK...',
+  ] },
+  geodreieck: { pal: { K: '#2a1a0a', Y: '#ffe07a', G: '#f0b830', B: '#b87a18', T: '#6a4210', W: '#ffffff' }, z: [
+    'KK..............', 'KWK.............', 'KYYK............', 'KTYYK...........',
+    'KYYYYK..........', 'KTYKYYK.........', 'KYYKKYYK........', 'KTYK.KYYK.......',
+    'KYYK..KYYK......', 'KTYK...KYYK.....', 'KYYK....KYYK....', 'KTYKKKKKKKYYK...',
+    'KYYGGGGGGGGGGK..', 'KGGTGTGTGTGTGGK.', 'KBBBBBBBBBBBBBBK', 'KKKKKKKKKKKKKKKK',
+  ] },
+  feder: { pal: { K: '#2a1808', L: '#fff4dc', Y: '#e8c890', B: '#b8844c', D: '#7a5228', Q: '#fffaf0' }, z: [
+    '............KKK.', '..........KKLLK.', '.........KLLLYK.', '........KLLLQBK.',
+    '........KLLQYBK.', '......KLLYQYBK..', '.....KLLYQYBBK..', '....KLLYQYBK....',
+    '...KLYYQYBBDK...', '...KLYQYBBDK....', '..KYYQBBDDK.....', '..KYQBDDKK......',
+    '.KKQKKKK........', '.KQK............', 'KQK.............', 'KK..............',
+  ] },
+  kaefer: { pal: { K: '#0a1a10', G: '#34b04a', L: '#8ae86a', D: '#16663a', T: '#2aa8b0', H: '#2e4a3a', W: '#ffffff' }, z: [
+    '..K..........K..', '...K........K...', '....K.KKKK.K....', '.....KHWHHK.....',
+    '.K..KKKKKKKK..K.', '..KKKLLGGGDKKK..', '...KKKKKKKKKK...', '...KLWLKKGGDK...',
+    '...KLLGKKLGDK...', '.KKKLGGKKGGDKKK.', 'K..KGGTKKGTDK..K', '...KGTGKKTGDK...',
+    '..KKGGGKKGDDKK..', '.K..KGGKKDDK..K.', 'K....KDKKDK....K', '......KKKK......',
+  ] },
+  raute_blau: { pal: { K: '#0a1430', B: '#3a8ae8', L: '#8ac8ff', D: '#1a4aa8', C: '#d0ecff', W: '#ffffff' }, z: [
+    '.......KK.......', '......KLBK......', '.....KLLBBK.....', '....KLLCCBBK....',
+    '...KLLCCCCBBK...', '..KLLLLCCBBBBK..', '.KLLCLLLBBBCBBK.', 'KLLCCCLWWBCCCBBK',
+    'KBBCCCBWWDCCCDDK', '.KBBCBBBDDDCDDK.', '..KBBBBCCDDDDK..', '...KBBCCCCDDK...',
+    '....KBBCCDDK....', '.....KBBDDK.....', '......KBDK......', '.......KK.......',
+  ] },
+  radioaktiv: { pal: { K: '#1a1408', Y: '#ffd23e', L: '#fff08a', O: '#e89a20', W: '#ffffff' }, z: [
+    '......KKKK......', '....KKLYYYKK....', '..KKLWYYYYYYKK..', '..KLLYYYYYYYYK..',
+    '.KLLKKYYYYKKYYK.', '.KLKKKKYYKKKKYK.', 'KLYKKKKYYKKKKYYK', 'KYKKKKYKKYKKKKYK',
+    'KYYYYYYKKYYYYYOK', 'KYYYYYYYYYYYYOOK', '.KYYYYYKKYYYOOK.', '.KYYYYKKKKYOOOK.',
+    '..KYYKKKKKKOOK..', '..KKYYYKKYOOKK..', '....KKYYOOKK....', '......KKKK......',
+  ] },
+  buch: { pal: { K: '#0e1430', B: '#2f6ae0', D: '#1c3a90', L: '#7eacff', G: '#ffd040', O: '#b8800c', P: '#f6f2e4', Q: '#b8b0a0' }, z: [
+    '.KKKKKKKKKKKKK..', 'KBDLLLLLLLLLLK..', 'KBDLBBBBBBBBBKK.', 'KBDLBBBBBBBBBKPK',
+    'KBDLBKKKKKKKBKPK', 'KBDLBKGGGGGKBKPK', 'KBDLBKGOOOGKBKPK', 'KBDLBKGGGGOKBKPK',
+    'KBDLBKKKKKKKBKPK', 'KBDLBBBBBBBBBKPK', 'KBDBBBBBBBBBBKPK', 'KBDBBBBBBBBBBKPK',
+    'KBDBBBBBBBBBDKPK', 'KBDDDDDDDDDDDKQK', 'KKPPPPPPPPPPPPQK', '.KKKKKKKKKKKKKK.',
+  ] },
+  halt: { pal: { K: '#2a0606', R: '#e02828', L: '#ff6a5a', D: '#a01010', W: '#ffffff', G: '#d0d0dc' }, z: [
+    '.....KKKKKK.....', '...KKLLLRRRKK...', '..KLLRRRRRRRRK..', '.KLLRRRRRRRRRDK.',
+    '.KLRRRRRRRRRRDK.', 'KLRRRRRRRRRRRRDK', 'KLRWWWWWWWWWWRDK', 'KRRWWWWWWWWWWRDK',
+    'KRRWWWWWWWWWWRDK', 'KRRGGGGGGGGGGRDK', 'KRRRRRRRRRRRRDDK', '.KRRRRRRRRRRRDK.',
+    '.KRRRRRRRRRRDDK.', '..KDRRRRRRRDDK..', '...KKDDDDDDKK...', '.....KKKKKK.....',
+  ] },
+  klee: { pal: { K: '#0c2410', L: '#8ee86a', G: '#46b83a', D: '#1f7a2a', S: '#3a9a30' }, z: [
+    '.....KK.KK......', '....KLLKLLK.....', '...KLGGLGGDK....', '..KKLGGGGGDKK...',
+    '.KLLKLGGGDKLLK..', 'KLGGLKLGDKLGGDK.', 'KLGGGGKDKGGGGDK.', '.KLGGGDDDGGGDK..',
+    'KLGGGGKDKSGGGDK.', 'KLGGDKLGDKSGGDK.', '.KLDKLGGGDKSDK..', '..KKLGGGGGDKSK..',
+    '...KLGGGGGDKSK..', '....KLDKLDKKSK..', '.....KK.KK..KSK.', '.............K..',
+  ] },
+  ninja: { pal: { K: '#0a0a14', N: '#262636', H: '#4a4a64', S: '#f2c490', T: '#c88a5a', R: '#e02828', D: '#8a1010', W: '#ffffff' }, z: [
+    '...KKKKKK.......', '.KKHHHHNNKK.....', '.KHHHNNNNNK.....', 'KHHNNNNNNNNK.KK.',
+    'KRRRRRRRRRRRKRRK', 'KRRRRRRRRRRRRRDK', 'KDDDDDDDDDDRRKK.', 'KNSSSSSSSSNKRDK.',
+    'KNSWKSSWKSNKKRDK', 'KNSKKSSKKSNK.KDK', 'KNTTTTTTTTNK..KK', 'KHNNNNNNNNNK....',
+    'KHNNNNNNNNNK....', '.KNNNNNNNNK.....', '.KKNNNNNNKK.....', '...KKKKKK.......',
+  ] },
+  haende: { pal: { K: '#1a1010', B: '#3a6ee0', N: '#1e3a8a', R: '#e03030', D: '#8a1414', S: '#f6c48a', T: '#c88450', L: '#ffe4bc' }, z: [
+    '................', '................', '.....KKK........', '....KLLSK.KKKKKK',
+    'KKKKLSSSKKLLLRRK', 'KBBBSSSKLLSSSRRK', 'KBBBSSKSSSSSTRRK', 'KBBBSKKKKKKSTRRK',
+    'KNNNKLLLLLTKTDDK', 'KNNNKSSSSSTKTDDK', 'KNNNKKKKKKKSTKKK', 'KKKKKLLLLLTTK...',
+    '....KSSSSSTK....', '....KKKKKKK.....', '................', '................',
+  ] },
+  klavier: { pal: { K: '#0c0c14', N: '#2a2a3a', H: '#55556e', W: '#ffffff', S: '#c4c8d6', G: '#8a90a4' }, z: [
+    '................', 'KKKKKKKKKKKKKKKK', 'KHHHHHHHHHHHHHNK', 'KHNNNNNNNNNNNNNK',
+    'KKKKKKKKKKKKKKKK', 'KWKWKWSWKWKWKWSK', 'KWKWKWSWKWKWKWSK', 'KWKWKWSWKWKWKWSK',
+    'KWKWKWSWKWKWKWSK', 'KWKWKWSWKWKWKWSK', 'KWSWSWSWSWSWSWSK', 'KWSWSWSWSWSWSWSK',
+    'KWSWSWSWSWSWSWSK', 'KGSGSGSGSGSGSGSK', 'KKKKKKKKKKKKKKKK', '................',
+  ] },
+  stuhl: { pal: { K: '#2a1408', L: '#eaa866', M: '#c07a3a', D: '#8a4a1e' }, z: [
+    '.......KKKKKKK..', '......KLLLLLLMK.', '......KMMMMMMDK.', '......KKKKKKKKK.',
+    '......KLK...KMK.', '......KLKKKKKMK.', '......KLLLLLLMK.', '......KMMMMMMDK.',
+    '....KKKKKKKKKMK.', '...KLLLLLLLLLKK.', '..KLMMMMMMMMLDK.', '.KLMMMMMMMMMDDK.',
+    '.KDDDDDDDDDDDKK.', '.KMKKKKKKKKKMKDK', '.KMK.....KMK.KDK', '.KKK.....KKK..K.',
+  ] },
+  zombie: { pal: { K: '#102010', L: '#a8e070', G: '#6cb840', D: '#3a7a28', H: '#5a2a3a', J: '#8a4050', W: '#f0f0d0' }, z: [
+    '...K.KK.K.KK....', '..KHKHHKHKHHKK..', '.KHJJHHHJJHHHHK.', '.KHJHHHHHHHHHHK.',
+    'KHHGGHHHGGHHGHHK', 'KHGLLGGGGGGGGDHK', 'KGLLLGGGGGGGGGDK', 'KGLDDDGGGDDDGGDK',
+    'KGLDKDGGGDKDGGDK', 'KGGDDDGGGDDDGGDK', 'KGGGGGGGGGGGGGDK', 'KGGGGKKKGGGGGDDK',
+    '.KGGKWKWKKKGGDK.', '.KDGGGGGGGKKDDK.', '..KKDDDDDDDDKK..', '....KKKKKKKK....',
+  ] },
+  ankh: { pal: { K: '#3a2404', L: '#fff080', G: '#ffc830', O: '#c0800c', W: '#ffffff' }, z: [
+    '.....KKKKKK.....', '....KLLLLGGK....', '...KLLKKKKGOK...', '...KLGK..KGOK...',
+    '...KLGK..KGOK...', '...KLGK..KGOK...', '...KLGK..KGOK...', '....KLGKKGOK....',
+    '.KKKKLGGGGOKKKK.', 'KLLLLLLGGGGGGGOK', 'KGGGGGGGGGGGOOOK', '.KKKKKLGGOKKKKK.',
+    '.....KLGGOK.....', '.....KLGGOK.....', '....KLLGGOOK....', '....KKKKKKKK....',
+  ] },
+  zahn: { pal: { K: '#1a2030', W: '#ffffff', L: '#eef2fa', M: '#c0cadb', D: '#8490a8' }, z: [
+    '..KKKKK..KKKKK..', '.KWWWWWKKWWWWMK.', 'KWWLLLLLLLLLLMMK', 'KWLLLLLLLLLLLMDK',
+    'KWLLLLLLLLLLLMDK', 'KLLLLLLLLLLLMMDK', 'KLLLLLLLLLLLMMDK', 'KLLLLLLLLLLMMMDK',
+    '.KLLLLLLLLLMMDK.', '.KLLLLLLLLMMMDK.', '.KLLLMKKKKMMMDK.', '.KLLMK....KMDDK.',
+    '.KLLMK....KMDK..', '..KLMK....KMDK..', '..KLK......KDK..', '...K.......KK...',
+  ] },
+  dna: { pal: { K: '#12102a', Q: '#ff9ad8', P: '#e8409c', C: '#8ad0ff', B: '#2a7ae8', Y: '#ffd040', G: '#50d070' }, z: [
+    'KQPKKKKKKKKKCBK.', '.KQPYYYGGGGCBK..', '..KQPKKKKKCBK...', '...KKQPKCBKK....',
+    '....KKCQPKK.....', '..KKCBKKKQPKK...', '.KCBYYYGGGGQPK..', '.KCBK.....KQPK..',
+    '.KCBK.....KQPK..', '.KCBYYYGGGGQPK..', '..KKCBKKKQPKK...', '....KKCBPKK.....',
+    '...KKQPKCBKK....', '..KQPKKKKKCBK...', '.KQPYYYGGGGCBK..', 'KQPKKKKKKKKKCBK.',
+  ] },
+  muenze: { pal: { K: '#3a2404', W: '#ffffff', L: '#ffe680', Y: '#ffc21e', O: '#c07a0a' }, z: [
+    '....KKKKKKKK....', '...KLLLLLLLYK...', '..KLWLOOOOYYYK..', '.KLLOOYYYYYYYYK.',
+    'KLLOYYYYYYYYYYYK', 'KLLOYYYLYYYYYYOK', 'KLOYYYLLLYYYYLOK', 'KLOYLLLLLLLYYLOK',
+    'KLOYYLLLLLOOYLOK', 'KLOYYLLOLLOYYLOK', 'KLYYYLOOYLOYLOOK', 'KYYYYYOYYYOYLOOK',
+    '.KYYYYYYYYLLOOK.', '..KYYYLLLLOOOK..', '...KYOOOOOOOK...', '....KKKKKKKK....',
+  ] },
+  galaxie: { pal: { K: '#08061a', N: '#1c1648', M: '#2a2266', V: '#8a4ad8', L: '#d0a0ff', P: '#ffd8ff', W: '#ffffff' }, z: [
+    '....KKKMMKKK....', '...KMMNNNNMMK...', '..KMNNNNNNWNMK..', '.KMNLLLVVVVVNMK.',
+    'KMNLLLVNNNNNNNMK', 'KMVLLVNNNNNWNNMK', 'KNVLLNPPPPLVNNNK', 'MNVLLPPWWPPLVNNM',
+    'MNNVLPPWWPPLLVNM', 'KNNNVLPPPPNLLVNK', 'KMNWNNNNNNVLLVMK', 'KMNNNNNNNVLLLNMK',
+    '.KMNVVVVVLLLNMK.', '..KMNNWNNNNNMK..', '...KMMNNNNMMK...', '....KKKMMKKK....',
+  ] },
+  funke: { mono: true, z: [
+    '.......##.......', '.......##.......', '......+##+......', '......####......',
+    '.....+####+.....', '....+######+....', '..++########++..', '################',
+    '################', '..++########++..', '....+######+....', '.....+####+.....',
+    '......####......', '......+##+......', '.......##.......', '.......##.......',
+  ] },
+};
+
+// Emoji → Abzeichen-Sprite. Vorrang vor PP_PX_ZEICHEN (PxIcon).
+const PP_PX_ICONS = {
+  '🔥': 'ab_flamme', '🛡️': 'ab_schild', '🛡': 'ab_schild', '❄️': 'ab_eis', '❄': 'ab_eis', '⚡': 'ab_blitz',
+  '🗿': 'ab_moai', '🚫': 'ab_verbot', '🪨': 'ab_fels', '🩸': 'ab_blut', '☠️': 'ab_schaedel_gift', '☠': 'ab_schaedel_gift',
+  '💀': 'ab_schaedel', '🤐': 'ab_mund_zu', '🔇': 'ab_stumm', '🔕': 'ab_glocke_aus', '😱': 'ab_schreck', '😡': 'ab_wut_gesicht',
+  '🧿': 'ab_nazar', '🕯️': 'ab_kerze', '🕯': 'ab_kerze', '⏳': 'ab_sanduhr', '⛓️': 'ab_kette', '⛓': 'ab_kette',
+  '👁️': 'ab_auge', '👁': 'ab_auge', '🌫️': 'ab_nebel', '🌫': 'ab_nebel', '⚑': 'ab_flagge', '🫧': 'ab_blasen',
+  '🌿': 'ab_zweig', '👻': 'ab_geist', '🌊': 'ab_welle', '💖': 'ab_herz', '💘': 'ab_herz_rosa', '💕': 'ab_herz_rosa',
+  '🎵': 'ab_note', '✨': 'ab_glanz', '🦋': 'ab_falter', '🎓': 'ab_hut', '☁️': 'ab_wolke', '☁': 'ab_wolke',
+  '⚙️': 'ab_zahnrad', '⚙': 'ab_zahnrad', '🕊️': 'ab_taube', '🕊': 'ab_taube', '🐈': 'ab_katze', '🔒': 'ab_schloss',
+  '😎': 'ab_sonnenbrille', '🪽': 'ab_fluegel', '🎯': 'ab_zielscheibe', '🐃': 'ab_bueffel', '🐕': 'ab_hund', '🌑': 'ab_neumond',
+  '💪': 'ab_arm', '📐': 'ab_geodreieck', '🪶': 'ab_feder', '🪲': 'ab_kaefer', '💠': 'ab_raute_blau', '☢️': 'ab_radioaktiv',
+  '☢': 'ab_radioaktiv', '📘': 'ab_buch', '⛔': 'ab_halt', '🍀': 'ab_klee', '🥷': 'ab_ninja', '🤝': 'ab_haende',
+  '🎹': 'ab_klavier', '🪑': 'ab_stuhl', '🧟': 'ab_zombie', '☥': 'ab_ankh', '🦷': 'ab_zahn', '🧬': 'ab_dna',
+  '🪙': 'ab_muenze', '🌌': 'ab_galaxie', '✦': 'ab_funke',
+};
+for (const [n, s] of Object.entries(PP_PX_ABZEICHEN_SPRITES)) PP_PX_SPRITES['ab_' + n] = s;
+// Die Animationen (Pixelierer, PxZeichen) bekommen die neuen Zeichen mit,
+// wo sie noch keines hatten — bestehende Zuordnungen bleiben.
+for (const [z, name] of Object.entries(PP_PX_ICONS)) if (!PP_PX_ZEICHEN[z]) PP_PX_ZEICHEN[z] = name;
+
+/**
+ * Scale2x (EPX): verdoppelt ein Zeichenraster und rundet Diagonalen ab,
+ * ohne den Pixel-Charakter zu verlieren — fuer grosse Darstellungen,
+ * damit ein 9×11-Sprite bei 90 px nicht aus 10-px-Kloetzen besteht.
+ */
+function _ppScale2x(z) {
+  const h = z.length, w = Math.max(...z.map(r => r.length));
+  const at = (x, y) => (y < 0 || y >= h || x < 0 || x >= w) ? '.' : (z[y][x] || '.');
+  const out = Array.from({ length: h * 2 }, () => []);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const P = at(x, y), A = at(x, y - 1), B = at(x + 1, y), C = at(x - 1, y), D = at(x, y + 1);
+    let e0 = P, e1 = P, e2 = P, e3 = P;
+    if (C === A && C !== D && A !== B) e0 = A;
+    if (A === B && A !== C && B !== D) e1 = B;
+    if (D === C && D !== B && C !== A) e2 = C;
+    if (B === D && B !== A && D !== C) e3 = D;
+    out[2 * y][2 * x] = e0; out[2 * y][2 * x + 1] = e1;
+    out[2 * y + 1][2 * x] = e2; out[2 * y + 1][2 * x + 1] = e3;
+  }
+  return out.map(r => r.join(''));
+}
+function _ppSpriteRaster(s, stufe) {
+  let z = s.z;
+  for (let i = 0; i < stufe; i++) z = _ppScale2x(z);
+  return z;
+}
+/** Stufe fuer eine Darstellungsgroesse (px): ~3 px pro Sprite-Pixel anstreben. */
+function ppPxSpriteStufe(name, groessePx) {
+  const s = PP_PX_SPRITES[name];
+  if (!s || !(groessePx > 0)) return 0;
+  const n = Math.max(s.z.length, ...s.z.map(r => r.length));
+  const proPixel = groessePx / n;
+  return proPixel > 9 ? 2 : proPixel > 4.5 ? 1 : 0;
+}
+
+function ppPxSpriteUrl(name, stufe = 0) {
+  const s = PP_PX_SPRITES[name];
+  if (!s) return '';
+  const z = _ppSpriteRaster(s, stufe);
+  const h = z.length, w = Math.max(...z.map(r => r.length));
+  return ppPxBild('spr:' + name + ':' + stufe, w, h, (setze) => {
+    z.forEach((r, y) => [...r].forEach((c, x) => {
+      if (s.mono) {
+        if (c === '#') setze(x, y, [255, 255, 255, 1]);
+        else if (c === '+') setze(x, y, [255, 255, 255, 0.5]);
+      } else if (s.pal[c]) setze(x, y, ppFarbe(s.pal[c]));
+    }));
+  }, stufe ? 2 : 4);
+}
+
+/**
+ * Emoji/Glyphe als Pixel-Sprite. Groesse 1em (erbt `font-size` wie die
+ * Glyphe vorher). Unbekannte Zeichen bleiben Text.
+ */
+function PxZeichen({ z, groesse, einfarbig, variante }) {
+  // `einfarbig`: die einfarbige Fassung (folgt `color`, z. B. hellblaue
+  // Betaeubungsblitze); `variante`: eine eigene Palette (`schwarz`).
+  const basis = PP_PX_ZEICHEN[z];
+  const name = basis && einfarbig && PP_PX_SPRITES[basis + '_mono'] ? basis + '_mono'
+    : basis && variante && PP_PX_SPRITES[basis + '_' + variante] ? basis + '_' + variante : basis;
+  const s = name ? PP_PX_SPRITES[name] : null;
+  const url = s ? ppPxSpriteUrl(name) : '';
+  if (!url) return z == null ? null : String(z);
+  const h = s.z.length, w = Math.max(...s.z.map(r => r.length));
+  const g = groesse || '1em';
+  const breite = `calc(${g} * ${(w / Math.max(w, h)).toFixed(3)})`;
+  const hoehe = `calc(${g} * ${(h / Math.max(w, h)).toFixed(3)})`;
+  if (!s.mono) {
+    return <img src={url} alt="" draggable={false} className="pp-px"
+      style={{ width: breite, height: hoehe, display: 'inline-block', verticalAlign: 'middle' }} />;
+  }
+  const m = `url(${url}) center / 100% 100% no-repeat`;
+  return <span className="pp-px" style={{
+    width: breite, height: hoehe, display: 'inline-block', verticalAlign: 'middle',
+    background: 'currentColor', WebkitMask: m, mask: m,
+  }} />;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  ★ v1448 — PAKET 3: STATUS-, BUFF- UND DEBUFF-ABZEICHEN
+//  (Als Vorgabe 27.9.: „Was jetzt noch fehlt, sind Icons/Badges
+//   (Status, Buffs, Debuffs …). Kannst du die auch durch
+//   Pixel-Grafiken ersetzen?")
+//
+//  Zwei Teile:
+//    PxIcon            Zeichen eines Abzeichens → handgezeichnetes Sprite
+//                      (PP_PX_ICONS vor PP_PX_ZEICHEN); ohne eigenes
+//                      Sprite das automatisch pixelierte Emoji; sonst Text.
+//                      Die Groesse setzt CSS (`.pp-px-icon`, style.css).
+//    ppPxPlaketteUrl   die runde Plakette dahinter: Kontur, Rand mit
+//                      Lichtkante, Flaeche (gedithert, wenn Verlauf) mit
+//                      Glanzpunkt und Schatten. Farben kommen aus
+//                      style.css (`PP_PX_KLASSEN.plaketten`).
+// ═══════════════════════════════════════════════════════════════════
+function _ppIconSprite(z) {
+  const k = String(z).trim();
+  return PP_PX_ICONS[k] || PP_PX_ICONS[k.replace(/️/g, '')] || PP_PX_ZEICHEN[k] || null;
+}
+
+function PxIcon({ z }) {
+  if (z == null || z === '') return null;
+  const k = String(z).trim();
+  const name = _ppIconSprite(k);
+  const s = name ? PP_PX_SPRITES[name] : null;
+  if (s && s.mono) {
+    const url = ppPxSpriteUrl(name);
+    if (url) {
+      const m = `url(${url}) center / contain no-repeat`;
+      return <span className="pp-px pp-px-icon" aria-hidden="true"
+        style={{ background: 'currentColor', WebkitMask: m, mask: m }} />;
+    }
+  }
+  const url = s ? ppPxSpriteUrl(name)
+    : PP_EMOJI_MUSTER.test(k) ? ppPxEmojiUrl(k, 24) : '';
+  if (!url) return k;
+  return <img src={url} alt="" draggable={false} className="pp-px pp-px-icon" />;
+}
+
+/** Halbtransparente Farbe auf dunklen Grund rechnen — Pixelart ist deckend. */
+const PP_PX_PLAKETTE_GRUND = [22, 16, 28];
+function _ppAufGrund(f) {
+  const a = f[3] == null ? 1 : f[3];
+  return [0, 1, 2].map(i => PP_PX_PLAKETTE_GRUND[i] * (1 - a) + f[i] * a).concat([1]);
+}
+
+/** Farbe eines Verlaufs an Stelle (px, py) ∈ [0,1]², zwischen den Stopps gedithert. */
+function _ppVerlaufBei(v, px, py, x, y) {
+  let t;
+  if (v.linear) {
+    const wr = (v.winkel || 0) * Math.PI / 180, sn = Math.sin(wr), cs = Math.cos(wr);
+    t = 0.5 + ((px - 0.5) * sn - (py - 0.5) * cs) / ((Math.abs(sn) + Math.abs(cs)) || 1);
+  } else {
+    const rk = Math.hypot(Math.max(v.cx, 1 - v.cx), Math.max(v.cy, 1 - v.cy));
+    t = Math.hypot(px - v.cx, py - v.cy) / (v.kreis ? rk : Math.SQRT2 * Math.max(v.cx, 1 - v.cx));
+  }
+  const S = v.stopps;
+  if (t <= S[0].p) return S[0].f;
+  if (t >= S[S.length - 1].p) return S[S.length - 1].f;
+  let i = 1; while (i < S.length - 1 && S[i].p < t) i++;
+  const a = S[i - 1], b = S[i];
+  return (b.p > a.p ? (t - a.p) / (b.p - a.p) : 1) > ppBayer(x, y) ? b.f : a.f;
+}
+
+/**
+ * Runde Pixel-Plakette im 21er-Raster (v1449, vorher 12 — Als Befund
+ * 27.9.: „sehen noch sehr grob aus"): 1 Pixel dunkle Kontur, 2 Pixel Rand
+ * mit Lichtkante oben links und Schattenkante unten rechts, Flaeche aus
+ * Farbe oder Verlauf, darauf ein Glanzbogen oben links und ein
+ * geditherter Schatten unten rechts. Ein Symbol mit 16 Pixeln fuellt 76 %
+ * der Plakette — dann sind die Pixel beider gleich gross.
+ */
+const PP_PX_PLAKETTE_N = 21;
+function ppPxPlaketteUrl(flaeche, rand) {
+  const N = PP_PX_PLAKETTE_N, M = N / 2;
+  const v = /gradient/.test(flaeche || '') ? ppVerlaufLesen(flaeche) : null;
+  const voll = v ? null : _ppAufGrund(ppFarbe(flaeche));
+  const r = ppFarbe(rand);
+  const randF = _ppAufGrund([r[0], r[1], r[2], Math.max(r[3], 0.85)]);
+  const randHell = _ppMisch(randF, [255, 255, 255], 0.45);
+  const randDunkel = _ppMisch(randF, [0, 0, 0], 0.3);
+  const kontur = [14, 9, 18, 1];
+  return ppPxBild('pl' + N + ':' + flaeche + '|' + rand, N, N, (setze) => {
+    for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+      const dx = x + 0.5 - M, dy = y + 0.5 - M;
+      const d = Math.hypot(dx, dy);
+      if (d > M) continue;
+      if (d > M - 1) { setze(x, y, kontur); continue; }
+      const diag = (dx + dy) / (d || 1);                  // −√2 oben links … +√2 unten rechts
+      if (d > M - 3) { setze(x, y, diag < -0.7 ? randHell : diag > 0.9 ? randDunkel : randF); continue; }
+      let f = v ? _ppAufGrund(_ppVerlaufBei(v, (x + 0.5) / N, (y + 0.5) / N, x, y)) : voll;
+      if (d > M - 5.2 && d <= M - 3.6 && diag < -0.95) f = _ppMisch(f, [255, 255, 255], 0.3);
+      else if (diag > 0.5 && d > M - 6 && ppBayer(x, y) < (d - (M - 6)) / 3) f = _ppMisch(f, [0, 0, 0], 0.28);
+      setze(x, y, f);
+    }
+  });
+}
+
+/** Pixel-Schraegstrich fuer „Blinded" (ueber der Plakette, gleiches Raster). */
+function ppPxSchraegstrichUrl() {
+  const N = PP_PX_PLAKETTE_N;
+  return ppPxBild('schraeg' + N, N, N, (setze) => {
+    for (let i = 3; i <= N - 4; i++) {
+      const y = N - 1 - i;
+      setze(i - 1, y, [40, 6, 10, 1]);
+      setze(i, y, [255, 90, 90, 1]);
+      setze(i + 1, y, [220, 30, 44, 1]);
+      setze(i + 2, y, [40, 6, 10, 1]);
+    }
+  });
+}
+
+// ── Freigabeliste der CSS-Klassen (pro Paket ergaenzt) ─────────────
+// `verlauf`: der radial-gradient der Klasse wird Pixelbild (Farben aus
+//   style.css gelesen — die Klasse bleibt die einzige Quelle).
+// `partikel`: runde Partikel mit `var(--color)` → Pixel-Scheibe mit
+//   Lichtpunkt und geditherter Schattierung.
+// `ohneFilter`: weicher `drop-shadow`/`blur`-Schein faellt weg.
+const PP_PX_KLASSEN = {
+  // Paket 1 (v1445): die haeufigsten Status-, Schadens- und Feuerbilder.
+  verlauf: ['.anim-explosion-flash', '.anim-freeze-flash', '.anim-flame-flash', '.anim-gold-flash',
+    '.anim-snowball', '.anim-stun-flash', '.anim-creature-death-flash', '.anim-black-flame-flash',
+    '.anim-electric-flash', '.anim-shield-bubble-core', '.anim-shield-bubble-glint',
+    '.torchure-glut', '.torchure-giftflamme'],
+  partikel: ['.anim-explosion-particle', '.anim-beer-bubble', '.anim-creature-death-spark',
+    '.anim-creature-death-soul'],
+  ohneFilter: ['.anim-flame-shard', '.anim-stun-megabolt', '.anim-electric-bolt', '.anim-stun-bolt',
+    '.anim-black-flame-shard'],
+  // Einzelregeln, wo ein entfernter Filter mehr tat als weichzeichnen.
+  extra: [
+    // Black Flame: `brightness(0)` faerbte auch die Glyphen schwarz.
+    '.anim-black-flame-shard{color:#3a0a52;}',
+  ],
+  // Umrisse aus `border` + weichem Schein → Pixelring (eigener Verlauf).
+  ersatz: [
+    { sel: '.anim-shield-bubble-rim', breite: 110, verlauf: 'radial-gradient(ellipse, transparent 64%, rgba(255,255,255,.95) 66%, rgba(255,255,255,.95) 69%, rgba(200,230,255,.5) 71%, transparent 73%)' },
+    { sel: '.torchure-ring', breite: 72, verlauf: 'radial-gradient(circle, transparent 58%, rgba(120,220,90,.55) 61%, #be5aff 63%, #be5aff 67%, rgba(160,60,230,.5) 69%, transparent 71%)' },
+  ],
+  // Paket 3 (v1448): runde Abzeichen → Pixel-Plakette. `klassen` ist die
+  // Klassenliste fuer die Probe (Flaeche und Rand werden aus style.css
+  // gelesen), `sel` der Selektor der erzeugten Regel.
+  plaketten: [
+    { sel: '.status-badge', klassen: 'status-badge' },
+    { sel: '.status-badge.status-positiv', klassen: 'status-badge status-positiv' },
+    { sel: '.buff-icon', klassen: 'buff-icon' },
+    { sel: '.buff-icon.buff-icon-debuff', klassen: 'buff-icon buff-icon-debuff' },
+    { sel: '.status-action-blocked-icon', klassen: 'status-immune-icon status-action-blocked-icon' },
+    { sel: '.status-stealth-icon', klassen: 'status-immune-icon status-stealth-icon' },
+    { sel: '.status-damage-proof-icon', klassen: 'status-immune-icon status-damage-proof-icon' },
+    { sel: '.status-cheat-chair-icon', klassen: 'status-immune-icon status-cheat-chair-icon' },
+  ],
+  // Abzeichen ohne Plakette: weicher Schein → harter Pixelschatten bzw.
+  // 1-Pixel-Umriss in der Scheinfarbe.
+  abzeichenExtra: [
+    '.status-immune-icon{filter:drop-shadow(1px 1px 0 rgba(0,0,0,.8));}',
+    '.status-immune-icon.status-shielded-icon{filter:drop-shadow(1px 0 0 #ffd84a) drop-shadow(-1px 0 0 #ffd84a) drop-shadow(0 1px 0 #ffd84a) drop-shadow(0 -1px 0 #ffd84a) drop-shadow(1px 1px 0 rgba(0,0,0,.8))!important;}',
+    '.status-immune-icon.vena-bounty-badge{box-shadow:none;filter:drop-shadow(1px 0 0 #ff5060) drop-shadow(-1px 0 0 #ff5060) drop-shadow(0 1px 0 #ff5060) drop-shadow(0 -1px 0 #ff5060);}',
+    '.mummified-icon{filter:drop-shadow(1px 1px 0 rgba(0,0,0,.8))!important;}',
+    // Buff-Puls: statt weichem Schein ein gestufter Helligkeitswechsel.
+    '.buff-icon{animation:ppPxBuffPuls 2s steps(2,jump-none) infinite;}',
+    '.buff-icon.buff-icon-debuff{animation:none;}',
+  ],
+};
+
+function _ppPxRegelnBauen() {
+  const regeln = [];
+  // Den Verlauf jeder Klasse ueber ein kurz eingehaengtes Probe-Element
+  // lesen: `getComputedStyle` klappt immer, `cssRules` nicht (fremde
+  // Herkunft, file://). Die Klassen der Liste sind einfache Klassen.
+  const verlaufVon = {}, plaketteVon = {};
+  try {
+    const probe = document.createElement('div');
+    probe.style.cssText = 'position:absolute;left:-9999px;top:-9999px;visibility:hidden;animation:none;';
+    document.body.appendChild(probe);
+    for (const sel of PP_PX_KLASSEN.verlauf) {
+      probe.className = sel.replace(/^\./, '').split('.').join(' ');
+      const cs = getComputedStyle(probe);
+      const bg = cs.backgroundImage;
+      if (bg && /(radial|linear)-gradient/.test(bg)) verlaufVon[sel] = { g: bg, b: parseFloat(cs.width) || 0, h: parseFloat(cs.height) || 0 };
+    }
+    // v1448: Flaeche und Rand der Abzeichen-Plaketten.
+    for (const p of PP_PX_KLASSEN.plaketten || []) {
+      probe.className = p.klassen;
+      const cs = getComputedStyle(probe);
+      const bg = cs.backgroundImage;
+      const flaeche = bg && /(radial|linear)-gradient/.test(bg) && !/,\s*(radial|linear)-gradient/.test(bg)
+        ? bg : cs.backgroundColor;
+      plaketteVon[p.sel] = { flaeche, rand: cs.borderTopColor };
+    }
+    probe.remove();
+  } catch {}
+  for (const sel of PP_PX_KLASSEN.verlauf) {
+    const g = verlaufVon[sel]?.g;
+    const url = g ? ppPxVerlaufUrl(g, verlaufVon[sel].b, verlaufVon[sel].h) : '';
+    if (!url) continue;
+    let r = `${sel}{background:url(${url}) center/100% 100% no-repeat;image-rendering:pixelated;box-shadow:none;`;
+    if (_ppRandDeckend(g)) {
+      const m = `url(${ppPxScheibeUrl()}) center/100% 100% no-repeat`;
+      r += `border-radius:0;-webkit-mask:${m};mask:${m};`;
+    }
+    regeln.push(r + '}');
+  }
+  for (const e of PP_PX_KLASSEN.ersatz || []) {
+    const url = ppPxVerlaufUrl(e.verlauf, e.breite || 0);
+    if (url) regeln.push(`${e.sel}{background:url(${url}) center/100% 100% no-repeat;image-rendering:pixelated;border:none;box-shadow:none;}`);
+  }
+  const scheibe = `url(${ppPxScheibeUrl()}) center/100% 100% no-repeat`;
+  for (const sel of PP_PX_KLASSEN.partikel) {
+    regeln.push(`${sel}{border-radius:0!important;box-shadow:none!important;`
+      + `background:url(${ppPxSchattenUrl()}) center/100% 100% no-repeat,var(--color)!important;`
+      + `-webkit-mask:${scheibe};mask:${scheibe};image-rendering:pixelated;}`);
+  }
+  for (const sel of PP_PX_KLASSEN.ohneFilter) regeln.push(`${sel}{filter:none!important;}`);
+  for (const r of PP_PX_KLASSEN.extra || []) regeln.push(r);
+  // v1448: Abzeichen. Der Rand bleibt als (durchsichtiger) Platzhalter
+  // stehen, damit sich die Groesse nicht aendert; das Bild deckt ihn mit.
+  for (const p of PP_PX_KLASSEN.plaketten || []) {
+    const f = plaketteVon[p.sel];
+    const url = f ? ppPxPlaketteUrl(f.flaeche, f.rand) : '';
+    if (!url) continue;
+    regeln.push(`${p.sel}{background:url(${url}) center/100% 100% no-repeat!important;background-origin:border-box!important;`
+      + 'border-color:transparent!important;border-radius:0!important;box-shadow:none!important;'
+      + 'filter:drop-shadow(1px 1px 0 rgba(0,0,0,.75));image-rendering:auto;}');
+  }
+  for (const r of PP_PX_KLASSEN.abzeichenExtra || []) regeln.push(r);
+  regeln.push(`.status-badge.status-blinded::after{background:url(${ppPxSchraegstrichUrl()}) center/100% 100% no-repeat;border-radius:0;image-rendering:auto;}`);
+  regeln.push('.pp-px{image-rendering:pixelated;}');
+  return regeln.join('\n');
+}
+
+function ppPxRegelnAnwenden() {
+  try {
+    let el = document.getElementById('pp-px-regeln');
+    if (!el) { el = document.createElement('style'); el.id = 'pp-px-regeln'; document.head.appendChild(el); }
+    el.textContent = '';                      // die Probe soll die ORIGINAL-Verlaeufe lesen
+    el.textContent = _ppPxRegelnBauen();
+  } catch {}
+}
+// ═══════════════════════════════════════════════════════════════════
+//  ★ v1446 — DER PIXELIERER (Paket 2 der Pixelart-Umstellung)
+//
+//  Die 276 Animationen bestehen aus einer Handvoll Bausteinen: weiche
+//  Verlaeufe, runde Punkte mit Leuchtschein, Rahmen mit weichem Schein,
+//  Emoji und leuchtender Text. Statt jede Animation einzeln umzuschreiben,
+//  laeuft beim Einblenden EINMAL dieser Durchgang ueber ihre Elemente
+//  (kein Filter, nichts pro Bild) und setzt die Bausteine in Pixelart um:
+//
+//    Verlauf (radial/linear)  → Pixelbild mit Dithering (Elementgroesse)
+//    runder Einfarb-Punkt     → Pixelpartikel mit Lichtpunkt und Schatten
+//    Rahmen (border)          → Pixelrahmen/-ring in der Randfarbe
+//    Leuchtschein (box-shadow, drop-shadow)
+//                             → geditherter Pixel-Halo als Kind-Element
+//    Emoji/Glyphe             → Pixel-Sprite (PP_PX_ZEICHEN)
+//    Text mit weichem Schein  → Pixelschrift mit harter Kontur
+//
+//  Ausgenommen: SVG (bekommt nur harte Kanten), Elemente mit Maske oder
+//  Bild-URL (schon Pixelart) und alles mit `data-pp-px="aus"`.
+//  Gelesen wird zuerst ALLES, geschrieben danach — sonst erzwingt jeder
+//  Schreibzugriff ein neues Layout.
+// ═══════════════════════════════════════════════════════════════════
+
+/** Farbe mischen: t=0 → a, t=1 → b. */
+function _ppMisch(a, b, t) { return [0, 1, 2].map(i => a[i] + (b[i] - a[i]) * t).concat([a[3]]); }
+
+/** Runder Pixelpartikel in fester Farbe: Lichtpunkt oben links, geditherter Schatten unten rechts. */
+function ppPxPartikelUrl(farbe) {
+  const f = ppFarbe(farbe);
+  if (!(f[3] > 0)) return '';
+  const hell = _ppMisch(f, [255, 255, 255], 0.55), dunkel = _ppMisch(f, [0, 0, 0], 0.35);
+  hell[3] = dunkel[3] = 1;
+  const voll = [f[0], f[1], f[2], 1];
+  const Z = ['..####..', '.######.', '########', '########', '########', '########', '.######.', '..####..'];
+  return ppPxBild('pt:' + f.join(','), 8, 8, (setze) => {
+    Z.forEach((z, y) => [...z].forEach((c, x) => {
+      if (c !== '#') return;
+      const hl = (x === 2 && y === 1) || (x === 3 && y === 1) || (x === 1 && y === 2) || (x === 2 && y === 2);
+      const sch = x + y >= 10 || (x + y >= 8 && (x + y) % 2 === 0);
+      setze(x, y, hl ? hell : sch ? dunkel : voll);
+    }));
+  });
+}
+
+/**
+ * Pixelrahmen: Band der Dicke `dicke` (px) an der Innenkante eines
+ * Rechtecks mit Eckradius `radius` (px; >= halbe Seite = Ellipse).
+ */
+function ppPxRahmenUrl(farbe, dicke, w, h, radius) {
+  const f = ppFarbe(farbe);
+  const P = PP_PX_GROESSE;
+  const nx = Math.max(2, Math.round(w / P)), ny = Math.max(2, Math.round(h / P));
+  const d = Math.max(1, Math.round(dicke / P));
+  const rund = radius >= Math.min(w, h) / 2 - 0.5;
+  const r = Math.min(radius, w / 2, h / 2) / P;
+  const hell = _ppMisch(f, [255, 255, 255], 0.45); hell[3] = f[3];
+  return ppPxBild(`rf:${f.join(',')}:${d}:${nx}x${ny}:${rund ? 'o' : Math.round(r)}`, nx, ny, (setze) => {
+    for (let y = 0; y < ny; y++) for (let x = 0; x < nx; x++) {
+      let innen;                                   // Abstand zur Aussenkante in Pixeln
+      const px = x + 0.5, py = y + 0.5;
+      if (rund) {
+        const ex = (px - nx / 2) / (nx / 2), ey = (py - ny / 2) / (ny / 2);
+        const q = Math.hypot(ex, ey);
+        if (q > 1) continue;
+        innen = (1 - q) * Math.min(nx, ny) / 2;
+      } else {
+        const dx = Math.min(px, nx - px), dy = Math.min(py, ny - py);
+        if (dx < r && dy < r) {
+          const k = r - Math.hypot(r - dx, r - dy);
+          if (k < 0) continue;
+          innen = k;
+        } else innen = Math.min(dx, dy);
+      }
+      if (innen > d) continue;
+      // Oben links eine Lichtkante, damit der Rahmen nicht flach wirkt.
+      const licht = (x + y) < (nx + ny) * 0.35 && innen <= 1;
+      setze(x, y, licht ? hell : f);
+    }
+  });
+}
+
+/**
+ * Geditherter Leuchtschein um eine Form (w×h, `rund` = Ellipse) mit
+ * `rand` px Ausdehnung. Innen bleibt leer — die Form selbst deckt ihn.
+ */
+function ppPxHaloUrl(farbe, w, h, rand, rund) {
+  const f = ppFarbe(farbe);
+  const P = PP_PX_GROESSE;
+  const W = w + 2 * rand, H = h + 2 * rand;
+  const nx = Math.max(2, Math.round(W / P)), ny = Math.max(2, Math.round(H / P));
+  const qr = Math.max(1, Math.round(rand / 2) * 2);
+  return ppPxBild(`hl:${f.join(',')}:${Math.round(w / 4)}x${Math.round(h / 4)}:${qr}:${rund ? 1 : 0}`, nx, ny, (setze) => {
+    for (let y = 0; y < ny; y++) for (let x = 0; x < nx; x++) {
+      const u = (x + 0.5) * P - W / 2, v = (y + 0.5) * P - H / 2;   // px relativ zur Mitte
+      let abstand;
+      if (rund) {
+        const q = Math.hypot(u / (w / 2 || 1), v / (h / 2 || 1));
+        if (q <= 1) continue;
+        abstand = (q - 1) * Math.min(w, h) / 2;
+      } else {
+        const ax = Math.abs(u) - w / 2, ay = Math.abs(v) - h / 2;
+        if (ax <= 0 && ay <= 0) continue;
+        abstand = Math.hypot(Math.max(ax, 0), Math.max(ay, 0));
+      }
+      const a = f[3] * Math.max(0, 1 - abstand / (rand || 1));
+      if (_ppAlphaStufe(a, x, y)) setze(x, y, [f[0], f[1], f[2], 1]);
+    }
+  });
+}
+
+/** Pixelige Ellipse als Maske in Elementgroesse (runde Flaechen behalten ihre Form). */
+function ppPxEllipseUrl(w, h) {
+  const P = PP_PX_GROESSE;
+  const nx = Math.max(2, Math.round(w / P / 2) * 2), ny = Math.max(2, Math.round(h / P / 2) * 2);
+  return ppPxBild('el:' + nx + 'x' + ny, nx, ny, (setze) => {
+    for (let y = 0; y < ny; y++) for (let x = 0; x < nx; x++) {
+      const ex = (x + 0.5 - nx / 2) / (nx / 2), ey = (y + 0.5 - ny / 2) / (ny / 2);
+      if (ex * ex + ey * ey <= 1) setze(x, y, [255, 255, 255, 1]);
+    }
+  }, 2);
+}
+
+/** Aeussere Leuchtscheine aus `box-shadow` / `filter: drop-shadow()` lesen → [{farbe, blur}]. */
+function _ppScheine(wert) {
+  const out = [];
+  if (!wert || wert === 'none') return out;
+  for (const teil of _ppTeile(wert.replace(/drop-shadow\(/g, '(').replace(/^\(|\)$/g, ''))) {
+    if (/inset/.test(teil)) continue;
+    const farbeM = teil.match(/(rgba?\([^)]*\)|#[0-9a-f]{3,8}|\b[a-z]+\b)/i);
+    const zahlen = (teil.replace(/rgba?\([^)]*\)/g, '').match(/-?[\d.]+px/g) || []).map(parseFloat);
+    const blur = zahlen[2] || 0, streu = zahlen[3] || 0;
+    if (!farbeM || (blur + streu) < 2) continue;
+    out.push({ farbe: farbeM[1], blur: blur + streu });
+  }
+  return out;
+}
+
+/** `filter` ohne drop-shadow()/blur() — der Rest (brightness, hue-rotate …) bleibt. */
+function _ppFilterOhneSchein(f) {
+  if (!f || f === 'none') return f;
+  const rest = f.replace(/drop-shadow\((?:[^()]|\([^()]*\))*\)/g, '').replace(/blur\([^)]*\)/g, '').trim();
+  return rest || 'none';
+}
+
+let _ppKeyframeCache = new Map();
+/** Veraendert eine @keyframes-Regel Breite/Hoehe? (Dann Rahmen nicht einbacken.) */
+function _ppKeyframesAendernGroesse(name) {
+  if (!name || name === 'none') return false;
+  if (_ppKeyframeCache.has(name)) return _ppKeyframeCache.get(name);
+  let ja = false;
+  try {
+    for (const blatt of Array.from(document.styleSheets)) {
+      let liste; try { liste = blatt.cssRules; } catch { continue; }
+      for (const r of Array.from(liste || [])) {
+        if (r.type === 7 && r.name === name && /(^|[\s;{])(width|height)\s*:/.test(r.cssText)) { ja = true; break; }
+      }
+      if (ja) break;
+    }
+  } catch {}
+  _ppKeyframeCache.set(name, ja);
+  return ja;
+}
+
+const PP_PX_SCHRIFT = "'Press Start 2P', monospace";
+const _ppPxErledigt = new WeakSet();
+
+/** Einen Knoten (und seine Nachfahren) pixelieren. */
+function ppPixelieren(wurzel) {
+  if (!wurzel || typeof wurzel.querySelectorAll !== 'function') return;
+  const elemente = [wurzel, ...wurzel.querySelectorAll('*')];
+  const auftraege = [];
+  // ── Lesen ────────────────────────────────────────────────────────
+  for (const el of elemente) {
+    if (_ppPxErledigt.has(el)) continue;
+    _ppPxErledigt.add(el);
+    if (el.closest && el.closest('[data-pp-px="aus"]')) continue;
+    if (el.namespaceURI === 'http://www.w3.org/2000/svg') {
+      if (el.tagName.toLowerCase() === 'svg') auftraege.push({ el, svg: true });
+      continue;
+    }
+    if (!(el instanceof HTMLElement) || el.tagName === 'STYLE' || el.tagName === 'IMG') continue;
+    const cs = getComputedStyle(el);
+    if (cs.maskImage && cs.maskImage !== 'none') continue;
+    if (cs.webkitMaskImage && cs.webkitMaskImage !== 'none') continue;
+    const a = { el, w: el.offsetWidth, h: el.offsetHeight };
+    const bg = cs.backgroundImage;
+    if (bg && bg !== 'none' && !/url\(/.test(bg) && /(radial|linear)-gradient/.test(bg)) a.verlauf = bg;
+    const bgf = ppFarbe(cs.backgroundColor);
+    const rad = parseFloat(cs.borderTopLeftRadius) || 0;
+    const radProzent = /%/.test(cs.borderTopLeftRadius);
+    const rundGross = radProzent ? parseFloat(cs.borderTopLeftRadius) >= 45 : rad >= Math.min(a.w, a.h) / 2 - 1;
+    a.rund = rundGross;
+    a.radius = radProzent ? Math.min(a.w, a.h) * parseFloat(cs.borderTopLeftRadius) / 100 : rad;
+    if (!a.verlauf && (!bg || bg === 'none') && bgf[3] > 0.05 && rundGross && a.w > 0 && a.w <= 40) a.partikel = cs.backgroundColor;
+    const bw = parseFloat(cs.borderTopWidth) || 0;
+    if (bw > 0 && cs.borderTopStyle === 'solid' && ppFarbe(cs.borderTopColor)[3] > 0.05
+        && !_ppKeyframesAendernGroesse(cs.animationName)) {
+      a.rahmen = { farbe: cs.borderTopColor, dicke: bw };
+    }
+    const scheine = _ppScheine(cs.boxShadow).concat(_ppScheine((cs.filter || '').match(/drop-shadow\(.*\)/)?.[0] || ''));
+    if (scheine.length) a.schein = scheine.sort((p, q) => q.blur - p.blur)[0];
+    if (cs.boxShadow && cs.boxShadow !== 'none') a.ohneSchatten = true;
+    if (/drop-shadow|blur\(/.test(cs.filter || '')) a.filter = _ppFilterOhneSchein(cs.filter);
+    // Emoji/Glyphe: genau ein Textkind, das eine Sprite-Entsprechung hat.
+    const kinder = Array.from(el.childNodes);
+    if (kinder.length === 1 && kinder[0].nodeType === 3) {
+      const z = kinder[0].nodeValue.trim();
+      if (PP_PX_ZEICHEN[z]) { a.zeichen = z; a.farbe = cs.color; a.schrift = parseFloat(cs.fontSize) || 16; }
+      else if (PP_EMOJI_MUSTER.test(z)) { a.emoji = z; a.schrift = parseFloat(cs.fontSize) || 16; }
+      else if (z.length > 1 && /\S/.test(z) && cs.textShadow && cs.textShadow !== 'none') {
+        a.text = { schatten: cs.textShadow, groesse: parseFloat(cs.fontSize) || 16 };
+      }
+    }
+    if (a.verlauf || a.partikel || a.rahmen || a.schein || a.ohneSchatten || a.filter || a.zeichen || a.emoji || a.text) auftraege.push(a);
+  }
+  // ── Schreiben ────────────────────────────────────────────────────
+  for (const a of auftraege) {
+    const el = a.el, st = el.style;
+    if (a.svg) { el.setAttribute('shape-rendering', 'crispEdges'); continue; }
+    const ebenen = [];
+    if (a.rahmen && a.w > 0 && a.h > 0) {
+      const u = ppPxRahmenUrl(a.rahmen.farbe, a.rahmen.dicke, a.w, a.h, a.radius);
+      if (u) { ebenen.push(`url(${u})`); st.borderColor = 'transparent'; }
+    }
+    if (a.verlauf) {
+      const u = ppPxVerlaufUrl(a.verlauf, a.w, a.h);
+      if (u) {
+        ebenen.push(`url(${u})`);
+        // Runde Flaechen: die weiche `border-radius`-Kante wird eine
+        // pixelige Ellipse (sonst stuenden die Ecken des Bildes da).
+        if (a.rund && a.w > 0 && a.h > 0) {
+          const m = `url(${ppPxEllipseUrl(a.w, a.h)}) center / 100% 100% no-repeat`;
+          st.webkitMask = m; st.mask = m;
+        }
+      } else if (a.verlauf) ebenen.push(a.verlauf);
+    }
+    if (a.partikel) {
+      const u = ppPxPartikelUrl(a.partikel);
+      if (u) { ebenen.push(`url(${u})`); st.backgroundColor = 'transparent'; }
+    }
+    if (a.zeichen) {
+      const name = PP_PX_ZEICHEN[a.zeichen];
+      const s = PP_PX_SPRITES[name];
+      const stufe = ppPxSpriteStufe(name, a.schrift);
+      const u = s && s.mono ? ppPxSpriteGefaerbtUrl(name, a.farbe, stufe) : ppPxSpriteUrl(name, stufe);
+      if (u) {
+        st.backgroundImage = `url(${u})`;
+        st.backgroundSize = '1em 1em'; st.backgroundRepeat = 'no-repeat'; st.backgroundPosition = 'center';
+        st.color = 'transparent'; st.textShadow = 'none';
+        st.imageRendering = 'pixelated';
+      }
+    }
+    if (a.emoji) {
+      const u = ppPxEmojiUrl(a.emoji, a.schrift);
+      if (u) {
+        st.backgroundImage = `url(${u})`;
+        st.backgroundSize = '1.1em 1.1em'; st.backgroundRepeat = 'no-repeat'; st.backgroundPosition = 'center';
+        st.color = 'transparent'; st.textShadow = 'none'; st.imageRendering = 'pixelated';
+      }
+    }
+    if (ebenen.length) {
+      st.backgroundImage = ebenen.join(', ');
+      st.backgroundSize = '100% 100%'; st.backgroundRepeat = 'no-repeat';
+      st.backgroundPosition = 'center'; st.backgroundOrigin = 'border-box';
+      st.imageRendering = 'pixelated';
+      if (a.rund || a.partikel) st.borderRadius = '0';
+    }
+    if (a.text) {
+      // Pixelschrift, weicher Schein → harte 2-px-Kontur in der dunkelsten Schattenfarbe.
+      const farben = _ppTeile(a.text.schatten).map(t => (t.match(/(rgba?\([^)]*\)|#[0-9a-f]{3,8})/i) || [])[1]).filter(Boolean);
+      const dunkel = farben.map(ppFarbe).sort((p, q) => (p[0] + p[1] + p[2]) - (q[0] + q[1] + q[2]))[0] || [0, 0, 0, 1];
+      const k = `rgb(${dunkel[0]},${dunkel[1]},${dunkel[2]})`;
+      st.fontFamily = PP_PX_SCHRIFT;
+      st.fontSize = Math.round(a.text.groesse * 0.72) + 'px';
+      st.textShadow = `2px 0 0 ${k}, -2px 0 0 ${k}, 0 2px 0 ${k}, 0 -2px 0 ${k}, 3px 3px 0 ${k}`;
+      st.webkitFontSmoothing = 'none';
+    }
+    if (a.ohneSchatten) st.boxShadow = 'none';
+    if (a.filter !== undefined) st.filter = a.filter;
+    if (a.schein && a.w > 0 && a.h > 0) {
+      // Halo als erstes Kind, hinter dem Inhalt.
+      const rand = Math.min(40, Math.max(3, Math.round(a.schein.blur * 0.8)));
+      const u = ppPxHaloUrl(a.schein.farbe, a.w, a.h, rand, a.rund || !!a.zeichen || !!a.emoji);
+      if (u) {
+        const halo = document.createElement('i');
+        halo.setAttribute('aria-hidden', 'true');
+        halo.className = 'pp-px-halo';
+        halo.style.cssText = `position:absolute;left:${-rand}px;top:${-rand}px;width:${a.w + 2 * rand}px;height:${a.h + 2 * rand}px;`
+          + `background:url(${u}) center/100% 100% no-repeat;image-rendering:pixelated;pointer-events:none;z-index:-1;`;
+        _ppPxErledigt.add(halo);
+        if (getComputedStyle(el).position === 'static') st.position = 'relative';
+        el.insertBefore(halo, el.firstChild);
+      }
+    }
+  }
+}
+
+/**
+ * Beliebiges Emoji als Pixel-Sprite: klein auf ein Canvas gezeichnet
+ * (10–28 Pixel je nach Darstellungsgroesse), Kanten per Bayer-Matrix
+ * gedithert, eine dunkle Kontur fuer den Pixelart-Umriss — dann hart
+ * vergroessert. Rueckfall fuer alle Zeichen ohne eigenes Sprite.
+ */
+const PP_EMOJI_SCHRIFT = '"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji","Twemoji Mozilla",sans-serif';
+function ppPxEmojiUrl(z, groessePx) {
+  const n = Math.max(10, Math.min(28, Math.round((groessePx || 16) / 2.4)));
+  return ppPxBild('em:' + n + ':' + z, n + 2, n + 2, (setze) => {
+    const c = document.createElement('canvas');
+    c.width = n; c.height = n;
+    const ctx = c.getContext('2d');
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.font = `${Math.round(n * 0.92)}px ${PP_EMOJI_SCHRIFT}`;
+    ctx.fillText(z, n / 2, n / 2 + n * 0.06);
+    const d = ctx.getImageData(0, 0, n, n).data;
+    const deckt = (x, y) => x >= 0 && y >= 0 && x < n && y < n && d[(y * n + x) * 4 + 3] > 0
+      && Math.pow(d[(y * n + x) * 4 + 3] / 255, 0.8) > ppBayer(x, y);
+    for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
+      if (!deckt(x, y)) continue;
+      const i = (y * n + x) * 4;
+      setze(x + 1, y + 1, [d[i], d[i + 1], d[i + 2], 1]);
+    }
+    // Kontur: leere Pixel neben gedeckten werden dunkel.
+    if (n >= 14) {
+      for (let y = -1; y <= n; y++) for (let x = -1; x <= n; x++) {
+        if (deckt(x, y)) continue;
+        if (deckt(x + 1, y) || deckt(x - 1, y) || deckt(x, y + 1) || deckt(x, y - 1)) setze(x + 1, y + 1, [24, 14, 26, 1]);
+      }
+    }
+  }, 2);
+}
+const PP_EMOJI_MUSTER = /^\p{Extended_Pictographic}(\uFE0F|\u200D\p{Extended_Pictographic}|\p{Emoji_Modifier})*$/u;
+
+/** Einfarbiges Sprite in fester Farbe (fuer Glyphen, deren Farbe aus `color` kommt). */
+function ppPxSpriteGefaerbtUrl(name, farbe, stufe = 0) {
+  const s = PP_PX_SPRITES[name];
+  if (!s) return '';
+  const f = ppFarbe(farbe);
+  const zz = _ppSpriteRaster(s, stufe);
+  const h = zz.length, w = Math.max(...zz.map(z => z.length));
+  const hell = _ppMisch(f, [255, 255, 255], 0.5);
+  return ppPxBild('sg:' + name + ':' + stufe + ':' + f.join(','), w, h, (setze) => {
+    zz.forEach((z, y) => [...z].forEach((c, x) => {
+      if (c === '#') setze(x, y, [f[0], f[1], f[2], 1]);
+      else if (c === '+') setze(x, y, [hell[0], hell[1], hell[2], 1]);
+    }));
+  });
+}
+
+/**
+ * Pixelierer an eine Animations-Wurzel haengen: einmal sofort, dann fuer
+ * jeden spaeter eingehaengten Knoten (Phasen, die erst nach Zeit
+ * erscheinen). Gibt die Abmeldung zurueck.
+ */
+function ppPixeliererAnhaengen(wurzel) {
+  if (!wurzel) return () => {};
+  try { ppPixelieren(wurzel); } catch (err) { console.warn('[Pixelierer]', err?.message); }
+  let wartend = null;
+  const neue = new Set();
+  const beobachter = new MutationObserver((liste) => {
+    for (const m of liste) for (const n of m.addedNodes) if (n.nodeType === 1) neue.add(n);
+    if (wartend || !neue.size) return;
+    wartend = requestAnimationFrame(() => {
+      wartend = null;
+      const jetzt = Array.from(neue); neue.clear();
+      for (const n of jetzt) { try { ppPixelieren(n); } catch {} }
+    });
+  });
+  beobachter.observe(wurzel, { childList: true, subtree: true });
+  return () => { beobachter.disconnect(); if (wartend) cancelAnimationFrame(wartend); };
+}
+window.ppPixeliererAnhaengen = ppPixeliererAnhaengen;
+
+window.PxZeichen = PxZeichen;
+window.PxIcon = PxIcon;
+window.pxHintergrund = pxHintergrund;
+window.ppPxVerlaufUrl = ppPxVerlaufUrl;
+window.ppPxRegelnAnwenden = ppPxRegelnAnwenden;
+// Nach dem Laden der Stylesheets — `style.css` liefert die Farben.
+if (document.readyState === 'complete') ppPxRegelnAnwenden();
+else window.addEventListener('load', ppPxRegelnAnwenden, { once: true });
+
 // ★ v1442 — DER WAAGERECHTE BILDLAUF-RIEGEL, an EINER Stelle.
 // Kampfbrett (`.board-center.can-scroll`, app-board.jsx) und Puzzle-
 // Editor (`.pz-board-wrap.pz-can-hscroll`, app-puzzle.jsx) entscheiden
@@ -2368,6 +3817,24 @@ function heroDisplayName(fullName) {
   const parts = name.split(/\s+/);
   return parts.length > 1 ? parts[parts.length - 1] : name;
 }
+
+// ★ v1443 (Als Vorgabe 26.9.): Starting-Ability-Filter (Deck-Builder,
+// Puzzle-Creator). Jede gewaehlte Ability muss der Held in IRGENDEINER
+// seiner beiden Zonen haben, die Reihenfolge ist egal. Wird dieselbe
+// Ability zweimal gewaehlt, muss er sie auch ZWEIMAL haben — gezaehlt
+// wird als Multimenge, jede Zone deckt nur eine Wahl.
+function matchesStartingAbilities(card, ...wanted) {
+  const want = wanted.filter(Boolean);
+  if (want.length === 0) return true;
+  const have = [card?.startingAbility1, card?.startingAbility2].filter(Boolean);
+  for (const w of want) {
+    const i = have.indexOf(w);
+    if (i < 0) return false;
+    have.splice(i, 1);
+  }
+  return true;
+}
+window.matchesStartingAbilities = matchesStartingAbilities;
 
 function cardImageUrl(cardName, skinOverrides) {
   // If a skin is selected for this card, use the skin image
@@ -5242,7 +6709,7 @@ function StatusBadges({ statuses, counters, buffs, isHero, player, cardName, isO
         <div key={b.key} className={'status-badge' + (b.className ? ' ' + b.className : '')}
           onMouseEnter={e => { showGameTooltip(e, b.tooltip); showBoardTip(); }}
           onMouseLeave={() => { hideGameTooltip(); hideBoardTip(); }}>
-          {b.icon}
+          <PxIcon z={b.icon} />
           {b.duration != null && <span className="status-badge-duration">{b.duration}</span>}
         </div>
       ))}
@@ -5361,7 +6828,7 @@ function BuffColumn({ buffs, cardName, statuses }) {
           <div key={key} className={'buff-icon ' + (istDebuff(key) ? 'badge-debuff buff-icon-debuff' : 'badge-buff')}
             onMouseEnter={e => { showGameTooltip(e, tooltipText); showBoardTip(); }}
             onMouseLeave={() => { hideGameTooltip(); hideBoardTip(); }}>
-            {def.icon}
+            <PxIcon z={def.icon} />
           </div>
         );
       })}
@@ -5592,7 +7059,8 @@ function useCardTooltip(opts) {
   // clear below doesn't wipe the card preview while the cursor is over a
   // status badge or buff icon (both hang off the card's bounds and aren't
   // .board-card elements themselves).
-  const hoverSelectors = (opts && opts.hoverSelectors) || '.board-card:hover, .card-mini:hover, .pz-search-card:hover, .pz-hand-card:hover, .status-badge:hover, .buff-icon:hover';
+  // v1443: `.bday-present-reveal-card` — Aufdeck-Karten (Zi, Birthday Present).
+  const hoverSelectors = (opts && opts.hoverSelectors) || '.board-card:hover, .card-mini:hover, .pz-search-card:hover, .pz-hand-card:hover, .status-badge:hover, .buff-icon:hover, .bday-present-reveal-card:hover';
   const [tooltipCard, setTooltipCard] = useState(null);
   const [tooltipSide, setTooltipSide] = useState(defaultSide);
 

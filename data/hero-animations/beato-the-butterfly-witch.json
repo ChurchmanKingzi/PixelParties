@@ -1,0 +1,12 @@
+{
+  "hero": "Beato, the Butterfly Witch",
+  "sheet": "beato-the-butterfly-witch.png",
+  "frameWidth": 27,
+  "frameHeight": 28,
+  "frames": 48,
+  "frameMs": 90,
+  "loop": true,
+  "layout": "horizontal",
+  "padLeft": 3,
+  "padRight": 3
+}

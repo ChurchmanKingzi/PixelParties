@@ -1,0 +1,11 @@
+{
+  "hero": "Lilly, the Charming Infiltrator",
+  "sheet": "lilly-the-charming-infiltrator.png",
+  "frameWidth": 20,
+  "frameHeight": 35,
+  "frames": 48,
+  "frameMs": 90,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 8
+}

@@ -1,0 +1,14 @@
+{
+  "hero": "Sett, the Adept of Necromancy",
+  "sheet": "sett-the-adept-of-necromancy.png",
+  "frameWidth": 27,
+  "frameHeight": 31,
+  "frames": 40,
+  "frameMs": 80,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 1,
+  "padLeft": 1,
+  "padRight": 2,
+  "padBottom": 1
+}

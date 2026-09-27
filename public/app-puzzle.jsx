@@ -4,7 +4,7 @@
 //  game-engine-compatible data structures.
 // ═══════════════════════════════════════════
 const { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo, useContext } = React;
-const { AppContext, cardImageUrl, VolumeControl, CARDS_BY_NAME, CardTooltipContent, useCardTooltip, StatusBadges, BuffColumn, GameTooltip, socket } = window;
+const { AppContext, cardImageUrl, VolumeControl, CARDS_BY_NAME, CardTooltipContent, useCardTooltip, StatusBadges, BuffColumn, GameTooltip, socket, PxIcon } = window;
 
 // Groesse des Galerie-Sichtfensters und der Nachlade-Schwelle. 120 deckt
 // bei 3 bzw. 5 Spalten mehrere Bildschirmhoehen ab, ist also nie sichtbar
@@ -623,8 +623,8 @@ function PuzzleCreator() {
     if (f.cardType) result = result.filter(c => c.cardType === f.cardType);
     if (f.subtype) result = result.filter(c => c.subtype === f.subtype);
     if (f.archetype) result = result.filter(c => c.archetype === f.archetype);
-    if (f.sa1) result = result.filter(c => c.startingAbility1 === f.sa1 || c.startingAbility2 === f.sa1);
-    if (f.sa2) result = result.filter(c => c.startingAbility1 === f.sa2 || c.startingAbility2 === f.sa2);
+    // v1443: beide Wahlen zusammen, Zone egal, doppelt gewaehlt = doppelt noetig.
+    if (f.sa1 || f.sa2) result = result.filter(c => matchesStartingAbilities(c, f.sa1, f.sa2));
     if (f.ss1) result = result.filter(c => c.spellSchool1 === f.ss1 || c.spellSchool2 === f.ss1);
     if (f.ss2) result = result.filter(c => c.spellSchool1 === f.ss2 || c.spellSchool2 === f.ss2);
     if (f.level !== '') result = result.filter(c => c.level != null && c.level === parseInt(f.level));
@@ -3520,7 +3520,7 @@ function PuzzleCreator() {
                     const l = allianceLinks.find(x => x.allySi === si && x.allyHi === hi);
                     if (!l) return null;
                     return <div className="status-immune-icon status-alliance-icon"
-                      title={`Allied with ${l.userName}`}>🤝</div>;
+                      title={`Allied with ${l.userName}`}><PxIcon z="🤝" /></div>;
                   })()}
                 </> : <div className="board-zone-empty">Hero</div>}
               </div>

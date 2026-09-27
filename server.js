@@ -3424,6 +3424,39 @@ let SKINS_DATA = {};
 try { SKINS_DATA = JSON.parse(fs.readFileSync(path.join(__dirname, 'data', 'skins.json'), 'utf-8')); } catch {}
 app.get('/api/skins', (req, res) => res.json({ skins: SKINS_DATA }));
 
+// ===== HELDEN-IDLE-ANIMATIONEN =====
+// ★ v1450: Verzeichnis der Spritesheets in `data/hero-animations/`
+// (je Held `<slug>.png` + `<slug>.json`, Slug = Kartenname wie bei den
+// Effekt-Skripten). Der Client holt die Liste EINMAL und weiß danach,
+// welche Helden auf dem Brett animiert werden — ohne je Held eine
+// JSON-Datei auf gut Glück anzufragen (404-Rauschen).
+// Bewusst bei jedem Aufruf frisch gelesen: ~40 kleine Dateien, ein
+// Aufruf je Seitenaufbau, und neue Animationen gelten sofort (siehe
+// die maxAge-Vorgabe bei den statischen Routen).
+const HERO_ANIM_DIR = path.join(__dirname, 'data', 'hero-animations');
+app.get('/api/hero-animations', async (req, res) => {
+  const animations = {};
+  try {
+    const files = (await fs.promises.readdir(HERO_ANIM_DIR)).filter(f => f.endsWith('.json'));
+    await Promise.all(files.map(async (f) => {
+      try {
+        const meta = JSON.parse(await fs.promises.readFile(path.join(HERO_ANIM_DIR, f), 'utf-8'));
+        const sheet = typeof meta.sheet === 'string' ? meta.sheet : f.replace(/\.json$/, '.png');
+        const st = await fs.promises.stat(path.join(HERO_ANIM_DIR, sheet));
+        if (!(meta.frameWidth > 0 && meta.frameHeight > 0 && meta.frames > 0)) return;
+        animations[f.replace(/\.json$/, '')] = {
+          ...meta,
+          // Zeitstempel als Cache-Brecher: ein neu erzeugtes Sheet
+          // ersetzt das alte sofort, auch unter demselben Namen.
+          sheetUrl: '/data/hero-animations/' + encodeURIComponent(sheet) + '?v=' + Math.floor(st.mtimeMs),
+        };
+      } catch {}
+    }));
+  } catch {}
+  res.set('Cache-Control', 'no-cache');
+  res.json({ animations });
+});
+
 // ===== SHOP SYSTEM =====
 // ★ v1384 (Als Vorgabe 24.9.): alle Shop-Preise auf das FUENFFACHE —
 // Gegenstueck zum Wegfall der SC-Tageskappe und den vielen neuen
@@ -4218,13 +4251,13 @@ function sendGameState(room, playerIdx, extra) {
       discardIdentities: require('./cards/effects/_future-tech-shared')
         .ablageIdentitaeten(gs, pi),
       discardEntries: room.engine ? room.engine.getDiscardEntries(pi) : [],
-      // Lethe per-pile +1 stamps — `{ [cardName]: [stampCount, ...] }`
-      // sized to combined discard+deleted occurrences. Forwarded to the
-      // client so pile-viewer / cardGallery / BoardCard renderings can
+      // Lethe per-pile +1 stamps — `{ discard: [s, …], deleted: [s, …] }`,
+      // ein Eintrag je STAPELPLATZ (v1443: pro Karte, nicht pro Name).
+      // Forwarded to the client so pile-viewer / cardGallery / BoardCard renderings can
       // surface the effective level on stamped Creatures. Shared with
       // both sides (no hidden-info concern: stamps are derived from
       // public actions — every Lethe Necromancy resolution is logged).
-      letheStamps: ps._letheStamps || {},
+      letheStamps: (room.engine && room.engine.getLetheStampView(pi)) || {},
       disconnected: ps.disconnected || false, left: ps.left || false,
       // Gold display can be temporarily frozen for cost-bypass flows
       // (Swagdri's free-play of an X-cost Artifact bumps gold by a
@@ -5220,7 +5253,7 @@ function sendSpectatorGameState(room) {
       discardIdentities: require('./cards/effects/_future-tech-shared')
         .ablageIdentitaeten(gs, spi),
       discardEntries: room.engine ? room.engine.getDiscardEntries(spi) : [],
-      letheStamps: ps._letheStamps || {},
+      letheStamps: (room.engine && room.engine.getLetheStampView(spi)) || {},
       disconnected: ps.disconnected || false, left: ps.left || false,
       // Gold display can be temporarily frozen for cost-bypass flows
       // (Swagdri's free-play of an X-cost Artifact bumps gold by a
@@ -10246,6 +10279,9 @@ async function doConfirmPotion(room, pi, { selectedIds }) {
         // v353: `'hand'` — der Spieler setzt die Karte gerade selbst aus
         // der Hand ein (Book of Doom & Co). Nur der GEGNER sieht sie.
         room.engine.announceActiveEffect(potionName, pi, 'hand');   // v347
+        // v1444: Defending the Gate, sobald ein Ziel in einer gegnerischen
+        // Support Zone liegt (Dark Gear & alle anderen zielenden Karten).
+        await room.engine.gateVorZielen(pi, potionName, selectedIds, validTargets);
         return await script.resolve(room.engine, pi, selectedIds, validTargets);
       } : null,
     });

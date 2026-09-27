@@ -16,6 +16,14 @@
 //  5. Apply un-removable "dark_gear_negated" debuff
 //     for rest of turn (clears negated on expiry)
 //
+//  v1444 (Als Ruling 26.9.): Die Negation ist UNVERHINDERBAR
+//  (`unpreventable`) — kein Statuseffekt, Lunatic Golems Immunitaet
+//  hebt sie nicht auf. Defending the Gate darf dagegen reagieren: der
+//  Server fragt das Tor vor dem Aufloesen (Ziel in gegnerischer Support
+//  Zone), `actionTransferCreature` notfalls noch einmal. Steht der
+//  Schild, ist der Effekt auf die Kreatur negiert — die Kosten sind
+//  bezahlt, die Kreatur bleibt, wo sie ist.
+//
 //  Animation: gear spin CW → card flies across → gear spin CCW
 // ═══════════════════════════════════════════
 
@@ -199,6 +207,18 @@ module.exports = {
       return { aborted: true };
     }
 
+    // ── Defending the Gate (v1444) ──
+    // Hat das Tor den Effekt schon abgewehrt, gibt es nichts zu
+    // uebernehmen. Die Kosten gehoeren zum Spielen der Karte.
+    if (engine._isGateShielded(oppIdx, pi)) {
+      await engine._payCardCost(pi, totalCost);
+      engine.log('gold_spent', { player: ps.username, amount: totalCost, reason: 'Dark Gear' });
+      engine._broadcastEvent('gold_change', { owner: pi, amount: -totalCost });
+      engine.log('dark_gear_fizzle', { player: ps.username, reason: 'defending_the_gate', creature: target.cardName });
+      engine.sync();
+      return true;
+    }
+
     // Prompt for a free support zone on the player's side
     const freeZones = getFreeZones(gs, pi);
     if (freeZones.length === 0) {
@@ -244,8 +264,9 @@ module.exports = {
     const destSi = chosenZone.slotIdx;
 
     // Transfer creature to player's control (handles zone move, animation, hooks, guardian sync)
-    const transferResult = await engine.actionTransferCreature(inst, pi, destHi, destSi);
-    if (!transferResult.success) return;
+    const transferResult = await engine.actionTransferCreature(inst, pi, destHi, destSi,
+      { sourceName: 'Dark Gear', sourceOwner: pi });
+    if (!transferResult.success) return true;   // Kosten sind bezahlt — Karte ist verbraucht
 
     // ── Animation phase 2: Gear spin CCW on destination ──
     engine._broadcastEvent('play_zone_animation', {
@@ -259,6 +280,7 @@ module.exports = {
       expiresAtTurn: gs.turn + 1,
       expiresForPlayer: pi === 0 ? 1 : 0, // expires at start of OPPONENT's next turn (= end of this turn cycle)
       selfInflicted: true,
+      unpreventable: true,   // v1444: kann NICHT verhindert werden
     });
 
     engine.log('dark_gear', {

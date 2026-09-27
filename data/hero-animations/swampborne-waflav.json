@@ -1,0 +1,11 @@
+{
+  "hero": "Swampborne Waflav",
+  "sheet": "swampborne-waflav.png",
+  "frameWidth": 84,
+  "frameHeight": 56,
+  "frames": 32,
+  "frameMs": 90,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 4
+}

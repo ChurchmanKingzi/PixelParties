@@ -1,0 +1,10 @@
+{
+  "hero": "Reiza, the Chief Tormentor",
+  "sheet": "reiza-the-chief-tormentor.png",
+  "frameWidth": 54,
+  "frameHeight": 42,
+  "frames": 48,
+  "frameMs": 80,
+  "loop": true,
+  "layout": "horizontal"
+}

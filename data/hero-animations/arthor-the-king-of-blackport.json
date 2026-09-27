@@ -1,0 +1,10 @@
+{
+  "hero": "Arthor, the King of Blackport",
+  "sheet": "arthor-the-king-of-blackport.png",
+  "frameWidth": 18,
+  "frameHeight": 25,
+  "frames": 48,
+  "frameMs": 90,
+  "loop": true,
+  "layout": "horizontal"
+}

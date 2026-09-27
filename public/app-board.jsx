@@ -169,6 +169,30 @@ function setBoardTooltip(card) {
   window._boardTooltipSetter?.(card);
 }
 
+// ★ v1443 (Als Befund 26.9.): WORAUF reagiert eine Karte gerade? Prompts
+// von Reaktionen (Skeleton Demon, Cool Rescuer Monia) tragen die
+// ausloesende Karte als `triggerCardName` — sie steht LINKS im Panel mit
+// der Zeile „Triggered by", rechts bleibt die reagierende Karte selbst.
+function TriggerCardSlot({ name }) {
+  const data = name ? CARDS_BY_NAME[name] : null;
+  if (!data) return null;
+  const img = cardImageUrl(name);
+  return (
+    <div style={{ width: 90, flexShrink: 0, alignSelf: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+      <div style={{ fontSize: 9, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: 1 }}>Triggered by</div>
+      <div className="board-card" style={{ width: 90, minHeight: 120, borderRadius: 6, overflow: 'hidden', border: '2px solid var(--bg4)', background: 'var(--bg3)' }}
+        onMouseEnter={() => { _boardTooltipLocked = true; setBoardTooltip(data); }}
+        onMouseLeave={() => { _boardTooltipLocked = false; setBoardTooltip(null); }}>
+        {img ? (
+          <img src={img} alt={name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} draggable={false} />
+        ) : (
+          <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 8, textAlign: 'center', fontSize: 11, color: 'var(--text2)' }}>{name}</div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 
 // ── Rusting Crystal / BGG cost helpers ───────────────────────
 // Mirror of `applyRustingCrystalCostMultiplier` in server.js so the
@@ -367,16 +391,14 @@ function BoardZone({ type, cards, label, faceDown, flipped, stackLabel, children
   const topCardName = cards && cards.length > 0 && !faceDown ? cards[cards.length - 1] : null;
   const suppressChildTooltip = !!onClick && !!onHoverCard;
   // For discard/deleted zones, the top card's effective level is the
-  // base printed level plus the max Lethe stamp on any copy of that
-  // name in the owner's combined piles. The same value `effectiveCardLevel`
-  // uses, so the player sees exactly what the revival gates will see.
+  // base printed level plus the Lethe stamp of THAT pile slot (v1443:
+  // `ownerLetheStamps = { discard: [...], deleted: [...] }`, ein Eintrag
+  // je Stapelplatz — eine spaeter abgelegte Kopie hat ihren eigenen Wert).
   const topLevelInfo = (() => {
     if (!topCardName || (type !== 'discard' && type !== 'deleted')) return null;
     const cd = CARDS_BY_NAME[topCardName];
     if (!cd || cd.cardType !== 'Creature' || cd.level == null) return null;
-    const arr = ownerLetheStamps?.[topCardName];
-    let stamp = 0;
-    if (Array.isArray(arr)) for (const v of arr) if (v > stamp) stamp = v;
+    const stamp = ownerLetheStamps?.[type]?.[cards.length - 1] || 0;
     return { effectiveLevel: (cd.level || 0) + stamp, stampBonus: stamp };
   })();
   // BoardZone-level hover dispatch. The shared pile-hover tooltip
@@ -1670,6 +1692,326 @@ function DraggablePanel({ children, className, style }) {
   );
 }
 
+// ═══════════════════════════════════════════
+//  HELDEN-IDLE-ANIMATION (v1450)
+//  „Lebende Heroes zeigen ihre Idle-Animation über dem oberen Drittel
+//   der Karte in Dauerschleife — wie in Yu-Gi-Oh!, als kämen sie aus
+//   ihren Karten." (Als Vorgabe 27.9.)
+//
+//  • Tot → keine Animation (die Komponente wird gar nicht gerendert);
+//    bei der Wiederbelebung steigt der Held erneut aus der Karte.
+//  • Frozen / Stunned / Webbed (die `paralysisLike`-Status) → der Held
+//    bleibt in seinem AKTUELLEN Frame stehen und läuft danach an
+//    derselben Stelle weiter.
+//  • Versteinert (gemeinsamer Marker `_petrified` am Stun — Petrifier,
+//    Petrifying Potion, Baihu) → zusätzlich Steinfarbe und -textur, die
+//    von den Füßen aufwärts über den Körper kriecht.
+//
+//  Daten: `data/hero-animations/<slug>.png|json`, Liste über
+//  `/api/hero-animations` (einmal je Seitenaufbau). Gezeichnet wird in
+//  ein Canvas in Sprite-Auflösung, das CSS hochskaliert; EINE gemeinsame
+//  requestAnimationFrame-Schleife für alle Helden, gemalt wird nur, wenn
+//  sich der Frame wirklich ändert.
+// ═══════════════════════════════════════════
+const HeroIdleAnims = (() => {
+  // Slug-Regel wie bei den Effekt-Skripten und den Sheet-Dateinamen.
+  const slug = (n) => String(n || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+  let liste = null;          // { slug: meta } sobald geladen
+  let listeLaedt = null;
+  const eintraege = new Map(); // slug → Promise<{ meta, img } | null>
+  const fertig = new Map();    // slug → { meta, img } | null (für den ersten Render)
+
+  function ladeListe() {
+    if (!listeLaedt) {
+      listeLaedt = fetch('/api/hero-animations', { credentials: 'same-origin' })
+        .then(r => (r.ok ? r.json() : null))
+        .then(d => { liste = (d && d.animations) || {}; return liste; })
+        .catch(() => {
+          // Netzfehler: beim nächsten Helden erneut versuchen statt
+          // für die ganze Sitzung ohne Animationen zu bleiben.
+          listeLaedt = null;
+          return {};
+        });
+    }
+    return listeLaedt;
+  }
+
+  // Umriss der DECKENDEN Figur über alle Frames (Alpha ≥ 160), in
+  // Frame-Koordinaten. Eingepasst und ausgerichtet wird nach ihm, nicht
+  // nach der Rahmengröße: halbtransparente Auren, Gas und Rauch (Arthors
+  // Blutsäule, Medeas Schwaden) würden die Figur sonst winzig machen —
+  // sie dürfen über den Kasten hinausragen. Rückfall ohne Pixelzugriff:
+  // Rahmen minus padTop/padBottom/padLeft/padRight.
+  function kernRahmen(meta, img) {
+    const fw = meta.frameWidth, fh = meta.frameHeight;
+    const pL = meta.padLeft || 0, pR = meta.padRight || 0, pT = meta.padTop || 0, pB = meta.padBottom || 0;
+    const rueckfall = { x0: pL, y0: pT, x1: fw - pR, y1: fh - pB };
+    try {
+      const w = img.naturalWidth, h = img.naturalHeight;
+      const c = document.createElement('canvas');
+      c.width = w; c.height = h;
+      const ctx = c.getContext('2d', { willReadFrequently: true });
+      ctx.drawImage(img, 0, 0);
+      const d = ctx.getImageData(0, 0, w, h).data;
+      const vertikal = meta.layout === 'vertical';
+      let x0 = fw, y0 = fh, x1 = 0, y1 = 0;
+      for (let y = 0; y < h; y++) {
+        for (let x = 0; x < w; x++) {
+          if (d[(y * w + x) * 4 + 3] < 160) continue;
+          const lx = vertikal ? x : x % fw, ly = vertikal ? y % fh : y;
+          if (lx < x0) x0 = lx; if (lx >= x1) x1 = lx + 1;
+          if (ly < y0) y0 = ly; if (ly >= y1) y1 = ly + 1;
+        }
+      }
+      return x1 > x0 && y1 > y0 ? { x0, y0, x1, y1 } : rueckfall;
+    } catch { return rueckfall; }
+  }
+
+  function hole(key) {
+    if (!key) return Promise.resolve(null);
+    if (eintraege.has(key)) return eintraege.get(key);
+    const p = ladeListe().then(l => {
+      const meta = l[key];
+      if (!meta) { if (liste) fertig.set(key, null); else eintraege.delete(key); return null; }
+      return new Promise(res => {
+        const img = new Image();
+        img.onload = () => { const e = { meta, img, kern: kernRahmen(meta, img) }; fertig.set(key, e); res(e); };
+        img.onerror = () => { fertig.set(key, null); res(null); };
+        img.src = meta.sheetUrl;
+      });
+    });
+    eintraege.set(key, p);
+    return p;
+  }
+
+  // ── Gemeinsame Schleife ──────────────────────────────────────
+  const schritte = new Set();
+  let raf = 0;
+  function tick(now) {
+    raf = 0;
+    for (const s of schritte) { try { s(now); } catch {} }
+    if (schritte.size) raf = requestAnimationFrame(tick);
+  }
+  function anmelden(schritt) {
+    schritte.add(schritt);
+    if (!raf) raf = requestAnimationFrame(tick);
+    return () => { schritte.delete(schritt); };
+  }
+
+  // ── Steinfassung eines Sheets ────────────────────────────────
+  // Einmal je Sheet (beim ersten Versteinern) Pixel für Pixel umgefärbt:
+  // Helligkeit → fünf warme Grautöne mit Bayer-Dithering, grobe Flecken
+  // und feines Korn als Textur, von oben beleuchtete Kanten und ein paar
+  // Risse. Die Kontur bleibt dunkel, die Deckkraft bleibt erhalten.
+  // Die Textur hängt an Frame-Koordinaten, damit sie auf jedem Frame
+  // gleich liegt.
+  const STEIN = [[46, 43, 41], [82, 78, 73], [111, 106, 99], [141, 135, 126], [172, 166, 156], [203, 197, 186]];
+  const BAYER = [[0, 8, 2, 10], [12, 4, 14, 6], [3, 11, 1, 9], [15, 7, 13, 5]];
+  const hash = (x, y, s) => {
+    let h = (x * 374761393 + y * 668265263 + s * 2147483647) | 0;
+    h = Math.imul(h ^ (h >>> 13), 1274126177);
+    return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
+  };
+  // Weiche Flecken: Wertrauschen auf 4-px-Zellen, bilinear.
+  const flecken = (x, y, s) => {
+    const gx = x / 4, gy = y / 4, x0 = Math.floor(gx), y0 = Math.floor(gy), fx = gx - x0, fy = gy - y0;
+    const a = hash(x0, y0, s), b = hash(x0 + 1, y0, s), c = hash(x0, y0 + 1, s), d = hash(x0 + 1, y0 + 1, s);
+    return (a * (1 - fx) + b * fx) * (1 - fy) + (c * (1 - fx) + d * fx) * fy;
+  };
+  const steinCache = new WeakMap();
+  function steinSheet(e) {
+    if (steinCache.has(e)) return steinCache.get(e);
+    let cv = null;
+    try {
+      const { img, meta } = e;
+      const w = img.naturalWidth, h = img.naturalHeight;
+      const fw = meta.frameWidth, fh = meta.frameHeight;
+      const vertikal = meta.layout === 'vertical';
+      cv = document.createElement('canvas');
+      cv.width = w; cv.height = h;
+      const ctx = cv.getContext('2d');
+      ctx.drawImage(img, 0, 0);
+      const bild = ctx.getImageData(0, 0, w, h);
+      const px = bild.data;
+      const seed = [...String(meta.hero || meta.sheet || '')].reduce((a, ch) => (a * 31 + ch.charCodeAt(0)) | 0, 7);
+      // Risse: kurze Zickzack-Linien in Frame-Koordinaten.
+      const riss = new Uint8Array(fw * fh);
+      const nRisse = Math.max(2, Math.round((fw * fh) / 260));
+      for (let r = 0; r < nRisse; r++) {
+        let x = Math.floor(hash(r, 1, seed) * fw), y = Math.floor(hash(r, 2, seed) * fh);
+        const len = 4 + Math.floor(hash(r, 3, seed) * 6);
+        const dx = hash(r, 4, seed) < 0.5 ? -1 : 1;
+        for (let k = 0; k < len; k++) {
+          if (x >= 0 && x < fw && y >= 0 && y < fh) riss[y * fw + x] = 1;
+          y += 1;
+          if (hash(r, 10 + k, seed) < 0.55) x += dx;
+        }
+      }
+      const alphaBei = (x, y) => (x < 0 || y < 0 || x >= w || y >= h) ? 0 : px[(y * w + x) * 4 + 3];
+      const aus = new Uint8ClampedArray(px.length);
+      for (let y = 0; y < h; y++) {
+        for (let x = 0; x < w; x++) {
+          const i = (y * w + x) * 4;
+          const a = px[i + 3];
+          if (!a) continue;
+          const lx = vertikal ? x : x % fw, ly = vertikal ? y % fh : y;
+          const lum = (0.3 * px[i] + 0.59 * px[i + 1] + 0.11 * px[i + 2]) / 255;
+          let f;
+          if (lum < 0.14) {
+            f = STEIN[0];                       // Kontur bleibt Kontur
+          } else {
+            let t = 0.12 + lum * 0.78
+              + (flecken(lx, ly, seed) - 0.5) * 0.22
+              + (hash(lx, ly, seed + 1) - 0.5) * 0.10;
+            // von oben beleuchtet: Kante unter Transparenz heller,
+            // Kante über Transparenz dunkler (lokale Frame-Grenzen beachten)
+            const obenFrei = (vertikal ? ly === 0 : y === 0) || alphaBei(x, y - 1) === 0;
+            const untenFrei = (vertikal ? ly === fh - 1 : y === h - 1) || alphaBei(x, y + 1) === 0;
+            if (obenFrei) t += 0.16;
+            else if (untenFrei) t -= 0.12;
+            t = Math.max(0, Math.min(1, t));
+            const stufe = t * 4;
+            let k = Math.floor(stufe);
+            if (stufe - k > (BAYER[ly & 3][lx & 3] + 0.5) / 16) k++;
+            k = Math.min(4, k);
+            if (riss[ly * fw + lx] && !obenFrei) k = Math.max(0, k - 3);
+            f = STEIN[1 + k];
+          }
+          aus[i] = f[0]; aus[i + 1] = f[1]; aus[i + 2] = f[2]; aus[i + 3] = a;
+        }
+      }
+      ctx.putImageData(new ImageData(aus, w, h), 0, 0);
+    } catch { cv = null; }
+    steinCache.set(e, cv);
+    return cv;
+  }
+
+  return { slug, hole, schonDa: (key) => fertig.get(key), anmelden, steinSheet };
+})();
+
+// Eine Idle-Animation über dem oberen Kartendrittel einer Heldenzone.
+// `angehalten`: Frame bleibt stehen (Frozen/Stunned/Webbed).
+// `versteinert`: zusätzlich Steinoptik (kriecht von unten nach oben).
+function HeroIdleSprite({ cardName, angehalten, versteinert, unsichtbar }) {
+  const key = HeroIdleAnims.slug(cardName);
+  const [eintrag, setEintrag] = useState(() => HeroIdleAnims.schonDa(key) || null);
+  useEffect(() => {
+    let lebt = true;
+    setEintrag(HeroIdleAnims.schonDa(key) || null);
+    HeroIdleAnims.hole(key).then(e => { if (lebt) setEintrag(e || null); });
+    return () => { lebt = false; };
+  }, [key]);
+
+  const canvasRef = useRef(null);
+  const zustand = useRef({ angehalten, versteinert });
+  zustand.current.angehalten = !!angehalten;
+  zustand.current.versteinert = !!versteinert;
+
+  useEffect(() => {
+    const cv = canvasRef.current;
+    if (!eintrag || !cv) return;
+    const ctx = cv.getContext('2d');
+    const { meta, img } = eintrag;
+    const fw = meta.frameWidth, fh = meta.frameHeight;
+    const frames = Math.max(1, meta.frames | 0);
+    const ms = Math.max(16, Number(meta.frameMs) || 90);
+    const vertikal = meta.layout === 'vertical';
+    const st = {
+      // Zufälliger Startframe: mehrere Helden laufen nicht im Gleichtakt.
+      frame: Math.floor(Math.random() * frames),
+      rest: 0, zuletzt: null,
+      // Beim Aufbau schon versteinert (Neuladen, Beitritt) → sofort Stein.
+      stein: zustand.current.versteinert ? 1 : 0,
+      gemalt: -1, steinGemalt: -1,
+    };
+    const quelle = (f) => (vertikal ? [0, f * fh] : [f * fw, 0]);
+    const male = () => {
+      const [sx, sy] = quelle(st.frame);
+      ctx.clearRect(0, 0, fw, fh);
+      if (st.stein < 1) ctx.drawImage(img, sx, sy, fw, fh, 0, 0, fw, fh);
+      if (st.stein > 0) {
+        const stein = HeroIdleAnims.steinSheet(eintrag);
+        if (stein) {
+          // Die Versteinerung steigt von den Füßen auf; eine hellere
+          // Staubkante markiert die Front, solange sie wandert.
+          const top = st.stein >= 1 ? 0 : Math.round(fh * (1 - st.stein));
+          if (top < fh) ctx.drawImage(stein, sx, sy + top, fw, fh - top, 0, top, fw, fh - top);
+          if (st.stein < 1 && top > 0) {
+            ctx.save();
+            ctx.globalCompositeOperation = 'source-atop';
+            ctx.fillStyle = 'rgba(225,220,210,0.85)';
+            ctx.fillRect(0, top, fw, 1);
+            ctx.restore();
+          }
+        }
+      }
+      st.gemalt = st.frame;
+      st.steinGemalt = st.stein;
+    };
+    male();
+    // Scharfe Pixel beim Vergrößern, weiches Verkleinern (`pixelated`
+    // verschluckt beim Verkleinern ganze Pixelzeilen, vgl. v1449). Der
+    // tatsächliche Maßstab hängt an `--board-scale` und der Bildschirm-
+    // dichte, deshalb gemessen statt gerechnet.
+    const pruefeSchaerfe = () => {
+      const breite = cv.getBoundingClientRect().width * (window.devicePixelRatio || 1);
+      cv.style.imageRendering = breite >= fw * 0.98 ? 'pixelated' : 'auto';
+    };
+    pruefeSchaerfe();
+    const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(pruefeSchaerfe) : null;
+    if (ro) ro.observe(cv);
+    const abmelden = HeroIdleAnims.anmelden((now) => {
+      const dt = st.zuletzt == null ? 0 : Math.min(now - st.zuletzt, 1000);
+      st.zuletzt = now;
+      const z = zustand.current;
+      if (!z.angehalten) {
+        st.rest += dt;
+        if (st.rest >= ms) {
+          const n = Math.floor(st.rest / ms);
+          st.rest -= n * ms;
+          st.frame = (st.frame + n) % frames;
+        }
+      }
+      if (z.versteinert) { if (st.stein < 1) st.stein = Math.min(1, st.stein + dt / 900); }
+      else st.stein = 0;
+      if (st.frame !== st.gemalt || st.stein !== st.steinGemalt) male();
+    });
+    return () => { abmelden(); if (ro) ro.disconnect(); };
+  }, [eintrag]);
+
+  if (!eintrag) return null;
+  const { meta, kern } = eintrag;
+  const fw = meta.frameWidth, fh = meta.frameHeight;
+  const cw = Math.max(1, kern.x1 - kern.x0), ch = Math.max(1, kern.y1 - kern.y0);
+  // Kasten = oberes Drittel der Karte (64 × 90 → 30 hoch), 2 px Rand
+  // seitlich. Nie vergrößert: 1 Sprite-Pixel = 1 Kartenpixel, damit alle
+  // Helden dieselbe Pixeldichte haben; große Sprites werden eingepasst.
+  const s = Math.min(1, 60 / cw, 30 / ch);
+  const bs = (n) => `${+n.toFixed(3)}px * var(--board-scale)`;
+  // Kartenoberkante = Zonenmitte − 45; die Füße stehen auf der
+  // Drittellinie (Oberkante + 30), die Figur ist waagrecht mittig.
+  const spriteStil = {
+    width: `calc(${bs(fw * s)})`,
+    height: `calc(${bs(fh * s)})`,
+    left: `calc(50% - ${bs((kern.x0 + cw / 2) * s)})`,
+    top: `calc(50% - ${bs(15 + kern.y1 * s)})`,
+  };
+  const schattenBreite = Math.max(8, cw * s * 0.8);
+  const schattenStil = {
+    width: `calc(${bs(schattenBreite)})`,
+    left: `calc(50% - ${bs(schattenBreite / 2)})`,
+  };
+  return (
+    <div className={'hero-idle-sprite' + (versteinert ? ' hero-idle-stein' : '') + (angehalten ? ' hero-idle-angehalten' : '')}
+      style={unsichtbar ? { opacity: 0.4 } : undefined} aria-hidden="true">
+      <div className="hero-idle-schatten" style={schattenStil} />
+      <div className="hero-idle-auftritt">
+        <canvas ref={canvasRef} width={fw} height={fh} className="hero-idle-canvas" style={spriteStil} />
+      </div>
+    </div>
+  );
+}
+
 // Frozen overlay with animated snowflake particles
 function FrozenOverlay() {
   const particles = useMemo(() => Array.from({ length: ppFxN(14) }, () => ({
@@ -1731,7 +2073,7 @@ function ImmuneIcon({ heroName, statusType }) {
     <div className={'status-immune-icon' + (statusType === 'shielded' ? ' status-shielded-icon' : '')}
       onMouseEnter={() => { window._immuneTooltip = heroName; window._immuneTooltipType = tooltipKey; window.dispatchEvent(new Event('immuneHover')); }}
       onMouseLeave={() => { window._immuneTooltip = null; window._immuneTooltipType = null; window.dispatchEvent(new Event('immuneHover')); }}>
-      🛡️
+      <PxIcon z="🛡️" />
     </div>
   );
 }
@@ -1793,18 +2135,43 @@ function CardRevealEntry({ cardName, onDone, fizzled }) {
 }
 
 function ExplosionEffect({ x, y, opacity }) {
-  const particles = useMemo(() => Array.from({ length: ppFxN(24) }, () => {
+  // ★ v1446 (Als Befund 26.9.: „Explosion nutzt relativ wenige Pixel —
+  // stelle sicher, dass die Animationen eindrucksvoll genug aussehen"):
+  // weisser Kern, Druckwelle, deutlich mehr Splitter, schwere Truemmer,
+  // aufsteigende Glut und Rauch. Alles laeuft durch den Pixelierer.
+  const particles = useMemo(() => Array.from({ length: ppFxN(38) }, () => {
     const angle = Math.random() * Math.PI * 2;
-    const speed = 25 + Math.random() * 55;
+    const speed = 30 + Math.random() * 75;
     return {
       dx: Math.cos(angle) * speed,
       dy: Math.sin(angle) * speed,
-      size: 3 + Math.random() * 8,
-      color: ['#ff4400','#ff8800','#ffcc00','#ff2200','#ffaa00','#fff'][Math.floor(Math.random() * 6)],
+      size: 4 + Math.random() * 9,
+      color: ['#ff4400','#ff8800','#ffcc00','#ff2200','#ffaa00','#fff','#ffe98a'][Math.floor(Math.random() * 7)],
       delay: Math.random() * 80,
-      dur: 350 + Math.random() * 400,
+      dur: 380 + Math.random() * 420,
     };
   }), []);
+  const brocken = useMemo(() => Array.from({ length: ppFxN(8) }, () => {
+    const angle = -Math.PI * (0.15 + Math.random() * 0.7);   // nach oben weg, fallen zurueck
+    const speed = 45 + Math.random() * 45;
+    return {
+      dx: Math.cos(angle) * speed, dy: Math.sin(angle) * speed,
+      size: 6 + Math.random() * 6, dreh: (Math.random() < 0.5 ? -1 : 1) * (180 + Math.random() * 360),
+      farbe: ['#5a2a1a', '#7a3a20', '#3a2a2a', '#c04a18'][Math.floor(Math.random() * 4)],
+      delay: 40 + Math.random() * 60, dur: 620 + Math.random() * 200,
+    };
+  }), []);
+  const glut = useMemo(() => Array.from({ length: ppFxN(12) }, () => ({
+    dx: -34 + Math.random() * 68, dy: -(30 + Math.random() * 45),
+    size: 3 + Math.random() * 3,
+    farbe: ['#ffe066', '#ffaa22', '#ff6a00'][Math.floor(Math.random() * 3)],
+    delay: 220 + Math.random() * 180, dur: 450 + Math.random() * 250,
+  })), []);
+  const rauch = useMemo(() => Array.from({ length: ppFxN(7) }, (_, i) => ({
+    dx: -26 + Math.random() * 52, dy: -(22 + Math.random() * 30),
+    size: 30 + Math.random() * 22, delay: 180 + i * 35, dur: 560 + Math.random() * 160,
+    ton: Math.random() < 0.5 ? '#5a5560' : '#3e3a44',
+  })), []);
   // Optional `opacity` prop — passed through from playAnimation options
   // so callers can dim the burst (Laser Volley wants its impacts more
   // ghostly than a regular hit explosion). Defaults to 1 / fully
@@ -1812,11 +2179,33 @@ function ExplosionEffect({ x, y, opacity }) {
   const wrapperOpacity = (typeof opacity === 'number' && opacity >= 0 && opacity <= 1) ? opacity : 1;
   return (
     <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100, opacity: wrapperOpacity }}>
+      {rauch.map((r, i) => (
+        <div key={'r' + i} className="anim-exp-rauch" style={{
+          width: r.size, height: r.size, left: -r.size / 2, top: -r.size / 2,
+          background: `radial-gradient(circle, ${r.ton} 0%, ${r.ton}cc 40%, transparent 72%)`,
+          '--dx': r.dx + 'px', '--dy': r.dy + 'px', animationDelay: r.delay + 'ms', animationDuration: r.dur + 'ms',
+        }} />
+      ))}
       <div className="anim-explosion-flash" />
+      <div className="anim-exp-welle" />
+      <div className="anim-exp-kern" />
       {particles.map((p, i) => (
         <div key={i} className="anim-explosion-particle" style={{
           '--dx': p.dx + 'px', '--dy': p.dy + 'px', '--size': p.size + 'px',
           '--color': p.color, animationDelay: p.delay + 'ms', animationDuration: p.dur + 'ms',
+        }} />
+      ))}
+      {brocken.map((b, i) => (
+        <div key={'b' + i} className="anim-exp-brocken" style={{
+          width: b.size, height: b.size, left: -b.size / 2, top: -b.size / 2, background: b.farbe,
+          '--dx': b.dx + 'px', '--dy': b.dy + 'px', '--dreh': b.dreh + 'deg',
+          animationDelay: b.delay + 'ms', animationDuration: b.dur + 'ms',
+        }} />
+      ))}
+      {glut.map((g, i) => (
+        <div key={'g' + i} className="anim-exp-glut" style={{
+          width: g.size, height: g.size, left: -g.size / 2, top: -g.size / 2, background: g.farbe,
+          '--dx': g.dx + 'px', '--dy': g.dy + 'px', animationDelay: g.delay + 'ms', animationDuration: g.dur + 'ms',
         }} />
       ))}
     </div>
@@ -2044,7 +2433,7 @@ function ElectricStrikeEffect({ x, y }) {
           '--startX': b.startX + 'px', '--startY': b.startY + 'px', '--size': b.size + 'px',
           '--rotation': b.rotation + 'deg',
           animationDelay: b.delay + 'ms', animationDuration: b.dur + 'ms',
-        }}>⚡</div>
+        }}><PxZeichen z="⚡" /></div>
       ))}
       {sparks.map((s, i) => (
         <div key={'es'+i} className="anim-explosion-particle" style={{
@@ -2129,7 +2518,7 @@ function BlackFlameStrikeEffect({ x, y, intensity = 1 }) {
         <div key={'bfl'+i} className="anim-black-flame-shard" style={{
           '--startX': f.startX + 'px', '--startY': f.startY + 'px', '--size': f.size + 'px',
           animationDelay: f.delay + 'ms', animationDuration: f.dur + 'ms',
-        }}>{f.char}</div>
+        }}><PxZeichen z={f.char} variante="schwarz" /></div>
       ))}
       {sparks.map((s, i) => (
         <div key={'bfs'+i} className="anim-explosion-particle" style={{
@@ -2516,6 +2905,114 @@ const PP_PIXELFLAMME = (() => {
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${bilder.length * 8}" height="12" viewBox="0 0 ${bilder.length * 8} 12" shape-rendering="crispEdges">${rects}</svg>`;
   return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
 })();
+
+// ── Torchure: das Schwein frisst die Fackel (Als Vorgabe 26.9.) ─────
+// Kartenbild als Vorlage: ein Schwein frisst eine Fackel und foltert
+// damit mental seine Aufpasserin (Torch + Torture). Ablauf am vergifteten
+// Helden:
+//     0–350   eine brennende Fackel faellt ueber dem Helden ein
+//   300–600   das Schwein ploppt daneben auf
+//   600–900   die Fackel fliegt ins Maul, zwei Bissen (Kauen)
+//   900–1250  die Flamme brennt im Schwein giftig violett weiter
+//  1000–1700  violette Gedankenringe ziehen sich um den Kopf zusammen,
+//             der Held glueht giftig
+//  1250–2000  Giftblasen steigen auf, alles blendet aus
+// Klang aus der Komponente (Regel ⑤), Keyframes in style.css (Regel ④).
+function TorchureEffect({ x, y, w = 80, h = 110 }) {
+  const P = 3;                                        // Pixelgroesse
+  // Schwein 14×11 Pixel: . leer, r rosa, d dunkelrosa, s Schnauze,
+  // n Nasenloch, k Auge, o Ohr (dunkel), m Maul.
+  // v1445: Glanzlicht oben links (h), geditherter Schatten unten rechts (d).
+  const schwein = [
+    '..o......o....',
+    '.odr....rdo...',
+    '.rhhrrrrrrr...',
+    'rhhrrrrrrrrd..',
+    'rhkrrrrrkrdr..',
+    'rrrrssssrrrd..',
+    'rrrsnssnsdrd..',
+    'drrrssssrdrd..',
+    '.drrmmmmdrd...',
+    '..ddrdrdrd....',
+    '...dddddd.....',
+  ];
+  const FARBE = { r: '#f4a2b4', d: '#c86a82', h: '#ffd6de', s: '#ff8fa6', n: '#6b2436', k: '#1a1016', o: '#9c4a60', m: '#4a1422' };
+  const fackel = [
+    '..y..',
+    '.ywy.',
+    'yoyor',
+    'rooor',
+    '.oro.',
+    '.bBb.',
+    '..b..',
+    '..B..',
+    '..b..',
+    '..B..',
+  ];
+  const FF = { w: '#fff8d0', y: '#ffe36b', o: '#ff9a2e', r: '#e8421c', b: '#8a5a2e', B: '#5a3a1c' };
+  const TP = 4;                                       // Fackel etwas groeber
+  const pixel = (zeilen, farben, key, q = P) => zeilen.flatMap((z, zy) => [...z].map((c, zx) => (
+    farben[c] ? <rect key={key + zx + '-' + zy} x={zx * q} y={zy * q} width={q} height={q} fill={farben[c]} /> : null
+  )));
+  const blasen = useMemo(() => Array.from({ length: ppFxN(14) }, () => ({
+    xOff: -w * 0.3 + Math.random() * w * 0.6,
+    size: 4 + Math.random() * 7,
+    delay: 1250 + Math.random() * 350,
+    dur: 500 + Math.random() * 400,
+    color: ['#9933cc', '#7722aa', '#bb55ee', '#5fbf3a', '#8fdc4a'][Math.floor(Math.random() * 5)],
+    wobble: -8 + Math.random() * 16,
+  })), []);
+  useEffect(() => {
+    const spiel = (name, opts, at) => setTimeout(() => { if (window.playSFX) window.playSFX(name, { ...opts, dedupe: 0 }); }, at);
+    spiel('elem_fire', { rate: 1.2, volume: 0.55 }, 0);
+    spiel('ping', { rate: 0.6, volume: 0.5 }, 330);
+    spiel('slash', { rate: 1.6, volume: 0.6 }, 640);
+    spiel('slash', { rate: 1.4, volume: 0.6 }, 800);
+    spiel('elem_dark', { rate: 0.85, volume: 0.7 }, 1000);
+    spiel('poison', { rate: 1.0, volume: 0.7 }, 1260);
+  }, []);
+  const kopfY = -h * 0.28;                             // Kopfhoehe des Helden
+  const sx = w * 0.42, sy = -h * 0.62;                 // Schwein oben rechts
+  // Flugbahn der Fackel: Flamme voran (70° gedreht) ins Maul des Schweins.
+  // Drehpunkt 50%/80% der Fackel (10 Pixel hoch); die Flammenmitte liegt
+  // 6 Fackelpixel darueber und wandert durch die Drehung nach rechts oben.
+  const fx = -w * 0.2, fy = -h * 0.8;                  // Fackel links oben
+  const drehX = fx + 2.5 * TP, drehY = fy + 8 * TP;
+  const maulX = sx - 1.5 * P, maulY = sy + 3 * P;
+  const rad = 70 * Math.PI / 180;
+  const zx = maulX - drehX - 6 * TP * Math.sin(rad);
+  const zy = maulY - drehY + 6 * TP * Math.cos(rad);
+  return (
+    <div className="torchure" style={{ left: x, top: y }} aria-hidden="true">
+      <span className="torchure-glut" style={{ width: w * 1.25, height: h * 1.15, left: -w * 0.625, top: -h * 0.575 }} />
+      {[0, 1, 2].map(i => (
+        <span key={'w' + i} className="torchure-ring" style={{
+          width: w * 0.9, height: w * 0.9, left: -w * 0.45, top: kopfY - w * 0.45,
+          animationDelay: (1000 + i * 180) + 'ms',
+        }} />
+      ))}
+      <div className="torchure-fackel" style={{
+        left: fx, top: fy, '--zx': zx + 'px', '--zy': zy + 'px',
+      }}>
+        <svg width={5 * TP} height={10 * TP} shapeRendering="crispEdges" className="torchure-flackern">
+          {pixel(fackel, FF, 'f', TP)}
+        </svg>
+      </div>
+      <div className="torchure-schwein" style={{ left: sx - 7 * P, top: sy - 5.5 * P }}>
+        <svg width={14 * P} height={11 * P} shapeRendering="crispEdges" className="torchure-kauen">
+          {pixel(schwein, FARBE, 's')}
+        </svg>
+        <span className="torchure-giftflamme" style={{ left: 5 * P, top: -3 * P }} />
+      </div>
+      {blasen.map((b, i) => (
+        <div key={'tb' + i} className="anim-beer-bubble" style={{
+          '--xOff': b.xOff + 'px', '--size': b.size + 'px', '--wobble': b.wobble + 'px',
+          '--color': b.color, animationDelay: b.delay + 'ms', animationDuration: b.dur + 'ms',
+        }} />
+      ))}
+    </div>
+  );
+}
 
 // ── Wuetende Anklage (Accusation, Als Vorgabe 26.9.) ────────────────
 // „Wuetende Sprechblase ueber dem Nutzer, aehnlich wie Furious Anger".
@@ -3371,7 +3868,7 @@ function FlameStrikeEffect({ x, y }) {
         <div key={'fl'+i} className="anim-flame-shard" style={{
           '--startX': f.startX + 'px', '--startY': f.startY + 'px', '--size': f.size + 'px',
           animationDelay: f.delay + 'ms', animationDuration: f.dur + 'ms',
-        }}>{f.char}</div>
+        }}><PxZeichen z={f.char} /></div>
       ))}
       {sparks.map((s, i) => (
         <div key={'fs'+i} className="anim-explosion-particle" style={{
@@ -4237,6 +4734,43 @@ const BuffColumn = window.BuffColumn;
 // uses it) — borrowed here to render CPU / avatar-less player portraits
 // next to the hand in-game using the same cropped hero art.
 const HeroArtCrop = window.HeroArtCrop;
+// v1448: Abzeichen-Symbole als Pixel-Sprites (app-shared.jsx, Paket 3).
+const PxIcon = window.PxIcon;
+
+/**
+ * ★ v1447 — PORTRAET NEBEN DER HAND, mit zwei Rueckfaellen
+ * (Als Befund 27.9.: „Der Avatar des Gegners (Bill, the Angry
+ * Auctioneer) laedt nicht" — der Rahmen blieb leer).
+ *
+ *   ① Kein Avatar → Heldenbild. Bisher NUR der mittlere Held; ist der
+ *     Platz leer, blieb der Rahmen leer, obwohl der Name daneben schon
+ *     auf den ersten vorhandenen Helden zurueckfiel. Jetzt dieselbe
+ *     Reihenfolge wie beim Namen: Mitte, sonst der erste mit Namen.
+ *   ② Avatar-Bild laedt nicht (hochgeladene Avatare kommen ueber den
+ *     Speicher-Cache `/api/img/<hash>` — nach einem Server-Neustart oder
+ *     einer Verdraengung antwortet er 404) → ebenfalls das Heldenbild
+ *     statt eines kaputten Bildes.
+ */
+function portraetHeld(spieler) {
+  const helden = spieler?.heroes || [];
+  return helden[1]?.name || helden.find(h => h?.name)?.name || null;
+}
+function HandPortraet({ src, bildKey, heroName, zustand, extraKlasse }) {
+  const [kaputt, setKaputt] = useState(false);
+  useEffect(() => { setKaputt(false); }, [src]);
+  if (src && !kaputt) {
+    return <img key={bildKey || 'avatar'} src={src} onError={() => setKaputt(true)}
+      className={'game-hand-avatar game-hand-avatar-big' + (extraKlasse || '') + zustand} />;
+  }
+  if (heroName && HeroArtCrop) {
+    return (
+      <div className={'game-hand-avatar-crop' + zustand}>
+        <HeroArtCrop heroName={heroName} width={135} />
+      </div>
+    );
+  }
+  return null;
+}
 
 // Status badges — small icons showing active negative statuses at a glance
 // StatusBadges and BuffColumn — now defined in app-shared.jsx
@@ -5385,14 +5919,14 @@ function StunStrikeEffect({ x, y }) {
   return (
     <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
       <div className="anim-stun-flash" />
-      <div className="anim-stun-megabolt anim-stun-megabolt-1">⚡</div>
-      <div className="anim-stun-megabolt anim-stun-megabolt-2">⚡</div>
+      <div className="anim-stun-megabolt anim-stun-megabolt-1"><PxZeichen z="⚡" einfarbig /></div>
+      <div className="anim-stun-megabolt anim-stun-megabolt-2"><PxZeichen z="⚡" einfarbig /></div>
       {bolts.map((b, i) => (
         <div key={'sb'+i} className="anim-stun-bolt" style={{
           '--startX': b.startX + 'px', '--startY': b.startY + 'px', '--size': b.size + 'px',
           '--rotation': b.rotation + 'deg',
           animationDelay: b.delay + 'ms', animationDuration: b.dur + 'ms',
-        }}>⚡</div>
+        }}><PxZeichen z="⚡" einfarbig /></div>
       ))}
       {sparks.map((s, i) => (
         <div key={'ss'+i} className="anim-explosion-particle" style={{
@@ -6917,6 +7451,7 @@ const ANIM_REGISTRY = {
   memory_wipe: MemoryWipeEffect,         // v1335
   furious_anger: FuriousAngerEffect,     // v1336
   anklage: AnklageEffect,                // Accusation, 26.9.
+  torchure: TorchureEffect,              // Torchure, 26.9.
   baby_spider_opfer: BabySpiderOpferEffect,   // Baby Spider, 26.9.
   crimson_web: CrimsonWebShotEffect,          // Crimson Web, 26.9. (Name war ungenutzt vergeben)
   todesgabe_erweckung: TodesgabeErweckungEffect,   // Divine Gift of Death, 26.9.
@@ -13502,7 +14037,7 @@ const ANIM_REGISTRY = {
       })), []);
       return (
         <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
-          <div className="anim-gold-flash" style={{ background: 'radial-gradient(circle, rgba(130,0,180,.8) 0%, rgba(100,0,160,.3) 40%, transparent 70%)' }} />
+          <div className="anim-gold-flash" style={pxHintergrund('radial-gradient(circle, rgba(130,0,180,.8) 0%, rgba(100,0,160,.3) 40%, transparent 70%)', 40)} />
           {bubbles.map((b, i) => (
             <div key={'pt'+i} className="anim-beer-bubble" style={{
               '--xOff': b.xOff + 'px', '--size': b.size + 'px', '--wobble': b.wobble + 'px',
@@ -13530,7 +14065,7 @@ const ANIM_REGISTRY = {
       })), []);
       return (
         <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
-          <div className="anim-gold-flash" style={{ background: 'radial-gradient(circle, rgba(100,0,160,.9) 0%, rgba(80,0,140,.4) 40%, transparent 70%)' }} />
+          <div className="anim-gold-flash" style={pxHintergrund('radial-gradient(circle, rgba(100,0,160,.9) 0%, rgba(80,0,140,.4) 40%, transparent 70%)', 40)} />
           {ooze.map((o, i) => (
             <div key={'po'+i} className="anim-beer-bubble" style={{
               '--xOff': o.xOff + 'px', '--size': o.size + 'px', '--wobble': o.wobble + 'px',
@@ -13542,7 +14077,7 @@ const ANIM_REGISTRY = {
               '--xOff': s.xOff + 'px', '--size': '14px', '--wobble': '0px',
               '--color': 'rgba(150,50,200,.6)', animationDelay: s.delay + 'ms', animationDuration: s.dur + 'ms',
               fontSize: 14, opacity: 0,
-            }}>💀</div>
+            }}><PxZeichen z="💀" /></div>
           ))}
         </div>
       );
@@ -15306,9 +15841,7 @@ const ANIM_REGISTRY = {
               position: 'absolute',
               left: p.x, top: p.y,
               width: p.size, height: p.size,
-              borderRadius: '50%',
-              background: `radial-gradient(circle, #88ffaa, #44ff88, #22cc66)`,
-              boxShadow: '0 0 6px #44ff88, 0 0 12px #22cc66',
+              ...pxHintergrund('radial-gradient(circle, #88ffaa, #44ff88, #22cc66)', p.size),   // v1445 Pixel
               opacity: 0,
               animation: `healSparkleParticle ${p.dur}s ease-out ${p.delay}s forwards`,
               '--spark-tx': `${Math.cos(p.angle) * p.dist}px`,
@@ -21664,12 +22197,21 @@ function ZielMarkenEbene({ marken, blitze, myIdx }) {
 
 function GameAnimationRenderer({ type, x, y, w, h, ...rest }) {
   const Component = ANIM_REGISTRY[type];
+  // ★ v1446: Pixelart-Umstellung — der Pixelierer (app-shared.jsx) setzt
+  // die Grafiken der Animation einmal beim Einblenden in Pixelart mit
+  // Dithering um, vor dem ersten Bild (useLayoutEffect).
+  const huelle = useRef(null);
+  useLayoutEffect(() => window.ppPixeliererAnhaengen ? window.ppPixeliererAnhaengen(huelle.current) : undefined, []);
   if (!Component) return null;
   // Forward extra props (intensity, custom payload, etc.) so animations
   // that key off broadcast-side parameters can scale themselves. Extras
   // come from `play_zone_animation` payloads via `onZoneAnim` →
   // `playAnimation(..., options)` → setGameAnims spread → here.
-  return <Component x={x} y={y} w={w} h={h} {...rest} />;
+  return (
+    <div ref={huelle} style={{ display: 'contents' }}>
+      <Component x={x} y={y} w={w} h={h} {...rest} />
+    </div>
+  );
 }
 
 // Renders a Creature card with an "underneath" overlay card revealed
@@ -22150,15 +22692,10 @@ function PileSearchModal({ title, cards, onClose, preserveOrder = false, ownerLe
                 const eintrag = entries?.[idx] || null;
                 // Lethe per-pile stamp lookup — when the modal was
                 // opened on a pile, the caller threads the owner's
-                // `letheStamps` map. Max stamp on any current
-                // occurrence of this name is what `effectiveCardLevel`
-                // uses, so the badge matches the engine's gates.
+                // stamps for THIS pile, one entry per pile slot (v1443:
+                // pro Karte, nicht mehr das Maximum ueber den Namen).
                 const isCreature = card.cardType === 'Creature' && card.level != null;
-                let stamp = 0;
-                if (isCreature && ownerLetheStamps) {
-                  const arr = ownerLetheStamps[name];
-                  if (Array.isArray(arr)) for (const v of arr) if (v > stamp) stamp = v;
-                }
+                const stamp = (isCreature && ownerLetheStamps?.[idx]) || 0;
                 const effectiveLevel = isCreature ? (card.level || 0) + stamp : null;
                 const displayCard = stamp > 0
                   ? { ...card, level: effectiveLevel, _liveLevel: effectiveLevel, _stampBonus: stamp }
@@ -23399,8 +23936,12 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   }, [result, iWon, isSpectator, tutorialOutroPending, gameState?.isTutorial, gameState?.isPuzzle, setBgmMode]);
 
   // ── Shared board tooltip (single instance, driven by BoardCard/CardRevealEntry) ──
+  // v1443 (Als Befund 26.9.): `.bday-present-reveal-card` gehoert dazu —
+  // die Aufdeck-Karten von Timeless King Zi / Birthday Present sind keine
+  // `.board-card`, und die 300-ms-Sicherung in `useCardTooltip` raeumte
+  // ihren Tooltip deshalb sofort wieder ab.
   const { tooltipCard, setTooltipCard } = useCardTooltip({
-    hoverSelectors: '.board-card:hover, .card-reveal-entry:hover, .card-mini:hover, .card-name-picker-row:hover, .revealed-hand-card:hover, .status-badge:hover, .buff-icon:hover, .option-tooltip-hover:hover',
+    hoverSelectors: '.board-card:hover, .card-reveal-entry:hover, .card-mini:hover, .card-name-picker-row:hover, .revealed-hand-card:hover, .status-badge:hover, .buff-icon:hover, .option-tooltip-hover:hover, .bday-present-reveal-card:hover',
   });
 
   // ── Phasenleiste auf die optische Naht des Spielfelds setzen ───────
@@ -39980,6 +40521,19 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                   );
                 })()}
                 {isDead && hero?.name && <div className="hero-dead-marker">🪦</div>}
+                {/* ★ v1450: Idle-Animation lebender Helden über dem oberen
+                    Kartendrittel. Tot oder im Rammflug → gar nicht da.
+                    Gelähmt (Frozen/Stunned/Webbed) → Frame steht still;
+                    versteinert → zusätzlich Steinoptik. Name wie auf der
+                    Karte (vorgezogene Gestalt, Shapeshifter-Kopie). */}
+                {hero?.name && !isDead && !isRamming && (
+                  <HeroIdleSprite
+                    cardName={(formPreview && formPreview.owner === pi && formPreview.heroIdx === i
+                      && CARDS_BY_NAME[formPreview.cardName]) ? formPreview.cardName : hero.name}
+                    angehalten={!!(isFrozen || isStunned)}
+                    versteinert={!!(isStunned?._petrified || isStunned?._baihuPetrify)}
+                    unsichtbar={!!isInvisible} />
+                )}
                 {hero?.name && isFrozen && <FrozenOverlay />}
                 {hero?.name && isStunned && !isStunned._petrified && !isStunned._baihuPetrify
                   && (hero.statuses?.stunned || !hero.statuses?.webbed)
@@ -40017,7 +40571,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                   <div className="status-immune-icon puppet-counter-badge badge-buff"
                     onMouseEnter={e => showGameTooltip(e, 'Luck Counter (Lucky Puppet Laki): when this target is chosen by an opponent\'s card or effect, Laki may remove all Luck Counters to redirect it to another target you control.')}
                     onMouseLeave={hideGameTooltip}
-                  >🍀{hero._luckCounter > 1 ? <span className="puppet-counter-num">×{hero._luckCounter}</span> : null}</div>
+                  ><PxIcon z="🍀" />{hero._luckCounter > 1 ? <span className="puppet-counter-num">×{hero._luckCounter}</span> : null}</div>
                 )}
                 {/* v904 (Vena, the Bounty Huntress): Kopfgeld-Marke. Liegt als
                     `hero._bountyBy` auf dem MARKIERTEN Helden und traegt den
@@ -40030,14 +40584,14 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                       ? 'Bounty: your Vena, the Bounty Huntress has marked this Hero. Her effects target it until she collects the bounty herself.'
                       : "Bounty: your opponent's Vena, the Bounty Huntress has marked this Hero. Her effects target it until she collects the bounty herself.")}
                     onMouseLeave={hideGameTooltip}
-                  >🎯</div>
+                  ><PxIcon z="🎯" /></div>
                 )}
                 {/* Aktionssperre (v642, Plant Golem u.a.): vom Server abgeleitet, kein Status */}
                 {hero?.name && p.actionBlockedHeroes?.[i] && !isFrozen && !isStunned && (
                   <div className="status-immune-icon status-action-blocked-icon badge-debuff"
                     onMouseEnter={e => showGameTooltip(e, 'This Hero cannot perform Actions (blocked by a card in its zones or its own effect).')}
                     onMouseLeave={hideGameTooltip}
-                  >⛔</div>
+                  ><PxIcon z="⛔" /></div>
                 )}
                 {/* Stealth (v634): Abzeichen strikt aus der Ability-Zone abgeleitet —
                     kein Status, nichts fuer den Puzzle-Editor. Level = Belegungen. */}
@@ -40048,7 +40602,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     <div className="status-immune-icon status-stealth-icon badge-buff"
                       onMouseEnter={e => showGameTooltip(e, `Stealth ${lvl}: cannot be chosen by the opponent's level ${lvl} or lower Attacks/Spells while you control other Heroes that can be chosen.`)}
                       onMouseLeave={hideGameTooltip}
-                    >🥷<span className="status-stealth-lvl">{lvl}</span></div>
+                    ><PxIcon z="🥷" /><span className="status-stealth-lvl">{lvl}</span></div>
                   );
                 })()}
                 {/* Alliance (v870): Abzeichen am VERBUENDETEN Helden. Abgeleitet
@@ -40063,7 +40617,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     <div className="status-immune-icon status-alliance-icon badge-debuff"
                       onMouseEnter={e => showGameTooltip(e, `Allied with ${partner.userName}: these two Heroes cannot choose each other with Attacks or non-Support Spells while other targets exist.`)}
                       onMouseLeave={hideGameTooltip}
-                    >🤝</div>
+                    ><PxIcon z="🤝" /></div>
                   );
                 })()}
                 {/* damage_proof (Storm Piano, v628): Schadensschutz bis zum Ende des naechsten eigenen Zuges */}
@@ -40071,20 +40625,20 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                   <div className="status-immune-icon status-damage-proof-icon badge-buff"
                     onMouseEnter={e => showGameTooltip(e, 'Damage-proof (Storm Piano): this Hero takes no damage until the end of its controller\'s next turn. Damage that cannot be negated still hits.')}
                     onMouseLeave={hideGameTooltip}
-                  >🎹</div>
+                  ><PxIcon z="🎹" /></div>
                 )}
                 {/* ★ v1341 — Cheat Chair: eigener Schutz fuer den Rest des Zuges (eigenes Abzeichen, Als Vorgabe) */}
                 {hero?.name && hero?.statuses?.cheat_chair_guard && !isShielded && (
                   <div className="status-immune-icon status-cheat-chair-icon badge-buff"
                     onMouseEnter={e => showGameTooltip(e, 'Cheat Chair: any damage this Hero would take for the rest of this turn becomes 0. Damage that cannot be reduced or negated still hits.')}
                     onMouseLeave={hideGameTooltip}
-                  >🪑</div>
+                  ><PxIcon z="🪑" /></div>
                 )}
                 {hero?.name && (p.supportZones?.[i] || []).some(slot => (slot || []).includes('Mummy Token')) && (
                   <div className="mummified-icon badge-debuff"
                     onMouseEnter={e => showGameTooltip(e, "This Hero's effect has been replaced by a Mummy Token's.")}
                     onMouseLeave={hideGameTooltip}
-                  >🧟</div>
+                  ><PxIcon z="🧟" /></div>
                 )}
                 {/* ── Lethe self-lock badge (cannot perform Actions) ── */}
                 {hero?.name && hero.hp > 0 && hero._letheActionLocked === gameState.turn && (
@@ -40110,7 +40664,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     onMouseEnter={e => showGameTooltip(e, `${hero.name.split(',')[0]} cannot perform Actions this turn: a target you control was defeated since the end of your last turn.`)}
                     onMouseLeave={hideGameTooltip}
                   >
-                    🚫
+                    <PxIcon z="🚫" />
                   </div>
                 )}
                 {hero?.name && <BuffColumn buffs={hero.buffs} statuses={hero.statuses} cardName={hero.name} />}
@@ -40138,7 +40692,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     onMouseEnter={e => showGameTooltip(e, `Deepsea Counters: ${hero.deepseaCounters}`)}
                     onMouseLeave={hideGameTooltip}
                   >
-                    🌊{hero.deepseaCounters}
+                    <PxIcon z="🌊" />{hero.deepseaCounters}
                   </div>
                 )}
                 {/* ── Time Counter badge (Carris, the Time Keeper) ── */}
@@ -40162,10 +40716,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                       border: 'calc(1.5px * var(--board-scale)) solid #2a1505',
                       zIndex: 6, pointerEvents: 'auto', cursor: 'help',
                     }}
-                    onMouseEnter={e => showGameTooltip(e, `Time Counters: ${hero._timeCounters}. At the end of each of your turns Carris gains 1; at 4 or more, you lose the game.`)}
+                    onMouseEnter={e => showGameTooltip(e, `Time Counters: ${hero._timeCounters}. At the end of each of your turns Carris gains 1; at 3 or more, you lose the game.`)}
                     onMouseLeave={hideGameTooltip}
                   >
-                    ⏳{hero._timeCounters}
+                    <PxIcon z="⏳" />{hero._timeCounters}
                   </div>
                 )}
                 {/* ── Divinity Counter badge (Pharaoh, the Lone Living Being) ── */}
@@ -40192,7 +40746,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     onMouseEnter={e => showGameTooltip(e, `Divinity Counters: ${hero._divinityCounters}. At the end of your turn, Pharaoh sacrifices a target you control, removes 1 counter and you draw 2 cards.`)}
                     onMouseLeave={hideGameTooltip}
                   >
-                    ☥{hero._divinityCounters}
+                    <PxIcon z="☥" />{hero._divinityCounters}
                   </div>
                 )}
                 {/* ── Devour-Zaehler (Pseudonia, the Skill Devourer, v1275) ──
@@ -40209,7 +40763,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     })())}
                     onMouseLeave={hideGameTooltip}
                   >
-                    🦷{(hero._pseudoniaAbsorbiert || []).length}/3
+                    <PxIcon z="🦷" />{(hero._pseudoniaAbsorbiert || []).length}/3
                   </div>
                 )}
                 {/* ── Evolution Counters (Waflav) ── */}
@@ -40228,7 +40782,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                       textShadow: '0 0 4px #2fbf7a',
                     }}
                   >
-                    🧬{hero._evolutionCounters}
+                    <PxIcon z="🧬" />{hero._evolutionCounters}
                   </div>
                 )}
                 {/* ── Invest Counters (Logan, the Investment Monkee) ── */}
@@ -40252,7 +40806,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                       textShadow: '0 0 4px #d9a520',
                     }}
                   >
-                    🪙{hero._investCounters}
+                    <PxIcon z="🪙" />{hero._investCounters}
                   </div>
                 )}
                 {/* ── Change Counters (Cosmic Depths) ── */}
@@ -40275,7 +40829,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                       zIndex: 5, pointerEvents: 'auto',
                     }}
                   >
-                    <span style={{ fontSize: 'calc(12px * var(--board-scale))', filter: 'drop-shadow(0 0 2px rgba(170,100,255,0.7))' }}>🌌</span>
+                    <span style={{ fontSize: 'calc(12px * var(--board-scale))', display: 'inline-flex' }}><PxIcon z="🌌" /></span>
                     <span style={{ fontWeight: 'bold' }}>×{hero._changeCounters}</span>
                   </div>
                 )}
@@ -41459,13 +42013,13 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                           <div className="status-immune-icon puppet-counter-badge"
                             onMouseEnter={e => showGameTooltip(e, 'Luck Counter (Lucky Puppet Laki): when this target is chosen by an opponent\'s card or effect, Laki may remove all Luck Counters to redirect it.')}
                             onMouseLeave={hideGameTooltip}
-                          >🍀{cc.luck > 1 ? <span className="puppet-counter-num">×{cc.luck}</span> : null}</div>
+                          ><PxIcon z="🍀" />{cc.luck > 1 ? <span className="puppet-counter-num">×{cc.luck}</span> : null}</div>
                         ) : null}
                         {cc?.preserve > 0 ? (
                           <div className="status-immune-icon puppet-counter-badge puppet-counter-badge-2"
                             onMouseEnter={e => showGameTooltip(e, 'Preserve Counter (Preserving Puppet Vinny): when an opponent\'s card or effect would affect this Creature, Vinny may remove all Preserve Counters to negate its effects on the preserved Creatures.')}
                             onMouseLeave={hideGameTooltip}
-                          >🔒{cc.preserve > 1 ? <span className="puppet-counter-num">×{cc.preserve}</span> : null}</div>
+                          ><PxIcon z="🔒" />{cc.preserve > 1 ? <span className="puppet-counter-num">×{cc.preserve}</span> : null}</div>
                         ) : null}
                         {cc ? <BuffColumn buffs={cc.buffs} statuses={cc} cardName={cards[cards.length-1]} /> : null}
                         {cc?.balance > 0 ? (
@@ -41728,7 +42282,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                         onMouseLeave={hideGameTooltip}
                         style={{ background: 'linear-gradient(135deg, #6644cc, #2a0d66)', borderColor: '#aa66ff', color: '#ffe9ff' }}
                       >
-                        <span className="head-counter-icon">🌌</span>
+                        <span className="head-counter-icon"><PxIcon z="🌌" /></span>
                         <span className="head-counter-num">×{cc.changeCounter}</span>
                       </div>
                     ) : null}
@@ -41803,13 +42357,13 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                       <div className="status-immune-icon puppet-counter-badge"
                         onMouseEnter={e => showGameTooltip(e, 'Luck Counter (Lucky Puppet Laki): when this target is chosen by an opponent\'s card or effect, Laki may remove all Luck Counters to redirect it.')}
                         onMouseLeave={hideGameTooltip}
-                      >🍀{cc.luck > 1 ? <span className="puppet-counter-num">×{cc.luck}</span> : null}</div>
+                      ><PxIcon z="🍀" />{cc.luck > 1 ? <span className="puppet-counter-num">×{cc.luck}</span> : null}</div>
                     ) : null}
                     {cc?.preserve > 0 ? (
                       <div className="status-immune-icon puppet-counter-badge puppet-counter-badge-2"
                         onMouseEnter={e => showGameTooltip(e, 'Preserve Counter (Preserving Puppet Vinny): when an opponent\'s card or effect would affect this Creature, Vinny may remove all Preserve Counters to negate its effects on the preserved Creatures.')}
                         onMouseLeave={hideGameTooltip}
-                      >🔒{cc.preserve > 1 ? <span className="puppet-counter-num">×{cc.preserve}</span> : null}</div>
+                      ><PxIcon z="🔒" />{cc.preserve > 1 ? <span className="puppet-counter-num">×{cc.preserve}</span> : null}</div>
                     ) : null}
                     {cc ? <BuffColumn buffs={cc.buffs} statuses={cc} cardName={cards[cards.length-1]} /> : null}
                     {ladung ? (
@@ -41879,16 +42433,13 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 (`.pp-portraet`, style.css). Im Tutorial: Monia Bot bzw.
                 Antonia mit eigenem Bild und eigener Farbe. */}
             <span className="pp-portraet" style={{ '--portraet': opp.color || '#ff5577' }}>
-              {(tutorialGegner ? tutorialGegner.avatar : opp.avatar)
-                /* `result ? '' : …` statt `!result && …`: der &&-Ausdruck liefert bei gesetztem Ergebnis das BOOLEAN false, und `'…-big' + false` haengt woertlich "false" an den Klassennamen. Aus `game-hand-avatar-crop` wurde `game-hand-avatar-cropfalse` — der quadratische Rahmen fiel weg und der HeroArtCrop lief auf seine volle 135px-Breite aus, der Avatar wurde also im End-Screen ploetzlich breiter. */
-                ? <img key={tutorialGegner ? tutorialGegner.key : 'avatar'} src={tutorialGegner ? tutorialGegner.avatar : opp.avatar} className={'game-hand-avatar game-hand-avatar-big' + (tutorialGegner ? ' game-hand-avatar-tutorial' : '') + (result ? '' : ((isMyTurn && !oppBarking) ? ' avatar-inactive' : ' avatar-active'))} />
-                : opp.heroes?.[1]?.name && HeroArtCrop
-                  ? (
-                    <div className={'game-hand-avatar-crop' + (result ? '' : ((isMyTurn && !oppBarking) ? ' avatar-inactive' : ' avatar-active'))}>
-                      <HeroArtCrop heroName={opp.heroes[1].name} width={135} />
-                    </div>
-                  )
-                  : null}
+              {/* `result ? '' : …` statt `!result && …`: der &&-Ausdruck liefert bei gesetztem Ergebnis das BOOLEAN false, und `'…-big' + false` haengt woertlich "false" an den Klassennamen. Aus `game-hand-avatar-crop` wurde `game-hand-avatar-cropfalse` — der quadratische Rahmen fiel weg und der HeroArtCrop lief auf seine volle 135px-Breite aus, der Avatar wurde also im End-Screen ploetzlich breiter. */}
+              <HandPortraet
+                src={tutorialGegner ? tutorialGegner.avatar : opp.avatar}
+                bildKey={tutorialGegner ? tutorialGegner.key : 'avatar'}
+                extraKlasse={tutorialGegner ? ' game-hand-avatar-tutorial' : ''}
+                heroName={portraetHeld(opp)}
+                zustand={result ? '' : ((isMyTurn && !oppBarking) ? ' avatar-inactive' : ' avatar-active')} />
               <span className="pp-portraet-zier" aria-hidden="true" />
             </span>
             <div className="game-hand-namensspalte">
@@ -42178,15 +42729,15 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           })()}
           <div className="board-util board-util-left">
             <div className="board-util-side">
-              <div data-opp-discard="1"><BoardZone type="discard" cards={ablageSicht(opp.discardPile, oppIdx, oppDiscardHidden)} label="Discard" onClick={() => setPileViewer({ title: 'Opponent Discard', cards: opp.discardPile, ownerIdx: oppIdx, isDiscard: true })} onHoverCard={setHoveredPileCard} style={oppBoardZone('discard')} ownerLetheStamps={opp.letheStamps} pileIdentities={opp.discardEntries} /></div>
-              <div data-opp-deleted="1"><BoardZone type="deleted" cards={oppDeletedHidden > 0 ? opp.deletedPile.slice(0, -oppDeletedHidden) : opp.deletedPile} label="Deleted" onClick={() => setPileViewer({ title: 'Opponent Deleted', cards: opp.deletedPile, ownerIdx: oppIdx })} onHoverCard={setHoveredPileCard} style={oppBoardZone('delete')} ownerLetheStamps={opp.letheStamps} /></div>
+              <div data-opp-discard="1"><BoardZone type="discard" cards={ablageSicht(opp.discardPile, oppIdx, oppDiscardHidden)} label="Discard" onClick={() => setPileViewer({ title: 'Opponent Discard', pile: 'discard', cards: opp.discardPile, ownerIdx: oppIdx, isDiscard: true })} onHoverCard={setHoveredPileCard} style={oppBoardZone('discard')} ownerLetheStamps={opp.letheStamps} pileIdentities={opp.discardEntries} /></div>
+              <div data-opp-deleted="1"><BoardZone type="deleted" cards={oppDeletedHidden > 0 ? opp.deletedPile.slice(0, -oppDeletedHidden) : opp.deletedPile} label="Deleted" onClick={() => setPileViewer({ title: 'Opponent Deleted', pile: 'deleted', cards: opp.deletedPile, ownerIdx: oppIdx })} onHoverCard={setHoveredPileCard} style={oppBoardZone('delete')} ownerLetheStamps={opp.letheStamps} /></div>
               <div className="board-util-spacer" />
             </div>
             <div className="board-util-mid" />
             <div className="board-util-side">
               <div className="board-util-spacer" />
-              <div data-my-deleted="1"><BoardZone type="deleted" cards={myDeletedHidden > 0 ? me.deletedPile.slice(0, -myDeletedHidden) : me.deletedPile} label="Deleted" onClick={() => setPileViewer({ title: 'My Deleted', cards: me.deletedPile, ownerIdx: myIdx })} onHoverCard={setHoveredPileCard} style={myBoardZone('delete')} ownerLetheStamps={me.letheStamps} /></div>
-              <div data-my-discard="1"><BoardZone type="discard" cards={ablageSicht(me.discardPile, myIdx, myDiscardHidden)} label="Discard" onClick={() => setPileViewer({ title: 'My Discard', cards: me.discardPile, ownerIdx: myIdx, isDiscard: true })} onHoverCard={setHoveredPileCard} style={myBoardZone('discard')} ownerLetheStamps={me.letheStamps} pileIdentities={me.discardEntries}
+              <div data-my-deleted="1"><BoardZone type="deleted" cards={myDeletedHidden > 0 ? me.deletedPile.slice(0, -myDeletedHidden) : me.deletedPile} label="Deleted" onClick={() => setPileViewer({ title: 'My Deleted', pile: 'deleted', cards: me.deletedPile, ownerIdx: myIdx })} onHoverCard={setHoveredPileCard} style={myBoardZone('delete')} ownerLetheStamps={me.letheStamps} /></div>
+              <div data-my-discard="1"><BoardZone type="discard" cards={ablageSicht(me.discardPile, myIdx, myDiscardHidden)} label="Discard" onClick={() => setPileViewer({ title: 'My Discard', pile: 'discard', cards: me.discardPile, ownerIdx: myIdx, isDiscard: true })} onHoverCard={setHoveredPileCard} style={myBoardZone('discard')} ownerLetheStamps={me.letheStamps} pileIdentities={me.discardEntries}
                 /* Liegt etwas Benutzbares in der Ablage (Future Tech
                    Prototypes), leuchtet der STAPEL — sonst muesste man
                    ihn jede Runde aufklappen, um nachzusehen. Das
@@ -42824,15 +43375,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             {/* Porträt im verzierten Pixelrahmen in der Farbe des Spielers
                 (`.pp-portraet`, style.css). */}
             <span className="pp-portraet" style={{ '--portraet': me.color || '#00f0ff' }}>
-              {me.avatar
-                ? <img src={me.avatar} className={'game-hand-avatar game-hand-avatar-big' + (result ? '' : ((isMyTurn || meBarking) ? ' avatar-active' : ' avatar-inactive'))} />
-                : me.heroes?.[1]?.name && HeroArtCrop
-                  ? (
-                    <div className={'game-hand-avatar-crop' + (result ? '' : ((isMyTurn || meBarking) ? ' avatar-active' : ' avatar-inactive'))}>
-                      <HeroArtCrop heroName={me.heroes[1].name} width={135} />
-                    </div>
-                  )
-                  : null}
+              <HandPortraet src={me.avatar} heroName={portraetHeld(me)}
+                zustand={result ? '' : ((isMyTurn || meBarking) ? ' avatar-active' : ' avatar-inactive')} />
               <span className="pp-portraet-zier" aria-hidden="true" />
             </span>
             <span className="orbit-font game-hand-name" style={{ fontSize: 18, fontWeight: 800, color: me.color }}>{me.username}</span>
@@ -44367,8 +44911,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           title={pileViewer.title}
           cards={pileViewer.cards || []}
           preserveOrder={pileViewer.preserveOrder}
-          ownerLetheStamps={pileViewer.ownerIdx != null
-            ? (gameState.players?.[pileViewer.ownerIdx]?.letheStamps || null)
+          ownerLetheStamps={pileViewer.ownerIdx != null && pileViewer.pile
+            ? (gameState.players?.[pileViewer.ownerIdx]?.letheStamps?.[pileViewer.pile] || null)
             : null}
           // ★ Ein Eintrag je Stapelplatz — trägt Identität und
           //   Benutzbarkeit der EINZELNEN Karte. Nur für Ablagen; der
@@ -44485,6 +45029,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       {/* ── Effect Prompt: Option Picker (generic multi-option) ── */}
       {isMyEffectPrompt && ep.type === 'optionPicker' && (
         <DraggablePanel className="first-choice-panel animate-in" style={{ borderColor: 'var(--accent)', display: 'flex', gap: 16, alignItems: 'stretch' }}>
+          <TriggerCardSlot name={ep.triggerCardName} />
           <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
           <div className="orbit-font" style={{ fontSize: 13, color: 'var(--accent)', marginBottom: 8 }}>{ep.title || 'Choose'}</div>
           {ep.description && <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 14 }}>{ep.description}</div>}
@@ -44629,15 +45174,24 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         // revival cost. Source is `entry.source`; ownership is implicit
         // (own piles only — every live caller passes the activator's
         // side). Stamps are Creature-only by spec.
+        // v1443: Stempel je Stapelplatz. Die Galerie waehlt nach Namen —
+        // waehlbar ist die Kopie mit dem NIEDRIGSTEN Stempel (so rechnet
+        // auch der Server: `_getLetheStampBonus`).
         const myStamps = (gameState?.players?.[myIdx]?.letheStamps) || {};
+        const myMe = gameState?.players?.[myIdx] || {};
         const stampForEntry = (entry, cardData) => {
           if (!cardData || cardData.cardType !== 'Creature') return 0;
           if (entry.source !== 'discard' && entry.source !== 'deleted') return 0;
-          const arr = myStamps[entry.name];
-          if (!arr || !arr.length) return 0;
-          let m = 0;
-          for (const v of arr) if (v > m) m = v;
-          return m;
+          const pile = entry.source === 'discard' ? myMe.discardPile : myMe.deletedPile;
+          const arr = myStamps[entry.source];
+          if (!Array.isArray(pile) || !Array.isArray(arr)) return 0;
+          let m = null;
+          pile.forEach((n, i) => {
+            if (n !== entry.name) return;
+            const v = arr[i] || 0;
+            if (m == null || v < m) m = v;
+          });
+          return m || 0;
         };
         const effectiveLevelFor = (entry, cardData) => {
           if (!cardData || cardData.cardType !== 'Creature' || cardData.level == null) return null;
@@ -45507,6 +46061,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       {/* Potion/Artifact targeting panel */}
       {!isSpectator && isTargeting && pt && !gameState.effectPrompt && (
         <DraggablePanel className="first-choice-panel" style={{ borderColor: 'var(--danger)', animation: 'fadeIn .2s ease-out', display: 'flex', gap: 16, alignItems: 'stretch' }}>
+          <TriggerCardSlot name={pt.config?.triggerCardName} />
           <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
           <div className="pixel-font" style={{ fontSize: 12, color: pt.config?.goldSelect ? '#ffd700' : pt.config?.greenSelect ? '#33dd55' : 'var(--danger)', marginBottom: 8 }}>{pt.potionName}</div>
           <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 14 }}>{pt.config?.description || 'Select targets'}</div>
