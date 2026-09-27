@@ -84,6 +84,12 @@ pixelgenau.
 * **`anchorX`** (optional): ausdrücklich abweichender Bildmittelpunkt in
   denselben Einheiten; hat Vorrang vor `faceX` („sofern nicht anders
   angegeben, ist das Gesicht die Mitte").
+* **`footY`** (optional): Standlinie in Frame-Pixeln von oben – hier steht
+  der Held auf der Kartenmitte. Ohne Angabe gilt das unterste deckende
+  Pixel. Nötig, wenn unter den Füßen noch etwas liegt (Medeas Schlangen);
+  dieser Teil wird nicht abgeschnitten, sondern liegt vor dem Helden.
+* **`boardScale`** (optional): Größenfaktor auf dem Brett für Ausreißer
+  (Bubbles: `0.5`). Sonst stehen alle Helden im selben Maßstab.
 * Gemeinsame Helfer (Glitzersterne, Lichtschimmer, Speichern) in `anim_common.py`.
 
 ## Stil-Lektionen aus dem Feedback
