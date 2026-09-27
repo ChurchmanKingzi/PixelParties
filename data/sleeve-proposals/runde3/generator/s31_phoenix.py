@@ -4,7 +4,7 @@
 Quellen (MotiveMoe.xcf):
   - Ebene 556 „Hintergrund-Kopie #1“: rosa Wolkenhimmel (Karte „Cute Princess Mary“)
   - Ebene 486 „Mary-Kopie“ + 487 „Mary #1“: Mary in Phönixgestalt mit Flügeln (Karte „Cute Princess Mary“), 4x
-  - Ebene 488 „Mary #3“: Flammenkranz, 2x
+  - Ebene 488 „Mary #3“: Flammenkranz, 2x (etwas röter umgefärbt)
   - Ebene 422 „Cute Phoenix“: Flammensäule/Feuerschweif (Karte „Cute Phoenix“), 3x
   - Ebene 220 „Ebene #105“: kleine Feuervögel (Karte „Victory Phoenix Cannon“), 3x
   Strahlenkranz: gedithert, selbst erstellt in den Orangetönen der Karte.
@@ -36,6 +36,7 @@ def build():
 
     # Flammenkranz 2x hinter Mary
     burst = compose(F, [488])
+    burst = hsv_shift(burst, -8, 1.0, 0.92)            # etwas röter/dunkler, damit die Flügel abheben
     B2 = up(burst, 2)
     cv.paste(B2, CX - B2.shape[1] // 2, CY - 150)
 
@@ -53,7 +54,7 @@ def build():
     cv.paste(up(bird, 2), 48, 312)
     cv.paste(up(bird, 2), 190, 300)
 
-    # Mary mit Phönixflügeln 3x
+    # Mary mit Phönixflügeln 4x
     mary = sprite('e31_mary_phoenix', F, [486, 487])
     M4 = up(mary, 4)
     cv.paste(M4, CX - M4.shape[1] // 2, CY - 96)
