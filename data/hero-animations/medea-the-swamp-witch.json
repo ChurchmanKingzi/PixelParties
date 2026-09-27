@@ -7,5 +7,6 @@
   "frameMs": 80,
   "loop": true,
   "layout": "horizontal",
-  "padTop": 6
+  "padTop": 6,
+  "faceX": 51.5
 }

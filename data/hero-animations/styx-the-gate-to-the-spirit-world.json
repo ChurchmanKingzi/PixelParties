@@ -8,5 +8,6 @@
   "loop": true,
   "layout": "horizontal",
   "padTop": 1,
-  "padBottom": 1
+  "padBottom": 1,
+  "faceX": 21
 }

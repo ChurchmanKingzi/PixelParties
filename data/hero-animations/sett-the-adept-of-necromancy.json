@@ -10,5 +10,6 @@
   "padTop": 1,
   "padLeft": 1,
   "padRight": 2,
-  "padBottom": 1
+  "padBottom": 1,
+  "faceX": 12.5
 }
