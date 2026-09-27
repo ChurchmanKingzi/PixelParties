@@ -2260,6 +2260,8 @@ function HeroEiskruste({ quelleRef, breite, hoehe, fussY, stil, schmilzt }) {
 //      auf dem Körper, Poisoned aufsteigende Totenschädel, Bleeding
 //      fallende Blutstropfen, Berserked dunkle Funken, Heal Reversed
 //      grün-violette Funken mit Schädeln, Webbed ein rotes Netz.
+//    v1460: Cursed flasht lila, Geister und Schädel steigen auf;
+//      Charmed flasht pink, Herzen steigen auf.
 //  Frozen (Eiskruste) und Petrified (Stein) haben eigene Wege.
 // ═══════════════════════════════════════════
 const HERO_TOENUNGEN = [
@@ -2268,6 +2270,11 @@ const HERO_TOENUNGEN = [
   { status: 'burned',       farbe: 'rgba(255,110,30,0.2)' },
   { status: 'berserked',    farbe: 'rgba(205,25,40,0.24)' },
   { status: 'healReversed', farbe: 'rgba(110,255,150,0.14)' },
+  // ★ v1460 (Als Vorgabe 27.9.): Cursed „flasht lila", Charmed pink —
+  // pulsierende Tönung (Stärke zwischen min und max, siehe `puls` im
+  // Zeichenschritt).
+  { status: 'cursed',       puls: [150, 40, 225], min: 0.06, max: 0.55 },
+  { status: 'charmed',      puls: [255, 85, 190], min: 0.06, max: 0.5 },
 ];
 
 // kleiner fester Zufall je Figur und Effekt
@@ -2380,6 +2387,21 @@ function HeroStatusPartikel({ effekte, kern, s, mitteX, fw, fh, saat }) {
         aus.push({ art: 'tropfen', x: x + 0.5, y: y + 0.5, dauer: 1.3 + z() * 0.9, verz: z() * 2 });
       }
     }
+    // ★ v1460: Cursed — kleine Geister und Totenschädel steigen auf;
+    // Charmed — Herzen steigen auf.
+    if (hat('cursed') || hat('charmed')) {
+      for (const art of ['cursed', 'charmed']) {
+        if (!hat(art)) continue;
+        const z = heroFxZufall(saat + art);
+        const n = 7;
+        for (let i = 0; i < n; i++) {
+          const zeichen = art === 'cursed' ? (i % 2 ? '💀' : '👻') : (z() < 0.5 ? '❤' : '💕');
+          aus.push({ art: 'schaedel', zeichen, x: kern.x0 + cw * (0.12 + 0.76 * ((i + z() * 0.8) / n)),
+            y: kern.y0 + ch * (0.15 + z() * 0.35), groesse: 10 + z() * 5,
+            dauer: 2.0 + z() * 1.2, verz: (i / n) * 2.4 + z() * 0.4 });
+        }
+      }
+    }
     if (hat('berserked') || hat('healReversed')) {
       const bers = hat('berserked');
       const z = heroFxZufall(saat + (bers ? 'wut' : 'umkehr'));
@@ -2404,7 +2426,7 @@ function HeroStatusPartikel({ effekte, kern, s, mitteX, fw, fh, saat }) {
         if (t.art === 'tropfen') return <span key={i} className="hfx hfx-tropfen" style={stil} />;
         if (t.dreh != null) stil['--hfx-dreh'] = t.dreh + 'deg';
         if (t.farbe) stil.color = t.farbe;
-        const zeichen = t.art === 'blitz' ? '⚡' : t.art === 'flamme' ? '🔥' : t.art === 'schaedel' ? '💀' : '✦';
+        const zeichen = t.zeichen || (t.art === 'blitz' ? '⚡' : t.art === 'flamme' ? '🔥' : t.art === 'schaedel' ? '💀' : '✦');
         return (
           <span key={i} className={'hfx hfx-' + t.art} style={stil}>
             <PxZeichen z={zeichen} groesse={px(t.groesse)} einfarbig={t.art === 'funke'} />
@@ -2510,7 +2532,12 @@ function HeroIdleSprite({ cardName, angehalten, versteinert, eingefroren, effekt
             ctx.drawImage(img, sx, sy, fw, fh, 0, 0, fw, fh);
           } else {
             ctx.globalCompositeOperation = 'source-atop';
-            ctx.fillStyle = t.farbe;
+            if (t.puls) {
+              const [r, g, b] = t.puls;
+              ctx.fillStyle = `rgba(${r},${g},${b},${(t.min + (t.max - t.min) * (st.puls || 0) / 8).toFixed(3)})`;
+            } else {
+              ctx.fillStyle = t.farbe;
+            }
             ctx.fillRect(0, 0, fw, fh);
           }
         }
@@ -2519,6 +2546,7 @@ function HeroIdleSprite({ cardName, angehalten, versteinert, eingefroren, effekt
       st.gemalt = st.frame;
       st.steinGemalt = st.stein;
       st.effekteGemalt = eff;
+      st.pulsGemalt = st.puls;
     };
     // Der Platz deckt sich in der Sprite-Ebene mit der Zone in der
     // Brettebene; die Hover-Vergrößerung der Zone (`--board-hover-scale`)
@@ -2591,8 +2619,16 @@ function HeroIdleSprite({ cardName, angehalten, versteinert, eingefroren, effekt
       if (z.versteinert) { if (st.stein < 1) st.stein = Math.min(1, st.stein + dt / 900); }
       else st.stein = 0;
       sicher('Zonenlage', folgeZone);
+      // Pulsierende Tönung (Cursed/Charmed): kurzes Aufflashen je
+      // 1,2 s, in acht Stufen — gemalt wird nur beim Stufenwechsel.
+      const effNun = zustand.current.effekte || '';
+      if (effNun.includes('cursed') || effNun.includes('charmed')) {
+        const phase = (now % 1200) / 1200;
+        const welle = Math.pow(Math.max(0, Math.sin(phase * Math.PI * 2)), 2);
+        st.puls = Math.round(welle * 8);
+      } else st.puls = 0;
       if (st.frame !== st.gemalt || st.stein !== st.steinGemalt
-        || (zustand.current.effekte || '') !== st.effekteGemalt) sicher('Malen', male);
+        || effNun !== st.effekteGemalt || st.puls !== st.pulsGemalt) sicher('Malen', male);
     }, { held: meta.hero || '?', frames, st, zustand });
     sicher('Zonenlage', folgeZone);
     sicher('Malen', male);
@@ -41235,6 +41271,11 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                       isNegated && !isNegated._byWeakeningCrystal ? 'negated' : '',
                       isBerserked ? 'berserked' : '',
                       isHealReversed ? 'healReversed' : '',
+                      // v1460: nur der echte Status, nicht die dauerhafte
+                      // Übernahme (permaControlBy), die ebenfalls als
+                      // „charmed" gerahmt wird
+                      isCursed ? 'cursed' : '',
+                      hero.statuses?.charmed ? 'charmed' : '',
                     ].filter(Boolean).join(' ')}
                     versteinert={!!(isStunned?._petrified || isStunned?._baihuPetrify)}
                     unsichtbar={!!isInvisible} />
