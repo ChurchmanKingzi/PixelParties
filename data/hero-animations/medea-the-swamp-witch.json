@@ -1,0 +1,11 @@
+{
+  "hero": "Medea, the Swamp Witch",
+  "sheet": "medea-the-swamp-witch.png",
+  "frameWidth": 96,
+  "frameHeight": 79,
+  "frames": 48,
+  "frameMs": 80,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 6
+}

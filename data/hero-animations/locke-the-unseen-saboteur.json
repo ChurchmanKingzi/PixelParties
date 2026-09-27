@@ -1,0 +1,11 @@
+{
+  "hero": "Locke, the Unseen Saboteur",
+  "sheet": "locke-the-unseen-saboteur.png",
+  "frameWidth": 27,
+  "frameHeight": 29,
+  "frames": 48,
+  "frameMs": 80,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 4
+}

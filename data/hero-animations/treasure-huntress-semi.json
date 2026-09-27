@@ -1,0 +1,10 @@
+{
+  "hero": "Treasure Huntress Semi",
+  "sheet": "treasure-huntress-semi.png",
+  "frameWidth": 27,
+  "frameHeight": 29,
+  "frames": 32,
+  "frameMs": 90,
+  "loop": true,
+  "layout": "horizontal"
+}

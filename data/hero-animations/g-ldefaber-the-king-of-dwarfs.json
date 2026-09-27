@@ -1,0 +1,11 @@
+{
+  "hero": "Güldefaber, the King of Dwarfs",
+  "sheet": "g-ldefaber-the-king-of-dwarfs.png",
+  "frameWidth": 38,
+  "frameHeight": 36,
+  "frames": 40,
+  "frameMs": 90,
+  "loop": true,
+  "layout": "horizontal",
+  "padLeft": 2
+}
