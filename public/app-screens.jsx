@@ -3519,6 +3519,8 @@ function ShopScreen() {
             return (
               <div key={item.id} className={'shop-item' + (type === 'avatar' ? ' shop-avatar-item' : '') + (isOwned ? ' shop-owned' : '') + (equipped ? ' shop-equipped' : '') + (sel ? ' shop-selected' : '')}
                 onClick={() => isOwned ? (!equipped && equipItem(type, item.id)) : toggleSelect(type, item.id)}>
+                {/* v1468: Zierrahmen (Eckschnoerkel), s. style.css „SHOP-KACHELN: ZIERRAHMEN" */}
+                <span className="shop-item-zier" aria-hidden="true" />
                 <div className="shop-item-img-wrap">
                   <img src={imgBase + encodeURIComponent(item.file)} draggable={false} />
                   {equipped ? <div className="shop-owned-badge shop-equipped-badge">EQUIPPED</div>
@@ -3566,6 +3568,7 @@ function ShopScreen() {
                 onMouseEnter={() => setHoverSkin({ skinName: skin.skinName, heroName: skin.heroName })}
                 onMouseLeave={() => setHoverSkin(null)}
                 onClick={() => toggleSelect('skin', skin.id)}>
+                <span className="shop-item-zier" aria-hidden="true" />
                 <div className="shop-item-img-wrap">
                   <img src={imgSrc} draggable={false}
                     className={!isOwned ? 'shop-skin-locked' : ''} />
@@ -3629,10 +3632,9 @@ function ShopScreen() {
               cursor: 'default',
               position: 'relative',
             };
-            if (isCurrentDefault) {
-              frameStyle.borderColor = '#33ff88';
-              frameStyle.boxShadow = '0 0 16px rgba(51,255,136,.7), 0 0 28px rgba(51,255,136,.35)';
-            }
+            // v1468: Gruen fuer das aktive Deck kommt aus der Klasse
+            // `structure-deck-default` (style.css „SHOP-KACHELN:
+            // ZIERRAHMEN") — ein Inline-Schatten ueberschrieb die Ringe.
             // shop-owned class adds the golden pulse + particle animations.
             // When the deck is the active default, the green border should
             // dominate, so we skip shop-owned and use a plain inline glow.
@@ -3644,6 +3646,7 @@ function ShopScreen() {
                 style={frameStyle}
                 onMouseEnter={() => d.coverCard && setHoverDeckCard(d.coverCard)}
                 onMouseLeave={() => setHoverDeckCard(null)}>
+                <span className="shop-item-zier" aria-hidden="true" />
                 <img src={coverUrl} alt={d.name} draggable={false}
                   style={{ width: '100%', height: 148, objectFit: 'cover', objectPosition: 'center top', borderRadius: 4, opacity: d.owned ? 1 : 0.5 }} />
                 <div style={{ fontSize: 11, textAlign: 'center', padding: '6px 4px 2px', color: isCurrentDefault ? '#33ff88' : (d.owned ? '#ffd700' : 'var(--text2)'), fontWeight: 600 }}>
