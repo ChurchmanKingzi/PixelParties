@@ -1414,7 +1414,10 @@ function DeckBuilder() {
     <div className="screen-full">
       {/* ── TOP BAR ── */}
       <div className="top-bar">
-        <button className="btn" style={{ padding: '4px 10px', fontSize: 9 }} onClick={() => hasUnsaved && !isSampleMode ? setShowLeaveConfirm(true) : setScreen('menu')}>← MENU</button>
+        {/* ★ v1462: Standardknopf wie „← BACK" auf allen anderen Bildschirmen
+            (vorher 9 px Schrift und 24 px hoch, siehe style.css
+            „KOPFZEILEN-KNOEPFE"). */}
+        <button className="btn" onClick={() => hasUnsaved && !isSampleMode ? setShowLeaveConfirm(true) : setScreen('menu')}>← MENU</button>
         <h2 className="orbit-font" style={{ fontSize: 22, fontWeight: 800, color: 'var(--player-color)' }}>DECK BUILDER</h2>
         {currentDeck && (
           /* Deck name + legality, left-aligned to sit directly above the
@@ -1424,7 +1427,7 @@ function DeckBuilder() {
               <>
                 <input className="input" value={renameVal} onChange={e => setRenameVal(e.target.value)}
                   onKeyDown={e => { if (e.key === 'Enter') finishRename(); }} autoFocus style={{ width: 200 }} />
-                <button className="btn" style={{ padding: '2px 8px', fontSize: 9 }} onClick={finishRename}>OK</button>
+                <button className="btn" onClick={finishRename}>OK</button>
               </>
             ) : (
               <>
