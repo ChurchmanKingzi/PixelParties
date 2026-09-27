@@ -536,192 +536,409 @@ const PP_PX_ZEICHEN = {
   '💢': 'wut', '💧': 'tropfen', '💦': 'tropfen', '✚': 'kreuz', '✙': 'kreuz', '➕': 'kreuz',
 };
 
-// ── Pixel-Sprites fuer Status-, Buff- und Debuff-Abzeichen (v1448) ──
-// Je ~9×9, mit dunkler Kontur, damit sie auf den farbigen Plaketten lesbar
-// bleiben. Grossbuchstaben = Palette, '.' = leer.
+// ── Pixel-Sprites fuer Status-, Buff- und Debuff-Abzeichen ──────────
+// ★ v1449 (Als Befund 27.9.: „sehen noch sehr grob aus"): 16×16 statt 9×9,
+// je Material drei Tonstufen, Licht von oben links, 1 Pixel dunkle Kontur
+// fuer die farbigen Plaketten. Eigener Namensraum `ab_…` in PP_PX_SPRITES,
+// damit die Animations-Sprites gleichen Namens unberuehrt bleiben.
 const PP_PX_ABZEICHEN_SPRITES = {
-  eis: { pal: { W: '#ffffff', B: '#6fd0ff', D: '#2a8ad0' }, z: [
-    '....W....', '.W..B..W.', '..W.B.W..', '...DBD...', 'WBBBWBBBW',
-    '...DBD...', '..W.B.W..', '.W..B..W.', '....W....'] },
-  moai: { pal: { G: '#a8a296', D: '#6c675e', K: '#2a2622', L: '#cfc9bc' }, z: [
-    '..KKKKK..', '.KLGGGGK.', '.KLGGGGK.', '.KKKGKKK.', '.KGGGGDK.',
-    '..KGGGDK.', '.KGDDDGK.', '.KGGGGDK.', '.KKKKKKK.'] },
-  verbot: { pal: { R: '#e8243a', W: '#ffd0d6' }, z: [
-    '..RRRRR..', '.RR...RR.', 'RRRW...RR', 'R.WRW...R', 'R..WRW..R',
-    'R...WRW.R', 'RR...WRRR', '.RR...RR.', '..RRRRR..'] },
-  halt: { pal: { R: '#e8243a', D: '#9a1020', W: '#ffffff' }, z: [
-    '..DDDDD..', '.DDRRRDD.', 'DDRRRRRDD', 'DRRRRRRRD', 'DRWWWWWRD',
-    'DRRRRRRRD', 'DDRRRRRDD', '.DDRRRDD.', '..DDDDD..'] },
-  fels: { pal: { G: '#8d8a84', L: '#bbb7ae', D: '#5c5a56', K: '#2b2a28' }, z: [
-    '.........', '...KKK...', '..KLLGK..', '.KLLGGGK.', '.KLGGGGK.',
-    'KLGGGGGDK', 'KGGGGGDDK', '.KDDDDDK.', '..KKKKK..'] },
-  blut: { pal: { R: '#d0203a', D: '#8a1024', W: '#ff9aa8', K: '#3a0610' }, z: [
-    '....K....', '...KRK...', '...KRK...', '..KRRRK..', '.KRWRRRK.',
-    '.KWRRRDK.', '.KRRRRDK.', '..KDDDK..', '...KKK...'] },
-  schaedel_gift: { pal: { W: '#d8f4b8', G: '#7fbf5a', K: '#12200c' }, z: [
-    '..WWWWW..', '.WWWWWWW.', 'WWWWWWWWG', 'WKKWWWKKG', 'WKKWWWKKG', 'WWWWKWWWG',
-    '.WWWWWWG.', '..WKWKWG.', '..WGWGWG.'] },
-  mund_zu: { pal: { Y: '#ffc83a', O: '#d8901a', K: '#3a2408', G: '#d8dce6' }, z: [
-    '..YYYYY..', '.YYYYYYY.', 'YYKYYYKYY', 'YYKYYYKYO', 'YYYYYYYYO',
-    'YKGKGKGKO', 'YYYYYYYYO', '.YYYYYYO.', '..OOOOO..'] },
-  stumm: { pal: { W: '#e4e4ee', K: '#2a2a36', R: '#ff4050' }, z: [
-    '...K.....', '..KK.....', 'KKWK.R..R', 'KWWK..RR.', 'KWWK..RR.',
-    'KKWK.R..R', '..KK.....', '...K.....', '.........'] },
-  glocke_aus: { pal: { Y: '#ffcc40', D: '#a87010', R: '#ff3040' }, z: [
-    'R...D....', '.R.YYY...', '..RYYYY..', '..YRYYY..', '..YYRYY..',
-    '.YYYYRYY.', 'DDDDDDRDD', '....Y..R.', '........R'] },
-  schreck: { pal: { B: '#6aa8e8', Y: '#ffd040', W: '#ffffff', K: '#1a1a2a', O: '#d89a20' }, z: [
-    '..BBBBB..', '.BBBBBBB.', 'BBWWBWWBB', 'YBWKBWKBY', 'YYYYYYYYO',
-    'YYYKKKYYO', 'YYYKKKYYO', '.YYKKKYO.', '..OOOOO..'] },
-  wut_gesicht: { pal: { R: '#e8402a', D: '#a82410', K: '#2a0804' }, z: [
-    '..RRRRR..', '.RRRRRRR.', 'RKKRRRKKR', 'RRRKRKRRD', 'RRKKRKKRD',
-    'RRRRRRRRD', 'RRRKKKRRD', '.RKRRRKD.', '..DDDDD..'] },
-  nazar: { pal: { B: '#1f4fc8', W: '#ffffff', L: '#6ac0ff', K: '#101018' }, z: [
-    '..BBBBB..', '.BBBWBBB.', 'BBWWLWWBB', 'BBWLLLWBB', 'BWLLKLLWB',
-    'BBWLLLWBB', 'BBWWLWWBB', '.BBBWBBB.', '..BBBBB..'] },
-  kerze: { pal: { Y: '#ffd23e', O: '#ff8a1e', W: '#f4efe0', G: '#b8b0a0' }, z: [
-    '....Y....', '...YOY...', '...YWY...', '....O....', '...WWG...',
-    '...WWG...', '...WWG...', '...WWG...', '..GGGGG..'] },
-  sanduhr: { pal: { K: '#7a5230', Y: '#f0c050', G: '#bfe4ff' }, z: [
-    'KKKKKKKKK', '.KYYYYYK.', '..KYYYK..', '...KYK...', '....Y....',
-    '...KGK...', '..KGYGK..', '.KYYYYYK.', 'KKKKKKKKK'] },
-  kette: { pal: { L: '#dfe3ec', D: '#8a90a0' }, z: [
-    '.LLL.....', 'L...L....', 'L...L....', 'L..DLDD..', '.LLLD..D.',
-    '....D..D.', '....D..D.', '.....DD..', '.........'] },
-  auge: { pal: { W: '#ffffff', B: '#4a90d0', K: '#1a1a2a' }, z: [
-    '.........', '..KKKKK..', '.KWWWWWK.', 'KWWBBBWWK', 'KWWBKBWWK',
-    'KWWBBBWWK', '.KWWWWWK.', '..KKKKK..', '.........'] },
-  nebel: { pal: { G: '#d8dce8', L: '#9aa0b4' }, z: [
-    '.........', '.GGGGGG..', '.........', '...LLLLLL', '.........',
-    'GGGGGG...', '.........', '..LLLLLLL', '.........'] },
+  flamme: { pal: { K: '#3a0a04', D: '#b8200c', R: '#e8461a', O: '#ff8a1e', Y: '#ffd23e', W: '#fff6c8' }, z: [
+    '.......K........', '......KRK.......', '......KRK....K..', '.....KROK...KRK.',
+    '.....KROOK..KRK.', '....KROYOK.KROK.', '...KRROYYOKKROK.', '..KRROYYYOORROK.',
+    '..KROOYWWYOOROK.', '.KRROYWWWYYOORK.', '.KROYYWWWWYYORK.', '.KROYWWWWWWYORK.',
+    '.KDROYWWWWYYORK.', '..KDROYYYYOORDK.', '...KDDRRRRRDDK..', '....KKKKKKKKK...',
+  ] },
+  schild: { pal: { K: '#141a2a', S: '#c8ccd8', G: '#8a90a0', B: '#4a7ad0', L: '#8ab4ff', D: '#2a4a90', W: '#ffffff' }, z: [
+    '................', '.KKKKKKKKKKKKKK.', '.KSSSSSSSSSSSGK.', '.KSLLLBBBBBBBGK.',
+    '.KSLWLBBBBBBDGK.', '.KSLLBBBBBBBDGK.', '.KSLBBBBBBBBDGK.', '.KSBBBBBBBBBDGK.',
+    '.KSBBBBBBBBBDGK.', '..KSBBBBBBBDGK..', '..KSBBBBBBBDGK..', '...KSBBBBBDGK...',
+    '....KSBBBDGK....', '.....KSBDGK.....', '......KGGK......', '.......KK.......',
+  ] },
+  eis: { pal: { K: '#0c1a3a', D: '#3a6cc0', B: '#78b4f0', L: '#c4ecff', W: '#ffffff' }, z: [
+    '.......K........', '.....KKWKK......', '...KKWKWKLKK....', '.KKWKKWLLKKLKK..',
+    'KWWWK.KLK.KBBBK.', '.KKWWKKLKKBBKK..', '.KWKKLLLLBKKBK..', '..K..KLWBK..K...',
+    '.KLKKLLBBBKKDK..', '.KKLLKKBKKBDKK..', 'KLLLK.KBK.KDDDK.', '.KKLKKBBBKKDKK..',
+    '...KKBKBKDKK....', '.....KKDKK......', '.......K........', '................',
+  ] },
+  blitz: { pal: { K: '#3a1a04', O: '#f08a10', Y: '#ffdc2a', W: '#fff8c0' }, z: [
+    '.........KKKKKK.', '........KWYYYOK.', '.......KWYYYOK..', '......KWYYYOK...',
+    '.....KWYYYOK....', '....KWYYYOK.....', '...KWYYYYYKKKK..', '..KWYYYYYYYYYOK.',
+    '..KKKOOOWYYYOK..', '.......KWYYOK...', '......KWYYOK....', '.....KWYYOK.....',
+    '....KWYOOK......', '...KWYOK........', '..KYOK..........', '..KKK...........',
+  ] },
+  moai: { pal: { K: '#16161a', W: '#e0dcd4', L: '#b4b0a8', M: '#88847c', D: '#5c5852', E: '#383632' }, z: [
+    '...KKKKKKKKKK...', '..KLLLLLLLLLMK..', '..KLWLLLLLLMMK..', '..KLLLLLLLLMDK..',
+    '.KLLLLLLLLLLMDK.', '.KEEEEELLEEEEDK.', 'KMKMMMMLLDMMMKDK', 'KMKMMMMLLDMMMKDK',
+    'KMKMMMMLLDMMMKDK', 'KMKMMMLLLLDMMKDK', 'KMKMMMLDDDDMMKDK', '.KKMMMMMMMMMDKK.',
+    '..KMEEEEEEEEDK..', '..KMMMMMMMMMDK..', '..KKMMMMMMMDDK..', '...KKKKKKKKKK...',
+  ] },
+  verbot: { pal: { K: '#3a0606', R: '#e42424', L: '#ff6a5a', D: '#a40c10', W: '#ffd8d0' }, z: [
+    '....KKLLLKK.....', '..KKLLLLRRRKK...', '.KLLLLLRRRRRRK..', '.KLWLKKKKKRRRK..',
+    'KLLLLLK...KRRRK.', 'KLLKLLRK...KRRK.', 'LLLKKRRRK..KRRDK', 'LLRK.KRRRK.KRDDK',
+    'LRRK..KRRRKKDDDK', 'KRRK...KRDDKDDK.', 'KRRRK...KDDDDDK.', '.KRRRKKKKKDDDK..',
+    '.KRRRRRRDDDDDK..', '..KKRRRDDDDKK...', '....KKDDDKK.....', '......KKK.......',
+  ] },
+  fels: { pal: { K: '#18181c', W: '#f2f2f4', L: '#c4c4ca', M: '#94949c', D: '#686870', E: '#46464e' }, z: [
+    '................', '................', '.....KKKKKKK....', '...KKLLLLLLLKK..',
+    '..KLWWLLLLLLLMK.', '.KLWLLLLLLLLMMDK', '.KLLLLLLLLLLMMDK', 'KMMLLLLLLLLMMDDK',
+    'KMMMMMLLLLMMDDDK', 'KMMMMMMMLMDDDDDK', 'KMMMMMMMMDDDDDEK', 'KMMMMMMMMDDDDDEK',
+    'KDMMMMMMMDDDDEEK', '.KDDMMMMMDDDEEK.', '..KKEEEEEEEEKK..', '....KKKKKKKK....',
+  ] },
+  blut: { pal: { K: '#2a0408', R: '#d8182a', L: '#ff5a64', D: '#8c0c1c', W: '#ffe0e0' }, z: [
+    '.......K........', '......KLK.......', '......KLK.......', '......KLK.......',
+    '.....KLLRK......', '....KLLRRRK.....', '...KLLRRRRRK....', '..KLLLRRRRRRK...',
+    '..KLLWRRRRRDK...', '.KLLWWRRRRRDDK..', '.KLLWRRRRRDDDK..', '..KRRRRRRDDDK...',
+    '..KRRRRRRDDDK...', '...KDDDDDDDK....', '....KDDDDDK.....', '.....KKKKK......',
+  ] },
+  schaedel_gift: { pal: { K: '#0e1e0c', W: '#eaffe2', B: '#b4dca0', S: '#6e9e5c' }, z: [
+    '..KK........KK..', '.KWBKKKKKKKKWBK.', 'KWBKWWBBBBBBKBBK', 'KBKWWBBBBBBBSKSK',
+    '.KKWBBBBBBBBSKK.', '..KBKKKBBKKKSK..', '..KBKKKBBKKKSK..', '..KBBBBKKBBBSK..',
+    '...KSBBBBBBSK...', '....KBKBKBSK....', '...KKKKKKKKKK...', '.KKWBSK..KBBBKK.',
+    'KWWBSK....KBBWBK', 'KBBSK......KWBSK', '.KBSK......KBSK.', '..KK........KK..',
+  ] },
+  schaedel: { pal: { K: '#1c1410', W: '#ffffff', B: '#ece4d2', S: '#b0a488' }, z: [
+    '................', '....KKKKKKKK....', '...KWWBBBBBBK...', '..KWWBBBBBBBBK..',
+    '.KWBBBBBBBBBBSK.', '.KWBBBBBBBBBBSK.', '.KBKKKBBBBKKKSK.', '.KBKKKKBBKKKKSK.',
+    '.KBKKKKBBKKKKSK.', '.KBBKKBBBBKKBSK.', '..KBBBBKKBBBSK..', '...KSBBKKBBSK...',
+    '...KBKBKBKBSK...', '...KBKBKBKBSK...', '....KSSSSSSK....', '.....KKKKKK.....',
+  ] },
+  mund_zu: { pal: { K: '#3a1c04', L: '#ffe46a', Y: '#ffc42a', O: '#e08810', W: '#fff8d0', S: '#dcdce4', G: '#8a8a96' }, z: [
+    '....KKKLKKK.....', '...KLLLLLLLK....', '..KLWWYYYYYYK...', '.KLLLYYYYYYYYK..',
+    'KLLLYKYYYYKYYOK.', 'KLLYYKYYYYKYYOK.', 'KLYYYYYYYYYYYOK.', 'LLYYYYYYYYYYYOOK',
+    'KLYKKKKKKKKKKOK.', 'KLYKSGSGSGSGSKK.', 'KLYKKKKKKKKKKSK.', '.KYYYYYYYYOOKK..',
+    '..KYYYYYYOOOK...', '...KOOOOOOOK....', '....KKKOKKK.....', '.......K........',
+  ] },
+  stumm: { pal: { K: '#141420', W: '#ffffff', L: '#d4d4e0', M: '#9a9aae', D: '#606078', R: '#e82222', P: '#ff7a6a', Q: '#a00c10' }, z: [
+    '.......K........', '......KLK.......', '.....KLLK.......', '....KLLLK.......',
+    '.KKKLLLLKKK..KK.', 'KWWLLLLLKPPKKRRK', 'KWLLLLLLKKPRRRK.', 'KLLLLLLMK.KRRK..',
+    'KLLLLLMMK.KRRK..', 'KLLLLMMMKKRRRQK.', 'KMMMMMMMKRRKKQQK', '.KKKMMMDKKK..KK.',
+    '....KMDDK.......', '.....KDDK.......', '......KDK.......', '.......K........',
+  ] },
+  glocke_aus: { pal: { K: '#2a1604', Y: '#ffc42a', L: '#ffe680', O: '#d8860e', D: '#8e5006', R: '#e82020', W: '#fffbe0' }, z: [
+    'KKK...KKKK......', 'KRRK.KYYYYK.....', '.KRRKYWYYYYK....', '..KRRKYYYYYOK...',
+    '...KRRKYYYYOK...', '..KLKRRKYYYOOK..', '..KLLKRRKYYOOK..', '..KLLYKRRKYOOK..',
+    '..KLLYYKRRKOOK..', '.KLLLYYYKRRKOOK.', 'KLLLLYYYYKRRKOOK', 'KOOOOOOOOOKRRKDK',
+    '.KKKKKOOOOKKRRK.', '......KOOK..KRRK', '.......KK....KRK', '.............KKK',
+  ] },
+  schreck: { pal: { K: '#2a1606', L: '#ffe46a', Y: '#ffc42a', O: '#e08810', W: '#ffffff', C: '#5aa8f0', N: '#2a64c0', D: '#6a1a10' }, z: [
+    '.....KKKKKK.....', '...KKCCCCCCKK...', '..KCWCCCCCCCNK..', '.KCCCCCCCCCCCNK.',
+    '.KCCCCCCCCCCNNK.', 'KYYYWWYYYYWWYYOK', 'KYYWKKWYYWKKWYOK', 'KYYYWWYYYYWWYYOK',
+    'KYYYYYYKKYYYYYOK', 'KKKYYYKDDKYYYKKK', 'KLYKYKDDDDKYKLOK', 'KLYKYKDDDDKYKLOK',
+    'KLYKYKDDDDKYKLOK', 'KLYKYYKDDKYYKLOK', 'KLOKKYYKKYYOKLOK', '.KKK.KKKKKK.KKK.',
+  ] },
+  wut_gesicht: { pal: { K: '#2a0404', L: '#ff7a5a', R: '#e8342a', D: '#a8141a' }, z: [
+    '....KKKLKKK.....', '...KLLLLLLLK....', '..KLLLRRRRRRK...', '.KLKKRRRRRRKKK..',
+    'KLLLKKKRRKKKRDK.', 'KLLRRRKRRKRRRDK.', 'KLRRRKKRRKKRRDK.', 'LLRRRKKRRKKRRDDK',
+    'KLRRRRRRRRRRRDK.', 'KLRRRRRRRRRRDDK.', 'KLRRRKKKKKKDDDK.', '.KRRKKRRRRKKDK..',
+    '..KRRRRRRDDDK...', '...KDDDDDDDK....', '....KKKDKKK.....', '.......K........',
+  ] },
+  nazar: { pal: { K: '#070a1e', D: '#0e1e70', B: '#1e40b4', L: '#4a7ae8', W: '#ffffff', S: '#c4d4e8', C: '#60c4f4' }, z: [
+    '....KKLLBKK.....', '..KKLLLBBBBKK...', '.KLLWLBBBBBBBK..', '.KLWLWWWWWBBBK..',
+    'KLLLWWCCCWWBBBK.', 'KLLWWCCCCCWWBBK.', 'LLBWCCWKKCCWBBDK', 'LBBWCCKKKCCSBDDK',
+    'BBBWCCKKKCCSDDDK', 'KBBWWCCCCCSSDDK.', 'KBBBWWCCCSSDDDK.', '.KBBBWWSSSDDDK..',
+    '.KBBBBBBDDDDDK..', '..KKBBBDDDDKK...', '....KKDDDKK.....', '......KKK.......',
+  ] },
+  kerze: { pal: { K: '#1e1410', W: '#ffffff', C: '#e4ded2', S: '#aea493', Y: '#ffe04a', O: '#ff8a1e' }, z: [
+    '.......K........', '......KOK.......', '......KOOK......', '.....KOYYOK.....',
+    '.....KOYWOK.....', '.....KOYYOK.....', '....KKKKKKKK....', '...KWWWWCCCSK...',
+    '...KWWCCCCCSK...', '...KWCCCCCSSK...', '...KWCCCCCSSK...', '...KWCCCCCSSK...',
+    '...KWCCCCCSSK...', '...KWCCCCCSSK...', '...KSSSSSSSSK...', '....KKKKKKKK....',
+  ] },
+  sanduhr: { pal: { K: '#1e1008', H: '#d08a4a', B: '#8a4e22', G: '#cfe8f4', W: '#ffffff', S: '#f4c64c', O: '#c8861e' }, z: [
+    'KKKKKKKKKKKKKKKK', 'KHHHHHHHHHHHHHHK', 'KBBBBBBBBBBBBBBK', 'KHK.KGGGGGGK.KBK',
+    'KHK.KWGGGGGK.KBK', 'KHK.KSSSSSOK.KBK', 'KHK..KSSSOK..KBK', 'KHK...KSOK...KBK',
+    'KHK...KGSK...KBK', 'KHK..KGGSGK..KBK', 'KHK.KGGGSGGK.KBK', 'KHK.KGGSSSGK.KBK',
+    'KHK.KSSSSSOK.KBK', 'KHHHHHHHHHHHHHHK', 'KBBBBBBBBBBBBBBK', 'KKKKKKKKKKKKKKKK',
+  ] },
+  kette: { pal: { K: '#14161e', W: '#ffffff', L: '#dde2ec', M: '#aab2c2', S: '#7a8292', D: '#4c5464' }, z: [
+    '...........KK...', '.........KKWLK..', '........KWMSSSK.', '.......KWMDKKSDK',
+    '......KWMDK.KMDK', '......KMDK.KLSK.', '....KKWSK.KLSDK.', '...KWKLSSKLSDK..',
+    '..KWMDKKSDKDK...', '.KWMDK.KMDKK....', '.KMDK.KLSK......', 'KWSK.KLSDK......',
+    'KLSKKLSDK.......', '.KSSMSDK........', '..KDDKK.........', '...KK...........',
+  ] },
+  auge: { pal: { K: '#141018', W: '#ffffff', E: '#dcdce8', G: '#a0a0b8', B: '#3a8ae0', D: '#1e4ea0', L: '#8ac8ff' }, z: [
+    '................', '................', '................', '.....KKKKKK.....',
+    '...KKWDDDDEKK...', '..KWWDLLBBDEEK..', '.KWWDLWKKBBDEEK.', 'KWWWDBKKKKBDEEEK',
+    'KEWWDBKKKKBDEGGK', '.KEEDBBKKBDDGGK.', '..KEEDBBDDDGGK..', '...KKEDDDDGKK...',
+    '.....KKKKKK.....', '................', '................', '................',
+  ] },
+  nebel: { pal: { K: '#1c2230', W: '#ffffff', L: '#dde3ec', M: '#b0bac8', S: '#7e8898' }, z: [
+    '........KK......', '...K..KKWWKK....', '..KWKKWWMMWWKK..', '.KWMWWMMKKMMWMK.',
+    '..KKMMKK..KKMK..', '....KK..KK..K...', '.KKK..KKLLKK..K.', 'KLLLKKLLMMLLKKMK',
+    '.KMMLLMMKKMMLLK.', '..KKMMKK..KKMMK.', '....KK..KK..KK..', '......KKLLKK....',
+    '...KKKLLSSLLK...', '..KLLLSSKKSSSK..', '...KSSKK..KKK...', '....KK..........',
+  ] },
   flagge: { mono: true, z: [
-    '#######..', '#+++++##.', '#+++++###', '#++++##..', '######...',
-    '#........', '#........', '#........', '#........'] },
-  blasen: { pal: { B: '#8ad0ff', L: '#d8f2ff', W: '#ffffff' }, z: [
-    '......LL.', '.....L..L', '.....L..L', '..BBB.LL.', '.B.W.B...',
-    'B.WW..B..', 'B.....B..', '.B...B...', '..BBB....'] },
-  zweig: { pal: { G: '#4caf3a', L: '#8ee06a', D: '#2a7022' }, z: [
-    '......LG.', '....LGG..', '.LG.GD...', '..GGD.LG.', '...D.GG..',
-    '.LG.D....', '..GGD....', '...D.....', '..D......'] },
-  welle: { pal: { B: '#3a8ae0', W: '#e8f6ff', D: '#1f4f9a' }, z: [
-    '.........', '...BBBB..', '..BWWWBB.', '.BW..BWB.', '.B..BBB..',
-    'BB.BBBBBB', 'BBBBBBBBB', 'DBBBDBBBD', 'DDDDDDDDD'] },
-  glanz: { pal: { Y: '#ffd84a', W: '#fffbe0', O: '#d89a20' }, z: [
-    '...Y.....', '...Y.....', '..YWY....', 'YYWWWYY..', '..YWY..Y.',
-    '...Y..YWY', '...Y...Y.', '.......O.', '.........'] },
-  schild: { pal: { B: '#4a7ad0', L: '#8ab4ff', D: '#2a4a90', K: '#141a2a' }, z: [
-    '.KKKKKKK.', 'KLLBBBBBK', 'KLBBBBBDK', 'KLBBBBBDK', 'KBBBBBBDK',
-    '.KBBBBDK.', '.KBBBBDK.', '..KBBDK..', '...KKK...'] },
-  falter: { pal: { B: '#3a9aff', L: '#aee0ff', K: '#1a1a2a' }, z: [
-    'BB.....BB', 'BLB...BLB', 'BLBB.BBLB', '.BBBKBBB.', '..BBKBB..',
-    '.BBBKBBB.', 'BLBB.BBLB', 'BBB...BBB', '.........'] },
-  hut: { pal: { K: '#3a3a4c', G: '#6a6a82', L: '#a8a8c0', Y: '#ffd23e' }, z: [
-    '.........', '....L....', '..LLGLL..', 'LLGGGGGLL', '..KKGKK.Y',
-    '..KKKKK.Y', '..KKKKK.Y', '.......YY', '.........'] },
-  zahnrad: { pal: { G: '#a8aebc', D: '#6a7080', K: '#2a2e38' }, z: [
-    '...GGG...', '.G.GGG.D.', '.GGGGGGD.', 'GGGK.KGDD', 'GGG...GDD',
-    'GGGK.KDDD', '.GGGDDDD.', '.D.DDD.D.', '...DDD...'] },
-  taube: { pal: { W: '#ffffff', G: '#b8c0d0', K: '#1a1a2a', O: '#f0a030' }, z: [
-    '.WW......', 'WWWW.....', '.WWWW..WW', '..WWWWWKW', '..GWWWWWO',
-    '.GWWWWWW.', 'GGWWWWW..', '....WW...', '.........'] },
-  katze: { pal: { O: '#f0a040', D: '#b86a1a', K: '#1a1008', P: '#ff8aa0' }, z: [
-    'O.......O', 'OO.....OO', 'OOOOOOOOO', 'OOKOOOKOD', 'OOKOOOKOD',
-    'OOOOPOOOD', '.OOOOOOD.', '..DDDDD..', '.........'] },
-  schloss: { pal: { G: '#b8bcc8', Y: '#f0c040', D: '#b08010', K: '#3a2808' }, z: [
-    '..GGGGG..', '.G.....G.', '.G.....G.', 'YYYYYYYYD', 'YYYYKYYYD',
-    'YYYYKYYYD', 'YYYYKYYYD', 'YYYYYYYYD', 'DDDDDDDDD'] },
-  sonnenbrille: { pal: { Y: '#ffc83a', O: '#d8901a', K: '#16161e', L: '#6a6a80' }, z: [
-    '..YYYYY..', '.YYYYYYY.', 'KKKKKKKKK', 'YKLKYKLKO', 'YYKKYKKYO',
-    'YYYYYYYYO', 'YYKYYYKYO', '.YYKKKYO.', '..OOOOO..'] },
-  fluegel: { pal: { W: '#ffe07a', L: '#d8a020', K: '#6a4a08' }, z: [
-    '......WW.', '....WWWLW', '..WWWLLW.', '.WWLLWW..', 'WWLLWWW..',
-    'WLLWWWW..', '.WWWWWK..', '..KKKK...', '.........'] },
-  zielscheibe: { pal: { R: '#e8243a', W: '#ffffff' }, z: [
-    '..RRRRR..', '.RWWWWWR.', 'RWRRRRRWR', 'RWRWWWRWR', 'RWRWRWRWR',
-    'RWRWWWRWR', 'RWRRRRRWR', '.RWWWWWR.', '..RRRRR..'] },
-  bueffel: { pal: { W: '#e8e0d0', G: '#5a5a66', K: '#101010', P: '#34343c' }, z: [
-    'W.......W', 'WW.....WW', '.WGGGGGW.', '..GKGKG..', '..GGGGG..',
-    '..GGGGG..', '...GPG...', '...GGG...', '.........'] },
-  hund: { pal: { B: '#8a5a2a', O: '#d8a060', K: '#1a1008', P: '#ff7a8a' }, z: [
-    '.........', 'BB.....BB', 'BBOOOOOBB', 'BBOKOKOBB', '.BOOOOOB.',
-    '..OOKOO..', '..OOOOO..', '...OPO...', '.........'] },
-  neumond: { pal: { D: '#3a3a5a', G: '#50507a', L: '#c8d0f0' }, z: [
-    '..DDDDD..', '.DDDDDDL.', 'DDGDDDDLL', 'DDDDDDDDL', 'DDDDGDDDL',
-    'DGDDDDDDL', 'DDDDDDDLL', '.DDDDDLL.', '..LLLLL..'] },
-  arm: { pal: { Y: '#ffc040', D: '#c8801a' }, z: [
-    '......YY.', '.....YYYY', '.....YYYD', '.....YYD.', '..YY.YYD.',
-    '.YYYYYYD.', 'YYYYYYYD.', 'YYYYYYD..', '.DDDDD...'] },
-  geodreieck: { pal: { B: '#4a90d0', L: '#a8d4ff' }, z: [
-    'B........', 'BB.......', 'BLB......', 'BL.B.....', 'BL..B....',
-    'BL...B...', 'BLLLLLB..', 'BBBBBBBB.', '.........'] },
-  feder: { pal: { W: '#f0f4ff', G: '#8a9ab8' }, z: [
-    '.......WG', '......WWG', '.....WWG.', '....WWG..', '...WWG...',
-    '..WWG....', '..WG.....', '.G.......', 'G........'] },
-  kaefer: { pal: { G: '#3aa060', L: '#8ae0a0', K: '#1a1a1a' }, z: [
-    '..K...K..', '...KKK...', '..KGGGK..', '.KGLKLGK.', 'KKGGKGGKK',
-    '.KGGKGGK.', 'KKGGKGGKK', '.KGGKGGK.', '..KKKKK..'] },
-  raute_blau: { pal: { D: '#1f5fb8', B: '#4aa8ff', L: '#a8dcff', W: '#ffffff' }, z: [
-    '....D....', '...DLD...', '..DLWLD..', '.DLLBLLD.', 'DBBBBBBBD',
-    '.DBBBBBD.', '..DBBBD..', '...DBD...', '....D....'] },
-  radioaktiv: { pal: { Y: '#ffd83a', K: '#1a1a10' }, z: [
-    '..YYYYY..', '.YKKYKKY.', 'YKKKYKKKY', 'YYKKYKKYY', 'YYYYKYYYY',
-    'YYYYYYYYY', 'YYYKKKYYY', '.YYKKKYY.', '..YYYYY..'] },
-  buch: { pal: { B: '#3a6ad8', L: '#1f3f90', Y: '#ffe070', W: '#f0f0e0' }, z: [
-    '.BBBBBBB.', '.LBBBBBBW', '.LBBBBBBW', '.LBYYYBBW', '.LBBBBBBW',
-    '.LBBBBBBW', '.LBBBBBBW', '.LBBBBBBW', '..WWWWWWW'] },
-  klee: { pal: { G: '#4cc04a', L: '#9af08a', D: '#2a8030' }, z: [
-    '.GG...GG.', 'GLGG.GGLG', 'GGGG.GGGG', '.GGGDGGG.', '...DDD...',
-    '.GGGDGGG.', 'GGGG.GGGD', 'GGGD.DGDD', '.DD...DD.'] },
-  ninja: { pal: { K: '#23232e', S: '#f0c8a0', R: '#d02a2a' }, z: [
-    '..KKKKK..', '.KKKKKKK.', 'RRRRRRRRR', 'KSSSSSSSK', 'KSKSSSKSK',
-    'KKKKKKKKK', 'KKKKKKKKK', '.KKKKKKK.', '..KKKKK..'] },
-  haende: { pal: { Y: '#ffcc5a', O: '#e08a3a', B: '#4a7ad0', R: '#d04a4a' }, z: [
-    '.........', '.........', 'BBY...ORR', 'BBYYYOORR', 'BBYYOYORR',
-    '..YOYOYO.', '...YOYO..', '.........', '.........'] },
-  klavier: { pal: { K: '#16161e', W: '#f4f4f0', G: '#9aa0a8' }, z: [
-    'KKKKKKKKK', 'WKWKWWKWK', 'WKWKWWKWK', 'WKWKWWKWK', 'WGWGWGWGW',
-    'WGWGWGWGW', 'KKKKKKKKK'] },
-  stuhl: { pal: { B: '#d0902a', D: '#8a5a1a' }, z: [
-    '.BD......', '.BD......', '.BD......', '.BD......', '.BBBBBBB.',
-    '.DDDDDDD.', '.B.....B.', '.B.....B.', '.D.....D.'] },
-  zombie: { pal: { G: '#7ab870', D: '#3a5a30', K: '#101810', R: '#e03030', W: '#e8e0c8' }, z: [
-    '..DDDDD..', '.DGGGGGD.', 'GGGGGGGGG', 'GKRGGGKRG', 'GGGGGGGGD',
-    'GGWKWKWGD', '.GKKKKKD.', '..DDDDD..', '.........'] },
-  ankh: { pal: { Y: '#ffd84a', D: '#b88a10' }, z: [
-    '..YYY..', '.Y...Y.', '.Y...D.', '..Y.D..', 'YYYYYYD',
-    '...Y...', '...Y...', '...YD..', '...YD..'] },
-  zahn: { pal: { W: '#f4f1e6', G: '#bdb6a2' }, z: [
-    '.WWW.WWW.', 'WWWWWWWWG', 'WWWWWWWWG', 'WWWWWWWWG', '.WWWWWWG.',
-    '.WWWGWWG.', '.WWG.WWG.', '.WG...WG.', '..G....G.'] },
-  dna: { pal: { B: '#4a8aff', R: '#ff5a7a', L: '#c8c8d8' }, z: [
-    'B.....R', '.B...R.', '..BLR..', '...B...', '..RLB..',
-    '.R...B.', 'R.....B', '.R...B.', '..RLB..'] },
-  muenze: { pal: { Y: '#ffd23e', D: '#b8860b', L: '#fff2a8' }, z: [
-    '..DDDDD..', '.DDLDYDD.', 'DDDDYDDDD', 'DLDYYYDYD', 'DDYYYYYDD',
-    'DYDYYYDYD', 'DDDDYDDDD', '.DDYDYDD.', '..DDDDD..'] },
-  galaxie: { pal: { D: '#2a1450', P: '#8a4ae8', L: '#d0a8ff', W: '#ffffff' }, z: [
-    '..DDDDD..', '.DDPPPDD.', 'DDPDDDPDD', 'DPDLLDDPD', 'DPDLWLDPD',
-    'DPDDLLDPD', 'DDPDDDPDD', '.DDPPPDD.', '..DDDDD..'] },
+    '..##............', '..#####+........', '..#########+....', '..############+.',
+    '..#############+', '..##########++..', '..########++....', '..#####+++......',
+    '..###++.........', '..##............', '..##............', '..##............',
+    '..##............', '..##............', '..##............', '.####...........',
+  ] },
+  blasen: { pal: { K: '#0c2238', W: '#ffffff', L: '#bfeaff', B: '#6cc4f0', D: '#2e7fbf' }, z: [
+    '..KKK...........', '.KWLBK....KKKK..', '.KLBDK...KLLBBK.', '.KBDDK..KLWLBBBK',
+    '..KKK...KWLBBBDK', '........KLBBBBDK', '...KKKK.KBBBBDDK', '.KKLLBBKKKBDDDK.',
+    '.KLWLBBBK.KKKK..', 'KLWBBBBBDK......', 'KLBBBBBBDK......', 'KBBBBBBBDK..KK..',
+    'KBBBBBBDDK.KWBK.', '.KBBBBDDK..KBDK.', '.KKDDDDKK...KK..', '...KKKK.........',
+  ] },
+  zweig: { pal: { K: '#0e2410', D: '#1f6b2a', G: '#3fa044', L: '#8ad85a', H: '#d8ffb0' }, z: [
+    '......KKK...KKKK', '.....KHLGK.KHLGK', '.....KLLGKKHLGDK', '...K.KLLGDKLGDK.',
+    '..KLKKGGGDKDDK..', '.KLLGKKGDDKKK...', '.KLLGDKDDKHLLKK.', '.KLLGDKKKLLLLGGK',
+    '..KGGDKGDKGGGGDK', '..KGGDKKKKKDDDDK', '...KDKHLLLKKKKK.', '....KKLLLLGK....',
+    '...KGKGGGGGDK...', '...KDKKDDDDDK...', '..KGDK.KKKKK....', '..KKK...........',
+  ] },
+  geist: { pal: { K: '#1a1428', W: '#ffffff', L: '#e4e4f2', S: '#b4b4cc', D: '#8484a4' }, z: [
+    '.....KKKKKK.....', '...KKWWWWLLKK...', '..KWWWWWWWWLSK..', '.KWWWWWWWWWWLSK.',
+    '.KWWWWWWWWWWLSK.', '.KWWWKKWWKKWLSK.', '.KWWWKKWWKKWLSK.', 'KLWWWKKWWKKWLSSK',
+    'KSWWWWWWWWWLLSDK', '.KLWWWWKKWWLSSK.', '.KLWWWWKKWLLSSK.', '.KLWWWWWLLLSSDK.',
+    '.KSLLLLLLSSSDDK.', '.KSSDKKSDKKSDDK.', '..KKK..KK..KKK..', '................',
+  ] },
+  welle: { pal: { K: '#061a30', D: '#1a5ab0', B: '#2a8ae0', L: '#6ac4ff', F: '#cfeeff', W: '#ffffff' }, z: [
+    '................', '.......KKKK.....', '.....KKWWWWKK...', '....KWWFFFLBBK..',
+    '...KWFLBBBBBBDK.', '...KWLBDKKKDBBDK', '..KWLBDK...KBBDK', '..KWBDK....KBBDK',
+    '..KWBDK.KK.KBBDK', '..KFBBKKWFKKBBDK', '.KKFBBBWFKKKBBDK', 'KFWWFWBBBBBBBBDK',
+    'KLBBBBBBBBBBBBDK', 'KDBBBBBBBBBBBDDK', '.KDDDDDDDDDDDDK.', '..KKKKKKKKKKKK..',
+  ] },
+  herz: { pal: { K: '#3a0a18', D: '#b01848', R: '#f0386a', L: '#ff90b0', W: '#ffffff', Y: '#ffe070' }, z: [
+    '................', '.............K..', '............KYK.', '...........KYWYK',
+    '..KKK...KKK.KYK.', '.KLLLK.KLLRK.K..', 'KLWLRRKRRRRDK...', 'KLWRRRRRRRRDK...',
+    'KLRRRRRRRRRDK...', 'KRRRRRRRRRDDK...', '.KRRRRRRRRDK.K..', '..KRRRRRRDK.KYK.',
+    '...KRRRRDK.KYWYK', '....KRRDK...KYK.', '.....KDK.....K..', '......K.........',
+  ] },
+  herz_rosa: { pal: { K: '#3a0a24', D: '#c0287a', P: '#ff5aa8', L: '#ffa8d4', W: '#ffffff', A: '#ffd05a', B: '#b07a1a' }, z: [
+    '...........KKKKK', '...........KAAAK', '....KKK...KKKABK', '...KLLLK.KLLAKBK',
+    '..KLWLPPKPPAKDK.', '..KLWPPPPPAKPDK.', '..KLPPPPPAKPPDK.', '..KPPPPPAKPPDDK.',
+    '...KPPPAKPPPDK..', '....KPAKPPPDK...', '....KAKPPPDK....', '...KAKKPPDK.....',
+    '.KLAK..KDK......', 'KLALK...K.......', 'KALK............', '.KK.............',
+  ] },
+  note: { pal: { K: '#1a0a2a', D: '#5a2a9a', V: '#9050e0', L: '#c8a0ff', W: '#ffffff' }, z: [
+    '.............KK.', '..........KKKLLK', '.......KKKLLLVVK', '.....KKLLLVVVVDK',
+    '....KLLVVVDDDVDK', '....KVVDDDKKKVDK', '....KVDKKK..KVDK', '....KVDK....KVDK',
+    '....KVDK..KKKVDK', '....KVDK.KLWVVDK', '..KKKVDKKLVVVVDK', '.KLWVVDKKVVVDDDK',
+    'KLVVVVDK.KDDDDK.', 'KVVVDDDK..KKKK..', '.KDDDDK.........', '..KKKK..........',
+  ] },
+  glanz: { pal: { K: '#3a2404', D: '#c07a10', Y: '#ffc21e', L: '#ffe680', W: '#ffffff' }, z: [
+    '............K...', '...........KYK..', '..........KKLKK.', '......K..KLLWYDK',
+    '.....KLK..KKDKK.', '.....KLK...KDK..', '....KLLYK...K...', '...KKLLYKK......',
+    '.KKLLLWYYDKK....', 'KLLLLWWYYYDDK...', '.KKYYYYDDDKKK...', '...KKYYDKK.KYK..',
+    '....KYDDK.KYWDK.', '.....KDK...KDK..', '.....KDK....K...', '......K.........',
+  ] },
+  falter: { pal: { K: '#0a1428', D: '#1a4ab0', B: '#3a8af0', L: '#8ad0ff', W: '#ffffff', G: '#7a6a90', H: '#3a2a50' }, z: [
+    '................', '..KK.H....H.KK..', '.KDDKKHKKHKKDDK.', 'KDWBDDKGHKDDBWDK',
+    'KDBLLBBGHBBLLBDK', 'KWBLBBBGHBBBLBWK', '.KDBBBBGHBBBBDK.', '..KDBBDGHDBBDK..',
+    '...KDDDGHDDDK...', '..KDBBDGHDBBDK..', '.KDLBBDGHDBBLDK.', '.KWBBBDGHDBBBWK.',
+    '.KDBBDKGHKDBBDK.', '..KDWDKGHKDWDK..', '...KKK.KK.KKK...', '................',
+  ] },
+  hut: { pal: { K: '#08080e', E: '#a8a8c8', M: '#565670', D: '#2c2c3c', W: '#e4e4f4', Y: '#ffc81e', O: '#b07a10' }, z: [
+    '................', '.......KK.......', '.....KKEEKK.....', '...KKEEMMEEKK...',
+    '.KKEEMMWYMMEEKK.', 'KEEMMMMYOYYYYYEK', '.KKDMMMMMMMMDYK.', '...KKDMMMMDKKYK.',
+    '...KKKKDDKKKKYK.', '...KMMDDDDDDKYK.', '...KMDDDDDDDKYYK', '...KEEEEEEEEKYOK',
+    '....KKKKKKKKKOOK', '.............KK.', '................', '................',
+  ] },
+  wolke: { pal: { K: '#1a2030', W: '#ffffff', G: '#d4dae6', S: '#9aa6ba' }, z: [
+    '................', '................', '................', '.....KKK........',
+    '....KWWWK.KK....', '...KWWWWWKWWK...', '..KWWWWWWWWWGK..', '.KKWWWWWWWWWWGK.',
+    'KWWKWWWWWWWWGGK.', 'KWWWWWWWWWWWWGGK', 'KWWWWWWWWWWWGGSK', 'KGWWWGGWWWWGGGSK',
+    '.KGGGGGGGGGGGSK.', '..KSSSSSSSSSSK..', '...KKKKKKKKKK...', '................',
+  ] },
+  zahnrad: { pal: { K: '#1a1a24', W: '#ffffff', L: '#dce0e8', M: '#a4aab6', D: '#666c7a' }, z: [
+    '......KKKK......', '..KK..KLLK..KK..', '.KLLKKLLLMKKMDK.', '.KLWLLLLLMMMMDK.',
+    '..KLLLLMMMMMDK..', '..KLLMKKKKMMDK..', 'KKKLLK....KMDKKK', 'KLLLLK....KMMMDK',
+    'KLLMMK....KMDDDK', 'KKKMMK....KDDKKK', '..KMMMKKKKDDDK..', '..KMMMMMMDDDDK..',
+    '.KMMMMMMDDDDDDK.', '.KMDKKMDDDKKDDK.', '..KK..KDDK..KK..', '......KKKK......',
+  ] },
+  taube: { pal: { K: '#1a1c2a', W: '#ffffff', L: '#e2e6ee', G: '#a8b0c2', Y: '#f0a020', O: '#7ac040', N: '#3a7a22' }, z: [
+    '.............KK.', '...........KKWLK', '.........KKWWLGK', '........KWWLLLGK',
+    '..KKK..KWWLLLGK.', '.KWWWK.KWLLLGGK.', 'KWWKWLKWLLLGGK..', 'YKWWLLKWLLGGK...',
+    'YYKWLLLKLGGKKK..', '.KKWLLLLKKKLLLKK', '.N.KWLLLLLLLLLGK', 'NON.KGLLLLLLGGK.',
+    '.ONO.KKGGGGGKGGK', '..N...KKKKKK.KKK', '................', '................',
+  ] },
+  katze: { pal: { K: '#2a1408', L: '#ffc070', O: '#f08a2a', D: '#b8561a', P: '#ff8aa0', W: '#ffffff', G: '#58c040' }, z: [
+    '.KK..........KK.', '.KLK........KOK.', '.KLPK......KPDK.', '.KLPPKKKKKKPPDK.',
+    'KLLOOODOODOOOODK', 'KLOOOOODDOOOOODK', 'KLOOOOOOOOOOOODK', 'KLOGKOOOOOOKGODK',
+    'KOOGKOOOOOOKGODK', 'KOOOOOOPPOOOOODK', 'KWWOOOOKKOOOOWWK', 'KOOWWOKOOKOWWODK',
+    '.KOOOOOOOOOOODK.', '..KDOOOOOOOODK..', '...KKDDDDDDKK...', '.....KKKKKK.....',
+  ] },
+  schloss: { pal: { K: '#20140a', Y: '#ffd23e', G: '#e8a020', B: '#a8640c', S: '#dde0e8', M: '#8a90a0', W: '#ffffff' }, z: [
+    '....KKKKKKKK....', '...KSWSSSSSMK...', '..KSSKKKKKKSMK..', '..KSSK....KSMK..',
+    '..KSSK....KSMK..', '..KSMK....KSMK..', '.KKKKKKKKKKKKKK.', '.KYYYYYYYYYYYGK.',
+    '.KYWYYYYYYYYGBK.', '.KYYYYYKKYYYGBK.', '.KYYYYKKKKGGGBK.', '.KYYYYYKKGGGGBK.',
+    '.KGYYYYKKGGGGBK.', '.KGGGGGGGGGGBBK.', '.KBBBBBBBBBBBBK.', '.KKKKKKKKKKKKKK.',
+  ] },
+  sonnenbrille: { pal: { K: '#2a1a08', Y: '#ffd23e', L: '#fff08a', O: '#e89a20', B: '#5a6a8a', W: '#ffffff' }, z: [
+    '.....KKKKKK.....', '...KKLLYYYYKK...', '..KLWLYYYYYYOK..', '.KLLYYYYYYYYYOK.',
+    '.KLYYYYYYYYYYOK.', 'KKKKKKKKKKKKKKKK', 'KKBBKKKYYKBBKKKK', 'KKBKKKKYYKBKKKKK',
+    'KYKKKKYYYYKKKKOK', 'KYYYYYYYYYYYYYOK', 'KYYKYYYYYYYYKYOK', '.KYYKWWWWWWKYOK.',
+    '.KOYYKKKKKKYYOK.', '..KOYYYYYYYYOK..', '...KKOOOOOOKK...', '.....KKKKKK.....',
+  ] },
+  fluegel: { pal: { K: '#3a2204', W: '#ffffff', L: '#fff0a0', Y: '#ffd23e', G: '#e8a020', B: '#a8640c' }, z: [
+    '..........KKKK..', '.......KKKLLLLKK', '.....KKLLLYYYYK.', '....KLWYYYYGGK..',
+    '...KLYYYGGKKKKK.', '..KLYYGKKKLLYYYK', '..KLYGKLLYYYGGK.', '.KLYGKLYYGGKKK..',
+    '.KLYGKYYGKKKKKK.', '.KLYKLYGKLYYYYGK', 'KLYGKYGKLYYGGKK.', 'KLYGKYGKYGGKK...',
+    'KLYYKGKYGKK.....', 'KLYYGKKGKK......', '.KGGGBBK........', '..KKKKK.........',
+  ] },
+  zielscheibe: { pal: { K: '#200a0a', R: '#e82828', L: '#ff6a5a', D: '#a01414', W: '#ffffff', G: '#d0ccd8', A: '#7a4a1a', F: '#ffd23e' }, z: [
+    '......KKKK..KFK.', '....KKLRRRKKFFFK', '..KKLRRWWRRRAKKK', '..KRRWWWWWWAKK..',
+    '.KLRWWWRRWAKRRK.', '.KRWWRRRRAKWWRK.', 'KLRWWRRWAKRWWRDK', 'KRWWRRWRRWRRGGDK',
+    'KRWWRRWRRWRRGGDK', 'KRRWWRRWWRRGGDDK', '.KRWWRRRRRRGGDK.', '.KRRWWWRRGGGDDK.',
+    '..KRRWWGGGGDDK..', '..KKRRRGGDDDKK..', '....KKDDDDKK....', '......KKKK......',
+  ] },
+  bueffel: { pal: { K: '#101014', G: '#6a6e7a', L: '#9aa0ac', D: '#3e4048', H: '#e8dcc0', N: '#a8987a', W: '#ffffff' }, z: [
+    'K..............K', 'KK............KK', 'KHK..........KNK', 'KHHK........KNNK',
+    '.KHHKK....KKNNK.', '..KHHHKKKKHNNK..', '...KKHHHHNNKK...', 'KKKKLGGGGGGGDKKK',
+    'KLGKLGGGGGGGDKDK', '.KKKLWGGGGWGDKK.', '...KLKGGGGKGDK..', '...KLGGGGGGDK...',
+    '...KLLLLLLLGK...', '...KLKLLLLKGK...', '...KGLLLLLGDK...', '....KKKKKKKK....',
+  ] },
+  hund: { pal: { K: '#2a1408', D: '#6a3e16', B: '#b87838', L: '#e0a868', C: '#f6dcb0', T: '#ff6a88', W: '#ffffff' }, z: [
+    '....KKKKKKKK....', '..KKLLLLBBBBKK..', '.KDKLWLBBBBBKDK.', 'KDDKLLLBBBBBKDDK',
+    'KDDKLLBBBBBBKDDK', 'KDDKLWKBBWKBKDDK', 'KDDKLKKBBKKBKDDK', 'KDDKBBBBBBBBKDDK',
+    'KDDKBCCKKCCBKDDK', 'KDDKCCKKKKCCKDDK', '.KDKCCCKKCCCKDK.', '.KKKCCKCCKCCKKK.',
+    '...KCCKTTKCCK...', '....KCKTTKCK....', '.....KKTTKK.....', '......KKKK......',
+  ] },
+  neumond: { pal: { K: '#0a0a14', M: '#5a5a74', D: '#3a3a4c', S: '#24242e', C: '#f0e6b0', Y: '#c8b870' }, z: [
+    '......KKKK......', '....KKMMDCKK....', '..KKMMMDDDDCKK..', '..KMMMDDDDDDCK..',
+    '.KMMMSSDDDDDCCK.', '.KMMSSMDDSDDDCK.', 'KMMDDMDDDDMDDCCK', 'KMDDDDDDDDDDDCCK',
+    'KDDDDDDDDDDDSCCK', 'KDDDDDDDSSDSSCCK', '.KDDDDDSSMSSSCK.', '.KDDDDDDMSSSCCK.',
+    '..KDDDDDSSSSCK..', '..KKDDDSSSSCKK..', '....KKSSSCKK....', '......KKKK......',
+  ] },
+  arm: { pal: { K: '#3a1a08', Y: '#ffc83a', L: '#ffe48a', O: '#e0902a', W: '#ffffff' }, z: [
+    '.....KKKKKK.....', '....KLLLLYYKK...', '...KLWLLYYYYOK..', '...KKKKKKYYYOK..',
+    '...KLLYYKYYYOOK.', '...KKKKKKYYYYOK.', '....KLYYKYYYYOK.', '.....KKKKLYYYOK.',
+    '..KKKK..KLYYYOK.', '.KLLLLK.KLYYOOK.', 'KLLWLYYKKLYYOOK.', 'KLYYYYYYKYYYOOK.',
+    'KYYYYYYYYYYYOOK.', 'KOYYYYYYYYYOOK..', 'KOOOOOOOOOOOK...', '.KKKKKKKKKKKK...',
+  ] },
+  geodreieck: { pal: { K: '#2a1a0a', Y: '#ffe07a', G: '#f0b830', B: '#b87a18', T: '#6a4210', W: '#ffffff' }, z: [
+    'KK..............', 'KWK.............', 'KYYK............', 'KTYYK...........',
+    'KYYYYK..........', 'KTYKYYK.........', 'KYYKKYYK........', 'KTYK.KYYK.......',
+    'KYYK..KYYK......', 'KTYK...KYYK.....', 'KYYK....KYYK....', 'KTYKKKKKKKYYK...',
+    'KYYGGGGGGGGGGK..', 'KGGTGTGTGTGTGGK.', 'KBBBBBBBBBBBBBBK', 'KKKKKKKKKKKKKKKK',
+  ] },
+  feder: { pal: { K: '#2a1808', L: '#fff4dc', Y: '#e8c890', B: '#b8844c', D: '#7a5228', Q: '#fffaf0' }, z: [
+    '............KKK.', '..........KKLLK.', '.........KLLLYK.', '........KLLLQBK.',
+    '........KLLQYBK.', '......KLLYQYBK..', '.....KLLYQYBBK..', '....KLLYQYBK....',
+    '...KLYYQYBBDK...', '...KLYQYBBDK....', '..KYYQBBDDK.....', '..KYQBDDKK......',
+    '.KKQKKKK........', '.KQK............', 'KQK.............', 'KK..............',
+  ] },
+  kaefer: { pal: { K: '#0a1a10', G: '#34b04a', L: '#8ae86a', D: '#16663a', T: '#2aa8b0', H: '#2e4a3a', W: '#ffffff' }, z: [
+    '..K..........K..', '...K........K...', '....K.KKKK.K....', '.....KHWHHK.....',
+    '.K..KKKKKKKK..K.', '..KKKLLGGGDKKK..', '...KKKKKKKKKK...', '...KLWLKKGGDK...',
+    '...KLLGKKLGDK...', '.KKKLGGKKGGDKKK.', 'K..KGGTKKGTDK..K', '...KGTGKKTGDK...',
+    '..KKGGGKKGDDKK..', '.K..KGGKKDDK..K.', 'K....KDKKDK....K', '......KKKK......',
+  ] },
+  raute_blau: { pal: { K: '#0a1430', B: '#3a8ae8', L: '#8ac8ff', D: '#1a4aa8', C: '#d0ecff', W: '#ffffff' }, z: [
+    '.......KK.......', '......KLBK......', '.....KLLBBK.....', '....KLLCCBBK....',
+    '...KLLCCCCBBK...', '..KLLLLCCBBBBK..', '.KLLCLLLBBBCBBK.', 'KLLCCCLWWBCCCBBK',
+    'KBBCCCBWWDCCCDDK', '.KBBCBBBDDDCDDK.', '..KBBBBCCDDDDK..', '...KBBCCCCDDK...',
+    '....KBBCCDDK....', '.....KBBDDK.....', '......KBDK......', '.......KK.......',
+  ] },
+  radioaktiv: { pal: { K: '#1a1408', Y: '#ffd23e', L: '#fff08a', O: '#e89a20', W: '#ffffff' }, z: [
+    '......KKKK......', '....KKLYYYKK....', '..KKLWYYYYYYKK..', '..KLLYYYYYYYYK..',
+    '.KLLKKYYYYKKYYK.', '.KLKKKKYYKKKKYK.', 'KLYKKKKYYKKKKYYK', 'KYKKKKYKKYKKKKYK',
+    'KYYYYYYKKYYYYYOK', 'KYYYYYYYYYYYYOOK', '.KYYYYYKKYYYOOK.', '.KYYYYKKKKYOOOK.',
+    '..KYYKKKKKKOOK..', '..KKYYYKKYOOKK..', '....KKYYOOKK....', '......KKKK......',
+  ] },
+  buch: { pal: { K: '#0e1430', B: '#2f6ae0', D: '#1c3a90', L: '#7eacff', G: '#ffd040', O: '#b8800c', P: '#f6f2e4', Q: '#b8b0a0' }, z: [
+    '.KKKKKKKKKKKKK..', 'KBDLLLLLLLLLLK..', 'KBDLBBBBBBBBBKK.', 'KBDLBBBBBBBBBKPK',
+    'KBDLBKKKKKKKBKPK', 'KBDLBKGGGGGKBKPK', 'KBDLBKGOOOGKBKPK', 'KBDLBKGGGGOKBKPK',
+    'KBDLBKKKKKKKBKPK', 'KBDLBBBBBBBBBKPK', 'KBDBBBBBBBBBBKPK', 'KBDBBBBBBBBBBKPK',
+    'KBDBBBBBBBBBDKPK', 'KBDDDDDDDDDDDKQK', 'KKPPPPPPPPPPPPQK', '.KKKKKKKKKKKKKK.',
+  ] },
+  halt: { pal: { K: '#2a0606', R: '#e02828', L: '#ff6a5a', D: '#a01010', W: '#ffffff', G: '#d0d0dc' }, z: [
+    '.....KKKKKK.....', '...KKLLLRRRKK...', '..KLLRRRRRRRRK..', '.KLLRRRRRRRRRDK.',
+    '.KLRRRRRRRRRRDK.', 'KLRRRRRRRRRRRRDK', 'KLRWWWWWWWWWWRDK', 'KRRWWWWWWWWWWRDK',
+    'KRRWWWWWWWWWWRDK', 'KRRGGGGGGGGGGRDK', 'KRRRRRRRRRRRRDDK', '.KRRRRRRRRRRRDK.',
+    '.KRRRRRRRRRRDDK.', '..KDRRRRRRRDDK..', '...KKDDDDDDKK...', '.....KKKKKK.....',
+  ] },
+  klee: { pal: { K: '#0c2410', L: '#8ee86a', G: '#46b83a', D: '#1f7a2a', S: '#3a9a30' }, z: [
+    '.....KK.KK......', '....KLLKLLK.....', '...KLGGLGGDK....', '..KKLGGGGGDKK...',
+    '.KLLKLGGGDKLLK..', 'KLGGLKLGDKLGGDK.', 'KLGGGGKDKGGGGDK.', '.KLGGGDDDGGGDK..',
+    'KLGGGGKDKSGGGDK.', 'KLGGDKLGDKSGGDK.', '.KLDKLGGGDKSDK..', '..KKLGGGGGDKSK..',
+    '...KLGGGGGDKSK..', '....KLDKLDKKSK..', '.....KK.KK..KSK.', '.............K..',
+  ] },
+  ninja: { pal: { K: '#0a0a14', N: '#262636', H: '#4a4a64', S: '#f2c490', T: '#c88a5a', R: '#e02828', D: '#8a1010', W: '#ffffff' }, z: [
+    '...KKKKKK.......', '.KKHHHHNNKK.....', '.KHHHNNNNNK.....', 'KHHNNNNNNNNK.KK.',
+    'KRRRRRRRRRRRKRRK', 'KRRRRRRRRRRRRRDK', 'KDDDDDDDDDDRRKK.', 'KNSSSSSSSSNKRDK.',
+    'KNSWKSSWKSNKKRDK', 'KNSKKSSKKSNK.KDK', 'KNTTTTTTTTNK..KK', 'KHNNNNNNNNNK....',
+    'KHNNNNNNNNNK....', '.KNNNNNNNNK.....', '.KKNNNNNNKK.....', '...KKKKKK.......',
+  ] },
+  haende: { pal: { K: '#1a1010', B: '#3a6ee0', N: '#1e3a8a', R: '#e03030', D: '#8a1414', S: '#f6c48a', T: '#c88450', L: '#ffe4bc' }, z: [
+    '................', '................', '.....KKK........', '....KLLSK.KKKKKK',
+    'KKKKLSSSKKLLLRRK', 'KBBBSSSKLLSSSRRK', 'KBBBSSKSSSSSTRRK', 'KBBBSKKKKKKSTRRK',
+    'KNNNKLLLLLTKTDDK', 'KNNNKSSSSSTKTDDK', 'KNNNKKKKKKKSTKKK', 'KKKKKLLLLLTTK...',
+    '....KSSSSSTK....', '....KKKKKKK.....', '................', '................',
+  ] },
+  klavier: { pal: { K: '#0c0c14', N: '#2a2a3a', H: '#55556e', W: '#ffffff', S: '#c4c8d6', G: '#8a90a4' }, z: [
+    '................', 'KKKKKKKKKKKKKKKK', 'KHHHHHHHHHHHHHNK', 'KHNNNNNNNNNNNNNK',
+    'KKKKKKKKKKKKKKKK', 'KWKWKWSWKWKWKWSK', 'KWKWKWSWKWKWKWSK', 'KWKWKWSWKWKWKWSK',
+    'KWKWKWSWKWKWKWSK', 'KWKWKWSWKWKWKWSK', 'KWSWSWSWSWSWSWSK', 'KWSWSWSWSWSWSWSK',
+    'KWSWSWSWSWSWSWSK', 'KGSGSGSGSGSGSGSK', 'KKKKKKKKKKKKKKKK', '................',
+  ] },
+  stuhl: { pal: { K: '#2a1408', L: '#eaa866', M: '#c07a3a', D: '#8a4a1e' }, z: [
+    '.......KKKKKKK..', '......KLLLLLLMK.', '......KMMMMMMDK.', '......KKKKKKKKK.',
+    '......KLK...KMK.', '......KLKKKKKMK.', '......KLLLLLLMK.', '......KMMMMMMDK.',
+    '....KKKKKKKKKMK.', '...KLLLLLLLLLKK.', '..KLMMMMMMMMLDK.', '.KLMMMMMMMMMDDK.',
+    '.KDDDDDDDDDDDKK.', '.KMKKKKKKKKKMKDK', '.KMK.....KMK.KDK', '.KKK.....KKK..K.',
+  ] },
+  zombie: { pal: { K: '#102010', L: '#a8e070', G: '#6cb840', D: '#3a7a28', H: '#5a2a3a', J: '#8a4050', W: '#f0f0d0' }, z: [
+    '...K.KK.K.KK....', '..KHKHHKHKHHKK..', '.KHJJHHHJJHHHHK.', '.KHJHHHHHHHHHHK.',
+    'KHHGGHHHGGHHGHHK', 'KHGLLGGGGGGGGDHK', 'KGLLLGGGGGGGGGDK', 'KGLDDDGGGDDDGGDK',
+    'KGLDKDGGGDKDGGDK', 'KGGDDDGGGDDDGGDK', 'KGGGGGGGGGGGGGDK', 'KGGGGKKKGGGGGDDK',
+    '.KGGKWKWKKKGGDK.', '.KDGGGGGGGKKDDK.', '..KKDDDDDDDDKK..', '....KKKKKKKK....',
+  ] },
+  ankh: { pal: { K: '#3a2404', L: '#fff080', G: '#ffc830', O: '#c0800c', W: '#ffffff' }, z: [
+    '.....KKKKKK.....', '....KLLLLGGK....', '...KLLKKKKGOK...', '...KLGK..KGOK...',
+    '...KLGK..KGOK...', '...KLGK..KGOK...', '...KLGK..KGOK...', '....KLGKKGOK....',
+    '.KKKKLGGGGOKKKK.', 'KLLLLLLGGGGGGGOK', 'KGGGGGGGGGGGOOOK', '.KKKKKLGGOKKKKK.',
+    '.....KLGGOK.....', '.....KLGGOK.....', '....KLLGGOOK....', '....KKKKKKKK....',
+  ] },
+  zahn: { pal: { K: '#1a2030', W: '#ffffff', L: '#eef2fa', M: '#c0cadb', D: '#8490a8' }, z: [
+    '..KKKKK..KKKKK..', '.KWWWWWKKWWWWMK.', 'KWWLLLLLLLLLLMMK', 'KWLLLLLLLLLLLMDK',
+    'KWLLLLLLLLLLLMDK', 'KLLLLLLLLLLLMMDK', 'KLLLLLLLLLLLMMDK', 'KLLLLLLLLLLMMMDK',
+    '.KLLLLLLLLLMMDK.', '.KLLLLLLLLMMMDK.', '.KLLLMKKKKMMMDK.', '.KLLMK....KMDDK.',
+    '.KLLMK....KMDK..', '..KLMK....KMDK..', '..KLK......KDK..', '...K.......KK...',
+  ] },
+  dna: { pal: { K: '#12102a', Q: '#ff9ad8', P: '#e8409c', C: '#8ad0ff', B: '#2a7ae8', Y: '#ffd040', G: '#50d070' }, z: [
+    'KQPKKKKKKKKKCBK.', '.KQPYYYGGGGCBK..', '..KQPKKKKKCBK...', '...KKQPKCBKK....',
+    '....KKCQPKK.....', '..KKCBKKKQPKK...', '.KCBYYYGGGGQPK..', '.KCBK.....KQPK..',
+    '.KCBK.....KQPK..', '.KCBYYYGGGGQPK..', '..KKCBKKKQPKK...', '....KKCBPKK.....',
+    '...KKQPKCBKK....', '..KQPKKKKKCBK...', '.KQPYYYGGGGCBK..', 'KQPKKKKKKKKKCBK.',
+  ] },
+  muenze: { pal: { K: '#3a2404', W: '#ffffff', L: '#ffe680', Y: '#ffc21e', O: '#c07a0a' }, z: [
+    '....KKKKKKKK....', '...KLLLLLLLYK...', '..KLWLOOOOYYYK..', '.KLLOOYYYYYYYYK.',
+    'KLLOYYYYYYYYYYYK', 'KLLOYYYLYYYYYYOK', 'KLOYYYLLLYYYYLOK', 'KLOYLLLLLLLYYLOK',
+    'KLOYYLLLLLOOYLOK', 'KLOYYLLOLLOYYLOK', 'KLYYYLOOYLOYLOOK', 'KYYYYYOYYYOYLOOK',
+    '.KYYYYYYYYLLOOK.', '..KYYYLLLLOOOK..', '...KYOOOOOOOK...', '....KKKKKKKK....',
+  ] },
+  galaxie: { pal: { K: '#08061a', N: '#1c1648', M: '#2a2266', V: '#8a4ad8', L: '#d0a0ff', P: '#ffd8ff', W: '#ffffff' }, z: [
+    '....KKKMMKKK....', '...KMMNNNNMMK...', '..KMNNNNNNWNMK..', '.KMNLLLVVVVVNMK.',
+    'KMNLLLVNNNNNNNMK', 'KMVLLVNNNNNWNNMK', 'KNVLLNPPPPLVNNNK', 'MNVLLPPWWPPLVNNM',
+    'MNNVLPPWWPPLLVNM', 'KNNNVLPPPPNLLVNK', 'KMNWNNNNNNVLLVMK', 'KMNNNNNNNVLLLNMK',
+    '.KMNVVVVVLLLNMK.', '..KMNNWNNNNNMK..', '...KMMNNNNMMK...', '....KKKMMKKK....',
+  ] },
+  funke: { mono: true, z: [
+    '.......##.......', '.......##.......', '......+##+......', '......####......',
+    '.....+####+.....', '....+######+....', '..++########++..', '################',
+    '################', '..++########++..', '....+######+....', '.....+####+.....',
+    '......####......', '......+##+......', '.......##.......', '.......##.......',
+  ] },
 };
 
-// Emoji → Sprite fuer die Abzeichen. Vorrang vor PP_PX_ZEICHEN
-// (Frost bekommt hier den farbigen Kristall statt der Schneeflocke,
-// Gift den gruenen Schaedel).
+// Emoji → Abzeichen-Sprite. Vorrang vor PP_PX_ZEICHEN (PxIcon).
 const PP_PX_ICONS = {
-  '❄️': 'eis', '❄': 'eis', '🗿': 'moai', '🚫': 'verbot', '⛔': 'halt', '🪨': 'fels',
-  '🩸': 'blut', '☠️': 'schaedel_gift', '☠': 'schaedel_gift', '🤐': 'mund_zu', '🔇': 'stumm',
-  '🔕': 'glocke_aus', '😱': 'schreck', '😡': 'wut_gesicht', '🧿': 'nazar', '🕯️': 'kerze',
-  '🕯': 'kerze', '⏳': 'sanduhr', '⛓️': 'kette', '⛓': 'kette', '👁️': 'auge', '👁': 'auge',
-  '🌫️': 'nebel', '🌫': 'nebel', '⚑': 'flagge', '🫧': 'blasen', '🌿': 'zweig', '🌊': 'welle',
-  '✨': 'glanz', '🛡️': 'schild', '🛡': 'schild', '🦋': 'falter', '🎓': 'hut', '⚙️': 'zahnrad',
-  '⚙': 'zahnrad', '🕊️': 'taube', '🕊': 'taube', '🐈': 'katze', '🔒': 'schloss',
-  '😎': 'sonnenbrille', '🪽': 'fluegel', '🎯': 'zielscheibe', '🐃': 'bueffel', '🐕': 'hund',
-  '🌑': 'neumond', '💪': 'arm', '📐': 'geodreieck', '🪶': 'feder', '🪲': 'kaefer',
-  '💠': 'raute_blau', '☢️': 'radioaktiv', '☢': 'radioaktiv', '📘': 'buch', '🍀': 'klee',
-  '🥷': 'ninja', '🤝': 'haende', '🎹': 'klavier', '🪑': 'stuhl', '🧟': 'zombie',
-  '☥': 'ankh', '🦷': 'zahn', '🧬': 'dna', '🪙': 'muenze', '🌌': 'galaxie',
+  '🔥': 'ab_flamme', '🛡️': 'ab_schild', '🛡': 'ab_schild', '❄️': 'ab_eis', '❄': 'ab_eis', '⚡': 'ab_blitz',
+  '🗿': 'ab_moai', '🚫': 'ab_verbot', '🪨': 'ab_fels', '🩸': 'ab_blut', '☠️': 'ab_schaedel_gift', '☠': 'ab_schaedel_gift',
+  '💀': 'ab_schaedel', '🤐': 'ab_mund_zu', '🔇': 'ab_stumm', '🔕': 'ab_glocke_aus', '😱': 'ab_schreck', '😡': 'ab_wut_gesicht',
+  '🧿': 'ab_nazar', '🕯️': 'ab_kerze', '🕯': 'ab_kerze', '⏳': 'ab_sanduhr', '⛓️': 'ab_kette', '⛓': 'ab_kette',
+  '👁️': 'ab_auge', '👁': 'ab_auge', '🌫️': 'ab_nebel', '🌫': 'ab_nebel', '⚑': 'ab_flagge', '🫧': 'ab_blasen',
+  '🌿': 'ab_zweig', '👻': 'ab_geist', '🌊': 'ab_welle', '💖': 'ab_herz', '💘': 'ab_herz_rosa', '💕': 'ab_herz_rosa',
+  '🎵': 'ab_note', '✨': 'ab_glanz', '🦋': 'ab_falter', '🎓': 'ab_hut', '☁️': 'ab_wolke', '☁': 'ab_wolke',
+  '⚙️': 'ab_zahnrad', '⚙': 'ab_zahnrad', '🕊️': 'ab_taube', '🕊': 'ab_taube', '🐈': 'ab_katze', '🔒': 'ab_schloss',
+  '😎': 'ab_sonnenbrille', '🪽': 'ab_fluegel', '🎯': 'ab_zielscheibe', '🐃': 'ab_bueffel', '🐕': 'ab_hund', '🌑': 'ab_neumond',
+  '💪': 'ab_arm', '📐': 'ab_geodreieck', '🪶': 'ab_feder', '🪲': 'ab_kaefer', '💠': 'ab_raute_blau', '☢️': 'ab_radioaktiv',
+  '☢': 'ab_radioaktiv', '📘': 'ab_buch', '⛔': 'ab_halt', '🍀': 'ab_klee', '🥷': 'ab_ninja', '🤝': 'ab_haende',
+  '🎹': 'ab_klavier', '🪑': 'ab_stuhl', '🧟': 'ab_zombie', '☥': 'ab_ankh', '🦷': 'ab_zahn', '🧬': 'ab_dna',
+  '🪙': 'ab_muenze', '🌌': 'ab_galaxie', '✦': 'ab_funke',
 };
-Object.assign(PP_PX_SPRITES, PP_PX_ABZEICHEN_SPRITES);
+for (const [n, s] of Object.entries(PP_PX_ABZEICHEN_SPRITES)) PP_PX_SPRITES['ab_' + n] = s;
 // Die Animationen (Pixelierer, PxZeichen) bekommen die neuen Zeichen mit,
 // wo sie noch keines hatten — bestehende Zuordnungen bleiben.
 for (const [z, name] of Object.entries(PP_PX_ICONS)) if (!PP_PX_ZEICHEN[z]) PP_PX_ZEICHEN[z] = name;
@@ -870,39 +1087,49 @@ function _ppVerlaufBei(v, px, py, x, y) {
 }
 
 /**
- * Runde Pixel-Plakette, 12×12: 1 Pixel dunkle Kontur, 1 Pixel Rand
- * (oben links heller), Flaeche aus Farbe oder Verlauf mit Glanzpunkt
- * oben links und gedithertem Schatten unten rechts.
+ * Runde Pixel-Plakette im 21er-Raster (v1449, vorher 12 — Als Befund
+ * 27.9.: „sehen noch sehr grob aus"): 1 Pixel dunkle Kontur, 2 Pixel Rand
+ * mit Lichtkante oben links und Schattenkante unten rechts, Flaeche aus
+ * Farbe oder Verlauf, darauf ein Glanzbogen oben links und ein
+ * geditherter Schatten unten rechts. Ein Symbol mit 16 Pixeln fuellt 76 %
+ * der Plakette — dann sind die Pixel beider gleich gross.
  */
+const PP_PX_PLAKETTE_N = 21;
 function ppPxPlaketteUrl(flaeche, rand) {
-  const N = 12, M = N / 2;
+  const N = PP_PX_PLAKETTE_N, M = N / 2;
   const v = /gradient/.test(flaeche || '') ? ppVerlaufLesen(flaeche) : null;
   const voll = v ? null : _ppAufGrund(ppFarbe(flaeche));
   const r = ppFarbe(rand);
   const randF = _ppAufGrund([r[0], r[1], r[2], Math.max(r[3], 0.85)]);
-  const randHell = _ppMisch(randF, [255, 255, 255], 0.4);
+  const randHell = _ppMisch(randF, [255, 255, 255], 0.45);
+  const randDunkel = _ppMisch(randF, [0, 0, 0], 0.3);
   const kontur = [14, 9, 18, 1];
-  return ppPxBild('pl:' + flaeche + '|' + rand, N, N, (setze) => {
+  return ppPxBild('pl' + N + ':' + flaeche + '|' + rand, N, N, (setze) => {
     for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
-      const d = Math.hypot(x + 0.5 - M, y + 0.5 - M);
-      if (d > 6) continue;
-      if (d > 5) { setze(x, y, kontur); continue; }
-      if (d > 4) { setze(x, y, x + y <= 8 ? randHell : randF); continue; }
+      const dx = x + 0.5 - M, dy = y + 0.5 - M;
+      const d = Math.hypot(dx, dy);
+      if (d > M) continue;
+      if (d > M - 1) { setze(x, y, kontur); continue; }
+      const diag = (dx + dy) / (d || 1);                  // −√2 oben links … +√2 unten rechts
+      if (d > M - 3) { setze(x, y, diag < -0.7 ? randHell : diag > 0.9 ? randDunkel : randF); continue; }
       let f = v ? _ppAufGrund(_ppVerlaufBei(v, (x + 0.5) / N, (y + 0.5) / N, x, y)) : voll;
-      if ((y === 3 && (x === 3 || x === 4)) || (x === 3 && y === 4)) f = _ppMisch(f, [255, 255, 255], 0.35);
-      else if (x + y >= 14 && (x + y) % 2 === 0) f = _ppMisch(f, [0, 0, 0], 0.3);
+      if (d > M - 5.2 && d <= M - 3.6 && diag < -0.95) f = _ppMisch(f, [255, 255, 255], 0.3);
+      else if (diag > 0.5 && d > M - 6 && ppBayer(x, y) < (d - (M - 6)) / 3) f = _ppMisch(f, [0, 0, 0], 0.28);
       setze(x, y, f);
     }
   });
 }
 
-/** Pixel-Schraegstrich fuer „Blinded" (ueber der Plakette, 12×12). */
+/** Pixel-Schraegstrich fuer „Blinded" (ueber der Plakette, gleiches Raster). */
 function ppPxSchraegstrichUrl() {
-  return ppPxBild('schraeg', 12, 12, (setze) => {
-    for (let i = 2; i <= 9; i++) {
-      setze(i, 11 - i, [255, 80, 80, 1]);
-      setze(i + 1, 11 - i, [200, 30, 40, 1]);
-      setze(i, 10 - i, [255, 235, 235, 1]);
+  const N = PP_PX_PLAKETTE_N;
+  return ppPxBild('schraeg' + N, N, N, (setze) => {
+    for (let i = 3; i <= N - 4; i++) {
+      const y = N - 1 - i;
+      setze(i - 1, y, [40, 6, 10, 1]);
+      setze(i, y, [255, 90, 90, 1]);
+      setze(i + 1, y, [220, 30, 44, 1]);
+      setze(i + 2, y, [40, 6, 10, 1]);
     }
   });
 }
@@ -1017,10 +1244,10 @@ function _ppPxRegelnBauen() {
     if (!url) continue;
     regeln.push(`${p.sel}{background:url(${url}) center/100% 100% no-repeat!important;background-origin:border-box!important;`
       + 'border-color:transparent!important;border-radius:0!important;box-shadow:none!important;'
-      + 'filter:drop-shadow(1px 1px 0 rgba(0,0,0,.75));image-rendering:pixelated;}');
+      + 'filter:drop-shadow(1px 1px 0 rgba(0,0,0,.75));image-rendering:auto;}');
   }
   for (const r of PP_PX_KLASSEN.abzeichenExtra || []) regeln.push(r);
-  regeln.push(`.status-badge.status-blinded::after{background:url(${ppPxSchraegstrichUrl()}) center/100% 100% no-repeat;border-radius:0;image-rendering:pixelated;}`);
+  regeln.push(`.status-badge.status-blinded::after{background:url(${ppPxSchraegstrichUrl()}) center/100% 100% no-repeat;border-radius:0;image-rendering:auto;}`);
   regeln.push('.pp-px{image-rendering:pixelated;}');
   return regeln.join('\n');
 }

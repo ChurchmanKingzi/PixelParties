@@ -11997,18 +11997,22 @@ body:has(.modal-overlay) .tooltip {
 }
 
 /* ★ v1448 — PIXEL-ABZEICHEN (Paket 3, `PxIcon` in app-shared.jsx).
-   Das Symbol folgt der Schriftgroesse wie das Emoji vorher. In den runden
-   Plaketten fuellt es 75 %: die Plakette hat ein 12er-Raster, die Symbole
-   ein 9er — so sind die Pixel beider gleich gross. Die Plaketten selbst
-   erzeugt `ppPxRegelnAnwenden` aus den Farben dieser Datei. */
-.pp-px-icon {
+   Das Symbol folgt der Schriftgroesse wie das Emoji vorher.
+   ★ v1449 (Als Befund 27.9.: „sehen noch sehr grob aus"): Symbole im
+   16er-, Plaketten im 21er-Raster. In der Plakette fuellt das Symbol
+   76 % — dann sind die Pixel beider gleich gross. Die Bilder sind
+   vierfach vorgerendert und werden VERKLEINERT gezeigt; dafuer
+   `image-rendering: auto` (glaettet) statt `pixelated` (verschluckt beim
+   Verkleinern ganze Pixelzeilen). */
+.pp-px-icon,
+.pp-px.pp-px-icon {
   display: inline-block;
   flex: none;
   width: 1em;
   height: 1em;
   vertical-align: middle;
   object-fit: contain;
-  image-rendering: pixelated;
+  image-rendering: auto;
   pointer-events: none;
 }
 .status-badge > .pp-px-icon,
@@ -12017,8 +12021,8 @@ body:has(.modal-overlay) .tooltip {
 .status-stealth-icon > .pp-px-icon,
 .status-damage-proof-icon > .pp-px-icon,
 .status-cheat-chair-icon > .pp-px-icon {
-  width: 75%;
-  height: 75%;
+  width: 76%;
+  height: 76%;
 }
 @keyframes ppPxBuffPuls {
   0%, 100% { filter: drop-shadow(1px 1px 0 rgba(0,0,0,.75)); }
