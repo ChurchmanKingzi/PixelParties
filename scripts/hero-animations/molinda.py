@@ -9,12 +9,12 @@ Amor-Schuss im Loop:
   mit rosa Spur und aufsteigenden Herzchen; die Sehne schwingt nach. Der Teil
   des Bogens hinter dem Schaft wird ergänzt.
 * Nachladen: ein neuer Pfeil materialisiert sich auf der Sehne.
-Dazu schwebt sie leicht. Flügel: beim Zielen und nach dem Nachladen trägt
-sie ihren Original-Flügel (gefaltet, wie im Sprite). Mit dem Schuss entfaltet
-er sich (Zwischenstellung: Original leicht ausgestellt) zu einem neu
-gezeichneten Engelsflügel-Paar (molinda_wings.py, pro Frame in der
-Schlagstellung gerastert), schlägt dreimal und faltet sich wieder zum
-Original zusammen – so passt die Animation zum statischen Sprite.
+Dazu schwebt sie leicht und flattert gleichmäßig: nach jedem Flügelschlag
+legt sie den Flügel kurz an – dann ist ihr Original-Flügel aus dem Sprite zu
+sehen (so passt die Animation zum statischen Sprite). Über eine
+Zwischenstellung (Original leicht ausgestellt) entfaltet er sich zu einem
+neu gezeichneten Engelsflügel-Paar (molinda_wings.py, pro Frame in der
+Schlagstellung gerastert), das einmal schlägt.
 """
 import math
 import sys
@@ -43,17 +43,19 @@ ROOT = (18.0, 9.0)                                   # Schulter (Sprite-Koordina
 
 
 ORIG_PIVOT = (18.0, 7.0)
-OPEN_START, FLAP_PERIOD, FLAPS = 13, 6, 3
+WING_CYCLE = 10                                      # 4 Zyklen pro Loop
 
 
 def wing_pose(i):
-    """('orig', Winkel) = Original-Flügel (gedreht), ('drawn', Schlagwinkel)."""
-    t = i - OPEN_START
-    if 0 <= t <= FLAP_PERIOD * FLAPS:
-        return 'drawn', -0.06 - 0.36 * math.cos(2 * math.pi * t / FLAP_PERIOD)
-    if i in (OPEN_START - 1, OPEN_START + FLAP_PERIOD * FLAPS + 1):
-        return 'orig', -0.12                             # halb entfaltet
-    return 'orig', 0.0
+    """Gleichmäßiger Zyklus: kurz angelegt (Original) -> halb ausgestellt ->
+    ein Flügelschlag (gezeichnete Schwingen) -> halb ausgestellt -> …
+    ('orig', Winkel) = Original-Flügel, ('drawn', Schlagwinkel)."""
+    t = i % WING_CYCLE
+    if t <= 1:
+        return 'orig', 0.0
+    if t in (2, 9):
+        return 'orig', -0.12
+    return 'drawn', -0.06 - 0.36 * math.cos(2 * math.pi * (t - 3) / 6)
 
 
 def is_arrow(x, y):
