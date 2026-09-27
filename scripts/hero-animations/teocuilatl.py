@@ -8,8 +8,9 @@ Aufruf: python3 teocuilatl.py <tag> [ms] [hero|platinum]
   entfernt (wo sie die Figur überdecken, wird mit der häufigsten
   Nachbarfarbe ergänzt) und neu gezeichnet – jeder eigenständig: eigener
   Takt, eigene Größe, er wächst auf, funkelt und vergeht.
-* Er blinzelt zweimal pro Loop (die Augenschlitze der Maske: x7–9 und
-  x14–16, Zeilen 11–12; das Lid in Maskenfarbe, unten eine dunkle Linie).
+* Er blinzelt zweimal pro Loop mit den Augen im Gesicht (x10 und x13,
+  Zeilen 14–15; beim normalen die roten, beim Skin an derselben Stelle):
+  das Lid senkt sich in Gesichtsfarbe, geschlossen bleibt eine dunkle Linie.
 * Er steht und atmet: der Oberkörper federt im 12er-Takt 1 px hoch und
   herunter, die Beine bleiben stehen (Steh-Idle).
 * Die rechte Hand lag unter einem Stern und war nach dem Entfernen nur
@@ -74,8 +75,8 @@ def mirror_hand(body):
 BODY = mirror_hand(strip_stars(SRC))
 KNEE = 27                                            # ab hier stehen die Beine
 BLINK = {14: 'halb', 15: 'zu', 16: 'zu', 17: 'halb', 38: 'halb', 39: 'zu', 40: 'zu', 41: 'halb'}
-EYE_XS = [7, 8, 9, 14, 15, 16]
-LID, LID_LINE = {'hero': (rgb('941b00'), rgb('5a2000')), 'platinum': (rgb('3f2700'), rgb('1f1b25'))}[V]
+EYE_XS = [10, 13]                                    # Augen: Zeile 14 (oben) und 15
+LID, LID_LINE = {'hero': (rgb('fffa55'), rgb('b01100')), 'platinum': (rgb('9490cf'), rgb('1f1b25'))}[V]
 WHITE, PEACH, ORANGE = rgb('fafafa'), rgb('ffb179'), rgb('ff883c')
 YEL, YEL2 = rgb('ffef72'), rgb('f3c042')
 RED, DARK = rgb('c92d00'), rgb('941b00')
@@ -124,9 +125,9 @@ def frame(i):
     st = BLINK.get(i)
     if st:
         for x in EYE_XS:
-            s[11, x] = LID
+            s[14, x] = LID
             if st == 'zu':
-                s[12, x] = LID_LINE
+                s[15, x] = LID_LINE
     out = np.zeros((H, W, 4), int)
     b = BOUNCE12[i % 12]
     draw_bounce(out, s, b, KNEE, PT, P)
