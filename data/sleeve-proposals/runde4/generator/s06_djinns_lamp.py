@@ -1,18 +1,18 @@
 # -*- coding: utf-8 -*-
 """06 Djinn's Lamp – Stillleben mit Magie: Aus der Tülle einer goldenen Öllampe steigt Rauch auf, windet sich
-nach oben und ballt sich zur Gewitterwolke, aus der Sol Rym, der Donner-Dschinn, mit verschränkten Armen
-herauswächst; in der Wolke knistern Blitze. Die Lampe steht auf einem roten Teppich mit Goldbordüre.
+nach oben und wird zum Leib von Sol Rym, dem Donner-Dschinn, der mit verschränkten Armen darüber schwebt; von
+seinen Ellbogen zucken verästelte Blitze. Die Lampe steht auf einem roten Teppich mit Goldbordüre und Falten.
 
 Quellen (Motive.xcf):
   Ebene 1509 „Sol Rym“ (Sol Rym, the Thunder Djinn – Halbfigur, wie auf der Karte aus der Wolke ragend)
   Ebene 1146 „Ebene #678“ (goldene Öllampe; Teil der Ebene, Zuckerstange verworfen)
   Ebene 1188 „Thieving #3“ (roter Teppich mit Goldbordüre)
-  Wolkenfarben nach Ebene 1519 „Ebene #639“ (Gewitterwolke der Sol-Rym-Karte), Blitzfarben nach 1514 „Chain Lightning“.
-Selbst gezeichnet: Hintergrund (Verlauf, Schein, Sterne), Rauchfahne, Wolke, Blitze.
+  Blitzfarben nach Ebene 1514 „Chain Lightning“.
+Selbst gezeichnet: Hintergrund (Verlauf, Schein, Sterne, Dielenboden), Rauchschweif, Blitze, Faltenwurf.
 
 Skalierung:
-  Vordergrund (Lampe, Teppich, Rauch, Wolke, Blitze, Dschinn): 6× (Raster 42×59, beschnitten auf 250×350)
-  Hintergrund (Nachthimmel-Verlauf, Schein, Sterne): 2× (Raster 125×175)
+  Vordergrund (Lampe, Teppich, Rauchschweif, Blitze, Dschinn): 6× (Raster 42×59, beschnitten auf 250×350)
+  Hintergrund (Nachthimmel-Verlauf, Schein, Sterne, Dielenboden): 2× (Raster 125×175)
 """
 from common import *  # noqa
 import numpy as np, math
@@ -43,6 +43,14 @@ for x, y in [(14, 18), (108, 30), (20, 92), (104, 96)]:
     for dx, dy in [(0, 0), (1, 0), (-1, 0), (0, 1), (0, -1)]:
         bg.px(x + dx, y + dy, (210, 210, 240) if (dx, dy) == (0, 0) else (120, 120, 170))
 
+# Boden (dunkle Dielen) unter dem Teppich
+FLY = 132
+for y in range(FLY, 175):
+    for x in range(125):
+        c = (34, 24, 30) if (y - FLY) % 5 else (22, 14, 20)
+        if (y - FLY) % 5 and (x + (y - FLY) // 5 * 11) % 23 == 0: c = (22, 14, 20)
+        bg.a[y, x] = c
+bg.a[FLY] = (52, 38, 48)
 vignette(bg, 0.5, 0.55)
 
 # ---------------- Vordergrund 6× ----------------
@@ -65,28 +73,37 @@ def dot(x, y, c):
         fg[y, x, :3] = c; fg[y, x, 3] = 255
 
 
-# Teppich (Thieving #3) – vordere Kante, perspektivisch gestaucht (jede 2. Zeile)
-carpet = sprite('b06_carpet', M, [1188])
-cp = carpet[::2][:, :]                                   # Stauchung in der Tiefe
-cp = cp[-8:]                                            # vorderer Teil mit Bordüre
-cp = darken(cp, 0.85)
-CY = FH - cp.shape[0]
-cx0 = (FW - cp.shape[1]) // 2
-for j in range(cp.shape[0]):
-    for i in range(FW):
-        sx = i - cx0
-        if 0 <= sx < cp.shape[1]:
-            fg[CY + j, i, :3] = cp[j, sx, :3]; fg[CY + j, i, 3] = 255
-# Teppichrand hinten: dunkle Kante
-for i in range(FW):
-    if fg[CY, i, 3]: fg[CY, i, :3] = (70, 16, 22)
+# Teppich (Thieving #3) – Texel 1:1 auf dem 6×-Raster, per 9-Slice auf Teppichgröße gebracht: Goldbordüre
+# (hinten verkürzt = Perspektive), Mittelfeld gekachelt; jede Zeile hinten etwas schmaler (Trapez);
+# sanfter Faltenwurf als zwei flache Wellen hell/dunkel.
+carpet = sprite('b06_carpet', M, [1188])                 # 60×55
+CH, CW = carpet.shape[:2]
+rows = [1, 2, 4] + [20, 21, 22] + [CH - 6, CH - 5, CH - 4, CH - 3, CH - 2, CH - 1]   # hinten, Mitte, vorne
+CY0 = 44
+CY1 = CY0 + len(rows) - 1
+W0, W1 = 32, 38
+CXM = FW // 2
+for jj, v in enumerate(rows):
+    t = jj / (len(rows) - 1)
+    w = int(round(W0 + (W1 - W0) * t))
+    left = CXM - w // 2
+    src = carpet[v, :, :3]
+    line = np.concatenate([src[:6], np.array([src[6 + (k % 12)] for k in range(w - 12)]), src[-6:]])
+    for k in range(w):
+        c = line[k].astype(float)
+        f = math.sin((k / w) * 7.5 - t * 1.6)
+        c *= (1.10 if f > 0.8 else (0.80 if f < -0.8 else 1.0)) * (0.62 + 0.18 * t)   # nachts, hinten dunkler
+        dot(left + k, CY0 + jj, tuple(np.clip(c, 0, 255).astype(np.uint8)))
+# Schlagschatten des Teppichs auf den Dielen (1 Zeile unter der Vorderkante)
+for k in range(W1):
+    dot(CXM - W1 // 2 + k, CY1 + 1, (14, 8, 12))
 
 # Lampe
 lamp = [p for p in parts(sprite('b06_lamp_layer', M, [1146]), dil=1) if p.shape[:2] == (14, 23)][0]
-LX, LY = (FW - 23) // 2 + 1, CY - 14 + 3                # Fuß steht im Teppich
+LX, LY = (FW - 23) // 2 + 1, CY0 + 6 - 14               # Fuß steht mitten auf dem Teppich
 # Schatten der Lampe auf dem Teppich
-for i in range(LX + 4, LX + 21):
-    for j in (LY + 13, LY + 14):
+for i in range(LX + 7, LX + 19):
+    for j in (LY + 14,):
         if 0 <= j < FH and fg[j, i, 3]:
             fg[j, i, :3] = (fg[j, i, :3] * 0.45).astype(np.uint8)
 put(lamp, LX, LY)
@@ -143,19 +160,39 @@ for (bx, by, br) in [(-6, 0, 2.0), (-3, 1, 2.3), (0, 1, 2.4), (3, 1, 2.3), (6, 0
             else: c = sm_cols['base']
             dot(i, j, c)
 
-# Blitze rechts und links des Dschinns (1 Rasterpixel breit)
-Y1, Y2 = (255, 248, 160), (236, 220, 80)
-bolts = [[(DX - 2, DY + 13), (DX - 5, DY + 12), (DX - 6, DY + 15), (DX - 9, DY + 14), (DX - 10, DY + 18)],
-         [(DX + 13, DY + 13), (DX + 16, DY + 12), (DX + 17, DY + 15), (DX + 20, DY + 14), (DX + 21, DY + 18)],
-         [(DX - 3, DY + 6), (DX - 5, DY + 4), (DX - 7, DY + 5)],
-         [(DX + 14, DY + 6), (DX + 16, DY + 4), (DX + 18, DY + 5)]]
-for b in bolts:
-    for (x0, y0), (x1, y1) in zip(b, b[1:]):
+# Blitze: verästelt, von den Ellbogen des Dschinns ausgehend, spiegelsymmetrisch.
+# Heller Kern (1 Rasterpixel) + goldener Rand rechts/unten, Äste nur mit Kern.
+CORE, RIM = (255, 252, 214), (232, 190, 44)
+ax = 2 * DX + 11                                          # Spiegelachse ×2 (Dschinn-Mitte)
+main = [(DX, DY + 15), (DX - 3, DY + 13), (DX - 4, DY + 10), (DX - 7, DY + 8), (DX - 8, DY + 4)]
+branch = [(DX - 4, DY + 10), (DX - 7, DY + 12), (DX - 9, DY + 11), (DX - 10, DY + 14)]
+twig = [(DX - 7, DY + 8), (DX - 10, DY + 7)]
+
+
+def seg_pixels(path):
+    out = []
+    for (x0, y0), (x1, y1) in zip(path, path[1:]):
         n = max(abs(x1 - x0), abs(y1 - y0))
         for st in range(n + 1):
-            x = round(x0 + (x1 - x0) * st / max(n, 1)); y = round(y0 + (y1 - y0) * st / max(n, 1))
-            dot(x, y, Y1)
-    dot(b[-1][0], b[-1][1], Y2)
+            out.append((round(x0 + (x1 - x0) * st / max(n, 1)), round(y0 + (y1 - y0) * st / max(n, 1))))
+    return out
+
+
+for side in (0, 1):
+    mir = (lambda p: [(ax - x, y) for x, y in p]) if side else (lambda p: p)
+    core = seg_pixels(mir(main))
+    thin = seg_pixels(mir(branch)) + seg_pixels(mir(twig))
+    cs = set(core) | set(thin)
+    for x, y in core:                                     # Rand zuerst (unten und zur Außenseite)
+        for dx, dy in [(0, 1), (-1, 0) if side == 0 else (1, 0)]:
+            if (x + dx, y + dy) not in cs and not (DX <= x + dx < DX + 12 and fg[y + dy, x + dx, 3]):
+                dot(x + dx, y + dy, RIM)
+    for x, y in core + thin:
+        dot(x, y, CORE)
+    ex, ey = mir(main)[-1]                                # Funken an den Spitzen
+    dot(ex, ey - 1, RIM)
+    bx, by = mir(branch)[-1]
+    dot(bx, by + 1, RIM)
 
 # ---------------- Zusammensetzen ----------------
 cv = Canvas(250, 350)

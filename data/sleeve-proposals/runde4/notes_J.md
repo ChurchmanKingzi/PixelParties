@@ -1,0 +1,15 @@
+# Block J – Sleeves 46–50 (Quellen: MotiveJapan, MotiveChina, MotiveGuardianBeasts)
+
+NN | English Name | Idee | Skalierung (welche Ebene wie groß) | Quellen | Rahmen: form/palette/stein[/stein2]
+---|---|---|---|---|---
+46 | Dragon Gate | Legende vom Drachentor: der Karpfen springt den Wasserfall hinauf, gerade dem Schnabel des Kranichs im Becken entwischt; oben im Abenddunst erscheint schemenhaft der Drache (Guardian Beast Long), der er werden will. | Himmel, Drachengeist (gedithert), Klippen, Bäume, Wasserfall, Becken, Gischt 2× (125×175); Kranich, Fisch, Tropfen, Wellenringe 5× (50×70) | MotiveJapan 6 (Kranich), 5 (Fisch, 180° gedreht), 7 (Gischt), 173 (Ahornbäume), 108 (Erdtextur als Fels); MotiveGuardianBeasts 105 (Long) | Rahmen: arch/lacquer/jade
+47 | Bamboo Sentinel | Nahaufnahme: Xiong, der Bambuswächter, steht groß und frontal mit quer gehaltenem Bambusstab im dämmrigen Bambushain, Lichtbahnen fallen schräg durch die Halme. | gesamter Hintergrund (ferner Hain aus Zaun-Halmen, nahe Halme, Blätter, Boden, Licht) 2× (125×175); Xiong + Schatten 6× (42×59) | MotiveChina 5 (Xiong, in „Sichtbar #4“ 100 % sichtbar), 8 (Bambuszaun), 37 (Gras) | Rahmen: bamboo/bamboo/emerald
+48 | Projection | Nachts steht der Idej Projector auf dem First von Todugawins violetter Pagode und wirft einen Lichtkegel in den Himmel, darin schwebt riesig das Hologramm des vermummten Idej mit Scanlinien. | Himmel, Wolken, Sterne und der Lichtkegel (als Himmelslicht) 2× (125×175); Pagode, Projektor, Hologramm 6× (42×59) | MotiveJapan 232 (Hologramm-Figur), 233 (Projektor), 236 (Pagode House Todugawin), 246 (Wolkenhimmel, umgefärbt) | Rahmen: cosmic/cosmic/amethyst
+49 | First Bloom | Frühling, Blick über die Schulter: der Tanuki steht von hinten groß im Vordergrund und reißt beim Anblick des ersten blühenden Kirschbaums auf dem Hügel die Arme hoch, Blütenblätter wehen vom Baum herüber. | Himmel + ferne Hügel 2× (125×175); Hügel, Kirschbaum, Blütenblätter am Baum 3× (84×117); Vordergrund-Böschung, Tanuki, nahe Blütenblätter 5× (50×70) | MotiveJapan 177 (Tanuki von hinten, Karte „Tanuki Escape“), 183 (Kirschbaum), 244 (Gras), 245 (Blütenteppich) | Rahmen: twist/wood/rose/pearl
+50 | Great Wave | Nach Hokusai: eine riesige, selbst gezeichnete Welle rollt von rechts heran und krümmt ihre Gischtkrallen über das Bild; davor kämpft sich das Segelschiff über die Dünung, in der Ferne der Schneeberg. | Himmel, Schneeberg, ferne See 2× (125×175); große Welle, Dünung, Schiff, Gischt 3× (84×117) | MotiveJapan 11 (Segelschiff); Welle/Berg/Himmel selbst gezeichnet | Rahmen: wave/sea/sapphire/pearl
+
+Anmerkungen:
+- Hilfsfunktionen: generator/j_util_46_50.py (Lay = RGBA-Ebene im eigenen Raster, flatten = einmal hochskalieren + übereinanderlegen; Halbtransparenz nur per Bayer-Dithering im Raster der Ebene).
+- Kein Überstand über den Rahmen (keine overlays).
+- 46: Der Drachengeist (Long) ist nur 2× groß (Hintergrundebene) – bewusst klein und schemenhaft; der dunkle Saum um Kopf/Schnabel des Kranichs ist nachgezeichnet (trennt Weiß vom Wasserfall).
+- 48: Der Lichtkegel liegt im 2×-Himmelsraster (weiches Licht), Projektor und Hologramm im 6×-Raster davor.

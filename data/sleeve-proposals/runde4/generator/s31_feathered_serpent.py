@@ -30,7 +30,7 @@ q = np.floor(t + TH * 0.999).clip(0, len(cols) - 1).astype(int)
 for k, c in enumerate(cols):
     cv.a[q == k] = c
 
-SX, SY = 62, 46            # Sonnenmitte (hinter dem Kopf der Schlange)
+SX, SY = 62, 48            # Sonnenmitte (hinter dem Kopf der Schlange)
 d = np.sqrt((xx + .5 - SX) ** 2 + (yy + .5 - SY) ** 2)
 ang = np.degrees(np.arctan2(yy + .5 - SY, xx + .5 - SX))
 # Strahlen: 16 Sektoren, jeder zweite heller (gedithert, nach außen schwächer)
@@ -56,7 +56,7 @@ for x0 in (-12, 88):
 
 temple = sprite('g31_temple', B, [305])
 TX = 62 - 58                # Achse der Pyramide (x≈58 in der Ebene) auf die Bildmitte
-TY = 76
+TY = 78
 # Abendlicht: Pyramide leicht warm getönt, rechte Flanke dunkler
 tp = temple.copy()
 tp[..., :3] = (tp[..., :3].astype(float) * np.array([1.08, 0.92, 0.78])).clip(0, 255).astype(np.uint8)
@@ -73,7 +73,7 @@ cv.paste(front, -4, 152)
 serp = sprite('g31_serpent', B, [218])
 fr = serp[:, :100].copy()
 fr = max(parts(fr, dil=1), key=lambda p: (p[..., 3] > 0).sum())   # Streupixel weg
-cv.paste(fr, 62 - 49, 10)
+cv.paste(fr, 62 - 49, 12)                         # Fühlerspitzen 24 px, Flügelspitzen 26/224 px vom Rand
 
 out = Canvas(250, 350)
 out.a[:] = up(np.dstack([cv.a, np.full((H, W), 255, np.uint8)]), 2)[..., :3]

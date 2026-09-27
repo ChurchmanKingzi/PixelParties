@@ -20,25 +20,33 @@ from dkit16_20 import *  # noqa
 B = 'MotiveGrailWar'
 rnd = random.Random(20)
 harpy = sprite('d20_harpy', B, [36])                    # 30×34
-animals = parts(sprite('d20_animals', B, [38]), dil=1)
-horse = [p for p in animals if p.shape[:2] == (23, 24)][0]  # Pferd unten links (vollständig)
 
 # ---------------- Hintergrund 2× --------------------------------------------------------------
 bw, bh = grid(2)
 bg = Canvas(bw, bh)
 HZ = 94
-bands(bg, 0, HZ, [(70, 60, 120), (120, 78, 132), (184, 100, 120), (232, 140, 104), (250, 186, 110), (254, 224, 150)],
-      soft=0.6)
-# große, halb versunkene Sonne genau hinter der Harpyie, goldener Hof
-SX, SY, SR = 62, HZ + 3, 31
-glow(bg, SX, SY, 70, (255, 232, 170), 0.45, ry=50)
-for y in range(SY - SR, SY + SR + 1):
-    for x in range(SX - SR, SX + SR + 1):
-        d = math.hypot(x + .5 - SX, y + .5 - SY)
-        if d < SR: bg.px(x, y, (255, 238, 186) if d < SR - 3 else (255, 214, 140))
+bands(bg, 0, HZ, [(34, 30, 76), (58, 44, 104), (100, 60, 120), (156, 80, 118), (212, 112, 104), (244, 160, 96),
+                  (252, 200, 120)], soft=0.7)
+# Abendrot: breiter, flacher Lichtsaum über dem Horizont (die Sonne ist schon untergegangen)
+glow(bg, 62, HZ, 90, (255, 214, 140), 0.45, ry=22)
+# blasser Erntemond oben rechts, mit Schattierung
+MX, MY, MR = 98, 30, 10
+glow(bg, MX, MY, 24, (230, 200, 190), 0.25)
+for y in range(MY - MR, MY + MR + 1):
+    for x in range(MX - MR, MX + MR + 1):
+        d = math.hypot(x + .5 - MX, y + .5 - MY)
+        if d < MR:
+            c = (250, 238, 206)
+            if math.hypot(x + .5 - MX - 3, y + .5 - MY + 2) > MR - 1: c = (226, 204, 186)   # Terminator-Schatten
+            if (x, y) in ((MX - 3, MY - 2), (MX - 2, MY - 2), (MX + 2, MY + 3), (MX - 4, MY + 3), (MX - 3, MY + 3)):
+                c = (228, 212, 184)                                                     # Mondflecken
+            bg.px(x, y, c)
+# Sterne (wenige, einzelne Pixel im 2×-Raster)
+for (x, y) in [(12, 10), (30, 22), (52, 8), (70, 18), (116, 52), (8, 40), (80, 40)]:
+    bg.px(x, y, (230, 222, 250))
 # Wolkenstreifen (vor der Sonne teils dunkler)
-for (cx, cy, L, col) in [(50, SY - 22, 34, (240, 168, 112)), (78, SY - 12, 40, (240, 168, 112)),
-                         (98, 40, 34, (190, 104, 124)), (30, 26, 22, (150, 86, 128)), (18, 60, 20, (226, 140, 108))]:
+for (cx, cy, L, col) in [(34, HZ - 20, 36, (236, 150, 108)), (92, HZ - 13, 40, (236, 150, 108)),
+                         (24, 58, 26, (170, 88, 118)), (100, 64, 22, (184, 96, 114))]:
     for x in range(int(cx - L / 2), int(cx + L / 2)):
         t = abs(x - cx) / (L / 2)
         bg.px(x, cy, col)
@@ -66,32 +74,24 @@ for y in range(HZ + 1, bh):
         bg.a[y, x] = c
 # Streiflicht: warm oben (Horizont), dunkler nach vorne
 shade(bg, lambda x, y: (0.55 * min(1, (y - HZ) / 70) if y > HZ else 0), col=(70, 40, 50))
-shade(bg, lambda x, y: (0.35 * max(0, 1 - math.hypot(x - SX, (y - HZ) * 2) / 50) if y > HZ else 0),
+shade(bg, lambda x, y: (0.3 * max(0, 1 - math.hypot(x - 62, (y - HZ) * 2) / 60) if y > HZ else 0),
       col=(255, 220, 150))
 
-# Pferd in der Ferne (2×) links vor der Sonne, Schatten zur Seite weg von der Sonne
-def ground_shadow(cx, gy, rx):
-    for yy in range(gy - 1, gy + 1):
-        for xx in range(int(cx), int(cx + rx * 2)):
-            if (xx + yy) % 2 == 0: bg.px(xx, yy, (110, 70, 58))
-
-px, py = 12, HZ + 20 - horse.shape[0]
-ground_shadow(px + 12, py + horse.shape[0], 9)
-bg.paste(horse, px, py)
 # Schwalben (selbst gezeichnet, kleine Bögen)
-for (x, y) in [(92, 22), (101, 30), (86, 34)]:
+for (x, y) in [(20, 70), (29, 76), (14, 78)]:
     for dx, dy in ((-2, 0), (-1, -1), (0, 0), (1, -1), (2, 0)):
         bg.px(x + dx, y + dy, (60, 44, 70))
 
-# ---------------- Vordergrund 5× --------------------------------------------------------------
-fw, fh = grid(5)                                    # 50×70
+# ---------------- Vordergrund 6× --------------------------------------------------------------
+fw, fh = grid(6)                                    # 42×59
 fg = rgba(fw, fh)
-hx = (fw - harpy.shape[1]) // 2
-hy = fh - 3 - harpy.shape[0]
-ellipse_shadow(fg, hx + harpy.shape[1] / 2 + 3, hy + harpy.shape[0] - 1, 17, 2.4, (70, 40, 44), 255)
-put(fg, harpy, hx, hy)
+harpy_o = outline(harpy, (38, 22, 34), 1)           # dunkle Kontur (1 Zelle) löst die Figur vom Abendhimmel
+hx = (fw - harpy_o.shape[1]) // 2
+hy = 55 - harpy_o.shape[0]
+ellipse_shadow(fg, hx + harpy_o.shape[1] / 2 + 2, hy + harpy_o.shape[0] - 1, 17, 2.2, (60, 34, 44), 255)
+put(fg, harpy_o, hx, hy)
 
 cv = Canvas(W, H)
 blit(cv, bg, 2)
-blit(cv, fg, 5)
+blit(cv, fg, 6, ox=1, oy=1)
 print(save(cv, '20_harvest_dusk.png'))

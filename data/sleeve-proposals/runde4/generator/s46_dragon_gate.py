@@ -6,7 +6,7 @@ Quellen:
   MotiveJapan.xcf  Ebene 6 „Scavenging Crane #1“ – Kranich (Karte „Scavenging Crane“, Szene „Sichtbar #36“), 5×
                    Ebene 5 „Scavenging Crane #2“ – Fisch, um 180° gedreht (gleiche Karte), 5×
                    Ebene 7 „Scavenging Crane“ – Gischtwolken am Fuß des Wasserfalls, 2×
-                   Ebene 183 „Ebene #17“ – Kirschbäume auf den Klippen, 2×
+                   Ebene 173 „Ebene #140“ – Ahornbaum auf den Klippenkanten (abgedunkelt, links + gespiegelt rechts), 2×
                    Ebene 108 „Ebene #31“ – Erdtextur, umgefärbt als Fels der Klippen, 2×
   MotiveGuardianBeasts.xcf  Ebene 105 „Long-Kopie“ – Guardian Beast Long als gedithertes Geisterbild, 2×
 Selbst gezeichnet: Himmel, Berge, Klippenform, Wasserfall, Becken, Wellenringe, Tropfen.
@@ -28,11 +28,11 @@ for x in range(bg.w):
     for y in range(int(h1), 74): bg.px(x, y, (104, 58, 106))
 # Drachengeist (Long) im Dunst – nach unten ausblendend
 long_ = sprite('j46_long', G, [105])
-ghost = recolor(long_, lambda a: a * 0.7 + np.array([255, 230, 200]) * 0.3)
+ghost = recolor(long_, lambda a: a * 0.6 + np.array([255, 226, 190]) * 0.4)
 gx, gy = 62 - long_.shape[1] // 2, 13
 bg.radial(62, 30, 32, (98, 52, 104), 0.9, 0.8)
 bg.radial(62, 30, 22, (132, 70, 116), 0.8, 1.0)
-bg.paste(ghost, gx, gy, mask_fn=lambda i, j: 0.8 * max(0.0, min(1.0, (34 - j) / 12)))
+bg.paste(ghost, gx, gy, mask_fn=lambda i, j: 0.92 * max(0.0, min(1.0, (38 - j) / 12)))
 
 # Klippen: Fels aus Erdtextur, blau-violett umgefärbt
 earth = sprite('j46_earth', J, [108], box=(140, 339, 220, 379))
@@ -104,11 +104,11 @@ for p in small[:2]:
 
 # Kirschbäume auf den Klippenkanten
 trees = [p for p in parts(sprite('j46_trees', J, [173]), dil=0) if p.shape[:2] == (36, 32)]
-t = darken([p for p in trees if p[..., 0].astype(int).sum() > p[..., 2].astype(int).sum()][0] if False else trees[0], 0.7)
+t = darken(trees[0], 0.7)
 bg.paste(t, -12, TOP - 4 - t.shape[0] + 2)
 bg.paste(flip(t), bg.w - t.shape[1] + 12, TOP - 4 - t.shape[0] + 3)
 
-# ---------------- 4×-Ebene: Kranich, Fisch, Tropfen ----------------
+# ---------------- 5×-Ebene: Kranich, Fisch, Tropfen ----------------
 fg = Lay(5)
 crane = sprite('j46_crane', J, [6])
 fish = rot90(sprite('j46_fish', J, [5]), 2)

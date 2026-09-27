@@ -169,3 +169,22 @@ def shade_final(cv, m, k, f):
 
 def grid_mask(k):
     return np.zeros((-(-350 // k), -(-250 // k)), bool)
+
+
+def vbands(g, cols, edges, x0=0, x1=None, m=None, soft=2.0):
+    """Waagerechte Farbbänder: cols[i] zwischen edges[i-1] und edges[i]; nur ±soft Zeilen um jede Kante
+    werden gedithert (ruhige Flächen statt großflächigem Schachbrett)."""
+    yy, xx = np.mgrid[0:g.h, 0:g.w]
+    x1 = g.w if x1 is None else x1
+    sel = (xx >= x0) & (xx < x1)
+    if m is not None: sel &= m
+    idx = np.searchsorted(np.array(edges), yy + .5)
+    idx = np.clip(idx, 0, len(cols) - 1)
+    out = np.array(cols)[idx]
+    for k, e in enumerate(edges):
+        if k + 1 >= len(cols): break
+        t = (yy + .5 - (e - soft)) / (2 * soft)
+        band = (t > 0) & (t < 1)
+        pick = band & (t > B4[yy % 4, xx % 4])
+        out[band & ~pick] = cols[k]; out[pick] = cols[k + 1]
+    g.a[sel, :3] = out[sel]; g.a[sel, 3] = 255

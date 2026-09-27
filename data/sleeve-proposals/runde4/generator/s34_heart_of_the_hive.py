@@ -14,9 +14,10 @@ Quellen (MotiveRussia.xcf, Karte „Hive's Crown“, Szenen 145 „Sichtbar #13�
   Königin     = Ebenen 177 „Ebene #45“ (Körper) + 176 „Ebene #47“ (Beine) + 175 „Ebene #46“ (Krone), in der Lage
                 wie in Szene 145 (Krone auf dem Kopf); der Thron aus Ebene 178 und die Auswahl-Leuchten
                 (170/171/173/174) bleiben weg.
-  Arbeiterin  = Ebenen 160 „Ebene #62“ (Körper) + 158 „Ebene #61“ (Flügel), linke der drei Bienen; die roten
-                Flecken 159 sind ein Karteneffekt und entfallen.
-  Schatten, Vignette: selbst gezeichnet.
+  Arbeiterin  = Ebenen 160 „Ebene #62“ (Körper) + 159 „Ebene #60“ (roter Rückenfleck) + 158 „Ebene #61“
+                (Flügel, wie in den Szenen 144/147 durchscheinend: 65 % Deckkraft auf ganzen Pixeln), linke der
+                drei Bienen; gegen Szene 147 (Bienen 161–163, gleiche Zeichnung) geprüft.
+  Schlagschatten, ringweise Randabdunklung: selbst gezeichnet.
 """
 from common import *
 import numpy as np
@@ -63,11 +64,26 @@ for k, (x, y) in enumerate(centers):
 
 # ---------- Figuren ----------
 queen = compose(RU, [175, 176, 177])
-bees = parts(compose(RU, [158, 160]), dil=0)
-bee = bees[0]                                       # Kopf oben
+# Arbeiterin wie in den Szenen 144/147: Körper (160) mit rotem Rückenfleck (159), darüber durchscheinende
+# Flügel (158, in den Szenen ca. 65 % deckend) – linke der drei Bienen
+body = compose(RU, [159, 160], crop=False)
+wing = compose(RU, [158], crop=False)
+un = (body[..., 3] > 0) | (wing[..., 3] > 0)
+import cv2
+n, lab = cv2.connectedComponents(un.astype(np.uint8), connectivity=8)
+k = lab[np.nonzero(un)[0][np.argmin(np.nonzero(un)[1])], np.nonzero(un)[1].min()]   # linkeste Biene
+ys, xs = np.nonzero(lab == k)
+box = (ys.min(), ys.max() + 1, xs.min(), xs.max() + 1)
+bee = body[box[0]:box[1], box[2]:box[3]].copy()
+wg = wing[box[0]:box[1], box[2]:box[3]]
+wm = wg[..., 3] > 0
+bee[wm, :3] = np.where(bee[wm, 3:4] > 0,
+                       (wg[wm, :3] * 0.65 + bee[wm, :3] * 0.35), wg[wm, :3]).astype(np.uint8)
+bee[wm & (bee[..., 3] == 0), 3] = 166                # Flügel über Wabe: 65 % deckend
+bee[wm & (bee[..., 3] == 255), 3] = 255
 
 def shadow(s, x, y, dx=1, dy=1):
-    m = s[..., 3] > 0
+    m = s[..., 3] > 200                             # nur deckende Teile werfen Schatten
     h, w = m.shape
     for j in range(h):
         for i in range(w):

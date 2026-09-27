@@ -13,7 +13,7 @@ untergetauchten Teilen, Lichtstrahlen unter Wasser, Tiefenverlauf.
 
 Skalierung (Tiefenebenen):
   Hintergrund (Himmel, Wolken, Horizont, Unterwasser-Verlauf, Lichtstrahlen, Fische, Blasen) – 2×
-  Vordergrund (Schildkröte mit Insel, Wasserschleier, Wellenkamm)                                     – 4×
+  Vordergrund (Schildkröte mit Insel, Wasserschleier, Wasserlinie)                                    – 5×
 """
 import random
 from dkit16_20 import *  # noqa
@@ -27,8 +27,8 @@ Image.fromarray(isle).save(os.path.join(os.path.dirname(os.path.abspath(__file__
 fish = parts(sprite('d19_fish', B, [617]), dil=1)
 bubbles = parts(sprite('d19_bubbles', B, [615]), dil=0, minpx=1)
 
-WL4 = 50                        # Wasserlinie in 4×-Zellen (= 200 px)
-WL2 = WL4 * 2                   # … in 2×-Zellen
+WL4 = 46                        # Wasserlinie in 5×-Zellen (= 230 px)
+WL2 = WL4 * 5 // 2              # … in 2×-Zellen (= 115)
 
 # ---------------- Hintergrund 2× --------------------------------------------------------------
 bw, bh = grid(2)
@@ -53,17 +53,18 @@ for (x0, wdt) in [(10, 6), (38, 4), (70, 7), (104, 5)]:
           col=(150, 214, 236))
 # Fische + Blasen
 f0 = fish[0]
-bg.paste(f0, 12, WL2 + 50)
-bg.paste(fish[1], 84, WL2 + 36)
-for (x, y), bb in zip([(98, WL2 + 30), (100, WL2 + 22), (97, WL2 + 14), (20, WL2 + 42), (22, WL2 + 34)],
+bg.paste(f0, 14, WL2 + 38)
+bg.paste(fish[1], 82, WL2 + 30)
+for (x, y), bb in zip([(96, WL2 + 24), (98, WL2 + 17), (95, WL2 + 10), (22, WL2 + 30), (24, WL2 + 23)],
                       bubbles * 2):
     bg.paste(bb, x, y)
 
-# ---------------- Vordergrund 4× --------------------------------------------------------------
-fw, fh = grid(4)
+# ---------------- Vordergrund 5× --------------------------------------------------------------
+fw, fh = grid(5)
 fg = rgba(fw, fh)
-tx = (fw - isle.shape[1]) // 2 + 1
-ROW_WL = 22                                    # Wasserlinie auf Höhe der Panzermitte (Sprite-Zeile)
+tx = 2                                         # Kopf/Auge ≥ 25 px vom Rand; Spitze der Hinterflosse ragt
+                                               # 10 px über den Bildrand (dort liegt ohnehin der Rahmen)
+ROW_WL = 20                                    # Wasserlinie auf Höhe der Panzermitte (Sprite-Zeile)
 ty = WL4 - ROW_WL
 put(fg, isle, tx, ty)
 # Wasserschleier über allen untergetauchten Pixeln (geordnetes Dithering: 50 % Wasserfarbe)
@@ -72,7 +73,7 @@ for y in range(WL4, fh):
     for x in range(fw):
         if fg[y, x, 3] == 0: continue
         d = (y - WL4)
-        t = 0.45 + min(0.3, d * 0.03)
+        t = 0.35 + min(0.3, d * 0.035)
         q = math.floor(t * 4 + BAYER4[y % 4, x % 4]) / 4
         fg[y, x, :3] = (fg[y, x, :3] * (1 - q) + WAT * q).astype(np.uint8)
 # Wasserlinie (1 Zelle, über die ganze Breite, auch vor der Schildkröte) + kleine Wellenkämme
@@ -86,5 +87,5 @@ for c in (cols.min() - 2, cols.min() - 1, cols.max() + 1, cols.max() + 2):
 
 cv = Canvas(W, H)
 blit(cv, bg, 2)
-blit(cv, fg, 4, ox=1, oy=0)
+blit(cv, fg, 5)
 print(save(cv, '19_world_on_a_shell.png'))

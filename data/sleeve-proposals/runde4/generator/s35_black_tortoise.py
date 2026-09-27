@@ -1,16 +1,16 @@
 # -*- coding: utf-8 -*-
 """Sleeve 35 – „Black Tortoise“: Xuanwu, die Schildkröte des Nordens, watet nachts durch einen spiegelglatten
-Bergsee. Hinter ihr stehen verschneite Gipfel unter dem Sternenhimmel; der See spiegelt Schildkröte, Berge und
-Sterne – nur ein paar Wellenlinien brechen das Spiegelbild. Die Wasserlinie liegt in der Bildmitte, das Bild ist
+Bergsee. Hinter ihr stehen verschneite Gipfel unter Mond und Sternen; der See spiegelt Schildkröte, Berge, Mond
+und Sterne – nur ein paar Wellenlinien brechen das Spiegelbild. Das Mondlicht setzt eine helle Oberkante auf die Figur. Die Wasserlinie liegt in der Bildmitte, das Bild ist
 um sie herum gespiegelt.
 
 Skalierung: EINE Ebene, alles im 84×117-Raster gebaut und einmal 3× hochskaliert (Schildkröte, Spiegelbild,
-Berge, Sterne, Wellenlinien, Himmelsverlauf).
+Berge, Mond, Sterne, Wellenlinien, Himmelsverlauf).
 
 Quellen (MotiveRussia.xcf, Karte „Cardinal Beast Xuanwu“, Szene 1 „Sichtbar #42“):
   Xuanwu = Ebene 5 „Xuanwu #1“ (Panzer, Beine, gehörnter Kopf, Schlange am Hals – vollständig; der weiße
            Wischer „Xuanwumon“ (Ebene 2) und der Bogen (Ebene 4) sind Angriffs-Effekte der Karte und entfallen)
-  Himmel, Sterne, Berge, Wasser, Wellen, Spiegelung: selbst gezeichnet (Farben aus dem Eismeer der Karte,
+  Himmel, Mond, Sterne, Berge, Wasser, Wellen, Glitzer, Spiegelung, Randlicht: selbst gezeichnet (Farben aus dem Eismeer der Karte,
   Ebene 221 „Ebene #6“)
 """
 from common import *
@@ -32,7 +32,8 @@ q = np.floor(t + TH * 0.999).clip(0, len(cols) - 1).astype(int)
 sky = np.zeros((H, W, 3), np.uint8)
 for k, c in enumerate(cols):
     sky[q == k] = c
-stars = [(rng.randint(2, W - 2), rng.randint(2, 30)) for _ in range(26)]
+stars = [(gx + rng.randint(0, 9), gy + rng.randint(0, 8)) for gy in range(2, 30, 9) for gx in range(1, W - 9, 10)
+         if rng.rand() < 0.8]                                 # gleichmäßig gestreut (Zufallsraster)
 for x, y in stars:
     sky[y, x] = (210, 216, 250) if rng.rand() < 0.7 else (150, 164, 220)
 
@@ -72,6 +73,9 @@ cv.a[:WL] = sky[:WL]
 # ---------- Schildkröte ----------
 tor = sprite('g35_xuanwu', RU, [5])
 th_, tw = tor.shape[:2]
+tm = tor[..., 3] > 0                               # Mondlicht von links oben: obere Kante leicht aufhellen
+edge = tm & ~np.vstack([np.zeros((1, tw), bool), tm[:-1]])
+tor[edge, :3] = np.clip(tor[edge, :3].astype(int) * 1.25 + np.array([18, 22, 40]), 0, 255).astype(np.uint8)
 TX, TY = W // 2 - tw // 2 + 1, WL - th_
 fig = np.zeros((H, W, 4), np.uint8)
 fig[TY:TY + th_, TX:TX + tw] = tor
@@ -100,11 +104,9 @@ for j, n in [(4, 3), (9, 3), (15, 4), (22, 4), (30, 5), (40, 5), (52, 6)]:
         y = WL + j
         if y < H:
             cv.a[y, x0:x0 + L] = np.maximum(cv.a[y, x0:x0 + L], (70, 86, 140))
-# Mondglitzern: helle Striche in einer Säule unter dem Mond
-for j in range(2, H - WL, 3):
-    L = 2 + (j * 7) % 4
-    x0 = MX_ - L // 2 + ((j * 5) % 3) - 1
-    cv.a[WL + j, max(0, x0):x0 + L] = (190, 196, 200) if j < 30 else (140, 150, 180)
+# Mondglitzern: wenige unregelmäßige Striche unter dem Mond, nahe der Wasserlinie
+for j, L, dx in [(2, 5, -2), (5, 3, 0), (8, 4, -1), (12, 2, 1), (17, 3, -2), (23, 2, 0)]:
+    cv.a[WL + j, MX_ + dx - L // 2:MX_ + dx - L // 2 + L] = (176, 182, 196) if j < 10 else (130, 140, 176)
 # Uferlinie / Wasserlinie an den Beinen
 cv.a[WL, :] = np.maximum(cv.a[WL, :], (40, 52, 96))
 
