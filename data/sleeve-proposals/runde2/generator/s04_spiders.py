@@ -4,7 +4,8 @@ ihrem roten Faden, ringsum Brain-, Diamond- und Cute Spider sowie kleine Spinnen
 Quellen (Repo PixelPartiesSprites):
   Netz      MotiveGrailWar.xcf „Trapping #1“ (273): weiße Netzpixel der oberen Hälfte, senkrecht
             gespiegelt (untere Hälfte ist dort von der gefangenen Figur verdeckt), um 90° gedreht;
-            Haltefäden = verlängerte Speichen des Netzes (1 Kartenpixel breit)
+            Haltefäden = verlängerte Speichen des Netzes (1 Kartenpixel breit); alle hellen Fäden (Netz,
+            Brain-Spider-Faden) hell-dunkel gedithert wie die Puppenfäden, der rote Faden ist es auf der Karte schon
   Spinnen   MotiveGN.xcf: Crimson Skull Spider „Ebene #178“ (259, mit rotem Faden), Brain Spider
             „Ebene #246“ (251, weißer Faden) + Glanz „Ebene #248“ (250), Diamond Spider „Ebene #181“ (260),
             Cute Spider „Ebene #309/#308/#310“ (264–266), kleine Spinnen „SPODDERS“ (267)
@@ -73,15 +74,35 @@ for a in spokes:
         if not (0 <= x < NW and 0 <= y < NH): break
         M[y, x] = True; r += 0.5
 
-WEB, WEBS = (214, 212, 222), (24, 16, 10)
+# Fäden hell-dunkel gedithert wie die Puppenfäden (Fadenfarben der Puppet-Karten): entlang jedes Fadens wechseln
+# sich die beiden Grautöne Pixel für Pixel ab (Parität des Wegabstands von der Nabe, 8er-Nachbarschaft)
+STR = [(176, 176, 176), (227, 227, 227)]
+WEBS = (24, 16, 10)
+from collections import deque
+par = np.full(M.shape, -1, np.int8)
+seeds = [(HY, HX)] + list(zip(*np.where(M)))
+for sy, sx in seeds:
+    if not M[sy, sx] or par[sy, sx] >= 0: continue
+    par[sy, sx] = 1; q = deque([(sy, sx)])
+    while q:
+        y, x = q.popleft()
+        for dy in (-1, 0, 1):
+            for dx in (-1, 0, 1):
+                v, u = y + dy, x + dx
+                if 0 <= v < NH and 0 <= u < NW and M[v, u] and par[v, u] < 0:
+                    par[v, u] = 1 - par[y, x]; q.append((v, u))
 for y, x in zip(*np.where(M)):
     cv.px(x + 1, y + 1, WEBS)
 for y, x in zip(*np.where(M)):
-    cv.px(x, y, WEB)
+    cv.px(x, y, STR[par[y, x]])
 
 # --- Spinnen (xcf-Ebenen, Kartenpixel 1:1)
 boss = sprite('r2_04_crimson_skull_spider', G, [259])      # mit rotem Faden
 brain = sprite('r2_04_brain_spider', G, [250, 251])        # mit weißem Faden + Glanz
+bcol_ = int(np.argmax(brain[0, :, 3] > 0))                  # weißer Faden → hell-dunkel wie die übrigen Fäden
+for j in range(brain.shape[0]):
+    if not brain[j, bcol_ - 1, 3] and not brain[j, bcol_ + 1, 3] and brain[j, bcol_, 3] and brain[j, bcol_, :3].min() > 200:
+        brain[j, bcol_, :3] = STR[j % 2]
 dia = sprite('r2_04_diamond_spider', G, [260])
 cute = sprite('r2_04_cute_spider', G, [264, 265, 266])     # Flügel + Körper + Herzaugen
 hive = [p for p in parts(sprite('r2_04_spodders', G, [267]), dil=1) if p.shape[0] >= 8 and p.shape[1] >= 10]

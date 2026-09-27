@@ -9,8 +9,8 @@ Runde 2b (technische Angleichung, Konzept/Anordnung unverändert):
 - Tiefenebene „Lupe“ (Vordergrund): Doqs Lupe (Ebene „Doq“, Motive.xcf #1437) 4× auf dem 250er-Raster.
   Ring vollständig und geschlossen nachgezogen (je 1 px dunkler Umriss + blauer Innenring in den Blautönen der
   Original-Lupe, Glanz oben links; Ø auf 15 px geweitet), Griff aus den Originalpixeln (Diagonale dunkel/hell/blau
-  + Endkappe), das von Doqs Hand verdeckte Griffstück mit demselben Muster ergänzt; Griff zeigt nach links oben,
-  damit die Lupe ganz im Bild bleibt. Die Linse zeigt die Wand 2× vergrößert → Linseninhalt hat dieselbe
+  + Endkappe), das von Doqs Hand verdeckte Griffstück mit demselben Muster ergänzt; Griff zeigt wie im Original
+  nach rechts unten. Die Lupe liegt über dem Rahmen und darf aus dem Bild ragen (eigene Ebene in overlays/). Die Linse zeigt die Wand 2× vergrößert → Linseninhalt hat dieselbe
   Pixelgröße (4) wie Ring und Griff.
 - Kein eigener Rahmen (kommt später per Skript).
 Quellen: Fotos pixelgenau aus den „Sichtbar“-Szenen (Motive #109/#849, MotiveDeepsea #46, MotiveGrailWar #182,
@@ -110,9 +110,9 @@ def dpx(x, y):  # Pixel der Doq-Ebene in Motive-Koordinaten
     return tuple(int(v) for v in doq[y - 171, x - 128, :3])
 RO = 7.6                                                   # Außenradius des Rings (Original Ø 13, hier auf Ø 15
 #                                                            geweitet, damit die Linse das ganze Gesicht fasst)
-N = 25                                                     # Lupe im Originalraster
+N = 28                                                     # Lupe im Originalraster
 lupe = np.zeros((N, N, 4), np.uint8)
-CX = CY = 16                                               # Ringmitte (Pixel)
+CX = CY = 9                                                # Ringmitte (Pixel)
 DARK, MID, BLUE, LIGHT = (0, 31, 94), (2, 60, 133), (3, 83, 184), (118, 183, 225)   # Blautöne der Original-Lupe
 yy, xx = np.mgrid[:N, :N]
 disc0 = np.hypot(xx - CX, yy - CY) <= RO                    # Linsenscheibe
@@ -126,16 +126,16 @@ lupe[inner_r, :3] = MID; lupe[inner_r & (ang > -100) & (ang < 45), :3] = BLUE   
 lupe[inner_r & (ang > -165) & (ang < -100), :3] = LIGHT                                     # Glanz oben links
 lupe[outer_r | inner_r, 3] = 255
 # Griff aus den Originalpixeln: Diagonale dunkel | hell | blau (Original: x = y-46 hell, Zeilen 185–193),
-# hier vom Ring nach links oben geführt (die Lupe wird von oben links gehalten), Endkappe wie im Original
+# wie im Original vom Ring nach rechts unten geführt, Endkappe wie im Original
 HD, HL, HB = dpx(144, 191), dpx(145, 191), dpx(146, 191)
 for t in range(6, 16):
-    j = CY - t; i0 = CX - t
+    j = CY + t; i0 = CX + t
     for i, c in ((i0 - 1, HD), (i0, HL), (i0 + 1, HB)):
         if 0 <= i < N and np.hypot(i - CX, j - CY) > RO:
             lupe[j, i, :3] = c; lupe[j, i, 3] = 255
-for (i, j) in ((0, 0), (1, 0), (0, 1), (1, 1)):
+E = CX + 16                                                # Endkappe am Griffende (2×2 + 1)
+for (i, j) in ((E, E), (E + 1, E), (E, E + 1), (E + 1, E + 1), (E + 1, E + 2)):
     lupe[j, i, :3] = dpx(147, 194); lupe[j, i, 3] = 255
-lupe[0, 2, :3] = dpx(147, 194); lupe[0, 2, 3] = 255
 
 K = 4                                                      # Pixelgröße der Lupe auf dem 250er-Raster (= 2 auf 125)
 # Linse über dem maskierten Monkee-Gesicht (Wand-Raster 125: (tx, ty)); jedes Lupen-Pixel zeigt genau ein
@@ -151,6 +151,28 @@ for j in range(N):
 for (i, j) in ((CX - 3, CY - 2), (CX - 2, CY - 3), (CX - 3, CY - 1), (CX - 1, CY - 3)):
     lupe[j, i, :3] = (224, 240, 250)                       # Glanz auf dem Glas
 R = up(lupe, K)
+
+# Die Lupe liegt über allem, auch über dem Rahmen, und darf aus dem Bild ragen: Wand ohne Lupe und die Lupe
+# (samt Schlagschatten, 50 % Schwarz) als eigene Ebene in 750×1050 speichern; frame_r2.py rahmt die Wand und
+# legt die Lupen-Ebene danach obenauf.
+import os
+from PIL import Image
+OV = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'overlays')
+os.makedirs(OV, exist_ok=True)
+Image.fromarray(up(cv.a, 3)).save(os.path.join(OV, '08_detective_board_base.png'))
+top = np.zeros((H, W, 4), np.uint8)
+for (dx, dy, col) in ((K, K, None), (0, 0, 'lupe')):
+    h_, w_ = R.shape[:2]
+    X0, Y0 = mx + dx, my + dy
+    xs0, ys0 = max(0, -X0), max(0, -Y0)
+    xs1, ys1 = min(w_, W - X0), min(h_, H - Y0)
+    src = R[ys0:ys1, xs0:xs1]; dst = top[Y0 + ys0:Y0 + ys1, X0 + xs0:X0 + xs1]
+    m = src[..., 3] > 0
+    if col is None:
+        dst[m] = (0, 0, 0, 128)
+    else:
+        dst[m] = src[m]
+Image.fromarray(up(top, 3)).save(os.path.join(OV, '08_detective_board_top.png'))
 shade(cv, R, mx + K, my + K, 0.5)
 cv.paste(R, mx, my)
 print(save(cv, '08_detective_board.png'))

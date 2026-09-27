@@ -32,6 +32,6 @@ z. B. `python3 s03_puppets.py`; das PNG landet in diesem Ordner.
 ## Überarbeitung (Runde 2b) und Shop
 Alle acht Sleeves wurden nach den Runde-3-Regeln neu gebaut (xcf-Sprites, einheitliche Pixelgröße, vollständige
 Figuren; Details in `notes_R2b.md`, Vorgaben in `BRIEF_R2b.md`), mit `runde3/generator/frames2.py` gerahmt
-(Zuordnung in `generator/frames_r2.json`) und liegen unter englischem Namen in `final/` und im Shop:
+(Zuordnung in `generator/frames_r2.json`, Skript `generator/frame_r2.py`) und liegen unter englischem Namen in `final/` und im Shop:
 guardian-zodiac, puppet-theater, spider-nest, pharaohs-tomb, gigantisaur-comic, detective-board, cycling-demons,
 divine-balance (Anzeigenamen in `data/shop/sleeve-names.json`). Übersicht: `00_overview_final.png`.
