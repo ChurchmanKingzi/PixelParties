@@ -58,6 +58,3 @@ def recolor_map(s, pairs, tol=10):
         out[m, :3] = b
     return out
 
-
-def quant(cv, step=1):
-    return cv

@@ -37,7 +37,7 @@ for y in range(H2):
         d = min(x, y, W2 - 1 - x, H2 - 1 - y)
         if d < F:
             if min(y, H2 - 1 - y) <= min(x, W2 - 1 - x):
-                cv.a[y, x] = hb[y if y < F else y - (H2 - F), x] if True else 0
+                cv.a[y, x] = hb[y if y < F else y - (H2 - F), x]
             else:
                 cv.a[y, x] = vb[y, x if x < F else x - (W2 - F)]
 # Rahmenkanten: außen dunkel, innen Schattenfuge

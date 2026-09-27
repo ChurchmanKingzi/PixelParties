@@ -145,6 +145,9 @@ cv.a[o3] = pit.a[o3]
 above = ~o3 & (YY < O3[0]) & (np.abs(pit.a.astype(int) - cv.a.astype(int)).sum(-1) > 0)
 cv.a[above] = pit.a[above]
 
+for n, sp in dict(dante=lay(B, 503), horned=lay(B, 573), soul=souls[-1], girl=g, dante_walk=dante_walk,
+                  demon=lay(B, 1496)).items():
+    Image.fromarray(sp).save(os.path.join(xcfkit.CACHE, 'g39_%s.png' % n))
 vignette(cv, 0.55, 0.55)
 frame(cv, ((10, 0, 0), (140, 30, 10), (240, 140, 40), (10, 0, 0)))
 print(save(cv, '39_inferno.png'))

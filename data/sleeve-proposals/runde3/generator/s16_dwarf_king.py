@@ -3,14 +3,14 @@
 
 Güldefaber, der König der Zwerge, als Brustbild vor der Felswand seines Stollens; hinter ihm eine
 dunkle Thronnische, daneben sein goldener Fass-Hammer, glitzernder Goldstaub und Fässer.
-Seine Garde – Steam Dwarf Dragon Pilot und Steam Dwarf Engineer – hält links und rechts Wache,
-ihr Dampf steigt in der Nische auf.
+Seine Garde – zwei Steam Dwarf Dragon Pilots (gespiegelt) – hält links und rechts auf Felssimsen
+Wache, Dampf steigt aus ihren Drachenhelmen auf.
 
 Quellen:
   Motive.xcf (Karte „Güldefaber, the King of Dwarfs“):
     König = Ebene 266 „Güldefaber“; Fass-Hammer + Holzfässer = Ebene 265; Glitzer = Ebene 264;
     Felswand = Ebene 874 (Stollen-/Felstextur)
-  MotiveSteamDwarfs.xcf: Dragon Pilot = Ebene 429, Engineer = Ebene 419, Dampf = Ebene 415
+  MotiveSteamDwarfs.xcf: Dragon Pilot = Ebene 429, Dampf = Ebene 415
 """
 from c_util import *
 from xcfkit import parts
@@ -44,9 +44,8 @@ for y in range(H):
 
 # ---------- Garde mit Dampf (in der Nische, halb im Dunkel)
 pilot = sprite('c16_pilot', SD, [429])
-eng = sprite('c15_eng', SD, [419])
 steam1 = sprite('c14_steam1', SD, [415])
-P = up(pilot, 2); E = up(eng, 2)
+P = up(pilot, 2); E = up(flip(pilot), 2)
 gy = 250                                           # Standlinie der Garde (weiter hinten in der Nische)
 px_, ex_ = 0, W - E.shape[1]
 S = up(steam1, 2)
@@ -62,7 +61,7 @@ for x0, x1 in ((0, 66), (W - 64, W)):
     cv.rect(x0, gy - 3, x1, gy - 2, (190, 140, 90))
     cv.rect(x0, gy + 9, x1, gy + 12, (20, 10, 6))
 cv.paste(darken(P, 0.8), px_, gy - P.shape[0])
-cv.paste(darken(flip(E), 0.8), ex_, gy - E.shape[0])
+cv.paste(darken(E, 0.8), ex_, gy - E.shape[0])
 
 # ---------- Fass-Hammer, Fässer, König
 p265 = parts(sprite('c16_items', M, [265]), dil=1)

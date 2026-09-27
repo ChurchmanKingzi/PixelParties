@@ -3,14 +3,14 @@
 
 Oben auf dem Felsvorsprung zapft der Steam Dwarf Brewer sein Fass, rechts bohrt sich der Steam Dwarf
 Miner in den Fels; darunter, im Querschnitt durch den Lavasee, stapft der Steam Dwarf Diver über den
-Grund. Aus allen Dampfrohren steigt Dampf – beim Taucher als Dampfsäule durch die Lava bis zur
-Oberfläche, wo sie als Wolke hervorbricht.
+Grund. Aus seinem Dampfrohr steigt der Dampf als Dampfsäule durch die Lava bis zur
+Oberfläche, wo er als Wolke hervorbricht und zwischen den Felsvorsprüngen aufsteigt.
 
 Quellen (MotiveSteamDwarfs.xcf):
   Diver       = Ebenen 420 (nur Helm-Teil, Box), 421–424   (Karte „Steam Dwarf Diver“)
   Brewer      = Ebenen 440–442, Fässer aus Ebene 443      (Karte „Steam Dwarf Brewer“)
   Miner       = Ebenen 437–439                            (Karte „Steam Dwarf Miner“)
-  Dampf       = Ebenen 414/415/416 (Dampfwolken)
+  Dampf       = Ebenen 414 (Doppelwolke) / 415 (Dampfsäule)
   Texturen    = Lava + Felsnadeln (Ebene 444), Krustengestein und Felswand (Ebene 445)
 """
 from c_util import *
@@ -27,15 +27,15 @@ spc = sp[..., :3].astype(int)
 sp[..., 3] = np.where((spc.max(-1) - spc.min(-1)) < 30, 255, 0)  # graue Felsnadel freistellen
 spike = trim(sp)
 
-SURF = 150                       # Lavaoberfläche (Canvas-y)
+SURF = 122                       # Lavaoberfläche (Canvas-y)
 FLOOR = 326                      # Seegrund
 # Felswand hinten (oben), 2×, nach oben dunkler
 tile_fill(cv, cliff, 0, 0, W, SURF, k=2, ox=6)
-shade_rows(cv, 0, 90, 0.7, 0.0, (22, 8, 10))
+shade_rows(cv, 0, 70, 0.7, 0.0, (22, 8, 10))
 # Lavasee im Querschnitt, 2×, nach unten dunkler und röter
 tile_fill(cv, lava, 0, SURF, W, FLOOR, k=2)
 shade_rows(cv, SURF + 14, FLOOR, 0.0, 0.9, (150, 30, 14))
-shade_rows(cv, SURF + 110, FLOOR, 0.0, 0.5, (70, 10, 8))
+shade_rows(cv, SURF + 120, FLOOR, 0.0, 0.5, (70, 10, 8))
 cv.rect(0, SURF, W, SURF + 2, (255, 246, 190))                 # glühende Oberfläche
 # Seegrund: Kruste 2× mit Felsnadeln
 tile_fill(cv, crust, 0, FLOOR, W, H, k=2, oy=4)
@@ -50,8 +50,8 @@ def ledge(x0, y0, x1, y1):
     tile_fill(cv, crust, x0, y0, x1, y1, k=2)
     cv.rect(x0, y1, x1, y1 + 2, (40, 10, 12))
     cv.rect(x0, y0, x1, y0 + 1, (255, 170, 90))
-LL = (0, 128, 146, SURF - 2)          # links: Brauer (liegt auf der Lava auf)
-LR = (176, 100, 250, 124)             # rechts oben: Bergmann
+LL = (0, 100, 146, SURF - 2)          # links: Brauer (liegt auf der Lava auf)
+LR = (176, 82, 250, 104)             # rechts oben: Bergmann
 tile_fill(cv, cliff, 190, LR[3], 250, SURF, k=2, ox=10)           # Felspfeiler unter dem rechten Vorsprung
 shade_rows(cv, LR[3], SURF, 0.5, 0.1, (22, 8, 10), x0=190)
 
@@ -63,20 +63,17 @@ barrels = parts(sprite('c14_barrels', SD, [443]), dil=1)
 steam1 = sprite('c14_steam1', SD, [415])                   # einzelne Dampfsäule 31×80
 steam2 = parts(sprite('c14_steam2', SD, [414]), dil=1)[1]  # Doppelsäule 42×80
 
-# Dampf der oberen Zwerge (hinter den Figuren)
-cv.paste(up(steam2, 2), 18, -44)
-cv.paste(up(steam1, 2), 178, -104)
 
-# Taucher: Dampfsäule (2×) aus dem rechten Rohr steigt durch die Lava auf und quillt zwischen den
-# Vorsprüngen nach oben; der Teil in der Lava ist im Glutschein eingefärbt
+# Taucher: aus seinem Rohr steigt eine Dampfsäule (1×, im Glutschein eingefärbt, dunkel umrandet)
+# bis zur Oberfläche; dort bricht der Dampf als Doppelwolke (2×) hervor und quillt zwischen den
+# Felsvorsprüngen nach oben
 D = up(diver, 5)
 dx, dy = 62, FLOOR - D.shape[0] + 6
-P = up(steam1, 2)
-px, py = dx + 18 * 5 + 2 - 24, dy + 2 - P.shape[0]
-cv.paste(P, px, py)
-PO = up(outline(tint(steam1, (255, 190, 110), 0.3), (150, 40, 20)), 2)   # gleiche Form, mit Kontur
-cut = SURF + 2 - (py - 2)
-cv.paste(PO[cut:], px - 2, SURF + 2)
+pipe_x = dx + 18 * 5 + 2                                   # rechtes Rohr (Diver-Spalte 17–20)
+col = outline(tint(steam1, (255, 200, 120), 0.3), (150, 40, 20))    # ganze Dampfsäule 1×, Spitze am Rohr
+Dc = up(steam2, 2)
+cv.paste(Dc, pipe_x - Dc.shape[1] // 2 + 2, SURF - Dc.shape[0] + 20)
+cv.paste(col, pipe_x - 13, dy + 4 - col.shape[0])
 
 ledge(*LL)
 ledge(*LR)
