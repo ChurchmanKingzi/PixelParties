@@ -11,6 +11,8 @@ Teile: src/idej-lord-daiyo-{ghost,sword}.png (deckungsgleich).
   grüner Schein liegt 1 px um seine Silhouette und pulsiert.
 * Sein Körper lebt: die Helmzier wippt nach, der Saum unten wogt, die Augen
   glühen auf, der Oberkörper atmet (hebt sich im Rhythmus um 1 px).
+* Er blinzelt zweimal pro Loop (die weißen Augen schließen sich zu grünen
+  Lidern mit dunkler Linie).
 """
 import math
 import sys
@@ -32,6 +34,9 @@ EYE = rgb('ffffff')
 EYE_GLOW = [rgb('ffffff'), rgb('e8ffd8'), rgb('b8ffa0'), rgb('e8ffd8')]
 ARM = {(x, y) for y in range(14, 21) for x in range(3, 10) if GHOST[y, x, 3]}   # Schwertarm
 HEM_Y = 21                                           # Saum
+BLINK = {14: 'halb', 15: 'zu', 16: 'zu', 17: 'halb', 38: 'halb', 39: 'zu', 40: 'zu', 41: 'halb'}
+EYE_TOP, EYE_BOT = 9, 10
+LID, LID_LINE = rgb('82f94f'), rgb('00f921')
 
 
 def bob(i):
@@ -70,7 +75,15 @@ def frame(i):
         for x in range(SW):
             if GHOST[y, x, 3]:
                 dx, dy = ghost_offset(x, y, i, lift)
-                c = glow if tuple(GHOST[y, x]) == EYE else GHOST[y, x]
+                c = GHOST[y, x]
+                if tuple(c[:3]) == EYE[:3]:              # Augen (halbtransparent wie der Geist)
+                    st = BLINK.get(i)
+                    col = glow
+                    if st == 'halb':
+                        col = LID_LINE if y == EYE_TOP else glow
+                    elif st == 'zu':
+                        col = LID if y == EYE_TOP else LID_LINE
+                    c = np.array([*col[:3], max(c[3], 200)])
                 ghost[y + oy + dy, x + P + dx] = c
     if breath(i):                                    # Zeile über dem Saum dehnen
         for x in range(SW):

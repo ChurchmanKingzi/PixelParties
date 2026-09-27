@@ -9,8 +9,8 @@ Pseudonia hält ihr Opfer und hat sich in seinen Hals verbissen.
   Opfer), das Opfer zuckt zurück, die Bisswunde leuchtet auf und Blut spritzt
   in kleinen Tropfen heraus (nur ins Freie, einzelne Pixel).
 * Ihre Flügel schlagen langsam (spaltentreu geschert).
-* hero: ihr eigenes Gesicht steckt im Biss; das Opfer blinzelt mit seinem
-  blauen Auge (zweimal pro Loop, kurz nach einem Biss).
+* Ihr eigenes Gesicht steckt im Biss; das Opfer blinzelt (zweimal pro Loop,
+  kurz nach einem Biss) – beim Skin sitzt sein Auge 7 Zeilen tiefer.
 * imperfect: der grüne Schwanzring (liegt vor ihr) pendelt sachte hin und her.
 """
 import math
@@ -49,8 +49,9 @@ HEAD_SET, VICTIM_SET = set(HEAD), set(VICTIM)
 BITE = (14, OY + 5)                                  # Bisswunde
 BLOOD = [rgb('930200'), rgb('b30000'), rgb('ff3030')]
 BLINK = {3: 'halb', 4: 'zu', 5: 'zu', 6: 'halb', 27: 'halb', 28: 'zu', 29: 'zu', 30: 'halb'}
-VIC_EYE_TOP, VIC_EYE_BOT = [(16, 4), (17, 4)], [(16, 5), (17, 5)]   # Auge des Opfers (hero)
-VIC_SKIN, VIC_LASH = rgb('f7bc97'), rgb('311800')
+VIC_EYE_TOP = [(16, OY + 4), (17, OY + 4)]           # Auge des Opfers
+VIC_EYE_BOT = [(16, OY + 5), (17, OY + 5)]
+VIC_SKIN, VIC_LASH = (rgb('f7bc97'), rgb('311800')) if V == 'hero' else (rgb('bde12d'), rgb('050404'))
 SPRAY = [(1, -2), (2, -3), (-1, -3), (3, -2)]        # Flugbahnen der Tropfen (Endpunkte)
 
 
@@ -68,7 +69,7 @@ def frame(i):
     shear_flap(BODY, WING_L, 7.5, -1, lift, sq, out, (P, PT))
     shear_flap(BODY, WING_R, 19.0, 1, lift, sq, out, (P, PT))
     body = BODY.copy()
-    st = BLINK.get(i) if V == 'hero' else None
+    st = BLINK.get(i)
     if st:
         for x, y in VIC_EYE_TOP:
             body[y, x] = VIC_LASH if st == 'halb' else VIC_SKIN
