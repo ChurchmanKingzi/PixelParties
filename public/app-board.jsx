@@ -2057,14 +2057,100 @@ function HeroSpriteEbene() {
   return <div className="hero-sprite-ebene" ref={HeroIdleAnims.setzeEbene} aria-hidden="true" />;
 }
 
+// ★ v1457 — EISBLOCK um eingefrorene Figuren (Als Vorgabe 27.9.: „bei
+// Frozen Heroes sollte ein visueller Eisblock um sie herum gezeichnet
+// werden"). Nötig, weil große Figuren das Eis-Overlay und das Abzeichen
+// ihrer Karte verdecken — Waflav stand eingefroren still und sah aus wie
+// ein Fehler. Gemalt in Sprite-Auflösung (Pixel für Pixel, Bayer-
+// Dithering wie die übrige Pixelkunst): halbtransparenter Block, der die
+// Figur bläulich tönt, helle Kante oben/links, dunkle unten/rechts,
+// diagonale Glanzlinien, ein paar Risse, Raureif am Fuß.
+const EIS_BAYER = [[0, 8, 2, 10], [12, 4, 14, 6], [3, 11, 1, 9], [15, 7, 13, 5]];
+function maleEisblock(ctx, w, h) {
+  const bild = ctx.createImageData(w, h);
+  const d = bild.data;
+  const setze = (x, y, r, g, b, a) => {
+    if (x < 0 || y < 0 || x >= w || y >= h) return;
+    const i = (y * w + x) * 4;
+    d[i] = r; d[i + 1] = g; d[i + 2] = b; d[i + 3] = Math.round(a * 255);
+  };
+  const bayer = (x, y) => (EIS_BAYER[y & 3][x & 3] + 0.5) / 16;
+  // Füllung: oben etwas dichter, ein geditherter Lichtstreifen links
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const oben = y < h * 0.35;
+      const streifen = x > w * 0.16 && x < w * 0.3 && bayer(x, y) < 0.5;
+      if (streifen) setze(x, y, 205, 238, 255, 0.36);
+      else setze(x, y, 160, 214, 255, oben ? 0.3 : 0.24);
+    }
+  }
+  // Glanzlinien: zwei Diagonalen im oberen linken Bereich
+  const k1 = Math.max(4, Math.round(Math.min(w, h) * 0.32));
+  for (let y = 2; y < h * 0.6; y++) {
+    for (let x = 2; x < w * 0.6; x++) {
+      if (x + y === k1) setze(x, y, 255, 255, 255, 0.75);
+      else if (x + y === k1 + 3) setze(x, y, 255, 255, 255, 0.45);
+    }
+  }
+  // Risse: kurze Zickzack-Linien, fest aus der Größe gesät
+  let saat = (w * 73856093) ^ (h * 19349663);
+  const zufall = () => { saat = (Math.imul(saat, 1103515245) + 12345) | 0; return ((saat >>> 8) & 0xffff) / 65536; };
+  const nRisse = Math.max(2, Math.round((w * h) / 520));
+  for (let r = 0; r < nRisse; r++) {
+    let x = 3 + Math.floor(zufall() * (w - 6));
+    let y = Math.floor(h * 0.3 + zufall() * h * 0.55);
+    const richtung = zufall() < 0.5 ? -1 : 1;
+    const laenge = 4 + Math.floor(zufall() * 6);
+    for (let k = 0; k < laenge; k++) {
+      setze(x, y, 95, 150, 205, 0.7);
+      y += 1;
+      if (zufall() < 0.6) x += richtung;
+    }
+  }
+  // Raureif am Fuß
+  for (let y = h - 3; y < h - 1; y++) {
+    for (let x = 1; x < w - 1; x++) {
+      if (bayer(x, y) < (y === h - 2 ? 0.7 : 0.4)) setze(x, y, 240, 250, 255, 0.85);
+    }
+  }
+  // Kanten: hell oben/links, dunkel unten/rechts, innen ein Lichtsaum
+  for (let x = 0; x < w; x++) { setze(x, 0, 235, 250, 255, 0.95); setze(x, h - 1, 85, 140, 200, 0.9); }
+  for (let y = 0; y < h; y++) { setze(0, y, 235, 250, 255, 0.95); setze(w - 1, y, 85, 140, 200, 0.9); }
+  for (let x = 1; x < w - 1; x++) setze(x, 1, 255, 255, 255, 0.45);
+  for (let y = 1; y < h - 1; y++) setze(1, y, 255, 255, 255, 0.45);
+  // Funkeln an den Ecken
+  setze(2, 2, 255, 255, 255, 1); setze(w - 3, 2, 255, 255, 255, 1); setze(w - 4, 3, 255, 255, 255, 0.7);
+  ctx.putImageData(bild, 0, 0);
+}
+function HeroEisblock({ breite, hoehe, stil, schmilzt }) {
+  const ref = useRef(null);
+  useEffect(() => {
+    const cv = ref.current;
+    if (!cv) return;
+    try { maleEisblock(cv.getContext('2d'), breite, hoehe); } catch {}
+  }, [breite, hoehe]);
+  return <canvas ref={ref} width={breite} height={hoehe}
+    className={'hero-idle-eis' + (schmilzt ? ' hero-idle-eis-schmilzt' : '')} style={stil} />;
+}
+
 // Eine Idle-Animation, die auf dem oberen Kartendrittel einer Heldenzone
 // steht. In der Zone selbst liegt nur ein unsichtbarer Anker; die Figur
 // wird in die Sprite-Ebene portiert und folgt der Zone dort (Lage,
 // Hover-Vergrößerung).
 // `angehalten`: Frame bleibt stehen (Frozen/Stunned/Webbed).
 // `versteinert`: zusätzlich Steinoptik (kriecht von unten nach oben).
-function HeroIdleSprite({ cardName, angehalten, versteinert, unsichtbar }) {
+// `eingefroren`: zusätzlich ein Eisblock um die Figur (v1457).
+function HeroIdleSprite({ cardName, angehalten, versteinert, eingefroren, unsichtbar }) {
   const key = HeroIdleAnims.slug(cardName);
+  // Eisblock: 'da' solange Frozen, danach kurz 'schmilzt' (zerspringt),
+  // dann 'weg'.
+  const [eisPhase, setEisPhase] = useState(eingefroren ? 'da' : 'weg');
+  useEffect(() => {
+    if (eingefroren) { setEisPhase('da'); return undefined; }
+    setEisPhase(p => (p === 'da' ? 'schmilzt' : p));
+    const t = setTimeout(() => setEisPhase('weg'), 450);
+    return () => clearTimeout(t);
+  }, [eingefroren]);
   const [eintrag, setEintrag] = useState(() => HeroIdleAnims.schonDa(key) || null);
   useEffect(() => {
     let lebt = true;
@@ -2270,6 +2356,18 @@ function HeroIdleSprite({ cardName, angehalten, versteinert, unsichtbar }) {
     width: `calc(${bs(fw * s)})`,
     height: `calc(${bs(fh * s)})`,
   };
+  // Eisblock: Umriss der Figur plus Rand, unten bis zur Standlinie —
+  // auf den Frame begrenzt, damit der Steher (overflow: hidden) keine
+  // Kante abschneidet (Bubbles reicht bis an den Frame-Rand).
+  const eisX0 = Math.max(0, Math.floor(kern.x0) - 2), eisY0 = Math.max(0, Math.floor(kern.y0) - 3);
+  const eisX1 = Math.min(fw, Math.ceil(kern.x1) + 2);
+  const eisY1 = Math.min(Math.ceil(unterkante), Math.ceil(fussY) + 1);
+  const eisStil = {
+    left: `calc(${bs(eisX0 * s)})`,
+    top: `calc(${bs(eisY0 * s)})`,
+    width: `calc(${bs((eisX1 - eisX0) * s)})`,
+    height: `calc(${bs((eisY1 - eisY0) * s)})`,
+  };
   const schattenBreite = Math.max(8, cw * s * 0.8);
   const schattenStil = {
     width: `calc(${bs(schattenBreite)})`,
@@ -2285,6 +2383,10 @@ function HeroIdleSprite({ cardName, angehalten, versteinert, unsichtbar }) {
           <div className="hero-idle-steher" style={steherStil}>
             <div className="hero-idle-holo" style={{ transformOrigin: drehpunkt }}>
               <canvas ref={canvasRef} width={fw} height={fh} className="hero-idle-canvas" style={canvasStil} />
+              {eisPhase !== 'weg' && (
+                <HeroEisblock breite={eisX1 - eisX0} hoehe={eisY1 - eisY0} stil={eisStil}
+                  schmilzt={eisPhase === 'schmilzt'} />
+              )}
             </div>
           </div>
         </div>,
@@ -40812,6 +40914,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     cardName={(formPreview && formPreview.owner === pi && formPreview.heroIdx === i
                       && CARDS_BY_NAME[formPreview.cardName]) ? formPreview.cardName : hero.name}
                     angehalten={!!(isFrozen || isStunned)}
+                    eingefroren={!!isFrozen}
                     versteinert={!!(isStunned?._petrified || isStunned?._baihuPetrify)}
                     unsichtbar={!!isInvisible} />
                 )}

@@ -3716,6 +3716,31 @@ body:has(.anim-backdrop) .pp-bg-particles { display: none; }
   80%  { transform: scaleY(1.03); }
   100% { opacity: 1; transform: none; }
 }
+/* ── Eisblock um eingefrorene Figuren (v1457) ─────────────────────────
+   Pixelbild in Sprite-Auflösung (maleEisblock), liegt IN der Figur-
+   Hülle: steht mit ihr aufrecht und zieht sich beim Hover mit zurück.
+   Wächst beim Einfrieren von den Füßen hoch, zerspringt beim Auftauen. */
+.hero-idle-eis {
+  position: absolute;
+  image-rendering: pixelated;
+  transform-origin: 50% 100%;
+  animation: heroEisBilden .45s steps(6, end) backwards;
+}
+.hero-idle-eis.hero-idle-eis-schmilzt { animation: heroEisZerspringen .45s ease-in forwards; }
+@keyframes heroEisBilden {
+  0%   { transform: scaleY(0);  opacity: 0; filter: brightness(2); }
+  60%  { opacity: 1; }
+  100% { transform: none;       opacity: 1; filter: none; }
+}
+@keyframes heroEisZerspringen {
+  0%   { transform: none;        opacity: 1; filter: none; }
+  30%  { transform: scale(1.03); opacity: 1; filter: brightness(1.8); }
+  100% { transform: scale(1.12); opacity: 0; filter: brightness(1.4); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hero-idle-eis { animation: none; }
+  .hero-idle-eis.hero-idle-eis-schmilzt { animation: none; opacity: 0; transition: opacity .2s ease; }
+}
 /* Unsichtbare Helden: halbtransparent wie ihre Karte */
 .hero-idle-unsichtbar .hero-idle-steher,
 .hero-idle-unsichtbar .hero-idle-schatten { opacity: .4; }
