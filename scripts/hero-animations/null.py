@@ -69,8 +69,8 @@ def frame(i):
                 out[y + PT, x + P] = body[y, x]
     # Partikel: lösen sich von der Klinge und treiben davon
     for m in range(10):
-        t = (i + m * 3) % 12
-        gen = (i + m * 3) // 12
+        t = (i + m * 3) % 16                          # 16 teilt N=32 -> nahtloser Loop
+        gen = ((i + m * 3) // 16) % (N // 16)
         sx, sy = SEEDS[int(rnd(m, gen) * len(SEEDS)) % len(SEEDS)]
         ang = rnd(m + 20, gen) * 2 * math.pi
         x = int(round(sx + P + math.cos(ang) * t * 0.45))

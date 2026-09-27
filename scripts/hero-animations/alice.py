@@ -58,7 +58,7 @@ def frame(i):
                 out[UPPER + PT, x + P] = s[UPPER, x]
     for m in range(6):                              # Schwebeteilchen
         t = (i + m * 7) % 20
-        gen = (i + m * 7) // 20
+        gen = ((i + m * 7) // 20) % (N // 20)
         side = -1 if m % 2 else 1
         x = int(round(W / 2 + side * (7 + rnd(m, gen) * 3) + math.sin(t * 0.5 + m)))
         y = int(round(H - 4 - t * 0.9))

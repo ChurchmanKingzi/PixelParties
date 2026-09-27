@@ -4,6 +4,7 @@ rechte Figur aus „Ebene #49“, gespiegelt).
 
 * Das Herzchen in ihrem Haar ploppt auf, löst sich, steigt wackelnd auf und
   verblasst – wie bei Lilly (darunter werden Haar und Kontur ergänzt).
+* Sie blinzelt einmal pro Loop (halb -> zu -> halb).
 * Sie wippt fröhlich (Füße bleiben stehen, die Zeile darüber wird gedehnt).
 * Ihre großen roten Schleifen schlagen abwechselnd nach außen aus (die
   Spitzen werden verlängert, nichts reißt ab).
@@ -23,6 +24,10 @@ FEET = 19
 OUTL = rgb('311800')
 HEART_PX = {(14, 5): OUTL, (16, 5): OUTL, (14, 6): OUTL, (15, 6): rgb('f6bd98'), (16, 6): OUTL,
             (15, 7): rgb('bd5a39')}                   # was unter dem Herzchen liegt
+SKIN, LASH = rgb('f6bd98'), rgb('311800')
+EYES_TOP = [(8, 7), (9, 7), (13, 7)]
+EYES_BOT = [(8, 8), (9, 8), (12, 8), (13, 8)]
+BLINK = {30: 'halb', 31: 'zu', 32: 'zu', 33: 'halb'}
 RIBBON = {rgb(c) for c in ('c3071f', 'd25261', 'ca1e2c', 'd14043')}
 PINK, PINK_HI, PINK_DK = rgb('ff4dc5'), rgb('ff8eda'), rgb('c6188e')
 HEART = [(-2, 0, PINK_DK), (-1, 0, PINK_HI), (1, 0, PINK_DK), (2, 0, PINK_DK),
@@ -76,6 +81,13 @@ def frame(i):
     s = SRC.copy()
     for (x, y), c in HEART_PX.items():               # Herz vom Haar lösen
         s[y, x] = c
+    st = BLINK.get(i)
+    if st:
+        for x, y in EYES_TOP:
+            s[y, x] = LASH if st == 'halb' else SKIN
+        if st == 'zu':
+            for x, y in EYES_BOT:
+                s[y, x] = LASH
     out = np.zeros((H, W, 4), int)
     b = bob(i)
     for y in range(SH):
