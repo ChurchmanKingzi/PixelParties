@@ -1,0 +1,10 @@
+{
+  "hero": "Ghuanjun, the Undead Martial Artist",
+  "sheet": "ghuanjun-the-undead-martial-artist.png",
+  "frameWidth": 20,
+  "frameHeight": 33,
+  "frames": 24,
+  "frameMs": 70,
+  "loop": true,
+  "layout": "horizontal"
+}

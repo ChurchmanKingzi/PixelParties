@@ -1,0 +1,10 @@
+{
+  "hero": "Sid, the King of Thieves",
+  "sheet": "sid-the-king-of-thieves.png",
+  "frameWidth": 38,
+  "frameHeight": 38,
+  "frames": 48,
+  "frameMs": 90,
+  "loop": true,
+  "layout": "horizontal"
+}

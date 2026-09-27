@@ -1,0 +1,10 @@
+{
+  "hero": "Arthor, Inheritor of the Barbarian Sword",
+  "sheet": "arthor-inheritor-of-the-barbarian-sword.png",
+  "frameWidth": 55,
+  "frameHeight": 142,
+  "frames": 48,
+  "frameMs": 90,
+  "loop": true,
+  "layout": "horizontal"
+}

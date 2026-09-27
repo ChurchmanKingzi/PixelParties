@@ -1,0 +1,13 @@
+{
+  "hero": "Bubbles, the Bouncy Bunny",
+  "sheet": "bubbles-the-bouncy-bunny.png",
+  "frameWidth": 138,
+  "frameHeight": 149,
+  "frames": 32,
+  "frameMs": 70,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 24,
+  "padLeft": 9,
+  "padRight": 9
+}
