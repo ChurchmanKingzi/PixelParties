@@ -1,0 +1,15 @@
+{
+  "hero": "Tarleinn the Traveler",
+  "sheet": "tarleinn-the-traveler.png",
+  "frameWidth": 36,
+  "frameHeight": 33,
+  "frames": 32,
+  "frameMs": 65,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 8,
+  "padLeft": 7,
+  "padRight": 7,
+  "padBottom": 1,
+  "faceX": 18
+}

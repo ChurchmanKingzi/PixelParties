@@ -3703,7 +3703,7 @@ body:has(.anim-backdrop) .pp-bg-particles { display: none; }
   inset: 0;
   transform-origin: 50% 100%;
 }
-.hero-idle-hover .hero-idle-holo { animation: heroHoloRueckzug .32s ease-in forwards; }
+.hero-idle-weg .hero-idle-holo { animation: heroHoloRueckzug .32s ease-in forwards; }
 .hero-idle-zurueck .hero-idle-holo { animation: heroHoloAuftauchen .36s ease-out both; }
 @keyframes heroHoloRueckzug {
   0%   { opacity: 1; transform: none; }
@@ -3741,6 +3741,67 @@ body:has(.anim-backdrop) .pp-bg-particles { display: none; }
   .hero-idle-eis { animation: none; }
   .hero-idle-eis.hero-idle-eis-schmilzt { animation: none; opacity: 0; transition: opacity .2s ease; }
 }
+/* ── Statuseffekte an der Figur (v1459) ───────────────────────────────
+   Effekt-Ebene: gleiche Lage und Drehung wie `.hero-idle-steher`, aber
+   ohne Beschnitt; ein halbes Pixel vor der Figur. Beim Hover blendet sie
+   mit der Figur aus. Partikel sitzen mit ihrem Fußpunkt auf der Lage. */
+.hero-idle-fx {
+  position: absolute;
+  pointer-events: none;
+  transform: rotateX(calc(-1 * var(--sprite-kipp, 0deg))) scaleY(var(--sprite-streck, 1)) translateZ(.5px);
+  transition: opacity .25s ease;
+}
+.hero-idle-weg .hero-idle-fx { opacity: 0; }
+.hero-idle-unsichtbar .hero-idle-fx { opacity: .4; }
+.hfx { position: absolute; display: block; line-height: 0; pointer-events: none; }
+.hfx .pp-px { display: block !important; }
+.hfx-netz { position: absolute; image-rendering: pixelated; animation: hfxEinblenden .5s ease-out backwards; }
+@keyframes hfxEinblenden { from { opacity: 0; } to { opacity: 1; } }
+/* Stunned: Blitze zucken um Kopf und Oberkörper */
+.hfx-blitz { transform: translate(-50%, -50%); animation: hfxBlitz 1.2s steps(1, end) infinite; opacity: 0; }
+@keyframes hfxBlitz {
+  0%   { opacity: 0; transform: translate(-50%, -50%) rotate(var(--hfx-dreh, 0deg)) scale(.6); }
+  8%   { opacity: 1; transform: translate(-50%, -50%) rotate(var(--hfx-dreh, 0deg)) scale(1.15); }
+  16%  { opacity: .6; transform: translate(-50%, -50%) rotate(calc(var(--hfx-dreh, 0deg) * -1)) scale(.9); }
+  24%  { opacity: 1; transform: translate(-50%, -50%) rotate(var(--hfx-dreh, 0deg)) scale(1); }
+  40%  { opacity: .7; transform: translate(-50%, -50%) rotate(calc(var(--hfx-dreh, 0deg) * -1)) scale(1.05); }
+  52%  { opacity: 1; transform: translate(-50%, -50%) rotate(var(--hfx-dreh, 0deg)) scale(.95); }
+  60%, 100% { opacity: 0; transform: translate(-50%, -50%) rotate(var(--hfx-dreh, 0deg)) scale(.6); }
+}
+/* Burned: Flammen lodern auf dem Körper (Fußpunkt unten mittig) */
+.hfx-flamme { transform: translate(-50%, -100%); transform-origin: 50% 100%; animation: hfxFlamme .6s ease-in-out infinite alternate; }
+@keyframes hfxFlamme {
+  from { transform: translate(-50%, -100%) scale(.85, .8);  opacity: .75; }
+  to   { transform: translate(-50%, -110%) scale(1.05, 1.15); opacity: 1; }
+}
+/* Poisoned / Heal Reversed: Schädel steigen über die Figur auf */
+.hfx-schaedel { transform: translate(-50%, -50%); animation: hfxAufsteigen 2.6s ease-out infinite; opacity: 0; }
+@keyframes hfxAufsteigen {
+  0%   { opacity: 0; transform: translate(-50%, -50%) scale(.7); }
+  15%  { opacity: 1; transform: translate(-50%, -80%) scale(1); }
+  100% { opacity: 0; transform: translate(-50%, calc(-50% - var(--hfx-hub, 32) * 1px * var(--board-scale))) scale(.9); }
+}
+/* Berserked / Heal Reversed: Funken steigen auf */
+.hfx-funke { transform: translate(-50%, -50%); animation: hfxFunke 1.8s ease-out infinite; opacity: 0; }
+@keyframes hfxFunke {
+  0%   { opacity: 0; transform: translate(-50%, -50%) scale(.5); }
+  20%  { opacity: 1; transform: translate(-50%, -70%) scale(1); }
+  100% { opacity: 0; transform: translate(-50%, calc(-50% - 22px * var(--board-scale))) scale(.6); }
+}
+/* Bleeding: Blutstropfen rinnen herab (Pixel-Tropfen mit Glanzpunkt) */
+.hfx-tropfen {
+  width: calc(2px * var(--board-scale)); height: calc(5px * var(--board-scale));
+  background: linear-gradient(#ff6a6a 0 20%, #c0101e 20% 80%, #6a0008 80%);
+  transform: translateX(-50%); animation: hfxTropfen 1.6s ease-in infinite; opacity: 0;
+}
+@keyframes hfxTropfen {
+  0%   { opacity: 0; transform: translateX(-50%) scaleY(.3); }
+  15%  { opacity: 1; transform: translateX(-50%) scaleY(1); }
+  100% { opacity: 0; transform: translate(-50%, calc(20px * var(--board-scale))) scaleY(1.2); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hfx { animation: none !important; opacity: 1 !important; }
+}
 /* Unsichtbare Helden: halbtransparent wie ihre Karte */
 .hero-idle-unsichtbar .hero-idle-steher,
 .hero-idle-unsichtbar .hero-idle-schatten { opacity: .4; }
@@ -3758,7 +3819,7 @@ body:has(.anim-backdrop) .pp-bg-particles { display: none; }
   animation: heroIdleSchatten .55s ease-out backwards;
   transition: opacity .3s ease;
 }
-.hero-idle-platz.hero-idle-hover .hero-idle-schatten { opacity: 0; }
+.hero-idle-platz.hero-idle-weg .hero-idle-schatten { opacity: 0; }
 @keyframes heroIdleSchatten {
   from { opacity: 0; transform: scaleX(.3); }
   to   { opacity: 1; transform: none; }
@@ -3766,11 +3827,21 @@ body:has(.anim-backdrop) .pp-bg-particles { display: none; }
 @media (prefers-reduced-motion: reduce) {
   .hero-idle-canvas, .hero-idle-schatten { animation: none; }
   /* ohne Bewegung: einfach aus- und einblenden */
-  .hero-idle-hover .hero-idle-holo,
+  .hero-idle-weg .hero-idle-holo,
   .hero-idle-zurueck .hero-idle-holo { animation: none; }
   .hero-idle-holo { transition: opacity .2s ease; }
-  .hero-idle-hover .hero-idle-holo { opacity: 0; }
+  .hero-idle-weg .hero-idle-holo { opacity: 0; }
 }
+
+/* v1463: Checkboxen der Helden-Anzeige im Profil */
+.profile-checks { display: flex; flex-wrap: wrap; gap: 8px 22px; margin-top: 12px; }
+.profile-check {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 12px; color: var(--text); cursor: pointer; user-select: none;
+}
+.profile-check input { width: 15px; height: 15px; accent-color: var(--accent); cursor: pointer; margin: 0; }
+.profile-check.profile-check-aus { color: var(--text2); opacity: .55; cursor: default; }
+.profile-check.profile-check-aus input { cursor: default; }
 
 /* ═══ Status Effect Visuals ═══ */
 
@@ -4070,6 +4141,8 @@ body:has(.anim-backdrop) .pp-bg-particles { display: none; }
   70% { opacity: .4; transform: translateY(-2px) scale(0.7); }
   100% { transform: translateY(-6px) scale(0.5); opacity: 0; }
 }
+/* v1462: nur die Stapelzahl, wenn eine animierte Figur das Gift zeigt */
+.status-poisoned-zahl { position: absolute; inset: 0; z-index: 5; pointer-events: none; }
 .poison-stack-count {
   position: absolute;
   top: 50%;
@@ -23953,4 +24026,41 @@ body.pp-dialog-offen .foil-diamond-rare:not(.modal-overlay *) {
   0%, 52% { transform: rotateY(0deg) scale(1); }
   62% { transform: rotateY(90deg) scale(1.08); }
   72%, 100% { transform: rotateY(180deg) scale(1); }
+}
+
+/* ── KOPFZEILEN-KNOEPFE: EINE HOEHE (v1463) ───────────────────────────
+   Als Befund 27.9.: „Die Kopfzeilen-Buttons sind nicht alle gleich hoch —
+   spezifisch ‚Reset‘ und ‚Test Puzzle‘. Alle Buttons, die in einer
+   Kopfzeile existieren, sollen gleich hoch sein!"
+
+   Die Knoepfe hatten keine Hoehe, nur Polster — die Hoehe kam aus dem
+   INHALT. Ein Farb-Emoji (⚔️ in „Test Puzzle") ist in der Emoji-Schrift
+   von Windows hoeher als eine Textzeile, der Knopf wuchs mit; der
+   Lautsprecher (34-px-Icon, eigenes Polster) lag bei 37 px statt 41.
+   Jetzt tragen alle Knoepfe einer Kopfzeile dieselbe feste Hoehe, der
+   Inhalt wird darin senkrecht mittig gesetzt. Das senkrechte Polster
+   faellt weg (`!important`, weil einzelne Knoepfe es inline setzen) —
+   die Hoehe allein bestimmt den Kasten, der waagerechte Abstand bleibt.
+   41 px ist die Hoehe, die ein Standardknopf ohnehin hat (13 px Schrift,
+   10 px Polster, 3 px Rand oben und unten). */
+.top-bar { --kopf-knopf-h: 41px; }
+.top-bar .btn,
+.top-bar .volume-btn {
+  box-sizing: border-box;
+  height: var(--kopf-knopf-h);
+  min-height: 0;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  flex-shrink: 0;
+}
+/* Telefon/schmale Fenster: die Knoepfe sind dort 8 px klein (siehe
+   „Top bar: allow wrapping"); der Lautsprecher zieht mit, sonst
+   ueberragte er die Zeile wie vorher. */
+@media (max-width: 850px) {
+  .top-bar { --kopf-knopf-h: 24px; }
+  .top-bar .volume-btn { font-size: 18px; }
 }

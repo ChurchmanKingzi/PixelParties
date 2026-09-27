@@ -898,6 +898,10 @@ async function initDatabase() {
   try { await db.execute("ALTER TABLE users ADD COLUMN board TEXT DEFAULT NULL"); } catch {}
   try { await db.execute("ALTER TABLE users ADD COLUMN hide_tutorial INTEGER DEFAULT 0"); } catch {}
   try { await db.execute("ALTER TABLE users ADD COLUMN play_animations INTEGER DEFAULT 1"); } catch {}
+  // v1463: animierte Helden auf dem Brett (Display Heroes) und ihr
+  // Einklappen während Zielwahl-Dialogen (Dynamic Heroes) — beide an.
+  try { await db.execute("ALTER TABLE users ADD COLUMN display_heroes INTEGER DEFAULT 1"); } catch {}
+  try { await db.execute("ALTER TABLE users ADD COLUMN dynamic_heroes INTEGER DEFAULT 1"); } catch {}
   // Ranked-games counter — incremented when a ranked SET (Bo1/Bo3/Bo5)
   // finishes. Used to filter the leaderboard to "actually competed"
   // players so fresh accounts at the default 1000 ELO don't pollute the
@@ -1882,7 +1886,7 @@ app.get('/api/auth/me', authMiddleware, async (req, res) => {
 });
 
 function sanitizeUser(u) {
-  return { id: u.id, username: u.username, elo: u.elo, eloCube: u.elo_cube == null ? 1000 : u.elo_cube, color: u.color, avatar: u.avatar, cardback: u.cardback, board: u.board || null, bio: u.bio || '', victoryMsg: u.victory_msg || '', defeatMsg: u.defeat_msg || '', wins: u.wins || 0, losses: u.losses || 0, sc: u.sc || 0, created_at: u.created_at, hide_tutorial: u.hide_tutorial || 0, play_animations: u.play_animations == null ? 1 : (u.play_animations ? 1 : 0), defaultSampleDeckId: u.default_sample_deck_id || null, email: u.email || null, emailVerified: !!u.email_verified, isGuest: !!u.is_guest };
+  return { id: u.id, username: u.username, elo: u.elo, eloCube: u.elo_cube == null ? 1000 : u.elo_cube, color: u.color, avatar: u.avatar, cardback: u.cardback, board: u.board || null, bio: u.bio || '', victoryMsg: u.victory_msg || '', defeatMsg: u.defeat_msg || '', wins: u.wins || 0, losses: u.losses || 0, sc: u.sc || 0, created_at: u.created_at, hide_tutorial: u.hide_tutorial || 0, play_animations: u.play_animations == null ? 1 : (u.play_animations ? 1 : 0), display_heroes: u.display_heroes == null ? 1 : (u.display_heroes ? 1 : 0), dynamic_heroes: (u.display_heroes === 0) ? 0 : (u.dynamic_heroes == null ? 1 : (u.dynamic_heroes ? 1 : 0)), defaultSampleDeckId: u.default_sample_deck_id || null, email: u.email || null, emailVerified: !!u.email_verified, isGuest: !!u.is_guest };
 }
 
 // ===== PROFILE ROUTES =====
@@ -1955,6 +1959,18 @@ app.put('/api/profile', authMiddleware, async (req, res) => {
 app.put('/api/profile/play-animations', authMiddleware, async (req, res) => {
   const play = req.body.play_animations ? 1 : 0;
   await db.run('UPDATE users SET play_animations = ? WHERE id = ?', [play, req.user.userId]);
+  const user = await db.get('SELECT * FROM users WHERE id = ?', [req.user.userId]);
+  res.json({ user: sanitizeUser(user) });
+});
+
+// v1463: Helden-Anzeige. `display_heroes` = animierte Helden auf dem
+// Brett; `dynamic_heroes` = sie klappen während Zielwahl-Dialogen ein.
+// Ohne Display gibt es kein Dynamic — der Server erzwingt das mit, damit
+// kein Client einen widersprüchlichen Zustand speichern kann.
+app.put('/api/profile/hero-display', authMiddleware, async (req, res) => {
+  const display = req.body.display_heroes ? 1 : 0;
+  const dynamic = display && req.body.dynamic_heroes ? 1 : 0;
+  await db.run('UPDATE users SET display_heroes = ?, dynamic_heroes = ? WHERE id = ?', [display, dynamic, req.user.userId]);
   const user = await db.get('SELECT * FROM users WHERE id = ?', [req.user.userId]);
   res.json({ user: sanitizeUser(user) });
 });

@@ -65,7 +65,9 @@ def sparkle_pixels(i, n, sparkles, tint0, tint1):
     return out
 
 
-def save_outputs(name, frames, ms, scale=8):
+def save_outputs(name, frames, ms, scale=8, check_edges=False):
+    if check_edges:
+        assert_not_clipped(frames, name)
     w = frames[0].shape[1]
     h = frames[0].shape[0]
     imgs = []
@@ -79,3 +81,42 @@ def save_outputs(name, frames, ms, scale=8):
     Image.fromarray(np.concatenate(frames, axis=1).astype(np.uint8)).save(f'{name}_sheet.png')
     ch = [int((frames[k] != frames[k - 1]).any(axis=2).sum()) for k in range(len(frames))]
     print(name, 'geänderte Pixel pro Frame:', ch)
+
+
+def draw_sparkles(out, i, n, sparkles, tint0, tint1, only_empty=True):
+    """Glitzersterne in out malen. Ein Stern muss vollständig im Bild liegen und
+    darf den Rand nicht berühren – sonst Fehler (nichts darf abgeschnitten
+    werden). Mit only_empty wird ein Stern, der die Figur überdecken würde, in
+    diesem Frame ganz weggelassen statt angeschnitten gezeichnet."""
+    h, w = out.shape[:2]
+    for star in sparkles:
+        pix = sparkle_pixels(i, n, [star], tint0, tint1)
+        for x, y in pix:
+            if not (1 <= x < w - 1 and 1 <= y < h - 1):
+                raise ValueError(f'Glitzerstern bei {(x, y)} ragt an den Bildrand ({w}x{h})')
+        if only_empty and any(out[y, x, 3] for x, y in pix):
+            continue
+        for (x, y), c in pix.items():
+            out[y, x] = c
+
+
+def assert_not_clipped(frames, name=''):
+    """Kein Frame darf am Bildrand deckende Pixel haben (sonst wäre etwas
+    abgeschnitten)."""
+    for k, f in enumerate(frames):
+        a = f[:, :, 3] > 0
+        if a[0].any() or a[-1].any() or a[:, 0].any() or a[:, -1].any():
+            raise ValueError(f'{name}: Frame {k} berührt den Bildrand (abgeschnitten?)')
+
+
+def ring8(mask):
+    """1-px-Rand (8er-Nachbarschaft) um eine Maske."""
+    h, w = mask.shape
+    d = mask.copy()
+    for dy in (-1, 0, 1):
+        for dx in (-1, 0, 1):
+            s = np.zeros_like(mask)
+            s[max(0, dy):h + min(0, dy), max(0, dx):w + min(0, dx)] = \
+                mask[max(0, -dy):h + min(0, -dy), max(0, -dx):w + min(0, -dx)]
+            d |= s
+    return d & ~mask
