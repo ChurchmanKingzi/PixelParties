@@ -329,8 +329,8 @@
   {
     "id": "on_fire",
     "title": "On Fire",
-    "description": "+5 SC on your 10th win in a row, +10 on the 20th, and so on (max +25)",
-    "amount": 5,
+    "description": "+25 SC on your 10th win in a row, +50 on the 20th, and so on (max +125)",
+    "amount": 25,
     "limit": "unlimited",
     "requires": "win_streak_bonus"
   },
