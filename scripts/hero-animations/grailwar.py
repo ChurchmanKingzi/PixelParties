@@ -53,8 +53,8 @@ import sys
 from PIL import Image
 import numpy as np
 import cv2
-from anim_common import rgb, save_outputs, sparkle_pixels, BOUNCE12
-from flap_common import fill_pinholes
+from anim_common import rgb, save_outputs, sparkle_pixels, BOUNCE12, ring8
+from flap_common import fill_pinholes, rotate_part
 
 BLACK = (0, 0, 0, 255)
 BLINK = {14: 'halb', 15: 'zu', 16: 'zu', 17: 'halb', 38: 'halb', 39: 'zu', 40: 'zu', 41: 'halb'}
@@ -88,6 +88,14 @@ V_ = {
                 line=[(5, 10), (6, 10), (9, 10)]),
     'alleria': dict(slug='alleria-the-queen-of-spiders', pads=(3, 3, 3, 2),
                     lid=[((16, 9), 'f5ce88'), ((17, 9), 'f5ce88')], line=[(16, 10), (17, 10)]),
+    'brackle': dict(slug='brackle-the-catapulting-turtle', knee=34, pads=(33, 12, 17, 2),
+                    lid=[((2, 19), '8baf65'), ((3, 19), '8baf65'), ((6, 19), '8baf65')],
+                    line=[(2, 20), (3, 20), (5, 20), (6, 20)]),
+    'leonardo': dict(slug='mutated-teenager-brackle', knee=34, pads=(33, 12, 17, 2),
+                     lid=[((2, 19), '114368'), ((3, 19), '114368'), ((5, 19), '114368'), ((6, 19), '114368')],
+                     line=[(2, 20), (3, 20), (5, 20), (6, 20)]),
+    'broghan': dict(slug='broghan-the-frozen-guardian-of-the-north', knee=25, pads=(14, 14, 5, 2)),
+    'golem': dict(slug='broghan-the-ancient-golem', knee=28, pads=(14, 14, 5, 2)),
     'kyli': dict(slug='kyli-the-deceptive-sapling', knee=28, pads=(3, 3, 5, 2),
                  blink={'halb': [((9, 16), '636363'), ((10, 16), '636363'), ((13, 16), '636363'), ((14, 16), '636363')],
                         'zu': [((9, 16), '636363'), ((10, 16), '636363'), ((13, 16), '636363'), ((14, 16), '636363'),
@@ -744,8 +752,218 @@ def f_alleria(i):
     return out
 
 
+# --- Etappe 2 -------------------------------------------------------------------
+CAT_PIVOT = (22.0, 16.5)                                 # Nabe des Katapultarms
+CAT_CUP = (32.5, 3.0)                                    # Mitte der Schale in Ruhe
+# Armwinkel (im Uhrzeigersinn positiv): Ruhe, Spannen nach hinten, Abschuss nach vorn-oben, Nachfedern
+CAT_ANG = [0.0] * 4 + [0.6 * (0.5 - 0.5 * math.cos(math.pi * k / 9)) for k in range(1, 11)] + \
+          [0.1, -0.5, -0.85, -0.6, -0.3, -0.05, 0.1, 0.08, 0.03, 0.0] + [0.0] * 24
+CAT_LOAD, CAT_FIRE = 6, 16                               # Schädel liegt ab 6 in der Schale, fliegt ab 16
+SKULL = None
+EXPL = None
+
+
+def rot_pt(p, piv, a):
+    dx, dy = p[0] - piv[0], p[1] - piv[1]
+    return (piv[0] + dx * math.cos(a) - dy * math.sin(a), piv[1] + dx * math.sin(a) + dy * math.cos(a))
+
+
+def skull_flight():
+    """Flugbahn des Schädels ab dem Abschuss: [(Frame, Mitte x, Mitte y)] bis zum Aufschlag."""
+    sx, sy = rot_pt(CAT_CUP, CAT_PIVOT, CAT_ANG[CAT_FIRE])
+    hh = SKULL.shape[0] / 2
+    ground = SH - 1
+    vx, vy, g = -1.9, -1.4, 0.35
+    path, t = [], 0
+    while True:
+        x, y = sx + vx * t, sy + vy * t + 0.5 * g * t * t
+        if y + hh >= ground:
+            return path, (int(round(x)), ground)
+        path.append((CAT_FIRE + t, x, y))
+        t += 1
+
+
+def explosion_px(t, cx, gy):
+    """Explosion am Boden (Frame t = 0.. 11): Blitz, wachsende Feuerkuppel (weiß, gelb,
+    orange, rot, unregelmäßiger Rand), Knochensplitter fliegen weg, danach steigen
+    Rauchballen auf und zerfasern. Nur über dem Boden."""
+    rng = np.random.default_rng(7)
+    edge = rng.uniform(0.84, 1.16, 24)                   # feste Randzacken je Richtung
+    layers = {0: [(2.5, 'ffffff'), (4.5, 'fff45c'), (5.5, 'ffa22a')],
+              1: [(3.5, 'ffffff'), (6.0, 'fff45c'), (8.0, 'ffa22a'), (9.0, 'd8321a')],
+              2: [(3.5, 'ffffff'), (6.5, 'fff45c'), (9.0, 'ff8a1c'), (10.5, 'd8321a')],
+              3: [(5.0, 'fff45c'), (8.0, 'ff8a1c'), (10.0, 'd8321a'), (11.0, '4e4644')],
+              4: [(3.5, 'ffa22a'), (7.0, 'd8321a'), (10.0, '4e4644')],
+              5: [(3.0, 'b04020'), (8.0, '5e5654')]}
+    pix = {}
+    cy = gy - 1
+    if t in layers:
+        rmax = layers[t][-1][0] * 1.2
+        for y in range(int(cy - rmax) - 1, gy + 1):
+            for x in range(int(cx - rmax) - 1, int(cx + rmax) + 2):
+                d = math.hypot(x - cx, (y - cy) * 1.15)
+                k = int((math.atan2(y - cy, x - cx) + math.pi) / (2 * math.pi) * 24) % 24
+                for r, c in layers[t]:
+                    if d <= r * edge[k]:
+                        pix[(x, y)] = rgb(c)
+                        break
+    if 1 <= t <= 4:                                      # Knochensplitter
+        for ang, sp in ((-2.6, 3.2), (-2.0, 3.8), (-1.3, 4.2), (-0.7, 3.6), (-0.3, 3.0), (-2.9, 2.6)):
+            d = 4 + sp * t
+            x, y = int(round(cx + math.cos(ang) * d)), int(round(cy + math.sin(ang) * d + 0.4 * t * t))
+            if y <= gy and (x, y) not in pix:
+                pix[(x, y)] = rgb('f6ffff' if t < 3 else 'bdbdbd')
+    if 6 <= t <= 11:                                     # Rauchballen steigen auf und zerfasern
+        k = t - 6
+        for ox, oy, r in ((-4, -3, 4.0), (3, -4, 3.6), (0, -8, 3.4), (-6, -1, 2.6), (6, -1, 2.4)):
+            rr = r - 0.45 * k
+            if rr < 0.8:
+                continue
+            yy = cy + oy - 1.4 * k
+            for y in range(int(yy - rr) - 1, int(yy + rr) + 2):
+                for x in range(int(cx + ox - rr) - 1, int(cx + ox + rr) + 2):
+                    d = math.hypot(x - cx - ox, y - yy)
+                    if d <= rr and y <= gy and (k < 2 or (x * 7 + y * 3 + k) % 4):
+                        c = '9a9290' if d < rr * 0.5 else '7a7270' if d < rr * 0.85 else '5e5654'
+                        pix[(x, y)] = rgb(c, int(230 - 30 * k))
+    return pix
+
+
+def f_brackle(i):
+    global SKULL, EXPL
+    s = SRC.copy()
+    if SKULL is None:
+        sk = load(slug='brackle-skull')
+        m = sk[:, :, 3] == 255
+        ys, xs = np.nonzero(m)
+        sk[~m] = 0
+        SKULL = sk[ys.min():ys.max() + 1, xs.min():xs.max() + 1]
+        EXPL = skull_flight()
+    path, (lx, gy) = EXPL
+    hit = path[-1][0] + 1                                # Frame des Aufschlags
+    blink(s, i)
+    # Rückstoß beim Abschuss: der Panzer sackt kurz ein (Beine bleiben stehen)
+    b = 1 if CAT_FIRE - 1 <= i <= CAT_FIRE + 1 else 0
+    arm_m = (s[:, :, 3] > 0) & (_ys <= 16) & (_xs >= 21)
+    body = s.copy()
+    body[arm_m] = 0
+    ang = CAT_ANG[i]
+    out = np.zeros((H, W, 4), int)
+    knee_put(out, body, b)
+    if ang == 0.0:
+        put(out, np.where(arm_m[:, :, None], s, 0), PL, PT + b)
+    else:                                                # großer Winkel: Drehung ist hier in Ordnung
+        arm = rotate_part(s, arm_m, CAT_PIVOT, ang, (H, W), offset=(PL, PT + b))
+        am = arm[:, :, 3] > 0
+        out[am] = arm[am]
+    fill_pinholes(out)
+    sh_, sw_ = SKULL.shape[:2]
+
+    def draw_skull(cx, cy, k):
+        sk = np.rot90(SKULL, k=k)
+        oy, ox = int(round(cy - sk.shape[0] / 2)) + PT, int(round(cx - sk.shape[1] / 2)) + PL
+        for y, x in zip(*np.nonzero(sk[:, :, 3])):
+            out[oy + y, ox + x] = sk[y, x]
+    if CAT_LOAD <= i < CAT_FIRE:                         # liegt in der Schale
+        cx, cy = rot_pt(CAT_CUP, CAT_PIVOT, ang)
+        draw_skull(cx, cy + b - 2, 0)
+    for f, cx, cy in path:                               # Flug, überschlägt sich
+        if f == i:
+            draw_skull(cx, cy, ((i - CAT_FIRE) // 3) % 4)
+    if i == hit:                                         # Aufschlag: Schädel liegt am Boden, darüber der Blitz
+        draw_skull(lx, gy - sh_ / 2 + 1, ((i - CAT_FIRE) // 3) % 4)
+    if hit <= i < hit + 12:
+        draw_px(out, {(x + PL, y + PT): c for (x, y), c in explosion_px(i - hit, lx, gy).items()}, only_empty=False)
+    return out
+
+
+ICE = [('f4faff', 210), ('dcecff', 180), ('b9d3f5', 140)]
+
+
+def ice_clouds(out, i, spots):
+    """Eiswolken: kleine Nebelballen, die an spots [(x, y, dx, Start)] entstehen, nach außen und
+    oben treiben, wachsen und verblassen. Eine Wolke, die die Figur berühren würde, entfällt
+    in diesem Frame ganz (nie halb dahinter)."""
+    for x0, y0, dx, t0 in spots:
+        t = (i - t0) % N
+        if t >= 16:
+            continue
+        cx, cy = x0 + dx * t * 0.3, y0 - t * 0.3
+        r = 1.0 + 0.2 * t if t < 10 else 3.0 - 0.3 * (t - 10)
+        fade = 1.0 if t < 10 else 1 - (t - 10) / 7
+        pix = {}
+        for bx, by, bs in ((-0.9, 0.2, 0.85), (0.9, 0.4, 0.8), (0.1, -0.7, 0.9)):   # drei Ballen = Wolke
+            rb = r * bs
+            ox, oy = cx + bx * r * 0.7, cy + by * r * 0.7
+            for y in range(int(oy - rb) - 1, int(oy + rb) + 2):
+                for x in range(int(ox - rb) - 1, int(ox + rb) + 2):
+                    d = math.hypot(x - ox, (y - oy) * 1.25) / rb
+                    if d <= 1:
+                        lvl = 0 if d < 0.45 else 1 if d < 0.8 else 2
+                        if (x, y) not in pix or pix[(x, y)][0] > lvl:
+                            pix[(x, y)] = (lvl, None)
+        for k, (lvl, _) in list(pix.items()):
+            c, a = ICE[lvl]
+            pix[k] = rgb(c, int(a * fade))
+        if not pix or any(out[y, x, 3] for x, y in pix):
+            continue
+        for (x, y), c in pix.items():
+            assert 0 < x < W - 1 and 0 < y < H - 1, f'Eiswolke am Rand: {(x, y)}'
+            out[y, x] = c
+
+
+def f_broghan(i):
+    s = SRC.copy()
+    b = BOUNCE12[i % 12]
+    w = 2 * math.pi * 2 * i / N
+    chain = np.zeros((SH, SW), bool)
+    for y, x in zip(*np.nonzero(s[:, :, 3])):
+        if hexc(s[y, x]) in ('a0a0a0', '898989', '595959') and y >= 18:
+            chain[y, x] = True
+
+    def cdx(x, y):                                       # Ketten schwingen, unten stärker
+        if chain[y, x]:
+            side = -1 if x < SW / 2 else 1
+            return int(round(1.2 * (y - 18) / 12 * (math.sin(w + (0 if side < 0 else 1.7)) - math.sin(0 if side < 0 else 1.7))))
+        return 0
+    out = np.zeros((H, W, 4), int)
+    knee_put(out, s, b, moves=lambda x, y: chain[y, x], dx_fn=cdx)
+    fill_pinholes(out)
+    ice_clouds(out, i, [(-3 + PL, 27 + PT, -1, 0), (SW + 2 + PL, 26 + PT, 1, 8), (17 + PL, 28 + PT, 0, 16),
+                        (-2 + PL, 22 + PT, -1, 24), (SW + 1 + PL, 22 + PT, 1, 32), (-3 + PL, 28 + PT, -1, 40),
+                        (SW + 2 + PL, 28 + PT, 1, 44)])
+    return out
+
+
+def f_golem(i):
+    s = SRC.copy()
+    f = max(0.0, math.sin(2 * math.pi * 2 * i / N - math.pi / 2) * 0.5 + 0.5) ** 2   # Auge leuchtet periodisch
+    eye = [(y, x) for y, x in zip(*np.nonzero(s[:, :, 3])) if hexc(s[y, x]) in ('c10000', '9f0000') and y < 15]
+    for y, x in eye:
+        s[y, x] = lighten([255, 40, 30, 255], 0.55 * f) if hexc(s[y, x]) == 'c10000' else lighten(s[y, x], 0.0)
+        if hexc(SRC[y, x]) == '9f0000':
+            s[y, x] = [int(0x9f + 0x60 * f), int(20 * f), int(20 * f), 255]
+    b = BOUNCE12[i % 12]
+    out = np.zeros((H, W, 4), int)
+    knee_put(out, s, b)
+    fill_pinholes(out)
+    if f > 0.25:                                         # Leuchtschein um das Auge (halbtransparent)
+        em = np.zeros((H, W), bool)
+        for y, x in eye:
+            em[y + PT + b, x + PL] = True
+        ring = ring8(em)
+        for y, x in zip(*np.nonzero(ring)):
+            c = out[y, x]
+            a = f * 0.55
+            out[y, x] = [int(c[0] * (1 - a) + 255 * a), int(c[1] * (1 - a) + 50 * a), int(c[2] * (1 - a) + 40 * a), c[3]]
+    ice_clouds(out, i, [(-3 + PL, 28 + PT, -1, 4), (SW + 2 + PL, 27 + PT, 1, 12), (13 + PL, 30 + PT, 0, 20),
+                        (-2 + PL, 23 + PT, -1, 28), (SW + 1 + PL, 23 + PT, 1, 36), (SW + 2 + PL, 29 + PT, 1, 44)])
+    return out
+
+
 FRAME = dict(asriel=f_asriel, barker=f_barker, blackstache=f_blackstache, chuck=f_chuck, codumbus=f_codumbus,
-             devlin=f_devlin, mmdevlin=f_devlin, enigma=f_enigma, krates=f_krates, key=f_key, kyli=f_kyli, alleria=f_alleria)
+             devlin=f_devlin, mmdevlin=f_devlin, enigma=f_enigma, krates=f_krates, key=f_key, kyli=f_kyli, alleria=f_alleria,
+             brackle=f_brackle, leonardo=f_brackle, broghan=f_broghan, golem=f_golem)
 
 if __name__ == '__main__':
     tag = sys.argv[1] if len(sys.argv) > 1 else 'v'
