@@ -92,16 +92,17 @@ Dazu je Variante:
 * hulijing:  federt, blinzelt; das blaue Fuchsfeuer strömt als Partikelfeuer aus
              ihrer Hand (Flammenballen wachsen, kühlen ab, züngeln: weiß,
              hellblau, türkis, blau, dunkelblauer Rand).
-* ingo:      Ingos eigene Animation (src/user/ingo-hood-frames.png): meist mit
-             Kapuze und Armen unten; er streift die Kapuze in den Nacken, breitet
-             kurz die Arme aus, steht ohne Kapuze (Monokel blitzt) und zieht sie
-             wieder auf; dazu Blinzeln.
+* ingo:      Ingos eigene Animation (src/user/ingo-hood-frames.png): Arme unten;
+             er streift die Kapuze in den Nacken, steht ohne Kapuze (Monokel
+             blitzt) und zieht sie wieder auf; dazu Blinzeln. Die T-Pose-Frames
+             bleiben ungenutzt (der Wechsel wirkte zu abrupt).
 * eingo:     Elegant Ingo: federt, blinzelt, das Monokel blitzt.
 * madame:    Madame Guillotine hält eine Rede (Mund auf und zu), federt,
              blinzelt; von der roten Beilschneide bilden sich an mehreren
              Stellen Tropfen und fallen zu Boden, an den Blutfäden unter dem abgeschlagenen Kopf rinnt
              es hinab (Kopf und Lache liegen fest).
-* marianne:  federt, blinzelt; die Mistgabel steht; sie streichelt die Katze
+* marianne:  federt, blinzelt; die Mistgabel federt mit und liegt ganz vorn; sie
+             streichelt die Katze
              (Hand und Katzenkopf gehen zusammen, der Arm biegt sich zwischen
              federndem Körper und Hand), die Katze schließt dabei die Augen und
              wedelt mit dem Schwanz.
@@ -111,8 +112,10 @@ Dazu je Variante:
              Nicolas blinzelt (die dunkelgelben Augen).
 * stellan / bunny: atmen ruhig (1 px), ab und zu zuckt ein Ohr hoch (wird dabei
              länger, reißt nicht ab).
-* tazune / bakugo: brüllen in der Loop-Mitte (Maul weit auf, Kopf bebt); aus den
-             Ohren pufft kleinteilig Rauch (über allem, beim Brüllen mehr). Bei
+* tazune / bakugo: brüllen in der Loop-Mitte, nur per Mimik (Maul weit auf, Augen
+             zusammengekniffen bzw. rot glühend); aus den Ohren pufft kleinteilig
+             Rauch (über allem, beim Brüllen mehr), die Dampfwolken des
+             Kartenbilds stehen in Frame 0 und lösen sich in Fetzen auf. Bei
              Tazune lodern die Flammen: jede Flammensäule streckt und staucht
              sich, die Zungen wiegen, Fetzen reißen ab; beim Skin kein Feuer.
 """
@@ -204,8 +207,8 @@ V_ = {
     'ingo': dict(slug='ingo-investor-of-evil'),
     'eingo': dict(slug='elegant-ingo', knee=22, line=[(7, 7), (8, 7), (11, 7), (12, 7)]),
     'madame': dict(slug='madame-guillotine-the-great-equalizer', knee=27, pads=(3, 3, 4, 2),
-                   lid=[((10, 11), 'f6bd98'), ((11, 11), 'f6bd98'), ((14, 11), 'f6bd98'), ((15, 11), 'f6bd98')],
-                   line=[(10, 12), (11, 12), (14, 12), (15, 12)]),
+                   lid=[((20, 11), 'f6bd98'), ((21, 11), 'f6bd98'), ((24, 11), 'f6bd98'), ((25, 11), 'f6bd98')],
+                   line=[(20, 12), (21, 12), (24, 12), (25, 12)]),
     'marianne': dict(slug='marianne-the-cocky-caretaker', knee=21,
                      lid=[((8, 11), 'efb075'), ((9, 11), 'efb075'), ((12, 11), 'efb075'), ((13, 11), 'efb075')],
                      line=[(8, 12), (9, 12), (12, 12), (13, 12)]),
@@ -217,8 +220,8 @@ V_ = {
     'saintnic': dict(slug='saint-nicolas', knee=27),
     'stellan': dict(slug='stellan-the-calm-cat', knee=22),
     'bunny': dict(slug='stellan-the-calm-easter-bunny', knee=23),
-    'tazune': dict(slug='tazune-the-angry-hot-blood', knee=30, pads=(8, 8, 12, 2)),
-    'bakugo': dict(slug='explosive-tazune', knee=30, pads=(8, 8, 12, 2)),
+    'tazune': dict(slug='tazune-the-angry-hot-blood', knee=30, pads=(12, 12, 12, 2)),
+    'bakugo': dict(slug='explosive-tazune', knee=30, pads=(12, 12, 12, 2)),
     'kyli': dict(slug='kyli-the-deceptive-sapling', knee=28, pads=(3, 3, 5, 2),
                  blink={'halb': [((9, 16), '636363'), ((10, 16), '636363'), ((13, 16), '636363'), ((14, 16), '636363')],
                         'zu': [((9, 16), '636363'), ((10, 16), '636363'), ((13, 16), '636363'), ((14, 16), '636363'),
@@ -1599,7 +1602,7 @@ def f_hulijing(i):
 # 24x32, zeilenweise gelesen): A = Kapuze auf, Arme ausgebreitet; B = Kapuze auf, Arme innen
 # (f2 offen / f4 zwinkernd); C = Kapuze rutscht in den Nacken; F = ohne Kapuze, Arme innen
 # (f3 offen / f1 zwinkernd); E = ohne Kapuze, Arme ausgebreitet; D = ohne Kapuze, Arme eng.
-INGO_SEQ = (['B2'] * 10 + ['C', 'C', 'F1', 'F3', 'E', 'E', 'E'] + ['F3'] * 13 +
+INGO_SEQ = (['B2'] * 10 + ['C', 'C', 'F1'] + ['F3'] * 17 +
             ['D', 'D', 'C', 'C'] + ['B2'] * 14)
 INGO_IDX = dict(A=0, B2=2, B4=4, C=6, F1=1, F3=3, E=5, D=7)
 INGO_BLINK = {5: 'B', 24: 'F', 42: 'B'}                  # zwischendurch blinzeln (Auge 9/10, Zeile 15)
@@ -1640,10 +1643,10 @@ def f_madame(i):
     blink(s, i)
     st = MADAME_TALK[i] if i else 'o'                     # Rede: Mund auf und zu
     if st == 'c':
-        s[14, 12] = s[14, 13] = rgb('740000')
-        s[15, 12] = s[15, 13] = rgb('f7bd7b')
+        s[14, 22] = s[14, 23] = rgb('740000')
+        s[15, 22] = s[15, 23] = rgb('f7bd7b')
     elif st == 'w':
-        s[16, 12] = s[16, 13] = rgb('660000')
+        s[16, 22] = s[16, 23] = rgb('660000')
     head = (s[:, :, 3] > 0) & (_xs >= 28)                 # abgeschlagener Kopf samt Blutlache liegt fest
     blade = (s[:, :, 3] > 0) & (_ys <= 13) & (_xs <= 15) & np.array(
         [[max(s[y, x, :3]) - min(s[y, x, :3]) < 20 and lum(s[y, x]) > 100 for x in range(SW)] for y in range(SH)])
@@ -1709,7 +1712,6 @@ def f_marianne(i):
             return int(round(b * (1 - t) + stroke * t))
         return b if y < KNEE else 0
     out = np.zeros((H, W, 4), int)
-    put(out, parts['fork'], PL, PT)
     put(out, cat, PL, PT, dy_fn=lambda x, y: catdy(x, y) + tail(x, y))
     put(out, body, PL, PT, dy_fn=dy)
     if b < 0:
@@ -1717,6 +1719,7 @@ def f_marianne(i):
             if body[KNEE - 1, x, 3] and body[KNEE, x, 3] and not out[KNEE - 1 + PT, x + PL, 3]:
                 out[KNEE - 1 + PT, x + PL] = body[KNEE - 1, x]
     fill_pinholes(out)
+    put(out, parts['fork'], PL, PT + b)                   # Mistgabel in der Hand: federt mit, ganz vorn
     return out
 
 
@@ -1740,8 +1743,8 @@ YELLOW = ('ffff7a', 'f6f675', 'eded71', 'f4f474', 'fefe79', 'ffffaf')
 def bolt_in(out, mask, i, ox, oy, seed):
     """Kleine Blitze innerhalb von mask (Glasinneres): alle 2 Frames ein neuer Zickzack aus
     3-6 Pixeln (weißer Kern, gelbe Enden), manchmal Pause; nie außerhalb der Flasche."""
-    rng = np.random.default_rng(seed * 1000 + i // 2)
-    if rng.random() < 0.25:
+    rng = np.random.default_rng(seed * 1000 + i)
+    if rng.random() < 0.1:
         return
     ys, xs = np.nonzero(mask)
     k = rng.integers(len(ys))
@@ -1782,12 +1785,14 @@ def f_alchemist(i):
     out = np.zeros((H, W, 4), int)
     knee_put(out, comp, b)
     fill_pinholes(out)
-    if V == 'saintnic':                                  # je Trank ein eigener Blitz
+    if V == 'saintnic':                                  # je Trank zwei eigene Blitze
         half = inner & (_xs < SW / 2)
-        bolt_in(out, half, i, PL, PT + b, 1)
-        bolt_in(out, inner & ~half, i, PL, PT + b, 2)
+        for sd in (1, 3):
+            bolt_in(out, half, i, PL, PT + b, sd)
+            bolt_in(out, inner & ~half, i, PL, PT + b, sd + 1)
     else:
-        bolt_in(out, inner, i, PL, PT + b, 1)
+        for sd in (1, 2, 3):
+            bolt_in(out, inner, i, PL, PT + b, sd)
     return out
 
 
@@ -1816,7 +1821,7 @@ def f_stellan(i):
 
 FLAME_COLS = ('ca2c29', 'f47b22', 'f6e70e', 'f7f5b8')
 STEAM_COLS = ('899ba7', 'bdc7cc', 'd8e3e9', 'e3eef5')
-TAZ_EARS = {'tazune': [((15, 8), -1), ((21, 8), 1)], 'bakugo': [((13, 15), -1), ((22, 15), 1)]}
+TAZ_EARS = {'tazune': [((11, 16), -1), ((24, 16), 1)], 'bakugo': [((11, 16), -1), ((24, 16), 1)]}
 ROAR = set(range(14, 30))                               # brüllt in der Loop-Mitte
 
 
@@ -1875,10 +1880,10 @@ def ear_smoke(out, i, ears, ox, oy, strong):
             if a >= life:
                 continue
             u = a / life
-            ang = rng.uniform(-0.35, 0.35)
+            ang = rng.uniform(-0.45, 0.45)
             sp = rng.uniform(0.9, 1.4)
-            vx = side * sp * math.cos(0.9 + ang)
-            vy = -sp * math.sin(0.9 + ang)
+            vx = side * sp * math.cos(0.35 + ang)
+            vy = -sp * math.sin(0.35 + ang)
             cx = ex + ox + side * 0.8 + vx * a + 0.5 * math.sin(a * 0.7 + e)
             cy = ey + oy - 0.5 + vy * a
             r = 0.5 + 1.3 * u ** 0.7
@@ -1894,27 +1899,42 @@ def ear_smoke(out, i, ears, ox, oy, strong):
 def f_tazune(i):
     body, fx = load('body'), load('fx')
     fl = np.array([[fx[y, x, 3] > 0 and hexc(fx[y, x]) in FLAME_COLS for x in range(SW)] for y in range(SH)])
+    stm = np.array([[fx[y, x, 3] > 0 and hexc(fx[y, x]) in STEAM_COLS for x in range(SW)] for y in range(SH)])
     roar = i in ROAR
-    if roar:                                              # Brüllen: Maul weit auf, Kopf bebt
-        if V == 'tazune':
+    if roar:                                              # Brüllen nur per Mimik: Maul weit auf, Augen
+        if V == 'tazune':                                 # zusammengekniffen (> <)
             for (x, y), c in {(16, 18): 'ffffff', (17, 18): '300901', (18, 18): 'ffffff',
                               (15, 19): 'd54419', (16, 19): '300901', (17, 19): 'f00000', (18, 19): '300901',
-                              (19, 19): 'd54419', (16, 20): 'd20000', (17, 20): 'f00000', (18, 20): 'd20000'}.items():
+                              (19, 19): 'd54419', (16, 20): 'd20000', (17, 20): 'f00000', (18, 20): 'd20000',
+                              (14, 16): '300901', (15, 17): '300901', (14, 17): 'e75b38', (15, 16): 'e75b38',
+                              (20, 16): '300901', (19, 17): '300901', (20, 17): 'e75b38', (19, 16): 'e75b38'}.items():
                 body[y, x] = rgb(c)
-        else:
+        else:                                             # Skin: Maul größer, Augen glühen rot auf
             for (x, y), c in {(14, 18): 'ff2d2d', (19, 18): 'ff2d2d', (15, 21): 'a90000', (16, 21): 'f00000',
-                              (17, 21): 'f00000', (18, 21): 'a90000', (16, 19): '5a0000', (17, 19): '5a0000'}.items():
+                              (17, 21): 'f00000', (18, 21): 'a90000', (16, 19): '5a0000', (17, 19): '5a0000',
+                              (15, 16): 'ff2d2d', (16, 16): 'ff2d2d', (19, 16): 'ff2d2d', (20, 16): 'ff2d2d'}.items():
                 body[y, x] = rgb(c)
     b = BOUNCE12[i % 12]
-    shake = ([0, 1, 0, -1][i % 4]) if roar else 0
     out = np.zeros((H, W, 4), int)
-    knee_put(out, body, b, dx_fn=lambda x, y: shake if y < 22 else 0)
+    knee_put(out, body, b)
     fill_pinholes(out)
     if V == 'tazune':                                     # das Feuer lodert über ihr (beim Skin entfällt es)
         live_flames(out, fx, fl, i, PL, PT + b)
-    # Rauch aus den Ohren – über allem, beim Brüllen doppelt so viel
-    ears = [((x + (shake if y < 22 else 0), y), sd) for (x, y), sd in TAZ_EARS[V]]
-    ear_smoke(out, i, ears, PL, PT + b, lambda e: e in ROAR)
+    # Dampfwolken des Kartenbilds: in Frame 0 vollständig, lösen sich danach in Fetzen auf (die nach
+    # außen und oben wegtreiben) und bauen sich zum Loop-Ende wieder auf
+    f = 1.0 if i == 0 else max(0.0, 1 - i / 9) if i < 24 else max(0.0, (i - 38) / 10)
+    for y, x in zip(*np.nonzero(stm)):
+        hsh = 0.5 + 0.25 * math.sin(0.9 * x + 1.3 * y) + 0.25 * math.sin(0.55 * x - 0.8 * y + 1.0)   # Fetzen statt Raster
+        if hsh >= f:
+            continue
+        side = -1 if x < SW / 2 else 1
+        d = int(round((1 - f) * 2.5))
+        yy, xx = y + PT + b - d, x + PL + side * d
+        a = int(255 * (0.55 + 0.45 * f))
+        if 0 < yy < H - 1 and 0 < xx < W - 1:
+            out[yy, xx] = rgb(hexc(fx[y, x]), a)
+    # Rauch aus den Ohren – über allem, beim Brüllen mehr
+    ear_smoke(out, i, TAZ_EARS[V], PL, PT + b, lambda e: e in ROAR)
     return out
 
 
