@@ -121,36 +121,39 @@ def above(a, y):
 
 # Unterkörper der drei Alchemisten (in der Ebene vom Tisch verdeckt, nachgezeichnet)
 LOWER = {
-    'nicolas': (231, 209, dict(Q='000200', V='282927', S='515350', R='696b68', U='414240', T='20211f'), [
-        "....QVSRSSSSVQ",
-        "....QVSRSSSSVQ",
+    'nicolas': (231, 209, dict(Q='000200', V='282927', S='515350', R='696b68', U='414240', T='20211f',
+                               K='282b2d', P='9fa8a7', N='c9cbbf'), [
+        "....QVSRSSSSVQKPNK",
+        "....QVSRSSSSVQ.KK.",
         "....QVUSSRSSVQ",
         "....QQVVVVVVQQ",
-        ".....QUQ..QUQ.",
-        ".....QUQ..QUQ.",
-        ".....QTQ..QTQ.",
-        "....QTTQ..QTTQ",
-        "....QQQQ..QQQQ"]),
+        "....QUUUQQUUUQ",
+        "....QUUUQQUUUQ",
+        "....QURUQQURUQ",
+        "....QUUUQQUUUQ",
+        "...QTTTTQQTTTTQ",
+        "...QQQQQQQQQQQQ"]),
     'saint': (229, 209, dict(G='430e18', E='641121', C='782132', D='9e3b50', A='dcbf87', B='ede0b4',
                              H='606663', T='c3c7b8', J='1a1a1a'), [
-        "....GECCCHTHCCCEG...",
-        "....GECDCCHCCDCEG...",
-        "...GECDCCCCCCCDCEG..",
-        "...GEECDCCCCCDCEEG..",
-        "...GECDCCECCCDCCEG..",
-        "...GEECDCECCDCEEEG..",
-        "...GAABAABAABAABAG..",
-        ".....JJJ....JJJ....."]),
-    'edward': (231, 209, dict(R='340404', S='b74346', T='672126', Y='1a1e1f', U='000200', X='420d13'), [
-        "....RTYYYYYYTR.....",
-        "...RSTYYYYYYTSR....",
-        "...RSTYYUYYYTSR....",
-        "..RSTTRYYYYRTTSR...",
-        "..RSTR.UYYU.RTSR...",
-        "..RRR..UYUYU.RRR...",
-        ".......UYUUYU......",
-        "......UUYU.UYUU....",
-        "......UUUU.UUUU...."]),
+        "...GECCCCHTHCCCCEG..",
+        "..GECDCCCCHCCCCDCEG.",
+        "..GECDCCCCCCCCCDCEG.",
+        ".GEECDCCCCCCCCCDCEEG",
+        ".GECDCCECCCCECCDCCEG",
+        ".GEECDCECCCCECCDCEEG",
+        ".GAABAABAABAABAABAAG",
+        "....JJJJ....JJJJ...."]),
+    'edward': (231, 209, dict(R='340404', S='b74346', T='672126', Y='1a1e1f', U='000200', Z='3a4946', z='5d6e69'), [
+        "....RTYYYYYYTRRzZR",
+        "...RSTYYYYYYTSRZR.",
+        "...RSTYYUYYYTSR",
+        "..RSTUYYUUYYUTSR",
+        "..RSTUYYUUYYUTSR",
+        "..RRRUYYUUYYURRR",
+        ".....UYYUUYYU",
+        ".....UYYUUYYU",
+        "....UZZZUUZZZU",
+        "....UUUUUUUUUU"]),
 }
 
 
@@ -164,20 +167,18 @@ def main(path):
     L = doc.raw_layers
     g = lambda n: layer(doc, L, n)
     # --- Heroes ---
-    save_parts('asriel-the-sapling-sacrificer', [('body', near(g('Ebene #430'), 295, 113))])
+    save_parts('asriel-the-sapling-sacrificer', [('body', near(g('Asriel'), 295, 100))])
     cec = near(g('CECILIA'), 313, 262)
+    cec = cec.copy()
     ys_, xs_ = np.nonzero(cec[:, :, 3])
     cx0, cy0 = xs_.min(), ys_.min()
-    # grimmig: gesenkte Braue über dem Auge, gerader dunkler Mund
-    grim = paint(cec.copy(), cx0, cy0, [".", ".", "........GG", ".", ".", ".......MM"], dict(G='1a0f0a', M='6b3a2a'))
-    hat = paint(np.zeros_like(cec), cx0, cy0 - 4, [
-        ".....AAAAAA.....",
-        "....AHHWWHHA....",
-        "AA.AHHHWWHHHA.AA",
-        "AGAAGGGGGGGGAAGA",
-        ".AAAAAAAAAAAAAA."], dict(A='0b0b0b', H='4a1418', W='eeeeee', G='d4a03a'))
-    save_parts('cecilia-the-harrowing-crusader', [('body', grim), ('hat', hat)])
-    save_parts('bad-birthday-girl-cecilia', [('body', cec), ('hat', g('Ebene #411'))])
+    cyan = (cec[:, :, 2].astype(int) > 180) & (cec[:, :, 0].astype(int) < 60) & (cec[:, :, 3] > 0)
+    cec[cyan] = 0                                        # türkiser Einzelpixel links am Kopf
+    bhat = g('Ebene #411').copy()
+    # Lücke zwischen Hutkrempe und Haaren: Krempe um eine Zeile nach unten verlängern
+    hy = np.nonzero(bhat[:, :, 3])[0].max()
+    paint(bhat, cx0 + 2, hy + 1, ["ABBBBBBBBBBA"], dict(A='604a1b', B='7a5f23'))
+    save_parts('bad-birthday-girl-cecilia', [('body', cec), ('hat', bhat)])
     save_parts('barker-the-monster-tamer', [('body', g('Barker')), ('mark', g('Barker #4'))])
     save_parts('blackstache-scourge-of-the-pixel-seas', [('body', near(g('Blackstache'), 167, 200))])
     save_parts('brackle-the-catapulting-turtle', [('body', g('Brackle'))])
@@ -203,13 +204,23 @@ def main(path):
     save_parts('devlin-the-masked-butcher', [('body', layer_over(dev, sweat))])
     save_parts('enigma-the-seller-of-secrets', [('body', near(g('Enigma #5'), 429, 235))])
     sw = g('Ebene #402')
-    r_, g_, b_ = (sw[:, :, k].astype(int) for k in range(3))
-    pink = (r_ - g_ > 18) & (r_ - b_ > 8) & ~((r_ > 180) & (g_ > 120) & (b_ < 80))
-    sw[pink] = 0
-    sw[228:] = 0                                         # nur das obere der drei Schwertbilder
-    sw[:, 313:] = 0
+    keep = np.zeros(sw.shape[:2], bool)                  # nur das obere der drei Schwertbilder (samt blutiger Spitze)
+    keep[218:224, :317] = True
+    keep[224:228, :308] = True
+    keep[228:231, :301] = True
+    sw[~keep] = 0
     sword = sw
-    save_parts('fern-the-ship-slave', [('body', near(g('Fern'), 299, 219)), ('sword', sword)])
+    # Arm samt Lappen: wie beim Skin (Ebene #399), in Froschgrün umgefärbt
+    frog = near(g('Fern'), 299, 219)
+    skin2frog = {'623a2e': '265f18', 'ba6b5e': '398e23', 'd98a79': '48b32c', 'eba08b': '5cce3f',
+                 'ffc1a8': '99e087', '2d0900': '0e2600'}
+    rag = g('Ebene #399').copy()
+    for y_, x_ in zip(*np.nonzero(rag[:, :, 3])):
+        h = '%02x%02x%02x' % tuple(int(v) for v in rag[y_, x_, :3])
+        if h in skin2frog:
+            c = skin2frog[h]
+            rag[y_, x_, :3] = (int(c[0:2], 16), int(c[2:4], 16), int(c[4:6], 16))
+    save_parts('fern-the-ship-slave', [('body', frog), ('sword', sword), ('arm', rag)])
     save_parts('fern-the-liberated-fairy', [('body', near(g('Ascended Fern'), 316, 203))])
     save_parts('fiona-the-princess-of-blackport', [('body', box(g('Fiona'), 247, 150, 282, 182))])
     bunny = g('Bunny')
@@ -225,13 +236,14 @@ def main(path):
     save_parts('garius-the-great-reformer', [('body', g('Garius'))])
     save_parts('gobbo-chief-of-goblin', [('body', g('Gobbo'))])
     save_parts('hatusbal-the-leader-of-tusca', [('body', near(g('Hatusbal'), 184, 142))])
-    save_parts('hulijing-the-foxdemon', [('fire', layer_over(g('Ebene #76'), g('Ebene #78'))), ('body', g('Hulijing'))])
+    save_parts('hulijing-the-foxdemon', [('fire', g('Ebene #76')), ('body', g('Hulijing'))])
     save_parts('ingo-investor-of-evil', [('body', g('Ingo'))])
     save_parts('key-the-cursed-thief', [('body', g('Key #3'))])
     save_parts('krates-the-smartass', [('body', g('Krates'))])
     save_parts('kyli-the-deceptive-sapling', [('body', g('Kyli'))])
     save_parts('madame-guillotine-the-great-equalizer', [('body', near(g('Madame Guillotine'), 121, 212))])
-    save_parts('marianne-the-cocky-caretaker', [('fork', g('Marianne #6')), ('body', g('Marianne #1')),
+    save_parts('marianne-the-cocky-caretaker', [('fork', g('Marianne #6')), ('cat', near(g('Marianne #3'), 250, 258)),
+                                                ('body', g('Marianne #1')), ('arm', g('Marianne #9')),
                                                 ('hat', near(g('Marianne #5'), 234, 244))])
     save_parts('nicolas-the-hidden-alchemist', [('body', lower_body(g('Nicolas'), 'nicolas')), ('flask', g('Ebene #2'))])
     save_parts('saint-nicolas', [('body', lower_body(g('Saint Nicolas'), 'saint')),
@@ -251,9 +263,7 @@ def main(path):
     save_parts('ancient-hatusbal', [('body', near(g('Jack'), 184, 139))])
     save_parts('barker-the-monster-trainer', [('body', near(g('Ash'), 40, 106))])
     golem = near(g('Ancient Gear Golem'), 271, 124)
-    chains = b472.copy()                                 # Handketten: in Broghans Ebene, nicht in der ohne Ketten
-    chains[near(g('Broghan'), 271, 125)[:, :, 3] > 0] = 0
-    save_parts('broghan-the-ancient-golem', [('body', golem), ('chains', chains)])
+    save_parts('broghan-the-ancient-golem', [('body', golem)])
     save_parts('cecilia-the-clown', [('body', g('CECILIA-Kopie'))])
     save_parts('dark-garius', [('body', g('Vader'))])
     save_parts('elegant-ingo', [('body', g('Ingo Skin'))])
