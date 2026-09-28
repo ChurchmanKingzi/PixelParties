@@ -52,11 +52,11 @@ module.exports = {
     const targets = [];
     const ops = gs.players[oppIdx];
     const cardDB = engine._getCardDB();
-    for (let hi = 0; hi < (ops.heroes || []).length; hi++) {
-      const hero = ops.heroes[hi];
+    // Kontrolle statt Seite (Styx 28.9.) — IDs bleiben physisch.
+    for (const { physOwner, heroIdx: hi, hero } of engine.heroesControlledBy(oppIdx)) {
       if (!hero?.name || hero.hp <= 0) continue;
       if (hero.statuses?.stunned) continue; // Already stunned
-      targets.push({ id: `hero-${oppIdx}-${hi}`, type: 'hero', owner: oppIdx, heroIdx: hi, cardName: hero.name });
+      targets.push({ id: `hero-${physOwner}-${hi}`, type: 'hero', owner: physOwner, heroIdx: hi, cardName: hero.name });
     }
     for (const inst of engine.cardInstances) {
       if (inst.owner !== oppIdx || inst.zone !== 'support' || inst.faceDown) continue;

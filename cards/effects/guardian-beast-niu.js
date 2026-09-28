@@ -59,8 +59,8 @@ module.exports = {
       + (engine.gs.players[1]?.discardPile?.length || 0);
     if (total < 1) return false;
     // Need at least one alive own Hero to receive the buff.
-    const ps = engine.gs.players[pi];
-    return (ps?.heroes || []).some(h => h?.name && h.hp > 0);
+    // Kontrolle statt Seite (Styx 28.9.)
+    return engine.heroesControlledBy(pi).some(e => e.hero.hp > 0);
   },
 
   async onCreatureEffect(ctx) {
@@ -75,19 +75,21 @@ module.exports = {
     if (cap <= 0) return false;
 
     // Step 1 — pick which of your alive Heroes gets the buff.
+    // Kontrolle statt Seite (Styx 28.9.): IDs/Zugriffe physisch.
     const heroTargets = [];
-    for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-      const h = ps.heroes[hi];
-      if (!h?.name || h.hp <= 0) continue;
+    for (const { physOwner, heroIdx: hi, hero: h } of engine.heroesControlledBy(pi)) {
+      if (h.hp <= 0) continue;
       heroTargets.push({
-        id: `hero-${pi}-${hi}`, type: 'hero',
-        owner: pi, heroIdx: hi, cardName: h.name,
+        id: `hero-${physOwner}-${hi}`, type: 'hero',
+        owner: physOwner, heroIdx: hi, cardName: h.name,
       });
     }
     if (heroTargets.length === 0) return false;
     let buffHeroIdx;
+    let buffOwner;
     if (heroTargets.length === 1) {
       buffHeroIdx = heroTargets[0].heroIdx;
+      buffOwner = heroTargets[0].owner;
     } else {
       const pickIds = await engine.promptEffectTarget(pi, heroTargets, {
         title: CARD_NAME,
@@ -102,8 +104,9 @@ module.exports = {
       const picked = heroTargets.find(t => t.id === pickIds[0]);
       if (!picked) return false;
       buffHeroIdx = picked.heroIdx;
+      buffOwner = picked.owner;
     }
-    const buffHero = ps.heroes[buffHeroIdx];
+    const buffHero = gs.players[buffOwner]?.heroes?.[buffHeroIdx];
     if (!buffHero) return false;
 
     // Step 2 — pay the cost. Click 1-cap cards directly in the gallery.
@@ -125,7 +128,7 @@ module.exports = {
     // Expire at the START of the opponent's next turn (= functional
     // "end of THIS turn" — buff doesn't survive into a fresh own turn).
     const oi = pi === 0 ? 1 : 0;
-    await engine.actionAddBuff(buffHero, pi, buffHeroIdx, BUFF_NAME, {
+    await engine.actionAddBuff(buffHero, buffOwner, buffHeroIdx, BUFF_NAME, {
       sourceOwner: pi,   // v1067: Quelle ist Pflicht (siehe _affected-shared)
       totalDamage: newTotal,
       stacks: newStacks,

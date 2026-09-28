@@ -42,6 +42,9 @@ function oppFreeZones(engine, pi) {
   for (let hi = 0; hi < (ops?.heroes || []).length; hi++) {
     const h = ops.heroes[hi];
     if (!h?.name || h.hp <= 0) continue;
+    // Kontrolle statt Seite (Styx 28.9.): ein von mir uebernommener
+    // Gegnerheld ist kein „Hero your opponent controls".
+    if (engine.heroSideOf(oppIdx, h) !== oppIdx) continue;
     for (let si = 0; si < 3; si++) {
       if (((ops.supportZones?.[hi] || [])[si] || []).length === 0) out.push({ ownerIdx: oppIdx, heroIdx: hi, slotIdx: si });
     }

@@ -121,10 +121,11 @@ function andereZieleVorhanden(engine, a, b, info) {
  * diese Quelle waehlen koennte? Wenn nicht, gilt das Verbot nicht.
  */
 function nutzerHatAndereWaehlbare(engine, nutzer) {
-  const ps = engine.gs.players[nutzer.owner];
-  for (let hi = 0; hi < (ps?.heroes || []).length; hi++) {
-    if (hi === nutzer.heroIdx) continue;
-    const h = ps.heroes[hi];
+  // Kontrolle statt Seite (Styx 28.9.): „other Heroes you control"
+  const nutzerHeld = engine.gs.players[nutzer.owner]?.heroes?.[nutzer.heroIdx];
+  const kontrolleur = engine.heroSideOf(nutzer.owner, nutzerHeld);
+  for (const { physOwner, heroIdx: hi, hero: h } of engine.heroesControlledBy(kontrolleur)) {
+    if (physOwner === nutzer.owner && hi === nutzer.heroIdx) continue;
     if (!h?.name || h.hp <= 0) continue;
     if (h.statuses?.untargetable || h.statuses?.invisible) continue;
     if (h.buffs?.damage_immune) continue;
@@ -158,7 +159,8 @@ module.exports = {
     // Es muss einen waehlbaren gegnerischen Helden geben.
     const oi = playerIdx === 0 ? 1 : 0;
     if (gs.firstTurnProtectedPlayer === oi) return false;
-    return (gs.players[oi]?.heroes || []).some(h => h?.name && h.hp > 0);
+    // Kontrolle statt Seite (Styx 28.9.)
+    return engine.heroesControlledBy(oi).some(({ hero: h }) => h?.name && h.hp > 0);
   },
 
   /**
@@ -205,11 +207,11 @@ module.exports = {
       const { host, inst } = res;
 
       // „choose a Hero your opponent controls"
+      // Kontrolle statt Seite (Styx 28.9.) — IDs bleiben physisch.
       const kandidaten = [];
-      for (let hi = 0; hi < (gs.players[oi]?.heroes || []).length; hi++) {
-        const h = gs.players[oi].heroes[hi];
+      for (const { physOwner, heroIdx: hi, hero: h } of engine.heroesControlledBy(oi)) {
         if (!h?.name || h.hp <= 0) continue;
-        kandidaten.push({ id: `hero-${oi}-${hi}`, type: 'hero', owner: oi, heroIdx: hi, cardName: h.name });
+        kandidaten.push({ id: `hero-${physOwner}-${hi}`, type: 'hero', owner: physOwner, heroIdx: hi, cardName: h.name });
       }
       if (kandidaten.length === 0) return;
 

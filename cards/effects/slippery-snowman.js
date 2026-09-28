@@ -23,10 +23,10 @@ const { onSlipperyTurnStart, slipperyOnMoveGate } = require('./_slippery-shared'
 
 const CARD_NAME = 'Slippery Snowman';
 
-/** True iff any of `oppPs`'s alive Heroes is currently Frozen. */
-function oppHasFrozenHero(oppPs) {
-  if (!oppPs?.heroes) return false;
-  for (const h of oppPs.heroes) {
+/** True iff any alive Hero controlled by `oi` is currently Frozen.
+ *  Kontrolle statt Seite (Styx 28.9.): „no Hero your opponent controls". */
+function oppHasFrozenHero(engine, oi) {
+  for (const { hero: h } of engine.heroesControlledBy(oi)) {
     if (!h?.name || h.hp <= 0) continue;
     if (h.statuses?.frozen) return true;
   }
@@ -66,7 +66,7 @@ module.exports = {
       if (!oppPs) return;
       // Gate clause from the card text: opp must have zero Frozen
       // Heroes when the move resolves.
-      if (oppHasFrozenHero(oppPs)) return;
+      if (oppHasFrozenHero(engine, oi)) return;
 
       const myHeroIdx = ctx.card.heroIdx;
       const oppHero = oppPs.heroes?.[myHeroIdx];

@@ -18403,3 +18403,13 @@ Anlass (Al 25.9.): Puzzle-Editor mit Wowhalla neu geladen → das Spielfeld „a
 - **Abilities an einen fremden, kontrollierten Helden** (v1481): nur wenn die Kontrollmarke es erlaubt (`statuses.charmed.abilitiesErlaubt`, Styx). Prüfung `engine.darfFremdAbilityAnlegen(pi, heroOwner, heroIdx)`, Server-Weg `doPlayAbilityFremd` (Feld `heroOwner` an `play_ability`). Die Karte liegt auf der Seite des Helden (`inst.owner = heroOwner`, `inst.originalOwner = pi`); einmal pro Zug über `statuses.charmed.abilityZug`.
 - **„… your opponent controls" bei selbst gesammelten Zielen** (v1481): `normalizeValidTargets` ruft `engine.filterSelbstKontrollierteGegnerHelden(validTargets, casterPi, cardName)`. Ist die Karte laut Text eine reine Gegner-Karte (`istReineGegnerKarte`: jeder „Choose …"-Satz sagt „your opponent controls"), fallen Helden heraus, die der Spieler gerade selbst kontrolliert. Betrifft Ziel-Artefakte und -Tränke (Snow Cannon, Arcane Lamp, Magic Ruby …); `promptDamageTarget`/`promptMultiTarget` machten es schon richtig.
 - **Charme-Badge** liest die Ausprägung (`ohneSchutz`, `onlyFromController`, `_loveShot`) und behauptet keinen Schutz mehr, den es nicht gibt.
+
+## ★ Kontrolle statt Seite — Helden selbst einsammeln (v1482, Audit 28.9.)
+
+Ein übernommener Held (Charme, Golden Apple, Love Shot, Styx, Paraseed) steht physisch in der Spalte seines Besitzers. Wer Helden SELBST einsammelt, fragt deshalb nie `gs.players[oppIdx].heroes`, sondern die Kontrolle:
+
+- **„… your opponent controls" / „you control" / „your Heroes":** `engine.heroesControlledBy(pi)` → `[{ physOwner, heroIdx, hero }]`, einzeln `engine.heroSideOf(physOwner, hero)`.
+- **Adressierung bleibt physisch:** Ziel-IDs `hero-${physOwner}-${hi}`, `owner: physOwner`; Zonen über `gs.players[physOwner]`.
+- **Charme ist kein pauschaler Schutz:** Statt `hero.statuses?.charmed` → `engine._charmBlocksFrom(hero, quellenSeite)` (Styx: kein Schutz, Golden Apple: nur gegen den Kontrolleur).
+- Die zentralen Sammler (`promptDamageTarget`, `promptMultiTarget`, `aoeHit`/`collectAoeHeroTargets`) machten es schon richtig.
+- **Bekannte offene Stellen (Engine):** Umleitungsfenster (`_checkTargetRedirectOnce` — Challenge, Martyry, Anti-Magnet, Monia Bot, Alleria, Shield of Wisdom) sowie die Schadens-/Surprise-Fenster fragen die PHYSISCHE Zielseite. Beschwören/Ausrüsten in Zonen eines übernommenen Helden der Gegenspalte gibt es nicht.

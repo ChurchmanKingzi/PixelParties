@@ -48,6 +48,18 @@ function zielVonAntwort(antwort, angebot) {
   return (angebot || []).find(t => t.id === id) || null;
 }
 
+/**
+ * Lebende Helden, die `pi` KONTROLLIERT (Styx 28.9.) — Ziel-IDs bleiben
+ * physisch, wie bei `engine.getHeroTargets`.
+ */
+function kontrollierteHeldenZiele(engine, pi) {
+  return engine.heroesControlledBy(pi)
+    .filter(({ hero }) => hero?.name && hero.hp > 0)
+    .map(({ physOwner, heroIdx, hero }) => ({
+      id: `hero-${physOwner}-${heroIdx}`, type: 'hero', owner: physOwner, heroIdx, cardName: hero.name,
+    }));
+}
+
 module.exports = {
   // ★★ v1182 — ENTKOPPELTE BILDER (CARD_API): wird die Karte NEGIERT,
   // laeuft ihr Effekt-Rumpf nie — die Engine spielt dann diese Bilder.
@@ -60,9 +72,11 @@ module.exports = {
 
   spellPlayCondition(gs, pi, engine) {
     const oppIdx = pi === 0 ? 1 : 0;
-    const hatHelden = (gs.players[oppIdx]?.heroes || []).some(h => h?.name && h.hp > 0);
+    if (!engine) return false;
+    // Kontrolle statt Seite (Styx 28.9.)
+    const hatHelden = engine.heroesControlledBy(oppIdx).some(({ hero: h }) => h?.name && h.hp > 0);
     if (!hatHelden) return false;
-    try { return engine.getHeroTargets(pi).length + engine.getCreatureTargets(pi).length > 0; }
+    try { return kontrollierteHeldenZiele(engine, pi).length + engine.getCreatureTargets(pi).length > 0; }
     catch { return false; }
   },
 
@@ -74,7 +88,7 @@ module.exports = {
       const oppIdx = pi === 0 ? 1 : 0;
 
       // ── ① Den ANGREIFER waehlen: ein Held des GEGNERS ─────────────
-      const gegnerZiele = engine.getHeroTargets(oppIdx);
+      const gegnerZiele = kontrollierteHeldenZiele(engine, oppIdx);   // Kontrolle statt Seite (Styx 28.9.)
       const heldWahl = await engine.promptEffectTarget(pi, gegnerZiele, {
         title: CARD_NAME,
         description: "Choose an opponent's Hero — it will be lured into attacking.",
@@ -90,12 +104,12 @@ module.exports = {
       // die zweite Zielwahl ueberhaupt aufging.
       const angreiferZiel = zielVonAntwort(heldWahl, gegnerZiele);
       if (!angreiferZiel) { gs._spellCancelled = true; return; }
-      const angreifer = gs.players[oppIdx]?.heroes?.[angreiferZiel.heroIdx];
+      const angreifer = gs.players[angreiferZiel.owner]?.heroes?.[angreiferZiel.heroIdx];
       if (!angreifer?.name || angreifer.hp <= 0) { gs._spellCancelled = true; return; }
 
       // ── ② Das OPFER waehlen: ein Ziel auf der EIGENEN Seite ───────
       const eigene = [
-        ...engine.getHeroTargets(pi),
+        ...kontrollierteHeldenZiele(engine, pi),
         ...engine.getCreatureTargets(pi),
       ];
       if (eigene.length === 0) { gs._spellCancelled = true; return; }
@@ -126,14 +140,14 @@ module.exports = {
       // der Angriff ihm, samt allem, was daran haengt.
       const attackSource = {
         name: CARD_NAME,
-        owner: oppIdx, controller: oppIdx, heroIdx: angreiferZiel.heroIdx,
+        owner: angreiferZiel.owner, controller: oppIdx, heroIdx: angreiferZiel.heroIdx,
         usesHeroAtk: true,
       };
       const finalDmg = await engine._fireAttackDeclare(attackSource, opfer, atk);
 
       // ── Animation ② der angelockte Held rammt hinein ──────────────
       engine._broadcastEvent('play_ram_animation', {
-        sourceOwner: oppIdx, sourceHeroIdx: angreiferZiel.heroIdx,
+        sourceOwner: angreiferZiel.owner, sourceHeroIdx: angreiferZiel.heroIdx,
         targetOwner: opfer.owner, targetHeroIdx: opfer.heroIdx,
         targetZoneSlot: opferSlot,
         cardName: angreifer.name, duration: 1100,

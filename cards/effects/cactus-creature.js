@@ -16,6 +16,22 @@
 
 const { hasCardType, STATUS_EFFECTS, getCleansableStatuses } = require('./_hooks');
 
+// Kontrolle statt Seite (Styx 28.9.): „target you control" — Helden
+// zaehlen fuer den, der sie KONTROLLIERT (Charme, Paraseed, Styx).
+// Kreaturen bleiben wie bisher in den Zonen der eigenen Spalte.
+function kontrolliert(engine, pi, hero) {
+  return engine.heroSideOf(pi, hero) === pi;
+}
+/** Lebende Helden der Gegenspalte, die `pi` gerade kontrolliert. */
+function uebernommeneHelden(engine, pi) {
+  return engine.heroesControlledBy(pi).filter(e => e.physOwner !== pi && e.hero?.name && e.hero.hp > 0);
+}
+/** Kann der Held diesen Status (noch) bekommen? Gift nur mit mehr Stapeln. */
+function heldKannEmpfangen(hero, sName, newStacks) {
+  if (!hero.statuses?.[sName]) return true;
+  return sName === 'poisoned' && newStacks > (hero.statuses.poisoned?.stacks || 1);
+}
+
 module.exports = {
   // ★★ v1182 — ENTKOPPELTE BILDER (CARD_API): wird die Karte NEGIERT,
   // laeuft ihr Effekt-Rumpf nie — die Engine spielt dann diese Bilder.
@@ -47,7 +63,9 @@ module.exports = {
       const hero = ps.heroes[hi];
       if (!hero?.name || hero.hp <= 0) continue;
       if (ownerIdx === statusInfo.targetOwner && hi === statusInfo.targetHeroIdx) continue;
-      if (hero.statuses?.[sName]) {
+      if (!kontrolliert(engine, ownerIdx, hero)) {
+        // Held gerade nicht unter unserer Kontrolle — nur seine Kreaturen
+      } else if (hero.statuses?.[sName]) {
         if (sName === 'poisoned') {
           if (newStacks > (hero.statuses.poisoned?.stacks || 1)) return true;
         }
@@ -69,6 +87,10 @@ module.exports = {
           return true;
         }
       }
+    }
+    for (const { physOwner, heroIdx: hi, hero } of uebernommeneHelden(engine, ownerIdx)) {
+      if (physOwner === statusInfo.targetOwner && hi === statusInfo.targetHeroIdx) continue;
+      if (heldKannEmpfangen(hero, sName, newStacks)) return true;
     }
     return false; // No valid redirect targets
   },
@@ -94,7 +116,7 @@ module.exports = {
         const hero = ps.heroes[hi];
         if (!hero?.name || hero.hp <= 0) continue;
         const heroStatuses = negStatuses.filter(s => hero.statuses?.[s]);
-        if (heroStatuses.length > 0) {
+        if (heroStatuses.length > 0 && kontrolliert(engine, pi, hero)) {
           sources.push({ id: `hero-${pi}-${hi}`, type: 'hero', owner: pi, heroIdx: hi, cardName: hero.name, statuses: heroStatuses, isHero: true });
         }
         for (let si = 0; si < (ps.supportZones[hi] || []).length; si++) {
@@ -109,6 +131,12 @@ module.exports = {
           if (creatureStatuses.length > 0) {
             sources.push({ id: `equip-${pi}-${hi}-${si}`, type: 'equip', owner: pi, heroIdx: hi, slotIdx: si, cardName: cn, cardInstance: inst, statuses: creatureStatuses, isHero: false });
           }
+        }
+      }
+      for (const { physOwner, heroIdx: hi, hero } of uebernommeneHelden(engine, pi)) {
+        const heroStatuses = negStatuses.filter(s => hero.statuses?.[s]);
+        if (heroStatuses.length > 0) {
+          sources.push({ id: `hero-${physOwner}-${hi}`, type: 'hero', owner: physOwner, heroIdx: hi, cardName: hero.name, statuses: heroStatuses, isHero: true });
         }
       }
       if (sources.length === 0) return null;
@@ -127,9 +155,9 @@ module.exports = {
       for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
         const hero = ps.heroes[hi];
         if (!hero?.name || hero.hp <= 0) continue;
-        if (src.isHero && src.heroIdx === hi) continue; // Exclude source
+        if (src.isHero && src.owner === pi && src.heroIdx === hi) continue; // Exclude source
         const canReceive = src.statuses.some(s => !hero.statuses?.[s] || (s === 'poisoned'));
-        if (canReceive) {
+        if (canReceive && kontrolliert(engine, pi, hero)) {
           redirectTargets.push({ id: `hero-${pi}-${hi}`, type: 'hero', owner: pi, heroIdx: hi, cardName: hero.name });
         }
         for (let si = 0; si < (ps.supportZones[hi] || []).length; si++) {
@@ -147,6 +175,12 @@ module.exports = {
           }
         }
       }
+      for (const { physOwner, heroIdx: hi, hero } of uebernommeneHelden(engine, pi)) {
+        if (src.isHero && src.owner === physOwner && src.heroIdx === hi) continue; // Exclude source
+        if (src.statuses.some(s => !hero.statuses?.[s] || (s === 'poisoned'))) {
+          redirectTargets.push({ id: `hero-${physOwner}-${hi}`, type: 'hero', owner: physOwner, heroIdx: hi, cardName: hero.name });
+        }
+      }
       if (redirectTargets.length === 0) return null;
 
       // Step 4: pick redirect target
@@ -159,18 +193,18 @@ module.exports = {
       if (!tgt) return null;
 
       // Step 5: animations
-      if (src.type === 'hero') engine._broadcastEvent('play_zone_animation', { type: 'cactus_burst', owner: pi, heroIdx: src.heroIdx, zoneSlot: -1 });
-      else engine._broadcastEvent('play_zone_animation', { type: 'cactus_burst', owner: pi, heroIdx: src.heroIdx, zoneSlot: src.slotIdx });
-      if (tgt.type === 'hero') engine._broadcastEvent('play_zone_animation', { type: 'cactus_burst', owner: pi, heroIdx: tgt.heroIdx, zoneSlot: -1 });
-      else engine._broadcastEvent('play_zone_animation', { type: 'cactus_burst', owner: pi, heroIdx: tgt.heroIdx, zoneSlot: tgt.slotIdx });
+      if (src.type === 'hero') engine._broadcastEvent('play_zone_animation', { type: 'cactus_burst', owner: src.owner, heroIdx: src.heroIdx, zoneSlot: -1 });
+      else engine._broadcastEvent('play_zone_animation', { type: 'cactus_burst', owner: src.owner, heroIdx: src.heroIdx, zoneSlot: src.slotIdx });
+      if (tgt.type === 'hero') engine._broadcastEvent('play_zone_animation', { type: 'cactus_burst', owner: tgt.owner, heroIdx: tgt.heroIdx, zoneSlot: -1 });
+      else engine._broadcastEvent('play_zone_animation', { type: 'cactus_burst', owner: tgt.owner, heroIdx: tgt.heroIdx, zoneSlot: tgt.slotIdx });
       await engine._delay(400);
 
       // Step 6: move statuses
       for (const sName of src.statuses) {
         // Remove from source (respects unhealable)
         if (src.isHero) {
-          const hero = ps.heroes[src.heroIdx];
-          const removed = engine.cleanseHeroStatuses(hero, pi, src.heroIdx, [sName], 'Cactus Creature');
+          const hero = gs.players[src.owner]?.heroes?.[src.heroIdx];
+          const removed = engine.cleanseHeroStatuses(hero, src.owner, src.heroIdx, [sName], 'Cactus Creature');
           if (removed.length === 0) continue; // Unhealable — skip this status
         } else {
           const inst = src.cardInstance;
@@ -179,9 +213,9 @@ module.exports = {
         }
         // Apply to target (if eligible)
         if (tgt.type === 'hero') {
-          const hero = ps.heroes[tgt.heroIdx];
+          const hero = gs.players[tgt.owner]?.heroes?.[tgt.heroIdx];
           if (hero && (!hero.statuses?.[sName] || sName === 'poisoned')) {
-            await engine.addHeroStatus(pi, tgt.heroIdx, sName, { _skipReactionCheck: true });
+            await engine.addHeroStatus(tgt.owner, tgt.heroIdx, sName, { _skipReactionCheck: true });
           }
         } else {
           const inst = tgt.cardInstance;
@@ -215,8 +249,9 @@ module.exports = {
       if (!hero?.name || hero.hp <= 0) continue;
       // Exclude original target
       if (pi === origOwner && hi === origHeroIdx) continue;
+      const heldMeiner = kontrolliert(engine, pi, hero);
       // Check if hero can receive this status
-      if (hero.statuses?.[statusName]) {
+      if (heldMeiner && hero.statuses?.[statusName]) {
         // Already has this status — only allow poison if new stacks would be higher
         if (statusName === 'poisoned') {
           const currentStacks = hero.statuses.poisoned?.stacks || 1;
@@ -225,7 +260,7 @@ module.exports = {
           continue; // Already has this non-stackable status
         }
       }
-      targets.push({
+      if (heldMeiner) targets.push({
         id: `hero-${pi}-${hi}`,
         type: 'hero',
         owner: pi,
@@ -262,6 +297,11 @@ module.exports = {
           cardInstance: inst,
         });
       }
+    }
+    for (const { physOwner, heroIdx: hi, hero } of uebernommeneHelden(engine, pi)) {
+      if (physOwner === origOwner && hi === origHeroIdx) continue;
+      if (!heldKannEmpfangen(hero, statusName, newPoisonStacks)) continue;
+      targets.push({ id: `hero-${physOwner}-${hi}`, type: 'hero', owner: physOwner, heroIdx: hi, cardName: hero.name });
     }
 
     if (targets.length === 0) return null;
@@ -334,7 +374,7 @@ module.exports = {
     for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
       const hero = ps.heroes[hi];
       if (!hero?.name || hero.hp <= 0) continue;
-      if (negStatuses.some(s => hero.statuses?.[s])) return true;
+      if (kontrolliert(engine, ownerIdx, hero) && negStatuses.some(s => hero.statuses?.[s])) return true;
       for (let si = 0; si < (ps.supportZones[hi] || []).length; si++) {
         const slot = (ps.supportZones[hi] || [])[si] || [];
         if (slot.length === 0) continue;
@@ -344,6 +384,7 @@ module.exports = {
         if (inst && !inst.faceDown && negStatuses.some(s => inst.counters?.[s])) return true;
       }
     }
+    if (uebernommeneHelden(engine, ownerIdx).some(({ hero }) => negStatuses.some(s => hero.statuses?.[s]))) return true;
     return false;
   },
 

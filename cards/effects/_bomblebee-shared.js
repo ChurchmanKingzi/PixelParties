@@ -85,9 +85,14 @@ function isOpponentTargetDeath(ctx, listenerOwner) {
   if (ctx.hero) {
     const gs = ctx._engine?.gs;
     if (!gs) return false;
-    const ownerOfDead = gs.players.findIndex(ps => (ps.heroes || []).includes(ctx.hero));
-    if (ownerOfDead < 0) return false;
-    return ownerOfDead !== listenerOwner;
+    const physOwner = gs.players.findIndex(ps => (ps.heroes || []).includes(ctx.hero));
+    if (physOwner < 0) return false;
+    // Kontrolle statt Seite (Styx 28.9.): ein Held, den der Gegner gerade
+    // kontrolliert, ist ein gegnerisches Ziel — auch in der eigenen Spalte.
+    // (Styx' Kontrolle endet mit dem Tod VOR den KO-Hooks; Charme &
+    // dauerhafte Uebernahme bleiben bis dahin bestehen.)
+    const kontrolleur = ctx._engine?.heroSideOf ? ctx._engine.heroSideOf(physOwner, ctx.hero) : physOwner;
+    return kontrolleur !== listenerOwner;
   }
   return false;
 }

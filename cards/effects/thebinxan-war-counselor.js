@@ -215,18 +215,20 @@ module.exports = {
     }
 
     // ── Falsch geraten: 50 Schaden auf ALLE Ziele des Gegners ──
-    for (let hi = 0; hi < (opp.heroes || []).length; hi++) {
-      const hero = opp.heroes[hi];
-      if (!hero?.name || !(hero.hp > 0)) continue;
+    // Kontrolle statt Seite (Styx 28.9.): „all targets your opponent
+    // CONTROLS" — Helden beider Spalten nach Kontrolleur, physisch adressiert.
+    const _oppHelden = () => engine.heroesControlledBy(oppIdx)
+      .filter(({ hero }) => hero?.name && hero.hp > 0);
+    for (const { physOwner, heroIdx: hi } of _oppHelden()) {
       engine._broadcastEvent('play_zone_animation', {
-        type: 'electric_strike', owner: oppIdx, heroIdx: hi, zoneSlot: -1,
+        type: 'electric_strike', owner: physOwner, heroIdx: hi, zoneSlot: -1,
       });
     }
     await engine._delay(420);
 
     // ★ v1043 („Interference"): ein Schlag auf die ganze Gegnerseite —
     // Helden UND Kreaturen. Gezaehlt wird, was WIRKLICH getroffen wird.
-    const _lebendeHelden = (opp.heroes || []).filter(h => h?.name && h.hp > 0).length;
+    const _lebendeHelden = _oppHelden().length;
     const _oppKreaturen = (engine.cardInstances || []).filter(
       (i) => i && i.zone === 'support' && (i.controller ?? i.owner) === oppIdx,
     );
@@ -239,8 +241,7 @@ module.exports = {
       amount: DAMAGE, type: 'creature', sourceOwner: pi,
     });
     try {
-    for (let hi = 0; hi < (opp.heroes || []).length; hi++) {
-      const hero = opp.heroes[hi];
+    for (const { hero } of _oppHelden()) {
       if (!hero?.name || !(hero.hp > 0)) continue;
       await ctx.dealDamage(hero, DAMAGE, 'creature');
     }
@@ -261,7 +262,7 @@ module.exports = {
 
     engine.log('thebinxan_punish', {
       player: ps.username, damage: DAMAGE,
-      heroes: (opp.heroes || []).filter((h) => h?.name && h.hp > 0).length,
+      heroes: _oppHelden().length,
       creatures: oppCreatures.length,
     });
     engine.sync();

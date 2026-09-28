@@ -132,9 +132,9 @@ async function fireGroupChoice(ctx, damage, postPromptReveal = false) {
   // ★ v1392: beide Varianten über die EINE Stelle für Mehrfachtreffer.
   const ziele = [];
   if (target === 'heroes') {
-    for (let hi = 0; hi < (oppPs.heroes || []).length; hi++) {
-      const h = oppPs.heroes[hi];
-      if (h?.name && h.hp > 0) ziele.push({ type: 'hero', owner: oppIdx, heroIdx: hi });
+    // Kontrolle statt Seite (Styx 28.9.): „all Heroes your opponent CONTROLS".
+    for (const { physOwner, heroIdx: hi, hero: h } of engine.heroesControlledBy(oppIdx)) {
+      if (h?.name && h.hp > 0) ziele.push({ type: 'hero', owner: physOwner, heroIdx: hi });
     }
   } else {
     for (const inst of engine.cardInstances) {

@@ -118,7 +118,11 @@ async function _explode(ctx, excludeKey) {
 
   const oppIdx = pi === 0 ? 1 : 0;
 
-  const heroTargets = engine.getHeroTargets(oppIdx)
+  // Kontrolle statt Seite (Styx 28.9.) — „all other targets your
+  // opponent controls"; `owner` bleibt die physische Spalte.
+  const heroTargets = engine.heroesControlledBy(oppIdx)
+    .filter(({ hero }) => hero.hp > 0)
+    .map(({ physOwner, heroIdx }) => ({ owner: physOwner, heroIdx }))
     .filter(t => `hero-${t.owner}-${t.heroIdx}` !== excludeKey);
   const creatureTargets = engine.getCreatureTargets(oppIdx)
     .map(t => t.cardInstance)

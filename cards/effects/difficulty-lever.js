@@ -70,11 +70,12 @@ const MAX_LEVEL = 3;
 
 /** Alle Zauberschulen, die IRGENDEIN eigener Held hat — Tote inklusive. */
 function schulenDerPartei(engine, pi) {
-  const ps = engine.gs.players[pi];
+  // Kontrolle statt Seite (Styx 28.9.) — „none of your Heroes": alle
+  // kontrollierten Helden; ihre Ability-Zonen liegen in der physischen Spalte.
   const raus = new Set();
-  for (let hi = 0; hi < (ps?.heroes || []).length; hi++) {
-    if (!ps.heroes[hi]?.name) continue;                 // leerer Platz, kein Held
-    for (const s of spellSchoolAbilitiesOn(ps.abilityZones?.[hi], SPELL_SCHOOL_ABILITIES)) raus.add(s);
+  for (const { physOwner, heroIdx: hi } of engine.heroesControlledBy(pi)) {
+    const zonen = engine.gs.players[physOwner]?.abilityZones?.[hi];
+    for (const s of spellSchoolAbilitiesOn(zonen, SPELL_SCHOOL_ABILITIES)) raus.add(s);
   }
   return raus;
 }
@@ -109,6 +110,11 @@ function faehigeHelden(engine, pi) {
   for (let hi = 0; hi < (ps?.heroes || []).length; hi++) {
     const hero = ps.heroes[hi];
     if (!hero?.name || hero.hp <= 0) continue;
+    // Kontrolle statt Seite (Styx 28.9.) — ein abgegebener Held ist nicht
+    // „a Hero you control". (Uebernommene Helden der Gegenspalte kann der
+    // Sofort-Zauberweg nicht als Wirker fuehren — er zaubert aus der
+    // eigenen Spalte.)
+    if (engine.heroSideOf(pi, hero) !== pi) continue;
     const s = hero.statuses || {};
     if (s.frozen || s.stunned || s.webbed || s.negated) continue;
     if (hero._actionLockedTurn === engine.gs.turn) continue;

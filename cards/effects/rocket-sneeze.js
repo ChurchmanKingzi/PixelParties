@@ -65,7 +65,8 @@ module.exports = {
     // engine's helper already routes us here when pi !== targetOwner,
     // but double-check for safety in case the wiring shifts later.
     const targetOwner = engine.gs.players.findIndex(ps => (ps.heroes || []).includes(target));
-    if (targetOwner === pi) return false;
+    // Kontrolle statt Seite (Styx 28.9.)
+    if (targetOwner < 0 || engine.heroSideOf(targetOwner, target) === pi) return false;
     _markPrompted(gs, pi);
     return true;
   },
@@ -150,10 +151,11 @@ async function _spreadDamage(engine, pi, targetCtrlPi, source, amount, type) {
   // Build snapshot list BEFORE damage so on-death cascades don't
   // shorten the iteration mid-loop. Heroes by index; Creatures by
   // instance id.
+  // Kontrolle statt Seite (Styx 28.9.): Helden, die targetCtrlPi
+  // kontrolliert, samt physischer Spalte (Ziel-IDs/Animationen).
   const heroHits = [];
-  for (let hi = 0; hi < (ops.heroes || []).length; hi++) {
-    const h = ops.heroes[hi];
-    if (h?.name && h.hp > 0) heroHits.push({ hi });
+  for (const { physOwner, heroIdx: hi, hero: h } of engine.heroesControlledBy(targetCtrlPi)) {
+    if (h?.name && h.hp > 0) heroHits.push({ hi, po: physOwner });
   }
 
   const cardDB = engine._getCardDB();
@@ -180,9 +182,9 @@ async function _spreadDamage(engine, pi, targetCtrlPi, source, amount, type) {
   // separate path and stays open.
   {
     const tgts = [
-      ...heroHits.map(({ hi }) => {
-        const h = ops.heroes[hi];
-        return { type: 'hero', owner: targetCtrlPi, heroIdx: hi, cardName: h?.name };
+      ...heroHits.map(({ hi, po }) => {
+        const h = gs.players[po]?.heroes?.[hi];
+        return { type: 'hero', owner: po, heroIdx: hi, cardName: h?.name };
       }),
       ...creatureHitIds.map(id => {
         const inst = engine.cardInstances.find(c => c.id === id);
@@ -208,9 +210,9 @@ async function _spreadDamage(engine, pi, targetCtrlPi, source, amount, type) {
   // shielded, immune, etc.) — the visual is "everyone gets hit by the
   // sneeze", separate from whether the damage actually lands. Mirror
   // of Guardian Beast Hou's two-phase pattern (anim → delay → damage).
-  for (const { hi } of heroHits) {
+  for (const { hi, po } of heroHits) {
     engine._broadcastEvent('play_zone_animation', {
-      type: 'explosion', owner: targetCtrlPi, heroIdx: hi, zoneSlot: -1,
+      type: 'explosion', owner: po, heroIdx: hi, zoneSlot: -1,
     });
   }
   for (const id of creatureHitIds) {
@@ -239,8 +241,8 @@ async function _spreadDamage(engine, pi, targetCtrlPi, source, amount, type) {
   try {
   // Phase 2: deliver hero damage in turn order — sequential so
   // afterDamage hooks settle per target.
-  for (const { hi } of heroHits) {
-    const live = ops.heroes?.[hi];
+  for (const { hi, po } of heroHits) {
+    const live = gs.players[po]?.heroes?.[hi];
     if (!live?.name || live.hp <= 0) continue;
     await engine.actionDealDamage(carriedSource, live, amount, type);
   }

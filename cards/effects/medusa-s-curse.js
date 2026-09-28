@@ -56,12 +56,13 @@ module.exports = {
       const heroTargets = []; // [{ owner, heroIdx, hero }]
       const creatureTargets = []; // CardInstance[]
 
-      for (let hi = 0; hi < (opp.heroes || []).length; hi++) {
-        const hero = opp.heroes[hi];
+      // Kontrolle statt Seite (Styx 28.9.): Helden, die der Gegner
+      // KONTROLLIERT; `owner` bleibt physisch.
+      for (const { physOwner, heroIdx: hi, hero } of engine.heroesControlledBy(oppIdx)) {
         if (!hero?.name || hero.hp <= 0) continue;
         if (hero._damagedOnTurn === currentTurn) continue;
         if (hero.statuses?.stunned) continue; // Already stunned — no-op
-        heroTargets.push({ owner: oppIdx, heroIdx: hi, hero });
+        heroTargets.push({ owner: physOwner, heroIdx: hi, hero });
       }
       for (const inst of engine.cardInstances) {
         if (inst.owner !== oppIdx) continue;

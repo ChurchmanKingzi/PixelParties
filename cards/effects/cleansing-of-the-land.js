@@ -38,11 +38,10 @@ const CARD_NAME = 'Cleansing of the Land';
 function einsetzbar(engine, pi, cd) {
   if (!cd) return false;
   if (!engine.canPlaceAnotherArea(pi, cd.name)) return false;
-  const ps = engine.gs.players[pi];
-  for (let hi = 0; hi < (ps?.heroes || []).length; hi++) {
-    const hero = ps.heroes[hi];
+  // Kontrolle statt Seite (Styx 28.9.) — „one of your Heroes"
+  for (const { physOwner, heroIdx, hero } of engine.heroesControlledBy(pi)) {
     if (!hero?.name || hero.hp <= 0) continue;
-    if (engine.heroMeetsLevelReq(pi, hi, cd)) return true;
+    if (engine.heroMeetsLevelReq(physOwner, heroIdx, cd, { levelSourcePi: pi })) return true;
   }
   return false;
 }

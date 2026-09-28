@@ -51,7 +51,8 @@ function countTargetsYouControl(engine, pi) {
   const ps = engine.gs.players[pi];
   if (!ps) return 0;
   let n = 0;
-  for (const hero of (ps.heroes || [])) {
+  // Kontrolle statt Seite (Styx 28.9.): kontrollierte Helden beider Spalten.
+  for (const { hero } of engine.heroesControlledBy(pi)) {
     if (hero?.name && hero.hp > 0) n++;
   }
   const cardDB = engine._getCardDB();

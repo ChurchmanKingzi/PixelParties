@@ -146,7 +146,8 @@ module.exports = {
 
     let gebrannt = 0;
     // Helden (lebende — ein Besiegter traegt keine Statusse mehr).
-    for (const hero of (ps.heroes || [])) {
+    // Kontrolle statt Seite (Styx 28.9.)
+    for (const { hero } of engine.heroesControlledBy(pi)) {
       if (!hero?.name || hero.hp <= 0) continue;
       const ok = await engine.actionAddStatus(hero, 'burned', {
         source: CARD_NAME,

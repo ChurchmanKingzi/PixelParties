@@ -148,9 +148,10 @@ module.exports = {
       }
       if (deadOwner < 0) return;
       // No self-cannibalism — a Cannibalism Hero who just died can't
-      // eat themselves on the way out.
-      if (deadOwner === ctx.cardOwner && deadHeroIdx === ctx.cardHeroIdx) return;
-      await tryEat(ctx, dyingHero.name, deadOwner);
+      // eat themselves on the way out. (Physischer Platz des Helden.)
+      if (deadOwner === (ctx.cardHeroOwner ?? ctx.cardOwner) && deadHeroIdx === ctx.cardHeroIdx) return;
+      // Kontrolle statt Seite (Styx 28.9.): „another target you CONTROL".
+      await tryEat(ctx, dyingHero.name, engine.heroSideOf(deadOwner, dyingHero));
     },
   },
 };

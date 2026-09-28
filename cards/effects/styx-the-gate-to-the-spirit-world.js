@@ -43,7 +43,7 @@ module.exports = {
    * seiner Basis-Styx unten mittig die bisherigen Wiederbelebungen.
    * Nur fuer den BESITZER — das Deck ist verdeckt, und der Zaehler
    * verriete sonst, dass die Karte darin liegt.
-   * @returns {{ heroIdxs: number[], count: number, needed: number } | null}
+   * @returns {{ heroIdxs: number[], count: number } | null}
    */
   reviveZaehlerAnzeige(engine, pi) {
     const ps = engine?.gs?.players?.[pi];
@@ -54,7 +54,7 @@ module.exports = {
     const inRotation = ['hand', 'mainDeck', 'discardPile', 'deletedPile']
       .some(k => (ps[k] || []).includes(AUFSTIEG_ZIEL));
     if (!inRotation) return null;
-    return { heroIdxs, count: engine.gs.heroRevivalCount || 0, needed: NOETIGE_WIEDERBELEBUNGEN };
+    return { heroIdxs, count: engine.gs.heroRevivalCount || 0 };
   },
 
   refreshAscensionReadiness(engine, pi, hi) {

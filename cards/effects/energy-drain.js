@@ -91,16 +91,17 @@ module.exports = {
       const BLASEN_FLUGZEIT_MS = 1500; // langsam, wie gewuenscht
 
       const oi = pi === 0 ? 1 : 0;
-      const ops = gs.players[oi];
       const quellen = [];
-      for (let hi = 0; hi < (ops?.heroes || []).length; hi++) {
-        if (!ops.heroes[hi]?.name || ops.heroes[hi].hp <= 0) continue;
-        quellen.push({ heroIdx: hi, zoneSlot: undefined });
+      // Kontrolle statt Seite (Styx 28.9.) — Blasen nur aus dem, was
+      // aoeHit (side 'enemy') auch trifft; `owner` = physische Spalte.
+      for (const { physOwner, heroIdx: hi, hero: h } of engine.heroesControlledBy(oi)) {
+        if (!h?.name || h.hp <= 0) continue;
+        quellen.push({ owner: physOwner, heroIdx: hi, zoneSlot: undefined });
       }
       for (const inst of engine.cardInstances) {
         if (inst.zone !== 'support') continue;
         if ((inst.controller ?? inst.owner) !== oi) continue;
-        quellen.push({ heroIdx: inst.heroIdx, zoneSlot: inst.zoneSlot });
+        quellen.push({ owner: oi, heroIdx: inst.heroIdx, zoneSlot: inst.zoneSlot });
       }
 
       if (quellen.length) {
@@ -109,7 +110,7 @@ module.exports = {
           // laufen; der Versatz entsteht ueber die Wellen-Schleife.
           for (const q of quellen) {
             engine._broadcastEvent('play_projectile_animation', {
-              sourceOwner: oi,
+              sourceOwner: q.owner,
               sourceHeroIdx: q.heroIdx,
               ...(q.zoneSlot != null ? { sourceZoneSlot: q.zoneSlot } : {}),
               targetOwner: pi,

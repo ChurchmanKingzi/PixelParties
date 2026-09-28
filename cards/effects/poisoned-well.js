@@ -43,11 +43,10 @@ module.exports = {
       // Collect all opponent targets
       const targets = [];
 
-      // Opponent heroes
-      for (let hi = 0; hi < (oppPs.heroes || []).length; hi++) {
-        const h = oppPs.heroes[hi];
+      // Opponent heroes — Kontrolle statt Seite (Styx 28.9.)
+      for (const { physOwner, heroIdx: hi, hero: h } of engine.heroesControlledBy(oppIdx)) {
         if (!h?.name || h.hp <= 0) continue;
-        targets.push({ type: 'hero', owner: oppIdx, heroIdx: hi });
+        targets.push({ type: 'hero', owner: physOwner, heroIdx: hi });
       }
 
       // Opponent creatures

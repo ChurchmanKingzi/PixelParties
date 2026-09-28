@@ -30,16 +30,12 @@ const { buildGreatmawSacSpec } = require('./_greatmaw-shared');
 
 const CARD_NAME = 'Infected Greatmaw';
 
-/** Living Heroes `pi` controls — eligible ATK sources. */
+/** Living Heroes `pi` controls — eligible ATK sources.
+ *  Kontrolle statt Seite (Styx 28.9.): `physOwner` fuer IDs/Zugriffe. */
 function livingHeroes(engine, pi) {
-  const ps = engine.gs.players[pi];
-  if (!ps) return [];
-  const out = [];
-  for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-    const h = ps.heroes[hi];
-    if (h?.name && h.hp > 0) out.push({ heroIdx: hi, hero: h });
-  }
-  return out;
+  return engine.heroesControlledBy(pi)
+    .filter(e => e.hero.hp > 0)
+    .map(e => ({ physOwner: e.physOwner, heroIdx: e.heroIdx, hero: e.hero }));
 }
 
 module.exports = {
@@ -99,8 +95,8 @@ module.exports = {
       attacker = heroes[0];
     } else {
       const targets = heroes.map(h => ({
-        id: `hero-${pi}-${h.heroIdx}`,
-        type: 'hero', owner: pi, heroIdx: h.heroIdx, cardName: h.hero.name,
+        id: `hero-${h.physOwner}-${h.heroIdx}`,
+        type: 'hero', owner: h.physOwner, heroIdx: h.heroIdx, cardName: h.hero.name,
       }));
       const picked = await ctx.promptTarget(targets, {
         title: CARD_NAME,
@@ -114,10 +110,11 @@ module.exports = {
         _skipRedirectCheck: true, // choosing your own Hero is not a redirectable "target"
       });
       if (!picked || picked.length === 0) return false;
-      attacker = heroes.find(h => `hero-${pi}-${h.heroIdx}` === picked[0]);
+      attacker = heroes.find(h => `hero-${h.physOwner}-${h.heroIdx}` === picked[0]);
       if (!attacker) return false;
     }
     const attackerHeroIdx = attacker.heroIdx;
+    const attackerOwner = attacker.physOwner;
 
     // Sacrifice spec — paid inside `onTargetChosen` below.
     const spec = buildGreatmawSacSpec(engine, pi, {
@@ -147,6 +144,8 @@ module.exports = {
       attackerSourceOverride: {
         name: attacker.hero.name, owner: pi, controller: pi,
         heroIdx: attackerHeroIdx, zone: 'hand', _heroAttackSource: true,
+        // Uebernommener Held: physische Seite wie beim Charme-Angriff.
+        ...(attackerOwner !== pi ? { heroOwner: attackerOwner } : {}),
       },
       onTargetChosen: async () => {
         // Idempotent — a dead-target retarget re-enters promptDamageTarget.
@@ -169,7 +168,7 @@ module.exports = {
     // promptDamageTarget; actionDealDamage skips the re-check via
     // `_surpriseCheckedHeroes`. Re-read the Hero live — a reaction
     // could have changed its ATK or killed it.
-    const hero = gs.players[pi]?.heroes?.[attackerHeroIdx];
+    const hero = gs.players[attackerOwner]?.heroes?.[attackerHeroIdx];
     if (!hero || hero.hp <= 0) {
       engine.log('infected_greatmaw_fizzle', { player: ps.username, reason: 'hero_gone' });
       engine.sync();
@@ -180,6 +179,9 @@ module.exports = {
     // damage source is the Hero, type 'attack', so afterDamage-style
     // retaliation (Fireshield) routes to the Hero, not Infected.
     const source = { name: hero.name, owner: pi, heroIdx: attackerHeroIdx };
+    // Uebernommener Held: `heroOwner` = physische Seite (Konvention
+    // der Charme-Angriffe in der Engine), `owner` bleibt der Spieler.
+    if (attackerOwner !== pi) { source.controller = pi; source.heroOwner = attackerOwner; }
 
     // Re-resolve the live target — a reaction could have moved or
     // killed it between the pick and here.
@@ -201,7 +203,7 @@ module.exports = {
     // this hit is "that Hero attacking".
     const tgtHeroIdx = tInst ? tInst.heroIdx : target.heroIdx;
     engine._broadcastEvent('play_ram_animation', {
-      sourceOwner: pi, sourceHeroIdx: attackerHeroIdx,
+      sourceOwner: attackerOwner, sourceHeroIdx: attackerHeroIdx,
       targetOwner: target.owner, targetHeroIdx: tgtHeroIdx,
       targetZoneSlot: tInst ? tInst.zoneSlot : undefined,
       cardName: hero.name, duration: 1200,

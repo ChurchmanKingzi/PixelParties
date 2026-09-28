@@ -67,6 +67,18 @@ function freieSlots(engine, pi) {
   return slots;
 }
 
+/**
+ * Lebende Helden, die `oi` KONTROLLIERT — Kontrolle statt Seite (Styx 28.9.).
+ * getHeroTargets() liest nur die physische Spalte. IDs bleiben physisch.
+ */
+function gegnerHelden(engine, oi) {
+  return engine.heroesControlledBy(oi)
+    .filter(e => e.hero.hp > 0)
+    .map(({ physOwner, heroIdx, hero }) => ({
+      id: `hero-${physOwner}-${heroIdx}`, type: 'hero', owner: physOwner, heroIdx, cardName: hero.name,
+    }));
+}
+
 module.exports = {
   // ★★ v1182 — ENTKOPPELTE BILDER (CARD_API): wird die Karte NEGIERT,
   // laeuft ihr Effekt-Rumpf nie — die Engine spielt dann diese Bilder.
@@ -87,7 +99,7 @@ module.exports = {
   canActivateCreatureEffect(ctx) {
     const engine = ctx._engine;
     const oi = ctx.cardOwner === 0 ? 1 : 0;
-    return (engine.getHeroTargets(oi).length + engine.getCreatureTargets(oi).length) > 0;
+    return (gegnerHelden(engine, oi).length + engine.getCreatureTargets(oi).length) > 0;
   },
 
   async onCreatureEffect(ctx) {
@@ -96,7 +108,7 @@ module.exports = {
     const pi = ctx.cardOwner;
     const oi = pi === 0 ? 1 : 0;
 
-    const ziele = [...engine.getHeroTargets(oi), ...engine.getCreatureTargets(oi)];
+    const ziele = [...gegnerHelden(engine, oi), ...engine.getCreatureTargets(oi)];
     if (ziele.length === 0) return false;
 
     for (const t of ziele) {

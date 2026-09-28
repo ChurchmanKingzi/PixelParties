@@ -161,7 +161,12 @@ module.exports = {
       if (!hero?.name) return;
       // „your opponent controls" — der gefallene Held muss auf der
       // Gegnerseite stehen.
-      if ((engine.gs.players?.[oppIdx]?.heroes || []).indexOf(hero) < 0) return;
+      // Kontrolle statt Seite (Styx 28.9.): massgeblich ist der Kontrolleur.
+      let physOwner = -1;
+      for (let p = 0; p < (engine.gs.players || []).length; p++) {
+        if ((engine.gs.players[p]?.heroes || []).includes(hero)) { physOwner = p; break; }
+      }
+      if (physOwner < 0 || engine.heroSideOf(physOwner, hero) !== oppIdx) return;
       await schattenschlag(ctx, hero.name);
     },
 

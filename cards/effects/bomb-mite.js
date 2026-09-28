@@ -39,13 +39,11 @@ const CARD_NAME = 'Bomb Mite';
 const SCHADEN_GEGNER = 100;   // v1014: war 150
 const SCHADEN_EIGEN  = 100;
 
-/** Alle lebenden Helden einer Seite. */
+/** Alle lebenden Helden, die `seite` KONTROLLIERT (Kontrolle statt Seite, Styx 28.9.). */
 function helden(engine, seite) {
   const out = [];
-  const liste = engine.gs.players[seite]?.heroes || [];
-  for (let hi = 0; hi < liste.length; hi++) {
-    const h = liste[hi];
-    if (h?.name && h.hp > 0) out.push({ heroIdx: hi, hero: h });
+  for (const { physOwner, heroIdx: hi, hero: h } of engine.heroesControlledBy(seite)) {
+    if (h?.name && h.hp > 0) out.push({ physOwner, heroIdx: hi, hero: h });
   }
   return out;
 }
@@ -56,7 +54,7 @@ async function explodiere(engine, quelle, seite, betrag) {
   if (ziele.length === 0) return 0;
   for (const z of ziele) {
     engine._broadcastEvent('play_zone_animation', {
-      type: 'explosion', owner: seite, heroIdx: z.heroIdx, zoneSlot: -1,
+      type: 'explosion', owner: z.physOwner, heroIdx: z.heroIdx, zoneSlot: -1,
     });
   }
   await engine._delay(420);
@@ -64,8 +62,8 @@ async function explodiere(engine, quelle, seite, betrag) {
   // gezaehlt wird, was WIRKLICH getroffen wird.
   let getroffen = 0;
   // ★ v1392: über die EINE Stelle für Mehrfachtreffer.
-  const lebend = ziele.filter(z => { const h = engine.gs.players[seite]?.heroes?.[z.heroIdx]; return h?.name && h.hp > 0; });
-  await engine.dealDamageToTargets(quelle, lebend.map(z => ({ type: 'hero', owner: seite, heroIdx: z.heroIdx })), {
+  const lebend = ziele.filter(z => { const h = engine.gs.players[z.physOwner]?.heroes?.[z.heroIdx]; return h?.name && h.hp > 0; });
+  await engine.dealDamageToTargets(quelle, lebend.map(z => ({ type: 'hero', owner: z.physOwner, heroIdx: z.heroIdx })), {
     damage: betrag, damageType: 'creature', hitDelay: 0, surpriseCheck: false, postTargetCheck: false,
   });
   getroffen = lebend.length;

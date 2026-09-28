@@ -25,8 +25,14 @@ const CARD_NAME = 'Cold-Hearted Yuki-Onna';
 const HEART = 'Heart of Ice';
 
 function eigeneHearts(engine, pi) {
-  return engine.cardInstances.filter(c => c.name === HEART && c.zone === 'support'
-    && (c.controller ?? c.owner) === pi && engine.gs.players[pi]?.heroes?.[c.heroIdx]?.name);
+  // Kontrolle statt Seite (Styx 28.9.) — „equipped to Heroes you control":
+  // massgeblich ist, wer den TRAEGER kontrolliert, nicht die Spalte.
+  return engine.cardInstances.filter(c => {
+    if (c.name !== HEART || c.zone !== 'support') return false;
+    const seite = engine.physicalSide(c);
+    const held = engine.gs.players[seite]?.heroes?.[c.heroIdx];
+    return !!held?.name && engine.heroSideOf(seite, held) === pi;
+  });
 }
 
 module.exports = {
@@ -44,8 +50,8 @@ module.exports = {
       if (hearts.length === 0) return;
 
       const ziele = hearts.map(h => ({
-        id: `equip-${h.owner}-${h.heroIdx}-${h.zoneSlot}`, type: 'equip',
-        owner: h.owner, heroIdx: h.heroIdx, slotIdx: h.zoneSlot, cardName: HEART, cardInstance: h,
+        id: `equip-${engine.physicalSide(h)}-${h.heroIdx}-${h.zoneSlot}`, type: 'equip',
+        owner: engine.physicalSide(h), heroIdx: h.heroIdx, slotIdx: h.zoneSlot, cardName: HEART, cardInstance: h,
       }));
       const ids = await engine.promptEffectTarget(pi, ziele, {
         title: CARD_NAME, source: CARD_NAME,

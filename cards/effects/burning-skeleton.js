@@ -30,7 +30,7 @@ module.exports = {
     const oppPs = engine.gs.players[oi];
     if (!oppPs) return false;
     // At least one un-burned opp Hero or Creature must exist.
-    for (const hero of (oppPs.heroes || [])) {
+    for (const { hero } of engine.heroesControlledBy(oi)) {   // Kontrolle statt Seite (Styx 28.9.)
       if (hero?.name && hero.hp > 0 && !hero.statuses?.burned) return true;
     }
     for (const inst of engine.cardInstances) {

@@ -55,7 +55,7 @@ module.exports = {
     // non-damage targeting (Disruption Ray, …). See Spectral Armor.
     if (opts && opts.dealsDamage === false) return false;
     if (_alreadyPrompted(gs, pi)) return false;
-    const eligible = _collectOwnedHeroTargets(gs, pi, targetedTargets).length > 0;
+    const eligible = _collectOwnedHeroTargets(gs, pi, targetedTargets, _engine).length > 0;
     if (eligible) {
       // Side effect — covers decline path. Once the prompt is offered
       // (accept or decline), no further CIB prompts for this source.
@@ -65,7 +65,7 @@ module.exports = {
   },
 
   async postTargetResolve(engine, pi, targetedTargets /*, sourceCard, opts */) {
-    const candidates = _collectOwnedHeroTargets(engine.gs, pi, targetedTargets);
+    const candidates = _collectOwnedHeroTargets(engine.gs, pi, targetedTargets, engine);
     if (candidates.length === 0) return { effectNegated: false };
     _markPrompted(engine.gs, pi);
 
@@ -103,6 +103,9 @@ module.exports = {
   afterDamageCondition(gs, pi, _engine, target, _targetHeroIdx, _source, amount /*, type */) {
     if (_alreadyPrompted(gs, pi)) return false;
     if (!(amount > 0)) return false;
+    // Kontrolle statt Seite (Styx 28.9.) — der Reaktor ist hier die
+    // physische Spalte; ein abgegebener Held ist nicht „you control".
+    if (_engine && _engine.heroSideOf(pi, target) !== pi) return false;
     // Don't trigger if the hero already has the Cloudy buff (no stacking).
     if (target?.buffs?.cloudy) return false;
     _markPrompted(gs, pi);
@@ -241,13 +244,15 @@ function _keyForHero(ownerIdx, heroIdx) {
  * implementation is hero-only (mirroring the existing after-damage
  * scope).
  */
-function _collectOwnedHeroTargets(gs, pi, targetedTargets) {
+function _collectOwnedHeroTargets(gs, pi, targetedTargets, engine) {
   const out = [];
   if (!Array.isArray(targetedTargets)) return out;
   for (const t of targetedTargets) {
     if (!t || t.type !== 'hero') continue;
-    if (t.owner !== pi) continue;
     const hero = gs.players[t.owner]?.heroes?.[t.heroIdx];
+    // Kontrolle statt Seite (Styx 28.9.) — „a target you control"
+    const seite = engine ? engine.heroSideOf(t.owner, hero) : t.owner;
+    if (seite !== pi) continue;
     if (!hero?.name || hero.hp <= 0) continue;
     if (hero.buffs?.cloudy) continue;
     out.push({

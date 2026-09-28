@@ -35,13 +35,21 @@ const { hasCardType } = require('./_hooks');
 
 const CARD_NAME = 'Arcane Lamp';
 
-function heroCanBeBurned(hero) {
+function heroCanBeBurned(hero, engine = null, quelle = null) {
   if (!hero?.name || hero.hp <= 0) return false;
   if (hero.statuses?.burned) return false;
   if (hero.statuses?.immune) return false;
-  if (hero.statuses?.charmed) return false;
+  // Charme schuetzt nur in seiner Auspraegung (Charme Lv3: alles, Golden
+  // Apple: nur gegen den Kontrolleur, Styx: gar nicht) — `_charmBlocksFrom`.
+  if (hero.statuses?.charmed && (engine?._charmBlocksFrom ? engine._charmBlocksFrom(hero, quelle) : true)) return false;
   if (hero.statuses?.burn_immune) return false;
   return true;
+}
+
+/** Helden, die `oi` kontrolliert (ohne Engine: physische Spalte). */
+function gegnerHelden(gs, oi, engine) {
+  if (engine?.heroesControlledBy) return engine.heroesControlledBy(oi);
+  return (gs.players[oi]?.heroes || []).map((hero, heroIdx) => ({ physOwner: oi, heroIdx, hero }));
 }
 
 module.exports = {
@@ -52,9 +60,9 @@ module.exports = {
     const ops = gs.players[oi];
     if (!ops) return false;
 
-    // At least one hero target?
-    for (const h of (ops.heroes || [])) {
-      if (heroCanBeBurned(h)) return true;
+    // At least one hero target? Kontrolle statt Seite (Styx 28.9.)
+    for (const { hero: h } of gegnerHelden(gs, oi, engine)) {
+      if (heroCanBeBurned(h, engine, pi)) return true;
     }
     // Or at least one creature target? Use the targeting-side gate
     // so Cardinal Beasts (and other omni-immune creatures) appear as
@@ -80,12 +88,12 @@ module.exports = {
     const targets = [];
     if (!ops) return targets;
 
-    for (let hi = 0; hi < (ops.heroes || []).length; hi++) {
-      const h = ops.heroes[hi];
-      if (!heroCanBeBurned(h)) continue;
+    // Kontrolle statt Seite (Styx 28.9.) — IDs bleiben physisch.
+    for (const { physOwner, heroIdx: hi, hero: h } of gegnerHelden(gs, oi, engine)) {
+      if (!heroCanBeBurned(h, engine, pi)) continue;
       targets.push({
-        id: `hero-${oi}-${hi}`,
-        type: 'hero', owner: oi, heroIdx: hi,
+        id: `hero-${physOwner}-${hi}`,
+        type: 'hero', owner: physOwner, heroIdx: hi,
         cardName: h.name,
       });
     }
@@ -133,7 +141,7 @@ module.exports = {
 
     if (target.type === 'hero') {
       const hero = engine.gs.players[target.owner]?.heroes?.[target.heroIdx];
-      if (!hero || !heroCanBeBurned(hero)) return { cancelled: true };
+      if (!hero || !heroCanBeBurned(hero, engine, pi)) return { cancelled: true };
       await engine.addHeroStatus(target.owner, target.heroIdx, 'burned', {
         permanent: true,
         appliedBy: pi,

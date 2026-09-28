@@ -119,7 +119,10 @@ module.exports = {
       // Caster hero must have ≥2 distinct schools attached.
       const casterHeroIdx = ctx.heroIdx;
       if (casterHeroIdx == null || casterHeroIdx < 0) return;
-      const schools = distinctSchoolsOnHero(engine, ps, casterHeroIdx);
+      // Kontrolle statt Seite (Styx 28.9.): `heroIdx` zeigt in die Reihe
+      // von `ctx.heroOwner` (bezauberter/uebernommener Wirker).
+      const casterPs = gs.players[ctx.heroOwner ?? pi] || ps;
+      const schools = distinctSchoolsOnHero(engine, casterPs, casterHeroIdx);
       if (schools.size < 2) return;
 
       const lvl = sd.level || 0;
@@ -128,12 +131,13 @@ module.exports = {
       // ── Build heal-target list (own heroes + own creatures) ──
       const cardDB = engine._getCardDB();
       const targets = [];
-      for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-        const h = ps.heroes[hi];
+      // Kontrolle statt Seite (Styx 28.9.): „a target you control" —
+      // alle kontrollierten Helden, physisch adressiert.
+      for (const { physOwner, heroIdx: hi, hero: h } of engine.heroesControlledBy(pi)) {
         if (!h?.name || h.hp <= 0) continue;
         // Only meaningful if the target isn't already at full HP — but the
         // card text doesn't gate on that; let the player still pick.
-        targets.push({ id: `hero-${pi}-${hi}`, type: 'hero', owner: pi, heroIdx: hi, cardName: h.name });
+        targets.push({ id: `hero-${physOwner}-${hi}`, type: 'hero', owner: physOwner, heroIdx: hi, cardName: h.name });
       }
       for (const inst of engine.cardInstances) {
         if ((inst.controller ?? inst.owner) !== pi || inst.zone !== 'support') continue;
@@ -176,10 +180,10 @@ module.exports = {
       const healSource = { name: CARD_NAME, owner: pi, heroIdx: ctx.cardHeroIdx };
 
       if (target.type === 'hero') {
-        const hero = gs.players[pi]?.heroes?.[target.heroIdx];
+        const hero = gs.players[target.owner]?.heroes?.[target.heroIdx];
         if (!hero?.name || hero.hp <= 0) { refundTrigger(ctx); return; }
         engine._broadcastEvent('play_zone_animation', {
-          type: 'heal_sparkle', owner: pi, heroIdx: target.heroIdx, zoneSlot: -1,
+          type: 'heal_sparkle', owner: target.owner, heroIdx: target.heroIdx, zoneSlot: -1,
         });
         await engine._delay(200);
         await engine.actionHealHero(healSource, hero, healAmt);

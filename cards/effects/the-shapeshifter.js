@@ -85,9 +85,10 @@ function ablaufZug(gs) {
  * AKTUELLEN Gestalt (Ruling ③). Tote Helden zaehlen mit: ihr Slot ist
  * belegt und ihr Name damit vergeben.
  */
-function aktuelleHeldennamen(ps) {
+function aktuelleHeldennamen(engine, pi) {
+  // Kontrolle statt Seite (Styx 28.9.): beide Spalten, nur kontrollierte.
   const namen = new Set();
-  for (const h of (ps.heroes || [])) {
+  for (const { hero: h } of engine.heroesControlledBy(pi)) {
     if (h?.name) namen.add(h.name);
   }
   return namen;
@@ -136,7 +137,7 @@ function waehlbareGestalten(engine, pi, heroIdx) {
   const hero = ps.heroes?.[heroIdx];
   if (!hero) return [];
   const cardDB = engine._getCardDB();
-  const vergeben = aktuelleHeldennamen(ps);
+  const vergeben = aktuelleHeldennamen(engine, pi);
   const schonBenutzt = new Set(benutzteGestalten(hero));
 
   const zulaessig = (name) => {

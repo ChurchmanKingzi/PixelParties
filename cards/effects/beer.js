@@ -58,10 +58,13 @@ module.exports = {
     if (!engine) return [];
     const negKeys = getCleansableStatuses();
 
-    const heroes = engine.getHeroTargets(pi).filter(t => {
-      const hero = gs.players[pi].heroes[t.heroIdx];
-      return hero.statuses && negKeys.some(k => hero.statuses[k]);
-    });
+    // Kontrolle statt Seite (Styx 28.9.): „targets you control" — IDs physisch.
+    const heroes = engine.heroesControlledBy(pi)
+      .filter(({ hero }) => hero?.name && hero.hp > 0
+        && hero.statuses && negKeys.some(k => hero.statuses[k]))
+      .map(({ physOwner, heroIdx, hero }) => ({
+        id: `hero-${physOwner}-${heroIdx}`, type: 'hero', owner: physOwner, heroIdx, cardName: hero.name,
+      }));
 
     const creatures = engine.getCreatureTargets(pi).filter(t => {
       const inst = t.cardInstance;
@@ -152,7 +155,7 @@ module.exports = {
       if (statuses.length === 0) continue;
 
       if (target.type === 'hero') {
-        const hero = ps.heroes[target.heroIdx];
+        const hero = engine.gs.players[target.owner]?.heroes?.[target.heroIdx];
         if (hero?.statuses) {
           for (const key of statuses) {
             if (hero.statuses[key]) {

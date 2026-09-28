@@ -27,9 +27,8 @@ function applyFreezeImmunity(engine, pi) {
   const ps = engine.gs.players[pi];
   if (!ps) return;
 
-  // Heroes
-  for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-    const hero = ps.heroes[hi];
+  // Heroes — Kontrolle statt Seite (Styx 28.9.): „targets you control"
+  for (const { hero } of engine.heroesControlledBy(pi)) {
     if (!hero?.name || hero.hp <= 0) continue;
     if (!hero.statuses) hero.statuses = {};
     hero.statuses.freeze_immune = { source: 'The Sun Sword' };
@@ -57,9 +56,8 @@ function removeFreezeImmunity(engine, pi) {
   const ps = engine.gs.players[pi];
   if (!ps) return;
 
-  // Heroes
-  for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-    const hero = ps.heroes[hi];
+  // Heroes — Kontrolle statt Seite (Styx 28.9.), wie applyFreezeImmunity
+  for (const { hero } of engine.heroesControlledBy(pi)) {
     if (!hero?.name) continue;
     if (hero.statuses?.freeze_immune?.source === 'The Sun Sword') {
       delete hero.statuses.freeze_immune;
@@ -91,12 +89,11 @@ async function thawAll(engine, pi) {
   const ps = engine.gs.players[pi];
   if (!ps) return;
 
-  // Heroes
-  for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-    const hero = ps.heroes[hi];
+  // Heroes — Kontrolle statt Seite (Styx 28.9.): „Thaw all Frozen targets you control"
+  for (const { physOwner, heroIdx: hi, hero } of engine.heroesControlledBy(pi)) {
     if (!hero?.name || hero.hp <= 0 || !hero.statuses?.frozen) continue;
     delete hero.statuses.frozen;
-    engine._broadcastEvent('play_zone_animation', { type: 'thaw', owner: pi, heroIdx: hi, zoneSlot: -1 });
+    engine._broadcastEvent('play_zone_animation', { type: 'thaw', owner: physOwner, heroIdx: hi, zoneSlot: -1 });
     engine.log('thaw', { target: hero.name, by: 'The Sun Sword' });
   }
 

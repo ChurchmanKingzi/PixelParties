@@ -66,10 +66,10 @@ function levelVon(engine, d) {
 function gegnerZiele(engine, oppIdx) {
   const gs = engine.gs;
   const out = [];
-  const ops = gs.players[oppIdx];
-  for (let hi = 0; hi < (ops?.heroes || []).length; hi++) {
-    const h = ops.heroes[hi];
-    if (h?.name && h.hp > 0) out.push({ owner: oppIdx, heroIdx: hi, zoneSlot: -1 });
+  // Kontrolle statt Seite (Styx 28.9.) — Blitze nur auf das, was der
+  // Schlag (actionAoeHit, side 'enemy') auch trifft.
+  for (const { physOwner, heroIdx, hero } of engine.heroesControlledBy(oppIdx)) {
+    if (hero.hp > 0) out.push({ owner: physOwner, heroIdx, zoneSlot: -1 });
   }
   const db = engine._getCardDB();
   for (const inst of engine.cardInstances) {
