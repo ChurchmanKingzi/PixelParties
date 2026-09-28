@@ -54,7 +54,7 @@ from PIL import Image
 import numpy as np
 import cv2
 from anim_common import rgb, save_outputs, sparkle_pixels, BOUNCE12
-from flap_common import fill_pinholes, rotate_part
+from flap_common import fill_pinholes
 
 BLACK = (0, 0, 0, 255)
 BLINK = {14: 'halb', 15: 'zu', 16: 'zu', 17: 'halb', 38: 'halb', 39: 'zu', 40: 'zu', 41: 'halb'}
@@ -88,7 +88,7 @@ V_ = {
                 line=[(5, 10), (6, 10), (9, 10)]),
     'alleria': dict(slug='alleria-the-queen-of-spiders', pads=(3, 3, 3, 2),
                     lid=[((16, 9), 'f5ce88'), ((17, 9), 'f5ce88')], line=[(16, 10), (17, 10)]),
-    'kyli': dict(slug='kyli-the-deceptive-sapling', pads=(3, 3, 5, 2),
+    'kyli': dict(slug='kyli-the-deceptive-sapling', knee=28, pads=(3, 3, 5, 2),
                  blink={'halb': [((9, 16), '636363'), ((10, 16), '636363'), ((13, 16), '636363'), ((14, 16), '636363')],
                         'zu': [((9, 16), '636363'), ((10, 16), '636363'), ((13, 16), '636363'), ((14, 16), '636363'),
                                ((9, 17), '000000'), ((10, 17), '000000'), ((13, 17), '000000'), ((14, 17), '000000')]}),
@@ -322,11 +322,12 @@ def f_blackstache(i):
     for (x, y), a in sweep(blade, i, 6, speed=1.2).items():
         s[y, x] = lighten(s[y, x], a)
     b = BOUNCE12[i % 12]
-    ang = 0.06 * math.sin(2 * math.pi * 2 * i / N)        # Spitze ± ~1,5 px
+    k_tilt = 0.06 * math.sin(2 * math.pi * 2 * i / N)     # Spitze ± ~1,5 px
+    tilt = lambda x: int(round(k_tilt * (BS_PIVOT[0] - x)))   # spaltenweise Scherung, nichts neu gerastert
     out = np.zeros((H, W, 4), int)
-    sw = rotate_part(s, sword_m, BS_PIVOT, ang, (H, W), offset=(PL, PT + b))
-    m = sw[:, :, 3] > 0
-    out[m] = sw[m]
+    sword = s.copy()
+    sword[~sword_m] = 0
+    put(out, sword, PL, PT + b, dy_fn=lambda x, y: -tilt(x))
     body = s.copy()
     body[sword_m] = 0
     knee_put(out, body, b)
@@ -356,12 +357,7 @@ def f_blackstache(i):
                 continue
             out[y + PT + b, x + PL] = c
     # Funkeln auf der Klinge (Punkte drehen mit)
-    ca, sa = math.cos(ang), math.sin(ang)
-    sp = []
-    for (x, y), t0 in (((4, 10), 4), ((11, 11), 20), ((16, 12), 34)):
-        dx, dy = x - BS_PIVOT[0], y - BS_PIVOT[1]
-        sp.append((int(round(BS_PIVOT[0] + dx * ca - dy * sa)) + PL,
-                   int(round(BS_PIVOT[1] + dx * sa + dy * ca)) + PT + b, t0))
+    sp = [(x + PL, y - tilt(x) + PT + b, t0) for (x, y), t0 in (((4, 10), 4), ((11, 11), 20), ((16, 12), 34))]
     stars(out, i, sp, 'e8f4ff', 'ffffff')
     return out
 
@@ -516,14 +512,7 @@ ENIGMA_TALK = talk_track(['oo', 'oc', 'ww', 'wo', 'occ', 'c'], 11)
 ARM_PIVOT = (6.0, 12.5)
 
 
-def squash(tmp, sy, foot):
-    """Senkrecht um die Fußzeile skalieren (rückwärts abgetastet, keine Löcher)."""
-    out = np.zeros_like(tmp)
-    for y in range(tmp.shape[0]):
-        src_y = int(round(foot - (foot - y) / sy))
-        if 0 <= src_y < tmp.shape[0]:
-            out[y] = tmp[src_y]
-    return out
+B8 = [0, -1, -1, -1, 0, 1, 1, 1]
 
 
 def f_enigma(i):
@@ -538,21 +527,18 @@ def f_enigma(i):
         s[13, 9] = s[13, 10] = rgb('300000')
     arm_m = (s[:, :, 3] > 0) & (_xs <= 5) & (_ys >= 11) & (_ys <= 14)
     w = 2 * math.pi * i / N
-    body = s.copy()
-    body[arm_m] = 0
-    tmp = np.zeros((H, W, 4), int)
-    put(tmp, body, PL, PT)
-    ang = 0.32 * math.sin(3 * w)                         # Arm schwingt beim Erzählen
-    arm = rotate_part(s, arm_m, ARM_PIVOT, ang, (H, W), offset=(PL, PT))
-    m = arm[:, :, 3] > 0
-    tmp[m] = arm[m]
-    fill_pinholes(tmp)
-    # Squash-and-Stretch (schnelles Wippen auf der Stelle), die Kutte bleibt am Boden
-    sy = 1 + 0.06 * math.sin(6 * w)
-    foot = PT + SH - 1
-    out = squash(tmp, sy, foot)
+    b = B8[i % 8]                                        # schnelles Wippen: 1-px-Hub an der Naht
+    k_arm = 0.32 * math.sin(3 * w)                       # Arm schwingt beim Erzählen (spaltenweise Scherung)
+    arm_dy = lambda x, y: b - int(round(k_arm * (ARM_PIVOT[0] - x))) if arm_m[y, x] else b if y < KNEE else 0
+    out = np.zeros((H, W, 4), int)
+    put(out, s, PL, PT, dy_fn=arm_dy)
+    if b < 0:                                            # Naht dehnen
+        for x in range(SW):
+            if s[KNEE - 1, x, 3] and s[KNEE, x, 3] and not out[KNEE - 1 + PT, x + PL, 3]:
+                out[KNEE - 1 + PT, x + PL] = s[KNEE - 1, x]
+    fill_pinholes(out)
     # Glitzern vor dem Gesicht wandert senkrecht mit ihr mit (Frame 0 = volles Kreuz wie im Bild)
-    fy = int(round(foot - (foot - (8 + PT)) * sy))
+    fy = 8 + PT + b
     stars(out, i, [(8 + PL, fy, 46), (8 + PL, fy, 22)], 'e8e8ff', 'ffffff')
     stars(out, i, [(PL - 3, 5 + PT, 8), (SW + 2 + PL, 4 + PT, 30), (SW + 2 + PL, 16 + PT, 14),
                    (PL - 3, 18 + PT, 36), (PL + 17, PT - 2, 40)], 'e8e8ff', 'ffffff', only_empty=True)
@@ -637,6 +623,9 @@ def f_key(i):
     return out
 
 
+B24 = [0, 0, 0, 0, -1, -1, -1, -1, -1, -1, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0]
+
+
 def f_kyli(i):
     s = SRC.copy()
     f = 0.5 - 0.5 * math.cos(2 * math.pi * 2 * i / N)
@@ -657,12 +646,15 @@ def f_kyli(i):
             d = (4.5 - x) / 4.5 if x <= 4 else (x - 16.5) / 7
             return int(round(1.0 * d * math.sin(w + (0 if x <= 4 else math.pi))))
         return 0
-    tmp = np.zeros((H, W, 4), int)
-    put(tmp, s, PL, PT, dy_fn=dy, dx_fn=dx)
-    fill_pinholes(tmp)
-    # Squash-and-Stretch: senkrecht skaliert, die Fußsohle bleibt stehen
-    sy = 1 + 0.05 * math.sin(2 * math.pi * 2 * i / N + 0.9) - 0.05 * math.sin(0.9)
-    out = squash(tmp, sy, PT + SH - 1)
+    # Squash-and-Stretch als 1-px-Hub an der Naht über den Beinen (nichts wird neu gerastert)
+    hb = B24[(i + 20) % 24] - B24[20]
+    out = np.zeros((H, W, 4), int)
+    put(out, s, PL, PT, dy_fn=lambda x, y: dy(x, y) + (hb if y < KNEE else 0), dx_fn=dx)
+    if hb < 0:
+        for x in range(SW):
+            if s[KNEE - 1, x, 3] and s[KNEE, x, 3] and not out[KNEE - 1 + PT, x + PL, 3]:
+                out[KNEE - 1 + PT, x + PL] = s[KNEE - 1, x]
+    fill_pinholes(out)
     return out
 
 
@@ -696,9 +688,6 @@ def close_gaps(part, mask):
         for x in range(part.shape[1]):
             if not op[y, x] and op[y - 1, x] and op[y + 1, x] and mask[y - 1, x] and mask[y + 1, x]:
                 part[y, x] = part[y - 1, x]
-
-
-B24 = [0, 0, 0, 0, -1, -1, -1, -1, -1, -1, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0]
 
 
 def f_alleria(i):

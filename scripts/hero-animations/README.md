@@ -309,6 +309,17 @@ Variante ohne Krone/Flügel), Hintergründe/Auren der Karte gehören nicht zum S
 * Vorhandene Mimik genau ansehen: ein roter Fleck unten im Gesicht ist oft
   schon ein offener Mund (Vena) – Brüllen dann nur dezent verstärken. Ein
   Strich-Auge kann schon ein Zwinkern sein (Monia).
+* **Nie „verwaschen“: keine Neu-Rasterung kleiner Bewegungen.** Fließendes
+  Skalieren (Squash um ein paar Prozent) oder Drehen um kleine Winkel mit
+  Neuabtastung lässt jedes Frame an wandernden Stellen Zeilen doppeln bzw.
+  wegfallen und schräge 1-px-Linien neu rastern – die Figur flimmert, die
+  Pixel „laufen ineinander“ (Alleria v5). Stattdessen nur **ganzzahlige
+  Verschiebungen ganzer Blöcke**: Squash-and-Stretch als 1-px-Hub an einer
+  festen Naht (wie das Federn in den Knien, Nahtzeile dehnen), kleine
+  Neigungen als spaltenweise Scherung (jede Spalte rückt als Ganzes um
+  `round(k * Abstand)`), dünne Glieder (Spinnenbeine) biegen, indem jedes
+  Pixel ganzzahlig um `round(Hub * Anteil entlang des Glieds)` rückt.
+  Drehung mit Neuabtastung nur für große Winkel (echter Flügelschlag).
 * **Loop-Längen**: jede Teilbewegung muss N glatt teilen (Federn alle 12
   Frames -> N = 36, nicht 32), sonst bricht am Loop-Ende eine Bewegung ab
   und es entstehen z. B. zwei schnelle Bounces hintereinander. Zufalls-
