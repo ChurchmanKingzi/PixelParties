@@ -166,7 +166,9 @@ def marianne_hair(old, fork):
                 continue
             r, gg, b = (int(v) for v in old[y_, x_, :3])
             h, s, _ = colorsys.rgb_to_hsv(r / 255, gg / 255, b / 255)
-            if not (h < 0.17 and s > 0.75 and r > 0x80 or r >= 0x29 and gg < 0x36 and b < 0x14 and r > gg * 1.6):
+            if x_ >= 239 and r < 0x50 and gg < 0x20 and b < 0x20:    # fast schwarze Kontur des rechten Zopfs
+                r = 0x29
+            elif not (h < 0.17 and s > 0.75 and r > 0x80 or r >= 0x29 and gg < 0x36 and b < 0x14 and r > gg * 1.6):
                 continue
             c = '440000' if r < 0x50 else '73290d' if r < 0xa0 else 'd66107' if gg < 0x80 else 'f8a314' if gg < 0xc8 else 'ffcd2d'
             out[y_, x_ + 2] = (int(c[0:2], 16), int(c[2:4], 16), int(c[4:6], 16), 255)
