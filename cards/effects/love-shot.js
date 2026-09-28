@@ -384,8 +384,11 @@ module.exports = {
 
         gs._immediateActionContext = true;
         gs._spellCancelled = false;
-        const hadPriorLog = gs._spellDamageLog !== undefined;
-        if (!hadPriorLog) gs._spellDamageLog = [];
+        // ★ v1476: eigenes Schadensprotokoll fuer den Nachguss (wie v1469 in
+        // `_castSpellImmediately`) — sonst saehe `afterSpellResolved` auch die
+        // Ziele des aeusseren Zaubers (Bartas' „exactly 1 target“) und umgekehrt.
+        const _aeussererLog = gs._spellDamageLog;
+        gs._spellDamageLog = [];
         gs._spellResolutionDepth = (gs._spellResolutionDepth || 0) + 1;
         if (chosenCd.cardType === 'Spell') engine._pushResolvingSpell(chosenName);
 
@@ -421,13 +424,15 @@ module.exports = {
               _skipReactionCheck: true,
             });
           }
-          if (!hadPriorLog) delete gs._spellDamageLog;
           delete gs._spellNegatedByEffect;
           // v1364: „counts as an additional Action" — als Aktion melden.
           if (!innerCancelled && !gs._spellCancelled) {
             await engine.meldeGussAlsAktion(pi, sel.heroIdx, chosenName, { heroOwner: oi });
           }
         } finally {
+          // v1476: aeusseres Protokoll zurueck (auch bei Fehler/Abbruch).
+          if (_aeussererLog === undefined) delete gs._spellDamageLog;
+          else gs._spellDamageLog = _aeussererLog;
           gs._spellResolutionDepth = Math.max(0, (gs._spellResolutionDepth || 1) - 1);
           if (chosenCd.cardType === 'Spell') engine._popResolvingSpell();
           engine.gussAuftrittBeenden(_auftritt, { abgebrochen: innerCancelled });

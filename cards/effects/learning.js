@@ -381,8 +381,11 @@ async function castLearningSpell(engine, pi, heroIdx, hero, cardName, abilityZon
   gs._immediateActionContext = true;
   gs._learningCasting = pi;
   gs._spellResolutionDepth = (gs._spellResolutionDepth || 0) + 1;
-  const hadPriorLog = gs._spellDamageLog !== undefined;
-  if (!hadPriorLog) gs._spellDamageLog = [];
+  // ★ v1476: eigenes Schadensprotokoll fuer den Nachguss (wie v1469 in
+  // `_castSpellImmediately`) — sonst saehe `afterSpellResolved` auch die
+  // Ziele des aeusseren Zaubers (Bartas' „exactly 1 target“) und umgekehrt.
+  const _aeussererLog = gs._spellDamageLog;
+  gs._spellDamageLog = [];
 
   try {
     // v1323: waehrend des Zusatz-Gusses zaehlt diese Karte nicht zur Hand
@@ -414,7 +417,9 @@ async function castLearningSpell(engine, pi, heroIdx, hero, cardName, abilityZon
     delete gs._immediateActionContext;
     delete gs._learningCasting;
     delete gs._spellNegatedByEffect;
-    if (!hadPriorLog) delete gs._spellDamageLog;
+    // v1476: aeusseres Protokoll zurueck (auch bei Fehler/Abbruch).
+    if (_aeussererLog === undefined) delete gs._spellDamageLog;
+    else gs._spellDamageLog = _aeussererLog;
   }
 
   // ── Step 4: splice + discard (or keep on board), then pay Wisdom. ──
