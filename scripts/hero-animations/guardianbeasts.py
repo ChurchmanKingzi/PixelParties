@@ -30,14 +30,14 @@ OUT = os.environ.get('GB_OUT', '.')
 
 V_ = {
     'mao': dict(slug='mao-the-vengeful-guardian', knee=21,
-                hand=dict(box=(11, 14, 15, 18), core=((12, 15), (13, 15), (12, 16), (13, 16)), hole='1e1e1e',
-                          outline='4f0611', arm=('1e1e1e', '080808'), shoulder=(8, 13)),
+                hand=dict(box=(11, 14, 15, 18), core=((12, 15), (13, 15), (12, 16), (13, 16)), hole=('1e1e1e', '262626', '333333'),
+                          outline='4f0611', arm=(('3a3a3a', '474747', '2c2c2c'), '080808'), shoulder=(8, 14)),
                 blink={'halb': [((10, 10), 'dacfd5'), ((11, 10), 'dacfd5'), ((14, 10), 'dacfd5'), ((15, 10), 'dacfd5')],
                        'zu': [((10, 10), 'dacfd5'), ((11, 10), 'dacfd5'), ((14, 10), 'dacfd5'), ((15, 10), 'dacfd5'),
                               ((10, 11), '000000'), ((11, 11), '000000'), ((14, 11), '000000'), ((15, 11), '000000')]}),
     'hunter': dict(slug='vengeful-hunter-mao', knee=19,
-                   hand=dict(box=(12, 13, 14, 15), core=((12, 13), (13, 13), (12, 14), (13, 14)), hole='696866',
-                             outline='4a4949', arm=('696866', '4a4949'), shoulder=(9, 12)),
+                   hand=dict(box=(12, 13, 14, 15), core=((12, 13), (13, 13), (12, 14), (13, 14)), hole=('696866', '7d8286', '5a5958'),
+                             outline='4a4949', arm=(('8a8f93', '9ea3a7', '7d8286'), '3a3939'), shoulder=(9, 13)),
                    blink={'halb': [((10, 9), '1a6614'), ((11, 9), '8a7a45'), ((14, 9), '1a6614'), ((15, 9), '8a7a45')],
                           'zu': [((10, 9), '000000'), ((11, 9), '000000'), ((14, 9), '000000'), ((15, 9), '000000')]}),
     'dajan': dict(slug='dajan-conqueror-of-the-treasure-cave', knee=20, pads=(3, 3, 3, 2),
@@ -121,7 +121,7 @@ def drop_pixels(t, x, y, ground, cols=BLOOD):
 # --- Mao: Schlitzspur ------------------------------------------------------------
 SLASH_T = None
 FADE = (1, 12)                                           # Spur verblasst vom Ende her
-SWEEP = (32, 39)                                         # neuer Schlitzer, links -> rechts
+SWEEP = (36, 39)                                         # neuer Schlitzer, links -> rechts
 
 
 def slash_param(sl):
@@ -148,38 +148,47 @@ def hand_target(i, rest):
     """Wohin die Hand in Frame i will (Welt-Koordinaten des Sprites): Ausholen zum linken Ende
     des Bogens, dann mit dem Kopf des Schlitzers entlang, dann zurück zur Brust."""
     p0, p1 = arc_point(0.0), arc_point(1.0)
-    if SWEEP[0] - 8 <= i < SWEEP[0]:
-        u = ease((i - SWEEP[0] + 9) / 8)
+    if SWEEP[0] - 3 <= i < SWEEP[0]:                 # schnelles Ausholen
+        u = ease((i - SWEEP[0] + 4) / 3)
         return rest[0] + (p0[0] - rest[0]) * u, rest[1] + (p0[1] - rest[1]) * u
     if SWEEP[0] <= i <= SWEEP[1]:
         head = (i - SWEEP[0] + 1) / (SWEEP[1] - SWEEP[0] + 1) * 1.2
         return arc_point(min(1.0, head))
-    if SWEEP[1] < i <= SWEEP[1] + 6:
-        u = ease((i - SWEEP[1]) / 6)
+    if SWEEP[1] < i <= SWEEP[1] + 3:
+        u = ease((i - SWEEP[1]) / 3)
         return p1[0] + (rest[0] - p1[0]) * u, p1[1] + (rest[1] - p1[1]) * u
     return rest
 
 
 def draw_arm(out, a, b, cols):
-    """2 px dicker Arm von a nach b (Ausgabe-Koordinaten) mit 1-px-Kontur, vor dem Körper."""
-    fill, line = rgb(cols[0]), rgb(cols[1])
-    m = np.zeros(out.shape[:2], bool)
-    n = int(max(abs(b[0] - a[0]), abs(b[1] - a[1])) * 2) + 1
-    for k in range(n + 1):
-        x = a[0] + (b[0] - a[0]) * k / n
-        y = a[1] + (b[1] - a[1]) * k / n
-        for dx, dy in ((0, 0), (1, 0), (0, 1), (1, 1)):
-            m[int(math.floor(y)) + dy, int(math.floor(x)) + dx] = True
+    """3 px dicker Arm von a nach b (Ausgabe-Koordinaten) mit Felltextur (Strähnen entlang des
+    Arms) und durchgehender 1-px-Kontur, damit er sich vom Körper abhebt (nur an der Schulter
+    geht er in den Körper über)."""
+    fur, line = [rgb(c) for c in cols[0]], rgb(cols[1])
+    L = max(1e-6, math.hypot(b[0] - a[0], b[1] - a[1]))
+    ux, uy = (b[0] - a[0]) / L, (b[1] - a[1]) / L
+    h, w = out.shape[:2]
+    m = np.zeros((h, w), bool)
+    col = {}
+    for y in range(h):
+        for x in range(w):
+            px, py = x + 0.5 - a[0], y + 0.5 - a[1]
+            s = px * ux + py * uy                        # entlang des Arms
+            q = -px * uy + py * ux                       # quer dazu
+            if -0.5 <= s <= L + 0.5 and abs(q) <= 1.55:
+                m[y, x] = True
+                col[(x, y)] = fur[(int(math.floor(s / 2)) + int(math.floor(q + 1.5))) % 3]
     ring = np.zeros_like(m)
     ring[1:] |= m[:-1]
     ring[:-1] |= m[1:]
     ring[:, 1:] |= m[:, :-1]
     ring[:, :-1] |= m[:, 1:]
     ring &= ~m
-    out[ring & (out[:, :, 3] == 0)] = line
-    out[m] = fill
-    edge = m & ~np.pad(m[1:-1, 1:-1] & m[:-2, 1:-1] & m[2:, 1:-1] & m[1:-1, :-2] & m[1:-1, 2:], 1)
-    out[edge & ((np.roll(~m, 1, 0) & (out[:, :, 3] == 0)) | False)] = line
+    for y, x in zip(*np.nonzero(ring)):
+        if math.hypot(x + 0.5 - a[0], y + 0.5 - a[1]) > 2.2:   # an der Schulter keine Kontur
+            out[y, x] = line
+    for (x, y), c in col.items():
+        out[y, x] = c
 
 
 def f_mao(i):
@@ -201,6 +210,7 @@ def f_mao(i):
                 hand[y, x] = 0
     rest = (np.mean([p[0] for p in hc['core']]), np.mean([p[1] for p in hc['core']]))
     tx, ty = hand_target(i, rest)
+    ty = max(ty, rest[1])                                # nie höher als die Brust (Arm nicht übers Gesicht)
     sx, sy = hc['shoulder']
     L = math.hypot(tx - sx, ty - sy)
     if L > 12:                                           # Armlänge begrenzen (die Klauen reichen weiter)
@@ -211,8 +221,8 @@ def f_mao(i):
     if ox or oy:                                         # Brust unter der Hand schließen
         for y in range(y0, y1):
             for x in range(x0, x1):
-                if hand[y, x, 3]:
-                    body[y, x] = rgb(hc['hole'])
+                if hand[y, x, 3]:                        # Felltextur statt einer Farbe
+                    body[y, x] = rgb(hc['hole'][(x + 2 * y) % 3])
     knee_put(out, body, b)
     fill_pinholes(out)
     draw_slash(out, sl, i)
