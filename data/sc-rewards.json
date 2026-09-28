@@ -4,7 +4,7 @@
     "title": "Player",
     "description": "Play a game",
     "amount": 5,
-    "limit": "daily",
+    "limit": "daily_per_opponent",
     "requires": "play",
     "onDisconnectWin": true
   },
@@ -23,7 +23,7 @@
     "title": "Winner",
     "description": "Win a game",
     "amount": 5,
-    "limit": "daily",
+    "limit": "daily_per_opponent",
     "requires": "win"
   },
   {
