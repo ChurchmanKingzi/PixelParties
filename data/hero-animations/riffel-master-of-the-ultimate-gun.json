@@ -1,0 +1,16 @@
+{
+  "hero": "Riffel, Master of the Ultimate Gun",
+  "sheet": "riffel-master-of-the-ultimate-gun.png",
+  "frameWidth": 68,
+  "frameHeight": 40,
+  "frames": 48,
+  "frameMs": 90,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 6,
+  "padLeft": 8,
+  "padRight": 8,
+  "padBottom": 6,
+  "faceX": 34.0,
+  "footY": 34
+}

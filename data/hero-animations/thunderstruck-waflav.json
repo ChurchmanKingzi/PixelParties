@@ -1,0 +1,15 @@
+{
+  "hero": "Thunderstruck Waflav",
+  "sheet": "thunderstruck-waflav.png",
+  "frameWidth": 90,
+  "frameHeight": 76,
+  "frames": 48,
+  "frameMs": 90,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 3,
+  "padLeft": 3,
+  "padRight": 3,
+  "padBottom": 4,
+  "faceX": 43.0
+}

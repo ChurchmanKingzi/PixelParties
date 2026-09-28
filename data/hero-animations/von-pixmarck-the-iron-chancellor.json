@@ -1,0 +1,15 @@
+{
+  "hero": "Von Pixmarck, the Iron Chancellor",
+  "sheet": "von-pixmarck-the-iron-chancellor.png",
+  "frameWidth": 74,
+  "frameHeight": 34,
+  "frames": 48,
+  "frameMs": 90,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 4,
+  "padLeft": 3,
+  "padRight": 16,
+  "padBottom": 2,
+  "faceX": 12.0
+}

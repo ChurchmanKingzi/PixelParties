@@ -1,0 +1,16 @@
+{
+  "hero": "Magical Girl Riffel",
+  "sheet": "magical-girl-riffel.png",
+  "frameWidth": 22,
+  "frameHeight": 31,
+  "frames": 48,
+  "frameMs": 90,
+  "loop": true,
+  "layout": "horizontal",
+  "skinOf": "Future Tech Gunslinger Riffel",
+  "padTop": 4,
+  "padLeft": 3,
+  "padRight": 3,
+  "padBottom": 2,
+  "faceX": 10.5
+}

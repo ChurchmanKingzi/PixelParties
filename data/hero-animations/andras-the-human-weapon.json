@@ -1,0 +1,16 @@
+{
+  "hero": "Andras, the Human Weapon",
+  "sheet": "andras-the-human-weapon.png",
+  "frameWidth": 102,
+  "frameHeight": 60,
+  "frames": 48,
+  "frameMs": 90,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 3,
+  "padLeft": 9,
+  "padRight": 9,
+  "padBottom": 8,
+  "faceX": 50.5,
+  "footY": 31
+}

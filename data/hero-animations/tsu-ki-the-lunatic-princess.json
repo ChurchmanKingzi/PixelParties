@@ -1,0 +1,15 @@
+{
+  "hero": "Tsu'Ki, the Lunatic Princess",
+  "sheet": "tsu-ki-the-lunatic-princess.png",
+  "frameWidth": 46,
+  "frameHeight": 61,
+  "frames": 48,
+  "frameMs": 90,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 7,
+  "padLeft": 7,
+  "padRight": 7,
+  "padBottom": 7,
+  "faceX": 22.5
+}

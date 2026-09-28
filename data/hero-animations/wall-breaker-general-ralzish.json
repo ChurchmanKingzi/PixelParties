@@ -1,0 +1,15 @@
+{
+  "hero": "Wall Breaker General Ralzish",
+  "sheet": "wall-breaker-general-ralzish.png",
+  "frameWidth": 25,
+  "frameHeight": 35,
+  "frames": 48,
+  "frameMs": 90,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 5,
+  "padLeft": 3,
+  "padRight": 3,
+  "padBottom": 2,
+  "faceX": 12.0
+}

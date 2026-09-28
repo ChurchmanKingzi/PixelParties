@@ -1,0 +1,16 @@
+{
+  "hero": "Dad of the Year Von Pixmarck",
+  "sheet": "dad-of-the-year-von-pixmarck.png",
+  "frameWidth": 74,
+  "frameHeight": 32,
+  "frames": 48,
+  "frameMs": 90,
+  "loop": true,
+  "layout": "horizontal",
+  "skinOf": "Von Pixmarck, the Iron Chancellor",
+  "padTop": 4,
+  "padLeft": 3,
+  "padRight": 16,
+  "padBottom": 2,
+  "faceX": 11.0
+}

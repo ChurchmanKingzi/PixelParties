@@ -1,0 +1,16 @@
+{
+  "hero": "Normal Nero Zira",
+  "sheet": "normal-nero-zira.png",
+  "frameWidth": 66,
+  "frameHeight": 83,
+  "frames": 48,
+  "frameMs": 90,
+  "loop": true,
+  "layout": "horizontal",
+  "skinOf": "Nero Zira, the Mastermind",
+  "padTop": 3,
+  "padLeft": 3,
+  "padRight": 3,
+  "padBottom": 4,
+  "faceX": 32.5
+}

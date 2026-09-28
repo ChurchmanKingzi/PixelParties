@@ -511,14 +511,14 @@ def frame(i):
         t = i % 6                                        # alle 6 Frames ein Schuss,
         front = (i // 6) % 2 == 1                        # abwechselnd hintere / vordere Pistole
         mzx = 23 if front else 15
-        if t < 3:
+        put_sprite(out, s, ox, oy, dy_fn)
+        if t < 3:                                        # Kugeln über allem, nur vor der Mündung
             dx = 14 - 12 * t + (8 if front else 0)
             a = [1.0, 1.0, 0.45][t]
             for y, x in zip(*np.nonzero(BULLETS[:, :, 3])):
                 xx = x + dx + ox
-                if 1 <= xx < W - 1:
+                if 1 <= xx < W - 1 and x + dx <= mzx:
                     blend(out, y + oy + b, xx, BULLETS[y, x], int(BULLETS[y, x, 3] * a))
-        put_sprite(out, s, ox, oy, dy_fn)
         if t < 2:
             muzzle_flash(out, mzx + ox, 11 + oy + b, 2 - t, -1)
 
