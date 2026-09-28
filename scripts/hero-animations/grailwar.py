@@ -70,9 +70,10 @@ Dazu je Variante:
              (spaltenweise Scherung), die pinke Aura flimmert am Rand, pinke
              Funken rieseln als Schweif herab.
 * fiona:     Fiona auf dem Thron blinzelt, ihre Krone und der Thron funkeln.
-* boarding / chosen: Gabby hängt am Seil und schwingt daran (jede Zeile rückt als
-             Ganzes seitlich, unten stärker – nichts wird neu gerastert), lose
-             Haare wehen nach, sie blinzelt; beim Chosen Girl läuft ein Glanz
+* boarding / chosen: Gabby hängt am Seil und schwingt kräftig daran (das Bild
+             ist der Ausschlag nach rechts; jede Zeile rückt als Ganzes seitlich,
+             unten stärker – nichts wird neu gerastert), die Haare hängen dem
+             Schwung nach, sie blinzelt; beim Chosen Girl läuft ein Glanz
              über das goldene Schwert.
 * zombie:    Zombie-Gabby torkelt (Oberkörper schwankt), sackt ab und zu ein,
              blinzelt mit den leeren Augen.
@@ -82,10 +83,11 @@ Dazu je Variante:
              Lichtblitz (samt Funkeln).
 * vader:     Dark Garius federt; das rote Lichtschwert leuchtet (pulsierender
              Saum, flackernder Kern), fährt ein, bleibt kurz aus und zündet neu.
-* gobbo:     federt, schwenkt den Knüppel (spaltenweise Scherung um die Faust),
+* gobbo:     federt, blinzelt, schwenkt den Knüppel (spaltenweise Scherung um die Faust),
              die roten Augen glimmen.
-* hatusbal / jack: federt, blinzelt; Hatusbals roter Umhang weht (Wind von
-             links, unten stärker), die Krone funkelt; bei Ancient Hatusbal weht
+* hatusbal / jack: federt, blinzelt, der Rüssel pendelt (zur Spitze hin
+             stärker); Hatusbals roter Umhang weht (Wind von links, unten
+             stärker, ohne Lücken), die Krone funkelt; bei Ancient Hatusbal weht
              der Helmbusch.
 * hulijing:  federt, blinzelt; das blaue Fuchsfeuer strömt als Partikelfeuer aus
              ihrer Hand (Flammenballen wachsen, kühlen ab, züngeln: weiß,
@@ -152,9 +154,9 @@ V_ = {
     'fiona': dict(slug='fiona-the-princess-of-blackport', pads=(3, 3, 4, 2),
                   lid=[((14, 14), 'ffe6d5'), ((15, 14), 'ffe6d5'), ((18, 14), 'ffe6d5'), ((19, 14), 'ffe6d5')],
                   line=[(14, 15), (15, 15), (18, 15), (19, 15)]),
-    'boarding': dict(slug='gabby-the-boarding-broad', pads=(4, 5, 3, 2),
+    'boarding': dict(slug='gabby-the-boarding-broad', pads=(10, 5, 3, 2),
                      lid=[((12, 39), 'f6cd8b'), ((13, 39), 'f6cd8b')], line=[(12, 38), (13, 38)]),
-    'chosen': dict(slug='gabby-the-chosen-girl', pads=(4, 5, 3, 2),
+    'chosen': dict(slug='gabby-the-chosen-girl', pads=(10, 5, 3, 2),
                    lid=[((11, 39), 'f1b7a2'), ((12, 39), 'f1b7a2')], line=[(11, 40), (12, 40)]),
     'zombie': dict(slug='gabby-the-pirate-zombie', knee=18,
                    lid=[((5, 7), 'b6c7b2'), ((6, 7), 'b6c7b2'), ((9, 7), 'b6c7b2'), ((10, 7), 'b6c7b2')],
@@ -166,7 +168,9 @@ V_ = {
                    lid=[((12, 16), 'cc9658'), ((13, 16), 'cc9658'), ((16, 16), 'cc9658'), ((17, 16), 'cc9658')],
                    line=[(12, 17), (13, 17), (16, 17), (17, 17)]),
     'vader': dict(slug='dark-garius', knee=38, pads=(3, 3, 4, 2)),
-    'gobbo': dict(slug='gobbo-chief-of-goblin', knee=17, pads=(3, 3, 4, 2)),
+    'gobbo': dict(slug='gobbo-chief-of-goblin', knee=17, pads=(3, 3, 4, 2),
+                  blink={'halb': [((7, 3), '3d0a0c'), ((11, 3), '3d0a0c')],
+                         'zu': [((6, 3), '000000'), ((7, 3), '000000'), ((10, 3), '000000'), ((11, 3), '000000')]}),
     'hatusbal': dict(slug='hatusbal-the-leader-of-tusca', knee=25, pads=(3, 4, 4, 2),
                      lid=[((9, 8), 'a19390'), ((10, 8), 'a19390'), ((13, 8), 'a19390'), ((14, 8), 'a19390')],
                      line=[(9, 9), (10, 9), (13, 9), (14, 9)]),
@@ -1235,9 +1239,10 @@ def f_fiona(i):
 
 
 # --- Etappe 3 -------------------------------------------------------------------
-def pendulum(i, amp=2.0):
-    """Schwingen am Seil (Aufhängung oben): jede Zeile rückt als Ganzes seitlich, unten stärker."""
-    s_ = math.sin(2 * math.pi * 2 * i / N)
+def pendulum(i, amp=6.0):
+    """Schwingen am Seil (Aufhängung oben): jede Zeile rückt als Ganzes seitlich, unten stärker.
+    Das Bild zeigt schon den Ausschlag nach rechts – von dort schwingt sie nach links und zurück."""
+    s_ = 0.5 * (math.cos(2 * math.pi * 2 * i / N) - 1)
     return lambda x, y: int(round(amp * s_ * y / (SH - 1)))
 
 
@@ -1245,14 +1250,35 @@ def f_gabbyrope(i):
     s = SRC.copy()
     blink(s, i)
     sw = pendulum(i)
-    lag = int(round(0.8 * (math.sin(2 * math.pi * 2 * i / N - 1.2) - math.sin(-1.2))))
-    hair = np.zeros((SH, SW), bool)                      # lose Haare hinten wehen nach
-    for y, x in zip(*np.nonzero(s[:, :, 3])):
-        if x >= 16 and 33 <= y <= 46 and hexc(s[y, x]) in ('bd39ac', 'f68bee', 'ffacff', 'd552c5', 'e66ae6', 'ac319c',
-                                                         '620852'):
-            hair[y, x] = True
+    # Haare hängen dem Schwung nach: gegen die Bewegungsrichtung, zur Spitze hin stärker
+    v = math.sin(2 * math.pi * 2 * i / N)                # Geschwindigkeit (nach links positiv)
+    if V == 'boarding':
+        hair = np.array([[x >= 15 and 33 <= y <= 46 and s[y, x, 3] > 0 and hexc(s[y, x]) in
+                          ('bd39ac', 'f68bee', 'ffacff', 'd552c5', 'e66ae6', 'ac319c', '620852')
+                          for x in range(SW)] for y in range(SH)])
+        root = 14
+    else:
+        hair = np.array([[x <= 16 and 35 <= y <= 46 and s[y, x, 3] > 0 and hexc(s[y, x]) in
+                          ('947116', 'd5b11e', 'f0f329', 'eecd2d') for x in range(SW)] for y in range(SH)])
+        root = 8
+    lag = lambda x: int(round(2.2 * v * min(1.0, abs(x - root) / 8)))
+    # Seil oberhalb der Hände: jede Frame als gerade Linie von der Aufhängung zur Hand neu legen
+    # (Muster je Zeile bleibt), sonst entstehen durch das zeilenweise Schieben kleine Knicke
+    RY = 32
+    rope = s.copy()
+    rope[RY + 1:] = 0
+    rest = s.copy()
+    rest[:RY + 1] = 0
+    rows = {y: sorted(x for x in range(SW) if rope[y, x, 3]) for y in range(RY + 1)}
+    x0, x1 = rows[0][0], rows[RY][0] + sw(0, RY)
     out = np.zeros((H, W, 4), int)
-    put(out, s, PL, PT, dx_fn=lambda x, y: sw(x, y) + (lag if hair[y, x] else 0))
+    for y, xs in rows.items():
+        if not xs:
+            continue
+        xs0 = xs[0] if sw(0, RY) == 0 else int(round(x0 + (x1 - x0) * y / RY))
+        for x in xs:
+            out[y + PT, xs0 + (x - xs[0]) + PL] = rope[y, x]
+    put(out, rest, PL, PT, dx_fn=lambda x, y: sw(x, y) + (lag(x) if hair[y, x] else 0))
     fill_pinholes(out)
     if V == 'chosen':                                    # Lichtreflex über das goldene Schwert
         gold = (s[:, :, 3] > 0) & (_xs >= 17) & (_ys >= 32) & np.array(
@@ -1358,6 +1384,7 @@ def f_vader(i):
 
 def f_gobbo(i):
     s = SRC.copy()
+    blink(s, i)
     club = (s[:, :, 3] > 0) & (_xs >= 14) & (_ys <= 16) & np.array(
         [[s[y, x, 0] > s[y, x, 1] + 10 or lum(s[y, x]) < 40 for x in range(SW)] for y in range(SH)]) & (_xs + _ys * 0.0 >= 14)
     k = 0.16 * math.sin(2 * math.pi * 2 * i / N)          # Knüppel schwenkt (spaltenweise Scherung um die Faust)
@@ -1382,29 +1409,52 @@ def f_hatusbal(i):
     s = SRC.copy()
     blink(s, i)
     w = 2 * math.pi * 2 * i / N
+    op = s[:, :, 3] > 0
     if V == 'hatusbal':
-        cape = (s[:, :, 3] > 0) & ((_xs <= 4) | (_xs >= SW - 5)) & (_ys >= 9) & np.array(
+        cape = op & ((_xs <= 4) | (_xs >= SW - 5)) & (_ys >= 9) & np.array(
             [[s[y, x, 0] > 2 * s[y, x, 1] + 20 for x in range(SW)] for y in range(SH)])
         y0, y1 = 9, 24
+        skin = ('f5cba1', '9c693e', 'efa15f')
+        trunk = op & (((_xs >= 9) & (_xs <= 14) & (_ys >= 11) & (_ys <= 16)) |
+                      ((_xs >= 9) & (_xs <= 19) & (_ys >= 17) & (_ys <= 19)))
+        trunk &= np.array([[hexc(s[y, x]) not in skin for x in range(SW)] for y in range(SH)])
+        tr0, tr1, behind = 11, 19, '302c2d'
     else:                                                # Ancient Hatusbal: der Helmbusch weht
-        cape = (s[:, :, 3] > 0) & (_ys <= 6)
+        cape = op & (_ys <= 6)
         y0, y1 = 6, 0
+        trunk = op & (((_xs >= 8) & (_xs <= 12) & (_ys >= 12) & (_ys <= 22)) |
+                      ((_xs >= 12) & (_xs <= 19) & (_ys >= 23) & (_ys <= 26)))
+        tr0, tr1, behind = 12, 26, '403530'
 
     def cdx(x, y):                                       # Wind von links: nur nach rechts, unten stärker
-        if not cape[y, x]:
-            return 0
         if V == 'jack':
             return int(round(1.2 * (6 - y) / 6 * (0.5 - 0.5 * math.cos(w - 0.6 * y)) -
                              1.2 * (6 - y) / 6 * (0.5 - 0.5 * math.cos(-0.6 * y))))
         t = (y - y0) / (y1 - y0)
         return int(round(1.3 * t * (0.5 - 0.5 * math.cos(w - 0.5 * y)) - 1.3 * t * (0.5 - 0.5 * math.cos(-0.5 * y))))
+    # Rüssel pendelt seitlich, zur Spitze hin stärker (zeilenweise, nichts neu gerastert)
+    tdx = lambda y: int(round(1.4 * min(1.0, max(0.0, (y - tr0) / (tr1 - tr0))) * math.sin(w * 0.5 * 2)))
     b = BOUNCE12[i % 12]
     out = np.zeros((H, W, 4), int)
-    tmp_cape = np.where(cape[:, :, None], s, 0)
-    put(out, tmp_cape, PL, PT, dy_fn=lambda x, y: b if y < KNEE else 0, dx_fn=cdx)
     body = s.copy()
-    body[cape] = 0
-    knee_put(out, body, b)
+    body[cape | trunk] = 0
+    for y, x in zip(*np.nonzero(trunk)):                  # was der Rüssel freigibt: dunkler Körper
+        body[y, x] = rgb(behind)
+    if V == 'hatusbal':                                   # Umhang: Original bleibt liegen, der Wind legt nach
+        put(out, np.where(cape[:, :, None], s, 0), PL, PT, dy_fn=lambda x, y: b if y < KNEE else 0)
+    put(out, np.where(cape[:, :, None], s, 0), PL, PT, dy_fn=lambda x, y: b if y < KNEE else 0,
+        dx_fn=lambda x, y: cdx(x, y) if cape[y, x] else 0)
+    legs = body.copy()
+    legs[:KNEE] = 0
+    upper = body.copy()
+    upper[KNEE:] = 0
+    put(out, legs, PL, PT)                                # Oberkörper vor den Beinen (Rüsselkante bleibt sichtbar)
+    put(out, upper, PL, PT + b)
+    if b < 0:
+        for x in range(SW):
+            if body[KNEE - 1, x, 3] and body[KNEE, x, 3] and not out[KNEE - 1 + PT, x + PL, 3]:
+                out[KNEE - 1 + PT, x + PL] = body[KNEE - 1, x]
+    put(out, np.where(trunk[:, :, None], s, 0), PL, PT + b, dx_fn=lambda x, y: tdx(y))
     fill_pinholes(out)
     if V == 'hatusbal':
         stars(out, i, [(11 + PL, 1 + PT + b, 30)], 'ffe600', 'fff6ac')   # Krone
