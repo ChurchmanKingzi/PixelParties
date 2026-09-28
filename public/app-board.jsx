@@ -169,6 +169,39 @@ function setBoardTooltip(card) {
   window._boardTooltipSetter?.(card);
 }
 
+// ★ v1478 (Als Vorgabe 28.9.: „Die Karte(n) in der Pop-Up-Box sind jetzt
+// deutlich kleiner als vorher" → Variante C: „bis direkt an den Rahmen oder
+// sogar über den Rahmen hinaus zum Rand der Box selbst" — „den (hier roten)
+// inneren Rahmen der Box ÜBER der Karte zeichnen, dann wirkt sie nicht so
+// abschneidend"). Die Kartenvorschau rechts im Zielwahl-Panel ist so hoch
+// wie die ganze Box (Aussenkante des Rahmens) und schliesst rechts buendig
+// mit ihr ab; die negativen Raender (Polster + Rahmen) stehen in style.css
+// (`.panel-zielwahl-vorschau-rand`), den Rahmen darueber zeichnet
+// `.panel-zielwahl::before`. Die Hoehe kommt aus der gemessenen Box — per
+// CSS allein laesst sich die Breite nicht aus einer gestreckten Hoehe
+// ableiten. Kein Rueckkopplungskreis: die Karte belegt mit ihren Raendern
+// genau die Inhaltshoehe, die Box waechst durch sie nicht.
+function ZielwahlRandVorschau({ card }) {
+  const ref = useRef(null);
+  const [hoehe, setHoehe] = useState(0);
+  useLayoutEffect(() => {
+    const panel = ref.current?.parentElement;
+    if (!panel) return undefined;
+    const messen = () => setHoehe(panel.offsetHeight || 0);
+    messen();
+    if (typeof ResizeObserver !== 'function') return undefined;
+    const ro = new ResizeObserver(messen);
+    ro.observe(panel);
+    return () => ro.disconnect();
+  }, []);
+  const stil = hoehe > 0 ? { height: hoehe, width: Math.round(hoehe * 86 / 120) } : { width: 48 };
+  return (
+    <div ref={ref} className="panel-zielwahl-aktiv panel-zielwahl-vorschau panel-zielwahl-vorschau-rand" style={stil}>
+      <CardMini card={card} inGallery />
+    </div>
+  );
+}
+
 // ★ v1443 (Als Befund 26.9.): WORAUF reagiert eine Karte gerade? Prompts
 // von Reaktionen (Skeleton Demon, Cool Rescuer Monia) tragen die
 // ausloesende Karte als `triggerCardName` — sie steht LINKS im Panel mit
@@ -47118,9 +47151,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               (mirrors the confirm / optionPicker panels) so the image never
               sits alone in its own row beneath the controls. */}
           {pt.config?.previewCardName && CARDS_BY_NAME[pt.config.previewCardName] && (
-            <div className="panel-zielwahl-aktiv panel-zielwahl-vorschau" style={{ width: 48, flexShrink: 0, alignSelf: 'center' }}>
-              <CardMini card={CARDS_BY_NAME[pt.config.previewCardName]} inGallery />
-            </div>
+            <ZielwahlRandVorschau card={CARDS_BY_NAME[pt.config.previewCardName]} />
           )}
         </DraggablePanel>
       )}

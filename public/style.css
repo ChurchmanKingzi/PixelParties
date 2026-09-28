@@ -23580,6 +23580,40 @@ body.pp-dialog-offen .foil-diamond-rare:not(.modal-overlay *) {
   height: auto;
   aspect-ratio: 86 / 120;
 }
+/* ★ v1478 (Als Vorgabe 28.9.: Variante C — die Kartenvorschau rechts reicht
+   „über den Rahmen hinaus zum Rand der Box selbst", und „den (hier roten)
+   inneren Rahmen der Box ÜBER der Karte zeichnen, dann wirkt sie nicht so
+   abschneidend"). Hoehe = ganze Box (gemessen, `ZielwahlRandVorschau`);
+   die negativen Raender heben Polster + Rahmen auf: oben/unten 7 + 3 px,
+   rechts 20 + 3 px. Unter 560 px Hoehe entfaellt die Vorschau ganz (s. u.). */
+.panel-zielwahl > .panel-zielwahl-vorschau-rand {
+  flex-shrink: 0;
+  align-self: flex-start;
+  margin: -10px -23px -10px 0;
+  position: relative;
+  z-index: 4;
+}
+.panel-zielwahl-vorschau-rand .card-mini {
+  width: 100%;
+  height: 100%;
+  aspect-ratio: auto;
+}
+/* Der Rahmen noch einmal UEBER der Karte: dieselbe 3-px-Linie in der Farbe,
+   die das Panel inline setzt (`border-color: inherit`), mit der schwarzen
+   Innenkontur. Die Eck-Ornamente (`::after`, z 2) bleiben darunter. */
+.first-choice-panel.panel-zielwahl::before {
+  content: '';
+  position: absolute;
+  inset: -3px;
+  z-index: 5;
+  pointer-events: none;
+  border: 3px solid;
+  border-color: inherit;
+  box-shadow: inset 0 0 0 1px var(--pp-kontur);
+}
+/* Rechts liegt jetzt die Karte — der rechte Zieh-Griff entfaellt, der
+   linke bleibt. */
+.panel-zielwahl:has(> .panel-zielwahl-vorschau-rand) > .panel-zielwahl-griff-r { display: none; }
 @media (prefers-reduced-motion: reduce) {
   .first-choice-panel.panel-zielwahl { transition: none; }
 }
