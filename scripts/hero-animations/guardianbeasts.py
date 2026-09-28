@@ -13,7 +13,7 @@ Aufruf: python3 guardianbeasts.py <tag> [ms] <variante>
             unten, links nach rechts) steht in Frame 0 wie im Kartenbild, verblasst
             vom Ende her, und später reißt ein neuer Schlitzer den Bogen in einem
             Zug von links nach rechts wieder auf (heller Kopf, dunkler Schweif);
-            die Spur steht fest im Raum, der Körper federt davor.
+            die Spur federt mit (sie hängt an den Krallen).
 * dajan:    Dajan, Conqueror of the Treasure Cave federt und blinzelt; Blut rinnt die
             Dolchklinge hinab und tropft von der Parierstange zu Boden, der
             Lichtreflex neben dem Dolch funkelt.
@@ -250,7 +250,7 @@ def f_mao(i):
                     body[y, x] = rgb(hc['hole'][(x + 2 * y) % 3])
     knee_put(out, body, b)
     fill_pinholes(out)
-    draw_slash(out, sl, i % PERIOD)
+    draw_slash(out, sl, i % PERIOD, b)
     if ox or oy:                                         # Arm und Hand vor Körper und Spur
         draw_arm(out, (sx + PL, sy + PT + b), (rest[0] + ox + PL, rest[1] + oy + PT + b), hc['arm'])
         ring = np.zeros(body.shape[:2], bool)
@@ -279,7 +279,7 @@ def f_mao(i):
     return out
 
 
-def draw_slash(out, sl, i):
+def draw_slash(out, sl, i, b=0):
     for (x, y), t in SLASH_T.items():
         c = sl[y, x]
         if FADE[0] <= i <= FADE[1]:                      # verblasst vom linken Ende her (leicht zerfasert)
@@ -302,7 +302,7 @@ def draw_slash(out, sl, i):
                 c = lighten(c, 0.25)
         elif SWEEP[1] < i <= SWEEP[1] + 3:               # kurz nachglühend
             c = lighten(c, 0.2 * (SWEEP[1] + 4 - i) / 4)
-        out[y + PT, x + PL] = c
+        out[y + PT + b, x + PL] = c
 
 
 # --- Dajan ----------------------------------------------------------------------
