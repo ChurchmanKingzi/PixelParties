@@ -92,9 +92,9 @@ Dazu je Variante:
 * hulijing:  federt, blinzelt; das blaue Fuchsfeuer strömt als Partikelfeuer aus
              ihrer Hand (Flammenballen wachsen, kühlen ab, züngeln: weiß,
              hellblau, türkis, blau, dunkelblauer Rand).
-* ingo:      vom Base-Sprite aus: die Kapuze rutscht zurück, fällt in den Nacken,
-             er steht eine Weile ohne (Kopf aus Ingos eigenen Frames), dann
-             wandert sie wieder auf; dazu Federn, Blinzeln, das Monokel blitzt.
+* ingo:      vom Base-Sprite aus (ohne Kapuze): die Kapuze aus Ingos eigenen Frames
+             kommt aus dem Nacken, rutscht über den Kopf, bleibt eine Weile auf
+             und gleitet wieder in den Nacken; dazu Federn, Blinzeln, Monokel.
 * eingo:     Elegant Ingo: federt, blinzelt, das Monokel blitzt.
 * madame:    Madame Guillotine hält eine Rede (Mund auf und zu), federt,
              blinzelt; von der roten Beilschneide bilden sich an mehreren
@@ -1597,42 +1597,43 @@ def f_hulijing(i):
 
 
 # --- Etappe 4 -------------------------------------------------------------------
-# Ingo: vom Base-Sprite aus die Kapuze ab- und wieder aufsetzen. Kopf ohne Kapuze (weiße Haare,
-# Stirn) und die in den Nacken gefallene Kapuze stammen aus Ingos eigenen Frames
-# (src/user/ingo-hood-frames.png, deckungsgleich mit dem Base-Sprite); Gesicht, Augen, Monokel,
-# Bart, Arme und Robe bleiben die des Base-Sprites.
-#   H0 = Kapuze auf (Base), H05 = Kapuze rutscht 1 px zurück und gibt die Stirn frei,
-#   H1 = Kapuze fällt in den Nacken (liegt hinter dem Kopf), H2 = ohne Kapuze.
-INGO_SEQ = ['H0'] * 14 + ['H05', 'H05', 'H1', 'H1', 'H1'] + ['H2'] * 17 + ['H1', 'H1', 'H1', 'H05', 'H05'] + ['H0'] * 7
-INGO_BLINK = {6: 'H0', 28: 'H2', 44: 'H0'}
-INGO_STAR = [(11, 7, 9), (11, 7, 26)]                    # Monokel blitzt (mit und ohne Kapuze)
+# Ingo: das Base-Sprite zeigt ihn ohne Kapuze (die graue Kappe sind seine Haare). Die Kapuze selbst
+# stammt Pixel für Pixel aus Ingos eigenen Frames (src/user/ingo-hood-frames.png, deckungsgleich:
+# Frame-Pixel (x, y) = Base (x - 3, y - 8)): aufgesetzt aus f2 (nur die Kapuzenfarben, das Gesicht
+# darin bleibt das des Base-Sprites), in den Nacken gefallen aus f6.
+#   B = ohne Kapuze (Base), N = Kapuze liegt im Nacken, S = Kapuze rutscht (halb auf), K = Kapuze auf.
+INGO_SEQ = ['B'] * 12 + ['N', 'N', 'S', 'S'] + ['K'] * 16 + ['S', 'S', 'N', 'N'] + ['B'] * 12
+INGO_BLINK = {5: 'B', 24: 'K', 42: 'B'}
+INGO_STAR = [(11, 7, 8), (11, 7, 27)]                    # Monokel blitzt (ohne und mit Kapuze)
 INGO_POSES = None
+INGO_TOP = 2                                             # Luft oben für die Kapuze
 
 
 def ingo_poses():
     fr = np.array(Image.open('src/user/ingo-hood-frames.png').convert('RGBA')).astype(int)
-    user = lambda k: fr[(k // 2) * 32:(k // 2 + 1) * 32, (k % 2) * 24:(k % 2 + 1) * 24][8:, 3:21]
-    base = np.zeros((SH + 1, SW, 4), int)                # 1 Zeile Luft oben (Kapuze rutscht hoch)
-    base[1:] = SRC
-    h0 = base.copy()
-    h2 = base.copy()                                     # ohne Kapuze: Kopf oben (Zeilen 0-6) aus f7
-    f7 = user(7)
-    h2[1:8] = 0
-    m = f7[:7, :, 3] > 0
-    h2[1:8][m] = f7[:7][m]
-    h1 = h2.copy()                                       # Kapuze im Nacken: f6-Kapuze um den Kopf herum
-    f6 = user(6)
-    hood = ('191919', '323232', '525252', '202020')
-    for y in range(0, 12):
-        for x in range(SW):
-            if f6[y, x, 3] and hexc(f6[y, x]) in hood and not (h2[y + 1, x, 3] and y < 8):
-                h1[y + 1, x] = f6[y, x]
-    h05 = base.copy()                                    # Kapuze 1 px zurück, Stirn frei
-    h05[0:6] = base[1:7]
-    h05[6] = h2[6]
-    h05[6, 4] = base[5, 4]
-    h05[6, 13] = base[5, 13]
-    return dict(H0=h0, H05=h05, H1=h1, H2=h2)
+    user = lambda k: fr[(k // 2) * 32:(k // 2 + 1) * 32, (k % 2) * 24:(k % 2 + 1) * 24]
+    base = np.zeros((SH + INGO_TOP, SW, 4), int)
+    base[INGO_TOP:] = SRC
+
+    def hood_from(k, cols, y_max, dy=0, keep=None):
+        out = base.copy()
+        f = user(k)
+        for fy in range(32):
+            for fx in range(24):
+                x, y = fx - 3, fy - 8 + INGO_TOP + dy
+                if not (0 <= x < SW and 0 <= y < out.shape[0]) or fy - 8 > y_max:
+                    continue
+                if f[fy, fx, 3] and hexc(f[fy, fx]) in cols and (keep is None or keep(x, y - INGO_TOP)):
+                    out[y, x] = f[fy, fx]
+        return out
+    hood_k = ('191919', '525252', '2a2a2a', '414141', '323232', '202020', '000000')
+    hood_n = ('191919', '525252', '323232', '202020', '2a2a2a')
+    head = SRC[:, :, 3] > 0
+    K = hood_from(2, hood_k, 8)                          # aufgesetzt
+    N = hood_from(6, hood_n, 9, keep=lambda x, y: not (0 <= y < SH and head[y, x]) or y >= 9)   # im Nacken
+    # halb: die Kapuze 1 px höher; auf dem Kopf nur ihr oberer Teil, das Gesicht wird frei
+    S = hood_from(2, hood_k, 8, dy=-1, keep=lambda x, y: y <= 2 or not (0 <= y < SH and head[y, x]))
+    return dict(B=base, N=N, S=S, K=K)
 
 
 def f_ingo(i):
@@ -1642,12 +1643,12 @@ def f_ingo(i):
     key = INGO_SEQ[i]
     f = INGO_POSES[key].copy()
     if INGO_BLINK.get(i):                                # linkes Auge (weiß + rot) schließt sich
-        f[8, 6] = f[8, 7] = BLACK
-    out = np.zeros((f.shape[0] + 5, f.shape[1] + 6, 4), int)
-    b = BOUNCE12[i % 12] if key in ('H0', 'H2') else 0
-    knee_put(out, f, b, knee=15 + 1, ox=3, oy=3)
+        f[7 + INGO_TOP, 6] = f[7 + INGO_TOP, 7] = BLACK
+    out = np.zeros((f.shape[0] + 4, f.shape[1] + 6, 4), int)
+    b = BOUNCE12[i % 12] if key in ('B', 'K') else 0
+    knee_put(out, f, b, knee=15 + INGO_TOP, ox=3, oy=2)
     fill_pinholes(out)
-    stars(out, i, [(x + 3, y + 1 + 3 + b, t0) for x, y, t0 in INGO_STAR], 'e8f4ff', 'ffffff')
+    stars(out, i, [(x + 3, y + INGO_TOP + 2 + b, t0) for x, y, t0 in INGO_STAR], 'e8f4ff', 'ffffff')
     return out
 
 
