@@ -5073,6 +5073,11 @@ function sendGameState(room, playerIdx, extra) {
     // nicht mehr fest bei 1 liegt.
     areaLimits: room.engine ? [room.engine.areaLimitFor(0), room.engine.areaLimitFor(1)] : [1, 1],
     heroPlayableCards: room.engine ? room.engine.getHeroPlayableCards(playerIdx) : { own: {}, charmed: {} },
+    // ★ Styx (28.9.): Revive-Zaehler auf dem eigenen Basis-Styx, solange
+    // „Styx, the Opened Gate" in Rotation ist — nur fuer den Besitzer.
+    styxReviveCounter: room.engine
+      ? (loadCardEffect('Styx, the Gate to the Spirit World')?.reviveZaehlerAnzeige?.(room.engine, playerIdx) || null)
+      : null,
     // Abilities, die als Joker auf einem fremden Schul-Stapel mitzählen
     // (Performance). Der Client spiegelt die Schulzählung der Engine für
     // seine Drop-Zonen-Hervorhebung und kannte diese Regel bisher NICHT —
@@ -6282,7 +6287,7 @@ function findAbilitySupportSlot(ps, heroIdx, cardName, wunsch, gs = null, pi = n
   return -1;
 }
 
-async function doPlayAbility(room, pi, { cardName, handIndex, heroIdx, zoneSlot, supportSlot, fromCreation }) {
+async function doPlayAbility(room, pi, { cardName, handIndex, heroIdx, zoneSlot, supportSlot, fromCreation, heroOwner }) {
   if (!room?.engine || !room.gameState) return false;
   const gs = room.gameState;
   if (pi !== gs.activePlayer) return false;
@@ -6299,6 +6304,13 @@ async function doPlayAbility(room, pi, { cardName, handIndex, heroIdx, zoneSlot,
 
   const cardData = getCardDB()[cardName];
   if (!cardData || cardData.cardType !== 'Ability') return false;
+
+  // ★ Styx, the Opened Gate (28.9.): Ability an einen FREMDEN Helden,
+  // den dieser Spieler gerade kontrolliert — eigener Weg, weil hier
+  // Spielerzustand (Hand) und Heldenseite (Zonen) auseinanderfallen.
+  if (heroOwner != null && heroOwner !== pi) {
+    return doPlayAbilityFremd(room, pi, { cardName, handIndex, heroIdx, zoneSlot, fromCreation, heroOwner });
+  }
 
   // ── ASCENDED-ONLY-ABILITIES DURCHSETZEN (1.8.) ─────────────────────
   // `ascendedHeroOnly` markiert Abilities, deren Kartentext das Anlegen
@@ -6481,6 +6493,75 @@ async function doPlayAbility(room, pi, { cardName, handIndex, heroIdx, zoneSlot,
     await room.engine.runHooks('onCardEnterZone', { enteringCard: inst, toZone: 'ability', toHeroIdx: heroIdx });
   } catch (err) {
     console.error('[Engine] doPlayAbility hooks error:', err.message, err.stack);
+  }
+  for (let i = 0; i < 2; i++) sendGameState(room, i); sendSpectatorGameState(room);
+  return true;
+}
+
+/**
+ * ★ ABILITY AN EINEN FREMDEN, KONTROLLIERTEN HELDEN (Styx, 28.9.).
+ *
+ * Als Vorgabe: „Anders als bei anderer temporärer Kontrolle sollte ich
+ * mit Styx in der Lage sein, Abilities an einen gestohlenen Hero
+ * anzulegen." Freigeschaltet wird das von der Kontrollmarke selbst
+ * (`statuses.charmed.abilitiesErlaubt`, `engine.darfFremdAbilityAnlegen`).
+ *
+ * Die Karte liegt danach in der Ability Zone auf der Seite des Helden
+ * (`inst.owner = heroOwner`) und gehoert weiter dem Spieler, der sie
+ * angelegt hat (`inst.originalOwner = pi` → dessen Ablage). Die
+ * Einmal-pro-Zug-Grenze fuehrt die Kontrollmarke (`abilityZug`), nicht
+ * `abilityGivenThisTurn` des Besitzers — dessen Stempel stammen aus
+ * SEINEM letzten Zug. Keine Xal-/Xalibur-Support-Zonen, keine Boni
+ * aus Divine Gift of Skill (die gelten fuer eigene Helden).
+ */
+async function doPlayAbilityFremd(room, pi, { cardName, handIndex, heroIdx, zoneSlot, fromCreation, heroOwner }) {
+  const gs = room.gameState;
+  const engine = room.engine;
+  const ps = gs.players[pi];
+  const hps = gs.players[heroOwner];
+  const hero = hps?.heroes?.[heroIdx];
+  if (!hero?.name || !engine.darfFremdAbilityAnlegen(pi, heroOwner, heroIdx)) return false;
+  const script = loadCardEffect(cardName);
+  if (script?.ascendedHeroOnly && getCardDB()[hero.name]?.cardType !== 'Ascended Hero') return false;
+  if (script?.canAttachToHero && !script.canAttachToHero(gs, heroOwner, heroIdx, engine)) return false;
+
+  const ziel = engine.abilityZielZone(heroOwner, heroIdx, cardName, { wunschZone: zoneSlot });
+  if (ziel < 0) return false;
+  if (!hps.abilityZones[heroIdx]) hps.abilityZones[heroIdx] = [[], [], []];
+  const abZones = hps.abilityZones[heroIdx];
+  if (!abZones[ziel]) abZones[ziel] = [];
+  abZones[ziel].push(cardName);
+  (fromCreation ? ps.creationZone : ps.hand).splice(handIndex, 1);
+  engine.notePlayedFromHand(pi);
+  hero.statuses.charmed.abilityZug = gs.turn;
+
+  const inst = engine._trackCard(cardName, heroOwner, 'ability', heroIdx, ziel);
+  inst.originalOwner = pi;
+
+  engine.log('ability_attached', { player: ps.username, card: cardName, hero: hero.name, foreignHero: true });
+  broadcastHandToBoard(room, pi, { cardName, handIndex, zoneType: 'ability', heroIdx, slotIdx: ziel, destOwner: heroOwner });
+
+  try {
+    const chainResult = await engine.executeCardWithChain({
+      cardName, owner: pi, heroIdx, cardType: 'Ability', goldCost: 0,
+    });
+    if (chainResult.negated) {
+      const slot = abZones[ziel] || [];
+      const idx = slot.lastIndexOf(cardName);
+      if (idx >= 0) slot.splice(idx, 1);
+      engine._untrackCard(inst.id);
+      delete hero.statuses?.charmed?.abilityZug;
+      const negatedAbilityOwner = engine._consumeHandCardOrigin(pi, cardName);
+      await engine.routeNegatedInitialCard(negatedAbilityOwner, cardName, chainResult, -1,
+        { fromZone: 'ability', fromHeroIdx: heroIdx, fromSlotIdx: ziel });
+      engine.log('ability_negated', { card: cardName, player: ps.username });
+      for (let i = 0; i < 2; i++) sendGameState(room, i); sendSpectatorGameState(room);
+      return true;
+    }
+    await engine.runHooks('onPlay', { _onlyCard: inst, playedCard: inst, cardName, zone: 'ability', heroIdx });
+    await engine.runHooks('onCardEnterZone', { enteringCard: inst, toZone: 'ability', toHeroIdx: heroIdx });
+  } catch (err) {
+    console.error('[Engine] doPlayAbilityFremd hooks error:', err.message, err.stack);
   }
   for (let i = 0; i < 2; i++) sendGameState(room, i); sendSpectatorGameState(room);
   return true;
@@ -10673,8 +10754,16 @@ async function doPlaySurprise(room, pi, { cardName, handIndex, heroIdx, bakhmSlo
  * targeting cards that emit `equip-${inst.owner}-…` IDs flow through
  * this helper without per-card changes.
  */
-function normalizeValidTargets(validTargets, casterPi, engine, config) {
+function normalizeValidTargets(validTargets, casterPi, engine, config, cardName) {
   if (!Array.isArray(validTargets)) return validTargets;
+  // ★ Styx (28.9., Als Befund: Snow Cannon bot einen uebernommenen Helden
+  // an). Karten, die ihre Ziele selbst sammeln, lesen die PHYSISCHE
+  // Gegnerseite — ein Held, den der Spieler gerade kontrolliert, steht
+  // dort noch. Sagt die Karte „… your opponent controls", faellt er raus.
+  if (engine && cardName && typeof casterPi === 'number'
+      && typeof engine.filterSelbstKontrollierteGegnerHelden === 'function') {
+    engine.filterSelbstKontrollierteGegnerHelden(validTargets, casterPi, cardName);
+  }
   // Erst-Runden-Immunität — Gegenstück zum Filter in
   // `promptEffectTarget`. Targeting-Karten (getValidTargets +
   // targetingConfig) laufen NICHT durch diesen Prompt, sondern über die
@@ -10799,7 +10888,7 @@ async function doUsePotion(room, pi, { cardName, handIndex, fromCreation }) {
       ? script.targetingConfig(gs, pi)
       : script.targetingConfig;
     const validTargets = normalizeValidTargets(
-      script.getValidTargets(gs, pi, room.engine), pi, room.engine, cfg,
+      script.getValidTargets(gs, pi, room.engine), pi, room.engine, cfg, cardName,
     );
     gs.potionTargeting = {
       potionName: cardName, handIndex,
@@ -11072,7 +11161,7 @@ async function doUseArtifactEffect(room, pi, { cardName, handIndex, fromCreation
         : 99;
     }
     const validTargets = normalizeValidTargets(
-      script.getValidTargets(gs, pi, room.engine, handIndex), pi, room.engine, config,
+      script.getValidTargets(gs, pi, room.engine, handIndex), pi, room.engine, config, cardName,
     );
     gs.potionTargeting = {
       potionName: cardName, handIndex,
