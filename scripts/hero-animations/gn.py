@@ -16,9 +16,10 @@ Dazu je Variante:
              Drahtseile laufen von den Geräten schräg nach oben aus dem Bild
              (oben ausgeblendet); er pendelt daran hin und her und federt
              dabei leicht auf und ab.
-* ftriffel:  Future Tech Gunslinger Riffel feuert durchgehend: alle 6 Frames
-             startet an der Pistolenmündung ein Mündungsfeuer, die beiden
-             Kugeln samt Leuchtspur rasen nach links davon und blenden aus.
+* ftriffel:  Future Tech Gunslinger Riffel feuert durchgehend, abwechselnd aus
+             beiden Pistolen: alle 6 Frames Mündungsfeuer, und genau eine Kugel
+             samt Leuchtspur rast nach links davon und blendet aus (über allem,
+             erst vor der Mündung sichtbar).
              Dazu Federn und Blinzeln.
 * ascriffel: Riffel, Master of the Ultimate Gun: Federn, Blinzeln, die zwei
              schwebenden Pistolen wippen gegenläufig, um sie herum zucken
@@ -332,7 +333,14 @@ if V in ('pixmarck', 'dad'):
     _x0 = xs_.min()
     STREAK = _sm[ys_.min():ys_.max() + 1, _x0:_x0 + 12]            # eine Kugel mit Streifen
 if V == 'ftriffel':
-    BULLETS = load('bullets')
+    # Die Ebene zeigt zwei Kugeln übereinander; die untere ist vollständig
+    # (die obere wird von ihr verdeckt) – sie ist die Vorlage für jeden Schuss.
+    _bl = load('bullets')
+    BULLET = np.zeros_like(_bl)
+    for _y in range(11, 16):
+        for _x in range(SW):
+            if _bl[_y, _x, 3] and (_x >= 5 if _y >= 12 else 6 <= _x <= 11):
+                BULLET[_y - 2, _x] = _bl[_y, _x]              # 2 Zeilen höher: Mitte auf Mündungshöhe
 if V in ('ralzish', 'blueralzish'):
     SWORD = load('sword')
     BLADE = (SWORD[:, :, 3] > 0) & (lum(SWORD) > 150)
@@ -512,13 +520,13 @@ def frame(i):
         front = (i // 6) % 2 == 1                        # abwechselnd hintere / vordere Pistole
         mzx = 23 if front else 15
         put_sprite(out, s, ox, oy, dy_fn)
-        if t < 3:                                        # Kugeln über allem, nur vor der Mündung
-            dx = 14 - 12 * t + (8 if front else 0)
+        if t < 3:                                        # eine Kugel je Schuss, über allem, nur vor der Mündung
+            dx = (mzx - 6) - 5 - 12 * t                  # Kopf startet direkt vor der Mündung
             a = [1.0, 1.0, 0.45][t]
-            for y, x in zip(*np.nonzero(BULLETS[:, :, 3])):
+            for y, x in zip(*np.nonzero(BULLET[:, :, 3])):
                 xx = x + dx + ox
                 if 1 <= xx < W - 1 and x + dx <= mzx:
-                    blend(out, y + oy + b, xx, BULLETS[y, x], int(BULLETS[y, x, 3] * a))
+                    blend(out, y + oy + b, xx, BULLET[y, x], int(BULLET[y, x, 3] * a))
         if t < 2:
             muzzle_flash(out, mzx + ox, 11 + oy + b, 2 - t, -1)
 
