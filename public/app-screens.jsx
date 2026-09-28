@@ -1997,7 +1997,16 @@ function MainMenu() {
       </div>
       </div>
       <div className="menu-corner">
+        {/* ★ v1472 (Als Befund 28.9.: „Im Hauptmenü sollen das
+            Lautsprecher-Icon und der Logout-Button Plätze tauschen (Logout
+            rechts, Lautstärke links) und der Discord-Button soll mit dem
+            Logout-Button mit nach rechts wandern."). Lautsprecher steht
+            jetzt VOR LOGOUT; Discord haengt per `grid-column: 2`
+            (style.css, `.menu-corner .discord-btn--block`) unter LOGOUT
+            in der rechten Spalte. Im Telefon-Layout (Flex-Zeile) ergibt
+            dieselbe Reihenfolge: Lautsprecher, LOGOUT, Discord. */}
         <div className="menu-corner-row">
+          <VolumeControl />
           <div className="menu-logout-confirm-wrap" style={{ position: 'relative' }}>
             {/* v1263 (Al 21.9.): so hoch wie Elo/SC-Plakette (46 px), Breite skaliert mit — Masse in .menu-logout-btn--gross */}
             <button className="btn menu-logout-btn menu-logout-btn--gross" onClick={() => setLogoutConfirm(v => !v)}>LOGOUT</button>
@@ -2016,7 +2025,6 @@ function MainMenu() {
               </div>
             )}
           </div>
-          <VolumeControl />
         </div>
         <DiscordButton block />
       </div>

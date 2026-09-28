@@ -47,6 +47,17 @@
 //  Shop-Artikel das Fünffache. Es gelten nur noch die Limits der
 //  einzelnen Kategorien.
 //
+//  TAGESLIMITS (★ v1471, Als Befund 28.9.: „Mindestens CPU-Games
+//  konsumieren offenbar den ‚Daily'-Teil von Daily-Rewards nicht? …
+//  Jedenfalls habe ich ‚Play a Game (Daily)' zweimal bekommen!").
+//  Befund: weder CPU-Pfad noch Neustart — beide buchen in `sc_log`
+//  (Datenbank, `created_at` = unixepoch), das Limit liest nur dort.
+//  „Player"/„Winner" zählen `daily_per_opponent`, und jede CPU ist seit
+//  v1381 ein eigener Gegner (`cpu:<Deck-ID>`, Als Vorgabe 24.9.) — zwei
+//  verschiedene CPUs = zweimal +5. Das ist so gewollt; falsch war nur das
+//  Band „Daily!" im Ergebnisbildschirm. Was je Gegner zählt, trägt jetzt
+//  „Daily per Foe!".
+//
 //  CPU-PARTIEN (Als Vorgabe 24.9.): offen für ALLE Belohnungen außer
 //  Ranked (gegen CPUs gibt es kein Ranked). Die CPU selbst hat kein
 //  Konto und wird nie ausgewertet — bis v1380 lief sie mit, ihr Insert
@@ -232,6 +243,9 @@ const CONDITIONS = {
     && !c.t.heroEverBelow50
     && benannteHelden(c.ps).every(h => h.hp > h.maxHp * 0.5),
 
+  // ★ v1471 (Als Befund 28.9.: „Der ‚Overkill'-SC-Award sollte nicht Daily
+  // sein, sondern unbegrenzt, dafür aber nur 1 SC einbringen."): Katalog
+  // jetzt `unlimited`, 1 SC (vorher `daily`, 5 SC).
   creature_overkill: (c) => !!c.t.creatureOverkill,
 
   // Endzustand (Als Ruling 24.9.).

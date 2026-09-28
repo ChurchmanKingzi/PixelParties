@@ -15366,6 +15366,11 @@ this._deathWatch = (this._deathWatchStack || []).length
         // listeners shouldn't fire either way.
         if (!rescuedFromDelete && resolvedInst) {
           resolvedInst.zone = destZone;
+          // v1469: die Instanz folgt der Karte auf den FREMDEN Stapel
+          // (wie in `actionDiscardHandCard`) — der Name lag schon richtig,
+          // die Instanz blieb aber beim Halter stehen.
+          const _io = resolvedInst.originalOwner;
+          if (_io != null && _io !== playerIdx && this.gs.players[_io]) resolvedInst.owner = _io;
           if (!this.gs._batchDiscardPendingHooks) this.gs._batchDiscardPendingHooks = [];
           this.gs._batchDiscardPendingHooks.push({
             hookName,
@@ -15490,8 +15495,21 @@ this._deathWatch = (this._deathWatchStack || []).length
       // the card's beforeDelete a chance to rescue. Returns true if
       // the card actually landed in the pile (caller should fire the
       // on-delete / on-discard hook); false if rescued.
-      const finishMove = async (cardName) => {
+      const finishMove = async (cardName, fromHandIdx = -1) => {
         const inst = this.findCards({ owner: playerIdx, zone: ZONES.HAND, name: cardName })[0] || null;
+        // ★ v1469 (Als Befund 28.9.: „Wenn ich eine gegnerische Karte via
+        // gegnerischer ‚Magic Lamp' erhalte und diese abwerfe (Hand Size
+        // Limit am Rundenende), wird sie auf MEINEN Discard geschickt statt
+        // den des eigentlichen Besitzers!"). Alle anderen Abwurfwege
+        // (`actionDiscardHandCard`, `actionDiscardCards`,
+        // `actionPromptForceDiscard`) routen seit 1.8. ueber
+        // `_handCardPileOwner`; nur das Handlimit (Rundenende UND
+        // Pollution-Loeschen, beides laeuft hier durch) legte stur auf den
+        // eigenen Stapel. Jetzt derselbe Weg: fremde Karten (Magic Lamp,
+        // Diebstahl, aus fremder Ablage geholt) gehen auf den Ablage- bzw.
+        // Loeschstapel ihres URSPRUENGLICHEN Besitzers.
+        const pileOwner = this._handCardPileOwner(playerIdx, cardName);
+        const pilePs = this.gs.players[pileOwner] || ps;
         if (deleteMode) {
           const rescued = await this._tryBeforeDelete(cardName, playerIdx, {
             fromZone: ZONES.HAND, fromInstance: inst, source: 'hand-limit',
@@ -15502,8 +15520,22 @@ this._deathWatch = (this._deathWatchStack || []).length
             return false;
           }
         }
-        ps[pileArr].push(cardName);
-        if (inst) inst.zone = destZone;
+        pilePs[pileArr].push(cardName);
+        if (inst) { inst.zone = destZone; if (pileOwner !== playerIdx) inst.owner = pileOwner; }
+        if (pileOwner !== playerIdx) {
+          // Flug von der eigenen Hand zum FREMDEN Stapel (wie in
+          // `actionDiscardHandCard`) — der Hand-Diff des Clients kennt
+          // nur die eigene Ablage.
+          this._broadcastEvent('play_pile_transfer', {
+            owner: playerIdx, cardName, from: 'hand', to: pile,
+            fromOwner: playerIdx, toOwner: pileOwner,
+            ...(fromHandIdx >= 0 ? { fromHandIdx } : {}),
+          });
+          this.log('stolen_card_returned', {
+            card: cardName, from: ps.username,
+            to: this.gs.players[pileOwner]?.username, via: deleteMode ? 'delete' : 'discard',
+          });
+        }
         this.log('hand_limit_' + pile, { player: ps.username, card: cardName });
         await this.runHooks(hookName, { playerIdx, cardName, discardedCardName: cardName, _fromHand: true, _skipReactionCheck: true });
         this.sync();
@@ -15513,7 +15545,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       if (!result || result.cardName == null) {
         // Safety: if prompt fails, auto-remove from end of hand
         const cardName = ps.hand.pop();
-        if (cardName != null) await finishMove(cardName);
+        if (cardName != null) await finishMove(cardName, ps.hand.length);
         continue;
       }
 
@@ -15530,11 +15562,13 @@ this._deathWatch = (this._deathWatchStack || []).length
           continue;
         }
         ps.hand.splice(fallbackIdx, 1);
+        await finishMove(result.cardName, fallbackIdx);
+        continue;
       } else {
         ps.hand.splice(handIdx, 1);
       }
 
-      await finishMove(result.cardName);
+      await finishMove(result.cardName, handIdx);
     }
   }
 
@@ -19959,8 +19993,17 @@ this._deathWatch = (this._deathWatchStack || []).length
     const _wisdomKosten = cardData.cardType === 'Spell'
       ? this.getWisdomDiscardCost(playerIdx, heroIdx, cardData) : 0;
     this.gs._immediateActionContext = true;
-    const hadPriorLog = this.gs._spellDamageLog !== undefined;
-    if (!hadPriorLog) this.gs._spellDamageLog = [];
+    // ★ v1469 (Als Befund 28.9.: „Bartas hat mich nicht gepromptet, ein
+    // zweites Ziel mit ‚Phoenix Tackle' anzugreifen"). Der Sofort-Guss
+    // schrieb bisher in das Schadensprotokoll des AEUSSEREN Zaubers, wenn
+    // es eins gab: Victory Phoenix Cannon traf Barker, der Folgeguss
+    // Phoenix Tackle traf Teppes — `afterSpellResolved` von Tackle sah
+    // ZWEI Ziele, und Bartas („hits exactly 1 target") stieg aus. Jeder
+    // Guss hat jetzt sein EIGENES Protokoll; das aeussere wird danach
+    // unveraendert wiederhergestellt (die Ziele des Folgezaubers sind
+    // nicht die des aeusseren).
+    const _aeussererLog = this.gs._spellDamageLog;
+    this.gs._spellDamageLog = [];
     if (opts.excludeTargets) this.gs._spellExcludeTargets = opts.excludeTargets;
     if ((this.gs._spellResolutionDepth || 0) === 0) delete this.gs._spellNegatedByEffect;
     this.gs._spellResolutionDepth = (this.gs._spellResolutionDepth || 0) + 1;
@@ -20025,9 +20068,11 @@ this._deathWatch = (this._deathWatchStack || []).length
           _skipReactionCheck: true,
         });
       }
-      if (!hadPriorLog) delete this.gs._spellDamageLog;
       delete this.gs._spellNegatedByEffect;
     } finally {
+      // v1469: aeusseres Protokoll zurueck (auch bei Fehler/Abbruch).
+      if (_aeussererLog === undefined) delete this.gs._spellDamageLog;
+      else this.gs._spellDamageLog = _aeussererLog;
       // v1364: eigener Brett-Stempel auswerten, aeusseren wiederherstellen.
       _aufsBrett = !!this.gs._spellPlacedOnBoard;
       if (_placedVorher) this.gs._spellPlacedOnBoard = true;
@@ -43794,12 +43839,40 @@ this._deathWatch = (this._deathWatchStack || []).length
         this.sync();
         await this._delay(DEATH_EQUIP_PACE_MS);
       }
-      // ★ v1330 (Als Regel 24.9.): ein besiegter Held ist NIE magie-
-      // immun — was auch immer die Immunitaet gegeben hat.
-      if (hero.buffs?.magic_immune) {
-        delete hero.buffs.magic_immune;
-        this.log('buff_remove', { hero: hero.name, buff: 'magic_immune' });
-        this.sync();
+      // ★ v1469 (Als Befund 28.9.: „Der Clouded-Buff bleibt nach dem Tod
+      // eines Heroes (im Test via Recoil) bestehen! Der Tod sollte immer
+      // alle Statuseffekte, Buffs und Debuffs abräumen!"). Oben wurden nur
+      // die STATUS geleert; `hero.buffs` (Cloudy, Disrupted, Cold Strike,
+      // Empowered Strike, Submerged, Combo-Lock …) blieb bis auf Magic
+      // Immune stehen. Jetzt raeumt der Tod ALLE Buffs/Debuffs ab.
+      // Einzige Ausnahme: ein Buff, dessen QUELLE als Karte weiterhin an
+      // diesem Helden liegt — das ist dann keine abgelaufene Wirkung,
+      // sondern eine Dauerwirkung der Karte, die den Tod ueberdauert
+      // (Divine Gift of Coolness: „cannot be removed … even if the Hero is
+      // defeated"; gewonnene Heldeneffekte, v1275). Magic Immune bleibt
+      // davon ausgenommen: ein besiegter Held ist NIE magie-immun
+      // (v1330, Als Regel 24.9.). Marken, die keine Buffs sind
+      // (`_extraLife`, `_koProcessed`, Kontrolle, Ability-Zonen), liegen
+      // nicht in `hero.buffs` und bleiben unberuehrt.
+      if (hero.buffs && typeof hero.buffs === 'object') {
+        const bleibtAmHelden = (quelle) => typeof quelle === 'string' && quelle
+          && this.cardInstances.some(c => c.owner === pi && c.zone === 'support'
+            && c.heroIdx === hi && c.name === quelle);
+        let geraeumt = false;
+        for (const key of Object.keys(hero.buffs)) {
+          const daten = hero.buffs[key];
+          if (key !== 'magic_immune' && bleibtAmHelden(daten?.source)) continue;
+          delete hero.buffs[key];
+          this.log('buff_remove', { hero: hero.name, buff: key, reason: 'defeated' });
+          geraeumt = true;
+          // Blessed (Divine Gift of Skill) ist nur die Anzeige der Bonus-
+          // Anlagen und der Aktionssperre — beides faellt mit.
+          if (key === 'blessed_skill') {
+            if (ps._bonusAbilityAttachments) delete ps._bonusAbilityAttachments[hi];
+            delete hero._skillLockTurn;
+          }
+        }
+        if (geraeumt) this.sync();
       }
       break;
     }

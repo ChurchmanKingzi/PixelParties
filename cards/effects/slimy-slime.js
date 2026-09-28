@@ -24,6 +24,10 @@ module.exports = {
         types: ['hero', 'creature'],
         side: 'any',
         max: 1,
+        // ★ v1470 (Als Heal-Befund 28.9.): als HEILUNG markieren, wie Heal —
+        // sonst greifen die CPU-Heil-Sicherungen (Gegner nur mit
+        // healReversed) für diesen Prompt nicht.
+        isHealing: true,
         title: 'Slimy Slime',
         description: 'Select a target to heal for 80 HP.',
         confirmLabel: 'Heal!',

@@ -33,6 +33,10 @@ module.exports = {
       side: 'any',
       types: ['hero', 'creature'],
       damageType: 'other',
+      // ★ v1470 (Als Heal-Befund 28.9.): als HEILUNG markieren, wie Heal —
+      // sonst greifen die CPU-Heil-Sicherungen (Gegner nur mit
+      // healReversed) für diesen Prompt nicht.
+      isHealing: true,
       title: CARD_NAME,
       description: `Heal a target for ${HEAL} HP. Cannot target this Creature.`,
       confirmLabel: `✨ Heal! (${HEAL})`,

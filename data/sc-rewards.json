@@ -111,8 +111,8 @@
     "id": "overkill",
     "title": "Overkill",
     "description": "Deal damage to a Creature equal to 2x its max HP in one hit",
-    "amount": 5,
-    "limit": "daily",
+    "amount": 1,
+    "limit": "unlimited",
     "requires": "creature_overkill"
   },
   {

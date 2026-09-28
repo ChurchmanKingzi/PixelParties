@@ -24047,7 +24047,7 @@ function schedulePlaySideDeckAppear(selector, slotBaseIdx, count) {
 //  Zuschauer oder ein Gast, gibt es keine eigenen Rewards — dann laeuft
 //  nur Titel → Ende (und `extra` zeigt die alte Zusammenfassung).
 // ═══════════════════════════════════════════════════════════════
-function ResultCeremony({ won, spectator, title, subtitle, rewards, total, eloChanges, myName, extra, children }) {
+function ResultCeremony({ won, spectator, title, subtitle, rewards, total, eloChanges, myName, oppName, extra, children }) {
   const n = rewards.length;
   const ENDE = n + 1;
   const [stufe, setStufe] = useState(0);
@@ -24153,7 +24153,10 @@ function ResultCeremony({ won, spectator, title, subtitle, rewards, total, eloCh
           <div className="pp-cer-rewards">
             {rewards.map((r, i) => (
               <div key={r.id || i} className={'pp-cer-reward' + (bonusArt(r) ? ' pp-cer-reward-' + bonusArt(r) : '') + (stufe > i ? ' pp-cer-reward-da' : '')}>
-                {bonusArt(r) && <div className="pp-cer-band">{bonusArt(r) === 'daily' ? 'Daily!' : 'Once!'}</div>}
+                {/* ★ v1471 (Als Befund 28.9.: „‚Play a Game (Daily)' zweimal bekommen … die Badge sagt nur ‚Daily'
+                    — verwirrend"): „Daily!" nur noch für echte Tageslimits. Was je Gegner und Tag zählt
+                    (`daily_per_opponent`, jede CPU ist ein eigener Gegner), nennt den Gegner: „Daily vs Siphem!". */}
+                {bonusArt(r) && <div className="pp-cer-band">{bonusArt(r) === 'daily' ? (r.limit === 'daily' ? 'Daily!' : (oppName ? `Daily vs ${oppName}!` : 'Daily per Foe!')) : 'Once!'}</div>}
                 {stufe > i && !phone && (
                   <div className="pp-cer-burst" aria-hidden="true">
                     {Array.from({ length: ppFxN(12) }).map((_, k) => (
@@ -27229,20 +27232,34 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     overlay.style.opacity = '0';
     setTimeout(() => overlay.remove(), 1300);
   }, [result]);
+  // ★ v1472 (Als Befund 28.9.: „Im Victory-/Defeat-Screen ist die
+  // Sprechblase des Spielers ein gutes Stück von seinem Avatar entfernt —
+  // deutlich weiter als die des Gegners von dessen … die y-Position des
+  // unteren Endes der Sprechblase sollte IMMER knapp über meinem Avatar
+  // sein!"). Ursache war NICHT die Blasenhoehe (die Blase haengt per
+  // translateY(-100%) mit ihrer Unterkante am Anker), sondern der Anker
+  // selbst: die eigene Blase hing an der Oberkante der GANZEN Handleiste
+  // (`.game-hand-me`), die Gegnerblase an der Unterkante ihrer
+  // Avatar-Zeile. Gemessen 1600×900: Gegner-Spitze 11 px unter dem
+  // Portraet, eigene Spitze 32 px ueber dem Portraet. Jetzt messen
+  // BEIDE Seiten dasselbe — das Portraet (`.pp-portraet`) samt seinem
+  // aeusseren Zierrahmen (Box-Schatten-Ringe 8 px, Zierkeil 9 px ueber
+  // die Kante) —, und die Spitze zeigt auf die Portraetmitte statt auf
+  // die Mitte aus Bild + Name. Gilt auch fuer die CPU-Zwischenrufe.
+  const PORTRAET_ZIER = 9;
+  const avatarAnker = (ref) => {
+    const huelle = ref.current;
+    if (!huelle) return null;
+    const portraet = huelle.querySelector('.pp-portraet');
+    const r = (portraet || huelle).getBoundingClientRect();
+    if (!(r.width > 0)) return null;
+    const zier = portraet ? PORTRAET_ZIER : 0;
+    return { x: r.left + r.width / 2, top: r.top - zier, bottom: r.bottom + zier };
+  };
   useEffect(() => {
     if (!showEndBubbles) { setBubbleAnchors(null); return; }
     const measure = () => {
-      const o = speechOppRef.current?.getBoundingClientRect();
-      const m = speechMeRef.current?.getBoundingClientRect();
-      // For the player's own bubble, anchor its bottom to the TOP of the
-      // whole bottom hand container (not just the avatar row), so it floats
-      // clearly above the hand instead of overlapping / sitting below it.
-      const meHand = document.querySelector('.game-hand-me');
-      const mc = meHand?.getBoundingClientRect();
-      setBubbleAnchors({
-        opp: o ? { x: o.left + o.width / 2, top: o.top, bottom: o.bottom } : null,
-        me: m ? { x: m.left + m.width / 2, top: mc ? mc.top : m.top, bottom: m.bottom } : null,
-      });
+      setBubbleAnchors({ opp: avatarAnker(speechOppRef), me: avatarAnker(speechMeRef) });
     };
     measure();
     const t = setTimeout(measure, 250); // re-measure after the result fade settles
@@ -27297,12 +27314,12 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       // painted (game start), so the rect isn't measurable yet.
       let tries = 0;
       const tryShow = () => {
-        const r = ref.current?.getBoundingClientRect();
-        if (r && r.width > 0) {
+        const anker = avatarAnker(ref); // v1472: derselbe Anker wie die End-Blasen
+        if (anker) {
           setCpuBark({
             text, owner, id: Date.now(),
             dir: owner === oppIdx ? 'up' : 'down',
-            anchor: { x: r.left + r.width / 2, top: r.top, bottom: r.bottom },
+            anchor: anker,
           });
         } else if (tries++ < 20) {
           setTimeout(tryShow, 50);
@@ -41451,7 +41468,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
                       boxShadow: '0 0 calc(5px * var(--board-scale)) #ff5a4a, inset 0 0 calc(2px * var(--board-scale)) #ffd0c8',
                       border: 'calc(1.5px * var(--board-scale)) solid #2a0505',
-                      zIndex: 6, pointerEvents: 'auto', cursor: 'help',
+                      zIndex: 6, pointerEvents: 'auto', cursor: 'default',
                     }}
                     onMouseEnter={e => showGameTooltip(e, `${hero.name.split(',')[0]} cannot perform Actions this turn: a target you control was defeated since the end of your last turn.`)}
                     onMouseLeave={hideGameTooltip}
@@ -41461,6 +41478,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 )}
                 {hero?.name && <BuffColumn buffs={hero.buffs} statuses={hero.statuses} cardName={hero.name} />}
                 {/* ── Deepsea Counter badge (Siphem) ── */}
+                {/* ★ v1472: hier und an den Nachbar-Abzeichen stand
+                    `cursor: 'help'` — der native Pfeil mit Fragezeichen
+                    (Als Befund 28.9.). Jetzt 'default'; style.css
+                    („Global pixel cursor") macht daraus den Pixelpfeil. */}
                 {hero?.name && (hero.deepseaCounters || 0) > 0 && (
                   <div
                     className="deepsea-counter-badge badge-zaehler"
@@ -41479,7 +41500,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                       gap: 'calc(1px * var(--board-scale))',
                       boxShadow: '0 0 calc(5px * var(--board-scale)) #38c0ff, inset 0 0 calc(2px * var(--board-scale)) #b8ecff',
                       border: 'calc(1.5px * var(--board-scale)) solid #061528',
-                      zIndex: 6, pointerEvents: 'auto', cursor: 'help',
+                      zIndex: 6, pointerEvents: 'auto', cursor: 'default',
                     }}
                     onMouseEnter={e => showGameTooltip(e, `Deepsea Counters: ${hero.deepseaCounters}`)}
                     onMouseLeave={hideGameTooltip}
@@ -41506,7 +41527,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                       gap: 'calc(1px * var(--board-scale))',
                       boxShadow: '0 0 calc(5px * var(--board-scale)) #ffcb45, inset 0 0 calc(2px * var(--board-scale)) #ffeec2',
                       border: 'calc(1.5px * var(--board-scale)) solid #2a1505',
-                      zIndex: 6, pointerEvents: 'auto', cursor: 'help',
+                      zIndex: 6, pointerEvents: 'auto', cursor: 'default',
                     }}
                     onMouseEnter={e => showGameTooltip(e, `Time Counters: ${hero._timeCounters}. At the end of each of your turns Carris gains 1; at 3 or more, you lose the game.`)}
                     onMouseLeave={hideGameTooltip}
@@ -41533,7 +41554,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                       gap: 'calc(1px * var(--board-scale))',
                       boxShadow: '0 0 calc(6px * var(--board-scale)) #ffd34d, inset 0 0 calc(2px * var(--board-scale)) #fff3bf',
                       border: 'calc(1.5px * var(--board-scale)) solid #4a3300',
-                      zIndex: 6, pointerEvents: 'auto', cursor: 'help',
+                      zIndex: 6, pointerEvents: 'auto', cursor: 'default',
                     }}
                     onMouseEnter={e => showGameTooltip(e, `Divinity Counters: ${hero._divinityCounters}. At the end of your turn, Pharaoh sacrifices a target you control, removes 1 counter and you draw 2 cards.`)}
                     onMouseLeave={hideGameTooltip}
@@ -41795,7 +41816,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                         border: '1px solid #b06ad0',
                         boxShadow: '0 0 6px rgba(176,106,208,.6)',
                         pointerEvents: 'auto',
-                        cursor: 'help',
+                        cursor: 'default',
                         zIndex: 5,
                       }}>
                       L{eff}
@@ -43525,7 +43546,30 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               <div data-opp-deleted="1"><BoardZone type="deleted" cards={oppDeletedHidden > 0 ? opp.deletedPile.slice(0, -oppDeletedHidden) : opp.deletedPile} label="Deleted" onClick={() => setPileViewer({ title: 'Opponent Deleted', pile: 'deleted', cards: opp.deletedPile, ownerIdx: oppIdx })} onHoverCard={setHoveredPileCard} style={oppBoardZone('delete')} ownerLetheStamps={opp.letheStamps} /></div>
               <div className="board-util-spacer" />
             </div>
-            <div className="board-util-mid" />
+            {/* ★ v1472 (Als Vorgabe 28.9.: „Ganz links im Battle-Screen,
+                zwischen den Deleted-Piles beider Spieler, sollte die
+                aktuelle Rundenzahl dargestellt werden, in der Farbe des
+                Spielers, dessen Runde es ist!"). Zaehlung = `gameState.turn`,
+                also dieselbe wie im Protokoll („── Turn N (…) ──", zaehlt
+                jeden Spielerzug; Puzzle-Duelle starten bei 1). Vor der
+                Anfangswahl steht turn auf 0 — dann bleibt die Anzeige leer.
+                Farbe wie ueberall im Kampf: `player.color` mit denselben
+                Rueckfallfarben wie Hand und Portraet. Die Anzeige haengt
+                ABSOLUT in `.board-util-mid` (style.css,
+                `.board-round-counter`) und veraendert die Hoehe der Spalte
+                nicht; `key` startet den kurzen Pop bei jedem Zugwechsel. */}
+            <div className="board-util-mid">
+              {(gameState.turn || 0) > 0 && (() => {
+                const amZug = activePlayer === myIdx ? me : opp;
+                const farbe = amZug.color || (activePlayer === myIdx ? '#00f0ff' : '#ff5577');
+                return (
+                  <div key={gameState.turn} className="board-round-counter" style={{ '--runde-farbe': farbe }}>
+                    <span className="board-round-counter-label">ROUND</span>
+                    <span className="board-round-counter-zahl">{gameState.turn}</span>
+                  </div>
+                );
+              })()}
+            </div>
             <div className="board-util-side">
               <div className="board-util-spacer" />
               <div data-my-deleted="1"><BoardZone type="deleted" cards={myDeletedHidden > 0 ? me.deletedPile.slice(0, -myDeletedHidden) : me.deletedPile} label="Deleted" onClick={() => setPileViewer({ title: 'My Deleted', pile: 'deleted', cards: me.deletedPile, ownerIdx: myIdx })} onHoverCard={setHoveredPileCard} style={myBoardZone('delete')} ownerLetheStamps={me.letheStamps} /></div>
@@ -47070,7 +47114,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 </select>
               </div>
             )}
-            <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
+            <div className="ergebnis-knoepfe" style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
               {isSpectator ? (
                 <button className="btn btn-danger" style={{ padding: '12px 32px', fontSize: 14 }} onClick={handleLeave}>LEAVE</button>
               ) : gameState.isCampaign ? (
@@ -47210,6 +47254,12 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           total={(!isSpectator && scEarned && !user?.isGuest) ? (scEarned.total || 0) : 0}
           eloChanges={result.eloChanges || null}
           myName={user?.username}
+          // v1471: derselbe Anzeigename wie in der Handleiste des Gegners
+          // (CPU → Kurzname ihres mittleren Helden), fuers „Daily vs …"-Band.
+          oppName={tutorialGegner ? tutorialGegner.name
+            : (gameState.isCpuBattle && opp?.username === 'CPU')
+              ? heroDisplayName(opp.heroes?.[1]?.name || opp.heroes?.find(h => h?.name)?.name || opp.username)
+              : opp?.username}
           extra={(isSpectator || user?.isGuest) ? renderSCEarned() : null}>
             {!isSpectator && ((decks && decks.length > 0) || (sampleDecks || []).some(d => isDeckLegal(d).legal)) && (
               <div style={{ marginBottom: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
@@ -47225,7 +47275,18 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 </select>
               </div>
             )}
-            <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
+            {/* ★ v1472 (Als Befund 28.9.: „Sind die Buttons für ‚Rematch‘
+                und ‚Leave‘ im Victory-/Defeat-Screen wirklich gleich
+                hoch?"). Gemessen (Chromium/Linux, 1600×900) je 46 px —
+                aber nur zufaellig: die Hoehe kam aus dem INHALT
+                (`line-height: normal` + 12-px-Polster), und das 🔄 in
+                REMATCH / ⏳ in WAITING laeuft in der Emoji-Schrift des
+                Systems (Windows: Segoe UI Emoji) mit hoeherer Zeile als
+                der Text von LEAVE. Wie bei den Kopfzeilen-Knoepfen
+                (v1463): `.ergebnis-knoepfe` gibt allen Knoepfen dieser
+                Zeile eine feste Hoehe und setzt den Inhalt mittig
+                (style.css). Gilt auch fuer die Satz-Variante oben. */}
+            <div className="ergebnis-knoepfe" style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
               {isSpectator ? (
                 <button className="btn btn-danger" style={{ padding: '12px 32px', fontSize: 14 }} onClick={handleLeave}>LEAVE</button>
               ) : gameState.isCampaign ? (
