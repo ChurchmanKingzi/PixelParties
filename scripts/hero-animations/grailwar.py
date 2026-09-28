@@ -154,9 +154,9 @@ V_ = {
     'fiona': dict(slug='fiona-the-princess-of-blackport', pads=(3, 3, 4, 2),
                   lid=[((14, 14), 'ffe6d5'), ((15, 14), 'ffe6d5'), ((18, 14), 'ffe6d5'), ((19, 14), 'ffe6d5')],
                   line=[(14, 15), (15, 15), (18, 15), (19, 15)]),
-    'boarding': dict(slug='gabby-the-boarding-broad', pads=(10, 5, 3, 2),
+    'boarding': dict(slug='gabby-the-boarding-broad', pads=(12, 6, 3, 2),
                      lid=[((12, 39), 'f6cd8b'), ((13, 39), 'f6cd8b')], line=[(12, 38), (13, 38)]),
-    'chosen': dict(slug='gabby-the-chosen-girl', pads=(10, 5, 3, 2),
+    'chosen': dict(slug='gabby-the-chosen-girl', pads=(12, 6, 3, 2),
                    lid=[((11, 39), 'f1b7a2'), ((12, 39), 'f1b7a2')], line=[(11, 40), (12, 40)]),
     'zombie': dict(slug='gabby-the-pirate-zombie', knee=18,
                    lid=[((5, 7), 'b6c7b2'), ((6, 7), 'b6c7b2'), ((9, 7), 'b6c7b2'), ((10, 7), 'b6c7b2')],
@@ -1239,10 +1239,13 @@ def f_fiona(i):
 
 
 # --- Etappe 3 -------------------------------------------------------------------
-def pendulum(i, amp=6.0):
+SWING = 3                                                # Schwünge pro Loop
+
+
+def pendulum(i, amp=9.0):
     """Schwingen am Seil (Aufhängung oben): jede Zeile rückt als Ganzes seitlich, unten stärker.
     Das Bild zeigt schon den Ausschlag nach rechts – von dort schwingt sie nach links und zurück."""
-    s_ = 0.5 * (math.cos(2 * math.pi * 2 * i / N) - 1)
+    s_ = 0.5 * (math.cos(2 * math.pi * SWING * i / N) - 1)
     return lambda x, y: int(round(amp * s_ * y / (SH - 1)))
 
 
@@ -1253,16 +1256,16 @@ def f_gabbyrope(i):
     # Haare hängen dem Schwung nach: gegen die Bewegungsrichtung, zur Spitze hin stärker
     # (schwingt sie nach rechts, fliegen sie nach links). Rückwärts abgetastet: jedes Zielpixel
     # holt sich sein Quellpixel – die Haare dehnen sich stetig, es reißen keine Lücken.
-    v = math.sin(2 * math.pi * 2 * i / N)                # > 0: sie schwingt gerade nach links
+    v = math.sin(2 * math.pi * SWING * i / N)            # > 0: sie schwingt gerade nach links
     if V == 'boarding':
         hair = np.array([[x >= 19 and 33 <= y <= 46 and s[y, x, 3] > 0 and hexc(s[y, x]) in
-                          ('bd39ac', 'f68bee', 'ffacff', 'd552c5', 'ac319c', '620852')
-                          for x in range(SW)] for y in range(SH)])
-        lagf = lambda x, y: 2.6 * v * min(1.0, max(0.0, (x - 19) / 5))
+                          ('bd39ac', 'f68bee', 'ffacff', 'd552c5', 'ac319c', '620852', '310062', '6a20ac')
+                          for x in range(SW)] for y in range(SH)])      # samt dunklen Schattenpixeln im Schopf
+        lagf = lambda x, y: 3.0 * v * min(1.0, max(0.0, (x - 19) / 5))
     else:                                                # Chosen Girl: langer blonder Zopf nach rechts unten
         hair = np.array([[x >= 17 and 31 <= y <= 47 and s[y, x, 3] > 0 and hexc(s[y, x]) in
                           ('402200', 'd5b11e', 'f0f329', '947116', 'eecd2d') for x in range(SW)] for y in range(SH)])
-        lagf = lambda x, y: 4.0 * v * min(1.0, max(0.0, (y - 31) / 16))
+        lagf = lambda x, y: 5.0 * v * min(1.0, max(0.0, (y - 37) / 10))   # erst unterhalb des Kopfes
     # Seil oberhalb der Hände: jede Frame als gerade Linie von der Aufhängung zur Hand neu legen
     # (Muster je Zeile bleibt), sonst entstehen durch das zeilenweise Schieben kleine Knicke
     RY = 32
