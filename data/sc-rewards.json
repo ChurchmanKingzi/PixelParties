@@ -329,9 +329,9 @@
   {
     "id": "on_fire",
     "title": "On Fire",
-    "description": "+5 SC for every 10 wins in a row (max +25)",
+    "description": "+5 SC on your 10th win in a row, +10 on the 20th, and so on (max +25)",
     "amount": 5,
-    "limit": "daily_per_opponent",
+    "limit": "unlimited",
     "requires": "win_streak_bonus"
   },
   {

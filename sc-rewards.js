@@ -345,12 +345,20 @@ const CONDITIONS = {
   win_only_creature_damage: (c) => c.isWinner && (c.t.dmgCreature || 0) > 0
     && !(c.t.dmgSpell > 0) && !(c.t.dmgOther > 0),
 
-  // On Fire: eine Stufe je volle 10 Siege in Folge (über alle Tage), max. 5 Stufen;
-  // ausgezahlt wird Stufe × Katalogbetrag.
+  // On Fire (★ v1474, Als Vorgabe 28.9.: „On Fire sollte überhaupt nicht
+  // Daily sein, sondern nur von der Anzahl Wins abhängen; ist es exakt der
+  // zehnte, gibt es +5, exakt der zwanzigste +10, usw. bis +25. Gezählt
+  // wird die laufende Siegesserie."): zahlt NUR, wenn dieser Sieg die
+  // laufende Serie (über alle Tage, `serieGesamt` inkl. dieses Siegs) auf
+  // ein Vielfaches von 10 bringt — Stufe = Serie/10, gedeckelt bei 5,
+  // ausgezahlt Stufe × Katalogbetrag (5): 10 → +5, 20 → +10 … 50 → +25,
+  // danach jeder weitere Zehner +25. Katalog `unlimited` statt
+  // `daily_per_opponent`. Bis v1473 zahlte es ab 10 Siegen JEDEN Sieg.
   win_streak_bonus: (c) => {
     if (!c.isWinner) return false;
-    const stufen = Math.floor((c.serieGesamt || 0) / 10);
-    return stufen >= 1 ? Math.min(5, stufen) : false;
+    const serie = c.serieGesamt || 0;
+    if (serie < 10 || serie % 10 !== 0) return false;
+    return Math.min(5, serie / 10);
   },
 
   // 31+ Main-Deck-Karten eines Archetyps; gebucht je Archetyp.
