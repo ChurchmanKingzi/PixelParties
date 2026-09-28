@@ -8,6 +8,7 @@ Aufruf:  python3 assemble_grailwar.py <pfad/zu/MotiveGrailWar.xcf>
 Schreibt src/<slug>.png und bewegliche Teile deckungsgleich als
 src/<slug>-<teil>.png; Geschosse (Brackles Totenschädel) als eigene Datei.
 """
+import colorsys
 import sys
 import numpy as np
 import cv2
@@ -155,6 +156,24 @@ def lower_body(a, key):
     return paint(above(a, y0), x0, y0, rws, pal)
 
 
+def marianne_hair(old, fork):
+    """Mariannes Haare aus der alten, flach gerenderten Szene (Sichtbar #164, dort 2 px weiter links):
+    warme Haarpixel ausschneiden, auf die heutige Haarpalette abbilden, unter der Mistgabel freistellen."""
+    out = np.zeros_like(old)
+    for y_ in range(242, 254):
+        for x_ in range(222, 244):
+            if y_ == 242 and x_ < 235 or 229 <= x_ <= 233 and y_ >= 252:     # Baum links oben, Mund
+                continue
+            r, gg, b = (int(v) for v in old[y_, x_, :3])
+            h, s, _ = colorsys.rgb_to_hsv(r / 255, gg / 255, b / 255)
+            if not (h < 0.17 and s > 0.75 and r > 0x80 or r >= 0x29 and gg < 0x36 and b < 0x14 and r > gg * 1.6):
+                continue
+            c = '440000' if r < 0x50 else '73290d' if r < 0xa0 else 'd66107' if gg < 0x80 else 'f8a314' if gg < 0xc8 else 'ffcd2d'
+            out[y_, x_ + 2] = (int(c[0:2], 16), int(c[2:4], 16), int(c[4:6], 16), 255)
+    out[fork[:, :, 3] > 0] = 0
+    return out
+
+
 def main(path):
     doc = GimpDocument(path)
     L = doc.raw_layers
@@ -180,6 +199,9 @@ def main(path):
             if not op[y_, x_] and op[y_ - 1, x_ - 1:x_ + 2].any() and op[y_ + 1, x_ - 1:x_ + 2].any():
                 xs_up = [x_ + d for d in (0, -1, 1) if op[y_ - 1, x_ + d]]
                 bhat[y_, x_] = comp[y_ - 1, xs_up[0]]
+    # Hut knapp über der Krempe verbreitern (Zeile 13 war eingeschnürt), Krempe je 1 px länger
+    ys_, xs_ = np.nonzero(layer_over(cec, bhat)[:, :, 3])
+    paint(bhat, xs_.min() + 1, ys_.min() + 13, [".A..........E", "A............E"], dict(A='604a1b', E='4e30a7'))
     save_parts('bad-birthday-girl-cecilia', [('body', cec), ('hat', bhat)])
     save_parts('barker-the-monster-tamer', [('body', g('Barker')), ('mark', g('Barker #4'))])
     save_parts('blackstache-scourge-of-the-pixel-seas', [('body', near(g('Blackstache'), 167, 200))])
@@ -253,15 +275,10 @@ def main(path):
     save_parts('kyli-the-deceptive-sapling', [('body', g('Kyli'))])
     save_parts('madame-guillotine-the-great-equalizer', [('body', near(g('Madame Guillotine'), 121, 212))])
     mar = g('Marianne #1')
-    # Zöpfe: in der Ebene liegen die Haare komplett unter dem Hut – unter der Krempe nachgezeichnet
-    braids = paint(np.zeros_like(mar), 227, 248, [
-        ".B............DA",
-        "C.............CA",
-        "D.............DA",
-        "C............CA",
-        "D"], dict(A='440000', B='73290d', C='f8a314', D='d66107'))
-    save_parts('marianne-the-cocky-caretaker', [('fork', g('Marianne #6')), ('cat', near(g('Marianne #3'), 250, 258)),
-                                                ('body', mar), ('braids', braids), ('arm', g('Marianne #9')),
+    fork = g('Marianne #6')
+    save_parts('marianne-the-cocky-caretaker', [('fork', fork), ('cat', near(g('Marianne #3'), 250, 258)),
+                                                ('body', mar), ('hair', marianne_hair(g('Sichtbar #164'), fork)),
+                                                ('arm', g('Marianne #9')),
                                                 ('hat', near(g('Marianne #5'), 234, 244))])
     save_parts('nicolas-the-hidden-alchemist', [('body', lower_body(g('Nicolas'), 'nicolas')), ('flask', g('Ebene #2'))])
     save_parts('saint-nicolas', [('body', lower_body(g('Saint Nicolas'), 'saint')),
