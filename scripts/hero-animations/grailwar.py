@@ -92,10 +92,10 @@ Dazu je Variante:
 * hulijing:  federt, blinzelt; das blaue Fuchsfeuer strömt als Partikelfeuer aus
              ihrer Hand (Flammenballen wachsen, kühlen ab, züngeln: weiß,
              hellblau, türkis, blau, dunkelblauer Rand).
-* ingo:      Ingos eigene Animation (src/user/ingo-hood-frames.png): Arme unten;
-             er streift die Kapuze in den Nacken, steht ohne Kapuze (Monokel
-             blitzt) und zieht sie wieder auf; dazu Blinzeln. Die T-Pose-Frames
-             bleiben ungenutzt (der Wechsel wirkte zu abrupt).
+* ingo:      Ingos eigene Animation (src/user/ingo-hood-frames.png): meist ohne
+             Kapuze mit hängenden Armen; er hebt die Arme, zieht die Kapuze auf,
+             verschränkt die Arme, hebt sie wieder, die Kapuze fällt in den
+             Nacken und die Arme sinken; dazu Blinzeln, das Monokel blitzt.
 * eingo:     Elegant Ingo: federt, blinzelt, das Monokel blitzt.
 * madame:    Madame Guillotine hält eine Rede (Mund auf und zu), federt,
              blinzelt; von der roten Beilschneide bilden sich an mehreren
@@ -112,8 +112,8 @@ Dazu je Variante:
              Nicolas blinzelt (die dunkelgelben Augen).
 * stellan / bunny: atmen ruhig (1 px), ab und zu zuckt ein Ohr hoch (wird dabei
              länger, reißt nicht ab).
-* tazune / bakugo: brüllen in der Loop-Mitte, nur per Mimik (Maul weit auf, Augen
-             zusammengekniffen bzw. rot glühend); aus den Ohren pufft kleinteilig
+* tazune / bakugo: brüllen in der Loop-Mitte, nur per Mimik (der schon offene
+             Mund unter den Augen reißt weiter auf, die Lider senken sich); aus den Ohren pufft kleinteilig
              Rauch (über allem, beim Brüllen mehr), die Dampfwolken des
              Kartenbilds stehen in Frame 0 und lösen sich in Fetzen auf. Bei
              Tazune lodern die Flammen: jede Flammensäule streckt und staucht
@@ -1602,11 +1602,13 @@ def f_hulijing(i):
 # 24x32, zeilenweise gelesen): A = Kapuze auf, Arme ausgebreitet; B = Kapuze auf, Arme innen
 # (f2 offen / f4 zwinkernd); C = Kapuze rutscht in den Nacken; F = ohne Kapuze, Arme innen
 # (f3 offen / f1 zwinkernd); E = ohne Kapuze, Arme ausgebreitet; D = ohne Kapuze, Arme eng.
-INGO_SEQ = (['B2'] * 10 + ['C', 'C', 'F1'] + ['F3'] * 17 +
-            ['D', 'D', 'C', 'C'] + ['B2'] * 14)
+# Arme hängen nur in D (ohne Kapuze) und C (Kapuze fällt in den Nacken) – D ist die Ruhepose.
+# Kapuze auf: Arme heben (E) -> Kapuze greifen (A) -> Arme verschränkt (B); wieder ab: Arme heben
+# (A) -> Kapuze fällt, Arme sinken (C) -> D.
+INGO_SEQ = (['D'] * 18 + ['E', 'E', 'A', 'A'] + ['B2'] * 10 + ['A', 'A', 'C', 'C', 'C'] + ['D'] * 11)
 INGO_IDX = dict(A=0, B2=2, B4=4, C=6, F1=1, F3=3, E=5, D=7)
-INGO_BLINK = {5: 'B', 24: 'F', 42: 'B'}                  # zwischendurch blinzeln (Auge 9/10, Zeile 15)
-INGO_STAR = [(13, 15, 19), (13, 15, 44)]                  # Monokel blitzt (ohne und mit Kapuze)
+INGO_BLINK = {6: 'D', 27: 'B', 43: 'D'}                  # zwischendurch blinzeln (Auge 9/10, Zeile 15)
+INGO_STAR = [(13, 15, 10), (13, 15, 24)]                  # Monokel blitzt (ohne und mit Kapuze)
 
 
 def f_ingo(i):
@@ -1902,17 +1904,16 @@ def f_tazune(i):
     stm = np.array([[fx[y, x, 3] > 0 and hexc(fx[y, x]) in STEAM_COLS for x in range(SW)] for y in range(SH)])
     roar = i in ROAR
     if roar:                                              # Brüllen nur per Mimik: Maul weit auf, Augen
-        if V == 'tazune':                                 # zusammengekniffen (> <)
-            for (x, y), c in {(16, 18): 'ffffff', (17, 18): '300901', (18, 18): 'ffffff',
-                              (15, 19): 'd54419', (16, 19): '300901', (17, 19): 'f00000', (18, 19): '300901',
-                              (19, 19): 'd54419', (16, 20): 'd20000', (17, 20): 'f00000', (18, 20): 'd20000',
-                              (14, 16): '300901', (15, 17): '300901', (14, 17): 'e75b38', (15, 16): 'e75b38',
-                              (20, 16): '300901', (19, 17): '300901', (20, 17): 'e75b38', (19, 16): 'e75b38'}.items():
+        if V == 'tazune':                                 # der Mund (2x2 unter den Augen) reißt weiter auf
+            for (x, y), c in {(17, 18): 'd20000', (18, 18): 'd20000',
+                              (16, 19): 'a90000', (17, 19): '4b0000', (18, 19): '4b0000', (19, 19): 'a90000',
+                              (16, 20): 'a90000', (17, 20): 'f00000', (18, 20): 'f00000', (19, 20): 'a90000',
+                              (15, 16): '000100', (20, 16): '000100'}.items():      # Lider senken sich
                 body[y, x] = rgb(c)
-        else:                                             # Skin: Maul größer, Augen glühen rot auf
-            for (x, y), c in {(14, 18): 'ff2d2d', (19, 18): 'ff2d2d', (15, 21): 'a90000', (16, 21): 'f00000',
-                              (17, 21): 'f00000', (18, 21): 'a90000', (16, 19): '5a0000', (17, 19): '5a0000',
-                              (15, 16): 'ff2d2d', (16, 16): 'ff2d2d', (19, 16): 'ff2d2d', (20, 16): 'ff2d2d'}.items():
+        else:                                             # Skin: Maul breiter und tiefer, Augen kneifen
+            for (x, y), c in {(15, 19): 'ff2d2d', (20, 19): 'ff2d2d', (16, 20): 'a90000', (19, 20): 'a90000',
+                              (17, 19): '5a0000', (18, 19): '5a0000',
+                              (16, 16): '000100', (19, 16): '000100'}.items():
                 body[y, x] = rgb(c)
     b = BOUNCE12[i % 12]
     out = np.zeros((H, W, 4), int)
