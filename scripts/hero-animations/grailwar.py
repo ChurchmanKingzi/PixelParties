@@ -1287,10 +1287,28 @@ def f_gabbyrope(i):
     put(out, body, PL, PT, dx_fn=sw)
     hy, hx = np.nonzero(hair)
     for y in range(hy.min(), hy.max() + 1):
-        for x in range(hx.min() - 6, hx.max() + 7):
-            sx = int(round(x - lagf(x, y)))
-            if 0 <= sx < SW and hair[y, sx]:
-                out[y + PT, x + sw(x, y) + PL] = s[y, sx]
+        row = np.nonzero(hair[y])[0]
+        if not len(row):
+            continue
+        if V == 'boarding':
+            # Schopf: die zwei Wurzelspalten bleiben am Kopf, der Rest rückt als Ganzes um lag;
+            # die Lücke dazwischen füllt die erste Innenspalte (pinke Haarfarbe, nicht der Schatten)
+            r0 = row[0]
+            lag = int(round(3.0 * v * min(1.0, (y - 33) / 4 + 0.25)))
+            for x in range(r0 - 4, row[-1] + 5):
+                if x <= r0 + 1:
+                    sx = x
+                elif lag > 0 and x <= r0 + 1 + lag:
+                    sx = r0 + 2
+                else:
+                    sx = x - lag
+                if 0 <= sx < SW and hair[y, sx]:
+                    out[y + PT, x + sw(x, y) + PL] = s[y, sx]
+        else:
+            for x in range(hx.min() - 6, hx.max() + 7):
+                sx = int(round(x - lagf(x, y)))
+                if 0 <= sx < SW and hair[y, sx]:
+                    out[y + PT, x + sw(x, y) + PL] = s[y, sx]
     fill_pinholes(out)
     if V == 'chosen':                                    # Lichtreflex über das goldene Schwert
         gold = (s[:, :, 3] > 0) & (_xs >= 17) & (_ys >= 32) & np.array(
