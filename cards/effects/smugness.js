@@ -46,6 +46,8 @@ module.exports = {
       const gs = engine.gs;
       const pi = ctx.cardOwner;
       const heroIdx = ctx.cardHeroIdx;
+      // Styx 28.9.: „dieser Held" steht auf der Brettseite (`feld`), „du" ist der Kontrolleur.
+      const feld = ctx.cardHeroOwner ?? pi;
       const target = ctx.target;
       const source = ctx.source;
       const dmgType = ctx.type;
@@ -53,7 +55,7 @@ module.exports = {
 
       // Only fire once per hero — skip if another Smugness instance on this hero already handled it
       const allSmugness = engine.cardInstances.filter(c =>
-        c.name === 'Smugness' && c.owner === pi && c.heroIdx === heroIdx && c.zone === 'ability'
+        c.name === 'Smugness' && c.owner === feld && c.heroIdx === heroIdx && c.zone === 'ability'
       );
       if (allSmugness.length > 0 && allSmugness[0].id !== ctx.card.id) return;
 
@@ -68,7 +70,7 @@ module.exports = {
         }
         if (tgtPi >= 0) break;
       }
-      if (tgtPi !== pi || tgtHi !== heroIdx) return;
+      if (tgtPi !== feld || tgtHi !== heroIdx) return;
 
       // No status/burn/poison damage
       const STATUS_TYPES = new Set(['status', 'burn', 'poison']);
@@ -83,7 +85,7 @@ module.exports = {
 
       // Determine level from ability stack
       const ps = gs.players[pi];
-      const abZones = ps.abilityZones[heroIdx] || [];
+      const abZones = gs.players[feld].abilityZones[heroIdx] || [];
       let level = 0;
       for (const slot of abZones) {
         if (!slot || slot.length === 0) continue;
@@ -100,7 +102,7 @@ module.exports = {
       if (retDamage <= 0) return;
 
       // Prompt: choose any target (hero or creature, friend or foe)
-      const heroName = ps.heroes[heroIdx]?.name || 'Hero';
+      const heroName = gs.players[feld].heroes[heroIdx]?.name || 'Hero';
       const picked = await ctx.promptDamageTarget({
         side: 'any',
         types: ['hero', 'creature'],
@@ -120,7 +122,7 @@ module.exports = {
       // Raccoon projectile animation from Smugness hero to target
       const tgtZoneSlot = picked.type === 'equip' ? picked.slotIdx : -1;
       engine._broadcastEvent('play_projectile_animation', {
-        sourceOwner: pi,
+        sourceOwner: feld,
         sourceHeroIdx: heroIdx,
         targetOwner: picked.owner,
         targetHeroIdx: picked.heroIdx,
@@ -140,7 +142,7 @@ module.exports = {
       await engine._delay(300);
 
       // Deal damage
-      const dmgSource = { name: 'Smugness', owner: pi, heroIdx };
+      const dmgSource = { name: 'Smugness', owner: pi, heroOwner: feld, heroIdx };
       if (picked.type === 'hero') {
         const h = gs.players[picked.owner]?.heroes?.[picked.heroIdx];
         if (h && h.hp > 0) {

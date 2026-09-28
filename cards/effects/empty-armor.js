@@ -72,7 +72,7 @@ function aktionFrei(engine, pi, heroIdx) {
   if (engine.findAdditionalActionForCard?.(pi, CARD_NAME, heroIdx)) return true;
   if (gs.currentPhase !== 3) return false;
   if ((ps.heroesActedThisTurn || []).length === 0) return true;
-  return (ps.bonusActions?.heroIdx === heroIdx && ps.bonusActions.remaining > 0)
+  return (ps.bonusActions?.heroIdx === heroIdx && (ps.bonusActions.heroOwner ?? pi) === pi /* Styx 28.9.: Seite */ && ps.bonusActions.remaining > 0)
     || ((ps._bonusMainActions || 0) > 0 && (ps._actionsPlayedThisPhase || 0) === 1);
 }
 

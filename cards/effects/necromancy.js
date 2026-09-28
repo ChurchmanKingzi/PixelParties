@@ -38,14 +38,14 @@ function countAbilityLevel(ps, heroIdx, school) {
 /**
  * Get free base support zones (slots 0–2) for a specific hero.
  */
-function getFreeZones(ps, heroIdx) {
+function getFreeZones(ps, heroIdx, owner) {
   const hero = ps.heroes?.[heroIdx];
   if (!hero?.name || hero.hp <= 0) return [];
   const zones = [];
   const supZones = ps.supportZones[heroIdx] || [];
   for (let s = 0; s < 3; s++) {
     if ((supZones[s] || []).length === 0) {
-      zones.push({ heroIdx, slotIdx: s, label: `${hero.name} — Support ${s + 1}` });
+      zones.push({ owner, heroIdx, slotIdx: s, label: `${hero.name} — Support ${s + 1}` });   // Styx 28.9.: Seite mitgeben
     }
   }
   return zones;
@@ -104,7 +104,7 @@ function getEligibleCreatures(engine, pi, heroIdx, necromancyLevel, feld = pi) {
     // depends on a `beforeSummon`-paid cost (King Trex's auto-
     // sacrifice path) to apply the STRICT per-Hero rule here, since
     // Necromancy bypasses beforeSummon entirely.
-    if (!engine.isCreatureSummonable(cardName, feld, heroIdx, { _bypassBeforeSummon: true })) continue;
+    if (!engine.isCreatureSummonable(cardName, feld, heroIdx, { _bypassBeforeSummon: true, beschwoerer: pi })) continue;
     seen.add(cardName);
     result.push({ name: cardName, source: 'discard' });
   }
@@ -221,7 +221,7 @@ module.exports = {
       const hostName = hps.heroes?.[heroIdx]?.name;
       if (hostName && lock.heroName && hostName !== lock.heroName) return false;
     }
-    if (getFreeZones(hps, heroIdx).length === 0) return false;
+    if (getFreeZones(hps, heroIdx, feld).length === 0) return false;
     return getEligibleCreatures(engine, pi, heroIdx, level, feld).length > 0;
   },
 
@@ -245,7 +245,7 @@ module.exports = {
     if (eligible.length === 0) return false;
 
     // Check free zones
-    const freeZones = getFreeZones(hps, heroIdx);
+    const freeZones = getFreeZones(hps, heroIdx, feld);
     if (freeZones.length === 0) return false;
 
     // Step 1: Gallery picker — choose a creature from discard
@@ -260,7 +260,7 @@ module.exports = {
 
     // Step 2: Zone picker — choose a free support zone (auto-pick if only one)
     let chosenZone;
-    const currentFreeZones = getFreeZones(hps, heroIdx);
+    const currentFreeZones = getFreeZones(hps, heroIdx, feld);
     if (currentFreeZones.length === 0) return false;
     if (currentFreeZones.length === 1) {
       chosenZone = currentFreeZones[0];

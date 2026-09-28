@@ -7196,7 +7196,7 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
 
   const actionsPlayedThisPhase = ps._actionsPlayedThisPhase || 0;
   const hasBonusAction = isActionPhase && (
-    (ps.bonusActions?.heroIdx === heroIdx && ps.bonusActions.remaining > 0)
+    room.engine.bonusAktionFuer(pi, heroIdx, charmedOwner ?? pi)
     || ((ps._bonusMainActions || 0) > 0 && actionsPlayedThisPhase === 1)
   );
   const actionAlreadyUsed = isActionPhase && (ps.heroesActedThisTurn?.length > 0) && !hasBonusAction;
@@ -8184,7 +8184,7 @@ async function doActivateCreatureEffect(room, pi, { heroIdx, zoneSlot, charmedOw
     if (isActionPhase) {
       const acPs = gs.players[pi];
       const actionsPlayedThisPhase = acPs._actionsPlayedThisPhase || 0;
-      const hasBonusAlready = (acPs.bonusActions?.heroIdx === heroIdx && acPs.bonusActions.remaining > 0)
+      const hasBonusAlready = room.engine.bonusAktionFuer(pi, heroIdx, charmedOwner ?? pi)
         || ((acPs._bonusMainActions || 0) > 0 && actionsPlayedThisPhase === 1);
       const actionAlreadyUsed = (acPs.heroesActedThisTurn?.length > 0) && !hasBonusAlready;
       if (actionAlreadyUsed) {
@@ -8889,7 +8889,7 @@ async function doPlayCreature(room, pi, { cardName, handIndex, heroIdx, zoneSlot
   const usingAdditional = !!additionalTypeId;
   const actionsPlayedThisPhase = ps._actionsPlayedThisPhase || 0;
   const hasBonusAction = isActionPhase && (
-    (ps.bonusActions?.heroIdx === heroIdx && ps.bonusActions.remaining > 0)
+    room.engine.bonusAktionFuer(pi, heroIdx, charmedOwner ?? pi)
     || ((ps._bonusMainActions || 0) > 0 && actionsPlayedThisPhase === 1)
   );
   const actionAlreadyUsed = isActionPhase && (ps.heroesActedThisTurn?.length > 0) && !hasBonusAction;
@@ -9473,7 +9473,7 @@ async function doActivateAbility(room, pi, { heroIdx, zoneIdx, zoneKind, charmed
   const actingPs = gs.players[pi];
   const actionsPlayedThisPhase = actingPs._actionsPlayedThisPhase || 0;
   const hasBonusActionAlready = isActionPhase && (
-    (actingPs.bonusActions?.heroIdx === heroIdx && actingPs.bonusActions.remaining > 0)
+    room.engine.bonusAktionFuer(pi, heroIdx, charmedOwner ?? pi)
     || ((actingPs._bonusMainActions || 0) > 0 && actionsPlayedThisPhase === 1)
   );
   const actionAlreadyUsed = isActionPhase
@@ -9942,7 +9942,7 @@ async function doActivateHeroEffect(room, pi, { heroIdx, charmedOwner, chosenEff
       const actingPs = gs.players[pi];
       if (isActionPhase) {
         const actionsPlayed = actingPs._actionsPlayedThisPhase || 0;
-        const hasBonus = (actingPs.bonusActions?.heroIdx === heroIdx && actingPs.bonusActions.remaining > 0)
+        const hasBonus = room.engine.bonusAktionFuer(pi, heroIdx, charmedOwner ?? pi)
           || ((actingPs._bonusMainActions || 0) > 0 && actionsPlayed === 1);
         const actionAlreadyUsed = (actingPs.heroesActedThisTurn?.length > 0) && !hasBonus;
         if (actionAlreadyUsed) {

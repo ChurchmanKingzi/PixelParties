@@ -76,6 +76,7 @@ module.exports = {
       const hasActed = (ps.heroesActedThisTurn || []).includes(heroIdx);
       if (!hasActed) return true;
       const hasBonus = (ps.bonusActions?.heroIdx === heroIdx
+                        && (ps.bonusActions.heroOwner ?? pi) === pi /* Styx 28.9.: Seite */
                         && ps.bonusActions.remaining > 0)
         || ((ps._bonusMainActions || 0) > 0);
       if (hasBonus) return true;

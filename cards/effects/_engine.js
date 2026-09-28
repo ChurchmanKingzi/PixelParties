@@ -4824,8 +4824,11 @@ class GameEngine {
           // Group by owner to check per-side
           const byOwner = {};
           for (const t of heroTargets) {
-            if (!byOwner[t.owner]) byOwner[t.owner] = [];
-            byOwner[t.owner].push(t);
+            // Styx 28.9.: gruppiert nach KONTROLLEUR — ein geliehener
+            // Held zaehlt zur Seite dessen, der ihn kontrolliert.
+            const k = engine.zielSeite(t, t.owner);
+            if (!byOwner[k]) byOwner[k] = [];
+            byOwner[k].push(t);
           }
           for (const [ownerStr, group] of Object.entries(byOwner)) {
             const owner = parseInt(ownerStr);
@@ -4839,11 +4842,11 @@ class GameEngine {
             // filter at ~line 1744), so a stunned Chuck doesn't suppress
             // his teammates' protections.
             let chuckActive = false;
-            for (const h of (gs.players[owner]?.heroes || [])) {
+            // Styx 28.9.: Chuck wirkt fuer die Helden SEINES Kontrolleurs.
+            for (const { hero: h, physOwner, heroIdx: hi } of engine.heroesControlledBy(owner)) {
               if (!h?.name || h.hp <= 0) continue;
               if (h.statuses?.frozen || (h.statuses?.stunned || h.statuses?.webbed) || h.statuses?.negated) continue;
-              const hi = (gs.players[owner].heroes || []).indexOf(h);
-              if (hi >= 0 && engine._isHeroMummified?.(owner, hi)) continue;
+              if (engine._isHeroMummified?.(physOwner, hi)) continue;
               const sc = engine.heroScript(h);
               if (sc?.ignoresOppUntargetable) { chuckActive = true; break; }
             }
@@ -5415,8 +5418,11 @@ class GameEngine {
           const untargetableIds = new Set();
           const byOwner = {};
           for (const t of heroTargets) {
-            if (!byOwner[t.owner]) byOwner[t.owner] = [];
-            byOwner[t.owner].push(t);
+            // Styx 28.9.: gruppiert nach KONTROLLEUR — ein geliehener
+            // Held zaehlt zur Seite dessen, der ihn kontrolliert.
+            const k = engine.zielSeite(t, t.owner);
+            if (!byOwner[k]) byOwner[k] = [];
+            byOwner[k].push(t);
           }
           for (const [ownerStr, group] of Object.entries(byOwner)) {
             const owner = parseInt(ownerStr);
@@ -5424,11 +5430,11 @@ class GameEngine {
             // Chuck (and any future Hero with `ignoresOppUntargetable: true`)
             // — same probe as the single-target path.
             let chuckActive = false;
-            for (const h of (gs.players[owner]?.heroes || [])) {
+            // Styx 28.9.: Chuck wirkt fuer die Helden SEINES Kontrolleurs.
+            for (const { hero: h, physOwner, heroIdx: hi } of engine.heroesControlledBy(owner)) {
               if (!h?.name || h.hp <= 0) continue;
               if (h.statuses?.frozen || (h.statuses?.stunned || h.statuses?.webbed) || h.statuses?.negated) continue;
-              const hi = (gs.players[owner].heroes || []).indexOf(h);
-              if (hi >= 0 && engine._isHeroMummified?.(owner, hi)) continue;
+              if (engine._isHeroMummified?.(physOwner, hi)) continue;
               const sc = engine.heroScript(h);
               if (sc?.ignoresOppUntargetable) { chuckActive = true; break; }
             }
@@ -6403,7 +6409,7 @@ class GameEngine {
       : (ps.heroes || []).map((h, i) => (h?.name && h.hp > 0) ? i : -1).filter(i => i >= 0);
 
     for (const hi of helden) {
-      if (isActionPhase && ps.bonusActions?.heroIdx === hi && ps.bonusActions.remaining > 0) return true;
+      if (isActionPhase && this.bonusAktionFuer(playerIdx, hi)) return true;
       if (this.findAdditionalActionForCard(playerIdx, cardName, hi)) return true;
     }
     return false;
@@ -18559,7 +18565,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       //   `_actionsPlayedThisPhase` (incremented by each play handler) to identify which
       //   slot we're in. The grace slot is available iff we've already played exactly
       //   one action (slot #2) and the flag is set.
-      const hasBonusAction = isActionPhase && ps.bonusActions?.heroIdx === hi && ps.bonusActions.remaining > 0;
+      const hasBonusAction = isActionPhase && this.bonusAktionFuer(playerIdx, hi);
       const actionsPlayed = ps._actionsPlayedThisPhase || 0;
       const hasBonusMainAction = isActionPhase && (ps._bonusMainActions || 0) > 0 && actionsPlayed === 1;
 
@@ -18842,7 +18848,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         }
 
         // v665: Bonus-Slots des handelnden Spielers (siehe eigener Zweig).
-        const hasBonusAction = isActionPhase && ps.bonusActions?.heroIdx === hi && ps.bonusActions.remaining > 0;
+        const hasBonusAction = isActionPhase && this.bonusAktionFuer(playerIdx, hi, oppIdx);
         const hasBonusMainAction = isActionPhase && (ps._bonusMainActions || 0) > 0 && (ps._actionsPlayedThisPhase || 0) === 1;
 
         const playable = [];
@@ -37051,6 +37057,18 @@ this._deathWatch = (this._deathWatchStack || []).length
   }
 
   /**
+   * Gilt die Bonusaktion (`ps.bonusActions`, Karian/Ghuanjun/Shamanic
+   * Curse) fuer DIESEN Helden? Styx 28.9.: auch die Seite muss passen —
+   * eigener und geliehener Held koennen denselben Index haben. Fehlt
+   * `heroOwner` in der Bonusaktion, gilt die eigene Seite.
+   */
+  bonusAktionFuer(playerIdx, heroIdx, heroOwner = playerIdx) {
+    const b = this.gs.players[playerIdx]?.bonusActions;
+    if (!b || !(b.remaining > 0) || b.heroIdx !== heroIdx) return false;
+    return (b.heroOwner ?? playerIdx) === heroOwner;
+  }
+
+  /**
    * Gehoert dieser Zusatzaktions-Anbieter dem Spieler? Nach KONTROLLE
    * (Styx 28.9.): Karten an einem geliehenen Helden dienen dem
    * Kontrolleur, seitenfremd beschworene Kreaturen ihrem Beschwoerer.
@@ -38337,7 +38355,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     const canSpendHeroActionCost = (heroIdx, heroOwner = playerIdx) => {
       if (isActionPhase) {
         const actionsPlayed = ps._actionsPlayedThisPhase || 0;
-        const hasBonus = (ps.bonusActions?.heroIdx === heroIdx && ps.bonusActions.remaining > 0)
+        const hasBonus = this.bonusAktionFuer(playerIdx, heroIdx, heroOwner)
           || ((ps._bonusMainActions || 0) > 0 && actionsPlayed === 1);
         const actionAlreadyUsed = (ps.heroesActedThisTurn?.length > 0) && !hasBonus;
         if (!actionAlreadyUsed) return true;

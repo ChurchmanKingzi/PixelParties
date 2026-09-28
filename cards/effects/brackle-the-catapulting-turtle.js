@@ -263,10 +263,12 @@ module.exports = {
     // `targetZoneSlot` is included for support-zone targets so the
     // fire phase lands on the Creature, not the column's Hero zone.
     const catapultEvent = {
-      sourceOwner: pi,
+      // Styx 28.9.: Zeichen-Seiten statt Kontrolleur — Kreatur und Brackle
+      // koennen (uebernommen/seitenfremd) auf der Gegenseite stehen.
+      sourceOwner: engine.physicalSide(creatureInst),
       sourceHeroIdx: creatureInst.heroIdx,
       sourceZoneSlot: creatureInst.zoneSlot,
-      brackleOwner: pi,
+      brackleOwner: ctx.cardHeroOwner ?? pi,
       brackleHeroIdx,
       targetOwner: target.owner,
       targetHeroIdx: target.heroIdx >= 0 ? target.heroIdx : 0,
@@ -289,7 +291,8 @@ module.exports = {
     await engine._delay(DAMAGE_LAND_MS);
 
     // ── Step 5: deal damage as an Attack ─────────────────────────────────
-    const source = { name: CARD_NAME, owner: pi, heroIdx: brackleHeroIdx };
+    const source = { name: CARD_NAME, owner: pi, heroIdx: brackleHeroIdx,
+      ...((ctx.cardHeroOwner ?? pi) !== pi ? { heroOwner: ctx.cardHeroOwner } : {}) };   // Styx 28.9.
     if (target.type === 'hero') {
       const hero = gs.players[target.owner]?.heroes?.[target.heroIdx];
       if (hero && hero.hp > 0) {

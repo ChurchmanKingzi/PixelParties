@@ -35,9 +35,11 @@ module.exports = {
       const gs = ctx.gameState;
       const pi = ctx.cardOwner;
       const heroIdx = ctx.cardHeroIdx;
+      // Styx 28.9.: Held/Zonen auf der Brettseite `feld`, „du" = Kontrolleur `pi`.
+      const feld = ctx.cardHeroOwner ?? pi;
 
-      // Only trigger for spells cast BY this hero
-      if (ctx.casterIdx !== pi || ctx.heroIdx !== heroIdx) return;
+      // Only trigger for spells cast BY this hero (Brettseite + Index)
+      if ((ctx.heroOwner ?? ctx.casterIdx) !== feld || ctx.heroIdx !== heroIdx) return;
 
       // Don't trigger on a second cast (prevent infinite loop)
       if (ctx.isSecondCast) return;
@@ -49,7 +51,7 @@ module.exports = {
 
       // Check Bartas is still alive and capable
       const ps = gs.players[pi];
-      const hero = ps.heroes?.[heroIdx];
+      const hero = ctx.attachedHero ?? gs.players[feld]?.heroes?.[heroIdx];
       if (!hero?.name || hero.hp <= 0) return;
       if (hero.statuses?.frozen || hero.statuses?.stunned || hero.statuses?.negated) return;
 
@@ -71,7 +73,7 @@ module.exports = {
 
       // Check spell level < Bartas's Destruction Magic level
       const spellLevel = spellData.level || 0;
-      const dmLevel = engine.countAbilitiesForSchool('Destruction Magic', ps.abilityZones[heroIdx] || []);
+      const dmLevel = engine.countAbilitiesForSchool('Destruction Magic', gs.players[feld]?.abilityZones?.[heroIdx] || []);
       if (spellLevel >= dmLevel) return;
 
       // Check there's at least 1 OTHER valid target on the opponent's side
@@ -117,6 +119,7 @@ module.exports = {
 
       // Create a temporary card instance for the second cast
       const tempInst = engine._trackCard(ctx.spellName, pi, 'hand', heroIdx, -1);
+      if (feld !== pi) tempInst.heroOwner = feld;   // Styx 28.9.: wie der Server bei Uebernahme
 
       // ★ v1277 (Als Befund 22.9.): der Zweitguss ist KEIN neues Ausspielen
       // der Karte — er darf die Aktionsoekonomie nicht veraendern. Fire Bolts

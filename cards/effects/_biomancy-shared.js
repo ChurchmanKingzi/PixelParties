@@ -123,7 +123,11 @@ function isPotionCardName(engine, cardName) {
  *          Zone frei war
  */
 async function placeBiomancyToken(engine, pi, heroIdx, potionName, level, opts = {}) {
-  const placeResult = engine.safePlaceInSupport(potionName, pi, heroIdx, opts.slot ?? -1);
+  // Styx 28.9.: `opts.feld` = Brettseite des Helden (geliehener Held); der
+  // Token gehoert dem Beschwoerer `pi` (seitenfremd).
+  const feld = opts.feld ?? pi;
+  const placeResult = engine.safePlaceInSupport(potionName, feld, heroIdx, opts.slot ?? -1,
+    feld !== pi ? { controller: pi } : {});
   if (!placeResult) return null;
   const { inst, actualSlot } = placeResult;
 
@@ -132,7 +136,7 @@ async function placeBiomancyToken(engine, pi, heroIdx, potionName, level, opts =
 
   engine._broadcastEvent('play_zone_animation', {
     type: 'biomancy_bloom',
-    owner: pi, heroIdx, zoneSlot: actualSlot,
+    owner: feld, heroIdx, zoneSlot: actualSlot,
   });
   if (opts.animate !== false) await engine._delay(opts.animationMs ?? 600);
   // ERST JETZT synchronisieren — der Token soll erscheinen, wenn SEINE
@@ -147,7 +151,7 @@ async function placeBiomancyToken(engine, pi, heroIdx, potionName, level, opts =
   const stats = tokenStatsForLevel(level);
   engine.log('biomancy_token_created', {
     player: engine.gs.players[pi]?.username,
-    hero: engine.gs.players[pi]?.heroes?.[heroIdx]?.name,
+    hero: engine.gs.players[feld]?.heroes?.[heroIdx]?.name,
     potion: potionName,
     level: stats.level, hp: stats.hp, damage: stats.damage,
     source: opts.sourceName || 'Biomancy',

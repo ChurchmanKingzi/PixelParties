@@ -55,27 +55,23 @@ const MAX_NECROMANCY_USES = 3;
 // dem Rundenstempel setzt sich der Zaehler von selbst zurueck.
 const NECRO_KEY = 'letheNecromancy';
 
-/** Die Necromancy-Instanz in der Ability-Zone dieses Lethe-Helden. */
-function necromancyInstanz(engine, controller, heroIdx) {
+/**
+ * Die Necromancy-Instanz in der Ability-Zone dieses Lethe-Helden.
+ * Styx 28.9.: ueber die BRETTSEITE `feld` (+ Index) — waehrend der
+ * Aktivierung ueber einen uebernommenen Helden traegt die Instanz
+ * `heroOwner` = Brettseite, `owner`/`controller` = Kontrolleur.
+ */
+function necromancyInstanz(engine, feld, heroIdx) {
   return (engine?.cardInstances || []).find(c => c
     && c.name === 'Necromancy' && c.zone === 'ability'
     && c.heroIdx === heroIdx
-    && (c.controller ?? c.owner) === controller) || null;
+    && (c.heroOwner ?? c.owner) === feld) || null;
 }
 
 // ─── HELPERS ─────────────────────────────────────────────────────
 
-/** Lethe heroes the player owns (loop — defensive vs. multi-copy). */
-function forEachLethe(ps, fn) {
-  const heroes = ps?.heroes || [];
-  for (let hi = 0; hi < heroes.length; hi++) {
-    const h = heroes[hi];
-    if (h?.name === CARD_NAME) fn(h, hi);
-  }
-}
-
 /**
- * Lock every Lethe `ps` owns for the current turn. Sets the engine's
+ * Lock every Lethe `controller` controls for the current turn. Sets the engine's
  * generic action lock (`_actionLockedTurn`) AND a Lethe-specific
  * marker (`_letheActionLocked`) so the UI can show a status badge
  * that means specifically "locked by Lethe's OWN effect" (a generic
@@ -83,11 +79,15 @@ function forEachLethe(ps, fn) {
  * and must NOT show this badge). Both auto-expire — they only count
  * while they equal `gs.turn`.
  */
-function lockLethe(ps, gs) {
-  forEachLethe(ps, (h) => {
+function lockLethe(engine, controller) {
+  // Kontrolle statt Seite (Styx 28.9.): jede Lethe, die `controller`
+  // KONTROLLIERT — auch eine geliehene in der Gegenspalte.
+  const gs = engine.gs;
+  for (const { hero: h } of engine.heroesControlledBy(controller)) {
+    if (h?.name !== CARD_NAME) continue;
     h._actionLockedTurn = gs.turn;
     h._letheActionLocked = gs.turn;
-  });
+  }
 }
 
 module.exports = {
@@ -99,7 +99,9 @@ module.exports = {
    */
   abilityCharges: (abilityName, inst, gs) => {
     if (abilityName !== 'Necromancy') return null;
-    const pi = inst?.controller ?? inst?.owner;
+    // Styx 28.9.: Sperren gehoeren dem Kontrolleur des Traegerhelden.
+    const _traeger = gs?.players?.[inst?.owner]?.heroes?.[inst?.heroIdx];
+    const pi = _traeger?.charmedBy ?? inst?.controller ?? inst?.owner;
     const ps = gs?.players?.[pi];
     const leer = { remaining: 0, max: MAX_NECROMANCY_USES };
 
@@ -148,7 +150,7 @@ module.exports = {
       if (!ps) return;
       // (Necromancy-Zaehler setzt sich per Rundenstempel selbst zurueck.)
       if (!ps._letheTargetDefeated) return;
-      lockLethe(ps, gs);
+      lockLethe(engine, controller);
       engine.sync();
     },
 
@@ -158,9 +160,10 @@ module.exports = {
      * turn) re-arm the lock.
      */
     onTurnEnd: async (ctx) => {
-      const controller = ctx.cardController ?? ctx.cardOwner;
-      if (ctx.activePlayer !== controller) return;
-      const ps = ctx._engine.gs.players[controller];
+      // Styx 28.9.: Tracker PRO SPIELER — jede Lethe auf dem Brett fuehrt
+      // ihn fuer beide Seiten, damit er auch fuer eine spaeter geliehene
+      // Lethe stimmt. Zuruecksetzen am Ende des Zuges des Betroffenen.
+      const ps = ctx._engine.gs.players[ctx.activePlayer];
       if (!ps) return;
       delete ps._letheTargetDefeated;
     },
@@ -207,6 +210,9 @@ module.exports = {
       // shadow the field on spread.
       if (ctx.hostHeroName !== CARD_NAME) return;
       if (ctx.hostHeroIdx !== ctx.cardHeroIdx) return;
+      // Styx 28.9.: Brettseite des Wirts, sofern necromancy.js sie meldet.
+      const feld = ctx.cardHeroOwner ?? controller;
+      if (ctx.hostHeroOwner != null && ctx.hostHeroOwner !== feld) return;
 
       const ps = gs.players[controller];
       if (!ps) return;
@@ -227,7 +233,7 @@ module.exports = {
       // Spielerzustand und wurde per `onTurnStart`/`onTurnEnd`
       // geloescht — dieselbe vergessbare Ruecksetzung, die bei Archer
       // und Golden Vermin schiefging. Der Stempel erledigt das jetzt.
-      const abInst = necromancyInstanz(engine, controller, ctx.hostHeroIdx);
+      const abInst = necromancyInstanz(engine, feld, ctx.hostHeroIdx);
       if (abInst) spendUse(abInst, gs, { key: NECRO_KEY, max: MAX_NECROMANCY_USES });
       const uses = abInst
         ? MAX_NECROMANCY_USES - usesLeft(abInst, gs, { key: NECRO_KEY, max: MAX_NECROMANCY_USES })
@@ -246,20 +252,21 @@ module.exports = {
 };
 
 /**
- * Record that a target controlled by `side` was defeated. If `side`
- * is this Lethe's controller, set the tracker; and if it is currently
- * that controller's own turn, lock every Lethe immediately so the
- * rest of the turn is action-locked too.
+ * Record that a target controlled by `side` was defeated: set that
+ * player's tracker; and if it is currently `side`'s own turn, lock every
+ * Lethe `side` controls immediately so the rest of the turn is
+ * action-locked too.
+ * Styx 28.9.: fuer JEDE Seite, nicht nur die des Kontrolleurs dieser
+ * Lethe — sonst fehlte der Tracker, sobald man eine Lethe erst spaeter
+ * (Styx, Charme) uebernimmt. Mehrere Lethes setzen dasselbe (idempotent).
  */
 function _markDefeat(ctx, side) {
   const engine = ctx._engine;
   const gs = engine.gs;
-  const controller = ctx.cardController ?? ctx.cardOwner;
-  if (side !== controller) return;
-  const ps = gs.players[controller];
+  const ps = gs.players[side];
   if (!ps) return;
   ps._letheTargetDefeated = true;
-  if (gs.activePlayer === controller) {
-    lockLethe(ps, gs);
+  if (gs.activePlayer === side) {
+    lockLethe(engine, side);
   }
 }

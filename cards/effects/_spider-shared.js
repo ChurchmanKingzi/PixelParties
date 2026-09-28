@@ -242,7 +242,7 @@ function _actionSlotAvailable(gs, pi, heroIdx) {
   if (!ps) return false;
   const actedAny = (ps.heroesActedThisTurn || []).length > 0;
   if (!actedAny) return true;
-  const hasBonus = (ps.bonusActions?.heroIdx === heroIdx && ps.bonusActions.remaining > 0)
+  const hasBonus = (ps.bonusActions?.heroIdx === heroIdx && (ps.bonusActions.heroOwner ?? pi) === pi /* Styx 28.9.: Seite */ && ps.bonusActions.remaining > 0)
     || ((ps._bonusMainActions || 0) > 0);
   return !!hasBonus;
 }

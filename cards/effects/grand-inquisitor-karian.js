@@ -142,12 +142,13 @@ function _restoreParalysis(hero) {
  * scoped grant is still live just refreshes `remaining` to 1, never
  * stacks (the rule says "a second Action", singular).
  */
-function _grantBonusAction(engine, pi, heroIdx) {
+function _grantBonusAction(engine, pi, heroIdx, heroOwner = pi) {
   const ps = engine.gs.players[pi];
   if (!ps) return;
   const cur = ps.bonusActions;
-  if (cur && cur.heroIdx !== heroIdx) return; // Don't override another card's grant.
-  ps.bonusActions = { heroIdx, remaining: 1 };
+  // Don't override another card's grant. Styx 28.9.: Seite des Helden mit.
+  if (cur && (cur.heroIdx !== heroIdx || (cur.heroOwner ?? pi) !== heroOwner)) return;
+  ps.bonusActions = { heroIdx, heroOwner, remaining: 1 };
 }
 
 module.exports = {
@@ -202,7 +203,7 @@ module.exports = {
       if (!wasAfflicted) return;
       // Die zweite Aktion bleibt der Action Phase vorbehalten.
       if (ctx.phaseIndex === PHASES.ACTION) {
-        _grantBonusAction(engine, ctx.cardController, ctx.cardHeroIdx);
+        _grantBonusAction(engine, ctx.cardController, ctx.cardHeroIdx, ctx.cardHeroOwner ?? ctx.cardController);
       }
       engine.log('karian_shake_off', { hero: hero.name, phase: ctx.phaseIndex });
       engine.sync();
@@ -260,7 +261,8 @@ module.exports = {
       if (ctx.playerIdx !== ctx.cardController) return;
       const ps = gs.players[ctx.cardController];
       if (!ps?.bonusActions) return;
-      if (ps.bonusActions.heroIdx !== ctx.cardHeroIdx) return;
+      if (ps.bonusActions.heroIdx !== ctx.cardHeroIdx
+          || (ps.bonusActions.heroOwner ?? ctx.cardController) !== (ctx.cardHeroOwner ?? ctx.cardController)) return;
       if (!(ps.bonusActions.remaining > 0)) return;
 
       const wasKarianAction = ctx.heroIdx === ctx.cardHeroIdx
@@ -289,7 +291,7 @@ module.exports = {
       if (!hero || hero !== ctx.target) return;
       const touched = _suspendParalysis(hero);
       if (!touched) return;
-      _grantBonusAction(engine, ctx.cardController, ctx.cardHeroIdx);
+      _grantBonusAction(engine, ctx.cardController, ctx.cardHeroIdx, ctx.cardHeroOwner ?? ctx.cardController);
       engine.log('karian_shake_off', { hero: hero.name, from: ctx.statusName });
       engine.sync();
     },
