@@ -92,10 +92,9 @@ Dazu je Variante:
 * hulijing:  federt, blinzelt; das blaue Fuchsfeuer strömt als Partikelfeuer aus
              ihrer Hand (Flammenballen wachsen, kühlen ab, züngeln: weiß,
              hellblau, türkis, blau, dunkelblauer Rand).
-* ingo:      Ingos eigene Animation (src/user/ingo-hood-frames.png): meist ohne
-             Kapuze mit hängenden Armen; er hebt die Arme, zieht die Kapuze auf,
-             verschränkt die Arme, hebt sie wieder, die Kapuze fällt in den
-             Nacken und die Arme sinken; dazu Blinzeln, das Monokel blitzt.
+* ingo:      Ingos eigene Animation (src/user/ingo-hood-frames.png), nur die Posen
+             mit verschränkten Armen: mit Kapuze, zwinkernd ohne Kapuze, eine
+             Weile ohne, wieder mit; dazu Blinzeln, das Monokel blitzt.
 * eingo:     Elegant Ingo: federt, blinzelt, das Monokel blitzt.
 * madame:    Madame Guillotine hält eine Rede (Mund auf und zu), federt,
              blinzelt; von der roten Beilschneide bilden sich an mehreren
@@ -1602,13 +1601,12 @@ def f_hulijing(i):
 # 24x32, zeilenweise gelesen): A = Kapuze auf, Arme ausgebreitet; B = Kapuze auf, Arme innen
 # (f2 offen / f4 zwinkernd); C = Kapuze rutscht in den Nacken; F = ohne Kapuze, Arme innen
 # (f3 offen / f1 zwinkernd); E = ohne Kapuze, Arme ausgebreitet; D = ohne Kapuze, Arme eng.
-# Arme hängen nur in D (ohne Kapuze) und C (Kapuze fällt in den Nacken) – D ist die Ruhepose.
-# Kapuze auf: Arme heben (E) -> Kapuze greifen (A) -> Arme verschränkt (B); wieder ab: Arme heben
-# (A) -> Kapuze fällt, Arme sinken (C) -> D.
-INGO_SEQ = (['D'] * 18 + ['E', 'E', 'A', 'A'] + ['B2'] * 10 + ['A', 'A', 'C', 'C', 'C'] + ['D'] * 11)
+# Nur die Posen mit verschränkten Armen: mit Kapuze (B) und ohne (F); die Posen mit hängenden
+# (C, D) und ausgebreiteten Armen (A, E) bleiben ungenutzt.
+INGO_SEQ = ['B2'] * 12 + ['F1'] + ['F3'] * 20 + ['B4'] + ['B2'] * 14
 INGO_IDX = dict(A=0, B2=2, B4=4, C=6, F1=1, F3=3, E=5, D=7)
-INGO_BLINK = {6: 'D', 27: 'B', 43: 'D'}                  # zwischendurch blinzeln (Auge 9/10, Zeile 15)
-INGO_STAR = [(13, 15, 10), (13, 15, 24)]                  # Monokel blitzt (ohne und mit Kapuze)
+INGO_BLINK = {5: 'B', 24: 'F', 42: 'B'}                  # zwischendurch blinzeln (Auge 9/10, Zeile 15)
+INGO_STAR = [(13, 15, 19), (13, 15, 44)]                  # Monokel blitzt (ohne und mit Kapuze)
 
 
 def f_ingo(i):
@@ -1824,7 +1822,6 @@ def f_stellan(i):
 FLAME_COLS = ('ca2c29', 'f47b22', 'f6e70e', 'f7f5b8')
 STEAM_COLS = ('899ba7', 'bdc7cc', 'd8e3e9', 'e3eef5')
 TAZ_EARS = {'tazune': [((11, 16), -1), ((24, 16), 1)], 'bakugo': [((11, 16), -1), ((24, 16), 1)]}
-ROAR = set(range(14, 30))                               # brüllt in der Loop-Mitte
 
 
 def live_flames(out, fx, fl, i, ox, oy):
@@ -1902,18 +1899,15 @@ def f_tazune(i):
     body, fx = load('body'), load('fx')
     fl = np.array([[fx[y, x, 3] > 0 and hexc(fx[y, x]) in FLAME_COLS for x in range(SW)] for y in range(SH)])
     stm = np.array([[fx[y, x, 3] > 0 and hexc(fx[y, x]) in STEAM_COLS for x in range(SW)] for y in range(SH)])
-    roar = i in ROAR
-    if roar:                                              # Brüllen nur per Mimik: Maul weit auf, Augen
-        if V == 'tazune':                                 # der Mund (2x2 unter den Augen) reißt weiter auf
-            for (x, y), c in {(17, 18): 'd20000', (18, 18): 'd20000',
-                              (16, 19): 'a90000', (17, 19): '4b0000', (18, 19): '4b0000', (19, 19): 'a90000',
-                              (16, 20): 'a90000', (17, 20): 'f00000', (18, 20): 'f00000', (19, 20): 'a90000',
-                              (15, 16): '000100', (20, 16): '000100'}.items():      # Lider senken sich
+    if (i % 16) in (6, 7, 8, 9):                          # der offene Mund schließt sich kurz
+        if V == 'tazune':
+            for (x, y), c in {(17, 19): 'a90000', (18, 19): 'a90000',
+                              (17, 20): 'e75b38', (18, 20): 'e75b38'}.items():
                 body[y, x] = rgb(c)
-        else:                                             # Skin: Maul breiter und tiefer, Augen kneifen
-            for (x, y), c in {(15, 19): 'ff2d2d', (20, 19): 'ff2d2d', (16, 20): 'a90000', (19, 20): 'a90000',
-                              (17, 19): '5a0000', (18, 19): '5a0000',
-                              (16, 16): '000100', (19, 16): '000100'}.items():
+        else:
+            for (x, y), c in {(16, 18): '0d0d0d', (17, 18): '0d0d0d', (18, 18): '0d0d0d', (19, 18): '0d0d0d',
+                              (16, 19): 'a90000', (17, 19): 'a90000', (18, 19): 'a90000', (19, 19): 'a90000',
+                              (17, 20): '0d0d0d', (18, 20): '0d0d0d'}.items():
                 body[y, x] = rgb(c)
     b = BOUNCE12[i % 12]
     out = np.zeros((H, W, 4), int)
@@ -1934,8 +1928,8 @@ def f_tazune(i):
         a = int(255 * (0.55 + 0.45 * f))
         if 0 < yy < H - 1 and 0 < xx < W - 1:
             out[yy, xx] = rgb(hexc(fx[y, x]), a)
-    # Rauch aus den Ohren – über allem, beim Brüllen mehr
-    ear_smoke(out, i, TAZ_EARS[V], PL, PT + b, lambda e: e in ROAR)
+    # Rauch aus den Ohren – über allem
+    ear_smoke(out, i, TAZ_EARS[V], PL, PT + b, lambda e: False)
     return out
 
 
