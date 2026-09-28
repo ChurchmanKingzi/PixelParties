@@ -9,7 +9,7 @@ Aufruf: python3 guardianbeasts.py <tag> [ms] <variante>
             Krallen ziehen den Bogen nach rechts bis an ihren Platz, die Hand ist damit
             wieder vor der Brust; reicht der kurze Arm nicht bis zum Bogen, strecken sich
             die Krallen als lange Klingen dorthin; der Arm reicht von der Schulter schräg links unter dem
-            Kopf zur Hand (Felltextur, Kontur); die Schlitzspur ihrer blutigen Klauen (der dunkelrote Bogen
+            Kopf zur Hand (Felltextur, Kontur); drei Hiebe pro Loop (alle 16 Frames); die Schlitzspur ihrer blutigen Klauen (der dunkelrote Bogen
             unten, links nach rechts) steht in Frame 0 wie im Kartenbild, verblasst
             vom Ende her, und später reißt ein neuer Schlitzer den Bogen in einem
             Zug von links nach rechts wieder auf (heller Kopf, dunkler Schweif);
@@ -125,8 +125,9 @@ def drop_pixels(t, x, y, ground, cols=BLOOD):
 
 # --- Mao: Schlitzspur ------------------------------------------------------------
 SLASH_T = None
-FADE = (1, 12)                                           # Spur verblasst vom Ende her
-SWEEP = (36, 39)                                         # neuer Schlitzer, links -> rechts
+PERIOD = 16                                              # drei Hiebe pro Loop
+FADE = (1, 6)                                            # Spur verblasst vom Ende her
+SWEEP = (12, 15)                                         # neuer Schlitzer, links -> rechts
 
 
 def slash_param(sl):
@@ -231,7 +232,7 @@ def f_mao(i):
     cys, cxs = np.nonzero(claws[:, :, 3])
     anchor = ((cxs.min() + cxs.max()) / 2, float(cys.max()))   # Ansatz der Krallen: unten Mitte
     off = (anchor[0] - rest[0], anchor[1] - rest[1])
-    ax, ay = claw_target(i, anchor)
+    ax, ay = claw_target(i % PERIOD, anchor)
     tx, ty = ax - off[0], ay - off[1]                    # die Hand folgt den Krallen
     ty = max(ty, rest[1])                                # nie höher als die Brust (Arm nicht übers Gesicht)
     sx, sy = hc['shoulder']
@@ -249,7 +250,7 @@ def f_mao(i):
                     body[y, x] = rgb(hc['hole'][(x + 2 * y) % 3])
     knee_put(out, body, b)
     fill_pinholes(out)
-    draw_slash(out, sl, i)
+    draw_slash(out, sl, i % PERIOD)
     if ox or oy:                                         # Arm und Hand vor Körper und Spur
         draw_arm(out, (sx + PL, sy + PT + b), (rest[0] + ox + PL, rest[1] + oy + PT + b), hc['arm'])
         ring = np.zeros(body.shape[:2], bool)
