@@ -6657,7 +6657,7 @@ function StatusBadges({ statuses, counters, buffs, isHero, player, cardName, isO
   if (s.charmed) {
     const ch = typeof s.charmed === 'object' ? s.charmed : {};
     const tip = ch.ohneSchutz
-      ? `Controlled by its owner's opponent${ch.quelle ? ` (${ch.quelle})` : ''} until it is defeated or the turn ends. Not protected from any cards or effects.`
+      ? `Controlled by its owner's opponent${ch.quelle ? ` (${ch.quelle})` : ''} until it is defeated or the turn ends.`
       : ch.onlyFromController
         ? 'Charmed: Under opponent control for the rest of the turn. Unaffected by the controlling player\'s other cards and effects.'
         : ch._loveShot

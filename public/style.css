@@ -24570,4 +24570,3 @@ body.pp-dialog-offen .foil-diamond-rare:not(.modal-overlay *) {
   box-shadow: 0 0 calc(5px * var(--board-scale)) #5ad8ff, inset 0 0 calc(2px * var(--board-scale)) #c9b8ff;
   z-index: 7; pointer-events: auto; cursor: default;
 }
-.styx-revive-counter-bereit { box-shadow: 0 0 calc(8px * var(--board-scale)) #b58cff, 0 0 calc(3px * var(--board-scale)) #fff; }

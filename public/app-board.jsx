@@ -41913,10 +41913,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     Rotation ist. Der Server schickt ihn nur dem Besitzer. */}
                 {!isOpp && hero?.name && (gameState.styxReviveCounter?.heroIdxs || []).includes(i) && (() => {
                   const z = gameState.styxReviveCounter;
-                  const bereit = z.count >= z.needed;
                   return (
-                    <div className={'styx-revive-counter' + (bereit ? ' styx-revive-counter-bereit' : '')}
-                      onMouseEnter={e => showGameTooltip(e, `Heroes revived this game: ${z.count}. "Styx, the Opened Gate" needs at least ${z.needed}.${bereit ? ' Ready to Ascend!' : ''}`)}
+                    <div className="styx-revive-counter"
+                      onMouseEnter={e => showGameTooltip(e, `Heroes revived this game: ${z.count}`)}
                       onMouseLeave={hideGameTooltip}>
                       <PxIcon z="👻" />{z.count}
                     </div>

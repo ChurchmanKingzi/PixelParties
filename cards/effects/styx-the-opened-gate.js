@@ -123,7 +123,6 @@ module.exports = {
           ? `Choose a card from your discard pile to add to your hand (up to ${BONUS_KARTEN}).`
           : `Choose another card (${genommen.length}/${BONUS_KARTEN}), or stop here.`,
         cards: galerie,
-        showCard: CARD_NAME,
         cancellable: true,
         cancelLabel: genommen.length === 0 ? 'Skip' : '✓ Done',
       });
