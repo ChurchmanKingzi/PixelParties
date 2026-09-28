@@ -38,24 +38,12 @@ const { IFRIT, ARMAGEDDON, ifritsOf, sourceSide } = require('./_apocalypse-share
 
 const CARD_NAME = 'Damus, the Prophet of Apocalypse';
 
-/** Freie Support-Zonen aller eigenen lebenden Helden. */
+/** Freie Support-Zonen aller lebenden Helden, die `pi` kontrolliert. */
 function freieZonen(engine, pi) {
-  const ps = engine.gs.players[pi];
-  const out = [];
-  for (let hi = 0; hi < (ps?.heroes || []).length; hi++) {
-    const hero = ps.heroes[hi];
-    if (!hero?.name || hero.hp <= 0) continue;
-    // Kontrolle statt Seite (Styx 28.9.) — ein abgegebener Held ist
-    // nicht „any Hero you control". (Uebernommene Helden der Gegenspalte
-    // bietet der Platzierungsweg nicht an — er setzt nur in die eigene.)
-    if (engine.heroSideOf(pi, hero) !== pi) continue;
-    for (let zi = 0; zi < 3; zi++) {
-      if (((ps.supportZones?.[hi] || [])[zi] || []).length === 0) {
-        out.push({ heroIdx: hi, slotIdx: zi, label: `${hero.name} — Support ${zi + 1}` });
-      }
-    }
-  }
-  return out;
+  // Kontrolle statt Seite (Styx 28.9.) — „any Hero you control": auch
+  // uebernommene Helden der Gegenspalte (Zone traegt `owner`), ein
+  // abgegebener eigener Held dagegen nicht.
+  return engine.getFreeSupportZones(pi, { nachKontrolle: true, livingHeroesOnly: true });
 }
 
 module.exports = {
@@ -139,26 +127,33 @@ module.exports = {
         cancellable: true,
       });
       if (!wahl || wahl.cancelled) return false;
-      ziel = { heroIdx: wahl.heroIdx, slotIdx: wahl.slotIdx };
+      const seite = wahl.owner ?? pi;
+      ziel = zonen.find(z => z.owner === seite && z.heroIdx === wahl.heroIdx && z.slotIdx === wahl.slotIdx)
+        || zonen.find(z => z.heroIdx === wahl.heroIdx && z.slotIdx === wahl.slotIdx);
+      if (!ziel) return false;
     }
+    // Kontrolle statt Seite (Styx 28.9.): physische Seite des Zielhelden.
+    const feld = ziel.owner ?? pi;
+    const fremd = feld !== pi;
 
     // Nach der Abfrage neu pruefen.
     const idxJetzt = (ps.hand || []).indexOf(IFRIT);
     if (idxJetzt < 0) return false;
-    if (((ps.supportZones?.[ziel.heroIdx] || [])[ziel.slotIdx] || []).length > 0) return false;
+    if (((engine.gs.players[feld]?.supportZones?.[ziel.heroIdx] || [])[ziel.slotIdx] || []).length > 0) return false;
 
     engine.takeFromPileSync(ps, 'hand', idxJetzt);
     const res = await engine.summonCreatureWithHooks(
-      IFRIT, pi, ziel.heroIdx, ziel.slotIdx,
+      IFRIT, feld, ziel.heroIdx, ziel.slotIdx,
       {
-        source: CARD_NAME, fromHandIdx: idxJetzt, _fromHand: true,
+        // Flug nur von der eigenen Seite (fromHandIdx zeigt in die Hand von `feld`).
+        source: CARD_NAME, ...(fremd ? { controller: pi } : { fromHandIdx: idxJetzt }), _fromHand: true,
         hookExtras: { _isNormalSummon: false },
       },
     );
     if (!res?.inst) { engine.handZugangSync(ps, IFRIT, { von: 'rueckgabe', ohneInstanz: true }); return false; }   // v1395
 
     engine._broadcastEvent('summon_effect', {
-      owner: pi, heroIdx: ziel.heroIdx, zoneSlot: ziel.slotIdx,
+      owner: feld, heroIdx: ziel.heroIdx, zoneSlot: ziel.slotIdx,
     });
     engine.log('damus_place_ifrit', {
       player: ps.username, heroIdx: ziel.heroIdx, slot: ziel.slotIdx,
@@ -171,6 +166,6 @@ module.exports = {
     if (kind !== 'generic' || promptData?.title !== CARD_NAME) return undefined;
     if (promptData.type !== 'zonePick') return undefined;
     const z = (promptData.zones || [])[0];
-    return z ? { heroIdx: z.heroIdx, slotIdx: z.slotIdx } : undefined;
+    return z ? { owner: z.owner, heroIdx: z.heroIdx, slotIdx: z.slotIdx } : undefined;
   },
 };

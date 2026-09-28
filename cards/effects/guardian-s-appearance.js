@@ -34,15 +34,8 @@ module.exports = {
     // Support slot on at least one alive Hero.
     const hasGBInHand = (ps.hand || []).some(isGuardianBeastCreature);
     if (!hasGBInHand) return false;
-    for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-      const h = ps.heroes[hi];
-      if (!h?.name || h.hp <= 0) continue;
-      const zones = ps.supportZones?.[hi] || [[], [], []];
-      for (let z = 0; z < 3; z++) {
-        if ((zones[z] || []).length === 0) return true;
-      }
-    }
-    return false;
+    // Kontrolle statt Seite (Styx 28.9.) — „any Hero you control".
+    return engine.getFreeSupportZones(pi, { nachKontrolle: true, livingHeroesOnly: true }).length > 0;
   },
 
   hooks: {
@@ -77,20 +70,9 @@ module.exports = {
       const beastName = pickHand.cardName;
 
       // Step 2: pick a free zone on one of the caster's alive heroes.
-      const zones = [];
-      for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-        const h = ps.heroes[hi];
-        if (!h?.name || h.hp <= 0) continue;
-        const sz = ps.supportZones?.[hi] || [[], [], []];
-        for (let z = 0; z < 3; z++) {
-          if ((sz[z] || []).length === 0) {
-            zones.push({
-              heroIdx: hi, slotIdx: z,
-              label: `${h.name} — Slot ${z + 1}`,
-            });
-          }
-        }
-      }
+      // Kontrolle statt Seite (Styx 28.9.) — alle Helden, die der
+      // Wirker kontrolliert; jede Zone traegt `owner` (physische Seite).
+      const zones = engine.getFreeSupportZones(pi, { nachKontrolle: true, livingHeroesOnly: true });
       if (zones.length === 0) return;
       const promptCtx = engine._createContext(ctx.card, {});
       const slotPick = await promptCtx.promptZonePick(zones, {
@@ -99,6 +81,7 @@ module.exports = {
         cancellable: false,
       });
       if (!slotPick) return;
+      const feld = slotPick.owner ?? pi;
 
       // Step 3: remove from hand & place. Use isPlacement+skipBeforeSummon
       // so the empty-discard summon gate is bypassed (matches "ignoring
@@ -110,14 +93,15 @@ module.exports = {
 
       engine._broadcastEvent('play_zone_animation', {
         type: 'summoning_glow',
-        owner: pi, heroIdx: slotPick.heroIdx, zoneSlot: slotPick.slotIdx,
+        owner: feld, heroIdx: slotPick.heroIdx, zoneSlot: slotPick.slotIdx,
       });
       await engine._delay(250);
 
       const placeRes = await engine.summonCreatureWithHooks(
-        beastName, pi, slotPick.heroIdx, slotPick.slotIdx,
+        beastName, feld, slotPick.heroIdx, slotPick.slotIdx,
         {
           source: CARD_NAME,
+          ...(feld !== pi ? { controller: pi } : {}),
           isPlacement: true,
           skipBeforeSummon: true,
           hookExtras: {

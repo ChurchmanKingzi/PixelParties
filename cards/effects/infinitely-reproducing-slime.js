@@ -158,8 +158,11 @@ module.exports = {
         });
         if (!zonePick || zonePick.cancelled
             || typeof zonePick.heroIdx !== 'number' || typeof zonePick.slotIdx !== 'number') return;
-        const match = zones.find(z => z.heroIdx === zonePick.heroIdx && z.slotIdx === zonePick.slotIdx
-          && z.owner === (zonePick.owner ?? pi));   // Kontrolle statt Seite (Styx 28.9.)
+        // Kontrolle statt Seite (Styx 28.9.): Zone samt Seite; eine Antwort
+        // ohne `owner` (generische CPU) faellt auf die erste passende zurueck.
+        const gleich = z => z.heroIdx === zonePick.heroIdx && z.slotIdx === zonePick.slotIdx;
+        const match = zones.find(z => gleich(z) && z.owner === (zonePick.owner ?? pi))
+          || (zonePick.owner == null ? zones.find(gleich) : null);
         if (!match) return;
         dest = match;
       }

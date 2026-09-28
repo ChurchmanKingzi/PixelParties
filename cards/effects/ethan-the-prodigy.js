@@ -53,19 +53,23 @@ function hatEthan(engine, pi) {
 
 /** Freie Support-Zonen, in die `pi` beschwoeren darf. */
 function freieZonen(engine, pi) {
-  const ps = engine.gs.players[pi];
-  const out = [];
-  for (let hi = 0; hi < (ps?.heroes || []).length; hi++) {
-    const hero = ps.heroes[hi];
-    if (!hero?.name || hero.hp <= 0) continue;
-    if (!engine._canHeroActivateSurprise(pi, hi, CARD_NAME)) continue;
-    for (let zi = 0; zi < 3; zi++) {
-      if (((ps.supportZones?.[hi] || [])[zi] || []).length === 0) {
-        out.push({ heroIdx: hi, slotIdx: zi, label: `${hero.name} — Support ${zi + 1}` });
-      }
-    }
-  }
-  return out;
+  return engine.getFreeSupportZones(pi, { nachKontrolle: true, livingHeroesOnly: true })
+    .filter(z => darfUeberHeld(engine, pi, z.owner, z.heroIdx));
+}
+
+// Kontrolle statt Seite (Styx 28.9.) — beschworen wird mit „a Hero you
+// control": auch ein uebernommener Held der Gegenspalte (Zone traegt
+// `owner` = physische Seite), ein abgegebener eigener dagegen nicht.
+// `_canHeroActivateSurprise` kennt nur die eigene Spalte — fuer den
+// uebernommenen Helden dieselben Kernpruefungen an der physischen Adresse.
+function darfUeberHeld(engine, pi, feld, hi) {
+  if (feld === pi) return engine._canHeroActivateSurprise(pi, hi, CARD_NAME);
+  if (engine._reaktionGesperrt(pi)) return false;
+  const hero = engine.gs.players[feld]?.heroes?.[hi];
+  if (!hero?.name || hero.hp <= 0) return false;
+  const st = hero.statuses || {};
+  if (st.frozen || st.stunned || st.webbed || st.negated) return false;
+  return engine.heroMeetsLevelReq(feld, hi, engine._getCardDB()[CARD_NAME], { levelSourcePi: pi });
 }
 
 module.exports = {
@@ -139,16 +143,21 @@ module.exports = {
           cancellable: true,
         });
         if (!wahl || wahl.cancelled) return;
-        ziel = { heroIdx: wahl.heroIdx, slotIdx: wahl.slotIdx };
+        ziel = zonenJetzt.find(z => z.owner === (wahl.owner ?? pi) && z.heroIdx === wahl.heroIdx && z.slotIdx === wahl.slotIdx)
+          || zonenJetzt.find(z => z.heroIdx === wahl.heroIdx && z.slotIdx === wahl.slotIdx);
+        if (!ziel) return;
       }
+      const feld = ziel.owner ?? pi;   // Kontrolle statt Seite (Styx 28.9.)
 
       const handIdx = ps.hand.indexOf(CARD_NAME);
       engine.takeFromPileSync(ps, 'hand', handIdx);
       const res = await engine.summonCreatureWithHooks(
-        CARD_NAME, pi, ziel.heroIdx, ziel.slotIdx,
+        CARD_NAME, feld, ziel.heroIdx, ziel.slotIdx,
         {
-          source: CARD_NAME, fromHandIdx: handIdx,
-          hookExtras: { _isNormalSummon: false },
+          source: CARD_NAME, ...(feld !== pi ? { controller: pi } : { fromHandIdx: handIdx }),
+          // Kontrolle statt Seite (Styx 28.9.): `beforeSummon` sieht als
+          // `cardOwner` die Feldseite — der Beschwoerer kommt extra mit.
+          hookExtras: { _isNormalSummon: false, ethanKontrolleur: pi },
         },
       );
       if (!res?.inst) { engine.handZugangSync(ps, CARD_NAME, { von: 'rueckgabe', ohneInstanz: true }); return; }   // v1395
@@ -157,7 +166,7 @@ module.exports = {
         player: ps.username, trigger: ctx.spellName || null, level: cd.level,
       });
       engine._broadcastEvent('summon_effect', {
-        owner: pi, heroIdx: ziel.heroIdx, zoneSlot: ziel.slotIdx,
+        owner: feld, heroIdx: ziel.heroIdx, zoneSlot: ziel.slotIdx,
       });
       engine.sync();
     },
@@ -175,7 +184,7 @@ module.exports = {
    */
   async beforeSummon(ctx) {
     const engine = ctx._engine;
-    const pi = ctx.cardOwner;
+    const pi = ctx.ethanKontrolleur ?? ctx.cardOwner;   // Styx 28.9. (s. Sofort-Weg)
     return !hatEthan(engine, pi);
   },
 
@@ -186,7 +195,7 @@ module.exports = {
     if (promptData.type === 'confirm') return { confirmed: true };
     if (promptData.type === 'zonePick') {
       const z = (promptData.zones || [])[0];
-      return z ? { heroIdx: z.heroIdx, slotIdx: z.slotIdx } : undefined;
+      return z ? { owner: z.owner, heroIdx: z.heroIdx, slotIdx: z.slotIdx } : undefined;
     }
     return undefined;
   },

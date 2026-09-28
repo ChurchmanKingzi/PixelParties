@@ -41,11 +41,11 @@ const TEST_IMMEDIATE = false;
  *  when their condition isn't met; tribute Creatures pass here and pay
  *  their cost via `beforeSummon` at placement. */
 function summonableForSomeHero(engine, pi, name) {
-  const ps = engine.gs.players[pi];
-  for (let hi = 0; hi < (ps?.heroes || []).length; hi++) {
-    const hero = ps.heroes[hi];
+  // Kontrolle statt Seite (Styx 28.9.): „any Hero you control" — auch
+  // uebernommene Helden der Gegenspalte, geprueft ueber ihre physische Adresse.
+  for (const { physOwner, heroIdx: hi, hero } of engine.heroesControlledBy(pi)) {
     if (!hero?.name || hero.hp <= 0) continue;
-    if (engine.isCreatureSummonable(name, pi, hi)) return true;
+    if (engine.isCreatureSummonable(name, physOwner, hi)) return true;
   }
   return false;
 }
@@ -91,15 +91,9 @@ async function doLadderSearch(engine, pi, sacLevel) {
   const maxLevel = (sacLevel || 0) + 1;
 
   const gallery = buildLadderGallery(engine, pi, maxLevel);
-  // Free Support Zone under any living Hero.
-  const freeZones = [];
-  for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-    const hero = ps.heroes[hi];
-    if (!hero?.name || hero.hp <= 0) continue;
-    for (let zi = 0; zi < 3; zi++) {
-      if (((ps.supportZones?.[hi] || [])[zi] || []).length === 0) freeZones.push({ heroIdx: hi, slotIdx: zi });
-    }
-  }
+  // Free Support Zone under any living Hero you control.
+  // Kontrolle statt Seite (Styx 28.9.): jede Zone traegt `owner` (physische Seite).
+  const freeZones = engine.getFreeSupportZones(pi, { nachKontrolle: true, livingHeroesOnly: true, source: CARD_NAME });
   if (gallery.length === 0 || freeZones.length === 0) return;
 
   // "you MAY search" — optional.
@@ -116,7 +110,7 @@ async function doLadderSearch(engine, pi, sacLevel) {
   if ((ps.mainDeck || []).indexOf(chosenName) < 0) return;
 
   // Zones where this Creature is actually summonable (per-Hero canSummon).
-  const placeable = freeZones.filter(z => engine.isCreatureSummonable(chosenName, pi, z.heroIdx));
+  const placeable = freeZones.filter(z => engine.isCreatureSummonable(chosenName, z.owner, z.heroIdx));
   if (placeable.length === 0) return;
 
   let dest = placeable[0];
@@ -129,15 +123,21 @@ async function doLadderSearch(engine, pi, sacLevel) {
       cancellable: true,
     });
     if (!zr || zr.cancelled) return;
-    dest = { heroIdx: zr.heroIdx, slotIdx: zr.slotIdx };
+    // Kontrolle statt Seite (Styx 28.9.): gewaehlte Zone samt `owner`.
+    // Antwort ohne `owner` (generische CPU) → erste passende Zone.
+    const gleich = z => z.heroIdx === zr.heroIdx && z.slotIdx === zr.slotIdx;
+    dest = placeable.find(z => gleich(z) && z.owner === (zr.owner ?? pi))
+      || (zr.owner == null ? placeable.find(gleich) : null);
+    if (!dest) return;
   }
 
   const _taken_deckIdx = await engine.deckEntnahme(ps,  chosenName, { source: CARD_NAME, shuffle: true });   // v820: Stapel-Schicht
   if (!_taken_deckIdx) return;
 
   const res = await engine.summonCreatureWithHooks(
-    chosenName, pi, dest.heroIdx, dest.slotIdx,
-    { source: CARD_NAME, isPlacement: true, hookExtras: engine.deckHookExtras() },   // v1393
+    chosenName, dest.owner, dest.heroIdx, dest.slotIdx,
+    { source: CARD_NAME, isPlacement: true, hookExtras: engine.deckHookExtras(),   // v1393
+      controller: pi },   // Kontrolle statt Seite (Styx 28.9.): Feldseite + Kontrolleur
   );
   if (!res?.inst) {
     engine.returnToPile(ps, 'deck', chosenName);
@@ -152,10 +152,10 @@ async function doLadderSearch(engine, pi, sacLevel) {
   //    skyward + a gold sparkle burst on the placed Creature (on top of
   //    the default summon glow). ──
   engine._broadcastEvent('play_zone_animation', {
-    type: 'holy_revival', owner: pi, heroIdx: dest.heroIdx, zoneSlot: dest.slotIdx,
+    type: 'holy_revival', owner: dest.owner, heroIdx: dest.heroIdx, zoneSlot: dest.slotIdx,
   });
   engine._broadcastEvent('play_zone_animation', {
-    type: 'gold_sparkle', owner: pi, heroIdx: dest.heroIdx, zoneSlot: dest.slotIdx,
+    type: 'gold_sparkle', owner: dest.owner, heroIdx: dest.heroIdx, zoneSlot: dest.slotIdx,
   });
   await engine._delay(600);
 

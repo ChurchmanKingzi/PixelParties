@@ -86,13 +86,14 @@ function _findFreeOwnSupportSlots(engine, pi) {
   const ps = engine.gs.players[pi];
   if (!ps) return [];
   const slots = [];
-  for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-    const hero = ps.heroes[hi];
+  // Kontrolle statt Seite (Styx 28.9.): alle Helden, die `pi` kontrolliert
+  // (auch uebernommene der Gegenspalte); `owner` = physische Seite.
+  for (const { physOwner, heroIdx: hi, hero } of engine.heroesControlledBy(pi)) {
     if (!hero?.name || hero.hp <= 0) continue;
-    const zones = ps.supportZones?.[hi] || [];
+    const zones = engine.gs.players[physOwner]?.supportZones?.[hi] || [];
     for (let zi = 0; zi < 3; zi++) {
       if ((zones[zi] || []).length === 0) {
-        slots.push({ heroIdx: hi, slotIdx: zi, label: `${hero.name} — Slot ${zi + 1}` });
+        slots.push({ owner: physOwner, heroIdx: hi, slotIdx: zi, label: `${hero.name} — Slot ${zi + 1}` });
       }
     }
   }
@@ -265,7 +266,8 @@ module.exports = {
         chosenName = null;
         continue;
       }
-      dest = freeSlots.find(z => z.heroIdx === pick.heroIdx && z.slotIdx === pick.slotIdx) || null;
+      dest = freeSlots.find(z => z.heroIdx === pick.heroIdx && z.slotIdx === pick.slotIdx
+        && z.owner === (pick.owner ?? pi)) || null;   // Kontrolle statt Seite (Styx 28.9.)
       if (!dest) {
         rueckspruenge++;
         if (automatAntwortet() || rueckspruenge > MAX_RUECKSPRUENGE) { dest = freeSlots[0]; break; }
@@ -289,8 +291,8 @@ module.exports = {
     engine.takeFromPileSync(ps, 'hand', handIdx);
 
     const summonResult = await engine.summonCreatureWithHooks(
-      chosenName, pi, dest.heroIdx, dest.slotIdx,
-      { source: CARD_NAME },
+      chosenName, dest.owner, dest.heroIdx, dest.slotIdx,
+      { source: CARD_NAME, controller: pi },   // Kontrolle statt Seite (Styx 28.9.): Feldseite + Kontrolleur
     );
     if (!summonResult?.inst) {
       // Race / cancelled by a beforeSummon cost — refund the hand card.

@@ -69,7 +69,8 @@ module.exports = {
       if (eligible.length === 0) return;
 
       // Any free support zone on any hero we control (living OR dead).
-      const freeZones = engine.getFreeSupportZones(pi);
+      // Kontrolle statt Seite (Styx 28.9.) — Zonen tragen `owner`.
+      const freeZones = engine.getFreeSupportZones(pi, { nachKontrolle: true });
       if (freeZones.length === 0) return;
 
       if (!(await promptOptionalOnSummon(ctx, CARD_NAME,
@@ -91,6 +92,7 @@ module.exports = {
       if (!zone) return;
 
       await engine.actionPlaceCreature(picked.cardName, pi, zone.heroIdx, zone.slotIdx, {
+        heldSeite: zone.owner ?? pi,
         source: 'discard',
         sourceName: CARD_NAME,
         negateEffects: true,

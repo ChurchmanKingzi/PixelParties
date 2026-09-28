@@ -102,23 +102,31 @@ async function zielZone(engine, pi, d) {
   // Die alte Zone gilt nur, wenn die Creature auf der EIGENEN Seite
   // stand (eine voruebergehend gestohlene lag beim Besitzer).
   const eigeneSeite = (d.owner ?? d.controller) === pi;
-  if (eigeneSeite && d.heroIdx != null && d.zoneSlot != null) {
-    if (zoneFrei(engine, pi, d.heroIdx, d.zoneSlot)) return { heroIdx: d.heroIdx, slotIdx: d.zoneSlot };
-    const gleicherHeld = engine.getFreeSupportZones(pi, { namedHeroesOnly: true, source: CARD_NAME })
+  // Kontrolle statt Seite (Styx 28.9.): stand sie ueber einem uebernommenen
+  // Helden der Gegenspalte, den `pi` noch kontrolliert, gilt dessen Zone.
+  const seite = d.owner ?? d.controller;
+  const fremdHeld = !eigeneSeite && typeof seite === 'number' && d.heroIdx != null
+    ? engine.gs.players[seite]?.heroes?.[d.heroIdx] : null;
+  const altSeite = eigeneSeite ? pi
+    : (fremdHeld?.name && engine.heroSideOf(seite, fremdHeld) === pi ? seite : null);
+  if (altSeite != null && d.heroIdx != null && d.zoneSlot != null) {
+    if (zoneFrei(engine, altSeite, d.heroIdx, d.zoneSlot)) return { owner: altSeite, heroIdx: d.heroIdx, slotIdx: d.zoneSlot };
+    const gleicherHeld = engine.getFreeSupportZones(altSeite, { namedHeroesOnly: true, source: CARD_NAME })
       .filter(z => z.heroIdx === d.heroIdx);
-    if (gleicherHeld.length) return { heroIdx: gleicherHeld[0].heroIdx, slotIdx: gleicherHeld[0].slotIdx };
+    if (gleicherHeld.length) return { owner: altSeite, heroIdx: gleicherHeld[0].heroIdx, slotIdx: gleicherHeld[0].slotIdx };
   }
-  const alle = engine.getFreeSupportZones(pi, { namedHeroesOnly: true, source: CARD_NAME });
+  // Kontrolle statt Seite (Styx 28.9.): Ausweichzonen = alle Helden, die `pi` kontrolliert.
+  const alle = engine.getFreeSupportZones(pi, { nachKontrolle: true, source: CARD_NAME });
   if (alle.length === 0) return null;
-  if (alle.length === 1) return { heroIdx: alle[0].heroIdx, slotIdx: alle[0].slotIdx };
+  if (alle.length === 1) return { owner: alle[0].owner, heroIdx: alle[0].heroIdx, slotIdx: alle[0].slotIdx };
   const wahl = await engine.promptGeneric(pi, {
     type: 'zonePick', zones: alle,
     title: CARD_NAME, source: CARD_NAME,
     description: `${d.name}'s Support Zone is taken. Choose another free Support Zone to revive it in.`,
     cancellable: false, heroShortcut: false, previewCardName: d.name,
   });
-  const z = alle.find(x => x.heroIdx === wahl?.heroIdx && x.slotIdx === wahl?.slotIdx) || alle[0];
-  return { heroIdx: z.heroIdx, slotIdx: z.slotIdx };
+  const z = alle.find(x => x.owner === (wahl?.owner ?? pi) && x.heroIdx === wahl?.heroIdx && x.slotIdx === wahl?.slotIdx) || alle[0];
+  return { owner: z.owner, heroIdx: z.heroIdx, slotIdx: z.slotIdx };
 }
 
 /** Welche der Kandidaten soll zurueck? (1 → ohne Frage) */
@@ -194,6 +202,7 @@ module.exports = {
     }
     const inst = (await engine.summonFromDiscard(pi, d.pileOwner, d.name, zone.heroIdx, zone.slotIdx, {
       mode: 'revive', source: CARD_NAME, vorAnim: { type: 'undead_revival', ms: 760 }, last: true,
+      heldSeite: zone.owner ?? pi,   // Kontrolle statt Seite (Styx 28.9.)
     }))?.inst || null;
     if (!inst) {
       engine.log('zombified_assault_fizzle', { player: ps?.username, reason: 'revive_failed', card: d.name });
@@ -227,7 +236,7 @@ module.exports = {
     }
     if (payload?.type === 'zonePick' && payload?.title === CARD_NAME) {
       const z = (payload.zones || [])[0];
-      return z ? { heroIdx: z.heroIdx, slotIdx: z.slotIdx } : undefined;
+      return z ? { owner: z.owner, heroIdx: z.heroIdx, slotIdx: z.slotIdx } : undefined;   // Kontrolle statt Seite (Styx 28.9.)
     }
     return undefined;
   },

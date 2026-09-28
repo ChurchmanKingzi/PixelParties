@@ -49,22 +49,13 @@ const CARD_NAME = 'Gangster Angel';
 const PARTNER = 'Angler Angel';
 const DAMAGE = 10;
 
-/** Freie eigene Support-Plaetze bei lebenden Helden. */
+/**
+ * Freie Support-Plaetze bei lebenden Helden, die `pi` kontrolliert.
+ * Kontrolle statt Seite (Styx 28.9.) — auch uebernommene Helden der
+ * Gegenspalte; jede Zone traegt `owner` (physische Seite).
+ */
 function freieSlots(engine, pi) {
-  const ps = engine.gs.players[pi];
-  if (!ps) return [];
-  const slots = [];
-  for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-    const hero = ps.heroes[hi];
-    if (!hero?.name || hero.hp <= 0) continue;
-    const zones = ps.supportZones?.[hi] || [];
-    for (let zi = 0; zi < 3; zi++) {
-      if ((zones[zi] || []).length === 0) {
-        slots.push({ heroIdx: hi, slotIdx: zi, label: `${hero.name} — Slot ${zi + 1}` });
-      }
-    }
-  }
-  return slots;
+  return engine.getFreeSupportZones(pi, { nachKontrolle: true, livingHeroesOnly: true });
 }
 
 /**
@@ -185,15 +176,18 @@ module.exports = {
           description: `Place ${PARTNER} into a free Support Zone.`,
           cancellable: false,
         });
-        ziel = slots.find(z => z.heroIdx === pick?.heroIdx && z.slotIdx === pick?.slotIdx) || slots[0];
+        ziel = slots.find(z => z.owner === (pick?.owner ?? pi) && z.heroIdx === pick?.heroIdx && z.slotIdx === pick?.slotIdx)
+          || slots.find(z => z.heroIdx === pick?.heroIdx && z.slotIdx === pick?.slotIdx) || slots[0];
       }
 
       const handIdx = (ps.hand || []).indexOf(PARTNER);
       if (handIdx < 0) return;                       // Rennen: Karte ist weg
       engine.takeFromPileSync(ps, 'hand', handIdx);
 
+      const feld = ziel.owner ?? pi;   // Kontrolle statt Seite (Styx 28.9.)
       const ergebnis = await engine.summonCreatureWithHooks(
-        PARTNER, pi, ziel.heroIdx, ziel.slotIdx, { source: CARD_NAME },
+        PARTNER, feld, ziel.heroIdx, ziel.slotIdx,
+        { source: CARD_NAME, ...(feld !== pi ? { controller: pi } : {}) },
       );
       if (!ergebnis?.inst) {
         // Abgebrochen (z.B. durch eine Kosten-Abfrage der Zielkarte):

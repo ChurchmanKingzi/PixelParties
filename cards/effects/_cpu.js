@@ -5926,7 +5926,8 @@ function mctsValidateGenericEntry(entry, promptData) {
   if (!v) return false;
   if (type === 'zonePick') {
     const zones = promptData.zones || [];
-    return zones.some(z => z.heroIdx === v.heroIdx && z.slotIdx === v.slotIdx);
+    return zones.some(z => z.heroIdx === v.heroIdx && z.slotIdx === v.slotIdx
+      && (v.owner == null || z.owner == null || z.owner === v.owner));
   }
   if (type === 'cardGallery') {
     const cards = promptData.cards || [];
@@ -6193,7 +6194,7 @@ function mctsEnumerateGenericAlternatives(engine, promptData, cpuIdxForBias) {
       }
     } catch { /* ignore — keep original ordering */ }
     return zones.map(z => ({
-      value: { heroIdx: z.heroIdx, slotIdx: z.slotIdx },
+      value: { heroIdx: z.heroIdx, slotIdx: z.slotIdx, ...(z.owner != null ? { owner: z.owner } : {}) },
       label: `zone=h${z.heroIdx}s${z.slotIdx}`,
     }));
   }
@@ -8230,7 +8231,7 @@ function cpuGenericChoice(engine, promptData, promptedPlayerIdx) {
       }
     } catch { /* ignore — fall through to uniform pick */ }
     const z = pool[Math.floor(Math.random() * pool.length)];
-    return { heroIdx: z.heroIdx, slotIdx: z.slotIdx };
+    return { heroIdx: z.heroIdx, slotIdx: z.slotIdx, ...(z.owner != null ? { owner: z.owner } : {}) };
   }
   // Hand-pick (mulligan) prompts: Leadership, Horn in a Bottle, etc.
   // These expect `{ selectedCards: [{ cardName, handIndex }, ...] }`.

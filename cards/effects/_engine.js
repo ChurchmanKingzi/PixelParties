@@ -1888,7 +1888,9 @@ class GameEngine {
     if (type === 'zonePick') {
       const zones = promptData.zones || [];
       if (zones.length === 0) return null;
-      return { heroIdx: zones[0].heroIdx, slotIdx: zones[0].slotIdx };
+      // `owner` mitgeben (Styx 28.9.): Zonen uebernommener Helden liegen
+      // auf der Gegenseite und tragen ihre physische Seite.
+      return { heroIdx: zones[0].heroIdx, slotIdx: zones[0].slotIdx, ...(zones[0].owner != null ? { owner: zones[0].owner } : {}) };
     }
 
     if (type === 'statusSelect') {
@@ -13879,7 +13881,9 @@ this._deathWatch = (this._deathWatchStack || []).length
     const { alsZusatzaktion, ...rest } = opts || {};
     const ergebnis = await this._summonCreatureWithHooksKern(cardName, playerIdx, heroIdx, zoneSlot, rest);
     if (alsZusatzaktion && ergebnis?.inst) {
-      await this.meldeBeschwoerungAlsAktion(playerIdx, heroIdx, cardName, ergebnis.inst);
+      // Die Aktion gehoert dem BESCHWOERER (`controller`), nicht der
+      // Feldseite — bei einem uebernommenen Helden der Gegenspalte (Styx).
+      await this.meldeBeschwoerungAlsAktion(rest.controller ?? playerIdx, heroIdx, cardName, ergebnis.inst);
     }
     return ergebnis;
   }
@@ -13906,10 +13910,12 @@ this._deathWatch = (this._deathWatchStack || []).length
     // uebergibt den Platz als `opts.fromHandIdx`; nur dann fliegt sie.
     if (opts.fromHandIdx != null && opts.fromHandIdx >= 0) {
       this._broadcastEvent('play_pile_transfer', {
-        owner: playerIdx, cardName,
+        owner: opts.controller ?? playerIdx, cardName,
         from: 'hand', to: 'support',
         fromHandIdx: opts.fromHandIdx,
         toHeroIdx: heroIdx, toSlotIdx: zoneSlot,
+        // Hand = Beschwoerer, Ziel = Feldseite (Styx 28.9.).
+        ...(opts.controller != null && opts.controller !== playerIdx ? { toOwner: playerIdx } : {}),
       });
     }
     // v704 (Puppets): gesperrte Support Zones (Tri Fecta / Tri Ad) — nur

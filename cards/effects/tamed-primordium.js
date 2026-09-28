@@ -20,7 +20,21 @@
 //    (`ps.summonLocked`, Engine-Vertrag: Hand UND Effekt-Beschwoerungen,
 //    faellt am Zugbeginn).
 // ═══════════════════════════════════════════
-const { summonZonesFor, pickZone } = require('./_of-kings-shared');
+const { eligibleSummonZones } = require('./_summon-eligibility');
+
+// Kontrolle statt Seite (Styx 28.9.): Beschwoerungsplaetze bei allen
+// Helden, die `pi` kontrolliert (Zonen tragen `owner` = physische Seite).
+function summonZonesFor(engine, pi, cd) {
+  return eligibleSummonZones(engine, pi, cd?.name, { nachKontrolle: true, alsAktion: true });
+}
+
+async function pickZone(engine, pi, zones, title, description) {
+  if (!zones.length) return null;
+  if (zones.length === 1) return zones[0];
+  const pick = await engine.promptGeneric(pi, { type: 'zonePick', title, description, zones, cancellable: true });
+  if (!pick || pick.cancelled || pick.heroIdx == null || pick.slotIdx == null) return null;
+  return zones.find(z => z.owner === (pick.owner ?? pi) && z.heroIdx === pick.heroIdx && z.slotIdx === pick.slotIdx) || null;
+}
 
 const CARD_NAME = 'Tamed Primordium';
 const MAX_LEVEL = 1;
@@ -39,7 +53,7 @@ function eligibleHand(engine, pi) {
     const cd = cardDB[n];
     if (!cd || !(cd.cardType === 'Creature' || String(cd.cardType || '').split('/').includes('Creature'))) continue;
     if (engine.effectiveCardLevel(cd, pi) > MAX_LEVEL) continue;
-    if (summonZonesFor(engine, pi, cd, { alsAktion: true }).length === 0) continue;
+    if (summonZonesFor(engine, pi, cd).length === 0) continue;
     out.push(n);
   }
   return out;
@@ -57,7 +71,7 @@ module.exports = {
     }
     if (payload.type === 'zonePick') {
       const z = (payload.zones || [])[0];
-      return z ? { heroIdx: z.heroIdx, slotIdx: z.slotIdx } : null;
+      return z ? { owner: z.owner, heroIdx: z.heroIdx, slotIdx: z.slotIdx } : null;   // Kontrolle statt Seite (Styx 28.9.)
     }
     return undefined;
   },
@@ -96,10 +110,11 @@ module.exports = {
         });
         if (!res || res.cancelled || !res.cardName) break;
         const cd = engine._getCardDB()[res.cardName];
-        const zone = await pickZone(engine, pi, summonZonesFor(engine, pi, cd, { alsAktion: true }), CARD_NAME, `Summon ${res.cardName} with which Hero?`);
+        const zone = await pickZone(engine, pi, summonZonesFor(engine, pi, cd), CARD_NAME, `Summon ${res.cardName} with which Hero?`);
         if (!zone) break;
         const out = await engine.summonFromPile(pi, 'hand', res.cardName, zone.heroIdx, zone.slotIdx, {
           source: CARD_NAME, sourceOwner: pi, hookExtras: { _summonedByTamedPrimordium: true },
+          heldSeite: zone.owner,   // Kontrolle statt Seite (Styx 28.9.)
         });
         if (!out) break;
         summoned++;

@@ -77,14 +77,15 @@ function _eligibleDestinations(engine, pi, cardName) {
   const cd = cardDB[cardName];
   if (!cd) return [];
   const out = [];
-  for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-    const h = ps.heroes[hi];
+  // Kontrolle statt Seite (Styx 28.9.): alle Helden, die `pi` kontrolliert
+  // (auch uebernommene der Gegenspalte); `owner` = physische Seite.
+  for (const { physOwner, heroIdx: hi, hero: h } of engine.heroesControlledBy(pi)) {
     if (!_heroCanSummon(h)) continue;
-    if (!engine.heroMeetsLevelReq(pi, hi, cd)) continue;
-    const zones = ps.supportZones?.[hi] || [[], [], []];
+    if (!engine.heroMeetsLevelReq(physOwner, hi, cd)) continue;
+    const zones = engine.gs.players[physOwner].supportZones?.[hi] || [[], [], []];
     for (let zi = 0; zi < 3; zi++) {
       if ((zones[zi] || []).length === 0) {
-        out.push({ heroIdx: hi, slotIdx: zi });
+        out.push({ owner: physOwner, heroIdx: hi, slotIdx: zi });
       }
     }
   }
@@ -114,15 +115,15 @@ function _totalUsableSummonZones(engine, pi, eligibleNames) {
   if (!ps || !eligibleNames || eligibleNames.length === 0) return 0;
   const cardDB = engine._getCardDB();
   let n = 0;
-  for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-    const h = ps.heroes[hi];
+  // Kontrolle statt Seite (Styx 28.9.)
+  for (const { physOwner, heroIdx: hi, hero: h } of engine.heroesControlledBy(pi)) {
     if (!_heroCanSummon(h)) continue;
     const heroCanHostSomething = eligibleNames.some(name => {
       const cd = cardDB[name];
-      return cd && engine.heroMeetsLevelReq(pi, hi, cd);
+      return cd && engine.heroMeetsLevelReq(physOwner, hi, cd);
     });
     if (!heroCanHostSomething) continue;
-    const zones = ps.supportZones?.[hi] || [[], [], []];
+    const zones = engine.gs.players[physOwner].supportZones?.[hi] || [[], [], []];
     for (let zi = 0; zi < 3; zi++) {
       if ((zones[zi] || []).length === 0) n++;
     }
@@ -247,11 +248,11 @@ module.exports = {
           // so cancelling would leave the chain in an awkward half-
           // resolved state. Default to the first option if the
           // prompt is somehow declined.
-          const heroes = ps.heroes || [];
           const zones = eligibleDests.map(d => ({
+            owner:   d.owner,   // Kontrolle statt Seite (Styx 28.9.)
             heroIdx: d.heroIdx,
             slotIdx: d.slotIdx,
-            label:   `${heroes[d.heroIdx]?.name || 'Hero'} — Support ${d.slotIdx + 1}`,
+            label:   `${engine.gs.players[d.owner]?.heroes?.[d.heroIdx]?.name || 'Hero'} — Support ${d.slotIdx + 1}`,
           }));
           const picked = await engine.promptGeneric(pi, {
             type:        'zonePick',
@@ -261,7 +262,7 @@ module.exports = {
             cancellable: false,
           });
           if (picked && picked.heroIdx != null && picked.slotIdx != null) {
-            dest = eligibleDests.find(d =>
+            dest = eligibleDests.find(d => d.owner === (picked.owner ?? pi) &&
               d.heroIdx === picked.heroIdx && d.slotIdx === picked.slotIdx,
             ) || eligibleDests[0];
           } else {
@@ -274,6 +275,7 @@ module.exports = {
         // 200 ms Landezeit, Signal, Rückgabe bei Fehlschlag).
         const placed = await engine.summonFromDiscard(pi, pi, dIdx, dest.heroIdx, dest.slotIdx, {
           source: CARD_NAME, flug: 200,
+          heldSeite: dest.owner,   // Kontrolle statt Seite (Styx 28.9.)
         });
         if (placed) summonsLanded++;
         engine.sync();

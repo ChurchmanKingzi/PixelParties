@@ -67,16 +67,17 @@ function eligibleHostSlots(engine, pi, creatureCardData) {
   const ps = engine.gs.players[pi];
   if (!ps) return [];
   const out = [];
-  for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-    const h = ps.heroes[hi];
+  // Kontrolle statt Seite (Styx 28.9.): alle Helden, die `pi` kontrolliert;
+  // Pruefungen und Zonen ueber die physische Adresse, `owner` = Seite.
+  for (const { physOwner, heroIdx: hi, hero: h } of engine.heroesControlledBy(pi)) {
     if (!h?.name || h.hp <= 0) continue;
     if (h.statuses?.frozen || h.statuses?.stunned) continue;
-    if (!engine.heroMeetsLevelReq(pi, hi, creatureCardData)) continue;
-    if (!engine.isCreatureSummonable(creatureCardData.name, pi, hi, { _bypassBeforeSummon: true })) continue;
-    const zones = ps.supportZones?.[hi] || [[], [], []];
+    if (!engine.heroMeetsLevelReq(physOwner, hi, creatureCardData)) continue;
+    if (!engine.isCreatureSummonable(creatureCardData.name, physOwner, hi, { _bypassBeforeSummon: true })) continue;
+    const zones = engine.gs.players[physOwner].supportZones?.[hi] || [[], [], []];
     for (let z = 0; z < 3; z++) {
       if ((zones[z] || []).length === 0) {
-        out.push({ heroIdx: hi, slotIdx: z, heroName: h.name });
+        out.push({ owner: physOwner, heroIdx: hi, slotIdx: z, heroName: h.name });
       }
     }
   }
@@ -109,7 +110,7 @@ module.exports = {
       // host Hero (this Soul Shard Ka's `cardHeroIdx`), not the player
       // overall — Performance copies on Summoning Magic count, which
       // matches the engine's standard ability-level semantics.
-      const levelCap = levelCapForHost(engine, ps, ctx.cardHeroIdx);
+      const levelCap = levelCapForHost(engine, gs.players[ctx.cardHeroOwner ?? pi] || ps, ctx.cardHeroIdx);   // Kontrolle statt Seite (Styx 28.9.): Wirt physisch adressiert
 
       // Build a deduped gallery of Lv ≤ levelCap Creatures from the
       // deck that AT LEAST one own Hero can host (level/school check
@@ -162,6 +163,7 @@ module.exports = {
         chosenHost = hosts[0];
       } else {
         const zones = hosts.map(h => ({
+          owner: h.owner,   // Kontrolle statt Seite (Styx 28.9.)
           heroIdx: h.heroIdx, slotIdx: h.slotIdx,
           label: `${h.heroName} — Support ${h.slotIdx + 1}`,
         }));
@@ -171,7 +173,7 @@ module.exports = {
           cancellable: true,
         });
         if (!zp) return;
-        chosenHost = hosts.find(h => h.heroIdx === zp.heroIdx && h.slotIdx === zp.slotIdx)
+        chosenHost = hosts.find(h => h.owner === (zp.owner ?? pi) && h.heroIdx === zp.heroIdx && h.slotIdx === zp.slotIdx)
           || hosts[0];
       }
 
@@ -180,10 +182,11 @@ module.exports = {
       if (!_taken_deckIdx) return;
 
       const placeRes = await engine.summonCreatureWithHooks(
-        chosenName, pi, chosenHost.heroIdx, chosenHost.slotIdx,
+        chosenName, chosenHost.owner, chosenHost.heroIdx, chosenHost.slotIdx,
         {
           source: CARD_NAME,
           isPlacement: true,
+          ...(chosenHost.owner !== pi ? { controller: pi } : {}),   // Kontrolle statt Seite (Styx 28.9.)
           hookExtras: {
             ...engine.deckHookExtras(),
             _summonedBySoulShard: true,
@@ -207,7 +210,7 @@ module.exports = {
       // glow that fires for a hand-summoned Creature so the placement
       // reads as an actual summon rather than a silent drop-in.
       engine._broadcastEvent('summon_effect', {
-        owner: pi, heroIdx: chosenHost.heroIdx,
+        owner: chosenHost.owner, heroIdx: chosenHost.heroIdx,
         zoneSlot: placeRes.actualSlot, cardName: chosenName,
       });
 

@@ -387,7 +387,13 @@ module.exports = {
         cancellable: false,
       });
       if (!ownPick) return;
-      const ownSeite = ownPick.owner ?? pi;   // Kontrolle statt Seite (Styx 28.9.)
+      // Kontrolle statt Seite (Styx 28.9.): Antwort ohne `owner` = eigene
+      // Seite; fehlt dort die Zone, die einzige passende der Liste.
+      const ownZiel = ownSlots.find(z => z.owner === (ownPick.owner ?? pi)
+          && z.heroIdx === ownPick.heroIdx && z.slotIdx === ownPick.slotIdx)
+        || ownSlots.find(z => z.heroIdx === ownPick.heroIdx && z.slotIdx === ownPick.slotIdx);
+      if (!ownZiel) return;
+      const ownSeite = ownZiel.owner;
 
       if (!(await engine.deckEntnahme(ps,  secondDeckIdx, { source: CARD_NAME }))) return;   // v820: Stapel-Schicht
 

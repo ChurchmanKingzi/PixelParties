@@ -27,6 +27,8 @@
 
 const { treatAsSacrificed } = require('./_chaorcs-shared');
 
+const { canHeroSummon } = require('./_summon-eligibility');
+
 const CARD_NAME = 'Chaorc Rider Warg';
 
 /**
@@ -37,12 +39,23 @@ const CARD_NAME = 'Chaorc Rider Warg';
  * (Summoning Magic Lv2) and has a free Support Zone.
  */
 function summonableZones(engine, pi) {
-  const ps = engine.gs.players[pi];
   const out = [];
-  for (let hi = 0; hi < (ps?.heroes || []).length; hi++) {
-    if (!engine._canHeroActivateSurprise(pi, hi, CARD_NAME)) continue;
+  // Kontrolle statt Seite (Styx 28.9.): alle Helden, die `pi` kontrolliert
+  // — auch uebernommene der Gegenspalte (Zone traegt dann `owner`).
+  for (const { physOwner, heroIdx: hi } of engine.heroesControlledBy(pi)) {
+    if (physOwner === pi) {
+      if (!engine._canHeroActivateSurprise(pi, hi, CARD_NAME)) continue;
+    } else {
+      // Das Surprise-Gate kennt nur die eigene Spalte — fuer den
+      // uebernommenen Helden die geteilte Beschwoerungspruefung.
+      const cd = engine._getCardDB()[CARD_NAME];
+      if (!canHeroSummon(engine, pi, hi, cd, { alsAktion: true, physOwner })) continue;
+    }
+    const sz = engine.gs.players[physOwner]?.supportZones?.[hi] || [];
     for (let zi = 0; zi < 3; zi++) {
-      if (((ps.supportZones?.[hi] || [])[zi] || []).length === 0) out.push({ heroIdx: hi, slotIdx: zi });
+      if ((sz[zi] || []).length === 0) {
+        out.push({ ...(physOwner !== pi ? { owner: physOwner } : {}), heroIdx: hi, slotIdx: zi });
+      }
     }
   }
   return out;
@@ -56,6 +69,11 @@ module.exports = {
   cpuResponse(engine, kind, promptData) {
     if (kind !== 'generic') return undefined;
     if (promptData?.type === 'confirm') return { confirmed: true };
+    // Kontrolle statt Seite (Styx 28.9.): Zonenwahl mit `owner` beantworten.
+    if (promptData?.type === 'zonePick' && promptData.title === CARD_NAME) {
+      const z = (promptData.zones || [])[0];
+      return z ? { owner: z.owner, heroIdx: z.heroIdx, slotIdx: z.slotIdx } : undefined;
+    }
     return undefined;
   },
 
@@ -107,14 +125,27 @@ module.exports = {
           cancellable: true,
         });
         if (!pick || pick.cancelled) return;
-        dest = { heroIdx: pick.heroIdx, slotIdx: pick.slotIdx };
+        // Antwort ohne `owner` = eigene Seite; sonst die einzige passende.
+        dest = zones.find(z => (z.owner ?? pi) === (pick.owner ?? pi)
+            && z.heroIdx === pick.heroIdx && z.slotIdx === pick.slotIdx)
+          || zones.find(z => z.heroIdx === pick.heroIdx && z.slotIdx === pick.slotIdx);
+        if (!dest) return;
       }
+      const seite = dest.owner ?? pi;   // Kontrolle statt Seite (Styx 28.9.)
 
       const handIdx = ps.hand.indexOf(CARD_NAME);
       engine.takeFromPileSync(ps, 'hand', handIdx);
+      // Kontrolle statt Seite (Styx 28.9.): der Engine-Flug nimmt die
+      // Feldseite als Hand — bei der Gegenspalte den Flug selbst senden.
+      if (seite !== pi) {
+        engine._broadcastEvent('play_pile_transfer', {
+          owner: pi, cardName: CARD_NAME, from: 'hand', to: 'support', fromHandIdx: handIdx,
+          toHeroIdx: dest.heroIdx, toSlotIdx: dest.slotIdx, toOwner: seite,
+        });
+      }
       const res = await engine.summonCreatureWithHooks(
-        CARD_NAME, pi, dest.heroIdx, dest.slotIdx, // `fromHandIdx`: Flug von der Hand in die Zone (v933)
-        { source: CARD_NAME, fromHandIdx: handIdx },
+        CARD_NAME, seite, dest.heroIdx, dest.slotIdx, // `fromHandIdx`: Flug von der Hand in die Zone (v933)
+        { source: CARD_NAME, ...(seite !== pi ? { controller: pi } : { fromHandIdx: handIdx }) },
       );
       if (!res?.inst) { engine.handZugangSync(ps, CARD_NAME, { von: 'rueckgabe', ohneInstanz: true }); return; }   // v1395
 
