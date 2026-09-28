@@ -76,7 +76,7 @@ from PIL import Image
 import numpy as np
 import cv2
 from anim_common import rgb, save_outputs, sparkle_pixels, BOUNCE12, ring8
-from flap_common import fill_pinholes, rotate_part
+from flap_common import fill_pinholes, rotate_part, shear_flap
 
 BLACK = (0, 0, 0, 255)
 BLINK = {14: 'halb', 15: 'zu', 16: 'zu', 17: 'halb', 38: 'halb', 39: 'zu', 40: 'zu', 41: 'halb'}
@@ -110,10 +110,10 @@ V_ = {
                 line=[(5, 10), (6, 10), (9, 10)]),
     'alleria': dict(slug='alleria-the-queen-of-spiders', pads=(3, 3, 3, 2),
                     lid=[((16, 9), 'f5ce88'), ((17, 9), 'f5ce88')], line=[(16, 10), (17, 10)]),
-    'brackle': dict(slug='brackle-the-catapulting-turtle', knee=34, pads=(33, 12, 17, 2),
+    'brackle': dict(slug='brackle-the-catapulting-turtle', knee=34, pads=(33, 12, 17, 2), anchor='sprite',
                     lid=[((2, 19), '8baf65'), ((3, 19), '8baf65'), ((6, 19), '8baf65')],
                     line=[(2, 20), (3, 20), (5, 20), (6, 20)]),
-    'leonardo': dict(slug='mutated-teenager-brackle', knee=34, pads=(33, 12, 17, 2),
+    'leonardo': dict(slug='mutated-teenager-brackle', knee=34, pads=(33, 12, 17, 2), anchor='sprite',
                      lid=[((2, 19), '114368'), ((3, 19), '114368'), ((5, 19), '114368'), ((6, 19), '114368')],
                      line=[(2, 20), (3, 20), (5, 20), (6, 20)]),
     'broghan': dict(slug='broghan-the-frozen-guardian-of-the-north', knee=25, pads=(14, 14, 5, 2)),
@@ -808,7 +808,7 @@ def skull_flight():
     sx, sy = rot_pt(CAT_CUP, CAT_PIVOT, CAT_ANG[CAT_FIRE])
     hh = SKULL.shape[0] / 2
     ground = SH - 1
-    vx, vy, g = -1.9, -1.4, 0.35
+    vx, vy, g = -2.5, -2.0, 0.65
     path, t = [], 0
     while True:
         x, y = sx + vx * t, sy + vy * t + 0.5 * g * t * t
@@ -891,6 +891,17 @@ def f_brackle(i):
         arm = rotate_part(s, arm_m, CAT_PIVOT, ang, (H, W), offset=(PL, PT + b))
         am = arm[:, :, 3] > 0
         out[am] = arm[am]
+        # Armfuß neu an die Nabe anschließen (die Drehung reißt sonst Lücken): 3 px breites
+        # Band vom Drehpunkt 5 px entlang der aktuellen Armrichtung
+        ux, uy = rot_pt((CAT_PIVOT[0] + 0.56, CAT_PIVOT[1] - 0.83), CAT_PIVOT, ang)
+        ux, uy = ux - CAT_PIVOT[0], uy - CAT_PIVOT[1]
+        for k in range(0, 11):
+            d = k * 0.5
+            for side, c in ((0, '502307'), (-1, '290e00'), (1, '290e00')):
+                x = int(round(CAT_PIVOT[0] + ux * d - uy * side)) + PL
+                y = int(round(CAT_PIVOT[1] + uy * d + ux * side)) + PT + b
+                if side == 0 or not out[y, x, 3]:
+                    out[y, x] = rgb(c)
     fill_pinholes(out)
     sh_, sw_ = SKULL.shape[:2]
 
@@ -961,36 +972,86 @@ def f_broghan(i):
             side = -1 if x < SW / 2 else 1
             return int(round(1.2 * (y - 18) / 12 * (math.sin(w + (0 if side < 0 else 1.7)) - math.sin(0 if side < 0 else 1.7))))
         return 0
+    eye = glow_eye(s, i, ('be0000', '9c0000'))
     out = np.zeros((H, W, 4), int)
     knee_put(out, s, b, moves=lambda x, y: chain[y, x], dx_fn=cdx)
     fill_pinholes(out)
+    glow_halo(out, i, eye, PL, PT + b)
     ice_clouds(out, i, [(-3 + PL, 27 + PT, -1, 0), (SW + 2 + PL, 26 + PT, 1, 8), (17 + PL, 28 + PT, 0, 16),
                         (-2 + PL, 22 + PT, -1, 24), (SW + 1 + PL, 22 + PT, 1, 32), (-3 + PL, 28 + PT, -1, 40),
                         (SW + 2 + PL, 28 + PT, 1, 44)])
     return out
 
 
+def eye_f(i):
+    return max(0.0, math.sin(2 * math.pi * 2 * i / N - math.pi / 2) * 0.5 + 0.5) ** 2   # leuchtet periodisch
+
+
+def glow_eye(s, i, reds):
+    """Rote Augenpixel (reds, heller zuerst) aufhellen; liefert ihre Positionen."""
+    f = eye_f(i)
+    eye = [(y, x) for y, x in zip(*np.nonzero(s[:, :, 3])) if hexc(s[y, x]) in reds and y < 15]
+    for y, x in eye:
+        if hexc(s[y, x]) == reds[0]:
+            s[y, x] = lighten([255, 40, 30, 255], 0.55 * f)
+        else:
+            c = s[y, x]
+            s[y, x] = [min(255, int(c[0] + 0x60 * f)), int(20 * f), int(20 * f), 255]
+    return eye
+
+
+def glow_halo(out, i, eye, ox, oy):
+    """Roter Leuchtschein (1 px) um das leuchtende Auge."""
+    f = eye_f(i)
+    if f <= 0.25:
+        return
+    em = np.zeros(out.shape[:2], bool)
+    for y, x in eye:
+        em[y + oy, x + ox] = True
+    for y, x in zip(*np.nonzero(ring8(em))):
+        c = out[y, x]
+        if not c[3]:
+            continue
+        a = f * 0.55
+        out[y, x] = [int(c[0] * (1 - a) + 255 * a), int(c[1] * (1 - a) + 50 * a), int(c[2] * (1 - a) + 40 * a), c[3]]
+
+
+GEAR_C = (13.0, 17.0)                                    # Zahnrad in der Brust (von vorn gesehen)
+
+
+def draw_gear(s, i):
+    """Das Zahnrad jedes Frame neu zeichnen (6 Zähne, eine Umdrehung pro Loop): Nabe
+    dunkel, Scheibe graublau, Zähne mit hellen Kanten; die alten graublauen Pixel werden
+    zum dunklen Brustgrund."""
+    teal = ('556867', '76948b', '293334')
+    phi = 2 * math.pi * i / N
+    for y in range(int(GEAR_C[1]) - 5, int(GEAR_C[1]) + 5):
+        for x in range(int(GEAR_C[0]) - 5, int(GEAR_C[0]) + 5):
+            if 0 <= y < SH and 0 <= x < SW and hexc(s[y, x]) in teal and x < 17:
+                s[y, x] = rgb('322e2d')
+    for y in range(int(GEAR_C[1]) - 5, int(GEAR_C[1]) + 5):
+        for x in range(int(GEAR_C[0]) - 5, int(GEAR_C[0]) + 5):
+            dx, dy = x - GEAR_C[0], y - GEAR_C[1]
+            r = math.hypot(dx, dy)
+            th = math.atan2(dy, dx) - phi
+            tooth = math.cos(6 * th) > 0.1
+            if r <= 1.0:
+                s[y, x] = rgb('293334')
+            elif r <= 2.7:
+                s[y, x] = rgb('76948b' if dx + dy < -1 else '556867')
+            elif r <= 3.7 and tooth:
+                s[y, x] = rgb('76948b' if dx + dy < 0 else '556867')
+
+
 def f_golem(i):
     s = SRC.copy()
-    f = max(0.0, math.sin(2 * math.pi * 2 * i / N - math.pi / 2) * 0.5 + 0.5) ** 2   # Auge leuchtet periodisch
-    eye = [(y, x) for y, x in zip(*np.nonzero(s[:, :, 3])) if hexc(s[y, x]) in ('c10000', '9f0000') and y < 15]
-    for y, x in eye:
-        s[y, x] = lighten([255, 40, 30, 255], 0.55 * f) if hexc(s[y, x]) == 'c10000' else lighten(s[y, x], 0.0)
-        if hexc(SRC[y, x]) == '9f0000':
-            s[y, x] = [int(0x9f + 0x60 * f), int(20 * f), int(20 * f), 255]
+    eye = glow_eye(s, i, ('c10000', '9f0000'))
+    draw_gear(s, i)
     b = BOUNCE12[i % 12]
     out = np.zeros((H, W, 4), int)
     knee_put(out, s, b)
     fill_pinholes(out)
-    if f > 0.25:                                         # Leuchtschein um das Auge (halbtransparent)
-        em = np.zeros((H, W), bool)
-        for y, x in eye:
-            em[y + PT + b, x + PL] = True
-        ring = ring8(em)
-        for y, x in zip(*np.nonzero(ring)):
-            c = out[y, x]
-            a = f * 0.55
-            out[y, x] = [int(c[0] * (1 - a) + 255 * a), int(c[1] * (1 - a) + 50 * a), int(c[2] * (1 - a) + 40 * a), c[3]]
+    glow_halo(out, i, eye, PL, PT + b)
     ice_clouds(out, i, [(-3 + PL, 28 + PT, -1, 4), (SW + 2 + PL, 27 + PT, 1, 12), (13 + PL, 30 + PT, 0, 20),
                         (-2 + PL, 23 + PT, -1, 28), (SW + 1 + PL, 23 + PT, 1, 36), (SW + 2 + PL, 29 + PT, 1, 44)])
     return out
@@ -1016,12 +1077,14 @@ def f_clown(i):
         return int(round(1.6 * t * (math.sin(w + ph) - math.sin(ph))))
     b = BOUNCE12[i % 12]
     out = np.zeros((H, W, 4), int)
-    put(out, s, PL, PT, dy_fn=lambda x, y: hdy(x, y) + (b if (y < KNEE or (x <= 9 and y < 24)) else 0))
+    hook = lambda x, y: x <= 10 and 20 <= y <= 24 and hexc(s[y, x]) in ('969696', 'ffffff')
+    put(out, s, PL, PT, dy_fn=lambda x, y: hdy(x, y) + (b if (y < KNEE or (x <= 9 and y < 24) or hook(x, y)) else 0))
     if b < 0:
         for x in range(SW):
             if s[KNEE - 1, x, 3] and s[KNEE, x, 3] and not out[KNEE - 1 + PT, x + PL, 3]:
                 out[KNEE - 1 + PT, x + PL] = s[KNEE - 1, x]
     fill_pinholes(out)
+    stars(out, i, [(7 + PL, 22 + PT + b, 10), (8 + PL, 24 + PT + b, 34)], 'e8f4ff', 'ffffff')   # Hakenhand blitzt
     return out
 
 
@@ -1032,9 +1095,10 @@ def f_bbg(i):
     tip = lambda x, y: int(round(1.0 * (4 - y) / 4 * math.sin(w))) if y < 4 else 0   # Hutspitze wippt nach
     b = BOUNCE12[i % 12]
     out = np.zeros((H, W, 4), int)
-    knee_put(out, s, b, moves=lambda x, y: x <= 1 and y < 29, dx_fn=tip)
+    hook = lambda x, y: x <= 2 and 25 <= y <= 29 and hexc(s[y, x]) in ('969696', 'ffffff')
+    knee_put(out, s, b, moves=lambda x, y: (x <= 1 and y < 29) or hook(x, y), dx_fn=tip)
     fill_pinholes(out)
-    stars(out, i, [(7 + PL + tip(7, 0), 0 + PT + b, 20)], 'd2c4ff', 'ffffff')
+    stars(out, i, [(0 + PL, 27 + PT + b, 10), (1 + PL, 29 + PT + b, 34)], 'e8f4ff', 'ffffff')   # Hakenhand blitzt
     return out
 
 
@@ -1083,8 +1147,8 @@ def f_fairy(i):
         fig = (s[:, :, 3] > 0) & ~pink
         wing = np.zeros((SH, SW), bool)
         for y, x in zip(*np.nonzero(fig)):
-            if (x <= 8 or x >= SW - 9) and hexc(s[y, x]) in ('5c31ca', '1e8a10', '107caa', 'c80000', '109eaa',
-                                                           '484149', 'a496a4', '877887', '685c68', '432493'):
+            if (x <= 8 or x >= SW - 9) and y <= 12 and hexc(s[y, x]) in ('5c31ca', '1e8a10', '107caa', 'c80000',
+                                                                          '109eaa'):
                 wing[y, x] = True
         near = np.zeros((SH, SW), int)                   # Aura: 1 = dicht an der Figur, 2 = Außenrand
         fy, fx = np.nonzero(fig)
@@ -1100,12 +1164,13 @@ def f_fairy(i):
     out = np.zeros((H, W, 4), int)
     put(out, body, PL, PT + hv)
     # Schmetterlingsflügel: spaltenweise Scherung (außen stärker), schnelles Flattern
-    lift = 1.6 * math.sin(2 * math.pi * 6 * i / N)
-    for y, x in zip(*np.nonzero(wing)):
-        side = -1 if x < SW / 2 else 1
-        d = (8.5 - x) if side < 0 else (x - (SW - 9.5))
-        dy = -int(round(lift * max(0.0, d) / 7))
-        out[y + PT + hv + dy, x + PL] = s[y, x]
+    ph = 2 * math.pi * 6 * i / N
+    lift = 0.45 * math.sin(ph)
+    squeeze = 1 - 0.3 * (0.5 - 0.5 * math.cos(ph))
+    wl = wing & (_xs < SW / 2)
+    shear_flap(s, wl, int(np.nonzero(wl)[1].max()) + 1, -1, lift, squeeze, out, offset=(PL, PT + hv))
+    wr = wing & (_xs >= SW / 2)
+    shear_flap(s, wr, int(np.nonzero(wr)[1].min()) - 1, 1, lift, squeeze, out, offset=(PL, PT + hv))
     fill_pinholes(out)
     # pinke Partikel: flimmernde Aura dicht an der Figur, dazu fallende Funken als Schweif
     rng = np.random.default_rng(i)
@@ -1139,6 +1204,9 @@ def f_fiona(i):
     put(out, s, PL, PT)
     stars(out, i, [(14 + PL, 9 + PT, 6), (19 + PL, 9 + PT, 18), (16 + PL, 8 + PT, 30), (17 + PL, 9 + PT, 42)],
           'ffe600', 'fff6ac')
+    stars(out, i, [(9 + PL, 1 + PT, 0), (22 + PL, 1 + PT, 12), (4 + PL, 13 + PT, 24), (27 + PL, 13 + PT, 36),
+                   (8 + PL, 23 + PT, 3), (25 + PL, 23 + PT, 27), (15 + PL, 3 + PT, 15), (1 + PL, 21 + PT, 39)],
+          'fdfd7c', 'fff6ac')                            # Thron funkelt
     return out
 
 
