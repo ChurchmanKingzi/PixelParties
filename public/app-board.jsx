@@ -24153,7 +24153,9 @@ function ResultCeremony({ won, spectator, title, subtitle, rewards, total, eloCh
           <div className="pp-cer-rewards">
             {rewards.map((r, i) => (
               <div key={r.id || i} className={'pp-cer-reward' + (bonusArt(r) ? ' pp-cer-reward-' + bonusArt(r) : '') + (stufe > i ? ' pp-cer-reward-da' : '')}>
-                {bonusArt(r) && <div className="pp-cer-band">{bonusArt(r) === 'daily' ? 'Daily!' : 'Once!'}</div>}
+                {/* ★ v1471 (Als Befund 28.9.: „‚Play a Game (Daily)' zweimal bekommen"): „Daily!" nur noch für
+                    echte Tageslimits — was je Gegner und Tag zählt (`daily_per_opponent`), sagt das jetzt. */}
+                {bonusArt(r) && <div className="pp-cer-band">{bonusArt(r) === 'daily' ? (r.limit === 'daily' ? 'Daily!' : 'Daily per Foe!') : 'Once!'}</div>}
                 {stufe > i && !phone && (
                   <div className="pp-cer-burst" aria-hidden="true">
                     {Array.from({ length: ppFxN(12) }).map((_, k) => (

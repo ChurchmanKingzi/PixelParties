@@ -20810,8 +20810,14 @@ img, .card-tooltip-img img { image-rendering: pixelated; }
 }
 .pp-cer-reward-titel { font-family: var(--font-display), sans-serif; font-size: 13px; color: #ffd700; letter-spacing: 1px; margin-bottom: 4px; }
 .pp-cer-reward-text { font-size: 11px; color: var(--text2); line-height: 1.35; min-height: 28px; }
+/* ★ v1471 (Als Befund 28.9.: „Im Reward-Screen sollten alle Rewards in einer
+   Zeile ihre Münzen auf derselben Höhe darstellen"). Die Kacheln einer Zeile
+   sind (Flex-Zeile, stretch) schon gleich hoch, der Betrag hing aber direkt
+   unter dem Text — ein längerer Text schob ihn tiefer. Jetzt ist die Kachel
+   eine Flex-Spalte und der Betrag sitzt unten (margin-top: auto). */
+.pp-cer-reward { display: flex; flex-direction: column; }
 .pp-cer-reward-betrag {
-  margin-top: 6px; font-family: var(--font-display), sans-serif; font-size: 18px; color: #ffd700;
+  margin-top: auto; padding-top: 6px; font-family: var(--font-display), sans-serif; font-size: 18px; color: #ffd700;
   display: flex; align-items: center; justify-content: center; gap: 5px;
 }
 .pp-cer-reward-betrag img, .pp-cer-summe img { width: 18px; height: 18px; image-rendering: pixelated; }

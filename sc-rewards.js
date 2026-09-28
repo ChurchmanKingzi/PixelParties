@@ -47,6 +47,21 @@
 //  Shop-Artikel das Fünffache. Es gelten nur noch die Limits der
 //  einzelnen Kategorien.
 //
+//  TAGESLIMITS (★ v1471, Als Befund 28.9.: „Mindestens CPU-Games
+//  konsumieren offenbar den ‚Daily'-Teil von Daily-Rewards nicht? …
+//  Jedenfalls habe ich ‚Play a Game (Daily)' zweimal bekommen!").
+//  Befund: weder CPU-Pfad noch Neustart — beide buchen in `sc_log`
+//  (Datenbank, `created_at` = unixepoch), das Limit liest nur dort.
+//  Ursache: „Player"/„Winner" hatten `daily_per_opponent`, und jede CPU
+//  ist ein eigener Gegner (`cpu:<Deck-ID>`) — zwei verschiedene CPUs =
+//  zweimal +5, im Ergebnisbildschirm aber beide Male als „Daily!"
+//  markiert. Jetzt: beide `daily` (einmal je UTC-Tag über ALLE Gegner,
+//  danach die 1-SC-Stufe `*_repeat`). Bestehende `sc_log`-Zeilen gelten
+//  unverändert weiter (Zählung je reward_id und Tag) — keine Migration
+//  nötig, keine Doppelvergabe am Umstellungstag. Was weiterhin je Gegner
+//  zählt (`daily_per_opponent`), trägt im Bildschirm das Band „Daily per
+//  Foe!" statt „Daily!".
+//
 //  CPU-PARTIEN (Als Vorgabe 24.9.): offen für ALLE Belohnungen außer
 //  Ranked (gegen CPUs gibt es kein Ranked). Die CPU selbst hat kein
 //  Konto und wird nie ausgewertet — bis v1380 lief sie mit, ihr Insert
@@ -232,6 +247,9 @@ const CONDITIONS = {
     && !c.t.heroEverBelow50
     && benannteHelden(c.ps).every(h => h.hp > h.maxHp * 0.5),
 
+  // ★ v1471 (Als Befund 28.9.: „Der ‚Overkill'-SC-Award sollte nicht Daily
+  // sein, sondern unbegrenzt, dafür aber nur 1 SC einbringen."): Katalog
+  // jetzt `unlimited`, 1 SC (vorher `daily`, 5 SC).
   creature_overkill: (c) => !!c.t.creatureOverkill,
 
   // Endzustand (Als Ruling 24.9.).
@@ -242,12 +260,16 @@ const CONDITIONS = {
   win_speedrun: (c) => c.isWinner && c.turn <= 6 && c.reason !== 'surrender',
 
   // Verschiedene Gegner-Schlüssel heute (jede CPU zählt einzeln).
+  // ★ v1471: „Player" zahlt jetzt nur noch EINMAL am Tag (vorher je
+  // Gegner), jede weitere Partie bucht „player_repeat" — gezählt werden
+  // daher beide Zeilenarten. Rückwärtsverträglich: bisher gab es
+  // „player_repeat" nur gegen Gegner, die schon eine „player"-Zeile hatten.
   unique_opponents_5: async (c) => {
     const heute = await c.db.get(
-      `SELECT COUNT(DISTINCT opponent_ip) as cnt FROM sc_log WHERE user_id = ? AND reward_id = 'player' AND created_at >= ?`,
+      `SELECT COUNT(DISTINCT opponent_ip) as cnt FROM sc_log WHERE user_id = ? AND reward_id IN ('player', 'player_repeat') AND created_at >= ?`,
       [c.ps.userId, c.todayStart]);
     const dieserSchonDa = await c.db.get(
-      `SELECT COUNT(*) as cnt FROM sc_log WHERE user_id = ? AND reward_id = 'player' AND opponent_ip = ? AND created_at >= ?`,
+      `SELECT COUNT(*) as cnt FROM sc_log WHERE user_id = ? AND reward_id IN ('player', 'player_repeat') AND opponent_ip = ? AND created_at >= ?`,
       [c.ps.userId, c.oppKey, c.todayStart]);
     const gesamt = (heute?.cnt || 0) + ((dieserSchonDa?.cnt || 0) === 0 ? 1 : 0);
     return gesamt >= 5;
