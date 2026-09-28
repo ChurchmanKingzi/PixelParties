@@ -1905,9 +1905,8 @@ def f_tazune(i):
                               (17, 20): 'e75b38', (18, 20): 'e75b38'}.items():
                 body[y, x] = rgb(c)
         else:
-            for (x, y), c in {(16, 18): '0d0d0d', (17, 18): '0d0d0d', (18, 18): '0d0d0d', (19, 18): '0d0d0d',
-                              (16, 19): 'a90000', (17, 19): 'a90000', (18, 19): 'a90000', (19, 19): 'a90000',
-                              (17, 20): '0d0d0d', (18, 20): '0d0d0d'}.items():
+            for (x, y), c in {(17, 18): 'ff2d2d', (18, 18): 'ff2d2d',          # Mund = nur die vier
+                              (17, 19): 'a90000', (18, 19): 'a90000'}.items():    # mittleren Pixel
                 body[y, x] = rgb(c)
     b = BOUNCE12[i % 12]
     out = np.zeros((H, W, 4), int)
