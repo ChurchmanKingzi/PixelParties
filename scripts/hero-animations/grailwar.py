@@ -119,6 +119,19 @@ Dazu je Variante:
              Kartenbilds stehen in Frame 0 und lösen sich in Fetzen auf. Bei
              Tazune lodern die Flammen: jede Flammensäule streckt und staucht
              sich, die Zungen wiegen, Fetzen reißen ab; beim Skin kein Feuer.
+* zi:        Timeless King Zi schwebt langsam auf und ab, der Umhang wogt majestätisch
+             (Welle von oben nach unten, der Saum kräuselt sich nach außen, hängt dem
+             Schweben nach), rundherum funkeln viele Sterne (nie halb hinter der Figur).
+* waflav:    brüllt einmal pro Loop: Anlauf (Kopf duckt sich, das Maul schließt sich), dann
+             reißt der Oberkiefer drei Zeilen auf (dunkler Rachen), die Augen glühen; sonst atmet es.
+* wahflav / ash / zetsu: federn, blinzeln; bei Kyli, the True Mastermind öffnen sich
+             die Fliegenfallen-Blätter beim Atmen.
+* xal / axal: atmen (1 px), der Umhang weht leicht nach außen, die Augen glühen.
+* octo:      Octo-Alleria: die acht Tentakel bewegen sich einzeln (glattes, ganzzahliges
+             Verschiebungsfeld je Arm mit eigener Phase, zur Spitze hin stärker), der Körper
+             atmet, sie blinzelt.
+* dreemurr:  Monster Prince Asriel federt, blinzelt; Blut rinnt die Messerklinge hinab und
+             tropft vom Knauf zu Boden.
 """
 import math
 import os
@@ -227,6 +240,27 @@ V_ = {
                  blink={'halb': [((9, 16), '636363'), ((10, 16), '636363'), ((13, 16), '636363'), ((14, 16), '636363')],
                         'zu': [((9, 16), '636363'), ((10, 16), '636363'), ((13, 16), '636363'), ((14, 16), '636363'),
                                ((9, 17), '000000'), ((10, 17), '000000'), ((13, 17), '000000'), ((14, 17), '000000')]}),
+    'zi': dict(slug='timeless-king-zi', pads=(7, 7, 7, 6)),
+    'waflav': dict(slug='waflav-the-metamorphing-monstrosity', pads=(3, 3, 5, 2)),
+    'wahflav': dict(slug='wahflav-the-uninvited-fighter', knee=27,
+                    blink={'halb': [((8, 9), 'bd8339'), ((13, 9), 'bd8339')],
+                           'zu': [((8, 9), 'bd8339'), ((13, 9), 'bd8339'), ((8, 10), '000000'), ((9, 10), '000000'),
+                                  ((12, 10), '000000'), ((13, 10), '000000')]}),
+    'ash': dict(slug='barker-the-monster-trainer', knee=20,
+                blink={'halb': [((7, 11), '6b4a2a'), ((10, 11), '6b4a2a')],
+                       'zu': [((7, 11), 'd5a464'), ((10, 11), 'd5a464'), ((7, 12), '000000'), ((10, 12), '000000')]}),
+    'zetsu': dict(slug='kyli-the-true-mastermind', knee=24,
+                  blink={'halb': [((5, 12), '7d7149'), ((9, 12), '7d7149')],
+                         'zu': [((4, 12), '000000'), ((5, 12), '000000'), ((8, 12), '000000'), ((9, 12), '000000')]}),
+    'xal': dict(slug='xal-the-animated-armor', knee=27, pads=(4, 4, 3, 2)),
+    'axal': dict(slug='alchemic-xal', knee=28, pads=(4, 4, 3, 2)),
+    'octo': dict(slug='alleria-the-octo-princess', pads=(4, 4, 3, 4),
+                 blink={'halb': [((14, 9), '000200'), ((15, 9), '000200')],
+                        'zu': [((14, 8), 'f8bc77'), ((15, 8), 'f8bc77'), ((14, 9), '000000'), ((15, 9), '000000')]}),
+    'dreemurr': dict(slug='monster-prince-asriel', knee=20,
+                     blink={'halb': [((7, 8), 'f6eeff'), ((8, 8), 'f6eeff'), ((11, 8), 'f6eeff'), ((12, 8), 'f6eeff')],
+                            'zu': [((7, 8), 'f6eeff'), ((8, 8), 'f6eeff'), ((11, 8), 'f6eeff'), ((12, 8), 'f6eeff'),
+                                   ((7, 9), '000000'), ((8, 9), '000000'), ((11, 9), '000000'), ((12, 9), '000000')]}),
 }
 V = next((v for v in sys.argv[2:] if v in V_), 'asriel')
 C = V_[V]
@@ -1991,6 +2025,250 @@ def f_tazune(i):
     return out
 
 
+# --- Etappe 5 -------------------------------------------------------------------
+def warp(s, mask, dfn, margin=4):
+    """Teil (mask) rückwärts abbilden: Ausgabepixel p nimmt das Quellpixel p - d(p) mit ganzzahligem
+    d – keine Löcher, nichts wird neu gerastert (nur Blockverschiebungen mit Nähten).
+    Liefert ein Bild in Sprite-Koordinaten, ringsum um margin erweitert."""
+    h, w = s.shape[:2]
+    out = np.zeros((h + 2 * margin, w + 2 * margin, 4), int)
+    for yo in range(-margin, h + margin):
+        for xo in range(-margin, w + margin):
+            dx, dy = dfn(xo, yo)
+            x, y = xo - dx, yo - dy
+            if 0 <= x < w and 0 <= y < h and mask[y, x]:
+                out[yo + margin, xo + margin] = s[y, x]
+    return out
+
+
+def put_m(out, img, ox, oy, margin=4):
+    put(out, img, ox - margin, oy - margin)
+
+
+def row_remap(s, off):
+    """Zeilen verschieben (off(y) = ganzzahliger Versatz der Quellzeile y); wo eine Lücke aufreißt,
+    wird die Quellzeile darunter wiederholt (nur wo darüber und darunter Pixel sind)."""
+    h, w = s.shape[:2]
+    m = 4
+    out = np.zeros((h + 2 * m, w, 4), int)
+    filled = np.zeros(h + 2 * m, bool)
+    pos = [y + off(y) for y in range(h)]
+    for y in range(h):
+        out[pos[y] + m] = np.where(s[y, :, 3:4] > 0, s[y], out[pos[y] + m])
+        filled[pos[y] + m] = True
+    for y in range(1, h):
+        for g in range(pos[y - 1] + 1, pos[y]):          # Lücke zwischen den Zeilen y-1 und y
+            both = (s[y - 1, :, 3] > 0) & (s[y, :, 3] > 0)
+            out[g + m][both] = s[y][both]
+    return out, m
+
+
+# Zi: der blaue Dschinn schwebt, der Umhang wogt majestätisch (Welle von oben nach unten, der Saum
+# kräuselt sich nach außen), viele Glitzersterne
+ZI_CAPE = ('04304a', '096ca4', '1e7ebd', '1582d5')
+ZI_STARS = [(1, 2, 0), (23, 3, 5), (3, 16, 10), (22, 17, 15), (0, 23, 20), (24, 24, 25), (4, 6, 30), (21, 8, 35),
+            (-2, 12, 40), (27, 13, 44), (4, 28, 3), (20, 28, 13), (0, 27, 23), (25, 27, 33), (12, 28, 42),
+            (-3, 5, 18), (28, 6, 28), (-3, 19, 8), (28, 21, 38)]
+
+
+def f_zi(i):
+    s = SRC.copy()
+    op = s[:, :, 3] > 0
+    cape = op & (_ys >= 13) & np.array([[hexc(s[y, x]) in ZI_CAPE for x in range(SW)] for y in range(SH)])
+    w = 2 * math.pi * 2 * i / N - 0.9                    # der Umhang hängt dem Schweben nach
+    cx = 12.5
+
+    def d(x, y):
+        t = min(1.0, max(0.0, (y - 13) / 14)) ** 1.2
+        side = -1 if x < cx else 1
+        w0 = -0.9                                        # Frame 0 = Ruhepose
+        dx = side * int(round(1.6 * t * (math.cos(w0 - 0.55 * y) - math.cos(w - 0.55 * y)) / 2))
+        dy = int(round(1.3 * t * (math.sin(w - 0.6 * abs(x - cx)) - math.sin(w0 - 0.6 * abs(x - cx)))))
+        return dx, dy
+    hv = int(round(2 * math.sin(2 * math.pi * i / N)))  # schwebt langsam auf und ab
+    body = s.copy()
+    body[cape] = 0
+    out = np.zeros((H, W, 4), int)
+    inner = cape & (np.abs(_xs - cx) <= 7)               # am Körper: Original darunter (keine Lücken)
+    put(out, np.where(inner[:, :, None], s, 0), PL, PT - hv)
+    put_m(out, warp(s, cape, d), PL, PT - hv)
+    put(out, body, PL, PT - hv)
+    fill_pinholes(out)
+    stars(out, i, [(x + PL, y + PT - hv, st) for x, y, st in ZI_STARS], 'c8f8ff', 'ffffff', only_empty=True)
+    return out
+
+
+# Waflav brüllt: Anlauf (Kopf duckt sich, das Maul schließt sich), dann reißt der Oberkiefer auf
+# (die Zeile unter den oberen Reißzähnen wird wiederholt: dunkler Rachen), die Augen glühen
+WAF_ROAR = {17: -1, 18: -1, 19: 1, 20: 2, 21: 3, 22: 3, 23: 3, 24: 3, 25: 3, 26: 3, 27: 3, 28: 3, 29: 3,
+            30: 3, 31: 2, 32: 1}
+
+
+def f_waflav(i):
+    s = SRC.copy()
+    o = WAF_ROAR.get(i, 0)
+    if o >= 2:
+        fl = 1.0 if i % 4 < 2 else 0.6
+        for y, x in zip(*np.nonzero(s[:, :, 3])):
+            if hexc(s[y, x]) == 'e62931':
+                s[y, x] = lighten([255, 70, 40, 255], 0.5 * fl)
+    b = B24[i % 24] if not o else -1
+    img, m = row_remap(s, lambda y: (b if y < 17 else 0) - (o if y <= 6 else 0))
+    out = np.zeros((H, W, 4), int)
+    put(out, img, PL, PT - m)
+    fill_pinholes(out)
+    return out
+
+
+def f_bounce_blink(i):
+    """Wahflav, Ash (Barker), Zetsu (Kyli): federn, blinzeln; Zetsus Fliegenfallen-Blätter atmen."""
+    s = SRC.copy()
+    blink(s, i)
+    b = BOUNCE12[i % 12]
+    out = np.zeros((H, W, 4), int)
+    if V == 'zetsu':                                     # die Blätter öffnen sich (Zeilen 4-12 nach außen)
+        leaf = (s[:, :, 3] > 0) & ((_xs <= 2) | (_xs >= SW - 3)) & (_ys >= 3) & (_ys <= 13)
+        o = 1 if 0.5 - 0.5 * math.cos(2 * math.pi * 2 * i / N) > 0.5 else 0
+
+        def d(x, y):
+            if o and 4 <= y <= 12:
+                return (-1 if x < SW / 2 else 1), 0
+            return 0, 0
+        img = warp(s, leaf, d)
+        body = s.copy()
+        body[leaf] = 0
+        # was das Blatt beim Öffnen freigibt: die Spalte daneben wird gedehnt
+        if o:
+            for y in range(4, 13):
+                for x in (2, SW - 3):
+                    if not img[y + 4, x + 4, 3]:
+                        img[y + 4, x + 4] = s[y, x]
+        body[img[4:4 + SH, 4:4 + SW, 3] > 0] = 0
+        whole = np.zeros_like(s)
+        whole[:] = body
+        m = img[4:4 + SH, 4:4 + SW, 3] > 0
+        whole[m] = img[4:4 + SH, 4:4 + SW][m]
+        side = img.copy()
+        side[4:4 + SH, 4:4 + SW] = 0
+        knee_put(out, whole, b)
+        put_m(out, side, PL, PT + b)
+    else:
+        knee_put(out, s, b)
+    fill_pinholes(out)
+    return out
+
+
+def f_xal(i):
+    """Xal / Alchemic Xal: atmet (1 px), der Umhang weht leicht nach außen (Welle von oben nach
+    unten, das Original bleibt darunter liegen), die Augen glühen."""
+    s = SRC.copy()
+    if V == 'xal':
+        eye = glow_eye(s, i, ('ff111c', 'bc000d'))
+        cols, y0, xl, xr = ('39090c', 'a51a22', '7b0815', '852323', 'f63342'), 11, 6, SW - 7
+    else:
+        f = eye_f(i)
+        for y, x in zip(*np.nonzero(s[:, :, 3])):
+            if y < 12 and hexc(s[y, x]) in ('9a9b98', 'fefffc'):
+                s[y, x] = lighten(s[y, x] if hexc(s[y, x]) == 'fefffc' else rgb('9fd8e6'), 0.6 * f)
+        eye = []
+        cols, y0, xl, xr = ('050921', '6e7589', '96a1bb'), 13, 3, SW - 4
+    cape = (s[:, :, 3] > 0) & (_ys >= y0) & ((_xs <= xl) | (_xs >= xr)) & np.array(
+        [[hexc(s[y, x]) in cols for x in range(SW)] for y in range(SH)])
+    w = 2 * math.pi * 2 * i / N
+
+    def d(x, y):
+        t = min(1.0, max(0.0, (y - y0) / (SH - y0)))
+        side = -1 if x < SW / 2 else 1
+        return side * int(round(1.4 * t * (math.cos(-0.5 * y) - math.cos(w - 0.5 * y)) / 2)), 0
+    b = B24[i % 24]
+    out = np.zeros((H, W, 4), int)
+    knee_put(out, s, b)                                  # Original (samt Umhang) darunter
+    body = s.copy()
+    body[cape] = 0
+    img = warp(s, cape, d)
+    top = img.copy()
+    top[KNEE + 4:] = 0
+    bot = img.copy()
+    bot[:KNEE + 4] = 0
+    put_m(out, top, PL, PT + b)
+    put_m(out, bot, PL, PT)
+    knee_put(out, body, b)
+    fill_pinholes(out)
+    if eye:
+        glow_halo(out, i, eye, PL, PT + b)
+    return out
+
+
+# Octo-Alleria: die acht Tentakel bewegen sich einzeln – ein glattes Verschiebungsfeld (je Tentakel
+# ein Winkelbereich um den Körper mit eigener Phase, zur Spitze hin stärker, als Welle entlang des
+# Arms), rückwärts und ganzzahlig abgebildet; der Körper atmet, sie blinzelt
+OCTO_C = (16.5, 11.0)
+OCTO_ARMS = [(math.radians(a), ph) for a, ph in ((100, 0.0), (130, 2.1), (160, 4.0), (190, 1.2))] + \
+            [(math.radians(180 - a), ph) for a, ph in ((100, 3.3), (130, 5.3), (160, 0.9), (190, 2.8))]
+
+
+def octo_d(i):
+    w = 2 * math.pi * 2 * i / N
+
+    def d(x, y):
+        rx, ry = x - OCTO_C[0], y - OCTO_C[1]
+        r = math.hypot(rx, ry)
+        u = min(1.0, max(0.0, (r - 6) / 14)) ** 1.2
+        if u == 0:
+            return 0, 0
+        th = math.atan2(ry, rx) % (2 * math.pi)
+        tan = sw = rad = 0.0
+        for a, ph in OCTO_ARMS:
+            da = (th - a + math.pi) % (2 * math.pi) - math.pi
+            g = math.exp(-(da / 0.28) ** 2)
+            sw += g
+            tan += g * (math.sin(w + ph - 0.3 * r) - math.sin(ph - 0.3 * r))   # Frame 0 = Ruhepose
+            rad += g * (math.cos(w + ph) - math.cos(ph))
+        if sw < 1e-6:
+            return 0, 0
+        tan, rad = 0.8 * u * tan / sw, 0.35 * u * rad / sw
+        ux, uy = rx / r, ry / r
+        return int(round(-uy * tan + ux * rad)), int(round(ux * tan + uy * rad))
+    return d
+
+
+def f_octo(i):
+    s = SRC.copy()
+    blink(s, i)
+    tent = (s[:, :, 3] > 0) & ((_ys >= 15) | ((_ys >= 13) & (np.abs(_xs - OCTO_C[0]) > 8)))
+    body = s.copy()
+    body[tent] = 0
+    b = B24[i % 24]
+    out = np.zeros((H, W, 4), int)
+    put_m(out, warp(s, tent, octo_d(i)), PL, PT)
+    put(out, body, PL, PT + b)
+    if b < 0:                                            # Körper hebt sich: unterste Körperzeile dehnen
+        for x in range(SW):
+            if body[14, x, 3] and not out[14 + PT, x + PL, 3]:
+                out[14 + PT, x + PL] = body[14, x]
+    fill_pinholes(out)
+    return out
+
+
+def f_dreemurr(i):
+    s = SRC.copy()
+    blink(s, i)
+    b = BOUNCE12[i % 12]
+    out = np.zeros((H, W, 4), int)
+    knee_put(out, s, b)
+    fill_pinholes(out)
+    # Blut rinnt von der Messerspitze links an der Klinge herab (Spalte 1, Zeile 11 → 14), verschwindet
+    # unter der Faust und tropft vom Knauf (1, 19) zu Boden (Zeile 25)
+    for t0 in (2, 26):
+        t = (i - t0) % N
+        if t < 8:
+            y = 11 + t // 2
+            out[y + PT + b, 1 + PL] = BLOOD[1] if t % 2 else BLOOD[2]
+        elif 11 <= t < 30:
+            draw_px(out, drop_pixels(t - 11, 1 + PL, 19 + PT + (b if t < 15 else 0), 25 + PT))
+    return out
+
+
 FRAME = dict(asriel=f_asriel, barker=f_barker, blackstache=f_blackstache, chuck=f_chuck, codumbus=f_codumbus,
              devlin=f_devlin, mmdevlin=f_devlin, enigma=f_enigma, krates=f_krates, key=f_key, kyli=f_kyli, alleria=f_alleria,
              brackle=f_brackle, leonardo=f_brackle, broghan=f_broghan, golem=f_golem,
@@ -1999,7 +2277,8 @@ FRAME = dict(asriel=f_asriel, barker=f_barker, blackstache=f_blackstache, chuck=
              vader=f_vader, gobbo=f_gobbo, hatusbal=f_hatusbal, jack=f_hatusbal, hulijing=f_hulijing,
              ingo=f_ingo, eingo=f_eingo, madame=f_madame, marianne=f_marianne, santa=f_santa,
              nicolas=f_alchemist, edward=f_alchemist, saintnic=f_alchemist, stellan=f_stellan, bunny=f_stellan,
-             tazune=f_tazune, bakugo=f_tazune)
+             tazune=f_tazune, bakugo=f_tazune, zi=f_zi, waflav=f_waflav, wahflav=f_bounce_blink,
+             ash=f_bounce_blink, zetsu=f_bounce_blink, xal=f_xal, axal=f_xal, octo=f_octo, dreemurr=f_dreemurr)
 
 if __name__ == '__main__':
     tag = sys.argv[1] if len(sys.argv) > 1 else 'v'
