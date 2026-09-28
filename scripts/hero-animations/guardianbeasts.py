@@ -4,9 +4,11 @@
 Aufruf: python3 guardianbeasts.py <tag> [ms] <variante>
 
 * mao / hunter: Mao, the Vengeful Guardian bzw. Vengeful Hunter Mao federn und
-            blinzeln; die Hand vor der Brust (rot bzw. weiß) holt nach links aus, zieht
-            den Schlitzer am Bogen entlang nach rechts und kehrt zur Brust zurück, der Arm
-            reicht dabei von der Schulter zur Hand; die Schlitzspur ihrer blutigen Klauen (der dunkelrote Bogen
+            blinzeln; die blutigen Krallen (der rote Zacken rechts) sitzen vorn an der Hand
+            vor der Brust (rot bzw. weiß): die Hand holt blitzschnell nach links aus, die
+            Krallen ziehen den Bogen nach rechts bis an ihren Platz, die Hand ist damit
+            wieder vor der Brust; der Arm reicht von der Schulter schräg links unter dem
+            Kopf zur Hand (Felltextur, Kontur); die Schlitzspur ihrer blutigen Klauen (der dunkelrote Bogen
             unten, links nach rechts) steht in Frame 0 wie im Kartenbild, verblasst
             vom Ende her, und später reißt ein neuer Schlitzer den Bogen in einem
             Zug von links nach rechts wieder auf (heller Kopf, dunkler Schweif);
@@ -31,13 +33,15 @@ OUT = os.environ.get('GB_OUT', '.')
 V_ = {
     'mao': dict(slug='mao-the-vengeful-guardian', knee=21,
                 hand=dict(box=(11, 14, 15, 18), core=((12, 15), (13, 15), (12, 16), (13, 16)), hole=('1e1e1e', '262626', '333333'),
-                          outline='4f0611', arm=(('3a3a3a', '474747', '2c2c2c'), '080808'), shoulder=(8, 14)),
+                          outline='4f0611', arm=(('3a3a3a', '474747', '2c2c2c'), '080808'), shoulder=(8, 14),
+                          claws=(14, 18)), pads=(8, 3, 4, 2),
                 blink={'halb': [((10, 10), 'dacfd5'), ((11, 10), 'dacfd5'), ((14, 10), 'dacfd5'), ((15, 10), 'dacfd5')],
                        'zu': [((10, 10), 'dacfd5'), ((11, 10), 'dacfd5'), ((14, 10), 'dacfd5'), ((15, 10), 'dacfd5'),
                               ((10, 11), '000000'), ((11, 11), '000000'), ((14, 11), '000000'), ((15, 11), '000000')]}),
     'hunter': dict(slug='vengeful-hunter-mao', knee=19,
                    hand=dict(box=(12, 13, 14, 15), core=((12, 13), (13, 13), (12, 14), (13, 14)), hole=('696866', '7d8286', '5a5958'),
-                             outline='4a4949', arm=(('8a8f93', '9ea3a7', '7d8286'), '3a3939'), shoulder=(9, 13)),
+                             outline='4a4949', arm=(('8a8f93', '9ea3a7', '7d8286'), '3a3939'), shoulder=(9, 13),
+                             claws=(14, 16)), pads=(8, 3, 4, 2),
                    blink={'halb': [((10, 9), '1a6614'), ((11, 9), '8a7a45'), ((14, 9), '1a6614'), ((15, 9), '8a7a45')],
                           'zu': [((10, 9), '000000'), ((11, 9), '000000'), ((14, 9), '000000'), ((15, 9), '000000')]}),
     'dajan': dict(slug='dajan-conqueror-of-the-treasure-cave', knee=20, pads=(3, 3, 3, 2),
@@ -144,19 +148,21 @@ def ease(u):
     return 0.5 - 0.5 * math.cos(math.pi * max(0.0, min(1.0, u)))
 
 
-def hand_target(i, rest):
-    """Wohin die Hand in Frame i will (Welt-Koordinaten des Sprites): Ausholen zum linken Ende
-    des Bogens, dann mit dem Kopf des Schlitzers entlang, dann zurück zur Brust."""
-    p0, p1 = arc_point(0.0), arc_point(1.0)
-    if SWEEP[0] - 3 <= i < SWEEP[0]:                 # schnelles Ausholen
+CLAW_RED = ('330000', '400000')                          # dunkles Blut an den Krallen (im Körper)
+
+
+def claw_target(i, rest):
+    """Wo der Ansatzpunkt der Krallen (unten Mitte) in Frame i hin will: schnelles Ausholen zum
+    linken Ende des Bogens, dann ziehen die Krallen den Bogen bis zu ihrem Platz rechts."""
+    p0 = arc_point(0.0)
+    if SWEEP[0] - 3 <= i < SWEEP[0]:
         u = ease((i - SWEEP[0] + 4) / 3)
         return rest[0] + (p0[0] - rest[0]) * u, rest[1] + (p0[1] - rest[1]) * u
     if SWEEP[0] <= i <= SWEEP[1]:
-        head = (i - SWEEP[0] + 1) / (SWEEP[1] - SWEEP[0] + 1) * 1.2
-        return arc_point(min(1.0, head))
-    if SWEEP[1] < i <= SWEEP[1] + 3:
-        u = ease((i - SWEEP[1]) / 3)
-        return p1[0] + (rest[0] - p1[0]) * u, p1[1] + (rest[1] - p1[1]) * u
+        head = (i - SWEEP[0] + 1) / (SWEEP[1] - SWEEP[0] + 1)
+        if head >= 1:
+            return rest
+        return arc_point(head)
     return rest
 
 
@@ -194,10 +200,21 @@ def draw_arm(out, a, b, cols):
 def f_mao(i):
     global SLASH_T
     body, sl = load('body'), load('slash')
+    hc = C['hand']
+    cx0, cy1 = hc['claws']
+    # Krallen: die rechte Spitze der Spur und das dunkle Blut daneben im Körper
+    claws = np.zeros_like(body)
+    for y in range(SH):
+        for x in range(SW):
+            if x >= cx0 and y <= cy1 and sl[y, x, 3]:
+                claws[y, x] = sl[y, x]
+                sl[y, x] = 0
+            elif x >= cx0 - 1 and y <= cy1 + 1 and body[y, x, 3] and hexc(body[y, x]) in CLAW_RED:
+                claws[y, x] = body[y, x]
+                body[y, x] = rgb(hc['hole'][(x + 2 * y) % 3])
     if SLASH_T is None:
         SLASH_T = slash_param(sl)
     blink(body, i)
-    hc = C['hand']
     x0, y0, x1, y1 = hc['box']
     hand = np.zeros_like(body)                           # Hand samt Kontur ausschneiden
     hand[y0:y1, x0:x1] = body[y0:y1, x0:x1]
@@ -209,19 +226,23 @@ def f_mao(i):
             if not keep[y, x] and hexc(body[y, x]) != hc['outline']:
                 hand[y, x] = 0
     rest = (np.mean([p[0] for p in hc['core']]), np.mean([p[1] for p in hc['core']]))
-    tx, ty = hand_target(i, rest)
+    cys, cxs = np.nonzero(claws[:, :, 3])
+    anchor = ((cxs.min() + cxs.max()) / 2, float(cys.max()))   # Ansatz der Krallen: unten Mitte
+    off = (anchor[0] - rest[0], anchor[1] - rest[1])
+    ax, ay = claw_target(i, anchor)
+    tx, ty = ax - off[0], ay - off[1]                    # die Hand folgt den Krallen
     ty = max(ty, rest[1])                                # nie höher als die Brust (Arm nicht übers Gesicht)
     sx, sy = hc['shoulder']
     L = math.hypot(tx - sx, ty - sy)
-    if L > 12:                                           # Armlänge begrenzen (die Klauen reichen weiter)
+    if L > 12:                                           # Armlänge begrenzen
         tx, ty = sx + (tx - sx) * 12 / L, sy + (ty - sy) * 12 / L
     ox, oy = int(round(tx - rest[0])), int(round(ty - rest[1]))
     b = BOUNCE12[i % 12]
     out = np.zeros((H, W, 4), int)
-    if ox or oy:                                         # Brust unter der Hand schließen
+    if ox or oy:                                         # Brust unter der Hand schließen (Felltextur)
         for y in range(y0, y1):
             for x in range(x0, x1):
-                if hand[y, x, 3]:                        # Felltextur statt einer Farbe
+                if hand[y, x, 3]:
                     body[y, x] = rgb(hc['hole'][(x + 2 * y) % 3])
     knee_put(out, body, b)
     fill_pinholes(out)
@@ -237,6 +258,7 @@ def f_mao(i):
         for y, x in zip(*np.nonzero(ring)):
             out[y + PT + b + oy, x + PL + ox] = rgb(hc['outline'])
         put(out, hand, PL + ox, PT + b + oy)
+    put(out, claws, PL + ox, PT + (b if not (ox or oy) else b + oy))   # Krallen vorn an der Hand
     return out
 
 
@@ -251,7 +273,7 @@ def draw_slash(out, sl, i):
         elif FADE[1] < i < SWEEP[0]:
             continue
         elif SWEEP[0] <= i <= SWEEP[1]:                  # der Schlitzer zieht den Bogen auf
-            head = (i - SWEEP[0] + 1) / (SWEEP[1] - SWEEP[0] + 1) * 1.2
+            head = (i - SWEEP[0] + 1) / (SWEEP[1] - SWEEP[0] + 1)
             if t > head:
                 continue
             d = head - t
