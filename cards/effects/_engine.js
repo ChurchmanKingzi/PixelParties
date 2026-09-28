@@ -3651,6 +3651,18 @@ class GameEngine {
         effectiveController = cardInstance.stolenBy;
         effectiveOwner = cardInstance.stolenBy;
         effectiveHeroOwner = cardInstance.owner;
+      } else if (cardInstance.zone === 'support'
+                 && cardInstance.counters?.crossSideControlled != null
+                 && cardInstance.controller != null
+                 && cardInstance.controller !== cardInstance.owner) {
+        // ★ Styx 28.9.: ueber einen uebernommenen Helden BESCHWOREN (Golden
+        // Apple, Charme, Styx …): die Kreatur steht physisch beim Gegner,
+        // gehoert aber ihrem Beschwoerer. Wie bei gestohlenen Kreaturen:
+        // „du" (cardOwner/cardController) ist der Kontrolleur, die
+        // Zeichen-Seite (cardHeroOwner) bleibt die physische.
+        effectiveController = cardInstance.controller;
+        effectiveOwner = cardInstance.controller;
+        effectiveHeroOwner = cardInstance.owner;
       }
     }
 

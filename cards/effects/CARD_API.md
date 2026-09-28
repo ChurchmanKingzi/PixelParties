@@ -18413,3 +18413,14 @@ Ein übernommener Held (Charme, Golden Apple, Love Shot, Styx, Paraseed) steht p
 - **Charme ist kein pauschaler Schutz:** Statt `hero.statuses?.charmed` → `engine._charmBlocksFrom(hero, quellenSeite)` (Styx: kein Schutz, Golden Apple: nur gegen den Kontrolleur).
 - Die zentralen Sammler (`promptDamageTarget`, `promptMultiTarget`, `aoeHit`/`collectAoeHeroTargets`) machten es schon richtig.
 - **Bekannte offene Stellen (Engine):** Umleitungsfenster (`_checkTargetRedirectOnce` — Challenge, Martyry, Anti-Magnet, Monia Bot, Alleria, Shield of Wisdom) sowie die Schadens-/Surprise-Fenster fragen die PHYSISCHE Zielseite. Beschwören/Ausrüsten in Zonen eines übernommenen Helden der Gegenspalte gibt es nicht.
+
+## ★ Umleitungen, Schadensfenster & Beschwören nach Kontrolle (v1483, Styx 28.9.)
+
+- **`engine.zielSeite(t)`**: Kontrolleur eines Zielobjekts (Held → `heroSideOf`, Kreatur → `controller ?? owner`). Die Adresse (`t.owner`, IDs) bleibt physisch.
+- **Umleitungsfenster** (`_checkTargetRedirect`) fragen den KONTROLLEUR des Ziels (Hand, Helden, Brett, Surprises). Skripte prüfen „a target you control" mit `engine.zielSeite(selected)`, nicht `selected.owner` (Challenge, Martyry, Anti-Magnet, Alleria, Monia Bot, Laki).
+- **Hand-Schadensfenster** (vor dem Schaden / Gegner vor dem Schaden / nach dem Schaden): Es reagiert der Kontrolleur; Skripte bekommen `targetHeroIdx` als PHYSISCHEN Index und lesen die Seite über `engine._findHeroOwner(target)`. `casterIsTarget`-Karten (Escape, Emergency Spell Armor, Weapon Absorption, Fireshield, Paraseed Zombie) wirken nicht über einen geliehenen Zielhelden (`zielNichtCastbar`).
+- **`_canHeroActivateSurprise`**: Ein Held, den gerade der Gegner kontrolliert, wirkt für seinen Besitzer keine Reaktion und löst keine Surprise aus.
+- **Beschwören/Platzieren über einen übernommenen Helden:** `getFreeSupportZones(pi, { nachKontrolle: true })` bzw. `eligibleSummonZones(…, { nachKontrolle: true })` liefern Zonen mit `owner` (physische Seite); beschworen wird mit `heldSeite: owner` (`summonFromPile`, `placeFromPile`, `summonFromDeck`, `summonFromDiscard`, `actionPlaceCreature`) oder `summonCreatureWithHooks(name, owner, hi, slot, { controller: pi })`. Die Kreatur steht beim Gegner, gehört `pi` (`crossSideControlled`, extra hervorgehoben).
+- **`_createContext`**: Für solche Kreaturen sind `cardOwner`/`cardController` der Kontrolleur, `cardHeroOwner` die physische Seite (wie bei gestohlenen Kreaturen). Zonenzugriffe einer Kreatur auf ihren eigenen Platz daher über `cardHeroOwner`.
+- CPU-Antworten auf `zonePick` geben `owner` mit.
+- **Bekannte Randfälle:** Drop auf einen BELEGTEN Platz eines geliehenen Helden (Bounce-Place: Waitress, Candlestick Squire, Blue Ice Dragon, Chimera) — `_requestedNormalSummonSlot` trägt keine Seite. Heldeneffekte eines übernommenen Helden, die „this Hero" beschwören lassen (Calamitusk, Cute Annoyance Mini, Argos), beschwören auf die Seite des Aktivierenden.

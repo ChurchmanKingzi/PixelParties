@@ -145,8 +145,7 @@ module.exports = {
     const res = await engine.summonCreatureWithHooks(
       IFRIT, feld, ziel.heroIdx, ziel.slotIdx,
       {
-        // Flug nur von der eigenen Seite (fromHandIdx zeigt in die Hand von `feld`).
-        source: CARD_NAME, ...(fremd ? { controller: pi } : { fromHandIdx: idxJetzt }), _fromHand: true,
+        source: CARD_NAME, fromHandIdx: idxJetzt, ...(fremd ? { controller: pi } : {}), _fromHand: true,
         hookExtras: { _isNormalSummon: false },
       },
     );

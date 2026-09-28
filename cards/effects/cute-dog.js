@@ -114,14 +114,15 @@ function getHostHeroes(engine, pi) {
   const cd = cardDB[CARD_NAME];
   if (!cd) return [];
   const out = [];
-  for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-    const h = ps.heroes[hi];
+  // Kontrolle statt Seite (Styx 28.9.): alle Helden, die `pi` kontrolliert
+  // — auch uebernommene der Gegenspalte. Eintrag: { owner, heroIdx }.
+  for (const { physOwner, heroIdx: hi, hero: h } of engine.heroesControlledBy(pi)) {
     if (!h?.name || h.hp <= 0) continue;
     if (h.statuses?.frozen || h.statuses?.stunned) continue;
-    const supZones = ps.supportZones?.[hi] || [];
+    const supZones = engine.gs.players[physOwner]?.supportZones?.[hi] || [];
     if (!supZones.some(slot => (slot || []).length === 0)) continue;
-    if (!engine.heroMeetsLevelReq(pi, hi, cd)) continue;
-    out.push(hi);
+    if (!engine.heroMeetsLevelReq(physOwner, hi, cd)) continue;
+    out.push({ owner: physOwner, heroIdx: hi });
   }
   return out;
 }
@@ -326,11 +327,12 @@ module.exports = {
 
       // ── Pick destination zone ──
       const zones = [];
-      for (const hi of hosts) {
-        const sup = ps.supportZones?.[hi] || [];
+      for (const { owner, heroIdx: hi } of hosts) {   // Kontrolle statt Seite (Styx 28.9.)
+        const hps = engine.gs.players[owner];
+        const sup = hps?.supportZones?.[hi] || [];
         for (let s = 0; s < 3; s++) {
           if ((sup[s] || []).length === 0) {
-            zones.push({ heroIdx: hi, slotIdx: s, label: `${ps.heroes[hi].name} — Support ${s + 1}` });
+            zones.push({ owner, heroIdx: hi, slotIdx: s, label: `${hps.heroes[hi].name} — Support ${s + 1}` });
           }
         }
       }
@@ -348,7 +350,9 @@ module.exports = {
           cancellable: true,
         });
         if (!picked || picked.cancelled) return;
-        chosen = zones.find(z => z.heroIdx === picked.heroIdx && z.slotIdx === picked.slotIdx) || zones[0];
+        // Antwort ohne `owner` = eigene Seite (Kontrolle statt Seite, Styx 28.9.).
+        chosen = zones.find(z => z.owner === (picked.owner ?? pi) && z.heroIdx === picked.heroIdx && z.slotIdx === picked.slotIdx)
+          || zones.find(z => z.heroIdx === picked.heroIdx && z.slotIdx === picked.slotIdx) || zones[0];
       }
 
       // ── v1389: Ablage → Feld über die EINE Stelle ──
@@ -357,6 +361,7 @@ module.exports = {
       const oldInst = ctx.card;
       const res = await engine.summonFromDiscard(pi, pi, CARD_NAME, chosen.heroIdx, chosen.slotIdx, {
         source: CARD_NAME, flug: 650,
+        ...(chosen.owner !== pi ? { heldSeite: chosen.owner } : {}),   // Kontrolle statt Seite (Styx 28.9.)
       });
       // Den Listener-Klon in der Ablage abräumen (sonst verwaist er).
       if (oldInst && oldInst.zone === 'discard') engine._untrackCard(oldInst.id);

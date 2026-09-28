@@ -154,7 +154,7 @@ module.exports = {
       const res = await engine.summonCreatureWithHooks(
         CARD_NAME, feld, ziel.heroIdx, ziel.slotIdx,
         {
-          source: CARD_NAME, ...(feld !== pi ? { controller: pi } : { fromHandIdx: handIdx }),
+          source: CARD_NAME, fromHandIdx: handIdx, ...(feld !== pi ? { controller: pi } : {}),
           // Kontrolle statt Seite (Styx 28.9.): `beforeSummon` sieht als
           // `cardOwner` die Feldseite — der Beschwoerer kommt extra mit.
           hookExtras: { _isNormalSummon: false, ethanKontrolleur: pi },

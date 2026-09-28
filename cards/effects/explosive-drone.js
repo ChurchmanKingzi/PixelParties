@@ -124,9 +124,8 @@ async function reagiereAufTod(ctx, opferName) {
   const res = await engine.summonCreatureWithHooks(
     CARD_NAME, feld, ziel.heroIdx, ziel.slotIdx,
     // `fromHandIdx` laesst die Karte sichtbar von der Hand in die Zone
-    // fliegen — ohne das erscheint sie dort einfach (v933). Nur auf der
-    // eigenen Seite: der Index zeigt in die Hand von `feld`.
-    { source: CARD_NAME, ...(feld !== pi ? { controller: pi } : { fromHandIdx: handIdx }) },
+    // fliegen — ohne das erscheint sie dort einfach (v933).
+    { source: CARD_NAME, fromHandIdx: handIdx, ...(feld !== pi ? { controller: pi } : {}) },
   );
   if (!res?.inst) { engine.handZugangSync(ps, CARD_NAME, { von: 'rueckgabe', ohneInstanz: true }); return; }   // v1395
 

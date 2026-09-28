@@ -157,7 +157,7 @@ module.exports = {
     engine.takeFromPileSync(ps, 'hand', handIdx);
     const res = await engine.summonCreatureWithHooks(
       CARD_NAME, feld, dest.heroIdx, dest.slotIdx,
-      { source: CARD_NAME, ...(feld !== pi ? { controller: pi } : { fromHandIdx: handIdx }) },
+      { source: CARD_NAME, fromHandIdx: handIdx, ...(feld !== pi ? { controller: pi } : {}) },
     );
     if (!res?.inst) { engine.handZugangSync(ps, CARD_NAME, { von: 'rueckgabe', ohneInstanz: true }); return false; }   // v1395
 
