@@ -1,0 +1,16 @@
+{
+  "hero": "Blue Ralzish",
+  "sheet": "blue-ralzish.png",
+  "frameWidth": 23,
+  "frameHeight": 47,
+  "frames": 48,
+  "frameMs": 90,
+  "loop": true,
+  "layout": "horizontal",
+  "skinOf": "Wall Breaker General Ralzish",
+  "padTop": 5,
+  "padLeft": 3,
+  "padRight": 3,
+  "padBottom": 2,
+  "faceX": 15.5
+}

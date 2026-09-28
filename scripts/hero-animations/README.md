@@ -154,6 +154,27 @@ kopiert, daneben liegt eine JSON-Datei mit den Metadaten. Die erzeugten
 | `deri.py` | `final 90 summoner` | `summoner_idle_final_sheet.png` | `layn-summonr-of-weapons` (Skin) |
 | `deri.py` | `final 90 ascended` | `ascended_idle_final_sheet.png` | `layn-master-of-deri-s-relic` |
 | `deri.py` | `final 90 tharx` | `tharx_idle_final_sheet.png` | `tharx-the-never-losing-general` |
+| `gn.py` | `final 90 andras` | `andras_idle_final_sheet.png` | `andras-the-human-weapon` |
+| `gn.py` | `final 90 friedhelm` | `friedhelm_idle_final_sheet.png` | `friedhelm-the-misled-avenger` |
+| `gn.py` | `final 90 titan` | `titan_idle_final_sheet.png` | `titan-slayer-friedhelm` (Skin) |
+| `gn.py` | `final 90 ftriffel` | `ftriffel_idle_final_sheet.png` | `future-tech-gunslinger-riffel` |
+| `gn.py` | `final 90 ascriffel` | `ascriffel_idle_final_sheet.png` | `riffel-master-of-the-ultimate-gun` |
+| `gn.py` | `final 90 mgriffel` | `mgriffel_idle_final_sheet.png` | `magical-girl-riffel` (Skin) |
+| `gn.py` | `final 90 kassaran` | `kassaran_idle_final_sheet.png` | `kassaran-seer-of-everything` |
+| `gn.py` | `final 90 kent` | `kent_idle_final_sheet.png` | `kent-the-indebted-apprentice` |
+| `gn.py` | `final 90 koperniko` | `koperniko_idle_final_sheet.png` | `koperniko-the-stargazer` |
+| `gn.py` | `final 90 waflav` | `waflav_idle_final_sheet.png` | `thunderstruck-waflav` |
+| `gn.py` | `final 90 heinz` | `heinz_idle_final_sheet.png` | `visionary-genius-heinz` |
+| `gn.py` | `final 90 madheinz` | `madheinz_idle_final_sheet.png` | `mad-scientist-heinz` (Skin) |
+| `gn.py` | `final 90 ralzish` | `ralzish_idle_final_sheet.png` | `wall-breaker-general-ralzish` |
+| `gn.py` | `final 90 blueralzish` | `blueralzish_idle_final_sheet.png` | `blue-ralzish` (Skin) |
+| `gn.py` | `final 90 pixmarck` | `pixmarck_idle_final_sheet.png` | `von-pixmarck-the-iron-chancellor` |
+| `gn.py` | `final 90 dad` | `dad_idle_final_sheet.png` | `dad-of-the-year-von-pixmarck` (Skin) |
+| `gn.py` | `final 90 nero` | `nero_idle_final_sheet.png` | `nero-zira-the-mastermind` |
+| `gn.py` | `final 90 normalnero` | `normalnero_idle_final_sheet.png` | `normal-nero-zira` (Skin) |
+| `gn.py` | `final 90 orthos` | `orthos_idle_final_sheet.png` | `orthos-the-loyal-guard-dog` |
+| `gn.py` | `final 90 luna` | `luna_idle_final_sheet.png` | `luna-the-flame-fairy` |
+| `gn.py` | `final 90 tsuki` | `tsuki_idle_final_sheet.png` | `tsu-ki-the-lunatic-princess` |
 | `bubbles.py` | `final gross` | `bubbles_idle_final_gross_sheet.png` | `bubbles-the-bouncy-bunny` |
 
 `bubbles.py` ohne `gross` erzeugt eine auf Hero-Größe verkleinerte Variante
@@ -189,6 +210,7 @@ python3 xcf_extract.py MotiveMoe.xcf assemble src/cute-princess-mary.png "Mary-K
 | MotiveCoolhalla-Heroes und Skin | `MotiveCoolhalla.xcf` | reproduzierbar per `python3 assemble_coolhalla.py <MotiveCoolhalla.xcf>` (Zuordnung im Skriptkopf; Cooldin wird aus zwei Szenen-Ebenen ausgeschnitten) |
 | MotiveDeepsea-Heroes und -Skins | `MotiveDeepsea.xcf` | reproduzierbar per `python3 assemble_deepsea.py <MotiveDeepsea.xcf>` (Zuordnung im Skriptkopf; Scherben-Vorlagen für die Lolek-Partikel als `-shards.png`) |
 | MotiveDeri-Heroes und -Skin | `MotiveDeri.xcf` | reproduzierbar per `python3 assemble_deri.py <MotiveDeri.xcf>` (Zuordnung im Skriptkopf; Thron, Arm, Bogen, Hände und Zinnen als bewegliche Teile `-<teil>.png`) |
+| MotiveGN-Heroes und -Skins | `MotiveGN.xcf` | reproduzierbar per `python3 assemble_gn.py <MotiveGN.xcf>` (Zuordnung im Skriptkopf; Ascended-Riffels Pistole vor ihr stammt aus dem Szenenbild „Sichtbar #146“; Nero Ziras Schläuche und Kabelenden werden ergänzt) |
 
 Neue Datei durchsuchen: `xcf_scan.py dump` legt alle Ebenen einzeln ab,
 `xcf_scan.py match <ordner> --heroes` gleicht sie mit allen noch nicht

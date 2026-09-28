@@ -1,0 +1,15 @@
+{
+  "hero": "Orthos, the Loyal Guard Dog",
+  "sheet": "orthos-the-loyal-guard-dog.png",
+  "frameWidth": 24,
+  "frameHeight": 31,
+  "frames": 48,
+  "frameMs": 90,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 5,
+  "padLeft": 3,
+  "padRight": 3,
+  "padBottom": 2,
+  "faceX": 11.5
+}

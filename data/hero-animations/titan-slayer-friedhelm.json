@@ -1,0 +1,16 @@
+{
+  "hero": "Titan Slayer Friedhelm",
+  "sheet": "titan-slayer-friedhelm.png",
+  "frameWidth": 30,
+  "frameHeight": 42,
+  "frames": 48,
+  "frameMs": 90,
+  "loop": true,
+  "layout": "horizontal",
+  "skinOf": "Friedhelm, the Misled Avenger",
+  "padTop": 12,
+  "padLeft": 3,
+  "padRight": 3,
+  "padBottom": 3,
+  "faceX": 14.5
+}

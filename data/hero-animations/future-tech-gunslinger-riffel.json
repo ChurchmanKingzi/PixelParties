@@ -1,0 +1,15 @@
+{
+  "hero": "Future Tech Gunslinger Riffel",
+  "sheet": "future-tech-gunslinger-riffel.png",
+  "frameWidth": 59,
+  "frameHeight": 30,
+  "frames": 48,
+  "frameMs": 90,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 4,
+  "padLeft": 14,
+  "padRight": 3,
+  "padBottom": 2,
+  "faceX": 44.5
+}
