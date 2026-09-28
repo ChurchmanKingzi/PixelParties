@@ -24047,7 +24047,7 @@ function schedulePlaySideDeckAppear(selector, slotBaseIdx, count) {
 //  Zuschauer oder ein Gast, gibt es keine eigenen Rewards — dann laeuft
 //  nur Titel → Ende (und `extra` zeigt die alte Zusammenfassung).
 // ═══════════════════════════════════════════════════════════════
-function ResultCeremony({ won, spectator, title, subtitle, rewards, total, eloChanges, myName, extra, children }) {
+function ResultCeremony({ won, spectator, title, subtitle, rewards, total, eloChanges, myName, oppName, extra, children }) {
   const n = rewards.length;
   const ENDE = n + 1;
   const [stufe, setStufe] = useState(0);
@@ -24153,9 +24153,10 @@ function ResultCeremony({ won, spectator, title, subtitle, rewards, total, eloCh
           <div className="pp-cer-rewards">
             {rewards.map((r, i) => (
               <div key={r.id || i} className={'pp-cer-reward' + (bonusArt(r) ? ' pp-cer-reward-' + bonusArt(r) : '') + (stufe > i ? ' pp-cer-reward-da' : '')}>
-                {/* ★ v1471 (Als Befund 28.9.: „‚Play a Game (Daily)' zweimal bekommen"): „Daily!" nur noch für
-                    echte Tageslimits — was je Gegner und Tag zählt (`daily_per_opponent`), sagt das jetzt. */}
-                {bonusArt(r) && <div className="pp-cer-band">{bonusArt(r) === 'daily' ? (r.limit === 'daily' ? 'Daily!' : 'Daily per Foe!') : 'Once!'}</div>}
+                {/* ★ v1471 (Als Befund 28.9.: „‚Play a Game (Daily)' zweimal bekommen … die Badge sagt nur ‚Daily'
+                    — verwirrend"): „Daily!" nur noch für echte Tageslimits. Was je Gegner und Tag zählt
+                    (`daily_per_opponent`, jede CPU ist ein eigener Gegner), nennt den Gegner: „Daily vs Siphem!". */}
+                {bonusArt(r) && <div className="pp-cer-band">{bonusArt(r) === 'daily' ? (r.limit === 'daily' ? 'Daily!' : (oppName ? `Daily vs ${oppName}!` : 'Daily per Foe!')) : 'Once!'}</div>}
                 {stufe > i && !phone && (
                   <div className="pp-cer-burst" aria-hidden="true">
                     {Array.from({ length: ppFxN(12) }).map((_, k) => (
@@ -47212,6 +47213,12 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           total={(!isSpectator && scEarned && !user?.isGuest) ? (scEarned.total || 0) : 0}
           eloChanges={result.eloChanges || null}
           myName={user?.username}
+          // v1471: derselbe Anzeigename wie in der Handleiste des Gegners
+          // (CPU → Kurzname ihres mittleren Helden), fuers „Daily vs …"-Band.
+          oppName={tutorialGegner ? tutorialGegner.name
+            : (gameState.isCpuBattle && opp?.username === 'CPU')
+              ? heroDisplayName(opp.heroes?.[1]?.name || opp.heroes?.find(h => h?.name)?.name || opp.username)
+              : opp?.username}
           extra={(isSpectator || user?.isGuest) ? renderSCEarned() : null}>
             {!isSpectator && ((decks && decks.length > 0) || (sampleDecks || []).some(d => isDeckLegal(d).legal)) && (
               <div style={{ marginBottom: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
