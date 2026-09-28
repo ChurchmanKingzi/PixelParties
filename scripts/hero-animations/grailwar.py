@@ -121,10 +121,10 @@ Dazu je Variante:
              sich, die Zungen wiegen, Fetzen reißen ab; beim Skin kein Feuer.
 * zi:        Timeless King Zi schwebt langsam auf und ab, die Arme heben und senken sich
              leicht, der Umhang wogt majestätisch (Welle von oben nach unten, der Saum
-             kräuselt sich nach außen, hängt dem Schweben nach); die gelben Augen leuchten
-             pulsierend und funkeln, rundherum funkeln viele Sterne (nie halb hinter der Figur).
-* waflav:    brüllt einmal pro Loop: der Unterkiefer klappt samt unteren Reißzähnen bis zu drei
-             Pixel herunter und legt sich über den Hals, dazwischen der rote Rachen mit
+             kräuselt sich nach außen, hängt dem Schweben nach); die gelben Augen strahlen
+             periodisch auf wie Glühbirnen (Lichtkranz), rundherum funkeln viele Sterne (nie halb hinter der Figur).
+* waflav:    brüllt einmal pro Loop: der Unterkiefer (untere Reißzähne) klappt bis zu drei
+             Pixel herunter und legt sich über den oberen Brustrand (die Brust bleibt stehen), dazwischen der rote Rachen mit
              Zunge; die Augen glühen; sonst atmet es.
 * wahflav / ash / zetsu: federn, blinzeln; Ash (Barker, the Monster Trainer) federt über die
              Beine (Oberkörper 2 px, Knie 1 px, Füße fest); bei Kyli, the True Mastermind
@@ -2070,6 +2070,7 @@ def row_remap(s, off):
 # Zi: der blaue Dschinn schwebt, der Umhang wogt majestätisch (Welle von oben nach unten, der Saum
 # kräuselt sich nach außen), viele Glitzersterne
 ZI_CAPE = ('04304a', '096ca4', '1e7ebd', '1582d5')
+ZI_GLOW = [0] * 12 + [1, 2, 3, 3, 3, 3, 3, 2, 1] + [0] * 3   # Augen: aus, glimmen, Kranz, voll
 ZI_STARS = [(1, 2, 0), (23, 3, 5), (3, 16, 10), (22, 17, 15), (0, 23, 20), (24, 24, 25), (4, 6, 30), (21, 8, 35),
             (-2, 12, 40), (27, 13, 44), (4, 28, 3), (20, 28, 13), (0, 27, 23), (25, 27, 33), (12, 28, 42),
             (-3, 5, 18), (28, 6, 28), (-3, 19, 8), (28, 21, 38)]
@@ -2080,11 +2081,21 @@ def f_zi(i):
     op = s[:, :, 3] > 0
     cape = op & (_ys >= 13) & np.array([[hexc(s[y, x]) in ZI_CAPE for x in range(SW)] for y in range(SH)])
     arms = op & ~cape & (_ys >= 8) & (_ys <= 13) & ((_xs <= 6) | (_xs >= SW - 7))
-    # die gelben Augen leuchten pulsierend heller (bis fast weiß)
-    f = 0.5 - 0.5 * math.cos(2 * math.pi * 3 * i / N)
-    for y, x in zip(*np.nonzero(op)):
-        if hexc(s[y, x]) == 'ffff00':
-            s[y, x] = lighten(rgb('ffff00'), 0.8 * f)
+    # die gelben Augen strahlen periodisch auf wie Glühbirnen: heller Kern, Lichtkranz ringsum
+    lv = ZI_GLOW[i % 24]
+    eyes = np.array([[op[y, x] and hexc(s[y, x]) == 'ffff00' for x in range(SW)] for y in range(SH)])
+    if lv:
+        e4 = np.zeros_like(eyes)                         # Kranz: die direkten Nachbarn, nicht zwischen den Augen
+        e4[1:] |= eyes[:-1]
+        e4[:-1] |= eyes[1:]
+        e4[:, 1:] |= eyes[:, :-1]
+        e4[:, :-1] |= eyes[:, 1:]
+        halo = e4 & op & ~eyes & ((_xs < 12) | (_xs > 13))
+        for y, x in zip(*np.nonzero(eyes)):
+            s[y, x] = rgb(('ffff6a', 'ffffb4', 'fffff0')[lv - 1])
+        if lv >= 2:
+            for y, x in zip(*np.nonzero(halo)):
+                s[y, x] = rgb('6e5f00' if lv == 2 else 'b39b00')
     w = 2 * math.pi * 2 * i / N - 0.9                    # der Umhang hängt dem Schweben nach
     wa = 2 * math.pi * 2 * i / N                         # die Arme heben und senken sich leicht
     cx = 12.5
@@ -2111,15 +2122,14 @@ def f_zi(i):
     put(out, body, PL, PT - hv)
     fill_pinholes(out)
     stars(out, i, [(x + PL, y + PT - hv, st) for x, y, st in ZI_STARS], 'c8f8ff', 'ffffff', only_empty=True)
-    stars(out, i, [(10 + PL, 5 + PT - hv, 9), (15 + PL, 6 + PT - hv, 33)], 'ffff9a', 'ffffff')   # Augen funkeln
     return out
 
 
-# Waflav brüllt: Anlauf (holt Luft: der Körper streckt sich), dann klappt der Unterkiefer (samt
-# unteren Reißzähnen) herunter und legt sich über den Hals, dazwischen der rote Rachen mit Zunge;
+# Waflav brüllt: Anlauf (holt Luft: der Körper streckt sich), dann klappt der Unterkiefer (die Zeile
+# mit den unteren Reißzähnen) herunter und legt sich über den oberen Rand der Brust (die bleibt stehen), dazwischen der rote Rachen mit Zunge;
 # die Augen glühen. Arme, Hals und Kopf bleiben dabei, wie sie sind.
 WAF_ROAR = {19: 1, 20: 2, 21: 3, 22: 3, 23: 3, 24: 3, 25: 3, 26: 3, 27: 3, 28: 3, 29: 3, 30: 3, 31: 2, 32: 1}
-WAF_JAW = (7, 10, 10, 17)                                # Zeilen 7-10, Spalten 10-17
+WAF_JAW = (7, 8, 10, 17)                                 # Rachen Zeile 7, Unterkiefer Zeile 8, Spalten 10-17
 
 
 def f_waflav(i):
@@ -2151,10 +2161,6 @@ def f_waflav(i):
             for x in range(jaw.shape[1]):
                 if jaw[y, x, 3]:
                     s[y0 + 1 + o + y, x0 + x] = jaw[y, x]
-        for x in range(x0 + 1, x1):                      # Schatten unter dem Kinn
-            yy = y1 + o + 1
-            if jaw[-1, x - x0, 3] and s[yy, x, 3]:
-                s[yy, x] = rgb('0e3300')
     b = B24[i % 24] if not o else 0
     img, m = row_remap(s, lambda y: b if y < 17 else 0)
     out = np.zeros((H, W, 4), int)
