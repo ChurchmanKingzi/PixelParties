@@ -2290,7 +2290,7 @@ select optgroup {
   letter-spacing: .5px; user-select: none; transition: opacity .15s, text-shadow .15s;
 }
 .auth-link:hover { text-shadow: 0 0 8px var(--accent); }
-.auth-link.disabled { color: var(--text2); cursor: default; text-shadow: none; opacity: .7; }
+.auth-link.disabled { color: var(--text2); cursor: url("/cursor-arrow.png?v=4") 2 2, default; text-shadow: none; opacity: .7; }
 .auth-row { display: flex; justify-content: space-between; align-items: center; margin-top: 2px; }
 .auth-fine { font-size: 11.5px; color: var(--text2); line-height: 1.5; text-align: left; }
 
@@ -2306,7 +2306,7 @@ select optgroup {
   cursor: pointer; transition: background .15s, border-color .15s;
 }
 .google-btn:hover:not(:disabled) { background: #1f2023; border-color: #8a8f93; }
-.google-btn:disabled { opacity: .6; cursor: default; }
+.google-btn:disabled { opacity: .6; cursor: url("/cursor-arrow.png?v=4") 2 2, default; }
 .google-btn svg { flex: 0 0 auto; }
 
 /* Auffaelligere Variante fuer den Login-Screen (Als Vorgabe 17.8.:
@@ -3843,7 +3843,7 @@ body:has(.anim-backdrop) .pp-bg-particles { display: none; }
   font-size: 12px; color: var(--text); cursor: pointer; user-select: none;
   align-self: flex-start;
 }
-.profile-schalter.profile-schalter-aus { color: var(--text2); opacity: .5; cursor: default; }
+.profile-schalter.profile-schalter-aus { color: var(--text2); opacity: .5; cursor: url("/cursor-arrow.png?v=4") 2 2, default; }
 .profile-passwort-spalte { display: flex; flex-direction: column; gap: 8px; }
 
 /* ═══ Status Effect Visuals ═══ */
@@ -6185,6 +6185,23 @@ input[type="number"], input[type="search"], input[type="tel"],
 input[type="url"], input:not([type]), textarea {
   cursor: url("/cursor-text.png?v=4") 5 9, text;
 }
+/* ★ v1472 (Als Befund 28.9.: „Beim Hover-Over von Status-Icons wird der
+   Cursor-Sprite zum Standard-Cursor. Außerdem zeigen manche Icons
+   (spezifisch das für die Siphem-Counter) noch ein Fragezeichen neben
+   dem Cursor an"). Status-Plaketten, Buff-Icons, Zaehler-Abzeichen usw.
+   setzten `cursor: default` bzw. `cursor: help` — das sind die NATIVEN
+   Zeiger des Systems (help = Pfeil mit Fragezeichen) und sie schlagen
+   den geerbten Pixelpfeil vom body. In dieser Datei steht an allen
+   diesen Stellen jetzt der Pixelpfeil selbst (gleiche Kaskade wie
+   vorher, nur das Bild getauscht). Fuer INLINE gesetzte Werte (React
+   `style={{ cursor: 'default' }}` / `'help'`, z. B. das Deepsea-Counter-
+   Abzeichen an Siphem) greift diese Regel — wie die Pointer-Regel
+   darunter ueber das style-Attribut. Sie steht VOR den Pointer-/Greif-/
+   Verbots-Regeln, damit die bei gleichem Gewicht gewinnen. */
+[style*="cursor: default"], [style*="cursor:default"],
+[style*="cursor: help"], [style*="cursor:help"] {
+  cursor: url("/cursor-arrow.png?v=4") 2 2, default !important;
+}
 .btn:not(:disabled):not([disabled]),
 button:not(:disabled):not([disabled]),
 a[href], select, summary,
@@ -6243,6 +6260,76 @@ body.pp-dragging-card.pp-dragging-card.pp-dragging-card * {
 .board-util-mid {
   height: calc(28px * var(--board-scale));
   flex-shrink: 0;
+  /* v1472: Bezugspunkt fuer die Rundenanzeige (darunter). */
+  position: relative;
+}
+/* ═══ RUNDENANZEIGE (v1472) ═══════════════════════════════════════════
+   Als Vorgabe 28.9.: „Ganz links im Battle-Screen, zwischen den
+   Deleted-Piles beider Spieler, sollte die aktuelle Rundenzahl
+   dargestellt werden, in der Farbe des Spielers, dessen Runde es ist!"
+
+   Sitzt in `.board-util-mid` der LINKEN Spalte — genau die Mitte
+   zwischen gegnerischem (oben) und eigenem (unten) Gelöscht-Stapel. Die
+   Anzeige ist absolut gesetzt und auf die Mitte zentriert: sie nimmt
+   keinen Platz, verschiebt also weder Stapel noch Spalte, und ragt nur
+   in die freien Abstandhalter darueber und darunter. Pixelsprache wie
+   Portraet und Pixelfenster: Pixelschrift, schwarze Kontur, harter
+   versetzter Schatten, Zahl in der Farbe des Spielers am Zug
+   (`--runde-farbe`, inline). Alle Masse mit `--board-scale`. Rein
+   anzeigend — kein Zeiger, kein Klick. */
+.board-round-counter {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: calc(3px * var(--board-scale));
+  pointer-events: none;
+  white-space: nowrap;
+  font-family: 'Pixel Intv', 'Press Start 2P', monospace;
+  line-height: 1;
+  color: var(--runde-farbe, var(--accent));
+}
+.board-round-counter-label {
+  font-size: calc(12px * var(--board-scale));
+  letter-spacing: calc(1px * var(--board-scale));
+  color: color-mix(in srgb, var(--runde-farbe, var(--accent)) 55%, #fff);
+  text-shadow:
+    1px 0 0 var(--pp-kontur), -1px 0 0 var(--pp-kontur),
+    0 1px 0 var(--pp-kontur), 0 -1px 0 var(--pp-kontur),
+    2px 2px 0 rgba(0, 0, 0, .7);
+}
+.board-round-counter-zahl {
+  font-size: calc(42px * var(--board-scale));
+  text-shadow:
+    2px 0 0 var(--pp-kontur), -2px 0 0 var(--pp-kontur),
+    0 2px 0 var(--pp-kontur), 0 -2px 0 var(--pp-kontur),
+    2px 2px 0 var(--pp-kontur), -2px -2px 0 var(--pp-kontur),
+    2px -2px 0 var(--pp-kontur), -2px 2px 0 var(--pp-kontur),
+    4px 4px 0 rgba(0, 0, 0, .65),
+    0 0 calc(12px * var(--board-scale)) color-mix(in srgb, var(--runde-farbe, var(--accent)) 45%, transparent);
+  animation: runde-pop .45s cubic-bezier(.2, 1.6, .4, 1);
+}
+@keyframes runde-pop {
+  0%   { transform: scale(.4); opacity: 0; }
+  100% { transform: scale(1);  opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .board-round-counter-zahl { animation: none; }
+}
+/* Telefon quer (≤ 500 px hoch): dort liegt die Phasenspalte mit
+   `left: 0` GENAU ueber der Mitte dieser Spalte (siehe `.phase-column`
+   im Telefonblock) und haette die Zahl verdeckt. Die Anzeige rueckt
+   deshalb nach oben in die Luecke zwischen gegnerischem Gelöscht-Stapel
+   und Phasenzeile (Unterkante 3 px ueber `.board-util-mid`), und die
+   Beschriftung faellt weg — die Luecke ist bei 360 px Hoehe nur rund
+   26 px hoch (gemessen 900×500 bis 700×360). */
+@media (max-height: 500px) {
+  .board-round-counter { top: auto; bottom: calc(100% + 3px); transform: translateX(-50%); }
+  .board-round-counter-label { display: none; }
 }
 .board-util-spacer {
   flex: 1;
@@ -7299,7 +7386,7 @@ body.pp-dragging-card.pp-dragging-card.pp-dragging-card * {
   color: #1f7a3a;
   text-shadow: 0 0 4px #000, 1px 1px 0 #000, -1px -1px 0 #000, 0 0 6px rgba(40,200,90,.5);
   pointer-events: auto;
-  cursor: help;
+  cursor: url("/cursor-arrow.png?v=4") 2 2, default;
 }
 
 /* Per-instance Artifact cost-override badge (Play Money). Top-left of
@@ -7321,7 +7408,7 @@ body.pp-dragging-card.pp-dragging-card.pp-dragging-card * {
   box-shadow: 0 0 6px rgba(68, 170, 255, 0.55);
   z-index: 5;
   pointer-events: auto;
-  cursor: help;
+  cursor: url("/cursor-arrow.png?v=4") 2 2, default;
   line-height: 1;
 }
 
@@ -7332,7 +7419,7 @@ body.pp-dragging-card.pp-dragging-card.pp-dragging-card * {
   top: 2px;
   font-size: calc(12px * var(--board-scale));
   z-index: 5;
-  cursor: default;
+  cursor: url("/cursor-arrow.png?v=4") 2 2, default;
   filter: drop-shadow(0 0 3px rgba(255,200,0,.8));
   animation: additionalActionPulse 2s ease-in-out infinite;
   line-height: 1;
@@ -7394,7 +7481,7 @@ body.pp-dragging-card.pp-dragging-card.pp-dragging-card * {
   box-shadow: 0 0 4px rgba(220, 80, 30, 0.5);
   z-index: 5;
   pointer-events: auto;
-  cursor: default;
+  cursor: url("/cursor-arrow.png?v=4") 2 2, default;
   line-height: 1;
 }
 .head-counter-badge .head-counter-icon {
@@ -7772,7 +7859,7 @@ body.pp-dragging-card.pp-dragging-card.pp-dragging-card * {
   top: 2px;
   font-size: calc(12px * var(--board-scale));
   z-index: 5;
-  cursor: default;
+  cursor: url("/cursor-arrow.png?v=4") 2 2, default;
   opacity: 0.8;
   filter: drop-shadow(0 0 2px rgba(150,150,255,.6));
   animation: summonSickPulse 2.5s ease-in-out infinite;
@@ -7800,7 +7887,7 @@ body.pp-dragging-card.pp-dragging-card.pp-dragging-card * {
   bottom: 2px;
   font-size: calc(14px * var(--board-scale));
   z-index: 5;
-  cursor: default;
+  cursor: url("/cursor-arrow.png?v=4") 2 2, default;
   opacity: 0.85;
   filter: drop-shadow(0 0 3px rgba(200,180,120,.7));
   animation: mummifiedPulse 3s ease-in-out infinite;
@@ -7829,7 +7916,7 @@ body.pp-dragging-card.pp-dragging-card.pp-dragging-card * {
 .card-reveal-entry {
   position: absolute;
   pointer-events: auto;
-  cursor: default;
+  cursor: url("/cursor-arrow.png?v=4") 2 2, default;
   animation: cardRevealAnim 3.5s ease-in-out forwards;
 }
 .card-reveal-card {
@@ -11614,7 +11701,7 @@ body:has(.modal-overlay) .tooltip {
   background: rgba(180,30,30,.85);
   border: 1.5px solid rgba(255,80,80,.7);
   border-radius: 50%;
-  cursor: default;
+  cursor: url("/cursor-arrow.png?v=4") 2 2, default;
   filter: drop-shadow(0 0 3px rgba(200,0,0,.5));
   animation: statusBadgePop .3s ease-out backwards;
 }
@@ -11692,7 +11779,7 @@ body:has(.modal-overlay) .tooltip {
   border: 1.5px solid rgba(255,255,255,.35);
   transform: translate(-50%, -50%);
   pointer-events: auto;
-  cursor: default;
+  cursor: url("/cursor-arrow.png?v=4") 2 2, default;
   transition: background .4s, box-shadow .4s, transform .3s;
 }
 .ascension-orb-collected {
@@ -12203,7 +12290,7 @@ body:has(.modal-overlay) .tooltip {
   align-items: center;
   justify-content: center;
   font-size: calc(12px * var(--board-scale));
-  cursor: default;
+  cursor: url("/cursor-arrow.png?v=4") 2 2, default;
   box-shadow: 0 0 6px rgba(100,180,255,.3);
   animation: buffIconPulse 2s ease-in-out infinite;
 }
@@ -15884,7 +15971,7 @@ body:has(.textbox-overlay) .tooltip {
 .menu-deck-card.is-active {
   background: rgba(0, 240, 255, .14);
   border-color: var(--player-color, #00f0ff);
-  cursor: default;
+  cursor: url("/cursor-arrow.png?v=4") 2 2, default;
 }
 /* The standalone "Active Deck" card up top is clickable (→ deck builder). */
 .menu-deck-card.is-editable { cursor: pointer; }
@@ -16048,6 +16135,13 @@ body:has(.textbox-overlay) .tooltip {
   padding: 11px 14px;
 }
 .menu-corner .discord-btn--block svg { width: auto; height: 100%; }
+/* ★ v1472 (Als Befund 28.9.: „Lautsprecher-Icon und Logout-Button sollen
+   Plätze tauschen … und der Discord-Button soll mit dem Logout-Button mit
+   nach rechts wandern"). Der Lautsprecher steht im JSX jetzt VOR LOGOUT
+   (Spalte 1), LOGOUT rechts (Spalte 2) — Discord gehoert unter LOGOUT,
+   also ausdruecklich in Spalte 2 (sonst liefe er in die freie Zelle
+   unter dem Lautsprecher). Im Telefon-Layout (Flex-Zeile) wirkungslos. */
+.menu-corner .discord-btn--block { grid-column: 2; }
 .menu-buttons { display: flex; flex-direction: column; gap: 12px; width: 340px; }
 
 /* Title + subtitle get their own backdrop plaque (they sit above the
@@ -16551,7 +16645,7 @@ body:has(.textbox-overlay) .tooltip {
 
 /* Touch devices: make tooltips tappable/scrollable */
 @media (pointer: coarse) {
-  .board-tooltip, .tooltip { pointer-events: auto !important; cursor: default; }
+  .board-tooltip, .tooltip { pointer-events: auto !important; cursor: url("/cursor-arrow.png?v=4") 2 2, default; }
 }
 
 /* ═══ Board tooltip mobile ═══ */
@@ -17980,7 +18074,7 @@ img, .card-tooltip-img img { image-rendering: pixelated; }
 .cmp-place-meta { font-size: 10px; color: var(--text2); }
 .cmp-place.is-here { border-left-color: #ffd700; }
 .cmp-place.is-here .cmp-place-name { color: #ffd700; }
-.cmp-place.is-disabled { opacity: .45; cursor: default; border-left-color: var(--text2); }
+.cmp-place.is-disabled { opacity: .45; cursor: url("/cursor-arrow.png?v=4") 2 2, default; border-left-color: var(--text2); }
 .cmp-places-empty { font-size: 11px; color: var(--text2); padding: 6px; }
 
 /* ── Dialogbox ───────────────────────────────────────────────────── */
@@ -18109,7 +18203,7 @@ img, .card-tooltip-img img { image-rendering: pixelated; }
 .cmp-card-row:hover:not(.is-out) { background: rgba(0,240,255,.15); }
 /* "0/x" bleibt überfahrbar, damit der Tooltip auch dort erscheint —
    nur klicken tut nichts (siehe Kommentar in addCard). */
-.cmp-card-row.is-out { opacity: .42; cursor: default; border-left-color: var(--text2); }
+.cmp-card-row.is-out { opacity: .42; cursor: url("/cursor-arrow.png?v=4") 2 2, default; border-left-color: var(--text2); }
 .cmp-card-row.is-out:hover { background: rgba(255,255,255,.07); }
 .cmp-card-count { color: var(--text2); font-size: 11px; flex: 0 0 46px; width: 46px; text-align: right; }
 .cmp-empty { color: var(--text2); font-size: 11px; padding: 8px; }
@@ -18239,7 +18333,7 @@ img, .card-tooltip-img img { image-rendering: pixelated; }
 /* Auswahl kurz nach dem Erscheinen gesperrt (siehe CMP_CHOICE_LOCK):
    ein nachlaufender Klick aus der Dialogbox soll nicht ungelesen die
    erste Möglichkeit wählen. Sichtbar nur als kurzes Abdunkeln. */
-.cmp-choice-locked { opacity: .55; cursor: default; transform: none !important; }
+.cmp-choice-locked { opacity: .55; cursor: url("/cursor-arrow.png?v=4") 2 2, default; transform: none !important; }
 .cmp-choice-locked:hover { background: linear-gradient(180deg, rgba(18,18,36,.96), rgba(10,10,22,.96)); transform: none; }
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -18414,7 +18508,7 @@ img, .card-tooltip-img img { image-rendering: pixelated; }
   font-size: 11px; padding: 4px 6px; cursor: pointer;
 }
 .cmp-filter:hover:not(:disabled) { border-color: var(--accent); }
-.cmp-filter:disabled { opacity: .4; cursor: default; }
+.cmp-filter:disabled { opacity: .4; cursor: url("/cursor-arrow.png?v=4") 2 2, default; }
 .cmp-sort-dir { flex: 0 0 auto; min-width: 72px; font-family: 'Pixel Intv', monospace; font-size: 10px; }
 .cmp-filter-clear { flex: 0 0 auto; min-width: 62px; border-color: var(--danger); color: var(--danger); font-size: 10px; }
 .cmp-filter-clear:hover { background: rgba(255,51,102,.15); }
@@ -20779,7 +20873,7 @@ img, .card-tooltip-img img { image-rendering: pixelated; }
 }
 @keyframes ppCerStern { 0%, 100% { opacity: 0; transform: scale(.4); } 50% { opacity: .9; transform: scale(1.2); } }
 .pp-cer-inhalt {
-  position: relative; z-index: 2; text-align: center; cursor: default;
+  position: relative; z-index: 2; text-align: center; cursor: url("/cursor-arrow.png?v=4") 2 2, default;
   max-width: min(92vw, 640px); max-height: 100dvh; overflow-y: auto; padding: 18px 12px;
 }
 .pp-cer-titel {
@@ -21327,7 +21421,7 @@ img, .card-tooltip-img img { image-rendering: pixelated; }
   box-shadow: 0 0 calc(6px * var(--board-scale)) #b066ff, inset 0 0 calc(2px * var(--board-scale)) #f3e3ff;
   z-index: 6;
   pointer-events: auto;
-  cursor: help;
+  cursor: url("/cursor-arrow.png?v=4") 2 2, default;
 }
 
 /* ═══════════════════════════════════════════════════════════════════════
@@ -24072,6 +24166,33 @@ body.pp-dialog-offen .foil-diamond-rare:not(.modal-overlay *) {
 @media (max-width: 850px) {
   .top-bar { --kopf-knopf-h: 24px; }
   .top-bar .volume-btn { font-size: 18px; }
+}
+
+/* ── ERGEBNIS-KNOEPFE: EINE HOEHE (v1472) ─────────────────────────────
+   Als Befund 28.9.: „Sind die Buttons für ‚Rematch‘ und ‚Leave‘ im
+   Victory-/Defeat-Screen wirklich gleich hoch?"
+
+   Gemessen (Chromium/Linux, 1600×900): beide 46 px — aber nur, weil hier
+   Noto Color Emoji die Zeile nicht streckt. Die Hoehe kam aus dem INHALT
+   (`line-height: normal`, 12 px Polster inline): das 🔄 in REMATCH bzw.
+   ⏳ in WAITING laeuft in der Emoji-Schrift des Systems, und die ist
+   unter Windows (Segoe UI Emoji) hoeher als eine Textzeile — REMATCH
+   wuchs dann ueber LEAVE hinaus. Gleiche Loesung wie die Kopfzeile
+   (v1463): feste Hoehe fuer alle Knoepfe der Zeile, Inhalt senkrecht
+   mittig, das senkrechte Polster faellt weg (`!important`, weil es
+   inline steht). 46 px = die bisher gemessene Hoehe, das Bild bleibt. */
+.ergebnis-knoepfe { --ergebnis-knopf-h: 46px; align-items: center; }
+.ergebnis-knoepfe > .btn {
+  box-sizing: border-box;
+  height: var(--ergebnis-knopf-h);
+  min-height: 0;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  white-space: nowrap;
 }
 
 /* ═══ SHOP-KACHELN: ZIERRAHMEN (v1468) ════════════════════════════════
