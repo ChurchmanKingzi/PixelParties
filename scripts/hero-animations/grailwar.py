@@ -1251,17 +1251,18 @@ def f_gabbyrope(i):
     blink(s, i)
     sw = pendulum(i)
     # Haare hängen dem Schwung nach: gegen die Bewegungsrichtung, zur Spitze hin stärker
-    v = math.sin(2 * math.pi * 2 * i / N)                # Geschwindigkeit (nach links positiv)
+    # (schwingt sie nach rechts, fliegen sie nach links). Rückwärts abgetastet: jedes Zielpixel
+    # holt sich sein Quellpixel – die Haare dehnen sich stetig, es reißen keine Lücken.
+    v = math.sin(2 * math.pi * 2 * i / N)                # > 0: sie schwingt gerade nach links
     if V == 'boarding':
-        hair = np.array([[x >= 15 and 33 <= y <= 46 and s[y, x, 3] > 0 and hexc(s[y, x]) in
-                          ('bd39ac', 'f68bee', 'ffacff', 'd552c5', 'e66ae6', 'ac319c', '620852')
+        hair = np.array([[x >= 19 and 33 <= y <= 46 and s[y, x, 3] > 0 and hexc(s[y, x]) in
+                          ('bd39ac', 'f68bee', 'ffacff', 'd552c5', 'ac319c', '620852')
                           for x in range(SW)] for y in range(SH)])
-        root = 14
-    else:
-        hair = np.array([[x <= 16 and 35 <= y <= 46 and s[y, x, 3] > 0 and hexc(s[y, x]) in
-                          ('947116', 'd5b11e', 'f0f329', 'eecd2d') for x in range(SW)] for y in range(SH)])
-        root = 8
-    lag = lambda x: int(round(2.2 * v * min(1.0, abs(x - root) / 8)))
+        lagf = lambda x, y: 2.6 * v * min(1.0, max(0.0, (x - 19) / 5))
+    else:                                                # Chosen Girl: langer blonder Zopf nach rechts unten
+        hair = np.array([[x >= 17 and 31 <= y <= 47 and s[y, x, 3] > 0 and hexc(s[y, x]) in
+                          ('402200', 'd5b11e', 'f0f329', '947116', 'eecd2d') for x in range(SW)] for y in range(SH)])
+        lagf = lambda x, y: 4.0 * v * min(1.0, max(0.0, (y - 31) / 16))
     # Seil oberhalb der Hände: jede Frame als gerade Linie von der Aufhängung zur Hand neu legen
     # (Muster je Zeile bleibt), sonst entstehen durch das zeilenweise Schieben kleine Knicke
     RY = 32
@@ -1278,7 +1279,15 @@ def f_gabbyrope(i):
         xs0 = xs[0] if sw(0, RY) == 0 else int(round(x0 + (x1 - x0) * y / RY))
         for x in xs:
             out[y + PT, xs0 + (x - xs[0]) + PL] = rope[y, x]
-    put(out, rest, PL, PT, dx_fn=lambda x, y: sw(x, y) + (lag(x) if hair[y, x] else 0))
+    body = rest.copy()
+    body[hair] = 0
+    put(out, body, PL, PT, dx_fn=sw)
+    hy, hx = np.nonzero(hair)
+    for y in range(hy.min(), hy.max() + 1):
+        for x in range(hx.min() - 6, hx.max() + 7):
+            sx = int(round(x - lagf(x, y)))
+            if 0 <= sx < SW and hair[y, sx]:
+                out[y + PT, x + sw(x, y) + PL] = s[y, sx]
     fill_pinholes(out)
     if V == 'chosen':                                    # Lichtreflex über das goldene Schwert
         gold = (s[:, :, 3] > 0) & (_xs >= 17) & (_ys >= 32) & np.array(
