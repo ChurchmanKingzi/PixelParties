@@ -92,22 +92,29 @@ Dazu je Variante:
 * hulijing:  federt, blinzelt; das blaue Fuchsfeuer strömt als Partikelfeuer aus
              ihrer Hand (Flammenballen wachsen, kühlen ab, züngeln: weiß,
              hellblau, türkis, blau, dunkelblauer Rand).
-* ingo:      Ingos eigene Animation (src/user/ingo-hood-frames.png): Kapuze auf,
-             Arme hoch, Kapuze in den Nacken, ohne Kapuze die Arme ausbreiten,
-             und wieder zurück; dazu Blinzeln und zweimal blitzt das Monokel.
+* ingo:      Ingos eigene Animation (src/user/ingo-hood-frames.png): meist mit
+             Kapuze und Armen unten; er streift die Kapuze in den Nacken, breitet
+             kurz die Arme aus, steht ohne Kapuze (Monokel blitzt) und zieht sie
+             wieder auf; dazu Blinzeln.
 * eingo:     Elegant Ingo: federt, blinzelt, das Monokel blitzt.
 * madame:    Madame Guillotine hält eine Rede (Mund auf und zu), federt,
-             blinzelt; über das Beil läuft ein Blitz, von der Schneide tropft
-             Blut zu Boden, an den Blutfäden unter dem abgeschlagenen Kopf rinnt
+             blinzelt; von der roten Beilschneide bilden sich an mehreren
+             Stellen Tropfen und fallen zu Boden, an den Blutfäden unter dem abgeschlagenen Kopf rinnt
              es hinab (Kopf und Lache liegen fest).
-* marianne:  federt, blinzelt; die Mistgabel steht, die Katze wedelt mit dem
-             Schwanz, stellt die Ohren auf und blinzelt versetzt.
-* santa:     federt, der Bommel wippt nach, über die Zuckerstange läuft ein Glanz.
-* nicolas / edward / saintnic: federn; die Tränke blubbern (Bläschen steigen,
-             die Flüssigkeit schimmert), Saint Nicolas' Tränke glühen unten auf.
-* stellan / bunny: atmen ruhig (1 px), ab und zu zuckt ein Ohr.
-* tazune / bakugo: die Flammen lodern (Farbstufen wogen nach oben, die Spitzen
-             züngeln), der Dampf wallt und kleine Dampfwölkchen steigen auf.
+* marianne:  federt, blinzelt; die Mistgabel steht; sie streichelt die Katze
+             (Hand und Katzenkopf gehen zusammen, der Arm biegt sich zwischen
+             federndem Körper und Hand), die Katze schließt dabei die Augen und
+             wedelt mit dem Schwanz.
+* santa:     federt, über die Zuckerstange läuft ein Glanz.
+* nicolas / edward / saintnic: federn; das Gelbe in den Flaschen ist ein Blitz:
+             die Flaschen sind leer, darin zucken kleine Blitze; Fullmetal
+             Nicolas blinzelt (die dunkelgelben Augen).
+* stellan / bunny: atmen ruhig (1 px), ab und zu zuckt ein Ohr hoch (wird dabei
+             länger, reißt nicht ab).
+* tazune / bakugo: brüllen in der Loop-Mitte (Maul weit auf, Kopf bebt); aus den
+             Ohren pufft kleinteilig Rauch (über allem, beim Brüllen mehr). Bei
+             Tazune lodern die Flammen: jede Flammensäule streckt und staucht
+             sich, die Zungen wiegen, Fetzen reißen ab; beim Skin kein Feuer.
 """
 import math
 import os
@@ -204,12 +211,14 @@ V_ = {
                      line=[(8, 12), (9, 12), (12, 12), (13, 12)]),
     'santa': dict(slug='santa-klaus', knee=25),
     'nicolas': dict(slug='nicolas-the-hidden-alchemist', knee=22),
-    'edward': dict(slug='fullmetal-nicolas', knee=22),
+    'edward': dict(slug='fullmetal-nicolas', knee=21,
+                   blink={'halb': [((10, 9), '563300'), ((14, 9), '563300')],
+                          'zu': [((10, 9), '000000'), ((14, 9), '000000')]}),
     'saintnic': dict(slug='saint-nicolas', knee=27),
     'stellan': dict(slug='stellan-the-calm-cat', knee=22),
     'bunny': dict(slug='stellan-the-calm-easter-bunny', knee=23),
-    'tazune': dict(slug='tazune-the-angry-hot-blood', knee=30, pads=(3, 3, 6, 2)),
-    'bakugo': dict(slug='explosive-tazune', knee=30, pads=(3, 3, 6, 2)),
+    'tazune': dict(slug='tazune-the-angry-hot-blood', knee=30, pads=(8, 8, 12, 2)),
+    'bakugo': dict(slug='explosive-tazune', knee=30, pads=(8, 8, 12, 2)),
     'kyli': dict(slug='kyli-the-deceptive-sapling', knee=28, pads=(3, 3, 5, 2),
                  blink={'halb': [((9, 16), '636363'), ((10, 16), '636363'), ((13, 16), '636363'), ((14, 16), '636363')],
                         'zu': [((9, 16), '636363'), ((10, 16), '636363'), ((13, 16), '636363'), ((14, 16), '636363'),
@@ -1590,11 +1599,11 @@ def f_hulijing(i):
 # 24x32, zeilenweise gelesen): A = Kapuze auf, Arme ausgebreitet; B = Kapuze auf, Arme innen
 # (f2 offen / f4 zwinkernd); C = Kapuze rutscht in den Nacken; F = ohne Kapuze, Arme innen
 # (f3 offen / f1 zwinkernd); E = ohne Kapuze, Arme ausgebreitet; D = ohne Kapuze, Arme eng.
-INGO_SEQ = (['A'] * 8 + ['B2', 'B2', 'C', 'C', 'F1', 'F3', 'F3'] + ['E'] * 13 +
-            ['D', 'D', 'C', 'C', 'B4', 'B2', 'B2'] + ['A'] * 13)
+INGO_SEQ = (['B2'] * 10 + ['C', 'C', 'F1', 'F3', 'E', 'E', 'E'] + ['F3'] * 13 +
+            ['D', 'D', 'C', 'C'] + ['B2'] * 14)
 INGO_IDX = dict(A=0, B2=2, B4=4, C=6, F1=1, F3=3, E=5, D=7)
-INGO_BLINK = {4: 'A', 23: 'E', 44: 'A'}                  # zwischendurch blinzeln (Auge 9/10, Zeile 15)
-INGO_STAR = [(13, 15, 17), (13, 15, 38)]                  # Monokel blitzt (ohne und mit Kapuze)
+INGO_BLINK = {5: 'B', 24: 'F', 42: 'B'}                  # zwischendurch blinzeln (Auge 9/10, Zeile 15)
+INGO_STAR = [(13, 15, 19), (13, 15, 44)]                  # Monokel blitzt (ohne und mit Kapuze)
 
 
 def f_ingo(i):
@@ -1638,8 +1647,6 @@ def f_madame(i):
     head = (s[:, :, 3] > 0) & (_xs >= 28)                 # abgeschlagener Kopf samt Blutlache liegt fest
     blade = (s[:, :, 3] > 0) & (_ys <= 13) & (_xs <= 15) & np.array(
         [[max(s[y, x, :3]) - min(s[y, x, :3]) < 20 and lum(s[y, x]) > 100 for x in range(SW)] for y in range(SH)])
-    for (x, y), a in sweep(blade, i, 14, speed=1.5).items():   # Beil blitzt
-        s[y, x] = lighten(s[y, x], a)
     if MADAME_STRANDS is None:                            # Blutfäden unter dem Kopf: je Spalte von oben nach unten
         MADAME_STRANDS = []
         for x in range(28, SW):
@@ -1660,11 +1667,16 @@ def f_madame(i):
         out[y + PT, x + PL] = s[y, x]
     knee_put(out, fig, b)
     fill_pinholes(out)
-    stars(out, i, [(7 + PL, 3 + PT + b, 20)], 'e8f4ff', 'ffffff')
-    # Blut tropft von der Beilschneide (unterste rote Spitze) zu Boden
-    for t0 in (6, 30):
+    stars(out, i, [(7 + PL, 3 + PT + b, 20)], 'e8f4ff', 'ffffff')              # Beil blitzt kurz auf
+    # Blut tropft von der roten Schneide: an mehreren Stellen bildet sich unter der Kante ein
+    # Tropfen, löst sich und fällt bis zum Boden (dort zerplatzt er)
+    red = ('660000', '740000', '800000')
+    for x, t0 in ((3, 2), (7, 14), (10, 26), (13, 38), (5, 32), (12, 8)):
+        ys = [y for y in range(0, 15) if SRC[y, x, 3] and hexc(SRC[y, x]) in red]
+        if not ys:
+            continue
         t = (i - t0) % N
-        draw_px(out, drop_pixels(t, 13 + PL, 14 + PT + (b if t < 4 else 0), SH - 1 + PT))
+        draw_px(out, drop_pixels(t, x + PL, max(ys) + 1 + PT + (b if t < 4 else 0), SH - 1 + PT))
     return out
 
 
@@ -1676,17 +1688,34 @@ def f_marianne(i):
         body[m] = parts[p][m]
     blink(body, i)
     cat = parts['cat']
-    w = 2 * math.pi * i / N
-    if BLINK.get((i + 20) % N) == 'zu':                   # die Katze blinzelt versetzt
+    # Streicheln: die Hand drückt sanft auf den Katzenkopf und streicht (2 Striche pro Takt),
+    # der Kopf der Katze geht mit, sie schließt dabei genießerisch die Augen
+    stroke = [0, 0, 1, 1, 1, 1, 0, 0][i % 8] if (i // 8) % 3 != 2 else 0
+    if stroke:
         cat[17, 22] = rgb('fff6ff')
         cat[18, 22] = rgb('000000')
-    tail = lambda x, y: -int(round(1.0 * (x - 31) / 4 * (math.sin(6 * w) - 0))) if x >= 32 and y <= 21 else 0
-    ear = lambda x, y: -1 if (y <= 15 and x <= 24 and (i % 16) in (9, 10)) else 0
+    catdy = lambda x, y: stroke if (x <= 27 and y <= 19) else 0
+    w = 2 * math.pi * i / N
+    tail = lambda x, y: -int(round(1.0 * (x - 31) / 4 * math.sin(6 * w))) if x >= 32 and y <= 21 else 0
     b = BOUNCE12[i % 12]
+    arm = np.zeros((SH, SW), bool)                        # ausgestreckter Arm (Unterarm + Hand)
+    for y, x in zip(*np.nonzero(body[:, :, 3])):
+        if x >= 18 and 12 <= y <= 17:
+            arm[y, x] = True
+
+    def dy(x, y):
+        if arm[y, x]:                                    # zur Schulter hin Körper, zur Hand hin Streichbewegung
+            t = min(1.0, max(0.0, (x - 17) / 4))
+            return int(round(b * (1 - t) + stroke * t))
+        return b if y < KNEE else 0
     out = np.zeros((H, W, 4), int)
     put(out, parts['fork'], PL, PT)
-    put(out, cat, PL, PT, dy_fn=lambda x, y: tail(x, y) + ear(x, y))
-    knee_put(out, body, b)
+    put(out, cat, PL, PT, dy_fn=lambda x, y: catdy(x, y) + tail(x, y))
+    put(out, body, PL, PT, dy_fn=dy)
+    if b < 0:
+        for x in range(SW):
+            if body[KNEE - 1, x, 3] and body[KNEE, x, 3] and not out[KNEE - 1 + PT, x + PL, 3]:
+                out[KNEE - 1 + PT, x + PL] = body[KNEE - 1, x]
     fill_pinholes(out)
     return out
 
@@ -1697,54 +1726,68 @@ def f_santa(i):
     for (x, y), a in sweep(cane & np.array([[lum(s[y, x]) > 150 for x in range(SW)] for y in range(SH)]),
                            i, 8, speed=1.2).items():
         s[y, x] = lighten(s[y, x], a)
-    w = 2 * math.pi * 2 * i / N
-    pom = lambda x, y: int(round(1.0 * (math.sin(w) - 0))) if (y <= 5 and x >= 20) else 0   # Bommel wippt nach
     b = BOUNCE12[i % 12]
     out = np.zeros((H, W, 4), int)
-    knee_put(out, s, b, dx_fn=pom)
+    knee_put(out, s, b)
     fill_pinholes(out)
     stars(out, i, [(4 + PL, 6 + PT + b, 30)], 'ffe0e0', 'ffffff')
     return out
 
 
-def potion_fx(out, part, i, ox, oy, liquid, bubble='ffffe8'):
-    """Trank blubbert: Bläschen steigen durch die Flüssigkeit (Farben liquid), die Flüssigkeit
-    schimmert in einem wandernden Band heller."""
-    m = np.array([[part[y, x, 3] > 0 and hexc(part[y, x]) in liquid for x in range(part.shape[1])]
-                  for y in range(part.shape[0])])
-    if not m.any():
+YELLOW = ('ffff7a', 'f6f675', 'eded71', 'f4f474', 'fefe79', 'ffffaf')
+
+
+def bolt_in(out, mask, i, ox, oy, seed):
+    """Kleine Blitze innerhalb von mask (Glasinneres): alle 2 Frames ein neuer Zickzack aus
+    3-6 Pixeln (weißer Kern, gelbe Enden), manchmal Pause; nie außerhalb der Flasche."""
+    rng = np.random.default_rng(seed * 1000 + i // 2)
+    if rng.random() < 0.25:
         return
-    ys, xs = np.nonzero(m)
-    for y, x in zip(ys, xs):                             # Schimmerband (läuft schräg hinauf)
-        if (x - y * 0.8 + i * 0.6) % 9 < 1.2:
-            out[y + oy, x + ox] = lighten(out[y + oy, x + ox], 0.35)
-    cols = sorted(set(xs))
-    for k, t0 in enumerate(range(0, N, 5)):              # Bläschen
-        x = cols[(k * 7) % len(cols)]
-        col = sorted(y for y in ys[xs == x])
-        t = (i - t0) % N
-        if t < len(col):
-            y = col[-1 - t]
-            out[y + oy, x + ox] = rgb(bubble)
+    ys, xs = np.nonzero(mask)
+    k = rng.integers(len(ys))
+    x, y = int(xs[k]), int(ys[k])
+    pts = [(x, y)]
+    for _ in range(int(rng.integers(3, 7))):
+        x += int(rng.choice([-1, 0, 1]))
+        y += int(rng.choice([-1, 1]))
+        if not (0 <= y < mask.shape[0] and 0 <= x < mask.shape[1] and mask[y, x]):
+            break
+        pts.append((x, y))
+    for j, (x, y) in enumerate(pts):
+        c = 'ffffff' if 0 < j < len(pts) - 1 else 'ffff7a'
+        out[y + oy, x + ox] = rgb(c)
+
+
+def glass_interior(comp):
+    """Glasinneres: Blitz-(Gelb-)Pixel und halbtransparentes Glas."""
+    return np.array([[comp[y, x, 3] > 0 and (hexc(comp[y, x]) in YELLOW or comp[y, x, 3] < 200)
+                      for x in range(comp.shape[1])] for y in range(comp.shape[0])])
 
 
 def f_alchemist(i):
     body = load('body')
     potion = load('potions' if V == 'saintnic' else 'flask')
+    blink(body, i)
+    comp = body.copy()
+    m = potion[:, :, 3] > 0
+    comp[m] = potion[m]
+    inner = glass_interior(comp)
+    if V == 'saintnic':                                  # rote Tränke: nur das Gelbe ist Blitz
+        inner = np.array([[potion[y, x, 3] > 0 and (hexc(potion[y, x]) in YELLOW + ('691e1e', '8a2929', 'b93636'))
+                           for x in range(SW)] for y in range(SH)])
+    for y, x in zip(*np.nonzero(comp[:, :, 3])):          # Flasche leeren: Blitz raus
+        if hexc(comp[y, x]) in YELLOW:
+            comp[y, x] = rgb('8a2929') if V == 'saintnic' else rgb('d6deef', 150)
     b = BOUNCE12[i % 12]
     out = np.zeros((H, W, 4), int)
-    knee_put(out, body, b)
-    put(out, potion, PL, PT + b)
+    knee_put(out, comp, b)
     fill_pinholes(out)
-    if V == 'saintnic':                                  # rote Tränke, unten glüht es gelb
-        f = 0.5 - 0.5 * math.cos(2 * math.pi * 2 * i / N)
-        for y, x in zip(*np.nonzero(potion[:, :, 3])):
-            c = potion[y, x]
-            if c[0] > 200 and c[1] > 180 and c[2] < 120:
-                out[y + PT + b, x + PL] = lighten(c, 0.5 * f)
-        potion_fx(out, potion, i, PL, PT + b, ('a41c1c', 'c52b2b', '8b1616', 'b93636', '9e3b50', '7e1a1a'), 'ff9c9c')
+    if V == 'saintnic':                                  # je Trank ein eigener Blitz
+        half = inner & (_xs < SW / 2)
+        bolt_in(out, half, i, PL, PT + b, 1)
+        bolt_in(out, inner & ~half, i, PL, PT + b, 2)
     else:
-        potion_fx(out, potion, i, PL, PT + b, ('eded71', 'f4f474', 'fefe79', 'ffffaf'))
+        bolt_in(out, inner, i, PL, PT + b, 1)
     return out
 
 
@@ -1758,7 +1801,11 @@ def f_stellan(i):
         ears = lambda x, y: (y <= 4 and (x <= 6 or x >= 12))
     dy = lambda x, y: (-1 if ear_t and ears(x, y) and x < SW / 2 else 0)
     out = np.zeros((H, W, 4), int)
-    put(out, s, PL, PT, dy_fn=lambda x, y: dy(x, y) + (b if y < KNEE else 0))
+    put(out, s, PL, PT, dy_fn=lambda x, y: (b if y < KNEE else 0))
+    if ear_t:                                            # Ohr zuckt hoch: gedehnt, nicht abgelöst
+        ear = s.copy()
+        ear[~np.array([[ears(x, y) and x < SW / 2 for x in range(SW)] for y in range(SH)])] = 0
+        put(out, ear, PL, PT, dy_fn=lambda x, y: b - 1)
     if b < 0:
         for x in range(SW):
             if s[KNEE - 1, x, 3] and s[KNEE, x, 3] and not out[KNEE - 1 + PT, x + PL, 3]:
@@ -1769,50 +1816,105 @@ def f_stellan(i):
 
 FLAME_COLS = ('ca2c29', 'f47b22', 'f6e70e', 'f7f5b8')
 STEAM_COLS = ('899ba7', 'bdc7cc', 'd8e3e9', 'e3eef5')
+TAZ_EARS = {'tazune': [((15, 8), -1), ((21, 8), 1)], 'bakugo': [((13, 15), -1), ((22, 15), 1)]}
+ROAR = set(range(14, 30))                               # brüllt in der Loop-Mitte
 
 
-def recolour_wave(part, mask, cols, i, speed, cycles, dirv, amp):
-    """Pixel in mask nach ihrer Helligkeitsstufe (cols dunkel -> hell) mit einer Welle, die
-    in Richtung dirv läuft, auf- und abstufen – nichts bewegt sich, nur die Farben wogen."""
-    rank = {c: k for k, c in enumerate(cols)}
-    n = len(cols) - 1
-    w = 2 * math.pi * cycles * i / N
-    for y, x in zip(*np.nonzero(mask)):
-        h = hexc(part[y, x])
-        if h not in rank:
+def live_flames(out, fx, fl, i, ox, oy):
+    """Lodernde Flammen mit der Silhouette der Original-Flammen: jede Flammensäule (Lauf je
+    Spalte) streckt und staucht sich mit eigener Welle (rückwärts abgetastet, der Fuß bleibt),
+    die Zungen wiegen zur Spitze hin seitlich, die Farbstufen wogen nach oben; ab und zu löst
+    sich über einer Spitze ein Flammenfetzen."""
+    w = 2 * math.pi * i / N
+    rank = {c: k for k, c in enumerate(FLAME_COLS)}
+    for x in range(fl.shape[1]):
+        ys = np.nonzero(fl[:, x])[0]
+        if not len(ys):
             continue
-        ph = 0.9 * math.sin(0.37 * x + 0.21 * y) + speed * (x * dirv[0] + y * dirv[1])
-        r = rank[h] / n + amp * (math.sin(w - ph) - math.sin(-ph))
-        part[y, x] = rgb(cols[int(round(min(1.0, max(0.0, r)) * n))])
+        runs, start = [], ys[0]
+        for a_, c_ in zip(ys, list(ys[1:]) + [None]):
+            if c_ is None or c_ != a_ + 1:
+                runs.append((start, a_))
+                start = c_
+        for top, base in runs:
+            h0 = base - top + 1
+            sc = 1 + 0.25 * math.sin(0.8 * x + 6 * w) + 0.12 * math.sin(1.9 * x - 4 * w)
+            hh = h0 * sc
+            for y in range(int(base - hh) - 1, base + 1):
+                sy = int(round(base - (base - y) / sc))
+                if sy < top or sy > base or not fl[sy, x]:
+                    continue
+                c = hexc(fx[sy, x])
+                rel = (base - y) / max(1.0, hh)
+                r = rank.get(c, 1) / 3 + 0.3 * math.sin(4 * w + 0.7 * y - 0.2 * x)
+                col = FLAME_COLS[int(round(min(1.0, max(0.0, r)) * 3))]
+                dx = int(round(0.9 * rel * math.sin(4 * w - 0.6 * y + 0.35 * x)))
+                yy, xx = y + oy, x + dx + ox
+                if 0 < yy < out.shape[0] - 1 and 0 < xx < out.shape[1] - 1:
+                    out[yy, xx] = rgb(col)
+            # Flammenfetzen reißt ab und steigt auf
+            ph = (i + x * 5) % 12
+            if h0 >= 3 and ph < 4 and math.sin(1.3 * x + 2.0) > 0.3:
+                yy, xx = int(base - hh) - 2 - ph + oy, x + ox
+                if 0 < yy < out.shape[0] - 1 and 0 < xx < out.shape[1] - 1 and not out[yy, xx, 3]:
+                    out[yy, xx] = rgb('f47b22' if ph < 2 else 'ca2c29')
+
+
+def ear_smoke(out, i, ears, ox, oy, strong):
+    """Rauch aus den Ohren, kleinteilig: alle 2 Frames (beim Brüllen jeden Frame) puffen aus
+    jedem Ohr einzelne Wölkchen, jedes mit eigener Richtung und eigenem Tempo; sie treiben nach
+    außen und oben auseinander, blähen sich auf, werden grauer und blassen aus. Über allem."""
+    H_, W_ = out.shape[:2]
+    for (ex, ey), side in ears:
+        for e in range(N):
+            if e % 2 and not strong(e):
+                continue
+            rng = np.random.default_rng(e * 13 + (0 if side < 0 else 500))
+            life = rng.uniform(8, 13)
+            a = (i - e) % N
+            if a >= life:
+                continue
+            u = a / life
+            ang = rng.uniform(-0.35, 0.35)
+            sp = rng.uniform(0.9, 1.4)
+            vx = side * sp * math.cos(0.9 + ang)
+            vy = -sp * math.sin(0.9 + ang)
+            cx = ex + ox + side * 0.8 + vx * a + 0.5 * math.sin(a * 0.7 + e)
+            cy = ey + oy - 0.5 + vy * a
+            r = 0.5 + 1.3 * u ** 0.7
+            col = STEAM_COLS[3 - min(3, int(u * 4))]
+            alpha = int(235 * (1 - u) ** 0.5) + 15
+            for y in range(int(cy - r) - 1, int(cy + r) + 2):
+                for x in range(int(cx - r) - 1, int(cx + r) + 2):
+                    if (x - cx) ** 2 + (y - cy) ** 2 <= r * r and 0 < x < W_ - 1 and 0 < y < H_ - 1:
+                        if not out[y, x, 3] or hexc(out[y, x]) not in STEAM_COLS or out[y, x, 3] < alpha:
+                            out[y, x] = rgb(col, alpha)
 
 
 def f_tazune(i):
     body, fx = load('body'), load('fx')
     fl = np.array([[fx[y, x, 3] > 0 and hexc(fx[y, x]) in FLAME_COLS for x in range(SW)] for y in range(SH)])
-    stm = np.array([[fx[y, x, 3] > 0 and hexc(fx[y, x]) in STEAM_COLS for x in range(SW)] for y in range(SH)])
-    recolour_wave(fx, fl, FLAME_COLS, i, 0.5, 6, (0, 1), 0.35)       # Flammen lodern nach oben
-    recolour_wave(fx, stm, STEAM_COLS, i, 0.4, 3, (0, 1), 0.3)       # Dampf wallt
-    # Flammenspitzen züngeln: oberste Flammenpixel je Spalte kommen und gehen
-    for x in range(SW):
-        ys = np.nonzero(fl[:, x])[0]
-        if len(ys) and math.sin(2 * math.pi * 6 * i / N + x * 1.7) > 0.4 and ys[0] > 0 and not fx[ys[0] - 1, x, 3]:
-            fx[ys[0] - 1, x] = rgb('f47b22')
+    roar = i in ROAR
+    if roar:                                              # Brüllen: Maul weit auf, Kopf bebt
+        if V == 'tazune':
+            for (x, y), c in {(16, 18): 'ffffff', (17, 18): '300901', (18, 18): 'ffffff',
+                              (15, 19): 'd54419', (16, 19): '300901', (17, 19): 'f00000', (18, 19): '300901',
+                              (19, 19): 'd54419', (16, 20): 'd20000', (17, 20): 'f00000', (18, 20): 'd20000'}.items():
+                body[y, x] = rgb(c)
+        else:
+            for (x, y), c in {(14, 18): 'ff2d2d', (19, 18): 'ff2d2d', (15, 21): 'a90000', (16, 21): 'f00000',
+                              (17, 21): 'f00000', (18, 21): 'a90000', (16, 19): '5a0000', (17, 19): '5a0000'}.items():
+                body[y, x] = rgb(c)
     b = BOUNCE12[i % 12]
+    shake = ([0, 1, 0, -1][i % 4]) if roar else 0
     out = np.zeros((H, W, 4), int)
-    put(out, fx, PL, PT + b)
-    knee_put(out, body, b)
+    knee_put(out, body, b, dx_fn=lambda x, y: shake if y < 22 else 0)
     fill_pinholes(out)
-    # Dampfwölkchen lösen sich oben von den Dampfwolken und steigen auf
-    tops = [(x, int(np.nonzero(stm[:, x])[0].min())) for x in range(SW) if stm[:, x].any()]
-    for k, t0 in enumerate(range(2, N, 6)):
-        x, y0 = tops[(k * 5) % len(tops)]
-        t = (i - t0) % N
-        if t < 8:
-            y = y0 - 2 - t // 2 + PT + b
-            pix = {(x + PL, y): rgb('e3eef5', 200 - 20 * t), (x + PL + 1, y): rgb('d8e3e9', 170 - 18 * t)}
-            if all(0 < px < W - 1 and 0 < py < H - 1 and not out[py, px, 3] for px, py in pix):
-                for (px, py), c in pix.items():
-                    out[py, px] = c
+    if V == 'tazune':                                     # das Feuer lodert über ihr (beim Skin entfällt es)
+        live_flames(out, fx, fl, i, PL, PT + b)
+    # Rauch aus den Ohren – über allem, beim Brüllen doppelt so viel
+    ears = [((x + (shake if y < 22 else 0), y), sd) for (x, y), sd in TAZ_EARS[V]]
+    ear_smoke(out, i, ears, PL, PT + b, lambda e: e in ROAR)
     return out
 
 

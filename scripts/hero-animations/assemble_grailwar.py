@@ -126,7 +126,6 @@ LOWER = {
                                K='282b2d', P='9fa8a7', N='c9cbbf'), [
         "....QVSRSSSSVQKPNK",
         "....QVSRSSSSVQ.KK.",
-        "....QQVVVVVVQQ",
         "....QUUUQQUUUQ",
         "....QURUQQURUQ",
         "...QTTTTQQTTTTQ",
@@ -142,7 +141,6 @@ LOWER = {
     'edward': (231, 209, dict(R='340404', S='b74346', T='672126', Y='1a1e1f', U='000200', Z='3a4946', z='5d6e69'), [
         "....RTYYYYYYTRRzZR",
         "...RSTYYYYYYTSRZR.",
-        "...RSTYYUYYYTSR",
         "..RSTUYYUUYYUTSR",
         "..RRRUYYUUYYURRR",
         ".....UYYUUYYU",
