@@ -52,15 +52,17 @@ Dazu je Variante:
              überschlägt sich, schlägt am Boden auf und explodiert (Feuerkuppel,
              Knochensplitter, aufsteigender Rauch). Beim Abschuss sackt der
              Panzer kurz ein, die Schildkröte blinzelt.
-* broghan:   federt, die Ketten an den Handgelenken schwingen, Eiswolken
+* broghan:   federt, das rote Auge glüht periodisch auf, die Ketten an den Handgelenken schwingen, Eiswolken
              (Nebelballen aus drei Kugeln) quellen neben ihm hervor und treiben
              davon – nie halb hinter der Figur.
 * golem:     Ancient Gear Golem: federt, das rote Auge glüht periodisch auf
-             (mit Leuchtschein), Eiswolken wie bei Broghan.
+             (mit Leuchtschein), das Zahnrad an der rechten Schulter (von der
+             Kante gesehen) dreht sich, Eiswolken wie bei Broghan.
 * clown:     Cecilia the Clown: federt, blinzelt, die blauen Haarschlaufen
              wippen (außen stärker, links und rechts versetzt).
-* bbg:       Bad Birthday Girl Cecilia: federt, blinzelt, die Partyhut-Spitze
-             wippt nach und funkelt.
+* bbg:       Bad Birthday Girl Cecilia: federt, blinzelt (nur rechts – links
+             die Augenklappe), die Partyhut-Spitze wippt nach, die Hakenhand
+             blitzt.
 * fern / fernelf: Fern putzt sein Schwert: der Lappen gleitet entlang der
              Klinge vor und zurück (zur Schulter hin unbewegt), nach jedem
              Strich läuft ein Glanz über die Klinge; der Elf blinzelt.
@@ -121,8 +123,7 @@ V_ = {
     'clown': dict(slug='cecilia-the-clown', knee=24, lid=[((16, 11), 'f6bd98'), ((17, 11), 'f6bd98')],
                   line=[(16, 12), (17, 12)]),
     'bbg': dict(slug='bad-birthday-girl-cecilia', knee=29, pads=(3, 3, 4, 2),
-                lid=[((5, 16), 'f6cd8b'), ((6, 16), 'f6cd8b'), ((10, 16), 'f6cd8b')],
-                line=[(5, 17), (6, 17), (9, 17), (10, 17)]),
+                lid=[((10, 16), 'f6cd8b')], line=[(9, 17), (10, 17)]),   # links: Augenklappe
     'fern': dict(slug='fern-the-ship-slave', pads=(3, 3, 3, 2)),
     'fernelf': dict(slug='fern-the-elf-slave', pads=(3, 3, 3, 2),
                     lid=[((8, 2), 'd98a79'), ((9, 2), 'd98a79'), ((12, 2), 'd98a79'), ((13, 2), 'd98a79')],
@@ -808,7 +809,7 @@ def skull_flight():
     sx, sy = rot_pt(CAT_CUP, CAT_PIVOT, CAT_ANG[CAT_FIRE])
     hh = SKULL.shape[0] / 2
     ground = SH - 1
-    vx, vy, g = -2.5, -2.0, 0.65
+    vx, vy, g = -4.4, -3.2, 1.9
     path, t = [], 0
     while True:
         x, y = sx + vx * t, sy + vy * t + 0.5 * g * t * t
@@ -1016,31 +1017,12 @@ def glow_halo(out, i, eye, ox, oy):
         out[y, x] = [int(c[0] * (1 - a) + 255 * a), int(c[1] * (1 - a) + 50 * a), int(c[2] * (1 - a) + 40 * a), c[3]]
 
 
-GEAR_C = (13.0, 17.0)                                    # Zahnrad in der Brust (von vorn gesehen)
-
-
 def draw_gear(s, i):
-    """Das Zahnrad jedes Frame neu zeichnen (6 Zähne, eine Umdrehung pro Loop): Nabe
-    dunkel, Scheibe graublau, Zähne mit hellen Kanten; die alten graublauen Pixel werden
-    zum dunklen Brustgrund."""
-    teal = ('556867', '76948b', '293334')
-    phi = 2 * math.pi * i / N
-    for y in range(int(GEAR_C[1]) - 5, int(GEAR_C[1]) + 5):
-        for x in range(int(GEAR_C[0]) - 5, int(GEAR_C[0]) + 5):
-            if 0 <= y < SH and 0 <= x < SW and hexc(s[y, x]) in teal and x < 17:
-                s[y, x] = rgb('322e2d')
-    for y in range(int(GEAR_C[1]) - 5, int(GEAR_C[1]) + 5):
-        for x in range(int(GEAR_C[0]) - 5, int(GEAR_C[0]) + 5):
-            dx, dy = x - GEAR_C[0], y - GEAR_C[1]
-            r = math.hypot(dx, dy)
-            th = math.atan2(dy, dx) - phi
-            tooth = math.cos(6 * th) > 0.1
-            if r <= 1.0:
-                s[y, x] = rgb('293334')
-            elif r <= 2.7:
-                s[y, x] = rgb('76948b' if dx + dy < -1 else '556867')
-            elif r <= 3.7 and tooth:
-                s[y, x] = rgb('76948b' if dx + dy < 0 else '556867')
+    """Zahnrad an der rechten Schulter, von der Kante gesehen (Spalte 19, Zeilen 11-18): die
+    hellen Zähne wandern nach unten – das Rad dreht sich auf den Betrachter zu."""
+    sh = (i // 2) % 3
+    for y in range(11, 19):
+        s[y, 19] = rgb('76948b' if (y - 13 - sh) % 3 == 0 else '556867')
 
 
 def f_golem(i):
