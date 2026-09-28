@@ -125,21 +125,16 @@ LOWER = {
                                K='282b2d', P='9fa8a7', N='c9cbbf'), [
         "....QVSRSSSSVQKPNK",
         "....QVSRSSSSVQ.KK.",
-        "....QVUSSRSSVQ",
         "....QQVVVVVVQQ",
         "....QUUUQQUUUQ",
-        "....QUUUQQUUUQ",
         "....QURUQQURUQ",
-        "....QUUUQQUUUQ",
         "...QTTTTQQTTTTQ",
         "...QQQQQQQQQQQQ"]),
     'saint': (229, 209, dict(G='430e18', E='641121', C='782132', D='9e3b50', A='dcbf87', B='ede0b4',
                              H='606663', T='c3c7b8', J='1a1a1a'), [
         "...GECCCCHTHCCCCEG..",
         "..GECDCCCCHCCCCDCEG.",
-        "..GECDCCCCCCCCCDCEG.",
         ".GEECDCCCCCCCCCDCEEG",
-        ".GECDCCECCCCECCDCCEG",
         ".GEECDCECCCCECCDCEEG",
         ".GAABAABAABAABAABAAG",
         "....JJJJ....JJJJ...."]),
@@ -148,9 +143,7 @@ LOWER = {
         "...RSTYYYYYYTSRZR.",
         "...RSTYYUYYYTSR",
         "..RSTUYYUUYYUTSR",
-        "..RSTUYYUUYYUTSR",
         "..RRRUYYUUYYURRR",
-        ".....UYYUUYYU",
         ".....UYYUUYYU",
         "....UZZZUUZZZU",
         "....UUUUUUUUUU"]),
@@ -178,6 +171,15 @@ def main(path):
     # Lücke zwischen Hutkrempe und Haaren: Krempe um eine Zeile nach unten verlängern
     hy = np.nonzero(bhat[:, :, 3])[0].max()
     paint(bhat, cx0 + 2, hy + 1, ["ABBBBBBBBBBA"], dict(A='604a1b', B='7a5f23'))
+    # Restlücken an den Krempenenden: Pixel mit Hut darüber und Haaren darunter (je ±1 Spalte) schließen
+    hx = np.nonzero(bhat[:, :, 3])[1]
+    for y_ in range(hy, hy + 3):
+        comp = layer_over(cec, bhat)
+        op = comp[:, :, 3] > 0
+        for x_ in range(hx.min() - 3, hx.max() + 4):
+            if not op[y_, x_] and op[y_ - 1, x_ - 1:x_ + 2].any() and op[y_ + 1, x_ - 1:x_ + 2].any():
+                xs_up = [x_ + d for d in (0, -1, 1) if op[y_ - 1, x_ + d]]
+                bhat[y_, x_] = comp[y_ - 1, xs_up[0]]
     save_parts('bad-birthday-girl-cecilia', [('body', cec), ('hat', bhat)])
     save_parts('barker-the-monster-tamer', [('body', g('Barker')), ('mark', g('Barker #4'))])
     save_parts('blackstache-scourge-of-the-pixel-seas', [('body', near(g('Blackstache'), 167, 200))])
@@ -209,6 +211,14 @@ def main(path):
     keep[224:228, :308] = True
     keep[228:231, :301] = True
     sw[~keep] = 0
+    # Klingenunterkante rechts vom Lappen springt um 5 px – als Diagonale auffüllen
+    ys_, xs_ = np.nonzero(sw[:, :, 3])
+    bx, by = xs_.min() - 1, ys_.min() - 10
+    edge = sw[by + 15, bx + 21].copy()
+    for y_, xa, xb in [(16, 17, 19), (17, 17, 17)]:
+        for x_ in range(xa, xb + 1):
+            sw[by + y_, bx + x_] = sw[by + y_ - 1, bx + x_]
+        sw[by + y_, bx + xb] = edge
     sword = sw
     # Arm samt Lappen: wie beim Skin (Ebene #399), in Froschgrün umgefärbt
     frog = near(g('Fern'), 299, 219)
@@ -242,8 +252,16 @@ def main(path):
     save_parts('krates-the-smartass', [('body', g('Krates'))])
     save_parts('kyli-the-deceptive-sapling', [('body', g('Kyli'))])
     save_parts('madame-guillotine-the-great-equalizer', [('body', near(g('Madame Guillotine'), 121, 212))])
+    mar = g('Marianne #1')
+    # Zöpfe: in der Ebene liegen die Haare komplett unter dem Hut – unter der Krempe nachgezeichnet
+    braids = paint(np.zeros_like(mar), 227, 248, [
+        ".B............DA",
+        "C.............CA",
+        "D.............DA",
+        "C............CA",
+        "D"], dict(A='440000', B='73290d', C='f8a314', D='d66107'))
     save_parts('marianne-the-cocky-caretaker', [('fork', g('Marianne #6')), ('cat', near(g('Marianne #3'), 250, 258)),
-                                                ('body', g('Marianne #1')), ('arm', g('Marianne #9')),
+                                                ('body', mar), ('braids', braids), ('arm', g('Marianne #9')),
                                                 ('hat', near(g('Marianne #5'), 234, 244))])
     save_parts('nicolas-the-hidden-alchemist', [('body', lower_body(g('Nicolas'), 'nicolas')), ('flask', g('Ebene #2'))])
     save_parts('saint-nicolas', [('body', lower_body(g('Saint Nicolas'), 'saint')),
