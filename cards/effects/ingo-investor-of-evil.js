@@ -8,7 +8,8 @@
 //
 //  Trigger: onCardEnterZone, filtered to
 //  Creatures entering this player's own support
-//  zones (enteringCard.owner === cardOwner).
+//  zones — nach Kontrolle (enteringCard.controller ?? owner)
+//  === cardOwner, Styx 28.9.
 // ═══════════════════════════════════════════
 
 const { hasCardType } = require('./_hooks');
