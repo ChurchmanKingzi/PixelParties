@@ -210,7 +210,10 @@ def main(path):
     paint(bhat, xs_.min() + 1, ys_.min() + 13, [".A..........E", "A............E"], dict(A='604a1b', E='4e30a7'))
     save_parts('bad-birthday-girl-cecilia', [('body', cec), ('hat', bhat)])
     save_parts('barker-the-monster-tamer', [('body', g('Barker')), ('mark', g('Barker #4'))])
-    save_parts('blackstache-scourge-of-the-pixel-seas', [('body', near(g('Blackstache'), 167, 200))])
+    bs = near(g('Blackstache'), 167, 200)
+    ys_, xs_ = np.nonzero(bs[:, :, 3])                   # brennende Lunten (Ebene #229) rund um ihn
+    fuses = box(g('Ebene #229'), xs_.min() - 8, ys_.min() - 8, xs_.max() + 9, ys_.max() + 9)
+    save_parts('blackstache-scourge-of-the-pixel-seas', [('body', bs), ('fuses', fuses)])
     save_parts('brackle-the-catapulting-turtle', [('body', g('Brackle'))])
     save_single('brackle-skull', g('Ebene #265'))
     b472 = near(g('Broghan-Kopie'), 271, 125)

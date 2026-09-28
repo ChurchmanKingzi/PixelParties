@@ -11,29 +11,35 @@ Dazu je Variante:
              2 px hoch offen – der Oberkörper bebt dabei); Blut läuft die
              Messerklinge hinab und tropft unter der Faust vom Knauf zu Boden.
 * barker:    Barker, the Monster Tamer: Federn, Blinzeln (die Augen reichen bis
-             in die rote Zeile darunter), die rote Bemalung glimmt auf und ab.
+             in die rote Zeile darunter), die rote Bemalung glimmt auf und ab;
+             Peitsche und Metallarmband samt Hand federn als Ganzes mit dem Arm.
+* alleria:   Alleria, the Queen of Spiders: jedes der acht Spinnenbeine dreht
+             sich einzeln um seine Wurzel (Gangbild über Kreuz, eigene Phasen),
+             die Spinnenaugen glühen, sie blinzelt.
 * blackstache: der Geisterpirat federt, blinzelt mit den gelben Augen, sein
              durchscheinender Körper flackert leicht; den Säbel neigt er
              leicht auf und ab (Drehung um die Faust), über die Klinge läuft
-             ein Lichtreflex und sie funkelt.
+             ein Lichtreflex und sie funkelt; an den Enden seiner acht Lunten
+             sprühen Funken.
 * chuck:     Federn, Blinzeln, er redet ununterbrochen (Mund unter dem
              Schnauzbart); die Schaumkrone brodelt ständig (Blasen wogen,
              die Oberkante wölbt sich, Schaumflocken spritzen auf), im Bier
              steigen Bläschen auf.
 * codumbus:  Federn; der Globus dreht sich (Land und Meer wandern, das Licht
-             bleibt stehen, der Rand bleibt fest), Schweißtropfen laufen
-             ständig über den Globus-Kopf herab.
+             bleibt stehen, der Rand bleibt fest); seine zwei türkisen
+             Schweißtropfen rinnen ständig über den Globus-Kopf herab.
 * devlin / mmdevlin: Federn; von den Krallen tropft Blut (Tropfen bildet
              sich, fällt, zerplatzt am Boden), der Schweißtropfen an der
              Stirn rinnt herab und bildet sich neu.
-* enigma:    das Kind in der Kutte erzählt: es wippt schnell auf der Stelle,
-             schwingt den Arm, die Kutte flattert, der Mund geht auf und zu.
-             Das weiße Glitzern (vor dem schwarzen Gesicht und daneben)
-             funkelt unabhängig von ihr.
+* enigma:    das Kind in der Kutte erzählt: schnelles Squash-and-Stretch auf
+             der Stelle, es schwingt den Arm, der Mund geht auf und zu. Das
+             weiße Glitzern (vor dem schwarzen Gesicht, wandert senkrecht mit,
+             und daneben) funkelt unabhängig von ihr.
 * krates:    Federn, Blinzeln; sein Jo-Jo schnellt am Faden hoch und fällt
              wieder, und dreht sich dabei.
 * key:       Federn, Blinzeln; die goldenen Armreifen glitzern, die
-             abstehenden Haarsträhnen wehen leicht hin und her.
+             abstehenden Haarsträhnen wandern um ihre Haarwurzel (bleiben
+             immer mindestens diagonal mit ihr verbunden).
 * kyli:      Squash-and-Stretch in der Senkrechten (die Füße bleiben), die
              schwarzen Äste wiegen sich (oben stärker), die roten Augen
              glühen auf und blinzeln.
@@ -63,7 +69,8 @@ V_ = {
                                  ((6, 11), 'd5a464'), ((7, 11), 'd5a464'), ((8, 11), 'd5a464'),
                                  ((11, 11), 'd5a464'), ((12, 11), 'd5a464'), ((13, 11), 'd5a464'),
                                  ((7, 12), '000000'), ((8, 12), '000000'), ((11, 12), '000000'), ((12, 12), '000000')]}),
-    'blackstache': dict(slug='blackstache-scourge-of-the-pixel-seas', knee=20, pads=(3, 3, 4, 2),
+    'blackstache': dict(slug='blackstache-scourge-of-the-pixel-seas', part='body', crop=(0, 2, 47, 29), knee=20,
+                        pads=(3, 11, 7, 2),
                         line=[(33, 10), (34, 10), (37, 10), (38, 10)]),
     'chuck': dict(slug='chuck-the-crazy-veteran', knee=18, pads=(3, 3, 5, 2), line=[(13, 6), (17, 6)]),
     'codumbus': dict(slug='codumbus-the-clueless-voyager', knee=21, pads=(3, 3, 5, 2)),
@@ -76,6 +83,8 @@ V_ = {
     'key': dict(slug='key-the-cursed-thief', knee=20,
                 lid=[((5, 9), 'f6cd8b'), ((6, 9), 'f6cd8b'), ((9, 9), 'f6cd8b')],
                 line=[(5, 10), (6, 10), (9, 10)]),
+    'alleria': dict(slug='alleria-the-queen-of-spiders', pads=(3, 3, 3, 2),
+                    lid=[((16, 9), 'f5ce88'), ((17, 9), 'f5ce88')], line=[(16, 10), (17, 10)]),
     'kyli': dict(slug='kyli-the-deceptive-sapling', pads=(3, 3, 5, 2),
                  blink={'halb': [((9, 16), '636363'), ((10, 16), '636363'), ((13, 16), '636363'), ((14, 16), '636363')],
                         'zu': [((9, 16), '636363'), ((10, 16), '636363'), ((13, 16), '636363'), ((14, 16), '636363'),
@@ -92,6 +101,9 @@ def load(part=None, slug=None):
 
 
 SRC = load(C.get('part'))
+if 'crop' in C:
+    _cx0, _cy0, _cx1, _cy1 = C['crop']
+    SRC = SRC[_cy0:_cy1, _cx0:_cx1]
 SH, SW = SRC.shape[:2]
 KNEE = C.get('knee', SH)
 PL, PR, PT, PB = C.get('pads', (3, 3, 4, 2))
@@ -268,16 +280,35 @@ def f_barker(i):
         s[y, x] = [min(255, int(c[0] + 50 * f)), int(c[1] + 14 * f), int(c[2] + 14 * f), c[3]]
     blink(s, i)
     out = np.zeros((H, W, 4), int)
-    knee_put(out, s, BOUNCE12[i % 12], moves=lambda x, y: x <= 4 and y < 26)   # Peitsche hängt an der Hand
+    knee_put(out, s, BOUNCE12[i % 12], moves=lambda x, y: (x <= 4 and y < 26) or (x >= 13 and y <= 24))   # Peitsche links, Armband + Hand rechts: hängen am Arm
     fill_pinholes(out)
     return out
 
 
 BS_PIVOT = (24.0, 12.5)                                  # Faust am Säbelgriff
+FUSES = None
 
 
 def f_blackstache(i):
+    global FUSES
     s = SRC.copy()
+    if FUSES is None:                                    # Lunten (Ebene #229) in Körper-Koordinaten
+        fu = load('fuses')
+        cx, cy = C['crop'][:2]
+        line, spark = [], []
+        for y, x in zip(*np.nonzero(fu[:, :, 3])):
+            (line if hexc(fu[y, x]) == '000000' else spark).append((x - cx, y - cy, fu[y, x].copy()))
+        m = np.zeros(fu.shape[:2], np.uint8)
+        for x, y, _ in spark:
+            m[y + cy, x + cx] = 1
+        n, lab = cv2.connectedComponents(m, connectivity=8)
+        tips = []                                        # je Funkenbüschel: Mitte = weißer Kern
+        for k in range(1, n):
+            pts = [(x, y, c) for x, y, c in spark if lab[y + cy, x + cx] == k]
+            core = [(x, y) for x, y, c in pts if hexc(c) == 'ffffff'] or [(x, y) for x, y, _ in pts]
+            tips.append((core[0], pts))
+        FUSES = (line, tips)
+    line, tips = FUSES
     blink(s, i)
     ghost = (s[:, :, 3] > 0) & (s[:, :, 3] < 255)
     f = math.sin(2 * math.pi * 3 * i / N)
@@ -297,6 +328,30 @@ def f_blackstache(i):
     body[sword_m] = 0
     knee_put(out, body, b)
     fill_pinholes(out)
+    # Lunten federn mit; die Funken an ihren Enden sprühen (Frame 0 = Bild)
+    fuse_px = set()
+    for x, y, c in line:
+        out[y + PT + b, x + PL] = c
+        fuse_px.add((x, y))
+    Y_, W_, O_ = rgb('ffff00'), rgb('ffffff'), rgb('ff9a1f')
+    for k, ((cx, cy), pts) in enumerate(tips):
+        if i == 0:
+            for x, y, c in pts:
+                out[y + PT + b, x + PL] = c
+            continue
+        rng = np.random.default_rng(1000 * k + i)
+        pix = {(cx, cy): W_ if rng.random() < 0.6 else Y_}
+        for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1), (1, 1), (-1, -1), (1, -1), (-1, 1)):
+            r = rng.random()
+            if r < 0.45:
+                pix[(cx + dx, cy + dy)] = Y_ if r < 0.3 else O_
+        if rng.random() < 0.5:                           # einzelner Funke fliegt weg
+            dx, dy = [(2, -1), (-2, -1), (1, -2), (-1, -2), (2, 0), (-2, 0)][rng.integers(6)]
+            pix[(cx + dx, cy + dy)] = W_ if rng.random() < 0.5 else Y_
+        for (x, y), c in pix.items():
+            if (x, y) in fuse_px:
+                continue
+            out[y + PT + b, x + PL] = c
     # Funkeln auf der Klinge (Punkte drehen mit)
     ca, sa = math.cos(ang), math.sin(ang)
     sp = []
@@ -371,29 +426,34 @@ def f_chuck(i):
 
 
 GLOBE = None
-SWEAT_BLUE = [['002744', '002744'], ['002744', '3f94d0'], ['002744', '0071c1']]
+SWEAT = ['a4ffff', '41ffff', '00e6e6']                   # die zwei türkisen Tropfen (oben hell)
+SWEAT_AT = [(10, 1), (5, 5)]
 
 
 def f_codumbus(i):
     global GLOBE
     s = SRC.copy()
-    s[2:7, 1:3] = 0                                      # die Schweißtropfen laufen gleich eigenständig
-    # Land ↔ Meer je Helligkeitsrolle; die Glanzlichter (türkis/weiß) und die Randpixel stehen fest
+    for x, y in SWEAT_AT:                                # Tropfen weg, darunter Globus (rechter Nachbar)
+        for k in range(3):
+            s[y + k, x] = s[y + k, x + 1]
+    # Land ↔ Meer je Helligkeitsrolle; die Randpixel stehen fest
     to_sea = {'92d14f': '0071c1', '6d9d3b': '005591', '53772d': '005591', '3e5921': '005591',
               'acdc7a': '3f94d0', '7d9860': '3f6683'}
     to_land = {'0071c1': '92d14f', '005591': '6d9d3b', '3f94d0': 'acdc7a', '3f6683': '7d9860'}
     if GLOBE is None:
         runs = []
+        gm = np.zeros((SH, SW), bool)
         for y in range(0, 10):
-            xs = [x for x in range(4, SW) if s[y, x, 3] and hexc(s[y, x]) in
-                  list(to_sea) + list(to_land) + ['00e6e6', '41ffff', 'a4ffff']]
+            xs = [x for x in range(4, SW) if s[y, x, 3] and hexc(s[y, x]) in list(to_sea) + list(to_land)]
             if len(xs) < 4:
                 continue
+            gm[y, xs[0]:xs[-1] + 1] = True
             xs = list(range(xs[0] + 1, xs[-1]))
             hs = [hexc(s[y, x]) for x in xs]
             runs.append((y, xs, hs))
-        GLOBE = runs
-    for y, xs, hs in GLOBE:
+        GLOBE = (runs, gm)
+    runs, gm = GLOBE
+    for y, xs, hs in runs:
         n = len(xs)
         sh = int(round(i * n / N))
         for j, h in enumerate(hs):
@@ -405,24 +465,20 @@ def f_codumbus(i):
                 s[y, xs[j]] = rgb(to_land[h])
             elif not land_src and h in to_sea:
                 s[y, xs[j]] = rgb(to_sea[h])
+    # Schweißtropfen rinnen über den Globus herab und tauchen oben wieder auf (2 Runden pro Loop)
+    for x, y0 in SWEAT_AT:
+        top = int(np.nonzero(gm[:, x])[0].min())
+        bot = int(np.nonzero(gm[:, x])[0].max())
+        ymin = top - 2
+        L = bot - ymin + 1
+        yt = ymin + ((y0 - ymin) + (i * L * 2) // N) % L
+        for k, c in enumerate(SWEAT):
+            if 0 <= yt + k < SH and gm[yt + k, x]:
+                s[yt + k, x] = rgb(c)
     b = BOUNCE12[i % 12]
     out = np.zeros((H, W, 4), int)
     knee_put(out, s, b)
     fill_pinholes(out)
-    # Schweißtropfen: rinnen über den Globus herab (beschleunigt) und verschwinden in der Halskrause
-    for x0, t0 in ((1, 0), (7, 7), (12, 14), (1, 24), (9, 30), (5, 38)):
-        spr = SWEAT_BLUE
-        t = (i - t0) % N
-        if t >= 14:
-            continue
-        y0 = 2 if x0 == 1 else 1
-        yy = y0 + (t * t) // 22
-        for dy, row in enumerate(spr):
-            for dx, c in enumerate(row):
-                y = yy + dy
-                if y > 7:
-                    continue
-                out[y + PT + b, x0 + dx + PL] = rgb(c)
     return out
 
 
@@ -454,8 +510,17 @@ def f_devlin(i):
 
 
 ENIGMA_TALK = talk_track(['oo', 'oc', 'ww', 'wo', 'occ', 'c'], 11)
-BOB8 = [0, -1, -1, -1, 0, 1, 1, 1]
 ARM_PIVOT = (6.0, 12.5)
+
+
+def squash(tmp, sy, foot):
+    """Senkrecht um die Fußzeile skalieren (rückwärts abgetastet, keine Löcher)."""
+    out = np.zeros_like(tmp)
+    for y in range(tmp.shape[0]):
+        src_y = int(round(foot - (foot - y) / sy))
+        if 0 <= src_y < tmp.shape[0]:
+            out[y] = tmp[src_y]
+    return out
 
 
 def f_enigma(i):
@@ -469,24 +534,23 @@ def f_enigma(i):
         s[12, 9] = s[12, 10] = rgb('5b0000')
         s[13, 9] = s[13, 10] = rgb('300000')
     arm_m = (s[:, :, 3] > 0) & (_xs <= 5) & (_ys >= 11) & (_ys <= 14)
-    b = BOB8[i % 8]
     w = 2 * math.pi * i / N
-
-    def flutter(x, y):                                   # Kutte flattert (unten stärker)
-        if y >= 16:
-            return int(round(1.0 * (y - 15) / 9 * (math.sin(4 * w - 0.7 * y) - math.sin(-0.7 * y))))
-        return 0
     body = s.copy()
     body[arm_m] = 0
-    out = np.zeros((H, W, 4), int)
-    knee_put(out, body, b, dx_fn=flutter)
+    tmp = np.zeros((H, W, 4), int)
+    put(tmp, body, PL, PT)
     ang = 0.32 * math.sin(3 * w)                         # Arm schwingt beim Erzählen
-    arm = rotate_part(s, arm_m, ARM_PIVOT, ang, (H, W), offset=(PL, PT + b))
+    arm = rotate_part(s, arm_m, ARM_PIVOT, ang, (H, W), offset=(PL, PT))
     m = arm[:, :, 3] > 0
-    out[m] = arm[m]
-    fill_pinholes(out)
-    # Glitzern, unabhängig von ihr: vor dem Gesicht (Frame 0 = volles Kreuz wie im Bild) und daneben
-    stars(out, i, [(8 + PL, 8 + PT, 46), (8 + PL, 8 + PT, 22)], 'e8e8ff', 'ffffff')
+    tmp[m] = arm[m]
+    fill_pinholes(tmp)
+    # Squash-and-Stretch (schnelles Wippen auf der Stelle), die Kutte bleibt am Boden
+    sy = 1 + 0.06 * math.sin(6 * w)
+    foot = PT + SH - 1
+    out = squash(tmp, sy, foot)
+    # Glitzern vor dem Gesicht wandert senkrecht mit ihr mit (Frame 0 = volles Kreuz wie im Bild)
+    fy = int(round(foot - (foot - (8 + PT)) * sy))
+    stars(out, i, [(8 + PL, fy, 46), (8 + PL, fy, 22)], 'e8e8ff', 'ffffff')
     stars(out, i, [(PL - 3, 5 + PT, 8), (SW + 2 + PL, 4 + PT, 30), (SW + 2 + PL, 16 + PT, 14),
                    (PL - 3, 18 + PT, 36), (PL + 17, PT - 2, 40)], 'e8e8ff', 'ffffff', only_empty=True)
     return out
@@ -529,20 +593,41 @@ def f_krates(i):
     return out
 
 
-KEY_STRAYS = [(9, 0), (2, 2), (3, 2), (13, 3), (0, 8), (15, 11)]
+KEY_STRAYS = [((9, 0), (8, 1), []), ((3, 2), (4, 3), [(2, 2)]), ((13, 3), (12, 4), []),
+              ((0, 8), (1, 7), []), ((15, 11), (14, 10), [])]   # (Strähne, Wurzel, angehängte Pixel)
+RING = [(-1, -1), (0, -1), (1, -1), (1, 0), (1, 1), (0, 1), (-1, 1), (-1, 0)]
 
 
 def f_key(i):
     s = SRC.copy()
     blink(s, i)
     w = 2 * math.pi * 2 * i / N
-    strays = {}
-    for k, (x, y) in enumerate(KEY_STRAYS):              # abstehende Strähnen wehen
-        ph = [0.0, 1.3, 1.3, 2.6, 4.0, 5.1][k]
-        strays[(x, y)] = int(round(0.8 * (math.sin(w + ph) - math.sin(ph))))
+    # abstehende Strähnen wehen: sie wandern um ihre Haarwurzel herum (bleiben immer mindestens
+    # diagonal mit ihr verbunden), angehängte Pixel folgen mit demselben Abstand
+    moved = {}
+    base = s.copy()
+    for (p, r, chain), ph in zip(KEY_STRAYS, (0.0, 1.3, 2.6, 4.0, 5.1)):
+        for q in [p] + chain:
+            base[q[1], q[0]] = 0
+    for (p, r, chain), ph in zip(KEY_STRAYS, (0.0, 1.3, 2.6, 4.0, 5.1)):
+        step = int(round(0.8 * (math.sin(w + ph) - math.sin(ph))))
+        k = RING.index((p[0] - r[0], p[1] - r[1]))
+        np_ = p
+        for st in ([step, 0] if step else [0]):
+            d = RING[(k + st) % 8]
+            cand = (r[0] + d[0], r[1] + d[1])
+            if 0 <= cand[0] < SW and 0 <= cand[1] < SH and not base[cand[1], cand[0], 3]:
+                np_ = cand
+                break
+        off = (np_[0] - p[0], np_[1] - p[1])
+        for q in [p] + chain:
+            moved[(q[0] + off[0], q[1] + off[1])] = s[q[1], q[0]].copy()
+    for (x, y), c in moved.items():
+        if 0 <= x < SW and 0 <= y < SH:
+            base[y, x] = c
     b = BOUNCE12[i % 12]
     out = np.zeros((H, W, 4), int)
-    knee_put(out, s, b, dx_fn=lambda x, y: strays.get((x, y), 0))
+    knee_put(out, base, b)
     fill_pinholes(out)
     stars(out, i, [(1 + PL, 19 + PT + b, 10), (14 + PL, 19 + PT + b, 22),
                    (2 + PL, 19 + PT + b, 34), (13 + PL, 19 + PT + b, 46)], 'ffe300', 'fff6ac')
@@ -574,17 +659,66 @@ def f_kyli(i):
     fill_pinholes(tmp)
     # Squash-and-Stretch: senkrecht skaliert, die Fußsohle bleibt stehen
     sy = 1 + 0.05 * math.sin(2 * math.pi * 2 * i / N + 0.9) - 0.05 * math.sin(0.9)
-    foot = PT + SH - 1
-    out = np.zeros_like(tmp)
-    for y in range(H):
-        src_y = int(round(foot - (foot - y) / sy))
-        if 0 <= src_y < H:
-            out[y] = tmp[src_y]
+    out = squash(tmp, sy, PT + SH - 1)
+    return out
+
+
+# Beine links (von außen oben nach innen unten) als Linienzüge ab der Wurzel; rechts gespiegelt
+LEGS_L = [[(12, 10), (8, 9.5), (5, 11), (3, 13), (1, 15), (0, 19)],
+          [(12, 13.5), (8, 14), (6, 16), (4, 19), (3, 22)],
+          [(12, 16), (9, 18), (7, 21), (5, 24), (5, 27)],
+          [(13, 20.5), (11, 23), (10, 26), (9, 29)]]
+LEG_SEG = None
+
+
+def seg_dist(px, py, a, b):
+    ax, ay = a
+    bx, by = b
+    dx, dy = bx - ax, by - ay
+    t = max(0.0, min(1.0, ((px - ax) * dx + (py - ay) * dy) / (dx * dx + dy * dy)))
+    return math.hypot(px - ax - t * dx, py - ay - t * dy)
+
+
+def f_alleria(i):
+    global LEG_SEG
+    s = SRC.copy()
+    legs = LEGS_L + [[(SW - 1 - x, y) for x, y in L] for L in LEGS_L]
+    if LEG_SEG is None:                                  # jedes Beinpixel gehört zum nächsten Linienzug
+        lab = np.full((SH, SW), -1)
+        for y, x in zip(*np.nonzero(s[:, :, 3])):
+            if y >= 9 and (x <= 12 or x >= SW - 13):
+                d = [min(seg_dist(x, y, a, b) for a, b in zip(L, L[1:])) for L in legs]
+                lab[y, x] = int(np.argmin(d))
+        LEG_SEG = lab
+    lab = LEG_SEG
+    # Spinnenaugen glühen, sie blinzelt
+    f = 0.5 - 0.5 * math.cos(2 * math.pi * 2 * i / N)
+    for y, x in zip(*np.nonzero(s[:, :, 3])):
+        if y >= 19 and hexc(s[y, x]) in ('ff0200', 'ad0100'):
+            c = s[y, x]
+            s[y, x] = [255, int(c[1] + 110 * f), int(c[2] + 90 * f), 255]
+    blink(s, i)
+    out = np.zeros((H, W, 4), int)
+    body = s.copy()
+    body[lab >= 0] = 0
+    w = 2 * math.pi * 2 * i / N
+    # jedes Bein einzeln: Drehung um seine Wurzel, Gangbild über Kreuz, dazu eigene Phase
+    phases = [0.0, 3.3, 0.4, 3.0, 3.1, 0.2, 2.9, 0.5]
+    for k in (0, 4, 1, 5, 2, 6, 3, 7):
+        m = lab == k
+        root = legs[k][0]
+        side = -1 if k < 4 else 1
+        ang = side * 0.13 * (math.sin(w + phases[k]) - math.sin(phases[k]))
+        leg = rotate_part(s, m, root, ang, (H, W), offset=(PL, PT))
+        lm = leg[:, :, 3] > 0
+        out[lm] = leg[lm]
+    put(out, body, PL, PT)
+    fill_pinholes(out)
     return out
 
 
 FRAME = dict(asriel=f_asriel, barker=f_barker, blackstache=f_blackstache, chuck=f_chuck, codumbus=f_codumbus,
-             devlin=f_devlin, mmdevlin=f_devlin, enigma=f_enigma, krates=f_krates, key=f_key, kyli=f_kyli)
+             devlin=f_devlin, mmdevlin=f_devlin, enigma=f_enigma, krates=f_krates, key=f_key, kyli=f_kyli, alleria=f_alleria)
 
 if __name__ == '__main__':
     tag = sys.argv[1] if len(sys.argv) > 1 else 'v'
