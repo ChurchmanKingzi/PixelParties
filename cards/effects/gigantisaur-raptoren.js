@@ -44,6 +44,12 @@ function eligibleHostSlots(engine, pi, cardData) {
   for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
     const h = ps.heroes[hi];
     if (!h?.name || h.hp <= 0) continue;
+    // Kontrolle statt Seite (Styx 28.9.) — ein Held, den gerade der
+    // Gegner kontrolliert, ist kein „Hero you control". (Uebernommene
+    // Helden der Gegenspalte bewusst noch nicht: `beforeSummon` der
+    // nachgezogenen Gigantisaurier — Chimera-Abwurf, Trex-Opfer — liefe
+    // dort mit der Feldseite als `cardOwner`.)
+    if (engine.heroSideOf(pi, h) !== pi) continue;
     if (h.statuses?.frozen || h.statuses?.stunned) continue;
     if (!engine.heroMeetsLevelReq(pi, hi, cardData)) continue;
     // Per-creature canSummon check — handles the archetype's "1 per

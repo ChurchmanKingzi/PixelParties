@@ -32,11 +32,11 @@ async function runOpponentDeathPayload(engine, inst, opts = {}) {
   const ops = gs.players[oi];
   if (!ops) return;
 
+  // Kontrolle statt Seite (Styx 28.9.): „all Heroes your opponent controls".
   const heroHits = [];
-  for (let hi = 0; hi < (ops.heroes || []).length; hi++) {
-    const h = ops.heroes[hi];
+  for (const { physOwner, heroIdx: hi, hero: h } of engine.heroesControlledBy(oi)) {
     if (!h?.name || h.hp <= 0) continue;
-    heroHits.push({ hi, hero: h });
+    heroHits.push({ owner: physOwner, hi, hero: h });
   }
   if (heroHits.length === 0) return;
 
@@ -53,16 +53,16 @@ async function runOpponentDeathPayload(engine, inst, opts = {}) {
   // Per-hero animation broadcast (the carpet-style cascade is emitted as
   // a sequence of small bursts walking across the opp's side; the client
   // animation component renders the cascade itself).
-  for (const { hi } of heroHits) {
+  for (const { owner, hi } of heroHits) {
     engine._broadcastEvent('play_zone_animation', {
-      type: ANIM_TYPE, owner: oi, heroIdx: hi, zoneSlot: -1,
+      type: ANIM_TYPE, owner, heroIdx: hi, zoneSlot: -1,
     });
   }
   await engine._delay(550);
 
   // ★ v1392: über die EINE Stelle für Mehrfachtreffer (Hand-Reaktionen,
   // Interference-Klammer, Heldentreffer) — vorher alles von Hand.
-  await engine.dealDamageToTargets(source, heroHits.map(({ hi }) => ({ type: 'hero', owner: oi, heroIdx: hi })), {
+  await engine.dealDamageToTargets(source, heroHits.map(({ owner, hi }) => ({ type: 'hero', owner, heroIdx: hi })), {
     damage: DAMAGE, damageType: 'creature', hitDelay: 0, surpriseCheck: false,
   });
 

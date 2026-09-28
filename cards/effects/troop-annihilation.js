@@ -103,6 +103,8 @@ function freieSurpriseZonen(gs, pi) {
   for (let hi = 0; hi < (ps?.heroes || []).length; hi++) {
     const hero = ps.heroes[hi];
     if (!hero?.name || hero.hp <= 0) continue;
+    // Kontrolle statt Seite (Styx 28.9.): abgegebene eigene Helden zaehlen nicht.
+    if ((hero.charmedBy ?? hero.permaControlBy ?? pi) !== pi) continue;
     if (((ps.surpriseZones?.[hi]) || []).length > 0) continue;
     frei.push(hi);
   }

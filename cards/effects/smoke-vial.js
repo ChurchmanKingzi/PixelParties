@@ -114,7 +114,9 @@ module.exports = {
 
   canActivate(gs, pi) {
     const oi = pi === 0 ? 1 : 0;
-    return (gs.players[oi]?.heroes || []).some(h => h?.name && h.hp > 0);
+    // Kontrolle statt Seite (Styx 28.9.) — wie engine.heroSideOf.
+    return (gs.players || []).some((ps, p) => (ps?.heroes || []).some(h =>
+      h?.name && h.hp > 0 && (h.charmedBy ?? h.permaControlBy ?? p) === oi));
   },
 
   async resolve(engine, pi) {
@@ -140,10 +142,10 @@ module.exports = {
     await engine._delay(450);
 
     let landed = 0;
-    for (let hi = 0; hi < heroCount; hi++) {
-      const hero = oppPs.heroes[hi];
+    // Kontrolle statt Seite (Styx 28.9.): „All Heroes your opponent controls".
+    for (const { physOwner, heroIdx: hi, hero } of engine.heroesControlledBy(oi)) {
       if (!hero?.name || hero.hp <= 0) continue;
-      await engine.addHeroStatus(oi, hi, 'blinded', {
+      await engine.addHeroStatus(physOwner, hi, 'blinded', {
         expiresAtTurn: expiresTurn,
         expiresForPlayer: oi,
         appliedBy: pi,

@@ -15,7 +15,7 @@
 //  dort). Platzieren nur zu lebenden Helden, regardless of level, keine
 //  Aktion. Auftritt beim Ja (v818-Grundregel).
 // ═══════════════════════════════════════════
-const { PAWN, boardOfKingsOnBoard, freeZonesOfHero, pickZone, ofKingsCpuAnswer } = require('./_of-kings-shared');
+const { PAWN, boardOfKingsOnBoard, freeZonesOfHero, ofKingsCpuAnswer } = require('./_of-kings-shared');
 
 const CARD_NAME = 'Bishop of Kings [W]';
 const key = (pi) => `bishop-of-kings-w:${pi}`;
@@ -62,11 +62,12 @@ module.exports = {
       engine.log('bishop_of_kings_search', { player: ps.username, card: name });
 
       if (!boardOfKingsOnBoard(engine)) return;
+      // Kontrolle statt Seite (Styx 28.9.): „an undefeated Hero you
+      // control" — auch uebernommene Helden der Gegenspalte (`owner`).
       const zones = [];
-      for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-        const h = ps.heroes[hi];
+      for (const { physOwner, heroIdx: hi, hero: h } of engine.heroesControlledBy(pi)) {
         if (!h?.name || h.hp <= 0) continue;
-        for (const z of freeZonesOfHero(engine, pi, hi)) zones.push({ heroIdx: hi, slotIdx: z });
+        for (const z of freeZonesOfHero(engine, physOwner, hi)) zones.push({ owner: physOwner, heroIdx: hi, slotIdx: z });
       }
       if (zones.length === 0) return;
       const place = await engine.promptGeneric(pi, {
@@ -75,15 +76,38 @@ module.exports = {
         showCard: name, confirmLabel: '♟ Place!', cancelLabel: 'Keep in hand', cancellable: true,
       });
       if (!place) return;
-      const zone = await pickZone(engine, pi, zones, CARD_NAME, `Place ${name} into which Support Zone?`);
+      // Kontrolle statt Seite (Styx 28.9.): eigene Zonenwahl, damit
+      // `owner` erhalten bleibt (das geteilte pickZone kennt ihn nicht).
+      let zone = zones[0];
+      if (zones.length > 1) {
+        const pick = await engine.promptGeneric(pi, {
+          type: 'zonePick', title: CARD_NAME, description: `Place ${name} into which Support Zone?`,
+          zones: zones.map(z => ({
+            owner: z.owner, heroIdx: z.heroIdx, slotIdx: z.slotIdx,
+            label: `${gs.players[z.owner]?.heroes?.[z.heroIdx]?.name || `Column ${z.heroIdx + 1}`} — Slot ${z.slotIdx + 1}`,
+          })),
+          cancellable: true,
+        });
+        if (!pick || pick.cancelled || pick.heroIdx == null || pick.slotIdx == null) return;
+        zone = zones.find(z => z.owner === (pick.owner ?? pi) && z.heroIdx === pick.heroIdx && z.slotIdx === pick.slotIdx)
+          || zones.find(z => z.heroIdx === pick.heroIdx && z.slotIdx === pick.slotIdx);
+      }
       if (!zone) return;
-      await engine.actionPlaceCreature(name, pi, zone.heroIdx, zone.slotIdx, { source: 'hand', sourceName: CARD_NAME });
+      await engine.actionPlaceCreature(name, pi, zone.heroIdx, zone.slotIdx, {
+        source: 'hand', sourceName: CARD_NAME,
+        ...(zone.owner !== pi ? { heldSeite: zone.owner } : {}),   // Kontrolle statt Seite (Styx 28.9.)
+      });
       engine.sync();
     },
   },
 
   cpuResponse(engine, kind, payload) {
     if (kind === 'generic' && payload?.type === 'confirm' && payload?.title === CARD_NAME) return true;
+    // Kontrolle statt Seite (Styx 28.9.): Zonenwahl mit `owner` beantworten.
+    if (kind === 'generic' && payload?.type === 'zonePick' && payload?.title === CARD_NAME) {
+      const z = (payload.zones || [])[0];
+      return z ? { owner: z.owner, heroIdx: z.heroIdx, slotIdx: z.slotIdx } : null;
+    }
     return ofKingsCpuAnswer(engine, kind, payload);
   },
 };

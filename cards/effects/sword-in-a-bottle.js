@@ -37,14 +37,33 @@ function schonGespielt(gs, pi) {
   return gs?.hoptUsed?.[`${HOPT_KEY}:${pi}`] === gs?.turn;
 }
 
-/** Eigene Helden, die zuschlagen koennen (lebend, mit Angriffswert). */
+// Kontrolle statt Seite (Styx 28.9.): „a Hero you control" / „a target
+// your opponent controls" — wie `engine.heroSideOf` (charmedBy >
+// permaControlBy > physischer Besitzer). Ziele bleiben physisch adressiert,
+// die Seite steht zusaetzlich als `seite` daran.
+function seiteVon(physOwner, hero) {
+  if (!hero) return physOwner;
+  if (hero.charmedBy != null) return hero.charmedBy;
+  if (hero.permaControlBy != null) return hero.permaControlBy;
+  return physOwner;
+}
+function seiteDesZiels(gs, t) {
+  if (t?.seite != null) return t.seite;
+  if (t?.type !== 'hero') return t?.owner;
+  return seiteVon(t.owner, gs?.players?.[t.owner]?.heroes?.[t.heroIdx]);
+}
+
+/** Kontrollierte Helden, die zuschlagen koennen (lebend, mit Angriffswert). */
 function angreifer(gs, pi) {
   const out = [];
-  const helden = gs?.players?.[pi]?.heroes || [];
-  for (let hi = 0; hi < helden.length; hi++) {
-    const h = helden[hi];
-    if (!h?.name || h.hp <= 0) continue;
-    out.push({ heroIdx: hi, hero: h });
+  for (let p = 0; p < (gs?.players || []).length; p++) {
+    const helden = gs.players[p]?.heroes || [];
+    for (let hi = 0; hi < helden.length; hi++) {
+      const h = helden[hi];
+      if (!h?.name || h.hp <= 0) continue;
+      if (seiteVon(p, h) !== pi) continue;
+      out.push({ physOwner: p, heroIdx: hi, hero: h });
+    }
   }
   return out;
 }
@@ -76,7 +95,7 @@ module.exports = {
     if (gs?.firstTurnProtectedPlayer === gegner) return false;
     const ops = gs?.players?.[gegner];
     if (!ops) return false;
-    const heldLebt = (ops.heroes || []).some(h => h?.name && h.hp > 0);
+    const heldLebt = angreifer(gs, gegner).length > 0;   // Kontrolle statt Seite
     const kreaturDa = (ops.supportZones || []).some(zone =>
       (zone || []).some(slot => Array.isArray(slot) && slot.length > 0));
     return heldLebt || kreaturDa;
@@ -86,12 +105,19 @@ module.exports = {
     if (!engine) return [];
     const gegner = playerIdx === 0 ? 1 : 0;
     const ziele = [];
-    // EIGENE Helden = die moeglichen Angreifer.
-    ziele.push(...engine.getHeroTargets(playerIdx));
-    // GEGNERISCHE Helden und Kreaturen = die moeglichen Opfer.
-    if (gs.firstTurnProtectedPlayer !== gegner) {
-      ziele.push(...engine.getHeroTargets(gegner));
-      ziele.push(...engine.getCreatureTargets(gegner));
+    // Kontrolle statt Seite (Styx 28.9.): Helden beider Spalten, sortiert
+    // nach Kontrolleur. KONTROLLIERTE Helden = die moeglichen Angreifer,
+    // vom Gegner kontrollierte Helden und seine Kreaturen = die Opfer.
+    const schutz = gs.firstTurnProtectedPlayer === gegner;
+    for (let p = 0; p < (gs.players || []).length; p++) {
+      for (const t of engine.getHeroTargets(p)) {
+        const seite = engine.heroSideOf(p, gs.players[p]?.heroes?.[t.heroIdx]);
+        if (seite === gegner && schutz) continue;
+        ziele.push({ ...t, seite });
+      }
+    }
+    if (!schutz) {
+      ziele.push(...engine.getCreatureTargets(gegner).map(t => ({ ...t, seite: gegner })));
     }
     return ziele;
   },
@@ -99,9 +125,8 @@ module.exports = {
   targetingConfig(gs, playerIdx) {
     // Als Funktion statt als Objekt: der Schadenshinweis fuer die CPU
     // haengt am staerksten eigenen Helden und ist damit nicht konstant.
-    const beste = (gs?.players?.[playerIdx]?.heroes || [])
-      .filter(h => h?.name && h.hp > 0)
-      .reduce((m, h) => Math.max(m, h.atk || 0), 0);
+    const beste = angreifer(gs, playerIdx)
+      .reduce((m, { hero: h }) => Math.max(m, h.atk || 0), 0);
     return {
       title: CARD_NAME,
       description: "Choose a Hero you control (the attacker) and a target your opponent controls. The target takes damage equal to that Hero's Attack.",
@@ -117,7 +142,7 @@ module.exports = {
       // sich im genannten Feld nicht gleichen, der zweite Klick auf
       // dieselbe Seite prallt im Picker ab. `validateSelection` bleibt
       // als serverseitiger Riegel bestehen.
-      uniqueBy: 'owner',
+      uniqueBy: 'seite',   // Kontrolle statt Seite (Styx 28.9.), vorher 'owner'
       // Schadenshinweis fuer den CPU-Zielbewerter (`inferDamage`) —
       // ohne ihn bewertet er jeden Treffer mit 0 und wuerfelt.
       baseDamage: beste,
@@ -133,12 +158,13 @@ module.exports = {
     if (!selectedIds || selectedIds.length !== 2) return false;
     const gewaehlt = selectedIds.map(id => validTargets.find(t => t.id === id)).filter(Boolean);
     if (gewaehlt.length !== 2) return false;
-    const seiten = new Set(gewaehlt.map(t => t.owner));
+    const seite = (t) => t.seite ?? t.owner;          // Kontrolle statt Seite
+    const seiten = new Set(gewaehlt.map(seite));
     if (seiten.size !== 2) return false;              // beide von derselben Seite
     // Der eigene Anteil muss ein HELD sein — eine eigene Kreatur kann
     // nicht zuschlagen.
     const eigenes = gewaehlt.find(t => validTargets.some(v => v.id === t.id) && t.type === 'hero'
-      && gewaehlt.some(o => o.owner !== t.owner));
+      && gewaehlt.some(o => seite(o) !== seite(t)));
     return !!eigenes;
   },
 
@@ -162,8 +188,9 @@ module.exports = {
     const pi = typeof payload.playerIdx === 'number' ? payload.playerIdx : engine._cpuPlayerIdx;
     if (ziele.length === 0 || pi == null) return undefined;
 
-    const eigene = ziele.filter(t => t.owner === pi && t.type === 'hero');
-    const fremde = ziele.filter(t => t.owner !== pi);
+    const gs = engine?.gs;
+    const eigene = ziele.filter(t => seiteDesZiels(gs, t) === pi && t.type === 'hero');
+    const fremde = ziele.filter(t => seiteDesZiels(gs, t) !== pi);
     if (eigene.length === 0 || fremde.length === 0) return undefined;
 
     let angreiferZiel = eigene[0], bestAtk = -1;
@@ -198,16 +225,18 @@ module.exports = {
 
     const gewaehlt = selectedIds.map(id => validTargets.find(t => t.id === id)).filter(Boolean);
     if (gewaehlt.length !== 2) return;
-    const held = gewaehlt.find(t => t.owner === pi && t.type === 'hero');
-    const opfer = gewaehlt.find(t => t.owner !== pi);
+    // Kontrolle statt Seite (Styx 28.9.): `held.owner` ist die PHYSISCHE Spalte.
+    const held = gewaehlt.find(t => seiteDesZiels(gs, t) === pi && t.type === 'hero');
+    const opfer = gewaehlt.find(t => seiteDesZiels(gs, t) !== pi);
     if (!held || !opfer) return;
 
     // Nach der Abfrage neu pruefen — zwischen Anzeige und Antwort kann
-    // der Angreifer gefallen sein.
-    const angreiferHeld = gs.players[pi]?.heroes?.[held.heroIdx];
+    // der Angreifer gefallen sein (oder die Kontrolle gewechselt haben).
+    const angreiferHeld = gs.players[held.owner]?.heroes?.[held.heroIdx];
     if (!angreiferHeld?.name || angreiferHeld.hp <= 0) return;
+    if (seiteVon(held.owner, angreiferHeld) !== pi) return;
 
-    const schaden = angriffswert(engine, pi, held.heroIdx);
+    const schaden = angriffswert(engine, held.owner, held.heroIdx);
     if (!(schaden > 0)) return;
 
     // Punkt ohne Rueckkehr — jetzt die Einmal-pro-Zug-Sperre stempeln.
@@ -219,6 +248,7 @@ module.exports = {
     // Hero hitting the target").
     const quelle = {
       name: CARD_NAME, owner: pi, controller: pi, heroIdx: held.heroIdx,
+      heroOwner: held.owner,   // physische Spalte des Angreifers (wie bei bezauberten Helden)
     };
 
     // ── Inszenierung: Dash, dann Schnitt (Muster von Phoenix Tackle) ──
@@ -227,7 +257,7 @@ module.exports = {
     // des Aufpralls, und nur auf dem Ziel.
     const zielSlot = opfer.type === 'hero' ? -1 : opfer.slotIdx;
     engine._broadcastEvent('play_ram_animation', {
-      sourceOwner: pi, sourceHeroIdx: held.heroIdx,
+      sourceOwner: held.owner, sourceHeroIdx: held.heroIdx,
       targetOwner: opfer.owner, targetHeroIdx: opfer.heroIdx,
       targetZoneSlot: zielSlot,
       cardName: angreiferHeld.name, duration: 1000,

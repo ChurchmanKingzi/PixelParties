@@ -1664,7 +1664,12 @@ function PuzzleCreator() {
     updatePlayer(si, (p) => {
       const old = p.heroes[hi];
       if (old) setHand(prev => [...prev, old.name]);
-      p.heroes[hi] = { name: c.name, hp: c.hp || 0, maxHp: c.hp || 0, atk: c.atk || 0, baseAtk: c.atk || 0, statuses: {} };
+      // Ascended Heroes ohne eigene Werte („stats are equal to its base
+      // Hero's stats", Styx, the Opened Gate) starten mit denen der Basis.
+      const statSource = c.hp == null && c.cardType === 'Ascended Hero' && ascensionMap[c.name]
+        ? getCard(ascensionMap[c.name]) || c
+        : c;
+      p.heroes[hi] = { name: c.name, hp: statSource.hp || 0, maxHp: statSource.hp || 0, atk: statSource.atk || 0, baseAtk: statSource.atk || 0, statuses: {} };
       p.abilityZones[hi] = [[], [], []];
       // For Ascended Heroes, use the base hero's starting abilities
       const abilitySource = c.cardType === 'Ascended Hero' && ascensionMap[c.name]

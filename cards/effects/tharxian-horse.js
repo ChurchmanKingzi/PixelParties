@@ -51,7 +51,8 @@ function countTargetsYouControl(engine, pi) {
   const ps = engine.gs.players[pi];
   if (!ps) return 0;
   let n = 0;
-  for (const hero of (ps.heroes || [])) {
+  // Kontrolle statt Seite (Styx 28.9.): kontrollierte Helden beider Spalten.
+  for (const { hero } of engine.heroesControlledBy(pi)) {
     if (hero?.name && hero.hp > 0) n++;
   }
   const cardDB = engine._getCardDB();
@@ -84,21 +85,22 @@ function eligibleDestinations(engine, pi, creatureName) {
   const cd = cardDB[creatureName];
   if (!cd) return [];
   const out = [];
-  for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-    const hero = ps.heroes[hi];
+  // Kontrolle statt Seite (Styx 28.9.): alle Helden, die `pi` kontrolliert;
+  // Pruefungen ueber die physische Adresse, `owner` = physische Seite.
+  for (const { physOwner, heroIdx: hi, hero } of engine.heroesControlledBy(pi)) {
     if (!hero?.name || hero.hp <= 0) continue;
     if (hero.statuses?.frozen
         || hero.statuses?.stunned
         || hero.statuses?.webbed
         || hero.statuses?.bound
         || hero.statuses?.negated) continue;
-    if (!engine.heroMeetsLevelReq(pi, hi, cd, { pileSide: 'discard' })) continue;
-    if (!engine.isCreatureSummonable(creatureName, pi, hi)) continue;
-    const sup = ps.supportZones?.[hi] || [];
+    if (!engine.heroMeetsLevelReq(physOwner, hi, cd, { pileSide: 'discard' })) continue;
+    if (!engine.isCreatureSummonable(creatureName, physOwner, hi)) continue;
+    const sup = engine.gs.players[physOwner].supportZones?.[hi] || [];
     for (let si = 0; si < 3; si++) {
       if (((sup[si] || []).length === 0)) {
         out.push({
-          heroIdx: hi, slotIdx: si,
+          owner: physOwner, heroIdx: hi, slotIdx: si,
           label: `${hero.name} — Slot ${si + 1}`,
         });
       }
@@ -317,7 +319,7 @@ async function reviveFromDiscard(engine, ctx, pi, chosenName) {
       engine.log('tharxian_horse_revive_cancelled', { creature: chosenName });
       return;
     }
-    chosenDest = dests.find(d =>
+    chosenDest = dests.find(d => d.owner === (picked.owner ?? pi) &&
       d.heroIdx === picked.heroIdx && d.slotIdx === picked.slotIdx
     ) || dests[0];
   }
@@ -360,8 +362,10 @@ async function reviveFromDiscard(engine, ctx, pi, chosenName) {
     );
     inst = matches[matches.length - 1] || null;
   } else {
-    const summonRes = engine.summonCreature(chosenName, pi, chosenDest.heroIdx, chosenDest.slotIdx, {
+    // Kontrolle statt Seite (Styx 28.9.): Feldseite = physische Seite des Helden.
+    const summonRes = engine.summonCreature(chosenName, chosenDest.owner, chosenDest.heroIdx, chosenDest.slotIdx, {
       source: CARD_NAME,
+      ...(chosenDest.owner !== pi ? { controller: pi } : {}),
     });
     if (!summonRes) {
       // safePlaceInSupport rejected (no free zone after all). Restore
@@ -379,7 +383,7 @@ async function reviveFromDiscard(engine, ctx, pi, chosenName) {
   engine.ablageLandung(inst, ab, 'summon');   // Lethe, Heimkehr, SC, Signal-Stempel
 
   engine._broadcastEvent('summon_effect', {
-    owner: pi, heroIdx: inst.heroIdx, zoneSlot: inst.zoneSlot,
+    owner: inst.owner ?? pi, heroIdx: inst.heroIdx, zoneSlot: inst.zoneSlot,   // Kontrolle statt Seite (Styx 28.9.): physische Seite
     cardName: chosenName,
   });
 

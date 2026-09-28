@@ -126,10 +126,10 @@ async function _fireAoEAsSource(engine, pi, sourceInst, isCopy) {
   // window can fire ONCE with the full hero+creature list (Sculpture
   // Guards / Spectral Armor get one consolidated prompt per source).
   const heroTargetsList = [];
-  for (let hi = 0; hi < (ops.heroes || []).length; hi++) {
-    const h = ops.heroes[hi];
+  // Kontrolle statt Seite (Styx 28.9.) — „all targets your opponent controls"
+  for (const { physOwner, heroIdx: hi, hero: h } of engine.heroesControlledBy(oi)) {
     if (!h?.name || h.hp <= 0) continue;
-    heroTargetsList.push({ type: 'hero', owner: oi, heroIdx: hi, cardName: h.name });
+    heroTargetsList.push({ type: 'hero', owner: physOwner, heroIdx: hi, cardName: h.name });
   }
   const creatureEntries = [];
   for (const inst of engine.cardInstances) {
@@ -157,7 +157,7 @@ async function _fireAoEAsSource(engine, pi, sourceInst, isCopy) {
 
   engine.log('dark_deepsea_god_awakened', {
     player: ps?.username, damage: DAMAGE,
-    heroHits: (ops.heroes || []).filter(h => h?.name && h.hp >= 0).length,
+    heroHits: heroTargetsList.length,
     creatureHits: creatureEntries.length,
     viaCopy: !!isCopy,
   });

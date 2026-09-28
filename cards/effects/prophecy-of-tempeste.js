@@ -227,7 +227,8 @@ module.exports = {
       if (!target || target.hp === undefined || target.hp <= 0) return;
       if (target === host) return;
       const targetOwnerIdx = engine._findHeroOwner(target);
-      if (targetOwnerIdx !== ownerIdx) return;
+      // Kontrolle statt Seite (Styx 28.9.): „another target you control".
+      if (targetOwnerIdx < 0 || engine.heroSideOf(targetOwnerIdx, target) !== ownerIdx) return;
 
       // Once per turn (per Tempeste instance).
       const hoptKey = `tempeste_redirect:${ctx.card.id}`;
@@ -265,7 +266,7 @@ module.exports = {
       engine._broadcastEvent('tempeste_redirect_strike', {
         srcOwner: ownerIdx, srcHeroIdx: targetOwnerIdx === ownerIdx ? ctx.cardHeroIdx : -1,
         fromOwner: targetOwnerIdx,
-        fromHeroIdx: ps.heroes.indexOf(target),
+        fromHeroIdx: (gs.players[targetOwnerIdx]?.heroes || []).indexOf(target),
         toOwner: ownerIdx, toHeroIdx: ctx.cardHeroIdx,
       });
       await engine._delay(ANIM_FLY_MS);

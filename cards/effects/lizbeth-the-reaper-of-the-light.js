@@ -99,14 +99,14 @@ function lizbethActiveBorrower(ctx) {
  *  contribute nothing). */
 function maxOpponentAbilityLevel(engine, pi, abilityName) {
   const oi = pi === 0 ? 1 : 0;
-  const ops = engine.gs.players[oi];
-  if (!ops) return 0;
+  if (!engine.gs.players[oi]) return 0;
   let max = 0;
-  for (let hi = 0; hi < (ops.heroes || []).length; hi++) {
-    const hero = ops.heroes[hi];
+  // Kontrolle statt Seite (Styx 28.9.): Helden, die der Gegner
+  // KONTROLLIERT; ihre Ability-Zonen liegen physisch beim Besitzer.
+  for (const { physOwner, heroIdx: hi, hero } of engine.heroesControlledBy(oi)) {
     if (!hero?.name || hero.hp <= 0) continue;
     if (hero.statuses?.frozen || hero.statuses?.stunned || hero.statuses?.negated) continue;
-    const abZones = ops.abilityZones?.[hi] || [];
+    const abZones = engine.gs.players[physOwner]?.abilityZones?.[hi] || [];
     for (const slot of abZones) {
       if (!slot || slot.length === 0) continue;
       if (slot[0] === abilityName && slot.length > max) max = slot.length;
@@ -151,10 +151,11 @@ function recomputeFighting(ctx) {
   if (isMyTurn && canAct) {
     const ownTotal = fightingTotalForHero(engine, pi, heroIdx);
     const oi = pi === 0 ? 1 : 0;
-    const ops = engine.gs.players[oi];
     let oppHighest = 0;
-    for (let hi = 0; hi < (ops?.heroes || []).length; hi++) {
-      const t = fightingTotalForHero(engine, oi, hi);
+    // Kontrolle statt Seite (Styx 28.9.): Fighting der Helden, die der
+    // Gegner KONTROLLIERT (Instanzen physisch beim Besitzer).
+    for (const { physOwner, heroIdx: hi } of engine.heroesControlledBy(oi)) {
+      const t = fightingTotalForHero(engine, physOwner, hi);
       if (t > oppHighest) oppHighest = t;
     }
     desiredDelta = Math.max(0, oppHighest - ownTotal);

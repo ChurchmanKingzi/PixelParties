@@ -54,8 +54,10 @@ function cuteHandCards(engine, pi) {
 }
 
 /** Freie Zonen GENAU des getroffenen Helden — place: ohne Lebens-/Statusfilter. */
-function freieZonenDesHelden(engine, pi, heroIdx) {
-  return engine.getFreeSupportZones(pi).filter(z => z.heroIdx === heroIdx);
+function freieZonenDesHelden(engine, pi, heroIdx, seite = pi) {
+  // Kontrolle statt Seite (Styx 28.9.): Zonen tragen `owner` (physische Seite).
+  return engine.getFreeSupportZones(pi, { nachKontrolle: true })
+    .filter(z => z.owner === seite && z.heroIdx === heroIdx);
 }
 
 module.exports = {
@@ -69,8 +71,11 @@ module.exports = {
       const ps = gs.players[pi];
       const ziel = ctx.target;
       if (!ziel || ziel.hp === undefined) return;                 // nur Helden
-      const heroIdx = (ps?.heroes || []).indexOf(ziel);
-      if (heroIdx < 0) return;                                     // eigener Held
+      // Kontrolle statt Seite (Styx 28.9.): „a Hero you control" — auch
+      // ein uebernommener Held der Gegenspalte, kein abgegebener eigener.
+      const eintrag = engine.heroesControlledBy(pi).find(e => e.hero === ziel);
+      if (!eintrag) return;                                        // kontrollierter Held
+      const heroIdx = eintrag.heroIdx, seite = eintrag.physOwner;
       if (!((ctx.realDealt ?? ctx.amount) > 0)) return;            // „takes damage"
       const q = ctx.source;
       const quellSeite = q?.controller ?? q?.owner;
@@ -78,11 +83,11 @@ module.exports = {
 
       const karten = cuteHandCards(engine, pi);
       if (karten.length === 0) return;
-      const zonen = freieZonenDesHelden(engine, pi, heroIdx);
+      const zonen = freieZonenDesHelden(engine, pi, heroIdx, seite);
       if (zonen.length === 0) return;
       if (ps.summonLocked) return;                                 // normale Place-Regel
 
-      const held = ps.heroes[heroIdx];
+      const held = ziel;
       const wahl = await ctx.promptCardGallery(karten, {
         title: CARD_NAME,
         description: `${held?.name || 'Your Hero'} took damage. Place a "Cute" Creature from your hand into its free Support Zone and draw a card?`,
@@ -98,7 +103,7 @@ module.exports = {
       let dest = zonen[0];
       if (zonen.length > 1) {
         const zp = await ctx.promptZonePick(
-          zonen.map(z => ({ heroIdx: z.heroIdx, slotIdx: z.slotIdx, ownerIdx: pi })),
+          zonen.map(z => ({ owner: z.owner, heroIdx: z.heroIdx, slotIdx: z.slotIdx, ownerIdx: z.owner })),
           { title: CARD_NAME, description: `Choose a free Support Zone for ${cardName}.`, cancellable: true, previewCardName: cardName },
         );
         if (!zp || zp.cancelled || typeof zp.heroIdx !== 'number' || typeof zp.slotIdx !== 'number') return;
@@ -109,6 +114,7 @@ module.exports = {
 
       const placed = await engine.actionPlaceCreature(cardName, pi, dest.heroIdx, dest.slotIdx, {
         source: 'hand', sourceName: CARD_NAME,
+        ...(seite !== pi ? { heldSeite: seite } : {}),   // Kontrolle statt Seite (Styx 28.9.)
       });
       if (!placed?.inst) return;
 

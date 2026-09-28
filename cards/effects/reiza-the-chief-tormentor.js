@@ -30,8 +30,8 @@ function allOpponentTargetsPoisoned(gs, oppIdx, engine) {
 
   let hasLivingTarget = false;
 
-  // Heroes
-  for (const hero of (oppPs.heroes || [])) {
+  // Heroes — Kontrolle statt Seite (Styx 28.9.)
+  for (const { hero } of engine.heroesControlledBy(oppIdx)) {
     if (!hero?.name || hero.hp <= 0) continue;
     hasLivingTarget = true;
     if (!hero.statuses?.poisoned) return false;

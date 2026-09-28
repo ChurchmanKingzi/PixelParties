@@ -37,10 +37,9 @@ module.exports = {
       // ── Butterfly swarm animation ──
       // Collect all enemy target positions for the animation
       const animTargets = [];
-      const oppPs = gs.players[oppIdx];
-      for (let hi = 0; hi < (oppPs.heroes || []).length; hi++) {
-        const h = oppPs.heroes[hi];
-        if (h?.name && h.hp > 0) animTargets.push({ owner: oppIdx, heroIdx: hi, type: 'hero' });
+      // Kontrolle statt Seite (Styx 28.9.) — wie der Schaden ueber aoeHit.
+      for (const { physOwner, heroIdx: hi, hero: h } of engine.heroesControlledBy(oppIdx)) {
+        if (h?.name && h.hp > 0) animTargets.push({ owner: physOwner, heroIdx: hi, type: 'hero' });
       }
       for (const inst of engine.cardInstances) {
         if ((inst.owner !== oppIdx && inst.controller !== oppIdx) || inst.zone !== 'support') continue;

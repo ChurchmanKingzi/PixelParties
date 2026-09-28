@@ -93,7 +93,8 @@ module.exports = {
     const kind = engine?.sourceEffectKind ? engine.sourceEffectKind(sourceCard) : null;
     if (kind !== 'attack' && kind !== 'spell' && kind !== 'creature') return false;
     // Must be targeting something the player controls
-    if (selected.owner !== pi) return false;
+    // Kontrolle statt Seite (Styx 28.9.): „a target you control".
+    if ((engine?.zielSeite ? engine.zielSeite(selected) : selected.owner) !== pi) return false;
 
     // Must have at least one eligible redirect hero
     return getEligibleRedirectHeroes(gs, pi, selected, validTargets, engine).length > 0;

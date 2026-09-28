@@ -111,19 +111,12 @@ function canHeroSummonCd(engine, pi, heroIdx, cd) {
  * `cd`. One entry per FREE zone across every eligible Hero.
  */
 function eligibleOwnSlotsFor(engine, pi, cd) {
-  const ps = engine.gs.players[pi];
-  if (!ps) return [];
-  const out = [];
-  for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-    if (!canHeroSummonCd(engine, pi, hi, cd)) continue;
-    const zones = ps.supportZones?.[hi] || [[], [], []];
-    for (let zi = 0; zi < 3; zi++) {
-      if ((zones[zi] || []).length === 0) {
-        out.push({ heroIdx: hi, slotIdx: zi });
-      }
-    }
-  }
-  return out;
+  if (!engine.gs.players[pi]) return [];
+  // Kontrolle statt Seite (Styx 28.9.): „a Hero you control" — auch
+  // uebernommene Helden der Gegenspalte; jede Zone traegt `owner`.
+  return engine.getFreeSupportZones(pi, { nachKontrolle: true })
+    .filter(z => canHeroSummonCd(engine, z.owner, z.heroIdx, cd))
+    .map(z => ({ owner: z.owner, heroIdx: z.heroIdx, slotIdx: z.slotIdx }));
 }
 
 /**
@@ -384,8 +377,9 @@ module.exports = {
         return;
       }
       const ownZones = ownSlots.map(s => ({
+        owner: s.owner,   // Kontrolle statt Seite (Styx 28.9.)
         heroIdx: s.heroIdx, slotIdx: s.slotIdx,
-        label: `${ps.heroes?.[s.heroIdx]?.name || 'Hero'} — Slot ${s.slotIdx + 1}`,
+        label: `${gs.players[s.owner]?.heroes?.[s.heroIdx]?.name || 'Hero'} — Slot ${s.slotIdx + 1}`,
       }));
       const ownPick = await promptCtx.promptZonePick(ownZones, {
         title: CARD_NAME,
@@ -393,19 +387,27 @@ module.exports = {
         cancellable: false,
       });
       if (!ownPick) return;
+      // Kontrolle statt Seite (Styx 28.9.): Antwort ohne `owner` = eigene
+      // Seite; fehlt dort die Zone, die einzige passende der Liste.
+      const ownZiel = ownSlots.find(z => z.owner === (ownPick.owner ?? pi)
+          && z.heroIdx === ownPick.heroIdx && z.slotIdx === ownPick.slotIdx)
+        || ownSlots.find(z => z.heroIdx === ownPick.heroIdx && z.slotIdx === ownPick.slotIdx);
+      if (!ownZiel) return;
+      const ownSeite = ownZiel.owner;
 
       if (!(await engine.deckEntnahme(ps,  secondDeckIdx, { source: CARD_NAME }))) return;   // v820: Stapel-Schicht
 
       engine._broadcastEvent('play_zone_animation', {
         type: ANIM_PORTAL,
-        owner: pi, heroIdx: ownPick.heroIdx, zoneSlot: ownPick.slotIdx,
+        owner: ownSeite, heroIdx: ownPick.heroIdx, zoneSlot: ownPick.slotIdx,
       });
       await engine._delay(550);
 
       // REAL SUMMON — fires onPlay / onCardEnterZone with the cosmic
       // flags so Life-Searcher / Invader / Cosmic Manipulation react.
-      await engine.summonCreatureWithHooks(secondName, pi, ownPick.heroIdx, ownPick.slotIdx, {
+      await engine.summonCreatureWithHooks(secondName, ownSeite, ownPick.heroIdx, ownPick.slotIdx, {
         source: CARD_NAME,
+        ...(ownSeite !== pi ? { controller: pi } : {}),
         hookExtras: {
           _summonedByCosmic: true,
           _summonedBy: CARD_NAME,
@@ -416,7 +418,7 @@ module.exports = {
       engine.log('arrival_summon', {
         player: ps.username,
         first: firstName, second: secondName,
-        ownHero: ps.heroes?.[ownPick.heroIdx]?.name,
+        ownHero: gs.players[ownSeite]?.heroes?.[ownPick.heroIdx]?.name,
       });
       engine.sync();
     },

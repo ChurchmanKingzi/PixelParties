@@ -58,7 +58,9 @@ function _isOpponentHero(target, vinepireInst, gs) {
   // target is a hero object — find its owner via heroes-array membership.
   for (let p = 0; p < 2; p++) {
     if ((gs.players[p]?.heroes || []).includes(target)) {
-      return p !== vinepireInst.owner;
+      // Kontrolle statt Seite (Styx 28.9.): wie `heroSideOf`.
+      const seite = target.charmedBy ?? target.permaControlBy ?? p;
+      return seite !== (vinepireInst.controller ?? vinepireInst.owner);
     }
   }
   return false;

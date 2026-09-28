@@ -18392,3 +18392,35 @@ Anlass (Al 25.9.): Puzzle-Editor mit Wowhalla neu geladen → das Spielfeld „a
 - **Höhe nie aus `clientHeight` eines Kastens, dessen waagerechter Balken kommen und gehen kann.** Der Editor rechnet mit der Innenhöhe ohne Balken und reserviert im Bildlauf-Modus die einmal gemessene Balkenstärke fest.
 - **ResizeObserver-Zähler:** nur eine Größenänderung des Wraps SELBST setzt `passes` zurück — die Kinder ändern sich als Folge jedes Maßstab-Schreibens. Über `MAX_PASSES` wird kein neuer Maßstab mehr geschrieben (vorher entfiel nur der nächste RAF, geschrieben wurde trotzdem).
 - Diagnose: `window.PP_HSCROLL_DEBUG = true` in der Konsole protokolliert jeden Editor-Pass. Mehr als eine Handvoll Zeilen im Ruhezustand = Schleife.
+
+## ★ Styx, the Opened Gate (28.9.) — Wiederbelebungszähler, Kontrolle bis zum Tod
+
+- **`gs.heroRevivalCount`** zählt JEDE Heldenwiederbelebung der Partie (beide Seiten). Gezählt wird zentral über `engine.zaehleHeldenWiederbelebung(hero, quelle)`: in `actionReviveHero`, in `_consumeExtraLife` und in Ascended Blooms Aufstieg aus dem Tod (Als Ruling: zählt als Wiederbelebung). Wer einen neuen Wiederbelebungsweg baut, der nicht über diese beiden Engine-Wege läuft, ruft den Zähler selbst.
+- **Neues Leben, kein alter Zwangstod:** `actionReviveHero` und `_consumeExtraLife` löschen `_forceKillAtTurnEnd` / `_forceKillSource`. Ein von Golden Ankh/Styx zurückgeholter Held, der mitten im Zug stirbt und vom Elixir wiederbelebt wird, stirbt am Zugende NICHT noch einmal.
+- **`hero._kontrolleBisZumTod = { by }`**: eine Kontrolle, die nur hält, solange der Held lebt. `runHooks(ON_HERO_KO)` gibt ihn VOR der Zuhörer-Runde an den Besitzer zurück (`kontrolleBeimTodZurueckgeben`) — im Moment des Sterbens reagieren also die Karten des BESITZERS (dessen Elixir belebt ihn unter dessen Kontrolle).
+- **`statuses.charmed.ohneSchutz`**: reine Kontrolle ohne jede Charme-Immunität (`_charmBlocksFrom` → false).
+- **Ascended Hero ohne eigene Werte** (HP/ATK `null` in cards.json): `performAscension` behält HP, max HP und ATK der Grundform unverändert. Der Puzzle-Editor setzt beim direkten Platzieren die Werte der Basis.
+- **Abilities an einen fremden, kontrollierten Helden** (v1481): nur wenn die Kontrollmarke es erlaubt (`statuses.charmed.abilitiesErlaubt`, Styx). Prüfung `engine.darfFremdAbilityAnlegen(pi, heroOwner, heroIdx)`, Server-Weg `doPlayAbilityFremd` (Feld `heroOwner` an `play_ability`). Die Karte liegt auf der Seite des Helden (`inst.owner = heroOwner`, `inst.originalOwner = pi`); einmal pro Zug über `statuses.charmed.abilityZug`.
+- **„… your opponent controls" bei selbst gesammelten Zielen** (v1481): `normalizeValidTargets` ruft `engine.filterSelbstKontrollierteGegnerHelden(validTargets, casterPi, cardName)`. Ist die Karte laut Text eine reine Gegner-Karte (`istReineGegnerKarte`: jeder „Choose …"-Satz sagt „your opponent controls"), fallen Helden heraus, die der Spieler gerade selbst kontrolliert. Betrifft Ziel-Artefakte und -Tränke (Snow Cannon, Arcane Lamp, Magic Ruby …); `promptDamageTarget`/`promptMultiTarget` machten es schon richtig.
+- **Charme-Badge** liest die Ausprägung (`ohneSchutz`, `onlyFromController`, `_loveShot`) und behauptet keinen Schutz mehr, den es nicht gibt.
+
+## ★ Kontrolle statt Seite — Helden selbst einsammeln (v1482, Audit 28.9.)
+
+Ein übernommener Held (Charme, Golden Apple, Love Shot, Styx, Paraseed) steht physisch in der Spalte seines Besitzers. Wer Helden SELBST einsammelt, fragt deshalb nie `gs.players[oppIdx].heroes`, sondern die Kontrolle:
+
+- **„… your opponent controls" / „you control" / „your Heroes":** `engine.heroesControlledBy(pi)` → `[{ physOwner, heroIdx, hero }]`, einzeln `engine.heroSideOf(physOwner, hero)`.
+- **Adressierung bleibt physisch:** Ziel-IDs `hero-${physOwner}-${hi}`, `owner: physOwner`; Zonen über `gs.players[physOwner]`.
+- **Charme ist kein pauschaler Schutz:** Statt `hero.statuses?.charmed` → `engine._charmBlocksFrom(hero, quellenSeite)` (Styx: kein Schutz, Golden Apple: nur gegen den Kontrolleur).
+- Die zentralen Sammler (`promptDamageTarget`, `promptMultiTarget`, `aoeHit`/`collectAoeHeroTargets`) machten es schon richtig.
+- **Bekannte offene Stellen (Engine):** Umleitungsfenster (`_checkTargetRedirectOnce` — Challenge, Martyry, Anti-Magnet, Monia Bot, Alleria, Shield of Wisdom) sowie die Schadens-/Surprise-Fenster fragen die PHYSISCHE Zielseite. Beschwören/Ausrüsten in Zonen eines übernommenen Helden der Gegenspalte gibt es nicht.
+
+## ★ Umleitungen, Schadensfenster & Beschwören nach Kontrolle (v1483, Styx 28.9.)
+
+- **`engine.zielSeite(t)`**: Kontrolleur eines Zielobjekts (Held → `heroSideOf`, Kreatur → `controller ?? owner`). Die Adresse (`t.owner`, IDs) bleibt physisch.
+- **Umleitungsfenster** (`_checkTargetRedirect`) fragen den KONTROLLEUR des Ziels (Hand, Helden, Brett, Surprises). Skripte prüfen „a target you control" mit `engine.zielSeite(selected)`, nicht `selected.owner` (Challenge, Martyry, Anti-Magnet, Alleria, Monia Bot, Laki).
+- **Hand-Schadensfenster** (vor dem Schaden / Gegner vor dem Schaden / nach dem Schaden): Es reagiert der Kontrolleur; Skripte bekommen `targetHeroIdx` als PHYSISCHEN Index und lesen die Seite über `engine._findHeroOwner(target)`. `casterIsTarget`-Karten (Escape, Emergency Spell Armor, Weapon Absorption, Fireshield, Paraseed Zombie) wirken nicht über einen geliehenen Zielhelden (`zielNichtCastbar`).
+- **`_canHeroActivateSurprise`**: Ein Held, den gerade der Gegner kontrolliert, wirkt für seinen Besitzer keine Reaktion und löst keine Surprise aus.
+- **Beschwören/Platzieren über einen übernommenen Helden:** `getFreeSupportZones(pi, { nachKontrolle: true })` bzw. `eligibleSummonZones(…, { nachKontrolle: true })` liefern Zonen mit `owner` (physische Seite); beschworen wird mit `heldSeite: owner` (`summonFromPile`, `placeFromPile`, `summonFromDeck`, `summonFromDiscard`, `actionPlaceCreature`) oder `summonCreatureWithHooks(name, owner, hi, slot, { controller: pi })`. Die Kreatur steht beim Gegner, gehört `pi` (`crossSideControlled`, extra hervorgehoben).
+- **`_createContext`**: Für solche Kreaturen sind `cardOwner`/`cardController` der Kontrolleur, `cardHeroOwner` die physische Seite (wie bei gestohlenen Kreaturen). Zonenzugriffe einer Kreatur auf ihren eigenen Platz daher über `cardHeroOwner`.
+- CPU-Antworten auf `zonePick` geben `owner` mit.
+- **Bekannte Randfälle:** Drop auf einen BELEGTEN Platz eines geliehenen Helden (Bounce-Place: Waitress, Candlestick Squire, Blue Ice Dragon, Chimera) — `_requestedNormalSummonSlot` trägt keine Seite. Heldeneffekte eines übernommenen Helden, die „this Hero" beschwören lassen (Calamitusk, Cute Annoyance Mini, Argos), beschwören auf die Seite des Aktivierenden.

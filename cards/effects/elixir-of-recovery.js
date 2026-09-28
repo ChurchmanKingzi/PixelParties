@@ -50,15 +50,15 @@ function getOwnTargetsWithStatuses(gs, pi, engine) {
   const ps = gs.players[pi];
   if (!ps) return targets;
 
-  for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-    const hero = ps.heroes[hi];
+  // Kontrolle statt Seite (Styx 28.9.) — „targets you control"
+  for (const { physOwner, heroIdx: hi, hero } of engine.heroesControlledBy(pi)) {
     if (!hero?.name || hero.hp <= 0) continue;
     if (!hero.statuses) continue;
     if (!negKeys.some(k => hero.statuses[k])) continue;
     targets.push({
-      id: `hero-${pi}-${hi}`,
+      id: `hero-${physOwner}-${hi}`,
       type: 'hero',
-      owner: pi,
+      owner: physOwner,
       heroIdx: hi,
       cardName: hero.name,
     });

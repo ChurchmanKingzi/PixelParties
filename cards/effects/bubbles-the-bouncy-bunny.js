@@ -116,7 +116,9 @@ function predictedDamage(engine, hero, pi, entry, piercing) {
 
   if (piercing.trueDamage) return amount;      // alles Weitere umgeht er
 
-  if (hero.statuses?.charmed) return 0;
+  // Charme schuetzt nur in seiner Auspraegung (Styx: gar nicht) — am
+  // Schadenspfad mit `loveShotOhneSchutz`, wie in der Engine.
+  if (hero.statuses?.charmed && engine._charmBlocksFrom(hero, entry?.sourceOwner ?? entry?.source?.owner ?? null, { loveShotOhneSchutz: true })) return 0;
   if (hero.statuses?.stunned?._baihuPetrify) return 0;
   // v1385: Submerged-Regel zentral in der Engine.
   if (hero.buffs?.submerged && engine.isSubmergedProtected(pi, hero)) return 0;

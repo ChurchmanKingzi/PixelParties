@@ -128,6 +128,9 @@ module.exports = {
   isAfterDamageReaction: true,
 
   afterDamageCondition(gs, pi, engine, target, targetHeroIdx, source, amount, type) {
+    // Kontrolle statt Seite (Styx 28.9.): der Hub fragt den physischen
+    // Besitzer — „a target you control" gilt nur, wenn er ihn auch kontrolliert.
+    if (engine?.heroSideOf && engine.heroSideOf(pi, target) !== pi) return false;
     return _attackerValid(gs, pi, engine, source, type);
   },
 

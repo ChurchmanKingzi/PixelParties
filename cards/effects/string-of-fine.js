@@ -42,11 +42,12 @@ module.exports = {
       confirmClass: 'btn-success',
       cancellable: true,
       condition: (t, eng) => {
-        if (t.owner !== pi) return false;
         if (t.type === 'hero') {
           const h = eng.gs.players[t.owner]?.heroes?.[t.heroIdx];
+          if (eng.heroSideOf(t.owner, h) !== pi) return false;   // Kontrolle statt Seite (Styx 28.9.)
           return h && !h._stringOfFineUsed;
         }
+        if (t.owner !== pi) return false;
         if (t.cardInstance) return !t.cardInstance._stringOfFineUsed;
         return true;
       },

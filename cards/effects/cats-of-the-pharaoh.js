@@ -40,6 +40,8 @@
 //  false` haelt sie aus der Normalbeschwoerungs-Grenze heraus.
 // ═══════════════════════════════════════════
 
+const { canHeroSummon } = require('./_summon-eligibility');
+
 const CARD_NAME = 'Cats of the Pharaoh';
 
 /** Kontrolliert `pi` gerade irgendeine Kreatur auf dem Brett? */
@@ -59,15 +61,26 @@ function kontrolliertKreaturen(engine, pi) {
 
 /** Freie Support-Zonen, in die `pi` beschwoeren darf. */
 function freieZonen(engine, pi) {
-  const ps = engine.gs.players[pi];
   const out = [];
-  for (let hi = 0; hi < (ps?.heroes || []).length; hi++) {
-    const hero = ps.heroes[hi];
+  // Kontrolle statt Seite (Styx 28.9.): alle Helden, die `pi` kontrolliert
+  // — auch uebernommene der Gegenspalte (Zone traegt dann `owner`).
+  for (const { physOwner, heroIdx: hi, hero } of engine.heroesControlledBy(pi)) {
     if (!hero?.name || hero.hp <= 0) continue;
-    if (!engine._canHeroActivateSurprise(pi, hi, CARD_NAME)) continue;
+    if (physOwner === pi) {
+      if (!engine._canHeroActivateSurprise(pi, hi, CARD_NAME)) continue;
+    } else {
+      // Das Surprise-Gate kennt nur die eigene Spalte — fuer den
+      // uebernommenen Helden die geteilte Beschwoerungspruefung.
+      const cd = engine._getCardDB()[CARD_NAME];
+      if (!canHeroSummon(engine, pi, hi, cd, { alsAktion: true, physOwner })) continue;
+    }
+    const sz = engine.gs.players[physOwner]?.supportZones?.[hi] || [];
     for (let zi = 0; zi < 3; zi++) {
-      if (((ps.supportZones?.[hi] || [])[zi] || []).length === 0) {
-        out.push({ heroIdx: hi, slotIdx: zi, label: `${hero.name} — Support ${zi + 1}` });
+      if ((sz[zi] || []).length === 0) {
+        out.push({
+          ...(physOwner !== pi ? { owner: physOwner } : {}),
+          heroIdx: hi, slotIdx: zi, label: `${hero.name} — Support ${zi + 1}`,
+        });
       }
     }
   }
@@ -129,8 +142,13 @@ module.exports = {
           cancellable: true,
         });
         if (!wahl || wahl.cancelled) return;
-        ziel = { heroIdx: wahl.heroIdx, slotIdx: wahl.slotIdx };
+        // Antwort ohne `owner` = eigene Seite; sonst die einzige passende.
+        ziel = zonenJetzt.find(z => (z.owner ?? pi) === (wahl.owner ?? pi)
+            && z.heroIdx === wahl.heroIdx && z.slotIdx === wahl.slotIdx)
+          || zonenJetzt.find(z => z.heroIdx === wahl.heroIdx && z.slotIdx === wahl.slotIdx);
+        if (!ziel) return;
       }
+      const seite = ziel.owner ?? pi;   // Kontrolle statt Seite (Styx 28.9.)
 
       // Stapel-Schicht (v820): die Karte ueber `takeFromPile` entnehmen,
       // nie per splice.
@@ -140,6 +158,7 @@ module.exports = {
         source: CARD_NAME, flug: false,
         summonOpts: { isPlacement: true },
         hookExtras: { _isNormalSummon: false },
+        ...(seite !== pi ? { heldSeite: seite } : {}),
       });
       if (!res) return;
 
@@ -152,7 +171,7 @@ module.exports = {
         player: ps.username, heroIdx: ziel.heroIdx, slotIdx: ziel.slotIdx,
       });
       engine._broadcastEvent('summon_effect', {
-        owner: pi, heroIdx: ziel.heroIdx, zoneSlot: ziel.slotIdx,
+        owner: seite, heroIdx: ziel.heroIdx, zoneSlot: ziel.slotIdx,
       });
       engine.sync();
     },
@@ -172,7 +191,7 @@ module.exports = {
     if (promptData.type === 'confirm') return { confirmed: true };
     if (promptData.type === 'zonePick') {
       const z = (promptData.zones || [])[0];
-      return z ? { heroIdx: z.heroIdx, slotIdx: z.slotIdx } : undefined;
+      return z ? { owner: z.owner, heroIdx: z.heroIdx, slotIdx: z.slotIdx } : undefined;   // Styx 28.9.
     }
     return undefined;
   },

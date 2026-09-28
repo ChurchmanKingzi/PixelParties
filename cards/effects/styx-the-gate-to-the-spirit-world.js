@@ -25,9 +25,49 @@
 // ═══════════════════════════════════════════
 
 const CARD_NAME = 'Styx, the Gate to the Spirit World';
+const AUFSTIEG_ZIEL = 'Styx, the Opened Gate';
+const NOETIGE_WIEDERBELEBUNGEN = 3;
 
 module.exports = {
   activeIn: ['hero'],
+
+  /**
+   * Aufstiegsbereitschaft an den Client melden („after Heroes have been
+   * revived at least 3 times this game"). Nur die Anzeige — verbindlich
+   * prueft `ascensionCondition` auf der aufgestiegenen Karte. Nimmt nur
+   * die EIGENE Bereitschaft zurueck.
+   */
+  /**
+   * ★ Revive-Zaehler (Als Vorgabe 28.9.): Hat `pi` „Styx, the Opened
+   * Gate" in Rotation (Hand, Deck, Ablage, Geloescht), zeigt jeder
+   * seiner Basis-Styx unten mittig die bisherigen Wiederbelebungen.
+   * Nur fuer den BESITZER — das Deck ist verdeckt, und der Zaehler
+   * verriete sonst, dass die Karte darin liegt.
+   * @returns {{ heroIdxs: number[], count: number } | null}
+   */
+  reviveZaehlerAnzeige(engine, pi) {
+    const ps = engine?.gs?.players?.[pi];
+    if (!ps) return null;
+    const heroIdxs = [];
+    (ps.heroes || []).forEach((h, hi) => { if (h?.name === CARD_NAME) heroIdxs.push(hi); });
+    if (heroIdxs.length === 0) return null;
+    const inRotation = ['hand', 'mainDeck', 'discardPile', 'deletedPile']
+      .some(k => (ps[k] || []).includes(AUFSTIEG_ZIEL));
+    if (!inRotation) return null;
+    return { heroIdxs, count: engine.gs.heroRevivalCount || 0 };
+  },
+
+  refreshAscensionReadiness(engine, pi, hi) {
+    const hero = engine.gs.players[pi]?.heroes?.[hi];
+    if (!hero || hero.name !== CARD_NAME) return;
+    if (hero.hp > 0 && (engine.gs.heroRevivalCount || 0) >= NOETIGE_WIEDERBELEBUNGEN) {
+      hero.ascensionReady = true;
+      hero.ascensionTarget = AUFSTIEG_ZIEL;
+    } else if (hero.ascensionTarget === AUFSTIEG_ZIEL) {
+      delete hero.ascensionReady;
+      delete hero.ascensionTarget;
+    }
+  },
 
   // ── CPU: Confirm-Prompts pauschal bejahen (Barker-Bugklasse) ──────
   // onHeroKO-Confirm (feuert im Gegner-Zug, plan-los).

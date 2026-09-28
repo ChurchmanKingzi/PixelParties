@@ -99,6 +99,7 @@ module.exports = {
       // aus `_hooks.js` statt einer eigenen Teilpruefung. Die
       // Frozen-Sperre stand hier schon, `charmed` fehlte.
       if (!heroCanBeEquipped(hero)) continue;
+      if (engine.heroSideOf(pi, hero) !== pi) continue;   // Kontrolle statt Seite (Styx 28.9.): abgegebener Held ist nicht „one of your Heroes"
       // Frozen Heroes can't accept new equipment.
       if (hero.statuses?.frozen) continue;
       const slots = ps.supportZones?.[hi] || [];

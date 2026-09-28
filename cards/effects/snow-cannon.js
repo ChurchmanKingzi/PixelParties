@@ -25,19 +25,24 @@ module.exports = {
   getValidTargets(gs, playerIdx, engine) {
     const targets = [];
     const oppIdx = playerIdx === 0 ? 1 : 0;
-    const ps = gs.players[oppIdx];
-    for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
+    // Kontrolle statt Seite (Styx 28.9.): alle Helden, die der Gegner
+    // kontrolliert (wie engine.heroSideOf) — Ziel-IDs bleiben physisch.
+    for (let po = 0; po < (gs.players || []).length; po++) {
+    const ps = gs.players[po];
+    for (let hi = 0; hi < (ps?.heroes || []).length; hi++) {
       const hero = ps.heroes[hi];
       if (!hero?.name || hero.hp <= 0) continue;
+      if ((hero.charmedBy ?? hero.permaControlBy ?? po) !== oppIdx) continue;
       if (hero.statuses?.immune) continue;
       if (hero.statuses?.frozen) continue;
       targets.push({
-        id: `hero-${oppIdx}-${hi}`,
+        id: `hero-${po}-${hi}`,
         type: 'hero',
-        owner: oppIdx,
+        owner: po,
         heroIdx: hi,
         cardName: hero.name,
       });
+    }
     }
 
     // Gegnerische Kreaturen in den Support-Zonen. Kreatur-Status liegt

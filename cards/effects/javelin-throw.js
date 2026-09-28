@@ -62,22 +62,23 @@ function equippedArtifacts(engine, pi, heroIdx) {
   });
 }
 
-/** Helden, die „can use an Action this turn" UND ein Equip tragen. */
+/** Helden, die „can use an Action this turn" UND ein Equip tragen.
+ *  Kontrolle statt Seite (Styx 28.9.): „a Hero you control" — liefert
+ *  `{ physOwner, heroIdx }`; Zonen/Equips liegen bei `physOwner`. */
 function eligibleHeroes(engine, pi) {
-  const ps = engine.gs.players[pi];
   const out = [];
-  for (let hi = 0; hi < (ps?.heroes || []).length; hi++) {
-    if (engine.isHeroIncapacitated(pi, hi)) continue;
-    if (equippedArtifacts(engine, pi, hi).length === 0) continue;
-    out.push(hi);
+  for (const { physOwner, heroIdx: hi } of engine.heroesControlledBy(pi)) {
+    if (engine.isHeroIncapacitated(physOwner, hi)) continue;
+    if (equippedArtifacts(engine, physOwner, hi).length === 0) continue;
+    out.push({ physOwner, heroIdx: hi });
   }
   return out;
 }
 
 function heroTargets(engine, pi) {
-  const ps = engine.gs.players[pi];
-  return eligibleHeroes(engine, pi).map(hi => ({
-    id: `hero-${pi}-${hi}`, type: 'hero', owner: pi, heroIdx: hi, cardName: ps.heroes[hi].name,
+  return eligibleHeroes(engine, pi).map(({ physOwner, heroIdx: hi }) => ({
+    id: `hero-${physOwner}-${hi}`, type: 'hero', owner: physOwner, heroIdx: hi,
+    cardName: engine.gs.players[physOwner].heroes[hi].name,
   }));
 }
 
@@ -115,17 +116,19 @@ module.exports = {
     const sel = validTargets.find(t => t.id === selectedIds[0]);
     if (!sel || sel.type !== 'hero') return { aborted: true };
     const hi = sel.heroIdx;
-    const hero = ps.heroes?.[hi];
-    if (!hero?.name || engine.isHeroIncapacitated(pi, hi)) return { aborted: true };
+    const heroOwner = sel.owner ?? pi;   // physische Seite des Helden
+    const hero = gs.players[heroOwner]?.heroes?.[hi];
+    if (!hero?.name || engine.isHeroIncapacitated(heroOwner, hi)) return { aborted: true };
+    if (engine.heroSideOf(heroOwner, hero) !== pi) return { aborted: true };
 
     // ── Artefakt waehlen ──────────────────────────────────────────
-    const equips = equippedArtifacts(engine, pi, hi);
+    const equips = equippedArtifacts(engine, heroOwner, hi);
     if (equips.length === 0) return { aborted: true };
     let thrown = equips[0];
     if (equips.length > 1) {
       const equipTargets = equips.map(inst => ({
-        id: `equip-${pi}-${hi}-${inst.zoneSlot}-${inst.id}`, type: 'equip',
-        owner: pi, heroIdx: hi, slotIdx: inst.zoneSlot, cardName: inst.name, cardInstance: inst,
+        id: `equip-${heroOwner}-${hi}-${inst.zoneSlot}-${inst.id}`, type: 'equip',
+        owner: heroOwner, heroIdx: hi, slotIdx: inst.zoneSlot, cardName: inst.name, cardInstance: inst,
       }));
       const picked = await engine.promptEffectTarget(pi, equipTargets, {
         maxTotal: 1,   // Einfachauswahl: ein Klick TAUSCHT das Ziel
@@ -151,6 +154,8 @@ module.exports = {
     // Spectral Armor, …) sehen als Quelle den WERFENDEN HELDEN, nicht die
     // Handkarte (die hat keinen heroIdx — der Cloak brach daran ab, v620).
     const attackSource = { name: CARD_NAME, owner: pi, heroIdx: hi, controller: pi };
+    // Uebernommener Held: physische Seite wie beim Charme-Angriff.
+    if (heroOwner !== pi) attackSource.heroOwner = heroOwner;
     delete gs._spellNegatedByEffect;
     const target = await ctx.promptDamageTarget({
       side: 'enemy',
@@ -192,7 +197,7 @@ module.exports = {
     // Speerwurf vom Helden zum Ziel.
     const tgtSlot = target.type === 'hero' ? undefined : target.slotIdx;
     engine._broadcastEvent('play_projectile_animation', {
-      sourceOwner: pi, sourceHeroIdx: hi,
+      sourceOwner: heroOwner, sourceHeroIdx: hi,
       targetOwner: target.owner, targetHeroIdx: target.heroIdx,
       targetZoneSlot: tgtSlot,
       // v614: eigene SVG-Form `javelin` (langer, duenner Schaft mit

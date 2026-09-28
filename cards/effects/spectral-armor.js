@@ -74,13 +74,15 @@ module.exports = {
     // so it never chains to a Spell/effect that deals no damage.
     if (opts && opts.dealsDamage === false) return false;
     // v1378: je HELD und QUELLE, nicht mehr je Spieler (s. `_dedupKey`).
+    // Kontrolle statt Seite (Styx 28.9.): Merker am PHYSISCHEN Helden
+    // (t.owner), wie ihn der Pre-Damage-Rueckfall bildet.
     const offen = _collectOwnedHeroTargets(gs, pi, targetedTargets)
-      .filter(t => !_alreadyPrompted(gs, _dedupKey(gs, pi, t.heroIdx, sourceCard)));
+      .filter(t => !_alreadyPrompted(gs, _dedupKey(gs, t.owner, t.heroIdx, sourceCard)));
     if (offen.length === 0) return false;
     // Side effect — covers decline path. Once the prompt is offered
     // (accept or decline), the pre-damage fallback stays quiet for
     // exactly these Heroes and THIS source.
-    for (const t of offen) _markPrompted(gs, _dedupKey(gs, pi, t.heroIdx, sourceCard));
+    for (const t of offen) _markPrompted(gs, _dedupKey(gs, t.owner, t.heroIdx, sourceCard));
     return true;
   },
 
@@ -121,7 +123,13 @@ module.exports = {
 
   preDamageCondition(gs, ownerIdx, _engine, _target, heroIdx, source, amount /*, type */) {
     if (!(amount > 0)) return false;
-    const key = _dedupKey(gs, ownerIdx, heroIdx, source);
+    // Kontrolle statt Seite (Styx 28.9.): „a target you control" — der
+    // Rueckfall fragt den physischen Besitzer; gehoert der Held gerade
+    // dem Gegner, gibt es hier nichts zu halbieren.
+    if (_sideOf(ownerIdx, _target) !== ownerIdx) return false;
+    // Dedup am PHYSISCHEN Platz — wie der Sammelweg nach der Zielwahl.
+    const _phys = _engine?._findHeroOwner ? _engine._findHeroOwner(_target) : ownerIdx;
+    const key = _dedupKey(gs, _phys >= 0 ? _phys : ownerIdx, heroIdx, source);
     if (_alreadyPrompted(gs, key)) return false;
     _markPrompted(gs, key);
     return true;
@@ -129,8 +137,9 @@ module.exports = {
 
   async preDamageResolve(engine, ownerIdx, target, heroIdx, _source, amount, _type) {
     const halved = Math.ceil(amount / 2);
+    const _phys = engine._findHeroOwner(target);   // physische Adresse (Styx 28.9.)
     engine._broadcastEvent('play_zone_animation', {
-      type: 'spectral_armor', owner: ownerIdx, heroIdx, zoneSlot: -1,
+      type: 'spectral_armor', owner: _phys >= 0 ? _phys : ownerIdx, heroIdx, zoneSlot: -1,
     });
     await engine._delay(450);
 
@@ -325,9 +334,9 @@ function _collectOwnedHeroTargets(gs, pi, targetedTargets) {
   if (!Array.isArray(targetedTargets)) return out;
   for (const t of targetedTargets) {
     if (!t || t.type !== 'hero') continue;
-    if (t.owner !== pi) continue;
     const hero = gs.players[t.owner]?.heroes?.[t.heroIdx];
     if (!hero?.name || hero.hp <= 0) continue;
+    if (_sideOf(t.owner, hero) !== pi) continue;   // Kontrolle statt Seite (Styx 28.9.)
     out.push({
       id: `hero-${t.owner}-${t.heroIdx}`,
       owner: t.owner, heroIdx: t.heroIdx,
@@ -335,4 +344,12 @@ function _collectOwnedHeroTargets(gs, pi, targetedTargets) {
     });
   }
   return out;
+}
+
+// Wie `engine.heroSideOf` (charmedBy > permaControlBy > physischer Besitzer).
+function _sideOf(physOwner, hero) {
+  if (!hero) return physOwner;
+  if (hero.charmedBy != null) return hero.charmedBy;
+  if (hero.permaControlBy != null) return hero.permaControlBy;
+  return physOwner;
 }

@@ -70,7 +70,8 @@ module.exports = {
       if (!(ps.hand || []).includes(CARD_NAME)) return;
       if ((ps.gold || 0) < betrag) return;
 
-      if (eligibleSummonZones(engine, pi, CARD_NAME).length === 0) return;
+      // Kontrolle statt Seite (Styx 28.9.): auch ueber uebernommene Helden.
+      if (eligibleSummonZones(engine, pi, CARD_NAME, { nachKontrolle: true }).length === 0) return;
 
       const bestaetigt = await engine.promptGeneric(pi, {
         type: 'confirm',
@@ -104,7 +105,7 @@ module.exports = {
         // waehlen lassen, wenn es mehrere Moeglichkeiten gibt — wie bei
         // einer normalen Beschwoerung (Als Vorgabe 8.8.). Nicht
         // abbrechbar: bestaetigt und bezahlt ist bereits verbindlich.
-        const zonen = eligibleSummonZones(engine, pi, CARD_NAME);
+        const zonen = eligibleSummonZones(engine, pi, CARD_NAME, { nachKontrolle: true });   // Kontrolle statt Seite (Styx 28.9.)
         if (zonen.length === 0) {
           engine.log('nimble_monkee_fizzle', { player: ps.username, reason: 'no_eligible_caster' });
           return;
@@ -117,7 +118,8 @@ module.exports = {
             cancellable: false,
           });
           const gewaehlt = wahl && zonen.find(z =>
-            z.heroIdx === wahl.heroIdx && z.slotIdx === (wahl.slotIdx ?? wahl.zoneSlot));
+            z.heroIdx === wahl.heroIdx && z.slotIdx === (wahl.slotIdx ?? wahl.zoneSlot)
+            && z.owner === (wahl.owner ?? pi));   // Kontrolle statt Seite (Styx 28.9.)
           if (gewaehlt) ziel = gewaehlt;
         }
         const i = (ps.hand || []).indexOf(CARD_NAME);
@@ -126,8 +128,9 @@ module.exports = {
         engine._broadcastEvent('card_reveal', { cardName: CARD_NAME });
 
         const res = await engine.summonCreatureWithHooks(
-          CARD_NAME, pi, ziel.heroIdx, ziel.slotIdx,
-          { source: `${CARD_NAME} trigger`, alsZusatzaktion: true },   // v1349: ist eine Aktion
+          CARD_NAME, ziel.owner, ziel.heroIdx, ziel.slotIdx,
+          { source: `${CARD_NAME} trigger`, alsZusatzaktion: true,   // v1349: ist eine Aktion
+            controller: pi },   // Kontrolle statt Seite (Styx 28.9.): Feldseite + Kontrolleur
         );
         if (!res) {
           engine.handZugangSync(ps, CARD_NAME, { von: 'rueckgabe', source: CARD_NAME, ohneInstanz: true });                // zurueck auf die Hand

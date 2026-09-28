@@ -180,9 +180,10 @@ module.exports = {
 
   async preDamageResolve(engine, ownerIdx, target, targetHeroIdx, source /*, amount, type */) {
     _markPrompted(engine.gs, ownerIdx);
+    const _phys = engine._findHeroOwner(target);   // physische Adresse (Styx 28.9.)
     engine._broadcastEvent('play_zone_animation', {
       type: 'shield_block',
-      owner: ownerIdx, heroIdx: targetHeroIdx, zoneSlot: -1,
+      owner: _phys >= 0 ? _phys : ownerIdx, heroIdx: targetHeroIdx, zoneSlot: -1,
     });
     await engine._delay(400);
     engine.log('sculpture_guards', {
@@ -329,7 +330,8 @@ function _collectFrozenOwnedTargets(gs, pi, engine, targetedTargets) {
       const hero = gs.players[t.owner]?.heroes?.[t.heroIdx];
       if (!hero?.name || hero.hp <= 0) continue;
       if (!hero.statuses?.frozen) continue;
-      if (t.owner !== pi) continue;
+      // Kontrolle statt Seite (Styx 28.9.): „Frozen target you control".
+      if (engine.heroSideOf(t.owner, hero) !== pi) continue;
       out.push({
         id: `hero-${t.owner}-${t.heroIdx}`,
         type: 'hero',

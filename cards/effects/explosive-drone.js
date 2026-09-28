@@ -43,15 +43,23 @@ const SCHADEN   = 150;
 
 /** Freie Support Zones, in die dieser Spieler jetzt beschwoeren darf. */
 function beschwoerbareZonen(engine, pi) {
-  const ps = engine.gs.players[pi];
-  const out = [];
-  for (let hi = 0; hi < (ps?.heroes || []).length; hi++) {
-    if (!engine._canHeroActivateSurprise(pi, hi, CARD_NAME)) continue;
-    for (let zi = 0; zi < 3; zi++) {
-      if (((ps.supportZones?.[hi] || [])[zi] || []).length === 0) out.push({ heroIdx: hi, slotIdx: zi });
-    }
-  }
-  return out;
+  return engine.getFreeSupportZones(pi, { nachKontrolle: true })
+    .filter(z => darfUeberHeld(engine, pi, z.owner, z.heroIdx));
+}
+
+// Kontrolle statt Seite (Styx 28.9.) — beschworen wird mit „a Hero you
+// control": auch ein uebernommener Held der Gegenspalte (Zone traegt
+// `owner` = physische Seite), ein abgegebener eigener dagegen nicht.
+// `_canHeroActivateSurprise` kennt nur die eigene Spalte — fuer den
+// uebernommenen Helden dieselben Kernpruefungen an der physischen Adresse.
+function darfUeberHeld(engine, pi, feld, hi) {
+  if (feld === pi) return engine._canHeroActivateSurprise(pi, hi, CARD_NAME);
+  if (engine._reaktionGesperrt(pi)) return false;
+  const hero = engine.gs.players[feld]?.heroes?.[hi];
+  if (!hero?.name || hero.hp <= 0) return false;
+  const st = hero.statuses || {};
+  if (st.frozen || st.stunned || st.webbed || st.negated) return false;
+  return engine.heroMeetsLevelReq(feld, hi, engine._getCardDB()[CARD_NAME], { levelSourcePi: pi });
 }
 
 /** Kam der Tod von der Gegenseite? */
@@ -98,8 +106,11 @@ async function reagiereAufTod(ctx, opferName) {
       cancellable: true,
     });
     if (!wahl || wahl.cancelled) return;
-    ziel = { heroIdx: wahl.heroIdx, slotIdx: wahl.slotIdx };
+    ziel = zonen.find(z => z.owner === (wahl.owner ?? pi) && z.heroIdx === wahl.heroIdx && z.slotIdx === wahl.slotIdx)
+      || zonen.find(z => z.heroIdx === wahl.heroIdx && z.slotIdx === wahl.slotIdx);
+    if (!ziel) return;
   }
+  const feld = ziel.owner ?? pi;   // Kontrolle statt Seite (Styx 28.9.)
 
   // ★ Grundregel (CARD_API): ein Effekt, der sich aus einem Hook heraus
   // aktiviert, streamt seine Karte an BEIDE Spieler — erst NACH dem Ja.
@@ -111,10 +122,10 @@ async function reagiereAufTod(ctx, opferName) {
   const handIdx = ps.hand.indexOf(CARD_NAME);
   engine.takeFromPileSync(ps, 'hand', handIdx);
   const res = await engine.summonCreatureWithHooks(
-    CARD_NAME, pi, ziel.heroIdx, ziel.slotIdx,
+    CARD_NAME, feld, ziel.heroIdx, ziel.slotIdx,
     // `fromHandIdx` laesst die Karte sichtbar von der Hand in die Zone
     // fliegen — ohne das erscheint sie dort einfach (v933).
-    { source: CARD_NAME, fromHandIdx: handIdx },
+    { source: CARD_NAME, fromHandIdx: handIdx, ...(feld !== pi ? { controller: pi } : {}) },
   );
   if (!res?.inst) { engine.handZugangSync(ps, CARD_NAME, { von: 'rueckgabe', ohneInstanz: true }); return; }   // v1395
 
@@ -141,7 +152,7 @@ module.exports = {
       if (promptData?.type === 'confirm') return { confirmed: true };
       if (promptData?.type === 'zonePick') {
         const z = (promptData.zones || [])[0];
-        return z ? { heroIdx: z.heroIdx, slotIdx: z.slotIdx } : undefined;
+        return z ? { owner: z.owner, heroIdx: z.heroIdx, slotIdx: z.slotIdx } : undefined;
       }
       return undefined;
     }
@@ -202,8 +213,13 @@ module.exports = {
       const pi = ctx.cardController ?? ctx.cardOwner;
       const held = ctx.hero;
       if (!held?.name) return;
-      const helden = engine.gs.players?.[pi]?.heroes || [];
-      if (helden.indexOf(held) < 0) return;          // nur eigene Helden
+      // Kontrolle statt Seite (Styx 28.9.) — „a target you control":
+      // Spalte suchen, dann den Kontrolleur fragen.
+      let seite = -1;
+      for (let p = 0; p < (engine.gs.players || []).length && seite < 0; p++) {
+        if ((engine.gs.players[p]?.heroes || []).indexOf(held) >= 0) seite = engine.heroSideOf(p, held);
+      }
+      if (seite !== pi) return;                      // nur eigene Helden
       if (!vomGegner(ctx, pi)) return;
       await reagiereAufTod(ctx, held.name);
     },

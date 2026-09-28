@@ -27,20 +27,25 @@ module.exports = {
   isTargetingArtifact: true,
 
   canActivate(gs, pi) {
-    const ps = gs.players[pi];
-    for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-      const hero = ps.heroes[hi];
-      if (hero?.name && hero.hp > 0) return true;
+    // Kontrolle statt Seite (Styx 28.9.) — wie engine.heroSideOf
+    for (let p = 0; p < (gs.players || []).length; p++) {
+      for (const hero of (gs.players[p]?.heroes || [])) {
+        if (!hero?.name || hero.hp <= 0) continue;
+        const seite = hero.charmedBy ?? hero.permaControlBy ?? p;
+        if (seite === pi) return true;
+      }
     }
     return false;
   },
 
   getValidTargets(gs, pi, engine) {
     if (!engine) return [];
-    const heroes = engine.getHeroTargets(pi).filter(t => {
-      const hero = gs.players[pi].heroes[t.heroIdx];
-      return !hero.buffs?.cloudy;
-    });
+    // Kontrolle statt Seite (Styx 28.9.) — „a target you control"
+    const heroes = engine.heroesControlledBy(pi)
+      .filter(({ hero }) => hero.hp > 0 && !hero.buffs?.cloudy)
+      .map(({ physOwner, heroIdx, hero }) => ({
+        id: `hero-${physOwner}-${heroIdx}`, type: 'hero', owner: physOwner, heroIdx, cardName: hero.name,
+      }));
     const creatures = engine.getCreatureTargets(pi);
     return [...heroes, ...creatures];
   },
@@ -71,10 +76,10 @@ module.exports = {
     const expiresTurn = gs.turn + 2;
 
     if (target.type === 'hero') {
-      const hero = gs.players[pi].heroes[target.heroIdx];
+      const hero = gs.players[target.owner]?.heroes?.[target.heroIdx];   // physische Spalte
       if (!hero?.name || hero.hp <= 0) return false;
 
-      await engine.actionAddBuff(hero, pi, target.heroIdx, 'cloudy', {
+      await engine.actionAddBuff(hero, target.owner, target.heroIdx, 'cloudy', {
         sourceOwner: pi,   // v1067: Quelle ist Pflicht (siehe _affected-shared)
         expiresAtTurn: expiresTurn,
         expiresForPlayer: pi,

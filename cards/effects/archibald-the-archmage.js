@@ -116,8 +116,17 @@ async function castSpellAsArchibald(engine, ctx, hero, cardName, evalResult) {
   gs._immediateActionContext = true;
   gs._archibaldCasting = true;
   gs._spellResolutionDepth = (gs._spellResolutionDepth || 0) + 1;
-  const hadPriorLog = gs._spellDamageLog !== undefined;
-  if (!hadPriorLog) gs._spellDamageLog = [];
+  // ★ v1476 (Als Vorgabe 28.9.: „ändere das bei Archibald unbedingt
+  // auch!"): dasselbe Muster wie v1469 in `_castSpellImmediately`. Der
+  // Abwurf, der Archibald ausloest, kann MITTEN in einem anderen Zauber
+  // passieren (Wisdom-Kosten, Abwurf-Effekte). Bisher schrieb der
+  // Nachguss dann in das Schadensprotokoll des aeusseren Zaubers:
+  // `afterSpellResolved` des Nachgusses sah auch dessen Ziele (Bartas'
+  // „hits exactly 1 target" stieg aus), und der aeussere Zauber sah die
+  // Ziele des Nachgusses. Jetzt hat der Nachguss sein EIGENES Protokoll;
+  // das aeussere wird danach unveraendert wiederhergestellt.
+  const _aeussererLog = gs._spellDamageLog;
+  gs._spellDamageLog = [];
   // v1339: der Guss aus der Ablage wird dem Gegner gezeigt (Engine-Helfer).
   const _auftritt = engine.gussAuftrittBeginnen(cardName, ctx.cardOwner);
 
@@ -150,7 +159,9 @@ async function castSpellAsArchibald(engine, ctx, hero, cardName, evalResult) {
     delete gs._immediateActionContext;
     delete gs._archibaldCasting;
     delete gs._spellNegatedByEffect;
-    if (!hadPriorLog) delete gs._spellDamageLog;
+    // v1476: aeusseres Protokoll zurueck (auch bei Fehler/Abbruch).
+    if (_aeussererLog === undefined) delete gs._spellDamageLog;
+    else gs._spellDamageLog = _aeussererLog;
     if (prevOverride === undefined) delete hero.levelOverrideCards[cardName];
     else hero.levelOverrideCards[cardName] = prevOverride;
     engine._untrackCard(synthInst.id);

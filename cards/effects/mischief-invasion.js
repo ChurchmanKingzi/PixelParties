@@ -67,18 +67,19 @@ function _heroCanHostCreature(engine, pi, heroIdx, cd) {
   return true;
 }
 
-/** Every free own-side Support Zone, with the host Hero index. */
+/** Every free Support Zone of a Hero `pi` controls, with the host Hero index. */
 function _enumerateFreeOwnSlots(engine, pi) {
   const ps = engine.gs.players[pi];
   if (!ps) return [];
   const slots = [];
-  for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-    const hero = ps.heroes[hi];
+  // Kontrolle statt Seite (Styx 28.9.): alle Helden, die `pi` kontrolliert
+  // (auch uebernommene der Gegenspalte); `owner` = physische Seite.
+  for (const { physOwner, heroIdx: hi, hero } of engine.heroesControlledBy(pi)) {
     if (!hero?.name || hero.hp <= 0) continue;
-    const zones = ps.supportZones?.[hi] || [];
+    const zones = engine.gs.players[physOwner]?.supportZones?.[hi] || [];
     for (let zi = 0; zi < 3; zi++) {
       if ((zones[zi] || []).length === 0) {
-        slots.push({ heroIdx: hi, slotIdx: zi, label: `${hero.name} — Slot ${zi + 1}` });
+        slots.push({ owner: physOwner, heroIdx: hi, slotIdx: zi, label: `${hero.name} — Slot ${zi + 1}` });
       }
     }
   }
@@ -93,7 +94,7 @@ function _enumerateFreeOwnSlots(engine, pi) {
  */
 function _enumerateHostSlotsForCreature(engine, pi, cd) {
   const slots = _enumerateFreeOwnSlots(engine, pi);
-  return slots.filter(s => _heroCanHostCreature(engine, pi, s.heroIdx, cd));
+  return slots.filter(s => _heroCanHostCreature(engine, s.owner, s.heroIdx, cd));
 }
 
 /**
@@ -113,7 +114,7 @@ function _buildHandCopies(engine, pi, slots) {
     if (!_isMmCreature(cd)) continue;
     const eligibleSlotIdxs = [];
     for (let s = 0; s < slots.length; s++) {
-      if (_heroCanHostCreature(engine, pi, slots[s].heroIdx, cd)) {
+      if (_heroCanHostCreature(engine, slots[s].owner, slots[s].heroIdx, cd)) {
         eligibleSlotIdxs.push(s);
       }
     }
@@ -359,8 +360,9 @@ module.exports = {
           // which ones are still queued so the player can track the
           // pipeline visually.
           const zones = hosts.map(h => ({
+            owner: h.owner,   // Kontrolle statt Seite (Styx 28.9.)
             heroIdx: h.heroIdx, slotIdx: h.slotIdx,
-            label: `${ps.heroes[h.heroIdx]?.name || 'Hero ' + (h.heroIdx + 1)} — Support ${h.slotIdx + 1}`,
+            label: `${engine.gs.players[h.owner]?.heroes?.[h.heroIdx]?.name || 'Hero ' + (h.heroIdx + 1)} — Support ${h.slotIdx + 1}`,
           }));
           const zp = await engine.promptGeneric(pi, {
             type: 'zonePick',
@@ -371,7 +373,8 @@ module.exports = {
             highlightHandIdx: handIdx,
             queuedHandIdxs,
           });
-          chosenSlot = (zp && hosts.find(h => h.heroIdx === zp.heroIdx && h.slotIdx === zp.slotIdx)) || hosts[0];
+          chosenSlot = (zp && hosts.find(h => h.heroIdx === zp.heroIdx && h.slotIdx === zp.slotIdx
+            && h.owner === (zp.owner ?? pi))) || hosts[0];   // Kontrolle statt Seite (Styx 28.9.)
         }
 
         // Mark in-flight via `_resolvingCard` so any beforeSummon cost
@@ -387,9 +390,10 @@ module.exports = {
         let summonResult = null;
         try {
           summonResult = await engine.summonCreatureWithHooks(
-            c.name, pi, chosenSlot.heroIdx, chosenSlot.slotIdx,
+            c.name, chosenSlot.owner, chosenSlot.heroIdx, chosenSlot.slotIdx,
             {
               source: CARD_NAME,
+              controller: pi,   // Kontrolle statt Seite (Styx 28.9.): Feldseite + Kontrolleur
               hookExtras: { _summonedBy: CARD_NAME, _summonedAsAdditional: true },
             },
           );
@@ -412,6 +416,7 @@ module.exports = {
           engine._broadcastEvent('hand_to_board_fly', {
             ownerIdx: pi, cardName: c.name, handIndex: realIdx,
             zoneType: 'support', heroIdx: chosenSlot.heroIdx, slotIdx: chosenSlot.slotIdx,
+            destOwner: chosenSlot.owner,   // Kontrolle statt Seite (Styx 28.9.)
             _forceOwnerAnim: true,
           });
         }

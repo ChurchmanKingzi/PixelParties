@@ -98,7 +98,9 @@ module.exports = {
         const heroes = engine.gs.players[p]?.heroes || [];
         if (heroes.includes(dyingHero)) { deadOwner = p; break; }
       }
-      if (deadOwner !== pi) return;
+      if (deadOwner < 0) return;
+      // Kontrolle statt Seite (Styx 28.9.): „another target you CONTROL".
+      if (engine.heroSideOf(deadOwner, dyingHero) !== pi) return;
 
       // Same co-fatality gate as the creature branch.
       if ((ctx.card?.counters?.currentHp ?? 1) <= 0) return;

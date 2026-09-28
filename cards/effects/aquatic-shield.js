@@ -107,12 +107,12 @@ module.exports = {
     const cardDB = engine._getCardDB();
 
     let vergeben = 0;
-    for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-      const h = ps.heroes[hi];
+    // Kontrolle statt Seite (Styx 28.9.): „each target you control"
+    for (const { physOwner, heroIdx: hi, hero: h } of engine.heroesControlledBy(pi)) {
       if (!h?.name || h.hp <= 0) continue;
       engine._grantOneShotDamageShield('hero', h, REDUCTION, CARD_NAME, pi);
       engine._broadcastEvent('play_zone_animation', {
-        type: 'shield_block', owner: pi, heroIdx: hi, zoneSlot: -1,
+        type: 'shield_block', owner: physOwner, heroIdx: hi, zoneSlot: -1,
       });
       vergeben++;
     }

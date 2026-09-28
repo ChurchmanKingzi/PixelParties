@@ -96,7 +96,8 @@ module.exports = {
     const kind = engine?.sourceEffectKind ? engine.sourceEffectKind(sourceCard) : null;
     if (kind !== 'attack' && kind !== 'spell' && kind !== 'creature') return false;
     // Must be a target the Anti-Magnet player controls.
-    if (selected.owner !== pi) return false;
+    // Kontrolle statt Seite (Styx 28.9.).
+    if ((engine?.zielSeite ? engine.zielSeite(selected) : selected.owner) !== pi) return false;
 
     // Cost 2 — must be able to pay (and not gold-locked, e.g. Golden Arrow).
     const ps = gs.players[pi];

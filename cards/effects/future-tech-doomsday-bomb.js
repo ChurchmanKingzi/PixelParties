@@ -84,14 +84,22 @@ function alleZiele(engine) {
  * ein Array — der Hook-Vertrag sagt ausdrücklich, dass Listener beide
  * Formen aushalten müssen.
  */
-function trifftGegner(ziele, gegnerIdx) {
+function trifftGegner(engine, ziele, gegnerIdx) {
   const liste = Array.isArray(ziele) ? ziele : (ziele ? [ziele] : []);
   for (const t of liste) {
     if (!t) continue;
-    // Kreaturziele tragen ihre Seite in `owner`; ein Heldenobjekt aus
-    // dem Zielsammler ebenfalls. Eine rohe Heldenreferenz (ohne
-    // `owner`) kommt hier nicht an — der Hook bekommt Zieleintraege.
-    const seite = t.owner ?? t.controller;
+    // Kreaturziele tragen ihre Seite in `owner`; Helden werden unten
+    // ueber die Kontrolle aufgeloest.
+    let seite = t.owner ?? t.controller;
+    // Kontrolle statt Seite (Styx 28.9.): ein Held zaehlt fuer den,
+    // der ihn gerade kontrolliert. Auch die rohe Heldenreferenz aus dem
+    // Auto-Fallback von actionDealDamage wird physisch aufgeloest.
+    for (let p = 0; p < (engine.gs.players || []).length; p++) {
+      const heroes = engine.gs.players[p]?.heroes || [];
+      const held = (t.type === 'hero' && t.owner === p) ? heroes[t.heroIdx]
+        : (heroes.includes(t) ? t : null);
+      if (held) { seite = engine.heroSideOf(p, held); break; }
+    }
     if (seite === gegnerIdx) return true;
   }
   return false;
@@ -121,7 +129,7 @@ module.exports = {
       // Nur, wenn wirklich etwas ausgeteilt würde.
       if (!(ctx.amount > 0)) return;
       // ★ Und nur bei mindestens einem GEGNERISCHEN Ziel.
-      if (!trifftGegner(ctx.target, gegner)) return;
+      if (!trifftGegner(engine, ctx.target, gegner)) return;
 
       // Einmal ist einmal: eine zweite Attacke im selben Zug findet die
       // Karte ohnehin nicht mehr im Feld, aber der Riegel macht das

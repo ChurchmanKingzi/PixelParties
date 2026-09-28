@@ -85,7 +85,12 @@ module.exports = {
     if (!ps || !triggerInst) return;
 
     const hostHeroIdx = triggerInst.heroIdx;
-    const host = ps.heroes?.[hostHeroIdx];
+    // Kontrolle statt Seite (Styx 28.9.): „the same Hero" ist der Held,
+    // unter dem der Ausloeser PHYSISCH steht — ueber einen uebernommenen
+    // Helden der Gegenspalte beschworen, liegt der auf der anderen Seite.
+    const feld = (triggerInst.owner === 0 || triggerInst.owner === 1) ? triggerInst.owner : pi;
+    const fps = gs.players[feld];
+    const host = fps?.heroes?.[hostHeroIdx];
     if (!host?.name || host.hp <= 0) {
       // Host hero died between the summon firing and this reaction
       // resolving — nothing to do, but still apply the summon-lock
@@ -101,7 +106,7 @@ module.exports = {
 
     // Cluster animation on the host hero's row — three cascading bursts.
     engine._broadcastEvent('play_zone_animation', {
-      type: ANIM_TYPE, owner: pi, heroIdx: hostHeroIdx, zoneSlot: -1,
+      type: ANIM_TYPE, owner: feld, heroIdx: hostHeroIdx, zoneSlot: -1,
     });
     await engine._delay(400);
 
@@ -110,7 +115,7 @@ module.exports = {
       const candidates = bomblebeeNamesInHand(ps, usedNames);
       if (candidates.length === 0) break;
 
-      const slot = findFreeSupportSlot(ps, hostHeroIdx);
+      const slot = findFreeSupportSlot(fps, hostHeroIdx);
       if (slot < 0) {
         engine.log('bomblebee_cluster_no_slot', {
           player: ps.username, hero: host.name, summoned,
@@ -147,8 +152,9 @@ module.exports = {
       engine._broadcastEvent('card_reveal', { cardName: chosenName, playerIdx: pi });
 
       const summonRes = await engine.summonCreatureWithHooks(
-        chosenName, pi, hostHeroIdx, slot,
+        chosenName, feld, hostHeroIdx, slot,
         {
+          ...(feld !== pi ? { controller: pi } : {}),
           // Skip the post-summon reaction window for these re-summons —
           // the engine helper already guards reentrancy, but this is an
           // extra belt-and-suspenders to keep recursion impossible.

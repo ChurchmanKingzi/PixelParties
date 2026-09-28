@@ -201,7 +201,10 @@ module.exports = {
           heroIdx: enemyTarget.heroIdx, zoneSlot: -1,
         });
         await engine._delay(400);
-        const hero = gs.players[oppIdx].heroes[enemyTarget.heroIdx];
+        // Kontrolle statt Seite (Styx 28.9.): das Ziel kann physisch in
+        // der eigenen Spalte stehen (vom Gegner kontrolliert) — also die
+        // Spalte aus dem Ziel, nicht `oppIdx`.
+        const hero = gs.players[enemyTarget.owner]?.heroes?.[enemyTarget.heroIdx];
         if (hero && hero.hp > 0) {
           await ctx.dealDamage(hero, 100, 'destruction_spell');
         }

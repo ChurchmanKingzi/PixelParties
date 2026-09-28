@@ -169,16 +169,58 @@ function setBoardTooltip(card) {
   window._boardTooltipSetter?.(card);
 }
 
+// ★ v1478 (Als Vorgabe 28.9.: „Die Karte(n) in der Pop-Up-Box sind jetzt
+// deutlich kleiner als vorher" → Variante C: „bis direkt an den Rahmen oder
+// sogar über den Rahmen hinaus zum Rand der Box selbst" — „den (hier roten)
+// inneren Rahmen der Box ÜBER der Karte zeichnen, dann wirkt sie nicht so
+// abschneidend"). Die Kartenvorschau rechts im Zielwahl-Panel ist so hoch
+// wie die ganze Box (Aussenkante des Rahmens) und schliesst rechts buendig
+// mit ihr ab; die negativen Raender (Polster + Rahmen) stehen in style.css
+// (`.panel-zielwahl-vorschau-rand`), den Rahmen darueber zeichnet
+// `.panel-zielwahl::before`. Die Hoehe kommt aus der gemessenen Box — per
+// CSS allein laesst sich die Breite nicht aus einer gestreckten Hoehe
+// ableiten.
+// ★ v1479 (Als Vorgabe 28.9.: „bringe sie auf die alte Größe zurück"): Der
+// Kasten reserviert nur noch die Breite und hat als Mindesthoehe die alte
+// Kartenhoehe (`--card-h`, CSS) — damit ist die Box wieder so hoch wie vor
+// v1477; die Karte selbst liegt absolut darin und spannt ueber die ganze
+// Box. Vorher hielt die Karte mit ihrer gemessenen Hoehe die Box fest:
+// wuchs sie einmal (z. B. eine Zaehlerzeile), schrumpfte sie nicht mehr.
+function ZielwahlRandVorschau({ card }) {
+  const ref = useRef(null);
+  const [hoehe, setHoehe] = useState(0);
+  useLayoutEffect(() => {
+    const panel = ref.current?.parentElement;
+    if (!panel) return undefined;
+    const messen = () => setHoehe(panel.offsetHeight || 0);
+    messen();
+    if (typeof ResizeObserver !== 'function') return undefined;
+    const ro = new ResizeObserver(messen);
+    ro.observe(panel);
+    return () => ro.disconnect();
+  }, []);
+  const stil = hoehe > 0 ? { width: Math.round(hoehe * 86 / 120) } : { width: 48 };
+  return (
+    <div ref={ref} className="panel-zielwahl-aktiv panel-zielwahl-vorschau panel-zielwahl-vorschau-rand" style={stil}>
+      <CardMini card={card} inGallery />
+    </div>
+  );
+}
+
 // ★ v1443 (Als Befund 26.9.): WORAUF reagiert eine Karte gerade? Prompts
 // von Reaktionen (Skeleton Demon, Cool Rescuer Monia) tragen die
 // ausloesende Karte als `triggerCardName` — sie steht LINKS im Panel mit
 // der Zeile „Triggered by", rechts bleibt die reagierende Karte selbst.
+// ★ v1479 (Als Vorgabe 28.9., alte Größe der Zielwahl-Box): wieder immer
+// 90 px (v1477 hatte eine kleine 58-px-Variante). `panel-zielwahl-aktiv`
+// bleibt: im durchklickbaren Zielwahl-Panel nimmt nur so der Kasten den
+// Zeiger (Tooltip) an; ausserhalb davon wirkt die Klasse nicht.
 function TriggerCardSlot({ name }) {
   const data = name ? CARDS_BY_NAME[name] : null;
   if (!data) return null;
   const img = cardImageUrl(name);
   return (
-    <div style={{ width: 90, flexShrink: 0, alignSelf: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+    <div className="panel-zielwahl-aktiv" style={{ width: 90, flexShrink: 0, alignSelf: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
       <div style={{ fontSize: 9, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: 1 }}>Triggered by</div>
       <div className="board-card" style={{ width: 90, minHeight: 120, borderRadius: 6, overflow: 'hidden', border: '2px solid var(--bg4)', background: 'var(--bg3)' }}
         onMouseEnter={() => { _boardTooltipLocked = true; setBoardTooltip(data); }}
@@ -1639,12 +1681,159 @@ function _ppPanelHatScrollbaresKind(wurzel) {
   return false;
 }
 
-function DraggablePanel({ children, className, style }) {
+// ★ v1477 — ZIELWAHL-PANELS DURCHKLICKBAR (Als Befund 28.9.: „Nutzt man
+// eine Attack/Spell/einen Effekt, die/der ein oder mehr Ziele auswählt,
+// erscheint ein Pop-up in der Mitte des Feldes. Dieses überdeckt den
+// eigenen und/oder gegnerischen mittleren Hero! … Hast du noch eine
+// bessere Alternative, alle Heroes ohne die Box jedes Mal draggen zu
+// müssen direkt anwählbar zu machen?")
+//
+// Ursache: `.first-choice-panel` steht fest bei `top: 52.5%` — auf dem
+// gekippten Brett liegt dort die eigene Heldenreihe, die Box (≈ 526×140
+// bei 1600×900) deckte den eigenen mittleren Helden ganz ab.
+//
+// Jetzt mit `zielwahl`:
+//  • Lage: die Panelmitte sitzt auf der Mittellinie zwischen dem
+//    mittleren Gegner- und dem mittleren eigenen Helden, gemessen im
+//    Bildschirmraum an den echten `[data-hero-zone]`-Kästen (die Ebene ist
+//    perspektivisch gekippt, Prozentwerte treffen nicht). Nachgeführt bei
+//    Größenänderung, Scrollen (Telefon-Kamera) und sanft im Sekundentakt;
+//    im Fenster eingeklemmt. Ohne Heldenzonen gilt die CSS-Lage wie bisher.
+//  • Durchklickbar: der Körper hat `pointer-events: none` (CSS
+//    `.panel-zielwahl`), nur Knöpfe, Formularfelder, der Griff (Titel)
+//    und `.panel-zielwahl-aktiv` (Kartenvorschau) nehmen den Zeiger an.
+//    Ein Klick auf ein Ziel unter der Box trifft also direkt das Ziel.
+//  • Durchsicht: Weil der Körper keine Zeigerereignisse mehr bekommt,
+//    prüft ein `pointermove` am Dokument (rAF-gedrosselt) das Rechteck;
+//    Zeiger in der Box, aber nicht über einem ihrer aktiven Elemente →
+//    Attribut `data-durchsicht` (CSS blendet auf ~25 % ab). Als Attribut
+//    und nicht als Klasse, weil React `className` bei jedem Rendern neu
+//    setzt.
+//  • Ziehen: über zwei Griffe — die seitlichen Polsterstreifen mit den
+//    Pfeil-Ornamenten (`.panel-zielwahl-griff`). Nicht die Titelzeile: die
+//    steht mittig genau über den mittleren Helden. Der Mausdruck blubbert
+//    wie bisher zum `onMouseDown` des Panels.
+// ★ v1479 (Als Befund 28.9.: „Die Buttons für Confirm und Cancel *bewegen
+// sich auf der x-Achse*, wenn die Box unsichtbar und sichtbar wird?")
+// Ursache: Steht der Zeiger über einem mittleren Helden (die Box wird dabei
+// durchsichtig), vergrößert dessen Hover die Zone per CSS-`scale`
+// (≈ 1,15, mit Übergang). Die Nachführung (Sekundentakt) maß diese
+// vergrößerte Breite → Lücke zwischen den Knöpfen +10 px → Bestätigen und
+// Abbrechen rückten je 5 px nach außen, nach dem Verlassen wieder zurück.
+// Jetzt wird der eigene `scale` der Zone herausgerechnet (um die Mitte,
+// wie `transform-origin` im Normalfall): Mitte und Lücke bleiben fest,
+// auch mitten im Übergang.
+function _ppUnskaliertesRechteck(el) {
+  const r = el.getBoundingClientRect();
+  const f = parseFloat(getComputedStyle(el).scale);
+  if (!(f > 0) || f === 1) return r;
+  const cx = (r.left + r.right) / 2, cy = (r.top + r.bottom) / 2;
+  const w = r.width / f, h = r.height / f;
+  return { left: cx - w / 2, right: cx + w / 2, top: cy - h / 2, bottom: cy + h / 2, width: w, height: h };
+}
+
+function _ppZielwahlMitte() {
+  const opp = document.querySelector('[data-hero-zone][data-hero-owner="opp"][data-hero-idx="1"]');
+  const me = document.querySelector('[data-hero-zone][data-hero-owner="me"][data-hero-idx="1"]');
+  if (!opp || !me) return null;
+  const a = _ppUnskaliertesRechteck(opp), b = _ppUnskaliertesRechteck(me);
+  if (!a.height || !b.height) return null;
+  // Gegner oben, eigener Held unten: Mitte der Lücke zwischen beiden.
+  const oben = a.top < b.top ? a : b, unten = a.top < b.top ? b : a;
+  return {
+    x: (a.left + a.right + b.left + b.right) / 4,
+    y: (oben.bottom + unten.top) / 2,
+    breite: Math.max(a.width, b.width),
+  };
+}
+
+function DraggablePanel({ children, className, style, zielwahl }) {
   const [pos, setPos] = useState({ x: 0, y: 0 });
   const [dragging, setDragging] = useState(false);
+  const [autoPos, setAutoPos] = useState(null);
   const offsetRef = useRef({ x: 0, y: 0 });
   const panelRef = useRef(null);
   const cleanupRef = useRef(null);
+  const draggingRef = useRef(false);
+  draggingRef.current = dragging;
+  const hasCustomPosRef = useRef(false);
+  hasCustomPosRef.current = pos.x !== 0 || pos.y !== 0;
+  // ★ v1477: Lage zwischen den mittleren Helden (siehe oben).
+  useLayoutEffect(() => {
+    if (!zielwahl) return;
+    let raf = 0;
+    const setze = () => {
+      raf = 0;
+      if (hasCustomPosRef.current) return;
+      const el = panelRef.current;
+      const m = _ppZielwahlMitte();
+      if (!el || !m) { setAutoPos(null); return; }
+      const r = el.getBoundingClientRect();
+      // Nicht die Panelmitte, sondern die Mitte des Anker-Elements
+      // (`data-zielwahl-mitte`, die Textspalte) kommt über die Helden —
+      // seitliche Kartenbilder verschöben sie sonst. Die Knopfzeile lässt
+      // dort eine Lücke in Heldenbreite (`--zielwahl-luecke`, CSS), die
+      // Knöpfe flankieren die mittleren Helden statt sie zu verdecken.
+      const anker = el.querySelector('[data-zielwahl-mitte]');
+      const ar = anker && anker.getBoundingClientRect();
+      const versatz = (ar && ar.width) ? (ar.left + ar.right) / 2 - (r.left + r.right) / 2 : 0;
+      const rand = 4;
+      const x = Math.max(r.width / 2 + rand, Math.min(window.innerWidth - r.width / 2 - rand, m.x - versatz));
+      const y = Math.max(r.height / 2 + rand, Math.min(window.innerHeight - r.height / 2 - rand, m.y));
+      const luecke = Math.round(m.breite + 8);
+      setAutoPos(prev => (prev && Math.abs(prev.x - x) < 1 && Math.abs(prev.y - y) < 1 && prev.luecke === luecke) ? prev : { x: Math.round(x), y: Math.round(y), luecke });
+    };
+    const plane = () => { if (!raf) raf = requestAnimationFrame(setze); };
+    setze();
+    window.addEventListener('resize', plane);
+    window.addEventListener('scroll', plane, true);
+    const ro = (typeof ResizeObserver !== 'undefined' && panelRef.current) ? new ResizeObserver(plane) : null;
+    if (ro) ro.observe(panelRef.current);
+    const takt = setInterval(plane, 1000);
+    return () => {
+      window.removeEventListener('resize', plane);
+      window.removeEventListener('scroll', plane, true);
+      if (ro) ro.disconnect();
+      clearInterval(takt);
+      if (raf) cancelAnimationFrame(raf);
+    };
+  }, [zielwahl]);
+  // ★ v1477: Durchsicht, solange der Zeiger über dem Panelkörper steht.
+  useEffect(() => {
+    if (!zielwahl) return;
+    let raf = 0, letzt = null;
+    const pruefe = () => {
+      raf = 0;
+      const el = panelRef.current;
+      if (!el || !letzt) return;
+      let an = false;
+      if (!draggingRef.current && letzt.x != null) {
+        const r = el.getBoundingClientRect();
+        const drin = letzt.x >= r.left && letzt.x <= r.right && letzt.y >= r.top && letzt.y <= r.bottom;
+        // Liegt das Ereignisziel IM Panel, ist es eines der aktiven
+        // Elemente (nur die bekommen Zeigerereignisse) → deckend lassen.
+        an = drin && !(letzt.ziel && el.contains(letzt.ziel));
+      }
+      if (el.hasAttribute('data-durchsicht') !== an) el.toggleAttribute('data-durchsicht', an);
+    };
+    const bewegt = (e) => {
+      letzt = { x: e.clientX, y: e.clientY, ziel: e.target };
+      if (!raf) raf = requestAnimationFrame(pruefe);
+    };
+    const raus = (e) => {
+      if (e.relatedTarget) return;
+      letzt = { x: null };
+      if (!raf) raf = requestAnimationFrame(pruefe);
+    };
+    document.addEventListener('pointermove', bewegt, { passive: true, capture: true });
+    document.addEventListener('pointerout', raus, { passive: true, capture: true });
+    return () => {
+      document.removeEventListener('pointermove', bewegt, { capture: true });
+      document.removeEventListener('pointerout', raus, { capture: true });
+      if (raf) cancelAnimationFrame(raf);
+      panelRef.current?.removeAttribute('data-durchsicht');
+    };
+  }, [zielwahl]);
   const onDown = (e) => {
     // ★ v1258: Auf Touch ist nur noch das Panel unbeweglich, das
     // scrollbaren Inhalt hat (Kartengalerie, lange Listen) — dort gewann
@@ -1683,11 +1872,14 @@ function DraggablePanel({ children, className, style }) {
   const hasCustomPos = pos.x !== 0 || pos.y !== 0;
   const posStyle = hasCustomPos
     ? { position: 'fixed', left: pos.x, top: pos.y, transform: 'none' }
-    : {};
+    : (zielwahl && autoPos ? { left: autoPos.x, top: autoPos.y } : {});
+  const lueckeStyle = (zielwahl && autoPos) ? { '--zielwahl-luecke': autoPos.luecke + 'px' } : {};
   return (
-    <div ref={panelRef} className={className} style={{ ...style, ...posStyle, cursor: dragging ? 'grabbing' : 'grab' }}
+    <div ref={panelRef} className={className + (zielwahl ? ' panel-zielwahl' : '')} style={{ ...style, ...lueckeStyle, ...posStyle, cursor: dragging ? 'grabbing' : 'grab' }}
       onMouseDown={onDown} onTouchStart={onDown} onClick={e => e.stopPropagation()}>
       {children}
+      {zielwahl && <div className="panel-zielwahl-griff panel-zielwahl-griff-l" />}
+      {zielwahl && <div className="panel-zielwahl-griff panel-zielwahl-griff-r" />}
     </div>
   );
 }
@@ -4039,6 +4231,42 @@ function CrimsonWebShotEffect({ x, y, w = 80, h = 110, vonDx = 0, vonDy = 160, b
 //  1250–2600  Lichtblitz, zwei Druckringe, eine Lichtsaeule, aufsteigende
 //             Funken; die Kreise zerfallen
 // Handy: weniger Partikel. Klang aus der Komponente (Regel ⑤).
+// ── Styx, the Opened Gate (28.9.) ───────────────────────────────
+// Das Tor zur Geisterwelt oeffnet sich UNTER dem Helden: ein dunkler,
+// violett-tuerkis wirbelnder Strudel, aus dem blasse Seelenfetzen
+// aufsteigen und in den Koerper zurueckfahren. Bewusst KALT statt des
+// goldenen `holy_revival` — hier kehrt jemand aus dem Totenreich
+// zurueck, nicht aus dem Himmel.
+function StyxTorEffect({ x, y, w = 80, h = 110 }) {
+  const seelen = useMemo(() => Array.from({ length: ppFxN(14) }, (_, i) => ({
+    dx: (Math.random() - 0.5) * w * 0.9, hoch: h * (0.55 + Math.random() * 0.5),
+    g: 8 + Math.random() * 8, verzug: 250 + Math.random() * 700, dauer: 700 + Math.random() * 400,
+    farbe: ['#bff6ff', '#8fe3ff', '#d6c8ff', '#ffffff'][i % 4],
+  })), [w, h]);
+  useEffect(() => {
+    const spiel = (name, opts, at) => setTimeout(() => { if (window.playSFX) window.playSFX(name, { ...opts, dedupe: 0 }); }, at);
+    spiel('elem_dark', { rate: 0.7, volume: 0.6 }, 0);
+    spiel('elem_wind', { rate: 0.6, volume: 0.4 }, 150);
+    spiel('revive', { rate: 0.85, volume: 0.9 }, 800);
+  }, []);
+  const breite = w * 1.6;
+  return (
+    <div className="styx-tor" style={{ left: x, top: y }} aria-hidden="true">
+      <span className="styx-tor-strudel" style={{ width: breite, height: breite * 0.42, left: -breite / 2, top: h * 0.38 - breite * 0.21 }} />
+      <span className="styx-tor-strudel styx-tor-strudel-innen" style={{ width: breite * 0.6, height: breite * 0.25, left: -breite * 0.3, top: h * 0.38 - breite * 0.125 }} />
+      {seelen.map((s, i) => (
+        <span key={i} className="styx-tor-seele" style={{
+          left: s.dx - s.g / 2, top: h * 0.35, width: s.g, height: s.g * 1.6,
+          background: `radial-gradient(ellipse at 50% 35%, ${s.farbe} 0%, ${s.farbe}88 45%, transparent 75%)`,
+          boxShadow: `0 0 10px ${s.farbe}`, '--hoch': -s.hoch + 'px',
+          animationDelay: s.verzug + 'ms', animationDuration: s.dauer + 'ms',
+        }} />
+      ))}
+      <span className="styx-tor-schein" style={{ width: w * 1.3, height: h * 1.3, left: -w * 0.65, top: -h * 0.65 }} />
+    </div>
+  );
+}
+
 function TodesgabeErweckungEffect({ x, y, w = 80, h = 110 }) {
   const funken = useMemo(() => Array.from({ length: ppFxN(18) }, (_, i) => ({
     dx: (Math.random() - 0.5) * w * 1.1, hoch: h * (0.5 + Math.random() * 0.7),
@@ -8213,6 +8441,7 @@ const ANIM_REGISTRY = {
   baby_spider_opfer: BabySpiderOpferEffect,   // Baby Spider, 26.9.
   crimson_web: CrimsonWebShotEffect,          // Crimson Web, 26.9. (Name war ungenutzt vergeben)
   todesgabe_erweckung: TodesgabeErweckungEffect,   // Divine Gift of Death, 26.9.
+  styx_gate_revival: StyxTorEffect,                 // Styx, the Opened Gate, 28.9.
   gewaltsame_erweckung: GewaltsameErweckungEffect, // Forceful Revival, 26.9.
   ruestkammer_tor: RuestkammerTorEffect,           // Gate to the Armory, 26.9.
   telekinese: TelekineseEffect,                    // Telekinesis, 26.9.
@@ -27117,7 +27346,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       }
       // Gray out Abilities that can't be played on any hero
       if (card.cardType === 'Ability') {
-        const canPlaySomewhere = [0,1,2].some(hi => canHeroReceiveAbility(me, hi, cardName));
+        const canPlaySomewhere = [0,1,2].some(hi => canHeroReceiveAbility(me, hi, cardName))
+          || [0,1,2].some(hi => canForeignHeroReceiveAbility(hi, cardName));   // Styx
         if (!canPlaySomewhere) return true;
       }
       // Gray out Artifacts if not enough gold or item-locked
@@ -27723,11 +27953,23 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     // v768: Xal / Xalibur — eine freie (oder gleichnamige) SUPPORT Zone
     // zaehlt genauso. Ohne das blieb die Handkarte grau, sobald die drei
     // echten Zonen voll waren.
-    if ((gameState.abilitySupportHeroes || []).includes(heroIdx)) {
+    if (!opts.nurAbilityZonen && (gameState.abilitySupportHeroes || []).includes(heroIdx)) {
       const supZones = playerData.supportZones?.[heroIdx] || [];
       return supZones.some((slot, _z) => ppAbilityZoneOk(playerData, heroIdx, _z, abilityName, 'support'));
     }
     return false;
+  };
+
+  // ★ Styx, the Opened Gate (28.9.): ein FREMDER Held, den ich gerade
+  // kontrolliere und dessen Kontrollmarke Abilities erlaubt — einmal pro
+  // Zug, nur echte Ability Zones. Dieselben Felder wie der Server
+  // (`engine.darfFremdAbilityAnlegen`).
+  const canForeignHeroReceiveAbility = (heroIdx, abilityName) => {
+    const h = opp?.heroes?.[heroIdx];
+    if (!h?.name || h.hp <= 0 || h.charmedBy !== myIdx) return false;
+    const ch = h.statuses?.charmed;
+    if (!ch?.abilitiesErlaubt || ch.abilityZug === gameState.turn) return false;
+    return canHeroReceiveAbility(opp, heroIdx, abilityName, { skipAbilityGiven: true, nurAbilityZonen: true });
   };
 
   // Check if a hero can play a card (fully server-driven via heroPlayableCards).
@@ -28542,7 +28784,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
 
       if (isAbilityPlayable) {
         // Ability play-mode drag — find valid hero/zone target
-        let targetHero = -1, targetZone = -1;
+        let targetHero = -1, targetZone = -1, targetOpp = false;
         // During abilityAttach prompt, restrict to specified hero and skip abilityGivenThisTurn
         const attachHeroOnly = abilityAttachPrompt ? abilityAttachPrompt.heroIdx : -1;
         const skipAbilityGiven = !!abilityAttachPrompt;
@@ -28564,7 +28806,11 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             if (mx >= r.left && mx <= r.right && my >= r.top && my <= r.bottom) {
               if (el.dataset.heroOwner === 'me') {
                 const hi = parseInt(el.dataset.heroIdx);
-                if (canReceive(hi, cardName)) { targetHero = hi; targetZone = -1; }
+                if (canReceive(hi, cardName)) { targetHero = hi; targetZone = -1; targetOpp = false; }
+              } else if (el.dataset.heroOwner === 'opp' && !abilityAttachPrompt) {
+                // Styx: fremder, kontrollierter Held
+                const hi = parseInt(el.dataset.heroIdx);
+                if (canForeignHeroReceiveAbility(hi, cardName)) { targetHero = hi; targetZone = -1; targetOpp = true; }
               }
             }
           }
@@ -28598,22 +28844,26 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           for (const el of abEls) {
             const r = el.getBoundingClientRect();
             if (mx >= r.left && mx <= r.right && my >= r.top && my <= r.bottom) {
-              if (el.dataset.abilityOwner === 'me') {
+              // Styx: Ability-Zone eines fremden, kontrollierten Helden.
+              const fremd = el.dataset.abilityOwner === 'opp' && !abilityAttachPrompt
+                && canForeignHeroReceiveAbility(parseInt(el.dataset.abilityHero), cardName);
+              if (el.dataset.abilityOwner === 'me' || fremd) {
+                const pd = fremd ? opp : me;
                 const hi = parseInt(el.dataset.abilityHero);
                 const zi = parseInt(el.dataset.abilitySlot);
-                if (canReceive(hi, cardName)) {
-                  const abSlot = (me.abilityZones[hi] || [])[zi] || [];
+                if (fremd || canReceive(hi, cardName)) {
+                  const abSlot = (pd.abilityZones[hi] || [])[zi] || [];
                   const isCustom = (gameState.customPlacementCards || []).includes(cardName);
 
                   if (isCustom) {
                     // Custom placement: occupied zones with <3 cards
-                    if (abSlot.length > 0 && abSlot.length < 3) { targetHero = hi; targetZone = zi; }
+                    if (abSlot.length > 0 && abSlot.length < 3) { targetHero = hi; targetZone = zi; targetOpp = fremd; }
                   } else {
                     // Standard: only matching or empty zones
                     // v1349: dieselben Regeln wie der Server (verwahrte Abilities).
-                    const existingZone = ((me.abilityZones[hi] || []).findIndex(s => (s||[]).length > 0 && s[0] === cardName));
+                    const existingZone = ((pd.abilityZones[hi] || []).findIndex(s => (s||[]).length > 0 && s[0] === cardName));
                     if (existingZone >= 0 && zi !== existingZone) { /* nur der eigene Stapel */ }
-                    else if (ppAbilityZoneOk(me, hi, zi, cardName)) { targetHero = hi; targetZone = zi; }
+                    else if (ppAbilityZoneOk(pd, hi, zi, cardName)) { targetHero = hi; targetZone = zi; targetOpp = fremd; }
                   }
                 }
               }
@@ -28626,7 +28876,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         // VORRATS-Index gegen die HAND, findet einen anderen Namen und
         // lehnt ab; die Karte springt zurueck. Dieselbe Herkunft wie
         // in den anderen drei Ziehzustaenden.
-        setAbilityDrag({ idx, cardName, card, mouseX: mx, mouseY: my, griffX, griffY, targetHero, targetZone, targetSupportZone, fromCreation });
+        setAbilityDrag({ idx, cardName, card, mouseX: mx, mouseY: my, griffX, griffY, targetHero, targetZone, targetSupportZone, targetOpp, fromCreation });
       } else if (isPlayable && card.cardType === 'Creature') {
         // Play-mode drag — find valid drop target
         let targetHero = -1, targetSlot = -1;
@@ -29460,7 +29710,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             // Click-to-attach. Instead of a popup, enter "pick-a-zone" mode:
             // eligible hero zones light up, existing stacks of the same
             // ability or empty ability slots become clickable.
-            const anyEligible = (me.heroes || []).some((_, hi) => canHeroReceiveAbility(me, hi, cardName));
+            const anyEligible = (me.heroes || []).some((_, hi) => canHeroReceiveAbility(me, hi, cardName))
+              || [0,1,2].some(hi => canForeignHeroReceiveAbility(hi, cardName));   // Styx
             if (anyEligible) {
               setAbilityAttachPick({ cardName, handIndex: idx, fromCreation, card });
             }
@@ -29798,6 +30049,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               // v768: auf eine Support Zone gezogen (Xal, Xalibur).
               supportSlot: (prev.targetSupportZone != null && prev.targetSupportZone >= 0)
                 ? prev.targetSupportZone : undefined,
+              // Styx: fremder, kontrollierter Held
+              heroOwner: prev.targetOpp ? oppIdx : undefined,
             fromCreation: prev.fromCreation || undefined,
           });
           }
@@ -40981,12 +41234,19 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             }
             return false;
           })();
-          const abilityTarget = !isOpp && abilityDrag && abilityDrag.targetHero === i && abilityDrag.targetZone < 0;
+          const abilityTarget = abilityDrag && (isOpp ? !!abilityDrag.targetOpp : !abilityDrag.targetOpp)
+            && abilityDrag.targetHero === i && abilityDrag.targetZone < 0;
           // Click-to-attach an Ability: highlight all eligible heroes + dim
           // the rest. Honours both the `skipAbilityGiven` flag (server-driven
           // tutor flows bypass the per-turn gate) and the `eligibleHeroIdxs`
           // allowlist (so Alex can't attach to himself via the deck-search).
-          const attachPickEligibleHero = !isOpp && abilityAttachPick && (() => {
+          const attachPickEligibleHero = abilityAttachPick && (() => {
+            // Styx: fremder, kontrollierter Held — nur beim Spielen aus der Hand.
+            if (isOpp) {
+              if (abilityAttachPick.source === 'effectPrompt') return false;
+              if ((gameState.customPlacementCards || []).includes(abilityAttachPick.cardName)) return false;
+              return canForeignHeroReceiveAbility(i, abilityAttachPick.cardName);
+            }
             if (Array.isArray(abilityAttachPick.eligibleHeroIdxs)
                 && !abilityAttachPick.eligibleHeroIdxs.includes(i)) return false;
             // Custom-placement abilities (Performance) MUST be clicked on
@@ -41194,6 +41454,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                   roomId: gameState.roomId, cardName: pick.cardName,
                   handIndex: pick.handIndex, fromCreation: pick.fromCreation || undefined,
                   heroIdx: i, zoneSlot: targetSlot,
+                  heroOwner: isOpp ? oppIdx : undefined,   // Styx
                 });
               }
             : isChainPickValid
@@ -41647,6 +41908,19 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                   </div>
                 )}
                 </div>{/* Ende .badge-spalte-rechts */}
+                {/* ── Revive-Zaehler (Styx, 28.9.) ── unten mittig auf dem
+                    eigenen Basis-Styx, solange „Styx, the Opened Gate" in
+                    Rotation ist. Der Server schickt ihn nur dem Besitzer. */}
+                {!isOpp && hero?.name && (gameState.styxReviveCounter?.heroIdxs || []).includes(i) && (() => {
+                  const z = gameState.styxReviveCounter;
+                  return (
+                    <div className="styx-revive-counter"
+                      onMouseEnter={e => showGameTooltip(e, `Heroes revived this game: ${z.count}`)}
+                      onMouseLeave={hideGameTooltip}>
+                      <PxIcon z="👻" />{z.count}
+                    </div>
+                  );
+                })()}
                 {/* ── Ascension Orbs ── */}
                 {hero?.name && hero.ascensionOrbs && (
                   <div className="ascension-orbs-container"
@@ -41875,17 +42149,21 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               ))}
               {[0, 1, 2].map(z => {
                 const cards = (abZones[i]||[])[z]||[];
-                const isAbTarget = !isOpp && abilityDrag && abilityDrag.targetHero === i && abilityDrag.targetZone === z;
+                const isAbTarget = abilityDrag && (isOpp ? !!abilityDrag.targetOpp : !abilityDrag.targetOpp)
+                  && abilityDrag.targetHero === i && abilityDrag.targetZone === z;
                 // Click-to-attach an Ability: is THIS slot a valid attach target?
                 // - If the hero already has the ability, only that existing stack is clickable.
                 // - Otherwise, every empty slot is clickable.
                 // - For custom-placement cards (e.g. Performance), only occupied zones with <3 cards.
-                const attachPickZoneValid = !isOpp && abilityAttachPick && (() => {
+                const attachPickZoneValid = abilityAttachPick && (() => {
                   const heroData = p.heroes[i];
                   if (!heroData || !heroData.name || heroData.hp <= 0) return false;
+                  // Styx: fremder, kontrollierter Held — nur aus der Hand.
+                  if (isOpp && (abilityAttachPick.source === 'effectPrompt'
+                      || !canForeignHeroReceiveAbility(i, abilityAttachPick.cardName))) return false;
                   if (Array.isArray(abilityAttachPick.eligibleHeroIdxs)
                       && !abilityAttachPick.eligibleHeroIdxs.includes(i)) return false;
-                  if (!canHeroReceiveAbility(p, i, abilityAttachPick.cardName, {
+                  if (!isOpp && !canHeroReceiveAbility(p, i, abilityAttachPick.cardName, {
                     skipAbilityGiven: !!abilityAttachPick.skipAbilityGiven,
                     // Same server-authority bypass as the hero-pick
                     // highlight above.
@@ -42011,6 +42289,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                       socket.emit('play_ability', {
                         roomId: gameState.roomId, cardName: pick.cardName,
                         handIndex: pick.handIndex, fromCreation: pick.fromCreation || undefined, heroIdx: i, zoneSlot: z,
+                        heroOwner: isOpp ? oppIdx : undefined,   // Styx
                       });
                     }
                   // ★ 28.8., Als Befund: die Ability war hervorgehoben,
@@ -46209,7 +46488,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
 
       {/* ── Effect Prompt: Zone Picker Panel ── */}
       {isMyEffectPrompt && ep.type === 'zonePick' && (
-        <DraggablePanel className="first-choice-panel animate-in" style={{ borderColor: 'var(--accent)' }}>
+        // ★ v1477: `zielwahl` wie das Zielwahl-Panel (siehe DraggablePanel).
+        <DraggablePanel zielwahl className="first-choice-panel animate-in" style={{ borderColor: 'var(--accent)' }}>
           <div className="orbit-font" style={{ fontSize: 13, color: 'var(--accent)', marginBottom: 8 }}>{ep.title || 'Select a Zone'}</div>
           <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 12 }}>{ep.description}</div>
           {/* Optional small card preview — server passes `previewCardName`
@@ -46217,7 +46497,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               CardMini gives the full hover tooltip + foil treatment for free. */}
           {ep.previewCardName && CARDS_BY_NAME[ep.previewCardName] && (
             <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 10 }}>
-              <div style={{ width: 90 }}>
+              <div className="panel-zielwahl-vorschau" style={{ width: 90 }}>
                 <CardMini card={CARDS_BY_NAME[ep.previewCardName]} inGallery />
               </div>
             </div>
@@ -46237,7 +46517,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         const canConfirm = surprisePickSelected.length >= minN
           && surprisePickSelected.length <= cap;
         return (
-          <DraggablePanel className="first-choice-panel animate-in" style={{ borderColor: '#b04ba0' }}>
+          <DraggablePanel zielwahl className="first-choice-panel animate-in" style={{ borderColor: '#b04ba0' }}>
             <div className="orbit-font" style={{ fontSize: 13, color: '#d36cc0', marginBottom: 8 }}>{ep.title || 'Sacrifice Surprises'}</div>
             <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 8 }}>{ep.description}</div>
             <div style={{ fontSize: 11, color: 'var(--text2)', opacity: .8, marginBottom: 8 }}>
@@ -46273,7 +46553,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
 
       {/* ── Effect Prompt: Chain Target Pick (Chain Lightning / Qinglong / Bottled Lightning) ── */}
       {isMyEffectPrompt && ep.type === 'chainTargetPick' && (
-        <DraggablePanel className="first-choice-panel animate-in" style={{ borderColor: '#ffcc00' }}>
+        <DraggablePanel zielwahl className="first-choice-panel animate-in" style={{ borderColor: '#ffcc00' }}>
           <div className="orbit-font" style={{ fontSize: 13, color: '#ffcc00', marginBottom: 8 }}>⚡ {ep.title || 'Chain Lightning'}</div>
           <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 8 }}>
             {chainPickSelected.length < chainPickMaxTargets && chainPickValidIds.size > 0
@@ -46818,7 +47098,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
            hero / zone handlers, which emit effect_prompt_response when
            the pick source is 'effectPrompt'. */}
       {isMyEffectPrompt && ep.type === 'abilityAttachTarget' && (
-        <DraggablePanel className="first-choice-panel animate-in attach-pick-panel" style={{ borderColor: '#7fffaa' }}>
+        <DraggablePanel zielwahl className="first-choice-panel animate-in attach-pick-panel" style={{ borderColor: '#7fffaa' }}>
           <div className="orbit-font" style={{ fontSize: 13, color: '#7fffaa', marginBottom: 4, textShadow: '0 0 8px rgba(120,255,170,.6)' }}>✦ {ep.title || 'Attach Ability'}</div>
           {ep.description && <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 10 }}>{ep.description}</div>}
           {ep.cardName && (
@@ -46902,11 +47182,15 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
 
       {/* Potion/Artifact targeting panel */}
       {!isSpectator && isTargeting && pt && !gameState.effectPrompt && (
-        <DraggablePanel className="first-choice-panel" style={{ borderColor: 'var(--danger)', animation: 'fadeIn .2s ease-out', display: 'flex', gap: 16, alignItems: 'stretch' }}>
+        // ★ v1477 (Als Befund 28.9., siehe DraggablePanel): `zielwahl` —
+        // zwischen den mittleren Helden, durchklickbar, seitliche Griffe.
+        // ★ v1479 (Als Vorgabe 28.9.): Schrift, Abstände und Knöpfe wieder
+        // in der alten Größe — die Box wird beim Überfahren ohnehin durchsichtig.
+        <DraggablePanel zielwahl className="first-choice-panel" style={{ borderColor: 'var(--danger)', animation: 'fadeIn .2s ease-out', display: 'flex', gap: 16, alignItems: 'stretch' }}>
           <TriggerCardSlot name={pt.config?.triggerCardName} />
-          <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+          <div className="panel-zielwahl-spalte" data-zielwahl-mitte="" style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
           <div className="pixel-font" style={{ fontSize: 12, color: pt.config?.goldSelect ? '#ffd700' : pt.config?.greenSelect ? '#33dd55' : 'var(--danger)', marginBottom: 8 }}>{pt.potionName}</div>
-          <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 14 }}>{pt.config?.description || 'Select targets'}</div>
+          <div className="panel-zielwahl-text" style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 14 }}>{pt.config?.description || 'Select targets'}</div>
           {pt.config?.maxTotal > 0 && pt.validTargets?.length > 0 && (() => {
             // For Pollution-capped prompts (Sun Beam etc.), the effective cap
             // grows with each own-support target selected — since destroying
@@ -46961,7 +47245,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               </>
             );
           })()}
-          <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
+          <div className="panel-zielwahl-knoepfe" style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
             <button className={'btn ' + (pt.config?.confirmClass || 'btn-success')} style={{ padding: '8px 24px', fontSize: 12 }}
               disabled={!canConfirmPotion}
               onClick={() => { socket.emit('confirm_potion', { roomId: gameState.roomId, selectedIds: potionSelection }); }}>
@@ -46980,9 +47264,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               (mirrors the confirm / optionPicker panels) so the image never
               sits alone in its own row beneath the controls. */}
           {pt.config?.previewCardName && CARDS_BY_NAME[pt.config.previewCardName] && (
-            <div style={{ width: 100, flexShrink: 0, alignSelf: 'center' }}>
-              <CardMini card={CARDS_BY_NAME[pt.config.previewCardName]} inGallery />
-            </div>
+            <ZielwahlRandVorschau card={CARDS_BY_NAME[pt.config.previewCardName]} />
           )}
         </DraggablePanel>
       )}

@@ -51,12 +51,15 @@ module.exports = {
      */
     modifyPoisonDamage(ctx) {
       // This hook fires for the card instance (Medea) that owns it.
-      // Only boost if this Medea belongs to the OPPONENT of the player taking damage.
-      if (ctx.cardOwner === ctx.playerIdx) return;
-
       // Check this Medea is alive and not negated
       const hero = ctx.attachedHero;
       if (!hero || !hero.name || hero.hp <= 0) return;
+
+      // Only boost if this Medea belongs to the OPPONENT of the player taking damage.
+      // Kontrolle statt Seite (Styx 28.9.): zaehlt fuer Medeas KONTROLLEUR.
+      const medeaSide = ctx._engine?.heroSideOf
+        ? ctx._engine.heroSideOf(ctx.cardOwner, hero) : ctx.cardOwner;
+      if (medeaSide === ctx.playerIdx) return;
       if (hero.statuses?.frozen || hero.statuses?.stunned || hero.statuses?.negated) return;
 
       // Double the damage

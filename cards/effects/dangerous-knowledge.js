@@ -56,9 +56,9 @@ const CARD_NAME = 'Dangerous Knowledge';
 
 /** Namen aller eigenen Helden — besiegte eingeschlossen. */
 function eigeneHeldennamen(engine, pi) {
-  const ps = engine.gs.players[pi];
+  // Kontrolle statt Seite (Styx 28.9.) — „all Heroes you control"
   const raus = new Set();
-  for (const h of (ps?.heroes || [])) {
+  for (const { hero: h } of engine.heroesControlledBy(pi)) {
     if (h?.name) raus.add(baseCardName(h.name));
   }
   return raus;
@@ -74,18 +74,17 @@ function hatEffekt(name) {
 /** Waehlbare Gegnerhelden. */
 function kandidaten(engine, pi) {
   const oi = pi === 0 ? 1 : 0;
-  const ops = engine.gs.players[oi];
   const eigene = eigeneHeldennamen(engine, pi);
   const schon = engine.gs.players[pi]?._dangerousKnowledgeGained;
   const out = [];
-  for (let hi = 0; hi < (ops?.heroes || []).length; hi++) {
-    const hero = ops.heroes[hi];
+  // Kontrolle statt Seite (Styx 28.9.) — „a Hero your opponent controls"
+  for (const { physOwner, heroIdx: hi, hero } of engine.heroesControlledBy(oi)) {
     if (!hero?.name) continue;
     const basis = baseCardName(hero.name);
     if (eigene.has(basis)) continue;                       // „different name"
     if (schon?.has(basis)) continue;                       // einmal je Partie
     if (!hatEffekt(hero.name)) continue;
-    out.push({ id: `hero-${oi}-${hi}`, type: 'hero', owner: oi, heroIdx: hi, cardName: hero.name });
+    out.push({ id: `hero-${physOwner}-${hi}`, type: 'hero', owner: physOwner, heroIdx: hi, cardName: hero.name });
   }
   return out;
 }

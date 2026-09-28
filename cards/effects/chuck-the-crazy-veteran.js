@@ -139,9 +139,11 @@ module.exports = {
       // Chuck-alone isn't an unbreakable wall.
       let anyVulnerable = false;
       let verwundbarerName = null;
-      const heroes = ps.heroes || [];
+      // Kontrolle statt Seite (Styx 28.9.): „all other Heroes you control".
+      const heroes = engine.heroesControlledBy(pi)
+        .filter(({ hero }) => hero !== ctx.attachedHero)
+        .map(({ hero }) => hero);
       for (let i = 0; i < heroes.length; i++) {
-        if (i === heroIdx) continue;
         const h = heroes[i];
         if (!h?.name || h.hp <= 0) continue;
         if (!_isImmuneToSource(h, ctx.type)) {
@@ -155,8 +157,8 @@ module.exports = {
         _diag('schild-greift', { verwundbar: verwundbarerName });
       } else {
         _diag('schild-faellt', {
-          mitspieler: heroes.map((h, i) => (i === heroIdx ? null : (h?.name
-            ? `${h.name} hp${h.hp}${_isImmuneToSource(h, ctx.type) ? ' IMMUN' : ''}` : 'leer'))).filter(Boolean),
+          mitspieler: heroes.map(h => (h?.name
+            ? `${h.name} hp${h.hp}${_isImmuneToSource(h, ctx.type) ? ' IMMUN' : ''}` : 'leer')),
         });
       }
     },

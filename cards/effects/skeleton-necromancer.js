@@ -10,10 +10,15 @@
 const {
   isSkeletonCreature,
   findSkeletonsInDiscard,
-  getFreeSupportZonesAcrossHeroes,
 } = require('./_skeleton-shared');
 
 const CARD_NAME = 'Skeleton Necromancer';
+
+/** Freie Zonen „of any Hero you control" — Kontrolle statt Seite (Styx 28.9.);
+ *  jede Zone traegt `owner` (physische Seite). */
+function zielZonen(engine, pi) {
+  return engine.getFreeSupportZones(pi, { nachKontrolle: true, source: CARD_NAME });
+}
 
 /** Discard-pile Skeletons, excluding self-name. */
 function eligibleTutorTargets(ps, engine) {
@@ -40,7 +45,7 @@ module.exports = {
     // and a free Support Zone on some living Hero.
     if ((ps.hand || []).length === 0) return false;
     if (eligibleTutorTargets(ps, engine).length === 0) return false;
-    if (getFreeSupportZonesAcrossHeroes(engine, pi).length === 0) return false;
+    if (zielZonen(engine, pi).length === 0) return false;   // Kontrolle statt Seite (Styx 28.9.)
     return true;
   },
 
@@ -67,7 +72,7 @@ module.exports = {
     if (!candidates.some(c => c.name === chosenName)) return false;
 
     // Step 2: pick the destination free zone on any of own Heroes.
-    let zones = getFreeSupportZonesAcrossHeroes(engine, pi);
+    let zones = zielZonen(engine, pi);   // Kontrolle statt Seite (Styx 28.9.)
     if (zones.length === 0) return false;
     let chosenZone;
     if (zones.length === 1) {
@@ -79,7 +84,7 @@ module.exports = {
         cancellable: true,
       });
       if (!zonePick) return false;
-      chosenZone = zones.find(z => z.heroIdx === zonePick.heroIdx && z.slotIdx === zonePick.slotIdx) || zones[0];
+      chosenZone = zones.find(z => z.owner === (zonePick.owner ?? pi) && z.heroIdx === zonePick.heroIdx && z.slotIdx === zonePick.slotIdx) || zones[0];
     }
 
     // Step 3: pay the discard cost (player picks). The discard fly-out
@@ -97,7 +102,7 @@ module.exports = {
     // the same effect. Played on the chosen Support Zone so the
     // animation lands where the Skeleton arrives.
     engine._broadcastEvent('play_zone_animation', {
-      type: 'necromancy_summon', owner: pi,
+      type: 'necromancy_summon', owner: chosenZone.owner,
       heroIdx: chosenZone.heroIdx, zoneSlot: chosenZone.slotIdx,
     });
     await engine._delay(800);
@@ -118,6 +123,7 @@ module.exports = {
     // Früher: eigene Entnahme + Sentinel `source: 'deck'` + Rückbuchung.
     const placeRes = await engine.summonFromDiscard(pi, pi, discardIdx, chosenZone.heroIdx, chosenZone.slotIdx, {
       mode: 'place', source: CARD_NAME,
+      heldSeite: chosenZone.owner,   // Kontrolle statt Seite (Styx 28.9.)
       placeOpts: { countAsSummon: true, animationType: 'summon', fireHooks: true },
     });
     if (!placeRes?.inst) {

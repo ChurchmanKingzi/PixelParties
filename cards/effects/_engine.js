@@ -1888,7 +1888,9 @@ class GameEngine {
     if (type === 'zonePick') {
       const zones = promptData.zones || [];
       if (zones.length === 0) return null;
-      return { heroIdx: zones[0].heroIdx, slotIdx: zones[0].slotIdx };
+      // `owner` mitgeben (Styx 28.9.): Zonen uebernommener Helden liegen
+      // auf der Gegenseite und tragen ihre physische Seite.
+      return { heroIdx: zones[0].heroIdx, slotIdx: zones[0].slotIdx, ...(zones[0].owner != null ? { owner: zones[0].owner } : {}) };
     }
 
     if (type === 'statusSelect') {
@@ -2770,6 +2772,17 @@ class GameEngine {
         this.gs._discardedOnTurn[wer] = this.gs.turn;
       }
     }
+    // ★ KONTROLLE ENDET MIT DEM TOD (Styx, the Opened Gate, 28.9.) ────
+    // „You take control of the Hero while it is revived by this effect."
+    // Als Ruling: IM MOMENT DES STERBENS gilt der Held wieder als von
+    // seinem eigentlichen Besitzer kontrolliert — also reagieren DESSEN
+    // Karten (Elixir of Immortality) und beleben ihn unter DESSEN
+    // Kontrolle wieder. Hier, VOR der Zuhoerer-Runde, an der Stelle,
+    // durch die jeder Heldentod laeuft (Schaden, Besiegen, Zwangstod).
+    if (hookName === HOOKS.ON_HERO_KO && hookCtx?.hero?._kontrolleBisZumTod
+        && !(hookCtx.hero.hp > 0)) {
+      this.kontrolleBeimTodZurueckgeben(hookCtx.hero);
+    }
     if (hookName === HOOKS.ON_CREATURE_DEATH || hookName === HOOKS.ON_HERO_KO) {
       const opfer = hookCtx.creature || hookCtx.hero;
       const quelle = hookCtx.source;
@@ -3637,6 +3650,18 @@ class GameEngine {
         // correct board.
         effectiveController = cardInstance.stolenBy;
         effectiveOwner = cardInstance.stolenBy;
+        effectiveHeroOwner = cardInstance.owner;
+      } else if (cardInstance.zone === 'support'
+                 && cardInstance.counters?.crossSideControlled != null
+                 && cardInstance.controller != null
+                 && cardInstance.controller !== cardInstance.owner) {
+        // ★ Styx 28.9.: ueber einen uebernommenen Helden BESCHWOREN (Golden
+        // Apple, Charme, Styx …): die Kreatur steht physisch beim Gegner,
+        // gehoert aber ihrem Beschwoerer. Wie bei gestohlenen Kreaturen:
+        // „du" (cardOwner/cardController) ist der Kontrolleur, die
+        // Zeichen-Seite (cardHeroOwner) bleibt die physische.
+        effectiveController = cardInstance.controller;
+        effectiveOwner = cardInstance.controller;
         effectiveHeroOwner = cardInstance.owner;
       }
     }
@@ -9249,6 +9274,10 @@ class GameEngine {
       return false;
     }
     target.hp = this.reviveMaxHp(target);
+    // Neues Leben: kein Zwangstod aus dem alten (s. actionReviveHero).
+    delete target._forceKillAtTurnEnd;
+    delete target._forceKillSource;
+    this.zaehleHeldenWiederbelebung(target, lifeMark?.by || 'Extra Life');
     const ownerIdx = (knownOwnerIdx != null && knownOwnerIdx >= 0)
       ? knownOwnerIdx
       : this.gs.players.findIndex(ps => (ps.heroes || []).includes(target));
@@ -9725,6 +9754,27 @@ class GameEngine {
     return true;
   }
 
+  /**
+   * ★ WIE OFT WURDEN IN DIESER PARTIE HELDEN WIEDERBELEBT? (Styx, 28.9.)
+   *
+   * „after Heroes have been revived at least 3 times this game" (Styx,
+   * the Opened Gate). Gezaehlt wird JEDE Wiederbelebung eines Helden,
+   * gleich auf welcher Seite und durch welche Karte. Die drei Wege:
+   *   • `actionReviveHero` — alle Karten (Golden Ankh, Hymn, Cheat
+   *     Chair, SCARAB, Styx selbst …)
+   *   • `_consumeExtraLife` — Trial of Coolness, Rescued Damsel Cecilia
+   *   • Ascended Blooms Aufstieg aus dem Tod (Als Ruling 28.9.: zaehlt
+   *     als Wiederbelebung)
+   * Todes-VERHINDERER (Guardian Angel) zaehlen nicht — dort stirbt
+   * niemand. Kreaturen zaehlen nicht („Heroes").
+   */
+  zaehleHeldenWiederbelebung(hero, quelle) {
+    this.gs.heroRevivalCount = (this.gs.heroRevivalCount || 0) + 1;
+    this.log('hero_revival_count', {
+      hero: hero?.name || null, by: quelle || null, count: this.gs.heroRevivalCount,
+    });
+  }
+
   async actionReviveHero(playerIdx, heroIdx, hp, opts = {}) {
     const ps = this.gs.players[playerIdx];
     const hero = ps?.heroes?.[heroIdx];
@@ -9766,6 +9816,12 @@ class GameEngine {
     hero.hp = reviveHp;
     hero.statuses = {};
     delete hero._koProcessed; // Allow death cleanup to fire again if hero dies again
+    // ★ Styx (28.9.): eine NEUE Wiederbelebung ist ein neues Leben — ein
+    // Zwangstod aus einem frueheren Leben (Golden Ankh, Styx) haengt nicht
+    // mehr an ihm. Setzt die Karte ihn wieder, geschieht das gleich unten.
+    delete hero._forceKillAtTurnEnd;
+    delete hero._forceKillSource;
+    this.zaehleHeldenWiederbelebung(hero, opts.source);
 
     if (opts.maxHpCap != null) {
       hero.maxHp = opts.maxHpCap;
@@ -11507,6 +11563,86 @@ class GameEngine {
    * it is controlled by you." Temporaer = `charmedBy`/`controlledBy` ohne
    * dauerhafte Uebernahme (`permaControlBy`).
    */
+  /**
+   * ★ Styx, the Opened Gate (28.9.): eine Kontrolle, die nur so lange
+   * gilt, wie der Held lebt (`hero._kontrolleBisZumTod`). Stirbt er,
+   * geht er zurueck an seinen Besitzer — genauso wie beim Zugwechsel
+   * (dauerhafte Uebernahme `permaControlBy` wird wiederhergestellt,
+   * sonst faellt die Marke weg). Aufgerufen aus `runHooks(ON_HERO_KO)`.
+   */
+  kontrolleBeimTodZurueckgeben(hero) {
+    if (!hero?._kontrolleBisZumTod) return;
+    const quelle = hero._kontrolleBisZumTod.by || null;
+    delete hero._kontrolleBisZumTod;
+    if (hero.permaControlBy != null) {
+      hero.charmedBy = hero.permaControlBy;
+      hero.charmedFromOwner = hero.permaControlFrom;
+      hero.charmedHeroIdx = hero.permaControlHeroIdx;
+    } else {
+      delete hero.charmedBy;
+      delete hero.charmedFromOwner;
+      delete hero.charmedHeroIdx;
+    }
+    if (hero.statuses?.charmed) delete hero.statuses.charmed;
+    this.log('control_returned_on_death', { hero: hero.name, by: quelle });
+  }
+
+  /**
+   * Darf `pi` gerade eine Ability aus der Hand an den Helden
+   * `heroOwner`/`heroIdx` anlegen, der physisch auf der ANDEREN Seite
+   * steht? Nur wenn die Kontrollmarke es ausdruecklich erlaubt (Styx,
+   * the Opened Gate — Als Vorgabe 28.9.) und in diesem Zug noch keine
+   * angelegt wurde. Server (`doPlayAbilityFremd`) und Client lesen
+   * dieselben Felder.
+   */
+  darfFremdAbilityAnlegen(pi, heroOwner, heroIdx) {
+    if (heroOwner === pi) return false;
+    const hero = this.gs.players[heroOwner]?.heroes?.[heroIdx];
+    if (!hero?.name || !(hero.hp > 0)) return false;
+    if (hero.charmedBy !== pi) return false;
+    const ch = hero.statuses?.charmed;
+    if (!ch?.abilitiesErlaubt) return false;
+    return ch.abilityZug !== this.gs.turn;
+  }
+
+  /**
+   * ★ „… YOUR OPPONENT CONTROLS" UND DER GELIEHENE HELD (Styx, 28.9.).
+   *
+   * Ein uebernommener Held steht physisch in der Spalte seines Besitzers.
+   * Die zentralen Zielsammler (`promptDamageTarget`, `promptMultiTarget`)
+   * zaehlen ihn laengst zur Seite des Kontrolleurs; Karten, die ihre
+   * Ziele SELBST sammeln (Ziel-Artefakte und -Traenke: Snow Cannon,
+   * Arcane Lamp, Magic Ruby …), lesen aber die physische Gegnerseite
+   * und boten ihn an (Als Befund).
+   *
+   * Entschieden wird am gedruckten Text: sagt JEDER „Choose …"-Satz der
+   * Karte „your opponent controls" (und keiner „you control", „either
+   * player", „any target", „on the board"), ist sie eine reine
+   * Gegner-Karte, und Helden, die `casterPi` gerade kontrolliert, fallen
+   * aus der Liste. Karten mit gemischten Zielen bleiben unberuehrt.
+   * Aendert `validTargets` an Ort und Stelle.
+   */
+  filterSelbstKontrollierteGegnerHelden(validTargets, casterPi, cardName) {
+    if (!Array.isArray(validTargets) || !this.istReineGegnerKarte(cardName)) return validTargets;
+    for (let i = validTargets.length - 1; i >= 0; i--) {
+      const t = validTargets[i];
+      if (t?.type !== 'hero' || t.owner === casterPi) continue;
+      const hero = this.gs.players[t.owner]?.heroes?.[t.heroIdx];
+      if (hero && this.heroSideOf(t.owner, hero) === casterPi) validTargets.splice(i, 1);
+    }
+    return validTargets;
+  }
+
+  /** Zielt die Karte laut Text ausschliesslich auf Gegnerisches? (s.o.) */
+  istReineGegnerKarte(cardName) {
+    const text = this._getCardDB()[cardName]?.effect || '';
+    const choose = text.split(/(?<=[.!])\s+|\n+/)
+      .filter(satz => /^\s*(?:\d\)\s*)?(?:you may (?:once per turn )?)?choose\b/i.test(satz));
+    if (choose.length === 0) return false;
+    return choose.every(satz => /your opponent controls/i.test(satz)
+      && !/\byou (?:permanently )?control\b|either player|any target|on the board/i.test(satz));
+  }
+
   istTemporaerGesteuert(hero) {
     if (!hero?.name) return false;
     if (hero.permaControlBy != null) return false;
@@ -13757,7 +13893,9 @@ this._deathWatch = (this._deathWatchStack || []).length
     const { alsZusatzaktion, ...rest } = opts || {};
     const ergebnis = await this._summonCreatureWithHooksKern(cardName, playerIdx, heroIdx, zoneSlot, rest);
     if (alsZusatzaktion && ergebnis?.inst) {
-      await this.meldeBeschwoerungAlsAktion(playerIdx, heroIdx, cardName, ergebnis.inst);
+      // Die Aktion gehoert dem BESCHWOERER (`controller`), nicht der
+      // Feldseite — bei einem uebernommenen Helden der Gegenspalte (Styx).
+      await this.meldeBeschwoerungAlsAktion(rest.controller ?? playerIdx, heroIdx, cardName, ergebnis.inst);
     }
     return ergebnis;
   }
@@ -13784,10 +13922,12 @@ this._deathWatch = (this._deathWatchStack || []).length
     // uebergibt den Platz als `opts.fromHandIdx`; nur dann fliegt sie.
     if (opts.fromHandIdx != null && opts.fromHandIdx >= 0) {
       this._broadcastEvent('play_pile_transfer', {
-        owner: playerIdx, cardName,
+        owner: opts.controller ?? playerIdx, cardName,
         from: 'hand', to: 'support',
         fromHandIdx: opts.fromHandIdx,
         toHeroIdx: heroIdx, toSlotIdx: zoneSlot,
+        // Hand = Beschwoerer, Ziel = Feldseite (Styx 28.9.).
+        ...(opts.controller != null && opts.controller !== playerIdx ? { toOwner: playerIdx } : {}),
       });
     }
     // v704 (Puppets): gesperrte Support Zones (Tri Fecta / Tri Ad) — nur
@@ -15625,6 +15765,8 @@ this._deathWatch = (this._deathWatchStack || []).length
   _charmBlocksFrom(target, quellenSeite, opts = {}) {
     const ch = target?.statuses?.charmed;
     if (!ch) return false;
+    // Styx, the Opened Gate: reine Kontrolle, der Text verspricht keinen Schutz.
+    if (ch.ohneSchutz) return false;
     if (ch._loveShot && opts.loveShotOhneSchutz) return false;
     if (ch.onlyFromController) {
       const k = ch.controller;
@@ -17546,10 +17688,15 @@ this._deathWatch = (this._deathWatchStack || []).length
   async summonFromPile(pi, pile, cardName, heroIdx, slotIdx, opts = {}) {
     pi = this._resolvePi(pi);
     // v1393: Deck laeuft ueber die EINE Stelle (summonFromDeck).
+    // Styx 28.9.: `opts.heldSeite` — physische Seite eines uebernommenen
+    // Zielhelden; die Kreatur landet dort und gehoert `pi`.
+    const feld = opts.heldSeite ?? pi;
+    const seitenOpt = feld !== pi ? { heldSeite: feld } : {};
     if (pile === 'deck') {
       const res = await this.summonFromDeck(pi, cardName, heroIdx, slotIdx, {
         source: opts.source || 'summonFromPile', hookExtras: opts.hookExtras,
         summonOpts: { alsZusatzaktion: !!opts.alsZusatzaktion, ...(opts.summonOpts || {}) },
+        ...seitenOpt,
       });
       return res?.inst || null;
     }
@@ -17558,18 +17705,20 @@ this._deathWatch = (this._deathWatchStack || []).length
       const res = await this.summonFromDiscard(pi, pi, cardName, heroIdx, slotIdx, {
         source: opts.source || 'summonFromPile', hookExtras: opts.hookExtras,
         summonOpts: { alsZusatzaktion: !!opts.alsZusatzaktion, ...(opts.summonOpts || {}) },
+        ...seitenOpt,
       });
       return res?.inst || null;
     }
     const taken = await this.takeFromPile(pi, pile, cardName, { ...opts, shuffle: pile === 'deck' });
     if (!taken) return null;
-    const flight = { toHeroIdx: heroIdx, toSlotIdx: slotIdx };
+    const flight = { toHeroIdx: heroIdx, toSlotIdx: slotIdx, ...(feld !== pi ? { toOwner: feld } : {}) };
     if (pile === 'hand') flight.fromHandIdx = taken.idx;
     this._pileFlight(pi, taken.name, pile, 'support', flight);
-    const summon = await this.summonCreatureWithHooks(taken.name, pi, heroIdx, slotIdx, {
+    const summon = await this.summonCreatureWithHooks(taken.name, feld, heroIdx, slotIdx, {
       source: opts.source || 'summonFromPile', hookExtras: { _summonedFromPile: pile, ...(opts.hookExtras || {}) },
       alsZusatzaktion: !!opts.alsZusatzaktion,   // v1349
       ...(opts.summonOpts || {}),
+      ...(feld !== pi ? { controller: pi } : {}),
     });
     if (!summon?.inst) { this.returnToPile(pi, pile, taken.name, pile === 'hand' ? taken.idx : null); this.sync(); return null; }
     return summon.inst;
@@ -17584,7 +17733,8 @@ this._deathWatch = (this._deathWatchStack || []).length
    */
   async placeFromPile(pi, pile, cardName, heroIdx, slotIdx, opts = {}) {
     pi = this._resolvePi(pi);
-    const placeOpts = { sourceName: opts.source || opts.sourceName || 'Placement', ...(opts.placeOpts || {}) };
+    const placeOpts = { sourceName: opts.source || opts.sourceName || 'Placement', ...(opts.placeOpts || {}),
+      ...(opts.heldSeite != null && opts.heldSeite !== pi ? { heldSeite: opts.heldSeite } : {}) };   // Styx 28.9.
     if (pile === 'hand' || pile === 'discard') {
       return this.actionPlaceCreature(cardName, pi, heroIdx, slotIdx, { ...placeOpts, source: pile });
     }
@@ -17592,6 +17742,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (pile === 'deck') {
       const res = await this.summonFromDeck(pi, cardName, heroIdx, slotIdx, {
         mode: 'place', source: opts.source || placeOpts.sourceName, placeOpts,
+        ...(placeOpts.heldSeite != null ? { heldSeite: placeOpts.heldSeite } : {}),
       });
       return res?.inst || null;
     }
@@ -20470,6 +20621,8 @@ this._deathWatch = (this._deathWatchStack || []).length
           if (hero.statuses?.charmed) delete hero.statuses.charmed;
           this.log('charme_revert', { hero: hero.name });
         }
+        // Styx' Kontrolle „bis zum Tod" endet spaetestens hier mit dem Zug.
+        if (hero?._kontrolleBisZumTod) delete hero._kontrolleBisZumTod;
         // Revert Controlled Attack
         if (hero?.controlledBy != null) {
           delete hero.controlledBy;
@@ -23690,8 +23843,14 @@ this._deathWatch = (this._deathWatchStack || []).length
     const gs = this.gs;
     const ps = gs.players[playerIdx];
     if (!ps) return null;
+    // ★ Styx 28.9.: `opts.heldSeite` — die Kreatur landet in der Zone eines
+    // uebernommenen Helden der Gegenspalte und gehoert `playerIdx`
+    // (`controller` + `crossSideControlled`, wie beim Beschwoeren ueber
+    // einen verzauberten Helden). Hand/Ablage bleiben die von `playerIdx`.
+    const feld = (opts.heldSeite != null && gs.players[opts.heldSeite]) ? opts.heldSeite : playerIdx;
+    const fps = gs.players[feld];
     // v704 (Puppets): gesperrte Support Zones (Tri Fecta / Tri Ad).
-    if (this.isSupportZoneLocked(playerIdx, heroIdx, { source: opts.source, cardName, via: 'place' })) {
+    if (this.isSupportZoneLocked(feld, heroIdx, { source: opts.source, cardName, via: 'place' })) {
       this.log('placement_blocked', { card: cardName, reason: 'support_zones_locked', heroIdx });
       return null;
     }
@@ -23765,6 +23924,7 @@ this._deathWatch = (this._deathWatchStack || []).length
           owner: playerIdx, cardName,
           from: 'hand', to: 'support', fromHandIdx: idx,
           toHeroIdx: heroIdx, toSlotIdx: slotIdx,
+          ...(feld !== playerIdx ? { toOwner: feld } : {}),
         });
         _handFlug = true;
       }
@@ -23801,7 +23961,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       // Hooks warten auf die Landung (`_handFlug`).
       if (!opts.skipPileTransfer && !this._fastMode && !this._inMctsSim) {
         this._broadcastEvent('play_pile_transfer', {
-          fromOwner: _pileOwner, toOwner: playerIdx, owner: playerIdx, cardName,
+          fromOwner: _pileOwner, toOwner: feld, owner: playerIdx, cardName,
           from: 'discard', to: 'support',
           toHeroIdx: heroIdx, toSlotIdx: slotIdx,
         });
@@ -23814,7 +23974,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // der Deleted-Zweig bleibt wie gehabt.
     const _letheBonus = source === 'deleted' ? this.consumeLetheStamp(playerIdx, cardName) : 0;
 
-    if (!ps.supportZones[heroIdx]) ps.supportZones[heroIdx] = [[], [], []];
+    if (!fps.supportZones[heroIdx]) fps.supportZones[heroIdx] = [[], [], []];
     // ── Geteilte Zone (Alice, the Transfer Student) ──────────────────
     // Liegt dort schon mindestens eine Kreatur GLEICHEN Namens und
     // teilt dieser Spieler seine Zonen, wird die neue Kopie DAZUGELEGT
@@ -23825,15 +23985,19 @@ this._deathWatch = (this._deathWatchStack || []).length
     // Bedingung ist ohne ihren Schalter immer falsch.
     {
       const { canShareInto } = require('./_alice-shared');
-      if (canShareInto(this, playerIdx, heroIdx, slotIdx, cardName)) {
-        ps.supportZones[heroIdx][slotIdx].push(cardName);
+      if (canShareInto(this, feld, heroIdx, slotIdx, cardName)) {
+        fps.supportZones[heroIdx][slotIdx].push(cardName);
       } else {
-        ps.supportZones[heroIdx][slotIdx] = [cardName];
+        fps.supportZones[heroIdx][slotIdx] = [cardName];
       }
     }
 
-    const inst = this._trackCard(cardName, playerIdx, ZONES.SUPPORT, heroIdx, slotIdx);
+    const inst = this._trackCard(cardName, feld, ZONES.SUPPORT, heroIdx, slotIdx);
     inst.counters = inst.counters || {};
+    if (feld !== playerIdx) {
+      inst.controller = playerIdx;
+      inst.counters.crossSideControlled = playerIdx;
+    }
     inst.counters.isPlacement = 1;
     inst.turnPlayed = gs.turn || 0;
     if (_letheBonus > 0) inst.counters._letheLevelBonus = _letheBonus;
@@ -23877,11 +24041,11 @@ this._deathWatch = (this._deathWatchStack || []).length
     const animType = opts.animationType || 'summon';
     if (animType === 'summon') {
       this._broadcastEvent('summon_effect', {
-        owner: playerIdx, heroIdx, zoneSlot: slotIdx, cardName,
+        owner: feld, heroIdx, zoneSlot: slotIdx, cardName,
       });
     } else if (animType !== 'none') {
       this._broadcastEvent('play_zone_animation', {
-        type: animType, owner: playerIdx, heroIdx, zoneSlot: slotIdx,
+        type: animType, owner: feld, heroIdx, zoneSlot: slotIdx,
       });
     }
 
@@ -24094,6 +24258,24 @@ this._deathWatch = (this._deathWatchStack || []).length
   }
 
   getFreeSupportZones(playerIdx, opts = {}) {
+    // ★ Styx 28.9.: „a Hero you control" — mit `nachKontrolle` zaehlen die
+    // Helden, die `playerIdx` KONTROLLIERT (auch uebernommene der
+    // Gegenspalte), nicht die physische Spalte. Jede Zone traegt dann
+    // `owner` (physische Seite) — zonePick hebt sie auf der richtigen
+    // Brettseite hervor, und `heldSeite` beim Beschwoeren nimmt ihn auf.
+    if (opts.nachKontrolle) {
+      const out = [];
+      const seiten = [...new Set(this.heroesControlledBy(playerIdx).map(e => e.physOwner))];
+      for (const seite of seiten) {
+        const erlaubt = new Set(this.heroesControlledBy(playerIdx)
+          .filter(e => e.physOwner === seite).map(e => e.heroIdx));
+        for (const z of this.getFreeSupportZones(seite, { ...opts, nachKontrolle: false, namedHeroesOnly: true })) {
+          if (!erlaubt.has(z.heroIdx)) continue;
+          out.push({ ...z, owner: seite });
+        }
+      }
+      return out;
+    }
     const ps = this.gs.players[playerIdx];
     if (!ps) return [];
     const livingOnly = !!opts.livingHeroesOnly;
@@ -26669,6 +26851,23 @@ this._deathWatch = (this._deathWatchStack || []).length
     return roh;
   }
 
+  /**
+   * Wer KONTROLLIERT dieses Zielobjekt? (Styx 28.9.)
+   * Held → `heroSideOf(owner, hero)`; Kreatur/Karte mit Instanz →
+   * `controller ?? owner`; sonst die Seite aus dem Objekt.
+   * Die Zieladresse (`t.owner`, IDs) bleibt davon unberuehrt physisch.
+   */
+  zielSeite(t, fallback = null) {
+    if (!t) return fallback;
+    if (t.type === 'hero') {
+      const hero = this.gs.players[t.owner]?.heroes?.[t.heroIdx];
+      return hero ? this.heroSideOf(t.owner, hero) : (t.owner ?? fallback);
+    }
+    const inst = t.cardInstance || t._cardInstance || t.inst;
+    if (inst) return inst.controller ?? inst.owner;
+    return t.owner ?? fallback;
+  }
+
   async _checkTargetRedirect(targetOwnerIdx, selected, validTargets, config, sourceCard, _depth = 0) {
     // Demon's Gate-style "Creature casts a Spell": present the Creature
     // as the source so redirect cards (Challenge / Martyry / Anti-Magnet)
@@ -26699,6 +26898,11 @@ this._deathWatch = (this._deathWatchStack || []).length
       }
     }
 
+    // ★ Kontrolle statt Seite (Styx 28.9.): gefragt wird der Spieler, der
+    // das Ziel KONTROLLIERT — ein uebernommener Held steht physisch beim
+    // Besitzer, seine Beschuetzer (Challenge, Martyry, Anti-Magnet, …)
+    // sitzen aber beim Kontrolleur. Die Zieladresse bleibt physisch.
+    targetOwnerIdx = this.zielSeite(selected, targetOwnerIdx);
     const redirected = await this._checkTargetRedirectOnce(
       targetOwnerIdx, selected, validTargets, config, sourceCard
     );
@@ -26795,7 +26999,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       let _redirHp = 1;
       try {
         if (selected?.type === 'hero' && typeof selected.heroIdx === 'number') {
-          _redirHp = Math.max(1, this.gs.players[targetOwnerIdx]?.heroes?.[selected.heroIdx]?.hp || 1);
+          _redirHp = Math.max(1, this.gs.players[selected.owner ?? targetOwnerIdx]?.heroes?.[selected.heroIdx]?.hp || 1);
         } else if (typeof selected?.hp === 'number') { _redirHp = Math.max(1, selected.hp); }
       } catch {}
       const confirmed = await this.promptGeneric(targetOwnerIdx, {
@@ -26875,6 +27079,8 @@ this._deathWatch = (this._deathWatchStack || []).length
     for (let hi = 0; hi < (_nurNegation ? 0 : (ps.heroes || []).length); hi++) {
       const hero = ps.heroes[hi];
       if (!hero?.name || hero.hp <= 0) continue;
+      // Styx 28.9.: ein an den Gegner abgegebener Held beschuetzt nicht.
+      if (this.heroSideOf(targetOwnerIdx, hero) !== targetOwnerIdx) continue;
       if (hero.statuses?.frozen || (hero.statuses?.stunned || hero.statuses?.webbed) || hero.statuses?.negated) continue;
 
       const heroScript = this.heroScript(hero);
@@ -26893,7 +27099,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       let _redirHpH = 1;
       try {
         if (selected?.type === 'hero' && typeof selected.heroIdx === 'number') {
-          _redirHpH = Math.max(1, this.gs.players[targetOwnerIdx]?.heroes?.[selected.heroIdx]?.hp || 1);
+          _redirHpH = Math.max(1, this.gs.players[selected.owner ?? targetOwnerIdx]?.heroes?.[selected.heroIdx]?.hp || 1);
         } else if (typeof selected?.hp === 'number') { _redirHpH = Math.max(1, selected.hp); }
       } catch {}
       const confirmed = await this.promptGeneric(targetOwnerIdx, {
@@ -29364,11 +29570,19 @@ this._deathWatch = (this._deathWatchStack || []).length
     // by `isCreatureSource` see the casting Creature.
     source = this._rewriteSourceForCreatureCaster(source);
 
-    const targetOwner = this.gs.players.findIndex(ps => (ps.heroes || []).includes(target));
-    if (targetOwner < 0) return NULL_RESULT;
+    // ★ Kontrolle statt Seite (Styx 28.9.): es reagiert der Spieler, der den
+    // Helden KONTROLLIERT (`targetOwner`); `zielPhys`/`targetHeroIdx` sind
+    // seine physische Adresse. Skripte lesen die Adresse ueber das
+    // Heldenobjekt (`engine._findHeroOwner(target)`).
+    const zielPhys = this.gs.players.findIndex(ps => (ps.heroes || []).includes(target));
+    if (zielPhys < 0) return NULL_RESULT;
 
-    const targetHeroIdx = this.gs.players[targetOwner]?.heroes?.indexOf(target);
+    const targetHeroIdx = this.gs.players[zielPhys]?.heroes?.indexOf(target);
     if (targetHeroIdx < 0) return NULL_RESULT;
+    const targetOwner = this.heroSideOf(zielPhys, target);
+    // Wirkt der GETROFFENE Held selbst (`casterIsTarget`), muss er in der
+    // Spalte des Reagierenden stehen — geliehene Helden casten hier nicht.
+    const casterZielIdx = zielPhys === targetOwner ? targetHeroIdx : null;
 
     // Schadenskontext für den Reaktions-Lernkanal (siehe _rxDamageTag).
     this._rxDamageCtx = { tag: this._rxDamageTag(target, source, amount, targetOwner) };
@@ -29420,7 +29634,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       // v619: Reaction-Attack/Spell/Creature braucht einen castenden Helden
       // (Level, Schule, lebend, nicht Frozen/Stunned/Negated); Artefakte
       // und Potions nicht — siehe `_rxHandCastingHero`.
-      const rxCast = this._rxCastPlan(ps, cardName, script, { targetHeroIdx });
+      const rxCast = this._rxCastPlan(ps, cardName, script, { targetHeroIdx: casterZielIdx, zielNichtCastbar: casterZielIdx == null });
       if (!rxCast) { this._noteRxWindow(ps, cardName, 'hero'); continue; }
       if (cost > 0 && !this._rxCanAfford(ps, cost, cardName)) { this._noteRxWindow(ps, cardName, 'gold'); continue; }
 
@@ -29465,7 +29679,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       });
       if (!confirmed) continue;
       // v1155: 2+ moegliche Wirker → Auswahl (Abbruch = keine Reaktion)
-      if (!(await this._rxCastWirkerWaehlen(ps, cardName, script, rxCast, { targetHeroIdx }))) continue;
+      if (!(await this._rxCastWirkerWaehlen(ps, cardName, script, rxCast, { targetHeroIdx: casterZielIdx, zielNichtCastbar: casterZielIdx == null }))) continue;
 
       // Activate: remove from hand, deduct gold, mark once-per-game.
       //
@@ -29649,10 +29863,12 @@ this._deathWatch = (this._deathWatchStack || []).length
     // Demon's Gate-style creature-caster annotation.
     source = this._rewriteSourceForCreatureCaster(source);
 
-    const targetOwner = this.gs.players.findIndex(ps => (ps.heroes || []).includes(target));
-    if (targetOwner < 0) return NULL_RESULT;
-    const targetHeroIdx = this.gs.players[targetOwner]?.heroes?.indexOf(target);
+    // Kontrolle statt Seite (Styx 28.9.): „Gegner" = Gegner des KONTROLLEURS.
+    const zielPhys = this.gs.players.findIndex(ps => (ps.heroes || []).includes(target));
+    if (zielPhys < 0) return NULL_RESULT;
+    const targetHeroIdx = this.gs.players[zielPhys]?.heroes?.indexOf(target);
     if (targetHeroIdx < 0) return NULL_RESULT;
+    const targetOwner = this.heroSideOf(zielPhys, target);
 
     const pi = targetOwner === 0 ? 1 : 0;
     const ps = this.gs.players[pi];
@@ -30570,14 +30786,19 @@ this._deathWatch = (this._deathWatchStack || []).length
    */
   async summonFromDeck(pi, what, heroIdx, slotIdx, opts = {}) {
     const mode = opts.mode || 'summon';
+    // Styx 28.9.: `opts.heldSeite` = physische Seite des Zielhelden (ein
+    // uebernommener Held der Gegenspalte). Die Kreatur landet dort und
+    // gehoert `pi` (`controller`).
+    const feld = opts.heldSeite ?? pi;
+    const kontrolle = feld !== pi ? { controller: pi } : {};
     const ab = await this.deckEntnahme(pi, what, { source: opts.source, shuffle: opts.shuffle !== false });
     if (!ab) return null;
     if (opts.vorAnim?.type) {
-      this._broadcastEvent('play_zone_animation', { type: opts.vorAnim.type, owner: pi, heroIdx, zoneSlot: slotIdx });
+      this._broadcastEvent('play_zone_animation', { type: opts.vorAnim.type, owner: feld, heroIdx, zoneSlot: slotIdx });
       await this._delay(opts.vorAnim.ms ?? 700);
     }
     if (opts.flug !== false) {
-      this._pileFlight(pi, ab.name, 'deck', 'support', { toHeroIdx: heroIdx, toSlotIdx: slotIdx });
+      this._pileFlight(pi, ab.name, 'deck', 'support', { toHeroIdx: heroIdx, toSlotIdx: slotIdx, ...(feld !== pi ? { toOwner: feld } : {}) });
       if (typeof opts.flug === 'number' && opts.flug > 0) { this.sync(); await this._delay(opts.flug); }
     }
     let res;
@@ -30586,11 +30807,13 @@ this._deathWatch = (this._deathWatchStack || []).length
         sourceName: opts.source || 'Placement', ...(opts.placeOpts || {}),
         source: 'deck', skipPileTransfer: true,
         hookExtras: this.deckHookExtras(opts.hookExtras || {}),
+        ...(feld !== pi ? { heldSeite: feld } : {}),
       });
     } else {
-      res = await this.summonCreatureWithHooks(ab.name, pi, heroIdx, slotIdx, {
+      res = await this.summonCreatureWithHooks(ab.name, feld, heroIdx, slotIdx, {
         source: opts.source || 'summonFromDeck',
         ...(opts.summonOpts || {}),
+        ...kontrolle,
         hookExtras: this.deckHookExtras(opts.hookExtras || {}),
       });
     }
@@ -30684,36 +30907,41 @@ this._deathWatch = (this._deathWatchStack || []).length
    */
   async summonFromDiscard(pi, pileOwner, what, heroIdx, slotIdx, opts = {}) {
     const mode = opts.mode || 'summon';
+    // Styx 28.9.: `opts.heldSeite` wie bei `summonFromDeck`.
+    const feld = opts.heldSeite ?? pi;
+    const kontrolle = feld !== pi ? { controller: pi } : {};
     if (mode === 'place') {
       return this.actionPlaceCreature(
         typeof what === 'number' ? this.gs.players[pileOwner]?.discardPile?.[what] : what,
         pi, heroIdx, slotIdx,
         { sourceName: opts.source, ...(opts.placeOpts || {}), source: 'discard',
-          pileOwner, sourceIdx: typeof what === 'number' ? what : undefined },
+          pileOwner, sourceIdx: typeof what === 'number' ? what : undefined,
+          ...(feld !== pi ? { heldSeite: feld } : {}) },
       );
     }
     const ab = await this.ablageEntnahme(pi, pileOwner, what, opts);
     if (!ab) return null;
     if (opts.vorAnim?.type) {
-      this._broadcastEvent('play_zone_animation', { type: opts.vorAnim.type, owner: pi, heroIdx, zoneSlot: slotIdx });
+      this._broadcastEvent('play_zone_animation', { type: opts.vorAnim.type, owner: feld, heroIdx, zoneSlot: slotIdx });
       await this._delay(opts.vorAnim.ms ?? 700);
     }
     if (opts.flug !== false) {
       this._broadcastEvent('play_pile_transfer', {
-        fromOwner: pileOwner, toOwner: pi, owner: pi, cardName: ab.name,
+        fromOwner: pileOwner, toOwner: feld, owner: pi, cardName: ab.name,
         from: 'discard', to: 'support', toHeroIdx: heroIdx, toSlotIdx: slotIdx,
         ...(opts.flugStil ? { flightStyle: opts.flugStil } : {}),   // 26.9. (Forceful Revival)
       });
       if (typeof opts.flug === 'number' && opts.flug > 0) { this.sync(); await this._delay(opts.flug); }
     }
     const res = mode === 'revive'
-      ? await this.summonCreatureWithHooks(ab.name, pi, heroIdx, slotIdx, {
+      ? await this.summonCreatureWithHooks(ab.name, feld, heroIdx, slotIdx, {
           skipHooks: true, skipBeforeSummon: true, playSummonAnim: false, skipLog: true,
-          source: opts.source || 'revive',
+          source: opts.source || 'revive', ...kontrolle,
         })
-      : await this.summonCreatureWithHooks(ab.name, pi, heroIdx, slotIdx, {
+      : await this.summonCreatureWithHooks(ab.name, feld, heroIdx, slotIdx, {
           source: opts.source || 'summonFromDiscard',
           ...(opts.summonOpts || {}),
+          ...kontrolle,
           hookExtras: this.ablageHookExtras(opts.hookExtras || {}),
         });
     if (!res?.inst) { this.ablageRueckgabe(ab); return null; }
@@ -30852,11 +31080,14 @@ this._deathWatch = (this._deathWatchStack || []).length
     source = this._rewriteSourceForCreatureCaster(source);
 
     const srcOwner = source?.owner ?? source?.controller ?? -1;
-    const targetOwner = this.gs.players.findIndex(ps => (ps.heroes || []).includes(target));
-    if (targetOwner < 0) return;
+    // Kontrolle statt Seite (Styx 28.9.): „der Besitzer des getroffenen
+    // Helden" ist hier sein KONTROLLEUR; die Adresse bleibt physisch.
+    const zielPhys = this.gs.players.findIndex(ps => (ps.heroes || []).includes(target));
+    if (zielPhys < 0) return;
 
-    const targetHeroIdx = this.gs.players[targetOwner]?.heroes?.indexOf(target);
+    const targetHeroIdx = this.gs.players[zielPhys]?.heroes?.indexOf(target);
     if (targetHeroIdx < 0) return;
+    const targetOwner = this.heroSideOf(zielPhys, target);
 
     const allCards = this._getCardDB();
 
@@ -30916,7 +31147,9 @@ this._deathWatch = (this._deathWatchStack || []).length
         // z.B. Fireshield „a Hero you control that can use it"). Vorher
         // durfte bei einem ueberlebenden eigenen Helden NUR dieser wirken.
         const _adZielIdx = (reactorIdx === targetOwner && !_defeated) ? targetHeroIdx : undefined;
-        const rxCast = this._rxCastPlan(ps, cardName, script, { targetHeroIdx: _adZielIdx });
+        // Styx 28.9.: geliehener Zielheld → kein Wirken ueber ihn.
+        const _adGeliehen = reactorIdx === targetOwner && zielPhys !== targetOwner;
+        const rxCast = this._rxCastPlan(ps, cardName, script, { targetHeroIdx: _adGeliehen ? undefined : _adZielIdx, zielNichtCastbar: _adGeliehen });
         if (!rxCast) continue;
 
         // Prompt
@@ -30935,7 +31168,7 @@ this._deathWatch = (this._deathWatchStack || []).length
 
         if (!confirmed) continue;
         // v1155: 2+ moegliche Wirker → Auswahl (Abbruch = keine Reaktion)
-        if (!(await this._rxCastWirkerWaehlen(ps, cardName, script, rxCast, { targetHeroIdx: _adZielIdx }))) continue;
+        if (!(await this._rxCastWirkerWaehlen(ps, cardName, script, rxCast, { targetHeroIdx: _adGeliehen ? undefined : _adZielIdx, zielNichtCastbar: _adGeliehen }))) continue;
 
         // Activate: remove from hand, deduct gold
         const actualIdx = ps.hand.indexOf(cardName);
@@ -33457,6 +33690,10 @@ this._deathWatch = (this._deathWatchStack || []).length
     const needsHero = hasCardType(cd, 'Attack') || hasCardType(cd, 'Spell') || hasCardType(cd, 'Creature');
     if (!needsHero) return null;
     const heroes = ps.heroes || [];
+    // Styx 28.9.: der getroffene Held steht nicht in der Spalte des
+    // Reagierenden (geliehen) — eine „casterIsTarget"-Karte hat dann
+    // keinen Wirker, statt auf beliebige Helden auszuweichen.
+    if (script?.casterIsTarget && opts.zielNichtCastbar) return [];
     const candidates = (script?.casterIsTarget && Number.isInteger(opts.targetHeroIdx))
       ? [opts.targetHeroIdx]
       : heroes.map((_, hi) => hi);
@@ -33603,6 +33840,9 @@ this._deathWatch = (this._deathWatchStack || []).length
     const ps = this.gs.players[playerIdx];
     const hero = ps?.heroes?.[heroIdx];
     if (!hero?.name || hero.hp <= 0) return false;
+    // Styx 28.9.: ein Held, den gerade der GEGNER kontrolliert, castet fuer
+    // seinen Besitzer keine Reaktion und loest keine Surprise aus.
+    if (this.heroSideOf(playerIdx, hero) !== playerIdx) return false;
     if (hero.statuses?.frozen || (hero.statuses?.stunned || hero.statuses?.webbed)) return false;
     // v619 (Als Regel 29.8.): ein NEGIERTER Held castet keine Reaktion —
     // jede Form der Negation, auch die Effekt-Only-Variante des

@@ -293,7 +293,8 @@ module.exports = {
         // Hero — figure out which side.
         for (let p = 0; p < 2; p++) {
           if ((engine.gs.players[p]?.heroes || []).includes(target)) {
-            targetOwner = p; break;
+            // Kontrolle statt Seite (Styx 28.9.)
+            targetOwner = engine.heroSideOf(p, target); break;
           }
         }
       }

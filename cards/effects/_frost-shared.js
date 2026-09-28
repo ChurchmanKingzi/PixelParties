@@ -19,17 +19,26 @@
 function gegnerZiele(engine, oi) {
   const gs = engine.gs;
   const out = [];
-  const helden = gs.players[oi]?.heroes || [];
-  for (let hi = 0; hi < helden.length; hi++) {
-    const h = helden[hi];
-    if (h?.name && h.hp > 0) out.push({ type: 'hero', owner: oi, heroIdx: hi, name: h.name });
+  // Kontrolle statt Seite (Styx 28.9.): ein Held, den der Spieler selbst
+  // gerade kontrolliert, steht physisch beim Gegner, ist aber kein
+  // gegnerisches Ziel — und umgekehrt. `owner` bleibt die physische Seite.
+  for (let p = 0; p < (gs.players || []).length; p++) {
+    const helden = gs.players[p]?.heroes || [];
+    for (let hi = 0; hi < helden.length; hi++) {
+      const h = helden[hi];
+      if (!h?.name || h.hp <= 0 || engine.heroSideOf(p, h) !== oi) continue;
+      out.push({ type: 'hero', owner: p, heroIdx: hi, name: h.name });
+    }
   }
   for (const inst of engine.cardInstances) {
-    if (inst.owner !== oi || inst.zone !== 'support') continue;
+    if ((inst.controller ?? inst.owner) !== oi || inst.zone !== 'support') continue;
     if (engine.isEquipInZone(inst.name, inst)) continue;
     const cd = engine.getEffectiveCardData(inst);
     if (!cd || cd.cardType !== 'Creature') continue;
-    out.push({ type: 'creature', owner: oi, inst, heroIdx: inst.heroIdx, slotIdx: inst.zoneSlot, name: inst.name });
+    // `owner` = physische Seite (fuer Animationen): gestohlene Kreaturen
+    // bleiben beim Besitzer stehen, dauerhaft versetzte beim Kontrolleur.
+    const seite = inst.stolenBy != null ? inst.owner : (inst.controller ?? inst.owner);
+    out.push({ type: 'creature', owner: seite, inst, heroIdx: inst.heroIdx, slotIdx: inst.zoneSlot, name: inst.name });
   }
   return out;
 }

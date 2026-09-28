@@ -39,10 +39,8 @@ module.exports = {
     const oi = ctx.cardOwner === 0 ? 1 : 0;
     const ops = engine.gs.players[oi];
     if (!ops) return false;
-    for (let hi = 0; hi < (ops.heroes || []).length; hi++) {
-      const h = ops.heroes[hi];
-      if (h?.name && h.hp > 0) return true;
-    }
+    // Kontrolle statt Seite (Styx 28.9.)
+    if (engine.heroesControlledBy(oi).some(e => e.hero.hp > 0)) return true;
     const cardDB = engine._getCardDB();
     for (const inst of engine.cardInstances) {
       if (inst.zone !== 'support') continue;

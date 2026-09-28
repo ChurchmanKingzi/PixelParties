@@ -83,14 +83,15 @@ module.exports = {
       //         cascades don't shorten the list mid-iteration. ──
       const cardDB = engine._getCardDB();
       const heroTargets = [];
-      for (let hi = 0; hi < (oppPs.heroes || []).length; hi++) {
-        const h = oppPs.heroes[hi];
+      // Kontrolle statt Seite (Styx 28.9.) — „all targets your opponent
+      // controls"; `owner` = physische Spalte des Helden.
+      for (const { physOwner, heroIdx: hi, hero: h } of engine.heroesControlledBy(oppIdx)) {
         if (!h?.name || h.hp <= 0) continue;
-        heroTargets.push({ heroIdx: hi });
+        heroTargets.push({ owner: physOwner, heroIdx: hi });
       }
       const creatureTargetIds = [];
       for (const inst of engine.cardInstances) {
-        if (inst.owner !== oppIdx || inst.zone !== 'support') continue;
+        if ((inst.controller ?? inst.owner) !== oppIdx || inst.zone !== 'support') continue;   // Kontrolle statt Seite
         if (inst.faceDown) continue;
         const cd = engine.getEffectiveCardData(inst) || cardDB[inst.name];
         if (!cd || !hasCardType(cd, 'Creature')) continue;
@@ -109,9 +110,9 @@ module.exports = {
       {
         const allTgts = [];
         for (const t of heroTargets) {
-          const h = oppPs.heroes?.[t.heroIdx];
+          const h = gs.players[t.owner]?.heroes?.[t.heroIdx];
           if (!h?.name || h.hp <= 0) continue;
-          allTgts.push({ type: 'hero', owner: oppIdx, heroIdx: t.heroIdx, cardName: h.name });
+          allTgts.push({ type: 'hero', owner: t.owner, heroIdx: t.heroIdx, cardName: h.name });
         }
         for (const id of creatureTargetIds) {
           const inst = engine.cardInstances.find(c => c.id === id);
@@ -136,7 +137,7 @@ module.exports = {
       // lebenden Ziel greift der Schutz nicht.
       // ★★ v1185: Klammer meldet die Kreaturen an das Anti-AoE-Fenster.
       await engine.beginAoeStrike(
-        heroTargets.filter(t => (oppPs.heroes[t.heroIdx]?.hp || 0) > 0).length + creatureTargetIds.length,
+        heroTargets.filter(t => (gs.players[t.owner]?.heroes?.[t.heroIdx]?.hp || 0) > 0).length + creatureTargetIds.length,
         {
           creatures: creatureTargetIds
             .map(id => engine.cardInstances.find(c => c.id === id))
@@ -147,7 +148,7 @@ module.exports = {
       try {
       // ── Step 3: deal damage + apply lockout to every alive opp Hero ──
       for (const t of heroTargets) {
-        const hero = oppPs.heroes[t.heroIdx];
+        const hero = gs.players[t.owner]?.heroes?.[t.heroIdx];
         if (!hero || hero.hp <= 0) continue;
         const r = await ctx.dealDamage(hero, DAMAGE, 'decay_spell');
         // Damage fully cancelled by a reaction (Idej Projection,
@@ -158,9 +159,9 @@ module.exports = {
         // lockout in that case — a dead hero can't act anyway, and
         // adding a status to a corpse breaks the "alive heroes only"
         // contract elsewhere in the engine.
-        const stillAlive = oppPs.heroes[t.heroIdx];
+        const stillAlive = gs.players[t.owner]?.heroes?.[t.heroIdx];
         if (!stillAlive || stillAlive.hp <= 0) continue;
-        await engine.addHeroStatus(oppIdx, t.heroIdx, 'bound', {
+        await engine.addHeroStatus(t.owner, t.heroIdx, 'bound', {
           appliedBy: pi,
           expiresAtTurn,
           expiresForPlayer,

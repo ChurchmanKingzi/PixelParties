@@ -85,7 +85,7 @@ module.exports = {
       if (!(ps.discardPile || []).includes(CARD_NAME)) return;
       if ((ps.gold || 0) < betrag) return;
 
-      if (eligibleSummonZones(engine, pi, CARD_NAME).length === 0) return;
+      if (eligibleSummonZones(engine, pi, CARD_NAME, { nachKontrolle: true }).length === 0) return;   // Kontrolle statt Seite (Styx 28.9.)
 
       const bestaetigt = await engine.promptGeneric(pi, {
         type: 'confirm',
@@ -118,7 +118,7 @@ module.exports = {
         // waehlen lassen, wenn es mehrere Moeglichkeiten gibt — wie bei
         // einer normalen Beschwoerung (Als Vorgabe 8.8.). Nicht
         // abbrechbar: bestaetigt und bezahlt ist bereits verbindlich.
-        const zonen = eligibleSummonZones(engine, pi, CARD_NAME);
+        const zonen = eligibleSummonZones(engine, pi, CARD_NAME, { nachKontrolle: true });   // Kontrolle statt Seite (Styx 28.9.)
         if (zonen.length === 0) {
           engine.log('resilient_monkee_fizzle', { player: ps.username, reason: 'no_eligible_caster' });
           return;
@@ -131,7 +131,7 @@ module.exports = {
             cancellable: false,
           });
           const gewaehlt = wahl && zonen.find(z =>
-            z.heroIdx === wahl.heroIdx && z.slotIdx === (wahl.slotIdx ?? wahl.zoneSlot));
+            z.owner === (wahl.owner ?? pi) && z.heroIdx === wahl.heroIdx && z.slotIdx === (wahl.slotIdx ?? wahl.zoneSlot));
           if (gewaehlt) ziel = gewaehlt;
         }
         engine._broadcastEvent('card_reveal', { cardName: CARD_NAME });
@@ -141,6 +141,7 @@ module.exports = {
         // `_summonedFromDiscard` für Skullmael/Vacarn setzt die Engine.
         const res = await engine.summonFromDiscard(pi, pi, CARD_NAME, ziel.heroIdx, ziel.slotIdx, {
           mode: 'place', source: CARD_NAME,
+          heldSeite: ziel.owner,   // Kontrolle statt Seite (Styx 28.9.)
           placeOpts: { countAsSummon: true, animationType: 'summon', fireHooks: true },
         });
         // v1349: „as an additional Action" — als ausgefuehrte Aktion melden.

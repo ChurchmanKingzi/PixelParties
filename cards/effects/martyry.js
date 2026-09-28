@@ -61,7 +61,8 @@ module.exports = {
     // NICHT aus (Alleria-Muster).
     const kind = engine?.sourceEffectKind ? engine.sourceEffectKind(sourceCard) : null;
     if (kind !== 'attack' && kind !== 'spell' && kind !== 'creature') return false;
-    if (selected.owner !== pi) return false;
+    // Kontrolle statt Seite (Styx 28.9.): „a target you control".
+    if ((engine?.zielSeite ? engine.zielSeite(selected) : selected.owner) !== pi) return false;
     return getEligibleRedirectHeroes(gs, pi, selected, validTargets, engine).length > 0;
   },
 

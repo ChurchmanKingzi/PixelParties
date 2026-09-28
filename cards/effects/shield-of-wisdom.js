@@ -78,12 +78,12 @@ function buildOpponentTargets(engine, sourceOwner, attackingInst) {
   const cardDB = engine._getCardDB();
   const out = [];
 
-  for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-    const h = ps.heroes[hi];
+  // Kontrolle statt Seite (Styx 28.9.): Ziel-IDs bleiben physisch.
+  for (const { physOwner, heroIdx: hi, hero: h } of engine.heroesControlledBy(sourceOwner)) {
     if (!h?.name || h.hp <= 0) continue;
     out.push({
-      id: `hero-${sourceOwner}-${hi}`, type: 'hero',
-      owner: sourceOwner, heroIdx: hi, cardName: h.name,
+      id: `hero-${physOwner}-${hi}`, type: 'hero',
+      owner: physOwner, heroIdx: hi, cardName: h.name,
     });
   }
 

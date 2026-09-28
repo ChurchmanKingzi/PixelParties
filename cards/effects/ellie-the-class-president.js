@@ -31,6 +31,10 @@ function zuschlag(pi, heroIdx) {
 function wirkbar(engine, pi, hi) {
   const hero = engine.gs.players[pi]?.heroes?.[hi];
   if (!hero?.name || hero.hp <= 0 || engine.isHeroIncapacitated(pi, hi)) return [];
+  // Kontrolle statt Seite (Styx 28.9.) — ein abgegebener Held ist nicht
+  // „one of your Heroes". (Uebernommene der Gegenspalte kann
+  // performImmediateAction nicht fuehren — sie bleiben aussen vor.)
+  if (engine.heroSideOf(pi, hero) !== pi) return [];
   const db = engine._getCardDB();
   const z = zuschlag(pi, hi);
   if (!engine._levelZuschlaege) engine._levelZuschlaege = [];
