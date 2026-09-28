@@ -18392,3 +18392,11 @@ Anlass (Al 25.9.): Puzzle-Editor mit Wowhalla neu geladen → das Spielfeld „a
 - **Höhe nie aus `clientHeight` eines Kastens, dessen waagerechter Balken kommen und gehen kann.** Der Editor rechnet mit der Innenhöhe ohne Balken und reserviert im Bildlauf-Modus die einmal gemessene Balkenstärke fest.
 - **ResizeObserver-Zähler:** nur eine Größenänderung des Wraps SELBST setzt `passes` zurück — die Kinder ändern sich als Folge jedes Maßstab-Schreibens. Über `MAX_PASSES` wird kein neuer Maßstab mehr geschrieben (vorher entfiel nur der nächste RAF, geschrieben wurde trotzdem).
 - Diagnose: `window.PP_HSCROLL_DEBUG = true` in der Konsole protokolliert jeden Editor-Pass. Mehr als eine Handvoll Zeilen im Ruhezustand = Schleife.
+
+## ★ Styx, the Opened Gate (28.9.) — Wiederbelebungszähler, Kontrolle bis zum Tod
+
+- **`gs.heroRevivalCount`** zählt JEDE Heldenwiederbelebung der Partie (beide Seiten). Gezählt wird zentral über `engine.zaehleHeldenWiederbelebung(hero, quelle)`: in `actionReviveHero`, in `_consumeExtraLife` und in Ascended Blooms Aufstieg aus dem Tod (Als Ruling: zählt als Wiederbelebung). Wer einen neuen Wiederbelebungsweg baut, der nicht über diese beiden Engine-Wege läuft, ruft den Zähler selbst.
+- **Neues Leben, kein alter Zwangstod:** `actionReviveHero` und `_consumeExtraLife` löschen `_forceKillAtTurnEnd` / `_forceKillSource`. Ein von Golden Ankh/Styx zurückgeholter Held, der mitten im Zug stirbt und vom Elixir wiederbelebt wird, stirbt am Zugende NICHT noch einmal.
+- **`hero._kontrolleBisZumTod = { by }`**: eine Kontrolle, die nur hält, solange der Held lebt. `runHooks(ON_HERO_KO)` gibt ihn VOR der Zuhörer-Runde an den Besitzer zurück (`kontrolleBeimTodZurueckgeben`) — im Moment des Sterbens reagieren also die Karten des BESITZERS (dessen Elixir belebt ihn unter dessen Kontrolle).
+- **`statuses.charmed.ohneSchutz`**: reine Kontrolle ohne jede Charme-Immunität (`_charmBlocksFrom` → false).
+- **Ascended Hero ohne eigene Werte** (HP/ATK `null` in cards.json): `performAscension` behält HP, max HP und ATK der Grundform unverändert. Der Puzzle-Editor setzt beim direkten Platzieren die Werte der Basis.

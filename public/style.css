@@ -24528,3 +24528,31 @@ body.pp-dialog-offen .foil-diamond-rare:not(.modal-overlay *) {
   border-radius: 0;
   box-shadow: 0 0 0 1px var(--pp-kontur), 2px 2px 0 rgba(0, 0, 0, .5);
 }
+
+/* ── Styx, the Opened Gate (28.9.) — Tor zur Geisterwelt ── */
+.styx-tor { position: fixed; width: 0; height: 0; pointer-events: none; z-index: 10206; }
+.styx-tor > span { position: absolute; display: block; }
+.styx-tor-strudel {
+  border-radius: 50%;
+  background: conic-gradient(from 0deg, rgba(40,10,70,.9), rgba(60,200,230,.55), rgba(20,4,40,.95), rgba(150,110,255,.6), rgba(40,10,70,.9));
+  box-shadow: 0 0 22px rgba(90,220,255,.55), inset 0 0 18px rgba(0,0,0,.9);
+  opacity: 0; animation: styxTorStrudel 1500ms ease-in-out forwards;
+}
+.styx-tor-strudel-innen { background: radial-gradient(ellipse, rgba(0,0,0,.95) 0%, rgba(30,8,50,.85) 55%, transparent 100%); box-shadow: none; }
+.styx-tor-seele { border-radius: 50% 50% 45% 45%; opacity: 0; animation-name: styxTorSeele; animation-timing-function: ease-out; animation-fill-mode: forwards; }
+.styx-tor-schein {
+  border-radius: 50%; background: radial-gradient(circle, rgba(200,245,255,.75) 0%, rgba(140,200,255,.3) 40%, transparent 70%);
+  opacity: 0; animation: styxTorSchein 1500ms ease-out forwards;
+}
+@keyframes styxTorStrudel {
+  0% { opacity: 0; transform: scale(.2) rotate(0deg); }
+  20% { opacity: 1; transform: scale(1) rotate(120deg); }
+  75% { opacity: 1; transform: scale(1.05) rotate(420deg); }
+  100% { opacity: 0; transform: scale(.3) rotate(560deg); }
+}
+@keyframes styxTorSeele {
+  0% { opacity: 0; transform: translateY(0) scale(.6); }
+  25% { opacity: .95; }
+  100% { opacity: 0; transform: translateY(var(--hoch)) scale(1.15); }
+}
+@keyframes styxTorSchein { 0%, 45% { opacity: 0; transform: scale(.5); } 65% { opacity: 1; transform: scale(1); } 100% { opacity: 0; transform: scale(1.2); } }

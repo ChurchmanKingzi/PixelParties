@@ -25,9 +25,29 @@
 // ═══════════════════════════════════════════
 
 const CARD_NAME = 'Styx, the Gate to the Spirit World';
+const AUFSTIEG_ZIEL = 'Styx, the Opened Gate';
+const NOETIGE_WIEDERBELEBUNGEN = 3;
 
 module.exports = {
   activeIn: ['hero'],
+
+  /**
+   * Aufstiegsbereitschaft an den Client melden („after Heroes have been
+   * revived at least 3 times this game"). Nur die Anzeige — verbindlich
+   * prueft `ascensionCondition` auf der aufgestiegenen Karte. Nimmt nur
+   * die EIGENE Bereitschaft zurueck.
+   */
+  refreshAscensionReadiness(engine, pi, hi) {
+    const hero = engine.gs.players[pi]?.heroes?.[hi];
+    if (!hero || hero.name !== CARD_NAME) return;
+    if (hero.hp > 0 && (engine.gs.heroRevivalCount || 0) >= NOETIGE_WIEDERBELEBUNGEN) {
+      hero.ascensionReady = true;
+      hero.ascensionTarget = AUFSTIEG_ZIEL;
+    } else if (hero.ascensionTarget === AUFSTIEG_ZIEL) {
+      delete hero.ascensionReady;
+      delete hero.ascensionTarget;
+    }
+  },
 
   // ── CPU: Confirm-Prompts pauschal bejahen (Barker-Bugklasse) ──────
   // onHeroKO-Confirm (feuert im Gegner-Zug, plan-los).
