@@ -15,7 +15,8 @@ Dazu je Variante:
              Peitsche und Metallarmband samt Hand federn als Ganzes mit dem Arm.
 * alleria:   Alleria, the Queen of Spiders: jedes der acht Spinnenbeine dreht
              sich einzeln um seine Wurzel (Gangbild über Kreuz, eigene Phasen),
-             die Spinnenaugen glühen, sie blinzelt.
+             die ganze Figur macht leichtes Squash-and-Stretch in der
+             Senkrechten, die Spinnenaugen glühen, sie blinzelt.
 * blackstache: der Geisterpirat federt, blinzelt mit den gelben Augen, sein
              durchscheinender Körper flackert leicht; den Säbel neigt er
              leicht auf und ab (Drehung um die Faust), über die Klinge läuft
@@ -714,7 +715,9 @@ def f_alleria(i):
         out[lm] = leg[lm]
     put(out, body, PL, PT)
     fill_pinholes(out)
-    return out
+    # leichtes Squash-and-Stretch der ganzen Figur (die Beinspitzen unten bleiben stehen)
+    sy = 1 + 0.04 * math.sin(2 * math.pi * 2 * i / N)
+    return squash(out, sy, PT + SH - 1)
 
 
 FRAME = dict(asriel=f_asriel, barker=f_barker, blackstache=f_blackstache, chuck=f_chuck, codumbus=f_codumbus,
