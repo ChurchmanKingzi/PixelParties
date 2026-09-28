@@ -3,7 +3,7 @@
 
 * Squash and Stretch (erste Loop-Hälfte): der Körper federt im 12er-Takt bis
   zu 2 px hoch (gestreckt – die Zeilen über den Beinen werden gedehnt) und
-  2 px herunter (gestaucht); die Beine bleiben stehen.
+  2 px herunter (gestaucht); die Beine und der Karren bleiben stehen.
 * Er hebt den Karren (zweite Loop-Hälfte): Karren und rechte Kristallhand
   heben sich um bis zu 6 px, bleiben kurz oben (mit einem Nachfassen) und
   setzen wieder auf. Darunter
@@ -39,6 +39,19 @@ _px = lambda f: np.array([[bool(SRC[y, x, 3]) and f(x, y, tuple(SRC[y, x])) for 
 CART = _px(lambda x, y, c: x >= 15 and y >= 31 and c in CART_COLS)
 RHAND = _px(lambda x, y, c: x >= 24 and 28 <= y <= 38 and c in HAND_COLS)
 GROUP = CART | RHAND                                 # wird angehoben
+# Das rechte Karrenfeld (x 25-33) liegt in den Zeilen 33-38 unter der Hand: ergänzt (oben der
+# Metallrand, darunter die Latten wie weiter unten), damit keine Kerbe entsteht, wenn die Hand
+# sich beim Federn vom Karren hebt
+CART_FULL = np.zeros_like(SRC)
+CART_FULL[CART] = SRC[CART]
+for _x, _c in zip(range(25, 34), ('af824b', '5a555a', '736e73', '736e73', '878287', 'c39b64', 'af824b', 'c39b64',
+                                   '191419')):
+    if RHAND[33, _x]:
+        CART_FULL[33, _x] = rgb(_c)
+for _y in range(34, 39):
+    for _x in range(25, 34):
+        if RHAND[_y, _x]:
+            CART_FULL[_y, _x] = SRC[40, _x]
 # rechtes Bein: Spiegelbild des linken Unterkörpers (ohne linke Hand), Achse x = 19
 LEG = np.zeros_like(SRC)
 for _y in range(33, SH):
@@ -77,11 +90,13 @@ def frame(i):
     body = s.copy()
     body[GROUP] = 0
     draw_squash(out, body, b)
-    for y, x in zip(*np.nonzero(GROUP)):             # Karren + rechte Hand (angehoben)
-        out[y + PT + (b if y < KNEE else 0) - lift, x + P] = s[y, x]
+    for y, x in zip(*np.nonzero(CART_FULL[:, :, 3])):  # Karren: steht beim Federn als Ganzes (sonst
+        out[y + PT - lift, x + P] = CART_FULL[y, x]      # reißt er am Knie), hebt sich mit der Hand
+    for y, x in zip(*np.nonzero(RHAND)):             # rechte Hand darüber, federt als Ganzes mit
+        out[y + PT + b - lift, x + P] = s[y, x]
     fill_pinholes(out)
     for x, y, t0 in SPARKLES:
-        dy = (b if y < KNEE else 0) - (lift if RHAND[y, x] else 0)
+        dy = (b if y < KNEE or RHAND[y, x] else 0) - (lift if RHAND[y, x] else 0)
         for (px_, py_), c in sparkle_pixels(i, N, [(x + P, y + PT + dy, t0)],
                                             rgb('e0ffff'), rgb('91e6e6')).items():
             assert 1 <= px_ < W - 1 and 1 <= py_ < H - 1, 'Glitzerstern ragt an den Rand'
