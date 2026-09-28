@@ -42,8 +42,13 @@ const CARD_NAME = 'Cute Conversion';
 function beuteliste(engine, oi) {
   const out = [];
   for (const inst of engine.cardInstances) {
-    if (inst.owner !== oi || inst.zone !== 'support') continue;
+    // Kontrolle statt Seite (Styx 28.9.): eigene seitenfremd beschworene
+    // Kreaturen sind keine Beute.
+    if ((inst.controller ?? inst.owner) !== oi || inst.zone !== 'support') continue;
     if (inst.stolenBy != null) continue;
+    // Seitenfremd auf UNSERER Seite: `actionStealCreature` lehnt ab
+    // (owner === Dieb) — nicht als Beute zaehlen.
+    if (inst.owner !== oi) continue;
     if (engine.isEquipInZone(inst.name, inst)) continue;
     const cd = engine.getEffectiveCardData(inst);
     if (!cd || cd.cardType !== 'Creature') continue;
@@ -111,7 +116,7 @@ module.exports = {
       //   sieht man, wen es erwischt, bevor sich die Seiten aendern.
       for (const inst of beute) {
         engine._broadcastEvent('play_zone_animation', {
-          type: 'cute_hearts', owner: oi, heroIdx: inst.heroIdx, zoneSlot: inst.zoneSlot,
+          type: 'cute_hearts', owner: engine.physicalSide(inst), heroIdx: inst.heroIdx, zoneSlot: inst.zoneSlot,
         });
       }
       await engine._delay(680);

@@ -49,13 +49,13 @@ module.exports = {
         targets.push({ type: 'hero', owner: physOwner, heroIdx: hi });
       }
 
-      // Opponent creatures
+      // Opponent creatures — Kontrolle statt Seite (Styx 28.9.)
       for (const inst of engine.cardInstances) {
-        if (inst.owner !== oppIdx || inst.zone !== 'support') continue;
+        if ((inst.controller ?? inst.owner) !== oppIdx || inst.zone !== 'support') continue;
         if (inst.faceDown) continue;
         const cd = engine.getEffectiveCardData(inst) || cardDB[inst.name];
         if (!cd || !hasCardType(cd, 'Creature')) continue;
-        targets.push({ type: 'creature', owner: oppIdx, heroIdx: inst.heroIdx, slotIdx: inst.zoneSlot, inst });
+        targets.push({ type: 'creature', owner: engine.physicalSide(inst), heroIdx: inst.heroIdx, slotIdx: inst.zoneSlot, inst });
       }
 
       if (targets.length === 0) return;

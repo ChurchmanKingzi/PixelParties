@@ -48,13 +48,14 @@ module.exports = {
         if (slot && slot[0] === 'Friendship' && slot.length >= 2) return false;
       }
     }
-    for (const hh of (ps.heroes || [])) {
+    // Kontrolle statt Seite (Styx 28.9.)
+    for (const { hero: hh } of engine.heroesControlledBy(pi)) {
       if (!hh?.name || hh.hp <= 0) continue;
       const max = hh.maxHp || hh.hp;
       if (naoCaster ? hh.hp <= max : hh.hp < max) return false;
     }
     for (const inst of (engine.cardInstances || [])) {
-      if (inst.owner !== pi || inst.zone !== 'support') continue;
+      if ((inst.controller ?? inst.owner) !== pi || inst.zone !== 'support') continue;
       const cur = inst.counters?.currentHp;
       const max = inst.counters?.maxHp;
       const base = inst.counters?.baseHp ?? max;

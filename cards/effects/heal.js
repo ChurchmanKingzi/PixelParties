@@ -62,13 +62,14 @@ module.exports = {
     // (a) heilbares eigenes Ziel? Ohne Nao: echtes HP-Defizit nötig.
     // Mit Nao: hp <= maxHp genügt (Overheal ab Voll-HP ist echter
     // Effekt — HP-Puffer + afterHeal-Trigger wie Lifeforce Howitzer).
-    for (const hh of (ps.heroes || [])) {
+    // Kontrolle statt Seite (Styx 28.9.)
+    for (const { hero: hh } of engine.heroesControlledBy(pi)) {
       if (!hh?.name || hh.hp <= 0) continue;
       const max = hh.maxHp || hh.hp;
       if (naoCaster ? hh.hp <= max : hh.hp < max) return false;
     }
     for (const inst of (engine.cardInstances || [])) {
-      if (inst.owner !== pi || inst.zone !== 'support') continue;
+      if ((inst.controller ?? inst.owner) !== pi || inst.zone !== 'support') continue;
       const cur = inst.counters?.currentHp;
       const max = inst.counters?.maxHp;
       const base = inst.counters?.baseHp ?? max;
@@ -77,7 +78,7 @@ module.exports = {
     }
     // (c) healReversed-Gegner (Heilung = Schaden)
     const oi = pi === 0 ? 1 : 0;
-    for (const hh of (gs.players?.[oi]?.heroes || [])) {
+    for (const { hero: hh } of engine.heroesControlledBy(oi)) {
       if (hh?.name && hh.hp > 0 && hh.statuses?.healReversed) return false;
     }
     return true; // keine Nutzenquelle → Play verwerfen

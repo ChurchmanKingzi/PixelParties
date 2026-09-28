@@ -103,15 +103,16 @@ function collectTargets(engine, pi, casterHeroIdx) {
       if (tpi === pi && hi === casterHeroIdx) continue; // Skip caster
       targets.push({ type: 'hero', owner: tpi, heroIdx: hi });
     }
-    // Creatures (both owned + stolen render on this side)
+    // Creatures — je Kontrolleur genau einmal (Styx 28.9.: das alte
+    // Oder-Muster zaehlte gestohlene/seitenfremde doppelt).
     for (const inst of engine.cardInstances) {
-      if ((inst.owner !== tpi && inst.controller !== tpi) || inst.zone !== 'support') continue;
+      if ((inst.controller ?? inst.owner) !== tpi || inst.zone !== 'support') continue;
       if (inst.faceDown) continue;
       const cd = engine.getEffectiveCardData(inst) || cardDB[inst.name];
       if (!cd || !hasCardType(cd, 'Creature')) continue;
       targets.push({
         type: 'creature',
-        owner: inst.owner,
+        owner: engine.physicalSide(inst),
         heroIdx: inst.heroIdx,
         slotIdx: inst.zoneSlot,
         inst,
@@ -169,7 +170,8 @@ module.exports = {
       if (!ps) return;
       const damageLocked = !!ps.damageLocked;
 
-      const targets = collectTargets(engine, pi, heroIdx);
+      // Der Anwender steht in seiner physischen Spalte (geliehener Held).
+      const targets = collectTargets(engine, ctx.cardHeroOwner ?? pi, heroIdx);
       if (targets.length === 0) return;
 
       // ── Animation: flame projectiles from caster to EVERY target ──

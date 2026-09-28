@@ -31,11 +31,13 @@ module.exports = {
   async onFreeActivate(ctx, level) {
     const engine = ctx._engine;
     const gs = engine.gs;
-    const pi = ctx.cardOriginalOwner;
+    // Kontrolle statt Seite (Styx 28.9.): deklariert und zieht der
+    // Kontrolleur; der Held steht auf seiner Brettseite (`attachedHero`).
+    const pi = ctx.cardOwner;
     const ps = gs.players[pi];
     const heroIdx = ctx.cardHeroIdx;
     const zoneIdx = ctx.card.zoneSlot;
-    const hero = ps?.heroes?.[heroIdx];
+    const hero = ctx.attachedHero;
     if (!hero) return false;
 
     // Build list of all available card names. Tokens are excluded —
@@ -152,8 +154,11 @@ module.exports = {
       // Guillotine) ist kein Ausspielen.
       if (ctx._verwahrungRueckkehr) return;
       // Kontrolle statt Seite (Styx 28.9.): gespielt hat der Kontrolleur —
-      // eine seitenfremd beschworene Kreatur liegt beim Gegner (owner).
-      await module.exports.hooks._triggerLuck(ctx, entering.name, entering.controller ?? entering.owner);
+      // eine seitenfremd beschworene Kreatur liegt beim Gegner (owner),
+      // ebenso eine ueber Styx an einen uebernommenen Helden angelegte
+      // Ability (owner = Brettseite, Kontrolle ueber den Charme).
+      const spieler = ctx._engine.effektiveSeiten(entering).controller ?? entering.owner;
+      await module.exports.hooks._triggerLuck(ctx, entering.name, spieler);
     },
 
     /**
@@ -168,7 +173,8 @@ module.exports = {
      * At the start of owner's turn: clear the declared target.
      */
     onTurnStart: (ctx) => {
-      if (ctx.activePlayer !== ctx.cardOriginalOwner) return;
+      // „until the beginning of YOUR next turn" — der Deklarierende.
+      if (ctx.activePlayer !== (ctx.card.counters?.luckOwner ?? ctx.cardOwner)) return;
       // Clear stored target
       delete ctx.card.counters.luckTarget;
       delete ctx.card.counters.luckLevel;

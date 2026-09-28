@@ -129,7 +129,8 @@ module.exports = {
 
   canActivateCreatureEffect(ctx) {
     const engine = ctx._engine;
-    const ps     = engine.gs.players[ctx.cardOriginalOwner ?? ctx.cardOwner];
+    // Kontrolle statt Seite (Styx 28.9.): „your discard pile" = Kontrolleur.
+    const ps     = engine.gs.players[ctx.cardOwner];
     if (!ps) return false;
     if (ps.handLocked) return false;
     return countDifferentRebelliokaiInDiscard(ps, engine, 3) > 0;
@@ -137,7 +138,7 @@ module.exports = {
 
   async onCreatureEffect(ctx) {
     const engine = ctx._engine;
-    const pi     = ctx.cardOriginalOwner;
+    const pi     = ctx.cardOwner;   // Kontrolle statt Seite (Styx 28.9.)
     const ps     = engine.gs.players[pi];
     if (!ps) return false;
 

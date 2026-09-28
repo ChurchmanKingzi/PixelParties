@@ -40,7 +40,7 @@ module.exports = {
     // Uniqueness: only one Intrude per player
     if (engine) {
       if (engine.cardInstances.some(c =>
-        c.owner === playerIdx && c.zone === 'support' && c.name === 'Intrude'
+        (c.controller ?? c.owner) === playerIdx && c.zone === 'support' && c.name === 'Intrude'   // Kontrolle statt Seite (Styx 28.9.)
       )) return false;
     } else {
       for (let hi = 0; hi < (ps.heroes || []).length; hi++) {

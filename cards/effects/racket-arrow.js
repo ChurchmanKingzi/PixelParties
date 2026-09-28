@@ -32,14 +32,14 @@ function opponentCreatureTargets(engine, pi) {
   const cardDB = engine._getCardDB();
   const out = [];
   for (const inst of engine.cardInstances) {
-    if (inst.owner !== oppIdx && inst.controller !== oppIdx) continue;
+    if ((inst.controller ?? inst.owner) !== oppIdx) continue;   // Kontrolle statt Seite (Styx 28.9.)
     if (inst.zone !== 'support') continue;
     if (inst.faceDown) continue;
     const cd = engine.getEffectiveCardData(inst) || cardDB[inst.name];
     if (!cd || !hasCardType(cd, 'Creature')) continue;
     out.push({
-      id: `equip-${inst.owner}-${inst.heroIdx}-${inst.zoneSlot}`,
-      type: 'equip', owner: inst.owner, heroIdx: inst.heroIdx, slotIdx: inst.zoneSlot,
+      id: `equip-${engine.physicalSide(inst)}-${inst.heroIdx}-${inst.zoneSlot}`,
+      type: 'equip', owner: engine.physicalSide(inst), heroIdx: inst.heroIdx, slotIdx: inst.zoneSlot,
       cardName: inst.name, cardInstance: inst,
     });
   }

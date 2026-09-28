@@ -40,7 +40,7 @@ module.exports = {
     // Is a larger hit plausibly still coming this turn?
     // (a) Any opp creature on board that hasn't attacked yet?
     const hasFreshCreature = engine.cardInstances?.some(c =>
-      c.owner === oppIdx && c.zone === 'support' && !c.faceDown
+      (c.controller ?? c.owner) === oppIdx && c.zone === 'support' && !c.faceDown   // Kontrolle statt Seite
       && !c.counters?.attackedThisTurn
     );
     // (b) Any opp hero with significant atk that hasn't acted?
@@ -99,17 +99,17 @@ module.exports = {
       });
     }
 
-    // Opponent creatures
+    // Opponent creatures — Kontrolle statt Seite (Styx 28.9.)
     for (const inst of engine.cardInstances) {
-      if (inst.owner !== oppIdx || inst.zone !== 'support' || inst.faceDown) continue;
+      if ((inst.controller ?? inst.owner) !== oppIdx || inst.zone !== 'support' || inst.faceDown) continue;
       const cd = engine.getEffectiveCardData(inst) || cardDB[inst.name];
       if (!cd || !hasCardType(cd, 'Creature')) continue;
       const hp = inst.counters?.currentHp ?? cd.hp ?? 0;
       if (hp <= 0) continue;
       targets.push({
-        id: `equip-${oppIdx}-${inst.heroIdx}-${inst.zoneSlot}`,
+        id: `equip-${engine.physicalSide(inst)}-${inst.heroIdx}-${inst.zoneSlot}`,
         type: 'equip',
-        owner: oppIdx,
+        owner: engine.physicalSide(inst),
         heroIdx: inst.heroIdx,
         slotIdx: inst.zoneSlot,
         cardName: inst.name,

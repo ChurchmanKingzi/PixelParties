@@ -215,7 +215,11 @@ module.exports = {
       if (ctx.toZone !== 'ability') return;
       if (ctx.toHeroIdx !== ctx.cardHeroIdx) return;
       const entering = ctx.enteringCard;
-      if (!entering || entering.owner !== ctx.cardOwner) return;
+      // Kontrolle statt Seite (Styx 28.9.): die Ability liegt auf der
+      // Brettseite des Helden (`cardHeroOwner`), angelegt hat sie sein
+      // Kontrolleur (`cardOwner`) — bei Uebernahme verschieden.
+      const feld = ctx.cardHeroOwner ?? ctx.cardOwner;
+      if (!entering || entering.owner !== feld) return;
 
       const engine = ctx._engine;
       const pi     = ctx.cardOwner;
@@ -231,7 +235,8 @@ module.exports = {
       // Live "other heroes" on Alex's side.
       const otherHeroIndices = [];
       for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-        if (hi === ctx.cardHeroIdx) continue;
+        // Alex selbst nur ueberspringen, wenn er in der eigenen Spalte steht.
+        if (hi === ctx.cardHeroIdx && feld === pi) continue;
         const h = ps.heroes[hi];
         if (!h?.name || h.hp <= 0) continue;
         otherHeroIndices.push(hi);

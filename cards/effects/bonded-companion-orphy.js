@@ -27,8 +27,15 @@ module.exports = companion({
       // Guillotine) ist KEIN Anlegen.
       if (ctx._verwahrungRueckkehr) return;
       if (ctx.toHeroIdx !== ctx.cardHeroIdx) return;
-      // „when YOU attach" — nur die eigene Seite.
-      const leger = ctx.enteringCard?.owner ?? ctx.enteringCard?.controller;
+      // Kontrolle statt Seite (Styx 28.9.): die Ability muss in der Zone
+      // DES zugehoerigen Helden liegen (Brettseite `cardHeroOwner`), und
+      // „when YOU attach" meint den Anleger — wer den Helden gerade
+      // kontrolliert (Styx: der Uebernehmer, nicht die Brettseite).
+      const ab = ctx.enteringCard;
+      const feld = ctx.cardHeroOwner ?? ctx.cardOwner;
+      if (!ab || ab.owner !== feld) return;
+      const held = ctx._engine.gs.players[feld]?.heroes?.[ctx.cardHeroIdx];
+      const leger = ctx._engine.heroSideOf(feld, held);
       if (leger !== ctx.cardOwner) return;
 
       const inst = ctx.card;

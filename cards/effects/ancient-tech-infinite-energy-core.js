@@ -64,9 +64,12 @@ function recomputeBonus(ctx) {
   const inst = ctx.card;
   if (!inst || inst.zone !== 'support') return;
 
+  // Kontrolle statt Seite (Styx 28.9.): „your discard pile" = Kontrolleur
+  // (`cardOwner`), der Held steht auf seiner Brettseite (`cardHeroOwner`).
   const owner = ctx.cardOwner;
+  const feld = ctx.cardHeroOwner ?? owner;
   const heroIdx = ctx.cardHeroIdx;
-  const hero = engine.gs.players[owner]?.heroes?.[heroIdx];
+  const hero = ctx.attachedHero;
   if (!hero?.name) return;
 
   const ps = engine.gs.players[owner];
@@ -80,7 +83,7 @@ function recomputeBonus(ctx) {
 
   // Engine ATK helper routes through Curse's suppression accumulator
   // when the host is cursed, otherwise mutates + broadcasts normally.
-  engine._applyHeroAtkDelta(hero, owner, heroIdx, delta);
+  engine._applyHeroAtkDelta(hero, feld, heroIdx, delta);
   inst.counters.atkGranted = newBonus;
 
   engine.log('ancient_tech_atk', {
@@ -127,7 +130,8 @@ module.exports = {
     // not for unrelated cards passing through onCardLeaveZone.
     onCardLeaveZone: (ctx) => {
       if (ctx.fromZone !== 'support') return;
-      if (ctx.fromOwner !== ctx.cardOwner) return;
+      // `fromOwner` ist die Brettseite (Styx 28.9.: bei Uebernahme != cardOwner).
+      if (ctx.fromOwner !== (ctx.cardHeroOwner ?? ctx.cardOwner)) return;
       if (ctx.fromHeroIdx !== ctx.card.heroIdx) return;
       if (ctx.fromZoneSlot !== ctx.card.zoneSlot) return;
       ctx.revokeAtk();

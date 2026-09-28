@@ -126,7 +126,9 @@ module.exports = {
       if (ctx._verwahrungRueckkehr) return;
       if (ctx.toHeroIdx !== ctx.cardHeroIdx) return;
       const entering = ctx.enteringCard;
-      if (!entering || entering.owner !== ctx.cardOwner) return;
+      // Kontrolle statt Seite (Styx 28.9.): die Ability liegt auf Kits
+      // Brettseite (`cardHeroOwner`); „you" ist sein Kontrolleur.
+      if (!entering || entering.owner !== (ctx.cardHeroOwner ?? ctx.cardOwner)) return;
 
       const engine = ctx._engine;
       const gs     = engine.gs;

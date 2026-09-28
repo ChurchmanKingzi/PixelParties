@@ -156,7 +156,7 @@ function _uninstallRedirect(engine, pi) {
   const ps = engine.gs.players[pi];
   if (!ps || !ps[INSTALLED_FLAG]) return;
   const stillActive = engine.cardInstances.some(c =>
-    c.name === CARD_NAME && c.zone === 'support' && c.owner === pi
+    c.name === CARD_NAME && c.zone === 'support' && (c.controller ?? c.owner) === pi   // Kontrolle statt Seite (Styx 28.9.)
   );
   if (stillActive) return;
   delete ps[INSTALLED_FLAG];
@@ -199,7 +199,8 @@ module.exports = {
 
     onCardLeaveZone: async (ctx) => {
       if (ctx.fromZone !== 'support') return;
-      if (ctx.fromOwner !== undefined && ctx.fromOwner !== ctx.cardOwner) return;
+      // Styx 28.9.: seitenfremd beschworen → verlaesst die Brettseite (cardHeroOwner).
+      if (ctx.fromOwner !== undefined && ctx.fromOwner !== ctx.cardOwner && ctx.fromOwner !== ctx.cardHeroOwner) return;
       _uninstallRedirect(ctx._engine, ctx.cardOwner);
     },
   },

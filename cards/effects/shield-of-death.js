@@ -127,7 +127,7 @@ module.exports = {
 
       engine._broadcastEvent('play_zone_animation', {
         type: 'equip_flash', color: '#ef4444',
-        owner: ctx.cardController ?? ctx.cardOwner,
+        owner: ctx.cardHeroOwner ?? ctx.cardOwner,   // Brettseite (Styx 28.9.)
         heroIdx: card.heroIdx, zoneSlot: card.zoneSlot,
       });
 
@@ -139,7 +139,9 @@ module.exports = {
       await engine._delay(400);
 
       // Deal damage
-      const dmgSource = { name: 'Shield of Death', owner: ctx.cardOriginalOwner, heroIdx };
+      // Kontrolle statt Seite (Styx 28.9.): Schaden des Kontrolleurs, der
+      // Held steht auf `heroOwner` (Bauform der Charme-Zauber).
+      const dmgSource = { name: 'Shield of Death', owner: pi, heroOwner: ctx.cardHeroOwner ?? ctx.cardOriginalOwner, heroIdx };
       if (retaliateTarget.type === 'hero') {
         const h = gs.players[retaliateTarget.owner]?.heroes?.[retaliateTarget.heroIdx];
         if (h && h.hp > 0) await engine.actionDealDamage(dmgSource, h, 100, 'artifact');

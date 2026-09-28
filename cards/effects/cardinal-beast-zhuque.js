@@ -57,17 +57,19 @@ module.exports = {
   canActivateCreatureEffect(ctx) {
     const engine = ctx._engine;
     const gs = engine.gs;
-    const pi = ctx.cardOriginalOwner;
+    // Styx 28.9.: „you" = Kontrolleur (seitenfremd beschworen: cardOwner ≠ owner).
+    const pi = ctx.cardOwner;
     const oppIdx = pi === 0 ? 1 : 0;
     const ops = gs.players[oppIdx];
     if (!ops) return false;
 
     // Must have 1+ non-burned target
-    for (const hero of (ops.heroes || [])) {
+    // Kontrolle statt Seite (Styx 28.9.)
+    for (const { hero } of engine.heroesControlledBy(oppIdx)) {
       if (hero?.name && hero.hp > 0 && !hero.statuses?.burned) return true;
     }
     for (const inst of engine.cardInstances) {
-      if (inst.owner !== oppIdx || inst.zone !== 'support' || inst.faceDown) continue;
+      if ((inst.controller ?? inst.owner) !== oppIdx || inst.zone !== 'support' || inst.faceDown) continue;
       if (!inst.counters.burned) return true;
     }
     return false;
@@ -76,30 +78,30 @@ module.exports = {
   async onCreatureEffect(ctx) {
     const engine = ctx._engine;
     const gs = engine.gs;
-    const pi = ctx.cardOriginalOwner;
+    // Styx 28.9.: „you" = Kontrolleur (seitenfremd beschworen: cardOwner ≠ owner).
+    const pi = ctx.cardOwner;
     const oppIdx = pi === 0 ? 1 : 0;
     const heroIdx = ctx.cardHeroIdx;
 
     // Build targets: opponent's non-burned heroes and creatures
     const targets = [];
-    const ops = gs.players[oppIdx];
-    for (let hi = 0; hi < (ops.heroes || []).length; hi++) {
-      const hero = ops.heroes[hi];
+    // Kontrolle statt Seite (Styx 28.9.); IDs/owner bleiben physisch.
+    for (const { physOwner, heroIdx: hi, hero } of engine.heroesControlledBy(oppIdx)) {
       if (!hero?.name || hero.hp <= 0) continue;
       if (hero.statuses?.burned) continue;
-      targets.push({ id: `hero-${oppIdx}-${hi}`, type: 'hero', owner: oppIdx, heroIdx: hi, cardName: hero.name });
+      targets.push({ id: `hero-${physOwner}-${hi}`, type: 'hero', owner: physOwner, heroIdx: hi, cardName: hero.name });
     }
     const cardDB = engine._getCardDB();
     for (const inst of engine.cardInstances) {
-      if (inst.owner !== oppIdx || inst.zone !== 'support' || inst.faceDown) continue;
+      if ((inst.controller ?? inst.owner) !== oppIdx || inst.zone !== 'support' || inst.faceDown) continue;
       if (inst.counters.burned) continue;
       const cd = inst.counters?._cardDataOverride || cardDB[inst.name]; // token-override-aware (Biomancy Token — Als AoE-Report)
       if (!cd || !hasCardType(cd, 'Creature')) continue;
       const hp = inst.counters?.currentHp ?? cd.hp ?? 0;
       if (hp <= 0) continue;
       targets.push({
-        id: `equip-${oppIdx}-${inst.heroIdx}-${inst.zoneSlot}`,
-        type: 'equip', owner: oppIdx, heroIdx: inst.heroIdx,
+        id: `equip-${engine.physicalSide(inst)}-${inst.heroIdx}-${inst.zoneSlot}`,
+        type: 'equip', owner: engine.physicalSide(inst), heroIdx: inst.heroIdx,
         slotIdx: inst.zoneSlot, cardName: inst.name, cardInstance: inst,
       });
     }
@@ -132,11 +134,10 @@ module.exports = {
       // Also burn all creatures in this hero's support zones. PHYSICAL
       // side identifies which player's board the slot is on — stolen
       // creatures stay on owner's side; cross-side-placed creatures
-      // (Chilly Wizard) sit on the controller's side.
+      // (Chilly Wizard) sit on the controller's side. Styx 28.9.:
+      // `physicalSide` kennt auch seitenfremd beschworene Kreaturen.
       for (const inst of engine.cardInstances) {
-        const physSide = inst.stolenBy != null
-          ? inst.owner
-          : (inst.controller ?? inst.owner);
+        const physSide = engine.physicalSide(inst);
         if (physSide !== picked.owner || inst.zone !== 'support' || inst.heroIdx !== picked.heroIdx) continue;
         if (inst.faceDown) continue;
         const cd = inst.counters?._cardDataOverride || cardDB[inst.name]; // token-override-aware (Biomancy Token — Als AoE-Report)

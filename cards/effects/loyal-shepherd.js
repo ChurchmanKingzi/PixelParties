@@ -82,9 +82,13 @@ module.exports = {
 
       const engine = ctx._engine;
       const gs     = engine.gs;
-      const pi     = ctx.cardOriginalOwner;
+      // Kontrolle statt Seite (Styx 28.9.): „you" ist der Kontrolleur des
+      // Shepherd (gestohlen/seitenfremd beschworen: nicht die Brettseite).
+      const pi     = ctx.cardOwner;
       const ps     = gs.players[pi];
       if (!ps) return;
+      // Brettseite des freigewordenen Platzes — dorthin wird beschworen.
+      const feld   = death.owner;
 
       // ── Filter: must be A LOYAL WE CONTROLLED, not Shepherd itself ──
       // Controller (not owner) is the gameplay-truth side — a Loyal
@@ -122,10 +126,10 @@ module.exports = {
       // sie als Platzierung: ohne Helden-Pruefung, ohne Aktionsmeldung, mit
       // Ausweichplatz). Sonst: kein Angebot (Leerlauf).
       const _db = engine._getCardDB();
-      const deckLoyals = engine.supportSlotBelegt(death.owner, death.heroIdx, death.zoneSlot) ? []
+      const deckLoyals = engine.supportSlotBelegt(feld, death.heroIdx, death.zoneSlot) ? []
         : getLoyalsInDeck(ps, engine, { exclude: death.name })
-          .filter(l => canHeroSummon(engine, pi, death.heroIdx, _db[l.name], { alsAktion: true })
-            && engine.isCreatureSummonable(l.name, pi, death.heroIdx));
+          .filter(l => canHeroSummon(engine, pi, death.heroIdx, _db[l.name], { alsAktion: true, physOwner: feld })
+            && engine.isCreatureSummonable(l.name, feld, death.heroIdx, { beschwoerer: pi }));
       if (deckLoyals.length === 0) {
         if (gs.hoptUsed) delete gs.hoptUsed[hoptKey];
         return;
@@ -184,7 +188,7 @@ module.exports = {
       // ON_CREATURE_DEATH). Use the same hero+slot the dying Loyal
       // occupied. summonCreatureWithHooks fires the full lifecycle.
       // v1360: der Platz kann waehrend der Wahl belegt worden sein.
-      if (engine.supportSlotBelegt(death.owner, death.heroIdx, death.zoneSlot)) {
+      if (engine.supportSlotBelegt(feld, death.heroIdx, death.zoneSlot)) {
         await engine.zeigeFizzle(CARD_NAME, { playerIdx: pi, grund: 'zone_taken' });
         return;
       }
@@ -194,9 +198,10 @@ module.exports = {
       }
 
       const placed = await engine.summonCreatureWithHooks(
-        replacementName, pi, death.heroIdx, death.zoneSlot,
+        replacementName, feld, death.heroIdx, death.zoneSlot,
         {
           source: CARD_NAME,
+          controller: pi,   // Kontrolle statt Seite (Styx 28.9.): Feldseite + Kontrolleur
           alsZusatzaktion: true,   // v1360: „summon … as an additional Action"
           hookExtras: { _summonedBy: CARD_NAME, ...engine.deckHookExtras() },
         },

@@ -43,7 +43,9 @@ const AOE_DAMAGE = 100;
 function creaturesUnderHero(engine, owner, heroIdx) {
   const cardDB = engine._getCardDB();
   return engine.cardInstances.filter(inst => {
-    if ((inst.controller ?? inst.owner) !== owner) return false;
+    // Styx 28.9.: `owner` ist die Brettseite — „that Hero's Support Zones"
+    // schliesst seitenfremd beschworene Kreaturen dort ein.
+    if (engine.physicalSide(inst) !== owner) return false;
     if (inst.zone !== 'support' || inst.faceDown) return false;
     if (inst.heroIdx !== heroIdx) return false;
     const cd = engine.getEffectiveCardData?.(inst) || cardDB[inst.name];
@@ -83,7 +85,8 @@ module.exports = {
   // Signatur des typisierten Triggers: (gs, ownerIdx, hostHeroIdx,
   // triggerInfo, engine). `_checkSurpriseOnCreatureEnterSupport`
   // liefert { zoneOwner, heroIdx, cardName, cardInstance, isMove,
-  // isPlacement }. `zoneOwner` ist die BRETTSEITE der betretenen Zone.
+  // isPlacement }. `zoneOwner` ist die BRETTSEITE der betretenen Zone,
+  // `controller` der Kontrolleur der Kreatur (Styx 28.9.).
   surpriseCreatureEnterSupportTrigger(gs, ownerIdx, hostHeroIdx, info) {
     if (!info) return false;
     if (info.zoneOwner === ownerIdx) return false;          // Gegnerseite

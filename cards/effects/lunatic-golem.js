@@ -88,7 +88,9 @@ module.exports = {
   async onCreatureEffect(ctx) {
     const engine = ctx._engine;
     const gs = engine.gs;
-    const pi = ctx.cardOriginalOwner;
+    // Kontrolle statt Seite (Styx 28.9.): gestohlen/seitenfremd beschworen
+    // handelt die Kreatur fuer ihren Kontrolleur, nicht fuer die Brettseite.
+    const pi = ctx.cardOwner;
     const inst = ctx.card;
     const n = countDistinctLunaticCycle(engine);
     if (n < 1) return false;
@@ -124,7 +126,7 @@ module.exports = {
     // `--bg-*` CSS vars (same path Disruption Ray uses).
     const tgtZoneSlot = target.type === 'hero' ? -1 : target.slotIdx;
     engine._broadcastEvent('play_beam_animation', {
-      sourceOwner: pi,
+      sourceOwner: engine.physicalSide(inst),   // Brettseite (Styx 28.9.)
       sourceHeroIdx: inst.heroIdx,
       sourceZoneSlot: inst.zoneSlot,
       targetOwner: target.owner,

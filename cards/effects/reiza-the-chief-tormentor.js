@@ -37,10 +37,10 @@ function allOpponentTargetsPoisoned(gs, oppIdx, engine) {
     if (!hero.statuses?.poisoned) return false;
   }
 
-  // Creatures in support zones
+  // Creatures in support zones — Kontrolle statt Seite (Styx 28.9.)
   const cardDB = engine._getCardDB();
   for (const inst of engine.cardInstances) {
-    if (inst.owner !== oppIdx || inst.zone !== 'support') continue;
+    if ((inst.controller ?? inst.owner) !== oppIdx || inst.zone !== 'support') continue;
     if (inst.faceDown) continue;
     const cd = inst.counters?._cardDataOverride || cardDB[inst.name]; // token-override-aware (Biomancy Token — Als AoE-Report)
     if (!cd || !hasCardType(cd, 'Creature')) continue;

@@ -64,8 +64,10 @@ module.exports = {
       const cd = engine.getEffectiveCardData(entering) || engine._getCardDB()[entering.name];
       if (!cd || !hasCardType(cd, 'Creature')) return;
 
-      // Nero must be alive
-      const hero = gs.players[pi]?.heroes?.[heroIdx];
+      // Nero must be alive — Held ueber seine Brettseite (Styx 28.9.:
+      // uebernommen steht er beim Gegner, `cardOwner` ist der Uebernehmer).
+      const hero = ctx.attachedHero;
+      const feld = ctx.cardHeroOwner ?? pi;
       if (!hero?.name || hero.hp <= 0) return;
 
       // Per-turn use cap, keyed by gs.turn (matches Sandy Blob).
@@ -76,7 +78,7 @@ module.exports = {
       // the Curse suppression accumulator catches it when the host
       // is cursed — `actionGrantAtk` isn't appropriate here because
       // the boost never expires (no per-instance revoke counter).
-      engine._applyHeroAtkDelta(hero, pi, heroIdx, ATK_BOOST);
+      engine._applyHeroAtkDelta(hero, feld, heroIdx, ATK_BOOST);
       engine.log('atk_grant', {
         hero: hero.name, amount: ATK_BOOST, source: CARD_NAME,
       });

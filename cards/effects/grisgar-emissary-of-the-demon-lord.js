@@ -94,18 +94,17 @@ module.exports = {
       // the prompt has no answer and we'd just spin the recast for
       // nothing. Mirror Bartas's check exactly.
       const oppIdx = pi === 0 ? 1 : 0;
-      const oppPs = gs.players[oppIdx];
       const firstTargetId = targets[0].id;
       let hasOtherTarget = false;
-      for (let hi = 0; hi < (oppPs.heroes || []).length; hi++) {
-        const h = oppPs.heroes[hi];
+      // Kontrolle statt Seite (Styx 28.9.); IDs bleiben physisch.
+      for (const { physOwner, heroIdx: hi, hero: h } of engine.heroesControlledBy(oppIdx)) {
         if (!h?.name || h.hp <= 0) continue;
-        if (`hero-${oppIdx}-${hi}` !== firstTargetId) { hasOtherTarget = true; break; }
+        if (`hero-${physOwner}-${hi}` !== firstTargetId) { hasOtherTarget = true; break; }
       }
       if (!hasOtherTarget) {
         for (const inst of engine.cardInstances) {
-          if (inst.owner !== oppIdx || inst.zone !== 'support') continue;
-          const cId = `equip-${inst.owner}-${inst.heroIdx}-${inst.zoneSlot}`;
+          if ((inst.controller ?? inst.owner) !== oppIdx || inst.zone !== 'support') continue;
+          const cId = `equip-${engine.physicalSide(inst)}-${inst.heroIdx}-${inst.zoneSlot}`;
           if (cId !== firstTargetId) { hasOtherTarget = true; break; }
         }
       }

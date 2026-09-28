@@ -57,7 +57,6 @@ module.exports = {
       const engine = ctx._engine;
       const gs     = engine.gs;
       const pi     = ctx.cardOwner;
-      const heroIdx = ctx.cardHeroIdx;
 
       if (ctx.toZone !== 'support') return;
 
@@ -69,8 +68,9 @@ module.exports = {
       const cd = engine.getEffectiveCardData(entering) || engine._getCardDB()[entering.name];
       if (!cd || !hasCardType(cd, 'Creature')) return;
 
-      // Ingo must be alive
-      const hero = gs.players[pi]?.heroes?.[heroIdx];
+      // Ingo must be alive — Held ueber seine Brettseite (Styx 28.9.:
+      // uebernommen steht er beim Gegner, `cardOwner` ist der Uebernehmer).
+      const hero = ctx.attachedHero;
       if (!hero?.name || hero.hp <= 0) return;
 
       // Coin burst on Ingo's gold display

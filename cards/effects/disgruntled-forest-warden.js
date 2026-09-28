@@ -72,7 +72,9 @@ module.exports = {
   async onCreatureEffect(ctx) {
     const engine = ctx._engine;
     const gs = engine.gs;
-    const pi = ctx.cardOriginalOwner;
+    // Kontrolle statt Seite (Styx 28.9.): gestohlen/seitenfremd beschworen
+    // handelt die Kreatur fuer ihren Kontrolleur, nicht fuer die Brettseite.
+    const pi = ctx.cardOwner;
     const heroIdx = ctx.cardHeroIdx;
 
     // "choose a target" — any target, either side. Cancellable: the

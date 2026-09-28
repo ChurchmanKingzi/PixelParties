@@ -44,7 +44,11 @@ function getOwnControlledCreatureInsts(engine, pi) {
   const out = [];
   for (const inst of engine.cardInstances) {
     if (inst.zone !== 'support') continue;
-    if (inst.owner !== pi) continue; // bounce returns to original owner — own only
+    // Styx 28.9.: „you control" = Kontrolle. Die Hand-Rueckkehr geht an
+    // `crossSideControlled ?? owner` (returnSupportCreatureToHand) — nur
+    // Kreaturen, die dabei auf UNSERE Hand gehen (keine gestohlenen).
+    if ((inst.controller ?? inst.owner) !== pi) continue;
+    if ((inst.counters?.crossSideControlled ?? inst.owner) !== pi) continue;
     if (inst.faceDown) continue;
     const cd = inst.counters?._cardDataOverride || cardDB[inst.name]; // token-override-aware (Biomancy Token — Als AoE-Report)
     if (!cd || !hasCardType(cd, 'Creature')) continue;
@@ -137,8 +141,8 @@ module.exports = {
       }
 
       const targets = candidates.map(inst => ({
-        id: `equip-${inst.owner}-${inst.heroIdx}-${inst.zoneSlot}`,
-        type: 'equip', owner: inst.owner,
+        id: `equip-${engine.physicalSide(inst)}-${inst.heroIdx}-${inst.zoneSlot}`,
+        type: 'equip', owner: engine.physicalSide(inst),
         heroIdx: inst.heroIdx, slotIdx: inst.zoneSlot,
         cardName: inst.name, cardInstance: inst,
       }));
@@ -161,6 +165,8 @@ module.exports = {
       if (!bouncedT) { gs._spellCancelled = true; return; }
 
       const bouncedInst = bouncedT.cardInstance;
+      // Styx 28.9.: Ersatz auf die BRETTSEITE der Kreatur, Kontrolle bei uns.
+      const feld = engine.physicalSide(bouncedInst);
       const bouncedHeroIdx = bouncedInst.heroIdx;
       const bouncedSlot = bouncedInst.zoneSlot;
       const bouncedLevel = engine.effectiveCardLevel(
@@ -179,7 +185,7 @@ module.exports = {
 
       // v1360 (Audit „same Support Zone"): Austritts-Listener koennen den
       // Platz sofort fuellen → sichtbar fizzeln, keine Galerie.
-      if (engine.supportSlotBelegt(pi, bouncedHeroIdx, bouncedSlot)) {
+      if (engine.supportSlotBelegt(feld, bouncedHeroIdx, bouncedSlot)) {
         engine.log('deepsea_no_replacement', { player: ps.username, reason: 'zone_taken' });
         await engine.zeigeFizzle('Divine Gift of the Deepsea', { playerIdx: pi, grund: 'zone_taken' });
         return;
@@ -244,14 +250,15 @@ module.exports = {
         if (ausDeck) { engine.deckRueckgabe(_taken_deckIdx); return; }
         engine.handZugangSync(ps, repName, { von: 'rueckgabe' });
       };
-      if (engine.supportSlotBelegt(pi, bouncedHeroIdx, bouncedSlot)) {   // v1360
+      if (engine.supportSlotBelegt(feld, bouncedHeroIdx, bouncedSlot)) {   // v1360
         zurueck();
         await engine.zeigeFizzle('Divine Gift of the Deepsea', { playerIdx: pi, grund: 'zone_taken' });
         return;
       }
       const summonRes = await engine.summonCreatureWithHooks(
-        repName, pi, bouncedHeroIdx, bouncedSlot,
+        repName, feld, bouncedHeroIdx, bouncedSlot,
         { source: 'Divine Gift of the Deepsea', isPlacement: true,
+          ...(feld !== pi ? { controller: pi } : {}),
           ...(ausDeck ? { hookExtras: engine.deckHookExtras() } : {}) }
       );
       if (!summonRes?.inst) {
@@ -276,7 +283,7 @@ module.exports = {
       // animations buried by this overlay.
       engine._broadcastEvent('play_zone_animation', {
         type: 'deepsea_summon_whirlpool',
-        owner: pi,
+        owner: feld,
         heroIdx: bouncedHeroIdx,
         zoneSlot: summonRes.actualSlot ?? bouncedSlot,
       });

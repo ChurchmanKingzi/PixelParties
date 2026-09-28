@@ -78,13 +78,17 @@ async function onTargetDefeated(ctx) {
   // eingefrorener, gestunnter oder negierter Baaliel verteilt keine
   // Zaehler; das schliesst seinen eigenen Tod ein (im Moment des KO ist
   // er bereits tot).
-  const self = engine.gs.players[ctx.cardOwner]?.heroes?.[ctx.cardHeroIdx];
+  // Kontrolle statt Seite (Styx 28.9.): Baaliel ueber seine Brettseite —
+  // uebernommen steht er beim Gegner, `cardOwner` ist der Uebernehmer.
+  const self = ctx.attachedHero;
   if (!self?.name || self.hp <= 0) return;
-  if (engine.isHeroIncapacitated(ctx.cardOwner, ctx.cardHeroIdx) || self.statuses?.negated) return;
+  if (engine.isHeroIncapacitated(ctx.cardHeroOwner ?? ctx.cardOwner, ctx.cardHeroIdx) || self.statuses?.negated) return;
   const demons = hornedDemonsOnBoard(engine);
   if (demons.length === 0) return;
   // Quellen-Glow auf Baaliel (Discard-Kosmetik-System), dann die Zaehler.
-  await engine.effectSourceGlow(ctx.cardOwner, CARD_NAME);
+  // Glanz auf Baaliels Platz (Brettseite), nicht auf dem gleichen Index
+  // der Kontrolleursseite.
+  await engine.effectSourceGlow(ctx.cardHeroOwner ?? ctx.cardOwner, CARD_NAME, { inst: ctx.card });
   placeDemonCounters(engine, demons, 1, CARD_NAME);
 }
 

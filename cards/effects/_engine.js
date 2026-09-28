@@ -29317,11 +29317,17 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (!enterCard || enterCard.faceDown) return null;
     const cd = this._getCardDB()[enterCard.name];
     if (!cd || !hasCardType(cd, 'Creature')) return null;
-    const zoneOwner = enterCard.controller ?? enterCard.owner;
+    // Styx 28.9.: Zonenseite und Kontrolleur getrennt. `zoneOwner` ist die
+    // BRETTSEITE der betretenen Zone (Heldenname, „that Hero's Support
+    // Zones"), `controller` der Spieler, fuer den die Kreatur handelt —
+    // bei einer ueber einen geliehenen Helden beschworenen Kreatur
+    // verschieden (liegt beim Gegner, gehoert dem Beschwoerer).
+    const zoneOwner = this.physicalSide(enterCard);
+    const controller = this.effektiveSeiten(enterCard).controller ?? enterCard.owner;
     const heroIdx = extras.heroIdx ?? enterCard.heroIdx;
     if (zoneOwner == null || zoneOwner < 0 || heroIdx == null || heroIdx < 0) return null;
     const info = {
-      zoneOwner, heroIdx,
+      zoneOwner, controller, heroIdx,
       cardName: enterCard.name, cardInstance: enterCard,
       isMove: !!extras.isMove, isPlacement: !!extras.isPlacement,
     };
