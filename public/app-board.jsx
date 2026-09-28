@@ -43564,7 +43564,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 const farbe = amZug.color || (activePlayer === myIdx ? '#00f0ff' : '#ff5577');
                 return (
                   <div key={gameState.turn} className="board-round-counter" style={{ '--runde-farbe': farbe }}>
-                    <span className="board-round-counter-label">ROUND</span>
+                    {/* v1473 (Als Vorgabe 28.9.): gezaehlt wird jeder Zug beider
+                        Spieler — die Beschriftung heisst deshalb „TURN", nicht „ROUND". */}
+                    <span className="board-round-counter-label">TURN</span>
                     <span className="board-round-counter-zahl">{gameState.turn}</span>
                   </div>
                 );

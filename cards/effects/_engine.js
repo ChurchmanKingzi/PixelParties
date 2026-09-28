@@ -15794,6 +15794,11 @@ this._deathWatch = (this._deathWatchStack || []).length
    * @returns {string[]} Array of actually removed status keys
    */
   cleanseHeroStatuses(hero, playerIdx, heroIdx, statusKeys, source) {
+    // ★ v1473 (Als Vorgabe 28.9.: „Effekte, die Status entfernen (Beer,
+    // Tea …) dürfen den Gift-of-Skill-Debuff nie entfernen können!").
+    // Die Sperre von Divine Gift of Skill ist KEIN Status: sie liegt in
+    // `hero._skillLockTurn` (Anzeige `hero.buffs.blessed_skill`) und wird
+    // hier nie angefasst — nur `hero.statuses`. So muss es bleiben.
     if (!hero?.statuses) return [];
     const removed = [];
     const poisonLocked = this._isPoisonHealLocked()
@@ -43854,6 +43859,16 @@ this._deathWatch = (this._deathWatchStack || []).length
       // (v1330, Als Regel 24.9.). Marken, die keine Buffs sind
       // (`_extraLife`, `_koProcessed`, Kontrolle, Ability-Zonen), liegen
       // nicht in `hero.buffs` und bleiben unberuehrt.
+      // ★ v1473 (Als Vorgabe 28.9.): zwei Eintraege in `hero.buffs` sind
+      // KEINE Buffs/Debuffs, sondern NACHWIRKUNGEN eines Zaubers, die der
+      // Tod nicht beendet — mit ihrem Abzeichen:
+      //   • `blessed_skill` (Divine Gift of Skill): „Gift of Skill ist
+      //     eigentlich kein Debuff, sondern ein lingering Effect." Bonus-
+      //     Anlagen und Aktionssperre (`_skillLockTurn`) bleiben ebenso;
+      //     sie enden wie immer mit dem Zug.
+      //   • `second_action_grant` (Weapon Unleashing): „soll im Tod nicht
+      //     verfallen — und der Badge soll ausnahmsweise bestehenbleiben."
+      const NACHWIRKUNGEN = new Set(['blessed_skill', 'second_action_grant']);
       if (hero.buffs && typeof hero.buffs === 'object') {
         const bleibtAmHelden = (quelle) => typeof quelle === 'string' && quelle
           && this.cardInstances.some(c => c.owner === pi && c.zone === 'support'
@@ -43861,16 +43876,11 @@ this._deathWatch = (this._deathWatchStack || []).length
         let geraeumt = false;
         for (const key of Object.keys(hero.buffs)) {
           const daten = hero.buffs[key];
+          if (NACHWIRKUNGEN.has(key)) continue;
           if (key !== 'magic_immune' && bleibtAmHelden(daten?.source)) continue;
           delete hero.buffs[key];
           this.log('buff_remove', { hero: hero.name, buff: key, reason: 'defeated' });
           geraeumt = true;
-          // Blessed (Divine Gift of Skill) ist nur die Anzeige der Bonus-
-          // Anlagen und der Aktionssperre — beides faellt mit.
-          if (key === 'blessed_skill') {
-            if (ps._bonusAbilityAttachments) delete ps._bonusAbilityAttachments[hi];
-            delete hero._skillLockTurn;
-          }
         }
         if (geraeumt) this.sync();
       }
