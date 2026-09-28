@@ -13,7 +13,9 @@ src/<slug>-<teil>.png.
                                     Rauchspur (Teile aus „Riffel …“, links)
   riffel-master-of-the-ultimate-gun Ascended: die Riffel mit den zwei Pistolen;
                                     der Körper sitzt wie in „Sichtbar #146“ unter
-                                    dem Kopf (+4/−3 gegenüber der Ebene)
+                                    dem Kopf (+4/−3 gegenüber der Ebene), die nach
+                                    vorne gerichtete Pistole vor ihr stammt aus
+                                    diesem Szenenbild
   magical-girl-riffel               Skin: „Ebene #162“
   kassaran-seer-of-everything       „Kassaran“
   kent-the-indebted-apprentice      „Kent“ (die Pose rechts oben)
@@ -27,7 +29,8 @@ src/<slug>-<teil>.png.
   dad-of-the-year-von-pixmarck      Skin: „Ebene #322“ + Pistole „Ebene #254“ +
                                     Schussstreifen „Ebene #257“
   nero-zira-the-mastermind          „Nero Zira“ + Roboterarme „Ebene #314“
-  normal-nero-zira                  Skin: „Normal Nero Zira“
+  normal-nero-zira                  Skin: „Normal Nero Zira“; die äußeren Schläuche
+                                    werden bis zu den Schultern weitergeführt
   orthos-the-loyal-guard-dog        der zweiköpfige Hund aus „Orthos“ (mit den
                                     Flammen auf den Köpfen)
   luna-the-flame-fairy              die kleine Fee im Flammenschild aus „Luna“
@@ -107,6 +110,37 @@ def shift(a, dx, dy):
     return out
 
 
+def muzzle(snap, parts):
+    """Ascended-Riffel: die nach vorne gerichtete Pistole vor ihrem Gesicht
+    (dunkler Mündungsring) gibt es nur im Szenenbild „Sichtbar #146“ – dort,
+    wo es vom zusammengesetzten Sprite abweicht, wird es übernommen."""
+    comp = np.zeros_like(snap)
+    for a in parts:
+        m = a[:, :, 3] > 0
+        comp[m] = a[m]
+    diff = (np.abs(snap[:, :, :3].astype(int) - comp[:, :, :3].astype(int)).sum(2) > 12) & (comp[:, :, 3] > 0)
+    return only(snap, diff)
+
+
+def connect_hoses(a):
+    """Normal Nero Zira: die äußeren Schläuche enden in der Ebene frei über den
+    Schultern – sie werden (Querschnitt Umriss/dunkel/hell/dunkel/Umriss) bis
+    zu den gelben Schulterpolstern weitergeführt, je Zeile 1 px zur Schulter."""
+    ys, xs = np.nonzero(a[:, :, 3])
+    x0, y0 = xs.min(), ys.min()
+    out = a.copy()
+    cross = [(0, 0, 0), (0x3b, 0x3b, 0x3b), (0x59, 0x59, 0x59), (0x3b, 0x3b, 0x3b), (0, 0, 0)]
+    for y in range(25, 28):                              # loses Kabelstück rechts
+        out[y0 + y, x0 + 49] = 0
+    for k, y in enumerate(range(24, 29)):
+        for cx in (10 + k, 48 - k):
+            for j, c in enumerate(cross):
+                out[y0 + y, x0 + cx - 2 + j] = (*c, 255)
+            if y == 24:                                  # alte Endkappe (1 px breiter) entfernen
+                out[y0 + y, x0 + (cx + 3 if cx < 30 else cx - 3)] = out[y0 + y, x0 + (cx + 3 if cx < 30 else cx - 3)] * 0
+    return out
+
+
 def main(path):
     doc = GimpDocument(path)
     L = doc.raw_layers
@@ -118,8 +152,10 @@ def main(path):
     save_parts('future-tech-gunslinger-riffel',
                [('body', left(n)) for n in ('Riffel', 'Riffel #9', 'Riffel #13', 'Riffel #8', 'Riffel #12', 'Riffel #11', 'Riffel #10')])
     body = shift(box(g('Riffel'), 240, 300, 300, 350), 4, -3)
+    face, hair = g('Riffel #1'), g('Riffel #2')
     save_parts('riffel-master-of-the-ultimate-gun',
-               [('body', body), ('face', g('Riffel #1')), ('hair', g('Riffel #2')), ('guns', g('Riffel #6')), ('mouth', g('Riffel #5'))])
+               [('body', body), ('face', face), ('hair', hair), ('guns', g('Riffel #6')),
+                ('pistol', muzzle(g('Sichtbar #146'), [body, face, hair]))])
     save_parts('magical-girl-riffel', [('body', g('Ebene #162'))])
     save_parts('kassaran-seer-of-everything', [('body', near(g('Kassaran'), 213, 242))])
     save_parts('kent-the-indebted-apprentice', [('body', near(g('Kent'), 289, 260))])
@@ -133,7 +169,7 @@ def main(path):
     save_parts('von-pixmarck-the-iron-chancellor', [('body', g('Von Pixmarck')), ('gun', g('Ebene #254'))])
     save_parts('dad-of-the-year-von-pixmarck', [('smoke', g('Ebene #257')), ('body', g('Ebene #322')), ('gun', g('Ebene #254'))])
     save_parts('nero-zira-the-mastermind', [('body', box(g('Nero Zira'), 170, 190, 265, 275)), ('arms', g('Ebene #314'))])
-    save_parts('normal-nero-zira', [('body', box(g('Normal Nero Zira'), 170, 190, 265, 275))])
+    save_parts('normal-nero-zira', [('body', connect_hoses(box(g('Normal Nero Zira'), 170, 190, 265, 275)))])
     save_parts('orthos-the-loyal-guard-dog', [('body', near(g('Orthos'), 302, 324))])
     save_parts('luna-the-flame-fairy', [('body', near(g('Luna'), 297, 239))])
     save_parts('tsu-ki-the-lunatic-princess', [('body', g('TsuKi')), ('mask', g('Ebene #208'))])
