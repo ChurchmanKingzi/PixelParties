@@ -176,6 +176,59 @@ kopiert, daneben liegt eine JSON-Datei mit den Metadaten. Die erzeugten
 | `gn.py` | `final 90 luna` | `luna_idle_final_sheet.png` | `luna-the-flame-fairy` |
 | `gn.py` | `final 90 tsuki` | `tsuki_idle_final_sheet.png` | `tsu-ki-the-lunatic-princess` |
 | `bubbles.py` | `final gross` | `bubbles_idle_final_gross_sheet.png` | `bubbles-the-bouncy-bunny` |
+| `grailwar.py` | `final 90 asriel` | `asriel_idle_final_sheet.png` | `asriel-the-sapling-sacrificer` |
+| `grailwar.py` | `final 90 barker` | `barker_idle_final_sheet.png` | `barker-the-monster-tamer` |
+| `grailwar.py` | `final 90 blackstache` | `blackstache_idle_final_sheet.png` | `blackstache-scourge-of-the-pixel-seas` |
+| `grailwar.py` | `final 90 chuck` | `chuck_idle_final_sheet.png` | `chuck-the-crazy-veteran` |
+| `grailwar.py` | `final 90 codumbus` | `codumbus_idle_final_sheet.png` | `codumbus-the-clueless-voyager` |
+| `grailwar.py` | `final 90 devlin` | `devlin_idle_final_sheet.png` | `devlin-the-masked-butcher` |
+| `grailwar.py` | `final 90 mmdevlin` | `mmdevlin_idle_final_sheet.png` | `mass-murderer-devlin` (Skin) |
+| `grailwar.py` | `final 90 enigma` | `enigma_idle_final_sheet.png` | `enigma-the-seller-of-secrets` |
+| `grailwar.py` | `final 90 krates` | `krates_idle_final_sheet.png` | `krates-the-smartass` |
+| `grailwar.py` | `final 90 key` | `key_idle_final_sheet.png` | `key-the-cursed-thief` |
+| `grailwar.py` | `final 90 alleria` | `alleria_idle_final_sheet.png` | `alleria-the-queen-of-spiders` |
+| `grailwar.py` | `final 90 brackle` | `brackle_idle_final_sheet.png` | `brackle-the-catapulting-turtle` |
+| `grailwar.py` | `final 90 leonardo` | `leonardo_idle_final_sheet.png` | `mutated-teenager-brackle` (Skin) |
+| `grailwar.py` | `final 90 broghan` | `broghan_idle_final_sheet.png` | `broghan-the-frozen-guardian-of-the-north` |
+| `grailwar.py` | `final 90 golem` | `golem_idle_final_sheet.png` | `broghan-the-ancient-golem` (Skin) |
+| `grailwar.py` | `final 90 clown` | `clown_idle_final_sheet.png` | `cecilia-the-clown` (Skin) |
+| `grailwar.py` | `final 90 bbg` | `bbg_idle_final_sheet.png` | `bad-birthday-girl-cecilia` |
+| `grailwar.py` | `final 90 fern` | `fern_idle_final_sheet.png` | `fern-the-ship-slave` |
+| `grailwar.py` | `final 90 fernelf` | `fernelf_idle_final_sheet.png` | `fern-the-elf-slave` (Skin) |
+| `grailwar.py` | `final 90 fairy` | `fairy_idle_final_sheet.png` | `fern-the-liberated-fairy` |
+| `grailwar.py` | `final 90 fiona` | `fiona_idle_final_sheet.png` | `fiona-the-princess-of-blackport` |
+| `grailwar.py` | `final 90 boarding` | `boarding_idle_final_sheet.png` | `gabby-the-boarding-broad` |
+| `grailwar.py` | `final 90 chosen` | `chosen_idle_final_sheet.png` | `gabby-the-chosen-girl` (Skin) |
+| `grailwar.py` | `final 90 zombie` | `zombie_idle_final_sheet.png` | `gabby-the-pirate-zombie` |
+| `grailwar.py` | `final 90 moon` | `moon_idle_final_sheet.png` | `gabby-the-moonlight-warrior` (Skin) |
+| `grailwar.py` | `final 90 garius` | `garius_idle_final_sheet.png` | `garius-the-great-reformer` |
+| `grailwar.py` | `final 90 vader` | `vader_idle_final_sheet.png` | `dark-garius` (Skin) |
+| `grailwar.py` | `final 90 gobbo` | `gobbo_idle_final_sheet.png` | `gobbo-chief-of-goblin` |
+| `grailwar.py` | `final 90 hatusbal` | `hatusbal_idle_final_sheet.png` | `hatusbal-the-leader-of-tusca` |
+| `grailwar.py` | `final 90 jack` | `jack_idle_final_sheet.png` | `ancient-hatusbal` (Skin) |
+| `grailwar.py` | `final 90 hulijing` | `hulijing_idle_final_sheet.png` | `hulijing-the-foxdemon` |
+| `grailwar.py` | `final 90 ingo` | `ingo_idle_final_sheet.png` | `ingo-investor-of-evil` |
+| `grailwar.py` | `final 90 eingo` | `eingo_idle_final_sheet.png` | `elegant-ingo` (Skin) |
+| `grailwar.py` | `final 90 madame` | `madame_idle_final_sheet.png` | `madame-guillotine-the-great-equalizer` |
+| `grailwar.py` | `final 90 marianne` | `marianne_idle_final_sheet.png` | `marianne-the-cocky-caretaker` |
+| `grailwar.py` | `final 90 santa` | `santa_idle_final_sheet.png` | `santa-klaus` |
+| `grailwar.py` | `final 90 nicolas` | `nicolas_idle_final_sheet.png` | `nicolas-the-hidden-alchemist` |
+| `grailwar.py` | `final 90 edward` | `edward_idle_final_sheet.png` | `fullmetal-nicolas` (Skin) |
+| `grailwar.py` | `final 90 saintnic` | `saintnic_idle_final_sheet.png` | `saint-nicolas` |
+| `grailwar.py` | `final 90 stellan` | `stellan_idle_final_sheet.png` | `stellan-the-calm-cat` |
+| `grailwar.py` | `final 90 bunny` | `bunny_idle_final_sheet.png` | `stellan-the-calm-easter-bunny` (Skin) |
+| `grailwar.py` | `final 90 tazune` | `tazune_idle_final_sheet.png` | `tazune-the-angry-hot-blood` |
+| `grailwar.py` | `final 90 bakugo` | `bakugo_idle_final_sheet.png` | `explosive-tazune` (Skin) |
+| `grailwar.py` | `final 90 kyli` | `kyli_idle_final_sheet.png` | `kyli-the-deceptive-sapling` |
+| `grailwar.py` | `final 90 zi` | `zi_idle_final_sheet.png` | `timeless-king-zi` |
+| `grailwar.py` | `final 90 waflav` | `waflav_idle_final_sheet.png` | `waflav-the-metamorphing-monstrosity` |
+| `grailwar.py` | `final 90 wahflav` | `wahflav_idle_final_sheet.png` | `wahflav-the-uninvited-fighter` (Skin) |
+| `grailwar.py` | `final 90 ash` | `ash_idle_final_sheet.png` | `barker-the-monster-trainer` (Skin) |
+| `grailwar.py` | `final 90 zetsu` | `zetsu_idle_final_sheet.png` | `kyli-the-true-mastermind` (Skin) |
+| `grailwar.py` | `final 90 xal` | `xal_idle_final_sheet.png` | `xal-the-animated-armor` |
+| `grailwar.py` | `final 90 axal` | `axal_idle_final_sheet.png` | `alchemic-xal` (Skin) |
+| `grailwar.py` | `final 90 octo` | `octo_idle_final_sheet.png` | `alleria-the-octo-princess` (Skin) |
+| `grailwar.py` | `final 90 dreemurr` | `dreemurr_idle_final_sheet.png` | `monster-prince-asriel` (Skin) |
 
 `bubbles.py` ohne `gross` erzeugt eine auf Hero-Größe verkleinerte Variante
 (Sprite aus `bubbles_downscale.py`), die aktuell nicht verwendet wird.
@@ -211,6 +264,7 @@ python3 xcf_extract.py MotiveMoe.xcf assemble src/cute-princess-mary.png "Mary-K
 | MotiveDeepsea-Heroes und -Skins | `MotiveDeepsea.xcf` | reproduzierbar per `python3 assemble_deepsea.py <MotiveDeepsea.xcf>` (Zuordnung im Skriptkopf; Scherben-Vorlagen für die Lolek-Partikel als `-shards.png`) |
 | MotiveDeri-Heroes und -Skin | `MotiveDeri.xcf` | reproduzierbar per `python3 assemble_deri.py <MotiveDeri.xcf>` (Zuordnung im Skriptkopf; Thron, Arm, Bogen, Hände und Zinnen als bewegliche Teile `-<teil>.png`) |
 | MotiveGN-Heroes und -Skins | `MotiveGN.xcf` | reproduzierbar per `python3 assemble_gn.py <MotiveGN.xcf>` (Zuordnung im Skriptkopf; Ascended-Riffels Pistole vor ihr stammt aus dem Szenenbild „Sichtbar #146“; Nero Ziras Schläuche und Kabelenden werden ergänzt) |
+| MotiveGrailWar-Heroes und -Skins | `MotiveGrailWar.xcf` | reproduzierbar per `python3 assemble_grailwar.py <MotiveGrailWar.xcf>` (Zuordnung im Skriptkopf; bewegliche Teile als `-<teil>.png`, Brackles Totenschädel als `brackle-skull.png`; die Unterkörper der Alchemisten, Mariannes Haare und Asriel Dreemurrs Hose in Uniformfarben werden ergänzt, Ingos Kapuzen-Frames liegen in `src/user/`) |
 
 Neue Datei durchsuchen: `xcf_scan.py dump` legt alle Ebenen einzeln ab,
 `xcf_scan.py match <ordner> --heroes` gleicht sie mit allen noch nicht
@@ -309,6 +363,17 @@ Variante ohne Krone/Flügel), Hintergründe/Auren der Karte gehören nicht zum S
 * Vorhandene Mimik genau ansehen: ein roter Fleck unten im Gesicht ist oft
   schon ein offener Mund (Vena) – Brüllen dann nur dezent verstärken. Ein
   Strich-Auge kann schon ein Zwinkern sein (Monia).
+* **Nie „verwaschen“: keine Neu-Rasterung kleiner Bewegungen.** Fließendes
+  Skalieren (Squash um ein paar Prozent) oder Drehen um kleine Winkel mit
+  Neuabtastung lässt jedes Frame an wandernden Stellen Zeilen doppeln bzw.
+  wegfallen und schräge 1-px-Linien neu rastern – die Figur flimmert, die
+  Pixel „laufen ineinander“ (Alleria v5). Stattdessen nur **ganzzahlige
+  Verschiebungen ganzer Blöcke**: Squash-and-Stretch als 1-px-Hub an einer
+  festen Naht (wie das Federn in den Knien, Nahtzeile dehnen), kleine
+  Neigungen als spaltenweise Scherung (jede Spalte rückt als Ganzes um
+  `round(k * Abstand)`), dünne Glieder (Spinnenbeine) biegen, indem jedes
+  Pixel ganzzahlig um `round(Hub * Anteil entlang des Glieds)` rückt.
+  Drehung mit Neuabtastung nur für große Winkel (echter Flügelschlag).
 * **Loop-Längen**: jede Teilbewegung muss N glatt teilen (Federn alle 12
   Frames -> N = 36, nicht 32), sonst bricht am Loop-Ende eine Bewegung ab
   und es entstehen z. B. zwei schnelle Bounces hintereinander. Zufalls-

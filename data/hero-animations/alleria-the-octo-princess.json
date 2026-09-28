@@ -1,0 +1,17 @@
+{
+  "hero": "Alleria the Octo Princess",
+  "sheet": "alleria-the-octo-princess.png",
+  "frameWidth": 46,
+  "frameHeight": 43,
+  "frames": 48,
+  "frameMs": 90,
+  "loop": true,
+  "layout": "horizontal",
+  "skinOf": "Alleria, the Queen of Spiders",
+  "padTop": 8,
+  "padLeft": 6,
+  "padRight": 6,
+  "padBottom": 3,
+  "faceX": 22.0,
+  "footY": 40
+}

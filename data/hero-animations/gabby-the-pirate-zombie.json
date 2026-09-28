@@ -1,0 +1,15 @@
+{
+  "hero": "Gabby, the Pirate Zombie",
+  "sheet": "gabby-the-pirate-zombie.png",
+  "frameWidth": 22,
+  "frameHeight": 29,
+  "frames": 48,
+  "frameMs": 90,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 4,
+  "padLeft": 3,
+  "padRight": 3,
+  "padBottom": 2,
+  "faceX": 11.0
+}

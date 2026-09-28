@@ -1,0 +1,16 @@
+{
+  "hero": "Kyli the True Mastermind",
+  "sheet": "kyli-the-true-mastermind.png",
+  "frameWidth": 20,
+  "frameHeight": 34,
+  "frames": 48,
+  "frameMs": 90,
+  "loop": true,
+  "layout": "horizontal",
+  "skinOf": "Kyli, the Deceptive Sapling",
+  "padTop": 4,
+  "padLeft": 3,
+  "padRight": 3,
+  "padBottom": 2,
+  "faceX": 10.0
+}

@@ -1,0 +1,17 @@
+{
+  "hero": "Mutated Teenager Brackle",
+  "sheet": "mutated-teenager-brackle.png",
+  "frameWidth": 82,
+  "frameHeight": 62,
+  "frames": 48,
+  "frameMs": 90,
+  "loop": true,
+  "layout": "horizontal",
+  "skinOf": "Brackle, the Catapulting Turtle",
+  "padTop": 17,
+  "padLeft": 33,
+  "padRight": 12,
+  "padBottom": 2,
+  "faceX": 37.5,
+  "anchorX": 51.5
+}

@@ -1,0 +1,16 @@
+{
+  "hero": "Timeless King Zi",
+  "sheet": "timeless-king-zi.png",
+  "frameWidth": 40,
+  "frameHeight": 41,
+  "frames": 48,
+  "frameMs": 90,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 7,
+  "padLeft": 7,
+  "padRight": 7,
+  "padBottom": 6,
+  "faceX": 20.0,
+  "footY": 35
+}

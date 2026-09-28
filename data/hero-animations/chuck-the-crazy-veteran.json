@@ -1,0 +1,15 @@
+{
+  "hero": "Chuck, the Crazy Veteran",
+  "sheet": "chuck-the-crazy-veteran.png",
+  "frameWidth": 29,
+  "frameHeight": 28,
+  "frames": 48,
+  "frameMs": 90,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 5,
+  "padLeft": 3,
+  "padRight": 3,
+  "padBottom": 2,
+  "faceX": 18.5
+}

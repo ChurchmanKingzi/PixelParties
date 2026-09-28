@@ -1,0 +1,15 @@
+{
+  "hero": "Ingo, Investor of Evil",
+  "sheet": "ingo-investor-of-evil.png",
+  "frameWidth": 24,
+  "frameHeight": 30,
+  "frames": 48,
+  "frameMs": 90,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 4,
+  "padLeft": 3,
+  "padRight": 3,
+  "padBottom": 2,
+  "faceX": 12.0
+}

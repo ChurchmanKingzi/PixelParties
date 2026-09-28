@@ -1,0 +1,16 @@
+{
+  "hero": "Garius, the Great Reformer",
+  "sheet": "garius-the-great-reformer.png",
+  "frameWidth": 32,
+  "frameHeight": 43,
+  "frames": 48,
+  "frameMs": 90,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 6,
+  "padLeft": 3,
+  "padRight": 3,
+  "padBottom": 3,
+  "faceX": 18.0,
+  "footY": 40
+}
