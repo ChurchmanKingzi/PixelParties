@@ -40,7 +40,7 @@ const CARD_NAME = 'Call of the Deepsea';
 const hoptKey = (inst) => `call-of-the-deepsea:${inst.id}`;
 
 /** Galerie: beschwoerbare Creatures aus Hand und Ablage, ohne den Namen der besiegten. */
-function kandidaten(engine, pi, heroIdx, ausserName) {
+function kandidaten(engine, pi, heroIdx, ausserName, seite = pi) {
   const ps = engine.gs.players[pi];
   const db = engine._getCardDB();
   const out = [];
@@ -52,8 +52,9 @@ function kandidaten(engine, pi, heroIdx, ausserName) {
       if (n === ausserName) continue;
       const cd = db[n];
       if (!cd || !isPileCreature(cd)) continue;
-      if (!canHeroSummon(engine, pi, heroIdx, cd, { alsAktion: true })) continue;
-      if (!engine.isCreatureSummonable(n, pi, heroIdx)) continue;
+      // Kontrolle statt Seite (Styx 28.9.): Held an seiner physischen Adresse.
+      if (!canHeroSummon(engine, pi, heroIdx, cd, { alsAktion: true, physOwner: seite })) continue;
+      if (!engine.isCreatureSummonable(n, seite, heroIdx)) continue;
       zaehler.set(n, (zaehler.get(n) || 0) + 1);
     }
     for (const [name, count] of [...zaehler.entries()].sort(([a], [b]) => a.localeCompare(b))) {
@@ -95,10 +96,14 @@ module.exports = {
       const pi = self.controller ?? self.owner;
       const tod = ctx.creature;
       if (!tod?.name) return;
-      // In der Support Zone eines EIGENEN Helden (Seite des Platzes).
-      if (tod.owner !== pi) return;
+      // In der Support Zone eines Helden, den `pi` KONTROLLIERT.
+      // Kontrolle statt Seite (Styx 28.9.): auch ein uebernommener Held
+      // der Gegenspalte; ein an den Gegner abgegebener eigener nicht.
       const heroIdx = tod.heroIdx, slotIdx = tod.zoneSlot;
       if (heroIdx == null || heroIdx < 0 || slotIdx == null || slotIdx < 0) return;
+      const seite = tod.owner;
+      const platzHeld = gs.players[seite]?.heroes?.[heroIdx];
+      if (!platzHeld?.name || engine.heroSideOf(seite, platzHeld) !== pi) return;
       if (gs.hoptUsed?.[`${hoptKey(self)}:${pi}`] === gs.turn) return;
       const ps = gs.players[pi];
 
@@ -107,8 +112,8 @@ module.exports = {
       if (!(gs.players[stapelBesitzer]?.discardPile || []).includes(tod.name)) return;
       if (!engine.pileOutAllowed(stapelBesitzer, 'discard', { source: CARD_NAME })) return;
       // Derselbe Platz muss frei sein.
-      if (engine.supportSlotBelegt(pi, heroIdx, slotIdx)) return;
-      const karten = kandidaten(engine, pi, heroIdx, tod.name);
+      if (engine.supportSlotBelegt(seite, heroIdx, slotIdx)) return;
+      const karten = kandidaten(engine, pi, heroIdx, tod.name, seite);
       if (karten.length === 0) return;
 
       const wahl = await engine.promptGeneric(pi, {
@@ -120,11 +125,11 @@ module.exports = {
       const quelle = wahl.source === 'discard' ? 'discard' : 'hand';
       const name = wahl.cardName;
       // Brett kann sich waehrend der Wahl gedreht haben.
-      if (!kandidaten(engine, pi, heroIdx, tod.name).some(k => k.name === name && k.source === quelle)) {
+      if (!kandidaten(engine, pi, heroIdx, tod.name, seite).some(k => k.name === name && k.source === quelle)) {
         await engine.zeigeFizzle(CARD_NAME, { playerIdx: pi, grund: 'no_target' });   // v1360
         return;
       }
-      if (engine.supportSlotBelegt(pi, heroIdx, slotIdx)) {
+      if (engine.supportSlotBelegt(seite, heroIdx, slotIdx)) {
         await engine.zeigeFizzle(CARD_NAME, { playerIdx: pi, grund: 'zone_taken' });   // v1360
         return;
       }
@@ -132,7 +137,7 @@ module.exports = {
 
       await engine.showTriggeredEffect(CARD_NAME, { playerIdx: pi });
       engine._broadcastEvent('play_zone_animation', {
-        type: 'deepsea_summon_whirlpool', owner: pi, heroIdx, zoneSlot: slotIdx,
+        type: 'deepsea_summon_whirlpool', owner: seite, heroIdx, zoneSlot: slotIdx,
       });
       await engine._delay(450);
 
@@ -144,7 +149,7 @@ module.exports = {
         return;
       }
       // v1359: der Platz kann waehrend des Loeschens belegt worden sein.
-      if (engine.supportSlotBelegt(pi, heroIdx, slotIdx)) {
+      if (engine.supportSlotBelegt(seite, heroIdx, slotIdx)) {
         engine.log('call_of_the_deepsea_fizzle', { player: ps.username, card: name });
         await engine.zeigeFizzle(CARD_NAME, { playerIdx: pi, grund: 'zone_taken' });
         return;
@@ -152,6 +157,7 @@ module.exports = {
       // ② summon … as an additional Action
       const neu = await engine.summonFromPile(pi, quelle, name, heroIdx, slotIdx, {
         source: CARD_NAME, alsZusatzaktion: true,
+        ...(seite !== pi ? { heldSeite: seite } : {}),   // Kontrolle statt Seite (Styx 28.9.)
       });
       if (!neu) {
         engine.log('call_of_the_deepsea_fizzle', { player: ps.username, card: name });
@@ -160,7 +166,7 @@ module.exports = {
       }
       engine.log('call_of_the_deepsea', {
         player: ps.username, card: CARD_NAME, deleted: tod.name, target: name, from: quelle,
-        hero: ps.heroes?.[heroIdx]?.name || null,
+        hero: platzHeld?.name || null,
       });
       engine.sync();
     },

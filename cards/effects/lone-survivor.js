@@ -59,18 +59,19 @@ function kandidaten(engine, pi) {
     .map(([name, count]) => ({ name, source: 'discard', count }));
 }
 
-/** Freie Plaetze lebender eigener Helden, auf denen diese Creature liegen darf. */
+/** Freie Plaetze lebender Helden, die `pi` kontrolliert, auf denen diese Creature liegen darf. */
 function zonenFuer(engine, pi, cardName) {
-  const ps = engine.gs.players[pi];
+  // Kontrolle statt Seite (Styx 28.9.): „an undefeated Hero you control" —
+  // auch uebernommene Helden der Gegenspalte; jede Zone traegt `owner`
+  // (physische Seite), alle Pruefungen laufen ueber diese Adresse.
   const out = [];
-  for (let hi = 0; hi < (ps?.heroes || []).length; hi++) {
-    const h = ps.heroes[hi];
+  for (const { physOwner, heroIdx: hi, hero: h } of engine.heroesControlledBy(pi)) {
     if (!h?.name || h.hp <= 0) continue;
-    if (engine.isSupportZoneLocked(pi, hi, { source: CARD_NAME, cardName, via: 'place' })) continue;
-    if (cardName && !engine.isCreatureSummonable(cardName, pi, hi, { _bypassBeforeSummon: true })) continue;
+    if (engine.isSupportZoneLocked(physOwner, hi, { source: CARD_NAME, cardName, via: 'place' })) continue;
+    if (cardName && !engine.isCreatureSummonable(cardName, physOwner, hi, { _bypassBeforeSummon: true })) continue;
     for (let si = 0; si < 3; si++) {
-      if (engine.supportSlotBelegt(pi, hi, si)) continue;
-      out.push({ heroIdx: hi, slotIdx: si, label: `${h.name} — Slot ${si + 1}` });
+      if (engine.supportSlotBelegt(physOwner, hi, si)) continue;
+      out.push({ owner: physOwner, heroIdx: hi, slotIdx: si, label: `${h.name} — Slot ${si + 1}` });
     }
   }
   return out;
@@ -118,7 +119,11 @@ module.exports = {
         zones: zonen, cancellable: true,
       });
       if (!z || z.cancelled) return { cancelled: true };
-      ziel = zonen.find(q => q.heroIdx === z.heroIdx && q.slotIdx === z.slotIdx) || null;
+      // Kontrolle statt Seite (Styx 28.9.): Zone samt Seite; Antwort ohne
+      // `owner` (generische CPU) → erste passende Zone.
+      const gleich = q => q.heroIdx === z.heroIdx && q.slotIdx === z.slotIdx;
+      ziel = zonen.find(q => gleich(q) && q.owner === (z.owner ?? pi))
+        || (z.owner == null ? zonen.find(gleich) : null) || null;
       if (!ziel) return { cancelled: true };
     }
 
@@ -126,6 +131,7 @@ module.exports = {
     // Lethe-Stempel, On-Summon-Hooks mit `_isPlacement`).
     const res = await engine.placeFromPile(pi, 'discard', gewaehlt, ziel.heroIdx, ziel.slotIdx, {
       source: CARD_NAME,
+      heldSeite: ziel.owner,   // Kontrolle statt Seite (Styx 28.9.)
     });
     if (!res) {
       engine.log('lone_survivor_fizzle', { player: ps.username, card: gewaehlt });
@@ -137,7 +143,7 @@ module.exports = {
     ps.summonLocked = true;
     engine.log('lone_survivor', {
       player: ps.username, card: CARD_NAME, target: gewaehlt,
-      hero: ps.heroes[ziel.heroIdx]?.name || null,
+      hero: gs.players[ziel.owner]?.heroes?.[ziel.heroIdx]?.name || null,
     });
     engine.sync();
     return true;

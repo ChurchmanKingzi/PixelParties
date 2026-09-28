@@ -69,14 +69,16 @@ function getHostHeroes(engine, pi) {
   const cd = cardDB[CARD_NAME];
   if (!cd) return [];
   const out = [];
-  for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-    const h = ps.heroes[hi];
+  // Kontrolle statt Seite (Styx 28.9.) — „a Hero that can summon it"
+  // unter den Helden, die `pi` KONTROLLIERT; Pruefung an der physischen
+  // Adresse. Ergebnis: `{ physOwner, heroIdx }`.
+  for (const { physOwner, heroIdx: hi, hero: h } of engine.heroesControlledBy(pi)) {
     if (!h?.name || h.hp <= 0) continue;
     if (h.statuses?.frozen || h.statuses?.stunned) continue;
-    const sup = ps.supportZones?.[hi] || [];
+    const sup = engine.gs.players[physOwner]?.supportZones?.[hi] || [];
     if (!sup.some(slot => (slot || []).length === 0)) continue;
-    if (!engine.heroMeetsLevelReq(pi, hi, cd)) continue;
-    out.push(hi);
+    if (!engine.heroMeetsLevelReq(physOwner, hi, cd, physOwner !== pi ? { levelSourcePi: pi } : {})) continue;
+    out.push({ physOwner, heroIdx: hi });
   }
   return out;
 }
@@ -208,12 +210,14 @@ module.exports = {
     if (!confirmed) return; // ctx.rescued stays false → deletion proceeds
 
     // Pick destination Support Zone.
+    // Kontrolle statt Seite (Styx 28.9.): Zonen tragen `owner` (physische Seite).
     const zones = [];
-    for (const hi of hosts) {
-      const sup = ps.supportZones?.[hi] || [];
+    for (const { physOwner, heroIdx: hi } of hosts) {
+      const sup = engine.gs.players[physOwner]?.supportZones?.[hi] || [];
+      const hName = engine.gs.players[physOwner].heroes[hi].name;
       for (let s = 0; s < 3; s++) {
         if ((sup[s] || []).length === 0) {
-          zones.push({ heroIdx: hi, slotIdx: s, label: `${ps.heroes[hi].name} — Support ${s + 1}` });
+          zones.push({ owner: physOwner, heroIdx: hi, slotIdx: s, label: `${hName} — Support ${s + 1}` });
         }
       }
     }
@@ -230,7 +234,8 @@ module.exports = {
         description: `Choose a Support Zone to summon ${CARD_NAME} into.`,
         cancellable: false,
       });
-      chosen = zones.find(z => z.heroIdx === picked?.heroIdx && z.slotIdx === picked?.slotIdx) || zones[0];
+      chosen = zones.find(z => z.owner === (picked?.owner ?? pi) && z.heroIdx === picked?.heroIdx && z.slotIdx === picked?.slotIdx)
+        || zones.find(z => z.heroIdx === picked?.heroIdx && z.slotIdx === picked?.slotIdx) || zones[0];
     }
 
     // Untrack the orphaned source instance (if any). For hand-deletes
@@ -248,8 +253,9 @@ module.exports = {
     const ausAblage = ctx.fromZone === 'discard';
     const ab = ausAblage ? (ctx.ablage || { name: CARD_NAME, pileOwner: pi, pi, lethe: 0, idx: null }) : null;
     const res = await engine.summonCreatureWithHooks(
-      CARD_NAME, pi, chosen.heroIdx, chosen.slotIdx,
-      { source: CARD_NAME, ...(ausAblage ? { hookExtras: engine.ablageHookExtras() } : {}) }
+      CARD_NAME, chosen.owner, chosen.heroIdx, chosen.slotIdx,
+      { source: CARD_NAME, ...(chosen.owner !== pi ? { controller: pi } : {}),
+        ...(ausAblage ? { hookExtras: engine.ablageHookExtras() } : {}) }
     );
     if (ab && res?.inst) engine.ablageLandung(res.inst, ab, 'summon');
 
@@ -278,7 +284,11 @@ module.exports = {
       if (inst.zone !== 'support') return;
 
       const engine = ctx._engine;
-      const pi     = ctx.cardOwner;
+      // Kontrolle statt Seite (Styx 28.9.): ueber einen uebernommenen
+      // Helden beschworen steht die Hydra auf der Gegenseite
+      // (`cardOwner` = Feldseite) — abgeworfen wird aus der Hand des
+      // Beschwoerers.
+      const pi     = ctx.cardController ?? ctx.cardOwner;
       const ps     = engine.gs.players[pi];
       if (!ps) return;
 

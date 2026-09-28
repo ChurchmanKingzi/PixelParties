@@ -39,10 +39,10 @@
 //    „Placed" ist keine Aktion und laeuft ohnehin nicht hierueber.
 
 /** Ist eine Aktion dieses Helden gerade gesperrt? */
-function heroActionLocked(engine, pi, heroIdx) {
-  const hero = engine?.gs?.players?.[pi]?.heroes?.[heroIdx];
+function heroActionLocked(engine, pi, heroIdx, physOwner = pi) {
+  const hero = engine?.gs?.players?.[physOwner]?.heroes?.[heroIdx];
   if (!hero) return true;
-  if (engine.isHeroSkillLocked?.(pi, heroIdx)) return true;
+  if (engine.isHeroSkillLocked?.(physOwner, heroIdx)) return true;
   if (hero._maxActionsPerTurn && (hero._actionsThisTurn || 0) >= hero._maxActionsPerTurn) return true;
   if (hero._actionLockedTurn === engine.gs.turn) return true;
   if (engine.areActionsBlocked?.(pi)) return true;
@@ -55,15 +55,21 @@ function heroActionLocked(engine, pi, heroIdx) {
  *   (Zusatz-)Aktion, also greifen auch die Aktionssperren.
  */
 function canHeroSummon(engine, pi, heroIdx, cd, opts = {}) {
+  // Kontrolle statt Seite (Styx 28.9.): `opts.physOwner` = Spalte des
+  // Helden (Standard: die eigene). Beschwoeren darf `pi` nur mit einem
+  // Helden, den er KONTROLLIERT — ein an den Gegner abgegebener eigener
+  // Held faellt heraus, ein uebernommener der Gegenspalte zaehlt.
+  const physOwner = opts.physOwner ?? pi;
   const ps = engine?.gs?.players?.[pi];
-  const hero = ps?.heroes?.[heroIdx];
+  const hero = engine?.gs?.players?.[physOwner]?.heroes?.[heroIdx];
   if (!hero?.name || hero.hp <= 0) return false;
-  if (ps.summonLocked) return false;
+  if (engine.heroSideOf && engine.heroSideOf(physOwner, hero) !== pi) return false;
+  if (ps?.summonLocked) return false;
   const st = hero.statuses || {};
   if (st.frozen || st.stunned || st.webbed || st.bound || st.negated) return false;
   if (!cd) return false;
-  if (opts.alsAktion && heroActionLocked(engine, pi, heroIdx)) return false;
-  return engine.heroMeetsLevelReq(pi, heroIdx, cd);
+  if (opts.alsAktion && heroActionLocked(engine, pi, heroIdx, physOwner)) return false;
+  return engine.heroMeetsLevelReq(physOwner, heroIdx, cd);
 }
 
 /**
@@ -84,15 +90,24 @@ function eligibleSummonZones(engine, pi, cardName, opts = {}) {
   if (!ps || !cd) return [];
   const pruef = { alsAktion: opts.alsAktion !== false };
   const out = [];
-  for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-    if (!canHeroSummon(engine, pi, hi, cd, pruef)) continue;
-    const zones = ps.supportZones?.[hi] || [];
+  // Kontrolle statt Seite (Styx 28.9.): mit `opts.nachKontrolle` zaehlen
+  // alle Helden, die `pi` kontrolliert — die Eintraege tragen dann
+  // `owner` (physische Seite), und der Aufrufer beschwoert mit
+  // `heldSeite: z.owner`. Ohne die Option bleibt es bei der eigenen
+  // Spalte (Aufrufer, die `owner` noch nicht weitergeben).
+  const helden = opts.nachKontrolle && engine.heroesControlledBy
+    ? engine.heroesControlledBy(pi)
+    : (ps.heroes || []).map((hero, heroIdx) => ({ physOwner: pi, heroIdx, hero }));
+  for (const { physOwner, heroIdx: hi, hero } of helden) {
+    if (!canHeroSummon(engine, pi, hi, cd, { ...pruef, physOwner })) continue;
+    const zones = engine.gs.players[physOwner]?.supportZones?.[hi] || [];
     for (let zi = 0; zi < Math.min(zones.length, 3); zi++) {
       // v1349: versiegelte Plaetze (Madame Guillotine) zaehlen als belegt.
-      if (!engine.supportSlotBelegt(pi, hi, zi)) {
+      if (!engine.supportSlotBelegt(physOwner, hi, zi)) {
         out.push({
           heroIdx: hi, slotIdx: zi,
-          label: `${ps.heroes[hi].name} — Slot ${zi + 1}`,
+          label: `${hero.name} — Slot ${zi + 1}`,
+          ...(opts.nachKontrolle ? { owner: physOwner } : {}),
         });
       }
     }
@@ -119,7 +134,8 @@ async function sofortAusHandBeschwoeren(engine, pi, name, opts = {}) {
   const { source, zonenFilter, nachZonenwahl } = opts;
   const ps = engine.gs.players[pi];
   if (!ps || !(ps.hand || []).includes(name)) return false;
-  let zonen = eligibleSummonZones(engine, pi, name);
+  // Kontrolle statt Seite (Styx 28.9.): auch ueber uebernommene Helden.
+  let zonen = eligibleSummonZones(engine, pi, name, { nachKontrolle: true });
   if (typeof zonenFilter === 'function') zonen = zonen.filter(zonenFilter);
   if (zonen.length === 0) return false;
   let ziel = zonen[0];
@@ -130,13 +146,15 @@ async function sofortAusHandBeschwoeren(engine, pi, name, opts = {}) {
       zones: zonen, cancellable: true,
     });
     if (!wahl || wahl.cancelled) return false;
-    ziel = zonen.find(z => z.heroIdx === wahl.heroIdx && z.slotIdx === wahl.slotIdx) || null;
+    ziel = zonen.find(z => z.heroIdx === wahl.heroIdx && z.slotIdx === wahl.slotIdx
+      && (z.owner ?? pi) === (wahl.owner ?? pi)) || null;
     if (!ziel) return false;
   }
   if (typeof nachZonenwahl === 'function') await nachZonenwahl(ziel);
   const inst = await engine.summonFromPile(pi, 'hand', name, ziel.heroIdx, ziel.slotIdx, {
     source: source || name, hookExtras: { _isNormalSummon: false },
     alsZusatzaktion: true,   // v1349: „as an additional Action" ist eine Aktion
+    ...((ziel.owner ?? pi) !== pi ? { heldSeite: ziel.owner } : {}),
   });
   return !!inst;
 }

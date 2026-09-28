@@ -81,8 +81,9 @@ module.exports = {
     if (!monia?.name || monia.name !== CARD_NAME || monia.hp <= 0) return false;
     const srcOwner = sourceCard?.heroOwner ?? sourceCard?.controller ?? sourceCard?.owner ?? -1;
     if (srcOwner === ownerIdx) return false;                    // nur gegnerische Karten/Effekte
-    if (!selected || selected.owner !== ownerIdx) return false;   // ein eigenes Ziel
-    if (selected.type === 'hero' && selected.heroIdx === heroIdx) return false; // „another"
+    // Kontrolle statt Seite (Styx 28.9.): ein Ziel, das ich KONTROLLIERE.
+    if (!selected || (engine?.zielSeite ? engine.zielSeite(selected) : selected.owner) !== ownerIdx) return false;   // ein eigenes Ziel
+    if (selected.type === 'hero' && selected.owner === ownerIdx && selected.heroIdx === heroIdx) return false; // „another"
     if (config?.cannotBeRedirected) return false;
     return moniaIsValidTarget(validTargets, ownerIdx, heroIdx);
   },

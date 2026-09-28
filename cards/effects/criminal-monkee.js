@@ -197,7 +197,8 @@ module.exports = {
       if (gs[RESOLVING]?.[pi]) return;
       if (!(ps.hand || []).includes(CARD_NAME)) return;
       if ((ps.gold || 0) < PRICE) return;
-      if (eligibleSummonZones(engine, pi, CARD_NAME).length === 0) return;
+      // Kontrolle statt Seite (Styx 28.9.): auch uebernommene Helden.
+      if (eligibleSummonZones(engine, pi, CARD_NAME, { nachKontrolle: true }).length === 0) return;
 
       const bestaetigt = await engine.promptGeneric(pi, {
         type: 'confirm',
@@ -226,7 +227,7 @@ module.exports = {
         // waehlen lassen, wenn es mehrere Moeglichkeiten gibt — wie bei
         // einer normalen Beschwoerung (Als Vorgabe 8.8.). Nicht
         // abbrechbar: bestaetigt und bezahlt ist bereits verbindlich.
-        const zonen = eligibleSummonZones(engine, pi, CARD_NAME);
+        const zonen = eligibleSummonZones(engine, pi, CARD_NAME, { nachKontrolle: true });   // Kontrolle statt Seite (Styx 28.9.)
         if (zonen.length === 0) {
           engine.log('criminal_monkee_fizzle', { player: ps.username, reason: 'no_eligible_caster' });
           return;
@@ -238,8 +239,10 @@ module.exports = {
             description: `Choose where to summon ${CARD_NAME}.`,
             cancellable: false,
           });
-          const gewaehlt = wahl && zonen.find(z =>
-            z.heroIdx === wahl.heroIdx && z.slotIdx === (wahl.slotIdx ?? wahl.zoneSlot));
+          // Antwort ohne `owner` = eigene Seite; sonst die einzige passende.
+          const passt = z => z.heroIdx === wahl.heroIdx && z.slotIdx === (wahl.slotIdx ?? wahl.zoneSlot);
+          const gewaehlt = wahl && (zonen.find(z => passt(z) && z.owner === (wahl.owner ?? pi))
+            || zonen.find(passt));
           if (gewaehlt) ziel = gewaehlt;
         }
         const i = (ps.hand || []).indexOf(CARD_NAME);
@@ -247,9 +250,11 @@ module.exports = {
         engine.takeFromPileSync(ps, 'hand', i);
         engine._broadcastEvent('card_reveal', { cardName: CARD_NAME });
 
+        const seite = ziel.owner ?? pi;   // Kontrolle statt Seite (Styx 28.9.)
         const res = await engine.summonCreatureWithHooks(
-          CARD_NAME, pi, ziel.heroIdx, ziel.slotIdx,
-          { source: `${CARD_NAME} trigger`, alsZusatzaktion: true },   // v1349: ist eine Aktion
+          CARD_NAME, seite, ziel.heroIdx, ziel.slotIdx,
+          { source: `${CARD_NAME} trigger`, alsZusatzaktion: true,   // v1349: ist eine Aktion
+            ...(seite !== pi ? { controller: pi } : {}) },
         );
         if (!res) {
           engine.handZugangSync(ps, CARD_NAME, { source: CARD_NAME, ohneInstanz: true });

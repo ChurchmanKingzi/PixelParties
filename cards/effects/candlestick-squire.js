@@ -158,17 +158,18 @@ module.exports = {
     // slot. Mirrors `getHeroPlayableCards`'s normal-summon gate.
     const cardDB = engine._getCardDB();
     const cd     = cardDB[CARD_NAME];
+    // Kontrolle statt Seite (Styx 28.9.): alle Helden, die `pi`
+    // kontrolliert — auch uebernommene der Gegenspalte (`owner`).
     const hostZones = [];
-    for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-      const h = ps.heroes[hi];
+    for (const { physOwner, heroIdx: hi, hero: h } of engine.heroesControlledBy(pi)) {
       if (!h?.name || h.hp <= 0) continue;
       if (h.statuses?.frozen || h.statuses?.stunned || h.statuses?.bound) continue;
-      if (cd && !engine.heroMeetsLevelReq(pi, hi, cd)) continue;
-      const sup = ps.supportZones?.[hi] || [[], [], []];
+      if (cd && !engine.heroMeetsLevelReq(physOwner, hi, cd)) continue;
+      const sup = engine.gs.players[physOwner]?.supportZones?.[hi] || [[], [], []];
       for (let z = 0; z < 3; z++) {
         if ((sup[z] || []).length === 0) {
           hostZones.push({
-            heroIdx: hi, slotIdx: z,
+            owner: physOwner, heroIdx: hi, slotIdx: z,
             label: `${h.name} — Support ${z + 1}`,
           });
         }
@@ -176,21 +177,26 @@ module.exports = {
     }
     if (hostZones.length === 0) return false; // no valid host
 
-    let hostHeroIdx, hostFreeSlot;
+    let hostHeroIdx, hostFreeSlot, hostSeite = pi;
     if (ctx.viaDragDrop) {
-      // Drag-drop pinned the host: use the dropped hero/slot.
+      // Drag-drop pinned the host: use the dropped hero/slot. Die Seite
+      // des Wurfs kennt `beforeSummon` nicht — hier bleibt es bei der
+      // eigenen Spalte; die Platzierung selbst macht dann der Server
+      // (der die Seite kennt).
+      const eigene = hostZones.filter(z => z.owner === pi);
       hostHeroIdx  = ctx.cardHeroIdx;
       hostFreeSlot = ps._requestedNormalSummonSlot?.slotIdx;
       const stillFree = hostFreeSlot != null
-        && hostZones.some(z => z.heroIdx === hostHeroIdx && z.slotIdx === hostFreeSlot);
+        && eigene.some(z => z.heroIdx === hostHeroIdx && z.slotIdx === hostFreeSlot);
       if (!stillFree) {
-        const fallback = hostZones.find(z => z.heroIdx === hostHeroIdx);
+        const fallback = eigene.find(z => z.heroIdx === hostHeroIdx);
         if (!fallback) return false;
         hostFreeSlot = fallback.slotIdx;
       }
     } else if (hostZones.length === 1) {
       hostHeroIdx  = hostZones[0].heroIdx;
       hostFreeSlot = hostZones[0].slotIdx;
+      hostSeite    = hostZones[0].owner;
     } else {
       const picked = await engine.promptGeneric(pi, {
         type: 'zonePick',
@@ -201,10 +207,13 @@ module.exports = {
         cancellable: true,
       });
       if (!picked || picked.cancelled) return false;
-      const chosen = hostZones.find(z => z.heroIdx === picked.heroIdx && z.slotIdx === picked.slotIdx);
+      const chosen = hostZones.find(z => z.owner === (picked.owner ?? pi)
+        && z.heroIdx === picked.heroIdx && z.slotIdx === picked.slotIdx)
+        || hostZones.find(z => z.heroIdx === picked.heroIdx && z.slotIdx === picked.slotIdx);
       if (!chosen) return false;
       hostHeroIdx  = chosen.heroIdx;
       hostFreeSlot = chosen.slotIdx;
+      hostSeite    = chosen.owner;
     }
 
     // ── Step 2: pick the BURNED target to cleanse ───────────────
@@ -250,18 +259,20 @@ module.exports = {
     // ── Step 4: redirect placement if host/slot differs from drop ──
     const drop = ps._requestedNormalSummonSlot;
     const sameAsDrop = drop
+      && hostSeite === pi   // Kontrolle statt Seite (Styx 28.9.): Gegenspalte immer selbst platzieren
       && hostHeroIdx === ctx.cardHeroIdx
       && hostFreeSlot === drop.slotIdx;
     if (!sameAsDrop) {
       await engine.actionPlaceCreature(CARD_NAME, pi, hostHeroIdx, hostFreeSlot, {
         source: 'external', sourceName: CARD_NAME, fireHooks: true,
+        ...(hostSeite !== pi ? { heldSeite: hostSeite } : {}),   // Kontrolle statt Seite (Styx 28.9.)
       });
       ps._placementConsumedByCard = CARD_NAME;
     }
 
     engine.log('candlestick_squire_cleanse', {
       player: ps.username,
-      host: ps.heroes?.[hostHeroIdx]?.name,
+      host: engine.gs.players[hostSeite]?.heroes?.[hostHeroIdx]?.name,
       target: target.cardName,
     });
     engine.sync();

@@ -61,13 +61,13 @@ function getOwnedCreatureLevels(engine, pi) {
  * The Cosmic Depths is NOT a placement — it summons through the host
  * Hero's normal-summon gate, then negates the resulting Creature.
  */
-function canHeroSummon(engine, pi, heroIdx, cd) {
-  const ps = engine.gs.players[pi];
+function canHeroSummon(engine, pi, heroIdx, cd, physOwner = pi) {
+  const ps = engine.gs.players[physOwner];   // Kontrolle statt Seite (Styx 28.9.): physische Adresse
   const hero = ps?.heroes?.[heroIdx];
   if (!hero?.name) return false;
   if (hero.hp <= 0) return false;
   if (hero.statuses?.frozen || hero.statuses?.stunned || hero.statuses?.bound) return false;
-  return engine.heroMeetsLevelReq(pi, heroIdx, cd);
+  return engine.heroMeetsLevelReq(physOwner, heroIdx, cd);
 }
 
 /**
@@ -80,12 +80,14 @@ function getEligibleHeroesForCreature(engine, pi, cd) {
   const ps = engine.gs.players[pi];
   if (!ps) return [];
   const out = [];
-  for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-    if (!canHeroSummon(engine, pi, hi, cd)) continue;
-    const zones = ps.supportZones?.[hi] || [[], [], []];
+  // Kontrolle statt Seite (Styx 28.9.): „one of their Heroes" = jeder Held,
+  // den `pi` kontrolliert; `owner` = physische Seite.
+  for (const { physOwner, heroIdx: hi } of engine.heroesControlledBy(pi)) {
+    if (!canHeroSummon(engine, pi, hi, cd, physOwner)) continue;
+    const zones = engine.gs.players[physOwner].supportZones?.[hi] || [[], [], []];
     for (let zi = 0; zi < 3; zi++) {
       if ((zones[zi] || []).length === 0) {
-        out.push({ heroIdx: hi, slotIdx: zi });
+        out.push({ owner: physOwner, heroIdx: hi, slotIdx: zi });
       }
     }
   }
@@ -268,8 +270,9 @@ module.exports = {
     const promptCtx = engine._createContext(pseudoInst, {});
 
     const zones = slots.map(s => {
-      const hero = ps.heroes?.[s.heroIdx];
+      const hero = gs.players[s.owner]?.heroes?.[s.heroIdx];
       return {
+        owner: s.owner,   // Kontrolle statt Seite (Styx 28.9.)
         heroIdx: s.heroIdx, slotIdx: s.slotIdx,
         label: `${hero?.name || 'Hero'} — Slot ${s.slotIdx + 1}`,
       };
@@ -280,6 +283,9 @@ module.exports = {
       cancellable: false,
     });
     if (!heroPick) return true;
+    // Kontrolle statt Seite (Styx 28.9.): physische Seite des gewaehlten Helden.
+    const zielSeite = (slots.find(s => s.owner === (heroPick.owner ?? activator)
+      && s.heroIdx === heroPick.heroIdx && s.slotIdx === heroPick.slotIdx) || slots[0]).owner;
 
     // ── Step 4.5: pay any beforeSummon cost (sacrifice tributes etc.)
     //              BEFORE the deck splice, so a cancelled / unpayable
@@ -336,7 +342,7 @@ module.exports = {
       // creature appears. Matches the Area's cosmos backdrop palette.
       engine._broadcastEvent('play_zone_animation', {
         type: 'cosmic_summon',
-        owner: activator,
+        owner: zielSeite,
         heroIdx: heroPick.heroIdx,
         zoneSlot: heroPick.slotIdx,
       });
@@ -347,8 +353,9 @@ module.exports = {
       // of _engine.js) short-circuits the summoned creature's own onPlay
       // / onCardEnterZone while still letting OTHER board cards react to
       // the summon.
-      const summonRes = engine.summonCreature(chosenName, activator, heroPick.heroIdx, heroPick.slotIdx, {
+      const summonRes = engine.summonCreature(chosenName, zielSeite, heroPick.heroIdx, heroPick.slotIdx, {
         source: CARD_NAME,
+        ...(zielSeite !== activator ? { controller: activator } : {}),   // Kontrolle statt Seite (Styx 28.9.)
       });
       if (!summonRes) return true;
       inst = summonRes.inst;
@@ -384,7 +391,7 @@ module.exports = {
       player: ps.username,
       shuffled: shuffledName,
       summoned: chosenName,
-      hero: ps.heroes?.[heroPick.heroIdx]?.name,
+      hero: gs.players[zielSeite]?.heroes?.[heroPick.heroIdx]?.name,
       heroIdx: heroPick.heroIdx,
     });
     engine.sync();

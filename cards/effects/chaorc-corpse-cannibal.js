@@ -94,8 +94,17 @@ module.exports = {
       const heroIdx = death.heroIdx;
       const slot = death.zoneSlot;
       if (heroIdx == null || slot == null || slot < 0) return;
-      if (((ps.supportZones?.[heroIdx] || [])[slot] || []).length !== 0) return;
-      if (!engine._canHeroActivateSurprise(pi, heroIdx, CARD_NAME)) return;
+      // Kontrolle statt Seite (Styx 28.9.): der frei gewordene Platz liegt
+      // auf der PHYSISCHEN Seite der geopferten Kreatur — ueber einen
+      // uebernommenen Helden beschworen, ist das die Gegenspalte.
+      const feld = (inst.owner === 0 || inst.owner === 1) ? inst.owner : pi;
+      const fps = gs.players[feld];
+      const { canHeroSummon } = require('./_summon-eligibility');
+      const heldDarf = () => (feld === pi
+        ? engine._canHeroActivateSurprise(pi, heroIdx, CARD_NAME)
+        : canHeroSummon(engine, pi, heroIdx, engine._getCardDB()[CARD_NAME], { physOwner: feld, alsAktion: true }));
+      if (((fps.supportZones?.[heroIdx] || [])[slot] || []).length !== 0) return;
+      if (!heldDarf()) return;
 
       const confirmed = await engine.promptGeneric(pi, {
         type: 'confirm',
@@ -110,11 +119,11 @@ module.exports = {
 
       // Re-validate post-prompt (board can shift across the await).
       if (!(ps.hand || []).includes(CARD_NAME)) return;
-      if (((ps.supportZones?.[heroIdx] || [])[slot] || []).length !== 0) {
+      if (((fps.supportZones?.[heroIdx] || [])[slot] || []).length !== 0) {
         await engine.zeigeFizzle(CARD_NAME, { playerIdx: pi, grund: 'zone_taken' });   // v1360
         return;
       }
-      if (!engine._canHeroActivateSurprise(pi, heroIdx, CARD_NAME)) { await engine.zeigeFizzle(CARD_NAME, { playerIdx: pi, grund: 'place_refused' }); return; }   // v1360
+      if (!heldDarf()) { await engine.zeigeFizzle(CARD_NAME, { playerIdx: pi, grund: 'place_refused' }); return; }   // v1360
 
       // ── Hand→board summon flight + landing shine. ──
       // Broadcast the flight BEFORE mutating state: the client captures
@@ -126,6 +135,7 @@ module.exports = {
       engine._broadcastEvent('play_pile_transfer', {
         owner: pi, cardName: CARD_NAME, from: 'hand', to: 'support',
         fromHandIdx: handIdx, toHeroIdx: heroIdx, toSlotIdx: slot,
+        ...(feld !== pi ? { toOwner: feld } : {}),
       });
 
       engine.takeFromPileSync(ps, 'hand', handIdx);
@@ -142,7 +152,7 @@ module.exports = {
       // summonCreatureWithHooks places the card and emits the
       // `summon_effect` shine/particles on the destination slot.
       const res = await engine.summonCreatureWithHooks(
-        CARD_NAME, pi, heroIdx, slot, { source: CARD_NAME },
+        CARD_NAME, feld, heroIdx, slot, { source: CARD_NAME, ...(feld !== pi ? { controller: pi } : {}) },
       );
       if (!res?.inst) {
         engine.handZugangSync(ps, CARD_NAME, { von: 'rueckgabe', source: CARD_NAME, ohneInstanz: true }); // placement fizzled — refund

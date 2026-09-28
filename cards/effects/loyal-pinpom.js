@@ -70,11 +70,13 @@ module.exports = {
       // Lv1, single school) AND a free Support Zone.
       const cardDB = engine._getCardDB();
       const eligibleHeroes = [];
-      for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-        const hero = ps.heroes[hi];
+      // Kontrolle statt Seite (Styx 28.9.): alle Helden, die `pi`
+      // kontrolliert (auch uebernommene der Gegenspalte), geprueft ueber
+      // ihre physische Adresse — wie beim normalen Ausspielen aus der Hand.
+      for (const { physOwner, heroIdx: hi, hero } of engine.heroesControlledBy(pi)) {
         if (!hero?.name || hero.hp <= 0) continue;
         // Free zone check.
-        const zones = ps.supportZones?.[hi] || [];
+        const zones = gs.players[physOwner]?.supportZones?.[hi] || [];
         let freeSlot = -1;
         for (let z = 0; z < 3; z++) {
           if ((zones[z] || []).length === 0) { freeSlot = z; break; }
@@ -85,8 +87,8 @@ module.exports = {
         // heroMeetsLevelReq covers Wisdom / Divinity coverage too.
         const sample = cardDB[handLoyals[0].name];
         if (!sample) continue;
-        if (!engine.heroMeetsLevelReq(pi, hi, sample)) continue;
-        eligibleHeroes.push({ heroIdx: hi, slot: freeSlot, name: hero.name });
+        if (!engine.heroMeetsLevelReq(physOwner, hi, sample)) continue;
+        eligibleHeroes.push({ owner: physOwner, heroIdx: hi, slot: freeSlot, name: hero.name });
       }
       if (eligibleHeroes.length === 0) { refundHopt(); return; }
 
@@ -133,16 +135,16 @@ module.exports = {
       // slot freedom they have for any other hand-played Creature.
       const cd = cardDB[pickedLoyal];
       const dests = [];
-      for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-        const hero = ps.heroes[hi];
+      // Kontrolle statt Seite (Styx 28.9.): `owner` = physische Seite.
+      for (const { physOwner, heroIdx: hi, hero } of engine.heroesControlledBy(pi)) {
         if (!hero?.name || hero.hp <= 0) continue;
-        if (!engine.heroMeetsLevelReq(pi, hi, cd)) continue;
-        const zones = ps.supportZones?.[hi] || [];
+        if (!engine.heroMeetsLevelReq(physOwner, hi, cd)) continue;
+        const zones = gs.players[physOwner]?.supportZones?.[hi] || [];
         for (let z = 0; z < 3; z++) {
           if ((zones[z] || []).length === 0) {
             dests.push({
-              id: `equip-${pi}-${hi}-${z}`,
-              type: 'equip', owner: pi, heroIdx: hi, slotIdx: z,
+              id: `equip-${physOwner}-${hi}-${z}`,
+              type: 'equip', owner: physOwner, heroIdx: hi, slotIdx: z,
               cardName: '',
             });
           }
@@ -150,7 +152,7 @@ module.exports = {
       }
       if (dests.length === 0) { refundHopt(); return; }
 
-      let destHero, destSlot;
+      let destHero, destSlot, destOwner = dests[0].owner;
       if (dests.length === 1) {
         destHero = dests[0].heroIdx;
         destSlot = dests[0].slotIdx;
@@ -166,6 +168,7 @@ module.exports = {
         if (!ids || ids.length === 0) { refundHopt(); return; }
         const dest = dests.find(d => d.id === ids[0]);
         if (!dest) { refundHopt(); return; }
+        destOwner = dest.owner;
         destHero = dest.heroIdx;
         destSlot = dest.slotIdx;
       }
@@ -182,8 +185,9 @@ module.exports = {
       // (Orthos's chain trigger fires correctly when the chained
       // Loyal lands on Orthos).
       const placed = await engine.summonCreatureWithHooks(
-        pickedLoyal, pi, destHero, destSlot,
-        { source: CARD_NAME, hookExtras: { _isNormalSummon: true } },
+        pickedLoyal, destOwner, destHero, destSlot,
+        { source: CARD_NAME, hookExtras: { _isNormalSummon: true },
+          controller: pi },   // Kontrolle statt Seite (Styx 28.9.): Feldseite + Kontrolleur
       );
       if (!placed) {
         // Refund the hand card if placement aborted (extremely unlikely
@@ -195,7 +199,7 @@ module.exports = {
       engine.log('loyal_pinpom_chain', {
         player: ps.username,
         summoned: pickedLoyal,
-        hero: ps.heroes[destHero]?.name,
+        hero: gs.players[destOwner]?.heroes?.[destHero]?.name,
       });
       engine.sync();
     },

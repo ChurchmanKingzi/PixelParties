@@ -43,6 +43,18 @@ const FREE_ZONES_FOR_REVIVE = 2;
 const FREE_ZONES_FOR_RESTORE = 3;
 const MAX_CREATURE_LEVEL = 4;
 
+// Kontrolle statt Seite (Styx 28.9.): „the free Support Zone of a Hero you
+// control" — Zielzonen der Kreatur nach Kontrolle (jede traegt `owner`).
+// Die 2 Pollution Tokens bleiben auf der eigenen Seite; eine eigene Zone
+// fuer die Kreatur braucht deshalb 3 freie eigene Zonen, eine Zone eines
+// uebernommenen Gegnerhelden nur die 2 fuer die Tokens.
+function getCreatureZones(engine, gs, pi) {
+  const ownFree = countFreeZones(gs, pi);
+  if (ownFree < FREE_ZONES_FOR_REVIVE) return [];
+  return engine.getFreeSupportZones(pi, { nachKontrolle: true, livingHeroesOnly: true })
+    .filter(z => z.owner !== pi || (z.slotIdx < 3 ? ownFree >= FREE_ZONES_FOR_RESTORE : true));
+}
+
 /** Caster's defeated heroes that Reincarnation hasn't already revived. */
 function getReviveTargets(gs, pi, engine) {
   const ps = gs.players[pi];
@@ -129,7 +141,7 @@ module.exports = {
     if (engine) {
       const cardDB = engine._getCardDB();
       canRestore =
-        freeZones >= FREE_ZONES_FOR_RESTORE &&
+        getCreatureZones(engine, gs, pi).length > 0 &&   // Kontrolle statt Seite (Styx 28.9.)
         Object.keys(getRestoreCandidates(ps, cardDB, engine, pi)).length > 0;
     } else {
       canRestore =
@@ -154,7 +166,7 @@ module.exports = {
       const restoreNames   = Object.keys(restoreCounts);
 
       const canRevive  = freeZones >= FREE_ZONES_FOR_REVIVE  && reviveTargets.length > 0;
-      const canRestore = freeZones >= FREE_ZONES_FOR_RESTORE && restoreNames.length > 0;
+      const canRestore = getCreatureZones(engine, gs, pi).length > 0 && restoreNames.length > 0;   // Kontrolle statt Seite (Styx 28.9.)
 
       // spellPlayCondition should have blocked this already, but guard anyway.
       if (!canRevive && !canRestore) {
@@ -256,7 +268,7 @@ module.exports = {
       // picks from their full set of free zones (matches the user-facing
       // "click any of your free Support Zones" UX). The 2 Pollution Tokens
       // are auto-placed in whatever's left afterward.
-      const placementZones = getFreeZones(gs, pi);
+      const placementZones = getCreatureZones(engine, gs, pi);   // Kontrolle statt Seite (Styx 28.9.)
       let destZone;
       if (placementZones.length === 0) {
         // Pre-check guaranteed 3+ zones; nothing should have consumed one
@@ -271,7 +283,7 @@ module.exports = {
           description: `Click any of your free Support Zones to summon ${creatureName}.`,
           cancellable: false,
         });
-        destZone = (zonePick && placementZones.find(z => z.heroIdx === zonePick.heroIdx && z.slotIdx === zonePick.slotIdx))
+        destZone = (zonePick && placementZones.find(z => z.owner === (zonePick.owner ?? pi) && z.heroIdx === zonePick.heroIdx && z.slotIdx === zonePick.slotIdx))
                  || placementZones[0];
       }
 
@@ -280,6 +292,7 @@ module.exports = {
       // Engel-Animation vor der Landung bleibt.
       await engine.summonFromDiscard(pi, pi, creatureName, destZone.heroIdx, destZone.slotIdx, {
         source: 'Reincarnation', flug: false, vorAnim: { type: 'angel_revival', ms: 700 },
+        heldSeite: destZone.owner,   // Kontrolle statt Seite (Styx 28.9.)
       });
 
       // Now pay the Pollution cost into the remaining free zones.

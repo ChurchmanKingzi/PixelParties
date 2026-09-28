@@ -51,18 +51,18 @@ function freieZonen(engine, pi, heroIdx) {
   return out;
 }
 
-/** Pflanzziele: eigene Helden ohne Paraseed — mit JEDER freien Zone. */
+/** Pflanzziele: kontrollierte Helden ohne Paraseed — mit JEDER freien Zone. */
 function pflanzZiele(engine, pi) {
   const ziele = [];
-  const ps = engine.gs.players[pi];
-  for (let hi = 0; hi < (ps?.heroes || []).length; hi++) {
-    const hero = ps.heroes[hi];
+  // Kontrolle statt Seite (Styx 28.9.): „any Hero you control" — auch
+  // uebernommene Helden der Gegenspalte; `owner` = physische Seite.
+  for (const { physOwner, heroIdx: hi, hero } of engine.heroesControlledBy(pi)) {
     if (!hero?.name) continue;
-    if (heroHasDiverHelmet(engine, pi, hi)) continue;
-    if (heroHasParaseed(engine, pi, hi)) continue;
-    for (const si of freieZonen(engine, pi, hi)) {
+    if (heroHasDiverHelmet(engine, physOwner, hi)) continue;
+    if (heroHasParaseed(engine, physOwner, hi)) continue;
+    for (const si of freieZonen(engine, physOwner, hi)) {
       ziele.push({
-        owner: pi, heroIdx: hi, slotIdx: si,
+        owner: physOwner, heroIdx: hi, slotIdx: si,
         label: `${hero.name} — ${si >= 3 ? 'Island ' + (si - 2) : 'Slot ' + (si + 1)}`,
       });
     }
@@ -131,12 +131,16 @@ async function pflanzen(engine, pi) {
 
   const ziele = pflanzZiele(engine, pi);
   if (ziele.length === 0) return true;
-  const zone = ziele.length === 1 ? ziele[0]
+  const antwort = ziele.length === 1 ? ziele[0]
     : (await engine.promptGeneric(pi, {
         type: 'zonePick', zones: ziele, title: CARD_NAME,
         description: `Place ${gewaehlt} into which Support Zone?`,
         previewCardName: gewaehlt, cancellable: false,
       })) || ziele[0];
+  // Kontrolle statt Seite (Styx 28.9.): Antwort auf die angebotene Zone
+  // samt physischer Seite abbilden (fehlt `owner`, ist es die eigene).
+  const zone = ziele.find(z => z.heroIdx === antwort.heroIdx && z.slotIdx === antwort.slotIdx
+    && z.owner === (antwort.owner ?? pi)) || ziele[0];
 
   const _taken_deckIdx = await engine.deckEntnahme(ps,  gewaehlt, { source: CARD_NAME });   // v820: Stapel-Schicht
   if (!_taken_deckIdx) return true;
@@ -144,6 +148,7 @@ async function pflanzen(engine, pi) {
     owner: pi, cardName: gewaehlt,
     from: 'deck', to: 'support',
     toHeroIdx: zone.heroIdx, toSlotIdx: zone.slotIdx,
+    ...(zone.owner !== pi ? { toOwner: zone.owner } : {}),   // Kontrolle statt Seite (Styx 28.9.)
   });
   engine.sync();
   await engine._delay(520);
@@ -151,9 +156,10 @@ async function pflanzen(engine, pi) {
   await engine.actionPlaceCreature(gewaehlt, pi, zone.heroIdx, zone.slotIdx, {
     source: 'deck', sourceName: CARD_NAME, animationType: 'poison_splash',
     hookExtras: engine.deckHookExtras(),   // v1393
+    heldSeite: zone.owner,   // Kontrolle statt Seite (Styx 28.9.)
   });
   engine.shuffleDeck(pi, 'main');
-  await syncParaseedPoison(engine, pi, zone.heroIdx);
+  await syncParaseedPoison(engine, zone.owner, zone.heroIdx);
   engine.sync();
   return true;
 }

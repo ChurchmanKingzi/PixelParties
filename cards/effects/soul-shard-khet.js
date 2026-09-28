@@ -44,15 +44,16 @@ function eligibleHostSlots(engine, pi, creatureCardData) {
   const ps = engine.gs.players[pi];
   if (!ps) return [];
   const out = [];
-  for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-    const h = ps.heroes[hi];
+  // Kontrolle statt Seite (Styx 28.9.): „with any of your Heroes" — alle
+  // Helden, die `pi` kontrolliert; physische Adresse, `owner` = Seite.
+  for (const { physOwner, heroIdx: hi, hero: h } of engine.heroesControlledBy(pi)) {
     if (!h?.name || h.hp <= 0) continue;
     if (h.statuses?.frozen || h.statuses?.stunned) continue;
-    if (!engine.heroMeetsLevelReq(pi, hi, creatureCardData)) continue;
-    const zones = ps.supportZones?.[hi] || [[], [], []];
+    if (!engine.heroMeetsLevelReq(physOwner, hi, creatureCardData)) continue;
+    const zones = engine.gs.players[physOwner].supportZones?.[hi] || [[], [], []];
     for (let z = 0; z < 3; z++) {
       if ((zones[z] || []).length === 0) {
-        out.push({ heroIdx: hi, slotIdx: z, heroName: h.name });
+        out.push({ owner: physOwner, heroIdx: hi, slotIdx: z, heroName: h.name });
       }
     }
   }
@@ -118,6 +119,7 @@ module.exports = {
         chosenHost = hosts[0];
       } else {
         const zones = hosts.map(h => ({
+          owner: h.owner,   // Kontrolle statt Seite (Styx 28.9.)
           heroIdx: h.heroIdx, slotIdx: h.slotIdx,
           label: `${h.heroName} — Support ${h.slotIdx + 1}`,
         }));
@@ -127,7 +129,7 @@ module.exports = {
           cancellable: true,
         });
         if (!zp) return;
-        chosenHost = hosts.find(h => h.heroIdx === zp.heroIdx && h.slotIdx === zp.slotIdx)
+        chosenHost = hosts.find(h => h.owner === (zp.owner ?? pi) && h.heroIdx === zp.heroIdx && h.slotIdx === zp.slotIdx)
           || hosts[0];
       }
 
@@ -138,13 +140,14 @@ module.exports = {
       // v1389: über die EINE Ablage-Stelle (Signal, Sperre, Rückgabe).
       const placeRes = await engine.summonFromDiscard(pi, pi, chosenName, chosenHost.heroIdx, chosenHost.slotIdx, {
         source: CARD_NAME, flug: false,
+        heldSeite: chosenHost.owner,   // Kontrolle statt Seite (Styx 28.9.)
         summonOpts: { isPlacement: true },
         hookExtras: { _summonedBySoulShard: true, _isNormalSummon: false },
       });
       if (!placeRes) return;
 
       engine._broadcastEvent('summon_effect', {
-        owner: pi, heroIdx: chosenHost.heroIdx,
+        owner: chosenHost.owner, heroIdx: chosenHost.heroIdx,
         zoneSlot: placeRes.actualSlot, cardName: chosenName,
       });
       // Necromancy logs an additional-action use for animation/CPU

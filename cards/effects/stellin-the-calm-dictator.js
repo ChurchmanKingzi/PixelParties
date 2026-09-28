@@ -63,13 +63,13 @@ function firstFreeSlot(ps, heroIdx) {
   return -1;
 }
 
-/** Total free Support Zone slots across all of `pi`'s LIVING heroes. */
-function totalFreeSlotsOnSide(ps) {
+/** Total free Support Zone slots across all LIVING heroes `pi` controls.
+ *  Kontrolle statt Seite (Styx 28.9.): auch uebernommene der Gegenspalte. */
+function totalFreeSlotsOnSide(engine, pi) {
   let n = 0;
-  for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-    const hero = ps.heroes[hi];
+  for (const { physOwner, heroIdx: hi, hero } of engine.heroesControlledBy(pi)) {
     if (!hero?.name || hero.hp <= 0) continue;
-    const zones = ps.supportZones?.[hi] || [];
+    const zones = engine.gs.players[physOwner].supportZones?.[hi] || [];
     for (let z = 0; z < 3; z++) {
       if ((zones[z] || []).length === 0) n++;
     }
@@ -89,16 +89,24 @@ function totalFreeSlotsOnSide(ps) {
  *     spellSchool to "always yes" and applies all board-wide level
  *     reductions, so future Forager-style helpers Just Work.
  */
-function isHostable(engine, pi, heroIdx, cardData) {
-  const ps = engine.gs.players[pi];
+function isHostable(engine, pi, heroIdx, cardData, physOwner = pi) {
+  // Kontrolle statt Seite (Styx 28.9.): Held physisch adressiert.
+  const ps = engine.gs.players[physOwner];
   const hero = ps?.heroes?.[heroIdx];
   if (!hero?.name) return false;
   if (hero.hp <= 0) return false;
   const s = hero.statuses || {};
   if (s.frozen || s.stunned || s.negated || s.bound) return false;
   if (firstFreeSlot(ps, heroIdx) < 0) return false;
-  if (!engine.heroMeetsLevelReq(pi, heroIdx, cardData)) return false;
+  if (!engine.heroMeetsLevelReq(physOwner, heroIdx, cardData)) return false;
   return true;
+}
+
+/** Kann irgendein Held, den `pi` kontrolliert, die Karte aufnehmen?
+ *  Kontrolle statt Seite (Styx 28.9.). */
+function anyHostHero(engine, pi, cardData) {
+  return engine.heroesControlledBy(pi)
+    .some(e => isHostable(engine, pi, e.heroIdx, cardData, e.physOwner));
 }
 
 /** Effective-Lv-0 Creature names in `source` (hand / mainDeck), deduped. */
@@ -139,20 +147,20 @@ function countCopies(arr, cardName) {
  * adds friction to the chained 3-card hand path.
  */
 async function pickHostSlot(engine, pi, cardName, cardData) {
-  const ps = engine.gs.players[pi];
   const zones = [];
-  for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-    if (!isHostable(engine, pi, hi, cardData)) continue;
-    const supZones = ps.supportZones?.[hi] || [];
+  // Kontrolle statt Seite (Styx 28.9.): alle Helden, die `pi` kontrolliert.
+  for (const { physOwner, heroIdx: hi } of engine.heroesControlledBy(pi)) {
+    if (!isHostable(engine, pi, hi, cardData, physOwner)) continue;
+    const supZones = engine.gs.players[physOwner].supportZones?.[hi] || [];
     for (let z = 0; z < 3; z++) {
       if ((supZones[z] || []).length === 0) {
-        zones.push({ heroIdx: hi, slotIdx: z });
+        zones.push({ owner: physOwner, heroIdx: hi, slotIdx: z });
       }
     }
   }
   if (zones.length === 0) return null;
   if (zones.length === 1) {
-    return { heroIdx: zones[0].heroIdx, slotIdx: zones[0].slotIdx };
+    return { owner: zones[0].owner, heroIdx: zones[0].heroIdx, slotIdx: zones[0].slotIdx };
   }
   const res = await engine.promptGeneric(pi, {
     type: 'zonePick',
@@ -166,7 +174,8 @@ async function pickHostSlot(engine, pi, cardName, cardData) {
   });
   if (!res || res.cancelled) return null;
   if (res.heroIdx == null || res.slotIdx == null) return null;
-  return { heroIdx: res.heroIdx, slotIdx: res.slotIdx };
+  const z = zones.find(x => x.owner === (res.owner ?? pi) && x.heroIdx === res.heroIdx && x.slotIdx === res.slotIdx);
+  return z ? { owner: z.owner, heroIdx: z.heroIdx, slotIdx: z.slotIdx } : null;
 }
 
 /**
@@ -194,10 +203,7 @@ async function runStellinEffect(ctx) {
   const anyHostable = (names) => names.some(cn => {
     const cd = cardDB[cn];
     if (!cd) return false;
-    for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-      if (isHostable(engine, pi, hi, cd)) return true;
-    }
-    return false;
+    return anyHostHero(engine, pi, cd);   // Kontrolle statt Seite (Styx 28.9.)
   });
   if (!anyHostable(handEligible) && !anyHostable(deckEligible)) return false;
 
@@ -205,7 +211,7 @@ async function runStellinEffect(ctx) {
   let source;
   if (handEligible.length > 0 && deckEligible.length > 0
       && anyHostable(handEligible) && anyHostable(deckEligible)) {
-    const freeSlotsTotal = totalFreeSlotsOnSide(ps);
+    const freeSlotsTotal = totalFreeSlotsOnSide(engine, pi);
     const handCap = Math.min(MAX_FROM_HAND, handEligible.length, freeSlotsTotal);
     const optRes = await engine.promptGeneric(pi, {
       type: 'optionPicker',
@@ -227,7 +233,7 @@ async function runStellinEffect(ctx) {
   }
 
   if (source === 'hand') {
-    const freeSlotsTotal = totalFreeSlotsOnSide(ps);
+    const freeSlotsTotal = totalFreeSlotsOnSide(engine, pi);
     const handCap = Math.min(MAX_FROM_HAND, handEligible.length, freeSlotsTotal);
     const gallery = handEligible.map(cn => ({ name: cn, source: 'hand' }));
     const picked = await engine.promptGeneric(pi, {
@@ -256,19 +262,16 @@ async function runStellinEffect(ctx) {
       if (!cd) continue;
       // Pre-check eligibility so we can tell "no host available for THIS
       // card, skip" apart from "user cancelled the host prompt, stop".
-      let anyHost = false;
-      for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-        if (isHostable(engine, pi, hi, cd)) { anyHost = true; break; }
-      }
-      if (!anyHost) continue;
+      if (!anyHostHero(engine, pi, cd)) continue;   // Kontrolle statt Seite (Styx 28.9.)
       const dest = await pickHostSlot(engine, pi, cardName, cd);
       if (!dest) { userCancelled = true; break; }
-      const { heroIdx, slotIdx: slot } = dest;
+      const { owner: seite, heroIdx, slotIdx: slot } = dest;
       // Race: the picked slot could have been filled between prompt
       // close and action — re-verify before committing.
-      const supZones = ps.supportZones?.[heroIdx] || [];
+      const supZones = gs.players[seite].supportZones?.[heroIdx] || [];
       if ((supZones[slot] || []).length !== 0) continue;
       const res = await engine.actionPlaceCreature(cardName, pi, heroIdx, slot, {
+        heldSeite: seite,   // Kontrolle statt Seite (Styx 28.9.)
         source: 'hand',
         sourceName: CARD_NAME,
         countAsSummon: false,
@@ -287,10 +290,7 @@ async function runStellinEffect(ctx) {
     .filter(cn => {
       const cd = cardDB[cn];
       if (!cd) return false;
-      for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-        if (isHostable(engine, pi, hi, cd)) return true;
-      }
-      return false;
+      return anyHostHero(engine, pi, cd);   // Kontrolle statt Seite (Styx 28.9.)
     })
     .map(cn => ({ name: cn, source: 'deck', count: countCopies(ps.mainDeck, cn) }))
     .sort((a, b) => a.name.localeCompare(b.name));
@@ -309,19 +309,21 @@ async function runStellinEffect(ctx) {
 
   const dest = await pickHostSlot(engine, pi, chosenName, cd);
   if (!dest) return false;
-  const { heroIdx, slotIdx: slot } = dest;
+  const { owner: seite, heroIdx, slotIdx: slot } = dest;
 
   const _taken_deckIdx = await engine.deckEntnahme(ps,  chosenName, { source: CARD_NAME });   // v820: Stapel-Schicht
   if (!_taken_deckIdx) return false;
 
   // Race: slot could have been filled between prompt and now (engine
   // has been doing other work during the prompt's network round-trip).
-  const supZones = ps.supportZones?.[heroIdx] || [];
+  const supZones = gs.players[seite].supportZones?.[heroIdx] || [];
   if ((supZones[slot] || []).length !== 0) {
     engine.returnToPile(ps, 'deck', chosenName);   // v1393 (mischt)
     return false;
   }
-  const summonRes = await engine.summonCreatureWithHooks(chosenName, pi, heroIdx, slot, {
+  // Kontrolle statt Seite (Styx 28.9.): Feldseite = physische Seite des Helden.
+  const summonRes = await engine.summonCreatureWithHooks(chosenName, seite, heroIdx, slot, {
+    ...(seite !== pi ? { controller: pi } : {}),
     source: CARD_NAME,
     countAsSummon: false,
     hookExtras: { _summonedBy: CARD_NAME, ...engine.deckHookExtras() },

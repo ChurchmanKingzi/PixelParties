@@ -83,16 +83,17 @@ function eligibleCharmeHeroes(engine, pi) {
  * Charme ≥ 2, and at least one free Support Zone slot.
  */
 function eligibleReviveHosts(engine, pi) {
-  const ps = engine.gs.players[pi];
-  if (!ps) return [];
+  if (!engine.gs.players[pi]) return [];
   const out = [];
-  for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-    const h = ps.heroes[hi];
+  // Kontrolle statt Seite (Styx 28.9.): „a Hero you control" — auch
+  // uebernommene Helden der Gegenspalte. Eintrag: { owner, heroIdx }.
+  for (const { physOwner, heroIdx: hi, hero: h } of engine.heroesControlledBy(pi)) {
     if (!h?.name || h.hp <= 0) continue;
-    if (countCharme(ps, hi) < REQUIRED_CHARME) continue;
-    const sup = ps.supportZones?.[hi] || [];
+    const hps = engine.gs.players[physOwner];
+    if (countCharme(hps, hi) < REQUIRED_CHARME) continue;
+    const sup = hps.supportZones?.[hi] || [];
     if (!sup.some(slot => (slot || []).length === 0)) continue;
-    out.push(hi);
+    out.push({ owner: physOwner, heroIdx: hi });
   }
   return out;
 }
@@ -111,14 +112,15 @@ function getDiscardSummonHosts(engine, pi) {
   const cd = cardDB[CARD_NAME];
   if (!cd) return [];
   const out = [];
-  for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-    const h = ps.heroes[hi];
+  // Kontrolle statt Seite (Styx 28.9.): alle Helden, die `pi` kontrolliert
+  // — auch uebernommene der Gegenspalte. Eintrag: { owner, heroIdx }.
+  for (const { physOwner, heroIdx: hi, hero: h } of engine.heroesControlledBy(pi)) {
     if (!h?.name || h.hp <= 0) continue;
     if (h.statuses?.frozen || h.statuses?.stunned) continue;
-    const sup = ps.supportZones?.[hi] || [];
+    const sup = engine.gs.players[physOwner]?.supportZones?.[hi] || [];
     if (!sup.some(slot => (slot || []).length === 0)) continue;
-    if (!engine.heroMeetsLevelReq(pi, hi, cd)) continue;
-    out.push(hi);
+    if (!engine.heroMeetsLevelReq(physOwner, hi, cd)) continue;
+    out.push({ owner: physOwner, heroIdx: hi });
   }
   return out;
 }
@@ -248,11 +250,12 @@ module.exports = {
 
       // Pick destination zone
       const zones = [];
-      for (const hi of hosts) {
-        const sup = ps.supportZones?.[hi] || [];
+      for (const { owner, heroIdx: hi } of hosts) {   // Kontrolle statt Seite (Styx 28.9.)
+        const hps = engine.gs.players[owner];
+        const sup = hps?.supportZones?.[hi] || [];
         for (let s = 0; s < 3; s++) {
           if ((sup[s] || []).length === 0) {
-            zones.push({ heroIdx: hi, slotIdx: s, label: `${ps.heroes[hi].name} — Support ${s + 1}` });
+            zones.push({ owner, heroIdx: hi, slotIdx: s, label: `${hps.heroes[hi].name} — Support ${s + 1}` });
           }
         }
       }
@@ -270,7 +273,9 @@ module.exports = {
           cancellable: true,
         });
         if (!picked || picked.cancelled) return;
-        chosen = zones.find(z => z.heroIdx === picked.heroIdx && z.slotIdx === picked.slotIdx) || zones[0];
+        // Antwort ohne `owner` = eigene Seite (Kontrolle statt Seite, Styx 28.9.).
+        chosen = zones.find(z => z.owner === (picked.owner ?? pi) && z.heroIdx === picked.heroIdx && z.slotIdx === picked.slotIdx)
+          || zones.find(z => z.heroIdx === picked.heroIdx && z.slotIdx === picked.slotIdx) || zones[0];
       }
 
       // Pop one copy out of the discard pile array & untrack the
@@ -279,6 +284,7 @@ module.exports = {
       const oldInst = ctx.card;
       const res = await engine.summonFromDiscard(pi, pi, CARD_NAME, chosen.heroIdx, chosen.slotIdx, {
         source: CARD_NAME, flug: false,
+        ...(chosen.owner !== pi ? { heldSeite: chosen.owner } : {}),   // Kontrolle statt Seite (Styx 28.9.)
       });
       if (oldInst && oldInst.zone === 'discard') {
         engine._untrackCard(oldInst.id);
@@ -346,18 +352,20 @@ module.exports = {
 
       // Auto-pick when only one eligible host; prompt otherwise.
       let chosen;
+      // Kontrolle statt Seite (Styx 28.9.): Eintraege tragen `owner`.
       if (hosts.length === 1) {
-        const hi = hosts[0];
-        const sup = ps.supportZones?.[hi] || [];
+        const { owner, heroIdx: hi } = hosts[0];
+        const sup = engine.gs.players[owner]?.supportZones?.[hi] || [];
         const slot = sup.findIndex(s => (s || []).length === 0);
-        chosen = { heroIdx: hi, slotIdx: slot >= 0 ? slot : -1 };
+        chosen = { owner, heroIdx: hi, slotIdx: slot >= 0 ? slot : -1 };
       } else {
         const zones = [];
-        for (const hi of hosts) {
-          const sup = ps.supportZones?.[hi] || [];
+        for (const { owner, heroIdx: hi } of hosts) {
+          const hps = engine.gs.players[owner];
+          const sup = hps?.supportZones?.[hi] || [];
           for (let s = 0; s < 3; s++) {
             if ((sup[s] || []).length === 0) {
-              zones.push({ heroIdx: hi, slotIdx: s, label: `${ps.heroes[hi].name} — Support ${s + 1}` });
+              zones.push({ owner, heroIdx: hi, slotIdx: s, label: `${hps.heroes[hi].name} — Support ${s + 1}` });
             }
           }
         }
@@ -368,7 +376,8 @@ module.exports = {
           description: `Place ${CARD_NAME} into the free Support Zone of a Charme 2+ Hero you control.`,
           cancellable: false,
         });
-        chosen = zones.find(z => z.heroIdx === picked?.heroIdx && z.slotIdx === picked?.slotIdx) || zones[0];
+        chosen = zones.find(z => z.owner === (picked?.owner ?? pi) && z.heroIdx === picked?.heroIdx && z.slotIdx === picked?.slotIdx)
+          || zones.find(z => z.heroIdx === picked?.heroIdx && z.slotIdx === picked?.slotIdx) || zones[0];
       }
 
       // Pop from discard pile array (the dead Familiar) and untrack
@@ -381,13 +390,15 @@ module.exports = {
       // Use safePlaceInSupport + manual on-play hooks (Necromancy's
       // pattern) — placements bypass the regular summon path so we
       // don't increment _creaturesSummonedThisTurn at end-of-turn.
-      const placeRes = engine.safePlaceInSupport(CARD_NAME, pi, chosen.heroIdx, chosen.slotIdx);
+      // Kontrolle statt Seite (Styx 28.9.): Feldseite = Held, Kontrolle = `pi`.
+      const placeRes = engine.safePlaceInSupport(CARD_NAME, chosen.owner, chosen.heroIdx, chosen.slotIdx,
+        chosen.owner !== pi ? { controller: pi } : {});
       if (!placeRes) { engine.ablageRueckgabe(ab); return; }
       const { inst, actualSlot } = placeRes;
       const ablageExtras = engine.ablageLandung(inst, ab, 'place');
 
       engine._broadcastEvent('summon_effect', {
-        owner: pi, heroIdx: chosen.heroIdx, zoneSlot: actualSlot, cardName: CARD_NAME,
+        owner: chosen.owner, heroIdx: chosen.heroIdx, zoneSlot: actualSlot, cardName: CARD_NAME,
       });
 
       await engine.runHooks('onPlay', {

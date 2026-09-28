@@ -127,7 +127,9 @@ module.exports = {
     // Rueckfall fragt den physischen Besitzer; gehoert der Held gerade
     // dem Gegner, gibt es hier nichts zu halbieren.
     if (_sideOf(ownerIdx, _target) !== ownerIdx) return false;
-    const key = _dedupKey(gs, ownerIdx, heroIdx, source);
+    // Dedup am PHYSISCHEN Platz — wie der Sammelweg nach der Zielwahl.
+    const _phys = _engine?._findHeroOwner ? _engine._findHeroOwner(_target) : ownerIdx;
+    const key = _dedupKey(gs, _phys >= 0 ? _phys : ownerIdx, heroIdx, source);
     if (_alreadyPrompted(gs, key)) return false;
     _markPrompted(gs, key);
     return true;
@@ -135,8 +137,9 @@ module.exports = {
 
   async preDamageResolve(engine, ownerIdx, target, heroIdx, _source, amount, _type) {
     const halved = Math.ceil(amount / 2);
+    const _phys = engine._findHeroOwner(target);   // physische Adresse (Styx 28.9.)
     engine._broadcastEvent('play_zone_animation', {
-      type: 'spectral_armor', owner: ownerIdx, heroIdx, zoneSlot: -1,
+      type: 'spectral_armor', owner: _phys >= 0 ? _phys : ownerIdx, heroIdx, zoneSlot: -1,
     });
     await engine._delay(450);
 

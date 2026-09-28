@@ -80,8 +80,11 @@ const CARD_NAME = 'Infinitely Reproducing Slime';
  * sich beliebig viele Slimes eine einzige.
  */
 function placementZones(engine, pi) {
+  // Kontrolle statt Seite (Styx 28.9.): „any Hero you control" — auch
+  // uebernommene Helden der Gegenspalte; jede Zone traegt `owner`.
   return engine.getFreeSupportZones(pi, {
     shareableFor: CARD_NAME,
+    nachKontrolle: true,
   });
 }
 
@@ -148,14 +151,18 @@ module.exports = {
       if (zones.length > 1) {
         const zonePick = await engine.promptGeneric(pi, {
           type: 'zonePick',
-          zones: zones.map(z => ({ heroIdx: z.heroIdx, slotIdx: z.slotIdx, ownerIdx: pi })),
+          zones: zones.map(z => ({ heroIdx: z.heroIdx, slotIdx: z.slotIdx, owner: z.owner, ownerIdx: z.owner })),   // Kontrolle statt Seite (Styx 28.9.)
           title: CARD_NAME,
           description: 'Choose a free Support Zone for the new Slime.',
           cancellable: true,
         });
         if (!zonePick || zonePick.cancelled
             || typeof zonePick.heroIdx !== 'number' || typeof zonePick.slotIdx !== 'number') return;
-        const match = zones.find(z => z.heroIdx === zonePick.heroIdx && z.slotIdx === zonePick.slotIdx);
+        // Kontrolle statt Seite (Styx 28.9.): Zone samt Seite; eine Antwort
+        // ohne `owner` (generische CPU) faellt auf die erste passende zurueck.
+        const gleich = z => z.heroIdx === zonePick.heroIdx && z.slotIdx === zonePick.slotIdx;
+        const match = zones.find(z => gleich(z) && z.owner === (zonePick.owner ?? pi))
+          || (zonePick.owner == null ? zones.find(gleich) : null);
         if (!match) return;
         dest = match;
       }
@@ -180,6 +187,7 @@ module.exports = {
         source,
         sourceName: CARD_NAME,
         selfPlacement: true,
+        heldSeite: dest.owner,   // Kontrolle statt Seite (Styx 28.9.)
         ...(source === 'deck' ? { hookExtras: engine.deckHookExtras() } : {}),   // v1393
       });
       const inst = placed?.inst || null;
@@ -199,7 +207,7 @@ module.exports = {
       self.counters._slimeSpawnedTurn = gs.turn;
 
       engine._broadcastEvent('play_zone_animation', {
-        type: 'heart_burst', owner: pi, heroIdx: dest.heroIdx, zoneSlot: dest.slotIdx,
+        type: 'heart_burst', owner: dest.owner, heroIdx: dest.heroIdx, zoneSlot: dest.slotIdx,
       });
       engine.log('slime_reproduce', {
         player: ps.username, from: source,

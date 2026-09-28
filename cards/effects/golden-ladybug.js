@@ -76,7 +76,9 @@ function platzschutz(engine, pi, heroIdx, surpriseName) {
     c.owner === pi && c.zone === 'surprise' && c.name === surpriseName && c.heroIdx === heroIdx);
   if (!liegtInSurpriseZone) return null;
   return (zone) => {
-    if (zone.heroIdx !== heroIdx) return true;
+    // Nur der eigene Traeger-Held ist geschuetzt — Zonen uebernommener
+    // Helden der Gegenspalte (`zone.owner`) nie (Styx 28.9.).
+    if ((zone.owner ?? pi) !== pi || zone.heroIdx !== heroIdx) return true;
     return freieZonen(engine.gs.players[pi], heroIdx) > 1;
   };
 }

@@ -97,14 +97,18 @@ function _findFreeSupportSlot(engine, pi) {
   const cardDB = engine._getCardDB();
   const cd = cardDB[CARD_NAME];
   if (!cd) return null;
-  for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-    const h = ps.heroes[hi];
+  // Kontrolle statt Seite (Styx 28.9.): alle Helden, die `pi` kontrolliert
+  // (eigene Spalte zuerst, dann uebernommene der Gegenspalte); `owner` =
+  // physische Seite, geprueft ueber die physische Adresse.
+  const helden = engine.heroesControlledBy(pi)
+    .sort((a, b) => (a.physOwner === pi ? 0 : 1) - (b.physOwner === pi ? 0 : 1));
+  for (const { physOwner, heroIdx: hi, hero: h } of helden) {
     if (!_heroCanSummon(h)) continue;
-    if (!engine.heroMeetsLevelReq(pi, hi, cd)) continue;
-    const zones = ps.supportZones?.[hi] || [[], [], []];
+    if (!engine.heroMeetsLevelReq(physOwner, hi, cd)) continue;
+    const zones = engine.gs.players[physOwner]?.supportZones?.[hi] || [[], [], []];
     for (let zi = 0; zi < 3; zi++) {
       if ((zones[zi] || []).length === 0) {
-        return { heroIdx: hi, slotIdx: zi };
+        return { owner: physOwner, heroIdx: hi, slotIdx: zi };
       }
     }
   }
@@ -262,8 +266,8 @@ module.exports = {
     // onCardEnterZone fire normally so any "when summoned" hooks
     // chain properly.
     const summonResult = await engine.summonCreatureWithHooks(
-      CARD_NAME, pi, dest.heroIdx, dest.slotIdx,
-      { source: `${CARD_NAME} reaction` },
+      CARD_NAME, dest.owner, dest.heroIdx, dest.slotIdx,
+      { source: `${CARD_NAME} reaction`, controller: pi },   // Kontrolle statt Seite (Styx 28.9.): Feldseite + Kontrolleur
     );
     if (!summonResult) {
       fallbackDiscard();
