@@ -69,7 +69,27 @@ Dazu je Variante:
 * fairy:     Ascended Fern schwebt, die Schmetterlingsflügel flattern
              (spaltenweise Scherung), die pinke Aura flimmert am Rand, pinke
              Funken rieseln als Schweif herab.
-* fiona:     Fiona auf dem Thron blinzelt, ihre Krone funkelt.
+* fiona:     Fiona auf dem Thron blinzelt, ihre Krone und der Thron funkeln.
+* boarding / chosen: Gabby hängt am Seil und schwingt daran (jede Zeile rückt als
+             Ganzes seitlich, unten stärker – nichts wird neu gerastert), lose
+             Haare wehen nach, sie blinzelt; beim Chosen Girl läuft ein Glanz
+             über das goldene Schwert.
+* zombie:    Zombie-Gabby torkelt (Oberkörper schwankt), sackt ab und zu ein,
+             blinzelt mit den leeren Augen.
+* moon:      Moonlight Warrior: federt, blinzelt, die langen Zöpfe schwingen.
+* garius:    federt, blinzelt; Schild und Speer heben und senken sich unabhängig
+             voneinander, der rote Helmbusch weht, über die Rüstung läuft ein
+             Lichtblitz (samt Funkeln).
+* vader:     Dark Garius federt; das rote Lichtschwert leuchtet (pulsierender
+             Saum, flackernder Kern), fährt ein, bleibt kurz aus und zündet neu.
+* gobbo:     federt, schwenkt den Knüppel (spaltenweise Scherung um die Faust),
+             die roten Augen glimmen.
+* hatusbal / jack: federt, blinzelt; Hatusbals roter Umhang weht (Wind von
+             links, unten stärker), die Krone funkelt; bei Ancient Hatusbal weht
+             der Helmbusch.
+* hulijing:  federt, blinzelt; das blaue Fuchsfeuer strömt als Partikelfeuer aus
+             ihrer Hand (Flammenballen wachsen, kühlen ab, züngeln: weiß,
+             hellblau, türkis, blau, dunkelblauer Rand).
 """
 import math
 import os
@@ -132,6 +152,28 @@ V_ = {
     'fiona': dict(slug='fiona-the-princess-of-blackport', pads=(3, 3, 4, 2),
                   lid=[((14, 14), 'ffe6d5'), ((15, 14), 'ffe6d5'), ((18, 14), 'ffe6d5'), ((19, 14), 'ffe6d5')],
                   line=[(14, 15), (15, 15), (18, 15), (19, 15)]),
+    'boarding': dict(slug='gabby-the-boarding-broad', pads=(4, 5, 3, 2),
+                     lid=[((12, 39), 'f6cd8b'), ((13, 39), 'f6cd8b')], line=[(12, 38), (13, 38)]),
+    'chosen': dict(slug='gabby-the-chosen-girl', pads=(4, 5, 3, 2),
+                   lid=[((11, 39), 'f1b7a2'), ((12, 39), 'f1b7a2')], line=[(11, 40), (12, 40)]),
+    'zombie': dict(slug='gabby-the-pirate-zombie', knee=18,
+                   lid=[((5, 7), 'b6c7b2'), ((6, 7), 'b6c7b2'), ((9, 7), 'b6c7b2'), ((10, 7), 'b6c7b2')],
+                   line=[(5, 8), (6, 8), (9, 8), (10, 8)]),
+    'moon': dict(slug='gabby-the-moonlight-warrior', knee=19,
+                 lid=[((8, 7), 'b6c7b2'), ((9, 7), 'b6c7b2'), ((12, 7), 'b6c7b2'), ((13, 7), 'b6c7b2')],
+                 line=[(8, 8), (9, 8), (12, 8), (13, 8)]),
+    'garius': dict(slug='garius-the-great-reformer', knee=31, pads=(3, 3, 6, 3),
+                   lid=[((12, 16), 'cc9658'), ((13, 16), 'cc9658'), ((16, 16), 'cc9658'), ((17, 16), 'cc9658')],
+                   line=[(12, 17), (13, 17), (16, 17), (17, 17)]),
+    'vader': dict(slug='dark-garius', knee=38, pads=(3, 3, 4, 2)),
+    'gobbo': dict(slug='gobbo-chief-of-goblin', knee=17, pads=(3, 3, 4, 2)),
+    'hatusbal': dict(slug='hatusbal-the-leader-of-tusca', knee=25, pads=(3, 4, 4, 2),
+                     lid=[((9, 8), 'a19390'), ((10, 8), 'a19390'), ((13, 8), 'a19390'), ((14, 8), 'a19390')],
+                     line=[(9, 9), (10, 9), (13, 9), (14, 9)]),
+    'jack': dict(slug='ancient-hatusbal', knee=27, pads=(3, 4, 4, 2)),
+    'hulijing': dict(slug='hulijing-the-foxdemon', knee=29, pads=(8, 3, 4, 2),
+                     lid=[((31, 16), 'ffe6d5'), ((34, 16), 'ffe6d5'), ((35, 16), 'ffe6d5')],
+                     line=[(30, 17), (31, 17), (34, 17), (35, 17)]),
     'kyli': dict(slug='kyli-the-deceptive-sapling', knee=28, pads=(3, 3, 5, 2),
                  blink={'halb': [((9, 16), '636363'), ((10, 16), '636363'), ((13, 16), '636363'), ((14, 16), '636363')],
                         'zu': [((9, 16), '636363'), ((10, 16), '636363'), ((13, 16), '636363'), ((14, 16), '636363'),
@@ -1192,10 +1234,251 @@ def f_fiona(i):
     return out
 
 
+# --- Etappe 3 -------------------------------------------------------------------
+def pendulum(i, amp=2.0):
+    """Schwingen am Seil (Aufhängung oben): jede Zeile rückt als Ganzes seitlich, unten stärker."""
+    s_ = math.sin(2 * math.pi * 2 * i / N)
+    return lambda x, y: int(round(amp * s_ * y / (SH - 1)))
+
+
+def f_gabbyrope(i):
+    s = SRC.copy()
+    blink(s, i)
+    sw = pendulum(i)
+    lag = int(round(0.8 * (math.sin(2 * math.pi * 2 * i / N - 1.2) - math.sin(-1.2))))
+    hair = np.zeros((SH, SW), bool)                      # lose Haare hinten wehen nach
+    for y, x in zip(*np.nonzero(s[:, :, 3])):
+        if x >= 16 and 33 <= y <= 46 and hexc(s[y, x]) in ('bd39ac', 'f68bee', 'ffacff', 'd552c5', 'e66ae6', 'ac319c',
+                                                         '620852'):
+            hair[y, x] = True
+    out = np.zeros((H, W, 4), int)
+    put(out, s, PL, PT, dx_fn=lambda x, y: sw(x, y) + (lag if hair[y, x] else 0))
+    fill_pinholes(out)
+    if V == 'chosen':                                    # Lichtreflex über das goldene Schwert
+        gold = (s[:, :, 3] > 0) & (_xs >= 17) & (_ys >= 32) & np.array(
+            [[hexc(s[y, x]) in ('f0f329', 'eecd2d', 'd5b11e', 'fff6bd', 'ffe600') for x in range(SW)] for y in range(SH)])
+        for (x, y), a in sweep(gold, i, 30, speed=1.4).items():
+            out[y + PT, x + PL + sw(x, y)] = lighten(out[y + PT, x + PL + sw(x, y)], a)
+    return out
+
+
+def f_zombie(i):
+    s = SRC.copy()
+    blink(s, i)
+    w = 2 * math.pi * i / N
+    lurch = lambda x, y: int(round(1.2 * (KNEE - y) / KNEE * math.sin(2 * w))) if y < KNEE else 0   # torkelt
+    b = [0, 0, 1, 1, 0, 0][i % 6] if (i // 12) % 2 else 0                                          # sackt ab und zu ein
+    out = np.zeros((H, W, 4), int)
+    knee_put(out, s, b, dx_fn=lurch)
+    fill_pinholes(out)
+    return out
+
+
+def f_moon(i):
+    s = SRC.copy()
+    blink(s, i)
+    w = 2 * math.pi * 2 * i / N
+    tails = lambda x, y: (x <= 3 or x >= SW - 4) and y >= 8                                         # Zöpfe
+    dx = lambda x, y: int(round(1.0 * (y - 8) / 11 * (math.sin(w - 0.3 * y) - math.sin(-0.3 * y)))) if tails(x, y) else 0
+    out = np.zeros((H, W, 4), int)
+    knee_put(out, s, BOUNCE12[i % 12], moves=tails, dx_fn=dx)
+    fill_pinholes(out)
+    return out
+
+
+def f_garius(i):
+    s = SRC.copy()
+    blink(s, i)
+    w = 2 * math.pi * 2 * i / N
+    shield = (s[:, :, 3] > 0) & (_xs <= 10) & (_ys >= 15)
+    spear = (s[:, :, 3] > 0) & (_xs >= 23)
+    plume = (s[:, :, 3] > 0) & (_ys <= 13) & np.array(
+        [[hexc(s[y, x]) in ('d60000', '9c0000', '710000', 'ff0000', 'e61010') for x in range(SW)] for y in range(SH)])
+    armour = (s[:, :, 3] > 0) & ~shield & ~spear & ~plume & np.array(
+        [[max(s[y, x, :3]) - min(s[y, x, :3]) < 24 and lum(s[y, x]) > 55 for x in range(SW)] for y in range(SH)])
+    for (x, y), a in sweep(armour, i, 22, speed=1.2).items():                # Rüstung blitzt
+        s[y, x] = lighten(s[y, x], a)
+    b = BOUNCE12[i % 12]
+    sh_dy = int(round(1.0 * (math.sin(w) - 0)))                              # Schild hebt/senkt sich
+    sp_dy = int(round(1.4 * (math.sin(w * 1.5 + 2.0) - math.sin(2.0))))     # Speer eigenständig
+    pl_dx = lambda y: int(round(0.9 * (13 - y) / 9 * (math.sin(w - 0.4 * y) - math.sin(-0.4 * y))))
+
+    def dy(x, y):
+        if shield[y, x]:
+            return b + sh_dy
+        if spear[y, x]:
+            return b + sp_dy
+        return b if y < KNEE else 0
+    out = np.zeros((H, W, 4), int)
+    body = s.copy()
+    body[shield | spear] = 0
+    put(out, np.where(spear[:, :, None], s, 0), PL, PT, dy_fn=dy)
+    put(out, body, PL, PT, dy_fn=dy, dx_fn=lambda x, y: pl_dx(y) if plume[y, x] else 0)
+    if b < 0:
+        for x in range(SW):
+            if body[KNEE - 1, x, 3] and body[KNEE, x, 3] and not out[KNEE - 1 + PT, x + PL, 3]:
+                out[KNEE - 1 + PT, x + PL] = body[KNEE - 1, x]
+    put(out, np.where(shield[:, :, None], s, 0), PL, PT, dy_fn=dy)
+    fill_pinholes(out)
+    stars(out, i, [(7 + PL, 17 + PT + b, 22)], 'e8f4ff', 'ffffff')           # Helm funkelt beim Blitzen
+    return out
+
+
+def f_vader(i):
+    s = SRC.copy()
+    blade = (s[:, :, 3] > 0) & (_ys <= 19) & (_xs >= 16)
+    # Klinge fährt ein (20-25), bleibt kurz aus, zündet wieder (32-37)
+    if 20 <= i < 26:
+        L = int(round(20 * (1 - (i - 19) / 6)))
+    elif 26 <= i < 32:
+        L = 0
+    elif 32 <= i < 38:
+        L = int(round(20 * (i - 31) / 6))
+    else:
+        L = 20
+    s[blade & (_ys < 20 - L)] = 0
+    b = BOUNCE12[i % 12]
+    out = np.zeros((H, W, 4), int)
+    knee_put(out, s, b)
+    fill_pinholes(out)
+    if L > 0:                                             # Leuchten: halbtransparenter roter Saum, pulsierend
+        f = 0.5 + 0.5 * math.sin(2 * math.pi * 4 * i / N)
+        bm = np.zeros((H, W), bool)
+        for y, x in zip(*np.nonzero(blade & (_ys >= 20 - L))):
+            bm[y + PT + b, x + PL] = True
+        ring = ring8(bm)
+        for y, x in zip(*np.nonzero(ring)):
+            if not out[y, x, 3]:
+                out[y, x] = rgb('ff3a3a', int(70 + 50 * f))
+        for y, x in zip(*np.nonzero(bm)):                 # Kern flackert
+            if hexc(out[y, x]) == 'fcfcf9' and (y + i) % 7 == 0:
+                out[y, x] = rgb('ffd0d0')
+    return out
+
+
+def f_gobbo(i):
+    s = SRC.copy()
+    club = (s[:, :, 3] > 0) & (_xs >= 14) & (_ys <= 16) & np.array(
+        [[s[y, x, 0] > s[y, x, 1] + 10 or lum(s[y, x]) < 40 for x in range(SW)] for y in range(SH)]) & (_xs + _ys * 0.0 >= 14)
+    k = 0.16 * math.sin(2 * math.pi * 2 * i / N)          # Knüppel schwenkt (spaltenweise Scherung um die Faust)
+    b = BOUNCE12[i % 12]
+    out = np.zeros((H, W, 4), int)
+    body = s.copy()
+    body[club] = 0
+    knee_put(out, body, b)
+    put(out, np.where(club[:, :, None], s, 0), PL, PT + b, dy_fn=lambda x, y: -int(round(k * (x - 15))))
+    fill_pinholes(out)
+    f = 0.5 - 0.5 * math.cos(2 * math.pi * 3 * i / N)     # rote Augen glimmen
+    for y, x in zip(*np.nonzero(s[:, :, 3])):
+        if hexc(s[y, x]) == '7b0818' and y < 6:
+            out[y + PT + b, x + PL] = [int(0x7b + 0x70 * f), int(8 + 30 * f), int(24 + 20 * f), 255]
+    return out
+
+
+CAPE_RED = ('4f0000', '6b0000', '8a0000', 'a50000', '3a0000', '5a0808', '7b1010', '940000', '310000', '2d0000')
+
+
+def f_hatusbal(i):
+    s = SRC.copy()
+    blink(s, i)
+    w = 2 * math.pi * 2 * i / N
+    if V == 'hatusbal':
+        cape = (s[:, :, 3] > 0) & ((_xs <= 4) | (_xs >= SW - 5)) & (_ys >= 9) & np.array(
+            [[s[y, x, 0] > 2 * s[y, x, 1] + 20 for x in range(SW)] for y in range(SH)])
+        y0, y1 = 9, 24
+    else:                                                # Ancient Hatusbal: der Helmbusch weht
+        cape = (s[:, :, 3] > 0) & (_ys <= 6)
+        y0, y1 = 6, 0
+
+    def cdx(x, y):                                       # Wind von links: nur nach rechts, unten stärker
+        if not cape[y, x]:
+            return 0
+        if V == 'jack':
+            return int(round(1.2 * (6 - y) / 6 * (0.5 - 0.5 * math.cos(w - 0.6 * y)) -
+                             1.2 * (6 - y) / 6 * (0.5 - 0.5 * math.cos(-0.6 * y))))
+        t = (y - y0) / (y1 - y0)
+        return int(round(1.3 * t * (0.5 - 0.5 * math.cos(w - 0.5 * y)) - 1.3 * t * (0.5 - 0.5 * math.cos(-0.5 * y))))
+    b = BOUNCE12[i % 12]
+    out = np.zeros((H, W, 4), int)
+    tmp_cape = np.where(cape[:, :, None], s, 0)
+    put(out, tmp_cape, PL, PT, dy_fn=lambda x, y: b if y < KNEE else 0, dx_fn=cdx)
+    body = s.copy()
+    body[cape] = 0
+    knee_put(out, body, b)
+    fill_pinholes(out)
+    if V == 'hatusbal':
+        stars(out, i, [(11 + PL, 1 + PT + b, 30)], 'ffe600', 'fff6ac')   # Krone
+    return out
+
+
+class BlueFire:
+    """Blaues Fuchsfeuer aus der Hand: jedes Frame strömen zwei Flammenballen nach links
+    (Richtung der Original-Flamme), wachsen, kühlen ab und züngeln leicht nach oben; die
+    Hitze ergibt die Farbe (weiß, hellblau, türkis, blau, dunkelblau am Rand). Loop nahtlos."""
+    COLS = [(0.86, rgb('ffffff')), (0.64, rgb('c8f8ff')), (0.42, rgb('49dff2')), (0.26, rgb('45c6ed')),
+            (0.14, rgb('41b0e2')), (0.07, rgb('2d7fcf'))]
+
+    def __init__(self, nozzle):
+        self.n0 = np.array(nozzle, float)
+        self.puffs = []
+        for e in range(N):
+            for k in range(2):
+                rng = np.random.default_rng(e * 31 + k + 5)
+                ang = math.pi + rng.uniform(-0.16, 0.12)
+                self.puffs.append(dict(e=e, v=np.array([math.cos(ang), math.sin(ang)]) * rng.uniform(1.9, 2.3),
+                                       life=rng.uniform(10.0, 12.0), r0=rng.uniform(1.0, 1.5),
+                                       r1=rng.uniform(4.5, 6.0), buoy=rng.uniform(0.03, 0.08),
+                                       h0=rng.uniform(0.95, 1.1), fl=rng.uniform(0, 6.28)))
+
+    def render(self, out, i, ox, oy):
+        H_, W_ = out.shape[:2]
+        heat = np.zeros((H_, W_))
+        for p in self.puffs:
+            a = (i - p['e']) % N
+            if a >= p['life']:
+                continue
+            u = a / p['life']
+            cx = self.n0[0] + p['v'][0] * a + ox
+            cy = self.n0[1] + p['v'][1] * a - 0.5 * p['buoy'] * a * a + oy
+            r = p['r0'] + (p['r1'] - p['r0']) * u ** 0.8
+            h = p['h0'] * (1 - u) ** 0.7 * (1 + 0.12 * math.sin(2 * math.pi * 6 * i / N + p['fl']))
+            for y in range(max(0, int(cy - r) - 1), min(H_, int(cy + r) + 2)):
+                for x in range(max(0, int(cx - r) - 1), min(W_, int(cx + r) + 2)):
+                    q = ((x - cx) ** 2 + (y - cy) ** 2) / (r * r)
+                    if q < 1:
+                        heat[y, x] = max(heat[y, x], h * (1 - q) ** 0.6)
+        for y, x in zip(*np.nonzero(heat > self.COLS[-1][0])):
+            if out[y, x, 3]:
+                continue
+            for th, c in self.COLS:
+                if heat[y, x] > th:
+                    out[y, x] = c
+                    break
+
+
+FIRE = None
+
+
+def f_hulijing(i):
+    global FIRE
+    s = load('body')
+    if FIRE is None:
+        FIRE = BlueFire((22.5, 21.0))
+    blink(s, i)
+    b = BOUNCE12[i % 12]
+    out = np.zeros((H, W, 4), int)
+    knee_put(out, s, b)
+    fill_pinholes(out)
+    FIRE.render(out, i, PL, PT + b)
+    return out
+
+
 FRAME = dict(asriel=f_asriel, barker=f_barker, blackstache=f_blackstache, chuck=f_chuck, codumbus=f_codumbus,
              devlin=f_devlin, mmdevlin=f_devlin, enigma=f_enigma, krates=f_krates, key=f_key, kyli=f_kyli, alleria=f_alleria,
              brackle=f_brackle, leonardo=f_brackle, broghan=f_broghan, golem=f_golem,
-             clown=f_clown, bbg=f_bbg, fern=f_fern, fernelf=f_fern, fairy=f_fairy, fiona=f_fiona)
+             clown=f_clown, bbg=f_bbg, fern=f_fern, fernelf=f_fern, fairy=f_fairy, fiona=f_fiona,
+             boarding=f_gabbyrope, chosen=f_gabbyrope, zombie=f_zombie, moon=f_moon, garius=f_garius,
+             vader=f_vader, gobbo=f_gobbo, hatusbal=f_hatusbal, jack=f_hatusbal, hulijing=f_hulijing)
 
 if __name__ == '__main__':
     tag = sys.argv[1] if len(sys.argv) > 1 else 'v'
