@@ -92,6 +92,22 @@ Dazu je Variante:
 * hulijing:  federt, blinzelt; das blaue Fuchsfeuer strömt als Partikelfeuer aus
              ihrer Hand (Flammenballen wachsen, kühlen ab, züngeln: weiß,
              hellblau, türkis, blau, dunkelblauer Rand).
+* ingo:      Ingos eigene Animation (src/user/ingo-hood-frames.png): Kapuze auf,
+             Arme hoch, Kapuze in den Nacken, ohne Kapuze die Arme ausbreiten,
+             und wieder zurück; dazu Blinzeln und zweimal blitzt das Monokel.
+* eingo:     Elegant Ingo: federt, blinzelt, das Monokel blitzt.
+* madame:    Madame Guillotine hält eine Rede (Mund auf und zu), federt,
+             blinzelt; über das Beil läuft ein Blitz, von der Schneide tropft
+             Blut zu Boden, an den Blutfäden unter dem abgeschlagenen Kopf rinnt
+             es hinab (Kopf und Lache liegen fest).
+* marianne:  federt, blinzelt; die Mistgabel steht, die Katze wedelt mit dem
+             Schwanz, stellt die Ohren auf und blinzelt versetzt.
+* santa:     federt, der Bommel wippt nach, über die Zuckerstange läuft ein Glanz.
+* nicolas / edward / saintnic: federn; die Tränke blubbern (Bläschen steigen,
+             die Flüssigkeit schimmert), Saint Nicolas' Tränke glühen unten auf.
+* stellan / bunny: atmen ruhig (1 px), ab und zu zuckt ein Ohr.
+* tazune / bakugo: die Flammen lodern (Farbstufen wogen nach oben, die Spitzen
+             züngeln), der Dampf wallt und kleine Dampfwölkchen steigen auf.
 """
 import math
 import os
@@ -178,6 +194,22 @@ V_ = {
     'hulijing': dict(slug='hulijing-the-foxdemon', knee=29, pads=(8, 3, 4, 2),
                      lid=[((31, 16), 'ffe6d5'), ((34, 16), 'ffe6d5'), ((35, 16), 'ffe6d5')],
                      line=[(30, 17), (31, 17), (34, 17), (35, 17)]),
+    'ingo': dict(slug='ingo-investor-of-evil'),
+    'eingo': dict(slug='elegant-ingo', knee=22, line=[(7, 7), (8, 7), (11, 7), (12, 7)]),
+    'madame': dict(slug='madame-guillotine-the-great-equalizer', knee=27, pads=(3, 3, 4, 2),
+                   lid=[((10, 11), 'f6bd98'), ((11, 11), 'f6bd98'), ((14, 11), 'f6bd98'), ((15, 11), 'f6bd98')],
+                   line=[(10, 12), (11, 12), (14, 12), (15, 12)]),
+    'marianne': dict(slug='marianne-the-cocky-caretaker', knee=21,
+                     lid=[((8, 11), 'efb075'), ((9, 11), 'efb075'), ((12, 11), 'efb075'), ((13, 11), 'efb075')],
+                     line=[(8, 12), (9, 12), (12, 12), (13, 12)]),
+    'santa': dict(slug='santa-klaus', knee=25),
+    'nicolas': dict(slug='nicolas-the-hidden-alchemist', knee=22),
+    'edward': dict(slug='fullmetal-nicolas', knee=22),
+    'saintnic': dict(slug='saint-nicolas', knee=27),
+    'stellan': dict(slug='stellan-the-calm-cat', knee=22),
+    'bunny': dict(slug='stellan-the-calm-easter-bunny', knee=23),
+    'tazune': dict(slug='tazune-the-angry-hot-blood', knee=30, pads=(3, 3, 6, 2)),
+    'bakugo': dict(slug='explosive-tazune', knee=30, pads=(3, 3, 6, 2)),
     'kyli': dict(slug='kyli-the-deceptive-sapling', knee=28, pads=(3, 3, 5, 2),
                  blink={'halb': [((9, 16), '636363'), ((10, 16), '636363'), ((13, 16), '636363'), ((14, 16), '636363')],
                         'zu': [((9, 16), '636363'), ((10, 16), '636363'), ((13, 16), '636363'), ((14, 16), '636363'),
@@ -1553,12 +1585,246 @@ def f_hulijing(i):
     return out
 
 
+# --- Etappe 4 -------------------------------------------------------------------
+# Ingo: seine eigene Animation (Kapuze absetzen) aus src/user/ingo-hood-frames.png (2x4 Frames à
+# 24x32, zeilenweise gelesen): A = Kapuze auf, Arme ausgebreitet; B = Kapuze auf, Arme innen
+# (f2 offen / f4 zwinkernd); C = Kapuze rutscht in den Nacken; F = ohne Kapuze, Arme innen
+# (f3 offen / f1 zwinkernd); E = ohne Kapuze, Arme ausgebreitet; D = ohne Kapuze, Arme eng.
+INGO_SEQ = (['A'] * 8 + ['B2', 'B2', 'C', 'C', 'F1', 'F3', 'F3'] + ['E'] * 13 +
+            ['D', 'D', 'C', 'C', 'B4', 'B2', 'B2'] + ['A'] * 13)
+INGO_IDX = dict(A=0, B2=2, B4=4, C=6, F1=1, F3=3, E=5, D=7)
+INGO_BLINK = {4: 'A', 23: 'E', 44: 'A'}                  # zwischendurch blinzeln (Auge 9/10, Zeile 15)
+INGO_STAR = [(13, 15, 17), (13, 15, 38)]                  # Monokel blitzt (ohne und mit Kapuze)
+
+
+def f_ingo(i):
+    fr = np.array(Image.open('src/user/ingo-hood-frames.png').convert('RGBA')).astype(int)
+    k = INGO_IDX[INGO_SEQ[i]]
+    f = fr[(k // 2) * 32:(k // 2 + 1) * 32, (k % 2) * 24:(k % 2 + 1) * 24].copy()
+    if INGO_BLINK.get(i) and hexc(f[15, 9]) == 'f6ffff':
+        f[15, 9] = f[15, 10] = BLACK
+    f = f[5:]                                             # oben leere Zeilen weg
+    out = np.zeros((f.shape[0] + 3, f.shape[1] + 4, 4), int)
+    put(out, f, 2, 1)
+    stars(out, i, [(x + 2, y - 5 + 1, t0) for x, y, t0 in INGO_STAR], 'e8f4ff', 'ffffff')
+    return out
+
+
+def f_eingo(i):
+    s = SRC.copy()
+    blink(s, i)
+    out = np.zeros((H, W, 4), int)
+    b = BOUNCE12[i % 12]
+    knee_put(out, s, b)
+    fill_pinholes(out)
+    stars(out, i, [(12 + PL, 7 + PT + b, 10), (12 + PL, 7 + PT + b, 34)], 'e8f4ff', 'ffffff')   # Monokel blitzt
+    return out
+
+
+MADAME_TALK = talk_track(['oo', 'oc', 'ww', 'wo', 'occ', 'wwc', 'c'], 23)
+MADAME_STRANDS = None
+
+
+def f_madame(i):
+    global MADAME_STRANDS
+    s = SRC.copy()
+    blink(s, i)
+    st = MADAME_TALK[i] if i else 'o'                     # Rede: Mund auf und zu
+    if st == 'c':
+        s[14, 12] = s[14, 13] = rgb('740000')
+        s[15, 12] = s[15, 13] = rgb('f7bd7b')
+    elif st == 'w':
+        s[16, 12] = s[16, 13] = rgb('660000')
+    head = (s[:, :, 3] > 0) & (_xs >= 28)                 # abgeschlagener Kopf samt Blutlache liegt fest
+    blade = (s[:, :, 3] > 0) & (_ys <= 13) & (_xs <= 15) & np.array(
+        [[max(s[y, x, :3]) - min(s[y, x, :3]) < 20 and lum(s[y, x]) > 100 for x in range(SW)] for y in range(SH)])
+    for (x, y), a in sweep(blade, i, 14, speed=1.5).items():   # Beil blitzt
+        s[y, x] = lighten(s[y, x], a)
+    if MADAME_STRANDS is None:                            # Blutfäden unter dem Kopf: je Spalte von oben nach unten
+        MADAME_STRANDS = []
+        for x in range(28, SW):
+            ys = [y for y in range(22, 30) if s[y, x, 3] and hexc(s[y, x]) in ('660000', '740000', '800000')]
+            if len(ys) >= 3:
+                MADAME_STRANDS.append((x, ys))
+    for k, (x, ys) in enumerate(MADAME_STRANDS):          # Blut rinnt die Fäden hinab (heller Tropfen)
+        t = (i * 2 + k * 5) % 24
+        if t < len(ys):
+            s[ys[t], x] = rgb('c01818')
+            if t > 0:
+                s[ys[t - 1], x] = rgb('9a0000')
+    b = BOUNCE12[i % 12]
+    out = np.zeros((H, W, 4), int)
+    fig = s.copy()
+    fig[head] = 0
+    for y, x in zip(*np.nonzero(head)):                   # Kopf und Lache federn nicht mit
+        out[y + PT, x + PL] = s[y, x]
+    knee_put(out, fig, b)
+    fill_pinholes(out)
+    stars(out, i, [(7 + PL, 3 + PT + b, 20)], 'e8f4ff', 'ffffff')
+    # Blut tropft von der Beilschneide (unterste rote Spitze) zu Boden
+    for t0 in (6, 30):
+        t = (i - t0) % N
+        draw_px(out, drop_pixels(t, 13 + PL, 14 + PT + (b if t < 4 else 0), SH - 1 + PT))
+    return out
+
+
+def f_marianne(i):
+    parts = {p: load(p) for p in ('fork', 'cat', 'body', 'hair', 'arm', 'hat')}
+    body = np.zeros_like(parts['body'])
+    for p in ('body', 'hair', 'arm', 'hat'):
+        m = parts[p][:, :, 3] > 0
+        body[m] = parts[p][m]
+    blink(body, i)
+    cat = parts['cat']
+    w = 2 * math.pi * i / N
+    if BLINK.get((i + 20) % N) == 'zu':                   # die Katze blinzelt versetzt
+        cat[17, 22] = rgb('fff6ff')
+        cat[18, 22] = rgb('000000')
+    tail = lambda x, y: -int(round(1.0 * (x - 31) / 4 * (math.sin(6 * w) - 0))) if x >= 32 and y <= 21 else 0
+    ear = lambda x, y: -1 if (y <= 15 and x <= 24 and (i % 16) in (9, 10)) else 0
+    b = BOUNCE12[i % 12]
+    out = np.zeros((H, W, 4), int)
+    put(out, parts['fork'], PL, PT)
+    put(out, cat, PL, PT, dy_fn=lambda x, y: tail(x, y) + ear(x, y))
+    knee_put(out, body, b)
+    fill_pinholes(out)
+    return out
+
+
+def f_santa(i):
+    s = SRC.copy()
+    cane = (s[:, :, 3] > 0) & (_xs <= 11) & (_ys <= 20)
+    for (x, y), a in sweep(cane & np.array([[lum(s[y, x]) > 150 for x in range(SW)] for y in range(SH)]),
+                           i, 8, speed=1.2).items():
+        s[y, x] = lighten(s[y, x], a)
+    w = 2 * math.pi * 2 * i / N
+    pom = lambda x, y: int(round(1.0 * (math.sin(w) - 0))) if (y <= 5 and x >= 20) else 0   # Bommel wippt nach
+    b = BOUNCE12[i % 12]
+    out = np.zeros((H, W, 4), int)
+    knee_put(out, s, b, dx_fn=pom)
+    fill_pinholes(out)
+    stars(out, i, [(4 + PL, 6 + PT + b, 30)], 'ffe0e0', 'ffffff')
+    return out
+
+
+def potion_fx(out, part, i, ox, oy, liquid, bubble='ffffe8'):
+    """Trank blubbert: Bläschen steigen durch die Flüssigkeit (Farben liquid), die Flüssigkeit
+    schimmert in einem wandernden Band heller."""
+    m = np.array([[part[y, x, 3] > 0 and hexc(part[y, x]) in liquid for x in range(part.shape[1])]
+                  for y in range(part.shape[0])])
+    if not m.any():
+        return
+    ys, xs = np.nonzero(m)
+    for y, x in zip(ys, xs):                             # Schimmerband (läuft schräg hinauf)
+        if (x - y * 0.8 + i * 0.6) % 9 < 1.2:
+            out[y + oy, x + ox] = lighten(out[y + oy, x + ox], 0.35)
+    cols = sorted(set(xs))
+    for k, t0 in enumerate(range(0, N, 5)):              # Bläschen
+        x = cols[(k * 7) % len(cols)]
+        col = sorted(y for y in ys[xs == x])
+        t = (i - t0) % N
+        if t < len(col):
+            y = col[-1 - t]
+            out[y + oy, x + ox] = rgb(bubble)
+
+
+def f_alchemist(i):
+    body = load('body')
+    potion = load('potions' if V == 'saintnic' else 'flask')
+    b = BOUNCE12[i % 12]
+    out = np.zeros((H, W, 4), int)
+    knee_put(out, body, b)
+    put(out, potion, PL, PT + b)
+    fill_pinholes(out)
+    if V == 'saintnic':                                  # rote Tränke, unten glüht es gelb
+        f = 0.5 - 0.5 * math.cos(2 * math.pi * 2 * i / N)
+        for y, x in zip(*np.nonzero(potion[:, :, 3])):
+            c = potion[y, x]
+            if c[0] > 200 and c[1] > 180 and c[2] < 120:
+                out[y + PT + b, x + PL] = lighten(c, 0.5 * f)
+        potion_fx(out, potion, i, PL, PT + b, ('a41c1c', 'c52b2b', '8b1616', 'b93636', '9e3b50', '7e1a1a'), 'ff9c9c')
+    else:
+        potion_fx(out, potion, i, PL, PT + b, ('eded71', 'f4f474', 'fefe79', 'ffffaf'))
+    return out
+
+
+def f_stellan(i):
+    s = SRC.copy()
+    b = B24[i % 24]                                       # ruhiges Atmen
+    ear_t = (i % 24) in (16, 17)                          # Ohrzucken ab und zu
+    if V == 'stellan':
+        ears = lambda x, y: (y <= 2 and (x <= 6 or x >= 11))
+    else:
+        ears = lambda x, y: (y <= 4 and (x <= 6 or x >= 12))
+    dy = lambda x, y: (-1 if ear_t and ears(x, y) and x < SW / 2 else 0)
+    out = np.zeros((H, W, 4), int)
+    put(out, s, PL, PT, dy_fn=lambda x, y: dy(x, y) + (b if y < KNEE else 0))
+    if b < 0:
+        for x in range(SW):
+            if s[KNEE - 1, x, 3] and s[KNEE, x, 3] and not out[KNEE - 1 + PT, x + PL, 3]:
+                out[KNEE - 1 + PT, x + PL] = s[KNEE - 1, x]
+    fill_pinholes(out)
+    return out
+
+
+FLAME_COLS = ('ca2c29', 'f47b22', 'f6e70e', 'f7f5b8')
+STEAM_COLS = ('899ba7', 'bdc7cc', 'd8e3e9', 'e3eef5')
+
+
+def recolour_wave(part, mask, cols, i, speed, cycles, dirv, amp):
+    """Pixel in mask nach ihrer Helligkeitsstufe (cols dunkel -> hell) mit einer Welle, die
+    in Richtung dirv läuft, auf- und abstufen – nichts bewegt sich, nur die Farben wogen."""
+    rank = {c: k for k, c in enumerate(cols)}
+    n = len(cols) - 1
+    w = 2 * math.pi * cycles * i / N
+    for y, x in zip(*np.nonzero(mask)):
+        h = hexc(part[y, x])
+        if h not in rank:
+            continue
+        ph = 0.9 * math.sin(0.37 * x + 0.21 * y) + speed * (x * dirv[0] + y * dirv[1])
+        r = rank[h] / n + amp * (math.sin(w - ph) - math.sin(-ph))
+        part[y, x] = rgb(cols[int(round(min(1.0, max(0.0, r)) * n))])
+
+
+def f_tazune(i):
+    body, fx = load('body'), load('fx')
+    fl = np.array([[fx[y, x, 3] > 0 and hexc(fx[y, x]) in FLAME_COLS for x in range(SW)] for y in range(SH)])
+    stm = np.array([[fx[y, x, 3] > 0 and hexc(fx[y, x]) in STEAM_COLS for x in range(SW)] for y in range(SH)])
+    recolour_wave(fx, fl, FLAME_COLS, i, 0.5, 6, (0, 1), 0.35)       # Flammen lodern nach oben
+    recolour_wave(fx, stm, STEAM_COLS, i, 0.4, 3, (0, 1), 0.3)       # Dampf wallt
+    # Flammenspitzen züngeln: oberste Flammenpixel je Spalte kommen und gehen
+    for x in range(SW):
+        ys = np.nonzero(fl[:, x])[0]
+        if len(ys) and math.sin(2 * math.pi * 6 * i / N + x * 1.7) > 0.4 and ys[0] > 0 and not fx[ys[0] - 1, x, 3]:
+            fx[ys[0] - 1, x] = rgb('f47b22')
+    b = BOUNCE12[i % 12]
+    out = np.zeros((H, W, 4), int)
+    put(out, fx, PL, PT + b)
+    knee_put(out, body, b)
+    fill_pinholes(out)
+    # Dampfwölkchen lösen sich oben von den Dampfwolken und steigen auf
+    tops = [(x, int(np.nonzero(stm[:, x])[0].min())) for x in range(SW) if stm[:, x].any()]
+    for k, t0 in enumerate(range(2, N, 6)):
+        x, y0 = tops[(k * 5) % len(tops)]
+        t = (i - t0) % N
+        if t < 8:
+            y = y0 - 2 - t // 2 + PT + b
+            pix = {(x + PL, y): rgb('e3eef5', 200 - 20 * t), (x + PL + 1, y): rgb('d8e3e9', 170 - 18 * t)}
+            if all(0 < px < W - 1 and 0 < py < H - 1 and not out[py, px, 3] for px, py in pix):
+                for (px, py), c in pix.items():
+                    out[py, px] = c
+    return out
+
+
 FRAME = dict(asriel=f_asriel, barker=f_barker, blackstache=f_blackstache, chuck=f_chuck, codumbus=f_codumbus,
              devlin=f_devlin, mmdevlin=f_devlin, enigma=f_enigma, krates=f_krates, key=f_key, kyli=f_kyli, alleria=f_alleria,
              brackle=f_brackle, leonardo=f_brackle, broghan=f_broghan, golem=f_golem,
              clown=f_clown, bbg=f_bbg, fern=f_fern, fernelf=f_fern, fairy=f_fairy, fiona=f_fiona,
              boarding=f_gabbyrope, chosen=f_gabbyrope, zombie=f_zombie, moon=f_moon, garius=f_garius,
-             vader=f_vader, gobbo=f_gobbo, hatusbal=f_hatusbal, jack=f_hatusbal, hulijing=f_hulijing)
+             vader=f_vader, gobbo=f_gobbo, hatusbal=f_hatusbal, jack=f_hatusbal, hulijing=f_hulijing,
+             ingo=f_ingo, eingo=f_eingo, madame=f_madame, marianne=f_marianne, santa=f_santa,
+             nicolas=f_alchemist, edward=f_alchemist, saintnic=f_alchemist, stellan=f_stellan, bunny=f_stellan,
+             tazune=f_tazune, bakugo=f_tazune)
 
 if __name__ == '__main__':
     tag = sys.argv[1] if len(sys.argv) > 1 else 'v'
