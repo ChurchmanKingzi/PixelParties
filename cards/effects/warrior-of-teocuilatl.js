@@ -62,15 +62,17 @@ module.exports = {
   // Freibrief, siehe `heroParalyzed` in der Engine).
   requiresActiveCaster: true,
 
+  // Styx 28.9.: geliehene Helden der Gegenspalte — der Bypass fragt nur
+  // nach eigenen Helden (`heroIdx` der eigenen Spalte), also nur eigene Plaetze.
   canBypassFreeZoneRequirement(gs, pi, heroIdx, cardData, engine) {
-    return T.sacrificeableSlots(engine, pi, CARD_NAME).some(s => s.heroIdx === heroIdx);
+    return T.sacrificeableSlots(engine, pi, CARD_NAME).some(s => s.heroIdx === heroIdx && s.owner === pi);
   },
-  canPlaceOnOccupiedSlot(gs, pi, heroIdx, slotIdx, engine) {
-    return !!T.findOccupant(engine, pi, heroIdx, slotIdx, CARD_NAME);
+  // Styx 28.9.: geliehene Helden der Gegenspalte — `heroOwner` = physische Seite.
+  canPlaceOnOccupiedSlot(gs, pi, heroIdx, slotIdx, engine, heroOwner = pi) {
+    return !!T.findOccupant(engine, pi, heroIdx, slotIdx, CARD_NAME, heroOwner);
   },
   getBouncePlacementTargets(gs, pi, engine) {
-    return T.sacrificeableSlots(engine, pi, CARD_NAME)
-      .map(s => ({ heroIdx: s.heroIdx, slotIdx: s.slotIdx }));
+    return T.bounceTargets(engine, pi, CARD_NAME);
   },
 
   async beforeSummon(ctx) {

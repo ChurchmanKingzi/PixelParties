@@ -39,28 +39,30 @@ const CARD_NAME = 'Calamitusk, the Chaorc War Chief';
 /** Can Calamitusk (at `calaHi`) summon `name` with its level reduced by
  *  1? Gates school/level on a -1 copy, plus the Creature's own
  *  `canSummon`. */
-function canSummonReduced(engine, pi, calaHi, name) {
+// Kontrolle statt Seite (Styx 28.9.): physische Seite des Helden —
+// `feld` = Spalte, in der Calamitusk steht (Level/Schule dort pruefen).
+function canSummonReduced(engine, feld, calaHi, name) {
   if (!isChaorcCreature(name, engine)) return false;
   const cd = engine._getCardDB()[name];
   if (!cd) return false;
   const reduced = { ...cd, level: Math.max(0, (cd.level || 0) - 1) };
-  if (!engine.heroMeetsLevelReq(pi, calaHi, reduced)) return false;
-  if (!engine.isCreatureSummonable(name, pi, calaHi, { _bypassBeforeSummon: true })) return false;
+  if (!engine.heroMeetsLevelReq(feld, calaHi, reduced)) return false;
+  if (!engine.isCreatureSummonable(name, feld, calaHi, { _bypassBeforeSummon: true })) return false;
   return true;
 }
 
 /** Distinct summonable Chaorc replacements (name != excludeName) from
  *  hand + deck, deduped by name (hand preferred for the splice). */
-function replacements(engine, pi, calaHi, excludeName) {
+function replacements(engine, pi, calaHi, excludeName, feld = pi) {
   const ps = engine.gs.players[pi];
   const byName = new Map();
   for (const cn of (ps?.hand || [])) {
     if (cn === excludeName || byName.has(cn)) continue;
-    if (canSummonReduced(engine, pi, calaHi, cn)) byName.set(cn, { name: cn, source: 'hand' });
+    if (canSummonReduced(engine, feld, calaHi, cn)) byName.set(cn, { name: cn, source: 'hand' });
   }
   for (const cn of (ps?.mainDeck || [])) {
     if (cn === excludeName || byName.has(cn)) continue;
-    if (canSummonReduced(engine, pi, calaHi, cn)) byName.set(cn, { name: cn, source: 'deck' });
+    if (canSummonReduced(engine, feld, calaHi, cn)) byName.set(cn, { name: cn, source: 'deck' });
   }
   return [...byName.values()].sort((a, b) => a.name.localeCompare(b.name));
 }
@@ -68,9 +70,12 @@ function replacements(engine, pi, calaHi, excludeName) {
 /** Sacrificing this tribute must (a) have ≥1 valid replacement and (b)
  *  leave Calamitusk a free Support slot — either one is free already,
  *  or the tribute sits in his column and frees one. */
-function tributeViable(engine, pi, calaHi, c) {
-  if (replacements(engine, pi, calaHi, c.cardName).length === 0) return false;
-  return firstFreeSupportSlot(engine, pi, calaHi) >= 0 || c.inst.heroIdx === calaHi;
+function tributeViable(engine, pi, calaHi, c, feld = pi) {
+  if (replacements(engine, pi, calaHi, c.cardName, feld).length === 0) return false;
+  // Kontrolle statt Seite (Styx 28.9.): physische Seite des Helden — ein
+  // Tribut macht nur dann Platz, wenn er in Calamitusks Spalte steht.
+  return firstFreeSupportSlot(engine, feld, calaHi) >= 0
+    || (c.inst.heroIdx === calaHi && (c.inst.owner ?? pi) === feld);
 }
 
 module.exports = {
@@ -81,8 +86,9 @@ module.exports = {
     const engine = ctx._engine;
     const pi = ctx.cardOwner;
     const calaHi = ctx.cardHeroIdx;
+    const feld = ctx.cardHeroOwner ?? pi;   // Kontrolle statt Seite (Styx 28.9.): physische Seite des Helden
     return chaorcFreshSacCandidates(engine, pi, null)
-      .some(c => tributeViable(engine, pi, calaHi, c));
+      .some(c => tributeViable(engine, pi, calaHi, c, feld));
   },
 
   async onHeroEffect(ctx) {
@@ -91,6 +97,7 @@ module.exports = {
     const pi = ctx.cardOwner;
     const ps = gs.players[pi];
     const calaHi = ctx.cardHeroIdx;
+    const feld = ctx.cardHeroOwner ?? pi;   // Kontrolle statt Seite (Styx 28.9.): physische Seite des Helden
     const base = chaorcSacrificeFilter(engine);
 
     const paid = await engine.resolveSacrificeCost(ctx, {
@@ -101,16 +108,16 @@ module.exports = {
       confirmLabel: '🗡️ Sacrifice!',
       confirmClass: 'btn-danger',
       cancellable: true,
-      filter: (c) => base(c) && tributeViable(engine, pi, calaHi, c),
+      filter: (c) => base(c) && tributeViable(engine, pi, calaHi, c, feld),
 
       onResolved: async (_ctx, picked) => {
         const sacName = picked?.[0]?.cardName;
         // The tribute is gone — recompute the (now-free) slot in
         // Calamitusk's column.
-        const slot = firstFreeSupportSlot(engine, pi, calaHi);
+        const slot = firstFreeSupportSlot(engine, feld, calaHi);
         if (slot < 0) { engine.sync(); return; }
 
-        const opts = replacements(engine, pi, calaHi, sacName);
+        const opts = replacements(engine, pi, calaHi, sacName, feld);
         if (opts.length === 0) { engine.sync(); return; }
 
         let chosen = opts[0];
@@ -138,8 +145,8 @@ module.exports = {
         // `_runBeforeSummon` greift hier nicht: das Opfer lief in
         // DIESEM Effekt, nicht in den Kosten der beschworenen Karte.
         const summon = await engine.summonCreatureWithHooks(
-          chosen.name, pi, calaHi, slot,
-          { source: CARD_NAME, hookExtras: { _tributePaid: true } },
+          chosen.name, feld, calaHi, slot,   // Kontrolle statt Seite (Styx 28.9.): physische Seite des Helden
+          { source: CARD_NAME, ...(feld !== pi ? { controller: pi } : {}), hookExtras: { _tributePaid: true } },
         );
         if (!summon?.inst) {
           // Placement fizzled — refund the fetched card.

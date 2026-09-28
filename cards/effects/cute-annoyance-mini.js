@@ -69,20 +69,23 @@ function getCuteCreaturesInDeck(engine, ps) {
  * this Hero" per card text. Returns empty when Mini's zones are
  * full or summoning is locked.
  */
-function eligibleSummonSlots(engine, pi, miniHeroIdx, creatureCd) {
+function eligibleSummonSlots(engine, pi, miniHeroIdx, creatureCd, feld = pi) {
   const ps = engine.gs.players[pi];
   if (!ps) return [];
   if (ps.summonLocked) return [];
-  const hero = ps.heroes?.[miniHeroIdx];
+  // Kontrolle statt Seite (Styx 28.9.): physische Seite des Helden —
+  // Held, Level-Check und Zonen liegen in der Spalte `feld`.
+  const fs = engine.gs.players[feld];
+  const hero = fs?.heroes?.[miniHeroIdx];
   if (!hero?.name || hero.hp <= 0) return [];
   // Mini herself must still meet the level req for the chosen
   // creature (the summon is "with this Hero", so Mini is the host).
-  if (!engine.heroMeetsLevelReq(pi, miniHeroIdx, creatureCd)) return [];
-  const zones = ps.supportZones?.[miniHeroIdx] || [[], [], []];
+  if (!engine.heroMeetsLevelReq(feld, miniHeroIdx, creatureCd)) return [];
+  const zones = fs.supportZones?.[miniHeroIdx] || [[], [], []];
   const out = [];
   for (let z = 0; z < 3; z++) {
     if ((zones[z] || []).length === 0) {
-      out.push({ heroIdx: miniHeroIdx, slotIdx: z });
+      out.push({ heroIdx: miniHeroIdx, slotIdx: z, ...(feld !== pi ? { owner: feld } : {}) });
     }
   }
   return out;
@@ -115,6 +118,8 @@ module.exports = {
     const miniHeroIdx = ctx.cardHeroIdx;
     const ps = ctx.players[pi];
     if (!ps) return false;
+    // Kontrolle statt Seite (Styx 28.9.): physische Seite des Helden
+    const feld = ctx.cardHeroOwner ?? pi;
 
     // Wrap the entire activation in a single discard batch so the
     // tutor cost + optional rider-summon cost count as ONE multi-
@@ -183,7 +188,7 @@ module.exports = {
     //     only one in hand and that IS the summon target — picking
     //     the same card to discard would defeat the rider).
     //   • Mini has no free Support Zone for the summon.
-    const hostSlots = eligibleSummonSlots(engine, pi, miniHeroIdx, chosenCd);
+    const hostSlots = eligibleSummonSlots(engine, pi, miniHeroIdx, chosenCd, feld);
     // Hand cards available to spend on the second discard: every
     // hand card EXCEPT the just-tutored copy at the trailing slot.
     const tutoredHandIdx = ps.hand.length - 1;
@@ -199,7 +204,7 @@ module.exports = {
     const wantsRider = await engine.promptGeneric(pi, {
       type: 'confirm',
       title: CARD_NAME,
-      message: `Discard 1 more card to immediately summon ${chosenName} on ${ps.heroes[miniHeroIdx]?.name || 'this Hero'} as an additional Action?`,
+      message: `Discard 1 more card to immediately summon ${chosenName} on ${gs.players[feld]?.heroes?.[miniHeroIdx]?.name || 'this Hero'} as an additional Action?`,
       showCard: chosenName,
       confirmLabel: '✨ Summon now!',
       cancelLabel: 'No',
@@ -256,6 +261,7 @@ module.exports = {
     } else {
       const zones = hostSlots.map(h => ({
         heroIdx: h.heroIdx, slotIdx: h.slotIdx,
+        ...(h.owner != null ? { owner: h.owner } : {}),   // Kontrolle statt Seite (Styx 28.9.)
         label: `Support ${h.slotIdx + 1}`,
       }));
       const zp = await engine.promptGeneric(pi, {
@@ -269,9 +275,10 @@ module.exports = {
     }
 
     const placed = await engine.summonCreatureWithHooks(
-      chosenName, pi, slot.heroIdx, slot.slotIdx,
+      chosenName, feld, slot.heroIdx, slot.slotIdx,   // Kontrolle statt Seite (Styx 28.9.): physische Seite des Helden
       {
         source: CARD_NAME,
+        ...(feld !== pi ? { controller: pi } : {}),
         hookExtras: {
           _summonedBy: CARD_NAME,
           _summonedAsAdditional: true,
@@ -295,7 +302,7 @@ module.exports = {
     // than gating them.
     engine._broadcastEvent('play_zone_animation', {
       type: 'mini_hearts',
-      owner: pi,
+      owner: feld,
       heroIdx: slot.heroIdx,
       zoneSlot: placed.actualSlot,
     });

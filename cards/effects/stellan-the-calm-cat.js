@@ -116,11 +116,16 @@ async function runStellanEffect(ctx) {
   const heroIdx = ctx.cardHeroIdx;
   const ps      = gs.players[pi];
   if (!ps) return false;
+  // Kontrolle statt Seite (Styx 28.9.): physische Seite des Helden —
+  // Stellans Support Zones stehen in `feld`, Hand/Deck/Prompts bei `pi`.
+  const feld    = ctx.cardHeroOwner ?? pi;
+  const fs      = gs.players[feld] || ps;
+  const seitenOpt = feld !== pi ? { heldSeite: feld } : {};
 
   // Bail paths that mean "no placement possible right now" — these still
   // consume the trigger (refund on cancel only, not on no-legal-target).
   if (ps.summonLocked) return false;
-  const freeSlots = freeStellanSlots(ps, heroIdx);
+  const freeSlots = freeStellanSlots(fs, heroIdx);
   if (freeSlots.length === 0) return false;
 
   const handEligible = levelZeroCreatureNames(engine, pi, ps.hand);
@@ -171,7 +176,7 @@ async function runStellanEffect(ctx) {
     // Re-snapshot the free slot list — nothing has mutated state between the
     // earlier read and here (prompts are pure), but we want the freshest
     // view in case a future hook interleaves something.
-    const slots = freeStellanSlots(ps, heroIdx);
+    const slots = freeStellanSlots(fs, heroIdx);
     let placed = 0;
     for (let i = 0; i < chosen.length && i < slots.length; i++) {
       const cardName = chosen[i];
@@ -184,6 +189,7 @@ async function runStellanEffect(ctx) {
         sourceName: CARD_NAME,
         countAsSummon: false,
         animationType: 'summon',
+        ...seitenOpt,
       });
       if (res?.inst) placed++;
     }
@@ -209,7 +215,7 @@ async function runStellanEffect(ctx) {
   const _taken_deckIdx = await engine.deckEntnahme(ps,  chosenName, { source: CARD_NAME });   // v820: Stapel-Schicht
   if (!_taken_deckIdx) return false;
 
-  const slot = freeStellanSlots(ps, heroIdx)[0];
+  const slot = freeStellanSlots(fs, heroIdx)[0];
   if (slot == null) {
     // Race: all slots filled between the free-slot check and here. Refund
     // the deck card so we don't silently eat it.
@@ -217,8 +223,9 @@ async function runStellanEffect(ctx) {
     engine.shuffleDeck(pi, 'main');
     return false;
   }
-  const summonRes = await engine.summonCreatureWithHooks(chosenName, pi, heroIdx, slot, {
+  const summonRes = await engine.summonCreatureWithHooks(chosenName, feld, heroIdx, slot, {
     source: CARD_NAME,
+    ...(feld !== pi ? { controller: pi } : {}),   // Kontrolle statt Seite (Styx 28.9.)
     countAsSummon: false,
     isPlacement: true,
     hookExtras: { _summonedBy: CARD_NAME, ...engine.deckHookExtras() },
@@ -374,7 +381,9 @@ module.exports = {
       // the rare call site that omits it the engine defaults to -1, so
       // we conservatively treat "unknown source" as opponent and fire.
       const appliedBy = target.statuses?.[ctx.statusName]?.appliedBy;
-      if (appliedBy === ctx.cardOriginalOwner) return;
+      // Kontrolle statt Seite (Styx 28.9.): „opponent" = Gegner des
+      // KONTROLLEURS (ohne Uebernahme ist cardOwner === cardOriginalOwner).
+      if (appliedBy === ctx.cardOwner) return;
       // Only negative statuses count — self-applied buffs like `shielded`
       // or `immune` shouldn't spend the trigger. (Matches Fiona.)
       const statusDef = STATUS_EFFECTS[ctx.statusName];

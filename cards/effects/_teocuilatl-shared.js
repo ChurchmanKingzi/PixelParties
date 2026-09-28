@@ -38,22 +38,30 @@ function hasTribute(engine, pi) {
 /** Can `heroIdx` legally host Guardian right now (alive + meets its
  *  level/school requirement)? The freed slot is the sacrificed
  *  Creature's, so that Creature's Hero is the host. */
-function heroCanSummon(engine, pi, heroIdx, CARD_NAME_ARG) {
-  const hero = engine.gs.players[pi]?.heroes?.[heroIdx];
+// Styx 28.9.: geliehene Helden der Gegenspalte — `heroOwner` = physische
+// Seite des Helden (fehlt → pi). Nur Helden, die `pi` gerade kontrolliert;
+// Schulen/Stufen vom Helden, Ermaessigungen aus der Hand von `pi`.
+function heroCanSummon(engine, pi, heroIdx, CARD_NAME_ARG, heroOwner = pi) {
+  const hero = engine.gs.players[heroOwner]?.heroes?.[heroIdx];
   if (!hero?.name || hero.hp <= 0) return false;
+  if (engine.heroSideOf(heroOwner, hero) !== pi) return false;
   const cd = engine._getCardDB()[CARD_NAME_ARG];
-  return engine.heroMeetsLevelReq(pi, heroIdx, cd);
+  if (heroOwner === pi) return engine.heroMeetsLevelReq(pi, heroIdx, cd);
+  return engine.heroMeetsLevelReq(heroOwner, heroIdx, cd, { levelSourcePi: pi });
 }
 
 /** The sacrificeable (not-summoned-this-turn) board Creature occupying a
  *  slot whose Hero can host Guardian, or null. */
-function findOccupant(engine, pi, heroIdx, slotIdx, CARD_NAME_ARG) {
+// Styx 28.9.: geliehene Helden der Gegenspalte — `heroOwner` = physische
+// Seite des Platzes (fehlt → pi); der Bewohner muss dort stehen UND von
+// `pi` kontrolliert werden.
+function findOccupant(engine, pi, heroIdx, slotIdx, CARD_NAME_ARG, heroOwner = pi) {
   const gs = engine.gs;
-  const slot = (gs.players[pi]?.supportZones?.[heroIdx] || [])[slotIdx] || [];
+  const slot = (gs.players[heroOwner]?.supportZones?.[heroIdx] || [])[slotIdx] || [];
   if (slot.length === 0) return null;
-  if (!heroCanSummon(engine, pi, heroIdx, CARD_NAME_ARG)) return null;
+  if (!heroCanSummon(engine, pi, heroIdx, CARD_NAME_ARG, heroOwner)) return null;
   const inst = engine.cardInstances.find(c =>
-    c.zone === 'support' && (c.controller ?? c.owner) === pi
+    c.zone === 'support' && (c.controller ?? c.owner) === pi && c.owner === heroOwner
     && c.heroIdx === heroIdx && c.zoneSlot === slotIdx && !c.faceDown);
   if (!inst) return null;
   if ((inst.turnPlayed || 0) >= (gs.turn || 0)) return null; // summoned this turn
@@ -63,13 +71,23 @@ function findOccupant(engine, pi, heroIdx, slotIdx, CARD_NAME_ARG) {
 }
 
 /** All occupied slots holding a sacrificeable Creature whose Hero can
- *  host Guardian. */
+ *  host Guardian. `owner` = physische Seite des Platzes.
+ *  Styx 28.9.: geliehene Helden der Gegenspalte — auch Plaetze von Helden,
+ *  die `pi` dort kontrolliert (eigene, vom Gegner kontrollierte nicht). */
 function sacrificeableSlots(engine, pi, CARD_NAME_ARG) {
   const turn = engine.gs.turn;
   return engine.getSacrificableCreatures(pi)
     .filter(c => c.inst.zone === 'support' && c.inst.turnPlayed !== turn
-      && heroCanSummon(engine, pi, c.inst.heroIdx, CARD_NAME_ARG))
-    .map(c => ({ heroIdx: c.inst.heroIdx, slotIdx: c.inst.zoneSlot, cardName: c.cardName, inst: c.inst }));
+      && heroCanSummon(engine, pi, c.inst.heroIdx, CARD_NAME_ARG, c.inst.owner ?? pi))
+    .map(c => ({ heroIdx: c.inst.heroIdx, slotIdx: c.inst.zoneSlot, owner: c.inst.owner ?? pi, cardName: c.cardName, inst: c.inst }));
+}
+
+/** Client-Ziele (`getBouncePlacementTargets`): `owner` nur, wenn ≠ pi. */
+function bounceTargets(engine, pi, CARD_NAME_ARG) {
+  return sacrificeableSlots(engine, pi, CARD_NAME_ARG)
+    .map(s => (s.owner !== pi
+      ? { heroIdx: s.heroIdx, slotIdx: s.slotIdx, owner: s.owner }
+      : { heroIdx: s.heroIdx, slotIdx: s.slotIdx }));
 }
 
 /** Full-board sacrifice-summon: sacrifice the occupant of the dropped
@@ -83,7 +101,12 @@ function sacrificeableSlots(engine, pi, CARD_NAME_ARG) {
 async function sacrificeSummonIntoSlot(engine, pi, req, CARD_NAME_ARG) {
   const gs = engine.gs;
   const ps = gs.players[pi];
-  const occ = findOccupant(engine, pi, req.heroIdx, req.slotIdx, CARD_NAME_ARG);
+  // Styx 28.9.: geliehene Helden der Gegenspalte — Platz, Zone, Ablage des
+  // Bewohners und Glow auf der physischen Seite `heroOwner`; Hand, Kosten
+  // und Kontrolle bei `pi`.
+  const heroOwner = (req.heroOwner === 0 || req.heroOwner === 1) ? req.heroOwner : pi;
+  const fps = gs.players[heroOwner];
+  const occ = findOccupant(engine, pi, req.heroIdx, req.slotIdx, CARD_NAME_ARG, heroOwner);
   if (!occ) return false;
   const { heroIdx, slotIdx } = req;
   const occName = occ.name;
@@ -93,7 +116,7 @@ async function sacrificeSummonIntoSlot(engine, pi, req, CARD_NAME_ARG) {
   //     per-turn tally + `_sacrificedTurn` stamp are applied centrally in
   //     runHooks — mirrors engine.resolveSacrificeCost.
   engine._broadcastEvent('play_zone_animation', {
-    type: 'knife_sacrifice', owner: pi, heroIdx, zoneSlot: slotIdx,
+    type: 'knife_sacrifice', owner: heroOwner, heroIdx, zoneSlot: slotIdx,
   });
   await engine._delay(450);
   await engine.runHooks('onCreatureSacrificed', {
@@ -115,21 +138,27 @@ async function sacrificeSummonIntoSlot(engine, pi, req, CARD_NAME_ARG) {
     ownerIdx: pi, cardName: CARD_NAME_ARG,
     handIndex: fromHandIdx >= 0 ? fromHandIdx : 0,
     zoneType: 'support', heroIdx, slotIdx, _forceOwnerAnim: true,
+    ...(heroOwner !== pi ? { destOwner: heroOwner } : {}),
   });
 
   // (3) Atomic swap: remove the occupant's name, place Guardian's name +
   //     a fresh instance into the SAME slot before the post-destroy hooks
   //     fire, so a resummon-into-the-freed-slot reaction (Corpse Cannibal)
   //     finds the slot taken and skips it.
-  const slotArr = ps.supportZones?.[heroIdx]?.[slotIdx];
+  const slotArr = fps.supportZones?.[heroIdx]?.[slotIdx];
   if (Array.isArray(slotArr)) {
     const idx = slotArr.indexOf(occName);
     if (idx >= 0) slotArr.splice(idx, 1);
   }
-  if (!ps.supportZones[heroIdx]) ps.supportZones[heroIdx] = [[], [], []];
-  ps.supportZones[heroIdx][slotIdx] = [CARD_NAME_ARG];
-  const newInst = engine._trackCard(CARD_NAME_ARG, pi, 'support', heroIdx, slotIdx);
+  if (!fps.supportZones[heroIdx]) fps.supportZones[heroIdx] = [[], [], []];
+  fps.supportZones[heroIdx][slotIdx] = [CARD_NAME_ARG];
+  const newInst = engine._trackCard(CARD_NAME_ARG, heroOwner, 'support', heroIdx, slotIdx);
   newInst.counters = newInst.counters || {};
+  if (heroOwner !== pi) {
+    // Wie `safePlaceInSupport(…, { controller: pi })`.
+    newInst.controller = pi;
+    newInst.counters.crossSideControlled = pi;
+  }
   newInst.counters.isPlacement = 1;
   newInst.turnPlayed = gs.turn || 0;
 
@@ -147,7 +176,7 @@ async function sacrificeSummonIntoSlot(engine, pi, req, CARD_NAME_ARG) {
   // (5) Summon glow, then sync (after the flight was emitted, so the
   //     client still had the source card when the flight fired).
   engine._broadcastEvent('summon_effect', {
-    owner: pi, heroIdx, zoneSlot: slotIdx, cardName: CARD_NAME_ARG,
+    owner: heroOwner, heroIdx, zoneSlot: slotIdx, cardName: CARD_NAME_ARG,
   });
   engine.log('teocuilatl_sacrifice_summon', {
     player: ps.username, sacrificed: occName, heroIdx, slotIdx,
@@ -157,11 +186,11 @@ async function sacrificeSummonIntoSlot(engine, pi, req, CARD_NAME_ARG) {
   // (6) Route the sacrificed occupant to discard + fire ON_CREATURE_DEATH
   //     (sacrifice is a sub-type of dying). Slot already taken by Guardian.
   occ.zone = 'discard'; occ.heroIdx = -1; occ.zoneSlot = -1;
-  if (!ps.discardPile) ps.discardPile = [];
-  ps.discardPile.push(occName);
+  if (!fps.discardPile) fps.discardPile = [];
+  fps.discardPile.push(occName);
   await engine.runHooks('onCardLeaveZone', {
     card: occ, leavingCard: occ, fromZone: 'support',
-    fromOwner: pi, fromHeroIdx: heroIdx, fromZoneSlot: slotIdx,
+    fromOwner: heroOwner, fromHeroIdx: heroIdx, fromZoneSlot: slotIdx,
     toZone: 'discard', _skipReactionCheck: true,
   });
   await engine.runHooks('onCreatureDeath', {
@@ -175,7 +204,7 @@ async function sacrificeSummonIntoSlot(engine, pi, req, CARD_NAME_ARG) {
   engine._untrackCard(occ.id);
 
   // (7) Guardian's own on-summon lifecycle.
-  const hostHero = gs.players[pi]?.heroes?.[heroIdx];
+  const hostHero = fps?.heroes?.[heroIdx];
   const onDeadHero = !hostHero?.name || hostHero.hp <= 0;
   await engine.runHooks('onPlay', {
     _onlyCard: newInst, playedCard: newInst, cardName: CARD_NAME_ARG,
@@ -230,6 +259,7 @@ module.exports = {
   heroCanSummon,
   findOccupant,
   sacrificeableSlots,
+  bounceTargets,
   sacrificeSummonIntoSlot,
   // War NIE exportiert — Guardian of Teocuilatl rief sie als freien
   // Bezeichner auf und lief dort in einen ReferenceError.

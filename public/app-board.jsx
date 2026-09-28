@@ -28953,7 +28953,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           //    canBypassLevelReq and inherentAction for the hero-specific
           //    case). Occupied slots stay un-highlighted.
           const bpTargets = (gameState.bouncePlacementTargets || {})[cardName] || [];
-          const bpSet = new Set(bpTargets.map(t => t.heroIdx + ':' + t.slotIdx));
+          // `owner` (Styx 28.9.): Bounce-Ziele auf einem uebernommenen
+          // Helden der Gegenspalte tragen ihre Seite; ohne = eigene.
+          const bpSet = new Set(bpTargets.filter(t => (t.owner ?? myIdx) === myIdx).map(t => t.heroIdx + ':' + t.slotIdx));
+          const bpSetGeliehen = new Set(bpTargets.filter(t => (t.owner ?? myIdx) !== myIdx).map(t => t.heroIdx + ':' + t.slotIdx));
           const hasBounceTargets = bpTargets.length > 0;
 
           const els = document.querySelectorAll('[data-support-zone]');
@@ -28980,12 +28983,23 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 {
                   const geliehen = opp.heroes?.[hi];
                   const zielCards = (opp.supportZones?.[hi] || [])[si] || [];
+                  // Styx 28.9.: belegter Platz eines geliehenen Helden, den
+                  // der Server als Bounce-/Opfer-Ziel meldet.
+                  if (card.cardType === 'Creature' && heroActionHeroIdx === undefined
+                      && geliehen?.charmedBy === myIdx && zielCards.length > 0
+                      && bpSetGeliehen.has(hi + ':' + si)) {
+                    targetHero = hi; targetSlot = si; dropCharmedOwner = oppIdx;
+                    continue;
+                  }
+                  // Leerer Platz: normale Beschwoerung — auch neben
+                  // Bounce-Zielen (wie auf der eigenen Seite), dann mit der
+                  // STRENGEN Pruefung.
                   if (card.cardType === 'Creature'
-                      && !hasBounceTargets && heroActionHeroIdx === undefined
+                      && heroActionHeroIdx === undefined
                       && geliehen?.charmedBy === myIdx && geliehen.hp > 0
                       && zielCards.length === 0
                       && si < ((opp.supportZones?.[hi] || []).length || 3)
-                      && canHeroPlayCard(opp, hi, card)) {
+                      && (hasBounceTargets ? canHeroNormalSummon(opp, hi, card) : canHeroPlayCard(opp, hi, card))) {
                     targetHero = hi; targetSlot = si; dropCharmedOwner = oppIdx;
                     continue;
                   }
@@ -29836,6 +29850,15 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 const slot = findFreeSupportSlot(me, hi);
                 if (slot < 0) continue;
                 normalTargets.push({ heroIdx: hi, slotIdx: slot });
+              }
+              // Styx 28.9.: auch ueber geliehene Helden der Gegenspalte.
+              for (let hi = 0; hi < (opp.heroes || []).length; hi++) {
+                const g = opp.heroes[hi];
+                if (!g?.name || g.hp <= 0 || g.charmedBy !== myIdx) continue;
+                if (!canHeroNormalSummon(opp, hi, card)) continue;
+                const slot = findFreeSupportSlot(opp, hi);
+                if (slot < 0) continue;
+                normalTargets.push({ heroIdx: hi, slotIdx: slot, owner: oppIdx });
               }
               setPendingBouncePick({
                 cardName, handIndex: idx, fromCreation, card,
@@ -42558,16 +42581,17 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               // by the Deepsea archetype (drop on an existing bounceable
               // Creature to swap it back to hand and place the new one in
               // its slot). Computed once per zone per frame.
-              const _bpTargetsForDrag = (!isOpp && playDrag?.card?.cardType === 'Creature')
+              const _bpTargetsForDrag = (playDrag?.card?.cardType === 'Creature')
                 ? ((gameState.bouncePlacementTargets || {})[playDrag.card.name] || [])
                 : [];
-              const isBouncePlaceTarget = _bpTargetsForDrag.some(t => t.heroIdx === i && t.slotIdx === z);
+              // Seite beachten (Styx 28.9.): Ziele auf geliehenen Helden tragen `owner`.
+              const isBouncePlaceTarget = _bpTargetsForDrag.some(t => (t.owner ?? myIdx) === pi && t.heroIdx === i && t.slotIdx === z);
               // Click-to-swap highlight: same visual as drag-bounce-place
               // but triggered by pendingBouncePick (clicking a Deepsea
               // card in hand). Covers BOTH bounce-candidate slots
               // (occupied) and free-slot targets.
-              const _bpPickOwn = !isOpp && pendingBouncePick;
-              const isPendingBounceTarget = _bpPickOwn && (pendingBouncePick.bounceTargets || []).some(t => t.heroIdx === i && t.slotIdx === z);
+              const _bpPickOwn = !!pendingBouncePick;
+              const isPendingBounceTarget = _bpPickOwn && (pendingBouncePick.bounceTargets || []).some(t => (t.owner ?? myIdx) === pi && t.heroIdx === i && t.slotIdx === z);
               // Valid drop zones come in two flavors that now coexist:
               //  • Bounce target — occupied slots listed in
               //    bouncePlacementTargets. Painted via the separate
@@ -42847,6 +42871,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     socket.emit('play_creature', {
                       roomId: gameState.roomId, cardName: ps.cardName,
                       handIndex: currentIdx, heroIdx: i, zoneSlot: z,
+                      // Styx 28.9.: Platz eines geliehenen Helden der Gegenspalte.
+                      ...(isOpp ? { charmedOwner: oppIdx } : {}),
                     });
                   } : isChainPickCreatureValid ? () => {
                     const tgt = (chainPickData?.targets || []).find(t => t.id === creatureChainId);

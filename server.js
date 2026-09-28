@@ -8924,7 +8924,8 @@ async function doPlayCreature(room, pi, { cardName, handIndex, heroIdx, zoneSlot
     let allowOccupied = false;
     if (typeof occCardScript?.canPlaceOnOccupiedSlot === 'function') {
       try {
-        allowOccupied = !!occCardScript.canPlaceOnOccupiedSlot(gs, pi, heroIdx, zoneSlot, room.engine);
+        // 6. Argument (Styx 28.9.): physische Seite des Zielplatzes.
+        allowOccupied = !!occCardScript.canPlaceOnOccupiedSlot(gs, pi, heroIdx, zoneSlot, room.engine, heroOwner);
       } catch (err) {
         console.error('[canPlaceOnOccupiedSlot]', cardName, err.message);
       }
@@ -8941,7 +8942,7 @@ async function doPlayCreature(room, pi, { cardName, handIndex, heroIdx, zoneSlot
     if (!allowOccupied) {
       try {
         const { canShareInto } = require('./cards/effects/_alice-shared');
-        shareOccupied = canShareInto(room.engine, pi, heroIdx, zoneSlot, cardName);
+        shareOccupied = canShareInto(room.engine, pi, heroIdx, zoneSlot, cardName, heroOwner);
       } catch (err) {
         console.error('[canShareInto]', cardName, err.message);
       }
@@ -8952,10 +8953,10 @@ async function doPlayCreature(room, pi, { cardName, handIndex, heroIdx, zoneSlot
       // kein Tausch. Deshalb dasselbe Absichts-Flag wie beim leeren
       // Platz setzen, sonst kaeme `tryBouncePlace` dazwischen.
       delete ps._requestedBouncePlaceSlot;
-      ps._requestedNormalSummonSlot = { heroIdx, slotIdx: zoneSlot };
+      ps._requestedNormalSummonSlot = { heroIdx, slotIdx: zoneSlot, heroOwner };
     } else {
       delete ps._requestedNormalSummonSlot;
-      ps._requestedBouncePlaceSlot = { heroIdx, slotIdx: zoneSlot };
+      ps._requestedBouncePlaceSlot = { heroIdx, slotIdx: zoneSlot, heroOwner };
     }
   } else {
     // Player picked an EMPTY slot — they want a regular summon into this
@@ -8968,7 +8969,8 @@ async function doPlayCreature(room, pi, { cardName, handIndex, heroIdx, zoneSlot
     // into this fresh empty-slot intent (mirror of the occupied branch
     // above).
     delete ps._requestedBouncePlaceSlot;
-    ps._requestedNormalSummonSlot = { heroIdx, slotIdx: zoneSlot };
+    // `heroOwner` (Styx 28.9.): physische Seite des Zielhelden.
+    ps._requestedNormalSummonSlot = { heroIdx, slotIdx: zoneSlot, heroOwner };
   }
 
   let additionalConsumed = false;
@@ -9122,7 +9124,9 @@ async function doPlayCreature(room, pi, { cardName, handIndex, heroIdx, zoneSlot
     // reserviert, damit ein Todes-Trigger (Green Dragoneer) sich nicht in
     // die gerade freigeopferte Zone setzt (Als Ruling 8.8.).
     // `_isNormalSummon`: Spieler-Beschwoerung aus der Hand — Effektbeschwoerungen (summonCreatureWithHooks) tragen es nicht (v833).
-    const beforeSummonOk = await room.engine._runBeforeSummon(cardName, pi, heroIdx, { isInherentAction, viaDragDrop: !!viaDragDrop, _isNormalSummon: true }, zoneSlot);
+    // `heldSeite` (Styx 28.9.): ueber einen geliehenen Helden beschworen —
+    // `beforeSummon` sieht den Helden auf seiner physischen Seite.
+    const beforeSummonOk = await room.engine._runBeforeSummon(cardName, pi, heroIdx, { isInherentAction, viaDragDrop: !!viaDragDrop, _isNormalSummon: true, ...(heroOwner !== pi ? { heldSeite: heroOwner } : {}) }, zoneSlot);
     const placementConsumed = ps._placementConsumedByCard === cardName;
     if (placementConsumed) delete ps._placementConsumedByCard;
     if (!beforeSummonOk && !placementConsumed) {

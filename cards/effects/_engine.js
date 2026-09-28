@@ -14018,7 +14018,11 @@ this._deathWatch = (this._deathWatchStack || []).length
     // that explicitly own the cost (e.g. Steam Dwarf Engineer's "its own
     // life is the cost") opt out via `skipBeforeSummon: true`.
     if (!opts.skipBeforeSummon) {
-      const ok = await this._runBeforeSummon(cardName, playerIdx, heroIdx, opts.hookExtras, zoneSlot);
+      // Styx 28.9.: auf eine fremde Feldseite beschworen (`controller`) —
+      // der Beschwoerer zahlt, der Held steht auf `playerIdx` (Feldseite).
+      const _fremd = opts.controller != null && opts.controller !== playerIdx;
+      const ok = await this._runBeforeSummon(cardName, _fremd ? opts.controller : playerIdx, heroIdx,
+        _fremd ? { ...(opts.hookExtras || {}), heldSeite: playerIdx } : opts.hookExtras, zoneSlot);
       if (!ok) return null;
     }
 
@@ -14214,8 +14218,14 @@ this._deathWatch = (this._deathWatchStack || []).length
     // Vorgaenger sichern, damit verschachtelte Beschwoerungen sich nicht
     // gegenseitig die Reservierung loeschen.
     const _prevReservation = this._reservedSummonSlot;
+    // ★ Styx 28.9.: `hookExtras.heldSeite` = physische Seite des Zielhelden
+    // (ein uebernommener Held der Gegenspalte). `playerIdx` bleibt der
+    // BESCHWOERER — er zahlt die Kosten (Hand, Opfer, Gold); Held und
+    // Zielplatz liegen auf `heldSeite` (`ctx.cardHeroOwner`).
+    const heldSeite = (hookExtras && (hookExtras.heldSeite === 0 || hookExtras.heldSeite === 1))
+      ? hookExtras.heldSeite : playerIdx;
     if (reservedSlot >= 0) {
-      this._reservedSummonSlot = { playerIdx, heroIdx, zoneSlot: reservedSlot };
+      this._reservedSummonSlot = { playerIdx: heldSeite, heroIdx, zoneSlot: reservedSlot };
     }
     // ── Welche Beschwoerung zahlt hier gerade ihre Kosten? ────────────
     // Gebraucht fuer den `_tributePaid`-Stempel: der muss SOFORT beim
@@ -14229,6 +14239,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     this._beforeSummonInFlight = { cardName, playerIdx, turn: this.gs?.turn };
     try {
       const dummy = new CardInstance(cardName, playerIdx, 'hand', heroIdx);
+      if (heldSeite !== playerIdx) dummy.heroOwner = heldSeite;
       const ctx = this._createContext(dummy, { ...hookExtras });
       // Tribut-Erkennung: hat die Kostenzahlung dieser Beschwoerung ein
       // echtes Opfer gefeuert? Der Stempel wird von
@@ -18273,7 +18284,10 @@ this._deathWatch = (this._deathWatchStack || []).length
       try {
         const targets = script.getBouncePlacementTargets(gs, playerIdx, this);
         if (Array.isArray(targets) && targets.length > 0) {
-          out[cardName] = targets.map(t => ({ heroIdx: t.heroIdx, slotIdx: t.slotIdx }));
+          // `owner` (Styx 28.9.): Platz eines uebernommenen Helden der
+          // Gegenspalte. Fehlt er, ist es die eigene Seite.
+          out[cardName] = targets.map(t => ({ heroIdx: t.heroIdx, slotIdx: t.slotIdx,
+            ...(t.owner != null && t.owner !== playerIdx ? { owner: t.owner } : {}) }));
         }
       } catch (err) {
         console.error('[getBouncePlacementTargets]', cardName, err.message);
@@ -23985,7 +23999,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // Bedingung ist ohne ihren Schalter immer falsch.
     {
       const { canShareInto } = require('./_alice-shared');
-      if (canShareInto(this, feld, heroIdx, slotIdx, cardName)) {
+      if (canShareInto(this, playerIdx, heroIdx, slotIdx, cardName, feld)) {
         fps.supportZones[heroIdx][slotIdx].push(cardName);
       } else {
         fps.supportZones[heroIdx][slotIdx] = [cardName];
@@ -24327,7 +24341,10 @@ this._deathWatch = (this._deathWatchStack || []).length
     const { CARDINAL_NAMES } = require('./_cardinal-shared');
     const results = [];
     for (const inst of this.cardInstances) {
-      if (inst.owner !== playerIdx) continue;
+      // Kontrolle statt Seite (Styx 28.9.): „a Creature you control" —
+      // auch eine ueber einen uebernommenen Helden beschworene Kreatur auf
+      // der Gegenspalte, nicht aber eine vom Gegner kontrollierte eigene.
+      if ((inst.controller ?? inst.owner) !== playerIdx) continue;
       if (inst.zone !== 'support') continue;
       if (inst.faceDown) continue;
       // No summoning-sickness gate: sacrifice is intentional self-removal,
@@ -33349,6 +33366,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         if (!isArtifact && (cardData?.cardType === 'Spell' || cardData?.cardType === 'Attack') && castingHeroIdx >= 0) {   // v1154: auch Attacks
           try {
             await this.runHooks('afterSpellResolved', {
+              heroOwner: pi,   // Styx 28.9.: Reihe, in die `heroIdx` zeigt
               spellName: cardName,
               spellCardData: cardData,
               heroIdx: castingHeroIdx,
@@ -33569,6 +33587,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       if (!isArtifact && (cardData?.cardType === 'Spell' || cardData?.cardType === 'Attack') && castingHeroIdx >= 0) {   // v1154: auch Attacks
         try {
           await this.runHooks('afterSpellResolved', {
+            heroOwner: pi,   // Styx 28.9.: Reihe, in die `heroIdx` zeigt
             spellName: cardName, spellCardData: cardData,
             heroIdx: castingHeroIdx, casterIdx: pi,
             damageTargets: [], isSecondCast: false,
@@ -34299,6 +34318,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (!surpriseNegated && (cardDataForDelay?.cardType === 'Spell' || cardDataForDelay?.cardType === 'Attack')) {   // v1154
       try {
         await this.runHooks('afterSpellResolved', {
+          heroOwner: playerIdx,   // Styx 28.9.: Reihe, in die `heroIdx` zeigt
           spellName: cardName,
           spellCardData: cardDataForDelay,
           heroIdx, casterIdx: playerIdx,
@@ -35468,6 +35488,7 @@ this._deathWatch = (this._deathWatchStack || []).length
           if (linkCardData) {
             try {
               await this.runHooks('afterSpellResolved', {
+                heroOwner: link.heroOwner ?? link.owner,   // Styx 28.9.: Reihe, in die `heroIdx` zeigt
                 spellName: link.cardName,
                 spellCardData: linkCardData,
                 heroIdx: link.casterHeroIdx,
