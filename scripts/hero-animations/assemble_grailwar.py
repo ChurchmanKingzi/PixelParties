@@ -172,6 +172,10 @@ def marianne_hair(old, fork):
                 continue
             c = '440000' if r < 0x50 else '73290d' if r < 0xa0 else 'd66107' if gg < 0x80 else 'f8a314' if gg < 0xc8 else 'ffcd2d'
             out[y_, x_ + 2] = (int(c[0:2], 16), int(c[2:4], 16), int(c[4:6], 16), 255)
+    # linker Zopf (hinter der Mistgabel) = Spiegelbild des rechten; Achse = Gesichtsmitte (x 233,5)
+    for y_ in range(242, 250):
+        for x_ in range(239, 246):
+            out[y_, 467 - x_] = out[y_, x_]
     out[fork[:, :, 3] > 0] = 0
     return out
 
