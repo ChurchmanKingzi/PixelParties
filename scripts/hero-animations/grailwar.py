@@ -1649,7 +1649,7 @@ def f_ingo(i):
     global INGO_POSES, INGO_ARM
     if INGO_POSES is None:
         INGO_POSES = ingo_poses()
-        INGO_ARM = (SRC[:, :, 3] > 0) & ((_xs <= 3) | (_xs >= SW - 4)) & (_ys >= 9) & (_ys <= 14)
+        INGO_ARM = (SRC[:, :, 3] > 0) & ((_xs <= 3) | (_xs >= SW - 4)) & (_ys >= 9) & (_ys <= 15)   # samt Unterkontur
     key = INGO_SEQ[i]
     f = INGO_POSES[key].copy()
     if INGO_BLINK.get(i):                                # linkes Auge (weiß + rot) schließt sich
@@ -1672,6 +1672,11 @@ def f_ingo(i):
                 if f[seam - 1, x, 3] and f[seam, x, 3] and not out[seam - 1 + 2 + dy(x, seam), x + 3, 3]:
                     out[seam - 1 + 2 + dy(x, seam), x + 3] = f[seam - 1, x]
     fill_pinholes(out)
+    if lift:                                             # angehobene Ärmel: Unterkante als 1-px-Kontur
+        for x in list(range(0, 3 + 7)) + list(range(3 + SW - 7, 3 + SW)):
+            for y in range(9 + T + 2 - 4, 17 + T + 2):
+                if out[y, x, 3] and not out[y + 1, x, 3]:
+                    out[y, x] = rgb('191919')
     stars(out, i, [(x + 3, y + T + 2 + 2 * b, t0) for x, y, t0 in INGO_STAR], 'e8f4ff', 'ffffff')
     return out
 
