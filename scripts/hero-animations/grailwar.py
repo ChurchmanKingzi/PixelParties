@@ -7,35 +7,45 @@ Menschliche Figuren blinzeln zweimal pro Loop (geschlossen: 2 px breiter
 schwarzer Strich), stehende federn in den Knien (die Füße bleiben stehen).
 Dazu je Variante:
 * asriel:    Asriel, the Sapling Sacrificer: lacht in der Loop-Mitte manisch
-             (Mund reißt auf – Zähne, dunkler Rachen – und schließt sich im
-             Takt, der Oberkörper bebt dabei); Blut läuft die Messerklinge
-             hinab und tropft unter der Faust vom Knauf zu Boden.
-* barker:    Barker, the Monster Tamer: Federn, Blinzeln, die rote
-             Bemalung glimmt auf und ab.
+             (der Mund reißt im Takt auf – mal Zähne über dunklem Rachen, mal
+             2 px hoch offen – der Oberkörper bebt dabei); Blut läuft die
+             Messerklinge hinab und tropft unter der Faust vom Knauf zu Boden.
+* barker:    Barker, the Monster Tamer: Federn, Blinzeln (die Augen reichen bis
+             in die rote Zeile darunter), die rote Bemalung glimmt auf und ab.
 * blackstache: der Geisterpirat federt, blinzelt mit den gelben Augen, sein
-             durchscheinender Körper flackert leicht, über die Säbelklinge
-             läuft ein Lichtreflex.
-* chuck:     Federn, Blinzeln; im Bier steigen Bläschen auf, auf der
-             Schaumkrone platzt ab und zu eins.
+             durchscheinender Körper flackert leicht; den Säbel neigt er
+             leicht auf und ab (Drehung um die Faust), über die Klinge läuft
+             ein Lichtreflex und sie funkelt.
+* chuck:     Federn, Blinzeln, er redet ununterbrochen (Mund unter dem
+             Schnauzbart); die Schaumkrone brodelt ständig (Blasen wogen,
+             die Oberkante wölbt sich, Schaumflocken spritzen auf), im Bier
+             steigen Bläschen auf.
 * codumbus:  Federn; der Globus dreht sich (Land und Meer wandern, das Licht
-             bleibt stehen, der Rand bleibt fest).
+             bleibt stehen, der Rand bleibt fest), Schweißtropfen laufen
+             ständig über den Globus-Kopf herab.
 * devlin / mmdevlin: Federn; von den Krallen tropft Blut (Tropfen bildet
-             sich, fällt, zerplatzt am Boden).
-* enigma:    das Kind in der Kutte hüpft fröhlich; beim Blinzeln wird aus
-             dem Kreuzauge ein lachendes „^“.
+             sich, fällt, zerplatzt am Boden), der Schweißtropfen an der
+             Stirn rinnt herab und bildet sich neu.
+* enigma:    das Kind in der Kutte erzählt: es wippt schnell auf der Stelle,
+             schwingt den Arm, die Kutte flattert, der Mund geht auf und zu.
+             Das weiße Glitzern (vor dem schwarzen Gesicht und daneben)
+             funkelt unabhängig von ihr.
 * krates:    Federn, Blinzeln; sein Jo-Jo schnellt am Faden hoch und fällt
              wieder, und dreht sich dabei.
-* key:       Federn, Blinzeln.
-* kyli:      die schwarzen Äste wiegen sich (oben stärker), die roten Augen
-             glühen auf.
+* key:       Federn, Blinzeln; die goldenen Armreifen glitzern, die
+             abstehenden Haarsträhnen wehen leicht hin und her.
+* kyli:      Squash-and-Stretch in der Senkrechten (die Füße bleiben), die
+             schwarzen Äste wiegen sich (oben stärker), die roten Augen
+             glühen auf und blinzeln.
 """
 import math
 import os
 import sys
 from PIL import Image
 import numpy as np
-from anim_common import rgb, save_outputs, BOUNCE12
-from flap_common import fill_pinholes
+import cv2
+from anim_common import rgb, save_outputs, sparkle_pixels, BOUNCE12
+from flap_common import fill_pinholes, rotate_part
 
 BLACK = (0, 0, 0, 255)
 BLINK = {14: 'halb', 15: 'zu', 16: 'zu', 17: 'halb', 38: 'halb', 39: 'zu', 40: 'zu', 41: 'halb'}
@@ -47,21 +57,29 @@ V_ = {
                    lid=[((7, 7), 'f6cd8b'), ((8, 7), 'f6cd8b'), ((11, 7), 'f6cd8b'), ((12, 7), 'f6cd8b')],
                    line=[(7, 8), (8, 8), (11, 8), (12, 8)]),
     'barker': dict(slug='barker-the-monster-tamer', knee=22,
-                   lid=[((7, 10), 'f8bc77'), ((12, 10), 'f8bc77')], line=[(7, 11), (12, 11)]),
-    'blackstache': dict(slug='blackstache-scourge-of-the-pixel-seas', knee=20,
+                   blink={'halb': [((7, 10), 'f8bc77'), ((12, 10), 'f8bc77'),
+                                   ((7, 11), '000000'), ((12, 11), '000000')],
+                          'zu': [((7, 10), 'f8bc77'), ((12, 10), 'f8bc77'),
+                                 ((6, 11), 'd5a464'), ((7, 11), 'd5a464'), ((8, 11), 'd5a464'),
+                                 ((11, 11), 'd5a464'), ((12, 11), 'd5a464'), ((13, 11), 'd5a464'),
+                                 ((7, 12), '000000'), ((8, 12), '000000'), ((11, 12), '000000'), ((12, 12), '000000')]}),
+    'blackstache': dict(slug='blackstache-scourge-of-the-pixel-seas', knee=20, pads=(3, 3, 4, 2),
                         line=[(33, 10), (34, 10), (37, 10), (38, 10)]),
-    'chuck': dict(slug='chuck-the-crazy-veteran', knee=18, line=[(13, 6), (17, 6)]),
-    'codumbus': dict(slug='codumbus-the-clueless-voyager', knee=21),
+    'chuck': dict(slug='chuck-the-crazy-veteran', knee=18, pads=(3, 3, 5, 2), line=[(13, 6), (17, 6)]),
+    'codumbus': dict(slug='codumbus-the-clueless-voyager', knee=21, pads=(3, 3, 5, 2)),
     'devlin': dict(slug='devlin-the-masked-butcher', knee=20),
     'mmdevlin': dict(slug='mass-murderer-devlin', knee=20),
-    'enigma': dict(slug='enigma-the-seller-of-secrets', pads=(3, 3, 4, 2)),
+    'enigma': dict(slug='enigma-the-seller-of-secrets', knee=15, pads=(6, 7, 5, 2)),
     'krates': dict(slug='krates-the-smartass', knee=23,
                    lid=[((7, 10), 'f6cd8b'), ((8, 10), 'f6cd8b'), ((11, 10), 'f6cd8b'), ((12, 10), 'f6cd8b')],
                    line=[(7, 11), (8, 11), (11, 11), (12, 11)]),
     'key': dict(slug='key-the-cursed-thief', knee=20,
                 lid=[((5, 9), 'f6cd8b'), ((6, 9), 'f6cd8b'), ((9, 9), 'f6cd8b')],
                 line=[(5, 10), (6, 10), (9, 10)]),
-    'kyli': dict(slug='kyli-the-deceptive-sapling'),
+    'kyli': dict(slug='kyli-the-deceptive-sapling', pads=(3, 3, 5, 2),
+                 blink={'halb': [((9, 16), '636363'), ((10, 16), '636363'), ((13, 16), '636363'), ((14, 16), '636363')],
+                        'zu': [((9, 16), '636363'), ((10, 16), '636363'), ((13, 16), '636363'), ((14, 16), '636363'),
+                               ((9, 17), '000000'), ((10, 17), '000000'), ((13, 17), '000000'), ((14, 17), '000000')]}),
 }
 V = next((v for v in sys.argv[2:] if v in V_), 'asriel')
 C = V_[V]
@@ -81,6 +99,10 @@ H, W = SH + PT + PB, SW + PL + PR
 _ys, _xs = np.mgrid[0:SH, 0:SW]
 
 
+def hexc(c):
+    return '%02x%02x%02x' % tuple(int(v) for v in c[:3])
+
+
 def lum(c):
     return 0.299 * c[0] + 0.587 * c[1] + 0.114 * c[2]
 
@@ -90,9 +112,14 @@ def lighten(c, f):
 
 
 def blink(s, i):
-    """Lider (Hautfarbe) und geschlossenes Auge (schwarzer Strich) nach BLINK."""
+    """Lider (Hautfarbe) und geschlossenes Auge (schwarzer Strich) nach BLINK;
+    oder je Zustand eigene Pixelliste (C['blink'])."""
     st = BLINK.get(i)
     if not st:
+        return
+    if 'blink' in C:
+        for (x, y), c in C['blink'][st]:
+            s[y, x] = rgb(c)
         return
     for (x, y), c in C.get('lid', []):
         s[y, x] = rgb(c)
@@ -110,18 +137,19 @@ def put(out, s, ox, oy, dy_fn=None, dx_fn=None):
             out[yy, xx] = s[y, x]
 
 
-def knee_put(out, s, b, knee=None, ox=PL, oy=PT, moves=None):
+def knee_put(out, s, b, knee=None, ox=PL, oy=PT, moves=None, dx_fn=None):
     """Federn: Zeilen über dem Knie um b verschoben, die Beine bleiben stehen;
     beim Strecken (b < 0) wird die Zeile über dem Knie gedehnt.
     moves(x, y): Pixel, die unabhängig von der Zeile mitfedern."""
     knee = KNEE if knee is None else knee
     up = lambda x, y: y < knee or (moves is not None and moves(x, y))
-    put(out, s, ox, oy, dy_fn=lambda x, y: b if up(x, y) else 0)
+    put(out, s, ox, oy, dy_fn=lambda x, y: b if up(x, y) else 0, dx_fn=dx_fn)
     if b < 0:
         y = knee - 1
         for x in range(s.shape[1]):
             if s[y, x, 3] and s[knee, x, 3] and not out[y + oy, x + ox, 3]:
-                out[y + oy, x + ox] = s[y, x]
+                dx = dx_fn(x, y) if dx_fn else 0
+                out[y + oy, x + ox + dx] = s[y, x]
 
 
 def sweep(mask, i, start, speed=1.5, width=1.5):
@@ -136,15 +164,42 @@ def sweep(mask, i, start, speed=1.5, width=1.5):
     return hit
 
 
+def draw_px(out, pix, only_empty=True):
+    for (x, y), c in pix.items():
+        assert 0 < x < out.shape[1] - 1 and 0 < y < out.shape[0] - 1, f'Partikel am Rand: {(x, y)}'
+        if not only_empty or not out[y, x, 3]:
+            out[y, x] = c
+
+
+def stars(out, i, sparkles, t0='fff6ac', t1='ffffff', only_empty=False):
+    """Glitzersterne [(x, y, Startframe)] in Ausgabe-Koordinaten; mit
+    only_empty wird ein Stern, der die Figur berühren würde, ganz weggelassen."""
+    for st in sparkles:
+        pix = sparkle_pixels(i, N, [st], rgb(t0), rgb(t1))
+        if only_empty and any(out[y, x, 3] for x, y in pix):
+            continue
+        draw_px(out, pix, only_empty=False)
+
+
+def talk_track(units, seed):
+    """Sprechspur über 48 Frames: Silben (offen/weit) mit kurzen Pausen."""
+    rng = np.random.default_rng(seed)
+    tr = []
+    while len(tr) < N:
+        u = units[rng.integers(len(units))]
+        tr += list(u)
+    return tr[:N]
+
+
 # --- Bluttropfen ---------------------------------------------------------------
 BLOOD = (rgb('5c0000'), rgb('9a0000'), rgb('d42a2a'))       # dunkel, mittel, Glanz
 
 
-def drop_pixels(t, x, y, ground):
+def drop_pixels(t, x, y, ground, cols=BLOOD):
     """Ein Tropfen, der bei (x, y) unter einer Spitze hängt: t = 0..3 bildet
     er sich, dann löst er sich und fällt beschleunigt; am Boden (Zeile
     ground) zerplatzt er zwei Frames lang. Liefert {(x, y): Farbe}."""
-    dk, md, hl = BLOOD
+    dk, md, hl = cols
     if t < 0:
         return {}
     if t < 2:
@@ -163,29 +218,25 @@ def drop_pixels(t, x, y, ground):
     return {}
 
 
-def draw_px(out, pix, only_empty=True):
-    for (x, y), c in pix.items():
-        assert 0 < x < out.shape[1] - 1 and 0 < y < out.shape[0] - 1, f'Partikel am Rand: {(x, y)}'
-        if not only_empty or not out[y, x, 3]:
-            out[y, x] = c
-
-
 # --- Varianten ----------------------------------------------------------------
 def f_asriel(i):
     s = SRC.copy()
     laugh = 16 <= i < 40
     if not laugh:
         blink(s, i)
-    b = BOUNCE12[i % 12] if not laugh else 0
+    b = BOUNCE12[i % 12]
     if laugh:                                            # „HA – HA – HA“: 4 Frames je Lacher
         k = (i - 16) % 4
-        mouth = 'weit' if k < 2 else 'halb'
+        mouth = ['hoch', 'hoch', 'weit', 'halb'][k] if (i - 16) // 4 % 2 == 0 else ['weit', 'weit', 'hoch', 'halb'][k]
         if i in (16, 39):
             mouth = 'halb'
-        b = -1 if mouth == 'weit' else 0
-        if mouth == 'weit':
-            s[9, 9] = s[9, 10] = rgb('f6f6f6')           # Zähne
-            s[10, 9] = s[10, 10] = rgb('5b0300')         # Rachen
+        b = -1 if k < 2 else 0
+        if mouth == 'weit':                              # Zähne über dunklem Rachen
+            s[9, 9] = s[9, 10] = rgb('f6f6f6')
+            s[10, 9] = s[10, 10] = rgb('5b0300')
+        elif mouth == 'hoch':                            # 2 px hoch aufgerissen
+            s[9, 9] = s[9, 10] = rgb('3a0000')
+            s[10, 9] = s[10, 10] = rgb('8a1414')
         else:
             s[10, 9] = s[10, 10] = rgb('5b0300')
     out = np.zeros((H, W, 4), int)
@@ -199,7 +250,7 @@ def f_asriel(i):
             y = 10 + t // 2
             out[y + PT + b, 1 + PL] = BLOOD[1] if t % 2 else BLOOD[2]
         elif 11 <= t < 30:
-            draw_px(out, drop_pixels(t - 11, 1 + PL, 18 + PT + b, 24 + PT))
+            draw_px(out, drop_pixels(t - 11, 1 + PL, 18 + PT + (b if t < 15 else 0), 24 + PT))
     return out
 
 
@@ -222,52 +273,111 @@ def f_barker(i):
     return out
 
 
+BS_PIVOT = (24.0, 12.5)                                  # Faust am Säbelgriff
+
+
 def f_blackstache(i):
     s = SRC.copy()
     blink(s, i)
     ghost = (s[:, :, 3] > 0) & (s[:, :, 3] < 255)
     f = math.sin(2 * math.pi * 3 * i / N)
     s[ghost, 3] = np.clip(s[ghost, 3] + int(round(22 * f)), 0, 255)
-    blade = (s[:, :, 3] == 255) & (_xs <= 19) & (_ys <= 17) & (np.abs(s[:, :, 0] - s[:, :, 2]) < 30) \
-        & (s[:, :, 0] > 0x50)
+    sword_m = (s[:, :, 3] > 0) & (_xs <= 24)
+    blade = sword_m & (s[:, :, 3] == 255) & (_ys <= 17) & (np.abs(s[:, :, 0] - s[:, :, 2]) < 30) \
+        & (s[:, :, 0] > 0x50) & (_xs <= 19)
     for (x, y), a in sweep(blade, i, 6, speed=1.2).items():
         s[y, x] = lighten(s[y, x], a)
+    b = BOUNCE12[i % 12]
+    ang = 0.06 * math.sin(2 * math.pi * 2 * i / N)        # Spitze ± ~1,5 px
     out = np.zeros((H, W, 4), int)
-    knee_put(out, s, BOUNCE12[i % 12])
+    sw = rotate_part(s, sword_m, BS_PIVOT, ang, (H, W), offset=(PL, PT + b))
+    m = sw[:, :, 3] > 0
+    out[m] = sw[m]
+    body = s.copy()
+    body[sword_m] = 0
+    knee_put(out, body, b)
     fill_pinholes(out)
+    # Funkeln auf der Klinge (Punkte drehen mit)
+    ca, sa = math.cos(ang), math.sin(ang)
+    sp = []
+    for (x, y), t0 in (((4, 10), 4), ((11, 11), 20), ((16, 12), 34)):
+        dx, dy = x - BS_PIVOT[0], y - BS_PIVOT[1]
+        sp.append((int(round(BS_PIVOT[0] + dx * ca - dy * sa)) + PL,
+                   int(round(BS_PIVOT[1] + dx * sa + dy * ca)) + PT + b, t0))
+    stars(out, i, sp, 'e8f4ff', 'ffffff')
     return out
 
 
+FOAM = None
+CHUCK_TALK = talk_track(['oo', 'ooc', 'ww', 'wwo', 'oc', 'c', 'owc'], 7)
+
+
 def f_chuck(i):
+    global FOAM
     s = SRC.copy()
+    if FOAM is None:
+        m = (s[:, :, 3] > 0) & (_xs <= 7) & (_ys >= 5) & (_ys <= 13)
+        m &= np.array([[lum(s[y, x]) > 200 for x in range(SW)] for y in range(SH)])
+        cols = sorted({hexc(s[y, x]) for y, x in zip(*np.nonzero(m))}, key=lambda h: lum(rgb(h)))
+        rank = {h: k / (len(cols) - 1) for k, h in enumerate(cols)}
+        tops = {x: int(np.nonzero(m[:, x])[0].min()) for x in range(SW) if m[:, x].any()}
+        FOAM = (m, cols, rank, tops)
+    m, cols, rank, tops = FOAM
     blink(s, i)
+    # Reden: c = zu (Schnauzbart schließt), o = offen (Original), w = weit (Zunge)
+    st = CHUCK_TALK[i] if i else 'o'
+    if st == 'c':
+        s[10, 15] = s[10, 16] = rgb('d5d5d5')
+        s[11, 15] = s[11, 16] = rgb('330000')
+    elif st == 'w':
+        s[11, 15] = s[11, 16] = rgb('b01818')
+    # Schaum brodelt: jede Blase wogt mit eigener Phase heller/dunkler
+    w = 2 * math.pi * i / N
+    for y, x in zip(*np.nonzero(m)):
+        ph = (x * 1.7 + y * 2.9) % 6.283
+        r = rank[hexc(s[y, x])] + 0.4 * (math.sin(3 * w + ph) - math.sin(ph))
+        s[y, x] = rgb(cols[int(round(min(1.0, max(0.0, r)) * (len(cols) - 1)))])
+    for x, ty in tops.items():                           # Oberkante wölbt sich
+        ph = x * 2.1
+        g = math.sin(4 * w + ph) - math.sin(ph)
+        if g > 0.9 and ty - 1 >= 0 and not s[ty - 1, x, 3]:
+            s[ty - 1, x] = rgb(cols[-1])
+        elif g < -1.2 and ty + 1 < SH and m[ty + 1, x]:
+            s[ty, x] = 0
     beer = np.zeros((SH, SW), bool)
     for y, x in zip(*np.nonzero(s[:, :, 3])):
-        if '%02x%02x%02x' % tuple(s[y, x, :3]) in ('ce9a10', 'dea610', 'b58a00', 'c69608'):
+        if hexc(s[y, x]) in ('ce9a10', 'dea610', 'b58a00', 'c69608'):
             beer[y, x] = True
     for x0, t0 in ((3, 0), (5, 9), (4, 20), (3, 31), (5, 40)):   # Bläschen steigen im Bier auf
         t = (i - t0) % N
         y = 17 - t // 2
         if t < 10 and beer[y, x0]:
             s[y, x0] = rgb('ffe89a')
-    for x0, t0 in ((3, 12), (5, 34)):                    # auf der Schaumkrone platzt eins
-        t = (i - t0) % N
-        if t < 2:
-            s[7, x0] = rgb('fffbe8')
-        elif t == 2:
-            s[6, x0 - 1] = s[6, x0 + 1] = rgb('fffbe8')
+    b = BOUNCE12[i % 12]
     out = np.zeros((H, W, 4), int)
-    knee_put(out, s, BOUNCE12[i % 12])
+    knee_put(out, s, b)
     fill_pinholes(out)
+    # Schaumflocken spritzen auf (starten 2 px über der Krone, berühren sie nie)
+    xs = sorted(tops)
+    for k, t0 in enumerate(range(1, 45, 5)):
+        x = xs[(k * 3) % len(xs)]
+        t = (i - t0) % N
+        if t < 4:
+            y = tops[x] - 3 - t + PT + b
+            xx = x + (1 if k % 2 else -1) * (t // 2) + PL
+            if 0 < xx < W - 1 and not out[y, xx, 3] and not out[y + 1, xx, 3]:
+                out[y, xx] = rgb('fffbe8') if t < 2 else rgb('f7ebc6')
     return out
 
 
 GLOBE = None
+SWEAT_BLUE = [['002744', '002744'], ['002744', '3f94d0'], ['002744', '0071c1']]
 
 
 def f_codumbus(i):
     global GLOBE
     s = SRC.copy()
+    s[2:7, 1:3] = 0                                      # die Schweißtropfen laufen gleich eigenständig
     # Land ↔ Meer je Helligkeitsrolle; die Glanzlichter (türkis/weiß) und die Randpixel stehen fest
     to_sea = {'92d14f': '0071c1', '6d9d3b': '005591', '53772d': '005591', '3e5921': '005591',
               'acdc7a': '3f94d0', '7d9860': '3f6683'}
@@ -275,12 +385,12 @@ def f_codumbus(i):
     if GLOBE is None:
         runs = []
         for y in range(0, 10):
-            xs = [x for x in range(4, SW) if s[y, x, 3] and '%02x%02x%02x' % tuple(s[y, x, :3]) in
+            xs = [x for x in range(4, SW) if s[y, x, 3] and hexc(s[y, x]) in
                   list(to_sea) + list(to_land) + ['00e6e6', '41ffff', 'a4ffff']]
             if len(xs) < 4:
                 continue
             xs = list(range(xs[0] + 1, xs[-1]))
-            hs = ['%02x%02x%02x' % tuple(s[y, x, :3]) for x in xs]
+            hs = [hexc(s[y, x]) for x in xs]
             runs.append((y, xs, hs))
         GLOBE = runs
     for y, xs, hs in GLOBE:
@@ -295,19 +405,47 @@ def f_codumbus(i):
                 s[y, xs[j]] = rgb(to_land[h])
             elif not land_src and h in to_sea:
                 s[y, xs[j]] = rgb(to_sea[h])
+    b = BOUNCE12[i % 12]
     out = np.zeros((H, W, 4), int)
-    knee_put(out, s, BOUNCE12[i % 12])
+    knee_put(out, s, b)
     fill_pinholes(out)
+    # Schweißtropfen: rinnen über den Globus herab (beschleunigt) und verschwinden in der Halskrause
+    for x0, t0 in ((1, 0), (7, 7), (12, 14), (1, 24), (9, 30), (5, 38)):
+        spr = SWEAT_BLUE
+        t = (i - t0) % N
+        if t >= 14:
+            continue
+        y0 = 2 if x0 == 1 else 1
+        yy = y0 + (t * t) // 22
+        for dy, row in enumerate(spr):
+            for dx, c in enumerate(row):
+                y = yy + dy
+                if y > 7:
+                    continue
+                out[y + PT + b, x0 + dx + PL] = rgb(c)
     return out
 
 
 def f_devlin(i):
     s = SRC.copy()
+    sweat = [(y, x) for y, x in zip(*np.nonzero(s[:, :, 3])) if hexc(s[y, x]) in ('8bffff', 'beffff') and y < 8]
+    for y, x in sweat:                                   # Stirn darunter freilegen (Farbe vom linken Nachbarn)
+        s[y, x] = s[y, x - 1]
+    sx, sy = sweat[0][1], min(y for y, _ in sweat)
     b = BOUNCE12[i % 12]
+    # Schweißtropfen: bildet sich an der Stirn, rinnt die Wange herab, zweimal pro Loop
+    t = i % 24
+    if t < 4:
+        drop = [(sy + (1 if t < 2 else 0), 'beffff')] + ([(sy + 1, '8bffff')] if t >= 2 else [])
+    else:
+        yy = sy + (t - 4) // 3
+        drop = [(yy, 'beffff'), (yy + 1, '8bffff')] if yy + 1 <= 8 else []
+    for y, c in drop:
+        s[y, sx] = rgb(c)
     out = np.zeros((H, W, 4), int)
     knee_put(out, s, b)
     fill_pinholes(out)
-    # Tropfen unter den blutigen Krallenspitzen, zeitversetzt
+    # Blut-Tropfen unter den Krallenspitzen, zeitversetzt
     for (x, y), t0 in (((1, 20), 3), ((16, 20), 15), ((0, 19), 27), ((17, 19), 38)):
         t = (i - t0) % N
         # hängend federt der Tropfen mit der Kralle, fallend nicht mehr
@@ -315,20 +453,42 @@ def f_devlin(i):
     return out
 
 
-HOP = [0, 0, 0, -1, -2, -3, -3, -2, -1, 0, 0, 0]
+ENIGMA_TALK = talk_track(['oo', 'oc', 'ww', 'wo', 'occ', 'c'], 11)
+BOB8 = [0, -1, -1, -1, 0, 1, 1, 1]
+ARM_PIVOT = (6.0, 12.5)
 
 
 def f_enigma(i):
     s = SRC.copy()
-    if BLINK.get(i) == 'zu' or BLINK.get(i) == 'halb':   # Kreuzauge wird zum lachenden ^
-        for x, y in ((8, 6), (8, 7), (6, 8), (7, 8), (8, 8), (9, 8), (10, 8), (8, 9)):
-            s[y, x] = rgb('1a0c12')
-        for x, y in ((6, 9), (7, 8), (8, 7), (9, 8), (10, 9)):
-            s[y, x] = rgb('ffffff')
-    dy = HOP[i % 12]
-    dx = int(round(0.6 * math.sin(2 * math.pi * 2 * i / N)))
+    for x, y in ((8, 6), (8, 7), (6, 8), (7, 8), (9, 8), (10, 8), (8, 9), (8, 10)):   # Glitzern kommt eigenständig
+        s[y, x] = rgb('1a0c12')
+    st = ENIGMA_TALK[i] if i else 'o'                    # Mund: roter Strich, darunter Rachen
+    if st == 'c':
+        s[12, 9] = s[12, 10] = rgb('0a0a0a')
+    elif st == 'w':
+        s[12, 9] = s[12, 10] = rgb('5b0000')
+        s[13, 9] = s[13, 10] = rgb('300000')
+    arm_m = (s[:, :, 3] > 0) & (_xs <= 5) & (_ys >= 11) & (_ys <= 14)
+    b = BOB8[i % 8]
+    w = 2 * math.pi * i / N
+
+    def flutter(x, y):                                   # Kutte flattert (unten stärker)
+        if y >= 16:
+            return int(round(1.0 * (y - 15) / 9 * (math.sin(4 * w - 0.7 * y) - math.sin(-0.7 * y))))
+        return 0
+    body = s.copy()
+    body[arm_m] = 0
     out = np.zeros((H, W, 4), int)
-    put(out, s, PL + dx, PT + dy)
+    knee_put(out, body, b, dx_fn=flutter)
+    ang = 0.32 * math.sin(3 * w)                         # Arm schwingt beim Erzählen
+    arm = rotate_part(s, arm_m, ARM_PIVOT, ang, (H, W), offset=(PL, PT + b))
+    m = arm[:, :, 3] > 0
+    out[m] = arm[m]
+    fill_pinholes(out)
+    # Glitzern, unabhängig von ihr: vor dem Gesicht (Frame 0 = volles Kreuz wie im Bild) und daneben
+    stars(out, i, [(8 + PL, 8 + PT, 46), (8 + PL, 8 + PT, 22)], 'e8e8ff', 'ffffff')
+    stars(out, i, [(PL - 3, 5 + PT, 8), (SW + 2 + PL, 4 + PT, 30), (SW + 2 + PL, 16 + PT, 14),
+                   (PL - 3, 18 + PT, 36), (PL + 17, PT - 2, 40)], 'e8e8ff', 'ffffff', only_empty=True)
     return out
 
 
@@ -339,33 +499,53 @@ def f_krates(i):
     global YOYO
     s = SRC.copy()
     if YOYO is None:
-        YOYO = s[25:29, 0:4].copy()
-    s[25:29, 0:4] = 0
+        yo = np.zeros((5, 5, 4), int)
+        blk = s[25:29, 0:5].copy()
+        keep = np.array([[blk[y, x, 3] > 0 and hexc(blk[y, x]) in
+                          ('ad0000', 'c54c4c', 'ffc54c', '790000', 'ffad00', 'b37900') for x in range(5)]
+                         for y in range(4)])
+        blk[~keep] = 0
+        yo[:4] = blk
+        YOYO = (yo, keep)
+    yo0, keep = YOYO
+    blk = s[25:29, 0:5]
+    blk[keep] = 0
     s[21:25, 2] = 0                                      # Faden (wird neu gezogen)
     blink(s, i)
     b = BOUNCE12[i % 12]
     out = np.zeros((H, W, 4), int)
-    knee_put(out, s, b, moves=lambda x, y: False)
+    knee_put(out, s, b)
     fill_pinholes(out)
     t = i % 24                                           # zwei Würfe pro Loop
     d = -int(round(4 * math.sin(math.pi * t / 24) ** 0.7))
-    yo = np.rot90(YOYO, k=(i // 2) % 4)
+    yo = np.rot90(yo0, k=(i // 2) % 4) if i % 24 else yo0
     top = 25 + d
     for y in range(21 + b, top):                         # Faden von der Hand bis zum Jo-Jo
         out[y + PT, 2 + PL] = rgb('cccccc') if (y - b) % 2 else rgb('ffffff')
-    for y in range(4):
-        for x in range(4):
+    for y in range(5):
+        for x in range(5):
             if yo[y, x, 3]:
                 out[top + y + PT, x + PL] = yo[y, x]
     return out
 
 
+KEY_STRAYS = [(9, 0), (2, 2), (3, 2), (13, 3), (0, 8), (15, 11)]
+
+
 def f_key(i):
     s = SRC.copy()
     blink(s, i)
+    w = 2 * math.pi * 2 * i / N
+    strays = {}
+    for k, (x, y) in enumerate(KEY_STRAYS):              # abstehende Strähnen wehen
+        ph = [0.0, 1.3, 1.3, 2.6, 4.0, 5.1][k]
+        strays[(x, y)] = int(round(0.8 * (math.sin(w + ph) - math.sin(ph))))
+    b = BOUNCE12[i % 12]
     out = np.zeros((H, W, 4), int)
-    knee_put(out, s, BOUNCE12[i % 12])
+    knee_put(out, s, b, dx_fn=lambda x, y: strays.get((x, y), 0))
     fill_pinholes(out)
+    stars(out, i, [(1 + PL, 19 + PT + b, 10), (14 + PL, 19 + PT + b, 22),
+                   (2 + PL, 19 + PT + b, 34), (13 + PL, 19 + PT + b, 46)], 'ffe300', 'fff6ac')
     return out
 
 
@@ -376,6 +556,7 @@ def f_kyli(i):
         c = s[y, x]
         if c[0] > 0x80 and c[1] < 0x20 and c[2] < 0x20:             # rote Augen glühen
             s[y, x] = [min(255, int(c[0] + 60 * f)), int(90 * f), int(90 * f), 255]
+    blink(s, i)
     w = 2 * math.pi * 2 * i / N
 
     def dx(x, y):
@@ -388,9 +569,17 @@ def f_kyli(i):
             d = (4.5 - x) / 4.5 if x <= 4 else (x - 16.5) / 7
             return int(round(1.0 * d * math.sin(w + (0 if x <= 4 else math.pi))))
         return 0
-    out = np.zeros((H, W, 4), int)
-    put(out, s, PL, PT, dy_fn=dy, dx_fn=dx)
-    fill_pinholes(out)
+    tmp = np.zeros((H, W, 4), int)
+    put(tmp, s, PL, PT, dy_fn=dy, dx_fn=dx)
+    fill_pinholes(tmp)
+    # Squash-and-Stretch: senkrecht skaliert, die Fußsohle bleibt stehen
+    sy = 1 + 0.05 * math.sin(2 * math.pi * 2 * i / N + 0.9) - 0.05 * math.sin(0.9)
+    foot = PT + SH - 1
+    out = np.zeros_like(tmp)
+    for y in range(H):
+        src_y = int(round(foot - (foot - y) / sy))
+        if 0 <= src_y < H:
+            out[y] = tmp[src_y]
     return out
 
 
