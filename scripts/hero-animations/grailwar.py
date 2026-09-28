@@ -92,9 +92,11 @@ Dazu je Variante:
 * hulijing:  federt, blinzelt; das blaue Fuchsfeuer strömt als Partikelfeuer aus
              ihrer Hand (Flammenballen wachsen, kühlen ab, züngeln: weiß,
              hellblau, türkis, blau, dunkelblauer Rand).
-* ingo:      vom Base-Sprite aus (ohne Kapuze): die Kapuze aus Ingos eigenen Frames
-             kommt aus dem Nacken, rutscht über den Kopf, bleibt eine Weile auf
-             und gleitet wieder in den Nacken; dazu Federn, Blinzeln, Monokel.
+* ingo:      vom Base-Sprite aus (ohne Kapuze): er hebt die Arme, die Kapuze aus
+             Ingos eigenen Frames kommt aus dem Nacken über den Kopf, die Arme
+             sinken; später wieder hoch und die Kapuze zurück in den Nacken.
+             Squash-and-Stretch der ganzen Figur (Kopf 2 px, Rumpf 1 px, Füße
+             fest), Blinzeln, das Monokel blitzt.
 * eingo:     Elegant Ingo: federt, blinzelt, das Monokel blitzt.
 * madame:    Madame Guillotine hält eine Rede (Mund auf und zu), federt,
              blinzelt; von der roten Beilschneide bilden sich an mehreren
@@ -1602,7 +1604,10 @@ def f_hulijing(i):
 # Frame-Pixel (x, y) = Base (x - 3, y - 8)): aufgesetzt aus f2 (nur die Kapuzenfarben, das Gesicht
 # darin bleibt das des Base-Sprites), in den Nacken gefallen aus f6.
 #   B = ohne Kapuze (Base), N = Kapuze liegt im Nacken, S = Kapuze rutscht (halb auf), K = Kapuze auf.
-INGO_SEQ = ['B'] * 12 + ['N', 'N', 'S', 'S'] + ['K'] * 16 + ['S', 'S', 'N', 'N'] + ['B'] * 12
+INGO_SEQ = ['B'] * 12 + ['N', 'N', 'S', 'S'] + ['K'] * 18 + ['S', 'S', 'N', 'N'] + ['B'] * 10
+# Arme heben sich zur Kapuze (Hub der Ärmelenden in px) – vorher, beim Greifen, danach wieder runter
+INGO_LIFT = {10: 1, 11: 2, 12: 3, 13: 3, 14: 3, 15: 3, 16: 2, 17: 1,
+             32: 1, 33: 2, 34: 3, 35: 3, 36: 3, 37: 3, 38: 2, 39: 1}
 INGO_BLINK = {5: 'B', 24: 'K', 42: 'B'}
 INGO_STAR = [(11, 7, 8), (11, 7, 27)]                    # Monokel blitzt (ohne und mit Kapuze)
 INGO_POSES = None
@@ -1631,24 +1636,43 @@ def ingo_poses():
     head = SRC[:, :, 3] > 0
     K = hood_from(2, hood_k, 8)                          # aufgesetzt
     N = hood_from(6, hood_n, 9, keep=lambda x, y: not (0 <= y < SH and head[y, x]) or y >= 9)   # im Nacken
-    # halb: die Kapuze 1 px höher; auf dem Kopf nur ihr oberer Teil, das Gesicht wird frei
-    S = hood_from(2, hood_k, 8, dy=-1, keep=lambda x, y: y <= 2 or not (0 <= y < SH and head[y, x]))
+    # halb: die Kapuze 1 px höher, nur ihr oberer Teil (bis Augenhöhe); auf dem Kopf nur die Haube,
+    # das Gesicht bleibt frei – die unteren Seiten fehlen noch (sonst schweben sie über den Schultern)
+    S = hood_from(2, hood_k, 6, dy=-1, keep=lambda x, y: y <= 2 or not (0 <= y < SH and head[y, x]))
     return dict(B=base, N=N, S=S, K=K)
 
 
+INGO_ARM = None
+
+
 def f_ingo(i):
-    global INGO_POSES
+    global INGO_POSES, INGO_ARM
     if INGO_POSES is None:
         INGO_POSES = ingo_poses()
+        INGO_ARM = (SRC[:, :, 3] > 0) & ((_xs <= 3) | (_xs >= SW - 4)) & (_ys >= 9) & (_ys <= 14)
     key = INGO_SEQ[i]
     f = INGO_POSES[key].copy()
     if INGO_BLINK.get(i):                                # linkes Auge (weiß + rot) schließt sich
         f[7 + INGO_TOP, 6] = f[7 + INGO_TOP, 7] = BLACK
+    T = INGO_TOP
+    b = BOUNCE12[i % 12] if INGO_LIFT.get(i, 0) == 0 else 0
+    lift = INGO_LIFT.get(i, 0)
+
+    def dy(x, y):                                        # y in Pose-Koordinaten (T Zeilen Luft oben)
+        ys = y - T
+        d = b * ((ys < 17) + (ys < 9))                   # ganze Figur: Kopf 2 px, Rumpf 1 px, Füße fest
+        if 0 <= ys < SH and INGO_ARM[ys, x] and lift:    # Ärmel heben sich, außen stärker
+            d -= int(round(lift * min(1.0, max(0.0, (abs(x - (SW - 1) / 2) - 4.5) / 4))))
+        return d
     out = np.zeros((f.shape[0] + 4, f.shape[1] + 6, 4), int)
-    b = BOUNCE12[i % 12] if key in ('B', 'K') else 0
-    knee_put(out, f, b, knee=15 + INGO_TOP, ox=3, oy=2)
+    put(out, f, 3, 2, dy_fn=dy)
+    if b < 0:                                            # Nähte dehnen (Hals und Beine)
+        for seam in (9 + T, 17 + T):
+            for x in range(SW):
+                if f[seam - 1, x, 3] and f[seam, x, 3] and not out[seam - 1 + 2 + dy(x, seam), x + 3, 3]:
+                    out[seam - 1 + 2 + dy(x, seam), x + 3] = f[seam - 1, x]
     fill_pinholes(out)
-    stars(out, i, [(x + 3, y + INGO_TOP + 2 + b, t0) for x, y, t0 in INGO_STAR], 'e8f4ff', 'ffffff')
+    stars(out, i, [(x + 3, y + T + 2 + 2 * b, t0) for x, y, t0 in INGO_STAR], 'e8f4ff', 'ffffff')
     return out
 
 
