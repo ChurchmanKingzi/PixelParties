@@ -176,9 +176,7 @@ function buildSupportStacks(room) {
   const byKey = {};
   for (const inst of engine.cardInstances) {
     if (inst.zone !== 'support') continue;
-    const physicalSide = (inst.stolenBy != null)
-      ? inst.owner
-      : (inst.controller ?? inst.owner);
+    const physicalSide = engine.physicalSide(inst);   // Styx 28.9.: inkl. seitenfremd beschworener
     const key = `${physicalSide}-${inst.heroIdx}-${inst.zoneSlot}`;
     if (byKey[key]) continue; // Platz schon abgearbeitet
     const stack = alice.stackAt(engine, physicalSide, inst.heroIdx, inst.zoneSlot);
@@ -10786,8 +10784,10 @@ function normalizeValidTargets(validTargets, casterPi, engine, config, cardName)
     if (t?.type !== 'equip') continue;
     const inst = t.cardInstance;
     if (!inst) continue;
-    if (inst.stolenBy != null) continue; // physical side = owner already
-    const physSide = inst.controller ?? inst.owner;
+    // Styx 28.9.: zentral — gestohlene UND ueber geliehene Helden
+    // beschworene Kreaturen liegen beim `owner`.
+    const physSide = engine?.physicalSide ? engine.physicalSide(inst)
+      : (inst.stolenBy != null || inst.counters?.crossSideControlled != null ? inst.owner : (inst.controller ?? inst.owner));
     if (physSide === t.owner) continue;
     t.owner = physSide;
     t.id = `equip-${physSide}-${t.heroIdx}-${t.slotIdx}`;

@@ -95,11 +95,26 @@ function makeLv1SacrificeSpec(engine) {
 
 /** Kann dieser Held Dragon Pilot ueberhaupt beschwoeren (lebt, erfuellt
  *  die Stufenanforderung)? */
-function heroCanSummonHere(engine, pi, heroIdx) {
-  const hero = engine.gs.players[pi]?.heroes?.[heroIdx];
+// Styx 28.9.: geliehene Helden der Gegenspalte — `heroOwner` = physische
+// Seite des Helden (fehlt → pi); nur Helden, die `pi` kontrolliert.
+function heroCanSummonHere(engine, pi, heroIdx, heroOwner = pi) {
+  const hero = engine.gs.players[heroOwner]?.heroes?.[heroIdx];
   if (!hero?.name || hero.hp <= 0) return false;
+  if (engine.heroSideOf(heroOwner, hero) !== pi) return false;
   const cd = engine._getCardDB()[CARD_NAME];
-  return engine.heroMeetsLevelReq(pi, heroIdx, cd);
+  if (heroOwner === pi) return engine.heroMeetsLevelReq(pi, heroIdx, cd);
+  return engine.heroMeetsLevelReq(heroOwner, heroIdx, cd, { levelSourcePi: pi });
+}
+
+/**
+ * Spec fuer den Wurf auf einen belegten Platz: mind. ein Opfer von DIESEM
+ * Helden. Styx 28.9.: `mustIncludeFromHeroOwner` = Seite des
+ * Helden (geliehene Helden der Gegenspalte).
+ */
+function fullDropSpec(base, heroIdx, pi, heroOwner = pi) {
+  // `mustIncludeFromHeroOwner` = Seite des Helden (Styx 28.9.): nur ein
+  // Opfer aus DIESER Spalte schafft dort Platz; weitere Opfer bleiben frei.
+  return { ...base, mustIncludeFromHeroIdx: heroIdx, mustIncludeFromHeroOwner: heroOwner };
 }
 
 /**
@@ -125,13 +140,21 @@ function occupiedDropSlots(gs, pi, engine) {
   const lv1 = makeLv1SacrificeSpec(engine);
   const spec = engine.canSatisfySacrifice(pi, lv1) ? lv1 : makeSacrificeSpec(engine);
   const out = [];
-  for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-    const zones = ps.supportZones?.[hi] || [];
+  // Styx 28.9.: geliehene Helden der Gegenspalte — alle Helden, die `pi`
+  // kontrolliert; `owner` = physische Seite, nur gesetzt, wenn ≠ pi.
+  const helden = typeof engine.heroesControlledBy === 'function'
+    ? engine.heroesControlledBy(pi)
+    : (ps.heroes || []).map((hero, heroIdx) => ({ physOwner: pi, heroIdx, hero }));
+  for (const { physOwner, heroIdx: hi } of helden) {
+    const zones = gs.players[physOwner]?.supportZones?.[hi] || [];
     const slots = [0, 1, 2];
     if (slots.some(z => (zones[z] || []).length === 0)) continue;   // hat noch Platz
-    if (!heroCanSummonHere(engine, pi, hi)) continue;
-    if (!engine.canSatisfySacrifice(pi, { ...spec, mustIncludeFromHeroIdx: hi })) continue;
-    for (const z of slots) if ((zones[z] || []).length > 0) out.push({ heroIdx: hi, slotIdx: z });
+    if (!heroCanSummonHere(engine, pi, hi, physOwner)) continue;
+    if (!engine.canSatisfySacrifice(pi, fullDropSpec(spec, hi, pi, physOwner))) continue;
+    for (const z of slots) {
+      if ((zones[z] || []).length === 0) continue;
+      out.push(physOwner !== pi ? { heroIdx: hi, slotIdx: z, owner: physOwner } : { heroIdx: hi, slotIdx: z });
+    }
   }
   return out;
 }
@@ -177,8 +200,10 @@ module.exports = attachSteamEngine({
   // of their OWN (sacrificing one of this Hero's Creatures is what
   // frees the slot Dragon Pilot lands in), AND the overall sacrifice
   // spec remains satisfiable.
+  // Styx 28.9.: geliehene Helden der Gegenspalte — nur eigene Plaetze
+  // (gefragt wird nur fuer Helden der eigenen Spalte).
   canBypassFreeZoneRequirement: (gs, pi, heroIdx, cardData, engine) =>
-    occupiedDropSlots(gs, pi, engine).some(sl => sl.heroIdx === heroIdx),
+    occupiedDropSlots(gs, pi, engine).some(sl => sl.heroIdx === heroIdx && (sl.owner ?? pi) === pi),
 
   // Drop-on-occupied: only relevant for the all-full-slots case. When
   // the summoning Hero's Support Zones are all occupied but the player
@@ -205,9 +230,10 @@ module.exports = attachSteamEngine({
 
   // Serverseitige Annahme des Wurfs — muss exakt dieselbe Liste
   // benutzen wie die Hervorhebung.
-  canPlaceOnOccupiedSlot: (gs, pi, heroIdx, slotIdx, engine) =>
+  // Styx 28.9.: geliehene Helden der Gegenspalte — `heroOwner` = physische Seite.
+  canPlaceOnOccupiedSlot: (gs, pi, heroIdx, slotIdx, engine, heroOwner = pi) =>
     occupiedDropSlots(gs, pi, engine)
-      .some(sl => sl.heroIdx === heroIdx && sl.slotIdx === slotIdx),
+      .some(sl => sl.heroIdx === heroIdx && sl.slotIdx === slotIdx && (sl.owner ?? pi) === heroOwner),
 
   // Pre-placement resolution: prompt for sacrifices, destroy them.
   // Returning false aborts the summon (engine's summonCreatureWithHooks
@@ -236,6 +262,9 @@ module.exports = attachSteamEngine({
     const pi = ctx.cardOwner;
     const ps = gs.players[pi];
     const heroIdx = ctx.cardHeroIdx;
+    // Styx 28.9.: geliehene Helden der Gegenspalte — physische Seite des
+    // Zielhelden (fehlt → pi). Opfer zahlt `pi`.
+    const heroOwner = (ctx.cardHeroOwner === 0 || ctx.cardHeroOwner === 1) ? ctx.cardHeroOwner : pi;
 
     // `_requestedBouncePlaceSlot` is only set when the player dropped
     // on an occupied slot — which for Dragon Pilot means the summoning
@@ -246,8 +275,7 @@ module.exports = attachSteamEngine({
     const baseSpec = ctx.isInherentAction ? makeLv1SacrificeSpec(engine) : makeSacrificeSpec(engine);
     const spec = allFullDrop
       ? {
-          ...baseSpec,
-          mustIncludeFromHeroIdx: heroIdx,
+          ...fullDropSpec(baseSpec, heroIdx, pi, heroOwner),
           description: `${baseSpec.description} At least one sacrifice must come from the summoning Hero's Support Zones.`,
         }
       : baseSpec;
@@ -258,11 +286,12 @@ module.exports = attachSteamEngine({
     // All-full path: manually place into a freed slot on the summoning
     // Hero, then tell the server to skip its default summonCreature.
     if (allFullDrop) {
-      const supZones = ps.supportZones[heroIdx] || [];
+      const supZones = gs.players[heroOwner]?.supportZones?.[heroIdx] || [];
       const freedSlot = [0, 1, 2].find(z => (supZones[z] || []).length === 0);
       if (freedSlot == null) return false; // shouldn't happen
       await engine.actionPlaceCreature(CARD_NAME, pi, heroIdx, freedSlot, {
         source: 'external', sourceName: CARD_NAME, fireHooks: true,
+        ...(heroOwner !== pi ? { heldSeite: heroOwner } : {}),
       });
       ps._placementConsumedByCard = CARD_NAME;
     }

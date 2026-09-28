@@ -91,10 +91,12 @@ function buildOwnStatusedTargets(engine, pi) {
   for (const inst of engine.cardInstances) {
     if ((inst.controller ?? inst.owner) !== pi || inst.zone !== 'support' || inst.faceDown) continue;
     if (!negKeys.some(k => inst.counters?.[k])) continue;
+    // Styx 28.9.: geliehene Helden der Gegenspalte — eine dort beschworene
+    // Kreatur steht physisch bei `inst.owner` (eigene: identisch zu pi).
     targets.push({
-      id: `equip-${pi}-${inst.heroIdx}-${inst.zoneSlot}`,
+      id: `equip-${inst.owner ?? pi}-${inst.heroIdx}-${inst.zoneSlot}`,
       type: 'equip',
-      owner: pi, heroIdx: inst.heroIdx, slotIdx: inst.zoneSlot,
+      owner: inst.owner ?? pi, heroIdx: inst.heroIdx, slotIdx: inst.zoneSlot,
       cardName: inst.name, cardInstance: inst,
     });
   }
@@ -193,43 +195,61 @@ module.exports = {
     // light up under a Creature drag).
     const cardDB = engine._getCardDB();
     const cd     = cardDB[CARD_NAME];
+    // Styx 28.9.: geliehene Helden der Gegenspalte — alle Helden, die `pi`
+    // kontrolliert; `owner` (physische Seite) nur, wenn ≠ pi.
     const hostZones = [];
-    for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-      const h = ps.heroes[hi];
+    const helden = typeof engine.heroesControlledBy === 'function'
+      ? engine.heroesControlledBy(pi)
+      : (ps.heroes || []).map((hero, heroIdx) => ({ physOwner: pi, heroIdx, hero }));
+    for (const { physOwner, heroIdx: hi, hero: h } of helden) {
       if (!h?.name || h.hp <= 0) continue;
       if (h.statuses?.frozen || h.statuses?.stunned || h.statuses?.bound) continue;
-      if (cd && !engine.heroMeetsLevelReq(pi, hi, cd)) continue;
-      const sup = ps.supportZones?.[hi] || [[], [], []];
+      if (cd && !(physOwner === pi
+        ? engine.heroMeetsLevelReq(pi, hi, cd)
+        : engine.heroMeetsLevelReq(physOwner, hi, cd, { levelSourcePi: pi }))) continue;
+      const sup = engine.gs.players[physOwner]?.supportZones?.[hi] || [[], [], []];
       for (let z = 0; z < 3; z++) {
         if ((sup[z] || []).length === 0) {
           hostZones.push({
             heroIdx: hi, slotIdx: z,
+            ...(physOwner !== pi ? { owner: physOwner } : {}),
             label: `${h.name} — Support ${z + 1}`,
           });
         }
       }
     }
     if (hostZones.length === 0) return false; // no valid host
+    const seiteVon = (z) => z.owner ?? pi;
 
-    let hostHeroIdx, hostFreeSlot;
+    // Styx 28.9.: physische Seite des Wurfs — aus der Absichtsmarke
+    // (`heroOwner`), sonst aus dem Kontext; fehlt beides → pi.
+    const drop0 = ps._requestedNormalSummonSlot;
+    const ctxSeite = (ctx.cardHeroOwner === 0 || ctx.cardHeroOwner === 1) ? ctx.cardHeroOwner : pi;
+    const dropSeite = (drop0 && (drop0.heroOwner === 0 || drop0.heroOwner === 1)) ? drop0.heroOwner : ctxSeite;
+
+    let hostHeroIdx, hostFreeSlot, hostSeite = pi;
     if (ctx.viaDragDrop) {
       // Drag-drop pinned the host: use the dropped hero/slot.
       // ps._requestedNormalSummonSlot is set by doPlayCreature for
       // every normal-summon emit (including drag-drop). Validate the
       // drop is still actually free as a defensive guard against the
       // rare race where another effect filled it during animation.
+      // Styx 28.9.: nur Plaetze auf der Seite des Wurfs.
+      const aufSeite = hostZones.filter(z => seiteVon(z) === dropSeite);
+      hostSeite    = dropSeite;
       hostHeroIdx  = ctx.cardHeroIdx;
       hostFreeSlot = ps._requestedNormalSummonSlot?.slotIdx;
       const stillFree = hostFreeSlot != null
-        && hostZones.some(z => z.heroIdx === hostHeroIdx && z.slotIdx === hostFreeSlot);
+        && aufSeite.some(z => z.heroIdx === hostHeroIdx && z.slotIdx === hostFreeSlot);
       if (!stillFree) {
-        const fallback = hostZones.find(z => z.heroIdx === hostHeroIdx);
+        const fallback = aufSeite.find(z => z.heroIdx === hostHeroIdx);
         if (!fallback) return false;
         hostFreeSlot = fallback.slotIdx;
       }
     } else if (hostZones.length === 1) {
       hostHeroIdx  = hostZones[0].heroIdx;
       hostFreeSlot = hostZones[0].slotIdx;
+      hostSeite    = seiteVon(hostZones[0]);
     } else {
       const picked = await engine.promptGeneric(pi, {
         type: 'zonePick',
@@ -240,10 +260,14 @@ module.exports = {
         cancellable: true,
       });
       if (!picked || picked.cancelled) return false;
-      const chosen = hostZones.find(z => z.heroIdx === picked.heroIdx && z.slotIdx === picked.slotIdx);
+      // Styx 28.9.: die Antwort traegt `owner` (Klick auf eine Zone);
+      // der Helden-Kurzklick nicht — dann die eigene Seite.
+      const chosen = hostZones.find(z => seiteVon(z) === (picked.owner ?? pi)
+        && z.heroIdx === picked.heroIdx && z.slotIdx === picked.slotIdx);
       if (!chosen) return false;
       hostHeroIdx  = chosen.heroIdx;
       hostFreeSlot = chosen.slotIdx;
+      hostSeite    = seiteVon(chosen);
     }
 
     // ── Step 2: pick the CLEANSE target ─────────────────────────
@@ -277,19 +301,24 @@ module.exports = {
     // and stamp `_placementConsumedByCard` so doPlayCreature skips
     // its summonCreature call.
     const drop = ps._requestedNormalSummonSlot;
+    // Styx 28.9.: geliehene Helden der Gegenspalte — auch die Seite muss
+    // zum Wurf passen; sonst platziert Waitress selbst (mit `heldSeite`).
     const sameAsDrop = drop
+      && hostSeite === ((drop.heroOwner === 0 || drop.heroOwner === 1) ? drop.heroOwner : pi)
+      && hostSeite === ctxSeite
       && hostHeroIdx === ctx.cardHeroIdx
       && hostFreeSlot === drop.slotIdx;
     if (!sameAsDrop) {
       await engine.actionPlaceCreature(CARD_NAME, pi, hostHeroIdx, hostFreeSlot, {
         source: 'external', sourceName: CARD_NAME, fireHooks: true,
+        ...(hostSeite !== pi ? { heldSeite: hostSeite } : {}),
       });
       ps._placementConsumedByCard = CARD_NAME;
     }
 
     engine.log('waitress_summon_cleanse', {
       player: ps.username,
-      host: ps.heroes?.[hostHeroIdx]?.name,
+      host: engine.gs.players[hostSeite]?.heroes?.[hostHeroIdx]?.name,
       cleansed: cleanseTarget.cardName,
     });
     engine.sync();

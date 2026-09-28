@@ -39951,7 +39951,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     // (a) Pflichttribut aus den Zonen eines bestimmten Helden.
     const heroIdxReq = cfg.mustIncludeFromHeroIdx;
     if (heroIdxReq != null) {
-      const fromHero = (t) => t.type === 'equip' && t.heroIdx === heroIdxReq;
+      // Styx 28.9.: optional die Seite des Pflicht-Helden.
+      const fromHero = (t) => t.type === 'equip' && t.heroIdx === heroIdxReq
+        && (cfg.mustIncludeFromHeroOwner == null || t.owner === cfg.mustIncludeFromHeroOwner);
       const alreadySatisfied = all.some(t => sel.has(t.id) && fromHero(t));
       if (!alreadySatisfied) {
         const maxTotal = cfg.maxTotal ?? Infinity;
@@ -40133,7 +40135,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     const mustHeroIdx = pt?.config?.mustIncludeFromHeroIdx;
     if (mustHeroIdx != null) {
       const selectedTargets = (pt?.validTargets || []).filter(t => potionSelection.includes(t.id));
-      if (!selectedTargets.some(t => t.type === 'equip' && t.heroIdx === mustHeroIdx)) return false;
+      const mustHeroOwner = pt?.config?.mustIncludeFromHeroOwner;
+      if (!selectedTargets.some(t => t.type === 'equip' && t.heroIdx === mustHeroIdx
+        && (mustHeroOwner == null || t.owner === mustHeroOwner))) return false;
     }
     return true;
   })();

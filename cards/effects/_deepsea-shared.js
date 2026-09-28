@@ -576,10 +576,7 @@ async function tryBouncePlace(ctx) {
   // Styx 28.9.: geliehene Helden der Gegenspalte — die Kreatur steht
   // beim Gegner, gehoert aber dem Beschwoerer (wie `actionPlaceCreature`
   // mit `heldSeite`).
-  if (seite !== pi) {
-    newInst.controller = pi;
-    newInst.counters.crossSideControlled = pi;
-  }
+  if (seite !== pi) engine.markiereSeitenfremd(newInst, pi);
   newInst.counters.isPlacement = 1;
   newInst.turnPlayed = gs.turn || 0;
   newInst.counters._bouncedFromName = bouncedName;
@@ -640,9 +637,9 @@ async function tryBouncePlace(ctx) {
   });
   engine._broadcastEvent('play_pile_transfer', {
     owner: pi, cardName, from: 'hand', to: 'support',
-    ...(seite !== pi ? { fromOwner: pi, toOwner: seite } : {}),
     fromHandIdx: newCardFromHandIdx,
     toHeroIdx: bouncedHeroIdx, toSlotIdx: bouncedSlotIdx,
+    ...(seite !== pi ? { fromOwner: pi, toOwner: seite } : {}),
   });
   engine._broadcastEvent('play_zone_animation', {
     type: 'deep_sea_bubbles', owner: seite, heroIdx: bouncedHeroIdx, zoneSlot: bouncedSlotIdx,
@@ -1001,10 +998,7 @@ async function atomicSwap(engine, pi, bouncedInst, newCardName, sourceName) {
   fps.supportZones[bouncedHeroIdx][bouncedSlotIdx] = [newCardName];
   const newInst = engine._trackCard(newCardName, seite, 'support', bouncedHeroIdx, bouncedSlotIdx);
   newInst.counters = newInst.counters || {};
-  if (seite !== pi) {   // Styx 28.9.: steht beim Gegner, gehoert `pi`
-    newInst.controller = pi;
-    newInst.counters.crossSideControlled = pi;
-  }
+  if (seite !== pi) engine.markiereSeitenfremd(newInst, pi);   // Styx 28.9.: steht beim Gegner, gehoert `pi`
   newInst.counters.isPlacement = 1;
   newInst.turnPlayed = gs.turn || 0;
   // See clearSwapInheritedStatus's docstring — the swapped-in Creature
@@ -1032,9 +1026,9 @@ async function atomicSwap(engine, pi, bouncedInst, newCardName, sourceName) {
   });
   engine._broadcastEvent('play_pile_transfer', {
     owner: pi, cardName: newCardName, from: 'hand', to: 'support',
-    ...(seite !== pi ? { fromOwner: pi, toOwner: seite } : {}),   // Styx 28.9.
     fromHandIdx: newCardFromHandIdx,
     toHeroIdx: bouncedHeroIdx, toSlotIdx: bouncedSlotIdx,
+    ...(seite !== pi ? { fromOwner: pi, toOwner: seite } : {}),   // Styx 28.9.
   });
   engine._broadcastEvent('play_zone_animation', {
     type: 'deep_sea_bubbles', owner: seite, heroIdx: bouncedHeroIdx, zoneSlot: bouncedSlotIdx,

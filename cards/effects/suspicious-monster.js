@@ -199,11 +199,7 @@ module.exports = {
     fps.supportZones[heroIdx][slotIdx] = [CARD_NAME];
     const newInst = engine._trackCard(CARD_NAME, heroOwner, 'support', heroIdx, slotIdx);
     newInst.counters = newInst.counters || {};
-    if (heroOwner !== pi) {
-      // Wie `safePlaceInSupport(…, { controller: pi })`.
-      newInst.controller = pi;
-      newInst.counters.crossSideControlled = pi;
-    }
+    if (heroOwner !== pi) engine.markiereSeitenfremd(newInst, pi);   // wie `safePlaceInSupport(…, { controller: pi })`
     newInst.counters.isPlacement = 1;
     newInst.turnPlayed = gs.turn || 0;
 

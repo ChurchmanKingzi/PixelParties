@@ -154,11 +154,7 @@ async function sacrificeSummonIntoSlot(engine, pi, req, CARD_NAME_ARG) {
   fps.supportZones[heroIdx][slotIdx] = [CARD_NAME_ARG];
   const newInst = engine._trackCard(CARD_NAME_ARG, heroOwner, 'support', heroIdx, slotIdx);
   newInst.counters = newInst.counters || {};
-  if (heroOwner !== pi) {
-    // Wie `safePlaceInSupport(…, { controller: pi })`.
-    newInst.controller = pi;
-    newInst.counters.crossSideControlled = pi;
-  }
+  if (heroOwner !== pi) engine.markiereSeitenfremd(newInst, pi);   // wie `safePlaceInSupport(…, { controller: pi })`
   newInst.counters.isPlacement = 1;
   newInst.turnPlayed = gs.turn || 0;
 
@@ -196,7 +192,7 @@ async function sacrificeSummonIntoSlot(engine, pi, req, CARD_NAME_ARG) {
   await engine.runHooks('onCreatureDeath', {
     creature: {
       name: occName, owner: occ.owner, originalOwner: occ.originalOwner,
-      heroIdx: slotIdx, zoneSlot: slotIdx, instId: occ.id,
+      heroIdx, zoneSlot: slotIdx, instId: occ.id,   // war faelschlich `heroIdx: slotIdx`
     },
     source: { name: CARD_NAME_ARG, owner: pi, heroIdx },
     _skipReactionCheck: true,

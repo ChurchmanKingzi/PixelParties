@@ -12657,11 +12657,18 @@ class GameEngine {
     // via actionMoveCard. (The Deepsea bounce path in _deepsea-shared
     // doesn't funnel through here — it fires its own pile-transfer
     // broadcast with the same schema.)
+    // Styx 28.9.: eine ueber einen geliehenen Helden beschworene Kreatur
+    // liegt beim Brettbesitzer (`owner`), die Karte gehoert aber dem
+    // Beschwoerer (`originalOwner`) — sie fliegt in DESSEN Hand.
+    const _heimkehr = (fromZone === ZONES.SUPPORT && toZone !== ZONES.SUPPORT
+      && cardInstance.counters?.crossSideControlled != null)
+      ? (cardInstance.originalOwner ?? cardInstance.controller ?? cardInstance.owner) : null;
     if (fromZone === ZONES.SUPPORT && toZone === ZONES.HAND) {
-      const owner = cardInstance.owner;
+      const owner = _heimkehr ?? cardInstance.owner;
       const handForOwner = this.gs.players[owner]?.hand || [];
       this._broadcastEvent('play_pile_transfer', {
         owner, cardName: cardInstance.name, from: 'support', to: 'hand',
+        ...(_heimkehr != null && _heimkehr !== cardInstance.owner ? { fromOwner: cardInstance.owner, toOwner: _heimkehr } : {}),
         fromHeroIdx: cardInstance.heroIdx, fromSlotIdx: cardInstance.zoneSlot,
         toHandIdx: handForOwner.length,
       });
@@ -12907,6 +12914,13 @@ this._deathWatch = (this._deathWatchStack || []).length
     const _auraAbgleichNoetig = fromZone === ZONES.AREA && toZone !== ZONES.AREA;
 
     // Update instance
+    if (_heimkehr != null) {
+      // Styx 28.9.: zurueck zum Kartenbesitzer (Hand/Deck); die Marke
+      // „seitenfremd" gilt nur, solange sie auf dem Brett steht.
+      cardInstance.owner = _heimkehr;
+      cardInstance.controller = _heimkehr;
+      delete cardInstance.counters.crossSideControlled;
+    }
     cardInstance.zone = toZone;
     cardInstance.heroIdx = toHeroIdx !== undefined ? toHeroIdx : -1;
     cardInstance.zoneSlot = toSlot !== undefined ? toSlot : -1;
@@ -13689,11 +13703,9 @@ this._deathWatch = (this._deathWatchStack || []).length
     // es `inst.controller` neben `inst.owner`; die Marke
     // `crossSideControlled` macht es am Brett sichtbar und ueberlebt das
     // Zugende, weil sie an der INSTANZ haengt und nicht am Charme.
-    if (opts.controller != null && opts.controller !== playerIdx) {
-      inst.controller = opts.controller;
-      inst.counters = inst.counters || {};
-      inst.counters.crossSideControlled = opts.controller;
-    }
+    // Styx 28.9.: `markiereSeitenfremd` setzt auch den Kartenbesitzer —
+    // Ablage/Hand gehen an den Beschwoerer, nicht an den Brettbesitzer.
+    if (opts.controller != null && opts.controller !== playerIdx) this.markiereSeitenfremd(inst, opts.controller);
     // Drain pending hand-indexed-field captures for this cardName. The
     // splice interceptor stamped these onto `ps._handIndexedFieldPending`
     // RIGHT BEFORE rebase dropped the matching hand entry. Each
@@ -14342,11 +14354,29 @@ this._deathWatch = (this._deathWatchStack || []).length
    * check, but usable from any summoning effect (Living Illusion,
    * Reincarnation, etc.) that wants to filter its gallery.
    */
+  /**
+   * Steht diese Opferinstanz beim Pflicht-Helden der Spec?
+   * (`mustIncludeFromHeroIdx` + optional `mustIncludeFromHeroOwner` = Seite)
+   */
+  _vomPflichtHelden(inst, spec) {
+    if (!inst || inst.heroIdx !== spec.mustIncludeFromHeroIdx) return false;
+    if (spec.mustIncludeFromHeroOwner == null) return true;
+    return inst.owner === spec.mustIncludeFromHeroOwner;
+  }
+
   isCreatureSummonable(cardName, playerIdx, heroIdx = -1, ctxExtras = {}) {
     const script = loadCardEffect(cardName);
     if (!script?.canSummon) return true;
     try {
-      const dummy = new CardInstance(cardName, playerIdx, 'hand', heroIdx);
+      // ★ Styx 28.9.: `playerIdx` ist die Seite des Zielhelden. Wird dieser
+      // gerade vom anderen Spieler kontrolliert (geliehen), ist ER der
+      // Beschwoerer — `canSummon` sieht ihn als `cardOwner` (Kosten, Hand,
+      // Opfer) und den Helden ueber `cardHeroOwner`.
+      const _held = heroIdx >= 0 ? this.gs.players[playerIdx]?.heroes?.[heroIdx] : null;
+      const _beschwoerer = ctxExtras.beschwoerer
+        ?? (_held?.name ? this.heroSideOf(playerIdx, _held) : playerIdx);
+      const dummy = new CardInstance(cardName, _beschwoerer, 'hand', heroIdx);
+      if (_beschwoerer !== playerIdx) dummy.heroOwner = playerIdx;
       const ctx = this._createContext(dummy, { event: 'canSummonCheck', ...ctxExtras });
       return !!script.canSummon(ctx);
     } catch (err) {
@@ -17997,9 +18027,27 @@ this._deathWatch = (this._deathWatchStack || []).length
    * deck / discard routing). Use this helper anywhere you need
    * "which side does the player see this creature on".
    */
+  /**
+   * Styx 28.9.: Kreatur `inst` steht auf der Brettseite `inst.owner`, wurde
+   * aber von `controller` ueber einen geliehenen Helden beschworen. Setzt
+   * Kontrolle, Marke und den Kartenbesitzer (Ablage/Hand-Rueckkehr) —
+   * EINE Stelle fuer alle Beschwoerungs- und Platzierungswege.
+   */
+  markiereSeitenfremd(inst, controller) {
+    if (!inst || controller == null || controller === inst.owner) return inst;
+    inst.controller = controller;
+    inst.counters = inst.counters || {};
+    inst.counters.crossSideControlled = controller;
+    if (inst.originalOwner === inst.owner) inst.originalOwner = controller;
+    return inst;
+  }
+
   physicalSide(inst) {
     if (!inst) return -1;
     if (inst.stolenBy != null) return inst.owner;
+    // Styx 28.9.: ueber einen geliehenen Helden beschworen — liegt auf der
+    // Seite des Helden (`owner`), kontrolliert vom Beschwoerer.
+    if (inst.counters?.crossSideControlled != null) return inst.owner;
     return inst.controller ?? inst.owner;
   }
 
@@ -18794,7 +18842,21 @@ this._deathWatch = (this._deathWatchStack || []).length
             const supZones = oppPs.supportZones[hi] || [];
             let hasFree = false;
             for (let z = 0; z < 3; z++) { if ((supZones[z] || []).length === 0) { hasFree = true; break; } }
-            if (!hasFree) continue;
+            if (!hasFree) {
+              // Styx 28.9.: Wurf auf einen BELEGTEN Platz des geliehenen
+              // Helden (Opfer/Rueckhand macht Platz: Blue-Ice, Deepsea,
+              // Teocuilatl …). Dieselbe Quelle wie die Hervorhebung —
+              // `getBouncePlacementTargets` nennt geliehene Plaetze mit `owner`.
+              const _s = loadCardEffect(cd.name);
+              let _wurf = false;
+              if (typeof _s?.getBouncePlacementTargets === 'function') {
+                try {
+                  _wurf = (_s.getBouncePlacementTargets(gs, playerIdx, this) || [])
+                    .some(t => t.heroIdx === hi && t.owner === oppIdx);
+                } catch (err) { console.error('[getBouncePlacementTargets]', cd.name, err.message); }
+              }
+              if (!_wurf) continue;
+            }
             // Per-Hero canSummon — same gate as the own-side branch
             // above. Runs against the hero-owner side (the charmed
             // hero's board) since that's where the Creature would land.
@@ -24026,10 +24088,7 @@ this._deathWatch = (this._deathWatchStack || []).length
 
     const inst = this._trackCard(cardName, feld, ZONES.SUPPORT, heroIdx, slotIdx);
     inst.counters = inst.counters || {};
-    if (feld !== playerIdx) {
-      inst.controller = playerIdx;
-      inst.counters.crossSideControlled = playerIdx;
-    }
+    if (feld !== playerIdx) this.markiereSeitenfremd(inst, playerIdx);
     inst.counters.isPlacement = 1;
     inst.turnPlayed = gs.turn || 0;
     if (_letheBonus > 0) inst.counters._letheLevelBonus = _letheBonus;
@@ -24520,7 +24579,9 @@ this._deathWatch = (this._deathWatchStack || []).length
     // summoning Hero's own Creatures has to be sacrificed to free the
     // slot the new Creature lands in.
     if (spec.mustIncludeFromHeroIdx != null) {
-      if (!candidates.some(c => c.inst.heroIdx === spec.mustIncludeFromHeroIdx)) return false;
+      // `mustIncludeFromHeroOwner` (Styx 28.9.): Seite des Helden — bei
+      // einem geliehenen Helden der Gegenspalte.
+      if (!candidates.some(c => this._vomPflichtHelden(c.inst, spec))) return false;
     }
     return this.hasValidSacrificeSet(candidates, spec.minCount, spec.minMaxHp || 0, spec.minSumLevel || 0);
   }
@@ -24785,7 +24846,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // Must-include-from-hero: same reasoning — if the filter removed
     // every Creature on that Hero, the constraint can't be met.
     if (spec.mustIncludeFromHeroIdx != null) {
-      if (!candidates.some(c => c.inst.heroIdx === spec.mustIncludeFromHeroIdx)) {
+      if (!candidates.some(c => this._vomPflichtHelden(c.inst, spec))) {
         this.log('sacrifice_fizzle', {
           card: ctx.cardName, player: this.gs.players[pi]?.username,
           reason: 'must_include_from_hero_filtered_out',
@@ -24882,6 +24943,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         // unten oeffnete den Waehler kommentarlos erneut. Jetzt kennt der
         // Client sie und sperrt die falschen Kreaturen schon vorher.
         mustIncludeFromHeroIdx: spec.mustIncludeFromHeroIdx,
+        ...(spec.mustIncludeFromHeroOwner != null ? { mustIncludeFromHeroOwner: spec.mustIncludeFromHeroOwner } : {}),
         // Sacrifice-flavor red highlight on every eligible target. All
         // engine-driven sacrifice prompts route through this helper, so
         // setting it here covers the whole codebase: Sacrifice to
@@ -24924,7 +24986,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       }
       // "Must include ≥1 from Hero" constraint.
       if (spec.mustIncludeFromHeroIdx != null) {
-        if (!chosen.some(t => t.cardInstance?.heroIdx === spec.mustIncludeFromHeroIdx)) continue;
+        if (!chosen.some(t => t.cardInstance && this._vomPflichtHelden(t.cardInstance, spec))) continue;
       }
       picked = chosen;
       break;
@@ -25865,8 +25927,8 @@ this._deathWatch = (this._deathWatchStack || []).length
     for (const t of validTargets) {
       if (t?.type !== 'equip') continue;
       const inst = t.cardInstance;
-      if (!inst || inst.stolenBy != null) continue;
-      const physSide = inst.controller ?? inst.owner;
+      if (!inst) continue;
+      const physSide = this.physicalSide(inst);   // Styx 28.9.: inkl. seitenfremd beschworener
       if (physSide === t.owner) continue;
       t.owner = physSide;
       t.id = `equip-${physSide}-${t.heroIdx}-${t.slotIdx}`;
@@ -25932,6 +25994,7 @@ this._deathWatch = (this._deathWatchStack || []).length
           // still satisfy it, instead of letting the player confirm and
           // silently re-opening the picker.
           mustIncludeFromHeroIdx: config.mustIncludeFromHeroIdx,
+          ...(config.mustIncludeFromHeroOwner != null ? { mustIncludeFromHeroOwner: config.mustIncludeFromHeroOwner } : {}),
           // Optional small card preview image rendered inside the
           // targeting panel — set this to the name of the card the
           // prompt is "about" (the equip Bill is offering, the creature
@@ -43578,9 +43641,9 @@ this._deathWatch = (this._deathWatchStack || []).length
     // side placements (Chilly Wizard). Without this distinction, the
     // splice below failed silently and left the dead creature visible
     // on opp's slot indefinitely.
-    const physicalSide = (e.inst.stolenBy != null)
-      ? e.inst.owner
-      : (e.inst.controller ?? e.inst.owner);
+    // Styx 28.9.: zentral ueber `physicalSide()` — ueber einen geliehenen
+    // Helden beschworene Kreaturen liegen beim Brettbesitzer (`owner`).
+    const physicalSide = this.physicalSide(e.inst);
     const ps = this.gs.players[physicalSide];
     this.log('creature_destroyed', { card: e.inst.name, by: e.source?.name || e.type, owner: e.inst.owner, heroIdx: e.inst.heroIdx, zoneSlot: e.inst.zoneSlot });
     // Store death info before cleanup. `instId` lets on-death listeners

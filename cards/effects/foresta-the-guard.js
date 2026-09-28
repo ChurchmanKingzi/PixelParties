@@ -121,19 +121,13 @@ function heroCanSummonHere(engine, pi, heroIdx, heroOwner = pi) {
 
 /**
  * Opfer-Spec fuer einen Wurf auf einen belegten Platz: mindestens ein
- * Opfer von DIESEM Helden. Styx 28.9.: geliehene Helden der Gegenspalte —
- * `mustIncludeFromHeroIdx` kennt keine Seite; liegt der Held auf der
- * Gegenspalte, fallen die Kreaturen am gleichnamigen Helden der ANDEREN
- * Seite aus der Wahl (sonst wuerde beim geliehenen Helden kein Platz frei).
- * Eigene Seite: exakt wie bisher. Wie Blue-Ice Dragon.
+ * Opfer von DIESEM Helden. Styx 28.9.: `mustIncludeFromHeroOwner` = Seite des
+ * Helden (geliehene Helden der Gegenspalte).
  */
 function fullDropSpec(engine, pi, heroIdx, heroOwner = pi, base = makeSacrificeSpec(engine, pi)) {
-  const spec = { ...base, mustIncludeFromHeroIdx: heroIdx };
-  if (heroOwner !== pi) {
-    spec.filter = (c) => base.filter(c)
-      && !(c?.inst?.zone === 'support' && c.inst.heroIdx === heroIdx && c.inst.owner !== heroOwner);
-  }
-  return spec;
+  // `mustIncludeFromHeroOwner` = Seite des Helden (Styx 28.9.): nur ein
+  // Opfer aus DIESER Spalte schafft dort Platz; weitere Opfer bleiben frei.
+  return { ...base, mustIncludeFromHeroIdx: heroIdx, mustIncludeFromHeroOwner: heroOwner };
 }
 
 /**
