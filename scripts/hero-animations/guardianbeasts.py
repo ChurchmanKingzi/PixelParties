@@ -7,7 +7,8 @@ Aufruf: python3 guardianbeasts.py <tag> [ms] <variante>
             blinzeln; die blutigen Krallen (der rote Zacken rechts) sitzen vorn an der Hand
             vor der Brust (rot bzw. weiß): die Hand holt blitzschnell nach links aus, die
             Krallen ziehen den Bogen nach rechts bis an ihren Platz, die Hand ist damit
-            wieder vor der Brust; der Arm reicht von der Schulter schräg links unter dem
+            wieder vor der Brust; reicht der kurze Arm nicht bis zum Bogen, strecken sich
+            die Krallen als lange Klingen dorthin; der Arm reicht von der Schulter schräg links unter dem
             Kopf zur Hand (Felltextur, Kontur); die Schlitzspur ihrer blutigen Klauen (der dunkelrote Bogen
             unten, links nach rechts) steht in Frame 0 wie im Kartenbild, verblasst
             vom Ende her, und später reißt ein neuer Schlitzer den Bogen in einem
@@ -148,6 +149,7 @@ def ease(u):
     return 0.5 - 0.5 * math.cos(math.pi * max(0.0, min(1.0, u)))
 
 
+ARM_MAX = 6                                              # maximale Armlänge (Schulter bis Hand)
 CLAW_RED = ('330000', '400000')                          # dunkles Blut an den Krallen (im Körper)
 
 
@@ -234,9 +236,10 @@ def f_mao(i):
     ty = max(ty, rest[1])                                # nie höher als die Brust (Arm nicht übers Gesicht)
     sx, sy = hc['shoulder']
     L = math.hypot(tx - sx, ty - sy)
-    if L > 12:                                           # Armlänge begrenzen
-        tx, ty = sx + (tx - sx) * 12 / L, sy + (ty - sy) * 12 / L
+    if L > ARM_MAX:                                      # Arm kurz halten – die Krallen strecken sich
+        tx, ty = sx + (tx - sx) * ARM_MAX / L, sy + (ty - sy) * ARM_MAX / L
     ox, oy = int(round(tx - rest[0])), int(round(ty - rest[1]))
+    kx, ky = int(round(ax - anchor[0])), int(round(ay - anchor[1]))   # Krallen am Ziel
     b = BOUNCE12[i % 12]
     out = np.zeros((H, W, 4), int)
     if ox or oy:                                         # Brust unter der Hand schließen (Felltextur)
@@ -258,7 +261,20 @@ def f_mao(i):
         for y, x in zip(*np.nonzero(ring)):
             out[y + PT + b + oy, x + PL + ox] = rgb(hc['outline'])
         put(out, hand, PL + ox, PT + b + oy)
-    put(out, claws, PL + ox, PT + (b if not (ox or oy) else b + oy))   # Krallen vorn an der Hand
+    if (kx, ky) != (ox, oy):                             # gestreckte Krallen: drei Klingen zur Krallenspitze
+        hx, hy = rest[0] + ox + PL + 0.5, rest[1] + oy + PT + b + 0.5
+        ccx = (cxs.min() + cxs.max()) / 2 + kx + PL + 0.5
+        ccy = (cys.min() + cys.max()) / 2 + ky + PT + b + 0.5
+        L = max(1e-6, math.hypot(ccx - hx, ccy - hy))
+        px, py = -(ccy - hy) / L, (ccx - hx) / L
+        n = int(L * 2) + 1
+        for q, col in ((-1, '730000'), (0, '990000'), (1, '730000')):
+            for k in range(n + 1):
+                x = int(math.floor(hx + (ccx - hx) * k / n + q * px))
+                y = int(math.floor(hy + (ccy - hy) * k / n + q * py))
+                out[y, x] = rgb(col)
+        put(out, hand, PL + ox, PT + b + oy)              # die Hand liegt über dem Klingenansatz
+    put(out, claws, PL + kx, PT + b + (ky if (kx or ky) else 0))   # Krallen vorn
     return out
 
 
