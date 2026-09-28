@@ -46,6 +46,28 @@ Dazu je Variante:
 * kyli:      Squash-and-Stretch in der Senkrechten (die Füße bleiben), die
              schwarzen Äste wiegen sich (oben stärker), die roten Augen
              glühen auf und blinzeln.
+* brackle / leonardo: das Katapult auf dem Panzer spannt (Arm kippt nach
+             hinten, ein Schädel liegt in der Schale), schnellt vor und
+             schleudert den Schädel in hohem Bogen vor die Schildkröte; er
+             überschlägt sich, schlägt am Boden auf und explodiert (Feuerkuppel,
+             Knochensplitter, aufsteigender Rauch). Beim Abschuss sackt der
+             Panzer kurz ein, die Schildkröte blinzelt.
+* broghan:   federt, die Ketten an den Handgelenken schwingen, Eiswolken
+             (Nebelballen aus drei Kugeln) quellen neben ihm hervor und treiben
+             davon – nie halb hinter der Figur.
+* golem:     Ancient Gear Golem: federt, das rote Auge glüht periodisch auf
+             (mit Leuchtschein), Eiswolken wie bei Broghan.
+* clown:     Cecilia the Clown: federt, blinzelt, die blauen Haarschlaufen
+             wippen (außen stärker, links und rechts versetzt).
+* bbg:       Bad Birthday Girl Cecilia: federt, blinzelt, die Partyhut-Spitze
+             wippt nach und funkelt.
+* fern / fernelf: Fern putzt sein Schwert: der Lappen gleitet entlang der
+             Klinge vor und zurück (zur Schulter hin unbewegt), nach jedem
+             Strich läuft ein Glanz über die Klinge; der Elf blinzelt.
+* fairy:     Ascended Fern schwebt, die Schmetterlingsflügel flattern
+             (spaltenweise Scherung), die pinke Aura flimmert am Rand, pinke
+             Funken rieseln als Schweif herab.
+* fiona:     Fiona auf dem Thron blinzelt, ihre Krone funkelt.
 """
 import math
 import os
@@ -96,6 +118,19 @@ V_ = {
                      line=[(2, 20), (3, 20), (5, 20), (6, 20)]),
     'broghan': dict(slug='broghan-the-frozen-guardian-of-the-north', knee=25, pads=(14, 14, 5, 2)),
     'golem': dict(slug='broghan-the-ancient-golem', knee=28, pads=(14, 14, 5, 2)),
+    'clown': dict(slug='cecilia-the-clown', knee=24, lid=[((16, 11), 'f6bd98'), ((17, 11), 'f6bd98')],
+                  line=[(16, 12), (17, 12)]),
+    'bbg': dict(slug='bad-birthday-girl-cecilia', knee=29, pads=(3, 3, 4, 2),
+                lid=[((5, 16), 'f6cd8b'), ((6, 16), 'f6cd8b'), ((10, 16), 'f6cd8b')],
+                line=[(5, 17), (6, 17), (9, 17), (10, 17)]),
+    'fern': dict(slug='fern-the-ship-slave', pads=(3, 3, 3, 2)),
+    'fernelf': dict(slug='fern-the-elf-slave', pads=(3, 3, 3, 2),
+                    lid=[((8, 2), 'd98a79'), ((9, 2), 'd98a79'), ((12, 2), 'd98a79'), ((13, 2), 'd98a79')],
+                    line=[(8, 3), (9, 3), (12, 3), (13, 3)]),
+    'fairy': dict(slug='fern-the-liberated-fairy', pads=(3, 3, 4, 4)),
+    'fiona': dict(slug='fiona-the-princess-of-blackport', pads=(3, 3, 4, 2),
+                  lid=[((14, 14), 'ffe6d5'), ((15, 14), 'ffe6d5'), ((18, 14), 'ffe6d5'), ((19, 14), 'ffe6d5')],
+                  line=[(14, 15), (15, 15), (18, 15), (19, 15)]),
     'kyli': dict(slug='kyli-the-deceptive-sapling', knee=28, pads=(3, 3, 5, 2),
                  blink={'halb': [((9, 16), '636363'), ((10, 16), '636363'), ((13, 16), '636363'), ((14, 16), '636363')],
                         'zu': [((9, 16), '636363'), ((10, 16), '636363'), ((13, 16), '636363'), ((14, 16), '636363'),
@@ -961,9 +996,156 @@ def f_golem(i):
     return out
 
 
+CLOWN_HAIR = ('273a59', '2c7494', '25283e', '5dcbe1', '084969')
+
+
+def f_clown(i):
+    s = SRC.copy()
+    blink(s, i)
+    w = 2 * math.pi * 2 * i / N
+    hair = np.zeros((SH, SW), bool)
+    for y, x in zip(*np.nonzero(s[:, :, 3])):
+        if hexc(s[y, x]) in CLOWN_HAIR and (x <= 10 or x >= SW - 11):
+            hair[y, x] = True
+
+    def hdy(x, y):                                       # Haarschlaufen federn, außen stärker (spaltenweise)
+        if not hair[y, x]:
+            return 0
+        t = min(1.0, max(0.0, (abs(x - (SW - 1) / 2) - 4) / 10))
+        ph = 0.0 if x < SW / 2 else 1.6
+        return int(round(1.6 * t * (math.sin(w + ph) - math.sin(ph))))
+    b = BOUNCE12[i % 12]
+    out = np.zeros((H, W, 4), int)
+    put(out, s, PL, PT, dy_fn=lambda x, y: hdy(x, y) + (b if (y < KNEE or (x <= 9 and y < 24)) else 0))
+    if b < 0:
+        for x in range(SW):
+            if s[KNEE - 1, x, 3] and s[KNEE, x, 3] and not out[KNEE - 1 + PT, x + PL, 3]:
+                out[KNEE - 1 + PT, x + PL] = s[KNEE - 1, x]
+    fill_pinholes(out)
+    return out
+
+
+def f_bbg(i):
+    s = SRC.copy()
+    blink(s, i)
+    w = 2 * math.pi * 2 * i / N
+    tip = lambda x, y: int(round(1.0 * (4 - y) / 4 * math.sin(w))) if y < 4 else 0   # Hutspitze wippt nach
+    b = BOUNCE12[i % 12]
+    out = np.zeros((H, W, 4), int)
+    knee_put(out, s, b, moves=lambda x, y: x <= 1 and y < 29, dx_fn=tip)
+    fill_pinholes(out)
+    stars(out, i, [(7 + PL + tip(7, 0), 0 + PT + b, 20)], 'd2c4ff', 'ffffff')
+    return out
+
+
+# Fern putzt sein Schwert: der Lappen gleitet entlang der Klinge (Verschiebungsfeld, zur Schulter hin null)
+FERN_RAG = {'fern': ('arm', (6.0, 13.0)), 'fernelf': ('hand', (5.0, 8.0))}
+BLADE_U = (0.92, -0.39)                                  # Richtung Heft -> Spitze
+
+
+def f_fern(i):
+    part, root = FERN_RAG[V]
+    s = SRC.copy()
+    body, sword, rag = load('body'), load('sword'), load(part)
+    if 'lid' in C:
+        blink(body, i)
+    st = math.sin(2 * math.pi * 4 * i / N)               # vier Striche pro Loop
+    out = np.zeros((H, W, 4), int)
+    put(out, body, PL, PT)
+    # Klinge glänzt kurz nach jedem Strich (Lichtreflex läuft zur Spitze)
+    blade = (sword[:, :, 3] > 0) & (np.array([[lum(sword[y, x]) > 150 for x in range(SW)] for y in range(SH)]))
+    sw = sword.copy()
+    for (x, y), a in sweep(blade, i * 4 % N, 2, speed=1.6).items():
+        sw[y, x] = lighten(sw[y, x], a * 0.8)
+    put(out, sw, PL, PT)
+    m = rag[:, :, 3] > 0
+    ys, xs = np.nonzero(m)
+    for y in range(max(0, ys.min() - 3), min(SH, ys.max() + 4)):
+        for x in range(max(0, xs.min() - 3), min(SW, xs.max() + 4)):
+            t = max(0.0, min(1.0, ((x - root[0]) * BLADE_U[0] + (y - root[1]) * BLADE_U[1]) / 10))
+            dx, dy = int(round(2.4 * st * t * BLADE_U[0])), int(round(2.4 * st * t * BLADE_U[1]))
+            sx, sy_ = x - dx, y - dy
+            if 0 <= sx < SW and 0 <= sy_ < SH and m[sy_, sx]:
+                out[y + PT, x + PL] = rag[sy_, sx]
+    fill_pinholes(out)
+    return out
+
+
+FAIRY = None
+PINK = rgb('e600e6', 127)
+
+
+def f_fairy(i):
+    global FAIRY
+    s = SRC.copy()
+    if FAIRY is None:
+        pink = (s[:, :, 3] > 0) & (s[:, :, 3] < 200)
+        fig = (s[:, :, 3] > 0) & ~pink
+        wing = np.zeros((SH, SW), bool)
+        for y, x in zip(*np.nonzero(fig)):
+            if (x <= 8 or x >= SW - 9) and hexc(s[y, x]) in ('5c31ca', '1e8a10', '107caa', 'c80000', '109eaa',
+                                                           '484149', 'a496a4', '877887', '685c68', '432493'):
+                wing[y, x] = True
+        near = np.zeros((SH, SW), int)                   # Aura: 1 = dicht an der Figur, 2 = Außenrand
+        fy, fx = np.nonzero(fig)
+        for y, x in zip(*np.nonzero(pink)):
+            d = np.min(np.abs(fy - y) + np.abs(fx - x))
+            if d <= 3:
+                near[y, x] = 1 if d <= 1 else 2
+        FAIRY = (pink, fig, wing, near)
+    pink, fig, wing, near = FAIRY
+    hv = int(round(math.sin(2 * math.pi * 2 * i / N)))   # schwebt
+    body = s.copy()
+    body[pink | wing] = 0
+    out = np.zeros((H, W, 4), int)
+    put(out, body, PL, PT + hv)
+    # Schmetterlingsflügel: spaltenweise Scherung (außen stärker), schnelles Flattern
+    lift = 1.6 * math.sin(2 * math.pi * 6 * i / N)
+    for y, x in zip(*np.nonzero(wing)):
+        side = -1 if x < SW / 2 else 1
+        d = (8.5 - x) if side < 0 else (x - (SW - 9.5))
+        dy = -int(round(lift * max(0.0, d) / 7))
+        out[y + PT + hv + dy, x + PL] = s[y, x]
+    fill_pinholes(out)
+    # pinke Partikel: flimmernde Aura dicht an der Figur, dazu fallende Funken als Schweif
+    rng = np.random.default_rng(i)
+    for y, x in zip(*np.nonzero(near)):
+        yy, xx = y + PT + hv, x + PL
+        if not out[yy, xx, 3] and (near[y, x] == 1 or rng.random() < 0.55):
+            out[yy, xx] = PINK if rng.random() < 0.9 else rgb('ff7bff', 200)
+    prng = np.random.default_rng(3)
+    for k in range(46):
+        life = [12, 16, 24][k % 3]
+        off = int(prng.integers(life))
+        x0 = prng.uniform(1, SW - 2)
+        y0 = prng.uniform(10, 26)
+        vy = prng.uniform(0.4, 0.9)
+        t = (i + off) % life
+        x = int(round(x0 + 0.8 * math.sin(t * 0.5 + k)))
+        y = int(round(y0 + vy * t))
+        if y >= SH + 2:
+            continue
+        yy, xx = y + PT, x + PL
+        if 0 < yy < H - 1 and 0 < xx < W - 1 and not out[yy, xx, 3]:
+            a = int(190 * (1 - t / life)) + 40
+            out[yy, xx] = rgb('ff7bff' if k % 5 == 0 else 'e600e6', a)
+    return out
+
+
+def f_fiona(i):
+    s = SRC.copy()
+    blink(s, i)
+    out = np.zeros((H, W, 4), int)
+    put(out, s, PL, PT)
+    stars(out, i, [(14 + PL, 9 + PT, 6), (19 + PL, 9 + PT, 18), (16 + PL, 8 + PT, 30), (17 + PL, 9 + PT, 42)],
+          'ffe600', 'fff6ac')
+    return out
+
+
 FRAME = dict(asriel=f_asriel, barker=f_barker, blackstache=f_blackstache, chuck=f_chuck, codumbus=f_codumbus,
              devlin=f_devlin, mmdevlin=f_devlin, enigma=f_enigma, krates=f_krates, key=f_key, kyli=f_kyli, alleria=f_alleria,
-             brackle=f_brackle, leonardo=f_brackle, broghan=f_broghan, golem=f_golem)
+             brackle=f_brackle, leonardo=f_brackle, broghan=f_broghan, golem=f_golem,
+             clown=f_clown, bbg=f_bbg, fern=f_fern, fernelf=f_fern, fairy=f_fairy, fiona=f_fiona)
 
 if __name__ == '__main__':
     tag = sys.argv[1] if len(sys.argv) > 1 else 'v'
