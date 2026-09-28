@@ -4231,6 +4231,42 @@ function CrimsonWebShotEffect({ x, y, w = 80, h = 110, vonDx = 0, vonDy = 160, b
 //  1250–2600  Lichtblitz, zwei Druckringe, eine Lichtsaeule, aufsteigende
 //             Funken; die Kreise zerfallen
 // Handy: weniger Partikel. Klang aus der Komponente (Regel ⑤).
+// ── Styx, the Opened Gate (28.9.) ───────────────────────────────
+// Das Tor zur Geisterwelt oeffnet sich UNTER dem Helden: ein dunkler,
+// violett-tuerkis wirbelnder Strudel, aus dem blasse Seelenfetzen
+// aufsteigen und in den Koerper zurueckfahren. Bewusst KALT statt des
+// goldenen `holy_revival` — hier kehrt jemand aus dem Totenreich
+// zurueck, nicht aus dem Himmel.
+function StyxTorEffect({ x, y, w = 80, h = 110 }) {
+  const seelen = useMemo(() => Array.from({ length: ppFxN(14) }, (_, i) => ({
+    dx: (Math.random() - 0.5) * w * 0.9, hoch: h * (0.55 + Math.random() * 0.5),
+    g: 8 + Math.random() * 8, verzug: 250 + Math.random() * 700, dauer: 700 + Math.random() * 400,
+    farbe: ['#bff6ff', '#8fe3ff', '#d6c8ff', '#ffffff'][i % 4],
+  })), [w, h]);
+  useEffect(() => {
+    const spiel = (name, opts, at) => setTimeout(() => { if (window.playSFX) window.playSFX(name, { ...opts, dedupe: 0 }); }, at);
+    spiel('elem_dark', { rate: 0.7, volume: 0.6 }, 0);
+    spiel('elem_wind', { rate: 0.6, volume: 0.4 }, 150);
+    spiel('revive', { rate: 0.85, volume: 0.9 }, 800);
+  }, []);
+  const breite = w * 1.6;
+  return (
+    <div className="styx-tor" style={{ left: x, top: y }} aria-hidden="true">
+      <span className="styx-tor-strudel" style={{ width: breite, height: breite * 0.42, left: -breite / 2, top: h * 0.38 - breite * 0.21 }} />
+      <span className="styx-tor-strudel styx-tor-strudel-innen" style={{ width: breite * 0.6, height: breite * 0.25, left: -breite * 0.3, top: h * 0.38 - breite * 0.125 }} />
+      {seelen.map((s, i) => (
+        <span key={i} className="styx-tor-seele" style={{
+          left: s.dx - s.g / 2, top: h * 0.35, width: s.g, height: s.g * 1.6,
+          background: `radial-gradient(ellipse at 50% 35%, ${s.farbe} 0%, ${s.farbe}88 45%, transparent 75%)`,
+          boxShadow: `0 0 10px ${s.farbe}`, '--hoch': -s.hoch + 'px',
+          animationDelay: s.verzug + 'ms', animationDuration: s.dauer + 'ms',
+        }} />
+      ))}
+      <span className="styx-tor-schein" style={{ width: w * 1.3, height: h * 1.3, left: -w * 0.65, top: -h * 0.65 }} />
+    </div>
+  );
+}
+
 function TodesgabeErweckungEffect({ x, y, w = 80, h = 110 }) {
   const funken = useMemo(() => Array.from({ length: ppFxN(18) }, (_, i) => ({
     dx: (Math.random() - 0.5) * w * 1.1, hoch: h * (0.5 + Math.random() * 0.7),
@@ -8405,6 +8441,7 @@ const ANIM_REGISTRY = {
   baby_spider_opfer: BabySpiderOpferEffect,   // Baby Spider, 26.9.
   crimson_web: CrimsonWebShotEffect,          // Crimson Web, 26.9. (Name war ungenutzt vergeben)
   todesgabe_erweckung: TodesgabeErweckungEffect,   // Divine Gift of Death, 26.9.
+  styx_gate_revival: StyxTorEffect,                 // Styx, the Opened Gate, 28.9.
   gewaltsame_erweckung: GewaltsameErweckungEffect, // Forceful Revival, 26.9.
   ruestkammer_tor: RuestkammerTorEffect,           // Gate to the Armory, 26.9.
   telekinese: TelekineseEffect,                    // Telekinesis, 26.9.

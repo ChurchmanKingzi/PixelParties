@@ -2770,6 +2770,17 @@ class GameEngine {
         this.gs._discardedOnTurn[wer] = this.gs.turn;
       }
     }
+    // ★ KONTROLLE ENDET MIT DEM TOD (Styx, the Opened Gate, 28.9.) ────
+    // „You take control of the Hero while it is revived by this effect."
+    // Als Ruling: IM MOMENT DES STERBENS gilt der Held wieder als von
+    // seinem eigentlichen Besitzer kontrolliert — also reagieren DESSEN
+    // Karten (Elixir of Immortality) und beleben ihn unter DESSEN
+    // Kontrolle wieder. Hier, VOR der Zuhoerer-Runde, an der Stelle,
+    // durch die jeder Heldentod laeuft (Schaden, Besiegen, Zwangstod).
+    if (hookName === HOOKS.ON_HERO_KO && hookCtx?.hero?._kontrolleBisZumTod
+        && !(hookCtx.hero.hp > 0)) {
+      this.kontrolleBeimTodZurueckgeben(hookCtx.hero);
+    }
     if (hookName === HOOKS.ON_CREATURE_DEATH || hookName === HOOKS.ON_HERO_KO) {
       const opfer = hookCtx.creature || hookCtx.hero;
       const quelle = hookCtx.source;
@@ -9249,6 +9260,10 @@ class GameEngine {
       return false;
     }
     target.hp = this.reviveMaxHp(target);
+    // Neues Leben: kein Zwangstod aus dem alten (s. actionReviveHero).
+    delete target._forceKillAtTurnEnd;
+    delete target._forceKillSource;
+    this.zaehleHeldenWiederbelebung(target, lifeMark?.by || 'Extra Life');
     const ownerIdx = (knownOwnerIdx != null && knownOwnerIdx >= 0)
       ? knownOwnerIdx
       : this.gs.players.findIndex(ps => (ps.heroes || []).includes(target));
@@ -9725,6 +9740,27 @@ class GameEngine {
     return true;
   }
 
+  /**
+   * ★ WIE OFT WURDEN IN DIESER PARTIE HELDEN WIEDERBELEBT? (Styx, 28.9.)
+   *
+   * „after Heroes have been revived at least 3 times this game" (Styx,
+   * the Opened Gate). Gezaehlt wird JEDE Wiederbelebung eines Helden,
+   * gleich auf welcher Seite und durch welche Karte. Die drei Wege:
+   *   • `actionReviveHero` — alle Karten (Golden Ankh, Hymn, Cheat
+   *     Chair, SCARAB, Styx selbst …)
+   *   • `_consumeExtraLife` — Trial of Coolness, Rescued Damsel Cecilia
+   *   • Ascended Blooms Aufstieg aus dem Tod (Als Ruling 28.9.: zaehlt
+   *     als Wiederbelebung)
+   * Todes-VERHINDERER (Guardian Angel) zaehlen nicht — dort stirbt
+   * niemand. Kreaturen zaehlen nicht („Heroes").
+   */
+  zaehleHeldenWiederbelebung(hero, quelle) {
+    this.gs.heroRevivalCount = (this.gs.heroRevivalCount || 0) + 1;
+    this.log('hero_revival_count', {
+      hero: hero?.name || null, by: quelle || null, count: this.gs.heroRevivalCount,
+    });
+  }
+
   async actionReviveHero(playerIdx, heroIdx, hp, opts = {}) {
     const ps = this.gs.players[playerIdx];
     const hero = ps?.heroes?.[heroIdx];
@@ -9766,6 +9802,12 @@ class GameEngine {
     hero.hp = reviveHp;
     hero.statuses = {};
     delete hero._koProcessed; // Allow death cleanup to fire again if hero dies again
+    // ★ Styx (28.9.): eine NEUE Wiederbelebung ist ein neues Leben — ein
+    // Zwangstod aus einem frueheren Leben (Golden Ankh, Styx) haengt nicht
+    // mehr an ihm. Setzt die Karte ihn wieder, geschieht das gleich unten.
+    delete hero._forceKillAtTurnEnd;
+    delete hero._forceKillSource;
+    this.zaehleHeldenWiederbelebung(hero, opts.source);
 
     if (opts.maxHpCap != null) {
       hero.maxHp = opts.maxHpCap;
@@ -11507,6 +11549,30 @@ class GameEngine {
    * it is controlled by you." Temporaer = `charmedBy`/`controlledBy` ohne
    * dauerhafte Uebernahme (`permaControlBy`).
    */
+  /**
+   * ★ Styx, the Opened Gate (28.9.): eine Kontrolle, die nur so lange
+   * gilt, wie der Held lebt (`hero._kontrolleBisZumTod`). Stirbt er,
+   * geht er zurueck an seinen Besitzer — genauso wie beim Zugwechsel
+   * (dauerhafte Uebernahme `permaControlBy` wird wiederhergestellt,
+   * sonst faellt die Marke weg). Aufgerufen aus `runHooks(ON_HERO_KO)`.
+   */
+  kontrolleBeimTodZurueckgeben(hero) {
+    if (!hero?._kontrolleBisZumTod) return;
+    const quelle = hero._kontrolleBisZumTod.by || null;
+    delete hero._kontrolleBisZumTod;
+    if (hero.permaControlBy != null) {
+      hero.charmedBy = hero.permaControlBy;
+      hero.charmedFromOwner = hero.permaControlFrom;
+      hero.charmedHeroIdx = hero.permaControlHeroIdx;
+    } else {
+      delete hero.charmedBy;
+      delete hero.charmedFromOwner;
+      delete hero.charmedHeroIdx;
+    }
+    if (hero.statuses?.charmed) delete hero.statuses.charmed;
+    this.log('control_returned_on_death', { hero: hero.name, by: quelle });
+  }
+
   istTemporaerGesteuert(hero) {
     if (!hero?.name) return false;
     if (hero.permaControlBy != null) return false;
@@ -15625,6 +15691,8 @@ this._deathWatch = (this._deathWatchStack || []).length
   _charmBlocksFrom(target, quellenSeite, opts = {}) {
     const ch = target?.statuses?.charmed;
     if (!ch) return false;
+    // Styx, the Opened Gate: reine Kontrolle, der Text verspricht keinen Schutz.
+    if (ch.ohneSchutz) return false;
     if (ch._loveShot && opts.loveShotOhneSchutz) return false;
     if (ch.onlyFromController) {
       const k = ch.controller;
@@ -20470,6 +20538,8 @@ this._deathWatch = (this._deathWatchStack || []).length
           if (hero.statuses?.charmed) delete hero.statuses.charmed;
           this.log('charme_revert', { hero: hero.name });
         }
+        // Styx' Kontrolle „bis zum Tod" endet spaetestens hier mit dem Zug.
+        if (hero?._kontrolleBisZumTod) delete hero._kontrolleBisZumTod;
         // Revert Controlled Attack
         if (hero?.controlledBy != null) {
           delete hero.controlledBy;

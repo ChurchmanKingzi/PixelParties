@@ -70,8 +70,13 @@ module.exports = {
   async onAscensionBonus(engine, pi, heroIdx) {
     const hero = engine.gs.players[pi]?.heroes?.[heroIdx];
     if (!hero) return;
+    // Als Ruling 28.9.: der Aufstieg aus dem Tod heraus ZAEHLT als
+    // Wiederbelebung (Styx, the Opened Gate). Die Todesmarken stehen
+    // hier noch — `performAscension` hat die HP schon auf >= 1 gehoben.
+    const ausDemTod = !!hero._koProcessed || hero.diedOnTurn != null;
     hero.maxHp = ASCEND_HP;
     hero.hp = ASCEND_HP;
+    if (ausDemTod) engine.zaehleHeldenWiederbelebung(hero, CARD_NAME);
     delete hero.maxHpCapped;
     delete hero.diedOnTurn;
     delete hero._koProcessed;
