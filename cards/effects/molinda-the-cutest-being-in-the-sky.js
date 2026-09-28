@@ -36,7 +36,6 @@ function stealableTargets(engine, pi) {
   for (const { hero: h } of engine.heroesControlledBy(opp)) if (h?.name && h.hp > 0 && h.charmedBy == null) n++;
   for (const c of engine.cardInstances) {
     if ((c.controller ?? c.owner) !== opp || c.zone !== 'support' || c.stolenBy != null || c.faceDown) continue;
-    if (c.owner === pi) continue;   // seitenfremd auf unserer Seite: `actionStealCreature` lehnt ab
     const cd = engine.getEffectiveCardData?.(c) || engine._getCardDB()[c.name];
     if (!cd || cd.cardType !== 'Creature') continue;
     if (engine.isOmniImmune?.(c)) continue;

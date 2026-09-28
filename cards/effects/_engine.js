@@ -23856,7 +23856,11 @@ this._deathWatch = (this._deathWatchStack || []).length
    */
   actionStealCreature(stealerPi, inst, opts = {}) {
     if (!inst || inst.zone !== 'support') return false;
-    const originalOwner = inst.owner;
+    // Styx 28.9.: bestohlen wird der KONTROLLEUR. Eine ueber einen
+    // geliehenen Helden beschworene Kreatur steht beim Gegner (`owner`),
+    // gehoert aber ihrem Beschwoerer — der Brettbesitzer darf sie stehlen,
+    // `_revertStolenCreatures` gibt sie danach an den Beschwoerer zurueck.
+    const originalOwner = inst.controller ?? inst.owner;
     if (originalOwner === stealerPi) return false;
     if (inst.stolenBy != null) return false;
     // Omni-immune Creatures silently fizzle the steal attempt — the

@@ -46,9 +46,6 @@ function beuteliste(engine, oi) {
     // Kreaturen sind keine Beute.
     if ((inst.controller ?? inst.owner) !== oi || inst.zone !== 'support') continue;
     if (inst.stolenBy != null) continue;
-    // Seitenfremd auf UNSERER Seite: `actionStealCreature` lehnt ab
-    // (owner === Dieb) — nicht als Beute zaehlen.
-    if (inst.owner !== oi) continue;
     if (engine.isEquipInZone(inst.name, inst)) continue;
     const cd = engine.getEffectiveCardData(inst);
     if (!cd || cd.cardType !== 'Creature') continue;
