@@ -3606,13 +3606,15 @@ class GameEngine {
     return hasCardType(cd, 'Creature') || hasCardType(cd, 'Token');
   }
 
-  _createContext(cardInstance, hookCtx) {
-    const engine = this;
+  /**
+   * Effektive Seiten einer Instanz (Styx 28.9. aus `_createContext` gezogen,
+   * damit Kontext und Engine-Filter nie auseinanderlaufen):
+   * `owner`/`controller` = wer mit der Karte handelt (Charme, gestohlene und
+   * seitenfremd beschworene Kreaturen), `heroOwner` = physische Heldenseite.
+   */
+  effektiveSeiten(cardInstance) {
     const gs = this.gs;
-
-    // ── Resolve effective controller for cards attached to charmed heroes ──
-    // This ensures ALL equipment hooks, ability hooks, and hero hooks
-    // automatically use the charming player as controller/owner.
+    const engine = this;
     let effectiveOwner = cardInstance.owner;
     let effectiveController = cardInstance.controller;
     let effectiveHeroOwner = cardInstance.heroOwner != null ? cardInstance.heroOwner : cardInstance.controller;
@@ -3665,6 +3667,20 @@ class GameEngine {
         effectiveHeroOwner = cardInstance.owner;
       }
     }
+    return { owner: effectiveOwner, controller: effectiveController, heroOwner: effectiveHeroOwner };
+  }
+
+  _createContext(cardInstance, hookCtx) {
+    const engine = this;
+    const gs = this.gs;
+
+    // ── Resolve effective controller for cards attached to charmed heroes ──
+    // This ensures ALL equipment hooks, ability hooks, and hero hooks
+    // automatically use the charming player as controller/owner.
+    const _seiten = this.effektiveSeiten(cardInstance);
+    const effectiveOwner = _seiten.owner;
+    const effectiveController = _seiten.controller;
+    const effectiveHeroOwner = _seiten.heroOwner;
 
     const ctx = {
       // Hook event data (spread first so card-specific props override)
@@ -3870,7 +3886,7 @@ class GameEngine {
         // Überschreibbar via opts, gleiches Muster wie ctx.discardCards.
         return engine.actionMoveCard(targetCard, toZone, toHeroIdx, toSlot, {
           source: cardInstance || undefined,
-          sourceOwner: cardInstance ? (cardInstance.controller ?? cardInstance.owner) : undefined,
+          sourceOwner: cardInstance ? (effectiveController ?? cardInstance.owner) : undefined,
           ...opts,
         });
       },
@@ -4079,20 +4095,20 @@ class GameEngine {
         // `config.source` eine Ersatzquelle bauen muesste. Damit gibt es
         // genau EINE Auslegung (`applyRedirectWindows`), und sie ist
         // mehrzielfaehig.
-        return await engine.promptEffectTarget(cardInstance.controller, targets,
+        return await engine.promptEffectTarget(effectiveController, targets,
           { previewCardName: cardInstance.name, ...config, _redirectSource: config?._redirectSource || cardInstance });
       },
       async chooseTarget(type, filter) {
-        return engine.promptChooseTarget(cardInstance.controller, type, filter);
+        return engine.promptChooseTarget(effectiveController, type, filter);
       },
       async chooseCards(zone, count, filter) {
-        return engine.promptChooseCards(cardInstance.controller, zone, count, filter);
+        return engine.promptChooseCards(effectiveController, zone, count, filter);
       },
       async chooseOption(options) {
-        return engine.promptChooseOption(cardInstance.controller, options);
+        return engine.promptChooseOption(effectiveController, options);
       },
       async confirm(message) {
-        return engine.promptConfirm(cardInstance.controller, message);
+        return engine.promptConfirm(effectiveController, message);
       },
 
       // ── Hard Once Per Turn (HOPT) ──
@@ -4100,7 +4116,7 @@ class GameEngine {
       // Returns false if already used — the effect should fizzle.
       // Automatically marks as used when returning true.
       hardOncePerTurn(effectId) {
-        return engine.claimHOPT(effectId, cardInstance.controller);
+        return engine.claimHOPT(effectId, effectiveController);
       },
 
       /**
@@ -4108,7 +4124,7 @@ class GameEngine {
        * Prevents all creature summoning (hand play + effect placement).
        */
       lockSummons() {
-        const ps = gs.players[cardInstance.controller];
+        const ps = gs.players[effectiveController];
         if (ps) ps.summonLocked = true;
         engine.sync();
       },
@@ -4120,7 +4136,7 @@ class GameEngine {
        * additional-Action penalty.
        */
       lockSummonsExceptGreatmaw() {
-        const ps = gs.players[cardInstance.controller];
+        const ps = gs.players[effectiveController];
         if (ps) ps.summonLockExceptGreatmaw = true;
         engine.sync();
       },
@@ -4129,7 +4145,7 @@ class GameEngine {
        * Check if the card's controller has summons locked this turn.
        */
       isSummonLocked() {
-        return !!gs.players[cardInstance.controller]?.summonLocked;
+        return !!gs.players[effectiveController]?.summonLocked;
       },
 
       /**
@@ -4137,7 +4153,7 @@ class GameEngine {
        * Prevents all draws and cards being added to hand (search effects, etc.).
        */
       lockHand() {
-        const ps = gs.players[cardInstance.controller];
+        const ps = gs.players[effectiveController];
         if (ps) ps.handLocked = true;
         engine.sync();
       },
@@ -4146,7 +4162,7 @@ class GameEngine {
        * Check if the card's controller has hand additions locked this turn.
        */
       isHandLocked() {
-        return !!gs.players[cardInstance.controller]?.handLocked;
+        return !!gs.players[effectiveController]?.handLocked;
       },
 
       /**
@@ -4175,7 +4191,7 @@ class GameEngine {
        * Expire ALL additional actions of a type for this card's controller.
        */
       expireAllAdditionalActions(typeId) {
-        engine.expireAllAdditionalActions(cardInstance.controller, typeId);
+        engine.expireAllAdditionalActions(effectiveController, typeId);
       },
 
       /**
@@ -4186,7 +4202,7 @@ class GameEngine {
        * @returns {{ played: boolean, cardName?, cardType? }}
        */
       async performImmediateAction(heroIdx, config) {
-        return engine.performImmediateAction(cardInstance.controller, heroIdx, config);
+        return engine.performImmediateAction(effectiveController, heroIdx, config);
       },
 
       /**
@@ -4198,12 +4214,12 @@ class GameEngine {
        * @param {object} config - { title, description, allowedCardTypes?, cardNameFilter? }
        */
       async performImmediateActionAnyHero(config) {
-        return engine.performImmediateActionAnyHero(cardInstance.controller, config);
+        return engine.performImmediateActionAnyHero(effectiveController, config);
       },
 
       /** Gain gold for the card's controller. Plays animation. */
       async gainGold(amount) {
-        await engine.actionGainGold(cardInstance.controller, amount);
+        await engine.actionGainGold(effectiveController, amount);
       },
 
       /** Get the hero name for this card's hero. */
@@ -4231,7 +4247,7 @@ class GameEngine {
         // `config.cancellable` / `config.gerrymanderEligible` if they
         // want a non-cancellable confirm or want to opt out of
         // Gerrymander control specifically.
-        const result = await engine.promptGeneric(cardInstance.controller, {
+        const result = await engine.promptGeneric(effectiveController, {
           type: 'confirm',
           title: config.title || cardInstance.name,
           message: config.message,
@@ -4283,7 +4299,7 @@ class GameEngine {
         const mehrfach = (config.selectCount ?? config.maxSelect ?? 1) > 1
           || config.minSelect > 1 || config.maxBudget != null;
         if (mehrfach) return this.promptCardGalleryMulti(cards, config);
-        return engine.promptGeneric(cardInstance.controller, {
+        return engine.promptGeneric(effectiveController, {
           type: 'cardGallery', cards,
           title: config.title || cardInstance.name,
           description: config.description || 'Select a card.',
@@ -4299,7 +4315,7 @@ class GameEngine {
        * @param {object} config - { title, description, cancellable, selectCount, minSelect, maxBudget, costKey, confirmLabel, confirmClass }
        */
       async promptCardGalleryMulti(cards, config = {}) {
-        return engine.promptGeneric(cardInstance.controller, {
+        return engine.promptGeneric(effectiveController, {
           type: 'cardGalleryMulti', cards,
           ...(config.searchToHand ? { searchToHand: true } : {}),
           ...(config.searchPile ? { searchPile: config.searchPile } : {}),
@@ -4321,7 +4337,7 @@ class GameEngine {
        * @param {object} config - { title, description, cancellable }
        */
       async promptZonePick(zones, config = {}) {
-        return engine.promptGeneric(cardInstance.controller, {
+        return engine.promptGeneric(effectiveController, {
           type: 'zonePick', zones,
           title: config.title || cardInstance.name,
           description: config.description || 'Select a zone.',
@@ -4351,7 +4367,7 @@ class GameEngine {
        * @returns {Promise<{selectedStatuses: string[]}|null>}
        */
       async promptStatusSelect(targetName, statuses, config = {}) {
-        return engine.promptGeneric(cardInstance.controller, {
+        return engine.promptGeneric(effectiveController, {
           type: 'statusSelect',
           targetName,
           statuses,
@@ -4381,7 +4397,7 @@ class GameEngine {
        * }
        */
       async executeAttack(config = {}) {
-        const pi = cardInstance.controller;
+        const pi = effectiveController;
         const heroIdx = cardInstance.heroIdx;
         // Performing Hero lives on heroOwner's side. Under Love
         // Shot the caster (`pi`) plays the Attack through an opp-
@@ -4538,10 +4554,10 @@ class GameEngine {
         return gs.players[playerIdx]?.heroes?.[heroIdx] || null;
       },
       getMyHeroes() {
-        return gs.players[cardInstance.controller]?.heroes || [];
+        return gs.players[effectiveController]?.heroes || [];
       },
       getEnemyHeroes() {
-        const oppIdx = cardInstance.controller === 0 ? 1 : 0;
+        const oppIdx = effectiveController === 0 ? 1 : 0;
         return gs.players[oppIdx]?.heroes || [];
       },
 
@@ -4565,7 +4581,7 @@ class GameEngine {
        * @returns {object|null} { id, type, owner, heroIdx, slotIdx?, cardName } or null
        */
       async promptDamageTarget(config = {}) {
-        const pi = cardInstance.controller;
+        const pi = effectiveController;
         const oppIdx = pi === 0 ? 1 : 0;
         const targets = [];
 
@@ -5020,7 +5036,7 @@ class GameEngine {
         const filteredTargets = excludeIds.length > 0 ? targets.filter(t => !excludeIds.includes(t.id)) : targets;
         if (filteredTargets.length === 0) return null;
 
-        const selectedIds = await engine.promptEffectTarget(cardInstance.controller, filteredTargets, {
+        const selectedIds = await engine.promptEffectTarget(effectiveController, filteredTargets, {
           title: config.title || cardInstance.name,
           description: config.description || 'Select a target.',
           confirmLabel: config.confirmLabel || 'Attack!',
@@ -5258,7 +5274,7 @@ class GameEngine {
        * @returns {Array} selected target objects
        */
       async promptMultiTarget(config = {}) {
-        const pi = cardInstance.controller;
+        const pi = effectiveController;
         const oppIdx = pi === 0 ? 1 : 0;
         const targets = [];
         // Same alias normalization as promptDamageTarget — accept 'own'
@@ -5578,7 +5594,7 @@ class GameEngine {
         // Love Shot through the opponent's Hero in the same slot).
         const flagOwner     = cardInstance.heroOwner != null
           ? cardInstance.heroOwner
-          : (cardInstance.controller ?? cardInstance.owner ?? -1);
+          : (effectiveController ?? cardInstance.owner ?? -1);
         const casterHeroIdx = cardInstance.heroIdx ?? -1;
         const casterHeroFlag = (flagOwner >= 0 && casterHeroIdx >= 0)
           ? gs.heroFlags?.[`${flagOwner}-${casterHeroIdx}`]
@@ -19487,7 +19503,9 @@ this._deathWatch = (this._deathWatchStack || []).length
     // v601: Karten- UND Heldenvertrag an einer Stelle (Baaliel) —
     // `zoneSlot` geht weiterhin an den Kartenvertrag.
     let isInherentAction = usingSilenceBonus
-      || this.cardHasInherentAction(pi, heroIdx, cardData, { zoneSlot: opts.zoneSlot });
+      || this.cardHasInherentAction(pi, heroIdx, cardData, { zoneSlot: opts.zoneSlot,
+           // Styx 28.9.: Drop auf einen geliehenen Helden — Seite des Platzes.
+           ...(opts.charmedOwner != null && opts.charmedOwner !== pi ? { charmedOwner: opts.charmedOwner, heroOwner: opts.charmedOwner } : {}) });
 
     // Berserk free-Attack grant. A Berserked Hero's Attack is treated
     // as inherent (additional Action — doesn't consume the
@@ -40479,7 +40497,9 @@ this._deathWatch = (this._deathWatchStack || []).length
       // by exporting `globalReduceCardLevel: true` — used by Area
       // effects like Spider Hive that reduce face-down Surprise levels
       // on BOTH sides of the board.
-      if (!script.globalReduceCardLevel && inst.controller !== playerIdx) continue;
+      // Styx 28.9.: der EFFEKTIVE Kontrolleur (ein uebernommener Held wie
+      // Damus senkt fuer den, der ihn gerade kontrolliert).
+      if (!script.globalReduceCardLevel && this.effektiveSeiten(inst).controller !== playerIdx) continue;
       // v654: `evalOpts.excludeReducerInstId` — „waere die Karte auch
       // OHNE diese eine Quelle spielbar?" (Forbidden Grimoire misst
       // damit ihre eigene Unentbehrlichkeit).

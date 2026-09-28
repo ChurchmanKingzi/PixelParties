@@ -83,11 +83,13 @@ const BISS_EINSCHLAG_MS = 620;
  * zugleich die Bestätigung der Halbierung, und ein Abbruch dort kostet
  * nichts.
  */
-function makeSacrificeSpec(engine, pi, heroIdx) {
+// Styx 28.9.: geliehene Helden der Gegenspalte — `heroOwner` = physische
+// Seite des Zielhelden (fehlt → pi), nur fuer den HP-Hinweis.
+function makeSacrificeSpec(engine, pi, heroIdx, heroOwner = pi) {
   const turn = engine?.gs?.turn || 0;
   let hpHinweis = '';
   if (pi != null && pi >= 0 && heroIdx != null && heroIdx >= 0) {
-    const hero = engine?.gs?.players?.[pi]?.heroes?.[heroIdx];
+    const hero = engine?.gs?.players?.[heroOwner]?.heroes?.[heroIdx];
     if (hero && hero.hp > 0) {
       hpHinweis = ` ${hero.name}'s HP will be halved: ${hero.hp} → ${Math.floor(hero.hp / 2)}.`;
     }
@@ -106,11 +108,32 @@ function makeSacrificeSpec(engine, pi, heroIdx) {
 }
 
 /** Kann dieser Held Foresta überhaupt beschwören (lebt, Stufe reicht)? */
-function heroCanSummonHere(engine, pi, heroIdx) {
-  const hero = engine.gs.players[pi]?.heroes?.[heroIdx];
+// Styx 28.9.: geliehene Helden der Gegenspalte — `heroOwner` = physische
+// Seite des Helden (fehlt → pi); nur Helden, die `pi` kontrolliert.
+function heroCanSummonHere(engine, pi, heroIdx, heroOwner = pi) {
+  const hero = engine.gs.players[heroOwner]?.heroes?.[heroIdx];
   if (!hero?.name || hero.hp <= 0) return false;
+  if (engine.heroSideOf(heroOwner, hero) !== pi) return false;
   const cd = engine._getCardDB()[CARD_NAME];
-  return engine.heroMeetsLevelReq(pi, heroIdx, cd);
+  if (heroOwner === pi) return engine.heroMeetsLevelReq(pi, heroIdx, cd);
+  return engine.heroMeetsLevelReq(heroOwner, heroIdx, cd, { levelSourcePi: pi });
+}
+
+/**
+ * Opfer-Spec fuer einen Wurf auf einen belegten Platz: mindestens ein
+ * Opfer von DIESEM Helden. Styx 28.9.: geliehene Helden der Gegenspalte —
+ * `mustIncludeFromHeroIdx` kennt keine Seite; liegt der Held auf der
+ * Gegenspalte, fallen die Kreaturen am gleichnamigen Helden der ANDEREN
+ * Seite aus der Wahl (sonst wuerde beim geliehenen Helden kein Platz frei).
+ * Eigene Seite: exakt wie bisher. Wie Blue-Ice Dragon.
+ */
+function fullDropSpec(engine, pi, heroIdx, heroOwner = pi, base = makeSacrificeSpec(engine, pi)) {
+  const spec = { ...base, mustIncludeFromHeroIdx: heroIdx };
+  if (heroOwner !== pi) {
+    spec.filter = (c) => base.filter(c)
+      && !(c?.inst?.zone === 'support' && c.inst.heroIdx === heroIdx && c.inst.owner !== heroOwner);
+  }
+  return spec;
 }
 
 /**
@@ -126,18 +149,26 @@ function heroCanSummonHere(engine, pi, heroIdx) {
  * Handkarten-Eignung) — sonst leuchten Plätze auf, die der Server
  * anschließend ablehnt. Wortgleich zu Blue-Ice Dragon.
  */
+// Styx 28.9.: geliehene Helden der Gegenspalte — alle Helden, die `pi`
+// kontrolliert; `owner` = physische Seite, nur gesetzt, wenn ≠ pi.
 function occupiedDropSlots(gs, pi, engine) {
   const ps = gs.players[pi];
   if (!ps) return [];
   const spec = makeSacrificeSpec(engine, pi);
   const out = [];
-  for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-    const zones = ps.supportZones?.[hi] || [];
+  const helden = typeof engine.heroesControlledBy === 'function'
+    ? engine.heroesControlledBy(pi)
+    : (ps.heroes || []).map((hero, heroIdx) => ({ physOwner: pi, heroIdx, hero }));
+  for (const { physOwner, heroIdx: hi } of helden) {
+    const zones = gs.players[physOwner]?.supportZones?.[hi] || [];
     const slots = [0, 1, 2];
     if (slots.some(z => (zones[z] || []).length === 0)) continue;   // hat noch Platz
-    if (!heroCanSummonHere(engine, pi, hi)) continue;
-    if (!engine.canSatisfySacrifice(pi, { ...spec, mustIncludeFromHeroIdx: hi })) continue;
-    for (const z of slots) if ((zones[z] || []).length > 0) out.push({ heroIdx: hi, slotIdx: z });
+    if (!heroCanSummonHere(engine, pi, hi, physOwner)) continue;
+    if (!engine.canSatisfySacrifice(pi, fullDropSpec(engine, pi, hi, physOwner, spec))) continue;
+    for (const z of slots) {
+      if ((zones[z] || []).length === 0) continue;
+      out.push(physOwner !== pi ? { heroIdx: hi, slotIdx: z, owner: physOwner } : { heroIdx: hi, slotIdx: z });
+    }
   }
   return out;
 }
@@ -148,9 +179,11 @@ function occupiedDropSlots(gs, pi, engine) {
  *
  * @returns {Promise<number>} die verlorene HP-Menge (nur fürs Log)
  */
-async function zahleHpKosten(engine, pi, heroIdx) {
+// Styx 28.9.: geliehene Helden der Gegenspalte — der Held steht auf
+// `heroOwner` (fehlt → pi); `pi` zahlt.
+async function zahleHpKosten(engine, pi, heroIdx, heroOwner = pi) {
   const ps = engine.gs.players[pi];
-  const hero = ps?.heroes?.[heroIdx];
+  const hero = engine.gs.players[heroOwner]?.heroes?.[heroIdx];
   // Kein Held oder bereits tot: es gibt nichts zu halbieren. Der
   // reguläre Beschwörungsweg lässt das gar nicht erst zu (ein Held mit
   // hp <= 0 kann nicht handeln), eine Fremdbeschwörung könnte hier aber
@@ -197,14 +230,17 @@ module.exports = {
   },
 
   // Volle Zonen: die beiden Opfer machen ja gerade Platz.
+  // Styx 28.9.: geliehene Helden der Gegenspalte — nur eigene Plaetze
+  // (gefragt wird nur fuer Helden der eigenen Spalte).
   canBypassFreeZoneRequirement: (gs, pi, heroIdx, cardData, engine) =>
-    occupiedDropSlots(gs, pi, engine).some(sl => sl.heroIdx === heroIdx),
+    occupiedDropSlots(gs, pi, engine).some(sl => sl.heroIdx === heroIdx && (sl.owner ?? pi) === pi),
 
   getBouncePlacementTargets: (gs, pi, engine) => occupiedDropSlots(gs, pi, engine),
 
-  canPlaceOnOccupiedSlot: (gs, pi, heroIdx, slotIdx, engine) =>
+  // Styx 28.9.: geliehene Helden der Gegenspalte — `heroOwner` = physische Seite.
+  canPlaceOnOccupiedSlot: (gs, pi, heroIdx, slotIdx, engine, heroOwner = pi) =>
     occupiedDropSlots(gs, pi, engine)
-      .some(sl => sl.heroIdx === heroIdx && sl.slotIdx === slotIdx),
+      .some(sl => sl.heroIdx === heroIdx && sl.slotIdx === slotIdx && (sl.owner ?? pi) === heroOwner),
 
   /**
    * Beide Kostenteile bezahlen: erst die Kreaturen, dann die HP.
@@ -217,17 +253,19 @@ module.exports = {
     const pi = ctx.cardOwner;
     const ps = gs.players[pi];
     const heroIdx = ctx.cardHeroIdx;
+    // Styx 28.9.: geliehene Helden der Gegenspalte — physische Seite des
+    // Zielhelden (fehlt → pi). Opfer zahlt `pi`, die HP der Zielheld.
+    const heroOwner = (ctx.cardHeroOwner === 0 || ctx.cardHeroOwner === 1) ? ctx.cardHeroOwner : pi;
 
     // Wurf auf einen belegten Platz → mind. ein Opfer muss von diesem
     // Helden kommen, sonst wird dort kein Platz frei.
     const allFullDrop = !!ps?._requestedBouncePlaceSlot;
     if (ps?._requestedBouncePlaceSlot) delete ps._requestedBouncePlaceSlot;
 
-    const base = makeSacrificeSpec(engine, pi, heroIdx);
+    const base = makeSacrificeSpec(engine, pi, heroIdx, heroOwner);
     const spec = allFullDrop
       ? {
-          ...base,
-          mustIncludeFromHeroIdx: heroIdx,
+          ...fullDropSpec(engine, pi, heroIdx, heroOwner, base),
           description: `${base.description} At least one of them must come from the summoning Hero's Support Zones.`,
         }
       : base;
@@ -235,14 +273,15 @@ module.exports = {
     const ok = await engine.resolveSacrificeCost(ctx, spec);
     if (!ok) return false;
 
-    await zahleHpKosten(engine, pi, heroIdx);
+    await zahleHpKosten(engine, pi, heroIdx, heroOwner);
 
     if (allFullDrop) {
-      const supZones = ps.supportZones[heroIdx] || [];
+      const supZones = gs.players[heroOwner]?.supportZones?.[heroIdx] || [];
       const freedSlot = [0, 1, 2].find(z => (supZones[z] || []).length === 0);
       if (freedSlot == null) return false;
       await engine.actionPlaceCreature(CARD_NAME, pi, heroIdx, freedSlot, {
         source: 'external', sourceName: CARD_NAME, fireHooks: true,
+        ...(heroOwner !== pi ? { heldSeite: heroOwner } : {}),
       });
       ps._placementConsumedByCard = CARD_NAME;
     }
