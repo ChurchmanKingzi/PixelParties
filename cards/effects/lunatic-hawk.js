@@ -270,9 +270,10 @@ module.exports = {
       }
 
       // ── Tier 3+: double current & max HP of Creatures YOU summon ──
+      // Kontrolle statt Seite (Styx 28.9.): „you summon" = Kontrolleur.
       if (n >= 3
         && hasCardType(cd, 'Creature')
-        && entering.owner === pi
+        && (entering.controller ?? entering.owner) === pi
         && !ctx._isMove) {
         const curMax = entering.counters?.maxHp ?? (cd.hp || 0);
         if (curMax > 0) {

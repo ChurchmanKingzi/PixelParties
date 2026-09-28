@@ -11,7 +11,12 @@
 //    `cannotBeReduced`-Sperre (Ida, Monia-Bot-True-Damage, eine
 //    ZWEITE Tempeste …). Nie unter 0. Gilt fuer jede Quelle, die durch
 //    actionDealDamage laeuft, also auch Burn/Poison. Nicht fuer sie
-//    selbst.
+//    selbst. „Eigene" heisst KONTROLLIERTE (Styx 28.9.): geliehene
+//    Helden der Gegenspalte zaehlen mit, eigene, die gerade der
+//    Gegner kontrolliert, nicht.
+//  • Stirbt Tempeste mitten in einem Flaechenschlag, wirkt die
+//    Reduktion bis zum Ende des Schlags weiter (Todes-Aufschub, siehe
+//    `heldTodAufgeschoben` in der Engine).
 //  • Der Hook wird von `runHooks` gefiltert: ist Tempeste Frozen /
 //    Stunned / Negated / mumifiziert, laeuft er nicht — die Reduktion
 //    faellt dann von selbst weg.
@@ -58,12 +63,21 @@ module.exports = {
       const hi = ctx.cardHeroIdx;
       const ziel = ctx.target;
       if (!ziel || ziel.hp === undefined) return;          // nur Helden
-      const ps = engine.gs.players[pi];
-      const zielIdx = (ps?.heroes || []).indexOf(ziel);
-      // Eigene ANDERE Helden. Der Selbst-Ausschluss ist doppelter
-      // Boden: fuer Tempeste selbst setzt die Engine `cannotBeReduced`,
-      // bevor dieser Hook laeuft (siehe unten).
-      if (zielIdx < 0 || zielIdx === hi) return;
+      // ★ Kontrolle statt Seite (Styx 28.9.): „your other Heroes" sind
+      // die Helden, die Tempestes KONTROLLEUR (`ctx.cardOwner`) gerade
+      // kontrolliert — auch geliehene aus der Gegenspalte. Ein eigener
+      // Held, den gerade der Gegner kontrolliert, faellt heraus.
+      const zielSeite = engine._findHeroOwner(ziel);
+      if (zielSeite < 0) return;
+      if (engine.heroSideOf(zielSeite, ziel) !== pi) return;
+      // ANDERE Helden. Vergleich ueber das Heldenobjekt, nicht den
+      // Index — die Indizes sind auf beiden Seiten dieselben. Der
+      // Selbst-Ausschluss ist doppelter Boden: fuer Tempeste selbst
+      // setzt die Engine `cannotBeReduced`, bevor dieser Hook laeuft
+      // (siehe unten).
+      const selbst = ctx.attachedHero
+        || engine.gs.players[ctx.cardHeroOwner ?? ctx.cardOriginalOwner]?.heroes?.[hi];
+      if (ziel === selbst) return;
       if (!(ctx.amount > 0)) return;
       // Ob die Reduktion greift, entscheidet allein die Sperre.
       if (ctx.cannotBeReduced) return;                       // z.B. zweite Tempeste, Ida, True Damage

@@ -62,7 +62,8 @@ module.exports = {
 
       // Only trigger for creatures entering this player's own support zones
       const entering = ctx.enteringCard;
-      if (!entering || entering.owner !== pi) return;
+      // Kontrolle statt Seite (Styx 28.9.): zaehlt, wer die Kreatur kontrolliert.
+      if (!entering || (entering.controller ?? entering.owner) !== pi) return;
 
       const cd = engine.getEffectiveCardData(entering) || engine._getCardDB()[entering.name];
       if (!cd || !hasCardType(cd, 'Creature')) return;

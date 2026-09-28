@@ -45,7 +45,8 @@ module.exports = {
 
       const entering = ctx.enteringCard;
       if (!entering) return;
-      if (entering.owner !== ctx.cardOwner) return;
+      // Kontrolle statt Seite (Styx 28.9.): Slimes, die ich kontrolliere.
+      if ((entering.controller ?? entering.owner) !== ctx.cardOwner) return;
       if (entering.id === ctx.card.id) return;
       if (SLIMES_NOT_DOUBLED.has(entering.name)) return;
 

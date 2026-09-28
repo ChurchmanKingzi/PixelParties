@@ -172,13 +172,16 @@ module.exports = {
       // attribution; status/burn/poison ticks are NOT "an opponent's
       // card or effect" (they're residual status damage with no source-
       // controller at tick time).
+      // Kontrolle statt Seite (Styx 28.9.): „opponent" / „discard" richten
+      // sich nach dem Kontrolleur beim Tod, nicht nach der Brettseite.
+      const ich = death.controller ?? death.owner;
       const source = ctx.source;
       const srcOwner = source?.controller ?? source?.owner ?? -1;
-      if (srcOwner < 0 || srcOwner === ctx.cardOriginalOwner) return;
+      if (srcOwner < 0 || srcOwner === ich) return;
       if (['status', 'burn', 'poison'].includes(ctx.type)) return;
 
       const engine = ctx._engine;
-      const pi     = ctx.cardOriginalOwner;
+      const pi     = ich;
       const ps     = engine.gs.players[pi];
       if (!ps) return;
 

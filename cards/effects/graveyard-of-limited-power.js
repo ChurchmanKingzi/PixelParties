@@ -67,7 +67,8 @@ module.exports = {
       if (targetOwner == null || targetOwner < 0) return;
       const losingPi = playerWithMoreDiscard(engine.gs);
       if (losingPi < 0) return;
-      if (targetOwner !== losingPi) return;
+      // „targets controlled by" — Kontrolle statt Seite (Styx 28.9.)
+      if (engine.heroSideOf(targetOwner, target) !== losingPi) return;
       // Diver Helmet: equipped Hero is unaffected by Areas — no +50.
       const tgtHi = (engine.gs.players[targetOwner]?.heroes || []).indexOf(target);
       if (tgtHi >= 0 && heroHasDiverHelmet(engine, targetOwner, tgtHi)) return;

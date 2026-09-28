@@ -79,7 +79,10 @@ module.exports = {
       const pi = ctx.cardOwner; // Effective controller (auto-resolved for charmed heroes)
       const heroIdx = ctx.cardHeroIdx;
       const hero = gs.players[ctx.cardOriginalOwner]?.heroes?.[heroIdx];
-      if (!hero?.name || hero.hp <= 0) return;
+      // Tot = kein Schutz — AUSSER Monia ist im laufenden Flaechenschlag
+      // gefallen: ihr Tod ist nur vorgemerkt, die Negation gehoert noch
+      // zur Schadensberechnung dieses Schlags (Todes-Aufschub 28.9.).
+      if (!hero?.name || (hero.hp <= 0 && !engine.heldTodAufgeschoben(hero))) return;
       if (hero.statuses?.frozen || hero.statuses?.stunned || hero.statuses?.negated) return;
 
       const flagKey = `${ctx.cardOriginalOwner}-${heroIdx}`;

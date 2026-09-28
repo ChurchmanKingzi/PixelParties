@@ -184,7 +184,8 @@ module.exports = {
       const entering = ctx.enteringCard;
       if (!entering) return;
       if (ctx.toZone !== 'support') return;
-      if (entering.owner !== ctx.cardOwner) return;
+      // Kontrolle statt Seite (Styx 28.9.): „targets you control".
+      if ((entering.controller ?? entering.owner) !== ctx.cardOwner) return;
 
       // Only Creatures get buffs, not Equipment Artifacts
       const cardDB = ctx._engine._getCardDB();

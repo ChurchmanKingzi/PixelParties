@@ -46,7 +46,8 @@ function isLoyalCreature(cardName, engine /*, inst = null */) {
 function countLoyalCreatures(engine, playerIdx) {
   let n = 0;
   for (const inst of engine.cardInstances) {
-    if (inst.owner !== playerIdx) continue;
+    // Kontrolle statt Seite (Styx 28.9.): „Loyal Creatures you control".
+    if ((inst.controller ?? inst.owner) !== playerIdx) continue;
     if (inst.zone !== 'support') continue;
     if (inst.faceDown) continue;
     if (!isLoyalCreature(inst.name, engine, inst)) continue;

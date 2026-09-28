@@ -86,7 +86,9 @@ module.exports = {
 
       const engine = ctx._engine;
       const gs     = engine.gs;
-      const pi     = ctx.cardOriginalOwner;
+      // Kontrolle statt Seite (Styx 28.9.): „you" = Kontrolleur des Terriers
+      // (cardOwner), nicht seine Brettseite (cardOriginalOwner).
+      const pi     = ctx.cardOwner;
       const ps     = gs.players[pi];
       if (!ps) return;
 

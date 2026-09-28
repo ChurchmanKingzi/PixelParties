@@ -152,7 +152,8 @@ module.exports = {
       const death = ctx.creature;
       if (!death || !ctx.card) return;
       if (death.instId !== ctx.card.id) return;
-      await recoverCybugFuel(ctx._engine, death.owner, FUEL_CARD, CARD_NAME);
+      // Kontrolle statt Seite (Styx 28.9.): „your discard pile" = Kontrolleur beim Tod.
+      await recoverCybugFuel(ctx._engine, death.controller ?? death.owner, FUEL_CARD, CARD_NAME);
     },
   },
 };

@@ -84,7 +84,8 @@ module.exports = {
 
       const zielSeite = ctx._engine?._findHeroOwner?.(ctx.target);
       if (typeof zielSeite !== 'number' || zielSeite < 0) return;
-      if (zielSeite === ctx.cardOwner) return;   // eigener Rueckstoss bleibt minderbar
+      // eigener Rueckstoss bleibt minderbar — „eigen" nach Kontrolle (Styx 28.9.)
+      if (ctx._engine.heroSideOf(zielSeite, ctx.target) === ctx.cardOwner) return;
 
       ctx.lockReduction();
       ctx.setFlag('cannotBeNegated', true);

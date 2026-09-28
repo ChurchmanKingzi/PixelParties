@@ -48,7 +48,10 @@ module.exports = {
       const pi = ctx.cardOwner;
       const heroIdx = ctx.cardHeroIdx;
       const hero = ctx.attachedHero;
-      if (!hero || hero.hp <= 0) return;
+      // Tot wirkt nicht — AUSSER der Tod ist im laufenden Flaechenschlag
+      // nur vorgemerkt: dann gehoert Effekt 1 (Negation) noch zur
+      // Schadensberechnung dieses Schlags (Todes-Aufschub 28.9.).
+      if (!hero || (hero.hp <= 0 && !engine.heldTodAufgeschoben(hero))) return;
 
       const entries = ctx.entries;
       if (!entries || entries.length === 0) return;
@@ -67,6 +70,10 @@ module.exports = {
       }
 
       // ── Effect 2: Protection prompt for opponent-sourced creature damage ──
+      // Der Preis ist Schaden an Diamond selbst. Steht sie schon auf 0 HP
+      // (Tod nur vorgemerkt), liefe er ins Leere — der Schutz waere
+      // umsonst. Also nur mit lebender Diamond.
+      if (hero.hp <= 0) return;
       // Collect entries where the source is the opponent
       const oppIdx = pi === 0 ? 1 : 0;
       const opponentEntries = entries.filter(e =>

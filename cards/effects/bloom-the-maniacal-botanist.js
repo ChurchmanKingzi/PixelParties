@@ -40,8 +40,11 @@ module.exports = {
       if (!ziel || ziel.hp === undefined) return;   // Creatures haben kein hp-Feld
 
       // Bloom muss leben, um zu wirken — ein gefallener Held wirkt nicht.
+      // Ausnahme: im laufenden Flaechenschlag gefallen (Tod nur
+      // vorgemerkt) — dann wirkt die Aura bis zum Ende des Schlags
+      // weiter (Todes-Aufschub 28.9.).
       const selbst = engine.gs.players[ctx.cardHeroOwner]?.heroes?.[ctx.cardHeroIdx];
-      if (!selbst?.name || selbst.hp <= 0) return;
+      if (!selbst?.name || (selbst.hp <= 0 && !engine.heldTodAufgeschoben(selbst))) return;
 
       // Welcher Held nimmt gerade Schaden?
       let owner = -1, heroIdx = -1;

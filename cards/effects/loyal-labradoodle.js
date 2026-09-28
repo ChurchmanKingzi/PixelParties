@@ -39,7 +39,8 @@ module.exports = {
   hooks: {
     beforeCreatureDamageBatch: async (ctx) => {
       const engine = ctx._engine;
-      const ownerIdx = ctx.cardOriginalOwner;
+      // Kontrolle statt Seite (Styx 28.9.): „your Creatures" = Kontrolleur.
+      const ownerIdx = ctx.cardOwner;
 
       // Pre-compute Loyal count for this side once — same value
       // applies to every entry in this batch.

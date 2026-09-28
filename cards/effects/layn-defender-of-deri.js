@@ -122,7 +122,9 @@ module.exports = {
       if (!entering) return;
 
       const pi = ctx.cardOwner;
-      if (entering.owner !== pi && entering.controller !== pi) return;
+      // Kontrolle statt Seite (Styx 28.9.): „you summon" = Kontrolleur, nicht
+      // die Brettseite (seitenfremd beschworene Kreatur: owner ≠ controller).
+      if ((entering.controller ?? entering.owner) !== pi) return;
 
       const engine = ctx._engine;
       const cd = engine.getEffectiveCardData(entering) || engine._getCardDB()[entering.name];

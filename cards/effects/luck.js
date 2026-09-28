@@ -151,7 +151,9 @@ module.exports = {
       // v1352 (Als Ruling): die Rueckkehr einer verwahrten Ability (Madame
       // Guillotine) ist kein Ausspielen.
       if (ctx._verwahrungRueckkehr) return;
-      await module.exports.hooks._triggerLuck(ctx, entering.name, entering.owner);
+      // Kontrolle statt Seite (Styx 28.9.): gespielt hat der Kontrolleur —
+      // eine seitenfremd beschworene Kreatur liegt beim Gegner (owner).
+      await module.exports.hooks._triggerLuck(ctx, entering.name, entering.controller ?? entering.owner);
     },
 
     /**

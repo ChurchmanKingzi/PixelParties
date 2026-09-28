@@ -378,6 +378,11 @@ function _applyForcesTargetingFilter(engine, targets, casterPi) {
 //  CARD INSTANCE
 //  Wraps a card name with tracking metadata.
 // ═══════════════════════════════════════════
+// Hooks, die Schaden BERECHNEN (Reduktion, Umleitung, Negation). Helden,
+// deren Tod im laufenden Schlag nur vorgemerkt ist, wirken hier noch mit
+// (siehe `heldTodAufgeschoben`).
+const SCHADENSBERECHNUNGS_HOOKS = new Set([HOOKS.BEFORE_DAMAGE, HOOKS.BEFORE_CREATURE_DAMAGE_BATCH]);
+
 class CardInstance {
   constructor(name, owner, zone, heroIdx = -1, zoneSlot = -1) {
     this.id = uuidv4().substring(0, 12);
@@ -3114,8 +3119,17 @@ class GameEngine {
         // whose attack still finished off the target gets to claim the
         // tutor. Hookctx-level `_bypassDeadHeroFilter` (set by the
         // engine for ON_HERO_KO etc.) still wins for backward compat.
+        // ★ 28.9. (Als Befund: Tempeste starb mitten im Flaechenschlag,
+        // die Helden NACH ihr bekamen vollen Schaden): „Erst alle
+        // Schadensberechnungen, dann pruefen, was gestorben ist, dann die
+        // Tode abwickeln." Ein Held, dessen Tod im laufenden Schlag nur
+        // VORGEMERKT ist (`_todesAufschub`), ist fuer die Berechnung noch
+        // nicht tot — seine Reduktionen/Umleitungen gelten bis zum Ende
+        // des Schlags. Nur fuer die Berechnungs-Hooks; Nachwirkungen
+        // (afterDamage …) eines toten Helden bleiben aus.
         if (hero.hp <= 0
             && !hookCtx._bypassDeadHeroFilter
+            && !(SCHADENSBERECHNUNGS_HOOKS.has(hookName) && this.heldTodAufgeschoben(hero))
             && !loadCardEffect(c.name)?.bypassDeadHeroFilter) return false;
         // Frozen / Stunned silence hero + ability passives. Chilly Dog
         // (Mischief Militia) lifts the FROZEN-ONLY case for own-side
@@ -8984,6 +8998,17 @@ class GameEngine {
         await this._checkReactiveHandLimits(owner);
       }
     });
+  }
+
+  /**
+   * Ist der Tod dieses Helden im laufenden Flaechenschlag nur vorgemerkt
+   * (noch nicht abgewickelt)? Dann gilt er fuer die SCHADENSBERECHNUNG
+   * des restlichen Schlags noch als im Spiel (Tempeste, 28.9.).
+   */
+  heldTodAufgeschoben(hero) {
+    const a = this._todesAufschub;
+    if (!a || !hero || hero._koProcessed) return false;
+    return a.liste.some(t => t.art === 'held' && t.target === hero);
   }
 
   /** Ein Held ist auf 0 HP gefallen: sofort abwickeln oder vormerken. */
@@ -18375,13 +18400,15 @@ this._deathWatch = (this._deathWatchStack || []).length
    * Sitzung sind dreimal Anzeige und Klick auseinandergelaufen, weil
    * dieselbe Frage an zwei Stellen beantwortet wurde — hier nicht.
    */
-  isCreationZoneUsable(playerIdx) {
+  isCreationZoneUsable(playerIdx, opts = {}) {
     const ps = this.gs.players[playerIdx];
     if (!ps || (ps.creationZone || []).length === 0) return false;
     for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
       const hero = ps.heroes[hi];
       if (hero?.name !== CRESTINA_ASCENDED) continue;
-      if (hero.hp <= 0) continue;                      // tot
+      // tot — ausser `opts.schadensberechnung` und der Tod ist im laufenden
+      // Flaechenschlag nur vorgemerkt (Todes-Aufschub 28.9.)
+      if (hero.hp <= 0 && !(opts.schadensberechnung && this.heldTodAufgeschoben(hero))) continue;
       const st = hero.statuses || {};
       if (st.frozen || st.stunned || st.webbed || st.negated || st.bound) continue;
       return true;

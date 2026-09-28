@@ -210,14 +210,18 @@ module.exports = {
 
       // Crestina selbst muss handlungsfaehig sein — und der Vorrat
       // benutzbar. Dieselbe eine Wahrheit wie ueberall.
-      if (!engine.isCreationZoneUsable(pi)) return;
+      // `schadensberechnung` (28.9.): faellt Crestina im selben
+      // Flaechenschlag, wirkt die Negation bis zum Ende des Schlags.
+      if (!engine.isCreationZoneUsable(pi, { schadensberechnung: true })) return;
 
       // Ziel muss ein EIGENER Ascended Hero sein.
       const cardDB = engine._getCardDB();
       const ziel = ctx.target;
       if (!ziel?.name) return;
       if (cardDB[ziel.name]?.cardType !== 'Ascended Hero') return;
-      if (!(ps.heroes || []).includes(ziel)) return;
+      // „you control" — Kontrolle statt Seite (Styx 28.9.).
+      const zielSeite = engine._findHeroOwner(ziel);
+      if (zielSeite < 0 || engine.heroSideOf(zielSeite, ziel) !== pi) return;
 
       // Durchschlagender Schaden laesst sich nicht negieren — bail
       // VOR der Abfrage, sonst zahlt der Spieler eine Karte umsonst

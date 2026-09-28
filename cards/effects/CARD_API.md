@@ -18430,3 +18430,12 @@ Ein übernommener Held (Charme, Golden Apple, Love Shot, Styx, Paraseed) steht p
 - **Opfer-Pflicht mit Seite:** `mustIncludeFromHeroIdx` + optional **`mustIncludeFromHeroOwner`** (physische Seite des Helden). Ohne das Feld zählt wie bisher jede Spalte mit diesem Index. Engine (`canSatisfySacrifice`, `resolveSacrificeCost`) und Client-Prüfung beachten beide Felder.
 - **`isCreatureSummonable(name, seite, heroIdx)`**: Steht der Held auf `seite` gerade unter fremder Kontrolle, ist der Kontrolleur der Beschwörer (`cardOwner`), `cardHeroOwner` = `seite`. Aufrufer übergeben also immer die physische Seite des Helden.
 - **Heldeneffekte „this Hero" eines übernommenen Helden** (Calamitusk, Cute Annoyance Mini, Argos, Garius, Klaus, Thep, Orthos, Stellan, Lizbeth, Damus, Dajan, Inya): beschwören in die Spalte des Helden (`ctx.cardHeroOwner`) mit `heldSeite`, bezahlt/gesteuert vom Kontrolleur.
+
+## ★ Flächenschaden: erst alle Schadensberechnungen, dann die Tode (28.9., Tempeste)
+
+Regel des Designers: „Alle Schadensberechnungen → prüfen, was gestorben ist → Tode in Reihenfolge abwickeln.“ Innerhalb einer Flächenklammer (`beginAoeStrike`/`beginMultiHit` … `await endMultiHit()`, auch `dealDamageToTargets`) wird ein Heldentod nur vorgemerkt (`_todesAufschub`).
+
+- **`engine.heldTodAufgeschoben(hero)`**: true, solange der Tod dieses Helden im laufenden Schlag nur vorgemerkt ist.
+- **`runHooks`**: Für die Berechnungs-Hooks `beforeDamage` und `beforeCreatureDamageBatch` (`SCHADENSBERECHNUNGS_HOOKS`) filtert der Tote-Helden-Filter einen solchen Helden NICHT heraus. Seine Reduktionen, Negationen und Auren (Heldeneffekt, Abilities, Ausrüstung) gelten bis zum Ende des Schlags (Tempeste, Monia, Great Wall, Diamond, Bloom, Chuck, Crestina). Nachwirkungen wie `afterDamage` eines toten Helden laufen weiterhin nicht.
+- **Skripte mit eigener Lebend-Prüfung des Wirts** in diesen Hooks schreiben `host.hp <= 0 && !engine.heldTodAufgeschoben(host)`. Ausnahme: Umleitungen AUF den Wirt (Prophecy of Tempeste, Johanna, Bubbles, Deepsea Siren) und Kosten, die mit Schaden am Wirt bezahlt werden (Diamond, Effekt 2). Dort bleibt `hp > 0` Pflicht, sonst würde Schaden an einen Toten den Treffer faktisch negieren.
+- **`isCreationZoneUsable(pi, { schadensberechnung: true })`**: dieselbe Ausnahme für Crestinas Negation.

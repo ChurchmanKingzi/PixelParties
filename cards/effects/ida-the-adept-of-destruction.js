@@ -121,7 +121,8 @@ module.exports = {
       // NICHT gestempelt.
       const targetOwner = ctx._engine?._findHeroOwner?.(ctx.target);
       if (typeof targetOwner !== 'number' || targetOwner < 0) return;
-      if (targetOwner === ctx.cardOwner) return;
+      // „your opponent's targets" — Kontrolle statt Seite (Styx 28.9.)
+      if (ctx._engine.heroSideOf(targetOwner, ctx.target) === ctx.cardOwner) return;
       ctx.lockReduction();
       ctx.setFlag('cannotBeNegated', true);
     },
