@@ -1,0 +1,16 @@
+{
+  "hero": "Fern, the Liberated Fairy",
+  "sheet": "fern-the-liberated-fairy.png",
+  "frameWidth": 36,
+  "frameHeight": 49,
+  "frames": 48,
+  "frameMs": 90,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 4,
+  "padLeft": 3,
+  "padRight": 3,
+  "padBottom": 4,
+  "faceX": 17.0,
+  "footY": 45
+}

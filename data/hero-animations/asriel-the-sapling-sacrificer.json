@@ -1,0 +1,15 @@
+{
+  "hero": "Asriel, the Sapling Sacrificer",
+  "sheet": "asriel-the-sapling-sacrificer.png",
+  "frameWidth": 26,
+  "frameHeight": 30,
+  "frames": 48,
+  "frameMs": 90,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 3,
+  "padLeft": 3,
+  "padRight": 3,
+  "padBottom": 2,
+  "faceX": 13.0
+}

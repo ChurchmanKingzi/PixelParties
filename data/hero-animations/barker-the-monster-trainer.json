@@ -1,0 +1,16 @@
+{
+  "hero": "Barker the Monster Trainer",
+  "sheet": "barker-the-monster-trainer.png",
+  "frameWidth": 24,
+  "frameHeight": 32,
+  "frames": 48,
+  "frameMs": 90,
+  "loop": true,
+  "layout": "horizontal",
+  "skinOf": "Barker, the Monster Tamer",
+  "padTop": 4,
+  "padLeft": 3,
+  "padRight": 3,
+  "padBottom": 2,
+  "faceX": 12.0
+}

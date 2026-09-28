@@ -1,0 +1,16 @@
+{
+  "hero": "Broghan the Ancient Golem",
+  "sheet": "broghan-the-ancient-golem.png",
+  "frameWidth": 55,
+  "frameHeight": 39,
+  "frames": 48,
+  "frameMs": 90,
+  "loop": true,
+  "layout": "horizontal",
+  "skinOf": "Broghan, the Frozen Guardian of the North",
+  "padTop": 5,
+  "padLeft": 14,
+  "padRight": 14,
+  "padBottom": 2,
+  "faceX": 27.5
+}

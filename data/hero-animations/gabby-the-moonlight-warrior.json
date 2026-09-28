@@ -1,0 +1,16 @@
+{
+  "hero": "Gabby the Moonlight Warrior",
+  "sheet": "gabby-the-moonlight-warrior.png",
+  "frameWidth": 28,
+  "frameHeight": 29,
+  "frames": 48,
+  "frameMs": 90,
+  "loop": true,
+  "layout": "horizontal",
+  "skinOf": "Gabby, the Pirate Zombie",
+  "padTop": 4,
+  "padLeft": 3,
+  "padRight": 3,
+  "padBottom": 2,
+  "faceX": 14.0
+}

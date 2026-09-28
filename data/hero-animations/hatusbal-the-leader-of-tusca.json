@@ -1,0 +1,15 @@
+{
+  "hero": "Hatusbal, the Leader of Tusca",
+  "sheet": "hatusbal-the-leader-of-tusca.png",
+  "frameWidth": 31,
+  "frameHeight": 32,
+  "frames": 48,
+  "frameMs": 90,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 4,
+  "padLeft": 3,
+  "padRight": 4,
+  "padBottom": 2,
+  "faceX": 15.0
+}

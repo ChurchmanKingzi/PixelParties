@@ -1,0 +1,16 @@
+{
+  "hero": "Cecilia the Clown",
+  "sheet": "cecilia-the-clown.png",
+  "frameWidth": 36,
+  "frameHeight": 33,
+  "frames": 48,
+  "frameMs": 90,
+  "loop": true,
+  "layout": "horizontal",
+  "skinOf": "Cecilia, the Harrowing Crusader",
+  "padTop": 4,
+  "padLeft": 3,
+  "padRight": 3,
+  "padBottom": 2,
+  "faceX": 18.0
+}

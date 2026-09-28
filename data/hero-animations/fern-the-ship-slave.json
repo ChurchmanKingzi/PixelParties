@@ -1,0 +1,15 @@
+{
+  "hero": "Fern, the Ship Slave",
+  "sheet": "fern-the-ship-slave.png",
+  "frameWidth": 32,
+  "frameHeight": 28,
+  "frames": 48,
+  "frameMs": 90,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 3,
+  "padLeft": 3,
+  "padRight": 3,
+  "padBottom": 2,
+  "faceX": 13.0
+}

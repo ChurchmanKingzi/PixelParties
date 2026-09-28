@@ -1,0 +1,16 @@
+{
+  "hero": "Fern the Elf Slave",
+  "sheet": "fern-the-elf-slave.png",
+  "frameWidth": 31,
+  "frameHeight": 23,
+  "frames": 48,
+  "frameMs": 90,
+  "loop": true,
+  "layout": "horizontal",
+  "skinOf": "Fern, the Ship Slave",
+  "padTop": 3,
+  "padLeft": 3,
+  "padRight": 3,
+  "padBottom": 2,
+  "faceX": 14.0
+}

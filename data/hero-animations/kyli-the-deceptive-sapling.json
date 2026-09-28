@@ -1,0 +1,15 @@
+{
+  "hero": "Kyli, the Deceptive Sapling",
+  "sheet": "kyli-the-deceptive-sapling.png",
+  "frameWidth": 30,
+  "frameHeight": 40,
+  "frames": 48,
+  "frameMs": 90,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 5,
+  "padLeft": 3,
+  "padRight": 3,
+  "padBottom": 2,
+  "faceX": 15.0
+}

@@ -1,0 +1,16 @@
+{
+  "hero": "ELEGANT Ingo",
+  "sheet": "elegant-ingo.png",
+  "frameWidth": 23,
+  "frameHeight": 31,
+  "frames": 48,
+  "frameMs": 90,
+  "loop": true,
+  "layout": "horizontal",
+  "skinOf": "Ingo, Investor of Evil",
+  "padTop": 4,
+  "padLeft": 3,
+  "padRight": 3,
+  "padBottom": 2,
+  "faceX": 13.0
+}
