@@ -351,9 +351,11 @@ const CONDITIONS = {
   // wird die laufende Siegesserie."): zahlt NUR, wenn dieser Sieg die
   // laufende Serie (über alle Tage, `serieGesamt` inkl. dieses Siegs) auf
   // ein Vielfaches von 10 bringt — Stufe = Serie/10, gedeckelt bei 5,
-  // ausgezahlt Stufe × Katalogbetrag (5): 10 → +5, 20 → +10 … 50 → +25,
-  // danach jeder weitere Zehner +25. Katalog `unlimited` statt
+  // ausgezahlt Stufe × Katalogbetrag. Katalog `unlimited` statt
   // `daily_per_opponent`. Bis v1473 zahlte es ab 10 Siegen JEDEN Sieg.
+  // ★ v1475 (Als Vorgabe 28.9.: „da es nur einmal bei jedem Meilenstein
+  // zählt, verfünffache die Rewards"): Katalogbetrag 25 statt 5 —
+  // 10 → +25, 20 → +50 … 50 → +125, danach jeder weitere Zehner +125.
   win_streak_bonus: (c) => {
     if (!c.isWinner) return false;
     const serie = c.serieGesamt || 0;
