@@ -119,18 +119,22 @@ Dazu je Variante:
              Kartenbilds stehen in Frame 0 und lösen sich in Fetzen auf. Bei
              Tazune lodern die Flammen: jede Flammensäule streckt und staucht
              sich, die Zungen wiegen, Fetzen reißen ab; beim Skin kein Feuer.
-* zi:        Timeless King Zi schwebt langsam auf und ab, der Umhang wogt majestätisch
-             (Welle von oben nach unten, der Saum kräuselt sich nach außen, hängt dem
-             Schweben nach), rundherum funkeln viele Sterne (nie halb hinter der Figur).
-* waflav:    brüllt einmal pro Loop: Anlauf (Kopf duckt sich, das Maul schließt sich), dann
-             reißt der Oberkiefer drei Zeilen auf (dunkler Rachen), die Augen glühen; sonst atmet es.
-* wahflav / ash / zetsu: federn, blinzeln; bei Kyli, the True Mastermind öffnen sich
-             die Fliegenfallen-Blätter beim Atmen.
+* zi:        Timeless King Zi schwebt langsam auf und ab, die Arme heben und senken sich
+             leicht, der Umhang wogt majestätisch (Welle von oben nach unten, der Saum
+             kräuselt sich nach außen, hängt dem Schweben nach); die gelben Augen leuchten
+             pulsierend und funkeln, rundherum funkeln viele Sterne (nie halb hinter der Figur).
+* waflav:    brüllt einmal pro Loop: der Unterkiefer klappt samt unteren Reißzähnen bis zu drei
+             Pixel herunter und legt sich über den Hals, dazwischen der rote Rachen mit
+             Zunge; die Augen glühen; sonst atmet es.
+* wahflav / ash / zetsu: federn, blinzeln; Ash (Barker, the Monster Trainer) federt über die
+             Beine (Oberkörper 2 px, Knie 1 px, Füße fest); bei Kyli, the True Mastermind
+             öffnen sich die Fliegenfallen-Blätter beim Atmen.
 * xal / axal: atmen (1 px), der Umhang weht leicht nach außen, die Augen glühen.
 * octo:      Octo-Alleria: die acht Tentakel bewegen sich einzeln (glattes, ganzzahliges
              Verschiebungsfeld je Arm mit eigener Phase, zur Spitze hin stärker), der Körper
-             atmet, sie blinzelt.
-* dreemurr:  Monster Prince Asriel federt, blinzelt; Blut rinnt die Messerklinge hinab und
+             atmet, sie blinzelt; Blubberblasen steigen auf, wachsen und platzen (nie an
+             der Figur).
+* dreemurr:  Monster Prince Asriel federt, blinzelt, der Mund geht auf und zu (offen rot); Blut rinnt die Messerklinge hinab und
              tropft vom Knauf zu Boden.
 """
 import math
@@ -254,7 +258,7 @@ V_ = {
                          'zu': [((4, 12), '000000'), ((5, 12), '000000'), ((8, 12), '000000'), ((9, 12), '000000')]}),
     'xal': dict(slug='xal-the-animated-armor', knee=27, pads=(4, 4, 3, 2)),
     'axal': dict(slug='alchemic-xal', knee=28, pads=(4, 4, 3, 2)),
-    'octo': dict(slug='alleria-the-octo-princess', pads=(4, 4, 3, 4),
+    'octo': dict(slug='alleria-the-octo-princess', pads=(6, 6, 8, 3),
                  blink={'halb': [((14, 9), '000200'), ((15, 9), '000200')],
                         'zu': [((14, 8), 'f8bc77'), ((15, 8), 'f8bc77'), ((14, 9), '000000'), ((15, 9), '000000')]}),
     'dreemurr': dict(slug='monster-prince-asriel', knee=20,
@@ -2075,33 +2079,47 @@ def f_zi(i):
     s = SRC.copy()
     op = s[:, :, 3] > 0
     cape = op & (_ys >= 13) & np.array([[hexc(s[y, x]) in ZI_CAPE for x in range(SW)] for y in range(SH)])
+    arms = op & ~cape & (_ys >= 8) & (_ys <= 13) & ((_xs <= 6) | (_xs >= SW - 7))
+    # die gelben Augen leuchten pulsierend heller (bis fast weiß)
+    f = 0.5 - 0.5 * math.cos(2 * math.pi * 3 * i / N)
+    for y, x in zip(*np.nonzero(op)):
+        if hexc(s[y, x]) == 'ffff00':
+            s[y, x] = lighten(rgb('ffff00'), 0.8 * f)
     w = 2 * math.pi * 2 * i / N - 0.9                    # der Umhang hängt dem Schweben nach
+    wa = 2 * math.pi * 2 * i / N                         # die Arme heben und senken sich leicht
     cx = 12.5
+
+    def arm(x):                                          # zur Hand hin stärker, am Körper 0
+        return 1.4 * min(1.0, max(0.0, (6.5 - x) / 6.5 if x < cx else (x - SW + 7.5) / 6.5)) * math.sin(wa)
 
     def d(x, y):
         t = min(1.0, max(0.0, (y - 13) / 14)) ** 1.2
         side = -1 if x < cx else 1
         w0 = -0.9                                        # Frame 0 = Ruhepose
         dx = side * int(round(1.6 * t * (math.cos(w0 - 0.55 * y) - math.cos(w - 0.55 * y)) / 2))
-        dy = int(round(1.3 * t * (math.sin(w - 0.6 * abs(x - cx)) - math.sin(w0 - 0.6 * abs(x - cx)))))
-        return dx, dy
+        dy = 1.3 * t * (math.sin(w - 0.6 * abs(x - cx)) - math.sin(w0 - 0.6 * abs(x - cx)))
+        dy -= arm(x) * max(0.0, 1 - (y - 12) / 4)        # der Umhang unter den Armen geht mit
+        return dx, int(round(dy))
     hv = int(round(2 * math.sin(2 * math.pi * i / N)))  # schwebt langsam auf und ab
     body = s.copy()
-    body[cape] = 0
+    body[cape | arms] = 0
     out = np.zeros((H, W, 4), int)
     inner = cape & (np.abs(_xs - cx) <= 7)               # am Körper: Original darunter (keine Lücken)
     put(out, np.where(inner[:, :, None], s, 0), PL, PT - hv)
     put_m(out, warp(s, cape, d), PL, PT - hv)
+    put_m(out, warp(s, arms, lambda x, y: (0, -int(round(arm(x))))), PL, PT - hv)
     put(out, body, PL, PT - hv)
     fill_pinholes(out)
     stars(out, i, [(x + PL, y + PT - hv, st) for x, y, st in ZI_STARS], 'c8f8ff', 'ffffff', only_empty=True)
+    stars(out, i, [(10 + PL, 5 + PT - hv, 9), (15 + PL, 6 + PT - hv, 33)], 'ffff9a', 'ffffff')   # Augen funkeln
     return out
 
 
-# Waflav brüllt: Anlauf (Kopf duckt sich, das Maul schließt sich), dann reißt der Oberkiefer auf
-# (die Zeile unter den oberen Reißzähnen wird wiederholt: dunkler Rachen), die Augen glühen
-WAF_ROAR = {17: -1, 18: -1, 19: 1, 20: 2, 21: 3, 22: 3, 23: 3, 24: 3, 25: 3, 26: 3, 27: 3, 28: 3, 29: 3,
-            30: 3, 31: 2, 32: 1}
+# Waflav brüllt: Anlauf (holt Luft: der Körper streckt sich), dann klappt der Unterkiefer (samt
+# unteren Reißzähnen) herunter und legt sich über den Hals, dazwischen der rote Rachen mit Zunge;
+# die Augen glühen. Arme, Hals und Kopf bleiben dabei, wie sie sind.
+WAF_ROAR = {19: 1, 20: 2, 21: 3, 22: 3, 23: 3, 24: 3, 25: 3, 26: 3, 27: 3, 28: 3, 29: 3, 30: 3, 31: 2, 32: 1}
+WAF_JAW = (7, 10, 10, 17)                                # Zeilen 7-10, Spalten 10-17
 
 
 def f_waflav(i):
@@ -2112,8 +2130,33 @@ def f_waflav(i):
         for y, x in zip(*np.nonzero(s[:, :, 3])):
             if hexc(s[y, x]) == 'e62931':
                 s[y, x] = lighten([255, 70, 40, 255], 0.5 * fl)
-    b = B24[i % 24] if not o else -1
-    img, m = row_remap(s, lambda y: (b if y < 17 else 0) - (o if y <= 6 else 0))
+    if o:
+        y0, y1, x0, x1 = WAF_JAW
+        jaw = s[y0 + 1:y1 + 1, x0:x1 + 1].copy()        # Unterkiefer ab der Zeile unter dem Rachen
+        s[y0 + 1:y1 + 1, x0:x1 + 1] = 0
+        for y in range(y0, y0 + o + 1):                  # Rachen: Ränder dunkel, innen rot, unten Zunge
+            for x in range(x0, x1 + 1):
+                if x in (x0, x1):
+                    c = '0e3300'
+                elif x in (x0 + 1, x1 - 1):
+                    c = '330000'
+                elif y == y0 + o and x0 + 2 < x < x1 - 2:
+                    c = 'c52029'
+                elif y >= y0 + o - 1 and o >= 2:
+                    c = '7b0818'
+                else:
+                    c = '690000'
+                s[y, x] = rgb(c)
+        for y in range(jaw.shape[0]):                    # Unterkiefer über den Hals legen
+            for x in range(jaw.shape[1]):
+                if jaw[y, x, 3]:
+                    s[y0 + 1 + o + y, x0 + x] = jaw[y, x]
+        for x in range(x0 + 1, x1):                      # Schatten unter dem Kinn
+            yy = y1 + o + 1
+            if jaw[-1, x - x0, 3] and s[yy, x, 3]:
+                s[yy, x] = rgb('0e3300')
+    b = B24[i % 24] if not o else 0
+    img, m = row_remap(s, lambda y: b if y < 17 else 0)
     out = np.zeros((H, W, 4), int)
     put(out, img, PL, PT - m)
     fill_pinholes(out)
@@ -2152,6 +2195,9 @@ def f_bounce_blink(i):
         side[4:4 + SH, 4:4 + SW] = 0
         knee_put(out, whole, b)
         put_m(out, side, PL, PT + b)
+    elif V == 'ash':                                     # Squash-and-Stretch über die Beine: Oberkörper
+        img, m = row_remap(s, lambda y: b * ((y < 20) + (y < 22)))   # 2 px, Knie 1 px, Füße fest
+        put(out, img, PL, PT - m)
     else:
         knee_put(out, s, b)
     fill_pinholes(out)
@@ -2232,7 +2278,7 @@ def octo_d(i):
     return d
 
 
-def f_octo(i):
+def octo_base(i):
     s = SRC.copy()
     blink(s, i)
     tent = (s[:, :, 3] > 0) & ((_ys >= 15) | ((_ys >= 13) & (np.abs(_xs - OCTO_C[0]) > 8)))
@@ -2250,9 +2296,75 @@ def f_octo(i):
     return out
 
 
+OCTO_BUBBLES = None
+
+
+def bubble_px(a, L):
+    """Blubberblase im Alter a (von L Frames): wächst beim Aufsteigen (1 px, 2x2, Ring 3x3) und
+    platzt im letzten Frame. Liefert {(dx, dy): Farbe} relativ zur linken oberen Ecke."""
+    ed, hl, core = rgb('9fd4f0', 230), rgb('ffffff'), rgb('d8f2ff', 200)
+    u = a / L
+    if a == L - 1:
+        return {(-1, -1): hl, (3, -1): hl, (-1, 3): ed, (3, 3): ed}
+    if u < 0.3:
+        return {(1, 1): core}
+    if u < 0.65:
+        return {(0, 0): hl, (1, 0): ed, (0, 1): ed, (1, 1): ed}
+    return {(1, 0): ed, (0, 1): ed, (2, 1): ed, (1, 2): ed, (0, 0): hl}
+
+
+def octo_bubbles():
+    """Blasen, die nie die Figur berühren (auch nicht in einem Frame ihrer Laufbahn)."""
+    fig = np.zeros((H, W), bool)
+    for k in range(N):
+        fig |= octo_base(k)[:, :, 3] > 0
+    fig = fig | ring8(fig)
+    rng = np.random.default_rng(17)
+    res = []
+    tries = 0
+    while len(res) < 14 and tries < 5000:
+        tries += 1
+        L = int(rng.integers(14, 21))
+        e = int(rng.integers(N))
+        x0, y0 = rng.uniform(1, W - 4), rng.uniform(12, H - 4)
+        v, ph = rng.uniform(0.7, 1.0), rng.uniform(0, 6.3)
+        path = []
+        ok = True
+        for a in range(L):
+            bx = int(round(x0 + 0.7 * math.sin(0.6 * a + ph)))
+            by = int(round(y0 - v * a))
+            for (dx, dy) in bubble_px(a, L):
+                x, y = bx + dx, by + dy
+                if not (1 <= x < W - 1 and 1 <= y < H - 1) or fig[y, x]:
+                    ok = False
+            path.append((bx, by))
+        if ok and all(abs(e - r[0]) % N > 2 for r in res):
+            res.append((e, L, path))
+    return res
+
+
+def f_octo(i):
+    global OCTO_BUBBLES
+    out = octo_base(i)
+    if OCTO_BUBBLES is None:
+        OCTO_BUBBLES = octo_bubbles()
+    for e, L, path in OCTO_BUBBLES:
+        a = (i - e) % N
+        if a < L:
+            bx, by = path[a]
+            for (dx, dy), c in bubble_px(a, L).items():
+                out[by + dy, bx + dx] = c
+    return out
+
+
 def f_dreemurr(i):
     s = SRC.copy()
     blink(s, i)
+    k = i % 16                                           # der Mund geht auf und zu, offen rot
+    if 4 <= k <= 9:
+        s[11, 9] = s[11, 10] = rgb('c41e1e')
+        if 6 <= k <= 7:
+            s[12, 9] = s[12, 10] = rgb('7b0a0a')
     b = BOUNCE12[i % 12]
     out = np.zeros((H, W, 4), int)
     knee_put(out, s, b)

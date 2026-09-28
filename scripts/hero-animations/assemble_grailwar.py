@@ -154,6 +154,21 @@ def lower_body(a, key):
     return paint(above(a, y0), x0, y0, rws, pal)
 
 
+# Monster Prince Asriel: Hose und Beine in den Farben seiner Uniform (statt Grau)
+DREEMURR_LEGS = {'191919': '1c1922', '202020': '241d37', '323232': '382c4d', '525252': '675372'}
+
+
+def uniform_legs(a):
+    a = a.copy()
+    y0 = int(np.nonzero(a[:, :, 3])[0].min()) + 17       # ab der Hüfte
+    for y, x in zip(*np.nonzero(a[y0:, :, 3])):
+        c = '%02x%02x%02x' % tuple(int(v) for v in a[y + y0, x, :3])
+        if c in DREEMURR_LEGS:
+            h = DREEMURR_LEGS[c]
+            a[y + y0, x, :3] = [int(h[k:k + 2], 16) for k in (0, 2, 4)]
+    return a
+
+
 def marianne_hair(old, fork):
     """Mariannes Haare aus der alten, flach gerenderten Szene (Sichtbar #164, dort 2 px weiter links):
     warme Haarpixel ausschneiden, auf die heutige Haarpalette abbilden, unter der Mistgabel freistellen."""
@@ -321,7 +336,7 @@ def main(path):
     save_parts('gabby-the-moonlight-warrior', [('body', rows(near(g('Sailor Moon'), 244, 178), 178))])
     save_parts('kyli-the-true-mastermind', [('body', g('Zetsu'))])
     save_parts('mass-murderer-devlin', [('body', dark)])
-    save_parts('monster-prince-asriel', [('body', g('Asriel Dreemurr'))])
+    save_parts('monster-prince-asriel', [('body', uniform_legs(g('Asriel Dreemurr')))])
     save_parts('stellan-the-calm-easter-bunny', [('body', near(g('OSTER STELLAN'), 247, 164))])
     save_parts('wahflav-the-uninvited-fighter', [('body', g('WAFLAV-Kopie'))])
     save_parts('mutated-teenager-brackle', [('body', g('Leonardo'))])
