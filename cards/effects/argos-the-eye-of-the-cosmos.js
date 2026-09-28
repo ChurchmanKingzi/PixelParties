@@ -135,7 +135,9 @@ module.exports = {
       const engine = ctx._engine;
       const gs = engine.gs;
       const pi = ctx.cardOwner;
-      const hero = gs.players[pi]?.heroes?.[ctx.cardHeroIdx];
+      // Kontrolle statt Seite (Styx 28.9.): physische Seite des Helden
+      const feld = ctx.cardHeroOwner ?? pi;
+      const hero = gs.players[feld]?.heroes?.[ctx.cardHeroIdx];
       if (!hero?.name || hero.hp <= 0) return;
 
       const oppIdx = pi === 0 ? 1 : 0;
@@ -166,7 +168,9 @@ module.exports = {
     const engine = ctx._engine;
     const gs = engine.gs;
     const pi = ctx.cardOwner;
-    const hero = gs.players[pi]?.heroes?.[ctx.cardHeroIdx];
+    // Kontrolle statt Seite (Styx 28.9.): physische Seite des Helden
+    const feld = ctx.cardHeroOwner ?? pi;
+    const hero = gs.players[feld]?.heroes?.[ctx.cardHeroIdx];
     if (!hero?.name || hero.hp <= 0) return false;
 
     // Need ≥1 counter to remove, ≥1 free zone on Argos, and ≥1 CD
@@ -174,8 +178,7 @@ module.exports = {
     // counter count (you can't remove more than you have).
     const have = getChangeCounters(hero);
     if (have < 1) return false;
-    const ps = gs.players[pi];
-    if (findArgosFreeSlot(ps, ctx.cardHeroIdx) < 0) return false;
+    if (findArgosFreeSlot(gs.players[feld], ctx.cardHeroIdx) < 0) return false;
 
     for (let lvl = 1; lvl <= have; lvl++) {
       if (cdCreaturesAtLevelInHandOrDeck(engine, pi, lvl).length > 0) return true;
@@ -189,13 +192,15 @@ module.exports = {
     const pi = ctx.cardOwner;
     const heroIdx = ctx.cardHeroIdx;
     const ps = gs.players[pi];
-    const hero = ps?.heroes?.[heroIdx];
+    // Kontrolle statt Seite (Styx 28.9.): physische Seite des Helden
+    const feld = ctx.cardHeroOwner ?? pi;
+    const hero = gs.players[feld]?.heroes?.[heroIdx];
     if (!hero?.name || hero.hp <= 0) return false;
 
     const have = getChangeCounters(hero);
     if (have < 1) return false;
 
-    const slot = findArgosFreeSlot(ps, heroIdx);
+    const slot = findArgosFreeSlot(gs.players[feld], heroIdx);
     if (slot < 0) return false;
 
     // Step 1: which level? Show only levels with ≥1 candidate.
@@ -295,7 +300,7 @@ module.exports = {
 
     engine._broadcastEvent('play_zone_animation', {
       type: 'cosmic_summon',
-      owner: pi, heroIdx, zoneSlot: slot,
+      owner: feld, heroIdx, zoneSlot: slot,
     });
     await engine._delay(550);
 
@@ -305,9 +310,11 @@ module.exports = {
     // gets its on-summon effects. `_summonedFromDeck` is set when the
     // source was the deck, which is what Cosmic Manipulation's post-
     // summon hand-reaction window keys off of.
-    const placeRes = await engine.summonCreatureWithHooks(chosenName, pi, heroIdx, slot, {
+    // Kontrolle statt Seite (Styx 28.9.): physische Seite des Helden
+    const placeRes = await engine.summonCreatureWithHooks(chosenName, feld, heroIdx, slot, {
       source: CARD_NAME,
       isPlacement: true,
+      ...(feld !== pi ? { controller: pi } : {}),
       hookExtras: {
         _summonedBy: CARD_NAME,
         ...(source === 'deck' ? engine.deckHookExtras() : {}),   // v1393

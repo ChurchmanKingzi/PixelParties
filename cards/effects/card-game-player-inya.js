@@ -116,6 +116,10 @@ module.exports = {
       // Caster must be THIS Inya.
       if (ctx.casterIdx !== ctx.cardOwner) return;
       if (ctx.heroIdx !== ctx.cardHeroIdx) return;
+      // Kontrolle statt Seite (Styx 28.9.): physische Seite des Helden —
+      // `heroOwner` (falls gemeldet) = Reihe, in die `heroIdx` zeigt.
+      const feld = ctx.cardHeroOwner ?? ctx.cardOwner;
+      if (ctx.heroOwner != null && ctx.heroOwner !== feld) return;
       // Must be Inya's controller's turn — excludes opp-turn reactions
       // / surprises Inya casts.
       if (gs.activePlayer !== ctx.cardOwner) return;
@@ -134,7 +138,8 @@ module.exports = {
       if (!ps) return;
 
       // Must have a free base support zone on Inya.
-      const supZones = ps.supportZones?.[heroIdx] || [];
+      // Kontrolle statt Seite (Styx 28.9.): physische Seite des Helden
+      const supZones = gs.players[feld]?.supportZones?.[heroIdx] || [];
       let hasFree = false;
       for (let z = 0; z < 3; z++) {
         if ((supZones[z] || []).length === 0) { hasFree = true; break; }
@@ -159,7 +164,10 @@ module.exports = {
       // safePlaceInSupport finds the first free base zone and creates
       // a fresh tracked inst. Same primitive Biomancy Token uses for
       // its spell-as-creature placement.
-      const placeResult = engine.safePlaceInSupport(spellName, pi, heroIdx, -1);
+      // Kontrolle statt Seite (Styx 28.9.): physische Seite des Helden,
+      // Kontrolle beim Spieler, der Inya gerade fuehrt.
+      const placeResult = engine.safePlaceInSupport(spellName, feld, heroIdx, -1,
+        feld !== pi ? { controller: pi } : {});
       if (!placeResult) return; // Race: zone filled mid-prompt.
 
       const { inst, actualSlot } = placeResult;
@@ -191,7 +199,7 @@ module.exports = {
 
       // Sparkle on the Buddy's slot.
       engine._broadcastEvent('play_zone_animation', {
-        type: 'gold_sparkle', owner: pi,
+        type: 'gold_sparkle', owner: feld,
         heroIdx, zoneSlot: actualSlot,
       });
 

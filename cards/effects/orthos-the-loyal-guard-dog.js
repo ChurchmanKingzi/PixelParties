@@ -47,9 +47,16 @@ module.exports = {
       // creatures around — the Loyal wasn't summoned by Orthos this
       // time. Skip.
       if (ctx._isMove) return;
+      // Kontrolle statt Seite (Styx 28.9.): physische Seite des Helden.
+      // `pi` = Kontrolleur (Hand, Prompts, HOPT), `feld` = Spalte, in der
+      // Orthos und seine Support Zones stehen. Ohne Uebernahme gleich.
+      const pi   = ctx.cardOwner;
+      const feld = ctx.cardHeroOwner ?? pi;
       // Same side — Orthos only chains off OUR summons.
       const enteringOwner = entering.owner ?? entering.controller;
-      if (enteringOwner !== ctx.cardOriginalOwner) return;
+      if (enteringOwner !== feld) return;
+      // Uebernommener Orthos: nur Beschwoerungen seines Kontrolleurs.
+      if (feld !== pi && (entering.controller ?? entering.owner) !== pi) return;
       // Orthos's hero must have summoned the Loyal — i.e. the entering
       // card landed in OUR heroIdx's support zones.
       if (entering.heroIdx !== ctx.cardHeroIdx) return;
@@ -62,9 +69,8 @@ module.exports = {
 
       const engine = ctx._engine;
       const gs     = engine.gs;
-      const pi     = ctx.cardOriginalOwner;
       const ps     = gs.players[pi];
-      const orthos = ps?.heroes?.[ctx.cardHeroIdx];
+      const orthos = gs.players[feld]?.heroes?.[ctx.cardHeroIdx];   // Kontrolle statt Seite (Styx 28.9.)
       if (!ps || !orthos?.name || orthos.hp <= 0) return;
 
       // Once per turn, scoped per Orthos instance.
@@ -78,7 +84,7 @@ module.exports = {
         if (gs.hoptUsed) delete gs.hoptUsed[hoptKey];
         return;
       }
-      const zones = ps.supportZones?.[ctx.cardHeroIdx] || [];
+      const zones = gs.players[feld]?.supportZones?.[ctx.cardHeroIdx] || [];
       let freeSlot = -1;
       for (let z = 0; z < 3; z++) {
         if ((zones[z] || []).length === 0) { freeSlot = z; break; }
@@ -92,7 +98,7 @@ module.exports = {
       // sample passes / fails the same way for Orthos's hero).
       const cardDB = engine._getCardDB();
       const sample = cardDB[handLoyals[0].name];
-      if (!sample || !engine.heroMeetsLevelReq(pi, ctx.cardHeroIdx, sample)) {
+      if (!sample || !engine.heroMeetsLevelReq(feld, ctx.cardHeroIdx, sample)) {
         if (gs.hoptUsed) delete gs.hoptUsed[hoptKey];
         return;
       }
@@ -139,7 +145,7 @@ module.exports = {
       }
 
       // Re-pick the slot fresh — board state can shift across awaits.
-      const zones2 = ps.supportZones?.[ctx.cardHeroIdx] || [];
+      const zones2 = gs.players[feld]?.supportZones?.[ctx.cardHeroIdx] || [];
       let destSlot = -1;
       for (let z = 0; z < 3; z++) {
         if ((zones2[z] || []).length === 0) { destSlot = z; break; }
@@ -157,8 +163,8 @@ module.exports = {
       engine.takeFromPileSync(ps, 'hand', handIdx);
 
       const placed = await engine.summonCreatureWithHooks(
-        pickedLoyal, pi, ctx.cardHeroIdx, destSlot,
-        { source: CARD_NAME },
+        pickedLoyal, feld, ctx.cardHeroIdx, destSlot,
+        { source: CARD_NAME, ...(feld !== pi ? { controller: pi } : {}) },   // Kontrolle statt Seite (Styx 28.9.)
       );
       if (!placed) {
         engine.handZugangSync(ps, pickedLoyal, { source: CARD_NAME, ohneInstanz: true });

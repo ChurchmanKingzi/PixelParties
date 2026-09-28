@@ -48,6 +48,9 @@ module.exports = {
       const returnedInsts = ctx.returnedInsts || [];
       if (returnedInsts.length === 0) return;
       const fromHeroIdxs = ctx.fromHeroIdxs || [];
+      // Styx 28.9.: Rueckgaben von Plaetzen der Gegenspalte (geliehene
+      // Helden) tragen `fromOwners` — nur Blood Moons eigene Spalte zaehlt.
+      const fromOwners = ctx.fromOwners || [];
 
       const cardDB = engine._getCardDB();
 
@@ -63,6 +66,7 @@ module.exports = {
           ? fromHeroIdxs[i]
           : inst.heroIdx;
         if (fromHi !== selfInst.heroIdx) continue;
+        if (fromOwners[i] != null && fromOwners[i] !== selfInst.owner) continue;
         const cd = inst.counters?._cardDataOverride || cardDB[inst.name]; // token-override-aware (Biomancy Token — Als AoE-Report)
         if (!cd || !hasCardType(cd, 'Creature')) continue;
         matches++;

@@ -137,6 +137,8 @@ function recomputeFighting(ctx) {
   const engine = ctx._engine;
   const pi = ctx.cardOwner;
   const heroIdx = ctx.cardHeroIdx;
+  // Kontrolle statt Seite (Styx 28.9.): physische Seite des Helden
+  const feld = ctx.cardHeroOwner ?? pi;
   const hero = ctx.attachedHero;
   if (!hero?.name) return;
 
@@ -149,7 +151,7 @@ function recomputeFighting(ctx) {
 
   let desiredDelta = 0;
   if (isMyTurn && canAct) {
-    const ownTotal = fightingTotalForHero(engine, pi, heroIdx);
+    const ownTotal = fightingTotalForHero(engine, feld, heroIdx);
     const oi = pi === 0 ? 1 : 0;
     let oppHighest = 0;
     // Kontrolle statt Seite (Styx 28.9.): Fighting der Helden, die der
@@ -166,7 +168,7 @@ function recomputeFighting(ctx) {
   const diff = desiredDelta - prevDelta;
   // Canonical ATK delta helper — routes through the Curse
   // suppression accumulator when the host is cursed.
-  engine._applyHeroAtkDelta(hero, pi, heroIdx, diff);
+  engine._applyHeroAtkDelta(hero, feld, heroIdx, diff);
   hero[FIGHTING_DELTA_KEY] = desiredDelta;
   engine.log('lizbeth_fighting_borrow', {
     delta: desiredDelta, prev: prevDelta, atk: hero.atk,
@@ -185,6 +187,8 @@ async function handleSmugnessMirror(ctx) {
   const pi = ctx.cardOwner;
   const heroIdx = ctx.cardHeroIdx;
   const hero = ctx.attachedHero;
+  // Kontrolle statt Seite (Styx 28.9.): physische Seite des Helden
+  const feld = ctx.cardHeroOwner ?? pi;
 
   // Damage event must target THIS Lizbeth.
   const target = ctx.target;
@@ -228,7 +232,7 @@ async function handleSmugnessMirror(ctx) {
 
   const tgtZoneSlot = picked.type === 'equip' ? picked.slotIdx : -1;
   engine._broadcastEvent('play_projectile_animation', {
-    sourceOwner: pi,
+    sourceOwner: feld,
     sourceHeroIdx: heroIdx,
     targetOwner: picked.owner,
     targetHeroIdx: picked.heroIdx,
@@ -280,7 +284,8 @@ function tryResistanceBlock(ctx) {
   hero[RESISTANCE_BLOCKS_KEY] = used + 1;
   const engine = ctx._engine;
   engine._broadcastEvent('play_zone_animation', {
-    type: 'gold_sparkle', owner: ctx.cardOwner, heroIdx: ctx.cardHeroIdx, zoneSlot: -1,
+    // Kontrolle statt Seite (Styx 28.9.): physische Seite des Helden
+    type: 'gold_sparkle', owner: ctx.cardHeroOwner ?? ctx.cardOwner, heroIdx: ctx.cardHeroIdx, zoneSlot: -1,
   });
   engine.log('lizbeth_resistance_block', {
     hero: hero.name, level, blocksUsed: used + 1,
@@ -304,7 +309,9 @@ async function handleCreativityMirror(ctx) {
   // controller — same gate as native Creativity.
   if (ctx.toZone !== 'ability') return;
   if (ctx.toHeroIdx !== heroIdx) return;
-  if (ctx.enteringCard?.owner !== pi) return;
+  // Kontrolle statt Seite (Styx 28.9.): die Zone liegt auf der physischen
+  // Seite des Helden (ohne Uebernahme === pi).
+  if (ctx.enteringCard?.owner !== (ctx.cardHeroOwner ?? pi)) return;
 
   // Soft HOPT per turn.
   if (!gs.hoptUsed) gs.hoptUsed = {};
@@ -330,12 +337,14 @@ function setupBorrowedFriendship(ctx) {
   const gs = engine.gs;
   const pi = ctx.cardOwner;
   const heroIdx = ctx.cardHeroIdx;
+  // Kontrolle statt Seite (Styx 28.9.): physische Seite des Helden
+  const feld = ctx.cardHeroOwner ?? pi;
 
   const level = maxOpponentAbilityLevel(engine, pi, 'Friendship');
   if (level <= 0 || !lizbethActiveBorrower(ctx)) {
     // Drop any previously-granted action if borrow no longer applies.
     const lizbethInst = engine.cardInstances.find(c =>
-      c.zone === 'hero' && c.owner === pi && c.heroIdx === heroIdx && c.name === CARD_NAME);
+      c.zone === 'hero' && c.owner === feld && c.heroIdx === heroIdx && c.name === CARD_NAME);
     if (lizbethInst?.counters?.aaGrants?.[FRIENDSHIP_TYPE_ID] != null) {
       engine.expireAdditionalActionType(lizbethInst, FRIENDSHIP_TYPE_ID);
     }
@@ -358,14 +367,14 @@ function setupBorrowedFriendship(ctx) {
       if (ps.supportSpellLocked) return false;
       // Lizbeth-as-caster level check.
       if ((cardData.level || 0) > 0) {
-        if (!engine.heroMeetsLevelReq(pi, heroIdx, cardData)) return false;
+        if (!engine.heroMeetsLevelReq(feld, heroIdx, cardData)) return false;
       }
       return true;
     },
   });
 
   const lizbethInst = engine.cardInstances.find(c =>
-    c.zone === 'hero' && c.owner === pi && c.heroIdx === heroIdx && c.name === CARD_NAME);
+    c.zone === 'hero' && c.owner === feld && c.heroIdx === heroIdx && c.name === CARD_NAME);
   if (lizbethInst) {
     engine.grantAdditionalAction(lizbethInst, FRIENDSHIP_TYPE_ID);
   }
@@ -380,6 +389,9 @@ async function handleFriendshipDrawMirror(ctx) {
 
   // Only fires when Lizbeth herself cast a Support Magic Spell.
   if (ctx.casterIdx !== pi || ctx.heroIdx !== heroIdx) return;
+  // Kontrolle statt Seite (Styx 28.9.): die Heldenreihe des Wirkers muss
+  // die physische Seite dieses Helden sein.
+  if ((ctx.heroOwner ?? ctx.casterIdx) !== (ctx.cardHeroOwner ?? pi)) return;
   const spellData = ctx.spellCardData;
   if (!spellData || !hasSpellSchool(spellData, 'Support Magic')) return;
 
@@ -414,9 +426,10 @@ async function handleBiomancyMirror(ctx) {
   if (ctx.potionOwner !== pi) return;
   if (ctx._biomancyHandled) return; // native Biomancy already ran
 
-  const ps = gs.players[pi];
+  // Kontrolle statt Seite (Styx 28.9.): physische Seite des Helden
+  const feld = ctx.cardHeroOwner ?? pi;
   // Lizbeth herself must have a free Support slot.
-  const supZones = ps.supportZones?.[heroIdx] || [[], [], []];
+  const supZones = gs.players[feld]?.supportZones?.[heroIdx] || [[], [], []];
   if (![0, 1, 2].some(z => (supZones[z] || []).length === 0)) return;
 
   // Soft HOPT per turn.
@@ -450,7 +463,8 @@ async function handleBiomancyMirror(ctx) {
   const potionName = ctx.potionName;
   const cardDB = engine._getCardDB();
   const potionData = cardDB[potionName];
-  const placeResult = engine.safePlaceInSupport(potionName, pi, heroIdx, -1);
+  const placeResult = engine.safePlaceInSupport(potionName, feld, heroIdx, -1,
+    feld !== pi ? { controller: pi } : {});   // Kontrolle statt Seite (Styx 28.9.)
   if (!placeResult) return;
   const { inst, actualSlot } = placeResult;
 
@@ -468,7 +482,7 @@ async function handleBiomancyMirror(ctx) {
 
   engine._broadcastEvent('play_zone_animation', {
     type: 'biomancy_bloom',
-    owner: pi, heroIdx, zoneSlot: actualSlot,
+    owner: feld, heroIdx, zoneSlot: actualSlot,
   });
   await engine._delay(600);
   engine.log('lizbeth_biomancy_token', {
@@ -554,7 +568,8 @@ module.exports = {
     onStatusApplied: (ctx) => {
       if (!lizbethActiveBorrower(ctx)) return;
       const hero = ctx.attachedHero;
-      if (ctx.heroOwner !== ctx.cardOwner) return;
+      // Kontrolle statt Seite (Styx 28.9.): physische Seite des Helden
+      if (ctx.heroOwner !== (ctx.cardHeroOwner ?? ctx.cardOwner)) return;
       if (ctx.heroIdx !== ctx.cardHeroIdx) return;
       if (!hero?.name || hero.hp <= 0) return;
 
@@ -570,7 +585,8 @@ module.exports = {
     beforeHeroEffect: (ctx) => {
       if (!lizbethActiveBorrower(ctx)) return;
       // Effects targeting Lizbeth herself.
-      if (ctx.playerIdx !== ctx.cardOwner) return;
+      // Kontrolle statt Seite (Styx 28.9.): `playerIdx` = Spalte des Ziels.
+      if (ctx.playerIdx !== (ctx.cardHeroOwner ?? ctx.cardOwner)) return;
       if (ctx.heroIdx !== ctx.cardHeroIdx) return;
       if (!tryResistanceBlock(ctx)) return;
       ctx.cancel();

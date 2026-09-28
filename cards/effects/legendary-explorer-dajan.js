@@ -124,6 +124,9 @@ async function _playEquip(engine, pi, cardName, cd, cost) {
     const hero = ps.heroes[hi];
     if (!hero?.name || hero.hp <= 0) continue;
     if (hero.statuses?.frozen) continue;
+    // Kontrolle statt Seite (Styx 28.9.): ein an den Gegner abgegebener
+    // Held der eigenen Spalte ist kein Ausruestungswirt.
+    if (engine.heroSideOf(pi, hero) !== pi) continue;
     let firstFree = -1;
     for (let si = 0; si < 3; si++) {
       if (((ps.supportZones[hi] || [])[si] || []).length === 0) {

@@ -109,11 +109,28 @@ function freeSummonForced(gs, pi, heroIdx) {
 
 /** Kann dieser Held Blue-Ice Dragon überhaupt beschwören (lebt,
  *  erfüllt die Stufenanforderung)? */
-function heroCanSummonHere(engine, pi, heroIdx) {
-  const hero = engine.gs.players[pi]?.heroes?.[heroIdx];
+// Styx 28.9.: geliehene Helden der Gegenspalte — `heroOwner` = physische
+// Seite des Helden (fehlt → pi); nur Helden, die `pi` kontrolliert.
+function heroCanSummonHere(engine, pi, heroIdx, heroOwner = pi) {
+  const hero = engine.gs.players[heroOwner]?.heroes?.[heroIdx];
   if (!hero?.name || hero.hp <= 0) return false;
+  if (engine.heroSideOf(heroOwner, hero) !== pi) return false;
   const cd = engine._getCardDB()[CARD_NAME];
-  return engine.heroMeetsLevelReq(pi, heroIdx, cd);
+  if (heroOwner === pi) return engine.heroMeetsLevelReq(pi, heroIdx, cd);
+  return engine.heroMeetsLevelReq(heroOwner, heroIdx, cd, { levelSourcePi: pi });
+}
+
+/**
+ * Opfer-Spec fuer einen Wurf auf einen belegten Platz des Helden
+ * (`heroOwner`, `heroIdx`): mindestens ein Opfer von DIESEM Helden.
+ * Styx 28.9.: `mustIncludeFromHeroOwner` = Seite des
+ * Helden (geliehene Helden der Gegenspalte).
+ */
+function fullDropSpec(engine, pi, heroIdx, heroOwner = pi) {
+  const base = makeSacrificeSpec(engine);
+  // `mustIncludeFromHeroOwner` = Seite des Helden (Styx 28.9.): nur ein
+  // Opfer aus DIESER Spalte schafft dort Platz; weitere Opfer bleiben frei.
+  return { ...base, mustIncludeFromHeroIdx: heroIdx, mustIncludeFromHeroOwner: heroOwner };
 }
 
 /**
@@ -130,20 +147,28 @@ function heroCanSummonHere(engine, pi, heroIdx) {
  * Handkarten-Eignung) — sonst leuchten Plätze auf, die der Server
  * anschließend ablehnt.
  */
+// Styx 28.9.: geliehene Helden der Gegenspalte — alle Helden, die `pi`
+// kontrolliert (auch auf der Gegenspalte), `owner` = physische Seite, nur
+// gesetzt, wenn ≠ pi. Eigene, vom Gegner kontrollierte Helden fallen raus.
 function occupiedDropSlots(gs, pi, engine) {
   const ps = gs.players[pi];
   if (!ps) return [];
-  const spec = makeSacrificeSpec(engine);
   const out = [];
-  for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-    const zones = ps.supportZones?.[hi] || [];
+  const helden = typeof engine.heroesControlledBy === 'function'
+    ? engine.heroesControlledBy(pi)
+    : (ps.heroes || []).map((hero, heroIdx) => ({ physOwner: pi, heroIdx, hero }));
+  for (const { physOwner, heroIdx: hi } of helden) {
+    const zones = gs.players[physOwner]?.supportZones?.[hi] || [];
     const slots = [0, 1, 2];
     if (slots.some(z => (zones[z] || []).length === 0)) continue;   // hat noch Platz
-    if (!heroCanSummonHere(engine, pi, hi)) continue;
+    if (!heroCanSummonHere(engine, pi, hi, physOwner)) continue;
     // Genau der Spec, den `beforeSummon` gleich benutzt: mindestens ein
     // Opfer muss BEI DIESEM HELDEN stehen, sonst wird dort kein Platz frei.
-    if (!engine.canSatisfySacrifice(pi, { ...spec, mustIncludeFromHeroIdx: hi })) continue;
-    for (const z of slots) if ((zones[z] || []).length > 0) out.push({ heroIdx: hi, slotIdx: z });
+    if (!engine.canSatisfySacrifice(pi, fullDropSpec(engine, pi, hi, physOwner))) continue;
+    for (const z of slots) {
+      if ((zones[z] || []).length === 0) continue;
+      out.push(physOwner !== pi ? { heroIdx: hi, slotIdx: z, owner: physOwner } : { heroIdx: hi, slotIdx: z });
+    }
   }
   return out;
 }
@@ -183,8 +208,10 @@ module.exports = {
   // Volle Zonen: die beiden Opfer machen ja gerade Platz. Ein Held mit
   // komplett belegten Zonen bleibt sonst als Beschwörer gesperrt,
   // obwohl das Opfern dort genau den nötigen Platz schafft.
+  // Styx 28.9.: geliehene Helden der Gegenspalte — gefragt wird nur fuer
+  // Helden der eigenen Spalte, also nur eigene Plaetze.
   canBypassFreeZoneRequirement: (gs, pi, heroIdx, cardData, engine) =>
-    occupiedDropSlots(gs, pi, engine).some(sl => sl.heroIdx === heroIdx),
+    occupiedDropSlots(gs, pi, engine).some(sl => sl.heroIdx === heroIdx && (sl.owner ?? pi) === pi),
 
   // Damit der Client die belegten Plätze auch ANZEIGT und den Wurf
   // zulässt. Ohne diese Liste leuchten bei Kreatur-Zügen ausschließlich
@@ -195,9 +222,10 @@ module.exports = {
 
   // Serverseitige Annahme des Wurfs auf einen belegten Platz. Muss
   // exakt dieselbe Liste benutzen wie die Hervorhebung.
-  canPlaceOnOccupiedSlot: (gs, pi, heroIdx, slotIdx, engine) =>
+  // Styx 28.9.: geliehene Helden der Gegenspalte — `heroOwner` = physische Seite.
+  canPlaceOnOccupiedSlot: (gs, pi, heroIdx, slotIdx, engine, heroOwner = pi) =>
     occupiedDropSlots(gs, pi, engine)
-      .some(sl => sl.heroIdx === heroIdx && sl.slotIdx === slotIdx),
+      .some(sl => sl.heroIdx === heroIdx && sl.slotIdx === slotIdx && (sl.owner ?? pi) === heroOwner),
 
   /**
    * Opfer bezahlen, dann die Beschwörungsart klären.
@@ -212,6 +240,9 @@ module.exports = {
     const pi = ctx.cardOwner;
     const ps = gs.players[pi];
     const heroIdx = ctx.cardHeroIdx;
+    // Styx 28.9.: geliehene Helden der Gegenspalte — physische Seite des
+    // Zielhelden (fehlt → pi). Opfer/Kosten zahlt weiterhin `pi`.
+    const heroOwner = (ctx.cardHeroOwner === 0 || ctx.cardHeroOwner === 1) ? ctx.cardHeroOwner : pi;
 
     // Wurf auf einen belegten Platz -> mind. ein Opfer muss von diesem
     // Helden kommen, sonst wird dort kein Platz frei.
@@ -221,8 +252,7 @@ module.exports = {
     const base = makeSacrificeSpec(engine);
     const spec = allFullDrop
       ? {
-          ...base,
-          mustIncludeFromHeroIdx: heroIdx,
+          ...fullDropSpec(engine, pi, heroIdx, heroOwner),
           description: `${base.description} At least one of them must come from the summoning Hero's Support Zones.`,
         }
       : base;
@@ -257,11 +287,12 @@ module.exports = {
     ps._blueIceFreeSummon = freeSummon;
 
     if (allFullDrop) {
-      const supZones = ps.supportZones[heroIdx] || [];
+      const supZones = gs.players[heroOwner]?.supportZones?.[heroIdx] || [];
       const freedSlot = [0, 1, 2].find(z => (supZones[z] || []).length === 0);
       if (freedSlot == null) return false;
       await engine.actionPlaceCreature(CARD_NAME, pi, heroIdx, freedSlot, {
         source: 'external', sourceName: CARD_NAME, fireHooks: true,
+        ...(heroOwner !== pi ? { heldSeite: heroOwner } : {}),
       });
       ps._placementConsumedByCard = CARD_NAME;
     }

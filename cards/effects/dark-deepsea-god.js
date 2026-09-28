@@ -99,6 +99,19 @@ function _collectTributeCandidates(engine, playerIdx, selfId) {
 }
 
 /**
+ * Styx 28.9.: geliehene Helden der Gegenspalte. Darf DDG im Platz dieses
+ * Tributs landen? Eigene Spalte: immer (wie bisher). Gegenspalte: nur,
+ * wenn `pi` den Helden dort gerade kontrolliert — sonst wuerde DDG ueber
+ * einen fremden Helden beschworen.
+ */
+function _landingAllowed(engine, pi, inst) {
+  if (!inst) return false;
+  if (inst.owner === pi) return true;
+  const hero = engine.gs.players[inst.owner]?.heroes?.[inst.heroIdx];
+  return engine.heroSideOf(inst.owner, hero) === pi;
+}
+
+/**
  * DDG's on-summon effect: AoE `DAMAGE` to every opp Hero + Creature.
  * HOPT-gated (`ddg_aoe` per controller) so a second DDG this turn
  * still fires its manifest animation but does not double-dip. Used by
@@ -230,13 +243,20 @@ module.exports = {
     }, null);
   },
 
-  canPlaceOnOccupiedSlot: (gs, pi, heroIdx, slotIdx, engine) => {
+  // Styx 28.9.: geliehene Helden der Gegenspalte. `heroOwner` = physische
+  // Seite des Zielplatzes; ein Platz auf der Gegenspalte zaehlt nur, wenn
+  // `pi` den Helden dort kontrolliert (`_landingAllowed`).
+  canPlaceOnOccupiedSlot: (gs, pi, heroIdx, slotIdx, engine, heroOwner = pi) => {
     const cands = _collectTributeCandidates(engine, pi, null);
-    return cands.some(c => c.inst.heroIdx === heroIdx && c.inst.zoneSlot === slotIdx);
+    return cands.some(c => c.inst.owner === heroOwner
+      && c.inst.heroIdx === heroIdx && c.inst.zoneSlot === slotIdx
+      && _landingAllowed(engine, pi, c.inst));
   },
   getBouncePlacementTargets: (gs, pi, engine) =>
     _collectTributeCandidates(engine, pi, null)
-      .map(c => ({ heroIdx: c.inst.heroIdx, slotIdx: c.inst.zoneSlot })),
+      .filter(c => _landingAllowed(engine, pi, c.inst))
+      .map(c => ({ heroIdx: c.inst.heroIdx, slotIdx: c.inst.zoneSlot,
+        ...(c.inst.owner !== pi ? { owner: c.inst.owner } : {}) })),
 
   beforeSummon: async (ctx) => {
     const engine = ctx._engine;
@@ -304,29 +324,36 @@ module.exports = {
     if (sumLvl < SACRIFICE_SPEC.minSumLevel) return false;
 
     // ── Step 2: pick DDG's placement slot (one of the tribute slots) ──
-    const zones = chosenTargets.map(t => {
-      const hero = ps.heroes[t.heroIdx];
+    // Styx 28.9.: geliehene Helden der Gegenspalte — Landeplatz auf der
+    // Gegenspalte nur ueber einen Helden, den `pi` kontrolliert.
+    const zones = chosenTargets.filter(t => _landingAllowed(engine, pi, t.cardInstance)).map(t => {
+      const hero = gs.players[t.owner]?.heroes?.[t.heroIdx];
       return {
         heroIdx: t.heroIdx, slotIdx: t.slotIdx,
+        ...(t.owner !== pi ? { owner: t.owner } : {}),
         label: `${hero?.name || 'Hero'} — ${t.cardName} (Slot ${t.slotIdx + 1})`,
       };
     });
+    if (zones.length === 0) return false;
     const zonePick = await ctx.promptZonePick(zones, {
       title: `${CARD_NAME} — Rise From`,
       description: `Pick which tributed Support Zone ${CARD_NAME} rises into.`,
       cancellable: true,
     });
     if (!zonePick) return false;
+    const landSeite = zonePick.owner ?? pi;   // Styx 28.9.: physische Seite
+    const _istLandung = (t) => t.heroIdx === zonePick.heroIdx && t.slotIdx === zonePick.slotIdx
+      && t.owner === landSeite;
+    if (!zones.some(z => z.heroIdx === zonePick.heroIdx && z.slotIdx === zonePick.slotIdx
+      && (z.owner ?? pi) === landSeite)) return false;
 
     // ── Step 3: bounce every chosen Creature back to hand ────────────
     // Non-landing tributes first, landing tribute last so the destination
     // slot stays "occupied by a departing sacrifice" right up to the
     // moment DDG takes its place.
-    const landingInst = chosenTargets.find(t =>
-      t.heroIdx === zonePick.heroIdx && t.slotIdx === zonePick.slotIdx
-    )?.cardInstance;
+    const landingInst = chosenTargets.find(_istLandung)?.cardInstance;
     const others = chosenTargets
-      .filter(t => !(t.heroIdx === zonePick.heroIdx && t.slotIdx === zonePick.slotIdx))
+      .filter(t => !_istLandung(t))
       .map(t => t.cardInstance);
     for (const inst of others) {
       if (!inst) continue;
@@ -347,6 +374,7 @@ module.exports = {
       sourceName: CARD_NAME,
       animationType: 'none',
       fireHooks: true,
+      ...(landSeite !== pi ? { heldSeite: landSeite } : {}),   // Styx 28.9.
     });
     if (!result) return false;
 
@@ -361,7 +389,8 @@ module.exports = {
     engine.log('ddg_summon', {
       player: ps.username,
       tributed: chosenTargets.map(t => t.cardName),
-      landedAt: { heroIdx: zonePick.heroIdx, slotIdx: zonePick.slotIdx },
+      landedAt: { heroIdx: zonePick.heroIdx, slotIdx: zonePick.slotIdx,
+        ...(landSeite !== pi ? { owner: landSeite } : {}) },
     });
     engine.sync();
     return false;

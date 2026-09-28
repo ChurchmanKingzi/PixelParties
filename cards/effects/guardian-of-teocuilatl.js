@@ -49,7 +49,8 @@ const T = require('./_teocuilatl-shared');
 
 const hasTribute          = (engine, pi) => T.hasTribute(engine, pi);
 const heroCanSummon       = (engine, pi, hi) => T.heroCanSummon(engine, pi, hi, CARD_NAME);
-const findOccupant        = (engine, pi, hi, si) => T.findOccupant(engine, pi, hi, si, CARD_NAME);
+// Styx 28.9.: geliehene Helden der Gegenspalte — `heroOwner` = physische Seite.
+const findOccupant        = (engine, pi, hi, si, heroOwner = pi) => T.findOccupant(engine, pi, hi, si, CARD_NAME, heroOwner);
 const sacrificeableSlots  = (engine, pi) => T.sacrificeableSlots(engine, pi, CARD_NAME);
 const sacrificeSummonIntoSlot = (engine, pi, req) => T.sacrificeSummonIntoSlot(engine, pi, req, CARD_NAME);
 
@@ -72,15 +73,18 @@ module.exports = {
   requiresActiveCaster: true,
 
   canBypassFreeZoneRequirement(gs, pi, heroIdx, cardData, engine) {
-    return sacrificeableSlots(engine, pi).some(s => s.heroIdx === heroIdx);
+    // Styx 28.9.: geliehene Helden der Gegenspalte — nur eigene Plaetze
+    // (der Bypass wird nur fuer Helden der eigenen Spalte gefragt).
+    return sacrificeableSlots(engine, pi).some(s => s.heroIdx === heroIdx && s.owner === pi);
   },
   // Legal drop onto an occupied slot iff its occupant is sacrificeable.
-  canPlaceOnOccupiedSlot(gs, pi, heroIdx, slotIdx, engine) {
-    return !!findOccupant(engine, pi, heroIdx, slotIdx);
+  // Styx 28.9.: geliehene Helden der Gegenspalte — `heroOwner` = physische Seite.
+  canPlaceOnOccupiedSlot(gs, pi, heroIdx, slotIdx, engine, heroOwner = pi) {
+    return !!findOccupant(engine, pi, heroIdx, slotIdx, heroOwner);
   },
   // Client highlight for the draggable drop targets.
   getBouncePlacementTargets(gs, pi, engine) {
-    return sacrificeableSlots(engine, pi).map(s => ({ heroIdx: s.heroIdx, slotIdx: s.slotIdx }));
+    return T.bounceTargets(engine, pi, CARD_NAME);
   },
 
   async beforeSummon(ctx) {
