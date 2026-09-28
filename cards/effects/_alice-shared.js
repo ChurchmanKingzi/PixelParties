@@ -88,13 +88,16 @@ function armSharing(gs, pi) {
  * Anhaengsel (Equipment, Attachment-Spells) sind KEINE Kreaturen und
  * bleiben draussen: sie werden ueber ihren eigenen Kartentyp erkannt.
  */
-function stackAt(engine, pi, heroIdx, slotIdx) {
+function stackAt(engine, pi, heroIdx, slotIdx, feld = pi) {
   const { hasCardType } = require('./_hooks');
   const cardDB = engine._getCardDB();
   const out = [];
   for (const inst of engine.cardInstances || []) {
     if (inst.zone !== 'support') continue;
     if ((inst.controller ?? inst.owner) !== pi) continue;
+    // Styx 28.9.: Platz auf der Gegenspalte (uebernommener Held) — nur
+    // die Kreaturen, die dort PHYSISCH stehen.
+    if (feld !== pi && inst.owner !== feld) continue;
     if (inst.heroIdx !== heroIdx || inst.zoneSlot !== slotIdx) continue;
     if (inst.faceDown) continue;
     const cd = engine.getEffectiveCardData?.(inst) || cardDB[inst.name];
@@ -118,10 +121,11 @@ function isStacked(engine, pi, heroIdx, slotIdx) {
  * Darf `cardName` zu diesem BELEGTEN Platz dazu? Nur wenn Alice wirkt
  * und dort bereits mindestens eine Kreatur GLEICHEN Namens liegt.
  */
-function canShareInto(engine, pi, heroIdx, slotIdx, cardName) {
+function canShareInto(engine, pi, heroIdx, slotIdx, cardName, feld = pi) {
   if (!cardName) return false;
   if (!sharingActive(engine.gs, pi)) return false;
-  const stack = stackAt(engine, pi, heroIdx, slotIdx);
+  // `feld` (Styx 28.9.): physische Seite des Platzes, `pi` der Beschwoerer.
+  const stack = stackAt(engine, pi, heroIdx, slotIdx, feld);
   if (stack.length === 0) return false;
   return stack.every(i => i.name === cardName);
 }

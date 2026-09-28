@@ -102,7 +102,9 @@ function _eligibleSacrificeCandidates(engine, pi) {
  *     sacrifice has already removed the catalyst from the board (so
  *     the catalyst can't also be picked as their tribute).
  */
-function _buildReplacementGallery(engine, pi, heroIdx, maxLevel, excludeName) {
+// Kontrolle statt Seite (Styx 28.9.): `seite` = physische Seite der
+// Ziel-Zone (die des geopferten Wesens); Hand/Deck bleiben bei `pi`.
+function _buildReplacementGallery(engine, pi, heroIdx, maxLevel, excludeName, seite = pi) {
   const ps = engine.gs.players[pi];
   if (!ps) return [];
   const cardDB = engine._getCardDB();
@@ -115,7 +117,7 @@ function _buildReplacementGallery(engine, pi, heroIdx, maxLevel, excludeName) {
     if (hasCardType(cd, 'Token') || cd.subtype === 'Token') continue;
     const effLvl = engine.effectiveCardLevel(cd, pi);
     if (effLvl > maxLevel) continue;
-    if (!engine.isCreatureSummonable(cn, pi, heroIdx)) continue;
+    if (!engine.isCreatureSummonable(cn, seite, heroIdx)) continue;
     seen.set(baseCardName(cn), { name: cn, source: 'deck', level: effLvl });
   }
   return [...seen.values()].sort(
@@ -135,6 +137,7 @@ function _hasReplacement(engine, pi, candidateInst) {
   const lvl = engine.effectiveCardLevel(cd, pi, { heroIdx: candidateInst.heroIdx, inst: candidateInst });
   return _buildReplacementGallery(
     engine, pi, candidateInst.heroIdx, lvl, candidateInst.name,
+    candidateInst.owner ?? pi,   // Kontrolle statt Seite (Styx 28.9.)
   ).length > 0;
 }
 
@@ -259,11 +262,15 @@ module.exports = {
       const sacName     = sacInst.name;
       const sacHeroIdx  = sacInst.heroIdx;
       const sacZoneSlot = sacInst.zoneSlot;
+      // Kontrolle statt Seite (Styx 28.9.): physische Seite der Tausch-Zone
+      // (die des Opfers) und des Helden Garius.
+      const sacSeite = sacInst.owner ?? pi;
+      const feld = ctx.cardHeroOwner ?? pi;
 
       // Build the replacement gallery from the deck — gated on
       // `canSummon` against `sacHeroIdx` so unsummonable Creatures
       // (Sparkfly Queen et al.) never appear.
-      const gallery = _buildReplacementGallery(engine, pi, sacHeroIdx, sacLevel, sacName);
+      const gallery = _buildReplacementGallery(engine, pi, sacHeroIdx, sacLevel, sacName, sacSeite);
       if (gallery.length === 0) continue; // Defensive — pre-filter should preclude.
 
       const repPick = await engine.promptGeneric(pi, {
@@ -289,7 +296,7 @@ module.exports = {
       // (e.g. a Hive's Crown resolution that ended between render
       // and pick). Looping back to the sacrifice picker lets the
       // player choose a different replacement instead of fizzling.
-      if (!engine.isCreatureSummonable(repName, pi, sacHeroIdx)) continue;
+      if (!engine.isCreatureSummonable(repName, sacSeite, sacHeroIdx)) continue;
 
       // ── Commit ──────────────────────────────────────────────────────
       const source = { name: CARD_NAME, owner: pi, heroIdx: gariusHeroIdx };
@@ -316,7 +323,7 @@ module.exports = {
       // of a still-occupied slot — safePlaceInSupport would relocate
       // it to a different slot, violating the "same Support Zone"
       // contract. Bail cleanly: HOPT stays refunded, deck untouched.
-      const slotArr = ps.supportZones?.[sacHeroIdx]?.[sacZoneSlot] || [];
+      const slotArr = gs.players[sacSeite]?.supportZones?.[sacHeroIdx]?.[sacZoneSlot] || [];
       if (slotArr.length > 0) {
         // v1360: Opfer blieb liegen (immun) → wie bisher, Sperre zurueck.
         // Liegt dort aber eine ANDERE Karte (ein Todes-Listener hat den
@@ -355,8 +362,8 @@ module.exports = {
       // `_runBeforeSummon` greift hier nicht: das Opfer lief in
       // DIESEM Effekt, nicht in den Kosten der beschworenen Karte.
       const summonRes = await engine.summonCreatureWithHooks(
-        repName, pi, sacHeroIdx, sacZoneSlot,
-        { source: CARD_NAME, isPlacement: true, hookExtras: engine.deckHookExtras({ _tributePaid: true }) },
+        repName, sacSeite, sacHeroIdx, sacZoneSlot,   // Kontrolle statt Seite (Styx 28.9.)
+        { source: CARD_NAME, isPlacement: true, ...(sacSeite !== pi ? { controller: pi } : {}), hookExtras: engine.deckHookExtras({ _tributePaid: true }) },
       );
       if (!summonRes?.inst) {
         // Placement fizzled (beforeSummon refused etc.). Refund the
@@ -378,12 +385,12 @@ module.exports = {
       //     Hinweis, wer das veranlasst hat.
       engine._broadcastEvent('play_zone_animation', {
         type: 'promotion_burst',
-        owner: pi, heroIdx: sacHeroIdx, zoneSlot: sacZoneSlot,
+        owner: sacSeite, heroIdx: sacHeroIdx, zoneSlot: sacZoneSlot,
         duration: 1400,
       });
       engine._broadcastEvent('play_zone_animation', {
         type: 'gold_sparkle',
-        owner: pi, heroIdx: gariusHeroIdx, zoneSlot: -1,
+        owner: feld, heroIdx: gariusHeroIdx, zoneSlot: -1,   // Kontrolle statt Seite (Styx 28.9.): physische Seite des Helden
       });
 
       engine.log('garius_reform', {

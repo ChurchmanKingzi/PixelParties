@@ -29,24 +29,30 @@ const CARD_NAME = 'Suspicious Monster';
  *  slot's Hero — only sacrifices sitting on Heroes able to summon
  *  Suspicious Monster are offered as targets (highlight / drop / picker),
  *  matching the normal-summon level gate. */
-function heroCanSummon(engine, pi, heroIdx) {
-  const hero = engine.gs.players[pi]?.heroes?.[heroIdx];
+// Styx 28.9.: geliehene Helden der Gegenspalte — `heroOwner` = physische
+// Seite des Helden (fehlt → pi); nur Helden, die `pi` kontrolliert.
+function heroCanSummon(engine, pi, heroIdx, heroOwner = pi) {
+  const hero = engine.gs.players[heroOwner]?.heroes?.[heroIdx];
   if (!hero?.name || hero.hp <= 0) return false;
+  if (engine.heroSideOf(heroOwner, hero) !== pi) return false;
   const cd = engine._getCardDB()[CARD_NAME];
-  return engine.heroMeetsLevelReq(pi, heroIdx, cd);
+  if (heroOwner === pi) return engine.heroMeetsLevelReq(pi, heroIdx, cd);
+  return engine.heroMeetsLevelReq(heroOwner, heroIdx, cd, { levelSourcePi: pi });
 }
 
 /** The sacrificeable Creature (not summoned this turn) occupying a slot,
  *  or null. Also requires the slot's Hero to be able to summon Suspicious
  *  Monster (it becomes the host). */
-function findOccupant(engine, pi, heroIdx, slotIdx) {
+// Styx 28.9.: geliehene Helden der Gegenspalte — `heroOwner` = physische
+// Seite des Platzes; der Bewohner steht dort und wird von `pi` kontrolliert.
+function findOccupant(engine, pi, heroIdx, slotIdx, heroOwner = pi) {
   const gs = engine.gs;
-  const slot = (gs.players[pi]?.supportZones?.[heroIdx] || [])[slotIdx] || [];
+  const slot = (gs.players[heroOwner]?.supportZones?.[heroIdx] || [])[slotIdx] || [];
   if (slot.length === 0) return null;
   // Host Hero (this slot's Hero) must itself be able to summon this card.
-  if (!heroCanSummon(engine, pi, heroIdx)) return null;
+  if (!heroCanSummon(engine, pi, heroIdx, heroOwner)) return null;
   const inst = engine.cardInstances.find(c =>
-    c.zone === 'support' && (c.controller ?? c.owner) === pi
+    c.zone === 'support' && (c.controller ?? c.owner) === pi && c.owner === heroOwner
     && c.heroIdx === heroIdx && c.zoneSlot === slotIdx && !c.faceDown);
   if (!inst) return null;
   if ((inst.turnPlayed || 0) >= (gs.turn || 0)) return null; // summoned this turn
@@ -61,8 +67,9 @@ function sacrificeableSlots(engine, pi) {
   const turn = engine.gs.turn;
   return engine.getSacrificableCreatures(pi)
     .filter(c => c.inst.zone === 'support' && c.inst.turnPlayed !== turn
-      && heroCanSummon(engine, pi, c.inst.heroIdx))
-    .map(c => ({ heroIdx: c.inst.heroIdx, slotIdx: c.inst.zoneSlot, cardName: c.cardName, inst: c.inst }));
+      && heroCanSummon(engine, pi, c.inst.heroIdx, c.inst.owner ?? pi))
+    // Styx 28.9.: `owner` = physische Seite des Platzes.
+    .map(c => ({ heroIdx: c.inst.heroIdx, slotIdx: c.inst.zoneSlot, owner: c.inst.owner ?? pi, cardName: c.cardName, inst: c.inst }));
 }
 
 module.exports = {
@@ -81,7 +88,10 @@ module.exports = {
   // slot; a free-slot drop is a normal Action summon.
   inherentAction(gs, pi, heroIdx, engine, opts) {
     if (opts && opts.zoneSlot != null) {
-      return !!findOccupant(engine, pi, heroIdx, opts.zoneSlot);
+      // Styx 28.9.: geliehene Helden der Gegenspalte — Seite, falls die
+      // Engine sie mitgibt (sonst eigene Seite wie bisher).
+      const side = opts.heroOwner ?? opts.charmedOwner ?? pi;
+      return !!findOccupant(engine, pi, heroIdx, opts.zoneSlot, side);
     }
     return sacrificeableSlots(engine, pi).length > 0;
   },
@@ -96,15 +106,20 @@ module.exports = {
   requiresActiveCaster: true,
 
   canBypassFreeZoneRequirement(gs, pi, heroIdx, cardData, engine) {
-    return sacrificeableSlots(engine, pi).some(s => s.heroIdx === heroIdx);
+    // Styx 28.9.: geliehene Helden der Gegenspalte — nur eigene Plaetze
+    // (der Bypass wird nur fuer Helden der eigenen Spalte gefragt).
+    return sacrificeableSlots(engine, pi).some(s => s.heroIdx === heroIdx && s.owner === pi);
   },
   // Legal drop onto an occupied slot iff its occupant is sacrificeable.
-  canPlaceOnOccupiedSlot(gs, pi, heroIdx, slotIdx, engine) {
-    return !!findOccupant(engine, pi, heroIdx, slotIdx);
+  // Styx 28.9.: geliehene Helden der Gegenspalte — `heroOwner` = physische Seite.
+  canPlaceOnOccupiedSlot(gs, pi, heroIdx, slotIdx, engine, heroOwner = pi) {
+    return !!findOccupant(engine, pi, heroIdx, slotIdx, heroOwner);
   },
   // Client highlight for the draggable drop targets.
   getBouncePlacementTargets(gs, pi, engine) {
-    return sacrificeableSlots(engine, pi).map(s => ({ heroIdx: s.heroIdx, slotIdx: s.slotIdx }));
+    return sacrificeableSlots(engine, pi).map(s => (s.owner !== pi
+      ? { heroIdx: s.heroIdx, slotIdx: s.slotIdx, owner: s.owner }
+      : { heroIdx: s.heroIdx, slotIdx: s.slotIdx }));
   },
 
   async beforeSummon(ctx) {
@@ -126,15 +141,18 @@ module.exports = {
     if (ps._requestedBouncePlaceSlot) {
       const req = ps._requestedBouncePlaceSlot;
       delete ps._requestedBouncePlaceSlot;
-      const occ = findOccupant(engine, pi, req.heroIdx, req.slotIdx);
-      if (occ) target = { heroIdx: req.heroIdx, slotIdx: req.slotIdx, inst: occ };
+      // Styx 28.9.: geliehene Helden der Gegenspalte — `heroOwner` der Marke.
+      const side = (req.heroOwner === 0 || req.heroOwner === 1) ? req.heroOwner : pi;
+      const occ = findOccupant(engine, pi, req.heroIdx, req.slotIdx, side);
+      if (occ) target = { heroIdx: req.heroIdx, slotIdx: req.slotIdx, owner: side, inst: occ };
     }
     if (!target) {
       const slots = sacrificeableSlots(engine, pi);
       if (slots.length === 0) return false; // nothing to sacrifice → abort
       const zones = slots.map(s => ({
         heroIdx: s.heroIdx, slotIdx: s.slotIdx,
-        label: `${ps.heroes[s.heroIdx]?.name || 'Hero'} — ${s.cardName} (Slot ${s.slotIdx + 1})`,
+        ...(s.owner !== pi ? { owner: s.owner } : {}),
+        label: `${gs.players[s.owner]?.heroes?.[s.heroIdx]?.name || 'Hero'} — ${s.cardName} (Slot ${s.slotIdx + 1})`,
       }));
       const picked = await ctx.promptZonePick(zones, {
         title: CARD_NAME,
@@ -143,20 +161,25 @@ module.exports = {
         cancellable: true,
       });
       if (!picked) return false; // cancel → abort (card back to hand, Action kept)
-      const occ = findOccupant(engine, pi, picked.heroIdx, picked.slotIdx);
+      const pickSide = (picked.owner === 0 || picked.owner === 1) ? picked.owner : pi;
+      const occ = findOccupant(engine, pi, picked.heroIdx, picked.slotIdx, pickSide);
       if (!occ) return false;
-      target = { heroIdx: picked.heroIdx, slotIdx: picked.slotIdx, inst: occ };
+      target = { heroIdx: picked.heroIdx, slotIdx: picked.slotIdx, owner: pickSide, inst: occ };
     }
 
     const { heroIdx, slotIdx, inst: occ } = target;
     const occName = occ.name;
+    // Styx 28.9.: geliehene Helden der Gegenspalte — Platz, Zone und Ablage
+    // des Bewohners auf der physischen Seite; Hand und Kontrolle bei `pi`.
+    const heroOwner = target.owner ?? pi;
+    const fps = gs.players[heroOwner];
 
     // (1) Fire ON_CREATURE_SACRIFICED while the occupant is still in its
     //     slot — feeds Temple / Ruin Mourner / Corpse Cannibal / etc. The
     //     per-turn tally and the `_sacrificedTurn` stamp are applied
     //     centrally in runHooks(onCreatureSacrificed) — don't do them here.
     engine._broadcastEvent('play_zone_animation', {
-      type: 'knife_sacrifice', owner: pi, heroIdx, zoneSlot: slotIdx,
+      type: 'knife_sacrifice', owner: heroOwner, heroIdx, zoneSlot: slotIdx,
     });
     await engine.runHooks('onCreatureSacrificed', {
       creature: occ, cardName: occName, owner: occ.owner,
@@ -167,15 +190,16 @@ module.exports = {
 
     // (2) Atomic swap: remove the occupant's name, place Suspicious
     //     Monster's name + a fresh instance into the SAME slot.
-    const slotArr = ps.supportZones?.[heroIdx]?.[slotIdx];
+    const slotArr = fps.supportZones?.[heroIdx]?.[slotIdx];
     if (Array.isArray(slotArr)) {
       const idx = slotArr.indexOf(occName);
       if (idx >= 0) slotArr.splice(idx, 1);
     }
-    if (!ps.supportZones[heroIdx]) ps.supportZones[heroIdx] = [[], [], []];
-    ps.supportZones[heroIdx][slotIdx] = [CARD_NAME];
-    const newInst = engine._trackCard(CARD_NAME, pi, 'support', heroIdx, slotIdx);
+    if (!fps.supportZones[heroIdx]) fps.supportZones[heroIdx] = [[], [], []];
+    fps.supportZones[heroIdx][slotIdx] = [CARD_NAME];
+    const newInst = engine._trackCard(CARD_NAME, heroOwner, 'support', heroIdx, slotIdx);
     newInst.counters = newInst.counters || {};
+    if (heroOwner !== pi) engine.markiereSeitenfremd(newInst, pi);   // wie `safePlaceInSupport(…, { controller: pi })`
     newInst.counters.isPlacement = 1;
     newInst.turnPlayed = gs.turn || 0;
 
@@ -200,9 +224,10 @@ module.exports = {
     engine._broadcastEvent('play_pile_transfer', {
       owner: pi, cardName: CARD_NAME, from: 'hand', to: 'support',
       fromHandIdx, toHeroIdx: heroIdx, toSlotIdx: slotIdx,
+      ...(heroOwner !== pi ? { toOwner: heroOwner } : {}),
     });
     engine._broadcastEvent('summon_effect', {
-      owner: pi, heroIdx, zoneSlot: slotIdx, cardName: CARD_NAME,
+      owner: heroOwner, heroIdx, zoneSlot: slotIdx, cardName: CARD_NAME,
     });
     ps._placementConsumedByCard = CARD_NAME;
     engine.log('suspicious_monster_sacrifice_summon', {
@@ -215,11 +240,11 @@ module.exports = {
     //     Suspicious Monster, so a resummon-into-the-freed-slot reaction
     //     (Corpse Cannibal) correctly finds it occupied and skips.
     occ.zone = 'discard'; occ.heroIdx = -1; occ.zoneSlot = -1;
-    if (!ps.discardPile) ps.discardPile = [];
-    ps.discardPile.push(occName);
+    if (!fps.discardPile) fps.discardPile = [];
+    fps.discardPile.push(occName);
     await engine.runHooks('onCardLeaveZone', {
       card: occ, leavingCard: occ, fromZone: 'support',
-      fromOwner: pi, fromHeroIdx: heroIdx, fromZoneSlot: slotIdx,
+      fromOwner: heroOwner, fromHeroIdx: heroIdx, fromZoneSlot: slotIdx,
       toZone: 'discard', _skipReactionCheck: true,
     });
     await engine.runHooks('onCreatureDeath', {
@@ -236,7 +261,7 @@ module.exports = {
     engine._untrackCard(occ.id);
 
     // (6) Suspicious Monster's own on-summon lifecycle.
-    const hostHero = gs.players[pi]?.heroes?.[heroIdx];
+    const hostHero = fps?.heroes?.[heroIdx];
     const onDeadHero = !hostHero?.name || hostHero.hp <= 0;
     await engine.runHooks('onPlay', {
       _onlyCard: newInst, playedCard: newInst, cardName: CARD_NAME,

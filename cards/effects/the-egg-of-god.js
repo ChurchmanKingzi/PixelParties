@@ -53,30 +53,52 @@ function makeSacrificeSpec(engine) {
   };
 }
 
-function heroCanSummonHere(engine, pi, heroIdx) {
-  const hero = engine.gs.players[pi]?.heroes?.[heroIdx];
+// Styx 28.9.: geliehene Helden der Gegenspalte — `heroOwner` = physische
+// Seite des Helden (fehlt → pi); nur Helden, die `pi` kontrolliert.
+function heroCanSummonHere(engine, pi, heroIdx, heroOwner = pi) {
+  const hero = engine.gs.players[heroOwner]?.heroes?.[heroIdx];
   if (!hero?.name || hero.hp <= 0) return false;
-  return engine.heroMeetsLevelReq(pi, heroIdx, engine._getCardDB()[CARD_NAME]);
+  if (engine.heroSideOf(heroOwner, hero) !== pi) return false;
+  if (heroOwner === pi) return engine.heroMeetsLevelReq(pi, heroIdx, engine._getCardDB()[CARD_NAME]);
+  return engine.heroMeetsLevelReq(heroOwner, heroIdx, engine._getCardDB()[CARD_NAME], { levelSourcePi: pi });
 }
 
-/** Belegte Plaetze voller Helden, deren Tribut dort Platz macht (wie Foresta). */
+/** Mind. ein Opfer von DIESEM Helden. Styx 28.9.: `mustIncludeFromHeroOwner` = Seite des
+ * Helden (geliehene Helden der Gegenspalte). */
+function fullDropSpec(base, heroIdx, pi, heroOwner = pi) {
+  // `mustIncludeFromHeroOwner` = Seite des Helden (Styx 28.9.): nur ein
+  // Opfer aus DIESER Spalte schafft dort Platz; weitere Opfer bleiben frei.
+  return { ...base, mustIncludeFromHeroIdx: heroIdx, mustIncludeFromHeroOwner: heroOwner };
+}
+
+/** Belegte Plaetze voller Helden, deren Tribut dort Platz macht (wie Foresta).
+ *  Styx 28.9.: geliehene Helden der Gegenspalte — alle Helden, die `pi`
+ *  kontrolliert; `owner` = physische Seite, nur gesetzt, wenn ≠ pi. */
 function occupiedDropSlots(gs, pi, engine) {
   const ps = gs.players[pi];
   if (!ps) return [];
   const spec = makeSacrificeSpec(engine);
   const out = [];
-  for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-    const zones = ps.supportZones?.[hi] || [];
-    if ([0, 1, 2].some(z => !engine.supportSlotBelegt(pi, hi, z))) continue;
-    if (!heroCanSummonHere(engine, pi, hi)) continue;
-    if (!engine.canSatisfySacrifice(pi, { ...spec, mustIncludeFromHeroIdx: hi })) continue;
-    for (const z of [0, 1, 2]) if ((zones[z] || []).length > 0) out.push({ heroIdx: hi, slotIdx: z });
+  const helden = typeof engine.heroesControlledBy === 'function'
+    ? engine.heroesControlledBy(pi)
+    : (ps.heroes || []).map((hero, heroIdx) => ({ physOwner: pi, heroIdx, hero }));
+  for (const { physOwner, heroIdx: hi } of helden) {
+    const zones = gs.players[physOwner]?.supportZones?.[hi] || [];
+    if ([0, 1, 2].some(z => !engine.supportSlotBelegt(physOwner, hi, z))) continue;
+    if (!heroCanSummonHere(engine, pi, hi, physOwner)) continue;
+    if (!engine.canSatisfySacrifice(pi, fullDropSpec(spec, hi, pi, physOwner))) continue;
+    for (const z of [0, 1, 2]) {
+      if ((zones[z] || []).length === 0) continue;
+      out.push(physOwner !== pi ? { heroIdx: hi, slotIdx: z, owner: physOwner } : { heroIdx: hi, slotIdx: z });
+    }
   }
   return out;
 }
 
 /** Deck-Creatures fuer die Suche (effektives Level ≤ 3, nicht Egg), Galerie-Form. */
-function suchKandidaten(engine, pi, heroIdx) {
+// Styx 28.9.: geliehene Helden der Gegenspalte — `seite` = physische Seite
+// des Zielplatzes (fehlt → pi), gegen die `isCreatureSummonable` fragt.
+function suchKandidaten(engine, pi, heroIdx, seite = pi) {
   const ps = engine.gs.players[pi];
   const db = engine._getCardDB();
   const zaehler = new Map();
@@ -85,7 +107,7 @@ function suchKandidaten(engine, pi, heroIdx) {
     const cd = db[n];
     if (!cd || !isPileCreature(cd)) continue;
     if (engine.effectiveCardLevel(cd, pi) > MAX_LEVEL) continue;
-    if (heroIdx != null && !engine.isCreatureSummonable(n, pi, heroIdx, { _bypassBeforeSummon: true })) continue;
+    if (heroIdx != null && !engine.isCreatureSummonable(n, seite, heroIdx, { _bypassBeforeSummon: true })) continue;
     zaehler.set(n, (zaehler.get(n) || 0) + 1);
   }
   return [...zaehler.entries()]
@@ -111,31 +133,39 @@ module.exports = {
     const engine = ctx._engine;
     return engine.canSatisfySacrifice(ctx.cardOwner, makeSacrificeSpec(engine));
   },
+  // Styx 28.9.: geliehene Helden der Gegenspalte — Bypass nur fuer eigene
+  // Plaetze (gefragt wird nur fuer Helden der eigenen Spalte); Wurf auf
+  // einen belegten Platz mit physischer Seite `heroOwner`.
   canBypassFreeZoneRequirement: (gs, pi, heroIdx, cardData, engine) =>
-    occupiedDropSlots(gs, pi, engine).some(sl => sl.heroIdx === heroIdx),
+    occupiedDropSlots(gs, pi, engine).some(sl => sl.heroIdx === heroIdx && (sl.owner ?? pi) === pi),
   getBouncePlacementTargets: (gs, pi, engine) => occupiedDropSlots(gs, pi, engine),
-  canPlaceOnOccupiedSlot: (gs, pi, heroIdx, slotIdx, engine) =>
-    occupiedDropSlots(gs, pi, engine).some(sl => sl.heroIdx === heroIdx && sl.slotIdx === slotIdx),
+  canPlaceOnOccupiedSlot: (gs, pi, heroIdx, slotIdx, engine, heroOwner = pi) =>
+    occupiedDropSlots(gs, pi, engine).some(sl => sl.heroIdx === heroIdx && sl.slotIdx === slotIdx
+      && (sl.owner ?? pi) === heroOwner),
 
   async beforeSummon(ctx) {
     const engine = ctx._engine;
     const pi = ctx.cardOwner;
     const ps = engine.gs.players[pi];
     const heroIdx = ctx.cardHeroIdx;
+    // Styx 28.9.: geliehene Helden der Gegenspalte — physische Seite des
+    // Zielhelden (fehlt → pi). Opfer zahlt `pi`.
+    const heroOwner = (ctx.cardHeroOwner === 0 || ctx.cardHeroOwner === 1) ? ctx.cardHeroOwner : pi;
     const allFullDrop = !!ps?._requestedBouncePlaceSlot;
     if (ps?._requestedBouncePlaceSlot) delete ps._requestedBouncePlaceSlot;
     const base = makeSacrificeSpec(engine);
     const spec = allFullDrop
-      ? { ...base, mustIncludeFromHeroIdx: heroIdx,
+      ? { ...fullDropSpec(base, heroIdx, pi, heroOwner),
           description: `${base.description} It must come from the summoning Hero's Support Zones.` }
       : base;
     const ok = await engine.resolveSacrificeCost(ctx, spec);
     if (!ok || ok.extraPicked) return false;
     if (allFullDrop) {
-      const frei = [0, 1, 2].find(z => !engine.supportSlotBelegt(pi, heroIdx, z));
+      const frei = [0, 1, 2].find(z => !engine.supportSlotBelegt(heroOwner, heroIdx, z));
       if (frei == null) return false;
       await engine.actionPlaceCreature(CARD_NAME, pi, heroIdx, frei, {
         source: 'external', sourceName: CARD_NAME, fireHooks: true,
+        ...(heroOwner !== pi ? { heldSeite: heroOwner } : {}),
       });
       ps._placementConsumedByCard = CARD_NAME;
     }
@@ -158,11 +188,19 @@ module.exports = {
       if (gs.activePlayer !== pi) return;
       const ps = gs.players[pi];
       const heroIdx = egg.heroIdx, slotIdx = egg.zoneSlot;
-      const seite = engine.physicalSide ? engine.physicalSide(egg) : egg.owner;
+      // Styx 28.9.: geliehene Helden der Gegenspalte — eine ueber einen
+      // uebernommenen Helden beschworene Egg steht physisch bei `egg.owner`
+      // (`physicalSide` liefert dort den Kontrolleur).
+      const quer = egg.counters?.crossSideControlled != null;
+      const seite = quer ? egg.owner
+        : (engine.physicalSide ? engine.physicalSide(egg) : egg.owner);
+      // Zielseite der Suche/Platzierung: nur bei der seitenfremd
+      // beschworenen Egg die Gegenspalte, sonst wie bisher `pi`.
+      const zielSeite = quer ? egg.owner : pi;
 
       // Leerlauf: nichts zu finden oder das Deck gesperrt → kein Ausloesen.
       if (!engine.pileOutAllowed(pi, 'deck', { source: CARD_NAME })) return;
-      if (suchKandidaten(engine, pi, heroIdx).length === 0) return;
+      if (suchKandidaten(engine, pi, heroIdx, zielSeite).length === 0) return;
 
       await engine.showTriggeredEffect(CARD_NAME, { playerIdx: pi });
       glaenzen(engine, egg);
@@ -184,7 +222,7 @@ module.exports = {
         await engine.zeigeFizzle(CARD_NAME, { playerIdx: pi, grund: 'zone_taken' });
         return;
       }
-      const karten = suchKandidaten(engine, pi, heroIdx);
+      const karten = suchKandidaten(engine, pi, heroIdx, zielSeite);
       if (karten.length === 0) {
         engine.log('egg_of_god_fizzle', { player: ps.username, reason: 'no_target' });
         await engine.zeigeFizzle(CARD_NAME, { playerIdx: pi, grund: 'no_target' });
@@ -206,7 +244,9 @@ module.exports = {
         await engine.zeigeFizzle(CARD_NAME, { playerIdx: pi, grund: 'zone_taken' });
         return;
       }
-      const res = await engine.placeFromPile(pi, 'deck', gewaehlt, heroIdx, slotIdx, { source: CARD_NAME });
+      const res = await engine.placeFromPile(pi, 'deck', gewaehlt, heroIdx, slotIdx, {
+        source: CARD_NAME, ...(zielSeite !== pi ? { heldSeite: zielSeite } : {}),
+      });
       const neu = res?.inst || res;
       if (!neu) {
         engine.log('egg_of_god_fizzle', { player: ps.username, reason: 'place_refused' });
@@ -218,7 +258,7 @@ module.exports = {
       neu.counters._hasHaste = true;
       engine.log('egg_of_god_hatch', {
         player: ps.username, card: CARD_NAME, target: gewaehlt,
-        hero: ps.heroes?.[heroIdx]?.name || null,
+        hero: gs.players[zielSeite]?.heroes?.[heroIdx]?.name || null,
       });
       engine.sync();
     },

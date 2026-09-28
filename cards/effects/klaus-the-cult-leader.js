@@ -64,6 +64,10 @@ module.exports = {
 
       // Trigger only when Klaus himself was the caster.
       if (ctx.casterIdx !== pi || ctx.heroIdx !== heroIdx) return;
+      // Kontrolle statt Seite (Styx 28.9.): physische Seite des Helden —
+      // `heroOwner` (falls gemeldet) = Reihe, in die `heroIdx` zeigt.
+      const feld = ctx.cardHeroOwner ?? pi;
+      if (ctx.heroOwner != null && ctx.heroOwner !== feld) return;
 
       // Spell must be Decay Magic. Match either school1 or school2 so
       // future multi-school Decay Spells (if any) still count.
@@ -73,7 +77,8 @@ module.exports = {
           && spellData.spellSchool2 !== 'Decay Magic') return;
 
       const ps = gs.players[pi];
-      const hero = ps?.heroes?.[heroIdx];
+      const fs = gs.players[feld];   // Kontrolle statt Seite (Styx 28.9.): physische Seite des Helden
+      const hero = fs?.heroes?.[heroIdx];
       if (!hero?.name || hero.hp <= 0) return;
       // Frozen / Stunned / Negated Klaus can't trigger his own bonus.
       // Bound is fine — bound only blocks Actions, this is a passive
@@ -81,7 +86,7 @@ module.exports = {
       if (hero.statuses?.frozen || hero.statuses?.stunned || hero.statuses?.negated) return;
 
       // Need a free Support Zone on Klaus.
-      const supZones = ps.supportZones?.[heroIdx] || [[], [], []];
+      const supZones = fs.supportZones?.[heroIdx] || [[], [], []];
       let freeSlot = -1;
       for (let z = 0; z < 3; z++) {
         if ((supZones[z] || []).length === 0) { freeSlot = z; break; }
@@ -120,7 +125,7 @@ module.exports = {
       // Re-verify hand presence — async prompt could have shifted state.
       if ((ps.hand || []).indexOf(chosenName) < 0) return;
       // Re-verify free slot.
-      const supZones2 = ps.supportZones?.[heroIdx] || [[], [], []];
+      const supZones2 = fs.supportZones?.[heroIdx] || [[], [], []];
       let slotNow = -1;
       for (let z = 0; z < 3; z++) {
         if ((supZones2[z] || []).length === 0) { slotNow = z; break; }
@@ -136,6 +141,7 @@ module.exports = {
         sourceName: CARD_NAME,
         countAsSummon: false,
         animationType: 'summon',
+        ...(feld !== pi ? { heldSeite: feld } : {}),   // Kontrolle statt Seite (Styx 28.9.)
       });
       if (!res?.inst) return;
 

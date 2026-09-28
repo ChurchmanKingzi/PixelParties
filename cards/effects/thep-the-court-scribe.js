@@ -55,9 +55,11 @@ module.exports = {
     const heroIdx = ctx.cardHeroIdx;
     const ps = gs.players[pi];
     if (!ps) return false;
+    // Kontrolle statt Seite (Styx 28.9.): physische Seite des Helden
+    const feld = ctx.cardHeroOwner ?? pi;
 
     // Need at least one free Support Zone on Thep.
-    const zones = ps.supportZones?.[heroIdx] || [];
+    const zones = gs.players[feld]?.supportZones?.[heroIdx] || [];
     let hasFreeSlot = false;
     for (let z = 0; z < 3; z++) {
       if ((zones[z] || []).length === 0) { hasFreeSlot = true; break; }
@@ -86,11 +88,13 @@ module.exports = {
     const pi = ctx.cardOwner;
     const heroIdx = ctx.cardHeroIdx;
     const ps = gs.players[pi];
-    const hero = ps?.heroes?.[heroIdx];
+    // Kontrolle statt Seite (Styx 28.9.): physische Seite des Helden
+    const feld = ctx.cardHeroOwner ?? pi;
+    const hero = gs.players[feld]?.heroes?.[heroIdx];
     if (!ps || !hero?.name) return false;
 
     // Thep's free Support Zones — placement target.
-    const zones = ps.supportZones?.[heroIdx] || [];
+    const zones = gs.players[feld]?.supportZones?.[heroIdx] || [];
     const freeSlots = [];
     for (let z = 0; z < 3; z++) {
       if ((zones[z] || []).length === 0) freeSlots.push(z);
@@ -138,6 +142,7 @@ module.exports = {
     } else {
       const zoneOptions = freeSlots.map(z => ({
         heroIdx, slotIdx: z,
+        ...(feld !== pi ? { owner: feld, ownerIdx: feld } : {}),   // Kontrolle statt Seite (Styx 28.9.)
         label: `${hero.name} — Support ${z + 1}`,
       }));
       const zp = await ctx.promptZonePick(zoneOptions, {
@@ -160,12 +165,13 @@ module.exports = {
       source: CARD_NAME, flug: false,
       summonOpts: { isPlacement: true },
       hookExtras: { _isNormalSummon: false },
+      ...(feld !== pi ? { heldSeite: feld } : {}),   // Kontrolle statt Seite (Styx 28.9.)
     });
     if (!placeRes) return false;
 
     // Standard summon glow on the placement zone.
     engine._broadcastEvent('summon_effect', {
-      owner: pi, heroIdx, zoneSlot: placeRes.actualSlot, cardName: chosenName,
+      owner: feld, heroIdx, zoneSlot: placeRes.actualSlot, cardName: chosenName,
     });
 
     engine.log('thep_revive', {

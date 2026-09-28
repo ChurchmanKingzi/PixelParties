@@ -186,32 +186,55 @@ function getBounceableDeepseaCreatures(engine, playerIdx, opts = {}) {
   const gs = engine.gs;
   const ps = gs.players[playerIdx];
   if (!ps) return [];
-  const turn = gs.turn || 0;
   const out = [];
-  for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-    for (let si = 0; si < 3; si++) {
-      const slot = (ps.supportZones[hi] || [])[si] || [];
-      if (slot.length === 0) continue;
-      const inst = engine.cardInstances.find(c =>
-        (c.owner === playerIdx || c.controller === playerIdx) &&
-        c.zone === 'support' &&
-        c.heroIdx === hi &&
-        c.zoneSlot === si
-      );
-      if (!inst) continue;
-      if (opts.excludeInstId && inst.id === opts.excludeInstId) continue;
-      if (!isDeepseaCreature(inst.name, engine, inst)) continue;
-      // "Not summoned this turn" — strictly less than current turn.
-      // Ausnahme per KARTEN-VERTRAG (`isDeepseaBounceableSameTurn`,
-      // aktuell Infected Squirrel): darf noch in der Beschwörungsrunde
-      // gebounct werden, zum Preis des Beschwörungs-Locks (gesetzt in
-      // tryBouncePlace).
-      if (!loadCardEffect(inst.name)?.isDeepseaBounceableSameTurn
-          && (inst.turnPlayed || 0) >= turn) continue;
-      out.push({ inst, heroIdx: hi, slotIdx: si, cardName: inst.name });
+  // Styx 28.9.: geliehene Helden der Gegenspalte. Durchsucht werden die
+  // Plaetze ALLER Helden, die `playerIdx` gerade kontrolliert (eigene
+  // Spalte ohne die vom Gegner uebernommenen, plus die uebernommenen der
+  // Gegenspalte). `heroOwner` im Eintrag = physische Seite des Platzes.
+  for (let side = 0; side < (gs.players || []).length; side++) {
+    const sps = gs.players[side];
+    if (!sps) continue;
+    for (let hi = 0; hi < (sps.heroes || []).length; hi++) {
+      if (engine.heroSideOf(side, sps.heroes[hi]) !== playerIdx) continue;
+      for (let si = 0; si < 3; si++) {
+        const inst = _bounceableAt(engine, playerIdx, side, hi, si);
+        if (!inst) continue;
+        if (opts.excludeInstId && inst.id === opts.excludeInstId) continue;
+        out.push({ inst, heroIdx: hi, slotIdx: si, cardName: inst.name, heroOwner: side });
+      }
     }
   }
   return out;
+}
+
+/**
+ * Bewohner des Platzes (side, hi, si), falls er eine bounce-bare
+ * Deepsea-Kreatur ist, die `pi` kontrolliert — sonst null. Prueft NICHT,
+ * wer den Helden kontrolliert (das tun die Aufrufer).
+ * Styx 28.9.: geliehene Helden der Gegenspalte — `side` ist die
+ * physische Seite des Platzes, die Kreatur gehoert `pi`.
+ */
+function _bounceableAt(engine, pi, side, hi, si) {
+  const gs = engine.gs;
+  const slot = (gs.players[side]?.supportZones?.[hi] || [])[si] || [];
+  if (slot.length === 0) return null;
+  const inst = engine.cardInstances.find(c =>
+    c.owner === side &&
+    (c.controller ?? c.owner) === pi &&
+    c.zone === 'support' &&
+    c.heroIdx === hi &&
+    c.zoneSlot === si
+  );
+  if (!inst) return null;
+  if (!isDeepseaCreature(inst.name, engine, inst)) return null;
+  // "Not summoned this turn" — strictly less than current turn.
+  // Ausnahme per KARTEN-VERTRAG (`isDeepseaBounceableSameTurn`,
+  // aktuell Infected Squirrel): darf noch in der Beschwörungsrunde
+  // gebounct werden, zum Preis des Beschwörungs-Locks (gesetzt in
+  // tryBouncePlace).
+  if (!loadCardEffect(inst.name)?.isDeepseaBounceableSameTurn
+      && (inst.turnPlayed || 0) >= (gs.turn || 0)) return null;
+  return inst;
 }
 
 /**
@@ -249,9 +272,15 @@ function hasBounceableDeepsea(gs, playerIdx) {
 async function returnSupportCreatureToHand(engine, inst, sourceName, opts = {}) {
   if (!inst || inst.zone !== 'support') return { returned: false };
   const gs = engine.gs;
-  const ownerIdx = inst.owner; // Hand-return ALWAYS goes to original owner.
+  // Styx 28.9.: geliehene Helden der Gegenspalte. Eine ueber einen
+  // uebernommenen Helden beschworene Kreatur steht physisch auf
+  // `inst.owner`, gehoert aber ihrem Beschwoerer (`crossSideControlled`)
+  // — die Hand ist seine, das Brett bleibt `seite`. Ohne Marke wie bisher.
+  const seite = inst.owner;
+  const ownerIdx = inst.counters?.crossSideControlled ?? inst.owner; // Hand-return ALWAYS goes to original owner.
   const ps = gs.players[ownerIdx];
   if (!ps) return { returned: false };
+  const bps = gs.players[seite] || ps;
 
   const heroIdx = inst.heroIdx;
   const slotIdx = inst.zoneSlot;
@@ -265,7 +294,7 @@ async function returnSupportCreatureToHand(engine, inst, sourceName, opts = {}) 
   // (Moonlight Butterfly steigt ins Mondlicht statt in Blasen). Ohne
   // Angabe bleibt alles wie bisher.
   engine._broadcastEvent('play_zone_animation', {
-    type: opts.animationType || 'deep_sea_bubbles', owner: ownerIdx, heroIdx, zoneSlot: slotIdx,
+    type: opts.animationType || 'deep_sea_bubbles', owner: seite, heroIdx, zoneSlot: slotIdx,
   });
 
   // Cardinal Beast immunity is the engine's absolute "this card cannot
@@ -293,12 +322,13 @@ async function returnSupportCreatureToHand(engine, inst, sourceName, opts = {}) 
   const toHandIdx = (ps.hand || []).length;
   engine._broadcastEvent('play_pile_transfer', {
     owner: ownerIdx, cardName, from: 'support', to: 'hand',
+    ...(seite !== ownerIdx ? { fromOwner: seite, toOwner: ownerIdx } : {}),   // Styx 28.9.
     fromHeroIdx: heroIdx, fromSlotIdx: slotIdx,
     toHandIdx,
   });
 
   // Remove name from support slot.
-  const slotArr = ps.supportZones?.[heroIdx]?.[slotIdx];
+  const slotArr = bps.supportZones?.[heroIdx]?.[slotIdx];
   if (Array.isArray(slotArr)) {
     const idx = slotArr.indexOf(cardName);
     if (idx >= 0) slotArr.splice(idx, 1);
@@ -317,7 +347,7 @@ async function returnSupportCreatureToHand(engine, inst, sourceName, opts = {}) 
   // creature-count watchers, etc.) see it.
   await engine.runHooks('onCardLeaveZone', {
     card: inst, fromZone: 'support',
-    fromOwner: ownerIdx, fromHeroIdx: heroIdx, fromZoneSlot: slotIdx,
+    fromOwner: seite, fromHeroIdx: heroIdx, fromZoneSlot: slotIdx,   // Styx 28.9.
     toZone: 'hand', toOwner: ownerIdx,
     _skipReactionCheck: true,
   });
@@ -335,6 +365,7 @@ async function returnSupportCreatureToHand(engine, inst, sourceName, opts = {}) 
     // hook), but the explicit field keeps callsites uniform with the
     // bounce-place / deepsea-swap paths where the inst IS reset first.
     fromHeroIdxs: [heroIdx], fromZoneSlots: [slotIdx],
+    ...(seite !== ownerIdx ? { fromOwners: [seite] } : {}),   // Styx 28.9.
     by: sourceName, _skipReactionCheck: true,
   });
 
@@ -450,18 +481,25 @@ async function tryBouncePlace(ctx) {
   // If the player targeted a specific occupied slot, place into it.
   let chosen = null;
   if (bounceReq) {
-    chosen = bounceable.find(b => b.heroIdx === bounceReq.heroIdx && b.slotIdx === bounceReq.slotIdx) || null;
+    // Styx 28.9.: geliehene Helden der Gegenspalte — `heroOwner` ist die
+    // physische Seite des Zielplatzes (alte Staende ohne Feld: eigene).
+    const reqSeite = bounceReq.heroOwner ?? pi;
+    chosen = bounceable.find(b => b.heroIdx === bounceReq.heroIdx && b.slotIdx === bounceReq.slotIdx
+      && b.heroOwner === reqSeite) || null;
     // If the request no longer matches (creature moved / bounced), fall
     // back to the prompt path below.
   }
 
   if (!chosen) {
     // Build zone-pick options (one per bounceable Creature).
+    // Styx 28.9.: geliehene Helden der Gegenspalte — Held und Platz
+    // liegen auf `b.heroOwner`; `owner` nur, wenn es nicht die eigene ist.
     const zones = bounceable.map(b => {
-      const hero = ps.heroes[b.heroIdx];
+      const hero = gs.players[b.heroOwner]?.heroes?.[b.heroIdx];
       return {
         heroIdx: b.heroIdx,
         slotIdx: b.slotIdx,
+        ...(b.heroOwner !== pi ? { owner: b.heroOwner } : {}),
         label: `${hero?.name || 'Hero'} — ${b.cardName} (Slot ${b.slotIdx + 1})`,
       };
     });
@@ -479,7 +517,8 @@ async function tryBouncePlace(ctx) {
       return false;
     }
 
-    chosen = bounceable.find(b => b.heroIdx === picked.heroIdx && b.slotIdx === picked.slotIdx);
+    chosen = bounceable.find(b => b.heroIdx === picked.heroIdx && b.slotIdx === picked.slotIdx
+      && b.heroOwner === (picked.owner ?? pi));   // Styx 28.9.
     if (!chosen) return false;
   }
 
@@ -489,6 +528,10 @@ async function tryBouncePlace(ctx) {
   const bouncedInst = chosen.inst;
   const bouncedHeroIdx = chosen.heroIdx;
   const bouncedSlotIdx = chosen.slotIdx;
+  // Styx 28.9.: geliehene Helden der Gegenspalte. `seite` = physische
+  // Seite des Platzes (Brett), `ps` bleibt die des Beschwoerers (Hand).
+  const seite = chosen.heroOwner ?? pi;
+  const fps = gs.players[seite];
   const cardDB = engine._getCardDB();
   const bouncedLevel = cardDB[bouncedName]?.level || 0;
 
@@ -516,7 +559,7 @@ async function tryBouncePlace(ctx) {
   // ════════════════════════════════════════════
 
   // (A) Remove bounced Creature's name from the support slot.
-  const slotArr = ps.supportZones?.[bouncedHeroIdx]?.[bouncedSlotIdx];
+  const slotArr = fps.supportZones?.[bouncedHeroIdx]?.[bouncedSlotIdx];
   if (Array.isArray(slotArr)) {
     const idx = slotArr.indexOf(bouncedName);
     if (idx >= 0) slotArr.splice(idx, 1);
@@ -526,10 +569,14 @@ async function tryBouncePlace(ctx) {
   //     fresh CardInstance for it so engine.sync() ships both changes
   //     in one broadcast. Directly mutate state (rather than calling
   //     placeCreature) so we control ordering vs. hand updates.
-  if (!ps.supportZones[bouncedHeroIdx]) ps.supportZones[bouncedHeroIdx] = [[], [], []];
-  ps.supportZones[bouncedHeroIdx][bouncedSlotIdx] = [cardName];
-  const newInst = engine._trackCard(cardName, pi, 'support', bouncedHeroIdx, bouncedSlotIdx);
+  if (!fps.supportZones[bouncedHeroIdx]) fps.supportZones[bouncedHeroIdx] = [[], [], []];
+  fps.supportZones[bouncedHeroIdx][bouncedSlotIdx] = [cardName];
+  const newInst = engine._trackCard(cardName, seite, 'support', bouncedHeroIdx, bouncedSlotIdx);
   newInst.counters = newInst.counters || {};
+  // Styx 28.9.: geliehene Helden der Gegenspalte — die Kreatur steht
+  // beim Gegner, gehoert aber dem Beschwoerer (wie `actionPlaceCreature`
+  // mit `heldSeite`).
+  if (seite !== pi) engine.markiereSeitenfremd(newInst, pi);
   newInst.counters.isPlacement = 1;
   newInst.turnPlayed = gs.turn || 0;
   newInst.counters._bouncedFromName = bouncedName;
@@ -580,8 +627,11 @@ async function tryBouncePlace(ctx) {
   //     hand slot is hidden via `bounceReturnHidden`; the landing
   //     support slot is hidden via `bounceOutgoingHidden`. A
   //     lightweight `deep_sea_bubbles` glow fires on the vacated slot.
+  // Styx 28.9.: geliehene Helden der Gegenspalte — Hand bleibt `pi`,
+  // das Brett ist `seite` (fromOwner/toOwner nur bei fremder Seite).
   engine._broadcastEvent('play_pile_transfer', {
     owner: pi, cardName: bouncedName, from: 'support', to: 'hand',
+    ...(seite !== pi ? { fromOwner: seite, toOwner: pi } : {}),
     fromHeroIdx: bouncedHeroIdx, fromSlotIdx: bouncedSlotIdx,
     toHandIdx,
   });
@@ -589,12 +639,13 @@ async function tryBouncePlace(ctx) {
     owner: pi, cardName, from: 'hand', to: 'support',
     fromHandIdx: newCardFromHandIdx,
     toHeroIdx: bouncedHeroIdx, toSlotIdx: bouncedSlotIdx,
+    ...(seite !== pi ? { fromOwner: pi, toOwner: seite } : {}),
   });
   engine._broadcastEvent('play_zone_animation', {
-    type: 'deep_sea_bubbles', owner: pi, heroIdx: bouncedHeroIdx, zoneSlot: bouncedSlotIdx,
+    type: 'deep_sea_bubbles', owner: seite, heroIdx: bouncedHeroIdx, zoneSlot: bouncedSlotIdx,
   });
   engine._broadcastEvent('summon_effect', {
-    owner: pi, heroIdx: bouncedHeroIdx, zoneSlot: bouncedSlotIdx, cardName,
+    owner: seite, heroIdx: bouncedHeroIdx, zoneSlot: bouncedSlotIdx, cardName,
   });
 
   // (F) Signal the server before sync so state sent to clients
@@ -627,13 +678,14 @@ async function tryBouncePlace(ctx) {
   bouncedInst.zoneSlot = -1;
   await engine.runHooks('onCardLeaveZone', {
     card: bouncedInst, fromZone: 'support',
-    fromOwner: pi, fromHeroIdx: bouncedHeroIdx, fromZoneSlot: bouncedSlotIdx,
+    fromOwner: seite, fromHeroIdx: bouncedHeroIdx, fromZoneSlot: bouncedSlotIdx,   // Styx 28.9.
     toZone: 'hand', toOwner: pi,
     _skipReactionCheck: true,
   });
   await engine.runHooks('onCardsReturnedToHand', {
     ownerIdx: pi, returnedCards: [bouncedName], returnedInsts: [bouncedInst],
     fromHeroIdxs: [bouncedHeroIdx], fromZoneSlots: [bouncedSlotIdx],
+    ...(seite !== pi ? { fromOwners: [seite] } : {}),   // Styx 28.9.
     by: `${cardName} (Bounce-Place)`, _skipReactionCheck: true,
   });
   engine._untrackCard(bouncedInst.id);
@@ -647,7 +699,7 @@ async function tryBouncePlace(ctx) {
   // which would swallow the new Creature's own onPlay. Deepsea swap
   // explicitly supports placing into dead-hero zones, so the on-summon
   // effect MUST still fire.
-  const bouncedHero = gs.players[pi]?.heroes?.[bouncedHeroIdx];
+  const bouncedHero = gs.players[seite]?.heroes?.[bouncedHeroIdx];   // Styx 28.9.
   const landedOnDeadHero = !bouncedHero?.name || bouncedHero.hp <= 0;
   await engine.runHooks('onPlay', {
     _onlyCard: newInst, playedCard: newInst, cardName,
@@ -708,7 +760,10 @@ function inherentActionIfBounceable(gs, pi, heroIdx, engine, opts) {
   // drop target; an empty slot here means the player is doing a normal
   // summon, not a bounce-place — so this is NOT inherent.
   if (opts && opts.zoneSlot != null) {
-    const slot = (gs.players?.[pi]?.supportZones?.[heroIdx] || [])[opts.zoneSlot] || [];
+    // Styx 28.9.: geliehene Helden der Gegenspalte — die Seite des
+    // Zielplatzes, falls der Aufrufer sie mitgibt (sonst die eigene).
+    const seite = opts.heroOwner ?? opts.heldSeite ?? opts.charmedOwner ?? pi;
+    const slot = (gs.players?.[seite]?.supportZones?.[heroIdx] || [])[opts.zoneSlot] || [];
     if (slot.length === 0) return false;
   }
   return getBounceableDeepseaCreatures(engine, pi).length > 0;
@@ -735,25 +790,15 @@ function canBypassFreeZoneIfBounceable(gs, pi, heroIdx, cardData, engine) {
  * legal "swap onto this Creature" gesture. A slot qualifies iff the
  * current occupant IS a bounceable Deepsea Creature for this player.
  */
-function canPlaceOnOccupiedSlotIfBounceable(gs, pi, heroIdx, slotIdx, engine) {
+function canPlaceOnOccupiedSlotIfBounceable(gs, pi, heroIdx, slotIdx, engine, heroOwner = pi) {
   if (!engine) return false;
-  const slot = (gs.players[pi]?.supportZones?.[heroIdx] || [])[slotIdx] || [];
-  if (slot.length === 0) return false;
-  const inst = engine.cardInstances.find(c =>
-    c.zone === 'support' &&
-    (c.owner === pi || c.controller === pi) &&
-    c.heroIdx === heroIdx &&
-    c.zoneSlot === slotIdx
-  );
-  if (!inst) return false;
-  if (!isDeepseaCreature(inst.name, engine, inst)) return false;
-  // "Not summoned this turn" — matches getBounceableDeepseaCreatures.
-  // Infected Squirrel is the explicit exception: its card text lets it
-  // be bounced on the same turn it was summoned (at the cost of
-  // locking further summons, applied in tryBouncePlace).
-  if (!loadCardEffect(inst.name)?.isDeepseaBounceableSameTurn
-      && (inst.turnPlayed || 0) >= (gs.turn || 0)) return false;
-  return true;
+  // Styx 28.9.: geliehene Helden der Gegenspalte. `heroOwner` = physische
+  // Seite des Zielplatzes; der Held dort muss von `pi` kontrolliert werden.
+  const hero = gs.players[heroOwner]?.heroes?.[heroIdx];
+  if (engine.heroSideOf(heroOwner, hero) !== pi) return false;
+  // "Not summoned this turn" / Infected-Squirrel-Ausnahme / Kontrolle —
+  // alles in `_bounceableAt` (dieselbe Pruefung wie die Aufzaehlung).
+  return !!_bounceableAt(engine, pi, heroOwner, heroIdx, slotIdx);
 }
 
 /**
@@ -765,8 +810,11 @@ function canPlaceOnOccupiedSlotIfBounceable(gs, pi, heroIdx, slotIdx, engine) {
  */
 function getBouncePlacementTargetsList(gs, pi, engine) {
   if (!engine) return [];
+  // Styx 28.9.: geliehene Helden der Gegenspalte — `owner` (physische
+  // Seite) nur, wenn es nicht die eigene ist.
   return getBounceableDeepseaCreatures(engine, pi)
-    .map(c => ({ heroIdx: c.heroIdx, slotIdx: c.slotIdx }));
+    .map(c => ({ heroIdx: c.heroIdx, slotIdx: c.slotIdx,
+      ...(c.heroOwner !== pi ? { owner: c.heroOwner } : {}) }));
 }
 
 // ─── Per-turn summon limit ──────────────────
@@ -911,6 +959,11 @@ async function atomicSwap(engine, pi, bouncedInst, newCardName, sourceName) {
   const bouncedLevel = cardDB[bouncedName]?.level || 0;
   const bouncedHeroIdx = bouncedInst.heroIdx;
   const bouncedSlotIdx = bouncedInst.zoneSlot;
+  // Styx 28.9.: geliehene Helden der Gegenspalte. `ownSupportCreatures`
+  // liefert auch Kreaturen, die `pi` auf der Gegenspalte kontrolliert —
+  // Brett = `seite` (physisch), Hand/Kosten = `pi`.
+  const seite = bouncedInst.owner ?? pi;
+  const fps = gs.players[seite] || ps;
 
   // Pre-placement gate: run the incoming Creature's `beforeSummon` hook
   // so sacrifice / tribute costs (Dragon Pilot, Dark Deepsea God, etc.)
@@ -923,7 +976,8 @@ async function atomicSwap(engine, pi, bouncedInst, newCardName, sourceName) {
   // creatures' beforeSummon) so it skips its own bounce-place prompt —
   // the swap's bounce-out is already happening via the caller.
   if (typeof engine._runBeforeSummon === 'function') {
-    const ok = await engine._runBeforeSummon(newCardName, pi, bouncedHeroIdx, { _isSwap: true });
+    const ok = await engine._runBeforeSummon(newCardName, pi, bouncedHeroIdx,
+      { _isSwap: true, ...(seite !== pi ? { heldSeite: seite } : {}) });   // Styx 28.9.
     if (!ok) {
       engine.log('swap_blocked', {
         card: newCardName, by: sourceName || 'Swap', reason: 'beforeSummon',
@@ -933,17 +987,18 @@ async function atomicSwap(engine, pi, bouncedInst, newCardName, sourceName) {
   }
 
   // (A) Remove bounced creature name from its support slot.
-  const slotArr = ps.supportZones?.[bouncedHeroIdx]?.[bouncedSlotIdx];
+  const slotArr = fps.supportZones?.[bouncedHeroIdx]?.[bouncedSlotIdx];
   if (Array.isArray(slotArr)) {
     const idx = slotArr.indexOf(bouncedName);
     if (idx >= 0) slotArr.splice(idx, 1);
   }
 
   // (B) Place new creature name + track a fresh instance.
-  if (!ps.supportZones[bouncedHeroIdx]) ps.supportZones[bouncedHeroIdx] = [[], [], []];
-  ps.supportZones[bouncedHeroIdx][bouncedSlotIdx] = [newCardName];
-  const newInst = engine._trackCard(newCardName, pi, 'support', bouncedHeroIdx, bouncedSlotIdx);
+  if (!fps.supportZones[bouncedHeroIdx]) fps.supportZones[bouncedHeroIdx] = [[], [], []];
+  fps.supportZones[bouncedHeroIdx][bouncedSlotIdx] = [newCardName];
+  const newInst = engine._trackCard(newCardName, seite, 'support', bouncedHeroIdx, bouncedSlotIdx);
   newInst.counters = newInst.counters || {};
+  if (seite !== pi) engine.markiereSeitenfremd(newInst, pi);   // Styx 28.9.: steht beim Gegner, gehoert `pi`
   newInst.counters.isPlacement = 1;
   newInst.turnPlayed = gs.turn || 0;
   // See clearSwapInheritedStatus's docstring — the swapped-in Creature
@@ -965,6 +1020,7 @@ async function atomicSwap(engine, pi, bouncedInst, newCardName, sourceName) {
   //     cross mid-flight — bounced support→hand, new hand→support.
   engine._broadcastEvent('play_pile_transfer', {
     owner: pi, cardName: bouncedName, from: 'support', to: 'hand',
+    ...(seite !== pi ? { fromOwner: seite, toOwner: pi } : {}),   // Styx 28.9.
     fromHeroIdx: bouncedHeroIdx, fromSlotIdx: bouncedSlotIdx,
     toHandIdx,
   });
@@ -972,12 +1028,13 @@ async function atomicSwap(engine, pi, bouncedInst, newCardName, sourceName) {
     owner: pi, cardName: newCardName, from: 'hand', to: 'support',
     fromHandIdx: newCardFromHandIdx,
     toHeroIdx: bouncedHeroIdx, toSlotIdx: bouncedSlotIdx,
+    ...(seite !== pi ? { fromOwner: pi, toOwner: seite } : {}),   // Styx 28.9.
   });
   engine._broadcastEvent('play_zone_animation', {
-    type: 'deep_sea_bubbles', owner: pi, heroIdx: bouncedHeroIdx, zoneSlot: bouncedSlotIdx,
+    type: 'deep_sea_bubbles', owner: seite, heroIdx: bouncedHeroIdx, zoneSlot: bouncedSlotIdx,
   });
   engine._broadcastEvent('summon_effect', {
-    owner: pi, heroIdx: bouncedHeroIdx, zoneSlot: bouncedSlotIdx, cardName: newCardName,
+    owner: seite, heroIdx: bouncedHeroIdx, zoneSlot: bouncedSlotIdx, cardName: newCardName,
   });
 
   engine.log('placement', {
@@ -999,13 +1056,14 @@ async function atomicSwap(engine, pi, bouncedInst, newCardName, sourceName) {
   bouncedInst.zoneSlot = -1;
   await engine.runHooks('onCardLeaveZone', {
     card: bouncedInst, fromZone: 'support',
-    fromOwner: pi, fromHeroIdx: bouncedHeroIdx, fromZoneSlot: bouncedSlotIdx,
+    fromOwner: seite, fromHeroIdx: bouncedHeroIdx, fromZoneSlot: bouncedSlotIdx,   // Styx 28.9.
     toZone: 'hand', toOwner: pi,
     _skipReactionCheck: true,
   });
   await engine.runHooks('onCardsReturnedToHand', {
     ownerIdx: pi, returnedCards: [bouncedName], returnedInsts: [bouncedInst],
     fromHeroIdxs: [bouncedHeroIdx], fromZoneSlots: [bouncedSlotIdx],
+    ...(seite !== pi ? { fromOwners: [seite] } : {}),   // Styx 28.9.
     by: sourceName, _skipReactionCheck: true,
   });
   engine._untrackCard(bouncedInst.id);
@@ -1014,7 +1072,7 @@ async function atomicSwap(engine, pi, bouncedInst, newCardName, sourceName) {
   // Hero's zone (same rationale as tryBouncePlace above) — Deepsea swap
   // explicitly supports dead-hero destinations and the new Creature's
   // on-summon must still fire.
-  const bouncedHero2 = gs.players[pi]?.heroes?.[bouncedHeroIdx];
+  const bouncedHero2 = gs.players[seite]?.heroes?.[bouncedHeroIdx];   // Styx 28.9.
   const landedOnDeadHero2 = !bouncedHero2?.name || bouncedHero2.hp <= 0;
   await engine.runHooks('onPlay', {
     _onlyCard: newInst, playedCard: newInst, cardName: newCardName,

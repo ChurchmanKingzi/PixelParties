@@ -60,6 +60,9 @@ module.exports = {
    */
   protectsCreatureFromDamage(engine, inst, source, pi, heroIdx) {
     if (inst?.name !== IFRIT) return false;
+    // Kontrolle statt Seite (Styx 28.9.): `pi` ist die physische Seite des
+    // Helden; „you" ist sein KONTROLLEUR (ohne Uebernahme dasselbe).
+    pi = engine.heroSideOf(pi, engine.gs.players[pi]?.heroes?.[heroIdx]);
     if ((inst.controller ?? inst.owner) !== pi) return false;   // „you control"
     const von = sourceSide(source);
     // „from your OPPONENT's cards or effects" — eigener Schaden trifft.
@@ -78,8 +81,10 @@ module.exports = {
     // jeden eigenen Wirker, nicht nur fuer Damus selbst.
     if (!inst || inst.zone !== 'hero') return 0;
     const seite = inst.owner, platz = inst.heroIdx;
-    if (seite !== ownerIdx) return 0;
     const hero = engine.gs.players[seite]?.heroes?.[platz];
+    // Kontrolle statt Seite (Styx 28.9.): physische Seite des Helden ist
+    // `seite`; „your hand" gehoert seinem Kontrolleur.
+    if (engine.heroSideOf(seite, hero) !== ownerIdx) return 0;
     if (hero?.name !== CARD_NAME || hero.hp <= 0) return 0;
     if (engine._isHeroEffectSilenced(seite, platz)) return 0;
     return ifritsOf(engine, ownerIdx).length;
@@ -94,7 +99,10 @@ module.exports = {
    */
   immuneToSourceNames: [ARMAGEDDON],
   immuneToSourceCondition(engine, pi, heroIdx) {
-    return ifritsOf(engine, pi).length > 0;
+    // Kontrolle statt Seite (Styx 28.9.): physische Seite des Helden →
+    // „you control" meint seinen Kontrolleur.
+    const du = engine.heroSideOf(pi, engine.gs.players[pi]?.heroes?.[heroIdx]);
+    return ifritsOf(engine, du).length > 0;
   },
 
   // ── ① Die Platzierung ────────────────────────────────────────────

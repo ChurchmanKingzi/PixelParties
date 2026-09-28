@@ -152,8 +152,13 @@ module.exports = {
     // being devoured by the incoming Chimera in its arrival slot.
     // Falls back to slot 0 / heroIdx in case the request flag isn't
     // set (defensive — every drag-drop path stamps it).
-    const destSlot = (ps._requestedNormalSummonSlot?.heroIdx === ctx.cardHeroIdx
-      ? ps._requestedNormalSummonSlot.slotIdx
+    // Styx 28.9.: geliehene Helden der Gegenspalte — die Marke gilt nur,
+    // wenn auch die physische Seite (`heroOwner`, fehlt → pi) passt.
+    const heroOwner = (ctx.cardHeroOwner === 0 || ctx.cardHeroOwner === 1) ? ctx.cardHeroOwner : pi;
+    const req = ps._requestedNormalSummonSlot;
+    const destSlot = (req?.heroIdx === ctx.cardHeroIdx
+      && ((req.heroOwner === 0 || req.heroOwner === 1) ? req.heroOwner : pi) === heroOwner
+      ? req.slotIdx
       : 0);
 
     // All 3 tribute discards land in one forced-discard batch so any
@@ -200,7 +205,7 @@ module.exports = {
         // distinct chomps, ramping the brutality of the summon.
         engine._broadcastEvent('play_zone_animation', {
           type: 'dino_bite',
-          owner: pi,
+          owner: heroOwner,
           heroIdx: ctx.cardHeroIdx,
           zoneSlot: destSlot,
           damage: 400,

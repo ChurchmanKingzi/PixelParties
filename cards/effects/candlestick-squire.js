@@ -164,7 +164,9 @@ module.exports = {
     for (const { physOwner, heroIdx: hi, hero: h } of engine.heroesControlledBy(pi)) {
       if (!h?.name || h.hp <= 0) continue;
       if (h.statuses?.frozen || h.statuses?.stunned || h.statuses?.bound) continue;
-      if (cd && !engine.heroMeetsLevelReq(physOwner, hi, cd)) continue;
+      // Styx 28.9.: geliehene Helden der Gegenspalte — Ermaessigungen aus
+      // der Hand von `pi` (fuer eigene Helden identisch zu vorher).
+      if (cd && !engine.heroMeetsLevelReq(physOwner, hi, cd, { levelSourcePi: pi })) continue;
       const sup = engine.gs.players[physOwner]?.supportZones?.[hi] || [[], [], []];
       for (let z = 0; z < 3; z++) {
         if ((sup[z] || []).length === 0) {
@@ -177,13 +179,17 @@ module.exports = {
     }
     if (hostZones.length === 0) return false; // no valid host
 
+    // Styx 28.9.: geliehene Helden der Gegenspalte — physische Seite des
+    // Wurfs: aus der Absichtsmarke (`heroOwner`), sonst aus dem Kontext.
+    const drop0 = ps._requestedNormalSummonSlot;
+    const ctxSeite = (ctx.cardHeroOwner === 0 || ctx.cardHeroOwner === 1) ? ctx.cardHeroOwner : pi;
+    const dropSeite = (drop0 && (drop0.heroOwner === 0 || drop0.heroOwner === 1)) ? drop0.heroOwner : ctxSeite;
     let hostHeroIdx, hostFreeSlot, hostSeite = pi;
     if (ctx.viaDragDrop) {
-      // Drag-drop pinned the host: use the dropped hero/slot. Die Seite
-      // des Wurfs kennt `beforeSummon` nicht — hier bleibt es bei der
-      // eigenen Spalte; die Platzierung selbst macht dann der Server
-      // (der die Seite kennt).
-      const eigene = hostZones.filter(z => z.owner === pi);
+      // Drag-drop pinned the host: use the dropped hero/slot — auf der
+      // Seite des Wurfs (Styx 28.9.: geliehene Helden der Gegenspalte).
+      const eigene = hostZones.filter(z => z.owner === dropSeite);
+      hostSeite    = dropSeite;
       hostHeroIdx  = ctx.cardHeroIdx;
       hostFreeSlot = ps._requestedNormalSummonSlot?.slotIdx;
       const stillFree = hostFreeSlot != null
@@ -258,8 +264,11 @@ module.exports = {
 
     // ── Step 4: redirect placement if host/slot differs from drop ──
     const drop = ps._requestedNormalSummonSlot;
+    // Styx 28.9.: geliehene Helden der Gegenspalte — gleiche Seite wie der
+    // Wurf, dann platziert der Server (der die Seite kennt) selbst.
     const sameAsDrop = drop
-      && hostSeite === pi   // Kontrolle statt Seite (Styx 28.9.): Gegenspalte immer selbst platzieren
+      && hostSeite === ((drop.heroOwner === 0 || drop.heroOwner === 1) ? drop.heroOwner : pi)
+      && hostSeite === ctxSeite
       && hostHeroIdx === ctx.cardHeroIdx
       && hostFreeSlot === drop.slotIdx;
     if (!sameAsDrop) {
