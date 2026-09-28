@@ -1,0 +1,15 @@
+{
+  "hero": "Tazune, the Angry Hot-Blood",
+  "sheet": "tazune-the-angry-hot-blood.png",
+  "frameWidth": 60,
+  "frameHeight": 47,
+  "frames": 48,
+  "frameMs": 90,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 12,
+  "padLeft": 12,
+  "padRight": 12,
+  "padBottom": 2,
+  "faceX": 30.0
+}

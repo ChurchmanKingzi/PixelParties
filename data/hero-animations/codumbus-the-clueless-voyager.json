@@ -1,0 +1,15 @@
+{
+  "hero": "Codumbus, the Clueless Voyager",
+  "sheet": "codumbus-the-clueless-voyager.png",
+  "frameWidth": 24,
+  "frameHeight": 30,
+  "frames": 48,
+  "frameMs": 90,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 5,
+  "padLeft": 3,
+  "padRight": 3,
+  "padBottom": 2,
+  "faceX": 11.0
+}

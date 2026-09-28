@@ -1,0 +1,15 @@
+{
+  "hero": "Hulijing, the Foxdemon",
+  "sheet": "hulijing-the-foxdemon.png",
+  "frameWidth": 57,
+  "frameHeight": 39,
+  "frames": 48,
+  "frameMs": 90,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 4,
+  "padLeft": 8,
+  "padRight": 3,
+  "padBottom": 2,
+  "faceX": 41.0
+}

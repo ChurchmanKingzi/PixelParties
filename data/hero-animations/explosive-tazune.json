@@ -1,0 +1,16 @@
+{
+  "hero": "Explosive Tazune",
+  "sheet": "explosive-tazune.png",
+  "frameWidth": 60,
+  "frameHeight": 47,
+  "frames": 48,
+  "frameMs": 90,
+  "loop": true,
+  "layout": "horizontal",
+  "skinOf": "Tazune, the Angry Hot-Blood",
+  "padTop": 12,
+  "padLeft": 12,
+  "padRight": 12,
+  "padBottom": 2,
+  "faceX": 30.0
+}

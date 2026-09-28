@@ -1,0 +1,15 @@
+{
+  "hero": "Gabby, the Boarding Broad",
+  "sheet": "gabby-the-boarding-broad.png",
+  "frameWidth": 43,
+  "frameHeight": 59,
+  "frames": 48,
+  "frameMs": 90,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 3,
+  "padLeft": 12,
+  "padRight": 6,
+  "padBottom": 2,
+  "faceX": 26.0
+}

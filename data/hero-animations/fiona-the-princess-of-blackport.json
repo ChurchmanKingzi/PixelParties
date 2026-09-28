@@ -1,0 +1,15 @@
+{
+  "hero": "Fiona, the Princess of Blackport",
+  "sheet": "fiona-the-princess-of-blackport.png",
+  "frameWidth": 40,
+  "frameHeight": 34,
+  "frames": 48,
+  "frameMs": 90,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 4,
+  "padLeft": 3,
+  "padRight": 3,
+  "padBottom": 2,
+  "faceX": 20.0
+}

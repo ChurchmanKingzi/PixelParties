@@ -1,0 +1,16 @@
+{
+  "hero": "Broghan, the Frozen Guardian of the North",
+  "sheet": "broghan-the-frozen-guardian-of-the-north.png",
+  "frameWidth": 63,
+  "frameHeight": 38,
+  "frames": 48,
+  "frameMs": 90,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 5,
+  "padLeft": 14,
+  "padRight": 14,
+  "padBottom": 2,
+  "faceX": 31.5,
+  "footY": 36
+}

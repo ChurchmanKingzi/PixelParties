@@ -1,0 +1,15 @@
+{
+  "hero": "Santa Klaus",
+  "sheet": "santa-klaus.png",
+  "frameWidth": 33,
+  "frameHeight": 34,
+  "frames": 48,
+  "frameMs": 90,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 4,
+  "padLeft": 3,
+  "padRight": 3,
+  "padBottom": 2,
+  "faceX": 21.0
+}
