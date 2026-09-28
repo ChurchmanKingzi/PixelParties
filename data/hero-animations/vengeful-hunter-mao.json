@@ -1,0 +1,16 @@
+{
+  "hero": "Vengeful Hunter Mao",
+  "sheet": "vengeful-hunter-mao.png",
+  "frameWidth": 32,
+  "frameHeight": 29,
+  "frames": 48,
+  "frameMs": 90,
+  "loop": true,
+  "layout": "horizontal",
+  "skinOf": "Mao, the Vengeful Guardian",
+  "padTop": 4,
+  "padLeft": 8,
+  "padRight": 3,
+  "padBottom": 2,
+  "faceX": 21.0
+}

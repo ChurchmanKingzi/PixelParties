@@ -1,0 +1,15 @@
+{
+  "hero": "Dajan, Conqueror of the Treasure Cave",
+  "sheet": "dajan-conqueror-of-the-treasure-cave.png",
+  "frameWidth": 23,
+  "frameHeight": 30,
+  "frames": 48,
+  "frameMs": 90,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 3,
+  "padLeft": 3,
+  "padRight": 3,
+  "padBottom": 2,
+  "faceX": 11.0
+}

@@ -1,0 +1,15 @@
+{
+  "hero": "Mao, the Vengeful Guardian",
+  "sheet": "mao-the-vengeful-guardian.png",
+  "frameWidth": 32,
+  "frameHeight": 31,
+  "frames": 48,
+  "frameMs": 90,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 4,
+  "padLeft": 8,
+  "padRight": 3,
+  "padBottom": 2,
+  "faceX": 21.0
+}
