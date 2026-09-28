@@ -173,14 +173,17 @@ function setBoardTooltip(card) {
 // von Reaktionen (Skeleton Demon, Cool Rescuer Monia) tragen die
 // ausloesende Karte als `triggerCardName` — sie steht LINKS im Panel mit
 // der Zeile „Triggered by", rechts bleibt die reagierende Karte selbst.
-function TriggerCardSlot({ name }) {
+// ★ v1477: `klein` fuer die kompakte Zielwahl (siehe DraggablePanel) —
+// 58 statt 90 px breit; der Kasten bleibt fuer den Tooltip ansprechbar.
+function TriggerCardSlot({ name, klein }) {
   const data = name ? CARDS_BY_NAME[name] : null;
   if (!data) return null;
   const img = cardImageUrl(name);
+  const breite = klein ? 58 : 90;
   return (
-    <div style={{ width: 90, flexShrink: 0, alignSelf: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
-      <div style={{ fontSize: 9, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: 1 }}>Triggered by</div>
-      <div className="board-card" style={{ width: 90, minHeight: 120, borderRadius: 6, overflow: 'hidden', border: '2px solid var(--bg4)', background: 'var(--bg3)' }}
+    <div className={klein ? 'panel-zielwahl-aktiv' : undefined} style={{ width: breite, flexShrink: 0, alignSelf: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: klein ? 2 : 4 }}>
+      <div style={{ fontSize: klein ? 7 : 9, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: klein ? 0 : 1 }}>Triggered by</div>
+      <div className="board-card" style={{ width: breite, minHeight: klein ? 78 : 120, borderRadius: 6, overflow: 'hidden', border: '2px solid var(--bg4)', background: 'var(--bg3)' }}
         onMouseEnter={() => { _boardTooltipLocked = true; setBoardTooltip(data); }}
         onMouseLeave={() => { _boardTooltipLocked = false; setBoardTooltip(null); }}>
         {img ? (
@@ -1639,12 +1642,140 @@ function _ppPanelHatScrollbaresKind(wurzel) {
   return false;
 }
 
-function DraggablePanel({ children, className, style }) {
+// ★ v1477 — ZIELWAHL-PANELS DURCHKLICKBAR (Als Befund 28.9.: „Nutzt man
+// eine Attack/Spell/einen Effekt, die/der ein oder mehr Ziele auswählt,
+// erscheint ein Pop-up in der Mitte des Feldes. Dieses überdeckt den
+// eigenen und/oder gegnerischen mittleren Hero! … Hast du noch eine
+// bessere Alternative, alle Heroes ohne die Box jedes Mal draggen zu
+// müssen direkt anwählbar zu machen?")
+//
+// Ursache: `.first-choice-panel` steht fest bei `top: 52.5%` — auf dem
+// gekippten Brett liegt dort die eigene Heldenreihe, die Box (≈ 526×140
+// bei 1600×900) deckte den eigenen mittleren Helden ganz ab.
+//
+// Jetzt mit `zielwahl`:
+//  • Lage: die Panelmitte sitzt auf der Mittellinie zwischen dem
+//    mittleren Gegner- und dem mittleren eigenen Helden, gemessen im
+//    Bildschirmraum an den echten `[data-hero-zone]`-Kästen (die Ebene ist
+//    perspektivisch gekippt, Prozentwerte treffen nicht). Nachgeführt bei
+//    Größenänderung, Scrollen (Telefon-Kamera) und sanft im Sekundentakt;
+//    im Fenster eingeklemmt. Ohne Heldenzonen gilt die CSS-Lage wie bisher.
+//  • Durchklickbar: der Körper hat `pointer-events: none` (CSS
+//    `.panel-zielwahl`), nur Knöpfe, Formularfelder, der Griff (Titel)
+//    und `.panel-zielwahl-aktiv` (Kartenvorschau) nehmen den Zeiger an.
+//    Ein Klick auf ein Ziel unter der Box trifft also direkt das Ziel.
+//  • Durchsicht: Weil der Körper keine Zeigerereignisse mehr bekommt,
+//    prüft ein `pointermove` am Dokument (rAF-gedrosselt) das Rechteck;
+//    Zeiger in der Box, aber nicht über einem ihrer aktiven Elemente →
+//    Attribut `data-durchsicht` (CSS blendet auf ~25 % ab). Als Attribut
+//    und nicht als Klasse, weil React `className` bei jedem Rendern neu
+//    setzt.
+//  • Ziehen: über zwei Griffe — die seitlichen Polsterstreifen mit den
+//    Pfeil-Ornamenten (`.panel-zielwahl-griff`). Nicht die Titelzeile: die
+//    steht mittig genau über den mittleren Helden. Der Mausdruck blubbert
+//    wie bisher zum `onMouseDown` des Panels.
+function _ppZielwahlMitte() {
+  const opp = document.querySelector('[data-hero-zone][data-hero-owner="opp"][data-hero-idx="1"]');
+  const me = document.querySelector('[data-hero-zone][data-hero-owner="me"][data-hero-idx="1"]');
+  if (!opp || !me) return null;
+  const a = opp.getBoundingClientRect(), b = me.getBoundingClientRect();
+  if (!a.height || !b.height) return null;
+  // Gegner oben, eigener Held unten: Mitte der Lücke zwischen beiden.
+  const oben = a.top < b.top ? a : b, unten = a.top < b.top ? b : a;
+  return {
+    x: (a.left + a.right + b.left + b.right) / 4,
+    y: (oben.bottom + unten.top) / 2,
+    breite: Math.max(a.width, b.width),
+  };
+}
+
+function DraggablePanel({ children, className, style, zielwahl }) {
   const [pos, setPos] = useState({ x: 0, y: 0 });
   const [dragging, setDragging] = useState(false);
+  const [autoPos, setAutoPos] = useState(null);
   const offsetRef = useRef({ x: 0, y: 0 });
   const panelRef = useRef(null);
   const cleanupRef = useRef(null);
+  const draggingRef = useRef(false);
+  draggingRef.current = dragging;
+  const hasCustomPosRef = useRef(false);
+  hasCustomPosRef.current = pos.x !== 0 || pos.y !== 0;
+  // ★ v1477: Lage zwischen den mittleren Helden (siehe oben).
+  useLayoutEffect(() => {
+    if (!zielwahl) return;
+    let raf = 0;
+    const setze = () => {
+      raf = 0;
+      if (hasCustomPosRef.current) return;
+      const el = panelRef.current;
+      const m = _ppZielwahlMitte();
+      if (!el || !m) { setAutoPos(null); return; }
+      const r = el.getBoundingClientRect();
+      // Nicht die Panelmitte, sondern die Mitte des Anker-Elements
+      // (`data-zielwahl-mitte`, die Textspalte) kommt über die Helden —
+      // seitliche Kartenbilder verschöben sie sonst. Die Knopfzeile lässt
+      // dort eine Lücke in Heldenbreite (`--zielwahl-luecke`, CSS), die
+      // Knöpfe flankieren die mittleren Helden statt sie zu verdecken.
+      const anker = el.querySelector('[data-zielwahl-mitte]');
+      const ar = anker && anker.getBoundingClientRect();
+      const versatz = (ar && ar.width) ? (ar.left + ar.right) / 2 - (r.left + r.right) / 2 : 0;
+      const rand = 4;
+      const x = Math.max(r.width / 2 + rand, Math.min(window.innerWidth - r.width / 2 - rand, m.x - versatz));
+      const y = Math.max(r.height / 2 + rand, Math.min(window.innerHeight - r.height / 2 - rand, m.y));
+      const luecke = Math.round(m.breite + 8);
+      setAutoPos(prev => (prev && Math.abs(prev.x - x) < 1 && Math.abs(prev.y - y) < 1 && prev.luecke === luecke) ? prev : { x: Math.round(x), y: Math.round(y), luecke });
+    };
+    const plane = () => { if (!raf) raf = requestAnimationFrame(setze); };
+    setze();
+    window.addEventListener('resize', plane);
+    window.addEventListener('scroll', plane, true);
+    const ro = (typeof ResizeObserver !== 'undefined' && panelRef.current) ? new ResizeObserver(plane) : null;
+    if (ro) ro.observe(panelRef.current);
+    const takt = setInterval(plane, 1000);
+    return () => {
+      window.removeEventListener('resize', plane);
+      window.removeEventListener('scroll', plane, true);
+      if (ro) ro.disconnect();
+      clearInterval(takt);
+      if (raf) cancelAnimationFrame(raf);
+    };
+  }, [zielwahl]);
+  // ★ v1477: Durchsicht, solange der Zeiger über dem Panelkörper steht.
+  useEffect(() => {
+    if (!zielwahl) return;
+    let raf = 0, letzt = null;
+    const pruefe = () => {
+      raf = 0;
+      const el = panelRef.current;
+      if (!el || !letzt) return;
+      let an = false;
+      if (!draggingRef.current && letzt.x != null) {
+        const r = el.getBoundingClientRect();
+        const drin = letzt.x >= r.left && letzt.x <= r.right && letzt.y >= r.top && letzt.y <= r.bottom;
+        // Liegt das Ereignisziel IM Panel, ist es eines der aktiven
+        // Elemente (nur die bekommen Zeigerereignisse) → deckend lassen.
+        an = drin && !(letzt.ziel && el.contains(letzt.ziel));
+      }
+      if (el.hasAttribute('data-durchsicht') !== an) el.toggleAttribute('data-durchsicht', an);
+    };
+    const bewegt = (e) => {
+      letzt = { x: e.clientX, y: e.clientY, ziel: e.target };
+      if (!raf) raf = requestAnimationFrame(pruefe);
+    };
+    const raus = (e) => {
+      if (e.relatedTarget) return;
+      letzt = { x: null };
+      if (!raf) raf = requestAnimationFrame(pruefe);
+    };
+    document.addEventListener('pointermove', bewegt, { passive: true, capture: true });
+    document.addEventListener('pointerout', raus, { passive: true, capture: true });
+    return () => {
+      document.removeEventListener('pointermove', bewegt, { capture: true });
+      document.removeEventListener('pointerout', raus, { capture: true });
+      if (raf) cancelAnimationFrame(raf);
+      panelRef.current?.removeAttribute('data-durchsicht');
+    };
+  }, [zielwahl]);
   const onDown = (e) => {
     // ★ v1258: Auf Touch ist nur noch das Panel unbeweglich, das
     // scrollbaren Inhalt hat (Kartengalerie, lange Listen) — dort gewann
@@ -1683,11 +1814,14 @@ function DraggablePanel({ children, className, style }) {
   const hasCustomPos = pos.x !== 0 || pos.y !== 0;
   const posStyle = hasCustomPos
     ? { position: 'fixed', left: pos.x, top: pos.y, transform: 'none' }
-    : {};
+    : (zielwahl && autoPos ? { left: autoPos.x, top: autoPos.y } : {});
+  const lueckeStyle = (zielwahl && autoPos) ? { '--zielwahl-luecke': autoPos.luecke + 'px' } : {};
   return (
-    <div ref={panelRef} className={className} style={{ ...style, ...posStyle, cursor: dragging ? 'grabbing' : 'grab' }}
+    <div ref={panelRef} className={className + (zielwahl ? ' panel-zielwahl' : '')} style={{ ...style, ...lueckeStyle, ...posStyle, cursor: dragging ? 'grabbing' : 'grab' }}
       onMouseDown={onDown} onTouchStart={onDown} onClick={e => e.stopPropagation()}>
       {children}
+      {zielwahl && <div className="panel-zielwahl-griff panel-zielwahl-griff-l" />}
+      {zielwahl && <div className="panel-zielwahl-griff panel-zielwahl-griff-r" />}
     </div>
   );
 }
@@ -46209,15 +46343,16 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
 
       {/* ── Effect Prompt: Zone Picker Panel ── */}
       {isMyEffectPrompt && ep.type === 'zonePick' && (
-        <DraggablePanel className="first-choice-panel animate-in" style={{ borderColor: 'var(--accent)' }}>
-          <div className="orbit-font" style={{ fontSize: 13, color: 'var(--accent)', marginBottom: 8 }}>{ep.title || 'Select a Zone'}</div>
+        // ★ v1477: `zielwahl` wie das Zielwahl-Panel (siehe DraggablePanel).
+        <DraggablePanel zielwahl className="first-choice-panel animate-in" style={{ borderColor: 'var(--accent)' }}>
+          <div className="orbit-font" style={{ fontSize: 13, color: 'var(--accent)', marginBottom: 6 }}>{ep.title || 'Select a Zone'}</div>
           <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 12 }}>{ep.description}</div>
           {/* Optional small card preview — server passes `previewCardName`
               to give the player a visual of what they're about to place.
               CardMini gives the full hover tooltip + foil treatment for free. */}
           {ep.previewCardName && CARDS_BY_NAME[ep.previewCardName] && (
-            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 10 }}>
-              <div style={{ width: 90 }}>
+            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 8 }}>
+              <div className="panel-zielwahl-vorschau" style={{ width: 62 }}>
                 <CardMini card={CARDS_BY_NAME[ep.previewCardName]} inGallery />
               </div>
             </div>
@@ -46237,8 +46372,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         const canConfirm = surprisePickSelected.length >= minN
           && surprisePickSelected.length <= cap;
         return (
-          <DraggablePanel className="first-choice-panel animate-in" style={{ borderColor: '#b04ba0' }}>
-            <div className="orbit-font" style={{ fontSize: 13, color: '#d36cc0', marginBottom: 8 }}>{ep.title || 'Sacrifice Surprises'}</div>
+          <DraggablePanel zielwahl className="first-choice-panel animate-in" style={{ borderColor: '#b04ba0' }}>
+            <div className="orbit-font" style={{ fontSize: 13, color: '#d36cc0', marginBottom: 6 }}>{ep.title || 'Sacrifice Surprises'}</div>
             <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 8 }}>{ep.description}</div>
             <div style={{ fontSize: 11, color: 'var(--text2)', opacity: .8, marginBottom: 8 }}>
               Click highlighted Surprise{cap > 1 ? 's' : ''} on the board to toggle selection.
@@ -46273,8 +46408,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
 
       {/* ── Effect Prompt: Chain Target Pick (Chain Lightning / Qinglong / Bottled Lightning) ── */}
       {isMyEffectPrompt && ep.type === 'chainTargetPick' && (
-        <DraggablePanel className="first-choice-panel animate-in" style={{ borderColor: '#ffcc00' }}>
-          <div className="orbit-font" style={{ fontSize: 13, color: '#ffcc00', marginBottom: 8 }}>⚡ {ep.title || 'Chain Lightning'}</div>
+        <DraggablePanel zielwahl className="first-choice-panel animate-in" style={{ borderColor: '#ffcc00' }}>
+          <div className="orbit-font" style={{ fontSize: 13, color: '#ffcc00', marginBottom: 6 }}>⚡ {ep.title || 'Chain Lightning'}</div>
           <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 8 }}>
             {chainPickSelected.length < chainPickMaxTargets && chainPickValidIds.size > 0
               ? `Click target #${chainPickSelected.length + 1} (${chainPickDamages[chainPickSelected.length]} dmg).`
@@ -46818,12 +46953,12 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
            hero / zone handlers, which emit effect_prompt_response when
            the pick source is 'effectPrompt'. */}
       {isMyEffectPrompt && ep.type === 'abilityAttachTarget' && (
-        <DraggablePanel className="first-choice-panel animate-in attach-pick-panel" style={{ borderColor: '#7fffaa' }}>
+        <DraggablePanel zielwahl className="first-choice-panel animate-in attach-pick-panel" style={{ borderColor: '#7fffaa' }}>
           <div className="orbit-font" style={{ fontSize: 13, color: '#7fffaa', marginBottom: 4, textShadow: '0 0 8px rgba(120,255,170,.6)' }}>✦ {ep.title || 'Attach Ability'}</div>
           {ep.description && <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 10 }}>{ep.description}</div>}
           {ep.cardName && (
             <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 10 }}>
-              <BoardCard cardName={ep.cardName} style={{ width: 110, height: 154, borderRadius: 6, boxShadow: '0 0 18px rgba(120,255,170,.55)' }} />
+              <BoardCard cardName={ep.cardName} style={{ width: 70, height: 98, borderRadius: 6, boxShadow: '0 0 18px rgba(120,255,170,.55)' }} />
             </div>
           )}
           <div style={{
@@ -46902,11 +47037,14 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
 
       {/* Potion/Artifact targeting panel */}
       {!isSpectator && isTargeting && pt && !gameState.effectPrompt && (
-        <DraggablePanel className="first-choice-panel" style={{ borderColor: 'var(--danger)', animation: 'fadeIn .2s ease-out', display: 'flex', gap: 16, alignItems: 'stretch' }}>
-          <TriggerCardSlot name={pt.config?.triggerCardName} />
-          <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-          <div className="pixel-font" style={{ fontSize: 12, color: pt.config?.goldSelect ? '#ffd700' : pt.config?.greenSelect ? '#33dd55' : 'var(--danger)', marginBottom: 8 }}>{pt.potionName}</div>
-          <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 14 }}>{pt.config?.description || 'Select targets'}</div>
+        // ★ v1477 (Als Befund 28.9., siehe DraggablePanel): `zielwahl` —
+        // zwischen den mittleren Helden, durchklickbar, Titel als Griff;
+        // Polster, Abstände, Knöpfe und Vorschau kompakter (≈ halbe Fläche).
+        <DraggablePanel zielwahl className="first-choice-panel" style={{ borderColor: 'var(--danger)', animation: 'fadeIn .2s ease-out', display: 'flex', gap: 10, alignItems: 'stretch' }}>
+          <TriggerCardSlot name={pt.config?.triggerCardName} klein />
+          <div className="panel-zielwahl-spalte" data-zielwahl-mitte="" style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+          <div className="pixel-font" style={{ fontSize: 11, color: pt.config?.goldSelect ? '#ffd700' : pt.config?.greenSelect ? '#33dd55' : 'var(--danger)', marginBottom: 4 }}>{pt.potionName}</div>
+          <div className="panel-zielwahl-text" style={{ fontSize: 11, color: 'var(--text2)', marginBottom: 7 }}>{pt.config?.description || 'Select targets'}</div>
           {pt.config?.maxTotal > 0 && pt.validTargets?.length > 0 && (() => {
             // For Pollution-capped prompts (Sun Beam etc.), the effective cap
             // grows with each own-support target selected — since destroying
@@ -46930,7 +47068,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               const sumHp = selectedTargets.reduce((s, t) => s + (t?._meta?.maxHp || 0), 0);
               const met = sumHp >= minSumHp;
               hpLine = (
-                <div style={{ fontSize: 11, color: met ? 'var(--success)' : 'var(--danger)', marginBottom: 10, fontWeight: 600 }}>
+                <div style={{ fontSize: 11, color: met ? 'var(--success)' : 'var(--danger)', marginBottom: 5, fontWeight: 600 }}>
                   HP {sumHp} / {minSumHp}{met ? ' ✓' : ''}
                 </div>
               );
@@ -46943,14 +47081,14 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               const sumLvl = selectedTargets.reduce((s, t) => s + (t?._meta?.level || 0), 0);
               const met = sumLvl >= minSumLvl;
               levelLine = (
-                <div style={{ fontSize: 11, color: met ? 'var(--success)' : 'var(--danger)', marginBottom: 10, fontWeight: 600 }}>
+                <div style={{ fontSize: 11, color: met ? 'var(--success)' : 'var(--danger)', marginBottom: 5, fontWeight: 600 }}>
                   Combined Levels {sumLvl} / {minSumLvl}{met ? ' ✓' : ''}
                 </div>
               );
             }
             return (
               <>
-                <div style={{ fontSize: 11, color: 'var(--accent)', marginBottom: 10, fontWeight: 600 }}>
+                <div style={{ fontSize: 11, color: 'var(--accent)', marginBottom: 5, fontWeight: 600 }}>
                   {potionSelection.length} / {effectiveMax} selected
                   {pt.config.minRequired > 0 && potionSelection.length < pt.config.minRequired
                     ? ` (min ${pt.config.minRequired})`
@@ -46961,15 +47099,15 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               </>
             );
           })()}
-          <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
-            <button className={'btn ' + (pt.config?.confirmClass || 'btn-success')} style={{ padding: '8px 24px', fontSize: 12 }}
+          <div className="panel-zielwahl-knoepfe" style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
+            <button className={'btn ' + (pt.config?.confirmClass || 'btn-success')} style={{ padding: '5px 12px', fontSize: 11 }}
               disabled={!canConfirmPotion}
               onClick={() => { socket.emit('confirm_potion', { roomId: gameState.roomId, selectedIds: potionSelection }); }}>
               {pt.config?.confirmLabel || 'Confirm'}
               {pt.config?.dynamicCostPerTarget > 0 && ` (${pt.config.dynamicCostPerTarget * potionSelection.length} Gold)`}
             </button>
             {pt.config?.cancellable !== false && (
-              <button className="btn" style={{ padding: '8px 24px', fontSize: 12 }}
+              <button className="btn" style={{ padding: '5px 12px', fontSize: 11 }}
                 onClick={() => { socket.emit('cancel_potion', { roomId: gameState.roomId }); setPotionSelection([]); }}>
                 {pt.config?.cancelLabel || 'Cancel'}
               </button>
@@ -46980,7 +47118,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               (mirrors the confirm / optionPicker panels) so the image never
               sits alone in its own row beneath the controls. */}
           {pt.config?.previewCardName && CARDS_BY_NAME[pt.config.previewCardName] && (
-            <div style={{ width: 100, flexShrink: 0, alignSelf: 'center' }}>
+            <div className="panel-zielwahl-aktiv panel-zielwahl-vorschau" style={{ width: 48, flexShrink: 0, alignSelf: 'center' }}>
               <CardMini card={CARDS_BY_NAME[pt.config.previewCardName]} inGallery />
             </div>
           )}

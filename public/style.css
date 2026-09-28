@@ -23507,6 +23507,106 @@ body.pp-dialog-offen .foil-diamond-rare:not(.modal-overlay *) {
     url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 4 7' shape-rendering='crispEdges'%3E%3Cpath fill='%23fff' d='M3 0h1v1h-1zM2 1h2v1h-2zM1 2h3v1h-3zM0 3h4v1h-4zM1 4h3v1h-3zM2 5h2v1h-2zM3 6h1v1h-1z'/%3E%3C/svg%3E") right center / calc(var(--eck-e) * 4) calc(var(--eck-e) * 7) no-repeat;
 }
 
+/* ★ v1477 — ZIELWAHL-PANELS (Als Befund 28.9.: „Nutzt man eine Attack/
+   Spell/einen Effekt, die/der ein oder mehr Ziele auswählt, erscheint ein
+   Pop-up in der Mitte des Feldes. Dieses überdeckt den eigenen und/oder
+   gegnerischen mittleren Hero!").
+   `DraggablePanel zielwahl` setzt die Panelmitte auf die Mittellinie
+   zwischen den beiden mittleren Helden (inline `left`/`top`, gemessen).
+   Hier: kompakter, und der Körper lässt den Zeiger durch — ein Klick auf
+   ein Ziel unter der Box wählt es direkt. Zeigerereignisse behalten nur
+   Knöpfe/Formularfelder, die Griffe (seitliche Streifen) und `.panel-zielwahl-aktiv`
+   (seitliche Kartenvorschau mit Tooltip). `pointer-events` erbt, deshalb
+   genügt `auto` am jeweiligen Element. Steht der Zeiger über dem
+   Panelkörper, setzt das Skript `data-durchsicht` → stark durchsichtig. */
+.first-choice-panel.panel-zielwahl {
+  pointer-events: none;
+  /* 20 px seitlich: die Pfeil-Ornamente links/rechts (::after, 12 px
+     breit ab 3 px Einzug) dürfen den Text nicht anschneiden. */
+  padding: 7px 20px;
+  /* `max-content`: ein fixes Element mit `left` = Heldenmitte bekäme
+     sonst nur den Rest bis zum rechten Fensterrand als Breite (auf dem
+     Telefon ~370 px → Text in drei Zeilen, Box höher). */
+  width: max-content;
+  max-width: min(500px, calc(92 * var(--vw)));
+  transition: opacity .18s ease-out;
+}
+.panel-zielwahl :is(button, a, input, select, textarea, label, .panel-zielwahl-aktiv) {
+  pointer-events: auto;
+}
+.first-choice-panel.panel-zielwahl[data-durchsicht] {
+  opacity: .25;
+}
+/* Griffe: die beiden seitlichen Polsterstreifen (dort sitzen die
+   Pfeil-Ornamente — sie sind der sichtbare Zieh-Hinweis). Bewusst NICHT
+   die Titelzeile: die steht mittig und damit genau über den mittleren
+   Helden, deren Klick sie schlucken würde. */
+.panel-zielwahl > .panel-zielwahl-griff {
+  position: absolute;
+  /* Nur das mittlere Stück um die Pfeile: die Ecken der Box ragen auf
+     mittelbreiten Fenstern (1280×720) knapp über die äußeren Helden. */
+  top: 30%;
+  bottom: 30%;
+  width: 20px;
+  z-index: 3;
+  pointer-events: auto;
+  cursor: grab;
+  touch-action: none;
+}
+.panel-zielwahl > .panel-zielwahl-griff-l { left: 0; }
+.panel-zielwahl > .panel-zielwahl-griff-r { right: 0; }
+.panel-zielwahl > .panel-zielwahl-griff:hover {
+  background: color-mix(in srgb, var(--player-color, var(--accent)) 16%, transparent);
+}
+.panel-zielwahl .panel-zielwahl-text {
+  line-height: 1.3;
+}
+/* Knopfzeile mit Lücke in der Mitte (Breite der mittleren Heldenzone,
+   vom Skript gemessen): Bestätigen links, Abbrechen rechts davon — die
+   Knöpfe flankieren die mittleren Helden, statt deren Klickfläche zu
+   belegen. Die Textspalte ist der Lage-Anker (`data-zielwahl-mitte`). */
+.panel-zielwahl .panel-zielwahl-knoepfe {
+  display: grid !important;
+  grid-template-columns: 1fr var(--zielwahl-luecke, 8px) 1fr;
+  column-gap: 0 !important;
+}
+.panel-zielwahl .panel-zielwahl-knoepfe > :first-child { grid-column: 1; justify-self: end; }
+.panel-zielwahl .panel-zielwahl-knoepfe > :nth-child(2) { grid-column: 3; justify-self: start; }
+.panel-zielwahl .btn { white-space: nowrap; }
+/* Seitliche Kartenvorschau: `.card-mini` hat sonst feste Masse
+   (`--card-w`/`--card-h`) und ragte aus dem schmalen Kasten. */
+.panel-zielwahl-vorschau .card-mini {
+  width: 100%;
+  height: auto;
+  aspect-ratio: 86 / 120;
+}
+@media (prefers-reduced-motion: reduce) {
+  .first-choice-panel.panel-zielwahl { transition: none; }
+}
+/* Niedrige Fenster (Telefon quer): die Helden sind dort nur ~40 px hoch —
+   noch dichter, die seitliche Vorschau entfällt (der Titel nennt die
+   Karte, der Tooltip bleibt an der Handkarte). */
+@media (max-height: 560px) {
+  .first-choice-panel.panel-zielwahl { padding: 5px 20px; max-width: min(620px, calc(94 * var(--vw))); }
+  .panel-zielwahl .panel-zielwahl-vorschau { display: none; }
+  .panel-zielwahl .btn { min-height: 0; padding: 4px 10px !important; font-size: 10px !important; }
+  /* Knöpfe NEBEN den Text statt darunter: eine Zeile weniger Höhe
+     (hier ohne Mittellücke — die Box ist ohnehin so breit wie das Brett). */
+  .panel-zielwahl .panel-zielwahl-knoepfe { display: flex !important; column-gap: 8px !important; }
+  .panel-zielwahl .panel-zielwahl-spalte {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) auto;
+    column-gap: 10px;
+    align-items: center;
+  }
+  .panel-zielwahl .panel-zielwahl-spalte > * { grid-column: 1; }
+  .panel-zielwahl .panel-zielwahl-spalte > .panel-zielwahl-knoepfe {
+    grid-column: 2;
+    grid-row: 1 / span 6;
+  }
+  .panel-zielwahl .panel-zielwahl-spalte > .panel-zielwahl-text { margin-bottom: 0 !important; }
+}
+
 /* ════════════════════════════════════════════════════════════════════
    EIGENE KARTENANIMATIONEN (Als Auswahl 26.9.)
    Accusation, Baby Spider, Chaorc Interception, Crimson Web, Divine
