@@ -189,8 +189,8 @@ def main(path):
     save_parts('friedhelm-the-misled-avenger', [('body', g('Friedhelm'))])
     save_parts('titan-slayer-friedhelm', [('body', g('Friedhelm-Kopie'))])
     left = lambda n: box(g(n), 130, 300, 200, 345)
-    rbody = left('Riffel')
-    for n in ('Riffel #12', 'Riffel #8', 'Riffel #13', 'Riffel #9'):     # zwei Pistolen, Hand, Haare (von unten nach oben)
+    rbody = left('Riffel #9')                              # Haare ganz hinten
+    for n in ('Riffel', 'Riffel #13', 'Riffel #8', 'Riffel #12'):     # Körper, Hand, hintere, vordere Pistole
         a = left(n)
         m = a[:, :, 3] > 0
         rbody[m] = a[m]

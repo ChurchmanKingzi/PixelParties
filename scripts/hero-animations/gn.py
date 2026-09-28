@@ -71,7 +71,7 @@ WHITE2 = ('e8f4ff', 'ffffff')
 N = 48
 
 V_ = {
-    'andras': dict(slug='andras-the-human-weapon', part='body', pads=(7, 7, 3, 7),
+    'andras': dict(slug='andras-the-human-weapon', part='body', pads=(9, 9, 3, 8),
                    lid=[((39, 11), 'f5ce88'), ((40, 11), 'f5ce88'), ((43, 11), 'f5ce88'), ((44, 11), 'f5ce88')],
                    line=[(39, 12), (40, 12), (43, 12), (44, 12)]),
     'friedhelm': dict(slug='friedhelm-the-misled-avenger', wires=((1, 8), (22, 8)), pads=(3, 3, 12, 3),
@@ -80,7 +80,7 @@ V_ = {
                   lid=[((9, 7), 'f5ce88'), ((10, 7), 'f5ce88')], line=[(9, 8), (10, 8)]),
     'ftriffel': dict(slug='future-tech-gunslinger-riffel', part='body', knee=20, pads=(14, 3, 4, 2),
                      lid=[((28, 8), 'f6bd98'), ((29, 8), 'f6bd98')], line=[(28, 9), (29, 9)]),
-    'ascriffel': dict(slug='riffel-master-of-the-ultimate-gun', knee=22, pads=(4, 4, 5, 3),
+    'ascriffel': dict(slug='riffel-master-of-the-ultimate-gun', knee=22, pads=(8, 8, 6, 6),
                       lid=[((23, 10), 'f6bd98'), ((24, 10), 'f6bd98')], line=[(23, 11), (24, 11)]),
     'mgriffel': dict(slug='magical-girl-riffel', knee=21, glint=(7, 1, 30, GOLD),
                      lid=[((5, 8), 'f6bd98'), ((6, 8), 'f6bd98')], line=[(5, 9), (6, 9)]),
@@ -236,12 +236,16 @@ def fire(part, i, dist, amp=0.25, cycles=4, k=0.6):
 
 
 # --- Flammenwerfer (Andras) -----------------------------------------------------
-class Jet:
-    """Eine Flamme aus einer Rohrmündung, erzeugt aus dem Umriss der
-    Original-Flamme: s = Abstand entlang der Flugrichtung ab der Mündung,
-    r = quer dazu. Je s wird die Breite (r_min..r_max) der Original-Flamme
-    gemessen; pro Frame wird die Flamme gedehnt/gestaucht, gewunden und an
-    den Rändern gezüngelt, die Hitze ergibt die Farbe."""
+class FireJet:
+    """Flammenwerfer als Partikel-Feuer: jedes Frame strömen aus der
+    Rohrmündung zwei Flammenballen in Richtung der Original-Flamme (Achse per
+    Hauptkomponente ihres Umrisses). Jeder Ballen wird im Flug größer und
+    kühler und steigt etwas auf (Feuer steigt nach oben); ihre Hitzefelder
+    ergeben die Farbe: weiß, gelb, orange und ganz außen rot-orange Zungen.
+    Die Ballen starten schon in der Rohrmündung (verdecken sie teilweise).
+    Alles läuft im 48er-Takt, der Loop ist nahtlos."""
+
+    COLS = [(0.64, rgb('ffffff')), (0.4, rgb('ffff00')), (0.22, rgb('ffa718')), (0.11, rgb('f05a14'))]
 
     def __init__(self, mask, nozzle, seed):
         ys, xs = np.nonzero(mask)
@@ -250,72 +254,48 @@ class Jet:
         d = np.linalg.svd(P_ - c)[2][0]
         if np.dot(d, c - np.array(nozzle)) < 0:
             d = -d
-        self.d, self.n, self.N = d, np.array([-d[1], d[0]]), np.array(nozzle, float)
-        s = (P_ - self.N) @ self.d
-        r = (P_ - self.N) @ self.n
-        self.L = s.max()
-        self.lo = np.full(int(self.L) + 3, np.nan)
-        self.hi = np.full(int(self.L) + 3, np.nan)
-        for si, ri in zip(s, r):
-            k = int(round(max(0, si)))
-            self.lo[k] = ri if np.isnan(self.lo[k]) else min(self.lo[k], ri)
-            self.hi[k] = ri if np.isnan(self.hi[k]) else max(self.hi[k], ri)
-        idx = np.arange(len(self.lo))
-        ok = ~np.isnan(self.lo)
-        self.lo = np.interp(idx, idx[ok], self.lo[ok])
-        self.hi = np.interp(idx, idx[ok], self.hi[ok])
-        self.seed = seed
+        self.d, self.n0 = d, np.array(nozzle, float) - d * 1.5
+        self.puffs = []
+        for e in range(N):
+            for k in range(2):
+                rng = np.random.default_rng(seed * 10007 + e * 31 + k)
+                ang = rng.uniform(-0.13, 0.13)
+                ca, sa = math.cos(ang), math.sin(ang)
+                dv = np.array([d[0] * ca - d[1] * sa, d[0] * sa + d[1] * ca])
+                self.puffs.append(dict(e=e, v=dv * rng.uniform(2.6, 3.2), life=rng.uniform(10.5, 13.0),
+                                       r0=rng.uniform(1.0, 1.5), r1=rng.uniform(6.0, 8.5),
+                                       buoy=rng.uniform(0.06, 0.13), h0=rng.uniform(0.95, 1.1),
+                                       fl=rng.uniform(0, 6.28)))
 
-    def width(self, s):
-        k = min(len(self.lo) - 1, max(0.0, s))
-        k0 = int(k)
-        k1 = min(len(self.lo) - 1, k0 + 1)
-        f = k - k0
-        return self.lo[k0] * (1 - f) + self.lo[k1] * f, self.hi[k0] * (1 - f) + self.hi[k1] * f
-
-    def render(self, out, i, ox, oy, palette):
-        w = 2 * math.pi / N
-        ph = self.seed
-        lam = 1 + 0.08 * math.sin(5 * w * i + ph) + 0.05 * math.sin(7 * w * i + 2 * ph)
+    def render(self, out, i, ox, oy):
         H_, W_ = out.shape[:2]
-        dx_, dy_ = float(self.d[0]), float(self.d[1])
-        nx_, ny_ = float(self.n[0]), float(self.n[1])
-        Nx, Ny = float(self.N[0]), float(self.N[1])
-        for y in range(H_):
-            for x in range(W_):
-                qx, qy = x - ox - Nx, y - oy - Ny
-                s = qx * dx_ + qy * dy_
-                if s < -2.5 or s > self.L * lam + 2:
-                    continue
-                r = qx * nx_ + qy * ny_
-                sp = max(0.0, s / lam)
-                wob = 1.3 * (sp / self.L) ** 1.3 * math.sin(0.42 * s - 6 * w * i + ph)
-                rr = r - wob
-                if s < 0:                                   # in der Rohrmündung: schmaler, heißer Kern
-                    if abs(rr - (self.lo[0] + self.hi[0]) / 2) > 1.3:
-                        continue
-                    heat = 0.95
-                else:
-                    lo, hi = self.width(sp)
-                    lick = 0.9 * (sp / self.L) * math.sin(0.9 * s + 1.7 * r - 8 * w * i + ph)
-                    if not (lo - 0.5 - lick <= rr <= hi + 0.5 + lick) or sp > self.L:
-                        continue
-                    mid, half = (lo + hi) / 2, max(0.8, (hi - lo) / 2 + 0.5)
-                    hr = 1 - abs(rr - mid) / half
-                    hs = 1 - sp / self.L
-                    heat = 0.55 * hr + 0.45 * hs + 0.14 * math.sin(0.8 * s - 6 * w * i + r + ph)
-                    if sp > 0.82 * self.L and math.sin(1.3 * s + 2.1 * r - 8 * w * i + ph) > 0.55:
-                        continue                            # Zungen an der Spitze reißen kurz ab
-                col = palette[0] if heat > 0.62 else (palette[1] if heat > 0.36 else palette[2])
-                out[y, x] = col
+        heat = np.zeros((H_, W_))
+        for p in self.puffs:
+            a = (i - p['e']) % N
+            if a >= p['life']:
+                continue
+            u = a / p['life']
+            cx = self.n0[0] + p['v'][0] * a + ox
+            cy = self.n0[1] + p['v'][1] * a - 0.5 * p['buoy'] * a * a + oy
+            r = p['r0'] + (p['r1'] - p['r0']) * u ** 0.8
+            h = p['h0'] * (1 - u) ** 0.7 * (1 + 0.12 * math.sin(2 * math.pi * 6 * i / N + p['fl']))
+            for y in range(max(0, int(cy - r) - 1), min(H_, int(cy + r) + 2)):
+                for x in range(max(0, int(cx - r) - 1), min(W_, int(cx + r) + 2)):
+                    q = ((x - cx) ** 2 + (y - cy) ** 2) / (r * r)
+                    if q < 1:
+                        heat[y, x] = max(heat[y, x], h * (1 - q) ** 0.6)
+        for y, x in zip(*np.nonzero(heat > self.COLS[-1][0])):
+            for th, c in self.COLS:
+                if heat[y, x] > th:
+                    out[y, x] = c
+                    break
 
 
 # --- Varianten-Vorbereitung ---------------------------------------------------
 if V == 'andras':
     _fl = load('flames')
     _fm = _fl[:, :, 3] > 0
-    JETS = [Jet(_fm & (_xs < 42), (28.5, 22.5), 0.0), Jet(_fm & (_xs >= 42), (SW - 1 - 28.5, 22.5), 1.9)]
-    FLAME_PAL = [rgb('ffffff'), rgb('ffff00'), rgb('ffa718')]
+    JETS = [FireJet(_fm & (_xs < 42), (28.5, 22.5), 1), FireJet(_fm & (_xs >= 42), (SW - 1 - 28.5, 22.5), 2)]
 if V == 'orthos':
     FLAME_M = (SRC[:, :, 3] > 0) & (_ys <= 10) & (SRC[:, :, 0] > SRC[:, :, 2] + 40)
     FL_DIST = (10.0 - _ys).astype(float)
@@ -326,6 +306,12 @@ if V == 'waflav':
     n_, _lab, ST, _ = cv2.connectedComponentsWithStats((_b[:, :, 3] > 0).astype(np.uint8), connectivity=8)
     _order = sorted(range(1, n_), key=lambda k: -ST[k][4])
     MAIN = tuple(int(v) for v in ST[_order[0]][:4])             # x, y, w, h der Blitzsäule
+    _bd = load('body')
+    HORNS = []                                                  # Einschlagpunkte: Hörner (oben), nie das Gesicht
+    for _y in range(31, 36):
+        for _x in range(SW):
+            if _bd[_y, _x, 3] and not _bd[_y - 1, _x, 3]:
+                HORNS.append((_x, _y))
     SPARKS = [tuple(int(v) for v in ST[k][:4]) for k in _order[1:]]
 if V == 'luna':
     _red = (SRC[:, :, 3] > 0) & (SRC[:, :, 0] == 255) & (SRC[:, :, 1] == 0) & (SRC[:, :, 2] == 0)
@@ -399,6 +385,25 @@ def sweep(mask, i, start, speed=1.5, width=1.5):
     return hit
 
 
+def fill_gaps(fig):
+    """Leere Pixel mit deckenden Nachbarn oben und unten (oder links und
+    rechts) schließen – die Farbe kommt vom oberen bzw. linken Nachbarn."""
+    for _ in range(2):
+        op = fig[:, :, 3] > 0
+        fix = []
+        for y in range(1, fig.shape[0] - 1):
+            for x in range(1, fig.shape[1] - 1):
+                if op[y, x]:
+                    continue
+                if op[y - 1, x] and op[y + 1, x]:
+                    fix.append((y, x, fig[y - 1, x].copy()))
+                elif op[y, x - 1] and op[y, x + 1]:
+                    fix.append((y, x, fig[y, x - 1].copy()))
+        for y, x, c in fix:
+            fig[y, x] = c
+    return fig
+
+
 def put_sprite(out, s, ox, oy, dy_fn=None, dx_fn=None, skip=None):
     """s in out malen; dy_fn/dx_fn(x, y) = zusätzliche Verschiebung je Pixel."""
     for y in range(s.shape[0]):
@@ -470,16 +475,32 @@ def frame(i):
     if V == 'andras':
         put_sprite(out, s, ox, oy)
         for j in JETS:
-            j.render(out, i, ox, oy, FLAME_PAL)
+            j.render(out, i, ox, oy)
 
     elif V in ('friedhelm', 'titan'):
         sway = int(round(math.sin(2 * math.pi * i / 24)))
         ox += sway
         oy += BOUNCE12[i % 12]
         for (gx, gy), side in zip(C['wires'], (-1, 1)):
-            ax, ay = gx + side * 16 + PL, -40
+            # Aufhängung weit oben schwingt mit, das Seil biegt sich leicht durch
+            ax = gx + side * 16 + PL + 3 * math.sin(2 * math.pi * i / 24 + side * 0.7)
+            ay = -40
             x0, y0 = gx + ox, gy + oy
-            for x, y in line_px(x0, y0, ax, ay):
+            bow = 1.6 * math.sin(2 * math.pi * i / 16 + side * 1.3)
+            ln = math.hypot(ax - x0, ay - y0)
+            nx_, ny_ = -(ay - y0) / ln, (ax - x0) / ln
+            pts = []
+            for k in range(41):
+                u = k / 40
+                bx = x0 + (ax - x0) * u + nx_ * bow * 4 * u * (1 - u)
+                by = y0 + (ay - y0) * u + ny_ * bow * 4 * u * (1 - u)
+                pts.append((bx, by))
+            wire = []
+            for (x1, y1), (x2, y2) in zip(pts, pts[1:]):
+                for p_ in line_px(x1, y1, x2, y2):
+                    if not wire or wire[-1] != p_:
+                        wire.append(p_)
+            for x, y in wire:
                 if 1 <= y < H - 1 and 1 <= x < W - 1 and not out[y, x, 3]:
                     a = 255 if y >= 5 else int(255 * (y - 1) / 4)
                     if a > 0:
@@ -487,9 +508,11 @@ def frame(i):
         put_sprite(out, s, ox, oy)
 
     elif V == 'ftriffel':
-        t = i % 6                                        # alle 6 Frames ein Schuss
+        t = i % 6                                        # alle 6 Frames ein Schuss,
+        front = (i // 6) % 2 == 1                        # abwechselnd hintere / vordere Pistole
+        mzx = 23 if front else 15
         if t < 3:
-            dx = 14 - 12 * t
+            dx = 14 - 12 * t + (8 if front else 0)
             a = [1.0, 1.0, 0.45][t]
             for y, x in zip(*np.nonzero(BULLETS[:, :, 3])):
                 xx = x + dx + ox
@@ -497,7 +520,7 @@ def frame(i):
                     blend(out, y + oy + b, xx, BULLETS[y, x], int(BULLETS[y, x, 3] * a))
         put_sprite(out, s, ox, oy, dy_fn)
         if t < 2:
-            muzzle_flash(out, 16 + ox, 11 + oy + b, 2 - t, -1)
+            muzzle_flash(out, mzx + ox, 11 + oy + b, 2 - t, -1)
 
     elif V == 'ascriffel':
         put_sprite(out, s, ox, oy, dy_fn)
@@ -510,21 +533,22 @@ def frame(i):
         fig = np.zeros((H, W), bool)
         fig[oy:oy + SH, ox:ox + SW] = FIG
         keep = cv2.dilate((out[:, :, 3] > 0).astype(np.uint8), np.ones((5, 5), np.uint8)) > 0
-        for k in range(6):
-            per, ph = 16, (k * 7) % 16
+        for k in range(24):
+            per, ph = 6 + (k % 3) * 3, (k * 5) % 6
             t = (i - ph) % per
             if t > 1:
                 continue
             strike = (i - ph) // per
             rng = np.random.default_rng(1000 + 37 * k + 101 * strike)
-            ang = 2 * math.pi * (k / 6) + rng.uniform(-0.4, 0.4)
-            cx = ox + SW / 2 + math.cos(ang) * (SW / 2 - 6)
-            cy = oy + SH / 2 + math.sin(ang) * (SH / 2 + 1)
-            ln = rng.uniform(3, 5)
+            ang = 2 * math.pi * (k / 24) + rng.uniform(-0.25, 0.25)
+            rad = rng.uniform(0.8, 1.15)
+            cx = ox + SW / 2 + math.cos(ang) * (SW / 2 + 1) * rad
+            cy = oy + SH / 2 + math.sin(ang) * (SH / 2 + 4) * rad
+            ln = rng.uniform(3.5, 6.5)
             a2 = rng.uniform(0, math.pi)
             p0 = (cx - math.cos(a2) * ln, cy - math.sin(a2) * ln)
             p1 = (cx + math.cos(a2) * ln, cy + math.sin(a2) * ln)
-            pix = zigzag(rng, p0, p1, 2.0, 2)
+            pix = zigzag(rng, p0, p1, 3.0, 3)
             if any(not (1 <= y < H - 1 and 1 <= x < W - 1) or keep[y, x] for x, y in pix):
                 continue                                 # nie an der Figur oder am Rand
             draw_bolt(out, pix, 'ffffff' if t == 0 else 'bff8ff', '6fe8ff', fade=1.0 if t == 0 else 0.7)
@@ -539,21 +563,25 @@ def frame(i):
         m = wl[:, :, 3] > 0
         out[oy + hv:oy + hv + SH, ox:ox + SW][m] = wl[m]
         put_sprite(out, s, ox, oy + hv)
-        # Blitzsäule: schlägt alle 12 Frames neu ein (unabhängig von Waflav)
+        # Blitzregen: viele einzelne Blitze schlagen von oben in die Hörner ein
+        # (nie ins Gesicht), jeder zu eigener Zeit und in eigener Form
         mx, my, mw, mh = MAIN
-        t = i % 12
-        strike = i // 12
-        rng = np.random.default_rng(500 + strike)
-        if t <= 8 and t != 3:
-            reach = 0.55 if t == 0 else 1.0
-            fade = {0: 1.0, 1: 1.0, 2: 1.0, 4: 0.9, 5: 1.0, 6: 0.8, 7: 1.0, 8: 0.55}[t]
-            core = 'ffffff'
-            for k, fx in enumerate((0.3, 0.5, 0.7)):
-                top = (mx + mw * fx + rng.uniform(-3, 3), my)
-                bot = (mx + mw * 0.5 + rng.uniform(-2, 2), my + mh - 1)
-                pix = zigzag(rng, top, bot, 5.0, 4)
-                pix = [(x + ox, y + oy) for x, y in pix if y <= my + mh * reach]
-                draw_bolt(out, pix, core, '428ad2', '3061ae', fade)
+        for k in range(14):
+            per, ph = 6 + (k % 4) * 2, (k * 7) % 6
+            t = (i - ph) % per
+            if t > 2:
+                continue
+            strike = (i - ph) // per
+            rng = np.random.default_rng(500 + 17 * k + 131 * strike)
+            tx, ty = HORNS[int(rng.integers(len(HORNS)))]
+            top = (rng.uniform(mx - 6, mx + mw + 6), rng.uniform(my, my + 4))
+            end = (tx + ox, ty + oy + hv - 1)
+            pix = zigzag(rng, (top[0] + ox, top[1] + oy), end, rng.uniform(3.0, 5.0), 4)
+            reach = [0.6, 1.0, 1.0][t]
+            y_end = (top[1] + oy) + (end[1] - top[1] - oy) * reach
+            pix = [(x, y) for x, y in pix if y <= y_end]
+            thick = rng.random() < 0.4
+            draw_bolt(out, pix, 'ffffff', '428ad2', '3061ae' if thick else None, fade=[1.0, 1.0, 0.55][t])
         # Funkenblitze um ihn: jeder zu eigenen Zeiten, jedes Mal neue Form
         for k, (sx, sy, sw_, sh_) in enumerate(SPARKS):
             per, ph = 12 + (k % 3) * 4, (k * 5) % 12
@@ -630,10 +658,20 @@ def frame(i):
             out[m] = wl[m]
 
     elif V == 'orthos':
-        sy = 1 + 0.05 * math.sin(2 * math.pi * i / 24)
-        base = SH - 1
+        # Squash-and-Stretch nur am Körper (unter den Köpfen), die Köpfe samt
+        # Flammen sitzen oben drauf und fahren mit
+        NECK, base = 17, SH - 1
+        sy = 1 + 0.12 * math.sin(2 * math.pi * i / 24)
+        top_new = base - (base - NECK) * sy                # neue Lage der Halslinie
+        shift = int(round(top_new - NECK))
         for yy in range(H):
-            y = int(round(base - (base - (yy - oy)) / sy))
+            y_rel = yy - oy
+            if y_rel >= NECK + shift:
+                if y_rel > base:
+                    continue
+                y = max(NECK, int(round(base - (base - y_rel) / sy)))
+            else:
+                y = y_rel - shift
             if 0 <= y < SH:
                 for x in range(SW):
                     if s[y, x, 3]:
@@ -641,7 +679,7 @@ def frame(i):
 
     elif V == 'luna':
         hv = hover(i)
-        body_dx = int(round(0.8 * math.sin(2 * math.pi * i / N)))
+        body_dy = int(round(math.sin(2 * math.pi * i / 16)))
         inner = INNER.copy()
         if st:                                           # Augen (dunkelrot) schließen
             for x in (7, 10):
@@ -654,11 +692,16 @@ def frame(i):
         def ldx(x, y):
             if y <= 6:                                   # Haare wehen
                 return int(round(0.9 * (6 - y) / 6 * (math.sin(2 * math.pi * 2 * i / N - 0.5 * y) - math.sin(-0.5 * y))))
-            if y >= 14:                                  # Körper wiegt sich
-                return body_dx if y >= 16 else int(round(body_dx * 0.5))
             return 0
+
+        def ldy(x, y):                                   # Körper wippt auf und ab
+            return body_dy if y >= 15 else 0
         fig = np.zeros((H, W, 4), int)
-        put_sprite(fig, wingless, ox, oy + hv, dx_fn=ldx)
+        put_sprite(fig, wingless, ox, oy + hv, dx_fn=ldx, dy_fn=ldy)
+        if body_dy > 0:                                  # Lücke unter dem Hals schließen
+            for x in range(SW):
+                if wingless[14, x, 3] and wingless[15, x, 3] and not fig[15 + oy + hv, x + ox, 3]:
+                    fig[15 + oy + hv, x + ox] = wingless[14, x]
         lift = 0.5 * math.sin(2 * math.pi * 3 * i / N)
         shear_flap(inner, WING_M & (_xs <= 5), 7, -1, lift, 1.0, fig, offset=(ox, oy + hv))
         shear_flap(inner, WING_M & (_xs >= 12), 10, 1, lift, 1.0, fig, offset=(ox, oy + hv))
@@ -682,17 +725,16 @@ def frame(i):
                 return int(round(1.4 * (y - 34) / 12 * math.sin(2 * w * i + (0 if side > 0 else math.pi))))
             return 0
 
-        def tdy(x, y):
+        def tdy(x, y):                                   # an der Wurzel fest, zur Spitze stärker
+            d = max(0.0, abs(x - 15.5) - 7) / 9
             if ARMS_UP[y, x]:
-                d = abs(x - 15.5) / 16
-                return -int(round(2.2 * d * math.sin(2 * w * i)))
+                return -int(round(2.0 * d * math.sin(2 * w * i)))
             if ARMS_LO[y, x]:
-                d = abs(x - 15.5) / 16
-                return int(round(2.2 * d * math.sin(2 * w * i)))
+                return int(round(2.0 * d * math.sin(2 * w * i)))
             return 0
         fig = np.zeros((H, W, 4), int)
         put_sprite(fig, g, ox, oy + hv, dy_fn=tdy, dx_fn=tdx)
-        fill_pinholes(fig)
+        fill_gaps(fig)
         op = fig[:, :, 3] > 0
         d2 = cv2.distanceTransform((~op).astype(np.uint8), cv2.DIST_L2, 3)
         for r, a in ((1.0, 110), (2.0, 55), (3.0, 22)):
