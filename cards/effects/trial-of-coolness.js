@@ -55,10 +55,13 @@ function _hasEligibleTarget(gs, pi, engine) {
   // einzige Ziel am Ende der Nutzer selbst, bricht die Aufloesung
   // sauber ab und die Karte bleibt auf der Hand — kein Schaden, nur
   // ein vergeblicher Klick.
-  for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-    const h = ps.heroes[hi];
-    if (!h?.name || h.hp <= 0) continue;
-    return true;
+  // Kontrolle statt Seite (Styx 28.9.): beide Spalten, nur kontrollierte Helden.
+  for (let p = 0; p < (gs.players || []).length; p++) {
+    for (const h of (gs.players[p]?.heroes || [])) {
+      if (!h?.name || h.hp <= 0) continue;
+      if ((h.charmedBy ?? h.permaControlBy ?? p) !== pi) continue;
+      return true;
+    }
   }
   // Own Creatures only — engine is required for the cardType lookup.
   if (!engine) return false;
@@ -119,13 +122,15 @@ module.exports = {
       // control, EXCEPT the user". Der Nutzer ist der beschwoerende
       // Held, also `ctx.heroIdx`.
       const userHeroIdx = ctx.heroIdx;
+      // Kontrolle statt Seite (Styx 28.9.): „a target you control" — alle
+      // kontrollierten Helden, physisch adressiert; der Nutzer per Objekt.
+      const userHero = gs.players[ctx.heroOwner ?? ctx.cardHeroOwner ?? pi]?.heroes?.[userHeroIdx];
       const cardDB = engine._getCardDB();
       const targets = [];
-      for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-        const h = ps.heroes[hi];
+      for (const { physOwner, heroIdx: hi, hero: h } of engine.heroesControlledBy(pi)) {
         if (!h?.name || h.hp <= 0) continue;
-        if (hi === userHeroIdx) continue;
-        targets.push({ id: `hero-${pi}-${hi}`, type: 'hero', owner: pi, heroIdx: hi, cardName: h.name });
+        if (h === userHero) continue;
+        targets.push({ id: `hero-${physOwner}-${hi}`, type: 'hero', owner: physOwner, heroIdx: hi, cardName: h.name });
       }
       for (const inst of engine.cardInstances) {
         if (inst.zone !== 'support') continue;
@@ -169,11 +174,11 @@ module.exports = {
       // Marke auf den Stapel und laesst vorhandene stehen.
       let stampedName, stampedOwner, stampedHeroIdx, stampedZoneSlot;
       if (target.type === 'hero') {
-        const h = ps.heroes[target.heroIdx];
+        const h = gs.players[target.owner]?.heroes?.[target.heroIdx];
         if (!h?.name || h.hp <= 0) { gs._spellCancelled = true; return; }
         engine.addExtraLife(h, lifeMark);
         stampedName = h.name;
-        stampedOwner = pi;
+        stampedOwner = target.owner;
         stampedHeroIdx = target.heroIdx;
         stampedZoneSlot = -1;
       } else { // 'equip' (creature)

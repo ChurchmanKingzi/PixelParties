@@ -67,13 +67,14 @@ function targetIsBurned(engine, t) {
  * Mirrors the hero-side gates that `addHeroStatus` would hit
  * (immune / charmed / burn_immune).
  */
-function targetCanBeBurned(engine, t) {
+function targetCanBeBurned(engine, t, quelle = null) {
   if (t.type === 'hero') {
     const hero = engine.gs.players[t.owner]?.heroes?.[t.heroIdx];
     if (!hero?.name || hero.hp <= 0) return false;
     if (hero.statuses?.burned) return false; // Already — not "can-be-newly".
     if (hero.statuses?.immune) return false;
-    if (hero.statuses?.charmed) return false;
+    // Charme schuetzt nur in seiner Auspraegung (Styx: gar nicht).
+    if (hero.statuses?.charmed && engine._charmBlocksFrom(hero, quelle)) return false;
     if (hero.statuses?.burn_immune) return false;
     return true;
   }
@@ -146,7 +147,7 @@ module.exports = {
     const damageLocked = !!ps.damageLocked;
     for (const t of pool) {
       const burned = targetIsBurned(engine, t);
-      const canBurn = targetCanBeBurned(engine, t);
+      const canBurn = targetCanBeBurned(engine, t, playerIdx);
       if (damageLocked) {
         // Only the burn leg is live. Need a non-burned, non-immune target.
         if (canBurn) return true;
@@ -252,7 +253,7 @@ module.exports = {
               );
             }
           }
-        } else if (targetCanBeBurned(engine, t)) {
+        } else if (targetCanBeBurned(engine, t, pi)) {
           // Not yet burned + not immune → apply Burned (permanent).
           if (t.type === 'hero') {
             await engine.addHeroStatus(t.owner, t.heroIdx, 'burned', {

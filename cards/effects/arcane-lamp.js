@@ -35,11 +35,13 @@ const { hasCardType } = require('./_hooks');
 
 const CARD_NAME = 'Arcane Lamp';
 
-function heroCanBeBurned(hero) {
+function heroCanBeBurned(hero, engine = null, quelle = null) {
   if (!hero?.name || hero.hp <= 0) return false;
   if (hero.statuses?.burned) return false;
   if (hero.statuses?.immune) return false;
-  if (hero.statuses?.charmed) return false;
+  // Charme schuetzt nur in seiner Auspraegung (Charme Lv3: alles, Golden
+  // Apple: nur gegen den Kontrolleur, Styx: gar nicht) — `_charmBlocksFrom`.
+  if (hero.statuses?.charmed && (engine?._charmBlocksFrom ? engine._charmBlocksFrom(hero, quelle) : true)) return false;
   if (hero.statuses?.burn_immune) return false;
   return true;
 }
@@ -60,7 +62,7 @@ module.exports = {
 
     // At least one hero target? Kontrolle statt Seite (Styx 28.9.)
     for (const { hero: h } of gegnerHelden(gs, oi, engine)) {
-      if (heroCanBeBurned(h)) return true;
+      if (heroCanBeBurned(h, engine, pi)) return true;
     }
     // Or at least one creature target? Use the targeting-side gate
     // so Cardinal Beasts (and other omni-immune creatures) appear as
@@ -88,7 +90,7 @@ module.exports = {
 
     // Kontrolle statt Seite (Styx 28.9.) — IDs bleiben physisch.
     for (const { physOwner, heroIdx: hi, hero: h } of gegnerHelden(gs, oi, engine)) {
-      if (!heroCanBeBurned(h)) continue;
+      if (!heroCanBeBurned(h, engine, pi)) continue;
       targets.push({
         id: `hero-${physOwner}-${hi}`,
         type: 'hero', owner: physOwner, heroIdx: hi,
@@ -139,7 +141,7 @@ module.exports = {
 
     if (target.type === 'hero') {
       const hero = engine.gs.players[target.owner]?.heroes?.[target.heroIdx];
-      if (!hero || !heroCanBeBurned(hero)) return { cancelled: true };
+      if (!hero || !heroCanBeBurned(hero, engine, pi)) return { cancelled: true };
       await engine.addHeroStatus(target.owner, target.heroIdx, 'burned', {
         permanent: true,
         appliedBy: pi,

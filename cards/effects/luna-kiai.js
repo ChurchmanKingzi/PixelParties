@@ -55,11 +55,13 @@ function liveOwnHeroes(gs, pi, engine) {
 }
 
 /** Can this Hero currently receive a permanent Burn? Mirrors engine gates. */
-function heroCanBeBurned(hero) {
+function heroCanBeBurned(hero, engine = null, quelle = null) {
   if (!hero?.name || hero.hp <= 0) return false;
   if (hero.statuses?.burned) return false;
   if (hero.statuses?.immune) return false;
-  if (hero.statuses?.charmed) return false;
+  // Charme schuetzt nur in seiner Auspraegung (Charme Lv3: alles, Golden
+  // Apple: nur gegen den Kontrolleur, Styx: gar nicht) — `_charmBlocksFrom`.
+  if (hero.statuses?.charmed && (engine?._charmBlocksFrom ? engine._charmBlocksFrom(hero, quelle) : true)) return false;
   if (hero.statuses?.burn_immune) return false;
   return true;
 }
@@ -82,7 +84,7 @@ module.exports = {
     const ps = gs.players[pi];
     if (!ps) return false;
     // Need at least one own Hero that can still be newly Burned.
-    return liveOwnHeroes(gs, pi, engine).some(({ hero }) => heroCanBeBurned(hero));
+    return liveOwnHeroes(gs, pi, engine).some(({ hero }) => heroCanBeBurned(hero, engine, pi));
   },
 
   async onHandActivate(ctx) {
@@ -98,7 +100,7 @@ module.exports = {
     const myHandIndex = ctx.handIndex;
 
     const burnable = liveOwnHeroes(gs, pi, engine)
-      .filter(({ hero }) => heroCanBeBurned(hero))
+      .filter(({ hero }) => heroCanBeBurned(hero, engine, pi))
       .map(({ hero, heroIdx, physOwner }) => ({
         id: `hero-${physOwner}-${heroIdx}`,
         type: 'hero',

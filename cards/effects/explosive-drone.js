@@ -202,8 +202,13 @@ module.exports = {
       const pi = ctx.cardController ?? ctx.cardOwner;
       const held = ctx.hero;
       if (!held?.name) return;
-      const helden = engine.gs.players?.[pi]?.heroes || [];
-      if (helden.indexOf(held) < 0) return;          // nur eigene Helden
+      // Kontrolle statt Seite (Styx 28.9.) — „a target you control":
+      // Spalte suchen, dann den Kontrolleur fragen.
+      let seite = -1;
+      for (let p = 0; p < (engine.gs.players || []).length && seite < 0; p++) {
+        if ((engine.gs.players[p]?.heroes || []).indexOf(held) >= 0) seite = engine.heroSideOf(p, held);
+      }
+      if (seite !== pi) return;                      // nur eigene Helden
       if (!vomGegner(ctx, pi)) return;
       await reagiereAufTod(ctx, held.name);
     },

@@ -63,14 +63,19 @@ function _stampHopt(gs, key) {
 }
 
 function _allOpponentHeroTargets(gs, pi) {
+  // Kontrolle statt Seite (Styx 28.9.): „all Heroes your opponent
+  // CONTROLS" — beide Spalten, nach Kontrolleur (wie `heroSideOf`);
+  // `owner` bleibt die physische Spalte.
   const oi = pi === 0 ? 1 : 0;
-  const ops = gs.players[oi];
-  if (!ops) return [];
   const out = [];
-  for (let hi = 0; hi < (ops.heroes || []).length; hi++) {
-    const h = ops.heroes[hi];
-    if (!h?.name || h.hp <= 0) continue;
-    out.push({ owner: oi, heroIdx: hi, hero: h });
+  for (let p = 0; p < (gs.players || []).length; p++) {
+    const heroes = gs.players[p]?.heroes || [];
+    for (let hi = 0; hi < heroes.length; hi++) {
+      const h = heroes[hi];
+      if (!h?.name || h.hp <= 0) continue;
+      if ((h.charmedBy ?? h.permaControlBy ?? p) !== oi) continue;
+      out.push({ owner: p, heroIdx: hi, hero: h });
+    }
   }
   return out;
 }

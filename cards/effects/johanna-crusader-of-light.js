@@ -72,18 +72,18 @@ function _johannaActive(johannaHero) {
  * Ziel, mit Lichtschimmer dort. Erst danach trifft sie die umgeleitete
  * Haelfte.
  */
-async function _dashZumZiel(engine, ownerIdx, johannaIdx, zielHeroIdx, zielSlot) {
+async function _dashZumZiel(engine, ownerIdx, johannaIdx, zielHeroIdx, zielSlot, zielOwner = ownerIdx) {
   const johanna = engine.gs.players[ownerIdx]?.heroes?.[johannaIdx];
   // v1316: nur bis zum AUFPRALL warten — der Schaden faellt im Moment der
   // Beruehrung, Johannas Rueckflug laeuft dabei weiter.
   await engine.rammeBisKontakt({
     sourceOwner: ownerIdx, sourceHeroIdx: johannaIdx,
-    targetOwner: ownerIdx, targetHeroIdx: zielHeroIdx,
+    targetOwner: zielOwner, targetHeroIdx: zielHeroIdx,
     targetZoneSlot: zielSlot == null ? undefined : zielSlot,
     cardName: johanna?.name || CARD_NAME, duration: 1200,
   });
   engine._broadcastEvent('play_zone_animation', {
-    type: 'heal_sparkle', owner: ownerIdx, heroIdx: zielHeroIdx, zoneSlot: zielSlot == null ? -1 : zielSlot,
+    type: 'heal_sparkle', owner: zielOwner, heroIdx: zielHeroIdx, zoneSlot: zielSlot == null ? -1 : zielSlot,
   });
 }
 
@@ -192,8 +192,12 @@ module.exports = {
       if (!_johannaActive(johannaHero)) return;
       if (johannaHero === target) return; // self-target — no redirect
 
-      // Target must be one of Johanna's sibling Heroes.
-      if (!(ownerPs.heroes || []).includes(target)) return;
+      // Target must be another Hero Johanna's CONTROLLER controls.
+      // Kontrolle statt Seite (Styx 28.9.): physische Seite des Ziels
+      // nur noch fuer Animation/Index.
+      const ctrl = engine.heroSideOf(ownerIdx, johannaHero);
+      const tgtOwner = engine._findHeroOwner(target);
+      if (tgtOwner < 0 || engine.heroSideOf(tgtOwner, target) !== ctrl) return;
 
       const hoptKey = heldenSperreKey('johanna_redirect', ownerIdx);
       if (gs.hoptUsed?.[hoptKey] === gs.turn) return;
@@ -204,7 +208,7 @@ module.exports = {
       // Prompt the controller. Decline → leave the damage intact and
       // DON'T mark HOPT, so a later damage instance this turn can still
       // be redirected.
-      const choice = await engine.promptGeneric(ownerIdx, {
+      const choice = await engine.promptGeneric(ctrl, {
         type:        'confirm',
         title:       CARD_NAME,
         message:     `Redirect ${redirected} of ${ctx.amount} damage from ${target.name || 'your Hero'} to ${CARD_NAME}? (Once per turn — accepting locks out further redirects this turn.)`,
@@ -226,7 +230,8 @@ module.exports = {
       // mutated the local copy, so the original target still took
       // full damage AND Johanna ate the redirected half on top.
       ctx.modifyAmount(-redirected);
-      await _dashZumZiel(engine, ownerIdx, johannaInst.heroIdx, ownerPs.heroes.indexOf(target), null);
+      await _dashZumZiel(engine, ownerIdx, johannaInst.heroIdx,
+        gs.players[tgtOwner].heroes.indexOf(target), null, tgtOwner);
 
       // Deal the redirected half to Johanna. The recursive damage call
       // re-enters this hook, but target === johannaHero short-circuits
@@ -257,6 +262,9 @@ module.exports = {
       const hoptKey = heldenSperreKey('johanna_redirect', ownerIdx);
       if (gs.hoptUsed?.[hoptKey] === gs.turn) return;
 
+      // Kontrolle statt Seite (Styx 28.9.): „target you control" meint
+      // Johannas Kontrolleur.
+      const ctrl = engine.heroSideOf(ownerIdx, johannaHero);
       const entries = ctx.entries || [];
       for (const e of entries) {
         if (gs.hoptUsed?.[hoptKey] === gs.turn) break; // accepted earlier
@@ -264,12 +272,12 @@ module.exports = {
         if (!e.inst || e.inst.zone !== 'support') continue;
         if (e.amount == null || e.amount <= 0) continue;
         const targetCtrl = e.inst.controller ?? e.inst.owner;
-        if (targetCtrl !== ownerIdx) continue;
+        if (targetCtrl !== ctrl) continue;
 
         const redirected = Math.ceil(e.amount / 2);
         if (redirected <= 0) continue;
 
-        const choice = await engine.promptGeneric(ownerIdx, {
+        const choice = await engine.promptGeneric(ctrl, {
           type:        'confirm',
           title:       CARD_NAME,
           message:     `Redirect ${redirected} of ${e.amount} damage from ${e.inst.name} to ${CARD_NAME}? (Once per turn — accepting locks out further redirects this turn.)`,
@@ -283,7 +291,7 @@ module.exports = {
         if (!gs.hoptUsed) gs.hoptUsed = {};
         gs.hoptUsed[hoptKey] = gs.turn;
         e.amount -= redirected;
-        await _dashZumZiel(engine, ownerIdx, johannaInst.heroIdx, e.inst.heroIdx, e.inst.zoneSlot);
+        await _dashZumZiel(engine, ownerIdx, johannaInst.heroIdx, e.inst.heroIdx, e.inst.zoneSlot, targetCtrl);
 
         await engine.actionDealDamage(e.source, johannaHero, redirected, e.type || 'normal');
         break;

@@ -71,14 +71,15 @@ function buildOwnStatusedHeroes(engine, pi) {
   if (!ps) return [];
   const negKeys = getCleansableStatuses();
   const out = [];
-  for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-    const h = ps.heroes[hi];
+  // Kontrolle statt Seite (Styx 28.9.): „a Hero/target you control" —
+  // alle kontrollierten Helden, physisch adressiert.
+  for (const { physOwner, heroIdx: hi, hero: h } of engine.heroesControlledBy(pi)) {
     if (!h?.name || h.hp <= 0) continue;
     if (!h.statuses) continue;
     if (!negKeys.some(k => h.statuses[k])) continue;
     out.push({
-      id: `hero-${pi}-${hi}`, type: 'hero',
-      owner: pi, heroIdx: hi, cardName: h.name,
+      id: `hero-${physOwner}-${hi}`, type: 'hero',
+      owner: physOwner, heroIdx: hi, cardName: h.name,
     });
   }
   return out;
