@@ -37,6 +37,26 @@ module.exports = {
    * prueft `ascensionCondition` auf der aufgestiegenen Karte. Nimmt nur
    * die EIGENE Bereitschaft zurueck.
    */
+  /**
+   * ★ Revive-Zaehler (Als Vorgabe 28.9.): Hat `pi` „Styx, the Opened
+   * Gate" in Rotation (Hand, Deck, Ablage, Geloescht), zeigt jeder
+   * seiner Basis-Styx unten mittig die bisherigen Wiederbelebungen.
+   * Nur fuer den BESITZER — das Deck ist verdeckt, und der Zaehler
+   * verriete sonst, dass die Karte darin liegt.
+   * @returns {{ heroIdxs: number[], count: number, needed: number } | null}
+   */
+  reviveZaehlerAnzeige(engine, pi) {
+    const ps = engine?.gs?.players?.[pi];
+    if (!ps) return null;
+    const heroIdxs = [];
+    (ps.heroes || []).forEach((h, hi) => { if (h?.name === CARD_NAME) heroIdxs.push(hi); });
+    if (heroIdxs.length === 0) return null;
+    const inRotation = ['hand', 'mainDeck', 'discardPile', 'deletedPile']
+      .some(k => (ps[k] || []).includes(AUFSTIEG_ZIEL));
+    if (!inRotation) return null;
+    return { heroIdxs, count: engine.gs.heroRevivalCount || 0, needed: NOETIGE_WIEDERBELEBUNGEN };
+  },
+
   refreshAscensionReadiness(engine, pi, hi) {
     const hero = engine.gs.players[pi]?.heroes?.[hi];
     if (!hero || hero.name !== CARD_NAME) return;

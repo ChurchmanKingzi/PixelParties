@@ -27,6 +27,11 @@
 //  max HP und ATK bleiben also 1:1 — samt aller +100-Boni der
 //  Grundform (Als Vorgabe 28.9.: „passt").
 //
+//  ── AUFSTIEGSBONUS (Als Vorgabe 28.9., steht auf dem Kartenbild) ──
+//  „Add any 2 cards from your discard pile to your hand." Bis zu zwei
+//  beliebige Karten; nach der ersten darf man aufhoeren. Laeuft ueber
+//  `addCardFromDiscardToHand` (Ablage-Sperren, Suchsperren, Flug).
+//
 //  ── HELDENEFFEKT ────────────────────────────────────────────────
 //  • Ziel: jeder besiegte Held BEIDER Seiten, den eine Wiederbelebung
 //    ueberhaupt erreicht (`canReviveHero`: max HP > 0).
@@ -53,6 +58,7 @@ const NOETIGE_WIEDERBELEBUNGEN = 3;
 const REVIVE_HP = 100;
 const ANIM = 'styx_gate_revival';
 const ANIM_MS = 1500;
+const BONUS_KARTEN = 2;
 
 /** Besiegte Helden, die Styx gerade zurueckholen darf. */
 function wiederbelebbareHelden(engine, pi) {
@@ -96,6 +102,42 @@ module.exports = {
     return (gs.heroRevivalCount || 0) >= NOETIGE_WIEDERBELEBUNGEN;
   },
 
+  /** „Add any 2 cards from your discard pile to your hand." */
+  async onAscensionBonus(engine, pi) {
+    const ps = engine.gs.players[pi];
+    if (!ps || ps.handLocked) return;
+    // Anzeige-Reihenfolge EINMAL festlegen (Muster Liberation) — sonst
+    // wandert die eben gewaehlte Karte beim naechsten Durchgang.
+    const reihenfolge = [...new Set(ps.discardPile || [])].sort((a, b) => a.localeCompare(b));
+    const genommen = [];
+    for (let i = 0; i < BONUS_KARTEN; i++) {
+      const zaehler = {};
+      for (const n of (ps.discardPile || [])) zaehler[n] = (zaehler[n] || 0) + 1;
+      const galerie = reihenfolge.filter(n => zaehler[n] > 0)
+        .map(n => ({ name: n, source: 'discard', count: zaehler[n] }));
+      if (galerie.length === 0) break;
+      const wahl = await engine.promptGeneric(pi, {
+        type: 'cardGallery', searchToHand: true, searchPile: 'discard',
+        title: `${CARD_NAME} — Ascension Bonus`,
+        description: genommen.length === 0
+          ? `Choose a card from your discard pile to add to your hand (up to ${BONUS_KARTEN}).`
+          : `Choose another card (${genommen.length}/${BONUS_KARTEN}), or stop here.`,
+        cards: galerie,
+        showCard: CARD_NAME,
+        cancellable: true,
+        cancelLabel: genommen.length === 0 ? 'Skip' : '✓ Done',
+      });
+      if (!wahl || wahl.cancelled || !wahl.cardName) break;
+      const ok = await engine.addCardFromDiscardToHand(pi, wahl.cardName, pi, { source: CARD_NAME });
+      if (!ok) break;   // Ablage-/Suchsperre
+      genommen.push(wahl.cardName);
+    }
+    if (genommen.length > 0) {
+      engine.log('styx_gate_bonus', { player: ps.username, cards: genommen });
+      engine.sync();
+    }
+  },
+
   canActivateHeroEffect(ctx) {
     return wiederbelebbareHelden(ctx._engine, ctx.cardOwner).length > 0;
   },
@@ -128,8 +170,18 @@ module.exports = {
     return false;
   },
 
-  /** CPU-Ziel: am liebsten den staerksten fremden Helden, sonst den eigenen. */
+  /** CPU: Bonus-Galerie (s.o.) und Ziel — am liebsten den staerksten fremden Helden, sonst den eigenen. */
   cpuResponse(engine, kind, payload) {
+    // Bonus-Galerie: die Karte mit der hoechsten Stufe bzw. den hoechsten
+    // Kosten nehmen — immer beide Picks nutzen.
+    if (kind === 'generic' && payload?.type === 'cardGallery') {
+      const karten = payload.cards || [];
+      if (karten.length === 0) return undefined;
+      const db = engine._getCardDB();
+      const wert = (n) => (db[n]?.level || 0) * 10 + (db[n]?.cost || 0);
+      const beste = karten.slice().sort((a, b) => wert(b.name) - wert(a.name))[0];
+      return { cardName: beste.name, source: 'discard' };
+    }
     if (kind !== 'effectTarget' && kind !== 'target') return undefined;
     const ziele = payload?.validTargets || [];
     if (ziele.length === 0) return undefined;
@@ -182,7 +234,13 @@ module.exports = {
       hero.charmedFromOwner = ziel.owner;
       hero.charmedHeroIdx = ziel.heroIdx;
       if (!hero.statuses) hero.statuses = {};
-      hero.statuses.charmed = { controller: pi, appliedTurn: gs.turn, ohneSchutz: true };
+      // `abilitiesErlaubt` (Als Vorgabe 28.9.): anders als bei jeder
+      // anderen temporaeren Kontrolle darf man diesem Helden Abilities
+      // anlegen (server.js `doPlayAbility`, Feld `heroOwner`).
+      hero.statuses.charmed = {
+        controller: pi, appliedTurn: gs.turn,
+        ohneSchutz: true, abilitiesErlaubt: true, quelle: CARD_NAME,
+      };
       engine._heldenStatusVerursacher?.(hero.statuses.charmed, { appliedBy: pi });
       hero._kontrolleBisZumTod = { by: CARD_NAME, turn: gs.turn };
       engine.log('styx_gate_control', {

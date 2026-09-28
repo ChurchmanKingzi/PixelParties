@@ -24556,3 +24556,18 @@ body.pp-dialog-offen .foil-diamond-rare:not(.modal-overlay *) {
   100% { opacity: 0; transform: translateY(var(--hoch)) scale(1.15); }
 }
 @keyframes styxTorSchein { 0%, 45% { opacity: 0; transform: scale(.5); } 65% { opacity: 1; transform: scale(1); } 100% { opacity: 0; transform: scale(1.2); } }
+
+/* ── Styx: Revive-Zaehler unten mittig auf dem Basis-Styx (28.9.) ── */
+.styx-revive-counter {
+  position: absolute; left: 50%; bottom: 6%; transform: translateX(-50%);
+  display: flex; align-items: center; gap: calc(2px * var(--board-scale));
+  min-width: calc(18px * var(--board-scale)); height: calc(18px * var(--board-scale));
+  padding: 0 calc(5px * var(--board-scale)); border-radius: calc(9px * var(--board-scale));
+  background: radial-gradient(circle at 30% 30%, #7fe3ff, #2a1150);
+  color: #e8fbff; font-family: 'Pixel Intv', monospace; font-size: calc(9px * var(--board-scale));
+  font-weight: bold; line-height: 1; justify-content: center;
+  border: calc(1.5px * var(--board-scale)) solid #0c0418;
+  box-shadow: 0 0 calc(5px * var(--board-scale)) #5ad8ff, inset 0 0 calc(2px * var(--board-scale)) #c9b8ff;
+  z-index: 7; pointer-events: auto; cursor: default;
+}
+.styx-revive-counter-bereit { box-shadow: 0 0 calc(8px * var(--board-scale)) #b58cff, 0 0 calc(3px * var(--board-scale)) #fff; }

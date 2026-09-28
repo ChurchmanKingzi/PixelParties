@@ -11573,6 +11573,62 @@ class GameEngine {
     this.log('control_returned_on_death', { hero: hero.name, by: quelle });
   }
 
+  /**
+   * Darf `pi` gerade eine Ability aus der Hand an den Helden
+   * `heroOwner`/`heroIdx` anlegen, der physisch auf der ANDEREN Seite
+   * steht? Nur wenn die Kontrollmarke es ausdruecklich erlaubt (Styx,
+   * the Opened Gate — Als Vorgabe 28.9.) und in diesem Zug noch keine
+   * angelegt wurde. Server (`doPlayAbilityFremd`) und Client lesen
+   * dieselben Felder.
+   */
+  darfFremdAbilityAnlegen(pi, heroOwner, heroIdx) {
+    if (heroOwner === pi) return false;
+    const hero = this.gs.players[heroOwner]?.heroes?.[heroIdx];
+    if (!hero?.name || !(hero.hp > 0)) return false;
+    if (hero.charmedBy !== pi) return false;
+    const ch = hero.statuses?.charmed;
+    if (!ch?.abilitiesErlaubt) return false;
+    return ch.abilityZug !== this.gs.turn;
+  }
+
+  /**
+   * ★ „… YOUR OPPONENT CONTROLS" UND DER GELIEHENE HELD (Styx, 28.9.).
+   *
+   * Ein uebernommener Held steht physisch in der Spalte seines Besitzers.
+   * Die zentralen Zielsammler (`promptDamageTarget`, `promptMultiTarget`)
+   * zaehlen ihn laengst zur Seite des Kontrolleurs; Karten, die ihre
+   * Ziele SELBST sammeln (Ziel-Artefakte und -Traenke: Snow Cannon,
+   * Arcane Lamp, Magic Ruby …), lesen aber die physische Gegnerseite
+   * und boten ihn an (Als Befund).
+   *
+   * Entschieden wird am gedruckten Text: sagt JEDER „Choose …"-Satz der
+   * Karte „your opponent controls" (und keiner „you control", „either
+   * player", „any target", „on the board"), ist sie eine reine
+   * Gegner-Karte, und Helden, die `casterPi` gerade kontrolliert, fallen
+   * aus der Liste. Karten mit gemischten Zielen bleiben unberuehrt.
+   * Aendert `validTargets` an Ort und Stelle.
+   */
+  filterSelbstKontrollierteGegnerHelden(validTargets, casterPi, cardName) {
+    if (!Array.isArray(validTargets) || !this.istReineGegnerKarte(cardName)) return validTargets;
+    for (let i = validTargets.length - 1; i >= 0; i--) {
+      const t = validTargets[i];
+      if (t?.type !== 'hero' || t.owner === casterPi) continue;
+      const hero = this.gs.players[t.owner]?.heroes?.[t.heroIdx];
+      if (hero && this.heroSideOf(t.owner, hero) === casterPi) validTargets.splice(i, 1);
+    }
+    return validTargets;
+  }
+
+  /** Zielt die Karte laut Text ausschliesslich auf Gegnerisches? (s.o.) */
+  istReineGegnerKarte(cardName) {
+    const text = this._getCardDB()[cardName]?.effect || '';
+    const choose = text.split(/(?<=[.!])\s+|\n+/)
+      .filter(satz => /^\s*(?:\d\)\s*)?(?:you may (?:once per turn )?)?choose\b/i.test(satz));
+    if (choose.length === 0) return false;
+    return choose.every(satz => /your opponent controls/i.test(satz)
+      && !/\byou (?:permanently )?control\b|either player|any target|on the board/i.test(satz));
+  }
+
   istTemporaerGesteuert(hero) {
     if (!hero?.name) return false;
     if (hero.permaControlBy != null) return false;

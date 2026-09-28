@@ -6652,7 +6652,19 @@ function StatusBadges({ statuses, counters, buffs, isHero, player, cardName, isO
         : `Extra Life: The next time this is defeated, it is fully revived. (Granted by ${by}.)`,
     });
   }
-  if (s.charmed) badges.push({ key: 'charmed', icon: '💘', tooltip: 'Charmed: Under opponent control and immune to all effects.' });
+  // Der Schutz haengt an der Karte, die die Kontrolle gab (v1196 / Styx
+  // 28.9.) — der Tooltip nennt deshalb die jeweilige Auspraegung.
+  if (s.charmed) {
+    const ch = typeof s.charmed === 'object' ? s.charmed : {};
+    const tip = ch.ohneSchutz
+      ? `Controlled by its owner's opponent${ch.quelle ? ` (${ch.quelle})` : ''} until it is defeated or the turn ends. Not protected from any cards or effects.`
+      : ch.onlyFromController
+        ? 'Charmed: Under opponent control for the rest of the turn. Unaffected by the controlling player\'s other cards and effects.'
+        : ch._loveShot
+          ? 'Charmed: Under opponent control for the rest of the turn. Immune to negative status effects, but takes damage normally.'
+          : 'Charmed: Under opponent control and immune to all effects.';
+    badges.push({ key: 'charmed', icon: '💘', tooltip: tip });
+  }
   if (s.sirenLinked || c.sirenLinked) {
     const linkData = s.sirenLinked || c.sirenLinked;
     const partner = (typeof linkData === 'object' && linkData.partnerName)

@@ -27346,7 +27346,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       }
       // Gray out Abilities that can't be played on any hero
       if (card.cardType === 'Ability') {
-        const canPlaySomewhere = [0,1,2].some(hi => canHeroReceiveAbility(me, hi, cardName));
+        const canPlaySomewhere = [0,1,2].some(hi => canHeroReceiveAbility(me, hi, cardName))
+          || [0,1,2].some(hi => canForeignHeroReceiveAbility(hi, cardName));   // Styx
         if (!canPlaySomewhere) return true;
       }
       // Gray out Artifacts if not enough gold or item-locked
@@ -27952,11 +27953,23 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     // v768: Xal / Xalibur — eine freie (oder gleichnamige) SUPPORT Zone
     // zaehlt genauso. Ohne das blieb die Handkarte grau, sobald die drei
     // echten Zonen voll waren.
-    if ((gameState.abilitySupportHeroes || []).includes(heroIdx)) {
+    if (!opts.nurAbilityZonen && (gameState.abilitySupportHeroes || []).includes(heroIdx)) {
       const supZones = playerData.supportZones?.[heroIdx] || [];
       return supZones.some((slot, _z) => ppAbilityZoneOk(playerData, heroIdx, _z, abilityName, 'support'));
     }
     return false;
+  };
+
+  // ★ Styx, the Opened Gate (28.9.): ein FREMDER Held, den ich gerade
+  // kontrolliere und dessen Kontrollmarke Abilities erlaubt — einmal pro
+  // Zug, nur echte Ability Zones. Dieselben Felder wie der Server
+  // (`engine.darfFremdAbilityAnlegen`).
+  const canForeignHeroReceiveAbility = (heroIdx, abilityName) => {
+    const h = opp?.heroes?.[heroIdx];
+    if (!h?.name || h.hp <= 0 || h.charmedBy !== myIdx) return false;
+    const ch = h.statuses?.charmed;
+    if (!ch?.abilitiesErlaubt || ch.abilityZug === gameState.turn) return false;
+    return canHeroReceiveAbility(opp, heroIdx, abilityName, { skipAbilityGiven: true, nurAbilityZonen: true });
   };
 
   // Check if a hero can play a card (fully server-driven via heroPlayableCards).
@@ -28771,7 +28784,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
 
       if (isAbilityPlayable) {
         // Ability play-mode drag — find valid hero/zone target
-        let targetHero = -1, targetZone = -1;
+        let targetHero = -1, targetZone = -1, targetOpp = false;
         // During abilityAttach prompt, restrict to specified hero and skip abilityGivenThisTurn
         const attachHeroOnly = abilityAttachPrompt ? abilityAttachPrompt.heroIdx : -1;
         const skipAbilityGiven = !!abilityAttachPrompt;
@@ -28793,7 +28806,11 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             if (mx >= r.left && mx <= r.right && my >= r.top && my <= r.bottom) {
               if (el.dataset.heroOwner === 'me') {
                 const hi = parseInt(el.dataset.heroIdx);
-                if (canReceive(hi, cardName)) { targetHero = hi; targetZone = -1; }
+                if (canReceive(hi, cardName)) { targetHero = hi; targetZone = -1; targetOpp = false; }
+              } else if (el.dataset.heroOwner === 'opp' && !abilityAttachPrompt) {
+                // Styx: fremder, kontrollierter Held
+                const hi = parseInt(el.dataset.heroIdx);
+                if (canForeignHeroReceiveAbility(hi, cardName)) { targetHero = hi; targetZone = -1; targetOpp = true; }
               }
             }
           }
@@ -28827,22 +28844,26 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           for (const el of abEls) {
             const r = el.getBoundingClientRect();
             if (mx >= r.left && mx <= r.right && my >= r.top && my <= r.bottom) {
-              if (el.dataset.abilityOwner === 'me') {
+              // Styx: Ability-Zone eines fremden, kontrollierten Helden.
+              const fremd = el.dataset.abilityOwner === 'opp' && !abilityAttachPrompt
+                && canForeignHeroReceiveAbility(parseInt(el.dataset.abilityHero), cardName);
+              if (el.dataset.abilityOwner === 'me' || fremd) {
+                const pd = fremd ? opp : me;
                 const hi = parseInt(el.dataset.abilityHero);
                 const zi = parseInt(el.dataset.abilitySlot);
-                if (canReceive(hi, cardName)) {
-                  const abSlot = (me.abilityZones[hi] || [])[zi] || [];
+                if (fremd || canReceive(hi, cardName)) {
+                  const abSlot = (pd.abilityZones[hi] || [])[zi] || [];
                   const isCustom = (gameState.customPlacementCards || []).includes(cardName);
 
                   if (isCustom) {
                     // Custom placement: occupied zones with <3 cards
-                    if (abSlot.length > 0 && abSlot.length < 3) { targetHero = hi; targetZone = zi; }
+                    if (abSlot.length > 0 && abSlot.length < 3) { targetHero = hi; targetZone = zi; targetOpp = fremd; }
                   } else {
                     // Standard: only matching or empty zones
                     // v1349: dieselben Regeln wie der Server (verwahrte Abilities).
-                    const existingZone = ((me.abilityZones[hi] || []).findIndex(s => (s||[]).length > 0 && s[0] === cardName));
+                    const existingZone = ((pd.abilityZones[hi] || []).findIndex(s => (s||[]).length > 0 && s[0] === cardName));
                     if (existingZone >= 0 && zi !== existingZone) { /* nur der eigene Stapel */ }
-                    else if (ppAbilityZoneOk(me, hi, zi, cardName)) { targetHero = hi; targetZone = zi; }
+                    else if (ppAbilityZoneOk(pd, hi, zi, cardName)) { targetHero = hi; targetZone = zi; targetOpp = fremd; }
                   }
                 }
               }
@@ -28855,7 +28876,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         // VORRATS-Index gegen die HAND, findet einen anderen Namen und
         // lehnt ab; die Karte springt zurueck. Dieselbe Herkunft wie
         // in den anderen drei Ziehzustaenden.
-        setAbilityDrag({ idx, cardName, card, mouseX: mx, mouseY: my, griffX, griffY, targetHero, targetZone, targetSupportZone, fromCreation });
+        setAbilityDrag({ idx, cardName, card, mouseX: mx, mouseY: my, griffX, griffY, targetHero, targetZone, targetSupportZone, targetOpp, fromCreation });
       } else if (isPlayable && card.cardType === 'Creature') {
         // Play-mode drag — find valid drop target
         let targetHero = -1, targetSlot = -1;
@@ -29689,7 +29710,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             // Click-to-attach. Instead of a popup, enter "pick-a-zone" mode:
             // eligible hero zones light up, existing stacks of the same
             // ability or empty ability slots become clickable.
-            const anyEligible = (me.heroes || []).some((_, hi) => canHeroReceiveAbility(me, hi, cardName));
+            const anyEligible = (me.heroes || []).some((_, hi) => canHeroReceiveAbility(me, hi, cardName))
+              || [0,1,2].some(hi => canForeignHeroReceiveAbility(hi, cardName));   // Styx
             if (anyEligible) {
               setAbilityAttachPick({ cardName, handIndex: idx, fromCreation, card });
             }
@@ -30027,6 +30049,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               // v768: auf eine Support Zone gezogen (Xal, Xalibur).
               supportSlot: (prev.targetSupportZone != null && prev.targetSupportZone >= 0)
                 ? prev.targetSupportZone : undefined,
+              // Styx: fremder, kontrollierter Held
+              heroOwner: prev.targetOpp ? oppIdx : undefined,
             fromCreation: prev.fromCreation || undefined,
           });
           }
@@ -41210,12 +41234,19 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             }
             return false;
           })();
-          const abilityTarget = !isOpp && abilityDrag && abilityDrag.targetHero === i && abilityDrag.targetZone < 0;
+          const abilityTarget = abilityDrag && (isOpp ? !!abilityDrag.targetOpp : !abilityDrag.targetOpp)
+            && abilityDrag.targetHero === i && abilityDrag.targetZone < 0;
           // Click-to-attach an Ability: highlight all eligible heroes + dim
           // the rest. Honours both the `skipAbilityGiven` flag (server-driven
           // tutor flows bypass the per-turn gate) and the `eligibleHeroIdxs`
           // allowlist (so Alex can't attach to himself via the deck-search).
-          const attachPickEligibleHero = !isOpp && abilityAttachPick && (() => {
+          const attachPickEligibleHero = abilityAttachPick && (() => {
+            // Styx: fremder, kontrollierter Held — nur beim Spielen aus der Hand.
+            if (isOpp) {
+              if (abilityAttachPick.source === 'effectPrompt') return false;
+              if ((gameState.customPlacementCards || []).includes(abilityAttachPick.cardName)) return false;
+              return canForeignHeroReceiveAbility(i, abilityAttachPick.cardName);
+            }
             if (Array.isArray(abilityAttachPick.eligibleHeroIdxs)
                 && !abilityAttachPick.eligibleHeroIdxs.includes(i)) return false;
             // Custom-placement abilities (Performance) MUST be clicked on
@@ -41423,6 +41454,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                   roomId: gameState.roomId, cardName: pick.cardName,
                   handIndex: pick.handIndex, fromCreation: pick.fromCreation || undefined,
                   heroIdx: i, zoneSlot: targetSlot,
+                  heroOwner: isOpp ? oppIdx : undefined,   // Styx
                 });
               }
             : isChainPickValid
@@ -41876,6 +41908,20 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                   </div>
                 )}
                 </div>{/* Ende .badge-spalte-rechts */}
+                {/* ── Revive-Zaehler (Styx, 28.9.) ── unten mittig auf dem
+                    eigenen Basis-Styx, solange „Styx, the Opened Gate" in
+                    Rotation ist. Der Server schickt ihn nur dem Besitzer. */}
+                {!isOpp && hero?.name && (gameState.styxReviveCounter?.heroIdxs || []).includes(i) && (() => {
+                  const z = gameState.styxReviveCounter;
+                  const bereit = z.count >= z.needed;
+                  return (
+                    <div className={'styx-revive-counter' + (bereit ? ' styx-revive-counter-bereit' : '')}
+                      onMouseEnter={e => showGameTooltip(e, `Heroes revived this game: ${z.count}. "Styx, the Opened Gate" needs at least ${z.needed}.${bereit ? ' Ready to Ascend!' : ''}`)}
+                      onMouseLeave={hideGameTooltip}>
+                      <PxIcon z="👻" />{z.count}
+                    </div>
+                  );
+                })()}
                 {/* ── Ascension Orbs ── */}
                 {hero?.name && hero.ascensionOrbs && (
                   <div className="ascension-orbs-container"
@@ -42104,17 +42150,21 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               ))}
               {[0, 1, 2].map(z => {
                 const cards = (abZones[i]||[])[z]||[];
-                const isAbTarget = !isOpp && abilityDrag && abilityDrag.targetHero === i && abilityDrag.targetZone === z;
+                const isAbTarget = abilityDrag && (isOpp ? !!abilityDrag.targetOpp : !abilityDrag.targetOpp)
+                  && abilityDrag.targetHero === i && abilityDrag.targetZone === z;
                 // Click-to-attach an Ability: is THIS slot a valid attach target?
                 // - If the hero already has the ability, only that existing stack is clickable.
                 // - Otherwise, every empty slot is clickable.
                 // - For custom-placement cards (e.g. Performance), only occupied zones with <3 cards.
-                const attachPickZoneValid = !isOpp && abilityAttachPick && (() => {
+                const attachPickZoneValid = abilityAttachPick && (() => {
                   const heroData = p.heroes[i];
                   if (!heroData || !heroData.name || heroData.hp <= 0) return false;
+                  // Styx: fremder, kontrollierter Held — nur aus der Hand.
+                  if (isOpp && (abilityAttachPick.source === 'effectPrompt'
+                      || !canForeignHeroReceiveAbility(i, abilityAttachPick.cardName))) return false;
                   if (Array.isArray(abilityAttachPick.eligibleHeroIdxs)
                       && !abilityAttachPick.eligibleHeroIdxs.includes(i)) return false;
-                  if (!canHeroReceiveAbility(p, i, abilityAttachPick.cardName, {
+                  if (!isOpp && !canHeroReceiveAbility(p, i, abilityAttachPick.cardName, {
                     skipAbilityGiven: !!abilityAttachPick.skipAbilityGiven,
                     // Same server-authority bypass as the hero-pick
                     // highlight above.
@@ -42240,6 +42290,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                       socket.emit('play_ability', {
                         roomId: gameState.roomId, cardName: pick.cardName,
                         handIndex: pick.handIndex, fromCreation: pick.fromCreation || undefined, heroIdx: i, zoneSlot: z,
+                        heroOwner: isOpp ? oppIdx : undefined,   // Styx
                       });
                     }
                   // ★ 28.8., Als Befund: die Ability war hervorgehoben,
