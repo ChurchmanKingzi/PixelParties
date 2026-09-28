@@ -737,7 +737,7 @@ def frame(i):
         fill_gaps(fig)
         op = fig[:, :, 3] > 0
         d2 = cv2.distanceTransform((~op).astype(np.uint8), cv2.DIST_L2, 3)
-        for r, a in ((1.0, 110), (2.0, 55), (3.0, 22)):
+        for r, a in ((1.0, 110), (2.0, 55), (3.5, 22)):
             ringm = (~op) & (d2 <= r + 0.01) & (out[:, :, 3] == 0)
             out[ringm] = [255, 248, 200, int(a * (0.8 + 0.4 * f))]
         out[op] = fig[op]
