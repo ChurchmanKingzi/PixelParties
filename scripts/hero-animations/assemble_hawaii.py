@@ -5,8 +5,9 @@
 * Taio, the Sun Fencer: „Taio“ (Schwertarm erhoben), die in dieser Ebene halb
   ausgeblendeten Beine aus „Taio-Kopie“; das Flammenschwert „Ebene #110“ als Teil `-sword`.
 * Taio, Absorber of the Mountain's Heart (Ascended): Flammenhaar-Taio „Ebene #153“,
-  Kette „Ebene #157“, Flasche „Ebene #155“, Stab „Ebene #154“, Flammen „Ebene #156“
-  (ohne den losen Funken) und das große Feuer „Ebene #125“ darunter.
+  Kette „Ebene #157“, Stab „Ebene #154“; statt des halben Flammenschwerts „Ebene #155“
+  Base-Taios komplettes Schwert (180° gedreht, Griff an derselben Stelle) als Teil
+  `-sword`; ohne das Feuer unter ihm.
 * Lizbeth, the Reaper of the Light: „Lizbeth“ (Sense samt Lichtstrahlen).
 * Johanna, Crusader of Light: „Johanna“.
 * Calamitusk, the Chaorc War Chief: „Calamitustk-Kopie“, der Arm „Calamitustk-Kopie #1“
@@ -116,6 +117,21 @@ def save_single(name, a):
 
 
 
+def grip(a):
+    """Schwerpunkt der türkisen Griffpixel (Grün und Blau über Rot)."""
+    ys, xs = np.nonzero((a[:, :, 3] > 0) & (a[:, :, 1].astype(int) > a[:, :, 0].astype(int) + 10)
+                        & (a[:, :, 2].astype(int) > a[:, :, 0].astype(int) + 10))
+    return xs.mean(), ys.mean()
+
+
+def rot180_at_grip(sword, ref):
+    """sword um 180° drehen (pixelgenau) und so verschieben, dass sein Griff auf dem von ref liegt."""
+    r = sword[::-1, ::-1].copy()
+    gx, gy = grip(r)
+    tx, ty = grip(ref)
+    return shift(r, int(round(tx - gx)), int(round(ty - gy)))
+
+
 def main(path):
     doc = GimpDocument(path)
     L = doc.raw_layers
@@ -128,10 +144,12 @@ def main(path):
     y0 = int(rows_legs[(taio[rows_legs, :, 3] < 255).any(1) & (taio[rows_legs, :, 3] > 0).any(1)].min())
     taio[y0:] = kopie[y0:]
     save_parts('taio-the-sun-fencer', [('body', taio), ('sword', g('Ebene #110'))])
-    fl = g('Ebene #156')
+    # Ascended Taio: ohne das Feuer unter ihm; statt des halben Flammenschwerts („Ebene #155“, Klinge nach
+    # unten) Base-Taios komplettes Flammenschwert, um 180° gedreht, Griff (türkis) an derselben Stelle
+    half = g('Ebene #155')
+    sword = rot180_at_grip(g('Ebene #110'), half)
     save_parts('taio-absorber-of-the-mountain-s-heart', [
-        ('fire', g('Ebene #125')), ('body', g('Ebene #153')), ('staff', g('Ebene #154')), ('flask', g('Ebene #155')),
-        ('flames', only(fl, biggest(fl)[:, :, 3] > 0)), ('chain', g('Ebene #157'))])
+        ('body', g('Ebene #153')), ('staff', g('Ebene #154')), ('sword', sword), ('chain', g('Ebene #157'))])
     save_parts('lizbeth-the-reaper-of-the-light', [('body', g('Lizbeth'))])
     save_parts('johanna-crusader-of-light', [('body', g('Johanna'))])
     save_parts('calamitusk-the-chaorc-war-chief', [('body', g('Calamitustk-Kopie')), ('arm', g('Calamitustk-Kopie #1')),

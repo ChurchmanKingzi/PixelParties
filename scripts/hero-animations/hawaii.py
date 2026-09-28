@@ -11,10 +11,11 @@ Fetzen ab. Frame 0 ist immer das Originalbild.
 * taio:     Taio, the Sun Fencer: federt; um ihn lodert eine Flammenaura; er hebt und senkt
             das Flammenschwert, dessen Klinge brennt.
 * taioasc:  Taio, Absorber of the Mountain's Heart: hängt an der Eisenkette und schaukelt
-            leicht (Pendel um das obere Kettenende); Flammenhaar und das Feuer unter ihm
-            brennen.
-* waflav:   Flamebathed Waflav: Feuerflügel und Feuerhörner (und die Flammen an den
-            Beinen) brennen, der Oberkörper atmet.
+            leicht (Pendel um das obere Kettenende); das Flammenhaar brennt, am gedrehten
+            Flammenschwert (Klinge nach unten) flackert die Klinge und die Spitze züngelt.
+* waflav:   Flamebathed Waflav schwebt sacht auf und ab; die Feuerflügel sind ein Flammenfeld
+            (Zungen steigen von unten nach oben durch die Flügel und züngeln über den Rand),
+            Feuerhörner und die Flammen an den Beinen brennen.
 * pele:     Luna Pele, the Flame Dancer: tanzt Hula (die Hüften schwingen, der Oberkörper
             gegenläufig, die Füße bleiben, sie federt im Takt), das Flammenhaar auf Kopf und
             Rücken brennt, sie blinzelt.
@@ -34,9 +35,9 @@ OUT = os.environ.get('HW_OUT', '.')
 FLAME = ('ca2c29', 'f47b22', 'f6e70e', 'f7f5b8')         # Hawaii-Flammen, dunkel -> hell
 
 V_ = {
-    'taio': dict(slug='taio-the-sun-fencer', part='body', knee=33, pads=(6, 6, 8, 2)),
-    'taioasc': dict(slug='taio-absorber-of-the-mountain-s-heart', part='body', pads=(5, 5, 6, 2)),
-    'waflav': dict(slug='flamebathed-waflav', part='body', knee=40, pads=(4, 4, 7, 2)),
+    'taio': dict(slug='taio-the-sun-fencer', part='body', knee=35, pads=(6, 6, 8, 2)),
+    'taioasc': dict(slug='taio-absorber-of-the-mountain-s-heart', part='body', pads=(5, 5, 6, 5)),
+    'waflav': dict(slug='flamebathed-waflav', part='body', pads=(4, 4, 7, 3)),
     'pele': dict(slug='luna-pele-the-flame-dancer', pads=(5, 5, 7, 2),
                  blink={'halb': [((9, 16), '311800'), ((10, 16), '311800'), ((13, 16), '311800'), ((14, 16), '311800')],
                         'zu': [((9, 16), 'ae8a70'), ((10, 16), 'ae8a70'), ((13, 16), 'ae8a70'), ((14, 16), 'ae8a70'),
@@ -202,6 +203,10 @@ def f_taio(i):
     aura(out, fig, i)
     tmp = np.zeros((H, W, 4), int)
     put(tmp, body, PL, PT, dy_fn=lambda x, y: b if y < KNEE else 0)
+    if b < 0:                                            # beim Strecken die Zeile über der Kniekante dehnen
+        for x in range(SW):
+            if body[KNEE - 1, x, 3] and body[KNEE, x, 3] and not tmp[KNEE - 1 + PT, x + PL, 3]:
+                tmp[KNEE - 1 + PT, x + PL] = body[KNEE - 1, x]
     put(tmp, hand, PL, PT + lift + b)
     blade = (sword[:, :, 3] > 0) & (_ys <= 16)
     hilt = sword.copy()
@@ -215,39 +220,84 @@ def f_taio(i):
 
 
 def f_taioasc(i):
-    body, chain, flask, staff, fire = SRC.copy(), load('chain'), load('flask'), load('staff'), load('fire')
+    body, chain, sword, staff = SRC.copy(), load('chain'), load('sword'), load('staff')
     w = 2 * math.pi * i / N
-    swing = lambda x, y: int(round(2.2 * max(0, y) / 35 * math.sin(w)))   # Pendel um das obere Kettenende
+    swing = lambda x, y: int(round(2.2 * max(0, y) / 40 * math.sin(w)))   # Pendel um das obere Kettenende
     out = np.zeros((H, W, 4), int)
-    draw_fire(out, burn(fire, fire[:, :, 3] > 0, i, seed=1, stretch=2.0, sway=1.0), PL, PT)
     fm = flame_mask(body)
     rest = body.copy()
     rest[fm] = 0
     put(out, rest, PL, PT, dx_fn=swing)
     draw_fire(out, burn(body, fm, i, seed=3, stretch=1.5, sway=0.9), PL, PT, dx_fn=swing)
-    for s_ in (staff, flask, chain):
-        put(out, s_, PL, PT, dx_fn=swing)
+    put(out, staff, PL, PT, dx_fn=swing)
+    # das gedrehte Flammenschwert (Klinge nach unten): die Klinge flackert, die Spitze züngelt
+    ys, xs = np.nonzero(sword[:, :, 3])
+    guard = int(ys.min()) + 12                            # unterhalb der Parierstange beginnt die Klinge
+    blade = (sword[:, :, 3] > 0) & (_ys >= guard)
+    hilt = sword.copy()
+    hilt[blade] = 0
+    put(out, hilt, PL, PT, dx_fn=swing)
+    fl = burn(sword[::-1], blade[::-1], i, seed=8, stretch=1.2, sway=0.8, flakes=False)
+    draw_fire(out, {(x, SH - 1 - y): c for (x, y), c in fl.items()}, PL, PT, dx_fn=swing)
+    put(out, chain, PL, PT, dx_fn=swing)
     fill_pinholes(out)
     return out
 
 
+def fire_field(img, mask, i, seed=0, reach=3):
+    """Flammenfeld für große Feuerflächen (Waflavs Flügel): die Hitze der Originalfarben bleibt
+    als Grundform, darüber steigen Flammenzungen (senkrecht gestreckte Hitzeflecken) von unten nach
+    oben durch die Fläche, an den Rändern züngeln sie bis zu reach Pixel über die Silhouette hinaus.
+    Rückgabe {(x, y): Farbe} in img-Koordinaten."""
+    w = 2 * math.pi * i / N
+    heat = {'ca2c29': 0.3, 'f47b22': 0.55, 'f6e70e': 0.78, 'f7f5b8': 1.0}
+    h, wd = mask.shape
+    hb = np.zeros((h + reach, wd))
+    for y, x in zip(*np.nonzero(mask)):
+        hb[y + reach, x] = heat.get(hexc(img[y, x]), 0.5)
+    hs = hb.copy()                                       # Hitze steigt: nach oben ausgedehnt
+    for k in range(1, reach + 1):
+        hs[:-k] = np.maximum(hs[:-k], hb[k:] * (1 - 0.22 * k))
+    inside = hb > 0
+    edge = inside & ~(np.roll(inside, 1, 0) & np.roll(inside, -1, 0) & np.roll(inside, 1, 1) & np.roll(inside, -1, 1))
+    res = {}
+    for yy in range(h + reach):
+        for x in range(wd):
+            if hs[yy, x] <= 0:
+                continue
+            y = yy - reach
+            ph = 2.6 * math.sin(0.55 * x + seed) + 0.9 * math.sin(1.37 * x + 2 * seed)   # je Spalte eigene Welle,
+            nz = 0.7 * math.sin(0.5 * y + 6 * w + ph) + 0.3 * math.sin(0.95 * y + 4 * w + 1.3 * ph)   # läuft nach oben
+            if inside[yy, x]:
+                v = hb[yy, x] * (0.86 + 0.26 * nz)
+                if not edge[yy, x]:
+                    v = max(v, 0.21)                     # innen keine Löcher
+            else:
+                v = hs[yy, x] * (0.5 + 0.5 * nz) - 0.05
+            if v > 0.88:
+                c = 'f7f5b8'
+            elif v > 0.66:
+                c = 'f6e70e'
+            elif v > 0.43:
+                c = 'f47b22'
+            elif v > 0.2:
+                c = 'ca2c29'
+            else:
+                continue
+            res[(x, y)] = rgb(c)
+    return res
+
+
 def f_waflav(i):
     body, wings = SRC.copy(), load('wings')
-    b = [0, 0, 0, 0, -1, -1, -1, -1, -1, -1, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0][i % 24]
-    up = lambda x, y: b if y < KNEE else 0
+    b = [0, 0, 0, 0, -1, -1, -1, -1, -1, -1, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0][i % 24]   # schwebt als Ganzes
     out = np.zeros((H, W, 4), int)
-    draw_fire(out, burn(wings, wings[:, :, 3] > 0, i, seed=4, stretch=2.4, sway=1.2), PL, PT + b)
+    draw_fire(out, fire_field(wings, wings[:, :, 3] > 0, i, seed=4), PL, PT + b)
     fm = flame_mask(body)
     rest = body.copy()
     rest[fm] = 0
-    put(out, rest, PL, PT, dy_fn=up)
-    if b < 0:                                            # Naht über den Beinen schließen
-        for x in range(SW):
-            if rest[KNEE - 1, x, 3] and rest[KNEE, x, 3] and not out[KNEE - 1 + PT, x + PL, 3]:
-                out[KNEE - 1 + PT, x + PL] = rest[KNEE - 1, x]
-    upper, lower = fm & (_ys < KNEE), fm & (_ys >= KNEE)
-    draw_fire(out, burn(body, upper, i, seed=5, stretch=1.6, sway=0.9), PL, PT + b)
-    draw_fire(out, burn(body, lower, i, seed=6, stretch=1.2, sway=0.7), PL, PT)
+    put(out, rest, PL, PT + b)
+    draw_fire(out, burn(body, fm, i, seed=5, stretch=1.6, sway=0.9), PL, PT + b)
     fill_pinholes(out)
     return out
 
