@@ -1093,7 +1093,18 @@ async function runActionPhase(engine, helpers) {
   // its full cost and attacks are simple enough to rank by level and
   // type without rollouts.
   const inBonusAction = (ps.bonusActions?.remaining || 0) > 0;
-  if (MCTS_ENABLED && candidates.length > 0 && !inBonusAction) {
+  // ★ v1470 (Als Adventurousness-Befund 28.9.): Ist die EINZIGE Option
+  // eine Action-Ability (Adventurousness: Action → Gold, kein Prompt),
+  // hat das Ranking nichts zu entscheiden — die Reihenfolge steht, einen
+  // Vergleich gegen „nichts tun" gibt es nicht (Design-Regel unten:
+  // eine verfügbare Action wird genutzt), und ohne eigenen Prompt gibt
+  // es auch keinen Zielplan zu finden. Der eine Recon-Rollout (Rest des
+  // Zuges + Horizont) war hier reine Wartezeit.
+  const nurActionAbility = candidates.length === 1 && candidates[0].cardType === 'AbilityAction';
+  if (nurActionAbility) {
+    cpuLog(`  [MCTS] einzige Option "${candidates[0].cardName}" (Action-Ability) — Ranking übersprungen`);
+  }
+  if (MCTS_ENABLED && candidates.length > 0 && !inBonusAction && !nurActionAbility) {
     candidates = await mctsRankCandidates(engine, helpers, candidates);
   } else {
     candidates.sort((a, b) =>
@@ -6654,6 +6665,27 @@ function installCpuBrain(engine) {
       }
       // else: leave in queue.
     }
+    // ★ v1470 (Als Befund 28.9.: „Die CPU kann den Zauber Heal gegen
+    // gegnerische Heroes einsetzen, die NICHT den Heal-Burn-Debuff haben
+    // … So sabotiert die CPU sich noch selbst"). Ursache: der MCTS-Plan.
+    // Die Variantensuche probierte bei Heal JEDES Ziel durch, auch
+    // Gegnerhelden ohne healReversed; lag ein verrauschter Rollout dort
+    // vorn, kam die Wahl hier als `scriptedPick` an und ging an BEIDEN
+    // Heil-Sicherungen vorbei (Gate in `cpuPickTargets`, Prior-Sicherung
+    // unten) — gemessen: „Heal → Gegnerheld" 1342 gegen 905 für das
+    // eigene Ziel. Jetzt gilt für den Plan dieselbe Regel wie für den
+    // Prior: Gegner nur, wenn ihre Heilung zu Schaden wird; sonst
+    // entscheidet der Picker. (Die Suche erzeugt solche Varianten seit
+    // v1470 gar nicht mehr, siehe Aufzeichnung unten — das hier ist der
+    // Riegel für jeden anderen Plan-Lieferanten.)
+    if (scriptedPick && config.isHealing) {
+      const verschenkt = scriptedPick.some(id => {
+        const t = validTargets.find(x => x && x.id === id);
+        if (!t || t.owner === playerIdx) return false;
+        return !heroHealReversed(engine, t);
+      });
+      if (verschenkt) scriptedPick = null;
+    }
 
     // ── Fast-mode non-CPU: auto-respond (prevents hangs in rollouts) ──
     // Default model of opp behaviour: passive — cancellable prompts get
@@ -6807,9 +6839,19 @@ function installCpuBrain(engine) {
           && !config.appliesStatus
           && !looksLikeHeal(recCd, config)
           && !looksLikeBuff(recCd, config);
-        const recordedTargets = (recDropOwn
+        // ★ v1470 (Als Heal-Befund 28.9.): Heil-Prompts (`isHealing`)
+        // zeichnen Gegnerziele nur auf, wenn deren Heilung zu Schaden
+        // wird (healReversed) — dieselbe Regel wie das Gate in
+        // `cpuPickTargets`. Sonst entstanden Varianten „heile den
+        // Gegnerhelden", die ein verrauschter Rollout gewinnen konnte.
+        let recPool = recDropOwn
           ? validTargets.filter(t => t.owner !== playerIdx)
-          : validTargets).map(t => ({
+          : validTargets;
+        if (config.isHealing) {
+          const _heilbar = recPool.filter(t => t && (t.owner === playerIdx || heroHealReversed(engine, t)));
+          if (_heilbar.length > 0) recPool = _heilbar;
+        }
+        const recordedTargets = recPool.map(t => ({
             id: t.id,
             owner: t.owner,
             heroIdx: t.heroIdx,
@@ -12447,6 +12489,23 @@ async function mctsRunOneRollout(engine, helpers, candidate, { plan = null, reco
   let completed = false;
   try {
     const applied = await applyActionCandidate(engine, helpers, candidate);
+    // ★ v1470 (Als Befund 28.9.: „Die CPU braucht jedes Mal extrem
+    // lange, sich für eine Action zu entscheiden, wenn ‚Adventurousness'
+    // angeboten wird … sogar dann, wenn … keine anderen Action-Optionen
+    // verfügbar wären"). Ursache: Aufzeichnung und Zielplan liefen über
+    // den GANZEN Rollout weiter — Main Phase 2 und alle Horizont-Züge.
+    // Jede spätere Wahl (Wheels-Galerie, Heal im Folgezug, …) wurde dem
+    // Kandidaten als eigene Variante zugeschrieben. Adventurousness hat
+    // selbst keinen einzigen Prompt, bekam so aber 5–8 Arme; damit griff
+    // der Ein-Arm-Riegel in `mctsRankCandidates` nie, und es liefen die
+    // vollen 80 Rollouts (gemessen 6,6–9,7 s allein in der Action Phase).
+    // Zudem sind diese Arme reines Rauschen: live gilt der Plan NUR
+    // während des Kandidaten-Plays (`runActionPhase` löscht ihn danach),
+    // und das Maximum über viele verrauschte Arme hob den Kandidaten
+    // künstlich an. Jetzt enden Aufzeichnung und Plan mit dem Play —
+    // genau wie live.
+    delete engine._mctsTargetPlan;
+    if (recordBuf) delete engine._mctsTargetRecord;
     if (applied) await rolloutRestOfTurn(engine, helpers);
     score = evaluateState(engine, cpuIdx);
     completed = true;
@@ -12940,8 +12999,13 @@ async function mctsGatedActivation(engine, helpers, desc, actionFn, options = {}
   _cpuLogSilent = true;
   let reconScore = -Infinity;
   let reconCompleted = false;
+  let record = [];
   try {
     await actionFn();
+    // ★ v1470: nur die Prompts DIESER Aktivierung aufzeichnen, nicht
+    // die des restlichen Zuges (Begründung in `mctsRunOneRollout`).
+    record = engine._mctsTargetRecord || [];
+    delete engine._mctsTargetRecord;
     if (evaluateThroughTurnEnd) {
       try { await rolloutRestOfTurn(engine, helpers); } catch {}
     }
@@ -12950,7 +13014,6 @@ async function mctsGatedActivation(engine, helpers, desc, actionFn, options = {}
   } catch (err) {
     // Action threw during recon — treat as unable-to-activate.
   }
-  const record = engine._mctsTargetRecord || [];
   delete engine._mctsTargetRecord;
   _cpuLogSilent = prevSilent;
   engine.exitFastMode();
@@ -12989,6 +13052,7 @@ async function mctsGatedActivation(engine, helpers, desc, actionFn, options = {}
       _cpuLogSilent = true;
       try {
         await actionFn();
+        delete engine._mctsTargetPlan;   // ★ v1470: Plan gilt nur für diese Aktivierung (wie live)
         if (evaluateThroughTurnEnd) {
           try { await rolloutRestOfTurn(engine, helpers); } catch {}
         }
