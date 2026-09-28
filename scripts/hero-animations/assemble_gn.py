@@ -9,8 +9,10 @@ src/<slug>-<teil>.png.
                                     „Andras #2“ (ohne die Rakete aus der Brust)
   friedhelm-the-misled-avenger      „Friedhelm“
   titan-slayer-friedhelm            Skin: „Friedhelm-Kopie“
-  future-tech-gunslinger-riffel     die blonde Riffel mit der großen Kanone samt
-                                    Rauchspur (Teile aus „Riffel …“, links)
+  future-tech-gunslinger-riffel     die blonde Riffel mit zwei Pistolen (Teile aus
+                                    „Riffel …“, links); die zwei abgefeuerten
+                                    Kugeln „Riffel #11“ als Teil bullets, die Risse
+                                    an der Einschlagstelle („Riffel #10“) entfallen
   riffel-master-of-the-ultimate-gun Ascended: die Riffel mit den zwei Pistolen;
                                     der Körper sitzt wie in „Sichtbar #146“ unter
                                     dem Kopf (+4/−3 gegenüber der Ebene), die nach
@@ -25,10 +27,13 @@ src/<slug>-<teil>.png.
   mad-scientist-heinz               Skin: „Ebene #165“ (ohne Laserkanone)
   wall-breaker-general-ralzish      Krummschwert „Ebene #227“ + „Ralzish-Kopie #1“
   blue-ralzish                      Skin: Schwert „Ebene #305“ + „Ralzish-Kopie“
-  von-pixmarck-the-iron-chancellor  „Von Pixmarck“ + Pistole „Ebene #254“
+  von-pixmarck-the-iron-chancellor  „Von Pixmarck“ + Pistole „Ebene #254“ + die
+                                    Kugeln „Ebene #257“ des Skins (er schießt auch)
   dad-of-the-year-von-pixmarck      Skin: „Ebene #322“ + Pistole „Ebene #254“ +
                                     Schussstreifen „Ebene #257“
-  nero-zira-the-mastermind          „Nero Zira“ + Roboterarme „Ebene #314“
+  nero-zira-the-mastermind          „Nero Zira“ + Roboterarme „Ebene #314“; die
+                                    unten heraushängenden Kabel bekommen (wie beim
+                                    Skin) abgerissene Enden mit Kupferlitzen
   normal-nero-zira                  Skin: „Normal Nero Zira“; die äußeren Schläuche
                                     werden bis zu den Schultern weitergeführt
   orthos-the-loyal-guard-dog        der zweiköpfige Hund aus „Orthos“ (mit den
@@ -141,6 +146,41 @@ def connect_hoses(a):
     return out
 
 
+def torn_cables(a):
+    """Die unten heraushängenden Kabel enden in der Ebene gerade abgeschnitten
+    am Bildrand – sie bekommen ein abgerissenes Ende: der Mantel franst
+    unregelmäßig aus, darunter stehen Kupferlitzen heraus."""
+    ys, xs = np.nonzero(a[:, :, 3])
+    yb = ys.max()
+    out = a.copy()
+    row = a[yb, :, 3] > 0
+    runs, x = [], 0
+    while x < len(row):
+        if row[x]:
+            x0 = x
+            while x < len(row) and row[x]:
+                x += 1
+            runs.append((x0, x - 1))
+        x += 1
+    dark, mid = (0x2a, 0x2a, 0x2a, 255), (0x55, 0x55, 0x55, 255)
+    cu0, cu1 = (0xc0, 0x6a, 0x2c, 255), (0xf0, 0xa8, 0x58, 255)
+    for k, (x0, x1) in enumerate(runs):
+        w = x1 - x0 + 1
+        # Mantel: eine ausgefranste Zeile (Rand schwarz, innen dunkel, eine Kerbe)
+        for x in range(x0, x1 + 1):
+            if x == x0 + 1 + k % max(1, w - 2):
+                continue
+            out[yb + 1, x] = (0, 0, 0, 255) if x in (x0, x1) else dark
+        out[yb + 2, x0] = (0, 0, 0, 255) if k % 2 else out[yb + 2, x0]
+        # Kupferlitzen
+        for j, (dx, ln) in enumerate(((1, 3), (w // 2, 2), (w - 2, 3 if k % 2 else 1))):
+            xx = x0 + max(1, min(w - 2, dx))
+            for d in range(ln):
+                out[yb + 2 + d, xx + (d // 2) * (1 if j == 2 else -1 if j == 0 else 0)] = cu1 if d == ln - 1 else cu0
+        out[yb + 1, x0 + w // 2] = mid
+    return out
+
+
 def main(path):
     doc = GimpDocument(path)
     L = doc.raw_layers
@@ -149,8 +189,12 @@ def main(path):
     save_parts('friedhelm-the-misled-avenger', [('body', g('Friedhelm'))])
     save_parts('titan-slayer-friedhelm', [('body', g('Friedhelm-Kopie'))])
     left = lambda n: box(g(n), 130, 300, 200, 345)
-    save_parts('future-tech-gunslinger-riffel',
-               [('body', left(n)) for n in ('Riffel', 'Riffel #9', 'Riffel #13', 'Riffel #8', 'Riffel #12', 'Riffel #11', 'Riffel #10')])
+    rbody = left('Riffel')
+    for n in ('Riffel #12', 'Riffel #8', 'Riffel #13', 'Riffel #9'):     # zwei Pistolen, Hand, Haare (von unten nach oben)
+        a = left(n)
+        m = a[:, :, 3] > 0
+        rbody[m] = a[m]
+    save_parts('future-tech-gunslinger-riffel', [('bullets', left('Riffel #11')), ('body', rbody)])
     body = shift(box(g('Riffel'), 240, 300, 300, 350), 4, -3)
     face, hair = g('Riffel #1'), g('Riffel #2')
     save_parts('riffel-master-of-the-ultimate-gun',
@@ -166,10 +210,10 @@ def main(path):
     save_parts('mad-scientist-heinz', [('body', g('Ebene #165'))])
     save_parts('wall-breaker-general-ralzish', [('body', g('Ralzish-Kopie #1')), ('sword', g('Ebene #227'))])
     save_parts('blue-ralzish', [('body', g('Ralzish-Kopie')), ('sword', g('Ebene #305'))])
-    save_parts('von-pixmarck-the-iron-chancellor', [('body', g('Von Pixmarck')), ('gun', g('Ebene #254'))])
+    save_parts('von-pixmarck-the-iron-chancellor', [('smoke', g('Ebene #257')), ('body', g('Von Pixmarck')), ('gun', g('Ebene #254'))])
     save_parts('dad-of-the-year-von-pixmarck', [('smoke', g('Ebene #257')), ('body', g('Ebene #322')), ('gun', g('Ebene #254'))])
-    save_parts('nero-zira-the-mastermind', [('body', box(g('Nero Zira'), 170, 190, 265, 275)), ('arms', g('Ebene #314'))])
-    save_parts('normal-nero-zira', [('body', connect_hoses(box(g('Normal Nero Zira'), 170, 190, 265, 275)))])
+    save_parts('nero-zira-the-mastermind', [('body', torn_cables(box(g('Nero Zira'), 170, 190, 265, 275))), ('arms', g('Ebene #314'))])
+    save_parts('normal-nero-zira', [('body', torn_cables(connect_hoses(box(g('Normal Nero Zira'), 170, 190, 265, 275))))])
     save_parts('orthos-the-loyal-guard-dog', [('body', near(g('Orthos'), 302, 324))])
     save_parts('luna-the-flame-fairy', [('body', near(g('Luna'), 297, 239))])
     save_parts('tsu-ki-the-lunatic-princess', [('body', g('TsuKi')), ('mask', g('Ebene #208'))])
