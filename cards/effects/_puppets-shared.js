@@ -395,7 +395,7 @@ function playerControlsPuppetHero(engine, pi) {
 
 function hasLuck(engine, ownerIdx, t) {
   if (!t) return false;
-  if (t.type === 'hero') return !!engine.gs.players[ownerIdx]?.heroes?.[t.heroIdx]?._luckCounter;
+  if (t.type === 'hero') return !!engine.gs.players[t.owner ?? ownerIdx]?.heroes?.[t.heroIdx]?._luckCounter;   // physische Adresse
   const inst = instForTarget(engine, t);
   return !!inst?.counters?.luck;
 }
@@ -438,14 +438,15 @@ const LUCK_GUARD = {
   },
   canBoardRedirect(gs, ownerIdx, inst, selected, validTargets, config, sourceCard, engine) {
     if (!isOpponentSource(sourceCard, ownerIdx)) return false;
-    if (!selected || selected.owner !== ownerIdx) return false;
+    // Kontrolle statt Seite (Styx 28.9.).
+    if (!selected || (engine?.zielSeite ? engine.zielSeite(selected) : selected.owner) !== ownerIdx) return false;
     if (!hasLuck(engine, ownerIdx, selected)) return false;
-    return (validTargets || []).some(t => t && t.owner === ownerIdx && t.id !== selected.id
+    return (validTargets || []).some(t => t && engine.zielSeite(t) === ownerIdx && t.id !== selected.id
       && (t.type === 'hero' || t.type === 'equip'));
   },
   async onBoardRedirect(engine, ownerIdx, inst, selected, validTargets) {
-    const options = (validTargets || []).filter(t => t && t.owner === ownerIdx && t.id !== selected.id
-      && (t.type === 'hero' || t.type === 'equip'));
+    const options = (validTargets || []).filter(t => t && engine.zielSeite(t) === ownerIdx && t.id !== selected.id
+      && (t.type === 'hero' || t.type === 'equip'));   // Kontrolle statt Seite
     if (options.length === 0) return null;
     let pick = null;
     if (options.length === 1) pick = options[0];

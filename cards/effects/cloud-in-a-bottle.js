@@ -127,13 +127,17 @@ module.exports = {
       });
     }
 
+    // Physische Adresse des Helden (Styx 28.9.: der Reagierende kann ihn
+    // kontrollieren, waehrend er beim Gegner steht).
+    const _phys = engine._findHeroOwner(target);
+    const zielSeite = _phys >= 0 ? _phys : pi;
     engine._broadcastEvent('play_zone_animation', {
-      type: 'cloud_gather', owner: pi, heroIdx: targetHeroIdx, zoneSlot: -1,
+      type: 'cloud_gather', owner: zielSeite, heroIdx: targetHeroIdx, zoneSlot: -1,
     });
     await engine._delay(600);
 
     const nextPlayer = gs.activePlayer === 0 ? 1 : 0;
-    await engine.actionAddBuff(target, pi, targetHeroIdx, 'cloudy', {
+    await engine.actionAddBuff(target, zielSeite, targetHeroIdx, 'cloudy', {
       sourceOwner: pi,   // v1067: Quelle ist Pflicht (siehe _affected-shared)
       expiresAtTurn: gs.turn + 1,
       expiresForPlayer: nextPlayer,

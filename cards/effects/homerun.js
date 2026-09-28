@@ -66,8 +66,9 @@ module.exports = {
   },
 
   async preDamageResolve(engine, pi, target, heroIdx /*, source, amount, type */) {
+    const _phys = engine._findHeroOwner(target);   // physische Adresse (Styx 28.9.)
     engine._broadcastEvent('play_zone_animation', {
-      type: 'holy_revival', owner: pi, heroIdx, zoneSlot: -1,
+      type: 'holy_revival', owner: _phys >= 0 ? _phys : pi, heroIdx, zoneSlot: -1,
     });
     await engine._delay(700);
     engine.log('homerun_save', {

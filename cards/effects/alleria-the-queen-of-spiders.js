@@ -59,15 +59,17 @@ module.exports = {
     if (kind !== 'attack' && kind !== 'spell' && kind !== 'creature') return false;
 
     // Only redirect hero targets on our own side
-    if (selected.type !== 'hero' || selected.owner !== ownerIdx) return false;
+    // Kontrolle statt Seite (Styx 28.9.).
+    if (selected.type !== 'hero' || (engine?.zielSeite ? engine.zielSeite(selected) : selected.owner) !== ownerIdx) return false;
 
     // Check for at least 1 OTHER hero with a Surprise in its Surprise Zone
     const ps = gs.players[ownerIdx];
     if (!ps) return false;
     for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-      if (hi === selected.heroIdx) continue; // Skip the original target
+      if (selected.owner === ownerIdx && hi === selected.heroIdx) continue; // Skip the original target
       const hero = ps.heroes[hi];
       if (!hero?.name || hero.hp <= 0) continue;
+      if (engine?.heroSideOf && engine.heroSideOf(ownerIdx, hero) !== ownerIdx) continue;   // abgegeben (Styx 28.9.)
       const surprises = (ps.surpriseZones || [])[hi] || [];
       if (surprises.length > 0) return true;
     }
@@ -85,9 +87,10 @@ module.exports = {
     // Build list of eligible redirect targets (own heroes with Surprises, not original target)
     const eligible = [];
     for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-      if (hi === selected.heroIdx) continue;
+      if (selected.owner === ownerIdx && hi === selected.heroIdx) continue;
       const hero = ps.heroes[hi];
       if (!hero?.name || hero.hp <= 0) continue;
+      if (engine.heroSideOf(ownerIdx, hero) !== ownerIdx) continue;   // abgegeben (Styx 28.9.)
       const surprises = (ps.surpriseZones || [])[hi] || [];
       if (surprises.length > 0) {
         eligible.push({
