@@ -181,9 +181,11 @@ module.exports = {
         // / surprises out of this self-sacrifice pick.
         dealsDamage: false,
         condition: (t, eng) => {
-          if (t.owner !== pi) return false;
+          // Kontrolle statt Seite (Styx 28.9.): Helden ueber heroSideOf,
+          // Kreaturen ueber getSacrificableCreatures(pi).
           if (t.type === 'hero') {
             const h = eng.gs.players[t.owner]?.heroes?.[t.heroIdx];
+            if (eng.heroSideOf(t.owner, h) !== pi) return false;
             return !!(h && h.name && h.hp > 0);
           }
           // Creature targets come back as type 'equip' with a

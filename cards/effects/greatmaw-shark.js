@@ -45,16 +45,12 @@ const sharkHoptUsed = (engine, pi) =>
 // Field Standard behandelt harte Sperren jetzt richtig: solche
 // Kreaturen sind schlicht keine legalen Ziele.
 
-/** Living Heroes `pi` controls — eligible buff targets. */
+/** Living Heroes `pi` controls — eligible buff targets.
+ *  Kontrolle statt Seite (Styx 28.9.): `physOwner` fuer IDs/Zugriffe. */
 function livingHeroes(engine, pi) {
-  const ps = engine.gs.players[pi];
-  if (!ps) return [];
-  const out = [];
-  for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-    const h = ps.heroes[hi];
-    if (h?.name && h.hp > 0) out.push({ heroIdx: hi, hero: h });
-  }
-  return out;
+  return engine.heroesControlledBy(pi)
+    .filter(e => e.hero.hp > 0)
+    .map(e => ({ physOwner: e.physOwner, heroIdx: e.heroIdx, hero: e.hero }));
 }
 
 module.exports = {
@@ -93,8 +89,8 @@ module.exports = {
       chosen = heroes[0];
     } else {
       const targets = heroes.map(h => ({
-        id: `hero-${pi}-${h.heroIdx}`,
-        type: 'hero', owner: pi, heroIdx: h.heroIdx, cardName: h.hero.name,
+        id: `hero-${h.physOwner}-${h.heroIdx}`,
+        type: 'hero', owner: h.physOwner, heroIdx: h.heroIdx, cardName: h.hero.name,
       }));
       const picked = await ctx.promptTarget(targets, {
         title: CARD_NAME,
@@ -107,7 +103,7 @@ module.exports = {
         maxPerType: { hero: 1 },
       });
       if (!picked || picked.length === 0) return false;
-      chosen = heroes.find(h => `hero-${pi}-${h.heroIdx}` === picked[0]);
+      chosen = heroes.find(h => `hero-${h.physOwner}-${h.heroIdx}` === picked[0]);
       if (!chosen) return false;
     }
 
@@ -126,9 +122,9 @@ module.exports = {
     // so it survives Shark itself being sacrificed mid-turn — e.g.
     // fed to Infected Greatmaw. `_processBuffExpiry` revokes it at the
     // start of the opponent's next turn ("rest of this turn").
-    const hero = gs.players[pi]?.heroes?.[chosen.heroIdx];
+    const hero = gs.players[chosen.physOwner]?.heroes?.[chosen.heroIdx];
     if (!hero || hero.hp <= 0) return false;
-    engine.grantTempHeroAtk(pi, chosen.heroIdx, ATK_BONUS, {
+    engine.grantTempHeroAtk(chosen.physOwner, chosen.heroIdx, ATK_BONUS, {
       expiresAtTurn: gs.turn + 1,
       expiresForPlayer: pi === 0 ? 1 : 0,
       source: CARD_NAME,

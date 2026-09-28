@@ -180,7 +180,8 @@ module.exports = {
       if (!dyingHero?.name) return;
       let side = -1;
       for (let p = 0; p < 2 && side < 0; p++) {
-        if ((engine.gs.players[p]?.heroes || []).includes(dyingHero)) side = p;
+        // Kontrolle statt Seite (Styx 28.9.): zaehlt fuer den Kontrolleur.
+        if ((engine.gs.players[p]?.heroes || []).includes(dyingHero)) side = engine.heroSideOf(p, dyingHero);
       }
       if (side < 0) return;
       _markDefeat(ctx, side);

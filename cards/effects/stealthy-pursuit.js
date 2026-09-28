@@ -99,20 +99,22 @@ function istVerborgen(gs, held) {
  */
 function andererWaehlbarerHeld(engine, info) {
   const gs = engine.gs;
-  const ps = gs.players?.[info.heroOwner];
   const liste = Array.isArray(info.allTargets) ? info.allTargets : null;
-  for (let hi = 0; hi < (ps?.heroes || []).length; hi++) {
-    if (hi === info.heroIdx) continue;
-    const h = ps.heroes[hi];
+  // Kontrolle statt Seite (Styx 28.9.): „while you CONTROL another Hero" —
+  // alle Helden des Kontrolleurs, physisch adressiert (physOwner, heroIdx).
+  const selbst = gs.players?.[info.heroOwner]?.heroes?.[info.heroIdx];
+  const kontrolleur = engine.heroSideOf(info.heroOwner, selbst);
+  for (const { physOwner, heroIdx: hi, hero: h } of engine.heroesControlledBy(kontrolleur)) {
+    if (physOwner === info.heroOwner && hi === info.heroIdx) continue;
     if (!h?.name || h.hp <= 0) continue;
     if (h.statuses?.untargetable || h.statuses?.invisible) continue;
     if (istVerborgen(gs, h)) continue;                 // gleich geschuetzt zaehlt nicht
     // Kennt der Picker die legalen Ziele der Quelle, entscheidet die Liste.
-    if (liste && !liste.some(t => t?.type === 'hero' && t.owner === info.heroOwner && t.heroIdx === hi)) continue;
+    if (liste && !liste.some(t => t?.type === 'hero' && t.owner === physOwner && t.heroIdx === hi)) continue;
     let geblockt = false;
     try {
       const { blocker, ...rest } = info;
-      geblockt = engine.heroBlocksTargeting(info.heroOwner, hi, { ...rest, [INNEN]: true });
+      geblockt = engine.heroBlocksTargeting(physOwner, hi, { ...rest, [INNEN]: true });
     } catch { geblockt = false; }
     if (geblockt) continue;
     return true;
@@ -155,8 +157,10 @@ module.exports = {
     if (info[INNEN]) return false;
     if (info._truthSeeingEye || info.ignoreUntargetable) return false;
     if (info.hit) return false;
-    if (info.chooserIdx == null || info.chooserIdx === info.heroOwner) return false;
+    if (info.chooserIdx == null) return false;
     const held = gs.players?.[info.heroOwner]?.heroes?.[info.heroIdx];
+    // Kontrolle statt Seite (Styx 28.9.): gesperrt ist nur der GEGNER des Kontrolleurs.
+    if (info.chooserIdx === engine.heroSideOf(info.heroOwner, held)) return false;
     if (!istVerborgen(gs, held)) return false;
     return andererWaehlbarerHeld(engine, info);
   },

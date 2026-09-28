@@ -152,19 +152,20 @@ module.exports = {
       const cleansable = getCleansableStatuses();
       let anyCleansed = false;
 
-      for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-        if (hi === destHero) continue;             // host not covered
-        const ally = ps.heroes[hi];
+      // Kontrolle statt Seite (Styx 28.9.): alle Helden, die ich
+      // KONTROLLIERE — Statuszugriff ueber die physische Seite.
+      for (const { physOwner, heroIdx: hi, hero: ally } of engine.heroesControlledBy(pi)) {
+        if (physOwner === pi && hi === destHero) continue; // host not covered
         if (!ally?.name || ally.hp <= 0) continue;
         if (!ally.statuses) continue;
         if (!cleansable.some(k => ally.statuses[k])) continue;
         const removed = engine.cleanseHeroStatuses(
-          ally, pi, hi, cleansable, CARD_NAME,
+          ally, physOwner, hi, cleansable, CARD_NAME,
         );
         if ((removed || []).length === 0) continue;
         anyCleansed = true;
         engine._broadcastEvent('play_zone_animation', {
-          type: 'gold_sparkle', owner: pi, heroIdx: hi, zoneSlot: -1,
+          type: 'gold_sparkle', owner: physOwner, heroIdx: hi, zoneSlot: -1,
         });
       }
 

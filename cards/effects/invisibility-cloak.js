@@ -20,11 +20,11 @@ const { hasCardType } = require('./_hooks');
  * Count all living targets a player controls (heroes + creatures).
  */
 function countLivingTargets(gs, pi, engine) {
-  const ps = gs.players[pi];
   let count = 0;
   const cardDB = engine._getCardDB();
-  for (const hero of (ps.heroes || [])) {
-    if (hero?.name && hero.hp > 0) count++;
+  // Kontrolle statt Seite (Styx 28.9.)
+  for (const { hero } of engine.heroesControlledBy(pi)) {
+    if (hero.hp > 0) count++;
   }
   for (const inst of engine.cardInstances) {
     if ((inst.controller ?? inst.owner) !== pi || inst.zone !== 'support' || inst.faceDown) continue;
@@ -75,7 +75,15 @@ module.exports = {
 
     // Exactly 1 target, belonging to the IC owner
     if (targetedHeroes.length !== 1) return false;
-    if (targetedHeroes[0].owner !== pi) return false;
+    // Kontrolle statt Seite (Styx 28.9.): ein Held zaehlt fuer den,
+    // der ihn gerade kontrolliert.
+    const t0 = targetedHeroes[0];
+    let t0Seite = t0.owner;
+    if (t0.type === 'hero') {
+      const h0 = gs.players[t0.owner]?.heroes?.[t0.heroIdx];
+      if (h0) t0Seite = engine.heroSideOf(t0.owner, h0);
+    }
+    if (t0Seite !== pi) return false;
 
     // Must have 2+ living targets (can't cloak last hero)
     if (countLivingTargets(gs, pi, engine) < 2) return false;

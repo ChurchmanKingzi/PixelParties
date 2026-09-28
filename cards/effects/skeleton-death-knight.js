@@ -53,7 +53,8 @@ module.exports = {
     if (!oppPs) return false;
 
     // Any opp hero alive + not already bound + not post-cleanse immune?
-    for (const hero of (oppPs.heroes || [])) {
+    // Kontrolle statt Seite (Styx 28.9.)
+    for (const { hero } of engine.heroesControlledBy(oi)) {
       if (!hero?.name || hero.hp <= 0) continue;
       if (hero.statuses?.bound) continue;
       if (hero.statuses?.immune) continue;

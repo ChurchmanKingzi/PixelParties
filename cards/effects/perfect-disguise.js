@@ -107,6 +107,11 @@ module.exports = {
     for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
       const hero = ps.heroes[hi];
       if (!hero?.name || hero.hp <= 0) continue;
+      // Kontrolle statt Seite (Styx 28.9.): vom Gegner uebernommene
+      // eigene Helden sind kein „target you control". Uebernommene
+      // Gegnerhelden bleiben aussen vor — der untargetable-Status
+      // verfaellt zum Zugbeginn der physischen Seite (Engine).
+      if ((hero.charmedBy ?? hero.permaControlBy ?? pi) !== pi) continue;
       targets.push({
         id: `hero-${pi}-${hi}`,
         type: 'hero',

@@ -170,7 +170,9 @@ module.exports = {
 
       const ownerIdx = ctx.cardOwner;
       const targetOwnerIdx = ctx._engine._findHeroOwner?.(target);
-      if (targetOwnerIdx !== ownerIdx) return;
+      // Kontrolle statt Seite (Styx 28.9.) — „Burned targets you control"
+      if (targetOwnerIdx == null || targetOwnerIdx < 0) return;
+      if (ctx._engine.heroSideOf(targetOwnerIdx, target) !== ownerIdx) return;
 
       // Punkt vor Strich (Al 1.9.): Halbierung als MULTIPLIKATOR, flat
       // Modifikatoren (Tempeste −100 …) rechnet die Engine danach.

@@ -69,7 +69,14 @@ function heldMoeglich(engine, pi) {
  */
 function heldenZiele(engine, pi, eigenerIdx) {
   if (!heldMoeglich(engine, pi)) return [];
-  return engine.getHeroTargets(pi).filter(t => t.heroIdx !== eigenerIdx);
+  // Kontrolle statt Seite (Styx 28.9.): „a Hero you control" — alle
+  // kontrollierten Helden beider Spalten, physisch adressiert.
+  const selbst = engine.gs.players[pi]?.heroes?.[eigenerIdx];
+  return engine.heroesControlledBy(pi)
+    .filter(({ hero }) => hero?.name && hero.hp > 0 && hero !== selbst)
+    .map(({ physOwner, heroIdx, hero }) => ({
+      id: `hero-${physOwner}-${heroIdx}`, type: 'hero', owner: physOwner, heroIdx, cardName: hero.name,
+    }));
 }
 
 /** Opfer-Vorgabe fuer den Kreatur-Weg; die Helden haengen als Fremdziele dran. */
@@ -135,12 +142,13 @@ module.exports = {
     // ── Weg 2: ein HELD wurde geklickt ─────────────────────────────
     if (ergebnis && ergebnis.extraPicked) {
       const ziel = ergebnis.extraPicked;
-      const opfer = ps.heroes?.[ziel.heroIdx];
+      const zielOwner = ziel.owner ?? pi;   // physische Spalte (Kontrolle statt Seite)
+      const opfer = gs.players[zielOwner]?.heroes?.[ziel.heroIdx];
       if (!opfer?.name || opfer.hp <= 0) return false;
 
       await engine.showTriggeredEffect(CARD_NAME, { playerIdx: pi });
       engine._broadcastEvent('play_zone_animation', {
-        type: 'knife_sacrifice', owner: pi, heroIdx: ziel.heroIdx, zoneSlot: -1,
+        type: 'knife_sacrifice', owner: zielOwner, heroIdx: ziel.heroIdx, zoneSlot: -1,
       });
       await engine._delay(500);
 

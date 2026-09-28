@@ -329,7 +329,8 @@ function _collectFrozenOwnedTargets(gs, pi, engine, targetedTargets) {
       const hero = gs.players[t.owner]?.heroes?.[t.heroIdx];
       if (!hero?.name || hero.hp <= 0) continue;
       if (!hero.statuses?.frozen) continue;
-      if (t.owner !== pi) continue;
+      // Kontrolle statt Seite (Styx 28.9.): „Frozen target you control".
+      if (engine.heroSideOf(t.owner, hero) !== pi) continue;
       out.push({
         id: `hero-${t.owner}-${t.heroIdx}`,
         type: 'hero',

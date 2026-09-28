@@ -37,13 +37,19 @@
 const CARD_NAME = 'Luna Kiai';
 const HP_PER_BURN_TICK = 60;
 
-/** Live own heroes (`hp > 0` + has a name). */
-function liveOwnHeroes(ps) {
-  if (!ps) return [];
+/** Live heroes `pi` CONTROLS (`hp > 0` + has a name).
+ *  Kontrolle statt Seite (Styx 28.9.): beide Spalten, maßgeblich ist
+ *  heroSideOf (charmedBy > permaControlBy > physischer Besitzer). */
+function liveOwnHeroes(gs, pi, engine) {
   const out = [];
-  for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-    const h = ps.heroes[hi];
-    if (h?.name && h.hp > 0) out.push({ hero: h, heroIdx: hi });
+  for (let p = 0; p < (gs?.players || []).length; p++) {
+    const heroes = gs.players[p]?.heroes || [];
+    for (let hi = 0; hi < heroes.length; hi++) {
+      const h = heroes[hi];
+      if (!h?.name || h.hp <= 0) continue;
+      const side = engine ? engine.heroSideOf(p, h) : (h.charmedBy ?? h.permaControlBy ?? p);
+      if (side === pi) out.push({ hero: h, heroIdx: hi, physOwner: p });
+    }
   }
   return out;
 }
@@ -72,11 +78,11 @@ module.exports = {
   handActivatedEffect: true,
   handActivateLabel: 'Reveal & Burn a Hero',
 
-  canHandActivate(gs, pi) {
+  canHandActivate(gs, pi, engine) {
     const ps = gs.players[pi];
     if (!ps) return false;
     // Need at least one own Hero that can still be newly Burned.
-    return liveOwnHeroes(ps).some(({ hero }) => heroCanBeBurned(hero));
+    return liveOwnHeroes(gs, pi, engine).some(({ hero }) => heroCanBeBurned(hero));
   },
 
   async onHandActivate(ctx) {
@@ -91,12 +97,12 @@ module.exports = {
     // set consistent across later hand mutations.
     const myHandIndex = ctx.handIndex;
 
-    const burnable = liveOwnHeroes(ps)
+    const burnable = liveOwnHeroes(gs, pi, engine)
       .filter(({ hero }) => heroCanBeBurned(hero))
-      .map(({ hero, heroIdx }) => ({
-        id: `hero-${pi}-${heroIdx}`,
+      .map(({ hero, heroIdx, physOwner }) => ({
+        id: `hero-${physOwner}-${heroIdx}`,
         type: 'hero',
-        owner: pi,
+        owner: physOwner,
         heroIdx,
         cardName: hero.name,
       }));
@@ -142,17 +148,17 @@ module.exports = {
 
     engine.log('luna_kiai_reveal_burn', {
       player: ps.username,
-      target: ps.heroes?.[chosen.heroIdx]?.name,
+      target: chosen.cardName,
     });
     engine.sync();
     return true;
   },
 
   // ── [B] Free-summon alt gate ─────────────────────────────────────────
-  inherentAction: (gs, pi) => {
+  inherentAction: (gs, pi, heroIdx, engine) => {
     const ps = gs.players[pi];
     if (!ps) return false;
-    const live = liveOwnHeroes(ps);
+    const live = liveOwnHeroes(gs, pi, engine);
     if (live.length === 0) return false;
     return live.every(({ hero }) => !!hero.statuses?.burned);
   },
@@ -178,8 +184,15 @@ module.exports = {
       const gs = engine.gs;
       const ownerPs = gs.players[ctx.cardOwner];
       if (!ownerPs) return;
-      const heroIdx = (ownerPs.heroes || []).indexOf(target);
+      // Kontrolle statt Seite (Styx 28.9.): Held irgendwo suchen, zaehlt
+      // nur, wenn Lunas Kontrolleur ihn KONTROLLIERT.
+      let physOwner = -1, heroIdx = -1;
+      for (let p = 0; p < (gs.players || []).length && heroIdx < 0; p++) {
+        const i = (gs.players[p]?.heroes || []).indexOf(target);
+        if (i >= 0) { physOwner = p; heroIdx = i; }
+      }
       if (heroIdx < 0) return;
+      if (engine.heroSideOf(physOwner, target) !== ctx.cardOwner) return;
 
       // ── Explicit damage + heal popups ──────────────────────────
       // The auto HP-delta detector on the client compares the
@@ -195,13 +208,13 @@ module.exports = {
       const burnAmount = ctx.amount || 0;
       if (!ctx._kiaiHpPopupEmitted && burnAmount > 0) {
         engine._broadcastEvent('kiai_hp_split', {
-          owner: ctx.cardOwner, heroIdx,
+          owner: physOwner, heroIdx,
           damage: burnAmount, heal: HP_PER_BURN_TICK,
         });
         ctx._kiaiHpPopupEmitted = true;
       } else {
         engine._broadcastEvent('kiai_hp_split', {
-          owner: ctx.cardOwner, heroIdx,
+          owner: physOwner, heroIdx,
           heal: HP_PER_BURN_TICK,
         });
       }

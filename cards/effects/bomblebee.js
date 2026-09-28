@@ -35,14 +35,13 @@ function opponentTargets(engine, listenerOwner) {
   if (!ops) return [];
 
   const out = [];
-  // Heroes
-  for (let hi = 0; hi < (ops.heroes || []).length; hi++) {
-    const h = ops.heroes[hi];
+  // Heroes — Kontrolle statt Seite (Styx 28.9.), IDs bleiben physisch.
+  for (const { physOwner, heroIdx: hi, hero: h } of engine.heroesControlledBy(oi)) {
     if (!h?.name || h.hp <= 0) continue;
     out.push({
-      id: `hero-${oi}-${hi}`,
+      id: `hero-${physOwner}-${hi}`,
       type: 'hero',
-      owner: oi, heroIdx: hi,
+      owner: physOwner, heroIdx: hi,
       cardName: h.name,
     });
   }

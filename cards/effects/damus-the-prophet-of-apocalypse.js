@@ -45,6 +45,10 @@ function freieZonen(engine, pi) {
   for (let hi = 0; hi < (ps?.heroes || []).length; hi++) {
     const hero = ps.heroes[hi];
     if (!hero?.name || hero.hp <= 0) continue;
+    // Kontrolle statt Seite (Styx 28.9.) — ein abgegebener Held ist
+    // nicht „any Hero you control". (Uebernommene Helden der Gegenspalte
+    // bietet der Platzierungsweg nicht an — er setzt nur in die eigene.)
+    if (engine.heroSideOf(pi, hero) !== pi) continue;
     for (let zi = 0; zi < 3; zi++) {
       if (((ps.supportZones?.[hi] || [])[zi] || []).length === 0) {
         out.push({ heroIdx: hi, slotIdx: zi, label: `${hero.name} — Support ${zi + 1}` });

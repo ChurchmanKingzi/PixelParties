@@ -92,10 +92,9 @@ function clearBuff(target) {
 /** Count own targets excluding Guardian Beast Gou Creatures (Heroes + non-Gou Creatures). */
 function countEligibleOwnTargets(engine, pi, selfInstId) {
   let n = 0;
-  const ps = engine.gs.players[pi];
-  for (let hi = 0; hi < (ps?.heroes || []).length; hi++) {
-    const h = ps.heroes[hi];
-    if (h?.name && h.hp > 0) n++;
+  // Kontrolle statt Seite (Styx 28.9.)
+  for (const e of engine.heroesControlledBy(pi)) {
+    if (e.hero.hp > 0) n++;
   }
   for (const inst of engine.cardInstances) {
     if (inst.controller !== pi) continue;

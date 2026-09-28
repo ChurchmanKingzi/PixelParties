@@ -38,8 +38,11 @@ function getOwnStatusedTargets(gs, pi, engine) {
   if (!engine) return [];
   const negKeys = getCleansableStatuses();
 
-  const heroes = engine.getHeroTargets(pi).filter(t => {
-    const hero = gs.players[pi].heroes[t.heroIdx];
+  // Kontrolle statt Seite (Styx 28.9.): „a target you control" — Helden
+  // beider Spalten, sofern `pi` sie kontrolliert (Ziel bleibt physisch).
+  const heroes = [0, 1].flatMap(p => engine.getHeroTargets(p)).filter(t => {
+    const hero = gs.players[t.owner].heroes[t.heroIdx];
+    if (engine.heroSideOf(t.owner, hero) !== pi) return false;
     return hero.statuses && negKeys.some(k => hero.statuses[k]);
   });
 
@@ -134,12 +137,17 @@ module.exports = {
 
   canActivate: (gs, pi, engine) => {
     // Schnellpfad: Helden-Status.
+    // Kontrolle statt Seite (Styx 28.9.): beide Spalten, nur kontrollierte
+    // Helden (charmedBy > permaControlBy > physischer Besitzer).
     const negKeys = getCleansableStatuses();
-    const ps = gs.players[pi];
-    for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-      const hero = ps.heroes[hi];
-      if (!hero?.name || hero.hp <= 0) continue;
-      if (hero.statuses && negKeys.some(k => hero.statuses[k])) return true;
+    for (let p = 0; p < (gs.players || []).length; p++) {
+      const heroes = gs.players[p]?.heroes || [];
+      for (let hi = 0; hi < heroes.length; hi++) {
+        const hero = heroes[hi];
+        if (!hero?.name || hero.hp <= 0) continue;
+        if ((hero.charmedBy ?? hero.permaControlBy ?? p) !== pi) continue;
+        if (hero.statuses && negKeys.some(k => hero.statuses[k])) return true;
+      }
     }
     // BUGFIX: Der Kartentext erlaubt JEDES eigene Ziel ("Choose a
     // target you control") — Kreaturen-Status (der häufige Fall:

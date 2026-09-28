@@ -87,14 +87,13 @@ module.exports = {
     // Build valid opponent targets (heroes + creatures)
     const targets = [];
 
-    // Opponent heroes
-    for (let hi = 0; hi < (oppPs.heroes || []).length; hi++) {
-      const hero = oppPs.heroes[hi];
+    // Opponent heroes — Kontrolle statt Seite (Styx 28.9.)
+    for (const { physOwner, heroIdx: hi, hero } of engine.heroesControlledBy(oppIdx)) {
       if (!hero?.name || hero.hp <= 0) continue;
       targets.push({
-        id: `hero-${oppIdx}-${hi}`,
+        id: `hero-${physOwner}-${hi}`,
         type: 'hero',
-        owner: oppIdx,
+        owner: physOwner,
         heroIdx: hi,
         cardName: hero.name,
       });
@@ -148,7 +147,7 @@ module.exports = {
     // opponent can chain their own after-damage reactions (e.g. their own Punch)
     engine._inAfterDamageReaction = false;
     if (chosen.type === 'hero') {
-      const hero = oppPs.heroes?.[chosen.heroIdx];
+      const hero = gs.players[chosen.owner]?.heroes?.[chosen.heroIdx];
       if (hero && hero.hp > 0) {
         await engine.actionDealDamage(
           { name: 'Punch in the Box', owner: pi },

@@ -49,12 +49,13 @@ module.exports = {
       // and every face-up Creature in their support zones.
       const cardDB = engine._getCardDB();
       const targets = [];
-      for (let hi = 0; hi < (ops.heroes || []).length; hi++) {
-        const h = ops.heroes[hi];
+      // Kontrolle statt Seite (Styx 28.9.): alle Helden, die der Gegner
+      // KONTROLLIERT — Ziel-ID/owner bleiben physisch (physOwner).
+      for (const { physOwner, heroIdx: hi, hero: h } of engine.heroesControlledBy(oi)) {
         if (h?.name && h.hp > 0) {
           targets.push({
-            kind: 'hero', heroIdx: hi, slotIdx: -1,
-            id: `hero-${oi}-${hi}`, cardName: h.name,
+            kind: 'hero', heroIdx: hi, slotIdx: -1, physOwner,
+            id: `hero-${physOwner}-${hi}`, cardName: h.name,
           });
         }
       }
@@ -149,7 +150,7 @@ module.exports = {
       const unsparedHeroTargets = targets
         .filter(t => t.kind === 'hero' && !sparedIds.has(t.id))
         .map(t => ({
-          type: 'hero', owner: oi, heroIdx: t.heroIdx, cardName: t.cardName,
+          type: 'hero', owner: t.physOwner, heroIdx: t.heroIdx, cardName: t.cardName,
         }));
       if (unsparedHeroTargets.length > 0) {
         if (ctx.card) ctx.card._isAoeCheck = true;
@@ -187,7 +188,7 @@ module.exports = {
         engine._broadcastEvent('play_beam_animation', {
           sourceOwner: pi,
           sourceHeroIdx: ctx.cardHeroIdx,
-          targetOwner: oi,
+          targetOwner: t.kind === 'hero' ? t.physOwner : oi,
           targetHeroIdx: t.heroIdx,
           targetZoneSlot: t.kind === 'creature' ? t.slotIdx : -1,
           color: '#ff2222',
@@ -210,7 +211,7 @@ module.exports = {
         const allUnspared = targets
           .filter(t => !sparedIds.has(t.id))
           .map(t => t.kind === 'hero'
-            ? { type: 'hero', owner: oi, heroIdx: t.heroIdx, cardName: t.cardName }
+            ? { type: 'hero', owner: t.physOwner, heroIdx: t.heroIdx, cardName: t.cardName }
             : { type: 'creature', owner: oi, heroIdx: t.heroIdx, slotIdx: t.slotIdx, cardName: t.cardName });
         const _negR = await engine.preDamageMultiTargetWindow(source, allUnspared);
         // Full-negate reaction (Storm Ring / Invisibility Cloak): bail
@@ -239,7 +240,7 @@ module.exports = {
         if (sparedIds.has(t.id)) continue;
         const source = { name: CARD_NAME, owner: pi, heroIdx: ctx.cardHeroIdx };
         if (t.kind === 'hero') {
-          const hero = ops.heroes?.[t.heroIdx];
+          const hero = gs.players[t.physOwner]?.heroes?.[t.heroIdx];
           if (hero?.name && hero.hp > 0) {
             await engine.actionDealDamage(source, hero, VOLLEY_DAMAGE, 'destruction_spell', {
               _skipReactionCheck: true,

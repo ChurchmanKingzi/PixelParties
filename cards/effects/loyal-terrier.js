@@ -127,9 +127,9 @@ module.exports = {
       const oppPs = gs.players[oi];
       if (!oppPs) return;
       const hasOppTarget = (() => {
+        // Kontrolle statt Seite (Styx 28.9.): Helden, die der Gegner kontrolliert.
+        if (engine.heroesControlledBy(oi).some(({ hero: h }) => h?.name && h.hp > 0)) return true;
         for (let hi = 0; hi < (oppPs.heroes || []).length; hi++) {
-          const h = oppPs.heroes[hi];
-          if (h?.name && h.hp > 0) return true;
           const sz = oppPs.supportZones?.[hi] || [];
           for (const slot of sz) if ((slot || []).length > 0) return true;
         }

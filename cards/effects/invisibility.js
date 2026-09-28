@@ -81,20 +81,36 @@ function findFreeSlot(ps, heroIdx) {
  *  Excludes the Invisibility-Hero itself ("OTHER heroes" in card
  *  text) and dead heroes.
  */
-function _hasChoosableOtherHero(ps, invisibilityHeroIdx) {
+function _hasChoosableOtherHero(engine, pi, invisibilityHeroIdx) {
+  // Kontrolle statt Seite (Styx 28.9.): „Heroes you control" — der
+  // Invisibility-Held selbst steht physisch bei `pi`.
   const living = [];
-  for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-    const h = ps.heroes[hi];
-    if (!h?.name || h.hp <= 0) continue;
-    living.push({ hi, h });
+  for (const { physOwner, heroIdx: hi, hero: h } of engine.heroesControlledBy(pi)) {
+    if (h.hp <= 0) continue;
+    living.push({ selbst: physOwner === pi && hi === invisibilityHeroIdx, h });
   }
   const nonTagged = living.filter(({ h }) =>
     !h.statuses?.untargetable && !h.statuses?.invisible);
   if (nonTagged.length === 0) {
     // All-tagged → pool collapses → every living hero is choosable.
-    return living.some(({ hi }) => hi !== invisibilityHeroIdx);
+    return living.some(({ selbst }) => !selbst);
   }
-  return nonTagged.some(({ hi }) => hi !== invisibilityHeroIdx);
+  return nonTagged.some(({ selbst }) => !selbst);
+}
+
+/** Kontrolle statt Seite (Styx 28.9.): Seite eines Zieleintrags. Helden
+ *  (Eintrag oder rohe Referenz) zaehlen fuer ihren Kontrolleur,
+ *  Kreaturen behalten `owner`. */
+function _zielSeite(engine, t) {
+  if (!t) return -1;
+  const players = engine.gs.players || [];
+  for (let p = 0; p < players.length; p++) {
+    const heroes = players[p]?.heroes || [];
+    const held = (t.type === 'hero' && t.owner === p) ? heroes[t.heroIdx]
+      : (heroes.includes(t) ? t : null);
+    if (held) return engine.heroSideOf(p, held);
+  }
+  return t.owner;
 }
 
 module.exports = {
@@ -120,7 +136,10 @@ module.exports = {
     // Eigene Regel bleibt: mindestens ZWEI lebende Helden (die Karte
     // braucht einen anderen Helden, der gewaehlt werden kann) plus ein
     // freier Platz — Letzteres ueber den geteilten Sammler.
-    const living = (gs.players[pi]?.heroes || []).filter(h => h?.name && h.hp > 0).length;
+    // Kontrolle statt Seite (Styx 28.9.)
+    const living = engine
+      ? engine.heroesControlledBy(pi).filter(e => e.hero.hp > 0).length
+      : (gs.players[pi]?.heroes || []).filter(h => h?.name && h.hp > 0).length;
     return living >= 2 && attachmentHostsFor(gs, pi, engine).length > 0;
   },
   attachmentHosts(gs, pi, engine) { return attachmentHostsFor(gs, pi, engine); },
@@ -187,7 +206,7 @@ module.exports = {
       const targets = Array.isArray(ctx.target)
         ? ctx.target
         : (ctx.target ? [ctx.target] : []);
-      if (targets.some(t => t?.owner === oppIdx)) {
+      if (targets.some(t => _zielSeite(ctx._engine, t) === oppIdx)) {
         await _selfDiscard(ctx, 'attacked_opp');
       }
     },
@@ -204,7 +223,7 @@ module.exports = {
       if (ctx.heroIdx !== ctx.cardHeroIdx) return;
       const oppIdx = ctx.cardOwner === 0 ? 1 : 0;
       const dmg = ctx.damageTargets || [];
-      if (dmg.some(t => t?.owner === oppIdx)) {
+      if (dmg.some(t => _zielSeite(ctx._engine, t) === oppIdx)) {
         await _selfDiscard(ctx, 'spell_targeted_opp');
       }
     },
@@ -227,7 +246,8 @@ module.exports = {
       // `ctx.target` here is the damaged Hero object — locate its owner.
       const engine = ctx._engine;
       const tgtOwner = engine._findHeroOwner ? engine._findHeroOwner(ctx.target) : -1;
-      if (tgtOwner === oppIdx) {
+      // Kontrolle statt Seite (Styx 28.9.)
+      if (tgtOwner >= 0 && engine.heroSideOf(tgtOwner, ctx.target) === oppIdx) {
         await _selfDiscard(ctx, 'damaged_opp_hero');
       }
     },
@@ -343,6 +363,6 @@ async function _maybeDiscardForNoOthers(ctx) {
   const engine = ctx._engine;
   const ps = engine.gs.players[ctx.cardOwner];
   if (!ps) return;
-  if (_hasChoosableOtherHero(ps, ctx.cardHeroIdx)) return;
+  if (_hasChoosableOtherHero(engine, ctx.cardOwner, ctx.cardHeroIdx)) return;
   await _selfDiscard(ctx, 'no_other_choosable_hero');
 }

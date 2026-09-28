@@ -66,21 +66,32 @@ function resync(engine, pi) {
   if (!ps) return;
   const active = countDistinctWarCounselors(engine, pi) >= NEEDED_DISTINCT;
 
-  for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-    const hero = ps.heroes[hi];
+  // Kontrolle statt Seite (Styx 28.9.) — „your Heroes": alle Helden, die
+  // `pi` kontrolliert, plus die, auf denen noch SEIN Zuschlag liegt
+  // (abgegebene Helden verlieren ihn). `_cykyranBy` merkt sich, wessen
+  // Ratgeber den Zuschlag gesetzt hat, damit sich zwei Kopien auf beiden
+  // Seiten nicht gegenseitig abraeumen.
+  for (let p = 0; p < (engine.gs.players || []).length; p++) {
+  const heroes = engine.gs.players[p]?.heroes || [];
+  for (let hi = 0; hi < heroes.length; hi++) {
+    const hero = heroes[hi];
     if (!hero?.name) continue;
+    const kontrolliert = engine.heroSideOf(p, hero) === pi;
     const current = hero._cykyranBonus || 0;
+    if (!kontrolliert && !(current && (hero._cykyranBy ?? p) === pi)) continue;
     // Natuerlicher Basiswert = gespeicherte Basis minus unser eigener
     // Zuschlag. Fehlt `baseAtk` (aeltere Spielstaende), dient der
     // Gesamtwert als Notbehelf.
     const storedBase = hero.baseAtk !== undefined ? hero.baseAtk : (hero.atk || 0);
     const natural = Math.max(0, storedBase - current);
-    const wanted = active ? natural : 0;
+    const wanted = (active && kontrolliert) ? natural : 0;
     const delta = wanted - current;
     if (!delta) continue;
-    engine._applyHeroAtkDelta(hero, pi, hi, delta);
+    engine._applyHeroAtkDelta(hero, p, hi, delta);
     if (hero.baseAtk !== undefined) hero.baseAtk = Math.max(0, hero.baseAtk + delta);
     hero._cykyranBonus = wanted;
+    hero._cykyranBy = pi;
+  }
   }
 }
 
@@ -112,8 +123,8 @@ module.exports = {
   canSummon: makeSingletonCanSummon(CARD_NAME),
 
   canActivateCreatureEffect(ctx) {
-    const ps = ctx._engine.gs.players[ctx.cardOwner];
-    return (ps?.heroes || []).some((h) => h?.name && h.hp > 0 && (h.atk || 0) > 0);
+    // Kontrolle statt Seite (Styx 28.9.) — „one of your Heroes"
+    return ctx._engine.heroesControlledBy(ctx.cardOwner).some(({ hero: h }) => h.hp > 0 && (h.atk || 0) > 0);
   },
 
   async onCreatureEffect(ctx) {
@@ -125,15 +136,15 @@ module.exports = {
     if (!ps) return false;
 
     // ── Welcher Held stellt den Wert? ──
+    // Kontrolle statt Seite (Styx 28.9.) — „one of your Heroes"
     const options = [];
-    for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-      const hero = ps.heroes[hi];
+    for (const { physOwner, heroIdx: hi, hero } of engine.heroesControlledBy(pi)) {
       if (!hero?.name || !(hero.hp > 0)) continue;
       const atk = hero.atk || 0;
       if (atk <= 0) continue;
       const dmg = Math.min(DAMAGE_CAP, atk);
       options.push({
-        id: String(hi),
+        id: `${physOwner}-${hi}`,
         label: `⚔️ ${hero.name} — ${dmg}`,
         description: atk > DAMAGE_CAP
           ? `Attack ${atk}, capped at ${DAMAGE_CAP}.`
@@ -143,7 +154,7 @@ module.exports = {
     }
     if (options.length === 0) return false;
 
-    let heroIdx = Number(options[0].id);
+    let heroKey = options[0].id;
     if (options.length > 1) {
       const pick = await engine.promptGeneric(pi, {
         type: 'optionPicker',
@@ -154,9 +165,10 @@ module.exports = {
         cancellable: true,
       });
       if (!pick || pick.cancelled || pick.optionId == null) return false;
-      heroIdx = Number(pick.optionId);
+      heroKey = String(pick.optionId);
     }
-    const sourceHero = ps.heroes?.[heroIdx];
+    const [srcOwner, heroIdx] = heroKey.split('-').map(Number);
+    const sourceHero = gs.players[srcOwner]?.heroes?.[heroIdx];
     if (!sourceHero?.name || !(sourceHero.hp > 0)) return false;
     const damage = Math.min(DAMAGE_CAP, sourceHero.atk || 0);
     if (!(damage > 0)) return false;

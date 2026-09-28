@@ -44,6 +44,12 @@ function heroCanBeBurned(hero) {
   return true;
 }
 
+/** Helden, die `oi` kontrolliert (ohne Engine: physische Spalte). */
+function gegnerHelden(gs, oi, engine) {
+  if (engine?.heroesControlledBy) return engine.heroesControlledBy(oi);
+  return (gs.players[oi]?.heroes || []).map((hero, heroIdx) => ({ physOwner: oi, heroIdx, hero }));
+}
+
 module.exports = {
   isTargetingArtifact: true,
 
@@ -52,8 +58,8 @@ module.exports = {
     const ops = gs.players[oi];
     if (!ops) return false;
 
-    // At least one hero target?
-    for (const h of (ops.heroes || [])) {
+    // At least one hero target? Kontrolle statt Seite (Styx 28.9.)
+    for (const { hero: h } of gegnerHelden(gs, oi, engine)) {
       if (heroCanBeBurned(h)) return true;
     }
     // Or at least one creature target? Use the targeting-side gate
@@ -80,12 +86,12 @@ module.exports = {
     const targets = [];
     if (!ops) return targets;
 
-    for (let hi = 0; hi < (ops.heroes || []).length; hi++) {
-      const h = ops.heroes[hi];
+    // Kontrolle statt Seite (Styx 28.9.) — IDs bleiben physisch.
+    for (const { physOwner, heroIdx: hi, hero: h } of gegnerHelden(gs, oi, engine)) {
       if (!heroCanBeBurned(h)) continue;
       targets.push({
-        id: `hero-${oi}-${hi}`,
-        type: 'hero', owner: oi, heroIdx: hi,
+        id: `hero-${physOwner}-${hi}`,
+        type: 'hero', owner: physOwner, heroIdx: hi,
         cardName: h.name,
       });
     }

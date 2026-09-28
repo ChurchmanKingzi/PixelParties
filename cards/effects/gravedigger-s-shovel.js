@@ -38,7 +38,9 @@ async function onDefeat(ctx) {
   if (ctx.creature) {
     if ((ctx.creature.controller ?? ctx.creature.owner) !== oppIdx) return;
   } else if (ctx.target) {
-    if (engine._findHeroOwner(ctx.target) !== oppIdx) return;
+    // Kontrolle statt Seite (Styx 28.9.)
+    const tOwner = engine._findHeroOwner(ctx.target);
+    if (tOwner < 0 || engine.heroSideOf(tOwner, ctx.target) !== oppIdx) return;
   } else return;
   if (!engine.claimHOPT(`gravediggers-shovel:${inst.id}`, ctrl)) return;
   await engine.announceHookActivation(CARD_NAME, ctrl);
