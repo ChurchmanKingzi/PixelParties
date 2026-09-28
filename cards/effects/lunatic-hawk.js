@@ -122,16 +122,18 @@ function ausruester(engine, inst) {
 }
 
 /** First free Support Zone across the player's living Heroes, honoring
- *  the Creature's own summon gate. Returns [{heroIdx,slotIdx}, …]. */
+ *  the Creature's own summon gate. Returns [{owner,heroIdx,slotIdx}, …].
+ *  Styx 28.9.: alle Helden, die `pi` KONTROLLIERT (auch uebernommene der
+ *  Gegenspalte — dort beschwoert der normale Weg mit `heldSeite`), `owner`
+ *  = Brettseite der Zone. Ein abgegebener eigener Held zaehlt nicht. */
 function freeZonesFor(engine, pi, creatureName) {
-  const ps = engine.gs.players[pi];
   const out = [];
-  for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-    const hero = ps.heroes[hi];
+  for (const { physOwner, heroIdx: hi, hero } of engine.heroesControlledBy(pi)) {
     if (!hero?.name || hero.hp <= 0) continue;
-    if (!engine.isCreatureSummonable(creatureName, pi, hi, { _bypassBeforeSummon: true })) continue;
+    if (!engine.isCreatureSummonable(creatureName, physOwner, hi, { _bypassBeforeSummon: true })) continue;
+    const zonen = engine.gs.players[physOwner]?.supportZones?.[hi] || [];
     for (let zi = 0; zi < 3; zi++) {
-      if (((ps.supportZones[hi] || [])[zi] || []).length === 0) out.push({ heroIdx: hi, slotIdx: zi });
+      if ((zonen[zi] || []).length === 0) out.push({ owner: physOwner, heroIdx: hi, slotIdx: zi });
     }
   }
   return out;

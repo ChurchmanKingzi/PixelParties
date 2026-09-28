@@ -81,7 +81,7 @@ module.exports = {
       // Performance copies the ability below it — delegate to that ability's onPlay.
       // This makes Performance trigger stat bonuses (Fighting ATK, Toughness HP, etc.)
       // just like a real copy of that ability would.
-      const ps = ctx.players[ctx.cardOwner];
+      const ps = ctx.players[ctx.cardHeroOwner ?? ctx.cardOwner];   // Styx 28.9.: Brettseite
       const zone = (ps.abilityZones[ctx.cardHeroIdx] || [])[ctx.card.zoneSlot] || [];
       if (zone.length < 2) return; // No ability below (shouldn't happen with customPlacement)
       // ── Kopierziel auflösen: erste NICHT-Performance-Karte im Slot ──

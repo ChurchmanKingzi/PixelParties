@@ -87,27 +87,29 @@ async function _dashZumZiel(engine, ownerIdx, johannaIdx, zielHeroIdx, zielSlot,
   });
 }
 
-async function _cleanseAllies(engine, ownerIdx, johannaIdx) {
-  const ps = engine.gs.players[ownerIdx];
+// Styx 28.9.: „Other Heroes you control" = Helden, die Johannas
+// KONTROLLEUR `ctrlIdx` kontrolliert (beide Spalten); Johanna selbst
+// wird ueber das Objekt ausgeschlossen, Zonen/Animation physisch.
+async function _cleanseAllies(engine, ctrlIdx, johannaHero) {
+  const ps = engine.gs.players[ctrlIdx];
   if (!ps) return;
   const cleansable = getCleansableStatuses();
   let anyCleansed = false;
-  for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-    if (hi === johannaIdx) continue;
-    const ally = ps.heroes[hi];
+  for (const { physOwner, heroIdx: hi, hero: ally } of engine.heroesControlledBy(ctrlIdx)) {
+    if (ally === johannaHero) continue;
     if (!ally?.name || ally.hp <= 0) continue;
     if (!ally.statuses) continue;
     // Quick gate: skip if the ally has nothing to cleanse.
     const has = cleansable.some(k => ally.statuses[k]);
     if (!has) continue;
 
-    const removed = engine.cleanseHeroStatuses(ally, ownerIdx, hi, cleansable, CARD_NAME);
+    const removed = engine.cleanseHeroStatuses(ally, physOwner, hi, cleansable, CARD_NAME);
     if ((removed || []).length === 0) continue;
 
     anyCleansed = true;
     engine._broadcastEvent('play_zone_animation', {
       type:    'johanna_cleanse',
-      owner:   ownerIdx,
+      owner:   physOwner,
       heroIdx: hi,
       zoneSlot: -1,
     });
@@ -199,7 +201,7 @@ module.exports = {
       const tgtOwner = engine._findHeroOwner(target);
       if (tgtOwner < 0 || engine.heroSideOf(tgtOwner, target) !== ctrl) return;
 
-      const hoptKey = heldenSperreKey('johanna_redirect', ownerIdx);
+      const hoptKey = heldenSperreKey('johanna_redirect', ctrl);   // Styx 28.9.: Sperre beim Kontrolleur
       if (gs.hoptUsed?.[hoptKey] === gs.turn) return;
 
       const redirected = Math.ceil(ctx.amount / 2);
@@ -259,12 +261,11 @@ module.exports = {
       const johannaHero = ownerPs.heroes?.[johannaInst.heroIdx];
       if (!_johannaActive(johannaHero)) return;
 
-      const hoptKey = heldenSperreKey('johanna_redirect', ownerIdx);
-      if (gs.hoptUsed?.[hoptKey] === gs.turn) return;
-
       // Kontrolle statt Seite (Styx 28.9.): „target you control" meint
-      // Johannas Kontrolleur.
+      // Johannas Kontrolleur; auch die Einmal-Sperre liegt bei ihm.
       const ctrl = engine.heroSideOf(ownerIdx, johannaHero);
+      const hoptKey = heldenSperreKey('johanna_redirect', ctrl);
+      if (gs.hoptUsed?.[hoptKey] === gs.turn) return;
       const entries = ctx.entries || [];
       for (const e of entries) {
         if (gs.hoptUsed?.[hoptKey] === gs.turn) break; // accepted earlier
@@ -291,7 +292,8 @@ module.exports = {
         if (!gs.hoptUsed) gs.hoptUsed = {};
         gs.hoptUsed[hoptKey] = gs.turn;
         e.amount -= redirected;
-        await _dashZumZiel(engine, ownerIdx, johannaInst.heroIdx, e.inst.heroIdx, e.inst.zoneSlot, targetCtrl);
+        await _dashZumZiel(engine, ownerIdx, johannaInst.heroIdx, e.inst.heroIdx, e.inst.zoneSlot,
+          engine.physicalSide(e.inst));   // Styx 28.9.: Zeichen-Seite, nicht Kontrolleur
 
         await engine.actionDealDamage(e.source, johannaHero, redirected, e.type || 'normal');
         break;
@@ -314,9 +316,9 @@ module.exports = {
       const inst = ctx.card;
       if (!inst) return;
       const ownerPs = engine.gs.players[inst.owner];
-      const johannaHero = ownerPs?.heroes?.[inst.heroIdx];
+      const johannaHero = ctx.attachedHero ?? ownerPs?.heroes?.[inst.heroIdx];
       if (!_johannaActive(johannaHero)) return;
-      await _cleanseAllies(engine, inst.owner, inst.heroIdx);
+      await _cleanseAllies(engine, ctx.cardOwner, johannaHero);
     },
 
     onStatusRemoved: async (ctx) => {
@@ -325,7 +327,7 @@ module.exports = {
       const inst = ctx.card;
       if (!inst || inst.zone !== 'hero') return;
       const ownerPs = gs.players[inst.owner];
-      const johannaHero = ownerPs?.heroes?.[inst.heroIdx];
+      const johannaHero = ctx.attachedHero ?? ownerPs?.heroes?.[inst.heroIdx];
       if (!johannaHero) return;
       // Only react when the status removal was on Johanna herself, and
       // only for the three incapacitating statuses (other status
@@ -333,7 +335,7 @@ module.exports = {
       if (ctx.target !== johannaHero) return;
       if (!['frozen', 'stunned', 'negated'].includes(ctx.status)) return;
       if (!_johannaActive(johannaHero)) return;
-      await _cleanseAllies(engine, inst.owner, inst.heroIdx);
+      await _cleanseAllies(engine, ctx.cardOwner, johannaHero);
     },
 
     /**
@@ -347,11 +349,26 @@ module.exports = {
       const inst = ctx.card;
       if (!inst || inst.zone !== 'hero') return;
       const ownerPs = gs.players[inst.owner];
-      const johannaHero = ownerPs?.heroes?.[inst.heroIdx];
+      const johannaHero = ctx.attachedHero ?? ownerPs?.heroes?.[inst.heroIdx];
       if (!johannaHero) return;
       if (ctx.target !== johannaHero) return;
       if (!_johannaActive(johannaHero)) return;
-      await _cleanseAllies(engine, inst.owner, inst.heroIdx);
+      await _cleanseAllies(engine, ctx.cardOwner, johannaHero);
+    },
+
+    /**
+     * Styx 28.9.: Wiederbelebung (Golden Ankh, Styx …) laeuft ueber
+     * `actionReviveHero` und feuert nur `onHeroRevive`, kein `afterHeal`
+     * — ohne diesen Hook reinigte eine wiederbelebte Johanna nie.
+     */
+    onHeroRevive: async (ctx) => {
+      const engine = ctx._engine;
+      const inst = ctx.card;
+      if (!inst || inst.zone !== 'hero') return;
+      const johannaHero = ctx.attachedHero ?? engine.gs.players[inst.owner]?.heroes?.[inst.heroIdx];
+      if (!johannaHero || ctx.hero !== johannaHero) return;
+      if (!_johannaActive(johannaHero)) return;
+      await _cleanseAllies(engine, ctx.cardOwner, johannaHero);
     },
   },
 };

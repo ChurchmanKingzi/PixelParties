@@ -67,16 +67,22 @@ function heldMoeglich(engine, pi) {
  * Opferbare Helden als Picker-Ziele — ★ OHNE Teocuilatl selbst
  * („a Hero you control, EXCEPT THIS ONE", Als Textfassung 12.9.).
  */
-function heldenZiele(engine, pi, eigenerIdx) {
+function heldenZiele(engine, pi, selbst) {
   if (!heldMoeglich(engine, pi)) return [];
   // Kontrolle statt Seite (Styx 28.9.): „a Hero you control" — alle
-  // kontrollierten Helden beider Spalten, physisch adressiert.
-  const selbst = engine.gs.players[pi]?.heroes?.[eigenerIdx];
+  // kontrollierten Helden beider Spalten, physisch adressiert. „Except
+  // this one" ueber das Heldenobjekt (uebernommen liegt es beim Gegner).
   return engine.heroesControlledBy(pi)
     .filter(({ hero }) => hero?.name && hero.hp > 0 && hero !== selbst)
     .map(({ physOwner, heroIdx, hero }) => ({
       id: `hero-${physOwner}-${heroIdx}`, type: 'hero', owner: physOwner, heroIdx, cardName: hero.name,
     }));
+}
+
+/** Teocuilatl selbst (Styx 28.9.: Brettseite, nicht Kontrolleur). */
+function selbstVon(ctx) {
+  return ctx.attachedHero
+    ?? ctx._engine.gs.players[ctx.cardHeroOwner ?? ctx.cardOwner]?.heroes?.[ctx.cardHeroIdx];
 }
 
 /** Opfer-Vorgabe fuer den Kreatur-Weg; die Helden haengen als Fremdziele dran. */
@@ -119,10 +125,10 @@ module.exports = {
   canActivateHeroEffect(ctx) {
     const engine = ctx._engine;
     const pi = ctx.cardOwner;
-    const hero = engine.gs.players[pi]?.heroes?.[ctx.cardHeroIdx];
+    const hero = selbstVon(ctx);
     if (!hero?.name || hero.hp <= 0) return false;
     return kreaturMoeglich(engine, pi)
-      || heldenZiele(engine, pi, ctx.cardHeroIdx).length > 0;
+      || heldenZiele(engine, pi, hero).length > 0;
   },
 
   async onHeroEffect(ctx) {
@@ -132,7 +138,7 @@ module.exports = {
     const ps = gs.players[pi];
     if (!ps) return false;
 
-    const extra = heldenZiele(engine, pi, ctx.cardHeroIdx);
+    const extra = heldenZiele(engine, pi, selbstVon(ctx));
     const kannKreatur = kreaturMoeglich(engine, pi);
     if (!kannKreatur && extra.length === 0) return false;
 

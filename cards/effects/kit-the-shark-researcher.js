@@ -70,12 +70,14 @@ function _collectOppTargets(engine, targetPi) {
   const out = [];
   const tps = engine.gs.players[targetPi];
   if (!tps) return out;
-  for (let hi = 0; hi < (tps.heroes || []).length; hi++) {
-    const h = tps.heroes[hi];
+  // Styx 28.9.: „targets they control" nach Kontrolle — Helden ueber
+  // `heroesControlledBy` (auch uebernommene der Gegenspalte), IDs immer
+  // mit der Brettseite.
+  for (const { physOwner, heroIdx: hi, hero: h } of engine.heroesControlledBy(targetPi)) {
     if (!h?.name || h.hp <= 0) continue;
     out.push({
-      id: `hero-${targetPi}-${hi}`,
-      type: 'hero', owner: targetPi, heroIdx: hi,
+      id: `hero-${physOwner}-${hi}`,
+      type: 'hero', owner: physOwner, heroIdx: hi,
       cardName: h.name,
     });
   }
@@ -86,9 +88,10 @@ function _collectOppTargets(engine, targetPi) {
     if (inst.faceDown) continue;
     const cd = engine.getEffectiveCardData(inst) || cardDB[inst.name];
     if (!cd || !hasCardType(cd, 'Creature')) continue;
+    const seite = engine.physicalSide(inst);
     out.push({
-      id: `equip-${inst.owner}-${inst.heroIdx}-${inst.zoneSlot}`,
-      type: 'equip', owner: inst.owner, heroIdx: inst.heroIdx, slotIdx: inst.zoneSlot,
+      id: `equip-${seite}-${inst.heroIdx}-${inst.zoneSlot}`,
+      type: 'equip', owner: seite, heroIdx: inst.heroIdx, slotIdx: inst.zoneSlot,
       cardName: inst.name, cardInstance: inst,
     });
   }
@@ -282,7 +285,7 @@ module.exports = {
         });
       } else if (chosenMode === 'B') {
         _stampHopt(gs, pi, HOPT_B);
-        await _runModeB(engine, pi, oppPi, ctx.cardHeroIdx);
+        await _runModeB(engine, pi, oppPi, ctx.cardHeroIdx, ctx.cardHeroOwner ?? pi);
         ps.discardPile.push(revealedName);
         engine.log('kit_creature_discarded', {
           player: ps.username, card: revealedName,
@@ -326,7 +329,7 @@ module.exports = {
  * silently if opp suddenly has fewer than N targets when the
  * picker opens (race-safe).
  */
-async function _runModeB(engine, pi, oppPi, kitHeroIdx) {
+async function _runModeB(engine, pi, oppPi, kitHeroIdx, kitSeite = pi) {
   const gs = engine.gs;
   const ps = gs.players[pi];
   const ops = gs.players[oppPi];
@@ -356,7 +359,8 @@ async function _runModeB(engine, pi, oppPi, kitHeroIdx) {
     return;
   }
 
-  const source = { name: CARD_NAME, owner: pi, heroIdx: kitHeroIdx };
+  // `heroOwner` (Styx 28.9.): uebernommener Kit steht auf der Gegenseite.
+  const source = { name: CARD_NAME, owner: pi, heroIdx: kitHeroIdx, ...(kitSeite !== pi ? { heroOwner: kitSeite } : {}) };
 
   // Consolidated post-target reaction window — same pattern as every
   // other multi-target damage card. Lets SG / SA / BS / HR / CIB on
@@ -391,7 +395,7 @@ async function _runModeB(engine, pi, oppPi, kitHeroIdx) {
       const t = tgts.find(x => x.id === id);
       if (!t) continue;
       if (t.type === 'hero') {
-        const hero = ops.heroes?.[t.heroIdx];
+        const hero = gs.players[t.owner]?.heroes?.[t.heroIdx];   // Brettseite (Styx 28.9.)
         if (!hero?.name || hero.hp <= 0) continue;
         await engine.actionDealDamage(source, hero, MODE_B_DAMAGE, 'hero');
       } else if (t.cardInstance) {

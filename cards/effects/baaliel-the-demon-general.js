@@ -119,6 +119,11 @@ module.exports = {
     onAnyActionResolved: async (ctx) => {
       if (ctx.actionType !== 'creature' || !ctx.isInherent) return;
       if (ctx.playerIdx !== ctx.cardOwner || ctx.heroIdx !== ctx.cardHeroIdx) return;
+      // Styx 28.9.: DIESER Baaliel = gleiche Brettseite (`heroOwner` aus
+      // doPlayCreature). Ohne den Vergleich stempelte ein uebernommener
+      // Baaliel auch die Beschwoerung des gleich indizierten Helden seines
+      // Kontrolleurs.
+      if ((ctx.heroOwner ?? ctx.playerIdx) !== (ctx.cardHeroOwner ?? ctx.cardOriginalOwner)) return;
       // `ctx.cardName` ist BAALIEL (der Lauscher) — der gespielte Name
       // kommt nur ueber `playedCardName` (siehe server.js doPlayCreature).
       if (!isHornedDemonName(ctx.playedCardName)) return;

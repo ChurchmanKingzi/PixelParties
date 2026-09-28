@@ -199,7 +199,7 @@ module.exports = {
 
     // Flash the Diplomacy ability zone
     engine._broadcastEvent('ability_activated', {
-      owner: ctx.cardOriginalOwner, heroIdx, zoneIdx: ctx.card.zoneSlot,
+      owner: ctx.cardHeroOwner ?? ctx.cardOriginalOwner, heroIdx, zoneIdx: ctx.card.zoneSlot,   // Styx 28.9.: Brettseite
     });
 
     // Play dove projectiles from Diplomacy hero to target creature (staggered)

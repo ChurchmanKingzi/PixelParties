@@ -6527,6 +6527,9 @@ async function doPlayAbilityFremd(room, pi, { cardName, handIndex, heroIdx, zone
   if (ziel < 0) return false;
   if (!hps.abilityZones[heroIdx]) hps.abilityZones[heroIdx] = [[], [], []];
   const abZones = hps.abilityZones[heroIdx];
+  // Kartenbesitzer (Ablage-Ziel) aus der Herkunft der Handkarte: eine
+  // gestohlene Handkarte gehoert weiter ihrem Ursprungsspieler.
+  const kartenBesitzer = fromCreation ? pi : engine._handCardPileOwner(pi, cardName);
   if (!abZones[ziel]) abZones[ziel] = [];
   abZones[ziel].push(cardName);
   (fromCreation ? ps.creationZone : ps.hand).splice(handIndex, 1);
@@ -6534,7 +6537,7 @@ async function doPlayAbilityFremd(room, pi, { cardName, handIndex, heroIdx, zone
   hero.statuses.charmed.abilityZug = gs.turn;
 
   const inst = engine._trackCard(cardName, heroOwner, 'ability', heroIdx, ziel);
-  inst.originalOwner = pi;
+  inst.originalOwner = kartenBesitzer;
 
   engine.log('ability_attached', { player: ps.username, card: cardName, hero: hero.name, foreignHero: true });
   broadcastHandToBoard(room, pi, { cardName, handIndex, zoneType: 'ability', heroIdx, slotIdx: ziel, destOwner: heroOwner });
@@ -6556,6 +6559,9 @@ async function doPlayAbilityFremd(room, pi, { cardName, handIndex, heroIdx, zone
       for (let i = 0; i < 2; i++) sendGameState(room, i); sendSpectatorGameState(room);
       return true;
     }
+    // Herkunftsmarke der Handkarte ist jetzt an der Instanz — verbrauchen,
+    // sonst gilt eine spaetere gleichnamige Handkarte als fremd.
+    if (kartenBesitzer !== pi) engine._consumeHandCardOrigin(pi, cardName);
     await engine.runHooks('onPlay', { _onlyCard: inst, playedCard: inst, cardName, zone: 'ability', heroIdx });
     await engine.runHooks('onCardEnterZone', { enteringCard: inst, toZone: 'ability', toHeroIdx: heroIdx });
   } catch (err) {
@@ -7224,7 +7230,7 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
   // (Main Phase / after the Hero has acted).
   const matchedAddlType = isReactionSubtype
     ? null
-    : room.engine.findAdditionalActionForCard(pi, cardName, heroIdx);
+    : room.engine.findAdditionalActionForCard(pi, cardName, heroIdx, charmedOwner ?? pi);
   const matchedPrefersAddl = !!matchedAddlType
     && !!room.engine._additionalActionTypes?.[matchedAddlType]?.preferOverMainAction;
   // `!isInherentAction` muss BEIDE Terme decken, nicht nur den
@@ -7510,7 +7516,7 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
       // Action Phase (`burnUpcomingAction` nach der Aufloesung — der
       // Pillar-of-Light-Weg, Sprung nach Main Phase 2).
       if (!isReactionSubtype && !additionalConsumed && (isMainPhase || actionAlreadyUsed)) {
-        const rueckfallTyp = room.engine.findAdditionalActionForCard(pi, cardName, heroIdx);
+        const rueckfallTyp = room.engine.findAdditionalActionForCard(pi, cardName, heroIdx, charmedOwner ?? pi);
         if (rueckfallTyp) {
           consumedInst = room.engine.consumeAdditionalAction(pi, rueckfallTyp);
           additionalConsumed = true;
@@ -7817,16 +7823,16 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
 
     if (isActionPhase && !additionalConsumed && !isInherentAction && !becameFreeAction && !isReactionSubtype) {
       await room.engine.runHooks('onActionUsed', {
-        actionType: cardData.cardType.toLowerCase(), playerIdx: pi, cardName, playedCardName: cardName, heroIdx,
+        actionType: cardData.cardType.toLowerCase(), playerIdx: pi, cardName, playedCardName: cardName, heroIdx, heroOwner,
         isAdditional: false, _skipReactionCheck: true,
       });
     } else if (additionalConsumed) {
       await room.engine.runHooks('onActionUsed', {
-        actionType: cardData.cardType.toLowerCase(), playerIdx: pi, cardName, playedCardName: cardName, heroIdx,
+        actionType: cardData.cardType.toLowerCase(), playerIdx: pi, cardName, playedCardName: cardName, heroIdx, heroOwner,
         isAdditional: true, _skipReactionCheck: true,
       });
       await room.engine.runHooks('onAdditionalActionUsed', {
-        actionType: cardData.cardType.toLowerCase(), playerIdx: pi, cardName, playedCardName: cardName, heroIdx,
+        actionType: cardData.cardType.toLowerCase(), playerIdx: pi, cardName, playedCardName: cardName, heroIdx, heroOwner,
         _skipReactionCheck: true,
       });
     }
@@ -7840,8 +7846,10 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
     // `playedCardName`: `cardName` wird in `_createContext` vom Namen
     // der LAUSCHENDEN Karte ueberschattet (v601, bei Baaliel bemerkt) —
     // Lauscher lesen den gespielten Namen deshalb NUR ueber dieses Feld.
+    // `heroOwner` (Styx 28.9.): Brettseite des handelnden Helden —
+    // `playerIdx` ist bei einem uebernommenen Helden der Kontrolleur.
     await room.engine.runHooks('onAnyActionResolved', {
-      actionType: cardData.cardType.toLowerCase(), playerIdx: pi, cardName, playedCardName: cardName, heroIdx,
+      actionType: cardData.cardType.toLowerCase(), playerIdx: pi, cardName, playedCardName: cardName, heroIdx, heroOwner,
       isAdditional: !!additionalConsumed,
       isInherent: !!isInherentAction,
       isFree: !!becameFreeAction,
@@ -8180,7 +8188,7 @@ async function doActivateCreatureEffect(room, pi, { heroIdx, zoneSlot, charmedOw
         || ((acPs._bonusMainActions || 0) > 0 && actionsPlayedThisPhase === 1);
       const actionAlreadyUsed = (acPs.heroesActedThisTurn?.length > 0) && !hasBonusAlready;
       if (actionAlreadyUsed) {
-        const typeId = room.engine.findAdditionalActionForCategory(pi, 'ability_activation', heroIdx);
+        const typeId = room.engine.findAdditionalActionForCategory(pi, 'ability_activation', heroIdx, charmedOwner ?? pi);
         if (!typeId) return false;
         consumedAdditionalCreatureInst = room.engine.consumeAdditionalAction(pi, typeId);
         if (!consumedAdditionalCreatureInst) return false;
@@ -8190,7 +8198,7 @@ async function doActivateCreatureEffect(room, pi, { heroIdx, zoneSlot, charmedOw
         creatureEffectIsMainAction = true;
       }
     } else if (isMainPhase) {
-      const typeId = room.engine.findAdditionalActionForCategory(pi, 'ability_activation', heroIdx);
+      const typeId = room.engine.findAdditionalActionForCategory(pi, 'ability_activation', heroIdx, charmedOwner ?? pi);
       if (!typeId) return false;
       consumedAdditionalCreatureInst = room.engine.consumeAdditionalAction(pi, typeId);
       if (!consumedAdditionalCreatureInst) return false;
@@ -8680,7 +8688,7 @@ async function doActivateFreeAbility(room, pi, { heroIdx, zoneIdx, zoneKind, cha
     // freie Ability schluepft.
     const abilitySurprise = chainResult.negated
       ? null
-      : await room.engine._checkSurpriseOnAbilityActivation(pi, heroIdx, zoneIdx, abilityName);
+      : await room.engine._checkSurpriseOnAbilityActivation(pi, heroIdx, zoneIdx, abilityName, heroOwner);   // Styx 28.9.: Brettseite
 
     if (chainResult.negated || abilitySurprise?.negateEffect) {
       // Gefeuert und gekontert — der Auftritt gehoert trotzdem dazu,
@@ -8876,7 +8884,7 @@ async function doPlayCreature(room, pi, { cardName, handIndex, heroIdx, zoneSlot
   // machinery — see the Spell/Attack path for the rationale.
   const isReactionSubtype = (cardData.subtype || '').toLowerCase() === 'reaction';
   const additionalTypeId = (!isInherentAction && !isReactionSubtype)
-    ? room.engine.findAdditionalActionForCard(pi, cardName, heroIdx)
+    ? room.engine.findAdditionalActionForCard(pi, cardName, heroIdx, charmedOwner ?? pi)
     : null;
   const usingAdditional = !!additionalTypeId;
   const actionsPlayedThisPhase = ps._actionsPlayedThisPhase || 0;
@@ -9302,19 +9310,20 @@ async function doPlayCreature(room, pi, { cardName, handIndex, heroIdx, zoneSlot
       // `playedCardName` wie im Spell-Pfad — `cardName` wird im ctx
       // vom Lauscher ueberschattet (v601).
       await room.engine.runHooks('onActionUsed', {
-        actionType: 'creature', playerIdx: pi, cardName, playedCardName: cardName, heroIdx,
+        actionType: 'creature', playerIdx: pi, cardName, playedCardName: cardName, heroIdx, heroOwner,
         isAdditional: usingAdditional, _skipReactionCheck: true,
       });
       if (usingAdditional) {
         await room.engine.runHooks('onAdditionalActionUsed', {
-          actionType: 'creature', playerIdx: pi, cardName, playedCardName: cardName, heroIdx,
+          actionType: 'creature', playerIdx: pi, cardName, playedCardName: cardName, heroIdx, heroOwner,
           _skipReactionCheck: true,
         });
       }
     }
     // Universal action-resolved hook (see doPlaySpell for rationale).
+    // `heroOwner` (Styx 28.9.): Brettseite des beschwoerenden Helden (Baaliel).
     await room.engine.runHooks('onAnyActionResolved', {
-      actionType: 'creature', playerIdx: pi, cardName, playedCardName: cardName, heroIdx,
+      actionType: 'creature', playerIdx: pi, cardName, playedCardName: cardName, heroIdx, heroOwner,
       isAdditional: !!usingAdditional,
       isInherent: !!effectiveIsInherent,
       isFree: false,
@@ -9473,7 +9482,7 @@ async function doActivateAbility(room, pi, { heroIdx, zoneIdx, zoneKind, charmed
   const needsAdditional = isMainPhase || actionAlreadyUsed;
   let consumedAdditionalInst = null;
   if (needsAdditional) {
-    const typeId = room.engine.findAdditionalActionForCategory(pi, 'ability_activation', heroIdx);
+    const typeId = room.engine.findAdditionalActionForCategory(pi, 'ability_activation', heroIdx, charmedOwner ?? pi);
     if (!typeId) return false;
     consumedAdditionalInst = room.engine.consumeAdditionalAction(pi, typeId);
     if (!consumedAdditionalInst) return false;
@@ -9571,7 +9580,7 @@ async function doActivateAbility(room, pi, { heroIdx, zoneIdx, zoneKind, charmed
     // Ausgang wie eine Negation aus der Kette.
     const abilitySurprise = chainResult.negated
       ? null
-      : await room.engine._checkSurpriseOnAbilityActivation(pi, heroIdx, zoneIdx, abilityName);
+      : await room.engine._checkSurpriseOnAbilityActivation(pi, heroIdx, zoneIdx, abilityName, heroOwner);   // Styx 28.9.: Brettseite
 
     if (chainResult.negated || abilitySurprise?.negateEffect) {
       room.engine.announceActiveEffect();   // gefeuert und gekontert
@@ -9686,12 +9695,12 @@ async function doActivateAbility(room, pi, { heroIdx, zoneIdx, zoneKind, charmed
     // doPlaySpell convention.
     const usingAdditional = !!consumedAdditionalInst;
     await room.engine.runHooks('onActionUsed', {
-      actionType: 'ability_activation', playerIdx: pi, abilityName, heroIdx,
+      actionType: 'ability_activation', playerIdx: pi, abilityName, heroIdx, heroOwner,
       isAdditional: usingAdditional, _skipReactionCheck: true,
     });
     if (usingAdditional) {
       await room.engine.runHooks('onAdditionalActionUsed', {
-        actionType: 'ability_activation', playerIdx: pi, abilityName, heroIdx, _skipReactionCheck: true,
+        actionType: 'ability_activation', playerIdx: pi, abilityName, heroIdx, heroOwner, _skipReactionCheck: true,
       });
     }
     // Universal action-resolved hook (see doPlaySpell for rationale).
@@ -9700,7 +9709,7 @@ async function doActivateAbility(room, pi, { heroIdx, zoneIdx, zoneKind, charmed
       kind: 'ability', playerIdx: pi, heroIdx, cardName: abilityName, zoneIdx, isActionCost: true,
     });
     await room.engine.runHooks('onAnyActionResolved', {
-      actionType: 'ability_activation', playerIdx: pi, abilityName, heroIdx,
+      actionType: 'ability_activation', playerIdx: pi, abilityName, heroIdx, heroOwner,
       isAdditional: !!usingAdditional, isInherent: false, isFree: false,
       _skipReactionCheck: true,
     });
@@ -9939,7 +9948,7 @@ async function doActivateHeroEffect(room, pi, { heroIdx, charmedOwner, chosenEff
         if (actionAlreadyUsed) {
           // Action 2+ in Action Phase — needs a matching additional-
           // action provider, otherwise activation is illegal.
-          const typeId = room.engine.findAdditionalActionForCategory(pi, 'ability_activation', heroIdx);
+          const typeId = room.engine.findAdditionalActionForCategory(pi, 'ability_activation', heroIdx, charmedOwner ?? pi);
           if (!typeId) return false;
           consumedAdditionalHeroInst = room.engine.consumeAdditionalAction(pi, typeId);
           if (!consumedAdditionalHeroInst) return false;
@@ -9966,7 +9975,7 @@ async function doActivateHeroEffect(room, pi, { heroIdx, charmedOwner, chosenEff
       } else if (isMainPhase) {
         // Main Phase action-cost activation — must come from an
         // additional-action provider (no main slot to spend here).
-        const typeId = room.engine.findAdditionalActionForCategory(pi, 'ability_activation', heroIdx);
+        const typeId = room.engine.findAdditionalActionForCategory(pi, 'ability_activation', heroIdx, charmedOwner ?? pi);
         if (!typeId) return false;
         consumedAdditionalHeroInst = room.engine.consumeAdditionalAction(pi, typeId);
         if (!consumedAdditionalHeroInst) return false;

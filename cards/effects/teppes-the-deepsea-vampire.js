@@ -52,12 +52,15 @@ module.exports = {
 
   hooks: {
     onCardsReturnedToHand: async (ctx) => {
-      if (ctx.ownerIdx !== ctx.cardOriginalOwner) return;
+      // Styx 28.9.: „your hand" = Hand des Kontrolleurs; Teppes selbst
+      // steht auf der Brettseite (`cardHeroOwner`).
+      if (ctx.ownerIdx !== ctx.cardOwner) return;
       const engine = ctx._engine;
       const gs = engine.gs;
-      const pi = ctx.cardOriginalOwner;
+      const pi = ctx.cardOwner;
+      const seite = ctx.cardHeroOwner ?? ctx.cardOriginalOwner;
       const heroIdx = ctx.cardHeroIdx;
-      const hero = gs.players[pi]?.heroes?.[heroIdx];
+      const hero = gs.players[seite]?.heroes?.[heroIdx];
       if (!hero?.name || hero.hp <= 0) return;
       if (hero.statuses?.frozen || hero.statuses?.stunned || hero.statuses?.negated) return;
 
@@ -70,7 +73,7 @@ module.exports = {
 
       await engine.actionDrawCards(pi, 1);
       engine._broadcastEvent('play_zone_animation', {
-        type: 'gold_sparkle', owner: pi, heroIdx, zoneSlot: -1,
+        type: 'gold_sparkle', owner: seite, heroIdx, zoneSlot: -1,
       });
       engine.log('teppes_draw', {
         player: gs.players[pi]?.username,

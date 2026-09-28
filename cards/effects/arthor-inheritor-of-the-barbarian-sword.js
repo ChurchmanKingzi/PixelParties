@@ -50,7 +50,9 @@ module.exports = {
     const pi      = ctx.cardOwner;
     const heroIdx = ctx.cardHeroIdx;
     const ps      = gs.players[pi];
-    const hero    = ps?.heroes?.[heroIdx];
+    // Styx 28.9.: Arthor steht ggf. auf der Brettseite des Gegners.
+    const feld    = ctx.cardHeroOwner ?? pi;
+    const hero    = ctx.attachedHero ?? gs.players[feld]?.heroes?.[heroIdx];
     if (!hero?.name || hero.hp <= 0) return false;
 
     const { clearArmedArrows } = require('./_arrows-shared');
@@ -96,6 +98,7 @@ module.exports = {
       owner: pi,
       cardType: 'Attack',
       heroIdx,
+      casterOwner: feld,   // Styx 28.9.: Seite des Wirkers
       fromBoard: true,
       resolve: async () => {
         engine._broadcastEvent('red_lightning_rain', {
@@ -110,7 +113,7 @@ module.exports = {
           }
         } else if (target.cardInstance) {
           await engine.actionDealCreatureDamage(
-            { name: CARD_NAME, owner: pi, heroIdx },
+            { name: CARD_NAME, owner: pi, heroIdx, ...(feld !== pi ? { heroOwner: feld } : {}) },
             target.cardInstance, DAMAGE, 'attack',
             { sourceOwner: pi, canBeNegated: true },
           );
@@ -142,6 +145,7 @@ module.exports = {
       spellName: CARD_NAME,
       spellCardData: FAKE_ATTACK_DATA,
       heroIdx,
+      heroOwner: feld,   // Styx 28.9.: Brettseite (wie der Server)
       casterIdx: pi,
       damageTargets: uniqueTargets,
       isSecondCast: false,

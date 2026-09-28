@@ -26,10 +26,9 @@ const CARD_NAME = 'Sorin, the Warden of Blood Rock';
 const MAX_FREE_ATTACK_LEVEL = 3;
 
 function isOwnAttackSource(ctx, source) {
-  if (!source) return false;
-  if (source.heroIdx !== ctx.card.heroIdx) return false;
-  const srcOwner = source.heroOwner ?? source.controller ?? source.owner ?? -1;
-  return srcOwner === ctx.cardOwner;
+  // Styx 28.9.: Brettseite + Index (uebernommen: `heroOwner` = Brettseite,
+  // der Vergleich mit dem Kontrolleur schlug dort fehl).
+  return ctx._engine.quelleIstHeld(source, ctx.cardHeroOwner ?? ctx.cardOriginalOwner, ctx.card.heroIdx);
 }
 
 module.exports = {

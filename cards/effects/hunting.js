@@ -89,12 +89,14 @@ module.exports = {
       const pi = ctx.cardOwner;
       const hi = ctx.cardHeroIdx;
       const ps = gs.players[pi];
-      const held = ps?.heroes?.[hi];
+      // Styx 28.9.: der Held steht auf der Brettseite (`feld`), „du" ist der Kontrolleur.
+      const feld = ctx.cardHeroOwner ?? pi;
+      const held = gs.players[feld]?.heroes?.[hi];
       if (!held?.name || held.hp <= 0) return;
 
       // ── Hat DIESER Held die Creature besiegt? ────────────────────
       const quelle = ctx.source;
-      if (!quelle || quelle.owner !== pi || quelle.heroIdx !== hi) return;
+      if (!quelle || !engine.quelleIstHeld(quelle, feld, hi)) return;
 
       // ── War es eine GEGNERISCHE Creature? ────────────────────────
       // Ueber den Controller, damit eine per Cross-Side-Platzierung
@@ -104,7 +106,7 @@ module.exports = {
 
       // ── Stapelhoehe = Stufe, Dedup ueber die kleinste Instanz-ID ──
       const stapel = engine.cardInstances.filter(c =>
-        (c.controller ?? c.owner) === pi
+        (feld === pi ? (c.controller ?? c.owner) === pi : c.owner === feld)   // Styx 28.9.
         && c.heroIdx === hi
         && c.zone === 'ability'
         && c.name === CARD_NAME
@@ -115,7 +117,7 @@ module.exports = {
       const stufe = Math.min(stapel.length, 3);
 
       // ── HOPT, VOR der Wirkung geklaut ────────────────────────────
-      const hoptKey = `hunting:${pi}-${hi}`;
+      const hoptKey = `hunting:${feld}-${hi}`;
       if (gs.hoptUsed?.[hoptKey] === gs.turn) return;
 
       // ── Kontrolluebernahme-Blocker (Boris & Co.) ─────────────────

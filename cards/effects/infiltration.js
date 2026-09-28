@@ -34,7 +34,7 @@ module.exports = {
     const gs = engine.gs;
     const pi = ctx.cardOwner;
     const heroIdx = ctx.cardHeroIdx;
-    const hero = gs.players[pi]?.heroes?.[heroIdx];
+    const hero = gs.players[ctx.cardHeroOwner ?? pi]?.heroes?.[heroIdx];   // Styx 28.9.: Brettseite
     if (!hero?.name || hero.hp <= 0) return false;
     const ps = gs.players[pi];
     if (!ps || ps.handLocked) return false;
@@ -55,7 +55,7 @@ module.exports = {
     const pi = ctx.cardOwner;
     const heroIdx = ctx.cardHeroIdx;
     const ps = gs.players[pi];
-    const hero = ps?.heroes?.[heroIdx];
+    const hero = gs.players[ctx.cardHeroOwner ?? pi]?.heroes?.[heroIdx];   // Styx 28.9.: Brettseite
     if (!hero?.name) return false;
     const oi = pi === 0 ? 1 : 0;
     if (gs.firstTurnProtectedPlayer === oi) return false;

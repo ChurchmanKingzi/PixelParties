@@ -85,9 +85,12 @@ module.exports = {
     onHeroKO: async (ctx) => {
       const engine = ctx._engine;
       const gs = engine.gs;
-      const ourPi = ctx.cardOwner;
+      const ourPi = ctx.cardOwner;            // Kontrolleur: wird gefragt
       const ourHi = ctx.cardHeroIdx;
-      const ourHero = gs.players[ourPi]?.heroes?.[ourHi];
+      // Styx 28.9.: Held und Animation auf der Brettseite — uebernommen
+      // ist das nicht die Seite des Kontrolleurs.
+      const ourSide = ctx.cardHeroOwner ?? ourPi;
+      const ourHero = ctx.attachedHero ?? gs.players[ourSide]?.heroes?.[ourHi];
       // A KO'd Styx can't absorb — the trigger only fires while he's
       // still standing. If he himself is the one dying, the
       // "another" gate below catches it; this guard is for chained
@@ -113,8 +116,8 @@ module.exports = {
         if (deadOwner >= 0) break;
       }
       if (deadOwner < 0) return;
-      // "Another Hero" — never trigger off Styx's own death.
-      if (deadOwner === ourPi && deadHeroIdx === ourHi) return;
+      // "Another Hero" — never trigger off Styx's own death (Objektvergleich).
+      if (dyingHero === ourHero) return;
 
       const confirmed = await engine.promptGeneric(ourPi, {
         type: 'confirm',
@@ -132,7 +135,7 @@ module.exports = {
       // vertical ribbon reads as the spirit ascending into the gate.
       engine._broadcastEvent('play_zone_animation', {
         type: 'heal_sparkle',
-        owner: ourPi, heroIdx: ourHi, zoneSlot: -1,
+        owner: ourSide, heroIdx: ourHi, zoneSlot: -1,
       });
       await engine._delay(300);
 

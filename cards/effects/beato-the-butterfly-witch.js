@@ -125,7 +125,9 @@ module.exports = {
      */
     afterSpellResolved: (ctx) => {
       // Match caster to this Beato instance
-      if (ctx.casterIdx !== ctx.cardOriginalOwner) return;
+      // Styx 28.9.: Brettseite des Wirkers (`heroOwner`), nicht der Wirker —
+      // uebernommen wirkt der Kontrolleur ueber Beatos Spalte.
+      if ((ctx.heroOwner ?? ctx.casterIdx) !== (ctx.cardHeroOwner ?? ctx.cardOriginalOwner)) return;
       if (ctx.heroIdx !== ctx.cardHeroIdx) return;
       // Check negation flag
       if (ctx._engine.gs._spellNegatedByEffect) return;

@@ -193,15 +193,16 @@ module.exports = {
     onPhaseStart: async (ctx) => {
       if (!HANDLUNGSPHASEN.has(ctx.phaseIndex)) return;
       const engine = ctx._engine;
-      // Nur der aktive Spieler — der Held handelt in seinem eigenen Zug.
-      if (engine.gs.activePlayer !== ctx.cardOriginalOwner) return;
+      // Nur der aktive Spieler — der Held handelt im Zug seines
+      // KONTROLLEURS („your Action Phase", Styx 28.9.).
+      if (engine.gs.activePlayer !== ctx.cardController) return;
       const hero = _karianHero(ctx);
       if (!hero?.name || hero.hp <= 0) return;
       const wasAfflicted = _suspendParalysis(hero);
       if (!wasAfflicted) return;
       // Die zweite Aktion bleibt der Action Phase vorbehalten.
       if (ctx.phaseIndex === PHASES.ACTION) {
-        _grantBonusAction(engine, ctx.cardOriginalOwner, ctx.cardHeroIdx);
+        _grantBonusAction(engine, ctx.cardController, ctx.cardHeroIdx);
       }
       engine.log('karian_shake_off', { hero: hero.name, phase: ctx.phaseIndex });
       engine.sync();
@@ -210,9 +211,12 @@ module.exports = {
     onPhaseEnd: async (ctx) => {
       if (!HANDLUNGSPHASEN.has(ctx.phaseIndex)) return;
       const engine = ctx._engine;
-      if (engine.gs.activePlayer !== ctx.cardOriginalOwner) return;
       const hero = _karianHero(ctx);
       if (!hero) return;
+      // Styx 28.9.: auch einsetzen, wenn der Kontrolleur mitten in der Phase
+      // wechselte (Uebernahme endet) — ein liegengebliebener Vorrat liefe
+      // sonst nie ab. Ohne Vorrat ist `_restoreParalysis` wirkungslos.
+      if (engine.gs.activePlayer !== ctx.cardController && !hero[SUSPENDED_KEY]) return;
       _restoreParalysis(hero);
       engine.sync();
     },
@@ -251,13 +255,16 @@ module.exports = {
       const engine = ctx._engine;
       const gs = engine.gs;
       if (gs.currentPhase !== PHASES.ACTION) return;
-      if (ctx.playerIdx !== ctx.cardOriginalOwner) return;
-      const ps = gs.players[ctx.cardOriginalOwner];
+      // „you" = Kontrolleur (Styx 28.9.); Karians eigene Aktion = gleiche
+      // Brettseite (`heroOwner`, sonst `playerIdx`) + gleicher Index.
+      if (ctx.playerIdx !== ctx.cardController) return;
+      const ps = gs.players[ctx.cardController];
       if (!ps?.bonusActions) return;
       if (ps.bonusActions.heroIdx !== ctx.cardHeroIdx) return;
       if (!(ps.bonusActions.remaining > 0)) return;
 
-      const wasKarianAction = ctx.heroIdx === ctx.cardHeroIdx;
+      const wasKarianAction = ctx.heroIdx === ctx.cardHeroIdx
+        && (ctx.heroOwner ?? ctx.playerIdx) === (ctx.cardHeroOwner ?? ctx.cardOriginalOwner);
       const actionsPlayed = ps._actionsPlayedThisPhase || 0;
       if (wasKarianAction && actionsPlayed > 1) {
         ps.bonusActions.remaining = 0;
@@ -277,12 +284,12 @@ module.exports = {
       if (!def?.paralysisLike) return;
       const engine = ctx._engine;
       if (engine.gs.currentPhase !== PHASES.ACTION) return;
-      if (engine.gs.activePlayer !== ctx.cardOriginalOwner) return;
+      if (engine.gs.activePlayer !== ctx.cardController) return;
       const hero = _karianHero(ctx);
       if (!hero || hero !== ctx.target) return;
       const touched = _suspendParalysis(hero);
       if (!touched) return;
-      _grantBonusAction(engine, ctx.cardOriginalOwner, ctx.cardHeroIdx);
+      _grantBonusAction(engine, ctx.cardController, ctx.cardHeroIdx);
       engine.log('karian_shake_off', { hero: hero.name, from: ctx.statusName });
       engine.sync();
     },

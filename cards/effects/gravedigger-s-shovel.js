@@ -32,7 +32,8 @@ async function onDefeat(ctx) {
   const gs = engine.gs;
   const inst = ctx.card;
   if (!inst || inst.zone !== 'support') return;
-  const ctrl = inst.controller ?? inst.owner;
+  // Styx 28.9.: am uebernommenen Helden dient die Ausruestung dem Kontrolleur.
+  const ctrl = ctx.cardController ?? inst.controller ?? inst.owner;
   const oppIdx = ctrl === 0 ? 1 : 0;
   // Ziel gehoert dem Gegner?
   if (ctx.creature) {
@@ -46,7 +47,7 @@ async function onDefeat(ctx) {
   await engine.announceHookActivation(CARD_NAME, ctrl);
   const milled = await engine.actionMillCards(oppIdx, MILL, { source: CARD_NAME });
   engine.log('gravediggers_shovel', {
-    player: gs.players[ctrl]?.username, hero: gs.players[ctrl]?.heroes?.[inst.heroIdx]?.name,
+    player: gs.players[ctrl]?.username, hero: gs.players[inst.owner]?.heroes?.[inst.heroIdx]?.name,
     milled: milled.length,
   });
   engine.sync();

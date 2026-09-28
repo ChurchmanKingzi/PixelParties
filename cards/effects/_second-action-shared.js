@@ -170,7 +170,9 @@ async function secondActionGrant(ctx, opts = {}) {
   const ps = gs.players[pi];
   if (!ps) return false;
   const heroIdx = ctx.cardHeroIdx;
-  const hostHero = ps.heroes?.[heroIdx];
+  // Kontrolle statt Seite (Styx 28.9.): Wirt ist der Held der Spalte, in
+  // der die Karte liegt (seitenfremd beschworen → Gegenseite).
+  const hostHero = gs.players[ctx.cardHeroOwner ?? pi]?.heroes?.[heroIdx];
   if (!hostHero?.name) return false;
 
   // Per-instance type id keeps multiple concurrent grants independent —
@@ -264,11 +266,12 @@ const secondActionHooks = {
     if (actionsPlayed >= 2 && saActive.length > 0) {
       const config = engine._additionalActionTypes?.[saActive[0]];
       for (const tid of saActive) engine.expireAdditionalActionType(inst, tid);
-      clearBadgeIfNoOtherGrants(engine, ctx.cardOwner, inst.heroIdx);
+      const feld = ctx.cardHeroOwner ?? ctx.cardOwner;   // Styx 28.9.: Wirt auf der Brettseite
+      clearBadgeIfNoOtherGrants(engine, feld, inst.heroIdx);
       engine.log('second_action_fizzle', {
         player: ps.username,
         source: config?.sourceLabel || inst.name,
-        hero: ps.heroes?.[inst.heroIdx]?.name,
+        hero: gs.players[feld]?.heroes?.[inst.heroIdx]?.name,
       });
       engine.sync();
     }

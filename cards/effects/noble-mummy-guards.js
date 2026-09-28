@@ -45,9 +45,12 @@ module.exports = {
    */
   surpriseTrigger: (gs, ownerIdx, heroIdx, abilityInfo, engine) => {
     // Only trigger on opponent ability attachments
+    // Styx 28.9.: `attachOwner` = Anleger (Kontrolleur), `zoneOwner` =
+    // Brettseite des Helden — beim Anlegen an einen uebernommenen Helden
+    // verschieden.
     if (abilityInfo.attachOwner === ownerIdx) return false;
     // Check that the hero has at least 1 other ability besides the new one
-    const attachPs = gs.players[abilityInfo.attachOwner];
+    const attachPs = gs.players[abilityInfo.zoneOwner ?? abilityInfo.attachOwner];
     const abZones = attachPs?.abilityZones?.[abilityInfo.attachHeroIdx] || [];
     let otherAbilityCount = 0;
     for (let z = 0; z < abZones.length; z++) {
@@ -112,7 +115,8 @@ module.exports = {
       attachHeroIdx = selectedHeroIdx;
       attachedInst = null;
     } else {
-      attachOwner = sourceInfo.attachOwner;
+      // Brettseite des Helden (Styx 28.9.), nicht der Anleger.
+      attachOwner = sourceInfo.zoneOwner ?? sourceInfo.attachOwner;
       attachHeroIdx = sourceInfo.attachHeroIdx;
       attachedInst = sourceInfo.cardInstance;
     }

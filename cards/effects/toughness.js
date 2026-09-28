@@ -44,11 +44,13 @@ module.exports = {
       const hero = ctx.attachedHero;
       if (!hero || !hero.name) return;
 
-      const ps = ctx.players[ctx.cardOwner];
+      // Styx 28.9.: Zone und Held liegen auf der Brettseite (geliehener Held).
+      const seite = ctx.cardHeroOwner ?? ctx.cardOwner;
+      const ps = ctx.players[seite];
       const zone = (ps.abilityZones[ctx.cardHeroIdx] || [])[ctx.card.zoneSlot] || [];
       const copyIndex = zone.length - 1; // 0-based (zone already includes this card)
 
-      applyBonus(ctx._engine, ctx.card, hero, ctx.cardOwner, ctx.cardHeroIdx, copyIndex);
+      applyBonus(ctx._engine, ctx.card, hero, seite, ctx.cardHeroIdx, copyIndex);
     },
 
     /**
@@ -61,14 +63,15 @@ module.exports = {
       if (!hero || !hero.name) return;
 
       const engine = ctx._engine;
+      const seite = ctx.cardHeroOwner ?? ctx.cardOwner;   // Styx 28.9.: Brettseite
       const sameZone = engine.cardInstances.filter(c =>
-        c.owner === ctx.cardOwner && c.zone === 'ability' &&
+        c.owner === seite && c.zone === 'ability' &&
         c.heroIdx === ctx.cardHeroIdx && c.zoneSlot === ctx.card.zoneSlot &&
         c.name === 'Toughness'
       );
       const processedCount = sameZone.filter(c => c.counters.hpGranted > 0).length;
 
-      applyBonus(engine, ctx.card, hero, ctx.cardOwner, ctx.cardHeroIdx, processedCount);
+      applyBonus(engine, ctx.card, hero, seite, ctx.cardHeroIdx, processedCount);
     },
 
     /**
@@ -88,13 +91,15 @@ module.exports = {
       ctx.card.counters.hpGranted = 0;
       if (hpGranted <= 0) return;
 
-      const hero = ctx.players[ctx.cardOwner]?.heroes?.[ctx.cardHeroIdx];
+      // Styx 28.9.: Held auf der Brettseite (geliehener Held).
+      const seite = ctx.cardHeroOwner ?? ctx.cardOwner;
+      const hero = ctx.players[seite]?.heroes?.[ctx.cardHeroIdx];
       if (!hero || !hero.name) return;
 
       const effective = ctx._engine.decreaseMaxHp(hero, hpGranted);
 
       ctx._engine._broadcastEvent('toughness_hp_change', {
-        owner: ctx.cardOwner, heroIdx: ctx.cardHeroIdx, amount: -effective,
+        owner: seite, heroIdx: ctx.cardHeroIdx, amount: -effective,
       });
 
       ctx.log('toughness_hp_down', { hero: hero.name, amount: effective });

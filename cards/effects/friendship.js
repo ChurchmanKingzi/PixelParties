@@ -48,15 +48,18 @@ function getFriendshipLevel(ps, heroIdx) {
  * Build the filter function for the additional action.
  * Captures engine + player references for dynamic checks.
  */
-function buildFilter(engine, pi, heroIdx) {
+function buildFilter(engine, pi, heroIdx, feld = pi) {
   return (cardData) => {
     if (!cardData || cardData.cardType !== 'Spell' || !hasSpellSchool(cardData, 'Support Magic')) return false;
 
     const ps = engine.gs.players[pi];
     if (!ps) return false;
+    // Styx 28.9.: Held und Ability-Zonen liegen auf der Brettseite (`feld`),
+    // die Zauber-Sperren gehoeren dem Kontrolleur (`pi`).
+    const hps = engine.gs.players[feld] || ps;
 
     // Lv1 restriction: no Support Spells used yet this turn
-    const level = getFriendshipLevel(ps, heroIdx);
+    const level = getFriendshipLevel(hps, heroIdx);
     if (level <= 1) {
       if (ps.supportSpellUsedThisTurn || ps.supportSpellLocked) return false;
     }
@@ -67,10 +70,10 @@ function buildFilter(engine, pi, heroIdx) {
     // Check if this hero can cast the spell (spell school level requirements)
     const spellLevel = cardData.level || 0;
     if (spellLevel > 0) {
-      const hero = ps.heroes?.[heroIdx];
+      const hero = hps.heroes?.[heroIdx];
       if (!hero?.name || hero.hp <= 0) return false;
       if (hero.statuses?.negated || hero.statuses?.frozen || hero.statuses?.stunned) return false;
-      if (!engine.heroMeetsLevelReq(pi, heroIdx, cardData)) return false;
+      if (!engine.heroMeetsLevelReq(feld, heroIdx, cardData, { levelSourcePi: pi })) return false;
     }
 
     return true;
@@ -80,8 +83,8 @@ function buildFilter(engine, pi, heroIdx) {
 /**
  * Register the additional action type and grant the action.
  */
-function setupAdditionalAction(engine, pi, heroIdx) {
-  const ps = engine.gs.players[pi];
+function setupAdditionalAction(engine, pi, heroIdx, feld = pi) {
+  const ps = engine.gs.players[feld];   // Styx 28.9.: Brettseite des Helden
   if (!ps) return;
   const level = getFriendshipLevel(ps, heroIdx);
   if (level <= 0) return;
@@ -91,12 +94,12 @@ function setupAdditionalAction(engine, pi, heroIdx) {
     label: 'Friendship',
     allowedCategories: ['spell'],
     heroRestricted: true,
-    filter: buildFilter(engine, pi, heroIdx),
+    filter: buildFilter(engine, pi, heroIdx, feld),
   });
 
   // Find the Friendship card instance for this hero to grant the action
   const friendshipInst = engine.cardInstances.find(c =>
-    c.owner === pi && c.zone === 'ability' && c.heroIdx === heroIdx && c.name === 'Friendship'
+    c.owner === feld && c.zone === 'ability' && c.heroIdx === heroIdx && c.name === 'Friendship'
   );
   if (friendshipInst) {
     engine.grantAdditionalAction(friendshipInst, typeId);
@@ -127,7 +130,7 @@ module.exports = {
       const engine = ctx._engine;
       const pi = ctx.cardOwner;
       const heroIdx = ctx.cardHeroIdx;
-      setupAdditionalAction(engine, pi, heroIdx);
+      setupAdditionalAction(engine, pi, heroIdx, ctx.cardHeroOwner ?? pi);
       engine.sync();
     },
 
@@ -139,7 +142,7 @@ module.exports = {
       const engine = ctx._engine;
       const pi = ctx.cardOwner;
       const heroIdx = ctx.cardHeroIdx;
-      setupAdditionalAction(engine, pi, heroIdx);
+      setupAdditionalAction(engine, pi, heroIdx, ctx.cardHeroOwner ?? pi);
     },
 
     /**
@@ -163,6 +166,9 @@ module.exports = {
       const pi = ctx.cardOwner;
       const heroIdx = ctx.cardHeroIdx;
       const ps = gs.players[pi];
+      // Styx 28.9.: Held und Zonen auf der Brettseite, gezogen wird vom Kontrolleur.
+      const feld = ctx.cardHeroOwner ?? pi;
+      const hps = gs.players[feld];
 
       // Gate on "was THIS spell played as Friendship's additional
       // action on THIS Hero?". server.js's spell-play path stamps
@@ -183,7 +189,7 @@ module.exports = {
       // consumed draws.
       const provider = ctx.viaAdditionalProvider;
       if (!provider || provider.name !== 'Friendship') return;
-      if (provider.owner !== pi || provider.heroIdx !== heroIdx) return;
+      if (provider.owner !== feld || provider.heroIdx !== heroIdx) return;
       if (provider.id !== ctx.card?.id) return;
 
       // Sanity: the spell must still be a Support Magic Spell. The
@@ -193,7 +199,7 @@ module.exports = {
       const spellData = ctx.spellCardData;
       if (!spellData || !hasSpellSchool(spellData, 'Support Magic')) return;
 
-      const level = getFriendshipLevel(ps, heroIdx);
+      const level = getFriendshipLevel(hps, heroIdx);
       if (level < 2) return; // Lv1 grants the action but no draw
 
       const drawCount = level >= 3 ? 3 : 1;
@@ -206,18 +212,18 @@ module.exports = {
       if (thaliaScript?.hasActiveThaliaOnSide?.(engine, pi)) {
         engine.log('friendship_draw_negated', {
           player: ps.username,
-          hero: ps.heroes[heroIdx]?.name,
+          hero: hps.heroes[heroIdx]?.name,
           by: 'Thalia, the Fun Fairy',
         });
         return;
       }
 
       // Play sparkle animation on Friendship's ability zone
-      const abZones = ps.abilityZones[heroIdx] || [];
+      const abZones = hps.abilityZones[heroIdx] || [];
       for (let z = 0; z < 3; z++) {
         if ((abZones[z] || []).includes('Friendship')) {
           engine._broadcastEvent('ability_activated', {
-            owner: pi, heroIdx, zoneIdx: z, abilityName: 'Friendship',
+            owner: feld, heroIdx, zoneIdx: z, abilityName: 'Friendship',
           });
           break;
         }
@@ -227,7 +233,7 @@ module.exports = {
       // Draw cards
       await engine.actionDrawCards(pi, drawCount);
 
-      engine.log('friendship_draw', { player: ps.username, hero: ps.heroes[heroIdx]?.name, cards: drawCount, level });
+      engine.log('friendship_draw', { player: ps.username, hero: hps.heroes[heroIdx]?.name, cards: drawCount, level });
     },
   },
 };

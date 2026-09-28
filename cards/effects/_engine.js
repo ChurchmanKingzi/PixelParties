@@ -374,14 +374,15 @@ function _applyForcesTargetingFilter(engine, targets, casterPi) {
   }
 }
 
-// ═══════════════════════════════════════════
-//  CARD INSTANCE
-//  Wraps a card name with tracking metadata.
-// ═══════════════════════════════════════════
 // Hooks, die Schaden BERECHNEN (Reduktion, Umleitung, Negation). Helden,
 // deren Tod im laufenden Schlag nur vorgemerkt ist, wirken hier noch mit
 // (siehe `heldTodAufgeschoben`).
 const SCHADENSBERECHNUNGS_HOOKS = new Set([HOOKS.BEFORE_DAMAGE, HOOKS.BEFORE_CREATURE_DAMAGE_BATCH]);
+
+// ═══════════════════════════════════════════
+//  CARD INSTANCE
+//  Wraps a card name with tracking metadata.
+// ═══════════════════════════════════════════
 
 class CardInstance {
   constructor(name, owner, zone, heroIdx = -1, zoneSlot = -1) {
@@ -3461,7 +3462,9 @@ class GameEngine {
       if (enteringCard && toZone === 'support') {
         const cd = this._getCardDB()[enteringCard.name];
         if (cd && !hasCardType(cd, 'Creature')) {
-          await this._checkSurpriseOnEquip(enteringCard.controller ?? enteringCard.owner, enteringCard.heroIdx, enteringCard);
+          // Styx 28.9.: Ausruestender nach Kontrolle (an einem uebernommenen
+          // Helden handelt die Ausruestung fuer den Uebernehmer).
+          await this._checkSurpriseOnEquip(this.effektiveSeiten(enteringCard).controller ?? enteringCard.owner, enteringCard.heroIdx, enteringCard);
         }
         if (cd && hasCardType(cd, 'Creature')) {
           await this._checkSurpriseOnSummon(enteringCard.controller ?? enteringCard.owner, enteringCard);
@@ -3511,10 +3514,15 @@ class GameEngine {
         // Reihenfolge, und eine Karte, die hier zerstoert, tut das erst,
         // nachdem alle anderen den Neuzugang gesehen haben.
         await this._checkSurpriseOnPlacement(
-          enteringCard?.controller ?? enteringCard?.owner, enteringCard, 'support');
+          this.effektiveSeiten(enteringCard).controller ?? enteringCard.owner, enteringCard, 'support');   // Styx 28.9.: nach Kontrolle
       }
       if (enteringCard && toZone === 'ability') {
-        await this._checkSurpriseOnAbility(enteringCard.controller ?? enteringCard.owner, enteringCard.heroIdx, enteringCard);
+        // Styx 28.9.: Anleger = Kontrolleur des Helden (uebernommen: der
+        // Uebernehmer), Zonenseite = Brettseite. Vorher `controller ?? owner`
+        // — bei Styx-Anlegen die Brettseite B statt des Anlegers A.
+        await this._checkSurpriseOnAbility(
+          this.effektiveSeiten(enteringCard).controller ?? enteringCard.owner,
+          enteringCard.heroIdx, enteringCard, this.physicalSide(enteringCard));
       }
     }
 
@@ -7108,16 +7116,41 @@ class GameEngine {
    * Ball from the board does.
    */
   _lightBallProtects(playerIdx, targetType, targetHeroIdx) {
-    const ps = this.gs.players[playerIdx];
-    if (!ps) return false;
-    for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-      const hero = ps.heroes[hi];
-      if (!hero?.name || hero.hp <= 0) continue;
-      if (targetType === 'hero' && hi === targetHeroIdx) continue;
-      const zones = ps.supportZones?.[hi] || [];
+    // ★ Styx 28.9.: nach KONTROLLE — „other targets you control". Bei
+    // 'hero' ist `playerIdx` die Brettseite des Zielhelden (Kontrolleur
+    // ueber `heroSideOf`), bei 'creature' bereits der Kontrolleur.
+    let ctrl = playerIdx, zielHeld = null;
+    if (targetType === 'hero') {
+      zielHeld = this.gs.players[playerIdx]?.heroes?.[targetHeroIdx] || null;
+      if (zielHeld) ctrl = this.heroSideOf(playerIdx, zielHeld);
+    }
+    for (const { physOwner, heroIdx: hi, hero } of this.heroesControlledBy(ctrl)) {
+      if (hero.hp <= 0) continue;
+      if (zielHeld && hero === zielHeld) continue;
+      const zones = this.gs.players[physOwner]?.supportZones?.[hi] || [];
       for (const slot of zones) {
         if ((slot || []).includes('Light Ball')) return true;
       }
+    }
+    return false;
+  }
+
+  /**
+   * Johanna, Crusader of Light: schuetzt die ANDEREN Helden ihres
+   * Kontrolleurs vor negativen Status (lebend, nicht Frozen/Stunned/
+   * Negated). ★ Styx 28.9.: nach Kontrolle — eine geliehene Johanna
+   * schuetzt die Helden ihres Kontrolleurs, nicht mehr die ihrer Spalte.
+   */
+  _johannaSchuetzt(zielHeld) {
+    const phys = this._findHeroOwner(zielHeld);
+    if (phys < 0) return false;
+    const ctrl = this.heroSideOf(phys, zielHeld);
+    for (const { hero: johanna } of this.heroesControlledBy(ctrl)) {
+      if (johanna.name !== 'Johanna, Crusader of Light') continue;
+      if (johanna === zielHeld) continue;   // schuetzt sich nicht selbst
+      if (johanna.hp <= 0) continue;
+      if (johanna.statuses?.frozen || (johanna.statuses?.stunned || johanna.statuses?.webbed) || johanna.statuses?.negated) continue;
+      return true;
     }
     return false;
   }
@@ -15926,13 +15959,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         const ownerIdx = this._findHeroOwner(target);
         if (ownerIdx >= 0) {
           const ownerPs = this.gs.players[ownerIdx];
-          for (let hi = 0; hi < (ownerPs?.heroes || []).length; hi++) {
-            const johanna = ownerPs.heroes[hi];
-            if (!johanna?.name) continue;
-            if (johanna.name !== 'Johanna, Crusader of Light') continue;
-            if (johanna === target) continue; // Johanna doesn't protect herself
-            if (johanna.hp <= 0) continue;
-            if (johanna.statuses?.frozen || (johanna.statuses?.stunned || johanna.statuses?.webbed) || johanna.statuses?.negated) continue;
+          if (this._johannaSchuetzt(target)) {   // Styx 28.9.: nach Kontrolle
             this.log('status_blocked', { target: this._heroLabel(target), status: statusName, reason: 'johanna_protected' });
             playBlockedAnim();
             return false;
@@ -18907,14 +18934,14 @@ this._deathWatch = (this._deathWatchStack || []).length
               let isInherent = this.cardHasInherentAction(oppIdx, hi, cd);
               if (!isInherent && cd.cardType === 'Attack' && hero.statuses?.berserked
                   && hero._berserkChargeUsedTurn !== gs.turn) isInherent = true;
-              if (!isInherent && !this.findAdditionalActionForCard(playerIdx, cd.name, hi)) continue;
+              if (!isInherent && !this.findAdditionalActionForCard(playerIdx, cd.name, hi, oppIdx)) continue;
             }
           }
           if (isMainPhase && !charmedFrei) {
             let isInherent = this.cardHasInherentAction(oppIdx, hi, cd);
             if (!isInherent && cd.cardType === 'Attack' && hero.statuses?.berserked
                 && hero._berserkChargeUsedTurn !== gs.turn) isInherent = true;
-            if (!isInherent && !this.findAdditionalActionForCard(playerIdx, cd.name, hi)) continue;
+            if (!isInherent && !this.findAdditionalActionForCard(playerIdx, cd.name, hi, oppIdx)) continue;
           }
           playable.push(cd.name);
         }
@@ -23762,6 +23789,20 @@ this._deathWatch = (this._deathWatchStack || []).length
   }
 
   /**
+   * Styx 28.9.: Stammt `source` vom Helden in Spalte (`seite`, `heroIdx`)?
+   * „Dieser Held" = gleiche Brettseite + gleicher Index. Bei Angriffen und
+   * Zaubern eines uebernommenen Helden ist `source.owner` der Kontrolleur
+   * und `source.heroOwner` die Brettseite; ohne `heroOwner` ist `owner`
+   * die Seite. Ein Vergleich nur ueber `owner` verwechselt den
+   * uebernommenen Helden mit dem gleich indizierten eigenen.
+   */
+  quelleIstHeld(source, seite, heroIdx) {
+    if (!source || typeof source !== 'object') return false;
+    if (source.heroIdx !== heroIdx) return false;
+    return (source.heroOwner ?? source.owner ?? source.controller) === seite;
+  }
+
+  /**
    * Alle Helden, die `playerIdx` gerade kontrolliert — eigene Spalte
    * ohne die abgegebenen, plus die aus der Gegenspalte uebernommenen.
    * @returns {Array<{physOwner:number, heroIdx:number, hero:object}>}
@@ -27205,11 +27246,12 @@ this._deathWatch = (this._deathWatchStack || []).length
 
     // ── Hero-based redirects (Alleria, etc.) ──
     // Scan heroes for redirect capabilities (heroRedirect flag on script)
-    for (let hi = 0; hi < (_nurNegation ? 0 : (ps.heroes || []).length); hi++) {
-      const hero = ps.heroes[hi];
+    // Styx 28.9.: alle Helden, die der Gefragte KONTROLLIERT — auch
+    // uebernommene der Gegenspalte; ein abgegebener eigener beschuetzt
+    // nicht. `physOwner` (Brettseite) geht als letztes Argument an
+    // `canHeroRedirect`/`onHeroRedirect`.
+    for (const { physOwner, heroIdx: hi, hero } of (_nurNegation ? [] : this.heroesControlledBy(targetOwnerIdx))) {
       if (!hero?.name || hero.hp <= 0) continue;
-      // Styx 28.9.: ein an den Gegner abgegebener Held beschuetzt nicht.
-      if (this.heroSideOf(targetOwnerIdx, hero) !== targetOwnerIdx) continue;
       if (hero.statuses?.frozen || (hero.statuses?.stunned || hero.statuses?.webbed) || hero.statuses?.negated) continue;
 
       const heroScript = this.heroScript(hero);
@@ -27220,7 +27262,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       // `sourceEffectKind` — Alleria leitet nur Attacks, Spells und
       // Kreatureneffekte um, keine Helden-, Artefakt- oder Potion-Effekte
       // (Als Befund: Lockes Heldeneffekt wurde umgeleitet).
-      if (heroScript.canHeroRedirect && !heroScript.canHeroRedirect(this.gs, targetOwnerIdx, hi, selected, validTargets, config, this, sourceCard)) continue;
+      if (heroScript.canHeroRedirect && !heroScript.canHeroRedirect(this.gs, targetOwnerIdx, hi, selected, validTargets, config, this, sourceCard, physOwner)) continue;
 
       // Prompt the target's owner
       const attackerName = config.title || sourceCard?.name || 'an effect';
@@ -27245,7 +27287,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       if (!this._confirmSaidYes(confirmed)) continue;
 
       // Run the hero's redirect logic (hero selection, animation, etc.)
-      const result = await heroScript.onHeroRedirect(this, targetOwnerIdx, hi, selected, validTargets, config, sourceCard);
+      const result = await heroScript.onHeroRedirect(this, targetOwnerIdx, hi, selected, validTargets, config, sourceCard, physOwner);
       if (!result?.redirectTo) continue;
 
       // Reveal hero card
@@ -29004,23 +29046,30 @@ this._deathWatch = (this._deathWatchStack || []).length
     }
   }
 
-  async _checkSurpriseOnHeroEffect(activatorIdx, heroIdx, effectName) {
+  async _checkSurpriseOnHeroEffect(activatorIdx, heroIdx, effectName, heroOwner = activatorIdx) {
     if (this._inSurpriseResolution) return null;
     const opponentIdx = activatorIdx === 0 ? 1 : 0;
-    const heroEffectInfo = { activatorIdx, heroIdx, effectName };
+    // Styx 28.9.: `heroOwner` = Brettseite des Helden (uebernommen: Gegenseite).
+    const heroEffectInfo = { activatorIdx, heroIdx, effectName, heroOwner };
     const activatorName = this.gs.players[activatorIdx]?.username || 'Opponent';
-    const effectHeroName = this.gs.players[activatorIdx]?.heroes?.[heroIdx]?.name || 'a Hero';
+    const effectHeroName = this.gs.players[heroOwner]?.heroes?.[heroIdx]?.name || 'a Hero';
     return this._scanSurpriseEntriesForPlayer(opponentIdx, 'surpriseHeroEffectTrigger', heroEffectInfo, {
       message: () => `${activatorName}'s ${effectHeroName} activated its Hero Effect!`,
     });
   }
 
-  async _checkSurpriseOnAbility(attachOwnerIdx, attachHeroIdx, attachCard) {
+  async _checkSurpriseOnAbility(attachOwnerIdx, attachHeroIdx, attachCard, zoneOwnerIdx = attachOwnerIdx) {
     if (this._inSurpriseResolution) return null;
     const opponentIdx = attachOwnerIdx === 0 ? 1 : 0;
-    const abilityInfo = { attachOwner: attachOwnerIdx, attachHeroIdx, cardName: attachCard?.name, cardInstance: attachCard };
+    // Styx 28.9.: `attachOwner` = wer anlegt (Kontrolleur), `zoneOwner` =
+    // Brettseite des Helden, an dem die Ability liegt. Beim Anlegen an einen
+    // uebernommenen Helden verschieden.
+    const abilityInfo = {
+      attachOwner: attachOwnerIdx, zoneOwner: zoneOwnerIdx, attachHeroIdx,
+      cardName: attachCard?.name, cardInstance: attachCard,
+    };
     const attachPlayerName = this.gs.players[attachOwnerIdx]?.username || 'Opponent';
-    const targetHeroName = this.gs.players[attachOwnerIdx]?.heroes?.[attachHeroIdx]?.name || 'a Hero';
+    const targetHeroName = this.gs.players[zoneOwnerIdx]?.heroes?.[attachHeroIdx]?.name || 'a Hero';
     return this._scanSurpriseEntriesForPlayer(opponentIdx, 'surpriseAbilityTrigger', abilityInfo, {
       message: () => `${attachPlayerName} attached ${attachCard?.name || 'an Ability'} to ${targetHeroName}!`,
       showCard: attachCard?.name,
@@ -29046,18 +29095,20 @@ this._deathWatch = (this._deathWatchStack || []).length
    *   `{ negateEffect: true }` laesst den Aufrufer die Aktivierung
    *   genauso abbrechen wie eine Negation aus der Kette.
    */
-  async _checkSurpriseOnAbilityActivation(activatorIdx, heroIdx, zoneIdx, abilityName) {
+  async _checkSurpriseOnAbilityActivation(activatorIdx, heroIdx, zoneIdx, abilityName, heroOwner = activatorIdx) {
     if (this._inSurpriseResolution) return null;
     const opponentIdx = activatorIdx === 0 ? 1 : 0;
+    // Styx 28.9.: `heroOwner` = Brettseite des Helden (uebernommen: Gegenseite);
+    // Stufe und Heldenname kommen von dort, nicht von der Aktivierer-Seite.
     const abilityInfo = {
-      activatorIdx, heroIdx, zoneIdx, cardName: abilityName,
+      activatorIdx, heroIdx, zoneIdx, cardName: abilityName, heroOwner,
       // Stufe = Stapelhoehe im Slot, dieselbe Rechnung wie in
       // `getAbilityTargets`. Surprises, die auf die Stufe schauen,
       // muessen sie nicht selbst herleiten.
-      level: (this.gs.players[activatorIdx]?.abilityZones?.[heroIdx]?.[zoneIdx] || []).length,
+      level: (this.gs.players[heroOwner]?.abilityZones?.[heroIdx]?.[zoneIdx] || []).length,
     };
     const activatorName = this.gs.players[activatorIdx]?.username || 'Opponent';
-    const heroName = this.gs.players[activatorIdx]?.heroes?.[heroIdx]?.name || 'a Hero';
+    const heroName = this.gs.players[heroOwner]?.heroes?.[heroIdx]?.name || 'a Hero';
     return this._scanSurpriseEntriesForPlayer(opponentIdx, 'surpriseAbilityActivationTrigger', abilityInfo, {
       message: () => `${activatorName}'s ${heroName} activated ${abilityName}!`,
       showCard: abilityName,
@@ -36698,7 +36749,7 @@ this._deathWatch = (this._deathWatchStack || []).length
    */
   expireAllAdditionalActions(playerIdx, typeId) {
     for (const inst of this.cardInstances) {
-      if (inst.owner !== playerIdx) continue;
+      if (!this._zusatzAnbieterVon(inst, playerIdx)) continue;   // Styx 28.9.: nach Kontrolle
       const g = inst.counters?.aaGrants;
       if (g && g[typeId] > 0) { g[typeId] = 0; this._syncAAMirror(inst); }
     }
@@ -36741,7 +36792,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // grant typeIds (multi-grant model).
     const byType = {};
     for (const inst of this.cardInstances) {
-      if (inst.owner !== playerIdx) continue;
+      if (!this._zusatzAnbieterVon(inst, playerIdx)) continue;   // Styx 28.9.: nach Kontrolle
       for (const [typeId] of this._instAAEntries(inst)) {
         const config = this._additionalActionTypes[typeId];
         if (!config) continue;
@@ -36784,7 +36835,7 @@ this._deathWatch = (this._deathWatchStack || []).length
    */
   consumeAdditionalAction(playerIdx, typeId, providerCardId) {
     for (const inst of this.cardInstances) {
-      if (inst.owner !== playerIdx) continue;
+      if (!this._zusatzAnbieterVon(inst, playerIdx)) continue;   // Styx 28.9.: nach Kontrolle
       if (providerCardId && inst.id !== providerCardId) continue;
       const g = inst.counters?.aaGrants;
       const avail = g ? g[typeId] : (inst.counters?.additionalActionType === typeId ? inst.counters.additionalActionAvail : 0);
@@ -36966,7 +37017,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     const cardDB = this._getCardDB();
     const result = [];
     for (const inst of this.cardInstances) {
-      if (inst.owner !== playerIdx) continue;
+      if (!this._zusatzAnbieterVon(inst, playerIdx)) continue;   // Styx 28.9.: nach Kontrolle
       if (inst.zone !== 'support') continue;
       if (inst.faceDown) continue;
       let config = null;
@@ -36999,7 +37050,23 @@ this._deathWatch = (this._deathWatchStack || []).length
     return result;
   }
 
-  findAdditionalActionForCard(playerIdx, cardName, heroIdx) {
+  /**
+   * Gehoert dieser Zusatzaktions-Anbieter dem Spieler? Nach KONTROLLE
+   * (Styx 28.9.): Karten an einem geliehenen Helden dienen dem
+   * Kontrolleur, seitenfremd beschworene Kreaturen ihrem Beschwoerer.
+   */
+  _zusatzAnbieterVon(inst, playerIdx) {
+    if (inst.owner === playerIdx && (inst.controller ?? inst.owner) === playerIdx
+        && inst.counters?.crossSideControlled == null) {
+      // Schnellweg fuer den Normalfall — nur der Held kann fremd sein.
+      if (!['hero', 'ability', 'support'].includes(inst.zone) || inst.heroIdx < 0) return true;
+      const held = this.gs.players[inst.owner]?.heroes?.[inst.heroIdx];
+      if (held?.charmedBy == null) return true;
+    }
+    return this.effektiveSeiten(inst).controller === playerIdx;
+  }
+
+  findAdditionalActionForCard(playerIdx, cardName, heroIdx, heroOwner = playerIdx) {
     if (this.additionalActionsLocked(playerIdx)) return null;   // v965
     const allCards = this._getCardDB();
     const cardData = allCards[cardName];
@@ -37011,7 +37078,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (!category) return null;
 
     for (const inst of this.cardInstances) {
-      if (inst.owner !== playerIdx) continue;
+      if (!this._zusatzAnbieterVon(inst, playerIdx)) continue;   // Styx 28.9.: nach Kontrolle
       for (const [typeId] of this._instAAEntries(inst)) {
         const config = this._additionalActionTypes[typeId];
         if (!config) continue;
@@ -37021,7 +37088,10 @@ this._deathWatch = (this._deathWatchStack || []).length
         // ★ v1004: Mission sperrt alle FREMDEN Zuschlaege.
         if (this.missionLockActive(playerIdx) && typeId !== MISSION_AA_TYPE) continue;
         // Hero-restricted: provider must be on the same hero as the spell caster
-        if (config.heroRestricted && heroIdx != null && inst.heroIdx !== heroIdx) continue;
+        // Styx 28.9.: auch die SEITE des Helden muss passen (eigener und
+        // geliehener Held koennen denselben Index haben).
+        if (config.heroRestricted && heroIdx != null
+            && (inst.heroIdx !== heroIdx || (inst.zone !== 'hand' && this.physicalSide(inst) !== heroOwner))) continue;
         // Check category
         if (config.allowedCategories && !config.allowedCategories.includes(category)) continue;
         // Check specific filter
@@ -37359,7 +37429,7 @@ this._deathWatch = (this._deathWatchStack || []).length
    */
   hasAdditionalActionForCategory(playerIdx, category) {
     for (const inst of this.cardInstances) {
-      if (inst.owner !== playerIdx) continue;
+      if (!this._zusatzAnbieterVon(inst, playerIdx)) continue;   // Styx 28.9.: nach Kontrolle
       for (const [typeId] of this._instAAEntries(inst)) {
         const config = this._additionalActionTypes[typeId];
         if (!config) continue;
@@ -37408,15 +37478,18 @@ this._deathWatch = (this._deathWatchStack || []).length
     return ps._additionalActionsLockedTurn === (this.gs?.turn || 0);
   }
 
-  findAdditionalActionForCategory(playerIdx, category, heroIdx) {
+  findAdditionalActionForCategory(playerIdx, category, heroIdx, heroOwner = playerIdx) {
     if (this.additionalActionsLocked(playerIdx)) return null;   // v965
     for (const inst of this.cardInstances) {
-      if (inst.owner !== playerIdx) continue;
+      if (!this._zusatzAnbieterVon(inst, playerIdx)) continue;   // Styx 28.9.: nach Kontrolle
       for (const [typeId] of this._instAAEntries(inst)) {
         const config = this._additionalActionTypes[typeId];
         if (!config) continue;
         if (!this._isSecondActionGrantAvailable(playerIdx, config)) continue;
-        if (config.heroRestricted && heroIdx != null && inst.heroIdx !== heroIdx) continue;
+        // Styx 28.9.: auch die SEITE des Helden muss passen (eigener und
+        // geliehener Held koennen denselben Index haben).
+        if (config.heroRestricted && heroIdx != null
+            && (inst.heroIdx !== heroIdx || (inst.zone !== 'hand' && this.physicalSide(inst) !== heroOwner))) continue;
         if (!config.allowedCategories?.includes(category)) continue;
         // ★ v1004: Mission sperrt alle FREMDEN Zuschlaege.
         if (this.missionLockActive(playerIdx) && typeId !== MISSION_AA_TYPE) continue;
@@ -38074,7 +38147,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       return true;
     }
 
-    const surprise = await this._checkSurpriseOnHeroEffect(pi, heroIdx, chosen.name);
+    const surprise = await this._checkSurpriseOnHeroEffect(pi, heroIdx, chosen.name, heroOwner);
     if (surprise?.negateEffect) {
       delete this.gs._pendingCardReveal;
       delete this.gs._pendingPlayLog;
@@ -38261,17 +38334,17 @@ this._deathWatch = (this._deathWatchStack || []).length
     // needs the main slot or a bonus / second-action grant; Main Phase
     // needs an additional-action provider for 'ability_activation'.
     // Heroes WITHOUT the flag remain Main-Phase-only and free.
-    const canSpendHeroActionCost = (heroIdx) => {
+    const canSpendHeroActionCost = (heroIdx, heroOwner = playerIdx) => {
       if (isActionPhase) {
         const actionsPlayed = ps._actionsPlayedThisPhase || 0;
         const hasBonus = (ps.bonusActions?.heroIdx === heroIdx && ps.bonusActions.remaining > 0)
           || ((ps._bonusMainActions || 0) > 0 && actionsPlayed === 1);
         const actionAlreadyUsed = (ps.heroesActedThisTurn?.length > 0) && !hasBonus;
         if (!actionAlreadyUsed) return true;
-        return !!this.findAdditionalActionForCategory(playerIdx, 'ability_activation', heroIdx);
+        return !!this.findAdditionalActionForCategory(playerIdx, 'ability_activation', heroIdx, heroOwner);
       }
       if (isMainPhase) {
-        return !!this.findAdditionalActionForCategory(playerIdx, 'ability_activation', heroIdx);
+        return !!this.findAdditionalActionForCategory(playerIdx, 'ability_activation', heroIdx, heroOwner);
       }
       return false;
     };
@@ -38435,14 +38508,23 @@ this._deathWatch = (this._deathWatchStack || []).length
       }
     }
 
-    // Also check charmed opponent heroes (Charme Lv3). Charmed Heroes
-    // activate via Main Phase only (consistent with the original design
-    // — heroEffectActionCost on a charmed Hero would let the borrowing
-    // player spend their OWN action through the opponent's Hero, which
-    // is a cross-side action-economy mess we don't support).
+    // Also check charmed opponent heroes (Charme Lv3, Golden Apple, Styx).
+    // ★ Styx 28.9. (Spieltest: geliehener Dajan in Main 1 markiert, aber
+    // der Server verlangte eine Zusatzaktion; in der Action Phase nicht
+    // markiert, obwohl der Server annahm): dieselbe Phasen-/Aktionsregel
+    // wie im Eigenzweig. Der Server bucht die Aktion eines geliehenen
+    // Helden bereits wie bei Zaubern (`doActivateHeroEffect`).
     const oi = playerIdx === 0 ? 1 : 0;
     const ops = this.gs.players[oi];
-    if (isMainPhase && ops) {
+    const _fremdPhaseOk = (hero, hi, script) => {
+      if (typeof script.onHeroEffect !== 'function') return false;   // v1166 wie im Eigenzweig
+      if (script.heroEffectActionCost) {
+        if (hero._actionLockedTurn === this.gs.turn || this.areActionsBlocked(playerIdx)) return false;
+        return canSpendHeroActionCost(hi, oi);
+      }
+      return isMainPhase;
+    };
+    if ((isMainPhase || isActionPhase) && ops) {
       for (let hi = 0; hi < (ops.heroes || []).length; hi++) {
         const hero = ops.heroes[hi];
         if (!hero?.name || hero.hp <= 0) continue;
@@ -38454,6 +38536,7 @@ this._deathWatch = (this._deathWatchStack || []).length
 
         const script = this.heroScript(hero);
         if (!script?.heroEffect) continue;
+        if (!_fremdPhaseOk(hero, hi, script)) continue;
         if (BLIND_STATUSES.some(n => hero.statuses?.[n]) && script.requiresTarget === true) continue;
         if (this.isHeroEffectBlockedByGraceShield(script, playerIdx)) continue;
 
@@ -38476,8 +38559,8 @@ this._deathWatch = (this._deathWatchStack || []).length
     }
 
     // Also check controlled opponent heroes (Controlled Attack). Same
-    // Main-Phase-only restriction as the charmed branch above.
-    if (isMainPhase && ops) {
+    // phase/action rule as the charmed branch above.
+    if ((isMainPhase || isActionPhase) && ops) {
       for (let hi = 0; hi < (ops.heroes || []).length; hi++) {
         const hero = ops.heroes[hi];
         if (!hero?.name || hero.hp <= 0) continue;
@@ -38490,6 +38573,7 @@ this._deathWatch = (this._deathWatchStack || []).length
 
         const script = this.heroScript(hero);
         if (!script?.heroEffect) continue;
+        if (!_fremdPhaseOk(hero, hi, script)) continue;
         if (BLIND_STATUSES.some(n => hero.statuses?.[n]) && script.requiresTarget === true) continue;
         if (this.isHeroEffectBlockedByGraceShield(script, playerIdx)) continue;
 
@@ -41454,14 +41538,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // path (`addHeroStatus`) which most Spells / Artifacts use to
     // freeze / stun / negate Heroes (Snow Cannon, etc.).
     if (statusDef?.negative) {
-      const johannaPs = this.gs.players[playerIdx];
-      for (let jhi = 0; jhi < (johannaPs?.heroes || []).length; jhi++) {
-        const johanna = johannaPs.heroes[jhi];
-        if (!johanna?.name) continue;
-        if (johanna.name !== 'Johanna, Crusader of Light') continue;
-        if (jhi === heroIdx) continue; // doesn't protect herself
-        if (johanna.hp <= 0) continue;
-        if (johanna.statuses?.frozen || (johanna.statuses?.stunned || johanna.statuses?.webbed) || johanna.statuses?.negated) continue;
+      if (this._johannaSchuetzt(hero)) {   // Styx 28.9.: nach Kontrolle
         this.log('status_blocked', { target: hero.name, status: statusName, reason: 'johanna_protected' });
         playBlockedAnim();
         return;

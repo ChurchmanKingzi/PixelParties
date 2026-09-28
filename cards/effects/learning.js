@@ -485,6 +485,9 @@ module.exports = {
       if (gs.activePlayer !== pi) return;
       if (ctx.casterIdx !== pi) return;
       if (ctx.heroIdx !== heroIdx) return;
+      // Styx 28.9.: „dieser Held" = gleiche Brettseite; ein uebernommener
+      // Held mit gleichem Index ist ein anderer.
+      if ((ctx.heroOwner ?? pi) !== (ctx.cardHeroOwner ?? pi)) return;
       if (gs._spellNegatedByEffect) return;
 
       // Action Phase restriction — Learning only triggers off Spells
