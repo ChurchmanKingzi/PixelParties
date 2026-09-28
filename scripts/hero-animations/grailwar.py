@@ -13,10 +13,12 @@ Dazu je Variante:
 * barker:    Barker, the Monster Tamer: Federn, Blinzeln (die Augen reichen bis
              in die rote Zeile darunter), die rote Bemalung glimmt auf und ab;
              Peitsche und Metallarmband samt Hand federn als Ganzes mit dem Arm.
-* alleria:   Alleria, the Queen of Spiders: jedes der acht Spinnenbeine dreht
-             sich einzeln um seine Wurzel (Gangbild über Kreuz, eigene Phasen),
-             der Spinnenkopf wippt eigenständig auf und ab, die ganze Figur
-             macht leichtes Squash-and-Stretch in der Senkrechten, die Spinnenaugen glühen, sie blinzelt.
+* alleria:   Alleria, the Queen of Spiders: nur ganzzahlige Verschiebungen,
+             nichts wird neu gerastert: der Körper hebt und senkt sich um
+             1 px (die Beinspitzen bleiben stehen, die Beine biegen sich mit),
+             jedes der acht Beine hebt und senkt seine Spitze einzeln
+             (Gangbild über Kreuz, eigene Phasen), der Spinnenkopf wippt
+             eigenständig auf und ab, die Spinnenaugen glühen, sie blinzelt.
 * blackstache: der Geisterpirat federt, blinzelt mit den gelben Augen, sein
              durchscheinender Körper flackert leicht; den Säbel neigt er
              leicht auf und ab (Drehung um die Faust), über die Klinge läuft
@@ -672,62 +674,85 @@ LEGS_L = [[(12, 10), (8, 9.5), (5, 11), (3, 13), (1, 15), (0, 19)],
 LEG_SEG = None
 
 
-def seg_dist(px, py, a, b):
-    ax, ay = a
-    bx, by = b
-    dx, dy = bx - ax, by - ay
-    t = max(0.0, min(1.0, ((px - ax) * dx + (py - ay) * dy) / (dx * dx + dy * dy)))
-    return math.hypot(px - ax - t * dx, py - ay - t * dy)
+def leg_pos(px, py, L):
+    """(Abstand, Anteil t entlang des Linienzugs: 0 = Wurzel, 1 = Spitze) des nächsten Punkts."""
+    segs = list(zip(L, L[1:]))
+    lens = [math.hypot(b[0] - a[0], b[1] - a[1]) for a, b in segs]
+    tot, acc, best = sum(lens), 0.0, (1e9, 0.0)
+    for (a, b), ln in zip(segs, lens):
+        dx, dy = b[0] - a[0], b[1] - a[1]
+        u = max(0.0, min(1.0, ((px - a[0]) * dx + (py - a[1]) * dy) / (ln * ln)))
+        d = math.hypot(px - a[0] - u * dx, py - a[1] - u * dy)
+        if d < best[0]:
+            best = (d, (acc + u * ln) / tot)
+        acc += ln
+    return best
+
+
+def close_gaps(part, mask):
+    """Einzelne Lücken im Bein (oben und unten Beinpixel) mit der Farbe darüber schließen."""
+    op = part[:, :, 3] > 0
+    for y in range(1, part.shape[0] - 1):
+        for x in range(part.shape[1]):
+            if not op[y, x] and op[y - 1, x] and op[y + 1, x] and mask[y - 1, x] and mask[y + 1, x]:
+                part[y, x] = part[y - 1, x]
+
+
+B24 = [0, 0, 0, 0, -1, -1, -1, -1, -1, -1, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0]
 
 
 def f_alleria(i):
     global LEG_SEG
     s = SRC.copy()
     legs = LEGS_L + [[(SW - 1 - x, y) for x, y in L] for L in LEGS_L]
-    if LEG_SEG is None:                                  # jedes Beinpixel gehört zum nächsten Linienzug
+    if LEG_SEG is None:                                  # jedes Beinpixel: nächster Linienzug + Anteil t
         lab = np.full((SH, SW), -1)
+        tt = np.zeros((SH, SW))
         for y, x in zip(*np.nonzero(s[:, :, 3])):
             if y >= 9 and (x <= 12 or x >= SW - 13):
-                d = [min(seg_dist(x, y, a, b) for a, b in zip(L, L[1:])) for L in legs]
-                lab[y, x] = int(np.argmin(d))
-        LEG_SEG = lab
-    lab = LEG_SEG
-    # Spinnenaugen glühen, sie blinzelt
-    f = 0.5 - 0.5 * math.cos(2 * math.pi * 2 * i / N)
+                best = min((leg_pos(x, y, L) + (k,) for k, L in enumerate(legs)))
+                lab[y, x], tt[y, x] = best[2], best[1]
+        LEG_SEG = (lab, tt)
+    lab, tt = LEG_SEG
+    f = 0.5 - 0.5 * math.cos(2 * math.pi * 2 * i / N)    # Spinnenaugen glühen
     for y, x in zip(*np.nonzero(s[:, :, 3])):
         if y >= 19 and hexc(s[y, x]) in ('ff0200', 'ad0100'):
             c = s[y, x]
             s[y, x] = [255, int(c[1] + 110 * f), int(c[2] + 90 * f), 255]
     blink(s, i)
-    out = np.zeros((H, W, 4), int)
+    w = 2 * math.pi * 2 * i / N
+    # Nur ganzzahlige Verschiebungen (nichts wird neu gerastert, die Pixel bleiben scharf):
+    # b = Squash/Stretch – der Körper hebt/senkt sich um 1 px, die Beinspitzen bleiben stehen;
+    # jedes Bein hebt/senkt dazu seine Spitze einzeln (Gangbild über Kreuz, eigene Phasen)
+    b = B24[i % 24]
+    phases = [0.0, 3.3, 0.4, 3.0, 3.1, 0.2, 2.9, 0.5]
+    legl = np.zeros((H, W, 4), int)
+    legm = np.zeros((H, W), bool)
+    for k in range(8):
+        lift = max(0.0, 1.6 * (math.sin(w + phases[k]) - math.sin(phases[k])))   # nur anheben, nie unter den Boden
+        for y, x in zip(*np.nonzero(lab == k)):
+            t = tt[y, x]
+            dy = int(round(b * (1 - t) - lift * t))
+            legl[y + PT + dy, x + PL] = s[y, x]
+            legm[y + PT + dy, x + PL] = True
+    close_gaps(legl, legm)
     body = s.copy()
     body[lab >= 0] = 0
-    w = 2 * math.pi * 2 * i / N
-    # jedes Bein einzeln: Drehung um seine Wurzel, Gangbild über Kreuz, dazu eigene Phase
-    phases = [0.0, 3.3, 0.4, 3.0, 3.1, 0.2, 2.9, 0.5]
-    for k in (0, 4, 1, 5, 2, 6, 3, 7):
-        m = lab == k
-        root = legs[k][0]
-        side = -1 if k < 4 else 1
-        ang = side * 0.13 * (math.sin(w + phases[k]) - math.sin(phases[k]))
-        leg = rotate_part(s, m, root, ang, (H, W), offset=(PL, PT))
-        lm = leg[:, :, 3] > 0
-        out[lm] = leg[lm]
-    # der Spinnenkopf (ab Zeile 19, mit den roten Augen) wippt eigenständig auf und ab
-    head = body.copy()
+    head = body.copy()                                   # Spinnenkopf (ab Zeile 19) wippt eigenständig
     head[:19] = 0
     body[19:] = 0
     hd = int(round(0.8 * (math.sin(w + 1.2) - math.sin(1.2))))
-    put(out, head, PL, PT + hd)
+    out = np.zeros((H, W, 4), int)
+    m = legl[:, :, 3] > 0
+    out[m] = legl[m]
+    put(out, head, PL, PT + b + hd)
     if hd > 0:                                           # Lücke unter den Händen: oberste Kopfzeile dehnen
         for x in range(SW):
             if head[19, x, 3]:
-                out[19 + PT, x + PL] = head[19, x]
-    put(out, body, PL, PT)
+                out[19 + PT + b, x + PL] = head[19, x]
+    put(out, body, PL, PT + b)
     fill_pinholes(out)
-    # leichtes Squash-and-Stretch der ganzen Figur (die Beinspitzen unten bleiben stehen)
-    sy = 1 + 0.04 * math.sin(2 * math.pi * 2 * i / N)
-    return squash(out, sy, PT + SH - 1)
+    return out
 
 
 FRAME = dict(asriel=f_asriel, barker=f_barker, blackstache=f_blackstache, chuck=f_chuck, codumbus=f_codumbus,
