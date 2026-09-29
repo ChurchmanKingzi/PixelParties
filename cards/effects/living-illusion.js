@@ -34,6 +34,7 @@
 
 const { placePollutionTokens, countFreeZones, getFreeZones } = require('./_pollution-shared');
 const { hasCardType, isOwnSideSummonableCreature } = require('./_hooks');
+const { heldSeite } = require('./_hooks');   // Als Befund 29.9.: Brettseite geliehener Helden
 
 /**
  * Return the free Support Zones belonging to a specific Hero only.
@@ -70,7 +71,7 @@ module.exports = {
   // fizzle mid-resolution. The engine calls this per hero during the
   // eligibility check and re-validates at play-time.
   canPlayWithHero(gs, pi, heroIdx) {
-    const ps = gs.players[pi];
+    const ps = gs.players[heldSeite(gs, pi, heroIdx)];
     const supZones = ps?.supportZones?.[heroIdx] || [];
     for (let z = 0; z < 3; z++) {
       if ((supZones[z] || []).length === 0) return true;

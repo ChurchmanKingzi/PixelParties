@@ -894,6 +894,18 @@ function heroCanBeEquipped(hero) {
  * Reine Lesefunktion am Heldenobjekt (ohne Engine), wie
  * `heroCanBeEquipped`.
  */
+/**
+ * Als Befund 29.9.: Brettseite des Helden (`pi`, `heroIdx`) waehrend einer
+ * Pruefung/eines Zaubers fuer einen GELIEHENEN Helden (`gs._wirkerSeite`,
+ * gesetzt von der Engine). Ohne Uebernahme = `pi`. Fuer Vertraege ohne
+ * Engine-Argument; mit Engine gleichwertig `engine.heldSeiteFuer`.
+ */
+function heldSeite(gs, pi, heroIdx) {
+  const w = gs?._wirkerSeite;
+  if (w && w.pi === pi && w.heroIdx === heroIdx && (w.heroOwner === 0 || w.heroOwner === 1)) return w.heroOwner;
+  return pi;
+}
+
 function kontrollRechteVon(hero) {
   const alle = { beschwoeren: true, ausruesten: true, abilities: true };
   if (!hero || !hero.name) return { beschwoeren: false, ausruesten: false, abilities: false };
@@ -1034,6 +1046,7 @@ function selbstsenkungZaehlt(engine, inst, cardName, ownerIdx, opts = {}) {
 }
 
 module.exports = {
+  heldSeite,
   selbstsenkungZaehlt,
   BLIND_STATUSES,
   baseCardName, sameCardName, cardVariantTag,

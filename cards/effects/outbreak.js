@@ -39,6 +39,7 @@
 // ═══════════════════════════════════════════
 
 const { getNegativeStatuses, getCleansableStatuses } = require('./_hooks');
+const { heldSeite } = require('./_hooks');   // Als Befund 29.9.: Brettseite geliehener Helden
 
 const CARD_NAME = 'Outbreak';
 const DAMAGE    = 100;
@@ -68,7 +69,7 @@ module.exports = {
    * this before the cast).
    */
   canPlayWithHero(gs, pi, heroIdx /* , cardData, engine */) {
-    const hero = gs.players[pi]?.heroes?.[heroIdx];
+    const hero = gs.players[heldSeite(gs, pi, heroIdx)]?.heroes?.[heroIdx];
     if (!hero?.name || hero.hp <= 0) return false;
     return heroHasAnyNegativeStatus(hero);
   },
@@ -85,7 +86,7 @@ module.exports = {
    * get the bypass on top of failing the prerequisite.
    */
   canPlayDespiteStatuses(gs, pi, heroIdx /* , cardData, engine */) {
-    const hero = gs.players[pi]?.heroes?.[heroIdx];
+    const hero = gs.players[heldSeite(gs, pi, heroIdx)]?.heroes?.[heroIdx];
     if (!hero?.name || hero.hp <= 0) return false;
     return heroHasAnyNegativeStatus(hero);
   },

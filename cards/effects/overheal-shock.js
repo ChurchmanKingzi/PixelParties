@@ -84,6 +84,7 @@ function countUsableHealSources(engine, pi) {
 }
 
 const { candidateHosts, pickAttachmentHost, placeAttachment } = require('./_attachment-shared');
+const { heldSeite } = require('./_hooks');   // Als Befund 29.9.: Brettseite geliehener Helden
 const CARD_NAME = 'Overheal Shock';
 
 module.exports = {
@@ -165,7 +166,7 @@ module.exports = {
     return candidateHosts(gs, pi, engine, { sides: [oi], heroFilter }).length > 0;
   },
   inherentAction(gs, pi, heroIdx, engine) {
-    const ps = gs.players[pi];
+    const ps = gs.players[heldSeite(gs, pi, heroIdx)];
     const abZones = ps.abilityZones[heroIdx] || [[], [], []];
     const smLevel = engine.countAbilitiesForSchool('Support Magic', abZones);
     if (smLevel >= 2) return true;

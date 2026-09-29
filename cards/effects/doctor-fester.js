@@ -43,6 +43,7 @@ const CARD_NAME = 'Doctor Fester';
 const FIGHTING_REQ = 2;
 
 
+const { heldSeite } = require('./_hooks');   // Als Befund 29.9.: Brettseite geliehener Helden
 module.exports = {
   activeIn: ['support'],
   creatureEffect: true,
@@ -67,7 +68,7 @@ module.exports = {
    */
   inherentAction(gs, pi, heroIdx, engine) {
     if (!engine) return false;
-    const hero = gs.players[pi]?.heroes?.[heroIdx];
+    const hero = gs.players[heldSeite(gs, pi, heroIdx)]?.heroes?.[heroIdx];
     if (!hero?.name || hero.hp <= 0) return false;
     return !anyTargetBleeding(engine);
   },

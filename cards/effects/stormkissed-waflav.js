@@ -159,7 +159,7 @@ module.exports = {
   heroEffect: true,
 
   canActivateHeroEffect(ctx) {
-    return W.canDescend(ctx._engine, ctx.cardOwner, ctx.cardHeroIdx);
+    return W.canDescend(ctx._engine, ctx.cardOwner, ctx.cardHeroIdx, ctx.cardHeroOwner ?? ctx.cardOwner);   // Als Befund 29.9.: Brettseite
   },
 
   cpuShouldUseHeroEffect(engine, pi, heroIdx) {
@@ -169,7 +169,7 @@ module.exports = {
   async onHeroEffect(ctx) {
     const engine = ctx._engine;
     return await W.performWaflavDescend(
-      engine, ctx.cardOwner, ctx.cardHeroIdx, DESCEND_GAIN,
+      engine, ctx.cardOwner, ctx.cardHeroIdx, DESCEND_GAIN, ctx.cardHeroOwner ?? ctx.cardOwner,   // Als Befund 29.9.: Brettseite
     );
   },
 

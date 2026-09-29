@@ -138,11 +138,13 @@ module.exports = {
             || engine.effectiveSchoolLevelForCaster(cd.spellSchool1, pi, heroIdx) >= lvl)
           && (!cd.spellSchool2
             || engine.effectiveSchoolLevelForCaster(cd.spellSchool2, pi, heroIdx) >= lvl);
-        if (!perOverride && !engine.heroMeetsLevelReq(pi, heroIdx, cd, { handIdx: i })) continue;
+        // Als Befund 29.9.: Stufen/Wisdom aus der Spalte des (geliehenen) Wirkers.
+        const _hs = ctx.cardHeroOwner ?? pi;
+        if (!perOverride && !engine.heroMeetsLevelReq(_hs, heroIdx, cd, _hs !== pi ? { handIdx: i, levelSourcePi: pi } : { handIdx: i })) continue;
         // Wisdom-Bezahlbarkeit wie in den anderen Zusatzaktions-Prompts:
         // reicht die Hand (ohne den Zauber selbst) nicht, faellt er weg.
         if (!perOverride) {
-          const wisdomCost = engine.getWisdomDiscardCost(pi, heroIdx, cd);
+          const wisdomCost = engine.getWisdomDiscardCost(_hs, heroIdx, cd);
           if (wisdomCost > 0 && engine.handFodderFor(pi, cardName) < wisdomCost
               && !engine.discardCostWaived(pi)) continue;
         }

@@ -122,9 +122,10 @@ function isProactivelyCastable(cd, script) {
  *   triggeringWisdom = 1 (FodderB about to leave as wisdom)
  *   effective = 0  → no card free for Learning's own wisdom cost.
  */
-function effectiveHandSize(engine, ps, pi, heroIdx, triggeringName, triggeringCd) {
+// Als Befund 29.9.: `hs` = Brettseite eines geliehenen Helden (Standard `pi`).
+function effectiveHandSize(engine, ps, pi, heroIdx, triggeringName, triggeringCd, hs = pi) {
   const handLen = (ps.hand || []).length;
-  const triggeringWisdom = engine.getWisdomDiscardCost(pi, heroIdx, triggeringCd) || 0;
+  const triggeringWisdom = engine.getWisdomDiscardCost(hs, heroIdx, triggeringCd) || 0;
   const stillResolving = (ps._resolvingCard?.name === triggeringName
     && (ps.hand || []).indexOf(triggeringName) >= 0) ? 1 : 0;
   return Math.max(0, handLen - stillResolving - triggeringWisdom);
@@ -150,7 +151,7 @@ function triggeringHandIndex(ps, triggeringName) {
  * target for this hero, with `wisdomPool` cards available to pay its
  * own discard cost.
  */
-function isNameEligibleForLearning(engine, ps, pi, heroIdx, name, requireMagicArts, wisdomPool, heroScript, cardDB) {
+function isNameEligibleForLearning(engine, ps, pi, heroIdx, name, requireMagicArts, wisdomPool, heroScript, cardDB, hs = pi) {
   const cd = cardDB[name];
   if (!cd) return false;
   if (cd.cardType !== 'Spell') return false;
@@ -159,15 +160,15 @@ function isNameEligibleForLearning(engine, ps, pi, heroIdx, name, requireMagicAr
   const script = loadCardEffect(name);
   if (!isProactivelyCastable(cd, script)) return false;
 
-  if (!engine.heroMeetsLevelReq(pi, heroIdx, cd)) return false;
+  if (!engine.heroMeetsLevelReq(hs, heroIdx, cd, hs !== pi ? { levelSourcePi: pi } : {})) return false;
 
-  const wisdomCost = engine.getWisdomDiscardCost(pi, heroIdx, cd);
+  const wisdomCost = engine.getWisdomDiscardCost(hs, heroIdx, cd);
   if (wisdomCost > 0 && wisdomPool < wisdomCost) return false;
 
   // Hero-level play restriction (e.g. Archibald's per-name dupe ban,
   // Bartas' attack restriction, …).
   if (heroScript?.canPlayCard
-      && !heroScript.canPlayCard(engine.gs, pi, heroIdx, cd, engine)) return false;
+      && !heroScript.canPlayCard(engine.gs, hs, heroIdx, cd, engine)) return false;
 
   // Spell-side custom play condition (Flame Avalanche needs targets,
   // Forbidden Zone needs a free area zone, …).
@@ -193,13 +194,13 @@ function isNameEligibleForLearning(engine, ps, pi, heroIdx, name, requireMagicAr
  * (see `effectiveHandSize`), minus one for the chosen Spell itself
  * (which leaves hand before paying its own cost).
  */
-function getEligibleHandIndices(engine, ps, pi, heroIdx, level, triggeringName, triggeringCd) {
+function getEligibleHandIndices(engine, ps, pi, heroIdx, level, triggeringName, triggeringCd, hs = pi) {
   const cardDB = engine._getCardDB();
   const hero = ps.heroes?.[heroIdx];
   const heroScript = hero?.name ? loadCardEffect(hero.name) : null;
 
   const requireMagicArts = level <= 1;
-  const effHand = effectiveHandSize(engine, ps, pi, heroIdx, triggeringName, triggeringCd);
+  const effHand = effectiveHandSize(engine, ps, pi, heroIdx, triggeringName, triggeringCd, hs);
   // `effHand` already subtracts the still-resolving triggering Spell
   // and its Wisdom cost. The chosen Spell itself will leave hand to
   // resolve BEFORE its own Wisdom is paid, so it can't fund its own
@@ -216,7 +217,7 @@ function getEligibleHandIndices(engine, ps, pi, heroIdx, level, triggeringName, 
     if (baseCardName(name) === baseCardName(triggeringName)) continue;   // v876
     let ok = cache.get(name);
     if (ok === undefined) {
-      ok = isNameEligibleForLearning(engine, ps, pi, heroIdx, name, requireMagicArts, wisdomPool, heroScript, cardDB);
+      ok = isNameEligibleForLearning(engine, ps, pi, heroIdx, name, requireMagicArts, wisdomPool, heroScript, cardDB, hs);
       cache.set(name, ok);
     }
     if (ok) out.push(i);
@@ -254,7 +255,7 @@ function wisdomPayableIndices(ps, triggeringName) {
  * the triggering Spell's hand index excluded so it can't be siphoned
  * away from the outer handler that owns its lifecycle.
  */
-async function castLearningSpell(engine, pi, heroIdx, hero, cardName, abilityZoneSlot, triggeringName) {
+async function castLearningSpell(engine, pi, heroIdx, hero, cardName, abilityZoneSlot, triggeringName, hs = pi) {
   const gs = engine.gs;
   const ps = gs.players[pi];
   const cardDB = engine._getCardDB();
@@ -314,19 +315,21 @@ async function castLearningSpell(engine, pi, heroIdx, hero, cardName, abilityZon
   // `ps.heroes[-1] = undefined` and silently fizzle while still
   // costing Wisdom.
   if (handInst) handInst.heroIdx = heroIdx;
+  if (handInst && hs !== pi) handInst.heroOwner = hs;   // Als Befund 29.9.: geliehener Wirker
 
   // ── Flash on Learning's slot before resolution. ──
   engine._broadcastEvent('ability_activated', {
-    owner: pi, heroIdx, zoneIdx: abilityZoneSlot,
+    owner: hs, heroIdx, zoneIdx: abilityZoneSlot,
   });
 
   // ── Step 2: reaction window (spell still in hand — Anti Magic
   // Shield / The Master's Plan can negate). ──
   const chainResult = await engine.executeCardWithChain({
     cardName, owner: pi, heroIdx, cardType: cd.cardType, goldCost: 0,
+    ...(hs !== pi ? { casterOwner: hs } : {}),
   });
 
-  const wisdomCost = engine.getWisdomDiscardCost(pi, heroIdx, cd);
+  const wisdomCost = engine.getWisdomDiscardCost(hs, heroIdx, cd);
 
   /** Find the chosen Spell's current hand position, skipping the
    *  triggering Spell's slot so a same-name copy of the trigger is
@@ -380,6 +383,9 @@ async function castLearningSpell(engine, pi, heroIdx, hero, cardName, abilityZon
   // instance located above is the synth instance the hooks operate on. ──
   gs._immediateActionContext = true;
   gs._learningCasting = pi;
+  // Als Befund 29.9.: Wirker-Seite fuer Stufen-/Seitenabfragen des Nachgusses.
+  const _wirkerVorher = gs._wirkerSeite;
+  if (hs !== pi) gs._wirkerSeite = { pi, heroIdx, heroOwner: hs };
   gs._spellResolutionDepth = (gs._spellResolutionDepth || 0) + 1;
   // ★ v1476: eigenes Schadensprotokoll fuer den Nachguss (wie v1469 in
   // `_castSpellImmediately`) — sonst saehe `afterSpellResolved` auch die
@@ -404,7 +410,7 @@ async function castLearningSpell(engine, pi, heroIdx, hero, cardName, abilityZon
       }
       await engine.runHooks('afterSpellResolved', {
         spellName: cardName, spellCardData: cd,
-        heroIdx, casterIdx: pi,
+        heroIdx, casterIdx: pi, ...(hs !== pi ? { heroOwner: hs } : {}),
         damageTargets: uniqueTargets,
         isSecondCast: false,
         _skipReactionCheck: true,
@@ -416,6 +422,7 @@ async function castLearningSpell(engine, pi, heroIdx, hero, cardName, abilityZon
     gs._spellResolutionDepth = Math.max(0, (gs._spellResolutionDepth || 1) - 1);
     delete gs._immediateActionContext;
     delete gs._learningCasting;
+    if (hs !== pi) { if (_wirkerVorher === undefined) delete gs._wirkerSeite; else gs._wirkerSeite = _wirkerVorher; }
     delete gs._spellNegatedByEffect;
     // v1476: aeusseres Protokoll zurueck (auch bei Fehler/Abbruch).
     if (_aeussererLog === undefined) delete gs._spellDamageLog;
@@ -527,7 +534,8 @@ module.exports = {
       const hoptKey = `learning:${pi}:${heroIdx}:${abilityZoneSlot}`;
       if (gs.hoptUsed?.[hoptKey] === gs.turn) return;
 
-      const eligibleIndices = getEligibleHandIndices(engine, ps, pi, heroIdx, level, triggeringName, sd);
+      const hs = ctx.cardHeroOwner ?? pi;   // Als Befund 29.9.: Brettseite
+      const eligibleIndices = getEligibleHandIndices(engine, ps, pi, heroIdx, level, triggeringName, sd, hs);
       if (eligibleIndices.length === 0) return;
 
       // Claim HOPT BEFORE the prompt — when Learning is stacked in this
@@ -561,11 +569,11 @@ module.exports = {
       // set and confirm the picked Spell is still in it; this catches
       // both "slot vanished" and "Wisdom no longer affordable" with
       // one check and stays in sync with the picker's filter logic.
-      const liveEligible = getEligibleHandIndices(engine, ps, pi, heroIdx, level, triggeringName, sd);
+      const liveEligible = getEligibleHandIndices(engine, ps, pi, heroIdx, level, triggeringName, sd, hs);
       const stillEligible = liveEligible.some(i => ps.hand[i] === pickedName);
       if (!stillEligible) return;
 
-      await castLearningSpell(engine, pi, heroIdx, hero, pickedName, abilityZoneSlot, triggeringName);
+      await castLearningSpell(engine, pi, heroIdx, hero, pickedName, abilityZoneSlot, triggeringName, hs);
     },
   },
 };

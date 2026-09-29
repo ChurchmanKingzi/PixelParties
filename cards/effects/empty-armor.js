@@ -47,6 +47,7 @@
 // ═══════════════════════════════════════════
 
 const { usesLeft, spendUse } = require('./_charges');
+const { heldSeite } = require('./_hooks');   // Als Befund 29.9.: Brettseite geliehener Helden
 
 const CARD_NAME = 'Empty Armor';
 const PREIS = 100;
@@ -104,7 +105,7 @@ module.exports = {
   /** Nur ERZWUNGEN (kein Aktionsplatz frei) ist der Weg von vornherein frei. */
   inherentAction(gs, pi, heroIdx, engine) {
     if (!engine) return false;
-    if (!volleHp(gs.players[pi]?.heroes?.[heroIdx])) return false;
+    if (!volleHp(gs.players[heldSeite(gs, pi, heroIdx)]?.heroes?.[heroIdx])) return false;
     return !aktionFrei(engine, pi, heroIdx);
   },
 

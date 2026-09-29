@@ -125,7 +125,7 @@ module.exports = {
   heroEffect: true,
 
   canActivateHeroEffect(ctx) {
-    return W.canDescend(ctx._engine, ctx.cardOwner, ctx.cardHeroIdx);
+    return W.canDescend(ctx._engine, ctx.cardOwner, ctx.cardHeroIdx, ctx.cardHeroOwner ?? ctx.cardOwner);   // Als Befund 29.9.: Brettseite
   },
 
   cpuShouldUseHeroEffect(engine, pi, heroIdx) {
@@ -134,7 +134,7 @@ module.exports = {
 
   async onHeroEffect(ctx) {
     return await W.performWaflavDescend(
-      ctx._engine, ctx.cardOwner, ctx.cardHeroIdx, DESCEND_GAIN,
+      ctx._engine, ctx.cardOwner, ctx.cardHeroIdx, DESCEND_GAIN, ctx.cardHeroOwner ?? ctx.cardOwner,
     );
   },
 

@@ -50,6 +50,7 @@ function _playerHasAscendedHero(gs, pi, engine) {
   return false;
 }
 
+const { heldSeite } = require('./_hooks');   // Als Befund 29.9.: Brettseite geliehener Helden
 module.exports = {
   // ★★ v1182 — ENTKOPPELTE BILDER (CARD_API): wird die Karte NEGIERT,
   // laeuft ihr Effekt-Rumpf nie — die Engine spielt dann diese Bilder.
@@ -79,7 +80,7 @@ module.exports = {
     const ps = gs.players[pi];
     if (!ps) return false;
     if ((ps.hand || []).length >= HAND_TARGET_PLUS_SELF) return false;
-    return _heroIsAscended(ps.heroes?.[heroIdx], engine._getCardDB());
+    return _heroIsAscended(gs.players[heldSeite(gs, pi, heroIdx)]?.heroes?.[heroIdx], engine._getCardDB());
   },
 
   hooks: {

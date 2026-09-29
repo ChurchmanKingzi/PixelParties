@@ -32,6 +32,7 @@
 // ═══════════════════════════════════════════
 
 const { hasCardType } = require('./_hooks');
+const { heldSeite } = require('./_hooks');   // Als Befund 29.9.: Brettseite geliehener Helden
 
 const CARD_NAME = 'Spirit of the Relic Hammer';
 const HAMMER = 'Earth-Shattering Hammer, Relic of Deri';
@@ -63,13 +64,13 @@ module.exports = {
   /** ① „can only be summoned by a Hero equipped with …\" */
   canPlayWithHero(gs, pi, heroIdx, cardData, engine) {
     if (!engine) return true;
-    return hatHammer(engine, pi, heroIdx);
+    return hatHammer(engine, heldSeite(gs, pi, heroIdx), heroIdx);
   },
 
   /** ③ „If the user has Summoning Magic 3, … additional Action.\" */
   inherentAction(gs, pi, heroIdx, engine) {
     if (!engine) return false;
-    const abZones = gs.players[pi]?.abilityZones?.[heroIdx] || [];
+    const abZones = gs.players[heldSeite(gs, pi, heroIdx)]?.abilityZones?.[heroIdx] || [];
     return engine.countAbilitiesForSchool('Summoning Magic', abZones) >= SM_SCHWELLE;
   },
 
