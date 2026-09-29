@@ -19,7 +19,7 @@ Frame 0 ist immer die Ruhepose.
             Dampf aus dem Kopf; er blinzelt.
 * sabrina:  Sabrina, the Psychic Witch: ihre grünen Augen glühen auf, psychische Lichtkugeln
             umkreisen sie (hinter ihr verschwinden sie ganz), sie atmet und blinzelt.
-* bartas:   Bomb Berserker Bartas schlägt periodisch die Fäuste in der Mitte zusammen, hinter ihm knallen kleine
+* bartas:   Bomb Berserker Bartas schlägt alle 12 Frames die Fäuste in der Mitte zusammen, hinter ihm knallen kleine
             Explosionen und steigt Glut auf; er atmet und blinzelt.
 * gon:      Gon, the Frostbringer hebt und senkt langsam beide Arme (auch den gefrorenen), Schnee rieselt
             um ihn, Eisnebel zieht vorbei, auf der gefrorenen Seite blitzen Eiskristalle.
@@ -660,8 +660,8 @@ SYSTEM = None
 
 
 # ---------------------------------------------------------------- Bartas
-CLAP = {9: 1, 10: 1, 11: 1, 33: 1, 34: 1, 35: 1}      # die Fäuste fahren zur Mitte und schlagen zusammen
-IMPACT = {10: 0, 11: 1, 34: 0, 35: 1}
+CLAP = {k: 1 for st in (3, 15, 27, 39) for k in (st, st + 1, st + 2)}   # alle 12 Frames: Fäuste zur Mitte …
+IMPACT = {k: j for st in (3, 15, 27, 39) for j, k in enumerate((st + 1, st + 2))}   # … und zusammengeschlagen
 FIST_L = (0, 5, 13, 15)                                 # linke Faust (mit Kontur rechts daneben)
 FIST_R = (8, 13, 13, 15)
 BOOMS = [(5, 8, 0, 2), (29, 6, 4, 1), (6, 26, 9, 2), (30, 22, 13, 2), (5, 16, 17, 1), (28, 14, 21, 2),
@@ -782,19 +782,23 @@ def fire_aura(out, fig, i):
     """Flammen hinter der Figur, die gerade nach oben brennen. Je freiem Pixel der Abstand zur Figur
     darunter (senkrecht gestreckt: Zungen gehen hoch, seitlich kaum); die Zungenlänge je Spalte
     flackert als stehende Welle (keine Seitwärtsdrift) plus Zufallszucken, darüber lösen sich
-    kleine Flammenfetzen und steigen senkrecht auf. Farbe nach relativer Höhe in der Zunge: innen
-    fast weiß, gelb, orange, an der Spitze rot – kein Farbblock bleibt stehen, die Kontur lebt."""
+    einzelne Funken und steigen senkrecht auf. Farbe nach relativer Höhe in der Zunge, strikt
+    geordnet: innen fast weiß, gelb, orange, außen ein zusammenhängender roter Saum – über Rot
+    kommt nur noch ein losgelöster Funke."""
     Hh, Ww = fig.shape
     fy, fx = np.nonzero(fig)
     w = 2 * math.pi * i / N
     k1 = 2 * math.pi * 8 / N
+    def length(x):
+        return 4.4 * (1 + 0.25 * math.sin(0.9 * x) * math.sin(5 * w) + 0.2 * math.sin(1.7 * x + 1) * math.sin(7 * w + 2)
+                      + 0.3 * math.sin(2.7 * x + 0.4) * math.sin(11 * w + 1) + 0.15 * (_hash(x, i, 3) - 0.5))
+    Ls = [length(x) for x in range(Ww)]
+    solid = np.zeros((Hh, Ww), bool)
     for x in range(1, Ww - 1):
         near = np.abs(fx - x) <= 3
         if not near.any():
             continue
-        L = 4.4 * (1 + 0.25 * math.sin(0.9 * x) * math.sin(5 * w) + 0.2 * math.sin(1.7 * x + 1) * math.sin(7 * w + 2)
-                   + 0.3 * math.sin(2.7 * x + 0.4) * math.sin(11 * w + 1) + 0.4 * (_hash(x, i, 3) - 0.5))
-        ph = 1.6 * math.sin(0.7 * x) + 0.9 * math.sin(1.9 * x + 0.5)
+        L = (Ls[x - 1] + 2 * Ls[x] + Ls[x + 1]) / 4          # benachbarte Zungen hängen zusammen
         for y in range(1, Hh - 1):
             if fig[y, x] or out[y, x, 3]:
                 continue
@@ -803,22 +807,23 @@ def fire_aura(out, fig, i):
                 continue
             d = np.min(np.hypot((fx[m] - x) * 1.5, (fy[m] - y) * 0.55))
             r = d / L
-            c = None
-            if r < 0.28:
-                c = FLAME[3]
-            elif r < 0.52:
-                c = FLAME[2]
-            elif r < 0.78:
-                c = FLAME[1]
-            elif r < 1.0:
-                c = FLAME[0]
-            elif r < 1.7:                               # abgerissene Fetzen steigen auf
-                blob = math.sin(k1 * (y + i) + ph)
-                if blob > 0.82 - 0.25 * (1.7 - r):
-                    c = FLAME[1] if r < 1.2 and blob > 0.95 else FLAME[0]
+            c = FLAME[3] if r < 0.28 else FLAME[2] if r < 0.52 else FLAME[1] if r < 0.78 else FLAME[0] if r < 1.0 else None
             if c:
                 out[y, x] = rgb(c)
-
+                solid[y, x] = True
+    ph = [1.6 * math.sin(0.7 * x) + 0.9 * math.sin(1.9 * x + 0.5) for x in range(Ww)]
+    for x in range(1, Ww - 1):                          # Funken: lösen sich über den Spitzen, steigen
+        for y in range(1, Hh - 1):                      # senkrecht auf, berühren die Flamme nie
+            if out[y, x, 3] or fig[y, x]:
+                continue
+            col = np.nonzero(solid[:, x])[0]
+            if not len(col) or y >= col.min() - 1:
+                continue
+            gap = col.min() - y
+            if gap > 6:
+                continue
+            if math.sin(k1 * (y + i) + ph[x]) > 0.93 and not solid[max(0, y - 1):y + 2, max(0, x - 1):x + 2].any():
+                out[y, x] = rgb(FLAME[0] if gap > 2 else FLAME[1])
 
 def ida_base(i):
     s = SRC.copy()
