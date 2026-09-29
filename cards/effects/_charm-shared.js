@@ -43,6 +43,8 @@
  *   Karte sind dann trotzdem bezahlt — wie bei Charme Lv3, wo der HOPT
  *   ebenfalls verbraucht bleibt.
  */
+const { KONTROLL_RECHTE } = require('./_hooks');
+
 async function temporaereKontrolle(engine, {
   controllerPi,
   ownerPi,
@@ -93,6 +95,10 @@ async function temporaereKontrolle(engine, {
   hero.statuses.charmed = { controller: controllerPi, appliedTurn: gs.turn };
   engine._heldenStatusVerursacher(hero.statuses.charmed, { appliedBy: controllerPi });   // v1399
   if (marker) hero.statuses.charmed[marker] = true;
+  // Als Vorgabe 29.9.: Charme („It and its Support Zones are unaffected")
+  // gibt dem Kontrolleur nichts; ohne Sperre im Kartentext (Golden Apple)
+  // darf er beschwoeren und ausruesten.
+  hero._kontrollRechte = { ...(supportZonesLocked ? KONTROLL_RECHTE.nichts : KONTROLL_RECHTE.brett) };
 
   // ⑤ Support-Zonen nur auf Ansage
   if (supportZonesLocked) {

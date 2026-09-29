@@ -6536,7 +6536,7 @@ async function doPlayAbilityFremd(room, pi, { cardName, handIndex, heroIdx, zone
   abZones[ziel].push(cardName);
   (fromCreation ? ps.creationZone : ps.hand).splice(handIndex, 1);
   engine.notePlayedFromHand(pi);
-  hero.statuses.charmed.abilityZug = gs.turn;
+  hero._abilityZug = gs.turn;   // Als Vorgabe 29.9.: am Helden (auch dauerhafte Uebernahme)
 
   const inst = engine._trackCard(cardName, heroOwner, 'ability', heroIdx, ziel);
   inst.originalOwner = kartenBesitzer;
@@ -6553,7 +6553,7 @@ async function doPlayAbilityFremd(room, pi, { cardName, handIndex, heroIdx, zone
       const idx = slot.lastIndexOf(cardName);
       if (idx >= 0) slot.splice(idx, 1);
       engine._untrackCard(inst.id);
-      delete hero.statuses?.charmed?.abilityZug;
+      delete hero._abilityZug;
       const negatedAbilityOwner = engine._consumeHandCardOrigin(pi, cardName);
       await engine.routeNegatedInitialCard(negatedAbilityOwner, cardName, chainResult, -1,
         { fromZone: 'ability', fromHeroIdx: heroIdx, fromSlotIdx: ziel });
@@ -8864,6 +8864,9 @@ async function doPlayCreature(room, pi, { cardName, handIndex, heroIdx, zoneSlot
   // verzauberte Helden ausdruecklich anbietet, leuchtete der Client und
   // der Server schickte die Beschwoerung woanders hin.
   const heroOwner = charmedOwner != null ? charmedOwner : pi;
+  // Als Vorgabe 29.9.: Charme („It and its Support Zones are unaffected")
+  // erlaubt kein Beschwoeren ueber den uebernommenen Helden.
+  if (charmedOwner != null && !room.engine.kontrollRechte(charmedOwner, heroIdx).beschwoeren) return false;
   const v = room.engine.validateActionPlay(pi, cardName, handIndex, heroIdx, ['Creature'], { zoneSlot, fromCreation, charmedOwner });
   if (!v) return _no('validate-nein');
   const { ps, cardData, hero, script, isActionPhase, isMainPhase, isInherentAction } = v;

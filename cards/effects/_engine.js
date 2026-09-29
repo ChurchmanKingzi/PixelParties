@@ -5,7 +5,7 @@
 // ═══════════════════════════════════════════════════════════════════
 
 const { v4: uuidv4 } = require('uuid');
-const { SPEED, HOOKS, PHASES, PHASE_NAMES, ZONES, STATUS_EFFECTS, getNegativeStatuses, BUFF_EFFECTS, hasCardType, hasSpellSchool, isArtifactCreature, POISON_BASE_DAMAGE, BURN_BASE_DAMAGE, baseCardName, BLIND_STATUSES, getCleansableStatuses } = require('./_hooks');
+const { SPEED, HOOKS, PHASES, PHASE_NAMES, ZONES, STATUS_EFFECTS, getNegativeStatuses, BUFF_EFFECTS, hasCardType, hasSpellSchool, isArtifactCreature, POISON_BASE_DAMAGE, BURN_BASE_DAMAGE, baseCardName, BLIND_STATUSES, getCleansableStatuses, kontrollRechteVon, KONTROLL_RECHTE } = require('./_hooks');
 // v1443: Hooks, deren Kontext die ausloesende Karte mitbekommt
 // (`ausloeserName`, s. `runHooks`) — fuer Reaktionen, die zeigen, worauf
 // sie reagieren.
@@ -11664,6 +11664,7 @@ class GameEngine {
       delete hero.charmedHeroIdx;
     }
     if (hero.statuses?.charmed) delete hero.statuses.charmed;
+    delete hero._kontrollRechte;   // Als Vorgabe 29.9.
     this.log('control_returned_on_death', { hero: hero.name, by: quelle });
   }
 
@@ -11679,10 +11680,21 @@ class GameEngine {
     if (heroOwner === pi) return false;
     const hero = this.gs.players[heroOwner]?.heroes?.[heroIdx];
     if (!hero?.name || !(hero.hp > 0)) return false;
-    if (hero.charmedBy !== pi) return false;
+    if (this.heroSideOf(heroOwner, hero) !== pi) return false;
+    // Als Vorgabe 29.9.: Abilities nur, wenn die Uebernahme es erlaubt
+    // (Styx; dauerhafte Uebernahme zaehlt wie ein eigener Held).
+    if (!this.kontrollRechte(heroOwner, heroIdx).abilities) return false;
     const ch = hero.statuses?.charmed;
-    if (!ch?.abilitiesErlaubt) return false;
-    return ch.abilityZug !== this.gs.turn;
+    return (hero._abilityZug ?? ch?.abilityZug) !== this.gs.turn;
+  }
+
+  /**
+   * Rechte des Kontrolleurs an einem uebernommenen Helden (Als Vorgabe
+   * 29.9.) — siehe `kontrollRechteVon` in `_hooks.js`.
+   * @returns {{beschwoeren:boolean, ausruesten:boolean, abilities:boolean}}
+   */
+  kontrollRechte(physOwner, heroIdx) {
+    return kontrollRechteVon(this.gs.players[physOwner]?.heroes?.[heroIdx]);
   }
 
   /**
@@ -18921,6 +18933,8 @@ this._deathWatch = (this._deathWatchStack || []).length
           // Creature checks: summonLocked is on the acting player, support zones on the hero owner
           if (hasCardType(cd, 'Creature')) {
             if (ps.summonLocked) continue;
+            // Als Vorgabe 29.9.: Charme sperrt „its Support Zones"
+            if (!this.kontrollRechte(oppIdx, hi).beschwoeren) continue;
             const supZones = oppPs.supportZones[hi] || [];
             let hasFree = false;
             for (let z = 0; z < 3; z++) { if ((supZones[z] || []).length === 0) { hasFree = true; break; } }
@@ -20805,6 +20819,8 @@ this._deathWatch = (this._deathWatchStack || []).length
         if (hero?.controlledBy != null) {
           delete hero.controlledBy;
         }
+        // Rechte der temporaeren Uebernahme (Als Vorgabe 29.9.) enden mit ihr.
+        if (hero?._kontrollRechte) delete hero._kontrollRechte;
       }
     }
     delete this.gs._charmedSupportLocked;
@@ -23648,6 +23664,9 @@ this._deathWatch = (this._deathWatchStack || []).length
     hero.charmedHeroIdx = heroIdx;
     if (!hero.statuses) hero.statuses = {};
     hero.statuses.charmed = { controller: stealerPi, appliedTurn: gs.turn };
+    // Als Vorgabe 29.9.: ohne Support-Zonen-Sperre im Kartentext darf der
+    // Kontrolleur beschwoeren und ausruesten (Molinda, Succubus).
+    hero._kontrollRechte = { ...(opts.kontrollRechte || KONTROLL_RECHTE.brett) };
     if (!gs._charmedSupportLocked) gs._charmedSupportLocked = [];
     gs._charmedSupportLocked.push({ owner: heroOwnerPi, heroIdx });
 
@@ -24462,8 +24481,10 @@ this._deathWatch = (this._deathWatchStack || []).length
       const out = [];
       const seiten = [...new Set(this.heroesControlledBy(playerIdx).map(e => e.physOwner))];
       for (const seite of seiten) {
+        // Als Vorgabe 29.9.: nur Helden, deren Uebernahme das Beschwoeren
+        // erlaubt (Charme sperrt „its Support Zones").
         const erlaubt = new Set(this.heroesControlledBy(playerIdx)
-          .filter(e => e.physOwner === seite).map(e => e.heroIdx));
+          .filter(e => e.physOwner === seite && kontrollRechteVon(e.hero).beschwoeren).map(e => e.heroIdx));
         for (const z of this.getFreeSupportZones(seite, { ...opts, nachKontrolle: false, namedHeroesOnly: true })) {
           if (!erlaubt.has(z.heroIdx)) continue;
           out.push({ ...z, owner: seite });

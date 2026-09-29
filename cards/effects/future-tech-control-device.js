@@ -95,6 +95,9 @@ module.exports = {
     if (!held?.name || held.hp <= 0) return false;
 
     held.controlledBy = pi;
+    // Als Vorgabe 29.9.: keine Support-Zonen-Sperre im Kartentext → der
+    // Kontrolleur darf beschwoeren und ausruesten (keine Abilities).
+    held._kontrollRechte = { beschwoeren: true, ausruesten: true, abilities: false };
 
     await engine.runHooks('onTakeControl', {
       controllerPi: pi, originalOwnerPi: oi,
@@ -169,7 +172,7 @@ module.exports = {
       // Kein Unterhalt → die ausgeruestete Karte geht in SEINE Ablage.
       const held = wirtsheld(engine, inst);
       engine.log('ft_control_device_upkeep', { player: ps.username, paid: false });
-      if (held && held.controlledBy === pi) delete held.controlledBy;
+      if (held && held.controlledBy === pi) { delete held.controlledBy; delete held._kontrollRechte; }
       await engine.actionDestroyCard(
         { name: CARD_NAME, owner: pi, heroIdx: inst.heroIdx }, inst,
         { toOwnerDiscard: true },

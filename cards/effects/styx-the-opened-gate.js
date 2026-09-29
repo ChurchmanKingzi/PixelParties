@@ -252,6 +252,9 @@ module.exports = {
       };
       engine._heldenStatusVerursacher?.(hero.statuses.charmed, { appliedBy: pi });
       hero._kontrolleBisZumTod = { by: CARD_NAME, turn: gs.turn };
+      // Als Vorgabe 29.9.: „Ueber Styx ist ALLES freigegeben“ — beschwoeren,
+      // ausruesten, Attachments und Abilities.
+      hero._kontrollRechte = { beschwoeren: true, ausruesten: true, abilities: true };
       engine.log('styx_gate_control', {
         player: gs.players[pi]?.username, target: hero.name,
         targetOwner: gs.players[ziel.owner]?.username,
