@@ -102,7 +102,10 @@ def main(path):
     one('grisgar-emissary-of-the-demon-lord', g('Grisgar #2'))
     one('nieht-the-blitz-blade', g('Nieht-Kopie'))
     one('kohta-the-silent-observer', box(g('Kohta #1'), 0, 0, 10000, 196))
-    one('bill-the-angry-auctioneer', biggest(g('Bill')))
+    bill = g('Bill')                                       # ohne die Striche um ihn herum (zwei Brauntöne)
+    stray = np.isin(bill[:, :, 0].astype(int) * 65536 + bill[:, :, 1].astype(int) * 256 + bill[:, :, 2],
+                    [0x6b5539, 0x312421])
+    one('bill-the-angry-auctioneer', biggest(only(bill, ~stray)))
     one('sabrina-the-psychic-witch', g('Sabrina #1'))
     one('silent-water-mizune', layer_over(g('Mizune #2'), g('Mizune #3')))
     one('bomb-berserker-bartas', g('Bartas'))
