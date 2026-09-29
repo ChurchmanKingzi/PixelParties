@@ -31988,7 +31988,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     // effect (Resistance, etc.). Same payload shape as ability_activated
     // — owner / heroIdx / zoneIdx pinpoint the slot.
     const onAbilityBlockFlash = ({ owner, heroIdx, zoneIdx }) => {
-      if (window.playSFX) window.playSFX('ui_cancel', { dedupe: 800, volume: 0.5 });
+      if (window.playSFX) window.playSFX('ui_cancel', { dedupe: 800, volume: 1.0 });
       setAbilityBlockFlash({ owner, heroIdx, zoneIdx });
       setTimeout(() => setAbilityBlockFlash(null), 1800);
     };

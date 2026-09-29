@@ -140,7 +140,7 @@ function PlayerProfilePopup({ seed, onClose }) {
 
   return (
     <div className="ppf-veil"
-      onMouseDown={(e) => { if (e.target === e.currentTarget) { ppfSfx('ui_cancel', { dedupe: 250, volume: 0.4 }); onClose(); } }}>
+      onMouseDown={(e) => { if (e.target === e.currentTarget) { ppfSfx('ui_cancel', { dedupe: 250, volume: 1.0 }); onClose(); } }}>
       <div className="ppf-panel menu-popup-dither pp-eckzier" role="dialog" aria-modal="true"
         aria-label={(p.username || seed.username) + ' profile'}
         style={{ '--ppf-color': color }}>
