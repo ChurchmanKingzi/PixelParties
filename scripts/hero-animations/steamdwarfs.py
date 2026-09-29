@@ -28,7 +28,7 @@ B24 = [BOUNCE12[(k // 2) % 12] for k in range(24)]  # gemächlich: ein Federn je
 BLINK = {14: 'halb', 15: 'zu', 16: 'zu', 17: 'halb', 38: 'halb', 39: 'zu', 40: 'zu', 41: 'halb'}
 
 V_ = {
-    'quetza': dict(slug='quetzahuitl-receiver-of-sacrifices', pads=(21, 23, 6, 4)),
+    'quetza': dict(slug='quetzahuitl-receiver-of-sacrifices', pads=(22, 24, 6, 4)),
     'emerald': dict(slug='quetzahuitl-the-emerald-dragon', pads=(4, 4, 6, 6),
                     skin='Quetzahuitl, Receiver of Sacrifices'),
     'lyta': dict(slug='little-lyta-the-amazon-princess', knee=20, pads=(4, 2, 3, 1)),
@@ -162,14 +162,19 @@ QZ_BLINK = {'halb': [((72, 79), '051c09'), ((73, 79), '051c09')],
                    ((75, 83), '051c09')]}
 
 
-def rot_wing(src, pivot, ang, span, oy):
-    """Flügel um sein Schultergelenk drehen (ang in Grad, positiv = im Uhrzeigersinn) und entlang des
-    Radius perspektivisch verkürzen (span <= 1). Rückwärts abgebildet mit 3x3-Überabtastung und
-    Mehrheitsfarbe: keine Mischfarben, die Palette bleibt erhalten."""
+def rot_wing(src, pivot, ang, span, oy, width=1.0):
+    """Flügel um sein Schultergelenk drehen (ang in Grad, positiv = im Uhrzeigersinn), perspektivisch
+    verkürzen (span <= 1) und quer zur Längsachse stauchen (width <= 1: der Flügel dreht sich um seine
+    Längsachse und steht schmaler zum Betrachter). Rückwärts abgebildet mit 3x3-Überabtastung und
+    Mehrheitsfarbe: keine Mischfarben, die Palette bleibt erhalten, nichts wird gedehnt."""
     m = src[:, :, 3] > 0
     cols, inv = np.unique(src[m][:, :3], axis=0, return_inverse=True)
     idx = np.full(src.shape[:2], -1)
     idx[m] = inv.ravel()
+    ys, xs = np.nonzero(m)
+    ax, ay = xs.mean() - pivot[0], ys.mean() - pivot[1]   # Längsachse: Gelenk -> Flügelmitte
+    L = math.hypot(ax, ay)
+    ax, ay = ax / L, ay / L
     Y, X = np.mgrid[0:H, 0:W]
     px_, py_ = pivot[0] + PL, pivot[1] + PT + oy
     a = math.radians(ang)
@@ -178,8 +183,11 @@ def rot_wing(src, pivot, ang, span, oy):
     for sx in (-0.33, 0.0, 0.33):
         for sy in (-0.33, 0.0, 0.33):
             dx, dy = X + sx - px_, Y + sy - py_
-            qx = np.rint(pivot[0] + (dx * c - dy * s) / span).astype(int)
-            qy = np.rint(pivot[1] + (dx * s + dy * c) / span).astype(int)
+            rx, ry = dx * c - dy * s, dx * s + dy * c
+            along = (rx * ax + ry * ay) / span
+            perp = (-rx * ay + ry * ax) / (span * width)
+            qx = np.rint(pivot[0] + along * ax - perp * ay).astype(int)
+            qy = np.rint(pivot[1] + along * ay + perp * ax).astype(int)
             ok = (qx >= 0) & (qx < SW) & (qy >= 0) & (qy < SH)
             k = np.where(ok, idx[np.clip(qy, 0, SH - 1), np.clip(qx, 0, SW - 1)], -1)
             np.add.at(votes, (k.ravel() + 1, np.arange(H * W)), 1)
@@ -195,12 +203,43 @@ def rot_wing(src, pivot, ang, span, oy):
     return out
 
 
+QZ_UNDER = {'c3a041': 'dccb8a', 'a58834': 'c2ab68', '8b6b26': 'a38b4d', '6c531d': '826c3c',
+            '153816': '2f5427', '07220b': '1c3a1a', '375623': '4d7236'}
+
+
+def wing_back(part):
+    """Die Rückseite eines Flügels: die Federn blasser und heller (Unterseite), ihre Streifen laufen
+    gespiegelt (jede Zeile wird zwischen Kontur und Knochen umgedreht), der Knochen heller."""
+    out = part.copy()
+    feather = lambda c: hexc(c) in ('c3a041', 'a58834', '8b6b26', '6c531d')
+    for y in range(part.shape[0]):
+        xs = [x for x in range(part.shape[1]) if part[y, x, 3] and feather(part[y, x])]
+        runs, cur = [], []
+        for x in xs:
+            if cur and x != cur[-1] + 1:
+                runs.append(cur)
+                cur = []
+            cur.append(x)
+        if cur:
+            runs.append(cur)
+        for run in runs:
+            for x, xr in zip(run, run[::-1]):
+                out[y, x] = part[y, xr]
+    for y, x in zip(*np.nonzero(out[:, :, 3])):
+        h = hexc(out[y, x])
+        if h in QZ_UNDER:
+            out[y, x] = rgb(QZ_UNDER[h])
+    return out
+
+
 QZ_PIVOTS = ((51, 70), (58, 67))                        # Schultergelenke (links, rechts)
-QZ_FLAP = [                                             # (Winkel nach außen/unten, Länge, Körper-y) – 16 Frames:
-    (0, 1.0, 0), (-6, 1.0, 1), (-10, 1.0, 2), (-12, 1.0, 3),       # fällt 1 px je Frame, Flügel heben sich
-    (40, 0.9, 0), (85, 0.72, -1), (100, 0.62, -2), (95, 0.64, -2),  # Schlag: schnell 3 px hoch, dann 1 px
-    (80, 0.7, -2), (60, 0.78, -2), (45, 0.85, -1), (30, 0.9, -1),   # Erholen: Flügel öffnen sich wieder
-    (18, 0.95, -1), (8, 0.98, 0), (3, 1.0, 0), (0, 1.0, 0)]
+QZ_FLAP = [                                             # (Winkel nach außen/unten, Länge, Körper-y, Breite, Seite)
+    (0, 1.0, 0, 1.0, 0), (-6, 1.0, 1, 1.0, 0), (-10, 1.0, 2, 1.0, 0), (-12, 1.0, 3, 1.0, 0),   # fällt, Flügel heben sich
+    (40, 0.9, 0, 0.55, 0), (85, 0.72, -1, 0.6, 1),     # Schlag: schnell 3 px hoch, der Flügel dreht sich um seine
+    (100, 0.62, -2, 1.0, 1), (95, 0.64, -2, 1.0, 1),   # Längsachse (schmal) und zeigt unten seine Rückseite
+    (80, 0.7, -2, 0.85, 1), (60, 0.78, -2, 0.5, 1),    # Erholen: er dreht sich zurück …
+    (45, 0.85, -1, 0.6, 0), (30, 0.9, -1, 0.85, 0),    # … und öffnet sich wieder mit der Vorderseite
+    (18, 0.95, -1, 1.0, 0), (8, 0.98, 0, 1.0, 0), (3, 1.0, 0, 1.0, 0), (0, 1.0, 0, 1.0, 0)]
 QZ_CACHE = {}
 
 
@@ -211,14 +250,14 @@ def f_quetza(i):
     wl, wr, body = QZ
     body = body.copy()
     blink(body, i, QZ_BLINK)
-    ang, span, dy = QZ_FLAP[i % 16]                       # drei Schläge je Loop
+    ang, span, dy, width, back = QZ_FLAP[i % 16]          # drei Schläge je Loop
     out = np.zeros((H, W, 4), int)
     wings = {}
     for part, pivot, side in ((wl, QZ_PIVOTS[0], -1), (wr, QZ_PIVOTS[1], 1)):
-        key = (side, ang, span, dy)
+        key = (side, ang, span, dy, width, back)
         if key not in QZ_CACHE:
-            if ang or span < 1:
-                QZ_CACHE[key] = rot_wing(part, pivot, side * ang, span, dy)
+            if ang or span < 1 or width < 1 or back:
+                QZ_CACHE[key] = rot_wing(wing_back(part) if back else part, pivot, side * ang, span, dy, width)
             else:
                 QZ_CACHE[key] = np.zeros((H, W, 4), int)
                 paste(QZ_CACHE[key], part, PL, PT + dy)
