@@ -46,8 +46,8 @@ V_ = {
     'inya': dict(slug='ultimate-despair-inya', pads=(1, 1, 2, 1)),
     'johanna': dict(slug='mega-priestess-johanna', knee=22, pads=(1, 1, 2, 1)),
     'nao': dict(slug='student-council-president-nao', knee=18, pads=(3, 1, 2, 4)),
-    'rhabi': dict(slug='rhabi-the-human-hunter', knee=21, pads=(6, 6, 3, 1)),
-    'kasperov': dict(slug='kasperov-the-king-of-the-east', pads=(2, 2, 2, 1)),
+    'rhabi': dict(slug='rhabi-the-human-hunter', knee=21, pads=(5, 6, 4, 1)),
+    'kasperov': dict(slug='kasperov-the-king-of-the-east', pads=(3, 2, 2, 1)),
 }
 V = next((v for v in sys.argv[2:] if v in V_), 'bill')
 C = V_[V]
@@ -301,26 +301,12 @@ def f_thundergod(i):
 
 
 # ---------------------------------------------------------------- Ultimate Despair Inya
-IN_LAUGH = [0, 0, 0, 0, 0, 0, 1, -1, 1, -1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, -1, 1, -1,
-            1, -1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, -1, 1, 0, 0, 0, 0, 0, 0, 0, 0]
+IN_LAUGH = [1, 1, 0, -1, 0, 1, 1, 0, 0, 1, 1, 0, -1, 0, 1, 0] * 3   # sie lacht ununterbrochen
 def f_inya(i):
-    """Sie lacht (der offene Mund geht in Lachstößen weiter auf und zu), ihre Zöpfe wehen; der Bär watschelt für sich (kippt hin und her, hebt ab), sein rotes Auge blitzt."""
+    """Sie lacht ununterbrochen (der offene Mund geht weiter auf und zu), ihre Zöpfe wehen; der Bär vor ihr watschelt für sich (kippt hin und her, hebt ab), sein rotes Auge blitzt."""
     t = 2 * math.pi * i / N
     girl, bear = load('girl'), load('bear')
     out = np.zeros((H, W, 4), int)
-    wb = [0, 0, 1, 1, 0, 0, -1, -1][(i // 3) % 8]
-    hop = -1 if (i // 3) % 4 in (1, 3) else 0
-    bys = np.nonzero(bear[:, :, 3])[0]
-    btop, bbot = bys.min(), bys.max()
-    for y, x in zip(*np.nonzero(bear[:, :, 3])):
-        u = (bbot - y) / max(1, bbot - btop)
-        dot(out, x + PL + round(wb * u), y + PT + hop, bear[y, x])
-    eye = [(y, x) for y, x in zip(*np.nonzero(bear[:, :, 3])) if bear[y, x, 0] > 180 and bear[y, x, 1] < 80]
-    if eye and (i % 16) in (6, 7):
-        y, x = eye[0]
-        u = (bbot - y) / max(1, bbot - btop)
-        for dx, dy in ((0, 0), (1, -1), (-1, 1)):
-            dot(out, x + PL + round(wb * u) + dx, y + PT + hop + dy, rgb('ff6060' if (dx, dy) == (0, 0) else 'ffd0d0'))
     laugh = IN_LAUGH[i]
     if laugh == 1:                                        # Mund weit auf
         for x in (15, 16):
@@ -336,6 +322,19 @@ def f_inya(i):
             u = min(1.0, (d - 7) / 8)
             dy += round(1.3 * u * math.sin(3 * t - 0.4 * d + (0 if x > cx else 1.6)))
         dot(out, x + PL, y + PT + dy, girl[y, x])
+    wb = [0, 0, 1, 1, 0, 0, -1, -1][(i // 3) % 8]
+    hop = -1 if (i // 3) % 4 in (1, 3) else 0
+    bys = np.nonzero(bear[:, :, 3])[0]
+    btop, bbot = bys.min(), bys.max()
+    for y, x in zip(*np.nonzero(bear[:, :, 3])):
+        u = (bbot - y) / max(1, bbot - btop)
+        dot(out, x + PL + round(wb * u), y + PT + hop, bear[y, x])
+    eye = [(y, x) for y, x in zip(*np.nonzero(bear[:, :, 3])) if bear[y, x, 0] > 180 and bear[y, x, 1] < 80]
+    if eye and (i % 16) in (6, 7):
+        y, x = eye[0]
+        u = (bbot - y) / max(1, bbot - btop)
+        for dx, dy in ((0, 0), (1, -1), (-1, 1)):
+            dot(out, x + PL + round(wb * u) + dx, y + PT + hop + dy, rgb('ff6060' if (dx, dy) == (0, 0) else 'ffd0d0'))
     return out
 
 
@@ -408,8 +407,9 @@ RH_ARMS = [('arml', 11), ('armr', 23), ('arml2', 37), ('armr2', 53)]   # (Teil, 
 RH_KEYS = {}
 
 
-def rh_keys(seed):
-    """Erratischer Flugplan eines Arms: Zielpunkte (Frame, weg vom Körper, quer), dazwischen hält er."""
+def rh_keys(seed, touch):
+    """Erratischer Flugplan eines Arms: Zielpunkte (Frame, weg vom Körper, quer), dazwischen hält er.
+    Etwa jeder zweite Zielpunkt liegt direkt am Körper (touch = Abstand bis dorthin)."""
     if seed not in RH_KEYS:
         rng = np.random.default_rng(seed)
         keys, f = [(0, 0, 0)], 0
@@ -417,14 +417,29 @@ def rh_keys(seed):
             f += int(rng.integers(4, 9))
             if f >= N - 3:
                 break
-            keys.append((f, int(rng.integers(-3, 6)), int(rng.integers(-2, 3))))
+            if rng.random() < 0.5:
+                keys.append((f, -touch, 0))               # ganz an ihn heran
+            else:
+                keys.append((f, int(rng.integers(1, 6)), int(rng.integers(-2, 3))))   # von ihm weg
         keys.append((N, 0, 0))
         RH_KEYS[seed] = keys
     return RH_KEYS[seed]
 
 
-def rh_pos(i, seed):
-    keys = rh_keys(seed)
+def rh_touch(arm, body, vx, vy):
+    """Wie weit der Arm Richtung Körper fliegen kann, bis er ihn berührt."""
+    near = cv2.dilate((body[:, :, 3] > 0).astype(np.uint8), np.ones((3, 3), np.uint8)) > 0
+    ays, axs = np.nonzero(arm[:, :, 3])
+    for k in range(0, 40):
+        xs, ys = axs - round(vx * k), ays - round(vy * k)
+        ok = (xs >= 0) & (xs < SW) & (ys >= 0) & (ys < SH)
+        if near[ys[ok], xs[ok]].any():
+            return k
+    return 0
+
+
+def rh_pos(i, seed, touch):
+    keys = rh_keys(seed, touch)
     for (fa, ra, pa), (fb, rb, pb) in zip(keys, keys[1:]):
         if fa <= i < fb:
             if i < fb - 2:                                # hält still …
@@ -452,7 +467,7 @@ def f_rhabi(i):
         vx, vy = axs.mean() - cx, ays.mean() - cy
         n = math.hypot(vx, vy)
         vx, vy = vx / n, vy / n
-        r, p = rh_pos(i, seed)
+        r, p = rh_pos(i, seed, rh_touch(arm, body, vx, vy))
         paste(out, arm, PL + round(vx * r - vy * p), PT + round(vy * r + vx * p))
     draw_bounce(out, body, b, KNEE, PT, PL)
     return out
@@ -467,15 +482,14 @@ def f_kasperov(i):
     out = np.zeros((H, W, 4), int)
     ys = np.nonzero(s[:, :, 3])[0]
     bot = ys.max()
-    bells = (s[:, :, 3] > 0) & (_ys >= 8) & (_ys <= 12) & ((_xs <= 2) | (_xs >= SW - 3))
-    ring = round(0.9 * math.sin(2 * math.pi * 4 * i / N))
+    tips = (s[:, :, 3] > 0) & (_ys >= 7) & ((_xs <= 2) | (_xs >= SW - 3))   # die herabhängenden Zipfel
+    ring = 0.9 * math.sin(2 * math.pi * 4 * i / N)
     for y, x in zip(*np.nonzero(s[:, :, 3])):
         u = (bot - y) / bot
         dx = round(rock * u)
-        dy = hop
-        if bells[y, x]:
-            dy += ring
-        dot(out, x + PL + dx, y + PT + dy, s[y, x])
+        if tips[y, x]:                                    # schwingen seitlich, unten weiter (Zeile an Zeile)
+            dx += round(ring * (y - 6) / 6)
+        dot(out, x + PL + dx, y + PT + hop, s[y, x])
     for (x, y), c in sparkle_pixels(i, N, [(PL + 1, PT + 10 + hop, 8), (PL + SW - 2, PT + 10 + hop, 32)],
                                     rgb('fffbd0'), rgb('ffd700')).items():
         dot(out, x, y, c)
