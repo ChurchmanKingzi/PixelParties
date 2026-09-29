@@ -38,7 +38,7 @@ V_ = {
     'styxgate': dict(slug='styx-the-opened-gate', pads=(3, 6, 1, 1)),
     'tushu': dict(slug='tushu-the-knowledge-keeper', pads=(2, 1, 5, 1)),
     'patty': dict(slug='patty-the-ninja-of-revenge', knee=19, pads=(5, 5, 5, 1)),
-    'rool': dict(slug='rool-the-troll-guard', knee=24, pads=(3, 3, 3, 2)),
+    'rool': dict(slug='rool-the-troll-guard', knee=24, pads=(1, 1, 2, 1)),
     'champion': dict(slug='champion-the-eye-of-the-storm', knee=36, pads=(11, 11, 4, 4)),
     'stormkissed': dict(slug='stormkissed-waflav', pads=(4, 4, 17, 5)),
     'klaus': dict(slug='klaus-the-cult-leader', knee=24, pads=(3, 3, 3, 1)),
@@ -161,33 +161,54 @@ SG_DOOR = (rgb('616360'), rgb('2b2d2a'))                # die zusammengeschobene
 SG_EDGE = rgb('000100')
 SG_BIG = {**{k: 1 - (k - 16) / 4 for k in range(17, 21)}, **{k: 0.0 for k in range(21, 31)},
           **{k: (k - 30) / 4 for k in range(31, 35)}}      # das große Tor: Öffnungsgrad je Frame (sonst offen)
-SG_SMALL = {8: (0.7, 1), 9: (0.45, 1), 10: (0.2, 1), 11: (0, 1), 12: (0, 1), 13: (0, 1), 14: (0, 0.55),
-            15: (0, 0.25), 16: (0, 0), 17: (0, 0), 18: (0, 0.25), 19: (0, 0.55), 20: (0, 1), 21: (0.25, 1),
-            22: (0.5, 1), 23: (0.8, 1)}                   # kleine Tore: zu – verschwinden – erscheinen – auf
+SG_EV = {                                               # kleine Tore (nach ihrer Ausgangsecke), unabhängig:
+    (75, 2): [('zu', 6, 4), ('weg', 26, 2, (64, 2)), ('weg', 40, 0, None)],        # zugehen und aufgehen –
+    (50, 4): [('weg', 3, 5, (40, 1)), ('zu', 20, 3), ('weg', 30, 1, None)],        # oder im Schatten verblassen
+    (22, 6): [('zu', 12, 6), ('zu', 36, 2)],                                       # und (mit oder ohne Pause)
+    (31, 17): [('weg', 10, 0, (10, 2)), ('weg', 22, 8, None), ('zu', 38, 3)],      # woanders auftauchen
+    (64, 17): [('zu', 2, 3), ('weg', 16, 3, (78, 12)), ('weg', 34, 4, None)],      # (None = zurück nach Hause);
+    (13, 18): [('weg', 20, 6, (65, 27)), ('zu', 34, 2), ('weg', 42, 0, None)],     # die beiden Tore der
+    (78, 22): [('zu', 24, 5)],                                                     # Geisterhand bleiben offen
+    (20, 30): [('weg', 5, 2, (31, 27)), ('zu', 18, 3), ('weg', 30, 3, None)],
+}
 
 
-def gate_state(i, k, big, small):
-    """(Öffnungsgrad 0..1, Sichtbarkeit 0..1) von Tor k in Frame i."""
-    if big:
-        return SG_BIG.get(i, 1.0), 1.0
-    for a, e, gate, mode in SG_HAND:                      # greift die Hand aus diesem Tor, ist es offen
-        if gate != 'big' and small[gate % len(small)] == k and a - 4 <= i < e + 4:
-            return (1.0 if a <= i < e else 1 - (a - i) / 4 if i < a else 1 - (i - e + 1) / 4), 1.0
-    return SG_SMALL.get((i + 5 * k) % 24, (1.0, 1))
+def gate_track(i, home, evs):
+    """(Ecke, Deckkraft, Öffnungsgrad) eines kleinen Tors in Frame i."""
+    pos = home
+    for ev in evs:
+        k = i - ev[1]
+        if k < 0:
+            break
+        if ev[0] == 'zu':                                 # zugehen, zu bleiben, aufgehen
+            d = ev[2]
+            if k < 3:
+                return pos, 1.0, (2 - k) / 3
+            if k < 3 + d:
+                return pos, 1.0, 0.0
+            if k < 6 + d:
+                return pos, 1.0, (k - 2 - d) / 3
+        else:                                             # verblassen, (warten,) woanders auftauchen
+            d, dest = ev[2], ev[3] or home
+            if k < 3:
+                return pos, (2 - k) / 3, 1.0
+            if k < 3 + d:
+                return pos, 0.0, 1.0
+            pos = dest
+            if k < 6 + d:
+                return pos, (k - 2 - d) / 3, 1.0
+    return pos, 1.0, 1.0
 
 
-def draw_gate(out, gates, m, o, v, ox, oy):
+def draw_gate(out, gates, m, o, ox, oy, al=1.0, dx=0, dy=0):
     """Ein Tor malen: die Falttüren (Spalten ohne Lila) bleiben, das lila Innere wird von beiden Seiten
-    her von den ausgezogenen Türen verdeckt (o = 1 offen, 0 zu); v staucht das ganze Tor senkrecht."""
+    her von den ausgezogenen Türen verdeckt (o = 1 offen, 0 zu); al < 1 lässt es im Schatten verblassen,
+    (dx, dy) versetzt es an eine andere Stelle."""
     ys, xs = np.nonzero(m)
     inner = [x for y, x in zip(ys, xs) if purple(gates[y, x])]
     il, ir = min(inner), max(inner)
     cx, hw = (il + ir) / 2, (ir - il + 1) / 2
-    cy, hh = (ys.min() + ys.max()) / 2, (ys.max() - ys.min() + 1) / 2
     for y, x in zip(ys, xs):
-        if v < 1 and abs(y - cy) > max(0.5, v * hh):
-            continue
-        yy = round(cy + (y - cy) * v) if v < 1 else y
         c = gates[y, x]
         if il <= x <= ir:
             d = abs(x - cx) + 0.5                         # Abstand von der Mitte
@@ -195,7 +216,10 @@ def draw_gate(out, gates, m, o, v, ox, oy):
                 c = SG_EDGE if d - o * hw <= 1 and o > 0 and hw > 2 else SG_DOOR[(x + y) % 2]
                 if o == 0 and hw > 2 and abs(x - cx) < 0.6:
                     c = SG_EDGE                           # die Naht in der Mitte
-        dot(out, x + ox, yy + oy, c)
+        if al >= 1:
+            dot(out, x + dx + ox, y + dy + oy, c)
+        else:
+            blend(out, x + dx + ox, y + dy + oy, np.array([*c[:3], int(255 * al)]))
 
 
 def hand_state(i):
@@ -214,8 +238,9 @@ def hand_state(i):
 
 
 def f_styxgate(i):
-    """Die Schatten wabern, die Schattenarme wiegen sich (lückenlos), die kleinen Tore gehen auf und zu,
-    verschwinden und erscheinen wieder; die Geisterhand greift aus dem großen Tor, zieht sich zurück und
+    """Die Schatten wabern, die Schattenarme wiegen sich (lückenlos); die Falttüren der Tore schieben sich
+    seitwärts zu und wieder auf, kleine Tore verblassen außerdem im Schatten und tauchen woanders wieder
+    auf (Schließen und Verschwinden sind unabhängig); die Geisterhand greift aus dem großen Tor, zieht sich zurück und
     greift aus anderen Toren; Geisterköpfe steigen aus den Schatten auf."""
     global SG
     t = 2 * math.pi * i / N
@@ -259,9 +284,13 @@ def f_styxgate(i):
         tx, ty = (x0 + x1) // 2 - hw // 2, y0 + 2 - round((1 - ext) * hh)
     for k, m in enumerate(gl):                            # Tore: Falttüren schieben sich seitwärts zu und auf
         gx0, gx1, gy0, gy1, big = info[k]
-        o, v = gate_state(i, k, big, small)
-        if v > 0:
-            draw_gate(out, gates, m, o, v, PL + wob(int((gy0 + gy1) / 2)), PT)
+        if big:
+            draw_gate(out, gates, m, SG_BIG.get(i, 1.0), PL + wob(int((gy0 + gy1) / 2)), PT)
+            continue
+        home = (int(gx0), int(gy0))
+        (px, py), al, o = gate_track(i, home, SG_EV.get(home, []))
+        if al > 0:
+            draw_gate(out, gates, m, o, PL + wob(int(py + (gy1 - gy0) / 2)), PT, al, px - home[0], py - home[1])
     for y, x in zip(*np.nonzero(hand[:, :, 3])):
         yy = y + ty
         if yy >= y0:                                      # über dem Tor steckt sie noch drin
@@ -288,7 +317,7 @@ def f_tushu(i):
     t = 2 * math.pi * i / N
     body, scrolls = load('body'), load('scrolls')
     out = np.zeros((H, W, 4), int)
-    dy = -round(3.5 * (0.5 - 0.5 * math.cos(t)))           # er steigt deutlich über das Buch auf
+    dy = -round(4 * (0.5 - 0.5 * math.cos(t)))             # er steigt deutlich über das Buch auf (oben verweilt er)
     comps = components(scrolls)
     book = max(comps, key=lambda m: np.nonzero(m)[0].mean())   # das Buch liegt unten in der Mitte
     for y, x in zip(*np.nonzero(book)):
@@ -360,41 +389,24 @@ def f_patty(i):
 
 
 # ---------------------------------------------------------------- Rool
-RO_BLINK = {'halb': [((19, 9), '0a2015')], 'zu': [((19, 9), '3d774c'), ((19, 10), '0a2015')]}
+RO_BLINK = {'halb': [((13, 9), '0a2015')], 'zu': [((13, 9), '3d774c'), ((13, 10), '0a2015')]}
 
 
 def f_rool(i):
-    """Er federt und blinzelt, sein Monokel blitzt; der Geldsack hängt fest an seiner Hand und schwingt
-    nur unten leicht, die Münze darauf glitzert."""
-    t = 2 * math.pi * i / N
-    body, bag = load('body').copy(), load('bag')
+    """Er federt und blinzelt, sein Monokel blitzt."""
+    body = load('body').copy()
     for part in ('arm', 'beard'):                         # ausgestreckter Arm und Bart gehören fest dazu
         p = load(part)
         body[p[:, :, 3] > 0] = p[p[:, :, 3] > 0]
     blink(body, i, RO_BLINK)
     if (i % 24) in (4, 5, 6):                             # das Monokel blitzt auf
-        for x, y in ((22, 9), (23, 9), (22, 10), (23, 10)):
-            body[y, x] = rgb('ffffff' if (i % 24) == 5 or (x, y) == (22, 9) else 'e8f4ff')
+        for x, y in ((16, 9), (17, 9), (16, 10), (17, 10)):
+            body[y, x] = rgb('ffffff' if (i % 24) == 5 or (x, y) == (16, 9) else 'e8f4ff')
         if (i % 24) == 5:                                 # im hellsten Moment glänzt auch die Fassung
-            for x, y in ((21, 8), (22, 8), (23, 8), (24, 9), (24, 10), (21, 11)):
+            for x, y in ((15, 8), (16, 8), (17, 8), (18, 9), (18, 10), (15, 11)):
                 body[y, x] = rgb('fffbd0')
-    b = B24[i % 24]
     out = np.zeros((H, W, 4), int)
-    draw_bounce(out, body, b, KNEE, PT, PL)
-    ys, xs = np.nonzero(bag[:, :, 3])
-    top = ys.min()
-    sw = 1.2 * math.sin(2 * t)                            # oben fest an der Hand, unten schwingt es leicht
-    lag = b
-    for y, x in zip(ys, xs):
-        dx = round(sw * (y - top) / (ys.max() - top))
-        dot(out, x + dx + PL, y + PT + min(b, lag), bag[y, x])
-    gold = [(y, x) for y, x in zip(ys, xs) if bag[y, x, 0] > 220 and bag[y, x, 1] > 180 and bag[y, x, 2] < 80]
-    if gold:
-        gy, gx = gold[len(gold) // 2]
-        dx = round(sw * (gy - top) / (ys.max() - top))
-        for (x, y), c in sparkle_pixels(i, N, [(gx + dx + PL, gy + PT + min(b, lag), 6), (gx + dx + PL, gy + PT + min(b, lag), 30)],
-                                        rgb('fffbd0'), rgb('ffd700')).items():
-            dot(out, x, y, c)
+    draw_bounce(out, body, B24[i % 24], KNEE, PT, PL)
     return out
 
 
@@ -469,11 +481,24 @@ SK_POWER = [1.0, 0.7, 1.25, 0.85, 1.15, 0.6, 1.3, 0.9]                       # j
 SK_HOP = [(0, 0), (-4, 2), (2, -1), (-6, 1), (-1, -3), (3, 0), (-5, 3), (-2, -1)]   # (dy, dx) je Schlag
 
 
+SK_BLINK = {'halb': [((64, 13), '0e1e39'), ((69, 13), '0e1e39')],
+            'zu': [((x, 13), '0e1e39') for x in (64, 65, 68, 69)]}
+SK_MOUTH = [0, 0, 1, 1, 0, 0, -1, -1, 0, 0, 1, 0]      # 1 = weiter auf, -1 = fast zu (je vier Frames)
+
+
 def f_stormkissed(i):
     """Er schlägt mit den Kristallflügeln: der Abschlag ist schnell (die Spitzen schlagen tief, der Flügel
     staucht sich perspektivisch), der Körper steigt; dann sinkt er, während die Flügel sich wieder heben.
-    An den Flügelspitzen knistern Funken."""
-    wings, body = load('wings'), load('body')
+    An den Flügelspitzen knistern Funken. Er blinzelt, sein offenes Maul geht etwas weiter auf und zu."""
+    wings, body = load('wings'), load('body').copy()
+    blink(body, i, SK_BLINK)
+    mo, src = SK_MOUTH[i // 4], load('body')
+    if mo > 0:                                            # der Unterkiefer (untere Zähne) sinkt eine Zeile
+        body[19, 64:70] = src[18, 64:70]
+        body[20, 64:70] = src[19, 64:70]
+    elif mo < 0:                                          # … oder hebt sich eine Zeile
+        body[18, 64:70] = src[19, 64:70]
+        body[19, 64:70] = src[20, 64:70]
     k, f = divmod(i, 6)
     lift, squeeze, dy = SK_FLAP[f]
     lift *= SK_POWER[k]
@@ -555,9 +580,6 @@ def f_kohtamaster(i):
             out[y + PT + b, x + PL] = 0
         for y, x in zip(*np.nonzero(knife)):
             dot(out, x + PL, y + PT + b + jab, s[y, x])
-        for x in range(24, SW):                           # darunter rückt der Arm nach
-            if s[21, x, 3] and not out[21 + PT + b, x + PL, 3]:
-                dot(out, x + PL, 21 + PT + b, s[21, x])
     flutter(out, s, i, PL, PT + b, list(range(13, 21)), range(0, 9), [], amp=1.3, speed=5)
     return out
 

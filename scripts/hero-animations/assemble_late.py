@@ -16,8 +16,7 @@ MotiveCoolhalla.xcf
   patty-the-ninja-of-revenge    nur das Mädchen aus „Patty“ (ohne Schleim und Shuriken)
 MotiveSteamDwarfs.xcf
   rool-the-troll-guard          „Rool“ mit dem ausgestreckten Arm „Ebene #36“ (Teil arm) und dem Bart
-                                „Ebene #43“ (Teil beard); der einzeln liegende Geldsack aus „Ebene #46“
-                                hängt an der Hand des ausgestreckten Arms (Teil bag)
+                                „Ebene #43“ (Teil beard)
 MotiveHawaii.xcf
   champion-the-eye-of-the-storm „Ascended Champion“ + „Ebene #161“
 MotiveMoe.xcf
@@ -32,7 +31,7 @@ import sys
 import numpy as np
 import cv2
 from gimpformats.gimpXcfDocument import GimpDocument
-from assemble_hawaii import layer, save_parts, only, shift
+from assemble_hawaii import layer, save_parts, only
 from xcf_scan import patch_gimpformats
 
 
@@ -84,10 +83,7 @@ def main(d):
     # ---- MotiveSteamDwarfs.xcf: Rool
     D = doc('MotiveSteamDwarfs.xcf')
     g = lambda n: layer(D, D.raw_layers, n)
-    bag = region(g('Ebene #46'), 127, 323, 146, 341)     # der einzeln liegende Sack unten links …
-    bag = shift(bag, -10, -15)                            # … hängt an der Hand des ausgestreckten Arms
-    save_parts('rool-the-troll-guard', [('body', g('Rool')), ('arm', g('Ebene #36')), ('beard', g('Ebene #43')),
-                                        ('bag', bag)])
+    save_parts('rool-the-troll-guard', [('body', g('Rool')), ('arm', g('Ebene #36')), ('beard', g('Ebene #43'))])
     # ---- MotiveHawaii.xcf: Champion, the Eye of the Storm
     D = doc('MotiveHawaii.xcf')
     g = lambda n: layer(D, D.raw_layers, n)
