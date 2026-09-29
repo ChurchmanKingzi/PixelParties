@@ -652,10 +652,12 @@ def f_lizbeth(i):
         for y, x in zip(*np.nonzero(m)):
             if not op[y, x]:
                 out[y + PT + dy(y), x + PL] = rgb('fff4b0', int(a0))
-    hand = np.zeros_like(s)                              # ihre rechte Hand (links) federt als Einheit mit
-    sel = (s[:, :, 3] > 0) & (_xs <= 3) & (_ys >= 23) & (_ys <= 31)
+    hand = np.zeros_like(s)                              # ihre rechte Hand (links) federt als Einheit mit;
+    sel = (s[:, :, 3] > 0) & (_xs <= 3) & (_ys >= 23) & (_ys <= 30)   # der weiße Rocksaum bleibt
     hand[sel] = s[sel]
     s[sel] = 0
+    for y, x in zip(*np.nonzero(sel & (_ys == 30))):     # unter der gehobenen Hand: grauer Rock
+        s[y, x] = rgb('373e44')
     tmp = np.zeros((H, W, 4), int)
     knee_put(tmp, s, b)
     put(tmp, hand, PL, PT + b)
@@ -702,8 +704,8 @@ def f_johanna(i):
             return int(round(1.3 * t_ * (math.sin(w2 - 0.35 * y) - math.sin(-0.35 * y))))
         return 0
     out = np.zeros((H, W, 4), int)
-    put(out, np.where(hair[:, :, None], 0, s), PL, PT + hv)
-    put(out, np.where(hair[:, :, None], s, 0), PL, PT + hv, dx_fn=hdx)
+    put(out, s, PL, PT + hv)                             # Haare bleiben darunter liegen (keine Lücke am Kopf,
+    put(out, np.where(hair[:, :, None], s, 0), PL, PT + hv, dx_fn=hdx)   # der Schopf wird beim Ausschlag dicker)
     fill_pinholes(out)
     return out
 
@@ -771,9 +773,11 @@ def f_karian(i):
     bpx = {(x, y): s[y, x].copy() for y, x in zip(*np.nonzero(blade))}
     s[blade] = 0
     arm = np.zeros_like(s)
-    sel = op & (_xs <= 4) & (_ys >= 10) & (_ys <= 15)
+    sel = op & (_xs <= 3) & (_ys >= 10) & (_ys <= 15)
     arm[sel] = s[sel]
     lift = KARIAN_ARM[i]
+    if lift:                                             # der Arm wird gehoben – nicht doppelt zeichnen
+        s[sel] = 0
     b = BOUNCE12[i % 12]
     out = np.zeros((H, W, 4), int)
     knee_put(out, s, b)
