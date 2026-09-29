@@ -11,7 +11,7 @@ Frame 0 ist immer die Ruhepose.
             Birthday Girl Cecilia) atmet und blinzelt, ihr Haken blitzt.
 * fiona:    Fiona, the Empty Vessel of a Forgotten Sorceress federt leicht und blinzelt; lila Blitze
             zucken als Partikel um sie herum (sie berühren sie nicht), die Krone funkelt.
-* mary:     Mary Crestmas singt: sie wiegt sich im Takt, der Mund geht auf und zu, der Bommel ihrer
+* mary:     Mary Crestmas fliegt singend: die Engelsflügel schlagen, sie steigt und sinkt, der Mund geht auf und zu, der Bommel ihrer
             Santa-Mütze wippt, rote und grüne Noten steigen auf.
 * beato:    Beato, the Eternal Butterfly fliegt: die Flügel schlagen (sie falten sich zur Mitte), sie
             steigt beim Abschlag und gaukelt in einer liegenden Acht; kleine goldene Schmetterlinge
@@ -24,6 +24,7 @@ import numpy as np
 import cv2
 from PIL import Image
 from anim_common import rgb, save_outputs, BOUNCE12, draw_bounce, sparkle_pixels
+from flap_common import shear_flap
 
 N = 48
 OUT = os.environ.get('L4_OUT', '.')
@@ -31,10 +32,10 @@ B24 = [BOUNCE12[(k // 2) % 12] for k in range(24)]
 BLINK = {14: 'halb', 15: 'zu', 16: 'zu', 17: 'halb', 38: 'halb', 39: 'zu', 40: 'zu', 41: 'halb'}
 
 V_ = {
-    'hel': dict(slug='hel-the-bound-specter', pads=(5, 6, 3, 3)),
-    'cecilia': dict(slug='cecilia-the-harrowing-crusader', knee=14, pads=(1, 1, 2, 1)),
+    'hel': dict(slug='hel-the-bound-specter', pads=(5, 6, 3, 10)),
+    'cecilia': dict(slug='cecilia-the-harrowing-crusader', knee=14, pads=(1, 1, 3, 1)),
     'fiona': dict(slug='fiona-the-empty-vessel-of-a-forgotten-sorceress', knee=19, pads=(9, 9, 4, 1)),
-    'mary': dict(slug='mary-crestmas', pads=(7, 9, 9, 1)),
+    'mary': dict(slug='mary-crestmas', pads=(7, 9, 9, 4)),
     'beato': dict(slug='beato-the-eternal-butterfly', pads=(8, 9, 6, 7)),
 }
 V = next((v for v in sys.argv[2:] if v in V_), 'hel')
@@ -82,6 +83,22 @@ def blink(s, i, table, shift=0):
             s[y, x] = rgb(c)
 
 
+def squash(out, s, knees, oy, ox):
+    """Wie draw_bounce, aber mit mehreren Knicken: Zeilen oberhalb von knee verschieben sich um die Summe
+    aller b der darunter liegenden Knicke; beim Strecken füllt die Zeile über dem Knick die Lücke."""
+    sh, sw = s.shape[:2]
+    off = [sum(b for k, b in knees if y < k) for y in range(sh)]
+    for y in range(sh):
+        for x in range(sw):
+            if s[y, x, 3]:
+                dot(out, x + ox, y + oy + off[y], s[y, x])
+    for y in range(sh - 1):                               # Lücken zwischen Zeile y und y+1 füllen
+        for g in range(off[y] + y + 1, off[y + 1] + y + 1):
+            for x in range(sw):
+                if s[y, x, 3] and s[y + 1, x, 3] and not out[g + oy, x + ox, 3]:
+                    out[g + oy, x + ox] = s[y, x]
+
+
 def near_mask(out, r=1):
     """Figur samt r Pixeln Abstand: dort dürfen keine Partikel hin."""
     return cv2.dilate((out[:, :, 3] > 0).astype(np.uint8), np.ones((2 * r + 1, 2 * r + 1), np.uint8)) > 0
@@ -95,6 +112,8 @@ def rnd(k, i):
 # ---------------------------------------------------------------- Hel
 HEL_EYES = {'halb': [((5, 11), '555555'), ((6, 11), '555555'), ((9, 11), '555555'), ((10, 11), '555555')],
             'zu': [((x, 11), '191919') for x in (5, 6, 9, 10)]}
+HEL_DRIP = [(7, 0), (9, 12), (8, 30)]                   # (Spalte, Startframe): Blutströme aus der Wunde
+HEL_WOUND = [(x, y) for y in (19, 20) for x in range(6, 11)]
 HEL_GLOW = {5: 'ff4040', 6: 'ff8080', 7: 'ff4040', 29: 'ff4040', 30: 'ff8080', 31: 'ff4040'}
 
 
@@ -107,13 +126,38 @@ def f_hel(i):
             s[11, x] = rgb(HEL_GLOW[i])
     blink(s, i, HEL_EYES)
     dy = -round(2 * math.sin(t))
+    hem = lambda y: round(1.4 * (y - 19) / (SH - 19) * (math.sin(3 * t - 0.9 * y) - math.sin(-0.9 * y))) \
+        if y >= 20 else 0                                 # der Saum weht: unten stärker
+    if (i % 12) in (0, 1, 6):                             # die Wunde quillt
+        for x, y in HEL_WOUND:
+            if s[y, x, 0] > 0x80:
+                s[y, x] = rgb('c81010' if (i % 12) == 0 else 'b00808')
+    drops = []
+    for col, st in HEL_DRIP:                              # Blut rinnt über den dunklen Umhang zum Saum …
+        a = (i - st) % 24
+        head = 21 + min(a // 2, 4)
+        if a < 16:
+            fade = 1.0 if a < 10 else 1 - (a - 10) / 6
+            for y in range(21, head + 1):
+                c = '9f0000' if y == head and a < 10 else '7a0000' if fade > 0.5 else '4a0000'
+                s[y, col] = rgb(c)
+        if 8 <= a < 20:                                   # … und tropft vom Saum ab
+            drops.append((col, a - 8))
     out = np.zeros((H, W, 4), int)
     for y, x in zip(*np.nonzero(s[:, :, 3])):
-        dx = 0
-        if y >= 20:                                       # der Saum weht: unten stärker
-            u = (y - 19) / (SH - 19)
-            dx = round(1.4 * u * (math.sin(3 * t - 0.9 * y) - math.sin(-0.9 * y)))
-        dot(out, x + dx + PL, y + dy + PT, s[y, x])
+        dot(out, x + hem(y) + PL, y + dy + PT, s[y, x])
+    for col, a in drops:
+        x = col + hem(SH - 1) + PL
+        y0 = SH + dy + PT
+        if a < 3:                                         # der Tropfen schwillt unter dem Saum an
+            dot(out, x, y0, rgb('9f0000'))
+            if a == 2:
+                dot(out, x, y0 + 1, rgb('7a0000'))
+        else:                                             # fällt immer schneller, zieht einen Faden
+            y = y0 + round(0.35 * (a - 2) ** 2)
+            if y - y0 <= 7:
+                dot(out, x, y, rgb('b00808'))
+                dot(out, x, y - 1, rgb('7a0000', 150))
     near = near_mask(out, 1)
     for k in range(6):                                    # fahle Geisterlichter steigen auf
         a = (i * 1 + k * 8) % N
@@ -131,6 +175,8 @@ def f_hel(i):
 
 
 # ---------------------------------------------------------------- Cecilia, the Harrowing Crusader
+CE_LEG = 23                                              # Stiefelschäfte (Zeile 22) werden gedehnt/gestaucht
+CE_HOOK = (4, 20)                                        # rechts neben der Hakenspitze (3, 20)
 CE_EYE = {'halb': [((10, 9), '3b211a')], 'zu': [((10, 9), 'f6cd8b'), ((10, 10), '3b211a')]}
 
 
@@ -139,19 +185,19 @@ def f_cecilia(i):
     s = SRC.copy()
     blink(s, i, CE_EYE)
     out = np.zeros((H, W, 4), int)
-    draw_bounce(out, s, B24[i % 24], KNEE, PT, PL)
-    hook = [(x, y) for y in range(15, SH) for x in range(0, 4) if s[y, x, 3] and min(s[y, x, :3]) > 200]
-    if hook:
-        hx, hy = min(hook, key=lambda p: (p[1], p[0]))
-        b = B24[i % 24] if hy < KNEE else 0
-        for (x, y), c in sparkle_pixels(i, N, [(hx + PL, hy + PT + b, 8), (hx + PL, hy + PT + b, 32)],
-                                        rgb('ffffff'), rgb('c8e8ff')).items():
+    b = B24[i % 24]
+    squash(out, s, [(KNEE, b), (CE_LEG, b)], PT, PL)      # Oberkörper und Beine federn beide
+    hx, hy = CE_HOOK                                      # Glanz rechts neben der Hakenspitze
+    for (x, y), c in sparkle_pixels(i, N, [(hx + PL, hy + PT + b, 8), (hx + PL, hy + PT + b, 32)],
+                                    rgb('ffffff'), rgb('c8e8ff')).items():
+        if not out[y, x, 3] or (x, y) == (hx + PL, hy + PT + b):
             dot(out, x, y, c)
     return out
 
 
 # ---------------------------------------------------------------- Fiona
-FI_EYES = {'halb': [((x, 7), '82715d') for x in (4, 5, 8, 9)], 'zu': [((x, 7), '322504') for x in (4, 5, 8, 9)]}
+FI_EYES = {'halb': [((x, 7), '322504') for x in (4, 5, 8, 9)],
+           'zu': [((x, 7), 'fee8d0') for x in (4, 5, 8, 9)] + [((x, 8), '322504') for x in (4, 5, 8, 9)]}
 FI_BOLT = [rgb('f0d8ff'), rgb('b060f0'), rgb('6a2a8a')]
 
 
@@ -208,6 +254,8 @@ NOTES = None
 MA_MOUTH = [(11, 13), (12, 13)]
 MA_SING = [1, 1, 0, 1, 1, 1, 0, 0, 1, 1, 1, 1, 0, 1, 0, 0, 1, 1, 1, 0, 1, 1, 0, 0,
            1, 1, 0, 1, 1, 1, 1, 0, 0, 1, 1, 0, 1, 1, 1, 1, 0, 0, 1, 1, 0, 1, 1, 1]
+MA_WING_ROWS = np.array([8 <= y <= 24 for y in range(SH)])   # weiße Engelsflügel links (x ≤ 4) und rechts (x ≥ 19)
+_ys, _xs = np.mgrid[0:SH, 0:SW]
 MA_NOTE_COLS = [('d8232f', '8b1414'), ('2e9e3e', '145a1e'), ('f4d040', '9a7a10')]
 
 
@@ -227,13 +275,17 @@ def f_mary(i):
     if not MA_SING[i]:
         for x, y in MA_MOUTH:
             s[y, x] = rgb('f2c27e')
-    sw = 1.6 * math.sin(2 * t)
+    lift = 0.6 * math.sin(2 * math.pi * i / 12)           # Flügelschlag (12 Frames), Spitzen hoch/runter
+    squeeze = 1 - 0.3 * abs(lift) / 0.6
+    dy = -round(2 * math.sin(t) + 0.8 * math.sin(2 * math.pi * i / 12 - 1.4))   # sie steigt und sinkt
     out = np.zeros((H, W, 4), int)
-    for y, x in zip(*np.nonzero(s[:, :, 3])):
-        dx = round(sw * max(0.0, (SH - 6 - y) / (SH - 6)))
-        if y <= 3 and x >= 16:                            # der Bommel schwingt nach
-            dx = round(sw * (SH - 6 - y) / (SH - 6) + 0.9 * math.sin(2 * t - 1.2))
-        dot(out, x + dx + PL, y + PT, s[y, x])
+    wing = (s[:, :, 3] > 0) & (MA_WING_ROWS[:, None]) & ((_xs <= 4) | (_xs >= 19))
+    shear_flap(s, wing & (_xs <= 4), 4, -1, lift, squeeze, out, (PL, PT + dy), curve=1.3)
+    shear_flap(s, wing & (_xs >= 19), 19, 1, lift, squeeze, out, (PL, PT + dy), curve=1.3)
+    for y, x in zip(*np.nonzero((s[:, :, 3] > 0) & ~wing)):
+        dx = round(0.9 * math.sin(2 * t - 1.2) + 0.6 * math.sin(2 * math.pi * i / 12)) \
+            if y <= 3 and x >= 16 else 0                  # der Bommel schwingt nach
+        dot(out, x + dx + PL, y + PT + dy, s[y, x])
     near = near_mask(out, 1)
     for k in range(5):
         a = (i + k * 10) % N
