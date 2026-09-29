@@ -4584,6 +4584,7 @@ function sendGameState(room, playerIdx, extra) {
       })() : {},
       supportSpellLocked: ps.supportSpellLocked || false,
       comboLockHeroIdx: ps.comboLockHeroIdx ?? null,
+      comboLockHeroOwner: ps.comboLockHeroOwner ?? null,
       heroesActedThisTurn: ps.heroesActedThisTurn || [],
       // Kreditrahmen (Debt-O-Tron/Kent). Der Client rechnet ihn beim
       // Ausgrauen der Handkarten mit — sonst sperrt die Oberflaeche
@@ -5398,6 +5399,7 @@ function sendSpectatorGameState(room) {
       handLevelOffsetsDynamic: {},
       handCostReductions: {},
       comboLockHeroIdx: ps.comboLockHeroIdx ?? null,
+      comboLockHeroOwner: ps.comboLockHeroOwner ?? null,
       heroesActedThisTurn: ps.heroesActedThisTurn || [],
       // Kreditrahmen (Debt-O-Tron/Kent). Der Client rechnet ihn beim
       // Ausgrauen der Handkarten mit — sonst sperrt die Oberflaeche
@@ -9424,7 +9426,7 @@ async function doActivateAbility(room, pi, { heroIdx, zoneIdx, zoneKind, charmed
   const hero = ps?.heroes?.[heroIdx];
   if (!hero?.name || hero.hp <= 0) return false;
   if (charmedOwner != null && hero.charmedBy !== pi && hero.controlledBy !== pi) return false;
-  if (charmedOwner == null && borrowedFromOwner == null && gs.players[pi].comboLockHeroIdx != null && gs.players[pi].comboLockHeroIdx !== heroIdx) return false;
+  if (borrowedFromOwner == null && !room.engine.comboSperreErlaubt(pi, heroIdx, charmedOwner ?? pi)) return false;   // Styx 28.9.: mit Seite
   // One-turn action lock (Treasure Hunter's Backpack, etc.)
   if (hero._actionLockedTurn === gs.turn) return false;
   // Spielerweite Aktionssperre (Kent bei negativem Gold) — gleicher
@@ -15347,7 +15349,7 @@ io.on('connection', (socket) => {
           ps.oppHandLocked = false;
           ps.supportSpellLocked = false; ps.supportSpellUsedThisTurn = false;
           ps.potionsUsedThisTurn = 0; ps.attacksPlayedThisTurn = 0; ps.spellsPlayedThisTurn = 0;
-          ps.comboLockHeroIdx = null; ps.heroesActedThisTurn = []; ps.heroesAttackedThisTurn = [];
+          ps.comboLockHeroIdx = null; delete ps.comboLockHeroOwner; ps.heroesActedThisTurn = []; ps.heroesAttackedThisTurn = [];
           ps._creaturesSummonedThisTurn = 0; ps.bonusActions = null; ps._bonusMainActions = 0;
           ps._actionsPlayedThisPhase = 0;
           ps.abilityGivenThisTurn = [false, false, false];

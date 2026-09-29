@@ -138,7 +138,10 @@ module.exports = {
       const pi = ctx.cardOwner;
       if (ctx.playerIdx !== pi || ctx.heroIdx !== ctx.cardHeroIdx) return;
       if ((ctx.heroOwner ?? ctx.playerIdx) !== (ctx.cardHeroOwner ?? pi)) return;   // Styx 28.9.
-      const cd = ctx._engine._getCardDB()[ctx.cardName];
+      // `ctx.cardName` ist der Name DIESER Karte (Pharaoh) — der
+      // Kontext ueberschattet das Ereignisfeld. Die gespielte Karte
+      // steht in `playedCardName` (28.9., Spieltest).
+      const cd = ctx._engine._getCardDB()[ctx.playedCardName];
       if (!cd || cd.cardType !== 'Creature') return;
       placeCounterIfDivinityNeeded(ctx, cd);
     },

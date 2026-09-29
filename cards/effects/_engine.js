@@ -13992,15 +13992,16 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (alsZusatzaktion && ergebnis?.inst) {
       // Die Aktion gehoert dem BESCHWOERER (`controller`), nicht der
       // Feldseite — bei einem uebernommenen Helden der Gegenspalte (Styx).
-      await this.meldeBeschwoerungAlsAktion(rest.controller ?? playerIdx, heroIdx, cardName, ergebnis.inst);
+      await this.meldeBeschwoerungAlsAktion(rest.controller ?? playerIdx, heroIdx, cardName, ergebnis.inst, playerIdx);
     }
     return ergebnis;
   }
 
   /** Meldet eine Beschwoerung „as an additional Action" als ausgefuehrte Aktion. */
-  async meldeBeschwoerungAlsAktion(playerIdx, heroIdx, cardName, inst = null) {
+  async meldeBeschwoerungAlsAktion(playerIdx, heroIdx, cardName, inst = null, heroOwner = playerIdx) {
     await this.runHooks('onAnyActionResolved', {
-      actionType: 'creature', playerIdx, heroIdx, cardName, playedCardName: cardName,
+      // `heroOwner` (Styx 28.9.): Brettseite des beschwoerenden Helden.
+      actionType: 'creature', playerIdx, heroIdx, heroOwner, cardName, playedCardName: cardName,
       // v1349: die beschworene Instanz — damit „eine Karte = ein Ausloeser"
       // (Madame Guillotine) Platzieren + Aktion derselben Karte erkennt.
       ...(inst ? { playedCard: inst } : {}),
@@ -18544,7 +18545,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       // Filtered per-card inside the handCards loop below.
       if (!hero?.name) { own[hi] = playable; continue; }
       const heroParalyzed = !!(hero.hp <= 0 || hero.statuses?.frozen || (hero.statuses?.stunned || hero.statuses?.webbed) || hero.statuses?.bound);
-      if (ps.comboLockHeroIdx != null && ps.comboLockHeroIdx !== hi) { own[hi] = playable; continue; }
+      if (!this.comboSperreErlaubt(playerIdx, hi)) { own[hi] = playable; continue; }
       if (hero._maxActionsPerTurn && (hero._actionsThisTurn || 0) >= hero._maxActionsPerTurn) { own[hi] = playable; continue; }
       if (hero._actionLockedTurn === this.gs.turn) { own[hi] = playable; continue; }
       // Spielerweite Aktionssperre (Kent bei negativem Gold) — gleicher
@@ -18854,6 +18855,8 @@ this._deathWatch = (this._deathWatchStack || []).length
         // Spielerweite Aktionssperre (Kent bei negativem Gold) — gleicher
         // Geltungsbereich wie der Rundenstempel darueber.
         if (this.areActionsBlocked(playerIdx)) continue;
+        // Ghuanjuns Kombo sperrt auch geliehene Helden (Styx 28.9.)
+        if (!this.comboSperreErlaubt(playerIdx, hi, oppIdx)) continue;
         // Skill lock — applies regardless of borrow side.
         if (this.isHeroSkillLocked(oppIdx, hi)) continue;
 
@@ -19508,8 +19511,8 @@ this._deathWatch = (this._deathWatchStack || []).length
     // If charmedOwner is set, verify the hero is actually charmed by this player
     if (opts.charmedOwner != null && hero.charmedBy !== pi) return null;
 
-    // Combo lock (only for own heroes)
-    if (opts.charmedOwner == null && ps.comboLockHeroIdx != null && ps.comboLockHeroIdx !== heroIdx) return null;
+    // Combo lock — Styx 28.9.: auch geliehene Helden, mit Seite
+    if (!this.comboSperreErlaubt(pi, heroIdx, opts.charmedOwner ?? pi)) return null;
 
     // Per-hero action limit (Sol Rym, etc.)
     if (hero._maxActionsPerTurn && (hero._actionsThisTurn || 0) >= hero._maxActionsPerTurn) return null;
@@ -19618,15 +19621,17 @@ this._deathWatch = (this._deathWatchStack || []).length
         console.error(`[blocksCardPlay] ${inst.name}:`, err.message);
       }
     }
+    // Styx 28.9.: wie `getHeroPlayableCards` — Heldenskript und
+    // Ausruestung bekommen die BRETTSEITE des Helden (`heroOwner`).
     const heroScript = this.heroScript(hero);
-    if (heroScript?.canPlayCard && !heroScript.canPlayCard(gs, pi, heroIdx, cardData, this, herkunft)) return null;
+    if (heroScript?.canPlayCard && !heroScript.canPlayCard(gs, heroOwner, heroIdx, cardData, this, herkunft)) return null;
 
     // Equipped hero card restrictions (treatAsEquip cards in support zones)
     for (const inst of this.cardInstances) {
-      if (inst.owner !== pi || inst.zone !== 'support' || inst.heroIdx !== heroIdx) continue;
+      if (inst.owner !== heroOwner || inst.zone !== 'support' || inst.heroIdx !== heroIdx) continue;
       if (!inst.counters?.treatAsEquip) continue;
       const equipScript = loadCardEffect(inst.name);
-      if (equipScript?.canPlayCard && !equipScript.canPlayCard(gs, pi, heroIdx, cardData, this, herkunft)) return null;
+      if (equipScript?.canPlayCard && !equipScript.canPlayCard(gs, heroOwner, heroIdx, cardData, this, herkunft)) return null;
     }
 
     // Inherent action detection. A Spell played via Silence's bonus
@@ -20900,6 +20905,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         delete ps._soleAttackTurn;        // v726: Stempel ist zugbezogen
         ps.spellsPlayedThisTurn = 0;
         ps.comboLockHeroIdx = null;
+        delete ps.comboLockHeroOwner;
         ps.heroesActedThisTurn = [];
         ps._actionsPlayedThisTurn = 0;        // v983, s. runHooks
         ps.heroesAttackedThisTurn = [];
@@ -22741,7 +22747,8 @@ this._deathWatch = (this._deathWatchStack || []).length
     const armed = this.freeArtifactArmed(playerIdx);
     if (!armed) return false;
     const ps = this.gs.players[playerIdx];
-    const hero = ps?.heroes?.[armed.heroIdx];
+    // Styx 28.9.: der scharfstellende Held kann geliehen sein (`heroOwner`)
+    const hero = this.gs.players[armed.heroOwner ?? playerIdx]?.heroes?.[armed.heroIdx];
     if (hero?.name) {
       if (!this.gs.hoptUsed) this.gs.hoptUsed = {};
       this.gs.hoptUsed[this.heroHoptKey(hero.name, playerIdx)] = this.gs.turn;
@@ -37086,6 +37093,14 @@ this._deathWatch = (this._deathWatchStack || []).length
    * eigener und geliehener Held koennen denselben Index haben. Fehlt
    * `heroOwner` in der Bonusaktion, gilt die eigene Seite.
    */
+  comboSperreErlaubt(playerIdx, heroIdx, heroOwner = playerIdx) {
+    // Ghuanjuns Kombo: nur DIESER Held darf handeln. Styx 28.9.: mit Seite
+    // (`comboLockHeroOwner`, fehlt → eigene Seite).
+    const ps = this.gs.players[playerIdx];
+    if (ps?.comboLockHeroIdx == null) return true;
+    return ps.comboLockHeroIdx === heroIdx && (ps.comboLockHeroOwner ?? playerIdx) === heroOwner;
+  }
+
   bonusAktionFuer(playerIdx, heroIdx, heroOwner = playerIdx) {
     const b = this.gs.players[playerIdx]?.bonusActions;
     if (!b || !(b.remaining > 0) || b.heroIdx !== heroIdx) return false;
