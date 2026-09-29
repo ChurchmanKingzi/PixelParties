@@ -21,6 +21,10 @@ module.exports = {
     const heroIdx = ctx.cardHeroIdx;
     const ps = gs.players[pi];
     if (!ps) return false;
+    // Styx 28.9.: „your deck" = Deck des Kontrolleurs (uebernommen: Uebernehmer).
+    const aktivierer = ctx.cardController ?? ctx.cardOwner;
+    const deckPs = gs.players[aktivierer];
+    if (!deckPs) return false;
 
     // Check for a free placement zone
     const { hasSurpriseZone, hasBakhmSlot } = _getFreePlacementZones(ps, heroIdx, pi, engine);
@@ -31,10 +35,10 @@ module.exports = {
     // in hand reducing every Whoolmoth-named card by 5).
     const cardDB = engine._getCardDB();
     const onlyCreatures = !hasSurpriseZone && hasBakhmSlot;
-    for (const cn of (ps.mainDeck || [])) {
+    for (const cn of (deckPs.mainDeck || [])) {
       const cd = cardDB[cn];
       if (!cd || (cd.subtype || '').toLowerCase() !== 'surprise') continue;
-      if (engine.effectiveCardLevel(cd, pi) > level) continue;
+      if (engine.effectiveCardLevel(cd, aktivierer) > level) continue;
       if (onlyCreatures && cd.cardType !== 'Creature') continue;
       return true; // At least one eligible surprise exists
     }
@@ -47,9 +51,13 @@ module.exports = {
     // Use cardHeroOwner for the hero's physical side (matters when controlled by opponent)
     const pi = ctx.cardHeroOwner;
     const heroIdx = ctx.cardHeroIdx;
-    const activator = ctx.cardOriginalOwner; // The player actually activating (may differ when controlled)
+    // Styx 28.9.: der Aktivierende ist der KONTROLLEUR des Helden (Charme,
+    // Styx …) — sein Deck, seine Abfragen. `cardOriginalOwner` waere die
+    // Brettseite. Gelegt wird in die Zone DIESES Helden (Brettseite `pi`).
+    const activator = ctx.cardController ?? ctx.cardOwner;
     const ps = gs.players[pi];
-    if (!ps) return false;
+    const deckPs = gs.players[activator];
+    if (!ps || !deckPs) return false;
 
     const cardDB = engine._getCardDB();
 
@@ -62,11 +70,11 @@ module.exports = {
     // Build deduplicated gallery of eligible Surprises
     const seen = new Set();
     const galleryCards = [];
-    for (const cn of (ps.mainDeck || [])) {
+    for (const cn of (deckPs.mainDeck || [])) {
       if (seen.has(cn)) continue;
       const cd = cardDB[cn];
       if (!cd || (cd.subtype || '').toLowerCase() !== 'surprise') continue;
-      if (engine.effectiveCardLevel(cd, pi) > level) continue;
+      if (engine.effectiveCardLevel(cd, activator) > level) continue;
       if (onlyCreatures && cd.cardType !== 'Creature') continue;
       seen.add(cn);
       galleryCards.push({ name: cn, source: 'deck' });
@@ -92,7 +100,7 @@ module.exports = {
     const isCreature = chosenData?.cardType === 'Creature';
 
     // Remove from deck
-    const _taken_deckIdx = await engine.takeFromPile(ps, 'deck', chosenName, { source: 'trapping' });   // v820: Stapel-Schicht
+    const _taken_deckIdx = await engine.takeFromPile(deckPs, 'deck', chosenName, { source: 'trapping' });   // v820: Stapel-Schicht
     if (!_taken_deckIdx) return false;
 
     // Shuffle deck
@@ -155,9 +163,15 @@ module.exports = {
 
     inst.faceDown = true;
     inst.knownToOpponent = true; // Opponent can see it semi-transparently
+    // Kartenbesitzer = Aktivierender; die Zone bleibt die Brettseite.
+    // Ausloesen scannt die Engine nur fuer die Brettseite
+    // (`_getAllSurpriseEntries`) und nur, solange diese den Helden
+    // kontrolliert (`_canHeroActivateSurprise`) — waehrend der Uebernahme
+    // also fuer niemanden.
+    if (activator !== pi) inst.originalOwner = activator;
 
     engine.log('trapping_set', {
-      player: ps.username,
+      player: deckPs.username,
       hero: ps.heroes[heroIdx]?.name,
       card: chosenName,
       zone: placementZone,

@@ -59,6 +59,24 @@
 const CARD_NAME = 'Saint Nicolas';
 
 /**
+ * Styx 28.9.: Held und die Hand, die die Potion stellen muss. Die Engine
+ * ruft mit der Brettseite (Aktionsgate, Aktionsliste) oder mit dem
+ * Kontrolleur (validateActionPlay bei Uebernahme) — steht an `pi` nicht
+ * Nicolas, ist er der geliehene Held der Gegenseite. Die Hand gehoert
+ * immer dem Kontrolleur.
+ */
+function heldUndHand(gs, pi, hi) {
+  let hero = gs.players[pi]?.heroes?.[hi];
+  if (hero?.name !== CARD_NAME) {
+    const fremd = (gs.players || []).map(p => p?.heroes?.[hi])
+      .find(h => h?.name === CARD_NAME && h.charmedBy === pi);
+    if (fremd) hero = fremd;
+  }
+  const ctrl = hero?.charmedBy ?? hero?.permaControlBy ?? pi;
+  return { hero, ps: gs.players[ctrl] };
+}
+
+/**
  * Hand indices of Potion-type cards in `ps`'s hand. Used by both the
  * `canPerformAction` gate (zero-length → block Actions) and the
  * pay-cost picker (one entry → auto-mark, multiple → prompt).
@@ -131,11 +149,10 @@ module.exports = {
     if (!cd) return true;
     const t = cd.cardType;
     if (t !== 'Spell' && t !== 'Attack' && t !== 'Creature') return true;
-    const hero = gs.players[pi]?.heroes?.[hi];
+    const { hero, ps } = heldUndHand(gs, pi, hi);
     if (!hero) return true;
     const s = hero.statuses || {};
     if (s.frozen || s.stunned || s.negated) return true;
-    const ps = gs.players[pi];
     if (!ps) return true;
     const db = engine._getCardDB();
     return _potionIndicesInHand(ps, db).length > 0;
@@ -149,11 +166,10 @@ module.exports = {
    * rule, matching `canPlayCard` above.
    */
   canPerformAction(gs, pi, hi, engine) {
-    const hero = gs.players[pi]?.heroes?.[hi];
+    const { hero, ps } = heldUndHand(gs, pi, hi);
     if (!hero) return true;
     const s = hero.statuses || {};
     if (s.frozen || s.stunned || s.negated) return true;
-    const ps = gs.players[pi];
     if (!ps) return true;
     const db = engine._getCardDB();
     return _potionIndicesInHand(ps, db).length > 0;

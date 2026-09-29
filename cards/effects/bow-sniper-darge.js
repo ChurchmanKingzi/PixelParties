@@ -43,11 +43,10 @@ const BONUS_PER_ARROW = 50;
  * Guards against firing for other heroes' attacks or non-attack damage.
  */
 function isOwnAttack(ctx, source) {
-  if (!source) return false;
-  if (source.heroIdx !== ctx.card.heroIdx) return false;
-  const srcOwner = source.owner ?? source.controller ?? -1;
-  if (srcOwner !== ctx.cardOwner) return false;
-  return true;
+  // Styx 28.9.: Brettseite + Index statt `owner` gegen den Kontrolleur —
+  // sonst hielte ein uebernommener Held den gleich indizierten Helden des
+  // Uebernehmers fuer sich selbst.
+  return ctx._engine.quelleIstHeld(source, ctx.cardHeroOwner ?? ctx.cardOriginalOwner, ctx.card.heroIdx);
 }
 
 /**

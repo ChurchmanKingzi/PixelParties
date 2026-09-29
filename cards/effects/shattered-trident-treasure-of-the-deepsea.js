@@ -72,14 +72,15 @@ module.exports = {
       const src = ctx.source;
       if (!inst || !src || inst.zone !== 'support') return;
       if (src.heroIdx !== inst.heroIdx) return;
-      if ((src.owner ?? src.controller) !== ctx.cardOwner) return;
+      // Styx 28.9.: „dieser Held" = Brettseite + Index (geliehener Held).
+      if (!ctx._engine.quelleIstHeld(src, ctx.cardHeroOwner ?? ctx.cardOwner, inst.heroIdx)) return;
       if (inst.counters?._tridentSpent) return;            // schon verbraucht, wartet auf Discard
       const targets = Array.isArray(ctx.target) ? ctx.target : (ctx.target ? [ctx.target] : []);
       if (targets.length !== 1) return;                     // „against a single target"
 
       const engine = ctx._engine;
       const pi = ctx.cardOwner;
-      const hero = engine.gs.players[pi]?.heroes?.[inst.heroIdx];
+      const hero = engine.gs.players[ctx.cardHeroOwner ?? pi]?.heroes?.[inst.heroIdx];   // Styx 28.9.: Brettseite
       const bonus = hero?.atk || 0;
       if (bonus <= 0) return;
 
@@ -118,6 +119,8 @@ module.exports = {
       if (!inst?.counters?._tridentSpent || inst.zone !== 'support') return;
       if (!ctx.spellCardData || ctx.spellCardData.cardType !== 'Attack') return;
       if (ctx.casterIdx !== ctx.cardOwner || ctx.heroIdx !== ctx.cardHeroIdx) return;
+      // Styx 28.9.: gleicher Index reicht nicht — gleiche Brettseite (geliehener Held).
+      if ((ctx.heroOwner ?? ctx.casterIdx) !== (ctx.cardHeroOwner ?? ctx.cardOwner)) return;
       if (ctx.isSecondCast) return;
       await spend(ctx._engine, inst);
     },
@@ -129,6 +132,7 @@ module.exports = {
       if (!inst?.counters?._tridentSpent || inst.zone !== 'support') return;
       if (ctx.actionType !== 'attack' && ctx.actionType !== 'hero_effect') return;
       if (ctx.playerIdx !== ctx.cardOwner || ctx.heroIdx !== ctx.cardHeroIdx) return;
+      if ((ctx.heroOwner ?? ctx.playerIdx) !== (ctx.cardHeroOwner ?? ctx.cardOwner)) return;   // Styx 28.9.: Brettseite
       await spend(ctx._engine, inst);
     },
   },

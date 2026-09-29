@@ -263,7 +263,10 @@ function makeCrusaderArtifact(spec) {
       const gs = engine.gs;
       const inst = ctx.card;
       if (!inst || inst.zone !== 'support') return false;
-      const pi = inst.controller ?? inst.owner;
+      // Styx 28.9.: „you" = Kontrolleur (geliehener Held), der Held steht
+      // auf der Brettseite (`feld`).
+      const pi = ctx.cardOwner ?? (inst.controller ?? inst.owner);
+      const feld = ctx.cardHeroOwner ?? (inst.controller ?? inst.owner);
       const heroIdx = inst.heroIdx;
       const oppIdx = pi === 0 ? 1 : 0;
 
@@ -295,7 +298,7 @@ function makeCrusaderArtifact(spec) {
 
       if (attackAnim) {
         await attackAnim(ctx, {
-          engine, pi, heroIdx, target,
+          engine, pi, feld, heroIdx, target,
           tgtOwner, tgtHeroIdx, impactSlot, tgtZoneSlot,
         });
       }
@@ -306,7 +309,7 @@ function makeCrusaderArtifact(spec) {
         }
       } else if (target.cardInstance) {
         await engine.actionDealCreatureDamage(
-          { name: cardName, owner: pi, heroIdx },
+          { name: cardName, owner: pi, heroOwner: feld, heroIdx },
           target.cardInstance, ATTACK_DAMAGE, 'attack',
           { sourceOwner: pi, canBeNegated: true },
         );

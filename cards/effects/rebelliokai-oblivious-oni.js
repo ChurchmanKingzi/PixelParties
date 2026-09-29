@@ -85,14 +85,14 @@ module.exports = {
   // second Oni's effect without burning the slot for nothing.
   canActivateCreatureEffect(ctx) {
     const engine = ctx._engine;
-    const pi     = ctx.cardOriginalOwner ?? ctx.cardOwner;
+    const pi     = ctx.cardOwner;   // Kontrolle statt Seite (Styx 28.9.)
     const hopt   = engine.gs.hoptUsed?.[`${HOPT_KEY}:${pi}`];
     return hopt !== engine.gs.turn;
   },
 
   async onCreatureEffect(ctx) {
     const engine = ctx._engine;
-    const pi     = ctx.cardOriginalOwner;
+    const pi     = ctx.cardOwner;   // Kontrolle statt Seite (Styx 28.9.)
     const ps     = engine.gs.players[pi];
     if (!ps) return false;
 

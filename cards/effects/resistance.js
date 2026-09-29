@@ -37,7 +37,7 @@ module.exports = {
     onTurnStart: (ctx) => {
       if (!ctx.isMyTurn) return;
       // Reset this hero's block budget at the start of each turn
-      const key = `${ctx.cardOwner}:${ctx.cardHeroIdx}`;
+      const key = `${ctx.cardHeroOwner ?? ctx.cardOwner}:${ctx.cardHeroIdx}`;   // Styx 28.9.: Brettseite
       if (ctx._engine.gs._resistanceBlocks) {
         delete ctx._engine.gs._resistanceBlocks[key];
       }
@@ -47,7 +47,7 @@ module.exports = {
     beforeHeroEffect: (ctx) => {
       const engine  = ctx._engine;
       const gs      = engine.gs;
-      const pi      = ctx.cardOwner;
+      const pi      = ctx.cardHeroOwner ?? ctx.cardOwner;   // Styx 28.9.: Brettseite des Helden
       const heroIdx = ctx.cardHeroIdx;
 
       // Only react to effects targeting THIS hero
@@ -94,7 +94,7 @@ module.exports = {
     onStatusApplied: async (ctx) => {
       const engine  = ctx._engine;
       const gs      = engine.gs;
-      const pi      = ctx.cardOwner;
+      const pi      = ctx.cardHeroOwner ?? ctx.cardOwner;   // Styx 28.9.: Brettseite des Helden
       const heroIdx = ctx.cardHeroIdx;
 
       // Only react to statuses applied to THIS hero

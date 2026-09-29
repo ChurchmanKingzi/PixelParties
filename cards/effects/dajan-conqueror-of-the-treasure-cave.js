@@ -39,6 +39,12 @@ function artifactInHand(ps, cardDB) {
   return (ps.hand || []).some(n => hasCardType(cardDB[n], 'Artifact'));
 }
 
+/** Styx 28.9.: Gehoert der scharfe Riegel DIESEM Dajan (Seite + Index)? */
+function istDieser(armed, ctx) {
+  return armed.heroIdx === ctx.cardHeroIdx
+    && (armed.heroOwner ?? ctx.cardOwner) === (ctx.cardHeroOwner ?? ctx.cardOwner);
+}
+
 module.exports = {
   activeIn: ['hero'],
   heroEffect: true,
@@ -119,7 +125,7 @@ module.exports = {
     const engine = ctx._engine;
     const pi = ctx.cardOwner;
     const armed = engine.freeArtifactArmed(pi);
-    if (armed && armed.heroIdx === ctx.cardHeroIdx) return true;
+    if (armed && istDieser(armed, ctx)) return true;
     if (armed) return false;
     const ps = engine.gs.players[pi];
     return !!ps && artifactInHand(ps, engine._getCardDB());
@@ -137,7 +143,7 @@ module.exports = {
     if (!ps) return false;
 
     const armed = engine.freeArtifactArmed(pi);
-    if (armed && armed.heroIdx === heroIdx) {
+    if (armed && istDieser(armed, ctx)) {
       engine.disarmFreeArtifact(pi);
       engine.log('free_artifact_disarmed', { player: ps.username, hero: CARD_NAME });
       engine.sync();
@@ -147,6 +153,10 @@ module.exports = {
     if (!artifactInHand(ps, engine._getCardDB())) return false;
 
     engine.armFreeArtifact(pi, heroIdx, CARD_NAME);
+    // Styx 28.9.: Brettseite dazu — geliehener und eigener Held koennen
+    // denselben Index haben.
+    const _a = engine.freeArtifactArmed(pi);
+    if (_a) _a.heroOwner = ctx.cardHeroOwner ?? pi;
     engine.log('free_artifact_armed', { player: ps.username, hero: CARD_NAME });
     // Erst syncen — die Hand soll SOFORT waehlbar sein —, dann Glow +
     // Klang ohne zu warten (der Glow wartet sonst 500 ms).

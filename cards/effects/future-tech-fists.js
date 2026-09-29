@@ -63,9 +63,10 @@ module.exports = {
     if (!inst || inst.zone !== 'support') return false;
     const engine = ctx._engine;
     const gs = engine.gs;
-    const pi = inst.controller ?? inst.owner;
+    // Styx 28.9.: Ablage = Kontrolleur (`cardOwner`), Held = Brettseite.
+    const pi = ctx.cardOwner ?? (inst.controller ?? inst.owner);
     if (zaehleInAblage(gs, pi, CARD_NAME) <= 0) return false;
-    const hero = gs.players[pi]?.heroes?.[inst.heroIdx];
+    const hero = gs.players[inst.controller ?? inst.owner]?.heroes?.[inst.heroIdx];
     return !!hero?.name && hero.hp > 0 && (hero.baseAtk || 0) > 0;
   },
 
@@ -74,9 +75,11 @@ module.exports = {
     const gs = engine.gs;
     const inst = ctx.card;
     if (!inst || inst.zone !== 'support') return false;
-    const pi = inst.controller ?? inst.owner;
+    // Styx 28.9.: „you" = Kontrolleur (`cardOwner`), Held = Brettseite (`feld`).
+    const feld = inst.controller ?? inst.owner;
+    const pi = ctx.cardOwner ?? feld;
     const heroIdx = inst.heroIdx;
-    const hero = gs.players[pi]?.heroes?.[heroIdx];
+    const hero = gs.players[feld]?.heroes?.[heroIdx];
     if (!hero?.name || hero.hp <= 0) return false;
 
     const grenze = zaehleInAblage(gs, pi, CARD_NAME);
@@ -101,7 +104,7 @@ module.exports = {
 
     // EIN Quellobjekt fuer alle Treffer — Reaktionen und die
     // Effekt-Immunitaet sehen den Streuschlag als EINEN Vorgang.
-    const quelle = { name: hero.name, owner: pi, heroIdx };
+    const quelle = { name: hero.name, owner: pi, heroOwner: feld, heroIdx };
     // ★ v1061 („Interference", Als Rulings 14.9.): EIN Einsatz, mehrere
     // Ziele — das ist ein Flaechenschlag. Die Klammer nimmt die ECHTE
     // gewaehlte Zielmenge; bei einem einzigen Ziel bleibt es ein

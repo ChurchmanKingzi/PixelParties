@@ -72,7 +72,8 @@ function kleinGenug(engine, inst) {
 function merken(ctx) {
   const engine = ctx._engine;
   const pi = ctx.cardOwner;
-  const held = engine.gs.players[pi]?.heroes?.[ctx.cardHeroIdx];
+  // Styx 28.9.: Kohta selbst (Brettseite), nicht der gleich indizierte eigene Held.
+  const held = ctx.attachedHero ?? engine.gs.players[ctx.cardHeroOwner ?? pi]?.heroes?.[ctx.cardHeroIdx];
   if (!held?.name || held.hp <= 0) return;
   if (held.statuses?.negated) return;
 
@@ -105,20 +106,21 @@ module.exports = {
   hooks: {
     // Bereitschaft bei jedem Wechsel in den eigenen Support Zones neu
     // bewerten (v910, Riffel-Muster).
+    // Styx 28.9.: Pruefung auf der Brettseite des Helden (`cardHeroOwner`).
     onGameStart: (ctx) => {
-      checkKohtaAscension(ctx._engine, ctx.cardOwner, ctx.cardHeroIdx, null);
+      checkKohtaAscension(ctx._engine, ctx.cardHeroOwner ?? ctx.cardOwner, ctx.cardHeroIdx, null);
     },
     onTurnStart: (ctx) => {
       checkKohtaAscension(ctx._engine, ctx.cardOriginalOwner, ctx.cardHeroIdx, null);
     },
     onCardEnterZone: (ctx) => {
       if (ctx.toZone !== 'support' || ctx.toHeroIdx !== ctx.cardHeroIdx) return;
-      checkKohtaAscension(ctx._engine, ctx.cardOwner, ctx.cardHeroIdx, null);
+      checkKohtaAscension(ctx._engine, ctx.cardHeroOwner ?? ctx.cardOwner, ctx.cardHeroIdx, null);
     },
     onCardLeaveZone: (ctx) => {
       if (ctx.fromZone !== 'support') return;
       if (ctx.fromHeroIdx !== undefined && ctx.fromHeroIdx !== ctx.cardHeroIdx) return;
-      checkKohtaAscension(ctx._engine, ctx.cardOwner, ctx.cardHeroIdx, ctx.leavingCard?.id);
+      checkKohtaAscension(ctx._engine, ctx.cardHeroOwner ?? ctx.cardOwner, ctx.cardHeroIdx, ctx.leavingCard?.id);
     },
     // ── ① Merken, waehrend der Effekt noch laeuft ─────────────────
     onHeroKO: async (ctx) => { merken(ctx); },
@@ -136,7 +138,7 @@ module.exports = {
       // Nur fuer die Creature, deren Effekt gerade zu Ende ging.
       if (ctx.creature?.id !== vermerk.instId) return;
 
-      const held = gs.players[pi]?.heroes?.[ctx.cardHeroIdx];
+      const held = ctx.attachedHero ?? gs.players[ctx.cardHeroOwner ?? pi]?.heroes?.[ctx.cardHeroIdx];   // Styx 28.9.
       if (!held?.name || held.hp <= 0 || held.statuses?.negated) return;
       if (gs.hoptUsed?.[`${HOPT_KEY}:${pi}`] === gs.turn) return;
 

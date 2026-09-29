@@ -105,9 +105,11 @@ module.exports = {
     const heroIdx = ausgeruesteterHeld(gs, pi, opts);
     if (heroIdx < 0) return false;
 
-    // Der ausgerüstete Held muss unter den Zielen sein …
+    // Der ausgerüstete Held muss unter den Zielen sein … Styx 28.9.: er
+    // steht auf `opts.heroOwner` (geliehener Held), `pi` = Kontrolleur.
+    const seite = opts?.heroOwner ?? pi;
     const treffer = (targetedHeroes || []).some(t =>
-      t.owner === pi && t.type === 'hero' && t.heroIdx === heroIdx);
+      t.owner === seite && t.type === 'hero' && t.heroIdx === heroIdx);
     if (!treffer) return false;
     // … UND mindestens ein weiteres Ziel („that also affects at least
     // 1 other target") — egal wem es gehört.
@@ -128,6 +130,7 @@ module.exports = {
     const ps = gs.players[pi];
     const heroIdx = ausgeruesteterHeld(gs, pi, opts);
     if (heroIdx < 0 || !ps) return {};
+    const seite = opts?.heroOwner ?? pi;   // Brettseite des Traegers (Styx 28.9.)
 
     // ── Preis zahlen: eine Kopie zurück ins Deck ──
     const idx = (ps.discardPile || []).lastIndexOf(CARD_NAME);
@@ -151,13 +154,13 @@ module.exports = {
     engine.shuffleDeck(pi, 'main');       // sendet auch die Misch-Animation
 
     engine._broadcastEvent('play_zone_animation', {
-      type: 'shield_bubble', owner: pi, heroIdx, zoneSlot: -1,
+      type: 'shield_bubble', owner: seite, heroIdx, zoneSlot: -1,
     });
     await engine._delay(420);
 
-    engine.grantEffectImmunity(pi, heroIdx, sourceCard);
+    engine.grantEffectImmunity(seite, heroIdx, sourceCard);
     engine.log('ft_weathercock', {
-      player: ps.username, hero: ps.heroes?.[heroIdx]?.name,
+      player: ps.username, hero: gs.players[seite]?.heroes?.[heroIdx]?.name,
       negated: sourceCard?.name || 'an Attack or Spell',
     });
     engine.sync();

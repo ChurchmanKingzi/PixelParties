@@ -45,9 +45,11 @@ module.exports = {
       const gs     = ctx.gameState;
       const pi      = ctx.cardOwner;
       const heroIdx = ctx.cardHeroIdx;
+      // Styx 28.9.: Held/Zonen auf der Brettseite `feld`, „du" = Kontrolleur `pi`.
+      const feld    = ctx.cardHeroOwner ?? pi;
 
-      // Only trigger for attacks cast BY this hero
-      if (ctx.casterIdx !== pi || ctx.heroIdx !== heroIdx) return;
+      // Only trigger for attacks cast BY this hero (Brettseite + Index)
+      if ((ctx.heroOwner ?? ctx.casterIdx) !== feld || ctx.heroIdx !== heroIdx) return;
 
       // Prevent infinite loop on the second hit
       if (ctx.isSecondCast) return;
@@ -57,7 +59,7 @@ module.exports = {
 
       // Andras must be alive and capable
       const ps   = gs.players[pi];
-      const hero = ps.heroes?.[heroIdx];
+      const hero = ctx.attachedHero ?? gs.players[feld]?.heroes?.[heroIdx];
       if (!hero?.name || hero.hp <= 0) return;
       if (hero.statuses?.frozen || hero.statuses?.stunned || hero.statuses?.negated) return;
 
@@ -73,24 +75,23 @@ module.exports = {
 
       // Attack's original level must be lower than Andras's Fighting level
       const attackLevel  = attackData.level || 0;
-      const fightingLevel = engine.countAbilitiesForSchool('Fighting', ps.abilityZones[heroIdx] || []);
+      const fightingLevel = engine.countAbilitiesForSchool('Fighting', gs.players[feld]?.abilityZones?.[heroIdx] || []);
       if (attackLevel >= fightingLevel) return;
 
       // Must be at least 1 other valid target on the opponent's side
       const oppIdx = pi === 0 ? 1 : 0;
-      const oppPs  = gs.players[oppIdx];
       const firstTargetId = targets[0].id;
       let hasOtherTarget = false;
 
-      for (let hi = 0; hi < (oppPs.heroes || []).length; hi++) {
-        const h = oppPs.heroes[hi];
+      // Kontrolle statt Seite (Styx 28.9.); IDs bleiben physisch.
+      for (const { physOwner, heroIdx: hi, hero: h } of engine.heroesControlledBy(oppIdx)) {
         if (!h?.name || h.hp <= 0) continue;
-        if (`hero-${oppIdx}-${hi}` !== firstTargetId) { hasOtherTarget = true; break; }
+        if (`hero-${physOwner}-${hi}` !== firstTargetId) { hasOtherTarget = true; break; }
       }
       if (!hasOtherTarget) {
         for (const inst of engine.cardInstances) {
-          if (inst.owner !== oppIdx || inst.zone !== 'support') continue;
-          const cId = `equip-${inst.owner}-${inst.heroIdx}-${inst.zoneSlot}`;
+          if ((inst.controller ?? inst.owner) !== oppIdx || inst.zone !== 'support') continue;
+          const cId = `equip-${engine.physicalSide(inst)}-${inst.heroIdx}-${inst.zoneSlot}`;
           if (cId !== firstTargetId) { hasOtherTarget = true; break; }
         }
       }
@@ -122,6 +123,7 @@ module.exports = {
 
       // Create a temporary card instance for the second hit
       const tempInst = engine._trackCard(ctx.spellName, pi, 'hand', heroIdx, -1);
+      if (feld !== pi) tempInst.heroOwner = feld;   // Styx 28.9.: wie der Server bei Uebernahme
 
       try {
         await engine.runHooks('onPlay', {

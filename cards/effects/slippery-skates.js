@@ -73,7 +73,9 @@ module.exports = {
     if (kind !== 'generic') return undefined;
     const promptData = payload;
     if (!promptData || promptData.type !== 'skatesMove') return undefined;
-    const pi = promptData.ownerIdx;
+    // Styx 28.9.: Zonen liegen auf der Brettseite (`boardOwner`), nicht
+    // zwingend beim Gefragten.
+    const pi = promptData.boardOwner ?? promptData.ownerIdx;
     const ps = engine.gs.players[pi];
     if (!ps) return null;
     const creatures = promptData.creatures || [];
@@ -206,13 +208,13 @@ module.exports = {
   canActivateEquipEffect(ctx) {
     const engine = ctx._engine;
     const gs = engine.gs;
-    const pi = ctx.cardOriginalOwner;
+    const pi = ctx.cardOriginalOwner;   // Brettseite des ausgeruesteten Helden
     const ps = gs.players[pi];
     const heroIdx = ctx.cardHeroIdx;
     if (!ps) return false;
 
-    // Check for 1+ creatures on this hero
-    const hasCreature = _getCreaturesOnHero(ps, heroIdx, engine).length > 0;
+    // Check for 1+ creatures on this hero (die der Kontrolleur kontrolliert)
+    const hasCreature = _getCreaturesOnHero(ps, heroIdx, engine, _kontrolleur(ctx)).length > 0;
     if (!hasCreature) return false;
 
     // Check for 1+ adjacent heroes with free zones
@@ -222,7 +224,11 @@ module.exports = {
   async onEquipEffect(ctx) {
     const engine = ctx._engine;
     const gs = engine.gs;
+    // Styx 28.9.: `pi` = Brettseite (Zonen des ausgeruesteten Helden und
+    // seiner Nachbarn), `kontrolleur` = wer die Skates nutzt (uebernommen:
+    // der Uebernehmer) — ihn fragen, nur seine Kreaturen verschieben.
     const pi = ctx.cardOriginalOwner;
+    const kontrolleur = _kontrolleur(ctx);
     const ps = gs.players[pi];
     const heroIdx = ctx.cardHeroIdx;
     if (!ps) return false;
@@ -231,16 +237,18 @@ module.exports = {
     const savedReveal = gs._pendingCardReveal;
     delete gs._pendingCardReveal;
 
-    const creatures = _getCreaturesOnHero(ps, heroIdx, engine);
+    const creatures = _getCreaturesOnHero(ps, heroIdx, engine, kontrolleur);
     if (creatures.length === 0) return false;
     const freeZones = _getAdjacentFreeZones(ps, heroIdx);
     if (freeZones.length === 0) return false;
 
-    // Single combined prompt — client handles two-step click flow
-    const result = await engine.promptGeneric(pi, {
+    // Single combined prompt — client handles two-step click flow.
+    // `ownerIdx` = Gefragter, `boardOwner` = Seite der Zonen (Styx 28.9.).
+    const result = await engine.promptGeneric(kontrolleur, {
       type: 'skatesMove',
       title: 'Slippery Skates',
-      ownerIdx: pi,
+      ownerIdx: kontrolleur,
+      boardOwner: pi,
       heroIdx,
       creatures: creatures.map(c => ({ zoneSlot: c.zoneSlot, name: c.name })),
       destZones: freeZones.map(z => ({ heroIdx: z.heroIdx, slotIdx: z.slotIdx })),
@@ -260,6 +268,7 @@ module.exports = {
       ci.owner === pi && ci.zone === 'support' && ci.heroIdx === heroIdx && ci.zoneSlot === srcSlot
     );
     if (!inst) return false;
+    if (!creatures.some(c => c.inst === inst)) return false;   // nur angebotene Kreaturen
 
     // Verify destination is still free
     if (((ps.supportZones[destHeroIdx] || [])[destSlot] || []).length > 0) return false;
@@ -329,7 +338,7 @@ module.exports = {
       card: inst.name,
       fromHero: ps.heroes[heroIdx]?.name || '?',
       toHero: ps.heroes[destHeroIdx]?.name || '?',
-      player: ps.username,
+      player: gs.players[kontrolleur]?.username,
     });
 
     engine.sync();
@@ -337,10 +346,15 @@ module.exports = {
   },
 };
 
+/** Wer nutzt die Skates? Der Kontrolleur (uebernommener Held: Uebernehmer). */
+function _kontrolleur(ctx) {
+  return ctx.cardController ?? ctx.cardOwner ?? ctx.cardOriginalOwner;
+}
+
 /**
  * Get all Creatures on a hero's support zones.
  */
-function _getCreaturesOnHero(ps, heroIdx, engine) {
+function _getCreaturesOnHero(ps, heroIdx, engine, kontrolleur = null) {
   const result = [];
   const cardDB = engine._getCardDB();
   for (let zi = 0; zi < (ps.supportZones[heroIdx] || []).length; zi++) {
@@ -353,6 +367,9 @@ function _getCreaturesOnHero(ps, heroIdx, engine) {
       c.zone === 'support' && c.heroIdx === heroIdx && c.zoneSlot === zi && c.name === name
     );
     if (!inst || inst.faceDown) continue;
+    // Styx 28.9.: verschiebbar ist nur, was der Nutzer der Skates
+    // kontrolliert (Kreaturen gehen bei Uebernahme nicht mit).
+    if (kontrolleur != null && (engine.effektiveSeiten(inst).controller ?? inst.owner) !== kontrolleur) continue;
     // Balancing rule: a Creature already moved by a "Slippery Skates"
     // effect THIS turn is ineligible for ANY Skates copy's move this
     // turn. The marker self-expires when gs.turn advances, so no reset

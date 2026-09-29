@@ -89,9 +89,11 @@ async function fallbeil(ctx, anlass) {
   if (!gewaehlt) return;
 
   await engine.showTriggeredEffect(CARD_NAME, { playerIdx: pi });
-  const heldName = gs.players[opp]?.heroes?.[gewaehlt.heroIdx]?.name || null;
+  // Styx 28.9.: Zielseite aus dem Ziel (physische Spalte), nicht `opp`.
+  const zielSeite = gewaehlt.owner ?? opp;
+  const heldName = gs.players[zielSeite]?.heroes?.[gewaehlt.heroIdx]?.name || null;
   engine._broadcastEvent('play_zone_animation', {
-    type: 'guillotine_drop', owner: opp, heroIdx: gewaehlt.heroIdx, zoneSlot: gewaehlt.slotIdx,
+    type: 'guillotine_drop', owner: zielSeite, heroIdx: gewaehlt.heroIdx, zoneSlot: gewaehlt.slotIdx,
     ...(gewaehlt.zoneKind === 'support' ? {} : { zoneType: 'ability' }),
   });
   await engine._delay(520);

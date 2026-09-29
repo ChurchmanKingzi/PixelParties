@@ -49,7 +49,7 @@ function targetSurvived(engine, target) {
 }
 
 /** Build the list of Attack cards in hand that pass the Lv1-or-lower gate. */
-function eligibleAttacks(engine, pi, heroIdx) {
+function eligibleAttacks(engine, pi, heroIdx, feld = pi) {   // Styx 28.9.: `feld` = Brettseite des Helden
   const ps = engine.gs.players[pi];
   const cardDB = engine._getCardDB();
   const out = [];
@@ -67,9 +67,9 @@ function eligibleAttacks(engine, pi, heroIdx) {
     // aware so a Demon's-Gate-style override on the original Attack
     // doesn't accidentally over-qualify the bonus pick.
     if (cd.spellSchool1
-        && engine.effectiveSchoolLevelForCaster(cd.spellSchool1, pi, heroIdx) < lvl) continue;
+        && engine.effectiveSchoolLevelForCaster(cd.spellSchool1, feld, heroIdx) < lvl) continue;
     if (cd.spellSchool2
-        && engine.effectiveSchoolLevelForCaster(cd.spellSchool2, pi, heroIdx) < lvl) continue;
+        && engine.effectiveSchoolLevelForCaster(cd.spellSchool2, feld, heroIdx) < lvl) continue;
     seen.add(cardName);
     out.push({ name: cardName, source: 'hand' });
   }
@@ -98,9 +98,11 @@ module.exports = {
       const pi = ctx.cardOwner;
       const heroIdx = ctx.cardHeroIdx;
       const ps = gs.players[pi];
+      // Styx 28.9.: Held/Zonen auf der Brettseite `feld`, „du" = Kontrolleur `pi`.
+      const feld = ctx.cardHeroOwner ?? pi;
 
-      // Only react to Attacks cast BY this Hero.
-      if (ctx.casterIdx !== pi || ctx.heroIdx !== heroIdx) return;
+      // Only react to Attacks cast BY this Hero (Brettseite + Index).
+      if ((ctx.heroOwner ?? ctx.casterIdx) !== feld || ctx.heroIdx !== heroIdx) return;
       const cardData = ctx.spellCardData;
       if (!cardData || !hasCardType(cardData, 'Attack')) return;
 
@@ -114,7 +116,7 @@ module.exports = {
 
       // Verify Nieht is still alive (he can die to retaliation /
       // recoil during his own Attack — Phoenix Tackle etc.).
-      const hero = ps.heroes?.[heroIdx];
+      const hero = ctx.attachedHero ?? gs.players[feld]?.heroes?.[heroIdx];
       if (!hero?.name || hero.hp <= 0) return;
 
       // ── Effect 1: Draw 1 on hit-exactly-1-opp-target ──
@@ -140,7 +142,7 @@ module.exports = {
       // Nieht must still be able to act.
       if (hero.statuses?.frozen || hero.statuses?.stunned || hero.statuses?.negated) return;
 
-      const eligible = eligibleAttacks(engine, pi, heroIdx);
+      const eligible = eligibleAttacks(engine, pi, heroIdx, feld);
       if (eligible.length === 0) return;
 
       const confirmed = await ctx.promptConfirmEffect({
@@ -194,6 +196,7 @@ module.exports = {
       gs._spellExcludeTargets = [];
 
       const bonusInst = engine._trackCard(bonusName, pi, 'hand', heroIdx, -1);
+      if (feld !== pi) bonusInst.heroOwner = feld;   // Styx 28.9.: wie der Server bei Uebernahme
       try {
         await engine.runHooks('onPlay', {
           _onlyCard: bonusInst, playedCard: bonusInst,
@@ -208,12 +211,12 @@ module.exports = {
           if (!seenIds.has(t.id)) { seenIds.add(t.id); uniqueTargets.push(t); }
         }
         await engine.runHooks('afterSpellResolved', {
-          spellName: bonusName, spellCardData: bonusCardData, heroIdx, casterIdx: pi,
+          spellName: bonusName, spellCardData: bonusCardData, heroIdx, heroOwner: feld, casterIdx: pi,
           damageTargets: uniqueTargets, isSecondCast: true,
           _skipReactionCheck: true,
         });
         // v1364: „as an additional Action" — als ausgefuehrte Aktion melden.
-        if (!gs._spellCancelled) await engine.meldeGussAlsAktion(pi, heroIdx, bonusName);
+        if (!gs._spellCancelled) await engine.meldeGussAlsAktion(pi, heroIdx, bonusName, { heroOwner: feld });
       } catch (err) {
         console.error(`[Engine] Nieht bonus Attack error for "${bonusName}":`, err.message);
       }

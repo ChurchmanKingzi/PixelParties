@@ -58,7 +58,7 @@ function eigenerAngriff(ctx, quelle, typ) {
   if (isCreatureSource(ctx._engine, quelle)) return false;      // v927
   if ((quelle.heroIdx ?? -1) !== ctx.cardHeroIdx) return false;
   const seite = quelle.heroOwner ?? quelle.owner ?? quelle.controller;
-  return seite === ctx.cardOwner;
+  return seite === (ctx.cardHeroOwner ?? ctx.cardOwner);   // Styx 28.9.: Brettseite, nicht Kontrolleur
 }
 
 /** 10 Gold je besiegtem Ziel — mit Auftritt, einmal je Angriff. */
@@ -99,7 +99,7 @@ module.exports = {
       if (!ctx.target || Array.isArray(ctx.target)) return;
 
       const pi = ctx.cardOwner;
-      const hero = engine.gs.players[pi]?.heroes?.[ctx.cardHeroIdx];
+      const hero = ctx.attachedHero ?? engine.gs.players[ctx.cardHeroOwner ?? pi]?.heroes?.[ctx.cardHeroIdx];   // Styx 28.9.
       if (!hero?.name || hero.hp <= 0) return;
 
       // ★ AKTUELLER Angriffswert, nicht der gedruckte.

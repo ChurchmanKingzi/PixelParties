@@ -38,7 +38,8 @@ module.exports = {
       const gs = engine.gs;
       const pi = ctx.cardOwner;
       const heroIdx = ctx.cardHeroIdx;
-      const hero = gs.players[pi]?.heroes?.[heroIdx];
+      const feld = ctx.cardHeroOwner ?? pi;   // Styx 28.9.: Brettseite des Helden
+      const hero = ctx.attachedHero ?? gs.players[feld]?.heroes?.[heroIdx];
 
       // Bakhm must be alive and not incapacitated
       if (!hero?.name || hero.hp <= 0) return;
@@ -46,7 +47,7 @@ module.exports = {
 
       // Sand twister animation on Bakhm
       engine._broadcastEvent('play_zone_animation', {
-        type: 'sand_twister', owner: pi,
+        type: 'sand_twister', owner: feld,
         heroIdx, zoneSlot: -1,
       });
       await engine._delay(300);

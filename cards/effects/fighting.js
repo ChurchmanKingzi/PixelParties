@@ -69,11 +69,13 @@ module.exports = {
       const hero = ctx.attachedHero;
       if (!hero || !hero.name) return;
 
-      const ps = ctx.players[ctx.cardOwner];
+      // Styx 28.9.: Zone und Held liegen auf der Brettseite (geliehener Held).
+      const seite = ctx.cardHeroOwner ?? ctx.cardOwner;
+      const ps = ctx.players[seite];
       const zone = (ps.abilityZones[ctx.cardHeroIdx] || [])[ctx.card.zoneSlot] || [];
       const copyIndex = zone.length - 1;
 
-      applyBonus(ctx._engine, ctx.card, hero, ctx.cardOwner, ctx.cardHeroIdx, copyIndex);
+      applyBonus(ctx._engine, ctx.card, hero, seite, ctx.cardHeroIdx, copyIndex);
     },
 
     /**
@@ -84,14 +86,15 @@ module.exports = {
       if (!hero || !hero.name) return;
 
       const engine = ctx._engine;
+      const seite = ctx.cardHeroOwner ?? ctx.cardOwner;   // Styx 28.9.: Brettseite
       const sameZone = engine.cardInstances.filter(c =>
-        c.owner === ctx.cardOwner && c.zone === 'ability' &&
+        c.owner === seite && c.zone === 'ability' &&
         c.heroIdx === ctx.cardHeroIdx && c.zoneSlot === ctx.card.zoneSlot &&
         c.name === 'Fighting'
       );
       const processedCount = sameZone.filter(c => c.counters.atkGranted > 0).length;
 
-      applyBonus(engine, ctx.card, hero, ctx.cardOwner, ctx.cardHeroIdx, processedCount);
+      applyBonus(engine, ctx.card, hero, seite, ctx.cardHeroIdx, processedCount);
     },
 
     /**
@@ -113,14 +116,16 @@ module.exports = {
       ctx.card.counters.atkGranted = 0;
       if (atkGranted <= 0) return;
 
-      const hero = ctx.players[ctx.cardOwner]?.heroes?.[ctx.cardHeroIdx];
+      // Styx 28.9.: Held auf der Brettseite (geliehener Held).
+      const seite = ctx.cardHeroOwner ?? ctx.cardOwner;
+      const hero = ctx.players[seite]?.heroes?.[ctx.cardHeroIdx];
       if (!hero || !hero.name) return;
 
       // Same canonical-helper route as the grant path above —
       // mirrors the Curse-suppression accumulator for revoke
       // semantics. The broadcast fires inside the helper only when
       // the hero is NOT cursed (visible stat unchanged otherwise).
-      engine._applyHeroAtkDelta(hero, ctx.cardOwner, ctx.cardHeroIdx, -atkGranted);
+      engine._applyHeroAtkDelta(hero, seite, ctx.cardHeroIdx, -atkGranted);
 
       ctx.log('fighting_atk_down', { hero: hero.name, amount: atkGranted });
       engine.sync();

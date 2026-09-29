@@ -31,18 +31,18 @@ module.exports = {
 
     // Burn all targets the taker controls
     // Heroes
-    for (let hi = 0; hi < (takerPs.heroes || []).length; hi++) {
-      const hero = takerPs.heroes[hi];
+    // Kontrolle statt Seite (Styx 28.9.) — Helden in ihrer physischen Spalte.
+    for (const { physOwner, heroIdx: hi, hero } of engine.heroesControlledBy(takerIdx)) {
       if (!hero?.name || hero.hp <= 0 || hero.statuses?.burned) continue;
-      await engine.addHeroStatus(takerIdx, hi, 'burned', { permanent: true, appliedBy: pi, _skipReactionCheck: true });
+      await engine.addHeroStatus(physOwner, hi, 'burned', { permanent: true, appliedBy: pi, _skipReactionCheck: true });
       engine._broadcastEvent('play_zone_animation', {
-        type: 'flame_strike', owner: takerIdx, heroIdx: hi, zoneSlot: -1,
+        type: 'flame_strike', owner: physOwner, heroIdx: hi, zoneSlot: -1,
       });
     }
 
     // Creatures
     for (const inst of engine.cardInstances) {
-      if (inst.owner !== takerIdx || inst.zone !== 'support' || inst.faceDown) continue;
+      if ((inst.controller ?? inst.owner) !== takerIdx || inst.zone !== 'support' || inst.faceDown) continue;
       const cd = inst.counters?._cardDataOverride || cardDB[inst.name]; // token-override-aware (Biomancy Token — Als AoE-Report)
       if (!cd || !hasCardType(cd, 'Creature')) continue;
       const applied = await engine.applyCreatureStatus(inst, 'burned', {
@@ -51,7 +51,7 @@ module.exports = {
       });
       if (applied) {
         engine._broadcastEvent('play_zone_animation', {
-          type: 'flame_strike', owner: inst.owner, heroIdx: inst.heroIdx, zoneSlot: inst.zoneSlot,
+          type: 'flame_strike', owner: engine.physicalSide(inst), heroIdx: inst.heroIdx, zoneSlot: inst.zoneSlot,
         });
         engine.log('creature_burned', { card: inst.name, owner: inst.owner, by: 'Bottled Flame' });
       }

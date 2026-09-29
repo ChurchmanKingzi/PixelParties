@@ -62,7 +62,7 @@ module.exports = {
     if (!inst || inst.zone !== 'support') return false;
     const engine = ctx._engine;
     const gs = engine.gs;
-    const pi = inst.controller ?? inst.owner;
+    const pi = ctx.cardOwner ?? (inst.controller ?? inst.owner);   // Styx 28.9.: „you" = Kontrolleur
     const ps = gs.players[pi];
     if (!ps || (ps.potionDeck || []).length === 0) return false;
     if (engine.arePotionsLockedFor?.(pi)) return false;
@@ -76,7 +76,7 @@ module.exports = {
     const gs = engine.gs;
     const inst = ctx.card;
     if (!inst || inst.zone !== 'support') return false;
-    const pi = inst.controller ?? inst.owner;
+    const pi = ctx.cardOwner ?? (inst.controller ?? inst.owner);   // Styx 28.9.: „you" = Kontrolleur
     const ps = gs.players[pi];
     if (!ps) return false;
 

@@ -85,11 +85,10 @@ const TYPE_GROUPS = [
 
 /** True iff `source` is Doq's own Hero making an Attack. */
 function isOwnAttack(ctx, source) {
-  if (!source) return false;
-  if (source.heroIdx !== ctx.card.heroIdx) return false;
-  const srcOwner = source.owner ?? source.controller ?? -1;
-  if (srcOwner !== ctx.cardOwner) return false;
-  return true;
+  // Styx 28.9.: Brettseite + Index statt `owner` gegen den Kontrolleur —
+  // sonst hielte ein uebernommener Held den gleich indizierten Helden des
+  // Uebernehmers fuer sich selbst.
+  return ctx._engine.quelleIstHeld(source, ctx.cardHeroOwner ?? ctx.cardOriginalOwner, ctx.card.heroIdx);
 }
 
 /**

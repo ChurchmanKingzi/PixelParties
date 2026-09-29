@@ -76,10 +76,13 @@ module.exports = {
     // don't know the caster — treat that as "not Taio's spell".
     if (heroIdx == null) return 0;
     if (inst?.heroIdx !== heroIdx) return 0;
+    // Styx 28.9.: Taios Zonen liegen auf der Brettseite seiner Instanz
+    // (`inst.owner`), nicht beim Kontrolleur `ownerIdx`.
+    const seite = inst?.owner ?? ownerIdx;
     // Conditional gate: at least one Artifact (cost ≥ 10) equipped.
-    if (!_hasHighCostArtifactEquipped(engine, ownerIdx, heroIdx)) return 0;
+    if (!_hasHighCostArtifactEquipped(engine, seite, heroIdx)) return 0;
     // Reduction amount = Taio's Fighting level.
-    const ps = engine.gs.players[ownerIdx];
+    const ps = engine.gs.players[seite];
     if (!ps) return 0;
     const abZones = ps.abilityZones?.[heroIdx] || [];
     return engine.countAbilitiesForSchool('Fighting', abZones);
@@ -120,7 +123,8 @@ module.exports = {
       // on his side, and qualify as an Equipment.
       if (entering.zone !== 'support') return;
       if (entering.heroIdx !== ctx.cardHeroIdx) return;
-      if ((entering.controller ?? entering.owner) !== ctx.cardOwner) return;
+      // Styx 28.9.: Taios Zone = Brettseite, gleich wer die Karte kontrolliert.
+      if (ctx._engine.physicalSide(entering) !== (ctx.cardHeroOwner ?? ctx.cardOwner)) return;
       if (!ctx._engine.isEquipInZone(entering.name, entering)) return;
       _grantAura(ctx, entering);
       // The Sun Sword landing is one half of the ascension gate —
@@ -165,12 +169,13 @@ module.exports = {
       // Dying hero must belong to Taio's opponent.
       const engine = ctx._engine;
       const dyingOwner = engine._findHeroOwner(ctx.hero);
-      if (dyingOwner < 0 || dyingOwner === ctx.cardOwner) return;
-      // Source attribution: same slot as Taio, and an Attack or
-      // Destruction Magic Spell card.
+      // Styx 28.9.: „opp Hero" nach Kontrolle.
+      if (dyingOwner < 0 || engine.heroSideOf(dyingOwner, ctx.hero) === ctx.cardOwner) return;
+      // Source attribution: same slot as Taio (Brettseite + Index), and an
+      // Attack or Destruction Magic Spell card.
       const src = ctx.source;
       if (!src?.name) return;
-      if (src.owner !== ctx.cardOwner) return;
+      if ((src.heroOwner ?? src.owner) !== (ctx.cardHeroOwner ?? ctx.cardOwner)) return;
       if (src.heroIdx !== ctx.cardHeroIdx) return;
       const cd = engine._getCardDB()[src.name];
       if (!cd) return;
@@ -200,11 +205,12 @@ module.exports = {
  * are respected.
  */
 function _hasHighCostArtifactEquipped(engine, ownerIdx, heroIdx) {
+  // Styx 28.9.: `ownerIdx` = Brettseite von Taio.
   const cardDB = engine._getCardDB();
   for (const inst of engine.cardInstances) {
     if (inst.zone !== 'support') continue;
     if (inst.heroIdx !== heroIdx) continue;
-    if ((inst.controller ?? inst.owner) !== ownerIdx) continue;
+    if (engine.physicalSide(inst) !== ownerIdx) continue;
     if (inst.faceDown) continue;
     if (!engine.isEquipInZone(inst.name, inst)) continue;
     const cd = cardDB[inst.name];
@@ -222,12 +228,12 @@ function _hasHighCostArtifactEquipped(engine, ownerIdx, heroIdx) {
  */
 function _grantForExistingEquipment(ctx) {
   const engine = ctx._engine;
-  const ownerIdx = ctx.cardOwner;
+  const ownerIdx = ctx.cardHeroOwner ?? ctx.cardOwner;   // Styx 28.9.: Brettseite
   const heroIdx  = ctx.cardHeroIdx;
   for (const inst of engine.cardInstances) {
     if (inst.zone !== 'support') continue;
     if (inst.heroIdx !== heroIdx) continue;
-    if ((inst.controller ?? inst.owner) !== ownerIdx) continue;
+    if (engine.physicalSide(inst) !== ownerIdx) continue;
     if (inst.faceDown) continue;
     if (!engine.isEquipInZone(inst.name, inst)) continue;
     if (inst.counters?._taioAtkGranted) continue; // already granted
@@ -242,7 +248,7 @@ function _grantAura(ctx, equipInst) {
   const engine = ctx._engine;
   // Canonical engine ATK delta helper — routes through Curse's
   // suppression accumulator when Taio is cursed.
-  engine._applyHeroAtkDelta(hero, ctx.cardOwner, ctx.cardHeroIdx, ATK_PER_ARTIFACT);
+  engine._applyHeroAtkDelta(hero, ctx.cardHeroOwner ?? ctx.cardOwner, ctx.cardHeroIdx, ATK_PER_ARTIFACT);   // Styx 28.9.
   if (!equipInst.counters) equipInst.counters = {};
   equipInst.counters._taioAtkGranted = ATK_PER_ARTIFACT;
   engine.log('taio_aura_grant', {
@@ -258,7 +264,7 @@ function _revokeAura(ctx, equipInst) {
   const engine = ctx._engine;
   const amount = equipInst.counters._taioAtkGranted || 0;
   if (amount <= 0) return;
-  engine._applyHeroAtkDelta(hero, ctx.cardOwner, ctx.cardHeroIdx, -amount);
+  engine._applyHeroAtkDelta(hero, ctx.cardHeroOwner ?? ctx.cardOwner, ctx.cardHeroIdx, -amount);   // Styx 28.9.
   delete equipInst.counters._taioAtkGranted;
   engine.log('taio_aura_revoke', {
     hero: hero.name, equipment: equipInst.name, amount,
@@ -281,7 +287,7 @@ function _refreshAscension(ctx) {
   const hasSword = engine.cardInstances.some(c =>
     c.zone === 'support'
     && c.heroIdx === ctx.cardHeroIdx
-    && (c.controller ?? c.owner) === ctx.cardOwner
+    && engine.physicalSide(c) === (ctx.cardHeroOwner ?? ctx.cardOwner)   // Styx 28.9.
     && c.name === SUN_SWORD
     && !c.faceDown,
   );

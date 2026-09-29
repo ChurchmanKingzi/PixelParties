@@ -66,9 +66,10 @@ const NOETIGE_GESTALTEN = 3;
 // ─── HELPERS ─────────────────────────────
 
 /** Namen aller Helden, die der Spieler gerade kontrolliert. */
-function aktuelleHeldennamen(ps) {
+function aktuelleHeldennamen(engine, pi) {
+  // Kontrolle statt Seite (Styx 28.9.): beide Spalten, nur kontrollierte.
   const namen = new Set();
-  for (const h of (ps.heroes || [])) if (h?.name) namen.add(baseCardName(h.name));   // v876
+  for (const { hero: h } of engine.heroesControlledBy(pi)) if (h?.name) namen.add(baseCardName(h.name));   // v876
   return namen;
 }
 
@@ -84,7 +85,7 @@ function aufstiegsziele(engine, pi, heroIdx) {
   const ps = gs.players[pi];
   if (!ps) return [];
   const cardDB = engine._getCardDB();
-  const vergeben = aktuelleHeldennamen(ps);
+  const vergeben = aktuelleHeldennamen(engine, pi);
 
   const zulaessig = (name) => {
     const cd = cardDB[name];
@@ -224,6 +225,10 @@ module.exports = {
     const engine = ctx._engine;
     const pi = ctx.cardOwner;
     const heroIdx = ctx.cardHeroIdx;
+    // Styx 28.9.: `performAscension(pi, heroIdx)` kennt nur die eigene
+    // Spalte — ein uebernommener Throne Robber stiege sonst den gleich
+    // indizierten EIGENEN Helden auf. Bis die Engine das kann: gesperrt.
+    if ((ctx.cardHeroOwner ?? pi) !== pi) return false;
     const hero = engine.gs.players[pi]?.heroes?.[heroIdx];
     if (!hero?.name || hero.hp <= 0) return false;
     return aufstiegsziele(engine, pi, heroIdx).length > 0;
@@ -236,6 +241,7 @@ module.exports = {
     const heroIdx = ctx.cardHeroIdx;
     const ps = gs.players[pi];
     if (!ps) return false;
+    if ((ctx.cardHeroOwner ?? pi) !== pi) return false;   // Styx 28.9.: s. canActivateHeroEffect
     const hero = ps.heroes?.[heroIdx];
     if (!hero?.name || hero.hp <= 0) return false;
 

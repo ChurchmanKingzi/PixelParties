@@ -83,9 +83,10 @@ module.exports = {
      */
     onTurnStart: (ctx) => {
       const engine = ctx._engine;
+      // Styx 28.9.: Heldeninstanz liegt auf der Brettseite.
       const inst = engine.cardInstances.find(c =>
         c.zone === 'hero'
-        && c.owner === ctx.cardOwner
+        && c.owner === (ctx.cardHeroOwner ?? ctx.cardOwner)
         && c.heroIdx === ctx.cardHeroIdx
         && c.name === CARD_NAME
       );
@@ -109,8 +110,11 @@ module.exports = {
       const gs = engine.gs;
       const pi = ctx.cardOwner;
       const heroIdx = ctx.cardHeroIdx;
+      // Styx 28.9.: Held/Zonen auf der Brettseite `feld`, Hand und Sperre beim Kontrolleur.
+      const feld = ctx.cardHeroOwner ?? pi;
+      const lvlOpts = feld !== pi ? { levelSourcePi: pi } : undefined;
 
-      if (ctx.casterIdx !== pi || ctx.heroIdx !== heroIdx) return;
+      if ((ctx.heroOwner ?? ctx.casterIdx) !== feld || ctx.heroIdx !== heroIdx) return;
       if (gs.currentPhase !== 3) return; // Action Phase only
 
       const hoptKey = heldenSperreKey(HOPT_KEY, pi);
@@ -121,7 +125,7 @@ module.exports = {
       if (!otherSchool) return;
 
       const ps = gs.players[pi];
-      const hero = ps?.heroes?.[heroIdx];
+      const hero = ctx.attachedHero ?? gs.players[feld]?.heroes?.[heroIdx];
       if (!hero?.name || hero.hp <= 0) return;
       if (hero.statuses?.frozen || hero.statuses?.stunned || hero.statuses?.negated) return;
 
@@ -134,7 +138,7 @@ module.exports = {
         const cd = cardDB[cn];
         if (!cd || cd.cardType !== 'Spell') continue;
         if (cd.spellSchool1 !== otherSchool && cd.spellSchool2 !== otherSchool) continue;
-        if (!engine.heroMeetsLevelReq(pi, heroIdx, cd)) continue;
+        if (!engine.heroMeetsLevelReq(feld, heroIdx, cd, lvlOpts)) continue;
         hasMatch = true; break;
       }
       if (!hasMatch) return;
@@ -150,12 +154,12 @@ module.exports = {
         filter: (cardData) => {
           if (!cardData || cardData.cardType !== 'Spell') return false;
           if (cardData.spellSchool1 !== otherSchool && cardData.spellSchool2 !== otherSchool) return false;
-          return engine.heroMeetsLevelReq(pi, heroIdx, cardData);
+          return engine.heroMeetsLevelReq(feld, heroIdx, cardData, lvlOpts);
         },
       });
 
       const inst = engine.cardInstances.find(c =>
-        c.zone === 'hero' && c.owner === pi && c.heroIdx === heroIdx && c.name === CARD_NAME
+        c.zone === 'hero' && c.owner === feld && c.heroIdx === heroIdx && c.name === CARD_NAME
       );
       if (inst) engine.grantAdditionalAction(inst, typeId);
 

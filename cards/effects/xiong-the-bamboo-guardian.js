@@ -53,11 +53,9 @@ const CARD_NAME = 'Xiong, the Bamboo Guardian';
  * damage event in the game.
  */
 function isFromThisXiong(ctx, source) {
-  if (!source) return false;
-  const owner = source.owner ?? source.controller;
-  if (owner !== ctx.cardOriginalOwner) return false;
-  if (source.heroIdx !== ctx.card.heroIdx) return false;
-  return true;
+  // Styx 28.9.: Brettseite + Index — beim uebernommenen Xiong ist
+  // `source.owner` der Kontrolleur, `source.heroOwner` die Brettseite.
+  return ctx._engine.quelleIstHeld(source, ctx.cardHeroOwner ?? ctx.cardOriginalOwner, ctx.card.heroIdx);
 }
 
 /**
@@ -69,7 +67,7 @@ function isFromThisXiong(ctx, source) {
 async function tryTutor(ctx) {
   const engine = ctx._engine;
   const gs     = engine.gs;
-  const pi     = ctx.cardOriginalOwner;
+  const pi     = ctx.cardOwner;   // „your hand" = Kontrolleur (Styx 28.9.)
   const ownPs  = gs.players[pi];
   if (!ownPs) return;
   if (ownPs.handLocked) return;

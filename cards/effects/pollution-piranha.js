@@ -86,8 +86,11 @@ module.exports = {
       chosen = pool[0];
     } else {
       const zones = pool.map(inst => {
-        const hero = ps.heroes?.[inst.heroIdx];
+        // Styx 28.9.: seitenfremd beschworene Tokens stehen auf der Gegenseite.
+        const seite = engine.physicalSide(inst);
+        const hero = engine.gs.players[seite]?.heroes?.[inst.heroIdx];
         return {
+          owner: seite,
           heroIdx: inst.heroIdx,
           slotIdx: inst.zoneSlot,
           label: `${hero?.name || 'Hero'} — Slot ${inst.zoneSlot + 1}`,
@@ -134,7 +137,9 @@ module.exports = {
   async onCreatureEffect(ctx) {
     const engine = ctx._engine;
     const gs = engine.gs;
-    const pi = ctx.cardOriginalOwner;
+    // Kontrolle statt Seite (Styx 28.9.): gestohlen/seitenfremd beschworen
+    // handelt die Kreatur fuer ihren Kontrolleur, nicht fuer die Brettseite.
+    const pi = ctx.cardOwner;
     const inst = ctx.card;
 
     const target = await ctx.promptDamageTarget({

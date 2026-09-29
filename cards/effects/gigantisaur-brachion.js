@@ -128,7 +128,10 @@ module.exports = {
       const pi = ctx.cardOwner;
       const ps = engine.gs.players[pi];
       if (!ps) return;
-      const hostHero = ps.heroes?.[inst.heroIdx];
+      // Wirt = Held in der Spalte, in der Brachion LIEGT (Styx 28.9.: ueber
+      // einen geliehenen Helden beschworen → Gegnerspalte); Hand und
+      // Abfrage gehoeren dem Kontrolleur `pi`.
+      const hostHero = engine.gs.players[engine.physicalSide(inst)]?.heroes?.[inst.heroIdx];
       if (!hostHero?.name || hostHero.hp <= 0) return;
       if (target !== hostHero) return;
 

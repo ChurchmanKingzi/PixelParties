@@ -139,10 +139,15 @@ module.exports = {
       if (ctx.cardZone !== 'hero') return;           // nur vom Brett
 
       const selbst = engine.gs.players[ctx.cardHeroOwner]?.heroes?.[ctx.cardHeroIdx];
-      if (!selbst?.name || selbst.hp <= 0) return;
+      // Tot wirkt nicht — AUSSER der Tod ist im laufenden Flaechenschlag
+      // nur vorgemerkt: dann gilt die Aura (b) bis zum Ende des Schlags
+      // weiter (Todes-Aufschub 28.9.).
+      if (!selbst?.name || (selbst.hp <= 0 && !engine.heldTodAufgeschoben(selbst))) return;
 
       // (a) Trifft es mich selbst? Dann wird geheilt statt geschadet.
+      // Nie bei 0 HP: Heilung wuerde einen gefallenen Helden zurueckholen.
       if (ziel === selbst) {
+        if (selbst.hp <= 0) return;
         const betrag = ctx.amount;
         ctx.setAmount(0);
         ctx.cancel();

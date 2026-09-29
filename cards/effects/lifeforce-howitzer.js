@@ -140,8 +140,11 @@ module.exports = {
       });
       await engine._delay(400);
 
-      // Deal damage
-      const dmgSource = { name: 'Lifeforce Howitzer', owner: ctx.cardOriginalOwner, heroIdx };
+      // Deal damage — Kontrolle statt Seite (Styx 28.9.): Schaden des
+      // Kontrolleurs („you may choose"), der Held steht auf `heroOwner`
+      // (Bauform der Charme-Zauber, server doPlaySpell).
+      const feld = ctx.cardHeroOwner ?? ctx.cardOriginalOwner;
+      const dmgSource = { name: 'Lifeforce Howitzer', owner: pi, heroOwner: feld, heroIdx };
       if (target.type === 'hero') {
         const tgtHero = gs.players[target.owner]?.heroes?.[target.heroIdx];
         if (tgtHero && tgtHero.hp > 0) {

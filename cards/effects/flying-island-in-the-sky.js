@@ -22,7 +22,7 @@ module.exports = {
     onPlay: async (ctx) => {
       // Add 2 island zones to the equipped hero
       const engine = ctx._engine;
-      engine.addIslandZones(ctx.cardOwner, ctx.cardHeroIdx, 2);
+      engine.addIslandZones(ctx.cardHeroOwner ?? ctx.cardOwner, ctx.cardHeroIdx, 2);   // Styx 28.9.: Brettseite
     },
 
     onCardLeaveZone: async (ctx) => {
@@ -33,7 +33,7 @@ module.exports = {
       // filtered this down to the actual leaving instance, so in that
       // case all of these checks pass trivially.
       if (ctx.fromZone !== 'support') return;
-      if (ctx.fromOwner !== undefined && ctx.fromOwner !== ctx.cardOwner) return;
+      if (ctx.fromOwner !== undefined && ctx.fromOwner !== ctx.cardOwner && ctx.fromOwner !== ctx.cardHeroOwner) return;   // Styx 28.9.: Brettseite
       if (ctx.fromHeroIdx !== undefined && ctx.fromHeroIdx !== ctx.cardHeroIdx) return;
       if (ctx.fromZoneSlot !== undefined && ctx.card?.zoneSlot !== undefined
           && ctx.fromZoneSlot !== ctx.card.zoneSlot) return;
@@ -41,7 +41,7 @@ module.exports = {
       // explicit count keeps stacked Flying Islands from wiping each other
       // out when just one is destroyed.
       const engine = ctx._engine;
-      await engine.removeIslandZones(ctx.cardOwner, ctx.cardHeroIdx, 2);
+      await engine.removeIslandZones(ctx.cardHeroOwner ?? ctx.cardOwner, ctx.cardHeroIdx, 2);   // Styx 28.9.: Brettseite
     },
   },
 };

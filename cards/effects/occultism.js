@@ -79,7 +79,7 @@ module.exports = {
     const engine = ctx._engine;
     const pi = ctx.cardOwner;
     const heroIdx = ctx.cardHeroIdx;
-    const hostHero = engine.gs.players[pi]?.heroes?.[heroIdx];
+    const hostHero = engine.gs.players[ctx.cardHeroOwner ?? pi]?.heroes?.[heroIdx];   // Styx 28.9.: Brettseite
     return getOccultismSacrificeCandidates(engine, pi, hostHero, ctx.card?.id).length > 0;
   },
 
@@ -90,7 +90,9 @@ module.exports = {
     const heroIdx = ctx.cardHeroIdx;
     const ps = gs.players[pi];
     if (!ps) return false;
-    const hostHero = ps.heroes?.[heroIdx];
+    // Styx 28.9.: der Held steht auf der Brettseite (`feld`), „you" ist der Kontrolleur.
+    const feld = ctx.cardHeroOwner ?? pi;
+    const hostHero = gs.players[feld]?.heroes?.[heroIdx];
     if (!hostHero?.name || hostHero.hp <= 0) return false;
 
     const damage = LEVEL_DAMAGE[Math.min(Math.max(level, 1), 3) - 1];
@@ -201,7 +203,7 @@ module.exports = {
       owner: sacOwner,
       heroIdx: sacHeroIdx,
       zoneSlot: sacZoneSlot,
-      source: { name: CARD_NAME, owner: pi, heroIdx },
+      source: { name: CARD_NAME, owner: pi, heroOwner: feld, heroIdx },
       _skipReactionCheck: true,
     });
     if (isHandSub) {
@@ -227,7 +229,7 @@ module.exports = {
     } else {
       delete engine.gs._opferFizzle;   // v1313: nur DIESES Opfer zaehlt
       await engine.actionDestroyCard(
-        { name: CARD_NAME, owner: pi, heroIdx },
+        { name: CARD_NAME, owner: pi, heroOwner: feld, heroIdx },
         sacInst,
         // Kosten-Zahlung des eigenen Besitzers, kein Fremdzugriff —
         // Schutzkarten dürfen den Tribut nicht abfangen, nachdem der
@@ -261,7 +263,7 @@ module.exports = {
     const abilitySlot = Number.isInteger(ctx.card?.zoneSlot) ? ctx.card.zoneSlot : -1;
     const targetZoneSlot = damageTarget.type === 'hero' ? -1 : damageTarget.slotIdx;
     engine._broadcastEvent('play_beam_animation', {
-      sourceOwner: pi,
+      sourceOwner: feld,
       sourceHeroIdx: heroIdx,
       sourceZoneSlot: abilitySlot,
       sourceZoneType: 'ability',
@@ -285,7 +287,7 @@ module.exports = {
       );
       if (inst) {
         await engine.actionDealCreatureDamage(
-          { name: CARD_NAME, owner: pi, heroIdx },
+          { name: CARD_NAME, owner: pi, heroOwner: feld, heroIdx },
           inst, damage, 'other',
           { sourceOwner: pi, canBeNegated: true },
         );

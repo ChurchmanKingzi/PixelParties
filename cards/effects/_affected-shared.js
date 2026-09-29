@@ -61,7 +61,7 @@ function heldenPlatz(engine, hero) {
  * @param {object} ctx  der Hook-Kontext, unveraendert
  * @returns {number|null} die Seite des Verursachers, oder null
  */
-function getroffenVon(art, ctx, meineSeite, meinHeroIdx) {
+function getroffenVon(art, ctx, meineSeite, meinHeroIdx, ichSeite) {
   const engine = ctx._engine;
   if (!engine) return null;
 
@@ -104,7 +104,9 @@ function getroffenVon(art, ctx, meineSeite, meinHeroIdx) {
   if (zielHeroIdx !== meinHeroIdx) return null;
 
   const verursacher = quellenSeite(quelle);
-  if (verursacher == null || verursacher === meineSeite) return null;
+  // Styx 28.9.: „Gegner" relativ zum Kontrolleur (`ichSeite`); die
+  // Brettseite (`meineSeite`) bestimmt nur, WELCHER Held gemeint ist.
+  if (verursacher == null || verursacher === (ichSeite ?? meineSeite)) return null;
   return verursacher;
 }
 
@@ -125,7 +127,7 @@ function trefferHooks(holeHeld, fn) {
     satz[art] = async (ctx) => {
       const held = holeHeld(ctx);
       if (!held) return;
-      const verursacher = getroffenVon(art, ctx, held.owner, held.heroIdx);
+      const verursacher = getroffenVon(art, ctx, held.owner, held.heroIdx, held.ich);
       if (verursacher == null) return;
       await fn(ctx, verursacher);
     };

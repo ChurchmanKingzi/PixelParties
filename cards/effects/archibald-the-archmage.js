@@ -62,7 +62,10 @@ function evaluateEligibility(engine, ps, hero, ctx, cardName) {
 
   const boostedLevel = (cd.level || 0) + 1;
   const boostedCd = { ...cd, level: boostedLevel };
-  if (!engine.heroMeetsLevelReq(ctx.cardOwner, ctx.cardHeroIdx, boostedCd)) return null;
+  // Styx 28.9.: Stufe/Wisdom am Helden der Brettseite, Hand beim Kontrolleur.
+  const feld = ctx.cardHeroOwner ?? ctx.cardOwner;
+  if (!engine.heroMeetsLevelReq(feld, ctx.cardHeroIdx, boostedCd,
+    feld !== ctx.cardOwner ? { levelSourcePi: ctx.cardOwner } : undefined)) return null;
 
   // Wisdom affordability gate. If the cast can ONLY clear the level
   // requirement via a Wisdom discard cost (which is the normal case
@@ -73,7 +76,7 @@ function evaluateEligibility(engine, ps, hero, ctx, cardName) {
   // "spell leaves hand on cast" adjustment that the regular spell-
   // play candidate filter uses). 0 cards in hand → no wisdom can
   // be paid → the cast is illegal.
-  const wisdomCost = engine.getWisdomDiscardCost(ctx.cardOwner, ctx.cardHeroIdx, boostedCd);
+  const wisdomCost = engine.getWisdomDiscardCost(feld, ctx.cardHeroIdx, boostedCd);
   if (wisdomCost > 0 && ps.hand.length < wisdomCost) return null;
 
   return { cd, boostedCd, boostedLevel, wisdomCost };
@@ -113,6 +116,9 @@ async function castSpellAsArchibald(engine, ctx, hero, cardName, evalResult) {
   // already in the discard pile — DO NOT push another copy when the
   // cast resolves.
   const synthInst = engine._trackCard(cardName, ctx.cardOwner, 'hand', ctx.cardHeroIdx, -1);
+  // Styx 28.9.: Wirt ist Archibald auf seiner Brettseite (wie der Server bei Uebernahme).
+  const feld = ctx.cardHeroOwner ?? ctx.cardOwner;
+  if (feld !== ctx.cardOwner) synthInst.heroOwner = feld;
   gs._immediateActionContext = true;
   gs._archibaldCasting = true;
   gs._spellResolutionDepth = (gs._spellResolutionDepth || 0) + 1;
@@ -146,7 +152,7 @@ async function castSpellAsArchibald(engine, ctx, hero, cardName, evalResult) {
       }
       await engine.runHooks('afterSpellResolved', {
         spellName: cardName, spellCardData: cd,
-        heroIdx: ctx.cardHeroIdx, casterIdx: ctx.cardOwner,
+        heroIdx: ctx.cardHeroIdx, heroOwner: feld, casterIdx: ctx.cardOwner,
         damageTargets: uniqueTargets,
         isSecondCast: false,
         _skipReactionCheck: true,
@@ -171,7 +177,7 @@ async function castSpellAsArchibald(engine, ctx, hero, cardName, evalResult) {
   // ★ v1323 (Tester-Befund 23.9.): Wisdom NACH dem Guss — wie im
   // regulaeren Zauber-Weg; ein abgebrochener Guss kostet nichts. Die Hoehe
   // richtet sich weiter nach dem GEHOBENEN Level.
-  const wisdomCost = engine.getWisdomDiscardCost(ctx.cardOwner, ctx.cardHeroIdx, boostedCd);
+  const wisdomCost = engine.getWisdomDiscardCost(feld, ctx.cardHeroIdx, boostedCd);
   if (wisdomCost > 0 && !gs.result && !gs._spellCancelled) {
     gs._archibaldCasting = true;
     try {
@@ -285,7 +291,14 @@ module.exports = {
    * previous normal cast).
    */
   canPlayCard(gs, pi, heroIdx, cardData /*, engine */) {
-    const hero = gs.players[pi]?.heroes?.[heroIdx];
+    let hero = gs.players[pi]?.heroes?.[heroIdx];
+    // Styx 28.9.: teils ruft die Engine mit dem Kontrolleur — dann ist
+    // Archibald der geliehene Held der Gegenseite mit demselben Index.
+    if (hero?.name !== CARD_NAME) {
+      const fremd = (gs.players || []).map(p => p?.heroes?.[heroIdx])
+        .find(h => h?.name === CARD_NAME && h.charmedBy === pi);
+      if (fremd) hero = fremd;
+    }
     if (!hero) return true;
     if (cardData?.cardType !== 'Spell') return true;
     const cast = hero[CAST_LIST_KEY] || [];
@@ -308,6 +321,8 @@ module.exports = {
     afterSpellResolved: (ctx) => {
       if (ctx.casterIdx !== ctx.cardOwner) return;
       if (ctx.heroIdx !== ctx.cardHeroIdx) return;
+      // Styx 28.9.: Brettseite des Wirkers muss Archibalds sein.
+      if ((ctx.heroOwner ?? ctx.casterIdx) !== (ctx.cardHeroOwner ?? ctx.cardOwner)) return;
       const sd = ctx.spellCardData;
       if (!sd || sd.cardType !== 'Spell') return;
       const hero = ctx.attachedHero;

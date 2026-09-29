@@ -107,7 +107,7 @@ module.exports = {
     await fireReturnBatchHook(engine, pi, returnedNames, chosenInsts, CARD_NAME);
 
     engine._broadcastEvent('play_zone_animation', {
-      type: 'gold_sparkle', owner: pi, heroIdx: ctx.cardHeroIdx, zoneSlot: -1,
+      type: 'gold_sparkle', owner: ctx.cardHeroOwner ?? pi, heroIdx: ctx.cardHeroIdx, zoneSlot: -1,   // Styx 28.9.: Brettseite
     });
     engine.log('shu_chaku_discount', {
       player: ps.username, bounced: returnedNames, discount: totalCost,

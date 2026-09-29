@@ -95,7 +95,7 @@ function actionSlotAvailable(gs, pi, heroIdx) {
   const ps = gs.players[pi];
   if (!ps) return false;
   if ((ps.heroesActedThisTurn || []).length === 0) return true;
-  const hasBonus = (ps.bonusActions?.heroIdx === heroIdx && ps.bonusActions.remaining > 0)
+  const hasBonus = (ps.bonusActions?.heroIdx === heroIdx && (ps.bonusActions.heroOwner ?? pi) === pi /* Styx 28.9.: Seite */ && ps.bonusActions.remaining > 0)
     || ((ps._bonusMainActions || 0) > 0);
   return !!hasBonus;
 }

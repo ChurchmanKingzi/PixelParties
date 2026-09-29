@@ -33,14 +33,17 @@ const DESCEND_GAIN = 1;
 
 async function onDefeat(ctx) {
   const engine = ctx._engine;
-  const pi = ctx.cardOriginalOwner;
+  // Styx 28.9.: `seite` = Brettseite (Held, Zaehler), `pi` = Kontrolleur
+  // (waehlt das Ziel, verursacht den Stun).
+  const seite = ctx.cardOriginalOwner;
+  const pi = ctx.cardOwner ?? seite;
   const heroIdx = ctx.card?.heroIdx;
   if (typeof heroIdx !== 'number' || heroIdx < 0) return;
-  const self = engine.gs.players[pi]?.heroes?.[heroIdx];
+  const self = engine.gs.players[seite]?.heroes?.[heroIdx];
   if (self?.name !== CARD_NAME || self.hp <= 0) return;
 
   // "place 1 Evolution Counter on it"
-  W.addEvo(engine, pi, heroIdx, 1, CARD_NAME);
+  W.addEvo(engine, seite, heroIdx, 1, CARD_NAME);
   engine.sync();
 
   // "and choose any target on the board and Stun it for 1 turn"

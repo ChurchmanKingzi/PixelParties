@@ -106,13 +106,16 @@ async function raeumeAb(engine, inst) {
   if (inst.counters._wardSettled) return;
   inst.counters._wardSettled = true;
 
-  const owner = inst.controller ?? inst.owner;
+  // Styx 28.9.: „your discard pile / draw" = Kontrolleur (auch an einem
+  // uebernommenen Helden), die Zone liegt auf der Brettseite.
+  const owner = engine.effektiveSeiten(inst).controller ?? inst.owner;
+  const seite = engine.physicalSide(inst);
   const ps = engine.gs.players[owner];
   engine.log('energy_aura_spent', {
     player: ps?.username, spell: inst.counters._wardSpentOn,
   });
   engine._broadcastEvent('play_zone_animation', {
-    type: 'gold_sparkle', owner, heroIdx: inst.heroIdx, zoneSlot: inst.zoneSlot,
+    type: 'gold_sparkle', owner: seite, heroIdx: inst.heroIdx, zoneSlot: inst.zoneSlot,
   });
   // Standardweg in die Ablage — er feuert `onCardLeaveZone`, traegt die
   // Zone aus und legt die Karte beim URSPRUENGLICHEN Besitzer ab.
@@ -160,7 +163,7 @@ module.exports = {
       if (!res) return;
 
       engine._broadcastEvent('play_zone_animation', {
-        type: 'gold_sparkle', owner: ctx.cardOwner,
+        type: 'gold_sparkle', owner: res.host.owner,   // Brettseite des Wirts
         heroIdx: res.host.heroIdx, zoneSlot: -1,
       });
       engine.log('energy_aura_attached', {

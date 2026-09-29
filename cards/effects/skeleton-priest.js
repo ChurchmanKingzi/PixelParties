@@ -64,6 +64,11 @@ module.exports = {
     const heroIdx = priestInst.heroIdx;
     const ps = gs.players[pi];
     if (!ps) return false;
+    // Styx 28.9.: Wirtsheld = Held der Spalte auf der BRETTSEITE der
+    // Kreatur (seitenfremd beschworen: liegt auf B, gehoert A). Wirkt fuer
+    // `pi`; die fluechtige Spell-Instanz traegt die Brettseite als
+    // `heroOwner` (→ `ctx.cardHeroOwner`/`attachedHero`).
+    const feld = engine.physicalSide(priestInst);
 
     const candidates = eligibleSpells(ps, engine, pi);
     if (candidates.length === 0) return false;
@@ -102,6 +107,7 @@ module.exports = {
     // hero-anchored targeting / level lookups still work.
     const spellInst = engine._trackCard(spellName, pi, 'hand', heroIdx, -1);
     spellInst.turnPlayed = gs.turn || 0;
+    if (feld !== pi) spellInst.heroOwner = feld;
 
     // Build the spell's ctx via the engine helper, then patch the
     // self-damage / heal helpers so any reference to "the casting
@@ -115,7 +121,7 @@ module.exports = {
       _onlyCard: spellInst, _skipReactionCheck: true,
       _viaSkeletonPriest: true,
     });
-    const castingHero = ps.heroes?.[heroIdx] || null;
+    const castingHero = gs.players[feld]?.heroes?.[heroIdx] || null;
     const origDealDamage = spellCtx.dealDamage;
     const origDealTrueDamage = spellCtx.dealTrueDamage;
     const origHealHero = spellCtx.healHero;

@@ -36,10 +36,11 @@ module.exports = {
      */
     onGameStart: (ctx) => {
       const gs = ctx.gameState;
-      const pi = ctx.cardOriginalOwner;
+      // Styx 28.9.: „you" = Kontrolleur; Willy selbst auf der Brettseite.
+      const pi = ctx.cardOwner;
       const ps = gs.players[pi];
-      const hero = ps?.heroes?.[ctx.cardHeroIdx];
-      if (!hero) return;
+      const hero = ctx.attachedHero ?? gs.players[ctx.cardHeroOwner ?? ctx.cardOriginalOwner]?.heroes?.[ctx.cardHeroIdx];
+      if (!hero || !ps) return;
 
       // Compute first turn number: player who goes first = turn 1, second = turn 2
       const firstTurn = (gs.activePlayer === pi) ? (gs.turn || 1) : (gs.turn || 1) + 1;
@@ -57,7 +58,7 @@ module.exports = {
       if (ctx.phaseIndex !== 5) return; // Only End Phase
       const engine = ctx._engine;
       const gs = ctx.gameState;
-      const pi = ctx.cardOriginalOwner;
+      const pi = ctx.cardOwner;   // Styx 28.9.: „you" = Kontrolleur
       const heroIdx = ctx.cardHeroIdx;
       const hero = ctx.attachedHero;
       if (!hero || hero._willyEffectUsed) return;
@@ -98,7 +99,7 @@ module.exports = {
       const picked = choice?.optionId || 'draw';
 
       // Leprechaun animation on Willy's hero zone (plays BEFORE effect resolves)
-      engine._broadcastEvent('willy_leprechaun', { owner: pi, heroIdx });
+      engine._broadcastEvent('willy_leprechaun', { owner: ctx.cardHeroOwner ?? pi, heroIdx });   // Brettseite
       await engine._delay(800);
 
       if (picked === 'draw') {

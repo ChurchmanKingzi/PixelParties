@@ -94,8 +94,9 @@ module.exports = {
 
       // Quelle muss unter DEINER Kontrolle stehen. Statusschaden hat
       // keinen Besitzer (-1) und fällt damit automatisch heraus.
-      const srcOwner = ctx.source?.owner ?? ctx.source?.controller ?? -1;
-      if (srcOwner < 0 || srcOwner !== ownerIdx) return;
+      // Styx 28.9.: „du" = Kontrolleur (`cardOwner`), nicht die Brettseite.
+      const srcOwner = ctx.source?.controller ?? ctx.source?.owner ?? -1;
+      if (srcOwner < 0 || srcOwner !== ctx.cardOwner) return;
 
       // Zwei Ladungen je Zug, Reset bei jedem Zugwechsel.
       const counters = inst.counters || (inst.counters = {});

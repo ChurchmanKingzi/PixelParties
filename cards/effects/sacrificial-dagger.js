@@ -119,9 +119,10 @@ module.exports = {
 
       // ── Damage, as the equipped Hero's Attack ──
       // Re-read the Hero — a reaction window could have changed its ATK.
-      const liveHero = gs.players[pi]?.heroes?.[heroIdx];
+      const feld = ctx.cardHeroOwner ?? pi;   // Styx 28.9.: Brettseite des Helden
+      const liveHero = gs.players[feld]?.heroes?.[heroIdx];
       const damage = Math.max(0, liveHero?.atk || 0);
-      const source = { name: hero.name, owner: pi, heroIdx };
+      const source = { name: hero.name, owner: pi, heroOwner: feld, heroIdx };
 
       if (tHero) {
         await engine.actionDealDamage(source, tHero, damage, 'attack');

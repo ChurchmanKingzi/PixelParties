@@ -183,6 +183,8 @@ module.exports = {
 
       const hero = ctx.attachedHero;
       const heroIdx = ctx.cardHeroIdx;
+      // Styx 28.9.: Bubbles steht auf der Brettseite `feld`; „you" = `pi`.
+      const feld = ctx.cardHeroOwner ?? pi;
       if (!hero?.name || hero.hp <= 0) return;
       // Gesperrter Held leistet nichts — allgemeine CC-Regel.
       const st = hero.statuses || {};
@@ -203,7 +205,7 @@ module.exports = {
         // Toedlich? Nur, wenn der Schaden bei Bubbles auch ANKOMMT.
         // Waere er ohnehin geblockt, ist die rote Zeile eine Luege.
         const piercing = piercingOf(entry);
-        const ankommend = predictedDamage(engine, hero, pi, entry, piercing);
+        const ankommend = predictedDamage(engine, hero, feld, entry, piercing);
         const toedlich = ankommend > 0 && ankommend >= hero.hp;
 
         const bestaetigt = await engine.promptGeneric(pi, {
@@ -225,7 +227,7 @@ module.exports = {
         entry.cancelled = true;
 
         engine._broadcastEvent('play_zone_animation', {
-          type: 'shield_bubble', owner: pi, heroIdx, zoneSlot: -1,
+          type: 'shield_bubble', owner: feld, heroIdx, zoneSlot: -1,
         });
         await engine._delay(250);
 
@@ -257,7 +259,7 @@ module.exports = {
               // Ghuanjun machte aus 20 umgeleiteten Schaden 0 (Als
               // Befund 9.8.). Zielseitige Regeln greifen weiterhin.
               amountIsFinal: true,
-              targetOwner: pi, targetHeroIdx: heroIdx,
+              targetOwner: feld, targetHeroIdx: heroIdx,
             },
           );
         }
@@ -273,7 +275,8 @@ module.exports = {
         // have 7 cards in your hand." Nur DIESE Todesart zaehlt — der
         // Nachzug haengt deshalb direkt an der Umleitung.
         if (hero.hp <= 0) {
-          const fehlend = Math.max(0, TARGET_HAND_SIZE - (ps.hand || []).length);
+          // Die gerade aufloesende Karte (Fireball …) liegt noch in der Hand, zaehlt aber nicht.
+          const fehlend = Math.max(0, TARGET_HAND_SIZE - engine._handOhneAufloesendeKarte(ps).length);
           engine.log('bubbles_defeated_by_redirect', {
             player: ps.username, handBefore: (ps.hand || []).length, draws: fehlend,
           });

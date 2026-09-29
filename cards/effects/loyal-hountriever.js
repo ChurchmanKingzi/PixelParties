@@ -50,7 +50,9 @@ module.exports = {
       // do not count as a fresh summon.
       if (ctx._isMove) return;
       // Same-side trigger — Hountriever fires off OUR summons only.
-      if ((entering.owner ?? entering.controller) !== ctx.cardOriginalOwner) return;
+      // Kontrolle statt Seite (Styx 28.9.): „you summon" = Kontrolleur der
+      // neuen Kreatur, „you" = Kontrolleur des Hountrievers (cardOwner).
+      if ((entering.controller ?? entering.owner) !== ctx.cardOwner) return;
       // Self-exclusion: the dying-into-life Hountriever doesn't trigger
       // its own draw, and other Hountrievers don't trigger each other
       // (per card text "except Loyal Hountriever").
@@ -66,7 +68,7 @@ module.exports = {
       if (!spendUse(ctx.card, gsH, { key: USE_KEY, max: MAX_PER_TURN })) return;
 
       const engine = ctx._engine;
-      const ps     = engine.gs.players[ctx.cardOriginalOwner];
+      const ps     = engine.gs.players[ctx.cardOwner];
 
       // Sparkle on Hountriever's slot — same anim Friendship / similar
       // ability-driven draws use.
@@ -78,7 +80,7 @@ module.exports = {
       });
       await engine._delay(220);
 
-      await engine.actionDrawCards(ctx.cardOriginalOwner, 1);
+      await engine.actionDrawCards(ctx.cardOwner, 1);
       engine.log('loyal_hountriever_draw', {
         player: ps?.username, trigger: entering.name,
         firesUsed: fired + 1, max: MAX_PER_TURN,

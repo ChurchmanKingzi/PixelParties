@@ -83,7 +83,7 @@ module.exports = {
     const engine = ctx._engine;
     const pi = ctx.cardOwner;
     const hi = ctx.cardHeroIdx;
-    const hero = engine.gs.players[pi]?.heroes?.[hi];
+    const hero = engine.gs.players[ctx.cardHeroOwner ?? pi]?.heroes?.[hi];   // Styx 28.9.: Brettseite
     if (!hero?.name || hero.hp <= 0) return false;
     if (anyTargetBleeding(engine)) return false;
     if (!hero.statuses?.bleeding) {

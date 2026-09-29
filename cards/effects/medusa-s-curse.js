@@ -65,7 +65,7 @@ module.exports = {
         heroTargets.push({ owner: physOwner, heroIdx: hi, hero });
       }
       for (const inst of engine.cardInstances) {
-        if (inst.owner !== oppIdx) continue;
+        if ((inst.controller ?? inst.owner) !== oppIdx) continue;   // Kontrolle statt Seite
         if (inst.zone !== 'support') continue;
         if (inst.faceDown) continue;
         const cd = inst.counters?._cardDataOverride || cardDB[inst.name]; // token-override-aware (Biomancy Token — Als AoE-Report)
@@ -103,7 +103,7 @@ module.exports = {
       }
       for (const inst of creatureTargets) {
         engine._broadcastEvent('play_zone_animation', {
-          type: 'petrify', owner: inst.owner, heroIdx: inst.heroIdx, zoneSlot: inst.zoneSlot,
+          type: 'petrify', owner: engine.physicalSide(inst), heroIdx: inst.heroIdx, zoneSlot: inst.zoneSlot,
         });
       }
       await engine._delay(900);

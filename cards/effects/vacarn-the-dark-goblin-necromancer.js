@@ -40,7 +40,8 @@ module.exports = {
       // own Support Zone (matched by owner + heroIdx).
       if (ctx.fromZone !== 'support') return;
       if (ctx.toZone !== 'discard') return;
-      if (ctx.fromOwner !== ctx.cardOwner) return;
+      // Styx 28.9.: Vacarns Zone liegt auf seiner Brettseite.
+      if (ctx.fromOwner !== (ctx.cardHeroOwner ?? ctx.cardOwner)) return;
       if (ctx.fromHeroIdx !== ctx.cardHeroIdx) return;
 
       const leaving = ctx.leavingCard;
@@ -56,7 +57,7 @@ module.exports = {
       // Vacarn must still be alive — a dead Vacarn has no Support Zone
       // to anchor this rule. The engine's runHooks already filters
       // listeners on dead-hero hosts, but belt-and-suspenders.
-      const hero = ctx._engine.gs.players[ctx.cardOwner]?.heroes?.[ctx.cardHeroIdx];
+      const hero = ctx.attachedHero ?? ctx._engine.gs.players[ctx.cardHeroOwner ?? ctx.cardOwner]?.heroes?.[ctx.cardHeroIdx];
       if (!hero?.name || hero.hp <= 0) return;
 
       // Stamp the redirect flag — actionMoveCard's redirect block

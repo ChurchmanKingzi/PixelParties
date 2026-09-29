@@ -62,7 +62,7 @@ module.exports = {
     // On-equip and on-remove checks live in the equip scripts.
 
     onGameStart: (ctx) => {
-      checkArthorAscension(ctx._engine, ctx.cardOwner, ctx.cardHeroIdx, null);
+      checkArthorAscension(ctx._engine, ctx.cardHeroOwner ?? ctx.cardOwner, ctx.cardHeroIdx, null);   // Styx 28.9.: Brettseite
     },
 
     // Turn-start safety net. The flag is normally maintained by the equip
@@ -80,7 +80,9 @@ module.exports = {
 
     afterSpellResolved: async (ctx) => {
       if (!ctx.spellCardData || ctx.spellCardData.cardType !== 'Spell') return;
-      if (ctx.casterIdx !== ctx.cardOwner || ctx.heroIdx !== ctx.cardHeroIdx) return;
+      // Styx 28.9.: „dieser Held" = Brettseite + Index, nicht Kontrolleur.
+      const feld    = ctx.cardHeroOwner ?? ctx.cardOwner;
+      if ((ctx.heroOwner ?? ctx.casterIdx) !== feld || ctx.heroIdx !== ctx.cardHeroIdx) return;
       if (ctx.isSecondCast) return;
 
       const engine  = ctx._engine;
@@ -97,19 +99,19 @@ module.exports = {
       if (gs.players[pi]?.oppHandLocked) return;
 
       // Arthor must still be alive and capable
-      const hero = gs.players[pi]?.heroes?.[heroIdx];
+      const hero = ctx.attachedHero ?? gs.players[feld]?.heroes?.[heroIdx];
       if (!hero?.name || hero.hp <= 0) return;
       if (hero.statuses?.frozen || hero.statuses?.stunned || hero.statuses?.negated) return;
 
       // Check for White Eye
       const hasWhiteEye = engine.cardInstances.some(c =>
-        c.owner === pi && c.zone === 'support' &&
+        c.owner === feld && c.zone === 'support' &&
         c.heroIdx === heroIdx && c.name === EYE_NAME,
       );
       const discardCount = hasWhiteEye ? 2 : 1;
 
       // Flash Arthor's hero zone + stream his card to both players
-      engine._broadcastEvent('card_effect_flash', { owner: pi, heroIdx });
+      engine._broadcastEvent('card_effect_flash', { owner: feld, heroIdx });
       engine._broadcastEvent('card_reveal', { cardName: 'Arthor, the King of Blackport' });
       await engine._delay(400);
 

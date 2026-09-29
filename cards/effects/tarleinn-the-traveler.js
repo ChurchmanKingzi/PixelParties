@@ -145,8 +145,9 @@ module.exports = {
         const cd = engine.getEffectiveCardData(inst) || cardDB[inst.name];
         if (!cd || !hasCardType(cd, 'Creature')) continue;
         targets.push({
-          id: `equip-${pi}-${inst.heroIdx}-${inst.zoneSlot}`,
-          type: 'equip', owner: pi, heroIdx: inst.heroIdx, slotIdx: inst.zoneSlot,
+          // Adresse = Brettseite (Styx 28.9.: seitenfremd beschworene Kreatur)
+          id: `equip-${engine.physicalSide(inst)}-${inst.heroIdx}-${inst.zoneSlot}`,
+          type: 'equip', owner: engine.physicalSide(inst), heroIdx: inst.heroIdx, slotIdx: inst.zoneSlot,
           cardName: inst.name, cardInstance: inst,
         });
       }
@@ -189,11 +190,11 @@ module.exports = {
         await engine.actionHealHero(healSource, hero, healAmt);
       } else if (target.type === 'equip') {
         const inst = target.cardInstance || engine.cardInstances.find(c =>
-          c.owner === pi && c.zone === 'support' && c.heroIdx === target.heroIdx && c.zoneSlot === target.slotIdx
+          c.owner === target.owner && c.zone === 'support' && c.heroIdx === target.heroIdx && c.zoneSlot === target.slotIdx
         );
         if (!inst) { refundTrigger(ctx); return; }
         engine._broadcastEvent('play_zone_animation', {
-          type: 'heal_sparkle', owner: pi, heroIdx: target.heroIdx, zoneSlot: target.slotIdx,
+          type: 'heal_sparkle', owner: target.owner, heroIdx: target.heroIdx, zoneSlot: target.slotIdx,
         });
         await engine._delay(200);
         await engine.actionHealCreature(healSource, inst, healAmt);

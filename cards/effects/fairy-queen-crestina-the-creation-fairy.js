@@ -74,7 +74,8 @@ module.exports = {
 
       // Hero must be alive and capable.
       const ps = gs.players[pi];
-      const hero = ps?.heroes?.[heroIdx];
+      // Styx 28.9.: Crestina selbst (Brettseite), Hand/Deck beim Kontrolleur.
+      const hero = ctx.attachedHero ?? gs.players[ctx.cardHeroOwner ?? pi]?.heroes?.[heroIdx];
       if (!hero?.name || hero.hp <= 0) return;
       if (hero.statuses?.frozen || hero.statuses?.stunned || hero.statuses?.negated) return;
 

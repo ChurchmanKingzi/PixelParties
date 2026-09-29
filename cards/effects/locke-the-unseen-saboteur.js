@@ -38,9 +38,11 @@ module.exports = {
       const gs = engine.gs;
       const pi = ctx.cardOwner;
       const heroIdx = ctx.cardHeroIdx;
-      const hero = gs.players[pi]?.heroes?.[heroIdx];
+      // Styx 28.9.: Locke selbst auf der Brettseite `feld`.
+      const feld = ctx.cardHeroOwner ?? pi;
+      const hero = ctx.attachedHero ?? gs.players[feld]?.heroes?.[heroIdx];
       if (!hero?.name || hero.hp <= 0) return;
-      if (engine.isHeroIncapacitated(pi, heroIdx) || hero.statuses?.negated) return;
+      if (engine.isHeroIncapacitated(feld, heroIdx) || hero.statuses?.negated) return;
       if (!engine.claimHOPT('locke-sabotage', pi)) return;
 
       // Ziel-Picker mit allen Filtern (Untargetable, Stealth, Boris …);

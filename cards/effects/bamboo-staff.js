@@ -110,7 +110,8 @@ module.exports = {
 
       // Equipped Hero must be alive (no body to swing the Staff).
       const heroIdx = ctx.card.heroIdx;
-      const hero    = ps.heroes?.[heroIdx];
+      const feld    = ctx.cardHeroOwner ?? pi;   // Styx 28.9.: Brettseite des Helden
+      const hero    = gs.players[feld]?.heroes?.[heroIdx];
       if (!hero?.name || hero.hp <= 0) return;
 
       // Per-instance soft-HOPT.
@@ -179,7 +180,7 @@ module.exports = {
       });
       await engine._delay(380);
 
-      const dmgSource = { name: hero.name, owner: pi, heroIdx };
+      const dmgSource = { name: hero.name, owner: pi, heroOwner: feld, heroIdx };
       if (target.type === 'hero') {
         const tgtHero = gs.players[target.owner]?.heroes?.[target.heroIdx];
         if (tgtHero && tgtHero.hp > 0) {

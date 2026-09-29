@@ -81,9 +81,10 @@ module.exports = {
     const pi      = ctx.cardOwner;
     const heroIdx = ctx.cardHeroIdx;
     const ps      = gs.players[pi];
-    const hero    = ps?.heroes?.[heroIdx];
+    // Styx 28.9.: Fiona selbst auf der Brettseite; Deck/Hand beim Kontrolleur.
+    const hero    = ctx.attachedHero ?? gs.players[ctx.cardHeroOwner ?? pi]?.heroes?.[heroIdx];
     if (!hero?.name || hero.hp <= 0) return false;
-    if (ps.handLocked) return false;
+    if (!ps || ps.handLocked) return false;
 
     const cardDB = engine._getCardDB();
     const names = spellsInDeck(ps, cardDB);

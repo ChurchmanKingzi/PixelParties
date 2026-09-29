@@ -74,12 +74,14 @@ function setInvest(hero, n) {
   else hero[COUNTER_FIELD] = safe;
 }
 
-/** Alle eigenen Logans des Spielers (mehrere Kopien sind moeglich). */
+/**
+ * Alle Logans, die der Spieler kontrolliert (mehrere Kopien sind moeglich).
+ * Kontrolle statt Seite (Styx 28.9.): `physOwner` fuer die Animation.
+ */
 function ownLogans(engine, pi) {
-  const heroes = engine?.gs?.players?.[pi]?.heroes || [];
   const out = [];
-  for (let hi = 0; hi < heroes.length; hi++) {
-    if (heroes[hi]?.name === CARD_NAME) out.push({ hero: heroes[hi], heroIdx: hi });
+  for (const { physOwner, heroIdx: hi, hero } of (engine?.heroesControlledBy?.(pi) || [])) {
+    if (hero?.name === CARD_NAME) out.push({ hero, heroIdx: hi, physOwner });
   }
   return out;
 }
@@ -108,7 +110,7 @@ function pruefePleite(engine, pi) {
   // abgeraeumt und ein Debt-O-Tron-Logan-Deck unmoeglich gemacht.
   if ((ps.gold || 0) !== 0) return;
   let etwasVerfallen = false;
-  for (const { hero, heroIdx } of ownLogans(engine, pi)) {
+  for (const { hero, heroIdx, physOwner } of ownLogans(engine, pi)) {
     const hatte = getInvest(hero);
     if (hatte <= 0) continue;
     setInvest(hero, 0);
@@ -124,7 +126,7 @@ function pruefePleite(engine, pi) {
     // ihre Counter gleichzeitig, also sollen auch beide bluten.
     engine._broadcastEvent('play_zone_animation', {
       type: 'invest_counters_lost',
-      owner: pi, heroIdx, zoneSlot: -1,
+      owner: physOwner, heroIdx, zoneSlot: -1,
       count: hatte,
     });
   }
@@ -182,7 +184,8 @@ module.exports = {
     const pi = ctx.cardOwner;
     const ps = engine.gs.players[pi];
     const heroIdx = ctx.card?.heroIdx;
-    const hero = ps?.heroes?.[heroIdx];
+    // Styx 28.9.: Logan selbst (Brettseite), Gold beim Kontrolleur.
+    const hero = ctx.attachedHero ?? engine.gs.players[ctx.cardHeroOwner ?? pi]?.heroes?.[heroIdx];
     // `false` statt blossem `return` an JEDEM Abbruchpfad: sonst
     // stempelt die Engine das Einmal-pro-Zug, obwohl nichts geschah
     // (Als Befund 17.8. an Cecilia — gleiche Bauart hier).
@@ -274,7 +277,7 @@ module.exports = {
       const pi = ctx.cardOwner;
       const heroIdx = ctx.card?.heroIdx;
       const ps = engine.gs.players[pi];
-      const hero = ps?.heroes?.[heroIdx];
+      const hero = ctx.attachedHero ?? engine.gs.players[ctx.cardHeroOwner ?? pi]?.heroes?.[heroIdx];   // Styx 28.9.
       if (!hero || hero.name !== CARD_NAME || hero.hp <= 0) return;
 
       const zaehler = getInvest(hero);
@@ -326,7 +329,8 @@ module.exports = {
 
       // v349: Auftritt erst jetzt — Ziel bestaetigt (Muster Book of Doom).
       engine.announceActiveEffect();
-      const quelle = { name: CARD_NAME, owner: pi, heroIdx };
+      const quelle = { name: CARD_NAME, owner: pi, heroIdx,
+        ...((ctx.cardHeroOwner ?? pi) !== pi ? { heroOwner: ctx.cardHeroOwner } : {}) };   // Styx 28.9.
       // Goldener Bananenregen auf das Ziel (Als Vorgabe). Vor dem
       // Schaden, damit die Bananen fallen und DANN die Zahl erscheint;
       // `_delay` ist im Rollout ein No-op, die Simulation kostet es also

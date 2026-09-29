@@ -282,10 +282,9 @@ function isDirectDefeatByThisHero(ctx, source) {
   if (!source) return false;
   if (ctx.type === 'creature') return false;
   if (source.zone === 'support') return false;
-  const owner = source.owner ?? source.controller;
-  if (owner !== ctx.cardOriginalOwner) return false;
-  if (source.heroIdx !== ctx.card.heroIdx) return false;
-  return true;
+  // Styx 28.9.: „dieser Held" = Brettseite + Index. Ein uebernommener Held
+  // greift mit `owner` = Kontrolleur und `heroOwner` = Brettseite an.
+  return ctx._engine.quelleIstHeld(source, ctx.cardHeroOwner ?? ctx.cardOriginalOwner, ctx.card.heroIdx);
 }
 
 /**

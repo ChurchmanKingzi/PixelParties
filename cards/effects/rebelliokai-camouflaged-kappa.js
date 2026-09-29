@@ -67,7 +67,9 @@ module.exports = {
 
   canActivateCreatureEffect(ctx) {
     const engine = ctx._engine;
-    const ps     = engine.gs.players[ctx.cardOriginalOwner ?? ctx.cardOwner];
+    // Kontrolle statt Seite (Styx 28.9.): „this Creature you control" /
+    // „your deck" = Kontrolleur.
+    const ps     = engine.gs.players[ctx.cardOwner];
     if (!ps) return false;
     // No deck → can't search → no point activating (the kappa would
     // sacrifice for nothing, and the rule requires we add a card to
@@ -82,7 +84,7 @@ module.exports = {
   async onCreatureEffect(ctx) {
     const engine = ctx._engine;
     const gs     = engine.gs;
-    const pi     = ctx.cardOriginalOwner;
+    const pi     = ctx.cardOwner;   // Kontrolle statt Seite (Styx 28.9.)
     const ps     = gs.players[pi];
     if (!ps) return false;
 
@@ -135,7 +137,7 @@ module.exports = {
     // with Loyal Rottweiler's self-sacrifice.
     engine._broadcastEvent('play_zone_animation', {
       type: 'knife_sacrifice',
-      owner: pi, heroIdx: ownHeroIdx, zoneSlot: ownZoneSlot,
+      owner: engine.physicalSide(sacrificed), heroIdx: ownHeroIdx, zoneSlot: ownZoneSlot,
     });
     await engine._delay(550);
 

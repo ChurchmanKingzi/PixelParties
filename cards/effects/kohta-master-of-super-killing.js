@@ -162,8 +162,11 @@ module.exports = {
     // ── Punkt ohne Rueckkehr: jetzt die harte Sperre beanspruchen ────
     if (!engine.claimHOPT(HOPT_KEY, pi)) return false;
 
-    const quelle = { name: CARD_NAME, owner: pi, controller: pi, heroIdx };
-    const held = eigenerHeld(engine, pi, heroIdx);
+    // Styx 28.9.: „this Hero" steht auf der Brettseite `feld` — Quelle
+    // traegt sie als `heroOwner`, der Held kommt als Objekt.
+    const feld = ctx.cardHeroOwner ?? pi;
+    const quelle = { name: CARD_NAME, owner: pi, controller: pi, heroIdx, ...(feld !== pi ? { heroOwner: feld } : {}) };
+    const held = ctx.attachedHero ?? eigenerHeld(engine, feld, heroIdx);
 
     // „This is treated as this Hero hitting the target with an Attack":
     // das Angriffsfenster gehoert erklaert, damit „when this Hero

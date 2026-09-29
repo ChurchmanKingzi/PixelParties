@@ -68,7 +68,8 @@ module.exports = {
         if (!q) continue;
         // Der Angriff muss von MEINEM Wirtshelden kommen.
         if (q.heroIdx !== inst.heroIdx) continue;
-        if ((q.owner ?? q.controller) !== pi) continue;
+        // Styx 28.9.: „dieser Held" = Brettseite + Index (geliehener Held).
+        if (!engine.quelleIstHeld(q, ctx.cardHeroOwner ?? pi, inst.heroIdx)) continue;
         // „hit\" — kein Treffer, kein Tod.
         const gelandet = e.realDealt ?? e.amount ?? 0;
         if (!(gelandet > 0)) continue;

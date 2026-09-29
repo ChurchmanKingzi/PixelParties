@@ -36,8 +36,11 @@ module.exports = {
       const heroIdx = ctx.cardHeroIdx;
       // ctx.sourceHeroIdx / ctx.casterIdx exposes the casting hero on
       // hero spells; for Attacks the source instance is the hero card.
-      const fromThorad = (ctx.sourceHeroIdx === heroIdx && ctx.casterIdx === pi)
-        || (src && src.owner === pi && src.heroIdx === heroIdx);
+      // Styx 28.9.: Brettseite der Quelle (`heroOwner`) muss Thorads Seite
+      // sein — sonst zaehlte der gleich indizierte eigene Held des Kontrolleurs.
+      const feld = ctx.cardHeroOwner ?? pi;
+      const fromThorad = (ctx.sourceHeroIdx === heroIdx && ctx.casterIdx === pi && (src?.heroOwner ?? pi) === feld)
+        || (src && (src.heroOwner ?? src.owner) === feld && src.heroIdx === heroIdx);
       if (!fromThorad) return;
       // Only Attack / Spell damage.
       const t = ctx.type || '';
@@ -61,7 +64,8 @@ module.exports = {
       // Single-target gate: only one entry in the batch.
       if (entries.length !== 1) return;
       for (const e of entries) {
-        const fromThorad = e.source?.owner === pi && e.source?.heroIdx === ctx.cardHeroIdx;
+        const fromThorad = (e.source?.heroOwner ?? e.source?.owner) === (ctx.cardHeroOwner ?? pi)   // Styx 28.9.
+          && e.source?.heroIdx === ctx.cardHeroIdx;
         if (!fromThorad) continue;
         const t = e.type || '';
         if (t !== 'attack' && t !== 'destruction_spell' && t !== 'spell') continue;

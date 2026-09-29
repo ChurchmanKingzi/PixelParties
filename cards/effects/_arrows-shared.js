@@ -113,7 +113,8 @@ function arrowTriggerCondition(gs, pi, engine, chainCtx, _opts = {}) {
   // both so the gate is resilient to future field-name tweaks.
   const hiIdx = initial.heroIdx ?? initial.casterHeroIdx;
   if (hiIdx == null || hiIdx < 0) return false;
-  const hero = gs.players[pi]?.heroes?.[hiIdx];
+  // Styx 28.9.: geliehener Angreifer steht auf der Brettseite `casterOwner`.
+  const hero = gs.players[initial.casterOwner ?? pi]?.heroes?.[hiIdx];
   if (!hero?.name || hero.hp <= 0) return false;
 
   // Future multi-target gate for Golden Arrow. Left intentionally true —
@@ -179,7 +180,8 @@ function _findAttackerHero(engine, pi, chain) {
   if (initial.owner !== pi) return null;
   const hiIdx = initial.heroIdx ?? initial.casterHeroIdx;
   if (hiIdx == null || hiIdx < 0) return null;
-  const hero = engine.gs.players[pi]?.heroes?.[hiIdx];
+  // Styx 28.9.: Held auf der Brettseite (`casterOwner`), „you" bleibt `pi`.
+  const hero = engine.gs.players[initial.casterOwner ?? pi]?.heroes?.[hiIdx];
   return hero?.name ? hero : null;
 }
 
@@ -314,7 +316,12 @@ async function applyArrowsAfterDamage(engine, source, target, dealt, _origAmount
 function clearArmedArrows(engine, pi) {
   const ps = engine.gs.players[pi];
   if (!ps) return;
-  for (const hero of (ps.heroes || [])) {
+  // Styx 28.9.: auch geliehene Angreifer (Brettseite des Gegners).
+  const helden = new Set(ps.heroes || []);
+  if (typeof engine.heroesControlledBy === 'function') {
+    for (const { hero } of engine.heroesControlledBy(pi)) helden.add(hero);
+  }
+  for (const hero of helden) {
     if (!hero) continue;
     if (hero._armedArrows) delete hero._armedArrows;
     if (hero._arrowsChainedCount != null) delete hero._arrowsChainedCount;
@@ -325,10 +332,12 @@ function clearArmedArrows(engine, pi) {
 
 /** Resolve the Hero object from an attack damage source. */
 function heroFromSource(engine, source) {
-  const pi = source.owner ?? source.controller ?? -1;
+  // Styx 28.9.: Angriffe geliehener Helden tragen `heroOwner` (Brettseite);
+  // `owner` ist der Kontrolleur.
+  const seite = source.heroOwner ?? source.owner ?? source.controller ?? -1;
   const hi = source.heroIdx ?? -1;
-  if (pi < 0 || hi < 0) return null;
-  return engine.gs.players[pi]?.heroes?.[hi] || null;
+  if (seite < 0 || hi < 0) return null;
+  return engine.gs.players[seite]?.heroes?.[hi] || null;
 }
 
 /** Collapse a damage-target (hero object OR creature instance) into a

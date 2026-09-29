@@ -138,7 +138,7 @@ async function fireGroupChoice(ctx, damage, postPromptReveal = false) {
     }
   } else {
     for (const inst of engine.cardInstances) {
-      if (inst.owner === oppIdx && inst.zone === 'support') {
+      if ((inst.controller ?? inst.owner) === oppIdx && inst.zone === 'support') {   // Kontrolle statt Seite
         const cd = engine._getCardDB()[inst.name];
         if (cd && hasCardType(cd, 'Creature')) ziele.push({ type: 'creature', inst });
       }

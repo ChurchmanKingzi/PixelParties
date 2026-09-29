@@ -45,7 +45,8 @@ module.exports = {
   async onCreatureEffect(ctx) {
     const engine = ctx._engine;
     const gs = engine.gs;
-    const pi = ctx.cardOriginalOwner;
+    // Styx 28.9.: „you" = Kontrolleur (seitenfremd beschworen: cardOwner ≠ owner).
+    const pi = ctx.cardOwner;
     const oppIdx = pi === 0 ? 1 : 0;
 
     // Target: any opponent's hero or creature
@@ -59,15 +60,15 @@ module.exports = {
       targets.push({ id: `hero-${physOwner}-${hi}`, type: 'hero', owner: physOwner, heroIdx: hi, cardName: hero.name });
     }
     for (const inst of engine.cardInstances) {
-      if (inst.owner !== oppIdx || inst.zone !== 'support' || inst.faceDown) continue;
+      if ((inst.controller ?? inst.owner) !== oppIdx || inst.zone !== 'support' || inst.faceDown) continue;
       if (inst.counters._baihuStunned) continue; // Already stunned
       const cd = cardDB[inst.name];
       if (!cd || cd.cardType !== 'Creature') continue;
       const hp = inst.counters?.currentHp ?? cd.hp ?? 0;
       if (hp <= 0) continue;
       targets.push({
-        id: `equip-${oppIdx}-${inst.heroIdx}-${inst.zoneSlot}`,
-        type: 'equip', owner: oppIdx, heroIdx: inst.heroIdx,
+        id: `equip-${engine.physicalSide(inst)}-${inst.heroIdx}-${inst.zoneSlot}`,
+        type: 'equip', owner: engine.physicalSide(inst), heroIdx: inst.heroIdx,
         slotIdx: inst.zoneSlot, cardName: inst.name, cardInstance: inst,
       });
     }

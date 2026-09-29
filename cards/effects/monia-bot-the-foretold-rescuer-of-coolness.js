@@ -76,30 +76,32 @@ module.exports = {
     return { drawsPerTurn: 0.5 };
   },
 
-  canHeroRedirect(gs, ownerIdx, heroIdx, selected, validTargets, config, engine, sourceCard) {
-    const monia = gs.players[ownerIdx]?.heroes?.[heroIdx];
+  // `physOwner` (Styx 28.9.): Brettseite der Monia — uebernommen steht sie
+  // beim Gegner, `ownerIdx` ist der Kontrolleur.
+  canHeroRedirect(gs, ownerIdx, heroIdx, selected, validTargets, config, engine, sourceCard, physOwner = ownerIdx) {
+    const monia = gs.players[physOwner]?.heroes?.[heroIdx];
     if (!monia?.name || monia.name !== CARD_NAME || monia.hp <= 0) return false;
     const srcOwner = sourceCard?.heroOwner ?? sourceCard?.controller ?? sourceCard?.owner ?? -1;
     if (srcOwner === ownerIdx) return false;                    // nur gegnerische Karten/Effekte
     // Kontrolle statt Seite (Styx 28.9.): ein Ziel, das ich KONTROLLIERE.
     if (!selected || (engine?.zielSeite ? engine.zielSeite(selected) : selected.owner) !== ownerIdx) return false;   // ein eigenes Ziel
-    if (selected.type === 'hero' && selected.owner === ownerIdx && selected.heroIdx === heroIdx) return false; // „another"
+    if (selected.type === 'hero' && selected.owner === physOwner && selected.heroIdx === heroIdx) return false; // „another"
     if (config?.cannotBeRedirected) return false;
-    return moniaIsValidTarget(validTargets, ownerIdx, heroIdx);
+    return moniaIsValidTarget(validTargets, physOwner, heroIdx);
   },
 
-  async onHeroRedirect(engine, ownerIdx, heroIdx, selected, _validTargets, _config, sourceCard) {
+  async onHeroRedirect(engine, ownerIdx, heroIdx, selected, _validTargets, _config, sourceCard, physOwner = ownerIdx) {
     const gs = engine.gs;
-    const monia = gs.players[ownerIdx]?.heroes?.[heroIdx];
+    const monia = gs.players[physOwner]?.heroes?.[heroIdx];
     if (!monia?.name) return null;
-    gs._redirectedTrueDamage = { owner: ownerIdx, heroIdx, turn: gs.turn, source: sourceCard?.name || null };
+    gs._redirectedTrueDamage = { owner: physOwner, heroIdx, turn: gs.turn, source: sourceCard?.name || null };
     // Dash zum geschuetzten Ziel wie die Basis-Monia, nur mit reinem
     // Jetpack-Feuerschweif (`trailType: 'fire'`, Al 30.8.).
     const physSide = selected?.cardInstance
       ? (selected.cardInstance.stolenBy != null ? selected.cardInstance.owner : (selected.cardInstance.controller ?? selected.cardInstance.owner))
       : selected?.owner;
     engine._broadcastEvent('play_ram_animation', {
-      sourceOwner: ownerIdx, sourceHeroIdx: heroIdx,
+      sourceOwner: physOwner, sourceHeroIdx: heroIdx,
       targetOwner: physSide, targetHeroIdx: selected?.heroIdx,
       targetZoneSlot: selected?.type === 'hero' ? undefined : (selected?.slotIdx ?? selected?.cardInstance?.zoneSlot),
       cardName: monia.name, duration: 600,
@@ -112,7 +114,7 @@ module.exports = {
       player: gs.players[ownerIdx]?.username, from: selected?.cardName || null, source: sourceCard?.name || null,
     });
     return {
-      redirectTo: { id: `hero-${ownerIdx}-${heroIdx}`, type: 'hero', owner: ownerIdx, heroIdx, cardName: monia.name },
+      redirectTo: { id: `hero-${physOwner}-${heroIdx}`, type: 'hero', owner: physOwner, heroIdx, cardName: monia.name },
     };
   },
 };

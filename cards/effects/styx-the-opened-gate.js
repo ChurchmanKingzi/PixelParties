@@ -215,11 +215,21 @@ module.exports = {
     // als lebend, die Frage ist aber, wem der Tote gehoerte.
     const warFremd = engine.heroSideOf(ziel.owner, hero) !== pi;
 
-    const ok = await engine.actionReviveHero(ziel.owner, ziel.heroIdx, REVIVE_HP, {
-      source: CARD_NAME,
-      forceKillAtTurnEnd: true,
-      animationType: ANIM, animDuration: ANIM_MS, animDelay: ANIM_MS,
-    });
+    // Styx 28.9.: „You control it while it is revived" — die Kontrolle
+    // wechselt MIT der Wiederbelebung. Die Marke sagt `onHeroRevive`-
+    // Lauschern (Johanna), dass gleich `onTakeControl` folgt und der
+    // bisherige Kontrolleur nicht mehr zaehlt.
+    if (warFremd) hero._uebernahmeNachWiederbelebung = pi;
+    let ok;
+    try {
+      ok = await engine.actionReviveHero(ziel.owner, ziel.heroIdx, REVIVE_HP, {
+        source: CARD_NAME,
+        forceKillAtTurnEnd: true,
+        animationType: ANIM, animDuration: ANIM_MS, animDelay: ANIM_MS,
+      });
+    } finally {
+      delete hero._uebernahmeNachWiederbelebung;
+    }
     if (!ok) {
       engine.log('styx_gate_fizzle', { player: gs.players[pi]?.username, target: hero.name });
       engine.sync();

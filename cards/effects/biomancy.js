@@ -58,28 +58,27 @@ module.exports = {
       if (ctx._biomancyHandled) return;
       ctx.setFlag('_biomancyHandled', true);
 
-      const ps = gs.players[pi];
-
       // Gather all eligible Biomancy heroes with their levels
+      // Styx 28.9.: alle Helden, die ich KONTROLLIERE (auch geliehene);
+      // Zonen und Held liegen auf ihrer Brettseite (`feld`).
       const eligible = [];
-      for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-        const hero = ps.heroes[hi];
+      for (const { physOwner: feld, heroIdx: hi, hero } of engine.heroesControlledBy(pi)) {
         if (!hero?.name || hero.hp <= 0) continue;
         if (hero.statuses?.frozen || hero.statuses?.stunned || hero.statuses?.negated) continue;
 
         // Must have a free support zone
-        if (freeSupportSlots(engine, pi, hi).length === 0) continue;
+        if (freeSupportSlots(engine, feld, hi).length === 0) continue;
 
         // Soft HOPT: check if this hero's Biomancy was already used this turn
-        const hoptKey = `biomancy:${pi}:${hi}`;
+        const hoptKey = `biomancy:${feld}:${hi}`;
         if (gs.hoptUsed?.[hoptKey] === gs.turn) continue;
 
         // Determine Biomancy level on this hero
-        const abZones = ps.abilityZones[hi] || [];
+        const abZones = gs.players[feld]?.abilityZones?.[hi] || [];
         const level = engine.countAbilitiesForSchool('Biomancy', abZones);
         if (level <= 0) continue;
 
-        eligible.push({ heroIdx: hi, level, hero });
+        eligible.push({ heroIdx: hi, level, hero, feld });
       }
 
       if (eligible.length === 0) return;
@@ -116,7 +115,7 @@ module.exports = {
 
         // Mark HOPT
         if (!gs.hoptUsed) gs.hoptUsed = {};
-        gs.hoptUsed[`biomancy:${pi}:${entry.heroIdx}`] = gs.turn;
+        gs.hoptUsed[`biomancy:${entry.feld}:${entry.heroIdx}`] = gs.turn;
 
         // Platzierung, Override, Animation, Log und onCardEnterZone
         // liegen seit dem 16.8. in `_biomancy-shared.js` — dieselbe
@@ -124,7 +123,7 @@ module.exports = {
         // unveraendert, nur nicht mehr doppelt gepflegt.
         const placed = await placeBiomancyToken(
           engine, pi, entry.heroIdx, ctx.potionName, entry.level,
-          { sourceName: 'Biomancy' },
+          { sourceName: 'Biomancy', feld: entry.feld },
         );
         if (!placed) continue;
 

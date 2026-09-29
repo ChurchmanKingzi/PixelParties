@@ -43,6 +43,8 @@ module.exports = {
     afterSpellResolved: async (ctx) => {
       if (!ctx.spellCardData || ctx.spellCardData.cardType !== 'Attack') return;
       if (ctx.casterIdx !== ctx.cardOwner || ctx.heroIdx !== ctx.cardHeroIdx) return;
+      // Styx 28.9.: gleicher Index reicht nicht — gleiche Brettseite (geliehener Held).
+      if ((ctx.heroOwner ?? ctx.casterIdx) !== (ctx.cardHeroOwner ?? ctx.cardOwner)) return;
       if (ctx.isSecondCast) return; // a repeat itself — don't recurse
 
       const engine = ctx._engine;
@@ -50,6 +52,7 @@ module.exports = {
       if (gs._spellNegatedByEffect) return;
       const pi = ctx.cardOwner;
       const heroIdx = ctx.cardHeroIdx;
+      const feld = ctx.cardHeroOwner ?? pi;   // Styx 28.9.: Brettseite des Helden
       const attackName = ctx.spellName;
       const attackScript = loadCardEffect(attackName);
 
@@ -68,7 +71,7 @@ module.exports = {
       };
 
       const heroReady = () => {
-        const h = gs.players[pi]?.heroes?.[heroIdx];
+        const h = gs.players[feld]?.heroes?.[heroIdx];
         return !!h?.name && h.hp > 0
           && !h.statuses?.frozen && !h.statuses?.stunned && !h.statuses?.negated;
       };
@@ -95,6 +98,7 @@ module.exports = {
         gs._bartasSecondCast = true;
         gs._spellCancelled = false;
         const tempInst = engine._trackCard(attackName, pi, 'hand', heroIdx, -1);
+        if (feld !== pi) tempInst.heroOwner = feld;   // Styx 28.9.: geliehener Held
         try {
           await engine.runHooks('onPlay', {
             _onlyCard: tempInst, playedCard: tempInst,

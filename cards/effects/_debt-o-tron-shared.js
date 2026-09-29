@@ -173,7 +173,7 @@ function modelBase(cardName, opts = {}) {
       if (oncePerTurn && gs.hoptUsed?.[hoptKey(playerIdx)] === gs.turn) return false;
       if (opts.onlyOneAtATime && engine) {
         const schonDa = (engine.cardInstances || []).some(
-          i => i.name === cardName && i.owner === playerIdx && i.zone === 'support');
+          i => i.name === cardName && (i.controller ?? i.owner) === playerIdx && i.zone === 'support');   // Kontrolle statt Seite (Styx 28.9.)
         if (schonDa) return false;
       }
       return true;

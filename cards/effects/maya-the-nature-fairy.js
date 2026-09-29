@@ -43,19 +43,20 @@ module.exports = {
       const engine  = ctx._engine;
       const gs      = engine.gs;
       const pi      = ctx.cardOwner;
-      const heroIdx = ctx.cardHeroIdx;
 
       if (ctx.toZone !== 'support') return;
 
       // Only trigger for creatures entering this player's own support zones
       const entering = ctx.enteringCard;
-      if (!entering || entering.owner !== pi) return;
+      // Kontrolle statt Seite (Styx 28.9.): zaehlt, wer die Kreatur kontrolliert.
+      if (!entering || (entering.controller ?? entering.owner) !== pi) return;
 
       const cd = engine.getEffectiveCardData(entering) || engine._getCardDB()[entering.name];
       if (!cd || !hasCardType(cd, 'Creature')) return;
 
-      // Maya must be alive
-      const hero = gs.players[pi]?.heroes?.[heroIdx];
+      // Maya must be alive — Held ueber seine Brettseite (Styx 28.9.:
+      // uebernommen steht sie beim Gegner, `cardOwner` ist der Uebernehmer).
+      const hero = ctx.attachedHero;
       if (!hero?.name || hero.hp <= 0) return;
 
       // Prompt: choose any friendly target (cancellable — the boost is optional)

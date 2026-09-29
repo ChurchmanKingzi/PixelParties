@@ -111,8 +111,8 @@ module.exports = {
 
       // Der Held muss handlungsfaehig sein — dieselbe Huerde wie fuer
       // die Benutzbarkeit des Vorrats, damit sich beides gleich
-      // verhaelt (Ruling ②).
-      const hero = ps.heroes?.[heroIdx];
+      // verhaelt (Ruling ②). Styx 28.9.: Crestina selbst (Brettseite).
+      const hero = ctx.attachedHero ?? gs.players[ctx.cardHeroOwner ?? pi]?.heroes?.[heroIdx];
       if (!hero?.name || hero.hp <= 0) return;
       const st = hero.statuses || {};
       if (st.frozen || st.stunned || st.webbed || st.negated || st.bound) return;
@@ -203,21 +203,25 @@ module.exports = {
       if (!ps) return;
       if (!(ctx.amount > 0)) return;
 
-      // Einmal pro Zug.
-      const hero = ps.heroes?.[ctx.cardHeroIdx];
+      // Einmal pro Zug. (Styx 28.9.: Crestina selbst, Brettseite.)
+      const hero = ctx.attachedHero ?? gs.players[ctx.cardHeroOwner ?? pi]?.heroes?.[ctx.cardHeroIdx];
       if (!hero) return;
       if (!heldenSperreFrei(gs, 'crestina-negate', pi)) return;   // v1275: pro Spieler (Ruling 22.9.)
 
       // Crestina selbst muss handlungsfaehig sein — und der Vorrat
       // benutzbar. Dieselbe eine Wahrheit wie ueberall.
-      if (!engine.isCreationZoneUsable(pi)) return;
+      // `schadensberechnung` (28.9.): faellt Crestina im selben
+      // Flaechenschlag, wirkt die Negation bis zum Ende des Schlags.
+      if (!engine.isCreationZoneUsable(pi, { schadensberechnung: true })) return;
 
       // Ziel muss ein EIGENER Ascended Hero sein.
       const cardDB = engine._getCardDB();
       const ziel = ctx.target;
       if (!ziel?.name) return;
       if (cardDB[ziel.name]?.cardType !== 'Ascended Hero') return;
-      if (!(ps.heroes || []).includes(ziel)) return;
+      // „you control" — Kontrolle statt Seite (Styx 28.9.).
+      const zielSeite = engine._findHeroOwner(ziel);
+      if (zielSeite < 0 || engine.heroSideOf(zielSeite, ziel) !== pi) return;
 
       // Durchschlagender Schaden laesst sich nicht negieren — bail
       // VOR der Abfrage, sonst zahlt der Spieler eine Karte umsonst

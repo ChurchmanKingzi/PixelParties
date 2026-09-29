@@ -47,13 +47,14 @@ module.exports = {
       if (!fired) return;
       const engine = ctx._engine;
       const gs = engine.gs;
-      const { pi, heroIdx } = fired;
-      const hero = gs.players[pi]?.heroes?.[heroIdx];
+      // Styx 28.9.: Held auf der Brettseite, „you" = Kontrolleur.
+      const { pi, heroIdx, heroOwner } = fired;
+      const hero = gs.players[heroOwner]?.heroes?.[heroIdx];
       if (!hero?.name || hero.hp <= 0) { engine.log('storm_piano', { player: gs.players[pi]?.username, hero: hero?.name || null, applied: false }); return; }
       // v1067: Quelle ist Pflicht. Eigener Held — loest korrekt KEINEN
       // Gegner-Trigger aus (siehe _affected-shared).
-      await engine.addHeroStatus(pi, heroIdx, 'damage_proof', { armedTurn: gs.turn, source: CARD_NAME, appliedBy: pi });
-      engine._broadcastEvent('play_zone_animation', { type: 'shield_bubble', owner: pi, heroIdx, zoneSlot: -1 });
+      await engine.addHeroStatus(heroOwner, heroIdx, 'damage_proof', { armedTurn: gs.turn, source: CARD_NAME, appliedBy: pi });
+      engine._broadcastEvent('play_zone_animation', { type: 'shield_bubble', owner: heroOwner, heroIdx, zoneSlot: -1 });
       engine.log('storm_piano', { player: gs.players[pi]?.username, hero: hero.name, applied: true });
       engine.sync();
     },

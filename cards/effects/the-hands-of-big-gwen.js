@@ -48,7 +48,8 @@ function vomWirt(ctx, quelle, typ) {
   if (quelle.zone === 'support') return false;          // Kreatur im selben Slot ist nicht der Held
   if ((quelle.heroIdx ?? -1) !== ctx.cardHeroIdx) return false;
   const seite = quelle.heroOwner ?? quelle.owner ?? quelle.controller;
-  return seite === (ctx.cardController ?? ctx.cardOwner);
+  // Styx 28.9.: Brettseite des Wirts (geliehener Held: `heroOwner` der Quelle).
+  return seite === (ctx.cardHeroOwner ?? ctx.cardController ?? ctx.cardOwner);
 }
 
 /** Gemeinsamer Weg beider Treffer-Fenster. */
@@ -63,7 +64,8 @@ async function bieteRueckholungAn(ctx, quelle) {
   if (quelle[marke]) return;
   quelle[marke] = true;
 
-  const pi = engine.physicalSide(ich);
+  // Styx 28.9.: „your discard pile" = Kontrolleur (geliehener Held), nicht die Brettseite.
+  const pi = ctx.cardController ?? ctx.cardOwner ?? engine.physicalSide(ich);
   const ps = gs.players[pi];
   if (!ps) return;
 
@@ -149,7 +151,7 @@ module.exports = {
 
     onCardLeaveZone: (ctx) => {
       if (ctx.fromZone !== 'support') return;
-      if (ctx.fromOwner !== ctx.cardOwner || ctx.fromHeroIdx !== ctx.card.heroIdx
+      if ((ctx.fromOwner !== ctx.cardOwner && ctx.fromOwner !== ctx.cardHeroOwner) || ctx.fromHeroIdx !== ctx.card.heroIdx
           || ctx.fromZoneSlot !== ctx.card.zoneSlot) return;
       ctx.revokeAtk();
     },

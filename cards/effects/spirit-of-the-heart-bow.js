@@ -41,10 +41,13 @@ function hatBogen(engine, pi, heroIdx) {
     && !c.faceDown && (c.counters?._effectOverride || c.name) === BOW);
 }
 
-/** Erste freie Support Zone des Wirtshelden dieses Spirits. */
+/**
+ * Erste freie Support Zone des Wirtshelden dieses Spirits. Styx 28.9.:
+ * der Wirt steht auf der BRETTSEITE (seitenfremd beschworen: B).
+ */
 function freieZoneAmWirt(engine, inst) {
-  const pi = inst.controller ?? inst.owner;
-  const slots = engine.gs.players[pi]?.supportZones?.[inst.heroIdx] || [];
+  const seite = engine.physicalSide(inst);
+  const slots = engine.gs.players[seite]?.supportZones?.[inst.heroIdx] || [];
   const anzahl = Math.max(3, slots.length);
   for (let si = 0; si < anzahl; si++) {
     if (!slots[si] || slots[si].length === 0) return si;
@@ -171,8 +174,12 @@ module.exports = {
     });
     await engine._delay(360);
 
-    const res = await engine.actionTransferCreature(ziel, pi, spirit.heroIdx, slot, {
+    // Styx 28.9.: in die Zone des Wirts auf der Brettseite; liegt die auf
+    // der Gegenseite, kontrolliert `pi` die Beute seitenfremd.
+    const seite = engine.physicalSide(spirit);
+    const res = await engine.actionTransferCreature(ziel, seite, spirit.heroIdx, slot, {
       sourceName: CARD_NAME,
+      ...(seite !== pi ? { controller: pi } : {}),
     });
     if (res?.success === false) return false;
 

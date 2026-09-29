@@ -155,7 +155,9 @@ function killerHeroOf(engine, source) {
   const heroIdx = source.heroIdx;
   if (!Number.isInteger(heroIdx) || heroIdx < 0) return null;
 
-  const owner = source.owner ?? source.controller;
+  // Styx 28.9.: Brettseite des Toeters — ein uebernommener Held greift mit
+  // `owner` = Kontrolleur und `heroOwner` = Brettseite an.
+  const owner = source.heroOwner ?? source.owner ?? source.controller;
   if (!Number.isInteger(owner) || owner < 0) return null;
 
   // Artifacts und Potions binden NICHT an den Helden (Als Ruling).

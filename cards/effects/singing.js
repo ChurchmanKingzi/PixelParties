@@ -236,9 +236,9 @@ function _isMeguHosted(gs, pi, heroIdx) {
   return gs.players[pi]?.heroes?.[heroIdx]?.name === 'Cute Starlet Megu';
 }
 
-function _getAllSingableCreatures(engine, gs, pi, heroIdx, level) {
+function _getAllSingableCreatures(engine, gs, pi, heroIdx, level, feld = pi) {
   const opponents = _getBorrowableCreatures(engine, gs, pi, level);
-  if (!_isMeguHosted(gs, pi, heroIdx)) return opponents;
+  if (!_isMeguHosted(gs, feld, heroIdx)) return opponents;
   return opponents.concat(_getOwnSingableCreatures(engine, gs, pi, level));
 }
 
@@ -261,21 +261,23 @@ module.exports = {
     const isMainPhase = gs.currentPhase === 2 || gs.currentPhase === 4;
     if (!isMainPhase) return false;
 
-    const hero = gs.players[pi]?.heroes?.[ctx.cardHeroIdx];
+    const feld = ctx.cardHeroOwner ?? pi;   // Styx 28.9.: Brettseite des Helden
+    const hero = gs.players[feld]?.heroes?.[ctx.cardHeroIdx];
     if (!hero?.name || hero.hp <= 0) return false;
 
-    return _getAllSingableCreatures(engine, gs, pi, ctx.cardHeroIdx, level).length > 0;
+    return _getAllSingableCreatures(engine, gs, pi, ctx.cardHeroIdx, level, feld).length > 0;
   },
 
   async onFreeActivate(ctx, level) {
     const engine = ctx._engine;
     const gs     = engine.gs;
     const pi     = ctx.cardOwner;
-    const hero   = gs.players[pi]?.heroes?.[ctx.cardHeroIdx];
+    const feld   = ctx.cardHeroOwner ?? pi;   // Styx 28.9.: Brettseite des Helden
+    const hero   = gs.players[feld]?.heroes?.[ctx.cardHeroIdx];
     if (!hero?.name) return false;
 
-    const isMegu     = _isMeguHosted(gs, pi, ctx.cardHeroIdx);
-    const candidates = _getAllSingableCreatures(engine, gs, pi, ctx.cardHeroIdx, level);
+    const isMegu     = _isMeguHosted(gs, feld, ctx.cardHeroIdx);
+    const candidates = _getAllSingableCreatures(engine, gs, pi, ctx.cardHeroIdx, level, feld);
     if (candidates.length === 0) return false;
 
     // ── Direct click: highlight eligible opponent Creatures, click

@@ -39,9 +39,11 @@ module.exports = {
       const gs = engine.gs;
       const pi = ctx.cardController ?? ctx.cardOwner;
       const hi = ctx.cardHeroIdx;
-      const hero = gs.players[pi]?.heroes?.[hi];
+      // Styx 28.9.: Kasperov selbst auf der Brettseite `feld`.
+      const feld = ctx.cardHeroOwner ?? pi;
+      const hero = ctx.attachedHero ?? gs.players[feld]?.heroes?.[hi];
       if (!hero?.name || hero.hp <= 0) return;
-      if (engine._isHeroEffectSilenced?.(pi, hi)) return;
+      if (engine._isHeroEffectSilenced?.(feld, hi)) return;
       const death = ctx.creature;
       if (!death || !isOfKingsName(death.name)) return;
       if ((death.controller ?? death.owner) !== pi) return;

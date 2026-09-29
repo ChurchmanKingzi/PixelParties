@@ -172,15 +172,24 @@ module.exports = {
     if (inst.zone !== 'support') return false;
     const ally = verbuendeter(inst);
     if (!ally) return false;
-    const nutzer = { owner: inst.controller ?? inst.owner, heroIdx: inst.heroIdx };
+    // Styx 28.9.: Nutzer und Verbuendeter sind SPALTEN (Brettseite +
+    // Index). Die Karte an einem uebernommenen Helden liegt auf dessen
+    // Brettseite; `controller` waere dort der Uebernehmer.
+    const nutzer = { owner: engine.physicalSide(inst), heroIdx: inst.heroIdx };
     if (!quelleBetroffen(info)) return false;
+
+    // Brettseite des waehlenden Helden: `chooserIdx` ist der Spieler; wirkt
+    // er ueber einen geliehenen Helden, nennt `gs._wirkerSeite` die Spalte.
+    const w = gs._wirkerSeite;
+    const waehlerSeite = (w && w.pi === info.chooserIdx && w.heroIdx === info.chooserHeroIdx)
+      ? w.heroOwner : info.chooserIdx;
 
     // Betrifft die Wahl genau dieses Paar — in einer der beiden
     // Richtungen?
     const zielIstNutzer = info.heroOwner === nutzer.owner && info.heroIdx === nutzer.heroIdx;
     const zielIstAlly   = info.heroOwner === ally.owner   && info.heroIdx === ally.heroIdx;
-    const waehlerIstNutzer = info.chooserIdx === nutzer.owner && info.chooserHeroIdx === nutzer.heroIdx;
-    const waehlerIstAlly   = info.chooserIdx === ally.owner   && info.chooserHeroIdx === ally.heroIdx;
+    const waehlerIstNutzer = waehlerSeite === nutzer.owner && info.chooserHeroIdx === nutzer.heroIdx;
+    const waehlerIstAlly   = waehlerSeite === ally.owner   && info.chooserHeroIdx === ally.heroIdx;
     const paar = (zielIstNutzer && waehlerIstAlly) || (zielIstAlly && waehlerIstNutzer);
     if (!paar) return false;
 
@@ -253,7 +262,8 @@ module.exports = {
       const engine = ctx._engine;
       const inst = ctx.card;
       if (!inst || inst.zone !== 'support') return;
-      const owner = inst.controller ?? inst.owner;
+      // Styx 28.9.: Kontrolleur, auch an einem uebernommenen Helden.
+      const owner = engine.effektiveSeiten(inst).controller ?? inst.owner;
       if (engine.gs.activePlayer !== owner) return;
       const ja = await engine.promptGeneric(owner, {
         type: 'confirm',

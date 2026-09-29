@@ -34,16 +34,16 @@ module.exports = {
 
   hooks: {
     onPlay: (ctx) => {
-      checkArthorAscension(ctx._engine, ctx.cardOwner, ctx.cardHeroIdx, null);
+      checkArthorAscension(ctx._engine, ctx.cardHeroOwner ?? ctx.cardOwner, ctx.cardHeroIdx, null);   // Styx 28.9.: Brettseite
     },
 
     onGameStart: (ctx) => {
-      checkArthorAscension(ctx._engine, ctx.cardOwner, ctx.cardHeroIdx, null);
+      checkArthorAscension(ctx._engine, ctx.cardHeroOwner ?? ctx.cardOwner, ctx.cardHeroIdx, null);   // Styx 28.9.: Brettseite
     },
 
     onCardLeaveZone: (ctx) => {
       if (ctx.fromZone !== 'support') return;
-      checkArthorAscension(ctx._engine, ctx.cardOwner, ctx.cardHeroIdx, ctx.card.id);
+      checkArthorAscension(ctx._engine, ctx.cardHeroOwner ?? ctx.cardOwner, ctx.cardHeroIdx, ctx.card.id);   // Styx 28.9.: Brettseite
     },
 
     /**
@@ -57,10 +57,13 @@ module.exports = {
       const entering = ctx.enteringCard;
       if (!entering) return;
 
-      // Only affect creatures owned by the same player
-      if (entering.owner !== ctx.cardOwner && entering.controller !== ctx.cardOwner) return;
-
       const engine = ctx._engine;
+
+      // Kontrolle statt Seite (Styx 28.9.): beschworen hat der Kontrolleur
+      // des Kreises; die Zone muss auf der Brettseite des ausgeruesteten
+      // Helden liegen (sonst zaehlte ein gleicher Heldenindex der Gegenseite).
+      if ((entering.controller ?? entering.owner) !== ctx.cardOwner) return;
+      if (engine.physicalSide(entering) !== (ctx.cardHeroOwner ?? ctx.cardOwner)) return;
       const cardDB = engine._getCardDB();
       const cd = engine.getEffectiveCardData(entering) || cardDB[entering.name];
       if (!cd || !hasCardType(cd, 'Creature')) return;

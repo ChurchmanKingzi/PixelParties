@@ -45,18 +45,30 @@ async function _checkCardinalWin(ctx) {
   const gs = engine.gs;
   if (gs._cardinalWinTriggered) return;
 
+  // Kontrolle statt Seite (Styx 28.9.): „If you control 4 …" — jede
+  // oben liegende Cardinal-Karte zaehlt fuer den Kontrolleur ihrer
+  // Instanz, nicht fuer die Brettseite (seitenfremd beschworen/gestohlen).
+  const kontrolle = [new Set(), new Set()];
+  for (let side = 0; side < gs.players.length; side++) {
+    const sps = gs.players[side];
+    if (!sps) continue;
+    for (let hi = 0; hi < (sps.heroes || []).length; hi++) {
+      for (let zi = 0; zi < (sps.supportZones?.[hi] || []).length; zi++) {
+        const slot = (sps.supportZones[hi] || [])[zi] || [];
+        if (slot.length === 0 || !CARDINAL_NAMES.includes(slot[0])) continue;
+        const inst = (engine.cardInstances || []).find(c => c.zone === 'support'
+          && c.name === slot[0] && c.heroIdx === hi && c.zoneSlot === zi
+          && engine.physicalSide(c) === side);
+        const wer = inst ? (inst.controller ?? inst.owner) : side;
+        kontrolle[wer]?.add(slot[0]);
+      }
+    }
+  }
+
   for (let pi = 0; pi < gs.players.length; pi++) {
     const ps = gs.players[pi];
     if (!ps) continue;
-    const onBoard = new Set();
-    for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-      for (let zi = 0; zi < (ps.supportZones[hi] || []).length; zi++) {
-        const slot = (ps.supportZones[hi] || [])[zi] || [];
-        if (slot.length > 0 && CARDINAL_NAMES.includes(slot[0])) {
-          onBoard.add(slot[0]);
-        }
-      }
-    }
+    const onBoard = kontrolle[pi] || new Set();
     if (onBoard.size === 4) {
       gs._cardinalWinTriggered = true;
       engine.log('cardinal_win', { player: ps.username });

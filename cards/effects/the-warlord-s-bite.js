@@ -39,11 +39,12 @@ module.exports = {
       const opp = 1 - pi;
       const ops = gs.players?.[opp];
       if (!ops) return true;
-      for (const h of (ops.heroes || [])) {
+      // Kontrolle statt Seite (Styx 28.9.)
+      for (const { hero: h } of engine.heroesControlledBy(opp)) {
         if (h && h.name && h.hp > 0 && !h.statuses?.poisoned) return true;
       }
       for (const inst of (engine.cardInstances || [])) {
-        if (inst.owner !== opp || inst.zone !== 'support' || inst.faceDown) continue;
+        if ((inst.controller ?? inst.owner) !== opp || inst.zone !== 'support' || inst.faceDown) continue;
         if (!inst.counters?.poisoned) return true;
       }
       return false;

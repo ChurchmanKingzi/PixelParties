@@ -82,9 +82,11 @@ module.exports = {
 
       // Zone-pick across all candidates.
       const zones = candidates.map(inst => {
-        const hero = ps.heroes[inst.heroIdx];
+        // Styx 28.9.: seitenfremd beschworene Kreaturen stehen auf der Gegenseite.
+        const seite = engine.physicalSide(inst);
+        const hero = gs.players[seite]?.heroes?.[inst.heroIdx];
         return {
-          heroIdx: inst.heroIdx, slotIdx: inst.zoneSlot,
+          owner: seite, heroIdx: inst.heroIdx, slotIdx: inst.zoneSlot,
           label: `${hero?.name || 'Hero'} — ${inst.name} (Slot ${inst.zoneSlot + 1})`,
         };
       });

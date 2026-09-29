@@ -13,7 +13,9 @@
 //    "Immune to that source" matches the engine's
 //    own immunity catalogue:
 //     • dead (hp ≤ 0) — counted as immune (can't
-//       take damage)
+//       take damage). Ausnahme (28.9.): im selben
+//       Flaechenschlag gefallen = Tod nur vorgemerkt,
+//       zaehlt fuer die Berechnung noch als lebend.
 //     • full damage protections: shielded (turn-1),
 //       buffs.gou_protected, buffs.submerged
 //     • generic CC immune (statuses.immune)
@@ -61,8 +63,12 @@ const CARD_NAME = 'Chuck, the Crazy Veteran';
  * qualify, otherwise Chuck would lose his shield against any source
  * his team has even partial mitigation for.
  */
-function _isImmuneToSource(hero, type) {
-  if (!hero || hero.hp <= 0) return true;
+function _isImmuneToSource(hero, type, engine) {
+  if (!hero) return true;
+  // Tot zaehlt als immun — AUSSER der Tod ist im laufenden
+  // Flaechenschlag nur vorgemerkt: dann steht der Held fuer die
+  // Schadensberechnung noch im Spiel (Todes-Aufschub 28.9.).
+  if (hero.hp <= 0 && !engine?.heldTodAufgeschoben?.(hero)) return true;
   // Full damage protections — every one of these makes the hero take
   // 0 damage from the engine's pipeline.
   if (hero.statuses?.shielded) return true;
@@ -145,8 +151,11 @@ module.exports = {
         .map(({ hero }) => hero);
       for (let i = 0; i < heroes.length; i++) {
         const h = heroes[i];
-        if (!h?.name || h.hp <= 0) continue;
-        if (!_isImmuneToSource(h, ctx.type)) {
+        // „Erst alle Schadensberechnungen, dann die Tode" (28.9.): ein
+        // Mitspieler, der frueher im selben Flaechenschlag gefallen ist,
+        // ist nur vorgemerkt und zaehlt hier noch als lebend.
+        if (!h?.name || (h.hp <= 0 && !engine.heldTodAufgeschoben(h))) continue;
+        if (!_isImmuneToSource(h, ctx.type, engine)) {
           anyVulnerable = true;
           verwundbarerName = h.name;
           break;
@@ -158,7 +167,7 @@ module.exports = {
       } else {
         _diag('schild-faellt', {
           mitspieler: heroes.map(h => (h?.name
-            ? `${h.name} hp${h.hp}${_isImmuneToSource(h, ctx.type) ? ' IMMUN' : ''}` : 'leer')),
+            ? `${h.name} hp${h.hp}${_isImmuneToSource(h, ctx.type, engine) ? ' IMMUN' : ''}` : 'leer')),
         });
       }
     },

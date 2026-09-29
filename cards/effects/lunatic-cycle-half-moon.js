@@ -36,7 +36,7 @@ module.exports = {
       // Is the damage target THIS equip's host Hero?
       const tgtOwner = engine._findHeroOwner?.(target);
       if (tgtOwner == null || tgtOwner < 0) return;
-      if (tgtOwner !== ctx.cardOwner) return;
+      if (tgtOwner !== (ctx.cardHeroOwner ?? ctx.cardOwner)) return;   // Styx 28.9.: Brettseite
       const tgtHi = (engine.gs.players[tgtOwner]?.heroes || []).indexOf(target);
       if (tgtHi < 0 || tgtHi !== ctx.card.heroIdx) return;
 

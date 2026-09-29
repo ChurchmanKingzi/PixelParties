@@ -55,7 +55,10 @@ module.exports = {
       if (!ctx._summonedFromDiscard) return;
 
       const heroIdx = ctx.cardHeroIdx;
-      const hero = gs.players[pi]?.heroes?.[heroIdx];
+      // Kontrolle statt Seite (Styx 28.9.): „the corresponding Hero" steht in
+      // der Spalte, in der Ib liegt — bei seitenfremder Beschwoerung die Gegenseite.
+      const feld = ctx.cardHeroOwner ?? pi;
+      const hero = gs.players[feld]?.heroes?.[heroIdx];
       if (!hero?.name || hero.hp <= 0) return;
 
       const distinct = distinctCreatureNamesInDiscard(engine, pi);
@@ -64,7 +67,7 @@ module.exports = {
 
       // Heal animation on the host's portrait.
       engine._broadcastEvent('play_zone_animation', {
-        type: 'heal_sparkle', owner: pi, heroIdx, zoneSlot: -1,
+        type: 'heal_sparkle', owner: feld, heroIdx, zoneSlot: -1,
       });
       await engine._delay(280);
 

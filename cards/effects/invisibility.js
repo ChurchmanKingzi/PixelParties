@@ -200,7 +200,8 @@ module.exports = {
       if (ctx.card.zone !== 'support') return;
       const src = ctx.source;
       if (src?.heroIdx !== ctx.cardHeroIdx) return;
-      if ((src.owner ?? src.controller) !== ctx.cardOwner) return;
+      // Styx 28.9.: „dieser Held" = Brettseite + Index (geliehener Held).
+      if (!ctx._engine.quelleIstHeld(src, ctx.cardHeroOwner ?? ctx.cardOwner, ctx.cardHeroIdx)) return;
 
       const oppIdx = ctx.cardOwner === 0 ? 1 : 0;
       const targets = Array.isArray(ctx.target)
@@ -221,6 +222,8 @@ module.exports = {
       if (ctx.card.zone !== 'support') return;
       if (ctx.casterIdx !== ctx.cardOwner) return;
       if (ctx.heroIdx !== ctx.cardHeroIdx) return;
+      // Styx 28.9.: gleicher Index reicht nicht — gleiche Brettseite (geliehener Held).
+      if ((ctx.heroOwner ?? ctx.casterIdx) !== (ctx.cardHeroOwner ?? ctx.cardOwner)) return;
       const oppIdx = ctx.cardOwner === 0 ? 1 : 0;
       const dmg = ctx.damageTargets || [];
       if (dmg.some(t => _zielSeite(ctx._engine, t) === oppIdx)) {
@@ -239,8 +242,8 @@ module.exports = {
     afterDamage: async (ctx) => {
       if (ctx.card.zone !== 'support') return;
       if (ctx.sourceHeroIdx !== ctx.cardHeroIdx) return;
-      const srcOwner = ctx.source?.owner ?? ctx.source?.controller;
-      if (srcOwner !== ctx.cardOwner) return;
+      // Styx 28.9.: „dieser Held" = Brettseite + Index (geliehener Held).
+      if (!ctx._engine.quelleIstHeld(ctx.source, ctx.cardHeroOwner ?? ctx.cardOwner, ctx.cardHeroIdx)) return;
       if ((ctx.amount || 0) <= 0) return;
       const oppIdx = ctx.cardOwner === 0 ? 1 : 0;
       // `ctx.target` here is the damaged Hero object — locate its owner.
@@ -265,8 +268,8 @@ module.exports = {
         if ((e.amount || 0) <= 0) continue;
         const srcHeroIdx = e.source?.heroIdx;
         if (srcHeroIdx !== ctx.cardHeroIdx) continue;
-        const srcOwner = e.source?.owner ?? e.sourceOwner;
-        if (srcOwner !== ctx.cardOwner) continue;
+        const srcOwner = e.source?.heroOwner ?? e.source?.owner ?? e.sourceOwner;
+        if (srcOwner !== (ctx.cardHeroOwner ?? ctx.cardOwner)) continue;   // Styx 28.9.: Brettseite
         const tgtOwner = e.inst?.controller ?? e.inst?.owner;
         if (tgtOwner === oppIdx) {
           await _selfDiscard(ctx, 'damaged_opp_creature');

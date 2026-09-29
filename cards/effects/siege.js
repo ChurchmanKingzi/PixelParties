@@ -75,7 +75,8 @@ module.exports = {
     if (inst.heroIdx == null || inst.heroIdx < 0) return false;
 
     // „YOUR OPPONENT cannot …" — der Traeger selbst bleibt frei.
-    const traeger = inst.controller ?? inst.owner;
+    // Styx 28.9.: Traeger = Kontrolleur (uebernommener Held → Uebernehmer).
+    const traeger = engine.effektiveSeiten(inst).controller ?? inst.owner;
     if (pi === traeger) return false;
 
     // „outside THEIR Resource Phase": nur in seiner eigenen Runde kann
@@ -100,7 +101,7 @@ module.exports = {
       if (!res) return;
 
       engine._broadcastEvent('play_zone_animation', {
-        type: 'gold_sparkle', owner: ctx.cardOwner,
+        type: 'gold_sparkle', owner: res.host.owner,   // Brettseite des Wirts
         heroIdx: res.host.heroIdx, zoneSlot: -1,
       });
       engine.log('siege_attached', {

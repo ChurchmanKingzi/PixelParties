@@ -52,9 +52,9 @@ module.exports = {
       const cd = engine.getEffectiveCardData(enteringCard) || engine._getCardDB()[enteringCard.name];
       if (!cd || !hasCardType(cd, 'Creature')) return;
 
-      // Hero must be alive
+      // Hero must be alive (Styx 28.9.: der Held selbst, Brettseite)
       const ps = gs.players[pi];
-      const hero = ps?.heroes?.[heroIdx];
+      const hero = ctx.attachedHero ?? gs.players[ctx.cardHeroOwner ?? pi]?.heroes?.[heroIdx];
       if (!hero?.name || hero.hp <= 0) return;
 
       // Build target list: all living heroes + creatures on the board (both players)

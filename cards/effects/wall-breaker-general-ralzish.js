@@ -242,7 +242,8 @@ module.exports = {
     const heroIdx = ctx.cardHeroIdx;
     const hero = ctx.attachedHero;
     if (!hero?.name || hero.hp <= 0) return false;
-    if (creaturesInSupport(engine, pi, heroIdx) !== 2) return false;
+    // Styx 28.9.: Ralzishs Zonen auf seiner Brettseite.
+    if (creaturesInSupport(engine, ctx.cardHeroOwner ?? pi, heroIdx) !== 2) return false;
     return collectTargets(engine, pi).length > 0;
   },
 
@@ -256,10 +257,12 @@ module.exports = {
     const gs = engine.gs;
     const pi = ctx.cardOwner;
     const heroIdx = ctx.cardHeroIdx;
+    // Styx 28.9.: Ralzish und seine Zonen auf der Brettseite `feld`.
+    const feld = ctx.cardHeroOwner ?? pi;
 
     // Re-verify the activation condition (state can shift between the
     // availability check and resolution).
-    if (creaturesInSupport(engine, pi, heroIdx) !== 2) return false;
+    if (creaturesInSupport(engine, feld, heroIdx) !== 2) return false;
 
     const targets = collectTargets(engine, pi);
     if (targets.length === 0) return false;
@@ -292,7 +295,7 @@ module.exports = {
 
     // ── Ram + explosion: Ralzish (the Wall Breaker) charges the
     //    target's zone, then it shatters. Mirrors Coolness Overcharge.
-    const hero = gs.players[pi]?.heroes?.[heroIdx];
+    const hero = ctx.attachedHero ?? gs.players[feld]?.heroes?.[heroIdx];
     if (hero?.name && hero.hp > 0) {
       const isStack = sel.type === 'coolnessStackTop';
       const ramTarget = isStack
@@ -300,7 +303,7 @@ module.exports = {
         : { owner: targetInst.owner, heroIdx: targetInst.heroIdx, zoneSlot: targetInst.zoneSlot, zoneType: targetInst.zone };
 
       const ramEvent = {
-        sourceOwner: pi, sourceHeroIdx: heroIdx,
+        sourceOwner: feld, sourceHeroIdx: heroIdx,
         targetOwner: ramTarget.owner,
         targetHeroIdx: ramTarget.heroIdx >= 0 ? ramTarget.heroIdx : 0,
         cardName: hero.name, duration: 1200,
