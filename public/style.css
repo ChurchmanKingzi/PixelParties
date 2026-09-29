@@ -24601,3 +24601,14 @@ body.pp-dialog-offen .foil-diamond-rare:not(.modal-overlay *) {
 /* Die Zone schneidet sonst alles ausserhalb ihres Randes ab
    (`.board-zone { overflow: hidden }`) — die Flammen sollen ueberstehen. */
 .board-zone.board-zone-aura { overflow: visible; }
+
+/* ★ Zentrierung der Blitz-Flaechen (Als Befund 29.9., Necromancy): diese
+   Klassen tragen `left/top: -Groesse/2` fuer IHRE Standardgroesse (70px,
+   40px …). Komponenten mit eigener Groesse setzen inline `margin-left/top
+   = -Groesse/2` — beides zusammen schob die Flaeche um die halbe
+   STANDARDgroesse nach links oben (Mitte auf der Ecke der Zone statt in
+   ihrer Mitte). Traegt der Knoten einen eigenen Rand-Versatz, kommt die
+   Zentrierung ausschliesslich von dort. Inline `left`/`top` schlaegt die
+   Regel weiterhin. */
+.anim-flame-flash[style*="margin-left"],
+.anim-gold-flash[style*="margin-left"] { left: 0; top: 0; }
