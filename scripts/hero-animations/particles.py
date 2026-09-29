@@ -32,8 +32,10 @@ def _ok(pix, fig, region):
     return True
 
 
-def rain(frames, count, seed, region=None, n=48):
-    """count Regentropfen; region (optional): Maske, in der sie fallen dürfen."""
+def rain(frames, count, seed, region=None, n=48, vx=0.55, tail=0.4, vy=(2.2, 3.0), storm=False, length=2):
+    """count Regentropfen; region (optional): Maske, in der sie fallen dürfen; vx/tail: Schräglage
+    (Sturm: großes vx, der Schweif liegt entsprechend weiter links). storm=True: Tropfen kommen
+    auch von links ins Bild und fliegen am rechten Rand hinaus; length: Strichlänge in Pixeln."""
     fig = _fig_union(frames)
     H, W = fig.shape
     rng = np.random.default_rng(seed)
@@ -41,18 +43,21 @@ def rain(frames, count, seed, region=None, n=48):
     while len(res) < count and tries < 20000:
         tries += 1
         e = int(rng.integers(n))
-        x0, y0 = rng.uniform(1, W - 3), rng.uniform(-2, H * 0.55)
-        vy, vx = rng.uniform(2.2, 3.0), 0.55
+        x0, y0 = rng.uniform(-W * 0.6 if storm else 1, W - 3), rng.uniform(-2, H * 0.55)
+        vy_ = rng.uniform(*vy)
         steps = []
         for a in range(40):
-            yh = y0 + vy * a
+            yh = y0 + vy_ * a
             if yh > H - 2:
                 break
             xh = x0 + vx * a
+            if storm and xh > W - 2:
+                break
             head = (int(round(xh)), int(round(yh)))
-            tail = (int(round(xh - 0.4)), int(round(yh - 1)))
-            steps.append({tail: RAIN_TAIL, head: RAIN_HEAD})
-        steps = [p for p in steps if all(1 <= y for (_, y) in p)]
+            px = {(int(round(xh - tail * k)), int(round(yh - k))): RAIN_TAIL for k in range(length - 1, 0, -1)}
+            px[head] = RAIN_HEAD
+            steps.append(px)
+        steps = [p for p in steps if all(1 <= y and (not storm or 1 <= x) for (x, y) in p)]
         if len(steps) < 3 or not all(_ok(p, fig, region) for p in steps):
             continue
         if sum(1 for r in res if abs(r[0] - e) < 2) > 6:
