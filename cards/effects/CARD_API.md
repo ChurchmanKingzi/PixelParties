@@ -18541,3 +18541,12 @@ Damit laufen unter Übernahme: Throne Robber (Formbesitz in `counters._identityF
   - Spider Silk Bridge (face-up): „you" = `surpriseKontrolleur(inst.owner, inst.heroIdx)`.
   - Golden Ladybug, Madame Guillotine und Water Golem lesen `surpriseController ?? surpriseOwner`.
   - `_rxAufgeloest(…, { heroOwner })`: `onReactionResolved` traegt `heroOwner`.
+
+## ★ FUN-FUN CIRCUS — Applause Counter, Handzähler, Resource-Phase-Wiederholung (29.9.)
+
+Vier Karten (Strongman, Elephant, Director, Clown; `PP MBS`, Archetyp „Fun-Fun Circus"), gemeinsame Bausteine in `_applause-shared.js`.
+
+- **Applause Counter** = `inst.counters.applause` (Zahl), nur an Creatures in Support Zonen. „On the board" = BEIDE Seiten (`boardTotal`). Platzieren NUR über `placeApplause(engine, inst, n)` (zählt pro Zähler die mitsammelnden Handkarten mit), Wegnehmen `removeApplause`, Verschieben `moveApplause` (kein Platzieren, löst nichts aus).
+- **Zähler auf Handkarten:** Hand-Index-Feld `ps._handApplause[handIdx]` (Engine: `registerHandIndexedField('_handApplause', …)` — folgt der physischen Kopie durch Splices/Umsortieren, wandert beim Beschwören als `inst.counters.applause` aufs Brett). Skripte, die in der Hand mitzählen: `collectsApplauseInHand: true` (+ `revealOnEnterHand: true`). Projektion `handApplause` (server.js): Besitzer alle, Gegner nur aufgedeckte Indizes. Client: `<ApplauseBadge n hand />` (Pixel-Icon klatschender Hände, unten mittig; auf dem Brett knapp über der HP-Zahl).
+- **Resource Phase wiederholen:** Skripte exportieren `extraResourcePhases(engine, inst)` (Zahl, live zu Phasenbeginn); `engine._extraResourcePhases(pi)` summiert alle aktiven Karten des Spielers (Deckel 12). Jede Wiederholung ist die volle Phase (Reaktionsfenster, Ziehen, 4 Gold, Phasenende); `START` läuft nur einmal.
+- **Todes-Anspruch auf die Hand + `revealOnEnterHand`:** `_redeemDeathClaim` deckt jetzt Karten mit `revealOnEnterHand` auf, wenn sie per `_deathClaim` auf die Hand kommen (Director → Elephant).

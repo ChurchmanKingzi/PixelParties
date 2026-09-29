@@ -820,6 +820,18 @@ class GameEngine {
     // offsets because all three are registered hand-indexed fields,
     // so a splice that shifts hand indices keeps them aligned.
     this.registerHandIndexedField('_handLevelOffsetHeroFilter', { kind: 'value' });
+    // Fun-Fun Circus Elephant: Applause Counter auf der HANDKARTE. Folgt
+    // der physischen Kopie durch Splices/Umsortieren und wandert beim
+    // Beschwoeren als `inst.counters.applause` aufs Brett (der Elephant
+    // liest sie im onPlay: „counters on this Creature when it is summoned").
+    this.registerHandIndexedField('_handApplause', {
+      kind: 'value',
+      onCardSummonedFromHand: ({ inst, value }) => {
+        if (!inst || !value) return;
+        if (!inst.counters) inst.counters = {};
+        inst.counters.applause = (inst.counters.applause || 0) + value;
+      },
+    });
   }
 
   // ═══════════════════════════════════════════
@@ -12151,6 +12163,7 @@ class GameEngine {
       if (zuPs && claim.to === 'hand') {
         const zielIdx = zuPs.hand.length;   // Platz, auf dem sie landet
         zuPs.hand.push(claim.name);
+        this._autoRevealOnEnterHand(claim.owner, zielIdx, claim.name);   // revealOnEnterHand auch beim Todes-Anspruch (Director → Elephant)
         // Herkunft (v693): gehoert weiter dem urspruenglichen Besitzer.
         this._tagHandCardOrigin(claim.owner, claim.name, herkunft.originalOwner ?? herkunft.owner);
         // Flug von der STERBEZONE in die Hand — nicht aus einem
@@ -21254,6 +21267,29 @@ this._deathWatch = (this._deathWatchStack || []).length
   /**
    * Run a specific phase: fire hooks, do automatic actions, auto-advance if needed.
    */
+  /**
+   * ★ Fun-Fun Circus Director — wie oft wiederholt sich die Resource Phase
+   * von `pi`? Jede aktive Karte des Spielers, deren Skript
+   * `extraResourcePhases(engine, inst)` (Zahl) exportiert, addiert ihre
+   * Wiederholungen. Gedeckelt (Sicherung gegen Endlosschleifen).
+   * @returns {{ n: number, quelle: string|null }}
+   */
+  _extraResourcePhases(pi) {
+    let n = 0, quelle = null;
+    for (const inst of this.cardInstances) {
+      if (inst.zone !== ZONES.SUPPORT || inst.faceDown) continue;
+      if ((inst.controller ?? inst.owner) !== pi) continue;
+      const script = loadCardEffect(inst.counters?._effectOverride || inst.name);
+      if (typeof script?.extraResourcePhases !== 'function') continue;
+      if (!this.isCardEffectActive(inst)) continue;
+      let extra = 0;
+      try { extra = Math.max(0, Math.floor(script.extraResourcePhases(this, inst)) || 0); }
+      catch (err) { console.error(`[extraResourcePhases] ${inst.name}:`, err.message); }
+      if (extra > 0) { n += extra; quelle = quelle || inst.name; }
+    }
+    return { n: Math.min(n, 12), quelle };
+  }
+
   async runPhase(phase) {
     this.gs.currentPhase = phase;
     const phaseName = PHASE_NAMES[phase];
@@ -21280,27 +21316,46 @@ this._deathWatch = (this._deathWatchStack || []).length
       case PHASES.RESOURCE: {
         await this._delay(200);
         const activeP = this.gs.activePlayer;
-        // Hand-reaction window for Resource-Phase-start cards (Idol of
-        // Crestina, etc.). These opt in via `isResourcePhaseReaction`
-        // and may set `gs._skipResourceDraw` from inside their resolve
-        // to replace the standard draw with their own effect.
-        await this._checkResourcePhaseReactions(activeP);
-        // Draw 1 card (unless an Idol-style reaction replaced it).
-        // `_isResourceDraw: true` flags this as the standard auto-draw
-        // so listeners (Analyzer / Gatherer) can skip it — they only
-        // count effect-induced draws / tutors.
-        if (!this.gs._skipResourceDraw) {
-          await this.actionDrawCards(activeP, 1, { _isResourceDraw: true });
+        // ★ Fun-Fun Circus Director: „Your Resource Phase repeats an
+        // additional time" — Anzahl LIVE zu Phasenbeginn aus dem Brett
+        // (`extraResourcePhases` am Skript, s. `_extraResourcePhases`).
+        // Jede Wiederholung ist die VOLLE Phase (Reaktionsfenster, Ziehen,
+        // Gold, Phasenende); der Phasenbeginn (`START`) laeuft nur einmal.
+        const wiederholung = this._extraResourcePhases(activeP);
+        for (let durchlauf = 0; durchlauf <= wiederholung.n; durchlauf++) {
+          if (this.gs.result) break;
+          if (durchlauf > 0) {
+            this.log('resource_phase_repeat', {
+              player: this.gs.players[activeP]?.username, run: durchlauf + 1, of: wiederholung.n + 1,
+            });
+            if (wiederholung.quelle) {
+              await this.showTriggeredEffect(wiederholung.quelle, {
+                playerIdx: activeP, source: `resource-repeat:${this.gs.turn}:${durchlauf}`,
+              });
+            }
+          }
+          // Hand-reaction window for Resource-Phase-start cards (Idol of
+          // Crestina, etc.). These opt in via `isResourcePhaseReaction`
+          // and may set `gs._skipResourceDraw` from inside their resolve
+          // to replace the standard draw with their own effect.
+          await this._checkResourcePhaseReactions(activeP);
+          // Draw 1 card (unless an Idol-style reaction replaced it).
+          // `_isResourceDraw: true` flags this as the standard auto-draw
+          // so listeners (Analyzer / Gatherer) can skip it — they only
+          // count effect-induced draws / tutors.
+          if (!this.gs._skipResourceDraw) {
+            await this.actionDrawCards(activeP, 1, { _isResourceDraw: true });
+          }
+          delete this.gs._skipResourceDraw;
+          delete this.gs._resourcePhaseLocked;
+          await this._delay(150);
+          // Gain 4 Gold — als AUTOMATISCHES Einkommen markiert, damit
+          // Effekte, die auf "Gold durch einen Effekt" reagieren, es
+          // ueberspringen koennen (Monkee-Archetyp).
+          await this.actionGainGold(activeP, 4, { _isResourceGain: true });
+          // Auto-advance after hooks
+          await this.runHooks(HOOKS.ON_PHASE_END, { phase: phaseName, phaseIndex: phase });
         }
-        delete this.gs._skipResourceDraw;
-        delete this.gs._resourcePhaseLocked;
-        await this._delay(150);
-        // Gain 4 Gold — als AUTOMATISCHES Einkommen markiert, damit
-        // Effekte, die auf "Gold durch einen Effekt" reagieren, es
-        // ueberspringen koennen (Monkee-Archetyp).
-        await this.actionGainGold(activeP, 4, { _isResourceGain: true });
-        // Auto-advance after hooks
-        await this.runHooks(HOOKS.ON_PHASE_END, { phase: phaseName, phaseIndex: phase });
         await this._delay(200);
         await this.runPhase(PHASES.MAIN1);
         break;
