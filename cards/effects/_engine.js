@@ -45924,16 +45924,6 @@ this._deathWatch = (this._deathWatchStack || []).length
           outData = { ...outData, [p + 'Owner']: akt.heroOwner };
         }
       }
-      // DIAG-ANIM (temporaer)
-      if (process.env.PP_ANIM_DIAG) {
-        const d = outData;
-        const verdacht = Object.keys(d).filter(k => /Owner$|^owner$|^playerIdx$|^ownerIdx$/.test(k) && d[k] === akt.pi).filter(k => {
-          const base = k === 'owner' || k === 'playerIdx' || k === 'ownerIdx' ? '' : k.slice(0, -5);
-          const hk = base ? base + 'HeroIdx' : 'heroIdx';
-          return d[hk] === akt.heroIdx;
-        });
-        if (verdacht.length) require('fs').appendFileSync(process.env.PP_ANIM_DIAG, ['[anim-verdacht]', event, JSON.stringify(d).slice(0, 300), 'akteur', JSON.stringify(akt), 'karte', this._currentEffectSource?.cardName || this._activationSource?.cardName || '?'].join(' ') + '\n');
-      }
       // Eine Karte in einer Support Zone animiert ihren EIGENEN Platz.
       if (akt.zoneSlot != null && outData.owner === akt.pi
           && outData.heroIdx === akt.heroIdx && outData.zoneSlot === akt.zoneSlot) {
