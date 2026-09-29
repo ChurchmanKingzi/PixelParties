@@ -14949,7 +14949,7 @@
     "subtype": "",
     "level": null,
     "hp": 450,
-    "atk": 80,
+    "atk": 100,
     "cost": null,
     "effect": "Whenever this Hero takes damage from an opponent's card or effect or from a negative status effect inflicted by your opponent, you may search your deck for any card, reveal it, and add it to your hand.",
     "archetype": "",
