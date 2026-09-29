@@ -545,6 +545,13 @@ module.exports = {
       setupBorrowedFriendship(ctx);
     },
 
+    // Styx 28.9.: nach einer Uebernahme (Lizbeth selbst oder ein Held, von
+    // dem sie leiht) Leihgaben neu berechnen.
+    onTakeControl: (ctx) => {
+      recomputeFighting(ctx);
+      setupBorrowedFriendship(ctx);
+    },
+
     onCardEnterZone: (ctx) => {
       // Fighting recompute when any Fighting joins any ability zone.
       if (ctx.toZone === 'ability' && ctx.enteringCard?.name === 'Fighting') {

@@ -8594,12 +8594,13 @@ async function doActivateFreeAbility(room, pi, { heroIdx, zoneIdx, zoneKind, cha
   // Lizbeth/Smugbeth borrow: the slot lives on opponent's hero but the
   // activation runs on the borrower's side. Validate via the engine
   // helper; reject if no borrower covers this slot.
-  let borrowerHeroIdx = null;
+  let borrowerHeroIdx = null, borrowerOwner = pi;
   if (borrowedFromOwner != null) {
     if (charmedOwner != null) return false;
     const borrow = room.engine._getAbilityBorrowerForOppSlot(pi, borrowedFromOwner, heroIdx, zoneIdx);
     if (!borrow) return false;
     borrowerHeroIdx = borrow.borrowerHeroIdx;
+    borrowerOwner = borrow.borrowerOwner ?? pi;   // Styx 28.9.: Seite des Leihers
   }
 
   const heroOwner = borrowedFromOwner != null
@@ -8660,9 +8661,9 @@ async function doActivateFreeAbility(room, pi, { heroIdx, zoneIdx, zoneKind, cha
       // hand cards, etc.) hit the activator instead of the source side.
       checkCtx.cardOwner = pi;
       checkCtx.cardController = pi;
-      checkCtx.cardHeroOwner = pi;
+      checkCtx.cardHeroOwner = borrowerOwner;
       checkCtx.cardHeroIdx = borrowerHeroIdx;
-      checkCtx.attachedHero = gs.players[pi]?.heroes?.[borrowerHeroIdx];
+      checkCtx.attachedHero = gs.players[borrowerOwner]?.heroes?.[borrowerHeroIdx];
     }
     if (!script.canFreeActivate(checkCtx, level)) return false;
   }
@@ -8725,9 +8726,9 @@ async function doActivateFreeAbility(room, pi, { heroIdx, zoneIdx, zoneKind, cha
       // borrower hero on the activator's side. Restored after the
       // free-activate finishes (success OR cancel).
       inst.controller = pi;
-      inst.owner = pi;
+      inst.owner = borrowerOwner;   // Styx 28.9.: Spalte des Leihers
       inst.heroIdx = borrowerHeroIdx;
-      inst.heroOwner = pi;
+      inst.heroOwner = borrowerOwner;
     }
 
     gs._pendingCardReveal = { cardName: abilityName, ownerIdx: pi };
@@ -9411,12 +9412,13 @@ async function doActivateAbility(room, pi, { heroIdx, zoneIdx, zoneKind, charmed
   // hero but the activation runs on the borrower's side. Validate via
   // the engine's borrow check; reject if no borrower covers this slot.
   // The borrower's heroIdx is what becomes the activation context.
-  let borrowerHeroIdx = null;
+  let borrowerHeroIdx = null, borrowerOwner = pi;
   if (borrowedFromOwner != null) {
     if (charmedOwner != null) return false; // charm + borrow combo not supported
     const borrow = room.engine._getAbilityBorrowerForOppSlot(pi, borrowedFromOwner, heroIdx, zoneIdx);
     if (!borrow) return false;
     borrowerHeroIdx = borrow.borrowerHeroIdx;
+    borrowerOwner = borrow.borrowerOwner ?? pi;   // Styx 28.9.: Seite des Leihers
   }
 
   const heroOwner = borrowedFromOwner != null
@@ -9625,9 +9627,9 @@ async function doActivateAbility(room, pi, { heroIdx, zoneIdx, zoneKind, charmed
       // attached to the borrower's hero on the activator's side. The
       // script's `ctx.cardOwner / cardHeroIdx / attachedHero` then route
       // benefits to the activator. Restored after onActivate returns.
-      inst.controller = pi; inst.owner = pi;
+      inst.controller = pi; inst.owner = borrowerOwner;   // Styx 28.9.
       inst.heroIdx = borrowerHeroIdx;
-      inst.heroOwner = pi;
+      inst.heroOwner = borrowerOwner;
     }
 
     // Live CPU: announce the ability before its effect resolves

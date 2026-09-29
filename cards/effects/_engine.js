@@ -37985,9 +37985,10 @@ this._deathWatch = (this._deathWatchStack || []).length
         // borrowing from THIS specific opponent hero. The helper does the
         // full per-borrower / per-source eligibility walk.
         let borrowed = false;
-        const ps2 = this.gs.players[playerIdx];
-        for (let bhi = 0; bhi < (ps2?.heroes || []).length; bhi++) {
-          const sources = this._getAbilityBorrowSources(playerIdx, bhi, 'active');
+        // Styx 28.9.: Leiher = Helden, die `playerIdx` KONTROLLIERT (auch
+        // eine geliehene Lizbeth auf der Gegenseite).
+        for (const { physOwner: bSeite, heroIdx: bhi } of this.heroesControlledBy(playerIdx)) {
+          const sources = this._getAbilityBorrowSources(bSeite, bhi, 'active');
           if (sources.some(s => s.playerIdx === oi && s.heroIdx === hi)) {
             borrowed = true; break;
           }
@@ -38023,10 +38024,9 @@ this._deathWatch = (this._deathWatchStack || []).length
    *  have ANY borrower-hero active right now? Avoids the per-slot
    *  per-borrower walk when no Lizbeth / Smugbeth is in play. */
   _anyBorrowerActive(playerIdx) {
-    const ps = this.gs.players[playerIdx];
-    if (!ps) return false;
-    for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-      if (this._getAbilityBorrowSources(playerIdx, hi, 'active').length > 0) return true;
+    // Styx 28.9.: alle Helden, die `playerIdx` kontrolliert
+    for (const { physOwner, heroIdx: hi } of this.heroesControlledBy(playerIdx)) {
+      if (this._getAbilityBorrowSources(physOwner, hi, 'active').length > 0) return true;
     }
     return false;
   }
@@ -39560,9 +39560,10 @@ this._deathWatch = (this._deathWatchStack || []).length
         if (hero.controlledBy === playerIdx && hero.charmedBy == null) continue;
 
         let borrowed = false;
-        const ps2 = this.gs.players[playerIdx];
-        for (let bhi = 0; bhi < (ps2?.heroes || []).length; bhi++) {
-          const sources = this._getAbilityBorrowSources(playerIdx, bhi, 'active');
+        // Styx 28.9.: Leiher = Helden, die `playerIdx` KONTROLLIERT (auch
+        // eine geliehene Lizbeth auf der Gegenseite).
+        for (const { physOwner: bSeite, heroIdx: bhi } of this.heroesControlledBy(playerIdx)) {
+          const sources = this._getAbilityBorrowSources(bSeite, bhi, 'active');
           if (sources.some(s => s.playerIdx === oi && s.heroIdx === hi)) {
             borrowed = true; break;
           }
@@ -39916,15 +39917,20 @@ this._deathWatch = (this._deathWatchStack || []).length
    * @returns {Array<{playerIdx:number, heroIdx:number}>}
    */
   _getAbilityBorrowSources(playerIdx, heroIdx, mode) {
-    if ((this.gs.activePlayer ?? -1) !== playerIdx) return [];
+    // Styx 28.9.: `playerIdx` ist die Brettseite des Leihers. Geliehen wird
+    // von den Helden, die der GEGNER SEINES KONTROLLEURS kontrolliert —
+    // ein geliehener Held des Kontrolleurs zaehlt nicht, ein vom Gegner
+    // uebernommener eigener schon.
+    const leiher = this.gs.players[playerIdx]?.heroes?.[heroIdx];
+    const kontrolleur = leiher ? this.heroSideOf(playerIdx, leiher) : playerIdx;
+    if ((this.gs.activePlayer ?? -1) !== kontrolleur) return [];
     if (!this._heroCanAct(playerIdx, heroIdx)) return [];
     if (!this._heroBorrowsAbilities(playerIdx, heroIdx, mode)) return [];
-    const oppIdx = playerIdx === 0 ? 1 : 0;
-    const ops = this.gs.players[oppIdx];
-    if (!ops) return [];
+    const oppIdx = kontrolleur === 0 ? 1 : 0;
+    if (!this.gs.players[oppIdx]) return [];
     const out = [];
-    for (let hi = 0; hi < (ops.heroes || []).length; hi++) {
-      if (this._heroCanAct(oppIdx, hi)) out.push({ playerIdx: oppIdx, heroIdx: hi });
+    for (const { physOwner, heroIdx: hi } of this.heroesControlledBy(oppIdx)) {
+      if (this._heroCanAct(physOwner, hi)) out.push({ playerIdx: physOwner, heroIdx: hi });
     }
     return out;
   }
@@ -40065,17 +40071,17 @@ this._deathWatch = (this._deathWatchStack || []).length
    */
   _getAbilityBorrowerForOppSlot(activatingPi, sourcePi, sourceHeroIdx, sourceZoneIdx) {
     if (sourcePi === activatingPi) return null; // not a borrow
-    const ps = this.gs.players[activatingPi];
-    if (!ps) return null;
-    for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-      const sources = this._getAbilityBorrowSources(activatingPi, hi, 'active');
+    // Styx 28.9.: Leiher = Helden, die der Aktivierende kontrolliert;
+    // `borrowerOwner` = deren Brettseite (geliehene Lizbeth → Gegenseite).
+    for (const { physOwner, heroIdx: hi } of this.heroesControlledBy(activatingPi)) {
+      const sources = this._getAbilityBorrowSources(physOwner, hi, 'active');
       for (const src of sources) {
         if (src.playerIdx === sourcePi && src.heroIdx === sourceHeroIdx) {
           // Confirm the slot itself exists and is non-empty — the
           // activation path will fail anyway, but bailing here gives
           // a cleaner false return to the click handler.
           const opSlot = this.gs.players[sourcePi]?.abilityZones?.[sourceHeroIdx]?.[sourceZoneIdx];
-          if (opSlot && opSlot.length > 0) return { borrowerHeroIdx: hi };
+          if (opSlot && opSlot.length > 0) return { borrowerHeroIdx: hi, borrowerOwner: physOwner };
         }
       }
     }
