@@ -1,15 +1,16 @@
 {
   "hero": "Luna, the Flame Fairy",
   "sheet": "luna-the-flame-fairy.png",
-  "frameWidth": 26,
-  "frameHeight": 32,
+  "frameWidth": 30,
+  "frameHeight": 35,
   "frames": 48,
   "frameMs": 90,
   "loop": true,
   "layout": "horizontal",
-  "padTop": 4,
-  "padLeft": 4,
-  "padRight": 4,
+  "padTop": 7,
+  "padLeft": 6,
+  "padRight": 6,
   "padBottom": 4,
-  "faceX": 12.5
+  "faceX": 14.5,
+  "footY": 31
 }

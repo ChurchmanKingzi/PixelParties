@@ -1,0 +1,15 @@
+{
+  "hero": "Luna Pele, the Flame Dancer",
+  "sheet": "luna-pele-the-flame-dancer.png",
+  "frameWidth": 32,
+  "frameHeight": 41,
+  "frames": 48,
+  "frameMs": 90,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 7,
+  "padLeft": 5,
+  "padRight": 5,
+  "padBottom": 2,
+  "faceX": 17.0
+}

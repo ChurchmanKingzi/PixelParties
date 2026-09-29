@@ -1,0 +1,16 @@
+{
+  "hero": "Taio, the Sun Fencer",
+  "sheet": "taio-the-sun-fencer.png",
+  "frameWidth": 35,
+  "frameHeight": 52,
+  "frames": 48,
+  "frameMs": 90,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 10,
+  "padLeft": 6,
+  "padRight": 6,
+  "padBottom": 2,
+  "faceX": 15.5,
+  "footY": 50
+}
