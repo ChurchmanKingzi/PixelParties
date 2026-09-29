@@ -149,11 +149,31 @@ def f_arnold(i):
     b = B24[i % 24]
     out = np.zeros((H, W, 4), int)
     draw_bounce(out, s, b, KNEE, PT, PL)
+    body = (SRC[:, :, 3] > 0) & ~gill
     for k, m in enumerate(components(np.where(gill[:, :, None], SRC, 0))):
-        ph = 1.7 * k
-        dy = round(0.9 * math.sin(4 * t + ph) - 0.9 * math.sin(ph))
-        for y, x in zip(*np.nonzero(m)):
-            dot(out, x + PL, y + dy + PT + b, rgb(AR_GILL))
+        ys, xs = np.nonzero(m)                            # die Kieme bleibt am Kopf: wo sie ihn berührt,
+        pts = set(zip(xs.tolist(), ys.tolist()))          # steht sie still, zur Spitze hin wippt sie stärker
+        dist = {(x, y): 0 for x, y in pts
+                if any(0 <= y + dy < SH and 0 <= x + dx < SW and body[y + dy, x + dx]
+                       for dx in (-1, 0, 1) for dy in (-1, 0, 1))}
+        todo, parent = list(dist), {}
+        while todo:                                       # Abstand entlang der Kieme (Breitensuche)
+            x, y = todo.pop(0)
+            for dx in (-1, 0, 1):
+                for dy in (-1, 0, 1):
+                    q = (x + dx, y + dy)
+                    if q in pts and q not in dist:
+                        dist[q] = dist[(x, y)] + 1
+                        parent[q] = (x, y)
+                        todo.append(q)
+        far = max(dist.values(), default=0)
+        w = math.sin(4 * t + 1.7 * k) - math.sin(1.7 * k)
+        new = {p_: (p_[0], p_[1] + (round(1.2 * dist[p_] / far * w) if far and p_ in dist else 0)) for p_ in pts}
+        for p_, (x, y) in new.items():
+            if p_ in parent:                              # nie abreißen: zum Vorgänger hin lückenlos verbinden
+                qx, qy = new[parent[p_]]
+                line(out, x + PL, y + PT + b, qx + PL, qy + PT + b, rgb(AR_GILL))
+            dot(out, x + PL, y + PT + b, rgb(AR_GILL))
     return out
 
 
@@ -243,31 +263,38 @@ def f_teppes(i):
 
 
 # ---------------------------------------------------------------- Shu'Chaku
-SC_GLITCH = {10: 2, 11: -1, 30: -2, 31: 1, 44: 1}
+SC_GLITCH = {10: 3, 11: -2, 23: 2, 30: -3, 31: 2, 44: 2}
+SC_BLINK = {'halb': [((7, 24), '335d77'), ((8, 24), '4d899a'), ((11, 24), None), ((12, 24), None)],
+            'zu': [((7, 24), '335d77'), ((8, 24), '4d899a'), ((11, 24), None), ((12, 24), None),
+                   ((7, 25), '000818'), ((8, 25), '000818'), ((11, 25), '000818'), ((12, 25), '000818')]}
 
 
 def f_shuchaku(i):
-    """Die Projektion schwebt, das rote Glühen pulsiert, die Augen leuchten auf; ab und zu flackert sie
-    (ein Zeilenband verrutscht kurz)."""
+    """Die Projektion schwebt und blinzelt (das weiße und das gelbe Quadrat sind ihre Augen). Das rote
+    Licht neben ihr ist ein verzerrter Lichteffekt: seine Zeilen wabern ständig gegeneinander, es pulsiert,
+    und ab und zu reißt ein Zeilenband ruckartig zur Seite (Bildstörung) – die schuppige Seite bleibt ruhig."""
     t = 2 * math.pi * i / N
     glow, body = load('glow'), load('body')
+    body = body.copy()
+    st = BLINK.get(i)
+    if st:
+        for (x, y), c in SC_BLINK[st]:
+            body[y, x] = rgb(c) if c else 0
     dy = -round(2.0 * math.sin(t))
-    pulse = 0.75 + 0.35 * math.sin(2 * t)
+    pulse = 1.05 + 0.3 * math.sin(3 * t)
+    band = SC_GLITCH.get(i, 0)
+    by0 = 8 + (i * 11) % 34
     out = np.zeros((H, W, 4), int)
     for y, x in zip(*np.nonzero(glow[:, :, 3])):
+        sx = round(1.4 * math.sin(0.45 * y + 3 * t) + 0.9 * math.sin(1.3 * y - 5 * t))   # Verzerrung
+        if by0 <= y < by0 + 5:
+            sx += band
         c = glow[y, x].copy()
-        c[3] = min(255, int(c[3] * pulse))
-        blend(out, x + PL, y + PT + dy, c)
-    band = SC_GLITCH.get(i, 0)
-    by0 = 15 + (i * 7) % 20
+        c[3] = min(255, int(c[3] * pulse * (0.85 + 0.15 * math.sin(0.7 * y - 4 * t))))
+        if x + sx >= 9:                                    # das Licht bleibt rechts der Gestalt
+            blend(out, x + sx + PL, y + PT + dy, c)
     for y, x in zip(*np.nonzero(body[:, :, 3])):
-        sx = band if by0 <= y < by0 + 4 else 0
-        c = body[y, x]
-        if hexc(c) == 'f6ffff' or (c[0] > 200 and c[1] > 200 and c[2] < 150):
-            lvl = 0.5 + 0.5 * math.sin(3 * t)
-            if lvl > 0.7 and hexc(c) != 'f6ffff':
-                c = rgb('ffffc8')
-        dot(out, x + sx + PL, y + PT + dy, c)
+        dot(out, x + PL, y + PT + dy, body[y, x])
     return out
 
 
