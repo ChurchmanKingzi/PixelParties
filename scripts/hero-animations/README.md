@@ -308,6 +308,12 @@ kopiert, daneben liegt eine JSON-Datei mit den Metadaten. Die erzeugten
 | `deepsea_late.py` | `final 90 teppesman` | `teppesman_idle_final_sheet.png` | `teppesman-the-deepsea-knight` |
 | `deepsea_late.py` | `final 90 shuchaku` | `shuchaku_idle_final_sheet.png` | `shu-chaku-the-blood-moon-projection` |
 | `deepsea_late.py` | `final 90 waflav` | `waflav_idle_final_sheet.png` | `deep-drowned-waflav` |
+| `motive_late.py` | `final 90 peszet` | `peszet_idle_final_sheet.png` | `peszet-the-plague-bringer` |
+| `motive_late.py` | `final 90 notandras` | `notandras_idle_final_sheet.png` | `definitely-not-andras-the-human-weapon` |
+| `motive_late.py` | `final 90 megaandras` | `megaandras_idle_final_sheet.png` | `mega-weapon-andras` |
+| `motive_late.py` | `final 90 champmizune` | `champmizune_idle_final_sheet.png` | `regional-champ-mizune` |
+| `motive_late.py` | `final 90 storyteller` | `storyteller_idle_final_sheet.png` | `chuck-the-storyteller` |
+| `motive_late.py` | `final 90 gueldefaber` | `gueldefaber_idle_final_sheet.png` | `g-ldefaber-of-the-fellowship` |
 
 `bubbles.py` ohne `gross` erzeugt eine auf Hero-Größe verkleinerte Variante
 (Sprite aus `bubbles_downscale.py`), die aktuell nicht verwendet wird.
@@ -348,7 +354,7 @@ python3 xcf_extract.py MotiveMoe.xcf assemble src/cute-princess-mary.png "Mary-K
 | MotiveHawaii-Heroes | `MotiveHawaii.xcf` | reproduzierbar per `python3 assemble_hawaii.py <MotiveHawaii.xcf>` (Zuordnung im Skriptkopf; Base-Taios Beine aus „Taio-Kopie“, seine Hand am Griff als `-hand`; Ascended Taio mit Base-Taios um 180° gedrehtem Flammenschwert; Waflavs Feuerflügel als `-wings`; Calamitusks Banner als `-banner`) |
 | MotiveIndia-Heroes | `MotiveIndia.xcf` | reproduzierbar per `python3 assemble_india.py <MotiveIndia.xcf>` (Zuordnung im Skriptkopf; die übrigen Ebenen sind Kreaturen, Puppen und Rennboote; Zamorins Glasschale und Sack als `-bowl`/`-sack`) |
 | MotiveJapan-Heroes | `MotiveJapan.xcf` | reproduzierbar per `python3 assemble_japan.py <MotiveJapan.xcf>` (Zuordnung im Skriptkopf; Champions Schwert und Hand als `-sword`/`-hand`, Nobunakins Laserschwert und Hand ebenso; die Idej-Ebenen werden voll deckend übernommen, die Transparenz setzt `hologram.py`) |
-| Motive-Heroes und -Skins | `Motive.xcf` | reproduzierbar per `python3 assemble_motive.py <Motive.xcf>` (Zuordnung im Skriptkopf; die Datei braucht `xcf_scan.patch_gimpformats`; bewegliche Teile als `-<teil>.png`: Sol Ryms Wolke `-cloud`, Chucks Sprechblase `-bubble`, Elanas Gitarre und Arme `-guitar`/`-arms`, ZsosSsars Gaswaffe `-gun`, Molindas Flügel `-wings`, Sas'Zas Bogen `-bow`) |
+| Motive-Heroes und -Skins | `Motive.xcf` | reproduzierbar per `python3 assemble_motive.py <Motive.xcf>` (Zuordnung im Skriptkopf; die Datei braucht `xcf_scan.patch_gimpformats`; bewegliche Teile als `-<teil>.png`: Sol Ryms Wolke `-cloud`, Chucks Sprechblase `-bubble`, Elanas Gitarre und Arme `-guitar`/`-arms`, ZsosSsars Gaswaffe `-gun`, Molindas Flügel `-wings`, Sas'Zas Bogen `-bow`, Pes'zets Schlangenarme `-arml`/`-armr`, Chuck the Storytellers Teile `-girl`/`-chair`/`-hands`/`-hand`/`-idea`; `g-ldefaber-of-the-fellowship.png` gibt es in keiner Ebene mehr – er ist aus dem Kartenbild rekonstruiert) |
 
 Neue Datei durchsuchen: `xcf_scan.py dump` legt alle Ebenen einzeln ab,
 `xcf_scan.py match <ordner> --heroes` gleicht sie mit allen noch nicht

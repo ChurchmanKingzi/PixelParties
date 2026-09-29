@@ -1,0 +1,16 @@
+{
+  "hero": "Güldefaber of the Fellowship",
+  "sheet": "g-ldefaber-of-the-fellowship.png",
+  "frameWidth": 24,
+  "frameHeight": 24,
+  "frames": 48,
+  "frameMs": 90,
+  "loop": true,
+  "layout": "horizontal",
+  "skinOf": "Güldefaber, the King of Dwarfs",
+  "padTop": 3,
+  "padLeft": 3,
+  "padRight": 3,
+  "padBottom": 1,
+  "faceX": 12.0
+}

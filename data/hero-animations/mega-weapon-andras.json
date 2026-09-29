@@ -1,0 +1,16 @@
+{
+  "hero": "Mega-Weapon Andras",
+  "sheet": "mega-weapon-andras.png",
+  "frameWidth": 39,
+  "frameHeight": 31,
+  "frames": 48,
+  "frameMs": 90,
+  "loop": true,
+  "layout": "horizontal",
+  "skinOf": "Andras, the Human Weapon",
+  "padTop": 3,
+  "padLeft": 8,
+  "padRight": 7,
+  "padBottom": 1,
+  "faceX": 20.0
+}

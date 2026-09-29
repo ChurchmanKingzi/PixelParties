@@ -1,0 +1,15 @@
+{
+  "hero": "Pes'zet, the Plague Bringer",
+  "sheet": "peszet-the-plague-bringer.png",
+  "frameWidth": 67,
+  "frameHeight": 35,
+  "frames": 48,
+  "frameMs": 90,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 3,
+  "padLeft": 14,
+  "padRight": 13,
+  "padBottom": 1,
+  "faceX": 33.5
+}
