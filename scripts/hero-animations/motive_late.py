@@ -8,9 +8,9 @@ Frame 0 ist immer die Ruhepose.
 * peszet:   Pes'zet, the Plague Bringer federt; seine beiden Schlangenarme bewegen sich unabhängig von
             ihm (spaltentreu geschert, an der Schulter fest – sie bleiben immer mit ihm verbunden), reißen
             die Mäuler auf und stoßen grünes Giftgas aus.
-* notandras: Definitely not Andras, the Human Weapon feuert reihum aus allen vier Rohren: Mündungsblitz,
-            die Kugel fliegt seitlich davon, das Rohr glüht nach.
-* megaandras: Mega-Weapon Andras federt, die gelben Schulterlichter blinken, die Leuchten am Rumpf glühen.
+* notandras: Definitely not Andras, the Human Weapon feuert im Dauerfeuer aus allen vier Rohren (oft mehrere
+            zugleich): Mündungsblitz, die Kugel fliegt schräg in Rohrrichtung davon; die Sonnenbrille blitzt.
+* megaandras: Mega-Weapon Andras federt und blinzelt, aus den Löchern in seinen Fäusten steigt Rauch.
 * champmizune: Regional Champ Mizune (Augen geschlossen) atmet, ihr Mantel wogt, um sie kreisen und
             spritzen Wassertropfen.
 * storyteller: Chuck, the Storyteller erzählt: der Mund geht im Redefluss auf und zu, die Hand gestikuliert,
@@ -32,8 +32,8 @@ BLINK = {14: 'halb', 15: 'zu', 16: 'zu', 17: 'halb', 38: 'halb', 39: 'zu', 40: '
 
 V_ = {
     'peszet': dict(slug='peszet-the-plague-bringer', knee=21, pads=(14, 13, 3, 1)),
-    'notandras': dict(slug='definitely-not-andras-the-human-weapon', knee=19, pads=(16, 16, 12, 14)),
-    'megaandras': dict(slug='mega-weapon-andras', knee=19, pads=(3, 3, 3, 1), skin='Andras, the Human Weapon'),
+    'notandras': dict(slug='definitely-not-andras-the-human-weapon', knee=19, pads=(16, 18, 13, 15)),
+    'megaandras': dict(slug='mega-weapon-andras', knee=19, pads=(8, 7, 3, 1), skin='Andras, the Human Weapon'),
     'champmizune': dict(slug='regional-champ-mizune', knee=17, pads=(6, 7, 3, 2), skin='Silent Water Mizune'),
     'storyteller': dict(slug='chuck-the-storyteller', pads=(3, 5, 4, 4)),
     'gueldefaber': dict(slug='g-ldefaber-of-the-fellowship', knee=16, pads=(3, 3, 3, 1),
@@ -142,10 +142,6 @@ def peszet_arms(i, b):
             moved[jaw] = 0
             for y, x in zip(*np.nonzero(jaw)):
                 moved[y + 1, x] = a[y, x]
-            inner = range(1, 3) if side < 0 else range(SW - 3, SW - 1)
-            for x in inner:
-                if jaw[13, x]:
-                    moved[13, x] = rgb('690000')          # der offene Schlund
             a = moved
         m = a[:, :, 3] > 0
         shear_flap(a, m & ((_xs < PZ_PIVOT[side]) if side < 0 else (_xs > PZ_PIVOT[side])), PZ_PIVOT[side], side,
@@ -190,7 +186,8 @@ def f_peszet(i):
 
 
 # ---------------------------------------------------------------- Definitely not Andras
-NA_BARRELS = [(2, 7, -1, -1, 0), (31, 7, 1, -1, 12), (9, 22, -1, 1, 24), (24, 22, 1, 1, 36)]  # Mündung, Richtung, Start
+NA_BARRELS = [(2, 7, -1, -1, 0), (31, 7, 1, -1, 2), (9, 22, -1, 1, 4), (24, 22, 1, 1, 1)]  # Mündung, Richtung, Phase
+NA_EVERY = 6                                            # jedes Rohr feuert alle 6 Frames – oft mehrere zugleich
 NA_FLASH = {0: [(0, 0, 'ffffff'), (1, 1, 'fff6a0'), (1, 0, 'ffd23c'), (0, 1, 'ffd23c'), (2, 2, 'ffd23c')],
             1: [(0, 0, 'fff6a0'), (1, 1, 'ff8a1e'), (1, 0, 'ff8a1e'), (0, 1, 'ff8a1e')],
             2: [(0, 0, 'ff8a1e')]}
@@ -198,7 +195,7 @@ NA_LENS = {'c41616', 'ca1b16', '901010'}
 
 
 def f_notandras(i):
-    """Er feuert reihum aus allen vier Kanonenrohren (je Rohr zwei Schüsse pro Loop): Mündungsblitz, die
+    """Er feuert im Dauerfeuer aus allen vier Kanonenrohren (jedes Rohr alle 6 Frames, oft mehrere zugleich): Mündungsblitz, die
     Kugel fliegt schräg in Rohrrichtung davon (oben nach oben außen, unten nach unten außen), die Mündung
     glüht nach, der Rumpf zuckt beim Rückstoß; über die Sonnenbrille blitzt ein Glanz."""
     s = SRC.copy()
@@ -213,25 +210,23 @@ def f_notandras(i):
     b = B24[i % 24]
     kick = 0
     for bx, by, sx, sy, st in NA_BARRELS:
-        for rep in (0, 6):
-            if (i - st - rep) % N == 0:
-                kick = -sx
+        if (i - st) % NA_EVERY == 0:
+            kick = -sx
     out = np.zeros((H, W, 4), int)
     draw_bounce(out, s, b, KNEE, PT, PL, dx_fn=(lambda x, y: kick) if kick else None)
     for bx, by, sx, sy, st in NA_BARRELS:
-        for rep in (0, 6):
-            a = (i - st - rep) % N
+        for a in ((i - st) % NA_EVERY, (i - st) % NA_EVERY + NA_EVERY):   # auch die vorige Kugel fliegt noch
             ex = bx + PL + kick + sx
             ey = by + PT + (b if by < KNEE else 0) + sy
-            if a in NA_FLASH:
+            if a in NA_FLASH and a < NA_EVERY:
                 for dx, dy, c in NA_FLASH[a]:
                     dot(out, ex + sx * dx, ey + sy * dy, rgb(c))
-            if 1 <= a < 6:                                # die Kugel mit kurzer Leuchtspur, schräg
-                x, y = ex + sx * (1 + 3 * a), ey + sy * (1 + 3 * a)
+            if 1 <= a < 5:                                # die Kugel mit kurzer Leuchtspur, schräg und schnell
+                x, y = ex + sx * (1 + 4 * a), ey + sy * (1 + 4 * a)
                 dot(out, x, y, rgb('fff6a0'))
                 dot(out, x - sx, y - sy, rgb('ffd23c'))
                 dot(out, x - 2 * sx, y - 2 * sy, rgb('ff8a1e', 160))
-            if a < 8:                                     # die Mündung glüht nach
+            if a < 4:                                     # die Mündung glüht nach
                 dot(out, bx + PL + kick, by + PT + (b if by < KNEE else 0), rgb('ffb440' if a < 4 else 'ff5020'))
     return out
 
@@ -241,18 +236,30 @@ MA_BLINK = {'halb': [((x, 10), '311800') for x in (9, 10, 13, 14)],
             'zu': [((x, 10), 'f5ce88') for x in (9, 10, 13, 14)] + [((x, 11), '311800') for x in (9, 10, 13, 14)]}
 
 
+MA_HOLES = [(2, 15, -1), (5, 15, -1), (1, 16, -1), (18, 15, 1), (21, 15, 1), (22, 16, 1)]   # Löcher in den Fäusten
+MA_SMOKE = ['bdb8b0', 'a39f98', '8b8781', '76736e']
+
+
 def f_megaandras(i):
-    """Er federt und blinzelt, die gelben Lichter an Schultern und Brust pulsieren gemeinsam."""
+    """Er federt und blinzelt; aus den Löchern in seinen Fäusten steigt Rauch auf und zieht nach außen weg."""
     s = SRC.copy()
     blink(s, i, MA_BLINK)
-    f = 0.75 + 0.25 * math.cos(2 * math.pi * 4 * i / N)
-    for y, x in zip(*np.nonzero(s[:, :, 3])):
-        c = s[y, x]
-        if c[0] > 200 and c[1] > 180 and c[2] < 120:      # gelbe Lichter
-            s[y, x] = [int(c[0] * f), int(c[1] * f), int(c[2] * f), 255]
     b = B24[i % 24]
     out = np.zeros((H, W, 4), int)
     draw_bounce(out, s, b, KNEE, PT, PL)
+    for k, (hx, hy, side) in enumerate(MA_HOLES):
+        for rep in range(2):
+            a = (i - 5 * k - 24 * rep) % N
+            if a < 18:
+                x = hx + PL + side * (0.35 * a + 0.5 * math.sin(0.7 * a + k))
+                y = hy + PT + (b if hy < KNEE else 0) - 0.8 * a
+                r = 0.5 + 0.08 * a
+                al = max(40, 200 - 9 * a)
+                for yy in range(int(y - 2), int(y + 3)):
+                    for xx in range(int(x - 2), int(x + 3)):
+                        if math.hypot(xx - x, yy - y) <= r and 0 <= xx < W and 0 <= yy < H and \
+                                (a < 3 or not out[yy, xx, 3] or out[yy, xx, 3] < 255):
+                            blend(out, xx, yy, rgb(MA_SMOKE[min(3, a // 5)], al))
     return out
 
 
@@ -305,26 +312,23 @@ ST_GIRL = {'halb': [((x, 7), '413704') for x in (24, 25, 28, 29)],
 
 BED_X0, BED_X1 = 17, 36                                 # das Bettgestell (neu gezeichnet, Holz wie der Stuhl)
 BED_WOOD = ('2d1a0c', '6b4424', '8a5a2c', 'a8723a')     # Kontur, dunkel, mittel, hell
+BED_TOP = 12                                            # hier wird das Bettzeug breit: darüber kein Gestell
 
 
 def bed(out, layer):
-    """Bettgestell: hinten das Kopfteil mit zwei Pfosten (hinter ihr), vorn das Fußteil vor der Decke,
-    darunter die Beine."""
+    """Bettgestell: zwei Pfosten mit Knäufen, die erst dort beginnen, wo das Bettzeug breit wird (hinter
+    ihr), vorn das Fußteil vor der Decke, darunter die Beine."""
     k, d, m, hl = (rgb(c) for c in BED_WOOD)
     if layer == 'back':
-        for y in range(2, 25):                            # Pfosten
+        for y in range(BED_TOP + 1, 25):                  # Pfosten
             for x in (BED_X0, BED_X1):
                 dot(out, x + PL, y + PT, k)
             for x in (BED_X0 + 1, BED_X1 - 1):
-                dot(out, x + PL, y + PT, d if y > 3 else m)
+                dot(out, x + PL, y + PT, d if y > BED_TOP + 2 else m)
         for x in range(BED_X0 - 1, BED_X0 + 3):           # Knäufe
-            dot(out, x + PL, 1 + PT, k if x in (BED_X0 - 1, BED_X0 + 2) else hl)
+            dot(out, x + PL, BED_TOP + PT, k if x in (BED_X0 - 1, BED_X0 + 2) else hl)
         for x in range(BED_X1 - 2, BED_X1 + 2):
-            dot(out, x + PL, 1 + PT, k if x in (BED_X1 - 2, BED_X1 + 1) else hl)
-        for y in range(4, 11):                            # Kopfteil zwischen den Pfosten
-            for x in range(BED_X0 + 2, BED_X1 - 1):
-                c = k if y in (4, 10) else (hl if y == 5 else (m if (x + y) % 5 else d))
-                dot(out, x + PL, y + PT, c)
+            dot(out, x + PL, BED_TOP + PT, k if x in (BED_X1 - 2, BED_X1 + 1) else hl)
     else:
         for y in range(21, 25):                           # Fußteil vor der Decke
             for x in range(BED_X0, BED_X1 + 1):
