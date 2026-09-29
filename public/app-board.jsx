@@ -1805,7 +1805,15 @@ function DraggablePanel({ children, className, style, zielwahl }) {
       const rand = 4;
       const x = Math.max(r.width / 2 + rand, Math.min(window.innerWidth - r.width / 2 - rand, m.x - versatz));
       const y = Math.max(r.height / 2 + rand, Math.min(window.innerHeight - r.height / 2 - rand, m.y));
-      const luecke = Math.round(m.breite + 8);
+      // ★ v1490 (Als Nachfrage 29.9.: „Ist der Button/sind die Buttons in
+      // diesem Fall zufällig nicht mittig auf der x-Achse angeordnet? Falls
+      // dem so sein sollte, kannst du diese einfach umplatzieren."): Die
+      // Knöpfe flankieren den mittleren Helden. Bei nur 4 px Abstand je
+      // Seite ragte ihr deckender 10-px-Rand (`ZW_KNOPF_RAND`) 6 px über den
+      // Helden, dort blieb die Box über einer Karte deckend. Jetzt reicht
+      // die Lücke für Rand + 8 px je Seite; die 8 px decken auch die
+      // Hover-Vergrößerung des Helden (scale ≈ 1,15 → ≈ 5 px je Seite).
+      const luecke = Math.round(m.breite + 2 * (ZW_KNOPF_RAND + 8));
       setAutoPos(prev => (prev && Math.abs(prev.x - x) < 1 && Math.abs(prev.y - y) < 1 && prev.luecke === luecke) ? prev : { x: Math.round(x), y: Math.round(y), luecke });
     };
     const plane = () => { if (!raf) raf = requestAnimationFrame(setze); };
