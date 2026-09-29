@@ -23551,7 +23551,8 @@ body.pp-dialog-offen .foil-diamond-rare:not(.modal-overlay *) {
 }
 /* ★ v1488 (Als Vorgabe 29.9.: Box überall verschiebbar, wo sie deckend
    ist und kein Knopf unter dem Zeiger liegt): Das Skript setzt
-   `data-greifbar`, solange der Zeiger im deckenden Rand um die Knöpfe
+   `data-greifbar`, solange der Zeiger im deckenden Teil (★ v1489: überall,
+   wo keine Karte darunter liegt) und nicht auf einem Knopf
    steht — dann nimmt der ganze Körper den Zeiger an (erbt auf die
    Kinder), ein Mausdruck startet das Ziehen. */
 .first-choice-panel.panel-zielwahl[data-greifbar] {
