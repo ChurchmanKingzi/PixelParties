@@ -1,0 +1,16 @@
+{
+  "hero": "Grisgar, Emissary of the Demon Lord",
+  "sheet": "grisgar-emissary-of-the-demon-lord.png",
+  "frameWidth": 180,
+  "frameHeight": 82,
+  "frames": 48,
+  "frameMs": 90,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 14,
+  "padLeft": 2,
+  "padRight": 2,
+  "padBottom": 14,
+  "faceX": 90.0,
+  "footY": 68
+}

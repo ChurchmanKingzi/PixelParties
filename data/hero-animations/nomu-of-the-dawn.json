@@ -1,0 +1,16 @@
+{
+  "hero": "Nomu of the Dawn",
+  "sheet": "nomu-of-the-dawn.png",
+  "frameWidth": 30,
+  "frameHeight": 29,
+  "frames": 48,
+  "frameMs": 90,
+  "loop": true,
+  "layout": "horizontal",
+  "skinOf": "Nomu, Wanderer of Worlds",
+  "padTop": 3,
+  "padLeft": 3,
+  "padRight": 11,
+  "padBottom": 1,
+  "faceX": 11.0
+}

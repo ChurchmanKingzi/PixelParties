@@ -1,0 +1,15 @@
+{
+  "hero": "Ida, the Adept of Destruction",
+  "sheet": "ida-the-adept-of-destruction.png",
+  "frameWidth": 32,
+  "frameHeight": 37,
+  "frames": 48,
+  "frameMs": 90,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 11,
+  "padLeft": 5,
+  "padRight": 5,
+  "padBottom": 1,
+  "faceX": 16.0
+}

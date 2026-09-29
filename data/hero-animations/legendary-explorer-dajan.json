@@ -1,0 +1,15 @@
+{
+  "hero": "Legendary Explorer Dajan",
+  "sheet": "legendary-explorer-dajan.png",
+  "frameWidth": 33,
+  "frameHeight": 31,
+  "frames": 48,
+  "frameMs": 90,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 5,
+  "padLeft": 3,
+  "padRight": 5,
+  "padBottom": 1,
+  "faceX": 18.0
+}

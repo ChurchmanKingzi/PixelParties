@@ -1,0 +1,17 @@
+{
+  "hero": "Beato the Golden Witch",
+  "sheet": "beato-the-golden-witch.png",
+  "frameWidth": 40,
+  "frameHeight": 38,
+  "frames": 48,
+  "frameMs": 90,
+  "loop": true,
+  "layout": "horizontal",
+  "skinOf": "Beato, the Butterfly Witch",
+  "padTop": 6,
+  "padLeft": 8,
+  "padRight": 8,
+  "padBottom": 5,
+  "faceX": 20.0,
+  "footY": 33
+}

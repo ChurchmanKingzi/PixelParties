@@ -1,0 +1,17 @@
+{
+  "hero": "One Chuck Man",
+  "sheet": "one-chuck-man.png",
+  "frameWidth": 29,
+  "frameHeight": 40,
+  "frames": 48,
+  "frameMs": 90,
+  "loop": true,
+  "layout": "horizontal",
+  "skinOf": "Chuck, the Crazy Veteran",
+  "padTop": 3,
+  "padLeft": 3,
+  "padRight": 3,
+  "padBottom": 4,
+  "faceX": 8.0,
+  "footY": 36
+}

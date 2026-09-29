@@ -1,0 +1,15 @@
+{
+  "hero": "Omikron, the Faceless Illusionist",
+  "sheet": "omikron-the-faceless-illusionist.png",
+  "frameWidth": 54,
+  "frameHeight": 31,
+  "frames": 48,
+  "frameMs": 90,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 4,
+  "padLeft": 16,
+  "padRight": 16,
+  "padBottom": 1,
+  "faceX": 27.0
+}

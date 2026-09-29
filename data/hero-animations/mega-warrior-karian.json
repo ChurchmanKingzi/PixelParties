@@ -1,0 +1,16 @@
+{
+  "hero": "Mega-Warrior Karian",
+  "sheet": "mega-warrior-karian.png",
+  "frameWidth": 32,
+  "frameHeight": 29,
+  "frames": 48,
+  "frameMs": 90,
+  "loop": true,
+  "layout": "horizontal",
+  "skinOf": "Grand Inquisitor Karian",
+  "padTop": 3,
+  "padLeft": 4,
+  "padRight": 4,
+  "padBottom": 1,
+  "faceX": 16.0
+}

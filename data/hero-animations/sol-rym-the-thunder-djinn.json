@@ -1,0 +1,16 @@
+{
+  "hero": "Sol Rym, the Thunder Djinn",
+  "sheet": "sol-rym-the-thunder-djinn.png",
+  "frameWidth": 85,
+  "frameHeight": 50,
+  "frames": 48,
+  "frameMs": 90,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 6,
+  "padLeft": 2,
+  "padRight": 2,
+  "padBottom": 14,
+  "faceX": 43.0,
+  "footY": 36
+}

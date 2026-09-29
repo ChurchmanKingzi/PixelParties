@@ -1,0 +1,16 @@
+{
+  "hero": "Duke Omikron",
+  "sheet": "duke-omikron.png",
+  "frameWidth": 54,
+  "frameHeight": 32,
+  "frames": 48,
+  "frameMs": 90,
+  "loop": true,
+  "layout": "horizontal",
+  "skinOf": "Omikron, the Faceless Illusionist",
+  "padTop": 4,
+  "padLeft": 16,
+  "padRight": 16,
+  "padBottom": 1,
+  "faceX": 27.0
+}

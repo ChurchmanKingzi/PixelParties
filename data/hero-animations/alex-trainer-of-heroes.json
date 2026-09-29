@@ -1,0 +1,15 @@
+{
+  "hero": "Alex, Trainer of Heroes",
+  "sheet": "alex-trainer-of-heroes.png",
+  "frameWidth": 20,
+  "frameHeight": 30,
+  "frames": 48,
+  "frameMs": 90,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 3,
+  "padLeft": 2,
+  "padRight": 2,
+  "padBottom": 1,
+  "faceX": 11.0
+}

@@ -1,0 +1,17 @@
+{
+  "hero": "Ida the Fire Princess",
+  "sheet": "ida-the-fire-princess.png",
+  "frameWidth": 30,
+  "frameHeight": 42,
+  "frames": 48,
+  "frameMs": 90,
+  "loop": true,
+  "layout": "horizontal",
+  "skinOf": "Ida, the Adept of Destruction",
+  "padTop": 11,
+  "padLeft": 6,
+  "padRight": 6,
+  "padBottom": 3,
+  "faceX": 15.0,
+  "footY": 39
+}

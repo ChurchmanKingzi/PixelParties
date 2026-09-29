@@ -1,0 +1,2429 @@
+# -*- coding: utf-8 -*-
+"""Idle-Animationen für die Heroes und Skins aus Motive.xcf.
+
+Aufruf: python3 motive.py <tag> [ms] <variante>
+
+Frame 0 ist immer die Ruhepose.
+
+* alex:     Alex, Trainer of Heroes federt (der verschränkte Unterarm geht als Einheit mit) und blinzelt.
+* doq:      Great Detective Doq federt; das durch die Lupe riesige Auge blinzelt, über das Glas huscht
+            ein Glanzlicht, dann blitzt ein Stern am Rand.
+* grisgar:  Grisgar schlägt langsam mit den riesigen Dämonenflügeln (spaltentreue Scherung) und
+            schwebt dabei auf und ab; der Heiligenschein schwingt nach und glüht, er blinzelt.
+* nieht:    Nieht, the Blitz Blade: an den Klingen knistern Blitze, die Funkelsterne neben ihm
+            pulsieren, Capezipfel und Haarspitzen wehen, er federt und blinzelt; zweimal je Loop ist
+            er blitzschnell weg (Tempolinien, Staub) und taucht von der anderen Seite wieder auf.
+* kohta:    Kohta, the Silent Observer sitzt, redet (der Mund geht auf und zu) und hebt ab und zu
+            sein Glas; Glas und Flasche sprudeln, über die Flasche läuft ein Glanz.
+* bill:     Bill, the Angry Auctioneer brüllt (Mund), schüttelt abwechselnd die Fäuste, ihm steigt
+            Dampf aus dem Kopf; er blinzelt.
+* sabrina:  Sabrina, the Psychic Witch: ihre grünen Augen glühen auf, psychische Lichtkugeln
+            umkreisen sie (hinter ihr verschwinden sie ganz), sie atmet und blinzelt.
+* bartas:   Bomb Berserker Bartas schlägt alle 12 Frames die Fäuste in der Mitte zusammen, hinter ihm knallen kleine
+            Explosionen und steigt Glut auf; er atmet und blinzelt.
+* gon:      Gon, the Frostbringer hebt und senkt langsam beide Arme (auch den gefrorenen), Schnee rieselt
+            um ihn, Eisnebel zieht vorbei, auf der gefrorenen Seite blitzen Eiskristalle.
+* ida:      Ida, the Adept of Destruction steht in einer lodernden Flammenaura (Farbfolge fest, nur
+            die Form lodert), Funken stieben, sie atmet und blinzelt.
+* vacarn:   Vacarn kichert (Mund auf und zu), seine roten Augen glühen, das rote Cape weht, um ihn
+            steigen Seelen auf.
+* solrym:   Sol Rym steigt samt Gewitterwolke langsam auf und ab; er steckt in ihr (der Unterkörper verblasst nach unten), er spricht und
+            blinzelt; die Wolke wallt (Bäusche quellen oben und unten auf
+            und sinken zusammen, innen rollt sie), zweimal zuckt ein Blitz heraus.
+* dajan:    Legendary Explorer Dajan atmet und blinzelt, der Edelstein in seiner Hand funkelt, der
+            Schalzipfel pendelt.
+* omikron:  Omikron, the Faceless Illusionist: links und rechts tauchen unregelmäßig Trugbilder mit
+            Bildfehlern und rot glühenden Augen auf; die grauen Haare wehen wild, das Monokel blitzt,
+            er hebt und senkt die Arme.
+Skins:
+* idafire:  Ida the Fire Princess sitzt in ihrem Flammenbett (neu gezeichnet wie Base-Ida: umhüllt sie
+            nach unten, schlägt nach oben in Zungen hoch, strikte Farbfolge), von unten lecken Zungen
+            über sie; alles steigt langsam auf und ab, sie blinzelt.
+* chuck:    One Chuck Man: die OK-Blase schwebt umher, verschwindet und ploppt wieder auf, der Umhang rechts wogt am
+            Saum, er blinzelt.
+* duke:     Duke Omikron: wie Omikron (Trugbilder mit Bildfehlern, wehende Haare, Monokel).
+* alice:    Alice the Wonderous Girl liegt im Bett, blinzelt, die Schleifen zucken, die Haarsträhnen
+            wiegen sich, um sie funkeln Sterne.
+* megakarian: Mega-Warrior Karian: der Umhang (unter den Schulterplatten) weht, er atmet und blinzelt.
+* settdunk: Sett Dunking on You schwebt, die Tentakel wabern, die Kapuzenspitze schwingt nach, das
+            türkise Auge leuchtet und funkelt.
+* emperor:  Emperor Arthor atmet und blinzelt, der Edelstein an seiner Hand leuchtet und funkelt.
+* yellowflash: Nieht the Yellow Flash: Cape und Haare wehen, er blinzelt; zweimal je Loop ist er im
+            gelben Blitz weg und im gelben Blitz wieder da.
+
+* mizune:   Silent Water Mizune spricht; um ihn steigen viele Wasserblasen auf, wachsen und platzen;
+            er atmet und blinzelt.
+"""
+import math
+import os
+import sys
+import numpy as np
+from PIL import Image
+from anim_common import rgb, save_outputs, BOUNCE12, sparkle_pixels, draw_bounce, ring8
+from flap_common import shear_flap, rotate_part
+
+N = 48
+OUT = os.environ.get('MO_OUT', '.')
+BLINK = {14: 'halb', 15: 'zu', 16: 'zu', 17: 'halb', 38: 'halb', 39: 'zu', 40: 'zu', 41: 'halb'}
+B24 = [BOUNCE12[(k // 2) % 12] for k in range(24)]  # gemächlich: ein Federn je 24 Frames
+
+
+def eyes(blocks, skin, line='000000'):
+    """Augen aus Blöcken (x0, x1, y_oben, y_unten): halb = obere Zeile dunkel, zu = obere Zeile Haut,
+    untere Zeile als dunkle Linie."""
+    halb, zu = [], []
+    for x0, x1, yt, yb in blocks:
+        for x in range(x0, x1 + 1):
+            halb.append(((x, yt), line))
+            zu += [((x, yt), skin), ((x, yb), line)]
+    return {'halb': halb, 'zu': zu}
+
+
+V_ = {
+    'alex': dict(slug='alex-trainer-of-heroes', knee=22, pads=(2, 2, 3, 1),
+                 blink=eyes([(6, 7, 9, 10), (10, 11, 9, 10)], 'f6bd7b')),
+    'doq': dict(slug='great-detective-doq', knee=20, pads=(3, 2, 3, 1)),
+    'grisgar': dict(slug='grisgar-emissary-of-the-demon-lord', pads=(2, 2, 14, 14),
+                    blink={'halb': [((86, 34), '110f08'), ((89, 34), '110f08')],
+                           'zu': [((x, 34), '110f08') for x in (85, 86, 89, 90)]}),
+    'nieht': dict(slug='nieht-the-blitz-blade', knee=20, pads=(4, 4, 3, 1),
+                  blink=eyes([(19, 20, 10, 11), (23, 24, 10, 11)], 'fde1d2')),
+    'kohta': dict(slug='kohta-the-silent-observer', knee=19, pads=(2, 2, 3, 1)),
+    'bill': dict(slug='bill-the-angry-auctioneer', knee=16, pads=(6, 6, 13, 1),
+                 blink=eyes([(5, 5, 5, 6), (10, 10, 5, 6)], 'b45f3d')),
+    'sabrina': dict(slug='sabrina-the-psychic-witch', knee=19, pads=(8, 8, 4, 2),
+                    blink=eyes([(7, 8, 7, 8), (11, 12, 7, 8)], 'cc9d7c')),
+    'mizune': dict(slug='silent-water-mizune', knee=19, pads=(6, 6, 8, 1),
+                   blink=eyes([(6, 7, 9, 10), (10, 11, 9, 10)], 'f5ce88')),
+    'bartas': dict(slug='bomb-berserker-bartas', knee=20, pads=(11, 11, 11, 1),
+                   blink=eyes([(4, 4, 5, 6), (9, 9, 5, 6)], 'f6bd7b')),
+    'gon': dict(slug='gon-the-frostbringer', knee=20, pads=(5, 5, 4, 1)),
+    'ida': dict(slug='ida-the-adept-of-destruction', knee=21, pads=(5, 5, 11, 1),
+                blink=eyes([(8, 9, 6, 7), (12, 13, 6, 7)], 'f6cd8b')),
+    'vacarn': dict(slug='vacarn-the-dark-goblin-necromancer', knee=18, pads=(4, 4, 10, 1),
+                   blink={'halb': [((8, 5), '2f312e'), ((13, 5), '2f312e'), ((8, 4), '2f312e'), ((13, 4), '2f312e')],
+                          'zu': [((x, 5), '000200') for x in (8, 9, 12, 13)] +
+                                [((8, 4), '2f312e'), ((13, 4), '2f312e')]}),
+    'solrym': dict(slug='sol-rym-the-thunder-djinn', pads=(2, 2, 6, 14),
+                   blink={'halb': [((x, 8), '000000') for x in (38, 39, 42, 43)],
+                          'zu': [((x, 7), '2a44af') for x in (38, 39, 42, 43)] +
+                                [((x, 8), '000000') for x in (38, 39, 42, 43)]}),
+    'dajan': dict(slug='legendary-explorer-dajan', knee=20, pads=(3, 5, 5, 1),
+                  blink=eyes([(12, 13, 8, 9), (16, 17, 8, 9)], 'd9ba8d', line='170f14')),
+    'omikron': dict(slug='omikron-the-faceless-illusionist', knee=20, pads=(16, 16, 4, 1)),
+    'idafire': dict(slug='ida-the-fire-princess', pads=(6, 6, 11, 3), skin='Ida, the Adept of Destruction',
+                    blink=eyes([(6, 7, 11, 12), (10, 11, 11, 12)], 'd2a077')),
+    'chuck': dict(slug='one-chuck-man', pads=(3, 3, 3, 4), skin='Chuck, the Crazy Veteran',
+                  blink={'halb': [((5, 17), '6b6760')],       # das Auge: schwarz + weiß in Zeile 17
+                         'zu': [((5, 17), '00020b')]}),
+    'duke': dict(slug='duke-omikron', knee=21, pads=(16, 16, 4, 1), skin='Omikron, the Faceless Illusionist',
+                 hair={'3e0403', 'cd0000', '70090a', '95050e'}, monocle=10, hands=[], hairrows=14),
+    'alice': dict(slug='alice-the-wonderous-girl', knee=15, pads=(7, 7, 6, 1), skin='Alice, the Puppeteer Girl',
+                  blink=eyes([(4, 5, 9, 10), (8, 9, 9, 10)], 'f5ce88', line='311700')),
+    'megakarian': dict(slug='mega-warrior-karian', knee=20, pads=(4, 4, 3, 1), skin='Grand Inquisitor Karian',
+                       blink=eyes([(9, 10, 8, 9), (13, 14, 8, 9)], 'ffe6d5', line='311800')),
+    'settdunk': dict(slug='sett-dunking-on-you', pads=(3, 3, 3, 3), skin='Sett, the Adept of Necromancy'),
+    'emperor': dict(slug='emperor-arthor', knee=22, pads=(3, 7, 3, 1), skin='Arthor, the King of Blackport',
+                    blink=eyes([(6, 7, 6, 7), (10, 11, 6, 7)], 'ffd5a4', line='291201')),
+    'yellowflash': dict(slug='nieht-the-yellow-flash', knee=20, pads=(4, 4, 5, 2), skin='Nieht, the Blitz Blade',
+                        blink=eyes([(19, 20, 10, 11), (23, 24, 10, 11)], 'fde1d2', line='000200')),
+    'beatogold': dict(slug='beato-the-golden-witch', pads=(8, 8, 6, 5), skin='Beato, the Butterfly Witch',
+                      blink=eyes([(9, 10, 10, 11), (13, 14, 10, 11)], 'fce7d6', line='000200')),
+    'fiona': dict(slug='fiona-the-ghost-princess', pads=(9, 9, 4, 1), skin='Fiona, the Princess of Blackport',
+                  blink=eyes([(7, 8, 14, 15), (11, 12, 14, 15)], 'ffe6d5', line='312408')),
+    'overlord': dict(slug='overlord-baaliel', knee=22, pads=(3, 3, 8, 1), skin='Baaliel, the Demon General'),
+    'greymage': dict(slug='grey-mage-archibald', pads=(8, 3, 3, 1), skin='Archibald the Archmage',
+                     blink={'halb': [((x, 15), '7b7b7b') for x in (5, 6, 9, 10)],
+                            'zu': [((x, 15), 'f6bd7b') for x in (5, 6, 9, 10)]}),   # Lid: dunkle Linie darüber
+    'battlemaniac': dict(slug='toras-the-battle-maniac', pads=(3, 3, 5, 4), skin='Toras, Master of all Weapons',
+                         blink={'halb': [((10, 13), '9a9594')], 'zu': [((9, 13), '000000'), ((10, 13), '000000')]}),
+    'wormsoldier': dict(slug='zsosssar-the-worm-soldier', pads=(20, 3, 8, 1), skin='ZsosSsar the Serpent Warlord',
+                        blink=eyes([(17, 18, 7, 8), (23, 24, 7, 8)], 'f99269')),
+    'diva': dict(slug='elana-the-digital-diva', pads=(7, 7, 5, 1), skin='Elana, the Rocky Rebel'),
+    'holystyx': dict(slug='holy-styx', pads=(4, 4, 6, 4), skin='Styx, the Gate to the Spirit World'),
+    'kaito': dict(slug='kaito-sid-the-phantom-thief', pads=(6, 7, 3, 1), skin='Sid, the King of Thieves',
+                  blink={'halb': [((10, 13), '5a6a80')], 'zu': [((10, 13), '1c1c1c')]}),
+    'halffrozen': dict(slug='gon-the-half-frozen', knee=18, pads=(6, 5, 7, 1), skin='Gon, the Frostbringer',
+                       blink={'halb': [((9, 6), '12090a'), ((10, 6), '12090a')],
+                              'zu': [((9, 6), 'fee8d7'), ((10, 6), 'fee8d7'), ((9, 7), '12090a'), ((10, 7), '12090a')]}),
+    'molinda': dict(slug='dead-singer-molinda', pads=(11, 11, 8, 3), skin='Cute Angel Molinda'),
+    'seaserpent': dict(slug='the-little-seaserpent', pads=(9, 7, 10, 5), skin='SasZa the Snaka Adventurer',
+                       blink=eyes([(6, 7, 9, 10), (10, 11, 9, 10)], 'fdd6ad', line='311800')),
+    'nomudawn': dict(slug='nomu-of-the-dawn', knee=22, pads=(3, 11, 3, 1), skin='Nomu, Wanderer of Worlds'),
+    'alienbartas': dict(slug='alien-invader-bartas', knee=19, pads=(9, 9, 8, 1), skin='Bomb Berserker Bartas',
+                        blink=eyes([(4, 5, 6, 7)], 'f8bc77', line='292114')),
+    'tharx': dict(slug='tharx-the-king-of-conquerors', knee=22, pads=(3, 3, 8, 1), skin='Tharx, the Never-Losing General',
+                  blink=eyes([(8, 9, 6, 7)], 'f5ce88', line='220000')),
+}
+V = next((v for v in sys.argv[2:] if v in V_), 'alex')
+C = V_[V]
+SLUG = C['slug']
+
+
+def load(part=None):
+    n = f'src/{SLUG}-{part}.png' if part else f'src/{SLUG}.png'
+    return np.array(Image.open(n).convert('RGBA')).astype(int)
+
+
+SRC = load() if V != 'solrym' else None
+if SRC is None:                                         # Sol Rym: Djinn + Wolke deckungsgleich
+    SRC = load('body')
+SH, SW = SRC.shape[:2]
+KNEE = C.get('knee', SH)
+PL, PR, PT, PB = C['pads']
+H, W = SH + PT + PB, SW + PL + PR
+_ys, _xs = np.mgrid[0:SH, 0:SW]
+
+
+def hexc(c):
+    return '%02x%02x%02x' % tuple(int(v) for v in c[:3])
+
+
+def blink(s, i):
+    st = BLINK.get(i)
+    if st and 'blink' in C:
+        for (x, y), c in C['blink'][st]:
+            s[y, x] = rgb(c)
+
+
+def dot(out, x, y, c):
+    if 0 <= y < out.shape[0] and 0 <= x < out.shape[1]:
+        out[y, x] = c
+
+
+def lighten(c, f):
+    return [int(c[k] + (255 - c[k]) * f) for k in range(3)] + [int(c[3])]
+
+
+def bounce_frame(s, b):
+    out = np.zeros((H, W, 4), int)
+    draw_bounce(out, s, b, KNEE, PT, PL)
+    return out
+
+
+def sweep(s, mask, i, start, dur=6, slope=1.0, width=0.8, col='ffffff', trail='d8e8f0'):
+    """Glanzlicht: ein schräger Streifen läuft von links nach rechts über die Pixel in mask."""
+    g = i - start
+    if not 0 <= g < dur:
+        return
+    ys, xs = np.nonzero(mask)
+    lo, hi = (xs - slope * ys).min(), (xs - slope * ys).max()
+    c = lo - 1 + (hi - lo + 3) * g / (dur - 1)
+    for y, x in zip(ys, xs):
+        d = (x - slope * y) - c
+        if abs(d) < width:
+            s[y, x] = rgb(col)
+        elif -2.2 < d < 0:
+            s[y, x] = rgb(trail)
+
+
+# ---------------------------------------------------------------- Alex
+def f_alex(i):
+    s = SRC.copy()
+    blink(s, i)
+    return bounce_frame(s, B24[i % 24])
+
+
+# ---------------------------------------------------------------- Doq
+LENS = {'a8c9e6', 'b5bbb7', 'c5c7b2', 'd1cdb7', 'a3b3aa', 'e4d38b', 'e2c27f', 'a0917a', 'e4d58d', 'e0d28c',
+        '8b8a7a', 'e2cdb3', 'e9d2b5', 'aa987d', 'a1927b', '586875', '4a6174', '4d626f', '405c6b', '97a49b',
+        '516474', '556675', '4e6373', '35566b', 'cec0a9', 'e6d1b6', 'ab977b', '9f9079'}
+
+
+RIM = {'001f5e', '0353b8', '033277', '023c85'}
+
+
+def f_doq(i):
+    s = SRC.copy()
+    st = BLINK.get(i)                                   # das durch die Lupe riesige Auge (x 6–9, Zeilen 10–13)
+    if st:                                              # blinzelt: das Lid kommt von oben
+        for y in range(10, 14 if st == 'zu' else 12):
+            for x in range(6, 10):
+                last = y == (13 if st == 'zu' else 11)
+                s[y, x] = rgb('35566b' if last else ('d9c6aa' if (x + y) % 3 else 'cbb89c'))
+    lens = np.array([[SRC[y, x, 3] > 0 and hexc(SRC[y, x]) in LENS and x <= 12 and y <= 15
+                      for x in range(SW)] for y in range(SH)])
+    sweep(s, lens, i, 4, dur=7, slope=-0.8, col='ffffff', trail='e8f4ff')
+    sweep(s, lens, i, 28, dur=7, slope=-0.8, col='ffffff', trail='e8f4ff')
+    b = B24[i % 24]
+    out = bounce_frame(s, b)
+    for (x, y), c in sparkle_pixels(i, N, [(10 + PL, 4 + PT + b, 10), (2 + PL, 12 + PT + b, 34)],
+                                    rgb('e8f4ff'), rgb('a8c9e6')).items():
+        dot(out, x, y, c)
+    return out
+
+
+# ---------------------------------------------------------------- Grisgar
+WING_L, WING_R = 81, 96                                 # Flügelwurzeln (links bis 81, rechts ab 96)
+HALO_ROWS = (20, 24)
+
+
+def f_grisgar(i):
+    s = SRC.copy()
+    blink(s, i)
+    t = 2 * math.pi * 2 * i / N                         # zwei langsame Schläge je Loop
+    lift = 0.12 * math.sin(t)
+    squeeze = 1.0 - 0.08 * max(0.0, math.sin(t))
+    hover = -round(2.0 * math.sin(t - 0.9)) if i else 0  # der Abschlag trägt ihn nach oben
+    op = s[:, :, 3] > 0
+    halo = op & (_ys >= HALO_ROWS[0]) & (_ys < HALO_ROWS[1]) & (_xs > WING_L) & (_xs < WING_R)
+    wl = op & (_xs <= WING_L)
+    wr = op & (_xs >= WING_R)
+    body = op & ~wl & ~wr & ~halo
+    out = np.zeros((H, W, 4), int)
+    wings = np.zeros_like(out)
+    shear_flap(s, wl, WING_L, -1, lift, squeeze, wings, (PL, PT + hover), curve=1.3)
+    shear_flap(s, wr, WING_R, 1, lift, squeeze, wings, (PL, PT + hover), curve=1.3)
+    m = wings[:, :, 3] > 0
+    out[m] = wings[m]
+    for y, x in zip(*np.nonzero(body)):
+        out[y + PT + hover, x + PL] = s[y, x]
+    lag = -round(2.0 * math.sin(t - 1.8)) if i else 0   # der Heiligenschein schwingt nach und glüht
+    glow = 0.5 - 0.5 * math.cos(2 * math.pi * 3 * i / N)
+    for y, x in zip(*np.nonzero(halo)):
+        out[y + PT + lag, x + PL] = lighten(s[y, x], 0.45 * glow)
+    return out
+
+
+# ---------------------------------------------------------------- Nieht
+CROSSES = [(6, 12, 0), (42, 12, 5)]                     # Funkelsterne (Mitte, Phase)
+BLADES = [(0, 17, 'l'), (31, 39, 'r')]                  # Klingen: Spalten, Zeilen 16–17
+ZAPS = {5: (3, 1), 6: (4, 1), 18: (33, 2), 19: (34, 2), 29: (8, 3), 30: (9, 3), 41: (36, 4), 42: (35, 4)}
+
+
+def cross(out, cx, cy, arm, ox, oy):
+    dot(out, cx + ox, cy + oy, rgb('ffffff'))
+    for k in range(1, arm + 1):
+        for dx, dy in ((k, 0), (-k, 0), (0, k), (0, -k)):
+            dot(out, cx + dx + ox, cy + dy + oy, rgb('ffffff' if k < arm else 'dadace'))
+
+
+BLADE_COLS = {'7a7975', 'ccccc4', 'f6f6f6', 'dadace'}
+
+
+def cape_flutter(out, s, i, b):
+    """Die Capezipfel links und rechts flattern: je Zeile schiebt sich die Spitze nach außen und zurück
+    (eine Welle läuft von oben nach unten), das Cape selbst bleibt darunter liegen – nichts reißt."""
+    t = 2 * math.pi * i / N
+    env = 0.5 - 0.5 * math.cos(2 * t)
+    for side, xs in ((-1, range(0, 13)), (1, range(32, SW))):
+        for y in list(range(11, 16)) + [18, 19]:
+            dx = round(2.2 * env * (0.5 + 0.5 * math.sin(6 * t - 0.9 * (y - 11) + (0 if side < 0 else 1.7))))
+            if not dx:
+                continue
+            for x in xs:
+                if s[y, x, 3] and hexc(s[y, x]) not in BLADE_COLS:
+                    xx = x + side * dx + PL
+                    if 0 <= xx < W and (not out[y + PT + b, xx, 3] or hexc(out[y + PT + b, xx]) not in BLADE_COLS):
+                        out[y + PT + b, xx] = s[y, x]
+
+
+GONE = {5: 'streak', 6: 'dust', 7: 'dust', 8: 'dust', 9: 'none', 10: 'back',
+        27: 'streak', 28: 'dust', 29: 'dust', 30: 'dust', 31: 'none', 32: 'none', 33: 'back'}
+STREAK_ROWS = [3, 8, 12, 16, 20, 23]
+
+
+def hair_sway(s, i, base):
+    """Haarspitzen oberhalb von Zeile base wiegen sich: je Zeile ein Versatz, oben am stärksten."""
+    t = 2 * math.pi * i / N
+    raw = [round(1.8 * (base - y) / base * math.sin(3 * t - 0.5 * y) * (0.5 - 0.5 * math.cos(2 * t) if i else 0))
+           for y in range(base, -1, -1)]
+    dxs = clamp_chain(raw)[::-1]
+    out = s.copy()
+    for y in range(0, base):
+        if dxs[y]:
+            row = s[y].copy()
+            out[y] = 0
+            for x in np.nonzero(row[:, 3])[0]:
+                if 0 <= x + dxs[y] < s.shape[1]:
+                    out[y, x + dxs[y]] = row[x]
+    return out
+
+
+def nieht_hair(s, i):
+    """Die Haarspitzen (Zeilen 0–5) wiegen sich: je Zeile ein Versatz, oben am stärksten."""
+    t = 2 * math.pi * i / N
+    raw = [round(1.6 * (6 - y) / 6 * math.sin(3 * t - 0.5 * y) * (0.5 - 0.5 * math.cos(2 * t) if i else 0))
+           for y in range(6, -1, -1)]
+    dxs = clamp_chain(raw)[::-1]                      # Zeile 6 bleibt, darüber höchstens 1 px je Zeile
+    out = s.copy()
+    for y in range(0, 6):
+        if dxs[y]:
+            row = s[y].copy()
+            out[y] = 0
+            for x in np.nonzero(row[:, 3])[0]:
+                if 0 <= x + dxs[y] < SW:
+                    out[y, x + dxs[y]] = row[x]
+    return out
+
+
+def clamp_chain(vals):
+    out = [vals[0]]
+    for v in vals[1:]:
+        out.append(max(out[-1] - 1, min(out[-1] + 1, v)))
+    return out
+
+
+def streaks(out, b, side, alpha):
+    """Tempolinien, wo er eben noch war (side: -1 = zur linken Seite hin, +1 = zur rechten)."""
+    for k, y in enumerate(STREAK_ROWS):
+        L = 10 + 4 * (k % 3)
+        x0 = PL + SW // 2 + (2 if side > 0 else -2 - L) + (k % 2) * 3 * side
+        for x in range(x0, x0 + L):
+            a = alpha * (1 - abs((x - x0) - L / 2) / (L / 2 + 1))
+            if 0 <= x < W and not out[y + PT + b, x, 3]:    # hinter der Figur
+                out[y + PT + b, x] = rgb('f4f2e4', int(a))
+
+
+def f_nieht(i):
+    s = nieht_hair(SRC.copy(), i)
+    blink(s, i)
+    b = B24[i % 24]
+    for cx, cy, _ in CROSSES:                           # die Sterne selbst malt cross()
+        for yy in range(cy - 2, cy + 3):
+            for xx in range(cx - 2, cx + 3):
+                if s[yy, xx, 3] and hexc(s[yy, xx]) in ('ffffff', 'dadace'):
+                    s[yy, xx] = 0
+    gone = GONE.get(i)
+    if gone in ('streak', 'dust', 'none'):             # Ninja: blitzschnell weg …
+        out = np.zeros((H, W, 4), int)
+        if gone == 'streak':
+            streaks(out, b, 1, 230)
+        if gone == 'dust':
+            a = (i - 6) % 22 if i < 20 else i - 28
+            for k, dx in enumerate((-3, -1, 2, 4)):
+                x, y = PL + SW // 2 + dx + (k - 1) * a, PT + SH - 1 - a - (k % 2)
+                dot(out, x, y, rgb('c8c0a0', 200 - 60 * a))
+        return out
+    out = bounce_frame(s, b)
+    cape_flutter(out, s, i, b)
+    if gone == 'back':                                  # … und von links wieder da
+        streaks(out, b, -1, 170)
+    for cx, cy, ph in CROSSES:
+        arm = [2, 2, 2, 1, 1, 0, 1, 2][((i // 2) + ph) % 8]
+        cross(out, cx, cy, arm, PL, PT + b)
+    z = ZAPS.get(i)
+    if z:                                               # Blitz knistert an der Klinge entlang
+        x0, seed = z
+        rng = np.random.default_rng(seed)
+        y = 15 if seed % 2 else 18
+        for k in range(6):
+            x = x0 + k
+            yy = y + (int(rng.integers(0, 2)) * (1 if y == 18 else -1))
+            if not out[yy + PT + b, x + PL, 3]:
+                out[yy + PT + b, x + PL] = rgb('fff7a0' if k % 2 else 'ffffff')
+    return out
+
+
+# ---------------------------------------------------------------- Kohta
+TALK = [0, 0, 1, 1, 0, 1, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 1, 0, 1, 0, 0, 0, 0,
+        0, 0, 0, 1, 1, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 1, 0, 1, 1, 0, 0, 0, 0]
+SIP = {k: -1 for k in range(20, 30)}                    # er hebt das Glas
+GLASS = (7, 12, 9, 15)                                  # Glas mit Hand: x0, x1, y0, y1
+BOTTLE = (0, 4, 7, 19)
+
+
+LIQUID = {'b59631', 'ad8a29', 'cea652', 'deb263', 'd6c7bd', 'a59684'}
+BOTTLE_BUB = [(1, 0), (2, 5), (3, 10), (2, 15), (1, 19)]  # (Spalte, Startframe) – Bläschen in der Flasche
+GLASS_FIZZ = [(8, 0), (9, 3), (10, 6), (8, 9), (9, 12), (10, 15), (9, 18), (8, 21)]
+
+
+def fizz(out, i, b):
+    """Kohlensäure: in der Flasche steigen Bläschen durch das Getränk, über dem Glas perlen winzige
+    Tröpfchen hoch und zerplatzen."""
+    for x, st in BOTTLE_BUB:
+        a = (i - st) % 24
+        y = 18 - a // 2
+        if 12 <= y <= 18 and hexc(SRC[y, x]) in LIQUID:
+            out[y + PT, x + PL] = rgb('fff3c0')
+        elif y < 12 and a // 2 in (7, 8):                # oben im Hals kurz sichtbar
+            out[y + PT, x + PL] = rgb('fff7d8', 220)
+    for x, st in GLASS_FIZZ:
+        a = (i - st) % 24
+        if a < 5:
+            y = 8 - a                                     # über dem Glasrand (Zeile 9)
+            if not out[y + PT + b, x + PL, 3]:
+                out[y + PT + b, x + PL] = rgb('fffbe8', 230 - 40 * a)
+
+
+def f_kohta(i):
+    s = SRC.copy()
+    if TALK[i]:                                         # Mund zu
+        s[8, 16] = s[8, 17] = rgb('f6cd8b')
+        s[9, 16] = s[9, 17] = rgb('580000')
+    bot = np.zeros((SH, SW), bool)
+    bot[BOTTLE[2]:BOTTLE[3] + 1, BOTTLE[0]:BOTTLE[1] + 1] = True
+    bot &= np.array([[hexc(SRC[y, x]) in ('94aaad', '6b926b', '526d52', 'd6c7bd', 'a59684') and SRC[y, x, 3] > 0
+                      for x in range(SW)] for y in range(SH)])
+    sweep(s, bot, i, 30, dur=6, slope=0.0, col='f6ffff', trail='c8dcdc')
+    b = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1, -1, -1, -1, -1, -1, -1, 0, 0, 0, 0, 0, 0][i % 24]
+    b_ = b if i % 48 < 24 else 0
+    out = np.zeros((H, W, 4), int)
+    fig = s.copy()
+    fig[:, :5] = 0
+    draw_bounce(out, fig, b_, KNEE, PT, PL)
+    for y, x in zip(*np.nonzero(s[:, :5, 3])):          # die Flasche steht fest
+        out[y + PT, x + PL] = s[y, x]
+    fizz(out, i, b_)
+    lift = SIP.get(i, 0)
+    if lift:
+        x0, x1, y0, y1 = GLASS
+        for y in range(y0, y1 + 1):
+            for x in range(x0, x1 + 1):
+                if s[y, x, 3]:
+                    out[y + PT + b_ + lift, x + PL] = s[y, x]
+    return out
+
+
+# ---------------------------------------------------------------- Bill
+YELL = [0, 0, 0, 1, 1, 0, 1, 1, 1, 0, 0, 0, 0, 1, 1, 1, 0, 0, 1, 1, 0, 0, 0, 0,
+        0, 0, 1, 1, 1, 0, 1, 1, 0, 0, 0, 0, 1, 1, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0]
+FIST_L = (0, 3, 7, 13)
+FIST_R = (12, 15, 7, 13)
+STEAM = [(3, 0), (12, 5), (3, 12), (12, 18), (3, 25), (12, 30), (3, 37), (12, 42)]   # (Spalte, Startframe)
+
+
+def steam(out, x0, st, i, b):
+    """Dampfwolke: quillt seitlich oben aus dem Kopf, wächst, steigt schräg nach außen und verblasst."""
+    a = (i - st) % N
+    if a >= 14:
+        return
+    side = -1 if x0 < 8 else 1
+    x = x0 + PL + side * (1 + a // 3)
+    y = PT + b - 1 - (a * 2) // 3
+    al = int(240 * (1 - a / 15))
+    core, rim = rgb('ffffff', al), rgb('d8d8e0', int(al * 0.8))
+    if a < 3:
+        pts = {(0, 0): core}
+    elif a < 7:
+        pts = {(0, 0): core, (side, 0): rim, (0, -1): rim}
+    else:
+        pts = {(0, 0): core, (side, 0): core, (0, -1): rim, (side, -1): rim, (-side, 0): rim, (0, 1): rim}
+    for (dx, dy), c in pts.items():
+        dot(out, x + dx, y + dy, c)
+
+
+VEIN = [(11, 1), (12, 1), (11, 2), (13, 2), (12, 3)]    # Zornesader auf der Stirn (rechts oben)
+
+
+def f_bill(i):
+    s = SRC.copy()
+    blink(s, i)
+    if not YELL[i]:                                     # Mund zu (sonst weit offen)
+        s[9, 7] = s[9, 8] = rgb('292829')
+        s[10, 7] = s[10, 8] = rgb('933c18')
+    b = B24[i % 24]
+    out = bounce_frame(s, b)
+    shake = (i // 2) % 2 if YELL[i] else 0              # Fäuste abwechselnd hoch
+    for (x0, x1, y0, y1), up in ((FIST_L, shake), (FIST_R, 1 - shake if YELL[i] else 0)):
+        if not up:
+            continue
+        for y in range(y0, y1 + 1):
+            for x in range(x0, x1 + 1):
+                if s[y, x, 3]:
+                    out[y + PT + b - 1, x + PL] = s[y, x]
+    for x0, st in STEAM:
+        steam(out, x0, st, i, b)
+    if YELL[i] and (i // 3) % 2 == 0:                   # die Zornesader pocht
+        for x, y in VEIN:
+            dot(out, x + PL + 2, y + PT + b - 3, rgb('ff2020'))
+    return out
+
+
+# ---------------------------------------------------------------- Sabrina
+ORBS = [  # (Phase, Umläufe je Loop, Radius x-Zusatz, Radius y, Höhe, Farbe innen, Farbe außen)
+    (0.0, 2, 4.0, 3.0, 12, 'c8ffd0', '20ff3d'), (1.3, 2, 4.0, 3.0, 12, 'ece4ff', '9d8fff'),
+    (2.6, 2, 4.0, 3.0, 12, 'c8ffd0', '20ff3d'), (3.9, 2, 4.0, 3.0, 12, 'ece4ff', '9d8fff'),
+    (5.2, 2, 4.0, 3.0, 12, 'c8ffd0', '20ff3d'), (0.7, -1, 6.0, 2.0, 18, 'ece4ff', '9d8fff'),
+    (3.8, -1, 6.0, 2.0, 18, 'c8ffd0', '20ff3d'), (2.2, 1, 5.0, 2.0, 6, 'ece4ff', '9d8fff')]
+
+
+def f_sabrina(i):
+    s = SRC.copy()
+    blink(s, i)
+    glow = 0.5 - 0.5 * math.cos(2 * math.pi * 2 * i / N)
+    if not BLINK.get(i):
+        for y, x in zip(*np.nonzero((s[:, :, 3] > 0))):
+            if hexc(s[y, x]) == '20ff3d':
+                s[y, x] = lighten(s[y, x], 0.7 * glow)
+    b = B24[i % 24]
+    out = bounce_frame(s, b)
+    fig = out[:, :, 3] > 0
+    ring = ring8(fig) | fig
+    cx = PL + SW / 2 - 0.5
+    for ph, k, rx, ry, hy, c1, c2 in ORBS:
+        a = 2 * math.pi * k * i / N + ph
+        a0 = a - 2 * math.pi * k / N * 1.2               # Nachleuchten knapp dahinter
+        pos = lambda q: (int(round(cx + (SW / 2 + rx) * math.cos(q))), int(round(PT + hy + ry * math.sin(q))))
+        x, y = pos(a)
+        tx, ty = pos(a0)
+        pts = {(tx, ty): rgb(c2, 110)}
+        pts.update({(x, y): rgb(c1), (x - 1, y): rgb(c2, 180), (x + 1, y): rgb(c2, 180), (x, y - 1): rgb(c2, 180),
+                    (x, y + 1): rgb(c2, 180)})
+        behind = math.sin(a) < 0
+        if behind and any(ring[yy, xx] for (xx, yy) in pts if 0 <= yy < H and 0 <= xx < W):
+            continue                                    # hinter ihr: ganz verdeckt
+        if any(fig[yy, xx] for (xx, yy) in pts if 0 <= yy < H and 0 <= xx < W):
+            continue
+        for (xx, yy), c in pts.items():
+            dot(out, xx, yy, c)
+    return out
+
+
+# ---------------------------------------------------------------- Mizune
+BUBBLES = None
+
+
+def bubble_px(a, L):
+    ed, hl, core = rgb('9fd4f0', 230), rgb('ffffff'), rgb('d8f2ff', 200)
+    u = a / L
+    if a == L - 1:
+        return {(-1, -1): hl, (3, -1): hl, (-1, 3): ed, (3, 3): ed}
+    if u < 0.3:
+        return {(1, 1): core}
+    if u < 0.65:
+        return {(0, 0): hl, (1, 0): ed, (0, 1): ed, (1, 1): ed}
+    return {(1, 0): ed, (0, 1): ed, (2, 1): ed, (1, 2): ed, (0, 0): hl}
+
+
+MTALK = [0, 0, 1, 1, 0, 1, 1, 1, 0, 0, 0, 0, 1, 1, 0, 0, 1, 0, 1, 1, 0, 0, 0, 0,
+         0, 1, 1, 0, 1, 1, 0, 0, 0, 0, 1, 0, 1, 1, 1, 0, 0, 1, 1, 0, 0, 0, 0, 0]
+
+
+def mizune_base(i):
+    s = SRC.copy()
+    blink(s, i)
+    if not MTALK[i]:                                    # Mund zu (sonst offen): nur Haut, wie bei Sabrina
+        s[12, 9] = s[12, 10] = rgb('f8bc77')
+        s[13, 9] = s[13, 10] = rgb('f8bc77')
+    return bounce_frame(s, B24[i % 24])
+
+
+def f_mizune(i):
+    global BUBBLES
+    if BUBBLES is None:
+        fig = np.zeros((H, W), bool)
+        for k in range(N):
+            fig |= mizune_base(k)[:, :, 3] > 0
+        fig |= ring8(fig)
+        rng = np.random.default_rng(23)
+        BUBBLES, tries = [], 0
+        while len(BUBBLES) < 38 and tries < 20000:
+            tries += 1
+            L = int(rng.integers(14, 21))
+            e = int(rng.integers(N))
+            x0, y0 = rng.uniform(1, W - 4), rng.uniform(10, H - 3)
+            v, ph = rng.uniform(0.7, 1.0), rng.uniform(0, 6.3)
+            path, ok = [], True
+            for a in range(L):
+                bx, by = int(round(x0 + 0.7 * math.sin(0.6 * a + ph))), int(round(y0 - v * a))
+                for (dx, dy) in bubble_px(a, L):
+                    x, y = bx + dx, by + dy
+                    if not (1 <= x < W - 1 and 1 <= y < H - 1) or fig[y, x]:
+                        ok = False
+                path.append((bx, by))
+            if ok and sum(1 for r in BUBBLES if min((e - r[0]) % N, (r[0] - e) % N) <= 1) < 3:
+                BUBBLES.append((e, L, path))
+    out = mizune_base(i)
+    for e, L, path in BUBBLES:
+        a = (i - e) % N
+        if a < L:
+            bx, by = path[a]
+            for (dx, dy), c in bubble_px(a, L).items():
+                out[by + dy, bx + dx] = c
+    return out
+
+
+# ---------------------------------------------------------------- gemeinsame Helfer (Teile bewegen, flattern)
+def move_part(out, s, mask, dx, dy, ox, oy, toward=0):
+    """Teil (mask) um (dx, dy) versetzt malen. Frei werdende Stellen bekommen die Farbe des nächsten
+    Nicht-Teil-Pixels derselben Zeile in Richtung toward (-1 links, +1 rechts; 0 = leer lassen) –
+    was hinter dem Teil lag, wird so ergänzt, nichts reißt auf."""
+    if not dx and not dy:
+        return
+    ys, xs = np.nonzero(mask)
+    moved = set((y + dy, x + dx) for y, x in zip(ys, xs))
+    for y, x in zip(ys, xs):
+        if (y, x) in moved:
+            continue
+        c = None
+        if toward:
+            xx = x + toward
+            while 0 <= xx < s.shape[1] and mask[y, xx]:
+                xx += toward
+            if 0 <= xx < s.shape[1] and s[y, xx, 3]:
+                c = s[y, xx]
+        out[y + oy, x + ox] = c if c is not None else 0
+    for y, x in zip(ys, xs):
+        if 0 <= y + dy + oy < out.shape[0] and 0 <= x + dx + ox < out.shape[1]:
+            out[y + dy + oy, x + dx + ox] = s[y, x]
+
+
+def shift_segment(out, s, y, seg, dx, ox, oy):
+    """Ein Zeilenstück (seg: Spalten von außen nach innen) um dx nach außen schieben; innen frei
+    werdende Stellen bekommen die Farbe des innersten Stückpixels (nie die Kontur doppeln)."""
+    if not dx or not seg:
+        return
+    side = -1 if seg[0] < seg[-1] else 1                # außen links: nach links schieben
+    for x in seg:
+        xx = x + side * dx + ox
+        if 0 <= xx < out.shape[1]:
+            out[y + oy, xx] = s[y, x]
+    inner = s[y, seg[-1]]
+    for x in seg[-dx:]:
+        out[y + oy, x + ox] = inner
+
+
+def flutter(out, s, i, ox, oy, rows, left, right, amp=2.0, speed=6, ok=None, erratic=0.0, pause=True,
+            clamp=False, fill=None, profile=None):
+    """Tuch-/Haarzipfel flattern nach außen: je Zeile schiebt sich die Spitze um 0..amp px hinaus und
+    zurück (Welle von oben nach unten), das Original bleibt darunter – nichts reißt. fill: Farbe für
+    Lücken zwischen alter und neuer Außenkante (wo der Zipfel nur 1 px breit ist). profile(t, k, side):
+    eigener Auslenkungsverlauf 0..1 je Zeile statt der Welle."""
+    t = 2 * math.pi * i / N
+    env = 0.5 - 0.5 * math.cos(2 * t) if pause else 1.0
+    for side, xs in ((-1, left), (1, right)):
+        dxs = []
+        for k, y in enumerate(rows):
+            w = 0.5 + 0.5 * math.sin(speed * t - 0.9 * k + (0 if side < 0 else 1.7))
+            if profile:
+                w = profile(t, k / max(1, len(rows) - 1), side)
+            if erratic:
+                w += erratic * math.sin(17 * t + 2.3 * k + side)
+            dxs.append(round(amp * env * max(0.0, w)))
+        if clamp:                                       # Nachbarzeilen höchstens 1 px auseinander: keine Lücken
+            for k in range(1, len(dxs)):
+                dxs[k] = max(dxs[k - 1] - 1, min(dxs[k - 1] + 1, dxs[k]))
+        for k, y in enumerate(rows):
+            dx = dxs[k]
+            if not dx:
+                continue
+            moved = [x for x in xs if s[y, x, 3] and (ok is None or ok(s[y, x]))]
+            for x in moved:
+                xx, yy = x + side * dx + ox, y + oy
+                if 0 <= xx < out.shape[1] and 0 <= yy < out.shape[0]:
+                    out[yy, xx] = s[y, x]
+            if fill is not None and moved:
+                xo = max(moved) if side > 0 else min(moved)
+                for k in range(1, dx):
+                    xx = xo + side * k + ox
+                    if 0 <= xx < out.shape[1] and not out[y + oy, xx, 3]:
+                        out[y + oy, xx] = rgb(fill)
+
+
+# ---------------------------------------------------------------- aufsteigende Partikel (Glut, Seelen, Schnee)
+def rising(base_fn, count, seed, pal, life=(9, 15), vy=(0.7, 1.1), region=None, fall=False, wob=(0.5, 1.0), tail=False,
+           blob=False):
+    """Partikel, die die Figur nie berühren (Vereinigung aller Frames + 1-px-Rand): steigen auf (oder
+    fallen, fall=True), wackeln seitlich und laufen durch die Palette pal (Anfang -> Ende)."""
+    fig = np.zeros((H, W), bool)
+    for k in range(N):
+        fig |= base_fn(k)[:, :, 3] > 0
+    fig |= ring8(fig)
+    rng = np.random.default_rng(seed)
+    res, tries = [], 0
+    while len(res) < count and tries < 30000:
+        tries += 1
+        e = int(rng.integers(N))
+        L = int(rng.integers(*life))
+        v, ph, wb = rng.uniform(*vy), rng.uniform(0, 6.3), rng.uniform(*wob)
+        x0 = rng.uniform(1, W - 2)
+        y0 = rng.uniform(1, H * 0.5) if fall else rng.uniform(H * 0.3, H - 2)
+        steps, ok = [], True
+        for a in range(L):
+            x = int(round(x0 + wb * math.sin(0.6 * a + ph)))
+            y = int(round(y0 + v * a)) if fall else int(round(y0 - v * a))
+            if not (1 <= x < W - 2 and 1 <= y < H - 2) or fig[y, x] or (tail and fig[y + 1, x]) or \
+                    (blob and (fig[y, x + 1] or fig[y + 1, x] or fig[y + 1, x + 1])) or \
+                    (region is not None and not region[y, x]):
+                ok = False
+                break
+            c = pal[min(len(pal) - 1, int(len(pal) * a / L))]
+            px = {(x, y): c}
+            if tail:                                     # Seele: Kopf mit blassem Schweif darunter
+                px[(x, y + 1)] = [c[0], c[1], c[2], int(c[3] * 0.5)]
+            if blob:                                     # Nebelwölkchen: 2x2, unten blasser
+                px[(x + 1, y)] = c
+                px[(x, y + 1)] = px[(x + 1, y + 1)] = [c[0], c[1], c[2], int(c[3] * 0.6)]
+            steps.append(px)
+        if not ok:
+            continue
+        if sum(1 for r in res if min((e - r[0]) % N, (r[0] - e) % N) <= 1) >= 3:
+            continue
+        res.append((e, steps))
+    return res
+
+
+def draw_parts(out, system, i):
+    for e, steps in system:
+        a = (i - e) % N
+        if a < len(steps):
+            for (x, y), c in steps[a].items():
+                out[y, x] = c
+
+
+EMBERS = [rgb('f7f5b8'), rgb('f6e70e'), rgb('f47b22'), rgb('ca2c29')]
+FLAME = ('ca2c29', 'f47b22', 'f6e70e', 'f7f5b8')
+SYSTEM = None
+
+
+# ---------------------------------------------------------------- Bartas
+CLAP = {k: 1 for st in (3, 15, 27, 39) for k in (st, st + 1, st + 2)}   # alle 12 Frames: Fäuste zur Mitte …
+IMPACT = {k: j for st in (3, 15, 27, 39) for j, k in enumerate((st + 1, st + 2))}   # … und zusammengeschlagen
+FIST_L = (0, 5, 13, 15)                                 # linke Faust (mit Kontur rechts daneben)
+FIST_R = (8, 13, 13, 15)
+BOOMS = [(5, 8, 0, 2), (29, 6, 4, 1), (6, 26, 9, 2), (30, 22, 13, 2), (5, 16, 17, 1), (28, 14, 21, 2),
+         (9, 3, 25, 1), (27, 29, 28, 2), (5, 33, 32, 1), (31, 4, 35, 2), (5, 21, 39, 2), (29, 10, 43, 1)]
+
+
+def bartas_base(i):
+    s = SRC.copy()
+    blink(s, i)
+    b = B24[i % 24]
+    out = bounce_frame(s, b)
+    d = CLAP.get(i, 0)
+    for (x0, x1, y0, y1), side in ((FIST_L, 1), (FIST_R, -1)):
+        if not d:
+            break
+        m = np.zeros((SH, SW), bool)
+        m[y0:y1 + 1, x0:x1 + 1] = SRC[y0:y1 + 1, x0:x1 + 1, 3] > 0
+        move_part(out, s, m, side * d, 0, PL, PT + b, toward=-side)   # der Unterarm folgt von außen
+    return out
+
+
+def boom(out, x, y, a, r=2):
+    """Explosion: weißer Blitz, gelber Feuerball, oranger und roter Ring, dann Rauch (r: Größe)."""
+    pts = {}
+    if a == 0:
+        pts = {(0, 0): rgb('ffffff'), (1, 0): rgb('fffbd0'), (-1, 0): rgb('fffbd0'), (0, 1): rgb('fffbd0'), (0, -1): rgb('fffbd0')}
+    elif a <= 4:
+        rad = 1 + (a - 1) * r / 3
+        for dy in range(-r - 2, r + 3):
+            for dx in range(-r - 2, r + 3):
+                d = math.hypot(dx, dy)
+                if d <= rad + 0.5:
+                    q = d / (rad + 0.5)
+                    c = 'fffbd0' if q < 0.3 and a < 3 else 'f6e70e' if q < 0.55 else 'f47b22' if q < 0.8 else 'ca2c29'
+                    if a == 4 and q < 0.5:
+                        continue                        # der Feuerball reißt innen auf
+                    pts[(dx, dy)] = rgb(c)
+    elif a < 10:
+        k = a - 5
+        for j, (dx, dy) in enumerate(((0, 0), (-1, 0), (1, -1), (0, -1), (-1, -1), (1, 0))):
+            if j < 6 - k:
+                pts[(dx, dy - k // 2)] = rgb('8a8278' if j % 2 else 'a09888', max(40, 200 - 35 * k))
+    for (dx, dy), c in pts.items():
+        dot(out, x + dx, y + dy, c)
+
+
+def f_bartas(i):
+    global SYSTEM
+    if SYSTEM is None:
+        SYSTEM = rising(bartas_base, 20, 31, EMBERS)
+    out = np.zeros((H, W, 4), int)
+    for x, y, st, r in BOOMS:                           # Explosionen im Hintergrund
+        a = (i - st) % N
+        boom(out, x, y, a, r)
+    fig = bartas_base(i)
+    m = fig[:, :, 3] > 0
+    out[m] = fig[m]
+    k = IMPACT.get(i)
+    if k is not None:                                   # Aufprall zwischen den Fäusten
+        cx, cy = 6 + PL, 14 + PT + B24[i % 24]
+        for dx, dy in ((0, -2 - k), (1, -2 - k), (0, 2 + k), (1, 2 + k)):
+            dot(out, cx + dx, cy + dy, rgb('fffbd0'))
+    draw_parts(out, SYSTEM, i)
+    return out
+
+
+# ---------------------------------------------------------------- Gon
+SNOW = [rgb('ffffff'), rgb('eef4ff'), rgb('d6e2ff', 220), rgb('c4d2f4', 170)]
+FROST = {'8988cc', 'dfe0f6', '9a99e5', 'a3a2f2', 'c1c1e6', 'b3b2ec', 'd6d5f4'}
+
+
+GON_ARMS = [((12, 15, 13, 16), -1), ((0, 3, 13, 16), 1)]  # (Kasten, Richtung, aus der Ersatzfarbe kommt)
+
+
+def gon_base(i):
+    s = SRC.copy()
+    b = B24[i % 24]
+    out = bounce_frame(s, b)
+    lift = -round(2 * (0.5 - 0.5 * math.cos(2 * math.pi * i / N * 2)))  # beide Arme langsam hoch und runter
+    for (x0, x1, y0, y1), toward in GON_ARMS:
+        m = np.zeros((SH, SW), bool)
+        m[y0:y1 + 1, x0:x1 + 1] = SRC[y0:y1 + 1, x0:x1 + 1, 3] > 0
+        move_part(out, s, m, 0, lift, PL, PT + b, toward=toward)
+    return out
+
+
+MIST = [rgb('eef2ff', 120), rgb('d8e0ff', 150), rgb('c8d0f4', 120), rgb('b8c0e8', 70)]
+MIST_SYS = None
+
+
+def f_gon(i):
+    global SYSTEM, MIST_SYS
+    if SYSTEM is None:
+        SYSTEM = rising(gon_base, 30, 41, SNOW, life=(14, 22), vy=(0.45, 0.7), fall=True, wob=(0.6, 1.2))
+        MIST_SYS = rising(gon_base, 14, 43, MIST, life=(14, 20), vy=(0.25, 0.4), wob=(1.0, 1.6), blob=True)
+    out = gon_base(i)
+    b = B24[i % 24]
+    frost = [(y, x) for y, x in zip(*np.nonzero(SRC[:, :, 3])) if hexc(SRC[y, x]) in FROST]
+    rng = np.random.default_rng(5)
+    stars = [frost[k] for k in rng.choice(len(frost), 4, replace=False)]
+    for k, (y, x) in enumerate(stars):                  # Eiskristalle auf der gefrorenen Seite blitzen
+        for (xx, yy), c in sparkle_pixels(i, N, [(x + PL, y + PT + b, 6 + 12 * k)], rgb('ffffff'), rgb('d6e2ff')).items():
+            dot(out, xx, yy, c)
+    draw_parts(out, MIST_SYS, i)
+    draw_parts(out, SYSTEM, i)
+    return out
+
+
+# ---------------------------------------------------------------- Ida
+def _hash(*v):
+    h = 2166136261
+    for x in v:
+        h = ((h ^ (int(x) & 0xffffffff)) * 16777619) & 0xffffffff
+    return h / 4294967295.0
+
+
+def fire_aura(out, fig, i, down=None, Ldown=4.8):
+    """Flammen hinter der Figur, die gerade nach oben brennen. Je freiem Pixel der Abstand zur Figur
+    darunter (senkrecht gestreckt: Zungen gehen hoch, seitlich kaum); die Zungenlänge je Spalte
+    flackert als stehende Welle (keine Seitwärtsdrift) plus Zufallszucken, darüber lösen sich
+    einzelne Funken und steigen senkrecht auf. Farbe nach relativer Höhe in der Zunge, strikt
+    geordnet: innen fast weiß, gelb, orange, außen ein zusammenhängender roter Saum – über Rot
+    kommt nur noch ein losgelöster Funke. down (z. B. 0.6): die Flammen umhüllen die Figur auch
+    nach unten (Flammenbett), dort gleichmäßig mit Länge Ldown."""
+    Hh, Ww = fig.shape
+    fy, fx = np.nonzero(fig)
+    w = 2 * math.pi * i / N
+    k1 = 2 * math.pi * 8 / N
+    def length(x):                                      # Zungen: Gipfel und Täler, die an Ort und Stelle lodern
+        peak = 0.0
+        for k in range(Ww // 3 + 2):
+            c = k * 3.4 + 0.7 * math.sin(9 * w + 1.3 * k)
+            h = 1 + 0.45 * math.sin(6 * w + 2.3 * k) + 0.25 * math.sin(13 * w + 0.7 * k)
+            peak = max(peak, h * max(0.0, 1 - abs(x - c) / 1.9))
+        return 3.0 + 3.6 * peak + 0.3 * math.sin(0.9 * x) * math.sin(5 * w)
+    Ls = [length(x) for x in range(Ww)]
+    solid = np.zeros((Hh, Ww), bool)
+    for x in range(1, Ww - 1):
+        near = np.abs(fx - x) <= (4 if down else 3)
+        if not near.any():
+            continue
+        L = (Ls[x - 1] + 6 * Ls[x] + Ls[x + 1]) / 8          # benachbarte Spalten hängen zusammen
+        for y in range(1, Hh - 1):
+            if fig[y, x] or out[y, x, 3]:
+                continue
+            m = near & (fy >= y)
+            r = np.min(np.hypot((fx[m] - x) * 1.5, (fy[m] - y) * 0.55)) / L if m.any() else 99.0
+            if down:
+                m2 = near & (fy < y)
+                if m2.any():
+                    r = min(r, np.min(np.hypot((fx[m2] - x) * 1.3, (y - fy[m2]) * down)) / Ldown)
+            if r > 50:
+                continue
+            c = FLAME[3] if r < 0.28 else FLAME[2] if r < 0.52 else FLAME[1] if r < 0.78 else FLAME[0] if r < 1.0 else None
+            if c:
+                out[y, x] = rgb(c)
+                solid[y, x] = True
+    ph = [1.6 * math.sin(0.7 * x) + 0.9 * math.sin(1.9 * x + 0.5) for x in range(Ww)]
+    for x in range(1, Ww - 1):                          # Funken: lösen sich über den Spitzen, steigen
+        for y in range(1, Hh - 1):                      # senkrecht auf, berühren die Flamme nie
+            if out[y, x, 3] or fig[y, x]:
+                continue
+            col = np.nonzero(solid[:, x])[0]
+            if not len(col) or y >= col.min() - 1:
+                continue
+            gap = col.min() - y
+            if gap > 6:
+                continue
+            if math.sin(k1 * (y + i) + ph[x]) > 0.93 and not solid[max(0, y - 1):y + 2, max(0, x - 1):x + 2].any():
+                out[y, x] = rgb(FLAME[0] if gap > 2 else FLAME[1])
+
+def ida_base(i):
+    s = SRC.copy()
+    blink(s, i)
+    return bounce_frame(s, B24[i % 24])
+
+
+def f_ida(i):
+    global SYSTEM
+    if SYSTEM is None:
+        SYSTEM = rising(ida_base, 18, 13, EMBERS)
+    fig = ida_base(i)
+    out = np.zeros_like(fig)
+    fire_aura(out, fig[:, :, 3] > 0, i)
+    m = fig[:, :, 3] > 0
+    out[m] = fig[m]
+    for e, steps in SYSTEM:                             # Funken nur, wo keine Flamme ist
+        a = (i - e) % N
+        if a < len(steps):
+            for (x, y), c in steps[a].items():
+                if not out[y, x, 3]:
+                    out[y, x] = c
+    return out
+
+
+# ---------------------------------------------------------------- Vacarn
+SOULS = [rgb('f0ecff'), rgb('d0c8ff', 230), rgb('a89cf0', 200), rgb('7a6cc8', 150)]
+CACKLE = [0, 0, 0, 0, 0, 0, 1, 1, 0, 1, 1, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+          0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 1, 1, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+
+
+def vacarn_base(i):
+    s = SRC.copy()
+    blink(s, i)
+    if not CACKLE[i]:                                   # sonst Mund zu
+        s[7, 10] = s[7, 11] = rgb('7570b8')
+        s[8, 10] = s[8, 11] = rgb('2f312e')
+    glow = 0.5 - 0.5 * math.cos(2 * math.pi * 3 * i / N)
+    if not BLINK.get(i):
+        for x in (9, 12):                               # die roten Augen glühen
+            s[5, x] = lighten(s[5, x], 0.55 * glow)
+    b = B24[i % 24]
+    out = bounce_frame(s, b)
+    capec = {'5c0400', '7b0815', '300901'}
+    flutter(out, s, i, PL, PT + b, list(range(13, 21)), range(0, 6), range(16, SW), amp=2.0, speed=4,
+            ok=lambda c: hexc(c) in capec)
+    return out
+
+
+def f_vacarn(i):
+    global SYSTEM
+    if SYSTEM is None:
+        SYSTEM = rising(vacarn_base, 22, 7, SOULS, life=(12, 18), vy=(0.5, 0.8), wob=(0.8, 1.4), tail=True)
+    out = vacarn_base(i)
+    draw_parts(out, SYSTEM, i)
+    return out
+
+
+# ---------------------------------------------------------------- Sol Rym
+CLOUD = None
+BOLTS = {9: 0, 10: 0, 11: 1, 30: 2, 31: 2, 32: 3}
+
+
+PUFFS = [(10, 1, 0.0), (24, 2, 1.1), (38, 1, 2.3), (52, 3, 0.7), (66, 2, 1.9), (18, 3, 2.9), (60, 1, 4.1)]
+
+
+def cloud_frame(i):
+    """Die Wolke wallt: an Ober- und Unterseite quellen Bäusche auf und sinken wieder zusammen
+    (die Spalte wächst dort über ihren Rand hinaus, die Wolke liegt darunter – nichts reißt), die
+    Bäusche wandern langsam; innen rollen die Zeilen leicht gegeneinander."""
+    global CLOUD
+    if CLOUD is None:
+        CLOUD = load('cloud')
+    t = 2 * math.pi * i / N
+    ch, cw = CLOUD.shape[:2]
+    op = CLOUD[:, :, 3] > 0
+    dxs = [round(0.8 * (math.sin(0.55 * y + 2 * t) - math.sin(0.55 * y))) for y in range(ch)]
+    base = np.zeros_like(CLOUD)
+    for y in range(ch):
+        for x in range(cw):
+            sx = x - dxs[y]
+            if 0 <= sx < cw and op[y, sx]:
+                base[y, x] = CLOUD[y, sx]
+    out = base.copy()
+    for k, (cx, m, ph) in enumerate(PUFFS):
+        amp = math.sin(math.pi * m * i / N) ** 2 * (2.4 if k % 2 == 0 else 1.6)
+        c = cx + 4 * math.sin(t + ph)
+        for x in range(cw):
+            bump = int(round(amp * math.exp(-((x - c) / 4.5) ** 2)))
+            if not bump:
+                continue
+            col = np.nonzero(base[:, x, 3])[0]
+            if not len(col):
+                continue
+            top, bot = col.min(), col.max()
+            mid = (top + bot) // 2
+            if k % 2 == 0:                              # Bausch oben: obere Hälfte hebt sich
+                for y in range(top, mid + 1):
+                    if 0 <= y - bump:
+                        out[y - bump, x] = base[y, x]
+            else:                                       # Bausch unten: untere Hälfte senkt sich
+                for y in range(bot, mid - 1, -1):
+                    if y + bump < ch:
+                        out[y + bump, x] = base[y, x]
+    return out
+
+
+def bolt(out, k, oy):
+    """Blitz unter der Wolke (Zickzack nach unten)."""
+    rng = np.random.default_rng(100 + k)
+    x = PL + int(rng.integers(12, 70))
+    y = oy
+    for _ in range(int(rng.integers(8, 12))):
+        dot(out, x, y, rgb('fffbd0'))
+        if 0 <= x + 1 < W:
+            dot(out, x + 1, y, rgb('f6e70e', 200))
+        y += 1
+        x += int(rng.choice([-1, 0, 1]))
+
+
+SPEAK = [0, 0, 1, 1, 0, 1, 1, 1, 0, 0, 0, 0, 1, 1, 0, 0, 1, 0, 1, 1, 0, 0, 0, 0,
+         0, 1, 1, 0, 1, 1, 0, 0, 0, 0, 1, 0, 1, 1, 1, 0, 0, 1, 1, 0, 0, 0, 0, 0]
+
+
+def f_solrym(i):
+    s = SRC.copy()
+    blink(s, i)
+    if not SPEAK[i]:                                    # Mund zu (sonst offen)
+        s[10, 40] = s[10, 41] = rgb('2a44af')
+        s[11, 40] = s[11, 41] = rgb('12298a')
+    cloud = cloud_frame(i)
+    k = BOLTS.get(i)
+    if k is not None:                                   # Wetterleuchten um den Blitz herum
+        bx = int(np.random.default_rng(100 + k).integers(12, 70))
+        for y, x in zip(*np.nonzero(cloud[:, :, 3])):
+            d = math.hypot((x - bx) / 2.2, y - 27)
+            if d < 9 and hexc(cloud[y, x]) != '000000':
+                cloud[y, x] = lighten(cloud[y, x], 0.4 * (1 - d / 9))
+    out = np.zeros((H, W, 4), int)
+    hv = -round(2 * math.sin(2 * math.pi * i / N))     # alles steigt langsam auf und ab
+    for y, x in zip(*np.nonzero(cloud[:, :, 3])):
+        out[y + PT + hv, x + PL] = cloud[y, x]
+    if k is not None:
+        bolt(out, k, PT + hv + 27)
+    for y, x in zip(*np.nonzero(s[:, :, 3])):           # der Unterkörper steckt in der Wolke
+        c = s[y, x]
+        f = 1.0 if y <= 12 else max(0.12, 1 - (y - 12) / 9)
+        out[y + PT + hv, x + PL] = [c[0], c[1], c[2], int(c[3] * f)] if f < 1 else c
+    return out
+
+
+# ---------------------------------------------------------------- Dajan
+LAMP = {'d8c386', 'fdfcb7', 'fcfbb6', 'fefdb8'}
+
+
+SCARF = (14, 17, 16, 18)                                # Zipfel des roten Schals (unter Zeile 15 hängend)
+GEM = {'229dd8', '08d3ef', '145e81', 'ecf0fc', 'f4fffb', '06448f'}
+
+
+def f_dajan(i):
+    s = SRC.copy()
+    blink(s, i)
+    gem = [(y, x) for y, x in zip(*np.nonzero(SRC[:, :, 3])) if hexc(SRC[y, x]) in GEM]
+    g = 0.5 - 0.5 * math.cos(2 * math.pi * 3 * i / N)  # der Edelstein funkelt
+    for y, x in gem:
+        s[y, x] = lighten(s[y, x], 0.45 * g)
+    b = B24[i % 24]
+    out = bounce_frame(s, b)
+    x0, x1, y0, y1 = SCARF
+    sw = round(1.3 * math.sin(2 * math.pi * 2 * i / N))
+    for y in range(y0, y1 + 1):                         # der Schalzipfel pendelt (unten am weitesten)
+        dx = round(sw * (y - y0 + 1) / (y1 - y0 + 1))
+        m = np.zeros((SH, SW), bool)
+        m[y, x0:x1 + 1] = np.array([hexc(SRC[y, x]) in ('7c1618', 'b02624') for x in range(x0, x1 + 1)])
+        move_part(out, s, m, dx, 0, PL, PT + b, toward=-1 if dx > 0 else 1)
+    for (x, y), c in sparkle_pixels(i, N, [(2 + PL, 14 + PT + b, 5), (4 + PL, 16 + PT + b, 21), (1 + PL, 16 + PT + b, 37)],
+                                    rgb('c8f4ff'), rgb('08d3ef')).items():
+        dot(out, x, y, c)
+    return out
+
+
+# ---------------------------------------------------------------- Omikron
+ILLU = [(3, 5, -9), (9, 3, 9), (13, 2, -10), (21, 6, 9), (29, 2, -9), (33, 4, 10), (40, 3, -9), (44, 2, 9)]
+GLITCH_ROWS = {4: 6, 10: 14, 22: 3, 24: 18, 30: 9, 34: 20, 41: 12}
+HAIR = {'515350', 'bbbdba', '7a7c79'}
+OM_HANDS = [((1, 4, 14, 17), 1), ((17, 20, 14, 17), -1)]
+
+
+def f_omikron(i):
+    s = SRC.copy()
+    b = B24[i % 24]
+    t = 2 * math.pi * i / N
+    k = (i - 16) % N                                    # das Monokel blitzt
+    my = C.get('monocle', 9)
+    hair = C.get('hair', HAIR)
+    if k < 3:
+        s[my, 12] = rgb('ffffff')
+        s[my, 13] = rgb('fff7d0')
+    fig = bounce_frame(s, b)
+    flutter(fig, s, i, PL, PT + b, list(range(0, C.get('hairrows', 13))), range(0, 5), range(SW - 5, SW), amp=2.4, speed=8,
+            ok=lambda c: hexc(c) in hair, erratic=0.5, pause=False)  # die Haare wehen wild, ohne Pause
+    lift = -round(2 * (0.5 - 0.5 * math.cos(2 * t)))   # Arme heben und senken
+    for (x0, x1, y0, y1), toward in C.get('hands', OM_HANDS):   # beim Heben ziehen die Hände nach innen
+        m = np.zeros((SH, SW), bool)
+        m[y0:y1 + 1, x0:x1 + 1] = SRC[y0:y1 + 1, x0:x1 + 1, 3] > 0
+        inward = 1 if lift <= -1 else 0
+        move_part(fig, s, m, toward * inward, lift, PL, PT + b, toward=toward if not inward else 0)
+    for (x, y), c in sparkle_pixels(i, N, [(12 + PL, my + PT + b, 16)], rgb('fff7d0'), rgb('cfc592')).items():
+        dot(fig, x, y, c)
+    out = np.zeros_like(fig)
+    for st, dur, dx in ILLU:                            # Trugbilder tauchen unregelmäßig auf, mit Bildfehlern
+        a = (i - st) % N
+        if a >= dur:
+            continue
+        al = [0.35, 0.6, 0.45, 0.6, 0.3, 0.5][a % 6]
+        ghost = np.zeros_like(fig)
+        for y, x in zip(*np.nonzero(fig[:, :, 3])):
+            if 0 <= x + dx < W:
+                c = fig[y, x]
+                ghost[y, x + dx] = [c[0], c[1], c[2], int(c[3] * al)]
+        g = GLITCH_ROWS.get(i)
+        if g is not None:
+            ghost[g + PT:g + PT + 2] = np.roll(ghost[g + PT:g + PT + 2], 2 if dx > 0 else -2, axis=1)
+        mm = (ghost[:, :, 3] > 0) & (out[:, :, 3] == 0)
+        out[mm] = ghost[mm]
+        for ex in (8, 13):
+            dot(out, ex + PL + dx, 10 + PT + b, rgb('ff2020', int(255 * al / 0.6)))
+    m = fig[:, :, 3] > 0
+    out[m] = fig[m]
+    return out
+
+
+# ================================================================ Skins
+# ---------------------------------------------------------------- Ida the Fire Princess
+FIRE_COLS = {'f42700', 'f44a00', 'f46600', 'f47b22', 'f6c40e', 'f6e70e', 'f6ec56', 'f7f5b8'}
+GIRL = None
+
+
+def f_idafire(i):
+    """Das Flammenbett ist neu gezeichnet (wie bei Base-Ida): die Prinzessin ist der Brennpunkt,
+    das Feuer umhüllt sie nach unten als Bett und schlägt nach oben in Zungen hoch – strikt
+    geordnet von innen fast weiß über gelb und orange zum geschlossenen roten Saum."""
+    global GIRL
+    if GIRL is None:
+        op = SRC[:, :, 3] > 0
+        GIRL = op & ~np.array([[hexc(SRC[y, x]) in FIRE_COLS for x in range(SW)] for y in range(SH)])
+    s = SRC.copy()
+    blink(s, i)
+    hv = -round(1.6 * math.sin(2 * math.pi * i / N))   # alles steigt langsam auf und ab
+    out = np.zeros((H, W, 4), int)
+    for y, x in zip(*np.nonzero(GIRL)):
+        out[y + PT + hv, x + PL] = s[y, x]
+    fig = np.zeros((H, W), bool)
+    fig[PT + hv:PT + hv + SH, PL:PL + SW] = GIRL
+    fire_aura(out, fig, i, down=0.6, Ldown=4.8)
+    w = 2 * math.pi * i / N                             # von unten lecken Zungen über sie (vor ihr)
+    ys, xs = np.nonzero(GIRL)
+    for x in range(SW):
+        col = ys[xs == x]
+        if not len(col):
+            continue
+        bot = col.max()
+        L = 2.0 + 2.6 * max(0.0, math.sin(0.9 * x + 1.3) * math.sin(4 * w + 0.8 * x) + 0.35 * math.sin(7 * w + 2.1 * x))
+        for dy in range(int(L) + 1):
+            y = bot - dy
+            if y < 0 or not GIRL[y, x] or dy >= L:
+                continue
+            r = dy / L
+            out[y + PT + hv, x + PL] = rgb(FLAME[2] if r < 0.4 else FLAME[1] if r < 0.75 else FLAME[0])
+    return out
+
+
+# ---------------------------------------------------------------- One Chuck Man
+def hem_wave(out, s, i, ox, oy, cols, y_from, amp, ok, speed=4, fill_above=True):
+    """Saum wogt: in jeder Spalte (cols) wandert der Teil ab Zeile y_from als Ganzes (samt Kontur)
+    senkrecht – eine Welle läuft über die Spalten, Nachbarn höchstens 1 px auseinander. Frei
+    gewordene Pixel oben füllt das Tuch darüber (nie die Kontur), unten wird es leer."""
+    t = 2 * math.pi * i / N
+    raw = [round(amp * (math.sin(speed * t - 0.7 * k) - math.sin(-0.7 * k))) for k, _ in enumerate(cols)]
+    dys = [raw[0]]
+    for v in raw[1:]:
+        dys.append(max(dys[-1] - 1, min(dys[-1] + 1, v)))
+    for x, dy in zip(cols, dys):
+        if not dy:
+            continue
+        seg = [y for y in range(y_from, s.shape[0]) if s[y, x, 3] and ok(s[y, x])]
+        if not seg:
+            continue
+        for y in seg:
+            out[y + oy, x + ox] = 0
+        for y in seg:
+            if 0 <= y + dy + oy < out.shape[0]:
+                out[y + dy + oy, x + ox] = s[y, x]
+        if dy > 0 and fill_above:
+            top = min(seg)
+            src = s[top, x] if s[top, x, 3] else None
+            above = s[top - 1, x] if top > 0 and s[top - 1, x, 3] and ok(s[top - 1, x]) else src
+            for k in range(dy):
+                out[top + k + oy, x + ox] = above if above is not None else 0
+
+
+CAPE_CH = {'7d939a', '6d7f85', 'c3d2d5', 'e1e2eb', '404b55', '292529'}
+
+
+def f_chuck(i):
+    s = load('body')
+    blink(s, i)
+    bub = load('bubble')
+    out = np.zeros((H, W, 4), int)
+    for y, x in zip(*np.nonzero(s[:, :, 3])):
+        out[y + PT, x + PL] = s[y, x]
+    hem_wave(out, s, i, PL, PT, list(range(11, SW)), 24, 1.4, lambda c: hexc(c) in CAPE_CH, speed=4)
+    k = i % 48                                          # die OK-Blase schwebt als Ganzes umher, verschwindet, ploppt auf
+    if 30 <= k < 38:
+        return out
+    t = 2 * math.pi * i / N
+    bx, by = round(1.3 * math.sin(2 * t)), round(1.3 * math.sin(3 * t))
+    ys, xs = np.nonzero(bub[:, :, 3])
+    for y, x in zip(ys, xs):
+        if k == 38 and y < 8:                           # erst nur der Schwanz …
+            continue
+        out[y + PT + by, x + PL + bx] = bub[y, x]
+    return out
+
+
+# ---------------------------------------------------------------- Alice the Wonderous Girl
+ALICE_HAIR = {'dd9936', 'f8e161', 'f3d038', 'fde569', 'f8f649', 'c37c22'}
+
+
+def f_alice(i):
+    s = SRC.copy()
+    blink(s, i)
+    t = 2 * math.pi * i / N
+    flap = round(0.5 - 0.5 * math.cos(4 * t))           # die Schleifen zucken nach außen
+    bow = s.copy()
+    for y in range(0, 3):                               # obere Schleifenzeilen kippen nach außen
+        for side, xs in ((-1, range(0, 7)), (1, range(7, SW))):
+            row = [x for x in xs if SRC[y, x, 3]]
+            for x in row:
+                bow[y, x] = 0
+            for x in row:
+                xx = x + side * flap * (1 if y < 2 else 0)
+                if 0 <= xx < SW:
+                    bow[y, xx] = SRC[y, x]
+    s = bow
+    out = bounce_frame(s, 0)                            # sie liegt still (nichts wird gestreckt)
+    for y in range(6, 16):                              # die Haarsträhnen seitlich wiegen sich
+        dx = round(max(0.0, math.sin(3 * t - 0.6 * (y - 6))) * (0.5 - 0.5 * math.cos(2 * t)) * 1.4)
+        for side, xs in ((-1, range(0, 4)), (1, range(SW - 1, SW - 5, -1))):
+            seg = [x for x in xs if SRC[y, x, 3] and hexc(SRC[y, x]) in ALICE_HAIR]
+            shift_segment(out, s, y, seg, dx, PL, PT)
+    for (x, y), c in sparkle_pixels(i, N, [(-3 + PL, 4 + PT, 3), (SW + 2 + PL, 8 + PT, 15), (-2 + PL, 14 + PT, 27),
+                                           (SW + 1 + PL, 17 + PT, 39)], rgb('fff6c0'), rgb('f8e161')).items():
+        dot(out, x, y, c)
+    return out
+
+
+# ---------------------------------------------------------------- Mega-Warrior Karian
+CAPE_MK = {'692c27', '9f3d32', '9e3d34', '452624', '51211f'}
+
+
+def karian_wind(t, u, side):
+    """Der Umhang weht: alle Zeilen blähen sich gemeinsam in Böen auf (unten weiter als oben), dazu
+    ein leichtes Nachschlagen des Saums – keine nach unten laufende Welle, nie ganz still."""
+    gust = 0.66 + 0.2 * math.sin(t + 0.4 * side) + 0.14 * math.sin(3 * t + 0.9 * side)
+    snap = 0.2 * math.sin(7 * t - 1.2 * u + side) * u
+    return min(1.0, (0.3 + 0.7 * u) * gust + snap)
+
+
+def f_megakarian(i):
+    s = SRC.copy()
+    blink(s, i)
+    t = 2 * math.pi * i / N
+    rows = list(range(14, SH - 1))                      # der Umhang unter den Schulterplatten bis zum Saum
+    for side in (-1, 1):
+        dxs = clamp_chain([round(2.6 * max(0.0, karian_wind(t, k / (len(rows) - 1), side)))
+                           for k in range(len(rows))])
+        for y, dx in zip(rows, dxs):
+            xs = range(0, SW) if side < 0 else range(SW - 1, -1, -1)
+            seg, started = [], False
+            for x in xs:                                # von außen nach innen: nur zusammenhängendes Tuch
+                if not SRC[y, x, 3]:
+                    if started:
+                        break
+                    continue
+                if hexc(SRC[y, x]) not in CAPE_MK:
+                    break
+                started = True
+                seg.append(x)
+            if not seg or not dx:
+                continue
+            inner = SRC[y, seg[-1]] if len(seg) > 1 else rgb('692c27')  # nur Kontur: dahinter kommt Tuch hervor
+            for x in range(min(seg[-1], seg[0] + side * dx), max(seg[-1], seg[0] + side * dx) + 1):
+                s[y, x] = inner                         # innen rückt Tuch nach (nie die Kontur doppeln)
+            for x in seg:                               # das ganze Tuchstück weht hinaus
+                s[y, x + side * dx] = SRC[y, x]
+    b = B24[i % 24]
+    return bounce_frame(s, b)
+
+
+# ---------------------------------------------------------------- Sett Dunking on You
+def f_settdunk(i):
+    s = SRC.copy()
+    t = 2 * math.pi * i / N
+    hover = -round(1.4 * math.sin(2 * t)) if i else 0
+    glow = 0.5 - 0.5 * math.cos(3 * t)
+    eye = [(y, x) for y, x in zip(*np.nonzero(s[:, :, 3])) if hexc(SRC[y, x]) == '00ecfe']
+    for y, x in eye:                                    # das türkise Auge leuchtet türkis
+        s[y, x] = [int(0 + 150 * glow), 236 + int(19 * glow), 254, 255]
+    out = np.zeros((H, W, 4), int)
+    for y, x in zip(*np.nonzero(s[:, :, 3])):
+        dx = 0
+        if y >= 18:                                     # die Tentakel wabern, zu den Spitzen stärker
+            u = min(1.0, (y - 17) / 7)
+            dx = round(1.6 * u * (math.sin(2 * t * 2 + 0.25 * x - 0.5 * (y - 18)) - math.sin(0.25 * x - 0.5 * (y - 18))))
+        dy = hover
+        if y <= 4:                                      # die Kapuzenspitze schwingt nach
+            dx += round(0.9 * (math.sin(2 * t - 1.2) - math.sin(-1.2)) * (5 - y) / 5)
+        out[y + PT + dy, x + PL + dx] = s[y, x]
+    ring = np.zeros((SH, SW), bool)
+    for y, x in eye:
+        ring[y, x] = True
+    for y, x in zip(*np.nonzero(ring8(ring))):          # türkiser Schein ums Auge
+        if not s[y, x, 3] or hexc(s[y, x]) in ('070707', '000000', '1e1e1e'):
+            out[y + PT + hover, x + PL] = rgb('40f0ff', int(60 + 120 * glow))
+    for (x, y), c in sparkle_pixels(i, N, [(12 + PL, 13 + PT + hover, 10), (13 + PL, 13 + PT + hover, 34)],
+                                    rgb('c0ffff'), rgb('00ecfe')).items():
+        dot(out, x, y, c)
+    return out
+
+
+# ---------------------------------------------------------------- Emperor Arthor
+GEM_EA = {'68a6a6', '91e6e6', '80cccc', '508080', 'ffffff'}
+EA_SPARK = [(20, 11, 2), (23, 8, 7), (25, 13, 12), (19, 11, 17), (22, 16, 22), (21, 6, 27), (21, 12, 31),
+            (25, 9, 36), (24, 15, 41), (20, 10, 45)]    # auf dem Stein und bis zu 5 px drumherum
+EA_TALK = 'ooohcchoohchoooohccho' + 'ooo'                # o offen, h halb, c zu (Frame 0 = Ruhepose)
+EA_MOUTH = {'o': [], 'h': [((8, 9), 'f0f4f4'), ((9, 9), 'f0f4f4')],
+            'c': [((8, 9), 'f0f4f4'), ((9, 9), 'f0f4f4'), ((8, 10), 'cecab8'), ((9, 10), 'cecab8')]}
+
+
+def f_emperor(i):
+    s = SRC.copy()
+    blink(s, i)
+    g = 0.5 - 0.5 * math.cos(2 * math.pi * 2 * i / N)
+    for y, x in zip(*np.nonzero(s[:, :, 3])):           # der Edelstein am Stab leuchtet
+        if x >= 17 and hexc(SRC[y, x]) in GEM_EA:
+            s[y, x] = lighten(s[y, x], 0.5 * g)
+    for (x, y), c in EA_MOUTH[EA_TALK[i % 24]]:          # er redet: der Mund schließt sich immer wieder
+        s[y, x] = rgb(c)
+    b = B24[i % 24]
+    out = bounce_frame(s, b)
+    for (x, y), c in sparkle_pixels(i, N, [(x + PL, y + PT + b, st) for x, y, st in EA_SPARK],
+                                    rgb('e8ffff'), rgb('91e6e6')).items():
+        dot(out, x, y, c)
+    return out
+
+
+# ---------------------------------------------------------------- Nieht the Yellow Flash
+YF_GONE = {6: 'flash', 7: 'glow', 8: 'none', 9: 'none', 10: 'back', 28: 'flash', 29: 'glow', 30: 'none',
+           31: 'none', 32: 'back'}
+YF_CAPE = {'4d1009', '801b0f', 'b42f1e', 'f2f0d9', 'bda47b', '998564'}
+
+
+def yellow_burst(out, cx, cy, r, alpha, front=False):
+    """Gelber Blitz: heller Kern, vier lange und vier kurze Strahlen (front: auch über der Figur)."""
+    pts = {}
+    for dy in range(-2, 3):
+        for dx in range(-2, 3):
+            if abs(dx) + abs(dy) <= 2:
+                pts[(dx, dy)] = ('ffffff' if abs(dx) + abs(dy) <= 1 else 'fff39a', 1.0)
+    for k in range(3, r + 1):
+        f = 1 - (k - 2) / (r - 1)
+        for dx, dy in ((k, 0), (-k, 0), (0, k), (0, -k)):
+            pts[(dx, dy)] = ('fff39a' if k < r * 0.6 else 'f9e149', f)
+        if k <= r // 2 + 1:
+            for dx, dy in ((k - 1, k - 1), (-k + 1, k - 1), (k - 1, -k + 1), (-k + 1, -k + 1)):
+                pts[(dx, dy)] = ('f9e149', f * 0.8)
+    for (dx, dy), (c, f) in pts.items():
+        x, y = cx + dx, cy + dy
+        if 0 <= x < W and 0 <= y < H and (front or not out[y, x, 3]):
+            out[y, x] = rgb(c, int(alpha * f))
+
+
+def f_yellowflash(i):
+    s = hair_sway(SRC.copy(), i, 9)
+    blink(s, i)
+    b = B24[i % 24]
+    g = YF_GONE.get(i)
+    cx, cy = PL + SW // 2, PT + 12 + b
+    if g in ('glow', 'none'):                           # der gelbe Blitz: weg …
+        out = np.zeros((H, W, 4), int)
+        if g == 'glow':
+            yellow_burst(out, cx, cy, 6, 170)
+        return out
+    out = bounce_frame(s, b)
+    flutter(out, s, i, PL, PT + b, list(range(13, 16)), range(0, 12), range(28, SW), amp=2.0, speed=6,
+            ok=lambda c: hexc(c) in YF_CAPE)          # nur zwischen oberer Kontur und Klingen
+    if g in ('flash', 'back'):                          # … und im gelben Blitz wieder da
+        yellow_burst(out, cx, cy, 10, 255, front=True)
+    return out
+
+
+# ---------------------------------------------------------------- Beato the Golden Witch
+BG_WING = {'91501a', 'e5b03e', 'ffff87', 'ffe874', 'ffd56a', 'ffca59'}
+BG_GOLD = [rgb('d19745'), rgb('ffcc80'), rgb('ffd290')]
+# (Mittelpunkt x, y, Radius x, y, Umläufe pro Loop, Phase, Flatter-Versatz) in Sprite-Koordinaten
+BG_FLIES = [(11.5, 12.0, 16.0, 12.0, 1, 0.0, 0), (11.5, 15.0, 15.0, 9.0, -1, 2.2, 2), (11.5, 10.0, 14.5, 10.0, 1, 3.6, 1)]
+BG_WINGS = {
+    'offen': [((-2, -1), 1), ((-1, -1), 2), ((1, -1), 2), ((2, -1), 1),
+              ((-1, 0), 1), ((1, 0), 1), ((-2, 0), 0), ((2, 0), 0), ((-1, 1), 0), ((1, 1), 0)],
+    'halb': [((-1, -1), 1), ((1, -1), 1), ((-1, -2), 2), ((1, -2), 2), ((-1, 0), 0), ((1, 0), 0)],
+    'zu': [((0, -1), 1), ((0, -2), 2), ((-1, -2), 0)],
+}
+BG_FLAP = ['offen', 'halb', 'zu', 'halb']
+
+
+def bg_fly(b, i):
+    cx, cy, rx, ry, laps, ph, _ = b
+    a = 2 * math.pi * laps * i / N + ph
+    return cx + rx * math.cos(a), cy + ry * math.sin(a) + 1.2 * math.sin(4 * a), math.sin(a) > 0
+
+
+def f_beatogold(i):
+    """Die vier goldenen Schmetterlingsflügel schlagen (spaltentreu, nichts gestreckt), sie schwebt,
+    goldene Schmetterlinge umkreisen sie mit Glitzerspur."""
+    s = SRC.copy()
+    blink(s, i)
+    t = 2 * math.pi * i / N
+    hover = -round(1.3 * math.sin(2 * t))
+    beat = 0.5 - 0.5 * math.cos(4 * t)                  # vier Flügelschläge je Loop
+    op = s[:, :, 3] > 0
+    gold = np.zeros((SH, SW), bool)
+    for y, x in zip(*np.nonzero(op)):
+        gold[y, x] = hexc(SRC[y, x]) in BG_WING
+    top, bot = _ys <= 11, (_ys >= 16) & (_ys <= 21)
+    left, right = _xs <= 6, _xs >= SW - 7
+    parts = [(gold & top & left, 6, -1, 0.14), (gold & top & right, SW - 7, 1, 0.14),
+             (gold & bot & left, 5, -1, -0.12), (gold & bot & right, SW - 6, 1, -0.12)]
+    out = np.zeros((H, W, 4), int)
+    body = op.copy()
+    for m, _, _, _ in parts:
+        body &= ~m
+    wings = np.zeros_like(out)
+    for m, px, side, lift in parts:
+        shear_flap(s, m, px, side, lift * beat, 1.0 - 0.3 * beat, wings, (PL, PT + hover), curve=1.2)
+    mw = wings[:, :, 3] > 0
+    out[mw] = wings[mw]
+    for y, x in zip(*np.nonzero(body)):
+        out[y + PT + hover, x + PL] = s[y, x]
+    for b in BG_FLIES:                                  # Schmetterlinge mit Glitzerspur
+        x, y, front = bg_fly(b, i)
+        px_, py_, _ = bg_fly(b, i - 1)
+        tx, ty = int(round(px_)) + PL, int(round(py_)) + PT
+        if 0 <= tx < W and 0 <= ty < H and out[ty, tx, 3] == 0:
+            out[ty, tx] = (*BG_GOLD[2][:3], 110)
+        st = BG_FLAP[(i + b[6]) % 4]
+        pix = [((dx, dy), BG_GOLD[k]) for (dx, dy), k in BG_WINGS[st]]
+        pix += [((0, 0), rgb('311800'))] + ([((0, -1), rgb('311800'))] if st != 'zu' else [])
+        x, y = int(round(x)) + PL, int(round(y)) + PT
+        for (dx, dy), c in pix:
+            xx, yy = x + dx, y + dy
+            if 0 <= xx < W and 0 <= yy < H and (front or out[yy, xx, 3] == 0):
+                out[yy, xx] = c
+    return out
+
+
+# ---------------------------------------------------------------- Fiona the Ghost Princess
+FG_DRILL = {'3c2340', 'fac5f2', 'd391c7', 'a6548d', '6c2f61', '1d0826'}
+FG_GHOST = ['.www.', 'wewew', 'wwwww', 'wswws']        # kleines Gespenst (letzte Zeile: wabernder Saum)
+FG_HEM = ['w.w.w', '.w.w.']
+# (Mittelpunkt x, y, Radius x, y, Umläufe, Phase) in Sprite-Koordinaten
+FG_GHOSTS = [(9.5, 11.0, 15.0, 5.0, 1, 0.0), (9.5, 20.0, 14.0, 4.0, -1, 2.1), (9.5, 4.0, 12.0, 3.0, 1, 4.0)]
+
+
+FG_CROWN = {'7f7886', 'd1c6dc'}
+FG_SPARK = [(10, 1, 2), (8, 4, 9), (12, 4, 16), (9, 2, 23), (11, 5, 30), (7, 5, 37), (12, 2, 43)]
+
+
+def f_fiona(i):
+    """Sie steht (die Füße bleiben am Boden), die Bohrlocken federn sacht, die Krone glitzert,
+    kleine Gespenster ziehen wabernd hinter ihr vorbei."""
+    s = SRC.copy()
+    blink(s, i)
+    t = 2 * math.pi * i / N
+    hover, lag = 0, -round(0.5 - 0.5 * math.cos(2 * t - 0.6))
+    g = 0.5 - 0.5 * math.cos(3 * t)
+    for y, x in zip(*np.nonzero(s[:, :, 3])):          # das Silber der Krone schimmert
+        if y <= 6 and hexc(SRC[y, x]) in FG_CROWN:
+            s[y, x] = lighten(s[y, x], 0.4 * g)
+    op = s[:, :, 3] > 0
+    drill = np.zeros((SH, SW), bool)
+    for y, x in zip(*np.nonzero(op)):
+        drill[y, x] = 6 <= y <= 21 and (x <= 4 or x >= SW - 5) and hexc(SRC[y, x]) in FG_DRILL
+    ghosts = []
+    for k, (cx, cy, rx, ry, laps, ph) in enumerate(FG_GHOSTS):
+        a = 2 * math.pi * laps * i / N + ph
+        gx = round(cx + rx * math.cos(a)) - 2 + PL
+        gy = round(cy + ry * math.sin(a) + 1.3 * math.sin(3 * a + k)) - 2 + PT
+        ghosts.append((gx, gy, (i // 3 + k) % 2))
+    out = np.zeros((H, W, 4), int)
+    for gx, gy, hem in ghosts:                          # die Gespenster ziehen hinter ihr vorbei
+        for yy, row in enumerate(FG_GHOST[:3] + [FG_HEM[hem]]):
+            for xx, ch in enumerate(row):
+                c = {'w': rgb('f4f8f9', 200), 'e': rgb('3c2340', 220), 's': rgb('d8cde5', 200)}.get(ch)
+                if c is not None and 0 <= gy + yy < H and 0 <= gx + xx < W:
+                    out[gy + yy, gx + xx] = c
+    for y, x in zip(*np.nonzero(op & ~drill)):
+        out[y + PT + hover, x + PL] = s[y, x]
+    for y, x in zip(*np.nonzero(drill)):
+        out[y + PT + lag, x + PL] = s[y, x]
+    for (x, y), c in sparkle_pixels(i, N, [(x + PL, y + PT, st) for x, y, st in FG_SPARK],
+                                    rgb('ffffff'), rgb('e8dcf4')).items():
+        dot(out, x, y, c)
+    return out
+
+# ---------------------------------------------------------------- Overlord Baaliel
+OB_EYES = [(15, 7), (18, 7)]
+OB_ORB = {'ffdbd2', 'd83a42'}
+OB_RINGS = [(4, 7), (29, 7)]                            # die blauen Ringe an den Knochenhänden
+OB_RSPARK = [(4, 7, 4), (29, 7, 12), (4, 7, 21), (29, 7, 28), (29, 7, 37), (4, 7, 44)]
+OB_AURA = [rgb('b58cff', 230), rgb('8a5fd0', 210), rgb('4c3274', 180), rgb('2a1a44', 120)]
+OB_MIST = [rgb('6a4a9c', 150), rgb('4c3274', 120), rgb('2a1a44', 80)]
+
+
+def overlord_base(i):
+    s = SRC.copy()
+    t = 2 * math.pi * i / N
+    g = 0.5 - 0.5 * math.cos(3 * t)                     # die roten Augenlichter und der Orb glühen
+    for x, y in OB_EYES:
+        s[y, x] = [int(0x43 + (255 - 0x43) * g), int(0x13 + 0x30 * g), int(0x14 + 0x30 * g), 255]
+    for y, x in zip(*np.nonzero(s[:, :, 3])):
+        if hexc(SRC[y, x]) in OB_ORB:
+            s[y, x] = lighten(s[y, x], 0.45 * g)
+    for x, y in OB_RINGS:
+        s[y, x] = lighten(s[y, x], 0.5 * (0.5 - 0.5 * math.cos(4 * t + x)))
+    return bounce_frame(s, B24[i % 24])
+
+
+AURA_SYS = MIST_OB = None
+
+
+def f_overlord(i):
+    """Er atmet ruhig, die roten Augenlichter und der Orb in der Brust glühen, dunkle Aura steigt auf."""
+    global AURA_SYS, MIST_OB
+    if AURA_SYS is None:
+        MIST_OB = rising(overlord_base, 22, 57, OB_MIST, life=(12, 18), vy=(0.3, 0.5), wob=(0.8, 1.4), blob=True)
+        AURA_SYS = rising(overlord_base, 32, 59, OB_AURA, life=(9, 14), vy=(0.6, 1.0))
+    out = overlord_base(i)
+    draw_parts(out, MIST_OB, i)
+    draw_parts(out, AURA_SYS, i)
+    t = 2 * math.pi * i / N
+    g = 0.5 - 0.5 * math.cos(3 * t)
+    b = B24[i % 24]
+    for x, y in OB_EYES:                                # roter Schein neben den Augenlichtern
+        if g > 0.6:
+            for dx in (-1, 1):
+                c = out[y + PT + b, x + dx + PL]
+                if hexc(c) in ('09090d', '060100'):
+                    out[y + PT + b, x + dx + PL] = [0x80, 0x10, 0x14, 255]
+    for (x, y), c in sparkle_pixels(i, N, [(x + PL, y + PT + b, st) for x, y, st in OB_RSPARK],
+                                    rgb('e8f0ff'), rgb('8fb0ff')).items():
+        dot(out, x, y, c)
+    return out
+
+
+# ---------------------------------------------------------------- Grey Mage Archibald
+GM_KNOB = (1.5, 14.0)                                   # Stabkopf
+GM_SPARK = [(-3, 11, 3), (-4, 16, 15), (0, 9, 26), (-2, 18, 38), (-5, 13, 44)]
+GM_TALK = 'oohcchoohchoooohcchooccho'[:24]              # o offen, h halb, c zu (Frame 0 = Ruhepose)
+GM_MOUTH = {'o': [], 'h': [((7, 18), '7b7b7b'), ((8, 18), '7b7b7b')],
+            'c': [((7, 17), '7b7b7b'), ((8, 17), '7b7b7b'), ((7, 18), '7b7b7b'), ((8, 18), '7b7b7b')]}
+GM_HAND_COLS = {'f6bd7b', 'd5a462', '945a18', '311800'}
+GM_LIFT = {k: v for e in (8, 30) for k, v in zip(range(e, e + 10), (1, 2, 2, 2, 1, 2, 2, 2, 1, 0))}
+
+
+def f_greymage(i):
+    """Die Hutspitze wiegt sich, der Stabkopf leuchtet weich auf (runder Lichtschein), Funken glitzern."""
+    s = SRC.copy()
+    t = 2 * math.pi * i / N
+    raw = [round(1.6 * ((8 - y) / 8) ** 1.3 * math.sin(2 * t - 0.25 * y)) for y in range(8, -1, -1)]
+    dxs = clamp_chain(raw)[::-1]                        # von der Krempe aus: Nachbarzeilen höchstens 1 px
+    hat = s.copy()
+    for y in range(0, 8):
+        if dxs[y]:
+            hat[y] = 0
+            for x in np.nonzero(s[y, :, 3])[0]:
+                if 0 <= x + dxs[y] < SW:
+                    hat[y, x + dxs[y]] = s[y, x]
+    s = hat
+    blink(s, i)
+    for (x, y), c in GM_MOUTH[GM_TALK[i % 24]]:          # er spricht: der Mund geht auf und zu
+        s[y, x] = rgb(c)
+    lift = GM_LIFT.get(i, 0)                            # die freie Hand hebt sich zur Betonung
+    if lift:
+        hand = np.zeros((SH, SW), bool)
+        for y in range(17, 21):
+            for x in range(11, 15):
+                hand[y, x] = s[y, x, 3] > 0 and hexc(SRC[y, x]) in GM_HAND_COLS
+        moved = s.copy()
+        for y, x in zip(*np.nonzero(hand)):             # darunter kommt der dunkle Ärmel hervor
+            moved[y, x] = rgb('0f1014')
+        for y, x in zip(*np.nonzero(hand)):
+            moved[y - lift, x] = s[y, x]
+        s = moved
+    g = 0.5 - 0.5 * math.cos(2 * t)
+    out = np.zeros((H, W, 4), int)
+    kx, ky = GM_KNOB[0] + PL, GM_KNOB[1] + PT
+    R = 4.0 + 1.6 * g
+    for y in range(int(ky - 6), int(ky + 7)):           # weicher, runder Lichtschein hinter dem Stab
+        for x in range(int(kx - 6), int(kx + 7)):
+            d = math.hypot(x - kx, y - ky)
+            if d < R and 0 <= y < H and 0 <= x < W:
+                a = (1 - d / R) ** 1.5
+                out[y, x] = [235, 245, 255, int(25 + 205 * a * (0.6 + 0.4 * g))]
+    for y, x in zip(*np.nonzero(s[:, :, 3])):
+        c = s[y, x]
+        if x <= 3 and 12 <= y <= 16:                    # der Stabkopf selbst glimmt mit
+            c = lighten(c, 0.25 + 0.35 * g)
+        out[y + PT, x + PL] = c
+    for (x, y), c in sparkle_pixels(i, N, [(x + PL, y + PT, st) for x, y, st in GM_SPARK],
+                                    rgb('ffffff'), rgb('d8e8f0')).items():
+        dot(out, x, y, c)
+    return out
+
+
+# ---------------------------------------------------------------- Toras the Battle Maniac
+TB_PIVOT = (20.5, 17.5)                                 # Faust
+TB_REST = 1.75                                          # in Ruhe gesenkt (links unten)
+# Schnell und unregelmäßig hin und her: (von, bis, Frames des Hiebs, Frames Nachleuchten); None = kurze Pause
+TB_SWINGS = [(1.72, -0.1, 2, 1), (-0.1, 1.72, 2, 1), (1.72, 0.3, 2, 0), (0.3, 1.72, 1, 1), (1.72, -0.2, 2, 2),
+             (-0.2, 1.1, 2, 0), (1.1, -0.1, 1, 1), (-0.1, 1.72, 2, 1), None, None, (1.72, -0.1, 2, 1),
+             (-0.1, 1.72, 3, 1), (1.72, 0.5, 2, 0), (0.5, -0.1, 1, 1), (-0.1, 1.72, 2, 1), (1.72, 0.8, 1, 0),
+             (0.8, 1.72, 1, 1), (1.72, -0.1, 2, 1), (-0.1, 1.72, 2, 1), None, None]
+
+
+def _tb_timeline():
+    """Je Frame: (Klingenwinkel, (Spur-Anfang, dickes Ende der Spur) oder None in Pausen)."""
+    res, last = [], 1.72
+    for sw in TB_SWINGS:
+        if sw is None:
+            res.append((last, None))
+            continue
+        a, b, n, f = sw
+        for j in range(1, n + 1):
+            e = 1.0 if n == 1 else [0.55, 1.0][j - 1] if n == 2 else [0.35, 0.75, 1.0][j - 1]
+            res.append((a + (b - a) * e, (a, b)))
+        for j in range(1, f + 1):                       # Nachleuchten: die Spur verschwindet von ihrem Anfang her
+            res.append((b, (a + (b - a) * j / (f + 1), b)))
+        last = b
+    assert len(res) == N, len(res)
+    return res
+
+
+TB_TIME = _tb_timeline()
+
+
+def _tb_masks():
+    op = SRC[:, :, 3] > 0
+    grey = np.array([[r == g == b for r, g, b in SRC[y, :, :3]] for y in range(SH)])
+    sword = op & (_ys >= 16) & (_ys <= 19) & (((_xs >= 22)) | ((_xs == 21) & np.isin(_ys, (16, 19))))
+    wedge = op & (_ys >= 20) & (_xs >= 16) & grey
+    body = op & ~sword & ~wedge
+    wedge |= sword & (_xs >= 24)                        # die breite Klinge aus dem Sprite gehört zur Spur
+    arm = body & (_xs >= 14) & (_xs <= 21) & (_ys >= 16) & (_ys <= 19)
+    hilt = np.zeros_like(SRC)                          # Heft und Stichblatt aus dem Sprite
+    for y, x in zip(*np.nonzero(sword & (_xs <= 23))):
+        hilt[y, x] = SRC[y, x]
+    return hilt, hilt[:, :, 3] > 0, wedge, body & ~arm, arm
+
+
+def tb_len(a):
+    return 19.0 + 3.8 * max(0.0, min(1.0, a / 1.7))
+
+
+def tb_trail(out, px_, py_, start, ang):
+    """Schwungspur als überstrichene Sichel vom Winkel start bis zur Klinge (ang): außen genau bis zur
+    Klingenspitze, an der Klinge so breit wie die ganze Klinge (vom Heft bis zur Spitze), zum Anfang hin
+    spitz; außen heller Rand, nach innen dunkler – in den Grautönen der Spur aus dem Sprite."""
+    lo, hi = min(start, ang), max(start, ang)
+    span = max(0.3, abs(ang - start))
+    for y in range(int(py_ - 26), int(py_ + 26)):
+        for x in range(int(px_ - 26), int(px_ + 26)):
+            if not (0 <= y < out.shape[0] and 0 <= x < out.shape[1]):
+                continue
+            dx, dy = x + 0.5 - px_, y + 0.5 - py_
+            a = math.atan2(dy, dx)
+            if not lo <= a <= hi:
+                continue
+            u = max(0.0, 1 - abs(a - ang) / span)       # 1 an der Klinge, 0 am Anfang der Spur
+            R = tb_len(a) + 0.5
+            T = 1.0 + (R - 4.0) * u ** 1.3                # an der Klinge: die ganze Klinge
+            r = math.hypot(dx, dy)
+            if R - T <= r <= R:
+                d = (R - r) / T
+                c = 'dedede' if d < 0.2 else 'cccccc' if d < 0.45 else 'bfbfbf' if d < 0.75 else 'a7a7a7'
+                if u < 0.12:
+                    c = '969696'
+                out[y, x] = rgb(c)
+
+
+def tb_blade(out, px_, py_, ang):
+    """Die eigentliche Klinge: schmal (heller Grat + dunklere Schneide), direkt gerastert – bleibt in
+    jedem Winkel geschlossen."""
+    ca, sa = math.cos(ang), math.sin(ang)
+    L = tb_len(ang)                                     # die Spur reicht außen genau bis hierhin
+    x0, y0 = round(px_ + 3 * ca - 0.5), round(py_ + 3 * sa - 0.5)
+    x1, y1 = round(px_ + L * ca - 0.5), round(py_ + L * sa - 0.5)
+    n = max(abs(x1 - x0), abs(y1 - y0))
+    line = [(round(x0 + (x1 - x0) * k / n), round(y0 + (y1 - y0) * k / n)) for k in range(n + 1)]
+    steep = abs(y1 - y0) > abs(x1 - x0)                 # Schneide: 1 px daneben, quer zur Hauptrichtung
+    edge = (-1 if ca > 0 else 1, 0) if steep else (0, 1 if ca >= 0 else -1)
+    for k, (x, y) in enumerate(line[:-1]):
+        if k < n - 1:
+            dot(out, x + edge[0], y + edge[1], rgb('9a9a9a'))
+    for k, (x, y) in enumerate(line):
+        dot(out, x, y, rgb('c8c8c8' if k == n else 'e6e6e6'))
+
+
+if V == 'battlemaniac':
+    TB_HILT, TB_HILT_M, TB_WEDGE, TB_BODY, TB_ARM = _tb_masks()
+    TB_ANG = np.arctan2(_ys + 0.5 - TB_PIVOT[1], _xs + 0.5 - TB_PIVOT[0])
+
+
+def f_battlemaniac(i):
+    """Wie Toras, nur rasend: er zieht die Klinge schnell und unregelmäßig hin und her (ganze und halbe
+    Hiebe, manche in einem Frame, kurze Pausen), von links unten im Bogen nach rechts hoch und zurück – der graue Bogen aus dem Sprite ist die Schwungspur direkt hinter der
+    Klinge, die Klinge selbst ist schmal. Der Arm hebt und senkt sich mit dem Schwert (spaltenweise um die Schulter
+    geschert, nichts gestreckt), die Haarstacheln wiegen sich sacht im Wind."""
+    s = SRC.copy()
+    blink(s, i)
+    t = 2 * math.pi * i / N
+    raw = [round(1.3 * ((11 - y) / 11) ** 1.2 * math.sin(2 * t - 0.35 * y)) for y in range(11, -1, -1)]
+    hdx = clamp_chain(raw)[::-1]                        # vom Haaransatz (Zeile 11) nach oben
+    ang, tr = TB_TIME[i]
+    k = round(3 * max(-0.35, min(2.05, ang)) / TB_REST)  # Faust: gesenkt bis 3 px tiefer, beim Hieb oben
+    k = max(-1, min(3, k))
+    arm_dy = lambda x: round(k * (x - 13) / 8)
+    out = np.zeros((H, W, 4), int)
+    if tr:
+        tb_trail(out, TB_PIVOT[0] + PL, TB_PIVOT[1] + PT + k, tr[0], ang)
+    tb_blade(out, TB_PIVOT[0] + PL, TB_PIVOT[1] + PT + k, ang)
+    hilt = rotate_part(TB_HILT, TB_HILT_M, TB_PIVOT, ang, (H, W), (PL, PT + k))
+    m = hilt[:, :, 3] > 0
+    out[m] = hilt[m]
+    for y, x in zip(*np.nonzero(TB_BODY)):
+        dx = hdx[y] if y <= 11 else 0
+        out[y + PT, x + PL + dx] = s[y, x]
+    for y, x in zip(*np.nonzero(TB_ARM)):               # der Arm schwingt mit (die Faust führt das Schwert)
+        out[y + PT + arm_dy(x), x + PL] = s[y, x]
+    return out
+
+
+# ---------------------------------------------------------------- ZsosSsar the Worm Soldier
+WS_SHOTS = [5, 17, 29, 41]                              # Gasstöße (Frame 0 = Ruhepose)
+WS_GAS = [rgb('e4ff9a'), rgb('b4ec5a'), rgb('7cc43c'), rgb('4a8c2c')]
+WS_MUZZLE = (1.0, 9.0)                                  # dunkler Streifen im goldenen Mündungsring (Sprite-Koordinaten)
+
+
+def ws_puffs(i):
+    """Gaswolken: je Stoß vier Wölkchen, die aus der Mündung quellen, nach links oben treiben,
+    anschwellen und verblassen; dazwischen kräuselt ein Faden aus der Mündung."""
+    res = []
+    for e in WS_SHOTS:
+        for k, (vx, vy, dl) in enumerate(((-0.8, -0.2, 0), (-0.6, -0.4, 1), (-0.7, 0.1, 2), (-0.45, -0.1, 3))):
+            a = (i - e - dl) % N
+            if a < 20:
+                u = a / 20
+                res.append((WS_MUZZLE[0] + vx * a * (1.2 - 0.4 * u), WS_MUZZLE[1] + vy * a + 0.4 * math.sin(0.7 * a + k),
+                            1.6 + 3.2 * u ** 0.6, 1.0 - u ** 2))
+    for k in range(4):                                  # Nachfaden: kleine Kringel direkt an der Mündung
+        a = (i + 4 * k) % 16
+        res.append((WS_MUZZLE[0] - 0.45 * a, WS_MUZZLE[1] - 0.3 * a + 0.7 * math.sin(0.8 * a + k),
+                    1.0 + 0.08 * a, 0.75 * (1 - a / 16)))
+    return res
+
+
+def f_wormsoldier(i):
+    """Er wiegt sich wurmartig (oben weiter als unten, das Schwanzende liegt still), die Gaswaffe schwingt
+    mit, stößt giftgrüne Wolken aus (mit Rückstoß), dazwischen kräuselt Gas aus der Mündung."""
+    body, gun = load('body'), load('gun')
+    blink(body, i)
+    t = 2 * math.pi * i / N
+    raw = [round(1.8 * ((22 - y) / 22) ** 1.1 * math.sin(2 * t - 0.04 * (22 - y))) if y < 22 else 0
+           for y in range(SH - 1, -1, -1)]
+    lean = clamp_chain(raw)[::-1]                       # von unten nach oben: Nachbarzeilen höchstens 1 px
+    bob = round(0.5 - 0.5 * math.cos(4 * t))            # dazu ein kleines Nicken im Doppeltakt (Kopf sinkt 1 px)
+    rec = 1 if any((i - e) % N in (0, 1) for e in WS_SHOTS) else 0
+    gdx, gdy = lean[13] + rec, bob
+    out = np.zeros((H, W, 4), int)
+    for y, x in zip(*np.nonzero(body[:, :, 3])):
+        out[y + PT + (bob if y < 14 else 0), x + PL + lean[y]] = body[y, x]
+    stripe = np.zeros((H, W), bool)
+    for y, x in zip(*np.nonzero(gun[:, :, 3])):
+        out[y + PT + gdy, x + PL + gdx] = gun[y, x]
+        stripe[y + PT + gdy, x + PL + gdx] = x <= 1 and hexc(gun[y, x]) in ('273305', '665300')
+    fig = (out[:, :, 3] > 0) & ~stripe                 # das Gas liegt über dem vorderen Ringstrich
+    gas = np.zeros((H, W))
+    col = np.zeros((H, W), int)
+    for cx, cy, r, a in ws_puffs(i):
+        cx, cy = cx + PL + gdx, cy + PT + gdy
+        for y in range(int(cy - r - 1), int(cy + r + 2)):
+            for x in range(int(cx - r - 1), int(cx + r + 2)):
+                d = math.hypot(x - cx, y - cy) / r
+                if d < 1 and 0 <= y < H and 0 <= x < W and not fig[y, x]:
+                    v = a * (1 - d * d)
+                    if v > gas[y, x]:
+                        gas[y, x] = v
+                        col[y, x] = min(3, int(4 * d))
+    for y, x in zip(*np.nonzero(gas > 0.08)):
+        c = WS_GAS[col[y, x]]
+        al = int(min(240, 90 + 220 * gas[y, x]))
+        if stripe[y, x]:                                # über dem Streifen deckend mischen
+            o = out[y, x]
+            out[y, x] = [int(o[k] + (c[k] - o[k]) * al / 255) for k in range(3)] + [255]
+        else:
+            out[y, x] = [c[0], c[1], c[2], al]
+    return out
+
+# ---------------------------------------------------------------- Elana the Digital Diva
+ED_NOTE = ['.##', '.#.', '##.', '##.']                  # Achtelnote
+ED_TEAL, ED_PINK = rgb('39c5bb'), rgb('f28cb6')
+# (Startframe, Start-x, Start-y, Drift je Frame) in Sprite-Koordinaten; steigen 12 Frames lang auf
+ED_NOTES = [(2, -4, 12, -0.15), (10, 31, 8, 0.12), (18, -4, 8, -0.1), (26, 31, 12, 0.1), (34, -4, 13, -0.12),
+            (42, 31, 10, 0.12)]
+
+
+ED_FRET = [0] * 8 + [1] * 8 + [0] * 4 + [-1] * 8 + [0] * 4 + [1] * 8 + [0] * 8   # Griffwechsel (+1 = zum Kopf)
+
+
+def ed_bop(i):
+    """Wippen im Halbtakt wie bei Base-Elana: 8 Frames unten, 8 oben (Frame 0 = Ruhe)."""
+    return 1 if 2 <= i % 16 < 10 else 0
+
+
+def f_diva(i):
+    """Sie spielt Gitarre wie Base-Elana: Achtel-Strumming (ab – mitte – auf – mitte), die Greifhand
+    wechselt die Griffe am Hals, der Fuß tippt den Takt, der ganze Oberkörper wippt, Kopf und Zöpfe
+    folgen verzögert, Noten in Türkis und Pink steigen auf."""
+    body, guitar, arms = load('body'), load('guitar'), load('arms')
+    out = np.zeros((H, W, 4), int)
+    bop = ed_bop(i)
+    foot = 1 if i % 8 in (5, 6, 7) else 0               # der linke Fuß tippt den Takt
+    nod = bop + (1 if 3 <= i % 16 < 7 else 0)          # der Kopf nickt zusätzlich (sinkt nur, nichts reißt)
+    tail = ed_bop(i - 2)                                # die Zöpfe schwingen hinterher
+    tip = {6: -1, 14: 1}.get(i % 16, 0)                 # die Zopfenden schlenkern
+    for y, x in zip(*np.nonzero(body[:, :, 3])):
+        if y >= 19:                                     # die Beine stehen, nur der linke Fuß hebt sich
+            dy, dx = (-foot if (x <= 13 and y >= 20) else 0), 0
+        elif x <= 7 or x >= 23:
+            dy, dx = tail, (tip if y >= 12 else 0)
+        elif y <= 11:
+            dy, dx = nod, 0
+        else:
+            dy, dx = bop, 0
+        out[y + PT + dy, x + PL + dx] = body[y, x]
+    for y, x in zip(*np.nonzero(guitar[:, :, 3])):
+        out[y + PT + bop, x + PL] = guitar[y, x]
+    strum = [0, 1, 0, -1][i % 4]                        # Schlaghand im Achteltakt
+    fret = ED_FRET[i]
+    for y, x in zip(*np.nonzero(arms[:, :, 3])):
+        dx = dy = 0
+        if y >= 19:                                     # Beine stehen, nur der Fuß hebt sich
+            dy = -foot if (x <= 13 and y >= 20) else 0
+        else:
+            dy = bop
+            if 15 <= x <= 17 and 12 <= y <= 15:         # Schlaghand
+                dy += strum
+            elif 21 <= x <= 24 and 6 <= y <= 9:         # Greifhand
+                dx, dy = fret, dy - fret
+        out[y + PT + dy, x + PL + dx] = arms[y, x]
+    for e, x0, y0, vx in ED_NOTES:                      # Noten steigen auf und verblassen
+        a = (i - e) % N
+        if a >= 12:
+            continue
+        c = ED_TEAL if (e // 8) % 2 == 0 else ED_PINK
+        nx, ny = round(x0 + vx * a + 0.6 * math.sin(0.8 * a)) + PL, round(y0 - 0.8 * a) + PT
+        al = 255 if a < 8 else int(255 * (12 - a) / 4)
+        for yy, row in enumerate(ED_NOTE):
+            for xx, ch in enumerate(row):
+                if ch == '#':
+                    dot(out, nx + xx, ny + yy, [c[0], c[1], c[2], al])
+    return out
+
+
+# ---------------------------------------------------------------- Holy Styx
+HS_MIRROR = {'9d91db', 'b5bdec', 'dee4f4'}
+HS_GOLD = {'837d03', '9e961c', 'a6a21e'}
+HS_STAFF = {'6e4b80', '916da4'}
+HS_HELM = {'51354b', '6a4d63', '75576e', '5e4258', '927a90', 'af95ac', 'c0a4b5', 'c8bac7'}
+HS_NOWING = HS_GOLD | HS_STAFF | {'58325c', '9869aa', '190200', '2a0000'}
+HS_GATE = (11.5, 19.5)                                  # Mitte des Tors
+# Sog-Teilchen: (Startframe, Startwinkel, Startradius, Lebensdauer)
+HS_PULL = [(k * 4 + (k * 7) % 3, 0.9 * k + 0.4, 9.5 + (k % 3), 10 + k % 4) for k in range(12)]
+
+
+def f_holystyx(i):
+    """Die vier Flügel auf dem Rücken schlagen (spaltentreu, oben nach oben, unten nach unten), über den
+    lila Helm läuft ein Schimmer, das Tor auf der Brust saugt: Ringe ziehen sich ins Tor, Lichtteilchen
+    wirbeln hinein. Sie schwebt, der Goldrahmen glimmt, das Band am Stab pendelt."""
+    s = SRC.copy()
+    t = 2 * math.pi * i / N
+    hover = -round(1.5 * math.sin(2 * t))
+    g = 0.5 - 0.5 * math.cos(3 * t)
+    band = (i * 1.1) % 26 - 5                           # Schimmer schräg über den Helm
+    cx, cy = HS_GATE
+    for y, x in zip(*np.nonzero(s[:, :, 3])):
+        h = hexc(SRC[y, x])
+        if h in HS_MIRROR:                              # Sog: helle Ringe laufen zur Mitte, innen wird es tief
+            d = math.hypot(x + 0.5 - cx, (y + 0.5 - cy) / 1.35)
+            v = 0.5 + 0.5 * math.cos(2 * math.pi * (d / 2.2 + i / 6))
+            c = SRC[y, x]
+            deep = max(0.0, 1 - d / 2.2)
+            c = [int(c[k] + ([90, 70, 170][k] - c[k]) * 0.75 * deep) for k in range(3)] + [255]
+            s[y, x] = lighten(c, 0.55 * v * (1 - deep))
+        elif h in HS_GOLD:
+            s[y, x] = lighten(s[y, x], 0.3 * g)
+        elif h in HS_HELM and y <= 11:
+            s[y, x] = lighten(s[y, x], 0.08 + (0.5 if abs(x - 7 + 0.5 * y - band) < 1.3 else 0))
+    op = s[:, :, 3] > 0
+    wing = op & ~np.isin(np.array([[hexc(c) for c in row] for row in SRC]), list(HS_NOWING))
+    parts = [(wing & (_ys >= 3) & (_ys <= 12) & (_xs <= 6), 6, -1, 0.16),
+             (wing & (_ys >= 3) & (_ys <= 12) & (_xs >= 17), 17, 1, 0.16),
+             (wing & (_ys >= 16) & (_ys <= 22) & (_xs <= 5), 5, -1, -0.16),
+             (wing & (_ys >= 16) & (_ys <= 23) & (_xs >= 18), 18, 1, -0.16)]
+    beat = 0.5 - 0.5 * math.cos(4 * t)                  # vier Flügelschläge je Loop
+    out = np.zeros((H, W, 4), int)
+    wl = np.zeros_like(out)
+    body = op.copy()
+    for m, px, side, lift in parts:
+        body &= ~m
+        shear_flap(s, m, px, side, lift * beat, 1.0 - 0.3 * beat, wl, (PL, PT + hover), curve=1.2)
+    mw = wl[:, :, 3] > 0
+    out[mw] = wl[mw]
+    for y, x in zip(*np.nonzero(body)):
+        dx = 0
+        if y >= 28 and hexc(SRC[y, x]) in HS_STAFF:     # das Band am Stab pendelt
+            dx = round(math.sin(2 * t - 0.6 * (y - 28)) * (y - 27) / 5)
+        out[y + PT + hover, x + PL + dx] = s[y, x]
+    gx, gy = cx + PL, cy + PT + hover
+    for e, a0, r0, L in HS_PULL:                        # Lichtteilchen wirbeln ins Tor
+        a = (i - e) % N
+        if a >= L:
+            continue
+        for back, al in ((1, 110), (0, 235)):
+            u = max(0, a - back) / L
+            r = r0 * (1 - u) ** 1.3 + 0.8
+            ang = a0 + 2.4 * u
+            x, y = int(math.floor(gx + r * math.cos(ang))), int(math.floor(gy + r * math.sin(ang)))
+            if 0 <= y < H and 0 <= x < W:               # über die Figur hinweg (halbtransparent) ins Tor
+                c = rgb('f4f0ff') if u < 0.5 else rgb('c8bcff')
+                o = out[y, x]
+                if o[3]:
+                    out[y, x] = [int(o[k] + (c[k] - o[k]) * al / 300) for k in range(3)] + [255]
+                else:
+                    out[y, x] = [c[0], c[1], c[2], al]
+    return out
+
+
+# ---------------------------------------------------------------- Kaito Sid the Phantom Thief
+KS_CARDS = [(0, -4.0, 6.0, 1.0), (16, 21.0, 10.0, -1.0), (32, -3.0, 16.0, 1.0)]   # (Start, x, y, Richtung)
+
+
+def f_kaito(i):
+    """Der Umhang flattert, das Monokel blitzt, über den Zylinder läuft ein Glanz, er blinzelt,
+    Spielkarten wirbeln um ihn herum."""
+    s = SRC.copy()
+    blink(s, i)
+    t = 2 * math.pi * i / N
+    sh = (i * 0.8) % 30 - 6                             # Glanz über den Zylinder
+    for y in range(0, 10):
+        for x in range(SW):
+            if s[y, x, 3] and abs(x - 1 - sh + 0.4 * y) < 1 and hexc(SRC[y, x]) not in ('323331',):
+                s[y, x] = lighten(s[y, x], 0.55)
+    out = np.zeros((H, W, 4), int)
+    for (st, x0, y0, d) in KS_CARDS:                    # Karten (hinter ihm, wo es frei ist)
+        a = (i - st) % N
+        if a >= 20:
+            continue
+        cx = round(x0 + d * 0.9 * a) + PL
+        cy = round(y0 - 0.25 * a + 1.2 * math.sin(0.5 * a)) + PT
+        face = (a // 2) % 2 == 0
+        pix = {(0, 0): 'f4f4f4', (1, 0): 'f4f4f4', (0, 1): 'f4f4f4', (1, 1): 'd02030', (0, 2): 'f4f4f4',
+               (1, 2): 'f4f4f4'} if face else {(0, 0): 'b0b0b8', (0, 1): 'b0b0b8', (0, 2): 'b0b0b8'}
+        for (dx, dy), c in pix.items():
+            dot(out, cx + dx, cy + dy, rgb(c))
+    for y, x in zip(*np.nonzero(s[:, :, 3])):
+        out[y + PT, x + PL] = s[y, x]
+    flutter(out, s, i, PL, PT, list(range(19, 26)), range(0, 2), range(13, SW), amp=1.6, speed=4,
+            pause=False, clamp=True)
+    for (x, y), c in sparkle_pixels(i, N, [(5 + PL, 13 + PT, 6), (5 + PL, 13 + PT, 30)],
+                                    rgb('ffffff'), rgb('e0f0ff')).items():
+        dot(out, x, y, c)
+    return out
+
+
+# ---------------------------------------------------------------- Gon the Half-Frozen
+GH_ICE = {'8988cc', 'a3a2f2', 'b3b2ec', '9a99e5', 'c1c1e6', 'dfe0f6'}
+# Fäuste (2x2 Inneres + Kontur): (Pixel, Richtung zum Körper, Farbe des Unterarms)
+GH_FISTS = [([(x, y) for y in (12, 13) for x in (12, 13, 14, 15)] + [(13, 11), (14, 11), (13, 14), (14, 14)], -1, '12090a'),
+            ([(x, y) for y in (12, 13) for x in (0, 1, 2, 3)] + [(1, 11), (2, 11), (1, 14), (2, 14)], 1, '8988cc')]
+GH_SNOW = GH_MIST = GH_FIRE = None
+
+
+def halffrozen_base(i):
+    s = SRC.copy()
+    blink(s, i)
+    band = (i * 0.9) % 34 - 8                           # ein Frostschimmer wandert über die vereiste Hälfte
+    for y, x in zip(*np.nonzero(s[:, :, 3])):
+        if hexc(SRC[y, x]) in GH_ICE and abs(y - x * 0.6 - band) < 1.2:
+            s[y, x] = lighten(s[y, x], 0.6)
+    b = B24[i % 24]
+    out = bounce_frame(s, b)
+    k = round(2 * (0.5 - 0.5 * math.cos(2 * math.pi * i / N * 2)))   # wie Gon: beide Arme hoch und runter
+    for pts, inward, arm in GH_FISTS:                   # die Faust hebt sich und rückt zum Körper (Ellbogen bleibt eng)
+        if not k:
+            continue
+        dx = inward if k == 2 else 0
+        new = {(x + dx, y - k) for x, y in pts}
+        xs = sorted({x for x, _ in pts})
+        inner = xs[:2] if inward < 0 else xs[-2:]
+        for x, y in pts:                                # frei gewordene Stellen: innen der schmale Unterarm
+            if (x, y) not in new:
+                out[y + PT + b, x + PL] = rgb(arm) if (x in inner and y >= 12) else 0
+        for x, y in pts:
+            out[y - k + PT + b, x + dx + PL] = s[y, x]
+    return out
+
+
+def f_halffrozen(i):
+    """Wie der normale Gon: er federt und hebt beide Arme hoch und runter. Über die vereiste Hälfte läuft ein
+    Frostschimmer, auf ihrer Seite rieseln Schnee und Frostnebel und Eiskristalle funkeln, auf der anderen
+    Seite steigen Flammenfunken auf; er blinzelt mit dem freien Auge."""
+    global GH_SNOW, GH_MIST, GH_FIRE
+    if GH_SNOW is None:
+        right = np.zeros((H, W), bool)
+        right[:, PL + 9:] = True
+        GH_FIRE = rising(halffrozen_base, 20, 85, EMBERS, region=right)
+        left = np.zeros((H, W), bool)
+        left[:, :PL + 8] = True
+        GH_SNOW = rising(halffrozen_base, 22, 81, SNOW, life=(12, 18), vy=(0.45, 0.7), fall=True, wob=(0.5, 1.0),
+                         region=left)
+        GH_MIST = rising(halffrozen_base, 10, 83, MIST, life=(12, 18), vy=(0.25, 0.4), wob=(0.8, 1.3), blob=True,
+                         region=left)
+    out = halffrozen_base(i)
+    draw_parts(out, GH_MIST, i)
+    draw_parts(out, GH_SNOW, i)
+    draw_parts(out, GH_FIRE, i)
+    for (x, y), c in sparkle_pixels(i, N, [(x + PL, y + PT, st) for x, y, st in
+                                           [(2, 12, 3), (5, 16, 15), (1, 11, 27), (4, 18, 39)]],
+                                    rgb('ffffff'), rgb('c8d8ff')).items():
+        dot(out, x, y, c)
+    return out
+
+
+# ---------------------------------------------------------------- Dead Singer Molinda
+DM_NOTE = ['.##', '.#.', '##.', '##.']
+DM_NOTES = [(3, -5, 12, -0.12), (15, 21, 10, 0.12), (27, -5, 16, -0.1), (39, 21, 14, 0.1)]
+
+
+DM_TAIL = {'7c0629', 'ea638e', 'f67ba2', 'bf3961', 'aa244c', 'ce466f', '421428'}
+DM_HEART = {(15, 10): 'bf3961', (17, 10): 'aa244c', (14, 11): 'bf3961', (15, 11): '7c0629', (16, 11): 'aa244c',
+            (17, 11): '7c0629', (18, 11): None, (15, 12): '7c0629', (16, 12): '7c0629', (17, 12): None,
+            (16, 13): '7c0629'}                          # das Herz neben dem Gesicht (dahinter: Haar bzw. frei)
+DM_HEART_PX = [((0, 0), 'f75981'), ((2, 0), 'f75981'), ((-1, 1), 'dd4b76'), ((0, 1), 'f75981'), ((1, 1), 'f75981'),
+               ((2, 1), 'f9a4b5'), ((3, 1), 'f75981'), ((0, 2), 'dd4b76'), ((1, 2), 'f75981'), ((2, 2), 'f75981'),
+               ((1, 3), 'dd4b76')]
+DM_HEART_SMALL = [((0, 0), 'f75981'), ((2, 0), 'f75981'), ((0, 1), 'f75981'), ((1, 1), 'f9a4b5'), ((2, 1), 'f75981'),
+                  ((1, 2), 'dd4b76')]
+# Herzchen steigen neben ihr auf, unabhängig von ihrem Flug: (Start, x, y, Drift) im Bild
+DM_HEARTS = [(0, 33.0, 15.0, 0.1), (16, 5.0, 12.0, -0.1), (32, 34.0, 17.0, 0.08)]
+DM_SING = 'oohooccohoocccoohhoocoohooc' [:24]               # o offen, h halb, c zu – sie singt
+DM_MOUTH = {'c': [], 'h': [((10, 12), '7c0629')], 'o': [((9, 12), '7c0629'), ((10, 12), '5a0a20')]}
+
+
+def dm_fly(t):
+    return round(1.6 * math.sin(t)), -round(2.0 * math.sin(2 * t))   # hin und her, auf und ab
+
+
+def f_molinda(i):
+    """Sie fliegt auf und ab und hin und her, die Flügel schlagen kräftig (sie öffnen sich zu den Spitzen hin,
+    zeilentreu), die Locke oben wackelt, die Brust wippt beim Fliegen leicht mit, sie singt, Herzchen und
+    dunkle Noten in Pink und Violett steigen auf."""
+    wings, body = load('wings'), load('body')
+    t = 2 * math.pi * i / N
+    fx, fy = dm_fly(t)
+    _, by = dm_fly(t - 0.45)                            # … die Brust ein wenig
+    jig = max(-1, min(1, by - fy))
+    for (x, y), c in DM_MOUTH[DM_SING[i % 24]]:
+        body[y, x] = rgb(c)
+    for (x, y), c in DM_HEART.items():                  # das Herz löst sich als eigenes Teilchen
+        body[y, x] = rgb(c) if c else 0
+    S = 8.0 * (0.5 - 0.5 * math.cos(4 * t))             # vier kräftige Flügelschläge je Loop
+    out = np.zeros((H, W, 4), int)
+    wy = PT + fy - round(1.5 * S / 8)
+    for y in range(SH):                                 # jede Flügelzeile rückt nach außen, innen wächst sie mit
+        u = max(0, y - 4) / 22
+        dx = round(S * u)
+        for side, xs in ((-1, range(0, SW // 2)), (1, range(SW // 2, SW))):
+            seg = [x for x in xs if wings[y, x, 3]]
+            if not seg:
+                continue
+            inner = max(seg) if side < 0 else min(seg)
+            fill = next((wings[y, x] for x in sorted(seg, key=lambda v: -side * v) if hexc(wings[y, x]) != '585371'),
+                        wings[y, inner])
+            for x in seg:
+                out[y + wy, x + PL + fx + side * dx] = wings[y, x]
+            if y <= 13:                                 # nur am Kopf: dort füllt der Flügel jede Lücke
+                for k in range(dx):
+                    out[y + wy, inner + PL + fx + side * k] = fill
+    src = body.copy()
+    if jig:                                             # Brust: die hellen Blöcke rutschen 1 px nach (Nachbarzeile füllt nach)
+        for x0, x1 in ((5, 8), (11, 14)):
+            for x in range(x0, x1 + 1):
+                col = [body[y, x].copy() for y in range(14, 19)]
+                if jig > 0:                             # nach unten: oben rückt die Zeile darüber nach
+                    for k, y in enumerate(range(15, 19)):
+                        src[y, x] = col[k]
+                else:                                   # nach oben: unten rückt die Zeile darunter nach
+                    for k, y in enumerate(range(14, 18)):
+                        src[y, x] = col[k + 1]
+    curl = round(1.2 * math.sin(4 * t))                 # die Locke oben wackelt
+    tails = src.copy()
+    for y in range(6, 11):                              # die Zopfenden wippen im Flügeltakt nach außen (oben fest)
+        dx = round(1.4 * (0.5 - 0.5 * math.cos(4 * t - 0.8)) * (y - 5) / 5)
+        if not dx:
+            continue
+        for side, xs in ((-1, range(0, 5)), (1, range(SW - 1, SW - 6, -1))):
+            seg = [x for x in xs if src[y, x, 3] and hexc(src[y, x]) in DM_TAIL]
+            if not seg:
+                continue
+            fillc = next((src[y, x] for x in sorted(seg, key=lambda v: side * v) if hexc(src[y, x]) != '7c0629'),
+                         src[y, seg[-1]])
+            for x in seg:
+                tails[y, x] = fillc                     # innen rückt Haar nach – keine Lücke zum Kopf
+            for x in seg:
+                if 0 <= x + side * dx < SW:
+                    tails[y, x + side * dx] = src[y, x]
+    for y, x in zip(*np.nonzero(tails[:, :, 3])):
+        dx = (curl if y == 0 else round(curl / 2)) if y <= 1 else 0   # die Locke oben wackelt
+        out[y + PT + fy, x + PL + fx + dx] = tails[y, x]
+    for e, x0, y0, vx in DM_HEARTS:                     # Herzchen: wachsen, steigen schaukelnd auf, verblassen
+        a = (i - e) % N
+        if a >= 16:
+            continue
+        hx_, hy_ = round(x0 + vx * a + 1.2 * math.sin(0.6 * a)), round(y0 - 0.7 * a)
+        al = 255 if a < 12 else int(255 * (16 - a) / 4)
+        for (dx, dy), c in (DM_HEART_SMALL if a < 3 or a >= 13 else DM_HEART_PX):
+            cc = rgb(c)
+            dot(out, hx_ + dx, hy_ + dy, [cc[0], cc[1], cc[2], al])
+    for k, (e, x0, y0, vx) in enumerate(DM_NOTES):
+        a = (i - e) % N
+        if a >= 12:
+            continue
+        c = rgb('ff66cc') if k % 2 == 0 else rgb('9a5ad0')
+        nx, ny = round(x0 + vx * a + 0.6 * math.sin(0.8 * a)) + PL, round(y0 - 0.8 * a) + PT
+        al = 255 if a < 8 else int(255 * (12 - a) / 4)
+        for yy, row in enumerate(DM_NOTE):
+            for xx, ch in enumerate(row):
+                if ch == '#':
+                    dot(out, nx + xx, ny + yy, [c[0], c[1], c[2], al])
+    return out
+
+
+# ---------------------------------------------------------------- The Little Seaserpent
+SP_BUBBLES = None
+
+
+SP_HAIR = {'5b090a', 'ea4c24', 'c12a20', '6b070b', 'ac2122', 'f0792d', '921a17', '450700'}
+SP_TAIL = {'1d6a3e', '358c4f', '7ac290', '499665', '95cda8', '56b177', '67a57a', '7eae8e'}
+
+
+def seaserpent_base(i):
+    """Die Haare treiben wie unter Wasser (je Zeile schwebt die Strähne nach außen, innen rückt Haar nach),
+    die Schwanzflosse schlägt kräftig (spaltentreu, zur Flosse hin stärker)."""
+    s = SRC.copy()
+    blink(s, i)
+    t = 2 * math.pi * i / N
+    hair = s.copy()
+    for y in range(5, 21):
+        u = (y - 4) / 16
+        for side, xs in ((-1, range(0, SW // 2)), (1, range(SW - 1, SW // 2, -1))):
+            seg = []
+            for x in xs:
+                if not SRC[y, x, 3]:
+                    if seg:
+                        break
+                    continue
+                if hexc(SRC[y, x]) not in SP_HAIR:
+                    break
+                seg.append(x)
+            dx = round(2.0 * u * (0.5 + 0.5 * math.sin(2 * t + (0.35 * y if side < 0 else 0.35 * y + 1.9))))
+            if not seg or not dx:
+                continue
+            inner = next((SRC[y, x] for x in reversed(seg) if hexc(SRC[y, x]) != '5b090a'), SRC[y, seg[-1]])
+            lo, hi = sorted((seg[-1], seg[0] + side * dx))
+            for x in range(max(0, lo), min(SW, hi + 1)):
+                if 0 <= x < SW:
+                    hair[y, x] = inner
+            for x in seg:
+                if 0 <= x + side * dx < SW:
+                    hair[y, x + side * dx] = SRC[y, x]
+    s = hair
+    raw = [round(3.2 * max(0.0, (x - 9) / 11) ** 1.3 * math.sin(3 * t - 0.5 * x)) for x in range(SW)]
+    dys = [0] * 9 + clamp_chain(raw[9:])               # die Schwanzflosse schlägt (spaltentreu)
+    out = np.zeros((H, W, 4), int)
+    for y, x in zip(*np.nonzero(s[:, :, 3])):
+        tail = y >= 21 and hexc(SRC[y, x]) in SP_TAIL
+        out[y + PT + (dys[x] if tail else 0), x + PL] = s[y, x]
+    for x in range(SW):                                 # Spalte nach unten versetzt: oben rückt Schuppe nach
+        if dys[x] > 0:
+            ys = [y for y in range(21, SH) if SRC[y, x, 3] and hexc(SRC[y, x]) in SP_TAIL]
+            if ys and SRC[ys[0] - 1, x, 3]:
+                for k in range(dys[x]):
+                    out[ys[0] + PT + k, x + PL] = s[ys[0], x]
+    return out
+
+
+def f_seaserpent(i):
+    """Die Schwanzflosse schlägt sacht, sie blinzelt, Luftblasen steigen auf."""
+    global SP_BUBBLES
+    if SP_BUBBLES is None:
+        rng = np.random.default_rng(91)
+        fig = np.zeros((H, W), bool)
+        for k in range(N):
+            fig |= seaserpent_base(k)[:, :, 3] > 0
+        fig = ring8(fig) | fig
+        SP_BUBBLES, tries = [], 0
+        while len(SP_BUBBLES) < 16 and tries < 5000:
+            tries += 1
+            e, L = int(rng.integers(N)), int(rng.integers(10, 16))
+            x0, y0 = rng.uniform(2, W - 5), rng.uniform(H * 0.3, H - 5)
+            path = [(int(round(x0 + 0.8 * math.sin(0.7 * a + e))), int(round(y0 - 0.9 * a))) for a in range(L)]
+            if all(2 <= x < W - 4 and 2 <= y < H - 4 and not fig[y:y + 3, x:x + 3].any() for x, y in path):
+                SP_BUBBLES.append((e, L, path))
+    out = seaserpent_base(i)
+    for e, L, path in SP_BUBBLES:
+        a = (i - e) % N
+        if a < L:
+            bx, by = path[a]
+            for (dx, dy), c in bubble_px(a, L).items():
+                dot(out, bx + dx, by + dy, c)
+    return out
+
+
+# ---------------------------------------------------------------- Nomu of the Dawn
+ND_EYE = [(5, 8), (6, 8), (5, 9), (6, 9)]
+
+
+def f_nomudawn(i):
+    """Er federt lässig, im Augenloch der Maske glüht das rote Auge auf, und neben ihm öffnet sich
+    periodisch ein Raum-Zeit-Wirbel, der sich dreht und wieder schließt."""
+    s = SRC.copy()
+    t = 2 * math.pi * i / N
+    g = 0.5 - 0.5 * math.cos(4 * t)
+    for k, (x, y) in enumerate(ND_EYE):                 # rotes Auge mit schwarzem Kern
+        s[y, x] = [int(90 + 150 * g), int(10 * g), int(10 * g), 255] if k != 3 else [20, 0, 0, 255]
+    b = B24[i % 24]
+    out = bounce_frame(s, b)
+    k = i % 24                                          # der Wirbel: öffnet sich, dreht sich, schließt sich
+    size = [0, 0, 0, 0, 1, 2, 3, 4, 5, 5, 5, 5, 5, 5, 5, 5, 4, 3, 2, 1, 0, 0, 0, 0][k]
+    if size:
+        cx, cy = SW + 4.5 + PL, 11.5 + PT
+        rot = -0.45 * i
+        for arm in range(3):
+            for st in range(28):
+                u = st / 27
+                r = u * (size + 0.5)
+                a = rot + arm * 2 * math.pi / 3 + 3.2 * u
+                x, y = int(math.floor(cx + r * math.cos(a))), int(math.floor(cy + r * math.sin(a) * 0.85))
+                c = rgb('2a1640', 240) if u < 0.3 else rgb('6a3aa0', 230) if u < 0.65 else rgb('b090e0', 200)
+                if 0 <= y < H and 0 <= x < W and not out[y, x, 3]:
+                    out[y, x] = c
+        dot(out, int(cx), int(cy), rgb('000000'))
+    return out
+
+
+# ---------------------------------------------------------------- Alien Invader Bartas
+AB_LENS = {'919cd0', 'b4b1d0', '86515c', '674050'}
+AB_BOOMS = [(4, -4, 3), (13, 17, 6), (22, -4, 14), (31, 17, 2), (40, -4, 17)]
+
+
+AB_CLAP = {k: d for st in (3, 15, 27, 39) for k, d in zip(range(st, st + 4), (1, 2, 2, 1))}   # wie Bartas
+AB_IMPACT = {k: j for st in (3, 15, 27, 39) for j, k in enumerate((st + 1, st + 2))}
+AB_FIST_L, AB_FIST_R = (0, 4, 12, 15), (9, 13, 12, 15)
+
+
+def f_alienbartas(i):
+    """Wie Bartas: alle 12 Frames schlägt er die Fäuste vor dem Bauch zusammen (mit Aufprall-Funken).
+    Dazu federt er, die Alien-Linse pulsiert grünlich, er blinzelt mit dem echten Auge, und ringsum
+    platzen Bomben."""
+    s = SRC.copy()
+    blink(s, i)
+    t = 2 * math.pi * i / N
+    g = 0.5 - 0.5 * math.cos(4 * t)
+    for y, x in zip(*np.nonzero(s[:, :, 3])):
+        if 5 <= y <= 7 and 7 <= x <= 10 and hexc(SRC[y, x]) in AB_LENS:
+            c = s[y, x]
+            s[y, x] = [int(c[0] + (120 - c[0]) * g * 0.6), int(c[1] + (255 - c[1]) * g * 0.6),
+                       int(c[2] + (140 - c[2]) * g * 0.6), 255]
+    b = B24[i % 24]
+    out = np.zeros((H, W, 4), int)
+    for e, x, y in AB_BOOMS:
+        a = (i - e) % N
+        if a < 10:
+            boom(out, x + PL, y + PT, a)
+    fig = bounce_frame(s, b)
+    d = AB_CLAP.get(i, 0)
+    if d:
+        for (x0, x1, y0, y1), side in ((AB_FIST_L, 1), (AB_FIST_R, -1)):
+            for k, y in enumerate(range(y0, y1 + 1)):   # der Arm schert von der Schulter zur Faust
+                off = round(d * min(3, k + 1) / 3)
+                if not off:
+                    continue
+                m = np.zeros((SH, SW), bool)
+                m[y, x0:x1 + 1] = SRC[y, x0:x1 + 1, 3] > 0
+                move_part(fig, s, m, side * off, 0, PL, PT + b, toward=-side)
+    m = fig[:, :, 3] > 0
+    out[m] = fig[m]
+    k = AB_IMPACT.get(i)
+    if k is not None:                                   # Aufprall zwischen den Fäusten
+        cx, cy = 6 + PL, 13 + PT + b
+        for dx, dy in ((0, 3 + k), (1, 3 + k)):         # nur unterhalb (oben säße es am Kinn)
+            dot(out, cx + dx, cy + dy, rgb('fffbd0'))
+    return out
+
+
+# ---------------------------------------------------------------- Tharx the King of Conquerors
+TX_EMBERS = None
+
+
+TX_TALK = 'oohcchoohchoooohccooccho'                    # o offen, h halb, c zu – er hält eine Ansprache
+TX_MOUTH = {'o': [], 'h': [((10, 9), 'f5ce88'), ((11, 9), 'f5ce88')],
+            'c': [((10, 8), 'f8bc77'), ((11, 8), 'f8bc77'), ((10, 9), 'f5ce88'), ((11, 9), 'f5ce88')]}
+TX_FIST = [0, 0, -1, -2, -2, -2, -2, -1]               # je 3 Frames: die Faust reckt sich zur Betonung
+
+
+def tharx_base(i):
+    s = SRC.copy()
+    blink(s, i)
+    for (x, y), c in TX_MOUTH[TX_TALK[i % 24]]:
+        s[y, x] = rgb(c)
+    k = TX_FIST[(i // 3) % 8]
+    b = B24[i % 24]                                     # er wippt beim Reden …
+    nod = 1 if k == -2 and (i // 3) % 8 in (3, 4) else 0  # … und nickt bei der Betonung (der Kopf sinkt 1 px)
+    out = np.zeros((H, W, 4), int)
+    fig = bounce_frame(s, b)
+    for y, x in zip(*np.nonzero(s[:, :, 3])):
+        if x >= 16 and 10 <= y <= 14:                   # der Arm schert um die Schulter
+            fig[y + PT + b, x + PL] = 0
+    for y, x in zip(*np.nonzero(s[:, :, 3])):
+        if x >= 16 and 10 <= y <= 14:
+            fig[y + PT + b + round(k * (x - 15) / 9), x + PL] = s[y, x]
+    if nod:
+        head = [(y, x) for y, x in zip(*np.nonzero(s[:, :, 3])) if y <= 9 and 3 <= x <= 19]
+        for y, x in sorted(head, reverse=True):
+            fig[y + PT + b + nod, x + PL] = s[y, x]
+        for x in range(3, 20):
+            if s[0, x, 3]:
+                fig[PT + b, x + PL] = 0
+    return fig
+
+
+def f_tharx(i):
+    """Er hält eine Ansprache: der Mund geht im Redefluss auf und zu, er wippt, reckt zur Betonung die Faust
+    (der Arm schert um die Schulter, nichts gestreckt) und nickt dabei; er blinzelt, Glut steigt um ihn auf."""
+    global TX_EMBERS
+    if TX_EMBERS is None:
+        TX_EMBERS = rising(tharx_base, 22, 101, EMBERS)
+    out = tharx_base(i)
+    draw_parts(out, TX_EMBERS, i)
+    return out
+
+
+FRAME = dict(alex=f_alex, doq=f_doq, grisgar=f_grisgar, nieht=f_nieht, kohta=f_kohta, bill=f_bill,
+             sabrina=f_sabrina, mizune=f_mizune, bartas=f_bartas, gon=f_gon, ida=f_ida, vacarn=f_vacarn,
+             solrym=f_solrym, dajan=f_dajan, omikron=f_omikron, idafire=f_idafire, chuck=f_chuck,
+             duke=f_omikron, alice=f_alice, megakarian=f_megakarian, settdunk=f_settdunk, emperor=f_emperor,
+             yellowflash=f_yellowflash, beatogold=f_beatogold, fiona=f_fiona, overlord=f_overlord, greymage=f_greymage,
+             battlemaniac=f_battlemaniac, wormsoldier=f_wormsoldier, diva=f_diva,
+             holystyx=f_holystyx, kaito=f_kaito, halffrozen=f_halffrozen, molinda=f_molinda,
+             seaserpent=f_seaserpent, nomudawn=f_nomudawn, alienbartas=f_alienbartas, tharx=f_tharx)
+
+if __name__ == '__main__':
+    tag = sys.argv[1] if len(sys.argv) > 1 else 'v'
+    frames = [FRAME[V](i) for i in range(N)]
+    ms = int(sys.argv[2]) if len(sys.argv) > 2 and sys.argv[2].isdigit() else 90
+    save_outputs(f'{OUT}/{V}_idle_{tag}', frames, ms, scale=6 if W < 90 else 3, check_edges=True)

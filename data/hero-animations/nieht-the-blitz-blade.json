@@ -1,0 +1,15 @@
+{
+  "hero": "Nieht, the Blitz Blade",
+  "sheet": "nieht-the-blitz-blade.png",
+  "frameWidth": 53,
+  "frameHeight": 30,
+  "frames": 48,
+  "frameMs": 90,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 3,
+  "padLeft": 4,
+  "padRight": 4,
+  "padBottom": 1,
+  "faceX": 26.0
+}

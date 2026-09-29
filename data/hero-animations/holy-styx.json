@@ -1,0 +1,17 @@
+{
+  "hero": "Holy Styx",
+  "sheet": "holy-styx.png",
+  "frameWidth": 32,
+  "frameHeight": 43,
+  "frames": 48,
+  "frameMs": 90,
+  "loop": true,
+  "layout": "horizontal",
+  "skinOf": "Styx, the Gate to the Spirit World",
+  "padTop": 6,
+  "padLeft": 4,
+  "padRight": 4,
+  "padBottom": 4,
+  "faceX": 16.0,
+  "footY": 39
+}

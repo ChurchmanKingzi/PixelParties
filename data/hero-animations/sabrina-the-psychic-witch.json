@@ -1,0 +1,15 @@
+{
+  "hero": "Sabrina, the Psychic Witch",
+  "sheet": "sabrina-the-psychic-witch.png",
+  "frameWidth": 36,
+  "frameHeight": 30,
+  "frames": 48,
+  "frameMs": 90,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 4,
+  "padLeft": 8,
+  "padRight": 8,
+  "padBottom": 2,
+  "faceX": 18.0
+}
