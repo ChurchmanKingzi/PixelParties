@@ -501,8 +501,12 @@ def f_sparrow(i):
     n = LY_DROOL[a]
     for k in range(n):
         dot(out, 8 + PL, 13 + k + PT + dy, rgb('ccffff' if k < n - 1 else '88ffff'))
-    if a >= 9:
-        dot(out, 8 + PL, 13 + 3 + 2 * (a - 8) + PT + dy, rgb('88ffff'))
+    for e in range(9, N, 12):                             # der Tropfen fällt bis ganz nach unten
+        k = (i - e) % N
+        y0 = 16 + PT - round(2.4 * math.sin(2 * 2 * math.pi * e / N))
+        y = y0 + 1 + 2 * k
+        if y < H - 1 and k < 12:
+            dot(out, 8 + PL, y, rgb('88ffff'))
     return out
 
 
@@ -595,7 +599,15 @@ def pinta_base(i):
             s[y, x] = rgb(c)
     water = np.array([[s[y, x, 3] > 0 and hexc(s[y, x]) in PI_WATER for x in range(SW)] for y in range(SH)])
     s[water] = 0
+    face = s.copy()
     s = sails(s, i)
+    fm = (face[:, :, 3] > 0) & (_ys >= 13) & (_ys <= 19) & (_xs >= 13) & (_xs <= 20) & \
+        ~np.isin(np.array([[hexc(c) for c in row] for row in face]), list(PI_SAIL))
+    s[fm] = face[fm]                                      # das Auge liegt immer über dem ganzen Segel
+    for y, x in zip(*np.nonzero(fm)):                     # samt seinem Rand aus Segeltuch
+        for yy, xx in ((y, x - 1), (y, x + 1)):
+            if not fm[yy, xx] and face[yy, xx, 3] and hexc(face[yy, xx]) in PI_SAIL and 13 <= xx <= 20:
+                s[yy, xx] = face[yy, xx]
     bob = 1 if math.sin(2 * t) > 0.25 else 0              # das Schiff taucht sacht ein und hebt sich wieder
     out = np.zeros((H, W, 4), int)
     for y, x in zip(*np.nonzero(s[:, :, 3])):
@@ -675,18 +687,12 @@ def quisto_base(i):
 
 
 def f_quisto(i):
-    """Don Quisto federt und blinzelt; seine Handkanone ist glühend heiß: die Mündung glimmt, über dem
-    Rohr flimmert die Luft; dreimal je Loop feuert sie (Mündungsfeuer, danach steigt Rauch auf)."""
+    """Don Quisto federt und blinzelt; seine Handkanone ist glühend heiß: die Mündung glimmt, aus der
+    Öffnung kräuselt Rauch; dreimal je Loop feuert sie (Mündungsfeuer, danach quillt eine Rauchwolke)."""
     global QU_SMOKE
     out = quisto_base(i)
     b = B24[i % 24]
     t = 2 * math.pi * i / N
-    for cx, ph in ((18, 0.0), (21, 2.1), (24, 4.2)):     # Hitzeflimmern über dem Rohr
-        for y in range(3, 9):
-            x = cx + round(0.9 * math.sin(1.3 * y - 3 * t * 2 + ph))
-            a = int(60 + 50 * (0.5 + 0.5 * math.sin(2 * t * 3 + y + ph)))
-            if not out[y + PT + b, x + PL, 3]:
-                dot(out, x + PL, y + PT + b, rgb('ffe8c0', a))
     my = 12 + PT + b                                      # Mündungsfeuer
     for st in QU_SHOTS:
         a = (i - st) % N
