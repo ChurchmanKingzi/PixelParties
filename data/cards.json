@@ -3665,7 +3665,7 @@
     "hp": 400,
     "atk": 80,
     "cost": null,
-    "effect": "Once per turn, when you would draw exactly 1 card through an effect, you may make your opponent declare a card type (Attack/Spell, Ability, Artifact, Potion, Hero) and reveal the card instead. If it's a card of the declared type, add it to your hand and draw 2 additional cards. Otherwise, delete it and send the top 4 cards of either player's deck to the discard pile.",
+    "effect": "Once per turn, when you would draw exactly 1 card through an effect, you may make your opponent declare a card type (Attack/Spell/Creature, Ability, Artifact, Potion, Hero) and reveal the card instead. If it's a card of the declared type, add it to your hand and draw 2 additional cards. Otherwise, delete it and send the top 4 cards of either player's deck to the discard pile.",
     "archetype": "",
     "setID": "PP MSIN",
     "banned": "",

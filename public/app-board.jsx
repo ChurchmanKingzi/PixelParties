@@ -36071,7 +36071,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         const delay = i * 200;
         card.style.cssText = `
           position:fixed; left:${srcX - gm.b / 2}px; top:${srcY - gm.h / 2}px;
-          width:${gm.b}px; height:${gm.h}px; z-index:10200; pointer-events:none;
+          width:${gm.b}px; height:${gm.h}px; z-index:${10200 + (cardNames.length - i)}; pointer-events:none;
           border-radius:4px; overflow:hidden;
           box-shadow: 0 0 12px rgba(100,255,150,0.7), 0 0 4px rgba(50,200,100,0.5);
           --dtdDx:${dx}px; --dtdDy:${dy}px;
@@ -38277,7 +38277,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         card.style.cssText = [
           'position:fixed',
           `left:${srcX - gm.b / 2}px`, `top:${srcY - gm.h / 2}px`,
-          `width:${gm.b}px`, `height:${gm.h}px`, 'z-index:10200', 'pointer-events:none',
+          `width:${gm.b}px`, `height:${gm.h}px`, `z-index:${10200 + (cardNames.length - i)}`, 'pointer-events:none',
           'border-radius:4px', 'overflow:hidden',
           'box-shadow:0 0 12px rgba(180,80,255,0.7),0 0 4px rgba(120,40,200,0.5)',
           `--dtdsDx:${dx}px`, `--dtdsDy:${dy}px`,
@@ -38359,7 +38359,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         card.style.cssText = [
           'position:fixed',
           `left:${srcX - gm.b / 2}px`, `top:${srcY - gm.h / 2}px`,
-          `width:${gm.b}px`, `height:${gm.h}px`, 'z-index:10200', 'pointer-events:none',
+          `width:${gm.b}px`, `height:${gm.h}px`, `z-index:${10200 + (cardNames.length - i)}`, 'pointer-events:none',
           'border-radius:4px', 'overflow:hidden',
           // Subtle red-purple glow to differentiate from the deck→
           // discard purple flight — makes "going to deleted" feel
@@ -38442,7 +38442,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         card.style.cssText = [
           'position:fixed',
           `left:${srcX - gm.b / 2}px`, `top:${srcY - gm.h / 2}px`,
-          `width:${gm.b}px`, `height:${gm.h}px`, 'z-index:10200', 'pointer-events:none',
+          `width:${gm.b}px`, `height:${gm.h}px`, `z-index:${10200 + (cardNames.length - i)}`, 'pointer-events:none',
           'border-radius:4px', 'overflow:hidden',
           // Green-cyan glow — "rescued from oblivion" read, distinct
           // from the red-purple flight when cards are deleted.
@@ -38518,7 +38518,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         card.style.cssText = [
           'position:fixed',
           `left:${srcX - gm.b / 2}px`, `top:${srcY - gm.h / 2}px`,
-          `width:${gm.b}px`, `height:${gm.h}px`, 'z-index:10200', 'pointer-events:none',
+          `width:${gm.b}px`, `height:${gm.h}px`, `z-index:${10200 + (count - i)}`, 'pointer-events:none',
           'border-radius:4px', 'overflow:hidden',
           'box-shadow:0 0 12px rgba(255,200,50,0.8),0 0 4px rgba(200,150,0,0.6)',
           `--dtaDx:${dx}px`, `--dtaDy:${dy}px`,
@@ -41287,6 +41287,14 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           return <span>{pName(p.name, p.color)} milled {cards.map((c, i) => <React.Fragment key={i}>{i > 0 && ', '}{cName(c)}</React.Fragment>)} ({dest}){entry.source ? <> by {cName(entry.source)}</> : ''}.</span>;
         }
         return <span>{pName(p.name, p.color)} milled {entry.count} card{entry.count>1?'s':''} ({dest}){entry.source ? <> by {cName(entry.source)}</> : ''}.</span>;
+      }
+      if (t === 'codumbus_declare') {
+        const p = playerByName(entry.player);
+        return <span className="log-status">{pName(p.name, p.color)} declares <b>{entry.declared}</b> ({cName(entry.by)}).</span>;
+      }
+      if (t === 'codumbus_reveal') {
+        const p = playerByName(entry.player);
+        return <span className="log-status">{pName(p.name, p.color)} reveals {cName(entry.card)} — {entry.hit ? <>a hit! It is added to their hand.</> : <>a miss ({entry.declared} was declared). It is deleted.</>}</span>;
       }
       if (t === 'magenta_discard') {
         const p = playerByName(entry.player);
