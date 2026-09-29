@@ -24,10 +24,12 @@ Fetzen ab. Frame 0 ist immer das Originalbild.
             gegenläufig, die Füße bleiben, sie federt im Takt), das Flammenhaar auf Kopf und
             Rücken brennt, sie blinzelt.
 * tempeste / tempeluna: schweben auf und ab, schlagen mit den Flügeln, die Locke oben weht im
-            Wind, sie blinzeln; die Kontur (Tempeste türkis, Tempeluna links rot, rechts türkis)
+            Wind, sie blinzeln; um Tempeste fällt Regen, bei Tempeluna auf der blauen Seite Regen,
+            auf der roten steigt Glut auf; die Kontur (Tempeste türkis, Tempeluna links rot, rechts türkis)
             wird jedes Frame neu um die ganze Figur gelegt – sie bleibt immer um die Flügel.
 * moana:    Tempeste Moana singt (der Mund geht in Phrasen auf und zu), neben ihr steigen kleine
-            Noten auf, die Haare wehen im Wind, sie tanzt langsam (Hüftschwung, sacht federnd).
+            Noten auf, ringsum fällt Regen, die Haare wehen im Wind, sie tanzt langsam
+            (Hüftschwung, sacht federnd).
 """
 import math
 import os
@@ -37,6 +39,7 @@ from PIL import Image
 from anim_common import rgb, save_outputs, BOUNCE12
 from flap_common import fill_pinholes, shear_flap
 from anim_common import ring8
+import particles
 
 BLACK = (0, 0, 0, 255)
 BLINK = {14: 'halb', 15: 'zu', 16: 'zu', 17: 'halb', 38: 'halb', 39: 'zu', 40: 'zu', 41: 'halb'}
@@ -54,15 +57,15 @@ V_ = {
                  blink={'halb': [((9, 16), '311800'), ((10, 16), '311800'), ((13, 16), '311800'), ((14, 16), '311800')],
                         'zu': [((9, 16), 'ae8a70'), ((10, 16), 'ae8a70'), ((13, 16), 'ae8a70'), ((14, 16), 'ae8a70'),
                                ((9, 17), '000000'), ((10, 17), '000000'), ((13, 17), '000000'), ((14, 17), '000000')]}),
-    'tempeste': dict(slug='tempeste-the-weather-fairy', pads=(5, 6, 5, 5), outline={'34fcff'},
+    'tempeste': dict(slug='tempeste-the-weather-fairy', pads=(9, 9, 6, 5), outline={'34fcff'},
                      wings=({'f6ffff', 'b4f6ff'}, {'f6ffff', 'b4f6ff'}), pivots=(5, 12),
                      blink={'halb': [((7, 12), '0093b3'), ((10, 12), '0093b3')],
                             'zu': [((7, 11), '152f66'), ((10, 11), '152f66'), ((7, 12), '000000'), ((10, 12), '000000')]}),
-    'tempeluna': dict(slug='tempeluna-the-convergence-fairy', pads=(5, 6, 5, 5), outline={'34fcff', 'ff0000'},
+    'tempeluna': dict(slug='tempeluna-the-convergence-fairy', pads=(9, 9, 8, 5), outline={'34fcff', 'ff0000'},
                       wings=({'ffdd00', 'ffaa00', 'ff8b00'}, {'f6ffff', 'b4f6ff'}), pivots=(5, 12),
                       blink={'halb': [((7, 12), '630000'), ((10, 12), '0093b3')],
                              'zu': [((7, 11), '3f0909'), ((10, 11), '152f66'), ((7, 12), '000000'), ((10, 12), '000000')]}),
-    'moana': dict(slug='tempeste-moana-the-rain-singer', pads=(5, 9, 9, 2)),
+    'moana': dict(slug='tempeste-moana-the-rain-singer', pads=(9, 9, 9, 2)),
 }
 V = next((v for v in sys.argv[2:] if v in V_), 'taio')
 C = V_[V]
@@ -407,7 +410,7 @@ def f_pele(i):
 
 
 # --- Etappe 2: Feen und Sängerin ------------------------------------------------
-def f_fairy(i):
+def fairy_base(i):
     """Tempeste / Tempeluna: schweben auf und ab, schlagen mit den Flügeln (spaltentreue Scherung),
     die Locke oben weht im Wind (nach rechts), sie blinzeln; die 1-px-Kontur wird jedes Frame neu
     um die ganze Figur gelegt – bei Tempeluna links rot, rechts türkis wie im Original."""
@@ -453,6 +456,28 @@ MOANA_MOUTH = [0, 0, 0, 1, 0, 0, 0, 0, 1, 2, 2, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1,
                2, 1, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 1, 2, 2, 1, 0, 0, 0, 0, 1, 1, 0]
 NOTE = [(1, 0), (1, 1), (2, 1), (1, 2), (0, 3), (1, 3), (0, 4), (1, 4)]   # Achtelnote (3 x 5)
 NOTES = None
+
+
+PARTS = None
+
+
+def f_fairy(i):
+    """Tempeste: Regen ringsum; Tempeluna: Regen auf der blauen (rechten), Glut auf der roten
+    (linken) Seite – Partikel berühren die Figur nie."""
+    global PARTS
+    if PARTS is None:
+        base = [fairy_base(k) for k in range(N)]
+        mid = PL + SW // 2
+        if V == 'tempeste':
+            PARTS = [particles.rain(base, 40, seed=11)]
+        else:
+            right = np.zeros((H, W), bool)
+            right[:, mid:] = True
+            PARTS = [particles.rain(base, 22, seed=12, region=right), particles.embers(base, 18, seed=13, region=~right)]
+    out = fairy_base(i)
+    for sysm in PARTS:
+        particles.draw(out, sysm, i, N)
+    return out
 
 
 def moana_base(i):
@@ -514,11 +539,21 @@ def moana_notes():
     return res
 
 
+RAIN = None
+
+
 def f_moana(i):
-    global NOTES
-    out = moana_base(i)
+    global NOTES, RAIN
     if NOTES is None:
         NOTES = moana_notes()
+    if RAIN is None:                                     # Regen ringsum (die Noten liegen davor)
+        RAIN = particles.rain([moana_base(k) for k in range(N)], 36, seed=14)
+    out = moana_base(i)
+    particles.draw(out, RAIN, i, N)
+    return draw_notes(out, i)
+
+
+def draw_notes(out, i):
     for k, (e, L, path) in enumerate(NOTES):
         a = (i - e) % N
         if a >= L:
@@ -528,6 +563,7 @@ def f_moana(i):
         for dx_, dy_ in NOTE:
             out[ny + dy_, nx + dx_] = col
     return out
+
 
 
 FRAME = dict(taio=f_taio, taioasc=f_taioasc, waflav=f_waflav, pele=f_pele, tempeste=f_fairy, tempeluna=f_fairy,
