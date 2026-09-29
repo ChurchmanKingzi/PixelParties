@@ -55,7 +55,7 @@ def rain(frames, count, seed, region=None, n=48):
         steps = [p for p in steps if all(1 <= y for (_, y) in p)]
         if len(steps) < 3 or not all(_ok(p, fig, region) for p in steps):
             continue
-        if sum(1 for r in res if abs(r[0] - e) < 2) > 3:
+        if sum(1 for r in res if abs(r[0] - e) < 2) > 6:
             continue
         res.append((e, steps))
     return res
@@ -85,7 +85,7 @@ def embers(frames, count, seed, region=None, n=48, sources=None):
             steps.append({(x, y): c})
         if not all(_ok(p, fig, region) for p in steps):
             continue
-        if sum(1 for r in res if abs(r[0] - e) < 2) > 2:
+        if sum(1 for r in res if abs(r[0] - e) < 2) > 5:
             continue
         res.append((e, steps))
     return res

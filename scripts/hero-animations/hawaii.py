@@ -469,11 +469,11 @@ def f_fairy(i):
         base = [fairy_base(k) for k in range(N)]
         mid = PL + SW // 2
         if V == 'tempeste':
-            PARTS = [particles.rain(base, 40, seed=11)]
+            PARTS = [particles.rain(base, 64, seed=11)]
         else:
             right = np.zeros((H, W), bool)
             right[:, mid:] = True
-            PARTS = [particles.rain(base, 22, seed=12, region=right), particles.embers(base, 18, seed=13, region=~right)]
+            PARTS = [particles.rain(base, 36, seed=12, region=right), particles.embers(base, 30, seed=13, region=~right)]
     out = fairy_base(i)
     for sysm in PARTS:
         particles.draw(out, sysm, i, N)
@@ -547,7 +547,7 @@ def f_moana(i):
     if NOTES is None:
         NOTES = moana_notes()
     if RAIN is None:                                     # Regen ringsum (die Noten liegen davor)
-        RAIN = particles.rain([moana_base(k) for k in range(N)], 36, seed=14)
+        RAIN = particles.rain([moana_base(k) for k in range(N)], 58, seed=14)
     out = moana_base(i)
     particles.draw(out, RAIN, i, N)
     return draw_notes(out, i)

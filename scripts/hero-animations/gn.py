@@ -785,7 +785,7 @@ def frame_with_particles(i):
     if V == 'luna':
         import particles
         if LUNA_EMBERS is None:
-            LUNA_EMBERS = particles.embers([frame(k) for k in range(N)], 22, seed=21)
+            LUNA_EMBERS = particles.embers([frame(k) for k in range(N)], 36, seed=21)
         particles.draw(out, LUNA_EMBERS, i, N)
     return out
 
