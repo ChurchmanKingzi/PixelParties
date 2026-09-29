@@ -49,9 +49,10 @@ function passenderSpell(engine, pi, name) {
 }
 
 /** Kann dieser Held danach einen passenden Spell aus der Hand wirken? */
-function folgeSpells(engine, pi, heroIdx) {
+// Als Vorgabe 29.9.: `seite` = Brettseite eines geliehenen Nutzers.
+function folgeSpells(engine, pi, heroIdx, seite = pi) {
   const cardDB = engine._getCardDB();
-  return engine.getHeroEligibleActionCards(pi, heroIdx)
+  return engine.getHeroEligibleActionCards(pi, heroIdx, seite)
     .filter(n => cardDB[n]?.cardType === 'Spell' && passenderSpell(engine, pi, n));
 }
 
@@ -59,6 +60,8 @@ module.exports = {
   activeIn: ['hand'],
   // KEIN `isReaction` — sonst meldet sie sich im generischen Kettenfenster.
   isBoardSentToDiscardReaction: true,
+  // Als Vorgabe 29.9.: auch ein geliehener Held (jede Uebernahme) wirkt sie.
+  fremdeWirker: 'alle',
 
   // ★★ ENTKOPPELTE BILDER (CARD_API).
   spellVisual: { impact: { type: 'furious_anger' }, impactMs: 500 },
@@ -72,18 +75,19 @@ module.exports = {
   },
 
   /** Nur Wirker, die danach auch wirklich einen Spell ≤ 2 wirken koennen. */
-  reactionCasterAllowed(gs, pi, heroIdx, engine) {
-    return folgeSpells(engine, pi, heroIdx).length > 0;
+  reactionCasterAllowed(gs, pi, heroIdx, engine, _info, seite = pi) {
+    return folgeSpells(engine, pi, heroIdx, seite).length > 0;
   },
 
-  async boardSentToDiscardResolve(engine, pi, info, { casterIdx } = {}) {
+  async boardSentToDiscardResolve(engine, pi, info, { casterIdx, casterSeite } = {}) {
     const gs = engine.gs;
     const ps = gs.players[pi];
-    const held = ps?.heroes?.[casterIdx];
+    const seite = casterSeite ?? pi;   // Als Vorgabe 29.9.: Brettseite des Nutzers
+    const held = gs.players[seite]?.heroes?.[casterIdx];
     if (!held?.name || held.hp <= 0) return;
 
     engine._broadcastEvent('play_zone_animation', {
-      type: 'furious_anger', owner: pi, heroIdx: casterIdx, zoneSlot: -1,
+      type: 'furious_anger', owner: seite, heroIdx: casterIdx, zoneSlot: -1,
       duration: 1350,   // v1341: ohne Angabe schneidet der Client nach 1000 ms ab
     });
     await engine._delay(650);
@@ -96,6 +100,7 @@ module.exports = {
       skipAbilities: true,
       skipHeroEffects: true,
       cancellable: true,
+      ...(seite !== pi ? { heroOwner: seite } : {}),
     });
     engine.log('furious_anger', {
       player: ps.username, hero: held.name, lost: info.cardName,

@@ -7621,13 +7621,15 @@ class GameEngine {
   /** Ist `hero` (Besitzer `owner`) gerade durch Submerged geschuetzt? */
   isSubmergedProtected(owner, hero) {
     if (!hero?.buffs?.submerged || !hero.name || !(hero.hp > 0)) return false;
-    const ps = this.gs.players[owner];
-    if (!ps) return false;
-    if ((ps.heroes || []).some(h => h && h !== hero && h.name && h.hp > 0 && !h.buffs?.submerged)) return true;
+    if (!this.gs.players[owner]) return false;
+    // Als Vorgabe 29.9. (Runde 3): „you control" = der KONTROLLEUR des
+    // Helden (dauerhaft uebernommen) — seine Helden und Kreaturen.
+    const kontrolleur = this.heroSideOf(owner, hero);
+    if (this.heroesControlledBy(kontrolleur).some(({ hero: h }) => h && h !== hero && h.name && h.hp > 0 && !h.buffs?.submerged)) return true;
     const cardDB = this._getCardDB();
     return this.cardInstances.some(inst => {
       if (inst.zone !== 'support' || inst.faceDown || inst.counters?.treatAsEquip) return false;
-      if ((inst.controller ?? inst.owner) !== owner) return false;
+      if ((inst.controller ?? inst.owner) !== kontrolleur) return false;
       if ((inst.counters?.currentHp ?? 1) <= 0) return false;
       return hasCardType(this.getEffectiveCardData(inst) || cardDB[inst.name], 'Creature');
     });
@@ -12442,14 +12444,14 @@ class GameEngine {
       this._inBoardDiscardReaction = true;
       try {
         if (script.boardSentToDiscardResolve) {
-          await script.boardSentToDiscardResolve(this, ownerIdx, info, { casterIdx: rxCast.casterIdx });
+          await script.boardSentToDiscardResolve(this, ownerIdx, info, { casterIdx: rxCast.casterIdx, casterSeite: rxCast.casterSeite ?? ownerIdx });
         }
       } catch (err) {
         console.error(`[BoardSentToDiscardReaction] ${cardName} threw:`, err.message);
       } finally {
         this._inBoardDiscardReaction = false;
       }
-      await this._rxAufgeloest(ps, cardName, rxCast.casterIdx);
+      await this._rxAufgeloest(ps, cardName, rxCast.casterIdx, { heroOwner: rxCast.casterSeite ?? ownerIdx });
       this.sync();
       return;                       // eine Reaktion je Ablage
     }
@@ -34178,6 +34180,22 @@ this._deathWatch = (this._deathWatchStack || []).length
    * ihren Wisdom-Kosten. `null`, wenn die Karte keinen Wirker braucht
    * (Artefakt, Potion). `casterIsTarget` beschraenkt auf den Zielhelden.
    */
+  /**
+   * Als Vorgabe 29.9. (Runde 3): GELIEHENE Wirker fuer Hand-Reaktionen.
+   * Eine Karte erlaubt sie ueber `fremdeWirker`: `'alle'` (jede echte
+   * Uebernahme — Furious Anger) oder `'dauerhaft'` (nur `permaControlBy`
+   * — Dive Down, Stealthy Pursuit, Jump in the River).
+   * @returns {Array<{seite:number, heroIdx:number, hero:object}>}
+   */
+  fremdeReaktionsWirker(pi, script) {
+    const modus = script?.fremdeWirker;
+    if (modus !== 'alle' && modus !== 'dauerhaft') return [];
+    return this.heroesControlledBy(pi)
+      .filter(({ physOwner, hero }) => physOwner !== pi
+        && (modus === 'alle' || hero.permaControlBy === pi))
+      .map(({ physOwner, heroIdx, hero }) => ({ seite: physOwner, heroIdx, hero }));
+  }
+
   _rxCastKandidaten(ps, cardName, script, opts = {}) {
     const pi = this._rxOwnerIdx(ps, '_rxCastKandidaten');
     if (pi < 0) return [];
@@ -34206,7 +34224,24 @@ this._deathWatch = (this._deathWatchStack || []).length
       }
       const w = (cd.cardType === 'Spell' && !script?.handlesOwnWisdomCost)
         ? Math.max(0, this.getWisdomDiscardCost(pi, hi, cd)) : 0;
-      out.push({ casterIdx: hi, wisdomCost: w });
+      out.push({ casterIdx: hi, casterSeite: pi, wisdomCost: w });
+    }
+    // Als Vorgabe 29.9. (Runde 3): geliehene Wirker, wenn die Karte sie erlaubt.
+    if (!script?.casterIsTarget) {
+      for (const { seite, heroIdx: hi } of this.fremdeReaktionsWirker(pi, script)) {
+        if (!this._canHeroActivateSurprise(seite, hi, cardName, { spellInHand: true, reaktor: pi })) continue;
+        if (typeof script?.reactionCasterAllowed === 'function') {
+          let erlaubt = false;
+          try {
+            erlaubt = !!this._mitWirker(pi, hi, seite,
+              () => script.reactionCasterAllowed(this.gs, pi, hi, this, opts.fensterInfo || null, seite));
+          } catch {}
+          if (!erlaubt) continue;
+        }
+        const w = (cd.cardType === 'Spell' && !script?.handlesOwnWisdomCost)
+          ? Math.max(0, this.getWisdomDiscardCost(seite, hi, cd)) : 0;
+        out.push({ casterIdx: hi, casterSeite: seite, wisdomCost: w });
+      }
     }
     return out;
   }
@@ -34235,18 +34270,21 @@ this._deathWatch = (this._deathWatchStack || []).length
       if (kandidaten.length === 1) Object.assign(plan, kandidaten[0]);
       return kandidaten.length === 1;
     }
+    const heldVon = (k) => this.gs.players[k.casterSeite ?? pi]?.heroes?.[k.casterIdx];
     if (this.isCpuPlayer(pi) || this._inMctsSim || this._fastMode) {
-      const kostenfrei = (k) => !loadCardEffect(ps.heroes[k.casterIdx]?.name)?.canPlayCard;
+      const kostenfrei = (k) => !loadCardEffect(heldVon(k)?.name)?.canPlayCard;
       const sortiert = [...kandidaten].sort((a, b) =>
         (kostenfrei(b) - kostenfrei(a)) || (a.wisdomCost - b.wisdomCost) || (a.casterIdx - b.casterIdx));
       Object.assign(plan, sortiert[0]);
       return true;
     }
     const optionen = kandidaten.map(k => {
-      const h = ps.heroes[k.casterIdx];
+      const h = heldVon(k);
       const name = h?.name || `Hero ${k.casterIdx + 1}`;
+      const seite = k.casterSeite ?? pi;
       return {
-        id: `hero-${k.casterIdx}`, heroIdx: k.casterIdx, label: name,
+        id: seite === pi ? `hero-${k.casterIdx}` : `hero-${seite}-${k.casterIdx}`,
+        heroIdx: k.casterIdx, seite, label: name,
         description: `Activate ${cardName} with ${name}.`
           + (k.wisdomCost > 0 ? ` Wisdom: discard ${k.wisdomCost}.` : ''),
         color: '#66ccff',
@@ -34263,7 +34301,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (!wahl || wahl.cancelled) return false;
     const sel = optionen.find(o => o.id === wahl.optionId);
     if (!sel) return false;
-    Object.assign(plan, kandidaten.find(k => k.casterIdx === sel.heroIdx));
+    Object.assign(plan, kandidaten.find(k => k.casterIdx === sel.heroIdx && (k.casterSeite ?? pi) === sel.seite));
     return true;
   }
 
@@ -35497,6 +35535,17 @@ this._deathWatch = (this._deathWatchStack || []).length
               catch { return false; }
             });
           }
+          // Als Vorgabe 29.9. (Runde 3): geliehene Wirker (`fremdeWirker`),
+          // als `{ hi, seite }` — die eigenen bleiben reine Indizes.
+          for (const { seite, heroIdx: fhi } of this.fremdeReaktionsWirker(pi, script)) {
+            if (!this._canHeroActivateSurprise(seite, fhi, cardName, { spellInHand: true, reaktor: pi })) continue;
+            if (typeof script.reactionCasterAllowed === 'function') {
+              let ok = false;
+              try { ok = !!this._mitWirker(pi, fhi, seite, () => script.reactionCasterAllowed(this.gs, pi, fhi, this, chainCtx, seite)); } catch {}
+              if (!ok) continue;
+            }
+            reactionEligibleHeroIdxs.push({ hi: fhi, seite });
+          }
           if (reactionEligibleHeroIdxs.length === 0) continue;
           if (cardData.cardType === 'Spell') {
             // Wisdom cost is hero-specific. Use the first eligible
@@ -35504,7 +35553,10 @@ this._deathWatch = (this._deathWatchStack || []).length
             // recomputed for the picked hero after the player
             // chooses (see below). The probe value just gates "do
             // you have enough hand cards to ever afford this".
-            reactionWisdomCost = this.getWisdomDiscardCost(pi, reactionEligibleHeroIdxs[0], cardData);
+            const _e0 = reactionEligibleHeroIdxs[0];
+            reactionWisdomCost = typeof _e0 === 'object'
+              ? this.getWisdomDiscardCost(_e0.seite, _e0.hi, cardData)
+              : this.getWisdomDiscardCost(pi, _e0, cardData);
           }
         }
 
@@ -35765,16 +35817,19 @@ this._deathWatch = (this._deathWatchStack || []).length
       // pick from a single panel instead of hunting for the Hero on
       // the board.
       let reactionCasterHeroIdx = -1;
+      let reactionCasterSeite = pi;   // Als Vorgabe 29.9.: Brettseite (geliehener Wirker)
       if (cardData?.cardType === 'Spell' || cardData?.cardType === 'Attack') {
         if (eligibleHeroIdxs.length === 0) continue;
+        const _eintrag = (e) => (typeof e === 'object' ? e : { hi: e, seite: pi });
         if (eligibleHeroIdxs.length === 1) {
-          reactionCasterHeroIdx = eligibleHeroIdxs[0];
+          ({ hi: reactionCasterHeroIdx, seite: reactionCasterSeite } = _eintrag(eligibleHeroIdxs[0]));
         } else {
-          const heroOptions = eligibleHeroIdxs.map(hi => {
-            const h = ps.heroes[hi];
+          const heroOptions = eligibleHeroIdxs.map(e => {
+            const { hi, seite } = _eintrag(e);
+            const h = this.gs.players[seite]?.heroes?.[hi];
             return {
-              id: `hero-${hi}`,
-              heroIdx: hi,
+              id: seite === pi ? `hero-${hi}` : `hero-${seite}-${hi}`,
+              heroIdx: hi, seite,
               label: h?.name || `Hero ${hi + 1}`,
               description: `Cast ${chosenName} with ${h?.name || `Hero ${hi + 1}`}.`,
               color: '#66ccff',
@@ -35791,6 +35846,7 @@ this._deathWatch = (this._deathWatchStack || []).length
           const sel = heroOptions.find(o => o.id === choice.optionId);
           if (!sel) continue;
           reactionCasterHeroIdx = sel.heroIdx;
+          reactionCasterSeite = sel.seite;
         }
       }
 
@@ -35805,7 +35861,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       // the player chose.
       let wisdomCost = 0;
       if (cardData?.cardType === 'Spell' && reactionCasterHeroIdx >= 0) {
-        wisdomCost = this.getWisdomDiscardCost(pi, reactionCasterHeroIdx, cardData);
+        wisdomCost = this.getWisdomDiscardCost(reactionCasterSeite, reactionCasterHeroIdx, cardData);
       }
 
       await this._rxPay(ps, cost);
@@ -35852,6 +35908,8 @@ this._deathWatch = (this._deathWatchStack || []).length
         fromHandIdx: actualHandIdx,
         casterHeroIdx: reactionCasterHeroIdx,
         heroIdx: reactionCasterHeroIdx,
+        // Als Vorgabe 29.9.: Reihe, in die `casterHeroIdx` zeigt (geliehener Wirker).
+        ...(reactionCasterSeite !== pi ? { casterOwner: reactionCasterSeite, heroOwner: reactionCasterSeite } : {}),
         goldCost: cost,
         wisdomCost: wisdomCost || 0,
         isInitialCard: false,
@@ -37527,8 +37585,13 @@ this._deathWatch = (this._deathWatchStack || []).length
         // Hero-restricted: provider must be on the same hero as the spell caster
         // Styx 28.9.: auch die SEITE des Helden muss passen (eigener und
         // geliehener Held koennen denselben Index haben).
+        // Als Befund 29.9.: `counters._grantSeite` — Zusage fuer einen
+        // geliehenen Helden, deren Traeger in der Ablage des Kontrolleurs
+        // liegt (Weapon Unleashing): die Heldenseite steht fest.
         if (config.heroRestricted && heroIdx != null
-            && (inst.heroIdx !== heroIdx || (inst.zone !== 'hand' && this.physicalSide(inst) !== heroOwner))) continue;
+            && (inst.heroIdx !== heroIdx || (inst.counters?._grantSeite != null
+              ? inst.counters._grantSeite !== heroOwner
+              : (inst.zone !== 'hand' && this.physicalSide(inst) !== heroOwner)))) continue;
         // Check category
         if (config.allowedCategories && !config.allowedCategories.includes(category)) continue;
         // Check specific filter
@@ -37925,8 +37988,13 @@ this._deathWatch = (this._deathWatchStack || []).length
         if (!this._isSecondActionGrantAvailable(playerIdx, config)) continue;
         // Styx 28.9.: auch die SEITE des Helden muss passen (eigener und
         // geliehener Held koennen denselben Index haben).
+        // Als Befund 29.9.: `counters._grantSeite` — Zusage fuer einen
+        // geliehenen Helden, deren Traeger in der Ablage des Kontrolleurs
+        // liegt (Weapon Unleashing): die Heldenseite steht fest.
         if (config.heroRestricted && heroIdx != null
-            && (inst.heroIdx !== heroIdx || (inst.zone !== 'hand' && this.physicalSide(inst) !== heroOwner))) continue;
+            && (inst.heroIdx !== heroIdx || (inst.counters?._grantSeite != null
+              ? inst.counters._grantSeite !== heroOwner
+              : (inst.zone !== 'hand' && this.physicalSide(inst) !== heroOwner)))) continue;
         if (!config.allowedCategories?.includes(category)) continue;
         // ★ v1004: Mission sperrt alle FREMDEN Zuschlaege.
         if (this.missionLockActive(playerIdx) && typeId !== MISSION_AA_TYPE) continue;
