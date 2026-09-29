@@ -964,8 +964,8 @@ CO_HEAD = 24                                            # bis hierher schwankt d
 
 
 CO_BASE = 48                                            # Fußzeile: darunter bleibt die Pflanze stehen
-CO_COUGH = (4, 20, 36)                                  # Pollenstöße: die Blume hustet sie aus
-CO_SCALE = [1.0, 0.97, 0.95, 1.08, 1.07, 1.05, 1.03, 1.02, 1.01]   # ducken, strecken, zurücksinken
+CO_COUGH = (4, 12, 20, 28, 36, 44)                      # Pollenstöße: die Blume hustet sie aus
+CO_SCALE = [1.0, 0.97, 0.95, 1.08, 1.06, 1.04, 1.02, 1.01]   # ducken, strecken, zurücksinken
 CO_V = [(11, 6), (16, 16), (23, 6)]                     # Blütenkelch: hier kommen die Pollen heraus
 CO_LEAN = lambda i: 2.2 * math.sin(2 * 2 * math.pi * i / N)
 
@@ -1023,7 +1023,7 @@ def corruptor_base(i):
 
 def f_corruptor(i):
     """Bloom, the Continent Corruptor: die riesige Blume schwankt, das Maul im Stängel schnappt, die Ranken
-    peitschen. Dreimal je Loop hustet sie Pollen aus: sie duckt sich, streckt sich ruckartig als Ganzes, und
+    peitschen. Sechsmal je Loop hustet sie Pollen aus: sie duckt sich, streckt sich ruckartig als Ganzes, und
     aus dem ganzen Blütenkelch schießt ein Pollenstoß hoch, der ringsum herabrieselt."""
     global CO_POLLEN
     if CO_POLLEN is None:
@@ -1032,7 +1032,7 @@ def f_corruptor(i):
         CO_POLLEN = []
         for c in CO_COUGH:
             n, tries = 0, 0
-            while n < 22 and tries < 5000:
+            while n < 34 and tries < 8000:
                 tries += 1
                 u = rng.uniform(0, 1)                     # Startpunkt auf dem Blütenkelch (V)
                 (ax, ay), (bx, by) = (CO_V[0], CO_V[1]) if u < 0.5 else (CO_V[1], CO_V[2])
@@ -1046,7 +1046,7 @@ def f_corruptor(i):
                 for a in range(44):
                     path.append((int(round(x)), int(round(y))))
                     x, y = x + vx + 0.3 * math.sin(0.5 * a + u * 9), y + vy
-                    vy = min(0.8, vy + 0.22)
+                    vy = min(1.1, vy + 0.26)
                     vx *= 0.95
                     if y > H - 3:
                         break
