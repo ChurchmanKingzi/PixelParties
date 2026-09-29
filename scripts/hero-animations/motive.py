@@ -114,8 +114,8 @@ V_ = {
     'idafire': dict(slug='ida-the-fire-princess', pads=(6, 6, 11, 3), skin='Ida, the Adept of Destruction',
                     blink=eyes([(6, 7, 11, 12), (10, 11, 11, 12)], 'd2a077')),
     'chuck': dict(slug='one-chuck-man', pads=(3, 3, 3, 4), skin='Chuck, the Crazy Veteran',
-                  blink={'halb': [((4, 17), 'd5d5d5')],
-                         'zu': [((3, 17), '130900'), ((4, 17), '130900')]}),
+                  blink={'halb': [((5, 17), '6b6760')],       # das Auge: schwarz + weiß in Zeile 17
+                         'zu': [((5, 17), '00020b')]}),
     'duke': dict(slug='duke-omikron', knee=21, pads=(16, 16, 4, 1), skin='Omikron, the Faceless Illusionist',
                  hair={'3e0403', 'cd0000', '70090a', '95050e'}, monocle=10, hands=[], hairrows=14),
     'alice': dict(slug='alice-the-wonderous-girl', knee=15, pads=(7, 7, 6, 1), skin='Alice, the Puppeteer Girl',
@@ -123,7 +123,7 @@ V_ = {
     'megakarian': dict(slug='mega-warrior-karian', knee=20, pads=(4, 4, 3, 1), skin='Grand Inquisitor Karian',
                        blink=eyes([(9, 10, 8, 9), (13, 14, 8, 9)], 'ffe6d5', line='311800')),
     'settdunk': dict(slug='sett-dunking-on-you', pads=(3, 3, 3, 3), skin='Sett, the Adept of Necromancy'),
-    'emperor': dict(slug='emperor-arthor', knee=22, pads=(3, 4, 3, 1), skin='Arthor, the King of Blackport',
+    'emperor': dict(slug='emperor-arthor', knee=22, pads=(3, 7, 3, 1), skin='Arthor, the King of Blackport',
                     blink=eyes([(6, 7, 6, 7), (10, 11, 6, 7)], 'ffd5a4', line='291201')),
     'yellowflash': dict(slug='nieht-the-yellow-flash', knee=20, pads=(4, 4, 5, 2), skin='Nieht, the Blitz Blade',
                         blink=eyes([(19, 20, 10, 11), (23, 24, 10, 11)], 'fde1d2', line='000200')),
@@ -638,7 +638,6 @@ def shift_segment(out, s, y, seg, dx, ox, oy):
     if not dx or not seg:
         return
     side = -1 if seg[0] < seg[-1] else 1                # außen links: nach links schieben
-    side = -side
     for x in seg:
         xx = x + side * dx + ox
         if 0 <= xx < out.shape[1]:
@@ -649,9 +648,10 @@ def shift_segment(out, s, y, seg, dx, ox, oy):
 
 
 def flutter(out, s, i, ox, oy, rows, left, right, amp=2.0, speed=6, ok=None, erratic=0.0, pause=True,
-            clamp=False):
+            clamp=False, fill=None):
     """Tuch-/Haarzipfel flattern nach außen: je Zeile schiebt sich die Spitze um 0..amp px hinaus und
-    zurück (Welle von oben nach unten), das Original bleibt darunter – nichts reißt."""
+    zurück (Welle von oben nach unten), das Original bleibt darunter – nichts reißt. fill: Farbe für
+    Lücken zwischen alter und neuer Außenkante (wo der Zipfel nur 1 px breit ist)."""
     t = 2 * math.pi * i / N
     env = 0.5 - 0.5 * math.cos(2 * t) if pause else 1.0
     for side, xs in ((-1, left), (1, right)):
@@ -668,11 +668,17 @@ def flutter(out, s, i, ox, oy, rows, left, right, amp=2.0, speed=6, ok=None, err
             dx = dxs[k]
             if not dx:
                 continue
-            for x in xs:
-                if s[y, x, 3] and (ok is None or ok(s[y, x])):
-                    xx, yy = x + side * dx + ox, y + oy
-                    if 0 <= xx < out.shape[1] and 0 <= yy < out.shape[0]:
-                        out[yy, xx] = s[y, x]
+            moved = [x for x in xs if s[y, x, 3] and (ok is None or ok(s[y, x]))]
+            for x in moved:
+                xx, yy = x + side * dx + ox, y + oy
+                if 0 <= xx < out.shape[1] and 0 <= yy < out.shape[0]:
+                    out[yy, xx] = s[y, x]
+            if fill is not None and moved:
+                xo = max(moved) if side > 0 else min(moved)
+                for k in range(1, dx):
+                    xx = xo + side * k + ox
+                    if 0 <= xx < out.shape[1] and not out[y + oy, xx, 3]:
+                        out[y + oy, xx] = rgb(fill)
 
 
 # ---------------------------------------------------------------- aufsteigende Partikel (Glut, Seelen, Schnee)
@@ -1271,7 +1277,7 @@ def f_megakarian(i):
     b = B24[i % 24]
     out = bounce_frame(s, b)
     flutter(out, s, i, PL, PT + b, list(range(12, 20)), range(0, 5), range(19, SW), amp=2.0, speed=4,
-            ok=lambda c: hexc(c) in CAPE_MK, pause=False, clamp=True)  # nur der Umhang unter den Schulterplatten
+            ok=lambda c: hexc(c) in CAPE_MK, pause=False, clamp=True, fill='692c27')  # nur der Umhang unter den Schulterplatten
     return out
 
 
@@ -1308,6 +1314,11 @@ def f_settdunk(i):
 
 # ---------------------------------------------------------------- Emperor Arthor
 GEM_EA = {'68a6a6', '91e6e6', '80cccc', '508080', 'ffffff'}
+EA_SPARK = [(20, 11, 2), (23, 8, 7), (25, 13, 12), (19, 11, 17), (22, 16, 22), (21, 6, 27), (21, 12, 31),
+            (25, 9, 36), (24, 15, 41), (20, 10, 45)]    # auf dem Stein und bis zu 5 px drumherum
+EA_TALK = 'ooohcchoohchoooohccho' + 'ooo'                # o offen, h halb, c zu (Frame 0 = Ruhepose)
+EA_MOUTH = {'o': [], 'h': [((8, 9), 'f0f4f4'), ((9, 9), 'f0f4f4')],
+            'c': [((8, 9), 'f0f4f4'), ((9, 9), 'f0f4f4'), ((8, 10), 'cecab8'), ((9, 10), 'cecab8')]}
 
 
 def f_emperor(i):
@@ -1317,9 +1328,11 @@ def f_emperor(i):
     for y, x in zip(*np.nonzero(s[:, :, 3])):           # der Edelstein am Stab leuchtet
         if x >= 17 and hexc(SRC[y, x]) in GEM_EA:
             s[y, x] = lighten(s[y, x], 0.5 * g)
+    for (x, y), c in EA_MOUTH[EA_TALK[i % 24]]:          # er redet: der Mund schließt sich immer wieder
+        s[y, x] = rgb(c)
     b = B24[i % 24]
     out = bounce_frame(s, b)
-    for (x, y), c in sparkle_pixels(i, N, [(20 + PL, 11 + PT + b, 8), (19 + PL, 12 + PT + b, 32)],
+    for (x, y), c in sparkle_pixels(i, N, [(x + PL, y + PT + b, st) for x, y, st in EA_SPARK],
                                     rgb('e8ffff'), rgb('91e6e6')).items():
         dot(out, x, y, c)
     return out
