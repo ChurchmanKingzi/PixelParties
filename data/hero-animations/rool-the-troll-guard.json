@@ -1,0 +1,15 @@
+{
+  "hero": "Rool, the Troll Guard",
+  "sheet": "rool-the-troll-guard.png",
+  "frameWidth": 29,
+  "frameHeight": 30,
+  "frames": 48,
+  "frameMs": 90,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 2,
+  "padLeft": 1,
+  "padRight": 1,
+  "padBottom": 1,
+  "faceX": 16.0
+}

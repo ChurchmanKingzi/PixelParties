@@ -1,0 +1,15 @@
+{
+  "hero": "Styx, the Opened Gate",
+  "sheet": "styx-the-opened-gate.png",
+  "frameWidth": 115,
+  "frameHeight": 77,
+  "frames": 48,
+  "frameMs": 90,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 1,
+  "padLeft": 3,
+  "padRight": 6,
+  "padBottom": 1,
+  "faceX": 56.0
+}

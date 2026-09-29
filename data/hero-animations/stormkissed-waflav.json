@@ -1,0 +1,16 @@
+{
+  "hero": "Stormkissed Waflav",
+  "sheet": "stormkissed-waflav.png",
+  "frameWidth": 142,
+  "frameHeight": 69,
+  "frames": 48,
+  "frameMs": 90,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 17,
+  "padLeft": 4,
+  "padRight": 4,
+  "padBottom": 5,
+  "faceX": 70.5,
+  "footY": 64
+}

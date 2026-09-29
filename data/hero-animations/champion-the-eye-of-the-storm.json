@@ -1,0 +1,16 @@
+{
+  "hero": "Champion, the Eye of the Storm",
+  "sheet": "champion-the-eye-of-the-storm.png",
+  "frameWidth": 47,
+  "frameHeight": 54,
+  "frames": 48,
+  "frameMs": 90,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 4,
+  "padLeft": 11,
+  "padRight": 11,
+  "padBottom": 4,
+  "faceX": 24.5,
+  "footY": 50
+}
