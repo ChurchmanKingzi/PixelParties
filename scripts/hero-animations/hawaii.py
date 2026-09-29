@@ -23,6 +23,11 @@ Fetzen ab. Frame 0 ist immer das Originalbild.
 * pele:     Luna Pele, the Flame Dancer: tanzt Hula (die Hüften schwingen, der Oberkörper
             gegenläufig, die Füße bleiben, sie federt im Takt), das Flammenhaar auf Kopf und
             Rücken brennt, sie blinzelt.
+* tempeste / tempeluna: schweben auf und ab, schlagen mit den Flügeln, die Locke oben weht im
+            Wind, sie blinzeln; die Kontur (Tempeste türkis, Tempeluna links rot, rechts türkis)
+            wird jedes Frame neu um die ganze Figur gelegt – sie bleibt immer um die Flügel.
+* moana:    Tempeste Moana singt (der Mund geht in Phrasen auf und zu), neben ihr steigen kleine
+            Noten auf, die Haare wehen im Wind, sie tanzt langsam (Hüftschwung, sacht federnd).
 """
 import math
 import os
@@ -30,7 +35,8 @@ import sys
 import numpy as np
 from PIL import Image
 from anim_common import rgb, save_outputs, BOUNCE12
-from flap_common import fill_pinholes
+from flap_common import fill_pinholes, shear_flap
+from anim_common import ring8
 
 BLACK = (0, 0, 0, 255)
 BLINK = {14: 'halb', 15: 'zu', 16: 'zu', 17: 'halb', 38: 'halb', 39: 'zu', 40: 'zu', 41: 'halb'}
@@ -48,6 +54,15 @@ V_ = {
                  blink={'halb': [((9, 16), '311800'), ((10, 16), '311800'), ((13, 16), '311800'), ((14, 16), '311800')],
                         'zu': [((9, 16), 'ae8a70'), ((10, 16), 'ae8a70'), ((13, 16), 'ae8a70'), ((14, 16), 'ae8a70'),
                                ((9, 17), '000000'), ((10, 17), '000000'), ((13, 17), '000000'), ((14, 17), '000000')]}),
+    'tempeste': dict(slug='tempeste-the-weather-fairy', pads=(5, 6, 5, 5), outline={'34fcff'},
+                     wings=({'f6ffff', 'b4f6ff'}, {'f6ffff', 'b4f6ff'}), pivots=(5, 12),
+                     blink={'halb': [((7, 12), '0093b3'), ((10, 12), '0093b3')],
+                            'zu': [((7, 11), '152f66'), ((10, 11), '152f66'), ((7, 12), '000000'), ((10, 12), '000000')]}),
+    'tempeluna': dict(slug='tempeluna-the-convergence-fairy', pads=(5, 6, 5, 5), outline={'34fcff', 'ff0000'},
+                      wings=({'ffdd00', 'ffaa00', 'ff8b00'}, {'f6ffff', 'b4f6ff'}), pivots=(5, 12),
+                      blink={'halb': [((7, 12), '630000'), ((10, 12), '0093b3')],
+                             'zu': [((7, 11), '3f0909'), ((10, 11), '152f66'), ((7, 12), '000000'), ((10, 12), '000000')]}),
+    'moana': dict(slug='tempeste-moana-the-rain-singer', pads=(5, 9, 9, 2)),
 }
 V = next((v for v in sys.argv[2:] if v in V_), 'taio')
 C = V_[V]
@@ -391,7 +406,132 @@ def f_pele(i):
     return out
 
 
-FRAME = dict(taio=f_taio, taioasc=f_taioasc, waflav=f_waflav, pele=f_pele)
+# --- Etappe 2: Feen und Sängerin ------------------------------------------------
+def f_fairy(i):
+    """Tempeste / Tempeluna: schweben auf und ab, schlagen mit den Flügeln (spaltentreue Scherung),
+    die Locke oben weht im Wind (nach rechts), sie blinzeln; die 1-px-Kontur wird jedes Frame neu
+    um die ganze Figur gelegt – bei Tempeluna links rot, rechts türkis wie im Original."""
+    s = SRC.copy()
+    op = s[:, :, 3] > 0
+    olm = op & np.array([[hexc(s[y, x]) in C['outline'] for x in range(SW)] for y in range(SH)])
+    ocol = {}                                            # Konturfarbe je Seite (nächstes Original-Konturpixel)
+    oys, oxs = np.nonzero(olm)
+    inner = s.copy()
+    inner[olm] = 0
+    blink(inner, i)
+    lw, rw = C['wings']
+    iop = inner[:, :, 3] > 0
+    wing = iop & (_ys >= 8) & (_ys <= 17) & np.array(
+        [[(x <= 4 and hexc(inner[y, x]) in lw) or (x >= 13 and hexc(inner[y, x]) in rw) for x in range(SW)] for y in range(SH)])
+    hv = int(round(1.5 * math.sin(2 * math.pi * 2 * i / N)))   # steigt auf und ab
+    w = 2 * math.pi * 2 * i / N
+
+    def curl(x, y):                                      # die Locke / die Haare oben wehen im Wind nach rechts
+        if y <= 7 and not wing[y, x]:
+            return int(round(1.3 * (7 - y) / 7 * (0.5 - 0.5 * math.cos(w - 0.5 * y)) * 2 - 1.3 * (7 - y) / 7 * (0.5 - 0.5 * math.cos(-0.5 * y)) * 2))
+        return 0
+    body = inner.copy()
+    body[wing] = 0
+    fig = np.zeros((H, W, 4), int)
+    put(fig, body, PL, PT + hv, dx_fn=curl)
+    lift = 0.5 * math.sin(2 * math.pi * 3 * i / N)
+    pl, pr = C['pivots']
+    shear_flap(inner, wing & (_xs <= 4), pl, -1, lift, 1.0, fig, offset=(PL, PT + hv))
+    shear_flap(inner, wing & (_xs >= 13), pr, 1, lift, 1.0, fig, offset=(PL, PT + hv))
+    fill_pinholes(fig)
+    ring = ring8(fig[:, :, 3] > 0)
+    out = fig.copy()
+    for y, x in zip(*np.nonzero(ring)):
+        sx, sy = x - PL, y - PT - hv
+        k = np.argmin((oxs - sx) ** 2 + (oys - sy) ** 2)
+        out[y, x] = s[oys[k], oxs[k]]
+    return out
+
+
+# Tempeste Moana: singt – Mund (0 = offen wie im Bild, 1 = halb, 2 = zu), Phrasen mit Atempausen
+MOANA_MOUTH = [0, 0, 0, 1, 0, 0, 0, 0, 1, 2, 2, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 2, 2,
+               2, 1, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 1, 2, 2, 1, 0, 0, 0, 0, 1, 1, 0]
+NOTE = [(1, 0), (1, 1), (2, 1), (1, 2), (0, 3), (1, 3), (0, 4), (1, 4)]   # Achtelnote (3 x 5)
+NOTES = None
+
+
+def moana_base(i):
+    s = SRC.copy()
+    mo = MOANA_MOUTH[i]
+    if mo >= 1:
+        s[9, 8] = s[9, 9] = rgb('b38e73')
+    if mo == 2:
+        s[10, 7] = rgb('ae8a70')
+        s[10, 8] = rgb('800005')
+    w = 2 * math.pi * i / N                               # langsamer Tanz: ein Hüftschwung pro Loop
+    op = s[:, :, 3] > 0
+    hair = op & np.array([[hexc(s[y, x]) in ('000540', '002ad0', '0075f0', '154fe2', '479af6', '86bdfd', '0020b8', '000b92')
+                           for x in range(SW)] for y in range(SH)]) & ((_xs <= 4) | (_xs >= 15)) & (_ys >= 8)
+
+    def dx(x, y):
+        sway = 0.0
+        if y >= 12:                                      # Hüfte schwingt, Füße bleiben
+            sway = (1.3 if y <= 20 else 1.3 * (24 - y) / 4) * math.sin(w)
+        elif y >= 8:
+            sway = -0.5 * math.sin(w) * (y - 8) / 4
+        wind = 0.0
+        if hair[y, x]:                                   # die Haare wehen im Wind nach rechts, unten stärker
+            wind = 1.2 * (y - 8) / 16 * (0.5 - 0.5 * math.cos(2 * w * 2 - 0.4 * y)) * 2 - 1.2 * (y - 8) / 16 * (0.5 - 0.5 * math.cos(-0.4 * y)) * 2
+        return int(round(sway + wind))
+    bob = int(round(0.5 - 0.5 * math.cos(2 * w)))        # federt sacht im Takt
+    out = np.zeros((H, W, 4), int)
+    put(out, s, PL, PT, dx_fn=dx, dy_fn=lambda x, y: bob if y < 20 else 0)
+    fill_pinholes(out)
+    return out
+
+
+def moana_notes():
+    """Noten steigen neben ihr auf (rechts vom Mund), wackeln und verblassen; nie an der Figur."""
+    fig = np.zeros((H, W), bool)
+    for k in range(N):
+        fig |= moana_base(k)[:, :, 3] > 0
+    fig |= ring8(fig)
+    res = []
+    rng = np.random.default_rng(5)
+    tries = 0
+    while len(res) < 6 and tries < 4000:
+        tries += 1
+        e = int(rng.integers(N))
+        L = int(rng.integers(12, 17))
+        x0 = rng.uniform(PL + SW - 4, W - 5)
+        y0 = rng.uniform(PT + 4, PT + 12)
+        path, ok = [], True
+        for a in range(L):
+            nx = int(round(x0 + 0.35 * a + 0.8 * math.sin(0.7 * a + e)))
+            ny = int(round(y0 - 0.8 * a))
+            for dx_, dy_ in NOTE:
+                X, Y = nx + dx_, ny + dy_
+                if not (1 <= X < W - 1 and 1 <= Y < H - 1) or fig[Y, X]:
+                    ok = False
+            path.append((nx, ny))
+        if ok and all(min(abs(e - r[0]), N - abs(e - r[0])) > 5 for r in res):
+            res.append((e, L, path))
+    return res
+
+
+def f_moana(i):
+    global NOTES
+    out = moana_base(i)
+    if NOTES is None:
+        NOTES = moana_notes()
+    for k, (e, L, path) in enumerate(NOTES):
+        a = (i - e) % N
+        if a >= L:
+            continue
+        nx, ny = path[a]
+        col = rgb(('ffffff', 'fff763', 'efaae7')[k % 3], 255 if a < L - 3 else 150)
+        for dx_, dy_ in NOTE:
+            out[ny + dy_, nx + dx_] = col
+    return out
+
+
+FRAME = dict(taio=f_taio, taioasc=f_taioasc, waflav=f_waflav, pele=f_pele, tempeste=f_fairy, tempeluna=f_fairy,
+             moana=f_moana)
 
 if __name__ == '__main__':
     tag = sys.argv[1] if len(sys.argv) > 1 else 'v'
