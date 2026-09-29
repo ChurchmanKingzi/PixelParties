@@ -29,7 +29,7 @@ BLINK = {14: 'halb', 15: 'zu', 16: 'zu', 17: 'halb', 38: 'halb', 39: 'zu', 40: '
 
 V_ = {
     'quetza': dict(slug='quetzahuitl-receiver-of-sacrifices', pads=(21, 23, 6, 4)),
-    'emerald': dict(slug='quetzahuitl-the-emerald-dragon', pads=(3, 3, 6, 6),
+    'emerald': dict(slug='quetzahuitl-the-emerald-dragon', pads=(4, 4, 6, 6),
                     skin='Quetzahuitl, Receiver of Sacrifices'),
     'lyta': dict(slug='little-lyta-the-amazon-princess', knee=20, pads=(4, 2, 3, 1)),
     'pete': dict(slug='monsieur-pete-the-booty-raider', pads=(4, 4, 4, 1)),
@@ -213,17 +213,22 @@ def f_quetza(i):
     blink(body, i, QZ_BLINK)
     ang, span, dy = QZ_FLAP[i % 16]                       # drei Schläge je Loop
     out = np.zeros((H, W, 4), int)
+    wings = {}
     for part, pivot, side in ((wl, QZ_PIVOTS[0], -1), (wr, QZ_PIVOTS[1], 1)):
         key = (side, ang, span, dy)
         if key not in QZ_CACHE:
-            QZ_CACHE[key] = part_rot = rot_wing(part, pivot, side * ang, span, dy) if ang or span < 1 else None
-        w = QZ_CACHE[key]
-        if w is None:
-            paste(out, part, PL, PT + dy)
+            if ang or span < 1:
+                QZ_CACHE[key] = rot_wing(part, pivot, side * ang, span, dy)
+            else:
+                QZ_CACHE[key] = np.zeros((H, W, 4), int)
+                paste(QZ_CACHE[key], part, PL, PT + dy)
+        wings[side] = QZ_CACHE[key]
+    for layer in (wings[1], None, wings[-1]):             # rechter Flügel hinter, linker vor dem Körper
+        if layer is None:
+            paste(out, body, PL, PT + dy)
         else:
-            m = w[:, :, 3] > 0
-            out[m] = w[m]
-    paste(out, body, PL, PT + dy)
+            m = layer[:, :, 3] > 0
+            out[m] = layer[m]
     flutter(out, body, i, PL, PT + dy, list(range(70, 80)), [], range(76, SW), amp=1.2, speed=4,
             ok=lambda c: hexc(c) in QZ_CREST)
     return out
@@ -240,20 +245,22 @@ EM_PIECES = [(0, 28, 3), (28, 45, 2), (45, EM_HEAD, 1)]   # Leibstücke (Spalten
 
 
 def f_emerald(i):
-    """Der Leib zieht sich zusammen, ohne schmaler zu werden: die Stücke rücken starr zum Kopf hin
-    und schieben sich dabei übereinander (das kopfnähere liegt oben), eine sanfte Welle läuft durch."""
+    """Er schlängelt durch die Luft: der Kopf pendelt vor und zurück, der Leib zieht sich dabei
+    zusammen, ohne schmaler zu werden – die Stücke rücken starr nach und schieben sich übereinander
+    (das kopfnähere liegt oben); eine Welle läuft durch."""
     t = 2 * math.pi * i / N
     s = SRC.copy()
     blink(s, i, EM_BLINK)
-    hover = -round(1.5 * math.sin(t))
-    pull = 0.5 - 0.5 * math.cos(2 * t)                    # zweimal je Loop: der Leib zieht sich zusammen
+    hover = -round(1.5 * math.sin(2 * t))
+    lead = round(2.0 * math.sin(3 * t))                   # der Kopf pendelt dreimal je Loop vor und zurück
+    pull = 0.5 - 0.5 * math.cos(3 * t)                    # der Leib zieht nach
     c = -12 + (SW + 24) * ((i % 24) / 24)                 # Leuchten läuft zweimal von links nach rechts
     out = np.zeros((H, W, 4), int)
     for x0, x1, reach in EM_PIECES + [(EM_HEAD, SW, 0)]:
-        sh = round(reach * pull)
+        sh = lead + round(reach * pull)
         for x in range(x0, x1):
             k = 2 * math.pi * min(x, EM_HEAD) / 44
-            dy = round(1.0 * (math.sin(k - 2 * t) - math.sin(k))) + hover
+            dy = round(1.2 * (math.sin(k - 4 * t) - math.sin(k))) + hover
             for y in np.nonzero(s[:, x, 3])[0]:
                 col = s[y, x]
                 hx = hexc(col)
