@@ -5,18 +5,21 @@ Aufruf: python3 skins_last.py <tag> [ms] <variante>
 
 Frame 0 ist immer die Ruhepose.
 
-* bill:      Bills Worst Nightmare federt, die roten Augen der Bärenhaube glühen, die Krone funkelt,
-             der Umhang weht an den Zipfeln.
-* semi:      Creepy Villager Girl Semi schwebt, ihre Flügelchen schlagen, sie blinzelt.
-* doq:       Non-Believer Doq federt, über das Glas der Lupe wandert ein Glanz.
+* bill:      Bills Worst Nightmare federt und blinzelt, die roten Augen der Bärenhaube glühen, die Krone
+             funkelt, der rote Umhang flattert leicht.
+* semi:      Creepy Villager Girl Semi schwebt, ihre Flügelchen schlagen, die Haare bewegen sich leicht,
+             sie blinzelt.
+* doq:       Non-Believer Doq federt (die Hand mit der Lupe geht ganz mit), das riesige Auge hinter der Lupe
+             blinzelt wie beim Standard-Doq, über das Glas wandert ein Glanz.
 * thundergod: Thunder God Sol Rym steigt samt Gewitterwolke auf und ab (die Wolke wallt wie bei Sol Rym),
              die Trommeln seines Kranzes werden reihum geschlagen (sie hüpfen, Funken), er spricht und
              blinzelt; aus der Wolke zucken Blitze.
-* inya:      Ultimate Despair Inya und ihr Bär bewegen sich unabhängig: sie wiegt sich und ihre Zöpfe
-             schwingen, der Bär watschelt (kippt hin und her), sein rotes Auge blitzt.
+* inya:      Ultimate Despair Inya und ihr Bär bewegen sich unabhängig: sie lacht (Mund, Schütteln), ihre
+             Zöpfe wehen; der Bär watschelt (kippt hin und her), sein rotes Auge blitzt.
 * johanna:   Mega-Priestess Johanna federt, ein Glanz läuft über die goldene Rüstung, der Umhang weht.
-* nao:       Student Council President Nao federt, ihr Haar weht, die Spitze ihres Stabs funkelt, sie blinzelt.
-* rhabi:     RhaBi the Human Hunter federt, die abgetrennten Arme schweben unabhängig auf und ab,
+* nao:       Student Council President Nao federt, ihre Engelsflügel schlagen, ihr Haar weht, die Spitze
+             ihres Stabs funkelt, sie blinzelt.
+* rhabi:     RhaBi the Human Hunter federt, die vier abgetrennten Arme schweben unabhängig auf und ab,
              das blaue Auge flackert.
 * kasperov:  Kasperov the King of the East: der Shogi-Stein wippt und hüpft, die Schellen der Narrenkappe
              klingeln (bimmeln hin und her, Funkeln).
@@ -28,6 +31,7 @@ import numpy as np
 import cv2
 from PIL import Image
 from anim_common import rgb, save_outputs, BOUNCE12, draw_bounce, sparkle_pixels
+from flap_common import shear_flap
 
 N = 48
 OUT = os.environ.get('L4_OUT', '.')
@@ -35,14 +39,14 @@ B24 = [BOUNCE12[(k // 2) % 12] for k in range(24)]
 BLINK = {14: 'halb', 15: 'zu', 16: 'zu', 17: 'halb', 38: 'halb', 39: 'zu', 40: 'zu', 41: 'halb'}
 
 V_ = {
-    'bill': dict(slug='bills-worst-nightmare', knee=22, pads=(1, 1, 2, 1)),
+    'bill': dict(slug='bills-worst-nightmare', knee=24, pads=(2, 1, 2, 1)),
     'semi': dict(slug='creepy-villager-girl-semi', pads=(1, 1, 3, 3)),
-    'doq': dict(slug='non-believer-doq', knee=20, pads=(1, 1, 2, 1)),
+    'doq': dict(slug='non-believer-doq', knee=20, pads=(1, 1, 2, 2)),
     'thundergod': dict(slug='thunder-god-sol-rym', pads=(1, 1, 6, 8)),
-    'inya': dict(slug='ultimate-despair-inya', pads=(2, 2, 1, 1)),
+    'inya': dict(slug='ultimate-despair-inya', pads=(1, 1, 2, 1)),
     'johanna': dict(slug='mega-priestess-johanna', knee=22, pads=(1, 1, 2, 1)),
-    'nao': dict(slug='student-council-president-nao', knee=18, pads=(3, 1, 2, 1)),
-    'rhabi': dict(slug='rhabi-the-human-hunter', knee=21, pads=(2, 1, 1, 1)),
+    'nao': dict(slug='student-council-president-nao', knee=18, pads=(3, 1, 2, 4)),
+    'rhabi': dict(slug='rhabi-the-human-hunter', knee=21, pads=(1, 1, 1, 1)),
     'kasperov': dict(slug='kasperov-the-king-of-the-east', pads=(2, 2, 2, 1)),
 }
 V = next((v for v in sys.argv[2:] if v in V_), 'bill')
@@ -100,15 +104,31 @@ def sweep(s, i, colors, period=24, width=2.5, strength=0.55, slope=0.8):
 
 
 # ---------------------------------------------------------------- Bills Worst Nightmare
+BI_EYES = {'halb': [((6, 11), '111216'), ((10, 11), '111216')],
+           'zu': [((x, 11), '111216') for x in (5, 6, 9, 10)] + [((x, 10), '1f1f23') for x in (5, 6, 9, 10)]}
+BI_CAPE = [0x5c0400, 0x440000, 0x7b0815, 0x6b0712, 0x300901]
 def f_bill(i):
+    """Er federt (die Knie federn, nicht der Gürtel) und blinzelt, die roten Augen der Haube glühen, die
+    Krone funkelt, der rote Umhang flattert leicht an den Seiten."""
+    t = 2 * math.pi * i / N
     s = SRC.copy()
     reds = [(y, x) for y, x in zip(*np.nonzero(s[:, :, 3])) if y < 14 and s[y, x, 0] > 180 and s[y, x, 1] < 80]
     g = 0.5 - 0.5 * math.cos(2 * math.pi * 2 * i / N)   # die roten Augen der Haube glühen
     for y, x in reds:
         s[y, x] = lighten(s[y, x], 0.5 * g)
+    blink(s, i, BI_EYES)
     b = B24[i % 24]
     out = np.zeros((H, W, 4), int)
-    draw_bounce(out, s, b, KNEE, PT, PL)
+    cape = (s[:, :, 3] > 0) & ((_xs <= 2) | (_xs >= SW - 5)) & (_ys >= 12) & (_ys <= 24) & \
+        np.isin(s[:, :, 0] * 65536 + s[:, :, 1] * 256 + s[:, :, 2], BI_CAPE)
+    rest = s.copy()
+    rest[cape] = 0
+    draw_bounce(out, rest, b, KNEE, PT, PL)
+    for y, x in zip(*np.nonzero(cape)):                   # Umhang flattert: unten stärker, außen nach außen
+        u = (y - 11) / 13
+        dx = round(1.1 * u * (0.5 + 0.5 * math.sin(4 * t - 0.7 * y))) * (-1 if x <= 2 else 1)
+        bb = b if y < KNEE else 0
+        dot(out, x + PL + dx, y + PT + bb, s[y, x])
     gold = [(x, y) for y, x in zip(*np.nonzero(s[:, :, 3])) if y < 10 and s[y, x, 0] > 200 and s[y, x, 1] > 150]
     if gold:
         gx, gy = gold[len(gold) // 2]
@@ -131,11 +151,15 @@ def f_semi(i):
     dy = -round(1.5 * math.sin(t))
     flap = [0, -1, -1, 0, 1, 1][(i // 2) % 6]
     out = np.zeros((H, W, 4), int)
+    hair = lambda c: int(c[1]) > int(c[0]) + 20 and int(c[1]) > int(c[2])      # grünes Haar
     for y, x in zip(*np.nonzero(s[:, :, 3])):
         c = s[y, x]
         wing = (x <= 5 or x >= SW - 6) and 6 <= y <= 13 and abs(int(c[0]) - int(c[1])) < 12 and c[0] > 90
         ddy = flap * (1 if (x <= 2 or x >= SW - 3) else 0) if wing else 0
-        dot(out, x + PL, y + PT + dy + ddy, c)
+        dx = 0
+        if hair(c) and (y <= 2 or x <= 8 or x >= 17):     # die Haarsträhnen bewegen sich leicht
+            dx = round(0.9 * math.sin(3 * t - 0.5 * y + (0 if x < SW / 2 else 1.5)))
+        dot(out, x + PL + dx, y + PT + dy + ddy, c)
     return out
 
 
@@ -144,15 +168,29 @@ GLASS = None
 
 
 def f_doq(i):
-    """Sie federt, über das Glas der Lupe wandert ein Glanz."""
+    """Sie federt; die Hand mit der Lupe geht ganz mit (auch der Griff), das durch die Lupe riesige Auge
+    blinzelt (das Lid kommt von oben, wie beim Standard-Doq), über das Glas wandert ein Glanz."""
     global GLASS
     s = SRC.copy()
+    st = BLINK.get(i)
+    if st:
+        for y in range(8, 12 if st == 'zu' else 10):
+            for x in range(6, 10):
+                last = y == (11 if st == 'zu' else 9)
+                s[y, x] = rgb('35566b' if last else ('d0c2ae' if (x + y) % 3 else 'beb6a4'))
     if GLASS is None:
         GLASS = {hexc(s[y, x]) for y, x in zip(*np.nonzero(s[:, :, 3]))
                  if s[y, x, 2] > 150 and s[y, x, 2] > s[y, x, 0] + 30}
     sweep(s, i, GLASS, period=16, width=2.2, strength=0.7, slope=-0.9)
+    b = B24[i % 24]
+    carry = ((_ys >= KNEE) & (_ys <= 21) & (_xs >= 4) & (_xs <= 7)) | ((_ys >= KNEE) & (_xs >= 16))
+    carry &= s[:, :, 3] > 0                               # untere Hand und Lupengriff gehen mit
+    rest = s.copy()
+    rest[carry] = 0
     out = np.zeros((H, W, 4), int)
-    draw_bounce(out, s, B24[i % 24], KNEE, PT, PL)
+    draw_bounce(out, rest, b, KNEE, PT, PL)
+    for y, x in zip(*np.nonzero(carry)):
+        dot(out, x + PL, y + PT + b, s[y, x])
     return out
 
 
@@ -263,13 +301,15 @@ def f_thundergod(i):
 
 
 # ---------------------------------------------------------------- Ultimate Despair Inya
+IN_LAUGH = [0, 0, 0, 0, 0, 0, 1, -1, 1, -1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, -1, 1, -1,
+            1, -1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, -1, 1, 0, 0, 0, 0, 0, 0, 0, 0]
 def f_inya(i):
-    """Sie wiegt sich (oben weiter als unten), ihre Zöpfe schwingen nach; der Bär watschelt für sich:
-    er kippt abwechselnd zur Seite und hebt dabei ab, sein rotes Auge blitzt."""
+    """Sie lacht (der offene Mund geht in Lachstößen weiter auf und zu, dabei schüttelt es sie leicht auf
+    und ab), ihre Zöpfe wehen; der Bär watschelt für sich (kippt hin und her, hebt ab), sein rotes Auge blitzt."""
     t = 2 * math.pi * i / N
     girl, bear = load('girl'), load('bear')
     out = np.zeros((H, W, 4), int)
-    wb = [0, 0, 1, 1, 0, 0, -1, -1][(i // 3) % 8]         # Watscheln: Kippen um die Mitte
+    wb = [0, 0, 1, 1, 0, 0, -1, -1][(i // 3) % 8]
     hop = -1 if (i // 3) % 4 in (1, 3) else 0
     bys = np.nonzero(bear[:, :, 3])[0]
     btop, bbot = bys.min(), bys.max()
@@ -282,18 +322,22 @@ def f_inya(i):
         u = (bbot - y) / max(1, bbot - btop)
         for dx, dy in ((0, 0), (1, -1), (-1, 1)):
             dot(out, x + PL + round(wb * u) + dx, y + PT + hop + dy, rgb('ff6060' if (dx, dy) == (0, 0) else 'ffd0d0'))
-    sw = 1.2 * math.sin(t)
-    gys, gxs = np.nonzero(girl[:, :, 3])
-    gbot = gys.max()
-    cx = (gxs.min() + gxs.max()) / 2
-    for y, x in zip(gys, gxs):
-        dx = round(sw * (gbot - y) / gbot)
-        if abs(x - cx) > 7 and 3 <= y <= 16:              # Zöpfe schwingen nach
-            dx = round(sw * (gbot - y) / gbot + 0.9 * math.sin(t - 1.3) * (1 if x > cx else -1) * 0.6)
-            dy = round(0.7 * math.sin(2 * t + (0 if x > cx else 1.7)) * min(1.0, (abs(x - cx) - 7) / 5))
-        else:
-            dy = 0
-        dot(out, x + PL + dx, y + PT + dy, girl[y, x])
+    laugh = IN_LAUGH[i]
+    if laugh == 1:                                        # Mund weit auf
+        for x in (15, 16):
+            girl[13, x] = rgb('250000')
+    elif laugh == -1:                                     # Mund fast zu
+        for x in (15, 16):
+            girl[12, x] = rgb('ecbcbc')
+    shake = -1 if laugh == 1 else 0
+    cx = 15.5
+    for y, x in zip(*np.nonzero(girl[:, :, 3])):
+        d = abs(x - cx)
+        dy = shake if y <= 14 else 0
+        if d > 7 and y <= 17:                             # die Zöpfe wehen: außen weiter als innen
+            u = min(1.0, (d - 7) / 8)
+            dy += round(1.3 * u * math.sin(3 * t - 0.4 * d + (0 if x > cx else 1.6)))
+        dot(out, x + PL, y + PT + dy, girl[y, x])
     return out
 
 
@@ -333,10 +377,15 @@ NA_EYES = {'halb': [((17, 8), '150000'), ((22, 8), '150000')],
 def f_nao(i):
     """Sie federt und blinzelt, ihr langes Haar weht, die goldene Spitze ihres Stabs funkelt."""
     t = 2 * math.pi * i / N
-    s = SRC.copy()
+    s = load('body')
     blink(s, i, NA_EYES)
     b = B24[i % 24]
     out = np.zeros((H, W, 4), int)
+    wings = load('wings')                                 # die Engelsflügel schlagen (hinter ihr)
+    lift = 0.35 * math.sin(2 * math.pi * 3 * i / N)
+    wm = wings[:, :, 3] > 0
+    shear_flap(wings, wm & (_xs < 20), 20, -1, lift, 1 - 0.15 * abs(lift) / 0.35, out, (PL, PT + b), curve=1.3)
+    shear_flap(wings, wm & (_xs >= 20), 20, 1, lift, 1 - 0.15 * abs(lift) / 0.35, out, (PL, PT + b), curve=1.3)
     hair = (s[:, :, 3] > 0) & (s[:, :, 2] > s[:, :, 1] + 15) & (s[:, :, 0] > 90) & (_ys >= 6)
     rest = s.copy()
     rest[hair & ((_xs <= 15) | (_xs >= 24))] = 0
@@ -360,7 +409,7 @@ def f_nao(i):
 def f_rhabi(i):
     """Er federt, die abgetrennten Arme schweben jeder für sich auf und ab, das blaue Auge flackert."""
     t = 2 * math.pi * i / N
-    body, arml, armr = load('body'), load('arml'), load('armr')
+    body = load('body')
     if (i % 12) in (3, 4, 9):
         for y, x in zip(*np.nonzero(body[:, :, 3])):
             if hexc(body[y, x]) == '01ffff':
@@ -368,7 +417,8 @@ def f_rhabi(i):
     b = B24[i % 24]
     out = np.zeros((H, W, 4), int)
     draw_bounce(out, body, b, KNEE, PT, PL)
-    for arm, ph, amp in ((arml, 0.0, 1.6), (armr, 2.2, 2.0)):
+    for part, ph, amp in (('arml', 0.0, 1.6), ('armr', 2.2, 2.0), ('arml2', 4.1, 1.4), ('armr2', 1.1, 1.5)):
+        arm = load(part)
         dy = -round(amp * math.sin(2 * t + ph) - amp * math.sin(ph))
         dx = round(0.8 * math.sin(t + ph) - 0.8 * math.sin(ph))
         paste(out, arm, PL + dx, PT + dy)

@@ -14,10 +14,11 @@ Motive.xcf
   thunder-god-sol-rym            „Ebene #425“ auf derselben Gewitterwolke „Ebene #639“ wie Sol Rym (Teile body, cloud)
   ultimate-despair-inya          „Ebene #308“, getrennt in das Mädchen (Teil girl) und den Bären darunter (Teil bear)
   mega-priestess-johanna         „Ebene #302“
-  student-council-president-nao  „Kanade“ (nur die obere Figur, samt Stab)
+  student-council-president-nao  „Kanade“ (nur die obere Figur, samt Stab) mit den Engelsflügeln „Ebene #583“
+                                 (Teil wings)
 MotiveDeepsea.xcf
   rhabi-the-human-hunter         „Papyrus“ (ohne die Bewegungsschlieren) mit den abgetrennten Knochenarmen aus
-                                 „Ebene #151“ (Teile arml, armr)
+                                 „Ebene #151“ (Teile arml, armr oben, arml2, armr2 unten)
 Kartenbild (in keiner Datei vorhanden)
   kasperov-the-king-of-the-east  Shogi-Stein mit Kasperovs Narrenkappe, aus cards/skins/ ausgeschnitten
                                  (gilt auch für „Kasperov the King of the East1“)
@@ -114,6 +115,8 @@ def kasperov_east():
     edge = np.zeros_like(m)
     edge[:, 38] = edge[:, 57:] = True                         # Brettlinien am Rand
     m &= ~(edge & (sat < 30))
+    for x, y in ((39, 53), (55, 53), (57, 52)):              # Schellen ohne Lücke zur Kappe
+        m[y, x] = True
     o = np.zeros((H, W, 4), np.uint8)
     o[..., :3] = a
     o[..., 3] = m * 255
@@ -152,14 +155,17 @@ def main(d):
                                          ('girl', region(inya, 0, 0, 10000, split))])
     # ---- Mega-Priestess Johanna, Student Council President Nao
     save_parts('mega-priestess-johanna', [('body', g('Ebene #302'))])
-    save_parts('student-council-president-nao', [('body', comp_at(g('Kanade'), 378, 215, dil=1))])
+    save_parts('student-council-president-nao', [('wings', g('Ebene #583')),
+                                                 ('body', comp_at(g('Kanade'), 378, 215, dil=1))])
     # ---- MotiveDeepsea.xcf: RhaBi the Human Hunter
     D = GimpDocument(os.path.join(d, 'MotiveDeepsea.xcf'))
     g = lambda n: layer(D, D.raw_layers, n)
     arms = g('Ebene #151')
     save_parts('rhabi-the-human-hunter', [('body', comp_at(g('Papyrus'), 172, 150)),
-                                          ('arml', region(arms, 158, 140, 172, 153)),
-                                          ('armr', region(arms, 178, 134, 192, 146))])
+                                          ('arml', region(arms, 158, 140, 172, 150)),      # oben links
+                                          ('armr', region(arms, 178, 134, 192, 146)),      # oben rechts
+                                          ('arml2', region(arms, 145, 148, 158, 157)),     # unten links
+                                          ('armr2', region(arms, 190, 148, 203, 157))])    # unten rechts
     # ---- Kasperov the King of the East (Kartenbild)
     save_parts('kasperov-the-king-of-the-east', [('body', kasperov_east())])
 
