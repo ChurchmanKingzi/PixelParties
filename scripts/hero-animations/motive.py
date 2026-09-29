@@ -1285,11 +1285,32 @@ def karian_wind(t, u, side):
 def f_megakarian(i):
     s = SRC.copy()
     blink(s, i)
+    t = 2 * math.pi * i / N
+    rows = list(range(14, SH - 1))                      # der Umhang unter den Schulterplatten bis zum Saum
+    for side in (-1, 1):
+        dxs = clamp_chain([round(2.6 * max(0.0, karian_wind(t, k / (len(rows) - 1), side)))
+                           for k in range(len(rows))])
+        for y, dx in zip(rows, dxs):
+            xs = range(0, SW) if side < 0 else range(SW - 1, -1, -1)
+            seg, started = [], False
+            for x in xs:                                # von außen nach innen: nur zusammenhängendes Tuch
+                if not SRC[y, x, 3]:
+                    if started:
+                        break
+                    continue
+                if hexc(SRC[y, x]) not in CAPE_MK:
+                    break
+                started = True
+                seg.append(x)
+            if not seg or not dx:
+                continue
+            inner = SRC[y, seg[-1]] if len(seg) > 1 else rgb('692c27')  # nur Kontur: dahinter kommt Tuch hervor
+            for x in range(min(seg[-1], seg[0] + side * dx), max(seg[-1], seg[0] + side * dx) + 1):
+                s[y, x] = inner                         # innen rückt Tuch nach (nie die Kontur doppeln)
+            for x in seg:                               # das ganze Tuchstück weht hinaus
+                s[y, x + side * dx] = SRC[y, x]
     b = B24[i % 24]
-    out = bounce_frame(s, b)
-    flutter(out, s, i, PL, PT + b, list(range(12, 20)), range(0, 5), range(19, SW), amp=2.6,
-            ok=lambda c: hexc(c) in CAPE_MK, pause=False, clamp=True, fill='692c27', profile=karian_wind)  # nur der Umhang unter den Schulterplatten
-    return out
+    return bounce_frame(s, b)
 
 
 # ---------------------------------------------------------------- Sett Dunking on You
