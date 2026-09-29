@@ -31,11 +31,12 @@ Fetzen ab. Frame 0 ist immer das Originalbild.
             Noten auf, ringsum fällt Regen, die Haare wehen im Wind, sie tanzt langsam
             (Hüftschwung, sacht federnd).
 * lizbeth:  die Sensenklinge besteht aus Licht und leuchtet pulsierend mit Lichthof, die
-            Lichtstrahlen flackern nach außen; sie federt und blinzelt.
-* johanna:  schwebt, die Kugel aus reinem Licht pulsiert hell mit Lichthof; das Licht hellt sie
-            nahe der Kugel warm auf, weiter weg liegt sie im Schatten; sie blinzelt.
-* calamitusk: hebt und senkt das Banner (die Stange gleitet durch die Hand), das Tuch weht im
-            Wind; von den Krallen rechts tropft Blut.
+            Lichtstrahlen flackern nach außen; sie federt (die Hand links als Einheit) und blinzelt.
+* johanna:  schwebt, die Kugel aus reinem Licht pulsiert hell; das Licht hellt sie nahe der Kugel
+            warm auf, weiter weg liegt sie im Schatten; die roten Haare wiegen sich (die Augen
+            sind schon geschlossen – kein Blinzeln).
+* calamitusk: hebt und senkt das Banner samt Arm, das Tuch weht im Wind, er blinzelt; von den
+            Krallen rechts tropft Blut.
 * karian:   spricht und klagt an (Mund, erhobener Zeigearm), die Klinge fährt blitzschnell ein
             und schnappt wie eine Schlange wieder aus; er federt und blinzelt.
 """
@@ -78,11 +79,11 @@ V_ = {
                     blink={'halb': [((5, 20), 'f6bd98'), ((6, 20), 'f6bd98'), ((9, 20), 'f6bd98'), ((10, 20), 'f6bd98')],
                            'zu': [((5, 20), 'f6bd98'), ((6, 20), 'f6bd98'), ((9, 20), 'f6bd98'), ((10, 20), 'f6bd98'),
                                   ((5, 21), '000000'), ((6, 21), '000000'), ((9, 21), '000000'), ((10, 21), '000000')]}),
-    'johanna': dict(slug='johanna-crusader-of-light', pads=(4, 4, 5, 4),
-                    blink={'halb': [((5, 8), 'f7bc97'), ((6, 8), 'f7bc97'), ((9, 8), 'f7bc97'), ((10, 8), 'f7bc97')],
-                           'zu': [((5, 8), 'f7bc97'), ((6, 8), 'f7bc97'), ((9, 8), 'f7bc97'), ((10, 8), 'f7bc97'),
-                                  ((5, 9), '000200'), ((6, 9), '000200'), ((9, 9), '000200'), ((10, 9), '000200')]}),
-    'calamitusk': dict(slug='calamitusk-the-chaorc-war-chief', part='body', pads=(4, 4, 5, 2)),
+    'johanna': dict(slug='johanna-crusader-of-light', pads=(4, 4, 5, 4)),   # Augen sind schon geschlossen: kein Blinzeln
+    'calamitusk': dict(slug='calamitusk-the-chaorc-war-chief', part='body', pads=(4, 4, 5, 2),
+                       blink={'halb': [((22, 36), '000000'), ((29, 36), '000000')],
+                              'zu': [((21, 36), '000000'), ((22, 36), '000000'), ((23, 36), '000000'),
+                                     ((28, 36), '000000'), ((29, 36), '000000'), ((30, 36), '000000')]}),
     'karian': dict(slug='grand-inquisitor-karian', knee=19, pads=(5, 4, 4, 2),
                    blink={'halb': [((6, 5), '000000'), ((11, 5), '000000')],
                           'zu': [((6, 5), '000000'), ((11, 5), '000000'), ((6, 6), 'f6bd7b'), ((7, 6), 'f6bd7b'),
@@ -651,8 +652,13 @@ def f_lizbeth(i):
         for y, x in zip(*np.nonzero(m)):
             if not op[y, x]:
                 out[y + PT + dy(y), x + PL] = rgb('fff4b0', int(a0))
+    hand = np.zeros_like(s)                              # ihre rechte Hand (links) federt als Einheit mit
+    sel = (s[:, :, 3] > 0) & (_xs <= 3) & (_ys >= 23) & (_ys <= 31)
+    hand[sel] = s[sel]
+    s[sel] = 0
     tmp = np.zeros((H, W, 4), int)
     knee_put(tmp, s, b)
+    put(tmp, hand, PL, PT + b)
     fill_pinholes(tmp)
     m = tmp[:, :, 3] > 0
     out[m] = tmp[m]
@@ -666,9 +672,8 @@ def f_lizbeth(i):
 
 def f_johanna(i):
     """Johanna schwebt und hält eine Kugel aus reinem Licht, die hell pulsiert: das Licht hellt
-    die Figur nahe der Kugel warm auf, weiter weg liegt sie im Schatten; um die Kugel ein Lichthof."""
+    die Figur nahe der Kugel warm auf, weiter weg liegt sie im Schatten; die roten Haare wiegen sich."""
     s = SRC.copy()
-    blink(s, i)
     op = s[:, :, 3] > 0
     orb = op & np.array([[hexc(s[y, x]) in ('ffff82', 'ffffb3', 'ffffe3') for x in range(SW)] for y in range(SH)])
     cy, cx = np.mean(np.nonzero(orb)[0]), np.mean(np.nonzero(orb)[1])
@@ -685,16 +690,21 @@ def f_johanna(i):
         col = base * (1 - lit) + np.array([255, 246, 200]) * lit
         s[y, x] = [int(v) for v in col] + [255]
     hv = int(round(1.4 * math.sin(2 * math.pi * 2 * i / N)))
+    red = {'4f0102', 'b00300', 'd10000', '730000', '8e0300', '420005'}
+    src = SRC
+    hair = (src[:, :, 3] > 0) & np.array([[hexc(src[y, x]) in red for x in range(SW)] for y in range(SH)]) & \
+        (((_xs >= 12) & (_ys >= 3)) | ((_xs <= 3) & (_ys >= 3) & (_ys <= 11)))
+    w2 = 2 * math.pi * 2 * i / N
+
+    def hdx(x, y):                                       # die roten Haare wiegen sich (unten stärker)
+        if hair[y, x]:
+            t_ = min(1.0, (y - 3) / 16)
+            return int(round(1.3 * t_ * (math.sin(w2 - 0.35 * y) - math.sin(-0.35 * y))))
+        return 0
     out = np.zeros((H, W, 4), int)
-    put(out, s, PL, PT + hv)
-    for r, a0 in ((1, 150), (2, 70)):                    # Lichthof um die Kugel (nur außerhalb der Figur)
-        for y in range(H):
-            for x in range(W):
-                if out[y, x, 3]:
-                    continue
-                d = math.hypot(x - PL - cx, (y - PT - hv - cy) * 1.1)
-                if d <= 3.5 + r + 1.2 * f and d > 2.5:
-                    out[y, x] = rgb('fff6c0', int(a0 * (0.5 + 0.5 * f)))
+    put(out, np.where(hair[:, :, None], 0, s), PL, PT + hv)
+    put(out, np.where(hair[:, :, None], s, 0), PL, PT + hv, dx_fn=hdx)
+    fill_pinholes(out)
     return out
 
 
@@ -702,8 +712,8 @@ BANNER = None
 
 
 def f_calamitusk(i):
-    """Calamitusk hebt und senkt das Banner (die Stange gleitet durch seine Hand), das Tuch weht im
-    Wind (von links, unten stärker, oben an der Querstange fest); von den Krallen rechts tropft Blut."""
+    """Calamitusk hebt und senkt das Banner samt Arm und Hand, das Tuch weht im Wind (von links,
+    unten stärker, oben an der Querstange fest), er blinzelt; von den Krallen rechts tropft Blut."""
     body, banner = SRC.copy(), load('banner')
     bop = banner[:, :, 3] > 0
     rows = bop.sum(1)
@@ -719,15 +729,15 @@ def f_calamitusk(i):
             t_ = (y - top) / (bot - top)
             return int(round(1.6 * t_ * (0.5 + 0.5 * math.sin(4 * w - 0.5 * y)) - 1.6 * t_ * (0.5 + 0.5 * math.sin(-0.5 * y))))
         return 0
+    blink(body, i)
     out = np.zeros((H, W, 4), int)
     put(out, np.where(cloth[:, :, None], banner, 0), PL, PT + lift, dx_fn=wind)
-    pys, pxs = np.nonzero(pole)
-    for x in sorted(set(pxs.tolist())):                  # Stange: vom Tuch (gehoben) bis in die Hand (fest)
-        col = pys[pxs == x]
-        for y in range(bot + 1 + lift, col.max() + 1):
-            sy = min(col.max(), max(col.min(), y - lift if y - lift <= col.max() else y))
-            out[y + PT, x + PL] = banner[sy, x]
+    put(out, np.where(pole[:, :, None], banner, 0), PL, PT + lift)   # Stange mit dem Banner
+    hand = np.zeros_like(body)                           # sein Arm mit der Standarte geht mit hoch und runter
+    sel = (body[:, :, 3] > 0) & (_xs <= 19) & (_ys >= 36) & (_ys <= 45)
+    hand[sel] = body[sel]
     put(out, body, PL, PT)
+    put(out, hand, PL, PT + lift)
     for x0, t0 in ((34, 3), (37, 21), (34, 35)):         # Blut tropft von den Krallen
         t_ = (i - t0) % N
         if t_ < 20:
@@ -782,7 +792,7 @@ def f_karian(i):
         k = y - y0
         if k >= n:
             continue
-        yy = y + PT + (b if y < KNEE else 0)
+        yy = y + PT + b                                  # die Klinge hängt am Griff: federt als Ganzes
         out[yy, x + PL + offs.get(k, 0)] = c
     fill_pinholes(out)
     return out
