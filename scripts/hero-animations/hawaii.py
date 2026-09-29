@@ -251,17 +251,45 @@ def f_taioasc(i):
     return out
 
 
-def fire_field(img, mask, i, seed=0, reach=3):
-    """Flammenfeld für große Feuerflächen (Waflavs Flügel): die Hitze der Originalfarben bleibt
-    als Grundform, darüber steigen Flammenzungen (senkrecht gestreckte Hitzeflecken) von unten nach
-    oben durch die Fläche, an den Rändern züngeln sie bis zu reach Pixel über die Silhouette hinaus.
+def fire_field(img, mask, i, seed=0, reach=4, tongue=3.0):
+    """Flammenfeld für große Feuerflächen (Waflavs Flügel): auch der Umriss lodert (die Säulen
+    strecken und stauchen sich an den Spitzen um bis zu ±tongue px und wiegen seitlich), darin
+    steigen Flammenzungen (senkrecht gestreckte Hitzeflecken) von unten nach oben, an den Rändern
+    züngeln sie bis zu reach Pixel über die Silhouette hinaus.
     Rückgabe {(x, y): Farbe} in img-Koordinaten."""
     w = 2 * math.pi * i / N
     heat = {'ca2c29': 0.3, 'f47b22': 0.55, 'f6e70e': 0.78, 'f7f5b8': 1.0}
     h, wd = mask.shape
     hb = np.zeros((h + reach, wd))
-    for y, x in zip(*np.nonzero(mask)):
-        hb[y + reach, x] = heat.get(hexc(img[y, x]), 0.5)
+    # 1) die Silhouette lodert: jede Flammensäule streckt/staucht sich an der Spitze (benachbarte
+    #    Säulen ähnlich -> zusammenhängende Zungen), zur Spitze hin wiegt sie seitlich
+    for x in range(wd):
+        ys = np.nonzero(mask[:, x])[0]
+        if not len(ys):
+            continue
+        runs, start = [], ys[0]
+        for a_, c_ in zip(ys, list(ys[1:]) + [None]):
+            if c_ is None or c_ != a_ + 1:
+                runs.append((start, a_))
+                start = c_
+        for top, base in runs:
+            h0 = base - top + 1
+            ph = 0.42 * x + seed
+            d = tongue * (0.6 * (math.sin(6 * w + ph) - math.sin(ph)) + 0.4 * (math.sin(4 * w - 0.31 * x) - math.sin(-0.31 * x)))
+            hh = max(1.0, h0 + d * min(1.0, h0 / 5))
+            for y in range(int(math.floor(base - hh + 1)), base + 1):
+                sy = base - int(round((base - y) * (h0 - 1) / max(1e-6, hh - 1))) if hh > 1 else base
+                sy = min(base, max(top, sy))
+                rel = (base - y) / max(1.0, hh)
+                dx = int(round(1.3 * rel ** 1.6 * (math.sin(4 * w - 0.3 * y + 0.2 * x + seed) - math.sin(-0.3 * y + 0.2 * x + seed))))
+                xx = x + dx
+                if 0 <= xx < wd and y + reach >= 0:
+                    hb[y + reach, xx] = max(hb[y + reach, xx], heat.get(hexc(img[sy, x]), 0.5))
+    for _ in range(2):                                   # Löcher der verformten Fläche schließen
+        z = hb == 0
+        nb = (np.roll(hb, 1, 0) > 0).astype(int) + (np.roll(hb, -1, 0) > 0) + (np.roll(hb, 1, 1) > 0) + (np.roll(hb, -1, 1) > 0)
+        fillv = np.maximum.reduce([np.roll(hb, 1, 0), np.roll(hb, -1, 0), np.roll(hb, 1, 1), np.roll(hb, -1, 1)])
+        hb[z & (nb >= 3)] = fillv[z & (nb >= 3)]
     hs = hb.copy()                                       # Hitze steigt: nach oben ausgedehnt
     for k in range(1, reach + 1):
         hs[:-k] = np.maximum(hs[:-k], hb[k:] * (1 - 0.22 * k))
