@@ -4508,6 +4508,17 @@ function sendGameState(room, playerIdx, extra) {
       // the opponent shouldn't see which copies are reduced. Maps
       // hand-index → numeric offset (currently always negative).
       handLevelOffsets: pi === playerIdx ? { ...(ps._handLevelOffsets || {}) } : {},
+      // Applause Counter auf Handkarten (Fun-Fun Circus Elephant): der Besitzer
+      // sieht alle, der Gegner nur die der AUFGEDECKTEN Karten (Index → Zahl).
+      handApplause: (() => {
+        const map = ps._handApplause || {};
+        if (pi === playerIdx) return { ...map };
+        const sichtbar = {};
+        for (const k of Object.keys(map)) {
+          if (ps._permanentlyRevealedHandIndices?.[k] || ps._revealedHandIndices?.[k]) sichtbar[k] = map[k];
+        }
+        return sichtbar;
+      })(),
       // Transient sibling (Sparkfly Queen's "as if levels were reduced
       // by 3" rebate). Same hand-index keying; the offset evaporates
       // when the card leaves the hand.
@@ -5429,6 +5440,7 @@ function sendSpectatorGameState(room) {
       neverPlayableCards: [],
       cardGateBlockedCards: [],
       handLevelOffsets: {},
+      handApplause: {},
       handLevelOffsetsTransient: {},
       handLevelOffsetHeroFilter: {},
       handLevelOffsetsDynamic: {},
@@ -15206,6 +15218,10 @@ io.on('connection', (socket) => {
             // as the draw count.
             if (typeof cs.balance === 'number' && cs.balance > 0) {
               inst.counters.balance = cs.balance;
+            }
+            // Applause Counter (Fun-Fun Circus) — im Puzzle-Editor gesetzt.
+            if (typeof cs.applause === 'number' && cs.applause > 0) {
+              inst.counters.applause = cs.applause;
             }
             // Bunny Bombs — im Puzzle-Editor gesetzte Bomb Counter.
             // Landen auf `inst.counters.bunnyBombCounter`; das Kartenskript

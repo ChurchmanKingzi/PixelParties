@@ -24613,3 +24613,36 @@ body.pp-dialog-offen .foil-diamond-rare:not(.modal-overlay *) {
    Regel weiterhin. */
 .anim-flame-flash[style*="margin-left"],
 .anim-gold-flash[style*="margin-left"] { left: 0; top: 0; }
+
+
+/* ── Applause Counter (Fun-Fun Circus): klatschende Haende + Zahl ──
+   Unten mittig auf der Karte. Auf dem Brett sitzt die HP-Zahl der
+   Creature selbst unten mittig — der Zaehler steht knapp darueber. */
+.applause-badge {
+  position: absolute; left: 50%; bottom: calc(15px * var(--board-scale, 1));
+  transform: translateX(-50%);
+  width: calc(22px * var(--board-scale, 1)); height: calc(18px * var(--board-scale, 1));
+  z-index: 6; pointer-events: auto;
+}
+.applause-badge-hand { bottom: 15px; width: 26px; height: 22px; }
+.applause-icon { display: block; width: 100%; height: 100%; image-rendering: pixelated; image-rendering: crisp-edges; }
+.applause-num {
+  position: absolute; left: 0; right: 0; bottom: -2px; text-align: center; line-height: 1;
+  font-family: 'Pixel Intv', 'Press Start 2P', monospace;
+  font-size: calc(9px * var(--board-scale, 1)); color: #fff;
+  text-shadow: -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000, 0 0 3px #000;
+}
+.applause-badge-hand .applause-num { font-size: 10px; }
+
+/* Aufleuchten, wenn ein Applause Counter steigt (kurz, in Stufen = Pixelstil). */
+.applause-badge.applause-glow .applause-icon { animation: applauseGlow 700ms steps(7, end); }
+.applause-badge.applause-glow .applause-num { animation: applauseNum 700ms steps(7, end); }
+@keyframes applauseGlow {
+  0%   { filter: brightness(2.6) drop-shadow(0 0 4px #fff2b0) drop-shadow(0 0 8px #ffd24a); transform: scale(1.35); }
+  40%  { filter: brightness(1.8) drop-shadow(0 0 3px #ffd24a) drop-shadow(0 0 6px #ffb020); transform: scale(1.15); }
+  100% { filter: none; transform: scale(1); }
+}
+@keyframes applauseNum {
+  0%   { color: #fff2b0; transform: scale(1.3); }
+  100% { color: #fff; transform: scale(1); }
+}
