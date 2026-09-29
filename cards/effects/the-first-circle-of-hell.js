@@ -66,10 +66,11 @@ async function massDeleteDiscardPile(engine, pi) {
     engine.log('card_deleted', {
       card: name, player: ps.username, source: CARD_NAME,
     });
-    // Build animation list in original front-to-back order — we
-    // walked the array backwards, so unshift restores the visual
-    // order the player originally laid the discards down in.
-    moved.unshift(name);
+    // Animationsliste OBEN ZUERST: wir laufen das Array rueckwaerts
+    // (oberste Karte zuerst), und die sichtbar oberste Karte des
+    // Stapels muss auch als erste fliegen (Als Befund) — der Client
+    // legt die erste Karte der Liste im Stapel nach oben.
+    moved.push(name);
   }
   if (moved.length > 0) {
     engine._broadcastEvent('discard_to_deleted_animation', {
