@@ -1828,8 +1828,13 @@ function DraggablePanel({ children, className, style, zielwahl }) {
         if (an) {
           for (const k of el.querySelectorAll(ZW_KNOPF_SEL)) {
             const kr = k.getBoundingClientRect();
+            // ★ v1487 (Als Vorgabe 29.9.: „Der Bereich unter den Buttons
+            // sollte vollständig on-hover NICHT die Box entfernen."): nach
+            // unten keine Grenze — bis zur Unterkante der Box (`drin`
+            // begrenzt schon auf die Box). Seitlich bleibt es beim Rand:
+            // die Lücke zwischen den Knöpfen liegt über dem mittleren Helden.
             if (kr.width && letzt.x >= kr.left - ZW_KNOPF_RAND && letzt.x <= kr.right + ZW_KNOPF_RAND
-              && letzt.y >= kr.top - ZW_KNOPF_RAND && letzt.y <= kr.bottom + ZW_KNOPF_RAND) { an = false; break; }
+              && letzt.y >= kr.top - ZW_KNOPF_RAND) { an = false; break; }
           }
         }
       }
