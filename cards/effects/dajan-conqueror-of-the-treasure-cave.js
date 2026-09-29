@@ -49,8 +49,10 @@ module.exports = {
   activeIn: ['hero'],
   heroEffect: true,
 
-  ascensionCondition(gs, pi, heroIdx, _engine) {
-    const hero = gs.players[pi]?.heroes?.[heroIdx];
+  // Als Vorgabe 29.9.: Held auf seiner Brettseite `heroOwner`, Gold des
+  // Kontrolleurs `pi` („while you have 60 or more Gold").
+  ascensionCondition(gs, pi, heroIdx, _engine, heroOwner) {
+    const hero = gs.players[heroOwner ?? pi]?.heroes?.[heroIdx];
     if (!hero?.name || hero.hp <= 0) return false;
     if (hero.name !== BASE_FORM) return false;
     return (gs.players[pi].gold || 0) >= ASCEND_GOLD;

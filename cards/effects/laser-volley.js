@@ -207,7 +207,7 @@ module.exports = {
       // prompt per source for Sculpture Guards / Spectral Armor / etc.
       // covering every unspared target.
       {
-        const source = { name: CARD_NAME, owner: pi, heroIdx: ctx.cardHeroIdx };
+        const source = { name: CARD_NAME, owner: pi, heroIdx: ctx.cardHeroIdx, heroOwner: ctx.cardHeroOwner ?? pi };   // Als Befund 29.9.: Brettseite des Wirkers
         const allUnspared = targets
           .filter(t => !sparedIds.has(t.id))
           .map(t => t.kind === 'hero'
@@ -232,13 +232,13 @@ module.exports = {
           .filter(t => !sparedIds.has(t.id) && t.kind === 'creature')
           .map(t => engine.cardInstances.find(c => c.id === t.instId))
           .filter(Boolean),
-        source: { name: CARD_NAME, owner: pi, heroIdx: ctx.cardHeroIdx },
+        source: { name: CARD_NAME, owner: pi, heroIdx: ctx.cardHeroIdx, heroOwner: ctx.cardHeroOwner ?? pi },   // Als Befund 29.9.: Brettseite des Wirkers
         amount: VOLLEY_DAMAGE, type: 'destruction_spell', sourceOwner: pi,
       });
       try {
       for (const t of targets) {
         if (sparedIds.has(t.id)) continue;
-        const source = { name: CARD_NAME, owner: pi, heroIdx: ctx.cardHeroIdx };
+        const source = { name: CARD_NAME, owner: pi, heroIdx: ctx.cardHeroIdx, heroOwner: ctx.cardHeroOwner ?? pi };   // Als Befund 29.9.: Brettseite des Wirkers
         if (t.kind === 'hero') {
           const hero = gs.players[t.physOwner]?.heroes?.[t.heroIdx];
           if (hero?.name && hero.hp > 0) {

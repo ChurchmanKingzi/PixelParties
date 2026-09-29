@@ -118,7 +118,7 @@ module.exports = {
       } else if (picked.type === 'equip' && picked.cardInstance) {
         const inst = picked.cardInstance;
         await engine.actionApplyCreaturePoison(
-          { name: hero.name, owner: pi, heroIdx },
+          { name: hero.name, owner: pi, heroIdx, heroOwner: ctx.cardHeroOwner ?? pi },   // Als Befund 29.9.: Brettseite des Wirkers
           inst,
         );
       }

@@ -295,12 +295,15 @@ module.exports = {
         charmedFromOwner: targetHero.charmedFromOwner,
         charmedHeroIdx: targetHero.charmedHeroIdx,
         statusCharmed: targetHero.statuses?.charmed,
+        kontrollRechte: targetHero._kontrollRechte,
       };
       targetHero.charmedBy = pi;
       targetHero.charmedFromOwner = oi;
       targetHero.charmedHeroIdx = sel.heroIdx;
       if (!targetHero.statuses) targetHero.statuses = {};
       targetHero.statuses.charmed = { controller: pi, appliedTurn: gs.turn, _loveShot: true };
+      // Nur die eine Attacke/der eine Zauber — kein Beschwoeren/Ausruesten (29.9.).
+      targetHero._kontrollRechte = { beschwoeren: false, ausruesten: false, abilities: false };
       engine._heldenStatusVerursacher(targetHero.statuses.charmed, { appliedBy: pi, source: ctx.card });   // v1399
       engine.sync();
 
@@ -476,6 +479,8 @@ module.exports = {
         else targetHero.charmedFromOwner = prev.charmedFromOwner;
         if (prev.charmedHeroIdx === undefined) delete targetHero.charmedHeroIdx;
         else targetHero.charmedHeroIdx = prev.charmedHeroIdx;
+        if (prev.kontrollRechte === undefined) delete targetHero._kontrollRechte;
+        else targetHero._kontrollRechte = prev.kontrollRechte;
         if (prev.statusCharmed === undefined) {
           if (targetHero.statuses) delete targetHero.statuses.charmed;
         } else {

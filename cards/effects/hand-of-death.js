@@ -107,20 +107,20 @@ module.exports = {
       // ever at most one pending effect per player.
       ps._handOfDeathArmed = {
         armedOnTurn: gs.turn,
-        casterHeroIdx: heroIdx,
+        casterHeroIdx: heroIdx, casterHeroOwner: ctx.cardHeroOwner ?? pi,   // Als Befund 29.9.: Brettseite des Wirkers
       };
 
       // Pre-fire flourish on the caster — dark swarm rising. The
       // serious animation lands later at trigger time on the picked
       // target.
       engine._broadcastEvent('play_zone_animation', {
-        type: 'dark_swarm', owner: pi, heroIdx, zoneSlot: -1,
+        type: 'dark_swarm', owner: ctx.cardHeroOwner ?? pi, heroIdx, zoneSlot: -1,   // Als Befund 29.9.: Brettseite des Wirkers
       });
       await engine._delay(400);
 
       engine.log('hand_of_death_armed', {
         player: ps.username,
-        hero: ps.heroes[heroIdx]?.name,
+        hero: (ctx.attachedHero || ps.heroes[heroIdx])?.name,   // Als Befund 29.9.: Brettseite des Wirkers
         armedOnTurn: gs.turn,
       });
       engine.sync();
@@ -162,7 +162,8 @@ module.exports = {
 
       // ── User-status gate ──
       const userHeroIdx = armed.casterHeroIdx;
-      const userHero = ps.heroes?.[userHeroIdx];
+      const userSeite = armed.casterHeroOwner ?? ownerIdx;   // Als Befund 29.9.: Brettseite des Wirkers
+      const userHero = gs.players[userSeite]?.heroes?.[userHeroIdx];
       if (!userHero?.name || userHero.hp <= 0) {
         engine.log('hand_of_death_fizzle', {
           player: ps.username, reason: 'user_defeated',
@@ -185,7 +186,7 @@ module.exports = {
       // Caster flourish — same dark-swarm cue tying the trigger to the
       // user before the picker opens.
       engine._broadcastEvent('play_zone_animation', {
-        type: 'dark_swarm', owner: ownerIdx,
+        type: 'dark_swarm', owner: userSeite,   // Als Befund 29.9.: Brettseite des Wirkers
         heroIdx: userHeroIdx, zoneSlot: -1,
       });
       await engine._delay(300);
@@ -195,7 +196,7 @@ module.exports = {
       // reactions (Spectral Armor / Bamboo Shield / Sculpture Guards).
       // `damageType: 'destruction_spell'` keeps the school tag.
       const sourceMeta = {
-        name: CARD_NAME, owner: ownerIdx, heroIdx: userHeroIdx,
+        name: CARD_NAME, owner: ownerIdx, heroIdx: userHeroIdx, heroOwner: userSeite,   // Als Befund 29.9.: Brettseite des Wirkers
         controller: ownerIdx,
       };
       const target = await ctx.promptDamageTarget({

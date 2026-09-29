@@ -19,8 +19,9 @@ module.exports = {
   surpriseTrigger(gs, tOwner, tHeroIdx, sourceInfo, engine) {
     // Don't trigger for AoE effects (Divine Gift of Fire, Flame Avalanche, etc.)
     if (sourceInfo?.cardInstance?._isAoeCheck) return false;
-    // Must be an opponent's effect
-    if (sourceInfo?.owner === tOwner) return false;
+    // Must be an opponent's effect (Als Vorgabe 29.9.: `tOwner` = Ausloeser,
+    // verglichen mit dem handelnden Spieler der Quelle)
+    if ((sourceInfo?.controller ?? sourceInfo?.owner) === tOwner) return false;
     // v666 (Sweep): „opponent's Attack, Spell or Creature effect“.
     if (!isAttackSpellOrCreatureSource(engine, sourceInfo)) return false;
     return true;
@@ -33,7 +34,7 @@ module.exports = {
   async onSurpriseActivate(ctx, sourceInfo) {
     const engine = ctx._engine;
     const gs = engine.gs;
-    const pi = ctx.cardOriginalOwner;
+    const pi = ctx.cardOwner ?? ctx.cardOriginalOwner;   // 29.9.: Ausloeser (Kontrolleur)
 
     // Queue deferred effect — will execute after spell/effect resolution
     if (!gs._deferredSurprises) gs._deferredSurprises = [];

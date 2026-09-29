@@ -159,14 +159,16 @@ function refreshAscensionTargets(engine, pi) {
  */
 function ascensionContract(cost) {
   return {
-    ascensionCondition(gs, pi, heroIdx, engine) {
-      const hero = gs.players[pi]?.heroes?.[heroIdx];
+    // Als Vorgabe 29.9.: `heroOwner` = Brettseite eines geliehenen Helden
+    // („you control" deckt ihn ab); die Counter liegen auf DIESEM Helden.
+    ascensionCondition(gs, pi, heroIdx, engine, heroOwner) {
+      const hero = gs.players[heroOwner ?? pi]?.heroes?.[heroIdx];
       if (!hero?.name || hero.hp <= 0) return false;
       if (!isWaflavName(engine, hero.name)) return false;   // "a 'Waflav' Hero you control"
       return getEvo(hero) >= cost;
     },
-    payAscensionCost(engine, pi, heroIdx) {
-      spendEvo(engine, pi, heroIdx, cost);
+    payAscensionCost(engine, pi, heroIdx, heroOwner) {
+      spendEvo(engine, heroOwner ?? pi, heroIdx, cost);
     },
   };
 }
@@ -184,9 +186,10 @@ function descendHoptKey(formName, pi, heroIdx) {
   return `waflav-descend:${formName}:${pi}:${heroIdx}`;
 }
 
-function canDescend(engine, pi, heroIdx) {
+// Als Befund 29.9.: `hs` = Brettseite eines geliehenen Waflav (Standard `pi`).
+function canDescend(engine, pi, heroIdx, hs = pi) {
   const gs = engine.gs;
-  const hero = gs.players[pi]?.heroes?.[heroIdx];
+  const hero = gs.players[hs]?.heroes?.[heroIdx];
   if (!hero?.name || hero.hp <= 0) return false;
   if (!Array.isArray(hero._formStack) || hero._formStack.length === 0) return false;
   return gs.hoptUsed?.[descendHoptKey(hero.name, pi, heroIdx)] !== gs.turn;
@@ -200,9 +203,9 @@ function canDescend(engine, pi, heroIdx) {
  * is what "onto it" refers to once the transformation has happened, and
  * it is what makes the cycle work: descend for fuel, re-ascend.
  */
-async function performWaflavDescend(engine, pi, heroIdx, gain) {
-  if (!canDescend(engine, pi, heroIdx)) return false;
-  const hero = engine.gs.players[pi]?.heroes?.[heroIdx];
+async function performWaflavDescend(engine, pi, heroIdx, gain, hs = pi) {
+  if (!canDescend(engine, pi, heroIdx, hs)) return false;
+  const hero = engine.gs.players[hs]?.heroes?.[heroIdx];
   const key = descendHoptKey(hero.name, pi, heroIdx);
   // Namen der ABSTEIGENDEN Form jetzt sichern: `performDescend` schreibt
   // das Heldenobjekt in-place um, danach liest `hero.name` schon die
@@ -232,7 +235,7 @@ async function performWaflavDescend(engine, pi, heroIdx, gain) {
   // `ok?.confirmed` liest, sperrt die CPU komplett aus — genau die
   // Falle, die _cpu.js an zwei Stellen dokumentiert.
   if (!(ok === true || ok?.confirmed === true)) return false;
-  const res = await engine.performDescend(pi, heroIdx);
+  const res = await engine.performDescend(pi, heroIdx, hs !== pi ? { heroOwner: hs } : undefined);
   if (!res?.success) return false;
   // ── Descend-Telemetrie (Als Auftrag 6.8.) ─────────────────────────
   // Der Descend ist der Counter-REGENERATOR des Archetyps: Stack
@@ -258,7 +261,7 @@ async function performWaflavDescend(engine, pi, heroIdx, gain) {
   } catch { /* Telemetrie darf nie einen Abstieg kippen */ }
   if (!engine.gs.hoptUsed) engine.gs.hoptUsed = {};
   engine.gs.hoptUsed[key] = engine.gs.turn;
-  addEvo(engine, pi, heroIdx, gain, 'Descend');
+  addEvo(engine, hs, heroIdx, gain, 'Descend');
   engine.sync();
   return true;
 }
@@ -594,9 +597,9 @@ function cpuPickEnemyTarget(engine, payload) {
  *   • Platz: freie Zone oder gleichnamiger Stapel < 3 bzw.
  *     `customPlacement` (ueber `canAttachAbilityToHero`)
  */
-function canAttachAbilityHere(engine, pi, heroIdx, abilityName) {
+function canAttachAbilityHere(engine, pi, heroIdx, abilityName, hs = pi) {
   const gs = engine.gs;
-  const hero = gs.players[pi]?.heroes?.[heroIdx];
+  const hero = gs.players[hs]?.heroes?.[heroIdx];
   if (!hero?.name || hero.hp <= 0) return false;
   const cardDB = engine._getCardDB();
   if (cardDB[abilityName]?.cardType !== 'Ability') return false;
@@ -604,19 +607,19 @@ function canAttachAbilityHere(engine, pi, heroIdx, abilityName) {
   const script = loadCardEffect(abilityName);
   if (script?.restrictedAttachment) return false;
   if (script?.ascendedHeroOnly && cardDB[hero.name]?.cardType !== 'Ascended Hero') return false;
-  if (script?.canAttachToHero && !script.canAttachToHero(gs, pi, heroIdx, engine)) return false;
+  if (script?.canAttachToHero && !script.canAttachToHero(gs, hs, heroIdx, engine)) return false;
 
-  return engine.canAttachAbilityToHero(pi, abilityName, heroIdx);
+  return engine.canAttachAbilityToHero(pi, abilityName, heroIdx, hs !== pi ? { heroOwner: hs } : undefined);
 }
 
 /** Die legal anlegbaren Ability-Namen aus einer Zone (Deck oder Hand). */
-function attachableAbilitiesIn(engine, pi, heroIdx, list) {
+function attachableAbilitiesIn(engine, pi, heroIdx, list, hs = pi) {
   const seen = new Set();
   const out = [];
   for (const n of list || []) {
     if (seen.has(n)) continue;
     seen.add(n);
-    if (canAttachAbilityHere(engine, pi, heroIdx, n)) out.push(n);
+    if (canAttachAbilityHere(engine, pi, heroIdx, n, hs)) out.push(n);
   }
   return out.sort();
 }
@@ -652,12 +655,16 @@ const gameStartHook = {
 function waflavHeroTargets(engine, pi) {
   const ps = engine.gs.players[pi];
   if (!ps) return [];
+  // Als Vorgabe 29.9.: „you control" — auch ein geliehener Waflav in der
+  // Gegnerspalte (`owner` = Brettseite), ohne den an den Gegner abgegebenen.
+  const helden = typeof engine.heroesControlledBy === 'function'
+    ? engine.heroesControlledBy(pi)
+    : (ps.heroes || []).map((hero, heroIdx) => ({ physOwner: pi, heroIdx, hero }));
   const out = [];
-  for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-    const h = ps.heroes[hi];
+  for (const { physOwner, heroIdx: hi, hero: h } of helden) {
     if (!h?.name || h.hp <= 0) continue;
     if (!isWaflavName(engine, h.name)) continue;
-    out.push({ id: `hero-${pi}-${hi}`, type: 'hero', owner: pi, heroIdx: hi, cardName: h.name });
+    out.push({ id: `hero-${physOwner}-${hi}`, type: 'hero', owner: physOwner, heroIdx: hi, cardName: h.name });
   }
   return out;
 }

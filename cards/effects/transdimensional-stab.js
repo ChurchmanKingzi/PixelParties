@@ -123,7 +123,7 @@ module.exports = {
       // BEFORE the animation + damage. Placed after the hand-empty
       // gate so Doq doesn't fire on a negated attack. Listeners may
       // mutate the about-to-deal damage.
-      const source = { name: CARD_NAME, owner: pi, heroIdx, controller: pi, usesHeroAtk: true };
+      const source = { name: CARD_NAME, owner: pi, heroIdx, controller: pi, heroOwner: ctx.cardHeroOwner ?? pi, usesHeroAtk: true };   // Als Befund 29.9.: Brettseite des Angreifers
       const finalDmg = await engine._fireAttackDeclare(source, target, damage);
 
       const tgtZoneSlot = target.type === 'hero' ? -1 : target.slotIdx;

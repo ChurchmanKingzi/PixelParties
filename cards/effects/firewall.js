@@ -114,12 +114,12 @@ module.exports = {
     const gs     = engine.gs;
     const cardDB = engine._getCardDB();
     // v633: Helden-Verstaerkung (Luna) — mehr Schaden, Flaechen-Burn.
-    const mods = firewallMods(engine, ctx.cardOwner, ctx.cardHeroIdx);
+    const mods = firewallMods(engine, ctx.cardHeroOwner ?? ctx.cardOwner, ctx.cardHeroIdx);   // 29.9.: Traeger auf der Brettseite
     const dmg = DAMAGE + mods.extraDamage;
 
     // ── Wall-of-flames animation on the host Hero who set up the Surprise ──
     engine._broadcastEvent('play_zone_animation', {
-      type: 'firewall', owner: ctx.cardOwner,
+      type: 'firewall', owner: ctx.cardHeroOwner ?? ctx.cardOwner,
       heroIdx: ctx.cardHeroIdx, zoneSlot: -1,
     });
     await engine._delay(800);
@@ -168,7 +168,7 @@ module.exports = {
         }
       } else if (target.cardInstance) {
         const r = await engine.actionDealCreatureDamage(
-          { name: CARD_NAME, owner: ctx.cardOwner, heroIdx: ctx.cardHeroIdx },
+          { name: CARD_NAME, owner: ctx.cardOwner, heroIdx: ctx.cardHeroIdx, heroOwner: ctx.cardHeroOwner },
           target.cardInstance, dmg, 'destruction_spell',
           { sourceOwner: ctx.cardOwner, canBeNegated: true }
         );
@@ -205,7 +205,7 @@ module.exports = {
       await engine._delay(400);
 
       const creatureDmgResult = await engine.actionDealCreatureDamage(
-        { name: CARD_NAME, owner: ctx.cardOwner, heroIdx: ctx.cardHeroIdx },
+        { name: CARD_NAME, owner: ctx.cardOwner, heroIdx: ctx.cardHeroIdx, heroOwner: ctx.cardHeroOwner },
         srcInst, dmg, 'destruction_spell',
         { sourceOwner: ctx.cardOwner, canBeNegated: true }
       );

@@ -139,7 +139,7 @@ module.exports = {
       }
 
       const source = {
-        name: CARD_NAME, owner: pi, heroIdx, controller: pi,
+        name: CARD_NAME, owner: pi, heroIdx, controller: pi, heroOwner: ctx.cardHeroOwner ?? pi,   // Als Befund 29.9.: Brettseite des Angreifers
       };
 
       // ── Ida override ──

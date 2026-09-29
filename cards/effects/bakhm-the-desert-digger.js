@@ -95,7 +95,7 @@ module.exports = {
         );
         if (inst) {
           await engine.actionDealCreatureDamage(
-            { name: 'Bakhm, the Desert Digger', owner: pi, heroIdx },
+            { name: 'Bakhm, the Desert Digger', owner: pi, heroIdx, heroOwner: ctx.cardHeroOwner ?? pi },   // Als Befund 29.9.: Brettseite des Wirkers
             inst, 100, 'other',
             { sourceOwner: pi, canBeNegated: true },
           );

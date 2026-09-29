@@ -53,12 +53,13 @@ const effKey = (id, pi, hi) => heldenSperreKey(`waflav-effect:${id}`, pi);   // 
  * legale Ability im Deck lag — der Spieler zahlte den Counter fuer eine
  * leere Galerie.
  */
-function effectAvailable(engine, id, pi, heroIdx) {
+// Als Befund 29.9.: `hs` = Brettseite eines geliehenen Waflav (Standard `pi`).
+function effectAvailable(engine, id, pi, heroIdx, hs = pi) {
   if (engine.gs.hoptUsed?.[effKey(id, pi, heroIdx)] === engine.gs.turn) return false;
   const ps = engine.gs.players[pi];
   if (!ps) return false;
-  if (id === 'deck') return W.attachableAbilitiesIn(engine, pi, heroIdx, ps.mainDeck).length > 0;
-  if (id === 'hand') return W.attachableAbilitiesIn(engine, pi, heroIdx, ps.hand).length > 0;
+  if (id === 'deck') return W.attachableAbilitiesIn(engine, pi, heroIdx, ps.mainDeck, hs).length > 0;
+  if (id === 'hand') return W.attachableAbilitiesIn(engine, pi, heroIdx, ps.hand, hs).length > 0;
   return true;   // 'draw'
 }
 
@@ -77,8 +78,8 @@ function stampEffect(engine, id, pi, heroIdx) {
  * Helfer bündelt genau die Schranken, die der Hand-Play-Pfad in
  * server.js einzeln prüft.
  */
-function abilityNamesIn(engine, pi, heroIdx, list) {
-  return W.attachableAbilitiesIn(engine, pi, heroIdx, list);
+function abilityNamesIn(engine, pi, heroIdx, list, hs = pi) {
+  return W.attachableAbilitiesIn(engine, pi, heroIdx, list, hs);
 }
 
 /**
@@ -91,7 +92,7 @@ function gallery(names, source) {
 }
 
 // ── Effect 1: "Draw 3 cards." ────────────────────────────────────────
-async function doDraw(engine, pi, heroIdx) {
+async function doDraw(engine, pi, heroIdx, hs = pi) {
   await engine.actionDrawCards(pi, DRAW_COUNT);
   engine.log('waflav_draw', {
     player: engine.gs.players[pi]?.username, amount: DRAW_COUNT,
@@ -101,9 +102,9 @@ async function doDraw(engine, pi, heroIdx) {
 }
 
 // ── Effect 2: "Attach an additional Ability from your deck." ─────────
-async function doDeckAttach(engine, pi, heroIdx) {
+async function doDeckAttach(engine, pi, heroIdx, hs = pi) {
   const ps = engine.gs.players[pi];
-  const names = abilityNamesIn(engine, pi, heroIdx, ps.mainDeck);
+  const names = abilityNamesIn(engine, pi, heroIdx, ps.mainDeck, hs);
   if (names.length === 0) return false;
 
   const choice = await engine.promptGeneric(pi, {
@@ -125,7 +126,7 @@ async function doDeckAttach(engine, pi, heroIdx) {
   // card only lifts the once-per-turn limit ("additional").
   engine.handZugangSync(ps, picked, { von: 'transit', source: CARD_NAME });
   const res = await engine.attachAbilityFromHand(pi, picked, heroIdx, {
-    skipAbilityGivenCheck: true,
+    skipAbilityGivenCheck: true, ...(hs !== pi ? { heroOwner: hs } : {}),
   });
   if (!res?.success) {
     // No legal slot — put it back rather than eating the card.
@@ -143,11 +144,11 @@ async function doDeckAttach(engine, pi, heroIdx) {
 }
 
 // ── Effect 3: "Attach up to 3 Abilities from your hand ..." ──────────
-async function doHandAttach(engine, pi, heroIdx) {
+async function doHandAttach(engine, pi, heroIdx, hs = pi) {
   const ps = engine.gs.players[pi];
   let attached = 0;
   for (let i = 0; i < MAX_HAND_ATTACH; i++) {
-    const names = abilityNamesIn(engine, pi, heroIdx, ps.hand);
+    const names = abilityNamesIn(engine, pi, heroIdx, ps.hand, hs);
     if (names.length === 0) break;
     const choice = await engine.promptGeneric(pi, {
       type: 'cardGallery',
@@ -160,7 +161,7 @@ async function doHandAttach(engine, pi, heroIdx) {
     const picked = choice?.cardName || null;
     if (!picked) break;
     const res = await engine.attachAbilityFromHand(pi, picked, heroIdx, {
-      skipAbilityGivenCheck: true,
+      skipAbilityGivenCheck: true, ...(hs !== pi ? { heroOwner: hs } : {}),
     });
     if (!res?.success) break;
     attached++;
@@ -192,21 +193,23 @@ module.exports = {
     const engine = ctx._engine;
     const pi = ctx.cardOwner;
     const heroIdx = ctx.cardHeroIdx;
-    const hero = engine.gs.players[pi]?.heroes?.[heroIdx];
+    const hs = ctx.cardHeroOwner ?? pi;   // Als Befund 29.9.: Brettseite
+    const hero = engine.gs.players[hs]?.heroes?.[heroIdx];
     if (!hero?.name || hero.hp <= 0) return false;
     if (W.getEvo(hero) < 1) return false;                       // costs 1 Counter
-    return EFFECTS.some(e => effectAvailable(engine, e.id, pi, heroIdx));
+    return EFFECTS.some(e => effectAvailable(engine, e.id, pi, heroIdx, hs));
   },
 
   async onHeroEffect(ctx) {
     const engine = ctx._engine;
     const pi = ctx.cardOwner;
     const heroIdx = ctx.cardHeroIdx;
-    const hero = engine.gs.players[pi]?.heroes?.[heroIdx];
+    const hs = ctx.cardHeroOwner ?? pi;   // Als Befund 29.9.: Brettseite
+    const hero = engine.gs.players[hs]?.heroes?.[heroIdx];
 
     if (!hero || W.getEvo(hero) < 1) return W.finishSelfManagedHeroEffect(engine);
 
-    const open = EFFECTS.filter(e => effectAvailable(engine, e.id, pi, heroIdx));
+    const open = EFFECTS.filter(e => effectAvailable(engine, e.id, pi, heroIdx, hs));
     if (open.length === 0) return W.finishSelfManagedHeroEffect(engine);
 
     let mode = open[0].id;
@@ -225,9 +228,9 @@ module.exports = {
 
     // Pay only once the effect actually resolves — a cancelled gallery
     // must not eat the Counter.
-    const ok = await RUNNERS[mode](engine, pi, heroIdx);
+    const ok = await RUNNERS[mode](engine, pi, heroIdx, hs);
     if (ok) {
-      W.spendEvo(engine, pi, heroIdx, 1);
+      W.spendEvo(engine, hs, heroIdx, 1);
       stampEffect(engine, mode, pi, heroIdx);
       engine.sync();
     }

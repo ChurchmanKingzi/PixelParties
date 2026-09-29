@@ -125,7 +125,7 @@ module.exports = {
         heroIdx: sourceInfo.heroIdx, zoneSlot: -1,
       });
       await engine._delay(400);
-      const source = { name: CARD_NAME, owner: ownerPi, heroIdx: ctx.cardHeroIdx };
+      const source = { name: CARD_NAME, owner: ownerPi, heroIdx: ctx.cardHeroIdx, heroOwner: ctx.cardHeroOwner };
       await engine.actionDealDamage(source, attacker, SPIKE_DAMAGE, 'other', {
         _skipReactionCheck: true,
       });

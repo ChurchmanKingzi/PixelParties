@@ -108,7 +108,7 @@ function isOwnAttack(ctx, source) {
  *   4. Broadcast `card_reveal` so the picked card is publicly visible
  *      on the verdict beat, then check the match.
  */
-async function runGuess(engine, pi, doqHeroIdx) {
+async function runGuess(engine, pi, doqHeroIdx, doqSeite = pi) {   // Als Befund 29.9.: doqSeite = Brettseite von Doq
   const oppIdx = pi === 0 ? 1 : 0;
   const ops = engine.gs.players[oppIdx];
   const hand = ops?.hand || [];
@@ -164,7 +164,7 @@ async function runGuess(engine, pi, doqHeroIdx) {
     // MCTS rollouts — otherwise the late macrotask emits leak past the
     // rollout's snapshot/restore and broadcast phantom sparkles to live
     // clients with stale coordinates.
-    const sparkleAt = { type: 'gold_sparkle', owner: pi, heroIdx: doqHeroIdx, zoneSlot: -1 };
+    const sparkleAt = { type: 'gold_sparkle', owner: doqSeite, heroIdx: doqHeroIdx, zoneSlot: -1 };   // Als Befund 29.9.: Brettseite des Wirkers
     engine._broadcastEvent('play_zone_animation', { ...sparkleAt, duration: 1400 });
     await engine._delay(200);
     engine._broadcastEvent('play_zone_animation', { ...sparkleAt, duration: 1200 });
@@ -197,7 +197,7 @@ module.exports = {
     // and feeds into the actual damage call.
     onAttackDeclare: async (ctx) => {
       if (!isOwnAttack(ctx, ctx.source)) return;
-      const bonus = await runGuess(ctx._engine, ctx.cardOwner, ctx.card.heroIdx);
+      const bonus = await runGuess(ctx._engine, ctx.cardOwner, ctx.card.heroIdx, ctx.cardHeroOwner ?? ctx.cardOwner);   // Als Befund 29.9.: Brettseite des Wirkers
       if (bonus > 0) ctx.modifyAmount(bonus);
     },
   },

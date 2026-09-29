@@ -1747,6 +1747,13 @@ function _ppZielwahlMitte() {
   };
 }
 
+// ★ v1484: Bedienelemente der Zielwahl-Box und ihr Hover-Rand (siehe die
+// Durchsicht in DraggablePanel).
+const ZW_KNOPF_SEL = 'button, a, input, select, textarea, label';
+const ZW_KNOPF_RAND = 10;
+// ★ v1488: alles, was im Panel von sich aus Zeigerereignisse bekommt.
+const ZW_AKTIV_SEL = ZW_KNOPF_SEL + ', .panel-zielwahl-aktiv, .panel-zielwahl-griff';
+
 function DraggablePanel({ children, className, style, zielwahl }) {
   const [pos, setPos] = useState({ x: 0, y: 0 });
   const [dragging, setDragging] = useState(false);
@@ -1807,14 +1814,48 @@ function DraggablePanel({ children, className, style, zielwahl }) {
       const el = panelRef.current;
       if (!el || !letzt) return;
       let an = false;
+      // ★ v1488 (Als Vorgabe 29.9.: „Aktuell kann man die Box nur an den
+      // dedizierten Stellen außen links/rechts verschieben. Das soll immer
+      // möglich sein, wenn die Box nicht transparent ist und man nicht
+      // gerade über einem Button hovert."): Steht der Zeiger im deckenden
+      // Bereich (Rand um die Knöpfe, s. u.), aber nicht auf einem aktiven
+      // Element, setzt die Prüfung `data-greifbar` — CSS schaltet dann den
+      // Zeiger für den ganzen Körper ein, ein Mausdruck dort startet über
+      // `onDown` das Ziehen. Wird die Box durchsichtig, fällt das Attribut
+      // weg und Klicks gehen wieder durch zu den Zielen. Während des
+      // Ziehens bleibt es, wie es ist.
+      let greifbar = draggingRef.current && el.hasAttribute('data-greifbar');
       if (!draggingRef.current && letzt.x != null) {
         const r = el.getBoundingClientRect();
         const drin = letzt.x >= r.left && letzt.x <= r.right && letzt.y >= r.top && letzt.y <= r.bottom;
-        // Liegt das Ereignisziel IM Panel, ist es eines der aktiven
-        // Elemente (nur die bekommen Zeigerereignisse) → deckend lassen.
-        an = drin && !(letzt.ziel && el.contains(letzt.ziel));
+        // Liegt das Ereignisziel auf einem aktiven Element des Panels
+        // (Knopf, Griff, Vorschau) → deckend lassen. ★ v1488: per
+        // `closest` statt `el.contains` — mit `data-greifbar` bekommen
+        // auch Text und Kästen des Panels Zeigerereignisse.
+        const aktiv = letzt.ziel && letzt.ziel.closest ? letzt.ziel.closest(ZW_AKTIV_SEL) : null;
+        an = drin && !(aktiv && el.contains(aktiv));
+        // ★ v1484 (Als Vorgabe 29.9.: „Die Bereiche direkt um Buttons auf
+        // dem Fenster herum sollten on-hover noch NICHT das Fenster
+        // transparent machen. Wenn *nur* exakt die Buttons das Fenster
+        // beibehalten, fühlt sich das seltsam an, ein kleiner Rand drumrum
+        // sollte helfen."): Rand von `ZW_KNOPF_RAND` px um jedes
+        // Bedienelement — dort bleibt die Box deckend (★ v1488: und ist
+        // dort greifbar, siehe oben).
+        if (an) {
+          for (const k of el.querySelectorAll(ZW_KNOPF_SEL)) {
+            const kr = k.getBoundingClientRect();
+            // ★ v1487 (Als Vorgabe 29.9.: „Der Bereich unter den Buttons
+            // sollte vollständig on-hover NICHT die Box entfernen."): nach
+            // unten keine Grenze — bis zur Unterkante der Box (`drin`
+            // begrenzt schon auf die Box). Seitlich bleibt es beim Rand:
+            // die Lücke zwischen den Knöpfen liegt über dem mittleren Helden.
+            if (kr.width && letzt.x >= kr.left - ZW_KNOPF_RAND && letzt.x <= kr.right + ZW_KNOPF_RAND
+              && letzt.y >= kr.top - ZW_KNOPF_RAND) { an = false; greifbar = true; break; }
+          }
+        }
       }
       if (el.hasAttribute('data-durchsicht') !== an) el.toggleAttribute('data-durchsicht', an);
+      if (el.hasAttribute('data-greifbar') !== greifbar) el.toggleAttribute('data-greifbar', greifbar);
     };
     const bewegt = (e) => {
       letzt = { x: e.clientX, y: e.clientY, ziel: e.target };
@@ -1832,6 +1873,7 @@ function DraggablePanel({ children, className, style, zielwahl }) {
       document.removeEventListener('pointerout', raus, { capture: true });
       if (raf) cancelAnimationFrame(raf);
       panelRef.current?.removeAttribute('data-durchsicht');
+      panelRef.current?.removeAttribute('data-greifbar');
     };
   }, [zielwahl]);
   const onDown = (e) => {
@@ -27142,8 +27184,34 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     if (!hero || !hero.name) return false;
     if (hero.hp <= 0) return false;                 // tot
     if (hero.statuses?.frozen) return false;        // eingefroren
-    if (hero.statuses?.charmed) return false;       // bezaubert
+    // Uebernommen: nur mit Recht `ausruesten` (Als Vorgabe 29.9., Spiegel
+    // von `kontrollRechteVon`) — Charme/Love Shot sperren, Styx & Co. nicht.
+    if (hero.permaControlBy == null && (hero.charmedBy != null || hero.controlledBy != null)) {
+      const r = hero._kontrollRechte;
+      if (r) return !!r.ausruesten;
+      if (hero.statuses?.charmed?.abilitiesErlaubt) return true;
+      return hero.charmedBy != null;
+    }
     return true;
+  };
+
+  // ★ Als Vorgabe 29.9.: Surprise in die Zone eines GELIEHENEN Gegner-
+  // helden setzen — ich kontrolliere ihn (Spiegel von `surpriseKontrolleur`)
+  // und habe das Ausruest-Recht (Spiegel von `kontrollRechteVon`).
+  const kannSurpriseAnFremdHeld = (hi) => {
+    const h = opp?.heroes?.[hi];
+    if (!h?.name || h.hp <= 0) return false;
+    if ((h.charmedBy ?? h.permaControlBy ?? h.controlledBy) !== myIdx) return false;
+    if (((opp.surpriseZones || [])[hi] || []).length > 0) return false;
+    if (h.permaControlBy != null) return true;
+    if (h._kontrollRechte) return !!h._kontrollRechte.ausruesten;
+    if (h.statuses?.charmed?.abilitiesErlaubt) return true;
+    return h.charmedBy != null;
+  };
+  // Eigener Held, den gerade der Gegner kontrolliert: dort keine Surprise.
+  const eigenerHeldAbgegeben = (hi) => {
+    const h = me?.heroes?.[hi];
+    return !!h && (h.charmedBy ?? h.permaControlBy ?? h.controlledBy ?? myIdx) !== myIdx;
   };
 
   // Card graying logic based on phase
@@ -27327,7 +27395,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           const hero = me.heroes[hi];
           if (!hero || !hero.name || hero.hp <= 0) return false;
           return ((me.surpriseZones || [])[hi] || []).length === 0;
-        });
+        }) || [0,1,2].some(hi => kannSurpriseAnFremdHeld(hi));   // 29.9.
         // Also check Bakhm support zones for Surprise Creatures
         const canSetBakhm = card.cardType === 'Creature' && (gameState.bakhmSurpriseSlots || []).some(b => b.freeSlots.length > 0);
         if (canSetSurprise || canSetBakhm) return false; // Un-gray: can be set face-down
@@ -27417,8 +27485,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       // Gray out Ascended Heroes if no eligible base hero exists
       // (v704: Helden-Formen wie Tri Ad ebenso)
       if (card.cardType === 'Ascended Hero' || (gameState.plainHeroForms || []).includes(cardName)) {
-        const hasEligible = (me.heroes || []).some((h, hi) => heroCanAscendTo(h, hi, cardName, handIdx));
-        return !hasEligible;
+        return !irgendeinAufstieg(cardName, handIdx);
       }
       return false;
     } else if (currentPhase === 3) {
@@ -27732,12 +27799,13 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         socket.emit('play_surprise', {
           roomId: gameState.roomId, cardName: pick.cardName,
           handIndex: pick.handIndex, fromCreation: pick.fromCreation || undefined, heroIdx: h.idx,
-          bakhmSlot: h.bakhmSlot,
+          bakhmSlot: h.bakhmSlot, heroOwner: h.heroOwner,   // 29.9.: geliehener Gegnerheld
           });
       } else if (pick.isAscension) {
         hideGameTooltip(); socket.emit('ascend_hero', {
           roomId: gameState.roomId, cardName: pick.cardName,
           handIndex: pick.handIndex, fromCreation: pick.fromCreation || undefined, heroIdx: h.idx,
+          heroOwner: h.heroOwner,   // 29.9.: geliehener Held
           });
       } else if (pick.isHeroAction) {
         // For Creature picks in heroAction mode (Hu's
@@ -27993,6 +28061,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
    */
   const heroCanAscendTo = (h, heroIdx, cardName, handIdx) => {
     if (!h?.name || h.hp <= 0) return false;
+    if (eigenerHeldAbgegeben(heroIdx)) return false;   // 29.9.: der Gegner kontrolliert ihn
     if (h.ascensionReady
         && (h.ascensionTarget === cardName || (h.ascensionTargets || []).includes(cardName))) return true;
     if (((gameState.ascensionSkipTargets || {})[heroIdx] || []).includes(cardName)) return true;
@@ -28003,6 +28072,14 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     return handIdx != null
       && (((gameState.ascensionGrantOffers || {})[handIdx]) || []).includes(heroIdx);
   };
+
+  // Als Vorgabe 29.9.: Aufstieg auf einen geliehenen Helden (Gegnerspalte).
+  // Der Server rechnet die Wege vor (`fremdAufstiegZiele`).
+  const kannFremdAufsteigen = (heroIdx, cardName) =>
+    ((gameState.fremdAufstiegZiele || {})[cardName] || []).includes(heroIdx);
+  const irgendeinAufstieg = (cardName, handIdx) =>
+    (me.heroes || []).some((h, hi) => heroCanAscendTo(h, hi, cardName, handIdx))
+    || ((gameState.fremdAufstiegZiele || {})[cardName] || []).length > 0;
 
   const canHeroPlayCard = (playerData, heroIdx, card) => {
     const isOwn = playerData === me;
@@ -28618,10 +28695,11 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     const isSurprisePlayable = !dimmed && isMyTurn && (currentPhase === 2 || currentPhase === 4) && card
       && (card.subtype || '').toLowerCase() === 'surprise'
       && ([0,1,2].some(hi => { const h = me.heroes[hi]; return h && h.name && h.hp > 0 && ((me.surpriseZones || [])[hi] || []).length === 0; })
+        || [0,1,2].some(hi => kannSurpriseAnFremdHeld(hi))   // 29.9.: geliehener Gegnerheld
         || (card.cardType === 'Creature' && (gameState.bakhmSurpriseSlots || []).some(b => b.freeSlots.length > 0)));
     const isAscensionPlayable = !dimmed && isMyTurn && (currentPhase === 2 || currentPhase === 4) && card
       && (card.cardType === 'Ascended Hero' || (gameState.plainHeroForms || []).includes(cardName)) // v704: Helden-Formen (Tri Ad)
-      && (me.heroes || []).some((h, hi) => heroCanAscendTo(h, hi, cardName, idx));
+      && irgendeinAufstieg(cardName, idx);
     const _startPt = window.getPointerXY(e);
     const startX = _startPt.x, startY = _startPt.y;
     // ★★ v1225 (Als Befund 18.9.: „die Kopie der Karte haelt man
@@ -28895,6 +28973,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         // gehoert dem Gegner, die Beschwoerung mir — der Server will
         // dafuer `charmedOwner` (v1198).
         let dropCharmedOwner;
+        let surpriseOpp = false;   // 29.9.: Surprise-Zone eines geliehenen Gegnerhelden
         const heroActionHeroIdx = heroActionPrompt?.heroIdx;
         const isSurpriseCard = (card.subtype || '').toLowerCase() === 'surprise';
         const crossSidePlayable = (gameState.crossSidePlayableCards || []).includes(cardName);
@@ -28912,10 +28991,13 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               if (el.dataset.surpriseOwner === 'me') {
                 const hi = parseInt(el.dataset.surpriseHero);
                 const hero = me.heroes[hi];
-                if (hero && hero.name && hero.hp > 0 && ((me.surpriseZones || [])[hi] || []).length === 0) {
+                if (hero && hero.name && hero.hp > 0 && ((me.surpriseZones || [])[hi] || []).length === 0 && !eigenerHeldAbgegeben(hi)) {
                   targetHero = hi;
                   surpriseTarget = true;
                 }
+              } else if (kannSurpriseAnFremdHeld(parseInt(el.dataset.surpriseHero))) {
+                targetHero = parseInt(el.dataset.surpriseHero);
+                surpriseTarget = true; surpriseOpp = true;
               }
             }
           }
@@ -29123,7 +29205,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             }
           }
         }
-        setPlayDrag({ idx, cardName, card, mouseX: mx, mouseY: my, griffX, griffY, targetHero, targetSlot, targetBakhmSlot, isSurprise: surpriseTarget, crossSideHost, charmedOwner: dropCharmedOwner, fromCreation });
+        setPlayDrag({ idx, cardName, card, mouseX: mx, mouseY: my, griffX, griffY, targetHero, targetSlot, targetBakhmSlot, isSurprise: surpriseTarget, surpriseOpp: surpriseTarget && surpriseOpp, crossSideHost, charmedOwner: dropCharmedOwner, fromCreation });
       } else if (isEquipPlayable) {
         // Equip artifact drag — can drop on support zones OR heroes.
         // Cross-side artifacts (Powder Keg etc., server-published in
@@ -29135,16 +29217,21 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         // Free-side equip: no inherent canEquipToHero restriction →
         // droppable on EITHER side's eligible Hero (server-published).
         const isFreeSideEquip = (gameState.freeSideEquipArtifacts || []).includes(cardName);
+        // Als Vorgabe 29.9.: uebernommene Helden der Gegenseite, an die diese
+        // Ausruestung darf (Server: `kontrollAusruestZiele`).
+        const kontrollZiele = (gameState.kontrollAusruestZiele || {})[cardName] || [];
+        const istKontrollZiel = (owner, hi) => kontrollZiele.some(z => z.owner === owner && z.heroIdx === hi);
         // Resolve which side a drop element belongs to. Free-side
         // equips accept BOTH sides (player picks own or opp Hero);
         // cross-side equips (Powder Keg) are opp-only; normal equips
-        // are own-only.
+        // are own-only (plus borrowed Heroes from `kontrollZiele`).
         const sideFor = (tag) => {
           if (isFreeSideEquip) {
             if (tag === 'me') return { ps: me, owner: myIdx };
             if (tag === 'opp') return { ps: opp, owner: oppIdx };
             return null;
           }
+          if (!isCrossSideEquip && tag === 'opp' && kontrollZiele.length > 0) return { ps: opp, owner: oppIdx, nurKontrolle: true };
           const wantTag = isCrossSideEquip ? 'opp' : 'me';
           if (tag !== wantTag) return null;
           return isCrossSideEquip ? { ps: opp, owner: oppIdx } : { ps: me, owner: myIdx };
@@ -29166,7 +29253,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             if (side) {
               const hi = parseInt(el.dataset.heroIdx);
               const hero = side.ps?.heroes?.[hi];
-              const hostOk = hero && hero.name && (!hostAliveNeeded || hero.hp > 0) && bezahlbarAuf(side.owner, hi);
+              const hostOk = hero && hero.name && (!hostAliveNeeded || hero.hp > 0) && bezahlbarAuf(side.owner, hi)
+                && (!side.nurKontrolle || istKontrollZiel(side.owner, hi));
               if (hostOk) {
                 const supZones = side.ps.supportZones?.[hi] || [];
                 for (let z = 0; z < 3; z++) {
@@ -29188,7 +29276,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               const isIsland = el.dataset.supportIsland === 'true';
               if (side && !isIsland && si < 3) { // Can only equip to base zones
                 const hero = side.ps?.heroes?.[hi];
-                const hostOk = hero && hero.name && (!hostAliveNeeded || hero.hp > 0) && bezahlbarAuf(side.owner, hi);
+                const hostOk = hero && hero.name && (!hostAliveNeeded || hero.hp > 0) && bezahlbarAuf(side.owner, hi)
+                  && (!side.nurKontrolle || istKontrollZiel(side.owner, hi));
                 if (hostOk) {
                   const slotCards = (side.ps.supportZones?.[hi] || [])[si] || [];
                   if (slotCards.length === 0) { targetHero = hi; targetSlot = si; targetOwner = side.owner; }
@@ -29204,14 +29293,17 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           // host side. Cross-side (Powder Keg) and free-side equips
           // pin it; a normal own-side equip leaves it undefined →
           // server defaults placement to the caster.
-          targetOwner: (isCrossSideEquip || isFreeSideEquip) ? targetOwner : undefined,
+          // Kontroll-Equip (geliehener Held, Als Vorgabe 29.9.) pinnt die Gegenseite.
+          targetOwner: (isCrossSideEquip || isFreeSideEquip || (targetHero >= 0 && targetOwner === oppIdx)) ? targetOwner : undefined,
           isCrossSideEquip,
           isFreeSideEquip,
+          kontrollZiele,
         });
       } else if (isSurprisePlayable && !isPlayable) {
         // Surprise drag — target hero zones (hero must be alive with empty surprise zone)
         let targetHero = -1;
         let targetBakhmSlot = -1;
+        let surpriseOpp = false;   // 29.9.: geliehener Gegnerheld
         const surEls = document.querySelectorAll('[data-surprise-zone]');
         for (const el of surEls) {
           const r = el.getBoundingClientRect();
@@ -29219,9 +29311,12 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             if (el.dataset.surpriseOwner === 'me') {
               const hi = parseInt(el.dataset.surpriseHero);
               const hero = me.heroes[hi];
-              if (hero && hero.name && hero.hp > 0 && ((me.surpriseZones || [])[hi] || []).length === 0) {
+              if (hero && hero.name && hero.hp > 0 && ((me.surpriseZones || [])[hi] || []).length === 0 && !eigenerHeldAbgegeben(hi)) {
                 targetHero = hi;
               }
+            } else if (kannSurpriseAnFremdHeld(parseInt(el.dataset.surpriseHero))) {
+              targetHero = parseInt(el.dataset.surpriseHero);
+              surpriseOpp = true;
             }
           }
         }
@@ -29234,7 +29329,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               if (el.dataset.heroOwner === 'me') {
                 const hi = parseInt(el.dataset.heroIdx);
                 const hero = me.heroes[hi];
-                if (hero && hero.name && hero.hp > 0 && ((me.surpriseZones || [])[hi] || []).length === 0) {
+                if (hero && hero.name && hero.hp > 0 && ((me.surpriseZones || [])[hi] || []).length === 0 && !eigenerHeldAbgegeben(hi)) {
                   targetHero = hi;
                 }
               }
@@ -29260,7 +29355,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             }
           }
         }
-        setPlayDrag({ idx, cardName, card, mouseX: mx, mouseY: my, griffX, griffY, targetHero, targetBakhmSlot, isSurprise: true , fromCreation });
+        setPlayDrag({ idx, cardName, card, mouseX: mx, mouseY: my, griffX, griffY, targetHero, targetBakhmSlot, isSurprise: true, surpriseOpp, fromCreation });
       } else if (isPlayable && (card.cardType === 'Spell' || card.cardType === 'Attack')) {
         // Spell/Attack drag — target hero zones (hero must have required spell schools)
         let targetHero = -1;
@@ -29317,6 +29412,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         // Surprises because they are always `isPlayable`; we recover that
         // functionality here. If no surprise-zone hit, fall through to the
         // normal hero-zone targeting below for a face-up cast.
+        let surpriseOpp = false;   // 29.9.: geliehener Gegnerheld
         if (isSurpriseCard && isSurprisePlayable) {
           const surEls = document.querySelectorAll('[data-surprise-zone]');
           for (const el of surEls) {
@@ -29325,10 +29421,13 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               if (el.dataset.surpriseOwner === 'me') {
                 const hi = parseInt(el.dataset.surpriseHero);
                 const hero = me.heroes[hi];
-                if (hero && hero.name && hero.hp > 0 && ((me.surpriseZones || [])[hi] || []).length === 0) {
+                if (hero && hero.name && hero.hp > 0 && ((me.surpriseZones || [])[hi] || []).length === 0 && !eigenerHeldAbgegeben(hi)) {
                   targetHero = hi;
                   surpriseTarget = true;
                 }
+              } else if (kannSurpriseAnFremdHeld(parseInt(el.dataset.surpriseHero))) {
+                targetHero = parseInt(el.dataset.surpriseHero);
+                surpriseTarget = true; surpriseOpp = true;
               }
             }
           }
@@ -29461,10 +29560,11 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           }
         }
         }
-        setPlayDrag({ idx, cardName, card, mouseX: mx, mouseY: my, griffX, griffY, targetHero, targetSlot: targetSlot, targetAttachOwner, creatureCasterSlot, creatureCasterInstId, isSpell: !surpriseTarget, isSurprise: surpriseTarget, charmedOwner: surpriseTarget ? undefined : targetCharmedOwner , fromCreation });
+        setPlayDrag({ idx, cardName, card, mouseX: mx, mouseY: my, griffX, griffY, targetHero, targetSlot: targetSlot, targetAttachOwner, creatureCasterSlot, creatureCasterInstId, isSpell: !surpriseTarget, isSurprise: surpriseTarget, surpriseOpp: surpriseTarget && surpriseOpp, charmedOwner: surpriseTarget ? undefined : targetCharmedOwner , fromCreation });
       } else if (isAscensionPlayable) {
         // Ascended Hero drag — target hero zones with eligible base heroes
         let targetHero = -1;
+        let targetHeroOwner;
         const heroEls4 = document.querySelectorAll('[data-hero-zone]');
         for (const el of heroEls4) {
           const r = el.getBoundingClientRect();
@@ -29473,12 +29573,16 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               const hi = parseInt(el.dataset.heroIdx);
               const hero = me.heroes[hi];
               if (heroCanAscendTo(hero, hi, cardName, idx)) {
-                targetHero = hi;
+                targetHero = hi; targetHeroOwner = undefined;
               }
+            } else if (el.dataset.heroOwner === 'opp') {
+              // 29.9.: geliehener Held in der Gegnerspalte
+              const hi = parseInt(el.dataset.heroIdx);
+              if (kannFremdAufsteigen(hi, cardName)) { targetHero = hi; targetHeroOwner = oppIdx; }
             }
           }
         }
-        setPlayDrag({ idx, cardName, card, mouseX: mx, mouseY: my, griffX, griffY, targetHero, isAscension: true , fromCreation });
+        setPlayDrag({ idx, cardName, card, mouseX: mx, mouseY: my, griffX, griffY, targetHero, targetHeroOwner, isAscension: true , fromCreation });
       } else {
         // Non-playable card outside hand zone — show floating card (no reorder gap)
         setPlayDrag(null);
@@ -29973,8 +30077,13 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 eligible.push({ idx: hi, name: h.name });
               }
             }
+            // 29.9.: geliehene Helden (Gegnerspalte)
+            for (let hi = 0; hi < (opp.heroes || []).length; hi++) {
+              if (kannFremdAufsteigen(hi, cardName)) eligible.push({ idx: hi, name: opp.heroes[hi].name, heroOwner: oppIdx });
+            }
             if (eligible.length === 1) {
               hideGameTooltip(); socket.emit('ascend_hero', { roomId: gameState.roomId, heroIdx: eligible[0].idx, cardName, handIndex: idx, fromCreation: fromCreation || undefined,
+            heroOwner: eligible[0].heroOwner,
           });
             } else if (eligible.length > 1) {
               setSpellHeroPick({ cardName, handIndex: idx, fromCreation, card, eligible, isAscension: true });
@@ -29984,9 +30093,13 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             const eligible = [];
             for (let hi = 0; hi < (me.heroes || []).length; hi++) {
               const hero = me.heroes[hi];
-              if (hero && hero.name && hero.hp > 0 && ((me.surpriseZones || [])[hi] || []).length === 0) {
+              if (hero && hero.name && hero.hp > 0 && ((me.surpriseZones || [])[hi] || []).length === 0 && !eigenerHeldAbgegeben(hi)) {
                 eligible.push({ idx: hi, name: hero.name });
               }
+            }
+            // 29.9.: geliehene Gegnerhelden (Kontrolle + Ausruest-Recht)
+            for (let hi = 0; hi < (opp.heroes || []).length; hi++) {
+              if (kannSurpriseAnFremdHeld(hi)) eligible.push({ idx: hi, name: opp.heroes[hi].name, heroOwner: oppIdx });
             }
             // Add Bakhm support zone slots for Surprise Creatures
             if (card.cardType === 'Creature') {
@@ -29999,7 +30112,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               }
             }
             if (eligible.length === 1) {
-              socket.emit('play_surprise', { roomId: gameState.roomId, cardName, handIndex: idx, fromCreation, heroIdx: eligible[0].idx, bakhmSlot: eligible[0].bakhmSlot,
+              socket.emit('play_surprise', { roomId: gameState.roomId, cardName, handIndex: idx, fromCreation, heroIdx: eligible[0].idx, bakhmSlot: eligible[0].bakhmSlot, heroOwner: eligible[0].heroOwner,
             fromCreation: fromCreation || undefined,
           });
             } else if (eligible.length > 1) {
@@ -30095,6 +30208,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               handIndex: prev.idx,
               heroIdx: prev.targetHero,
               bakhmSlot: prev.targetBakhmSlot >= 0 ? prev.targetBakhmSlot : undefined,
+              heroOwner: prev.surpriseOpp ? oppIdx : undefined,   // 29.9.
             fromCreation: prev.fromCreation || undefined,
           });
             return null;
@@ -30195,6 +30309,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             // Chosen host side (cross-side / free-side equips); omitted
             // for normal own-side equips → server defaults to caster.
             targetOwner: prev.targetOwner,
+            // Als Vorgabe 29.9.: geliehener Held (Kontroll-Equip) — wie bei Zaubern/Kreaturen.
+            heroOwner: (!prev.isFreeSideEquip && !prev.isCrossSideEquip && prev.targetOwner === oppIdx) ? oppIdx : undefined,
             fromCreation: prev.fromCreation || undefined,
           });
           return null;
@@ -30208,6 +30324,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             handIndex: prev.idx,
             heroIdx: prev.targetHero,
             bakhmSlot: prev.targetBakhmSlot >= 0 ? prev.targetBakhmSlot : undefined,
+            heroOwner: prev.surpriseOpp ? oppIdx : undefined,   // 29.9.
             fromCreation: prev.fromCreation || undefined,
           });
           return null;
@@ -30224,6 +30341,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               cardName: prev.cardName,
               handIndex: prev.idx,
               heroIdx: prev.targetHero,
+              heroOwner: prev.surpriseOpp ? oppIdx : undefined,   // 29.9.
             fromCreation: prev.fromCreation || undefined,
           });
             return null;
@@ -30246,16 +30364,26 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           let _casterIdx = prev.targetHero;
           let _attachHeroIdx;
           let _attachOwner;
+          let _casterCharmedOwner;
           if (_attHostsEmit && prev.targetHero >= 0) {
             _attachHeroIdx = prev.targetHero;
             _attachOwner = prev.targetAttachOwner;
+            // Als Vorgabe 29.9.: ein geliehener Held als Wirker (Charme-Liste).
+            const _geliehenKannWirken = (hi) => opp.heroes?.[hi]?.charmedBy === myIdx && canHeroPlayCard(opp, hi, prev.card);
             // v651: liegt das Ziel beim Gegner, ist der Empfaenger kein
             // Caster — der Wirker ist der erste eigene Held, der die Karte
-            // wirken darf.
+            // wirken darf. Als Vorgabe 29.9.: ist das Ziel ein GELIEHENER
+            // Held, der selbst wirken darf, wirkt er (Anlegen „an den
+            // Nutzer"); sonst ein eigener, notfalls ein anderer geliehener.
             if (_attachOwner != null && _attachOwner !== myIdx) {
-              _casterIdx = [0, 1, 2].find(hi => canHeroPlayCard(me, hi, prev.card));
+              if (_geliehenKannWirken(prev.targetHero)) { _casterIdx = prev.targetHero; _casterCharmedOwner = oppIdx; }
+              else _casterIdx = [0, 1, 2].find(hi => canHeroPlayCard(me, hi, prev.card));
             } else if (!canHeroPlayCard(me, _casterIdx, prev.card)) {
               _casterIdx = [0, 1, 2].find(hi => canHeroPlayCard(me, hi, prev.card));
+            }
+            if (_casterIdx == null && prev.charmedOwner == null) {
+              const g = [0, 1, 2].find(_geliehenKannWirken);
+              if (g != null) { _casterIdx = g; _casterCharmedOwner = oppIdx; }
             }
           }
           socket.emit('play_spell', {
@@ -30263,7 +30391,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             cardName: prev.cardName,
             handIndex: prev.idx,
             heroIdx: _casterIdx,
-            charmedOwner: prev.charmedOwner,
+            charmedOwner: prev.charmedOwner ?? _casterCharmedOwner,
             attachmentZoneSlot: prev.targetSlot >= 0 ? prev.targetSlot : undefined,
             attachHeroIdx: _attachHeroIdx,
             attachOwner: _attachOwner,
@@ -30286,6 +30414,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             roomId: gameState.roomId, heroIdx: prev.targetHero,
             cardName: prev.cardName, handIndex: prev.idx,
             fromCreation: prev.fromCreation || undefined,
+            heroOwner: prev.targetHeroOwner,   // 29.9.: geliehener Held
           });
           return null;
         });
@@ -31460,7 +31589,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     // pulst golden auf, bevor ihre Abwürfe fliegen — der Spieler sieht,
     // WELCHER Effekt gleich wirkt. Klassen-Neustart via Reflow, damit
     // schnelle Folge-Glows sichtbar neu zünden.
-    const onEffectGlow = ({ cardName, origin, sfx, playerIdx, zone, heroIdx, zoneSlot }) => {
+    const onEffectGlow = ({ cardName, origin, sfx, playerIdx, zone, heroIdx, zoneSlot, boardOwner }) => {
       if (!cardName) return;
       if (sfx && window.playSFX) window.playSFX(sfx, { dedupe: 300, category: 'effect' });
       try {
@@ -31471,11 +31600,13 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         // Effekt dem EIGENEN Spieler gehoert (die CPU-Hydra darf meine
         // Handkopie nicht anzuenden).
         const ownerLabel = typeof playerIdx === 'number' ? (playerIdx === myIdx ? 'me' : 'opp') : null;
+        // 29.9.: Brett-Platz auf der BRETTSEITE (geliehener Held steht drueben).
+        const brettLabel = typeof boardOwner === 'number' ? (boardOwner === myIdx ? 'me' : 'opp') : ownerLabel;
         let nodes = null;
-        if (ownerLabel && zone === 'support' && heroIdx >= 0 && zoneSlot >= 0) {
-          nodes = document.querySelectorAll(`[data-support-zone][data-support-owner="${ownerLabel}"][data-support-hero="${heroIdx}"][data-support-slot="${zoneSlot}"]`);
-        } else if (ownerLabel && zone === 'hero' && heroIdx >= 0) {
-          nodes = document.querySelectorAll(`[data-hero-zone][data-hero-owner="${ownerLabel}"][data-hero-idx="${heroIdx}"]`);
+        if (brettLabel && zone === 'support' && heroIdx >= 0 && zoneSlot >= 0) {
+          nodes = document.querySelectorAll(`[data-support-zone][data-support-owner="${brettLabel}"][data-support-hero="${heroIdx}"][data-support-slot="${zoneSlot}"]`);
+        } else if (brettLabel && zone === 'hero' && heroIdx >= 0) {
+          nodes = document.querySelectorAll(`[data-hero-zone][data-hero-owner="${brettLabel}"][data-hero-idx="${heroIdx}"]`);
         }
         if (!nodes || nodes.length === 0) nodes = document.querySelectorAll(sel);
         nodes.forEach(el => {
@@ -37983,8 +38114,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     };
     socket.on('deleted_to_discard_animation', onDeletedToDiscard);
 
-    const onDeckToAbility = ({ owner, heroIdx, slotIdx, cardName, count, source }) => {
+    const onDeckToAbility = ({ owner, heroIdx, slotIdx, cardName, count, source, destOwner }) => {
       const ownerLabel = owner === myIdx ? 'me' : 'opp';
+      // 29.9.: Ziel-Zone eines geliehenen Helden liegt auf der anderen Seite.
+      const zielLabel = (destOwner ?? owner) === myIdx ? 'me' : 'opp';
       // 'hand' source flies cards out of the player's hand instead of
       // their deck pile (used by Ascension bonus when deck supply is
       // exhausted but hand still has copies).
@@ -37994,7 +38127,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       } else {
         srcSel = ownerLabel === 'me' ? '[data-my-deck]' : '[data-opp-deck]';
       }
-      const abSel   = `[data-ability-zone][data-ability-owner="${ownerLabel}"][data-ability-hero="${heroIdx}"][data-ability-slot="${slotIdx}"]`;
+      const abSel   = `[data-ability-zone][data-ability-owner="${zielLabel}"][data-ability-hero="${heroIdx}"][data-ability-slot="${slotIdx}"]`;
       const srcEl   = document.querySelector(srcSel);
       const tgtEl   = document.querySelector(abSel);
       if (!srcEl || !tgtEl || !count) return;
@@ -41211,11 +41344,11 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             return true;
           })();
           const surpriseTarget = isDraggingSurpriseCard && playDrag?.isSurprise && playDrag.targetHero === i;
-          const ascensionIneligible = !isOpp && playDrag?.isAscension && (() => {
-            const h = heroes[i];
-            return !heroCanAscendTo(h, i, playDrag.cardName, playDrag.idx);
-          })();
-          const ascensionTarget = !isOpp && playDrag?.isAscension && playDrag.targetHero === i;
+          const ascensionIneligible = playDrag?.isAscension && (isOpp
+            ? (hero?.charmedBy === myIdx && !kannFremdAufsteigen(i, playDrag.cardName))   // 29.9.: geliehener Held
+            : !heroCanAscendTo(heroes[i], i, playDrag.cardName, playDrag.idx));
+          const ascensionTarget = playDrag?.isAscension && playDrag.targetHero === i
+            && (isOpp ? playDrag.targetHeroOwner === oppIdx : playDrag.targetHeroOwner == null);
           // v673: pickHandCard-Drag auf HELDEN-Zonen (Open Invitation).
           // Dieselbe Optik wie ein Aufstiegs-Drag — es ist derselbe
           // Vorgang aus Spielersicht: ein Ascended Hero geht auf einen
@@ -41306,7 +41439,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           const equipTarget = playDrag && playDrag.isEquip && playDrag.targetHero === i && playDrag.targetSlot === -1
             && (playDrag.isFreeSideEquip
                   ? (playDrag.targetOwner === (isOpp ? oppIdx : myIdx))
-                  : (playDrag.isCrossSideEquip ? isOpp : !isOpp));
+                  : (playDrag.isCrossSideEquip ? isOpp : (playDrag.targetOwner === oppIdx ? isOpp : !isOpp)));   // Kontroll-Equip: Gegenseite
           // v652: Cross-Side-Attachments (Overheal Shock) — die Zielseite
           // steckt in `targetAttachOwner`; ohne sie gilt die alte Regel.
           const _spellTargetSideOk = playDrag?.targetAttachOwner != null
@@ -41983,7 +42116,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 {/* v673: der pickHandCard-Drag auf eine Heldenzone nutzt
                     denselben Schein — aus Spielersicht ist es derselbe
                     Vorgang. */}
-                {!isOpp && ((playDrag?.isAscension && playDrag.targetHero === i) || pickHeroDropTarget) && (
+                {(ascensionTarget || (!isOpp && pickHeroDropTarget)) && (
                   <div className="ascension-drop-glow" />
                 )}
                 {!isOpp && gameState.bonusActions?.heroIdx === i && gameState.bonusActions.remaining > 0 && (
@@ -42022,11 +42155,13 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                   // Drag highlight logic — eligible zones stay highlighted
                   // for the whole duration of any Surprise-card drag, not
                   // only when the cursor is currently over one.
-                  const draggingSurprise = !isOpp && playDrag
+                  // 29.9.: auch die Zone eines geliehenen Gegnerhelden;
+                  // der eigene, abgegebene Held leuchtet nicht.
+                  const draggingSurprise = (isOpp ? kannSurpriseAnFremdHeld(i) : !eigenerHeldAbgegeben(i)) && playDrag
                     && (playDrag.card?.subtype || '').toLowerCase() === 'surprise';
                   if (draggingSurprise) {
                     const isEligible = zoneEmpty && heroAlive;
-                    const isActive = playDrag.isSurprise && playDrag.targetHero === i;
+                    const isActive = playDrag.isSurprise && playDrag.targetHero === i && !!playDrag.surpriseOpp === isOpp;
                     // Only highlight eligible zones — leave ineligible ones
                     // in their normal state (no gray-out dimming).
                     if (isActive && isEligible) cls += ' surprise-drop-active';
@@ -42093,7 +42228,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     selbst, nicht an ihrem Rahmen — sonst verschwand die
                     ganze Surprise Zone kurz mit (die Regel verbirgt alle
                     Kinder des markierten Elements). */}
-                <BoardZone type="surprise" cards={surZones[i] || []} faceDown={isOpp && !(p.surpriseKnown || [])[i] && (surZones[i] || []).every(c => c === '?')} label="Surprise" style={zs('surprise')}
+                <BoardZone type="surprise" cards={surZones[i] || []} faceDown={(isOpp ? !(p.surpriseKnown || [])[i] : (surZones[i] || []).length > 0) && (surZones[i] || []).every(c => c === '?')} label="Surprise" style={zs('surprise')}
                   dataAttrs={(bounceOutgoingHidden.has(`sp-${pi}-${i}`) && (surZones[i] || []).length > 0) ? { 'data-bounce-hiding': 'true' } : undefined} />
                 {/* Reduced-level badge — only when the server-computed
                     effective Surprise level differs from the printed
@@ -42473,7 +42608,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               const _equipDragSideMatch = playDrag?.isEquip
                 && (playDrag.isFreeSideEquip
                       ? (playDrag.targetOwner === (isOpp ? oppIdx : myIdx))
-                      : (playDrag.isCrossSideEquip ? isOpp : !isOpp));
+                      : (playDrag.isCrossSideEquip ? isOpp : (playDrag.targetOwner === oppIdx ? isOpp : !isOpp)));   // Kontroll-Equip: Gegenseite
               // v652: Zonen-Highlight seitenbewusst — Cross-Side-Attachments
               // tragen die Zielseite in `targetAttachOwner`.
               // ★★ v1200 (Als Befund 18.9.): beim Beschwoeren in die Zone
@@ -42665,6 +42800,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 && cards.length === 0
                 && !!opp.heroes?.[i]?.name && opp.heroes[i].hp > 0
                 && !opp.heroes[i].statuses?.frozen
+                && canHeroHostEquip(opp.heroes[i])   // Als Vorgabe 29.9.: Charme sperrt
                 && !isIsland
                 && z < 3;
               const isDragValidZone = (isDraggingCreature || isDraggingAttachment)
@@ -42704,7 +42840,14 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 && (opp.heroes?.[i]?.hp > 0)
                 && z < ((opp.supportZones?.[i] || []).length || 3)
                 && canHeroPlayCard(opp, i, playDrag.card);
-              const isDragValidZoneAny = isDragValidZone || isShareDragZone || isOppCrossSideValid || isOppCrossSideEquipValid || isOppFreeSideEquipValid || isOppCharmedSummonValid;
+              // Als Vorgabe 29.9.: Ausruestung an einen GELIEHENEN Helden (Styx,
+              // Golden Apple, FTCD …) — freie Basiszonen der Helden aus
+              // `kontrollAusruestZiele` leuchten beim Equip-Drag.
+              const isOppKontrollEquipValid = isOpp && !!playDrag?.isEquip
+                && !playDrag.isFreeSideEquip && !playDrag.isCrossSideEquip
+                && (playDrag.kontrollZiele || []).some(k => k.owner === oppIdx && k.heroIdx === i)
+                && cards.length === 0 && !isIsland && z < 3;
+              const isDragValidZoneAny = isDragValidZone || isShareDragZone || isOppCrossSideValid || isOppCrossSideEquipValid || isOppFreeSideEquipValid || isOppCharmedSummonValid || isOppKontrollEquipValid;
               // Zonen-Ausgrauen beim Ausruestungs-Drag (Als Vorgaben 17.8.).
               // Bisher dimmte ein Equip-Drag ueberhaupt KEINE Zone — die
               // Bedingung unten kennt nur Creature- und Attachment-Draege.

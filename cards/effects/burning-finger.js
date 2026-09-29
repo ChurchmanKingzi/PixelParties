@@ -19,7 +19,7 @@ module.exports = {
       const pi = ctx.cardOwner;
       const ps = ctx.players[pi];
       const heroIdx = ctx.cardHeroIdx;
-      const hero = ps.heroes?.[heroIdx];
+      const hero = ctx.attachedHero || ps.heroes?.[heroIdx];   // Als Befund 29.9.: Brettseite des Wirkers
       if (!hero?.name || hero.hp <= 0) return;
 
       // Caster-aware Destruction Magic level — honours engine overrides
@@ -58,7 +58,7 @@ module.exports = {
         }
       } else if (target.cardInstance) {
         await engine.actionDealCreatureDamage(
-          { name: 'Burning Finger', owner: pi, heroIdx },
+          { name: 'Burning Finger', owner: pi, heroIdx, heroOwner: ctx.cardHeroOwner ?? pi },   // Als Befund 29.9.: Brettseite des Wirkers
           target.cardInstance, damage, 'destruction_spell',
           { sourceOwner: pi, canBeNegated: true },
         );

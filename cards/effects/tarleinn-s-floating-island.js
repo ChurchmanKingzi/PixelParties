@@ -21,6 +21,7 @@
 const CARD_NAME = "Tarleinn's Floating Island";
 const HOPT_KEY  = 'tarleinnIslandTriggeredOnTurn';
 
+const { heldSeite } = require('./_hooks');   // Als Befund 29.9.: Brettseite geliehener Helden
 module.exports = {
   // ★★ v1182 — ENTKOPPELTE BILDER (CARD_API): wird die Karte NEGIERT,
   // laeuft ihr Effekt-Rumpf nie — die Engine spielt dann diese Bilder.
@@ -40,7 +41,7 @@ module.exports = {
    * the hero is Tarleinn.
    */
   inherentAction: (gs, pi, heroIdx /*, engine */) => {
-    const hero = gs.players[pi]?.heroes?.[heroIdx];
+    const hero = gs.players[heldSeite(gs, pi, heroIdx)]?.heroes?.[heroIdx];
     return hero?.name === 'Tarleinn the Traveler';
   },
 

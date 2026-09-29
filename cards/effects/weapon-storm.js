@@ -60,11 +60,11 @@ module.exports = {
       const ps = gs.players[pi];
       const hero = ctx.attachedHero || ps?.heroes?.[heroIdx];   // v1364: geliehener Held (Love Shot, Charme) — physische Seite
       if (!hero?.name || hero.hp <= 0) return;
-      if (!hasSendable(engine, pi, heroIdx)) { gs._spellCancelled = true; return; }
+      if (!hasSendable(engine, ctx.cardHeroOwner ?? pi, heroIdx)) { gs._spellCancelled = true; return; }   // Als Befund 29.9.: Brettseite des Wirkers
 
       // 1) Senden — mindestens eine Karte, beliebig viele.
       const res = await sendCardsLoop(engine, pi, heroIdx, {
-        cardName: CARD_NAME, kinds: ['ability', 'equip'], min: 1, amount: 0,
+        cardName: CARD_NAME, kinds: ['ability', 'equip'], min: 1, amount: 0, heroOwner: ctx.cardHeroOwner ?? pi,   // Als Befund 29.9.: Brettseite des Wirkers
         confirmLabel: '🌪️ Send',
         describe: (sent) => sent === 0
           ? `Click an Artifact equipped or an Ability attached to ${hero.name} to send it to the discard pile — each card adds ${rateFor(engine, pi, heroIdx)} damage.`
@@ -87,10 +87,10 @@ module.exports = {
         confirmLabel: `🌪️ Storm! (${dmg})`,
         confirmClass: 'btn-danger',
         cancellable: false,
-        condition: (t) => !(t.type === 'hero' && t.owner === pi && t.heroIdx === heroIdx),
+        condition: (t) => !(t.type === 'hero' && t.owner === (ctx.cardHeroOwner ?? pi) && t.heroIdx === heroIdx),   // Als Befund 29.9.: Brettseite des Angreifers
       });
       if (!target) return;
-      const attackSource = { name: CARD_NAME, owner: pi, heroIdx, controller: pi };
+      const attackSource = { name: CARD_NAME, owner: pi, heroIdx, controller: pi, heroOwner: ctx.cardHeroOwner ?? pi };   // Als Befund 29.9.: Brettseite des Angreifers
       const finalDmg = await engine._fireAttackDeclare(attackSource, target, dmg);
       const impactSlot = target.type === 'hero' ? -1 : target.slotIdx;
       engine._broadcastEvent('play_zone_animation', {

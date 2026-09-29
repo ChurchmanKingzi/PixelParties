@@ -59,11 +59,14 @@ module.exports = {
    * Die Namensbindung prueft die Engine nicht selbst — sie steht nur
    * im Text —, also steht sie mit hier drin.
    */
-  ascensionCondition(gs, pi, heroIdx, engine) {
-    const hero = gs.players[pi]?.heroes?.[heroIdx];
+  // Als Vorgabe 29.9.: `heroOwner` = Brettseite eines geliehenen Helden
+  // (dort liegt auch das angehaengte Awakening).
+  ascensionCondition(gs, pi, heroIdx, engine, heroOwner) {
+    const hs = heroOwner ?? pi;
+    const hero = gs.players[hs]?.heroes?.[heroIdx];
     if (!hero?.name || hero.hp <= 0) return false;
     if (hero.name !== BASIS_FORM) return false;
-    return hatAwakening(engine, pi, heroIdx);
+    return hatAwakening(engine, hs, heroIdx);
   },
 
   /**
@@ -77,8 +80,8 @@ module.exports = {
    * mit Ja/Nein-Abfrage. Seitdem prueft `scripts/check-ascension-bonus.js`
    * diesen Vertrag fuer alle Ascended Heroes.
    */
-  async onAscensionBonus(engine, pi, heroIdx) {
-    await engine.performAscensionBonus(pi, heroIdx, ['Wisdom']);
+  async onAscensionBonus(engine, pi, heroIdx, heroOwner) {
+    await engine.performAscensionBonus(pi, heroIdx, ['Wisdom'], heroOwner);
   },
 
   hooks: {
@@ -176,7 +179,7 @@ module.exports = {
         toCreationIdx: ps.creationZone.length - 1,
       });
       engine._broadcastEvent('play_zone_animation', {
-        type: 'holy_revival', owner: pi, heroIdx,
+        type: 'holy_revival', owner: ctx.cardHeroOwner ?? pi, heroIdx,   // Als Befund 29.9.: Brettseite des Wirkers
       });
       engine.log('crestina_creation_search', { player: ps.username, card: name });
       engine.sync();

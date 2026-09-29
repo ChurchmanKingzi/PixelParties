@@ -55,7 +55,7 @@ module.exports = {
 
       // Max level = Magic Arts level on this hero
       const magicArtsLevel = engine.countAbilitiesForSchool(
-        'Magic Arts', ps.abilityZones[heroIdx] || [],
+        'Magic Arts', (gs.players[ctx.cardHeroOwner ?? pi] || ps).abilityZones[heroIdx] || [],   // Als Befund 29.9.: Zonen des Wirkers auf seiner Brettseite
       );
       const maxLevel = Math.max(1, Math.min(magicArtsLevel, 3));
 

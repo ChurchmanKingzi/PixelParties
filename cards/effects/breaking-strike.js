@@ -70,11 +70,11 @@ module.exports = {
       const ps = gs.players[pi];
       const hero = ctx.attachedHero || ps?.heroes?.[heroIdx];   // v1364: geliehener Held (Love Shot, Charme) — physische Seite
       if (!hero?.name || hero.hp <= 0) { gs._spellCancelled = true; return; }
-      if (equipsAm(engine, pi, heroIdx).length === 0) { gs._spellCancelled = true; return; }
+      if (equipsAm(engine, ctx.cardHeroOwner ?? pi, heroIdx).length === 0) { gs._spellCancelled = true; return; }   // Als Befund 29.9.: Brettseite des Wirkers
 
       // 1) Abwerfen — mindestens eins, beliebig viele.
       const res = await sendCardsLoop(engine, pi, heroIdx, {
-        cardName: CARD_NAME, kinds: ['equip'], min: 1, amount: 0,
+        cardName: CARD_NAME, kinds: ['equip'], min: 1, amount: 0, heroOwner: ctx.cardHeroOwner ?? pi,   // Als Befund 29.9.: Brettseite des Wirkers
         // ★ Abbrechbar, SOLANGE nichts abgelegt ist (Als Vorgabe 12.9.):
         // wer es sich anders ueberlegt, kommt ohne Verlust heraus — der
         // Angriff loest dann gar nicht auf und bleibt auf der Hand
@@ -105,11 +105,11 @@ module.exports = {
         confirmLabel: `🗡️ Strike! (${dmg})`,
         confirmClass: 'btn-danger',
         cancellable: false,
-        condition: (t) => !(t.type === 'hero' && t.owner === pi && t.heroIdx === heroIdx),
+        condition: (t) => !(t.type === 'hero' && t.owner === (ctx.cardHeroOwner ?? pi) && t.heroIdx === heroIdx),   // Als Befund 29.9.: Brettseite des Angreifers
       });
       if (!target) return;
 
-      const quelle = { name: CARD_NAME, owner: pi, heroIdx, controller: pi };
+      const quelle = { name: CARD_NAME, owner: pi, heroIdx, controller: pi, heroOwner: ctx.cardHeroOwner ?? pi };   // Als Befund 29.9.: Brettseite des Angreifers
       const endgueltig = await engine._fireAttackDeclare(quelle, target, dmg);
       const slot = target.type === 'hero' ? -1 : target.slotIdx;
       engine._broadcastEvent('play_zone_animation', {

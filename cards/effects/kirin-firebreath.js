@@ -175,7 +175,7 @@ module.exports = {
           const inst = engine.cardInstances.find(c => c.id === target.cardInstance.id);
           if (inst && inst.zone === 'support') {
             await engine.actionDealCreatureDamage(
-              { name: CARD_NAME, owner: pi, heroIdx: ctx.cardHeroIdx },
+              { name: CARD_NAME, owner: pi, heroIdx: ctx.cardHeroIdx, heroOwner: ctx.cardHeroOwner ?? pi },   // Als Befund 29.9.: Brettseite des Wirkers
               inst, STRIKE_DMG, 'destruction_spell',
               { sourceOwner: pi, canBeNegated: true },
             );

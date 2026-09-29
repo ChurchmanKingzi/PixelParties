@@ -249,7 +249,7 @@ async function handleSmugnessMirror(ctx) {
   });
   await engine._delay(300);
 
-  const dmgSource = { name: 'Smugness', owner: pi, heroIdx };
+  const dmgSource = { name: 'Smugness', owner: pi, heroIdx, heroOwner: ctx.cardHeroOwner ?? pi };   // Als Befund 29.9.: Brettseite des Wirkers
   if (picked.type === 'hero') {
     const h = gs.players[picked.owner]?.heroes?.[picked.heroIdx];
     if (h && h.hp > 0) await engine.actionDealDamage(dmgSource, h, retDamage, 'other');

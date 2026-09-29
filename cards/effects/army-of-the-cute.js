@@ -39,10 +39,11 @@ const CARD_NAME = 'Army of the Cute';
  *  Any printed-Cute Creature qualifies; while that Hero wears "Cute
  *  Wings" EVERY Creature it summons counts as Cute, so any Creature
  *  qualifies. (`heroIdx == null` → no Wings context, printed-Cute only.) */
-function isArmyPick(engine, cd, pi, heroIdx) {
+// Als Befund 29.9.: `hs` = Brettseite des Nutzers (geliehener Held), Standard `pi`.
+function isArmyPick(engine, cd, pi, heroIdx, hs = pi) {
   if (!cd || !hasCardType(cd, 'Creature')) return false;
   if (cd.archetype === 'Cute') return true;
-  return heroIdx != null && heroIdx >= 0 && heroHasCuteWings(engine, pi, heroIdx);
+  return heroIdx != null && heroIdx >= 0 && heroHasCuteWings(engine, hs, heroIdx);
 }
 
 /** Casting Hero's Summoning Magic level, clamped to [1, 3]. */
@@ -67,21 +68,21 @@ function freeSlots(ps, heroIdx) {
  *  (Whoolmoth-style, etc.) and Lethe per-pile stamps both bite the
  *  cap honestly — a Lv5 Cute card rebated to 0 costs 0 budget, a
  *  Lv2 card with a +1 Lethe stamp in discard costs 3. */
-function cuteGallery(engine, pi, heroIdx) {
+function cuteGallery(engine, pi, heroIdx, hs = pi) {
   const ps = engine.gs.players[pi];
   if (!ps) return [];
   const cardDB = engine._getCardDB();
   const out = [];
   for (const name of (ps.hand || [])) {
     const cd = cardDB[name];
-    if (isArmyPick(engine, cd, pi, heroIdx)) {
+    if (isArmyPick(engine, cd, pi, heroIdx, hs)) {
       const level = engine.effectiveCardLevel(cd, pi);
       out.push({ name, level, source: 'hand' });
     }
   }
   for (const name of (ps.discardPile || [])) {
     const cd = cardDB[name];
-    if (isArmyPick(engine, cd, pi, heroIdx)) {
+    if (isArmyPick(engine, cd, pi, heroIdx, hs)) {
       const level = engine.effectiveCardLevel(cd, pi, { pileSide: 'discard' });
       out.push({ name, level, source: 'discard' });
     }
@@ -120,20 +121,28 @@ module.exports = {
       const ps = gs.players[pi];
       if (!ps) { gs._spellCancelled = true; return; }
       const heroIdx = ctx.cardHeroIdx; // "the user" = casting Hero
+      // Als Befund 29.9.: „the user's Support Zones" — bei einem geliehenen
+      // Nutzer die Zonen in SEINER Spalte; die Kreaturen gehoeren dem Wirker.
+      const hs = ctx.cardHeroOwner ?? pi;
+      const hps = gs.players[hs] || ps;
+      if (hs !== pi && !engine.kontrollRechte(hs, heroIdx).beschwoeren) {
+        gs._spellCancelled = true;
+        return;
+      }
 
-      const free = freeSlots(ps, heroIdx);
+      const free = freeSlots(hps, heroIdx);
       if (free.length === 0) {
         gs._spellCancelled = true;
         engine.log('army_of_the_cute_fizzle', { player: ps.username, reason: 'no_free_zones' });
         return;
       }
 
-      const cap = levelBudget(engine, pi, heroIdx);
+      const cap = levelBudget(engine, hs, heroIdx);
 
       // Per-copy entries; drop any single Creature already over budget
       // (it can never be part of a legal pick — keeps the gallery clean
       // on top of the client-side grey-out).
-      const gallery = cuteGallery(engine, pi, heroIdx).filter(e => (e.level || 0) <= cap);
+      const gallery = cuteGallery(engine, pi, heroIdx, hs).filter(e => (e.level || 0) <= cap);
       if (gallery.length === 0) {
         gs._spellCancelled = true;
         engine.log('army_of_the_cute_fizzle', { player: ps.username, reason: 'no_affordable_cute' });
@@ -173,7 +182,7 @@ module.exports = {
       // v1364: Name und gewaehlte Quelle bleiben paarweise zusammen.
       const _paare = result.selectedCards
         .map((n, i) => ({ n, q: selectedIndices ? (gallery[selectedIndices[i]]?.source || null) : null }))
-        .filter(p => typeof p.n === 'string' && isArmyPick(engine, cardDB[p.n], pi, heroIdx));
+        .filter(p => typeof p.n === 'string' && isArmyPick(engine, cardDB[p.n], pi, heroIdx, hs));
       const chosen = _paare.map(p => p.n);
       const totalLvl = selectedIndices
         ? selectedIndices.reduce((s, i) => s + (gallery[i]?.level || 0), 0)
@@ -211,7 +220,7 @@ module.exports = {
       const gewollteQuellen = _paare.map(p => p.q);
       for (let ci = 0; ci < chosen.length; ci++) {
         const name = chosen[ci];
-        const slots = freeSlots(ps, heroIdx);
+        const slots = freeSlots(hps, heroIdx);
         if (slots.length === 0) break; // ran out of zones (defensive)
         const slot = slots[0];
 
@@ -228,22 +237,23 @@ module.exports = {
         if (src === 'hand') engine.takeFromPileSync(ps, 'hand', idx);
         else if (!(ab = await engine.ablageEntnahme(pi, pi, idx, { source: CARD_NAME }))) continue;
 
-        if (!ps.supportZones[heroIdx]) ps.supportZones[heroIdx] = [[], [], []];
-        if (!ps.supportZones[heroIdx][slot]) ps.supportZones[heroIdx][slot] = [];
-        ps.supportZones[heroIdx][slot].push(name);
+        if (!hps.supportZones[heroIdx]) hps.supportZones[heroIdx] = [[], [], []];
+        if (!hps.supportZones[heroIdx][slot]) hps.supportZones[heroIdx][slot] = [];
+        hps.supportZones[heroIdx][slot].push(name);
 
-        const inst = engine._trackCard(name, pi, 'support', heroIdx, slot);
+        const inst = engine._trackCard(name, hs, 'support', heroIdx, slot);
+        if (hs !== pi) engine.markiereSeitenfremd(inst, pi);
         const ablageExtras = ab ? engine.ablageLandung(inst, ab, 'place') : {};
         ps._creaturesSummonedThisTurn = (ps._creaturesSummonedThisTurn || 0) + 1;
 
         engine._broadcastEvent('summon_effect', {
-          owner: pi, heroIdx, zoneSlot: slot, cardName: name,
+          owner: hs, heroIdx, zoneSlot: slot, cardName: name,
         });
         // Cute flourish: a burst of little hearts puffs off each Creature
         // as the Army assembles (the same pink heart_burst Cute Angel
         // Molinda / Summoning Circle use), layered over the summon shine.
         engine._broadcastEvent('play_zone_animation', {
-          type: 'heart_burst', owner: pi, heroIdx, zoneSlot: slot,
+          type: 'heart_burst', owner: hs, heroIdx, zoneSlot: slot,
         });
         engine.sync(); // this Creature pops in now (one-by-one)
 

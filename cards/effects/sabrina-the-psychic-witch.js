@@ -114,6 +114,9 @@ module.exports = {
     const pi = ctx.cardOwner;
     const ps = gs.players[pi];
     const heroIdx = ctx.cardHeroIdx;
+    // Als Vorgabe 29.9.: Brettseite der Sabrina (geliehener Held); Deck,
+    // Hand und Ablage bleiben beim Kontrolleur `pi`.
+    const seite = ctx.cardHeroOwner ?? pi;
 
     const minLvl = minDeckSurpriseLevel(engine, pi);
     if (!Number.isFinite(minLvl)) return false;
@@ -190,11 +193,11 @@ module.exports = {
     await engine.runHooks('onCreatureSacrificed', {
       creature: sacInst, cardName: sacInst.name,
       owner: sacInst.owner, heroIdx: sacInst.heroIdx, zoneSlot: sacInst.zoneSlot,
-      source: { name: CARD_NAME, owner: pi, heroIdx },
+      source: { name: CARD_NAME, owner: pi, heroIdx, heroOwner: seite },
       _skipReactionCheck: true,
     });
     await engine.actionDestroyCard(
-      { name: CARD_NAME, owner: pi, heroIdx },
+      { name: CARD_NAME, owner: pi, heroIdx, heroOwner: seite },
       sacInst,
     );
     engine.log('sabrina_sacrifice', {
@@ -247,8 +250,9 @@ module.exports = {
     // then routes through the standard Creature → support / non-
     // Creature → discard disposition without trying to splice from a
     // surprise zone array that never contained the card.
-    await engine._activateSurprise(pi, heroIdx, surpriseName, sourceInfo, surpriseScript, {
+    await engine._activateSurprise(seite, heroIdx, surpriseName, sourceInfo, surpriseScript, {
       fromDeck: true,
+      steuerer: pi,
     });
 
     engine.log('sabrina_surprise_activated', {

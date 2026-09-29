@@ -108,11 +108,13 @@ module.exports = {
       const pi = ctx.cardOwner;
       const heroIdx = ctx.cardHeroIdx;
       const ps = gs.players[pi];
+      const hs = ctx.cardHeroOwner ?? pi;                  // Als Befund 29.9.: Brettseite des Nutzers
+      const hps = gs.players[hs] || ps;                     // Zonen des Nutzers; Deck bleibt beim Kontrolleur
       const hero = ctx.attachedHero || ps?.heroes?.[heroIdx];   // v1364: geliehener Held (Love Shot, Charme) — physische Seite
       if (!hero?.name || hero.hp <= 0) return;
 
       // ── Validate per-hero conditions ──
-      if (!heroCanAcceptFighting(ps, heroIdx)) {
+      if (!heroCanAcceptFighting(hps, heroIdx)) {   // Als Befund 29.9.: Brettseite des Wirkers
         gs._spellCancelled = true;
         return;
       }
@@ -125,7 +127,7 @@ module.exports = {
 
       // ── Play dumbbell pump animation ──
       engine._broadcastEvent('play_zone_animation', {
-        type: 'dumbbell_pump', owner: pi, heroIdx, zoneSlot: -1,
+        type: 'dumbbell_pump', owner: hs, heroIdx, zoneSlot: -1,   // Als Befund 29.9.: Brettseite des Wirkers
       });
       await engine._delay(1600);
 
@@ -133,10 +135,10 @@ module.exports = {
       if (!(await engine.takeFromPile(ps, 'deck', deckIdx, { source: 'Muscle Training' }))) return;   // v820: Stapel-Schicht
 
       // ── Find target ability zone ──
-      const abZones = ps.abilityZones[heroIdx] || [[], [], []];
-      ps.abilityZones[heroIdx] = abZones;
+      const abZones = hps.abilityZones[heroIdx] || [[], [], []];   // Als Befund 29.9.: Brettseite des Wirkers
+      hps.abilityZones[heroIdx] = abZones;   // Als Befund 29.9.: Brettseite des Wirkers
       // v1349: Zonenwahl an EINER Stelle (verwahrte Abilities, Madame Guillotine).
-      const targetZone = engine.abilityZielZone(pi, heroIdx, 'Fighting');
+      const targetZone = engine.abilityZielZone(hs, heroIdx, 'Fighting');   // Als Befund 29.9.: Brettseite des Wirkers
 
       if (targetZone < 0) return; // Shouldn't happen (spellPlayCondition guards this)
 
@@ -147,7 +149,7 @@ module.exports = {
       // Does NOT consume abilityGivenThisTurn (additional attachment)
 
       // ── Track card instance + fire hooks ──
-      const inst = engine._trackCard('Fighting', pi, 'ability', heroIdx, targetZone);
+      const inst = engine._trackCard('Fighting', hs, 'ability', heroIdx, targetZone);   // Als Befund 29.9.: Brettseite des Wirkers
       engine._broadcastEvent('deck_search_add', { cardName: 'Fighting', playerIdx: pi });
       engine.log('deck_search', { player: ps.username, card: 'Fighting', by: 'Muscle Training' });
 
@@ -165,7 +167,7 @@ module.exports = {
 
       // Flash the target ability zone
       engine._broadcastEvent('ability_activated', {
-        owner: pi, heroIdx, zoneIdx: targetZone, abilityName: 'Fighting',
+        owner: hs, heroIdx, zoneIdx: targetZone, abilityName: 'Fighting',   // Als Befund 29.9.: Brettseite des Wirkers
       });
 
       engine.log('muscle_training', {

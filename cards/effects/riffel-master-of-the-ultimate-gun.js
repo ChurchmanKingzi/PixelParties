@@ -40,12 +40,13 @@ module.exports = {
   activeIn: ['hero'],
   heroEffect: true,
 
-  ascensionCondition(gs, pi, heroIdx, engine) {
-    return riffelAscensionMet(engine, pi, heroIdx, null);
+  // Als Vorgabe 29.9.: `heroOwner` = Brettseite eines geliehenen Helden.
+  ascensionCondition(gs, pi, heroIdx, engine, heroOwner) {
+    return riffelAscensionMet(engine, heroOwner ?? pi, heroIdx, null);
   },
 
-  async onAscensionBonus(engine, pi, heroIdx) {
-    await engine.performAscensionBonus(pi, heroIdx, ['Fighting']);
+  async onAscensionBonus(engine, pi, heroIdx, heroOwner) {
+    await engine.performAscensionBonus(pi, heroIdx, ['Fighting'], heroOwner);
   },
 
   supportYield() {

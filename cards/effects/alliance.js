@@ -208,7 +208,7 @@ module.exports = {
 
       // „Attach this card to the user" — nur der Wirker-Held.
       const res = await attachToHero(ctx, CARD_NAME, {
-        preferCaster: true, heroFilter: (h, hi) => hi === ctx.cardHeroIdx,
+        preferCaster: true, heroFilter: (h, hi, side) => hi === ctx.cardHeroIdx && side === (ctx.cardHeroOwner ?? ctx.cardOwner),   // Als Vorgabe 29.9.: Seite des Nutzers
         description: 'Attach Alliance to the Hero that used it.',
         confirmLabel: '🤝 Attach!', animationType: 'gold_sparkle',
       });

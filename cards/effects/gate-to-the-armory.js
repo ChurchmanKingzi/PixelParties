@@ -40,7 +40,7 @@
 //  compose normally.
 // ═══════════════════════════════════════════
 
-const { hasCardType } = require('./_hooks');
+const { hasCardType, heroCanBeEquipped } = require('./_hooks');
 const { loadCardEffect } = require('./_loader');
 const { mainActionSlotFree } = require('./_of-kings-shared');
 
@@ -196,15 +196,21 @@ module.exports = {
         && hasCardType(pickedData, 'Artifact')
         && (pickedData.subtype || '').toLowerCase() === 'equipment');
 
-      const userHero = (heroIdx >= 0) ? ps.heroes?.[heroIdx] : null;
+      // Als Vorgabe 29.9.: wirkt ein uebernommener Held, ist „der Nutzer"
+      // SEIN Platz auf der Brettseite `userSeite` (nicht der gleich
+      // indizierte eigene Held).
+      const userSeite = ctx.cardHeroOwner ?? pi;
+      const ups = gs.players[userSeite] || ps;
+      const userHero = (heroIdx >= 0) ? ups.heroes?.[heroIdx] : null;
       const canOfferEquip = (() => {
         if (!isEquipment) return false;
         if (!userHero?.name || userHero.hp <= 0) return false;
         // Frozen / charmed Heroes can't accept new gear (matches the
         // server's standard equip gate in `doPlayArtifact`).
-        if (userHero.statuses?.frozen || userHero.statuses?.charmed) return false;
+        // Als Vorgabe 29.9.: bezaubert sperrt nur ohne Recht `ausruesten`.
+        if (userSeite !== pi ? !engine.darfFremdAusruesten(pi, userSeite, heroIdx) : !heroCanBeEquipped(userHero)) return false;
         // Free slot required to host the Equipment.
-        if (_firstFreeSlot(ps, heroIdx) < 0) return false;
+        if (_firstFreeSlot(ups, heroIdx) < 0) return false;
 
         const equipScript = loadCardEffect(pickedName);
         // Stack-only Equips (Modnir, Swellpnir) carry `neverPlayable`
@@ -216,7 +222,7 @@ module.exports = {
         // `canEquipToHero(gs, pi, heroIdx, engine)`.
         if (typeof equipScript?.canEquipToHero === 'function') {
           try {
-            if (!equipScript.canEquipToHero(gs, pi, heroIdx, engine)) return false;
+            if (!equipScript.canEquipToHero(gs, userSeite, heroIdx, engine)) return false;
           } catch { return false; }
         }
         // oncePerGame already-used lockout (Smug Coin, etc.).
@@ -262,11 +268,11 @@ module.exports = {
         player: ps.username, card: pickedName, source: pickedEntry.source,
       });
 
-      const freeSlot = direkt ? _firstFreeSlot(ps, heroIdx) : -1;
+      const freeSlot = direkt ? _firstFreeSlot(ups, heroIdx) : -1;
       let placed = null;
       if (direkt && freeSlot >= 0) {
         engine._broadcastEvent('play_zone_animation', {
-          type: 'ruestkammer_tor', owner: pi, heroIdx, zoneSlot: freeSlot,
+          type: 'ruestkammer_tor', owner: userSeite, heroIdx, zoneSlot: freeSlot,
           cardName: pickedName, duration: 2050,
         });
         engine.sync();
@@ -275,7 +281,8 @@ module.exports = {
         // per card text ("without paying its cost"). `safePlaceInSupport`
         // returns the new CardInstance; the caller (us) fires onPlay +
         // onCardEnterZone as per the API contract.
-        placed = engine.safePlaceInSupport(pickedName, pi, heroIdx, freeSlot);
+        placed = engine.safePlaceInSupport(pickedName, userSeite, heroIdx, freeSlot);
+        if (placed?.inst && userSeite !== pi) placed.inst.originalOwner = pi;
       }
 
       if (placed?.inst) {

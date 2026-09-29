@@ -54,7 +54,7 @@ module.exports = {
 
       // Play thought bubble animation on caster
       engine._broadcastEvent('play_zone_animation', {
-        type: 'thought_bubbles', owner: pi, heroIdx, zoneSlot: -1,
+        type: 'thought_bubbles', owner: ctx.cardHeroOwner ?? pi, heroIdx, zoneSlot: -1,   // Als Befund 29.9.: Brettseite des Wirkers
       });
       await engine._delay(500);
 

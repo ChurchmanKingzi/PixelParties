@@ -4084,7 +4084,15 @@ function sendGameState(room, playerIdx, extra) {
       actionBlockedHeroes: room.engine
         ? (ps.heroes || []).map((h, hi) => !!(h?.name && h.hp > 0 && !room.engine.canHeroPerformAction(pi, hi)))
         : [],
-      surpriseZones: pi === playerIdx ? ps.surpriseZones : ps.surpriseZones.map((sz, hi) => (sz || []).map(cn => {
+      // Als Vorgabe 29.9.: eine verdeckte Surprise sieht ihr KARTENBESITZER
+      // (`originalOwner`) — auch auf der Gegenseite (gesetzt am geliehenen
+      // Helden, Trapping); die Brettseite sieht fremde verdeckte Karten nicht.
+      surpriseZones: pi === playerIdx ? ps.surpriseZones.map((sz, hi) => (sz || []).map(cn => {
+        if (gs.isPuzzle) return cn;
+        const inst = room.engine?.cardInstances.find(c => c.owner === pi && c.zone === 'surprise' && c.heroIdx === hi && c.name === cn);
+        if (inst && inst.faceDown && inst.originalOwner != null && inst.originalOwner !== playerIdx && !inst.knownToOpponent) return '?';
+        return cn;
+      })) : ps.surpriseZones.map((sz, hi) => (sz || []).map(cn => {
         // Puzzle mode: reveal opponent (CPU) surprises so the player can
         // plan around them — they're part of the puzzle's authored setup,
         // not hidden information the player is supposed to discover. The
@@ -4100,6 +4108,8 @@ function sendGameState(room, playerIdx, extra) {
         if (inst && !inst.faceDown) return cn;
         // Known surprises (re-set) are visible but marked as known
         if (inst && inst.knownToOpponent) return cn;
+        // 29.9.: eigene Karte auf der Gegenseite (geliehener Held, Trapping)
+        if (inst && inst.originalOwner === playerIdx) return cn;
         return '?';
       })),
       surpriseFaceDown: ps.surpriseZones.map((sz, hi) => {
@@ -5124,6 +5134,9 @@ function sendGameState(room, playerIdx, extra) {
     // Heldenkacheln und Support-Zonen beim Drag korrekt aus.
     equipEligibleHeroes: room.engine ? room.engine.getEquipEligibleHeroes(playerIdx) : {},
     freeSideEquipArtifacts: room.engine ? room.engine.getFreeSideEquipArtifacts(playerIdx) : [],
+    // Als Vorgabe 29.9.: Kartenname → [{ owner, heroIdx }] uebernommener
+    // Helden, an die die Ausruestung darf (Styx, Golden Apple, FTCD …).
+    kontrollAusruestZiele: room.engine ? room.engine.getKontrollAusruestZiele(playerIdx) : {},
     bouncePlacementTargets: room.engine ? room.engine.getBouncePlacementTargets(playerIdx) : {},
     // Empfaenger-Zonen von Anlege-Karten (Divine Awakening). Gleiche
     // Form wie `bouncePlacementTargets` — der Client ueberstimmt damit
@@ -5139,6 +5152,8 @@ function sendGameState(room, playerIdx, extra) {
     // v677b: Erlasse je Handkopie — indexbasiert, nur fuer den
     // Besitzer sinnvoll (es sind SEINE Handindizes).
     ascensionGrantOffers: room.engine ? room.engine.getAscensionGrantOffers(playerIdx) : {},
+    // Als Vorgabe 29.9.: Aufstieg auf geliehene Helden (Gegnerspalte).
+    fremdAufstiegZiele: room.engine ? room.engine.getFremdAufstiegZiele(playerIdx) : {},
     bakhmSurpriseSlots: room.engine ? (() => {
       const result = [];
       const ps2 = gs.players[playerIdx];
@@ -5539,10 +5554,12 @@ function sendSpectatorGameState(room) {
     ownSideSummonArtifacts: [],
     equipEligibleHeroes: {},
     freeSideEquipArtifacts: [],
+    kontrollAusruestZiele: {},
     bouncePlacementTargets: {},
     attachmentHostTargets: {},
     ascensionSkipTargets: {},
     ascensionGrantOffers: {},
+    fremdAufstiegZiele: {},
     bakhmSurpriseSlots: [],
     ushabtiSummonable: [],
     roomParticipants: {
@@ -6536,7 +6553,7 @@ async function doPlayAbilityFremd(room, pi, { cardName, handIndex, heroIdx, zone
   abZones[ziel].push(cardName);
   (fromCreation ? ps.creationZone : ps.hand).splice(handIndex, 1);
   engine.notePlayedFromHand(pi);
-  hero.statuses.charmed.abilityZug = gs.turn;
+  hero._abilityZug = gs.turn;   // Als Vorgabe 29.9.: am Helden (auch dauerhafte Uebernahme)
 
   const inst = engine._trackCard(cardName, heroOwner, 'ability', heroIdx, ziel);
   inst.originalOwner = kartenBesitzer;
@@ -6553,7 +6570,7 @@ async function doPlayAbilityFremd(room, pi, { cardName, handIndex, heroIdx, zone
       const idx = slot.lastIndexOf(cardName);
       if (idx >= 0) slot.splice(idx, 1);
       engine._untrackCard(inst.id);
-      delete hero.statuses?.charmed?.abilityZug;
+      delete hero._abilityZug;
       const negatedAbilityOwner = engine._consumeHandCardOrigin(pi, cardName);
       await engine.routeNegatedInitialCard(negatedAbilityOwner, cardName, chainResult, -1,
         { fromZone: 'ability', fromHeroIdx: heroIdx, fromSlotIdx: ziel });
@@ -6573,8 +6590,11 @@ async function doPlayAbilityFremd(room, pi, { cardName, handIndex, heroIdx, zone
   return true;
 }
 
-async function doPlayArtifact(room, pi, { cardName, handIndex, heroIdx, zoneSlot, clickPlaced, targetOwner, fromCreation }) {
+async function doPlayArtifact(room, pi, { cardName, handIndex, heroIdx, zoneSlot, clickPlaced, targetOwner, fromCreation, heroOwner, charmedOwner }) {
   if (!room?.engine || !room.gameState) return false;
+  // Als Vorgabe 29.9.: Zielseite auch als `heroOwner`/`charmedOwner` (wie
+  // bei Zaubern/Kreaturen ueber geliehene Helden).
+  if (targetOwner !== 0 && targetOwner !== 1) targetOwner = heroOwner ?? charmedOwner;
   const gs = room.gameState;
   if (pi !== gs.activePlayer) return false;
   // Hand waehrend einer erzwungenen Abwurf-Stapelabfrage gesperrt —
@@ -6672,8 +6692,11 @@ async function doPlayArtifact(room, pi, { cardName, handIndex, heroIdx, zoneSlot
   // die auch die CPU liest.
   // For cross-side artifacts the equip target hero sits on the
   // opponent's side (Tsu'Ki's `equipCostReduction` reads that hero).
+  // Zielheld-Rabatt (Tsu'Ki) am Helden der Zielseite — auch bei Free-Side-
+  // und Kontroll-Equip (Als Vorgabe 29.9.); ungueltige Seiten lehnt der
+  // Weg unten ohnehin ab.
   const { costReduction, cost } = room.engine.artifactPlayCost(pi, cardName, handIndex, {
-    heroIdx, heroOwner: _isCrossSideArtifact ? (pi === 0 ? 1 : 0) : pi,
+    heroIdx, heroOwner: _isCrossSideArtifact ? (pi === 0 ? 1 : 0) : ((targetOwner === 0 || targetOwner === 1) ? targetOwner : pi),
   });
   if (!room.engine.canAffordGold(pi, cost, cardName)) return false;
 
@@ -6702,9 +6725,24 @@ async function doPlayArtifact(room, pi, { cardName, handIndex, heroIdx, zoneSlot
     && typeof _script?.canEquipToHero !== 'function'
     && _script?.equipOwnSideOnly !== true
     && (targetOwner === 0 || targetOwner === 1);
+  // ★ KONTROLL-EQUIP (Als Vorgabe 29.9.): an einen UEBERNOMMENEN Helden
+  // der Gegenseite darf JEDE Ausruestung (auch mit `canEquipToHero` oder
+  // `equipOwnSideOnly` — „a Hero you control"), wenn die Uebernahme
+  // `ausruesten` erlaubt (Styx, Golden Apple, FTCD …; Charme nicht). Die
+  // Karte liegt auf der Brettseite, `originalOwner` = pi (unten), sie
+  // dient dem Kontrolleur (`effektiveSeiten`).
+  const _isKontrollEquip = _subLowerEarly === 'equipment'
+    && !_isCrossSideArtifact
+    && (targetOwner === 0 || targetOwner === 1) && targetOwner !== pi
+    && room.engine.darfFremdAusruesten(pi, targetOwner, heroIdx);
   const placementOwner = _isCrossSideArtifact
     ? (pi === 0 ? 1 : 0)
-    : (_isFreeSideEquip ? targetOwner : pi);
+    : ((_isFreeSideEquip || _isKontrollEquip) ? targetOwner : pi);
+  // Ausdruecklich die andere Seite gewuenscht, aber weder Free-Side noch
+  // Kontroll-Equip (Charme, Love Shot, fremder Held): ablehnen — nie still
+  // auf den gleich indizierten eigenen Helden umlenken.
+  if (_subLowerEarly === 'equipment' && !_isCrossSideArtifact
+      && (targetOwner === 0 || targetOwner === 1) && targetOwner !== placementOwner) return false;
   const placementPs = gs.players[placementOwner];
   if (!placementPs) return false;
   const hero = placementPs.heroes[heroIdx];
@@ -6718,9 +6756,14 @@ async function doPlayArtifact(room, pi, { cardName, handIndex, heroIdx, zoneSlot
     // Karten, die per `safePlaceInSupport` direkt ausruesten, dieselbe
     // Regel lesen statt sie nachzubauen (und dabei Teile zu vergessen).
     if (!heroCanBeEquipped(hero)) return false;
+    // Als Vorgabe 29.9.: gebundene Ausruestung („a Hero you control") nicht an
+    // einen eigenen Helden, den gerade der Gegner kontrolliert.
+    if (!_isFreeSideEquip && !_isKontrollEquip && placementOwner === pi
+        && room.engine.heroSideOf(pi, hero) !== pi) return false;
 
     const equipScript = loadCardEffect(cardName);
-    if (equipScript?.canEquipToHero && !equipScript.canEquipToHero(gs, pi, heroIdx, room.engine)) return false;
+    // Kontroll-Equip: die Beschraenkung gegen die Brettseite des Helden fragen.
+    if (equipScript?.canEquipToHero && !equipScript.canEquipToHero(gs, _isKontrollEquip ? placementOwner : pi, heroIdx, room.engine)) return false;
     if (equipScript?.oncePerGame) {
       const opgKey = equipScript.oncePerGameKey || cardName;
       if (ps._oncePerGameUsed?.has(opgKey)) return false;
@@ -8378,7 +8421,7 @@ async function doActivateCreatureEffect(room, pi, { heroIdx, zoneSlot, charmedOw
     gs._spellCasterCreature = inst;
     let resolved;
     try {
-      resolved = await script.onCreatureEffect(ctx);
+      resolved = await room.engine._alsAkteur(ctx, () => script.onCreatureEffect(ctx));   // 29.9.: Animationen auf die Brettseite
       if (room.engine.nimmOpferFizzle()) resolved = true;   // v1313: fizzelt, aber verbraucht
       // Karten mit eigener Zielwahl haben den Auftritt schon selbst
       // ausgeloest; alle anderen bekommen ihn hier, nach dem Effekt.
@@ -8745,7 +8788,7 @@ async function doActivateFreeAbility(room, pi, { heroIdx, zoneIdx, zoneKind, cha
     }
 
     const ctx = room.engine._createContext(inst, {});
-    const resolved = await script.onFreeActivate(ctx, level);
+    const resolved = await room.engine._alsAkteur(ctx, () => script.onFreeActivate(ctx, level));
     // ── AUFTRITT ERST HIER (12.8., Als Befund an "Trade") ────────────
     // Vorher stand der Auftritt direkt hinter dem Chain-Fenster, also
     // VOR `onFreeActivate` und damit vor jeder Abfrage der Karte. Bei
@@ -8864,6 +8907,9 @@ async function doPlayCreature(room, pi, { cardName, handIndex, heroIdx, zoneSlot
   // verzauberte Helden ausdruecklich anbietet, leuchtete der Client und
   // der Server schickte die Beschwoerung woanders hin.
   const heroOwner = charmedOwner != null ? charmedOwner : pi;
+  // Als Vorgabe 29.9.: Charme („It and its Support Zones are unaffected")
+  // erlaubt kein Beschwoeren ueber den uebernommenen Helden.
+  if (charmedOwner != null && !room.engine.kontrollRechte(charmedOwner, heroIdx).beschwoeren) return false;
   const v = room.engine.validateActionPlay(pi, cardName, handIndex, heroIdx, ['Creature'], { zoneSlot, fromCreation, charmedOwner });
   if (!v) return _no('validate-nein');
   const { ps, cardData, hero, script, isActionPhase, isMainPhase, isInherentAction } = v;
@@ -9636,7 +9682,7 @@ async function doActivateAbility(room, pi, { heroIdx, zoneIdx, zoneKind, charmed
     // (no-op for humans / PvP / MCTS sim; idempotent below).
     room.engine.maybeFireCpuRevealEarly();
     const ctx = room.engine._createContext(inst, {});
-    let result = await script.onActivate(ctx, level);
+    let result = await room.engine._alsAkteur(ctx, () => script.onActivate(ctx, level));
     if (room.engine.nimmOpferFizzle()) result = true;   // v1313: fizzelt, aber verbraucht
     // Auftritt NACH dem Handler (siehe doActivateFreeAbility) — eine
     // abgebrochene Aktivierung darf keine Karte einblenden.
@@ -10232,7 +10278,7 @@ async function doActivateEquipEffect(room, pi, { heroIdx, zoneSlot }) {
     // (`'board'`), NICHT in der Hand. Angemeldet vor dem Handler,
     // ausgeloest erst danach.
     room.engine.armEffectAnnounce(cardName, pi, 'board');
-    let resolved = await script.onEquipEffect(ctx);
+    let resolved = await room.engine._alsAkteur(ctx, () => script.onEquipEffect(ctx));
     if (room.engine.nimmOpferFizzle()) resolved = true;   // v1313: fizzelt, aber verbraucht
     if (resolved !== false) room.engine.announceActiveEffect();
     room.engine.clearEffectAnnounce();
@@ -10663,7 +10709,7 @@ async function doConfirmPotion(room, pi, { selectedIds }) {
   return true;
 }
 
-async function doPlaySurprise(room, pi, { cardName, handIndex, heroIdx, bakhmSlot, fromCreation }) {
+async function doPlaySurprise(room, pi, { cardName, handIndex, heroIdx, bakhmSlot, fromCreation, heroOwner }) {
   if (!room?.engine || !room.gameState) return false;
   const gs = room.gameState;
   if (pi !== gs.activePlayer) return false;
@@ -10693,8 +10739,17 @@ async function doPlaySurprise(room, pi, { cardName, handIndex, heroIdx, bakhmSlo
     if (ps._oncePerGameUsed?.has(opgKey)) return false;
   }
 
+  // Als Vorgabe 29.9.: Surprise an einen geliehenen Gegnerhelden setzen.
+  if (heroOwner != null && heroOwner !== pi) {
+    if (bakhmSlot != null && bakhmSlot >= 0) return false;
+    return doPlaySurpriseFremd(room, pi, { cardName, handIndex, heroIdx, fromCreation, heroOwner, script });
+  }
+
   const hero = ps.heroes[heroIdx];
   if (!hero || !hero.name || hero.hp <= 0) return false;
+  // Als Vorgabe 29.9.: ein Held, den gerade der Gegner kontrolliert, ist
+  // dessen Held — sein Besitzer setzt dort keine Surprise.
+  if (room.engine.surpriseKontrolleur && room.engine.surpriseKontrolleur(pi, heroIdx) !== pi) return false;
 
   // Bakhm Support-Zone placement: Surprise Creatures can go into Bakhm's own
   // Support Zones instead of the Surprise Zone.
@@ -10753,6 +10808,49 @@ async function doPlaySurprise(room, pi, { cardName, handIndex, heroIdx, bakhmSlo
     await room.engine.runHooks('onCardEnterZone', { enteringCard: inst, toZone: 'surprise', toHeroIdx: heroIdx, _skipReactionCheck: true });
   } catch (err) {
     console.error('[Engine] doPlaySurprise hooks error:', err.message);
+  }
+  for (let i = 0; i < 2; i++) sendGameState(room, i); sendSpectatorGameState(room);
+  return true;
+}
+
+/**
+ * ★ Als Vorgabe 29.9.: Surprise aus der Hand in die Surprise Zone eines
+ * GELIEHENEN Gegnerhelden setzen. Surprises sind weder Ausruestung noch
+ * Ability; es gilt dieselbe Rechte-Logik wie beim Ausruesten
+ * (`kontrollRechte(...).ausruesten`). Die Karte liegt auf der Brettseite
+ * (`owner` = heroOwner) und gehoert dem Setzenden (`originalOwner`).
+ */
+async function doPlaySurpriseFremd(room, pi, { cardName, handIndex, heroIdx, fromCreation, heroOwner, script }) {
+  const gs = room.gameState;
+  const engine = room.engine;
+  const ps = gs.players[pi];
+  const hps = gs.players[heroOwner];
+  const hero = hps?.heroes?.[heroIdx];
+  if (!hero?.name || hero.hp <= 0) return false;
+  if (engine.surpriseKontrolleur(heroOwner, heroIdx) !== pi) return false;
+  if (!engine.kontrollRechte(heroOwner, heroIdx).ausruesten) return false;
+  if ((hps.surpriseZones[heroIdx] || []).length > 0) return false;
+
+  hps.surpriseZones[heroIdx] = [cardName];
+  (fromCreation ? ps.creationZone : ps.hand).splice(handIndex, 1);
+  engine.notePlayedFromHand(pi);
+
+  const inst = engine._trackCard(cardName, heroOwner, 'surprise', heroIdx, 0);
+  inst.originalOwner = pi;
+  inst.faceDown = true;
+
+  if (script?.oncePerGame) {
+    if (!ps._oncePerGameUsed) ps._oncePerGameUsed = new Set();
+    ps._oncePerGameUsed.add(script.oncePerGameKey || cardName);
+  }
+
+  engine.log('surprise_set', { player: ps.username, hero: hero.name, foreignHero: true });
+  broadcastHandToBoard(room, pi, { cardName, handIndex, zoneType: 'surprise', heroIdx, slotIdx: 0, faceDown: true, destOwner: heroOwner });
+
+  try {
+    await engine.runHooks('onCardEnterZone', { enteringCard: inst, toZone: 'surprise', toHeroIdx: heroIdx, _skipReactionCheck: true });
+  } catch (err) {
+    console.error('[Engine] doPlaySurpriseFremd hooks error:', err.message);
   }
   for (let i = 0; i < 2; i++) sendGameState(room, i); sendSpectatorGameState(room);
   return true;
@@ -14458,7 +14556,7 @@ io.on('connection', (socket) => {
 
   // ── Hero Ascension ──
 
-  socket.on('ascend_hero', async ({ roomId, heroIdx, cardName, handIndex, fromCreation }) => {
+  socket.on('ascend_hero', async ({ roomId, heroIdx, cardName, handIndex, fromCreation, heroOwner }) => {
     if (!currentUser) return;
     const room = rooms.get(roomId);
     if (!room?.gameState || room.gameState.result) return;
@@ -14473,9 +14571,15 @@ io.on('connection', (socket) => {
     // sie brauchen den Riegel eigens — Als Befund 5.8.: waehrend Ambush
     // aufloeste, liess sich per Spam-Klick eine Waflav-Form ascenden.
     if (gs._chainResolvingLock || gs._forceDiscardLock === pi) return;
+    // Als Vorgabe 29.9.: `heroOwner` = Spalte des Helden. Ein geliehener
+    // Held (Gegnerspalte) darf aufsteigen, solange `pi` ihn kontrolliert;
+    // ein eigener Held, den gerade der Gegner kontrolliert, nicht.
+    const hs = (heroOwner === 0 || heroOwner === 1) ? heroOwner : pi;
+    const _aufHeld = gs.players[hs]?.heroes?.[heroIdx];
+    if (!_aufHeld?.name || room.engine.heroSideOf(hs, _aufHeld) !== pi) return;
     // Perform ascension via engine
     try {
-      const result = await room.engine.performAscension(pi, heroIdx, cardName, handIndex, { fromCreation });
+      const result = await room.engine.performAscension(pi, heroIdx, cardName, handIndex, { fromCreation, heroOwner: hs });
       if (!result.success) return;
       // Skip to End Phase if required
       if (result.skipEndPhase) {

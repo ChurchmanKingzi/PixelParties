@@ -154,9 +154,10 @@ module.exports = {
             engine.log('deepsea_treasure_skip', { card: name, reason: 'kein_platz' });
             continue;
           }
+          // Als Vorgabe 29.9.: Ziele koennen uebernommene Helden sein (`z.side`).
           const zonen = ziele.map(z => ({
-            heroIdx: z.heroIdx, slotIdx: z.slotIdx, owner: pi,
-            label: `${ps.heroes[z.heroIdx]?.name || 'Hero'} · Slot ${z.slotIdx + 1}`,
+            heroIdx: z.heroIdx, slotIdx: z.slotIdx, owner: z.side,
+            label: `${engine.gs.players[z.side]?.heroes?.[z.heroIdx]?.name || 'Hero'} · Slot ${z.slotIdx + 1}`,
           }));
           const platz = await ctx.promptZonePick(zonen, {
             title: name,
@@ -164,7 +165,7 @@ module.exports = {
             cancellable: true,
           });
           if (!platz) continue;
-          await equipArtifactToHero(engine, pi, name, pi, platz.heroIdx, platz.slotIdx, {
+          await equipArtifactToHero(engine, pi, name, platz.owner ?? pi, platz.heroIdx, platz.slotIdx, {
             from: 'hand', source: CARD_NAME,
           });
           engine.log('deepsea_treasure_played', { player: ps.username, card: name, as: 'equipment' });

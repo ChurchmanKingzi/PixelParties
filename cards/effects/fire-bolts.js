@@ -220,7 +220,7 @@ module.exports = {
         );
         if (inst) {
           await engine.actionDealCreatureDamage(
-            { name: 'Fire Bolts', owner: pi, heroIdx },
+            { name: 'Fire Bolts', owner: pi, heroIdx, heroOwner: ctx.cardHeroOwner ?? pi },   // Als Befund 29.9.: Brettseite des Wirkers
             inst, 100, 'destruction_spell',
             { sourceOwner: pi, canBeNegated: true },
           );
@@ -251,7 +251,7 @@ module.exports = {
 
       engine.log('fire_bolts', {
         player: gs.players[pi].username,
-        hero: gs.players[pi].heroes[heroIdx]?.name,
+        hero: (ctx.attachedHero || gs.players[pi].heroes[heroIdx])?.name,   // Als Befund 29.9.: Brettseite des Wirkers
         enhanced,
         recoilDamage,
         enemyTarget: enemyTarget?.cardName,

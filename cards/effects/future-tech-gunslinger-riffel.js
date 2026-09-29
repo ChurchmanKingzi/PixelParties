@@ -67,7 +67,7 @@ function schonAngelegt(ps, heroIdx, name) {
  * Wählbare Namen: Ausrüstung, liegt in der ABLAGE, eine Kopie im DECK,
  * und an DIESEM Helden noch nicht angelegt.
  */
-function kandidaten(gs, pi, heroIdx, engine) {
+function kandidaten(gs, pi, heroIdx, engine, seite = pi) {
   const ps = gs.players[pi];
   if (!ps) return [];
   const db = engine._getCardDB();
@@ -78,11 +78,11 @@ function kandidaten(gs, pi, heroIdx, engine) {
     if (!cd || !hasCardType(cd, 'Artifact')) continue;
     if ((cd.subtype || '') !== 'Equipment') continue;   // „equippable"
     if (!imDeck.has(name)) continue;                    // Kopie im Deck noetig
-    if (schonAngelegt(ps, heroIdx, name)) continue;
+    if (schonAngelegt(gs.players[seite], heroIdx, name)) continue;
     // v1268: kartenseitige Ausruest-Beschraenkung (Crusader's & Co.) —
     // ohne diese Pruefung waere die Wahl erlaubt, das Anlegen danach aber
     // nicht (`_equip-shared`).
-    if (!istAusruestTraeger(engine, pi, heroIdx, name)) continue;
+    if (!istAusruestTraeger(engine, pi, heroIdx, name, seite)) continue;
     out.add(name);
   }
   return [...out];
@@ -140,15 +140,16 @@ module.exports = {
     const heroIdx = ctx.cardHeroIdx;
     const ps = gs.players[pi];
     if (!ps || heroIdx == null || heroIdx < 0) return false;
-    // Styx 28.9.: `_equip-shared` legt nur an Helden der eigenen Spalte an
-    // (und ein bezauberter Held ist ohnehin kein Ausruest-Traeger). Ein
-    // uebernommener Riffel wuerde sonst den gleich indizierten EIGENEN
-    // Helden ausruesten — dann lieber nichts.
-    if ((ctx.cardHeroOwner ?? pi) !== pi) return false;
+    // Als Vorgabe 29.9.: ein uebernommener Riffel ruestet SICH aus (Brettseite
+    // `seite`), sofern die Uebernahme `ausruesten` erlaubt (Styx, Golden
+    // Apple …; Charme nicht). Deck und Ablage bleiben die des Kontrolleurs.
+    const seite = ctx.cardHeroOwner ?? pi;
+    const zps = gs.players[seite];
+    if (seite !== pi && !engine.darfFremdAusruesten(pi, seite, heroIdx)) return false;
 
-    if (freieSlots(ps, heroIdx).length === 0) return false;
+    if (freieSlots(zps, heroIdx).length === 0) return false;
 
-    const wahl = kandidaten(gs, pi, heroIdx, engine);
+    const wahl = kandidaten(gs, pi, heroIdx, engine, seite);
     if (wahl.length === 0) return false;
 
     const name = await waehleAusNamen(engine, pi, wahl, {
@@ -161,7 +162,7 @@ module.exports = {
 
     // Die Kopie kommt aus dem DECK, nicht aus der Ablage.
     if (!(ps.mainDeck || []).includes(name)) return false;   // zwischenzeitlich weg
-    const slot = freieBasisZonen(ps, heroIdx, engine, pi)[0];
+    const slot = freieBasisZonen(zps, heroIdx, engine, seite)[0];
     if (slot == null) return false;
 
     // ★ v1268: ueber den gemeinsamen Ausruestweg (`_equip-shared`). Neu
@@ -170,7 +171,7 @@ module.exports = {
     // Riffel bisher), und das Surprise-Fenster beim Ausruesten oeffnet
     // wie beim Handweg (vorher `_skipReactionCheck`). Flug Deck → Zone
     // wie bisher.
-    const inst = await ruesteAusStapelAus(engine, pi, 'deck', name, heroIdx, slot, { source: CARD_NAME });
+    const inst = await ruesteAusStapelAus(engine, pi, 'deck', name, heroIdx, slot, { source: CARD_NAME, seite });
     if (!inst) return false;
 
     engine.shuffleDeck(pi, 'main');                // „Search your deck"

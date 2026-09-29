@@ -127,11 +127,12 @@ module.exports = {
       });
       if (!res) return;
       const destHero = res.host.heroIdx, destSlot = res.host.slotIdx, inst = res.inst;
-      const destHeroObj = ps.heroes?.[destHero];
+      const destSeite = res.host.owner;   // Brettseite (Als Vorgabe 29.9.: auch ein uebernommener Held)
+      const destHeroObj = gs.players[destSeite]?.heroes?.[destHero];
 
       // Attach burst — warm gold sparkles on the host Hero.
       engine._broadcastEvent('play_zone_animation', {
-        type: 'gold_sparkle', owner: pi, heroIdx: destHero, zoneSlot: -1,
+        type: 'gold_sparkle', owner: destSeite, heroIdx: destHero, zoneSlot: -1,
       });
       await engine._delay(400);
 
@@ -155,7 +156,7 @@ module.exports = {
       // Kontrolle statt Seite (Styx 28.9.): alle Helden, die ich
       // KONTROLLIERE — Statuszugriff ueber die physische Seite.
       for (const { physOwner, heroIdx: hi, hero: ally } of engine.heroesControlledBy(pi)) {
-        if (physOwner === pi && hi === destHero) continue; // host not covered
+        if (physOwner === destSeite && hi === destHero) continue; // host not covered
         if (!ally?.name || ally.hp <= 0) continue;
         if (!ally.statuses) continue;
         if (!cleansable.some(k => ally.statuses[k])) continue;

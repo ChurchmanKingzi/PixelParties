@@ -10,6 +10,7 @@
 
 const { loadCardEffect } = require('./_loader');
 const { ZONES } = require('./_hooks');
+const { heldSeite } = require('./_hooks');   // Als Befund 29.9.: Brettseite geliehener Helden
 
 module.exports = {
   requiresTarget: true,
@@ -25,8 +26,9 @@ module.exports = {
     // sourced negation is the lighter "effect-only" form and does
     // NOT disqualify a Hero from acting; the helper handles the
     // distinction so we don't duplicate it here.
-    if (engine?.isHeroIncapacitated?.(pi, heroIdx)) return false;
-    const abZones = ps.abilityZones?.[heroIdx] || [];
+    const hs = heldSeite(gs, pi, heroIdx);
+    if (engine?.isHeroIncapacitated?.(hs, heroIdx)) return false;
+    const abZones = gs.players[hs]?.abilityZones?.[heroIdx] || [];
     let magicArtsCount = 0;
     for (const slot of abZones) {
       if (!slot || slot.length === 0) continue;
@@ -41,18 +43,17 @@ module.exports = {
   spellPlayCondition(gs, playerIdx, engine) {
     const ps = gs.players[playerIdx];
     if (!ps) return false;
+    // Als Vorgabe 29.9.: „a face-down Surprise you control" — Zonen nach
+    // Kontrolle, auch am geliehenen Helden (`_getAllSurpriseEntries`).
+    if (engine && _regulaereZonen(engine, playerIdx).some(e => {
+      const script = loadCardEffect(e.cardName);
+      if (!script?.isSurprise || script.canTelekinesisActivate === false) return false;
+      return typeof script.canTelekinesisActivate !== 'function' || script.canTelekinesisActivate(engine, playerIdx);
+    })) return true;
     for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
       const hero = ps.heroes[hi];
       if (!hero?.name || hero.hp <= 0) continue;
       if (hero.statuses?.frozen || hero.statuses?.stunned) continue;
-      const sz = ps.surpriseZones?.[hi] || [];
-      if (sz.length > 0) {
-        const script = loadCardEffect(sz[0]);
-        if (script?.isSurprise && script.canTelekinesisActivate !== false) {
-          // Also check canTelekinesisActivate function if present
-          if (typeof script.canTelekinesisActivate !== 'function' || (engine && script.canTelekinesisActivate(engine, playerIdx))) return true;
-        }
-      }
       // Bakhm support zones
       if (engine) {
         const heroScript = loadCardEffect(hero.name);
@@ -109,6 +110,7 @@ module.exports = {
 
       const surpriseCardName = target.cardName;
       const heroIdx = target.heroIdx;
+      const seite = target.owner ?? pi;   // Als Vorgabe 29.9.: Brettseite der Zone
       const script = loadCardEffect(surpriseCardName);
       if (!script) return;
 
@@ -127,16 +129,29 @@ module.exports = {
       // in ihrer Zone — erst dann laeuft ihr Effekt, ohne das uebliche
       // Aufdeck-Blitzen.
       engine._broadcastEvent('play_zone_animation', {
-        type: 'telekinese', owner: pi, heroIdx,
+        type: 'telekinese', owner: seite, heroIdx,
         ...(isBakhmSlot ? { zoneSlot: bakhmZoneSlot } : { zoneSlot: -1, zoneType: 'surprise' }),
         cardName: surpriseCardName, duration: 2000,
       });
       await engine._delay(1800);
 
-      await engine._activateSurprise(pi, heroIdx, surpriseCardName, sourceInfo, script, { ...activateOpts, ohneFlip: true });
+      await engine._activateSurprise(seite, heroIdx, surpriseCardName, sourceInfo, script, { ...activateOpts, ohneFlip: true });
     },
   },
 };
+
+/**
+ * Als Vorgabe 29.9.: regulaere Surprise Zones, die `playerIdx` kontrolliert
+ * (eigene Spalte + geliehene Helden), Traeger lebend, nicht Frozen/Stunned.
+ */
+function _regulaereZonen(engine, playerIdx) {
+  return (engine._getAllSurpriseEntries?.(playerIdx) || []).filter(e => {
+    if (e.isBakhmSlot) return false;
+    const hero = engine.gs.players[e.seite ?? playerIdx]?.heroes?.[e.heroIdx];
+    if (!hero?.name || hero.hp <= 0) return false;
+    return !(hero.statuses?.frozen || hero.statuses?.stunned);
+  }).map(e => ({ ...e, seite: e.seite ?? playerIdx }));
+}
 
 /**
  * Find all face-down surprises the player controls that can be
@@ -148,27 +163,20 @@ function _getEligibleTelekinesisTargets(engine, playerIdx) {
   if (!ps) return [];
   const targets = [];
 
-  // Regular surprise zones
-  for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-    const hero = ps.heroes[hi];
-    if (!hero?.name || hero.hp <= 0) continue;
-    if (hero.statuses?.frozen || hero.statuses?.stunned) continue;
-    const sz = ps.surpriseZones?.[hi] || [];
-    if (sz.length === 0) continue;
-
-    const cardName = sz[0];
+  // Regular surprise zones — Als Vorgabe 29.9.: nach Kontrolle, `owner` = Brettseite.
+  for (const { seite, heroIdx: hi, cardName } of _regulaereZonen(engine, playerIdx)) {
     const script = loadCardEffect(cardName);
     if (!script?.isSurprise) continue;
     if (script.canTelekinesisActivate === false) continue;
     if (typeof script.canTelekinesisActivate === 'function' && !script.canTelekinesisActivate(engine, playerIdx)) continue;
 
     // Check hero can activate (spell school/level)
-    if (!engine._canHeroActivateSurprise(playerIdx, hi, cardName)) continue;
+    if (!engine._canHeroActivateSurprise(seite, hi, cardName, { reaktor: playerIdx })) continue;
 
     targets.push({
-      id: `surprise-${playerIdx}-${hi}`,
+      id: `surprise-${seite}-${hi}`,
       type: 'surprise',
-      owner: playerIdx,
+      owner: seite,
       heroIdx: hi,
       cardName,
       isBakhmSlot: false,

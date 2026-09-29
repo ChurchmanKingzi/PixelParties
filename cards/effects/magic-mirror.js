@@ -90,7 +90,7 @@ module.exports = {
     // negation flash, then the reflected spell's own onPlay will produce its
     // native animation.
     engine._broadcastEvent('play_zone_animation', {
-      type: 'plague_smoke', owner: ownerIdx, heroIdx: hostHeroIdx, zoneSlot: -1,
+      type: 'plague_smoke', owner: ctx.cardHeroOwner ?? ownerIdx, heroIdx: hostHeroIdx, zoneSlot: -1,
     });
     await engine._delay(500);
 
@@ -117,6 +117,9 @@ module.exports = {
       // zone 'hand' so downstream cost logic in the spell treats it as a
       // normal play.
       const synthInst = engine._trackCard(sourceCard, ownerIdx, 'hand', hostHeroIdx, -1);
+      // Als Vorgabe 29.9.: Wirker ist der Traeger auf seiner Brettseite
+      // (geliehener Held) — `cardHeroOwner` der Kopie zeigt dorthin.
+      if (ctx.cardHeroOwner != null && ctx.cardHeroOwner !== ownerIdx) synthInst.heroOwner = ctx.cardHeroOwner;
 
       // Mark this as an immediate/copied play so nested systems know to
       // skip certain once-per-turn restrictions that would otherwise lock

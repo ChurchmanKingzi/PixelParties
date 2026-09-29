@@ -109,7 +109,7 @@ module.exports = {
         if (!e.inst || e.inst.zone !== 'support') continue;
 
         await engine.actionApplyCreaturePoison(
-          { name: CARD_NAME, owner: pi, heroIdx },
+          { name: CARD_NAME, owner: pi, heroIdx, heroOwner: ctx.cardHeroOwner ?? pi },   // Als Befund 29.9.: Brettseite des Wirkers
           e.inst,
         );
       }

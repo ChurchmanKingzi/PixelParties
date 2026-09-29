@@ -121,10 +121,10 @@ function aufstiegsziele(engine, pi, heroIdx) {
   return raus;
 }
 
-/** Die Heldeninstanz dieses Slots. */
-function heldeninstanz(engine, pi, heroIdx) {
+/** Die Heldeninstanz dieses Slots (`seite` = Brettseite). */
+function heldeninstanz(engine, seite, heroIdx) {
   return engine.cardInstances.find(c =>
-    c.owner === pi && c.zone === 'hero' && c.heroIdx === heroIdx) || null;
+    c.owner === seite && c.zone === 'hero' && c.heroIdx === heroIdx) || null;
 }
 
 // ─── MODULE EXPORTS ──────────────────────
@@ -144,8 +144,9 @@ module.exports = {
    * gueltiges Ziel. `_shapeshiftBase` ist dabei die zweite Probe: es
    * ist genau dann gesetzt, wenn eine Gestalt aktiv ist.
    */
-  ascensionCondition(gs, pi, heroIdx, _engine) {
-    const hero = gs.players[pi]?.heroes?.[heroIdx];
+  // Als Vorgabe 29.9.: `heroOwner` = Brettseite eines geliehenen Helden.
+  ascensionCondition(gs, pi, heroIdx, _engine, heroOwner) {
+    const hero = gs.players[heroOwner ?? pi]?.heroes?.[heroIdx];
     if (!hero?.name || hero.hp <= 0) return false;
     if (hero.name !== BASIS_FORM) return false;
     if (hero._shapeshiftBase) return false;
@@ -225,11 +226,10 @@ module.exports = {
     const engine = ctx._engine;
     const pi = ctx.cardOwner;
     const heroIdx = ctx.cardHeroIdx;
-    // Styx 28.9.: `performAscension(pi, heroIdx)` kennt nur die eigene
-    // Spalte — ein uebernommener Throne Robber stiege sonst den gleich
-    // indizierten EIGENEN Helden auf. Bis die Engine das kann: gesperrt.
-    if ((ctx.cardHeroOwner ?? pi) !== pi) return false;
-    const hero = engine.gs.players[pi]?.heroes?.[heroIdx];
+    // Als Vorgabe 29.9.: ein uebernommener Throne Robber steigt auf der
+    // Brettseite auf (`performAscension` mit `heroOwner`), Karten aus
+    // Hand/Deck des Kontrolleurs.
+    const hero = ctx.attachedHero ?? engine.gs.players[ctx.cardHeroOwner ?? pi]?.heroes?.[heroIdx];
     if (!hero?.name || hero.hp <= 0) return false;
     return aufstiegsziele(engine, pi, heroIdx).length > 0;
   },
@@ -241,8 +241,8 @@ module.exports = {
     const heroIdx = ctx.cardHeroIdx;
     const ps = gs.players[pi];
     if (!ps) return false;
-    if ((ctx.cardHeroOwner ?? pi) !== pi) return false;   // Styx 28.9.: s. canActivateHeroEffect
-    const hero = ps.heroes?.[heroIdx];
+    const feld = ctx.cardHeroOwner ?? pi;   // Als Vorgabe 29.9.: Brettseite des Helden
+    const hero = ctx.attachedHero ?? gs.players[feld]?.heroes?.[heroIdx];
     if (!hero?.name || hero.hp <= 0) return false;
 
     const ziele = aufstiegsziele(engine, pi, heroIdx);
@@ -292,6 +292,8 @@ module.exports = {
       // Ohne das faende der spaetere Abstieg keinen Formstapel — die
       // Zielkarten fuehren `formsAscensionStack` nicht.
       forceFormStack: true,
+      // Als Vorgabe 29.9.: geliehener Held — Held auf seiner Brettseite.
+      ...(feld !== pi ? { heroOwner: feld } : {}),
     });
 
     if (!res?.success) {
@@ -313,10 +315,14 @@ module.exports = {
     // ── Abstieg vormerken ─────────────────────────────────────────
     // „At the end of your opponent's NEXT turn". `gs.turn` zaehlt je
     // Spielerzug hoch — die naechste Nummer ist der gegnerische Zug.
-    const heldInst = heldeninstanz(engine, pi, heroIdx);
+    const heldInst = heldeninstanz(engine, feld, heroIdx);
     if (heldInst) {
       heldInst.counters = heldInst.counters || {};
       heldInst.counters._identityExpiresTurn = gs.turn + 1;
+      // Als Vorgabe 29.9.: die Form stammt vom Kontrolleur — beim Abstieg
+      // geht sie in SEINE Ablage, auch wenn die Uebernahme dann vorbei ist.
+      if (feld !== pi) heldInst.counters._identityFormOwner = pi;
+      else delete heldInst.counters._identityFormOwner;
       // Der Sweep sucht die Ruecknahme ueber `loadCardEffect(inst.name)`
       // — und der Name ist jetzt der der Zielkarte. Dieser Zeiger fuehrt
       // ihn auf DIESE Datei.
@@ -343,17 +349,21 @@ module.exports = {
     const engine = ctx._engine;
     const inst = ctx.card;
     if (!inst) return;
-    const pi = inst.owner;
+    const feld = inst.owner;   // Brettseite des Helden
     const heroIdx = inst.heroIdx;
     const vonForm = inst.name;
+    // Als Vorgabe 29.9.: Form gehoert dem, aus dessen Hand/Deck sie kam.
+    const formBesitzer = inst.counters?._identityFormOwner ?? feld;
+    if (inst.counters) delete inst.counters._identityFormOwner;
 
-    const res = await engine.performDescend(pi, heroIdx, {
+    const res = await engine.performDescend(formBesitzer, heroIdx, {
       // „even if it is defeated"
       evenIfDefeated: true,
+      ...(formBesitzer !== feld ? { heroOwner: feld } : {}),
     });
 
     engine.log('throne_robber_descend', {
-      player: engine.gs.players[pi]?.username,
+      player: engine.gs.players[formBesitzer]?.username,
       from: vonForm, back: res?.newName || CARD_NAME, ok: !!res?.success,
     });
     engine.sync();

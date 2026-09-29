@@ -6,6 +6,7 @@
 // ═══════════════════════════════════════════
 
 const { drawWouldBeBlocked } = require('./_draw-block-shared');
+const { heldSeite } = require('./_hooks');   // Als Befund 29.9.: Brettseite geliehener Helden
 
 module.exports = {
   cpuMeta: { scalesWithSchool: 'Support Magic' },
@@ -18,7 +19,7 @@ module.exports = {
   // graut ueber `cardGateBlockedCards` erst aus, wenn KEIN eigener Held
   // sie mehr spielen kann.
   canPlayWithHero(gs, pi, heroIdx, cardData, engine) {
-    const ps = gs.players[pi];
+    const ps = gs.players[heldSeite(gs, pi, heroIdx)];
     const abZones = ps?.abilityZones?.[heroIdx] || [[], [], []];
     const smLevel = engine.countAbilitiesForSchool('Support Magic', abZones);
     const drawCount = smLevel >= 3 ? 4 : smLevel >= 2 ? 3 : 2;
@@ -35,7 +36,7 @@ module.exports = {
       if (!hero?.name || hero.hp <= 0) return;
 
       // Calculate Support Magic level
-      const abZones = ps.abilityZones[heroIdx] || [[], [], []];
+      const abZones = (gs.players[ctx.cardHeroOwner ?? pi] || ps).abilityZones[heroIdx] || [[], [], []];   // Als Befund 29.9.: Zonen des Wirkers auf seiner Brettseite
       const smLevel = engine.countAbilitiesForSchool('Support Magic', abZones);
       const drawCount = smLevel >= 3 ? 4 : smLevel >= 2 ? 3 : 2;
 

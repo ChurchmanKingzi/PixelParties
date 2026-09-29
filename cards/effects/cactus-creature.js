@@ -48,8 +48,8 @@ module.exports = {
    * a negative status effect.
    */
   surpriseTrigger: (gs, ownerIdx, heroIdx, statusInfo, engine) => {
-    // Only trigger for our own targets
-    if (statusInfo.targetOwner !== ownerIdx) return false;
+    // Only trigger for our own targets (Als Vorgabe 29.9.: nach Kontrolle)
+    if ((statusInfo.targetController ?? statusInfo.targetOwner) !== ownerIdx) return false;
     // Only negative statuses
     const def = STATUS_EFFECTS[statusInfo.statusName];
     if (!def?.negative) return false;

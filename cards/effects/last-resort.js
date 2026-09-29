@@ -93,7 +93,8 @@ module.exports = {
       const oi = pi === 0 ? 1 : 0;
       const heroIdx = ctx.cardHeroIdx;
       const ps = gs.players[pi];
-      const nutzer = ps?.heroes?.[heroIdx];
+      const heldSeite = ctx.cardHeroOwner ?? pi;   // Als Befund 29.9.: Brettseite des Nutzers
+      const nutzer = ctx.attachedHero || gs.players[heldSeite]?.heroes?.[heroIdx];
       if (!nutzer?.name || nutzer.hp <= 0) { gs._spellCancelled = true; return; }
 
       // ★ Der Stand VOR dem eigenen Tod (s. Kopf).
@@ -113,7 +114,7 @@ module.exports = {
       });
       if (!ziel) { gs._spellCancelled = true; return; }
 
-      const quelle = { name: CARD_NAME, owner: pi, controller: pi, heroIdx };
+      const quelle = { name: CARD_NAME, owner: pi, controller: pi, heroIdx, heroOwner: heldSeite };   // Als Befund 29.9.: Brettseite des Wirkers
 
       // ── Spielende anhalten und den Verlierer benennen ───────────
       gs._deferGameOverCheck = (gs._deferGameOverCheck || 0) + 1;
@@ -158,12 +159,12 @@ module.exports = {
         }
 
         // ── „The user is defeated afterwards." ────────────────────
-        const lebt = gs.players[pi]?.heroes?.[heroIdx];
+        const lebt = gs.players[heldSeite]?.heroes?.[heroIdx];   // Als Befund 29.9.: Brettseite des Wirkers
         if (lebt?.name && lebt.hp > 0) {
           // Der Nutzer geht in derselben Detonation unter — dieselbe
           // Explosion, nur auf SEINEM Platz.
           engine._broadcastEvent('play_zone_animation', {
-            type: 'last_resort_blast', owner: pi, heroIdx, zoneSlot: -1, duration: 1400,
+            type: 'last_resort_blast', owner: heldSeite, heroIdx, zoneSlot: -1, duration: 1400,   // Als Befund 29.9.: Brettseite des Wirkers
           });
           await engine._delay(260);
           await engine.actionDefeatHero(quelle, lebt, {

@@ -283,7 +283,7 @@ function beiHook(tracking, hookName, ctx, env = {}) {
     case 'onSurpriseActivated': {
       // Aufdecken zählt, auch wenn die Surprise danach negiert wird
       // (Als Ruling 24.9., Golden Ladybug).
-      const t = tracking[ctx.surpriseOwner];
+      const t = tracking[ctx.surpriseController ?? ctx.surpriseOwner];   // 29.9.: Ausloeser
       if (t) t.surprisesActivated = (t.surprisesActivated || 0) + 1;
       return;
     }

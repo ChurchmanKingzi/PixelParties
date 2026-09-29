@@ -38,7 +38,11 @@ module.exports = {
     if (!ps) return false;
 
     // Uniqueness: only one Intrude per player
-    if (engine) {
+    // Als Vorgabe 29.9.: „attached to your Heroes" = alle Helden, die
+    // der Spieler gerade kontrolliert (geliehene eingeschlossen).
+    if (engine?.kopienAnKontrolliertenHelden) {
+      if (engine.kopienAnKontrolliertenHelden(playerIdx, c => c.name === 'Intrude') > 0) return false;
+    } else if (engine) {
       if (engine.cardInstances.some(c =>
         (c.controller ?? c.owner) === playerIdx && c.zone === 'support' && c.name === 'Intrude'   // Kontrolle statt Seite (Styx 28.9.)
       )) return false;
@@ -81,7 +85,7 @@ module.exports = {
       // „Attach this Spell to the user / the Hero that uses it": NUR der
       // Caster-Held (kein anderer, auch wenn er keinen Platz hat).
       const res = await attachToHero(ctx, CARD_NAME, {
-        preferCaster: true, heroFilter: (h, hi) => hi === ctx.cardHeroIdx,
+        preferCaster: true, heroFilter: (h, hi, side) => hi === ctx.cardHeroIdx && side === (ctx.cardHeroOwner ?? ctx.cardOwner),   // Als Vorgabe 29.9.: Seite des Nutzers
         description: 'Choose a Hero you control to attach Intrude to.',
         confirmLabel: '🕵️ Attach!', animationType: 'gold_sparkle',
       });
@@ -89,7 +93,7 @@ module.exports = {
       const { host, inst } = res;
       const targetHero = host.heroIdx;
       engine.log('intrude_placed', {
-        player: ps.username, hero: ps.heroes[targetHero]?.name,
+        player: ps.username, hero: gs.players[host.owner]?.heroes?.[targetHero]?.name,
       });
 
       await engine.runHooks('onCardEnterZone', {

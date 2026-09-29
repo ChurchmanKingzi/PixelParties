@@ -63,7 +63,7 @@ module.exports = {
       // gs._spellCancelled / gs._spellNegatedByEffect as appropriate).
       if (!targets || targets.length === 0) return;
 
-      const source = { name: CARD_NAME, owner: pi, heroIdx: srcHeroIdx, controller: pi };
+      const source = { name: CARD_NAME, owner: pi, heroIdx: srcHeroIdx, controller: pi, heroOwner: ctx.cardHeroOwner ?? pi };   // Als Befund 29.9.: Brettseite des Angreifers
 
       // ── Cascade of big explosion animations on every target ──
       // Fire each `explosion` broadcast first (staggered so the booms

@@ -118,7 +118,7 @@ module.exports = {
       // Casting Hero's Support Magic level caps the revive count
       // (matches the card's "1/2/3" scaling), further capped at 3
       // and the available dead-Hero count.
-      const supportMagic = supportMagicLevelOfHero(engine, ps, heroIdx);
+      const supportMagic = supportMagicLevelOfHero(engine, gs.players[ctx.cardHeroOwner ?? pi] || ps, heroIdx);   // Als Befund 29.9.: Zonen des Wirkers auf seiner Brettseite
       const maxPicks = Math.min(supportMagic, 3, targets.length);
       // Main Phase = inherent-additional path (commit to 2+).
       // Action Phase = regular Action (1+).

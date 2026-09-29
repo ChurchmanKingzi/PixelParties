@@ -57,7 +57,7 @@ module.exports = {
         confirmClass: 'btn-danger',
         cancellable: true,
         // The attacking Hero can't rocket-punch itself.
-        condition: (t) => !(t.type === 'hero' && t.owner === pi && t.heroIdx === heroIdx),
+        condition: (t) => !(t.type === 'hero' && t.owner === (ctx.cardHeroOwner ?? pi) && t.heroIdx === heroIdx),   // Als Befund 29.9.: Brettseite des Angreifers
       });
       // Cancelled (promptDamageTarget already set _spellCancelled).
       if (!target) { gs._spellCancelled = true; return; }
@@ -81,7 +81,7 @@ module.exports = {
       // projectile + impact + damage. Listeners may mutate the
       // about-to-deal damage.
       const baseDamage = Math.max(0, hero.atk || 0);
-      const source = { name: CARD_NAME, owner: pi, heroIdx, controller: pi, usesHeroAtk: true };
+      const source = { name: CARD_NAME, owner: pi, heroIdx, controller: pi, heroOwner: ctx.cardHeroOwner ?? pi, usesHeroAtk: true };   // Als Befund 29.9.: Brettseite des Angreifers
       const damage = await engine._fireAttackDeclare(source, target, baseDamage);
 
       // ── Rocket Fist projectile ──

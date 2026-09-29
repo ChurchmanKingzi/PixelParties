@@ -57,8 +57,9 @@ const HOPT_KEY  = 'taio-mountains-heart-followup';
 module.exports = {
   activeIn: ['hero'],
 
-  async onAscensionBonus(engine, pi, heroIdx) {
-    await engine.performAscensionBonus(pi, heroIdx, ['Fighting', 'Destruction Magic']);
+  // Als Vorgabe 29.9.: `heroOwner` = Brettseite eines geliehenen Helden.
+  async onAscensionBonus(engine, pi, heroIdx, heroOwner) {
+    await engine.performAscensionBonus(pi, heroIdx, ['Fighting', 'Destruction Magic'], heroOwner);
   },
 
   hooks: {
@@ -67,12 +68,11 @@ module.exports = {
       if (!ctx.isMyTurn) return;
       if (ctx.casterIdx !== ctx.cardOwner) return;
       if (ctx.heroIdx !== ctx.cardHeroIdx) return;
-      // Styx 28.9.: Wirker = dieser Held (Brettseite + Index). Die
-      // Zusatzaktion laeuft ueber Engine-Helfer, die nur Helden der
-      // eigenen Spalte kennen — ein uebernommener Taio wirkte sonst ueber
-      // den gleich indizierten EIGENEN Helden. Bis dahin: kein Angebot.
+      // Styx 28.9.: Wirker = dieser Held (Brettseite + Index). Als Vorgabe
+      // 29.9.: ein uebernommener Taio wirkt den Nachguss auf seiner
+      // Brettseite (`feld`), Hand/Deck/Ablage beim Kontrolleur.
       if ((ctx.heroOwner ?? ctx.casterIdx) !== (ctx.cardHeroOwner ?? ctx.cardOwner)) return;
-      if ((ctx.cardHeroOwner ?? ctx.cardOwner) !== ctx.cardOwner) return;
+      const feld = ctx.cardHeroOwner ?? ctx.cardOwner;
 
       const spellData = ctx.spellCardData;
       if (!spellData) return;
@@ -95,7 +95,7 @@ module.exports = {
       // Build the candidate list — opposite type, from deck + hand,
       // playable by this Hero (level + school via heroMeetsLevelReq).
       const targetType = justCast === 'Attack' ? 'DMSpell' : 'Attack';
-      const candidates = _collectCandidates(engine, pi, heroIdx, targetType);
+      const candidates = _collectCandidates(engine, pi, heroIdx, targetType, feld);
       if (candidates.length === 0) return;
 
       const galleryCards = candidates.map(c => ({
@@ -126,7 +126,7 @@ module.exports = {
       // Claim HOPT NOW (the prompt was accepted).
       engine.claimHOPT(HOPT_KEY, pi);
 
-      await _castAsAdditionalAction(engine, pi, heroIdx, picked);
+      await _castAsAdditionalAction(engine, pi, heroIdx, picked, feld);
     },
   },
 };
@@ -166,7 +166,7 @@ function _matchesKind(cd, kind) {
  * each entry is `{ name, source: 'hand' | 'deck' }`. Filter by
  * `heroMeetsLevelReq` so the player doesn't see un-castable picks.
  */
-function _collectCandidates(engine, pi, heroIdx, kind) {
+function _collectCandidates(engine, pi, heroIdx, kind, feld = pi) {
   const ps = engine.gs.players[pi];
   if (!ps) return [];
   const cardDB = engine._getCardDB();
@@ -180,7 +180,7 @@ function _collectCandidates(engine, pi, heroIdx, kind) {
   // action limit), so we just intersect its hand-pool with the kind
   // filter. This is what fixes Flame Avalanche etc. from appearing
   // when their `spellPlayCondition` would refuse the cast.
-  const handEligible = engine.getHeroEligibleActionCards(pi, heroIdx) || [];
+  const handEligible = engine.getHeroEligibleActionCards(pi, heroIdx, feld) || [];
   for (const name of handEligible) {
     if (seen.has(name)) continue;
     const cd = cardDB[name];
@@ -202,12 +202,13 @@ function _collectCandidates(engine, pi, heroIdx, kind) {
     // Reaction subtype is not proactively castable unless opted in.
     if ((cd.subtype || '').toLowerCase() === 'reaction'
         && !script?.proactivePlay) continue;
-    if (!engine.heroMeetsLevelReq(pi, heroIdx, cd)) continue;
+    // Als Vorgabe 29.9.: Stufe am Helden (`feld`), Ermaessigungen beim Kontrolleur.
+    if (!engine.heroMeetsLevelReq(feld, heroIdx, cd, feld !== pi ? { levelSourcePi: pi } : {})) continue;
     if (cd.cardType === 'Spell') {
       // Wisdom-cost affordability. For a deck card the cast doesn't
       // remove a slot from hand the way a hand-played Spell does,
       // so the full hand counts toward paying the cost.
-      const wisdomCost = engine.getWisdomDiscardCost(pi, heroIdx, cd);
+      const wisdomCost = engine.getWisdomDiscardCost(feld, heroIdx, cd);
       if (wisdomCost > 0 && (ps.hand || []).length < wisdomCost) continue;
     }
     if (script?.oncePerGame) {
@@ -234,7 +235,7 @@ function _collectCandidates(engine, pi, heroIdx, kind) {
  * point. The synth-inst is untracked + the card pushed to discard
  * regardless of how onPlay terminates.
  */
-async function _castAsAdditionalAction(engine, pi, heroIdx, picked) {
+async function _castAsAdditionalAction(engine, pi, heroIdx, picked, feld = pi) {
   const gs = engine.gs;
   const ps = gs.players[pi];
   const cardDB = engine._getCardDB();
@@ -266,6 +267,10 @@ async function _castAsAdditionalAction(engine, pi, heroIdx, picked) {
   }
 
   const inst = engine._trackCard(cardName, pi, 'hand', heroIdx, -1);
+  if (feld !== pi) inst.heroOwner = feld;   // Als Vorgabe 29.9.: Wirker auf der Brettseite
+  // Wirker-Seite fuer Stufenabfragen (wie doPlaySpell).
+  const _wirkerVorher = gs._wirkerSeite;
+  gs._wirkerSeite = { pi, heroIdx, heroOwner: feld };
 
 
   gs._immediateActionContext = true;
@@ -294,7 +299,7 @@ async function _castAsAdditionalAction(engine, pi, heroIdx, picked) {
       }
       await engine.runHooks('afterSpellResolved', {
         spellName: cardName, spellCardData: cardData,
-        heroIdx, casterIdx: pi,
+        heroIdx, casterIdx: pi, heroOwner: feld,
         damageTargets: uniqueTargets,
         // Mark as second-cast so this card's own trigger ignores
         // it — belt-and-suspenders alongside the HOPT.
@@ -303,9 +308,10 @@ async function _castAsAdditionalAction(engine, pi, heroIdx, picked) {
       });
     }
     // v1364: „as an additional Action" — als ausgefuehrte Aktion melden.
-    if (!(gs._spellCancelled && !gs._spellNegatedByEffect)) await engine.meldeGussAlsAktion(pi, heroIdx, cardName);
+    if (!(gs._spellCancelled && !gs._spellNegatedByEffect)) await engine.meldeGussAlsAktion(pi, heroIdx, cardName, feld !== pi ? { heroOwner: feld } : {});
     delete gs._spellNegatedByEffect;
   } finally {
+    if (_wirkerVorher === undefined) delete gs._wirkerSeite; else gs._wirkerSeite = _wirkerVorher;
     // v1476: aeusseres Protokoll zurueck (auch bei Fehler/Abbruch).
     if (_aeussererLog === undefined) delete gs._spellDamageLog;
     else gs._spellDamageLog = _aeussererLog;
@@ -318,7 +324,7 @@ async function _castAsAdditionalAction(engine, pi, heroIdx, picked) {
   // liegt dann schon in der Ablage (kein Selbst-Abwurf), und ein Abbruch
   // kostet nichts.
   if (cardData.cardType === 'Spell' && !gs.result && !gs._spellCancelled) {
-    const wisdomCost = engine.getWisdomDiscardCost(pi, heroIdx, cardData);
+    const wisdomCost = engine.getWisdomDiscardCost(feld, heroIdx, cardData);
     if (wisdomCost > 0) {
       await engine.actionPromptForceDiscard(pi, wisdomCost, {
         title: 'Wisdom Cost', source: 'Wisdom', selfInflicted: true,

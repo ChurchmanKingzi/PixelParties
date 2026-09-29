@@ -911,7 +911,7 @@ function attachTrainingRecorder(engine, { pinnedIdx, pinnedName, opponentName, f
         }
       } else if (hookName === 'onSurpriseActivated') {
         // Face-down Surprises flipping face-up.
-        if (!engine._inMctsSim && hookCtx.surpriseOwner === pinnedIdx) {
+        if (!engine._inMctsSim && (hookCtx.surpriseController ?? hookCtx.surpriseOwner) === pinnedIdx) {   // 29.9.
           recordPlay(hookCtx.surpriseCardName);
         }
       } else if (hookName === 'onHeroKO') {
