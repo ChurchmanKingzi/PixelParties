@@ -7,12 +7,14 @@ Frame 0 ist immer das Originalbild.
 
 * madaga:   Madaga, the Forsaken Seafarer: die vier Tentakel winden sich (die oberen wogen mit einer
             nach außen laufenden Welle auf und ab, die unteren krümmen sich in der Mitte zum Körper
-            hin, Ansatz und Fußspitze bleiben); er blinzelt.
+            hin, Ansatz und Fußspitze bleiben); er blinzelt mit dem echten Auge (das andere ist ein
+            Glasauge).
 * logan:    Logan, the Investment Monkee: federt gemächlich, aus der Zigarre steigt eine sich
             kräuselnde Rauchfahne (nach oben verblassend), die Glut glimmt beim Ziehen auf; über die
-            Sonnenbrille huscht hin und wieder ein Glanzlicht, dann blitzt ein Stern auf.
+            Sonnenbrille huscht hin und wieder ein Glanzlicht, dann blitzt ein Stern auf; auch die
+            Goldkette und die goldenen Schuhe blitzen (Lichtstreif und Goldsterne).
 * trifecta / triad: Tri Fecta und Tri Ad wippen mit dem Kopf, die Schellen an den Mützenzipfeln
-            pendeln, sie blinzeln; an ihren Händen hängen kurze Puppenfäden, die hin- und herschwingen.
+            pendeln, sie blinzeln (auch das halb geschlossene Auge); an ihren Händen hängen kurze Puppenfäden, die hin- und herschwingen.
 * zamorin:  Zamorin, the Spice Rajah: federt, aus dem Glasgefäß in seiner Hand steigt Dampf in
             Schwaden auf, der Sack in der anderen Hand pendelt; er blinzelt.
 """
@@ -29,20 +31,21 @@ BLINK = {14: 'halb', 15: 'zu', 16: 'zu', 17: 'halb', 38: 'halb', 39: 'zu', 40: '
 
 V_ = {
     'madaga': dict(slug='madaga-the-forsaken-seafarer', pads=(2, 2, 3, 1),
-                   blink={'halb': [((x, 6), '000000') for x in (11, 12, 15, 16)],
-                          'zu': [((x, 6), 'ffd5a4') for x in (11, 12, 15, 16)] +
-                                [((x, 7), '000000') for x in (11, 12, 15, 16)]}),
-    'logan': dict(slug='logan-the-investment-monkee', knee=17, pads=(1, 3, 6, 1)),
+                   blink={'halb': [((x, 6), '000000') for x in (11, 12)],       # rechts (vom Betrachter)
+                          'zu': [((x, 6), 'ffd5a4') for x in (11, 12)] +           # das Glasauge – blinzelt nicht
+                                [((x, 7), '000000') for x in (11, 12)]}),
+    'logan': dict(slug='logan-the-investment-monkee', knee=17, pads=(1, 3, 6, 2)),
     'trifecta': dict(slug='tri-fecta-the-puppet-master', knee=15, pads=(2, 2, 2, 5),
                      tips=(2, 21), bells=(14, 17), hands=[(6, 21), (8, 21), (14, 20), (16, 20)],
-                     blink={'halb': [((13, 8), '000000'), ((14, 8), '000000')],
+                     blink={'halb': [((13, 8), '000000'), ((14, 8), '000000'), ((9, 9), 'c8b8b8')],
                             'zu': [((13, 7), '9f6161'), ((14, 7), '9f6161'), ((13, 8), '000000'),
-                                   ((14, 8), '000000'), ((14, 9), 'b18b8b')]}),
+                                   ((14, 8), '000000'), ((14, 9), 'b18b8b'), ((9, 9), 'b18b8b')]}),
     'triad': dict(slug='tri-ad-the-puppet-mistress', knee=15, pads=(2, 2, 2, 5),
                   tips=(3, 24), bells=(16, 19), hands=[(9, 20), (11, 20), (17, 21), (19, 21)],
-                  blink={'halb': [((11, 8), '000000'), ((12, 8), '000000')],
+                  blink={'halb': [((11, 8), '000000'), ((12, 8), '000000'), ((16, 9), 'c8b8b8')],
                          'zu': [((11, 7), 'd8936a'), ((12, 7), 'd8936a'), ((11, 8), '000000'),
-                                ((12, 8), '000000'), ((11, 9), 'b18b8b')]}),
+                                ((12, 8), '000000'), ((11, 9), 'b18b8b'),
+                                ((15, 7), 'd8936a'), ((16, 7), 'd8936a'), ((16, 9), 'b18b8b')]}),
     'zamorin': dict(slug='zamorin-the-spice-rajah', knee=21, pads=(5, 2, 12, 1),
                     blink={'halb': [((9, 6), '526475'), ((14, 6), '526475')],
                            'zu': [((9, 6), '5e84b0'), ((14, 6), '5e84b0')] +
@@ -154,6 +157,8 @@ def smoke(out, x0, y0, i, hmax=14, col=('efe8dc', 'd0c3af'), drift=0.12, amp=1.4
 
 
 LENS = {'000000', '393939', '3f3f3f', '5f5f5f'}
+GOLD = {'fad54a', 'f29a3e', 'f7f7ad', 'ee6428'}      # Goldkette und goldene Schuhe
+GOLD_STARS = [(8, 14, 6), (5, 20, 31), (10, 20, 35), (11, 12, 44)]
 
 
 def f_logan(i):
@@ -177,12 +182,26 @@ def f_logan(i):
                         s[y, x] = rgb('f4f4f4')
                     elif -2 < d < 0:
                         s[y, x] = rgb('8a8a8a')
+    # Goldglanz: ein Lichtstreif läuft schräg über Kette und Schuhe (Frames 27–34)
+    g = i - 27
+    if 0 <= g < 8:
+        for y, x in zip(*np.nonzero(op)):
+            if y >= 11 and x < 18 and hexc(SRC[y, x]) in GOLD:
+                d = (x - 0.6 * y) - (-12 + 3.2 * g)
+                if abs(d) < 0.9:
+                    s[y, x] = rgb('fffbe6')
+                elif -2.5 < d < 0:
+                    s[y, x] = rgb('fff29a')
     b = B24[i % 24]
     out = np.zeros((H, W, 4), int)
     draw_bounce(out, s, b, KNEE, PT, PL)
     for (x, y), c in sparkle_pixels(i, N, [(13 + PL, 7 + PT, 23), (5 + PL, 7 + PT, 42)],
                                     rgb('c8c8c8'), rgb('a0a0a0')).items():
         dot(out, x, y + b, c)
+    for gx, gy, st in GOLD_STARS:                       # Goldsterne auf Kette und Schuhen
+        gb = b if gy < KNEE else 0
+        for (x, y), c in sparkle_pixels(i, N, [(gx + PL, gy + PT, st)], rgb('fff0a0'), rgb('ffd54a')).items():
+            dot(out, x, y + gb, c)
     smoke(out, 19 + PL, 10 + PT + b, i)
     return out
 
