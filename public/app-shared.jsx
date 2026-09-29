@@ -2901,7 +2901,16 @@ const ZONE_ANIM_SFX = {
   null_zone_spiral:        { name: 'elem_dark' },
   rain_of_death:           { name: 'elem_dark' },
   mummy_wrap:              { name: 'elem_dark' },
-  necromancy_summon:       { name: 'elem_dark' },
+  // ★ Als Vorgabe 29.9.: die Necromancy-Animation braucht IMMER einen
+  // dunklen Klang. Der bisherige Einzeleintrag lief in der Kategorie
+  // 'effect' (400 ms Sperre) und wurde von jedem Klang davor verschluckt
+  // (Auftritts-Karte, Ability-Aktivierung, Undurdles Auftritt) — deshalb
+  // `category: null`. Tief und kraeftig; `dedupe` faengt die zwei
+  // Broadcasts von Necromancy (Held + Zielplatz) auf einen Klang ab.
+  necromancy_summon: [
+    { name: 'elem_dark', opts: { rate: 0.72, volume: 1.3, category: null, dedupe: 350 } },
+    { name: 'elem_dark', opts: { rate: 0.5,  volume: 0.7, delay: 260, category: null, dedupe: 350 } },
+  ],
   soul_shard_dark_grant:   { name: 'elem_dark' },
   soul_shard_inferno:      { name: 'elem_fire' },
   // ★ `explosion` war STUMM (Als Klangregel verletzt). Die Animation
@@ -3192,6 +3201,18 @@ function playSFXForZoneAnim(type, payload = {}) {
 
 window.playSFXForZoneAnim = playSFXForZoneAnim;
 
+// Etiketten, die einen ABBRUCH bedeuten (Cancel-Klang statt Klick-Klang).
+// Fuehrende Symbole („✕ ", „← ", „↩ ") werden ignoriert; ein reines
+// Schliess-Symbol („×", „✕", „✖", „x") zaehlt ebenfalls.
+function ppIstAbbruchEtikett(label) {
+  const t = String(label || '').trim().toLowerCase();
+  if (!t) return false;
+  if (['×', '✕', '✖', '✗', 'x'].includes(t)) return true;
+  const sauber = t.replace(/^[^\p{L}\p{N}]+/u, '');
+  return /^(cancel|close|back|abort|dismiss|never ?mind|abbrechen|schlie(ß|ss)en|zur(ü|u)ck|no)(?![\p{L}\p{N}])/u.test(sauber);
+}
+window.ppIstAbbruchEtikett = ppIstAbbruchEtikett;
+
 // ═══════════════════════════════════════════
 //  GLOBAL UI SFX LISTENERS
 //  Delegated listeners save us wiring hundreds of onClick handlers.
@@ -3214,18 +3235,25 @@ if (typeof document !== 'undefined') {
     if (btn.dataset && btn.dataset.sfx === 'none') return;
     // Cancel-style buttons get ui_cancel instead of ui_click.
     const label = (btn.textContent || '').trim().toLowerCase();
+    // ★ Als Befund 29.9. (Golden Apple: Abbrechen blieb ohne Cancel-Klang):
+    // die alte Pruefung verlangte das GANZE Etikett gleich „cancel" — „Cancel
+    // (Esc)", „✕ Cancel", „← Back", „✕ CANCEL" (fast alle Zielwahl- und
+    // Abfrage-Leisten) fielen durch und klangen wie ein normaler Klick.
+    // Jetzt zaehlt der ANFANG des Etiketts ohne fuehrende Symbole.
     const isCancel = btn.dataset?.sfx === 'cancel'
       || btn.classList.contains('btn-cancel')
       || btn.classList.contains('cancel-btn')
-      || ['cancel', 'close', 'back', '×', '✕', 'x'].includes(label);
+      || ppIstAbbruchEtikett(label);
     // ui_click uses its intrinsic (SFX_VOLUME_OVERRIDES) for a uniform level.
-    // ui_cancel keeps its explicit attenuation.
+    // ui_cancel: Pegel 1,0 (Als Befund 29.9.: bei 0,4 kam er mit dem globalen
+    // Daempfer 0,33 nur auf ~13 % heraus — leiser als der Klick). 1,0 = ~33 %,
+    // Hoehe von `placement`.
     // Caller-side dedupe values stay shorter than the global auto-
     // dedupe so explicit per-callsite tightening still works (e.g.
     // batch-draw chimes still pass their own 40-80ms window). The
     // auto-dedupe kicks in for any callsite that DOESN'T pass an
     // explicit `dedupe` (most of the cancel-handler call sites).
-    if (isCancel) playSFX('ui_cancel', { dedupe: 250, volume: 0.4 });
+    if (isCancel) playSFX('ui_cancel', { dedupe: 250, volume: 1.0 });
     else playSFX('ui_click', { dedupe: 60 });
   }, { capture: true });
 
@@ -3260,7 +3288,7 @@ if (typeof document !== 'undefined') {
   // Reihenfolge der Registrierung — und `app-shared` laedt als erstes.
   window.addEventListener('keydown', (e) => {
     if (e.key !== 'Escape' || e.repeat) return;
-    playSFX('ui_cancel', { dedupe: 250, volume: 0.4 });
+    playSFX('ui_cancel', { dedupe: 250, volume: 1.0 });
   }, true);
 
   // ── TIPPEN KLINGT (Als Vorgabe 17.8.) ─────────────────────────────

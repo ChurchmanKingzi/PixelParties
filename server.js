@@ -169,6 +169,22 @@ function getCardArray() {
 // der Engine, damit Brett und Abfrage dieselben Zeilen zeichnen.
 // Nur Plaetze mit MEHR als einer Kreatur landen hier; ohne Alice ist
 // die Karte leer und kostet nichts.
+/**
+ * Aura, die der Held einer Support Zone ueber seinen Kreaturen legt
+ * (`supportAura` im Heldenskript, z.B. 'necro_flicker' bei Sett) — nur
+ * solange er lebt und nicht negiert ist, nur fuer Kreaturen.
+ */
+function zoneAuraFuer(room, seite, inst) {
+  try {
+    const hero = room.gameState?.players?.[seite]?.heroes?.[inst.heroIdx];
+    if (!hero?.name || hero.hp <= 0 || hero.statuses?.negated) return null;
+    const aura = heroScriptOf(hero)?.supportAura;
+    if (!aura) return null;
+    const cd = room.engine.getEffectiveCardData?.(inst) || getCardDB()[inst.name];
+    return cd && String(cd.cardType || '').split('/').some(t => t.trim() === 'Creature') ? aura : null;
+  } catch { return null; }
+}
+
 function buildSupportStacks(room) {
   if (!room?.engine) return {};
   const alice = require('./cards/effects/_alice-shared');
@@ -4492,6 +4508,17 @@ function sendGameState(room, playerIdx, extra) {
       // the opponent shouldn't see which copies are reduced. Maps
       // hand-index → numeric offset (currently always negative).
       handLevelOffsets: pi === playerIdx ? { ...(ps._handLevelOffsets || {}) } : {},
+      // Applause Counter auf Handkarten (Fun-Fun Circus Elephant): der Besitzer
+      // sieht alle, der Gegner nur die der AUFGEDECKTEN Karten (Index → Zahl).
+      handApplause: (() => {
+        const map = ps._handApplause || {};
+        if (pi === playerIdx) return { ...map };
+        const sichtbar = {};
+        for (const k of Object.keys(map)) {
+          if (ps._permanentlyRevealedHandIndices?.[k] || ps._revealedHandIndices?.[k]) sichtbar[k] = map[k];
+        }
+        return sichtbar;
+      })(),
       // Transient sibling (Sparkfly Queen's "as if levels were reduced
       // by 3" rebate). Same hand-index keying; the offset evaporates
       // when the card leaves the hand.
@@ -4845,8 +4872,12 @@ function sendGameState(room, playerIdx, extra) {
         // die HP des Helden derselben Spalte — dafuer muss er wissen,
         // dass der Pool geteilt ist.
         const _teiltHp = !!loadCardEffect(inst.counters?._effectOverride || inst.name)?.sharesHpWithHero;
-        if (hasCounters || hasSummoningSickness || isFaceDown || isStolen || _teiltHp) {
+        // Dauer-Aura des Helden ueber seinen Support Zones (Sett: lila
+        // Todes-Flackern). Live abgeleitet: Held lebt und ist nicht negiert.
+        const _zoneAura = zoneAuraFuer(room, physicalSide, inst);
+        if (hasCounters || hasSummoningSickness || isFaceDown || isStolen || _teiltHp || _zoneAura) {
           cc[key] = { ...inst.counters };
+          if (_zoneAura) cc[key]._zoneAura = _zoneAura;
           if (_teiltHp) cc[key]._sharesHpWithHero = true;
           if (hasSummoningSickness) cc[key].summoningSickness = true;
           if (isFaceDown) cc[key].faceDown = true;
@@ -5409,6 +5440,7 @@ function sendSpectatorGameState(room) {
       neverPlayableCards: [],
       cardGateBlockedCards: [],
       handLevelOffsets: {},
+      handApplause: {},
       handLevelOffsetsTransient: {},
       handLevelOffsetHeroFilter: {},
       handLevelOffsetsDynamic: {},
@@ -5520,8 +5552,12 @@ function sendSpectatorGameState(room) {
         // die HP des Helden derselben Spalte — dafuer muss er wissen,
         // dass der Pool geteilt ist.
         const _teiltHp = !!loadCardEffect(inst.counters?._effectOverride || inst.name)?.sharesHpWithHero;
-        if (hasCounters || hasSummoningSickness || isFaceDown || isStolen || _teiltHp) {
+        // Dauer-Aura des Helden ueber seinen Support Zones (Sett: lila
+        // Todes-Flackern). Live abgeleitet: Held lebt und ist nicht negiert.
+        const _zoneAura = zoneAuraFuer(room, physicalSide, inst);
+        if (hasCounters || hasSummoningSickness || isFaceDown || isStolen || _teiltHp || _zoneAura) {
           cc[key] = { ...inst.counters };
+          if (_zoneAura) cc[key]._zoneAura = _zoneAura;
           if (_teiltHp) cc[key]._sharesHpWithHero = true;
           if (hasSummoningSickness) cc[key].summoningSickness = true;
           if (isFaceDown) cc[key].faceDown = true;
@@ -15182,6 +15218,10 @@ io.on('connection', (socket) => {
             // as the draw count.
             if (typeof cs.balance === 'number' && cs.balance > 0) {
               inst.counters.balance = cs.balance;
+            }
+            // Applause Counter (Fun-Fun Circus) — im Puzzle-Editor gesetzt.
+            if (typeof cs.applause === 'number' && cs.applause > 0) {
+              inst.counters.applause = cs.applause;
             }
             // Bunny Bombs — im Puzzle-Editor gesetzte Bomb Counter.
             // Landen auf `inst.counters.bunnyBombCounter`; das Kartenskript

@@ -1753,11 +1753,31 @@ const ZW_KNOPF_SEL = 'button, a, input, select, textarea, label';
 const ZW_KNOPF_RAND = 10;
 // ★ v1488: alles, was im Panel von sich aus Zeigerereignisse bekommt.
 const ZW_AKTIV_SEL = ZW_KNOPF_SEL + ', .panel-zielwahl-aktiv, .panel-zielwahl-griff';
+// ★ v1489: Was unter der Box „im Weg" sein kann — Zonen mit Karte, Karten
+// selbst (Stapel, Hand) und wählbare LEERE Zielzonen (Zonenwahl,
+// Beschwörungsplätze, Chain-Ziele), die sonst verdeckt blieben.
+const ZW_KARTE_SEL = '.zone-has-card, .board-card, [data-card-name], .zone-pick-target, '
+  + '.potion-target-valid, .board-zone-play-target, .chain-pick-valid';
+
+// ★ v1489: Liegt unter dem Zielwahl-Panel an (x, y) eine Karte? Geprüft
+// wird das oberste Element, das nicht zum Panel gehört — also genau das,
+// was ein Klick durch die durchsichtige Box treffen würde.
+function _ppKarteUnterPanel(panel, x, y) {
+  const liste = document.elementsFromPoint(x, y);
+  for (const e of liste) {
+    if (e === panel || panel.contains(e)) continue;
+    const k = e.closest ? e.closest(ZW_KARTE_SEL) : null;
+    return !!(k && !panel.contains(k));
+  }
+  return false;
+}
 
 function DraggablePanel({ children, className, style, zielwahl }) {
   const [pos, setPos] = useState({ x: 0, y: 0 });
   const [dragging, setDragging] = useState(false);
   const [autoPos, setAutoPos] = useState(null);
+  // ★ Zielwahl-Box erst zeigen, wenn ihre Lage STEHT (siehe Stabilisierung unten).
+  const [bereit, setBereit] = useState(!zielwahl);
   const offsetRef = useRef({ x: 0, y: 0 });
   const panelRef = useRef(null);
   const cleanupRef = useRef(null);
@@ -1769,12 +1789,12 @@ function DraggablePanel({ children, className, style, zielwahl }) {
   useLayoutEffect(() => {
     if (!zielwahl) return;
     let raf = 0;
-    const setze = () => {
-      raf = 0;
-      if (hasCustomPosRef.current) return;
+    // Messung der Zielwahl-Lage (rein, ohne State). Gibt `null`, wenn es
+    // (noch) keine mittleren Helden gibt.
+    const messen = () => {
       const el = panelRef.current;
       const m = _ppZielwahlMitte();
-      if (!el || !m) { setAutoPos(null); return; }
+      if (!el || !m) return null;
       const r = el.getBoundingClientRect();
       // Nicht die Panelmitte, sondern die Mitte des Anker-Elements
       // (`data-zielwahl-mitte`, die Textspalte) kommt über die Helden —
@@ -1787,11 +1807,69 @@ function DraggablePanel({ children, className, style, zielwahl }) {
       const rand = 4;
       const x = Math.max(r.width / 2 + rand, Math.min(window.innerWidth - r.width / 2 - rand, m.x - versatz));
       const y = Math.max(r.height / 2 + rand, Math.min(window.innerHeight - r.height / 2 - rand, m.y));
-      const luecke = Math.round(m.breite + 8);
-      setAutoPos(prev => (prev && Math.abs(prev.x - x) < 1 && Math.abs(prev.y - y) < 1 && prev.luecke === luecke) ? prev : { x: Math.round(x), y: Math.round(y), luecke });
+      // ★ v1490 (Als Nachfrage 29.9.: „Ist der Button/sind die Buttons in
+      // diesem Fall zufällig nicht mittig auf der x-Achse angeordnet? Falls
+      // dem so sein sollte, kannst du diese einfach umplatzieren."): Die
+      // Knöpfe flankieren den mittleren Helden. Bei nur 4 px Abstand je
+      // Seite ragte ihr deckender 10-px-Rand (`ZW_KNOPF_RAND`) 6 px über den
+      // Helden, dort blieb die Box über einer Karte deckend. Jetzt reicht
+      // die Lücke für Rand + 8 px je Seite; die 8 px decken auch die
+      // Hover-Vergrößerung des Helden (scale ≈ 1,15 → ≈ 5 px je Seite).
+      const luecke = Math.round(m.breite + 2 * (ZW_KNOPF_RAND + 8));
+      return { x: Math.round(x), y: Math.round(y), luecke };
+    };
+    const setze = () => {
+      raf = 0;
+      if (hasCustomPosRef.current) return;
+      const el = panelRef.current;
+      if (!el) return;
+      let pos = messen();
+      if (!pos) { setAutoPos(null); return; }
+      // ★ Als Befund 29.9. (Strongman-Zielwahl „blendet von links ein"): die
+      // erste Messung sieht die Box noch ohne ihre Knopf-Lücke
+      // (`--zielwahl-luecke`, erst NACH der Messung gesetzt) und liegt
+      // dadurch um ein Stück daneben; erst der ResizeObserver-Lauf ~100 ms
+      // später rückte sie zurecht — sichtbar als Rutsch. Deshalb hier bis zu
+      // dreimal nachmessen und die Werte SOFORT am Element setzen, bevor
+      // gezeichnet wird (React schreibt danach dieselben Zahlen).
+      for (let i = 0; i < 3; i++) {
+        el.style.left = pos.x + 'px';
+        el.style.top = pos.y + 'px';
+        el.style.setProperty('--zielwahl-luecke', pos.luecke + 'px');
+        const neu = messen();
+        if (!neu) break;
+        const gleich = Math.abs(neu.x - pos.x) < 1 && Math.abs(neu.y - pos.y) < 1 && neu.luecke === pos.luecke;
+        pos = neu;
+        if (gleich) break;
+      }
+      el.style.left = pos.x + 'px'; el.style.top = pos.y + 'px';
+      setAutoPos(prev => (prev && Math.abs(prev.x - pos.x) < 1 && Math.abs(prev.y - pos.y) < 1 && prev.luecke === pos.luecke) ? prev : { x: pos.x, y: pos.y, luecke: pos.luecke });
     };
     const plane = () => { if (!raf) raf = requestAnimationFrame(setze); };
     setze();
+    // ★ Als Befund 29.9. (Strongman-Zielwahl „blendet von links ein"): die
+    // Box aendert ihre Breite noch NACH der ersten Messung (Schrift/Inhalt
+    // setzen sich erst zum ersten Zeichnen) — sie erschien deshalb ein
+    // Stueck neben ihrem Platz und rutschte ~100 ms spaeter hin. Jetzt
+    // bleibt sie unsichtbar (`visibility`), waehrend jedes Bild neu gemessen
+    // wird; gezeigt wird sie erst, wenn Lage und Groesse drei Bilder in
+    // Folge unveraendert sind (Notausstieg nach 30 Bildern).
+    let stabilRaf = 0, sig = null, stabil = 0, bilder = 0, fertig = false;
+    const pruefeStabil = () => {
+      stabilRaf = 0;
+      if (fertig) return;
+      setze();
+      const el0 = panelRef.current;
+      if (el0) {
+        const q = el0.getBoundingClientRect();
+        const s2 = `${Math.round(q.left)}|${Math.round(q.top)}|${Math.round(q.width)}|${Math.round(q.height)}`;
+        if (s2 === sig) stabil++; else { stabil = 0; sig = s2; }
+      }
+      bilder++;
+      if (stabil >= 3 || bilder > 30 || hasCustomPosRef.current) { fertig = true; setBereit(true); return; }
+      stabilRaf = requestAnimationFrame(pruefeStabil);
+    };
+    stabilRaf = requestAnimationFrame(pruefeStabil);
     window.addEventListener('resize', plane);
     window.addEventListener('scroll', plane, true);
     const ro = (typeof ResizeObserver !== 'undefined' && panelRef.current) ? new ResizeObserver(plane) : null;
@@ -1803,6 +1881,8 @@ function DraggablePanel({ children, className, style, zielwahl }) {
       if (ro) ro.disconnect();
       clearInterval(takt);
       if (raf) cancelAnimationFrame(raf);
+      fertig = true;
+      if (stabilRaf) cancelAnimationFrame(stabilRaf);
     };
   }, [zielwahl]);
   // ★ v1477: Durchsicht, solange der Zeiger über dem Panelkörper steht.
@@ -1818,7 +1898,7 @@ function DraggablePanel({ children, className, style, zielwahl }) {
       // dedizierten Stellen außen links/rechts verschieben. Das soll immer
       // möglich sein, wenn die Box nicht transparent ist und man nicht
       // gerade über einem Button hovert."): Steht der Zeiger im deckenden
-      // Bereich (Rand um die Knöpfe, s. u.), aber nicht auf einem aktiven
+      // Bereich (★ v1489: überall ohne Karte darunter, s. u.), aber nicht auf einem aktiven
       // Element, setzt die Prüfung `data-greifbar` — CSS schaltet dann den
       // Zeiger für den ganzen Körper ein, ein Mausdruck dort startet über
       // `onDown` das Ziehen. Wird die Box durchsichtig, fällt das Attribut
@@ -1833,7 +1913,15 @@ function DraggablePanel({ children, className, style, zielwahl }) {
         // `closest` statt `el.contains` — mit `data-greifbar` bekommen
         // auch Text und Kästen des Panels Zeigerereignisse.
         const aktiv = letzt.ziel && letzt.ziel.closest ? letzt.ziel.closest(ZW_AKTIV_SEL) : null;
+        // ★ v1489 (Als Vorgabe 29.9.: „Sie soll exakt dann transparent
+        // werden, wenn unter ihr an der Stelle des Cursors eine Karte liegt
+        // und dort kein Button ist. Nur dann ist sie ja im Weg!"): Vorher
+        // wurde der ganze Körper durchsichtig. Jetzt nur, wenn
+        // `_ppKarteUnterPanel` unter dem Zeiger eine Karte (oder eine
+        // wählbare leere Zielzone, z. B. bei „Select a Zone") findet.
+        // Überall sonst im Körper bleibt die Box deckend und greifbar.
         an = drin && !(aktiv && el.contains(aktiv));
+        if (an) greifbar = true;
         // ★ v1484 (Als Vorgabe 29.9.: „Die Bereiche direkt um Buttons auf
         // dem Fenster herum sollten on-hover noch NICHT das Fenster
         // transparent machen. Wenn *nur* exakt die Buttons das Fenster
@@ -1850,9 +1938,11 @@ function DraggablePanel({ children, className, style, zielwahl }) {
             // begrenzt schon auf die Box). Seitlich bleibt es beim Rand:
             // die Lücke zwischen den Knöpfen liegt über dem mittleren Helden.
             if (kr.width && letzt.x >= kr.left - ZW_KNOPF_RAND && letzt.x <= kr.right + ZW_KNOPF_RAND
-              && letzt.y >= kr.top - ZW_KNOPF_RAND) { an = false; greifbar = true; break; }
+              && letzt.y >= kr.top - ZW_KNOPF_RAND) { an = false; break; }
           }
         }
+        if (an && !_ppKarteUnterPanel(el, letzt.x, letzt.y)) an = false;
+        if (an) greifbar = false;
       }
       if (el.hasAttribute('data-durchsicht') !== an) el.toggleAttribute('data-durchsicht', an);
       if (el.hasAttribute('data-greifbar') !== greifbar) el.toggleAttribute('data-greifbar', greifbar);
@@ -1917,7 +2007,7 @@ function DraggablePanel({ children, className, style, zielwahl }) {
     : (zielwahl && autoPos ? { left: autoPos.x, top: autoPos.y } : {});
   const lueckeStyle = (zielwahl && autoPos) ? { '--zielwahl-luecke': autoPos.luecke + 'px' } : {};
   return (
-    <div ref={panelRef} className={className + (zielwahl ? ' panel-zielwahl' : '')} style={{ ...style, ...lueckeStyle, ...posStyle, cursor: dragging ? 'grabbing' : 'grab' }}
+    <div ref={panelRef} className={className + (zielwahl ? ' panel-zielwahl' : '')} style={{ ...style, ...lueckeStyle, ...posStyle, ...(bereit ? null : { visibility: 'hidden' }), cursor: dragging ? 'grabbing' : 'grab' }}
       onMouseDown={onDown} onTouchStart={onDown} onClick={e => e.stopPropagation()}>
       {children}
       {zielwahl && <div className="panel-zielwahl-griff panel-zielwahl-griff-l" />}
@@ -3862,6 +3952,69 @@ function FuriousAngerEffect({ x, y, w = 80, h = 110 }) {
   );
 }
 
+
+// ── Applause Counter (Fun-Fun Circus, Als Vorgabe 29.9.) ────────────
+// Pixel-Icon zweier klatschender Haende mit der aktuellen Anzahl darauf,
+// unten mittig auf der Karte (auf dem Brett knapp UEBER der HP-Zahl, die
+// dort selbst unten mittig sitzt). Sprite als SVG-Daten-URI mit
+// `crispEdges`, gezeichnet mit `image-rendering: pixelated`.
+const PP_APPLAUSE_ICON = (() => {
+  const zeilen = [
+    '........MM........', '..M.....MM.....M..', '...M..KKKKKK..M...', '.....KSKKSSSK.....',
+    '....KSSKSSSSSK....', '...KSHHHSHHHHSK...', '...SHHHHSHHHHHS...', '..KSSSSSKSSSSSSK..',
+    '.KSSSSSSKSSSSSSSK.', '.KDSSSSSDDSSSSSDK.', '.KSSSSSDKKDSSSSSK.', 'KDSSSSDK..KDSSSSDK',
+    'KDDSSDK....KDSSDDK', 'KKDDDK......KDDDKK', '.KKKK........KKKK.',
+  ];
+  const FARBE = { K: '#1a0f08', S: '#ffd24a', H: '#fff2b0', D: '#e08a1e', M: '#ffffff' };
+  let rects = '';
+  zeilen.forEach((z, y) => [...z].forEach((c, x) => {
+    if (FARBE[c]) rects += `<rect x="${x}" y="${y}" width="1" height="1" fill="${FARBE[c]}"/>`;
+  }));
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="15" viewBox="0 0 18 15" shape-rendering="crispEdges">${rects}</svg>`;
+  return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+})();
+
+// Aufleuchten + Klang, wenn IRGENDEIN Applause Counter steigt (Als Vorgabe
+// 29.9.). Der Server sendet `applause_gain` mit dem Ziel; der Schluessel
+// `b:<Seite>:<Held>:<Platz>` (Brett) bzw. `h:<Seite>:<Handindex>` (Hand)
+// findet das Abzeichen. Der Stempel deckt beide Reihenfolgen ab: kommt das
+// Ereignis VOR dem Zustand (Abzeichen entsteht erst danach), leuchtet es
+// beim Einhaengen; kommt es danach, wird das vorhandene Abzeichen angestossen.
+window._ppApplauseGlow = window._ppApplauseGlow || {};
+function ppApplauseAufleuchten(el) {
+  if (!el || window._playAnimations === false) return;
+  el.classList.remove('applause-glow');
+  void el.offsetWidth;   // Animation neu starten
+  el.classList.add('applause-glow');
+}
+window.ppApplauseFlash = function (key) {
+  window._ppApplauseGlow[key] = Date.now();
+  if (window.playSFX) {
+    window.playSFX('ping', { rate: 1.7, volume: 1.2, dedupe: 90, category: null });
+    window.playSFX('slash', { rate: 2.4, volume: 0.45, dedupe: 90, category: null, delay: 25 });
+  }
+  document.querySelectorAll(`[data-applause-key="${key}"]`).forEach(ppApplauseAufleuchten);
+};
+
+function ApplauseBadge({ n, hand, akey }) {
+  const ref = React.useRef(null);
+  React.useEffect(() => {
+    // Beim Einhaengen bzw. bei jeder Aenderung: gerade erst gemeldet?
+    if (akey && Date.now() - (window._ppApplauseGlow[akey] || 0) < 1500) ppApplauseAufleuchten(ref.current);
+  }, [n, akey]);
+  if (!(n > 0)) return null;
+  return (
+    <div ref={ref} data-applause-key={akey || undefined}
+      className={'applause-badge' + (hand ? ' applause-badge-hand' : '')}
+      onMouseEnter={e => showGameTooltip(e, `Applause Counters: ${n}.`)}
+      onMouseLeave={hideGameTooltip}>
+      <img className="applause-icon" src={PP_APPLAUSE_ICON} alt="" draggable={false} />
+      <span className="applause-num">{n}</span>
+    </div>
+  );
+}
+window.ApplauseBadge = ApplauseBadge;
+
 // Seitenverhaeltnis der Kartenbilder (750 × 1050). Kopien von Brettkarten,
 // die eine Animation bewegt, nehmen die BREITE der Karte auf dem Brett
 // und diese Hoehe — das Bildschirm-Rechteck der gekippten Karte ist zu
@@ -3874,7 +4027,7 @@ const PP_KARTEN_FORMAT = 1.4;
 // `crispEdges`; CSS blaettert per `steps(5)` durch die Bilder und
 // skaliert mit `image-rendering: pixelated`. Dazu tanzt jede Flamme in
 // Pixelschritten (`ptFlammeTanz`) — sonst wirkten sie steif.
-const PP_PIXELFLAMME = (() => {
+const ppFlammenSprite = (FARBE) => {
   const bilder = [
     ['...R....', '...RR...', '..RRR...', '..RORR.R', '.RROORRR', '.ROOYOR.', 'RROYYOOR', 'ROOYWYOR', 'ROYWWYOR', 'ROYWWYOR', '.ROYYOR.', '..RRRR..'],
     ['....R...', '....RR..', '...RRR..', 'R..ROR..', 'RR.ROORR', '.RROOOR.', 'RROYYOR.', 'ROYYWOOR', 'ROYWWYOR', 'ROYWWYOR', '.ROYYOR.', '..RRRR..'],
@@ -3882,14 +4035,44 @@ const PP_PIXELFLAMME = (() => {
     ['.....R..', '.R...RR.', '.RR.RRR.', '.RRRROR.', 'RROOORR.', 'ROOYYORR', 'ROYYWYOR', 'ROYWWYOR', 'ROYWWYOR', 'ROYWWYOR', '.ROYYOR.', '..RRRR..'],
     ['........', '...R....', '..RR..R.', '..RORRR.', '.RROOOR.', '.ROOYOOR', 'RROYYYOR', 'ROYYWYOR', 'ROYWWYOR', 'ROYWWYOR', '.ROYYOR.', '..RRRR..'],
   ];
-  const FARBE = { R: '#b8200e', O: '#ff7a14', Y: '#ffd23a', W: '#fff3a8' };
   let rects = '';
   bilder.forEach((zeilen, b) => zeilen.forEach((z, y) => [...z].forEach((c, x) => {
     if (FARBE[c]) rects += `<rect x="${b * 8 + x}" y="${y}" width="1" height="1" fill="${FARBE[c]}"/>`;
   })));
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${bilder.length * 8}" height="12" viewBox="0 0 ${bilder.length * 8} 12" shape-rendering="crispEdges">${rects}</svg>`;
   return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
-})();
+};
+const PP_PIXELFLAMME = ppFlammenSprite({ R: '#b8200e', O: '#ff7a14', Y: '#ffd23a', W: '#fff3a8' });
+// Lila Totenflamme (Sett, the Adept of Necromancy): dieselben fuenf
+// Bilder, Palette dunkelviolett → violett → hellviolett → fast weiss.
+const PP_NECROFLAMME = ppFlammenSprite({ R: '#2b0b47', O: '#6b21b8', Y: '#a54ae8', W: '#e9c8ff' });
+
+// ── Totes Flackern (Sett, Als Vorgabe 29.9.) ────────────────────────
+// Dauer-Aura um jede Kreatur in Setts Support Zones, solange sein Effekt
+// live ist: lila Pixel-Flammen rundum am Kartenrand plus ein harter,
+// flackernder Pixelrahmen. Keyframes in style.css (Regel ④); der Server
+// setzt `cc._zoneAura = 'necro_flicker'` (`zoneAuraFuer`).
+function NecroFlickerAura() {
+  // [x %, y %, Pixelgroesse, Versatz ms] — links, rechts, unten, oben
+  const zungen = useMemo(() => [
+    // Nur Seiten und OBEN — unten bleibt frei (HP-Zahl u. a. Werte, Als Vorgabe 29.9.).
+    [-2, 22, 2, 0], [-2, 52, 2, 90], [102, 30, 2, 40], [102, 60, 2, 150],
+    [34, 2, 2, 130], [70, 2, 2, 70], [52, 2, 3, 20],
+  ].slice(0, ppFxN(7)), []);
+  return (
+    <div className="necro-aura">
+      {zungen.map(([x, y, g, d], i) => (
+        <i key={i} className="pt-pixelflamme necro-zunge" style={{
+          left: `calc(${x}% - ${4 * g}px)`, top: `calc(${y}% - ${12 * g}px)`,
+          width: 8 * g, height: 12 * g,
+          backgroundImage: `url("${PP_NECROFLAMME}")`,
+          animationDuration: `${210 + (i % 4) * 35}ms, ${260 + (i % 5) * 45}ms`,
+          animationDelay: `${-d}ms, ${-((i * 71) % 300)}ms`,
+        }} />
+      ))}
+    </div>
+  );
+}
 
 // ── Torchure: das Schwein frisst die Fackel (Als Vorgabe 26.9.) ─────
 // Kartenbild als Vorlage: ein Schwein frisst eine Fackel und foltert
@@ -10351,8 +10534,8 @@ const ANIM_REGISTRY = {
     return function TigerImpactEffect({ x, y }) {
       return (
         <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100,
-          display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <div style={{ fontSize: 64, animation: 'tigerFadeInOut 1.2s ease-in-out forwards', marginLeft: -32, marginTop: -32 }}>🐯</div>
+          display: 'flex', alignItems: 'center', justifyContent: 'center', width: 0, height: 0 }}>
+          <div style={{ fontSize: 64, animation: 'tigerFadeInOut 1.2s ease-in-out forwards' }}>🐯</div>
         </div>
       );
     };
@@ -10944,8 +11127,8 @@ const ANIM_REGISTRY = {
     return function OxImpactEffect({ x, y }) {
       return (
         <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100,
-          display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <div style={{ fontSize: 64, animation: 'tigerFadeInOut 1.2s ease-in-out forwards', marginLeft: -32, marginTop: -32 }}>𖤍</div>
+          display: 'flex', alignItems: 'center', justifyContent: 'center', width: 0, height: 0 }}>
+          <div style={{ fontSize: 64, animation: 'tigerFadeInOut 1.2s ease-in-out forwards' }}>𖤍</div>
         </div>
       );
     };
@@ -10954,8 +11137,8 @@ const ANIM_REGISTRY = {
     return function SnakeImpactEffect({ x, y }) {
       return (
         <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100,
-          display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <div style={{ fontSize: 64, animation: 'tigerFadeInOut 1.2s ease-in-out forwards', marginLeft: -32, marginTop: -32 }}>🐍</div>
+          display: 'flex', alignItems: 'center', justifyContent: 'center', width: 0, height: 0 }}>
+          <div style={{ fontSize: 64, animation: 'tigerFadeInOut 1.2s ease-in-out forwards' }}>🐍</div>
         </div>
       );
     };
@@ -16534,7 +16717,7 @@ const ANIM_REGISTRY = {
       })), []);
       return (
         <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
-          <div className="anim-flame-flash" style={{ width: 120, height: 60, marginLeft: -60, marginTop: -10, background: 'radial-gradient(ellipse, rgba(60,140,220,.7) 0%, rgba(40,100,180,.3) 50%, transparent 80%)' }} />
+          <div className="anim-flame-flash" style={{ top: -35, width: 120, height: 60, marginLeft: -60, marginTop: -10, background: 'radial-gradient(ellipse, rgba(60,140,220,.7) 0%, rgba(40,100,180,.3) 50%, transparent 80%)' }} />
           {ripples.map((r, i) => (
             <div key={'wr'+i} style={{
               position: 'absolute', left: -r.size/2, top: -8,
@@ -16792,8 +16975,8 @@ const ANIM_REGISTRY = {
     return function AngerMarkEffect({ x, y }) {
       return (
         <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100,
-          display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <div style={{ fontSize: 52, animation: 'tigerFadeInOut 1s ease-in-out forwards', marginLeft: -26, marginTop: -36 }}>💢</div>
+          display: 'flex', alignItems: 'center', justifyContent: 'center', width: 0, height: 0 }}>
+          <div style={{ fontSize: 52, animation: 'tigerFadeInOut 1s ease-in-out forwards' }}>💢</div>
         </div>
       );
     };
@@ -16804,10 +16987,9 @@ const ANIM_REGISTRY = {
     return function WeirdDollGrowEffect({ x, y }) {
       return (
         <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100,
-          display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          display: 'flex', alignItems: 'center', justifyContent: 'center', width: 0, height: 0 }}>
           <div style={{
             fontSize: 52,
-            marginLeft: -26, marginTop: -26,
             filter: 'drop-shadow(0 0 8px rgba(255,180,200,0.7))',
             animation: 'weirdDollGrow 700ms ease-out forwards',
           }}>🪆</div>
@@ -31152,6 +31334,11 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         playAnimation(type, sel, { duration: 1000, ...rest, ...(vonDaten || {}), ankerSel: sel, eigeneSeite: owner === myIdx });
       }, window.ZONE_ANIM_MOUNT_DELAY_MS ?? 100);
     };
+    // Applause Counter gestiegen: Klang + Abzeichen leuchtet kurz auf.
+    const onApplauseGain = ({ kind, owner, heroIdx, zoneSlot, handIdx }) => {
+      const key = kind === 'hand' ? `h:${owner}:${handIdx}` : `b:${owner}:${heroIdx}:${zoneSlot}`;
+      if (window.ppApplauseFlash) window.ppApplauseFlash(key);
+    };
     const onLevelChange = ({ delta, owner, heroIdx, zoneSlot }) => {
       const entry = { id: Date.now() + Math.random(), delta, owner, heroIdx, zoneSlot };
       setLevelChanges(prev => [...prev, entry]);
@@ -31952,6 +32139,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     };
     socket.on('nomu_draw', onNomuDraw);
     socket.on('level_change', onLevelChange);
+    socket.on('applause_gain', onApplauseGain);
     socket.on('ability_activated', onAbilityActivated);
     socket.on('play_beam_animation', onBeamAnimation);
     socket.on('play_tether_animation', onTetherAnimation);   // v1331
@@ -31960,7 +32148,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     // effect (Resistance, etc.). Same payload shape as ability_activated
     // — owner / heroIdx / zoneIdx pinpoint the slot.
     const onAbilityBlockFlash = ({ owner, heroIdx, zoneIdx }) => {
-      if (window.playSFX) window.playSFX('ui_cancel', { dedupe: 800, volume: 0.5 });
+      if (window.playSFX) window.playSFX('ui_cancel', { dedupe: 800, volume: 1.0 });
       setAbilityBlockFlash({ owner, heroIdx, zoneIdx });
       setTimeout(() => setAbilityBlockFlash(null), 1800);
     };
@@ -38854,7 +39042,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       socket.off('reaction_chain_link_negated', onChainLinkNegated); socket.off('reaction_chain_done', onChainDone);
       socket.off('camera_flash', onCameraFlash); socket.off('toughness_hp_change', onToughnessHp); socket.off('kiai_hp_split', onKiaiHpSplit); socket.off('creature_zone_move', onCreatureZoneMove); socket.off('fighting_atk_change', onFightingAtk); socket.off('zhu_skip_turn_animation', onZhuSkipTurn);
       socket.off('summon_effect', onSummon); socket.off('burn_tick', onBurnTick); socket.off('bleed_tick', onBleedTick);
-      socket.off('play_zone_animation', onZoneAnim); socket.off('level_change', onLevelChange);
+      socket.off('play_zone_animation', onZoneAnim); socket.off('level_change', onLevelChange); socket.off('applause_gain', onApplauseGain);
       socket.off('play_card_showcase', onCardShowcase);
       socket.off('deepsea_spores_activated', onDeepseaSporesActivated);
       socket.off('rain_of_spores_activated', onRainOfSporesActivated);
@@ -42984,7 +43172,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 || brackleSourceHidden.has(`${pi}-${i}-${z}`)
                 || pusherFlungHidden.has(`${pi}-${i}-${z}`);
               return (
-                <div key={z} className={'board-zone board-zone-support' + (cards.length > 0 ? ' zone-has-card' : '') + (isIsland ? ' board-zone-island' : '') + ((isPlayTarget || isAutoTarget) ? ' board-zone-play-target' : '') + (isValidEquipTarget ? ' potion-target-valid' : '') + (isValidEquipTarget && equipTargetIds.some(id => accentGreenTargetIds.has(id)) ? ' potion-target-accent-green' : '') + (isValidEquipTarget && pt?.config?.autoConfirm ? ' borrow-pick-target' : '') + (isIneligibleEquipTarget ? ' potion-target-ineligible' : '') + (isSelectedEquipTarget ? ' potion-target-selected' : '') + (isEquipExploding ? ' zone-exploding' : '') + (isSummonGlow ? ' zone-summon-glow' : '') + (equipTargetIds.some(id => oppTargetHighlight.includes(id)) ? ' opp-target-highlight' : '') + (isZonePickTarget ? ' zone-pick-target' : '') + (isAbilitySupportTarget ? ' board-zone-play-target' : '') + (supportAbilityEntry ? ' zone-ability-activatable' : '') + (abilityFlash && abilityFlash.zoneKind === 'support' && abilityFlash.owner === (isOpp ? oppIdx : myIdx) && abilityFlash.heroIdx === i && abilityFlash.zoneIdx === z ? ' zone-ability-activated' : '') + (istSupportAbility && (isDead || isFrozenOrStunnedSup) ? ' board-zone-dead' : '') + ((isDragValidZoneAny || isCsppEmptySlot) ? ' zone-drag-valid' : '') + (isDragInvalidZone ? (cards.length > 0 ? ' board-zone-dead' : ' zone-drag-invalid') : '') + ((isBouncePlaceTarget || isPendingBounceTarget) ? ' zone-bounce-place-target' : '') + (isProviderZone ? ' zone-provider-highlight' : '') + (isProviderSelectionActive && !isProviderZone ? ' zone-provider-dimmed' : '') + (isHeroActionZoneDimmed ? ' zone-drag-invalid' : '') + (isCreatureActivatable ? ' zone-creature-activatable' : '') + (isCreatureActivatable && istArtefaktKreatur ? ' zone-artifact-creature' : '') + (isEquipActivatable ? ' zone-equip-activatable' : '') + (isEquipActivatable && equipEffectEntry?.crossSide ? ' zone-equip-crossside' : '') + (isBakhmSurpriseActive ? ' surprise-drop-active' : isBakhmSurpriseTarget ? ' surprise-drop-eligible' : '') + (isSkatesCreature ? ' zone-skates-creature' : '') + (isSkatesCreatureSelected ? ' zone-skates-selected' : '') + (isSkatesDest ? ' zone-skates-dest' : '') + (isSlipperyCreature ? ' zone-slippery-creature' : '') + (isSlipperyCreatureSelected ? ' zone-slippery-selected' : '') + (isSlipperyDest ? ' zone-slippery-dest' : '') + (isSlipperySwap ? ' zone-slippery-dest' : '') + (isChainPickCreatureValid ? ' chain-pick-valid' : '') + (isChainPickCreatureSelected ? ' chain-pick-selected' : '') + (isStolen ? ' hero-charmed' : '')}
+                <div key={z} className={'board-zone board-zone-support' + (cards.length > 0 ? ' zone-has-card' : '') + ((gameState.creatureCounters || {})[`${pi}-${i}-${z}`]?._zoneAura === 'necro_flicker' ? ' board-zone-aura' : '') + (isIsland ? ' board-zone-island' : '') + ((isPlayTarget || isAutoTarget) ? ' board-zone-play-target' : '') + (isValidEquipTarget ? ' potion-target-valid' : '') + (isValidEquipTarget && equipTargetIds.some(id => accentGreenTargetIds.has(id)) ? ' potion-target-accent-green' : '') + (isValidEquipTarget && pt?.config?.autoConfirm ? ' borrow-pick-target' : '') + (isIneligibleEquipTarget ? ' potion-target-ineligible' : '') + (isSelectedEquipTarget ? ' potion-target-selected' : '') + (isEquipExploding ? ' zone-exploding' : '') + (isSummonGlow ? ' zone-summon-glow' : '') + (equipTargetIds.some(id => oppTargetHighlight.includes(id)) ? ' opp-target-highlight' : '') + (isZonePickTarget ? ' zone-pick-target' : '') + (isAbilitySupportTarget ? ' board-zone-play-target' : '') + (supportAbilityEntry ? ' zone-ability-activatable' : '') + (abilityFlash && abilityFlash.zoneKind === 'support' && abilityFlash.owner === (isOpp ? oppIdx : myIdx) && abilityFlash.heroIdx === i && abilityFlash.zoneIdx === z ? ' zone-ability-activated' : '') + (istSupportAbility && (isDead || isFrozenOrStunnedSup) ? ' board-zone-dead' : '') + ((isDragValidZoneAny || isCsppEmptySlot) ? ' zone-drag-valid' : '') + (isDragInvalidZone ? (cards.length > 0 ? ' board-zone-dead' : ' zone-drag-invalid') : '') + ((isBouncePlaceTarget || isPendingBounceTarget) ? ' zone-bounce-place-target' : '') + (isProviderZone ? ' zone-provider-highlight' : '') + (isProviderSelectionActive && !isProviderZone ? ' zone-provider-dimmed' : '') + (isHeroActionZoneDimmed ? ' zone-drag-invalid' : '') + (isCreatureActivatable ? ' zone-creature-activatable' : '') + (isCreatureActivatable && istArtefaktKreatur ? ' zone-artifact-creature' : '') + (isEquipActivatable ? ' zone-equip-activatable' : '') + (isEquipActivatable && equipEffectEntry?.crossSide ? ' zone-equip-crossside' : '') + (isBakhmSurpriseActive ? ' surprise-drop-active' : isBakhmSurpriseTarget ? ' surprise-drop-eligible' : '') + (isSkatesCreature ? ' zone-skates-creature' : '') + (isSkatesCreatureSelected ? ' zone-skates-selected' : '') + (isSkatesDest ? ' zone-skates-dest' : '') + (isSlipperyCreature ? ' zone-slippery-creature' : '') + (isSlipperyCreatureSelected ? ' zone-slippery-selected' : '') + (isSlipperyDest ? ' zone-slippery-dest' : '') + (isSlipperySwap ? ' zone-slippery-dest' : '') + (isChainPickCreatureValid ? ' chain-pick-valid' : '') + (isChainPickCreatureSelected ? ' chain-pick-selected' : '') + (isStolen ? ' hero-charmed' : '')}
                   data-support-zone="1" data-support-hero={i} data-support-slot={z} data-support-owner={ownerLabel} data-support-island={isIsland ? 'true' : 'false'} data-card-name={cards[0] || ''}
                   data-versiegelt={ppVerwahrung(gameState.players?.[pi], i, 'support', z).versiegelt ? '1' : undefined}
                   onClick={supportAbilityEntry ? () => {
@@ -43617,8 +43805,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                       onMouseLeave={hideGameTooltip}
                     >🌀</div> : null}
                     {cc?.burned ? <BurnedOverlay /> : null}
+                    {cc?.applause > 0 ? <ApplauseBadge n={cc.applause} akey={`b:${pi}:${i}:${z}`} /> : null}
                     {cc?.bleeding ? <BleedingOverlay /> : null}
                     {cc?.frozen ? <FrozenOverlay /> : null}
+                    {cc?._zoneAura === 'necro_flicker' ? <NecroFlickerAura /> : null}
                     {(cc?.negated || cc?.nulled) ? <NegatedOverlay /> : null}
                     {cc?.poisoned ? <PoisonedOverlay stacks={cc.poisonStacks || 1} /> : null}
                     {/* v1143: ohne Handliste, siehe Heldenreihe */}
@@ -43855,6 +44045,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                   ) : (
                     <img src={opp.cardback || "/cardback.png"} style={{ width: '100%', height: '100%', objectFit: 'cover' }} draggable={false} />
                   )}
+                  {revealEntry && (opp.handApplause?.[i] > 0) ? <ApplauseBadge n={opp.handApplause[i]} hand akey={`h:${myIdx === 0 ? 1 : 0}:${i}`} /> : null}
                 </div>
               );
             })}
@@ -44943,6 +45134,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                         </div>
                       );
                     })()}
+                    {(me.handApplause?.[item.origIdx] > 0) && <ApplauseBadge n={me.handApplause[item.origIdx]} hand akey={`h:${myIdx}:${item.origIdx}`} />}
                     {handEffectiveCost != null && (
                       <div className="hand-cost-override"
                         onMouseEnter={e => {
