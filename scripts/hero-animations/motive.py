@@ -2109,7 +2109,6 @@ DM_HEART_SMALL = [((0, 0), 'f75981'), ((2, 0), 'f75981'), ((0, 1), 'f75981'), ((
                   ((1, 2), 'dd4b76')]
 # Herzchen steigen neben ihr auf, unabhängig von ihrem Flug: (Start, x, y, Drift) im Bild
 DM_HEARTS = [(0, 33.0, 15.0, 0.1), (16, 5.0, 12.0, -0.1), (32, 34.0, 17.0, 0.08)]
-DM_HAIR = {'7c0629', 'ea638e', 'f67ba2', 'bf3961', 'aa244c', 'ce466f', 'dd4b76', 'f75981', 'f9a4b5', '421428'}
 DM_SING = 'oohooccohoocccoohhoocoohooc' [:24]               # o offen, h halb, c zu – sie singt
 DM_MOUTH = {'c': [], 'h': [((10, 12), '7c0629')], 'o': [((9, 12), '7c0629'), ((10, 12), '5a0a20')]}
 
@@ -2120,7 +2119,7 @@ def dm_fly(t):
 
 def f_molinda(i):
     """Sie fliegt auf und ab und hin und her, die Flügel schlagen kräftig (sie öffnen sich zu den Spitzen hin,
-    zeilentreu), die Haare wippen verzögert nach, die Brust wippt beim Fliegen leicht mit, sie singt, und
+    zeilentreu), die Locke oben wackelt, die Brust wippt beim Fliegen leicht mit, sie singt, Herzchen und
     dunkle Noten in Pink und Violett steigen auf."""
     wings, body = load('wings'), load('body')
     t = 2 * math.pi * i / N
@@ -2160,27 +2159,8 @@ def f_molinda(i):
                 else:                                   # nach oben: unten rückt die Zeile darunter nach
                     for k, y in enumerate(range(14, 18)):
                         src[y, x] = col[k + 1]
-    hx, _ = dm_fly(t - 0.7)
     curl = round(1.2 * math.sin(4 * t))                 # die Locke oben wackelt
-    tails = src.copy()
-    for y in range(2, 14):                              # Zöpfe: oben am Kopf fest, unten schleppen sie waagrecht nach
-        dx = round((hx - fx) * min(1.0, y / 12))
-        if not dx:
-            continue
-        for side, xs in ((-1, range(0, 5)), (1, range(SW - 1, SW - 6, -1))):
-            seg = [x for x in xs if src[y, x, 3] and hexc(src[y, x]) in DM_HAIR]
-            if not seg:
-                continue
-            fillc = next((src[y, x] for x in reversed(seg) if hexc(src[y, x]) not in ('7c0629', '421428')), src[y, seg[-1]])
-            for x in seg:
-                tails[y, x] = 0
-            for x in seg:
-                if 0 <= x + dx < SW:
-                    tails[y, x + dx] = src[y, x]
-            if dx * side > 0:                           # nach außen: innen rückt Haar nach, nie eine Lücke
-                for x in range(min(seg), max(seg) + 1):
-                    if not tails[y, x, 3]:
-                        tails[y, x] = fillc
+    tails = src
     for y, x in zip(*np.nonzero(tails[:, :, 3])):
         dx = (curl if y == 0 else round(curl / 2)) if y <= 1 else 0   # die Locke oben wackelt
         out[y + PT + fy, x + PL + fx + dx] = tails[y, x]
