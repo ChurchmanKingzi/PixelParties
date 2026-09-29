@@ -2037,7 +2037,9 @@ def f_kaito(i):
 
 # ---------------------------------------------------------------- Gon the Half-Frozen
 GH_ICE = {'8988cc', 'a3a2f2', 'b3b2ec', '9a99e5', 'c1c1e6', 'dfe0f6'}
-GH_ARMS = [((12, 15, 10, 14), -1), ((0, 3, 11, 14), 1)]  # wie beim normalen Gon: beide Arme hoch und runter
+# Fäuste (2x2 Inneres + Kontur): (Pixel, Richtung zum Körper, Farbe des Unterarms)
+GH_FISTS = [([(x, y) for y in (12, 13) for x in (12, 13, 14, 15)] + [(13, 11), (14, 11), (13, 14), (14, 14)], -1, '12090a'),
+            ([(x, y) for y in (12, 13) for x in (0, 1, 2, 3)] + [(1, 11), (2, 11), (1, 14), (2, 14)], 1, '8988cc')]
 GH_SNOW = GH_MIST = GH_FIRE = None
 
 
@@ -2050,11 +2052,19 @@ def halffrozen_base(i):
             s[y, x] = lighten(s[y, x], 0.6)
     b = B24[i % 24]
     out = bounce_frame(s, b)
-    lift = -round(2 * (0.5 - 0.5 * math.cos(2 * math.pi * i / N * 2)))
-    for (x0, x1, y0, y1), toward in GH_ARMS:
-        m = np.zeros((SH, SW), bool)
-        m[y0:y1 + 1, x0:x1 + 1] = SRC[y0:y1 + 1, x0:x1 + 1, 3] > 0
-        move_part(out, s, m, 0, lift, PL, PT + b, toward=toward)
+    k = round(2 * (0.5 - 0.5 * math.cos(2 * math.pi * i / N * 2)))   # wie Gon: beide Arme hoch und runter
+    for pts, inward, arm in GH_FISTS:                   # die Faust hebt sich und rückt zum Körper (Ellbogen bleibt eng)
+        if not k:
+            continue
+        dx = inward if k == 2 else 0
+        new = {(x + dx, y - k) for x, y in pts}
+        xs = sorted({x for x, _ in pts})
+        inner = xs[:2] if inward < 0 else xs[-2:]
+        for x, y in pts:                                # frei gewordene Stellen: innen der schmale Unterarm
+            if (x, y) not in new:
+                out[y + PT + b, x + PL] = rgb(arm) if (x + dx in inner and y >= 12) else 0
+        for x, y in pts:
+            out[y - k + PT + b, x + dx + PL] = s[y, x]
     return out
 
 
@@ -2105,7 +2115,6 @@ def f_molinda(i):
     wings, body = load('wings'), load('body')
     t = 2 * math.pi * i / N
     fx, fy = dm_fly(t)
-    _, hy = dm_fly(t - 0.7)                             # Haare hängen nach
     _, by = dm_fly(t - 0.45)                            # … die Brust ein wenig
     jig = max(-1, min(1, by - fy))
     for (x, y), c in DM_MOUTH[DM_SING[i % 24]]:
@@ -2127,9 +2136,15 @@ def f_molinda(i):
                 else:                                   # nach oben: unten rückt die Zeile darunter nach
                     for k, y in enumerate(range(14, 18)):
                         src[y, x] = col[k + 1]
+    hx, _ = dm_fly(t - 0.7)
+    curl = round(1.2 * math.sin(4 * t))                 # die Locke oben wackelt
     for y, x in zip(*np.nonzero(src[:, :, 3])):
-        hair = y <= 13 and (x <= 4 or x >= SW - 5) and hexc(body[y, x]) in DM_HAIR
-        out[y + PT + (hy if hair else fy), x + PL + fx] = src[y, x]
+        dx = 0
+        if y <= 13 and (x <= 4 or x >= SW - 5) and hexc(body[y, x]) in DM_HAIR:
+            dx = round((hx - fx) * min(1.0, y / 12))    # Zöpfe: oben am Kopf fest, unten schleppen sie nach
+        elif y <= 1:
+            dx = curl if y == 0 else round(curl / 2)
+        out[y + PT + fy, x + PL + fx + dx] = src[y, x]
     for k, (e, x0, y0, vx) in enumerate(DM_NOTES):
         a = (i - e) % N
         if a >= 12:
@@ -2316,9 +2331,13 @@ def f_alienbartas(i):
     d = AB_CLAP.get(i, 0)
     if d:
         for (x0, x1, y0, y1), side in ((AB_FIST_L, 1), (AB_FIST_R, -1)):
-            m = np.zeros((SH, SW), bool)
-            m[y0:y1 + 1, x0:x1 + 1] = SRC[y0:y1 + 1, x0:x1 + 1, 3] > 0
-            move_part(fig, s, m, side * d, 0, PL, PT + b, toward=-side)   # der Unterarm folgt von außen
+            for k, y in enumerate(range(y0, y1 + 1)):   # der Arm schert von der Schulter zur Faust
+                off = round(d * min(3, k + 1) / 3)
+                if not off:
+                    continue
+                m = np.zeros((SH, SW), bool)
+                m[y, x0:x1 + 1] = SRC[y, x0:x1 + 1, 3] > 0
+                move_part(fig, s, m, side * off, 0, PL, PT + b, toward=-side)
     m = fig[:, :, 3] > 0
     out[m] = fig[m]
     k = AB_IMPACT.get(i)
