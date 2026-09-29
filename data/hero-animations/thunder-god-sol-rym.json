@@ -1,0 +1,17 @@
+{
+  "hero": "Thunder God Sol Rym",
+  "sheet": "thunder-god-sol-rym.png",
+  "frameWidth": 83,
+  "frameHeight": 50,
+  "frames": 48,
+  "frameMs": 90,
+  "loop": true,
+  "layout": "horizontal",
+  "skinOf": "Sol Rym, the Thunder Djinn",
+  "padTop": 6,
+  "padLeft": 1,
+  "padRight": 1,
+  "padBottom": 8,
+  "faceX": 42.0,
+  "footY": 42
+}

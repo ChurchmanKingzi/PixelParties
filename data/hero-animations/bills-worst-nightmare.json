@@ -1,0 +1,16 @@
+{
+  "hero": "Bills Worst Nightmare",
+  "sheet": "bills-worst-nightmare.png",
+  "frameWidth": 21,
+  "frameHeight": 31,
+  "frames": 48,
+  "frameMs": 90,
+  "loop": true,
+  "layout": "horizontal",
+  "skinOf": "Bill, the Angry Auctioneer",
+  "padTop": 2,
+  "padLeft": 2,
+  "padRight": 1,
+  "padBottom": 1,
+  "faceX": 10.0
+}

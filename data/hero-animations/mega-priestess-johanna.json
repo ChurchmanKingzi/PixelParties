@@ -1,0 +1,16 @@
+{
+  "hero": "Mega-Priestess Johanna",
+  "sheet": "mega-priestess-johanna.png",
+  "frameWidth": 22,
+  "frameHeight": 32,
+  "frames": 48,
+  "frameMs": 90,
+  "loop": true,
+  "layout": "horizontal",
+  "skinOf": "Johanna, Crusader of Light",
+  "padTop": 2,
+  "padLeft": 1,
+  "padRight": 1,
+  "padBottom": 1,
+  "faceX": 11.0
+}

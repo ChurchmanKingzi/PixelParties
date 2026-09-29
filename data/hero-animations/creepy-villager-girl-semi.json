@@ -1,0 +1,17 @@
+{
+  "hero": "Creepy Villager Girl Semi",
+  "sheet": "creepy-villager-girl-semi.png",
+  "frameWidth": 28,
+  "frameHeight": 29,
+  "frames": 48,
+  "frameMs": 90,
+  "loop": true,
+  "layout": "horizontal",
+  "skinOf": "Treasure Huntress Semi",
+  "padTop": 3,
+  "padLeft": 1,
+  "padRight": 1,
+  "padBottom": 3,
+  "faceX": 14.0,
+  "footY": 26
+}

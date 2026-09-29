@@ -1,0 +1,16 @@
+{
+  "hero": "RhaBi the Human Hunter",
+  "sheet": "rhabi-the-human-hunter.png",
+  "frameWidth": 65,
+  "frameHeight": 32,
+  "frames": 48,
+  "frameMs": 90,
+  "loop": true,
+  "layout": "horizontal",
+  "skinOf": "RhaBi the Living Skeleton",
+  "padTop": 4,
+  "padLeft": 5,
+  "padRight": 6,
+  "padBottom": 1,
+  "faceX": 32.0
+}
