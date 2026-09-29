@@ -60,23 +60,52 @@ function andereGrundfee(gs, pi, heroIdx) {
   return -1;
 }
 
-/** Die gedruckte Bedingung von Tempeluna, an EINER Stelle. */
-function tempelunaBedingung(gs, pi, heroIdx) {
-  const hero = gs?.players?.[pi]?.heroes?.[heroIdx];
+/**
+ * Als Vorgabe 29.9.: die ANDERE Grundfee „you control" als `{ seite, idx }`.
+ * Steht der Aufsteiger in der eigenen Spalte (`feld === pi`), unveraendert
+ * `andereGrundfee` in dieser Spalte. Ist er GELIEHEN (Spalte `feld` des
+ * Gegners, Kontrolleur `pi`), zaehlt jeder Held, den `pi` kontrolliert —
+ * eigene Spalte wie weitere geliehene.
+ */
+function andereGrundfeeVon(engine, pi, heroIdx, feld = pi) {
+  const gs = engine?.gs;
+  if (feld === pi) {
+    const idx = andereGrundfee(gs, pi, heroIdx);
+    return idx >= 0 ? { seite: pi, idx } : null;
+  }
+  const hier = gs?.players?.[feld]?.heroes?.[heroIdx]?.name;
+  const gesucht = (hier === LUNA) ? TEMPESTE : (hier === TEMPESTE ? LUNA : null);
+  if (!gesucht || typeof engine?.heroesControlledBy !== 'function') return null;
+  for (const { physOwner, heroIdx: hi, hero } of engine.heroesControlledBy(pi)) {
+    if (physOwner === feld && hi === heroIdx) continue;
+    if (hero?.name === gesucht) return { seite: physOwner, idx: hi };   // hp bewusst NICHT geprueft
+  }
+  return null;
+}
+
+/**
+ * Die gedruckte Bedingung von Tempeluna, an EINER Stelle.
+ * Als Vorgabe 29.9.: `feld` = Brettseite des Aufsteigers (geliehen ≠ `pi`);
+ * dafuer braucht es `engine` (Kontrolle). Ohne beide wie bisher.
+ */
+function tempelunaBedingung(gs, pi, heroIdx, engine, feld = pi) {
+  const hero = gs?.players?.[feld]?.heroes?.[heroIdx];
   if (!hero?.name) return false;
   if (!GRUNDFEEN.includes(hero.name)) return false;
   if (hero.hp <= 0) return false;                     // der Aufsteiger muss leben
-  return andereGrundfee(gs, pi, heroIdx) >= 0;
+  if (feld === pi) return andereGrundfee(gs, pi, heroIdx) >= 0;
+  return !!andereGrundfeeVon(engine, pi, heroIdx, feld);
 }
 
 /**
  * Bereitschaftsfelder am Basis-Helden pflegen. Muster wie
  * `checkMoniaAscension` in `_monia-shared.js`.
+ * Als Vorgabe 29.9.: `pi` = Spalte, `kontrolleur` = wer den Helden fuehrt.
  */
-function checkTempelunaAscension(engine, pi, heroIdx) {
+function checkTempelunaAscension(engine, pi, heroIdx, kontrolleur) {
   const hero = engine?.gs?.players?.[pi]?.heroes?.[heroIdx];
   if (!hero?.name) return;
-  if (tempelunaBedingung(engine.gs, pi, heroIdx)) {
+  if (tempelunaBedingung(engine.gs, kontrolleur ?? pi, heroIdx, engine, pi)) {
     if (hero.ascensionReady && (hero.ascensionTargets || []).includes(TEMPELUNA)) return;
     hero.ascensionReady = true;
     hero.ascensionTarget = TEMPELUNA;
@@ -92,5 +121,5 @@ function checkTempelunaAscension(engine, pi, heroIdx) {
 
 module.exports = {
   TEMPELUNA, LUNA, TEMPESTE, GRUNDFEEN,
-  istFeenHeld, andereGrundfee, tempelunaBedingung, checkTempelunaAscension,
+  istFeenHeld, andereGrundfee, andereGrundfeeVon, tempelunaBedingung, checkTempelunaAscension,
 };

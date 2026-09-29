@@ -144,8 +144,9 @@ module.exports = {
    * gueltiges Ziel. `_shapeshiftBase` ist dabei die zweite Probe: es
    * ist genau dann gesetzt, wenn eine Gestalt aktiv ist.
    */
-  ascensionCondition(gs, pi, heroIdx, _engine) {
-    const hero = gs.players[pi]?.heroes?.[heroIdx];
+  // Als Vorgabe 29.9.: `heroOwner` = Brettseite eines geliehenen Helden.
+  ascensionCondition(gs, pi, heroIdx, _engine, heroOwner) {
+    const hero = gs.players[heroOwner ?? pi]?.heroes?.[heroIdx];
     if (!hero?.name || hero.hp <= 0) return false;
     if (hero.name !== BASIS_FORM) return false;
     if (hero._shapeshiftBase) return false;

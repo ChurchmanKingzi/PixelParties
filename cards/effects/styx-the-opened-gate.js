@@ -17,7 +17,9 @@
 //  • Zwei Riegel (CARD_API ①): `ascensionCondition` hier, die Anzeige
 //    `refreshAscensionReadiness` am Basis-Styx.
 //  • Nur auf den EIGENEN Styx (Als Ruling 28.9.) — das erzwingt
-//    `performAscension` ohnehin (Held aus `players[pi]`).
+//    `performAscension` ohnehin (Held aus `players[pi]`). Als Vorgabe
+//    29.9.: ein GELIEHENER Styx (kontrolliert, Spalte `heroOwner`) zaehlt
+//    als eigener.
 //  • „cannot be negated or substituted": `ascensionConditionUnskippable`.
 //
 //  ── STATS ────────────────────────────────────────────────────────
@@ -96,8 +98,8 @@ module.exports = {
   // Wert erst nach dem Zugende beurteilen (wie Golden Ankh).
   cpuMeta: { evaluateThroughTurnEnd: true },
 
-  ascensionCondition(gs, pi, heroIdx) {
-    const hero = gs?.players?.[pi]?.heroes?.[heroIdx];
+  ascensionCondition(gs, pi, heroIdx, _engine, heroOwner) {
+    const hero = gs?.players?.[heroOwner ?? pi]?.heroes?.[heroIdx];   // Als Vorgabe 29.9.: Brettseite
     if (!hero || hero.name !== BASIS || !(hero.hp > 0)) return false;
     return (gs.heroRevivalCount || 0) >= NOETIGE_WIEDERBELEBUNGEN;
   },

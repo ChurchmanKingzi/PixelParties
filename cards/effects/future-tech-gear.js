@@ -82,6 +82,13 @@ module.exports = {
    * bleibt der alte Namensscan als Rückfall.
    */
   canEquipToHero(gs, playerIdx, heroIdx, engine) {
+    // Als Vorgabe 29.9.: gezaehlt ueber alle Helden, die der Ausruester
+    // kontrolliert (geliehene eingeschlossen; `playerIdx` = Spalte des
+    // Zielhelden). Nur Anlege-Sperre — Leihen erzwingt keinen Abwurf.
+    if (engine?.kopienAnKontrolliertenHelden) {
+      const ich = heroIdx != null ? engine.kontrolleurVonHeld(playerIdx, heroIdx) : playerIdx;
+      return engine.kopienAnKontrolliertenHelden(ich, istGear) === 0;
+    }
     if (engine) return gearsImFeld(engine, playerIdx).length === 0;
     const zonen = gs.players[playerIdx]?.supportZones || [];
     for (const heldZonen of zonen) {

@@ -52,12 +52,13 @@ module.exports = {
   // Rein schaedlich fuer den Gegner — unter dem Spielstart-Schutz gesperrt.
   heroEffectHarmfulOnly: true,
 
-  ascensionCondition(gs, pi, heroIdx, engine) {
-    return molindaAscensionMet(engine, pi, heroIdx, null);
+  // Als Vorgabe 29.9.: `heroOwner` = Brettseite eines geliehenen Helden.
+  ascensionCondition(gs, pi, heroIdx, engine, heroOwner) {
+    return molindaAscensionMet(engine, heroOwner ?? pi, heroIdx, null);
   },
 
-  async onAscensionBonus(engine, pi, heroIdx) {
-    await engine.performAscensionBonus(pi, heroIdx, ['Charme']);
+  async onAscensionBonus(engine, pi, heroIdx, heroOwner) {
+    await engine.performAscensionBonus(pi, heroIdx, ['Charme'], heroOwner);
   },
 
   canActivateHeroEffect(ctx) {

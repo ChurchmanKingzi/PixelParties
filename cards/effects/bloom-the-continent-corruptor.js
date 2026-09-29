@@ -60,15 +60,18 @@ module.exports = {
    * Situation vorliegt, die der KO-Hook gestempelt hat: die Grundform
    * ist am Gift einer Paraseed gefallen.
    */
-  ascensionCondition(gs, pi, heroIdx, engine) {
-    const hero = gs.players[pi]?.heroes?.[heroIdx];
+  // Als Vorgabe 29.9.: `heroOwner` = Brettseite eines geliehenen Bloom;
+  // der Stempel haengt an der Spalte des Helden.
+  ascensionCondition(gs, pi, heroIdx, engine, heroOwner) {
+    const hs = heroOwner ?? pi;
+    const hero = gs.players[hs]?.heroes?.[heroIdx];
     if (!hero?.name || hero.name !== BLOOM) return false;
-    return gs._bloomAscendReady?.[stempelKey(pi, heroIdx)] === gs.turn;
+    return gs._bloomAscendReady?.[stempelKey(hs, heroIdx)] === gs.turn;
   },
 
   /** „its current and max HP become 500\" */
-  async onAscensionBonus(engine, pi, heroIdx) {
-    const hero = engine.gs.players[pi]?.heroes?.[heroIdx];
+  async onAscensionBonus(engine, pi, heroIdx, heroOwner) {
+    const hero = engine.gs.players[heroOwner ?? pi]?.heroes?.[heroIdx];   // Als Vorgabe 29.9.: Brettseite
     if (!hero) return;
     // Als Ruling 28.9.: der Aufstieg aus dem Tod heraus ZAEHLT als
     // Wiederbelebung (Styx, the Opened Gate). Die Todesmarken stehen
@@ -103,11 +106,9 @@ module.exports = {
         if (hi >= 0) { owner = p; heroIdx = hi; }
       }
       if (heroIdx < 0) return;
-      // `performAscension` arbeitet auf der SPALTE des Spielers: die
-      // Karte kommt aus meiner Hand, der Held muss also auch in meiner
-      // Spalte stehen. Ein per Paraseed Control uebernommener fremder
-      // Bloom steigt darueber nicht auf — bewusste Grenze, kein Bug.
-      if (owner !== pi) return;
+      // Als Vorgabe 29.9.: ein GELIEHENER Bloom (steht in der Spalte des
+      // Gegners, ich kontrolliere ihn) steigt ebenfalls auf — Karte aus
+      // meiner Hand, Held auf seiner Brettseite (`opts.heroOwner`).
       if (engine.heroSideOf(owner, gefallen) !== pi) return;
 
       // „defeated by the Poison of a 'Paraseed'\" — Giftschaden UND
@@ -124,7 +125,8 @@ module.exports = {
       gs._bloomAscendReady[stempelKey(owner, heroIdx)] = gs.turn;
       try {
         await engine.showTriggeredEffect(CARD_NAME);
-        await engine.performAscension(pi, heroIdx, CARD_NAME, handIdx);
+        await engine.performAscension(pi, heroIdx, CARD_NAME, handIdx,
+          owner !== pi ? { heroOwner: owner } : {});
       } finally {
         delete gs._bloomAscendReady[stempelKey(owner, heroIdx)];
       }

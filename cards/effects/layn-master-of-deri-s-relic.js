@@ -109,8 +109,9 @@ module.exports = {
   activeIn: ['hero'],
   heroEffect: true,
 
-  async onAscensionBonus(engine, pi, heroIdx) {
-    await engine.performAscensionBonus(pi, heroIdx, ['Fighting']);
+  // Als Vorgabe 29.9.: `heroOwner` = Brettseite eines geliehenen Helden.
+  async onAscensionBonus(engine, pi, heroIdx, heroOwner) {
+    await engine.performAscensionBonus(pi, heroIdx, ['Fighting'], heroOwner);
   },
 
   canActivateHeroEffect(ctx) {

@@ -60,8 +60,9 @@ module.exports = {
   // aktionsfrei).
   heroEffectActionCost: true,
 
-  ascensionCondition(gs, pi, heroIdx, engine) {
-    return kohtaAscensionMet(engine, pi, heroIdx, null);
+  // Als Vorgabe 29.9.: `heroOwner` = Brettseite eines geliehenen Helden.
+  ascensionCondition(gs, pi, heroIdx, engine, heroOwner) {
+    return kohtaAscensionMet(engine, heroOwner ?? pi, heroIdx, null);
   },
 
   /**
@@ -70,8 +71,8 @@ module.exports = {
    * duerfen sie direkt angelegt werden, auch weniger Kopien). Gleiche
    * Bauform wie bei Riffel — der Helfer der Engine macht die Arbeit.
    */
-  async onAscensionBonus(engine, pi, heroIdx) {
-    await engine.performAscensionBonus(pi, heroIdx, ['Fighting']);
+  async onAscensionBonus(engine, pi, heroIdx, heroOwner) {
+    await engine.performAscensionBonus(pi, heroIdx, ['Fighting'], heroOwner);
   },
 
   /**

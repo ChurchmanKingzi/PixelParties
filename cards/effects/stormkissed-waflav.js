@@ -74,7 +74,7 @@ module.exports = {
     const discarded = await W.discardFromHand(engine, pi, CARD_NAME, ctx.handIndex, CARD_NAME);
     if (!discarded) return false;
 
-    W.addEvo(engine, pi, sel.heroIdx, 1, CARD_NAME);
+    W.addEvo(engine, sel.owner ?? pi, sel.heroIdx, 1, CARD_NAME);   // Als Vorgabe 29.9.: Brettseite
     engine.sync();
     return true;
   },
@@ -93,8 +93,8 @@ module.exports = {
     if (targets.length === 0) return false;
     // Steht bereits genug fuer einen Aufstieg bereit? Dann lieber den.
     for (const t of targets) {
-      const h = engine.gs.players[pi]?.heroes?.[t.heroIdx];
-      if (W.affordableForms(engine, pi, t.heroIdx).length > 0
+      const h = engine.gs.players[t.owner]?.heroes?.[t.heroIdx];
+      if (W.affordableForms(engine, t.owner, t.heroIdx).length > 0
           && (engine.gs.players[pi]?.hand || []).some(n => W.FORMS[n]
               && W.FORMS[n].cost <= W.getEvo(h))) {
         return false;
@@ -148,8 +148,9 @@ module.exports = {
    * Die Counter zuerst — sie sind bedingungslos, der Tutor kann an einer
    * Handsperre oder einem leeren Deck scheitern.
    */
-  async onAscensionBonus(engine, pi, heroIdx) {
-    W.addEvo(engine, pi, heroIdx, 2, CARD_NAME);
+  async onAscensionBonus(engine, pi, heroIdx, heroOwner) {
+    // Als Vorgabe 29.9.: Counter auf DIESEN Helden (Brettseite), Tutor fuer `pi`.
+    W.addEvo(engine, heroOwner ?? pi, heroIdx, 2, CARD_NAME);
     engine.sync();
     await W.tutorAscendedHeroes(engine, pi, CARD_NAME, { from: 'deck', max: 1 });
   },
@@ -238,7 +239,7 @@ module.exports = {
       try {
         const targets = W.waflavHeroTargets(engine, pi);
         if (targets.length === 0) return false;
-        return targets.every(t => W.getEvo(engine.gs.players[pi]?.heroes?.[t.heroIdx]) === 0);
+        return targets.every(t => W.getEvo(engine.gs.players[t.owner]?.heroes?.[t.heroIdx]) === 0);
       } catch { return false; }
     },
   },

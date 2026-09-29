@@ -64,16 +64,17 @@ module.exports = {
    * once this game". Die Engine prueft zusaetzlich selbst, dass der
    * Held lebt und die Karte wirklich in der Hand liegt.
    */
-  ascensionCondition(gs, pi, heroIdx, engine) {
-    const hero = gs?.players?.[pi]?.heroes?.[heroIdx];
+  // Als Vorgabe 29.9.: `heroOwner` = Brettseite eines geliehenen Helden.
+  ascensionCondition(gs, pi, heroIdx, engine, heroOwner) {
+    const hero = gs?.players?.[heroOwner ?? pi]?.heroes?.[heroIdx];
     if (!hero || hero.name !== BASIS) return false;
     return !!hero._ceciliaDefeatedOnce;
   },
 
   /** „Charme 3" — bis zu drei Charme an die frisch aufgestiegene Form. */
-  async onAscensionBonus(engine, pi, heroIdx) {
-    await engine.performAscensionBonus(pi, heroIdx, [BONUS_ABILITY]);
-    sicherstellenExtraLeben(engine.gs?.players?.[pi]?.heroes?.[heroIdx]);
+  async onAscensionBonus(engine, pi, heroIdx, heroOwner) {
+    await engine.performAscensionBonus(pi, heroIdx, [BONUS_ABILITY], heroOwner);
+    sicherstellenExtraLeben(engine.gs?.players?.[heroOwner ?? pi]?.heroes?.[heroIdx]);
   },
 
   hooks: {

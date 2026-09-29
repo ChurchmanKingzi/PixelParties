@@ -82,17 +82,19 @@ module.exports = {
   formsAscensionStack: true,
 
   /** performAscension-Gate: Basis muss Tri Fecta sein, HOPT frei. */
-  ascensionCondition(gs, pi, heroIdx) {
-    return gs.players[pi]?.heroes?.[heroIdx]?.name === TRI_FECTA && triAdHoptFree(gs, pi);
+  // Als Vorgabe 29.9.: Held auf der Brettseite `heroOwner`, HOPT des Kontrolleurs `pi`.
+  ascensionCondition(gs, pi, heroIdx, _engine, heroOwner) {
+    return gs.players[heroOwner ?? pi]?.heroes?.[heroIdx]?.name === TRI_FECTA && triAdHoptFree(gs, pi);
   },
 
   /** Nach dem Auflegen (performAscension, plainForm): HOPT + Token-Tausch. */
-  async onPlainFormPlaced(engine, pi, heroIdx) {
+  // Als Vorgabe 29.9.: Tokens in der Spalte `heroOwner`, HOPT bei `pi`.
+  async onPlainFormPlaced(engine, pi, heroIdx, heroOwner) {
     const gs = engine.gs;
     stampTriAdHopt(gs, pi);
     engine.log('tri_ad_placed', { player: gs.players[pi]?.username, heroIdx });
     engine.sync();
-    await swapPuppetTokens(engine, pi, heroIdx, TRI_AD);
+    await swapPuppetTokens(engine, heroOwner ?? pi, heroIdx, TRI_AD);
     engine.sync();
   },
 

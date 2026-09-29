@@ -294,12 +294,14 @@ module.exports = {
    * Bedingung selbst steht beim Conqueror (`ascensionCondition`); hier
    * werden nur die Anzeige-Flags nachgefuehrt (Throne-Robber-Lehre).
    */
-  refreshAscensionReadiness(engine, pi, heroIdx) {
+  // Als Vorgabe 29.9.: `pi` = Brettseite, `kontrolleur` = wer ihn fuehrt
+  // (geliehen: der Gegner) — dessen Gold zaehlt („you have").
+  refreshAscensionReadiness(engine, pi, heroIdx, kontrolleur) {
     const hero = engine.gs.players[pi]?.heroes?.[heroIdx];
     if (!hero?.name || hero.name !== CARD_NAME) return;
     const conqueror = loadCardEffect(ASCENDED_FORM);
     const bereit = hero.hp > 0 && typeof conqueror?.ascensionCondition === 'function'
-      && conqueror.ascensionCondition(engine.gs, pi, heroIdx, engine);
+      && conqueror.ascensionCondition(engine.gs, kontrolleur ?? pi, heroIdx, engine, pi);
     if (bereit) {
       if (hero.ascensionReady && hero.ascensionTarget === ASCENDED_FORM) return;
       hero.ascensionReady   = true;

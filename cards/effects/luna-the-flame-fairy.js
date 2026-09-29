@@ -25,8 +25,9 @@ module.exports = {
   // Die BEREITSCHAFT pflegt immer der Basis-Held. Ohne sie bietet der
   // Client den Aufstieg gar nicht erst an — `ascensionCondition` auf
   // der Ascended-Karte ist der zweite Riegel, nicht der erste.
-  refreshAscensionReadiness(engine, pi, hi) {
-    checkTempelunaAscension(engine, pi, hi);
+  // Als Vorgabe 29.9.: `kontrolleur` = wer den Helden fuehrt (geliehen: der Gegner).
+  refreshAscensionReadiness(engine, pi, hi, kontrolleur) {
+    checkTempelunaAscension(engine, pi, hi, kontrolleur);
   },
 
   activeIn: ['hero'],
