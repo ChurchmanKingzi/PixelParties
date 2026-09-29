@@ -18492,4 +18492,38 @@ Damit laufen unter Übernahme: Throne Robber (Formbesitz in `counters._identityF
 - Effekt-Ausrüsten: `_equip-shared` (`ausruestTraegerMitSeite`, `waehleAusruestPlatz` → `{heroIdx, slot, seite}`, `ruesteAusStapelAus(…, { seite })`), `_orchestra-shared.equipDestinations` (bei `sides: [pi]` bzw. ohne `sides`), Dajan, Modnir, Swellpnir, Gate to the Armory („der Nutzer“), Riffel, Hel (Unterhalt: ohne Recht gilt „If you can't, defeat this Hero“).
 - Client: `canHeroHostEquip` spiegelt die Rechte; Equip-Drag nimmt Helden aus `kontrollAusruestZiele` auf der Gegenseite an (`targetOwner`/`heroOwner`); Attachment-Drop auf einen geliehenen Helden lässt ihn selbst wirken, wenn er darf.
 
-**Offene Regelfragen:** Surprises in der Zone eines geliehenen Helden sind während der Übernahme für niemanden auslösbar.
+**Surprises am übernommenen Helden (Als Vorgabe 29.9.):** „Surprises soll der aktuelle Kontrolleur auslösen können.“ Die Surprise Zone hängt am Helden und geht mit ihm mit. Während der Übernahme löst NUR der Kontrolleur aus, nicht der Besitzer.
+- Kontrolleur einer Zone: `engine.surpriseKontrolleur(seite, heroIdx)`, Reihenfolge `charmedBy` → `permaControlBy` → `controlledBy` (FTCD, Controlled Attack) → Brettseite.
+- Sammler `_getAllSurpriseEntries(pi)`: Zonen aller Helden, die `pi` kontrolliert, zuerst die eigene Spalte. Jeder Eintrag trägt `seite` (Brettseite der Zone). Bakhm-Slots bleiben auf der eigenen Spalte, weil Kreaturen nicht mitgehen.
+- Fenster: Der Reagierende ist der Kontrolleur des betroffenen Helden bzw. Ziels, nicht die Brettseite. Das gilt für Ziel, Schaden (vor und nach), Niederlage, Status, Surprise-Abwurf, Defending the Gate und die Umleit-Surprises. Die übrigen Fenster (Beschwörung, Zugende, Draw, Equip, Ability, Heldeneffekt, Gold, Suche) scannen ohnehin den Spieler.
+- `_canHeroActivateSurprise(seite, hi, name, { reaktor })`:
+  - `reaktor` muss den Helden kontrollieren.
+  - Wisdom wird aus der Hand des Reaktors bezahlt.
+  - Eine Kreatur-Surprise an einem geliehenen Helden braucht `kontrollRechte(…).beschwoeren`.
+  - Ohne `reaktor` gilt wie bisher die Brettseite. Das betrifft Hand-Reaktionen.
+- Auslöser-Signatur: `surpriseTrigger` und alle getypten `surprise…Trigger(gs, ownerIdx, heroIdx, info, engine, seite)`.
+  - `ownerIdx` = Auslöser/Kontrolleur, also „you/your opponent“.
+  - `seite` = Brettseite der Zone, also „the user“ bzw. „this Hero“ zusammen mit `heroIdx`.
+  - `canSurpriseRedirect(…, engine, seite)` bekommt die Seite als 10. Argument.
+  - Ohne Übernahme gilt `seite === ownerIdx`.
+- Zusatzfelder in `sourceInfo`/`info`:
+  - `controller`: handelnder Spieler der Quelle (`_surpriseQuellenSpieler`; geliehener Held → Kontrolleur). Für „opponent's …“-Vergleiche `(info.controller ?? info.owner) === ownerIdx` nehmen. `owner` bleibt die Brettseite des handelnden Helden, zum Nachschlagen des Angreifers.
+  - `targetController` (Schaden, Status), `defeatedController` (Niederlage), `zoneController` (Surprise-Abwurf).
+  - „you deal damage“ (`_checkSurpriseOnDealtDamage`) liest den handelnden Spieler.
+- `_activateSurprise(seite, hi, …)`:
+  - Der Kontrolleur (`steuerer`) wird bestimmt; während der Auflösung ist `inst.controller` = Kontrolleur.
+  - Kontext: `cardOwner`/`cardController` = Kontrolleur, `cardHeroOwner` = Brettseite (`effektiveSeiten` für `zone === 'surprise'`).
+  - Prompts, Aufdecken und Wisdom laufen beim Kontrolleur. `afterSpellResolved.casterIdx` = Kontrolleur.
+  - `onSurpriseActivated`/`onSurpriseCreaturePlaced` tragen zusätzlich `surpriseController`; `surpriseOwner` bleibt die Brettseite (mit `heroIdx`).
+  - Ablage beim KARTENBESITZER (`originalOwner`).
+  - Eine Kreatur-Surprise landet in der Support Zone des Helden (Brettseite) und wird per `markiereSeitenfremd` dem Kontrolleur zugeordnet. `originalOwner` bleibt dabei der Kartenbesitzer.
+  - `physicalSide` einer Instanz in `zone === 'surprise'` ist immer `owner`.
+- Skripte: Den Träger über `ctx.attachedHero` bzw. `ctx.cardHeroOwner` holen, nie über `gs.players[ctx.cardOwner]…[ctx.cardHeroIdx]`. Schadensquellen tragen `heroOwner: ctx.cardHeroOwner`, Zonen-Animationen `owner: ctx.cardHeroOwner ?? pi`.
+- Setzen aus der Hand: `play_surprise` mit `heroOwner` → `doPlaySurpriseFremd`. Voraussetzung sind Kontrolle und `kontrollRechte(…).ausruesten`, wie beim Ausrüsten. Die Karte liegt auf der Brettseite, `originalOwner` = der Setzende. Der Besitzer setzt an seinem abgegebenen Helden nichts.
+- Client: Drag/Klick auf die Surprise Zone eines geliehenen Helden (`kannSurpriseAnFremdHeld`).
+- Ansicht: Eine verdeckte Surprise sieht ihr Kartenbesitzer, auch auf der Gegenseite. Die Brettseite sieht fremde verdeckte Karten als `?`.
+- Nicht umgestellt (nur eigene Spalte):
+  - Surprise-Kettenreaktionen (Lunar Eclipse, `_checkReactionCards`),
+  - Telekinesis, Baby Spider, `_spider-shared`, Sabrina, Cute Spider,
+  - die Brettwache von Spider Silk Bridge (liest `inst.owner`).
+  Surprises am abgegebenen Helden bietet dort niemand an, weil `_canHeroActivateSurprise` ohne `reaktor` die Kontrolle der Brettseite verlangt (`heroSideOf`). Ausnahme: `controlledBy` (FTCD) kennt `heroSideOf` nicht, dort bietet dieser Weg dem Besitzer weiter an.
