@@ -70,20 +70,22 @@ function countSpiderCreaturesOnBoard(engine) {
  */
 function listOwnFaceDownSurprises(engine, playerIdx) {
   const out = [];
-  const ps = engine.gs.players[playerIdx];
-  if (!ps) return out;
-  for (let hi = 0; hi < (ps.surpriseZones || []).length; hi++) {
-    const zone = ps.surpriseZones[hi] || [];
-    if (zone.length === 0) continue;
-    const cardName = zone[0];
+  if (!engine.gs.players[playerIdx]) return out;
+  // Als Vorgabe 29.9.: „Surprises you control" — Zonen nach Kontrolle,
+  // auch am geliehenen Helden (`seite` = Brettseite der Zone).
+  for (const e of engine._getAllSurpriseEntries(playerIdx)) {
+    if (e.isBakhmSlot) continue;
+    const seite = e.seite ?? playerIdx;
+    const hi = e.heroIdx;
+    const cardName = e.cardName;
     // Find the live instance to send to discard later.
     const inst = engine.cardInstances.find(c =>
-      (c.owner === playerIdx || c.controller === playerIdx)
+      c.owner === seite
       && c.zone === 'surprise' && c.heroIdx === hi && c.name === cardName
     );
     if (!inst) continue;
     if (!inst.faceDown) continue;
-    out.push({ inst, heroIdx: hi, cardName });
+    out.push({ inst, heroIdx: hi, cardName, seite });
   }
   return out;
 }
@@ -116,7 +118,7 @@ async function paySurpriseCostToSummon(engine, playerIdx, count, sourceCardName,
   const result = await engine.promptGeneric(playerIdx, {
     type: 'pickSurprise',
     surprises: available.map(s => ({
-      owner: playerIdx,
+      owner: s.seite ?? playerIdx,   // 29.9.: Brettseite der Zone
       heroIdx: s.heroIdx,
       instId: s.inst.id,
     })),
@@ -202,7 +204,10 @@ async function forceActivateSurprise(engine, playerIdx, heroIdx, surpriseCardNam
   const script = loadCardEffect(surpriseCardName);
   if (!script?.isSurprise || !script.onSurpriseActivate) return null;
 
-  if (!engine._canHeroActivateSurprise(playerIdx, heroIdx, surpriseCardName)) return null;
+  // Als Vorgabe 29.9.: `opts.seite` = Brettseite der Zone (geliehener
+  // Held); ausloesen darf nur der Kontrolleur `playerIdx`.
+  const seite = Number.isInteger(opts.seite) ? opts.seite : playerIdx;
+  if (!engine._canHeroActivateSurprise(seite, heroIdx, surpriseCardName, { reaktor: playerIdx })) return null;
 
   // Synthetic sourceInfo — no real attacker. Surprises that REQUIRE
   // an attacker (Booby Trap) check `sourceInfo.owner >= 0` and bail;
@@ -215,7 +220,7 @@ async function forceActivateSurprise(engine, playerIdx, heroIdx, surpriseCardNam
     forcedByCard: opts.forcerCardName,
   };
 
-  return engine._activateSurprise(playerIdx, heroIdx, surpriseCardName, sourceInfo, script);
+  return engine._activateSurprise(seite, heroIdx, surpriseCardName, sourceInfo, script);
 }
 
 // ═══════════════════════════════════════════

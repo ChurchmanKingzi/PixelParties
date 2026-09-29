@@ -153,7 +153,8 @@ module.exports = {
       const golem = ctx.cardInstance;
       if (!golem || golem.id !== ctx.card.id) return;      // nur ich selbst
 
-      const pi = ctx.surpriseOwner;
+      // Als Vorgabe 29.9.: „your opponent" relativ zum Ausloeser (Kontrolleur).
+      const pi = ctx.surpriseController ?? ctx.surpriseOwner;
       const oppIdx = pi === 0 ? 1 : 0;
       const gs = engine.gs;
       const cardDB = engine._getCardDB();

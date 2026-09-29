@@ -119,8 +119,9 @@ module.exports = {
     // den Caster; Fallback 0 hält die Animation im Zweifel am Laufen.
     const selfLink = chain[myIndex];
     const casterHeroIdx = selfLink?.casterHeroIdx ?? selfLink?.heroIdx ?? 0;
+    // Als Vorgabe 29.9.: Brettseite des Traegers (geliehener Held).
     engine._broadcastEvent('play_zone_animation', {
-      type: 'lunar_eclipse_pulse', owner: pi, heroIdx: casterHeroIdx, zoneSlot: -1,
+      type: 'lunar_eclipse_pulse', owner: selfLink?.heroOwner ?? pi, heroIdx: casterHeroIdx, zoneSlot: -1,
     });
     await engine._delay(500);
 

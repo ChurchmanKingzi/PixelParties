@@ -18522,8 +18522,10 @@ Damit laufen unter Übernahme: Throne Robber (Formbesitz in `counters._identityF
 - Setzen aus der Hand: `play_surprise` mit `heroOwner` → `doPlaySurpriseFremd`. Voraussetzung sind Kontrolle und `kontrollRechte(…).ausruesten`, wie beim Ausrüsten. Die Karte liegt auf der Brettseite, `originalOwner` = der Setzende. Der Besitzer setzt an seinem abgegebenen Helden nichts.
 - Client: Drag/Klick auf die Surprise Zone eines geliehenen Helden (`kannSurpriseAnFremdHeld`).
 - Ansicht: Eine verdeckte Surprise sieht ihr Kartenbesitzer, auch auf der Gegenseite. Die Brettseite sieht fremde verdeckte Karten als `?`.
-- Nicht umgestellt (nur eigene Spalte):
-  - Surprise-Kettenreaktionen (Lunar Eclipse, `_checkReactionCards`),
-  - Telekinesis, Baby Spider, `_spider-shared`, Sabrina, Cute Spider,
-  - die Brettwache von Spider Silk Bridge (liest `inst.owner`).
-  Surprises am abgegebenen Helden bietet dort niemand an, weil `_canHeroActivateSurprise` ohne `reaktor` die Kontrolle der Brettseite verlangt (`heroSideOf`). Ausnahme: `controlledBy` (FTCD) kennt `heroSideOf` nicht, dort bietet dieser Weg dem Besitzer weiter an.
+- Ebenfalls nach Kontrolle (29.9.):
+  - Surprise-Kettenreaktionen (Lunar Eclipse): `_promptReactionsForChain` sammelt ueber `_getAllSurpriseEntries`. Das Kettenglied traegt `casterOwner`/`heroOwner` = Brettseite; Ablage beim Kartenbesitzer.
+  - Telekinesis, Baby Spider, `_spider-shared` (`listOwnFaceDownSurprises` liefert `seite`, `forceActivateSurprise(…, { seite })`), Silent Water Mizune, Detection (Surprise Zones).
+  - Sabrina und Cute Spider: `_activateSurprise(seite, hi, …, { fromDeck | fromDiscard, steuerer })`. Deck, Hand und Ablage gehoeren dem `steuerer`, der Held steht auf `seite`.
+  - Spider Silk Bridge (face-up): „you" = `surpriseKontrolleur(inst.owner, inst.heroIdx)`.
+  - Golden Ladybug, Madame Guillotine und Water Golem lesen `surpriseController ?? surpriseOwner`.
+  - `_rxAufgeloest(…, { heroOwner })`: `onReactionResolved` traegt `heroOwner`.

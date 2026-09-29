@@ -72,25 +72,28 @@ function getEligibleTargets(engine, pi) {
   const ps = gs.players[pi];
   if (!ps) return [];
   const targets = [];
-  for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-    const hero = ps.heroes[hi];
+  // Als Vorgabe 29.9.: „one of your Heroes" = nach Kontrolle, auch die
+  // Zone eines geliehenen Helden; `owner` = Brettseite der Zone.
+  for (const e of engine._getAllSurpriseEntries(pi)) {
+    if (e.isBakhmSlot) continue;
+    const seite = e.seite ?? pi;
+    const hi = e.heroIdx;
+    const hero = gs.players[seite]?.heroes?.[hi];
     if (!hero?.name || hero.hp <= 0) continue;
     if (hero.statuses?.frozen
         || hero.statuses?.stunned
         || hero.statuses?.webbed) continue;
-    const sz = ps.surpriseZones?.[hi] || [];
-    if (sz.length === 0) continue;
-    const cardName = sz[0];
+    const cardName = e.cardName;
     const script = loadCardEffect(cardName);
     if (!script?.isSurprise) continue;
     if (script.canTelekinesisActivate === false) continue;
     if (typeof script.canTelekinesisActivate === 'function'
         && !script.canTelekinesisActivate(engine, pi)) continue;
-    if (!engine._canHeroActivateSurprise(pi, hi, cardName)) continue;
+    if (!engine._canHeroActivateSurprise(seite, hi, cardName, { reaktor: pi })) continue;
     targets.push({
-      id: `surprise-${pi}-${hi}`,
+      id: `surprise-${seite}-${hi}`,
       type: 'surprise',
-      owner: pi,
+      owner: seite,
       heroIdx: hi,
       cardName,
     });
@@ -173,6 +176,7 @@ module.exports = {
     if (!target) return false;
     const surpriseCardName = target.cardName;
     const surpriseHeroIdx = target.heroIdx;
+    const surpriseSeite = target.owner ?? pi;   // Als Vorgabe 29.9.: Brettseite der Zone
     const script = loadCardEffect(surpriseCardName);
     if (!script?.isSurprise || !script.onSurpriseActivate) return false;
 
@@ -194,9 +198,9 @@ module.exports = {
     // laeuft am Faden zur gewaehlten Surprise und webt ein Netz darueber.
     // Angehaengt an die Surprise Zone, die Baby Spider kommt als `von`.
     engine._broadcastEvent('play_zone_animation', {
-      type: 'baby_spider_opfer', owner: pi, heroIdx: surpriseHeroIdx,
+      type: 'baby_spider_opfer', owner: surpriseSeite, heroIdx: surpriseHeroIdx,
       zoneSlot: -1, zoneType: 'surprise', duration: 1900,
-      von: { owner: pi, heroIdx: babyInst.heroIdx, zoneSlot: babyInst.zoneSlot },
+      von: { owner: engine.physicalSide(babyInst), heroIdx: babyInst.heroIdx, zoneSlot: babyInst.zoneSlot },
     });
     await engine._delay(620);
     // Der gemeinsame Opfer-Weg (Hook + Zerstoerung als Opfer), nur ohne
@@ -227,7 +231,7 @@ module.exports = {
     const prevCasterCreature = engine.gs._spellCasterCreature;
     engine.gs._spellCasterCreature = sacrificedSnapshot;
     try {
-      await engine._activateSurprise(pi, surpriseHeroIdx, surpriseCardName, {
+      await engine._activateSurprise(surpriseSeite, surpriseHeroIdx, surpriseCardName, {
         telekinesis: true,
         forcedByCard: CARD_NAME,
         activatorIdx: pi === 0 ? 1 : 0,

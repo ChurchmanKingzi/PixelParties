@@ -34102,17 +34102,19 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (typeof casterIdx !== 'number' || casterIdx < 0) return;
     const cd = this._getCardDB()[cardName];
     const typ = cd?.cardType;
+    // Als Vorgabe 29.9.: `opts.heroOwner` = Brettseite des Wirkers (geliehener Held).
+    const heroOwner = Number.isInteger(opts.heroOwner) ? opts.heroOwner : pi;
     try {
       if (opts.spellHook !== false && (typ === 'Spell' || typ === 'Attack')) {
         await this.runHooks('afterSpellResolved', {
-          heroOwner: pi, spellName: cardName, spellCardData: cd,
+          heroOwner, spellName: cardName, spellCardData: cd,
           heroIdx: casterIdx, casterIdx: pi,
           damageTargets: [], isSecondCast: false, isReaction: true,
           _skipReactionCheck: true,
         });
       }
       await this.runHooks('onReactionResolved', {
-        playerIdx: pi, heroIdx: casterIdx, cardName, playedCardName: cardName,
+        playerIdx: pi, heroIdx: casterIdx, heroOwner, cardName, playedCardName: cardName,
         actionType: String(typ || '').toLowerCase(), isReaction: true,
         _skipReactionCheck: true,
       });
@@ -34651,8 +34653,12 @@ this._deathWatch = (this._deathWatchStack || []).length
     // Kreaturplatz); `steuerer` ist der Ausloeser (Kontrolleur des
     // Helden) — Prompts, Hand, Log, Aufdecken fuer den Gegner. Bakhm-Slots,
     // Ablage- und Deck-Aktivierungen bleiben bei `playerIdx`.
-    const steuerer = (isBakhmSlot || opts.fromDiscard || opts.fromDeck)
-      ? playerIdx : this.surpriseKontrolleur(playerIdx, heroIdx);
+    // Ablage/Deck: `opts.steuerer` (Sabrina, Cute Spider ueber einen
+    // geliehenen Helden — Karte aus Deck/Ablage des Ausloesers).
+    const steuerer = isBakhmSlot ? playerIdx
+      : (opts.fromDiscard || opts.fromDeck)
+        ? (Number.isInteger(opts.steuerer) ? opts.steuerer : playerIdx)
+        : this.surpriseKontrolleur(playerIdx, heroIdx);
 
     // Find and update the CardInstance — flip face-up
     let inst;
@@ -34664,6 +34670,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       // had been a normally-resolved face-down Surprise.
       inst = this._trackCard(cardName, playerIdx, ZONES.SURPRISE, heroIdx, -1);
       inst.faceDown = false;
+      if (steuerer !== playerIdx) inst.originalOwner = steuerer;   // 29.9.: Deck des Ausloesers
     } else if (fromDiscard) {
       // Activation came from a discard event — the inst is sitting in
       // the controller's discard pile. The caller MAY pass an exact
@@ -34676,7 +34683,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       }
       if (!inst) {
         const candidates = this.cardInstances.filter(c =>
-          c.owner === playerIdx && c.zone === 'discard' && c.name === cardName
+          c.owner === steuerer && c.zone === 'discard' && c.name === cardName   // 29.9.: Ablage des Ausloesers
         );
         inst = candidates[candidates.length - 1] || null;
       }
@@ -34706,6 +34713,9 @@ this._deathWatch = (this._deathWatchStack || []).length
       if (!isBakhmSlot && (hostHeroIdx !== heroIdx || fromDiscard)) {
         inst.heroIdx = heroIdx;
       }
+      // 29.9.: aus der Ablage ueber einen geliehenen Helden — `heroIdx`
+      // zeigt in die Reihe `playerIdx` (`ctx.cardHeroOwner`).
+      if (fromDiscard && steuerer !== playerIdx) inst.heroOwner = playerIdx;
       // Als Vorgabe 29.9.: waehrend der Aufloesung handelt die Instanz fuer
       // den Ausloeser — Engine-Helfer, die `inst.controller` lesen
       // (actionAoeHit u.a.), sehen den Kontrolleur. Bleibt sie in der
@@ -34841,16 +34851,19 @@ this._deathWatch = (this._deathWatchStack || []).length
       // contingent on the Surprise actually resolving, so a
       // Booby-Trap-style negation refunds the card to discard
       // (where it already physically is — no movement needed).
+      // 29.9.: Ablage des Ausloesers (`steuerer`, sonst `playerIdx`).
+      if (inst && inst.heroOwner === playerIdx && steuerer !== playerIdx) delete inst.heroOwner;
+      const aps = this.gs.players[steuerer] || ps;
       if (!surpriseNegated) {
-        const discardIdx = ps.discardPile.lastIndexOf(cardName);
+        const discardIdx = aps.discardPile.lastIndexOf(cardName);
         if (discardIdx >= 0) {
           this._broadcastEvent('play_pile_transfer', {
-            owner: playerIdx, cardName,
+            owner: steuerer, cardName,
             from: 'discard', to: 'deleted',
           });
-          ps.discardPile.splice(discardIdx, 1);
-          if (!ps.deletedPile) ps.deletedPile = [];
-          ps.deletedPile.push(cardName);
+          aps.discardPile.splice(discardIdx, 1);
+          if (!aps.deletedPile) aps.deletedPile = [];
+          aps.deletedPile.push(cardName);
           if (inst) inst.zone = 'deleted';
         }
       }
@@ -35464,23 +35477,26 @@ this._deathWatch = (this._deathWatchStack || []).length
       // chain semantics to a hand Reaction, but it stays hidden until
       // the owner chooses to flip it. (Lunar Eclipse is the first such
       // card.) Additive: the hand scan above is untouched.
-      for (let shi = 0; shi < (ps.surpriseZones || []).length; shi++) {
-        const sz = ps.surpriseZones[shi] || [];
-        if (sz.length === 0) continue;
-        const sName = sz[0];
+      // Als Vorgabe 29.9.: Zonen nach KONTROLLE (`_getAllSurpriseEntries`),
+      // auch am geliehenen Helden; `seite` = Brettseite der Zone.
+      for (const sEntry of this._getAllSurpriseEntries(pi)) {
+        if (sEntry.isBakhmSlot) continue;
+        const shi = sEntry.heroIdx;
+        const sSeite = sEntry.seite ?? pi;
+        const sName = sEntry.cardName;
         if (eligibleByName.has(sName)) continue; // a hand copy already offered
         const sScript = loadCardEffect(sName);
         if (!sScript?.isSurprise || !sScript?.isReaction) continue;
         if (sScript.reactionCondition
             && !sScript.reactionCondition(this.gs, pi, this, chainCtx)) continue;
-        if (!this._canHeroActivateSurprise(pi, shi, sName)) continue;
+        if (!this._canHeroActivateSurprise(sSeite, shi, sName, { reaktor: pi })) continue;
         const sData = allCards[sName];
         const sWisdom = sData?.cardType === 'Spell'
-          ? this.getWisdomDiscardCost(pi, shi, sData) : 0;
+          ? this.getWisdomDiscardCost(sSeite, shi, sData) : 0;
         eligibleByName.set(sName, {
           handIdx: -1, cost: 0, script: sScript, cardData: sData, cardName: sName,
           eligibleHeroIdxs: [shi], wisdomCost: sWisdom,
-          fromSurprise: { heroIdx: shi }, source: 'surprise',
+          fromSurprise: { heroIdx: shi, seite: sSeite }, source: 'surprise',
         });
         countByName.set(sName, 1);
       }
@@ -35616,6 +35632,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       // so there is no multi-Hero caster picker.
       if (info.fromSurprise) {
         const sHeroIdx = info.fromSurprise.heroIdx;
+        const sSeite = info.fromSurprise.seite ?? pi;   // Als Vorgabe 29.9.: Brettseite der Zone
         // Activation cost (Lunar Eclipse: send a "Lunatic Cycle" from
         // your board to discard). `false` → couldn't pay / declined →
         // treat as "no reaction" (the Surprise stays face-down).
@@ -35631,10 +35648,10 @@ this._deathWatch = (this._deathWatchStack || []).length
         // suppresses the chain's own mid-resolve discard so it isn't
         // pulled early.
         const sInst = this.cardInstances.find(c =>
-          c.owner === pi && c.zone === ZONES.SURPRISE
+          c.owner === sSeite && c.zone === ZONES.SURPRISE
           && c.heroIdx === sHeroIdx && c.name === chosenName);
         if (sInst) sInst.faceDown = false;
-        this._broadcastEvent('surprise_flip', { owner: pi, heroIdx: sHeroIdx, cardName: chosenName });
+        this._broadcastEvent('surprise_flip', { owner: sSeite, heroIdx: sHeroIdx, cardName: chosenName });
         this._broadcastEvent('card_reveal', { cardName: chosenName });
         // `source` unterscheidet die beiden gleichnamigen Logs: aus der
         // Surprise-Zone ist es eine ECHTE Aktivierung einer gesetzten
@@ -35642,8 +35659,10 @@ this._deathWatch = (this._deathWatchStack || []).length
         // ist es ein normaler Cast, den der Recorder schon als Play führt.
         this.log('reaction_activated', { card: chosenName, player: ps.username, chainPosition: chain.length, source: 'surprise' });
         if (!this._pendingSurpriseReactionCleanup) this._pendingSurpriseReactionCleanup = [];
+        // Als Vorgabe 29.9.: `pi` = Brettseite der Zone, `ablage` = Kartenbesitzer.
         this._pendingSurpriseReactionCleanup.push({
-          pi, heroIdx: sHeroIdx, cardName: chosenName, instId: sInst?.id,
+          pi: sSeite, heroIdx: sHeroIdx, cardName: chosenName, instId: sInst?.id,
+          ablage: sInst?.originalOwner ?? sSeite,
         });
 
         const engine = this;
@@ -35654,6 +35673,8 @@ this._deathWatch = (this._deathWatchStack || []).length
           cardName: chosenName, owner: pi,
           cardType: cardData?.cardType || 'Unknown',
           casterHeroIdx: sHeroIdx, heroIdx: sHeroIdx,
+          // Als Vorgabe 29.9.: Reihe, in die `casterHeroIdx` zeigt (geliehener Held).
+          casterOwner: sSeite, heroOwner: sSeite,
           goldCost: 0, wisdomCost: sWisdom,
           isInitialCard: false, negated: false, chainClosed: false,
           resolve: script.resolve
@@ -36018,7 +36039,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         // v1157: Handlung des Wirkers („performs an Action") — auch fuer
         // Reaktionen aus der Kette.
         if (!link.isInitialCard && link.casterHeroIdx >= 0 && this.gs.players[link.owner]) {
-          await this._rxAufgeloest(this.gs.players[link.owner], link.cardName, link.casterHeroIdx, { spellHook: false });
+          await this._rxAufgeloest(this.gs.players[link.owner], link.cardName, link.casterHeroIdx, { spellHook: false, heroOwner: link.heroOwner });
         }
 
         // Non-initial cards go to discard after resolving — UNLESS
@@ -36099,9 +36120,11 @@ this._deathWatch = (this._deathWatchStack || []).length
         const szi = sZone.indexOf(ent.cardName);
         if (szi >= 0) sZone.splice(szi, 1);
         if (ent.instId != null) this._untrackCard(ent.instId);
-        if (!ps.discardPile) ps.discardPile = [];
-        ps.discardPile.push(ent.cardName);
-        this.log('surprise_reaction_discarded', { card: ent.cardName, owner: ent.pi });
+        // Als Vorgabe 29.9.: Ablage beim Kartenbesitzer, Zone auf der Brettseite.
+        const ablagePs = this.gs.players[ent.ablage ?? ent.pi] || ps;
+        if (!ablagePs.discardPile) ablagePs.discardPile = [];
+        ablagePs.discardPile.push(ent.cardName);
+        this.log('surprise_reaction_discarded', { card: ent.cardName, owner: ent.ablage ?? ent.pi });
         this.sync();
         await this._delay(450);
       }

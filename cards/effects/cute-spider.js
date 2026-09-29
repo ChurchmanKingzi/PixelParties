@@ -32,7 +32,7 @@ const CARD_NAME = 'Cute Spider';
 /**
  * First living Hero on `pi`'s side that legitimately meets the
  * Surprise's school / level / Wisdom-affordability requirement.
- * Returns -1 if none qualify. The Cute Spider trigger uses this
+ * Returns null if none qualify. The Cute Spider trigger uses this
  * Hero as the activator for the engine's
  * `_activateSurprise(..., { fromDiscard: true })` call.
  *
@@ -43,12 +43,21 @@ const CARD_NAME = 'Cute Spider';
  */
 function pickActivatingHero(engine, pi, cardData) {
   const ps = engine.gs.players[pi];
-  if (!ps) return -1;
-  for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-    const hero = ps.heroes[hi];
+  if (!ps) return null;
+  // Als Vorgabe 29.9.: „one of your Heroes" = Helden, die `pi` gerade
+  // kontrolliert (auch geliehene), eigene Spalte zuerst. Rueckgabe
+  // { seite, heroIdx } oder null.
+  const kandidaten = [];
+  for (const seite of [pi, pi === 0 ? 1 : 0]) {
+    for (let hi = 0; hi < (engine.gs.players[seite]?.heroes || []).length; hi++) {
+      if (engine.surpriseKontrolleur(seite, hi) === pi) kandidaten.push({ seite, hi });
+    }
+  }
+  for (const { seite, hi } of kandidaten) {
+    const hero = engine.gs.players[seite].heroes[hi];
     if (!hero?.name || hero.hp <= 0) continue;
     if (hero.statuses?.frozen || hero.statuses?.stunned || hero.statuses?.webbed) continue;
-    if (!engine.heroMeetsLevelReq(pi, hi, cardData)) continue;
+    if (!engine.heroMeetsLevelReq(seite, hi, cardData)) continue;
     // Wisdom affordability gate: if `heroMeetsLevelReq` only passed
     // by leaning on Wisdom paying down a level gap, the player must
     // actually be able to pay it. Surprise card is already in
@@ -56,12 +65,12 @@ function pickActivatingHero(engine, pi, cardData) {
     // the available pool — same convention `_canHeroActivateSurprise`
     // uses for non-`spellInHand` activations.
     if (cardData.cardType === 'Spell') {
-      const wisdomCost = engine.getWisdomDiscardCost(pi, hi, cardData);
+      const wisdomCost = engine.getWisdomDiscardCost(seite, hi, cardData);
       if (wisdomCost > 0 && (ps.hand || []).length < wisdomCost) continue;
     }
-    return hi;
+    return { seite, heroIdx: hi };
   }
-  return -1;
+  return null;
 }
 
 module.exports = {
@@ -113,8 +122,9 @@ module.exports = {
       // Surprise. The engine's force-activation path still pays Wisdom
       // if there's a school / level gap on that Hero, matching the
       // semantics of a normal Surprise activation.
-      const activatingHeroIdx = pickActivatingHero(engine, owner, discardedData);
-      if (activatingHeroIdx < 0) return;
+      const wirker = pickActivatingHero(engine, owner, discardedData);
+      if (!wirker) return;
+      const activatingHeroIdx = wirker.heroIdx;
 
       // Confirm — soft once per turn, players may want to save the
       // trigger for a different Surprise.
@@ -180,10 +190,11 @@ module.exports = {
       gs._spellCasterCreature = spiderSnapshot;
       try {
         await engine._activateSurprise(
-          owner, activatingHeroIdx, discardedCardName,
+          wirker.seite, activatingHeroIdx, discardedCardName,
           sourceInfo, surpriseScript,
           {
             fromDiscard: true,
+            steuerer: owner,   // Als Vorgabe 29.9.: Ablage/Hand des Ausloesers
             // Precise inst handoff so duplicate-named copies already in
             // discard don't get confused with the one Cute Spider is
             // reacting to. The onDiscard ctx carries the just-discarded

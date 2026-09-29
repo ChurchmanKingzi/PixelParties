@@ -171,7 +171,7 @@ module.exports = {
         // No requirement — always qualifies
         drawCount++;
       } else if (level > 0 || cardData.spellSchool1) {
-        if (engine.heroMeetsLevelReq(pi, heroIdx, cardData)) drawCount++;
+        if (engine.heroMeetsLevelReq(heroOwner, heroIdx, cardData)) drawCount++;   // 29.9.: Brettseite
       }
     }
 
@@ -201,25 +201,27 @@ function _getSurpriseTargets(engine, playerIdx) {
   const targets = [];
   const cardDB = engine._getCardDB();
 
-  // Regular surprise zones
-  for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-    const sz = ps.surpriseZones?.[hi] || [];
-    if (sz.length === 0) continue;
-    const cardName = sz[0];
+  // Regular surprise zones — Als Vorgabe 29.9.: „a Surprise you control"
+  // nach Kontrolle, auch am geliehenen Helden (`seite` = Brettseite).
+  for (const e of engine._getAllSurpriseEntries(playerIdx)) {
+    if (e.isBakhmSlot) continue;
+    const seite = e.seite ?? playerIdx;
+    const hi = e.heroIdx;
+    const cardName = e.cardName;
     const inst = engine.cardInstances.find(c =>
-      c.owner === playerIdx && c.zone === ZONES.SURPRISE && c.heroIdx === hi && c.name === cardName
+      c.owner === seite && c.zone === ZONES.SURPRISE && c.heroIdx === hi && c.name === cardName
     );
     targets.push({
-      id: `surprise-${playerIdx}-${hi}`,
+      id: `surprise-${seite}-${hi}`,
       type: 'surprise',
-      owner: playerIdx,
+      owner: seite,
       heroIdx: hi,
       cardName,
       cardInstance: inst,
       wasFaceUp: inst ? !inst.faceDown : false,
       zoneType: 'surprise',
       zoneSlot: -1,
-      heroOwnerIdx: playerIdx,
+      heroOwnerIdx: seite,
     });
   }
 

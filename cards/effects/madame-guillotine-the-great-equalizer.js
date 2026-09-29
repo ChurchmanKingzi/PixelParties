@@ -159,7 +159,8 @@ module.exports = {
     // diesen eigenen Hook.
     onSurpriseCreaturePlaced: async (ctx) => {
       const inst = ctx.cardInstance;
-      if (!gegnerHandelt(ctx, ctx.surpriseOwner)) return;
+      // Als Vorgabe 29.9.: handelnd ist der Ausloeser, nicht die Brettseite.
+      if (!gegnerHandelt(ctx, ctx.surpriseController ?? ctx.surpriseOwner)) return;
       if (karteSchonGezaehlt(ctx._engine, inst)) return;
       await fallbeil(ctx, 'placed a Creature');
     },
