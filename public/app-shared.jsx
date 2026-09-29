@@ -3192,6 +3192,18 @@ function playSFXForZoneAnim(type, payload = {}) {
 
 window.playSFXForZoneAnim = playSFXForZoneAnim;
 
+// Etiketten, die einen ABBRUCH bedeuten (Cancel-Klang statt Klick-Klang).
+// Fuehrende Symbole („✕ ", „← ", „↩ ") werden ignoriert; ein reines
+// Schliess-Symbol („×", „✕", „✖", „x") zaehlt ebenfalls.
+function ppIstAbbruchEtikett(label) {
+  const t = String(label || '').trim().toLowerCase();
+  if (!t) return false;
+  if (['×', '✕', '✖', '✗', 'x'].includes(t)) return true;
+  const sauber = t.replace(/^[^\p{L}\p{N}]+/u, '');
+  return /^(cancel|close|back|abort|dismiss|never ?mind|abbrechen|schlie(ß|ss)en|zur(ü|u)ck|no)(?![\p{L}\p{N}])/u.test(sauber);
+}
+window.ppIstAbbruchEtikett = ppIstAbbruchEtikett;
+
 // ═══════════════════════════════════════════
 //  GLOBAL UI SFX LISTENERS
 //  Delegated listeners save us wiring hundreds of onClick handlers.
@@ -3214,10 +3226,15 @@ if (typeof document !== 'undefined') {
     if (btn.dataset && btn.dataset.sfx === 'none') return;
     // Cancel-style buttons get ui_cancel instead of ui_click.
     const label = (btn.textContent || '').trim().toLowerCase();
+    // ★ Als Befund 29.9. (Golden Apple: Abbrechen blieb ohne Cancel-Klang):
+    // die alte Pruefung verlangte das GANZE Etikett gleich „cancel" — „Cancel
+    // (Esc)", „✕ Cancel", „← Back", „✕ CANCEL" (fast alle Zielwahl- und
+    // Abfrage-Leisten) fielen durch und klangen wie ein normaler Klick.
+    // Jetzt zaehlt der ANFANG des Etiketts ohne fuehrende Symbole.
     const isCancel = btn.dataset?.sfx === 'cancel'
       || btn.classList.contains('btn-cancel')
       || btn.classList.contains('cancel-btn')
-      || ['cancel', 'close', 'back', '×', '✕', 'x'].includes(label);
+      || ppIstAbbruchEtikett(label);
     // ui_click uses its intrinsic (SFX_VOLUME_OVERRIDES) for a uniform level.
     // ui_cancel keeps its explicit attenuation.
     // Caller-side dedupe values stay shorter than the global auto-
