@@ -7,8 +7,8 @@ Frame 0 ist immer das Originalbild.
 
 * madaga:   Madaga, the Forsaken Seafarer: die vier Tentakel winden sich (die oberen wogen mit einer
             nach außen laufenden Welle auf und ab, die unteren krümmen sich in der Mitte zum Körper
-            hin, Ansatz und Fußspitze bleiben); er blinzelt mit dem echten Auge (das andere ist ein
-            Glasauge).
+            hin, Ansatz und Fußspitze bleiben); er blinzelt mit dem echten Auge, das Glasauge blitzt
+            zweimal je Loop auf.
 * logan:    Logan, the Investment Monkee: federt gemächlich, aus der Zigarre steigt eine sich
             kräuselnde Rauchfahne (nach oben verblassend), die Glut glimmt beim Ziehen auf; über die
             Sonnenbrille huscht hin und wieder ein Glanzlicht, dann blitzt ein Stern auf; auch die
@@ -102,6 +102,9 @@ def clamp_chain(vals):
     return out
 
 
+GLASS_FLASH = (8, 30)
+
+
 def f_madaga(i):
     s = SRC.copy()
     blink(s, i)
@@ -131,6 +134,13 @@ def f_madaga(i):
             sel = (xs[y] <= 8) if side < 0 else (xs[y] >= 19)
             for x in np.nonzero(lower[y] & sel)[0]:
                 out[y + PT, x + PL - side * dx] = s[y, x]
+    for st in GLASS_FLASH:                              # das Glasauge blitzt auf
+        if 1 <= (i - st) % N <= 3:
+            for x, y in ((15, 6), (16, 6), (15, 7), (16, 7)):
+                out[y + PT, x + PL] = rgb('ffffff' if (x, y) in ((15, 6), (16, 7)) or (i - st) % N == 2 else 'd8ecff')
+    for (x, y), c in sparkle_pixels(i, N, [(16 + PL, 6 + PT, st) for st in GLASS_FLASH],
+                                    rgb('d8ecff'), rgb('acd5ff')).items():
+        dot(out, x, y, c)
     return out
 
 
