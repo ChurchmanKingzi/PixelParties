@@ -1,0 +1,15 @@
+{
+  "hero": "Cecilia, the Harrowing Crusader",
+  "sheet": "cecilia-the-harrowing-crusader.png",
+  "frameWidth": 18,
+  "frameHeight": 29,
+  "frames": 48,
+  "frameMs": 90,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 3,
+  "padLeft": 1,
+  "padRight": 1,
+  "padBottom": 1,
+  "faceX": 9.0
+}

@@ -1,0 +1,15 @@
+{
+  "hero": "Fiona, the Empty Vessel of a Forgotten Sorceress",
+  "sheet": "fiona-the-empty-vessel-of-a-forgotten-sorceress.png",
+  "frameWidth": 32,
+  "frameHeight": 28,
+  "frames": 48,
+  "frameMs": 90,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 4,
+  "padLeft": 9,
+  "padRight": 9,
+  "padBottom": 1,
+  "faceX": 16.0
+}

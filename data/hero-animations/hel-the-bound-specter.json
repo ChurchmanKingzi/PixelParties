@@ -1,0 +1,16 @@
+{
+  "hero": "Hel, the Bound Specter",
+  "sheet": "hel-the-bound-specter.png",
+  "frameWidth": 27,
+  "frameHeight": 40,
+  "frames": 48,
+  "frameMs": 90,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 3,
+  "padLeft": 5,
+  "padRight": 6,
+  "padBottom": 10,
+  "faceX": 13.0,
+  "footY": 30
+}
