@@ -113,7 +113,7 @@ module.exports = {
     // Web/silk visual on the activating Hero's slot.
     engine._broadcastEvent('play_zone_animation', {
       type: 'gold_sparkle',
-      owner: pi, heroIdx: ctx.cardHeroIdx, zoneSlot: -1,
+      owner: ctx.cardHeroOwner ?? pi, heroIdx: ctx.cardHeroIdx, zoneSlot: -1,
     });
     await engine._delay(400);
 

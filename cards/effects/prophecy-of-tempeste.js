@@ -150,17 +150,18 @@ module.exports = {
       });
       if (!res) return;
       const destHero = res.host.heroIdx, destSlot = res.host.slotIdx, inst = res.inst;
-      const destHeroObj = ps?.heroes?.[destHero];
+      const destSeite = res.host.owner;   // Brettseite (Als Vorgabe 29.9.: auch ein uebernommener Held)
+      const destHeroObj = gs.players[destSeite]?.heroes?.[destHero];
 
       // Permanent rain overlay — client owns the lifetime by listening
       // to start + stop pairs keyed on (owner, heroIdx, zoneSlot).
       engine._broadcastEvent('tempeste_rain_start', {
         instId: inst.id,
-        owner: pi, heroIdx: destHero, zoneSlot: destSlot,
+        owner: destSeite, heroIdx: destHero, zoneSlot: destSlot,
       });
 
       engine.log('prophecy_of_tempeste_attached', {
-        player: ps.username, hero: ps.heroes[destHero]?.name,
+        player: ps.username, hero: destHeroObj?.name,
       });
 
       await engine.runHooks('onCardEnterZone', {

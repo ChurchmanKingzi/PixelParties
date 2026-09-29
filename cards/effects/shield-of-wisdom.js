@@ -114,16 +114,17 @@ module.exports = {
    * Surprise Zone holds this card ("the user").
    * @returns {boolean}
    */
-  canSurpriseRedirect(gs, pi, hostHeroIdx, selected, validTargets, config, sourceCard, engine) {
+  canSurpriseRedirect(gs, pi, hostHeroIdx, selected, validTargets, config, sourceCard, engine, seite = pi) {
     if (!isOppCreatureEffect(engine, pi, sourceCard)) return false;
 
     // The chosen target must be the host Hero itself OR a Creature in
     // that Hero's Support Zones. Creature targets are type 'equip' in
     // the picker (the picker only adds actual Creatures as 'equip').
+    // Als Vorgabe 29.9.: `pi` = Ausloeser, `seite` = Brettseite der Zone.
     const isHostHero = selected.type === 'hero'
-      && selected.owner === pi && selected.heroIdx === hostHeroIdx;
+      && selected.owner === seite && selected.heroIdx === hostHeroIdx;
     const isHostSupportCreature = selected.type === 'equip'
-      && selected.owner === pi && selected.heroIdx === hostHeroIdx;
+      && selected.owner === seite && selected.heroIdx === hostHeroIdx;
     if (!isHostHero && !isHostSupportCreature) return false;
 
     // A legal redirect target must exist (else the Surprise cannot

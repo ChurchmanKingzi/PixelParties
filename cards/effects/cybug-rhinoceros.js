@@ -117,7 +117,7 @@ module.exports = {
     // Kanonischer Weg. `actionDestroyCard` erkennt Kreaturen selbst und
     // feuert dann den Todes-Hook — genau Als Klausel.
     await engine.actionDestroyCard(
-      { name: CARD_NAME, owner: pi, heroIdx: ctx.cardHeroIdx },
+      { name: CARD_NAME, owner: pi, heroIdx: ctx.cardHeroIdx, heroOwner: ctx.cardHeroOwner },
       inst,
       { sourceOwner: pi, sourceName: CARD_NAME },
     );

@@ -29,7 +29,7 @@
 //  je Kartenname (`claimHOPT`).
 // ═══════════════════════════════════════════
 
-const { hasCardType } = require('./_hooks');
+const { hasCardType, heroCanBeEquipped } = require('./_hooks');
 
 function isEquipArtifact(cd) {
   return !!cd && hasCardType(cd, 'Artifact') && (cd.subtype || '').toLowerCase() === 'equipment';
@@ -38,16 +38,29 @@ function isEquipArtifact(cd) {
 function equipDestinations(engine, pi, cardName, opts = {}) {
   const sides = opts.sides || [pi];
   const out = [];
+  const platz = (side, hi) => {
+    const ps = engine.gs.players[side];
+    for (let si = 0; si < 3; si++) {
+      if (((ps.supportZones[hi] || [])[si] || []).length === 0) out.push({ side, heroIdx: hi, slotIdx: si });
+    }
+  };
   for (const side of sides) {
     const ps = engine.gs.players[side];
     for (let hi = 0; hi < (ps?.heroes || []).length; hi++) {
       const hero = ps.heroes[hi];
       if (!hero?.name || hero.hp <= 0) continue;
-      if (hero.statuses?.frozen) continue;
+      // Als Vorgabe 29.9.: tot/Frozen/Uebernahme ohne `ausruesten` (Charme) sperrt.
+      if (!heroCanBeEquipped(hero)) continue;
       if (!engine.canEquipCardToHero(cardName, side, hi)) continue;
-      for (let si = 0; si < 3; si++) {
-        if (((ps.supportZones[hi] || [])[si] || []).length === 0) out.push({ side, heroIdx: hi, slotIdx: si });
-      }
+      platz(side, hi);
+    }
+  }
+  // Als Vorgabe 29.9.: „a Hero you control" (nur eigene Seite gefragt) —
+  // dazu uebernommene Helden der Gegenseite mit Recht `ausruesten`.
+  if (sides.length === 1 && sides[0] === pi && opts.uebernommene !== false) {
+    for (const { physOwner, heroIdx } of (engine.fremdAusruestHelden?.(pi) || [])) {
+      if (!engine.canEquipCardToHero(cardName, physOwner, heroIdx)) continue;
+      platz(physOwner, heroIdx);
     }
   }
   return out;
@@ -69,8 +82,13 @@ async function equipArtifactToHero(engine, pi, cardName, ownerOfHero, heroIdx, s
   if (!hps.supportZones[heroIdx]) hps.supportZones[heroIdx] = [[], [], []];
   if (!hps.supportZones[heroIdx][slotIdx]) hps.supportZones[heroIdx][slotIdx] = [];
   hps.supportZones[heroIdx][slotIdx].push(cardName);
-  const inst = engine._trackCard(cardName, pi, 'support', heroIdx, slotIdx);
-  if (ownerOfHero !== pi) inst.controller = ownerOfHero;
+  // Als Vorgabe 29.9.: an einen UEBERNOMMENEN Helden wie beim Handweg —
+  // Instanz auf der Brettseite, Karte gehoert `pi` (dient dem Kontrolleur).
+  // Sonst (Orchester an einen echten Gegnerhelden) das alte Modell.
+  const _kontrolliert = ownerOfHero !== pi && !!engine.darfFremdAusruesten?.(pi, ownerOfHero, heroIdx);
+  const inst = engine._trackCard(cardName, _kontrolliert ? ownerOfHero : pi, 'support', heroIdx, slotIdx);
+  if (_kontrolliert) inst.originalOwner = pi;
+  else if (ownerOfHero !== pi) inst.controller = ownerOfHero;
   inst.turnPlayed = gs.turn || 0;
   engine.log('equip_placed', {
     card: cardName, player: ps.username, hero: hps.heroes[heroIdx]?.name, from, source: opts.source || null,

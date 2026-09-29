@@ -36,7 +36,8 @@ module.exports = {
     gs._gateShieldActive = pi;
 
     // Log
-    const heroName = ps.heroes?.[ctx.cardHeroIdx]?.name || 'Hero';
+    // Als Vorgabe 29.9.: Traeger ueber `attachedHero` (geliehener Held).
+    const heroName = ctx.attachedHero?.name || ps.heroes?.[ctx.cardHeroIdx]?.name || 'Hero';
     engine.log('gate_activated', { player: ps.username, hero: heroName, card: 'Defending the Gate' });
 
     // Shield animation on all occupied support zones

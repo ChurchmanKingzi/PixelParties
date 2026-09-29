@@ -78,19 +78,18 @@ module.exports = {
       const pi = ctx.cardController ?? ctx.cardOwner;
       const hi = inst?.heroIdx;
       if (typeof hi !== 'number' || hi < 0) return;
-      // Styx 28.9.: `_heroCanAct`/`performImmediateAction` kennen nur Helden
-      // der eigenen Spalte — ein uebernommener Junshi spielte sonst ueber
-      // den gleich indizierten EIGENEN Helden. Bis die Engine das kann: aus.
-      if ((ctx.cardHeroOwner ?? pi) !== pi) return;
+      // Als Vorgabe 29.9.: ein uebernommener Junshi handelt auf seiner
+      // Brettseite (`feld`), Hand/Sperre/Prompt beim Kontrolleur `pi`.
+      const feld = ctx.cardHeroOwner ?? pi;
       if (gs.activePlayer === pi) return;                                   // nur im gegnerischen Zug
       if (!(ctx.defeated || []).some(d => (d.controller ?? d.owner) === pi)) return;
       if (!heldenSperreFrei(gs, SPERRE, pi)) return;
       // ③ Junshi muss handeln und den Spell wirken koennen.
-      if (!engine._heroCanAct(pi, hi)) return;
-      const spells = engine.getHeroEligibleActionCards(pi, hi).filter(n => istMagicArtsSpell(engine, n));
+      if (!engine._heroCanAct(feld, hi)) return;
+      const spells = engine.getHeroEligibleActionCards(pi, hi, feld).filter(n => istMagicArtsSpell(engine, n));
       if (spells.length === 0) return;
 
-      const hero = gs.players[pi].heroes[hi];
+      const hero = gs.players[feld].heroes[hi];
       const ja = await engine.promptGeneric(pi, {
         type: 'confirm',
         title: CARD_NAME,
@@ -112,6 +111,7 @@ module.exports = {
         allowedCardTypes: ['Spell'],
         cardNameFilter: (name) => istMagicArtsSpell(engine, name),
         zusageAuftritt: CARD_NAME,
+        ...(feld !== pi ? { heroOwner: feld } : {}),   // Als Vorgabe 29.9.
       });
       if (!res?.played) heldenSperreFreigeben(gs, SPERRE, pi);   // nichts gespielt → Ausloeser bleibt frei
       engine.log('junshi_counter', { player: gs.players[pi]?.username, card: res?.cardName || null, played: !!res?.played });

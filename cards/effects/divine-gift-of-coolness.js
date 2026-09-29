@@ -57,18 +57,19 @@ module.exports = {
       if (!res) return;
       const { host, inst } = res;
       const targetHeroIdx = host.heroIdx, targetSlot = host.slotIdx;
-      const hero = ps.heroes[targetHeroIdx];
+      const seite = host.owner;   // Brettseite (Als Vorgabe 29.9.: auch ein uebernommener Held)
+      const hero = gs.players[seite].heroes[targetHeroIdx];
       inst.counters.immovable = true;
       engine.sync();
 
       // ── Play sunglasses animation AFTER card is visible (on the Hero, not the zone) ──
       engine._broadcastEvent('play_zone_animation', {
-        type: 'sunglasses_drop', owner: pi, heroIdx: targetHeroIdx, zoneSlot: -1,
+        type: 'sunglasses_drop', owner: seite, heroIdx: targetHeroIdx, zoneSlot: -1,
       });
       await engine._delay(1800);
 
       // ── Apply negative_status_immune buff ──
-      await engine.actionAddBuff(hero, pi, targetHeroIdx, 'negative_status_immune', {
+      await engine.actionAddBuff(hero, seite, targetHeroIdx, 'negative_status_immune', {
         sourceOwner: pi,   // v1067: Quelle ist Pflicht (siehe _affected-shared)
         source: 'Divine Gift of Coolness',
         permanent: true,
@@ -76,7 +77,7 @@ module.exports = {
 
       // ── Cleanse all existing negative statuses ──
       const negKeys = getNegativeStatuses();
-      engine.cleanseHeroStatuses(hero, pi, targetHeroIdx, negKeys, 'Divine Gift of Coolness');
+      engine.cleanseHeroStatuses(hero, seite, targetHeroIdx, negKeys, 'Divine Gift of Coolness');
 
       // Fire zone enter hook
       await engine.runHooks('onCardEnterZone', {

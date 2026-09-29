@@ -54,10 +54,11 @@ module.exports = {
    * Nur der TRAEGER zaehlt ("the user"): Helden-Ziel, eigene Seite,
    * gleiche Position wie die Zone, Schaden > 0.
    */
-  surpriseTrigger(gs, ownerIdx, hostHeroIdx, sourceInfo) {
+  surpriseTrigger(gs, ownerIdx, hostHeroIdx, sourceInfo, engine, seite = ownerIdx) {
     const tgt = sourceInfo?.damageTarget;
     if (!tgt || tgt.kind !== 'hero') return false;
-    if (tgt.owner !== ownerIdx || tgt.heroIdx !== hostHeroIdx) return false;
+    // Als Vorgabe 29.9.: „the user" = Brettseite der Zone (`seite`) + Index.
+    if (tgt.owner !== seite || tgt.heroIdx !== hostHeroIdx) return false;
     return (sourceInfo.damageAmount || 0) > 0;
   },
 
@@ -72,7 +73,7 @@ module.exports = {
     if (promptData?.type === 'confirm' && promptData.title === CARD_NAME) {
       const amount = promptData._damageAmount ?? 0;
       const cpuIdx = engine._cpuPlayerIdx;
-      const hero = engine.gs.players[cpuIdx]?.heroes?.[promptData._hostHeroIdx ?? -1];
+      const hero = engine.gs.players[promptData._hostSeite ?? cpuIdx]?.heroes?.[promptData._hostHeroIdx ?? -1];
       const lethal = hero ? hero.hp <= amount : false;
       return { confirmed: amount >= REDUCTION || lethal };
     }
@@ -85,7 +86,7 @@ module.exports = {
     const heroIdx = ctx.cardHeroIdx ?? -1;
 
     engine._broadcastEvent('play_zone_animation', {
-      type: 'shield_block', owner: pi, heroIdx, zoneSlot: -1,
+      type: 'shield_block', owner: ctx.cardHeroOwner ?? pi, heroIdx, zoneSlot: -1,
     });
     await engine._delay(500);
 

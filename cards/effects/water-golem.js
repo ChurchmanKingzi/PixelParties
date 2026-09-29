@@ -127,10 +127,11 @@ module.exports = {
    * traegt die abgelegte Karte denselben Namen, waere es dieser Golem
    * selbst — dann nicht.
    */
-  surpriseSurpriseDiscardedTrigger: (gs, ownerIdx, heroIdx, info /*, engine */) => {
+  surpriseSurpriseDiscardedTrigger: (gs, ownerIdx, heroIdx, info, engine, seite = ownerIdx) => {
     if (!info?.cardName) return false;
-    if (info.zoneOwner !== ownerIdx) return false;
-    if (info.cardName === CARD_NAME && info.fromHeroIdx === heroIdx) return false;
+    // Als Vorgabe 29.9.: „meine Seite" = Zonen der Helden, die ich kontrolliere.
+    if ((info.zoneController ?? info.zoneOwner) !== ownerIdx) return false;
+    if (info.cardName === CARD_NAME && info.fromHeroIdx === heroIdx && info.zoneOwner === seite) return false;
     return true;
   },
 

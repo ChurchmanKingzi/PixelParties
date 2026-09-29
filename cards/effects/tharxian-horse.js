@@ -194,7 +194,7 @@ module.exports = {
     // client's trajectory renderer can draw the gallop path. Impact
     // animation lands on the attacker AFTER the charge completes.
     const chargePayload = {
-      sourceOwner: pi,
+      sourceOwner: ctx.cardHeroOwner ?? pi,
       sourceHeroIdx: ctx.cardHeroIdx,
       targetOwner: sourceInfo.owner,
       targetHeroIdx: -1,
@@ -228,7 +228,7 @@ module.exports = {
           });
           await engine._delay(200);
           await engine.actionDealCreatureDamage(
-            { name: CARD_NAME, owner: pi, heroIdx: ctx.cardHeroIdx },
+            { name: CARD_NAME, owner: pi, heroIdx: ctx.cardHeroIdx, heroOwner: ctx.cardHeroOwner },
             srcInst, damage, 'attack',
             { sourceOwner: pi, canBeNegated: true },
           );

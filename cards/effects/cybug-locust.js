@@ -90,7 +90,7 @@ module.exports = {
    * Trigger: der GEGNER hat ein Artifact/Attack/Spell an einen eigenen
    * Helden gehängt, der Träger hat zwei freie Zonen, Treibstoff da.
    */
-  surpriseEquipTrigger(gs, ownerIdx, heroIdx, info, engine) {
+  surpriseEquipTrigger(gs, ownerIdx, heroIdx, info, engine, seite = ownerIdx) {
     if (!info) return false;
     if (info.equipOwner == null || info.equipOwner === ownerIdx) return false;
     const inst = info.cardInstance;
@@ -101,9 +101,10 @@ module.exports = {
     // ein „Crusader's"-Artefakt kann NUR auf eine Cecilia wandern.
     // Ohne legalen Traeger ist die Karte kein Ziel — dann wird der
     // Surprise gar nicht erst angeboten.
-    if (!engine?.canEquipCardToHero?.(info.cardName, ownerIdx, heroIdx)) return false;
+    // Als Vorgabe 29.9.: Traeger = Held der Zone auf ihrer Brettseite.
+    if (!engine?.canEquipCardToHero?.(info.cardName, seite, heroIdx)) return false;
     // Als Vorgabe: zwei freie Zonen, sonst gar nicht erst anbieten.
-    if (freieZonen(gs, ownerIdx, heroIdx).length < BENOETIGTE_ZONEN) return false;
+    if (freieZonen(gs, seite, heroIdx).length < BENOETIGTE_ZONEN) return false;
     return hasCybugFuel(gs, ownerIdx, FUEL_CARD);
   },
 
@@ -122,7 +123,8 @@ module.exports = {
     if ((inst.controller ?? inst.owner) === pi) return null;   // liegt schon bei uns
 
     const traegerHeroIdx = ctx.cardHeroIdx;
-    const frei = freieZonen(gs, pi, traegerHeroIdx);
+    const traegerSeite = ctx.cardHeroOwner ?? pi;   // 29.9.: geliehener Held
+    const frei = freieZonen(gs, traegerSeite, traegerHeroIdx);
     // Erneut prüfen: zwischen Auslöser und jetzt kann sich das Brett
     // bewegt haben. Ohne zwei Zonen bliebe die Kreatur ohne Platz.
     if (frei.length < BENOETIGTE_ZONEN) return null;
@@ -133,7 +135,7 @@ module.exports = {
     if (!bezahlt) return null;
 
     const ergebnis = await engine.actionTransferAttachment(
-      inst, pi, traegerHeroIdx, frei[0], { sourceName: CARD_NAME },
+      inst, traegerSeite, traegerHeroIdx, frei[0], { sourceName: CARD_NAME },
     );
     if (!ergebnis?.success) { engine.sync(); return null; }
 
@@ -141,7 +143,7 @@ module.exports = {
       player: ps.username,
       card: inst.name,
       from: gs.players[sourceInfo.equipOwner]?.username,
-      hero: ps.heroes?.[traegerHeroIdx]?.name,
+      hero: ctx.attachedHero?.name ?? ps.heroes?.[traegerHeroIdx]?.name,
     });
     engine.sync();
     return { attachmentRedirected: true };

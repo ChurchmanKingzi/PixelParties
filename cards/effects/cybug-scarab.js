@@ -61,14 +61,15 @@ module.exports = {
   /**
    * Trigger: ein EIGENER Held ist gefallen, und zwar nicht der Traeger.
    */
-  surpriseHeroDefeatTrigger(gs, ownerIdx, heroIdx, info) {
+  surpriseHeroDefeatTrigger(gs, ownerIdx, heroIdx, info, engine, seite = ownerIdx) {
     if (!info) return false;
-    if (info.defeatedOwner !== ownerIdx) return false;      // „a Hero you control"
+    // „a Hero you control" — nach Kontrolle (Als Vorgabe 29.9.)
+    if ((info.defeatedController ?? info.defeatedOwner) !== ownerIdx) return false;
     if (info.defeatedHeroIdx == null || info.defeatedHeroIdx < 0) return false;
-    if (heroIdx === info.defeatedHeroIdx) return false;     // „except the user"
+    if (heroIdx === info.defeatedHeroIdx && seite === info.defeatedOwner) return false;     // „except the user"
     // Der Gefallene muss auch wirklich liegen — ein Hook (Guardian
     // Angel) kann ihn zwischenzeitlich gerettet haben.
-    const gefallen = gs.players[ownerIdx]?.heroes?.[info.defeatedHeroIdx];
+    const gefallen = gs.players[info.defeatedOwner]?.heroes?.[info.defeatedHeroIdx];
     if (!gefallen?.name || gefallen.hp > 0) return false;
     // ★ v1466: „mit 100 HP" wird auf die max HP gedeckelt — bei 0 max HP
     // loest die Falle gar nicht erst aus (s. _revive-shared).
@@ -88,13 +89,14 @@ module.exports = {
 
     const zielIdx = sourceInfo?.defeatedHeroIdx;
     if (zielIdx == null || zielIdx < 0) return null;
-    if (sourceInfo.defeatedOwner !== pi) return null;
-    const gefallen = ps.heroes?.[zielIdx];
+    if ((sourceInfo.defeatedController ?? sourceInfo.defeatedOwner) !== pi) return null;
+    const zielSeite = sourceInfo.defeatedOwner ?? pi;   // 29.9.: Brettseite
+    const gefallen = gs.players[zielSeite]?.heroes?.[zielIdx];
     if (!gefallen?.name || gefallen.hp > 0) return null;
     // Sicherheitsnetz gegen den Fall, dass der Traeger doch der
     // Gefallene waere — dann gaebe es niemanden, der die Kreatur
     // aufnimmt.
-    if (ctx.cardHeroIdx === zielIdx) return null;
+    if (ctx.cardHeroIdx === zielIdx && (ctx.cardHeroOwner ?? pi) === zielSeite) return null;
 
     // Kosten ZUERST. Ist die Kopie zwischen Auslöser und jetzt
     // verschwunden, scheitert die Aktivierung sauber und der Held
@@ -102,7 +104,7 @@ module.exports = {
     const bezahlt = await deleteCybugFuel(engine, pi, FUEL_CARD);
     if (!bezahlt) return null;
 
-    const zurueck = await engine.actionReviveHero(pi, zielIdx, REVIVE_HP, {
+    const zurueck = await engine.actionReviveHero(zielSeite, zielIdx, REVIVE_HP, {
       source: CARD_NAME,
     });
     if (!zurueck) { engine.sync(); return null; }

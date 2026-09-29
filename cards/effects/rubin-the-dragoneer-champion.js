@@ -62,12 +62,14 @@ function isDestructionSpell(cd) {
  * Prüfkette wie `learning.js` — das ist die kanonische Antwort auf
  * „darf dieser Held diesen Zauber aus der Hand spielen?".
  */
-function eligibleHandIndices(engine, pi, heroIdx) {
+function eligibleHandIndices(engine, pi, heroIdx, feld = pi) {
   const gs = engine.gs;
   const ps = gs.players[pi];
   if (!ps) return [];
   const cardDB = engine._getCardDB();
-  const hero = ps.heroes?.[heroIdx];
+  // Als Vorgabe 29.9.: `feld` = Brettseite eines geliehenen Rubin — Stufe,
+  // Wisdom und Heldensperren am Helden, Hand beim Kontrolleur `pi`.
+  const hero = gs.players[feld]?.heroes?.[heroIdx];
   const heroScript = hero?.name ? loadCardEffect(hero.name) : null;
   // Der gewählte Zauber verlässt die Hand, BEVOR seine Wisdom-Kosten
   // bezahlt werden — er kann seinen eigenen Abwurf also nicht finanzieren.
@@ -85,13 +87,13 @@ function eligibleHandIndices(engine, pi, heroIdx) {
         const script = loadCardEffect(name);
         ok = true;
         if (script?.isReaction || script?.isSurprise || script?.neverPlayable) ok = false;
-        if (ok && !engine.heroMeetsLevelReq(pi, heroIdx, cd)) ok = false;
+        if (ok && !engine.heroMeetsLevelReq(feld, heroIdx, cd, feld !== pi ? { levelSourcePi: pi } : {})) ok = false;
         if (ok) {
-          const wisdomCost = engine.getWisdomDiscardCost(pi, heroIdx, cd);
+          const wisdomCost = engine.getWisdomDiscardCost(feld, heroIdx, cd);
           if (wisdomCost > 0 && wisdomPool < wisdomCost) ok = false;
         }
         if (ok && heroScript?.canPlayCard
-            && !heroScript.canPlayCard(gs, pi, heroIdx, cd, engine)) ok = false;
+            && !heroScript.canPlayCard(gs, feld, heroIdx, cd, engine)) ok = false;
         if (ok && typeof script?.spellPlayCondition === 'function') {
           try { if (!script.spellPlayCondition(gs, pi)) ok = false; }
           catch (err) {
@@ -112,14 +114,14 @@ function eligibleHandIndices(engine, pi, heroIdx) {
  * learning.js, ohne jede Aktions-Buchhaltung (Rubins Zusatz-Aktion
  * verbraucht keine Aktion, also wird auch keine gezählt).
  */
-async function performSpell(engine, pi, heroIdx, cardName) {
+async function performSpell(engine, pi, heroIdx, cardName, feld = pi) {
   const gs = engine.gs;
   const ps = gs.players[pi];
   const cardDB = engine._getCardDB();
   const cd = cardDB[cardName];
   if (!cd) return false;
 
-  const hero = ps.heroes?.[heroIdx];
+  const hero = gs.players[feld]?.heroes?.[heroIdx];   // Als Vorgabe 29.9.: Brettseite
   if (!hero?.name || hero.hp <= 0) return false;
 
   const findInHand = () => (ps.hand || []).indexOf(cardName);
@@ -133,8 +135,11 @@ async function performSpell(engine, pi, heroIdx, cardName) {
     if (c.zone === 'hand' && c.owner === pi && c.name === cardName) { handInst = c; break; }
   }
   if (handInst) handInst.heroIdx = heroIdx;
+  // Als Vorgabe 29.9.: geliehener Wirker — Instanz traegt die Brettseite
+  // (wie `doPlaySpell` mit `charmedOwner`).
+  if (handInst) { if (feld !== pi) handInst.heroOwner = feld; else delete handInst.heroOwner; }
 
-  const wisdomCost = engine.getWisdomDiscardCost(pi, heroIdx, cd);
+  const wisdomCost = engine.getWisdomDiscardCost(feld, heroIdx, cd);
   const payWisdom = async () => {
     if (wisdomCost <= 0) return;
     await engine.actionPromptForceDiscard(pi, wisdomCost, {
@@ -148,6 +153,7 @@ async function performSpell(engine, pi, heroIdx, cardName) {
   // (Anti Magic Shield, The Master's Plan, …) — wie beim normalen Cast.
   const chainResult = await engine.executeCardWithChain({
     cardName, owner: pi, heroIdx, cardType: cd.cardType, goldCost: 0,
+    casterOwner: feld,   // Als Vorgabe 29.9.: Wirker-Seite fuer die Handlungspruefung
   });
 
   // ★ v1328: gefizzelt (Wirker waehrend der Kette handlungsunfaehig) —
@@ -170,6 +176,9 @@ async function performSpell(engine, pi, heroIdx, cardName) {
   // Ziele des aeusseren Zaubers (Bartas' „exactly 1 target“) und umgekehrt.
   const _aeussererLog = gs._spellDamageLog;
   gs._spellDamageLog = [];
+  // Als Vorgabe 29.9.: Wirker-Seite fuer Stufenabfragen (wie doPlaySpell).
+  const _wirkerVorher = gs._wirkerSeite;
+  gs._wirkerSeite = { pi, heroIdx, heroOwner: feld };
 
   try {
     // v1323: waehrend des Zusatz-Gusses zaehlt diese Karte nicht zur Hand
@@ -188,13 +197,14 @@ async function performSpell(engine, pi, heroIdx, cardName) {
       }
       await engine.runHooks('afterSpellResolved', {
         spellName: cardName, spellCardData: cd,
-        heroIdx, casterIdx: pi, damageTargets: uniqueTargets,
+        heroIdx, casterIdx: pi, heroOwner: feld, damageTargets: uniqueTargets,
         isSecondCast: false, _skipReactionCheck: true,
       });
     }
   } catch (err) {
     console.error(`[${CARD_NAME}] Zauber-Auflösung fehlgeschlagen:`, err?.message || err);
   } finally {
+    if (_wirkerVorher === undefined) delete gs._wirkerSeite; else gs._wirkerSeite = _wirkerVorher;
     gs._spellResolutionDepth = Math.max(0, (gs._spellResolutionDepth || 1) - 1);
     delete gs._immediateActionContext;
     // v1476: aeusseres Protokoll zurueck (auch bei Fehler/Abbruch).
@@ -250,10 +260,9 @@ module.exports = {
       const hero = ctx.attachedHero;
       const heroIdx = ctx.cardHeroIdx;
       if (!hero?.name || hero.hp <= 0) return;
-      // Styx 28.9.: Pruefkette und Guss (`eligibleHandIndices`/`performSpell`)
-      // laufen ueber die Spalte von `pi` — ein uebernommener Rubin wirkte
-      // sonst ueber den gleich indizierten EIGENEN Helden. Dann kein Angebot.
-      if ((ctx.cardHeroOwner ?? pi) !== pi) return;
+      // Als Vorgabe 29.9.: ein uebernommener Rubin wirkt auf seiner
+      // Brettseite (`feld`), Hand/Sperre/Prompt beim Kontrolleur `pi`.
+      const feld = ctx.cardHeroOwner ?? pi;
 
       // Once per turn — Rundenstempel auf der Instanz statt eines
       // onTurnStart-Zählers: der würde bei eingefrorenem/gestuntem
@@ -263,7 +272,7 @@ module.exports = {
       if (!counters) return;
       if (!heldenSperreFrei(gs, 'rubin-dragoneer', pi)) return;   // v1275: pro Spieler (Ruling 22.9.)
 
-      const eligible = eligibleHandIndices(engine, pi, heroIdx);
+      const eligible = eligibleHandIndices(engine, pi, heroIdx, feld);
       if (eligible.length === 0) return;
 
       const pick = await engine.promptGeneric(pi, {
@@ -282,11 +291,11 @@ module.exports = {
 
       // Gegenprüfung am LEBENDEN Zustand: die Abfrage ist asynchron, die
       // Hand kann sich zwischenzeitlich geändert haben.
-      const live = eligibleHandIndices(engine, pi, heroIdx);
+      const live = eligibleHandIndices(engine, pi, heroIdx, feld);
       if (!live.some(i => gs.players[pi].hand[i] === pickedName)) return;
 
       heldenSperreSetzen(gs, 'rubin-dragoneer', pi);
-      await performSpell(engine, pi, heroIdx, pickedName);
+      await performSpell(engine, pi, heroIdx, pickedName, feld);
     },
   },
 };

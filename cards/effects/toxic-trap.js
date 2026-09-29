@@ -104,7 +104,7 @@ module.exports = {
 
     // Mushroom animation on the defender (the hero being protected)
     engine._broadcastEvent('play_zone_animation', {
-      type: 'mushroom_spore', owner: pi,
+      type: 'mushroom_spore', owner: ctx.cardHeroOwner ?? pi,
       heroIdx: defenderHeroIdx, zoneSlot: -1,
     });
     await engine._delay(400);

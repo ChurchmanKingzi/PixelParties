@@ -112,7 +112,7 @@ module.exports = {
    */
   attachmentHosts(gs, pi, engine) {
     const erlaubt = new Set(legaleZiele(gs, pi, engine));
-    return attachmentHostsFor(gs, pi, engine, { heroFilter: (h, hi) => erlaubt.has(hi) });
+    return attachmentHostsFor(gs, pi, engine, { heroFilter: (h, hi, side) => side === pi && erlaubt.has(hi) });   // `erlaubt` = eigene Indizes
   },
   // ── Vertrag fuer die Engine ────────────────────────────────────
   // `performAscension` fragt ueber diesen Namen, ob der aufsteigende
@@ -142,7 +142,7 @@ module.exports = {
       // Ascended-Form), Drop-Hinweise und Prompt kommen vom Baustein.
       const erlaubt = new Set(legaleZiele(gs, pi, engine));
       const res = await attachToHero(ctx, CARD_NAME, {
-        heroFilter: (h, hi) => erlaubt.has(hi), preferCaster: true,
+        heroFilter: (h, hi, side) => side === pi && erlaubt.has(hi), preferCaster: true,   // `erlaubt` = eigene Indizes
         description: 'Choose one of your Heroes that has an Ascended form (auto-leftmost-free slot), or click a specific empty Support Zone.',
         confirmLabel: '✨ Attach!', animationType: 'divine_awakening',
       });

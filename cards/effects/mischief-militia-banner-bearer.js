@@ -71,14 +71,17 @@ module.exports = {
    * The new engine window already filters by target ownership before
    * calling here, but we re-check defensively.
    */
-  surpriseTrigger: (gs, ownerIdx, heroIdx, sourceInfo, engine) => {
+  surpriseTrigger: (gs, ownerIdx, heroIdx, sourceInfo, engine, seite = ownerIdx) => {
     const tgt = sourceInfo.damageTarget;
     if (!tgt) return false;
-    if (tgt.owner !== ownerIdx) return false; // safety
+    // Als Vorgabe 29.9.: „target you control" nach Kontrolle (geliehener
+    // Held → Kontrolleur); `ownerIdx` = Ausloeser, `seite` = Brettseite.
+    if ((sourceInfo.targetController ?? tgt.owner) !== ownerIdx) return false; // safety
     if ((sourceInfo.damageAmount || 0) <= 0) return false;
 
     // Source must be opp.
-    const srcOwner = sourceInfo.cardInstance?.controller
+    const srcOwner = sourceInfo.controller
+      ?? sourceInfo.cardInstance?.controller
       ?? sourceInfo.cardInstance?.owner
       ?? sourceInfo.owner;
     if (srcOwner === ownerIdx) return false;
@@ -89,7 +92,7 @@ module.exports = {
     if (dmgType === 'burn' || dmgType === 'poison' || dmgType === 'status') return false;
 
     // Banner Bearer's body needs somewhere to land.
-    if (!_ownerHasFreeSupportZone(gs, ownerIdx)) return false;
+    if (!_ownerHasFreeSupportZone(gs, seite)) return false;
 
     return true;
   },

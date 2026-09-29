@@ -5,7 +5,7 @@
 // ═══════════════════════════════════════════════════════════════════
 
 const { v4: uuidv4 } = require('uuid');
-const { SPEED, HOOKS, PHASES, PHASE_NAMES, ZONES, STATUS_EFFECTS, getNegativeStatuses, BUFF_EFFECTS, hasCardType, hasSpellSchool, isArtifactCreature, POISON_BASE_DAMAGE, BURN_BASE_DAMAGE, baseCardName, BLIND_STATUSES, getCleansableStatuses, kontrollRechteVon, KONTROLL_RECHTE } = require('./_hooks');
+const { SPEED, HOOKS, PHASES, PHASE_NAMES, ZONES, STATUS_EFFECTS, getNegativeStatuses, BUFF_EFFECTS, hasCardType, hasSpellSchool, isArtifactCreature, POISON_BASE_DAMAGE, BURN_BASE_DAMAGE, baseCardName, BLIND_STATUSES, getCleansableStatuses, kontrollRechteVon, KONTROLL_RECHTE, heroCanBeEquipped } = require('./_hooks');
 // v1443: Hooks, deren Kontext die ausloesende Karte mitbekommt
 // (`ausloeserName`, s. `runHooks`) — fuer Reaktionen, die zeigen, worauf
 // sie reagieren.
@@ -3688,6 +3688,16 @@ class GameEngine {
         effectiveOwner = cardInstance.controller;
         effectiveHeroOwner = cardInstance.owner;
       }
+    } else if (cardInstance.zone === 'surprise' && cardInstance.heroIdx >= 0) {
+      // Als Vorgabe 29.9.: die Surprise Zone haengt am Helden und geht mit
+      // ihm mit — „du" ist der aktuelle Kontrolleur, die Zone bleibt auf
+      // der Brettseite (`owner`).
+      const k = engine.surpriseKontrolleur(cardInstance.owner, cardInstance.heroIdx);
+      if (k !== cardInstance.owner) {
+        effectiveController = k;
+        effectiveOwner = k;
+        effectiveHeroOwner = cardInstance.owner;
+      }
     }
     return { owner: effectiveOwner, controller: effectiveController, heroOwner: effectiveHeroOwner };
   }
@@ -4438,7 +4448,10 @@ class GameEngine {
         const excludeSelf = config.excludeSelf !== false;
         const combinedCondition = excludeSelf
           ? (t, eng) => {
-              if (t.type === 'hero' && t.owner === pi && t.heroIdx === heroIdx) return false;
+              // Als Vorgabe 29.9.: der Angreifer selbst — bei einem geliehenen
+              // Helden auf der Brettseite (`heroOwnerIdx`), nicht der gleich
+              // indizierte Held des Kontrolleurs.
+              if (t.type === 'hero' && t.owner === heroOwnerIdx && t.heroIdx === heroIdx) return false;
               return baseCondition ? baseCondition(t, eng) : true;
             }
           : baseCondition;
@@ -11698,6 +11711,70 @@ class GameEngine {
   }
 
   /**
+   * Als Vorgabe 29.9.: Darf `pi` an den UEBERNOMMENEN Helden der anderen
+   * Brettseite (`physOwner`/`heroIdx`) ausruesten (Equip-Artefakt oder
+   * Attachment)? Nur als dessen Kontrolleur (Charme/Styx/Golden Apple
+   * ueber `charmedBy`, Paraseed ueber `permaControlBy`, FTCD ueber
+   * `controlledBy`) und nur, wenn die Uebernahme `ausruesten` erlaubt
+   * (`heroCanBeEquipped`: lebend, nicht Frozen, Recht gesetzt).
+   * Die Karte liegt dann auf der Brettseite des Helden, `originalOwner`
+   * ist der Ausruestende.
+   */
+  darfFremdAusruesten(pi, physOwner, heroIdx) {
+    if (physOwner === pi || physOwner == null) return false;
+    const hero = this.gs.players[physOwner]?.heroes?.[heroIdx];
+    if (!hero?.name) return false;
+    const kontrolleur = hero.charmedBy ?? hero.permaControlBy ?? hero.controlledBy;
+    if (kontrolleur !== pi) return false;
+    return heroCanBeEquipped(hero);
+  }
+
+  /** Als Vorgabe 29.9.: uebernommene Helden der anderen Seite, an die `pi` ausruesten darf. */
+  fremdAusruestHelden(pi) {
+    const out = [];
+    for (let seite = 0; seite < (this.gs.players || []).length; seite++) {
+      if (seite === pi) continue;
+      const heroes = this.gs.players[seite]?.heroes || [];
+      for (let hi = 0; hi < heroes.length; hi++) {
+        if (this.darfFremdAusruesten(pi, seite, hi)) out.push({ physOwner: seite, heroIdx: hi, hero: heroes[hi] });
+      }
+    }
+    return out;
+  }
+
+  /**
+   * Als Vorgabe 29.9.: Handausruestung an uebernommene Helden —
+   * `{ [kartenname]: [{ owner, heroIdx }] }` (owner = Brettseite). Nur
+   * Equipment-Artefakte (ohne Powder-Keg-Weg); eine eigene Beschraenkung
+   * (`canEquipToHero`) wird gegen die Brettseite des Helden gefragt.
+   * Veroeffentlicht als `kontrollAusruestZiele`; der Client nimmt damit
+   * geliehene Helden als Drop-Ziel an.
+   */
+  getKontrollAusruestZiele(playerIdx) {
+    const ps = this.gs.players[playerIdx];
+    if (!ps) return {};
+    const helden = this.fremdAusruestHelden(playerIdx);
+    if (helden.length === 0) return {};
+    const cardDB = this._getCardDB();
+    const out = {};
+    for (const cardName of new Set([...(ps.hand || []), ...(ps.creationZone || [])])) {
+      const cd = cardDB[cardName];
+      if (!cd || cd.cardType !== 'Artifact' || (cd.subtype || '').toLowerCase() !== 'equipment') continue;
+      const script = loadCardEffect(cardName);
+      if (script?.placesOnOpponentBoard || script?.isTargetingArtifact || script?.neverPlayable) continue;
+      const ziele = [];
+      for (const { physOwner, heroIdx } of helden) {
+        if (typeof script?.canEquipToHero === 'function') {
+          try { if (!script.canEquipToHero(this.gs, physOwner, heroIdx, this)) continue; } catch { continue; }
+        }
+        ziele.push({ owner: physOwner, heroIdx });
+      }
+      if (ziele.length > 0) out[cardName] = ziele;
+    }
+    return out;
+  }
+
+  /**
    * ★ „… YOUR OPPONENT CONTROLS" UND DER GELIEHENE HELD (Styx, 28.9.).
    *
    * Ein uebernommener Held steht physisch in der Spalte seines Besitzers.
@@ -18135,6 +18212,10 @@ this._deathWatch = (this._deathWatchStack || []).length
   physicalSide(inst) {
     if (!inst) return -1;
     if (inst.stolenBy != null) return inst.owner;
+    // Als Vorgabe 29.9.: Surprise Zones liegen immer auf der `owner`-Seite
+    // (eine ausgeloeste Surprise am geliehenen Helden handelt fuer den
+    // Kontrolleur, `controller`).
+    if (inst.zone === 'surprise') return inst.owner;
     // Styx 28.9.: ueber einen geliehenen Helden beschworen — liegt auf der
     // Seite des Helden (`owner`), kontrolliert vom Beschwoerer.
     if (inst.counters?.crossSideControlled != null) return inst.owner;
@@ -18304,17 +18385,25 @@ this._deathWatch = (this._deathWatchStack || []).length
     return liste.filter((_, i) => !this._istAufloesendeHandkarte(ps, i, ausVorrat));
   }
 
-  getHeroEligibleActionCards(playerIdx, heroIdx) {
+  getHeroEligibleActionCards(playerIdx, heroIdx, heroOwner = null) {
     const ps = this.gs.players[playerIdx];
     if (!ps) return [];
-    const hero = ps.heroes[heroIdx];
+    // Als Vorgabe 29.9.: `heroOwner` = Brettseite eines GELIEHENEN Helden.
+    // Hand, Sperren und Kosten beim Kontrolleur `playerIdx`; Stufe, Zonen
+    // und Heldensperren am Helden (wie der Charme-Zweig in
+    // `getHeroPlayableCards`).
+    const hs = (heroOwner === 0 || heroOwner === 1) ? heroOwner : playerIdx;
+    const fremd = hs !== playerIdx;
+    const hps = this.gs.players[hs];
+    const hero = hps?.heroes?.[heroIdx];
     if (!hero?.name || hero.hp <= 0) return [];
+    if (fremd && this.heroSideOf(hs, hero) !== playerIdx) return [];
     // ★ v1323 (Tester-Befund 23.9.): Divine Gift of Skill — „That Hero
     // cannot perform an Action for the rest of the turn". Das gilt auch
     // fuer ZUSATZaktionen: diese Liste speist jede geschenkte Aktion
     // (Yukana, Junshi, Ellie, Coffee, Learning …). Vorher prueften nur
     // der regulaere Spielweg und ein paar Einzelstellen die Sperre.
-    if (this.isHeroSkillLocked(playerIdx, heroIdx)) return [];
+    if (this.isHeroSkillLocked(hs, heroIdx)) return [];
     // Per-hero action limit (Sol Rym, etc.)
     if (hero._maxActionsPerTurn && (hero._actionsThisTurn || 0) >= hero._maxActionsPerTurn) return [];
     // One-turn action lock (Treasure Hunter's Backpack, etc.) — stamp matches the
@@ -18355,21 +18444,24 @@ this._deathWatch = (this._deathWatchStack || []).length
       // Heart-Shaped Bows „regardless of its level") muss die Karte
       // auch in den Sofort-Zug-Prompts sichtbar machen, sonst bietet
       // `performImmediateAction` sie nie an.
-      if (!this.canBypassCasterRequirementForSpell(playerIdx, heroIdx, cd, cardName)
+      if (fremd) {
+        if (!this.heroMeetsLevelReq(hs, heroIdx, cd, { levelSourcePi: playerIdx })) continue;
+      } else if (!this.canBypassCasterRequirementForSpell(playerIdx, heroIdx, cd, cardName)
           && !this.heroMeetsLevelReq(playerIdx, heroIdx, cd)) continue;
       // Wisdom hand-size affordability check — spells that ONLY meet
       // the level requirement via Wisdom paid coverage need enough
       // hand cards to actually pay the discard cost (the spell itself
       // is in hand and would leave on cast, so subtract 1).
       if (cd.cardType === 'Spell') {
-        const wisdomCost = this.getWisdomDiscardCost(playerIdx, heroIdx, cd);
+        const wisdomCost = this.getWisdomDiscardCost(hs, heroIdx, cd);
         // v1279: Boris & Co. erlassen die Abwurfkosten — dann darf die
         // Handgroesse nicht sperren (Als Befund 22.9.).
         if (wisdomCost > 0 && this.handFodderFor(playerIdx, cardName) < wisdomCost && !this.discardCostWaived(playerIdx)) continue;   // v1288
       }
       // Creatures need a free support zone
       if (hasCardType(cd, 'Creature')) {
-        const supZones = ps.supportZones[heroIdx] || [];
+        if (fremd && !this.kontrollRechte(hs, heroIdx).beschwoeren) continue;
+        const supZones = hps.supportZones[heroIdx] || [];
         let hasFree = false;
         for (let z = 0; z < 3; z++) { if ((supZones[z] || []).length === 0) { hasFree = true; break; } }
         if (!hasFree) continue;
@@ -18380,7 +18472,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         // (Hu, Coffee, Trample Sounds, …) silently bypass the gate
         // and let the player play Creatures their own canSummon
         // would otherwise refuse.
-        if (!this.isCreatureSummonable(cardName, playerIdx, heroIdx)) continue;
+        if (!this.isCreatureSummonable(cardName, hs, heroIdx)) continue;
       }
       // Once-per-game cards (Divine Gift, etc.)
       const script = loadCardEffect(cardName);
@@ -19191,7 +19283,8 @@ this._deathWatch = (this._deathWatchStack || []).length
       for (let hi = 0; hi < (sidePs.heroes || []).length; hi++) {
         const h = sidePs.heroes[hi];
         if (!h?.name || h.hp <= 0) continue;
-        if (h.statuses?.frozen || h.statuses?.charmed) continue;
+        // Als Vorgabe 29.9.: bezaubert sperrt nur, wenn die Uebernahme kein `ausruesten` erlaubt.
+        if (!heroCanBeEquipped(h)) continue;
         const sz = sidePs.supportZones?.[hi] || [];
         for (let z = 0; z < 3; z++) if ((sz[z] || []).length === 0) return true;
       }
@@ -19864,8 +19957,16 @@ this._deathWatch = (this._deathWatchStack || []).length
   async performImmediateAction(playerIdx, heroIdx, config = {}) {
     const ps = this.gs.players[playerIdx];
     if (!ps) return { played: false };
-    const hero = ps.heroes[heroIdx];
+    // Als Vorgabe 29.9.: `config.heroOwner` = Brettseite eines GELIEHENEN
+    // Helden (Junshi unter Styx). Angeboten werden dann nur Attacks und
+    // Spells aus der Hand des Kontrolleurs — der Guss laeuft wie
+    // `doPlaySpell` mit `charmedOwner` (`_castSpellImmediately` mit
+    // `heroOwner`). Kreaturen, Abilities und Heldeneffekte des geliehenen
+    // Helden bietet die Zusatzaktion (noch) nicht an.
+    const hs = (config.heroOwner === 0 || config.heroOwner === 1) ? config.heroOwner : playerIdx;
+    const hero = this.gs.players[hs]?.heroes?.[heroIdx];
     if (!hero?.name || hero.hp <= 0) return { played: false };
+    if (hs !== playerIdx && this.heroSideOf(hs, hero) !== playerIdx) return { played: false };
 
     // ── ★ 28.8. (Als Vorgabe): ABBRUCH FUEHRT ZURUECK ZUR AUSWAHL ──
     // Wer eine Aktion waehlt und sie dann abbricht (Zielwahl weg-
@@ -19890,7 +19991,11 @@ this._deathWatch = (this._deathWatchStack || []).length
         this.log('immediate_action_reprompt_capped', { by: config.title });
         return { played: false };
       }
-    let eligible = this.getHeroEligibleActionCards(playerIdx, heroIdx);
+    let eligible = this.getHeroEligibleActionCards(playerIdx, heroIdx, hs);
+    if (hs !== playerIdx) {
+      const _db = this._getCardDB();
+      eligible = eligible.filter(n => !hasCardType(_db[n], 'Creature'));
+    }
 
     // Optional card type filter (e.g. ['Attack', 'Spell'] for Invisibility Cloak)
     if (config.allowedCardTypes) {
@@ -19929,7 +20034,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // (Adventurousness' Gold-Riegel), Boris und den
     // Distracting-Crystal-Riegel nicht kannte. Zwei Wahrheiten fuer
     // dieselbe Frage, und die schwaechere gewann.
-    const activatableAbilities = config.skipAbilities ? [] : this.getActivatableAbilities(playerIdx, {
+    const activatableAbilities = (config.skipAbilities || hs !== playerIdx) ? [] : this.getActivatableAbilities(playerIdx, {
       ignoreActionEconomy: true, onlyHeroIdx: heroIdx, ownSideOnly: true,
     });
 
@@ -19937,7 +20042,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // Dance „nur Spider") beschreibt eine eingeschraenkte Aktion — die
     // bezahlt dann auch keinen Brett-Effekt.
     const eingeschraenkt = !!config.allowedCardTypes || typeof config.cardNameFilter === 'function';
-    const activatableHeroEffects = (eingeschraenkt || config.skipHeroEffects) ? [] : this.getActiveHeroEffects(playerIdx, {
+    const activatableHeroEffects = (eingeschraenkt || config.skipHeroEffects || hs !== playerIdx) ? [] : this.getActiveHeroEffects(playerIdx, {
       ignoreActionEconomy: true, onlyHeroIdx: heroIdx, onlyActionCost: true,
     });
 
@@ -19948,6 +20053,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     const actionResult = await this.promptGeneric(playerIdx, {
       type: 'heroAction',
       heroIdx,
+      ...(hs !== playerIdx ? { heroOwner: hs } : {}),   // Als Vorgabe 29.9.: geliehener Held
       heroName: hero.name,
       eligibleCards: eligible,
       activatableAbilities,
@@ -19996,6 +20102,10 @@ this._deathWatch = (this._deathWatchStack || []).length
     const ps = this.gs.players[playerIdx];
     if (!ps) return { played: false };
     const activatableHeroEffects = angebot.activatableHeroEffects || [];
+    // Als Vorgabe 29.9.: geliehener Held — nur Attack/Spell aus der Hand.
+    const _leihSeite = (config.heroOwner === 0 || config.heroOwner === 1) && config.heroOwner !== playerIdx
+      ? config.heroOwner : null;
+    if (_leihSeite != null && (actionResult.heroEffectActivation || actionResult.abilityActivation)) return { retry: true };
 
     // ── Helden-Effekt als Zusatzaktion ─────────────────────────────
     if (actionResult.heroEffectActivation) {
@@ -20138,6 +20248,7 @@ this._deathWatch = (this._deathWatchStack || []).length
 
     const ACTION_TYPES = ['Attack', 'Spell', 'Creature'];
     if (!ACTION_TYPES.includes(cardData.cardType)) return { retry: true };
+    if (_leihSeite != null && hasCardType(cardData, 'Creature')) return { retry: true };   // Als Vorgabe 29.9.
 
     if (hasCardType(cardData, 'Creature')) {
       if (zoneSlot === undefined || zoneSlot < 0) return { retry: true };
@@ -20220,6 +20331,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         fromZone: 'hand', pool: quelle, poolIndex: handIndex, by: config.title, excludeTargets: config.excludeTargets,
         zusageEintrag: zusage,   // v1303: Auftritt beim BEGINN der Aufloesung
         alsZusatzaktion: true,   // v1352: als ausgefuehrte Aktion melden
+        ...(_leihSeite != null ? { heroOwner: _leihSeite } : {}),   // Als Vorgabe 29.9.
       });
       if (r.cancelled) { this._zusageAuftrittVerwerfen(zusage); return { retry: true }; }
       this._feuereZusageAuftritte(zusage);   // Spell ohne Abfrage: jetzt
@@ -20302,7 +20414,12 @@ this._deathWatch = (this._deathWatchStack || []).length
 
   async _castSpellImmediately(playerIdx, heroIdx, cardName, opts = {}) {
     const ps = this.gs.players[playerIdx];
-    const hero = ps?.heroes?.[heroIdx];
+    // Als Vorgabe 29.9.: `opts.heroOwner` = Brettseite eines GELIEHENEN
+    // Wirkers (Friedhelm, Yukana, Junshi unter Styx) — wie `doPlaySpell`
+    // mit `charmedOwner`: Karte, Wisdom und Ablage beim Kontrolleur, der
+    // Wirker (Instanz `heroOwner`, `gs._wirkerSeite`) auf der Brettseite.
+    const wirkerSeite = (opts.heroOwner === 0 || opts.heroOwner === 1) ? opts.heroOwner : playerIdx;
+    const hero = this.gs.players[wirkerSeite]?.heroes?.[heroIdx];
     const cardData = this._getCardDB()[cardName];
     if (!ps || !hero || !cardData) return { cancelled: true };
     const pool = opts.pool || ps.hand;
@@ -20330,6 +20447,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       this.log('spell_cast_from_deck', { player: ps.username, card: cardName, by: opts.by || null });
     }
     const inst = this._trackCard(cardName, playerIdx, 'hand', heroIdx, -1);
+    if (wirkerSeite !== playerIdx) inst.heroOwner = wirkerSeite;   // Als Vorgabe 29.9.
     const _cancelVorher = this.gs._spellCancelled;
     this.gs._spellCancelled = false;
     // ★ v1316 (Als Befund 23.9., Yukana): die Wisdom-Kosten werden jetzt
@@ -20339,7 +20457,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // auf — und wer anschliessend in der Zielwahl abbrach, hatte die
     // Abwuerfe umsonst bezahlt. Die Hoehe steht beim Wirken fest.
     const _wisdomKosten = cardData.cardType === 'Spell'
-      ? this.getWisdomDiscardCost(playerIdx, heroIdx, cardData) : 0;
+      ? this.getWisdomDiscardCost(wirkerSeite, heroIdx, cardData) : 0;   // wie doPlaySpell: Seite des Wirkers
     this.gs._immediateActionContext = true;
     // ★ v1469 (Als Befund 28.9.: „Bartas hat mich nicht gepromptet, ein
     // zweites Ziel mit ‚Phoenix Tackle' anzugreifen"). Der Sofort-Guss
@@ -20373,6 +20491,9 @@ this._deathWatch = (this._deathWatchStack || []).length
     // hat nichts zu verbergen, und der Auftritt soll der Wirkung vorangehen).
     let _placedVorher = false, _aufsBrett = false;   // v1364
     const _auftritt = this.gussAuftrittBeginnen(cardName, playerIdx);   // v1339: gemeinsamer Helfer
+    // Als Vorgabe 29.9.: Wirker-Seite fuer Stufenabfragen (wie doPlaySpell).
+    const _wirkerVorher = this.gs._wirkerSeite;
+    this.gs._wirkerSeite = { pi: playerIdx, heroIdx, heroOwner: wirkerSeite };
     try {
       // ★ v1323 (Tester-Befund 23.9.: Yukana + Supply Chain zog nur bis 6):
       // waehrend der Aufloesung gilt die Karte als „aufloesend" — Effekte,
@@ -20418,6 +20539,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       }
       delete this.gs._spellNegatedByEffect;
     } finally {
+      if (_wirkerVorher === undefined) delete this.gs._wirkerSeite; else this.gs._wirkerSeite = _wirkerVorher;
       // v1469: aeusseres Protokoll zurueck (auch bei Fehler/Abbruch).
       if (_aeussererLog === undefined) delete this.gs._spellDamageLog;
       else this.gs._spellDamageLog = _aeussererLog;
@@ -20518,7 +20640,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // gemeldet — ein zweiter Haken liesse Bleeding doppelt ticken und
     // zaehlte die Aktion doppelt (`_actionsPlayedThisTurn`).
     if (opts.alsZusatzaktion && !this.gs.result) {
-      await this.meldeGussAlsAktion(playerIdx, heroIdx, cardName);
+      await this.meldeGussAlsAktion(playerIdx, heroIdx, cardName, wirkerSeite !== playerIdx ? { heroOwner: wirkerSeite } : {});
     }
     return { cancelled: false };
   }
@@ -22289,6 +22411,8 @@ this._deathWatch = (this._deathWatchStack || []).length
           try { ok = !!script.canEquipToHero(this.gs, playerIdx, hi, this); } catch {}
           if (ok) { anyHero = true; break; }
         }
+        // Als Vorgabe 29.9.: auch ein uebernommener Held mit Recht `ausruesten`.
+        if (!anyHero && (this.getKontrollAusruestZiele(playerIdx)[cardName] || []).length > 0) anyHero = true;
         if (!anyHero) { blocked.push(cardName); continue; }
       }
     }
@@ -27451,10 +27575,23 @@ this._deathWatch = (this._deathWatchStack || []).length
       }
     }
 
-    for (let shi = 0; shi < (ps.heroes || []).length; shi++) {
-      const sHero = ps.heroes[shi];
+    // Als Vorgabe 29.9.: Zonen der Zielseite (ausloesen darf ihr
+    // jeweiliger Kontrolleur) plus Zonen geliehener Helden der Gegenseite,
+    // die der Zielbesitzer kontrolliert. `seite` = Brettseite der Zone.
+    const _umleitZonen = [];
+    for (const seite of [targetOwnerIdx, targetOwnerIdx === 0 ? 1 : 0]) {
+      const zps = this.gs.players[seite];
+      for (let shi = 0; shi < (zps?.heroes || []).length; shi++) {
+        if (seite !== targetOwnerIdx && this.surpriseKontrolleur(seite, shi) !== targetOwnerIdx) continue;
+        _umleitZonen.push({ seite, shi });
+      }
+    }
+    for (const { seite, shi } of _umleitZonen) {
+      const sps = this.gs.players[seite];
+      const reaktor = this.surpriseKontrolleur(seite, shi);
+      const sHero = sps.heroes[shi];
       if (!sHero?.name || sHero.hp <= 0) continue;
-      const sz = ps.surpriseZones?.[shi] || [];
+      const sz = sps.surpriseZones?.[shi] || [];
       if (sz.length === 0) continue;
       const sName = sz[0];
       const sScript = loadCardEffect(sName);
@@ -27471,15 +27608,16 @@ this._deathWatch = (this._deathWatchStack || []).length
 
       // Surprise instance must still be face-down in the zone.
       const sInst = this.cardInstances.find(c =>
-        c.owner === targetOwnerIdx && c.zone === ZONES.SURPRISE
+        c.owner === seite && c.zone === ZONES.SURPRISE
         && c.heroIdx === shi && c.name === sName);
       if (!sInst || !sInst.faceDown) continue;
 
-      if (!sScript.canSurpriseRedirect(this.gs, targetOwnerIdx, shi, selected, validTargets, config, sourceCard, this)) continue;
-      if (!this._canHeroActivateSurprise(targetOwnerIdx, shi, sName)) continue;
+      // 29.9.: 2. Argument = Ausloeser (Kontrolleur), 10. = Brettseite.
+      if (!sScript.canSurpriseRedirect(this.gs, reaktor, shi, selected, validTargets, config, sourceCard, this, seite)) continue;
+      if (!this._canHeroActivateSurprise(seite, shi, sName, { reaktor })) continue;
 
       const attackerName = config.title || sourceCard?.name || 'an effect';
-      const confirmed = await this.promptGeneric(targetOwnerIdx, {
+      const confirmed = await this.promptGeneric(reaktor, {
         type: 'confirm',
         title: sName,
         message: `Your ${selected.cardName} was chosen by ${attackerName}! Activate ${sName}?`,
@@ -27502,7 +27640,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         // Redirect-mode extras the Surprise's onSurpriseActivate reads.
         selected, validTargets, _redirectMode: true,
       };
-      const sResult = await this._activateSurprise(targetOwnerIdx, shi, sName, sInfo, sScript);
+      const sResult = await this._activateSurprise(seite, shi, sName, sInfo, sScript);
       // ── NEGATION statt Umleitung (v701, Rolling Boulder) ───────────
       // Eine `isSurpriseRedirect`-Karte darf statt `{ redirectTo }` auch
       // `{ negateEffect: true }` liefern: der anvisierende Effekt wird
@@ -27514,7 +27652,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       if (sResult?.negateEffect) {
         this.log('target_negated_by_surprise', {
           surprise: sName, source: sourceCard?.name,
-          target: selected.cardName, player: ps.username,
+          target: selected.cardName, player: this.gs.players[reaktor]?.username,
         });
         return { _redirectNegated: true, _bySurprise: sName };
       }
@@ -27524,7 +27662,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         redirectCard: sName,
         originalTarget: selected.cardName,
         newTarget: sResult.redirectTo.cardName,
-        player: ps.username,
+        player: this.gs.players[reaktor]?.username,
       });
       return sResult.redirectTo;
     }
@@ -28829,29 +28967,33 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (!ps) return false;
     
     // Find a Defending the Gate surprise
+    // Als Vorgabe 29.9.: Surprises aller Helden, die `targetOwnerIdx`
+    // kontrolliert (auch geliehene); `gateSeite` = Brettseite der Zone.
     let gateHeroIdx = -1;
     let gateName = null;
-    for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-      const hero = ps.heroes[hi];
+    let gateSeite = targetOwnerIdx;
+    for (const entry of this._getAllSurpriseEntries(targetOwnerIdx)) {
+      if (entry.isBakhmSlot) continue;
+      const hi = entry.heroIdx;
+      const hero = this.gs.players[entry.seite]?.heroes?.[hi];
       if (!hero?.name || hero.hp <= 0) continue;
       if (hero.statuses?.frozen || (hero.statuses?.stunned || hero.statuses?.webbed)) continue;
-      const sz = ps.surpriseZones?.[hi] || [];
-      if (sz.length === 0) continue;
-      const script = loadCardEffect(sz[0]);
+      const script = loadCardEffect(entry.cardName);
       if (script?.isDefendingGate) {
-        if (!this._canHeroActivateSurprise(targetOwnerIdx, hi, sz[0])) continue;
+        if (!this._canHeroActivateSurprise(entry.seite, hi, entry.cardName, { reaktor: targetOwnerIdx })) continue;
         gateHeroIdx = hi;
-        gateName = sz[0];
+        gateName = entry.cardName;
+        gateSeite = entry.seite;
         break;
       }
     }
     if (gateHeroIdx < 0) return false;
-    
+
     this._inGateCheck = true;
     this.gs._surprisePendingCount = (this.gs._surprisePendingCount || 0) + 1;
     this.gs.surprisePending = true;
     try {
-      const heroName = ps.heroes[gateHeroIdx]?.name || 'Hero';
+      const heroName = this.gs.players[gateSeite]?.heroes?.[gateHeroIdx]?.name || 'Hero';
       // Name the triggering card/effect so the player isn't left
       // guessing what they're defending against. Prefer the explicit
       // source the caller passed; fall back to whatever card/effect is
@@ -28884,7 +29026,7 @@ this._deathWatch = (this._deathWatchStack || []).length
 
       // Use centralized _activateSurprise — handles flip, logging, hooks (Bakhm), discard
       const script = loadCardEffect(gateName);
-      await this._activateSurprise(targetOwnerIdx, gateHeroIdx, gateName, {}, script);
+      await this._activateSurprise(gateSeite, gateHeroIdx, gateName, {}, script);
       
       return this.gs._gateShieldActive === targetOwnerIdx;
     } finally {
@@ -28963,7 +29105,13 @@ this._deathWatch = (this._deathWatchStack || []).length
   /**
    * Get all surprise entries for a player — both regular surprise zones
    * AND Bakhm's support zones (face-down surprise creatures).
-   * Returns array of { heroIdx, cardName, isBakhmSlot, zoneSlot }
+   * Returns array of { heroIdx, cardName, isBakhmSlot, zoneSlot, seite }
+   *
+   * Als Vorgabe 29.9.: regulaere Surprise Zones nach KONTROLLE — alle
+   * Helden, die `playerIdx` gerade kontrolliert (`surpriseKontrolleur`),
+   * erst die eigene Spalte, dann geliehene Gegnerhelden. `seite` =
+   * Brettseite der Zone. Bakhm-Slots bleiben auf der eigenen Spalte
+   * (Kreaturen gehen nicht mit dem Helden mit).
    */
   _getAllSurpriseEntries(playerIdx) {
     const ps = this.gs.players[playerIdx];
@@ -28971,14 +29119,19 @@ this._deathWatch = (this._deathWatchStack || []).length
     const entries = [];
 
     // Regular surprise zones
-    for (let heroIdx = 0; heroIdx < (ps.heroes || []).length; heroIdx++) {
-      const surpriseZone = ps.surpriseZones?.[heroIdx] || [];
-      if (surpriseZone.length > 0) {
+    for (const seite of [playerIdx, playerIdx === 0 ? 1 : 0]) {
+      const sps = this.gs.players[seite];
+      if (!sps) continue;
+      for (let heroIdx = 0; heroIdx < (sps.heroes || []).length; heroIdx++) {
+        const surpriseZone = sps.surpriseZones?.[heroIdx] || [];
+        if (surpriseZone.length === 0) continue;
+        if (this.surpriseKontrolleur(seite, heroIdx) !== playerIdx) continue;
         entries.push({
           heroIdx,
           cardName: surpriseZone[0],
           isBakhmSlot: false,
           zoneSlot: -1,
+          seite,
         });
       }
     }
@@ -29007,6 +29160,7 @@ this._deathWatch = (this._deathWatchStack || []).length
           cardName,
           isBakhmSlot: true,
           zoneSlot: si,
+          seite: playerIdx,
         });
       }
     }
@@ -29032,8 +29186,11 @@ this._deathWatch = (this._deathWatchStack || []).length
     for (const entry of entries) {
       const script = loadCardEffect(entry.cardName);
       if (!script?.isSurprise || !script[triggerFlag]) continue;
+      // Als Vorgabe 29.9.: `playerIdx` = Ausloeser (Kontrolleur), `seite` =
+      // Brettseite der Zone. Ausloeser bekommen die Seite als 6. Argument.
+      const seite = entry.seite ?? playerIdx;
 
-      if (script.surpriseTrigger && !script.surpriseTrigger(this.gs, playerIdx, entry.heroIdx, triggerInfo, this)) continue;
+      if (script.surpriseTrigger && !script.surpriseTrigger(this.gs, playerIdx, entry.heroIdx, triggerInfo, this, seite)) continue;
       // Typed trigger filter: when `script[triggerFlag]` is a function
       // (not just a marker boolean), call it with the same signature as
       // `surpriseTrigger` so the script can gate on trigger-specific
@@ -29043,12 +29200,12 @@ this._deathWatch = (this._deathWatchStack || []).length
       // trigger function was treated as a mere presence marker and
       // the surprise prompted on every turn end.
       if (typeof script[triggerFlag] === 'function'
-          && !script[triggerFlag](this.gs, playerIdx, entry.heroIdx, triggerInfo, this)) continue;
+          && !script[triggerFlag](this.gs, playerIdx, entry.heroIdx, triggerInfo, this, seite)) continue;
 
-      const canActivateOpts = entry.isBakhmSlot ? { isBakhmSlot: true } : {};
-      if (!this._canHeroActivateSurprise(playerIdx, entry.heroIdx, entry.cardName, canActivateOpts)) continue;
+      const canActivateOpts = entry.isBakhmSlot ? { isBakhmSlot: true } : { reaktor: playerIdx };
+      if (!this._canHeroActivateSurprise(seite, entry.heroIdx, entry.cardName, canActivateOpts)) continue;
 
-      const heroName = this.gs.players[playerIdx]?.heroes?.[entry.heroIdx]?.name || 'Hero';
+      const heroName = this.gs.players[seite]?.heroes?.[entry.heroIdx]?.name || 'Hero';
       const msg = typeof promptConfig.message === 'function'
         ? promptConfig.message(heroName, entry.cardName)
         : promptConfig.message;
@@ -29070,6 +29227,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         // schaetzen kann (Aquatic Arrows: "same position"). Bewusst nur
         // serialisierbare Skalare — keine Instanzen in Prompt-Payloads.
         _hostHeroIdx: entry.heroIdx,
+        _hostSeite: seite,   // Als Vorgabe 29.9.: Brettseite der Zone
         // Fenster-spezifische Zusatz-Skalare (Aquatic Spear:
         // `_targetIsOwn`). Der Aufrufer buergt fuer Serialisierbarkeit.
         ...(promptConfig.extra || {}),
@@ -29078,12 +29236,12 @@ this._deathWatch = (this._deathWatchStack || []).length
       if (!confirmed) continue;
 
       const activateOpts = entry.isBakhmSlot ? { isBakhmSlot: true, bakhmZoneSlot: entry.zoneSlot } : {};
-      const result = await this._activateSurprise(playerIdx, entry.heroIdx, entry.cardName, triggerInfo, script, activateOpts);
+      const result = await this._activateSurprise(seite, entry.heroIdx, entry.cardName, triggerInfo, script, activateOpts);
 
       // For summon triggers: check if newly placed creature triggers more surprises
       if (triggerFlag === 'surpriseSummonTrigger') {
         const newCreatureInst = this.cardInstances.find(c =>
-          c.name === entry.cardName && c.owner === playerIdx && c.zone === 'support'
+          c.name === entry.cardName && c.owner === seite && c.zone === 'support'
         );
         if (newCreatureInst) {
           await this._checkSurpriseOnSummon(playerIdx, newCreatureInst);
@@ -29213,12 +29371,15 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (this._inSurpriseResolution) return null;
     if (!targetInfo || !(amount > 0)) return null;
     if (type === 'status' || type === 'burn' || type === 'poison') return null;
-    const dealerIdx = source?.heroOwner ?? source?.controller ?? source?.owner ?? -1;
+    // Als Vorgabe 29.9.: „you deal damage" = der handelnde SPIELER — bei
+    // einem geliehenen Helden dessen Kontrolleur, nicht die Brettseite.
+    const dealerIdx = this._surpriseQuellenSpieler(source);
     if (dealerIdx < 0 || dealerIdx > 1) return null;
 
     const info = {
       cardName: source?.name,
       owner: dealerIdx,
+      controller: dealerIdx,
       heroIdx: source?.heroIdx ?? -1,
       cardInstance: source,
       damageType: type,
@@ -29237,7 +29398,8 @@ this._deathWatch = (this._deathWatchStack || []).length
     return this._scanSurpriseEntriesForPlayer(dealerIdx, 'surpriseDealtDamageTrigger', info, {
       message: () => `${dealerName} dealt ${amount} damage to ${tgtLabel}!`,
       showCard: source?.name,
-      extra: { _targetIsOwn: targetInfo.owner === dealerIdx },
+      extra: { _targetIsOwn: (targetInfo.kind === 'hero' && targetInfo.heroIdx >= 0
+        ? this.surpriseKontrolleur(targetInfo.owner, targetInfo.heroIdx) : targetInfo.owner) === dealerIdx },
     });
   }
 
@@ -29255,19 +29417,24 @@ this._deathWatch = (this._deathWatchStack || []).length
     // `heroOwner` zuerst: unter Love Shot fuehrt der Caster einen
     // Angriff durch einen FREMDEN Helden, und „your opponent deals
     // damage" meint den physisch handelnden.
+    // Als Vorgabe 29.9.: es reagiert, wer den getroffenen Helden
+    // KONTROLLIERT; `controller` = handelnder Spieler der Quelle.
+    const reaktor = this.surpriseKontrolleur(targetOwner, targetHeroIdx);
     const info = {
       cardName: source?.name,
       owner: source?.heroOwner ?? source?.controller ?? source?.owner ?? -1,
+      controller: this._surpriseQuellenSpieler(source),
       heroIdx: source?.heroIdx ?? -1,
       cardInstance: source,
       damageType: type,
       targetOwner, targetHeroIdx,
+      targetController: reaktor,
       amount,
       defeated: !!opts.defeated,
     };
     const srcName = source?.name || 'An effect';
     const targetName = target.name || 'Hero';
-    return this._scanSurpriseEntriesForPlayer(targetOwner, 'surpriseAfterDamageTrigger', info, {
+    return this._scanSurpriseEntriesForPlayer(reaktor, 'surpriseAfterDamageTrigger', info, {
       message: () => `${targetName} took ${amount} damage from ${srcName}!`,
       showCard: source?.name,
     });
@@ -29308,18 +29475,23 @@ this._deathWatch = (this._deathWatchStack || []).length
     const defeatedHeroIdx = (this.gs.players[besitzer]?.heroes || []).indexOf(defeatedHero);
     if (defeatedHeroIdx < 0) return null;
 
+    // Als Vorgabe 29.9.: es reagiert, wer den Gefallenen kontrollierte
+    // (`defeatedController`); `defeatedOwner` bleibt die Brettseite.
+    const reaktor = this.surpriseKontrolleur(besitzer, defeatedHeroIdx);
     const info = {
       cardName: source?.name,
       owner: source?.heroOwner ?? source?.controller ?? source?.owner ?? -1,
+      controller: this._surpriseQuellenSpieler(source),
       heroIdx: source?.heroIdx ?? -1,
       cardInstance: source,
       defeatedOwner: besitzer,
+      defeatedController: reaktor,
       defeatedHeroIdx,
       defeatedHero,
     };
     const gefallen = defeatedHero.name || 'A Hero';
     const durch = source?.name || 'an effect';
-    return this._scanSurpriseEntriesForPlayer(besitzer, 'surpriseHeroDefeatTrigger', info, {
+    return this._scanSurpriseEntriesForPlayer(reaktor, 'surpriseHeroDefeatTrigger', info, {
       message: () => `${gefallen} was defeated by ${durch}!`,
       showCard: source?.name,
     });
@@ -29474,7 +29646,10 @@ this._deathWatch = (this._deathWatchStack || []).length
     const ownerIdx = info?.zoneOwner;
     if (!Number.isInteger(ownerIdx) || ownerIdx < 0) return null;
     const heldName = this.gs.players[ownerIdx]?.heroes?.[info.fromHeroIdx]?.name || 'a Hero';
-    return this._scanSurpriseEntriesForPlayer(ownerIdx, 'surpriseSurpriseDiscardedTrigger', info, {
+    // Als Vorgabe 29.9.: die Zone gehoerte dem Kontrolleur ihres Helden.
+    const reaktor = info.fromHeroIdx >= 0 ? this.surpriseKontrolleur(ownerIdx, info.fromHeroIdx) : ownerIdx;
+    info = { ...info, zoneController: reaktor };
+    return this._scanSurpriseEntriesForPlayer(reaktor, 'surpriseSurpriseDiscardedTrigger', info, {
       message: () => `${info.cardName} was sent from ${heldName}'s Surprise Zone to the discard pile!`,
       showCard: info.cardName,
     });
@@ -29482,7 +29657,9 @@ this._deathWatch = (this._deathWatchStack || []).length
 
   async _checkSurpriseOnStatus(targetOwnerIdx, targetHeroIdx, statusName, opts) {
     if (this._inSurpriseResolution) return null;
-    const statusInfo = { targetOwner: targetOwnerIdx, targetHeroIdx, statusName, opts };
+    // Als Vorgabe 29.9.: es reagiert, wer den Helden kontrolliert.
+    const reaktor = this.surpriseKontrolleur(targetOwnerIdx, targetHeroIdx);
+    const statusInfo = { targetOwner: targetOwnerIdx, targetHeroIdx, targetController: reaktor, statusName, opts };
     const targetName = this.gs.players[targetOwnerIdx]?.heroes?.[targetHeroIdx]?.name || 'Target';
     const statusLabel = STATUS_EFFECTS[statusName]?.label || statusName;
     // Name the card/effect inflicting the status so the player isn't
@@ -29495,7 +29672,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     const _trigger = opts?.sourceName || opts?.source?.name
       || _pend?.card || _pend?.effect || null;
     const _src = _trigger ? `the opponent's "${_trigger}"` : 'an opponent effect';
-    const result = await this._scanSurpriseEntriesForPlayer(targetOwnerIdx, 'surpriseStatusTrigger', statusInfo, {
+    const result = await this._scanSurpriseEntriesForPlayer(reaktor, 'surpriseStatusTrigger', statusInfo, {
       message: () => `${targetName} is about to be ${statusLabel} by ${_src}!`,
       confirmLabel: '🌵 Activate Surprise!',
     });
@@ -32627,6 +32804,10 @@ this._deathWatch = (this._deathWatchStack || []).length
       const heroKey = `${tOwner}-${tHeroIdx}`;
       if (this._activeSurpriseHeroes?.has(heroKey)) continue;
 
+      // Als Vorgabe 29.9.: ausloesen darf nur, wer den anvisierten Helden
+      // gerade KONTROLLIERT (geliehen: der Kontrolleur, nicht die Seite).
+      const reaktor = this.surpriseKontrolleur(tOwner, tHeroIdx);
+
       // Candidate Surprises this targeted hero can activate. Standard:
       // the target's own Surprise Zone (host == activator). Brain Spider
       // extension: while the controller has Brain Spider on the board,
@@ -32640,11 +32821,12 @@ this._deathWatch = (this._deathWatchStack || []).length
       if (ownZone.length > 0) {
         candidates.push({ hostHeroIdx: tHeroIdx, cardName: ownZone[0] });
       }
-      if (this._controllerHasBrainSpider && this._controllerHasBrainSpider(tOwner)) {
+      if (this._controllerHasBrainSpider && this._controllerHasBrainSpider(reaktor)) {
         for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
           if (hi === tHeroIdx) continue;
           const sz = ps.surpriseZones?.[hi] || [];
           if (sz.length === 0) continue;
+          if (this.surpriseKontrolleur(tOwner, hi) !== reaktor) continue;   // 29.9.
           candidates.push({ hostHeroIdx: hi, cardName: sz[0] });
         }
       }
@@ -32693,6 +32875,9 @@ this._deathWatch = (this._deathWatchStack || []).length
         const sourceInfo = {
           cardName: sourceCard?.name,
           owner: sourceCard?.heroOwner ?? sourceCard?.controller ?? sourceCard?.owner ?? -1,
+          // Als Vorgabe 29.9.: handelnder SPIELER (geliehener Held → Kontrolleur)
+          // fuer „opponent's …"-Vergleiche; `owner` bleibt die Brettseite.
+          controller: this._surpriseQuellenSpieler(sourceCard),
           heroIdx: sourceCard?.heroIdx ?? -1,
           cardInstance: sourceCard,
           damageType: opts.damageType,
@@ -32713,10 +32898,11 @@ this._deathWatch = (this._deathWatchStack || []).length
         // tHeroIdx (the targeted hero), matching "as if placed in
         // theirs". Surprise scripts that gate on "the user" see the
         // activator.
-        if (script.surpriseTrigger && !script.surpriseTrigger(this.gs, tOwner, tHeroIdx, sourceInfo, this)) continue;
+        // Als Vorgabe 29.9.: 2. Argument = Ausloeser (Kontrolleur), 6. = Seite.
+        if (script.surpriseTrigger && !script.surpriseTrigger(this.gs, reaktor, tHeroIdx, sourceInfo, this, tOwner)) continue;
 
         // Check if hero can activate (alive, not frozen/stunned, meets ability requirements)
-        if (!this._canHeroActivateSurprise(tOwner, tHeroIdx, surpriseCardName)) continue;
+        if (!this._canHeroActivateSurprise(tOwner, tHeroIdx, surpriseCardName, { reaktor })) continue;
 
         // Prompt the owner to activate
         const heroName = ps.heroes[tHeroIdx]?.name || 'Hero';
@@ -32742,7 +32928,7 @@ this._deathWatch = (this._deathWatchStack || []).length
           promptMsg += ` (Activate via Brain Spider — Surprise is set on ${hostName}.)`;
         }
 
-        const confirmed = await this.promptGeneric(tOwner, {
+        const confirmed = await this.promptGeneric(reaktor, {
           type: 'confirm',
           title: surpriseCardName,
           message: `${promptMsg} Activate ${surpriseCardName}?`,
@@ -32750,6 +32936,7 @@ this._deathWatch = (this._deathWatchStack || []).length
           confirmLabel: '💥 Activate Surprise!',
           cancelLabel: 'No',
           cancellable: true,
+          _hostSeite: tOwner,   // Als Vorgabe 29.9.: Brettseite der Zone
         });
 
         if (!confirmed) continue;
@@ -32808,15 +32995,23 @@ this._deathWatch = (this._deathWatchStack || []).length
     let totalReduced = 0;
     let negated = false;
 
-    // Scan every hero on the target's side; each may hold a face-down
-    // surprise whose script opts in to creature/hero damage triggers.
-    for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-      const hostHero = ps.heroes[hi];
-      if (!hostHero?.name) continue;
-      const surpriseZone = ps.surpriseZones?.[hi] || [];
-      if (surpriseZone.length === 0) continue;
+    // Als Vorgabe 29.9.: es reagiert, wer das Ziel KONTROLLIERT — mit den
+    // Surprises aller Helden, die er kontrolliert (auch geliehener).
+    // Kreaturen gehen nicht mit ihrem Helden mit (`effektiveSeiten`).
+    const reaktor = targetInfo.kind === 'hero' && targetInfo.heroIdx >= 0
+      ? this.surpriseKontrolleur(ownerIdx, targetInfo.heroIdx)
+      : (targetInfo.inst ? (this.effektiveSeiten(targetInfo.inst).controller ?? targetInfo.inst.owner) : ownerIdx);
 
-      const surpriseCardName = surpriseZone[0];
+    // Scan every hero the reacting player controls; each may hold a face-down
+    // surprise whose script opts in to creature/hero damage triggers.
+    for (const entry of this._getAllSurpriseEntries(reaktor)) {
+      if (entry.isBakhmSlot) continue;
+      const seite = entry.seite;
+      const hi = entry.heroIdx;
+      const hostHero = this.gs.players[seite]?.heroes?.[hi];
+      if (!hostHero?.name) continue;
+
+      const surpriseCardName = entry.cardName;
       const script = loadCardEffect(surpriseCardName);
       if (!script?.isSurprise) continue;
       if (script.firesOnAnyDamageTarget !== true) continue;
@@ -32827,7 +33022,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       if (dmgInfo.statusTick && script.firesOnStatusTickDamage !== true) continue;
 
       // Per-hero re-entry guard — same shape as `_checkSurpriseWindow`.
-      const heroKey = `${ownerIdx}-${hi}`;
+      const heroKey = `${seite}-${hi}`;
       if (this._activeSurpriseHeroes?.has(heroKey)) continue;
 
       const sourceCard = dmgInfo.source;
@@ -32839,6 +33034,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       const sourceInfo = {
         cardName: sourceCard?.name,
         owner: sourceCard?.heroOwner ?? sourceCard?.controller ?? sourceCard?.owner ?? -1,
+        controller: this._surpriseQuellenSpieler(sourceCard),   // 29.9.
         heroIdx: sourceCard?.heroIdx ?? -1,
         cardInstance: sourceCard,
         damageType: dmgInfo.damageType,
@@ -32846,11 +33042,12 @@ this._deathWatch = (this._deathWatchStack || []).length
         // amount without re-deriving from the engine state.
         damageTarget: targetInfo,
         damageAmount: dmgInfo.amount,
+        targetController: reaktor,   // 29.9.
       };
 
       if (script.surpriseTrigger
-          && !script.surpriseTrigger(this.gs, ownerIdx, hi, sourceInfo, this)) continue;
-      if (!this._canHeroActivateSurprise(ownerIdx, hi, surpriseCardName)) continue;
+          && !script.surpriseTrigger(this.gs, reaktor, hi, sourceInfo, this, seite)) continue;
+      if (!this._canHeroActivateSurprise(seite, hi, surpriseCardName, { reaktor })) continue;
 
       // Owner confirms activation. Build a target-aware label so the
       // prompt reads naturally for both hero and creature targets.
@@ -32858,7 +33055,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         ? (this.gs.players[targetInfo.owner]?.heroes?.[targetInfo.heroIdx]?.name || 'Hero')
         : (targetInfo.cardName || targetInfo.inst?.name || 'Creature');
       const srcLabel = sourceInfo.cardName || 'An effect';
-      const confirmed = await this.promptGeneric(ownerIdx, {
+      const confirmed = await this.promptGeneric(reaktor, {
         type: 'confirm',
         title: surpriseCardName,
         message: `${srcLabel} would damage ${tgtLabel}! Activate ${surpriseCardName}?`,
@@ -32871,11 +33068,12 @@ this._deathWatch = (this._deathWatchStack || []).length
         // v697: nackte Skalare fuer Karten-`cpuResponse` (Aquatic
         // Shield schaetzt seinen Wert am anrollenden Betrag).
         _hostHeroIdx: hi,
+        _hostSeite: seite,   // 29.9.
         _damageAmount: dmgInfo.amount,
       });
       if (!confirmed) continue;
 
-      const result = await this._activateSurprise(ownerIdx, hi, surpriseCardName, sourceInfo, script);
+      const result = await this._activateSurprise(seite, hi, surpriseCardName, sourceInfo, script);
       if (result?.damageReduced) totalReduced += result.damageReduced;
       if (result?.effectNegated) {
         negated = true;
@@ -34078,17 +34276,58 @@ this._deathWatch = (this._deathWatchStack || []).length
   }
 
   /**
+   * ★ Als Vorgabe 29.9.: „Surprises soll der aktuelle Kontrolleur auslösen
+   * können." Wer darf die Surprise in der Zone des Helden (`seite`,
+   * `heroIdx`) ausloesen? Charme/Styx/Golden Apple (`charmedBy`), dauerhafte
+   * Uebernahme (`permaControlBy`), FTCD/Controlled Attack (`controlledBy`),
+   * sonst die Brettseite. Die Surprise Zone geht mit dem Helden mit.
+   */
+  surpriseKontrolleur(seite, heroIdx) {
+    const hero = this.gs.players[seite]?.heroes?.[heroIdx];
+    if (!hero?.name) return seite;
+    const k = this.heroSideOf(seite, hero);
+    if (k !== seite) return k;
+    return hero.controlledBy != null ? hero.controlledBy : seite;
+  }
+
+  /**
+   * Als Vorgabe 29.9.: welcher SPIELER handelt mit einer Surprise-Quelle?
+   * Kreaturen: ihr Kontrolleur. Helden-Quellen mit Brettseite
+   * (`heroOwner`, geliehener Held): der Kontrolleur dieses Helden. Sonst
+   * `controller ?? owner`. Fuer „opponent's …"-Vergleiche in Ausloesern
+   * (`sourceInfo.controller`); `sourceInfo.owner` bleibt die Brettseite des
+   * handelnden Helden (Nachschlagen des Angreifers).
+   */
+  _surpriseQuellenSpieler(source) {
+    if (!source || typeof source !== 'object') return -1;
+    if (source.zone === 'support' && typeof source.owner === 'number') {
+      return this.effektiveSeiten(source).controller ?? source.owner;
+    }
+    if (typeof source.heroOwner === 'number' && source.heroOwner >= 0 && source.heroIdx >= 0) {
+      return this.surpriseKontrolleur(source.heroOwner, source.heroIdx);
+    }
+    return source.controller ?? source.owner ?? -1;
+  }
+
+  /**
    * Requires: hero alive, not frozen/stunned, meets spell school & level requirements.
    * For Creature surprises: also requires a free Support Zone.
+   * `playerIdx` = Brettseite des Helden. `opts.reaktor` (Als Vorgabe 29.9.):
+   * wer die Surprise ausloesen will — muss den Helden kontrollieren
+   * (`surpriseKontrolleur`). Ohne `reaktor` gilt die Brettseite.
    */
   _canHeroActivateSurprise(playerIdx, heroIdx, cardName, opts = {}) {
-    if (this._reaktionGesperrt(playerIdx)) return false;   // v1293 Reaktionssperre
+    const reaktor = opts.reaktor ?? playerIdx;
+    if (this._reaktionGesperrt(reaktor)) return false;   // v1293 Reaktionssperre
     const ps = this.gs.players[playerIdx];
     const hero = ps?.heroes?.[heroIdx];
     if (!hero?.name || hero.hp <= 0) return false;
     // Styx 28.9.: ein Held, den gerade der GEGNER kontrolliert, castet fuer
     // seinen Besitzer keine Reaktion und loest keine Surprise aus.
-    if (this.heroSideOf(playerIdx, hero) !== playerIdx) return false;
+    // Als Vorgabe 29.9.: mit `reaktor` loest der Kontrolleur aus.
+    if (opts.reaktor != null) {
+      if (this.surpriseKontrolleur(playerIdx, heroIdx) !== reaktor) return false;
+    } else if (this.heroSideOf(playerIdx, hero) !== playerIdx) return false;
     if (hero.statuses?.frozen || (hero.statuses?.stunned || hero.statuses?.webbed)) return false;
     // v619 (Als Regel 29.8.): ein NEGIERTER Held castet keine Reaktion —
     // jede Form der Negation, auch die Effekt-Only-Variante des
@@ -34159,11 +34398,17 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (cardData.cardType === 'Spell') {
       const wisdomCost = this.getWisdomDiscardCost(playerIdx, heroIdx, cardData);
       if (wisdomCost > 0) {
-        const handLen = (ps.hand || []).length;
+        // Als Vorgabe 29.9.: abgeworfen wird aus der Hand des Ausloesers.
+        const handLen = (this.gs.players[reaktor]?.hand || []).length;
         const available = opts.spellInHand ? Math.max(0, handLen - 1) : handLen;
         if (available < wisdomCost) return false;
       }
     }
+
+    // Als Vorgabe 29.9.: eine Surprise-Kreatur am geliehenen Helden ist
+    // eine Beschwoerung ueber ihn — nur mit dem Beschwoerungsrecht.
+    if (reaktor !== playerIdx && !opts.isBakhmSlot && hasCardType(cardData, 'Creature')
+        && !this.kontrollRechte(playerIdx, heroIdx).beschwoeren) return false;
 
     // Creature surprises need a free Support Zone (skip for Bakhm slots — already in support)
     if (!opts.isBakhmSlot && hasCardType(cardData, 'Creature')) {
@@ -34359,6 +34604,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     const _surpriseCardData = this._getCardDB()[cardName];
     const _surpriseIsSpell = _surpriseCardData?.cardType === 'Spell';
     if (_surpriseIsSpell) this._pushResolvingSpell(cardName);
+    let _steuerInst = null, _steuerVorher;   // 29.9.: Ausloeser als controller (s.u.)
     try {
     const ps = this.gs.players[playerIdx];
     const hero = ps.heroes[heroIdx];
@@ -34399,6 +34645,14 @@ this._deathWatch = (this._deathWatchStack || []).length
     // in theirs"). When `hostHeroIdx` is omitted, defaults to the
     // activator — preserving the long-standing single-hero behaviour.
     const hostHeroIdx = (opts.hostHeroIdx != null) ? opts.hostHeroIdx : heroIdx;
+
+    // ★ Als Vorgabe 29.9.: „Surprises soll der aktuelle Kontrolleur
+    // auslösen können." `playerIdx` bleibt die BRETTSEITE (Zone, Instanz,
+    // Kreaturplatz); `steuerer` ist der Ausloeser (Kontrolleur des
+    // Helden) — Prompts, Hand, Log, Aufdecken fuer den Gegner. Bakhm-Slots,
+    // Ablage- und Deck-Aktivierungen bleiben bei `playerIdx`.
+    const steuerer = (isBakhmSlot || opts.fromDiscard || opts.fromDeck)
+      ? playerIdx : this.surpriseKontrolleur(playerIdx, heroIdx);
 
     // Find and update the CardInstance — flip face-up
     let inst;
@@ -34452,6 +34706,14 @@ this._deathWatch = (this._deathWatchStack || []).length
       if (!isBakhmSlot && (hostHeroIdx !== heroIdx || fromDiscard)) {
         inst.heroIdx = heroIdx;
       }
+      // Als Vorgabe 29.9.: waehrend der Aufloesung handelt die Instanz fuer
+      // den Ausloeser — Engine-Helfer, die `inst.controller` lesen
+      // (actionAoeHit u.a.), sehen den Kontrolleur. Bleibt sie in der
+      // Zone (staysFaceUp), wird unten zurueckgesetzt.
+      if (steuerer !== playerIdx) {
+        _steuerInst = inst; _steuerVorher = inst.controller;
+        inst.controller = steuerer;
+      }
     }
 
     if (!fromDiscard && !fromDeck) {
@@ -34471,7 +34733,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     }
 
     // Reveal card to opponent and spectators
-    const oi = playerIdx === 0 ? 1 : 0;
+    const oi = steuerer === 0 ? 1 : 0;   // 29.9.: Gegner des Ausloesers
     const oppSid = this.gs.players[oi]?.socketId;
     if (oppSid) this.io.to(oppSid).emit('card_reveal', { cardName });
     if (this.room?.spectators) {
@@ -34480,7 +34742,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       }
     }
 
-    this.log('surprise_activated', { card: cardName, player: ps.username, hero: hero.name });
+    this.log('surprise_activated', { card: cardName, player: this.gs.players[steuerer]?.username ?? ps.username, hero: hero.name });
     // Sync with card still face-up in the surprise zone
     this.sync();
     await this._delay(800);
@@ -34496,7 +34758,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (cardDataForCost?.cardType === 'Spell') {
       const wisdomCost = this.getWisdomDiscardCost(playerIdx, heroIdx, cardDataForCost);
       if (wisdomCost > 0) {
-        await this.actionPromptForceDiscard(playerIdx, wisdomCost, {
+        await this.actionPromptForceDiscard(steuerer, wisdomCost, {   // 29.9.: Hand des Ausloesers
           title: 'Wisdom Cost', source: 'Wisdom', selfInflicted: true,
         });
       }
@@ -34510,8 +34772,11 @@ this._deathWatch = (this._deathWatchStack || []).length
     // Spell. Any cost the owner already paid at activation (e.g. the
     // Wisdom level-gap discard above) stays paid, matching the engine's
     // standard negation philosophy.
+    // 29.9.: `surpriseOwner` = Brettseite der Zone (mit `heroIdx`),
+    // `surpriseController` = Ausloeser.
     const surpriseHookCtx = {
       surpriseCardName: cardName, surpriseOwner: playerIdx, heroIdx,
+      surpriseController: steuerer,
       sourceInfo, _skipReactionCheck: true,
     };
     await this.runHooks('onSurpriseActivated', surpriseHookCtx);
@@ -34530,7 +34795,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         _skipReactionCheck: true,
       });
       this.log('surprise_negated', {
-        card: cardName, player: ps.username,
+        card: cardName, player: this.gs.players[steuerer]?.username ?? ps.username,
         by: surpriseHookCtx._surpriseNegatedBy || 'a reaction',
       });
     }
@@ -34548,7 +34813,7 @@ this._deathWatch = (this._deathWatchStack || []).length
           heroOwner: playerIdx,   // Styx 28.9.: Reihe, in die `heroIdx` zeigt
           spellName: cardName,
           spellCardData: cardDataForDelay,
-          heroIdx, casterIdx: playerIdx,
+          heroIdx, casterIdx: steuerer,   // 29.9.: Ausloeser
           damageTargets: [],
           isSecondCast: false,
           _skipReactionCheck: true,
@@ -34684,6 +34949,15 @@ this._deathWatch = (this._deathWatchStack || []).length
         inst.zoneSlot = placed.actualSlot;
         inst.faceDown = false;
         inst.turnPlayed = this.gs.turn || 0; // Enforce summoning sickness
+        // Als Vorgabe 29.9.: ueber einen geliehenen Helden ausgeloest — die
+        // Kreatur steht auf der Brettseite, handelt fuer den Ausloeser
+        // (wie eine seitenfremde Beschwoerung). Die KARTE gehoert weiter
+        // ihrem Besitzer (`originalOwner` bleibt).
+        if (steuerer !== playerIdx) {
+          const _besitzer = inst.originalOwner;
+          this.markiereSeitenfremd(inst, steuerer);
+          inst.originalOwner = _besitzer;
+        }
         this._syncGuardianImmunity(inst, playerIdx);
         // Als Vorgabe 19.8.: die Kreatur soll sich SICHTBAR von ihrer
         // Surprise Zone in die Support Zone bewegen statt dorthin zu
@@ -34726,6 +35000,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         // Fire hook for Bakhm's 80-damage chain
         await this.runHooks('onSurpriseCreaturePlaced', {
           surpriseCardName: cardName, surpriseOwner: playerIdx, heroIdx,
+          surpriseController: steuerer,   // 29.9.
           zoneSlot: placed.actualSlot, cardInstance: inst,
         });
       } else {
@@ -34735,14 +35010,17 @@ this._deathWatch = (this._deathWatchStack || []).length
         // otherwise pick the leftmost rect). `fromDeck` activations
         // have no zone-of-origin to fly from — the diff handler will
         // surface the new discard entry on its own.
+        // Als Vorgabe 29.9.: Ablage beim KARTENBESITZER (`originalOwner`).
+        const _ablage = (inst?.originalOwner === 0 || inst?.originalOwner === 1) ? inst.originalOwner : playerIdx;
         if (!fromDeck) {
           this._broadcastEvent('play_pile_transfer', {
             owner: playerIdx, cardName,
+            fromOwner: playerIdx, toOwner: _ablage,
             from: 'surprise', to: 'discard',
             fromHeroIdx: hostHeroIdx,
           });
         }
-        ps.discardPile.push(cardName);
+        this.gs.players[_ablage].discardPile.push(cardName);
         if (inst) this._untrackCard(inst.id);
       }
     } else {
@@ -34751,14 +35029,17 @@ this._deathWatch = (this._deathWatchStack || []).length
       // actual resolved slot (the diff-detector keys by name and
       // would otherwise pick the leftmost rect). `fromDeck` skips the
       // flight (see Creature branch above).
+      // Als Vorgabe 29.9.: Ablage beim KARTENBESITZER (`originalOwner`).
+      const _ablage = (inst?.originalOwner === 0 || inst?.originalOwner === 1) ? inst.originalOwner : playerIdx;
       if (!fromDeck) {
         this._broadcastEvent('play_pile_transfer', {
           owner: playerIdx, cardName,
+          fromOwner: playerIdx, toOwner: _ablage,
           from: 'surprise', to: 'discard',
           fromHeroIdx: hostHeroIdx,
         });
       }
-      ps.discardPile.push(cardName);
+      this.gs.players[_ablage].discardPile.push(cardName);
       if (inst) this._untrackCard(inst.id);
     }
     } // end if/else isBakhmSlot
@@ -34770,6 +35051,11 @@ this._deathWatch = (this._deathWatchStack || []).length
       if (this._surpriseResolutionDepth === 0) this._inSurpriseResolution = false;
       this._activeSurpriseHeroes?.delete(heroKey);
       if (_surpriseIsSpell) this._popResolvingSpell();
+      // 29.9.: liegt die Instanz noch in der Surprise Zone (staysFaceUp),
+      // bestimmt wieder `effektiveSeiten` den Kontrolleur.
+      if (_steuerInst && _steuerInst.zone === ZONES.SURPRISE && _steuerInst.controller !== _steuerVorher) {
+        _steuerInst.controller = _steuerVorher;
+      }
     }
   }
 
@@ -41447,10 +41733,16 @@ this._deathWatch = (this._deathWatchStack || []).length
    * @returns {boolean}
    */
   canAttachAbilityToHero(playerIdx, cardName, heroIdx, opts = {}) {
-    const ps = this.gs.players[playerIdx];
+    // Als Vorgabe 29.9.: `opts.heroOwner` = Brettseite eines GELIEHENEN
+    // Helden (Peter Röll unter Styx). Nur, wenn die Uebernahme Abilities
+    // erlaubt (`kontrollRechte(…).abilities`); Zonen auf der Brettseite.
+    const hs = (opts.heroOwner === 0 || opts.heroOwner === 1) ? opts.heroOwner : playerIdx;
+    const ps = this.gs.players[hs];
     if (!ps) return false;
     const hero = ps.heroes?.[heroIdx];
     if (!hero?.name || hero.hp <= 0) return false;
+    if (hs !== playerIdx && (this.heroSideOf(hs, hero) !== playerIdx
+        || !this.kontrollRechte(hs, heroIdx).abilities)) return false;
 
     const abZones = ps.abilityZones[heroIdx] || [[], [], []];
     const script = loadCardEffect(cardName);
@@ -41464,7 +41756,7 @@ this._deathWatch = (this._deathWatchStack || []).length
 
     // ★★ v1349: EINE Stelle fuer die Zonenwahl (siehe `abilityZielZone`).
     void abZones;
-    return this.abilityZielZone(playerIdx, heroIdx, cardName) >= 0;
+    return this.abilityZielZone(hs, heroIdx, cardName) >= 0;
   }
 
   /**
@@ -45596,8 +45888,18 @@ this._deathWatch = (this._deathWatchStack || []).length
     const ps = gs.players[pi];
     if (!ps) return { success: false };
 
-    const hero = ps.heroes?.[heroIdx];
+    // Als Vorgabe 29.9.: `opts.heroOwner` = Brettseite eines GELIEHENEN
+    // Helden (Throne Robber unter Styx). Karte aus Hand/Deck des
+    // Kontrolleurs `pi`; Held, Heldeninstanz und Anzeige auf `hs`. Das
+    // Heldenobjekt bleibt dasselbe — Kontrollmarken bleiben also dran.
+    // Nur ueber Wege, die die Bedingung uebergehen (`skipCondition`):
+    // Aufstiegsbedingungen lesen die Spalte von `pi`.
+    const hs = (opts.heroOwner === 0 || opts.heroOwner === 1) ? opts.heroOwner : pi;
+    const hps = gs.players[hs];
+    if (!hps) return { success: false };
+    const hero = hps.heroes?.[heroIdx];
     if (!hero?.name) return { success: false };
+    if (hs !== pi && (this.heroSideOf(hs, hero) !== pi || !opts.skipCondition)) return { success: false };
     // ── AUFSTIEG AUS DEM TOD HERAUS (v718) ───────────────────────────
     // Der Normalfall verlangt einen lebenden Helden. Eine Ascended-
     // Karte, deren gedruckte Bedingung GENAU der Tod der Grundform ist
@@ -45803,14 +46105,14 @@ this._deathWatch = (this._deathWatchStack || []).length
       // der Flug Deck → Held — es gibt keinen Startplatz zu erhalten.
       const genommen = await this.takeFromPile(pi, 'deck', cardName, { source: opts.source || 'Ascension', shuffle: true });
       if (!genommen) return { success: false };
-      this._pileFlight(pi, cardName, 'deck', 'hero', { toHeroIdx: heroIdx });
+      this._pileFlight(pi, cardName, 'deck', 'hero', { toHeroIdx: heroIdx, ...(hs !== pi ? { toOwner: hs } : {}) });
       if (!this._fastMode && !this._inMctsSim) { this.sync(); await this._delay(700); }
     } else {
     if (!this._fastMode && !this._inMctsSim) {
       this._broadcastEvent('attach_hero_fly', {
         ownerIdx: pi, source: opts.fromCreation ? 'coolnessStack' : 'hand',
         handIndex, cardName,
-        destOwner: pi, destHeroIdx: heroIdx, destZoneSlot: -1,
+        destOwner: hs, destHeroIdx: heroIdx, destZoneSlot: -1,
       });
       this.sync();
       await this._delay(700);
@@ -45828,7 +46130,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       // Aufstieg daran vorbei und die Loeschung landete irgendwann
       // mitten im naechsten Schritt. Synchrone Preise (Waflav & Co.)
       // merken davon nichts.
-      await ascendedScript.payAscensionCost(this, pi, heroIdx);
+      await ascendedScript.payAscensionCost(this, hs, heroIdx);   // Als Vorgabe 29.9.: Seite des Helden
     }
 
     // ── State transfer ──
@@ -45878,7 +46180,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // keep firing on the ascended hero. Setting `inst.script = null` forces
     // the next loadScript() to re-resolve against the new name.
     for (const inst of this.cardInstances) {
-      if (inst.owner === pi && inst.heroIdx === heroIdx && inst.zone === 'hero') {
+      if (inst.owner === hs && inst.heroIdx === heroIdx && inst.zone === 'hero') {   // Als Vorgabe 29.9.: Brettseite
         inst.name = cardName;
         inst.script = null;
         break;
@@ -45887,7 +46189,7 @@ this._deathWatch = (this._deathWatchStack || []).length
 
     // ── Set up new hero's passive (bypassLevelReq, etc.) ──
     if (ascendedScript?.onAscendSetup) {
-      ascendedScript.onAscendSetup(gs, pi, heroIdx, this);
+      ascendedScript.onAscendSetup(gs, hs, heroIdx, this);
     }
 
     // Der Broadcast bleibt in beiden Faellen `hero_ascension` — er ist
@@ -45896,7 +46198,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // Wege auseinanderhalten.
     this.log(opts.notAnAscension ? 'hero_form_placed' : 'hero_ascension',
       { player: ps.username, oldHero: oldName, newHero: cardName });
-    this._broadcastEvent('hero_ascension', { owner: pi, heroIdx, oldHero: oldName, newHero: cardName });
+    this._broadcastEvent('hero_ascension', { owner: hs, heroIdx, oldHero: oldName, newHero: cardName });
     // ── Form stack ──
     // Cards that can Descend need to know what they came FROM. Pushed
     // for every Ascension of a stack-forming card so a later Descend
@@ -45925,7 +46227,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // Ascensions keep their existing presentation.
     if (ascendedScript?.evolutionAnimation) {
       this._broadcastEvent('play_evolution_animation', {
-        owner: pi, heroIdx, fromHero: oldName, toHero: cardName,
+        owner: hs, heroIdx, fromHero: oldName, toHero: cardName,
         direction: 'ascend', duration: 1600,
       });
       await this._delay(1600);
@@ -45944,7 +46246,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (!opts.notAnAscension) {
       await this.runHooks(HOOKS.ON_ASCENSION, {
         playerIdx: pi, heroIdx, oldHeroName: oldName, newHeroName: cardName,
-        hero, ascendedCardData: newCardData,
+        hero, ascendedCardData: newCardData, heroOwner: hs,
       });
     }
 
@@ -46347,7 +46649,11 @@ this._deathWatch = (this._deathWatchStack || []).length
     const ps = gs.players[pi];
     if (!ps) return { success: false };
 
-    const hero = ps.heroes?.[heroIdx];
+    // Als Vorgabe 29.9.: `opts.heroOwner` = Brettseite eines geliehenen
+    // Helden (Tri Ad/Throne Robber unter Styx). `pi` bekommt die Form
+    // (Ablage bzw. Hand beim Aufrufer), Held und Instanz liegen auf `hs`.
+    const hs = (opts.heroOwner === 0 || opts.heroOwner === 1) ? opts.heroOwner : pi;
+    const hero = gs.players[hs]?.heroes?.[heroIdx];
     // ★ 28.8., `opts.evenIfDefeated`: „At the end of your opponent's next
     // turn, Descend this Hero (even if it is defeated …)". Der normale
     // Weg steigt bei einem toten Helden aus — hier ist der Abstieg
@@ -46467,7 +46773,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // Ascension does — otherwise the descended-from form's hooks keep
     // firing on the reverted Hero.
     for (const inst of this.cardInstances) {
-      if (inst.owner === pi && inst.heroIdx === heroIdx && inst.zone === 'hero') {
+      if (inst.owner === hs && inst.heroIdx === heroIdx && inst.zone === 'hero') {   // Als Vorgabe 29.9.: Brettseite
         inst.name = newName;
         inst.script = null;
         break;
@@ -46476,7 +46782,7 @@ this._deathWatch = (this._deathWatchStack || []).length
 
     // Let the form we land on re-install its passive (bypassLevelReq etc.).
     const newScript = loadCardEffect(newName);
-    if (newScript?.onAscendSetup) newScript.onAscendSetup(gs, pi, heroIdx, this);
+    if (newScript?.onAscendSetup) newScript.onAscendSetup(gs, hs, heroIdx, this);
 
     // ★ `opts.notADescend` (v673, Als Ruling zu Open Invitation: „Den
     //   Ascended ins Deck zu shuffeln gilt auch nicht als Descending").
@@ -46489,13 +46795,13 @@ this._deathWatch = (this._deathWatchStack || []).length
     this.log(opts.notADescend ? 'hero_form_returned' : 'hero_descend',
       { player: ps.username, oldHero: oldName, newHero: newName });
     this._broadcastEvent('hero_ascension', {
-      owner: pi, heroIdx, oldHero: oldName, newHero: newName, descend: true,
+      owner: hs, heroIdx, oldHero: oldName, newHero: newName, descend: true,
     });
 
     const oldScript = loadCardEffect(oldName);
     if (oldScript?.evolutionAnimation) {
       this._broadcastEvent('play_evolution_animation', {
-        owner: pi, heroIdx, fromHero: oldName, toHero: newName,
+        owner: hs, heroIdx, fromHero: oldName, toHero: newName,
         direction: 'descend', duration: 1200,
       });
       await this._delay(1200);
@@ -46513,6 +46819,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         owner: pi, cardName: oldName,
         from: 'hero', to: 'discard',
         fromHeroIdx: heroIdx,
+        ...(hs !== pi ? { fromOwner: hs } : {}),
       });
       ps.discardPile.push(oldName);
       this.log('waflav_form_discarded', { player: ps.username, card: oldName });

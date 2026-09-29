@@ -135,7 +135,7 @@ module.exports = {
     // `animType` am Batch-Eintrag, derselbe Weg wie arrow_rain und
     // die Burn-Ticks. Der Klang laeuft ueber ZONE_ANIM_SFX mit
     // dedupe (eine Salve, nicht drei uebereinander).
-    const source = { name: CARD_NAME, owner: pi, heroIdx: ctx.cardHeroIdx ?? -1 };
+    const source = { name: CARD_NAME, owner: pi, heroIdx: ctx.cardHeroIdx ?? -1, heroOwner: ctx.cardHeroOwner };
     // ★★ v1185: Flaechenklammer ergaenzt („Interference"). Das
     // Anti-AoE-Fenster (Deepsea Idol) oeffnet der Batch selbst —
     // alle Kreaturen liegen in EINEM Aufruf.

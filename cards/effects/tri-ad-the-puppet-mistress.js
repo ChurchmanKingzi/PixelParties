@@ -106,11 +106,10 @@ module.exports = {
   canActivateHeroEffect(ctx) {
     const gs = ctx._engine.gs;
     if (!triAdHoptFree(gs, ctx.cardOwner)) return false;
-    // Styx 28.9.: `performDescend` kennt nur die eigene Spalte — ein
-    // uebernommener Tri Ad stiege sonst am gleich indizierten EIGENEN
-    // Helden ab. Bis die Engine das kann: nicht aktivierbar.
-    if ((ctx.cardHeroOwner ?? ctx.cardOwner) !== ctx.cardOwner) return false;
-    const hero = gs.players[ctx.cardOwner]?.heroes?.[ctx.cardHeroIdx];
+    // Als Vorgabe 29.9.: ein uebernommener Tri Ad steigt auf seiner
+    // Brettseite ab (`performDescend` mit `heroOwner`), Karte in die Hand
+    // des Kontrolleurs.
+    const hero = ctx.attachedHero ?? gs.players[ctx.cardHeroOwner ?? ctx.cardOwner]?.heroes?.[ctx.cardHeroIdx];
     return hero?.name === TRI_AD && Array.isArray(hero._formStack) && hero._formStack.length > 0;
   },
   onHeroEffect: async (ctx) => {
@@ -119,17 +118,18 @@ module.exports = {
     const pi = ctx.cardOwner;
     const hi = ctx.cardHeroIdx;
     const ps = gs.players[pi];
-    if ((ctx.cardHeroOwner ?? pi) !== pi) return false;   // Styx 28.9.: s. canActivateHeroEffect
-    const hero = ps?.heroes?.[hi];
+    const feld = ctx.cardHeroOwner ?? pi;   // Als Vorgabe 29.9.: Brettseite (Spalte, Tokens)
+    const hero = gs.players[feld]?.heroes?.[hi];
     if (!hero || hero.name !== TRI_AD || !triAdHoptFree(gs, pi)) return false;
     // Sperre der Spalte ab JETZT (v707) — der Rueckweg hat vor dem
     // Tausch eigene Wartezeiten (performDescend).
-    setPuppetSwapLock(engine, pi, hi, true);
+    setPuppetSwapLock(engine, feld, hi, true);
     engine.sync();
     try {
       const res = await engine.performDescend(pi, hi, {
         noDiscard: true,     // Karte geht in die HAND, nicht in die Ablage
         notADescend: true,   // Als Ruling: gilt nicht als Descending
+        ...(feld !== pi ? { heroOwner: feld } : {}),
       });
       if (!res?.success) {
         engine.log('tri_ad_return_failed', { player: ps.username, heroIdx: hi });
@@ -137,11 +137,11 @@ module.exports = {
       }
       engine.handZugangSync(ps, TRI_AD, {  });
       stampTriAdHopt(gs, pi);
-      engine.log('tri_ad_returned_to_hand', { player: ps.username, heroIdx: hi, nowHero: ps.heroes[hi]?.name });
+      engine.log('tri_ad_returned_to_hand', { player: ps.username, heroIdx: hi, nowHero: hero.name });
       engine.sync();
-      await swapPuppetTokens(engine, pi, hi, TRI_FECTA);
+      await swapPuppetTokens(engine, feld, hi, TRI_FECTA);
     } finally {
-      setPuppetSwapLock(engine, pi, hi, false);
+      setPuppetSwapLock(engine, feld, hi, false);
       engine.sync();
     }
     return true;

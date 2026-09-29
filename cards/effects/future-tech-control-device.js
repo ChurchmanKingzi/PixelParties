@@ -22,10 +22,15 @@
 //  angeboten. Dafür gibt es jetzt `getActivatableEquipsCrossSide`.
 //
 //  ── Die Übernahme ──
-//  `hero.controlledBy = pi` — dieselbe Marke wie bei Controlled Attack,
-//  samt `onTakeControl`-Fenster (Very Special Prisoner reagiert darauf)
-//  und Kontroll-Animation. Sie hält bis zum Zugende; das Aufräumen
-//  besorgt die Engine wie bei jeder anderen Übernahme.
+//  ★ Als Vorgabe 29.9.: eine ECHTE Übernahme („take control of this Hero
+//  for the rest of the turn") — `charmedBy` + Charme-Status OHNE Schutz
+//  (`ohneSchutz`; der Kartentext nennt keinen), wie bei Styx. Vorher
+//  `controlledBy` (Marke von Controlled Attack, „as if you controlled
+//  it"): der Held galt dann für Ausrüstung, Effekte und Beschwörung
+//  nicht als übernommen. Rechte: beschwören + ausrüsten, keine
+//  Abilities. `onTakeControl`-Fenster (Very Special Prisoner) und
+//  Kontroll-Animation wie bisher; das Aufräumen am Zugbeginn besorgt
+//  die Charme-Rückgabe der Engine.
 //
 //  ── Der Unterhalt ──
 //  Am Ende JEDES Zuges des Besitzers: eine Kopie aus SEINER Ablage
@@ -81,7 +86,7 @@ module.exports = {
     if (engine.gs.activePlayer !== pi) return false;
     const held = wirtsheld(engine, inst);
     if (!held?.name || held.hp <= 0) return false;
-    return held.controlledBy !== pi;              // schon uebernommen?
+    return engine.heroSideOf(inst.owner, held) !== pi;   // schon uebernommen?
   },
 
   async onEquipEffect(ctx) {
@@ -94,7 +99,12 @@ module.exports = {
     const held = wirtsheld(engine, inst);
     if (!held?.name || held.hp <= 0) return false;
 
-    held.controlledBy = pi;
+    held.charmedBy = pi;
+    held.charmedFromOwner = oi;
+    held.charmedHeroIdx = inst.heroIdx;
+    if (!held.statuses) held.statuses = {};
+    held.statuses.charmed = { controller: pi, appliedTurn: gs.turn, ohneSchutz: true, quelle: CARD_NAME };
+    engine._heldenStatusVerursacher?.(held.statuses.charmed, { appliedBy: pi });
     // Als Vorgabe 29.9.: keine Support-Zonen-Sperre im Kartentext → der
     // Kontrolleur darf beschwoeren und ausruesten (keine Abilities).
     held._kontrollRechte = { beschwoeren: true, ausruesten: true, abilities: false };
@@ -172,7 +182,11 @@ module.exports = {
       // Kein Unterhalt → die ausgeruestete Karte geht in SEINE Ablage.
       const held = wirtsheld(engine, inst);
       engine.log('ft_control_device_upkeep', { player: ps.username, paid: false });
-      if (held && held.controlledBy === pi) { delete held.controlledBy; delete held._kontrollRechte; }
+      if (held && held.charmedBy === pi && held.permaControlBy == null) {
+        delete held.charmedBy; delete held.charmedFromOwner; delete held.charmedHeroIdx;
+        if (held.statuses?.charmed?.quelle === CARD_NAME) delete held.statuses.charmed;
+        delete held._kontrollRechte;
+      }
       await engine.actionDestroyCard(
         { name: CARD_NAME, owner: pi, heroIdx: inst.heroIdx }, inst,
         { toOwnerDiscard: true },

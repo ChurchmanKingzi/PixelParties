@@ -223,11 +223,12 @@ module.exports = {
       const feld = ctx.cardHeroOwner ?? ctx.cardOwner;
       const hero = ctx.attachedHero ?? engine.gs.players[feld]?.heroes?.[ctx.cardHeroIdx];
       if (!hero?.name || hero.hp <= 0) return;
-      // Styx 28.9.: `actionTransferCreature` legt nur in die Spalte des
-      // neuen Kontrolleurs — eine geliehene Molinda (Zonen beim Gegner)
-      // kann die Kreatur nicht in IHRE Zonen holen. Statt in den gleich
-      // indizierten eigenen Helden zu legen: kein Angebot.
-      if (feld !== ctx.cardOwner) return;
+      // Als Vorgabe 29.9.: eine geliehene Molinda holt die Kreatur in IHRE
+      // Zonen auf der Brettseite `feld`; Kontrolleur wird `ctx.cardOwner`
+      // (`actionTransferCreature` mit `controller`, seitenfremd). Nur, wenn
+      // die Uebernahme Beschwoeren in ihre Zonen erlaubt (Charme nicht).
+      const fremd = feld !== ctx.cardOwner;
+      if (fremd && !engine.kontrollRechte(feld, ctx.cardHeroIdx).beschwoeren) return;
 
       for (const inst of hits) {
         // Re-validate every iteration: a parallel damage source
@@ -267,7 +268,7 @@ module.exports = {
         } else {
           const picked = await engine.promptGeneric(ctx.cardOwner, {
             type: 'zonePick',
-            zones: freeZones,
+            zones: fremd ? freeZones.map(z => ({ ...z, owner: feld })) : freeZones,
             title: CARD_NAME,
             description: `Choose a Support Zone under ${hero.name} for "${inst.name}".`,
             cancellable: false,
@@ -295,7 +296,7 @@ module.exports = {
         const srcHeroIdx = inst.heroIdx;
         const srcSlotIdx = inst.zoneSlot;
         engine._broadcastEvent('play_zone_animation', {
-          type: 'heart_burst', owner: ctx.cardOwner,
+          type: 'heart_burst', owner: feld,
           heroIdx: ctx.cardHeroIdx, zoneSlot: -1,
         });
         engine._broadcastEvent('play_zone_animation', {
@@ -303,20 +304,21 @@ module.exports = {
           heroIdx: srcHeroIdx, zoneSlot: srcSlotIdx,
         });
         engine._broadcastEvent('play_zone_animation', {
-          type: 'heart_burst', owner: ctx.cardOwner,
+          type: 'heart_burst', owner: feld,
           heroIdx: chosen.heroIdx, zoneSlot: chosen.slotIdx,
         });
         await engine._delay(300);
 
         const result = await engine.actionTransferCreature(
-          inst, ctx.cardOwner, chosen.heroIdx, chosen.slotIdx,
+          inst, feld, chosen.heroIdx, chosen.slotIdx,
+          fremd ? { controller: ctx.cardOwner } : {},
         );
         if (!result?.success) continue;
 
         // Trailing burst on the destination slot — the Creature
         // has just landed; finish the flourish where it now sits.
         engine._broadcastEvent('play_zone_animation', {
-          type: 'heart_burst', owner: ctx.cardOwner,
+          type: 'heart_burst', owner: feld,
           heroIdx: chosen.heroIdx, zoneSlot: chosen.slotIdx,
         });
         await engine._delay(400);

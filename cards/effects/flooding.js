@@ -96,7 +96,7 @@ module.exports = {
     // through the full 2400ms rise → hold → drain cycle (the default
     // 1000ms would unmount it mid-rise).
     engine._broadcastEvent('play_zone_animation', {
-      type: 'flooding', owner: ownerIdx, heroIdx: hostHeroIdx, zoneSlot: -1,
+      type: 'flooding', owner: ctx.cardHeroOwner ?? ownerIdx, heroIdx: hostHeroIdx, zoneSlot: -1,
       duration: 2500,
     });
     // Wait for the water to fully cover the board before resolving

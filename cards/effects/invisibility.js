@@ -170,12 +170,13 @@ module.exports = {
       });
       if (!res) return;
       const destHero = res.host.heroIdx, destSlot = res.host.slotIdx, inst = res.inst;
-      const destHeroObj = ps.heroes?.[destHero];
+      const destSeite = res.host.owner;   // Brettseite (Als Vorgabe 29.9.: auch ein uebernommener Held)
+      const destHeroObj = gs.players[destSeite]?.heroes?.[destHero];
       if (!destHeroObj.statuses) destHeroObj.statuses = {};
       destHeroObj.statuses.invisible = true;
 
       engine._broadcastEvent('play_zone_animation', {
-        type: 'gold_sparkle', owner: pi, heroIdx: destHero, zoneSlot: -1,
+        type: 'gold_sparkle', owner: destSeite, heroIdx: destHero, zoneSlot: -1,
       });
       await engine._delay(400);
 

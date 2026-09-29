@@ -72,6 +72,17 @@ module.exports = {
    */
   canSurpriseRedirect(gs, pi, hostHeroIdx, selected, validTargets, config, sourceCard, engine) {
     if (!isOppCreatureEffect(engine, pi, sourceCard)) return false;
+    // Als Vorgabe 29.9.: der Scan bietet auch Zonen geliehener Helden an
+    // (`pi` = Kontrolleur der Zone) — „target you control" daher hier
+    // nach Kontrolle pruefen: Held ueber `surpriseKontrolleur`, Karte
+    // ueber ihren Kontrolleur.
+    if (selected && engine?.surpriseKontrolleur) {
+      const inst = selected.cardInstance;
+      const kontrolle = selected.type === 'hero'
+        ? engine.surpriseKontrolleur(selected.owner, selected.heroIdx)
+        : (inst ? (engine.effektiveSeiten(inst).controller ?? inst.owner) : selected.owner);
+      if (kontrolle !== pi) return false;
+    }
     // „target you control": KEIN eigenes Gate noetig — der Scan
     // (`_checkTargetRedirectOnce`) wird immer nur mit dem Besitzer des
     // gewaehlten Ziels aufgerufen und durchsucht dessen Surprise-Zonen;

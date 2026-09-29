@@ -73,15 +73,16 @@ module.exports = {
    * Trigger: der Gegner hat GENAU DIESEN Träger getroffen, er lebt
    * noch, und der Treibstoff ist bezahlbar.
    */
-  surpriseAfterDamageTrigger(gs, ownerIdx, heroIdx, info) {
+  surpriseAfterDamageTrigger(gs, ownerIdx, heroIdx, info, engine, seite = ownerIdx) {
     if (!info) return false;
     if (info.defeated) return false;                    // „does not defeat it"
-    if (heroIdx !== info.targetHeroIdx) return false;   // „the user"
+    // „the user": Index UND Brettseite der Zone (Als Vorgabe 29.9.)
+    if (heroIdx !== info.targetHeroIdx || seite !== info.targetOwner) return false;
     if (!(info.amount > 0)) return false;
     // „your opponent deals damage" — eigener Schaden und besitzerlose
     // Statusticks zählen nicht.
     if (info.owner == null || info.owner < 0) return false;
-    if (info.owner === ownerIdx) return false;
+    if ((info.controller ?? info.owner) === ownerIdx) return false;   // 29.9.: Spieler, nicht Seite
     return hasCybugFuel(gs, ownerIdx, FUEL_CARD);
   },
 
@@ -125,7 +126,7 @@ module.exports = {
     // vom Traeger des Surprise aus.
     const FLUGZEIT = 420;
     engine._broadcastEvent('play_projectile_animation', {
-      sourceOwner: pi, sourceHeroIdx: ctx.cardHeroIdx, sourceZoneSlot: -1,
+      sourceOwner: ctx.cardHeroOwner ?? pi, sourceHeroIdx: ctx.cardHeroIdx, sourceZoneSlot: -1,
       targetOwner: ziel.owner, targetHeroIdx: ziel.heroIdx,
       targetZoneSlot: ziel.type === 'hero' ? -1 : ziel.slotIdx,
       emoji: '•',
@@ -144,7 +145,7 @@ module.exports = {
       if (held && held.hp > 0) await ctx.dealDamage(held, schaden, DAMAGE_TYPE);
     } else if (ziel.cardInstance) {
       await engine.actionDealCreatureDamage(
-        { name: CARD_NAME, owner: pi, heroIdx: ctx.cardHeroIdx },
+        { name: CARD_NAME, owner: pi, heroIdx: ctx.cardHeroIdx, heroOwner: ctx.cardHeroOwner },
         ziel.cardInstance, schaden, DAMAGE_TYPE,
         { sourceOwner: pi, canBeNegated: true },
       );
