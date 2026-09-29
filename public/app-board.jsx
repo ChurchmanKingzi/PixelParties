@@ -3920,10 +3920,38 @@ const PP_APPLAUSE_ICON = (() => {
   return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
 })();
 
-function ApplauseBadge({ n, hand }) {
+// Aufleuchten + Klang, wenn IRGENDEIN Applause Counter steigt (Als Vorgabe
+// 29.9.). Der Server sendet `applause_gain` mit dem Ziel; der Schluessel
+// `b:<Seite>:<Held>:<Platz>` (Brett) bzw. `h:<Seite>:<Handindex>` (Hand)
+// findet das Abzeichen. Der Stempel deckt beide Reihenfolgen ab: kommt das
+// Ereignis VOR dem Zustand (Abzeichen entsteht erst danach), leuchtet es
+// beim Einhaengen; kommt es danach, wird das vorhandene Abzeichen angestossen.
+window._ppApplauseGlow = window._ppApplauseGlow || {};
+function ppApplauseAufleuchten(el) {
+  if (!el || window._playAnimations === false) return;
+  el.classList.remove('applause-glow');
+  void el.offsetWidth;   // Animation neu starten
+  el.classList.add('applause-glow');
+}
+window.ppApplauseFlash = function (key) {
+  window._ppApplauseGlow[key] = Date.now();
+  if (window.playSFX) {
+    window.playSFX('ping', { rate: 1.7, volume: 1.2, dedupe: 90, category: null });
+    window.playSFX('slash', { rate: 2.4, volume: 0.45, dedupe: 90, category: null, delay: 25 });
+  }
+  document.querySelectorAll(`[data-applause-key="${key}"]`).forEach(ppApplauseAufleuchten);
+};
+
+function ApplauseBadge({ n, hand, akey }) {
+  const ref = React.useRef(null);
+  React.useEffect(() => {
+    // Beim Einhaengen bzw. bei jeder Aenderung: gerade erst gemeldet?
+    if (akey && Date.now() - (window._ppApplauseGlow[akey] || 0) < 1500) ppApplauseAufleuchten(ref.current);
+  }, [n, akey]);
   if (!(n > 0)) return null;
   return (
-    <div className={'applause-badge' + (hand ? ' applause-badge-hand' : '')}
+    <div ref={ref} data-applause-key={akey || undefined}
+      className={'applause-badge' + (hand ? ' applause-badge-hand' : '')}
       onMouseEnter={e => showGameTooltip(e, `Applause Counters: ${n}.`)}
       onMouseLeave={hideGameTooltip}>
       <img className="applause-icon" src={PP_APPLAUSE_ICON} alt="" draggable={false} />
@@ -31251,6 +31279,11 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         playAnimation(type, sel, { duration: 1000, ...rest, ...(vonDaten || {}), ankerSel: sel, eigeneSeite: owner === myIdx });
       }, window.ZONE_ANIM_MOUNT_DELAY_MS ?? 100);
     };
+    // Applause Counter gestiegen: Klang + Abzeichen leuchtet kurz auf.
+    const onApplauseGain = ({ kind, owner, heroIdx, zoneSlot, handIdx }) => {
+      const key = kind === 'hand' ? `h:${owner}:${handIdx}` : `b:${owner}:${heroIdx}:${zoneSlot}`;
+      if (window.ppApplauseFlash) window.ppApplauseFlash(key);
+    };
     const onLevelChange = ({ delta, owner, heroIdx, zoneSlot }) => {
       const entry = { id: Date.now() + Math.random(), delta, owner, heroIdx, zoneSlot };
       setLevelChanges(prev => [...prev, entry]);
@@ -32051,6 +32084,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     };
     socket.on('nomu_draw', onNomuDraw);
     socket.on('level_change', onLevelChange);
+    socket.on('applause_gain', onApplauseGain);
     socket.on('ability_activated', onAbilityActivated);
     socket.on('play_beam_animation', onBeamAnimation);
     socket.on('play_tether_animation', onTetherAnimation);   // v1331
@@ -38953,7 +38987,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       socket.off('reaction_chain_link_negated', onChainLinkNegated); socket.off('reaction_chain_done', onChainDone);
       socket.off('camera_flash', onCameraFlash); socket.off('toughness_hp_change', onToughnessHp); socket.off('kiai_hp_split', onKiaiHpSplit); socket.off('creature_zone_move', onCreatureZoneMove); socket.off('fighting_atk_change', onFightingAtk); socket.off('zhu_skip_turn_animation', onZhuSkipTurn);
       socket.off('summon_effect', onSummon); socket.off('burn_tick', onBurnTick); socket.off('bleed_tick', onBleedTick);
-      socket.off('play_zone_animation', onZoneAnim); socket.off('level_change', onLevelChange);
+      socket.off('play_zone_animation', onZoneAnim); socket.off('level_change', onLevelChange); socket.off('applause_gain', onApplauseGain);
       socket.off('play_card_showcase', onCardShowcase);
       socket.off('deepsea_spores_activated', onDeepseaSporesActivated);
       socket.off('rain_of_spores_activated', onRainOfSporesActivated);
@@ -43716,7 +43750,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                       onMouseLeave={hideGameTooltip}
                     >🌀</div> : null}
                     {cc?.burned ? <BurnedOverlay /> : null}
-                    {cc?.applause > 0 ? <ApplauseBadge n={cc.applause} /> : null}
+                    {cc?.applause > 0 ? <ApplauseBadge n={cc.applause} akey={`b:${pi}:${i}:${z}`} /> : null}
                     {cc?.bleeding ? <BleedingOverlay /> : null}
                     {cc?.frozen ? <FrozenOverlay /> : null}
                     {cc?._zoneAura === 'necro_flicker' ? <NecroFlickerAura /> : null}
@@ -43956,7 +43990,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                   ) : (
                     <img src={opp.cardback || "/cardback.png"} style={{ width: '100%', height: '100%', objectFit: 'cover' }} draggable={false} />
                   )}
-                  {revealEntry && (opp.handApplause?.[i] > 0) ? <ApplauseBadge n={opp.handApplause[i]} hand /> : null}
+                  {revealEntry && (opp.handApplause?.[i] > 0) ? <ApplauseBadge n={opp.handApplause[i]} hand akey={`h:${myIdx === 0 ? 1 : 0}:${i}`} /> : null}
                 </div>
               );
             })}
@@ -45045,7 +45079,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                         </div>
                       );
                     })()}
-                    {(me.handApplause?.[item.origIdx] > 0) && <ApplauseBadge n={me.handApplause[item.origIdx]} hand />}
+                    {(me.handApplause?.[item.origIdx] > 0) && <ApplauseBadge n={me.handApplause[item.origIdx]} hand akey={`h:${myIdx}:${item.origIdx}`} />}
                     {handEffectiveCost != null && (
                       <div className="hand-cost-override"
                         onMouseEnter={e => {

@@ -15219,6 +15219,10 @@ io.on('connection', (socket) => {
             if (typeof cs.balance === 'number' && cs.balance > 0) {
               inst.counters.balance = cs.balance;
             }
+            // Applause Counter (Fun-Fun Circus) — im Puzzle-Editor gesetzt.
+            if (typeof cs.applause === 'number' && cs.applause > 0) {
+              inst.counters.applause = cs.applause;
+            }
             // Bunny Bombs — im Puzzle-Editor gesetzte Bomb Counter.
             // Landen auf `inst.counters.bunnyBombCounter`; das Kartenskript
             // rechnet daraus beim Tod 20 Schaden je Zaehler, und das

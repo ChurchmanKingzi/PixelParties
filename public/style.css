@@ -24633,3 +24633,16 @@ body.pp-dialog-offen .foil-diamond-rare:not(.modal-overlay *) {
   text-shadow: -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000, 0 0 3px #000;
 }
 .applause-badge-hand .applause-num { font-size: 10px; }
+
+/* Aufleuchten, wenn ein Applause Counter steigt (kurz, in Stufen = Pixelstil). */
+.applause-badge.applause-glow .applause-icon { animation: applauseGlow 700ms steps(7, end); }
+.applause-badge.applause-glow .applause-num { animation: applauseNum 700ms steps(7, end); }
+@keyframes applauseGlow {
+  0%   { filter: brightness(2.6) drop-shadow(0 0 4px #fff2b0) drop-shadow(0 0 8px #ffd24a); transform: scale(1.35); }
+  40%  { filter: brightness(1.8) drop-shadow(0 0 3px #ffd24a) drop-shadow(0 0 6px #ffb020); transform: scale(1.15); }
+  100% { filter: none; transform: scale(1); }
+}
+@keyframes applauseNum {
+  0%   { color: #fff2b0; transform: scale(1.3); }
+  100% { color: #fff; transform: scale(1); }
+}
