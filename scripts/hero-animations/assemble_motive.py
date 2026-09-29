@@ -15,7 +15,8 @@ Heroes:
 * Ida, the Adept of Destruction: „Ida“.
 * Vacarn, the Dark Goblin Necromancer: der Goblin mit offenem Mund aus „Vacarn“.
 * Sol Rym, the Thunder Djinn: „Sol Rym“ auf der schwarzen Wolke „Ebene #639“ (Teil `-cloud`).
-* Legendary Explorer Dajan: die Figur aus „Dajan #1“ mit „Dajan #4“.
+* Legendary Explorer Dajan: die Figur aus „Dajan #1“ mit „Dajan #4“ und dem Edelstein in seiner Hand
+  aus „Dajan #3“.
 * Omikron, the Faceless Illusionist: die Figur aus der Szene „Omikron“.
 
 Skins:
@@ -113,7 +114,8 @@ def main(path):
     one('ida-the-adept-of-destruction', g('Ida'))
     one('vacarn-the-dark-goblin-necromancer', near(g('Vacarn'), 330, 207, dil=1))
     save_parts('sol-rym-the-thunder-djinn', [('cloud', g('Ebene #639')), ('body', g('Sol Rym'))])
-    one('legendary-explorer-dajan', layer_over(near(g('Dajan #1'), 280, 205, dil=1), g('Dajan #4')))
+    one('legendary-explorer-dajan', layer_over(near(g('Dajan #1'), 280, 205, dil=1), g('Dajan #4'),
+                                               near(g('Dajan #3'), 271, 218)))
     one('omikron-the-faceless-illusionist', near(g('Omikron'), 245, 90, dil=1))
     # ---- Skins
     one('ida-the-fire-princess', g('Ebene #203'))

@@ -19,17 +19,22 @@ Frame 0 ist immer die Ruhepose.
             Dampf aus dem Kopf; er blinzelt.
 * sabrina:  Sabrina, the Psychic Witch: ihre grünen Augen glühen auf, psychische Lichtkugeln
             umkreisen sie (hinter ihr verschwinden sie ganz), sie atmet und blinzelt.
-* bartas:   Bomb Berserker Bartas atmet und blinzelt, hinter ihm steigt Glut auf.
-* gon:      Gon, the Frostbringer: Schnee rieselt um ihn, auf der gefrorenen Seite blitzen Eiskristalle,
-            er atmet und blinzelt.
+* bartas:   Bomb Berserker Bartas schlägt periodisch die Fäuste zusammen, hinter ihm knallen kleine
+            Explosionen und steigt Glut auf; er atmet und blinzelt.
+* gon:      Gon, the Frostbringer hebt und senkt langsam beide Arme (auch den gefrorenen), Schnee rieselt
+            um ihn, auf der gefrorenen Seite blitzen Eiskristalle.
 * ida:      Ida, the Adept of Destruction steht in einer lodernden Flammenaura (Farbfolge fest, nur
             die Form lodert), Funken stieben, sie atmet und blinzelt.
-* vacarn:   Vacarn kichert (Mund auf und zu), seine roten Augen glühen, um ihn steigen Seelen auf.
-* solrym:   Sol Rym schwebt auf seiner Gewitterwolke: sie wallt (Bäusche quellen oben und unten auf
-            und sinken zusammen, innen rollt sie), zweimal zuckt ein Blitz heraus, er blinzelt.
-* dajan:    Legendary Explorer Dajan atmet und blinzelt, das Licht in seiner Hand flackert.
-* omikron:  Omikron, the Faceless Illusionist: links und rechts flackern Trugbilder mit rot glühenden
-            Augen auf und vergehen.
+* vacarn:   Vacarn kichert (Mund auf und zu), seine roten Augen glühen, das rote Cape weht, um ihn
+            steigen Seelen auf.
+* solrym:   Sol Rym steckt in seiner Gewitterwolke (der Unterkörper verblasst nach unten), er spricht und
+            blinzelt; die Wolke wallt (Bäusche quellen oben und unten auf
+            und sinken zusammen, innen rollt sie), zweimal zuckt ein Blitz heraus.
+* dajan:    Legendary Explorer Dajan atmet und blinzelt, der Edelstein in seiner Hand funkelt, der
+            Schalzipfel pendelt.
+* omikron:  Omikron, the Faceless Illusionist: links und rechts tauchen unregelmäßig Trugbilder mit
+            Bildfehlern und rot glühenden Augen auf; die grauen Haare wehen wild, das Monokel blitzt,
+            er hebt und senkt die Arme.
 * mizune:   Silent Water Mizune spricht; um ihn steigen viele Wasserblasen auf, wachsen und platzen;
             er atmet und blinzelt.
 """
@@ -74,21 +79,21 @@ V_ = {
                     blink=eyes([(7, 8, 7, 8), (11, 12, 7, 8)], 'cc9d7c')),
     'mizune': dict(slug='silent-water-mizune', knee=19, pads=(6, 6, 8, 1),
                    blink=eyes([(6, 7, 9, 10), (10, 11, 9, 10)], 'f5ce88')),
-    'bartas': dict(slug='bomb-berserker-bartas', knee=19, pads=(4, 4, 8, 1),
+    'bartas': dict(slug='bomb-berserker-bartas', knee=19, pads=(8, 8, 8, 1),
                    blink=eyes([(4, 4, 5, 6), (9, 9, 5, 6)], 'f6bd7b')),
-    'gon': dict(slug='gon-the-frostbringer', knee=20, pads=(5, 5, 4, 1),
-                blink={'halb': [((11, 8), 'd5a464')], 'zu': [((11, 8), '311700'), ((10, 8), '311700')]}),
+    'gon': dict(slug='gon-the-frostbringer', knee=20, pads=(5, 5, 4, 1)),
     'ida': dict(slug='ida-the-adept-of-destruction', knee=21, pads=(5, 5, 7, 1),
                 blink=eyes([(8, 9, 6, 7), (12, 13, 6, 7)], 'f6cd8b')),
     'vacarn': dict(slug='vacarn-the-dark-goblin-necromancer', knee=18, pads=(4, 4, 10, 1),
-                   blink={'halb': [((7, 5), '2f312e'), ((14, 5), '2f312e')],
-                          'zu': [((x, 5), '000200') for x in (7, 8, 13, 14)]}),
+                   blink={'halb': [((8, 5), '2f312e'), ((13, 5), '2f312e')],
+                          'zu': [((x, 5), '000200') for x in (8, 9, 12, 13)]}),
     'solrym': dict(slug='sol-rym-the-thunder-djinn', pads=(2, 2, 4, 12),
-                   blink={'halb': [((38, 8), '000000'), ((42, 8), '000000')],
-                          'zu': [((x, 8), '000000') for x in (38, 39, 42, 43)]}),
+                   blink={'halb': [((x, 8), '000000') for x in (38, 39, 42, 43)],
+                          'zu': [((x, 7), '2a44af') for x in (38, 39, 42, 43)] +
+                                [((x, 8), '000000') for x in (38, 39, 42, 43)]}),
     'dajan': dict(slug='legendary-explorer-dajan', knee=20, pads=(3, 5, 5, 1),
-                  blink=eyes([(8, 9, 8, 9), (12, 13, 8, 9)], 'd9ba8d', line='170f14')),
-    'omikron': dict(slug='omikron-the-faceless-illusionist', knee=20, pads=(10, 10, 2, 1)),
+                  blink=eyes([(12, 13, 8, 9), (16, 17, 8, 9)], 'd9ba8d', line='170f14')),
+    'omikron': dict(slug='omikron-the-faceless-illusionist', knee=20, pads=(14, 14, 4, 1)),
 }
 V = next((v for v in sys.argv[2:] if v in V_), 'alex')
 C = V_[V]
@@ -552,6 +557,51 @@ def f_mizune(i):
     return out
 
 
+# ---------------------------------------------------------------- gemeinsame Helfer (Teile bewegen, flattern)
+def move_part(out, s, mask, dx, dy, ox, oy, toward=0):
+    """Teil (mask) um (dx, dy) versetzt malen. Frei werdende Stellen bekommen die Farbe des nächsten
+    Nicht-Teil-Pixels derselben Zeile in Richtung toward (-1 links, +1 rechts; 0 = leer lassen) –
+    was hinter dem Teil lag, wird so ergänzt, nichts reißt auf."""
+    if not dx and not dy:
+        return
+    ys, xs = np.nonzero(mask)
+    moved = set((y + dy, x + dx) for y, x in zip(ys, xs))
+    for y, x in zip(ys, xs):
+        if (y, x) in moved:
+            continue
+        c = None
+        if toward:
+            xx = x + toward
+            while 0 <= xx < s.shape[1] and mask[y, xx]:
+                xx += toward
+            if 0 <= xx < s.shape[1] and s[y, xx, 3]:
+                c = s[y, xx]
+        out[y + oy, x + ox] = c if c is not None else 0
+    for y, x in zip(ys, xs):
+        if 0 <= y + dy + oy < out.shape[0] and 0 <= x + dx + ox < out.shape[1]:
+            out[y + dy + oy, x + dx + ox] = s[y, x]
+
+
+def flutter(out, s, i, ox, oy, rows, left, right, amp=2.0, speed=6, ok=None, erratic=0.0):
+    """Tuch-/Haarzipfel flattern nach außen: je Zeile schiebt sich die Spitze um 0..amp px hinaus und
+    zurück (Welle von oben nach unten), das Original bleibt darunter – nichts reißt."""
+    t = 2 * math.pi * i / N
+    env = 0.5 - 0.5 * math.cos(2 * t)
+    for side, xs in ((-1, left), (1, right)):
+        for k, y in enumerate(rows):
+            w = 0.5 + 0.5 * math.sin(speed * t - 0.9 * k + (0 if side < 0 else 1.7))
+            if erratic:
+                w += erratic * math.sin(17 * t + 2.3 * k + side)
+            dx = round(amp * env * max(0.0, w))
+            if not dx:
+                continue
+            for x in xs:
+                if s[y, x, 3] and (ok is None or ok(s[y, x])):
+                    xx, yy = x + side * dx + ox, y + oy
+                    if 0 <= xx < out.shape[1] and 0 <= yy < out.shape[0]:
+                        out[yy, xx] = s[y, x]
+
+
 # ---------------------------------------------------------------- aufsteigende Partikel (Glut, Seelen, Schnee)
 def rising(base_fn, count, seed, pal, life=(9, 15), vy=(0.7, 1.1), region=None, fall=False, wob=(0.5, 1.0), tail=False):
     """Partikel, die die Figur nie berühren (Vereinigung aller Frames + 1-px-Rand): steigen auf (oder
@@ -604,17 +654,74 @@ SYSTEM = None
 
 
 # ---------------------------------------------------------------- Bartas
+CLAP = {k: 1 for k in range(6, 11)}                    # Fäuste auseinander …
+CLAP.update({k: 2 for k in range(8, 11)})
+CLAP.update({k: 1 for k in range(30, 35)})
+CLAP.update({k: 2 for k in range(32, 35)})
+IMPACT = {11: 0, 12: 1, 35: 0, 36: 1}                   # … und zusammengeschlagen
+FIST_L = (0, 6, 11, 15)
+FIST_R = (7, 13, 11, 15)
+BOOMS = [(4, 7, 2), (25, 5, 14), (4, 24, 22), (25, 21, 27), (5, 14, 38), (24, 13, 44)]
+
+
 def bartas_base(i):
     s = SRC.copy()
     blink(s, i)
-    return bounce_frame(s, B24[i % 24])
+    b = B24[i % 24]
+    out = bounce_frame(s, b)
+    d = CLAP.get(i, 0)
+    if d:
+        for (x0, x1, y0, y1), side in ((FIST_L, -1), (FIST_R, 1)):
+            m = np.zeros((SH, SW), bool)
+            m[y0:y1 + 1, x0:x1 + 1] = SRC[y0:y1 + 1, x0:x1 + 1, 3] > 0
+            fill = s.copy()
+            fill[m] = rgb('d5a462')                     # dahinter: seine Brust
+            fill[~m] = s[~m]
+            move_part(out, np.where(m[:, :, None], s, fill), m, side * d, 0, PL, PT + b, toward=0)
+            for y in range(y0, y1 + 1):                 # frei gewordene Mitte: Brust
+                for k in range(d):
+                    x = (x1 - k) if side < 0 else (x0 + k)
+                    if SRC[y, x, 3] and not out[y + PT + b, x + PL, 3]:
+                        out[y + PT + b, x + PL] = rgb('d5a462')
+    return out
+
+
+def boom(out, x, y, a):
+    """Kleine Explosion: Blitz, Feuerball, roter Ring, Rauch."""
+    if a == 0:
+        pts = {(0, 0): rgb('ffffff')}
+    elif a == 1:
+        pts = {(0, 0): rgb('fffbd0'), (1, 0): rgb('f6e70e'), (-1, 0): rgb('f6e70e'), (0, 1): rgb('f6e70e'), (0, -1): rgb('f6e70e')}
+    elif a == 2:
+        pts = {(0, 0): rgb('f6e70e'), (1, 1): rgb('f47b22'), (-1, -1): rgb('f47b22'), (1, -1): rgb('f47b22'), (-1, 1): rgb('f47b22'),
+               (2, 0): rgb('f47b22'), (-2, 0): rgb('f47b22'), (0, 2): rgb('f47b22'), (0, -2): rgb('f47b22')}
+    elif a == 3:
+        pts = {(2, 1): rgb('ca2c29'), (-2, -1): rgb('ca2c29'), (1, -2): rgb('ca2c29'), (-1, 2): rgb('ca2c29'), (0, 0): rgb('f47b22')}
+    elif a < 7:
+        k = a - 4
+        pts = {(0, -k): rgb('8a8278', 190 - 50 * k), (1, -k - 1): rgb('a09888', 150 - 40 * k)}
+    else:
+        return
+    for (dx, dy), c in pts.items():
+        dot(out, x + dx, y + dy, c)
 
 
 def f_bartas(i):
     global SYSTEM
     if SYSTEM is None:
-        SYSTEM = rising(bartas_base, 26, 31, EMBERS)
-    out = bartas_base(i)
+        SYSTEM = rising(bartas_base, 20, 31, EMBERS)
+    out = np.zeros((H, W, 4), int)
+    for x, y, st in BOOMS:                              # Explosionen im Hintergrund
+        a = (i - st) % N
+        boom(out, x, y, a)
+    fig = bartas_base(i)
+    m = fig[:, :, 3] > 0
+    out[m] = fig[m]
+    k = IMPACT.get(i)
+    if k is not None:                                   # Aufprall zwischen den Fäusten
+        cx, cy = 6 + PL + 0.5, 13 + PT + B24[i % 24]
+        for dx, dy in ((0, -2 - k), (0, 3 + k), (-2 - k, 0), (3 + k, 0)):
+            dot(out, int(cx + dx), cy + dy, rgb('fffbd0'))
     draw_parts(out, SYSTEM, i)
     return out
 
@@ -624,10 +731,19 @@ SNOW = [rgb('ffffff'), rgb('eef4ff'), rgb('d6e2ff', 220), rgb('c4d2f4', 170)]
 FROST = {'8988cc', 'dfe0f6', '9a99e5', 'a3a2f2', 'c1c1e6', 'b3b2ec', 'd6d5f4'}
 
 
+GON_ARMS = [((12, 15, 13, 16), -1), ((0, 3, 13, 16), 1)]  # (Kasten, Richtung, aus der Ersatzfarbe kommt)
+
+
 def gon_base(i):
     s = SRC.copy()
-    blink(s, i)
-    return bounce_frame(s, B24[i % 24])
+    b = B24[i % 24]
+    out = bounce_frame(s, b)
+    lift = -round(2 * (0.5 - 0.5 * math.cos(2 * math.pi * i / N * 2)))  # beide Arme langsam hoch und runter
+    for (x0, x1, y0, y1), toward in GON_ARMS:
+        m = np.zeros((SH, SW), bool)
+        m[y0:y1 + 1, x0:x1 + 1] = SRC[y0:y1 + 1, x0:x1 + 1, 3] > 0
+        move_part(out, s, m, 0, lift, PL, PT + b, toward=toward)
+    return out
 
 
 def f_gon(i):
@@ -664,8 +780,10 @@ def fire_aura(out, fig, i, reach=3.2):
             ab = dyv > 0
             d_up = np.min(np.hypot(fx[m][ab] - x, dyv[ab] * 0.38)) if ab.any() else 99.0
             d_any = np.min(np.hypot(fx[m] - x, dyv))
-            nz = 0.5 * math.sin(1.25 * x + 0.35 * y + 6 * w) + 0.5 * math.sin(0.8 * x - 0.25 * y + 4 * w + 1.7)
-            h = max(1 - d_up / reach, 0.5 * (1 - d_any / 1.6)) + 0.35 * nz
+            rn = (((x * 73856093) ^ (i * 19349663) ^ ((y // 2) * 83492791)) % 1000) / 1000 - 0.5
+            nz = 0.45 * math.sin(1.25 * x + 0.35 * y + 14 * w) + 0.35 * math.sin(0.8 * x - 0.25 * y + 10 * w + 1.7) \
+                + 0.2 * math.sin(2.1 * x + 22 * w) + 0.5 * rn
+            h = max(1 - d_up / reach, 0.5 * (1 - d_any / 1.6)) + 0.45 * nz
             c = FLAME[3] if h > 1.05 else FLAME[2] if h > 0.8 else FLAME[1] if h > 0.5 else FLAME[0] if h > 0.2 else None
             if c:
                 out[y, x] = rgb(c)
@@ -683,7 +801,7 @@ def f_ida(i):
         SYSTEM = rising(ida_base, 18, 13, EMBERS)
     fig = ida_base(i)
     out = np.zeros_like(fig)
-    fire_aura(out, fig[:, :, 3] > 0, i)
+    fire_aura(out, fig[:, :, 3] > 0, i, reach=3.4 + 0.8 * math.sin(2 * math.pi * 7 * i / N) * (i > 0))
     m = fig[:, :, 3] > 0
     out[m] = fig[m]
     for e, steps in SYSTEM:                             # Funken nur, wo keine Flamme ist
@@ -709,9 +827,14 @@ def vacarn_base(i):
         s[8, 10] = s[8, 11] = rgb('2f312e')
     glow = 0.5 - 0.5 * math.cos(2 * math.pi * 3 * i / N)
     if not BLINK.get(i):
-        for x in (8, 13):                               # die roten Augen glühen
+        for x in (9, 12):                               # die roten Augen glühen
             s[5, x] = lighten(s[5, x], 0.55 * glow)
-    return bounce_frame(s, B24[i % 24])
+    b = B24[i % 24]
+    out = bounce_frame(s, b)
+    capec = {'5c0400', '7b0815', '300901'}
+    flutter(out, s, i, PL, PT + b, list(range(13, 21)), range(0, 6), range(16, SW), amp=2.0, speed=4,
+            ok=lambda c: hexc(c) in capec)
+    return out
 
 
 def f_vacarn(i):
@@ -785,9 +908,16 @@ def bolt(out, k, oy):
         x += int(rng.choice([-1, 0, 1]))
 
 
+SPEAK = [0, 0, 1, 1, 0, 1, 1, 1, 0, 0, 0, 0, 1, 1, 0, 0, 1, 0, 1, 1, 0, 0, 0, 0,
+         0, 1, 1, 0, 1, 1, 0, 0, 0, 0, 1, 0, 1, 1, 1, 0, 0, 1, 1, 0, 0, 0, 0, 0]
+
+
 def f_solrym(i):
     s = SRC.copy()
     blink(s, i)
+    if not SPEAK[i]:                                    # Mund zu (sonst offen)
+        s[10, 40] = s[10, 41] = rgb('2a44af')
+        s[11, 40] = s[11, 41] = rgb('12298a')
     cloud = cloud_frame(i)
     k = BOLTS.get(i)
     if k is not None:                                   # Wetterleuchten um den Blitz herum
@@ -801,10 +931,10 @@ def f_solrym(i):
         out[y + PT, x + PL] = cloud[y, x]
     if k is not None:
         bolt(out, k, PT + 27)
-    b = [0, 0, 0, -1, -1, -1, -1, -1, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 0, 0, 0, 0][i % 24]  # er schwebt
-    for y, x in zip(*np.nonzero(s[:, :, 3])):
-        if 0 <= y + PT + b < H:
-            out[y + PT + b, x + PL] = s[y, x]
+    for y, x in zip(*np.nonzero(s[:, :, 3])):           # der Unterkörper steckt in der Wolke
+        c = s[y, x]
+        f = 1.0 if y <= 12 else max(0.12, 1 - (y - 12) / 9)
+        out[y + PT, x + PL] = [c[0], c[1], c[2], int(c[3] * f)] if f < 1 else c
     return out
 
 
@@ -812,46 +942,75 @@ def f_solrym(i):
 LAMP = {'d8c386', 'fdfcb7', 'fcfbb6', 'fefdb8'}
 
 
+SCARF = (14, 17, 16, 18)                                # Zipfel des roten Schals (unter Zeile 15 hängend)
+GEM = {'229dd8', '08d3ef', '145e81', 'ecf0fc', 'f4fffb', '06448f'}
+
+
 def f_dajan(i):
     s = SRC.copy()
     blink(s, i)
-    fl = [0.0, 0.4, 0.15, 0.6, 0.25, 0.0, 0.5, 0.2][i % 8] if i else 0.0   # die Laterne flackert
-    lamp = [(y, x) for y, x in zip(*np.nonzero(SRC[:, :, 3])) if hexc(SRC[y, x]) in LAMP and x >= 15]
-    for y, x in lamp:
-        s[y, x] = lighten(s[y, x], 0.6 * fl)
+    gem = [(y, x) for y, x in zip(*np.nonzero(SRC[:, :, 3])) if hexc(SRC[y, x]) in GEM]
+    g = 0.5 - 0.5 * math.cos(2 * math.pi * 3 * i / N)  # der Edelstein funkelt
+    for y, x in gem:
+        s[y, x] = lighten(s[y, x], 0.45 * g)
     b = B24[i % 24]
     out = bounce_frame(s, b)
-    m = np.zeros((SH, SW), bool)
-    for y, x in lamp:
-        m[y, x] = True
-    halo = ring8(m)
-    for y, x in zip(*np.nonzero(halo)):                 # warmer Lichtschein um die Laterne
-        if not out[y + PT + b, x + PL, 3]:
-            out[y + PT + b, x + PL] = rgb('fff4b0', int(70 + 110 * fl))
+    x0, x1, y0, y1 = SCARF
+    sw = round(1.3 * math.sin(2 * math.pi * 2 * i / N))
+    for y in range(y0, y1 + 1):                         # der Schalzipfel pendelt (unten am weitesten)
+        dx = round(sw * (y - y0 + 1) / (y1 - y0 + 1))
+        m = np.zeros((SH, SW), bool)
+        m[y, x0:x1 + 1] = np.array([hexc(SRC[y, x]) in ('7c1618', 'b02624') for x in range(x0, x1 + 1)])
+        move_part(out, s, m, dx, 0, PL, PT + b, toward=-1 if dx > 0 else 1)
+    for (x, y), c in sparkle_pixels(i, N, [(2 + PL, 14 + PT + b, 5), (4 + PL, 16 + PT + b, 21), (1 + PL, 16 + PT + b, 37)],
+                                    rgb('c8f4ff'), rgb('08d3ef')).items():
+        dot(out, x, y, c)
     return out
 
 
 # ---------------------------------------------------------------- Omikron
-ILLU = [(-9, 0.0), (9, math.pi)]                        # Trugbilder links und rechts
+ILLU = [(3, 5, -9), (9, 3, 9), (13, 2, -10), (21, 6, 9), (29, 2, -9), (33, 4, 10), (40, 3, -9), (44, 2, 9)]
+GLITCH_ROWS = {4: 6, 10: 14, 22: 3, 24: 18, 30: 9, 34: 20, 41: 12}
+HAIR = {'515350', 'bbbdba', '7a7c79'}
+OM_HANDS = [((1, 4, 14, 17), 1), ((17, 20, 14, 17), -1)]
 
 
 def f_omikron(i):
     s = SRC.copy()
     b = B24[i % 24]
-    fig = bounce_frame(s, b)
-    out = np.zeros_like(fig)
     t = 2 * math.pi * i / N
-    for dx, ph in ILLU:                                 # Trugbilder flackern auf und vergehen
-        a = max(0.0, math.sin(2 * t + ph)) if i else 0.0
-        if a < 0.08:
+    k = (i - 16) % N                                    # das Monokel blitzt
+    if k < 3:
+        s[9, 12] = rgb('ffffff')
+        s[9, 13] = rgb('fff7d0')
+    fig = bounce_frame(s, b)
+    flutter(fig, s, i, PL, PT + b, list(range(0, 13)), range(0, 5), range(17, SW), amp=2.4, speed=8,
+            ok=lambda c: hexc(c) in HAIR, erratic=0.5)  # die grauen Haare wehen wild
+    lift = -round(2 * (0.5 - 0.5 * math.cos(2 * t)))   # Arme heben und senken
+    for (x0, x1, y0, y1), toward in OM_HANDS:
+        m = np.zeros((SH, SW), bool)
+        m[y0:y1 + 1, x0:x1 + 1] = SRC[y0:y1 + 1, x0:x1 + 1, 3] > 0
+        move_part(fig, s, m, 0, lift, PL, PT + b, toward=toward)
+    for (x, y), c in sparkle_pixels(i, N, [(12 + PL, 9 + PT + b, 16)], rgb('fff7d0'), rgb('cfc592')).items():
+        dot(fig, x, y, c)
+    out = np.zeros_like(fig)
+    for st, dur, dx in ILLU:                            # Trugbilder tauchen unregelmäßig auf, mit Bildfehlern
+        a = (i - st) % N
+        if a >= dur:
             continue
+        al = [0.35, 0.6, 0.45, 0.6, 0.3, 0.5][a % 6]
+        ghost = np.zeros_like(fig)
         for y, x in zip(*np.nonzero(fig[:, :, 3])):
-            xx = x + dx
-            if 0 <= xx < W and not out[y, xx, 3]:
+            if 0 <= x + dx < W:
                 c = fig[y, x]
-                out[y, xx] = [c[0], c[1], c[2], int(c[3] * 0.55 * a)]
-        for ex in (8, 13):                              # rot glühende Augen im Nebel
-            dot(out, ex + PL + dx, 10 + PT + b, rgb('ff2020', int(255 * a)))
+                ghost[y, x + dx] = [c[0], c[1], c[2], int(c[3] * al)]
+        g = GLITCH_ROWS.get(i)
+        if g is not None:
+            ghost[g + PT:g + PT + 2] = np.roll(ghost[g + PT:g + PT + 2], 2 if dx > 0 else -2, axis=1)
+        mm = (ghost[:, :, 3] > 0) & (out[:, :, 3] == 0)
+        out[mm] = ghost[mm]
+        for ex in (8, 13):
+            dot(out, ex + PL + dx, 10 + PT + b, rgb('ff2020', int(255 * al / 0.6)))
     m = fig[:, :, 3] > 0
     out[m] = fig[m]
     return out
