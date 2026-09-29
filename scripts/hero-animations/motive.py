@@ -132,8 +132,10 @@ V_ = {
     'fiona': dict(slug='fiona-the-ghost-princess', pads=(9, 9, 4, 1), skin='Fiona, the Princess of Blackport',
                   blink=eyes([(7, 8, 14, 15), (11, 12, 14, 15)], 'ffe6d5', line='312408')),
     'overlord': dict(slug='overlord-baaliel', knee=22, pads=(3, 3, 8, 1), skin='Baaliel, the Demon General'),
-    'greymage': dict(slug='grey-mage-archibald', pads=(8, 3, 3, 1), skin='Archibald the Archmage'),
-    'battlemaniac': dict(slug='toras-the-battle-maniac', pads=(2, 2, 4, 1), skin='Toras, Master of all Weapons',
+    'greymage': dict(slug='grey-mage-archibald', pads=(8, 3, 3, 1), skin='Archibald the Archmage',
+                     blink={'halb': [((x, 15), '7b7b7b') for x in (5, 6, 9, 10)],
+                            'zu': [((x, 15), 'f6bd7b') for x in (5, 6, 9, 10)]}),   # Lid: dunkle Linie darüber
+    'battlemaniac': dict(slug='toras-the-battle-maniac', pads=(3, 3, 5, 1), skin='Toras, Master of all Weapons',
                          blink={'halb': [((10, 13), '9a9594')], 'zu': [((9, 13), '000000'), ((10, 13), '000000')]}),
     'wormsoldier': dict(slug='zsosssar-the-worm-soldier', pads=(20, 3, 8, 1), skin='ZsosSsar the Serpent Warlord',
                         blink=eyes([(17, 18, 7, 8), (23, 24, 7, 8)], 'f99269')),
@@ -1613,6 +1615,7 @@ def f_greymage(i):
                 if 0 <= x + dxs[y] < SW:
                     hat[y, x + dxs[y]] = s[y, x]
     s = hat
+    blink(s, i)
     for (x, y), c in GM_MOUTH[GM_TALK[i % 24]]:          # er spricht: der Mund geht auf und zu
         s[y, x] = rgb(c)
     lift = GM_LIFT.get(i, 0)                            # die freie Hand hebt sich zur Betonung
@@ -1650,7 +1653,12 @@ def f_greymage(i):
 
 # ---------------------------------------------------------------- Toras the Battle Maniac
 TB_PIVOT = (20.5, 17.5)                                 # Faust
-TB_REST, TB_WIND = 1.75, 2.05                           # in Ruhe gesenkt (links unten), ausholen nach hinten
+TB_REST = 1.75                                          # in Ruhe gesenkt (links unten)
+# Ein Hieb je 16 Frames (drei pro Loop): (Winkel, Spur) – Spur ('ab', a): von a bis zur Klinge,
+# ('bis', a): Rest der Spur bis a (verschwindet von ihrem Anfang her)
+TB_CYCLE = [(TB_REST, None)] * 5 + [(1.9, None), (2.05, None), (1.0, ('ab', 1.0)), (0.0, ('ab', 0.0)),
+            (-0.3, ('ab', 0.0)), (-0.3, ('bis', 1.1)), (-0.15, ('bis', 0.6)), (0.0, ('bis', 0.25)),
+            (0.45, None), (0.95, None), (1.4, None)]
 
 
 def _tb_masks():
@@ -1658,48 +1666,70 @@ def _tb_masks():
     grey = np.array([[r == g == b for r, g, b in SRC[y, :, :3]] for y in range(SH)])
     sword = op & (_ys >= 16) & (_ys <= 19) & (((_xs >= 22)) | ((_xs == 21) & np.isin(_ys, (16, 19))))
     wedge = op & (_ys >= 20) & (_xs >= 16) & grey
-    return sword, wedge, op & ~sword & ~wedge
+    body = op & ~sword & ~wedge
+    wedge |= sword & (_xs >= 24)                        # die breite Klinge aus dem Sprite gehört zur Spur
+    arm = body & (_xs >= 14) & (_xs <= 21) & (_ys >= 16) & (_ys <= 19)
+    hilt = np.zeros_like(SRC)                          # Heft und Stichblatt aus dem Sprite
+    for y, x in zip(*np.nonzero(sword & (_xs <= 23))):
+        hilt[y, x] = SRC[y, x]
+    return hilt, hilt[:, :, 3] > 0, wedge, body & ~arm, arm
+
+
+def tb_blade(out, px_, py_, ang):
+    """Die eigentliche Klinge: schmal (heller Grat + dunklere Schneide), direkt gerastert – bleibt in
+    jedem Winkel geschlossen."""
+    ca, sa = math.cos(ang), math.sin(ang)
+    nx, ny = -sa, ca                                    # Schneide auf der Unterseite
+    L = SW - 1 - TB_PIVOT[0]
+    pts = {}
+    d = 3.0
+    while d <= L:
+        x, y = px_ + d * ca, py_ + d * sa
+        pts.setdefault((int(math.floor(x)), int(math.floor(y))), 'e6e6e6' if d < L - 0.6 else 'c8c8c8')
+        d += 0.35
+    d = 3.0
+    while d <= L - 1.2:
+        x, y = px_ + d * ca + 0.9 * nx, py_ + d * sa + 0.9 * ny
+        pts.setdefault((int(math.floor(x)), int(math.floor(y))), '9a9a9a')
+        d += 0.35
+    for (x, y), c in pts.items():
+        dot(out, x, y, rgb(c))
 
 
 if V == 'battlemaniac':
-    TB_SWORD, TB_WEDGE, TB_BODY = _tb_masks()
+    TB_HILT, TB_HILT_M, TB_WEDGE, TB_BODY, TB_ARM = _tb_masks()
     TB_ANG = np.arctan2(_ys + 0.5 - TB_PIVOT[1], _xs + 0.5 - TB_PIVOT[0])
 
 
-def tb_pose(i):
-    """(Winkel der Klinge, Spur: ('ab', a) = Spur von a bis zur Klinge, ('bis', a) = Rest der Spur bis a, None).
-    Der Hieb beginnt links unten und zieht im Bogen nach rechts hoch (die Sprite-Pose ist sein Ende)."""
-    if i < 18 or i >= 42:
-        return TB_REST, None
-    if i < 22:
-        return TB_REST + (TB_WIND - TB_REST) * (i - 17) / 4, None
-    if i <= 24:
-        a = {22: 1.3, 23: 0.6, 24: 0.0}[i]
-        return a, ('ab', a)
-    if i < 30:
-        return 0.0, {25: ('bis', 1.2), 26: ('bis', 0.7), 27: ('bis', 0.3)}.get(i)
-    f = (i - 29) / 12
-    return TB_REST * (0.5 - 0.5 * math.cos(math.pi * f)), None
-
-
 def f_battlemaniac(i):
-    """Wie Toras: das Schwert in Ruhe gesenkt, ausholen, in drei Frames von links unten im Bogen nach rechts
-    durchziehen – der graue Bogen aus dem Sprite ist die Schwungspur (nur hinter der Klinge), dann langsam
-    wieder senken."""
+    """Wie Toras, nur öfter und schneller: dreimal pro Loop holt er aus und zieht die Klinge von links unten
+    im Bogen nach rechts hoch (mit Nachschwung) – der graue Bogen aus dem Sprite ist die Schwungspur, die
+    Klinge selbst ist schmal. Der Arm hebt und senkt sich mit dem Schwert (spaltenweise um die Schulter
+    geschert, nichts gestreckt), die Haarstacheln wiegen sich sacht im Wind."""
     s = SRC.copy()
     blink(s, i)
+    t = 2 * math.pi * i / N
+    raw = [round(1.3 * ((11 - y) / 11) ** 1.2 * math.sin(2 * t - 0.35 * y)) for y in range(11, -1, -1)]
+    hdx = clamp_chain(raw)[::-1]                        # vom Haaransatz (Zeile 11) nach oben
+    ang, trail = TB_CYCLE[i % 16]
+    k = round(3 * max(-0.35, min(2.05, ang)) / TB_REST)  # Faust: gesenkt bis 3 px tiefer, beim Hieb oben
+    k = max(-1, min(3, k))
+    arm_dy = lambda x: round(k * (x - 13) / 8)
     out = np.zeros((H, W, 4), int)
-    ang, trail = tb_pose(i)
     if trail:
         kind, a = trail
         m = TB_WEDGE & ((TB_ANG <= a) if kind == 'bis' else (TB_ANG >= a)) & (TB_ANG >= ang + 0.05)
         for y, x in zip(*np.nonzero(m)):
             out[y + PT, x + PL] = s[y, x]
-    sword = rotate_part(s, TB_SWORD, TB_PIVOT, ang, (H, W), (PL, PT))
-    m = sword[:, :, 3] > 0
-    out[m] = sword[m]
+    tb_blade(out, TB_PIVOT[0] + PL, TB_PIVOT[1] + PT + k, ang)
+    hilt = rotate_part(TB_HILT, TB_HILT_M, TB_PIVOT, ang, (H, W), (PL, PT + k))
+    m = hilt[:, :, 3] > 0
+    out[m] = hilt[m]
     for y, x in zip(*np.nonzero(TB_BODY)):
-        out[y + PT, x + PL] = s[y, x]
+        dx = hdx[y] if y <= 11 else 0
+        out[y + PT, x + PL + dx] = s[y, x]
+    for y, x in zip(*np.nonzero(TB_ARM)):               # der Arm schwingt mit (die Faust führt das Schwert)
+        out[y + PT + arm_dy(x), x + PL] = s[y, x]
     return out
 
 
@@ -1745,8 +1775,8 @@ def f_wormsoldier(i):
     stripe = np.zeros((H, W), bool)
     for y, x in zip(*np.nonzero(gun[:, :, 3])):
         out[y + PT + gdy, x + PL + gdx] = gun[y, x]
-        stripe[y + PT + gdy, x + PL + gdx] = x <= 2 and hexc(gun[y, x]) == '273305'
-    fig = (out[:, :, 3] > 0) & ~stripe                 # auf dem dunklen Streifen darf das Gas schon beginnen
+        stripe[y + PT + gdy, x + PL + gdx] = x <= 1 and hexc(gun[y, x]) in ('273305', '665300')
+    fig = (out[:, :, 3] > 0) & ~stripe                 # das Gas liegt über dem vorderen Ringstrich
     gas = np.zeros((H, W))
     col = np.zeros((H, W), int)
     for cx, cy, r, a in ws_puffs(i):
@@ -1792,12 +1822,13 @@ def f_diva(i):
     body, guitar, arms = load('body'), load('guitar'), load('arms')
     out = np.zeros((H, W, 4), int)
     bop = ed_bop(i)
+    foot = 1 if i % 8 in (5, 6, 7) else 0               # der linke Fuß tippt den Takt
     nod = bop + (1 if 3 <= i % 16 < 7 else 0)          # der Kopf nickt zusätzlich (sinkt nur, nichts reißt)
     tail = ed_bop(i - 2)                                # die Zöpfe schwingen hinterher
     tip = {6: -1, 14: 1}.get(i % 16, 0)                 # die Zopfenden schlenkern
     for y, x in zip(*np.nonzero(body[:, :, 3])):
-        if y >= 19:                                     # die Beine stehen
-            dy, dx = 0, 0
+        if y >= 19:                                     # die Beine stehen, nur der linke Fuß hebt sich
+            dy, dx = (-foot if (x <= 13 and y >= 20) else 0), 0
         elif x <= 7 or x >= 23:
             dy, dx = tail, (tip if y >= 12 else 0)
         elif y <= 11:
@@ -1809,7 +1840,6 @@ def f_diva(i):
         out[y + PT + bop, x + PL] = guitar[y, x]
     strum = [0, 1, 0, -1][i % 4]                        # Schlaghand im Achteltakt
     fret = ED_FRET[i]
-    foot = 1 if i % 8 in (5, 6, 7) else 0               # der linke Fuß tippt den Takt
     for y, x in zip(*np.nonzero(arms[:, :, 3])):
         dx = dy = 0
         if y >= 19:                                     # Beine stehen, nur der Fuß hebt sich
