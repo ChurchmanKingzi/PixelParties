@@ -11,7 +11,8 @@ Frame 0 ist immer die Ruhepose.
 * grisgar:  Grisgar schlägt langsam mit den riesigen Dämonenflügeln (spaltentreue Scherung) und
             schwebt dabei auf und ab; der Heiligenschein schwingt nach und glüht, er blinzelt.
 * nieht:    Nieht, the Blitz Blade: an den Klingen knistern Blitze, die Funkelsterne neben ihm
-            pulsieren, die Capezipfel flattern, er federt und blinzelt.
+            pulsieren, Capezipfel und Haarspitzen wehen, er federt und blinzelt; einmal je Loop ist
+            er blitzschnell weg (Tempolinien, Staub) und taucht von der anderen Seite wieder auf.
 * kohta:    Kohta, the Silent Observer sitzt, redet (der Mund geht auf und zu) und hebt ab und zu
             sein Glas; Glas und Flasche sprudeln, über die Flasche läuft ein Glanz.
 * bill:     Bill, the Angry Auctioneer brüllt (Mund), schüttelt abwechselnd die Fäuste, ihm steigt
@@ -47,7 +48,7 @@ def eyes(blocks, skin, line='000000'):
 
 
 V_ = {
-    'alex': dict(slug='alex-trainer-of-heroes', knee=21, pads=(2, 2, 3, 1),
+    'alex': dict(slug='alex-trainer-of-heroes', knee=22, pads=(2, 2, 3, 1),
                  blink=eyes([(6, 7, 9, 10), (10, 11, 9, 10)], 'f6bd7b')),
     'doq': dict(slug='great-detective-doq', knee=20, pads=(3, 2, 3, 1)),
     'grisgar': dict(slug='grisgar-emissary-of-the-demon-lord', pads=(2, 2, 14, 14),
@@ -143,10 +144,10 @@ def f_doq(i):
     s = SRC.copy()
     st = BLINK.get(i)                                   # das durch die Lupe riesige Auge blinzelt
     if st:
-        for y in range(8, 13 if st == 'zu' else 10):
+        for y in range(8, 14 if st == 'zu' else 11):
             for x in range(4, 11):
                 if s[y, x, 3] and hexc(s[y, x]) not in RIM:
-                    s[y, x] = rgb('35566b' if (st == 'zu' and y == 12) else ('d9c6aa' if (x + y) % 3 else 'cbb89c'))
+                    s[y, x] = rgb('35566b' if (st == 'zu' and y == 13) or (st == 'halb' and y == 10) else ('d9c6aa' if (x + y) % 3 else 'cbb89c'))
     lens = np.array([[SRC[y, x, 3] > 0 and hexc(SRC[y, x]) in LENS and x <= 12 and y <= 15
                       for x in range(SW)] for y in range(SH)])
     sweep(s, lens, i, 10, dur=7, slope=-0.8, col='ffffff', trail='e8f4ff')
@@ -224,8 +225,47 @@ def cape_flutter(out, s, i, b):
                         out[y + PT + b, xx] = s[y, x]
 
 
+GONE = {27: 'streak', 28: 'dust', 29: 'dust', 30: 'dust', 31: 'none', 32: 'none', 33: 'back'}
+STREAK_ROWS = [3, 8, 12, 16, 20, 23]
+
+
+def nieht_hair(s, i):
+    """Die Haarspitzen (Zeilen 0–5) wiegen sich: je Zeile ein Versatz, oben am stärksten."""
+    t = 2 * math.pi * i / N
+    raw = [round(1.6 * (6 - y) / 6 * math.sin(3 * t - 0.5 * y) * (0.5 - 0.5 * math.cos(2 * t) if i else 0))
+           for y in range(6, -1, -1)]
+    dxs = clamp_chain(raw)[::-1]                      # Zeile 6 bleibt, darüber höchstens 1 px je Zeile
+    out = s.copy()
+    for y in range(0, 6):
+        if dxs[y]:
+            row = s[y].copy()
+            out[y] = 0
+            for x in np.nonzero(row[:, 3])[0]:
+                if 0 <= x + dxs[y] < SW:
+                    out[y, x + dxs[y]] = row[x]
+    return out
+
+
+def clamp_chain(vals):
+    out = [vals[0]]
+    for v in vals[1:]:
+        out.append(max(out[-1] - 1, min(out[-1] + 1, v)))
+    return out
+
+
+def streaks(out, b, side, alpha):
+    """Tempolinien, wo er eben noch war (side: -1 = zur linken Seite hin, +1 = zur rechten)."""
+    for k, y in enumerate(STREAK_ROWS):
+        L = 10 + 4 * (k % 3)
+        x0 = PL + SW // 2 + (2 if side > 0 else -2 - L) + (k % 2) * 3 * side
+        for x in range(x0, x0 + L):
+            a = alpha * (1 - abs((x - x0) - L / 2) / (L / 2 + 1))
+            if 0 <= x < W and not out[y + PT + b, x, 3]:    # hinter der Figur
+                out[y + PT + b, x] = rgb('f4f2e4', int(a))
+
+
 def f_nieht(i):
-    s = SRC.copy()
+    s = nieht_hair(SRC.copy(), i)
     blink(s, i)
     b = B24[i % 24]
     for cx, cy, _ in CROSSES:                           # die Sterne selbst malt cross()
@@ -233,8 +273,21 @@ def f_nieht(i):
             for xx in range(cx - 2, cx + 3):
                 if s[yy, xx, 3] and hexc(s[yy, xx]) in ('ffffff', 'dadace'):
                     s[yy, xx] = 0
+    gone = GONE.get(i)
+    if gone in ('streak', 'dust', 'none'):             # Ninja: blitzschnell weg …
+        out = np.zeros((H, W, 4), int)
+        if gone == 'streak':
+            streaks(out, b, 1, 230)
+        if gone == 'dust':
+            a = i - 28
+            for k, dx in enumerate((-3, -1, 2, 4)):
+                x, y = PL + SW // 2 + dx + (k - 1) * a, PT + SH - 1 - a - (k % 2)
+                dot(out, x, y, rgb('c8c0a0', 200 - 60 * a))
+        return out
     out = bounce_frame(s, b)
     cape_flutter(out, s, i, b)
+    if gone == 'back':                                  # … und von links wieder da
+        streaks(out, b, -1, 170)
     for cx, cy, ph in CROSSES:
         arm = [2, 2, 2, 1, 1, 0, 1, 2][((i // 2) + ph) % 8]
         cross(out, cx, cy, arm, PL, PT + b)
@@ -429,9 +482,9 @@ MTALK = [0, 0, 1, 1, 0, 1, 1, 1, 0, 0, 0, 0, 1, 1, 0, 0, 1, 0, 1, 1, 0, 0, 0, 0,
 def mizune_base(i):
     s = SRC.copy()
     blink(s, i)
-    if not MTALK[i]:                                    # Mund zu (sonst offen)
-        s[12, 9] = s[12, 10] = rgb('f8bc77')
-        s[13, 9] = s[13, 10] = rgb('7a0000')
+    if not MTALK[i]:                                    # Mund zu (sonst offen): nur eine Lippenlinie
+        s[12, 9] = s[12, 10] = rgb('b8664a')
+        s[13, 9] = s[13, 10] = rgb('f8bc77')
     return bounce_frame(s, B24[i % 24])
 
 
