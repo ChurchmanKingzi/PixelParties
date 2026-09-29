@@ -1,0 +1,17 @@
+{
+  "hero": "Regional Champ Mizune",
+  "sheet": "regional-champ-mizune.png",
+  "frameWidth": 29,
+  "frameHeight": 29,
+  "frames": 48,
+  "frameMs": 90,
+  "loop": true,
+  "layout": "horizontal",
+  "skinOf": "Silent Water Mizune",
+  "padTop": 3,
+  "padLeft": 6,
+  "padRight": 7,
+  "padBottom": 2,
+  "faceX": 14.0,
+  "footY": 27
+}

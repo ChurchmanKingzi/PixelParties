@@ -1,0 +1,16 @@
+{
+  "hero": "Definitely not Andras, the Human Weapon",
+  "sheet": "definitely-not-andras-the-human-weapon.png",
+  "frameWidth": 68,
+  "frameHeight": 55,
+  "frames": 48,
+  "frameMs": 90,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 13,
+  "padLeft": 16,
+  "padRight": 18,
+  "padBottom": 15,
+  "faceX": 33.0,
+  "footY": 40
+}
