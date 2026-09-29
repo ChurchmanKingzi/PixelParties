@@ -3874,7 +3874,7 @@ const PP_KARTEN_FORMAT = 1.4;
 // `crispEdges`; CSS blaettert per `steps(5)` durch die Bilder und
 // skaliert mit `image-rendering: pixelated`. Dazu tanzt jede Flamme in
 // Pixelschritten (`ptFlammeTanz`) — sonst wirkten sie steif.
-const PP_PIXELFLAMME = (() => {
+const ppFlammenSprite = (FARBE) => {
   const bilder = [
     ['...R....', '...RR...', '..RRR...', '..RORR.R', '.RROORRR', '.ROOYOR.', 'RROYYOOR', 'ROOYWYOR', 'ROYWWYOR', 'ROYWWYOR', '.ROYYOR.', '..RRRR..'],
     ['....R...', '....RR..', '...RRR..', 'R..ROR..', 'RR.ROORR', '.RROOOR.', 'RROYYOR.', 'ROYYWOOR', 'ROYWWYOR', 'ROYWWYOR', '.ROYYOR.', '..RRRR..'],
@@ -3882,14 +3882,43 @@ const PP_PIXELFLAMME = (() => {
     ['.....R..', '.R...RR.', '.RR.RRR.', '.RRRROR.', 'RROOORR.', 'ROOYYORR', 'ROYYWYOR', 'ROYWWYOR', 'ROYWWYOR', 'ROYWWYOR', '.ROYYOR.', '..RRRR..'],
     ['........', '...R....', '..RR..R.', '..RORRR.', '.RROOOR.', '.ROOYOOR', 'RROYYYOR', 'ROYYWYOR', 'ROYWWYOR', 'ROYWWYOR', '.ROYYOR.', '..RRRR..'],
   ];
-  const FARBE = { R: '#b8200e', O: '#ff7a14', Y: '#ffd23a', W: '#fff3a8' };
   let rects = '';
   bilder.forEach((zeilen, b) => zeilen.forEach((z, y) => [...z].forEach((c, x) => {
     if (FARBE[c]) rects += `<rect x="${b * 8 + x}" y="${y}" width="1" height="1" fill="${FARBE[c]}"/>`;
   })));
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${bilder.length * 8}" height="12" viewBox="0 0 ${bilder.length * 8} 12" shape-rendering="crispEdges">${rects}</svg>`;
   return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
-})();
+};
+const PP_PIXELFLAMME = ppFlammenSprite({ R: '#b8200e', O: '#ff7a14', Y: '#ffd23a', W: '#fff3a8' });
+// Lila Totenflamme (Sett, the Adept of Necromancy): dieselben fuenf
+// Bilder, Palette dunkelviolett → violett → hellviolett → fast weiss.
+const PP_NECROFLAMME = ppFlammenSprite({ R: '#2b0b47', O: '#6b21b8', Y: '#a54ae8', W: '#e9c8ff' });
+
+// ── Totes Flackern (Sett, Als Vorgabe 29.9.) ────────────────────────
+// Dauer-Aura um jede Kreatur in Setts Support Zones, solange sein Effekt
+// live ist: lila Pixel-Flammen rundum am Kartenrand plus ein harter,
+// flackernder Pixelrahmen. Keyframes in style.css (Regel ④); der Server
+// setzt `cc._zoneAura = 'necro_flicker'` (`zoneAuraFuer`).
+function NecroFlickerAura() {
+  // [x %, y %, Pixelgroesse, Versatz ms] — links, rechts, unten, oben
+  const zungen = useMemo(() => [
+    [-2, 22, 3, 0], [-2, 62, 3, 90], [102, 30, 3, 40], [102, 70, 3, 150],
+    [20, 100, 3, 60], [52, 100, 4, 20], [82, 100, 3, 110], [34, 4, 3, 130], [70, 4, 3, 70],
+  ].slice(0, ppFxN(9)), []);
+  return (
+    <div className="necro-aura">
+      {zungen.map(([x, y, g, d], i) => (
+        <i key={i} className="pt-pixelflamme necro-zunge" style={{
+          left: `calc(${x}% - ${4 * g}px)`, top: `calc(${y}% - ${12 * g}px)`,
+          width: 8 * g, height: 12 * g,
+          backgroundImage: `url("${PP_NECROFLAMME}")`,
+          animationDuration: `${210 + (i % 4) * 35}ms, ${260 + (i % 5) * 45}ms`,
+          animationDelay: `${-d}ms, ${-((i * 71) % 300)}ms`,
+        }} />
+      ))}
+    </div>
+  );
+}
 
 // ── Torchure: das Schwein frisst die Fackel (Als Vorgabe 26.9.) ─────
 // Kartenbild als Vorlage: ein Schwein frisst eine Fackel und foltert
@@ -43619,6 +43648,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     {cc?.burned ? <BurnedOverlay /> : null}
                     {cc?.bleeding ? <BleedingOverlay /> : null}
                     {cc?.frozen ? <FrozenOverlay /> : null}
+                    {cc?._zoneAura === 'necro_flicker' ? <NecroFlickerAura /> : null}
                     {(cc?.negated || cc?.nulled) ? <NegatedOverlay /> : null}
                     {cc?.poisoned ? <PoisonedOverlay stacks={cc.poisonStacks || 1} /> : null}
                     {/* v1143: ohne Handliste, siehe Heldenreihe */}
