@@ -3236,13 +3236,15 @@ if (typeof document !== 'undefined') {
       || btn.classList.contains('cancel-btn')
       || ppIstAbbruchEtikett(label);
     // ui_click uses its intrinsic (SFX_VOLUME_OVERRIDES) for a uniform level.
-    // ui_cancel keeps its explicit attenuation.
+    // ui_cancel: Pegel 1,0 (Als Befund 29.9.: bei 0,4 kam er mit dem globalen
+    // Daempfer 0,33 nur auf ~13 % heraus — leiser als der Klick). 1,0 = ~33 %,
+    // Hoehe von `placement`.
     // Caller-side dedupe values stay shorter than the global auto-
     // dedupe so explicit per-callsite tightening still works (e.g.
     // batch-draw chimes still pass their own 40-80ms window). The
     // auto-dedupe kicks in for any callsite that DOESN'T pass an
     // explicit `dedupe` (most of the cancel-handler call sites).
-    if (isCancel) playSFX('ui_cancel', { dedupe: 250, volume: 0.4 });
+    if (isCancel) playSFX('ui_cancel', { dedupe: 250, volume: 1.0 });
     else playSFX('ui_click', { dedupe: 60 });
   }, { capture: true });
 
@@ -3277,7 +3279,7 @@ if (typeof document !== 'undefined') {
   // Reihenfolge der Registrierung — und `app-shared` laedt als erstes.
   window.addEventListener('keydown', (e) => {
     if (e.key !== 'Escape' || e.repeat) return;
-    playSFX('ui_cancel', { dedupe: 250, volume: 0.4 });
+    playSFX('ui_cancel', { dedupe: 250, volume: 1.0 });
   }, true);
 
   // ── TIPPEN KLINGT (Als Vorgabe 17.8.) ─────────────────────────────

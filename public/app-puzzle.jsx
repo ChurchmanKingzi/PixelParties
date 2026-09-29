@@ -1833,7 +1833,7 @@ function PuzzleCreator() {
         ? `„${cardName}" liegt bereits — es sind nur VERSCHIEDENE Areas erlaubt.`
         : `Area-Limit erreicht (${window.computeAreaLimit(zone)}). „Spatial Crevice" hebt es auf 3.`;
       notify(grund, 'info');
-      if (window.playSFX) window.playSFX('ui_cancel', { volume: 0.4 });
+      if (window.playSFX) window.playSFX('ui_cancel', { volume: 1.0 });
       return;
     }
     if (window.playSFX) window.playSFX('placement');
@@ -3129,16 +3129,16 @@ function PuzzleCreator() {
       // Pop-ups close one level at a time so a "viewing a deck pile"
       // Escape doesn't boot the whole creator. Order matters: most
       // transient overlay first, navigation away last.
-      if (allianceLink)       { e.preventDefault(); e.stopImmediatePropagation(); if (window.playSFX) window.playSFX('ui_cancel', { volume: 0.4 }); setAllianceLink(null);        return; }
-      if (viewPile)           { e.preventDefault(); e.stopImmediatePropagation(); if (window.playSFX) window.playSFX('ui_cancel', { volume: 0.4 }); setViewPile(null); setPileSuche(''); return; }
-      if (debuffMenuOpen)     { e.preventDefault(); e.stopImmediatePropagation(); if (window.playSFX) window.playSFX('ui_cancel', { volume: 0.4 }); setDebuffMenuOpen(null);      return; }
-      if (removePopupPos)     { e.preventDefault(); e.stopImmediatePropagation(); if (window.playSFX) window.playSFX('ui_cancel', { volume: 0.4 }); setRemovePopupPos(null);      return; }
-      if (mobileSelected)     { e.preventDefault(); e.stopImmediatePropagation(); if (window.playSFX) window.playSFX('ui_cancel', { volume: 0.4 }); setMobileSelected(null);      return; }
-      if (editTarget)         { e.preventDefault(); e.stopImmediatePropagation(); if (window.playSFX) window.playSFX('ui_cancel', { volume: 0.4 }); setEditTarget(null);          return; }
-      if (doomEdit)           { e.preventDefault(); e.stopImmediatePropagation(); if (window.playSFX) window.playSFX('ui_cancel', { volume: 0.4 }); setDoomEdit(null);            return; }
+      if (allianceLink)       { e.preventDefault(); e.stopImmediatePropagation(); if (window.playSFX) window.playSFX('ui_cancel', { volume: 1.0 }); setAllianceLink(null);        return; }
+      if (viewPile)           { e.preventDefault(); e.stopImmediatePropagation(); if (window.playSFX) window.playSFX('ui_cancel', { volume: 1.0 }); setViewPile(null); setPileSuche(''); return; }
+      if (debuffMenuOpen)     { e.preventDefault(); e.stopImmediatePropagation(); if (window.playSFX) window.playSFX('ui_cancel', { volume: 1.0 }); setDebuffMenuOpen(null);      return; }
+      if (removePopupPos)     { e.preventDefault(); e.stopImmediatePropagation(); if (window.playSFX) window.playSFX('ui_cancel', { volume: 1.0 }); setRemovePopupPos(null);      return; }
+      if (mobileSelected)     { e.preventDefault(); e.stopImmediatePropagation(); if (window.playSFX) window.playSFX('ui_cancel', { volume: 1.0 }); setMobileSelected(null);      return; }
+      if (editTarget)         { e.preventDefault(); e.stopImmediatePropagation(); if (window.playSFX) window.playSFX('ui_cancel', { volume: 1.0 }); setEditTarget(null);          return; }
+      if (doomEdit)           { e.preventDefault(); e.stopImmediatePropagation(); if (window.playSFX) window.playSFX('ui_cancel', { volume: 1.0 }); setDoomEdit(null);            return; }
       // No open overlay — actually leave the creator.
       e.stopImmediatePropagation();
-      if (window.playSFX) window.playSFX('ui_cancel', { volume: 0.4 });
+      if (window.playSFX) window.playSFX('ui_cancel', { volume: 1.0 });
       setScreen('menu');
     };
     window.addEventListener('keydown', h, true); return () => window.removeEventListener('keydown', h, true);
@@ -3438,7 +3438,7 @@ function PuzzleCreator() {
           if (zt === 'hero' && si !== allianceLink.si && p.heroes[hi]) {
             setzeAllianz(allianceLink, si, hi);
           } else if (window.playSFX) {
-            window.playSFX('ui_cancel', { volume: 0.4 });
+            window.playSFX('ui_cancel', { volume: 1.0 });
           }
           setAllianceLink(null);
           return;
