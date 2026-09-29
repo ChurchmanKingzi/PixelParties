@@ -4,7 +4,7 @@
 //
 //  "Once per turn, when you would draw exactly 1 card through an
 //   effect, you may make your opponent declare a card type (Attack/
-//   Spell, Ability, Artifact, Potion, Hero) and reveal the card
+//   Spell/Creature, Ability, Artifact, Potion, Hero) and reveal the card
 //   instead. If it's a card of the declared type, add it to your hand
 //   and draw 2 additional cards. Otherwise, delete it and send the top
 //   4 cards of either player's deck to the discard pile."
@@ -20,9 +20,10 @@
 //  • Deklariert wird VOR der Aufdeckung; der Gegner waehlt (bei
 //    fehlender Antwort, z. B. CPU, zufaellig). Die oberste Karte wird
 //    beiden gezeigt.
-//  • Typgruppen wie im Kartentext — KEINE Creature-Option: Creatures
-//    (und Tokens) treffen nie die deklarierte Gruppe. „Hero" schliesst
-//    Ascended Hero ein (wie bei Great Detective Doq).
+//  • Typgruppen wie im Kartentext (Errata: „Attack/Spell/Creature").
+//    Creature schliesst „Creature/Token" ein; reine Tokens zaehlen
+//    nicht. „Hero" schliesst Ascended Hero ein (wie bei Great Detective
+//    Doq).
 //  • Treffer: Karte aus dem Deck auf die Hand (kein Tutor/Search-Signal,
 //    kein Zieh-Signal) + 2 Karten ziehen. Fehlschlag: Karte in den
 //    Loeschstapel, dann waehlt DU, wessen Deck die obersten 4 Karten
@@ -33,8 +34,8 @@
 const CARD_NAME = 'Codumbus, the Clueless Voyager';
 
 const TYPE_GROUPS = [
-  { id: 'action', label: '⚔️ Attack / Spell', description: 'Any Attack or Spell card.',
-    match: (cd) => cd?.cardType === 'Attack' || cd?.cardType === 'Spell' },
+  { id: 'action', label: '⚔️ Attack / Spell / Creature', description: 'Any Attack, Spell or Creature card.',
+    match: (cd) => cd?.cardType === 'Attack' || cd?.cardType === 'Spell' || /(^|\/)Creature($|\/)/.test(cd?.cardType || '') },
   { id: 'ability', label: '✨ Ability', description: 'Any Ability card.',
     match: (cd) => cd?.cardType === 'Ability' },
   { id: 'artifact', label: '🪄 Artifact', description: 'Any Artifact card.',
