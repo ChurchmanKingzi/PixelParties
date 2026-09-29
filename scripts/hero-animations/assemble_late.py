@@ -25,6 +25,9 @@ MotiveMoe.xcf
 MotiveGrailWar.xcf
   klaus-the-cult-leader         die Kapuzenfigur mit Messer und Geisel aus „Kultisten“
   kohta-master-of-super-killing Kohta mit erhobenem Messer aus „Summoning Instructions“
+MotiveArcanum.xcf
+  hel-the-bound-specter         die Kapuzengestalt „Ebene #55“ mit dem Dolch in der Brust „Ebene #112“
+                                (Teil knife), beide voll deckend statt 40 % wie im xcf
 """
 import os
 import sys
@@ -101,6 +104,16 @@ def main(d):
     g = lambda n: layer(D, D.raw_layers, n)
     save_parts('klaus-the-cult-leader', [('body', comp_at(g('Kultisten'), 290, 150, dil=1))])
     save_parts('kohta-master-of-super-killing', [('body', g('Summoning Instructions'))])
+    # ---- MotiveArcanum.xcf: Hel (im xcf zu 40 % deckend – hier voll deckend)
+    D = doc('MotiveArcanum.xcf')
+    g = lambda n: opaque(layer(D, D.raw_layers, n))
+    save_parts('hel-the-bound-specter', [('body', g('Ebene #55')), ('knife', g('Ebene #112'))])
+
+
+def opaque(a):
+    a = a.copy()
+    a[:, :, 3] = np.where(a[:, :, 3] > 0, 255, 0)
+    return a
 
 
 if __name__ == '__main__':

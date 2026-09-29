@@ -22,6 +22,8 @@ Varianten (gleicher Aufbau, gleicher Ausschnitt; Aufruf: python3 monia.py <tag> 
   delusional  Skin Delusional Monia
   lightning   Skin Lightning-Fast Monia (Ausschnitt 1 Zeile höher -> DY = 1)
   birthday    Hero Cool Birthday Girl Monia
+  bot         Hero Monia Bot, the Foretold Rescuer of Coolness (vom Nutzer gezeichnet, gleiche Lage wie
+              Cool Rescuer Monia, aber längere Düsenflammen; statt zu zwinkern glüht ihr rotes Roboterauge)
 Bei den Varianten wird der Glitzerstern allgemein entfernt (Stern-Pixel mit
 der häufigsten Nachbarfarbe gefüllt bzw. außen transparent), das offene
 rechte Auge übernimmt die Farben des linken.
@@ -37,13 +39,14 @@ from collections import Counter
 
 VARIANTS = {'hero': ('cool-rescuer-monia', 0, 'monia'), 'delusional': ('delusional-monia', 0, 'delusional_monia'),
             'lightning': ('lightning-fast-monia', 1, 'lightning_monia'),
-            'birthday': ('cool-birthday-girl-monia', 0, 'birthday_monia')}
+            'birthday': ('cool-birthday-girl-monia', 0, 'birthday_monia'),
+            'bot': ('monia-bot-the-foretold-rescuer-of-coolness', 0, 'bot_monia')}
 VARIANT = next((v for v in sys.argv[2:] if v in VARIANTS), 'hero')
 SLUG, DY, PREFIX = VARIANTS[VARIANT]
 BODY = np.array(Image.open(f'src/{SLUG}-body.png').convert('RGBA')).astype(int)
 FIRE = np.array(Image.open(f'src/{SLUG}-flames.png').convert('RGBA')).astype(int)
 SH, SW = BODY.shape[:2]
-P, PT, PB = 3, 3, 8
+P, PT, PB = 3, 3, (11 if VARIANT == 'bot' else 8)
 H, W = SH + PT + PB, SW + 2 * P
 N = 32
 CORE = [rgb('f7f5b8'), rgb('f6e70e'), rgb('f47b22'), rgb('ca2c29')]
@@ -73,6 +76,11 @@ STAR = [(0, 0), (1, 0), (2, 0), (3, 1), (2, 1), (1, 2), (0, 2), (0, 1)]   # 16 F
 EYE_OPEN = {(16 + dx, y + DY): tuple(int(v) for v in BODY[y + DY, 12 + dx]) for dx in (0, 1) for y in (9, 10)}
 EYE_WINK = {p: tuple(int(v) for v in BODY[p[1], p[0]]) for p in EYE_OPEN}
 WINK = range(20, 25)
+BOT_EYE = [(12, 9), (12, 10)]                            # Monia Bot: rotes Roboterauge (links)
+BOT_GLOW = [rgb('800000'), rgb('800000'), rgb('a00000'), rgb('d01010'), rgb('ff3030'), rgb('d01010'),
+            rgb('a00000'), rgb('800000')]
+if VARIANT == 'bot':                                   # kein zweites Auge, kein Zwinkern
+    EYE_OPEN, EYE_WINK = {}, {}
 # Seitenzopf: Spitze (Zeilen 0–1) und Mittelstück (Zeile 2, rechts vom Kopf)
 TAIL = {(x, y) for y in range(0, 3 + DY) for x in range(17, 23)
         if BODY[y, x, 3] and (y <= 1 + DY or x >= 19)}
@@ -110,7 +118,8 @@ def frame(i):
             continue
         y0, y1 = min(col), max(col)
         n = y1 - y0 + 1
-        grow = 1.0 + 0.25 * rnd(x, i) + (0.3 if rising else 0.0) - 0.12 * rnd(x + 40, i)
+        damp = min(1.0, 12 / n)                         # lange Flammen (Monia Bot) wachsen nicht übermäßig
+        grow = 1.0 + damp * (0.25 * rnd(x, i) + (0.3 if rising else 0.0) - 0.12 * rnd(x + 40, i))
         m = max(1, int(round(n * grow)))
         for j in range(m):
             sy = y0 + min(n - 1, int(j * n / m))
@@ -124,6 +133,9 @@ def frame(i):
                 out[yy, x + P] = c
     for (x, y), c in (EYE_WINK if i in WINK else EYE_OPEN).items():
         BODY[y, x] = c
+    if VARIANT == 'bot':
+        for x, y in BOT_EYE:
+            BODY[y, x] = BOT_GLOW[(i // 2) % len(BOT_GLOW)]
     # Körper, Füße schlackern gegenläufig
     ph = 2 * math.pi * i / 16
     dl = -1 if math.sin(ph) > 0.5 else 0
