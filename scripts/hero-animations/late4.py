@@ -34,12 +34,12 @@ B24 = [BOUNCE12[(k // 2) % 12] for k in range(24)]
 BLINK = {14: 'halb', 15: 'zu', 16: 'zu', 17: 'halb', 38: 'halb', 39: 'zu', 40: 'zu', 41: 'halb'}
 
 V_ = {
-    'styxgate': dict(slug='styx-the-opened-gate', pads=(3, 4, 3, 1)),
-    'tushu': dict(slug='tushu-the-knowledge-keeper', pads=(2, 2, 3, 2)),
+    'styxgate': dict(slug='styx-the-opened-gate', pads=(3, 6, 1, 1)),
+    'tushu': dict(slug='tushu-the-knowledge-keeper', pads=(2, 1, 3, 1)),
     'patty': dict(slug='patty-the-ninja-of-revenge', knee=17, pads=(5, 5, 5, 1)),
     'rool': dict(slug='rool-the-troll-guard', knee=24, pads=(3, 3, 3, 2)),
-    'champion': dict(slug='champion-the-eye-of-the-storm', knee=36, pads=(8, 8, 3, 1)),
-    'stormkissed': dict(slug='stormkissed-waflav', pads=(3, 3, 6, 3)),
+    'champion': dict(slug='champion-the-eye-of-the-storm', knee=36, pads=(8, 8, 3, 3)),
+    'stormkissed': dict(slug='stormkissed-waflav', pads=(1, 1, 10, 3)),
     'klaus': dict(slug='klaus-the-cult-leader', knee=24, pads=(3, 3, 3, 1)),
     'kohtamaster': dict(slug='kohta-master-of-super-killing', knee=22, pads=(3, 3, 4, 1)),
 }
@@ -131,63 +131,114 @@ def puff(out, cx, cy, a, L, cols=('e8e4f0', 'c8c4d0', 'a8a4b0')):
 
 # ---------------------------------------------------------------- Styx, the Opened Gate
 SG = None
-SG_HEADS = None
+SG_HAND = [(0, 12, 'big', 1.0), (12, 16, 'big', -1), (16, 28, 3, 0), (30, 42, 9, 0), (44, 48, 'big', 1)]  # Handweg
+
+
+def line(out, x0, y0, x1, y1, c):
+    n = max(abs(x1 - x0), abs(y1 - y0))
+    for k in range(n + 1):
+        blend(out, round(x0 + (x1 - x0) * k / max(1, n)), round(y0 + (y1 - y0) * k / max(1, n)), c)
+
+
+def warp(out, part, field, ox, oy):
+    """Teil verformen, ohne dass Lücken entstehen: jedes Pixel wird verschoben (field(x, y) -> (dx, dy))
+    und mit seinen Nachbarn per Linie verbunden."""
+    pts = {}
+    for y, x in zip(*np.nonzero(part[:, :, 3])):
+        dx, dy = field(x, y)
+        pts[(x, y)] = (x + dx, y + dy)
+    for (x, y), (nx, ny) in pts.items():
+        for qx, qy in ((x + 1, y), (x, y + 1), (x + 1, y + 1), (x - 1, y + 1)):
+            if (qx, qy) in pts:
+                mx, my = pts[(qx, qy)]
+                if max(abs(mx - nx), abs(my - ny)) > 1:
+                    line(out, nx + ox, ny + oy, mx + ox, my + oy, part[y, x])
+        blend(out, nx + ox, ny + oy, part[y, x])
+
+
+def hand_state(i):
+    """Die Geisterhand aus „Ebene #669“: wo sie gerade ist (Tor) und wie weit sie heraushängt (0..1)."""
+    for a, e, gate, mode in SG_HAND:
+        if a <= i < e:
+            u = (i - a) / (e - a)
+            if mode == 1.0 or mode == 1:
+                ext = 1.0 if mode == 1.0 and gate == 'big' and a == 0 else u
+            elif mode == -1:
+                ext = 1.0 - u
+            else:
+                ext = math.sin(math.pi * u)                # heraus und wieder hinein
+            return gate, ext
+    return 'big', 1.0
 
 
 def f_styxgate(i):
-    """Die Schatten wabern, die Tore gehen auf und zu, aus offenen Toren greifen Arme, Geisterköpfe
-    steigen auf."""
-    global SG, SG_HEADS
+    """Die Schatten wabern, die Schattenarme wiegen sich (lückenlos), die kleinen Tore gehen auf und zu,
+    verschwinden und erscheinen wieder; die Geisterhand greift aus dem großen Tor, zieht sich zurück und
+    greift aus anderen Toren; Geisterköpfe steigen aus den Schatten auf."""
+    global SG
     t = 2 * math.pi * i / N
     if SG is None:
-        shadow, tendrils, gates, eye = load('shadow'), load('tendrils'), load('gates'), load('eye')
+        shadow, tendrils, gates, hand = load('shadow'), load('tendrils'), load('gates'), load('eye')
         gl = components(gates)
         heads = np.array(Image.open('src/styx-the-opened-gate-heads.png').convert('RGBA')).astype(int)
-        m = components(heads)[0]                          # ein einzelner Geisterkopf als Vorlage
+        m = components(heads)[0]
         ys, xs = np.nonzero(m)
         head = np.where(m[:, :, None], heads, 0)[ys.min():ys.max() + 1, xs.min():xs.max() + 1]
-        SG = shadow, tendrils, gates, eye, gl, head
-    shadow, tendrils, gates, eye, gl, head = SG
+        ys, xs = np.nonzero(hand[:, :, 3])
+        hx0, hy0 = xs.min(), ys.min()
+        hand = hand[hy0:ys.max() + 1, hx0:xs.max() + 1]
+        SG = shadow, tendrils, gates, gl, head, hand, hx0, hy0
+    shadow, tendrils, gates, gl, head, hand, hx0, hy0 = SG
     out = np.zeros((H, W, 4), int)
+    wob = lambda y: round(1.2 * math.sin(2 * t + 0.35 * y) - 1.2 * math.sin(0.35 * y))
     for y, x in zip(*np.nonzero(shadow[:, :, 3])):        # der Schattenblock wabert zeilenweise
-        dx = round(1.2 * math.sin(2 * t + 0.35 * y) - 1.2 * math.sin(0.35 * y))
         dy = round(0.8 * math.sin(3 * t + 0.25 * x) - 0.8 * math.sin(0.25 * x)) if y > SH - 30 else 0
-        dot(out, x + dx + PL, y + dy + PT, shadow[y, x])
-    for y, x in zip(*np.nonzero(tendrils[:, :, 3])):      # Schattenarme wiegen sich, unten stärker
-        u = max(0.0, (y - 30) / (SH - 30))
-        dx = round(2.0 * u * math.sin(2 * t - 0.2 * x) - 2.0 * u * math.sin(-0.2 * x))
-        blend(out, x + dx + PL, y + PT, tendrils[y, x])
-    arms = []
-    for k, m in enumerate(gl):                            # Tore: offen – schließen – zu – öffnen
+        dot(out, x + wob(y) + PL, y + dy + PT, shadow[y, x])
+
+    def tfield(x, y):                                     # Schattenarme: unten weit ausschwingend
+        u = max(0.0, (y - 28) / (SH - 28)) ** 1.2
+        dx = 3.2 * u * (math.sin(2 * t - 0.22 * x - 0.15 * y) - math.sin(-0.22 * x - 0.15 * y))
+        dy = 1.2 * u * (math.sin(3 * t - 0.3 * x) - math.sin(-0.3 * x))
+        return round(dx), round(dy)
+    warp(out, tendrils, tfield, PL, PT)
+    gate, ext = hand_state(i)
+    info = []
+    for k, m in enumerate(gl):
         ys, xs = np.nonzero(m)
-        cy, cx = ys.mean(), xs.mean()
-        big = len(ys) > 40
-        a = (i + 7 * k) % 24
-        f = 1.0 if a < 12 else (0.5 if a in (12, 13, 22, 23) else 0.0)
-        if big:
+        info.append((xs.min(), xs.max(), ys.min(), ys.max(), len(ys) > 100))
+    big_k = next(k for k, g in enumerate(info) if g[4])
+    small = [k for k, g in enumerate(info) if not g[4]]
+    hk = big_k if gate == 'big' else small[gate % len(small)]
+    x0, x1, y0, y1, _ = info[hk]                           # die Hand hängt aus ihrem Tor heraus
+    hh, hw = hand.shape[:2]
+    if gate == 'big':
+        tx, ty = hx0, hy0 - round((1 - ext) * hh)
+    else:
+        tx, ty = (x0 + x1) // 2 - hw // 2, y0 + 2 - round((1 - ext) * hh)
+    for k, m in enumerate(gl):                            # Tore: auf – schließen – weg – erscheinen – öffnen
+        ys, xs = np.nonzero(m)
+        gx0, gx1, gy0, gy1, big = info[k]
+        cy = (gy0 + gy1) / 2
+        a = (i + 5 * k) % 24
+        f = (1.0 if a < 10 else 0.5 if a in (10, 11, 20, 21) else 0.15 if a in (12, 13, 18, 19) else 0.0)
+        if big or k == hk:
             f = 1.0
-        dy0 = round(1.2 * math.sin(2 * t + 0.35 * cy) - 1.2 * math.sin(0.35 * cy))
+        if f <= 0:
+            continue
+        dy0 = wob(int(cy))
         for y, x in zip(ys, xs):
-            if f >= 1 or abs(y - cy) <= f * (ys.max() - ys.min()) / 2:
+            if f >= 1 or abs(y - cy) <= max(0.5, f * (gy1 - gy0) / 2):
                 dot(out, x + PL + dy0, y + PT, gates[y, x])
-        if f >= 1 and not big and 3 <= a < 11 and k % 3 == 0:   # ein fahler Arm greift heraus
-            reach = min(a - 2, 11 - a, 4)
-            arms.append((cx + dy0, ys.max(), reach, 1 if k % 2 else -1))
-    for y, x in zip(*np.nonzero(eye[:, :, 3])):
-        dot(out, x + PL, y + PT, eye[y, x])
-    for cx, by, reach, side in arms:
-        for r in range(1, reach + 1):
-            dot(out, round(cx + side * r * 0.6) + PL, int(by) + r + PT, rgb('b8b4c8'))
-        hx, hy = round(cx + side * reach * 0.6) + PL, int(by) + reach + 1 + PT
-        for dx in (-1, 0, 1):
-            dot(out, hx + dx, hy, rgb('d8d4e8'))          # Klauenhand
-    hh, hw = head.shape[:2]
+    for y, x in zip(*np.nonzero(hand[:, :, 3])):
+        yy = y + ty
+        if yy >= y0:                                      # über dem Tor steckt sie noch drin
+            dot(out, x + tx + wob((y0 + y1) // 2) + PL, yy + PT, hand[y, x])
+    hh2, hw2 = head.shape[:2]
     for k in range(6):                                    # Geisterköpfe steigen aus den Schatten auf
         a = (i - 8 * k) % N
         L = 22
         if a < L:
-            x0 = 8 + (k * 17) % (SW - hw - 8)
-            x = x0 + round(1.2 * math.sin(0.5 * a + k))
+            x = 8 + (k * 17) % (SW - hw2 - 8) + round(1.2 * math.sin(0.5 * a + k))
             y = SH - 18 - round(1.6 * a)
             al = min(1.0, a / 4) * (1 - max(0, a - L + 6) / 6)
             paste(out, head, x + PL, y + PT, alpha=al)
@@ -195,20 +246,40 @@ def f_styxgate(i):
 
 
 # ---------------------------------------------------------------- Tushu
+TU_ROBE = lambda c: int(c[2]) > int(c[1]) + 30 and int(c[0]) > int(c[1])     # lila Robe
+
+
 def f_tushu(i):
-    """Er schwebt; Buch und Schriftrollen schweben jede für sich (eigene Höhe und eigener Takt)."""
+    """Er schwebt, seine Robe weht an den Zipfeln; die Schriftrollen schweben jede für sich, ihre roten
+    Bänder schlackern; das Buch liegt ruhig."""
     t = 2 * math.pi * i / N
     body, scrolls = load('body'), load('scrolls')
     out = np.zeros((H, W, 4), int)
     dy = -round(1.5 * math.sin(t))
-    for k, m in enumerate(components(scrolls)):
+    comps = components(scrolls)
+    book = max(comps, key=lambda m: np.nonzero(m)[0].mean())   # das Buch liegt unten in der Mitte
+    for y, x in zip(*np.nonzero(book)):
+        dot(out, x + PL, y + PT, scrolls[y, x])
+    for y, x in zip(*np.nonzero(body[:, :, 3])):
+        dot(out, x + PL, y + dy + PT, body[y, x])
+    flutter(out, body, i, PL, PT + dy, list(range(12, SH)), range(0, 24), range(33, SW), amp=1.4, speed=4,
+            ok=TU_ROBE)
+    for k, m in enumerate([c for c in comps if c is not book]):
         ph = 1.9 * k
         sy = -round(2.0 * math.sin(2 * t + ph) - 2.0 * math.sin(ph))
         sx = round(1.0 * math.sin(t + ph) - 1.0 * math.sin(ph))
-        for y, x in zip(*np.nonzero(m)):
-            dot(out, x + sx + PL, y + sy + PT, scrolls[y, x])
-    for y, x in zip(*np.nonzero(body[:, :, 3])):
-        dot(out, x + PL, y + dy + PT, body[y, x])
+        ys, xs = np.nonzero(m)
+        red = [(y, x) for y, x in zip(ys, xs) if scrolls[y, x, 0] > 150 and scrolls[y, x, 1] < 80]
+        rtop = min((y for y, _ in red), default=0) + 3
+        span = max(1, max((y for y, _ in red), default=1) - rtop)
+
+        def field(x, y, ph=ph):
+            if scrolls[y, x, 0] > 150 and scrolls[y, x, 1] < 80 and y > rtop:   # die Bänder schlackern
+                u = (y - rtop) / span
+                return round(1.8 * u * math.sin(5 * t - 0.6 * y + ph)), 0
+            return 0, 0
+        sub = np.where(m[:, :, None], scrolls, 0)
+        warp(out, sub, field, PL + sx, PT + sy)
     return out
 
 
@@ -224,14 +295,12 @@ def f_patty(i):
     taucht ein Stück daneben ebenso wieder auf, dann huscht sie zurück."""
     s = SRC.copy()
     blink(s, i, PA_BLINK)
-    b = B24[i % 24]
+    b = -1 if B24[i % 24] < 0 else 0                     # sie federt als Ganzes (nichts wird gedehnt)
     st = PA_GONE.get(i)
     out = np.zeros((H, W, 4), int)
     cx, cy = PL + SW / 2, PT + SH / 2
-    if st in (None, 'poof'):
-        draw_bounce(out, s, b, KNEE, PT, PL)
-    elif st == 'back':
-        draw_bounce(out, s, b, KNEE, PT, PL)
+    if st in (None, 'poof', 'back'):
+        paste(out, s, PL, PT + b)
     if st == 'poof':
         a = i - 20
         for dx, dy in ((-4, 2), (4, 2), (0, -3), (-3, -2), (3, -3)):
@@ -251,7 +320,10 @@ def f_patty(i):
 def f_rool(i):
     """Er federt; der Geldsack an seiner Hand pendelt nach, die Münze darauf glitzert."""
     t = 2 * math.pi * i / N
-    body, bag = load('body'), load('bag')
+    body, bag = load('body').copy(), load('bag')
+    for part in ('arm', 'beard'):                         # ausgestreckter Arm und Bart gehören fest dazu
+        p = load(part)
+        body[p[:, :, 3] > 0] = p[p[:, :, 3] > 0]
     b = B24[i % 24]
     out = np.zeros((H, W, 4), int)
     draw_bounce(out, body, b, KNEE, PT, PL)
@@ -286,9 +358,9 @@ def f_champion(i):
     zuckt ab und zu ein Blitz; er federt."""
     t = 2 * math.pi * i / N
     s = SRC.copy()
-    b = B24[i % 24]
+    b = -round(2.5 * math.sin(t))                         # er schwebt frei: steigt und sinkt als Ganzes
     out = np.zeros((H, W, 4), int)
-    draw_bounce(out, s, b, KNEE, PT, PL)
+    paste(out, s, PL, PT + b)
     rows = list(range(15, 25))
     for side, xs in ((1, range(12, SW)), (-1, range(7, 12))):   # zerzaust: je Zeile ein ruppiger Ausschlag
         for k, y in enumerate(rows):
@@ -316,10 +388,10 @@ def f_champion(i):
 
 # ---------------------------------------------------------------- Stormkissed Waflav
 SK_PIVOT = (63, 70)                                     # Flügelwurzeln links/rechts
-SK_FLAP = [(0.0, 1.0, 0), (0.06, 1.0, 1), (0.1, 1.0, 2), (0.12, 1.0, 2),     # fällt, Flügel heben sich
-           (-0.12, 0.93, 0), (-0.26, 0.86, -2), (-0.3, 0.84, -3), (-0.26, 0.86, -3),   # Schlag, steigt
-           (-0.18, 0.9, -3), (-0.1, 0.94, -2), (-0.03, 0.97, -2), (0.02, 1.0, -1),
-           (0.03, 1.0, -1), (0.02, 1.0, 0), (0.01, 1.0, 0), (0.0, 1.0, 0)]
+SK_FLAP = [(0.0, 1.0, 0), (0.08, 1.0, 1), (0.12, 1.0, 2),                     # fällt, Flügel heben sich
+           (-0.16, 0.9, 0), (-0.3, 0.84, -2), (-0.26, 0.86, -3),              # Schlag: schnell, er steigt
+           (-0.16, 0.9, -3), (-0.07, 0.95, -2), (0.0, 1.0, -1),               # erholen
+           (0.03, 1.0, -1), (0.02, 1.0, 0), (0.0, 1.0, 0)]                     # 12 Frames: vier Schläge je Loop
 
 
 def f_stormkissed(i):
@@ -327,7 +399,10 @@ def f_stormkissed(i):
     staucht sich perspektivisch), der Körper steigt; dann sinkt er, während die Flügel sich wieder heben.
     An den Flügelspitzen knistern Funken."""
     wings, body = load('wings'), load('body')
-    lift, squeeze, dy = SK_FLAP[i % 16]
+    lift, squeeze, dy = SK_FLAP[i % 12]
+    t = 2 * math.pi * i / N                               # dazu steigt und sinkt er unregelmäßig
+    dy += round(1.6 * math.sin(t + 0.4) + 1.1 * math.sin(3 * t + 2.0) + 0.7 * math.sin(5 * t) -
+                (1.6 * math.sin(0.4) + 1.1 * math.sin(2.0)))
     out = np.zeros((H, W, 4), int)
     m = wings[:, :, 3] > 0
     shear_flap(wings, m & (_xs < SK_PIVOT[0]), SK_PIVOT[0], -1, lift, squeeze, out, (PL, PT + dy), curve=1.4)
@@ -347,6 +422,8 @@ def f_stormkissed(i):
 
 
 # ---------------------------------------------------------------- Klaus, the Cult Leader
+KL_EYE = {'halb': [((11, 8), '300700'), ((12, 8), '300700')],
+          'zu': [((11, 8), 'f6bd7b'), ((12, 8), 'f6bd7b'), ((11, 9), '300700'), ((12, 9), '300700')]}
 KL_GIRL = {'halb': [((x, 19), '301700') for x in (7, 8, 11, 12)],
            'zu': [((x, 19), 'f6bd7b') for x in (7, 8, 11, 12)] + [((x, 20), '301700') for x in (7, 8, 11, 12)]}
 
@@ -355,6 +432,7 @@ def f_klaus(i):
     """Er hält die Geisel fest und atmet, das Messer blitzt auf; die Geisel zittert ab und zu und blinzelt."""
     s = SRC.copy()
     blink(s, i, KL_GIRL, shift=10)
+    blink(s, i, KL_EYE)
     g = (i % 24) - 6                                      # Glanz läuft die Klinge (x 1–2, y 6–12) hinab
     for y in range(5, 13):
         for x in (1, 2):
@@ -368,11 +446,19 @@ def f_klaus(i):
 
 
 # ---------------------------------------------------------------- Kohta, Master of Super-Killing
+KO_TALK = [0, 1, 1, 0, 1, 1, 1, 0, 0, 1, 0, 1, 1, 0, 0, 0, 1, 1, 1, 0, 1, 0, 0, 0,
+           1, 1, 0, 1, 1, 0, 0, 1, 1, 1, 0, 0, 0, 0, 1, 0, 1, 1, 0, 1, 1, 0, 0, 0]
+
+
 def f_kohtamaster(i):
     """Er reckt das Messer (es zuckt zweimal je Loop hoch, die Klinge blitzt), der Zettel in seiner
     Hand flattert, er federt."""
     t = 2 * math.pi * i / N
     s = SRC.copy()
+    if not KO_TALK[i]:                                    # er spricht: der Mund geht auf und zu
+        for x in (17, 18):
+            for y in (13, 14):
+                s[y, x] = rgb('f6bd7b')
     g = (i % 24) - 4
     for y in range(0, 21):
         for x in range(26, SW):

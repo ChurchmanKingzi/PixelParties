@@ -15,8 +15,9 @@ MotiveChina.xcf
 MotiveCoolhalla.xcf
   patty-the-ninja-of-revenge    nur das Mädchen aus „Patty“ (ohne Schleim und Shuriken)
 MotiveSteamDwarfs.xcf
-  rool-the-troll-guard          „Rool“; der einzeln liegende Geldsack aus „Ebene #46“ hängt an seiner
-                                rechten Hand (Teil bag)
+  rool-the-troll-guard          „Rool“ mit dem ausgestreckten Arm „Ebene #36“ (Teil arm) und dem Bart
+                                „Ebene #43“ (Teil beard); der einzeln liegende Geldsack aus „Ebene #46“
+                                hängt an der Hand des ausgestreckten Arms (Teil bag)
 MotiveHawaii.xcf
   champion-the-eye-of-the-storm „Ascended Champion“ + „Ebene #161“
 MotiveMoe.xcf
@@ -84,8 +85,9 @@ def main(d):
     D = doc('MotiveSteamDwarfs.xcf')
     g = lambda n: layer(D, D.raw_layers, n)
     bag = region(g('Ebene #46'), 127, 323, 146, 341)     # der einzeln liegende Sack unten links …
-    bag = shift(bag, 12, -7)                              # … an seine rechte Hand gehängt (Knoten an der Hand)
-    save_parts('rool-the-troll-guard', [('body', g('Rool')), ('bag', bag)])
+    bag = shift(bag, -10, -15)                            # … hängt an der Hand des ausgestreckten Arms
+    save_parts('rool-the-troll-guard', [('body', g('Rool')), ('arm', g('Ebene #36')), ('beard', g('Ebene #43')),
+                                        ('bag', bag)])
     # ---- MotiveHawaii.xcf: Champion, the Eye of the Storm
     D = doc('MotiveHawaii.xcf')
     g = lambda n: layer(D, D.raw_layers, n)
