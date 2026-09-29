@@ -46,6 +46,10 @@ Skins:
 * Alien Invader Bartas: „Bartas skin“.
 * Tharx the King of Conquerors: „Ebene #286“.
 
+Nachzügler:
+* Sas'Za, the Snaka Adventurer: die mittlere Figur (blaue Haare) aus „Sas'Za“, dahinter ihr Bogen
+  „Sas'Za #1“ (Teil `-bow`).
+
 Aufruf:  python3 assemble_motive.py <pfad/zu/Motive.xcf>
 """
 import sys
@@ -162,6 +166,7 @@ def main(path):
     one('nomu-of-the-dawn', g('Obito'))
     one('alien-invader-bartas', g('Bartas skin'))
     one('tharx-the-king-of-conquerors', g('Ebene #286'))
+    save_parts('sasza-the-snaka-adventurer', [('bow', g("Sas'Za #1")), ('body', near(g("Sas'Za"), 336, 143))])
 
 
 if __name__ == '__main__':
