@@ -234,8 +234,10 @@ function aufstiegsbereitschaftPruefen(engine, pi, heroIdx) {
   const hero = engine.gs.players[pi]?.heroes?.[heroIdx];
   if (!hero?.name) return;
   const robber = loadCardEffect(ASCENDED_FORM);
+  // Als Vorgabe 29.9.: `pi` ist hier die Brettseite — als `heroOwner`
+  // mitgeben, Kontrolleur ueber `heroSideOf` (geliehen: der Gegner).
   const bereit = typeof robber?.ascensionCondition === 'function'
-    && robber.ascensionCondition(engine.gs, pi, heroIdx, engine);
+    && robber.ascensionCondition(engine.gs, engine.heroSideOf?.(pi, hero) ?? pi, heroIdx, engine, pi);
   if (bereit) {
     hero.ascensionReady = true;
     hero.ascensionTarget = ASCENDED_FORM;

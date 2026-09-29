@@ -57,12 +57,13 @@ module.exports = {
   activeIn: ['hero'],
   heroEffect: true,
 
-  ascensionCondition(gs, pi, heroIdx, engine) {
-    return fionaAscensionMet(engine, pi, heroIdx, null);
+  // Als Vorgabe 29.9.: `heroOwner` = Brettseite eines geliehenen Helden.
+  ascensionCondition(gs, pi, heroIdx, engine, heroOwner) {
+    return fionaAscensionMet(engine, heroOwner ?? pi, heroIdx, null);
   },
 
-  async onAscensionBonus(engine, pi, heroIdx) {
-    await engine.performAscensionBonus(pi, heroIdx, ['Magic Arts']);
+  async onAscensionBonus(engine, pi, heroIdx, heroOwner) {
+    await engine.performAscensionBonus(pi, heroIdx, ['Magic Arts'], heroOwner);
   },
 
   // Nicht aktivierbar, wenn nichts zu holen ist oder die Hand gesperrt

@@ -60,7 +60,9 @@ module.exports = {
    * play path, so opponent reactions like Master's Plan / Anti Magic
    * Shield can still intercept that FOLLOW-UP action as usual.
    */
-  ascensionReactionResolve: async (engine, pi, castingHeroIdx, ascendedHeroIdx) => {
+  // Als Vorgabe 29.9.: `heroOwner` = Brettseite eines GELIEHENEN
+  // aufgestiegenen Helden (fehlt er, ist es die eigene Spalte).
+  ascensionReactionResolve: async (engine, pi, castingHeroIdx, ascendedHeroIdx, heroOwner) => {
     if (!engine.claimHOPT(HOPT_KEY, pi)) return;
 
     // The free Action is locked to the Hero that just Ascended — matches
@@ -69,6 +71,7 @@ module.exports = {
     await engine.performImmediateAction(pi, ascendedHeroIdx, {
       title: CARD_NAME,
       description: 'Perform one free additional Action with the Ascended Hero!',
+      ...((heroOwner === 0 || heroOwner === 1) && heroOwner !== pi ? { heroOwner } : {}),
     });
   },
 };

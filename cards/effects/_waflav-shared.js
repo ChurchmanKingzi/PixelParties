@@ -159,14 +159,16 @@ function refreshAscensionTargets(engine, pi) {
  */
 function ascensionContract(cost) {
   return {
-    ascensionCondition(gs, pi, heroIdx, engine) {
-      const hero = gs.players[pi]?.heroes?.[heroIdx];
+    // Als Vorgabe 29.9.: `heroOwner` = Brettseite eines geliehenen Helden
+    // („you control" deckt ihn ab); die Counter liegen auf DIESEM Helden.
+    ascensionCondition(gs, pi, heroIdx, engine, heroOwner) {
+      const hero = gs.players[heroOwner ?? pi]?.heroes?.[heroIdx];
       if (!hero?.name || hero.hp <= 0) return false;
       if (!isWaflavName(engine, hero.name)) return false;   // "a 'Waflav' Hero you control"
       return getEvo(hero) >= cost;
     },
-    payAscensionCost(engine, pi, heroIdx) {
-      spendEvo(engine, pi, heroIdx, cost);
+    payAscensionCost(engine, pi, heroIdx, heroOwner) {
+      spendEvo(engine, heroOwner ?? pi, heroIdx, cost);
     },
   };
 }
@@ -652,12 +654,16 @@ const gameStartHook = {
 function waflavHeroTargets(engine, pi) {
   const ps = engine.gs.players[pi];
   if (!ps) return [];
+  // Als Vorgabe 29.9.: „you control" — auch ein geliehener Waflav in der
+  // Gegnerspalte (`owner` = Brettseite), ohne den an den Gegner abgegebenen.
+  const helden = typeof engine.heroesControlledBy === 'function'
+    ? engine.heroesControlledBy(pi)
+    : (ps.heroes || []).map((hero, heroIdx) => ({ physOwner: pi, heroIdx, hero }));
   const out = [];
-  for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-    const h = ps.heroes[hi];
+  for (const { physOwner, heroIdx: hi, hero: h } of helden) {
     if (!h?.name || h.hp <= 0) continue;
     if (!isWaflavName(engine, h.name)) continue;
-    out.push({ id: `hero-${pi}-${hi}`, type: 'hero', owner: pi, heroIdx: hi, cardName: h.name });
+    out.push({ id: `hero-${physOwner}-${hi}`, type: 'hero', owner: physOwner, heroIdx: hi, cardName: h.name });
   }
   return out;
 }

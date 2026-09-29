@@ -41,7 +41,8 @@ function bedingungErfuellt(engine, pi, heroIdx, name) {
   const script = require('./_loader').loadCardEffect(name);
   if (script?.plainHeroForm) return false;
   if (typeof script?.ascensionCondition === 'function') {
-    try { return !!script.ascensionCondition(gs, pi, heroIdx, engine); } catch { return false; }
+    // Als Vorgabe 29.9.: Brettseite (`heroOwner`) = eigene Spalte.
+    try { return !!script.ascensionCondition(gs, pi, heroIdx, engine, pi); } catch { return false; }
   }
   return !!hero.ascensionReady
     && (hero.ascensionTarget === name || (hero.ascensionTargets || []).includes(name));

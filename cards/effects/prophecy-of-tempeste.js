@@ -99,10 +99,14 @@ module.exports = {
    * (aus Deck/Ablage spielen, Kopien) nicht aktivierbar: die Sperre
    * haengt an `spellPlayCondition`, dem Tor fuer JEDEN Spielweg.
    */
-  spellPlayCondition(gs, playerIdx /* , engine */) {
+  spellPlayCondition(gs, playerIdx, engine) {
     const ps = gs.players[playerIdx];
     if (!ps) return false;
-    if (bereitsImSpiel(ps)) return false;
+    // Als Vorgabe 29.9.: gezaehlt ueber alle Helden, die der Spieler
+    // kontrolliert (geliehene eingeschlossen).
+    if (engine?.kopienAnKontrolliertenHelden) {
+      if (engine.kopienAnKontrolliertenHelden(playerIdx, c => c.name === CARD_NAME) > 0) return false;
+    } else if (bereitsImSpiel(ps)) return false;
     return ownerHasAttachableHero(ps);
   },
 

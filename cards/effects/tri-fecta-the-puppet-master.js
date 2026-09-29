@@ -95,11 +95,12 @@ module.exports = {
    * nur, wenn `ascensionReady`/`ascensionTargets` gesetzt sind. Frei,
    * solange das gemeinsame HOPT (Auflegen/Zuruecknehmen) unverbraucht ist.
    */
-  refreshAscensionReadiness(engine, pi, heroIdx) {
+  // Als Vorgabe 29.9.: `pi` = Spalte, HOPT beim `kontrolleur` („You may once per turn").
+  refreshAscensionReadiness(engine, pi, heroIdx, kontrolleur) {
     const gs = engine.gs;
     const hero = gs.players[pi]?.heroes?.[heroIdx];
     if (!hero || hero.name !== TRI_FECTA) return;
-    if (hero.hp > 0 && triAdHoptFree(gs, pi)) {
+    if (hero.hp > 0 && triAdHoptFree(gs, kontrolleur ?? pi)) {
       hero.ascensionReady   = true;
       hero.ascensionTarget  = TRI_AD;
       hero.ascensionTargets = [TRI_AD];

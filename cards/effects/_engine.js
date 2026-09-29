@@ -19264,6 +19264,8 @@ this._deathWatch = (this._deathWatchStack || []).length
       if (typeof script?.canEquipToHero !== 'function') continue;
       const erlaubt = [];
       for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
+        // 29.9.: ein eigener Held, den gerade der Gegner kontrolliert, ist kein Ziel.
+        if (ps.heroes[hi]?.name && this.heroSideOf(playerIdx, ps.heroes[hi]) !== playerIdx) continue;
         try {
           if (script.canEquipToHero(this.gs, playerIdx, hi, this)) erlaubt.push(hi);
         } catch { /* eine kaputte Karte darf die Oberflaeche nicht kippen */ }
@@ -22407,6 +22409,8 @@ this._deathWatch = (this._deathWatchStack || []).length
         let anyHero = false;
         for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
           if (!ps.heroes[hi]?.name) continue;
+          // 29.9.: ein eigener Held, den gerade der Gegner kontrolliert, ist kein Ziel.
+          if (this.heroSideOf(playerIdx, ps.heroes[hi]) !== playerIdx) continue;
           let ok = false;
           try { ok = !!script.canEquipToHero(this.gs, playerIdx, hi, this); } catch {}
           if (ok) { anyHero = true; break; }
@@ -23997,6 +24001,29 @@ this._deathWatch = (this._deathWatchStack || []).length
       }
     }
     return out;
+  }
+
+  /**
+   * Als Vorgabe 29.9.: „You can only have 1 ‚X' equipped to your Heroes"
+   * und Verwandte — gezaehlt ueber ALLE Helden, die `playerIdx` gerade
+   * kontrolliert (eigene ohne die abgegebenen, plus geliehene). Nur eine
+   * ANLEGE-Sperre: wer einen Helden leiht, der schon eine weitere Kopie
+   * traegt, muss nichts abwerfen.
+   * @param {function} passt - (inst) → true fuer die gezaehlte Karte
+   */
+  kopienAnKontrolliertenHelden(playerIdx, passt) {
+    const helden = new Set(this.heroesControlledBy(playerIdx).map(h => `${h.physOwner}:${h.heroIdx}`));
+    let n = 0;
+    for (const inst of (this.cardInstances || [])) {
+      if (!inst || inst.zone !== ZONES.SUPPORT || !passt(inst)) continue;
+      if (helden.has(`${this.physicalSide(inst)}:${inst.heroIdx}`)) n++;
+    }
+    return n;
+  }
+
+  /** Kontrolleur des Helden in Spalte (`seite`, `heroIdx`) — sonst `seite`. */
+  kontrolleurVonHeld(seite, heroIdx) {
+    return this.heroSideOf(seite, this.gs.players[seite]?.heroes?.[heroIdx]);
   }
 
   /** Support-Zonen-Sperren der dauerhaft uebernommenen Helden setzen. */
@@ -25688,15 +25715,19 @@ this._deathWatch = (this._deathWatchStack || []).length
    * Zone. Prompts the player between options if more than one is
    * offered; fizzles silently if none are available.
    */
-  async performAscensionBonus(pi, heroIdx, abilityChoices) {
+  async performAscensionBonus(pi, heroIdx, abilityChoices, heroOwner = pi) {
     const gs = this.gs;
     const ps = gs.players[pi];
     if (!ps) return;
+    // Als Vorgabe 29.9.: `heroOwner` = Spalte eines geliehenen Helden.
+    // Deck/Hand/Abfragen bleiben beim Kontrolleur `pi`; die Abilities
+    // landen in den Zonen DIESES Helden (wie doPlayAbilityFremd).
+    const hps = gs.players[heroOwner] || ps;
 
-    const abZones = ps.abilityZones?.[heroIdx] || [[], [], []];
+    const abZones = hps.abilityZones?.[heroIdx] || [[], [], []];
     while (abZones.length < 3) abZones.push([]);
-    if (!ps.abilityZones) ps.abilityZones = [];
-    ps.abilityZones[heroIdx] = abZones;
+    if (!hps.abilityZones) hps.abilityZones = [];
+    hps.abilityZones[heroIdx] = abZones;
 
     // Auto-attach as many copies of every offered ability as physically
     // possible. No prompt: each ability claims a slot (existing same-name
@@ -25731,6 +25762,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       // Flug endet.
       this._broadcastEvent('deck_to_ability_animation', {
         owner: pi, heroIdx, slotIdx, cardName: name, count: 1, source,
+        ...(heroOwner !== pi ? { destOwner: heroOwner } : {}),
       });
       await this._delay(LAND_AT_MS);
       if (source === 'deck') {
@@ -25748,7 +25780,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       }
       if (!abZones[slotIdx]) abZones[slotIdx] = [];
       abZones[slotIdx].push(name);
-      const inst = this._trackCard(name, pi, 'ability', heroIdx, slotIdx);
+      const inst = this._trackCard(name, heroOwner, 'ability', heroIdx, slotIdx);
       placedInsts.push({ inst, name, slotIdx, source });
       this.sync();
       await this._delay(FLIGHT_MS - LAND_AT_MS);
@@ -25757,16 +25789,16 @@ this._deathWatch = (this._deathWatchStack || []).length
 
     // ★★ v1349: Zonenwahl und Obergrenze zentral (`abilityZielZone` —
     // zaehlt verwahrte Kopien mit, Madame Guillotine).
-    const nochPlatz = (name, slotIdx) => this.abilityZielZone(pi, heroIdx, name) === slotIdx;
+    const nochPlatz = (name, slotIdx) => this.abilityZielZone(heroOwner, heroIdx, name) === slotIdx;
     for (const name of abilityChoices) {
-      const slotIdx = this.abilityZielZone(pi, heroIdx, name);
+      const slotIdx = this.abilityZielZone(heroOwner, heroIdx, name);
       if (slotIdx < 0) continue;
       if (!ps.mainDeck.includes(name) && !ps.hand.includes(name)) continue;
       // v670 (Al 30.8.): der Bonus ist OPTIONAL — je Ability ein Ja/Nein
       // („Add Resistance to Monia?"). Die CPU bejaht immer
       // (`_cpuAutoConfirm`, cpuGenericChoice), ein Mensch darf ablehnen,
       // etwa um eine Zone frei zu halten.
-      const heroName = ps.heroes?.[heroIdx]?.name || 'this Hero';
+      const heroName = hps.heroes?.[heroIdx]?.name || 'this Hero';
       const antwort = await this.promptGeneric(pi, {
         type: 'confirm', title: 'Ascension Bonus',
         message: `Add ${name} to ${heroName}?`,
@@ -33915,12 +33947,13 @@ this._deathWatch = (this._deathWatchStack || []).length
    * @param {number} pi - Ascending player's index
    * @param {number} ascendedHeroIdx - Slot of the hero that just ascended
    */
-  async _checkAscensionHandReactions(pi, ascendedHeroIdx) {
+  async _checkAscensionHandReactions(pi, ascendedHeroIdx, heroOwner = pi) {
     if (this._inAscensionReactionCheck) return;
     const ps = this.gs.players[pi];
     if (!ps) return;
     const allCards = this._getCardDB();
-    const ascendedHero = ps.heroes?.[ascendedHeroIdx];
+    // Als Vorgabe 29.9.: der Held kann ein geliehener sein (Brettseite).
+    const ascendedHero = this.gs.players[heroOwner]?.heroes?.[ascendedHeroIdx];
     const ascendedName = ascendedHero?.name || 'Your Hero';
 
     for (let hi = 0; hi < ps.hand.length; hi++) {
@@ -33999,7 +34032,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       this._inAscensionReactionCheck = true;
       try {
         if (script.ascensionReactionResolve) {
-          await script.ascensionReactionResolve(this, pi, castingHeroIdx, ascendedHeroIdx);
+          await script.ascensionReactionResolve(this, pi, castingHeroIdx, ascendedHeroIdx, heroOwner);
         }
       } finally {
         this._inAscensionReactionCheck = false;
@@ -45915,14 +45948,21 @@ this._deathWatch = (this._deathWatchStack || []).length
     // Helden (Throne Robber unter Styx). Karte aus Hand/Deck des
     // Kontrolleurs `pi`; Held, Heldeninstanz und Anzeige auf `hs`. Das
     // Heldenobjekt bleibt dasselbe — Kontrollmarken bleiben also dran.
-    // Nur ueber Wege, die die Bedingung uebergehen (`skipCondition`):
-    // Aufstiegsbedingungen lesen die Spalte von `pi`.
+    // Aufstiegsbedingungen und -boni bekommen die Brettseite `hs` als
+    // zusaetzliches Argument (`ascensionCondition(gs, pi, hi, engine, hs)`,
+    // `payAscensionCost`/`onAscensionBonus(engine, pi, hi, hs)`).
     const hs = (opts.heroOwner === 0 || opts.heroOwner === 1) ? opts.heroOwner : pi;
     const hps = gs.players[hs];
     if (!hps) return { success: false };
     const hero = hps.heroes?.[heroIdx];
     if (!hero?.name) return { success: false };
-    if (hs !== pi && (this.heroSideOf(hs, hero) !== pi || !opts.skipCondition)) return { success: false };
+    // Als Vorgabe 29.9. (zweite Runde): auch aus der HAND auf einen
+    // geliehenen Helden — bei JEDER echten Uebernahme (Charme,
+    // Golden Apple, Styx …; `charmedBy`/`permaControlBy`). Endet die
+    // Kontrolle, bekommt der Besitzer den aufgestiegenen Helden mit
+    // voller Kontrolle zurueck: das Heldenobjekt bleibt dasselbe, die
+    // Kontrollmarken fallen wie gewohnt am Zugbeginn.
+    if (hs !== pi && this.heroSideOf(hs, hero) !== pi) return { success: false };
     // ── AUFSTIEG AUS DEM TOD HERAUS (v718) ───────────────────────────
     // Der Normalfall verlangt einen lebenden Helden. Eine Ascended-
     // Karte, deren gedruckte Bedingung GENAU der Tod der Grundform ist
@@ -45991,7 +46031,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       // welchem der 28 Ascended Heroes es geht. Ein Flag auf der
       // Zielkarte muesste an 28 Karten haengen und waere auf jedem
       // anderen Aufstiegsweg falsch.
-    } else if (this._heroHasAscensionSkip(pi, heroIdx)
+    } else if (this._heroHasAscensionSkip(hs, heroIdx)
                && !this.isAscensionConditionUnskippable(cardName)) {
       // ── „Divine Awakening" ─────────────────────────────────────────
       // „That Hero can Ascend to an appropriate Ascended Hero without
@@ -46017,7 +46057,7 @@ this._deathWatch = (this._deathWatchStack || []).length
                              // Rueckruf am Ende feuerte faelschlich
                              // (genau so gefunden, Probe 4).
                              && !(typeof ascendedScript?.ascensionCondition === 'function'
-                                  ? ascendedScript.ascensionCondition(gs, pi, heroIdx, this)
+                                  ? ascendedScript.ascensionCondition(gs, pi, heroIdx, this, hs)
                                   : hero.ascensionReady)
                              && this._handAscensionGrantFor(pi, cardName, handIndex)) || null)) {
       // ── AUFSTIEGS-ERLASS JE HANDKOPIE (Perilous Journey, v676) ─────
@@ -46047,7 +46087,8 @@ this._deathWatch = (this._deathWatchStack || []).length
       // The condition belongs to the ASCENDED card because that is where
       // the sentence is printed. Checked BEFORE the hand splice below, so
       // a refused Ascension never eats the card.
-      if (!ascendedScript.ascensionCondition(gs, pi, heroIdx, this)) return { success: false };
+      // Als Vorgabe 29.9.: 5. Argument = Brettseite des Helden (geliehen).
+      if (!ascendedScript.ascensionCondition(gs, pi, heroIdx, this, hs)) return { success: false };
     } else {
       // Normal mode: hero must be ascension-ready
       if (!hero.ascensionReady) return { success: false };
@@ -46153,7 +46194,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       // Aufstieg daran vorbei und die Loeschung landete irgendwann
       // mitten im naechsten Schritt. Synchrone Preise (Waflav & Co.)
       // merken davon nichts.
-      await ascendedScript.payAscensionCost(this, hs, heroIdx);   // Als Vorgabe 29.9.: Seite des Helden
+      await ascendedScript.payAscensionCost(this, pi, heroIdx, hs);   // Als Vorgabe 29.9.: pi = Kontrolleur, hs = Brettseite
     }
 
     // ── State transfer ──
@@ -46244,7 +46285,10 @@ this._deathWatch = (this._deathWatchStack || []).length
     // Skripte fragen ihn ab (Puppets: isPuppetSwapInProgress).
     if (plainForm) {
       if (!gs._formChangeInProgress) gs._formChangeInProgress = {};
-      gs._formChangeInProgress[`${pi}-${heroIdx}`] = { turn: gs.turn };
+      gs._formChangeInProgress[`${hs}-${heroIdx}`] = { turn: gs.turn };
+      // Puppet-Marken tragen den Kontrolleur als Seite — bei einem
+      // geliehenen Helden beide Schluessel sperren.
+      if (hs !== pi) gs._formChangeInProgress[`${pi}-${heroIdx}`] = { turn: gs.turn };
     }
     // Flashy transformation flourish, opt-in per card so ordinary
     // Ascensions keep their existing presentation.
@@ -46278,7 +46322,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // Hero you Ascend to" (Throne Robber). Gilt fuer den WEG, nicht
     // fuer die Zielkarte — deshalb hier und nicht als Kartenflag.
     if (ascendedScript?.onAscensionBonus && !opts.skipBonus && !opts.notAnAscension) {
-      await ascendedScript.onAscensionBonus(this, pi, heroIdx);
+      await ascendedScript.onAscensionBonus(this, pi, heroIdx, hs);
     }
 
     this.sync();
@@ -46289,7 +46333,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // free additional Action with any Hero before the turn wraps up.
     // The helper iterates the ascending player's hand for cards flagged
     // `isAscensionReaction: true`, HOPT-guarded via each card's own key.
-    if (!opts.notAnAscension) await this._checkAscensionHandReactions(pi, heroIdx);
+    if (!opts.notAnAscension) await this._checkAscensionHandReactions(pi, heroIdx, hs);
 
     // ── Preis eines Handkopie-Erlasses (v676) ──────────────────────
     // NACH dem vollzogenen Aufstieg samt Bonus und Reaktionen: „if you
@@ -46300,7 +46344,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       const gewaehrer = loadCardEffect(_ascGrant.grant.byCard);
       if (typeof gewaehrer?.onAscensionGrantUsed === 'function') {
         try {
-          await gewaehrer.onAscensionGrantUsed(this, pi, heroIdx);
+          await gewaehrer.onAscensionGrantUsed(this, pi, heroIdx, hs);
         } catch (err) {
           console.error('[Engine] onAscensionGrantUsed error:', err.message);
         }
@@ -46331,12 +46375,15 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (plainForm) {
       try {
         if (typeof ascendedScript?.onPlainFormPlaced === 'function') {
-          await ascendedScript.onPlainFormPlaced(this, pi, heroIdx);
+          await ascendedScript.onPlainFormPlaced(this, pi, heroIdx, hs);
         }
       } catch (err) {
         console.error(`[Engine] onPlainFormPlaced failed for "${cardName}":`, err.message);
       } finally {
-        if (gs._formChangeInProgress) delete gs._formChangeInProgress[`${pi}-${heroIdx}`];
+        if (gs._formChangeInProgress) {
+          delete gs._formChangeInProgress[`${hs}-${heroIdx}`];
+          delete gs._formChangeInProgress[`${pi}-${heroIdx}`];
+        }
         this.sync();
       }
     }
@@ -46385,7 +46432,8 @@ this._deathWatch = (this._deathWatchStack || []).length
         if (!hero?.name) continue;
         const script = this.heroScript(hero);
         if (typeof script?.refreshAscensionReadiness !== 'function') continue;
-        try { script.refreshAscensionReadiness(this, pi, hi); }
+        // Als Vorgabe 29.9.: 4. Argument = Kontrolleur („you" der Bedingung).
+        try { script.refreshAscensionReadiness(this, pi, hi, this.heroSideOf(pi, hero)); }
         catch (err) { console.error(`[Engine] refreshAscensionReadiness failed for "${hero.name}":`, err.message); }
       }
     }
@@ -46628,6 +46676,66 @@ this._deathWatch = (this._deathWatchStack || []).length
    *
    * @returns {Object} handIdx → [heroIdx]
    */
+  /**
+   * Als Vorgabe 29.9. (zweite Runde): AUFSTIEG AUF GELIEHENE HELDEN.
+   * `{ [kartenname]: [heroIdx] }` — Helden in der GEGNERspalte, die
+   * `playerIdx` gerade kontrolliert (jede echte Uebernahme), und die
+   * Ascended-Karten aus Hand/Vorrat, zu denen sie jetzt aufsteigen
+   * koennten. Dieselben Wege wie `performAscension` (Awakening, Erlass,
+   * Kartenbedingung mit Brettseite, Orb-Weg), nur ohne Seiteneffekte.
+   * Veroeffentlicht als `fremdAufstiegZiele`; der Server prueft beim
+   * Spielen erneut.
+   */
+  getFremdAufstiegZiele(playerIdx) {
+    const gs = this.gs;
+    const ps = gs.players[playerIdx];
+    const oi = playerIdx === 0 ? 1 : 0;
+    const ops = gs.players[oi];
+    if (!ps || !ops || gs.activePlayer !== playerIdx) return {};
+    const helden = [];
+    for (let hi = 0; hi < (ops.heroes || []).length; hi++) {
+      const hero = ops.heroes[hi];
+      if (hero?.name && this.heroSideOf(oi, hero) === playerIdx) helden.push(hi);
+    }
+    if (helden.length === 0) return {};
+    const cardDB = this._getCardDB();
+    const out = {};
+    const kandidaten = [
+      ...(ps.hand || []).map((name, idx) => ({ name, idx })),
+      ...(ps.creationZone || []).map(name => ({ name, idx: null })),
+    ];
+    for (const { name, idx } of kandidaten) {
+      const cd = cardDB[name];
+      const script = loadCardEffect(name);
+      const plainForm = cd?.cardType === 'Hero' && !!script?.plainHeroForm;
+      if (cd?.cardType !== 'Ascended Hero' && !plainForm) continue;
+      for (const hi of helden) {
+        if ((out[name] || []).includes(hi)) continue;
+        if (!this._aufstiegMoeglich(playerIdx, oi, hi, name, idx, plainForm)) continue;
+        (out[name] = out[name] || []).push(hi);
+      }
+    }
+    return out;
+  }
+
+  /** Trockenlauf der Aufstiegswege aus `performAscension` (ohne Cheat). */
+  _aufstiegMoeglich(pi, hs, heroIdx, cardName, handIndex, plainForm = false) {
+    const hero = this.gs.players[hs]?.heroes?.[heroIdx];
+    if (!hero?.name || hero.name === cardName) return false;
+    const script = loadCardEffect(cardName);
+    if (hero.hp <= 0 && !script?.ascendsFromDefeat) return false;
+    const formen = this.getAscendedFormsFor(hero.name);
+    if (!plainForm && !formen.includes(cardName)) return false;
+    const unskip = this.isAscensionConditionUnskippable(cardName);
+    if (!unskip && this._heroHasAscensionSkip(hs, heroIdx)) return true;
+    if (!unskip && handIndex != null && this._handAscensionGrantFor(pi, cardName, handIndex)) return true;
+    if (typeof script?.ascensionCondition === 'function') {
+      try { return !!script.ascensionCondition(this.gs, pi, heroIdx, this, hs); } catch { return false; }
+    }
+    return !!hero.ascensionReady
+      && (hero.ascensionTarget === cardName || (hero.ascensionTargets || []).includes(cardName));
+  }
+
   getAscensionGrantOffers(playerIdx) {
     const ps = this.gs.players[playerIdx];
     if (!ps) return {};

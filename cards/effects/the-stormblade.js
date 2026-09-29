@@ -195,7 +195,14 @@ module.exports = {
    * Heroes at a time." — anders als bei Wanted Poster (je Held) zaehlt
    * hier die GANZE eigene Seite.
    */
-  canEquipToHero(gs, playerIdx /*, heroIdx, engine */) {
+  canEquipToHero(gs, playerIdx, heroIdx, engine) {
+    // Als Vorgabe 29.9.: „your Heroes" = alle Helden, die der Ausruester
+    // gerade kontrolliert, geliehene eingeschlossen (`playerIdx` ist die
+    // Spalte des Zielhelden). Nur Anlege-Sperre, kein Abwurfzwang.
+    if (engine?.kopienAnKontrolliertenHelden) {
+      const ich = heroIdx != null ? engine.kontrolleurVonHeld(playerIdx, heroIdx) : playerIdx;
+      return engine.kopienAnKontrolliertenHelden(ich, c => c.name === CARD_NAME) === 0;
+    }
     for (const heldenZonen of (gs.players[playerIdx]?.supportZones || [])) {
       for (const slot of (heldenZonen || [])) {
         if ((slot || []).includes(CARD_NAME)) return false;

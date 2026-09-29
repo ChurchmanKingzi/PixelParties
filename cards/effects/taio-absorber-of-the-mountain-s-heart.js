@@ -57,8 +57,9 @@ const HOPT_KEY  = 'taio-mountains-heart-followup';
 module.exports = {
   activeIn: ['hero'],
 
-  async onAscensionBonus(engine, pi, heroIdx) {
-    await engine.performAscensionBonus(pi, heroIdx, ['Fighting', 'Destruction Magic']);
+  // Als Vorgabe 29.9.: `heroOwner` = Brettseite eines geliehenen Helden.
+  async onAscensionBonus(engine, pi, heroIdx, heroOwner) {
+    await engine.performAscensionBonus(pi, heroIdx, ['Fighting', 'Destruction Magic'], heroOwner);
   },
 
   hooks: {

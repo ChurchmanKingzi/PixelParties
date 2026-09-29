@@ -27443,8 +27443,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       // Gray out Ascended Heroes if no eligible base hero exists
       // (v704: Helden-Formen wie Tri Ad ebenso)
       if (card.cardType === 'Ascended Hero' || (gameState.plainHeroForms || []).includes(cardName)) {
-        const hasEligible = (me.heroes || []).some((h, hi) => heroCanAscendTo(h, hi, cardName, handIdx));
-        return !hasEligible;
+        return !irgendeinAufstieg(cardName, handIdx);
       }
       return false;
     } else if (currentPhase === 3) {
@@ -27764,6 +27763,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         hideGameTooltip(); socket.emit('ascend_hero', {
           roomId: gameState.roomId, cardName: pick.cardName,
           handIndex: pick.handIndex, fromCreation: pick.fromCreation || undefined, heroIdx: h.idx,
+          heroOwner: h.heroOwner,   // 29.9.: geliehener Held
           });
       } else if (pick.isHeroAction) {
         // For Creature picks in heroAction mode (Hu's
@@ -28019,6 +28019,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
    */
   const heroCanAscendTo = (h, heroIdx, cardName, handIdx) => {
     if (!h?.name || h.hp <= 0) return false;
+    if (eigenerHeldAbgegeben(heroIdx)) return false;   // 29.9.: der Gegner kontrolliert ihn
     if (h.ascensionReady
         && (h.ascensionTarget === cardName || (h.ascensionTargets || []).includes(cardName))) return true;
     if (((gameState.ascensionSkipTargets || {})[heroIdx] || []).includes(cardName)) return true;
@@ -28029,6 +28030,14 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     return handIdx != null
       && (((gameState.ascensionGrantOffers || {})[handIdx]) || []).includes(heroIdx);
   };
+
+  // Als Vorgabe 29.9.: Aufstieg auf einen geliehenen Helden (Gegnerspalte).
+  // Der Server rechnet die Wege vor (`fremdAufstiegZiele`).
+  const kannFremdAufsteigen = (heroIdx, cardName) =>
+    ((gameState.fremdAufstiegZiele || {})[cardName] || []).includes(heroIdx);
+  const irgendeinAufstieg = (cardName, handIdx) =>
+    (me.heroes || []).some((h, hi) => heroCanAscendTo(h, hi, cardName, handIdx))
+    || ((gameState.fremdAufstiegZiele || {})[cardName] || []).length > 0;
 
   const canHeroPlayCard = (playerData, heroIdx, card) => {
     const isOwn = playerData === me;
@@ -28648,7 +28657,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         || (card.cardType === 'Creature' && (gameState.bakhmSurpriseSlots || []).some(b => b.freeSlots.length > 0)));
     const isAscensionPlayable = !dimmed && isMyTurn && (currentPhase === 2 || currentPhase === 4) && card
       && (card.cardType === 'Ascended Hero' || (gameState.plainHeroForms || []).includes(cardName)) // v704: Helden-Formen (Tri Ad)
-      && (me.heroes || []).some((h, hi) => heroCanAscendTo(h, hi, cardName, idx));
+      && irgendeinAufstieg(cardName, idx);
     const _startPt = window.getPointerXY(e);
     const startX = _startPt.x, startY = _startPt.y;
     // ★★ v1225 (Als Befund 18.9.: „die Kopie der Karte haelt man
@@ -29513,6 +29522,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       } else if (isAscensionPlayable) {
         // Ascended Hero drag — target hero zones with eligible base heroes
         let targetHero = -1;
+        let targetHeroOwner;
         const heroEls4 = document.querySelectorAll('[data-hero-zone]');
         for (const el of heroEls4) {
           const r = el.getBoundingClientRect();
@@ -29521,12 +29531,16 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               const hi = parseInt(el.dataset.heroIdx);
               const hero = me.heroes[hi];
               if (heroCanAscendTo(hero, hi, cardName, idx)) {
-                targetHero = hi;
+                targetHero = hi; targetHeroOwner = undefined;
               }
+            } else if (el.dataset.heroOwner === 'opp') {
+              // 29.9.: geliehener Held in der Gegnerspalte
+              const hi = parseInt(el.dataset.heroIdx);
+              if (kannFremdAufsteigen(hi, cardName)) { targetHero = hi; targetHeroOwner = oppIdx; }
             }
           }
         }
-        setPlayDrag({ idx, cardName, card, mouseX: mx, mouseY: my, griffX, griffY, targetHero, isAscension: true , fromCreation });
+        setPlayDrag({ idx, cardName, card, mouseX: mx, mouseY: my, griffX, griffY, targetHero, targetHeroOwner, isAscension: true , fromCreation });
       } else {
         // Non-playable card outside hand zone — show floating card (no reorder gap)
         setPlayDrag(null);
@@ -30021,8 +30035,13 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 eligible.push({ idx: hi, name: h.name });
               }
             }
+            // 29.9.: geliehene Helden (Gegnerspalte)
+            for (let hi = 0; hi < (opp.heroes || []).length; hi++) {
+              if (kannFremdAufsteigen(hi, cardName)) eligible.push({ idx: hi, name: opp.heroes[hi].name, heroOwner: oppIdx });
+            }
             if (eligible.length === 1) {
               hideGameTooltip(); socket.emit('ascend_hero', { roomId: gameState.roomId, heroIdx: eligible[0].idx, cardName, handIndex: idx, fromCreation: fromCreation || undefined,
+            heroOwner: eligible[0].heroOwner,
           });
             } else if (eligible.length > 1) {
               setSpellHeroPick({ cardName, handIndex: idx, fromCreation, card, eligible, isAscension: true });
@@ -30353,6 +30372,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             roomId: gameState.roomId, heroIdx: prev.targetHero,
             cardName: prev.cardName, handIndex: prev.idx,
             fromCreation: prev.fromCreation || undefined,
+            heroOwner: prev.targetHeroOwner,   // 29.9.: geliehener Held
           });
           return null;
         });
@@ -38050,8 +38070,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     };
     socket.on('deleted_to_discard_animation', onDeletedToDiscard);
 
-    const onDeckToAbility = ({ owner, heroIdx, slotIdx, cardName, count, source }) => {
+    const onDeckToAbility = ({ owner, heroIdx, slotIdx, cardName, count, source, destOwner }) => {
       const ownerLabel = owner === myIdx ? 'me' : 'opp';
+      // 29.9.: Ziel-Zone eines geliehenen Helden liegt auf der anderen Seite.
+      const zielLabel = (destOwner ?? owner) === myIdx ? 'me' : 'opp';
       // 'hand' source flies cards out of the player's hand instead of
       // their deck pile (used by Ascension bonus when deck supply is
       // exhausted but hand still has copies).
@@ -38061,7 +38083,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       } else {
         srcSel = ownerLabel === 'me' ? '[data-my-deck]' : '[data-opp-deck]';
       }
-      const abSel   = `[data-ability-zone][data-ability-owner="${ownerLabel}"][data-ability-hero="${heroIdx}"][data-ability-slot="${slotIdx}"]`;
+      const abSel   = `[data-ability-zone][data-ability-owner="${zielLabel}"][data-ability-hero="${heroIdx}"][data-ability-slot="${slotIdx}"]`;
       const srcEl   = document.querySelector(srcSel);
       const tgtEl   = document.querySelector(abSel);
       if (!srcEl || !tgtEl || !count) return;
@@ -41278,11 +41300,11 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             return true;
           })();
           const surpriseTarget = isDraggingSurpriseCard && playDrag?.isSurprise && playDrag.targetHero === i;
-          const ascensionIneligible = !isOpp && playDrag?.isAscension && (() => {
-            const h = heroes[i];
-            return !heroCanAscendTo(h, i, playDrag.cardName, playDrag.idx);
-          })();
-          const ascensionTarget = !isOpp && playDrag?.isAscension && playDrag.targetHero === i;
+          const ascensionIneligible = playDrag?.isAscension && (isOpp
+            ? (hero?.charmedBy === myIdx && !kannFremdAufsteigen(i, playDrag.cardName))   // 29.9.: geliehener Held
+            : !heroCanAscendTo(heroes[i], i, playDrag.cardName, playDrag.idx));
+          const ascensionTarget = playDrag?.isAscension && playDrag.targetHero === i
+            && (isOpp ? playDrag.targetHeroOwner === oppIdx : playDrag.targetHeroOwner == null);
           // v673: pickHandCard-Drag auf HELDEN-Zonen (Open Invitation).
           // Dieselbe Optik wie ein Aufstiegs-Drag — es ist derselbe
           // Vorgang aus Spielersicht: ein Ascended Hero geht auf einen
@@ -42050,7 +42072,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 {/* v673: der pickHandCard-Drag auf eine Heldenzone nutzt
                     denselben Schein — aus Spielersicht ist es derselbe
                     Vorgang. */}
-                {!isOpp && ((playDrag?.isAscension && playDrag.targetHero === i) || pickHeroDropTarget) && (
+                {(ascensionTarget || (!isOpp && pickHeroDropTarget)) && (
                   <div className="ascension-drop-glow" />
                 )}
                 {!isOpp && gameState.bonusActions?.heroIdx === i && gameState.bonusActions.remaining > 0 && (

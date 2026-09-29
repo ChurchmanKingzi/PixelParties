@@ -5152,6 +5152,8 @@ function sendGameState(room, playerIdx, extra) {
     // v677b: Erlasse je Handkopie — indexbasiert, nur fuer den
     // Besitzer sinnvoll (es sind SEINE Handindizes).
     ascensionGrantOffers: room.engine ? room.engine.getAscensionGrantOffers(playerIdx) : {},
+    // Als Vorgabe 29.9.: Aufstieg auf geliehene Helden (Gegnerspalte).
+    fremdAufstiegZiele: room.engine ? room.engine.getFremdAufstiegZiele(playerIdx) : {},
     bakhmSurpriseSlots: room.engine ? (() => {
       const result = [];
       const ps2 = gs.players[playerIdx];
@@ -5557,6 +5559,7 @@ function sendSpectatorGameState(room) {
     attachmentHostTargets: {},
     ascensionSkipTargets: {},
     ascensionGrantOffers: {},
+    fremdAufstiegZiele: {},
     bakhmSurpriseSlots: [],
     ushabtiSummonable: [],
     roomParticipants: {
@@ -14553,7 +14556,7 @@ io.on('connection', (socket) => {
 
   // ── Hero Ascension ──
 
-  socket.on('ascend_hero', async ({ roomId, heroIdx, cardName, handIndex, fromCreation }) => {
+  socket.on('ascend_hero', async ({ roomId, heroIdx, cardName, handIndex, fromCreation, heroOwner }) => {
     if (!currentUser) return;
     const room = rooms.get(roomId);
     if (!room?.gameState || room.gameState.result) return;
@@ -14568,9 +14571,15 @@ io.on('connection', (socket) => {
     // sie brauchen den Riegel eigens — Als Befund 5.8.: waehrend Ambush
     // aufloeste, liess sich per Spam-Klick eine Waflav-Form ascenden.
     if (gs._chainResolvingLock || gs._forceDiscardLock === pi) return;
+    // Als Vorgabe 29.9.: `heroOwner` = Spalte des Helden. Ein geliehener
+    // Held (Gegnerspalte) darf aufsteigen, solange `pi` ihn kontrolliert;
+    // ein eigener Held, den gerade der Gegner kontrolliert, nicht.
+    const hs = (heroOwner === 0 || heroOwner === 1) ? heroOwner : pi;
+    const _aufHeld = gs.players[hs]?.heroes?.[heroIdx];
+    if (!_aufHeld?.name || room.engine.heroSideOf(hs, _aufHeld) !== pi) return;
     // Perform ascension via engine
     try {
-      const result = await room.engine.performAscension(pi, heroIdx, cardName, handIndex, { fromCreation });
+      const result = await room.engine.performAscension(pi, heroIdx, cardName, handIndex, { fromCreation, heroOwner: hs });
       if (!result.success) return;
       // Skip to End Phase if required
       if (result.skipEndPhase) {

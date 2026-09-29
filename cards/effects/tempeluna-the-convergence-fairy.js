@@ -51,7 +51,7 @@ const { gainedNames } = require('./_gained-effects-shared');
 // `_drago-shared` / `_monkee-shared`).
 const {
   TEMPELUNA: CARD_NAME, LUNA, TEMPESTE, GRUNDFEEN,
-  istFeenHeld, andereGrundfee, tempelunaBedingung,
+  istFeenHeld, andereGrundfeeVon, tempelunaBedingung,
 } = require('./_fairy-shared');
 
 /** Freie Support Zones dieses Helden. */
@@ -121,8 +121,10 @@ module.exports = {
   // other one you control": beide muessen stehen. Geprueft wird VOR
   // dem Hand-Splice, ein abgelehnter Aufstieg frisst die Karte also
   // nicht.
-  ascensionCondition(gs, pi, heroIdx) {
-    return tempelunaBedingung(gs, pi, heroIdx);
+  // Als Vorgabe 29.9.: `heroOwner` = Brettseite eines geliehenen Aufsteigers;
+  // „the other one you control" sucht dann unter allen Helden von `pi`.
+  ascensionCondition(gs, pi, heroIdx, engine, heroOwner) {
+    return tempelunaBedingung(gs, pi, heroIdx, engine, heroOwner ?? pi);
   },
 
   // Der Preis: die zweite Fee samt ihrer Abilities loeschen.
@@ -130,11 +132,14 @@ module.exports = {
   // Zones und Support Zones und legt den Helden in den Geloescht-
   // Stapel; der Platz bleibt LEER (nicht wiederbelebbar), was „delete"
   // von „defeat" unterscheidet.
-  async payAscensionCost(engine, pi, heroIdx) {
+  // Als Vorgabe 29.9.: `pi` = Kontrolleur, `heroOwner` = Brettseite des
+  // Aufsteigers; die andere Fee kann in einer anderen Spalte stehen.
+  async payAscensionCost(engine, pi, heroIdx, heroOwner) {
+    const hs = heroOwner ?? pi;
     // ★ Als Ruling 18.9.: die andere Fee darf TOT sein — sie wird
     // ohnehin geloescht. `deleteHero` fragt nur nach dem Namen.
-    const andere = andereGrundfee(engine.gs, pi, heroIdx);
-    if (andere < 0) return;
+    const andere = andereGrundfeeVon(engine, pi, heroIdx, hs);
+    if (!andere) return;
 
     // ═══ INSZENIERUNG (Als Vorgabe 18.9.) ══════════════════════════
     //
@@ -146,12 +151,12 @@ module.exports = {
     // die Engine ihn wechselt (der `sync()` danach loest das Bild
     // lautlos ab).
     engine._broadcastEvent('hero_form_preview', {
-      owner: pi, heroIdx, cardName: CARD_NAME,
+      owner: hs, heroIdx, cardName: CARD_NAME,
     });
     // Der Moment des Zusammenfallens — Klang ohne eigenes Bild, das
     // liefert gleich der Dampf (ZONE_ANIM_SFX `tempeluna_converge`).
     engine._broadcastEvent('play_zone_animation', {
-      type: 'tempeluna_converge', owner: pi, heroIdx, zoneSlot: -1,
+      type: 'tempeluna_converge', owner: hs, heroIdx, zoneSlot: -1,
     });
 
     // ★ ② DAMPF von der brandneuen Tempeluna, ueber die ganze
@@ -161,7 +166,7 @@ module.exports = {
     // der Flug des Helden in den Geloescht-Stapel.
     const DAMPF_MS = 2400;
     engine._broadcastEvent('play_zone_animation', {
-      type: 'tempeluna_steam', owner: pi, heroIdx, zoneSlot: -1,
+      type: 'tempeluna_steam', owner: hs, heroIdx, zoneSlot: -1,
       duration: DAMPF_MS,
     });
     // Kurzer Vorlauf, damit der Formwechsel wirklich VOR dem ersten
@@ -172,10 +177,10 @@ module.exports = {
     // nicht, sie wird ausgeloescht — `hero_death` waere das falsche
     // Wort (ZONE_ANIM_SFX `tempeluna_erase`).
     engine._broadcastEvent('play_zone_animation', {
-      type: 'tempeluna_erase', owner: pi, heroIdx: andere, zoneSlot: -1,
+      type: 'tempeluna_erase', owner: andere.seite, heroIdx: andere.idx, zoneSlot: -1,
     });
 
-    await engine.deleteHero(pi, andere, CARD_NAME);
+    await engine.deleteHero(andere.seite, andere.idx, CARD_NAME);
   },
 
   /**
@@ -194,7 +199,7 @@ module.exports = {
   },
 
   // Ascension Bonus: „Add 1 'Fairy' Hero from your deck to your hand"
-  async onAscensionBonus(engine, pi, heroIdx) {
+  async onAscensionBonus(engine, pi, heroIdx, heroOwner) {
     const ps = engine.gs.players[pi];
     if (!ps) return;
     const cardDB = engine._getCardDB();
@@ -209,7 +214,7 @@ module.exports = {
       engine.log('tempeluna_bonus_empty', { player: ps.username });
       return;
     }
-    const inst = heldeninstanz(engine, pi, heroIdx);
+    const inst = heldeninstanz(engine, heroOwner ?? pi, heroIdx);   // Als Vorgabe 29.9.: Brettseite
     const ctx = engine._createContext(inst || { name: CARD_NAME, owner: pi, heroIdx, counters: {} }, {});
     const auswahl = await ctx.promptCardGallery(kandidaten, {
       // Kennzeichnung als SUCHE — unter einer Such-Sperre (Cats of the
@@ -422,7 +427,8 @@ module.exports = {
       const engine = ctx._engine;
       if (ctx.playerIdx == null || ctx.heroIdx == null) return;
       if (ctx.newHeroName !== CARD_NAME) return;
-      await engine.finishGainedHeroEffects(ctx.playerIdx, ctx.heroIdx);
+      // Als Vorgabe 29.9.: Traegerinstanzen liegen auf der Brettseite.
+      await engine.finishGainedHeroEffects(ctx.heroOwner ?? ctx.playerIdx, ctx.heroIdx);
     },
 
     // Puzzle-Modus: eine aufgestellte Tempeluna ist nie aufgestiegen —

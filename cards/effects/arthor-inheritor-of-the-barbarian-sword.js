@@ -36,8 +36,10 @@ module.exports = {
   // Unter dem Spielstart-Schutz nicht nutzbar (Als Ruling 8.8.).
   heroEffectHarmfulOnly: true,
 
-  async onAscensionBonus(engine, pi, heroIdx) {
-    await engine.performAscensionBonus(pi, heroIdx, ['Fighting', 'Summoning Magic']);
+  // Als Vorgabe 29.9.: `heroOwner` = Brettseite eines geliehenen Helden
+  // (Abilities in SEINE Zonen, Quelle Deck/Hand von `pi`).
+  async onAscensionBonus(engine, pi, heroIdx, heroOwner) {
+    await engine.performAscensionBonus(pi, heroIdx, ['Fighting', 'Summoning Magic'], heroOwner);
   },
 
   canActivateHeroEffect(ctx) {

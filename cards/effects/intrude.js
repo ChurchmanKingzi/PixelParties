@@ -38,7 +38,11 @@ module.exports = {
     if (!ps) return false;
 
     // Uniqueness: only one Intrude per player
-    if (engine) {
+    // Als Vorgabe 29.9.: „attached to your Heroes" = alle Helden, die
+    // der Spieler gerade kontrolliert (geliehene eingeschlossen).
+    if (engine?.kopienAnKontrolliertenHelden) {
+      if (engine.kopienAnKontrolliertenHelden(playerIdx, c => c.name === 'Intrude') > 0) return false;
+    } else if (engine) {
       if (engine.cardInstances.some(c =>
         (c.controller ?? c.owner) === playerIdx && c.zone === 'support' && c.name === 'Intrude'   // Kontrolle statt Seite (Styx 28.9.)
       )) return false;
