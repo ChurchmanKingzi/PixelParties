@@ -1700,13 +1700,12 @@ def tb_len(a):
     return 19.0 + 3.8 * max(0.0, min(1.0, a / 1.7))
 
 
-def tb_trail(out, px_, py_, start, ang, end):
+def tb_trail(out, px_, py_, start, ang):
     """Schwungspur als überstrichene Sichel vom Winkel start bis zur Klinge (ang): außen genau bis zur
-    Klingenspitze, am Ende des Hiebs (end) am dicksten, zum Anfang hin spitz; außen heller Rand,
-    nach innen dunkler – in den Grautönen der Spur aus dem Sprite. Kurze Hiebe: schmalere Sichel."""
+    Klingenspitze, an der Klinge so breit wie die ganze Klinge (vom Heft bis zur Spitze), zum Anfang hin
+    spitz; außen heller Rand, nach innen dunkler – in den Grautönen der Spur aus dem Sprite."""
     lo, hi = min(start, ang), max(start, ang)
-    span = max(0.3, abs(end - start))
-    tmax = 14.0 * min(1.0, abs(end - start) / 1.82)
+    span = max(0.3, abs(ang - start))
     for y in range(int(py_ - 26), int(py_ + 26)):
         for x in range(int(px_ - 26), int(px_ + 26)):
             if not (0 <= y < out.shape[0] and 0 <= x < out.shape[1]):
@@ -1715,9 +1714,9 @@ def tb_trail(out, px_, py_, start, ang, end):
             a = math.atan2(dy, dx)
             if not lo <= a <= hi:
                 continue
-            u = max(0.0, 1 - abs(a - end) / span)       # 1 am Ende des Hiebs, 0 an seinem Anfang
+            u = max(0.0, 1 - abs(a - ang) / span)       # 1 an der Klinge, 0 am Anfang der Spur
             R = tb_len(a) + 0.5
-            T = 1.0 + tmax * u ** 1.3
+            T = 1.0 + (R - 4.0) * u ** 1.3                # an der Klinge: die ganze Klinge
             r = math.hypot(dx, dy)
             if R - T <= r <= R:
                 d = (R - r) / T
@@ -1766,7 +1765,7 @@ def f_battlemaniac(i):
     arm_dy = lambda x: round(k * (x - 13) / 8)
     out = np.zeros((H, W, 4), int)
     if tr:
-        tb_trail(out, TB_PIVOT[0] + PL, TB_PIVOT[1] + PT + k, tr[0], ang, tr[1])
+        tb_trail(out, TB_PIVOT[0] + PL, TB_PIVOT[1] + PT + k, tr[0], ang)
     tb_blade(out, TB_PIVOT[0] + PL, TB_PIVOT[1] + PT + k, ang)
     hilt = rotate_part(TB_HILT, TB_HILT_M, TB_PIVOT, ang, (H, W), (PL, PT + k))
     m = hilt[:, :, 3] > 0
