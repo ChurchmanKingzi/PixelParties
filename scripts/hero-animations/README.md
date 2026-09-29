@@ -302,6 +302,12 @@ kopiert, daneben liegt eine JSON-Datei mit den Metadaten. Die erzeugten
 | `steamdwarfs.py` | `final 90 bulwark` | `bulwark_idle_final_sheet.png` | `diamond-the-bulwark-of-peace` |
 | `steamdwarfs.py` | `final 90 cecilia` | `cecilia_idle_final_sheet.png` | `rescued-damsel-cecilia` |
 | `steamdwarfs.py` | `final 90 corruptor` | `corruptor_idle_final_sheet.png` | `bloom-the-continent-corruptor` |
+| `deepsea_late.py` | `final 90 arnold` | `arnold_idle_final_sheet.png` | `arnold-the-maximum-lotl` |
+| `deepsea_late.py` | `final 90 feral` | `feral_idle_final_sheet.png` | `feral-the-fortress-breaker` |
+| `deepsea_late.py` | `final 90 teppes` | `teppes_idle_final_sheet.png` | `teppes-the-deepsea-vampire` |
+| `deepsea_late.py` | `final 90 teppesman` | `teppesman_idle_final_sheet.png` | `teppesman-the-deepsea-knight` |
+| `deepsea_late.py` | `final 90 shuchaku` | `shuchaku_idle_final_sheet.png` | `shu-chaku-the-blood-moon-projection` |
+| `deepsea_late.py` | `final 90 waflav` | `waflav_idle_final_sheet.png` | `deep-drowned-waflav` |
 
 `bubbles.py` ohne `gross` erzeugt eine auf Hero-Größe verkleinerte Variante
 (Sprite aus `bubbles_downscale.py`), die aktuell nicht verwendet wird.
@@ -334,7 +340,7 @@ python3 xcf_extract.py MotiveMoe.xcf assemble src/cute-princess-mary.png "Mary-K
 | MotiveBritain-Heroes und -Skins | `MotiveBritain.xcf` | reproduzierbar per `python3 assemble_britain.py <MotiveBritain.xcf>` (Zuordnung im Skriptkopf) |
 | MotiveChina-Heroes | `MotiveChina.xcf` | reproduzierbar per `python3 assemble_china.py <MotiveChina.xcf>` (Zuordnung im Skriptkopf) |
 | MotiveCoolhalla-Heroes und Skin | `MotiveCoolhalla.xcf` | reproduzierbar per `python3 assemble_coolhalla.py <MotiveCoolhalla.xcf>` (Zuordnung im Skriptkopf; Cooldin wird aus zwei Szenen-Ebenen ausgeschnitten) |
-| MotiveDeepsea-Heroes und -Skins | `MotiveDeepsea.xcf` | reproduzierbar per `python3 assemble_deepsea.py <MotiveDeepsea.xcf>` (Zuordnung im Skriptkopf; Scherben-Vorlagen für die Lolek-Partikel als `-shards.png`) |
+| MotiveDeepsea-Heroes und -Skins | `MotiveDeepsea.xcf` | reproduzierbar per `python3 assemble_deepsea.py <MotiveDeepsea.xcf>` (Zuordnung im Skriptkopf; Scherben-Vorlagen für die Lolek-Partikel als `-shards.png`; Fledermäuse von Teppes/Teppesman als `-bats`, Shu'Chakus Licht als `-glow`, Waflavs Skelettflügel und Tentakel als `-wings`/`-tentacles`) |
 | MotiveDeri-Heroes und -Skin | `MotiveDeri.xcf` | reproduzierbar per `python3 assemble_deri.py <MotiveDeri.xcf>` (Zuordnung im Skriptkopf; Thron, Arm, Bogen, Hände und Zinnen als bewegliche Teile `-<teil>.png`) |
 | MotiveGN-Heroes und -Skins | `MotiveGN.xcf` | reproduzierbar per `python3 assemble_gn.py <MotiveGN.xcf>` (Zuordnung im Skriptkopf; Ascended-Riffels Pistole vor ihr stammt aus dem Szenenbild „Sichtbar #146“; Nero Ziras Schläuche und Kabelenden werden ergänzt) |
 | MotiveGrailWar-Heroes und -Skins | `MotiveGrailWar.xcf` | reproduzierbar per `python3 assemble_grailwar.py <MotiveGrailWar.xcf>` (Zuordnung im Skriptkopf; bewegliche Teile als `-<teil>.png`, Brackles Totenschädel als `brackle-skull.png`; die Unterkörper der Alchemisten, Mariannes Haare und Asriel Dreemurrs Hose in Uniformfarben werden ergänzt, Ingos Kapuzen-Frames liegen in `src/user/`) |
