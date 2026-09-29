@@ -9703,6 +9703,144 @@ const ANIM_REGISTRY = {
   // A puff of white/grey steam clouds rising upward. Used as a
   // generic "steam engine fired" feedback — +HP on discard, brewing,
   // engineer activation, miner end-of-turn draw, etc.
+  // ── Elephant: der Elefantenfuss zertritt das Ziel (Als Vorgabe 29.9.) ──
+  // Pixelart: ein grauer Fuss (Sprite `PP_ELEFANTENFUSS`, Licht von oben
+  // rechts) faellt von oben auf das Ziel, ein Schatten waechst darunter, beim
+  // Aufprall (33 %) spritzen Staubpixel, Risse und ein Stossring, das Ziel
+  // selbst wird flachgedrueckt (`pp-elephant-squash`, style.css) und federt
+  // zurueck, waehrend der Fuss sich wieder hebt. Keyframes stehen LOKAL
+  // (CARD_API ④); der Klang haengt am Typ (`ZONE_ANIM_SFX.elephant_stomp`).
+  elephant_stomp: (() => {
+    const ZEILEN = [
+    '.....KDSSSSSSSLLK.....',
+    '.....KDSSSSSSSLLK.....',
+    '.....KDSSSSSSSLLK.....',
+    '.....KDWWWWWWSLLK.....',
+    '.....KDSSSSSSSLLK.....',
+    '.....KDSSSSSSSLLK.....',
+    '.....KDSWWWWWWWLK.....',
+    '.....KDSSSSSSSLLK.....',
+    '.....KDSSSSSSSLLK.....',
+    '.....KWWWWWWSSLLK.....',
+    '.....KDSSSSSSSLLK.....',
+    '.....KDDSWWWWWWLK.....',
+    '.....KDDSSSSSSLLK.....',
+    '....KKDDSSSSSSLLKK....',
+    '...KDDSSSSSSSSSSLLK...',
+    '..KDDSSSSSSSSSSSSLLK..',
+    '.KDDSSSSSSSSSSSSSSLLK.',
+    '.KDDSSSSSSSSSSSSSSLLK.',
+    'KDDSSSWSSSSWSSSWSSSLLK',
+    'KDDSSSWSSSSWSSSWSSSLLK',
+    'KDDSSSWSSSSWSSSWSSSLLK',
+    'KDDSSSWSSSSWSSSWSSSLLK',
+    '.KDDSSWSSSSWSSSWSSLLK.',
+    '..KNNKDKNNKDKNNKKNNK..',
+    '..KNNKKKNNKKKNNKKNNK..',
+    '..KKKK.KKKK.KKKKKKKK..',
+    '......................'
+    ];
+    const FARBE = { K: '#22222b', S: '#8a8a98', L: '#b7b7c6', D: '#5f5f6d', W: '#4a4a57', N: '#ece4c8' };
+    let rects = '';
+    ZEILEN.forEach((z, yy) => [...z].forEach((c, xx) => {
+      if (FARBE[c]) rects += `<rect x="${xx}" y="${yy}" width="1" height="1" fill="${FARBE[c]}"/>`;
+    }));
+    const FUSS = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(
+      `<svg xmlns="http://www.w3.org/2000/svg" width="22" height="27" viewBox="0 0 22 27" shape-rendering="crispEdges">${rects}</svg>`);
+    return function ElephantStompEffect({ x, y, w, ankerSel }) {
+      const px = Math.max(3, Math.round((w || 90) * 0.72 / 22));      // Bildschirmpixel je Sprite-Pixel
+      const fw = 22 * px, fh = 27 * px;
+      const staub = useMemo(() => Array.from({ length: ppFxN(16) }, (_, i) => {
+        const seite = i % 2 === 0 ? -1 : 1;
+        return {
+          dx: seite * (fw * 0.35 + Math.random() * fw * 0.7),
+          dy: -(6 + Math.random() * fh * 0.55),
+          gross: (Math.random() < 0.4 ? 2 : 1) * Math.max(3, px),
+          farbe: ['#b9b3a1', '#8e8878', '#d8d2be', '#6f6a5c'][i % 4],
+        };
+      }), [fw, fh, px]);
+      useEffect(() => {
+        const el = ankerSel ? document.querySelector(ankerSel) : null;
+        if (!el || window._playAnimations === false) return undefined;
+        el.classList.add('pp-elephant-squash');
+        const t = setTimeout(() => el.classList.remove('pp-elephant-squash'), 1000);
+        return () => { clearTimeout(t); el.classList.remove('pp-elephant-squash'); };
+      }, []);
+      const risse = [-70, -25, 20, 65, 110, 155, 200, 245];
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+          {/* Schatten des nahenden Fusses */}
+          <div style={{
+            position: 'absolute', left: -fw * 0.55, top: -px * 3, width: fw * 1.1, height: px * 6,
+            background: 'rgba(0,0,0,.55)', borderRadius: '50%', opacity: 0,
+            animation: 'ele-schatten 1000ms steps(8, end) forwards',
+          }} />
+          {/* Der Fuss: Sohle landet auf der Zielmitte */}
+          <div style={{
+            position: 'absolute', left: -fw / 2, top: -fh + px * 2, width: fw, height: fh, opacity: 0,
+            animation: 'ele-fall 1000ms linear forwards', '--ele-hoehe': Math.round(fh * 3.2 + 220) + 'px',
+          }}>
+            <img src={FUSS} alt="" draggable={false}
+              style={{ width: '100%', height: '100%', imageRendering: 'pixelated', display: 'block' }} />
+          </div>
+          {/* Stossring + Risse beim Aufprall */}
+          <div style={{
+            position: 'absolute', left: -fw * 0.5, top: -fw * 0.5, width: fw, height: fw,
+            border: `${px}px solid #ffffff`, opacity: 0,
+            animation: 'ele-ring 1000ms steps(6, end) forwards',
+          }} />
+          {risse.map((grad, i) => (
+            <div key={'er' + i} style={{
+              position: 'absolute', left: 0, top: -px / 2, width: fw * (0.42 + (i % 3) * 0.1), height: px,
+              background: '#1a1a22', transformOrigin: '0 50%', transform: `rotate(${grad}deg)`, opacity: 0,
+              animation: 'ele-riss 1000ms steps(4, end) forwards',
+            }} />
+          ))}
+          {/* Staubpixel */}
+          {staub.map((s, i) => (
+            <div key={'ed' + i} style={{
+              position: 'absolute', left: 0, top: 0, width: s.gross, height: s.gross, background: s.farbe, opacity: 0,
+              animation: 'ele-staub 1000ms steps(9, end) forwards',
+              '--ele-dx': s.dx + 'px', '--ele-dy': s.dy + 'px',
+            }} />
+          ))}
+          <style>{`
+            @keyframes ele-fall {
+              0%   { opacity: 0; transform: translateY(calc(-1 * var(--ele-hoehe))) scale(.7); }
+              6%   { opacity: 1; }
+              33%  { opacity: 1; transform: translateY(0) scale(1); animation-timing-function: linear; }
+              40%  { transform: translateY(4px) scale(1.03); }
+              78%  { opacity: 1; transform: translateY(4px) scale(1.03); animation-timing-function: ease-in; }
+              100% { opacity: 0; transform: translateY(calc(-1 * var(--ele-hoehe))) scale(.8); }
+            }
+            @keyframes ele-schatten {
+              0%   { opacity: 0; transform: scale(.35); }
+              30%  { opacity: 1; transform: scale(1); }
+              80%  { opacity: 1; transform: scale(1.1); }
+              100% { opacity: 0; transform: scale(1.1); }
+            }
+            @keyframes ele-ring {
+              0%, 32% { opacity: 0; transform: scale(.3); }
+              33%  { opacity: 1; transform: scale(.4); }
+              55%  { opacity: 0; transform: scale(1.7); }
+              100% { opacity: 0; transform: scale(1.7); }
+            }
+            @keyframes ele-riss {
+              0%, 32% { opacity: 0; }
+              33%, 72% { opacity: .9; }
+              100% { opacity: 0; }
+            }
+            @keyframes ele-staub {
+              0%, 32% { opacity: 0; transform: translate(0, 0); }
+              34%  { opacity: 1; transform: translate(0, 0); }
+              62%  { opacity: 1; transform: translate(calc(var(--ele-dx) * .85), var(--ele-dy)); }
+              100% { opacity: 0; transform: translate(var(--ele-dx), calc(var(--ele-dy) + 34px)); }
+            }
+          `}</style>
+        </div>
+      );
+    };
+  })(),
   // ── „Golden Apple" (v1196) ───────────────────────────────────────
   // Al 18.9.: „viele goldene Particles auf dem Ziel". Drei Schichten,
   // damit es nach Gold aussieht und nicht nach gelben Punkten:

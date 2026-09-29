@@ -3031,6 +3031,15 @@ const ZONE_ANIM_SFX = {
   // ist der vorhandene Muenzklang, etwas tiefer fuer das Gewicht eines
   // ganzen Helden; darunter `elem_holy` als warmer Schein. Eigene
   // Slots, sonst laesst die Sammelkategorie nur einen durch (CARD_API ⑤).
+  // Elephant: der Fuss faellt (Wusch), Aufprall bei 33 % der Animation
+  // (dumpfer Schlag + Knall), Ausfedern leiser. `category: null` +
+  // `dedupe: 0`, damit kein vorheriger Effektklang die Folge verschluckt.
+  elephant_stomp: [
+    { name: 'slash',        opts: { rate: 0.5,  volume: 0.55, category: null, dedupe: 0 } },
+    { name: 'heavy_impact', opts: { rate: 0.55, volume: 1.4,  delay: 330, category: null, dedupe: 0 } },
+    { name: 'damage',       opts: { rate: 0.6,  volume: 0.8,  delay: 335, category: null, dedupe: 0 } },
+    { name: 'placement',    opts: { rate: 0.7,  volume: 0.6,  delay: 420, category: null, dedupe: 0 } },
+  ],
   golden_apple_burst: [
     { name: 'gold_gain',  opts: { rate: 0.85, volume: 1, category: null, dedupe: 600 } },
     { name: 'elem_holy',  opts: { rate: 1.1, volume: 0.7, delay: 220, category: null, dedupe: 600 } },
