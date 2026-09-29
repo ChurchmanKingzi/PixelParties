@@ -243,6 +243,11 @@ kopiert, daneben liegt eine JSON-Datei mit den Metadaten. Die erzeugten
 | `hawaii.py` | `final 90 johanna` | `johanna_idle_final_sheet.png` | `johanna-crusader-of-light` |
 | `hawaii.py` | `final 90 calamitusk` | `calamitusk_idle_final_sheet.png` | `calamitusk-the-chaorc-war-chief` |
 | `hawaii.py` | `final 90 karian` | `karian_idle_final_sheet.png` | `grand-inquisitor-karian` |
+| `india.py` | `final 90 madaga` | `madaga_idle_final_sheet.png` | `madaga-the-forsaken-seafarer` |
+| `india.py` | `final 90 logan` | `logan_idle_final_sheet.png` | `logan-the-investment-monkee` |
+| `india.py` | `final 90 trifecta` | `trifecta_idle_final_sheet.png` | `tri-fecta-the-puppet-master` |
+| `india.py` | `final 90 triad` | `triad_idle_final_sheet.png` | `tri-ad-the-puppet-mistress` |
+| `india.py` | `final 90 zamorin` | `zamorin_idle_final_sheet.png` | `zamorin-the-spice-rajah` |
 
 `bubbles.py` ohne `gross` erzeugt eine auf Hero-Größe verkleinerte Variante
 (Sprite aus `bubbles_downscale.py`), die aktuell nicht verwendet wird.
@@ -281,6 +286,7 @@ python3 xcf_extract.py MotiveMoe.xcf assemble src/cute-princess-mary.png "Mary-K
 | MotiveGrailWar-Heroes und -Skins | `MotiveGrailWar.xcf` | reproduzierbar per `python3 assemble_grailwar.py <MotiveGrailWar.xcf>` (Zuordnung im Skriptkopf; bewegliche Teile als `-<teil>.png`, Brackles Totenschädel als `brackle-skull.png`; die Unterkörper der Alchemisten, Mariannes Haare und Asriel Dreemurrs Hose in Uniformfarben werden ergänzt, Ingos Kapuzen-Frames liegen in `src/user/`) |
 | MotiveGuardianBeasts-Heroes und Skin | `MotiveGuardianBeasts.xcf` | reproduzierbar per `python3 assemble_guardianbeasts.py <MotiveGuardianBeasts.xcf>` (Zuordnung im Skriptkopf; die übrigen Ebenen sind die zwölf Wächter-Kreaturen; Maos Schlitzspur als `-slash`, der Körper darunter wird ergänzt; Dajans Dolch und Blut als `-dagger`/`-blood`) |
 | MotiveHawaii-Heroes | `MotiveHawaii.xcf` | reproduzierbar per `python3 assemble_hawaii.py <MotiveHawaii.xcf>` (Zuordnung im Skriptkopf; Base-Taios Beine aus „Taio-Kopie“, seine Hand am Griff als `-hand`; Ascended Taio mit Base-Taios um 180° gedrehtem Flammenschwert; Waflavs Feuerflügel als `-wings`; Calamitusks Banner als `-banner`) |
+| MotiveIndia-Heroes | `MotiveIndia.xcf` | reproduzierbar per `python3 assemble_india.py <MotiveIndia.xcf>` (Zuordnung im Skriptkopf; die übrigen Ebenen sind Kreaturen, Puppen und Rennboote; Zamorins Glasschale und Sack als `-bowl`/`-sack`) |
 
 Neue Datei durchsuchen: `xcf_scan.py dump` legt alle Ebenen einzeln ab,
 `xcf_scan.py match <ordner> --heroes` gleicht sie mit allen noch nicht

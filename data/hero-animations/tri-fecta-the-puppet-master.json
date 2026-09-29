@@ -1,0 +1,16 @@
+{
+  "hero": "Tri Fecta, the Puppet Master",
+  "sheet": "tri-fecta-the-puppet-master.png",
+  "frameWidth": 28,
+  "frameHeight": 31,
+  "frames": 48,
+  "frameMs": 90,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 2,
+  "padLeft": 2,
+  "padRight": 2,
+  "padBottom": 5,
+  "faceX": 13.5,
+  "footY": 26
+}

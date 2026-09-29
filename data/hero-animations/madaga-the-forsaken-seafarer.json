@@ -1,0 +1,15 @@
+{
+  "hero": "Madaga, the Forsaken Seafarer",
+  "sheet": "madaga-the-forsaken-seafarer.png",
+  "frameWidth": 32,
+  "frameHeight": 29,
+  "frames": 48,
+  "frameMs": 90,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 3,
+  "padLeft": 2,
+  "padRight": 2,
+  "padBottom": 1,
+  "faceX": 15.5
+}
