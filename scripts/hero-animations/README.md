@@ -248,6 +248,11 @@ kopiert, daneben liegt eine JSON-Datei mit den Metadaten. Die erzeugten
 | `india.py` | `final 90 trifecta` | `trifecta_idle_final_sheet.png` | `tri-fecta-the-puppet-master` |
 | `india.py` | `final 90 triad` | `triad_idle_final_sheet.png` | `tri-ad-the-puppet-mistress` |
 | `india.py` | `final 90 zamorin` | `zamorin_idle_final_sheet.png` | `zamorin-the-spice-rajah` |
+| `japan.py` | `final 90 champion` | `champion_idle_final_sheet.png` | `champion-the-stormbringer` |
+| `japan.py` | `final 90 nobunakin` | `nobunakin_idle_final_sheet.png` | `idej-lord-nobunakin` |
+| `japan.py` | `final 90 shoguwana` | `shoguwana_idle_final_sheet.png` | `idej-lord-shoguwana` |
+| `japan.py` | `final 90 todugawin` | `todugawin_idle_final_sheet.png` | `idej-lord-todugawin` |
+| `japan.py` | `final 90 yukana` | `yukana_idle_final_sheet.png` | `yukana-the-scholar-on-the-run` |
 
 `bubbles.py` ohne `gross` erzeugt eine auf Hero-Größe verkleinerte Variante
 (Sprite aus `bubbles_downscale.py`), die aktuell nicht verwendet wird.
@@ -287,6 +292,7 @@ python3 xcf_extract.py MotiveMoe.xcf assemble src/cute-princess-mary.png "Mary-K
 | MotiveGuardianBeasts-Heroes und Skin | `MotiveGuardianBeasts.xcf` | reproduzierbar per `python3 assemble_guardianbeasts.py <MotiveGuardianBeasts.xcf>` (Zuordnung im Skriptkopf; die übrigen Ebenen sind die zwölf Wächter-Kreaturen; Maos Schlitzspur als `-slash`, der Körper darunter wird ergänzt; Dajans Dolch und Blut als `-dagger`/`-blood`) |
 | MotiveHawaii-Heroes | `MotiveHawaii.xcf` | reproduzierbar per `python3 assemble_hawaii.py <MotiveHawaii.xcf>` (Zuordnung im Skriptkopf; Base-Taios Beine aus „Taio-Kopie“, seine Hand am Griff als `-hand`; Ascended Taio mit Base-Taios um 180° gedrehtem Flammenschwert; Waflavs Feuerflügel als `-wings`; Calamitusks Banner als `-banner`) |
 | MotiveIndia-Heroes | `MotiveIndia.xcf` | reproduzierbar per `python3 assemble_india.py <MotiveIndia.xcf>` (Zuordnung im Skriptkopf; die übrigen Ebenen sind Kreaturen, Puppen und Rennboote; Zamorins Glasschale und Sack als `-bowl`/`-sack`) |
+| MotiveJapan-Heroes | `MotiveJapan.xcf` | reproduzierbar per `python3 assemble_japan.py <MotiveJapan.xcf>` (Zuordnung im Skriptkopf; Champions Schwert und Hand als `-sword`/`-hand`, Nobunakins Laserschwert und Hand ebenso; die Idej-Ebenen werden voll deckend übernommen, die Transparenz setzt `hologram.py`) |
 
 Neue Datei durchsuchen: `xcf_scan.py dump` legt alle Ebenen einzeln ab,
 `xcf_scan.py match <ordner> --heroes` gleicht sie mit allen noch nicht
@@ -342,7 +348,10 @@ Variante ohne Krone/Flügel), Hintergründe/Auren der Karte gehören nicht zum S
 * **`alphaScale`** (optional): Faktor auf die Deckkraft aller
   halbtransparenten Pixel (Gas, Rauch, Auren) auf dem Brett; voll deckende
   Pixel bleiben, wie sie sind. `< 1` = durchsichtiger (Medea: `0.55`).
-* Partikel, die die Figur nie berühren (Regen, Glut), in `particles.py`.
+* Partikel, die die Figur nie berühren (Regen, Glut), in `particles.py`;
+  `rain(..., storm=True)` für diagonalen Sturmregen (Champion).
+* Hologramm-Look der Idej-Heroes (halb durchsichtig, wandernde Abtastzeile,
+  Flackern mit seitlich springendem Zeilenstreifen) in `hologram.py`.
 * Gemeinsame Helfer (Glitzersterne, Lichtschimmer, Speichern, 1-px-Ring) in
   `anim_common.py`, Flügelschlag (Drehung ums Schultergelenk bzw. spaltentreue
   Scherung für sehr kleine Flügel, Lochfüller) in `flap_common.py`.
