@@ -57,18 +57,21 @@ function areaImSpiel(gs) {
  * `effectiveSchoolLevelForCaster` rechnet Performance-Joker und
  * geliehene Ability-Zonen (Xal) korrekt mit.
  */
-function heldKannWirken(engine, pi, heroIdx) {
-  const ps = engine.gs.players[pi];
+// Als Vorgabe 29.9. (Runde 3): `seite` = Brettseite eines dauerhaft
+// uebernommenen Helden (Standard `pi`).
+function heldKannWirken(engine, pi, heroIdx, seite = pi) {
+  const ps = engine.gs.players[seite];
   const hero = ps?.heroes?.[heroIdx];
   if (!hero?.name || hero.hp <= 0) return false;
-  if (engine._isHeroEffectSilenced(pi, heroIdx)) return false;
-  const stufe = engine.effectiveSchoolLevelForCaster(SCHULE, pi, heroIdx);
+  if (engine._isHeroEffectSilenced(seite, heroIdx)) return false;
+  const stufe = engine.effectiveSchoolLevelForCaster(SCHULE, pi, heroIdx, seite);
   return (stufe || 0) >= STUFE;
 }
 
 /** Ist diese Quelle ein gegnerischer Attack, Spell oder Creature-Effekt? */
-function gedeckteQuelle(info) {
-  if (info.chooserIdx == null || info.chooserIdx === info.heroOwner) return false;
+function gedeckteQuelle(info, kontrolleur = info.heroOwner) {
+  // Als Vorgabe 29.9.: „your opponent" = Gegner des KONTROLLEURS.
+  if (info.chooserIdx == null || info.chooserIdx === kontrolleur) return false;
   const cd = info.sourceData;
   if (!cd) return false;
   return hasCardType(cd, 'Attack') || hasCardType(cd, 'Spell')
@@ -80,24 +83,22 @@ function gedeckteQuelle(info) {
  * „while you control other targets that can be chosen or hit" — bleibt
  * dem Gegner sonst nichts zu waehlen, faellt der Schutz weg.
  */
-function andereWaehlbareZiele(engine, info) {
+function andereWaehlbareZiele(engine, info, kontrolleur = info.heroOwner) {
   const gs = engine.gs;
-  const ps = gs.players[info.heroOwner];
-  // Andere Helden
-  for (let hi = 0; hi < (ps?.heroes || []).length; hi++) {
-    if (hi === info.heroIdx) continue;
-    const h = ps.heroes[hi];
+  // Andere Helden — Als Vorgabe 29.9.: alle, die der Kontrolleur fuehrt.
+  for (const { physOwner, heroIdx: hi, hero: h } of engine.heroesControlledBy(kontrolleur)) {
+    if (physOwner === info.heroOwner && hi === info.heroIdx) continue;
     if (!h?.name || h.hp <= 0) continue;
     if (h.statuses?.untargetable || h.statuses?.invisible) continue;
     // Ein zweiter getauchter Held zaehlt nicht — sonst schuetzten sich
     // zwei gegenseitig ins Nichts (Stealth-Lehre).
-    if (istGetaucht(gs, ps.heroes[hi])) continue;
+    if (istGetaucht(gs, h)) continue;
     return true;
   }
-  // Kreaturen dieser Seite
+  // Kreaturen des Kontrolleurs
   for (const inst of (engine.cardInstances || [])) {
     if (inst.zone !== 'support' || inst.faceDown) continue;
-    if ((inst.controller ?? inst.owner) !== info.heroOwner) continue;
+    if ((inst.controller ?? inst.owner) !== kontrolleur) continue;
     if (inst.counters?.untargetable_all) continue;
     if (inst.counters?.untargetable_by_opponent) continue;
     const cd = engine.getEffectiveCardData(inst) || engine._getCardDB()[inst.name];
@@ -137,8 +138,9 @@ module.exports = {
     if (info._truthSeeingEye || info.ignoreUntargetable) return false;
     const hero = gs.players?.[info.heroOwner]?.heroes?.[info.heroIdx];
     if (!istGetaucht(gs, hero)) return false;
-    if (!gedeckteQuelle(info)) return false;
-    return andereWaehlbareZiele(engine, info);
+    const kontrolleur = engine.heroSideOf(info.heroOwner, hero);   // Als Vorgabe 29.9.
+    if (!gedeckteQuelle(info, kontrolleur)) return false;
+    return andereWaehlbareZiele(engine, info, kontrolleur);
   },
 
   // Die CPU sagt zu ihrem eigenen Fenster ja — Schutz ist gratis.
@@ -164,10 +166,13 @@ module.exports = {
       if (!areaImSpiel(gs)) return;
 
       while (ps.hand.includes(CARD_NAME)) {
+        // Als Vorgabe 29.9. (Runde 3): eigene Helden, die ich kontrolliere,
+        // plus DAUERHAFT uebernommene (Paraseed) — als { seite, hi }.
         const waehlbar = [];
-        for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-          if (istGetaucht(gs, ps.heroes[hi])) continue;   // schon unten
-          if (heldKannWirken(engine, pi, hi)) waehlbar.push(hi);
+        for (const { physOwner: seite, heroIdx: hi, hero: h } of engine.heroesControlledBy(pi)) {
+          if (seite !== pi && h.permaControlBy !== pi) continue;
+          if (istGetaucht(gs, h)) continue;   // schon unten
+          if (heldKannWirken(engine, pi, hi, seite)) waehlbar.push({ seite, hi });
         }
         if (waehlbar.length === 0) break;
 
@@ -183,13 +188,13 @@ module.exports = {
         });
         if (!will) break;
 
-        let heroIdx;
+        let heroIdx, seite;
         if (waehlbar.length === 1) {
-          heroIdx = waehlbar[0];
+          ({ hi: heroIdx, seite } = waehlbar[0]);
         } else {
-          const ziele = waehlbar.map(hi => ({
-            id: `hero-${pi}-${hi}`, type: 'hero', owner: pi,
-            heroIdx: hi, cardName: ps.heroes[hi].name,
+          const ziele = waehlbar.map(({ seite: s, hi }) => ({
+            id: `hero-${s}-${hi}`, type: 'hero', owner: s,
+            heroIdx: hi, cardName: gs.players[s].heroes[hi].name,
           }));
           const gewaehlt = await engine.promptEffectTarget(pi, ziele, {
             maxTotal: 1,
@@ -207,9 +212,10 @@ module.exports = {
           const t = ziele.find(z => z.id === gewaehlt[0]);
           if (!t) break;
           heroIdx = t.heroIdx;
+          seite = t.owner;
         }
 
-        const hero = ps.heroes[heroIdx];
+        const hero = gs.players[seite]?.heroes?.[heroIdx];
         if (!hero?.name) break;
 
         // ── Handkarte verbrauchen ──────────────────────────────────
@@ -240,7 +246,7 @@ module.exports = {
 
         const kette = await engine.executeCardWithChain({
           cardName: CARD_NAME, owner: pi, cardType: 'Spell',
-          heroIdx, goldCost: 0,
+          heroIdx, goldCost: 0, casterOwner: seite,
           resolve: async () => {
             // ★ Der Held VERSINKT in seiner Zone — Wasser steigt, Blasen
             // perlen, die Karte sackt weg. Laufzeit und Absinken teilen
@@ -248,11 +254,11 @@ module.exports = {
             // auseinanderlaufen.
             const TAUCH_MS = 1400;
             engine._broadcastEvent('play_zone_animation', {
-              type: 'dive_down', owner: pi, heroIdx, zoneSlot: -1,
+              type: 'dive_down', owner: seite, heroIdx, zoneSlot: -1,
               duration: TAUCH_MS,
             });
             await engine._delay(TAUCH_MS);
-            engine.addHeroTargetBlocker(pi, heroIdx, CARD_NAME, {
+            engine.addHeroTargetBlocker(seite, heroIdx, CARD_NAME, {
               // „Until the end of the turn\" — gemeint ist der Zug, in
               // dem getaucht wurde, also der laufende Gegnerzug.
               untilTurn: gs.turn,

@@ -63,6 +63,8 @@ const INNEN = '_stealthyPursuitInnen';   // Rekursionsriegel fuer die Anti-Lock-
  * einen Spell ausgefuehrt haben. Initialglied: `heroIdx`; Reaktions-
  * glieder: `casterHeroIdx`.
  */
+// Als Vorgabe 29.9. (Runde 3): Schluessel `seite:heroIdx` — ein dauerhaft
+// uebernommener Held (Gegnerspalte) kann ebenfalls der Handelnde sein.
 function handelndeHelden(gs, pi, engine, chainCtx) {
   const kette = chainCtx?.chain;
   const out = new Set();
@@ -75,9 +77,10 @@ function handelndeHelden(gs, pi, engine, chainCtx) {
     if (!cd || !(hasCardType(cd, 'Attack') || hasCardType(cd, 'Spell'))) continue;
     const hi = glied.isInitialCard ? glied.heroIdx : (glied.casterHeroIdx ?? glied.heroIdx);
     if (!Number.isInteger(hi) || hi < 0) continue;
-    const held = gs.players?.[pi]?.heroes?.[hi];
+    const seite = Number.isInteger(glied.casterOwner) ? glied.casterOwner : pi;
+    const held = gs.players?.[seite]?.heroes?.[hi];
     if (!held?.name || held.hp <= 0) continue;
-    out.add(hi);
+    out.add(`${seite}:${hi}`);
   }
   return out;
 }
@@ -129,6 +132,8 @@ module.exports = {
 
   isReaction: true,
   deleteOnUse: true,                       // „Delete this card."
+  // Als Vorgabe 29.9. (Runde 3): nur dauerhaft uebernommene Helden (Paraseed).
+  fremdeWirker: 'dauerhaft',
 
   // Nie proaktiv — nur als Glied einer Kette.
   canActivate: () => false,
@@ -144,8 +149,8 @@ module.exports = {
   },
 
   /** v1327-Vertrag: nur der Held, der gehandelt hat, darf wirken. */
-  reactionCasterAllowed(gs, pi, heroIdx, engine, chainCtx) {
-    return handelndeHelden(gs, pi, engine, chainCtx).has(heroIdx);
+  reactionCasterAllowed(gs, pi, heroIdx, engine, chainCtx, seite = pi) {
+    return handelndeHelden(gs, pi, engine, chainCtx).has(`${seite}:${heroIdx}`);
   },
 
   /**
@@ -170,7 +175,8 @@ module.exports = {
     const ps = gs.players?.[pi];
     const glied = Array.isArray(chain) ? chain[myIndex] : null;
     const heroIdx = glied?.casterHeroIdx ?? glied?.heroIdx;
-    const held = ps?.heroes?.[heroIdx];
+    const seite = Number.isInteger(glied?.casterOwner) ? glied.casterOwner : pi;   // Als Vorgabe 29.9.
+    const held = gs.players?.[seite]?.heroes?.[heroIdx];
     if (!held?.name || held.hp <= 0) {
       engine.log('stealthy_pursuit_fizzle', { player: ps?.username });
       return;
@@ -179,13 +185,13 @@ module.exports = {
     // Nebel um den Helden — vorhandene Animation samt Klang (`elem_wind`).
     const NEBEL_MS = 1400;
     engine._broadcastEvent('play_zone_animation', {
-      type: 'mist_veil', owner: pi, heroIdx, zoneSlot: -1, duration: NEBEL_MS,
+      type: 'mist_veil', owner: seite, heroIdx, zoneSlot: -1, duration: NEBEL_MS,
     });
     await engine._delay(700);
 
     // „Until the end of your NEXT turn"
     const bisZug = gs.activePlayer === pi ? gs.turn + 2 : gs.turn + 1;
-    engine.addHeroTargetBlocker(pi, heroIdx, CARD_NAME, { untilTurn: bisZug, appliedBy: pi });
+    engine.addHeroTargetBlocker(seite, heroIdx, CARD_NAME, { untilTurn: bisZug, appliedBy: pi });
 
     engine.log('stealthy_pursuit', { player: ps.username, hero: held.name });
     engine.sync();

@@ -45,7 +45,9 @@
  * (Performance on Fighting counts), and not on
  * per-hero cooldown.
  */
-function heroCanUseJump(gs, ps, heroIdx, engine) {
+// Als Vorgabe 29.9. (Runde 3): `ps` = Spalte des Helden, `reaktor` = wer
+// die Karte aus der Hand spielt (dauerhaft uebernommener Held).
+function heroCanUseJump(gs, ps, heroIdx, engine, reaktor = null) {
   const hero = ps.heroes[heroIdx];
   if (!hero?.name || hero.hp <= 0) return false;
   if (hero.statuses?.frozen || hero.statuses?.stunned || hero.statuses?.negated) return false;
@@ -59,7 +61,8 @@ function heroCanUseJump(gs, ps, heroIdx, engine) {
   // Zaehlung — Stufensenkungen, Overrides, Sperren gelten so auch hier.
   if (engine?._canHeroActivateSurprise) {
     const pi = gs.players.indexOf(ps);
-    return engine._canHeroActivateSurprise(pi, heroIdx, 'Jump in the River', { spellInHand: true });
+    return engine._canHeroActivateSurprise(pi, heroIdx, 'Jump in the River',
+      reaktor != null && reaktor !== pi ? { spellInHand: true, reaktor } : { spellInHand: true });
   }
   // Rueckfall ohne Engine-Bezug (sollte nicht vorkommen): alte Zaehlung.
   const abZones = ps.abilityZones[heroIdx] || [];
@@ -86,10 +89,13 @@ async function doJumpCascade(engine, pi) {
 
   while (true) {
     // ── Check: eligible heroes exist? ──
+    // Als Vorgabe 29.9. (Runde 3): eigene Helden, die ich kontrolliere,
+    // plus DAUERHAFT uebernommene (Paraseed) — als { seite, hi }.
     const eligible = [];
-    for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-      if (usedThisCascade.has(hi)) continue;
-      if (heroCanUseJump(gs, ps, hi, engine)) eligible.push(hi);
+    for (const { physOwner: seite, heroIdx: hi, hero: h } of engine.heroesControlledBy(pi)) {
+      if (seite !== pi && h.permaControlBy !== pi) continue;
+      if (usedThisCascade.has(`${seite}:${hi}`)) continue;
+      if (heroCanUseJump(gs, gs.players[seite], hi, engine, pi)) eligible.push({ seite, hi });
     }
     if (eligible.length === 0) break;
 
@@ -109,16 +115,16 @@ async function doJumpCascade(engine, pi) {
     if (!wantsJump) break; // Player declined — stop entire cascade
 
     // ── Select Hero ──
-    let selectedHeroIdx;
+    let selectedHeroIdx, seite;
     if (eligible.length === 1) {
-      selectedHeroIdx = eligible[0]; // Auto-select only option
+      ({ hi: selectedHeroIdx, seite } = eligible[0]); // Auto-select only option
     } else {
-      const heroTargets = eligible.map(hi => ({
-        id: `hero-${pi}-${hi}`,
+      const heroTargets = eligible.map(({ seite: s, hi }) => ({
+        id: `hero-${s}-${hi}`,
         type: 'hero',
-        owner: pi,
+        owner: s,
         heroIdx: hi,
-        cardName: ps.heroes[hi].name,
+        cardName: gs.players[s].heroes[hi].name,
       }));
 
       const picked = await engine.promptEffectTarget(pi, heroTargets, {
@@ -137,9 +143,10 @@ async function doJumpCascade(engine, pi) {
       const target = heroTargets.find(t => t.id === picked[0]);
       if (!target) break;
       selectedHeroIdx = target.heroIdx;
+      seite = target.owner;
     }
 
-    const hero = ps.heroes[selectedHeroIdx];
+    const hero = gs.players[seite]?.heroes?.[selectedHeroIdx];
     if (!hero?.name) break;
 
     // ── Remove one copy from hand (committed) ──
@@ -205,12 +212,12 @@ async function doJumpCascade(engine, pi) {
       resolve: async () => {
         // Play water splash animation
         engine._broadcastEvent('play_zone_animation', {
-          type: 'water_splash', owner: pi, heroIdx: heroIdxCapture, zoneSlot: -1,
+          type: 'water_splash', owner: seite, heroIdx: heroIdxCapture, zoneSlot: -1,
         });
         await engine._delay(800);
 
         // Apply Submerged buff — expires at start of owner's next turn
-        await engine.actionAddBuff(hero, pi, heroIdxCapture, 'submerged', {
+        await engine.actionAddBuff(hero, seite, heroIdxCapture, 'submerged', {
           sourceOwner: pi,   // v1067: Quelle ist Pflicht (siehe _affected-shared)
           source: 'Jump in the River',
           expiresAtTurn: gs.turn + 1,
@@ -228,7 +235,7 @@ async function doJumpCascade(engine, pi) {
     } else {
       // Only record cooldown + mark used if NOT negated
       hero._jumpLastUsedTurn = gs.turn;
-      usedThisCascade.add(selectedHeroIdx);
+      usedThisCascade.add(`${seite}:${selectedHeroIdx}`);
       engine.log('jump_in_river', { player: ps.username, hero: hero.name });
     }
     engine.sync();
@@ -240,6 +247,8 @@ async function doJumpCascade(engine, pi) {
 // ─── MODULE EXPORTS ──────────────────────
 
 module.exports = {
+  // Als Vorgabe 29.9. (Runde 3): nur dauerhaft uebernommene Helden (Paraseed).
+  fremdeWirker: 'dauerhaft',
   // ★★ v1182 — ENTKOPPELTE BILDER (CARD_API): wird die Karte NEGIERT,
   // laeuft ihr Effekt-Rumpf nie — die Engine spielt dann diese Bilder.
   // Im normalen Weg bleibt es bei den Broadcasts im Effekt selbst.
@@ -297,10 +306,11 @@ module.exports = {
       gs._jumpPromptDone = gs.turn;
 
       // Pre-check: any eligible heroes at all?
-      const ps = gs.players[pi];
+      // Als Vorgabe 29.9. (Runde 3): auch dauerhaft uebernommene Helden.
       let anyEligible = false;
-      for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-        if (heroCanUseJump(gs, ps, hi, engine)) { anyEligible = true; break; }
+      for (const { physOwner: seite, heroIdx: hi, hero: h } of engine.heroesControlledBy(pi)) {
+        if (seite !== pi && h.permaControlBy !== pi) continue;
+        if (heroCanUseJump(gs, gs.players[seite], hi, engine, pi)) { anyEligible = true; break; }
       }
       if (!anyEligible) return; // No eligible heroes — skip silently
 

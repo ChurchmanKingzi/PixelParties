@@ -27,6 +27,7 @@
 // ═══════════════════════════════════════════
 
 const { secondActionHooks, isSecondActionGrant } = require('./_second-action-shared');
+const { heldSeite } = require('./_hooks');
 
 const CARD_NAME = 'Weapon Unleashing';
 const TYPE_ID_PREFIX = 'second_action:weapon-unleashing:';
@@ -34,6 +35,10 @@ const PHASE_MAIN1 = 2, PHASE_ACTION = 3;
 const STACK = 3;
 
 function stacksOf(engine, pi, heroIdx) {
+  // Als Befund 29.9.: Ability Zones eines TEMPORAER gesteuerten Helden sind
+  // unberuehrbar (v1375) — die Kosten waeren nicht bezahlbar, also kein Stapel.
+  const _held = engine.gs.players[pi]?.heroes?.[heroIdx];
+  if (engine.istTemporaerGesteuert?.(_held)) return [];
   // Ability-Zonen UND echte Stapel in Support Zones (Xal, Xalibur, v805);
   // Karten, die nur als Ability GELTEN (Cloak of Edge), haben keinen Stapel.
   return engine.getAbilityTargets(pi, { heroIdx })
@@ -56,12 +61,14 @@ module.exports = {
   canActivate(gs, pi, engine) {
     if (!gs || (gs.currentPhase !== PHASE_MAIN1 && gs.currentPhase !== PHASE_ACTION)) return false;
     if (!engine) return true;
-    return (gs.players[pi]?.heroes || []).some((h, hi) => h?.name && h.hp > 0 && stacksOf(engine, pi, hi).length > 0);
+    // Als Befund 29.9.: auch geliehene Helden (ihre Abilities liegen auf der Brettseite).
+    return engine.heroesControlledBy(pi).some(({ physOwner, heroIdx: hi, hero: h }) =>
+      h?.name && h.hp > 0 && stacksOf(engine, physOwner, hi).length > 0);
   },
 
   canPlayWithHero(gs, pi, heroIdx, cardData, engine) {
     if (!engine) return true;
-    try { return stacksOf(engine, pi, heroIdx).length > 0; } catch { return true; }
+    try { return stacksOf(engine, heldSeite(gs, pi, heroIdx), heroIdx).length > 0; } catch { return true; }   // Als Befund 29.9.: Brettseite
   },
 
   hooks: {
@@ -106,18 +113,25 @@ module.exports = {
         if (ownSid && engine.io) engine.io.to(ownSid).emit('card_reveal', { cardName: CARD_NAME });
       } catch { /* Anzeige ist Beiwerk */ }
       const abilityName = gewaehlt.cardName;
+      let abgelegt = 0;
       for (let k = 0; k < STACK; k++) {
         const entry = engine.getAbilityTargets(ctx.cardHeroOwner ?? pi, { heroIdx, cardName: abilityName })   // Als Befund 29.9.: Brettseite des Wirkers
           .find(a => a.zoneKind === gewaehlt.zoneKind && a.slotIdx === gewaehlt.slotIdx);
         if (!entry || !(await engine.discardAbilityTopCopy(entry, { source: CARD_NAME, sourceOwner: pi }))) break;
+        abgelegt++;
         engine.sync();
         await engine._delay(250);
       }
+      // Als Befund 29.9.: ohne vollstaendig bezahlte Kosten keine Wirkung.
+      if (abgelegt === 0) { gs._spellCancelled = true; return; }
 
       // Effekt: Second-Action-Grant, an den Nutzer gebunden.
       inst.heroIdx = heroIdx;
       inst.counters = inst.counters || {};
       inst.counters._unleashHero = heroIdx;
+      // Als Befund 29.9.: die Zusage gilt dem Nutzer auf SEINER Brettseite —
+      // die Instanz liegt danach in der Ablage des Kontrolleurs.
+      inst.counters._grantSeite = ctx.cardHeroOwner ?? pi;
       const typeId = `${TYPE_ID_PREFIX}${inst.id}`;
       engine.registerAdditionalActionType(typeId, {
         label: hero.name,
@@ -165,7 +179,7 @@ module.exports = {
       const pinned = inst.counters?._unleashHero;
       if (Number.isInteger(pinned) && inst.heroIdx !== pinned) inst.heroIdx = pinned;
       if (Number.isInteger(pinned) && inst.counters?.additionalActionAvail > 0) {
-        const hero = engine.gs.players[inst.owner]?.heroes?.[pinned];
+        const hero = engine.gs.players[inst.counters?._grantSeite ?? inst.owner]?.heroes?.[pinned];
         if (hero?.name) { hero.buffs = hero.buffs || {}; hero.buffs.second_action_grant = hero.buffs.second_action_grant || { appliedTurn: engine.gs.turn }; }
       }
     },

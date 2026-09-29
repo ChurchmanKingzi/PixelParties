@@ -112,10 +112,15 @@ function isSecondActionGrant(engine, inst) {
  * host Hero's buff badge can be torn down (only when ALL grants for that
  * Hero are gone).
  */
+/** Als Befund 29.9.: Heldenseite einer Zusage (`_grantSeite`, sonst `owner`). */
+function grantSeite(inst, fallback) {
+  return inst?.counters?._grantSeite ?? fallback ?? inst?.owner;
+}
+
 function heroHasOtherActiveSecondActionGrant(engine, playerIdx, heroIdx, excludeInstId) {
   if (playerIdx == null || playerIdx < 0) return false;
   for (const inst of engine.cardInstances) {
-    if (inst.owner !== playerIdx) continue;
+    if (grantSeite(inst) !== playerIdx) continue;
     if (inst.heroIdx !== heroIdx) continue;
     if (excludeInstId != null && inst.id === excludeInstId) continue;
     if (secondActionTypeIds(engine, inst, true).length === 0) continue;
@@ -266,7 +271,7 @@ const secondActionHooks = {
     if (actionsPlayed >= 2 && saActive.length > 0) {
       const config = engine._additionalActionTypes?.[saActive[0]];
       for (const tid of saActive) engine.expireAdditionalActionType(inst, tid);
-      const feld = ctx.cardHeroOwner ?? ctx.cardOwner;   // Styx 28.9.: Wirt auf der Brettseite
+      const feld = grantSeite(inst, ctx.cardHeroOwner ?? ctx.cardOwner);   // Styx 28.9.: Wirt auf der Brettseite
       clearBadgeIfNoOtherGrants(engine, feld, inst.heroIdx);
       engine.log('second_action_fizzle', {
         player: ps.username,
@@ -283,7 +288,7 @@ const secondActionHooks = {
     if (!isSecondActionGrant(engine, inst)) return;
     // Still a live second-action grant on this inst → not yet drained.
     if (secondActionTypeIds(engine, inst, true).length > 0) return;
-    clearBadgeIfNoOtherGrants(engine, inst.owner, inst.heroIdx);
+    clearBadgeIfNoOtherGrants(engine, grantSeite(inst), inst.heroIdx);
     engine.sync();
   },
 
@@ -297,7 +302,7 @@ const secondActionHooks = {
     for (const tid of secondActionTypeIds(engine, inst, true)) {
       engine.expireAdditionalActionType(inst, tid);
     }
-    clearBadgeIfNoOtherGrants(engine, inst.owner, inst.heroIdx);
+    clearBadgeIfNoOtherGrants(engine, grantSeite(inst), inst.heroIdx);
     engine.sync();
   },
 
@@ -307,7 +312,7 @@ const secondActionHooks = {
     if (!isSecondActionGrant(engine, ctx.card)) return;
     // Exclude self from the "any other grant?" check — Ba is leaving,
     // its own grant doesn't count toward keeping the badge alive.
-    clearBadgeIfNoOtherGrants(engine, ctx.card.owner, ctx.card.heroIdx, ctx.card.id);
+    clearBadgeIfNoOtherGrants(engine, grantSeite(ctx.card), ctx.card.heroIdx, ctx.card.id);
     engine.sync();
   },
 };
