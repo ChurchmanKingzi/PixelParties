@@ -77,14 +77,14 @@ module.exports = {
       // The casting Hero (ctx.cardHeroIdx for hand-cast spells) rams
       // into the picked card's zone, then an explosion fires on the
       // impact point right before the destroy resolves.
-      const hero = engine.gs.players[pi]?.heroes?.[ctx.cardHeroIdx];
+      const hero = ctx.attachedHero || engine.gs.players[pi]?.heroes?.[ctx.cardHeroIdx];   // Als Befund 29.9.: Brettseite des Wirkers
       if (hero?.name && hero.hp > 0) {
         const ramTarget = sel.type === 'coolnessStackTop'
           ? { owner: sel.owner, heroIdx: -1, zoneSlot: -1, zoneType: 'coolnessStack' }
           : { owner: targetInst.owner, heroIdx: targetInst.heroIdx, zoneSlot: targetInst.zoneSlot, zoneType: targetInst.zone };
 
         const ramEvent = {
-          sourceOwner: pi, sourceHeroIdx: ctx.cardHeroIdx,
+          sourceOwner: ctx.cardHeroOwner ?? pi, sourceHeroIdx: ctx.cardHeroIdx,   // Als Befund 29.9.: Brettseite des Wirkers
           targetOwner: ramTarget.owner,
           targetHeroIdx: ramTarget.heroIdx >= 0 ? ramTarget.heroIdx : 0,
           cardName: hero.name, duration: 1200,

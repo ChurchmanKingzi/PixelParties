@@ -47,7 +47,7 @@ module.exports = {
       // Gegnerische Area-Zone nur mit Decay Magic 2 auf dem Anwender.
       let ziel = pi;
       const decayLv = engine.countAbilitiesForSchool(
-        'Decay Magic', ps.abilityZones?.[ctx.cardHeroIdx] || [],
+        'Decay Magic', (gs.players[ctx.cardHeroOwner ?? pi] || ps).abilityZones?.[ctx.cardHeroIdx] || [],   // Als Befund 29.9.: Zonen des Wirkers auf seiner Brettseite
       );
       if (decayLv >= 2) {
         const wahl = await engine.promptGeneric(pi, {

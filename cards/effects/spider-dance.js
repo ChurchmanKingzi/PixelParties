@@ -53,7 +53,7 @@ module.exports = {
       const heroIdx = ctx.cardHeroIdx;
       const ps = gs.players[pi];
       if (!ps) return;
-      const hero = ps.heroes?.[heroIdx];
+      const hero = ctx.attachedHero || ps.heroes?.[heroIdx];   // Als Befund 29.9.: Brettseite des Wirkers
       if (!hero?.name || hero.hp <= 0) return;
 
       // ── Step 1: Surprise deck-search (up to N different names) ──

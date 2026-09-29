@@ -350,7 +350,7 @@ module.exports = {
       await engine._delay(200);
     }
 
-    const source = { name: CARD_NAME, owner: pi, heroIdx };
+    const source = { name: CARD_NAME, owner: pi, heroIdx, heroOwner: ctx.cardHeroOwner ?? pi };   // Als Befund 29.9.: Brettseite des Wirkers
     if (sel.type === 'coolnessStackTop') {
       await engine.actionPopCoolnessStackTo(sel.owner, 'discard', { source: CARD_NAME });
     } else if (targetInst) {

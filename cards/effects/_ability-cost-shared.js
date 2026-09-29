@@ -78,6 +78,7 @@ function targetsFor(engine, pi, heroIdx, kinds) {
  * @param opts.confirmLabel Button-Text
  * @param opts.describe     (sent, abilitiesSent, remaining) → Beschreibung
  * @param opts.sourceOwner  Verursacher, falls nicht der Waehlende (v1335)
+ * @param opts.heroOwner    Brettseite des Helden, falls nicht `pi` (Als Befund 29.9.: geliehener Held)
  * @returns {{sent, abilitiesSent, equipsSent, aborted}}
  */
 async function sendCardsLoop(engine, pi, heroIdx, opts) {
@@ -86,7 +87,7 @@ async function sendCardsLoop(engine, pi, heroIdx, opts) {
   const max = opts.max == null ? Infinity : opts.max;
   let sent = 0, abilitiesSent = 0, equipsSent = 0, schleifen = 0, aborted = false;
   while (schleifen++ < 40 && sent < max) {
-    const ziele = targetsFor(engine, pi, heroIdx, kinds);
+    const ziele = targetsFor(engine, opts.heroOwner ?? pi, heroIdx, kinds);   // Als Befund 29.9.: Brettseite des Helden
     if (ziele.length === 0) break;
     const remaining = Math.max(0, min - sent);
     const fertigErlaubt = remaining === 0 && sent > 0;

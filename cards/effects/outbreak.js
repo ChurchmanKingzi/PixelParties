@@ -111,7 +111,8 @@ module.exports = {
       const pi     = ctx.cardOwner;
       const heroIdx = ctx.cardHeroIdx;
       const ps     = gs.players[pi];
-      const userHero = ps?.heroes?.[heroIdx];
+      const hs     = ctx.cardHeroOwner ?? pi;   // Als Befund 29.9.: Brettseite des Nutzers
+      const userHero = ctx.attachedHero || gs.players[hs]?.heroes?.[heroIdx];
       if (!userHero?.name || userHero.hp <= 0) {
         gs._spellCancelled = true;
         return;
@@ -163,7 +164,7 @@ module.exports = {
       });
       await engine._delay(400);
 
-      const dmgSource = { name: CARD_NAME, owner: pi, heroIdx };
+      const dmgSource = { name: CARD_NAME, owner: pi, heroIdx, heroOwner: hs };   // Als Befund 29.9.: Brettseite des Wirkers
       if (target.type === 'hero') {
         const h = gs.players[target.owner]?.heroes?.[target.heroIdx];
         if (h && h.hp > 0) {
@@ -180,12 +181,12 @@ module.exports = {
       const cleansable = getCleansableStatuses();
       // The host might have been moved/affected by the damage step (rare —
       // damage rarely targets self), so re-resolve the live reference.
-      const liveUser = gs.players[pi]?.heroes?.[heroIdx];
+      const liveUser = gs.players[hs]?.heroes?.[heroIdx];   // Als Befund 29.9.: Brettseite des Wirkers
       if (liveUser?.name && liveUser.hp > 0) {
-        engine.cleanseHeroStatuses(liveUser, pi, heroIdx, cleansable, CARD_NAME);
+        engine.cleanseHeroStatuses(liveUser, hs, heroIdx, cleansable, CARD_NAME);   // Als Befund 29.9.: Brettseite des Wirkers
         engine._broadcastEvent('play_zone_animation', {
           type: 'heal_sparkle',
-          owner: pi, heroIdx, zoneSlot: -1,
+          owner: hs, heroIdx, zoneSlot: -1,   // Als Befund 29.9.: Brettseite des Wirkers
         });
         engine.sync();
         await engine._delay(300);
@@ -204,7 +205,7 @@ module.exports = {
       }
 
       if (killedTarget && liveUser?.name && liveUser.hp > 0) {
-        await engine.performImmediateAction(pi, heroIdx, {
+        await engine.performImmediateAction(pi, heroIdx, { heroOwner: hs,   // Als Befund 29.9.: Brettseite des Wirkers
           title: CARD_NAME,
           description: `${liveUser.name} may perform an additional Action!`,
         });

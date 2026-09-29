@@ -124,7 +124,7 @@ module.exports = {
 
       // Beide Bedingungen bei der Auflösung erneut prüfen — zwischen
       // Handklick und Auflösung kann eine Kette dazwischenfahren.
-      if (!heldTaugt(engine, pi, heroIdx)) {
+      if (!heldTaugt(engine, ctx.cardHeroOwner ?? pi, heroIdx)) {   // Als Befund 29.9.: Brettseite des Wirkers
         gs._spellCancelled = true;
         engine.log('ft_organnon_fizzle', { player: ps.username, reason: 'inventing' });
         return;

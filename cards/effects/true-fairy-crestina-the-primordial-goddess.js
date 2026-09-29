@@ -179,7 +179,7 @@ module.exports = {
         toCreationIdx: ps.creationZone.length - 1,
       });
       engine._broadcastEvent('play_zone_animation', {
-        type: 'holy_revival', owner: pi, heroIdx,
+        type: 'holy_revival', owner: ctx.cardHeroOwner ?? pi, heroIdx,   // Als Befund 29.9.: Brettseite des Wirkers
       });
       engine.log('crestina_creation_search', { player: ps.username, card: name });
       engine.sync();

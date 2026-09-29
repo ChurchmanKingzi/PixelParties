@@ -60,7 +60,7 @@ module.exports = {
         );
         if (inst) {
           await engine.actionDealCreatureDamage(
-            { name: 'Magic Hammer', owner: pi, heroIdx },
+            { name: 'Magic Hammer', owner: pi, heroIdx, heroOwner: ctx.cardHeroOwner ?? pi },   // Als Befund 29.9.: Brettseite des Wirkers
             inst, 300, 'destruction_spell',
             { sourceOwner: pi, canBeNegated: true },
           );

@@ -108,7 +108,7 @@ module.exports = {
       // MORE different…").
       const fullBoardMode = N > totalTargets;
 
-      const dmgSource = { name: CARD_NAME, owner: pi, heroIdx };
+      const dmgSource = { name: CARD_NAME, owner: pi, heroIdx, heroOwner: ctx.cardHeroOwner ?? pi };   // Als Befund 29.9.: Brettseite des Wirkers
 
       if (fullBoardMode) {
         // ── 150 damage to ALL targets, both sides ──

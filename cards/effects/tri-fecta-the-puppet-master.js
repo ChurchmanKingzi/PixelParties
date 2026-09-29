@@ -127,7 +127,7 @@ module.exports = {
       if (ctx.fromOwner !== feld || ctx.fromHeroIdx !== ctx.cardHeroIdx) return;
       if (!isPuppetToken(card.name)) return;
       await checkPuppetHeroDefeat(engine, feld, ctx.cardHeroIdx,
-        { name: TRI_FECTA, owner: ctx.cardOwner, heroIdx: ctx.cardHeroIdx }, card.id);
+        { name: TRI_FECTA, owner: ctx.cardOwner, heroIdx: ctx.cardHeroIdx, heroOwner: ctx.cardHeroOwner ?? ctx.cardOwner }, card.id);   // Als Befund 29.9.: Brettseite des Helden
     },
 
     /** Rueckfall: Zustand ohne Tokens, den kein Zonen-Hook gemeldet hat. */
@@ -140,7 +140,7 @@ module.exports = {
     },
     onTurnStart: async (ctx) => {
       await checkPuppetHeroDefeat(ctx._engine, ctx.cardHeroOwner ?? ctx.cardOwner, ctx.cardHeroIdx,   // Styx 28.9.: Brettseite
-        { name: TRI_FECTA, owner: ctx.cardOwner, heroIdx: ctx.cardHeroIdx });
+        { name: TRI_FECTA, owner: ctx.cardOwner, heroIdx: ctx.cardHeroIdx, heroOwner: ctx.cardHeroOwner ?? ctx.cardOwner });   // Als Befund 29.9.: Brettseite des Helden
     },
   },
 };

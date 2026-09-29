@@ -116,7 +116,7 @@ module.exports = {
       // Thought bubbles drift up from the casting hero (same emoji set
       // Brilliant Idea uses — already wired into the client renderer).
       engine._broadcastEvent('play_zone_animation', {
-        type: 'thought_bubbles', owner: pi, heroIdx, zoneSlot: -1,
+        type: 'thought_bubbles', owner: ctx.cardHeroOwner ?? pi, heroIdx, zoneSlot: -1,   // Als Befund 29.9.: Brettseite des Wirkers
       });
       await engine._delay(400);
 

@@ -355,7 +355,7 @@ async function _selfDiscard(ctx, reason) {
     reason,
   });
   await engine.actionDestroyCard(
-    { name: CARD_NAME, owner: ctx.cardOwner, heroIdx: ctx.cardHeroIdx },
+    { name: CARD_NAME, owner: ctx.cardOwner, heroIdx: ctx.cardHeroIdx, heroOwner: ctx.cardHeroOwner ?? ctx.cardOwner },   // Als Befund 29.9.: Brettseite des Wirkers
     ctx.card,
     { ignoreGateShield: true },
   );

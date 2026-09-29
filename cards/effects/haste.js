@@ -35,7 +35,7 @@ module.exports = {
       if (!hero?.name || hero.hp <= 0) return;
 
       // Calculate Support Magic level
-      const abZones = ps.abilityZones[heroIdx] || [[], [], []];
+      const abZones = (gs.players[ctx.cardHeroOwner ?? pi] || ps).abilityZones[heroIdx] || [[], [], []];   // Als Befund 29.9.: Zonen des Wirkers auf seiner Brettseite
       const smLevel = engine.countAbilitiesForSchool('Support Magic', abZones);
       const drawCount = smLevel >= 3 ? 4 : smLevel >= 2 ? 3 : 2;
 

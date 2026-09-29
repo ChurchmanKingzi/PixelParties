@@ -105,7 +105,7 @@ module.exports = {
       const pi = ctx.cardOwner;
       const casterHeroIdx = ctx.cardHeroIdx;
 
-      const betroffen = betroffeneHelden(engine, pi, casterHeroIdx);
+      const betroffen = betroffeneHelden(engine, ctx.cardHeroOwner ?? pi, casterHeroIdx);   // Als Befund 29.9.: „except the user“ = Brettseite des Wirkers
       if (betroffen.length === 0) { gs._spellCancelled = true; return; }
 
       // Auftritt: ab hier gibt es keine Abbruchstelle mehr — der Zauber

@@ -516,7 +516,7 @@ module.exports = {
       if (hero.statuses?.frozen || hero.statuses?.stunned || hero.statuses?.negated) return;
 
       const abilityZoneSlot = ctx.card.zoneSlot;
-      const level = learningLevelOf(ps, heroIdx, abilityZoneSlot);
+      const level = learningLevelOf(gs.players[ctx.cardHeroOwner ?? pi] || ps, heroIdx, abilityZoneSlot);   // Als Befund 29.9.: Ability-Zone auf der Brettseite des Helden
       if (level <= 0) return;
 
       // Trigger predicate: Lv1/Lv2 require the trigger Spell to be

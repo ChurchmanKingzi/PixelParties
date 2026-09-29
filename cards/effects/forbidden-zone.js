@@ -123,7 +123,7 @@ module.exports = {
           });
         }
         const _negR = await engine.preDamageMultiTargetWindow(
-          { name: CARD_NAME, owner: pi, heroIdx },
+          { name: CARD_NAME, owner: pi, heroIdx, heroOwner: ctx.cardHeroOwner ?? pi },   // Als Befund 29.9.: Brettseite des Wirkers
           allTgts,
         );
         // Full-negate reaction (Storm Ring / Invisibility Cloak): bail
@@ -142,7 +142,7 @@ module.exports = {
           creatures: creatureTargetIds
             .map(id => engine.cardInstances.find(c => c.id === id))
             .filter(Boolean),
-          source: { name: CARD_NAME, owner: pi, heroIdx },
+          source: { name: CARD_NAME, owner: pi, heroIdx, heroOwner: ctx.cardHeroOwner ?? pi },   // Als Befund 29.9.: Brettseite des Wirkers
           amount: DAMAGE, type: 'decay_spell', sourceOwner: pi,
         });
       try {
@@ -174,7 +174,7 @@ module.exports = {
         const inst = engine.cardInstances.find(c => c.id === id);
         if (!inst || inst.zone !== 'support') continue;
         const r = await engine.actionDealCreatureDamage(
-          { name: CARD_NAME, owner: pi, heroIdx },
+          { name: CARD_NAME, owner: pi, heroIdx, heroOwner: ctx.cardHeroOwner ?? pi },   // Als Befund 29.9.: Brettseite des Wirkers
           inst, DAMAGE, 'decay_spell',
           { sourceOwner: pi, canBeNegated: true },
         );

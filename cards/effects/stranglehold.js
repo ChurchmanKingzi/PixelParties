@@ -80,7 +80,7 @@ module.exports = {
       const hero = ctx.attachedHero || ps?.heroes?.[heroIdx];   // v1364: geliehener Held (Love Shot, Charme) — physische Seite
       if (!hero?.name || hero.hp <= 0) return;
 
-      const fightingLevel = getFightingLevel(ps, heroIdx);
+      const fightingLevel = getFightingLevel(gs.players[ctx.cardHeroOwner ?? pi] || ps, heroIdx);   // Als Befund 29.9.: Zonen des Nutzers auf seiner Brettseite
       const atkBonus = fightingLevel >= 3 ? (hero.baseAtk || 0) : 0;
 
       // Prompt for target (any living target except the caster)

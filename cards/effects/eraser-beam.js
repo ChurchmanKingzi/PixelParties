@@ -172,7 +172,7 @@ module.exports = {
           inst: target.cardInstance,
           amount: ERASE_DAMAGE,
           type: 'destruction_spell',
-          source: { name: CARD_NAME, owner: pi, heroIdx },
+          source: { name: CARD_NAME, owner: pi, heroIdx, heroOwner: ctx.cardHeroOwner ?? pi },   // Als Befund 29.9.: Brettseite des Wirkers
           sourceOwner: pi,
           canBeNegated: true,
           isStatusDamage: false,

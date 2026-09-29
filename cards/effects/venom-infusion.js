@@ -104,7 +104,7 @@ module.exports = {
         await engine._delay(500);
 
         await engine.actionApplyCreaturePoison(
-          { name: 'Venom Infusion', owner: pi, heroIdx }, inst,
+          { name: 'Venom Infusion', owner: pi, heroIdx, heroOwner: ctx.cardHeroOwner ?? pi }, inst,   // Als Befund 29.9.: Brettseite des Wirkers
         );
 
         // Stamp unhealable flag on the creature (same semantics as heroes —

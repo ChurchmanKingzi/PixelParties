@@ -229,7 +229,7 @@ module.exports = {
             .filter(t => t.type !== 'hero')
             .map(t => engine.cardInstances.find(c => c.id === t.inst.id))
             .filter(Boolean),
-          source: { name: CARD_NAME, owner: pi, heroIdx },
+          source: { name: CARD_NAME, owner: pi, heroIdx, heroOwner: ctx.cardHeroOwner ?? pi },   // Als Befund 29.9.: Brettseite des Wirkers
           amount: DAMAGE, type: 'destruction_spell', sourceOwner: pi,
         });
       }
@@ -249,7 +249,7 @@ module.exports = {
             const inst = engine.cardInstances.find(c => c.id === t.inst.id);
             if (inst && inst.zone === 'support') {
               await engine.actionDealCreatureDamage(
-                { name: CARD_NAME, owner: pi, heroIdx },
+                { name: CARD_NAME, owner: pi, heroIdx, heroOwner: ctx.cardHeroOwner ?? pi },   // Als Befund 29.9.: Brettseite des Wirkers
                 inst, DAMAGE, 'destruction_spell',
                 { sourceOwner: pi, canBeNegated: true },
               );

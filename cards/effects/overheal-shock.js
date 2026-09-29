@@ -375,7 +375,7 @@ module.exports = {
           engine._shockLog.push({
             zug: gs.turn,
             spieler: pi,
-            caster: ps.heroes?.[heroIdx]?.name || '?',
+            caster: (ctx.attachedHero || ps.heroes?.[heroIdx])?.name || '?',   // Als Befund 29.9.: Brettseite des Wirkers
             casterIdx: heroIdx,
             modus: gs._spellWasInherent ? 'frei'
               : (gs._spellConsumedMainAction ? 'main' : 'zusatz'),

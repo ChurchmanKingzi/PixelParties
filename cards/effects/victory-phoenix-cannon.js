@@ -36,7 +36,7 @@ module.exports = {
       const pi = ctx.cardOwner;
       const ps = gs.players[pi];
       const heroIdx = ctx.cardHeroIdx;
-      const hero = ps.heroes?.[heroIdx];
+      const hero = ctx.attachedHero || ps.heroes?.[heroIdx];   // Als Befund 29.9.: Brettseite des Wirkers
       if (!hero?.name || hero.hp <= 0) return;
 
       // ── Phase 1: Deal 200 damage to any target ──
@@ -94,7 +94,7 @@ module.exports = {
         );
         if (inst) {
           await engine.actionDealCreatureDamage(
-            { name: 'Victory Phoenix Cannon', owner: pi, heroIdx },
+            { name: 'Victory Phoenix Cannon', owner: pi, heroIdx, heroOwner: ctx.cardHeroOwner ?? pi },   // Als Befund 29.9.: Brettseite des Wirkers
             inst, 200, 'destruction_spell',
             { sourceOwner: pi, canBeNegated: true }
           );
@@ -184,7 +184,7 @@ module.exports = {
       if (handIdx < 0) return;
       const bonusRes = await engine._castSpellImmediately(pi, heroIdx, bonusSpellName, {
         fromZone: 'hand', pool: ps.hand, poolIndex: handIdx,
-        by: 'Victory Phoenix Cannon', alsZusatzaktion: true,
+        by: 'Victory Phoenix Cannon', alsZusatzaktion: true, heroOwner: ctx.cardHeroOwner ?? pi,   // Als Befund 29.9.: Brettseite des Wirkers
       });
       if (!bonusRes || bonusRes.cancelled) return;   // abgebrochen → kein Rueckstoss
 

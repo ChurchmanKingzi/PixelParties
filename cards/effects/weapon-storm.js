@@ -60,11 +60,11 @@ module.exports = {
       const ps = gs.players[pi];
       const hero = ctx.attachedHero || ps?.heroes?.[heroIdx];   // v1364: geliehener Held (Love Shot, Charme) — physische Seite
       if (!hero?.name || hero.hp <= 0) return;
-      if (!hasSendable(engine, pi, heroIdx)) { gs._spellCancelled = true; return; }
+      if (!hasSendable(engine, ctx.cardHeroOwner ?? pi, heroIdx)) { gs._spellCancelled = true; return; }   // Als Befund 29.9.: Brettseite des Wirkers
 
       // 1) Senden — mindestens eine Karte, beliebig viele.
       const res = await sendCardsLoop(engine, pi, heroIdx, {
-        cardName: CARD_NAME, kinds: ['ability', 'equip'], min: 1, amount: 0,
+        cardName: CARD_NAME, kinds: ['ability', 'equip'], min: 1, amount: 0, heroOwner: ctx.cardHeroOwner ?? pi,   // Als Befund 29.9.: Brettseite des Wirkers
         confirmLabel: '🌪️ Send',
         describe: (sent) => sent === 0
           ? `Click an Artifact equipped or an Ability attached to ${hero.name} to send it to the discard pile — each card adds ${rateFor(engine, pi, heroIdx)} damage.`

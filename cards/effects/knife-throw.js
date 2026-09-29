@@ -98,7 +98,7 @@ module.exports = {
       if (!hero?.name || hero.hp <= 0) { gs._spellCancelled = true; return; }
 
       // ── ① Kosten: ein ausgeruestetes Artefakt in die Ablage ──────
-      const ausruestung = ausruestungAm(engine, pi, heroIdx);
+      const ausruestung = ausruestungAm(engine, ctx.cardHeroOwner ?? pi, heroIdx);   // Als Befund 29.9.: Ausruestung des Nutzers auf seiner Brettseite
       if (ausruestung.length === 0) { gs._spellCancelled = true; return; }
 
       let opfer = ausruestung[0];

@@ -178,7 +178,7 @@ module.exports = {
         return;
       }
 
-      const healSource = { name: CARD_NAME, owner: pi, heroIdx: ctx.cardHeroIdx };
+      const healSource = { name: CARD_NAME, owner: pi, heroIdx: ctx.cardHeroIdx, heroOwner: ctx.cardHeroOwner ?? pi };   // Als Befund 29.9.: Brettseite des Wirkers
 
       if (target.type === 'hero') {
         const hero = gs.players[target.owner]?.heroes?.[target.heroIdx];
