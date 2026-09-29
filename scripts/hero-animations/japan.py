@@ -24,24 +24,26 @@ import os
 import sys
 import numpy as np
 from PIL import Image
-from anim_common import rgb, save_outputs, BOUNCE12, sparkle_pixels, draw_bounce
+from anim_common import rgb, save_outputs, BOUNCE12, sparkle_pixels, draw_bounce, ring8
 import particles
 
 N = 48
 OUT = os.environ.get('JP_OUT', '.')
 BLINK = {14: 'halb', 15: 'zu', 16: 'zu', 17: 'halb', 38: 'halb', 39: 'zu', 40: 'zu', 41: 'halb'}
-IDEJ_ALPHA = 0.8
+IDEJ_ALPHA = 0.62                                       # Idej-Heroes sind Projektionen: halb durchsichtig
 B24 = [BOUNCE12[(k // 2) % 12] for k in range(24)]  # gemächlich: ein Federn je 24 Frames
 
 V_ = {
-    'champion': dict(slug='champion-the-stormbringer', pads=(3, 6, 4, 2)),
+    'champion': dict(slug='champion-the-stormbringer', knee=17, pads=(3, 6, 4, 2)),
     'nobunakin': dict(slug='idej-lord-nobunakin', knee=29, pads=(2, 2, 2, 1), idej=True,
                       blink={'halb': [((6, 20), '8a0000'), ((10, 20), '8a0000')],
                              'zu': [((6, 20), '000000'), ((10, 20), '000000'),
                                     ((5, 20), '000000'), ((9, 20), '000000')]}),
     'shoguwana': dict(slug='idej-lord-shoguwana', pads=(3, 3, 2, 1), idej=True),
-    'todugawin': dict(slug='idej-lord-todugawin', knee=13, pads=(1, 1, 3, 1), idej=True),
-    'yukana': dict(slug='yukana-the-scholar-on-the-run', knee=20, pads=(1, 1, 2, 1)),
+    'todugawin': dict(slug='idej-lord-todugawin', knee=13, pads=(1, 1, 3, 1), idej=True,
+                      blink={'halb': [((7, 7), '5d2694'), ((10, 7), '5d2694')],
+                             'zu': [((7, 7), '7d33c7'), ((10, 7), '7d33c7')]}),
+    'yukana': dict(slug='yukana-the-scholar-on-the-run', knee=20, pads=(7, 1, 8, 3)),
 }
 V = next((v for v in sys.argv[2:] if v in V_), 'champion')
 C = V_[V]
@@ -92,9 +94,24 @@ def clamp_chain(vals, lo=None):
 RAIN = None
 
 
+ARM = ([0] * 5 + [-1] * 7 + [0] * 12) * 2             # der ausgestreckte Arm stemmt sich leicht gegen den Wind
+VISOR = {'262626', '808080', '4d4d4d', '666666'}
+
+
 def champion_fig(i):
-    body, sword, hand = SRC, load('sword'), load('hand')
+    body, sword, hand = SRC.copy(), load('sword'), load('hand')
     t = 2 * math.pi * i / N
+    for k, st in enumerate((8, 32)):                    # Glanzlicht über das Visier
+        g = i - st
+        if 0 <= g < 6:
+            for y in range(7, 10):
+                for x in range(8, 19):
+                    if body[y, x, 3] and hexc(body[y, x]) in VISOR:
+                        d = (x - y) - (-1 + 2.4 * g)
+                        if abs(d) < 0.8:
+                            body[y, x] = rgb('f4f4f4')
+                        elif -2 < d < 0:
+                            body[y, x] = rgb('b0b0b0')
     gust = 0.5 - 0.5 * math.cos(2 * t) + 0.25 * (0.5 - 0.5 * math.cos(6 * t))   # zwei Böen, dazwischen Flattern
     # Haar (über dem Visier, Zeilen 0–6): je Zeile nach rechts, oben am weitesten, unruhig
     raw = [0] * 7
@@ -102,11 +119,28 @@ def champion_fig(i):
         wild = 0.9 * math.sin(2.3 * y + 10 * t) + 0.6 * math.sin(1.1 * y - 14 * t)
         raw[y] = round(gust * ((6 - y) / 6 * 3.2 + wild * (6 - y) / 6))
     dxs = clamp_chain([raw[y] for y in range(6, -1, -1)], lo=0)[::-1]
+    fig = body.copy()                                   # Körper und Schwertarm federn gemeinsam über dem Knie,
+    m = hand[:, :, 3] > 0                               # die Hand am Knauf bleibt, das Schwert steckt fest
+    fig[m] = hand[m]
+    b = B24[i % 24]
+    arm = ARM[i % 48]
     out = np.zeros((H, W, 4), int)
-    for part in (body, sword, hand):
-        for y, x in zip(*np.nonzero(part[:, :, 3])):
-            dx = dxs[y] if (part is body and y <= 6) else 0
-            out[y + PT, x + PL + dx] = part[y, x]
+    for y, x in zip(*np.nonzero(sword[:, :, 3])):
+        out[y + PT, x + PL] = sword[y, x]
+    for y, x in zip(*np.nonzero(fig[:, :, 3])):
+        dy = b if y < KNEE else 0
+        if x <= 7 and 10 <= y <= 14:
+            dy += arm
+        dx = dxs[y] if y <= 6 and not m[y, x] else 0
+        out[y + PT + dy, x + PL + dx] = fig[y, x]
+    if b < 0:                                           # Naht über dem Knie schließen
+        y = KNEE - 1
+        for x in range(SW):
+            if fig[y, x, 3] and fig[KNEE, x, 3] and not out[y + PT, x + PL, 3]:
+                out[y + PT, x + PL] = fig[y, x]
+    for st in (13, 37):                                 # Stern auf dem Visier
+        for (x, y), c in sparkle_pixels(i, N, [(15 + PL, 8 + PT + b, st)], rgb('d8d8d8'), rgb('a8a8a8')).items():
+            dot(out, x, y, c)
     return out
 
 
@@ -187,7 +221,8 @@ def f_shoguwana(i):
 
 # ---------------------------------------------------------------- Todugawin
 def f_todugawin(i):
-    s = SRC
+    s = SRC.copy()
+    blink(s, i)
     t = 2 * math.pi * i / N
     b = [0, 0, 0, 0, 0, -1, -1, -1, -1, -1, -1, -1, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0][i % 24]  # ruhiger Atem
     body = s.copy()
@@ -219,6 +254,48 @@ def tear(s, x, age):
         s[y, x] = rgb(TEAR[c])
 
 
+STAFF = None
+GREEN = ('eaffea', '9dff8a', '4fd04a')
+STAFF_STARS = [(-4, 3, 4), (-4, 13, 17), (-3, -2, 28), (-4, 20, 40)]
+MOTES = [(1, 0, 0.0), (3, 6, 2.1), (2, 12, 4.0), (1, 18, 1.2), (3, 24, 5.1), (2, 30, 3.3), (1, 36, 0.7), (3, 42, 2.6)]
+
+
+def staff_mask():
+    global STAFF
+    if STAFF is None:
+        s = SRC
+        g = (s[:, :, 1] > s[:, :, 0] + 30) & (s[:, :, 1] > s[:, :, 2]) & (s[:, :, 3] > 0)
+        g[:, 6:] = False
+        STAFF = g
+    return STAFF
+
+
+def staff_glow(out, i, b):
+    """Grüner Lichthof um die Ranken des Zauberstabs, pulsierend (liegt hinter der Figur)."""
+    m = staff_mask()
+    pulse = 0.5 - 0.5 * math.cos(2 * math.pi * 2 * i / N)
+    r1 = ring8(m)
+    r2 = ring8(m | r1) & ~r1 & ~m
+    for ring, a in ((r2, 25 + 45 * pulse), (r1, 60 + 80 * pulse)):
+        for y, x in zip(*np.nonzero(ring)):
+            if not SRC[y, x, 3]:
+                dot(out, x + PL, y + PT + b, rgb('7dff6a', int(a)))
+
+
+def staff_magic(out, i, b):
+    """Funkelnde Sterne neben dem Stab und aufsteigende Lichtfunken über der Spitze."""
+    for x0, y0, st in STAFF_STARS:
+        for (x, y), c in sparkle_pixels(i, N, [(x0 + PL, y0 + PT + b, st)], rgb(GREEN[1]), rgb(GREEN[2])).items():
+            dot(out, x, y, c)
+    for x0, st, ph in MOTES:
+        a = (i - st) % N
+        if a >= 12:
+            continue
+        x = x0 + PL + round(0.8 * math.sin(0.7 * a + ph))
+        y = PT + b - 1 - a // 2
+        dot(out, x, y, rgb(GREEN[min(2, a // 4)], int(255 * (1 - a / 14))))
+
+
 def f_yukana(i):
     s = SRC.copy()
     for (x, y), c in UNDER.items():
@@ -232,9 +309,11 @@ def f_yukana(i):
             d = (x + y) - (16 + 2.5 * sweep) + (4 if x >= 14 else 0)
             if abs(d) < 0.8:
                 s[y, x] = rgb('dff4ff')
-    sob = {6: 1, 7: 1, 9: 1, 30: 1, 31: 1, 33: 1}.get(i, 0)   # leises Schluchzen
+    b = B24[i % 24]                                     # ruhiger Atem
     out = np.zeros((H, W, 4), int)
-    draw_bounce(out, s, sob, KNEE, PT, PL)
+    staff_glow(out, i, b)
+    draw_bounce(out, s, b, KNEE, PT, PL)
+    staff_magic(out, i, b)
     for (x, y), c in sparkle_pixels(i, N, [(15 + PL, 8 + PT, 30)], rgb('dff4ff'), rgb('9fd8ff')).items():
         dot(out, x, y, c)
     return out
@@ -244,10 +323,30 @@ FRAME = dict(champion=f_champion, nobunakin=f_nobunakin, shoguwana=f_shoguwana, 
              yukana=f_yukana)
 
 
+FLICKER = {'nobunakin': {11: 0.55, 12: 0.8, 35: 0.5}, 'shoguwana': {7: 0.5, 26: 0.55, 27: 0.8},
+           'todugawin': {19: 0.5, 20: 0.8, 43: 0.55}}
+GLITCH = {'nobunakin': {11: 14, 35: 24}, 'shoguwana': {7: 9, 26: 18}, 'todugawin': {19: 8, 43: 14}}
+
+
+def projection(out, i):
+    """Projektion: halb durchsichtig, eine hellere Abtastzeile wandert nach unten, ab und zu flackert
+    das Bild (kurz blasser) und ein Zeilenstreifen springt um 1 px zur Seite."""
+    f = FLICKER[V].get(i, 1.0)
+    band = (i * 1.5) % (H + 12) - 6
+    g = GLITCH[V].get(i)
+    if g is not None:
+        g += PT
+        out[g:g + 2] = np.roll(out[g:g + 2], 1, axis=1)
+    for y in range(H):
+        a = IDEJ_ALPHA * f * (1.35 if abs(y - band) < 1 else 1.0)
+        out[y, :, 3] = np.minimum(255, out[y, :, 3] * a).astype(int)
+    return out
+
+
 def frame(i):
     out = FRAME[V](i)
     if C.get('idej'):
-        out[:, :, 3] = (out[:, :, 3] * IDEJ_ALPHA).astype(int)
+        out = projection(out, i)
     return out
 
 
