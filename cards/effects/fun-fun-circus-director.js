@@ -16,8 +16,8 @@
 //    negierte Director zaehlt nicht (`isCardEffectActive`).
 //  • ② „another 'Fun-Fun Circus' Creature": nur MEINE (Kontrolleur =
 //    Director-Kontrolleur) — sie kommt auf MEINE Hand.
-//  • Zweistufig, jede Stufe optional und nacheinander (beide WAHLEN kommen
-//    sofort hintereinander, die Abwuerfe samt Animationen erst danach):
+//  • Zweistufig, jede Stufe optional und nacheinander — jede Stufe wirft ihre
+//    Karte SOFORT ab (Als Vorgabe 29.9.), ohne 500-ms-Glow davor:
 //      1. Abwurf 1 Karte → ALLE Applause Counter der sterbenden Creature
 //         wandern auf den Director (zaehlt fuer den Elephant in der Hand
 //         wie Platzieren, Als Ruling 29.9.). Auch bei 0 Countern erlaubt (Tor zu Stufe 2).
@@ -89,22 +89,16 @@ module.exports = {
       if (!toteInst || toteInst._deathClaim) return;           // Anspruch schon vergeben
       const n = zaehler(toteInst);
 
-      // ── Beide Wahlen ZUERST, danach erst die Abwuerfe ─────────────
-      // Als Befund 29.9. („zu langer Delay zwischen Aktivierung und ‚Ich darf
-      // jetzt abwerfen'"): Glow (500 ms), Abwurf-Takt und Auftritt der ersten
-      // Stufe standen VOR der zweiten Abfrage. Jetzt kommt die zweite Frage
-      // sofort nach der ersten Antwort; die Animationen laufen erst danach.
-      // Die zweite Wahl darf die erste Karte nicht noch einmal nehmen.
+      // ── Stufe 1: Abwurf → Counter auf den Director ────────────────
+      // Als Vorgabe 29.9.: die gewaehlte Karte wird SOFORT abgeworfen, bevor
+      // die zweite Stufe beginnt. Damit es trotzdem zuegig bleibt: kein
+      // 500-ms-Glow vor dem Abwurf (`_noGlow`) — der Auftritt des Directors
+      // folgt direkt hinter dem Abwurf, und die zweite Frage kommt gleich danach.
       const wahl1 = await abwurfWaehlen(engine, pi,
         `${tot.name} was defeated. Discard 1 card to move its ${n} Applause Counter${n === 1 ? '' : 's'} to ${CARD_NAME}?`);
       if (!wahl1) return;
-      const wahl2 = await abwurfWaehlen(engine, pi,
-        `Discard a second card to add ${tot.name} back to your hand instead of sending it to the discard pile? (Cancel: keep only the Applause Counters move.)`,
-        wahl1.handIndex);
-      if (toteInst._deathClaim) return;   // waehrend der Abfragen weggeschnappt
-
-      // ── Stufe 1: Abwurf → Counter auf den Director ────────────────
-      if (!(await abwerfen(engine, pi, wahl1))) return;
+      if (toteInst._deathClaim) return;   // waehrend der Abfrage weggeschnappt
+      if (!(await abwerfen(engine, pi, wahl1, { _noGlow: true }))) return;
       await engine.showTriggeredEffect(CARD_NAME, { playerIdx: pi, source: `director:${tot.instId}` });
       const bewegt = moveApplause(engine, toteInst, director);
       engine.log('director_move_applause', {
@@ -112,11 +106,11 @@ module.exports = {
       });
 
       // ── Stufe 2: zweiter Abwurf → zurueck auf die Hand ────────────
+      if (toteInst._deathClaim) return;
+      const wahl2 = await abwurfWaehlen(engine, pi,
+        `Discard a second card to add ${tot.name} back to your hand instead of sending it to the discard pile?`);
       if (!wahl2 || toteInst._deathClaim) return;
-      // Die Hand ist um die erste Karte geschrumpft.
-      const idx2 = wahl2.handIndex - (wahl2.handIndex > wahl1.handIndex ? 1 : 0);
-      // Director hat gerade geleuchtet — kein zweiter Glow (Kosmetik-Dedupe).
-      if (!(await abwerfen(engine, pi, { cardName: wahl2.cardName, handIndex: idx2 }, { _noGlow: true }))) return;
+      if (!(await abwerfen(engine, pi, wahl2, { _noGlow: true }))) return;
       toteInst._deathClaim = { to: 'hand', name: tot.name, owner: pi, by: CARD_NAME };
       engine.log('director_to_hand', { player: engine.gs.players[pi]?.username, creature: tot.name });
     },
