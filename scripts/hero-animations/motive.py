@@ -11,7 +11,7 @@ Frame 0 ist immer die Ruhepose.
 * grisgar:  Grisgar schlägt langsam mit den riesigen Dämonenflügeln (spaltentreue Scherung) und
             schwebt dabei auf und ab; der Heiligenschein schwingt nach und glüht, er blinzelt.
 * nieht:    Nieht, the Blitz Blade: an den Klingen knistern Blitze, die Funkelsterne neben ihm
-            pulsieren, Capezipfel und Haarspitzen wehen, er federt und blinzelt; einmal je Loop ist
+            pulsieren, Capezipfel und Haarspitzen wehen, er federt und blinzelt; zweimal je Loop ist
             er blitzschnell weg (Tempolinien, Staub) und taucht von der anderen Seite wieder auf.
 * kohta:    Kohta, the Silent Observer sitzt, redet (der Mund geht auf und zu) und hebt ab und zu
             sein Glas; Glas und Flasche sprudeln, über die Flasche läuft ein Glanz.
@@ -145,16 +145,16 @@ def f_doq(i):
     st = BLINK.get(i)                                   # das durch die Lupe riesige Auge blinzelt
     if st:
         for y in range(8, 14 if st == 'zu' else 11):
-            for x in range(4, 11):
+            for x in range(5, 11):
                 if s[y, x, 3] and hexc(s[y, x]) not in RIM:
                     s[y, x] = rgb('35566b' if (st == 'zu' and y == 13) or (st == 'halb' and y == 10) else ('d9c6aa' if (x + y) % 3 else 'cbb89c'))
     lens = np.array([[SRC[y, x, 3] > 0 and hexc(SRC[y, x]) in LENS and x <= 12 and y <= 15
                       for x in range(SW)] for y in range(SH)])
-    sweep(s, lens, i, 10, dur=7, slope=-0.8, col='ffffff', trail='e8f4ff')
-    sweep(s, lens, i, 34, dur=7, slope=-0.8, col='ffffff', trail='e8f4ff')
+    sweep(s, lens, i, 4, dur=7, slope=-0.8, col='ffffff', trail='e8f4ff')
+    sweep(s, lens, i, 28, dur=7, slope=-0.8, col='ffffff', trail='e8f4ff')
     b = B24[i % 24]
     out = bounce_frame(s, b)
-    for (x, y), c in sparkle_pixels(i, N, [(10 + PL, 4 + PT + b, 16), (2 + PL, 12 + PT + b, 40)],
+    for (x, y), c in sparkle_pixels(i, N, [(10 + PL, 4 + PT + b, 10), (2 + PL, 12 + PT + b, 34)],
                                     rgb('e8f4ff'), rgb('a8c9e6')).items():
         dot(out, x, y, c)
     return out
@@ -225,7 +225,8 @@ def cape_flutter(out, s, i, b):
                         out[y + PT + b, xx] = s[y, x]
 
 
-GONE = {27: 'streak', 28: 'dust', 29: 'dust', 30: 'dust', 31: 'none', 32: 'none', 33: 'back'}
+GONE = {5: 'streak', 6: 'dust', 7: 'dust', 8: 'dust', 9: 'none', 10: 'back',
+        27: 'streak', 28: 'dust', 29: 'dust', 30: 'dust', 31: 'none', 32: 'none', 33: 'back'}
 STREAK_ROWS = [3, 8, 12, 16, 20, 23]
 
 
@@ -279,7 +280,7 @@ def f_nieht(i):
         if gone == 'streak':
             streaks(out, b, 1, 230)
         if gone == 'dust':
-            a = i - 28
+            a = (i - 6) % 22 if i < 20 else i - 28
             for k, dx in enumerate((-3, -1, 2, 4)):
                 x, y = PL + SW // 2 + dx + (k - 1) * a, PT + SH - 1 - a - (k % 2)
                 dot(out, x, y, rgb('c8c0a0', 200 - 60 * a))
@@ -482,8 +483,8 @@ MTALK = [0, 0, 1, 1, 0, 1, 1, 1, 0, 0, 0, 0, 1, 1, 0, 0, 1, 0, 1, 1, 0, 0, 0, 0,
 def mizune_base(i):
     s = SRC.copy()
     blink(s, i)
-    if not MTALK[i]:                                    # Mund zu (sonst offen): nur eine Lippenlinie
-        s[12, 9] = s[12, 10] = rgb('b8664a')
+    if not MTALK[i]:                                    # Mund zu (sonst offen): nur Haut, wie bei Sabrina
+        s[12, 9] = s[12, 10] = rgb('f8bc77')
         s[13, 9] = s[13, 10] = rgb('f8bc77')
     return bounce_frame(s, B24[i % 24])
 
