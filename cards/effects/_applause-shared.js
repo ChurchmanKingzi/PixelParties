@@ -23,8 +23,9 @@
 //  ── PLATZIEREN ─────────────────────────────────────────────────────
 //  `placeApplause` ist der EINE Weg, Zaehler auf eine Board-Creature zu
 //  legen. Er zaehlt PRO ZAEHLER: legt eine Karte 3 Zaehler auf eine
-//  Creature, bekommt jeder Elephant in irgendeiner Hand 3. Verschieben
-//  (`moveApplause`) ist KEIN Platzieren und loest nichts aus.
+//  Creature, bekommt jeder Elephant in irgendeiner Hand 3. Auch
+//  VERSCHIEBEN (`moveApplause`, Director) zaehlt so (Als Ruling 29.9.:
+//  20 verschobene Counter → +20 auf dem Elephant in der Hand).
 // ═══════════════════════════════════════════
 
 const { hasCardType } = require('./_hooks');
@@ -40,6 +41,25 @@ const ARCHETYPE = 'Fun-Fun Circus';
  */
 function meldeGewinn(engine, ziel) {
   try { engine._broadcastEvent('applause_gain', ziel); } catch { /* Anzeige darf nie stoeren */ }
+}
+
+/**
+ * Mitsammelnde Handkarten (Elephant, `collectsApplauseInHand`) beider
+ * Spieler: PRO Counter, der auf eine Board-Creature kommt, einer. Solange
+ * die Karte in der Hand liegt, ist sie aufgedeckt (Kartentext).
+ */
+function sammelnInDerHand(engine, n) {
+  for (let pi = 0; pi < engine.gs.players.length; pi++) {
+    const ps = engine.gs.players[pi];
+    (ps.hand || []).forEach((name, idx) => {
+      if (!loadCardEffect(name)?.collectsApplauseInHand) return;
+      if (!ps._handApplause) ps._handApplause = {};
+      ps._handApplause[idx] = (ps._handApplause[idx] || 0) + n;
+      if (!ps._permanentlyRevealedHandIndices) ps._permanentlyRevealedHandIndices = {};
+      ps._permanentlyRevealedHandIndices[idx] = true;
+      meldeGewinn(engine, { kind: 'hand', owner: pi, handIdx: idx, amount: n });
+    });
+  }
 }
 
 /** Ist das eine Creature in einer Support Zone (kein Verdeckter)? */
@@ -84,19 +104,7 @@ async function placeApplause(engine, inst, n, opts = {}) {
 
   meldeGewinn(engine, { kind: 'board', owner: engine.physicalSide(inst), heroIdx: inst.heroIdx, zoneSlot: inst.zoneSlot, amount: n });
 
-  // Mitsammelnde Handkarten beider Spieler.
-  for (let pi = 0; pi < engine.gs.players.length; pi++) {
-    const ps = engine.gs.players[pi];
-    (ps.hand || []).forEach((name, idx) => {
-      if (!loadCardEffect(name)?.collectsApplauseInHand) return;
-      if (!ps._handApplause) ps._handApplause = {};
-      ps._handApplause[idx] = (ps._handApplause[idx] || 0) + n;
-      // Solange sie in der Hand liegt, ist sie aufgedeckt (Kartentext).
-      if (!ps._permanentlyRevealedHandIndices) ps._permanentlyRevealedHandIndices = {};
-      ps._permanentlyRevealedHandIndices[idx] = true;
-      meldeGewinn(engine, { kind: 'hand', owner: pi, handIdx: idx, amount: n });
-    });
-  }
+  sammelnInDerHand(engine, n);
 
   engine.log('applause_placed', {
     card: inst.name, amount: n, total: inst.counters[KEY],
@@ -116,7 +124,7 @@ function removeApplause(engine, inst, n) {
   return weg;
 }
 
-/** Verschiebt ALLE Zaehler von `von` auf `nach` (kein Platzieren). */
+/** Verschiebt ALLE Zaehler von `von` auf `nach` (zaehlt fuer mitsammelnde Handkarten wie Platzieren). */
 function moveApplause(engine, von, nach) {
   const n = zaehler(von);
   if (n <= 0 || !nach) return 0;
@@ -124,6 +132,9 @@ function moveApplause(engine, von, nach) {
   nach.counters[KEY] = zaehler(nach) + n;
   if (von.counters) delete von.counters[KEY];
   meldeGewinn(engine, { kind: 'board', owner: engine.physicalSide(nach), heroIdx: nach.heroIdx, zoneSlot: nach.zoneSlot, amount: n });
+  // Als Ruling 29.9. (Director → Elephant): Counter, die auf eine Creature
+  // VERSCHOBEN werden, zaehlen fuer den Elephant in der Hand wie platzierte.
+  sammelnInDerHand(engine, n);
   engine.sync();
   return n;
 }
