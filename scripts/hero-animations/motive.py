@@ -37,11 +37,13 @@ Frame 0 ist immer die Ruhepose.
             er hebt und senkt die Arme.
 Skins:
 * idafire:  Ida the Fire Princess sitzt in ihrem Flammenbett (neu gezeichnet wie Base-Ida: umhüllt sie
-            nach unten, schlägt nach oben in Zungen hoch, strikte Farbfolge); sie blinzelt.
-* chuck:    One Chuck Man: die OK-Blase verschwindet und ploppt wieder auf, der Umhang rechts wogt am
+            nach unten, schlägt nach oben in Zungen hoch, strikte Farbfolge), von unten lecken Zungen
+            über sie; alles steigt langsam auf und ab, sie blinzelt.
+* chuck:    One Chuck Man: die OK-Blase schwebt umher, verschwindet und ploppt wieder auf, der Umhang rechts wogt am
             Saum, er blinzelt.
 * duke:     Duke Omikron: wie Omikron (Trugbilder mit Bildfehlern, wehende Haare, Monokel).
-* alice:    Alice the Wonderous Girl liegt im Bett und blinzelt, um sie funkeln Sterne.
+* alice:    Alice the Wonderous Girl liegt im Bett, blinzelt, die Schleifen zucken, die Haarsträhnen
+            wiegen sich, um sie funkeln Sterne.
 * megakarian: Mega-Warrior Karian: der Umhang (unter den Schulterplatten) weht, er atmet und blinzelt.
 * settdunk: Sett Dunking on You schwebt, die Tentakel wabern, die Kapuzenspitze schwingt nach, das
             türkise Auge leuchtet und funkelt.
@@ -109,19 +111,19 @@ V_ = {
     'dajan': dict(slug='legendary-explorer-dajan', knee=20, pads=(3, 5, 5, 1),
                   blink=eyes([(12, 13, 8, 9), (16, 17, 8, 9)], 'd9ba8d', line='170f14')),
     'omikron': dict(slug='omikron-the-faceless-illusionist', knee=20, pads=(16, 16, 4, 1)),
-    'idafire': dict(slug='ida-the-fire-princess', pads=(6, 6, 9, 1), skin='Ida, the Adept of Destruction',
+    'idafire': dict(slug='ida-the-fire-princess', pads=(6, 6, 11, 3), skin='Ida, the Adept of Destruction',
                     blink=eyes([(6, 7, 11, 12), (10, 11, 11, 12)], 'd2a077')),
-    'chuck': dict(slug='one-chuck-man', pads=(2, 2, 2, 4), skin='Chuck, the Crazy Veteran',
-                  blink={'halb': [((4, 15), 'd5d5d5'), ((5, 15), 'd5d5d5')],
-                         'zu': [((4, 15), '130900'), ((5, 15), '130900')]}),
+    'chuck': dict(slug='one-chuck-man', pads=(3, 3, 3, 4), skin='Chuck, the Crazy Veteran',
+                  blink={'halb': [((4, 17), 'd5d5d5')],
+                         'zu': [((3, 17), '130900'), ((4, 17), '130900')]}),
     'duke': dict(slug='duke-omikron', knee=21, pads=(16, 16, 4, 1), skin='Omikron, the Faceless Illusionist',
-                 hair={'3e0403', 'cd0000', '70090a', '95050e'}, monocle=10, hands=[]),
+                 hair={'3e0403', 'cd0000', '70090a', '95050e'}, monocle=10, hands=[], hairrows=14),
     'alice': dict(slug='alice-the-wonderous-girl', knee=15, pads=(7, 7, 6, 1), skin='Alice, the Puppeteer Girl',
                   blink=eyes([(4, 5, 9, 10), (8, 9, 9, 10)], 'f5ce88', line='311700')),
     'megakarian': dict(slug='mega-warrior-karian', knee=20, pads=(4, 4, 3, 1), skin='Grand Inquisitor Karian',
                        blink=eyes([(9, 10, 8, 9), (13, 14, 8, 9)], 'ffe6d5', line='311800')),
     'settdunk': dict(slug='sett-dunking-on-you', pads=(3, 3, 3, 3), skin='Sett, the Adept of Necromancy'),
-    'emperor': dict(slug='emperor-arthor', knee=20, pads=(3, 4, 3, 1), skin='Arthor, the King of Blackport',
+    'emperor': dict(slug='emperor-arthor', knee=22, pads=(3, 4, 3, 1), skin='Arthor, the King of Blackport',
                     blink=eyes([(6, 7, 6, 7), (10, 11, 6, 7)], 'ffd5a4', line='291201')),
     'yellowflash': dict(slug='nieht-the-yellow-flash', knee=20, pads=(4, 4, 5, 2), skin='Nieht, the Blitz Blade',
                         blink=eyes([(19, 20, 10, 11), (23, 24, 10, 11)], 'fde1d2', line='000200')),
@@ -630,17 +632,40 @@ def move_part(out, s, mask, dx, dy, ox, oy, toward=0):
             out[y + dy + oy, x + dx + ox] = s[y, x]
 
 
-def flutter(out, s, i, ox, oy, rows, left, right, amp=2.0, speed=6, ok=None, erratic=0.0, pause=True):
+def shift_segment(out, s, y, seg, dx, ox, oy):
+    """Ein Zeilenstück (seg: Spalten von außen nach innen) um dx nach außen schieben; innen frei
+    werdende Stellen bekommen die Farbe des innersten Stückpixels (nie die Kontur doppeln)."""
+    if not dx or not seg:
+        return
+    side = -1 if seg[0] < seg[-1] else 1                # außen links: nach links schieben
+    side = -side
+    for x in seg:
+        xx = x + side * dx + ox
+        if 0 <= xx < out.shape[1]:
+            out[y + oy, xx] = s[y, x]
+    inner = s[y, seg[-1]]
+    for x in seg[-dx:]:
+        out[y + oy, x + ox] = inner
+
+
+def flutter(out, s, i, ox, oy, rows, left, right, amp=2.0, speed=6, ok=None, erratic=0.0, pause=True,
+            clamp=False):
     """Tuch-/Haarzipfel flattern nach außen: je Zeile schiebt sich die Spitze um 0..amp px hinaus und
     zurück (Welle von oben nach unten), das Original bleibt darunter – nichts reißt."""
     t = 2 * math.pi * i / N
     env = 0.5 - 0.5 * math.cos(2 * t) if pause else 1.0
     for side, xs in ((-1, left), (1, right)):
+        dxs = []
         for k, y in enumerate(rows):
             w = 0.5 + 0.5 * math.sin(speed * t - 0.9 * k + (0 if side < 0 else 1.7))
             if erratic:
                 w += erratic * math.sin(17 * t + 2.3 * k + side)
-            dx = round(amp * env * max(0.0, w))
+            dxs.append(round(amp * env * max(0.0, w)))
+        if clamp:                                       # Nachbarzeilen höchstens 1 px auseinander: keine Lücken
+            for k in range(1, len(dxs)):
+                dxs[k] = max(dxs[k - 1] - 1, min(dxs[k - 1] + 1, dxs[k]))
+        for k, y in enumerate(rows):
+            dx = dxs[k]
             if not dx:
                 continue
             for x in xs:
@@ -1078,7 +1103,7 @@ def f_omikron(i):
         s[my, 12] = rgb('ffffff')
         s[my, 13] = rgb('fff7d0')
     fig = bounce_frame(s, b)
-    flutter(fig, s, i, PL, PT + b, list(range(0, 14)), range(0, 5), range(SW - 5, SW), amp=2.4, speed=8,
+    flutter(fig, s, i, PL, PT + b, list(range(0, C.get('hairrows', 13))), range(0, 5), range(SW - 5, SW), amp=2.4, speed=8,
             ok=lambda c: hexc(c) in hair, erratic=0.5, pause=False)  # die Haare wehen wild, ohne Pause
     lift = -round(2 * (0.5 - 0.5 * math.cos(2 * t)))   # Arme heben und senken
     for (x0, x1, y0, y1), toward in C.get('hands', OM_HANDS):   # beim Heben ziehen die Hände nach innen
@@ -1127,12 +1152,27 @@ def f_idafire(i):
         GIRL = op & ~np.array([[hexc(SRC[y, x]) in FIRE_COLS for x in range(SW)] for y in range(SH)])
     s = SRC.copy()
     blink(s, i)
+    hv = -round(1.6 * math.sin(2 * math.pi * i / N))   # alles steigt langsam auf und ab
     out = np.zeros((H, W, 4), int)
     for y, x in zip(*np.nonzero(GIRL)):
-        out[y + PT, x + PL] = s[y, x]
+        out[y + PT + hv, x + PL] = s[y, x]
     fig = np.zeros((H, W), bool)
-    fig[PT:PT + SH, PL:PL + SW] = GIRL
+    fig[PT + hv:PT + hv + SH, PL:PL + SW] = GIRL
     fire_aura(out, fig, i, down=0.6, Ldown=4.8)
+    w = 2 * math.pi * i / N                             # von unten lecken Zungen über sie (vor ihr)
+    ys, xs = np.nonzero(GIRL)
+    for x in range(SW):
+        col = ys[xs == x]
+        if not len(col):
+            continue
+        bot = col.max()
+        L = 2.0 + 2.6 * max(0.0, math.sin(0.9 * x + 1.3) * math.sin(4 * w + 0.8 * x) + 0.35 * math.sin(7 * w + 2.1 * x))
+        for dy in range(int(L) + 1):
+            y = bot - dy
+            if y < 0 or not GIRL[y, x] or dy >= L:
+                continue
+            r = dy / L
+            out[y + PT + hv, x + PL] = rgb(FLAME[2] if r < 0.4 else FLAME[1] if r < 0.75 else FLAME[0])
     return out
 
 
@@ -1176,22 +1216,45 @@ def f_chuck(i):
     for y, x in zip(*np.nonzero(s[:, :, 3])):
         out[y + PT, x + PL] = s[y, x]
     hem_wave(out, s, i, PL, PT, list(range(11, SW)), 24, 1.4, lambda c: hexc(c) in CAPE_CH, speed=4)
-    k = i % 48                                          # die OK-Blase: bleibt am Kopf, verschwindet, ploppt auf
+    k = i % 48                                          # die OK-Blase schwebt als Ganzes umher, verschwindet, ploppt auf
     if 30 <= k < 38:
         return out
+    t = 2 * math.pi * i / N
+    bx, by = round(1.3 * math.sin(2 * t)), round(1.3 * math.sin(3 * t))
     ys, xs = np.nonzero(bub[:, :, 3])
     for y, x in zip(ys, xs):
         if k == 38 and y < 8:                           # erst nur der Schwanz …
             continue
-        out[y + PT, x + PL] = bub[y, x]
+        out[y + PT + by, x + PL + bx] = bub[y, x]
     return out
 
 
 # ---------------------------------------------------------------- Alice the Wonderous Girl
+ALICE_HAIR = {'dd9936', 'f8e161', 'f3d038', 'fde569', 'f8f649', 'c37c22'}
+
+
 def f_alice(i):
     s = SRC.copy()
     blink(s, i)
+    t = 2 * math.pi * i / N
+    flap = round(0.5 - 0.5 * math.cos(4 * t))           # die Schleifen zucken nach außen
+    bow = s.copy()
+    for y in range(0, 3):                               # obere Schleifenzeilen kippen nach außen
+        for side, xs in ((-1, range(0, 7)), (1, range(7, SW))):
+            row = [x for x in xs if SRC[y, x, 3]]
+            for x in row:
+                bow[y, x] = 0
+            for x in row:
+                xx = x + side * flap * (1 if y < 2 else 0)
+                if 0 <= xx < SW:
+                    bow[y, xx] = SRC[y, x]
+    s = bow
     out = bounce_frame(s, 0)                            # sie liegt still (nichts wird gestreckt)
+    for y in range(6, 16):                              # die Haarsträhnen seitlich wiegen sich
+        dx = round(max(0.0, math.sin(3 * t - 0.6 * (y - 6))) * (0.5 - 0.5 * math.cos(2 * t)) * 1.4)
+        for side, xs in ((-1, range(0, 4)), (1, range(SW - 1, SW - 5, -1))):
+            seg = [x for x in xs if SRC[y, x, 3] and hexc(SRC[y, x]) in ALICE_HAIR]
+            shift_segment(out, s, y, seg, dx, PL, PT)
     for (x, y), c in sparkle_pixels(i, N, [(-3 + PL, 4 + PT, 3), (SW + 2 + PL, 8 + PT, 15), (-2 + PL, 14 + PT, 27),
                                            (SW + 1 + PL, 17 + PT, 39)], rgb('fff6c0'), rgb('f8e161')).items():
         dot(out, x, y, c)
@@ -1208,7 +1271,7 @@ def f_megakarian(i):
     b = B24[i % 24]
     out = bounce_frame(s, b)
     flutter(out, s, i, PL, PT + b, list(range(12, 20)), range(0, 5), range(19, SW), amp=2.0, speed=4,
-            ok=lambda c: hexc(c) in CAPE_MK, pause=False)  # nur der Umhang unter den Schulterplatten
+            ok=lambda c: hexc(c) in CAPE_MK, pause=False, clamp=True)  # nur der Umhang unter den Schulterplatten
     return out
 
 
