@@ -2099,6 +2099,7 @@ DM_NOTE = ['.##', '.#.', '##.', '##.']
 DM_NOTES = [(3, -5, 12, -0.12), (15, 21, 10, 0.12), (27, -5, 16, -0.1), (39, 21, 14, 0.1)]
 
 
+DM_TAIL = {'7c0629', 'ea638e', 'f67ba2', 'bf3961', 'aa244c', 'ce466f', '421428'}
 DM_HEART = {(15, 10): 'bf3961', (17, 10): 'aa244c', (14, 11): 'bf3961', (15, 11): '7c0629', (16, 11): 'aa244c',
             (17, 11): '7c0629', (18, 11): None, (15, 12): '7c0629', (16, 12): '7c0629', (17, 12): None,
             (16, 13): '7c0629'}                          # das Herz neben dem Gesicht (dahinter: Haar bzw. frei)
@@ -2160,7 +2161,22 @@ def f_molinda(i):
                     for k, y in enumerate(range(14, 18)):
                         src[y, x] = col[k + 1]
     curl = round(1.2 * math.sin(4 * t))                 # die Locke oben wackelt
-    tails = src
+    tails = src.copy()
+    for y in range(6, 11):                              # die Zopfenden wippen im Flügeltakt nach außen (oben fest)
+        dx = round(1.4 * (0.5 - 0.5 * math.cos(4 * t - 0.8)) * (y - 5) / 5)
+        if not dx:
+            continue
+        for side, xs in ((-1, range(0, 5)), (1, range(SW - 1, SW - 6, -1))):
+            seg = [x for x in xs if src[y, x, 3] and hexc(src[y, x]) in DM_TAIL]
+            if not seg:
+                continue
+            fillc = next((src[y, x] for x in sorted(seg, key=lambda v: side * v) if hexc(src[y, x]) != '7c0629'),
+                         src[y, seg[-1]])
+            for x in seg:
+                tails[y, x] = fillc                     # innen rückt Haar nach – keine Lücke zum Kopf
+            for x in seg:
+                if 0 <= x + side * dx < SW:
+                    tails[y, x + side * dx] = src[y, x]
     for y, x in zip(*np.nonzero(tails[:, :, 3])):
         dx = (curl if y == 0 else round(curl / 2)) if y <= 1 else 0   # die Locke oben wackelt
         out[y + PT + fy, x + PL + fx + dx] = tails[y, x]
