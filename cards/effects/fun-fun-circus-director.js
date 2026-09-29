@@ -18,8 +18,8 @@
 //    Director-Kontrolleur) — sie kommt auf MEINE Hand.
 //  • Zweistufig, jede Stufe optional und nacheinander:
 //      1. Abwurf 1 Karte → ALLE Applause Counter der sterbenden Creature
-//         wandern auf den Director (Verschieben, kein Platzieren — kein
-//         Elephant-Zaehlen). Auch bei 0 Countern erlaubt (Tor zu Stufe 2).
+//         wandern auf den Director (zaehlt fuer den Elephant in der Hand
+//         wie Platzieren, Als Ruling 29.9.). Auch bei 0 Countern erlaubt (Tor zu Stufe 2).
 //      2. Zweiter Abwurf → die Creature kommt statt in die Ablage auf die
 //         Hand (Todes-Anspruch `_deathClaim`, kein Zwischenstopp in der
 //         Ablage; die Zaehler sind durch Stufe 1 schon beim Director).

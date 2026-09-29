@@ -1776,6 +1776,8 @@ function DraggablePanel({ children, className, style, zielwahl }) {
   const [pos, setPos] = useState({ x: 0, y: 0 });
   const [dragging, setDragging] = useState(false);
   const [autoPos, setAutoPos] = useState(null);
+  // ★ Zielwahl-Box erst zeigen, wenn ihre Lage STEHT (siehe Stabilisierung unten).
+  const [bereit, setBereit] = useState(!zielwahl);
   const offsetRef = useRef({ x: 0, y: 0 });
   const panelRef = useRef(null);
   const cleanupRef = useRef(null);
@@ -1787,12 +1789,12 @@ function DraggablePanel({ children, className, style, zielwahl }) {
   useLayoutEffect(() => {
     if (!zielwahl) return;
     let raf = 0;
-    const setze = () => {
-      raf = 0;
-      if (hasCustomPosRef.current) return;
+    // Messung der Zielwahl-Lage (rein, ohne State). Gibt `null`, wenn es
+    // (noch) keine mittleren Helden gibt.
+    const messen = () => {
       const el = panelRef.current;
       const m = _ppZielwahlMitte();
-      if (!el || !m) { setAutoPos(null); return; }
+      if (!el || !m) return null;
       const r = el.getBoundingClientRect();
       // Nicht die Panelmitte, sondern die Mitte des Anker-Elements
       // (`data-zielwahl-mitte`, die Textspalte) kommt über die Helden —
@@ -1814,10 +1816,60 @@ function DraggablePanel({ children, className, style, zielwahl }) {
       // die Lücke für Rand + 8 px je Seite; die 8 px decken auch die
       // Hover-Vergrößerung des Helden (scale ≈ 1,15 → ≈ 5 px je Seite).
       const luecke = Math.round(m.breite + 2 * (ZW_KNOPF_RAND + 8));
-      setAutoPos(prev => (prev && Math.abs(prev.x - x) < 1 && Math.abs(prev.y - y) < 1 && prev.luecke === luecke) ? prev : { x: Math.round(x), y: Math.round(y), luecke });
+      return { x: Math.round(x), y: Math.round(y), luecke };
+    };
+    const setze = () => {
+      raf = 0;
+      if (hasCustomPosRef.current) return;
+      const el = panelRef.current;
+      if (!el) return;
+      let pos = messen();
+      if (!pos) { setAutoPos(null); return; }
+      // ★ Als Befund 29.9. (Strongman-Zielwahl „blendet von links ein"): die
+      // erste Messung sieht die Box noch ohne ihre Knopf-Lücke
+      // (`--zielwahl-luecke`, erst NACH der Messung gesetzt) und liegt
+      // dadurch um ein Stück daneben; erst der ResizeObserver-Lauf ~100 ms
+      // später rückte sie zurecht — sichtbar als Rutsch. Deshalb hier bis zu
+      // dreimal nachmessen und die Werte SOFORT am Element setzen, bevor
+      // gezeichnet wird (React schreibt danach dieselben Zahlen).
+      for (let i = 0; i < 3; i++) {
+        el.style.left = pos.x + 'px';
+        el.style.top = pos.y + 'px';
+        el.style.setProperty('--zielwahl-luecke', pos.luecke + 'px');
+        const neu = messen();
+        if (!neu) break;
+        const gleich = Math.abs(neu.x - pos.x) < 1 && Math.abs(neu.y - pos.y) < 1 && neu.luecke === pos.luecke;
+        pos = neu;
+        if (gleich) break;
+      }
+      el.style.left = pos.x + 'px'; el.style.top = pos.y + 'px';
+      setAutoPos(prev => (prev && Math.abs(prev.x - pos.x) < 1 && Math.abs(prev.y - pos.y) < 1 && prev.luecke === pos.luecke) ? prev : { x: pos.x, y: pos.y, luecke: pos.luecke });
     };
     const plane = () => { if (!raf) raf = requestAnimationFrame(setze); };
     setze();
+    // ★ Als Befund 29.9. (Strongman-Zielwahl „blendet von links ein"): die
+    // Box aendert ihre Breite noch NACH der ersten Messung (Schrift/Inhalt
+    // setzen sich erst zum ersten Zeichnen) — sie erschien deshalb ein
+    // Stueck neben ihrem Platz und rutschte ~100 ms spaeter hin. Jetzt
+    // bleibt sie unsichtbar (`visibility`), waehrend jedes Bild neu gemessen
+    // wird; gezeigt wird sie erst, wenn Lage und Groesse drei Bilder in
+    // Folge unveraendert sind (Notausstieg nach 30 Bildern).
+    let stabilRaf = 0, sig = null, stabil = 0, bilder = 0, fertig = false;
+    const pruefeStabil = () => {
+      stabilRaf = 0;
+      if (fertig) return;
+      setze();
+      const el0 = panelRef.current;
+      if (el0) {
+        const q = el0.getBoundingClientRect();
+        const s2 = `${Math.round(q.left)}|${Math.round(q.top)}|${Math.round(q.width)}|${Math.round(q.height)}`;
+        if (s2 === sig) stabil++; else { stabil = 0; sig = s2; }
+      }
+      bilder++;
+      if (stabil >= 3 || bilder > 30 || hasCustomPosRef.current) { fertig = true; setBereit(true); return; }
+      stabilRaf = requestAnimationFrame(pruefeStabil);
+    };
+    stabilRaf = requestAnimationFrame(pruefeStabil);
     window.addEventListener('resize', plane);
     window.addEventListener('scroll', plane, true);
     const ro = (typeof ResizeObserver !== 'undefined' && panelRef.current) ? new ResizeObserver(plane) : null;
@@ -1829,6 +1881,8 @@ function DraggablePanel({ children, className, style, zielwahl }) {
       if (ro) ro.disconnect();
       clearInterval(takt);
       if (raf) cancelAnimationFrame(raf);
+      fertig = true;
+      if (stabilRaf) cancelAnimationFrame(stabilRaf);
     };
   }, [zielwahl]);
   // ★ v1477: Durchsicht, solange der Zeiger über dem Panelkörper steht.
@@ -1953,7 +2007,7 @@ function DraggablePanel({ children, className, style, zielwahl }) {
     : (zielwahl && autoPos ? { left: autoPos.x, top: autoPos.y } : {});
   const lueckeStyle = (zielwahl && autoPos) ? { '--zielwahl-luecke': autoPos.luecke + 'px' } : {};
   return (
-    <div ref={panelRef} className={className + (zielwahl ? ' panel-zielwahl' : '')} style={{ ...style, ...lueckeStyle, ...posStyle, cursor: dragging ? 'grabbing' : 'grab' }}
+    <div ref={panelRef} className={className + (zielwahl ? ' panel-zielwahl' : '')} style={{ ...style, ...lueckeStyle, ...posStyle, ...(bereit ? null : { visibility: 'hidden' }), cursor: dragging ? 'grabbing' : 'grab' }}
       onMouseDown={onDown} onTouchStart={onDown} onClick={e => e.stopPropagation()}>
       {children}
       {zielwahl && <div className="panel-zielwahl-griff panel-zielwahl-griff-l" />}
@@ -4001,9 +4055,10 @@ const PP_NECROFLAMME = ppFlammenSprite({ R: '#2b0b47', O: '#6b21b8', Y: '#a54ae8
 function NecroFlickerAura() {
   // [x %, y %, Pixelgroesse, Versatz ms] — links, rechts, unten, oben
   const zungen = useMemo(() => [
-    [-2, 22, 2, 0], [-2, 62, 2, 90], [102, 30, 2, 40], [102, 70, 2, 150],
-    [20, 102, 2, 60], [52, 102, 3, 20], [82, 102, 2, 110], [34, 2, 2, 130], [70, 2, 2, 70],
-  ].slice(0, ppFxN(9)), []);
+    // Nur Seiten und OBEN — unten bleibt frei (HP-Zahl u. a. Werte, Als Vorgabe 29.9.).
+    [-2, 22, 2, 0], [-2, 52, 2, 90], [102, 30, 2, 40], [102, 60, 2, 150],
+    [34, 2, 2, 130], [70, 2, 2, 70], [52, 2, 3, 20],
+  ].slice(0, ppFxN(7)), []);
   return (
     <div className="necro-aura">
       {zungen.map(([x, y, g, d], i) => (
