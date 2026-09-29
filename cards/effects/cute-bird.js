@@ -58,7 +58,11 @@ module.exports = {
       if (!death || death.instId !== ctx.card.id) return;
 
       const engine  = ctx._engine;
-      const pi      = ctx.cardOwner;
+      // Styx 28.9.: seitenfremd beschworen (liegt auf B, gehoert A) — „du"
+      // ist der Kontrolleur zum Todeszeitpunkt, die Zone liegt auf der
+      // Brettseite (`feld`). Der Phoenix landet dort, mit `controller`.
+      const pi      = death.controller ?? ctx.cardOwner;
+      const feld    = engine.physicalSide(ctx.card);
       const ps      = engine.gs.players[pi];
       if (!ps) return;
 
@@ -76,10 +80,10 @@ module.exports = {
 
       // The host hero must still exist & be alive — Phoenix can't
       // anchor to a corpse's column.
-      const hostHero = ps.heroes?.[heroIdx];
+      const hostHero = engine.gs.players[feld]?.heroes?.[heroIdx];
       if (!hostHero?.name || hostHero.hp <= 0) return;
       // v1360: „into the same Support Zone" — schon belegt → nichts anbieten.
-      if (engine.supportSlotBelegt(pi, heroIdx, zoneSlot)) return;
+      if (engine.supportSlotBelegt(feld, heroIdx, zoneSlot)) return;
 
       const confirmed = await engine.promptGeneric(pi, {
         type: 'confirm',
@@ -101,7 +105,7 @@ module.exports = {
       });
 
       // v1360: der Platz kann waehrend der Kosten belegt worden sein.
-      if (engine.supportSlotBelegt(pi, heroIdx, zoneSlot)) {
+      if (engine.supportSlotBelegt(feld, heroIdx, zoneSlot)) {
         engine.log('cute_bird_fizzle', { player: ps.username, reason: 'zone_taken' });
         await engine.zeigeFizzle(CARD_NAME, { playerIdx: pi, grund: 'zone_taken' });   // v1360
         return;
@@ -128,11 +132,12 @@ module.exports = {
       // Phoenix's canSummon (uniqueness) gate, and fires onPlay /
       // onCardEnterZone (so Phoenix's counters & subscriptions activate).
       const summonRes = await engine.summonCreatureWithHooks(
-        TUTOR_TARGET, pi, heroIdx, zoneSlot,
+        TUTOR_TARGET, feld, heroIdx, zoneSlot,
         {
           source: CARD_NAME,
           isPlacement: true,
           hookExtras: { _summonedBy: CARD_NAME, ...engine.deckHookExtras() },
+          ...(feld !== pi ? { controller: pi } : {}),
         }
       );
 

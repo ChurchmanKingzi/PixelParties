@@ -31,8 +31,13 @@ const {
 
 const CARD_NAME = 'Castling';
 
+/**
+ * Wirt der Karte. Styx 28.9.: `pi` ist die BRETTSEITE des Wirts (auch
+ * bei einem uebernommenen Helden); reagieren darf der Kontrolleur, den
+ * die Engine als `pi` des Fensters reicht (`effektiveSeiten`).
+ */
 function hostHeroOf(engine, inst) {
-  const pi = inst.controller ?? inst.owner;
+  const pi = engine.physicalSide(inst);
   const hero = engine.gs.players[pi]?.heroes?.[inst.heroIdx];
   return hero?.name ? { pi, heroIdx: inst.heroIdx, hero } : null;
 }
@@ -87,9 +92,12 @@ module.exports = {
     // `performImmediateAction`: den heroAction-Banner beantwortet die CPU
     // grundsaetzlich mit Abbruch (v828, Als Report) — so laeuft es fuer
     // Mensch und CPU gleich, Aktion wird keine verbraucht.
+    // Styx 28.9.: Wirt ggf. geliehen — Zonen auf seiner Brettseite
+    // (`physOwner`), die Kreatur gehoert trotzdem `pi` (`heldSeite`).
     const cardDB = engine._getCardDB();
+    const zonenOpts = host.pi !== pi ? { physOwner: host.pi } : {};
     const entries = collectHandAndDeck(engine, pi, cd => isOfKingsCreatureData(cd)
-      && summonZonesFor(engine, pi, cd).some(z => z.heroIdx === host.heroIdx), { deck: false });
+      && summonZonesFor(engine, pi, cd, zonenOpts).some(z => z.heroIdx === host.heroIdx), { deck: false });
     if (entries.length > 0) {
       const pick = await pickFromHandOrDeck(engine, pi, entries, {
         title: CARD_NAME, auto: false, cancellable: true,
@@ -97,10 +105,11 @@ module.exports = {
         confirmLabel: '♟ Summon!',
       });
       if (pick) {
-        const zones = summonZonesFor(engine, pi, cardDB[pick.name]).filter(z => z.heroIdx === host.heroIdx);
+        const zones = summonZonesFor(engine, pi, cardDB[pick.name], zonenOpts).filter(z => z.heroIdx === host.heroIdx);
         const zone = await pickZone(engine, pi, zones, CARD_NAME, `Summon ${pick.name} into which Support Zone of ${host.hero.name}?`);
         if (zone) {
-          const summoned = await summonFromHandOrDeck(engine, pi, pick, zone.heroIdx, zone.slotIdx, CARD_NAME);
+          const summoned = await summonFromHandOrDeck(engine, pi, pick, zone.heroIdx, zone.slotIdx, CARD_NAME, {},
+            host.pi !== pi ? { heldSeite: host.pi } : {});
           if (summoned) {
             await engine.runHooks('onAnyActionResolved', {
               actionType: 'creature', playerIdx: pi, cardName: pick.name, playedCardName: pick.name, heroIdx: zone.heroIdx,
@@ -139,7 +148,7 @@ module.exports = {
       });
       if (!res) return;
       engine.log('castling_attached', {
-        player: ps.username, hero: ps.heroes?.[res.host.heroIdx]?.name, heroIdx: res.host.heroIdx,
+        player: ps.username, hero: gs.players[res.host.owner]?.heroes?.[res.host.heroIdx]?.name, heroIdx: res.host.heroIdx,
       });
     },
   },

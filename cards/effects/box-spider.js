@@ -48,12 +48,17 @@ module.exports = {
 
       const ps = gs.players[owner];
       if (!ps) return;
+      // Styx 28.9.: seitenfremd beschworen (liegt auf B, gehoert A) — der
+      // corresponding Hero und seine Surprise Zone liegen auf der
+      // Brettseite `feld`, Deck und Prompt gehoeren dem Kontrolleur.
+      const feld = engine.physicalSide(inst);
+      const hps = gs.players[feld];
       const heroIdx = inst.heroIdx;
-      const hero = ps.heroes?.[heroIdx];
+      const hero = hps?.heroes?.[heroIdx];
       // Host Hero must be alive (a dead Hero has no Surprise Zone).
       if (!hero?.name || hero.hp <= 0) return;
       // Surprise Zone must be empty.
-      if ((ps.surpriseZones?.[heroIdx] || []).length > 0) return;
+      if ((hps.surpriseZones?.[heroIdx] || []).length > 0) return;
       // Box Spider must still be alive on the board.
       const cardDB = engine._getCardDB();
       const hp = inst.counters?.currentHp ?? cardDB[CARD_NAME]?.hp ?? 0;
@@ -91,9 +96,11 @@ module.exports = {
       const _taken_deckIdx = await engine.takeFromPile(ps, 'deck', chosenName, { source: CARD_NAME });   // v820: Stapel-Schicht
       if (!_taken_deckIdx) return;
 
-      ps.surpriseZones[heroIdx] = [chosenName];
-      const surpriseInst = engine._trackCard(chosenName, owner, 'surprise', heroIdx, 0);
+      hps.surpriseZones[heroIdx] = [chosenName];
+      const surpriseInst = engine._trackCard(chosenName, feld, 'surprise', heroIdx, 0);
       surpriseInst.faceDown = true;
+      // Karte aus As Deck: Ablage/Rueckkehr zu ihm.
+      if (feld !== owner) surpriseInst.originalOwner = owner;
 
       // Per-player deck → Surprise Zone flight. The owner's client
       // gets the real card image (they just searched for it); the
@@ -109,6 +116,7 @@ module.exports = {
         owner, cardName: chosenName,
         from: 'deck', to: 'surprise',
         toHeroIdx: heroIdx,
+        ...(feld !== owner ? { toOwner: feld } : {}),
       };
       if (ownerSid) engine.io.to(ownerSid).emit('play_pile_transfer', basePayload);
       if (oppSid) engine.io.to(oppSid).emit('play_pile_transfer', { ...basePayload, faceDown: true });

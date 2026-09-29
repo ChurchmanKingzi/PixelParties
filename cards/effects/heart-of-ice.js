@@ -49,10 +49,13 @@ function immunEntfernen(engine, pi, hi, ausserId) {
 }
 
 async function vergelten(engine, heart, ziel) {
-  await engine.showTriggeredEffect(CARD_NAME, { playerIdx: heart.controller ?? heart.owner });
+  // Styx 28.9.: Verursacher = Kontrolleur der Karte (an einem
+  // uebernommenen Helden der Uebernehmer), nicht die Brettseite.
+  const ktrl = engine.effektiveSeiten(heart).controller ?? heart.owner;
+  await engine.showTriggeredEffect(CARD_NAME, { playerIdx: ktrl });
   eisblockAnimation(engine, [ziel]);
-  const ok = await einfrieren(engine, ziel, { dauer: 1, appliedBy: heart.controller ?? heart.owner, source: CARD_NAME });
-  if (ok) engine.log('heart_of_ice', { player: engine.gs.players[heart.controller ?? heart.owner]?.username, target: ziel.name });
+  const ok = await einfrieren(engine, ziel, { dauer: 1, appliedBy: ktrl, source: CARD_NAME });
+  if (ok) engine.log('heart_of_ice', { player: engine.gs.players[ktrl]?.username, target: ziel.name });
   engine.sync();
 }
 

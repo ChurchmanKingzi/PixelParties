@@ -89,9 +89,13 @@ async function equipArtifactToHero(engine, pi, cardName, ownerOfHero, heroIdx, s
 }
 
 /**
- * Gemeinsamer Ausloeser der drei Instrumente. Gibt `{ pi, heroIdx }`
- * zurueck (Besitzer und vorher ausgeruesteter Held), wenn der Effekt
- * feuern darf — sonst null.
+ * Gemeinsamer Ausloeser der drei Instrumente. Gibt `{ pi, heroIdx,
+ * heroOwner }` zurueck (Kontrolleur, vorher ausgeruesteter Held und
+ * dessen Brettseite), wenn der Effekt feuern darf — sonst null.
+ *
+ * Styx 28.9.: „you" ist der KONTROLLEUR der Karte (`effektiveSeiten`),
+ * bei einem uebernommenen Helden also der Uebernehmende, nicht die
+ * Brettseite. Held und Zone bleiben auf der Brettseite.
  */
 function instrumentDiscardTrigger(ctx, cardName, hoptKey) {
   const inst = ctx.card;
@@ -102,10 +106,16 @@ function instrumentDiscardTrigger(ctx, cardName, hoptKey) {
   if (inst.faceDown) return null;
   const engine = ctx._engine;
   const heroIdx = ctx.fromHeroIdx ?? inst.heroIdx;
-  const ctrl = inst.controller ?? inst.owner;
-  if (ctrl !== inst.owner) return null;                       // „equipped to a Hero YOU control"
-  if (!engine.claimHOPT(hoptKey, inst.owner)) return null;    // „once per turn" je Kartenname
-  return { pi: inst.owner, heroIdx };
+  const seiten = engine.effektiveSeiten(inst);
+  const du = seiten.controller ?? inst.owner;
+  // Orchester-Muster (Karte gehoert A, liegt bei B): Besitz und Kontrolle
+  // laufen auseinander — wie bisher kein „Hero you control".
+  if ((seiten.owner ?? inst.owner) !== du) return null;
+  const heroOwner = engine.physicalSide(inst);
+  const held = engine.gs.players[heroOwner]?.heroes?.[heroIdx];
+  if (engine.heroSideOf(heroOwner, held) !== du) return null;   // „equipped to a Hero YOU control"
+  if (!engine.claimHOPT(hoptKey, du)) return null;              // „once per turn" je Kartenname
+  return { pi: du, heroIdx, heroOwner };
 }
 
 module.exports = { isEquipArtifact, equipDestinations, equipArtifactToHero, instrumentDiscardTrigger };

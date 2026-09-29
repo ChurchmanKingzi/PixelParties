@@ -216,6 +216,12 @@ module.exports = {
 
       const death = ctx.creature;
       if (!isDragoDeath(engine, death, pi)) return;
+      // Styx 28.9.: der gefallene Drago kann seitenfremd gelegen haben
+      // (liegt auf B, gehoert A). „Its Support Zone" liegt dann auf der
+      // Brettseite `feld`; beschworen wird fuer `pi` (`controller`).
+      const totInst = engine.cardInstances.find(c => c.id === death.instId);
+      const feld = totInst ? engine.physicalSide(totInst) : (death.owner ?? pi);
+      const fps = gs.players[feld];
 
       // ── RESERVIERTE ZONE (Als Ruling 8.8.) ───────────────────────────
       // Eine Opfer-Beschwoerung raeumt sich ihren eigenen Landeplatz frei:
@@ -228,7 +234,7 @@ module.exports = {
       // Gesperrt wird nur der EINE reservierte Platz. Faellt bei einer
       // Mehrfach-Opferung eine zweite Kreatur in einer anderen Zone, ist
       // deren Platz frei und der Trigger dort weiterhin erlaubt.
-      if (engine.isSlotReservedForSummon(pi, death.heroIdx, death.zoneSlot)) {
+      if (engine.isSlotReservedForSummon(feld, death.heroIdx, death.zoneSlot)) {
         engine.log('green_dragoneer_fizzle', {
           player: ps.username, reason: 'zone_reserved_for_summon',
         });
@@ -251,7 +257,7 @@ module.exports = {
       // widerspricht dem Wortlaut und ist raus.
       const heroIdx = death.heroIdx;
       const slot = death.zoneSlot;
-      if (((ps.supportZones?.[heroIdx]?.[slot]) || []).length !== 0) {
+      if (((fps?.supportZones?.[heroIdx]?.[slot]) || []).length !== 0) {
         engine.log('green_dragoneer_fizzle', { player: ps.username, reason: 'zone_taken' });
         return;
       }
@@ -262,7 +268,9 @@ module.exports = {
       // Caster fest: der Held dieser Zone. Ist er tot, gesperrt oder
       // erfuellt er die Levelanforderung nicht, findet nichts statt.
       const cd = engine._getCardDB()[CARD_NAME];
-      if (!canHeroSummon(engine, pi, heroIdx, cd, { alsAktion: true })) {
+      // Der Held der Spalte muss von `pi` kontrolliert werden (canHeroSummon
+      // prueft Kontrolle) — ein zurueckgefallener geliehener Held nicht.
+      if (!canHeroSummon(engine, pi, heroIdx, cd, { alsAktion: true, physOwner: feld })) {
         engine.log('green_dragoneer_fizzle', { player: ps.username, reason: 'no_eligible_caster' });
         return;
       }
@@ -292,8 +300,9 @@ module.exports = {
         engine._broadcastEvent('card_reveal', { cardName: CARD_NAME });
 
         const res = await engine.summonCreatureWithHooks(
-          CARD_NAME, pi, heroIdx, slot,
-          { source: `${CARD_NAME} reaction`, skipBeforeSummon: false, alsZusatzaktion: true },   // v1349
+          CARD_NAME, feld, heroIdx, slot,
+          { source: `${CARD_NAME} reaction`, skipBeforeSummon: false, alsZusatzaktion: true,   // v1349
+            ...(feld !== pi ? { controller: pi } : {}) },
         );
         if (!res) {
           engine.handZugangSync(ps, CARD_NAME, { von: 'rueckgabe', source: CARD_NAME, ohneInstanz: true });                   // zurueck auf die Hand

@@ -158,7 +158,9 @@ module.exports = {
       }
 
       // ── Stufe 2/3: Uebernahme in die eigene Support Zone ─────────
-      const zone = ersteFreieZone(ps, hi);
+      // Styx 28.9.: „this Hero's Support Zone" liegt auf der Brettseite
+      // (`feld`); die Kreatur gehoert trotzdem `pi` (seitenfremd).
+      const zone = ersteFreieZone(gs.players[feld], hi);
       if (zone < 0) return;                       // Als Ruling ③
 
       const negiert = stufe === 2;
@@ -182,6 +184,7 @@ module.exports = {
         to: 'support',
         name: tot.name,
         owner: pi,
+        ...(feld !== pi ? { heroOwner: feld } : {}),
         heroIdx: hi,
         zoneSlot: zone,
         keepOriginalOwner: tot.originalOwner ?? gegnerSeite,
@@ -194,7 +197,7 @@ module.exports = {
           type: 'hunting_net',
           data: {
             fromOwner: gegnerSeite, fromHeroIdx: tot.heroIdx, fromSlot: tot.zoneSlot,
-            toOwner: pi, toHeroIdx: hi, toSlot: zone, cardName: tot.name,
+            toOwner: feld, toHeroIdx: hi, toSlot: zone, cardName: tot.name,
           },
         },
       };

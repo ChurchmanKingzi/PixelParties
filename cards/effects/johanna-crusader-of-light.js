@@ -367,8 +367,27 @@ module.exports = {
       if (!inst || inst.zone !== 'hero') return;
       const johannaHero = ctx.attachedHero ?? engine.gs.players[inst.owner]?.heroes?.[inst.heroIdx];
       if (!johannaHero || ctx.hero !== johannaHero) return;
+      // Styx (Opened Gate) holt sie fuer den anderen Spieler zurueck: die
+      // Kontrolle wechselt mit der Wiederbelebung — gereinigt wird erst in
+      // `onTakeControl`, fuer den neuen Kontrolleur.
+      if (johannaHero._uebernahmeNachWiederbelebung != null) return;
       if (!_johannaActive(johannaHero)) return;
       await _cleanseAllies(engine, ctx.cardOwner, johannaHero);
+    },
+
+    /**
+     * Styx 28.9.: Johanna wechselt den Kontrolleur (Styx, Charme, Love
+     * Shot …) — ab jetzt schuetzt sie SEINE Helden, also sofort reinigen.
+     */
+    onTakeControl: async (ctx) => {
+      if (ctx.targetType !== 'hero') return;
+      const engine = ctx._engine;
+      const inst = ctx.card;
+      if (!inst || inst.zone !== 'hero') return;
+      const johannaHero = ctx.attachedHero ?? engine.gs.players[inst.owner]?.heroes?.[inst.heroIdx];
+      if (!johannaHero || ctx.targetHero !== johannaHero) return;
+      if (!_johannaActive(johannaHero)) return;
+      await _cleanseAllies(engine, engine.heroSideOf(inst.owner, johannaHero), johannaHero);
     },
   },
 };

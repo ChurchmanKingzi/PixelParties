@@ -311,6 +311,8 @@ async function summonFromHandOrDeck(engine, pi, entry, heroIdx, slotIdx, sourceN
   return engine.summonFromPile(pi, entry.source, entry.name, heroIdx, slotIdx, {
     source: sourceName, sourceOwner: pi, hookExtras: { _ofKingsSummon: true, ...hookExtras },
     alsZusatzaktion: !!extra.alsZusatzaktion,   // v1349
+    // Styx 28.9.: Zone eines geliehenen Helden (Brettseite), Kreatur gehoert `pi`.
+    ...(extra.heldSeite != null && extra.heldSeite !== pi ? { heldSeite: extra.heldSeite } : {}),
   });
 }
 
@@ -322,10 +324,15 @@ async function summonFromHandOrDeck(engine, pi, entry, heroIdx, slotIdx, sourceN
 function summonZonesFor(engine, pi, cd, opts = {}) {
   const { canHeroSummon } = require('./_summon-eligibility');
   const out = [];
-  const heroes = engine.gs.players[pi]?.heroes || [];
+  // Styx 28.9.: `opts.physOwner` = Spalte eines geliehenen Helden; die
+  // Zonen tragen dann `owner` (Zonenwahl auf der Gegenseite).
+  const seite = opts.physOwner ?? pi;
+  const heroes = engine.gs.players[seite]?.heroes || [];
   for (let hi = 0; hi < heroes.length; hi++) {
     if (!canHeroSummon(engine, pi, hi, cd, opts)) continue;
-    for (const z of freeZonesOfHero(engine, pi, hi)) out.push({ heroIdx: hi, slotIdx: z });
+    for (const z of freeZonesOfHero(engine, seite, hi)) {
+      out.push(seite !== pi ? { heroIdx: hi, slotIdx: z, owner: seite } : { heroIdx: hi, slotIdx: z });
+    }
   }
   return out;
 }
@@ -333,17 +340,20 @@ function summonZonesFor(engine, pi, cd, opts = {}) {
 async function pickZone(engine, pi, zones, title, description) {
   if (!zones.length) return null;
   if (zones.length === 1) return zones[0];
-  const heroes = engine.gs.players[pi]?.heroes || [];
+  // Styx 28.9.: Zonen mit `owner` liegen auf dieser Brettseite.
+  const heroesOf = (z) => engine.gs.players[z.owner ?? pi]?.heroes || [];
   const pick = await engine.promptGeneric(pi, {
     type: 'zonePick', title, description,
     zones: zones.map(z => ({
-      heroIdx: z.heroIdx, slotIdx: z.slotIdx,
-      label: `${heroes[z.heroIdx]?.name || `Column ${z.heroIdx + 1}`} — Slot ${z.slotIdx + 1}`,
+      heroIdx: z.heroIdx, slotIdx: z.slotIdx, ...(z.owner != null ? { owner: z.owner } : {}),
+      label: `${heroesOf(z)[z.heroIdx]?.name || `Column ${z.heroIdx + 1}`} — Slot ${z.slotIdx + 1}`,
     })),
     cancellable: true,
   });
   if (!pick || pick.cancelled || pick.heroIdx == null || pick.slotIdx == null) return null;
-  return { heroIdx: pick.heroIdx, slotIdx: pick.slotIdx };
+  const treffer = zones.find(z => z.heroIdx === pick.heroIdx && z.slotIdx === pick.slotIdx
+    && (z.owner ?? pi) === (pick.owner ?? z.owner ?? pi));
+  return treffer ? { ...treffer } : { heroIdx: pick.heroIdx, slotIdx: pick.slotIdx };
 }
 
 /**

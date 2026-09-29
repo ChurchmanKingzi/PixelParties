@@ -12081,7 +12081,11 @@ class GameEngine {
         // Hand, die `turnPlayed` der alten UEBERNIMMT — damit ist
         // die Creature weder krank noch faelschlich „frisch" fuer
         // Alice/Hive's Crown/Singing-Filter.
-        const slots = zuPs.supportZones?.[claim.heroIdx];
+        // ★ Styx 28.9.: `claim.heroOwner` = Brettseite eines geliehenen
+        // Helden („this Hero's Support Zone"). Die Kreatur liegt dann dort,
+        // gehoert aber dem Beanspruchenden (`claim.owner`, seitenfremd).
+        const feldSeite = (claim.heroOwner === 0 || claim.heroOwner === 1) ? claim.heroOwner : claim.owner;
+        const slots = this.gs.players[feldSeite]?.supportZones?.[claim.heroIdx];
         if (slots && (slots[claim.zoneSlot] || []).length === 0) {
           // Sichtbare Wanderung von der alten in die neue Zone —
           // derselbe Flug, den `actionTransferCreature` fuer Dark
@@ -12116,16 +12120,17 @@ class GameEngine {
             sourceOwner: herkunft.owner,
             sourceHeroIdx: herkunft.heroIdx,
             sourceZoneSlot: herkunft.zoneSlot,
-            targetOwner: claim.owner,
+            targetOwner: feldSeite,
             targetHeroIdx: claim.heroIdx,
             targetZoneSlot: claim.zoneSlot,
             cardName: claim.name, duration: flugMs,
           });
           await this._delay(flugMs + 100);
           slots[claim.zoneSlot] = [claim.name];
-          const neu = this._trackCard(claim.name, claim.owner, ZONES.SUPPORT,
+          const neu = this._trackCard(claim.name, feldSeite, ZONES.SUPPORT,
             claim.heroIdx, claim.zoneSlot);
           if (neu) {
+            if (feldSeite !== claim.owner) this.markiereSeitenfremd(neu, claim.owner);
             neu.zoneSlot = claim.zoneSlot;
             neu.turnPlayed = herkunft.turnPlayed || 0;
             if (claim.keepOriginalOwner != null) {
@@ -14467,6 +14472,14 @@ this._deathWatch = (this._deathWatchStack || []).length
     const fromPs = gs.players[fromPlayerIdx];
     const toPs = gs.players[toPlayerIdx];
     if (!fromPs || !toPs || !inst) return { success: false };
+    // ★ Styx 28.9.: `toPlayerIdx` ist die ZIELSEITE (Brett). Landet die
+    // Kreatur in der Zone eines geliehenen Helden der Gegenseite, nennt
+    // `opts.controller` den neuen Kontrolleur (seitenfremd). Die Quellzone
+    // liegt auf der Brettseite der Kreatur (`physicalSide`), nicht beim
+    // Kontrolleur (seitenfremd beschworen / gestohlen).
+    const neuerKtrl = (opts.controller === 0 || opts.controller === 1) ? opts.controller : toPlayerIdx;
+    const fromSeite = this.physicalSide(inst);
+    const fromZonenPs = gs.players[fromSeite] || fromPs;
 
     // Omni-immune Creatures (Cardinal Beasts, `_cardinalImmune` /
     // `_omniImmune` flag, cardinal-name fallback) silently fizzle
@@ -14490,8 +14503,8 @@ this._deathWatch = (this._deathWatchStack || []).length
     // `_triggerGateCheck` laesst eigene Effekte ohnehin durch.
     // Opt-out `ignoreGateShield` fuer Texte ohne Gegner-Effekt (Jumper
     // Spider wechselt aus eigenem Text).
-    if (!opts.ignoreGateShield && fromPlayerIdx !== toPlayerIdx && inst.zone === 'support') {
-      const quelle = typeof opts.sourceOwner === 'number' ? opts.sourceOwner : toPlayerIdx;
+    if (!opts.ignoreGateShield && fromPlayerIdx !== neuerKtrl && inst.zone === 'support') {
+      const quelle = typeof opts.sourceOwner === 'number' ? opts.sourceOwner : neuerKtrl;
       await this._triggerGateCheck(fromPlayerIdx, opts.sourceName || this._effectSourceName(), quelle);
       if (this._isGateShielded(fromPlayerIdx, quelle)) {
         this.log('transfer_fizzle', {
@@ -14515,7 +14528,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     const srcSlotIdx = inst.zoneSlot;
 
     // Remove from source support zone
-    const srcSlot = (fromPs.supportZones[srcHeroIdx] || [])[srcSlotIdx] || [];
+    const srcSlot = (fromZonenPs.supportZones[srcHeroIdx] || [])[srcSlotIdx] || [];
     const srcIdx = srcSlot.indexOf(cardName);
     if (srcIdx >= 0) srcSlot.splice(srcIdx, 1);
 
@@ -14532,7 +14545,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (!opts.skipAnimation) {
       const dur = opts.animDuration || 800;
       this._broadcastEvent('play_card_transfer', {
-        sourceOwner: fromPlayerIdx, sourceHeroIdx: srcHeroIdx, sourceZoneSlot: srcSlotIdx,
+        sourceOwner: fromSeite, sourceHeroIdx: srcHeroIdx, sourceZoneSlot: srcSlotIdx,
         targetOwner: toPlayerIdx, targetHeroIdx: destHeroIdx, targetZoneSlot: destSlotIdx,
         cardName, duration: dur,
       });
@@ -14559,14 +14572,19 @@ this._deathWatch = (this._deathWatchStack || []).length
     //     slot moves to the new side; engine internals (hand-limit
     //     reduction iteration, hook dispatch, etc.) use it for "this
     //     player's physical board". Distinct from `originalOwner`.
-    inst.controller = toPlayerIdx;
+    inst.controller = neuerKtrl;
     inst.owner = toPlayerIdx;
     inst.zone = ZONES.SUPPORT;
     inst.heroIdx = destHeroIdx;
     inst.zoneSlot = destSlotIdx;
+    // Styx 28.9.: Seitenfremd-Marke passend zur neuen Lage (originalOwner
+    // bleibt, siehe oben — deshalb nicht `markiereSeitenfremd`).
+    inst.counters = inst.counters || {};
+    if (neuerKtrl !== toPlayerIdx) inst.counters.crossSideControlled = neuerKtrl;
+    else delete inst.counters.crossSideControlled;
 
     // Sync guardian immunity to match new controller's side
-    this._syncGuardianImmunity(inst, toPlayerIdx);
+    this._syncGuardianImmunity(inst, neuerKtrl);
 
     this.sync();
 
@@ -14588,7 +14606,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // temporary `actionStealCreature` steal so listeners can discriminate
     // if they need to. Inline `await` is safe here — the caller is async.
     await this.runHooks('onTakeControl', {
-      controllerPi: toPlayerIdx,
+      controllerPi: neuerKtrl,
       originalOwnerPi: fromPlayerIdx,
       targetType: 'creature',
       targetName: cardName,
@@ -18032,7 +18050,8 @@ this._deathWatch = (this._deathWatchStack || []).length
       if (this._reaktionGesperrt(pi)) continue;   // v1293 Reaktionssperre
       for (const inst of [...this.cardInstances]) {
         if (inst.zone !== 'support' && inst.zone !== 'area') continue;
-        if ((inst.controller ?? inst.owner) !== pi) continue;
+        // Styx 28.9.: Kontrolleur (Karte an einem uebernommenen Helden → Uebernehmer).
+        if ((this.effektiveSeiten(inst).controller ?? inst.owner) !== pi) continue;
         if (inst.faceDown) continue;
         const script = loadCardEffect(inst.name);
         if (!script?.isPostTargetBoardReaction) continue;
@@ -33591,22 +33610,27 @@ this._deathWatch = (this._deathWatchStack || []).length
       // Bewusst OHNE Goldpruefung und ohne Zauberer-Check: die Karte
       // liegt schon im Feld und ist bezahlt; was sie kostet, regelt sie
       // selbst (Weathercock zahlt mit einer Kopie aus der Ablage).
-      for (let hi = 0; hi < (ps.supportZones || []).length; hi++) {
-        for (const slot of (ps.supportZones[hi] || [])) {
+      // ★ Styx 28.9.: nach KONTROLLE statt nach Seite — die Zonen aller
+      // Helden, die `pi` kontrolliert (auch geliehene der Gegenspalte;
+      // ein abgegebener eigener Held faellt heraus). Reagierender = `pi`,
+      // die Brettseite des Traegers geht als `rxOpts.heroOwner` mit.
+      for (const { physOwner: seite, heroIdx: hi } of this.heroesControlledBy(pi)) {
+        const zonenPs = this.gs.players[seite];
+        for (const slot of (zonenPs?.supportZones?.[hi] || [])) {
           const namen = Array.isArray(slot) ? slot : (slot ? [slot] : []);
           for (const cardName of namen) {
             // ★ Override-bewusst (v575): eine Copy Device, die zu einer
             // Weathercock geworden ist, heisst weiter Copy Device — mit
             // `loadCardEffect(cardName)` wurde sie nie angeboten.
-            const script = this.supportCardScript(pi, hi, cardName);
+            const script = this.supportCardScript(seite, hi, cardName);
             if (!script?.isEquippedPostTargetReaction) continue;
             // Die INSTANZ mitreichen: eine Karte, die sich bisher ueber
             // ihren Namen in den Support Zonen suchte, findet sich unter
             // geliehener Identitaet sonst nicht selbst.
             const rxInst = this.cardInstances.find(c =>
               c.zone === 'support' && c.heroIdx === hi && c.name === cardName
-              && (c.owner === pi || c.controller === pi)) || null;
-            const rxOpts = { damageType, dealsDamage, inst: rxInst, heroIdx: hi };
+              && this.physicalSide(c) === seite) || null;
+            const rxOpts = { damageType, dealsDamage, inst: rxInst, heroIdx: hi, heroOwner: seite };
             if (script.postTargetCondition
                 && !script.postTargetCondition(this.gs, pi, this, targetedHeroes, sourceCard, rxOpts)) continue;
 
@@ -39644,7 +39668,17 @@ this._deathWatch = (this._deathWatchStack || []).length
   async attachAbilityFromHand(playerIdx, cardName, heroIdx, opts = {}) {
     const ps = this.gs.players[playerIdx];
     if (!ps) return { success: false };
-    const hero = ps.heroes?.[heroIdx];
+    // ★ Styx 28.9.: `opts.heroOwner` = Brettseite eines GELIEHENEN Helden
+    // (Training „attach … to this Hero"). Hand = `playerIdx`, Held und
+    // Zonen = `feld`, Instanz wie in `doPlayAbilityFremd` (Seite `feld`,
+    // gehoert dem Kartenbesitzer). Nur mit `skipAbilityGivenCheck` — das
+    // regulaere Anlegen an fremde Helden regelt der Server.
+    const feld = (opts.heroOwner === 0 || opts.heroOwner === 1) ? opts.heroOwner : playerIdx;
+    const fremd = feld !== playerIdx;
+    if (fremd && !opts.skipAbilityGivenCheck) return { success: false };
+    const hps = this.gs.players[feld];
+    if (!hps) return { success: false };
+    const hero = hps.heroes?.[heroIdx];
     if (!hero?.name || hero.hp <= 0) return { success: false };
 
     const handIdx = ps.hand.indexOf(cardName);
@@ -39652,8 +39686,8 @@ this._deathWatch = (this._deathWatchStack || []).length
     // v1356: ohne „additional" muss der Held sein Anlegen noch frei haben.
     if (!opts.skipAbilityGivenCheck && !this.kannAbilityAnlegen(playerIdx, heroIdx)) return { success: false };
 
-    const abZones = ps.abilityZones[heroIdx] || [[], [], []];
-    ps.abilityZones[heroIdx] = abZones;
+    const abZones = hps.abilityZones[heroIdx] || [[], [], []];
+    hps.abilityZones[heroIdx] = abZones;
 
     const script = loadCardEffect(cardName);
     // Restricted attachment — same gate as canAttachAbilityToHero.
@@ -39662,7 +39696,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (script?.restrictedAttachment && !opts.allowRestricted) return { success: false };
     // ★★ v1349: Zonenwahl an EINER Stelle (verwahrte Abilities, Madame
     // Guillotine) — vorher eine eigene Kopie der Schleife.
-    const targetZone = this.abilityZielZone(playerIdx, heroIdx, cardName, {
+    const targetZone = this.abilityZielZone(feld, heroIdx, cardName, {
       wunschZone: opts.targetZoneSlot,
     });
 
@@ -39685,9 +39719,15 @@ this._deathWatch = (this._deathWatchStack || []).length
       this._broadcastEvent('hand_to_board_fly', {
         ownerIdx: playerIdx, cardName, handIndex: verifyIdx,
         zoneType: 'ability', heroIdx, slotIdx: targetZone,
+        ...(fremd ? { destOwner: feld } : {}),
         _forceOwnerAnim: true,
       });
     }
+
+    // Kartenbesitzer (Ablage-Ziel) wie in `doPlayAbilityFremd` — vor dem Splice.
+    const kartenBesitzer = fremd
+      ? (typeof this._handCardPileOwner === 'function' ? this._handCardPileOwner(playerIdx, cardName) : playerIdx)
+      : null;
 
     // Execute: remove from hand, add to zone
     ps.hand.splice(verifyIdx, 1);
@@ -39701,7 +39741,13 @@ this._deathWatch = (this._deathWatchStack || []).length
     }
 
     // Track card instance
-    const inst = this._trackCard(cardName, playerIdx, 'ability', heroIdx, targetZone);
+    const inst = this._trackCard(cardName, feld, 'ability', heroIdx, targetZone);
+    if (fremd) {
+      inst.originalOwner = kartenBesitzer ?? playerIdx;
+      if (inst.originalOwner !== playerIdx && typeof this._consumeHandCardOrigin === 'function') {
+        this._consumeHandCardOrigin(playerIdx, cardName);
+      }
+    }
 
     // Fire hooks
     await this.runHooks('onPlay', { _onlyCard: inst, playedCard: inst, cardName, zone: 'ability', heroIdx, _skipReactionCheck: true });

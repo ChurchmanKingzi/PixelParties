@@ -38,9 +38,36 @@
 // ═══════════════════════════════════════════
 
 const { onSlipperyTurnStart, slipperyOnMoveGate } = require('./_slippery-shared');
+const { eligibleSummonZones, sofortAusHandBeschwoeren } = require('./_summon-eligibility');
 
 const CARD_NAME = 'Slippery Polar';
 const HOPT_KEY  = 'slippery-polar';
+
+/**
+ * Styx 28.9.: `performImmediateAction` kennt nur Helden der eigenen
+ * Spalte. Fuer einen geliehenen Helden der Gegenseite: Kreatur aus der
+ * Hand waehlen, die er beschwoeren kann, und ueber den gemeinsamen
+ * Zusatzaktions-Weg (`sofortAusHandBeschwoeren`, nur seine Zonen)
+ * beschwoeren. Rueckgabe wie `performImmediateAction`.
+ */
+async function beschwoereMitGeliehenemHeld(engine, pi, feld, heroIdx, hostHero) {
+  const ps = engine.gs.players[pi];
+  if (!ps || ps.summonLocked) return { played: false };
+  const cardDB = engine._getCardDB();
+  const passt = (z) => (z.owner ?? pi) === feld && z.heroIdx === heroIdx;
+  const namen = [...new Set(ps.hand || [])].filter(n => cardDB[n]?.cardType === 'Creature'
+    && eligibleSummonZones(engine, pi, n, { nachKontrolle: true }).some(passt));
+  if (namen.length === 0) return { played: false };
+  const wahl = await engine.promptGeneric(pi, {
+    type: 'cardGallery', title: CARD_NAME,
+    cards: namen.map(name => ({ name, source: 'hand' })),
+    description: `${hostHero.name} may immediately summon a Creature from your hand as an additional Action.`,
+    cancellable: true,
+  });
+  if (!wahl || wahl.cancelled || !namen.includes(wahl.cardName)) return { played: false };
+  const ok = await sofortAusHandBeschwoeren(engine, pi, wahl.cardName, { source: CARD_NAME, zonenFilter: passt });
+  return ok ? { played: true, cardName: wahl.cardName, cardType: 'Creature' } : { played: false };
+}
 
 module.exports = {
   activeIn: ['support'],
@@ -65,8 +92,15 @@ module.exports = {
       const hoptKey = `${HOPT_KEY}:${ctx.card.id}:${pi}`;
       if (engine.gs.hoptUsed?.[hoptKey] === engine.gs.turn) return;
 
-      const hostHero = gs.players[pi]?.heroes?.[heroIdx];
+      // Styx 28.9.: seitenfremd beschworen (liegt auf B, gehoert A) —
+      // „that Hero" ist der Held der Spalte auf der Brettseite (`feld`).
+      const feld = ctx.cardHeroOwner ?? pi;
+      const hostHero = gs.players[feld]?.heroes?.[heroIdx];
       if (!hostHero?.name || hostHero.hp <= 0) return;
+      // Ein Held der Gegenseite beschwoert nur, solange `pi` ihn
+      // kontrolliert (geliehen). Faellt er zurueck, ist offen, ob ein
+      // fremder Held „from your hand" beschwoeren darf → kein Angebot.
+      if (feld !== pi && engine.heroSideOf(feld, hostHero) !== pi) return;
 
       engine.log('slippery_polar_trigger', {
         player: gs.players[pi]?.username,
@@ -82,12 +116,14 @@ module.exports = {
       // `{ played: false }` for "no eligible Creature" (e.g. not enough
       // Summoning Magic on the new host) or a declined/cancelled prompt
       // (the card says "may").
-      const result = await engine.performImmediateAction(pi, heroIdx, {
-        title: CARD_NAME,
-        description: `${hostHero.name} may immediately summon a Creature from your hand as an additional Action.`,
-        allowedCardTypes: ['Creature'],
-        skipAbilities: true,
-      });
+      const result = feld === pi
+        ? await engine.performImmediateAction(pi, heroIdx, {
+          title: CARD_NAME,
+          description: `${hostHero.name} may immediately summon a Creature from your hand as an additional Action.`,
+          allowedCardTypes: ['Creature'],
+          skipAbilities: true,
+        })
+        : await beschwoereMitGeliehenemHeld(engine, pi, feld, heroIdx, hostHero);
 
       // Consume the once-per-turn ONLY now, and ONLY if something was
       // actually summoned. Nothing summoned (can't / declined) → the

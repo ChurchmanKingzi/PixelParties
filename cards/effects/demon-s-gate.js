@@ -110,7 +110,12 @@ module.exports = {
     const heroIdx = gateInst.heroIdx;
     const ps = gs.players[pi];
     if (!ps) return false;
-    const castingHero = ps.heroes?.[heroIdx] || null;
+    // Styx 28.9.: Wirtsheld = Held der Spalte auf der BRETTSEITE der
+    // Kreatur (seitenfremd beschworen: liegt auf B, gehoert A). Wirkt fuer
+    // `pi`; die fluechtige Spell-Instanz traegt die Brettseite als
+    // `heroOwner` (→ `ctx.cardHeroOwner`/`attachedHero`).
+    const feld = engine.physicalSide(gateInst);
+    const castingHero = gs.players[feld]?.heroes?.[heroIdx] || null;
 
     const eligibleIdx = eligibleHandIndices(engine, ps, pi);
     if (eligibleIdx.length === 0) return false;
@@ -182,6 +187,7 @@ module.exports = {
     // perspective — we treat the activation as a one-shot cast.
     const spellInst = engine._trackCard(spellName, pi, 'hand', heroIdx, -1);
     spellInst.turnPlayed = gs.turn || 0;
+    if (feld !== pi) spellInst.heroOwner = feld;
 
     // Build the cast ctx and patch self-targeting helpers so anything
     // the Spell would do to "the casting hero" (Phoenix Tackle's

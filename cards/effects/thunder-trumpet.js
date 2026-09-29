@@ -29,7 +29,7 @@ module.exports = {
       if (!fired) return;
       const engine = ctx._engine;
       const gs = engine.gs;
-      const { pi, heroIdx } = fired;
+      const { pi, heroIdx, heroOwner } = fired;
       const target = await ctx.promptDamageTarget({
         side: 'any', types: ['hero', 'creature'], damageType: 'artifact', baseDamage: DAMAGE,
         title: CARD_NAME,
@@ -40,7 +40,8 @@ module.exports = {
       const tgtSlot = target.type === 'hero' ? -1 : target.slotIdx;
       engine._broadcastEvent('play_zone_animation', { type: 'electric_strike', owner: target.owner, heroIdx: target.heroIdx, zoneSlot: tgtSlot });
       await engine._delay(350);
-      const source = { name: CARD_NAME, owner: pi, heroIdx, controller: pi };
+      // Styx 28.9.: Quelle = Held auf der Brettseite, gewirkt vom Kontrolleur.
+      const source = { name: CARD_NAME, owner: pi, heroIdx, controller: pi, heroOwner };
       if (target.type === 'hero') {
         const hero = gs.players[target.owner]?.heroes?.[target.heroIdx];
         if (hero && hero.hp > 0) await engine.actionDealDamage(source, hero, DAMAGE, 'artifact');

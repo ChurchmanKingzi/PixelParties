@@ -37,25 +37,39 @@ function stealthLevel(engine, pi, heroIdx) {
   return engine.countAbilitiesForSchool(ABILITY, ps?.abilityZones?.[heroIdx] || []);
 }
 
+/**
+ * Styx 28.9.: Kontrolleur des Helden (Spalte `seite`). „you/your
+ * opponent" auf der Ability gilt relativ zu ihm, nicht zur Brettseite.
+ */
+function kontrolleur(engine, seite, heroIdx) {
+  const h = engine.gs.players[seite]?.heroes?.[heroIdx];
+  return typeof engine.heroSideOf === 'function' ? engine.heroSideOf(seite, h) : seite;
+}
+
 /** Ist diese Quelle ein gegnerischer Attack/Spell, den Stealth-Level `lvl` abdeckt? */
-function coveredBy(engine, lvl, info) {
+function coveredBy(engine, lvl, info, ctrl) {
   if (lvl <= 0) return false;
   const cd = info.sourceData;
   if (!cd || !(hasCardType(cd, 'Attack') || hasCardType(cd, 'Spell'))) return false;
-  if (info.chooserIdx === info.heroOwner || info.chooserIdx == null) return false; // eigene Karten
+  if (info.chooserIdx === ctrl || info.chooserIdx == null) return false; // eigene Karten
   const srcLevel = engine.effectiveCardLevel(cd, info.chooserIdx);
   return (srcLevel ?? cd.level ?? 0) <= lvl;
 }
 
-/** Hat der Besitzer einen ANDEREN Helden, den diese Quelle waehlen kann? */
-function otherChoosableHero(engine, info) {
-  const ps = engine.gs.players[info.heroOwner];
-  for (let hi = 0; hi < (ps?.heroes || []).length; hi++) {
-    if (hi === info.heroIdx) continue;
-    const h = ps.heroes[hi];
+/**
+ * Kontrolliert der Kontrolleur einen ANDEREN Helden, den diese Quelle
+ * waehlen kann? Styx 28.9.: „you control" = alle Helden des Kontrolleurs
+ * (auch geliehene), nicht die Helden der Brettseite.
+ */
+function otherChoosableHero(engine, info, ctrl) {
+  const liste = typeof engine.heroesControlledBy === 'function'
+    ? engine.heroesControlledBy(ctrl)
+    : (engine.gs.players[info.heroOwner]?.heroes || []).map((hero, heroIdx) => ({ physOwner: info.heroOwner, heroIdx, hero }));
+  for (const { physOwner, heroIdx: hi, hero: h } of liste) {
+    if (physOwner === info.heroOwner && hi === info.heroIdx) continue;
     if (!h?.name || h.hp <= 0) continue;
     if (h.statuses?.untargetable || h.statuses?.invisible) continue;
-    if (coveredBy(engine, stealthLevel(engine, info.heroOwner, hi), info)) continue; // selbst per Stealth geschuetzt
+    if (coveredBy(engine, stealthLevel(engine, physOwner, hi), info, ctrl)) continue; // selbst per Stealth geschuetzt
     return true;
   }
   return false;
@@ -72,9 +86,11 @@ module.exports = {
     // Absicht „blockt dort bewusst nicht"). Der Treffer traegt jetzt
     // `info.hit`.
     if (info.hit) return false;
+    // Held und Zone auf der Brettseite, „Gegner" relativ zum Kontrolleur.
+    const ctrl = kontrolleur(engine, info.heroOwner, info.heroIdx);
     const lvl = stealthLevel(engine, info.heroOwner, info.heroIdx);
-    if (!coveredBy(engine, lvl, info)) return false;
-    return otherChoosableHero(engine, info);
+    if (!coveredBy(engine, lvl, info, ctrl)) return false;
+    return otherChoosableHero(engine, info, ctrl);
   },
 
   stealthLevel,
