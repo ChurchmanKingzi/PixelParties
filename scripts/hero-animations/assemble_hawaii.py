@@ -3,11 +3,12 @@
 
 * Tempeste, the Weather Fairy: „Tempeste“ (mit türkisem Leuchtrand).
 * Taio, the Sun Fencer: „Taio“ (Schwertarm erhoben), die in dieser Ebene halb
-  ausgeblendeten Beine aus „Taio-Kopie“; das Flammenschwert „Ebene #110“ als Teil `-sword`.
+  ausgeblendeten Beine aus „Taio-Kopie“; das Flammenschwert „Ebene #110“ als Teil `-sword`,
+  darüber seine Hand am Griff „Ebene #111“ als Teil `-hand`.
 * Taio, Absorber of the Mountain's Heart (Ascended): Flammenhaar-Taio „Ebene #153“,
   Kette „Ebene #157“, Stab „Ebene #154“; statt des halben Flammenschwerts „Ebene #155“
   Base-Taios komplettes Schwert (180° gedreht, Griff an derselben Stelle) als Teil
-  `-sword`; ohne das Feuer unter ihm.
+  `-sword` – unter dem Körper, seine Hand liegt über dem Knauf; ohne das Feuer unter ihm.
 * Lizbeth, the Reaper of the Light: „Lizbeth“ (Sense samt Lichtstrahlen).
 * Johanna, Crusader of Light: „Johanna“.
 * Calamitusk, the Chaorc War Chief: „Calamitustk-Kopie“, der Arm „Calamitustk-Kopie #1“
@@ -143,13 +144,13 @@ def main(path):
     rows_legs = np.nonzero(legs.any(1) & (taio[:, :, 3] > 0).any(1))[0]
     y0 = int(rows_legs[(taio[rows_legs, :, 3] < 255).any(1) & (taio[rows_legs, :, 3] > 0).any(1)].min())
     taio[y0:] = kopie[y0:]
-    save_parts('taio-the-sun-fencer', [('body', taio), ('sword', g('Ebene #110'))])
+    save_parts('taio-the-sun-fencer', [('body', taio), ('sword', g('Ebene #110')), ('hand', g('Ebene #111'))])
     # Ascended Taio: ohne das Feuer unter ihm; statt des halben Flammenschwerts („Ebene #155“, Klinge nach
     # unten) Base-Taios komplettes Flammenschwert, um 180° gedreht, Griff (türkis) an derselben Stelle
     half = g('Ebene #155')
     sword = rot180_at_grip(g('Ebene #110'), half)
     save_parts('taio-absorber-of-the-mountain-s-heart', [
-        ('body', g('Ebene #153')), ('staff', g('Ebene #154')), ('sword', sword), ('chain', g('Ebene #157'))])
+        ('sword', sword), ('body', g('Ebene #153')), ('staff', g('Ebene #154')), ('chain', g('Ebene #157'))])
     save_parts('lizbeth-the-reaper-of-the-light', [('body', g('Lizbeth'))])
     save_parts('johanna-crusader-of-light', [('body', g('Johanna'))])
     save_parts('calamitusk-the-chaorc-war-chief', [('body', g('Calamitustk-Kopie')), ('arm', g('Calamitustk-Kopie #1')),
