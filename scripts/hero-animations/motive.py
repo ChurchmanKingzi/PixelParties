@@ -140,19 +140,20 @@ V_ = {
     'wormsoldier': dict(slug='zsosssar-the-worm-soldier', pads=(20, 3, 8, 1), skin='ZsosSsar the Serpent Warlord',
                         blink=eyes([(17, 18, 7, 8), (23, 24, 7, 8)], 'f99269')),
     'diva': dict(slug='elana-the-digital-diva', pads=(7, 7, 5, 1), skin='Elana, the Rocky Rebel'),
-    'holystyx': dict(slug='holy-styx', pads=(3, 3, 5, 3), skin='Styx, the Gate to the Spirit World'),
+    'holystyx': dict(slug='holy-styx', pads=(4, 4, 6, 4), skin='Styx, the Gate to the Spirit World'),
     'kaito': dict(slug='kaito-sid-the-phantom-thief', pads=(6, 7, 3, 1), skin='Sid, the King of Thieves',
                   blink={'halb': [((10, 13), '5a6a80')], 'zu': [((10, 13), '1c1c1c')]}),
-    'halffrozen': dict(slug='gon-the-half-frozen', pads=(6, 4, 5, 1), skin='Gon, the Frostbringer',
-                       blink={'halb': [((10, 7), '809cd2')], 'zu': [((9, 7), '12090a'), ((10, 7), '12090a')]}),
-    'molinda': dict(slug='dead-singer-molinda', pads=(8, 8, 6, 1), skin='Cute Angel Molinda'),
-    'seaserpent': dict(slug='the-little-seaserpent', pads=(8, 6, 10, 3), skin='SasZa the Snaka Adventurer',
+    'halffrozen': dict(slug='gon-the-half-frozen', knee=18, pads=(6, 5, 7, 1), skin='Gon, the Frostbringer',
+                       blink={'halb': [((9, 6), '12090a'), ((10, 6), '12090a')],
+                              'zu': [((9, 6), 'fee8d7'), ((10, 6), 'fee8d7'), ((9, 7), '12090a'), ((10, 7), '12090a')]}),
+    'molinda': dict(slug='dead-singer-molinda', pads=(11, 11, 8, 3), skin='Cute Angel Molinda'),
+    'seaserpent': dict(slug='the-little-seaserpent', pads=(9, 7, 10, 5), skin='SasZa the Snaka Adventurer',
                        blink=eyes([(6, 7, 9, 10), (10, 11, 9, 10)], 'fdd6ad', line='311800')),
     'nomudawn': dict(slug='nomu-of-the-dawn', knee=22, pads=(3, 11, 3, 1), skin='Nomu, Wanderer of Worlds'),
     'alienbartas': dict(slug='alien-invader-bartas', knee=19, pads=(9, 9, 8, 1), skin='Bomb Berserker Bartas',
-                        blink={'halb': [((4, 6), '5a4a4a')], 'zu': [((4, 6), '12090a'), ((5, 6), '12090a')]}),
-    'tharx': dict(slug='tharx-the-king-of-conquerors', pads=(3, 3, 8, 1), skin='Tharx, the Never-Losing General',
-                  blink={'halb': [((8, 6), '8a9aaa')], 'zu': [((8, 6), '000000'), ((9, 6), '000000')]}),
+                        blink=eyes([(4, 5, 6, 7)], 'f8bc77', line='292114')),
+    'tharx': dict(slug='tharx-the-king-of-conquerors', knee=22, pads=(3, 3, 8, 1), skin='Tharx, the Never-Losing General',
+                  blink=eyes([(8, 9, 6, 7)], 'f5ce88', line='220000')),
 }
 V = next((v for v in sys.argv[2:] if v in V_), 'alex')
 C = V_[V]
@@ -1927,45 +1928,73 @@ def f_diva(i):
 HS_MIRROR = {'9d91db', 'b5bdec', 'dee4f4'}
 HS_GOLD = {'837d03', '9e961c', 'a6a21e'}
 HS_STAFF = {'6e4b80', '916da4'}
-HS_MOTES = [rgb('ffffff'), rgb('fff6c0', 230), rgb('f0e080', 190), rgb('c8b040', 120)]
-HS_SYS = None
+HS_HELM = {'51354b', '6a4d63', '75576e', '5e4258', '927a90', 'af95ac', 'c0a4b5', 'c8bac7'}
+HS_NOWING = HS_GOLD | HS_STAFF | {'58325c', '9869aa', '190200', '2a0000'}
+HS_GATE = (11.5, 19.5)                                  # Mitte des Tors
+# Sog-Teilchen: (Startframe, Startwinkel, Startradius, Lebensdauer)
+HS_PULL = [(k * 4 + (k * 7) % 3, 0.9 * k + 0.4, 9.5 + (k % 3), 10 + k % 4) for k in range(12)]
 
 
-def holystyx_base(i):
+def f_holystyx(i):
+    """Die vier Flügel auf dem Rücken schlagen (spaltentreu, oben nach oben, unten nach unten), über den
+    lila Helm läuft ein Schimmer, das Tor auf der Brust saugt: Ringe ziehen sich ins Tor, Lichtteilchen
+    wirbeln hinein. Sie schwebt, der Goldrahmen glimmt, das Band am Stab pendelt."""
     s = SRC.copy()
     t = 2 * math.pi * i / N
     hover = -round(1.5 * math.sin(2 * t))
     g = 0.5 - 0.5 * math.cos(3 * t)
-    band = (i * 1.2) % 30 - 6                           # ein Lichtstreif wandert schräg über den Spiegel
+    band = (i * 1.1) % 26 - 5                           # Schimmer schräg über den Helm
+    cx, cy = HS_GATE
     for y, x in zip(*np.nonzero(s[:, :, 3])):
         h = hexc(SRC[y, x])
-        if h in HS_MIRROR:
-            f = 0.35 * g + (0.55 if abs((x + y) - band - 20) < 1.5 else 0)
-            s[y, x] = lighten(s[y, x], min(0.85, f))
-        elif h in HS_GOLD:                              # der Goldrahmen glimmt mit
+        if h in HS_MIRROR:                              # Sog: helle Ringe laufen zur Mitte, innen wird es tief
+            d = math.hypot(x + 0.5 - cx, (y + 0.5 - cy) / 1.35)
+            v = 0.5 + 0.5 * math.cos(2 * math.pi * (d / 2.2 + i / 6))
+            c = SRC[y, x]
+            deep = max(0.0, 1 - d / 2.2)
+            c = [int(c[k] + ([90, 70, 170][k] - c[k]) * 0.75 * deep) for k in range(3)] + [255]
+            s[y, x] = lighten(c, 0.55 * v * (1 - deep))
+        elif h in HS_GOLD:
             s[y, x] = lighten(s[y, x], 0.3 * g)
+        elif h in HS_HELM and y <= 11:
+            s[y, x] = lighten(s[y, x], 0.08 + (0.5 if abs(x - 7 + 0.5 * y - band) < 1.3 else 0))
+    op = s[:, :, 3] > 0
+    wing = op & ~np.isin(np.array([[hexc(c) for c in row] for row in SRC]), list(HS_NOWING))
+    parts = [(wing & (_ys >= 3) & (_ys <= 12) & (_xs <= 6), 6, -1, 0.16),
+             (wing & (_ys >= 3) & (_ys <= 12) & (_xs >= 17), 17, 1, 0.16),
+             (wing & (_ys >= 16) & (_ys <= 22) & (_xs <= 5), 5, -1, -0.16),
+             (wing & (_ys >= 16) & (_ys <= 23) & (_xs >= 18), 18, 1, -0.16)]
+    beat = 0.5 - 0.5 * math.cos(4 * t)                  # vier Flügelschläge je Loop
     out = np.zeros((H, W, 4), int)
-    for y, x in zip(*np.nonzero(s[:, :, 3])):
+    wl = np.zeros_like(out)
+    body = op.copy()
+    for m, px, side, lift in parts:
+        body &= ~m
+        shear_flap(s, m, px, side, lift * beat, 1.0 - 0.3 * beat, wl, (PL, PT + hover), curve=1.2)
+    mw = wl[:, :, 3] > 0
+    out[mw] = wl[mw]
+    for y, x in zip(*np.nonzero(body)):
         dx = 0
         if y >= 28 and hexc(SRC[y, x]) in HS_STAFF:     # das Band am Stab pendelt
             dx = round(math.sin(2 * t - 0.6 * (y - 28)) * (y - 27) / 5)
         out[y + PT + hover, x + PL + dx] = s[y, x]
-    return out
-
-
-def f_holystyx(i):
-    """Sie schwebt, der Spiegel schimmert (Lichtstreif, Glühen), der Goldrahmen glimmt, das Band am Stab
-    pendelt, helle Lichtfunken steigen auf, goldene Sterne funkeln."""
-    global HS_SYS
-    if HS_SYS is None:
-        HS_SYS = rising(holystyx_base, 26, 71, HS_MOTES, life=(10, 16), vy=(0.5, 0.9))
-    out = holystyx_base(i)
-    draw_parts(out, HS_SYS, i)
-    hover = -round(1.5 * math.sin(4 * math.pi * i / N))
-    for (x, y), c in sparkle_pixels(i, N, [(x + PL, y + PT + hover, st) for x, y, st in
-                                           [(12, 17, 4), (10, 22, 16), (14, 20, 28), (11, 18, 40)]],
-                                    rgb('ffffff'), rgb('fff0a0')).items():
-        dot(out, x, y, c)
+    gx, gy = cx + PL, cy + PT + hover
+    for e, a0, r0, L in HS_PULL:                        # Lichtteilchen wirbeln ins Tor
+        a = (i - e) % N
+        if a >= L:
+            continue
+        for back, al in ((1, 110), (0, 235)):
+            u = max(0, a - back) / L
+            r = r0 * (1 - u) ** 1.3 + 0.8
+            ang = a0 + 2.4 * u
+            x, y = int(math.floor(gx + r * math.cos(ang))), int(math.floor(gy + r * math.sin(ang)))
+            if 0 <= y < H and 0 <= x < W:               # über die Figur hinweg (halbtransparent) ins Tor
+                c = rgb('f4f0ff') if u < 0.5 else rgb('c8bcff')
+                o = out[y, x]
+                if o[3]:
+                    out[y, x] = [int(o[k] + (c[k] - o[k]) * al / 300) for k in range(3)] + [255]
+                else:
+                    out[y, x] = [c[0], c[1], c[2], al]
     return out
 
 
@@ -2008,7 +2037,8 @@ def f_kaito(i):
 
 # ---------------------------------------------------------------- Gon the Half-Frozen
 GH_ICE = {'8988cc', 'a3a2f2', 'b3b2ec', '9a99e5', 'c1c1e6', 'dfe0f6'}
-GH_SNOW = GH_MIST = None
+GH_ARMS = [((12, 15, 10, 14), -1), ((0, 3, 11, 14), 1)]  # wie beim normalen Gon: beide Arme hoch und runter
+GH_SNOW = GH_MIST = GH_FIRE = None
 
 
 def halffrozen_base(i):
@@ -2018,17 +2048,25 @@ def halffrozen_base(i):
     for y, x in zip(*np.nonzero(s[:, :, 3])):
         if hexc(SRC[y, x]) in GH_ICE and abs(y - x * 0.6 - band) < 1.2:
             s[y, x] = lighten(s[y, x], 0.6)
-    out = np.zeros((H, W, 4), int)
-    for y, x in zip(*np.nonzero(s[:, :, 3])):
-        out[y + PT, x + PL] = s[y, x]
+    b = B24[i % 24]
+    out = bounce_frame(s, b)
+    lift = -round(2 * (0.5 - 0.5 * math.cos(2 * math.pi * i / N * 2)))
+    for (x0, x1, y0, y1), toward in GH_ARMS:
+        m = np.zeros((SH, SW), bool)
+        m[y0:y1 + 1, x0:x1 + 1] = SRC[y0:y1 + 1, x0:x1 + 1, 3] > 0
+        move_part(out, s, m, 0, lift, PL, PT + b, toward=toward)
     return out
 
 
 def f_halffrozen(i):
-    """Über die vereiste Hälfte läuft ein Frostschimmer, auf ihrer Seite rieseln Schnee und Frostnebel,
-    Eiskristalle funkeln, er blinzelt mit dem freien Auge."""
-    global GH_SNOW, GH_MIST
+    """Wie der normale Gon: er federt und hebt beide Arme hoch und runter. Über die vereiste Hälfte läuft ein
+    Frostschimmer, auf ihrer Seite rieseln Schnee und Frostnebel und Eiskristalle funkeln, auf der anderen
+    Seite steigen Flammenfunken auf; er blinzelt mit dem freien Auge."""
+    global GH_SNOW, GH_MIST, GH_FIRE
     if GH_SNOW is None:
+        right = np.zeros((H, W), bool)
+        right[:, PL + 9:] = True
+        GH_FIRE = rising(halffrozen_base, 20, 85, EMBERS, region=right)
         left = np.zeros((H, W), bool)
         left[:, :PL + 8] = True
         GH_SNOW = rising(halffrozen_base, 22, 81, SNOW, life=(12, 18), vy=(0.45, 0.7), fall=True, wob=(0.5, 1.0),
@@ -2038,6 +2076,7 @@ def f_halffrozen(i):
     out = halffrozen_base(i)
     draw_parts(out, GH_MIST, i)
     draw_parts(out, GH_SNOW, i)
+    draw_parts(out, GH_FIRE, i)
     for (x, y), c in sparkle_pixels(i, N, [(x + PL, y + PT, st) for x, y, st in
                                            [(2, 12, 3), (5, 16, 15), (1, 11, 27), (4, 18, 39)]],
                                     rgb('ffffff'), rgb('c8d8ff')).items():
@@ -2050,20 +2089,47 @@ DM_NOTE = ['.##', '.#.', '##.', '##.']
 DM_NOTES = [(3, -5, 12, -0.12), (15, 21, 10, 0.12), (27, -5, 16, -0.1), (39, 21, 14, 0.1)]
 
 
+DM_HAIR = {'7c0629', 'ea638e', 'f67ba2', 'bf3961', 'aa244c', 'ce466f', 'dd4b76', 'f75981', 'f9a4b5', '421428'}
+DM_SING = 'oohooccohoocccoohhoocoohooc' [:24]               # o offen, h halb, c zu – sie singt
+DM_MOUTH = {'c': [], 'h': [((10, 12), '7c0629')], 'o': [((9, 12), '7c0629'), ((10, 12), '5a0a20')]}
+
+
+def dm_fly(t):
+    return round(1.6 * math.sin(t)), -round(2.0 * math.sin(2 * t))   # hin und her, auf und ab
+
+
 def f_molinda(i):
-    """Die Flügel schlagen (sie öffnen sich zu den Spitzen hin, zeilentreu – nichts gestreckt), dunkle
-    Noten in Pink und Violett steigen auf."""
+    """Sie fliegt auf und ab und hin und her, die Flügel schlagen kräftig (sie öffnen sich zu den Spitzen hin,
+    zeilentreu), die Haare wippen verzögert nach, die Brust wippt beim Fliegen leicht mit, sie singt, und
+    dunkle Noten in Pink und Violett steigen auf."""
     wings, body = load('wings'), load('body')
     t = 2 * math.pi * i / N
-    S = 5.0 * (0.5 - 0.5 * math.cos(4 * t))             # vier Flügelschläge je Loop
+    fx, fy = dm_fly(t)
+    _, hy = dm_fly(t - 0.7)                             # Haare hängen nach
+    _, by = dm_fly(t - 0.45)                            # … die Brust ein wenig
+    jig = max(-1, min(1, by - fy))
+    for (x, y), c in DM_MOUTH[DM_SING[i % 24]]:
+        body[y, x] = rgb(c)
+    S = 8.0 * (0.5 - 0.5 * math.cos(4 * t))             # vier kräftige Flügelschläge je Loop
     out = np.zeros((H, W, 4), int)
     for y, x in zip(*np.nonzero(wings[:, :, 3])):
         side = -1 if x < SW / 2 else 1
-        dx = side * round(S * max(0, y - 4) / 22)
-        dy = -round(0.8 * S / 5 * max(0, y - 4) / 22)
-        out[y + PT + dy, x + PL + dx] = wings[y, x]
-    for y, x in zip(*np.nonzero(body[:, :, 3])):
-        out[y + PT, x + PL] = body[y, x]
+        u = max(0, y - 4) / 22
+        out[y + PT + fy - round(1.5 * S / 8), x + PL + fx + side * round(S * u)] = wings[y, x]
+    src = body.copy()
+    if jig:                                             # Brust: die hellen Blöcke rutschen 1 px nach (Nachbarzeile füllt nach)
+        for x0, x1 in ((5, 8), (11, 14)):
+            for x in range(x0, x1 + 1):
+                col = [body[y, x].copy() for y in range(14, 19)]
+                if jig > 0:                             # nach unten: oben rückt die Zeile darüber nach
+                    for k, y in enumerate(range(15, 19)):
+                        src[y, x] = col[k]
+                else:                                   # nach oben: unten rückt die Zeile darunter nach
+                    for k, y in enumerate(range(14, 18)):
+                        src[y, x] = col[k + 1]
+    for y, x in zip(*np.nonzero(src[:, :, 3])):
+        hair = y <= 13 and (x <= 4 or x >= SW - 5) and hexc(body[y, x]) in DM_HAIR
+        out[y + PT + (hy if hair else fy), x + PL + fx] = src[y, x]
     for k, (e, x0, y0, vx) in enumerate(DM_NOTES):
         a = (i - e) % N
         if a >= 12:
@@ -2082,16 +2148,53 @@ def f_molinda(i):
 SP_BUBBLES = None
 
 
+SP_HAIR = {'5b090a', 'ea4c24', 'c12a20', '6b070b', 'ac2122', 'f0792d', '921a17', '450700'}
+SP_TAIL = {'1d6a3e', '358c4f', '7ac290', '499665', '95cda8', '56b177', '67a57a', '7eae8e'}
+
+
 def seaserpent_base(i):
+    """Die Haare treiben wie unter Wasser (je Zeile schwebt die Strähne nach außen, innen rückt Haar nach),
+    die Schwanzflosse schlägt kräftig (spaltentreu, zur Flosse hin stärker)."""
     s = SRC.copy()
     blink(s, i)
     t = 2 * math.pi * i / N
-    raw = [round(1.8 * max(0.0, (x - 13) / 7) ** 1.4 * math.sin(3 * t - 0.5 * x)) for x in range(SW)]
-    dys = [0] * 13 + clamp_chain(raw[13:])             # die Schwanzflosse schlägt (spaltentreu)
+    hair = s.copy()
+    for y in range(5, 21):
+        u = (y - 4) / 16
+        for side, xs in ((-1, range(0, SW // 2)), (1, range(SW - 1, SW // 2, -1))):
+            seg = []
+            for x in xs:
+                if not SRC[y, x, 3]:
+                    if seg:
+                        break
+                    continue
+                if hexc(SRC[y, x]) not in SP_HAIR:
+                    break
+                seg.append(x)
+            dx = round(2.0 * u * (0.5 + 0.5 * math.sin(2 * t + (0.35 * y if side < 0 else 0.35 * y + 1.9))))
+            if not seg or not dx:
+                continue
+            inner = next((SRC[y, x] for x in reversed(seg) if hexc(SRC[y, x]) != '5b090a'), SRC[y, seg[-1]])
+            lo, hi = sorted((seg[-1], seg[0] + side * dx))
+            for x in range(max(0, lo), min(SW, hi + 1)):
+                if 0 <= x < SW:
+                    hair[y, x] = inner
+            for x in seg:
+                if 0 <= x + side * dx < SW:
+                    hair[y, x + side * dx] = SRC[y, x]
+    s = hair
+    raw = [round(3.2 * max(0.0, (x - 9) / 11) ** 1.3 * math.sin(3 * t - 0.5 * x)) for x in range(SW)]
+    dys = [0] * 9 + clamp_chain(raw[9:])               # die Schwanzflosse schlägt (spaltentreu)
     out = np.zeros((H, W, 4), int)
     for y, x in zip(*np.nonzero(s[:, :, 3])):
-        dy = dys[x] if y >= 22 else 0
-        out[y + PT + dy, x + PL] = s[y, x]
+        tail = y >= 21 and hexc(SRC[y, x]) in SP_TAIL
+        out[y + PT + (dys[x] if tail else 0), x + PL] = s[y, x]
+    for x in range(SW):                                 # Spalte nach unten versetzt: oben rückt Schuppe nach
+        if dys[x] > 0:
+            ys = [y for y in range(21, SH) if SRC[y, x, 3] and hexc(SRC[y, x]) in SP_TAIL]
+            if ys and SRC[ys[0] - 1, x, 3]:
+                for k in range(dys[x]):
+                    out[ys[0] + PT + k, x + PL] = s[ys[0], x]
     return out
 
 
@@ -2185,9 +2288,15 @@ def alien_boom(out, x, y, a, r=2):
         dot(out, x + dx, y + dy, c)
 
 
+AB_CLAP = {k: d for st in (3, 15, 27, 39) for k, d in zip(range(st, st + 4), (1, 2, 2, 1))}   # wie Bartas
+AB_IMPACT = {k: j for st in (3, 15, 27, 39) for j, k in enumerate((st + 1, st + 2))}
+AB_FIST_L, AB_FIST_R = (0, 4, 12, 15), (9, 13, 12, 15)
+
+
 def f_alienbartas(i):
-    """Er federt, die Alien-Linse pulsiert und blitzt, er blinzelt mit dem echten Auge, ringsum platzen
-    grüne Plasma-Bomben."""
+    """Wie Bartas: alle 12 Frames schlägt er die Fäuste vor dem Bauch zusammen (mit Aufprall-Funken).
+    Dazu federt er, die Alien-Linse pulsiert grünlich, er blinzelt mit dem echten Auge, und ringsum
+    platzen grüne Plasma-Bomben."""
     s = SRC.copy()
     blink(s, i)
     t = 2 * math.pi * i / N
@@ -2198,11 +2307,25 @@ def f_alienbartas(i):
             s[y, x] = [int(c[0] + (120 - c[0]) * g * 0.6), int(c[1] + (255 - c[1]) * g * 0.6),
                        int(c[2] + (140 - c[2]) * g * 0.6), 255]
     b = B24[i % 24]
-    out = bounce_frame(s, b)
+    out = np.zeros((H, W, 4), int)
     for e, x, y in AB_BOOMS:
         a = (i - e) % N
         if a < 9:
             alien_boom(out, x + PL, y + PT, a)
+    fig = bounce_frame(s, b)
+    d = AB_CLAP.get(i, 0)
+    if d:
+        for (x0, x1, y0, y1), side in ((AB_FIST_L, 1), (AB_FIST_R, -1)):
+            m = np.zeros((SH, SW), bool)
+            m[y0:y1 + 1, x0:x1 + 1] = SRC[y0:y1 + 1, x0:x1 + 1, 3] > 0
+            move_part(fig, s, m, side * d, 0, PL, PT + b, toward=-side)   # der Unterarm folgt von außen
+    m = fig[:, :, 3] > 0
+    out[m] = fig[m]
+    k = AB_IMPACT.get(i)
+    if k is not None:                                   # Aufprall zwischen den Fäusten
+        cx, cy = 6 + PL, 13 + PT + b
+        for dx, dy in ((0, -2 - k), (1, -2 - k), (0, 3 + k), (1, 3 + k)):
+            dot(out, cx + dx, cy + dy, rgb('e8ffd0'))
     return out
 
 
@@ -2210,20 +2333,41 @@ def f_alienbartas(i):
 TX_EMBERS = None
 
 
+TX_TALK = 'oohcchoohchoooohccooccho'                    # o offen, h halb, c zu – er hält eine Ansprache
+TX_MOUTH = {'o': [], 'h': [((10, 9), 'f5ce88'), ((11, 9), 'f5ce88')],
+            'c': [((10, 8), 'f8bc77'), ((11, 8), 'f8bc77'), ((10, 9), 'f5ce88'), ((11, 9), 'f5ce88')]}
+TX_FIST = [0, 0, -1, -2, -2, -2, -2, -1]               # je 3 Frames: die Faust reckt sich zur Betonung
+
+
 def tharx_base(i):
     s = SRC.copy()
     blink(s, i)
-    k = [0, 0, -1, -2, -2, -2, -2, -1][(i // 3) % 8]    # die Faust reckt sich immer wieder in die Höhe
+    for (x, y), c in TX_MOUTH[TX_TALK[i % 24]]:
+        s[y, x] = rgb(c)
+    k = TX_FIST[(i // 3) % 8]
+    b = B24[i % 24]                                     # er wippt beim Reden …
+    nod = 1 if k == -2 and (i // 3) % 8 in (3, 4) else 0  # … und nickt bei der Betonung (der Kopf sinkt 1 px)
     out = np.zeros((H, W, 4), int)
+    fig = bounce_frame(s, b)
     for y, x in zip(*np.nonzero(s[:, :, 3])):
-        dy = round(k * (x - 15) / 9) if (x >= 16 and 10 <= y <= 14) else 0
-        out[y + PT + dy, x + PL] = s[y, x]
-    return out
+        if x >= 16 and 10 <= y <= 14:                   # der Arm schert um die Schulter
+            fig[y + PT + b, x + PL] = 0
+    for y, x in zip(*np.nonzero(s[:, :, 3])):
+        if x >= 16 and 10 <= y <= 14:
+            fig[y + PT + b + round(k * (x - 15) / 9), x + PL] = s[y, x]
+    if nod:
+        head = [(y, x) for y, x in zip(*np.nonzero(s[:, :, 3])) if y <= 9 and 3 <= x <= 19]
+        for y, x in sorted(head, reverse=True):
+            fig[y + PT + b + nod, x + PL] = s[y, x]
+        for x in range(3, 20):
+            if s[0, x, 3]:
+                fig[PT + b, x + PL] = 0
+    return fig
 
 
 def f_tharx(i):
-    """Er reckt die Faust immer wieder in die Höhe (der Arm schert um die Schulter, nichts gestreckt),
-    blinzelt, und Glut steigt um ihn auf."""
+    """Er hält eine Ansprache: der Mund geht im Redefluss auf und zu, er wippt, reckt zur Betonung die Faust
+    (der Arm schert um die Schulter, nichts gestreckt) und nickt dabei; er blinzelt, Glut steigt um ihn auf."""
     global TX_EMBERS
     if TX_EMBERS is None:
         TX_EMBERS = rising(tharx_base, 22, 101, EMBERS)
