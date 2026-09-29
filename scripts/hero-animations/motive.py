@@ -60,7 +60,7 @@ import sys
 import numpy as np
 from PIL import Image
 from anim_common import rgb, save_outputs, BOUNCE12, sparkle_pixels, draw_bounce, ring8
-from flap_common import shear_flap
+from flap_common import shear_flap, rotate_part
 
 N = 48
 OUT = os.environ.get('MO_OUT', '.')
@@ -127,6 +127,17 @@ V_ = {
                     blink=eyes([(6, 7, 6, 7), (10, 11, 6, 7)], 'ffd5a4', line='291201')),
     'yellowflash': dict(slug='nieht-the-yellow-flash', knee=20, pads=(4, 4, 5, 2), skin='Nieht, the Blitz Blade',
                         blink=eyes([(19, 20, 10, 11), (23, 24, 10, 11)], 'fde1d2', line='000200')),
+    'beatogold': dict(slug='beato-the-golden-witch', pads=(8, 8, 6, 5), skin='Beato, the Butterfly Witch',
+                      blink=eyes([(9, 10, 10, 11), (13, 14, 10, 11)], 'fce7d6', line='000200')),
+    'fiona': dict(slug='fiona-the-ghost-princess', pads=(9, 9, 6, 2), skin='Fiona, the Princess of Blackport',
+                  blink=eyes([(7, 8, 14, 15), (11, 12, 14, 15)], 'ffe6d5', line='312408')),
+    'overlord': dict(slug='overlord-baaliel', knee=22, pads=(2, 2, 8, 1), skin='Baaliel, the Demon General'),
+    'greymage': dict(slug='grey-mage-archibald', pads=(8, 3, 3, 1), skin='Archibald the Archmage'),
+    'battlemaniac': dict(slug='toras-the-battle-maniac', pads=(2, 2, 4, 1), skin='Toras, Master of all Weapons',
+                         blink={'halb': [((10, 13), '9a9594')], 'zu': [((9, 13), '000000'), ((10, 13), '000000')]}),
+    'wormsoldier': dict(slug='zsosssar-the-worm-soldier', pads=(19, 2, 8, 1), skin='ZsosSsar the Serpent Warlord',
+                        blink=eyes([(17, 18, 7, 8), (23, 24, 7, 8)], 'f99269')),
+    'diva': dict(slug='elana-the-digital-diva', pads=(7, 7, 5, 1), skin='Elana, the Rocky Rebel'),
 }
 V = next((v for v in sys.argv[2:] if v in V_), 'alex')
 C = V_[V]
@@ -1415,11 +1426,350 @@ def f_yellowflash(i):
     return out
 
 
+# ---------------------------------------------------------------- Beato the Golden Witch
+BG_WING = {'91501a', 'e5b03e', 'ffff87', 'ffe874', 'ffd56a', 'ffca59'}
+BG_GOLD = [rgb('d19745'), rgb('ffcc80'), rgb('ffd290')]
+# (Mittelpunkt x, y, Radius x, y, Umläufe pro Loop, Phase, Flatter-Versatz) in Sprite-Koordinaten
+BG_FLIES = [(11.5, 12.0, 16.0, 12.0, 1, 0.0, 0), (11.5, 15.0, 15.0, 9.0, -1, 2.2, 2), (11.5, 10.0, 14.5, 10.0, 1, 3.6, 1)]
+BG_WINGS = {
+    'offen': [((-2, -1), 1), ((-1, -1), 2), ((1, -1), 2), ((2, -1), 1),
+              ((-1, 0), 1), ((1, 0), 1), ((-2, 0), 0), ((2, 0), 0), ((-1, 1), 0), ((1, 1), 0)],
+    'halb': [((-1, -1), 1), ((1, -1), 1), ((-1, -2), 2), ((1, -2), 2), ((-1, 0), 0), ((1, 0), 0)],
+    'zu': [((0, -1), 1), ((0, -2), 2), ((-1, -2), 0)],
+}
+BG_FLAP = ['offen', 'halb', 'zu', 'halb']
+
+
+def bg_fly(b, i):
+    cx, cy, rx, ry, laps, ph, _ = b
+    a = 2 * math.pi * laps * i / N + ph
+    return cx + rx * math.cos(a), cy + ry * math.sin(a) + 1.2 * math.sin(4 * a), math.sin(a) > 0
+
+
+def f_beatogold(i):
+    """Die vier goldenen Schmetterlingsflügel schlagen (spaltentreu, nichts gestreckt), sie schwebt,
+    goldene Schmetterlinge umkreisen sie mit Glitzerspur."""
+    s = SRC.copy()
+    blink(s, i)
+    t = 2 * math.pi * i / N
+    hover = -round(1.3 * math.sin(2 * t))
+    beat = 0.5 - 0.5 * math.cos(4 * t)                  # vier Flügelschläge je Loop
+    op = s[:, :, 3] > 0
+    gold = np.zeros((SH, SW), bool)
+    for y, x in zip(*np.nonzero(op)):
+        gold[y, x] = hexc(SRC[y, x]) in BG_WING
+    top, bot = _ys <= 11, (_ys >= 16) & (_ys <= 21)
+    left, right = _xs <= 6, _xs >= SW - 7
+    parts = [(gold & top & left, 6, -1, 0.14), (gold & top & right, SW - 7, 1, 0.14),
+             (gold & bot & left, 5, -1, -0.12), (gold & bot & right, SW - 6, 1, -0.12)]
+    out = np.zeros((H, W, 4), int)
+    body = op.copy()
+    for m, _, _, _ in parts:
+        body &= ~m
+    wings = np.zeros_like(out)
+    for m, px, side, lift in parts:
+        shear_flap(s, m, px, side, lift * beat, 1.0 - 0.3 * beat, wings, (PL, PT + hover), curve=1.2)
+    mw = wings[:, :, 3] > 0
+    out[mw] = wings[mw]
+    for y, x in zip(*np.nonzero(body)):
+        out[y + PT + hover, x + PL] = s[y, x]
+    for b in BG_FLIES:                                  # Schmetterlinge mit Glitzerspur
+        x, y, front = bg_fly(b, i)
+        px_, py_, _ = bg_fly(b, i - 1)
+        tx, ty = int(round(px_)) + PL, int(round(py_)) + PT
+        if 0 <= tx < W and 0 <= ty < H and out[ty, tx, 3] == 0:
+            out[ty, tx] = (*BG_GOLD[2][:3], 110)
+        st = BG_FLAP[(i + b[6]) % 4]
+        pix = [((dx, dy), BG_GOLD[k]) for (dx, dy), k in BG_WINGS[st]]
+        pix += [((0, 0), rgb('311800'))] + ([((0, -1), rgb('311800'))] if st != 'zu' else [])
+        x, y = int(round(x)) + PL, int(round(y)) + PT
+        for (dx, dy), c in pix:
+            xx, yy = x + dx, y + dy
+            if 0 <= xx < W and 0 <= yy < H and (front or out[yy, xx, 3] == 0):
+                out[yy, xx] = c
+    return out
+
+
+# ---------------------------------------------------------------- Fiona the Ghost Princess
+FG_DRILL = {'3c2340', 'fac5f2', 'd391c7', 'a6548d', '6c2f61', '1d0826'}
+FG_GHOST = ['.www.', 'wewew', 'wwwww', 'wswws']        # kleines Gespenst (letzte Zeile: wabernder Saum)
+FG_HEM = ['w.w.w', '.w.w.']
+# (Mittelpunkt x, y, Radius x, y, Umläufe, Phase) in Sprite-Koordinaten
+FG_GHOSTS = [(9.5, 11.0, 15.0, 5.0, 1, 0.0), (9.5, 20.0, 14.0, 4.0, -1, 2.1), (9.5, 4.0, 12.0, 3.0, 1, 4.0)]
+
+
+def f_fiona(i):
+    """Sie schwebt, die Bohrlocken federn verzögert nach, kleine Gespenster umkreisen sie wabernd."""
+    s = SRC.copy()
+    blink(s, i)
+    t = 2 * math.pi * i / N
+    hov = lambda tt: -round(2.0 * (0.5 - 0.5 * math.cos(2 * tt)))
+    hover, lag = hov(t), hov(t - 0.55)                  # die Locken hängen einen Tick nach
+    op = s[:, :, 3] > 0
+    drill = np.zeros((SH, SW), bool)
+    for y, x in zip(*np.nonzero(op)):
+        drill[y, x] = 6 <= y <= 21 and (x <= 4 or x >= SW - 5) and hexc(SRC[y, x]) in FG_DRILL
+    ghosts = []
+    for k, (cx, cy, rx, ry, laps, ph) in enumerate(FG_GHOSTS):
+        a = 2 * math.pi * laps * i / N + ph
+        gx = round(cx + rx * math.cos(a)) - 2 + PL
+        gy = round(cy + ry * math.sin(a) + 1.3 * math.sin(3 * a + k)) - 2 + PT
+        ghosts.append((gx, gy, (i // 3 + k) % 2))
+    out = np.zeros((H, W, 4), int)
+    for gx, gy, hem in ghosts:                          # die Gespenster ziehen hinter ihr vorbei
+        for yy, row in enumerate(FG_GHOST[:3] + [FG_HEM[hem]]):
+            for xx, ch in enumerate(row):
+                c = {'w': rgb('f4f8f9', 200), 'e': rgb('3c2340', 220), 's': rgb('d8cde5', 200)}.get(ch)
+                if c is not None and 0 <= gy + yy < H and 0 <= gx + xx < W:
+                    out[gy + yy, gx + xx] = c
+    for y, x in zip(*np.nonzero(op & ~drill)):
+        out[y + PT + hover, x + PL] = s[y, x]
+    for y, x in zip(*np.nonzero(drill)):
+        out[y + PT + lag, x + PL] = s[y, x]
+    return out
+
+# ---------------------------------------------------------------- Overlord Baaliel
+OB_EYES = [(15, 7), (18, 7)]
+OB_ORB = {'ffdbd2', 'd83a42'}
+OB_AURA = [rgb('b58cff', 230), rgb('8a5fd0', 210), rgb('4c3274', 180), rgb('2a1a44', 120)]
+OB_MIST = [rgb('6a4a9c', 150), rgb('4c3274', 120), rgb('2a1a44', 80)]
+
+
+def overlord_base(i):
+    s = SRC.copy()
+    t = 2 * math.pi * i / N
+    g = 0.5 - 0.5 * math.cos(3 * t)                     # die roten Augenlichter und der Orb glühen
+    for x, y in OB_EYES:
+        s[y, x] = [int(0x43 + (255 - 0x43) * g), int(0x13 + 0x30 * g), int(0x14 + 0x30 * g), 255]
+    for y, x in zip(*np.nonzero(s[:, :, 3])):
+        if hexc(SRC[y, x]) in OB_ORB:
+            s[y, x] = lighten(s[y, x], 0.45 * g)
+    return bounce_frame(s, B24[i % 24])
+
+
+AURA_SYS = MIST_OB = None
+
+
+def f_overlord(i):
+    """Er atmet ruhig, die roten Augenlichter und der Orb in der Brust glühen, dunkle Aura steigt auf."""
+    global AURA_SYS, MIST_OB
+    if AURA_SYS is None:
+        MIST_OB = rising(overlord_base, 22, 57, OB_MIST, life=(12, 18), vy=(0.3, 0.5), wob=(0.8, 1.4), blob=True)
+        AURA_SYS = rising(overlord_base, 32, 59, OB_AURA, life=(9, 14), vy=(0.6, 1.0))
+    out = overlord_base(i)
+    draw_parts(out, MIST_OB, i)
+    draw_parts(out, AURA_SYS, i)
+    t = 2 * math.pi * i / N
+    g = 0.5 - 0.5 * math.cos(3 * t)
+    b = B24[i % 24]
+    for x, y in OB_EYES:                                # roter Schein neben den Augenlichtern
+        if g > 0.6:
+            for dx in (-1, 1):
+                c = out[y + PT + b, x + dx + PL]
+                if hexc(c) in ('09090d', '060100'):
+                    out[y + PT + b, x + dx + PL] = [0x80, 0x10, 0x14, 255]
+    return out
+
+
+# ---------------------------------------------------------------- Grey Mage Archibald
+GM_KNOB = (1.5, 14.0)                                   # Stabkopf
+GM_SPARK = [(-3, 11, 3), (-4, 16, 15), (0, 9, 26), (-2, 18, 38), (-5, 13, 44)]
+
+
+def f_greymage(i):
+    """Die Hutspitze wiegt sich, der Stabkopf leuchtet weich auf (runder Lichtschein), Funken glitzern."""
+    s = SRC.copy()
+    t = 2 * math.pi * i / N
+    raw = [round(1.6 * ((8 - y) / 8) ** 1.3 * math.sin(2 * t - 0.25 * y)) for y in range(8, -1, -1)]
+    dxs = clamp_chain(raw)[::-1]                        # von der Krempe aus: Nachbarzeilen höchstens 1 px
+    hat = s.copy()
+    for y in range(0, 8):
+        if dxs[y]:
+            hat[y] = 0
+            for x in np.nonzero(s[y, :, 3])[0]:
+                if 0 <= x + dxs[y] < SW:
+                    hat[y, x + dxs[y]] = s[y, x]
+    s = hat
+    g = 0.5 - 0.5 * math.cos(2 * t)
+    out = np.zeros((H, W, 4), int)
+    kx, ky = GM_KNOB[0] + PL, GM_KNOB[1] + PT
+    R = 4.0 + 1.6 * g
+    for y in range(int(ky - 6), int(ky + 7)):           # weicher, runder Lichtschein hinter dem Stab
+        for x in range(int(kx - 6), int(kx + 7)):
+            d = math.hypot(x - kx, y - ky)
+            if d < R and 0 <= y < H and 0 <= x < W:
+                a = (1 - d / R) ** 1.5
+                out[y, x] = [235, 245, 255, int(25 + 205 * a * (0.6 + 0.4 * g))]
+    for y, x in zip(*np.nonzero(s[:, :, 3])):
+        c = s[y, x]
+        if x <= 3 and 12 <= y <= 16:                    # der Stabkopf selbst glimmt mit
+            c = lighten(c, 0.25 + 0.35 * g)
+        out[y + PT, x + PL] = c
+    for (x, y), c in sparkle_pixels(i, N, [(x + PL, y + PT, st) for x, y, st in GM_SPARK],
+                                    rgb('ffffff'), rgb('d8e8f0')).items():
+        dot(out, x, y, c)
+    return out
+
+
+# ---------------------------------------------------------------- Toras the Battle Maniac
+TB_PIVOT = (20.5, 17.5)                                 # Faust
+TB_RAISED, TB_WIND = -1.0, -1.25
+
+
+def _tb_masks():
+    op = SRC[:, :, 3] > 0
+    grey = np.array([[r == g == b for r, g, b in SRC[y, :, :3]] for y in range(SH)])
+    sword = op & (_ys >= 16) & (_ys <= 19) & (((_xs >= 22)) | ((_xs == 21) & np.isin(_ys, (16, 19))))
+    wedge = op & (_ys >= 20) & (_xs >= 16) & grey
+    return sword, wedge, op & ~sword & ~wedge
+
+
+if V == 'battlemaniac':
+    TB_SWORD, TB_WEDGE, TB_BODY = _tb_masks()
+    TB_ANG = np.arctan2(_ys + 0.5 - TB_PIVOT[1], _xs + 0.5 - TB_PIVOT[0])
+    TB_DOWN = float(TB_ANG[TB_WEDGE].max()) + 0.02      # die Klinge endet am Ende der Schwungspur
+
+
+def tb_pose(i):
+    """(Winkel der Klinge, Spur: ('bis', a) = Spur bis a, ('ab', a) = Rest der Spur ab a, None)."""
+    if i < 18 or i >= 42:
+        return TB_RAISED, None
+    if i < 22:
+        return TB_RAISED + (TB_WIND - TB_RAISED) * (i - 17) / 4, None
+    if i <= 24:
+        a = {22: -0.3, 23: 0.7, 24: TB_DOWN}[i]
+        return a, ('bis', a)
+    if i < 30:
+        return TB_DOWN, {25: ('ab', 0.5), 26: ('ab', 1.0), 27: ('ab', 1.4)}.get(i)
+    f = (i - 29) / 12
+    return TB_DOWN + (TB_RAISED - TB_DOWN) * (0.5 - 0.5 * math.cos(math.pi * f)), None
+
+
+def f_battlemaniac(i):
+    """Wie Toras: das Schwert in Ruhe schräg nach oben, ausholen, in drei Frames nach unten durchziehen –
+    der graue Bogen aus dem Sprite ist die Schwungspur (nur hinter der Klinge), dann langsam wieder hoch."""
+    s = SRC.copy()
+    blink(s, i)
+    out = np.zeros((H, W, 4), int)
+    ang, trail = tb_pose(i)
+    if trail:
+        kind, a = trail
+        m = TB_WEDGE & ((TB_ANG <= a) if kind == 'bis' else (TB_ANG >= a)) & (TB_ANG <= ang - 0.05)
+        for y, x in zip(*np.nonzero(m)):
+            out[y + PT, x + PL] = s[y, x]
+    sword = rotate_part(s, TB_SWORD, TB_PIVOT, ang, (H, W), (PL, PT))
+    m = sword[:, :, 3] > 0
+    out[m] = sword[m]
+    for y, x in zip(*np.nonzero(TB_BODY)):
+        out[y + PT, x + PL] = s[y, x]
+    return out
+
+
+# ---------------------------------------------------------------- ZsosSsar the Worm Soldier
+WS_SHOTS = [5, 17, 29, 41]                              # Gasstöße (Frame 0 = Ruhepose)
+WS_GAS = [rgb('e4ff9a'), rgb('b4ec5a'), rgb('7cc43c'), rgb('4a8c2c')]
+WS_MUZZLE = (-0.5, 9.0)                                 # vor dem goldenen Mündungsring (Sprite-Koordinaten)
+
+
+def ws_puffs(i):
+    """Gaswolken: je Stoß vier Wölkchen, die aus der Mündung quellen, nach links oben treiben,
+    anschwellen und verblassen; dazwischen kräuselt ein Faden aus der Mündung."""
+    res = []
+    for e in WS_SHOTS:
+        for k, (vx, vy, dl) in enumerate(((-0.8, -0.2, 0), (-0.6, -0.4, 1), (-0.7, 0.1, 2), (-0.45, -0.1, 3))):
+            a = (i - e - dl) % N
+            if a < 20:
+                u = a / 20
+                res.append((WS_MUZZLE[0] + vx * a * (1.2 - 0.4 * u), WS_MUZZLE[1] + vy * a + 0.4 * math.sin(0.7 * a + k),
+                            1.6 + 3.2 * u ** 0.6, 1.0 - u ** 2))
+    for k in range(4):                                  # Nachfaden: kleine Kringel direkt an der Mündung
+        a = (i + 4 * k) % 16
+        res.append((WS_MUZZLE[0] - 0.45 * a, WS_MUZZLE[1] - 0.3 * a + 0.7 * math.sin(0.8 * a + k),
+                    1.0 + 0.08 * a, 0.75 * (1 - a / 16)))
+    return res
+
+
+def f_wormsoldier(i):
+    """Die Gaswaffe stößt giftgrüne Wolken aus (mit Rückstoß), dazwischen kräuselt Gas aus der Mündung."""
+    body, gun = load('body'), load('gun')
+    blink(body, i)
+    rec = 1 if any((i - e) % N in (0, 1) for e in WS_SHOTS) else 0
+    out = np.zeros((H, W, 4), int)
+    for y, x in zip(*np.nonzero(body[:, :, 3])):
+        out[y + PT, x + PL] = body[y, x]
+    for y, x in zip(*np.nonzero(gun[:, :, 3])):
+        out[y + PT, x + PL + rec] = gun[y, x]
+    fig = out[:, :, 3] > 0
+    gas = np.zeros((H, W))
+    col = np.zeros((H, W), int)
+    for cx, cy, r, a in ws_puffs(i):
+        cx, cy = cx + PL + rec, cy + PT
+        for y in range(int(cy - r - 1), int(cy + r + 2)):
+            for x in range(int(cx - r - 1), int(cx + r + 2)):
+                d = math.hypot(x - cx, y - cy) / r
+                if d < 1 and 0 <= y < H and 0 <= x < W and not fig[y, x]:
+                    v = a * (1 - d * d)
+                    if v > gas[y, x]:
+                        gas[y, x] = v
+                        col[y, x] = min(3, int(4 * d))
+    for y, x in zip(*np.nonzero(gas > 0.08)):
+        c = WS_GAS[col[y, x]]
+        out[y, x] = [c[0], c[1], c[2], int(min(240, 90 + 220 * gas[y, x]))]
+    return out
+
+
+# ---------------------------------------------------------------- Elana the Digital Diva
+ED_NOTE = ['.##', '.#.', '##.', '##.']                  # Achtelnote
+ED_TEAL, ED_PINK = rgb('39c5bb'), rgb('f28cb6')
+# (Startframe, Start-x, Start-y, Drift je Frame) in Sprite-Koordinaten; steigen 12 Frames lang auf
+ED_NOTES = [(2, -4, 12, -0.15), (10, 31, 8, 0.12), (18, -4, 8, -0.1), (26, 31, 12, 0.1), (34, -4, 13, -0.12),
+            (42, 31, 10, 0.12)]
+
+
+def ed_strum(i):
+    """Schlaghand: im Achteltakt (8 Frames je Viertel) ab- und aufschlagen, Frame 0 = Ruhe."""
+    return {2: 1, 3: 1, 6: -1}.get(i % 8, 0)
+
+
+def f_diva(i):
+    """Sie spielt Gitarre: die Schlaghand schlägt im Takt, die Greifhand wechselt die Griffe am Hals,
+    der Kopf nickt im Beat, Noten in Türkis und Pink steigen auf."""
+    body, guitar, arms = load('body'), load('guitar'), load('arms')
+    out = np.zeros((H, W, 4), int)
+    nod = 1 if i % 8 in (2, 3) else 0
+    for y, x in zip(*np.nonzero(body[:, :, 3])):        # Kopf und Zöpfe nicken (Zeilen 0–11)
+        out[y + PT + (nod if y < 12 else 0), x + PL] = body[y, x]
+    for y, x in zip(*np.nonzero(guitar[:, :, 3])):
+        out[y + PT, x + PL] = guitar[y, x]
+    strum = ed_strum(i)
+    chord = 1 if (i // 12) % 2 else 0                   # Griffwechsel: die Hand rutscht den Hals hinauf
+    for y, x in zip(*np.nonzero(arms[:, :, 3])):
+        dx = dy = 0
+        if 15 <= x <= 17 and 12 <= y <= 15:             # Schlaghand
+            dy = strum
+        elif 21 <= x <= 24 and 6 <= y <= 9:             # Greifhand
+            dx, dy = chord, -chord
+        out[y + PT + dy, x + PL + dx] = arms[y, x]
+    for e, x0, y0, vx in ED_NOTES:                      # Noten steigen auf und verblassen
+        a = (i - e) % N
+        if a >= 12:
+            continue
+        c = ED_TEAL if (e // 8) % 2 == 0 else ED_PINK
+        nx, ny = round(x0 + vx * a + 0.6 * math.sin(0.8 * a)) + PL, round(y0 - 0.8 * a) + PT
+        al = 255 if a < 8 else int(255 * (12 - a) / 4)
+        for yy, row in enumerate(ED_NOTE):
+            for xx, ch in enumerate(row):
+                if ch == '#':
+                    dot(out, nx + xx, ny + yy, [c[0], c[1], c[2], al])
+    return out
+
+
 FRAME = dict(alex=f_alex, doq=f_doq, grisgar=f_grisgar, nieht=f_nieht, kohta=f_kohta, bill=f_bill,
              sabrina=f_sabrina, mizune=f_mizune, bartas=f_bartas, gon=f_gon, ida=f_ida, vacarn=f_vacarn,
              solrym=f_solrym, dajan=f_dajan, omikron=f_omikron, idafire=f_idafire, chuck=f_chuck,
              duke=f_omikron, alice=f_alice, megakarian=f_megakarian, settdunk=f_settdunk, emperor=f_emperor,
-             yellowflash=f_yellowflash)
+             yellowflash=f_yellowflash, beatogold=f_beatogold, fiona=f_fiona, overlord=f_overlord, greymage=f_greymage,
+             battlemaniac=f_battlemaniac, wormsoldier=f_wormsoldier, diva=f_diva)
 
 if __name__ == '__main__':
     tag = sys.argv[1] if len(sys.argv) > 1 else 'v'
