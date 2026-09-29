@@ -1,0 +1,16 @@
+{
+  "hero": "Quetzahuitl, Receiver of Sacrifices",
+  "sheet": "quetzahuitl-receiver-of-sacrifices.png",
+  "frameWidth": 151,
+  "frameHeight": 117,
+  "frames": 48,
+  "frameMs": 90,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 6,
+  "padLeft": 22,
+  "padRight": 24,
+  "padBottom": 4,
+  "faceX": 97.0,
+  "footY": 113
+}

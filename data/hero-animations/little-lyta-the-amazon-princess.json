@@ -1,0 +1,15 @@
+{
+  "hero": "Little Lyta, the Amazon Princess",
+  "sheet": "little-lyta-the-amazon-princess.png",
+  "frameWidth": 31,
+  "frameHeight": 30,
+  "frames": 48,
+  "frameMs": 90,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 3,
+  "padLeft": 4,
+  "padRight": 2,
+  "padBottom": 1,
+  "faceX": 13.5
+}
