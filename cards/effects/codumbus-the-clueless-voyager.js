@@ -81,6 +81,10 @@ module.exports = {
       let group = TYPE_GROUPS.find(g => g.id === choice?.optionId);
       if (!group) group = TYPE_GROUPS[Math.floor(Math.random() * TYPE_GROUPS.length)];
 
+      engine.log('codumbus_declare', {
+        player: engine.gs.players[oi]?.username, declared: group.label.replace(/^\S+\s/, ''), by: CARD_NAME,
+      });
+
       const cardName = engine.revealTop(pi, 1)[0];
       if (!cardName) return;
       engine._broadcastEvent('card_reveal', { cardName, playerIdx: pi });
@@ -89,7 +93,7 @@ module.exports = {
       const cd = engine._getCardDB()[cardName];
       const hit = !!group.match(cd);
       engine.log('codumbus_reveal', {
-        player: ps.username, card: cardName, declared: group.label, hit,
+        player: ps.username, card: cardName, declared: group.label.replace(/^\S+\s/, ''), hit,
       });
 
       if (hit) {
