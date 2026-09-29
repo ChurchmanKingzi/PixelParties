@@ -23536,13 +23536,26 @@ body.pp-dialog-offen .foil-diamond-rare:not(.modal-overlay *) {
      Telefon ~370 px → Text in drei Zeilen, Box höher). */
   width: max-content;
   max-width: min(620px, calc(92 * var(--vw)));
-  transition: opacity .18s ease-out;
+  /* ★ v1485/v1486 (Als Befund 29.9.: „gibt es einen spürbaren Delay
+     zwischen "Hover über dem Fenster" und "es wird transparent"?" — „Ja,
+     auch der Rückweg soll instantan sein"): keine Überblendung mehr, weder
+     hinein noch zurück. Vorher machte `opacity .18s` die Box erst nach
+     ≈ 200 ms durchsichtig, obwohl das Attribut nach < 10 ms kam. */
+  transition: none;
 }
 .panel-zielwahl :is(button, a, input, select, textarea, label, .panel-zielwahl-aktiv) {
   pointer-events: auto;
 }
 .first-choice-panel.panel-zielwahl[data-durchsicht] {
   opacity: .25;
+}
+/* ★ v1488 (Als Vorgabe 29.9.: Box überall verschiebbar, wo sie deckend
+   ist und kein Knopf unter dem Zeiger liegt): Das Skript setzt
+   `data-greifbar`, solange der Zeiger im deckenden Rand um die Knöpfe
+   steht — dann nimmt der ganze Körper den Zeiger an (erbt auf die
+   Kinder), ein Mausdruck startet das Ziehen. */
+.first-choice-panel.panel-zielwahl[data-greifbar] {
+  pointer-events: auto;
 }
 /* Griffe: die beiden seitlichen Polsterstreifen (dort sitzen die
    Pfeil-Ornamente — sie sind der sichtbare Zieh-Hinweis). Bewusst NICHT
@@ -23627,9 +23640,6 @@ body.pp-dialog-offen .foil-diamond-rare:not(.modal-overlay *) {
 /* Rechts liegt jetzt die Karte — der rechte Zieh-Griff entfaellt, der
    linke bleibt. */
 .panel-zielwahl:has(> .panel-zielwahl-vorschau-rand) > .panel-zielwahl-griff-r { display: none; }
-@media (prefers-reduced-motion: reduce) {
-  .first-choice-panel.panel-zielwahl { transition: none; }
-}
 /* Niedrige Fenster (Telefon quer): die Helden sind dort nur ~40 px hoch —
    noch dichter, die seitliche Vorschau entfällt (der Titel nennt die
    Karte, der Tooltip bleibt an der Handkarte). */

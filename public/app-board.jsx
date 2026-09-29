@@ -1747,6 +1747,13 @@ function _ppZielwahlMitte() {
   };
 }
 
+// ★ v1484: Bedienelemente der Zielwahl-Box und ihr Hover-Rand (siehe die
+// Durchsicht in DraggablePanel).
+const ZW_KNOPF_SEL = 'button, a, input, select, textarea, label';
+const ZW_KNOPF_RAND = 10;
+// ★ v1488: alles, was im Panel von sich aus Zeigerereignisse bekommt.
+const ZW_AKTIV_SEL = ZW_KNOPF_SEL + ', .panel-zielwahl-aktiv, .panel-zielwahl-griff';
+
 function DraggablePanel({ children, className, style, zielwahl }) {
   const [pos, setPos] = useState({ x: 0, y: 0 });
   const [dragging, setDragging] = useState(false);
@@ -1807,14 +1814,48 @@ function DraggablePanel({ children, className, style, zielwahl }) {
       const el = panelRef.current;
       if (!el || !letzt) return;
       let an = false;
+      // ★ v1488 (Als Vorgabe 29.9.: „Aktuell kann man die Box nur an den
+      // dedizierten Stellen außen links/rechts verschieben. Das soll immer
+      // möglich sein, wenn die Box nicht transparent ist und man nicht
+      // gerade über einem Button hovert."): Steht der Zeiger im deckenden
+      // Bereich (Rand um die Knöpfe, s. u.), aber nicht auf einem aktiven
+      // Element, setzt die Prüfung `data-greifbar` — CSS schaltet dann den
+      // Zeiger für den ganzen Körper ein, ein Mausdruck dort startet über
+      // `onDown` das Ziehen. Wird die Box durchsichtig, fällt das Attribut
+      // weg und Klicks gehen wieder durch zu den Zielen. Während des
+      // Ziehens bleibt es, wie es ist.
+      let greifbar = draggingRef.current && el.hasAttribute('data-greifbar');
       if (!draggingRef.current && letzt.x != null) {
         const r = el.getBoundingClientRect();
         const drin = letzt.x >= r.left && letzt.x <= r.right && letzt.y >= r.top && letzt.y <= r.bottom;
-        // Liegt das Ereignisziel IM Panel, ist es eines der aktiven
-        // Elemente (nur die bekommen Zeigerereignisse) → deckend lassen.
-        an = drin && !(letzt.ziel && el.contains(letzt.ziel));
+        // Liegt das Ereignisziel auf einem aktiven Element des Panels
+        // (Knopf, Griff, Vorschau) → deckend lassen. ★ v1488: per
+        // `closest` statt `el.contains` — mit `data-greifbar` bekommen
+        // auch Text und Kästen des Panels Zeigerereignisse.
+        const aktiv = letzt.ziel && letzt.ziel.closest ? letzt.ziel.closest(ZW_AKTIV_SEL) : null;
+        an = drin && !(aktiv && el.contains(aktiv));
+        // ★ v1484 (Als Vorgabe 29.9.: „Die Bereiche direkt um Buttons auf
+        // dem Fenster herum sollten on-hover noch NICHT das Fenster
+        // transparent machen. Wenn *nur* exakt die Buttons das Fenster
+        // beibehalten, fühlt sich das seltsam an, ein kleiner Rand drumrum
+        // sollte helfen."): Rand von `ZW_KNOPF_RAND` px um jedes
+        // Bedienelement — dort bleibt die Box deckend (★ v1488: und ist
+        // dort greifbar, siehe oben).
+        if (an) {
+          for (const k of el.querySelectorAll(ZW_KNOPF_SEL)) {
+            const kr = k.getBoundingClientRect();
+            // ★ v1487 (Als Vorgabe 29.9.: „Der Bereich unter den Buttons
+            // sollte vollständig on-hover NICHT die Box entfernen."): nach
+            // unten keine Grenze — bis zur Unterkante der Box (`drin`
+            // begrenzt schon auf die Box). Seitlich bleibt es beim Rand:
+            // die Lücke zwischen den Knöpfen liegt über dem mittleren Helden.
+            if (kr.width && letzt.x >= kr.left - ZW_KNOPF_RAND && letzt.x <= kr.right + ZW_KNOPF_RAND
+              && letzt.y >= kr.top - ZW_KNOPF_RAND) { an = false; greifbar = true; break; }
+          }
+        }
       }
       if (el.hasAttribute('data-durchsicht') !== an) el.toggleAttribute('data-durchsicht', an);
+      if (el.hasAttribute('data-greifbar') !== greifbar) el.toggleAttribute('data-greifbar', greifbar);
     };
     const bewegt = (e) => {
       letzt = { x: e.clientX, y: e.clientY, ziel: e.target };
@@ -1832,6 +1873,7 @@ function DraggablePanel({ children, className, style, zielwahl }) {
       document.removeEventListener('pointerout', raus, { capture: true });
       if (raf) cancelAnimationFrame(raf);
       panelRef.current?.removeAttribute('data-durchsicht');
+      panelRef.current?.removeAttribute('data-greifbar');
     };
   }, [zielwahl]);
   const onDown = (e) => {
