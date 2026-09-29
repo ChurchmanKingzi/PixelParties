@@ -142,12 +142,12 @@ RIM = {'001f5e', '0353b8', '033277', '023c85'}
 
 def f_doq(i):
     s = SRC.copy()
-    st = BLINK.get(i)                                   # das durch die Lupe riesige Auge blinzelt
-    if st:
-        for y in range(8, 14 if st == 'zu' else 11):
-            for x in range(5, 11):
-                if s[y, x, 3] and hexc(s[y, x]) not in RIM:
-                    s[y, x] = rgb('35566b' if (st == 'zu' and y == 13) or (st == 'halb' and y == 10) else ('d9c6aa' if (x + y) % 3 else 'cbb89c'))
+    st = BLINK.get(i)                                   # das durch die Lupe riesige Auge (x 6–9, Zeilen 10–13)
+    if st:                                              # blinzelt: das Lid kommt von oben
+        for y in range(10, 14 if st == 'zu' else 12):
+            for x in range(6, 10):
+                last = y == (13 if st == 'zu' else 11)
+                s[y, x] = rgb('35566b' if last else ('d9c6aa' if (x + y) % 3 else 'cbb89c'))
     lens = np.array([[SRC[y, x, 3] > 0 and hexc(SRC[y, x]) in LENS and x <= 12 and y <= 15
                       for x in range(SW)] for y in range(SH)])
     sweep(s, lens, i, 4, dur=7, slope=-0.8, col='ffffff', trail='e8f4ff')
