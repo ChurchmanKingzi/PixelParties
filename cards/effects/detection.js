@@ -52,27 +52,32 @@ function _getOppSurprises(engine, oppIdx) {
   const targets = [];
   const cardDB = engine._getCardDB();
 
-  for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-    // Surprise Zone — face-down by default, may be face-up for cards
-    // that linger after activation (Spider Silk Bridge). Always counts.
-    const sz = ps.surpriseZones?.[hi] || [];
-    if (sz.length > 0) {
-      const cardName = sz[0];
-      const inst = engine.cardInstances.find(c =>
-        c.owner === oppIdx && c.zone === ZONES.SURPRISE
-        && c.heroIdx === hi && c.name === cardName
-      );
-      targets.push({
-        cardName,
-        cardInstance: inst,
-        heroIdx: hi,
-        zoneType: 'surprise',
-        zoneSlot: -1,
-        isCreature: false,
-        isFaceUp: inst ? !inst.faceDown : true,
-      });
-    }
+  // Surprise Zone — face-down by default, may be face-up for cards
+  // that linger after activation (Spider Silk Bridge). Always counts.
+  // Als Vorgabe 29.9.: nach KONTROLLE — auch die Zone eines Helden, den
+  // der Gegner gerade von uns geliehen hat; `seite` = Brettseite.
+  for (const e of engine._getAllSurpriseEntries(oppIdx)) {
+    if (e.isBakhmSlot) continue;
+    const seite = e.seite ?? oppIdx;
+    const hi = e.heroIdx;
+    const cardName = e.cardName;
+    const inst = engine.cardInstances.find(c =>
+      c.owner === seite && c.zone === ZONES.SURPRISE
+      && c.heroIdx === hi && c.name === cardName
+    );
+    targets.push({
+      cardName,
+      cardInstance: inst,
+      heroIdx: hi,
+      seite,
+      zoneType: 'surprise',
+      zoneSlot: -1,
+      isCreature: false,
+      isFaceUp: inst ? !inst.faceDown : true,
+    });
+  }
 
+  for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
     // Support Zones — any card with subtype "Surprise" counts. That
     // catches face-down Bakhm-trapped Surprises (any cardType) AND
     // face-up summoned Surprise Creatures (Cybugs, Pure Advantage Camel,
@@ -149,8 +154,11 @@ module.exports = {
         // Zone-anchored pile flight BEFORE the splice — the diff
         // animator otherwise keys flights by card name and would pick
         // the leftmost duplicate.
+        const tSeite = t.seite ?? oppIdx;   // 29.9.: Brettseite der Zone
+        const discardIdx = t.cardInstance?.originalOwner ?? oppIdx;
         engine._broadcastEvent('play_pile_transfer', {
-          owner: oppIdx,
+          owner: tSeite,
+          ...(discardIdx !== tSeite ? { fromOwner: tSeite, toOwner: discardIdx } : {}),
           cardName: t.cardName,
           from: t.zoneType === 'support' ? 'support' : 'surprise',
           to: 'discard',
@@ -159,7 +167,7 @@ module.exports = {
         });
 
         if (t.zoneType === 'surprise') {
-          const sz = ops.surpriseZones?.[t.heroIdx] || [];
+          const sz = gs.players[tSeite]?.surpriseZones?.[t.heroIdx] || [];
           const idx = sz.indexOf(t.cardName);
           if (idx >= 0) sz.splice(idx, 1);
         } else {

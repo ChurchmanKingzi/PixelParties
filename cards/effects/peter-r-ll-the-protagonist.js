@@ -73,11 +73,14 @@ async function offerAttach(ctx) {
   const heroIdx = ctx.cardHeroIdx;
   const ps = engine.gs.players[pi];
   if (!ps) return;
-  // Styx 28.9.: `canAttachAbilityToHero`/`attachAbilityFromHand` legen nur
-  // an Helden der eigenen Spalte an — ein uebernommener Peter bekaeme die
-  // Ability sonst auf den gleich indizierten EIGENEN Helden. Bis die
-  // Engine das kann: kein Angebot.
-  if ((ctx.cardHeroOwner ?? pi) !== pi) return;
+  // Als Vorgabe 29.9.: ein uebernommener Peter bekommt die Ability auf
+  // seiner Brettseite (`feld`) — nur, wenn die Uebernahme Abilities
+  // erlaubt (`kontrollRechte`, prueft `canAttachAbilityToHero`). Hand und
+  // Deck gehoeren dem Kontrolleur `pi`, die Karte bleibt seine.
+  const feld = ctx.cardHeroOwner ?? pi;
+  const hps = engine.gs.players[feld];
+  if (!hps) return;
+  const seitenOpt = feld !== pi ? { heroOwner: feld } : {};
 
   const cardDB = engine._getCardDB();
 
@@ -93,7 +96,7 @@ async function offerAttach(ctx) {
     if (seen.has(key)) return;
     const cd = cardDB[name];
     if (!cd || !hasCardType(cd, 'Ability')) return;
-    if (!engine.canAttachAbilityToHero(pi, name, heroIdx)) return;
+    if (!engine.canAttachAbilityToHero(pi, name, heroIdx, seitenOpt)) return;
     seen.add(key);
     gallery.push({ name, source });
   };
@@ -121,7 +124,7 @@ async function offerAttach(ctx) {
   const chosenSource = picked.source === 'hand' ? 'hand' : 'deck';
 
   // Re-verify legality (state may have shifted while the prompt was open).
-  if (!engine.canAttachAbilityToHero(pi, chosenAbility, heroIdx)) return;
+  if (!engine.canAttachAbilityToHero(pi, chosenAbility, heroIdx, seitenOpt)) return;
   if (chosenSource === 'hand') {
     if ((ps.hand || []).indexOf(chosenAbility) < 0) return;
   } else {
@@ -135,14 +138,15 @@ async function offerAttach(ctx) {
   if (chosenSource === 'hand') {
     await engine.attachAbilityFromHand(pi, chosenAbility, heroIdx, {
       skipAbilityGivenCheck: true,
+      ...seitenOpt,
     });
   } else {
     const _taken_deckIdx = await engine.takeFromPile(ps, 'deck', chosenAbility, { source: CARD_NAME });   // v820: Stapel-Schicht
     if (!_taken_deckIdx) return;
 
-    const abZones = ps.abilityZones[heroIdx] || [[], [], []];
-    ps.abilityZones[heroIdx] = abZones;
-    const targetZone = findTargetZone(abZones, chosenAbility, engine, pi, heroIdx);
+    const abZones = hps.abilityZones[heroIdx] || [[], [], []];
+    hps.abilityZones[heroIdx] = abZones;
+    const targetZone = findTargetZone(abZones, chosenAbility, engine, feld, heroIdx);
     if (targetZone < 0) {
       // Race: zone filled between the gate check and now. Restore.
       ps.mainDeck.push(chosenAbility);
@@ -152,7 +156,8 @@ async function offerAttach(ctx) {
     if (!abZones[targetZone]) abZones[targetZone] = [];
     abZones[targetZone].push(chosenAbility);
 
-    const inst = engine._trackCard(chosenAbility, pi, 'ability', heroIdx, targetZone);
+    const inst = engine._trackCard(chosenAbility, feld, 'ability', heroIdx, targetZone);
+    if (feld !== pi) inst.originalOwner = pi;   // wie doPlayAbilityFremd: Seite `feld`, gehoert `pi`
     engine._broadcastEvent('deck_search_add', { cardName: chosenAbility, playerIdx: pi });
 
     await engine.runHooks('onPlay', {
@@ -182,7 +187,7 @@ async function offerAttach(ctx) {
   });
 
   engine._broadcastEvent('ability_activated', {
-    owner: pi, heroIdx, zoneIdx: -1, abilityName: chosenAbility,
+    owner: feld, heroIdx, zoneIdx: -1, abilityName: chosenAbility,
   });
 
   engine.sync();

@@ -15,7 +15,7 @@
 // ═══════════════════════════════════════════
 
 const { getCardDB: _getCardDB } = require('./_card-db');
-const { waehleAusruestPlatz, ausruestTraeger } = require('./_equip-shared');
+const { waehleAusruestPlatz, ausruestTraegerMitSeite } = require('./_equip-shared');
 
 const CARD_NAME = "Treasure Hunter's Backpack";
 const MAX_EQUIP_COST = 50;
@@ -52,7 +52,7 @@ function buildEligibleGallery(gs, pi, engine) {
     // v1268: dieselbe Traegerpruefung wie die Wahl danach
     // (`_equip-shared`), sonst stuende eine Ausruestung zur Wahl, fuer
     // die es dann keinen Helden gibt (gefroren / gecharmt).
-    if (engine && ausruestTraeger(engine, pi, cardName).length === 0) continue;
+    if (engine && ausruestTraegerMitSeite(engine, pi, cardName).length === 0) continue;   // Als Vorgabe 29.9.: inkl. uebernommener Helden
     seen.add(cardName);
     out.push({
       name: cardName, source: 'deck', cost,
@@ -136,16 +136,21 @@ module.exports = {
     if (!platz) return { aborted: true };
     const destHeroIdx = platz.heroIdx;
     const destSlot = platz.slot;
+    // Als Vorgabe 29.9.: Brettseite eines uebernommenen Helden; die Karte
+    // gehoert weiter mir (`originalOwner`).
+    const seite = platz.seite ?? pi;
+    const zps = gs.players[seite];
 
     // Final validation: slot still free + deck still contains the equip
-    if (((ps.supportZones[destHeroIdx] || [])[destSlot] || []).length > 0) return { aborted: true };
+    if (((zps.supportZones[destHeroIdx] || [])[destSlot] || []).length > 0) return { aborted: true };
     const _taken_stillIdx = await engine.takeFromPile(ps, 'deck', equipName, { source: CARD_NAME });   // v820: Stapel-Schicht
     if (!_taken_stillIdx) return { aborted: true };
-    if (!ps.supportZones[destHeroIdx]) ps.supportZones[destHeroIdx] = [[], [], []];
-    if (!ps.supportZones[destHeroIdx][destSlot]) ps.supportZones[destHeroIdx][destSlot] = [];
-    ps.supportZones[destHeroIdx][destSlot].push(equipName);
+    if (!zps.supportZones[destHeroIdx]) zps.supportZones[destHeroIdx] = [[], [], []];
+    if (!zps.supportZones[destHeroIdx][destSlot]) zps.supportZones[destHeroIdx][destSlot] = [];
+    zps.supportZones[destHeroIdx][destSlot].push(equipName);
 
-    const inst = engine._trackCard(equipName, pi, 'support', destHeroIdx, destSlot);
+    const inst = engine._trackCard(equipName, seite, 'support', destHeroIdx, destSlot);
+    if (seite !== pi) inst.originalOwner = pi;
 
     engine.sync();
 
@@ -159,17 +164,17 @@ module.exports = {
     // back to false), causing the captured `destHeroIdx` / `destSlot`
     // from imagined rollouts to paint explosions on real client zones.
     engine._broadcastEvent('play_zone_animation', {
-      type: 'explosion', owner: pi,
+      type: 'explosion', owner: seite,
       heroIdx: destHeroIdx, zoneSlot: destSlot,
     });
     await engine._delay(220);
     engine._broadcastEvent('play_zone_animation', {
-      type: 'gold_sparkle', owner: pi,
+      type: 'gold_sparkle', owner: seite,
       heroIdx: destHeroIdx, zoneSlot: destSlot,
     });
     await engine._delay(260);
     engine._broadcastEvent('play_zone_animation', {
-      type: 'explosion', owner: pi,
+      type: 'explosion', owner: seite,
       heroIdx: destHeroIdx, zoneSlot: destSlot,
     });
     await engine._delay(420);
@@ -188,7 +193,7 @@ module.exports = {
     // ends (actually, it's just a stamp matched against gs.turn — when
     // the turn number changes, the stamp becomes stale and the gate no
     // longer fires).
-    const destHero = ps.heroes[destHeroIdx];
+    const destHero = zps.heroes[destHeroIdx];
     if (destHero) {
       destHero._actionLockedTurn = gs.turn;
     }

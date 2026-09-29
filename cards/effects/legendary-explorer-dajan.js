@@ -119,28 +119,37 @@ async function _playEquip(engine, pi, cardName, cd, cost) {
   if (!ps) return false;
 
   // Build destination targets: free zones under each alive Hero.
+  // Als Vorgabe 29.9.: dazu uebernommene Helden der Gegenseite, deren
+  // Uebernahme `ausruesten` erlaubt (Styx, Golden Apple …; Charme nicht)
+  // — Ziel-ID und `owner` tragen die Brettseite.
+  const kandidaten = [];
+  for (let hi = 0; hi < (ps.heroes || []).length; hi++) kandidaten.push({ seite: pi, hi });
+  for (const { physOwner, heroIdx } of (engine.fremdAusruestHelden?.(pi) || [])) {
+    if (engine.canEquipCardToHero(cardName, physOwner, heroIdx)) kandidaten.push({ seite: physOwner, hi: heroIdx });
+  }
   const destTargets = [];
-  for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-    const hero = ps.heroes[hi];
+  for (const { seite, hi } of kandidaten) {
+    const zps = engine.gs.players[seite];
+    const hero = zps?.heroes?.[hi];
     if (!hero?.name || hero.hp <= 0) continue;
     if (hero.statuses?.frozen) continue;
     // Kontrolle statt Seite (Styx 28.9.): ein an den Gegner abgegebener
     // Held der eigenen Spalte ist kein Ausruestungswirt.
-    if (engine.heroSideOf(pi, hero) !== pi) continue;
+    if (seite === pi && engine.heroSideOf(pi, hero) !== pi) continue;
     let firstFree = -1;
     for (let si = 0; si < 3; si++) {
-      if (((ps.supportZones[hi] || [])[si] || []).length === 0) {
+      if (((zps.supportZones[hi] || [])[si] || []).length === 0) {
         if (firstFree === -1) firstFree = si;
         destTargets.push({
-          id: `equip-${pi}-${hi}-${si}`, type: 'equip',
-          owner: pi, heroIdx: hi, slotIdx: si, cardName: '',
+          id: `equip-${seite}-${hi}-${si}`, type: 'equip',
+          owner: seite, heroIdx: hi, slotIdx: si, cardName: '',
         });
       }
     }
     if (firstFree >= 0) {
       destTargets.push({
-        id: `hero-${pi}-${hi}`, type: 'hero',
-        owner: pi, heroIdx: hi, cardName: hero.name,
+        id: `hero-${seite}-${hi}`, type: 'hero',
+        owner: seite, heroIdx: hi, cardName: hero.name,
       });
     }
   }
@@ -163,18 +172,20 @@ async function _playEquip(engine, pi, cardName, cd, cost) {
   if (!dest) return false;
 
   let destHeroIdx = dest.heroIdx;
+  const destSeite = dest.owner;                   // Brettseite (Als Vorgabe 29.9.)
+  const dps = engine.gs.players[destSeite];
   let destSlot;
   if (dest.type === 'equip') {
     destSlot = dest.slotIdx;
   } else {
     for (let si = 0; si < 3; si++) {
-      if (((ps.supportZones[destHeroIdx] || [])[si] || []).length === 0) {
+      if (((dps.supportZones[destHeroIdx] || [])[si] || []).length === 0) {
         destSlot = si; break;
       }
     }
     if (destSlot === undefined) return false;
   }
-  if (((ps.supportZones[destHeroIdx] || [])[destSlot] || []).length > 0) return false;
+  if (((dps.supportZones[destHeroIdx] || [])[destSlot] || []).length > 0) return false;
 
   // Splice from deck right before the placement so a chain negate
   // routes the card to discard from a deck-pulled state.
@@ -190,13 +201,15 @@ async function _playEquip(engine, pi, cardName, cd, cost) {
         await engine._payCardCost(pi, cost);
         engine._broadcastEvent('gold_change', { owner: pi, amount: -cost });
       }
-      const result = engine.safePlaceInSupport(cardName, pi, destHeroIdx, destSlot);
+      const result = engine.safePlaceInSupport(cardName, destSeite, destHeroIdx, destSlot);
       if (!result) {
         ps.discardPile.push(cardName);
         engine.log('dajan_equip_fizzle', { card: cardName, reason: 'zone_occupied' });
         return true;
       }
       placedInst = result.inst;
+      // Liegt beim uebernommenen Helden, gehoert aber mir (Ablage/Rueckkehr).
+      if (placedInst && destSeite !== pi) placedInst.originalOwner = pi;
       const actualSlot = result.actualSlot;
       await engine.runHooks('onPlay', {
         _onlyCard: placedInst, playedCard: placedInst, cardName,

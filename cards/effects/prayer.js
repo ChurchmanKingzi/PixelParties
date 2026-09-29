@@ -74,13 +74,13 @@ module.exports = {
       const ps = gs.players[pi];
       if (!ps) { gs._spellCancelled = true; return; }
       const res = await attachToHero(ctx, CARD_NAME, {
-        heroFilter: (h, hi) => hi === casterHeroIdx, preferCaster: true,
-        description: `Attach ${CARD_NAME} to ${ps.heroes?.[casterHeroIdx]?.name || 'the user'} — pick one of its empty Support Zones.`,
+        heroFilter: (h, hi, side) => hi === casterHeroIdx && side === (ctx.cardHeroOwner ?? ctx.cardOwner), preferCaster: true,   // Als Vorgabe 29.9.: Seite des Nutzers
+        description: `Attach ${CARD_NAME} to ${gs.players[ctx.cardHeroOwner ?? pi]?.heroes?.[casterHeroIdx]?.name || 'the user'} — pick one of its empty Support Zones.`,
         confirmLabel: '🙏 Attach!', animationType: 'equip_flash',
       });
       if (!res) return;
       engine.log('prayer_attached', {
-        player: ps.username, hero: ps.heroes?.[res.host.heroIdx]?.name, heroIdx: res.host.heroIdx, zoneSlot: res.host.slotIdx,
+        player: ps.username, hero: gs.players[res.host.owner]?.heroes?.[res.host.heroIdx]?.name, heroIdx: res.host.heroIdx, zoneSlot: res.host.slotIdx,
       });
     },
   },

@@ -71,7 +71,7 @@ module.exports = {
 
     // ── Frost flash on the protected Hero — the Rune triggers ──
     engine._broadcastEvent('play_zone_animation', {
-      type: 'ice_encase', owner: ownerIdx, heroIdx: hostHeroIdx, zoneSlot: -1,
+      type: 'ice_encase', owner: ctx.cardHeroOwner ?? ownerIdx, heroIdx: hostHeroIdx, zoneSlot: -1,
     });
     await engine._delay(450);
 

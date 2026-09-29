@@ -27,7 +27,7 @@
 //    kostet nichts).
 // ═══════════════════════════════════════════
 
-const { ausruestTraeger, waehleAusruestPlatz, ruesteAusStapelAus } = require('./_equip-shared');
+const { ausruestTraegerMitSeite, waehleAusruestPlatz, ruesteAusStapelAus } = require('./_equip-shared');
 
 const CARD_NAME = 'Weapon Collecting Wight';
 const MAX_KOSTEN = 15;
@@ -46,7 +46,7 @@ function kandidaten(engine, pi) {
     if (!cd || cd.cardType !== 'Artifact') continue;
     if ((cd.subtype || '') !== 'Equipment') continue;          // „equippable"
     if ((cd.cost || 0) > MAX_KOSTEN) continue;                 // „Cost of 15 or less"
-    if (ausruestTraeger(engine, pi, name).length === 0) continue;
+    if (ausruestTraegerMitSeite(engine, pi, name).length === 0) continue;   // Als Vorgabe 29.9.: inkl. uebernommener Helden
     out.push(name);
   }
   return out.sort((a, b) => a.localeCompare(b));
@@ -96,11 +96,11 @@ module.exports = {
     });
     if (!platz) return false;
 
-    const inst = await ruesteAusStapelAus(engine, pi, 'discard', name, platz.heroIdx, platz.slot, { source: CARD_NAME });
+    const inst = await ruesteAusStapelAus(engine, pi, 'discard', name, platz.heroIdx, platz.slot, { source: CARD_NAME, seite: platz.seite });
     if (!inst) return false;
 
     engine.log('weapon_collecting_wight', {
-      player: ps.username, card: name, hero: ps.heroes[platz.heroIdx]?.name, slot: platz.slot,
+      player: ps.username, card: name, hero: engine.gs.players[platz.seite ?? pi]?.heroes?.[platz.heroIdx]?.name, slot: platz.slot,
     });
     engine.sync();
     return true;

@@ -58,7 +58,8 @@ module.exports = {
 
       // React ONLY to the OPPONENT activating a Surprise.
       const bootsOwner = ctx.cardOriginalOwner;
-      const surpriseOwner = ctx.surpriseOwner;
+      // Als Vorgabe 29.9.: der AUSLOESER (Kontrolleur), nicht die Zonen-Seite.
+      const surpriseOwner = ctx.surpriseController ?? ctx.surpriseOwner;
       if (surpriseOwner == null || surpriseOwner === bootsOwner) return;
 
       // Already negated this activation (a prior copy / effect). Each

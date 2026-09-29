@@ -36,15 +36,16 @@ function passenderSpell(cd, stufe = cd?.level) {
   return !!cd && cd.cardType === 'Spell' && (stufe === 1 || stufe === 2);
 }
 
-/** Spells auf der Hand, die Yukana JETZT wirken koennte. */
-function wirkbar(engine, pi, hi) {
+/** Spells auf der Hand, die Yukana JETZT wirken koennte.
+ *  Als Vorgabe 29.9.: `feld` = Brettseite (geliehene Yukana), Hand = `pi`. */
+function wirkbar(engine, pi, hi, feld = pi) {
   const gs = engine.gs;
-  const hero = gs.players[pi]?.heroes?.[hi];
+  const hero = gs.players[feld]?.heroes?.[hi];
   if (!hero?.name || hero.hp <= 0 || hero.statuses?.negated) return [];
-  if (spellSchoolAbilitiesOn(gs.players[pi]?.abilityZones?.[hi]).length > 0) return [];
-  if (engine.isHeroIncapacitated(pi, hi)) return [];
+  if (spellSchoolAbilitiesOn(gs.players[feld]?.abilityZones?.[hi]).length > 0) return [];
+  if (engine.isHeroIncapacitated(feld, hi)) return [];
   const db = engine._getCardDB();
-  const erlaubt = new Set(engine.getHeroEligibleActionCards(pi, hi));
+  const erlaubt = new Set(engine.getHeroEligibleActionCards(pi, hi, feld));
   const hand = gs.players[pi]?.hand || [];
   const out = [];
   hand.forEach((n, i) => {
@@ -61,12 +62,10 @@ module.exports = {
   canActivateHeroEffect(ctx) {
     const engine = ctx._engine;
     const pi = ctx.cardOwner;
-    // Styx 28.9.: `_castSpellImmediately` wirkt nur ueber Helden der
-    // eigenen Spalte — eine uebernommene Yukana wirkte sonst ueber den
-    // gleich indizierten EIGENEN Helden. Bis die Engine das kann: aus.
-    if ((ctx.cardHeroOwner ?? pi) !== pi) return false;
+    // Als Vorgabe 29.9.: eine uebernommene Yukana wirkt auf ihrer
+    // Brettseite (`_castSpellImmediately` mit `heroOwner`), Hand = Kontrolleur.
     if (!heldenSperreFrei(engine.gs, SPERRE, pi)) return false;
-    return wirkbar(engine, pi, ctx.cardHeroIdx).length > 0;
+    return wirkbar(engine, pi, ctx.cardHeroIdx, ctx.cardHeroOwner ?? pi).length > 0;
   },
 
   async onHeroEffect(ctx) {
@@ -75,14 +74,14 @@ module.exports = {
     const pi = ctx.cardOwner;
     const hi = ctx.cardHeroIdx;
     const ps = gs.players[pi];
-    if ((ctx.cardHeroOwner ?? pi) !== pi) return false;   // Styx 28.9.: s. canActivateHeroEffect
+    const feld = ctx.cardHeroOwner ?? pi;   // Als Vorgabe 29.9.: Brettseite
     if (!heldenSperreFrei(gs, SPERRE, pi)) return false;
-    const spells = wirkbar(engine, pi, hi);
+    const spells = wirkbar(engine, pi, hi, feld);
     if (spells.length === 0) return false;
 
     const wahl = await engine.promptGeneric(pi, {
       type: 'cardGallery', title: CARD_NAME, source: CARD_NAME,
-      description: `Choose a level 1 or 2 Spell for ${ps.heroes[hi].name} to perform as an additional Action.`,
+      description: `Choose a level 1 or 2 Spell for ${gs.players[feld].heroes[hi].name} to perform as an additional Action.`,
       cards: spells.map(name => ({ name, source: 'hand' })),
       cancellable: true,
     });
@@ -94,6 +93,7 @@ module.exports = {
     const r = await engine._castSpellImmediately(pi, hi, name, {
       fromZone: 'hand', pool: ps.hand, poolIndex: idx, by: CARD_NAME,
       alsZusatzaktion: true,   // v1352: „as an additional Action"
+      ...(feld !== pi ? { heroOwner: feld } : {}),   // Als Vorgabe 29.9.
     });
     if (!r || r.cancelled) return false;   // Zielwahl abgebrochen → nichts verbraucht
     heldenSperreSetzen(gs, SPERRE, pi);

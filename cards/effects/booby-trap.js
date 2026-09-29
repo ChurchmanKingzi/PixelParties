@@ -90,7 +90,7 @@ module.exports = {
         }
       } else if (target.cardInstance) {
         await engine.actionDealCreatureDamage(
-          { name: 'Booby Trap', owner: ctx.cardOwner, heroIdx: ctx.cardHeroIdx },
+          { name: 'Booby Trap', owner: ctx.cardOwner, heroIdx: ctx.cardHeroIdx, heroOwner: ctx.cardHeroOwner },
           target.cardInstance, 100, 'destruction_spell',
           { sourceOwner: ctx.cardOwner, canBeNegated: true }
         );
@@ -122,7 +122,7 @@ module.exports = {
 
       // Deal 100 damage to the creature
       await engine.actionDealCreatureDamage(
-        { name: 'Booby Trap', owner: ctx.cardOwner, heroIdx: ctx.cardHeroIdx },
+        { name: 'Booby Trap', owner: ctx.cardOwner, heroIdx: ctx.cardHeroIdx, heroOwner: ctx.cardHeroOwner },
         srcInst, 100, 'destruction_spell',
         { sourceOwner: ctx.cardOwner, canBeNegated: true }
       );

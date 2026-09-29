@@ -43,7 +43,7 @@
 const CARD_NAME = 'Friedhelm, the Misled Avenger';
 
 /** Attacks und Spells im Deck, die DIESER Held spielen koennte. */
-function spielbareDeckkarten(engine, pi, heroIdx) {
+function spielbareDeckkarten(engine, pi, heroIdx, feld = pi) {
   const gs = engine.gs;
   const ps = gs.players[pi];
   const db = engine._getCardDB();
@@ -61,7 +61,9 @@ function spielbareDeckkarten(engine, pi, heroIdx) {
     // `heroMeetsLevelReq` ist die Stelle, die auch
     // `getHeroPlayableCards` benutzt (mit levelOverrideCards,
     // bypassLevelReq, Performance und Wisdom). NICHT selbst nachbauen.
-    if (!engine.heroMeetsLevelReq(pi, heroIdx, cd)) continue;
+    // Als Vorgabe 29.9.: geliehener Friedhelm — Stufe am Helden (`feld`),
+    // Ermaessigungen beim Kontrolleur (wie der Charme-Zweig).
+    if (!engine.heroMeetsLevelReq(feld, heroIdx, cd, feld !== pi ? { levelSourcePi: pi } : {})) continue;
     // ★ GALERIE-EINTRAEGE SIND OBJEKTE (Als Befund 12.9.) ────────────
     // `promptCardGallery` erwartet `[{ name, source?, … }]`, keine
     // nackten Strings. Mit Strings oeffnet sich die Galerie und bleibt
@@ -82,17 +84,16 @@ module.exports = {
   canActivateHeroEffect(ctx) {
     const engine = ctx._engine;
     const pi = ctx.cardOwner;
-    // Styx 28.9.: `_castSpellImmediately` wirkt nur ueber Helden der
-    // eigenen Spalte — ein uebernommener Friedhelm spielte sonst ueber
-    // den gleich indizierten EIGENEN Helden. Bis die Engine das kann: aus.
-    if ((ctx.cardHeroOwner ?? pi) !== pi) return false;
-    const hero = ctx.attachedHero ?? engine?.gs?.players?.[pi]?.heroes?.[ctx.cardHeroIdx];
+    // Als Vorgabe 29.9.: ein uebernommener Friedhelm wirkt auf seiner
+    // Brettseite (`_castSpellImmediately` mit `heroOwner`), Deck = Kontrolleur.
+    const feld = ctx.cardHeroOwner ?? pi;
+    const hero = ctx.attachedHero ?? engine?.gs?.players?.[feld]?.heroes?.[ctx.cardHeroIdx];
     if (!hero?.name || hero.hp <= 0) return false;
     // Die Aktionsgrenze der Karte selbst: hat er schon gehandelt, ist
     // Schluss. Die Engine prueft das auch, aber ein toter Knopf ist
     // besser als eine abgelehnte Aktivierung.
     if (hero._maxActionsPerTurn && (hero._actionsThisTurn || 0) >= hero._maxActionsPerTurn) return false;
-    return spielbareDeckkarten(engine, pi, ctx.cardHeroIdx).length > 0;
+    return spielbareDeckkarten(engine, pi, ctx.cardHeroIdx, feld).length > 0;
   },
 
   cpuShouldUseHeroEffect(engine, pi) {
@@ -140,9 +141,9 @@ module.exports = {
     const heroIdx = ctx.cardHeroIdx;
     const ps = gs.players[pi];
     if (!ps) return false;
-    if ((ctx.cardHeroOwner ?? pi) !== pi) return false;   // Styx 28.9.: s. canActivateHeroEffect
+    const feld = ctx.cardHeroOwner ?? pi;   // Als Vorgabe 29.9.: Brettseite des Helden
 
-    const kandidaten = spielbareDeckkarten(engine, pi, heroIdx);
+    const kandidaten = spielbareDeckkarten(engine, pi, heroIdx, feld);
     if (kandidaten.length === 0) return false;
 
     // Die Galerie haengt am ctx (`_createContext`), nicht an der Engine.
@@ -175,7 +176,7 @@ module.exports = {
     // Zielwahl ist nicht abbrechbar (`_forceNonCancellable` unten).
     await engine.showTriggeredEffect(name, { playerIdx: pi });
 
-    const key = `${pi}-${heroIdx}`;
+    const key = `${feld}-${heroIdx}`;   // heroFlags liegen auf der Brettseite
     const vorher = gs.heroFlags?.[key];
     try {
       // „cannot affect more than 1 target" — nur fuer DIESE Aufloesung.
@@ -194,6 +195,7 @@ module.exports = {
           pool: ps.mainDeck,
           poolIndex,
           by: CARD_NAME,
+          ...(feld !== pi ? { heroOwner: feld } : {}),   // Als Vorgabe 29.9.
         });
         if (r?.cancelled) return false;
       } finally {

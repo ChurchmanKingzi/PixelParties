@@ -127,10 +127,11 @@ module.exports = {
    * traegt die abgelegte Karte denselben Namen, waere es dieser Golem
    * selbst — dann nicht.
    */
-  surpriseSurpriseDiscardedTrigger: (gs, ownerIdx, heroIdx, info /*, engine */) => {
+  surpriseSurpriseDiscardedTrigger: (gs, ownerIdx, heroIdx, info, engine, seite = ownerIdx) => {
     if (!info?.cardName) return false;
-    if (info.zoneOwner !== ownerIdx) return false;
-    if (info.cardName === CARD_NAME && info.fromHeroIdx === heroIdx) return false;
+    // Als Vorgabe 29.9.: „meine Seite" = Zonen der Helden, die ich kontrolliere.
+    if ((info.zoneController ?? info.zoneOwner) !== ownerIdx) return false;
+    if (info.cardName === CARD_NAME && info.fromHeroIdx === heroIdx && info.zoneOwner === seite) return false;
     return true;
   },
 
@@ -152,7 +153,8 @@ module.exports = {
       const golem = ctx.cardInstance;
       if (!golem || golem.id !== ctx.card.id) return;      // nur ich selbst
 
-      const pi = ctx.surpriseOwner;
+      // Als Vorgabe 29.9.: „your opponent" relativ zum Ausloeser (Kontrolleur).
+      const pi = ctx.surpriseController ?? ctx.surpriseOwner;
       const oppIdx = pi === 0 ? 1 : 0;
       const gs = engine.gs;
       const cardDB = engine._getCardDB();

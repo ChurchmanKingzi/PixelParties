@@ -869,9 +869,49 @@ function heroCanBeEquipped(hero) {
   if (!hero || !hero.name) return false;
   if (hero.hp <= 0) return false;                 // tot
   if (hero.statuses && hero.statuses.frozen) return false;   // eingefroren
-  if (hero.statuses && hero.statuses.charmed) return false;  // bezaubert
+  // Uebernommen: nur, wenn die Uebernahme Ausruestung erlaubt (Als Vorgabe
+  // 29.9. — alles ausser Charme, der „It and its Support Zones" sperrt).
+  if (!kontrollRechteVon(hero).ausruesten) return false;
   return true;
 }
+
+/**
+ * ★ WAS DARF DER KONTROLLEUR MIT EINEM UEBERNOMMENEN HELDEN? (Als Vorgabe 29.9.)
+ *
+ * „Ueber Styx ist ALLES freigegeben. Diejenigen [Uebernahmen], die nicht
+ * ausdruecklich Support Zones sperren, erlauben sowohl das Beschwoeren von
+ * Creatures als auch das Anlegen von Equips oder Attachments."
+ *
+ *   Eigener Held / dauerhafte Uebernahme (Paraseed Control)  → alles
+ *   Styx                                  → beschwoeren, ausruesten, abilities
+ *   Golden Apple, FTCD, Molinda, Succubus → beschwoeren, ausruesten
+ *   Charme Lv3 („It and its Support Zones are unaffected") → nichts
+ *   Love Shot / Controlled Attack (nur eine Handlung)      → nichts
+ *
+ * Die Quelle stempelt `hero._kontrollRechte` beim Uebernehmen; das Ende
+ * der Kontrolle raeumt den Stempel ab. Ohne Stempel: `charmedBy` →
+ * Grundregel (beschwoeren + ausruesten), nur `controlledBy` → nichts.
+ * Reine Lesefunktion am Heldenobjekt (ohne Engine), wie
+ * `heroCanBeEquipped`.
+ */
+function kontrollRechteVon(hero) {
+  const alle = { beschwoeren: true, ausruesten: true, abilities: true };
+  if (!hero || !hero.name) return { beschwoeren: false, ausruesten: false, abilities: false };
+  if (hero.permaControlBy != null) return alle;                    // zaehlt wie ein eigener
+  if (hero.charmedBy == null && hero.controlledBy == null) return alle;   // nicht uebernommen
+  const r = hero._kontrollRechte;
+  if (r) return { beschwoeren: !!r.beschwoeren, ausruesten: !!r.ausruesten, abilities: !!r.abilities };
+  if (hero.statuses && hero.statuses.charmed && hero.statuses.charmed.abilitiesErlaubt) return alle;
+  if (hero.charmedBy != null) return { beschwoeren: true, ausruesten: true, abilities: false };
+  return { beschwoeren: false, ausruesten: false, abilities: false };
+}
+
+/** Vorlagen fuer `_kontrollRechte` je Uebernahme-Art. */
+const KONTROLL_RECHTE = {
+  alles:  { beschwoeren: true,  ausruesten: true,  abilities: true },
+  brett:  { beschwoeren: true,  ausruesten: true,  abilities: false },
+  nichts: { beschwoeren: false, ausruesten: false, abilities: false },
+};
 
 /**
  * ★ ALLGEMEINE SKALIERUNGSREGEL (Als Vorgabe 5.9.)
@@ -1003,6 +1043,8 @@ module.exports = {
   getParalysisStatuses, getTargetingBlockingStatuses, getStatusDamageSourceNames, BUFF_EFFECTS,
   hasCardType, hasSpellSchool, SPELL_SCHOOL_ABILITIES, spellSchoolAbilitiesOn, isArtifactCreature, isPileCreature, hasNumericCreatureLevel, isCreatureNegated,
   heroCanBeEquipped,
+  kontrollRechteVon,
+  KONTROLL_RECHTE,
   isOwnSideSummonableCreature,
   resolveSourceCreature, isCreatureSource, isAttackSpellOrCreatureSource,
   POISON_BASE_DAMAGE, BURN_BASE_DAMAGE,

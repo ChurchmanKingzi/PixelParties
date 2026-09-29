@@ -281,8 +281,8 @@ async function doDeckSearch(engine, playerIdx, heroIdx, level, trainingZoneIdx, 
     if (feld === playerIdx) ps.abilityGivenThisTurn[heroIdx] = true;
     else {
       // Geliehener Held: sein Anlegen dieses Zuges ist die Styx-Marke.
-      const ch = hps.heroes?.[heroIdx]?.statuses?.charmed;
-      if (ch) ch.abilityZug = engine.gs.turn;
+      const h = hps.heroes?.[heroIdx];
+      if (h) h._abilityZug = engine.gs.turn;
     }
   }
 

@@ -116,7 +116,7 @@ module.exports = {
     //     silently miss a death routed any other way.
     if (tInst) {
       await engine.actionDestroyCard(
-        { name: 'Afflicted Vermin', owner: pi, heroIdx: ctx.cardHeroIdx },
+        { name: 'Afflicted Vermin', owner: pi, heroIdx: ctx.cardHeroIdx, heroOwner: ctx.cardHeroOwner },
         tInst,
         { fireCreatureDeath: true },
       );

@@ -64,6 +64,9 @@ function canHeroSummon(engine, pi, heroIdx, cd, opts = {}) {
   const hero = engine?.gs?.players?.[physOwner]?.heroes?.[heroIdx];
   if (!hero?.name || hero.hp <= 0) return false;
   if (engine.heroSideOf && engine.heroSideOf(physOwner, hero) !== pi) return false;
+  // Als Vorgabe 29.9.: die Uebernahme muss das Beschwoeren erlauben
+  // (Charme sperrt „its Support Zones").
+  if (engine.kontrollRechte && !engine.kontrollRechte(physOwner, heroIdx).beschwoeren) return false;
   if (ps?.summonLocked) return false;
   const st = hero.statuses || {};
   if (st.frozen || st.stunned || st.webbed || st.bound || st.negated) return false;

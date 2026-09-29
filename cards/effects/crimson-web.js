@@ -146,7 +146,8 @@ module.exports = {
    */
   surpriseTrigger: (gs, ownerIdx, heroIdx, sourceInfo, engine) => {
     if (!sourceInfo || sourceInfo.owner == null || sourceInfo.owner < 0) return false;
-    if (sourceInfo.owner === ownerIdx) return false; // opp source only
+    // opp source only (Als Vorgabe 29.9.: handelnder Spieler, nicht Seite)
+    if ((sourceInfo.controller ?? sourceInfo.owner) === ownerIdx) return false;
     if (sourceInfo.heroIdx == null || sourceInfo.heroIdx < 0) return false;
     const attacker = gs.players[sourceInfo.owner]?.heroes?.[sourceInfo.heroIdx];
     if (!attacker || attacker.hp <= 0) return false;
@@ -180,6 +181,9 @@ module.exports = {
     const gs = engine.gs;
     const ownerIdx = ctx.cardOwner;
     const ownerHi = ctx.cardHeroIdx;
+    // Als Vorgabe 29.9.: Zone auf der Brettseite (geliehener Held),
+    // Ablage beim Kartenbesitzer.
+    const zonenSeite = ctx.cardHeroOwner ?? ownerIdx;
     const attackerOwner = sourceInfo.owner;
     const attackerHi = sourceInfo.heroIdx;
 
@@ -188,7 +192,7 @@ module.exports = {
     if (!attackerHero || attackerHero.hp <= 0) return null;
 
     const freeSlot = findFreeSupportSlot(attackerPs, attackerHi);
-    const ownerPs = gs.players[ownerIdx];
+    const ownerPs = gs.players[zonenSeite];
     const inst = ctx.card;
 
     if (freeSlot < 0 || !inst) {
@@ -196,7 +200,7 @@ module.exports = {
       // blendet dann ueber eine Sekunde aus (Als Vorgabe 26.9.).
       engine._broadcastEvent('play_zone_animation', {
         type: 'crimson_web', owner: attackerOwner, heroIdx: attackerHi, zoneSlot: -1,
-        von: { owner: ownerIdx, heroIdx: ownerHi, zoneType: 'surprise' },
+        von: { owner: zonenSeite, heroIdx: ownerHi, zoneType: 'surprise' },
         bleibt: false, duration: 2100,
       });
       await engine._delay(1100);
@@ -209,7 +213,7 @@ module.exports = {
         const idx = sz.indexOf(CARD_NAME);
         if (idx >= 0) sz.splice(idx, 1);
       }
-      ownerPs?.discardPile?.push(CARD_NAME);
+      gs.players[ctx.cardOriginalOwner ?? zonenSeite]?.discardPile?.push(CARD_NAME);
       if (inst) engine._untrackCard(inst.id);
       engine.log('crimson_web_fizzle', {
         reason: 'no_free_slot_on_attacker',
@@ -227,7 +231,7 @@ module.exports = {
     engine._broadcastEvent('play_zone_animation', {
       type: 'crimson_web', owner: attackerOwner,
       heroIdx: attackerHi, zoneSlot: -1,
-      von: { owner: ownerIdx, heroIdx: ownerHi, zoneType: 'surprise' },
+      von: { owner: zonenSeite, heroIdx: ownerHi, zoneType: 'surprise' },
       bleibt: true, duration: 1500,
     });
     await engine._delay(500);
@@ -257,8 +261,8 @@ module.exports = {
 
     // Animate the card's flight from Surprise Zone → Support Zone.
     engine._broadcastEvent('play_pile_transfer', {
-      owner: ownerIdx, cardName: CARD_NAME,
-      fromOwner: ownerIdx, toOwner: attackerOwner,
+      owner: zonenSeite, cardName: CARD_NAME,
+      fromOwner: zonenSeite, toOwner: attackerOwner,
       from: 'surprise', to: 'support',
       fromHeroIdx: ownerHi,
       toHeroIdx: attackerHi, toSlotIdx: freeSlot,

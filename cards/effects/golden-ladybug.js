@@ -69,17 +69,17 @@ function freieZonen(ps, heroIdx) {
  * Surprise Zone (Bakhm-Slots liegen schon in der Support Zone, Aktivierung
  * aus der Ablage platziert nicht).
  */
-function platzschutz(engine, pi, heroIdx, surpriseName) {
+function platzschutz(engine, pi, heroIdx, surpriseName, seite = pi) {
   const cd = engine._getCardDB()[surpriseName];
   if (!cd || !hasCardType(cd, 'Creature')) return null;
+  // Als Vorgabe 29.9.: `seite` = Brettseite der Zone (geliehener Held).
   const liegtInSurpriseZone = (engine.cardInstances || []).some(c =>
-    c.owner === pi && c.zone === 'surprise' && c.name === surpriseName && c.heroIdx === heroIdx);
+    c.owner === seite && c.zone === 'surprise' && c.name === surpriseName && c.heroIdx === heroIdx);
   if (!liegtInSurpriseZone) return null;
   return (zone) => {
-    // Nur der eigene Traeger-Held ist geschuetzt — Zonen uebernommener
-    // Helden der Gegenspalte (`zone.owner`) nie (Styx 28.9.).
-    if ((zone.owner ?? pi) !== pi || zone.heroIdx !== heroIdx) return true;
-    return freieZonen(engine.gs.players[pi], heroIdx) > 1;
+    // Nur der Traeger-Held (Brettseite + Index) ist geschuetzt (Styx 28.9.).
+    if ((zone.owner ?? pi) !== seite || zone.heroIdx !== heroIdx) return true;
+    return freieZonen(engine.gs.players[seite], heroIdx) > 1;
   };
 }
 
@@ -88,7 +88,7 @@ async function handAngebot(ctx) {
   const gs = engine.gs;
   const pi = ctx.card.owner;
   const surprise = ctx.surpriseCardName;
-  const filter = platzschutz(engine, pi, ctx.heroIdx, surprise);
+  const filter = platzschutz(engine, pi, ctx.heroIdx, surprise, ctx.surpriseOwner ?? pi);
 
   // Eine Runde je Kopie auf der Hand; Obergrenze nur als Schleifenriegel.
   for (let runde = 0; runde < 12; runde++) {
@@ -199,7 +199,8 @@ module.exports = {
     onSurpriseActivated: async (ctx) => {
       const inst = ctx.card;
       if (!inst || inst.zone !== 'hand') return;
-      if (ctx.surpriseOwner !== inst.owner) return;       // „when YOU activate"
+      // „when YOU activate" — Als Vorgabe 29.9.: der Ausloeser, nicht die Brettseite.
+      if ((ctx.surpriseController ?? ctx.surpriseOwner) !== inst.owner) return;
       if (ctx._goldenLadybugAngebot) return;               // eine Runde je Aktivierung
       ctx.setFlag('_goldenLadybugAngebot', true);
       await handAngebot(ctx);

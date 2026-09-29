@@ -348,6 +348,10 @@ module.exports = {
       if (cost > 0 && (ps.goldLocked || (ps.gold || 0) < cost)) return doDefeat('cant_pay');
       if (_firstFreeSupportSlot(gs.players[feld], helHeroIdx) < 0) return doDefeat('no_slot');
       if (!_helCanUseEquip(engine, feld, helHeroIdx, name)) return doDefeat('cant_equip');
+      // Als Vorgabe 29.9.: uebernommene Hel nur ausruestbar, wenn die
+      // Uebernahme es erlaubt (Charme sperrt „its Support Zones") — sonst
+      // „If you can't, defeat this Hero".
+      if (feld !== pi && !engine.kontrollRechte(feld, helHeroIdx).ausruesten) return doDefeat('cant_equip');
 
       // Source: player chooses only when BOTH piles hold a copy
       // (mandatory effect — they must pick one). Otherwise automatic.

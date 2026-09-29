@@ -48,18 +48,32 @@ function freeSlots(ps, heroIdx) {
   return out;
 }
 
-/** Alle in Frage kommenden Plaetze: [{ side, heroIdx, slotIdx }]. */
+/**
+ * Alle in Frage kommenden Plaetze: [{ side, heroIdx, slotIdx }].
+ *
+ * Als Vorgabe 29.9.: Ohne `opts.sides` („attach to a Hero you control")
+ * kommen zu den eigenen Helden die UEBERNOMMENEN der Gegenseite hinzu,
+ * deren Uebernahme `ausruesten` erlaubt (Styx, Golden Apple, FTCD …;
+ * Charme und Love Shot nicht) — mit ihrer Brettseite als `side`.
+ * `heroFilter` bekommt die Seite als drittes Argument und muss sie
+ * pruefen, wenn er nur Indizes vergleicht. `opts.nurEigene` schaltet das ab.
+ */
 function candidateHosts(gs, pi, engine, opts = {}) {
   const sides = opts.sides || [pi];
   const out = [];
+  const nimm = (side, hi) => {
+    const ps = gs.players[side];
+    const h = ps?.heroes?.[hi];
+    if (!h?.name || h.hp <= 0) return;
+    if (opts.heroFilter && !opts.heroFilter(h, hi, side, engine)) return;
+    for (const si of freeSlots(ps, hi)) out.push({ side, heroIdx: hi, slotIdx: si });
+  };
   for (const side of sides) {
     const ps = gs.players[side];
-    for (let hi = 0; hi < (ps?.heroes || []).length; hi++) {
-      const h = ps.heroes[hi];
-      if (!h?.name || h.hp <= 0) continue;
-      if (opts.heroFilter && !opts.heroFilter(h, hi, side, engine)) continue;
-      for (const si of freeSlots(ps, hi)) out.push({ side, heroIdx: hi, slotIdx: si });
-    }
+    for (let hi = 0; hi < (ps?.heroes || []).length; hi++) nimm(side, hi);
+  }
+  if (!opts.sides && !opts.nurEigene && typeof engine?.fremdAusruestHelden === 'function') {
+    for (const { physOwner, heroIdx } of engine.fremdAusruestHelden(pi)) nimm(physOwner, heroIdx);
   }
   return out;
 }
@@ -72,8 +86,9 @@ function candidateHosts(gs, pi, engine, opts = {}) {
  * Helden als Drop-Ziel an (v651).
  */
 function attachmentHostsFor(gs, pi, engine, opts = {}) {
-  const sides = opts.sides || [pi];
-  return candidateHosts(gs, pi, engine, { ...opts, sides }).map(h => ({ owner: h.side, heroIdx: h.heroIdx, slotIdx: h.slotIdx }));
+  // `sides` bleibt ungesetzt, wenn der Aufrufer keine nennt — sonst fielen
+  // die uebernommenen Helden heraus (Als Vorgabe 29.9., `candidateHosts`).
+  return candidateHosts(gs, pi, engine, opts).map(h => ({ owner: h.side, heroIdx: h.heroIdx, slotIdx: h.slotIdx }));
 }
 
 async function pickAttachmentHost(ctx, CARD_NAME, opts = {}) {
@@ -115,8 +130,11 @@ async function pickAttachmentHost(ctx, CARD_NAME, opts = {}) {
   // 2 legte auf den linkesten freien Platz — egal, wohin gezogen wurde.
   // Ein Slot-Hinweis allein ist eindeutig genug, sobald er mit dem
   // Caster-Helden zusammen einen gueltigen Platz ergibt.
+  // Brettseite des Wirkers (Als Vorgabe 29.9.: ein uebernommener Held
+  // wirkt von der Gegenseite — sonst traefe es den gleich indizierten eigenen).
+  const casterSide = ctx.cardHeroOwner ?? pi;
   if ((hintHero == null || hintHero < 0) && wanted != null && wanted >= 0) {
-    const beimCaster = hosts.find(h => h.side === pi && h.heroIdx === ctx.cardHeroIdx && h.slotIdx === wanted);
+    const beimCaster = hosts.find(h => h.side === casterSide && h.heroIdx === ctx.cardHeroIdx && h.slotIdx === wanted);
     if (beimCaster) return { owner: beimCaster.side, heroIdx: beimCaster.heroIdx, slotIdx: beimCaster.slotIdx };
   }
   // 2) Caster-Held als Standard, wenn gewuenscht und moeglich.
@@ -125,7 +143,7 @@ async function pickAttachmentHost(ctx, CARD_NAME, opts = {}) {
   // es keinen Drop, der den Wirt ausdrueckt; der Caster als stiller
   // Standard nahm dem Spieler die Wahl. Dann fragt Schritt 4.
   if (opts.preferCaster && !gs._immediateActionContext) {
-    const hit = hosts.find(h => h.side === pi && h.heroIdx === ctx.cardHeroIdx);
+    const hit = hosts.find(h => h.side === casterSide && h.heroIdx === ctx.cardHeroIdx);
     if (hit) return { owner: hit.side, heroIdx: hit.heroIdx, slotIdx: hit.slotIdx };
   }
   // 3) Genau ein Held mit genau einem Platz → automatisch

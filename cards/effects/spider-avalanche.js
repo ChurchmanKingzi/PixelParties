@@ -48,7 +48,7 @@ module.exports = {
 
     if (sourceInfo.owner < 0 || sourceInfo.heroIdx < 0) return false;
     // Only triggers against OPPONENT effects
-    if (sourceInfo.owner === ownerIdx) return false;
+    if ((sourceInfo.controller ?? sourceInfo.owner) === ownerIdx) return false;   // 29.9.: Spieler, nicht Seite
     // v666 (Sweep): „opponent's Attack, Spell or Creature effect“.
     if (!isAttackSpellOrCreatureSource(engine, sourceInfo)) return false;
     return true;

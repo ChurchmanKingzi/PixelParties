@@ -36,6 +36,8 @@
 //       etwas bezahlt.
 // ═══════════════════════════════════════════
 
+const { heroCanBeEquipped } = require('./_hooks');
+
 /**
  * Freie Basis-Support-Zonen (0–2) dieses Helden.
  * ★★ v1349: mit `engine` + `pi` zaehlen versiegelte Plaetze (Madame
@@ -51,14 +53,25 @@ function freieBasisZonen(ps, heroIdx, engine = null, pi = null) {
   return out;
 }
 
-/** Taugt dieser eigene Held als Traeger fuer `cardName`? */
-function istAusruestTraeger(engine, pi, heroIdx, cardName) {
-  const ps = engine.gs.players[pi];
+/**
+ * Taugt dieser Held als Traeger fuer `cardName`? `seite` = Brettseite des
+ * Helden (Standard `pi`). Als Vorgabe 29.9.: ein uebernommener Held der
+ * Gegenseite taugt, wenn `pi` ihn kontrolliert und die Uebernahme
+ * `ausruesten` erlaubt (`engine.darfFremdAusruesten`); ein an den Gegner
+ * abgegebener eigener Held nicht.
+ */
+function istAusruestTraeger(engine, pi, heroIdx, cardName, seite = pi) {
+  const ps = engine.gs.players[seite];
   const hero = ps?.heroes?.[heroIdx];
   if (!hero?.name || hero.hp <= 0) return false;
-  if (hero.statuses?.frozen || hero.statuses?.charmed) return false;
-  if (freieBasisZonen(ps, heroIdx, engine, pi).length === 0) return false;
-  return engine.canEquipCardToHero(cardName, pi, heroIdx);
+  if (seite !== pi) {
+    if (!engine.darfFremdAusruesten?.(pi, seite, heroIdx)) return false;
+  } else {
+    if (!heroCanBeEquipped(hero)) return false;
+    if (engine.heroSideOf && engine.heroSideOf(pi, hero) !== pi) return false;
+  }
+  if (freieBasisZonen(ps, heroIdx, engine, seite).length === 0) return false;
+  return engine.canEquipCardToHero(cardName, seite, heroIdx);
 }
 
 /** Alle eigenen Helden, die `cardName` tragen koennen. */
@@ -71,6 +84,15 @@ function ausruestTraeger(engine, pi, cardName) {
   return out;
 }
 
+/** Als Vorgabe 29.9.: alle Traeger inkl. uebernommener Helden — [{ seite, heroIdx }]. */
+function ausruestTraegerMitSeite(engine, pi, cardName) {
+  const out = ausruestTraeger(engine, pi, cardName).map(hi => ({ seite: pi, heroIdx: hi }));
+  for (const { physOwner, heroIdx } of (engine.fremdAusruestHelden?.(pi) || [])) {
+    if (istAusruestTraeger(engine, pi, heroIdx, cardName, physOwner)) out.push({ seite: physOwner, heroIdx });
+  }
+  return out;
+}
+
 /**
  * Held oder Zone waehlen, an den `cardName` kommt. Liefert
  * `{ heroIdx, slot }` oder `null` (Abbruch / kein Traeger).
@@ -79,16 +101,20 @@ function ausruestTraeger(engine, pi, cardName) {
 async function waehleAusruestPlatz(engine, pi, cardName, cfg = {}) {
   const ps = engine.gs.players[pi];
   if (!ps) return null;
-  const helden = ausruestTraeger(engine, pi, cardName)
-    .filter(hi => !cfg.nurHelden || cfg.nurHelden.includes(hi));
+  // Als Vorgabe 29.9.: auch uebernommene Helden (Brettseite `seite`);
+  // `nurHelden` meint eigene Helden.
+  const helden = (cfg.nurHelden ? ausruestTraeger(engine, pi, cardName).map(hi => ({ seite: pi, heroIdx: hi }))
+    : ausruestTraegerMitSeite(engine, pi, cardName))
+    .filter(h => !cfg.nurHelden || cfg.nurHelden.includes(h.heroIdx));
   if (helden.length === 0) return null;
 
   const ziele = [];
-  for (const hi of helden) {
-    for (const si of freieBasisZonen(ps, hi, engine, pi)) {
-      ziele.push({ id: `equip-${pi}-${hi}-${si}`, type: 'equip', owner: pi, heroIdx: hi, slotIdx: si, cardName: '' });
+  for (const { seite, heroIdx: hi } of helden) {
+    const sps = engine.gs.players[seite];
+    for (const si of freieBasisZonen(sps, hi, engine, seite)) {
+      ziele.push({ id: `equip-${seite}-${hi}-${si}`, type: 'equip', owner: seite, heroIdx: hi, slotIdx: si, cardName: '' });
     }
-    ziele.push({ id: `hero-${pi}-${hi}`, type: 'hero', owner: pi, heroIdx: hi, cardName: ps.heroes[hi].name });
+    ziele.push({ id: `hero-${seite}-${hi}`, type: 'hero', owner: seite, heroIdx: hi, cardName: sps.heroes[hi].name });
   }
 
   const ids = await engine.promptEffectTarget(pi, ziele, {
@@ -105,9 +131,9 @@ async function waehleAusruestPlatz(engine, pi, cardName, cfg = {}) {
   if (!ids || ids.length === 0) return null;
   const ziel = ziele.find(t => t.id === ids[0]);
   if (!ziel) return null;
-  const slot = ziel.type === 'equip' ? ziel.slotIdx : freieBasisZonen(ps, ziel.heroIdx, engine, pi)[0];
+  const slot = ziel.type === 'equip' ? ziel.slotIdx : freieBasisZonen(engine.gs.players[ziel.owner], ziel.heroIdx, engine, ziel.owner)[0];
   if (slot == null) return null;
-  return { heroIdx: ziel.heroIdx, slot };
+  return { heroIdx: ziel.heroIdx, slot, seite: ziel.owner };
 }
 
 /**
@@ -122,15 +148,20 @@ async function waehleAusruestPlatz(engine, pi, cardName, cfg = {}) {
 async function ruesteAusStapelAus(engine, pi, stapel, cardName, heroIdx, slot, opts = {}) {
   const ps = engine.gs.players[pi];
   if (!ps) return null;
-  if (!istAusruestTraeger(engine, pi, heroIdx, cardName)) return null;
-  if (((ps.supportZones[heroIdx] || [])[slot] || []).length > 0) return null;
+  // Als Vorgabe 29.9.: `opts.seite` = Brettseite eines uebernommenen Helden.
+  // Die Karte liegt dort, gehoert aber `pi` (`originalOwner`).
+  const seite = (opts.seite === 0 || opts.seite === 1) ? opts.seite : pi;
+  const zps = engine.gs.players[seite];
+  if (!istAusruestTraeger(engine, pi, heroIdx, cardName, seite)) return null;
+  if (((zps.supportZones[heroIdx] || [])[slot] || []).length > 0) return null;
 
   const genommen = await engine.takeFromPile(ps, stapel, cardName, { source: opts.source });
   if (!genommen) return null;
 
-  if (!ps.supportZones[heroIdx]) ps.supportZones[heroIdx] = [[], [], []];
-  ps.supportZones[heroIdx][slot] = [cardName];
-  const inst = engine._trackCard(cardName, pi, 'support', heroIdx, slot);
+  if (!zps.supportZones[heroIdx]) zps.supportZones[heroIdx] = [[], [], []];
+  zps.supportZones[heroIdx][slot] = [cardName];
+  const inst = engine._trackCard(cardName, seite, 'support', heroIdx, slot);
+  if (seite !== pi) inst.originalOwner = pi;
 
   const flug = opts.flug !== false;
   if (flug) {
@@ -138,7 +169,7 @@ async function ruesteAusStapelAus(engine, pi, stapel, cardName, heroIdx, slot, o
     // Stapeln wird animiert). Der Client versteckt das Ziel waehrend
     // des Flugs.
     engine._broadcastEvent('play_pile_transfer', {
-      owner: pi, cardName,
+      owner: pi, toOwner: seite, cardName,
       from: stapel, to: 'support',
       toHeroIdx: heroIdx, toSlotIdx: slot,
     });
@@ -163,6 +194,7 @@ module.exports = {
   freieBasisZonen,
   istAusruestTraeger,
   ausruestTraeger,
+  ausruestTraegerMitSeite,
   waehleAusruestPlatz,
   ruesteAusStapelAus,
 };

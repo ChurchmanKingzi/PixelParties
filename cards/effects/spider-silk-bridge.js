@@ -33,11 +33,27 @@
 
 const CARD_NAME = 'Spider Silk Bridge';
 
+/**
+ * Als Vorgabe 29.9.: „you" = aktueller Kontrolleur der Zone
+ * (`surpriseKontrolleur`), nicht die Brettseite `inst.owner`.
+ */
+function kontrolleur(engine, inst) {
+  return engine.surpriseKontrolleur?.(inst.owner, inst.heroIdx) ?? inst.owner;
+}
+
+/** Handelnder Spieler einer Schadensquelle (geliehener Held → Kontrolleur). */
+function quellenSpieler(engine, source) {
+  const q = engine._surpriseQuellenSpieler?.(source);
+  return (typeof q === 'number' && q >= 0) ? q : (source?.owner ?? source?.controller ?? -1);
+}
+
 /** Move this face-up Spider Silk Bridge to its owner's discard pile. */
 async function discardFaceUp(engine, inst, reason) {
   if (!inst || inst.zone !== 'surprise') return;
   const ps = engine.gs.players[inst.owner];
   if (!ps) return;
+  // 29.9.: Ablage beim Kartenbesitzer (`originalOwner`), Zone auf der Brettseite.
+  const ablage = engine.gs.players[inst.originalOwner ?? inst.owner] || ps;
   const zone = ps.surpriseZones?.[inst.heroIdx];
   if (!zone) return;
   const idx = zone.indexOf(inst.name);
@@ -49,14 +65,15 @@ async function discardFaceUp(engine, inst, reason) {
   // leftmost — pre-emit the slot-anchored flight to disambiguate.
   engine._broadcastEvent('play_pile_transfer', {
     owner: inst.owner, cardName: inst.name,
+    fromOwner: inst.owner, toOwner: inst.originalOwner ?? inst.owner,
     from: 'surprise', to: 'discard',
     fromHeroIdx: inst.heroIdx,
   });
   zone.splice(idx, 1);
-  ps.discardPile.push(inst.name);
+  ablage.discardPile.push(inst.name);
   engine._untrackCard(inst.id);
   engine.log('spider_silk_bridge_consumed', {
-    player: ps.username, reason,
+    player: engine.gs.players[kontrolleur(engine, inst)]?.username ?? ps.username, reason,
   });
   engine.sync();
 }
@@ -113,7 +130,7 @@ module.exports = {
     // Web/silk visual on the activating Hero's slot.
     engine._broadcastEvent('play_zone_animation', {
       type: 'gold_sparkle',
-      owner: pi, heroIdx: ctx.cardHeroIdx, zoneSlot: -1,
+      owner: ctx.cardHeroOwner ?? pi, heroIdx: ctx.cardHeroIdx, zoneSlot: -1,
     });
     await engine._delay(400);
 
@@ -135,11 +152,12 @@ module.exports = {
       const inst = ctx.card;
       if (!inst || inst.faceDown) return;
       if (inst.zone !== 'surprise') return;
-      if (ctx.activePlayer !== inst.owner) return;
       const engine = ctx._engine;
-      const drawn = await engine.actionDrawCards(inst.owner, 1, { source: CARD_NAME });
+      const k = kontrolleur(engine, inst);   // 29.9.: „your turn" = Kontrolleur
+      if (ctx.activePlayer !== k) return;
+      const drawn = await engine.actionDrawCards(k, 1, { source: CARD_NAME });
       engine.log('spider_silk_bridge_draw', {
-        player: engine.gs.players[inst.owner]?.username,
+        player: engine.gs.players[k]?.username,
         drawn: drawn?.length || 0, phase: 'turn_start',
       });
       engine.sync();
@@ -156,11 +174,16 @@ module.exports = {
       if (!inst || inst.faceDown || inst.zone !== 'surprise') return;
       if ((ctx.amount || 0) <= 0) return;
       const engine = ctx._engine;
-      const srcOwner = ctx.source?.owner ?? ctx.source?.controller ?? -1;
-      if (srcOwner < 0 || srcOwner === inst.owner) return; // opp-source only
-      // Target's owner must be this Bridge's controller.
-      const tgtOwner = ctx.target?.owner ?? engine._findHeroOwner?.(ctx.target);
-      if (tgtOwner == null || tgtOwner !== inst.owner) return;
+      const k = kontrolleur(engine, inst);   // 29.9.: Kontrolleur statt Brettseite
+      const srcOwner = quellenSpieler(engine, ctx.source);
+      if (srcOwner < 0 || srcOwner === k) return; // opp-source only
+      // Target must be controlled by this Bridge's controller.
+      const tgtSeite = ctx.target?.owner ?? engine._findHeroOwner?.(ctx.target);
+      if (tgtSeite == null || tgtSeite < 0) return;
+      const tgtHi = (engine.gs.players[tgtSeite]?.heroes || []).indexOf(ctx.target);
+      const tgtOwner = tgtHi >= 0 ? engine.surpriseKontrolleur(tgtSeite, tgtHi)
+        : (ctx.target?.controller ?? tgtSeite);
+      if (tgtOwner !== k) return;
       await discardFaceUp(engine, inst, 'opp_damaged_hero');
     },
 
@@ -168,13 +191,14 @@ module.exports = {
       const inst = ctx.card;
       if (!inst || inst.faceDown || inst.zone !== 'surprise') return;
       const engine = ctx._engine;
+      const k = kontrolleur(engine, inst);   // 29.9.: Kontrolleur statt Brettseite
       const entries = ctx.entries || [];
       for (const e of entries) {
         if (e.cancelled || (e.amount || 0) <= 0) continue;
         const tgtCtrl = e.inst?.controller ?? e.inst?.owner;
-        if (tgtCtrl == null || tgtCtrl !== inst.owner) continue;
-        const srcOwner = e.source?.owner ?? e.source?.controller ?? -1;
-        if (srcOwner < 0 || srcOwner === inst.owner) continue;
+        if (tgtCtrl == null || tgtCtrl !== k) continue;
+        const srcOwner = quellenSpieler(engine, e.source);
+        if (srcOwner < 0 || srcOwner === k) continue;
         await discardFaceUp(engine, inst, 'opp_damaged_creature');
         return;
       }

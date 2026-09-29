@@ -47,34 +47,40 @@ module.exports = {
     // the Hero auto-picks the leftmost free slot; clicking a specific
     // empty slot places there directly.
     const targets = [];
-    for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-      const hero = ps.heroes[hi];
+    // Als Vorgabe 29.9.: dazu uebernommene Helden der Gegenseite mit Recht
+    // `ausruesten` (Styx, Golden Apple …) — Ziel-ID/owner = Brettseite.
+    const _plaetze = (ps.heroes || []).map((_, hi) => ({ seite: pi, hi }))
+      .concat((engine.fremdAusruestHelden?.(pi) || []).map(e => ({ seite: e.physOwner, hi: e.heroIdx })));
+    for (const { seite, hi } of _plaetze) {
+      const sps = engine.gs.players[seite];
+      const hero = sps.heroes[hi];
       // v341: kanonische Ausruest-Regel (tot / eingefroren / bezaubert)
       // aus `_hooks.js` statt einer eigenen Teilpruefung. Die
       // Frozen-Sperre stand hier schon, `charmed` fehlte.
       if (!heroCanBeEquipped(hero)) continue;
+      if (seite === pi && engine.heroSideOf(pi, hero) !== pi) continue;   // abgegebener Held ist nicht „one of your Heroes"
       // Frozen Heroes cannot be equipped (they can't accept new gear
       // while frozen). Stunned + Negated are also disqualified for the
       // same reason — the Hero is incapacitated.
       if (hero.statuses?.frozen) continue;
-      const slots = ps.supportZones?.[hi] || [];
+      const slots = sps.supportZones?.[hi] || [];
       let leftmostFree = -1;
       for (let si = 0; si < slots.length; si++) {
         if (!slots[si] || slots[si].length === 0) {
           if (leftmostFree < 0) leftmostFree = si;
           targets.push({
-            id: `equip-${pi}-${hi}-${si}`,
+            id: `equip-${seite}-${hi}-${si}`,
             type: 'equip',
-            owner: pi, heroIdx: hi, slotIdx: si,
+            owner: seite, heroIdx: hi, slotIdx: si,
             cardName: '',
           });
         }
       }
       if (leftmostFree >= 0) {
         targets.push({
-          id: `hero-${pi}-${hi}`,
+          id: `hero-${seite}-${hi}`,
           type: 'hero',
-          owner: pi, heroIdx: hi,
+          owner: seite, heroIdx: hi,
           cardName: hero.name,
           _autoSlot: leftmostFree,
         });
@@ -97,8 +103,9 @@ module.exports = {
     if (!sel) return { aborted: true, reason: 'invalid_pick' };
 
     const heroIdx = sel.heroIdx;
+    const seite = sel.owner;   // Brettseite (Als Vorgabe 29.9.)
     const slotIdx = sel.type === 'hero' ? sel._autoSlot : sel.slotIdx;
-    const heroName = ps.heroes?.[heroIdx]?.name;
+    const heroName = engine.gs.players[seite]?.heroes?.[heroIdx]?.name;
 
     // ── Animation phase: fly the card from Stack to Support ──
     // The card is STILL on the Stack at this point — broadcasting
@@ -109,16 +116,17 @@ module.exports = {
     const popInst = engine.getCoolnessStackTopInst(pi);
     engine._broadcastEvent('attach_hero_fly', {
       ownerIdx: pi, source: 'coolnessStack', cardName: CARD_NAME,
-      destOwner: pi, destHeroIdx: heroIdx, destZoneSlot: slotIdx,
+      destOwner: seite, destHeroIdx: heroIdx, destZoneSlot: slotIdx,
     });
     await engine._delay(620);
 
     // ── Commit phase: pop Stack + place in support, single sync ──
     const popped = await ctx.popCoolnessStackTo(pi, 'board', { source: CARD_NAME });
     if (!popped) return { aborted: true, reason: 'pop_failed' };
-    const placed = engine.safePlaceInSupport(CARD_NAME, pi, heroIdx, slotIdx);
+    const placed = engine.safePlaceInSupport(CARD_NAME, seite, heroIdx, slotIdx);
     if (!placed?.inst) return { aborted: true, reason: 'placement_failed' };
     placed.inst.zone = 'support';
+    if (seite !== pi) placed.inst.originalOwner = pi;
 
     engine.log('modnir_equip', { player: ps.username, hero: heroName, slot: placed.actualSlot });
     engine.sync();
@@ -139,7 +147,7 @@ module.exports = {
     });
     await engine.runHooks('onCardEnterZone', {
       enteringCard: placed.inst, cardName: CARD_NAME,
-      toZone: 'support', toOwner: pi, toHeroIdx: heroIdx,
+      toZone: 'support', toOwner: seite, toHeroIdx: heroIdx,
       fromZone: 'coolnessStack',
     });
     return { played: true };
