@@ -30,9 +30,24 @@ src/<slug>-<teil>.png.
   tryse-the-shadow-slayer                „Tryse #4“ + zustechender Arm „Tryse #2“,
                                          Hand „Tryse #8“, Schwert „Tryse #9“
 
-Nicht gefunden (keine Ebene): Teppes/Teppesman, Toras the Battle Maniac, RhaBi
-the Human Hunter, Deep-Drowned Waflav, Waflav, Silent Water Mizune/Regional
-Champ Mizune, Madaga. Arnold (Hero) hat noch kein Kartenbild.
+Nachzügler (zweite Runde):
+
+  arnold-the-maximum-lotl                „Arnold“ (ohne Shirt; „Arnold-Kopie“ ist Bravo Arnold)
+  feral-the-fortress-breaker             „Feral“
+  teppes-the-deepsea-vampire             die Figur aus „TEPPES“; Teil bats = die zwei
+                                         Fledermäuse aus „Teppes“
+  teppesman-the-deepsea-knight           Skin: die Figur aus „Ebene #143“; Teil bats =
+                                         die drei Fledermäuse neben ihm
+  shu-chaku-the-blood-moon-projection    graue Gestalt „Ebene #174“ (voll deckend) +
+                                         Augen „Ebene #176“; Teil glow = das rote
+                                         Glühen „Ebene #175“ (halbtransparent)
+  deep-drowned-waflav                    die gekrönte Figur aus „Deep-Drowned Waflav“
+                                         (ohne die Seetang-Monster); Teile tentacles =
+                                         „Deep-Drowned Waflav #1“, wings = die
+                                         Skelettflügel „Deep-Drowned Waflav #2“
+
+Nicht gefunden (keine Ebene): Toras the Battle Maniac, RhaBi the Human Hunter,
+Waflav, Silent Water Mizune/Regional Champ Mizune, Madaga.
 """
 import sys
 import numpy as np
@@ -43,12 +58,12 @@ from gimpformats.gimpXcfDocument import GimpDocument
 OUT = 'src'
 
 
-def layer(doc, layers, name):
+def layer(doc, layers, name, full=False):
     hits = [l for l in layers if l.name == name]
     assert len(hits) == 1, (name, len(hits))
     l = hits[0]
     im = l.image.convert('RGBA')
-    if l.opacity < 255:                                   # Ebenen-Deckkraft übernehmen
+    if l.opacity < 255 and not full:                                   # Ebenen-Deckkraft übernehmen
         a = np.array(im)
         a[:, :, 3] = (a[:, :, 3].astype(int) * l.opacity // 255).astype(np.uint8)
         im = Image.fromarray(a)
@@ -94,6 +109,17 @@ def near(a, ref):
     return only(a, lab == best)
 
 
+def comp_at(a, x, y, dil=0):
+    """Die Zusammenhangskomponente von a, die (x, y) am nächsten liegt (dil: vorher wachsen lassen)."""
+    m = (a[:, :, 3] > 0).astype(np.uint8)
+    if dil:
+        m = cv2.dilate(m, np.ones((3, 3), np.uint8), iterations=dil)
+    n, lab = cv2.connectedComponents(m, connectivity=8)
+    ys, xs = np.nonzero(lab > 0)
+    d = (xs - x) ** 2 + (ys - y) ** 2
+    return only(a, (lab == lab[ys[d.argmin()], xs[d.argmin()]]) & (a[:, :, 3] > 0))
+
+
 def split_x(a, x):
     """a in links (< x) und rechts (>= x) teilen."""
     l, r = a.copy(), a.copy()
@@ -133,6 +159,25 @@ def main(path):
     save_parts('sorin-the-warden-of-blood-rock', [('body', only(sorin, lab == min(xs_mean, key=xs_mean.get)))])
     save_parts('toras-master-of-all-weapons', [('body', g('Toras'))])
     save_parts('tryse-the-shadow-slayer', [('body', g('Tryse #4')), ('arm', g('Tryse #2')), ('hand', g('Tryse #8')), ('sword', g('Tryse #9'))])
+    # ---- Nachzügler
+    save_parts('arnold-the-maximum-lotl', [('body', g('Arnold'))])
+    save_parts('feral-the-fortress-breaker', [('body', g('Feral'))])
+    save_parts('teppes-the-deepsea-vampire', [('body', comp_at(g('TEPPES'), 245, 308, dil=1)), ('bats', g('Teppes'))])
+    tm = g('Ebene #143')                                  # die Figur unten rechts und die drei Fledermäuse bei ihr
+    body = comp_at(tm, 325, 305)
+    n, lab = components(tm)
+    near_bats = np.zeros(tm.shape[:2], bool)
+    for k in range(1, n):
+        ys, xs = np.nonzero(lab == k)
+        if xs.mean() > 290 and ys.mean() > 260 and not (body[ys, xs, 3] > 0).any():
+            near_bats |= lab == k
+    save_parts('teppesman-the-deepsea-knight', [('body', body), ('bats', only(tm, near_bats))])
+    shu = layer(doc, L, 'Ebene #174', full=True)                     # die graue Gestalt voll deckend, darauf die Augen
+    eyes = g('Ebene #176')
+    shu[eyes[:, :, 3] > 0] = eyes[eyes[:, :, 3] > 0]
+    save_parts('shu-chaku-the-blood-moon-projection', [('glow', g('Ebene #175')), ('body', shu)])
+    save_parts('deep-drowned-waflav', [('wings', g('Deep-Drowned Waflav #2')), ('tentacles', g('Deep-Drowned Waflav #1')),
+                                       ('body', comp_at(g('Deep-Drowned Waflav'), 222, 310, dil=1))])
 
 
 if __name__ == '__main__':
