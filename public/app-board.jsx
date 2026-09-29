@@ -41288,6 +41288,14 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         }
         return <span>{pName(p.name, p.color)} milled {entry.count} card{entry.count>1?'s':''} ({dest}){entry.source ? <> by {cName(entry.source)}</> : ''}.</span>;
       }
+      if (t === 'codumbus_declare') {
+        const p = playerByName(entry.player);
+        return <span className="log-status">{pName(p.name, p.color)} declares <b>{entry.declared}</b> ({cName(entry.by)}).</span>;
+      }
+      if (t === 'codumbus_reveal') {
+        const p = playerByName(entry.player);
+        return <span className="log-status">{pName(p.name, p.color)} reveals {cName(entry.card)} — {entry.hit ? <>a hit! It is added to their hand.</> : <>a miss ({entry.declared} was declared). It is deleted.</>}</span>;
+      }
       if (t === 'magenta_discard') {
         const p = playerByName(entry.player);
         return <span>{pName(p.name, p.color)} discarded {cName(entry.discarded)} (Cute Nerd Magenta).</span>;
