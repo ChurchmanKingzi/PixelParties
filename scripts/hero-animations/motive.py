@@ -5,21 +5,21 @@ Aufruf: python3 motive.py <tag> [ms] <variante>
 
 Frame 0 ist immer die Ruhepose.
 
-* alex:     Alex, Trainer of Heroes federt und blinzelt.
-* doq:      Great Detective Doq federt; über das Glas seiner Lupe huscht ein Glanzlicht, dann
-            blitzt ein Stern am Rand.
+* alex:     Alex, Trainer of Heroes federt (der verschränkte Unterarm geht als Einheit mit) und blinzelt.
+* doq:      Great Detective Doq federt; das durch die Lupe riesige Auge blinzelt, über das Glas huscht
+            ein Glanzlicht, dann blitzt ein Stern am Rand.
 * grisgar:  Grisgar schlägt langsam mit den riesigen Dämonenflügeln (spaltentreue Scherung) und
             schwebt dabei auf und ab; der Heiligenschein schwingt nach und glüht, er blinzelt.
 * nieht:    Nieht, the Blitz Blade: an den Klingen knistern Blitze, die Funkelsterne neben ihm
-            pulsieren, er federt und blinzelt.
+            pulsieren, die Capezipfel flattern, er federt und blinzelt.
 * kohta:    Kohta, the Silent Observer sitzt, redet (der Mund geht auf und zu) und hebt ab und zu
-            sein Glas; über die Flasche neben ihm läuft ein Glanz.
+            sein Glas; Glas und Flasche sprudeln, über die Flasche läuft ein Glanz.
 * bill:     Bill, the Angry Auctioneer brüllt (Mund), schüttelt abwechselnd die Fäuste, ihm steigt
             Dampf aus dem Kopf; er blinzelt.
 * sabrina:  Sabrina, the Psychic Witch: ihre grünen Augen glühen auf, psychische Lichtkugeln
             umkreisen sie (hinter ihr verschwinden sie ganz), sie atmet und blinzelt.
-* mizune:   Silent Water Mizune: um sie steigen Wasserblasen auf, wachsen und platzen; sie atmet
-            und blinzelt.
+* mizune:   Silent Water Mizune spricht; um ihn steigen viele Wasserblasen auf, wachsen und platzen;
+            er atmet und blinzelt.
 """
 import math
 import os
@@ -47,13 +47,13 @@ def eyes(blocks, skin, line='000000'):
 
 
 V_ = {
-    'alex': dict(slug='alex-trainer-of-heroes', knee=19, pads=(2, 2, 3, 1),
+    'alex': dict(slug='alex-trainer-of-heroes', knee=21, pads=(2, 2, 3, 1),
                  blink=eyes([(6, 7, 9, 10), (10, 11, 9, 10)], 'f6bd7b')),
     'doq': dict(slug='great-detective-doq', knee=20, pads=(3, 2, 3, 1)),
-    'grisgar': dict(slug='grisgar-emissary-of-the-demon-lord', pads=(2, 2, 9, 9),
+    'grisgar': dict(slug='grisgar-emissary-of-the-demon-lord', pads=(2, 2, 14, 14),
                     blink={'halb': [((86, 34), '110f08'), ((89, 34), '110f08')],
                            'zu': [((x, 34), '110f08') for x in (85, 86, 89, 90)]}),
-    'nieht': dict(slug='nieht-the-blitz-blade', knee=19, pads=(2, 2, 3, 1),
+    'nieht': dict(slug='nieht-the-blitz-blade', knee=20, pads=(4, 4, 3, 1),
                   blink=eyes([(19, 20, 10, 11), (23, 24, 10, 11)], 'fde1d2')),
     'kohta': dict(slug='kohta-the-silent-observer', knee=19, pads=(2, 2, 3, 1)),
     'bill': dict(slug='bill-the-angry-auctioneer', knee=16, pads=(6, 6, 13, 1),
@@ -136,8 +136,17 @@ LENS = {'a8c9e6', 'b5bbb7', 'c5c7b2', 'd1cdb7', 'a3b3aa', 'e4d38b', 'e2c27f', 'a
         '516474', '556675', '4e6373', '35566b', 'cec0a9', 'e6d1b6', 'ab977b', '9f9079'}
 
 
+RIM = {'001f5e', '0353b8', '033277', '023c85'}
+
+
 def f_doq(i):
     s = SRC.copy()
+    st = BLINK.get(i)                                   # das durch die Lupe riesige Auge blinzelt
+    if st:
+        for y in range(8, 13 if st == 'zu' else 10):
+            for x in range(4, 11):
+                if s[y, x, 3] and hexc(s[y, x]) not in RIM:
+                    s[y, x] = rgb('35566b' if (st == 'zu' and y == 12) else ('d9c6aa' if (x + y) % 3 else 'cbb89c'))
     lens = np.array([[SRC[y, x, 3] > 0 and hexc(SRC[y, x]) in LENS and x <= 12 and y <= 15
                       for x in range(SW)] for y in range(SH)])
     sweep(s, lens, i, 10, dur=7, slope=-0.8, col='ffffff', trail='e8f4ff')
@@ -159,9 +168,9 @@ def f_grisgar(i):
     s = SRC.copy()
     blink(s, i)
     t = 2 * math.pi * 2 * i / N                         # zwei langsame Schläge je Loop
-    lift = 0.075 * math.sin(t)
-    squeeze = 1.0 - 0.05 * max(0.0, math.sin(t))
-    hover = -round(1.4 * math.sin(t - 0.9)) if i else 0  # der Abschlag trägt ihn nach oben
+    lift = 0.12 * math.sin(t)
+    squeeze = 1.0 - 0.08 * max(0.0, math.sin(t))
+    hover = -round(2.0 * math.sin(t - 0.9)) if i else 0  # der Abschlag trägt ihn nach oben
     op = s[:, :, 3] > 0
     halo = op & (_ys >= HALO_ROWS[0]) & (_ys < HALO_ROWS[1]) & (_xs > WING_L) & (_xs < WING_R)
     wl = op & (_xs <= WING_L)
@@ -175,7 +184,7 @@ def f_grisgar(i):
     out[m] = wings[m]
     for y, x in zip(*np.nonzero(body)):
         out[y + PT + hover, x + PL] = s[y, x]
-    lag = -round(1.4 * math.sin(t - 1.8)) if i else 0   # der Heiligenschein schwingt nach und glüht
+    lag = -round(2.0 * math.sin(t - 1.8)) if i else 0   # der Heiligenschein schwingt nach und glüht
     glow = 0.5 - 0.5 * math.cos(2 * math.pi * 3 * i / N)
     for y, x in zip(*np.nonzero(halo)):
         out[y + PT + lag, x + PL] = lighten(s[y, x], 0.45 * glow)
@@ -195,6 +204,26 @@ def cross(out, cx, cy, arm, ox, oy):
             dot(out, cx + dx + ox, cy + dy + oy, rgb('ffffff' if k < arm else 'dadace'))
 
 
+BLADE_COLS = {'7a7975', 'ccccc4', 'f6f6f6', 'dadace'}
+
+
+def cape_flutter(out, s, i, b):
+    """Die Capezipfel links und rechts flattern: je Zeile schiebt sich die Spitze nach außen und zurück
+    (eine Welle läuft von oben nach unten), das Cape selbst bleibt darunter liegen – nichts reißt."""
+    t = 2 * math.pi * i / N
+    env = 0.5 - 0.5 * math.cos(2 * t)
+    for side, xs in ((-1, range(0, 13)), (1, range(32, SW))):
+        for y in list(range(11, 16)) + [18, 19]:
+            dx = round(2.2 * env * (0.5 + 0.5 * math.sin(6 * t - 0.9 * (y - 11) + (0 if side < 0 else 1.7))))
+            if not dx:
+                continue
+            for x in xs:
+                if s[y, x, 3] and hexc(s[y, x]) not in BLADE_COLS:
+                    xx = x + side * dx + PL
+                    if 0 <= xx < W and (not out[y + PT + b, xx, 3] or hexc(out[y + PT + b, xx]) not in BLADE_COLS):
+                        out[y + PT + b, xx] = s[y, x]
+
+
 def f_nieht(i):
     s = SRC.copy()
     blink(s, i)
@@ -205,6 +234,7 @@ def f_nieht(i):
                 if s[yy, xx, 3] and hexc(s[yy, xx]) in ('ffffff', 'dadace'):
                     s[yy, xx] = 0
     out = bounce_frame(s, b)
+    cape_flutter(out, s, i, b)
     for cx, cy, ph in CROSSES:
         arm = [2, 2, 2, 1, 1, 0, 1, 2][((i // 2) + ph) % 8]
         cross(out, cx, cy, arm, PL, PT + b)
@@ -229,6 +259,29 @@ GLASS = (7, 12, 9, 15)                                  # Glas mit Hand: x0, x1,
 BOTTLE = (0, 4, 7, 19)
 
 
+LIQUID = {'b59631', 'ad8a29', 'cea652', 'deb263', 'd6c7bd', 'a59684'}
+BOTTLE_BUB = [(1, 0), (2, 5), (3, 10), (2, 15), (1, 19)]  # (Spalte, Startframe) – Bläschen in der Flasche
+GLASS_FIZZ = [(8, 0), (9, 3), (10, 6), (8, 9), (9, 12), (10, 15), (9, 18), (8, 21)]
+
+
+def fizz(out, i, b):
+    """Kohlensäure: in der Flasche steigen Bläschen durch das Getränk, über dem Glas perlen winzige
+    Tröpfchen hoch und zerplatzen."""
+    for x, st in BOTTLE_BUB:
+        a = (i - st) % 24
+        y = 18 - a // 2
+        if 12 <= y <= 18 and hexc(SRC[y, x]) in LIQUID:
+            out[y + PT, x + PL] = rgb('fff3c0')
+        elif y < 12 and a // 2 in (7, 8):                # oben im Hals kurz sichtbar
+            out[y + PT, x + PL] = rgb('fff7d8', 220)
+    for x, st in GLASS_FIZZ:
+        a = (i - st) % 24
+        if a < 5:
+            y = 8 - a                                     # über dem Glasrand (Zeile 9)
+            if not out[y + PT + b, x + PL, 3]:
+                out[y + PT + b, x + PL] = rgb('fffbe8', 230 - 40 * a)
+
+
 def f_kohta(i):
     s = SRC.copy()
     if TALK[i]:                                         # Mund zu
@@ -247,6 +300,7 @@ def f_kohta(i):
     draw_bounce(out, fig, b_, KNEE, PT, PL)
     for y, x in zip(*np.nonzero(s[:, :5, 3])):          # die Flasche steht fest
         out[y + PT, x + PL] = s[y, x]
+    fizz(out, i, b_)
     lift = SIP.get(i, 0)
     if lift:
         x0, x1, y0, y1 = GLASS
@@ -313,7 +367,11 @@ def f_bill(i):
 
 
 # ---------------------------------------------------------------- Sabrina
-ORBS = [(0.0, 'c8ffd0', '20ff3d'), (1.57, 'ece4ff', '9d8fff'), (3.14, 'c8ffd0', '20ff3d'), (4.71, 'ece4ff', '9d8fff')]
+ORBS = [  # (Phase, Umläufe je Loop, Radius x-Zusatz, Radius y, Höhe, Farbe innen, Farbe außen)
+    (0.0, 2, 4.0, 3.0, 12, 'c8ffd0', '20ff3d'), (1.3, 2, 4.0, 3.0, 12, 'ece4ff', '9d8fff'),
+    (2.6, 2, 4.0, 3.0, 12, 'c8ffd0', '20ff3d'), (3.9, 2, 4.0, 3.0, 12, 'ece4ff', '9d8fff'),
+    (5.2, 2, 4.0, 3.0, 12, 'c8ffd0', '20ff3d'), (0.7, -1, 6.0, 2.0, 18, 'ece4ff', '9d8fff'),
+    (3.8, -1, 6.0, 2.0, 18, 'c8ffd0', '20ff3d'), (2.2, 1, 5.0, 2.0, 6, 'ece4ff', '9d8fff')]
 
 
 def f_sabrina(i):
@@ -328,12 +386,16 @@ def f_sabrina(i):
     out = bounce_frame(s, b)
     fig = out[:, :, 3] > 0
     ring = ring8(fig) | fig
-    cx, cy = PL + SW / 2 - 0.5, PT + 12
-    for ph, c1, c2 in ORBS:
-        a = 2 * math.pi * 2 * i / N + ph
-        x, y = int(round(cx + (SW / 2 + 4) * math.cos(a))), int(round(cy + 3 * math.sin(a) + 3 * math.sin(2 * a + ph)))
-        pts = {(x, y): rgb(c1), (x - 1, y): rgb(c2, 190), (x + 1, y): rgb(c2, 190), (x, y - 1): rgb(c2, 190),
-               (x, y + 1): rgb(c2, 190)}
+    cx = PL + SW / 2 - 0.5
+    for ph, k, rx, ry, hy, c1, c2 in ORBS:
+        a = 2 * math.pi * k * i / N + ph
+        a0 = a - 2 * math.pi * k / N * 1.2               # Nachleuchten knapp dahinter
+        pos = lambda q: (int(round(cx + (SW / 2 + rx) * math.cos(q))), int(round(PT + hy + ry * math.sin(q))))
+        x, y = pos(a)
+        tx, ty = pos(a0)
+        pts = {(tx, ty): rgb(c2, 110)}
+        pts.update({(x, y): rgb(c1), (x - 1, y): rgb(c2, 180), (x + 1, y): rgb(c2, 180), (x, y - 1): rgb(c2, 180),
+                    (x, y + 1): rgb(c2, 180)})
         behind = math.sin(a) < 0
         if behind and any(ring[yy, xx] for (xx, yy) in pts if 0 <= yy < H and 0 <= xx < W):
             continue                                    # hinter ihr: ganz verdeckt
@@ -360,9 +422,16 @@ def bubble_px(a, L):
     return {(1, 0): ed, (0, 1): ed, (2, 1): ed, (1, 2): ed, (0, 0): hl}
 
 
+MTALK = [0, 0, 1, 1, 0, 1, 1, 1, 0, 0, 0, 0, 1, 1, 0, 0, 1, 0, 1, 1, 0, 0, 0, 0,
+         0, 1, 1, 0, 1, 1, 0, 0, 0, 0, 1, 0, 1, 1, 1, 0, 0, 1, 1, 0, 0, 0, 0, 0]
+
+
 def mizune_base(i):
     s = SRC.copy()
     blink(s, i)
+    if not MTALK[i]:                                    # Mund zu (sonst offen)
+        s[12, 9] = s[12, 10] = rgb('f8bc77')
+        s[13, 9] = s[13, 10] = rgb('7a0000')
     return bounce_frame(s, B24[i % 24])
 
 
@@ -375,7 +444,7 @@ def f_mizune(i):
         fig |= ring8(fig)
         rng = np.random.default_rng(23)
         BUBBLES, tries = [], 0
-        while len(BUBBLES) < 16 and tries < 6000:
+        while len(BUBBLES) < 38 and tries < 20000:
             tries += 1
             L = int(rng.integers(14, 21))
             e = int(rng.integers(N))
@@ -389,7 +458,7 @@ def f_mizune(i):
                     if not (1 <= x < W - 1 and 1 <= y < H - 1) or fig[y, x]:
                         ok = False
                 path.append((bx, by))
-            if ok and all(abs(e - r[0]) % N > 2 for r in BUBBLES):
+            if ok and sum(1 for r in BUBBLES if min((e - r[0]) % N, (r[0] - e) % N) <= 1) < 3:
                 BUBBLES.append((e, L, path))
     out = mizune_base(i)
     for e, L, path in BUBBLES:
