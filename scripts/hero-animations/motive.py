@@ -1654,12 +1654,32 @@ def f_greymage(i):
 # ---------------------------------------------------------------- Toras the Battle Maniac
 TB_PIVOT = (20.5, 17.5)                                 # Faust
 TB_REST = 1.75                                          # in Ruhe gesenkt (links unten)
-# Hin und her, praktisch durchgehend (8 Frames je Hin- und Rückhieb): (Winkel, Spur von, Spur bis) –
-# die Spur liegt immer direkt hinter der Klinge und verschwindet von ihrem Anfang her
-TB_CYCLE = [(1.72, 1.3, 1.67), (0.95, 1.0, 2.0), (-0.1, -0.05, 2.0), (-0.1, -0.05, 0.9),
-            (0.7, -0.3, 0.65), (1.35, -0.3, 1.3), (1.72, -0.3, 1.67), (1.72, 0.8, 1.67)]
-TB_BACK = {0, 4, 5, 6, 7}                               # Rückhieb: die Spur ist gespiegelt (dick an der Klinge)
-TB_UP_END, TB_DOWN_END = -0.1, 1.72                     # wo Hieb und Rückhieb enden (dort ist die Spur am dicksten)   # unten endet die Klinge an der Spitze der Spur
+# Schnell und unregelmäßig hin und her: (von, bis, Frames des Hiebs, Frames Nachleuchten); None = kurze Pause
+TB_SWINGS = [(1.72, -0.1, 2, 1), (-0.1, 1.72, 2, 1), (1.72, 0.3, 2, 0), (0.3, 1.72, 1, 1), (1.72, -0.2, 2, 2),
+             (-0.2, 1.1, 2, 0), (1.1, -0.1, 1, 1), (-0.1, 1.72, 2, 1), None, None, (1.72, -0.1, 2, 1),
+             (-0.1, 1.72, 3, 1), (1.72, 0.5, 2, 0), (0.5, -0.1, 1, 1), (-0.1, 1.72, 2, 1), (1.72, 0.8, 1, 0),
+             (0.8, 1.72, 1, 1), (1.72, -0.1, 2, 1), (-0.1, 1.72, 2, 1), None, None]
+
+
+def _tb_timeline():
+    """Je Frame: (Klingenwinkel, (Spur-Anfang, dickes Ende der Spur) oder None in Pausen)."""
+    res, last = [], 1.72
+    for sw in TB_SWINGS:
+        if sw is None:
+            res.append((last, None))
+            continue
+        a, b, n, f = sw
+        for j in range(1, n + 1):
+            e = 1.0 if n == 1 else [0.55, 1.0][j - 1] if n == 2 else [0.35, 0.75, 1.0][j - 1]
+            res.append((a + (b - a) * e, (a, b)))
+        for j in range(1, f + 1):                       # Nachleuchten: die Spur verschwindet von ihrem Anfang her
+            res.append((b, (a + (b - a) * j / (f + 1), b)))
+        last = b
+    assert len(res) == N, len(res)
+    return res
+
+
+TB_TIME = _tb_timeline()
 
 
 def _tb_masks():
@@ -1680,12 +1700,13 @@ def tb_len(a):
     return 19.0 + 3.8 * max(0.0, min(1.0, a / 1.7))
 
 
-def tb_trail(out, px_, py_, lo, hi, back):
-    """Schwungspur als überstrichene Sichel zwischen den Winkeln lo und hi: außen genau bis zur Klingenspitze,
-    am Ende des Hiebs am dicksten, zum Anfang hin spitz (beim Rückhieb gespiegelt); außen heller Rand,
-    nach innen dunkler – in den Grautönen der Spur aus dem Sprite."""
-    end = TB_DOWN_END if back else TB_UP_END
-    span = TB_DOWN_END - TB_UP_END
+def tb_trail(out, px_, py_, start, ang, end):
+    """Schwungspur als überstrichene Sichel vom Winkel start bis zur Klinge (ang): außen genau bis zur
+    Klingenspitze, am Ende des Hiebs (end) am dicksten, zum Anfang hin spitz; außen heller Rand,
+    nach innen dunkler – in den Grautönen der Spur aus dem Sprite. Kurze Hiebe: schmalere Sichel."""
+    lo, hi = min(start, ang), max(start, ang)
+    span = max(0.3, abs(end - start))
+    tmax = 14.0 * min(1.0, abs(end - start) / 1.82)
     for y in range(int(py_ - 26), int(py_ + 26)):
         for x in range(int(px_ - 26), int(px_ + 26)):
             if not (0 <= y < out.shape[0] and 0 <= x < out.shape[1]):
@@ -1696,7 +1717,7 @@ def tb_trail(out, px_, py_, lo, hi, back):
                 continue
             u = max(0.0, 1 - abs(a - end) / span)       # 1 am Ende des Hiebs, 0 an seinem Anfang
             R = tb_len(a) + 0.5
-            T = 1.0 + 14.0 * u ** 1.3
+            T = 1.0 + tmax * u ** 1.3
             r = math.hypot(dx, dy)
             if R - T <= r <= R:
                 d = (R - r) / T
@@ -1730,8 +1751,8 @@ if V == 'battlemaniac':
 
 
 def f_battlemaniac(i):
-    """Wie Toras, nur praktisch durchgehend: er zieht die Klinge hin und her, von links unten im Bogen nach
-    rechts hoch und wieder zurück – der graue Bogen aus dem Sprite ist die Schwungspur direkt hinter der
+    """Wie Toras, nur rasend: er zieht die Klinge schnell und unregelmäßig hin und her (ganze und halbe
+    Hiebe, manche in einem Frame, kurze Pausen), von links unten im Bogen nach rechts hoch und zurück – der graue Bogen aus dem Sprite ist die Schwungspur direkt hinter der
     Klinge, die Klinge selbst ist schmal. Der Arm hebt und senkt sich mit dem Schwert (spaltenweise um die Schulter
     geschert, nichts gestreckt), die Haarstacheln wiegen sich sacht im Wind."""
     s = SRC.copy()
@@ -1739,12 +1760,13 @@ def f_battlemaniac(i):
     t = 2 * math.pi * i / N
     raw = [round(1.3 * ((11 - y) / 11) ** 1.2 * math.sin(2 * t - 0.35 * y)) for y in range(11, -1, -1)]
     hdx = clamp_chain(raw)[::-1]                        # vom Haaransatz (Zeile 11) nach oben
-    ang, lo, hi = TB_CYCLE[i % 8]
+    ang, tr = TB_TIME[i]
     k = round(3 * max(-0.35, min(2.05, ang)) / TB_REST)  # Faust: gesenkt bis 3 px tiefer, beim Hieb oben
     k = max(-1, min(3, k))
     arm_dy = lambda x: round(k * (x - 13) / 8)
     out = np.zeros((H, W, 4), int)
-    tb_trail(out, TB_PIVOT[0] + PL, TB_PIVOT[1] + PT + k, lo, hi, i % 8 in TB_BACK)
+    if tr:
+        tb_trail(out, TB_PIVOT[0] + PL, TB_PIVOT[1] + PT + k, tr[0], ang, tr[1])
     tb_blade(out, TB_PIVOT[0] + PL, TB_PIVOT[1] + PT + k, ang)
     hilt = rotate_part(TB_HILT, TB_HILT_M, TB_PIVOT, ang, (H, W), (PL, PT + k))
     m = hilt[:, :, 3] > 0
