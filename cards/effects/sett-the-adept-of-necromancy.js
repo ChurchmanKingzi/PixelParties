@@ -71,6 +71,9 @@ async function besiege(engine, pi, inst) {
 module.exports = {
   activeIn: ['hero'],
   heroEffect: true,
+  // Client: lila Pixel-Todesflackern um jede Kreatur in Setts Support
+  // Zones, solange er lebt und nicht negiert ist (server.js `zoneAuraFuer`).
+  supportAura: 'necro_flicker',
   // Zugende-Klausel trifft ALLE alten Kreaturen in einem Schlag (ohne
   // Schaden) — Wächter check-aoe-text verlangt die Kennzeichnung.
   hitsMultipleTargets: true,
