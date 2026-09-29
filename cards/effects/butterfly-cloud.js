@@ -42,11 +42,11 @@ module.exports = {
         if (h?.name && h.hp > 0) animTargets.push({ owner: physOwner, heroIdx: hi, type: 'hero' });
       }
       for (const inst of engine.cardInstances) {
-        if ((inst.owner !== oppIdx && inst.controller !== oppIdx) || inst.zone !== 'support') continue;
+        if ((inst.controller ?? inst.owner) !== oppIdx || inst.zone !== 'support') continue;
         if (inst.faceDown) continue;
         const cd = engine.getEffectiveCardData(inst) || engine._getCardDB()[inst.name];
         if (!cd || !cd.cardType?.includes('Creature')) continue;
-        animTargets.push({ owner: oppIdx, heroIdx: inst.heroIdx, zoneSlot: inst.zoneSlot, type: 'creature' });
+        animTargets.push({ owner: engine.physicalSide(inst), heroIdx: inst.heroIdx, zoneSlot: inst.zoneSlot, type: 'creature' });
       }
 
       engine._broadcastEvent('butterfly_cloud_animation', {

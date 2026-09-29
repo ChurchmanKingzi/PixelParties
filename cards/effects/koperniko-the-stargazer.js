@@ -59,7 +59,7 @@ function artFilter(cardDB, vorbildName) {
  * Die Zusatzsuche. Gibt true zurueck, wenn tatsaechlich gesucht wurde
  * (nur dann ist die Rundensperre verbraucht).
  */
-async function zusatzSuche(engine, pi, heroIdx, tally) {
+async function zusatzSuche(engine, pi, heroIdx, tally, feld = pi) {
   const gs = engine.gs;
   const ps = gs.players[pi];
   if (!ps || (ps.mainDeck || []).length === 0) return false;
@@ -83,7 +83,7 @@ async function zusatzSuche(engine, pi, heroIdx, tally) {
     .map(([name, count]) => ({ name, source: 'deck', count }));
   if (galerie.length === 0) return false;
 
-  const heldName = gs.players[pi]?.heroes?.[heroIdx]?.name || CARD_NAME;
+  const heldName = gs.players[feld]?.heroes?.[heroIdx]?.name || CARD_NAME;   // Styx 28.9.: Brettseite
   const wahl = await engine.promptGeneric(pi, {
     type: 'cardGallery',
         searchToHand: true,   // v1119: Suche AUF DIE HAND
@@ -118,10 +118,12 @@ async function zusatzSuche(engine, pi, heroIdx, tally) {
 async function pruefeUndBiete(ctx) {
   const engine = ctx._engine;
   const gs = engine.gs;
-  const pi = ctx.cardOwner;               // Besitzer DIESES Helden
+  const pi = ctx.cardOwner;               // Kontrolleur DIESES Helden („you")
   const heroIdx = ctx.cardHeroIdx;
+  // Styx 28.9.: der Held selbst liegt auf der Brettseite `feld`.
+  const feld = ctx.cardHeroOwner ?? pi;
 
-  const held = gs.players[pi]?.heroes?.[heroIdx];
+  const held = ctx.attachedHero ?? gs.players[feld]?.heroes?.[heroIdx];
   if (!held?.name || held.hp <= 0) return;
   if (held.statuses?.negated) return;     // negierter Held wirkt nicht
 
@@ -137,7 +139,7 @@ async function pruefeUndBiete(ctx) {
   const kopie = { ...tally };
   engine._deckAddTally = null;            // vor der Suche leeren
   // Auftritt UND Rundensperre haengen beide am Erfolg — s. `zusatzSuche`.
-  const gesucht = await zusatzSuche(engine, pi, heroIdx, kopie);
+  const gesucht = await zusatzSuche(engine, pi, heroIdx, kopie, feld);
   if (gesucht) engine.claimHOPT(HOPT_KEY, pi);
 }
 

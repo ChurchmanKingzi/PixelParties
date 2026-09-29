@@ -51,11 +51,13 @@ module.exports = {
      * prevent that.
      */
     onTurnStart: (ctx) => {
-      if (ctx.activePlayer !== ctx.cardOriginalOwner) return;
       // v1275 (Als Ruling 22.9.): Merker am SPIELER statt an der Instanz —
       // alle Traeger dieses Effekts auf einer Seite teilen ihn. Die
       // bisherige Eigenheit bleibt: frei wird er zu Beginn des eigenen Zuges.
-      const ps = ctx._engine.gs.players[ctx.cardOriginalOwner];
+      // Styx 28.9.: der Merker liegt beim Kontrolleur, der ihn nutzte —
+      // freigegeben wird der des Spielers, dessen Zug beginnt (auch wenn
+      // Mary ihm inzwischen nicht mehr gehoert).
+      const ps = ctx._engine.gs.players[ctx.activePlayer];
       if (ps?._maryNegateUsed) delete ps._maryNegateUsed;
     },
 
@@ -104,8 +106,8 @@ module.exports = {
       const engine = ctx._engine;
       const pi = ctx.cardOwner;
       const oi = pi === 0 ? 1 : 0;
-      const heroIdx = ctx.cardHeroIdx;
-      const myHero = engine.gs.players[pi]?.heroes?.[heroIdx];
+      // „this Hero" auf der Brettseite (uebernommen: beim Gegner), Styx 28.9.
+      const myHero = ctx.attachedHero;
       if (!myHero || myHero.hp <= 0) return;
       // The hook fires for every damage event in the engine — only
       // react when the target IS Mary herself.

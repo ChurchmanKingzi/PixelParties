@@ -126,6 +126,14 @@ function rhabi(engine, pi, heroIdx) {
   return engine?.gs?.players?.[pi]?.heroes?.[heroIdx] || null;
 }
 
+/**
+ * Styx 28.9.: Rha'Bi aus dem Hook-Kontext — sein Platz liegt auf der
+ * Brettseite (`cardHeroOwner`), nicht beim Kontrolleur.
+ */
+function rhabiVon(ctx) {
+  return ctx.attachedHero ?? rhabi(ctx._engine, ctx.cardHeroOwner ?? ctx.cardOwner, ctx.cardHeroIdx);
+}
+
 /** Kann die Senkung ueberhaupt voll bezahlt werden? */
 function bezahlbar(hero) {
   if (!hero?.name || hero.hp <= 0) return false;
@@ -145,7 +153,7 @@ module.exports = {
   canActivateHeroEffect(ctx) {
     const engine = ctx._engine;
     const pi = ctx.cardOwner;
-    const held = rhabi(engine, pi, ctx.cardHeroIdx);
+    const held = rhabiVon(ctx);
     if (!bezahlbar(held)) return false;
     if ((engine.gs.players[pi]?.mainDeck || []).length === 0) return false;
     return moeglicheZiele(engine, pi).length > 0;
@@ -189,7 +197,7 @@ module.exports = {
     const gs = engine.gs;
     const pi = ctx.cardOwner;
     const heroIdx = ctx.cardHeroIdx;
-    const held = rhabi(engine, pi, heroIdx);
+    const held = rhabiVon(ctx);
     if (!bezahlbar(held)) return false;
 
     const ziele = moeglicheZiele(engine, pi);
@@ -215,7 +223,7 @@ module.exports = {
     const slot = freierSlot(engine, ziel.owner, ziel.heroIdx);
     if (slot < 0) return false;
     if (schonGewaehlt(engine, pi, ziel.heroIdx)) return false;   // ★ je ZUG
-    if (!bezahlbar(rhabi(engine, pi, heroIdx))) return false;
+    if (!bezahlbar(rhabiVon(ctx))) return false;
 
     // Oberste Deckkarte ueber die Stapel-Schicht entnehmen (★-Regel:
     // kein direktes Splicen an Deck und Ablage).
@@ -225,7 +233,7 @@ module.exports = {
     if (!genommen?.name) return false;
 
     // Kosten erst zahlen, wenn die Karte wirklich da ist.
-    const lebend = rhabi(engine, pi, heroIdx);
+    const lebend = rhabiVon(ctx);
     // ★ v1260 (Als Befund 20.9.): „sein Effekt hat nicht immer 100
     // Schaden an ihm selbst verursacht — immer der erste Einsatz jede
     // Runde war frei". Genau Als Vermutung: `decreaseMaxHp` senkt nur
@@ -292,7 +300,7 @@ module.exports = {
       const amZug = ctx.activePlayer ?? gs.activePlayer;
       if (amZug !== pi) return;                            // nur der EIGENE Zug
 
-      const held = rhabi(engine, pi, ctx.cardHeroIdx);
+      const held = rhabiVon(ctx);
       if (!held?.name || held.hp <= 0) return;             // tot: nichts kommt zurueck
 
       const liegend = platzierte(engine, pi);
@@ -306,13 +314,14 @@ module.exports = {
       // Rha'Bi bekommt SOFORT seine 100 → erst dann die naechste.
       // Dadurch oeffnet jede Karte ihre eigenen On-Hit-Fenster beim
       // jeweiligen Ziel, statt dass drei Treffer als Block ankommen.
-      const quelle = { name: CARD_NAME, owner: pi, controller: pi, heroIdx: ctx.cardHeroIdx };
+      const quelle = { name: CARD_NAME, owner: pi, controller: pi, heroIdx: ctx.cardHeroIdx,
+        ...((ctx.cardHeroOwner ?? pi) !== pi ? { heroOwner: ctx.cardHeroOwner } : {}) };   // Styx 28.9.
       let zurueck = 0;
 
       for (const inst of liegend) {
         // Abbruch mitten in der Kette: faellt Rha'Bi durch eine Reaktion
         // auf den vorigen Treffer, kommt nichts mehr zurueck.
-        const lebt = rhabi(engine, pi, ctx.cardHeroIdx);
+        const lebt = rhabiVon(ctx);
         if (!lebt?.name || lebt.hp <= 0) break;
 
         const zielOwner = inst.owner;
@@ -354,7 +363,7 @@ module.exports = {
         }
 
         // ── ④ Rha'Bi bekommt SOFORT seine 100 ────────────────────────
-        const jetzt = rhabi(engine, pi, ctx.cardHeroIdx);
+        const jetzt = rhabiVon(ctx);
         if (jetzt?.name && jetzt.hp > 0) engine.increaseMaxHp(jetzt, ZUWACHS);
 
         zurueck++;

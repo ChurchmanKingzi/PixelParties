@@ -60,7 +60,7 @@ module.exports = {
   hooks: {
     onPlay: (ctx) => {
       ctx.grantAtk(ATK_BONUS);
-      _applySurpriseSkip(ctx._engine, ctx.cardOwner, ctx.cardHeroIdx);
+      _applySurpriseSkip(ctx._engine, ctx.cardHeroOwner ?? ctx.cardOwner, ctx.cardHeroIdx);   // Styx 28.9.: Brettseite
     },
 
     /**
@@ -73,7 +73,7 @@ module.exports = {
       const hero = ctx.attachedHero;
       if (!hero?.name) return;
       ctx.grantAtk(ATK_BONUS);
-      _applySurpriseSkip(ctx._engine, ctx.cardOwner, ctx.cardHeroIdx);
+      _applySurpriseSkip(ctx._engine, ctx.cardHeroOwner ?? ctx.cardOwner, ctx.cardHeroIdx);   // Styx 28.9.: Brettseite
     },
 
     /**
@@ -82,7 +82,7 @@ module.exports = {
      */
     onCardLeaveZone: (ctx) => {
       if (ctx.fromZone !== 'support') return;
-      if (ctx.fromOwner !== ctx.cardOwner) return;
+      if (ctx.fromOwner !== ctx.cardOwner && ctx.fromOwner !== ctx.cardHeroOwner) return;   // Styx 28.9.: Brettseite
       if (ctx.fromHeroIdx !== ctx.card.heroIdx || ctx.fromZoneSlot !== ctx.card.zoneSlot) return;
       ctx.revokeAtk();
       _clearSurpriseSkipIfLast(ctx._engine, ctx.fromOwner, ctx.fromHeroIdx, ctx.card.id);

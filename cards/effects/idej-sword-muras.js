@@ -105,6 +105,9 @@ module.exports = {
     onActionUsed: (ctx) => {
       if (ctx.playerIdx !== ctx.cardOwner) return;
       if (ctx.heroIdx !== ctx.cardHeroIdx) return;   // the equipped Hero acted
+      // Styx 28.9.: gleiche Brettseite — sonst verwechselt ein geliehener
+      // Held den gleich nummerierten eigenen (Muster der Idej-Schwerter).
+      if ((ctx.heroOwner ?? ctx.playerIdx) !== (ctx.cardHeroOwner ?? ctx.cardOwner)) return;
       const engine = ctx._engine;
       const gs = engine.gs;
       if ((gs.currentPhase | 0) !== 3) return;       // Action Phase only

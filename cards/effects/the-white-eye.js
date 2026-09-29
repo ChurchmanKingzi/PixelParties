@@ -51,6 +51,8 @@ module.exports = {
     afterSpellResolved: async (ctx) => {
       if (!ctx.spellCardData || ctx.spellCardData.cardType !== 'Spell') return;
       if (ctx.casterIdx !== ctx.cardOwner || ctx.heroIdx !== ctx.cardHeroIdx) return;
+      // Styx 28.9.: gleicher Index reicht nicht — gleiche Brettseite (geliehener Held).
+      if ((ctx.heroOwner ?? ctx.casterIdx) !== (ctx.cardHeroOwner ?? ctx.cardOwner)) return;
 
       const targets = ctx.damageTargets || [];
       if (targets.length !== 1) return;
@@ -64,13 +66,14 @@ module.exports = {
       if (!tgtPs || (tgtPs.hand || []).length === 0) return;
 
       // Arthor must still be alive and capable
-      const hero = gs.players[pi]?.heroes?.[ctx.cardHeroIdx];
+      const feld = ctx.cardHeroOwner ?? pi;   // Styx 28.9.: Brettseite des Helden
+      const hero = gs.players[feld]?.heroes?.[ctx.cardHeroIdx];
       if (!hero?.name || hero.hp <= 0) return;
       if (hero.statuses?.frozen || hero.statuses?.stunned || hero.statuses?.negated) return;
 
       // Flash The White Eye's support zone slot
       engine._broadcastEvent('card_effect_flash', {
-        owner: pi, heroIdx: ctx.cardHeroIdx, zoneSlot: ctx.card.zoneSlot,
+        owner: feld, heroIdx: ctx.cardHeroIdx, zoneSlot: ctx.card.zoneSlot,
       });
 
       // Prompt: optionally trigger the discard
@@ -123,7 +126,7 @@ module.exports = {
       // Confirm the leaving card is The White Eye itself (match by slot)
       const engine = ctx._engine;
       const leavingInst = engine.cardInstances.find(c =>
-        c.owner === ctx.cardOwner && c.zone === 'support' &&
+        (c.owner === ctx.cardOwner || c.owner === ctx.cardHeroOwner) && c.zone === 'support' &&   // Styx 28.9.: Brettseite
         c.heroIdx === ctx.fromHeroIdx && c.zoneSlot === ctx.fromZoneSlot,
       );
       if (!leavingInst || leavingInst.id !== ctx.card.id) return;

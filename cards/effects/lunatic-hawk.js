@@ -110,17 +110,30 @@ function handLunaticCreatures(engine, pi) {
   return out;
 }
 
+/**
+ * Wer hat `inst` ausgeruestet? Kontrolle statt Seite (Styx 28.9.): an einen
+ * Gegnerhelden gelegt (freie Ausruestung, server `doPlayArtifact`), liegt die
+ * Instanz auf dessen Seite (`owner`), `originalOwner` ist der Ausruestende.
+ * Sonst der Kontrolleur (Charme: auch an einem geliehenen Helden).
+ */
+function ausruester(engine, inst) {
+  if (inst.originalOwner != null && inst.originalOwner !== inst.owner) return inst.originalOwner;
+  return engine.effektiveSeiten(inst).controller ?? inst.owner;
+}
+
 /** First free Support Zone across the player's living Heroes, honoring
- *  the Creature's own summon gate. Returns [{heroIdx,slotIdx}, …]. */
+ *  the Creature's own summon gate. Returns [{owner,heroIdx,slotIdx}, …].
+ *  Styx 28.9.: alle Helden, die `pi` KONTROLLIERT (auch uebernommene der
+ *  Gegenspalte — dort beschwoert der normale Weg mit `heldSeite`), `owner`
+ *  = Brettseite der Zone. Ein abgegebener eigener Held zaehlt nicht. */
 function freeZonesFor(engine, pi, creatureName) {
-  const ps = engine.gs.players[pi];
   const out = [];
-  for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-    const hero = ps.heroes[hi];
+  for (const { physOwner, heroIdx: hi, hero } of engine.heroesControlledBy(pi)) {
     if (!hero?.name || hero.hp <= 0) continue;
-    if (!engine.isCreatureSummonable(creatureName, pi, hi, { _bypassBeforeSummon: true })) continue;
+    if (!engine.isCreatureSummonable(creatureName, physOwner, hi, { _bypassBeforeSummon: true })) continue;
+    const zonen = engine.gs.players[physOwner]?.supportZones?.[hi] || [];
     for (let zi = 0; zi < 3; zi++) {
-      if (((ps.supportZones[hi] || [])[zi] || []).length === 0) out.push({ heroIdx: hi, slotIdx: zi });
+      if ((zonen[zi] || []).length === 0) out.push({ owner: physOwner, heroIdx: hi, slotIdx: zi });
     }
   }
   return out;
@@ -150,7 +163,7 @@ module.exports = {
     const inst = ctx.card;
     if (!inst || inst.zone !== 'support') return false;
     if (countDistinctLunaticCycle(engine) < 4) return false;
-    const pi = ctx.cardOriginalOwner;
+    const pi = ctx.cardOwner;   // Kontrolle statt Seite (Styx 28.9.)
     const candidates = handLunaticCreatures(engine, pi);
     if (candidates.length === 0) return false;
     return candidates.some(n => freeZonesFor(engine, pi, n).length > 0);
@@ -159,7 +172,7 @@ module.exports = {
   async onCreatureEffect(ctx) {
     const engine = ctx._engine;
     const gs = engine.gs;
-    const pi = ctx.cardOriginalOwner;
+    const pi = ctx.cardOwner;   // Kontrolle statt Seite (Styx 28.9.)
     const ps = gs.players[pi];
     const inst = ctx.card;
     if (!ps || !inst) return false;
@@ -253,13 +266,15 @@ module.exports = {
 
       // ── Tier 2+: an Artifact equipped to a Hero → its controller
       //    (= you, the equipper) draws 1. Only when YOU equip. ──
+      // Kontrolle statt Seite (Styx 28.9.): der Ausruestende, nicht die
+      // Brettseite der Ausruestung (siehe `ausruester`).
       // Cloak of Edge & Co. zaehlen in der Support-Zone als ABILITY
       // (Als Ruling 5.8.) — sie loesen den Artefakt-Trigger nicht aus.
       if (ctx._engine.countsAsAbilityInZone(entering.name, entering)) return;
       if (n >= 2
         && cd.cardType === 'Artifact'
         && (cd.subtype || '').toLowerCase() === 'equipment'
-        && entering.owner === pi
+        && ausruester(engine, entering) === pi
         && !ctx._isMove) {
         await engine.actionDrawCards(pi, 1);
         engine.log('lunatic_hawk_equip_draw', {
@@ -270,9 +285,10 @@ module.exports = {
       }
 
       // ── Tier 3+: double current & max HP of Creatures YOU summon ──
+      // Kontrolle statt Seite (Styx 28.9.): „you summon" = Kontrolleur.
       if (n >= 3
         && hasCardType(cd, 'Creature')
-        && entering.owner === pi
+        && (entering.controller ?? entering.owner) === pi
         && !ctx._isMove) {
         const curMax = entering.counters?.maxHp ?? (cd.hp || 0);
         if (curMax > 0) {

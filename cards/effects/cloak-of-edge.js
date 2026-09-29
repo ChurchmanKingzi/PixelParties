@@ -93,7 +93,7 @@ module.exports = {
 
   canActivateEquipEffect(ctx) {
     const engine = ctx._engine;
-    const hero = engine.gs.players[ctx.cardOwner]?.heroes?.[ctx.cardHeroIdx];
+    const hero = engine.gs.players[ctx.cardHeroOwner ?? ctx.cardOwner]?.heroes?.[ctx.cardHeroIdx];   // Styx 28.9.: Brettseite
     if (!hero || hero.hp <= 0) return false;
     const key = `free-ability:${CARD_NAME}:${ctx.cardOwner}`;
     return engine.gs.hoptUsed?.[key] !== engine.gs.turn;
@@ -103,7 +103,8 @@ module.exports = {
     const engine = ctx._engine;
     const pi = ctx.cardOwner;
     const heroIdx = ctx.cardHeroIdx;
-    const hero = engine.gs.players[pi]?.heroes?.[heroIdx];
+    const feld = ctx.cardHeroOwner ?? pi;   // Styx 28.9.: Brettseite des Helden
+    const hero = engine.gs.players[feld]?.heroes?.[heroIdx];
     if (!hero || hero.hp <= 0) return false;
 
     // Ueber den kanonischen Helfer, damit die Curse-Sperre (ATK immer
@@ -112,7 +113,7 @@ module.exports = {
     if (!engine.gs.hoptUsed) engine.gs.hoptUsed = {};
     engine.gs.hoptUsed[`free-ability:${CARD_NAME}:${pi}`] = engine.gs.turn;
 
-    engine.actionGrantAtk(ctx.card, hero, pi, heroIdx, ATK_GAIN);
+    engine.actionGrantAtk(ctx.card, hero, feld, heroIdx, ATK_GAIN);
 
     engine.log('cloak_of_edge_atk', {
       player: engine.gs.players[pi]?.username,

@@ -10,6 +10,28 @@
 // ═══════════════════════════════════════════
 
 const { heldenSperreKey } = require('./_hero-hopt-shared');   // v1275: Heldensperre pro Spieler (Ruling 22.9.)
+
+/**
+ * Umleitungsziele: „any of your Heroes that has a Surprise in its Surprise
+ * Zone" — Kontrolle statt Seite (Styx 28.9.): alle Helden, die `ownerIdx`
+ * kontrolliert (auch uebernommene der Gegenspalte), Surprise-Zone auf der
+ * Brettseite, ohne das urspruengliche Ziel (Seite + Index).
+ */
+function umleitungsZiele(gs, ownerIdx, selected, engine) {
+  const out = [];
+  const helden = engine?.heroesControlledBy
+    ? engine.heroesControlledBy(ownerIdx)
+    : (gs.players[ownerIdx]?.heroes || []).map((hero, heroIdx) => ({ physOwner: ownerIdx, heroIdx, hero }));
+  for (const { physOwner, heroIdx: hi, hero } of helden) {
+    if (selected.type === 'hero' && selected.owner === physOwner && selected.heroIdx === hi) continue;
+    if (!hero?.name || hero.hp <= 0) continue;
+    const surprises = (gs.players[physOwner]?.surpriseZones || [])[hi] || [];
+    if (surprises.length === 0) continue;
+    out.push({ id: `hero-${physOwner}-${hi}`, type: 'hero', owner: physOwner, heroIdx: hi, cardName: hero.name });
+  }
+  return out;
+}
+
 module.exports = {
   activeIn: ['hero'],
   heroEffect: true,
@@ -63,45 +85,19 @@ module.exports = {
     if (selected.type !== 'hero' || (engine?.zielSeite ? engine.zielSeite(selected) : selected.owner) !== ownerIdx) return false;
 
     // Check for at least 1 OTHER hero with a Surprise in its Surprise Zone
-    const ps = gs.players[ownerIdx];
-    if (!ps) return false;
-    for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-      if (selected.owner === ownerIdx && hi === selected.heroIdx) continue; // Skip the original target
-      const hero = ps.heroes[hi];
-      if (!hero?.name || hero.hp <= 0) continue;
-      if (engine?.heroSideOf && engine.heroSideOf(ownerIdx, hero) !== ownerIdx) continue;   // abgegeben (Styx 28.9.)
-      const surprises = (ps.surpriseZones || [])[hi] || [];
-      if (surprises.length > 0) return true;
-    }
-    return false;
+    if (!gs.players[ownerIdx]) return false;
+    return umleitungsZiele(gs, ownerIdx, selected, engine).length > 0;
   },
 
   /**
    * Execute the redirect: prompt player to choose a hero with a Surprise.
    * Returns { redirectTo } or null if cancelled.
    */
-  async onHeroRedirect(engine, ownerIdx, heroIdx, selected, validTargets, config, sourceCard) {
+  async onHeroRedirect(engine, ownerIdx, heroIdx, selected, validTargets, config, sourceCard, physOwner = ownerIdx) {
     const gs = engine.gs;
-    const ps = gs.players[ownerIdx];
 
-    // Build list of eligible redirect targets (own heroes with Surprises, not original target)
-    const eligible = [];
-    for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-      if (selected.owner === ownerIdx && hi === selected.heroIdx) continue;
-      const hero = ps.heroes[hi];
-      if (!hero?.name || hero.hp <= 0) continue;
-      if (engine.heroSideOf(ownerIdx, hero) !== ownerIdx) continue;   // abgegeben (Styx 28.9.)
-      const surprises = (ps.surpriseZones || [])[hi] || [];
-      if (surprises.length > 0) {
-        eligible.push({
-          id: `hero-${ownerIdx}-${hi}`,
-          type: 'hero',
-          owner: ownerIdx,
-          heroIdx: hi,
-          cardName: hero.name,
-        });
-      }
-    }
+    // Build list of eligible redirect targets (controlled heroes with Surprises, not original target)
+    const eligible = umleitungsZiele(gs, ownerIdx, selected, engine);
 
     if (eligible.length === 0) return null;
 
@@ -113,14 +109,18 @@ module.exports = {
       // Prompt player to pick which hero to redirect to
       const result = await engine.promptGeneric(ownerIdx, {
         type: 'cardGallery',
-        cards: eligible.map(t => ({ name: t.cardName, source: 'hero', heroIdx: t.heroIdx })),
+        // `source` = Ziel-ID: der Client schickt sie unveraendert zurueck
+        // (gleichnamige Helden beider Seiten bleiben unterscheidbar).
+        cards: eligible.map(t => ({ name: t.cardName, source: t.id, heroIdx: t.heroIdx, owner: t.owner })),
         title: 'Alleria, the Queen of Spiders',
         description: 'Choose a Hero with a Surprise to redirect the effect to:',
         cancellable: true,
       });
 
       if (!result || result.cancelled) return null;
-      redirectTarget = eligible.find(t => t.cardName === result.cardName) || eligible[0];
+      // Treffer ueber Seite + Index (Ziel-ID in `source`), Name als Rueckfall.
+      redirectTarget = eligible.find(t => t.id === result.source)
+        || eligible.find(t => t.cardName === result.cardName) || eligible[0];
     }
 
     // Claim HOPT
@@ -136,7 +136,7 @@ module.exports = {
       srcHeroIdx: selected.heroIdx,
       tgtOwner: tgtOwnerLabel,
       tgtHeroIdx: redirectTarget.heroIdx,
-      alleriaOwner: ownerIdx,
+      alleriaOwner: physOwner,   // Brettseite (Styx 28.9.)
       alleriaHeroIdx: heroIdx,
     });
     await engine._delay(1000);
@@ -148,7 +148,7 @@ module.exports = {
     // Sparkle on Alleria
     engine._broadcastEvent('play_zone_animation', {
       type: 'gold_sparkle',
-      owner: ownerIdx, heroIdx, zoneSlot: -1,
+      owner: physOwner, heroIdx, zoneSlot: -1,
     });
 
     return { redirectTo: redirectTarget };
@@ -159,7 +159,8 @@ module.exports = {
      * When a Surprise in Alleria's Surprise Zone activates, draw 1 card.
      */
     onSurpriseActivated: async (ctx) => {
-      if (ctx.surpriseOwner !== ctx.cardOriginalOwner) return;
+      // „this Hero's Surprise Zone": Brettseite + Index (Styx 28.9.).
+      if (ctx.surpriseOwner !== (ctx.cardHeroOwner ?? ctx.cardOriginalOwner)) return;
       if (ctx.heroIdx !== ctx.cardHeroIdx) return;
       // Alleria must be alive and not incapacitated
       const hero = ctx.attachedHero;
@@ -167,7 +168,7 @@ module.exports = {
       if (hero.statuses?.frozen || hero.statuses?.stunned || hero.statuses?.negated) return;
 
       const engine = ctx._engine;
-      const pi = ctx.cardOriginalOwner;
+      const pi = ctx.cardOwner;   // „draw" = Kontrolleur (Styx 28.9.)
 
       await engine.actionDrawCards(pi, 1);
 

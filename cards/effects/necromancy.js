@@ -38,14 +38,14 @@ function countAbilityLevel(ps, heroIdx, school) {
 /**
  * Get free base support zones (slots 0–2) for a specific hero.
  */
-function getFreeZones(ps, heroIdx) {
+function getFreeZones(ps, heroIdx, owner) {
   const hero = ps.heroes?.[heroIdx];
   if (!hero?.name || hero.hp <= 0) return [];
   const zones = [];
   const supZones = ps.supportZones[heroIdx] || [];
   for (let s = 0; s < 3; s++) {
     if ((supZones[s] || []).length === 0) {
-      zones.push({ heroIdx, slotIdx: s, label: `${hero.name} — Support ${s + 1}` });
+      zones.push({ owner, heroIdx, slotIdx: s, label: `${hero.name} — Support ${s + 1}` });   // Styx 28.9.: Seite mitgeben
     }
   }
   return zones;
@@ -56,7 +56,7 @@ function getFreeZones(ps, heroIdx) {
  * Must be a Creature with level ≤ necromancyLevel that
  * the hero can summon (spell school check).
  */
-function getEligibleCreatures(engine, pi, heroIdx, necromancyLevel) {
+function getEligibleCreatures(engine, pi, heroIdx, necromancyLevel, feld = pi) {
   const ps = engine.gs.players[pi];
   if (!ps) return [];
   const cardDB = engine._getCardDB();
@@ -93,7 +93,8 @@ function getEligibleCreatures(engine, pi, heroIdx, necromancyLevel) {
     // der Deepsea-Bounce-Bypass darf hier nicht greifen, der Held muss
     // das echte Schul-Level für die Kreatur haben (Necromancy 2 + SM 1
     // darf KEINE Lv2-Witch holen).
-    if (!engine.heroMeetsLevelReq(pi, heroIdx, cd, { pileSide: 'discard', noPlacementBypass: true })) continue;
+    // Styx 28.9.: Held auf der Brettseite (`feld`), Karte/Ermaessigungen vom Beschwoerer.
+    if (!engine.heroMeetsLevelReq(feld, heroIdx, cd, { pileSide: 'discard', noPlacementBypass: true, levelSourcePi: pi })) continue;
     // Per-card summoning condition (canSummon). Without this, per-turn
     // summon limits ("you can only summon 1 Deepsea Primordium per
     // turn"), uniqueness gates (Cute Phoenix), and sacrifice tributes
@@ -103,7 +104,7 @@ function getEligibleCreatures(engine, pi, heroIdx, necromancyLevel) {
     // depends on a `beforeSummon`-paid cost (King Trex's auto-
     // sacrifice path) to apply the STRICT per-Hero rule here, since
     // Necromancy bypasses beforeSummon entirely.
-    if (!engine.isCreatureSummonable(cardName, pi, heroIdx, { _bypassBeforeSummon: true })) continue;
+    if (!engine.isCreatureSummonable(cardName, feld, heroIdx, { _bypassBeforeSummon: true, beschwoerer: pi })) continue;
     seen.add(cardName);
     result.push({ name: cardName, source: 'discard' });
   }
@@ -206,6 +207,9 @@ module.exports = {
     const heroIdx = ctx.cardHeroIdx;
     const ps = ctx.players[pi];
     if (!ps) return false;
+    // Styx 28.9.: Held und Support-Zonen liegen auf der Brettseite.
+    const feld = ctx.cardHeroOwner ?? pi;
+    const hps = ctx.players[feld] || ps;
     // Per-hero Necromancy lock — once a Hero with a per-turn limit
     // override (Lethe, 3/turn) has used Necromancy this turn, it is
     // pinned to that Hero for the rest of the turn. Other Necromancy
@@ -214,11 +218,11 @@ module.exports = {
     // auto-expires when the turn ticks.
     const lock = ps._necromancyLockedToHero;
     if (lock && lock.turn === engine.gs.turn) {
-      const hostName = ps.heroes?.[heroIdx]?.name;
+      const hostName = hps.heroes?.[heroIdx]?.name;
       if (hostName && lock.heroName && hostName !== lock.heroName) return false;
     }
-    if (getFreeZones(ps, heroIdx).length === 0) return false;
-    return getEligibleCreatures(engine, pi, heroIdx, level).length > 0;
+    if (getFreeZones(hps, heroIdx, feld).length === 0) return false;
+    return getEligibleCreatures(engine, pi, heroIdx, level, feld).length > 0;
   },
 
   /**
@@ -231,13 +235,17 @@ module.exports = {
     const pi = ctx.cardOwner;
     const heroIdx = ctx.cardHeroIdx;
     const ps = gs.players[pi];
+    // Styx 28.9.: Held und Support-Zonen liegen auf der Brettseite (`feld`);
+    // die Kreatur kommt aus MEINER Ablage und gehoert mir (seitenfremd).
+    const feld = ctx.cardHeroOwner ?? pi;
+    const hps = gs.players[feld] || ps;
 
     // Build eligible creature list
-    const eligible = getEligibleCreatures(engine, pi, heroIdx, level);
+    const eligible = getEligibleCreatures(engine, pi, heroIdx, level, feld);
     if (eligible.length === 0) return false;
 
     // Check free zones
-    const freeZones = getFreeZones(ps, heroIdx);
+    const freeZones = getFreeZones(hps, heroIdx, feld);
     if (freeZones.length === 0) return false;
 
     // Step 1: Gallery picker — choose a creature from discard
@@ -252,7 +260,7 @@ module.exports = {
 
     // Step 2: Zone picker — choose a free support zone (auto-pick if only one)
     let chosenZone;
-    const currentFreeZones = getFreeZones(ps, heroIdx);
+    const currentFreeZones = getFreeZones(hps, heroIdx, feld);
     if (currentFreeZones.length === 0) return false;
     if (currentFreeZones.length === 1) {
       chosenZone = currentFreeZones[0];
@@ -271,12 +279,12 @@ module.exports = {
     // Play dark magic skull animation on the Necromancy ability zone
     const necroSlotIdx = ctx.card.zoneSlot;
     engine._broadcastEvent('play_zone_animation', {
-      type: 'necromancy_summon', owner: pi,
+      type: 'necromancy_summon', owner: feld,
       heroIdx, zoneSlot: -1,
     });
     // Also play on the target support zone
     engine._broadcastEvent('play_zone_animation', {
-      type: 'necromancy_summon', owner: pi,
+      type: 'necromancy_summon', owner: feld,
       heroIdx: chosenZone.heroIdx, zoneSlot: chosenZone.slotIdx,
     });
     await engine._delay(800);
@@ -289,11 +297,12 @@ module.exports = {
     // Place into support zone
     const hi = chosenZone.heroIdx;
     const si = chosenZone.slotIdx;
-    if (!ps.supportZones[hi]) ps.supportZones[hi] = [[], [], []];
-    ps.supportZones[hi][si] = [creatureName];
+    if (!hps.supportZones[hi]) hps.supportZones[hi] = [[], [], []];
+    hps.supportZones[hi][si] = [creatureName];
 
     // Track card instance — Landung meldet Lethe, Heimkehr, SC, Signal.
-    const inst = engine._trackCard(creatureName, pi, 'support', hi, si);
+    const inst = engine._trackCard(creatureName, feld, 'support', hi, si);
+    if (feld !== pi) engine.markiereSeitenfremd(inst, pi);   // Styx 28.9.
     const ablageExtras = engine.ablageLandung(inst, ab, 'summon');
 
     // Permanently stamp this instance as "summoned by Necromancy" so
@@ -335,7 +344,7 @@ module.exports = {
     // including the "treated as Skeleton" overrides).
     const summonedScript = require('./_loader').loadCardEffect(creatureName);
     const skipNegate = summonedScript?.bypassNecromancyNegation === true;
-    const hostHero = ps.heroes?.[heroIdx];
+    const hostHero = hps.heroes?.[heroIdx];
     let vacarnBypass = false;
     if (hostHero?.name === 'Vacarn, the Dark Goblin Necromancer' && hostHero.hp > 0) {
       const { isSkeletonCreature } = require('./_skeleton-shared');
@@ -368,7 +377,7 @@ module.exports = {
     });
 
     // Emit summon effect glow
-    engine._broadcastEvent('summon_effect', { owner: pi, heroIdx: hi, zoneSlot: si, cardName: creatureName });
+    engine._broadcastEvent('summon_effect', { owner: feld, heroIdx: hi, zoneSlot: si, cardName: creatureName });
 
     // Fire on-summon hooks. `_summonedFromDiscard` and
     // `_summonedByNecromancy` flags let archetype-trigger creatures
@@ -412,7 +421,7 @@ module.exports = {
     // script chooses to clear that HOPT (Lethe — 3 uses/turn). The lock
     // then enforces "only the same Hero may re-activate" via
     // `canFreeActivate` above. Stamped with `turn` so it auto-expires.
-    const _hostHero = ps.heroes?.[heroIdx];
+    const _hostHero = hps.heroes?.[heroIdx];
     if (_hostHero?.name) {
       ps._necromancyLockedToHero = { turn: gs.turn, heroName: _hostHero.name };
     }

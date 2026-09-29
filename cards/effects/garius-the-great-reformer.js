@@ -117,7 +117,8 @@ function _buildReplacementGallery(engine, pi, heroIdx, maxLevel, excludeName, se
     if (hasCardType(cd, 'Token') || cd.subtype === 'Token') continue;
     const effLvl = engine.effectiveCardLevel(cd, pi);
     if (effLvl > maxLevel) continue;
-    if (!engine.isCreatureSummonable(cn, seite, heroIdx)) continue;
+    // Styx 28.9.: Beschwoerer ist der Kontrolleur, auch wenn der Held tot/weg ist.
+    if (!engine.isCreatureSummonable(cn, seite, heroIdx, { beschwoerer: pi })) continue;
     seen.set(baseCardName(cn), { name: cn, source: 'deck', level: effLvl });
   }
   return [...seen.values()].sort(
@@ -296,7 +297,7 @@ module.exports = {
       // (e.g. a Hive's Crown resolution that ended between render
       // and pick). Looping back to the sacrifice picker lets the
       // player choose a different replacement instead of fizzling.
-      if (!engine.isCreatureSummonable(repName, sacSeite, sacHeroIdx)) continue;
+      if (!engine.isCreatureSummonable(repName, sacSeite, sacHeroIdx, { beschwoerer: pi })) continue;   // Styx 28.9.
 
       // ── Commit ──────────────────────────────────────────────────────
       const source = { name: CARD_NAME, owner: pi, heroIdx: gariusHeroIdx };

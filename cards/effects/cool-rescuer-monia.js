@@ -79,13 +79,16 @@ module.exports = {
       const pi = ctx.cardOwner; // Effective controller (auto-resolved for charmed heroes)
       const heroIdx = ctx.cardHeroIdx;
       const hero = gs.players[ctx.cardOriginalOwner]?.heroes?.[heroIdx];
-      if (!hero?.name || hero.hp <= 0) return;
+      // Tot = kein Schutz — AUSSER Monia ist im laufenden Flaechenschlag
+      // gefallen: ihr Tod ist nur vorgemerkt, die Negation gehoert noch
+      // zur Schadensberechnung dieses Schlags (Todes-Aufschub 28.9.).
+      if (!hero?.name || (hero.hp <= 0 && !engine.heldTodAufgeschoben(hero))) return;
       if (hero.statuses?.frozen || hero.statuses?.stunned || hero.statuses?.negated) return;
 
       const flagKey = `${ctx.cardOriginalOwner}-${heroIdx}`;
       const flags = gs.heroFlags?.[flagKey];
       if (!flags?.moniaProtection) return;
-      if (!heldenSperreFrei(gs, 'monia-protect', ctx.cardOriginalOwner)) return;   // v1275: pro Spieler (Ruling 22.9.)
+      if (!heldenSperreFrei(gs, 'monia-protect', ctx.cardOwner)) return;   // v1275: pro Spieler (Ruling 22.9.); Styx 28.9.: Kontrolleur
 
       // If shield is already active from an earlier batch in the same resolution, auto-apply
       if (gs._moniaShieldActive != null) {
@@ -169,7 +172,7 @@ module.exports = {
       const protectOwner = parseInt(match[1]);
 
       // Mark as used this turn
-      heldenSperreSetzen(gs, 'monia-protect', ctx.cardOriginalOwner);   // v1275
+      heldenSperreSetzen(gs, 'monia-protect', ctx.cardOwner);   // v1275; Styx 28.9.: Kontrolleur
 
       // Set shield active for subsequent batches in this resolution
       gs._moniaShieldActive = protectOwner;
@@ -256,7 +259,7 @@ module.exports = {
       const flagKey = `${ctx.cardOriginalOwner}-${heroIdx}`;
       const flags = gs.heroFlags?.[flagKey];
       if (!flags?.moniaProtection) return;
-      if (!heldenSperreFrei(gs, 'monia-protect', ctx.cardOriginalOwner)) return;   // v1275: pro Spieler (Ruling 22.9.)
+      if (!heldenSperreFrei(gs, 'monia-protect', ctx.cardOwner)) return;   // v1275: pro Spieler (Ruling 22.9.); Styx 28.9.: Kontrolleur
 
       // Side attribution uses CONTROLLER — a cross-side-placed
       // Creature counts under the side that currently controls it.
@@ -294,7 +297,7 @@ module.exports = {
       if (!match) return;
       const protectOwner = parseInt(match[1]);
 
-      heldenSperreSetzen(gs, 'monia-protect', ctx.cardOriginalOwner);   // v1275
+      heldenSperreSetzen(gs, 'monia-protect', ctx.cardOwner);   // v1275; Styx 28.9.: Kontrolleur
       gs._moniaShieldActive = protectOwner;
       ctx.cancelled = true;
 

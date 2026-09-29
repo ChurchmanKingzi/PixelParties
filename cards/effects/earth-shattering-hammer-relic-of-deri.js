@@ -78,9 +78,9 @@ module.exports = {
 
     onCardLeaveZone: (ctx) => {
       if (ctx.fromZone !== 'support') return;
-      if (ctx.fromOwner !== ctx.cardOwner || ctx.fromHeroIdx !== ctx.card.heroIdx || ctx.fromZoneSlot !== ctx.card.zoneSlot) return;
+      if ((ctx.fromOwner !== ctx.cardOwner && ctx.fromOwner !== ctx.cardHeroOwner) || ctx.fromHeroIdx !== ctx.card.heroIdx || ctx.fromZoneSlot !== ctx.card.zoneSlot) return;   // Styx 28.9.: Brettseite
       ctx.revokeAtk();
-      maybeDisableAscension(ctx._engine, ctx.cardOwner, ctx.cardHeroIdx, ctx.card.id);
+      maybeDisableAscension(ctx._engine, ctx.cardHeroOwner ?? ctx.cardOwner, ctx.cardHeroIdx, ctx.card.id);   // Styx 28.9.: Brettseite
     },
 
     // ── After an Attack resolves: offer to destroy a support zone card ────
@@ -88,6 +88,8 @@ module.exports = {
     afterSpellResolved: async (ctx) => {
       if (!ctx.spellCardData || ctx.spellCardData.cardType !== 'Attack') return;
       if (ctx.casterIdx !== ctx.cardOwner || ctx.heroIdx !== ctx.cardHeroIdx) return;
+      // Styx 28.9.: gleicher Index reicht nicht — gleiche Brettseite (geliehener Held).
+      if ((ctx.heroOwner ?? ctx.casterIdx) !== (ctx.cardHeroOwner ?? ctx.cardOwner)) return;
 
       // Exactly 1 Hero target (not a creature)
       const targets = ctx.damageTargets || [];
@@ -147,7 +149,7 @@ module.exports = {
       await engine._delay(400);
 
       await engine.actionDestroyCard(
-        { name: CARD_NAME, owner: pi, heroIdx: ctx.cardHeroIdx },
+        { name: CARD_NAME, owner: pi, heroOwner: ctx.cardHeroOwner ?? pi, heroIdx: ctx.cardHeroIdx },
         chosen.cardInstance,
       );
 

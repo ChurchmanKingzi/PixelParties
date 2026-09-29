@@ -65,6 +65,8 @@ module.exports = {
     afterSpellResolved: (ctx) => {
       if (!ctx.spellCardData || ctx.spellCardData.cardType !== 'Spell') return;
       if (ctx.casterIdx !== ctx.cardOwner || ctx.heroIdx !== ctx.cardHeroIdx) return;
+      // Styx 28.9.: gleicher Index reicht nicht — gleiche Brettseite (geliehener Held).
+      if ((ctx.heroOwner ?? ctx.casterIdx) !== (ctx.cardHeroOwner ?? ctx.cardOwner)) return;
       const hero = ctx.attachedHero;
       if (hero) hero._idejKogarasuSpellTurn = ctx._engine.gs.turn;
     },

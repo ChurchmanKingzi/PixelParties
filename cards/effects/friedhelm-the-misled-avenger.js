@@ -82,7 +82,11 @@ module.exports = {
   canActivateHeroEffect(ctx) {
     const engine = ctx._engine;
     const pi = ctx.cardOwner;
-    const hero = engine?.gs?.players?.[pi]?.heroes?.[ctx.cardHeroIdx];
+    // Styx 28.9.: `_castSpellImmediately` wirkt nur ueber Helden der
+    // eigenen Spalte — ein uebernommener Friedhelm spielte sonst ueber
+    // den gleich indizierten EIGENEN Helden. Bis die Engine das kann: aus.
+    if ((ctx.cardHeroOwner ?? pi) !== pi) return false;
+    const hero = ctx.attachedHero ?? engine?.gs?.players?.[pi]?.heroes?.[ctx.cardHeroIdx];
     if (!hero?.name || hero.hp <= 0) return false;
     // Die Aktionsgrenze der Karte selbst: hat er schon gehandelt, ist
     // Schluss. Die Engine prueft das auch, aber ein toter Knopf ist
@@ -136,6 +140,7 @@ module.exports = {
     const heroIdx = ctx.cardHeroIdx;
     const ps = gs.players[pi];
     if (!ps) return false;
+    if ((ctx.cardHeroOwner ?? pi) !== pi) return false;   // Styx 28.9.: s. canActivateHeroEffect
 
     const kandidaten = spielbareDeckkarten(engine, pi, heroIdx);
     if (kandidaten.length === 0) return false;

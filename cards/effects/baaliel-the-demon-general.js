@@ -78,13 +78,17 @@ async function onTargetDefeated(ctx) {
   // eingefrorener, gestunnter oder negierter Baaliel verteilt keine
   // Zaehler; das schliesst seinen eigenen Tod ein (im Moment des KO ist
   // er bereits tot).
-  const self = engine.gs.players[ctx.cardOwner]?.heroes?.[ctx.cardHeroIdx];
+  // Kontrolle statt Seite (Styx 28.9.): Baaliel ueber seine Brettseite —
+  // uebernommen steht er beim Gegner, `cardOwner` ist der Uebernehmer.
+  const self = ctx.attachedHero;
   if (!self?.name || self.hp <= 0) return;
-  if (engine.isHeroIncapacitated(ctx.cardOwner, ctx.cardHeroIdx) || self.statuses?.negated) return;
+  if (engine.isHeroIncapacitated(ctx.cardHeroOwner ?? ctx.cardOwner, ctx.cardHeroIdx) || self.statuses?.negated) return;
   const demons = hornedDemonsOnBoard(engine);
   if (demons.length === 0) return;
   // Quellen-Glow auf Baaliel (Discard-Kosmetik-System), dann die Zaehler.
-  await engine.effectSourceGlow(ctx.cardOwner, CARD_NAME);
+  // Glanz auf Baaliels Platz (Brettseite), nicht auf dem gleichen Index
+  // der Kontrolleursseite.
+  await engine.effectSourceGlow(ctx.cardHeroOwner ?? ctx.cardOwner, CARD_NAME, { inst: ctx.card });
   placeDemonCounters(engine, demons, 1, CARD_NAME);
 }
 
@@ -115,6 +119,11 @@ module.exports = {
     onAnyActionResolved: async (ctx) => {
       if (ctx.actionType !== 'creature' || !ctx.isInherent) return;
       if (ctx.playerIdx !== ctx.cardOwner || ctx.heroIdx !== ctx.cardHeroIdx) return;
+      // Styx 28.9.: DIESER Baaliel = gleiche Brettseite (`heroOwner` aus
+      // doPlayCreature). Ohne den Vergleich stempelte ein uebernommener
+      // Baaliel auch die Beschwoerung des gleich indizierten Helden seines
+      // Kontrolleurs.
+      if ((ctx.heroOwner ?? ctx.playerIdx) !== (ctx.cardHeroOwner ?? ctx.cardOriginalOwner)) return;
       // `ctx.cardName` ist BAALIEL (der Lauscher) — der gespielte Name
       // kommt nur ueber `playedCardName` (siehe server.js doPlayCreature).
       if (!isHornedDemonName(ctx.playedCardName)) return;

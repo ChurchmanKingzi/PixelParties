@@ -90,13 +90,13 @@ function countTriggerSources(engine, pi) {
  * geheilte HP in Schaden am Gegner uebersetzt.
  */
 function pingIstScharf(engine, pi) {
-  const gs = engine.gs;
   const oi = pi === 0 ? 1 : 0;
-  for (const h of (gs.players?.[oi]?.heroes || [])) {
+  // Kontrolle statt Seite (Styx 28.9.)
+  for (const { hero: h } of engine.heroesControlledBy(oi)) {
     if (h?.name && h.hp > 0 && h.statuses?.healReversed) return true;
   }
   for (const inst of (engine.cardInstances || [])) {
-    if (inst.owner !== pi || inst.zone !== 'support') continue;
+    if ((inst.controller ?? inst.owner) !== pi || inst.zone !== 'support') continue;
     if (inst.name !== 'Lifeforce Howitzer') continue;
     if (!inst.counters?.usedThisTurn) return true;
   }

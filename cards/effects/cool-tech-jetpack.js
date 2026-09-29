@@ -42,7 +42,9 @@ module.exports = {
     if (sourceOwner === pi) return false;
     const ps = gs.players[pi];
     if (!ps || (ps.hand || []).length < 1) return false;
-    return (targetedHeroes || []).some(t => t.owner === pi && t.type === 'hero' && t.heroIdx === heroIdx);
+    // Styx 28.9.: `pi` = Kontrolleur, der Traeger steht auf `opts.heroOwner`.
+    const seite = opts?.heroOwner ?? pi;
+    return (targetedHeroes || []).some(t => t.owner === seite && t.type === 'hero' && t.heroIdx === heroIdx);
   },
 
   async postTargetResolve(engine, pi, targetedHeroes, sourceCard, opts) {
@@ -50,6 +52,7 @@ module.exports = {
     const ps = gs.players[pi];
     const inst = opts?.inst;
     const heroIdx = opts?.heroIdx ?? inst?.heroIdx;
+    const seite = opts?.heroOwner ?? pi;   // Brettseite des Traegers (Styx 28.9.)
     if (!ps || (ps.hand || []).length < 1) return {};
     const vorher = ps.hand.length;
     await engine.actionPromptForceDiscard(pi, 1, {
@@ -59,10 +62,10 @@ module.exports = {
     if (!gs.hoptUsed) gs.hoptUsed = {};
     gs.hoptUsed[`cool-tech-jetpack:${inst?.id || `${pi}-${heroIdx}`}`] = gs.turn;
     engine._broadcastEvent('play_zone_animation', {
-      type: 'equip_flash', owner: pi, heroIdx, zoneSlot: inst?.zoneSlot ?? -1,
+      type: 'equip_flash', owner: seite, heroIdx, zoneSlot: inst?.zoneSlot ?? -1,
     });
     engine.log('jetpack_negate', {
-      player: ps.username, hero: ps.heroes?.[heroIdx]?.name, negated: sourceCard?.name || null,
+      player: ps.username, hero: gs.players[seite]?.heroes?.[heroIdx]?.name, negated: sourceCard?.name || null,
     });
     return { effectNegated: true };
   },
@@ -79,7 +82,7 @@ module.exports = {
       await engine._delay(450);
       // Sprengt sich selbst: Explosion auf dem Slot, dann der Pile-Flug.
       engine._broadcastEvent('play_zone_animation', {
-        type: 'explosion', owner: ctx.cardOwner, heroIdx: inst.heroIdx, zoneSlot: inst.zoneSlot,
+        type: 'explosion', owner: ctx.cardHeroOwner ?? ctx.cardOwner, heroIdx: inst.heroIdx, zoneSlot: inst.zoneSlot,
       });
       await engine._delay(300);
       engine.log('jetpack_discarded', { player: engine.gs.players[ctx.cardOwner]?.username, card: CARD_NAME });

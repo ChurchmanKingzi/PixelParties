@@ -56,7 +56,8 @@ module.exports = {
   async onHeroEffect(ctx) {
     const engine = ctx._engine;
     const ps = engine.gs.players[ctx.cardOwner];
-    const hero = ps?.heroes?.[ctx.cardHeroIdx];
+    // Styx 28.9.: der Held selbst (Brettseite), Gold an den Kontrolleur.
+    const hero = ctx.attachedHero ?? engine.gs.players[ctx.cardHeroOwner ?? ctx.cardOwner]?.heroes?.[ctx.cardHeroIdx];
     if (!hero?.name || hero.hp <= 0) return false;
     await ctx.gainGold(ACTION_GOLD);
     engine.log('guldefaber_action', {
@@ -85,6 +86,8 @@ module.exports = {
       // Actor must be Güldefaber on Güldefaber's owning player.
       if (ctx.playerIdx !== ctx.cardOwner) return;
       if (ctx.heroIdx !== ctx.cardHeroIdx) return;
+      // Styx 28.9.: `heroOwner` = Brettseite des Handelnden (gleicher Index ≠ derselbe Held).
+      if ((ctx.heroOwner ?? ctx.playerIdx) !== (ctx.cardHeroOwner ?? ctx.cardOwner)) return;
       // Filter to Attack and Spell card types.
       if (ctx.actionType !== 'attack' && ctx.actionType !== 'spell') return;
       // Once per turn — counter on the card instance.
@@ -94,7 +97,7 @@ module.exports = {
 
       const engine = ctx._engine;
       const ps = engine.gs.players[ctx.cardOwner];
-      const hero = ps?.heroes?.[ctx.cardHeroIdx];
+      const hero = ctx.attachedHero ?? engine.gs.players[ctx.cardHeroOwner ?? ctx.cardOwner]?.heroes?.[ctx.cardHeroIdx];
       if (!hero?.name || hero.hp <= 0) return;
 
       // Stamp the HOPT BEFORE the gold call so a re-entrant trigger

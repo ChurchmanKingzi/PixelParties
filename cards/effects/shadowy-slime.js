@@ -27,6 +27,11 @@ module.exports = {
       const pi = ctx.cardOwner;
       const ps = gs[pi];
       const heroIdx = ctx.cardHeroIdx;
+      // Styx 28.9.: seitenfremd beschworen (liegt auf B, gehoert A) — „the
+      // SAME Hero" ist der Held der Spalte auf der Brettseite (`feld`),
+      // Ablage und Sperre gehoeren dem Kontrolleur `pi`.
+      const feld = ctx.cardHeroOwner ?? pi;
+      const hps = gs[feld];
 
       // Check HOPT manually — only mark used AFTER successful summon
       if (!engine.gs.hoptUsed) engine.gs.hoptUsed = {};
@@ -47,7 +52,7 @@ module.exports = {
       // `beforeSummon`, so cards like King Trex re-apply their strict
       // per-Hero archetype rule.
       const canPlaceOnHere = (name) =>
-        engine.isCreatureSummonable(name, pi, heroIdx, { _bypassBeforeSummon: true });
+        engine.isCreatureSummonable(name, feld, heroIdx, { _bypassBeforeSummon: true, beschwoerer: pi });
       const eligibleCards = [];
       const seen = new Set();
       for (const name of (ps.discardPile || [])) {
@@ -65,17 +70,17 @@ module.exports = {
       // Find free support zones on the SAME hero only
       const getFreeZones = () => {
         const zones = [];
-        const hero = ps.heroes[heroIdx];
+        const hero = hps.heroes[heroIdx];
         // ── ALS RULING (31.7.) ──────────────────────────────────────
         // "place"-Effekte setzen KEINEN lebenden Helden voraus — die
         // Karte wird direkt vom Spieler platziert. Der hp-Filter lieferte
         // bei totem Helden eine LEERE Zonenliste und ließ den Effekt
         // still ausfallen, obwohl die Slots noch da sind.
         if (!hero?.name) return zones;
-        const supZones = ps.supportZones[heroIdx] || [];
+        const supZones = hps.supportZones[heroIdx] || [];
         for (let s = 0; s < 3; s++) { // Base zones only
           if ((supZones[s] || []).length === 0) {
-            zones.push({ heroIdx, slotIdx: s, label: `${hero.name} — Support ${s + 1}` });
+            zones.push({ heroIdx, slotIdx: s, label: `${hero.name} — Support ${s + 1}`, ...(feld !== pi ? { owner: feld } : {}) });
           }
         }
         return zones;
@@ -132,11 +137,12 @@ module.exports = {
 
         // Place into support zone
         const si = zone.slotIdx;
-        if (!ps.supportZones[heroIdx]) ps.supportZones[heroIdx] = [[], [], []];
-        ps.supportZones[heroIdx][si] = [cardName];
+        if (!hps.supportZones[heroIdx]) hps.supportZones[heroIdx] = [[], [], []];
+        hps.supportZones[heroIdx][si] = [cardName];
 
         // Track card instance with placement flag
-        const inst = engine._trackCard(cardName, pi, 'support', heroIdx, si);
+        const inst = engine._trackCard(cardName, feld, 'support', heroIdx, si);
+        if (feld !== pi) engine.markiereSeitenfremd(inst, pi);
         inst.counters.isPlacement = 1;
         const ablageExtras = engine.ablageLandung(inst, ab, 'place');   // Lethe, SC, Signal
 
@@ -150,8 +156,8 @@ module.exports = {
         engine.log('summon_lock', { player: ps.username, by: 'Shadowy Slime' });
 
         // Emit summon effect glow + shadow animation
-        engine._broadcastEvent('summon_effect', { owner: pi, heroIdx, zoneSlot: si, cardName });
-        engine._broadcastEvent('play_zone_animation', { type: 'shadow_summon', owner: pi, heroIdx, zoneSlot: si });
+        engine._broadcastEvent('summon_effect', { owner: feld, heroIdx, zoneSlot: si, cardName });
+        engine._broadcastEvent('play_zone_animation', { type: 'shadow_summon', owner: feld, heroIdx, zoneSlot: si });
 
         // Fire on-summon hooks
         await engine.runHooks('onPlay', { _onlyCard: inst, playedCard: inst, cardName, zone: 'support', heroIdx, zoneSlot: si, ...ablageExtras });

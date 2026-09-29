@@ -250,6 +250,10 @@ module.exports = {
       const hero = ctx.attachedHero;
       const heroIdx = ctx.cardHeroIdx;
       if (!hero?.name || hero.hp <= 0) return;
+      // Styx 28.9.: Pruefkette und Guss (`eligibleHandIndices`/`performSpell`)
+      // laufen ueber die Spalte von `pi` — ein uebernommener Rubin wirkte
+      // sonst ueber den gleich indizierten EIGENEN Helden. Dann kein Angebot.
+      if ((ctx.cardHeroOwner ?? pi) !== pi) return;
 
       // Once per turn — Rundenstempel auf der Instanz statt eines
       // onTurnStart-Zählers: der würde bei eingefrorenem/gestuntem

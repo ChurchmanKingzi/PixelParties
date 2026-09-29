@@ -38,7 +38,7 @@ module.exports = {
         allowedCategories: ['creature'],
         filter: (cardData) => hasCardType(cardData, 'Creature'),
       });
-      checkArthorAscension(ctx._engine, ctx.cardOwner, ctx.cardHeroIdx, null);
+      checkArthorAscension(ctx._engine, ctx.cardHeroOwner ?? ctx.cardOwner, ctx.cardHeroIdx, null);   // Styx 28.9.: Brettseite
     },
 
     onGameStart: (ctx) => {
@@ -49,16 +49,16 @@ module.exports = {
         allowedCategories: ['creature'],
         filter: (cardData) => hasCardType(cardData, 'Creature'),
       });
-      checkArthorAscension(ctx._engine, ctx.cardOwner, ctx.cardHeroIdx, null);
+      checkArthorAscension(ctx._engine, ctx.cardHeroOwner ?? ctx.cardOwner, ctx.cardHeroIdx, null);   // Styx 28.9.: Brettseite
     },
 
     onCardLeaveZone: (ctx) => {
       if (ctx.fromZone !== 'support') return;
-      if (ctx.fromOwner !== ctx.cardOwner || ctx.fromHeroIdx !== ctx.card.heroIdx || ctx.fromZoneSlot !== ctx.card.zoneSlot) return;
+      if ((ctx.fromOwner !== ctx.cardOwner && ctx.fromOwner !== ctx.cardHeroOwner) || ctx.fromHeroIdx !== ctx.card.heroIdx || ctx.fromZoneSlot !== ctx.card.zoneSlot) return;   // Styx 28.9.: Brettseite
       ctx.revokeAtk();
       // Expire any unused summon grant from this sword instance
       ctx.expireAdditionalAction();
-      checkArthorAscension(ctx._engine, ctx.cardOwner, ctx.cardHeroIdx, ctx.card.id);
+      checkArthorAscension(ctx._engine, ctx.cardHeroOwner ?? ctx.cardOwner, ctx.cardHeroIdx, ctx.card.id);   // Styx 28.9.: Brettseite
     },
 
     onTurnStart: (ctx) => {
@@ -81,6 +81,8 @@ module.exports = {
     afterSpellResolved: async (ctx) => {
       if (!ctx.spellCardData || ctx.spellCardData.cardType !== 'Attack') return;
       if (ctx.casterIdx !== ctx.cardOwner || ctx.heroIdx !== ctx.cardHeroIdx) return;
+      // Styx 28.9.: gleicher Index reicht nicht — gleiche Brettseite (geliehener Held).
+      if ((ctx.heroOwner ?? ctx.casterIdx) !== (ctx.cardHeroOwner ?? ctx.cardOwner)) return;
       if (ctx.isSecondCast) return;
 
       const engine  = ctx._engine;
@@ -96,7 +98,7 @@ module.exports = {
       if (!ctx.hardOncePerTurn(hoptKey)) return;
       const refundHopt = () => { if (gs.hoptUsed) delete gs.hoptUsed[`${hoptKey}:${pi}`]; };
 
-      const hero = gs.players[pi]?.heroes?.[heroIdx];
+      const hero = gs.players[ctx.cardHeroOwner ?? pi]?.heroes?.[heroIdx];   // Styx 28.9.: Brettseite
       if (!hero?.name || hero.hp <= 0) { refundHopt(); return; }
 
       // Register type (idempotent)

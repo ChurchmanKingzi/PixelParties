@@ -92,15 +92,18 @@ module.exports = {
     const ps = engine.gs.players[ctx.cardOwner];
     if (!ps) return false;
     if (ctx.card?.zone !== 'support') return false;
+    // Styx 28.9.: corresponding Hero = Held der Spalte auf der Brettseite
+    // (seitenfremd beschworen: B), Deck und Invest gehoeren `cardOwner`.
+    const hps = engine.gs.players[ctx.cardHeroOwner ?? ctx.cardOwner];
     // Toter corresponding Hero → kein Effekt: an einen toten Helden
     // kann nichts ausgeruestet werden (siehe `istWirtAmLeben`).
-    if (!wirtKannAusgeruestetWerden(ps, ctx.cardHeroIdx)) return false;
+    if (!wirtKannAusgeruestetWerden(hps, ctx.cardHeroIdx)) return false;
     // v343 (Als Auftrag): die zweite Faehigkeit kostet 4 INVEST COUNTER
     // statt 4 Gold. Der Beschwoerungs-Trigger unten bleibt bei Gold.
     if (investHoptUsed(engine.gs, ctx.card)) return false;
     if (heroesWithInvest(ps, INVEST_COST).length === 0) return false;
     if (!nfmImDeck(ps)) return false;
-    return freeSlotOn(ps, ctx.cardHeroIdx) >= 0;
+    return freeSlotOn(hps, ctx.cardHeroIdx) >= 0;
   },
 
   async onCreatureEffect(ctx) {
@@ -109,21 +112,24 @@ module.exports = {
     const pi = ctx.cardOwner;
     const ps = gs.players[pi];
     const heroIdx = ctx.cardHeroIdx;                 // der corresponding Hero
-    if (!ps) return false;
+    // Styx 28.9.: Spalte des Wirts auf der Brettseite (`feld`).
+    const feld = ctx.cardHeroOwner ?? pi;
+    const hps = gs.players[feld];
+    if (!ps || !hps) return false;
 
     // Zweite Sperre am Ausfuehrungsweg: `canActivateCreatureEffect` ist
     // nur das Angebot, ein manipulierter Client koennte die Aktivierung
     // trotzdem schicken.
-    if (!wirtKannAusgeruestetWerden(ps, heroIdx)) return false;
+    if (!wirtKannAusgeruestetWerden(hps, heroIdx)) return false;
     if (investHoptUsed(gs, ctx.card)) return false;
     if (heroesWithInvest(ps, INVEST_COST).length === 0) return false;
     if (!nfmImDeck(ps)) return false;
-    if (freeSlotOn(ps, heroIdx) < 0) return false;
+    if (freeSlotOn(hps, heroIdx) < 0) return false;
 
     const bestaetigt = await engine.promptGeneric(pi, {
       type: 'confirm',
       title: CARD_NAME,
-      message: `Remove ${INVEST_COST} Invest Counters from a Hero you control to equip "${NFM}" from your deck to ${ps.heroes?.[heroIdx]?.name || 'this Hero'} for free?`,
+      message: `Remove ${INVEST_COST} Invest Counters from a Hero you control to equip "${NFM}" from your deck to ${hps.heroes?.[heroIdx]?.name || 'this Hero'} for free?`,
       showCard: CARD_NAME,
       confirmLabel: `🐒 Remove ${INVEST_COST} Invest Counters!`,
       cancelLabel: 'No',
@@ -144,7 +150,7 @@ module.exports = {
       engine.log('criminal_monkee_fizzle', { player: ps.username, reason: 'no_nfm_in_deck' });
       return true;                                    // bezahlt ist bezahlt
     }
-    const slot = freeSlotOn(ps, heroIdx);
+    const slot = freeSlotOn(hps, heroIdx);
     if (slot < 0) {
       engine.log('criminal_monkee_fizzle', { player: ps.username, reason: 'no_free_zone' });
       return true;
@@ -159,12 +165,16 @@ module.exports = {
 
     // Equippen = platzieren + die beiden Eintritts-Hooks feuern, genau
     // wie der Equipment-Zweig beim normalen Ausspielen.
-    const platz = engine.safePlaceInSupport(NFM, pi, heroIdx, slot);
+    // Ausruestung auf der Brettseite: wie der Free-Side-Equip in
+    // `doPlayArtifact` gehoert die Instanz der Wirtsseite, die Karte
+    // selbst (Ablage) dem Spieler, aus dessen Deck sie kam.
+    const platz = engine.safePlaceInSupport(NFM, feld, heroIdx, slot);
     if (!platz?.inst) {
       ps.discardPile.push(NFM);
       engine.log('criminal_monkee_fizzle', { player: ps.username, reason: 'place_refused' });
       return true;
     }
+    if (feld !== pi) platz.inst.originalOwner = pi;
     await engine.runHooks('onPlay', {
       _onlyCard: platz.inst, playedCard: platz.inst, cardName: NFM,
       zone: 'support', heroIdx, zoneSlot: platz.actualSlot,
@@ -175,7 +185,7 @@ module.exports = {
 
     engine.log('criminal_monkee_equip', {
       player: ps.username, card: NFM,
-      hero: ps.heroes?.[heroIdx]?.name, slot: platz.actualSlot, investPaid: INVEST_COST,
+      hero: hps.heroes?.[heroIdx]?.name, slot: platz.actualSlot, investPaid: INVEST_COST,
     });
     engine.sync();
     return true;

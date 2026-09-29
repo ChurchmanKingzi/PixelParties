@@ -86,7 +86,8 @@ module.exports = {
     // Ghuanjun's cap and other attack-keyed hooks fire normally.
     // usesHeroAtk is left false because the damage is a fixed formula,
     // not derived from hero.atk.
-    const attackSource = { name: CARD_NAME, owner: pi, heroIdx, controller: pi };
+    const attackSource = { name: CARD_NAME, owner: pi, heroIdx, controller: pi,
+      ...(ctx.cardHeroOwner != null && ctx.cardHeroOwner !== pi ? { heroOwner: ctx.cardHeroOwner } : {}) };   // Styx 28.9.: Brettseite des Angreifers
 
     if (target.type === 'hero') {
       const targetHero = engine.gs.players[target.owner]?.heroes?.[target.heroIdx];

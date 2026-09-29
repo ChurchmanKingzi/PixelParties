@@ -48,7 +48,7 @@ module.exports = {
       // small delay so the reveal lands before the draw animation.
       const engine = ctx._engine;
       engine._broadcastEvent('card_effect_flash', {
-        owner: ctx.cardOwner, heroIdx: ctx.cardHeroIdx,
+        owner: ctx.cardHeroOwner ?? ctx.cardOwner, heroIdx: ctx.cardHeroIdx,   // Styx 28.9.: Brettseite
       });
       engine._broadcastEvent('card_reveal', { cardName: hero.name });
       await engine._delay(400);

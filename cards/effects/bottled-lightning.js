@@ -33,18 +33,19 @@ module.exports = {
 
     // Build all targets the taker controls
     const targets = [];
-    for (let hi = 0; hi < (takerPs.heroes || []).length; hi++) {
-      const hero = takerPs.heroes[hi];
+    // Kontrolle statt Seite (Styx 28.9.); IDs/owner bleiben physisch.
+    for (const { physOwner, heroIdx: hi, hero } of engine.heroesControlledBy(takerIdx)) {
       if (!hero?.name || hero.hp <= 0) continue;
-      targets.push({ id: `hero-${takerIdx}-${hi}`, type: 'hero', owner: takerIdx, heroIdx: hi, cardName: hero.name });
+      targets.push({ id: `hero-${physOwner}-${hi}`, type: 'hero', owner: physOwner, heroIdx: hi, cardName: hero.name });
     }
     for (const inst of engine.cardInstances) {
-      if (inst.owner !== takerIdx || inst.zone !== 'support' || inst.faceDown) continue;
+      if ((inst.controller ?? inst.owner) !== takerIdx || inst.zone !== 'support' || inst.faceDown) continue;
       const cd = inst.counters?._cardDataOverride || cardDB[inst.name]; // token-override-aware (Biomancy Token — Als AoE-Report)
       if (!cd || !hasCardType(cd, 'Creature')) continue;
       const hp = inst.counters?.currentHp ?? cd.hp ?? 0;
       if (hp <= 0) continue;
-      targets.push({ id: `equip-${takerIdx}-${inst.heroIdx}-${inst.zoneSlot}`, type: 'equip', owner: takerIdx, heroIdx: inst.heroIdx, slotIdx: inst.zoneSlot, cardName: inst.name, cardInstance: inst });
+      const seite = engine.physicalSide(inst);
+      targets.push({ id: `equip-${seite}-${inst.heroIdx}-${inst.zoneSlot}`, type: 'equip', owner: seite, heroIdx: inst.heroIdx, slotIdx: inst.zoneSlot, cardName: inst.name, cardInstance: inst });
     }
     if (targets.length === 0) return true;
 

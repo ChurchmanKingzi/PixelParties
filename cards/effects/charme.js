@@ -127,7 +127,8 @@ module.exports = {
     const gs = engine.gs;
     const pi = ctx.cardOwner;
     const heroIdx = ctx.cardHeroIdx;
-    const hero = gs.players[pi]?.heroes?.[heroIdx];
+    const feld = ctx.cardHeroOwner ?? pi;   // Styx 28.9.: Brettseite des Helden
+    const hero = gs.players[feld]?.heroes?.[heroIdx];
     if (!hero?.name || hero.hp <= 0) return false;
 
     const oi = pi === 0 ? 1 : 0;
@@ -171,7 +172,8 @@ module.exports = {
     const gs = engine.gs;
     const pi = ctx.cardOwner;
     const heroIdx = ctx.cardHeroIdx;
-    const hero = gs.players[pi]?.heroes?.[heroIdx];
+    const feld = ctx.cardHeroOwner ?? pi;   // Styx 28.9.: Brettseite des Helden
+    const hero = gs.players[feld]?.heroes?.[heroIdx];
     if (!hero?.name) return false;
 
     const oi = pi === 0 ? 1 : 0;
@@ -182,7 +184,7 @@ module.exports = {
     } else if (level >= 2) {
       return await _activateLv2(engine, gs, pi, heroIdx, hero, oi, ops);
     } else {
-      return await _activateLv1(engine, gs, pi, heroIdx, hero, oi, ops);
+      return await _activateLv1(engine, gs, pi, heroIdx, hero, oi, ops, feld);
     }
   },
 };
@@ -279,7 +281,7 @@ function _getOpponentActivatableAbilities(gs, pi, engine) {
   return results;
 }
 
-async function _activateLv1(engine, gs, pi, heroIdx, hero, oi, ops) {
+async function _activateLv1(engine, gs, pi, heroIdx, hero, oi, ops, feld = pi) {
   const allAbilities = _getOpponentActivatableAbilities(gs, pi, engine);
   const isActionPhase = gs.currentPhase === 3;
   // During Action Phase: only action-cost abilities; during Main Phase: only free abilities
@@ -372,6 +374,7 @@ async function _activateLv1(engine, gs, pi, heroIdx, hero, oi, ops) {
     name: selectedAb.abName,
     owner: pi,
     controller: pi,
+    heroOwner: feld,   // Styx 28.9.: Held liegt auf der Brettseite
     zone: 'ability',
     heroIdx: heroIdx,
     zoneSlot: -1,

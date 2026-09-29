@@ -64,15 +64,17 @@ module.exports = {
       const gs = engine.gs;
       const inst = ctx.card;
       if (!inst || inst.zone !== 'support') return;
-      const pi = inst.controller ?? inst.owner;
+      // Styx 28.9.: „you" = Kontrolleur (geliehener Held), Held/Zonen = Brettseite.
+      const feld = ctx.cardHeroOwner ?? (inst.controller ?? inst.owner);
+      const pi = ctx.cardOwner ?? (inst.controller ?? inst.owner);
       if (ctx.playerIdx !== pi) return;
       if (ctx._isResourceGain) return;
       if (gs._royalTreasuryGain) return;               // eigener Bonus loest nicht erneut aus
       if (!((ctx.amount || 0) > 0)) return;
-      const hero = ctx.attachedHero || gs.players[pi]?.heroes?.[inst.heroIdx];
+      const hero = ctx.attachedHero || gs.players[feld]?.heroes?.[inst.heroIdx];
       if (!hero?.name || hero.hp <= 0) return;
       if (usesLeft(inst, gs, { key: USE_KEY, max: MAX_USES_PER_TURN }) <= 0) return;
-      const ma = engine.countAbilitiesForSchool('Magic Arts', gs.players[pi]?.abilityZones?.[inst.heroIdx] || []);
+      const ma = engine.countAbilitiesForSchool('Magic Arts', gs.players[feld]?.abilityZones?.[inst.heroIdx] || []);
       const bonus = BONUS[Math.min(3, Math.max(1, ma))];
       spendUse(inst, gs, { key: USE_KEY, max: MAX_USES_PER_TURN });
       await engine.announceHookActivation(CARD_NAME, pi, { source: ctx._goldSource });

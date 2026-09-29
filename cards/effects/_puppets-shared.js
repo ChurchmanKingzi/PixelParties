@@ -197,7 +197,7 @@ function canUsePuppetActive(ctx) {
   const pi = ctx.cardOwner;
   // Waehrend der Tausch-Animation sind ALLE Puppets gesperrt (Al 3.9.).
   if (isPuppetSwapInProgress(engine, pi, inst.heroIdx)) return false;
-  const hero = engine.gs.players[pi]?.heroes?.[inst.heroIdx];
+  const hero = engine.gs.players[engine.physicalSide(inst)]?.heroes?.[inst.heroIdx];   // Styx 28.9.: Brettseite
   if (!hero?.name || hero.hp <= 0) return false;
   if (isPuppetActiveLocked(engine, pi, inst.heroIdx, inst.id)) return false;
   return true;

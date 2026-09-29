@@ -40,7 +40,9 @@ async function tryEat(ctx, deadName, deadOwnerSide) {
   // The listener IS this Cannibalism Hero.
   const ourPi = ctx.cardOwner;
   const ourHi = ctx.cardHeroIdx;
-  const ourHero = gs.players[ourPi]?.heroes?.[ourHi];
+  // Styx 28.9.: der Held steht auf der Brettseite (`feld`), „unsere" Seite ist der Kontrolleur.
+  const feld = ctx.cardHeroOwner ?? ourPi;
+  const ourHero = gs.players[feld]?.heroes?.[ourHi];
   if (!ourHero?.name || ourHero.hp <= 0) return;
   // Wounded gate — Cannibalism only offers when there's HP to fill.
   const maxHp = ourHero.maxHp ?? ourHero.hp;
@@ -59,7 +61,7 @@ async function tryEat(ctx, deadName, deadOwnerSide) {
   // NaN on strings and silently bails every listener.) Stack length
   // drives the heal level.
   const stack = engine.cardInstances.filter(c =>
-    (c.controller ?? c.owner) === ourPi
+    (feld === ourPi ? (c.controller ?? c.owner) === ourPi : c.owner === feld)   // Styx 28.9.
     && c.heroIdx === ourHi
     && c.zone === 'ability'
     && c.name === 'Cannibalism'
@@ -73,7 +75,7 @@ async function tryEat(ctx, deadName, deadOwnerSide) {
   // choice (the prior confirm prompt has been removed). Claimed
   // BEFORE the heal so any reentrant deaths fired by downstream
   // effects can't double-trigger this hero's eat.
-  const hoptKey = `cannibalism_eat:${ourPi}-${ourHi}`;
+  const hoptKey = `cannibalism_eat:${feld}-${ourHi}`;
   if (gs.hoptUsed?.[hoptKey] === gs.turn) return;
   if (!gs.hoptUsed) gs.hoptUsed = {};
   gs.hoptUsed[hoptKey] = gs.turn;
@@ -91,13 +93,13 @@ async function tryEat(ctx, deadName, deadOwnerSide) {
   // paints over the portrait.
   engine._broadcastEvent('play_zone_animation', {
     type: 'cannibalism_chomp',
-    owner: ourPi, heroIdx: ourHi, zoneSlot: -1,
+    owner: feld, heroIdx: ourHi, zoneSlot: -1,
   });
   // Short hold so the first bite "lands" before the heal numbers
   // pop — keeps the visual reading as cause-then-effect.
   await engine._delay(280);
 
-  const source = { name: 'Cannibalism', owner: ourPi, heroIdx: ourHi };
+  const source = { name: 'Cannibalism', owner: ourPi, heroOwner: feld, heroIdx: ourHi };
   await engine.actionHealHero(source, ourHero, healAmount);
 
   engine.log('cannibalism_heal', {

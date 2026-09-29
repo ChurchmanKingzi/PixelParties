@@ -50,7 +50,8 @@ async function zuschlagSetzen(ctx) {
   if (!inst || inst.zone !== 'hero') return;
   const pi = ctx.cardOwner;
   if (engine.gs.activePlayer !== pi) return;
-  const hero = engine.gs.players[pi]?.heroes?.[ctx.cardHeroIdx];
+  // Styx 28.9.: Zhigao selbst (Brettseite), nicht der gleich indizierte eigene Held.
+  const hero = ctx.attachedHero ?? engine.gs.players[ctx.cardHeroOwner ?? pi]?.heroes?.[ctx.cardHeroIdx];
   if (!hero?.name || hero.hp <= 0) return;             // besiegt: kein Zuschlag
   await secondActionGrant(ctx, {
     sourceLabel: CARD_NAME,

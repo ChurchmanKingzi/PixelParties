@@ -27153,7 +27153,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   const canCreatureBePlayed = (card) => {
     if (!card || card.cardType !== 'Creature') return false;
     // heroPlayableCards already includes free support zone check for creatures
-    return [0,1,2].some(hi => canHeroPlayCard(me, hi, card));
+    if ([0,1,2].some(hi => canHeroPlayCard(me, hi, card))) return true;
+    // Styx 28.9.: auch ueber geliehene Helden (Server meldet sie in
+    // `heroPlayableCards.charmed`) — sonst blieb die Handkarte gedimmt.
+    return (opp.heroes || []).some((h, hi) => h?.charmedBy === myIdx && canHeroPlayCard(opp, hi, card));
   };
 
   // Check if a Spell or Attack can be used by ANY hero (level/spell school reqs, no zone needed)
@@ -40208,12 +40211,15 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   const skatesCreatureSet = new Set();
   const skatesDestSet = new Set();
   if (isMyEffectPrompt && ep.type === 'skatesMove') {
+    // Styx 28.9.: Zonen liegen auf `boardOwner` (Skates an einem
+    // uebernommenen Helden: Gegnerseite), sonst auf der eigenen Seite.
+    const skatesSeite = ep.boardOwner ?? myIdx;
     for (const c of (ep.creatures || [])) {
-      skatesCreatureSet.add(`${myIdx}-${ep.heroIdx}-${c.zoneSlot}`);
+      skatesCreatureSet.add(`${skatesSeite}-${ep.heroIdx}-${c.zoneSlot}`);
     }
     if (skatesSelected != null) {
       for (const z of (ep.destZones || [])) {
-        skatesDestSet.add(`${myIdx}-${z.heroIdx}-${z.slotIdx}`);
+        skatesDestSet.add(`${skatesSeite}-${z.heroIdx}-${z.slotIdx}`);
       }
     }
   }

@@ -73,6 +73,11 @@ async function offerAttach(ctx) {
   const heroIdx = ctx.cardHeroIdx;
   const ps = engine.gs.players[pi];
   if (!ps) return;
+  // Styx 28.9.: `canAttachAbilityToHero`/`attachAbilityFromHand` legen nur
+  // an Helden der eigenen Spalte an — ein uebernommener Peter bekaeme die
+  // Ability sonst auf den gleich indizierten EIGENEN Helden. Bis die
+  // Engine das kann: kein Angebot.
+  if ((ctx.cardHeroOwner ?? pi) !== pi) return;
 
   const cardDB = engine._getCardDB();
 

@@ -103,7 +103,15 @@ module.exports = {
    */
   canPlayCard: (gs, pi, heroIdx, cardData, _engine) => {
     if (!hasCardType(cardData, 'Attack')) return true;
-    const hero = gs.players[pi]?.heroes?.[heroIdx];
+    // Styx 28.9.: die Engine ruft teils mit dem Kontrolleur statt der
+    // Brettseite — steht dort nicht Mirjam, ist sie der geliehene Held
+    // der Gegenseite mit demselben Index.
+    let hero = gs.players[pi]?.heroes?.[heroIdx];
+    if (hero?.name !== CARD_NAME) {
+      const fremd = (gs.players || []).map(p => p?.heroes?.[heroIdx])
+        .find(h => h?.name === CARD_NAME && h.charmedBy === pi);
+      if (fremd) hero = fremd;
+    }
     if (!hero) return true;
     // Nur ein Zaehler aus DIESEM Zug sperrt (v1465, siehe Kopf).
     if (hero._mirjamAttackTurn !== gs.turn) return true;
@@ -166,6 +174,8 @@ module.exports = {
       // Effective controller — survives hero theft (a stealer
       // playing an Attack from Mirjam's column still trips her cap).
       if (ctx.playerIdx !== ctx.cardOwner) return;
+      // Styx 28.9.: `heroOwner` = Brettseite des Angreifers (gleicher Index ≠ Mirjam).
+      if ((ctx.heroOwner ?? ctx.playerIdx) !== (ctx.cardHeroOwner ?? ctx.cardOriginalOwner)) return;
       const hero = ctx.attachedHero;
       if (!hero) return;
       // Neuer Zug → neuer Zaehler. Ersetzt den frueheren Reset in

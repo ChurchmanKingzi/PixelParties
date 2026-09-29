@@ -39,8 +39,9 @@ const DAUER = 2;
 /** Gehoert dieser Treffer einem Angriff DIESES Helden? */
 function vonDiesemHelden(ctx, quelle, typ) {
   if (typ !== 'attack') return false;
-  const besitzer = quelle?.owner ?? quelle?.controller ?? -1;
-  if (besitzer !== ctx.cardOwner) return false;
+  // Styx 28.9.: Brettseite der Quelle (`heroOwner`) gegen Nulls Seite.
+  const besitzer = quelle?.heroOwner ?? quelle?.owner ?? quelle?.controller ?? -1;
+  if (besitzer !== (ctx.cardHeroOwner ?? ctx.cardOwner)) return false;
   return (quelle?.heroIdx ?? -1) === ctx.cardHeroIdx;
 }
 

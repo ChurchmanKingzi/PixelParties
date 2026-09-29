@@ -70,9 +70,10 @@ function freieZonen(ps, heroIdx) {
  * anzulegen brauchte eine Support Zone und braechte nichts, also
  * steht sie gar nicht erst zur Wahl.
  */
-function anlegbareFeen(engine, pi, heroIdx) {
+function anlegbareFeen(engine, pi, heroIdx, feld = pi) {
+  // Styx 28.9.: Hand beim Kontrolleur `pi`, Tempeluna auf der Brettseite `feld`.
   const ps = engine.gs.players[pi];
-  const hero = ps?.heroes?.[heroIdx];
+  const hero = engine.gs.players[feld]?.heroes?.[heroIdx];
   if (!ps || !hero?.name) return [];
   const cardDB = engine._getCardDB();
   const schon = new Set([hero.name, ...gainedNames(hero)]);
@@ -238,16 +239,17 @@ module.exports = {
     const engine = ctx._engine;
     const pi = ctx.cardOwner;
     const heroIdx = ctx.cardHeroIdx;
-    const ps = engine.gs.players[pi];
-    const hero = ps?.heroes?.[heroIdx];
+    // Styx 28.9.: Tempeluna und ihre Zonen auf der Brettseite `feld`.
+    const feld = ctx.cardHeroOwner ?? pi;
+    const hero = ctx.attachedHero ?? engine.gs.players[feld]?.heroes?.[heroIdx];
     if (!hero?.name || hero.hp <= 0) return false;
     // Anlegen geht nur mit freier Zone UND passender Handkarte …
-    const kannAnlegen = freieZonen(ps, heroIdx).length > 0
-      && anlegbareFeen(engine, pi, heroIdx).length > 0;
+    const kannAnlegen = freieZonen(engine.gs.players[feld], heroIdx).length > 0
+      && anlegbareFeen(engine, pi, heroIdx, feld).length > 0;
     if (kannAnlegen) return true;
     // … aber das Menue steht auch offen, wenn nur ein GEWONNENER
     // Aktiveffekt uebrig ist (Jenny).
-    return gewonneneAktiveffekte(engine, pi, heroIdx)
+    return gewonneneAktiveffekte(engine, feld, heroIdx)
       .some(({ script }) => typeof script.canActivateHeroEffect !== 'function'
         || script.canActivateHeroEffect(ctx));
   },
@@ -258,8 +260,12 @@ module.exports = {
     const pi = ctx.cardOwner;
     const heroIdx = ctx.cardHeroIdx;
     const ps = gs.players[pi];
-    const hero = ps?.heroes?.[heroIdx];
-    if (!hero?.name || hero.hp <= 0) return false;
+    // Styx 28.9.: Tempeluna, ihre Zonen, die angelegte Fee und die
+    // gewonnenen Effekte auf der Brettseite `feld`; Hand/Sperren bei `pi`.
+    const feld = ctx.cardHeroOwner ?? pi;
+    const hostPs = gs.players[feld];
+    const hero = ctx.attachedHero ?? hostPs?.heroes?.[heroIdx];
+    if (!ps || !hostPs || !hero?.name || hero.hp <= 0) return false;
 
     // ── Was steht zur Wahl? ────────────────────────────────────────
     // Tempelunas eigener Effekt plus jeder gewonnene Aktiveffekt. Die
@@ -268,10 +274,10 @@ module.exports = {
     // v1275: pro Spieler (Ruling 22.9.), siehe `_hero-hopt-shared.js`.
     const eigenerHopt = heldenSperreKey('hero-effect:tempeluna-attach', pi);
     const eigenOffen = gs.hoptUsed?.[eigenerHopt] !== gs.turn
-      && freieZonen(ps, heroIdx).length > 0
-      && anlegbareFeen(engine, pi, heroIdx).length > 0;
+      && freieZonen(hostPs, heroIdx).length > 0
+      && anlegbareFeen(engine, pi, heroIdx, feld).length > 0;
 
-    const fremde = gewonneneAktiveffekte(engine, pi, heroIdx).filter(({ name, script }) => {
+    const fremde = gewonneneAktiveffekte(engine, feld, heroIdx).filter(({ name, script }) => {
       // v1275: derselbe Schluessel wie der Aktiveffekt der Fee selbst —
       // eine gewonnene Fee und eine echte auf derselben Seite teilen sich
       // die Sperre (Ruling 22.9.).
@@ -321,9 +327,9 @@ module.exports = {
     }
 
     // ── Anlegen ────────────────────────────────────────────────────
-    const kandidaten = anlegbareFeen(engine, pi, heroIdx);
+    const kandidaten = anlegbareFeen(engine, pi, heroIdx, feld);
     if (kandidaten.length === 0) return false;
-    if (freieZonen(ps, heroIdx).length === 0) return false;
+    if (freieZonen(hostPs, heroIdx).length === 0) return false;
 
     const auswahl = await ctx.promptCardGallery(kandidaten, {
       title: CARD_NAME,
@@ -338,7 +344,7 @@ module.exports = {
     // Hand geaendert haben (Reaktionen, Kosten).
     const handIdx = ps.hand.indexOf(feeName);
     if (handIdx < 0) return false;
-    const frei = freieZonen(ps, heroIdx);
+    const frei = freieZonen(hostPs, heroIdx);
     if (frei.length === 0) return false;
     const slot = frei[0];
 
@@ -354,12 +360,13 @@ module.exports = {
     engine._broadcastEvent('play_pile_transfer', {
       owner: pi, cardName: feeName, from: 'hand', to: 'support',
       fromHandIdx: handIdx, toHeroIdx: heroIdx, toSlotIdx: slot,
+      ...(feld !== pi ? { toOwner: feld } : {}),
       sfx: 'placement',
     });
     engine.takeFromPileSync(ps, 'hand', handIdx);
 
-    if (!ps.supportZones[heroIdx]) ps.supportZones[heroIdx] = [[], [], []];
-    ps.supportZones[heroIdx][slot] = [feeName];
+    if (!hostPs.supportZones[heroIdx]) hostPs.supportZones[heroIdx] = [[], [], []];
+    hostPs.supportZones[heroIdx][slot] = [feeName];
     // ★★ v1222: Abgleich SOFORT nach dem Hand-Abgang — sonst taucht die
     // abgeflogene Karte nach dem Flug wieder in der Hand auf (Als
     // Befund 18.9. zu „Dive Down").
@@ -367,7 +374,8 @@ module.exports = {
     // die Karte zieht von der Hand in die Support Zone, und ein
     // Abgleich dazwischen zeigte sie fuer einen Takt nirgends.
     engine.sync();
-    const feeInst = engine._trackCard(feeName, pi, 'support', heroIdx, slot);
+    const feeInst = engine._trackCard(feeName, feld, 'support', heroIdx, slot);
+    if (feld !== pi) feeInst.originalOwner = pi;   // Ablage beim Kontrolleur
     feeInst.counters = feeInst.counters || {};
     // `treatAsEquip` macht die Karte fuer die ganze Engine zur
     // Ausruestung (zerstoerbar) UND laesst laut `CardInstance.isActiveIn`
@@ -378,8 +386,8 @@ module.exports = {
 
     // DIESE Instanz ist der Traeger des gewonnenen Effekts — keine
     // zusaetzliche unsichtbare (sonst liefen die Hooks doppelt).
-    engine.grantHeroEffect(pi, heroIdx, feeName, { traeger: feeInst });
-    await engine.finishGainedHeroEffects(pi, heroIdx);
+    engine.grantHeroEffect(feld, heroIdx, feeName, { traeger: feeInst });
+    await engine.finishGainedHeroEffects(feld, heroIdx);
 
     // ★★ v1192 (Als Vorgabe 18.9.): der Moment, in dem der Effekt
     // uebergeht — Dampf, Funken und Sterne, und zwar AUSSCHLIESSLICH
@@ -388,7 +396,7 @@ module.exports = {
     // das war falsch herum: sie GIBT den Effekt, Tempeluna nimmt ihn
     // auf. Klang haengt an `tempeluna_infuse` in ZONE_ANIM_SFX.
     engine._broadcastEvent('play_zone_animation', {
-      type: 'tempeluna_infuse', owner: pi, heroIdx, zoneSlot: -1,
+      type: 'tempeluna_infuse', owner: feld, heroIdx, zoneSlot: -1,
       duration: 1100,
     });
     await engine._delay(520);
@@ -422,7 +430,7 @@ module.exports = {
     // 16.8.: der Puzzle Mode ist der Teststand.)
     onGameStart: (ctx) => {
       const engine = ctx._engine;
-      const pi = ctx.cardOwner;
+      const pi = ctx.cardHeroOwner ?? ctx.cardOwner;   // Styx 28.9.: Brettseite
       const heroIdx = ctx.cardHeroIdx;
       if (pi == null || heroIdx == null || heroIdx < 0) return;
       for (const fee of GRUNDFEEN) engine.grantHeroEffect(pi, heroIdx, fee);
@@ -435,7 +443,7 @@ module.exports = {
       const engine = ctx._engine;
       const weg = ctx.leavingCard;
       if (!weg?.counters?._tempelunaAttached) return;
-      const pi = ctx.cardOwner;
+      const pi = ctx.cardHeroOwner ?? ctx.cardOwner;   // Styx 28.9.: Brettseite
       const heroIdx = ctx.cardHeroIdx;
       if (weg.owner !== pi || weg.heroIdx !== heroIdx) return;
       await engine.revokeHeroEffect(pi, heroIdx, weg.name, 'attachmentLeft');

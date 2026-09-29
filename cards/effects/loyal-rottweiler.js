@@ -49,7 +49,8 @@ module.exports = {
 
   canActivateCreatureEffect(ctx) {
     const engine = ctx._engine;
-    const ps     = engine.gs.players[ctx.cardOriginalOwner];
+    // Kontrolle statt Seite (Styx 28.9.): „your deck" = Kontrolleur.
+    const ps     = engine.gs.players[ctx.cardOwner];
     if (!ps) return false;
     // No deck Loyals → can't tutor anything → bail before paying the cost.
     return getLoyalsInDeck(ps, engine).length > 0;
@@ -58,9 +59,12 @@ module.exports = {
   async onCreatureEffect(ctx) {
     const engine = ctx._engine;
     const gs     = engine.gs;
-    const pi     = ctx.cardOriginalOwner;
+    // Kontrolle statt Seite (Styx 28.9.): „your deck" = Kontrolleur; der
+    // Platz liegt auf der Brettseite der Kreatur (`feld`).
+    const pi     = ctx.cardOwner;
     const ps     = gs.players[pi];
     if (!ps) return false;
+    const feld   = engine.physicalSide(ctx.card);
 
     const ownHeroIdx  = ctx.cardHeroIdx;
     const ownZoneSlot = ctx.card.zoneSlot;
@@ -94,7 +98,7 @@ module.exports = {
     // ON_CREATURE_SACRIFICED listeners can react with the live
     // instance, mirroring resolveSacrificeCost's contract.
     const sacrificed = ctx.card;
-    const _seite = sacrificed.owner;   // v1360: Seite des Platzes
+    const _seite = feld;   // v1360: Seite des Platzes
     await engine.runHooks('onCreatureSacrificed', {
       creature: sacrificed,
       cardName: sacrificed.name,
@@ -109,7 +113,7 @@ module.exports = {
     // with Sacrifice to Divinity.
     engine._broadcastEvent('play_zone_animation', {
       type: 'knife_sacrifice',
-      owner: pi, heroIdx: ownHeroIdx, zoneSlot: ownZoneSlot,
+      owner: feld, heroIdx: ownHeroIdx, zoneSlot: ownZoneSlot,
     });
     await engine._delay(550);
 
@@ -144,12 +148,13 @@ module.exports = {
       return true;
     }
 
-    if (!ps.supportZones[ownHeroIdx]) ps.supportZones[ownHeroIdx] = [[], [], []];
     // The slot SHOULD be empty now (sacrifice cleared it) — if some
     // other effect snuck a creature in there mid-await, fall back to
     // the first free slot of the same hero. safePlaceInSupport's
     // built-in relocator handles this.
-    const placeResult = engine.safePlaceInSupport(loyalName, pi, ownHeroIdx, ownZoneSlot);
+    // Kontrolle statt Seite (Styx 28.9.): Feldseite + Kontrolleur.
+    const placeResult = engine.safePlaceInSupport(loyalName, feld, ownHeroIdx, ownZoneSlot,
+      feld !== pi ? { controller: pi } : {});
     if (!placeResult) {
       // No free zone left at all — return the card to deck top so it
       // isn't silently lost.

@@ -54,7 +54,9 @@ function adjacentHeroIndices(heroIdx) {
  * Quetzahuitl mass-delete fix). Returns `{ heroIdx, slotIdx, label }`.
  */
 function destinationsFor(engine, pi, inst) {
-  const ps = engine.gs.players[pi];
+  // Styx 28.9.: Nachbarspalten auf der BRETTSEITE der Kreatur
+  // (seitenfremd beschworen: B), nicht beim Kontrolleur `pi`.
+  const ps = engine.gs.players[engine.physicalSide ? engine.physicalSide(inst) : pi];
   if (!ps) return [];
   const out = [];
   for (const hi of adjacentHeroIndices(inst.heroIdx)) {
@@ -93,7 +95,9 @@ function destinationsFor(engine, pi, inst) {
  * this helper at all, so they're naturally unaffected.
  */
 async function moveSlipperyCreature(engine, pi, inst, destHeroIdx, destSlot, opts = {}) {
-  const ps = engine.gs.players[pi];
+  // Styx 28.9.: Zonen der Brettseite der Kreatur (seitenfremd: B).
+  const seite = engine.physicalSide ? engine.physicalSide(inst) : pi;
+  const ps = engine.gs.players[seite];
   if (!ps) return false;
   const srcHeroIdx = inst.heroIdx;
   const srcSlot = inst.zoneSlot;
@@ -105,16 +109,16 @@ async function moveSlipperyCreature(engine, pi, inst, destHeroIdx, destSlot, opt
   // Suppress the diff-detector's spurious damage-floater on the
   // source slot as the Creature leaves it.
   engine._broadcastEvent('creature_zone_move', {
-    owner: pi, heroIdx: srcHeroIdx, zoneSlot: srcSlot,
+    owner: seite, heroIdx: srcHeroIdx, zoneSlot: srcSlot,
   });
 
   srcArr.splice(srcIdx, 1);
 
   engine._broadcastEvent('play_card_transfer', {
-    sourceOwner: pi,
+    sourceOwner: seite,
     sourceHeroIdx: srcHeroIdx,
     sourceZoneSlot: srcSlot,
-    targetOwner: pi,
+    targetOwner: seite,
     targetHeroIdx: destHeroIdx,
     targetZoneSlot: destSlot,
     cardName: inst.name,

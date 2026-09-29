@@ -198,17 +198,19 @@ module.exports = {
   hooks: {
     // Add a counter whenever OUR cards return to hand.
     onCardsReturnedToHand: async (ctx) => {
-      if (ctx.ownerIdx !== ctx.cardOriginalOwner) return;
+      // Styx 28.9.: „you ... to your hand" = Kontrolleur; Zaehler und
+      // Animation am Helden auf der Brettseite.
+      if (ctx.ownerIdx !== ctx.cardOwner) return;
       const engine = ctx._engine;
       const hero = ctx.attachedHero;
       if (!hero?.name || hero.hp <= 0) return;
       addDeepseaCounters(hero, 1);
       engine._broadcastEvent('play_zone_animation', {
-        type: 'pollution_place', owner: ctx.cardOriginalOwner,
+        type: 'pollution_place', owner: ctx.cardHeroOwner ?? ctx.cardOriginalOwner,
         heroIdx: ctx.cardHeroIdx, zoneSlot: -1,
       });
       engine.log('siphem_counter_add', {
-        player: engine.gs.players[ctx.cardOriginalOwner]?.username,
+        player: engine.gs.players[ctx.cardOwner]?.username,
         counters: hero.deepseaCounters,
       });
       engine.sync();

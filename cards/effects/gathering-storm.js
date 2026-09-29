@@ -221,29 +221,30 @@ module.exports = {
       // ── Collect every target the opponent controls ──
       const cardDB = engine._getCardDB();
       const targets = [];
-      for (let hi = 0; hi < (oppPs.heroes || []).length; hi++) {
-        const h = oppPs.heroes[hi];
+      // Kontrolle statt Seite (Styx 28.9.); IDs/owner bleiben physisch.
+      for (const { physOwner, heroIdx: hi, hero: h } of engine.heroesControlledBy(oppIdx)) {
         if (!h?.name || h.hp <= 0) continue;
         targets.push({
-          id: `hero-${oppIdx}-${hi}`, type: 'hero',
-          owner: oppIdx, heroIdx: hi, cardName: h.name,
+          id: `hero-${physOwner}-${hi}`, type: 'hero',
+          owner: physOwner, heroIdx: hi, cardName: h.name,
         });
       }
       for (const inst of engine.cardInstances) {
-        if (inst.owner !== oppIdx || inst.zone !== 'support') continue;
+        if ((inst.controller ?? inst.owner) !== oppIdx || inst.zone !== 'support') continue;
         if (inst.faceDown) continue;
         const cd = engine.getEffectiveCardData(inst) || cardDB[inst.name];
         if (!cd || !hasCardType(cd, 'Creature')) continue;
+        const seite = engine.physicalSide(inst);
         targets.push({
-          id: `equip-${oppIdx}-${inst.heroIdx}-${inst.zoneSlot}`,
-          type: 'equip', owner: oppIdx,
+          id: `equip-${seite}-${inst.heroIdx}-${inst.zoneSlot}`,
+          type: 'equip', owner: seite,
           heroIdx: inst.heroIdx, slotIdx: inst.zoneSlot,
           cardName: inst.name, cardInstance: inst,
         });
       }
       if (targets.length === 0) return;
 
-      const dmg = hostHasWhiteEye(engine, ownerIdx, ctx.cardHeroIdx)
+      const dmg = hostHasWhiteEye(engine, ctx.cardHeroOwner ?? ownerIdx, ctx.cardHeroIdx)   // Styx 28.9.: Brettseite
         ? BASE_DMG * 2 : BASE_DMG;
       const pickCount = Math.min(MAX_TGTS, targets.length);
 
@@ -266,7 +267,7 @@ module.exports = {
       });
       if (!picked || picked.length === 0) return;
 
-      const source = { name: CARD_NAME, owner: ownerIdx, heroIdx: ctx.cardHeroIdx };
+      const source = { name: CARD_NAME, owner: ownerIdx, heroOwner: ctx.cardHeroOwner ?? ownerIdx, heroIdx: ctx.cardHeroIdx };
       const chosen = picked.map(id => targets.find(t => t.id === id)).filter(Boolean);
 
       // Pre-damage post-target hand-reaction window — one consolidated

@@ -98,7 +98,8 @@ module.exports = {
       const engine = ctx._engine;
       const targetOwner = engine._findHeroOwner?.(target);
       if (targetOwner == null || targetOwner < 0) return;
-      if (targetOwner === ctx.cardOwner) return;
+      // „your opponent's targets" — Kontrolle statt Seite (Styx 28.9.)
+      if (engine.heroSideOf(targetOwner, target) === ctx.cardOwner) return;
       // Use ctx.setAmount — `ctx.amount` is a copy of the hookCtx
       // value (numbers don't share references through the spread in
       // _createContext), so a direct assignment doesn't propagate

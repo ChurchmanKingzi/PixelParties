@@ -326,7 +326,10 @@ module.exports = {
 
     // ── Step 6: Zi performs the chosen Spell, ignoring its level ──
     // "if possible": only while Zi is alive & not crowd-controlled.
-    const hero = ps.heroes?.[heroIdx];
+    // Styx 28.9.: Zi selbst auf der Brettseite `feld` (nicht der gleich
+    // indizierte eigene Held); der Guss laeuft ueber ihn (`heroOwner`).
+    const feld = ctx.cardHeroOwner ?? pi;
+    const hero = ctx.attachedHero ?? gs.players[feld]?.heroes?.[heroIdx];
     const canPerform = hero?.name && hero.hp > 0
       && !hero.statuses?.frozen && !hero.statuses?.stunned && !hero.statuses?.negated;
 
@@ -346,6 +349,7 @@ module.exports = {
       // clear it first so we only see THIS sub-cast's result.
       delete gs._spellPlacedOnBoard;
       const subInst = engine._trackCard(oppChoice, pi, 'hand', heroIdx, -1);
+      if (feld !== pi) subInst.heroOwner = feld;
       let placedOnBoard = false;
       try {
         await engine.runHooks('onPlay', {
@@ -360,7 +364,7 @@ module.exports = {
         }
         await engine.runHooks('afterSpellResolved', {
           spellName: oppChoice, spellCardData: cardDB[oppChoice],
-          heroIdx, casterIdx: pi, damageTargets: uniqueTargets,
+          heroIdx, heroOwner: feld, casterIdx: pi, damageTargets: uniqueTargets,
           isSecondCast: false, _skipReactionCheck: true,
         });
       } catch (err) {

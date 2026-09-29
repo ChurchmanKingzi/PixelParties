@@ -75,15 +75,22 @@ function zaehleKreaturen(engine, p) {
   // stand dadurch immer auf 0:0 — und weil Gleichstand „du verlierst"
   // heisst, verlor der Wirker jedes Mal. Die Zonen sind der
   // massgebliche Brettzustand.
-  const ps = engine.gs.players[p];
+  // Kontrolle statt Seite (Styx 28.9.): seitenfremde Kreaturen (ueber
+  // einen geliehenen Helden beschworen) zaehlen fuer ihren KONTROLLEUR.
+  // Die Instanz dient nur zur Bestimmung des Kontrolleurs; fehlt sie
+  // (Batch-Umbau, s.o.), gilt die Seite.
   let n = 0;
-  for (const zonen of (ps?.supportZones || [])) {
-    for (const slot of (zonen || [])) {
+  for (let seite = 0; seite < 2; seite++) {
+    const ps = engine.gs.players[seite];
+    (ps?.supportZones || []).forEach((zonen, hi) => (zonen || []).forEach((slot, si) => {
       const name = (slot || [])[0];
-      if (!name) continue;
+      if (!name) return;
       const cd = engine._getCardDB()[name] || {};
-      if (cd.cardType === 'Creature' || cd.cardType === 'Token') n++;
-    }
+      if (cd.cardType !== 'Creature' && cd.cardType !== 'Token') return;
+      const inst = engine.cardInstances.find(c => c.zone === 'support'
+        && c.owner === seite && c.heroIdx === hi && c.zoneSlot === si);
+      if ((inst ? (inst.controller ?? inst.owner) : seite) === p) n++;
+    }));
   }
   return n;
 }
@@ -105,8 +112,8 @@ function istKreatur(engine, inst) {
 function heldGefeit(engine, pi, heroIdx) {
   const d = damusActive(engine, pi);
   if (!d || d.heroIdx !== heroIdx) return false;
-  // „While you control at least 1 «Ifrit» Creature."
-  return ifritsOf(engine, pi).length > 0;
+  // „While you control at least 1 «Ifrit» Creature." — „you" = Kontrolleur (Styx 28.9.)
+  return ifritsOf(engine, engine.heroSideOf(pi, d.hero)).length > 0;
 }
 
 module.exports = {

@@ -45,7 +45,9 @@ module.exports = {
 
       const engine = ctx._engine;
       const gs     = engine.gs;
-      const pi     = ctx.cardOriginalOwner;
+      // Kontrolle statt Seite (Styx 28.9.): „when YOU summon" — der
+      // Beschwoerer (ueber einen geliehenen Helden: nicht die Brettseite).
+      const pi     = ctx.cardOwner;
       const ps     = gs.players[pi];
       if (!ps) return;
 

@@ -129,12 +129,13 @@ function grundname(hero) {
  * Alle waehlbaren Gestalten aus Hand, Deck und Ablage.
  * Rueckgabe im Galerie-Format `{ name, source }` — die Quellen-Badges
  * HAND / DECK / DISCARD kann der Client bereits darstellen.
+ * Styx 28.9.: `pi` = Kontrolleur (Quellen, „Heroes you control"),
+ * `hero` = der Shapeshifter selbst als Objekt (liegt ggf. beim Gegner).
  */
-function waehlbareGestalten(engine, pi, heroIdx) {
+function waehlbareGestalten(engine, pi, hero) {
   const gs = engine.gs;
   const ps = gs.players[pi];
   if (!ps) return [];
-  const hero = ps.heroes?.[heroIdx];
   if (!hero) return [];
   const cardDB = engine._getCardDB();
   const vergeben = aktuelleHeldennamen(engine, pi);
@@ -276,7 +277,7 @@ module.exports = {
     // Puzzle-Fall: ein aufgestellter Shapeshifter bewegt beim Start
     // nichts, also muss die Bereitschaft hier einmal berechnet werden.
     onGameStart(ctx) {
-      aufstiegsbereitschaftPruefen(ctx._engine, ctx.cardOwner, ctx.cardHeroIdx);
+      aufstiegsbereitschaftPruefen(ctx._engine, ctx.cardHeroOwner ?? ctx.cardOwner, ctx.cardHeroIdx);
     },
   },
   // KEIN `heroEffectActionCost`: der Kartentext sagt „once per turn",
@@ -287,13 +288,14 @@ module.exports = {
     const engine = ctx._engine;
     const pi = ctx.cardOwner;
     const heroIdx = ctx.cardHeroIdx;
-    const ps = engine.gs.players[pi];
-    if (!ps) return false;
-    const hero = ps.heroes?.[heroIdx];
+    // Styx 28.9.: Held und Zonen auf der Brettseite, Quellen beim Kontrolleur.
+    const hostPs = engine.gs.players[ctx.cardHeroOwner ?? pi];
+    if (!hostPs) return false;
+    const hero = ctx.attachedHero ?? hostPs.heroes?.[heroIdx];
     if (!hero?.name || hero.hp <= 0) return false;
     // Ruling ④: ohne freie Support Zone geht es nicht.
-    if (freieZonen(ps, heroIdx).length === 0) return false;
-    return waehlbareGestalten(engine, pi, heroIdx).length > 0;
+    if (freieZonen(hostPs, heroIdx).length === 0) return false;
+    return waehlbareGestalten(engine, pi, hero).length > 0;
   },
 
   async onHeroEffect(ctx) {
@@ -303,12 +305,17 @@ module.exports = {
     const heroIdx = ctx.cardHeroIdx;
     const ps = gs.players[pi];
     if (!ps) return false;
-    const hero = ps.heroes?.[heroIdx];
+    // Styx 28.9.: „this Hero" liegt auf der Brettseite `hs` — Held, Zonen,
+    // Instanz, Animation dort; Hand/Deck/Ablage bleiben beim Kontrolleur.
+    const hs = ctx.cardHeroOwner ?? pi;
+    const hostPs = gs.players[hs];
+    if (!hostPs) return false;
+    const hero = ctx.attachedHero ?? hostPs.heroes?.[heroIdx];
     if (!hero?.name || hero.hp <= 0) return false;
 
-    const kandidaten = waehlbareGestalten(engine, pi, heroIdx);
+    const kandidaten = waehlbareGestalten(engine, pi, hero);
     if (kandidaten.length === 0) return false;
-    if (freieZonen(ps, heroIdx).length === 0) return false;
+    if (freieZonen(hostPs, heroIdx).length === 0) return false;
 
     // ── AUSWAHL ────────────────────────────────────────────────────
     // ★ Als Vorgabe 28.8.: KEINE Zonenwahl. Der angelegte Held geht in
@@ -328,7 +335,7 @@ module.exports = {
     });
     if (!auswahl) return false;
 
-    const frei = freieZonen(ps, heroIdx);
+    const frei = freieZonen(hostPs, heroIdx);
     if (frei.length === 0) return false;
     const zielZone = frei[0];
     const gewaehlt = auswahl;
@@ -363,10 +370,12 @@ module.exports = {
 
     // ── Anlegen ───────────────────────────────────────────────────
     const slot = zielZone.slotIdx;
-    if (!ps.supportZones[heroIdx]) ps.supportZones[heroIdx] = [[], [], []];
-    ps.supportZones[heroIdx][slot] = [gestaltName];
-    const eqInst = engine._trackCard(gestaltName, pi, 'support', heroIdx, slot);
+    if (!hostPs.supportZones[heroIdx]) hostPs.supportZones[heroIdx] = [[], [], []];
+    hostPs.supportZones[heroIdx][slot] = [gestaltName];
+    const eqInst = engine._trackCard(gestaltName, hs, 'support', heroIdx, slot);
     if (eqInst) {
+      // Styx 28.9.: gehoert dem Kontrolleur — Ablage beim Abfallen dorthin.
+      if (hs !== pi) eqInst.originalOwner = pi;
       eqInst.counters = eqInst.counters || {};
       // `treatAsEquip` macht die Karte fuer die ganze Engine zur
       // Ausruestung — Kartentext: „count as Equipment Artifacts".
@@ -394,6 +403,7 @@ module.exports = {
     engine._broadcastEvent('play_pile_transfer', {
       owner: pi, cardName: gestaltName, from: quelle, to: 'support',
       toHeroIdx: heroIdx, toSlotIdx: slot,
+      ...(hs !== pi ? { toOwner: hs } : {}),   // Styx 28.9.: Zielzone auf der Brettseite
       // KEIN `fromHandIdx`: die Karte ist hier bereits aus ihrer Quelle
       // entnommen, der alte Handplatz existiert nicht mehr. Ohne Index
       // nimmt der Handler den Handbereich als Ganzes — richtig fuer
@@ -408,7 +418,7 @@ module.exports = {
     // HP, maxHp, atk und die Ability-Zonen bleiben unberuehrt —
     // Ruling ①. `performAscension` rechnet an dieser Stelle einen
     // HP-Delta ein; das ist hier ausdruecklich NICHT gewollt.
-    const heldInst = heldeninstanz(engine, pi, heroIdx);
+    const heldInst = heldeninstanz(engine, hs, heroIdx);
     if (heldInst) {
       heldInst.name = gestaltName;
       heldInst.script = null;   // Cache-Reset, siehe performAscension
@@ -449,11 +459,11 @@ module.exports = {
       // `[data-hero-zone]` — das ist die etablierte Form (dark_control,
       // petrify …). Ein erfundenes Feld haette Unterstuetzung
       // vorgetaeuscht, die es nicht gibt.
-      type: 'shapeshift_into', owner: pi, heroIdx,
+      type: 'shapeshift_into', owner: hs, heroIdx,
     });
     // Verwandelt = kein Aufstiegsziel mehr; und die Gestaltenzahl ist
     // gerade gewachsen, also in beiden Richtungen neu bewerten.
-    aufstiegsbereitschaftPruefen(engine, pi, heroIdx);
+    aufstiegsbereitschaftPruefen(engine, hs, heroIdx);
     engine.log('shapeshift', {
       player: ps.username, from: vorher, into: gestaltName,
       source: quelle, distinct: benutzt.length,

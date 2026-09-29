@@ -18430,3 +18430,48 @@ Ein übernommener Held (Charme, Golden Apple, Love Shot, Styx, Paraseed) steht p
 - **Opfer-Pflicht mit Seite:** `mustIncludeFromHeroIdx` + optional **`mustIncludeFromHeroOwner`** (physische Seite des Helden). Ohne das Feld zählt wie bisher jede Spalte mit diesem Index. Engine (`canSatisfySacrifice`, `resolveSacrificeCost`) und Client-Prüfung beachten beide Felder.
 - **`isCreatureSummonable(name, seite, heroIdx)`**: Steht der Held auf `seite` gerade unter fremder Kontrolle, ist der Kontrolleur der Beschwörer (`cardOwner`), `cardHeroOwner` = `seite`. Aufrufer übergeben also immer die physische Seite des Helden.
 - **Heldeneffekte „this Hero" eines übernommenen Helden** (Calamitusk, Cute Annoyance Mini, Argos, Garius, Klaus, Thep, Orthos, Stellan, Lizbeth, Damus, Dajan, Inya): beschwören in die Spalte des Helden (`ctx.cardHeroOwner`) mit `heldSeite`, bezahlt/gesteuert vom Kontrolleur.
+
+## ★ Flächenschaden: erst alle Schadensberechnungen, dann die Tode (28.9., Tempeste)
+
+Regel des Designers: „Alle Schadensberechnungen → prüfen, was gestorben ist → Tode in Reihenfolge abwickeln.“ Innerhalb einer Flächenklammer (`beginAoeStrike`/`beginMultiHit` … `await endMultiHit()`, auch `dealDamageToTargets`) wird ein Heldentod nur vorgemerkt (`_todesAufschub`).
+
+- **`engine.heldTodAufgeschoben(hero)`**: true, solange der Tod dieses Helden im laufenden Schlag nur vorgemerkt ist.
+- **`runHooks`**: Für die Berechnungs-Hooks `beforeDamage` und `beforeCreatureDamageBatch` (`SCHADENSBERECHNUNGS_HOOKS`) filtert der Tote-Helden-Filter einen solchen Helden NICHT heraus. Seine Reduktionen, Negationen und Auren (Heldeneffekt, Abilities, Ausrüstung) gelten bis zum Ende des Schlags (Tempeste, Monia, Great Wall, Diamond, Bloom, Chuck, Crestina). Nachwirkungen wie `afterDamage` eines toten Helden laufen weiterhin nicht.
+- **Skripte mit eigener Lebend-Prüfung des Wirts** in diesen Hooks schreiben `host.hp <= 0 && !engine.heldTodAufgeschoben(host)`. Ausnahme: Umleitungen AUF den Wirt (Prophecy of Tempeste, Johanna, Bubbles, Deepsea Siren) und Kosten, die mit Schaden am Wirt bezahlt werden (Diamond, Effekt 2). Dort bleibt `hp > 0` Pflicht, sonst würde Schaden an einen Toten den Treffer faktisch negieren.
+- **`isCreationZoneUsable(pi, { schadensberechnung: true })`**: dieselbe Ausnahme für Crestinas Negation.
+
+## ★ Übernommene Helden gelten als Helden des Kontrolleurs (Styx 28.9., Spieltest-Runde)
+
+Regel: Ein übernommener Held (Charme, Golden Apple, Love Shot, Styx; `hero.charmedBy`) ist für die Dauer der Übernahme ein Held des KONTROLLEURS. Das gilt für seine Effekte, Abilities, Ausrüstung und Anhängsel. „you/your“ = Kontrolleur (Hand, Deck, Ablage, Gold, Ziehen, Prompts, Einmal-Sperren). „this Hero“, seine Zonen und seine Spalte liegen auf der Brettseite. Kreaturen gehen NICHT mit dem Helden mit.
+
+**Im Hook-Kontext:**
+- `ctx.cardOwner`/`ctx.cardController` = Kontrolleur,
+- `ctx.cardHeroOwner` = Brettseite,
+- `ctx.attachedHero` = das Heldenobjekt.
+
+**Den EIGENEN Helden bzw. seine Zonen NIE über `gs.players[ctx.cardOwner]…[ctx.cardHeroIdx]` holen.** Bei einem übernommenen Helden ist das der gleich nummerierte Held des Kontrolleurs. Stattdessen `ctx.attachedHero` bzw. `gs.players[ctx.cardHeroOwner ?? ctx.cardOwner]`.
+
+**„Dieser Held wirkt/greift an“:**
+- Hooks: `(ctx.heroOwner ?? ctx.playerIdx) === ctx.cardHeroOwner` plus Index.
+- Schadensquellen: `engine.quelleIstHeld(source, seite, heroIdx)` (liest `heroOwner ?? owner`).
+
+**Engine-Helfer mit Seite:**
+- `bonusAktionFuer(pi, heroIdx, heroOwner)` — `ps.bonusActions.heroOwner`.
+- `comboSperreErlaubt(pi, heroIdx, heroOwner)` — `ps.comboLockHeroOwner`.
+- `findAdditionalActionForCard/Category(pi, …, heroIdx, heroOwner)`.
+- Zusatzaktions-Anbieter zählen nach Kontrolle (`_zusatzAnbieterVon`).
+- `effectiveSchoolLevelForCaster(school, pi, heroIdx, heroOwner?)`. Während `doPlaySpell` liegt der Wirker in `gs._wirkerSeite`.
+- Heldeneffekte geliehener Helden mit `heroEffectActionCost` sind in der Action Phase aktivierbar, wie im Eigenzweig (`getActiveHeroEffects`).
+- `canPlayCard` (Held/Ausrüstung) bekommt in `validateActionPlay` und `getHeroPlayableCards` einheitlich die BRETTSEITE.
+- Lizbeth/Smugbeth: Leihquellen sind die Helden, die der Gegner ihres Kontrolleurs kontrolliert (`_getAbilityBorrowSources`). Leiher sind die Helden, die der Aktivierende kontrolliert (`borrowerOwner`).
+- Johanna, Light Ball, Chuck und die Unantastbar-Gruppierung laufen nach Kontrolle (`_johannaSchuetzt`, `_lightBallProtects`, Gruppierung über `zielSeite`).
+
+**Kreaturen über geliehene Helden** (`crossSideControlled`):
+- `markiereSeitenfremd`: `controller`, Marke und `originalOwner`.
+- `physicalSide` = Brettseite.
+- Beim Verlassen des Bretts gehen sie an den Kartenbesitzer.
+- Stehlen: bestohlen wird der Kontrolleur (`actionStealCreature`).
+
+**Noch gesperrt (unter Übernahme nicht aktivierbar, weil die Engine-Helfer nur die eigene Spalte kennen):** Throne Robber (`performAscension`), Friedhelm und Yukana (`_castSpellImmediately`), Junshi (`performImmediateAction`), Tri Ad (`performDescend`), Taio Absorber, Rubin, Peter Röll (`canAttachAbilityToHero`), Riffel (`_equip-shared`), Cute Angel Molinda (Kreatur-Übernahme).
+
+**Offene Regelfragen:** Surprises in der Zone eines geliehenen Helden sind während der Übernahme für niemanden auslösbar. Ausrüstung an geliehene Helden bleibt gesperrt (nur Abilities sind bei Styx erlaubt).

@@ -218,14 +218,16 @@ module.exports = {
     // Aufstiegsmarken koennten aber von anderer Seite geraeumt worden
     // sein — und ein im Puzzle gesetzter Merker hat nie einen KO
     // gesehen.
+    // Styx 28.9.: der Held selbst (Brettseite), nicht der gleich
+    // indizierte Held des Kontrolleurs.
     onTurnStart: (ctx) => {
-      const ps = ctx._engine?.gs?.players?.[ctx.cardOwner];
-      const hero = ps?.heroes?.[ctx.card?.heroIdx];
+      const ps = ctx._engine?.gs?.players?.[ctx.cardHeroOwner ?? ctx.cardOwner];
+      const hero = ctx.attachedHero ?? ps?.heroes?.[ctx.card?.heroIdx];
       meldeAufstieg(hero);
     },
     onGameStart: (ctx) => {
-      const ps = ctx._engine?.gs?.players?.[ctx.cardOwner];
-      const hero = ps?.heroes?.[ctx.card?.heroIdx];
+      const ps = ctx._engine?.gs?.players?.[ctx.cardHeroOwner ?? ctx.cardOwner];
+      const hero = ctx.attachedHero ?? ps?.heroes?.[ctx.card?.heroIdx];
       meldeAufstieg(hero);
     },
   },

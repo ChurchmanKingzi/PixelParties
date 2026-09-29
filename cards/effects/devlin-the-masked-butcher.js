@@ -35,9 +35,9 @@ const DISCARD_PER_TARGET = 2;
 
 function isOwnAttack(ctx, source) {
   if (!source || ctx.type !== 'attack' && ctx.entryType !== 'attack') return false;
-  if (source.heroIdx !== ctx.card.heroIdx) return false;
-  const srcOwner = source.heroOwner ?? source.controller ?? source.owner ?? -1;
-  return srcOwner === ctx.cardOwner;
+  // Styx 28.9.: Brettseite + Index (uebernommen: `heroOwner` = Brettseite,
+  // der Vergleich mit dem Kontrolleur schlug dort fehl).
+  return ctx._engine.quelleIstHeld(source, ctx.cardHeroOwner ?? ctx.cardOriginalOwner, ctx.card.heroIdx);
 }
 
 async function forceDiscard(engine, pi, count, source) {

@@ -35,9 +35,8 @@ const DRAW_COUNT = 2;
 function _isHeroSource(ctx) {
   const src = ctx.source;
   if (!src) return false;
-  const srcOwner = src.controller ?? src.owner ?? -1;
-  if (srcOwner !== ctx.cardOwner) return false;
-  if ((src.heroIdx ?? -1) !== ctx.cardHeroIdx) return false;
+  // Styx 28.9.: „dieser Held" = Brettseite + Index (geliehener Held).
+  if (!ctx._engine.quelleIstHeld(src, ctx.cardHeroOwner ?? ctx.cardOwner, ctx.cardHeroIdx)) return false;
   // A Creature sitting in the equipped Hero's Support Zone shares the
   // same `heroIdx` (the host) — but the Creature is the source of its
   // own attacks/effects, not the Hero. Synthetic sources from Attack /

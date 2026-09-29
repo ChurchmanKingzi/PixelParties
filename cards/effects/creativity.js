@@ -38,20 +38,23 @@ module.exports = {
       // Only care about abilities entering THIS hero's zone (same player + same hero)
       if (ctx.toZone !== 'ability') return;
       if (ctx.toHeroIdx !== ctx.cardHeroIdx) return;
-      if (entering.owner !== ctx.cardOwner) return;
+      // Kontrolle statt Seite (Styx 28.9.): Zone = Brettseite des Helden
+      // (`cardHeroOwner`), gezogen wird vom Kontrolleur (`cardOwner`).
+      const feld = ctx.cardHeroOwner ?? ctx.cardOwner;
+      if (entering.owner !== feld) return;
 
       const engine = ctx._engine;
       const pi = ctx.cardOwner;
       const heroIdx = ctx.cardHeroIdx;
 
-      // Soft once per turn per hero — keyed by hero index
-      const soptKey = `creativity-draw:${pi}:${heroIdx}`;
+      // Soft once per turn per hero — keyed by hero (Brettseite + Index)
+      const soptKey = `creativity-draw:${feld}:${heroIdx}`;
       if (!engine.gs.hoptUsed) engine.gs.hoptUsed = {};
       if (engine.gs.hoptUsed[soptKey] === engine.gs.turn) return;
 
       // Find the Creativity slot and its current level
       // Level = slot length (includes Performance copies on top)
-      const ps = ctx.players[pi];
+      const ps = ctx.players[feld];
       const abZones = ps.abilityZones[heroIdx] || [];
       let creativitySlotIdx = -1;
       let creativityLevel = 0;
@@ -88,7 +91,7 @@ module.exports = {
 
       // Flash the Creativity ability zone (visible to all players)
       engine._broadcastEvent('ability_activated', {
-        owner: pi, heroIdx, zoneIdx: creativitySlotIdx,
+        owner: feld, heroIdx, zoneIdx: creativitySlotIdx,
       });
 
       // Sync BEFORE drawing so the client sees the hand without the

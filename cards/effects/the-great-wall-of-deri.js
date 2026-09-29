@@ -74,7 +74,11 @@ module.exports = {
       // (death cleanup not yet flushed), the Wall isn't meaningfully
       // "controlled" — match Diamond's pattern (`!hero || hero.hp <= 0`
       // bail at the top of its batch hook).
-      if (!hero || hero.hp <= 0) return;
+      // AUSNAHME (Todes-Aufschub 28.9.): ist der Wirt im LAUFENDEN
+      // Flaechenschlag gefallen, ist sein Tod nur vorgemerkt — die Wall
+      // reduziert bis zum Ende des Schlags weiter („erst alle
+      // Schadensberechnungen, dann die Tode").
+      if (!hero || (hero.hp <= 0 && !ctx._engine.heldTodAufgeschoben(hero))) return;
 
       const entries = ctx.entries;
       if (!entries || entries.length === 0) return;

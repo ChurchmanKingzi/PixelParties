@@ -67,6 +67,12 @@ module.exports = {
       if (!ctx.isMyTurn) return;
       if (ctx.casterIdx !== ctx.cardOwner) return;
       if (ctx.heroIdx !== ctx.cardHeroIdx) return;
+      // Styx 28.9.: Wirker = dieser Held (Brettseite + Index). Die
+      // Zusatzaktion laeuft ueber Engine-Helfer, die nur Helden der
+      // eigenen Spalte kennen — ein uebernommener Taio wirkte sonst ueber
+      // den gleich indizierten EIGENEN Helden. Bis dahin: kein Angebot.
+      if ((ctx.heroOwner ?? ctx.casterIdx) !== (ctx.cardHeroOwner ?? ctx.cardOwner)) return;
+      if ((ctx.cardHeroOwner ?? ctx.cardOwner) !== ctx.cardOwner) return;
 
       const spellData = ctx.spellCardData;
       if (!spellData) return;

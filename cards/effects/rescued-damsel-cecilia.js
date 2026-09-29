@@ -79,13 +79,15 @@ module.exports = {
   hooks: {
     // Nachziehen fuer vorplatzierte Exemplare (Puzzle Mode) — der
     // regulaere Weg hat den Marker schon.
+    // Styx 28.9.: der Held selbst (Brettseite), nicht der gleich
+    // indizierte Held des Kontrolleurs.
     onTurnStart: (ctx) => {
-      const ps = ctx._engine?.gs?.players?.[ctx.cardOwner];
-      sicherstellenExtraLeben(ps?.heroes?.[ctx.card?.heroIdx]);
+      const ps = ctx._engine?.gs?.players?.[ctx.cardHeroOwner ?? ctx.cardOwner];
+      sicherstellenExtraLeben(ctx.attachedHero ?? ps?.heroes?.[ctx.card?.heroIdx]);
     },
     onGameStart: (ctx) => {
-      const ps = ctx._engine?.gs?.players?.[ctx.cardOwner];
-      sicherstellenExtraLeben(ps?.heroes?.[ctx.card?.heroIdx]);
+      const ps = ctx._engine?.gs?.players?.[ctx.cardHeroOwner ?? ctx.cardOwner];
+      sicherstellenExtraLeben(ctx.attachedHero ?? ps?.heroes?.[ctx.card?.heroIdx]);
     },
   },
 

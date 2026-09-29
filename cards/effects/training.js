@@ -36,7 +36,7 @@ const { loadCardEffect } = require('./_loader');
  * Get ability card names in hand that can be attached to a specific hero.
  * @returns {string[]} deduplicated list of eligible ability names
  */
-function getEligibleHandAbilities(engine, playerIdx, heroIdx) {
+function getEligibleHandAbilities(engine, playerIdx, heroIdx, feld = playerIdx) {
   const ps = engine.gs.players[playerIdx];
   if (!ps) return [];
   const cardDB = engine._getCardDB();
@@ -46,7 +46,8 @@ function getEligibleHandAbilities(engine, playerIdx, heroIdx) {
     if (seen.has(cardName)) continue;
     const cd = cardDB[cardName];
     if (!cd || !hasCardType(cd, 'Ability')) continue;
-    if (!engine.canAttachAbilityToHero(playerIdx, cardName, heroIdx)) continue;
+    // Styx 28.9.: Held und Zonen auf der Brettseite (`feld`), Hand = `playerIdx`.
+    if (!engine.canAttachAbilityToHero(feld, cardName, heroIdx)) continue;
     seen.add(cardName);
     result.push(cardName);
   }
@@ -57,7 +58,7 @@ function getEligibleHandAbilities(engine, playerIdx, heroIdx) {
  * Get ability card names in deck that can be attached to a specific hero.
  * @returns {{ name, source, count }[]} gallery-ready entries
  */
-function getEligibleDeckAbilities(engine, playerIdx, heroIdx) {
+function getEligibleDeckAbilities(engine, playerIdx, heroIdx, feld = playerIdx) {
   const ps = engine.gs.players[playerIdx];
   if (!ps) return [];
   const cardDB = engine._getCardDB();
@@ -65,7 +66,7 @@ function getEligibleDeckAbilities(engine, playerIdx, heroIdx) {
   for (const cardName of (ps.mainDeck || [])) {
     const cd = cardDB[cardName];
     if (!cd || !hasCardType(cd, 'Ability')) continue;
-    if (!engine.canAttachAbilityToHero(playerIdx, cardName, heroIdx)) continue;
+    if (!engine.canAttachAbilityToHero(feld, cardName, heroIdx)) continue;
     countMap[cardName] = (countMap[cardName] || 0) + 1;
   }
   return Object.entries(countMap)
@@ -79,7 +80,8 @@ function getEligibleDeckAbilities(engine, playerIdx, heroIdx) {
  * @param {number} trainingZoneIdx - Training's own zone slot (for activation flash)
  * @returns {number} how many abilities were attached (0 = fully cancelled)
  */
-async function doHandAttach(engine, playerIdx, heroIdx, maxAttach, trainingZoneIdx) {
+async function doHandAttach(engine, playerIdx, heroIdx, maxAttach, trainingZoneIdx, feld = playerIdx) {
+  if (feld !== playerIdx) return doHandAttachFremd(engine, playerIdx, heroIdx, maxAttach, trainingZoneIdx, feld);
   let attached = 0;
 
   for (let i = 0; i < maxAttach; i++) {
@@ -148,16 +150,63 @@ async function doHandAttach(engine, playerIdx, heroIdx, maxAttach, trainingZoneI
 }
 
 /**
+ * Styx 28.9.: Option A fuer einen GELIEHENEN Helden (Brettseite `feld`).
+ * Das Zieh-Prompt `abilityAttach` kennt nur eigene Helden — hier waehlt
+ * der Spieler die Ability per `handPick`, angelegt wird seitenfremd ueber
+ * `attachAbilityFromHand(…, { heroOwner })` (wie `doPlayAbilityFremd`).
+ */
+async function doHandAttachFremd(engine, playerIdx, heroIdx, maxAttach, trainingZoneIdx, feld) {
+  const ps = engine.gs.players[playerIdx];
+  const heroName = engine.gs.players[feld]?.heroes?.[heroIdx]?.name || 'Hero';
+  let attached = 0;
+  for (let i = 0; i < maxAttach; i++) {
+    const eligible = getEligibleHandAbilities(engine, playerIdx, heroIdx, feld);
+    if (eligible.length === 0) break;
+    const indices = (ps.hand || []).map((n, idx) => (eligible.includes(n) ? idx : -1)).filter(idx => idx >= 0);
+    const result = await engine.promptGeneric(playerIdx, {
+      type: 'handPick', title: 'Training',
+      description: maxAttach === 1
+        ? `Attach an Ability to ${heroName}.`
+        : `Attach an Ability to ${heroName} (${attached + 1}/${maxAttach}).`,
+      eligibleIndices: indices, minSelect: 1, maxSelect: 1,
+      cancellable: true, confirmLabel: '📚 Attach!', pickIntent: 'use',
+    });
+    const pick = result && !result.cancelled && Array.isArray(result.selectedCards) ? result.selectedCards[0] : null;
+    if (!pick?.cardName || !eligible.includes(pick.cardName)) break;
+    const attachResult = await engine.attachAbilityFromHand(playerIdx, pick.cardName, heroIdx, {
+      skipAbilityGivenCheck: true, heroOwner: feld,
+    });
+    if (!attachResult.success) break;
+    attached++;
+    if (attached === 1) {
+      engine._broadcastEvent('ability_activated', {
+        owner: feld, heroIdx, zoneIdx: trainingZoneIdx, abilityName: 'Training',
+      });
+      await engine._delay(400);
+    }
+    engine._broadcastEvent('ability_activated', {
+      owner: feld, heroIdx, zoneIdx: attachResult.zoneSlot, abilityName: pick.cardName,
+    });
+    engine.sync();
+    await engine._delay(300);
+  }
+  return attached;
+}
+
+/**
  * Run the "search deck for ability" flow (Option B).
  * At level 2: costs 1 discard + consumes abilityGivenThisTurn.
  * At level 3: free + does NOT consume abilityGivenThisTurn.
  * @param {number} trainingZoneIdx - Training's own zone slot (for activation flash)
  * @returns {boolean} true if resolved (ability attached)
  */
-async function doDeckSearch(engine, playerIdx, heroIdx, level, trainingZoneIdx) {
+async function doDeckSearch(engine, playerIdx, heroIdx, level, trainingZoneIdx, feld = playerIdx) {
   const ps = engine.gs.players[playerIdx];
   if (!ps) return false;
-  const heroName = ps.heroes?.[heroIdx]?.name || 'Hero';
+  // Styx 28.9.: Deck/Ablage/Hand = `playerIdx`, Held und Zonen = `feld`.
+  const hps = engine.gs.players[feld];
+  if (!hps) return false;
+  const heroName = hps.heroes?.[heroIdx]?.name || 'Hero';
 
   // Level 2: require a discard first (cancellable)
   if (level === 2) {
@@ -184,14 +233,14 @@ async function doDeckSearch(engine, playerIdx, heroIdx, level, trainingZoneIdx) 
 
     // Lv2: Training resolves when discard cost is paid → flash Training zone now
     engine._broadcastEvent('ability_activated', {
-      owner: playerIdx, heroIdx, zoneIdx: trainingZoneIdx, abilityName: 'Training',
+      owner: feld, heroIdx, zoneIdx: trainingZoneIdx, abilityName: 'Training',
     });
     engine.sync();
     await engine._delay(400);
   }
 
   // Show deck gallery picker (filtered for attachable abilities)
-  const galleryCards = getEligibleDeckAbilities(engine, playerIdx, heroIdx);
+  const galleryCards = getEligibleDeckAbilities(engine, playerIdx, heroIdx, feld);
   if (galleryCards.length === 0) {
     // Fizzle — no eligible abilities in deck
     // If level 2, the discard already happened (cost was paid, but effect fizzles)
@@ -213,14 +262,14 @@ async function doDeckSearch(engine, playerIdx, heroIdx, level, trainingZoneIdx) 
   if (!_taken_deckIdx) return false;
 
   // Attach to hero's ability zone
-  const abZones = ps.abilityZones[heroIdx] || [[], [], []];
-  ps.abilityZones[heroIdx] = abZones;
+  const abZones = hps.abilityZones[heroIdx] || [[], [], []];
+  hps.abilityZones[heroIdx] = abZones;
   const cardName = picked.cardName;
   const script = loadCardEffect(cardName);
   void script;
   // v1349: Zonenwahl an EINER Stelle (`engine.abilityZielZone` — auch
   // customPlacement; verwahrte Abilities, Madame Guillotine).
-  const targetZone = engine.abilityZielZone(playerIdx, heroIdx, cardName);
+  const targetZone = engine.abilityZielZone(feld, heroIdx, cardName);
 
   if (targetZone < 0) return false; // No valid zone — shouldn't happen if canAttach was checked
 
@@ -229,11 +278,17 @@ async function doDeckSearch(engine, playerIdx, heroIdx, level, trainingZoneIdx) 
 
   // Level 2 consumes abilityGivenThisTurn; Level 3 does not
   if (level === 2) {
-    ps.abilityGivenThisTurn[heroIdx] = true;
+    if (feld === playerIdx) ps.abilityGivenThisTurn[heroIdx] = true;
+    else {
+      // Geliehener Held: sein Anlegen dieses Zuges ist die Styx-Marke.
+      const ch = hps.heroes?.[heroIdx]?.statuses?.charmed;
+      if (ch) ch.abilityZug = engine.gs.turn;
+    }
   }
 
   // Track card instance and fire hooks
-  const inst = engine._trackCard(cardName, playerIdx, 'ability', heroIdx, targetZone);
+  const inst = engine._trackCard(cardName, feld, 'ability', heroIdx, targetZone);
+  if (feld !== playerIdx) inst.originalOwner = playerIdx;   // Karte aus meinem Deck
   engine._broadcastEvent('deck_search_add', { cardName, playerIdx });
   engine.log('deck_search', { player: ps.username, card: cardName, by: 'Training' });
 
@@ -243,13 +298,13 @@ async function doDeckSearch(engine, playerIdx, heroIdx, level, trainingZoneIdx) 
   // Lv3: Training resolves when attachment happens → flash Training zone now
   if (level === 3) {
     engine._broadcastEvent('ability_activated', {
-      owner: playerIdx, heroIdx, zoneIdx: trainingZoneIdx, abilityName: 'Training',
+      owner: feld, heroIdx, zoneIdx: trainingZoneIdx, abilityName: 'Training',
     });
   }
 
   // Flash the target ability zone immediately (no gap between placement and flash)
   engine._broadcastEvent('ability_activated', {
-    owner: playerIdx, heroIdx, zoneIdx: targetZone, abilityName: cardName,
+    owner: feld, heroIdx, zoneIdx: targetZone, abilityName: cardName,
   });
   engine.sync();
   await engine._delay(1200);
@@ -334,11 +389,15 @@ module.exports = {
     const engine = ctx._engine;
     const pi = ctx.cardOwner;
     const heroIdx = ctx.cardHeroIdx;
+    const feld = ctx.cardHeroOwner ?? pi;   // Styx 28.9.: „this Hero" = Brettseite
 
-    const hasHandAbilities = getEligibleHandAbilities(engine, pi, heroIdx).length > 0;
-    const hasDeckAbilities = getEligibleDeckAbilities(engine, pi, heroIdx).length > 0;
+    const hasHandAbilities = getEligibleHandAbilities(engine, pi, heroIdx, feld).length > 0;
+    const hasDeckAbilities = getEligibleDeckAbilities(engine, pi, heroIdx, feld).length > 0;
     const ps = ctx.players[pi];
     const hasCardsInHand = (ps.hand || []).length > 0;
+    const anlegenVerbraucht = feld === pi
+      ? !!(ps.abilityGivenThisTurn || [])[heroIdx]
+      : !engine.darfFremdAbilityAnlegen(pi, feld, heroIdx);
 
     switch (level) {
       case 1:
@@ -348,7 +407,7 @@ module.exports = {
         // Option A: eligible hand abilities, OR
         // Option B: eligible deck abilities AND cards in hand to discard
         //   Option B costs the hero's per-turn attachment, so it must be unspent.
-        return hasHandAbilities || (hasDeckAbilities && hasCardsInHand && !(ps.abilityGivenThisTurn || [])[heroIdx]);
+        return hasHandAbilities || (hasDeckAbilities && hasCardsInHand && !anlegenVerbraucht);
       case 3:
         // Option A: eligible hand abilities, OR
         // Option B: eligible deck abilities (no discard, no abilityGiven cost)
@@ -367,22 +426,27 @@ module.exports = {
     const engine = ctx._engine;
     const pi = ctx.cardOwner;
     const heroIdx = ctx.cardHeroIdx;
+    // Styx 28.9.: Training an einem geliehenen Helden — „your hand/deck" =
+    // Kontrolleur `pi`, „this Hero" und seine Zonen = Brettseite `feld`.
+    const feld = ctx.cardHeroOwner ?? pi;
     const trainingZoneIdx = ctx.card.zoneSlot; // Training's own ability zone slot
     const ps = ctx.players[pi];
-    const heroName = ps.heroes?.[heroIdx]?.name || 'Hero';
+    const heroName = ctx.players[feld]?.heroes?.[heroIdx]?.name || 'Hero';
 
     // ── Level 1 ──
     if (level === 1) {
-      const attached = await doHandAttach(engine, pi, heroIdx, 1, trainingZoneIdx);
+      const attached = await doHandAttach(engine, pi, heroIdx, 1, trainingZoneIdx, feld);
       return attached > 0;
     }
 
     // ── Levels 2 & 3 ──
     const maxHandAttach = level === 2 ? 2 : 3;
-    const hasHandAbilities = getEligibleHandAbilities(engine, pi, heroIdx).length > 0;
-    const hasDeckAbilities = getEligibleDeckAbilities(engine, pi, heroIdx).length > 0;
+    const hasHandAbilities = getEligibleHandAbilities(engine, pi, heroIdx, feld).length > 0;
+    const hasDeckAbilities = getEligibleDeckAbilities(engine, pi, heroIdx, feld).length > 0;
     const hasCardsInHand = (ps.hand || []).length > 0;
-    const abilityGivenBlocked = (ps.abilityGivenThisTurn || [])[heroIdx];
+    const abilityGivenBlocked = feld === pi
+      ? (ps.abilityGivenThisTurn || [])[heroIdx]
+      : !engine.darfFremdAbilityAnlegen(pi, feld, heroIdx);
     const canOptionA = hasHandAbilities;
     const canOptionB = level === 3
       ? hasDeckAbilities
@@ -390,11 +454,11 @@ module.exports = {
 
     // If only one option is available, auto-select
     if (canOptionA && !canOptionB) {
-      const attached = await doHandAttach(engine, pi, heroIdx, maxHandAttach, trainingZoneIdx);
+      const attached = await doHandAttach(engine, pi, heroIdx, maxHandAttach, trainingZoneIdx, feld);
       return attached > 0;
     }
     if (!canOptionA && canOptionB) {
-      const resolved = await doDeckSearch(engine, pi, heroIdx, level, trainingZoneIdx);
+      const resolved = await doDeckSearch(engine, pi, heroIdx, level, trainingZoneIdx, feld);
       return resolved;
     }
     if (!canOptionA && !canOptionB) return false; // Shouldn't happen (canFreeActivate guards this)
@@ -432,11 +496,11 @@ module.exports = {
     if (!choice || choice.cancelled) return false;
 
     if (choice.optionId === 'hand') {
-      const attached = await doHandAttach(engine, pi, heroIdx, maxHandAttach, trainingZoneIdx);
+      const attached = await doHandAttach(engine, pi, heroIdx, maxHandAttach, trainingZoneIdx, feld);
       return attached > 0;
     }
     if (choice.optionId === 'deck') {
-      const resolved = await doDeckSearch(engine, pi, heroIdx, level, trainingZoneIdx);
+      const resolved = await doDeckSearch(engine, pi, heroIdx, level, trainingZoneIdx, feld);
       return resolved;
     }
 

@@ -246,7 +246,7 @@ module.exports = {
 
     onCardLeaveZone: (ctx) => {
       if (ctx.fromZone !== 'support') return;
-      if (ctx.fromOwner !== ctx.cardOwner
+      if ((ctx.fromOwner !== ctx.cardOwner && ctx.fromOwner !== ctx.cardHeroOwner)   // Styx 28.9.: Brettseite
           || ctx.fromHeroIdx !== ctx.card.heroIdx
           || ctx.fromZoneSlot !== ctx.card.zoneSlot) return;
       ctx.revokeAtk();
@@ -259,8 +259,8 @@ module.exports = {
     afterDamage: async (ctx) => {
       if (ctx.type !== 'attack') return;
       if (ctx.sourceHeroIdx !== ctx.cardHeroIdx) return;
-      const srcOwner = ctx.source?.owner ?? ctx.source?.controller ?? -1;
-      if (srcOwner !== ctx.cardOwner) return;
+      // Styx 28.9.: „dieser Held" = Brettseite + Index (geliehener Held).
+      if (!ctx._engine.quelleIstHeld(ctx.source, ctx.cardHeroOwner ?? ctx.cardOwner, ctx.cardHeroIdx)) return;
       // A Creature hosted on the equipped Hero's slot shares heroIdx
       // but is its own source — exclude (Hero-only trigger).
       if (ctx.source?.zone === 'support') return;
@@ -291,7 +291,8 @@ module.exports = {
       for (const e of ctx.entries) {
         if (e.type !== 'attack') continue;
         if ((e.source?.heroIdx ?? -1) !== ctx.cardHeroIdx) continue;
-        if ((e.source?.owner ?? e.source?.controller ?? -1) !== ctx.cardOwner) continue;
+        // Styx 28.9.: „dieser Held" = Brettseite + Index (geliehener Held).
+        if (!ctx._engine.quelleIstHeld(e.source, ctx.cardHeroOwner ?? ctx.cardOwner, ctx.cardHeroIdx)) continue;
         if (e.source?.zone === 'support') continue;
         const inst = e.inst;
         if (!inst || (inst.counters?.currentHp ?? 1) > 0) continue;

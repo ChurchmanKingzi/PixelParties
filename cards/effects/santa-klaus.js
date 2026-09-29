@@ -75,7 +75,8 @@ module.exports = {
      */
     afterSpellResolved: async (ctx) => {
       const pi = ctx.cardOwner;
-      if (ctx.casterIdx !== pi) return;
+      // Styx 28.9.: „dieser Held" = Brettseite + Index, nicht Kontrolleur.
+      if ((ctx.heroOwner ?? ctx.casterIdx) !== (ctx.cardHeroOwner ?? pi)) return;
       if (ctx.heroIdx !== ctx.cardHeroIdx) return;
       const cd = ctx.spellCardData;
       if (!cd || (cd.cardType !== 'Spell' && cd.cardType !== 'Attack')) return;

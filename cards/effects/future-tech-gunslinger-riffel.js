@@ -109,21 +109,22 @@ module.exports = {
   },
 
   hooks: {
+    // Styx 28.9.: Pruefung auf der Brettseite des Helden (`cardHeroOwner`).
     onGameStart: (ctx) => {
-      checkRiffelAscension(ctx._engine, ctx.cardOwner, ctx.cardHeroIdx, null);
+      checkRiffelAscension(ctx._engine, ctx.cardHeroOwner ?? ctx.cardOwner, ctx.cardHeroIdx, null);
     },
     onTurnStart: (ctx) => {
       checkRiffelAscension(ctx._engine, ctx.cardOriginalOwner, ctx.cardHeroIdx, null);
     },
     onCardEnterZone: (ctx) => {
       if (ctx.toZone !== 'support' || ctx.toHeroIdx !== ctx.cardHeroIdx) return;
-      checkRiffelAscension(ctx._engine, ctx.cardOwner, ctx.cardHeroIdx, null);
+      checkRiffelAscension(ctx._engine, ctx.cardHeroOwner ?? ctx.cardOwner, ctx.cardHeroIdx, null);
     },
     onCardLeaveZone: (ctx) => {
       if (ctx.fromZone !== 'support') return;
       if (ctx.fromHeroIdx !== undefined && ctx.fromHeroIdx !== ctx.cardHeroIdx) return;
       // `ctx.card` ist der Lauscher, die gehende Karte `ctx.leavingCard`.
-      checkRiffelAscension(ctx._engine, ctx.cardOwner, ctx.cardHeroIdx, ctx.leavingCard?.id);
+      checkRiffelAscension(ctx._engine, ctx.cardHeroOwner ?? ctx.cardOwner, ctx.cardHeroIdx, ctx.leavingCard?.id);
     },
   },
 
@@ -139,6 +140,11 @@ module.exports = {
     const heroIdx = ctx.cardHeroIdx;
     const ps = gs.players[pi];
     if (!ps || heroIdx == null || heroIdx < 0) return false;
+    // Styx 28.9.: `_equip-shared` legt nur an Helden der eigenen Spalte an
+    // (und ein bezauberter Held ist ohnehin kein Ausruest-Traeger). Ein
+    // uebernommener Riffel wuerde sonst den gleich indizierten EIGENEN
+    // Helden ausruesten — dann lieber nichts.
+    if ((ctx.cardHeroOwner ?? pi) !== pi) return false;
 
     if (freieSlots(ps, heroIdx).length === 0) return false;
 

@@ -36,19 +36,21 @@ module.exports = {
       const gs = engine.gs;
       const pi = ctx.cardOwner;
       const heroIdx = ctx.cardHeroIdx;
-      if (ctx.casterIdx !== pi || ctx.heroIdx !== heroIdx) return;
+      // Styx 28.9.: Held/Zonen auf der Brettseite `feld`, „du" = Kontrolleur `pi`.
+      const feld = ctx.cardHeroOwner ?? pi;
+      if ((ctx.heroOwner ?? ctx.casterIdx) !== feld || ctx.heroIdx !== heroIdx) return;
       if (ctx.isSecondCast || gs._bartasSecondCast) return;
       if (gs._spellNegatedByEffect) return;
       const ps = gs.players[pi];
-      const hero = ps?.heroes?.[heroIdx];
+      const hero = ctx.attachedHero ?? gs.players[feld]?.heroes?.[heroIdx];
       if (!hero?.name || hero.hp <= 0) return;
-      if (engine.isHeroIncapacitated(pi, heroIdx) || hero.statuses?.negated) return;
+      if (engine.isHeroIncapacitated(feld, heroIdx) || hero.statuses?.negated) return;
       const spellData = ctx.spellCardData;
       if (!spellData || !hasCardType(spellData, 'Spell')) return;
       if ((spellData.subtype || '').toLowerCase() !== 'normal') return;
       if (spellData.spellSchool1 !== SCHOOL && spellData.spellSchool2 !== SCHOOL) return;
       const spellLevel = spellData.level || 0;
-      const smLevel = engine.countAbilitiesForSchool(SCHOOL, ps.abilityZones?.[heroIdx] || []);
+      const smLevel = engine.countAbilitiesForSchool(SCHOOL, gs.players[feld]?.abilityZones?.[heroIdx] || []);
       if (spellLevel >= smLevel) return;
       const spellScript = loadCardEffect(ctx.spellName);
       if (!spellScript?.hooks?.onPlay) return;
@@ -70,6 +72,7 @@ module.exports = {
       gs._spellDamageLog = [];
       gs._bartasSecondCast = true;
       const tempInst = engine._trackCard(ctx.spellName, pi, 'hand', heroIdx, -1);
+      if (feld !== pi) tempInst.heroOwner = feld;   // Styx 28.9.: wie der Server bei Uebernahme
       try {
         await engine.runHooks('onPlay', {
           _onlyCard: tempInst, playedCard: tempInst,

@@ -39,8 +39,11 @@ module.exports = {
       const gs = engine.gs;
       const pi = ctx.cardOwner;
       if (ctx.playerIdx !== pi || ctx.heroIdx !== ctx.cardHeroIdx) return;
+      // Styx 28.9.: `heroOwner` = Brettseite des Beschwoerer-Helden; Maho selbst als Objekt.
+      const feld = ctx.cardHeroOwner ?? pi;
+      if ((ctx.heroOwner ?? ctx.playerIdx) !== feld) return;
       const db = engine._getCardDB();
-      const hero = gs.players[pi]?.heroes?.[ctx.cardHeroIdx];
+      const hero = ctx.attachedHero ?? gs.players[feld]?.heroes?.[ctx.cardHeroIdx];
       if (!hero?.name || hero.hp <= 0) return;
 
       // ① Gratis-Beschwoerung verbraucht

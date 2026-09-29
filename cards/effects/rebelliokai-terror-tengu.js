@@ -156,7 +156,9 @@ module.exports = {
       if (ctx.cardZone !== 'support') return;
 
       const engine = ctx._engine;
-      const pi     = ctx.cardOriginalOwner;
+      // Kontrolle statt Seite (Styx 28.9.): „when YOU summon" — der
+      // Beschwoerer, auch ueber einen geliehenen Helden der Gegenspalte.
+      const pi     = ctx.cardOwner;
       const ps     = engine.gs.players[pi];
       if (!ps) return;
 

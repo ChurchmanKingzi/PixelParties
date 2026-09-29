@@ -48,7 +48,8 @@ function _isAttackOrSpellType(t) {
  */
 function _isFromMolinda(source, ctx) {
   if (!source || typeof source !== 'object') return false;
-  return source.owner === ctx.cardOwner
+  // Styx 28.9.: Brettseite der Quelle (`heroOwner`) gegen Molindas Seite.
+  return (source.heroOwner ?? source.owner) === (ctx.cardHeroOwner ?? ctx.cardOwner)
       && source.heroIdx === ctx.cardHeroIdx;
 }
 
@@ -58,10 +59,11 @@ function _isFromMolinda(source, ctx) {
  * matches dark-gear.js' getFreeZones, scoped to one hero.
  */
 function _molindaFreeZones(engine, ctx) {
-  const ps = engine.gs.players[ctx.cardOwner];
+  // Styx 28.9.: Zonen auf Molindas Brettseite.
+  const ps = engine.gs.players[ctx.cardHeroOwner ?? ctx.cardOwner];
   if (!ps) return [];
   const heroIdx = ctx.cardHeroIdx;
-  const hero = ps.heroes?.[heroIdx];
+  const hero = ctx.attachedHero ?? ps.heroes?.[heroIdx];
   if (!hero?.name || hero.hp <= 0) return [];
   const slots = ps.supportZones?.[heroIdx] || [];
   const zones = [];
@@ -130,9 +132,10 @@ module.exports = {
     // zieht der naechste sync() ueber refreshAscensionReadiness nach.
     afterSpellResolved: (ctx) => {
       if (ctx.spellName !== LOVE_SHOT || ctx.isSecondCast) return;
-      if (ctx.casterIdx !== ctx.cardOwner || ctx.heroIdx !== ctx.cardHeroIdx) return;
+      // Styx 28.9.: „diese Molinda" = Brettseite + Index.
+      if ((ctx.heroOwner ?? ctx.casterIdx) !== (ctx.cardHeroOwner ?? ctx.cardOwner) || ctx.heroIdx !== ctx.cardHeroIdx) return;
       const engine = ctx._engine;
-      const hero = engine.gs.players[ctx.cardOwner]?.heroes?.[ctx.cardHeroIdx];
+      const hero = ctx.attachedHero ?? engine.gs.players[ctx.cardHeroOwner ?? ctx.cardOwner]?.heroes?.[ctx.cardHeroIdx];
       if (!hero?.name || hero.name !== 'Cute Angel Molinda') return;
       hero._loveShotsCast = (hero._loveShotsCast || 0) + 1;
       engine.log('molinda_love_shot_count', {
@@ -217,8 +220,14 @@ module.exports = {
       // Molinda must still be alive to route stolen Creatures
       // into her column.
       const ps = engine.gs.players[ctx.cardOwner];
-      const hero = ps?.heroes?.[ctx.cardHeroIdx];
+      const feld = ctx.cardHeroOwner ?? ctx.cardOwner;
+      const hero = ctx.attachedHero ?? engine.gs.players[feld]?.heroes?.[ctx.cardHeroIdx];
       if (!hero?.name || hero.hp <= 0) return;
+      // Styx 28.9.: `actionTransferCreature` legt nur in die Spalte des
+      // neuen Kontrolleurs — eine geliehene Molinda (Zonen beim Gegner)
+      // kann die Kreatur nicht in IHRE Zonen holen. Statt in den gleich
+      // indizierten eigenen Helden zu legen: kein Angebot.
+      if (feld !== ctx.cardOwner) return;
 
       for (const inst of hits) {
         // Re-validate every iteration: a parallel damage source

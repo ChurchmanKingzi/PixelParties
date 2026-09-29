@@ -69,7 +69,10 @@ module.exports = {
       const gs = engine.gs;
       const pi = ctx.cardOwner;
       const heroIdx = ctx.cardHeroIdx;
-      const hero = gs.players[pi]?.heroes?.[heroIdx];
+      // Styx 28.9.: Rakah selbst (Brettseite) bekommt die ATK, nicht der
+      // gleich indizierte Held des Kontrolleurs.
+      const feld = ctx.cardHeroOwner ?? pi;
+      const hero = ctx.attachedHero ?? gs.players[feld]?.heroes?.[heroIdx];
       if (!hero?.name) return;
 
       const opfer = ctx.creature;
@@ -88,7 +91,7 @@ module.exports = {
       // feuert, streamt seine Karte an BEIDE Spieler.
       await engine.showTriggeredEffect(CARD_NAME, { playerIdx: pi });
 
-      engine._applyHeroAtkDelta(hero, pi, heroIdx, hp);
+      engine._applyHeroAtkDelta(hero, feld, heroIdx, hp);
       engine.log('atk_grant', { hero: hero.name, amount: hp, source: CARD_NAME });
       engine.log('rakah_collect', {
         player: gs.players[pi]?.username,

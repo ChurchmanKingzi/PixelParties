@@ -120,7 +120,7 @@ module.exports = {
 
     if (!ctx.isInherentAction) return true;          // regulaer bezahlt, nichts zu tun
 
-    const kandidaten = ausruestungAm(engine, pi, heroIdx);
+    const kandidaten = ausruestungAm(engine, ctx.cardHeroOwner ?? pi, heroIdx);   // Styx 28.9.: Brettseite
     if (kandidaten.length === 0) return true;        // sollte `inherentAction` verhindern
 
     // Stand diesem Helden noch eine regulaere Aktion offen?
@@ -130,7 +130,7 @@ module.exports = {
     if (hatteAktion) {
       const ja = await engine.promptGeneric(pi, {
         type: 'confirm', title: CARD_NAME,
-        message: `Delete an Artifact equipped to ${gs.players[pi]?.heroes?.[heroIdx]?.name || 'this Hero'} to summon this as an additional Action? Otherwise it costs the Hero's Action as usual.`,
+        message: `Delete an Artifact equipped to ${gs.players[ctx.cardHeroOwner ?? pi]?.heroes?.[heroIdx]?.name || 'this Hero'} to summon this as an additional Action? Otherwise it costs the Hero's Action as usual.`,
         showCard: CARD_NAME,
         confirmLabel: '🔱 Delete one',
         cancelLabel: 'Use the Action',

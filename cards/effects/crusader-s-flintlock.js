@@ -30,10 +30,10 @@ module.exports = makeCrusaderArtifact({
   // beim Einschlag, nicht beim Abschuss: die Animation wartet die
   // Flugzeit ab und kehrt genau dann zurueck, wenn die Kugel ankommt —
   // der gemeinsame Teil der Fabrik schlaegt unmittelbar danach zu.
-  async attackAnim(ctx, { engine, pi, heroIdx, tgtOwner, tgtHeroIdx, tgtZoneSlot, impactSlot }) {
+  async attackAnim(ctx, { engine, pi, feld = pi, heroIdx, tgtOwner, tgtHeroIdx, tgtZoneSlot, impactSlot }) {
     const FLUGZEIT = 380;                       // schnell, es ist eine Kugel
     engine._broadcastEvent('play_projectile_animation', {
-      sourceOwner: pi, sourceHeroIdx: heroIdx, sourceZoneSlot: -1,  // vom Helden, nicht vom Artefakt
+      sourceOwner: feld, sourceHeroIdx: heroIdx, sourceZoneSlot: -1,  // vom Helden, nicht vom Artefakt
       targetOwner: tgtOwner, targetHeroIdx: tgtHeroIdx,
       targetZoneSlot: tgtZoneSlot,
       emoji: '•',

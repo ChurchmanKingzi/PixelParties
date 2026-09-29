@@ -32,9 +32,10 @@ function stealableTargets(engine, pi) {
   if (!ops) return 0;
   if (gs.firstTurnProtectedPlayer === opp) return 0;
   let n = 0;
-  for (const h of (ops.heroes || [])) if (h?.name && h.hp > 0 && h.charmedBy == null) n++;
+  // Kontrolle statt Seite (Styx 28.9.)
+  for (const { hero: h } of engine.heroesControlledBy(opp)) if (h?.name && h.hp > 0 && h.charmedBy == null) n++;
   for (const c of engine.cardInstances) {
-    if (c.owner !== opp || c.zone !== 'support' || c.stolenBy != null || c.faceDown) continue;
+    if ((c.controller ?? c.owner) !== opp || c.zone !== 'support' || c.stolenBy != null || c.faceDown) continue;
     const cd = engine.getEffectiveCardData?.(c) || engine._getCardDB()[c.name];
     if (!cd || cd.cardType !== 'Creature') continue;
     if (engine.isOmniImmune?.(c)) continue;
@@ -86,7 +87,7 @@ module.exports = {
     const zoneSlot = target.type === 'hero' ? -1 : (target.slotIdx ?? -1);
     const PROJECTILE_MS = 1100;
     engine._broadcastEvent('play_projectile_animation', {
-      sourceOwner: pi, sourceHeroIdx: ctx.cardHeroIdx,
+      sourceOwner: ctx.cardHeroOwner ?? pi, sourceHeroIdx: ctx.cardHeroIdx,   // Styx 28.9.: Brettseite
       targetOwner: target.owner, targetHeroIdx: target.heroIdx, targetZoneSlot: zoneSlot,
       projectileClass: 'projectile-love-heart', trailClass: 'projectile-love-trail',
       duration: PROJECTILE_MS,

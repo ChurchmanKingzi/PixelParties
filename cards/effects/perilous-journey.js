@@ -156,9 +156,10 @@ module.exports = {
       });
       if (ok) gebrannt++;
     }
-    // Kreaturen in den eigenen Support Zones.
+    // Kreaturen, die der Spieler kontrolliert — Kontrolle statt Seite
+    // (Styx 28.9.): auch seitenfremd beschworene, keine gestohlenen.
     for (const inst of engine.cardInstances) {
-      if (inst.owner !== pi || inst.zone !== 'support') continue;
+      if ((inst.controller ?? inst.owner) !== pi || inst.zone !== 'support') continue;
       const cd = engine._getCardDB()[inst.name];
       if (!cd || !/creature/i.test(cd.cardType || '')) continue;
       const ok = await engine.applyCreatureStatus(inst, 'burned', {

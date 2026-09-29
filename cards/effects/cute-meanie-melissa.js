@@ -32,7 +32,9 @@ module.exports = {
       const heroIdx = ctx.cardHeroIdx;
       if (ctx.playerIdx === owner) return;                    // Gegner muss ziehen
       if (ctx._isResourceDraw) return;                        // nicht „via an effect"
-      const hero = gs.players[owner]?.heroes?.[heroIdx];
+      // Styx 28.9.: Melissa selbst (Brettseite), nicht der gleich indizierte eigene Held.
+      const feld = ctx.cardHeroOwner ?? owner;
+      const hero = ctx.attachedHero ?? gs.players[feld]?.heroes?.[heroIdx];
       if (!hero?.name || hero.hp <= 0) return;
       // Ein Ziehvorgang = eine Antwort.
       const batch = ctx._drawBatch;
@@ -57,7 +59,7 @@ module.exports = {
       // Abbruchstelle) — Kartenbild an beide Spieler, dann der Zug.
       await engine.showTriggeredEffect(CARD_NAME);
       engine._broadcastEvent('play_zone_animation', {
-        type: 'equip_flash', owner, heroIdx, zoneSlot: -1,
+        type: 'equip_flash', owner: feld, heroIdx, zoneSlot: -1,
       });
       const got = await engine.actionDrawCards(owner, 1, { source: CARD_NAME });
       engine.log('melissa_draw', { player: ps.username, hero: hero.name, drawn: Array.isArray(got) ? got.length : 1 });

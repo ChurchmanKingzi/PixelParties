@@ -51,8 +51,8 @@ function eigeneKreaturen(engine, pi) {
 
 /** Der Held hinter dieser Instanz, sofern sein Effekt gerade wirkt. */
 function heldWirkt(engine, inst) {
-  const pi = inst?.controller ?? inst?.owner;
-  const hero = engine.gs.players[pi]?.heroes?.[inst?.heroIdx];
+  // Styx 28.9.: Heldeninstanz liegt auf der Brettseite `owner`.
+  const hero = engine.gs.players[inst?.owner]?.heroes?.[inst?.heroIdx];
   if (!hero?.name || hero.hp <= 0) return false;
   return !hero.statuses?.negated;   // jede Form der Negation legt den Effekt still
 }
@@ -78,6 +78,10 @@ module.exports = {
       const pi = ctx.cardController ?? ctx.cardOwner;
       const hi = inst?.heroIdx;
       if (typeof hi !== 'number' || hi < 0) return;
+      // Styx 28.9.: `_heroCanAct`/`performImmediateAction` kennen nur Helden
+      // der eigenen Spalte — ein uebernommener Junshi spielte sonst ueber
+      // den gleich indizierten EIGENEN Helden. Bis die Engine das kann: aus.
+      if ((ctx.cardHeroOwner ?? pi) !== pi) return;
       if (gs.activePlayer === pi) return;                                   // nur im gegnerischen Zug
       if (!(ctx.defeated || []).some(d => (d.controller ?? d.owner) === pi)) return;
       if (!heldenSperreFrei(gs, SPERRE, pi)) return;

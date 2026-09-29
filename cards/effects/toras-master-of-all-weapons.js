@@ -41,8 +41,8 @@ function countUniqueArtifacts(engine, pi, heroIdx, excludeId) {
     if (excludeId && inst.id === excludeId) continue;
     if (inst.zone !== 'support') continue;
     if (inst.heroIdx !== heroIdx) continue;
-    // Artifacts attached on the hero column we currently control.
-    if ((inst.controller ?? inst.owner) !== pi) continue;
+    // Artifacts in Toras' column (Styx 28.9.: `pi` = Brettseite).
+    if (engine.physicalSide(inst) !== pi) continue;
     // Cloak of Edge & Co. zaehlen in der Support-Zone als ABILITY und
     // duerfen Toras' Artefakt-Zaehlung deshalb nicht erhoehen
     // (Als Ruling 5.8.).
@@ -62,9 +62,10 @@ function countUniqueArtifacts(engine, pi, heroIdx, excludeId) {
 function applyAtkBonus(ctx, excludeId) {
   const engine = ctx._engine;
   const gs = engine.gs;
-  const pi = ctx.cardOwner;
+  // Styx 28.9.: Toras, seine Zonen und seine ATK auf der Brettseite.
+  const pi = ctx.cardHeroOwner ?? ctx.cardOwner;
   const heroIdx = ctx.cardHeroIdx;
-  const hero = gs.players[pi]?.heroes?.[heroIdx];
+  const hero = ctx.attachedHero ?? gs.players[pi]?.heroes?.[heroIdx];
   if (!hero?.name) return;
 
   const count      = countUniqueArtifacts(engine, pi, heroIdx, excludeId);
@@ -91,7 +92,7 @@ function applyAtkBonus(ctx, excludeId) {
 function registerFlag(ctx) {
   const gs = ctx._engine.gs;
   if (!gs.heroFlags) gs.heroFlags = {};
-  const key = `${ctx.cardOwner}-${ctx.cardHeroIdx}`;
+  const key = `${ctx.cardHeroOwner ?? ctx.cardOwner}-${ctx.cardHeroIdx}`;   // Styx 28.9.: Brettseite
   if (!gs.heroFlags[key]) gs.heroFlags[key] = {};
   gs.heroFlags[key].singleTargetAttack = true;
 }
@@ -101,7 +102,7 @@ function registerFlag(ctx) {
  */
 function clearFlag(ctx) {
   const gs = ctx._engine.gs;
-  const key = `${ctx.cardOwner}-${ctx.cardHeroIdx}`;
+  const key = `${ctx.cardHeroOwner ?? ctx.cardOwner}-${ctx.cardHeroIdx}`;   // Styx 28.9.
   if (gs.heroFlags?.[key]) {
     delete gs.heroFlags[key].singleTargetAttack;
     if (Object.keys(gs.heroFlags[key]).length === 0) {
@@ -150,7 +151,7 @@ module.exports = {
       if (ctx.fromHeroIdx !== ctx.cardHeroIdx) return;
 
       const leavingInst = ctx._engine.cardInstances.find(c =>
-        c.owner === ctx.cardOwner && c.zone === 'support' &&
+        c.owner === (ctx.cardHeroOwner ?? ctx.cardOwner) && c.zone === 'support' &&
         c.heroIdx === ctx.fromHeroIdx && c.zoneSlot === ctx.fromZoneSlot,
       );
       const cd = ctx._engine.getEffectiveCardData(leavingInst)

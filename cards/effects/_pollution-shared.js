@@ -207,7 +207,8 @@ async function placePollutionTokens(engine, playerIdx, count, sourceName, opts =
 }
 
 /**
- * Enumerate all Pollution Tokens currently on a player's side of the board.
+ * Enumerate all Pollution Tokens a player CONTROLS (Styx 28.9.: Kontrolle
+ * statt Brettseite — gestohlene/seitenfremde Tokens zaehlen beim Kontrolleur).
  * Returns CardInstance objects so callers can inspect counters (e.g. filter
  * by placedOnTurn for Victorica).
  *
@@ -218,7 +219,7 @@ async function placePollutionTokens(engine, playerIdx, count, sourceName, opts =
 function getPollutionTokens(engine, playerIdx) {
   return engine.cardInstances.filter(inst =>
     inst.name === POLLUTION_TOKEN &&
-    inst.owner === playerIdx &&
+    (inst.controller ?? inst.owner) === playerIdx &&
     inst.zone === 'support' &&
     !inst.faceDown
   );
@@ -292,9 +293,13 @@ async function removePollutionTokens(engine, playerIdx, count, sourceName, opts 
     removalList = [];
     const remaining = pool.slice();
     for (let i = 0; i < toRemoveCount; i++) {
+      // Styx 28.9.: Zone mit physischer Seite (`owner`), falls ein
+      // kontrollierter Token auf der Gegenseite liegt.
       const zones = remaining.map(inst => {
-        const hero = ps.heroes?.[inst.heroIdx];
+        const seite = engine.physicalSide(inst);
+        const hero = gs.players[seite]?.heroes?.[inst.heroIdx];
         return {
+          ...(seite !== playerIdx ? { owner: seite } : {}),
           heroIdx: inst.heroIdx,
           slotIdx: inst.zoneSlot,
           label: `${hero?.name || 'Hero'} — Slot ${inst.zoneSlot + 1}`,
@@ -306,7 +311,8 @@ async function removePollutionTokens(engine, playerIdx, count, sourceName, opts 
         cancellable: false,
       });
       const pickedInstIdx = picked
-        ? remaining.findIndex(inst => inst.heroIdx === picked.heroIdx && inst.zoneSlot === picked.slotIdx)
+        ? remaining.findIndex(inst => inst.heroIdx === picked.heroIdx && inst.zoneSlot === picked.slotIdx
+            && engine.physicalSide(inst) === (picked.owner ?? playerIdx))
         : 0;
       const chosen = remaining[Math.max(0, pickedInstIdx)];
       removalList.push(chosen);

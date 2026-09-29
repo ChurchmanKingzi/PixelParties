@@ -215,7 +215,8 @@ module.exports = {
      * when the next own-turn begins; same scoping as the use counter.
      */
     onTurnStart: (ctx) => {
-      if (ctx.activePlayer !== ctx.cardOriginalOwner) return;
+      // Styx 28.9.: Zug des Kontrolleurs („you"), nicht der Brettseite.
+      if (ctx.activePlayer !== ctx.cardOwner) return;
       const hero = ctx.attachedHero;
       if (!hero) return;
       // ── KEINE Ruecksetzung der Nutzungen mehr (v421) ────────────
