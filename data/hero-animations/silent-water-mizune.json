@@ -1,0 +1,15 @@
+{
+  "hero": "Silent Water Mizune",
+  "sheet": "silent-water-mizune.png",
+  "frameWidth": 32,
+  "frameHeight": 35,
+  "frames": 48,
+  "frameMs": 90,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 8,
+  "padLeft": 6,
+  "padRight": 6,
+  "padBottom": 1,
+  "faceX": 15.0
+}

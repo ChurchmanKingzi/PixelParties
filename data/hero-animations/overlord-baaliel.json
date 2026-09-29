@@ -1,0 +1,16 @@
+{
+  "hero": "Overlord Baaliel",
+  "sheet": "overlord-baaliel.png",
+  "frameWidth": 40,
+  "frameHeight": 34,
+  "frames": 48,
+  "frameMs": 90,
+  "loop": true,
+  "layout": "horizontal",
+  "skinOf": "Baaliel, the Demon General",
+  "padTop": 8,
+  "padLeft": 3,
+  "padRight": 3,
+  "padBottom": 1,
+  "faceX": 20.0
+}

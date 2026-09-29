@@ -1,0 +1,16 @@
+{
+  "hero": "ZsosSsar the Worm Soldier",
+  "sheet": "zsosssar-the-worm-soldier.png",
+  "frameWidth": 55,
+  "frameHeight": 36,
+  "frames": 48,
+  "frameMs": 90,
+  "loop": true,
+  "layout": "horizontal",
+  "skinOf": "ZsosSsar the Serpent Warlord",
+  "padTop": 8,
+  "padLeft": 20,
+  "padRight": 3,
+  "padBottom": 1,
+  "faceX": 41.0
+}

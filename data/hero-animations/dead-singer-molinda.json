@@ -1,0 +1,17 @@
+{
+  "hero": "Dead Singer Molinda",
+  "sheet": "dead-singer-molinda.png",
+  "frameWidth": 42,
+  "frameHeight": 38,
+  "frames": 48,
+  "frameMs": 90,
+  "loop": true,
+  "layout": "horizontal",
+  "skinOf": "Cute Angel Molinda",
+  "padTop": 8,
+  "padLeft": 11,
+  "padRight": 11,
+  "padBottom": 3,
+  "faceX": 21.5,
+  "footY": 35
+}

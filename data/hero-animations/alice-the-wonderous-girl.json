@@ -1,0 +1,16 @@
+{
+  "hero": "Alice the Wonderous Girl",
+  "sheet": "alice-the-wonderous-girl.png",
+  "frameWidth": 28,
+  "frameHeight": 29,
+  "frames": 48,
+  "frameMs": 90,
+  "loop": true,
+  "layout": "horizontal",
+  "skinOf": "Alice, the Puppeteer Girl",
+  "padTop": 6,
+  "padLeft": 7,
+  "padRight": 7,
+  "padBottom": 1,
+  "faceX": 14.0
+}

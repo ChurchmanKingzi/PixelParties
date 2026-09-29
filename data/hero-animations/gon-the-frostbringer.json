@@ -1,0 +1,15 @@
+{
+  "hero": "Gon, the Frostbringer",
+  "sheet": "gon-the-frostbringer.png",
+  "frameWidth": 26,
+  "frameHeight": 28,
+  "frames": 48,
+  "frameMs": 90,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 4,
+  "padLeft": 5,
+  "padRight": 5,
+  "padBottom": 1,
+  "faceX": 14.5
+}

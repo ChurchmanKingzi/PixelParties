@@ -253,6 +253,44 @@ kopiert, daneben liegt eine JSON-Datei mit den Metadaten. Die erzeugten
 | `japan.py` | `final 90 shoguwana` | `shoguwana_idle_final_sheet.png` | `idej-lord-shoguwana` |
 | `japan.py` | `final 90 todugawin` | `todugawin_idle_final_sheet.png` | `idej-lord-todugawin` |
 | `japan.py` | `final 90 yukana` | `yukana_idle_final_sheet.png` | `yukana-the-scholar-on-the-run` |
+| `motive.py` | `final 90 alex` | `alex_idle_final_sheet.png` | `alex-trainer-of-heroes` |
+| `motive.py` | `final 90 doq` | `doq_idle_final_sheet.png` | `great-detective-doq` |
+| `motive.py` | `final 90 grisgar` | `grisgar_idle_final_sheet.png` | `grisgar-emissary-of-the-demon-lord` |
+| `motive.py` | `final 90 nieht` | `nieht_idle_final_sheet.png` | `nieht-the-blitz-blade` |
+| `motive.py` | `final 90 kohta` | `kohta_idle_final_sheet.png` | `kohta-the-silent-observer` |
+| `motive.py` | `final 90 bill` | `bill_idle_final_sheet.png` | `bill-the-angry-auctioneer` |
+| `motive.py` | `final 90 sabrina` | `sabrina_idle_final_sheet.png` | `sabrina-the-psychic-witch` |
+| `motive.py` | `final 90 mizune` | `mizune_idle_final_sheet.png` | `silent-water-mizune` |
+| `motive.py` | `final 90 bartas` | `bartas_idle_final_sheet.png` | `bomb-berserker-bartas` |
+| `motive.py` | `final 90 gon` | `gon_idle_final_sheet.png` | `gon-the-frostbringer` |
+| `motive.py` | `final 90 ida` | `ida_idle_final_sheet.png` | `ida-the-adept-of-destruction` |
+| `motive.py` | `final 90 vacarn` | `vacarn_idle_final_sheet.png` | `vacarn-the-dark-goblin-necromancer` |
+| `motive.py` | `final 90 solrym` | `solrym_idle_final_sheet.png` | `sol-rym-the-thunder-djinn` |
+| `motive.py` | `final 90 dajan` | `dajan_idle_final_sheet.png` | `legendary-explorer-dajan` |
+| `motive.py` | `final 90 omikron` | `omikron_idle_final_sheet.png` | `omikron-the-faceless-illusionist` |
+| `motive.py` | `final 90 idafire` | `idafire_idle_final_sheet.png` | `ida-the-fire-princess` |
+| `motive.py` | `final 90 chuck` | `chuck_idle_final_sheet.png` | `one-chuck-man` |
+| `motive.py` | `final 90 duke` | `duke_idle_final_sheet.png` | `duke-omikron` |
+| `motive.py` | `final 90 alice` | `alice_idle_final_sheet.png` | `alice-the-wonderous-girl` |
+| `motive.py` | `final 90 megakarian` | `megakarian_idle_final_sheet.png` | `mega-warrior-karian` |
+| `motive.py` | `final 90 settdunk` | `settdunk_idle_final_sheet.png` | `sett-dunking-on-you` |
+| `motive.py` | `final 90 emperor` | `emperor_idle_final_sheet.png` | `emperor-arthor` |
+| `motive.py` | `final 90 yellowflash` | `yellowflash_idle_final_sheet.png` | `nieht-the-yellow-flash` |
+| `motive.py` | `final 90 beatogold` | `beatogold_idle_final_sheet.png` | `beato-the-golden-witch` |
+| `motive.py` | `final 90 fiona` | `fiona_idle_final_sheet.png` | `fiona-the-ghost-princess` |
+| `motive.py` | `final 90 overlord` | `overlord_idle_final_sheet.png` | `overlord-baaliel` |
+| `motive.py` | `final 90 greymage` | `greymage_idle_final_sheet.png` | `grey-mage-archibald` |
+| `motive.py` | `final 90 battlemaniac` | `battlemaniac_idle_final_sheet.png` | `toras-the-battle-maniac` |
+| `motive.py` | `final 90 wormsoldier` | `wormsoldier_idle_final_sheet.png` | `zsosssar-the-worm-soldier` |
+| `motive.py` | `final 90 diva` | `diva_idle_final_sheet.png` | `elana-the-digital-diva` |
+| `motive.py` | `final 90 holystyx` | `holystyx_idle_final_sheet.png` | `holy-styx` |
+| `motive.py` | `final 90 kaito` | `kaito_idle_final_sheet.png` | `kaito-sid-the-phantom-thief` |
+| `motive.py` | `final 90 halffrozen` | `halffrozen_idle_final_sheet.png` | `gon-the-half-frozen` |
+| `motive.py` | `final 90 molinda` | `molinda_idle_final_sheet.png` | `dead-singer-molinda` |
+| `motive.py` | `final 90 seaserpent` | `seaserpent_idle_final_sheet.png` | `the-little-seaserpent` |
+| `motive.py` | `final 90 nomudawn` | `nomudawn_idle_final_sheet.png` | `nomu-of-the-dawn` |
+| `motive.py` | `final 90 alienbartas` | `alienbartas_idle_final_sheet.png` | `alien-invader-bartas` |
+| `motive.py` | `final 90 tharx` | `tharx_idle_final_sheet.png` | `tharx-the-king-of-conquerors` |
 
 `bubbles.py` ohne `gross` erzeugt eine auf Hero-Größe verkleinerte Variante
 (Sprite aus `bubbles_downscale.py`), die aktuell nicht verwendet wird.
@@ -293,6 +331,7 @@ python3 xcf_extract.py MotiveMoe.xcf assemble src/cute-princess-mary.png "Mary-K
 | MotiveHawaii-Heroes | `MotiveHawaii.xcf` | reproduzierbar per `python3 assemble_hawaii.py <MotiveHawaii.xcf>` (Zuordnung im Skriptkopf; Base-Taios Beine aus „Taio-Kopie“, seine Hand am Griff als `-hand`; Ascended Taio mit Base-Taios um 180° gedrehtem Flammenschwert; Waflavs Feuerflügel als `-wings`; Calamitusks Banner als `-banner`) |
 | MotiveIndia-Heroes | `MotiveIndia.xcf` | reproduzierbar per `python3 assemble_india.py <MotiveIndia.xcf>` (Zuordnung im Skriptkopf; die übrigen Ebenen sind Kreaturen, Puppen und Rennboote; Zamorins Glasschale und Sack als `-bowl`/`-sack`) |
 | MotiveJapan-Heroes | `MotiveJapan.xcf` | reproduzierbar per `python3 assemble_japan.py <MotiveJapan.xcf>` (Zuordnung im Skriptkopf; Champions Schwert und Hand als `-sword`/`-hand`, Nobunakins Laserschwert und Hand ebenso; die Idej-Ebenen werden voll deckend übernommen, die Transparenz setzt `hologram.py`) |
+| Motive-Heroes und -Skins | `Motive.xcf` | reproduzierbar per `python3 assemble_motive.py <Motive.xcf>` (Zuordnung im Skriptkopf; die Datei braucht `xcf_scan.patch_gimpformats`; bewegliche Teile als `-<teil>.png`: Sol Ryms Wolke `-cloud`, Chucks Sprechblase `-bubble`, Elanas Gitarre und Arme `-guitar`/`-arms`, ZsosSsars Gaswaffe `-gun`, Molindas Flügel `-wings`) |
 
 Neue Datei durchsuchen: `xcf_scan.py dump` legt alle Ebenen einzeln ab,
 `xcf_scan.py match <ordner> --heroes` gleicht sie mit allen noch nicht

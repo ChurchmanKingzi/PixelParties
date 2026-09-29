@@ -1,0 +1,16 @@
+{
+  "hero": "Kaito Sid the Phantom Thief",
+  "sheet": "kaito-sid-the-phantom-thief.png",
+  "frameWidth": 31,
+  "frameHeight": 31,
+  "frames": 48,
+  "frameMs": 90,
+  "loop": true,
+  "layout": "horizontal",
+  "skinOf": "Sid, the King of Thieves",
+  "padTop": 3,
+  "padLeft": 6,
+  "padRight": 7,
+  "padBottom": 1,
+  "faceX": 14.0
+}

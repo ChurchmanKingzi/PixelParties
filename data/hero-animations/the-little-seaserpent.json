@@ -1,0 +1,17 @@
+{
+  "hero": "The Little Seaserpent",
+  "sheet": "the-little-seaserpent.png",
+  "frameWidth": 37,
+  "frameHeight": 44,
+  "frames": 48,
+  "frameMs": 90,
+  "loop": true,
+  "layout": "horizontal",
+  "skinOf": "SasZa the Snaka Adventurer",
+  "padTop": 10,
+  "padLeft": 9,
+  "padRight": 7,
+  "padBottom": 5,
+  "faceX": 18.0,
+  "footY": 39
+}

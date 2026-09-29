@@ -1,0 +1,15 @@
+{
+  "hero": "Bill, the Angry Auctioneer",
+  "sheet": "bill-the-angry-auctioneer.png",
+  "frameWidth": 28,
+  "frameHeight": 37,
+  "frames": 48,
+  "frameMs": 90,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 13,
+  "padLeft": 6,
+  "padRight": 6,
+  "padBottom": 1,
+  "faceX": 14.0
+}

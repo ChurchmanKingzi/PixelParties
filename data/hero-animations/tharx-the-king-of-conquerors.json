@@ -1,0 +1,16 @@
+{
+  "hero": "Tharx the King of Conquerors",
+  "sheet": "tharx-the-king-of-conquerors.png",
+  "frameWidth": 31,
+  "frameHeight": 35,
+  "frames": 48,
+  "frameMs": 90,
+  "loop": true,
+  "layout": "horizontal",
+  "skinOf": "Tharx, the Never-Losing General",
+  "padTop": 8,
+  "padLeft": 3,
+  "padRight": 3,
+  "padBottom": 1,
+  "faceX": 14.5
+}

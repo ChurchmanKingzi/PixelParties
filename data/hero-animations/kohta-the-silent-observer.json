@@ -1,0 +1,15 @@
+{
+  "hero": "Kohta, the Silent Observer",
+  "sheet": "kohta-the-silent-observer.png",
+  "frameWidth": 28,
+  "frameHeight": 27,
+  "frames": 48,
+  "frameMs": 90,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 3,
+  "padLeft": 2,
+  "padRight": 2,
+  "padBottom": 1,
+  "faceX": 11.5
+}
