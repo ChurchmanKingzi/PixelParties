@@ -229,6 +229,9 @@ kopiert, daneben liegt eine JSON-Datei mit den Metadaten. Die erzeugten
 | `grailwar.py` | `final 90 axal` | `axal_idle_final_sheet.png` | `alchemic-xal` (Skin) |
 | `grailwar.py` | `final 90 octo` | `octo_idle_final_sheet.png` | `alleria-the-octo-princess` (Skin) |
 | `grailwar.py` | `final 90 dreemurr` | `dreemurr_idle_final_sheet.png` | `monster-prince-asriel` (Skin) |
+| `guardianbeasts.py` | `final 90 mao` | `mao_idle_final_sheet.png` | `mao-the-vengeful-guardian` |
+| `guardianbeasts.py` | `final 90 hunter` | `hunter_idle_final_sheet.png` | `vengeful-hunter-mao` (Skin) |
+| `guardianbeasts.py` | `final 90 dajan` | `dajan_idle_final_sheet.png` | `dajan-conqueror-of-the-treasure-cave` |
 
 `bubbles.py` ohne `gross` erzeugt eine auf Hero-Größe verkleinerte Variante
 (Sprite aus `bubbles_downscale.py`), die aktuell nicht verwendet wird.
@@ -265,6 +268,7 @@ python3 xcf_extract.py MotiveMoe.xcf assemble src/cute-princess-mary.png "Mary-K
 | MotiveDeri-Heroes und -Skin | `MotiveDeri.xcf` | reproduzierbar per `python3 assemble_deri.py <MotiveDeri.xcf>` (Zuordnung im Skriptkopf; Thron, Arm, Bogen, Hände und Zinnen als bewegliche Teile `-<teil>.png`) |
 | MotiveGN-Heroes und -Skins | `MotiveGN.xcf` | reproduzierbar per `python3 assemble_gn.py <MotiveGN.xcf>` (Zuordnung im Skriptkopf; Ascended-Riffels Pistole vor ihr stammt aus dem Szenenbild „Sichtbar #146“; Nero Ziras Schläuche und Kabelenden werden ergänzt) |
 | MotiveGrailWar-Heroes und -Skins | `MotiveGrailWar.xcf` | reproduzierbar per `python3 assemble_grailwar.py <MotiveGrailWar.xcf>` (Zuordnung im Skriptkopf; bewegliche Teile als `-<teil>.png`, Brackles Totenschädel als `brackle-skull.png`; die Unterkörper der Alchemisten, Mariannes Haare und Asriel Dreemurrs Hose in Uniformfarben werden ergänzt, Ingos Kapuzen-Frames liegen in `src/user/`) |
+| MotiveGuardianBeasts-Heroes und Skin | `MotiveGuardianBeasts.xcf` | reproduzierbar per `python3 assemble_guardianbeasts.py <MotiveGuardianBeasts.xcf>` (Zuordnung im Skriptkopf; die übrigen Ebenen sind die zwölf Wächter-Kreaturen; Maos Schlitzspur als `-slash`, der Körper darunter wird ergänzt; Dajans Dolch und Blut als `-dagger`/`-blood`) |
 
 Neue Datei durchsuchen: `xcf_scan.py dump` legt alle Ebenen einzeln ab,
 `xcf_scan.py match <ordner> --heroes` gleicht sie mit allen noch nicht

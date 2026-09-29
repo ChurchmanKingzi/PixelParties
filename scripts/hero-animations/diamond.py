@@ -3,7 +3,9 @@
 
 * Squash and Stretch (erste Loop-Hälfte): der Körper federt im 12er-Takt bis
   zu 2 px hoch (gestreckt – die Zeilen über den Beinen werden gedehnt) und
-  2 px herunter (gestaucht); die Beine bleiben stehen.
+  2 px herunter (gestaucht); die Beine bleiben stehen. Karren und rechte Hand
+  bleiben immer zusammen: beim Strecken hebt er den Karren mit an, beim Stauchen
+  stützt er sich auf ihn.
 * Er hebt den Karren (zweite Loop-Hälfte): Karren und rechte Kristallhand
   heben sich um bis zu 6 px, bleiben kurz oben (mit einem Nachfassen) und
   setzen wieder auf. Darunter
@@ -77,11 +79,12 @@ def frame(i):
     body = s.copy()
     body[GROUP] = 0
     draw_squash(out, body, b)
-    for y, x in zip(*np.nonzero(GROUP)):             # Karren + rechte Hand (angehoben)
-        out[y + PT + (b if y < KNEE else 0) - lift, x + P] = s[y, x]
+    g = min(b, 0)                                    # Karren + rechte Hand als Ganzes: beim Strecken hebt
+    for y, x in zip(*np.nonzero(GROUP)):             # er den Karren mit, beim Stauchen stützt er sich auf ihn
+        out[y + PT + g - lift, x + P] = s[y, x]
     fill_pinholes(out)
     for x, y, t0 in SPARKLES:
-        dy = (b if y < KNEE else 0) - (lift if RHAND[y, x] else 0)
+        dy = (min(b, 0) if RHAND[y, x] else (b if y < KNEE else 0)) - (lift if RHAND[y, x] else 0)
         for (px_, py_), c in sparkle_pixels(i, N, [(x + P, y + PT + dy, t0)],
                                             rgb('e0ffff'), rgb('91e6e6')).items():
             assert 1 <= px_ < W - 1 and 1 <= py_ < H - 1, 'Glitzerstern ragt an den Rand'
