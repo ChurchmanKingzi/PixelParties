@@ -1084,10 +1084,15 @@ def f_solrym(i):
         out[y + PT + hv, x + PL] = cloud[y, x]
     if k is not None:
         bolt(out, k, PT + hv + 27)
-    for y, x in zip(*np.nonzero(s[:, :, 3])):           # der Unterkörper steckt in der Wolke
-        c = s[y, x]
+    for y, x in zip(*np.nonzero(s[:, :, 3])):           # der Unterkörper steckt in der Wolke: er verblasst
+        c = s[y, x]                                     # nach unten, darunter sieht man die Wolke
         f = 1.0 if y <= 12 else max(0.12, 1 - (y - 12) / 9)
-        out[y + PT + hv, x + PL] = [c[0], c[1], c[2], int(c[3] * f)] if f < 1 else c
+        yy, xx = y + PT + hv, x + PL
+        under = out[yy, xx]
+        if f >= 1 or not under[3]:
+            out[yy, xx] = c if f >= 1 else [c[0], c[1], c[2], int(c[3] * f)]
+        else:
+            out[yy, xx] = [int(c[k] * f + under[k] * (1 - f)) for k in range(3)] + [max(int(under[3]), int(c[3]))]
     return out
 
 

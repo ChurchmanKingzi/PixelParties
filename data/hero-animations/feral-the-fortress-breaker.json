@@ -1,0 +1,15 @@
+{
+  "hero": "Feral, the Fortress Breaker",
+  "sheet": "feral-the-fortress-breaker.png",
+  "frameWidth": 24,
+  "frameHeight": 29,
+  "frames": 48,
+  "frameMs": 90,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 3,
+  "padLeft": 3,
+  "padRight": 3,
+  "padBottom": 1,
+  "faceX": 12.0
+}

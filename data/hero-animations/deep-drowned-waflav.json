@@ -1,0 +1,15 @@
+{
+  "hero": "Deep-Drowned Waflav",
+  "sheet": "deep-drowned-waflav.png",
+  "frameWidth": 110,
+  "frameHeight": 60,
+  "frames": 48,
+  "frameMs": 90,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 10,
+  "padLeft": 5,
+  "padRight": 5,
+  "padBottom": 2,
+  "faceX": 55.0
+}

@@ -1,0 +1,16 @@
+{
+  "hero": "Shu'Chaku, the Blood Moon Projection",
+  "sheet": "shu-chaku-the-blood-moon-projection.png",
+  "frameWidth": 43,
+  "frameHeight": 62,
+  "frames": 48,
+  "frameMs": 90,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 4,
+  "padLeft": 4,
+  "padRight": 4,
+  "padBottom": 4,
+  "faceX": 12.0,
+  "footY": 58
+}
