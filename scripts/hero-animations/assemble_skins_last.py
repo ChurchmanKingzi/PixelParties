@@ -120,6 +120,9 @@ def kasperov_east():
     o = np.zeros((H, W, 4), np.uint8)
     o[..., :3] = a
     o[..., 3] = m * 255
+    # die schwarzen Pixel unter der Krempe trennen die Zipfel optisch von der Kappe: Krempe durchziehen
+    for (x, y), c in {(41, 50): 'e29607', (42, 50): '540b21', (51, 50): '550e0f', (52, 50): '2f2d7a'}.items():
+        o[y, x] = [int(c[k:k + 2], 16) for k in (0, 2, 4)] + [255]
     return o
 
 

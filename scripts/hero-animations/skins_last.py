@@ -14,12 +14,12 @@ Frame 0 ist immer die Ruhepose.
 * thundergod: Thunder God Sol Rym steigt samt Gewitterwolke auf und ab (die Wolke wallt wie bei Sol Rym),
              die Trommeln seines Kranzes werden reihum geschlagen (sie hüpfen, Funken), er spricht und
              blinzelt; aus der Wolke zucken Blitze.
-* inya:      Ultimate Despair Inya und ihr Bär bewegen sich unabhängig: sie lacht (Mund, Schütteln), ihre
+* inya:      Ultimate Despair Inya und ihr Bär bewegen sich unabhängig: sie lacht (der Mund), ihre
              Zöpfe wehen; der Bär watschelt (kippt hin und her), sein rotes Auge blitzt.
 * johanna:   Mega-Priestess Johanna federt, ein Glanz läuft über die goldene Rüstung, der Umhang weht.
 * nao:       Student Council President Nao federt, ihre Engelsflügel schlagen, ihr Haar weht, die Spitze
              ihres Stabs funkelt, sie blinzelt.
-* rhabi:     RhaBi the Human Hunter federt, die vier abgetrennten Arme schweben unabhängig auf und ab,
+* rhabi:     RhaBi the Human Hunter federt, die vier abgetrennten Arme fliegen erratisch zu ihm hin und weg,
              das blaue Auge flackert.
 * kasperov:  Kasperov the King of the East: der Shogi-Stein wippt und hüpft, die Schellen der Narrenkappe
              klingeln (bimmeln hin und her, Funkeln).
@@ -46,7 +46,7 @@ V_ = {
     'inya': dict(slug='ultimate-despair-inya', pads=(1, 1, 2, 1)),
     'johanna': dict(slug='mega-priestess-johanna', knee=22, pads=(1, 1, 2, 1)),
     'nao': dict(slug='student-council-president-nao', knee=18, pads=(3, 1, 2, 4)),
-    'rhabi': dict(slug='rhabi-the-human-hunter', knee=21, pads=(1, 1, 1, 1)),
+    'rhabi': dict(slug='rhabi-the-human-hunter', knee=21, pads=(6, 6, 3, 1)),
     'kasperov': dict(slug='kasperov-the-king-of-the-east', pads=(2, 2, 2, 1)),
 }
 V = next((v for v in sys.argv[2:] if v in V_), 'bill')
@@ -304,8 +304,7 @@ def f_thundergod(i):
 IN_LAUGH = [0, 0, 0, 0, 0, 0, 1, -1, 1, -1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, -1, 1, -1,
             1, -1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, -1, 1, 0, 0, 0, 0, 0, 0, 0, 0]
 def f_inya(i):
-    """Sie lacht (der offene Mund geht in Lachstößen weiter auf und zu, dabei schüttelt es sie leicht auf
-    und ab), ihre Zöpfe wehen; der Bär watschelt für sich (kippt hin und her, hebt ab), sein rotes Auge blitzt."""
+    """Sie lacht (der offene Mund geht in Lachstößen weiter auf und zu), ihre Zöpfe wehen; der Bär watschelt für sich (kippt hin und her, hebt ab), sein rotes Auge blitzt."""
     t = 2 * math.pi * i / N
     girl, bear = load('girl'), load('bear')
     out = np.zeros((H, W, 4), int)
@@ -329,11 +328,10 @@ def f_inya(i):
     elif laugh == -1:                                     # Mund fast zu
         for x in (15, 16):
             girl[12, x] = rgb('ecbcbc')
-    shake = -1 if laugh == 1 else 0
     cx = 15.5
     for y, x in zip(*np.nonzero(girl[:, :, 3])):
         d = abs(x - cx)
-        dy = shake if y <= 14 else 0
+        dy = 0
         if d > 7 and y <= 17:                             # die Zöpfe wehen: außen weiter als innen
             u = min(1.0, (d - 7) / 8)
             dy += round(1.3 * u * math.sin(3 * t - 0.4 * d + (0 if x > cx else 1.6)))
@@ -406,9 +404,39 @@ def f_nao(i):
 
 
 # ---------------------------------------------------------------- RhaBi the Human Hunter
+RH_ARMS = [('arml', 11), ('armr', 23), ('arml2', 37), ('armr2', 53)]   # (Teil, Zufallssaat)
+RH_KEYS = {}
+
+
+def rh_keys(seed):
+    """Erratischer Flugplan eines Arms: Zielpunkte (Frame, weg vom Körper, quer), dazwischen hält er."""
+    if seed not in RH_KEYS:
+        rng = np.random.default_rng(seed)
+        keys, f = [(0, 0, 0)], 0
+        while True:
+            f += int(rng.integers(4, 9))
+            if f >= N - 3:
+                break
+            keys.append((f, int(rng.integers(-3, 6)), int(rng.integers(-2, 3))))
+        keys.append((N, 0, 0))
+        RH_KEYS[seed] = keys
+    return RH_KEYS[seed]
+
+
+def rh_pos(i, seed):
+    keys = rh_keys(seed)
+    for (fa, ra, pa), (fb, rb, pb) in zip(keys, keys[1:]):
+        if fa <= i < fb:
+            if i < fb - 2:                                # hält still …
+                return ra, pa
+            u = (i - (fb - 2) + 1) / 3                    # … und schießt in zwei Frames zum nächsten Punkt
+            return ra + (rb - ra) * u, pa + (pb - pa) * u
+    return 0, 0
+
+
 def f_rhabi(i):
-    """Er federt, die abgetrennten Arme schweben jeder für sich auf und ab, das blaue Auge flackert."""
-    t = 2 * math.pi * i / N
+    """Er federt, das blaue Auge flackert; die vier abgetrennten Arme fliegen erratisch und unabhängig
+    voneinander immer wieder schnell zu ihm hin und von ihm weg."""
     body = load('body')
     if (i % 12) in (3, 4, 9):
         for y, x in zip(*np.nonzero(body[:, :, 3])):
@@ -416,12 +444,17 @@ def f_rhabi(i):
                 body[y, x] = rgb('b0ffff' if (i % 12) != 9 else '008c8c')
     b = B24[i % 24]
     out = np.zeros((H, W, 4), int)
-    draw_bounce(out, body, b, KNEE, PT, PL)
-    for part, ph, amp in (('arml', 0.0, 1.6), ('armr', 2.2, 2.0), ('arml2', 4.1, 1.4), ('armr2', 1.1, 1.5)):
+    ys, xs = np.nonzero(body[:, :, 3])
+    cx, cy = xs.mean(), ys.mean()
+    for part, seed in RH_ARMS:                            # die Arme fliegen hinter ihm
         arm = load(part)
-        dy = -round(amp * math.sin(2 * t + ph) - amp * math.sin(ph))
-        dx = round(0.8 * math.sin(t + ph) - 0.8 * math.sin(ph))
-        paste(out, arm, PL + dx, PT + dy)
+        ays, axs = np.nonzero(arm[:, :, 3])
+        vx, vy = axs.mean() - cx, ays.mean() - cy
+        n = math.hypot(vx, vy)
+        vx, vy = vx / n, vy / n
+        r, p = rh_pos(i, seed)
+        paste(out, arm, PL + round(vx * r - vy * p), PT + round(vy * r + vx * p))
+    draw_bounce(out, body, b, KNEE, PT, PL)
     return out
 
 
