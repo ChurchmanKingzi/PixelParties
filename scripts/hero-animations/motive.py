@@ -135,7 +135,7 @@ V_ = {
     'greymage': dict(slug='grey-mage-archibald', pads=(8, 3, 3, 1), skin='Archibald the Archmage',
                      blink={'halb': [((x, 15), '7b7b7b') for x in (5, 6, 9, 10)],
                             'zu': [((x, 15), 'f6bd7b') for x in (5, 6, 9, 10)]}),   # Lid: dunkle Linie darüber
-    'battlemaniac': dict(slug='toras-the-battle-maniac', pads=(3, 3, 5, 1), skin='Toras, Master of all Weapons',
+    'battlemaniac': dict(slug='toras-the-battle-maniac', pads=(3, 3, 5, 4), skin='Toras, Master of all Weapons',
                          blink={'halb': [((10, 13), '9a9594')], 'zu': [((9, 13), '000000'), ((10, 13), '000000')]}),
     'wormsoldier': dict(slug='zsosssar-the-worm-soldier', pads=(20, 3, 8, 1), skin='ZsosSsar the Serpent Warlord',
                         blink=eyes([(17, 18, 7, 8), (23, 24, 7, 8)], 'f99269')),
@@ -1654,11 +1654,10 @@ def f_greymage(i):
 # ---------------------------------------------------------------- Toras the Battle Maniac
 TB_PIVOT = (20.5, 17.5)                                 # Faust
 TB_REST = 1.75                                          # in Ruhe gesenkt (links unten)
-# Ein Hieb je 16 Frames (drei pro Loop): (Winkel, Spur) – Spur ('ab', a): von a bis zur Klinge,
-# ('bis', a): Rest der Spur bis a (verschwindet von ihrem Anfang her)
-TB_CYCLE = [(TB_REST, None)] * 5 + [(1.9, None), (2.05, None), (1.0, ('ab', 1.0)), (0.0, ('ab', 0.0)),
-            (-0.3, ('ab', 0.0)), (-0.3, ('bis', 1.1)), (-0.15, ('bis', 0.6)), (0.0, ('bis', 0.25)),
-            (0.45, None), (0.95, None), (1.4, None)]
+# Hin und her, praktisch durchgehend (8 Frames je Hin- und Rückhieb): (Winkel, Spur von, Spur bis) –
+# die Spur liegt immer direkt hinter der Klinge und verschwindet von ihrem Anfang her
+TB_CYCLE = [(1.72, 1.2, 1.67), (0.95, 1.0, 2.0), (-0.1, -0.05, 2.0), (-0.1, -0.05, 0.9),
+            (0.7, -0.3, 0.65), (1.35, 0.2, 1.3), (1.72, 0.8, 1.67), (1.72, 1.3, 1.67)]   # unten endet die Klinge an der Spitze der Spur
 
 
 def _tb_masks():
@@ -1679,21 +1678,18 @@ def tb_blade(out, px_, py_, ang):
     """Die eigentliche Klinge: schmal (heller Grat + dunklere Schneide), direkt gerastert – bleibt in
     jedem Winkel geschlossen."""
     ca, sa = math.cos(ang), math.sin(ang)
-    nx, ny = -sa, ca                                    # Schneide auf der Unterseite
-    L = SW - 1 - TB_PIVOT[0]
-    pts = {}
-    d = 3.0
-    while d <= L:
-        x, y = px_ + d * ca, py_ + d * sa
-        pts.setdefault((int(math.floor(x)), int(math.floor(y))), 'e6e6e6' if d < L - 0.6 else 'c8c8c8')
-        d += 0.35
-    d = 3.0
-    while d <= L - 1.2:
-        x, y = px_ + d * ca + 0.9 * nx, py_ + d * sa + 0.9 * ny
-        pts.setdefault((int(math.floor(x)), int(math.floor(y))), '9a9a9a')
-        d += 0.35
-    for (x, y), c in pts.items():
-        dot(out, x, y, rgb(c))
+    L = 19.0 + 3.8 * max(0.0, min(1.0, ang / 1.7))     # reicht in jedem Winkel bis an den Außenrand der Spur
+    x0, y0 = round(px_ + 3 * ca - 0.5), round(py_ + 3 * sa - 0.5)
+    x1, y1 = round(px_ + L * ca - 0.5), round(py_ + L * sa - 0.5)
+    n = max(abs(x1 - x0), abs(y1 - y0))
+    line = [(round(x0 + (x1 - x0) * k / n), round(y0 + (y1 - y0) * k / n)) for k in range(n + 1)]
+    steep = abs(y1 - y0) > abs(x1 - x0)                 # Schneide: 1 px daneben, quer zur Hauptrichtung
+    edge = (-1 if ca > 0 else 1, 0) if steep else (0, 1 if ca >= 0 else -1)
+    for k, (x, y) in enumerate(line[:-1]):
+        if k < n - 1:
+            dot(out, x + edge[0], y + edge[1], rgb('9a9a9a'))
+    for k, (x, y) in enumerate(line):
+        dot(out, x, y, rgb('c8c8c8' if k == n else 'e6e6e6'))
 
 
 if V == 'battlemaniac':
@@ -1702,25 +1698,23 @@ if V == 'battlemaniac':
 
 
 def f_battlemaniac(i):
-    """Wie Toras, nur öfter und schneller: dreimal pro Loop holt er aus und zieht die Klinge von links unten
-    im Bogen nach rechts hoch (mit Nachschwung) – der graue Bogen aus dem Sprite ist die Schwungspur, die
-    Klinge selbst ist schmal. Der Arm hebt und senkt sich mit dem Schwert (spaltenweise um die Schulter
+    """Wie Toras, nur praktisch durchgehend: er zieht die Klinge hin und her, von links unten im Bogen nach
+    rechts hoch und wieder zurück – der graue Bogen aus dem Sprite ist die Schwungspur direkt hinter der
+    Klinge, die Klinge selbst ist schmal. Der Arm hebt und senkt sich mit dem Schwert (spaltenweise um die Schulter
     geschert, nichts gestreckt), die Haarstacheln wiegen sich sacht im Wind."""
     s = SRC.copy()
     blink(s, i)
     t = 2 * math.pi * i / N
     raw = [round(1.3 * ((11 - y) / 11) ** 1.2 * math.sin(2 * t - 0.35 * y)) for y in range(11, -1, -1)]
     hdx = clamp_chain(raw)[::-1]                        # vom Haaransatz (Zeile 11) nach oben
-    ang, trail = TB_CYCLE[i % 16]
+    ang, lo, hi = TB_CYCLE[i % 8]
     k = round(3 * max(-0.35, min(2.05, ang)) / TB_REST)  # Faust: gesenkt bis 3 px tiefer, beim Hieb oben
     k = max(-1, min(3, k))
     arm_dy = lambda x: round(k * (x - 13) / 8)
     out = np.zeros((H, W, 4), int)
-    if trail:
-        kind, a = trail
-        m = TB_WEDGE & ((TB_ANG <= a) if kind == 'bis' else (TB_ANG >= a)) & (TB_ANG >= ang + 0.05)
-        for y, x in zip(*np.nonzero(m)):
-            out[y + PT, x + PL] = s[y, x]
+    m = TB_WEDGE & (TB_ANG >= lo) & (TB_ANG <= hi)      # die Spur geht mit der Faust mit (keine Lücke)
+    for y, x in zip(*np.nonzero(m)):
+        out[y + PT + k, x + PL] = s[y, x]
     tb_blade(out, TB_PIVOT[0] + PL, TB_PIVOT[1] + PT + k, ang)
     hilt = rotate_part(TB_HILT, TB_HILT_M, TB_PIVOT, ang, (H, W), (PL, PT + k))
     m = hilt[:, :, 3] > 0
