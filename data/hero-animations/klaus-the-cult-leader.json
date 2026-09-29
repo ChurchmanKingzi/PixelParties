@@ -1,0 +1,15 @@
+{
+  "hero": "Klaus, the Cult Leader",
+  "sheet": "klaus-the-cult-leader.png",
+  "frameWidth": 24,
+  "frameHeight": 35,
+  "frames": 48,
+  "frameMs": 90,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 3,
+  "padLeft": 3,
+  "padRight": 3,
+  "padBottom": 1,
+  "faceX": 13.0
+}

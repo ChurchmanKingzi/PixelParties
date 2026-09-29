@@ -234,7 +234,7 @@ def hand_state(i):
             else:
                 ext = math.sin(math.pi * u)                # heraus und wieder hinein
             return gate, ext
-    return 'big', 1.0
+    return 'big', 0.0                                     # dazwischen steckt sie ganz im Schatten
 
 
 def f_styxgate(i):
@@ -291,9 +291,10 @@ def f_styxgate(i):
         (px, py), al, o = gate_track(i, home, SG_EV.get(home, []))
         if al > 0:
             draw_gate(out, gates, m, o, PL + wob(int(py + (gy1 - gy0) / 2)), PT, al, px - home[0], py - home[1])
+    shut = SG_BIG.get(i, 1.0) < 1 if gate == 'big' else False   # aus einem (halb) geschlossenen Tor kommt nichts
     for y, x in zip(*np.nonzero(hand[:, :, 3])):
         yy = y + ty
-        if yy >= y0:                                      # über dem Tor steckt sie noch drin
+        if ext > 0 and not shut and yy >= y0:             # über dem Tor steckt sie noch drin
             dot(out, x + tx + wob((y0 + y1) // 2) + PL, yy + PT, hand[y, x])
     hh2, hw2 = head.shape[:2]
     for k in range(6):                                    # Geisterköpfe steigen aus den Schatten auf

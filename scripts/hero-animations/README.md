@@ -314,6 +314,14 @@ kopiert, daneben liegt eine JSON-Datei mit den Metadaten. Die erzeugten
 | `motive_late.py` | `final 90 champmizune` | `champmizune_idle_final_sheet.png` | `regional-champ-mizune` |
 | `motive_late.py` | `final 90 storyteller` | `storyteller_idle_final_sheet.png` | `chuck-the-storyteller` |
 | `motive_late.py` | `final 90 gueldefaber` | `gueldefaber_idle_final_sheet.png` | `g-ldefaber-of-the-fellowship` |
+| `late4.py` | `final 90 styxgate` | `styxgate_idle_final_sheet.png` | `styx-the-opened-gate` |
+| `late4.py` | `final 90 tushu` | `tushu_idle_final_sheet.png` | `tushu-the-knowledge-keeper` |
+| `late4.py` | `final 90 patty` | `patty_idle_final_sheet.png` | `patty-the-ninja-of-revenge` |
+| `late4.py` | `final 90 rool` | `rool_idle_final_sheet.png` | `rool-the-troll-guard` |
+| `late4.py` | `final 90 champion` | `champion_idle_final_sheet.png` | `champion-the-eye-of-the-storm` |
+| `late4.py` | `final 90 stormkissed` | `stormkissed_idle_final_sheet.png` | `stormkissed-waflav` |
+| `late4.py` | `final 90 klaus` | `klaus_idle_final_sheet.png` | `klaus-the-cult-leader` |
+| `late4.py` | `final 90 kohtamaster` | `kohtamaster_idle_final_sheet.png` | `kohta-master-of-super-killing` |
 
 `bubbles.py` ohne `gross` erzeugt eine auf Hero-Größe verkleinerte Variante
 (Sprite aus `bubbles_downscale.py`), die aktuell nicht verwendet wird.
@@ -355,6 +363,7 @@ python3 xcf_extract.py MotiveMoe.xcf assemble src/cute-princess-mary.png "Mary-K
 | MotiveIndia-Heroes | `MotiveIndia.xcf` | reproduzierbar per `python3 assemble_india.py <MotiveIndia.xcf>` (Zuordnung im Skriptkopf; die übrigen Ebenen sind Kreaturen, Puppen und Rennboote; Zamorins Glasschale und Sack als `-bowl`/`-sack`) |
 | MotiveJapan-Heroes | `MotiveJapan.xcf` | reproduzierbar per `python3 assemble_japan.py <MotiveJapan.xcf>` (Zuordnung im Skriptkopf; Champions Schwert und Hand als `-sword`/`-hand`, Nobunakins Laserschwert und Hand ebenso; die Idej-Ebenen werden voll deckend übernommen, die Transparenz setzt `hologram.py`) |
 | Motive-Heroes und -Skins | `Motive.xcf` | reproduzierbar per `python3 assemble_motive.py <Motive.xcf>` (Zuordnung im Skriptkopf; die Datei braucht `xcf_scan.patch_gimpformats`; bewegliche Teile als `-<teil>.png`: Sol Ryms Wolke `-cloud`, Chucks Sprechblase `-bubble`, Elanas Gitarre und Arme `-guitar`/`-arms`, ZsosSsars Gaswaffe `-gun`, Molindas Flügel `-wings`, Sas'Zas Bogen `-bow`, Pes'zets Schlangenarme `-arml`/`-armr`, Chuck the Storytellers Teile `-girl`/`-chair`/`-hands`/`-hand`/`-idea`; `g-ldefaber-of-the-fellowship.png` gibt es in keiner Ebene mehr – er ist aus dem Kartenbild rekonstruiert) |
+| Nachzügler aus mehreren Dateien (Styx, the Opened Gate; Tushu; Patty; Rool; Champion, the Eye of the Storm; Stormkissed Waflav; Klaus; Kohta, Master of Super-Killing) | `Motive.xcf`, `MotiveChina.xcf`, `MotiveCoolhalla.xcf`, `MotiveSteamDwarfs.xcf`, `MotiveHawaii.xcf`, `MotiveMoe.xcf`, `MotiveGrailWar.xcf` | reproduzierbar per `python3 assemble_late.py <verzeichnis mit den xcf>` (Zuordnung im Skriptkopf; Styx' Schatten, Schattenarme, Tore und Geisterhand als `-shadow`/`-tendrils`/`-gates`/`-eye`, die Geisterköpfe als Partikel-Vorlage `-heads.png`; Tushus Schriftrollen samt Buch als `-scrolls`; Rools ausgestreckter Arm und Bart als `-arm`/`-beard`; Stormkissed Waflavs Kristallflügel als `-wings`) |
 
 Neue Datei durchsuchen: `xcf_scan.py dump` legt alle Ebenen einzeln ab,
 `xcf_scan.py match <ordner> --heroes` gleicht sie mit allen noch nicht

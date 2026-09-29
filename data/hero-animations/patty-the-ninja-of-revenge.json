@@ -1,0 +1,15 @@
+{
+  "hero": "Patty, the Ninja of Revenge",
+  "sheet": "patty-the-ninja-of-revenge.png",
+  "frameWidth": 30,
+  "frameHeight": 28,
+  "frames": 48,
+  "frameMs": 90,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 5,
+  "padLeft": 5,
+  "padRight": 5,
+  "padBottom": 1,
+  "faceX": 15.0
+}
