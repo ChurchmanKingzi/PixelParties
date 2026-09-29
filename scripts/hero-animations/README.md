@@ -232,6 +232,17 @@ kopiert, daneben liegt eine JSON-Datei mit den Metadaten. Die erzeugten
 | `guardianbeasts.py` | `final 90 mao` | `mao_idle_final_sheet.png` | `mao-the-vengeful-guardian` |
 | `guardianbeasts.py` | `final 90 hunter` | `hunter_idle_final_sheet.png` | `vengeful-hunter-mao` (Skin) |
 | `guardianbeasts.py` | `final 90 dajan` | `dajan_idle_final_sheet.png` | `dajan-conqueror-of-the-treasure-cave` |
+| `hawaii.py` | `final 90 taio` | `taio_idle_final_sheet.png` | `taio-the-sun-fencer` |
+| `hawaii.py` | `final 90 taioasc` | `taioasc_idle_final_sheet.png` | `taio-absorber-of-the-mountain-s-heart` |
+| `hawaii.py` | `final 90 waflav` | `waflav_idle_final_sheet.png` | `flamebathed-waflav` |
+| `hawaii.py` | `final 90 pele` | `pele_idle_final_sheet.png` | `luna-pele-the-flame-dancer` |
+| `hawaii.py` | `final 90 tempeste` | `tempeste_idle_final_sheet.png` | `tempeste-the-weather-fairy` |
+| `hawaii.py` | `final 90 tempeluna` | `tempeluna_idle_final_sheet.png` | `tempeluna-the-convergence-fairy` |
+| `hawaii.py` | `final 90 moana` | `moana_idle_final_sheet.png` | `tempeste-moana-the-rain-singer` |
+| `hawaii.py` | `final 90 lizbeth` | `lizbeth_idle_final_sheet.png` | `lizbeth-the-reaper-of-the-light` |
+| `hawaii.py` | `final 90 johanna` | `johanna_idle_final_sheet.png` | `johanna-crusader-of-light` |
+| `hawaii.py` | `final 90 calamitusk` | `calamitusk_idle_final_sheet.png` | `calamitusk-the-chaorc-war-chief` |
+| `hawaii.py` | `final 90 karian` | `karian_idle_final_sheet.png` | `grand-inquisitor-karian` |
 
 `bubbles.py` ohne `gross` erzeugt eine auf Hero-Größe verkleinerte Variante
 (Sprite aus `bubbles_downscale.py`), die aktuell nicht verwendet wird.
@@ -269,6 +280,7 @@ python3 xcf_extract.py MotiveMoe.xcf assemble src/cute-princess-mary.png "Mary-K
 | MotiveGN-Heroes und -Skins | `MotiveGN.xcf` | reproduzierbar per `python3 assemble_gn.py <MotiveGN.xcf>` (Zuordnung im Skriptkopf; Ascended-Riffels Pistole vor ihr stammt aus dem Szenenbild „Sichtbar #146“; Nero Ziras Schläuche und Kabelenden werden ergänzt) |
 | MotiveGrailWar-Heroes und -Skins | `MotiveGrailWar.xcf` | reproduzierbar per `python3 assemble_grailwar.py <MotiveGrailWar.xcf>` (Zuordnung im Skriptkopf; bewegliche Teile als `-<teil>.png`, Brackles Totenschädel als `brackle-skull.png`; die Unterkörper der Alchemisten, Mariannes Haare und Asriel Dreemurrs Hose in Uniformfarben werden ergänzt, Ingos Kapuzen-Frames liegen in `src/user/`) |
 | MotiveGuardianBeasts-Heroes und Skin | `MotiveGuardianBeasts.xcf` | reproduzierbar per `python3 assemble_guardianbeasts.py <MotiveGuardianBeasts.xcf>` (Zuordnung im Skriptkopf; die übrigen Ebenen sind die zwölf Wächter-Kreaturen; Maos Schlitzspur als `-slash`, der Körper darunter wird ergänzt; Dajans Dolch und Blut als `-dagger`/`-blood`) |
+| MotiveHawaii-Heroes | `MotiveHawaii.xcf` | reproduzierbar per `python3 assemble_hawaii.py <MotiveHawaii.xcf>` (Zuordnung im Skriptkopf; Base-Taios Beine aus „Taio-Kopie“, seine Hand am Griff als `-hand`; Ascended Taio mit Base-Taios um 180° gedrehtem Flammenschwert; Waflavs Feuerflügel als `-wings`; Calamitusks Banner als `-banner`) |
 
 Neue Datei durchsuchen: `xcf_scan.py dump` legt alle Ebenen einzeln ab,
 `xcf_scan.py match <ordner> --heroes` gleicht sie mit allen noch nicht
@@ -324,6 +336,7 @@ Variante ohne Krone/Flügel), Hintergründe/Auren der Karte gehören nicht zum S
 * **`alphaScale`** (optional): Faktor auf die Deckkraft aller
   halbtransparenten Pixel (Gas, Rauch, Auren) auf dem Brett; voll deckende
   Pixel bleiben, wie sie sind. `< 1` = durchsichtiger (Medea: `0.55`).
+* Partikel, die die Figur nie berühren (Regen, Glut), in `particles.py`.
 * Gemeinsame Helfer (Glitzersterne, Lichtschimmer, Speichern, 1-px-Ring) in
   `anim_common.py`, Flügelschlag (Drehung ums Schultergelenk bzw. spaltentreue
   Scherung für sehr kleine Flügel, Lochfüller) in `flap_common.py`.

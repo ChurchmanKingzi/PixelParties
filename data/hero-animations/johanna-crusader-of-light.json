@@ -1,0 +1,16 @@
+{
+  "hero": "Johanna, Crusader of Light",
+  "sheet": "johanna-crusader-of-light.png",
+  "frameWidth": 24,
+  "frameHeight": 33,
+  "frames": 48,
+  "frameMs": 90,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 5,
+  "padLeft": 4,
+  "padRight": 4,
+  "padBottom": 4,
+  "faceX": 12.0,
+  "footY": 29
+}

@@ -1,0 +1,15 @@
+{
+  "hero": "Flamebathed Waflav",
+  "sheet": "flamebathed-waflav.png",
+  "frameWidth": 94,
+  "frameHeight": 66,
+  "frames": 48,
+  "frameMs": 90,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 7,
+  "padLeft": 4,
+  "padRight": 4,
+  "padBottom": 3,
+  "faceX": 47.0
+}

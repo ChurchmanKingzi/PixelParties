@@ -1,0 +1,16 @@
+{
+  "hero": "Grand Inquisitor Karian",
+  "sheet": "grand-inquisitor-karian.png",
+  "frameWidth": 26,
+  "frameHeight": 37,
+  "frames": 48,
+  "frameMs": 90,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 4,
+  "padLeft": 5,
+  "padRight": 4,
+  "padBottom": 2,
+  "faceX": 14.0,
+  "footY": 35
+}
