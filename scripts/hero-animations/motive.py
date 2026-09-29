@@ -789,16 +789,20 @@ def fire_aura(out, fig, i):
     fy, fx = np.nonzero(fig)
     w = 2 * math.pi * i / N
     k1 = 2 * math.pi * 8 / N
-    def length(x):
-        return 4.4 * (1 + 0.25 * math.sin(0.9 * x) * math.sin(5 * w) + 0.2 * math.sin(1.7 * x + 1) * math.sin(7 * w + 2)
-                      + 0.3 * math.sin(2.7 * x + 0.4) * math.sin(11 * w + 1) + 0.15 * (_hash(x, i, 3) - 0.5))
+    def length(x):                                      # Zungen: Gipfel und Täler, die an Ort und Stelle lodern
+        peak = 0.0
+        for k in range(Ww // 3 + 2):
+            c = k * 3.4 + 0.7 * math.sin(9 * w + 1.3 * k)
+            h = 1 + 0.45 * math.sin(6 * w + 2.3 * k) + 0.25 * math.sin(13 * w + 0.7 * k)
+            peak = max(peak, h * max(0.0, 1 - abs(x - c) / 1.9))
+        return 3.0 + 3.6 * peak + 0.3 * math.sin(0.9 * x) * math.sin(5 * w)
     Ls = [length(x) for x in range(Ww)]
     solid = np.zeros((Hh, Ww), bool)
     for x in range(1, Ww - 1):
         near = np.abs(fx - x) <= 3
         if not near.any():
             continue
-        L = (Ls[x - 1] + 2 * Ls[x] + Ls[x + 1]) / 4          # benachbarte Zungen hängen zusammen
+        L = (Ls[x - 1] + 6 * Ls[x] + Ls[x + 1]) / 8          # benachbarte Spalten hängen zusammen
         for y in range(1, Hh - 1):
             if fig[y, x] or out[y, x, 3]:
                 continue
