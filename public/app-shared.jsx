@@ -2901,7 +2901,16 @@ const ZONE_ANIM_SFX = {
   null_zone_spiral:        { name: 'elem_dark' },
   rain_of_death:           { name: 'elem_dark' },
   mummy_wrap:              { name: 'elem_dark' },
-  necromancy_summon:       { name: 'elem_dark' },
+  // ★ Als Vorgabe 29.9.: die Necromancy-Animation braucht IMMER einen
+  // dunklen Klang. Der bisherige Einzeleintrag lief in der Kategorie
+  // 'effect' (400 ms Sperre) und wurde von jedem Klang davor verschluckt
+  // (Auftritts-Karte, Ability-Aktivierung, Undurdles Auftritt) — deshalb
+  // `category: null`. Tief und kraeftig; `dedupe` faengt die zwei
+  // Broadcasts von Necromancy (Held + Zielplatz) auf einen Klang ab.
+  necromancy_summon: [
+    { name: 'elem_dark', opts: { rate: 0.72, volume: 1.3, category: null, dedupe: 350 } },
+    { name: 'elem_dark', opts: { rate: 0.5,  volume: 0.7, delay: 260, category: null, dedupe: 350 } },
+  ],
   soul_shard_dark_grant:   { name: 'elem_dark' },
   soul_shard_inferno:      { name: 'elem_fire' },
   // ★ `explosion` war STUMM (Als Klangregel verletzt). Die Animation
