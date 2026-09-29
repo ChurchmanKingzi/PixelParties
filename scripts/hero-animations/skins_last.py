@@ -21,8 +21,8 @@ Frame 0 ist immer die Ruhepose.
              ihres Stabs funkelt, sie blinzelt.
 * rhabi:     RhaBi the Human Hunter federt, die vier abgetrennten Arme fliegen erratisch zu ihm hin und weg,
              das blaue Auge flackert.
-* kasperov:  Kasperov the King of the East: der Shogi-Stein wippt und hüpft, die Schellen der Narrenkappe
-             klingeln (bimmeln hin und her, Funkeln).
+* kasperov:  Kasperov the King of the East: der Shogi-Stein steht still, nur die Narrenkappe bewegt sich
+             (Scheitel wackelt, Zipfel mit den Schellen schwingen, Funkeln).
 """
 import math
 import os
@@ -414,8 +414,8 @@ def rh_keys(seed, touch):
         rng = np.random.default_rng(seed)
         keys, f = [(0, 0, 0)], 0
         while True:
-            f += int(rng.integers(4, 9))
-            if f >= N - 3:
+            f += int(rng.integers(3, 7))
+            if f >= N - 2:
                 break
             if rng.random() < 0.5:
                 keys.append((f, -touch, 0))               # ganz an ihn heran
@@ -442,10 +442,9 @@ def rh_pos(i, seed, touch):
     keys = rh_keys(seed, touch)
     for (fa, ra, pa), (fb, rb, pb) in zip(keys, keys[1:]):
         if fa <= i < fb:
-            if i < fb - 2:                                # hält still …
+            if i < fb - 1:                                # hält kurz still …
                 return ra, pa
-            u = (i - (fb - 2) + 1) / 3                    # … und schießt in zwei Frames zum nächsten Punkt
-            return ra + (rb - ra) * u, pa + (pb - pa) * u
+            return (ra + rb) / 2, (pa + pb) / 2           # … und schießt in einem Zwischenschritt weiter
     return 0, 0
 
 
@@ -474,23 +473,31 @@ def f_rhabi(i):
 
 
 # ---------------------------------------------------------------- Kasperov the King of the East
+KA_PIECE = {8: (7, 10), 9: (6, 11), 10: (5, 12), 11: (4, 13), 12: (3, 14),
+            **{y: (2, 15) for y in range(13, 17)}, **{y: (1, 16) for y in range(17, 25)}}   # der Shogi-Stein
+
+
 def f_kasperov(i):
-    """Der Shogi-Stein wippt und hüpft; die Schellen der Narrenkappe bimmeln und funkeln."""
+    """Der Shogi-Stein steht still; nur die Narrenkappe bewegt sich: ihr Scheitel wackelt, die herab-
+    hängenden Zipfel mit den Schellen schwingen (Zeile an Zeile, nichts reißt), die Schellen funkeln."""
+    t = 2 * math.pi * i / N
     s = SRC.copy()
-    rock = [0, 0, 1, 1, 0, 0, -1, -1][(i // 3) % 8]
-    hop = -1 if (i % 24) in (10, 11, 12) else 0
     out = np.zeros((H, W, 4), int)
-    ys = np.nonzero(s[:, :, 3])[0]
-    bot = ys.max()
-    tips = (s[:, :, 3] > 0) & (_ys >= 7) & ((_xs <= 2) | (_xs >= SW - 3))   # die herabhängenden Zipfel
-    ring = 0.9 * math.sin(2 * math.pi * 4 * i / N)
+    piece = np.zeros((SH, SW), bool)
+    for y, (x0, x1) in KA_PIECE.items():
+        piece[y, x0:x1 + 1] = True
+    tips = (_ys >= 7) & ((_xs <= 2) | (_xs >= SW - 3)) & ~piece
+    wob = 0.9 * math.sin(2 * t)
+    ring = 0.9 * math.sin(4 * t + 0.7)
     for y, x in zip(*np.nonzero(s[:, :, 3])):
-        u = (bot - y) / bot
-        dx = round(rock * u)
-        if tips[y, x]:                                    # schwingen seitlich, unten weiter (Zeile an Zeile)
-            dx += round(ring * (y - 6) / 6)
-        dot(out, x + PL + dx, y + PT + hop, s[y, x])
-    for (x, y), c in sparkle_pixels(i, N, [(PL + 1, PT + 10 + hop, 8), (PL + SW - 2, PT + 10 + hop, 32)],
+        dx = 0
+        if not piece[y, x]:
+            if tips[y, x]:                                # Zipfel: unten weiter als oben
+                dx = round(ring * (y - 6) / 6)
+            elif y <= 6:                                  # Scheitel wackelt, zur Krempe hin weniger
+                dx = round(wob * (7 - y) / 7)
+        dot(out, x + PL + dx, y + PT, s[y, x])
+    for (x, y), c in sparkle_pixels(i, N, [(PL + 1, PT + 11, 8), (PL + SW - 2, PT + 11, 32)],
                                     rgb('fffbd0'), rgb('ffd700')).items():
         dot(out, x, y, c)
     return out
