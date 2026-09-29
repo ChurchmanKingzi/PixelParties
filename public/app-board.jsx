@@ -9711,45 +9711,74 @@ const ANIM_REGISTRY = {
   // zurueck, waehrend der Fuss sich wieder hebt. Keyframes stehen LOKAL
   // (CARD_API ④); der Klang haengt am Typ (`ZONE_ANIM_SFX.elephant_stomp`).
   elephant_stomp: (() => {
+    // Elefantenbein 40×53: Licht von oben rechts, 4×4-Bayer-Dithering zwischen
+    // sechs Grautoenen, quer verlaufende Hautfalten, fuenf Zehen mit Kerben
+    // und Naegeln (K Kontur, 1–6 dunkel→hell, N/M/n Nagel hell/mittel/Schatten).
     const ZEILEN = [
-    '.....KDSSSSSSSLLK.....',
-    '.....KDSSSSSSSLLK.....',
-    '.....KDSSSSSSSLLK.....',
-    '.....KDWWWWWWSLLK.....',
-    '.....KDSSSSSSSLLK.....',
-    '.....KDSSSSSSSLLK.....',
-    '.....KDSWWWWWWWLK.....',
-    '.....KDSSSSSSSLLK.....',
-    '.....KDSSSSSSSLLK.....',
-    '.....KWWWWWWSSLLK.....',
-    '.....KDSSSSSSSLLK.....',
-    '.....KDDSWWWWWWLK.....',
-    '.....KDDSSSSSSLLK.....',
-    '....KKDDSSSSSSLLKK....',
-    '...KDDSSSSSSSSSSLLK...',
-    '..KDDSSSSSSSSSSSSLLK..',
-    '.KDDSSSSSSSSSSSSSSLLK.',
-    '.KDDSSSSSSSSSSSSSSLLK.',
-    'KDDSSSWSSSSWSSSWSSSLLK',
-    'KDDSSSWSSSSWSSSWSSSLLK',
-    'KDDSSSWSSSSWSSSWSSSLLK',
-    'KDDSSSWSSSSWSSSWSSSLLK',
-    '.KDDSSWSSSSWSSSWSSLLK.',
-    '..KNNKDKNNKDKNNKKNNK..',
-    '..KNNKKKNNKKKNNKKNNK..',
-    '..KKKK.KKKK.KKKKKKKK..',
-    '......................'
+      '..........K12232334454455566K...........',
+      '..........K11223333445453555K...........',
+      '.........K1112333344445554444K..........',
+      '.........K1112223322121234455K..........',
+      '.........K1111111123445555656K..........',
+      '.........K1112233434433312233K..........',
+      '.........K1111111112334456656K..........',
+      '........K111111334344445455556K.........',
+      '........K111111121434444555565K.........',
+      '........K111111212121212343555K.........',
+      '........K111223233445454444323K.........',
+      '........K111122323343444455656K.........',
+      '........K111221233333222323343K.........',
+      '.........K1111111112234456565K..........',
+      '.........K1111323344444455555K..........',
+      '.........K1112222333344444555K..........',
+      '.........K1122223332443233334K..........',
+      '.........K1112111112133345566K..........',
+      '.........K1111113344445454556K..........',
+      '.........K1111111111122323555K..........',
+      '.........K1122223444555444433K..........',
+      '.........K1112122333244445566K..........',
+      '.........K1111111111222233444K..........',
+      '.........K1111122333244445454K..........',
+      '.........K1122223343445555656K..........',
+      '.........K1112232324444545555K..........',
+      '.........K1122213333445453556K..........',
+      '........K111122313343333332333K.........',
+      '........K111111111112244556566K.........',
+      '........K111122334334445353333K.........',
+      '........K111223233433232334455K.........',
+      '.......K11111211111223354545555K........',
+      '......K1111111113344544454545555K.......',
+      '.....K111112232333333434454545455K......',
+      '....K11111222223334443434455545555K.....',
+      '...K1111111223232333334434454555455K....',
+      '..K111112112333113434114544425555555K...',
+      '.K11111112122321143321144445154555555K..',
+      '.K11112122123331133341144444155455655K..',
+      'K1111112121122211333311434411545454545K.',
+      'K1111122211133311443411443412555455565K.',
+      '111111121211232314333144444115444455555K',
+      '111111212211323313434144445114555555556K',
+      '111111121211222314333134444115454545555K',
+      '111111112211323313434143444115545555655K',
+      '111111nnnNN123231333314434311nnnNN45555K',
+      '111111MMMNN132321143114443412MMMNN54555K',
+      'K11111MMMNN2nnnNN3332434nnnNNMMMNN4545K.',
+      '.KKK111nnn21MMMNN3nnnNN3MMMNN4nnn55KKK..',
+      '....KKKKKKKKMMMNN2MMMNN4MMMNNKKKKKK.....',
+      '............KnnnKKMMMNNKKnnnK...........',
+      '.............KKK..KnnnK..KKK............',
+      '...................KKK..................'
     ];
-    const FARBE = { K: '#22222b', S: '#8a8a98', L: '#b7b7c6', D: '#5f5f6d', W: '#4a4a57', N: '#ece4c8' };
+    const FARBE = { K: '#1d1d26', '1': '#3c3c4a', '2': '#575766', '3': '#75758a', '4': '#9494a8', '5': '#b7b7ca', '6': '#d6d6e4', N: '#f4eed6', M: '#d8cfae', n: '#8e866c' };
     let rects = '';
     ZEILEN.forEach((z, yy) => [...z].forEach((c, xx) => {
       if (FARBE[c]) rects += `<rect x="${xx}" y="${yy}" width="1" height="1" fill="${FARBE[c]}"/>`;
     }));
     const FUSS = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(
-      `<svg xmlns="http://www.w3.org/2000/svg" width="22" height="27" viewBox="0 0 22 27" shape-rendering="crispEdges">${rects}</svg>`);
+      `<svg xmlns="http://www.w3.org/2000/svg" width="40" height="53" viewBox="0 0 40 53" shape-rendering="crispEdges">${rects}</svg>`);
     return function ElephantStompEffect({ x, y, w, ankerSel }) {
-      const px = Math.max(3, Math.round((w || 90) * 0.72 / 22));      // Bildschirmpixel je Sprite-Pixel
-      const fw = 22 * px, fh = 27 * px;
+      const px = Math.max(2, Math.ceil((w || 90) * 0.95 / 40));      // Bildschirmpixel je Sprite-Pixel
+      const fw = 40 * px, fh = 53 * px;
       const staub = useMemo(() => Array.from({ length: ppFxN(16) }, (_, i) => {
         const seite = i % 2 === 0 ? -1 : 1;
         return {
