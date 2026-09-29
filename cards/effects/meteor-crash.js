@@ -66,7 +66,7 @@ module.exports = {
       });
       await engine._delay(560); // Aufschlag bei ~520 ms
 
-      const source = { name: CARD_NAME, owner: pi, heroIdx: ctx.cardHeroIdx, controller: pi };
+      const source = { name: CARD_NAME, owner: pi, heroIdx: ctx.cardHeroIdx, controller: pi, heroOwner: ctx.cardHeroOwner ?? pi };   // Als Befund 29.9.: Brettseite des Angreifers
       if (target.type === 'hero') {
         const hero = gs.players[target.owner]?.heroes?.[target.heroIdx];
         if (hero && hero.hp > 0) await ctx.dealDamage(hero, damage, 'destruction_spell');

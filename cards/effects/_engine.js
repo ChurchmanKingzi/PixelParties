@@ -3230,6 +3230,12 @@ class GameEngine {
       // die der schwächeren Form (Regelheft, Ascended Heroes).
       if (typeof hookFn !== 'function') continue;
       const ctx = this._createContext(card, hookCtx);
+      // Als Befund 29.9.: Animationen eines geliehenen Helden (bzw. einer
+      // Karte an ihm) auf seine Brettseite umschreiben — siehe `_akteurRein`.
+      const _akt = this._akteurRein(ctx);
+      const hookFnA = _akt
+        ? async (c) => { try { return await hookFn(c); } finally { this._akteurRaus(_akt); } }
+        : hookFn;
 
       // Effekt-Coverage-Audit (PP_COVERAGE=1, nur live)
       if (this._coverageEnabled && !this._inMctsSim) {
@@ -3291,7 +3297,7 @@ class GameEngine {
           // creating more. Skipping the race in fastMode dropped the
           // Heal-Burn / Poison-Torture per-rollout heap delta from
           // 5-12MB to expected near-zero in testing.
-          await hookFn(ctx);
+          await hookFnA(ctx);
         } else {
           // ── DER WACHHUND MUSS ABGESCHALTET WERDEN (Als Befund 17.8.) ──
           // `Promise.race` beendet nur das WARTEN — die Timer-Kette unten
@@ -3318,7 +3324,7 @@ class GameEngine {
           };
           try {
           await Promise.race([
-            Promise.resolve(hookFn(ctx)).then(
+            Promise.resolve(hookFnA(ctx)).then(
               (v) => { abschalten(); return v; },
               (e) => { abschalten(); throw e; },
             ),
@@ -10951,8 +10957,10 @@ class GameEngine {
     // des GEGNERS leuchten nie (Client filtert per playerIdx).
     let inst = opts.inst || null;
     if (!inst) {
+      // Als Befund 29.9.: nach KONTROLLE (geliehener Held und seine
+      // Karten stehen in der Gegnerspalte, gehoeren aber `ownerIdx`).
       const cands = this.cardInstances.filter(c => c.name === sourceName
-        && (c.controller ?? c.owner) === ownerIdx
+        && ((c.controller ?? c.owner) === ownerIdx || this.effektiveSeiten(c).controller === ownerIdx)
         && (c.zone === ZONES.SUPPORT || c.zone === ZONES.HERO) && !c.faceDown);
       if (cands.length === 1 && origin !== 'hand') inst = cands[0];
       // ★ v1371 (Als Befund, Grunge Harpyformer): liegen MEHRERE Kopien
@@ -10981,6 +10989,8 @@ class GameEngine {
       this._broadcastEvent('effect_source_glow', {
         playerIdx: ownerIdx, cardName: sourceName, origin, sfx: opts.sfx,
         zone: inst?.zone, heroIdx: inst?.heroIdx, zoneSlot: inst?.zoneSlot,
+        // Als Befund 29.9.: Brettseite der Instanz (geliehener Held).
+        boardOwner: inst ? this.physicalSide(inst) : undefined,
       });
     } catch { /* rein kosmetisch */ }
     await this._delay(EFFECT_GLOW_LEAD_MS);
@@ -19017,6 +19027,12 @@ this._deathWatch = (this._deathWatchStack || []).length
             if (wisdomCost > 0 && this.handFodderFor(playerIdx, cd.name) < wisdomCost && !this.discardCostWaived(playerIdx)) continue;
           }
           if (heroScript?.canPlayCard && !heroScript.canPlayCard(gs, oppIdx, hi, cd, this)) continue;
+          // Als Befund 29.9.: Kartenvertrag je Held auch fuer geliehene Helden.
+          {
+            const _cs = loadCardEffect(cd.name);
+            if (_cs?.canPlayWithHero && !this._mitWirker(playerIdx, hi, oppIdx,
+                () => _cs.canPlayWithHero(gs, playerIdx, hi, cd, this))) continue;
+          }
           let equipBlocked = false;
           for (const es of equipScripts) {
             if (!es.canPlayCard(gs, oppIdx, hi, cd, this)) { equipBlocked = true; break; }
@@ -19065,14 +19081,14 @@ this._deathWatch = (this._deathWatchStack || []).length
               const allowed = ps.bonusActions.allowedTypes || [];
               if (allowed.length > 0 && !allowed.includes(cd.cardType)) continue;
             } else if (!charmedFrei) {
-              let isInherent = this.cardHasInherentAction(oppIdx, hi, cd);
+              let isInherent = this.cardHasInherentAction(playerIdx, hi, cd, { heroOwner: oppIdx, charmedOwner: oppIdx });
               if (!isInherent && cd.cardType === 'Attack' && hero.statuses?.berserked
                   && hero._berserkChargeUsedTurn !== gs.turn) isInherent = true;
               if (!isInherent && !this.findAdditionalActionForCard(playerIdx, cd.name, hi, oppIdx)) continue;
             }
           }
           if (isMainPhase && !charmedFrei) {
-            let isInherent = this.cardHasInherentAction(oppIdx, hi, cd);
+            let isInherent = this.cardHasInherentAction(playerIdx, hi, cd, { heroOwner: oppIdx, charmedOwner: oppIdx });
             if (!isInherent && cd.cardType === 'Attack' && hero.statuses?.berserked
                 && hero._berserkChargeUsedTurn !== gs.turn) isInherent = true;
             if (!isInherent && !this.findAdditionalActionForCard(playerIdx, cd.name, hi, oppIdx)) continue;
@@ -19476,7 +19492,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       // honours the same hook for parity.
       if (!bypass && hero.hp > 0 && typeof cardScript?.canPlayDespiteStatuses === 'function') {
         try {
-          bypass = !!cardScript.canPlayDespiteStatuses(gs, pi, heroIdx, cardData, this);
+          bypass = !!this._mitWirker(pi, heroIdx, opts.charmedOwner, () => cardScript.canPlayDespiteStatuses(gs, pi, heroIdx, cardData, this));
         } catch (err) {
           console.error('[canPlayDespiteStatuses]', cardData.name, err.message);
         }
@@ -19497,7 +19513,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       let bypass = false;
       if (typeof cardScript?.canPlayDespiteStatuses === 'function') {
         try {
-          bypass = !!cardScript.canPlayDespiteStatuses(gs, pi, heroIdx, cardData, this);
+          bypass = !!this._mitWirker(pi, heroIdx, opts.charmedOwner, () => cardScript.canPlayDespiteStatuses(gs, pi, heroIdx, cardData, this));
         } catch (err) {
           console.error('[canPlayDespiteStatuses]', cardData.name, err.message);
         }
@@ -19515,7 +19531,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       let bypass = false;
       if (typeof cardScript?.canPlayDespiteStatuses === 'function') {
         try {
-          bypass = !!cardScript.canPlayDespiteStatuses(gs, pi, heroIdx, cardData, this);
+          bypass = !!this._mitWirker(pi, heroIdx, opts.charmedOwner, () => cardScript.canPlayDespiteStatuses(gs, pi, heroIdx, cardData, this));
         } catch (err) {
           console.error('[canPlayDespiteStatuses]', cardData.name, err.message);
         }
@@ -19536,7 +19552,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       let bypass = false;
       if (typeof cardScript?.canPlayDespiteStatuses === 'function') {
         try {
-          bypass = !!cardScript.canPlayDespiteStatuses(gs, pi, heroIdx, cardData, this);
+          bypass = !!this._mitWirker(pi, heroIdx, opts.charmedOwner, () => cardScript.canPlayDespiteStatuses(gs, pi, heroIdx, cardData, this));
         } catch (err) {
           console.error('[canPlayDespiteStatuses]', cardData.name, err.message);
         }
@@ -19676,7 +19692,8 @@ this._deathWatch = (this._deathWatchStack || []).length
     // Card-level per-hero gate — same hook used by getPlayableActionCards
     // to filter the client-side eligible list, re-checked here so direct
     // socket plays can't bypass it.
-    if (script?.canPlayWithHero && !script.canPlayWithHero(gs, pi, heroIdx, cardData, this)) return null;
+    if (script?.canPlayWithHero && !this._mitWirker(pi, heroIdx, opts.charmedOwner,
+        () => script.canPlayWithHero(gs, pi, heroIdx, cardData, this))) return null;
 
     // Generic draw/search lock: cards with blockedByHandLock cannot be
     // played while hand is locked. Creatures are exempt — the lock
@@ -20185,7 +20202,7 @@ this._deathWatch = (this._deathWatchStack || []).length
 
       this._broadcastEvent('ability_activated', { owner: playerIdx, heroIdx, zoneIdx, abilityName });
       const ctx = this._createContext(inst, {});
-      const abErgebnis = await script.onActivate(ctx, level);
+      const abErgebnis = await this._alsAkteur(ctx, () => script.onActivate(ctx, level));
       // ── Abbruch (Als Vorgabe 28.8.) ────────────────────────────
       // `onActivate` liefert `false`, wenn der Spieler die eigene
       // Abfrage der Ability weggeklickt hat. Der normale Weg
@@ -23547,7 +23564,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     this.gs._spellCasterCreature = inst;
     let resolved;
     try {
-      resolved = await script.onCreatureEffect(ctx);
+      resolved = await this._alsAkteur(ctx, () => script.onCreatureEffect(ctx));
       if (resolved !== false) this.announceActiveEffect();
     } finally {
       if (_vorigerCasterCreature === undefined) delete this.gs._spellCasterCreature;
@@ -38589,7 +38606,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     const ctx = this._createContext(chosen.inst, {});
     this.armEffectAnnounce(chosen.name, pi, 'board');   // v349
     let gerryVeto = false;
-    let resolved = await chosen.script.onHeroEffect(ctx);
+    let resolved = await this._alsAkteur(ctx, () => chosen.script.onHeroEffect(ctx));
     if (this.nimmOpferFizzle()) resolved = true;   // v1313: gerettetes Opfer → fizzelt, aber verbraucht
     if (resolved !== false) this.announceActiveEffect();
     this.clearEffectAnnounce();
@@ -40746,9 +40763,36 @@ this._deathWatch = (this._deathWatchStack || []).length
    *
    * `opts` wird nur an den Kartenvertrag weitergereicht (`zoneSlot`).
    */
+  /**
+   * Als Befund 29.9.: Brettseite des Helden (`heroIdx`), fuer den `pi`
+   * gerade eine Spielbarkeitspruefung oder einen Zauber laufen laesst.
+   * Die Engine setzt `gs._wirkerSeite` fuer geliehene Helden (Zauber,
+   * `inherentAction`, `canPlayWithHero`, `canPlayDespiteStatuses`);
+   * Skripte lesen damit „this Hero"/„the user" in der richtigen Spalte:
+   * `gs.players[engine.heldSeiteFuer(pi, heroIdx)].heroes[heroIdx]`.
+   * Ohne Uebernahme = `pi`.
+   */
+  heldSeiteFuer(pi, heroIdx) {
+    const w = this.gs?._wirkerSeite;
+    if (w && w.pi === pi && w.heroIdx === heroIdx && (w.heroOwner === 0 || w.heroOwner === 1)) return w.heroOwner;
+    return pi;
+  }
+
+  /** `fn()` mit `gs._wirkerSeite` fuer einen geliehenen Helden (synchron). */
+  _mitWirker(pi, heroIdx, heroOwner, fn) {
+    if (heroOwner == null || heroOwner === pi) return fn();
+    const vorher = this.gs._wirkerSeite;
+    this.gs._wirkerSeite = { pi, heroIdx, heroOwner };
+    try { return fn(); }
+    finally { if (vorher === undefined) delete this.gs._wirkerSeite; else this.gs._wirkerSeite = vorher; }
+  }
+
   cardHasInherentAction(playerIdx, heroIdx, cardData, opts) {
     if (!cardData?.name) return false;
     const gs = this.gs;
+    // Als Befund 29.9.: geliehener Held — „you" = `playerIdx`, der Held
+    // steht in `opts.heroOwner` (Skripte: `heldSeiteFuer`).
+    const hs = (opts?.heroOwner === 0 || opts?.heroOwner === 1) ? opts.heroOwner : playerIdx;
     // ★ v1004: Unter Missions Sperre ist auch eine INHAERENTE
     // Zusatzaktion (Quick Attack) eine Zusatzaktion — sie kostet eine
     // Mission-Ladung. Ohne Ladung ist sie schlicht nicht mehr
@@ -40758,18 +40802,20 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (script?.inherentAction === true) return true;
     if (typeof script?.inherentAction === 'function') {
       try {
-        if (opts !== undefined ? script.inherentAction(gs, playerIdx, heroIdx, this, opts)
-                               : script.inherentAction(gs, playerIdx, heroIdx, this)) return true;
+        if (this._mitWirker(playerIdx, heroIdx, hs, () => (opts !== undefined
+              ? script.inherentAction(gs, playerIdx, heroIdx, this, opts)
+              : script.inherentAction(gs, playerIdx, heroIdx, this)))) return true;
       } catch (err) {
         console.error(`[inherentAction] ${cardData.name} threw:`, err.message);
       }
     }
-    const hero = gs.players[playerIdx]?.heroes?.[heroIdx];
+    const hero = gs.players[hs]?.heroes?.[heroIdx];
     if (!hero?.name || hero.hp <= 0) return false;
     const heroScript = this.heroScript(hero);
     if (typeof heroScript?.grantsInherentActionForCard !== 'function') return false;
     try {
-      return !!heroScript.grantsInherentActionForCard(gs, playerIdx, heroIdx, cardData, this);
+      // Heldenvertrag: liest seine eigene Spalte (wie bisher im Uebernahme-Zweig).
+      return !!heroScript.grantsInherentActionForCard(gs, hs, heroIdx, cardData, this);
     } catch (err) {
       console.error(`[grantsInherentActionForCard] ${hero.name} threw:`, err.message);
       return false;
@@ -45767,6 +45813,50 @@ this._deathWatch = (this._deathWatchStack || []).length
     }
   }
 
+  /**
+   * Als Befund 29.9.: „Führe ich eine Animation mit einem geliehenen Hero
+   * aus (Dash von Quick Attack), führt der eigene Hero an der
+   * entsprechenden Position sie aus." Skripte senden ihre Quelle als
+   * `sourceOwner: ctx.cardOwner` (= Kontrolleur); der geliehene Held
+   * steht aber in der Spalte `ctx.cardHeroOwner`. Solange ein solcher
+   * Effekt laeuft, liegt er hier als AKTEUR auf dem Stapel, und
+   * `_broadcastEvent` schreibt Quell-Koordinaten (Kontrolleur + Index
+   * des Akteurs) auf die Brettseite um. Nur fuer Kontexte mit
+   * `cardOwner !== cardHeroOwner` — sonst null (kein Aufwand).
+   */
+  _akteurRein(ctx) {
+    if (!ctx) return null;
+    const pi = ctx.cardOwner, hs = ctx.cardHeroOwner, hi = ctx.cardHeroIdx;
+    if (pi == null || hs == null || pi === hs || !(hi >= 0)) return null;
+    const t = { pi, heroOwner: hs, heroIdx: hi,
+      zoneSlot: ctx.card?.zone === 'support' && ctx.card.zoneSlot >= 0 ? ctx.card.zoneSlot : null };
+    (this._animAkteure || (this._animAkteure = [])).push(t);
+    return t;
+  }
+
+  _akteurRaus(t) {
+    if (!t || !this._animAkteure) return;
+    const i = this._animAkteure.lastIndexOf(t);
+    if (i >= 0) this._animAkteure.splice(i, 1);
+  }
+
+  /** `fn()` mit `ctx` als Akteur ausfuehren (Aktivierungswege). */
+  async _alsAkteur(ctx, fn) {
+    const t = this._akteurRein(ctx);
+    try { return await fn(); } finally { this._akteurRaus(t); }
+  }
+
+  /** Aktueller Akteur: oberster Stapeleintrag, sonst der Wirker eines Zaubers. */
+  _animAkteur() {
+    const st = this._animAkteure;
+    if (st && st.length) return st[st.length - 1];
+    const w = this.gs?._wirkerSeite;
+    if (w && w.heroOwner != null && w.pi != null && w.heroOwner !== w.pi && w.heroIdx >= 0) {
+      return { pi: w.pi, heroOwner: w.heroOwner, heroIdx: w.heroIdx, zoneSlot: null };
+    }
+    return null;
+  }
+
   _broadcastEvent(event, data, opts) {
     if (this._aborted) return;
     if (this._fastMode) return; // Silent during MCTS simulations.
@@ -45824,6 +45914,20 @@ this._deathWatch = (this._deathWatchStack || []).length
           && outData.heroIdx === override.heroIdx
           && (outData.zoneSlot == null || outData.zoneSlot < 0)) {
         outData = { ...outData, zoneSlot: override.zoneSlot };
+      }
+    }
+    // Als Befund 29.9.: Quelle = geliehener Held → Brettseite (`_akteurRein`).
+    const akt = outData && typeof outData === 'object' ? this._animAkteur() : null;
+    if (akt) {
+      for (const p of ['source', 'caster', 'origin', 'attacker', 'src']) {
+        if (outData[p + 'Owner'] === akt.pi && outData[p + 'HeroIdx'] === akt.heroIdx) {
+          outData = { ...outData, [p + 'Owner']: akt.heroOwner };
+        }
+      }
+      // Eine Karte in einer Support Zone animiert ihren EIGENEN Platz.
+      if (akt.zoneSlot != null && outData.owner === akt.pi
+          && outData.heroIdx === akt.heroIdx && outData.zoneSlot === akt.zoneSlot) {
+        outData = { ...outData, owner: akt.heroOwner };
       }
     }
     // Optionale Empfaengerauswahl (12.8.). `opts.toPlayers` ist eine

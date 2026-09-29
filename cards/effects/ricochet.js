@@ -180,7 +180,7 @@ module.exports = {
 
       // ── 2) Die Kette abfeuern ───────────────────────────────────
       const attackSource = {
-        name: CARD_NAME, owner: pi, heroIdx, controller: pi, usesHeroAtk: true,
+        name: CARD_NAME, owner: pi, heroIdx, controller: pi, heroOwner: ctx.cardHeroOwner ?? pi, usesHeroAtk: true,   // Als Befund 29.9.: Brettseite des Angreifers
       };
       // Startpunkt des ersten Fluges ist der angreifende Held.
       let vonOwner = ctx.cardHeroOwner ?? pi;

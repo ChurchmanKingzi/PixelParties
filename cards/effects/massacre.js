@@ -93,7 +93,7 @@ module.exports = {
         cancellable: true,
         // Der Angreifer zerlegt sich nicht selbst (gleiche Schranke wie
         // Quick Attack / Rocket Fist).
-        condition: (t) => !(t.type === 'hero' && t.owner === pi && t.heroIdx === heroIdx),
+        condition: (t) => !(t.type === 'hero' && t.owner === (ctx.cardHeroOwner ?? pi) && t.heroIdx === heroIdx),   // Als Befund 29.9.: Brettseite des Angreifers
       });
       if (!target) return;
 
@@ -104,7 +104,7 @@ module.exports = {
       // Angriffs-Ansage VOR Animation und Schaden: Doqs Rateeffekt,
       // Darges Pfeil-Bonus und alles andere „wenn dieser Held
       // angreift" haengt hier dran und darf den Betrag noch aendern.
-      const attackSource = { name: CARD_NAME, owner: pi, heroIdx, controller: pi };
+      const attackSource = { name: CARD_NAME, owner: pi, heroIdx, controller: pi, heroOwner: ctx.cardHeroOwner ?? pi };   // Als Befund 29.9.: Brettseite des Angreifers
       const finalDmg = await engine._fireAttackDeclare(attackSource, target, schaden);
 
       engine._broadcastEvent('play_zone_animation', {

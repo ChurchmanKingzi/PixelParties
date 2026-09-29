@@ -130,7 +130,7 @@ module.exports = {
         if (held && held.hp > 0) await ctx.dealDamage(held, schaden, 'destruction_spell');
       } else if (ziel.cardInstance) {
         await engine.actionDealCreatureDamage(
-          { name: CARD_NAME, owner: pi, heroIdx: ctx.cardHeroIdx },
+          { name: CARD_NAME, owner: pi, heroIdx: ctx.cardHeroIdx, heroOwner: ctx.cardHeroOwner ?? pi },   // Als Befund 29.9.: Brettseite des Wirkers
           ziel.cardInstance, schaden, 'destruction_spell',
           { sourceOwner: pi, canBeNegated: true },
         );

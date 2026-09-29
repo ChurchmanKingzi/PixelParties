@@ -87,7 +87,7 @@ module.exports = {
         );
         if (inst) {
           const r = await engine.actionDealCreatureDamage(
-            { name: 'Icebolt', owner: pi, heroIdx },
+            { name: 'Icebolt', owner: pi, heroIdx, heroOwner: ctx.cardHeroOwner ?? pi },   // Als Befund 29.9.: Brettseite des Wirkers
             inst, 120, 'destruction_spell',
             { sourceOwner: pi, canBeNegated: true },
           );

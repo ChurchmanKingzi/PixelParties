@@ -108,7 +108,7 @@ module.exports = {
       await engine._delay(260);
 
       // ── Resolve damage ──
-      const source = { name: CARD_NAME, owner: pi, heroIdx };
+      const source = { name: CARD_NAME, owner: pi, heroIdx, heroOwner: ctx.cardHeroOwner ?? pi };   // Als Befund 29.9.: Brettseite des Wirkers
 
       // Pre-damage post-target hand-reaction window — ONE consolidated
       // prompt per source for Sculpture Guards / Spectral Armor / etc.

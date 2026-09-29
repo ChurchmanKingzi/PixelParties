@@ -32,10 +32,11 @@ const SURGE_DAMAGE = 100;
 
 const surgeKey = (pi, hi) => heldenSperreKey(`waflav-surge:${CARD_NAME}`, pi);   // v1275: pro Spieler (Ruling 22.9.)
 
-function surgeAvailable(engine, pi, heroIdx) {
+// Als Befund 29.9.: `hs` = Brettseite eines geliehenen Waflav (Standard `pi`).
+function surgeAvailable(engine, pi, heroIdx, hs = pi) {
   const gs = engine.gs;
   if (gs.hoptUsed?.[surgeKey(pi, heroIdx)] === gs.turn) return false;
-  const hero = gs.players[pi]?.heroes?.[heroIdx];
+  const hero = gs.players[hs]?.heroes?.[heroIdx];
   return !!hero?.name && hero.hp > 0 && W.getEvo(hero) >= 1;
 }
 
@@ -43,7 +44,8 @@ async function runSurge(ctx) {
   const engine = ctx._engine;
   const pi = ctx.cardOwner;
   const heroIdx = ctx.cardHeroIdx;
-  const hero = engine.gs.players[pi]?.heroes?.[heroIdx];
+  const hs = ctx.cardHeroOwner ?? pi;   // Als Befund 29.9.: Brettseite
+  const hero = engine.gs.players[hs]?.heroes?.[heroIdx];
   if (!hero) return false;
 
   const have = W.getEvo(hero);
@@ -90,11 +92,11 @@ async function runSurge(ctx) {
   if (!sel) return false;
 
   // Commit: pay, stamp, then land the instances in quick succession.
-  if (!W.spendEvo(engine, pi, heroIdx, count)) return false;
+  if (!W.spendEvo(engine, hs, heroIdx, count)) return false;
   if (!engine.gs.hoptUsed) engine.gs.hoptUsed = {};
   engine.gs.hoptUsed[surgeKey(pi, heroIdx)] = engine.gs.turn;
 
-  const source = { name: CARD_NAME, owner: pi, heroIdx };
+  const source = { name: CARD_NAME, owner: pi, heroIdx, heroOwner: hs };
   for (let i = 0; i < count; i++) {
     // Target chosen once (Als Ruling) — but it can die partway through,
     // so re-check before each instance instead of hitting a corpse.
@@ -157,8 +159,9 @@ module.exports = {
 
   canActivateHeroEffect(ctx) {
     const engine = ctx._engine;
-    return surgeAvailable(engine, ctx.cardOwner, ctx.cardHeroIdx)
-      || W.canDescend(engine, ctx.cardOwner, ctx.cardHeroIdx);
+    const hs = ctx.cardHeroOwner ?? ctx.cardOwner;   // Als Befund 29.9.
+    return surgeAvailable(engine, ctx.cardOwner, ctx.cardHeroIdx, hs)
+      || W.canDescend(engine, ctx.cardOwner, ctx.cardHeroIdx, hs);
   },
 
   cpuShouldUseHeroEffect(engine, pi, heroIdx) {
@@ -171,8 +174,9 @@ module.exports = {
     const pi = ctx.cardOwner;
     const heroIdx = ctx.cardHeroIdx;
 
-    const canSurge = surgeAvailable(engine, pi, heroIdx);
-    const canDesc = W.canDescend(engine, pi, heroIdx);
+    const hs = ctx.cardHeroOwner ?? pi;   // Als Befund 29.9.: Brettseite
+    const canSurge = surgeAvailable(engine, pi, heroIdx, hs);
+    const canDesc = W.canDescend(engine, pi, heroIdx, hs);
 
     let mode = null;
     if (canSurge && canDesc) {
@@ -196,7 +200,7 @@ module.exports = {
     }
 
     if (mode === 'surge') await runSurge(ctx);
-    else if (mode === 'descend') await W.performWaflavDescend(engine, pi, heroIdx, DESCEND_GAIN);
+    else if (mode === 'descend') await W.performWaflavDescend(engine, pi, heroIdx, DESCEND_GAIN, hs);
 
     // Self-managed HOPT keys — never let the engine stamp the shared
     // `hero-effect:<name>` slot, or using one effect would lock out the

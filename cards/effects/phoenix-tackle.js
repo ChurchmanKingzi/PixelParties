@@ -35,7 +35,7 @@ module.exports = {
       const oppIdx = pi === 0 ? 1 : 0;
       const ps = ctx.players[pi];
       const heroIdx = ctx.cardHeroIdx;
-      const hero = ps.heroes?.[heroIdx];
+      const hero = ctx.attachedHero || ps.heroes?.[heroIdx];   // Als Befund 29.9.: Brettseite des Wirkers
       if (!hero?.name || hero.hp <= 0) return;
 
       // Destruction Magic level on the caster — caster-aware so an
@@ -101,7 +101,7 @@ module.exports = {
         );
         if (inst) {
           await engine.actionDealCreatureDamage(
-            { name: 'Phoenix Tackle', owner: pi, heroIdx },
+            { name: 'Phoenix Tackle', owner: pi, heroIdx, heroOwner: ctx.cardHeroOwner ?? pi },   // Als Befund 29.9.: Brettseite des Wirkers
             inst, damage, 'destruction_spell',
             { sourceOwner: pi, canBeNegated: true }
           );

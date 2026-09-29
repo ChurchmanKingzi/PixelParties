@@ -146,7 +146,7 @@ module.exports = {
       // actually connect before the damage number pops.
       await engine._delay(900);
 
-      const dmgSource = { name: CARD_NAME, owner: pi, heroIdx };
+      const dmgSource = { name: CARD_NAME, owner: pi, heroIdx, heroOwner: ctx.cardHeroOwner ?? pi };   // Als Befund 29.9.: Brettseite des Wirkers
       if (target.type === 'hero') {
         const h = gs.players[target.owner]?.heroes?.[target.heroIdx];
         if (h && h.hp > 0) {

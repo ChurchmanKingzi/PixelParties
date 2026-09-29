@@ -108,16 +108,18 @@ module.exports = {
       const pi        = ctx.cardOwner;
       const heroIdx   = ctx.cardHeroIdx;
       const ps        = gs.players[pi];
-      const userHero  = ps?.heroes?.[heroIdx];
+      const hs        = ctx.cardHeroOwner ?? pi;   // Als Befund 29.9.: Brettseite des Nutzers
+      const hps       = gs.players[hs] || ps;   // Zonen des Nutzers; Ablage bleibt beim Kontrolleur
+      const userHero  = ctx.attachedHero || hps?.heroes?.[heroIdx];
       if (!ps || !userHero?.name || userHero.hp <= 0) {
         gs._spellCancelled = true;
         return;
       }
 
-      const lvl = _fightingLevel(engine, ps, heroIdx);
+      const lvl = _fightingLevel(engine, hps, heroIdx);   // Als Befund 29.9.: Brettseite des Nutzers
       const gallery = _eligibleCreatureNames(engine, ps, lvl, pi);
       if (gallery.length === 0) { gs._spellCancelled = true; return; }
-      if (!_userHasFreeSupportSlot(ps, heroIdx)) { gs._spellCancelled = true; return; }
+      if (!_userHasFreeSupportSlot(hps, heroIdx)) { gs._spellCancelled = true; return; }   // Als Befund 29.9.: Brettseite des Nutzers
 
       // ── Pick a creature from the discard gallery ─────────────────
       const picked = await engine.promptGeneric(pi, {
@@ -144,7 +146,7 @@ module.exports = {
       }
       const dpIdx = (ps.discardPile || []).indexOf(chosenName);
       if (dpIdx < 0) { gs._spellCancelled = true; return; }
-      if (!_userHasFreeSupportSlot(ps, heroIdx)) { gs._spellCancelled = true; return; }
+      if (!_userHasFreeSupportSlot(hps, heroIdx)) { gs._spellCancelled = true; return; }   // Als Befund 29.9.: Brettseite des Nutzers
 
       // ── Pop from discard and summon onto the user hero ───────────
       // v1389: Ablage → Feld über die EINE Stelle (Sperre, Lethe-Stempel,
@@ -155,23 +157,23 @@ module.exports = {
       // ist der Schaden am Helden. Dafuer muss der Zielplatz VOR dem
       // Anlauf feststehen; die Kreatur fliegt nicht aus der Ablage heran,
       // sie ERSCHEINT mit dem Aufprall.
-      const freiSlot = (ps.supportZones?.[heroIdx] || []).findIndex(sl => (sl || []).length === 0);
+      const freiSlot = (hps.supportZones?.[heroIdx] || []).findIndex(sl => (sl || []).length === 0);   // Als Befund 29.9.: Brettseite des Nutzers
       if (freiSlot < 0) { gs._spellCancelled = true; return; }
       engine._broadcastEvent('play_ram_animation', {
-        sourceOwner: pi, sourceHeroIdx: heroIdx,
-        targetOwner: pi, targetHeroIdx: heroIdx, targetZoneSlot: freiSlot,
+        sourceOwner: hs, sourceHeroIdx: heroIdx,   // Als Befund 29.9.: Brettseite des Nutzers
+        targetOwner: hs, targetHeroIdx: heroIdx, targetZoneSlot: freiSlot,
         cardName: userHero.name, duration: 1600,
       });
       // Aufprall bei 12 % des Anlaufs (≈190 ms); Zonen-Animationen haben
       // 100 ms Einhaengeverzug — also 90 ms vorher senden.
       await engine._delay(90);
       engine._broadcastEvent('play_zone_animation', {
-        type: 'gewaltsame_erweckung', owner: pi, heroIdx, zoneSlot: freiSlot, duration: 900,
+        type: 'gewaltsame_erweckung', owner: hs, heroIdx, zoneSlot: freiSlot, duration: 900,   // Als Befund 29.9.: Brettseite des Nutzers
       });
       await engine._delay(100);
 
       const summonRes = await engine.summonFromDiscard(pi, pi, dpIdx, heroIdx, freiSlot, {
-        source: CARD_NAME, flug: false,
+        source: CARD_NAME, flug: false, heldSeite: hs,   // Als Befund 29.9.: Brettseite des Nutzers
         summonOpts: { playSummonAnim: false },   // die Landung zeigt die eigene Animation
         hookExtras: { _isForcefulRevival: true },
       });
@@ -205,8 +207,8 @@ module.exports = {
         // attacks" effects) fires BEFORE the damage. The damage is
         // self-inflicted on the user's own hero — pass that as the
         // target so listeners can see what's about to be hit.
-        const attackSource = { name: CARD_NAME, owner: pi, heroIdx, controller: pi };
-        const selfTarget = { type: 'hero', owner: pi, heroIdx, cardName: userHero.name };
+        const attackSource = { name: CARD_NAME, owner: pi, heroIdx, controller: pi, heroOwner: hs };   // Als Befund 29.9.: Brettseite des Angreifers
+        const selfTarget = { type: 'hero', owner: hs, heroIdx, cardName: userHero.name };   // Als Befund 29.9.: Brettseite des Nutzers
         const finalDmg = await engine._fireAttackDeclare(attackSource, selfTarget, maxHp);
         await engine.actionDealDamage(attackSource, userHero, finalDmg, 'attack');
       }

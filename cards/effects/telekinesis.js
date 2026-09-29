@@ -10,6 +10,7 @@
 
 const { loadCardEffect } = require('./_loader');
 const { ZONES } = require('./_hooks');
+const { heldSeite } = require('./_hooks');   // Als Befund 29.9.: Brettseite geliehener Helden
 
 module.exports = {
   requiresTarget: true,
@@ -25,8 +26,9 @@ module.exports = {
     // sourced negation is the lighter "effect-only" form and does
     // NOT disqualify a Hero from acting; the helper handles the
     // distinction so we don't duplicate it here.
-    if (engine?.isHeroIncapacitated?.(pi, heroIdx)) return false;
-    const abZones = ps.abilityZones?.[heroIdx] || [];
+    const hs = heldSeite(gs, pi, heroIdx);
+    if (engine?.isHeroIncapacitated?.(hs, heroIdx)) return false;
+    const abZones = gs.players[hs]?.abilityZones?.[heroIdx] || [];
     let magicArtsCount = 0;
     for (const slot of abZones) {
       if (!slot || slot.length === 0) continue;

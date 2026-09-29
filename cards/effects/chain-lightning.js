@@ -75,9 +75,9 @@ module.exports = {
         if (!tgt) return;
         // v1333: auch der Einzelblitz gilt als Wahl dieses Ziels (Umleitung).
         await kettenblitz(engine, {
-          quelle: { name: 'Chain Lightning', owner: pi, heroIdx }, zone: 'hand',
+          quelle: { name: 'Chain Lightning', owner: pi, heroIdx, heroOwner: ctx.cardHeroOwner ?? pi }, zone: 'hand',   // Als Befund 29.9.: Brettseite des Wirkers
           ziele: [tgt], alleZiele: targets, schaden: [200], typ: 'destruction_spell',
-          start: { owner: pi, heroIdx, zoneSlot: -1 },
+          start: { owner: ctx.cardHeroOwner ?? pi, heroIdx, zoneSlot: -1 },   // Als Befund 29.9.: Brettseite des Wirkers
         });
         engine.sync();
         return;
@@ -96,7 +96,7 @@ module.exports = {
       // A full-negate reaction (Storm Ring / Invisibility Cloak) bails
       // the whole Spell here — no bolts, no damage, no side effects.
       const _negR = await engine.preDamageMultiTargetWindow(
-        { name: 'Chain Lightning', owner: pi, heroIdx: ctx.cardHeroIdx },
+        { name: 'Chain Lightning', owner: pi, heroIdx: ctx.cardHeroIdx, heroOwner: ctx.cardHeroOwner ?? pi },   // Als Befund 29.9.: Brettseite des Wirkers
         selectedTargets,
       );
       if (_negR?.effectNegated) return;
@@ -106,9 +106,9 @@ module.exports = {
       // (Frost Rune, v1324/v1325) — und NEU: jeder einzelne Blitz gilt als
       // Wahl seines Ziels, Umleiter (Empty Armor & Co.) sehen ihn.
       await kettenblitz(engine, {
-        quelle: { name: 'Chain Lightning', owner: pi, heroIdx: ctx.cardHeroIdx }, zone: 'hand',
+        quelle: { name: 'Chain Lightning', owner: pi, heroIdx: ctx.cardHeroIdx, heroOwner: ctx.cardHeroOwner ?? pi }, zone: 'hand',   // Als Befund 29.9.: Brettseite des Wirkers
         ziele: selectedTargets, alleZiele: targets, schaden: damages, typ: 'destruction_spell',
-        start: { owner: pi, heroIdx: ctx.cardHeroIdx, zoneSlot: -1 },
+        start: { owner: ctx.cardHeroOwner ?? pi, heroIdx: ctx.cardHeroIdx, zoneSlot: -1 },   // Als Befund 29.9.: Brettseite des Wirkers
       });
     },
   },

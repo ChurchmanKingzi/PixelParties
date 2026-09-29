@@ -69,7 +69,7 @@ module.exports = {
       // Aufdeck-Teil wartet, bis die Blase zu zittern beginnt.
       if (ctx.cardHeroIdx != null && ctx.cardHeroIdx >= 0) {
         engine._broadcastEvent('play_zone_animation', {
-          type: 'anklage', owner: pi, heroIdx: ctx.cardHeroIdx, zoneSlot: -1,
+          type: 'anklage', owner: ctx.cardHeroOwner ?? pi, heroIdx: ctx.cardHeroIdx, zoneSlot: -1,   // Als Befund 29.9.: Brettseite des Wirkers
           cardName: declared, duration: 2200,
         });
         await engine._delay(1500);

@@ -39,7 +39,12 @@ module.exports = {
       }
       // User = the casting Hero. Place into a free support slot of the user.
       const heroIdx = ctx.cardHeroIdx >= 0 ? ctx.cardHeroIdx : ctx.heroIdx;
-      const slots = ps.supportZones?.[heroIdx] || [];
+      // Als Befund 29.9.: geliehener Nutzer — seine Zonen (Brettseite `hs`),
+      // die Kreatur gehoert dem Wirker.
+      const hs = ctx.cardHeroOwner ?? pi;
+      const hps = engine.gs.players[hs] || ps;
+      if (hs !== pi && !engine.kontrollRechte(hs, heroIdx).beschwoeren) { engine.gs._spellCancelled = true; return; }
+      const slots = hps.supportZones?.[heroIdx] || [];
       const hasFree = slots.some(s => !s || s.length === 0);
       if (heroIdx == null || heroIdx < 0 || !hasFree) {
         engine.gs._spellCancelled = true;
@@ -48,7 +53,7 @@ module.exports = {
 
       // Pre-compute the leftmost-free slot for the user's hero so we
       // can broadcast the fly animation BEFORE mutating Stack/Support.
-      const heroSlots = ps.supportZones?.[heroIdx] || [];
+      const heroSlots = hps.supportZones?.[heroIdx] || [];
       let slotIdx = -1;
       for (let si = 0; si < heroSlots.length; si++) {
         if (!heroSlots[si] || heroSlots[si].length === 0) { slotIdx = si; break; }
@@ -61,18 +66,19 @@ module.exports = {
       const popInst = engine.getCoolnessStackTopInst(pi);
       engine._broadcastEvent('attach_hero_fly', {
         ownerIdx: pi, source: 'coolnessStack', cardName: topName,
-        destOwner: pi, destHeroIdx: heroIdx, destZoneSlot: slotIdx,
+        destOwner: hs, destHeroIdx: heroIdx, destZoneSlot: slotIdx,
       });
       await engine._delay(620);
 
       const popped = await ctx.popCoolnessStackTo(pi, 'board', { source: CARD_NAME });
       if (!popped) { engine.gs._spellCancelled = true; return; }
-      const placed = engine.safePlaceInSupport(topName, pi, heroIdx, slotIdx);
+      const placed = engine.safePlaceInSupport(topName, hs, heroIdx, slotIdx);
       if (!placed?.inst) return;
       placed.inst.zone = 'support';
+      if (hs !== pi) engine.markiereSeitenfremd(placed.inst, pi);
 
       engine.sync();
-      engine._broadcastEvent('summon_zone_animation', { owner: pi, heroIdx, zoneSlot: placed.actualSlot });
+      engine._broadcastEvent('summon_zone_animation', { owner: hs, heroIdx, zoneSlot: placed.actualSlot });
 
       await engine.runHooks('onCardLeaveZone', {
         card: popInst, cardName: topName,
@@ -86,7 +92,7 @@ module.exports = {
       });
       await engine.runHooks('onCardEnterZone', {
         enteringCard: placed.inst, cardName: topName,
-        toZone: 'support', toOwner: pi, toHeroIdx: heroIdx,
+        toZone: 'support', toOwner: hs, toHeroIdx: heroIdx,
         fromZone: 'coolnessStack',
       });
     },

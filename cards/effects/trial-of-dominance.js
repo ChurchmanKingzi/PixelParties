@@ -122,7 +122,7 @@ module.exports = {
       // Snapshot already taken (`creatures`); actionDestroyCard mutates
       // cardInstances / zones as it goes. Sequential awaits naturally
       // stagger the per-body deleted-pile flights.
-      const source = { name: CARD_NAME, owner: pi, heroIdx: ctx.cardHeroIdx, controller: pi };
+      const source = { name: CARD_NAME, owner: pi, heroIdx: ctx.cardHeroIdx, controller: pi, heroOwner: ctx.cardHeroOwner ?? pi };   // Als Befund 29.9.: Brettseite des Angreifers
       let defeated = 0;
       // ★ v1057 („Enhanced Guard Dog"): Zerstoerungs-Klammer.
       engine.beginDestroyScope(creatures.length);

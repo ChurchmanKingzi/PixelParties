@@ -76,7 +76,7 @@ module.exports = {
       const hero = ctx.attachedHero || ps?.heroes?.[heroIdx];   // v1364: geliehener Held (Love Shot, Charme) — physische Seite
       const inst = ctx.card;
       if (!hero?.name || hero.hp <= 0 || !inst) { gs._spellCancelled = true; return; }
-      const stacks = stacksOf(engine, pi, heroIdx);
+      const stacks = stacksOf(engine, ctx.cardHeroOwner ?? pi, heroIdx);   // Als Befund 29.9.: Abilities des Nutzers auf seiner Brettseite
       if (stacks.length === 0) { gs._spellCancelled = true; return; }
       // Kartenbild ZURUECKHALTEN, bis die Ability gewaehlt ist (Als Vorgabe
       // 6.9.) — vorher kann der Spieler noch abbrechen. Danach an BEIDE
@@ -107,7 +107,7 @@ module.exports = {
       } catch { /* Anzeige ist Beiwerk */ }
       const abilityName = gewaehlt.cardName;
       for (let k = 0; k < STACK; k++) {
-        const entry = engine.getAbilityTargets(pi, { heroIdx, cardName: abilityName })
+        const entry = engine.getAbilityTargets(ctx.cardHeroOwner ?? pi, { heroIdx, cardName: abilityName })   // Als Befund 29.9.: Brettseite des Wirkers
           .find(a => a.zoneKind === gewaehlt.zoneKind && a.slotIdx === gewaehlt.slotIdx);
         if (!entry || !(await engine.discardAbilityTopCopy(entry, { source: CARD_NAME, sourceOwner: pi }))) break;
         engine.sync();
@@ -136,7 +136,7 @@ module.exports = {
       hero.buffs.second_action_grant = { appliedTurn: gs.turn };   // Badge-Schluessel aus _second-action-shared
       if ((ps._actionsPlayedThisPhase || 0) === 1) gs._preventPhaseAdvance = true;
       engine._broadcastEvent('play_zone_animation', {
-        type: 'weapon_unleashing', owner: pi, heroIdx, zoneSlot: -1,
+        type: 'weapon_unleashing', owner: ctx.cardHeroOwner ?? pi, heroIdx, zoneSlot: -1,   // Als Befund 29.9.: Brettseite des Wirkers
       });
       engine.log('weapon_unleashing', { player: ps.username, hero: hero.name, ability: abilityName });
       engine.sync();

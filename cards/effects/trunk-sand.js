@@ -83,7 +83,7 @@ module.exports = {
         confirmLabel: `🏜️ Pocket Sand! (${atk})`,
         confirmClass: 'btn-danger',
         cancellable: true,
-        condition: (t) => !(t.type === 'hero' && t.owner === pi && t.heroIdx === heroIdx),
+        condition: (t) => !(t.type === 'hero' && t.owner === (ctx.cardHeroOwner ?? pi) && t.heroIdx === heroIdx),   // Als Befund 29.9.: Brettseite des Angreifers
       });
       if (!target) return;
 
@@ -92,7 +92,7 @@ module.exports = {
       const tgtZoneSlot = target.type === 'hero' ? -1 : target.slotIdx;
 
       const attackSource = {
-        name: CARD_NAME, owner: pi, heroIdx, controller: pi, usesHeroAtk: true,
+        name: CARD_NAME, owner: pi, heroIdx, controller: pi, heroOwner: ctx.cardHeroOwner ?? pi, usesHeroAtk: true,   // Als Befund 29.9.: Brettseite des Angreifers
       };
       const finalDmg = await engine._fireAttackDeclare(attackSource, target, atk);
 
