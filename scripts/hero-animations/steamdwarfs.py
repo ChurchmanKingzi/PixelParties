@@ -38,7 +38,7 @@ V_ = {
     'quisto': dict(slug='don-quisto-the-gold-seeker', knee=19, pads=(2, 14, 10, 1)),
     'sasza': dict(slug='sasza-the-snaka-adventurer', knee=17, pads=(3, 3, 3, 3)),
     'bulwark': dict(slug='diamond-the-bulwark-of-peace', knee=38, pads=(4, 4, 6, 2)),
-    'cecilia': dict(slug='rescued-damsel-cecilia', pads=(2, 8, 2, 4)),
+    'cecilia': dict(slug='rescued-damsel-cecilia', pads=(5, 12, 3, 7)),
     'corruptor': dict(slug='bloom-the-continent-corruptor', pads=(12, 12, 12, 8)),
 }
 V = next((v for v in sys.argv[2:] if v in V_), 'quetza')
@@ -786,6 +786,27 @@ BW_SPARKLES = [(49, 3, 0), (21, 16, 8), (54, 16, 16), (7, 23, 24), (67, 23, 32),
 BW_FIRE = ['ca2c29', 'f47b22', 'f6e70e', 'f7f5b8']
 BW = None
 BW_EMBERS = None
+BW_SPK = None
+
+
+def bw_sparkles():
+    """Viele Glitzersterne auf den türkisen Kristallen: feste Kristallpixel (mindestens 6 px
+    auseinander), gleichmäßig über den Loop verteilt – fast immer blitzt irgendwo einer."""
+    global BW_SPK
+    if BW_SPK is None:
+        body = load('body')
+        ys, xs = np.nonzero(body[:, :, 3])
+        cand = [(x, y) for y, x in zip(ys, xs) if hexc(body[y, x]) in BW_CRYSTAL and y >= 2 and 2 <= x < SW - 2]
+        rng = np.random.default_rng(11)
+        rng.shuffle(cand)
+        pts = [(x, y) for x, y, _ in BW_SPARKLES]
+        for x, y in cand:
+            if len(pts) >= 18:
+                break
+            if all(math.hypot(x - px, y - py) >= 6 for px, py in pts):
+                pts.append((x, y))
+        BW_SPK = [(x, y, round(k * N / len(pts))) for k, (x, y) in enumerate(pts)]
+    return BW_SPK
 
 
 def purple(c):
@@ -824,10 +845,6 @@ def bulwark_base(i):
     t = 2 * math.pi * i / N
     b = B24[i % 24]
     out = np.zeros((H, W, 4), int)
-    for y, x in zip(*np.nonzero(gas[:, :, 3])):           # die Gaswolke wallt: Zeilen treiben hin und her
-        c = gas[y, x]
-        dx = round(1.4 * math.sin(2 * t - 0.45 * y) - 1.4 * math.sin(-0.45 * y)) if purple(c) else 0
-        dot(out, x + dx + PL, y + PT, c)
     s = body.copy()
     g = (i % 24) * 3.6 - 14                               # Schimmer läuft schräg über die Kristalle
     for y, x in zip(*np.nonzero(s[:, :, 3])):
@@ -837,6 +854,10 @@ def bulwark_base(i):
     draw_bounce(fig, s, b, KNEE, PT, PL)
     m = fig[:, :, 3] > 0
     out[m] = fig[m]
+    for y, x in zip(*np.nonzero(gas[:, :, 3])):           # die Gaswolke liegt vor ihm und wallt hin und her
+        c = gas[y, x]
+        dx = round(1.4 * math.sin(2 * t - 0.45 * y) - 1.4 * math.sin(-0.45 * y)) if purple(c) else 0
+        dot(out, x + dx + PL, y + PT, c)
     f = bulwark_fire(i, b)
     m = f[:, :, 3] > 0
     out[m] = f[m]
@@ -860,7 +881,7 @@ def f_bulwark(i):
         BW_EMBERS = emb, puffs
     out = bulwark_base(i)
     b = B24[i % 24]
-    for (x, y), c in sparkle_pixels(i, N, [(x + PL, y + PT + (b if y < KNEE else 0), t0) for x, y, t0 in BW_SPARKLES],
+    for (x, y), c in sparkle_pixels(i, N, [(x + PL, y + PT + (b if y < KNEE else 0), t0) for x, y, t0 in bw_sparkles()],
                                     rgb('e0ffff'), rgb('91e6e6')).items():
         dot(out, x, y, c)
     draw_parts(out, BW_EMBERS[0], i)
@@ -907,7 +928,7 @@ def f_cecilia(i):
         CE = upper, fig, blush, hearts
     upper, fig, blush, hearts = CE
     t = 2 * math.pi * i / N
-    ang = 6.0 * math.sin(t)                               # ein ruhiger Schwung je Loop
+    ang = 9.0 * math.sin(2 * t)                           # zwei weite Schwünge je Loop
     a = math.radians(ang)
     gx, gy = CE_GRIP[0] - CE_PIVOT[0], CE_GRIP[1] - CE_PIVOT[1]
     dx = round(gx * math.cos(a) - gy * math.sin(a) - gx)
@@ -942,15 +963,36 @@ CO_VINE = {'17414d', '19653b', '144f2e', '228a50'}
 CO_HEAD = 24                                            # bis hierher schwankt die Blüte
 
 
+CO_BASE = 48                                            # Fußzeile: darunter bleibt die Pflanze stehen
+CO_COUGH = (4, 20, 36)                                  # Pollenstöße: die Blume hustet sie aus
+CO_SCALE = [1.0, 0.97, 0.95, 1.08, 1.07, 1.05, 1.03, 1.02, 1.01]   # ducken, strecken, zurücksinken
+CO_V = [(11, 6), (16, 16), (23, 6)]                     # Blütenkelch: hier kommen die Pollen heraus
+CO_LEAN = lambda i: 2.2 * math.sin(2 * 2 * math.pi * i / N)
+
+
+def co_scale(i):
+    a = min((i - c + 3) % N for c in CO_COUGH)
+    return CO_SCALE[a] if a < len(CO_SCALE) else 1.0
+
+
+def co_map(x, y, i):
+    """Pflanzen- in Bildkoordinaten: gestreckt/geduckt über dem Fuß, oben schwankt die Blüte."""
+    sc = co_scale(i)
+    yd = CO_BASE - (CO_BASE - y) * sc if y < CO_BASE else y
+    lean = CO_LEAN(i)
+    dx = lean * ((CO_HEAD - y) / CO_HEAD) ** 1.2 if y < CO_HEAD else 0
+    return x + dx + PL, yd + PT
+
+
 def corruptor_base(i):
     global CO
     if CO is None:
         CO = load('stem'), load('leaves'), load('flower'), load('glow')
     stem, leaves, flower, glow = CO
-    t = 2 * math.pi * i / N
-    lean = 2.2 * math.sin(2 * t)
+    lean = CO_LEAN(i)
+    sc = co_scale(i)
     chomp = (i % 8) in (4, 5)                             # das Maul schnappt
-    out = np.zeros((H, W, 4), int)
+    plant = np.zeros((SH, SW, 4), int)
     for part in (stem, leaves, flower):
         p = part.copy()
         if part is flower and chomp:                      # Oberkiefer (Zeilen 37–41) klappt 1 px herunter
@@ -960,12 +1002,19 @@ def corruptor_base(i):
             for y, x in sorted(zip(*np.nonzero(jaw)), reverse=True):
                 q[y + 1, x] = p[y, x]
             p = q
-        for y, x in zip(*np.nonzero(p[:, :, 3])):
-            dx = round(lean * ((CO_HEAD - y) / CO_HEAD) ** 1.2) if y < CO_HEAD else 0
-            dot(out, x + dx + PL, y + PT, p[y, x])
-    for y, x in zip(*np.nonzero(glow[:, :, 3])):          # das Leuchten liegt halbtransparent darüber
-        dx = round(lean * ((CO_HEAD - y) / CO_HEAD) ** 1.2) if y < CO_HEAD else 0
-        blend(out, x + dx + PL, y + PT, glow[y, x])
+        m = p[:, :, 3] > 0
+        plant[m] = p[m]
+    out = np.zeros((H, W, 4), int)
+    top = min(np.nonzero(plant[:, :, 3].any(1))[0])
+    for yd in range(0, SH + 4):                           # jede Zielzeile holt sich ihre Quellzeile (Strecken
+        ys = round(CO_BASE - (CO_BASE - yd) / sc) if yd < CO_BASE else yd   # wiederholt Zeilen, Ducken lässt aus)
+        if not top <= ys < SH:
+            continue
+        dx = round(lean * ((CO_HEAD - ys) / CO_HEAD) ** 1.2) if ys < CO_HEAD else 0
+        for x in np.nonzero(plant[ys, :, 3])[0]:
+            dot(out, x + dx + PL, yd + PT, plant[ys, x])
+        for x in np.nonzero(glow[ys, :, 3])[0]:           # das Leuchten liegt halbtransparent darüber
+            blend(out, x + dx + PL, yd + PT, glow[ys, x])
     src = out[PT:PT + SH, PL:PL + SW].copy()
     flutter(out, src, i, PL, PT, list(range(21, 37)), range(0, 12), range(21, SW), amp=1.2, speed=4,
             ok=lambda c: hexc(c) in CO_VINE)             # die Ranken peitschen
@@ -973,40 +1022,46 @@ def corruptor_base(i):
 
 
 def f_corruptor(i):
-    """Bloom, the Continent Corruptor: die riesige Blume schwankt, die Blüte leuchtet, das Maul im Stängel
-    schnappt, die Ranken peitschen; aus der Blüte schießt Pollen nach oben und rieselt ringsum herab."""
+    """Bloom, the Continent Corruptor: die riesige Blume schwankt, das Maul im Stängel schnappt, die Ranken
+    peitschen. Dreimal je Loop hustet sie Pollen aus: sie duckt sich, streckt sich ruckartig als Ganzes, und
+    aus dem ganzen Blütenkelch schießt ein Pollenstoß hoch, der ringsum herabrieselt."""
     global CO_POLLEN
     if CO_POLLEN is None:
         fig = figure_mask(corruptor_base)
         rng = np.random.default_rng(29)
-        CO_POLLEN, tries = [], 0
-        while len(CO_POLLEN) < 60 and tries < 40000:
-            tries += 1
-            e = int(rng.integers(N))
-            vx, vy = rng.uniform(-0.9, 0.9), rng.uniform(-1.6, -0.8)
-            x0, y0 = PL + 16 + rng.uniform(-3, 3), PT - 1
-            path = []
-            x, y = x0, y0
-            for a in range(40):
-                x, y = x + vx + 0.35 * math.sin(0.5 * a + e), y + vy
-                vy = min(0.9, vy + 0.18)
-                vx *= 0.97
-                path.append((int(round(x)), int(round(y))))
-                if y > H - 3:
-                    break
-            path = [(x, y) for x, y in path]
-            ok = all(1 <= x < W - 1 and 1 <= y < H - 1 for x, y in path) and \
-                all(not fig[y, x] for x, y in path[2:])
-            if ok and len(path) > 12:
-                CO_POLLEN.append((e, path, int(rng.integers(3))))
+        CO_POLLEN = []
+        for c in CO_COUGH:
+            n, tries = 0, 0
+            while n < 22 and tries < 5000:
+                tries += 1
+                u = rng.uniform(0, 1)                     # Startpunkt auf dem Blütenkelch (V)
+                (ax, ay), (bx, by) = (CO_V[0], CO_V[1]) if u < 0.5 else (CO_V[1], CO_V[2])
+                v = u * 2 if u < 0.5 else u * 2 - 1
+                sx, sy = ax + (bx - ax) * v, ay + (by - ay) * v
+                x, y = co_map(sx, sy, c)
+                side = -1 if u < 0.5 else 1
+                vx, vy = side * rng.uniform(0.2, 1.3), rng.uniform(-2.8, -1.6)
+                e = c + int(rng.integers(0, 2))
+                path = []
+                for a in range(44):
+                    path.append((int(round(x)), int(round(y))))
+                    x, y = x + vx + 0.3 * math.sin(0.5 * a + u * 9), y + vy
+                    vy = min(0.8, vy + 0.22)
+                    vx *= 0.95
+                    if y > H - 3:
+                        break
+                ok = all(1 <= x < W - 1 and 1 <= y < H - 1 for x, y in path) and \
+                    all(not fig[y, x] for x, y in path[5:])
+                if ok and len(path) > 14:
+                    CO_POLLEN.append((e, path, int(rng.integers(3))))
+                    n += 1
     out = corruptor_base(i)
     for e, path, kind in CO_POLLEN:
         a = (i - e) % N
         if a < len(path):
             x, y = path[a]
             c = rgb('ffff00', 150 + 40 * kind) if (a + kind) % 5 else rgb('ffffa0', 230)
-            if not out[y, x, 3] or a < 2:
-                blend(out, x, y, c)
+            blend(out, x, y, c)
     return out
 
 
