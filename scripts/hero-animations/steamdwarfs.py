@@ -20,7 +20,7 @@ import os
 import sys
 import numpy as np
 from PIL import Image
-from anim_common import rgb, save_outputs, BOUNCE12, draw_bounce, ring8
+from anim_common import rgb, save_outputs, BOUNCE12, draw_bounce, ring8, sparkle_pixels
 
 N = 48
 OUT = os.environ.get('SD_OUT', '.')
@@ -37,6 +37,9 @@ V_ = {
     'pinta': dict(slug='pinta-the-singing-ship', pads=(8, 8, 10, 1)),
     'quisto': dict(slug='don-quisto-the-gold-seeker', knee=19, pads=(2, 14, 10, 1)),
     'sasza': dict(slug='sasza-the-snaka-adventurer', knee=17, pads=(3, 3, 3, 3)),
+    'bulwark': dict(slug='diamond-the-bulwark-of-peace', knee=38, pads=(4, 4, 6, 2)),
+    'cecilia': dict(slug='rescued-damsel-cecilia', pads=(2, 8, 2, 4)),
+    'corruptor': dict(slug='bloom-the-continent-corruptor', pads=(12, 12, 12, 8)),
 }
 V = next((v for v in sys.argv[2:] if v in V_), 'quetza')
 C = V_[V]
@@ -765,8 +768,250 @@ def f_sasza(i):
     return out
 
 
+def blend(out, x, y, c):
+    """Halbtransparentes Pixel c über out legen."""
+    if not (0 <= y < out.shape[0] and 0 <= x < out.shape[1]):
+        return
+    a = c[3] / 255
+    if not out[y, x, 3]:
+        out[y, x] = c
+        return
+    out[y, x, :3] = [int(c[k] * a + out[y, x, k] * (1 - a)) for k in range(3)]
+    out[y, x, 3] = 255
+
+
+# ---------------------------------------------------------------- Diamond, the Bulwark of Peace
+BW_CRYSTAL = {'68a6a6', '80cccc', '91e6e6', 'b8e6e6'}
+BW_SPARKLES = [(49, 3, 0), (21, 16, 8), (54, 16, 16), (7, 23, 24), (67, 23, 32), (36, 28, 40)]
+BW_FIRE = ['ca2c29', 'f47b22', 'f6e70e', 'f7f5b8']
+BW = None
+BW_EMBERS = None
+
+
+def purple(c):
+    r, g, b = int(c[0]), int(c[1]), int(c[2])
+    return (b >= r and g < 0.7 * b + 10) or r + g + b < 30
+
+
+def bulwark_fire(i, b):
+    """Das Feuer am Fuß lodert: jede Spalte schlägt eigene Zungen nach oben (unten bleibt es stehen),
+    die Farben folgen streng von außen nach innen: rot, orange, gelb, fast weiß."""
+    fire = BW[2]
+    m = fire[:, :, 3] > 0
+    cols = [x for x in range(SW) if m[:, x].any()]
+    new = np.zeros_like(m)
+    for x in cols:
+        ys = np.nonzero(m[:, x])[0]
+        top, bot = ys.min(), ys.max()
+        u = 1.3 * math.sin(2 * math.pi * (3 * i / N) + 1.7 * x) + 1.0 * math.sin(2 * math.pi * (5 * i / N) - 0.9 * x)
+        new[max(0, top - round(max(-1.0, u + 0.6))):bot + 1, x] = True
+    out = np.zeros((H, W, 4), int)
+    ys, xs = np.nonzero(new)
+    for y, x in zip(ys, xs):                              # Tiefe = Abstand zum Rand (4er-Nachbarschaft)
+        d = 0
+        while d < 3 and all(new[y + dy * (d + 1), x + dx * (d + 1)] if 0 <= y + dy * (d + 1) < SH and
+                            0 <= x + dx * (d + 1) < SW else False for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1))):
+            d += 1
+        dot(out, x + PL, y + PT, rgb(BW_FIRE[d]))
+    return out
+
+
+def bulwark_base(i):
+    global BW
+    if BW is None:
+        BW = load('gas'), load('body'), load('fire')
+    gas, body, _ = BW
+    t = 2 * math.pi * i / N
+    b = B24[i % 24]
+    out = np.zeros((H, W, 4), int)
+    for y, x in zip(*np.nonzero(gas[:, :, 3])):           # die Gaswolke wallt: Zeilen treiben hin und her
+        c = gas[y, x]
+        dx = round(1.4 * math.sin(2 * t - 0.45 * y) - 1.4 * math.sin(-0.45 * y)) if purple(c) else 0
+        dot(out, x + dx + PL, y + PT, c)
+    s = body.copy()
+    g = (i % 24) * 3.6 - 14                               # Schimmer läuft schräg über die Kristalle
+    for y, x in zip(*np.nonzero(s[:, :, 3])):
+        if hexc(s[y, x]) in BW_CRYSTAL and abs(x + y * 0.6 - g) < 1.5:
+            s[y, x, :3] = (s[y, x, :3] * 0.45 + np.array([235, 255, 255]) * 0.55).astype(int)
+    fig = np.zeros((H, W, 4), int)
+    draw_bounce(fig, s, b, KNEE, PT, PL)
+    m = fig[:, :, 3] > 0
+    out[m] = fig[m]
+    f = bulwark_fire(i, b)
+    m = f[:, :, 3] > 0
+    out[m] = f[m]
+    return out
+
+
+def f_bulwark(i):
+    """Diamond, the Bulwark of Peace atmet, über seine Kristalle läuft ein Schimmer und Glitzersterne
+    blitzen auf den Spitzen; das Feuer an seinem Fuß lodert (Funken steigen auf), die giftige
+    Gaswolke wallt und stößt Schwaden aus."""
+    global BW_EMBERS
+    if BW_EMBERS is None:
+        region = np.zeros((H, W), bool)
+        region[PT + 30:PT + 58, PL + 38:PL + 60] = True
+        emb = rising(bulwark_base, 12, 17, [rgb('f7f5b8'), rgb('f6e70e'), rgb('f47b22'), rgb('ca2c29')],
+                     life=(5, 9), region=region)
+        pregion = np.zeros((H, W), bool)
+        pregion[PT + 36:PT + 62, 0:PL + 34] = True
+        puffs = rising(bulwark_base, 14, 23, [rgb('8410ff', 200), rgb('7410d2', 170), rgb('6000ba', 130),
+                                              rgb('420080', 90)], life=(7, 12), vy=(0.4, 0.7), region=pregion)
+        BW_EMBERS = emb, puffs
+    out = bulwark_base(i)
+    b = B24[i % 24]
+    for (x, y), c in sparkle_pixels(i, N, [(x + PL, y + PT + (b if y < KNEE else 0), t0) for x, y, t0 in BW_SPARKLES],
+                                    rgb('e0ffff'), rgb('91e6e6')).items():
+        dot(out, x, y, c)
+    draw_parts(out, BW_EMBERS[0], i)
+    for e, steps in BW_EMBERS[1]:                         # Gasschwaden: 2x2, halbtransparent
+        a = (i - e) % N
+        if a < len(steps):
+            for (x, y), c in steps[a].items():
+                for dx, dy in ((0, 0), (1, 0), (0, 1), (1, 1)):
+                    if not out[y + dy, x + dx, 3]:
+                        dot(out, x + dx, y + dy, c)
+    return out
+
+
+# ---------------------------------------------------------------- Rescued Damsel Cecilia
+CE_PIVOT = (-6, -13)                                    # Aufhängung des Seils (oberhalb des Bildes)
+CE_GRIP = (23, 50)                                      # hier hält sie das Seil
+CE_HEART = {'fa7dff', 'fca7ff', 'f836ff'}
+CE = None
+
+
+def f_cecilia(i):
+    """Die gerettete Cecilia schwingt mit dem Ritter im Arm am Seil hin und her (das Seil dreht sich
+    um seine Aufhängung, die beiden hängen daran); die Herzchen um sie schweben auf und ab, das Herz
+    in ihrem Auge pocht."""
+    global CE
+    if CE is None:
+        rope, body, knight, blush = load('rope'), load('body'), load('knight'), load('blush')
+        upper = rope.copy()
+        upper[CE_GRIP[1] + 2:] = 0
+        lower = rope.copy()
+        lower[:CE_GRIP[1] + 2] = 0
+        fig = np.zeros_like(body)
+        for part in (lower, body, knight):
+            m = part[:, :, 3] > 0
+            fig[m] = part[m]
+        import cv2
+        hm = np.array([[fig[y, x, 3] > 0 and hexc(fig[y, x]) in CE_HEART for x in range(SW)] for y in range(SH)])
+        n, lab = cv2.connectedComponents(hm.astype(np.uint8), connectivity=8)
+        hearts = []
+        for k in range(1, n):
+            ys, xs = np.nonzero(lab == k)
+            hearts.append({(x, y): fig[y, x].copy() for y, x in zip(ys, xs)})
+        fig[hm] = 0
+        CE = upper, fig, blush, hearts
+    upper, fig, blush, hearts = CE
+    t = 2 * math.pi * i / N
+    ang = 6.0 * math.sin(t)                               # ein ruhiger Schwung je Loop
+    a = math.radians(ang)
+    gx, gy = CE_GRIP[0] - CE_PIVOT[0], CE_GRIP[1] - CE_PIVOT[1]
+    dx = round(gx * math.cos(a) - gy * math.sin(a) - gx)
+    dy = round(gx * math.sin(a) + gy * math.cos(a) - gy)
+    out = rot_wing(upper, CE_PIVOT, ang, 1.0, 0) if ang else np.zeros((H, W, 4), int)
+    if not ang:
+        paste(out, upper, PL, PT)
+    paste(out, fig, PL + dx, PT + dy)
+    for y, x in zip(*np.nonzero(blush[:, :, 3])):
+        blend(out, x + PL + dx, y + PT + dy, blush[y, x])
+    for k, h in enumerate(hearts):
+        cx = sum(x for x, _ in h) / len(h)
+        cy = sum(y for _, y in h) / len(h)
+        eye = 25 <= cx <= 29 and cy > 56                  # das Herz im Auge pocht an Ort und Stelle
+        hy = 0 if eye else -round(1.5 * (0.5 - 0.5 * math.cos(3 * t + 1.3 * k)) * 2)
+        big = eye and (i % 12) in (0, 1, 6)
+        for (x, y), c in h.items():
+            dot(out, x + PL + dx, y + PT + dy + hy, c)
+        if big:
+            for (x, y), c in h.items():
+                for ex, ey in ((-1, 0), (1, 0)):
+                    if (x + ex, y + ey) not in h:
+                        dot(out, x + ex + PL + dx, y + ey + PT + dy, rgb('f836ff'))
+    return out
+
+
+# ---------------------------------------------------------------- Bloom, the Continent Corruptor
+CO = None
+CO_POLLEN = None
+CO_RED = {'210000', '390000', '760000', '530000', '420000', '330000', '660000', '800000', 'b50000'}
+CO_VINE = {'17414d', '19653b', '144f2e', '228a50'}
+CO_HEAD = 24                                            # bis hierher schwankt die Blüte
+
+
+def corruptor_base(i):
+    global CO
+    if CO is None:
+        CO = load('stem'), load('leaves'), load('flower'), load('glow')
+    stem, leaves, flower, glow = CO
+    t = 2 * math.pi * i / N
+    lean = 2.2 * math.sin(2 * t)
+    chomp = (i % 8) in (4, 5)                             # das Maul schnappt
+    out = np.zeros((H, W, 4), int)
+    for part in (stem, leaves, flower):
+        p = part.copy()
+        if part is flower and chomp:                      # Oberkiefer (Zeilen 37–41) klappt 1 px herunter
+            jaw = np.zeros(p.shape[:2], bool)
+            jaw[37:42, 10:19] = p[37:42, 10:19, 3] > 0
+            q = p.copy()
+            for y, x in sorted(zip(*np.nonzero(jaw)), reverse=True):
+                q[y + 1, x] = p[y, x]
+            p = q
+        for y, x in zip(*np.nonzero(p[:, :, 3])):
+            dx = round(lean * ((CO_HEAD - y) / CO_HEAD) ** 1.2) if y < CO_HEAD else 0
+            dot(out, x + dx + PL, y + PT, p[y, x])
+    for y, x in zip(*np.nonzero(glow[:, :, 3])):          # das Leuchten liegt halbtransparent darüber
+        dx = round(lean * ((CO_HEAD - y) / CO_HEAD) ** 1.2) if y < CO_HEAD else 0
+        blend(out, x + dx + PL, y + PT, glow[y, x])
+    src = out[PT:PT + SH, PL:PL + SW].copy()
+    flutter(out, src, i, PL, PT, list(range(21, 37)), range(0, 12), range(21, SW), amp=1.2, speed=4,
+            ok=lambda c: hexc(c) in CO_VINE)             # die Ranken peitschen
+    return out
+
+
+def f_corruptor(i):
+    """Bloom, the Continent Corruptor: die riesige Blume schwankt, die Blüte leuchtet, das Maul im Stängel
+    schnappt, die Ranken peitschen; aus der Blüte schießt Pollen nach oben und rieselt ringsum herab."""
+    global CO_POLLEN
+    if CO_POLLEN is None:
+        fig = figure_mask(corruptor_base)
+        rng = np.random.default_rng(29)
+        CO_POLLEN, tries = [], 0
+        while len(CO_POLLEN) < 60 and tries < 40000:
+            tries += 1
+            e = int(rng.integers(N))
+            vx, vy = rng.uniform(-0.9, 0.9), rng.uniform(-1.6, -0.8)
+            x0, y0 = PL + 16 + rng.uniform(-3, 3), PT - 1
+            path = []
+            x, y = x0, y0
+            for a in range(40):
+                x, y = x + vx + 0.35 * math.sin(0.5 * a + e), y + vy
+                vy = min(0.9, vy + 0.18)
+                vx *= 0.97
+                path.append((int(round(x)), int(round(y))))
+                if y > H - 3:
+                    break
+            path = [(x, y) for x, y in path]
+            ok = all(1 <= x < W - 1 and 1 <= y < H - 1 for x, y in path) and \
+                all(not fig[y, x] for x, y in path[2:])
+            if ok and len(path) > 12:
+                CO_POLLEN.append((e, path, int(rng.integers(3))))
+    out = corruptor_base(i)
+    for e, path, kind in CO_POLLEN:
+        a = (i - e) % N
+        if a < len(path):
+            x, y = path[a]
+            c = rgb('ffff00', 150 + 40 * kind) if (a + kind) % 5 else rgb('ffffa0', 230)
+            if not out[y, x, 3] or a < 2:
+                blend(out, x, y, c)
+    return out
+
+
 FRAME = dict(quetza=f_quetza, emerald=f_emerald, lyta=f_lyta, pete=f_pete, sparrow=f_sparrow, pinta=f_pinta,
-             quisto=f_quisto, sasza=f_sasza)
+             quisto=f_quisto, sasza=f_sasza, bulwark=f_bulwark, cecilia=f_cecilia, corruptor=f_corruptor)
 
 if __name__ == '__main__':
     tag = sys.argv[1] if len(sys.argv) > 1 else 'v'
