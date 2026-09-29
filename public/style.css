@@ -24597,3 +24597,7 @@ body.pp-dialog-offen .foil-diamond-rare:not(.modal-overlay *) {
   55%  { box-shadow: inset 0 0 0 2px #2b0b47, inset 0 0 0 4px rgba(107,33,184,.6); }
   80%  { box-shadow: inset 0 0 0 2px #8d3fd6, inset 0 0 0 4px rgba(165,74,232,.4); }
 }
+
+/* Die Zone schneidet sonst alles ausserhalb ihres Randes ab
+   (`.board-zone { overflow: hidden }`) — die Flammen sollen ueberstehen. */
+.board-zone.board-zone-aura { overflow: visible; }
