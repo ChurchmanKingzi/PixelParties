@@ -648,16 +648,19 @@ def shift_segment(out, s, y, seg, dx, ox, oy):
 
 
 def flutter(out, s, i, ox, oy, rows, left, right, amp=2.0, speed=6, ok=None, erratic=0.0, pause=True,
-            clamp=False, fill=None):
+            clamp=False, fill=None, profile=None):
     """Tuch-/Haarzipfel flattern nach außen: je Zeile schiebt sich die Spitze um 0..amp px hinaus und
     zurück (Welle von oben nach unten), das Original bleibt darunter – nichts reißt. fill: Farbe für
-    Lücken zwischen alter und neuer Außenkante (wo der Zipfel nur 1 px breit ist)."""
+    Lücken zwischen alter und neuer Außenkante (wo der Zipfel nur 1 px breit ist). profile(t, k, side):
+    eigener Auslenkungsverlauf 0..1 je Zeile statt der Welle."""
     t = 2 * math.pi * i / N
     env = 0.5 - 0.5 * math.cos(2 * t) if pause else 1.0
     for side, xs in ((-1, left), (1, right)):
         dxs = []
         for k, y in enumerate(rows):
             w = 0.5 + 0.5 * math.sin(speed * t - 0.9 * k + (0 if side < 0 else 1.7))
+            if profile:
+                w = profile(t, k / max(1, len(rows) - 1), side)
             if erratic:
                 w += erratic * math.sin(17 * t + 2.3 * k + side)
             dxs.append(round(amp * env * max(0.0, w)))
@@ -1271,13 +1274,21 @@ def f_alice(i):
 CAPE_MK = {'692c27', '9f3d32', '9e3d34', '452624', '51211f'}
 
 
+def karian_wind(t, u, side):
+    """Der Umhang weht: alle Zeilen blähen sich gemeinsam in Böen auf (unten weiter als oben), dazu
+    ein leichtes Nachschlagen des Saums – keine nach unten laufende Welle, nie ganz still."""
+    gust = 0.66 + 0.2 * math.sin(t + 0.4 * side) + 0.14 * math.sin(3 * t + 0.9 * side)
+    snap = 0.2 * math.sin(7 * t - 1.2 * u + side) * u
+    return min(1.0, (0.3 + 0.7 * u) * gust + snap)
+
+
 def f_megakarian(i):
     s = SRC.copy()
     blink(s, i)
     b = B24[i % 24]
     out = bounce_frame(s, b)
-    flutter(out, s, i, PL, PT + b, list(range(12, 20)), range(0, 5), range(19, SW), amp=2.0, speed=4,
-            ok=lambda c: hexc(c) in CAPE_MK, pause=False, clamp=True, fill='692c27')  # nur der Umhang unter den Schulterplatten
+    flutter(out, s, i, PL, PT + b, list(range(12, 20)), range(0, 5), range(19, SW), amp=2.6,
+            ok=lambda c: hexc(c) in CAPE_MK, pause=False, clamp=True, fill='692c27', profile=karian_wind)  # nur der Umhang unter den Schulterplatten
     return out
 
 
