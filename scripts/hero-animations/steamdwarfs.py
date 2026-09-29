@@ -33,6 +33,10 @@ V_ = {
                     skin='Quetzahuitl, Receiver of Sacrifices'),
     'lyta': dict(slug='little-lyta-the-amazon-princess', knee=20, pads=(4, 2, 3, 1)),
     'pete': dict(slug='monsieur-pete-the-booty-raider', pads=(4, 4, 4, 1)),
+    'sparrow': dict(slug='sparrow-the-bumbling-buffoon', pads=(3, 3, 4, 4)),
+    'pinta': dict(slug='pinta-the-singing-ship', pads=(8, 8, 10, 1)),
+    'quisto': dict(slug='don-quisto-the-gold-seeker', knee=19, pads=(2, 10, 8, 1)),
+    'sasza': dict(slug='sasza-the-snaka-adventurer', knee=17, pads=(3, 3, 3, 3)),
 }
 V = next((v for v in sys.argv[2:] if v in V_), 'quetza')
 C = V_[V]
@@ -453,7 +457,221 @@ def f_pete(i):
     return out
 
 
-FRAME = dict(quetza=f_quetza, emerald=f_emerald, lyta=f_lyta, pete=f_pete)
+def clamp_chain(vals):
+    out = [vals[0]]
+    for v in vals[1:]:
+        out.append(max(out[-1] - 1, min(out[-1] + 1, v)))
+    return out
+
+
+def figure_mask(base_fn):
+    """Vereinigung aller Frames einer Figur + 1-px-Rand: hier dürfen Partikel nie hin."""
+    fig = np.zeros((H, W), bool)
+    for k in range(N):
+        fig |= base_fn(k)[:, :, 3] > 0
+    return fig | ring8(fig)
+
+
+# ---------------------------------------------------------------- Sparrow
+SP_BLINK = {'halb': [((5, 9), '03161d'), ((6, 9), '03161d'), ((9, 9), '03161d'), ((10, 9), '03161d')],
+            'zu': [((x, 9), 'd8c6b5') for x in (5, 6, 9, 10)] + [((x, 10), '03161d') for x in (5, 6, 9, 10)]}
+SP_COAT = {'090a0d', '302f3d', '20212b', '191921', '111217'}
+
+
+def f_sparrow(i):
+    """Er schwebt: der ganze Kerl steigt und sinkt, die Beine baumeln etwas nach, die Mantelschöße
+    flattern, er blinzelt."""
+    t = 2 * math.pi * i / N
+    s = SRC.copy()
+    blink(s, i, SP_BLINK)
+    dy = -round(2.4 * math.sin(2 * t))
+    lag = -round(2.4 * math.sin(2 * t - 0.7))             # die Beine hängen einen Tick hinterher
+    out = np.zeros((H, W, 4), int)
+    for y, x in zip(*np.nonzero(s[:, :, 3])):
+        dot(out, x + PL, y + PT + (lag if y >= 21 else dy), s[y, x])
+    if lag > dy:                                          # die Beine hängen tiefer: die Lücke füllt das Bein
+        for x in range(SW):
+            if s[21, x, 3]:
+                for k in range(lag - dy):
+                    dot(out, x + PL, 21 + dy + k + PT, s[21, x])
+    flutter(out, s, i, PL, PT + dy, list(range(12, 21)), range(0, 5), range(11, SW), amp=1.3, speed=4,
+            ok=lambda c: hexc(c) in SP_COAT)
+    return out
+
+
+# ---------------------------------------------------------------- Pinta
+PI_WATER = {'11419b', '1b5fcd', '2573eb', 'b1f5ff', 'd9ffff'}
+PI_EYE_OPEN = [(x, y) for y in (17, 18) for x in range(14, 19)] + [(x, 19) for x in range(16, 19)]
+PI_BLINK = {'halb': [((x, 17), '404040') for x in range(14, 19)],
+            'zu': [((x, 17), 'd7d7d7') for x in range(14, 19)] + [((x, 18), '404040') for x in range(14, 19)] +
+                  [((x, 19), 'd7d7d7') for x in range(16, 19)]}
+PI_NOTES = None
+
+
+def note_templates():
+    a = load('notes')
+    import cv2
+    n, lab = cv2.connectedComponents((a[:, :, 3] > 0).astype(np.uint8), connectivity=8)
+    res = []
+    for k in range(1, n):
+        ys, xs = np.nonzero(lab == k)
+        res.append({(x - xs.min(), y - ys.min()): a[y, x] for y, x in zip(ys, xs)})
+    return res
+
+
+def pinta_base(i):
+    t = 2 * math.pi * i / N
+    s = SRC.copy()
+    blink(s, i, PI_BLINK)
+    if (i // 3) % 2:                                      # sie singt: der Mund geht auf
+        for x in (16, 17, 18):
+            s[20, x] = rgb('000000')
+            s[21, x] = rgb('5a1010')
+    water = np.array([[s[y, x, 3] > 0 and hexc(s[y, x]) in PI_WATER for x in range(SW)] for y in range(SH)])
+    bob = 1 if math.sin(2 * t) > 0.25 else 0              # das Schiff taucht sacht ein und hebt sich wieder
+    out = np.zeros((H, W, 4), int)
+    for y, x in zip(*np.nonzero(s[:, :, 3] & ~water)):
+        if y + bob < 30 or bob == 0:
+            dot(out, x + PL, y + bob + PT, s[y, x])
+    for y in range(SH):                                   # die Wellen wogen: jede Zeile schwappt hin und her
+        xs = [x for x in range(SW) if water[y, x]]
+        if not xs:
+            continue
+        off = round(1.6 * math.sin(2 * t - 0.9 * (y - 29)) - 1.6 * math.sin(-0.9 * (y - 29)))
+        for x in xs:
+            src = xs[(xs.index(x) + off) % len(xs)]
+            dot(out, x + PL, y + PT, s[y, src])
+    for k in range(3):                                    # Schaumkronen laufen über die Wasserkante
+        cx = 12 + (k * 8 + i // 2) % 23
+        if water[30, min(SW - 1, cx)]:
+            dot(out, cx + PL, 29 + PT, rgb('d9ffff'))
+            dot(out, cx + 1 + PL, 29 + PT, rgb('b1f5ff'))
+    return out
+
+
+def f_pinta(i):
+    """Die Pinta singt: der Mund im Segel geht auf und zu, Noten steigen neben ihr auf; das Auge
+    blinzelt, das Schiff taucht sacht ein, die Wellen darunter wogen, Schaumkronen laufen darüber."""
+    global PI_NOTES
+    if PI_NOTES is None:
+        fig = figure_mask(pinta_base)
+        tpl = note_templates()
+        rng = np.random.default_rng(7)
+        PI_NOTES, tries = [], 0
+        while len(PI_NOTES) < 9 and tries < 20000:
+            tries += 1
+            e, L = int(rng.integers(N)), int(rng.integers(12, 18))
+            k = int(rng.integers(len(tpl)))
+            x0, y0 = rng.uniform(0, W - 4), rng.uniform(H * 0.25, H * 0.7)
+            ph, drift = rng.uniform(0, 6.3), rng.uniform(-0.25, 0.25)
+            path = [(int(round(x0 + drift * a + 1.2 * math.sin(0.5 * a + ph))), int(round(y0 - 0.8 * a))) for a in range(L)]
+            ok = all(0 <= x + dx < W and 0 <= y + dy < H and not fig[y + dy, x + dx]
+                     for x, y in path for (dx, dy) in tpl[k])
+            if ok and sum(1 for r in PI_NOTES if min((e - r[0]) % N, (r[0] - e) % N) <= 3) < 2:
+                PI_NOTES.append((e, L, k, path))
+        PI_NOTES = (tpl, PI_NOTES)
+    tpl, notes = PI_NOTES
+    out = pinta_base(i)
+    for e, L, k, path in notes:
+        a = (i - e) % N
+        if a < L:
+            x, y = path[a]
+            for (dx, dy), c in tpl[k].items():
+                if a >= L - 3 and (dx + dy + a) % 2:              # verblasst am Ende
+                    continue
+                dot(out, x + dx, y + dy, c)
+    return out
+
+
+# ---------------------------------------------------------------- Don Quisto
+QU_BLINK = {'halb': [((7, 9), '000000')],
+            'zu': [((7, 9), 'c69863'), ((11, 9), 'c69863'), ((7, 10), '000000'), ((11, 10), '000000')]}
+QU_MUZZLE = 25                                          # letzte Spalte der Handkanone
+QU_HOT = {'692110', '592500', '591000', '593e00', '591b00'}
+QU_SHOTS = (6, 22, 38)                                  # Schüsse
+QU_FLASH = {0: {(0, 0): 'ffffff', (1, 0): 'ffffff', (0, -1): 'fff6a0', (0, 1): 'fff6a0', (2, 0): 'fff6a0',
+                (1, -1): 'ffd23c', (1, 1): 'ffd23c', (3, 0): 'ffd23c', (2, -2): 'ff8a1e', (2, 2): 'ff8a1e',
+                (4, 0): 'ff8a1e', (0, -2): 'ffd23c', (0, 2): 'ffd23c'},
+            1: {(0, 0): 'fff6a0', (1, 0): 'ffd23c', (2, 0): 'ff8a1e', (0, -1): 'ff8a1e', (0, 1): 'ff8a1e',
+                (3, -1): 'ee2d24', (3, 1): 'ee2d24'},
+            2: {(1, 0): 'ee2d24', (2, -1): 'a02010'}}
+QU_SMOKE = None
+
+
+def quisto_base(i):
+    s = SRC.copy()
+    blink(s, i, QU_BLINK)
+    since = min((i - st) % N for st in QU_SHOTS)
+    heat = max(0.0, 1.0 - since / 10)                      # nach dem Schuss glüht die Mündung, kühlt ab
+    glow = 0.35 + 0.25 * math.sin(2 * math.pi * i / 8)    # und glimmt immer ein wenig
+    f = max(heat, glow)
+    for y in range(SH):
+        for x in range(QU_MUZZLE - 2, QU_MUZZLE + 1):
+            if s[y, x, 3] and hexc(s[y, x]) in QU_HOT:
+                c = s[y, x]
+                hot = rgb('ff7a1e') if f > 0.8 else rgb('e8461c') if f > 0.5 else rgb('a8301a')
+                s[y, x] = hot if (x == QU_MUZZLE or f > 0.5) else c
+    out = np.zeros((H, W, 4), int)
+    draw_bounce(out, s, B24[i % 24], KNEE, PT, PL)
+    return out
+
+
+def f_quisto(i):
+    """Don Quisto federt und blinzelt; seine Handkanone ist glühend heiß: die Mündung glimmt, über dem
+    Rohr flimmert die Luft; dreimal je Loop feuert sie (Mündungsfeuer, danach steigt Rauch auf)."""
+    global QU_SMOKE
+    out = quisto_base(i)
+    b = B24[i % 24]
+    t = 2 * math.pi * i / N
+    for cx, ph in ((18, 0.0), (21, 2.1), (24, 4.2)):     # Hitzeflimmern über dem Rohr
+        for y in range(3, 9):
+            x = cx + round(0.9 * math.sin(1.3 * y - 3 * t * 2 + ph))
+            a = int(60 + 50 * (0.5 + 0.5 * math.sin(2 * t * 3 + y + ph)))
+            if not out[y + PT + b, x + PL, 3]:
+                dot(out, x + PL, y + PT + b, rgb('ffe8c0', a))
+    my = 12 + PT + b                                      # Mündungsfeuer
+    for st in QU_SHOTS:
+        a = (i - st) % N
+        if a in QU_FLASH:
+            for (dx, dy), c in QU_FLASH[a].items():
+                dot(out, QU_MUZZLE + 1 + dx + PL, my + dy, rgb(c))
+        if 2 <= a < 12:                                   # Rauch zieht nach oben weg
+            k = a - 2
+            for j, (dx, dy) in enumerate(((0, 0), (1, 0), (0, -1), (1, -1))):
+                if j < 4 - k // 3:
+                    dot(out, QU_MUZZLE + 3 + dx + k // 3 + PL, my - 2 - k + dy, rgb('9a948c' if j % 2 else 'b8b2aa', max(60, 210 - 18 * k)))
+    return out
+
+
+# ---------------------------------------------------------------- Sas'Za
+SZ_BLINK = {'halb': [((x, 9), '311800') for x in (8, 9, 12, 13)],
+            'zu': [((x, 9), 'f6bd98') for x in (8, 9, 12, 13)] + [((x, 10), '311800') for x in (8, 9, 12, 13)]}
+SZ_HAIR = {'172145', '788cd2', '4863c2', '3d58b7', '1e2c5b', '2d4187', 'a2b0e0'}
+SZ_SCALES = {'3f5d1d', '6c8527', '0c3304', '311800', '0f0a04'}
+
+
+def f_sasza(i):
+    """Sas'Za atmet und blinzelt, ihre blauen Haarspitzen wippen, der Schlangenleib unten wogt sacht."""
+    s = SRC.copy()
+    blink(s, i, SZ_BLINK)
+    b = B24[i % 24]
+    out = np.zeros((H, W, 4), int)
+    draw_bounce(out, s, b, KNEE, PT, PL)
+    flutter(out, s, i, PL, PT + b, list(range(0, 8)), range(3, 7), range(14, SW), amp=1.2, speed=5,
+            ok=lambda c: hexc(c) in SZ_HAIR)
+    t = 2 * math.pi * i / N
+    for x in range(5, 16):                                # der Schlangenleib wogt: Spalten wandern sacht
+        dy = round(0.9 * (math.sin(3 * t - 0.8 * x) - math.sin(-0.8 * x)))
+        if dy <= 0:
+            continue
+        seg = [y for y in range(20, SH) if s[y, x, 3] and hexc(s[y, x]) in SZ_SCALES]
+        if seg:
+            dot(out, x + PL, max(seg) + dy + PT, s[max(seg), x])
+    return out
+
+
+FRAME = dict(quetza=f_quetza, emerald=f_emerald, lyta=f_lyta, pete=f_pete, sparrow=f_sparrow, pinta=f_pinta,
+             quisto=f_quisto, sasza=f_sasza)
 
 if __name__ == '__main__':
     tag = sys.argv[1] if len(sys.argv) > 1 else 'v'
