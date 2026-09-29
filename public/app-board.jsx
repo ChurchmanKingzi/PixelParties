@@ -10380,8 +10380,8 @@ const ANIM_REGISTRY = {
     return function TigerImpactEffect({ x, y }) {
       return (
         <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100,
-          display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <div style={{ fontSize: 64, animation: 'tigerFadeInOut 1.2s ease-in-out forwards', marginLeft: -32, marginTop: -32 }}>🐯</div>
+          display: 'flex', alignItems: 'center', justifyContent: 'center', width: 0, height: 0 }}>
+          <div style={{ fontSize: 64, animation: 'tigerFadeInOut 1.2s ease-in-out forwards' }}>🐯</div>
         </div>
       );
     };
@@ -10973,8 +10973,8 @@ const ANIM_REGISTRY = {
     return function OxImpactEffect({ x, y }) {
       return (
         <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100,
-          display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <div style={{ fontSize: 64, animation: 'tigerFadeInOut 1.2s ease-in-out forwards', marginLeft: -32, marginTop: -32 }}>𖤍</div>
+          display: 'flex', alignItems: 'center', justifyContent: 'center', width: 0, height: 0 }}>
+          <div style={{ fontSize: 64, animation: 'tigerFadeInOut 1.2s ease-in-out forwards' }}>𖤍</div>
         </div>
       );
     };
@@ -10983,8 +10983,8 @@ const ANIM_REGISTRY = {
     return function SnakeImpactEffect({ x, y }) {
       return (
         <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100,
-          display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <div style={{ fontSize: 64, animation: 'tigerFadeInOut 1.2s ease-in-out forwards', marginLeft: -32, marginTop: -32 }}>🐍</div>
+          display: 'flex', alignItems: 'center', justifyContent: 'center', width: 0, height: 0 }}>
+          <div style={{ fontSize: 64, animation: 'tigerFadeInOut 1.2s ease-in-out forwards' }}>🐍</div>
         </div>
       );
     };
@@ -16821,8 +16821,8 @@ const ANIM_REGISTRY = {
     return function AngerMarkEffect({ x, y }) {
       return (
         <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100,
-          display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <div style={{ fontSize: 52, animation: 'tigerFadeInOut 1s ease-in-out forwards', marginLeft: -26, marginTop: -36 }}>💢</div>
+          display: 'flex', alignItems: 'center', justifyContent: 'center', width: 0, height: 0 }}>
+          <div style={{ fontSize: 52, animation: 'tigerFadeInOut 1s ease-in-out forwards' }}>💢</div>
         </div>
       );
     };
@@ -16833,10 +16833,9 @@ const ANIM_REGISTRY = {
     return function WeirdDollGrowEffect({ x, y }) {
       return (
         <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100,
-          display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          display: 'flex', alignItems: 'center', justifyContent: 'center', width: 0, height: 0 }}>
           <div style={{
             fontSize: 52,
-            marginLeft: -26, marginTop: -26,
             filter: 'drop-shadow(0 0 8px rgba(255,180,200,0.7))',
             animation: 'weirdDollGrow 700ms ease-out forwards',
           }}>🪆</div>
