@@ -1,0 +1,16 @@
+{
+  "hero": "Tri Ad, the Puppet Mistress",
+  "sheet": "tri-ad-the-puppet-mistress.png",
+  "frameWidth": 32,
+  "frameHeight": 31,
+  "frames": 48,
+  "frameMs": 90,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 2,
+  "padLeft": 2,
+  "padRight": 2,
+  "padBottom": 5,
+  "faceX": 15.5,
+  "footY": 26
+}

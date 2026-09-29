@@ -1,0 +1,16 @@
+{
+  "hero": "Tempeste Moana, the Rain Singer",
+  "sheet": "tempeste-moana-the-rain-singer.png",
+  "frameWidth": 38,
+  "frameHeight": 36,
+  "frames": 48,
+  "frameMs": 90,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 9,
+  "padLeft": 9,
+  "padRight": 9,
+  "padBottom": 2,
+  "faceX": 18.0,
+  "footY": 34
+}

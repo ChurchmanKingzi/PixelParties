@@ -50,7 +50,7 @@ Dazu je Variante:
              Roboter: die Augen glimmen; Skin: blinzelt.
 * orthos:    die Flammen auf den Köpfen lodern, beide Köpfe blinzeln, dazu
              leichtes Squash-and-Stretch in der Senkrechten (unten fest).
-* luna:      schwebt auf und ab, schlägt mit den gelben Flügelchen, ihr Körper
+* luna:      schwebt auf und ab (um sie steigt Glut auf), schlägt mit den gelben Flügelchen, ihr Körper
              wiegt sich, die Haare wehen sacht, sie blinzelt; die rote Kontur
              wird jedes Frame neu um die ganze Figur gelegt (immer genau 1 px).
 * tsuki:     leuchtet hellgelb bis weiß, leicht durchscheinend mit weichem
@@ -104,7 +104,7 @@ V_ = {
     'nero': dict(slug='nero-zira-the-mastermind', part='body', hang=6, pads=(3, 3, 3, 4)),
     'normalnero': dict(slug='normal-nero-zira', hang=1, pads=(3, 3, 3, 4)),
     'orthos': dict(slug='orthos-the-loyal-guard-dog', pads=(3, 3, 5, 2)),
-    'luna': dict(slug='luna-the-flame-fairy', pads=(4, 4, 4, 4)),
+    'luna': dict(slug='luna-the-flame-fairy', pads=(6, 6, 7, 4)),
     'tsuki': dict(slug='tsu-ki-the-lunatic-princess', part='body', pads=(7, 7, 7, 7)),
 }
 V = next((v for v in sys.argv[2:] if v in V_), 'kent')
@@ -775,8 +775,23 @@ def frame(i):
     return out
 
 
+LUNA_EMBERS = None
+
+
+def frame_with_particles(i):
+    """Luna: um sie steigt Glut auf (Funken kühlen ab und verlöschen, nie an der Figur)."""
+    global LUNA_EMBERS
+    out = frame(i)
+    if V == 'luna':
+        import particles
+        if LUNA_EMBERS is None:
+            LUNA_EMBERS = particles.embers([frame(k) for k in range(N)], 36, seed=21)
+        particles.draw(out, LUNA_EMBERS, i, N)
+    return out
+
+
 if __name__ == '__main__':
     tag = sys.argv[1] if len(sys.argv) > 1 else 'v'
-    frames = [frame(i) for i in range(N)]
+    frames = [frame_with_particles(i) for i in range(N)]
     ms = int(sys.argv[2]) if len(sys.argv) > 2 and sys.argv[2].isdigit() else 90
     save_outputs(f'{V}_idle_{tag}', frames, ms, scale=6, check_edges=True)

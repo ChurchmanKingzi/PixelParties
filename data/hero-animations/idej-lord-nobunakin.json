@@ -1,0 +1,15 @@
+{
+  "hero": "Idej Lord Nobunakin",
+  "sheet": "idej-lord-nobunakin.png",
+  "frameWidth": 26,
+  "frameHeight": 38,
+  "frames": 48,
+  "frameMs": 90,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 2,
+  "padLeft": 2,
+  "padRight": 2,
+  "padBottom": 1,
+  "faceX": 10.0
+}

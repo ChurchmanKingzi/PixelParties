@@ -13,6 +13,8 @@ Teile: src/idej-lord-daiyo-{ghost,sword}.png (deckungsgleich).
   glühen auf, der Oberkörper atmet (hebt sich im Rhythmus um 1 px).
 * Er blinzelt zweimal pro Loop (die weißen Augen schließen sich zu grünen
   Lidern mit dunkler Linie).
+* Als Projektion ist er halb durchsichtig und flackert wie die übrigen Idej-Heroes
+  (hologram.py: wandernde Abtastzeile, kurz blasser, ein Zeilenstreifen springt zur Seite).
 """
 import math
 import sys
@@ -20,6 +22,7 @@ from PIL import Image
 import numpy as np
 from anim_common import rgb, save_outputs, ring8
 from flap_common import rotate_part, over, fill_pinholes
+from hologram import projection
 
 GHOST = np.array(Image.open('src/idej-lord-daiyo-ghost.png').convert('RGBA')).astype(int)
 SWORD = np.array(Image.open('src/idej-lord-daiyo-sword.png').convert('RGBA')).astype(int)
@@ -37,6 +40,8 @@ HEM_Y = 21                                           # Saum
 BLINK = {14: 'halb', 15: 'zu', 16: 'zu', 17: 'halb', 38: 'halb', 39: 'zu', 40: 'zu', 41: 'halb'}
 EYE_TOP, EYE_BOT = 9, 10
 LID, LID_LINE = rgb('82f94f'), rgb('00f921')
+FLICKER = {9: 0.5, 10: 0.8, 31: 0.55}                # Projektion: kurz blasser …
+GLITCH = {9: 12, 31: 20}                             # … und ein Zeilenstreifen springt zur Seite
 
 
 def bob(i):
@@ -104,6 +109,6 @@ def frame(i):
 
 if __name__ == '__main__':
     tag = sys.argv[1] if len(sys.argv) > 1 else 'v'
-    frames = [frame(i) for i in range(N)]
+    frames = [projection(frame(i), i, FLICKER, GLITCH, PT) for i in range(N)]
     ms = int(sys.argv[2]) if len(sys.argv) > 2 and sys.argv[2].isdigit() else 90
     save_outputs(f'idej_idle_{tag}', frames, ms, scale=8, check_edges=True)

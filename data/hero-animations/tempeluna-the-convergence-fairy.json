@@ -1,0 +1,16 @@
+{
+  "hero": "Tempeluna, the Convergence Fairy",
+  "sheet": "tempeluna-the-convergence-fairy.png",
+  "frameWidth": 36,
+  "frameHeight": 39,
+  "frames": 48,
+  "frameMs": 90,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 8,
+  "padLeft": 9,
+  "padRight": 9,
+  "padBottom": 5,
+  "faceX": 18.0,
+  "footY": 34
+}

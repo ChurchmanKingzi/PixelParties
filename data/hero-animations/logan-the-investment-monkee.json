@@ -1,0 +1,16 @@
+{
+  "hero": "Logan, the Investment Monkee",
+  "sheet": "logan-the-investment-monkee.png",
+  "frameWidth": 26,
+  "frameHeight": 30,
+  "frames": 48,
+  "frameMs": 90,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 6,
+  "padLeft": 1,
+  "padRight": 3,
+  "padBottom": 2,
+  "faceX": 9.5,
+  "footY": 28
+}

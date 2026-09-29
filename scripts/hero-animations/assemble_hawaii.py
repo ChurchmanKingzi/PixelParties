@@ -1,0 +1,187 @@
+# -*- coding: utf-8 -*-
+"""Hero-Sprites aus MotiveHawaii.xcf zusammensetzen (mit dem Nutzer abgeglichen).
+
+* Tempeste, the Weather Fairy: „Tempeste“ (mit türkisem Leuchtrand).
+* Taio, the Sun Fencer: „Taio“ (Schwertarm erhoben), die in dieser Ebene halb
+  ausgeblendeten Beine aus „Taio-Kopie“; das Flammenschwert „Ebene #110“ als Teil `-sword`,
+  darüber seine Hand am Griff „Ebene #111“ als Teil `-hand`.
+* Taio, Absorber of the Mountain's Heart (Ascended): Flammenhaar-Taio „Ebene #153“,
+  Kette „Ebene #157“, Stab „Ebene #154“; statt des halben Flammenschwerts „Ebene #155“
+  Base-Taios komplettes Schwert (180° gedreht, Griff an derselben Stelle) als Teil
+  `-sword` – über der Hüfte, seine Hand (Teil `-hand`) liegt über dem Knauf; ohne das Feuer
+  unter ihm.
+* Lizbeth, the Reaper of the Light: „Lizbeth“ (Sense samt Lichtstrahlen).
+* Johanna, Crusader of Light: „Johanna“.
+* Calamitusk, the Chaorc War Chief: „Calamitustk-Kopie“ und das Banner „Ebene #53“ als Teil
+  `-banner` (die Lücke in der Stange geschlossen); ohne den Fetzen „Calamitustk-Kopie #1“.
+* Grand Inquisitor Karian: „Karian“ (nur der Inquisitor mit dem Schwert).
+* Flamebathed Waflav (Ascended): „Flamebathed Waflav“ und die Feuerflügel
+  „Flamebathed Waflav #1“ als Teil `-wings`.
+* Luna Pele, the Flame Dancer: die Tänzerin aus „Luna Tepe“ (ohne die Feuersäulen).
+* Tempeste Moana, the Rain Singer: „Tempeste Moana“.
+* Tempeluna, the Convergence Fairy (Ascended): „Tempeluna“.
+
+Aufruf:  python3 assemble_hawaii.py <pfad/zu/MotiveHawaii.xcf>
+"""
+import sys
+import numpy as np
+import cv2
+from PIL import Image
+from gimpformats.gimpXcfDocument import GimpDocument
+
+OUT = 'src'
+
+
+def layer(doc, layers, name):
+    hits = [l for l in layers if l.name == name]
+    assert len(hits) == 1, (name, len(hits))
+    l = hits[0]
+    im = l.image.convert('RGBA')
+    if l.opacity < 255:                                   # Ebenen-Deckkraft übernehmen
+        a = np.array(im)
+        a[:, :, 3] = (a[:, :, 3].astype(int) * l.opacity // 255).astype(np.uint8)
+        im = Image.fromarray(a)
+    c = Image.new('RGBA', (doc.width, doc.height), (0, 0, 0, 0))
+    c.paste(im, (l.xOffset, l.yOffset))
+    return np.array(c)
+
+
+def components(a):
+    return cv2.connectedComponents((a[:, :, 3] > 0).astype(np.uint8), connectivity=8)
+
+
+def only(a, keep):
+    return np.where(keep[:, :, None], a, 0).astype(np.uint8)
+
+
+def biggest(a):
+    n, lab = components(a)
+    k = int(np.argmax([(lab == k).sum() for k in range(1, n)])) + 1
+    return only(a, lab == k)
+
+
+def save_parts(slug, parts):
+    """parts: [(teil, Leinwand-RGBA)] von unten nach oben."""
+    comp = Image.new('RGBA', (parts[0][1].shape[1], parts[0][1].shape[0]), (0, 0, 0, 0))
+    for _, a in parts:
+        comp.alpha_composite(Image.fromarray(a))
+    bb = comp.getbbox()
+    if len(parts) > 1:
+        for name, a in parts:
+            Image.fromarray(a).crop(bb).save(f'{OUT}/{slug}-{name}.png')
+    img = comp.crop(bb)
+    img.save(f'{OUT}/{slug}.png')
+    print(slug, img.size)
+
+
+def near(a, x, y):
+    """Die Zusammenhangskomponente von a, die (x, y) am nächsten liegt."""
+    n, lab = components(a)
+    ys, xs = np.nonzero(lab > 0)
+    d = (xs - x) ** 2 + (ys - y) ** 2
+    k = lab[ys[d.argmin()], xs[d.argmin()]]
+    return only(a, lab == k)
+
+
+def box(a, x0, y0, x1, y1):
+    """Nur den Ausschnitt [x0, x1) × [y0, y1) behalten."""
+    out = np.zeros_like(a)
+    out[y0:y1, x0:x1] = a[y0:y1, x0:x1]
+    return out
+
+
+def shift(a, dx, dy):
+    out = np.zeros_like(a)
+    h, w = a.shape[:2]
+    out[max(0, dy):h + min(0, dy), max(0, dx):w + min(0, dx)] = a[max(0, -dy):h - max(0, dy), max(0, -dx):w - max(0, dx)]
+    return out
+
+
+def rows(a, y0=None, y1=None):
+    """Nur Zeilen [y0, y1) behalten (Leinwand-Koordinaten)."""
+    out = np.zeros_like(a)
+    out[y0:y1] = a[y0:y1]
+    return out
+
+
+def layer_over(*arrs):
+    """Ebenen von unten nach oben zusammenlegen."""
+    out = np.zeros_like(arrs[0])
+    for a in arrs:
+        m = a[:, :, 3] > 0
+        out[m] = a[m]
+    return out
+
+
+def save_single(name, a):
+    ys, xs = np.nonzero(a[:, :, 3])
+    Image.fromarray(a[ys.min():ys.max() + 1, xs.min():xs.max() + 1]).save(f'{OUT}/{name}.png')
+
+
+
+def grip(a):
+    """Schwerpunkt der türkisen Griffpixel (Grün und Blau über Rot)."""
+    ys, xs = np.nonzero((a[:, :, 3] > 0) & (a[:, :, 1].astype(int) > a[:, :, 0].astype(int) + 10)
+                        & (a[:, :, 2].astype(int) > a[:, :, 0].astype(int) + 10))
+    return xs.mean(), ys.mean()
+
+
+def rot180_at_grip(sword, ref):
+    """sword um 180° drehen (pixelgenau) und so verschieben, dass sein Griff auf dem von ref liegt."""
+    r = sword[::-1, ::-1].copy()
+    gx, gy = grip(r)
+    tx, ty = grip(ref)
+    return shift(r, int(round(tx - gx)), int(round(ty - gy)))
+
+
+def close_pole(a):
+    """Senkrechte Lücken in der Bannerstange (unterhalb des Tuchs) mit dem Pixel darüber füllen."""
+    op = a[:, :, 3] > 0
+    ys, xs = np.nonzero(op)
+    rows = op.sum(1)
+    cloth_bottom = int(max(y for y in range(a.shape[0]) if rows[y] > 6))
+    for x in range(a.shape[1]):
+        col = np.nonzero(op[cloth_bottom + 1:, x])[0] + cloth_bottom + 1
+        if len(col) < 2:
+            continue
+        for y in range(col.min(), col.max()):
+            if not op[y, x]:
+                a[y, x] = a[y - 1, x]
+                op[y, x] = True
+
+
+def main(path):
+    doc = GimpDocument(path)
+    L = doc.raw_layers
+    g = lambda n: layer(doc, L, n)
+    save_parts('tempeste-the-weather-fairy', [('body', g('Tempeste'))])
+    taio = g('Taio')
+    semi = (taio[:, :, 3] > 0) & (taio[:, :, 3] < 255)   # nur die halb ausgeblendeten Beinpixel aus der Kopie
+    kopie = g('Taio-Kopie')                              # (dort hängt der linke Arm herab – den nicht übernehmen)
+    taio[semi] = kopie[semi]
+    save_parts('taio-the-sun-fencer', [('body', taio), ('sword', g('Ebene #110')), ('hand', g('Ebene #111'))])
+    # Ascended Taio: ohne das Feuer unter ihm; statt des halben Flammenschwerts („Ebene #155“, Klinge nach
+    # unten) Base-Taios komplettes Flammenschwert, um 180° gedreht, Griff (türkis) an derselben Stelle
+    half = g('Ebene #155')
+    sword = rot180_at_grip(g('Ebene #110'), half)
+    body = g('Ebene #153')                               # Schwert über der Hüfte, die Hand liegt über dem Knauf
+    top = int(np.nonzero(sword[:, :, 3])[0].min())
+    over = (body[:, :, 3] > 0) & (sword[:, :, 3] > 0)
+    over[top + 2:] = False
+    hand = only(body, over)
+    save_parts('taio-absorber-of-the-mountain-s-heart', [
+        ('body', body), ('sword', sword), ('hand', hand), ('staff', g('Ebene #154')), ('chain', g('Ebene #157'))])
+    save_parts('lizbeth-the-reaper-of-the-light', [('body', g('Lizbeth'))])
+    save_parts('johanna-crusader-of-light', [('body', g('Johanna'))])
+    banner = g('Ebene #53')                              # ohne „Calamitustk-Kopie #1“ (überflüssiger Fetzen);
+    close_pole(banner)                                   # die darunter verdeckte Lücke der Stange schließen
+    save_parts('calamitusk-the-chaorc-war-chief', [('body', g('Calamitustk-Kopie')), ('banner', banner)])
+    save_parts('grand-inquisitor-karian', [('body', g('Karian'))])
+    save_parts('flamebathed-waflav', [('wings', g('Flamebathed Waflav #1')), ('body', g('Flamebathed Waflav'))])
+    save_parts('luna-pele-the-flame-dancer', [('body', near(g('Luna Tepe'), 286, 452))])
+    save_parts('tempeste-moana-the-rain-singer', [('body', g('Tempeste Moana'))])
+    save_parts('tempeluna-the-convergence-fairy', [('body', g('Tempeluna'))])
+
+
+if __name__ == '__main__':
+    main(sys.argv[1])
