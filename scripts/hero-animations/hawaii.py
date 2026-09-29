@@ -8,15 +8,16 @@ staucht sich (der Fuß bleibt), die Zungen wiegen zur Spitze hin seitlich, die H
 nach oben (Farbstufen aus den eigenen Farben der Flamme), über den Spitzen reißen
 Fetzen ab. Frame 0 ist immer das Originalbild.
 
-* taio:     Taio, the Sun Fencer: federt; um ihn lodert eine Flammenaura; seine Hand hält den
+* taio:     Taio, the Sun Fencer: federt; um ihn lodert eine Flammenaura; seine linke Hand hält den
             Griff, er hebt und senkt das Flammenschwert (Unterarm geht mit), die Klinge brennt.
             Die Farbfolge der Flammen (innen fast weiß, dann gelb, orange, außen rot) bleibt
             bei Taio, Ascended Taio und Waflavs Hörnern fest, nur die Form lodert.
 * taioasc:  Taio, Absorber of the Mountain's Heart: hängt an der Eisenkette und schaukelt
             leicht (Pendel um das obere Kettenende); das Flammenhaar brennt, am gedrehten
             Flammenschwert (Klinge nach unten) flackert die Klinge und die Spitze züngelt.
-* waflav:   Flamebathed Waflav steht, hebt und senkt die Klauen neben dem Kopf gegengleich und
-            blinzelt; die Feuerflügel sind ein Flammenfeld
+* waflav:   Flamebathed Waflav steht, hebt und senkt die Klauen neben dem Kopf in kleinen,
+            unregelmäßigen Gesten, der Mund geht ab und zu leicht zu (der Unterkiefer schiebt
+            sich hoch), er blinzelt; die Feuerflügel sind ein Flammenfeld
             (Zungen steigen von unten nach oben durch die Flügel und züngeln über den Rand),
             Feuerhörner und die Flammen an den Beinen brennen.
 * pele:     Luna Pele, the Flame Dancer: tanzt Hula (die Hüften schwingen, der Oberkörper
@@ -38,7 +39,7 @@ OUT = os.environ.get('HW_OUT', '.')
 FLAME = ('ca2c29', 'f47b22', 'f6e70e', 'f7f5b8')         # Hawaii-Flammen, dunkel -> hell
 
 V_ = {
-    'taio': dict(slug='taio-the-sun-fencer', part='body', knee=35, pads=(6, 6, 8, 2)),
+    'taio': dict(slug='taio-the-sun-fencer', part='body', knee=35, pads=(6, 6, 10, 2)),
     'taioasc': dict(slug='taio-absorber-of-the-mountain-s-heart', part='body', pads=(5, 5, 6, 5)),
     'waflav': dict(slug='flamebathed-waflav', part='body', pads=(4, 4, 7, 3),
                    blink={'halb': [((40, 30), '5a7080'), ((45, 30), '5a7080')],
@@ -228,21 +229,22 @@ def f_taioasc(i):
     w = 2 * math.pi * i / N
     swing = lambda x, y: int(round(2.2 * max(0, y) / 40 * math.sin(w)))   # Pendel um das obere Kettenende
     out = np.zeros((H, W, 4), int)
-    # das gedrehte Flammenschwert (Klinge nach unten) liegt unter ihm (die Hand über dem Knauf):
+    # das gedrehte Flammenschwert (Klinge nach unten) liegt über der Hüfte, die Hand über dem Knauf;
     # die Klinge züngelt, die Farbfolge (innen hell, außen rot) bleibt dabei fest
     ys, xs = np.nonzero(sword[:, :, 3])
     guard = int(ys.min()) + 12                            # unterhalb der Parierstange beginnt die Klinge
     blade = (sword[:, :, 3] > 0) & (_ys >= guard)
     hilt = sword.copy()
     hilt[blade] = 0
-    put(out, hilt, PL, PT, dx_fn=swing)
-    fl = burn(sword[::-1], blade[::-1], i, seed=8, stretch=1.2, sway=0.8, flakes=False, heat=0.0)
-    draw_fire(out, {(x, SH - 1 - y): c for (x, y), c in fl.items()}, PL, PT, dx_fn=swing)
     fm = flame_mask(body)
     rest = body.copy()
     rest[fm] = 0
     put(out, rest, PL, PT, dx_fn=swing)
     draw_fire(out, burn(body, fm, i, seed=3, stretch=1.5, sway=0.9, heat=0.0), PL, PT, dx_fn=swing)
+    put(out, hilt, PL, PT, dx_fn=swing)                  # das Schwert liegt über der Hüfte ...
+    fl = burn(sword[::-1], blade[::-1], i, seed=8, stretch=1.2, sway=0.8, flakes=False, heat=0.0)
+    draw_fire(out, {(x, SH - 1 - y): c for (x, y), c in fl.items()}, PL, PT, dx_fn=swing)
+    put(out, load('hand'), PL, PT, dx_fn=swing)          # ... die Hand über dem Knauf
     put(out, staff, PL, PT, dx_fn=swing)
     put(out, chain, PL, PT, dx_fn=swing)
     fill_pinholes(out)
@@ -293,14 +295,18 @@ def fire_field(img, mask, i, seed=0, reach=3):
     return res
 
 
+# Klauen: kleine, unregelmäßige Gesten (hoch/runter um 1 px, mit Pausen), links und rechts versetzt
+WAF_LA = [0] * 5 + [-1] * 4 + [0] * 9 + [1] * 2 + [0] * 3 + [-1] * 6 + [0] * 7 + [1] * 3 + [0] * 9
+WAF_RA = [0] * 11 + [-1] * 3 + [0] * 4 + [-1] * 2 + [0] * 8 + [1] * 4 + [0] * 5 + [-1] * 5 + [0] * 6
+WAF_MOUTH = [0] * 7 + [1, 2, 2, 1] + [0] * 10 + [1, 1] + [0] * 6 + [1, 2, 2, 2, 1] + [0] * 7 + [1] + [0] * 6   # 2 = zu
+
+
 def f_waflav(i):
     body, wings = SRC.copy(), load('wings')
     blink(body, i)
-    w = 2 * math.pi * 2 * i / N
-    la = int(round(1.2 * math.sin(w)))                   # linke Klaue hoch, rechte runter und umgekehrt
-    ra = -la
+    la, ra, mo = WAF_LA[i], WAF_RA[i], WAF_MOUTH[i]
 
-    def claws(x, y):                                     # Spaltenweise: nur die äußeren Klauen, Körper bleibt
+    def claws(x, y):                                     # nur die äußeren Klauen, der Körper bleibt stehen
         if 29 <= y <= 36 and x <= 34:
             return la
         if 29 <= y <= 36 and x >= 51:
@@ -312,6 +318,11 @@ def f_waflav(i):
     rest = body.copy()
     rest[fm] = 0
     put(out, rest, PL, PT, dy_fn=claws)
+    if mo:                                               # Mund: der Unterkiefer (untere Zähne) schiebt sich hoch
+        jaw = np.zeros_like(rest)
+        sel = (_ys >= 36) & (_ys <= 38) & (_xs >= 38) & (_xs <= 47) & (rest[:, :, 3] > 0)
+        jaw[sel] = rest[sel]
+        put(out, jaw, PL, PT - mo)
     draw_fire(out, burn(body, fm, i, seed=5, stretch=1.6, sway=0.9, heat=0.0), PL, PT)
     fill_pinholes(out)
     return out
