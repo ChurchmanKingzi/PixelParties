@@ -1,0 +1,15 @@
+{
+  "hero": "\"Bloom\", the Continent Corruptor",
+  "sheet": "bloom-the-continent-corruptor.png",
+  "frameWidth": 57,
+  "frameHeight": 73,
+  "frames": 48,
+  "frameMs": 90,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 12,
+  "padLeft": 12,
+  "padRight": 12,
+  "padBottom": 8,
+  "faceX": 28.0
+}

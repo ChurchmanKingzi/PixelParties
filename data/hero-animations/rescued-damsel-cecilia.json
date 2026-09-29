@@ -1,0 +1,16 @@
+{
+  "hero": "Rescued Damsel Cecilia",
+  "sheet": "rescued-damsel-cecilia.png",
+  "frameWidth": 61,
+  "frameHeight": 90,
+  "frames": 48,
+  "frameMs": 90,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 3,
+  "padLeft": 5,
+  "padRight": 12,
+  "padBottom": 7,
+  "faceX": 32.0,
+  "footY": 83
+}

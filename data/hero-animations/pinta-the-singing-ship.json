@@ -1,0 +1,15 @@
+{
+  "hero": "Pinta, the Singing Ship",
+  "sheet": "pinta-the-singing-ship.png",
+  "frameWidth": 52,
+  "frameHeight": 45,
+  "frames": 48,
+  "frameMs": 90,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 10,
+  "padLeft": 8,
+  "padRight": 8,
+  "padBottom": 1,
+  "faceX": 24.0
+}

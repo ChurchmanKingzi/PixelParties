@@ -1,0 +1,15 @@
+{
+  "hero": "Diamond, the Bulwark of Peace",
+  "sheet": "diamond-the-bulwark-of-peace.png",
+  "frameWidth": 78,
+  "frameHeight": 73,
+  "frames": 48,
+  "frameMs": 90,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 6,
+  "padLeft": 4,
+  "padRight": 4,
+  "padBottom": 2,
+  "faceX": 41.0
+}

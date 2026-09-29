@@ -291,6 +291,17 @@ kopiert, daneben liegt eine JSON-Datei mit den Metadaten. Die erzeugten
 | `motive.py` | `final 90 nomudawn` | `nomudawn_idle_final_sheet.png` | `nomu-of-the-dawn` |
 | `motive.py` | `final 90 alienbartas` | `alienbartas_idle_final_sheet.png` | `alien-invader-bartas` |
 | `motive.py` | `final 90 tharx` | `tharx_idle_final_sheet.png` | `tharx-the-king-of-conquerors` |
+| `steamdwarfs.py` | `final 90 quetza` | `quetza_idle_final_sheet.png` | `quetzahuitl-receiver-of-sacrifices` |
+| `steamdwarfs.py` | `final 90 emerald` | `emerald_idle_final_sheet.png` | `quetzahuitl-the-emerald-dragon` |
+| `steamdwarfs.py` | `final 90 lyta` | `lyta_idle_final_sheet.png` | `little-lyta-the-amazon-princess` |
+| `steamdwarfs.py` | `final 90 pete` | `pete_idle_final_sheet.png` | `monsieur-pete-the-booty-raider` |
+| `steamdwarfs.py` | `final 90 sparrow` | `sparrow_idle_final_sheet.png` | `sparrow-the-bumbling-buffoon` |
+| `steamdwarfs.py` | `final 90 pinta` | `pinta_idle_final_sheet.png` | `pinta-the-singing-ship` |
+| `steamdwarfs.py` | `final 90 quisto` | `quisto_idle_final_sheet.png` | `don-quisto-the-gold-seeker` |
+| `steamdwarfs.py` | `final 90 sasza` | `sasza_idle_final_sheet.png` | `sasza-the-snaka-adventurer` |
+| `steamdwarfs.py` | `final 90 bulwark` | `bulwark_idle_final_sheet.png` | `diamond-the-bulwark-of-peace` |
+| `steamdwarfs.py` | `final 90 cecilia` | `cecilia_idle_final_sheet.png` | `rescued-damsel-cecilia` |
+| `steamdwarfs.py` | `final 90 corruptor` | `corruptor_idle_final_sheet.png` | `bloom-the-continent-corruptor` |
 
 `bubbles.py` ohne `gross` erzeugt eine auf Hero-Größe verkleinerte Variante
 (Sprite aus `bubbles_downscale.py`), die aktuell nicht verwendet wird.
@@ -319,7 +330,7 @@ python3 xcf_extract.py MotiveMoe.xcf assemble src/cute-princess-mary.png "Mary-K
 | MotiveArcanum-Heroes und Skin Dark Maho | `MotiveArcanum.xcf` | reproduzierbar per `python3 assemble_arcanum.py <MotiveArcanum.xcf>` (Zuordnung im Skriptkopf) |
 | MotiveBoons-Heroes und -Skins | `MotiveBoons.xcf` | reproduzierbar per `python3 assemble_boons.py <MotiveBoons.xcf>` (Zuordnung im Skriptkopf) |
 | MotiveEgypt-Heroes und -Skins | `MotiveEgypt.xcf` | reproduzierbar per `python3 assemble_egypt.py <MotiveEgypt.xcf>` (Zuordnung im Skriptkopf) |
-| MotiveSteamDwarfs-Heroes und -Skins | `MotiveSteamDwarfs.xcf` | reproduzierbar per `python3 assemble_steamdwarfs.py <MotiveSteamDwarfs.xcf>` (Zuordnung im Skriptkopf; die Datei braucht `xcf_scan.patch_gimpformats`) |
+| MotiveSteamDwarfs-Heroes und -Skins | `MotiveSteamDwarfs.xcf` | reproduzierbar per `python3 assemble_steamdwarfs.py <MotiveSteamDwarfs.xcf>` (Zuordnung im Skriptkopf; die Datei braucht `xcf_scan.patch_gimpformats`; Quetzahuitls oben abgeschnittene Flügel ergänzt `quetza_wings.py`, Pintas Noten und Blooms Pollen liegen als Partikel-Vorlagen `-notes.png`/`-pollen.png` bei) |
 | MotiveBritain-Heroes und -Skins | `MotiveBritain.xcf` | reproduzierbar per `python3 assemble_britain.py <MotiveBritain.xcf>` (Zuordnung im Skriptkopf) |
 | MotiveChina-Heroes | `MotiveChina.xcf` | reproduzierbar per `python3 assemble_china.py <MotiveChina.xcf>` (Zuordnung im Skriptkopf) |
 | MotiveCoolhalla-Heroes und Skin | `MotiveCoolhalla.xcf` | reproduzierbar per `python3 assemble_coolhalla.py <MotiveCoolhalla.xcf>` (Zuordnung im Skriptkopf; Cooldin wird aus zwei Szenen-Ebenen ausgeschnitten) |
@@ -331,7 +342,7 @@ python3 xcf_extract.py MotiveMoe.xcf assemble src/cute-princess-mary.png "Mary-K
 | MotiveHawaii-Heroes | `MotiveHawaii.xcf` | reproduzierbar per `python3 assemble_hawaii.py <MotiveHawaii.xcf>` (Zuordnung im Skriptkopf; Base-Taios Beine aus „Taio-Kopie“, seine Hand am Griff als `-hand`; Ascended Taio mit Base-Taios um 180° gedrehtem Flammenschwert; Waflavs Feuerflügel als `-wings`; Calamitusks Banner als `-banner`) |
 | MotiveIndia-Heroes | `MotiveIndia.xcf` | reproduzierbar per `python3 assemble_india.py <MotiveIndia.xcf>` (Zuordnung im Skriptkopf; die übrigen Ebenen sind Kreaturen, Puppen und Rennboote; Zamorins Glasschale und Sack als `-bowl`/`-sack`) |
 | MotiveJapan-Heroes | `MotiveJapan.xcf` | reproduzierbar per `python3 assemble_japan.py <MotiveJapan.xcf>` (Zuordnung im Skriptkopf; Champions Schwert und Hand als `-sword`/`-hand`, Nobunakins Laserschwert und Hand ebenso; die Idej-Ebenen werden voll deckend übernommen, die Transparenz setzt `hologram.py`) |
-| Motive-Heroes und -Skins | `Motive.xcf` | reproduzierbar per `python3 assemble_motive.py <Motive.xcf>` (Zuordnung im Skriptkopf; die Datei braucht `xcf_scan.patch_gimpformats`; bewegliche Teile als `-<teil>.png`: Sol Ryms Wolke `-cloud`, Chucks Sprechblase `-bubble`, Elanas Gitarre und Arme `-guitar`/`-arms`, ZsosSsars Gaswaffe `-gun`, Molindas Flügel `-wings`) |
+| Motive-Heroes und -Skins | `Motive.xcf` | reproduzierbar per `python3 assemble_motive.py <Motive.xcf>` (Zuordnung im Skriptkopf; die Datei braucht `xcf_scan.patch_gimpformats`; bewegliche Teile als `-<teil>.png`: Sol Ryms Wolke `-cloud`, Chucks Sprechblase `-bubble`, Elanas Gitarre und Arme `-guitar`/`-arms`, ZsosSsars Gaswaffe `-gun`, Molindas Flügel `-wings`, Sas'Zas Bogen `-bow`) |
 
 Neue Datei durchsuchen: `xcf_scan.py dump` legt alle Ebenen einzeln ab,
 `xcf_scan.py match <ordner> --heroes` gleicht sie mit allen noch nicht
