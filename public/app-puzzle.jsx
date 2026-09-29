@@ -334,6 +334,8 @@ const PUZZLE_COUNTER_BADGES = [
   { key: 'headCounter',       icon: '🐲', label: 'Head Counters' },
   { key: 'changeCounter',     icon: '🌌', label: 'Change Counters' },
   { key: 'balance',           icon: '⚖️', label: 'Balance Counters' },
+  // Fun-Fun Circus: Applause Counter auf beliebigen Creatures.
+  { key: 'applause',          icon: '👏', label: 'Applause Counters' },
   { key: 'bunnyBombCounter',  icon: '🧨', label: 'Bomb Counters' },
   // Demon Counter (v601) — Horned Demon, Baaliel; spaeter Great Vanguard Demon.
   { key: 'demonCounter',      icon: '😈', label: 'Demon Counters' },
@@ -2582,6 +2584,10 @@ function PuzzleCreator() {
   // and changeCounter). Null for non-Charm targets so the editor section
   // stays hidden.
   const [editBalanceCounter, setEditBalanceCounter] = useState(null);
+  // Fun-Fun Circus: Applause Counter, mit denen eine BELIEBIGE Creature ins
+  // Puzzle startet (`_creatureStatuses[hi-slot].applause` → `inst.counters.applause`).
+  // Null fuer Nicht-Creatures, damit der Abschnitt verborgen bleibt.
+  const [editApplause, setEditApplause] = useState(null);
   // Fuer Bunny Bombs: Anzahl Bomb Counter, mit denen die Kreatur ins
   // Puzzle startet. Gespeichert unter `_creatureStatuses[hi-slot].bunnyBombCounter`,
   // serverseitig als `inst.counters.bunnyBombCounter` angewendet. Null fuer
@@ -2684,6 +2690,7 @@ function PuzzleCreator() {
     setEditCeciliaDefeated(null);
     setEditJeGetroffen(null);
     setEditBalanceCounter(null);
+    setEditApplause(null);
     setEditBunnyBombCounter(null);
     setEditDemonCounter(null);
     setEditSparkflyGifts(null);
@@ -2820,6 +2827,8 @@ function PuzzleCreator() {
       setEditBalanceCounter(c?.name === 'Charm of Balance'
         ? (cs.balance || 0)
         : null);
+      // Fun-Fun Circus: jede Creature darf Applause Counter tragen.
+      setEditApplause(String(c?.cardType || '').split('/').some(t => t.trim() === 'Creature') ? (cs.applause || 0) : null);
       // Bunny Bombs: Bomb Counter aus dem gespeicherten Zustand holen.
       setEditDemonCounter(cardUsesDemonCounters(c) ? (cs.demonCounter || 0) : null);
       // Puppets (v707): Luck/Preserve auf Creatures und Tokens.
@@ -3017,6 +3026,11 @@ function PuzzleCreator() {
       if (editBalanceCounter != null && editBalanceCounter > 0) {
         merged.balance = editBalanceCounter;
       }
+      // Applause Counter (Fun-Fun Circus): Server legt sie auf `inst.counters.applause`.
+      delete merged.applause;
+      if (editApplause != null && editApplause > 0) {
+        merged.applause = editApplause;
+      }
       // Bunny Bombs: Bomb Counter sichern. Server legt sie auf
       // `inst.counters.bunnyBombCounter`.
       delete merged.bunnyBombCounter;
@@ -3056,7 +3070,7 @@ function PuzzleCreator() {
       return p;
     });
     setEditTarget(null);
-  }, [editTarget, editHp, editMaxHp, editAtk, editStatuses, editBuffs, editBiomancyLevel, editAttachedHero, editHeadCounter, editLinkedHeroSlot, editChangeCounter, editEvolutionCounter, editInvestCounter, editCeciliaDefeated, editJeGetroffen, editBountyMark, editBalanceCounter, editBunnyBombCounter, editDemonCounter, editSparkflyGifts, editAntiMagicLevel, updatePlayer, getCard, statusScopePasst]);
+  }, [editTarget, editHp, editMaxHp, editAtk, editStatuses, editBuffs, editBiomancyLevel, editAttachedHero, editHeadCounter, editLinkedHeroSlot, editChangeCounter, editEvolutionCounter, editInvestCounter, editCeciliaDefeated, editJeGetroffen, editBountyMark, editBalanceCounter, editApplause, editBunnyBombCounter, editDemonCounter, editSparkflyGifts, editAntiMagicLevel, updatePlayer, getCard, statusScopePasst]);
 
   const toggleHeroDead = useCallback(() => {
     if (!editTarget || editTarget.zt !== 'hero') return;
@@ -4872,6 +4886,41 @@ function PuzzleCreator() {
                 </div>
                 <div style={{ fontSize: 10, color: 'var(--text2)', opacity: 0.7, marginTop: 4 }}>
                   Number of cards Charm of Balance lets the player draw on activation.
+                </div>
+              </div>
+            )}
+            {/* Applause Counter (Fun-Fun Circus) — fuer JEDE Creature. Stempelt
+                `applause` in `_creatureStatuses[hi-slot]`; der Puzzle-Loader
+                des Servers legt es auf `inst.counters.applause`, sodass Abzeichen,
+                Strongman/Elephant/Director/Clown vom eingestellten Wert starten. */}
+            {editApplause != null && (
+              <div style={{ marginBottom: 14 }}>
+                <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: 1 }}>
+                  👏 Applause Counters
+                </span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
+                  <button className="btn"
+                    style={{ padding: '6px 12px', fontSize: 12, minWidth: 36 }}
+                    disabled={(editApplause || 0) <= 0}
+                    onClick={() => setEditApplause(Math.max(0, (editApplause || 0) - 1))}>
+                    −
+                  </button>
+                  <input className="input" type="number" min={0}
+                    value={editApplause ?? 0}
+                    onChange={(e) => {
+                      const n = parseInt(e.target.value, 10);
+                      setEditApplause(Number.isFinite(n) && n >= 0 ? n : 0);
+                    }}
+                    onKeyDown={(e) => e.key === 'Enter' && saveStats()}
+                    style={{ flex: 1, textAlign: 'center', fontSize: 13, fontWeight: 700, color: '#ffd24a' }} />
+                  <button className="btn"
+                    style={{ padding: '6px 12px', fontSize: 12, minWidth: 36 }}
+                    onClick={() => setEditApplause((editApplause || 0) + 1)}>
+                    +
+                  </button>
+                </div>
+                <div style={{ fontSize: 10, color: 'var(--text2)', opacity: 0.7, marginTop: 4 }}>
+                  Applause Counters on this Creature at the start of the puzzle.
                 </div>
               </div>
             )}

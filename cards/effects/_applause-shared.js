@@ -33,6 +33,15 @@ const { loadCardEffect } = require('./_loader');
 const KEY = 'applause';
 const ARCHETYPE = 'Fun-Fun Circus';
 
+/**
+ * Meldet einen GESTIEGENEN Zaehler an beide Clients (Klang + Aufleuchten
+ * des Abzeichens, Als Vorgabe 29.9.: bei JEDEM steigenden Applause Counter).
+ * Ziel: Brett `{owner, heroIdx, zoneSlot}` oder Hand `{owner, handIdx}`.
+ */
+function meldeGewinn(engine, ziel) {
+  try { engine._broadcastEvent('applause_gain', ziel); } catch { /* Anzeige darf nie stoeren */ }
+}
+
 /** Ist das eine Creature in einer Support Zone (kein Verdeckter)? */
 function istBrettCreature(engine, inst) {
   if (!inst || inst.zone !== 'support' || inst.faceDown) return false;
@@ -73,6 +82,8 @@ async function placeApplause(engine, inst, n, opts = {}) {
   if (!inst.counters) inst.counters = {};
   inst.counters[KEY] = zaehler(inst) + n;
 
+  meldeGewinn(engine, { kind: 'board', owner: engine.physicalSide(inst), heroIdx: inst.heroIdx, zoneSlot: inst.zoneSlot, amount: n });
+
   // Mitsammelnde Handkarten beider Spieler.
   for (let pi = 0; pi < engine.gs.players.length; pi++) {
     const ps = engine.gs.players[pi];
@@ -83,6 +94,7 @@ async function placeApplause(engine, inst, n, opts = {}) {
       // Solange sie in der Hand liegt, ist sie aufgedeckt (Kartentext).
       if (!ps._permanentlyRevealedHandIndices) ps._permanentlyRevealedHandIndices = {};
       ps._permanentlyRevealedHandIndices[idx] = true;
+      meldeGewinn(engine, { kind: 'hand', owner: pi, handIdx: idx, amount: n });
     });
   }
 
@@ -111,6 +123,7 @@ function moveApplause(engine, von, nach) {
   if (!nach.counters) nach.counters = {};
   nach.counters[KEY] = zaehler(nach) + n;
   if (von.counters) delete von.counters[KEY];
+  meldeGewinn(engine, { kind: 'board', owner: engine.physicalSide(nach), heroIdx: nach.heroIdx, zoneSlot: nach.zoneSlot, amount: n });
   engine.sync();
   return n;
 }
