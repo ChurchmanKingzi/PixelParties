@@ -350,10 +350,11 @@ module.exports = {
     // Ausgabe-Hooks (Debt-O-Tron, Wealth) und das Log.
     await engine.actionSpendGold(pi, GOLD_COST);
     engine._broadcastEvent('play_zone_animation', {
-      type: 'gold_sparkle', owner: pi, heroIdx: ctx.cardHeroIdx, zoneSlot: -1,
+      type: 'gold_sparkle', owner: ctx.cardHeroOwner ?? pi, heroIdx: ctx.cardHeroIdx, zoneSlot: -1,   // Styx 28.9.: Brettseite
     });
 
-    const quelle = { name: CARD_NAME, owner: pi, controller: pi, heroIdx: ctx.cardHeroIdx };
+    const quelle = { name: CARD_NAME, owner: pi, controller: pi, heroIdx: ctx.cardHeroIdx,
+      ...((ctx.cardHeroOwner ?? pi) !== pi ? { heroOwner: ctx.cardHeroOwner } : {}) };   // Styx 28.9.
 
     if (modus === 'damage') {
       engine._broadcastEvent('play_zone_animation', {

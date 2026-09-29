@@ -106,6 +106,10 @@ module.exports = {
   canActivateHeroEffect(ctx) {
     const gs = ctx._engine.gs;
     if (!triAdHoptFree(gs, ctx.cardOwner)) return false;
+    // Styx 28.9.: `performDescend` kennt nur die eigene Spalte — ein
+    // uebernommener Tri Ad stiege sonst am gleich indizierten EIGENEN
+    // Helden ab. Bis die Engine das kann: nicht aktivierbar.
+    if ((ctx.cardHeroOwner ?? ctx.cardOwner) !== ctx.cardOwner) return false;
     const hero = gs.players[ctx.cardOwner]?.heroes?.[ctx.cardHeroIdx];
     return hero?.name === TRI_AD && Array.isArray(hero._formStack) && hero._formStack.length > 0;
   },
@@ -115,6 +119,7 @@ module.exports = {
     const pi = ctx.cardOwner;
     const hi = ctx.cardHeroIdx;
     const ps = gs.players[pi];
+    if ((ctx.cardHeroOwner ?? pi) !== pi) return false;   // Styx 28.9.: s. canActivateHeroEffect
     const hero = ps?.heroes?.[hi];
     if (!hero || hero.name !== TRI_AD || !triAdHoptFree(gs, pi)) return false;
     // Sperre der Spalte ab JETZT (v707) — der Rueckweg hat vor dem
@@ -147,19 +152,22 @@ module.exports = {
       // `ctx.card` ist der HELD (Listener); abgehende Karte = `ctx.leavingCard`.
       const card = ctx.leavingCard;
       if (!card || ctx.fromZone !== 'support') return;
-      if (ctx.fromOwner !== ctx.cardOwner || ctx.fromHeroIdx !== ctx.cardHeroIdx) return;
+      // Styx 28.9.: Spalte = Brettseite des Helden, nicht Kontrolleur.
+      const feld = ctx.cardHeroOwner ?? ctx.cardOwner;
+      if (ctx.fromOwner !== feld || ctx.fromHeroIdx !== ctx.cardHeroIdx) return;
       if (!isPuppetToken(card.name)) return;
-      await checkPuppetHeroDefeat(ctx._engine, ctx.cardOwner, ctx.cardHeroIdx,
+      await checkPuppetHeroDefeat(ctx._engine, feld, ctx.cardHeroIdx,
         { name: TRI_AD, owner: ctx.cardOwner, heroIdx: ctx.cardHeroIdx }, card.id);
     },
     /** Ohne Tri Fecta/Tri Ad verschwinden alle Luck/Preserve Counter (Al 3.9.). */
     onHeroKO: async (ctx) => {
       const dead = ctx.hero;
-      if (!dead || dead !== ctx._engine.gs.players[ctx.cardOwner]?.heroes?.[ctx.cardHeroIdx]) return;
+      // Styx 28.9.: der Held selbst (Objektvergleich statt Kontrolleur-Spalte).
+      if (!dead || dead !== (ctx.attachedHero ?? ctx._engine.gs.players[ctx.cardHeroOwner ?? ctx.cardOwner]?.heroes?.[ctx.cardHeroIdx])) return;
       purgePuppetCountersIfOrphaned(ctx._engine, ctx.cardOwner);
     },
     onTurnStart: async (ctx) => {
-      await checkPuppetHeroDefeat(ctx._engine, ctx.cardOwner, ctx.cardHeroIdx,
+      await checkPuppetHeroDefeat(ctx._engine, ctx.cardHeroOwner ?? ctx.cardOwner, ctx.cardHeroIdx,   // Styx 28.9.: Brettseite
         { name: TRI_AD, owner: ctx.cardOwner, heroIdx: ctx.cardHeroIdx });
     },
   },

@@ -121,9 +121,11 @@ module.exports = {
       // steht in `ctx.leavingCard` (actionMoveCard-Form).
       const card = ctx.leavingCard;
       if (!card || ctx.fromZone !== 'support') return;
-      if (ctx.fromOwner !== ctx.cardOwner || ctx.fromHeroIdx !== ctx.cardHeroIdx) return;
+      // Styx 28.9.: Spalte = Brettseite des Helden, nicht Kontrolleur.
+      const feld = ctx.cardHeroOwner ?? ctx.cardOwner;
+      if (ctx.fromOwner !== feld || ctx.fromHeroIdx !== ctx.cardHeroIdx) return;
       if (!isPuppetToken(card.name)) return;
-      await checkPuppetHeroDefeat(engine, ctx.cardOwner, ctx.cardHeroIdx,
+      await checkPuppetHeroDefeat(engine, feld, ctx.cardHeroIdx,
         { name: TRI_FECTA, owner: ctx.cardOwner, heroIdx: ctx.cardHeroIdx }, card.id);
     },
 
@@ -131,11 +133,12 @@ module.exports = {
     /** Ohne Tri Fecta/Tri Ad verschwinden alle Luck/Preserve Counter (Al 3.9.). */
     onHeroKO: async (ctx) => {
       const dead = ctx.hero;
-      if (!dead || dead !== ctx._engine.gs.players[ctx.cardOwner]?.heroes?.[ctx.cardHeroIdx]) return;
+      // Styx 28.9.: der Held selbst (Objektvergleich statt Kontrolleur-Spalte).
+      if (!dead || dead !== (ctx.attachedHero ?? ctx._engine.gs.players[ctx.cardHeroOwner ?? ctx.cardOwner]?.heroes?.[ctx.cardHeroIdx])) return;
       purgePuppetCountersIfOrphaned(ctx._engine, ctx.cardOwner);
     },
     onTurnStart: async (ctx) => {
-      await checkPuppetHeroDefeat(ctx._engine, ctx.cardOwner, ctx.cardHeroIdx,
+      await checkPuppetHeroDefeat(ctx._engine, ctx.cardHeroOwner ?? ctx.cardOwner, ctx.cardHeroIdx,   // Styx 28.9.: Brettseite
         { name: TRI_FECTA, owner: ctx.cardOwner, heroIdx: ctx.cardHeroIdx });
     },
   },

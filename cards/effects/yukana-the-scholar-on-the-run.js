@@ -61,6 +61,10 @@ module.exports = {
   canActivateHeroEffect(ctx) {
     const engine = ctx._engine;
     const pi = ctx.cardOwner;
+    // Styx 28.9.: `_castSpellImmediately` wirkt nur ueber Helden der
+    // eigenen Spalte — eine uebernommene Yukana wirkte sonst ueber den
+    // gleich indizierten EIGENEN Helden. Bis die Engine das kann: aus.
+    if ((ctx.cardHeroOwner ?? pi) !== pi) return false;
     if (!heldenSperreFrei(engine.gs, SPERRE, pi)) return false;
     return wirkbar(engine, pi, ctx.cardHeroIdx).length > 0;
   },
@@ -71,6 +75,7 @@ module.exports = {
     const pi = ctx.cardOwner;
     const hi = ctx.cardHeroIdx;
     const ps = gs.players[pi];
+    if ((ctx.cardHeroOwner ?? pi) !== pi) return false;   // Styx 28.9.: s. canActivateHeroEffect
     if (!heldenSperreFrei(gs, SPERRE, pi)) return false;
     const spells = wirkbar(engine, pi, hi);
     if (spells.length === 0) return false;

@@ -111,8 +111,8 @@ module.exports = {
 
       // Der Held muss handlungsfaehig sein — dieselbe Huerde wie fuer
       // die Benutzbarkeit des Vorrats, damit sich beides gleich
-      // verhaelt (Ruling ②).
-      const hero = ps.heroes?.[heroIdx];
+      // verhaelt (Ruling ②). Styx 28.9.: Crestina selbst (Brettseite).
+      const hero = ctx.attachedHero ?? gs.players[ctx.cardHeroOwner ?? pi]?.heroes?.[heroIdx];
       if (!hero?.name || hero.hp <= 0) return;
       const st = hero.statuses || {};
       if (st.frozen || st.stunned || st.webbed || st.negated || st.bound) return;
@@ -203,8 +203,8 @@ module.exports = {
       if (!ps) return;
       if (!(ctx.amount > 0)) return;
 
-      // Einmal pro Zug.
-      const hero = ps.heroes?.[ctx.cardHeroIdx];
+      // Einmal pro Zug. (Styx 28.9.: Crestina selbst, Brettseite.)
+      const hero = ctx.attachedHero ?? gs.players[ctx.cardHeroOwner ?? pi]?.heroes?.[ctx.cardHeroIdx];
       if (!hero) return;
       if (!heldenSperreFrei(gs, 'crestina-negate', pi)) return;   // v1275: pro Spieler (Ruling 22.9.)
 

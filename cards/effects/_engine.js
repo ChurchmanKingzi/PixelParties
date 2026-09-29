@@ -40069,13 +40069,21 @@ this._deathWatch = (this._deathWatchStack || []).length
    * @param {number} heroIdx  - Host Hero's index in that player's heroes
    * @returns {number} effective school level the Spell should scale by
    */
-  effectiveSchoolLevelForCaster(school, pi, heroIdx) {
+  effectiveSchoolLevelForCaster(school, pi, heroIdx, heroOwner = null) {
     const ovr = this.gs._castSchoolOverride;
     if (ovr && typeof ovr[school] === 'number') return ovr[school];
-    const ps = this.gs.players[pi];
+    // Styx 28.9.: Wirker ist ggf. ein GELIEHENER Held (Brettseite ≠ pi).
+    // Explizit uebergeben oder aus dem laufenden Zauber (`doPlaySpell`
+    // setzt `gs._wirkerSeite`).
+    let seite = heroOwner;
+    if (seite == null) {
+      const w = this.gs._wirkerSeite;
+      seite = (w && w.pi === pi && w.heroIdx === heroIdx) ? w.heroOwner : pi;
+    }
+    const ps = this.gs.players[seite];
     const abZones = [
       ...(ps?.abilityZones?.[heroIdx] || []),
-      ...this.heroSupportAbilityStacks(pi, heroIdx),   // v767 (Xal)
+      ...this.heroSupportAbilityStacks(seite, heroIdx),   // v767 (Xal)
     ];
     return this.countAbilitiesForSchool(school, abZones);
   }

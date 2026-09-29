@@ -7394,7 +7394,14 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
       }
     }
 
-    const chainResult = await room.engine.executeCardWithChain({
+    // Styx 28.9.: Wirkt ein GELIEHENER Held, lesen Stufenabfragen
+    // (`effectiveSchoolLevelForCaster`) seine Zonen, nicht die des
+    // gleich nummerierten eigenen Helden. Verschachtelt → wiederherstellen.
+    const _wirkerVorher = gs._wirkerSeite;
+    gs._wirkerSeite = { pi, heroIdx, heroOwner };
+    let chainResult;
+    try {
+    chainResult = await room.engine.executeCardWithChain({
       cardName, owner: pi, cardType: cardData.cardType, goldCost: 0, heroIdx,
       resolve: null,
       // ★ v1328: Wirker-Seite (bezauberter Held) fuer die Handlungs-
@@ -7403,6 +7410,9 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
       casterOwner: heroOwner,
       casterCheck: !viaCreatureInstId,
     });
+    } finally {
+      if (_wirkerVorher === undefined) delete gs._wirkerSeite; else gs._wirkerSeite = _wirkerVorher;
+    }
     // ★ v1328 (Als Befund 24.9.): Der Wirker wurde WAEHREND der Kette
     // handlungsunfaehig (eingefroren, besiegt, gestunnt, negiert). Der
     // Zauber ist GESPIELT — Aktion verbraucht, Karte in die Ablage, alle

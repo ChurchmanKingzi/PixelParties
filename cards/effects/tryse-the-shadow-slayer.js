@@ -58,8 +58,10 @@ const DISCARD_COUNT = 2;
 function istDieserHeld(ctx) {
   const src = ctx.source;
   if (!src) return false;
-  const srcOwner = src.controller ?? src.owner ?? -1;
-  if (srcOwner !== ctx.cardOwner) return false;
+  // Styx 28.9.: Brettseite der Quelle (`heroOwner`) gegen Tryses Seite —
+  // sonst zaehlte der gleich indizierte eigene Held des Kontrolleurs.
+  const srcOwner = src.heroOwner ?? src.controller ?? src.owner ?? -1;
+  if (srcOwner !== (ctx.cardHeroOwner ?? ctx.cardOwner)) return false;
   if ((src.heroIdx ?? -1) !== ctx.cardHeroIdx) return false;
   // ★ KREATUREN DER EIGENEN SPALTE AUSSCHLIESSEN (Als Befund 12.9.) ──
   // Die alte Wache `src.zone === 'support'` griff nur bei LIVE-Instanzen.

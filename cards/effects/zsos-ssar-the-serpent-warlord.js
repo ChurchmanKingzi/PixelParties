@@ -63,9 +63,11 @@ module.exports = {
       const gs = engine.gs;
       const pi = ctx.cardOwner;
       const heroIdx = ctx.cardHeroIdx;
+      // Styx 28.9.: „dieser Held" = Brettseite + Index, nicht Kontrolleur.
+      const feld = ctx.cardHeroOwner ?? pi;
 
       // Only trigger for spells cast BY this hero
-      if (ctx.casterIdx !== pi || ctx.heroIdx !== heroIdx) return;
+      if ((ctx.heroOwner ?? ctx.casterIdx) !== feld || ctx.heroIdx !== heroIdx) return;
 
       // Must be a Decay Magic spell
       const spellData = ctx.spellCardData;
@@ -76,28 +78,28 @@ module.exports = {
 
       // Dedup guard: prevent double-firing for the same spell in the same turn
       const dedupKey = `zsos_cost_${gs.turn}_${ctx.spellName}_${engine.eventId}`;
-      const hero0 = gs.players[pi]?.heroes?.[heroIdx];
+      const hero0 = ctx.attachedHero ?? gs.players[feld]?.heroes?.[heroIdx];
       if (!hero0?._zsosCostDedupKey) hero0._zsosCostDedupKey = null;
       if (hero0._zsosCostDedupKey === dedupKey) return;
       hero0._zsosCostDedupKey = dedupKey;
 
       // Hero must still be alive
       const ps = gs.players[pi];
-      const hero = ps?.heroes?.[heroIdx];
+      const hero = hero0;
       if (!hero?.name || hero.hp <= 0) return;
 
-      // Collect own alive heroes as targets
+      // Collect own alive heroes as targets — Kontrolle statt Seite
+      // (Styx 28.9.): „one of your Heroes", IDs physisch.
       const ownHeroes = [];
-      for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-        const h = ps.heroes[hi];
+      for (const { physOwner, heroIdx: hi, hero: h } of engine.heroesControlledBy(pi)) {
         if (h?.name && h.hp > 0) {
-          ownHeroes.push({ id: `hero-${pi}-${hi}`, type: 'hero', owner: pi, heroIdx: hi, cardName: h.name });
+          ownHeroes.push({ id: `hero-${physOwner}-${hi}`, type: 'hero', owner: physOwner, heroIdx: hi, cardName: h.name });
         }
       }
       if (ownHeroes.length === 0) return;
 
       // If only 1 hero alive, auto-target
-      let targetHeroIdx;
+      let targetHeroIdx, targetOwner = ownHeroes[0].owner;
       if (ownHeroes.length === 1) {
         targetHeroIdx = ownHeroes[0].heroIdx;
       } else {
@@ -118,18 +120,19 @@ module.exports = {
           // Force first hero if no selection
           targetHeroIdx = ownHeroes[0].heroIdx;
         } else {
-          const picked = ownHeroes.find(t => t.id === selectedIds[0]);
-          targetHeroIdx = picked ? picked.heroIdx : ownHeroes[0].heroIdx;
+          const picked = ownHeroes.find(t => t.id === selectedIds[0]) || ownHeroes[0];
+          targetHeroIdx = picked.heroIdx;
+          targetOwner = picked.owner;
         }
       }
 
       // Apply 2 Poison stacks
-      await engine.addHeroStatus(pi, targetHeroIdx, 'poisoned', {
+      await engine.addHeroStatus(targetOwner, targetHeroIdx, 'poisoned', {
         addStacks: 2,
         appliedBy: pi,
       });
 
-      const targetName = ps.heroes[targetHeroIdx]?.name;
+      const targetName = gs.players[targetOwner]?.heroes?.[targetHeroIdx]?.name;
       engine.log('zsos_ssar_cost', {
         player: ps.username, hero: hero.name,
         target: targetName,
@@ -147,7 +150,8 @@ module.exports = {
 
       // Only modify damage dealt by this hero
       const source = ctx.source;
-      if (!source || source.owner !== pi || source.heroIdx !== heroIdx) return;
+      // Styx 28.9.: Brettseite der Quelle gegen Zsos'Ssars Seite.
+      if (!source || (source.heroOwner ?? source.owner) !== (ctx.cardHeroOwner ?? pi) || source.heroIdx !== heroIdx) return;
 
       // Only during spell/attack resolution (spellDamageLog exists)
       const log = gs._spellDamageLog;
@@ -167,7 +171,7 @@ module.exports = {
       ctx.modifyAmount(bonus);
 
       engine.log('zsos_ssar_boost', {
-        hero: gs.players[pi]?.heroes?.[heroIdx]?.name,
+        hero: ctx.attachedHero?.name,
         poisonedCount,
         bonus,
       });
