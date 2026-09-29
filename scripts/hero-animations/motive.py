@@ -1659,7 +1659,7 @@ TB_REST = 1.75                                          # in Ruhe gesenkt (links
 TB_CYCLE = [(1.72, 1.3, 1.67), (0.95, 1.0, 2.0), (-0.1, -0.05, 2.0), (-0.1, -0.05, 0.9),
             (0.7, -0.3, 0.65), (1.35, -0.3, 1.3), (1.72, -0.3, 1.67), (1.72, 0.8, 1.67)]
 TB_BACK = {0, 4, 5, 6, 7}                               # Rückhieb: die Spur ist gespiegelt (dick an der Klinge)
-TB_AXIS = 0.86                                          # Winkelhalbierende des Bogens (Spiegelachse)   # unten endet die Klinge an der Spitze der Spur
+TB_UP_END, TB_DOWN_END = -0.1, 1.72                     # wo Hieb und Rückhieb enden (dort ist die Spur am dicksten)   # unten endet die Klinge an der Spitze der Spur
 
 
 def _tb_masks():
@@ -1676,11 +1676,41 @@ def _tb_masks():
     return hilt, hilt[:, :, 3] > 0, wedge, body & ~arm, arm
 
 
+def tb_len(a):
+    return 19.0 + 3.8 * max(0.0, min(1.0, a / 1.7))
+
+
+def tb_trail(out, px_, py_, lo, hi, back):
+    """Schwungspur als überstrichene Sichel zwischen den Winkeln lo und hi: außen genau bis zur Klingenspitze,
+    am Ende des Hiebs am dicksten, zum Anfang hin spitz (beim Rückhieb gespiegelt); außen heller Rand,
+    nach innen dunkler – in den Grautönen der Spur aus dem Sprite."""
+    end = TB_DOWN_END if back else TB_UP_END
+    span = TB_DOWN_END - TB_UP_END
+    for y in range(int(py_ - 26), int(py_ + 26)):
+        for x in range(int(px_ - 26), int(px_ + 26)):
+            if not (0 <= y < out.shape[0] and 0 <= x < out.shape[1]):
+                continue
+            dx, dy = x + 0.5 - px_, y + 0.5 - py_
+            a = math.atan2(dy, dx)
+            if not lo <= a <= hi:
+                continue
+            u = max(0.0, 1 - abs(a - end) / span)       # 1 am Ende des Hiebs, 0 an seinem Anfang
+            R = tb_len(a) + 0.5
+            T = 1.0 + 14.0 * u ** 1.3
+            r = math.hypot(dx, dy)
+            if R - T <= r <= R:
+                d = (R - r) / T
+                c = 'dedede' if d < 0.2 else 'cccccc' if d < 0.45 else 'bfbfbf' if d < 0.75 else 'a7a7a7'
+                if u < 0.12:
+                    c = '969696'
+                out[y, x] = rgb(c)
+
+
 def tb_blade(out, px_, py_, ang):
     """Die eigentliche Klinge: schmal (heller Grat + dunklere Schneide), direkt gerastert – bleibt in
     jedem Winkel geschlossen."""
     ca, sa = math.cos(ang), math.sin(ang)
-    L = 19.0 + 3.8 * max(0.0, min(1.0, ang / 1.7))     # reicht in jedem Winkel bis an den Außenrand der Spur
+    L = tb_len(ang)                                     # die Spur reicht außen genau bis hierhin
     x0, y0 = round(px_ + 3 * ca - 0.5), round(py_ + 3 * sa - 0.5)
     x1, y1 = round(px_ + L * ca - 0.5), round(py_ + L * sa - 0.5)
     n = max(abs(x1 - x0), abs(y1 - y0))
@@ -1697,16 +1727,6 @@ def tb_blade(out, px_, py_, ang):
 if V == 'battlemaniac':
     TB_HILT, TB_HILT_M, TB_WEDGE, TB_BODY, TB_ARM = _tb_masks()
     TB_ANG = np.arctan2(_ys + 0.5 - TB_PIVOT[1], _xs + 0.5 - TB_PIVOT[0])
-    TB_MIRROR = np.zeros_like(SRC)                     # der Bogen an der Achse gespiegelt (Rückwärts-Abbildung)
-    _ux, _uy = math.cos(TB_AXIS), math.sin(TB_AXIS)
-    for _y in range(SH):
-        for _x in range(SW):
-            _vx, _vy = _x + 0.5 - TB_PIVOT[0], _y + 0.5 - TB_PIVOT[1]
-            _d = _vx * _ux + _vy * _uy
-            _sx, _sy = int(math.floor(TB_PIVOT[0] + 2 * _d * _ux - _vx)), int(math.floor(TB_PIVOT[1] + 2 * _d * _uy - _vy))
-            if 0 <= _sx < SW and 0 <= _sy < SH and TB_WEDGE[_sy, _sx]:
-                TB_MIRROR[_y, _x] = SRC[_sy, _sx]
-    TB_MIRROR_M = TB_MIRROR[:, :, 3] > 0
 
 
 def f_battlemaniac(i):
@@ -1724,11 +1744,7 @@ def f_battlemaniac(i):
     k = max(-1, min(3, k))
     arm_dy = lambda x: round(k * (x - 13) / 8)
     out = np.zeros((H, W, 4), int)
-    back = i % 8 in TB_BACK
-    src, wm = (TB_MIRROR, TB_MIRROR_M) if back else (s, TB_WEDGE)
-    m = wm & (TB_ANG >= lo) & (TB_ANG <= hi)            # die Spur geht mit der Faust mit (keine Lücke)
-    for y, x in zip(*np.nonzero(m)):
-        out[y + PT + k, x + PL] = src[y, x]
+    tb_trail(out, TB_PIVOT[0] + PL, TB_PIVOT[1] + PT + k, lo, hi, i % 8 in TB_BACK)
     tb_blade(out, TB_PIVOT[0] + PL, TB_PIVOT[1] + PT + k, ang)
     hilt = rotate_part(TB_HILT, TB_HILT_M, TB_PIVOT, ang, (H, W), (PL, PT + k))
     m = hilt[:, :, 3] > 0
