@@ -4,7 +4,7 @@
 Aufruf: python3 japan.py <tag> [ms] <variante>
 
 Frame 0 ist immer die Ruhepose. Die Idej-Heroes (Nobunakin, Shoguwana, Todugawin) sind
-Projektionen und werden zu 80 % deckend ausgegeben.
+Projektionen (hologram.py): halb durchsichtig, mit wandernder Abtastzeile, ab und zu flackernd.
 
 * champion:  Champion, the Stormbringer stützt sich auf sein in den Boden gerammtes Schwert; um
              ihn peitscht Sturmregen diagonal von links oben nach rechts unten, sein Haar
@@ -26,11 +26,11 @@ import numpy as np
 from PIL import Image
 from anim_common import rgb, save_outputs, BOUNCE12, sparkle_pixels, draw_bounce, ring8
 import particles
+from hologram import projection
 
 N = 48
 OUT = os.environ.get('JP_OUT', '.')
 BLINK = {14: 'halb', 15: 'zu', 16: 'zu', 17: 'halb', 38: 'halb', 39: 'zu', 40: 'zu', 41: 'halb'}
-IDEJ_ALPHA = 0.62                                       # Idej-Heroes sind Projektionen: halb durchsichtig
 B24 = [BOUNCE12[(k // 2) % 12] for k in range(24)]  # gemächlich: ein Federn je 24 Frames
 
 V_ = {
@@ -270,16 +270,30 @@ def staff_mask():
     return STAFF
 
 
+GLOW_SRC = [((2.5, 4.0), 0.0, 6.0), ((1.5, 12.0), 2.1, 4.8), ((2.5, 18.5), 4.2, 4.2)]   # (Lichtpunkt, Phase, Radius)
+
+
 def staff_glow(out, i, b):
-    """Grüner Lichthof um die Ranken des Zauberstabs, pulsierend (liegt hinter der Figur)."""
-    m = staff_mask()
-    pulse = 0.5 - 0.5 * math.cos(2 * math.pi * 2 * i / N)
-    r1 = ring8(m)
-    r2 = ring8(m | r1) & ~r1 & ~m
-    for ring, a in ((r2, 25 + 45 * pulse), (r1, 60 + 80 * pulse)):
-        for y, x in zip(*np.nonzero(ring)):
-            if not SRC[y, x, 3]:
-                dot(out, x + PL, y + PT + b, rgb('7dff6a', int(a)))
+    """Grünes Licht strahlt von drei Punkten der Ranke aus: runde, nach außen abfallende Lichthöfe
+    (drei Helligkeitsstufen), die versetzt pulsieren und hinter der Figur liegen; die Ranke selbst
+    hellt im Takt auf."""
+    light = np.zeros((SH + 8, SW + 8))
+    t = 2 * math.pi * 2 * i / N
+    for (cx, cy), ph, r0 in GLOW_SRC:
+        p = 0.5 - 0.5 * math.cos(t + ph) if i else 0.0
+        r = r0 * (0.8 + 0.3 * p)
+        for y in range(int(cy - r) - 1, int(cy + r) + 2):
+            for x in range(int(cx - r) - 1, int(cx + r) + 2):
+                d = math.hypot(x - cx, y - cy)
+                if d < r:
+                    light[y + 4, x + 4] = max(light[y + 4, x + 4], (1 - d / r) * (0.7 + 0.3 * p))
+    for y, x in zip(*np.nonzero(light > 0.12)):
+        sy, sx = y - 4, x - 4
+        if 0 <= sy < SH and 0 <= sx < SW and SRC[sy, sx, 3]:
+            continue
+        v = light[y, x]
+        a, c = (150, 'b8ffa0') if v > 0.55 else ((90, '8dff6a') if v > 0.3 else (40, '6ae04e'))
+        dot(out, sx + PL, sy + PT + b, rgb(c, a))
 
 
 def staff_magic(out, i, b):
@@ -309,6 +323,10 @@ def f_yukana(i):
             d = (x + y) - (16 + 2.5 * sweep) + (4 if x >= 14 else 0)
             if abs(d) < 0.8:
                 s[y, x] = rgb('dff4ff')
+    pulse = 0.5 - 0.5 * math.cos(2 * math.pi * 2 * i / N)
+    for y, x in zip(*np.nonzero(staff_mask())):         # die Ranke leuchtet im Takt auf
+        c = s[y, x]
+        s[y, x] = [int(c[k] + (255 - c[k]) * 0.35 * pulse * (0.4 if k != 1 else 1)) for k in range(3)] + [int(c[3])]
     b = B24[i % 24]                                     # ruhiger Atem
     out = np.zeros((H, W, 4), int)
     staff_glow(out, i, b)
@@ -328,25 +346,10 @@ FLICKER = {'nobunakin': {11: 0.55, 12: 0.8, 35: 0.5}, 'shoguwana': {7: 0.5, 26: 
 GLITCH = {'nobunakin': {11: 14, 35: 24}, 'shoguwana': {7: 9, 26: 18}, 'todugawin': {19: 8, 43: 14}}
 
 
-def projection(out, i):
-    """Projektion: halb durchsichtig, eine hellere Abtastzeile wandert nach unten, ab und zu flackert
-    das Bild (kurz blasser) und ein Zeilenstreifen springt um 1 px zur Seite."""
-    f = FLICKER[V].get(i, 1.0)
-    band = (i * 1.5) % (H + 12) - 6
-    g = GLITCH[V].get(i)
-    if g is not None:
-        g += PT
-        out[g:g + 2] = np.roll(out[g:g + 2], 1, axis=1)
-    for y in range(H):
-        a = IDEJ_ALPHA * f * (1.35 if abs(y - band) < 1 else 1.0)
-        out[y, :, 3] = np.minimum(255, out[y, :, 3] * a).astype(int)
-    return out
-
-
 def frame(i):
     out = FRAME[V](i)
     if C.get('idej'):
-        out = projection(out, i)
+        out = projection(out, i, FLICKER[V], GLITCH[V], PT)
     return out
 
 
