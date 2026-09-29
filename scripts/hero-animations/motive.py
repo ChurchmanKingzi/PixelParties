@@ -79,10 +79,10 @@ V_ = {
                     blink=eyes([(7, 8, 7, 8), (11, 12, 7, 8)], 'cc9d7c')),
     'mizune': dict(slug='silent-water-mizune', knee=19, pads=(6, 6, 8, 1),
                    blink=eyes([(6, 7, 9, 10), (10, 11, 9, 10)], 'f5ce88')),
-    'bartas': dict(slug='bomb-berserker-bartas', knee=19, pads=(8, 8, 8, 1),
+    'bartas': dict(slug='bomb-berserker-bartas', knee=20, pads=(11, 11, 11, 1),
                    blink=eyes([(4, 4, 5, 6), (9, 9, 5, 6)], 'f6bd7b')),
     'gon': dict(slug='gon-the-frostbringer', knee=20, pads=(5, 5, 4, 1)),
-    'ida': dict(slug='ida-the-adept-of-destruction', knee=21, pads=(5, 5, 7, 1),
+    'ida': dict(slug='ida-the-adept-of-destruction', knee=21, pads=(5, 5, 11, 1),
                 blink=eyes([(8, 9, 6, 7), (12, 13, 6, 7)], 'f6cd8b')),
     'vacarn': dict(slug='vacarn-the-dark-goblin-necromancer', knee=18, pads=(4, 4, 10, 1),
                    blink={'halb': [((8, 5), '2f312e'), ((13, 5), '2f312e'), ((8, 4), '2f312e'), ((13, 4), '2f312e')],
@@ -94,7 +94,7 @@ V_ = {
                                 [((x, 8), '000000') for x in (38, 39, 42, 43)]}),
     'dajan': dict(slug='legendary-explorer-dajan', knee=20, pads=(3, 5, 5, 1),
                   blink=eyes([(12, 13, 8, 9), (16, 17, 8, 9)], 'd9ba8d', line='170f14')),
-    'omikron': dict(slug='omikron-the-faceless-illusionist', knee=20, pads=(14, 14, 4, 1)),
+    'omikron': dict(slug='omikron-the-faceless-illusionist', knee=20, pads=(16, 16, 4, 1)),
 }
 V = next((v for v in sys.argv[2:] if v in V_), 'alex')
 C = V_[V]
@@ -583,11 +583,11 @@ def move_part(out, s, mask, dx, dy, ox, oy, toward=0):
             out[y + dy + oy, x + dx + ox] = s[y, x]
 
 
-def flutter(out, s, i, ox, oy, rows, left, right, amp=2.0, speed=6, ok=None, erratic=0.0):
+def flutter(out, s, i, ox, oy, rows, left, right, amp=2.0, speed=6, ok=None, erratic=0.0, pause=True):
     """Tuch-/Haarzipfel flattern nach außen: je Zeile schiebt sich die Spitze um 0..amp px hinaus und
     zurück (Welle von oben nach unten), das Original bleibt darunter – nichts reißt."""
     t = 2 * math.pi * i / N
-    env = 0.5 - 0.5 * math.cos(2 * t)
+    env = 0.5 - 0.5 * math.cos(2 * t) if pause else 1.0
     for side, xs in ((-1, left), (1, right)):
         for k, y in enumerate(rows):
             w = 0.5 + 0.5 * math.sin(speed * t - 0.9 * k + (0 if side < 0 else 1.7))
@@ -664,7 +664,8 @@ CLAP = {9: 1, 10: 1, 11: 1, 33: 1, 34: 1, 35: 1}      # die Fäuste fahren zur M
 IMPACT = {10: 0, 11: 1, 34: 0, 35: 1}
 FIST_L = (0, 5, 13, 15)                                 # linke Faust (mit Kontur rechts daneben)
 FIST_R = (8, 13, 13, 15)
-BOOMS = [(4, 7, 2), (25, 5, 14), (4, 24, 22), (25, 21, 27), (5, 14, 38), (24, 13, 44)]
+BOOMS = [(5, 8, 0, 2), (29, 6, 4, 1), (6, 26, 9, 2), (30, 22, 13, 2), (5, 16, 17, 1), (28, 14, 21, 2),
+         (9, 3, 25, 1), (27, 29, 28, 2), (5, 33, 32, 1), (31, 4, 35, 2), (5, 21, 39, 2), (29, 10, 43, 1)]
 
 
 def bartas_base(i):
@@ -682,22 +683,27 @@ def bartas_base(i):
     return out
 
 
-def boom(out, x, y, a):
-    """Kleine Explosion: Blitz, Feuerball, roter Ring, Rauch."""
+def boom(out, x, y, a, r=2):
+    """Explosion: weißer Blitz, gelber Feuerball, oranger und roter Ring, dann Rauch (r: Größe)."""
+    pts = {}
     if a == 0:
-        pts = {(0, 0): rgb('ffffff')}
-    elif a == 1:
-        pts = {(0, 0): rgb('fffbd0'), (1, 0): rgb('f6e70e'), (-1, 0): rgb('f6e70e'), (0, 1): rgb('f6e70e'), (0, -1): rgb('f6e70e')}
-    elif a == 2:
-        pts = {(0, 0): rgb('f6e70e'), (1, 1): rgb('f47b22'), (-1, -1): rgb('f47b22'), (1, -1): rgb('f47b22'), (-1, 1): rgb('f47b22'),
-               (2, 0): rgb('f47b22'), (-2, 0): rgb('f47b22'), (0, 2): rgb('f47b22'), (0, -2): rgb('f47b22')}
-    elif a == 3:
-        pts = {(2, 1): rgb('ca2c29'), (-2, -1): rgb('ca2c29'), (1, -2): rgb('ca2c29'), (-1, 2): rgb('ca2c29'), (0, 0): rgb('f47b22')}
-    elif a < 7:
-        k = a - 4
-        pts = {(0, -k): rgb('8a8278', 190 - 50 * k), (1, -k - 1): rgb('a09888', 150 - 40 * k)}
-    else:
-        return
+        pts = {(0, 0): rgb('ffffff'), (1, 0): rgb('fffbd0'), (-1, 0): rgb('fffbd0'), (0, 1): rgb('fffbd0'), (0, -1): rgb('fffbd0')}
+    elif a <= 4:
+        rad = 1 + (a - 1) * r / 3
+        for dy in range(-r - 2, r + 3):
+            for dx in range(-r - 2, r + 3):
+                d = math.hypot(dx, dy)
+                if d <= rad + 0.5:
+                    q = d / (rad + 0.5)
+                    c = 'fffbd0' if q < 0.3 and a < 3 else 'f6e70e' if q < 0.55 else 'f47b22' if q < 0.8 else 'ca2c29'
+                    if a == 4 and q < 0.5:
+                        continue                        # der Feuerball reißt innen auf
+                    pts[(dx, dy)] = rgb(c)
+    elif a < 10:
+        k = a - 5
+        for j, (dx, dy) in enumerate(((0, 0), (-1, 0), (1, -1), (0, -1), (-1, -1), (1, 0))):
+            if j < 6 - k:
+                pts[(dx, dy - k // 2)] = rgb('8a8278' if j % 2 else 'a09888', max(40, 200 - 35 * k))
     for (dx, dy), c in pts.items():
         dot(out, x + dx, y + dy, c)
 
@@ -707,9 +713,9 @@ def f_bartas(i):
     if SYSTEM is None:
         SYSTEM = rising(bartas_base, 20, 31, EMBERS)
     out = np.zeros((H, W, 4), int)
-    for x, y, st in BOOMS:                              # Explosionen im Hintergrund
+    for x, y, st, r in BOOMS:                           # Explosionen im Hintergrund
         a = (i - st) % N
-        boom(out, x, y, a)
+        boom(out, x, y, a, r)
     fig = bartas_base(i)
     m = fig[:, :, 3] > 0
     out[m] = fig[m]
@@ -765,28 +771,51 @@ def f_gon(i):
 
 
 # ---------------------------------------------------------------- Ida
-def fire_aura(out, fig, i, reach=3.2):
-    """Flammenaura hinter der Figur: Zungen steigen nach oben, Farbfolge fest (außen rot, dann
-    orange, gelb, innen fast weiß), nur die Form lodert."""
-    w = 2 * math.pi * i / N
+def _hash(*v):
+    h = 2166136261
+    for x in v:
+        h = ((h ^ (int(x) & 0xffffffff)) * 16777619) & 0xffffffff
+    return h / 4294967295.0
+
+
+def fire_aura(out, fig, i):
+    """Flammen hinter der Figur, die gerade nach oben brennen. Je freiem Pixel der Abstand zur Figur
+    darunter (senkrecht gestreckt: Zungen gehen hoch, seitlich kaum); die Zungenlänge je Spalte
+    flackert als stehende Welle (keine Seitwärtsdrift) plus Zufallszucken, darüber lösen sich
+    kleine Flammenfetzen und steigen senkrecht auf. Farbe nach relativer Höhe in der Zunge: innen
+    fast weiß, gelb, orange, an der Spitze rot – kein Farbblock bleibt stehen, die Kontur lebt."""
     Hh, Ww = fig.shape
     fy, fx = np.nonzero(fig)
-    for y in range(1, Hh - 1):
-        for x in range(1, Ww - 1):
+    w = 2 * math.pi * i / N
+    k1 = 2 * math.pi * 8 / N
+    for x in range(1, Ww - 1):
+        near = np.abs(fx - x) <= 3
+        if not near.any():
+            continue
+        L = 4.4 * (1 + 0.25 * math.sin(0.9 * x) * math.sin(5 * w) + 0.2 * math.sin(1.7 * x + 1) * math.sin(7 * w + 2)
+                   + 0.3 * math.sin(2.7 * x + 0.4) * math.sin(11 * w + 1) + 0.4 * (_hash(x, i, 3) - 0.5))
+        ph = 1.6 * math.sin(0.7 * x) + 0.9 * math.sin(1.9 * x + 0.5)
+        for y in range(1, Hh - 1):
             if fig[y, x] or out[y, x, 3]:
                 continue
-            m = (np.abs(fx - x) <= reach + 1) & (fy >= y - 3) & (fy <= y + 10)
+            m = near & (fy >= y)
             if not m.any():
                 continue
-            dyv = fy[m] - y
-            ab = dyv > 0
-            d_up = np.min(np.hypot(fx[m][ab] - x, dyv[ab] * 0.38)) if ab.any() else 99.0
-            d_any = np.min(np.hypot(fx[m] - x, dyv))
-            ph = ((x * 2654435761) % 997) / 997 * 6.283   # je Spalte eigene Phase: Zungen steigen senkrecht
-            rn = (((x * 73856093) ^ ((i // 2) * 19349663)) % 1000) / 1000 - 0.5
-            nz = 0.55 * math.sin(0.9 * y + 14 * w + ph) + 0.3 * math.sin(0.5 * y + 8 * w + 1.7 * ph) + 0.45 * rn
-            h = max(1 - d_up / reach, 0.5 * (1 - d_any / 1.6)) + 0.45 * nz
-            c = FLAME[3] if h > 1.05 else FLAME[2] if h > 0.8 else FLAME[1] if h > 0.5 else FLAME[0] if h > 0.2 else None
+            d = np.min(np.hypot((fx[m] - x) * 1.5, (fy[m] - y) * 0.55))
+            r = d / L
+            c = None
+            if r < 0.28:
+                c = FLAME[3]
+            elif r < 0.52:
+                c = FLAME[2]
+            elif r < 0.78:
+                c = FLAME[1]
+            elif r < 1.0:
+                c = FLAME[0]
+            elif r < 1.7:                               # abgerissene Fetzen steigen auf
+                blob = math.sin(k1 * (y + i) + ph)
+                if blob > 0.82 - 0.25 * (1.7 - r):
+                    c = FLAME[1] if r < 1.2 and blob > 0.95 else FLAME[0]
             if c:
                 out[y, x] = rgb(c)
 
@@ -803,7 +832,7 @@ def f_ida(i):
         SYSTEM = rising(ida_base, 18, 13, EMBERS)
     fig = ida_base(i)
     out = np.zeros_like(fig)
-    fire_aura(out, fig[:, :, 3] > 0, i, reach=3.4 + 0.8 * math.sin(2 * math.pi * 7 * i / N) * (i > 0))
+    fire_aura(out, fig[:, :, 3] > 0, i)
     m = fig[:, :, 3] > 0
     out[m] = fig[m]
     for e, steps in SYSTEM:                             # Funken nur, wo keine Flamme ist
@@ -988,7 +1017,7 @@ def f_omikron(i):
         s[9, 13] = rgb('fff7d0')
     fig = bounce_frame(s, b)
     flutter(fig, s, i, PL, PT + b, list(range(0, 13)), range(0, 5), range(17, SW), amp=2.4, speed=8,
-            ok=lambda c: hexc(c) in HAIR, erratic=0.5)  # die grauen Haare wehen wild
+            ok=lambda c: hexc(c) in HAIR, erratic=0.5, pause=False)  # die grauen Haare wehen wild, ohne Pause
     lift = -round(2 * (0.5 - 0.5 * math.cos(2 * t)))   # Arme heben und senken
     for (x0, x1, y0, y1), toward in OM_HANDS:          # beim Heben ziehen die Hände nach innen
         m = np.zeros((SH, SW), bool)
