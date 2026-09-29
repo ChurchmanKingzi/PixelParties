@@ -60,9 +60,14 @@ module.exports = {
       if (!ziel) return;
 
       await engine.showTriggeredEffect(CARD_NAME, { playerIdx: pi, source: `elephant:${ctx.card.id}` });
+      // Elefantenfuss zertritt das Ziel (Pixelanimation `elephant_stomp`,
+      // 1000 ms, Aufprall bei 33 %): der Schaden faellt in den Aufprall
+      // (100 ms Mount-Verzoegerung + 330 ms), der Rest der Animation laeuft aus.
       const slot = ziel.type === 'hero' ? -1 : ziel.slotIdx;
-      engine._broadcastEvent('punch_impact', { owner: ziel.owner, heroIdx: ziel.heroIdx, zoneSlot: slot });
-      await engine._delay(400);
+      engine._broadcastEvent('play_zone_animation', {
+        type: 'elephant_stomp', owner: ziel.owner, heroIdx: ziel.heroIdx, zoneSlot: slot, duration: 1100,
+      });
+      await engine._delay(440);
 
       if (ziel.type === 'hero') {
         const held = gs.players[ziel.owner]?.heroes?.[ziel.heroIdx];
@@ -74,6 +79,7 @@ module.exports = {
           { sourceOwner: pi, canBeNegated: true },
         );
       }
+      await engine._delay(560);   // Fuss hebt sich wieder, Ziel federt zurueck
       engine.sync();
     },
   },
