@@ -41,7 +41,7 @@ function zuschlagNachrechnen(ctx) {
   const inst = ctx.card;
   if (!inst || inst.zone !== 'support') return;
 
-  const owner = ctx.cardOwner;
+  const owner = ctx.cardHeroOwner ?? ctx.cardOwner;   // Styx 28.9.: Brettseite des Helden
   const heroIdx = ctx.cardHeroIdx;
   const hero = engine.gs.players[owner]?.heroes?.[heroIdx];
   if (!hero?.name) return;

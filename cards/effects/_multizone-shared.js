@@ -126,7 +126,8 @@ function canSummonMultiZone(ctx, cardName, benoetigt = BELEGT_STANDARD) {
  */
 function claimZones(ctx, logTyp, benoetigt = BELEGT_STANDARD) {
   const engine = ctx._engine;
-  const ps = engine.gs.players[ctx.cardOwner];
+  // Styx 28.9.: Spalte der Kreatur = Brettseite (seitenfremd beschworen).
+  const ps = engine.gs.players[ctx.cardHeroOwner ?? ctx.cardOwner];
   if (!ps) return false;
   const heroIdx = ctx.cardHeroIdx;
   const eigenerPlatz = ctx.card.zoneSlot;
@@ -164,7 +165,8 @@ function claimZones(ctx, logTyp, benoetigt = BELEGT_STANDARD) {
  */
 function releaseZones(ctx, cardName) {
   const engine = ctx._engine;
-  const ps = engine.gs.players[ctx.cardOwner];
+  // Styx 28.9.: Spalte der Kreatur = Brettseite (seitenfremd beschworen).
+  const ps = engine.gs.players[ctx.cardHeroOwner ?? ctx.cardOwner];
   if (!ps) return false;
 
   const raeumen = (heroIdx) => {

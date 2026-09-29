@@ -37,9 +37,10 @@ const CARD_NAME = 'Club of Gobbo';
 const ATK_BONUS = 30;
 
 /** Stammt dieser Angriff vom ausgeruesteten Helden? */
-function vomEigenenHelden(ctx, sourceOwner, sourceHeroIdx) {
+function vomEigenenHelden(ctx, sourceOwner, sourceHeroIdx, quelle) {
   if (sourceHeroIdx < 0 || sourceHeroIdx !== ctx.cardHeroIdx) return false;
-  return sourceOwner === ctx.cardOwner;
+  // Styx 28.9.: gleiche Brettseite — `heroOwner` der Quelle (geliehener Held).
+  return (quelle?.heroOwner ?? sourceOwner) === (ctx.cardHeroOwner ?? ctx.cardOwner);
 }
 
 module.exports = {
@@ -62,7 +63,7 @@ module.exports = {
     /** Abgelegt, zerstoert, umgehaengt: Bonus zurueck. */
     onCardLeaveZone: async (ctx) => {
       if (ctx.fromZone !== 'support') return;
-      if (ctx.fromOwner !== ctx.cardOwner
+      if ((ctx.fromOwner !== ctx.cardOwner && ctx.fromOwner !== ctx.cardHeroOwner)   // Styx 28.9.: Brettseite
         || ctx.fromHeroIdx !== ctx.card.heroIdx
         || ctx.fromZoneSlot !== ctx.card.zoneSlot) return;
       ctx.revokeAtk();
@@ -80,7 +81,7 @@ module.exports = {
     beforeDamage: (ctx) => {
       if (ctx.type !== 'attack') return;
       const srcOwner = ctx.source?.owner ?? ctx.source?.controller ?? -1;
-      if (!vomEigenenHelden(ctx, srcOwner, ctx.sourceHeroIdx)) return;
+      if (!vomEigenenHelden(ctx, srcOwner, ctx.sourceHeroIdx, ctx.source)) return;
 
       const zielSeite = ctx._engine?._findHeroOwner?.(ctx.target);
       if (typeof zielSeite !== 'number' || zielSeite < 0) return;
@@ -96,7 +97,7 @@ module.exports = {
       for (const e of (ctx.entries || [])) {
         if (e.cancelled) continue;
         if (e.type !== 'attack') continue;
-        if (!vomEigenenHelden(ctx, e.sourceOwner, e.sourceHeroIdx)) continue;
+        if (!vomEigenenHelden(ctx, e.sourceOwner, e.sourceHeroIdx, e.source)) continue;
         if (!e.inst) continue;
         if ((e.inst.controller ?? e.inst.owner) === ctx.cardOwner) continue;
 

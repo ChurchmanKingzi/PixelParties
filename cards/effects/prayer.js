@@ -90,7 +90,7 @@ module.exports = {
   canActivateEquipEffect(ctx) {
     const engine = ctx._engine;
     const inst = ctx.card;
-    const pi = inst?.controller ?? inst?.owner;
+    const pi = ctx.cardOwner ?? (inst?.controller ?? inst?.owner);   // Styx 28.9.: „you" = Kontrolleur
     const ps = engine.gs.players[pi];
     if (!ps) return false;
     if (abilityIndices(engine, ps).length > 0) return true;
@@ -102,7 +102,7 @@ module.exports = {
     const gs = engine.gs;
     const inst = ctx.card;
     if (!inst || inst.zone !== 'support') return false;
-    const pi = inst.controller ?? inst.owner;
+    const pi = ctx.cardOwner ?? (inst.controller ?? inst.owner);   // Styx 28.9.: „you" = Kontrolleur
     const ps = gs.players[pi];
     if (!ps) return false;
 

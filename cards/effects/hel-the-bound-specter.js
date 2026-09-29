@@ -136,10 +136,12 @@ function _helCanUseEquip(engine, pi, helHeroIdx, name) {
 
 /** The live artifact instance equipped to Hel BY HER OWN EFFECT, or null. */
 function _findOwnEffectArtifact(engine, ownerIdx, helHeroIdx) {
+  // Styx 28.9.: `ownerIdx` = Brettseite von Hel; die Zone liegt dort,
+  // gleich wer sie gerade kontrolliert.
   for (const inst of engine.cardInstances || []) {
     if (!inst?.counters?._helEffectEquip) continue;
     if (inst.zone !== 'support' || inst.faceDown) continue;
-    if ((inst.controller ?? inst.owner) !== ownerIdx) continue;
+    if (engine.physicalSide(inst) !== ownerIdx) continue;
     if (inst.heroIdx !== helHeroIdx) continue;
     return inst;
   }
@@ -161,22 +163,24 @@ function _firstFreeSupportSlot(ps, helHeroIdx) {
  * equip's own onPlay — ATK grants, etc. — applies), and animate it.
  * Returns the tracked instance, or null if no slot was free.
  */
-async function _equipOnHel(engine, pi, helHeroIdx, name) {
-  const ps = engine.gs.players[pi];
+async function _equipOnHel(engine, pi, helHeroIdx, name, feld = pi) {
+  // Styx 28.9.: Zone auf Hels Brettseite `feld`; die Karte gehoert `pi`.
+  const ps = engine.gs.players[feld];
   const slot = _firstFreeSupportSlot(ps, helHeroIdx);
   if (slot < 0) return null;
 
   if (!ps.supportZones[helHeroIdx]) ps.supportZones[helHeroIdx] = [[], [], []];
   ps.supportZones[helHeroIdx][slot] = [name];
 
-  const inst = engine._trackCard(name, pi, 'support', helHeroIdx, slot);
+  const inst = engine._trackCard(name, feld, 'support', helHeroIdx, slot);
   if (inst) {
+    if (feld !== pi) inst.originalOwner = pi;   // Ablage beim Kontrolleur
     if (!inst.counters) inst.counters = {};
     inst.counters._helEffectEquip = true;
   }
 
   engine._broadcastEvent('summon_effect', {
-    owner: pi, heroIdx: helHeroIdx, zoneSlot: slot, cardName: name,
+    owner: feld, heroIdx: helHeroIdx, zoneSlot: slot, cardName: name,
   });
 
   await engine.runHooks('onPlay', {
@@ -302,11 +306,14 @@ module.exports = {
       const helHeroIdx = ctx.cardHeroIdx;
       const ps = gs.players[pi];
       if (!ps) return;
-      const helHero = ps.heroes?.[helHeroIdx];
+      // Styx 28.9.: Hel, ihre Zonen und ihre Ausruestung auf der Brettseite
+      // `feld`; Hand, Ablage, Gold und Abfrage beim Kontrolleur `pi`.
+      const feld = ctx.cardHeroOwner ?? pi;
+      const helHero = ctx.attachedHero ?? gs.players[feld]?.heroes?.[helHeroIdx];
       if (!helHero?.name || helHero.hp <= 0) return; // gone / already dead
 
       // Still wearing an own-effect artifact → nothing to do.
-      if (_findOwnEffectArtifact(engine, pi, helHeroIdx)) return;
+      if (_findOwnEffectArtifact(engine, feld, helHeroIdx)) return;
 
       const name = helHero._helEffectArtifactName;
       const cardDB = engine._getCardDB();
@@ -322,7 +329,7 @@ module.exports = {
         // (fits the death-goddess / Necromancy theme), not a generic
         // explosion. Same zone-animation channel Shield of Death uses.
         engine._broadcastEvent('play_zone_animation', {
-          type: 'death_skulls', owner: pi, heroIdx: helHeroIdx, zoneSlot: -1,
+          type: 'death_skulls', owner: feld, heroIdx: helHeroIdx, zoneSlot: -1,
         });
         await engine._delay(600);
         await engine.actionDefeatHero(
@@ -339,8 +346,8 @@ module.exports = {
       if (!name || !cd) return doDefeat('no_reference');
       if (!handHas && !discHas) return doDefeat('no_copy');
       if (cost > 0 && (ps.goldLocked || (ps.gold || 0) < cost)) return doDefeat('cant_pay');
-      if (_firstFreeSupportSlot(ps, helHeroIdx) < 0) return doDefeat('no_slot');
-      if (!_helCanUseEquip(engine, pi, helHeroIdx, name)) return doDefeat('cant_equip');
+      if (_firstFreeSupportSlot(gs.players[feld], helHeroIdx) < 0) return doDefeat('no_slot');
+      if (!_helCanUseEquip(engine, feld, helHeroIdx, name)) return doDefeat('cant_equip');
 
       // Source: player chooses only when BOTH piles hold a copy
       // (mandatory effect — they must pick one). Otherwise automatic.
@@ -369,7 +376,7 @@ module.exports = {
       if (fromHand && !liveHandHas) fromHand = liveDiscHas ? false : fromHand;
       if (!fromHand && !liveDiscHas) fromHand = liveHandHas ? true : fromHand;
       if (!liveHandHas && !liveDiscHas) return doDefeat('no_copy');
-      if (_firstFreeSupportSlot(ps, helHeroIdx) < 0) return doDefeat('no_slot');
+      if (_firstFreeSupportSlot(gs.players[feld], helHeroIdx) < 0) return doDefeat('no_slot');
 
       // Pay the Cost. Only now — failure here still means "can't".
       if (cost > 0) {
@@ -382,7 +389,7 @@ module.exports = {
       const idx = pile.indexOf(name);
       if (idx >= 0) pile.splice(idx, 1);
 
-      const inst = await _equipOnHel(engine, pi, helHeroIdx, name);
+      const inst = await _equipOnHel(engine, pi, helHeroIdx, name, feld);
       if (!inst) {
         // Slot vanished between the guard and placement (shouldn't
         // happen at own turn end) — Cost paid + copy consumed; the

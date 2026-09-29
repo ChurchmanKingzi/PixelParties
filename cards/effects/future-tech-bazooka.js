@@ -45,9 +45,8 @@ const FLUGZEIT_MS = 430;
 function vomHeldenPerAngriff(ctx) {
   const src = ctx.source;
   if (!src) return false;
-  const srcOwner = src.controller ?? src.owner ?? -1;
-  if (srcOwner !== ctx.cardOwner) return false;
-  if ((src.heroIdx ?? -1) !== ctx.cardHeroIdx) return false;
+  // Styx 28.9.: „dieser Held" = Brettseite + Index (geliehener Held).
+  if (!ctx._engine.quelleIstHeld(src, ctx.cardHeroOwner ?? ctx.cardOwner, ctx.cardHeroIdx)) return false;
   // Eine Kreatur in derselben Support Zone teilt den `heroIdx` des
   // Wirts, ist aber Quelle ihrer eigenen Angriffe (Vorbild Wanted
   // Poster).
@@ -101,7 +100,7 @@ async function schiessen(ctx) {
 
   // EIN Quellobjekt fuer alle Treffer — so erkennen Reaktionen und die
   // Effekt-Immunitaet den Schuss als EINEN Vorgang.
-  const quelle = { name: CARD_NAME, owner: pi, heroIdx: ctx.cardHeroIdx };
+  const quelle = { name: CARD_NAME, owner: pi, heroOwner: ctx.cardHeroOwner ?? pi, heroIdx: ctx.cardHeroIdx };
   let getroffen = 0;
   // ★ v1061 („Interference", Als Rulings 14.9.): EIN Einsatz, mehrere
   // Ziele — das ist ein Flaechenschlag. Die Klammer nimmt die ECHTE
@@ -126,7 +125,7 @@ async function schiessen(ctx) {
       // faellt beim EINSCHLAG, nicht beim Abschuss — deshalb erst die
       // Flugzeit abwarten, dann treffen.
       engine._broadcastEvent('play_projectile_animation', {
-        sourceOwner: pi, sourceHeroIdx: ctx.cardHeroIdx, sourceZoneSlot: -1,
+        sourceOwner: ctx.cardHeroOwner ?? pi, sourceHeroIdx: ctx.cardHeroIdx, sourceZoneSlot: -1,   // Styx 28.9.: Brettseite
         targetOwner: ziel.owner, targetHeroIdx: ziel.heroIdx,
         targetZoneSlot: ziel.slotIdx,
         emoji: '•',

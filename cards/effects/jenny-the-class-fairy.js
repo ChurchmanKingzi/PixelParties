@@ -199,7 +199,8 @@ module.exports = {
     const pi      = ctx.cardOwner;
     const heroIdx = ctx.cardHeroIdx;
     const ps      = gs.players[pi];
-    const jenny   = ps?.heroes?.[heroIdx];
+    // Styx 28.9.: Jenny selbst (Brettseite), nicht der gleich indizierte eigene Held.
+    const jenny   = ctx.attachedHero ?? gs.players[ctx.cardHeroOwner ?? pi]?.heroes?.[heroIdx];
     if (!ps || !jenny?.name || jenny.hp <= 0) return false;
 
     const targets = buildAbilityTargets(engine, pi);

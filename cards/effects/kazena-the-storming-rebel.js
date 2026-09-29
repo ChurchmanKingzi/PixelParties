@@ -87,7 +87,7 @@ module.exports = {
 
     // Play storm animation on Kazena
     engine._broadcastEvent('play_zone_animation', {
-      type: 'wind_burst', owner: pi, heroIdx, zoneSlot: -1,
+      type: 'wind_burst', owner: ctx.cardHeroOwner ?? pi, heroIdx, zoneSlot: -1,   // Styx 28.9.: Brettseite
     });
     await engine._delay(400);
 

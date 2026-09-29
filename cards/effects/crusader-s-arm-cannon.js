@@ -35,10 +35,10 @@ module.exports = makeCrusaderArtifact({
 
   // Kanonenkugel: dasselbe Projektil-Prinzip wie bei der Flintlock, aber
   // deutlich groesser und traeger — und mit Explosion statt Einschlag.
-  async attackAnim(ctx, { engine, pi, heroIdx, tgtOwner, tgtHeroIdx, tgtZoneSlot, impactSlot }) {
+  async attackAnim(ctx, { engine, pi, feld = pi, heroIdx, tgtOwner, tgtHeroIdx, tgtZoneSlot, impactSlot }) {
     const FLUGZEIT = 620;                       // schwerer als eine Kugel
     engine._broadcastEvent('play_projectile_animation', {
-      sourceOwner: pi, sourceHeroIdx: heroIdx, sourceZoneSlot: -1,
+      sourceOwner: feld, sourceHeroIdx: heroIdx, sourceZoneSlot: -1,
       targetOwner: tgtOwner, targetHeroIdx: tgtHeroIdx,
       targetZoneSlot: tgtZoneSlot,
       emoji: '⚫',

@@ -100,7 +100,8 @@ function ausruestung(ctx) {
 function traegerHeld(ctx) {
   const inst = ausruestung(ctx);
   if (!inst) return null;
-  return { owner: inst.controller ?? inst.owner, heroIdx: inst.heroIdx };
+  // Styx 28.9.: `ich` = Kontrolleur (geliehener Held), `owner` = Brettseite.
+  return { owner: inst.controller ?? inst.owner, heroIdx: inst.heroIdx, ich: ctx.cardOwner };
 }
 
 /**

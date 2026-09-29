@@ -35,18 +35,20 @@ module.exports = {
       const src = ctx.source;
       if (!inst || !src || inst.zone !== 'support') return;
       if (src.heroIdx !== inst.heroIdx) return;
-      if ((src.owner ?? src.controller) !== ctx.cardOwner) return;
+      // Styx 28.9.: „dieser Held" = Brettseite + Index (geliehener Held).
+      if (!ctx._engine.quelleIstHeld(src, ctx.cardHeroOwner ?? ctx.cardOwner, inst.heroIdx)) return;
       const targets = Array.isArray(ctx.target) ? ctx.target : (ctx.target ? [ctx.target] : []);
       if (targets.length !== 1) return;                     // „exactly 1 target"
       const engine = ctx._engine;
       const pi = ctx.cardOwner;
-      const hero = engine.gs.players[pi]?.heroes?.[inst.heroIdx];
+      const feld = ctx.cardHeroOwner ?? pi;   // Styx 28.9.: Brettseite des Helden
+      const hero = engine.gs.players[feld]?.heroes?.[inst.heroIdx];
       const heroIdx = inst.heroIdx;
       const tgt = targets[0];
 
       ctx.modifyAmount(BONUS);
       engine._broadcastEvent('play_zone_animation', {
-        type: 'equip_flash', owner: pi, heroIdx, zoneSlot: inst.zoneSlot,
+        type: 'equip_flash', owner: feld, heroIdx, zoneSlot: inst.zoneSlot,
       });
       // Das Schwert zerbricht: sofort in die Ablage.
       await engine.sendBoardCardToDiscard(inst, { source: CARD_NAME, sourceOwner: pi });

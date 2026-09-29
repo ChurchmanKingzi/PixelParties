@@ -89,7 +89,7 @@ async function preisZahlen(ctx) {
   const engine = ctx._engine;
   const pi = ctx.cardOwner;
   const hi = ctx.cardHeroIdx;
-  const hero = engine.gs.players[pi]?.heroes?.[hi];
+  const hero = engine.gs.players[ctx.cardHeroOwner ?? pi]?.heroes?.[hi];   // Styx 28.9.: Brettseite
   if (!hero?.name || hero.hp <= 0) return false;
   await ctx.dealDamage(hero, PREIS, 'other');
   engine.log('empty_armor_summon', { player: engine.gs.players[pi]?.username, hero: hero.name, damage: PREIS });
@@ -114,7 +114,7 @@ module.exports = {
     const gs = engine.gs;
     const pi = ctx.cardOwner;
     const hi = ctx.cardHeroIdx;
-    const hero = gs.players[pi]?.heroes?.[hi];
+    const hero = gs.players[ctx.cardHeroOwner ?? pi]?.heroes?.[hi];   // Styx 28.9.: Brettseite
     if (!volleHp(hero)) return !ctx.isInherentAction;   // ohne volle HP nur der normale Weg
 
     if (ctx.isInherentAction) {

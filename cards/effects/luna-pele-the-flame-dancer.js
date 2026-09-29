@@ -65,7 +65,8 @@ module.exports = {
       const engine = ctx._engine;
       const gs     = engine.gs;
       const pi     = ctx.cardOwner;
-      const luna   = gs.players[pi]?.heroes?.[ctx.cardHeroIdx];
+      // Styx 28.9.: Luna selbst auf der Brettseite, Ziehen beim Kontrolleur.
+      const luna   = ctx.attachedHero ?? gs.players[ctx.cardHeroOwner ?? pi]?.heroes?.[ctx.cardHeroIdx];
       if (!luna?.name || luna.hp <= 0) return;
 
       // ── Effect 1: Poisoned → also permanently Burned ────────────

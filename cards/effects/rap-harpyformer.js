@@ -63,7 +63,7 @@ module.exports = {
     const gs = engine.gs;
     const pi = ctx.cardOwner;
     const heroIdx = ctx.cardHeroIdx;
-    const hero = gs.players[pi]?.heroes?.[heroIdx];
+    const hero = gs.players[ctx.cardHeroOwner ?? pi]?.heroes?.[heroIdx];   // Styx 28.9.: Brettseite
     const ps = gs.players[pi];
     if (!ps) return false;
 

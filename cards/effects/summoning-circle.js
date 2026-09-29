@@ -34,16 +34,16 @@ module.exports = {
 
   hooks: {
     onPlay: (ctx) => {
-      checkArthorAscension(ctx._engine, ctx.cardOwner, ctx.cardHeroIdx, null);
+      checkArthorAscension(ctx._engine, ctx.cardHeroOwner ?? ctx.cardOwner, ctx.cardHeroIdx, null);   // Styx 28.9.: Brettseite
     },
 
     onGameStart: (ctx) => {
-      checkArthorAscension(ctx._engine, ctx.cardOwner, ctx.cardHeroIdx, null);
+      checkArthorAscension(ctx._engine, ctx.cardHeroOwner ?? ctx.cardOwner, ctx.cardHeroIdx, null);   // Styx 28.9.: Brettseite
     },
 
     onCardLeaveZone: (ctx) => {
       if (ctx.fromZone !== 'support') return;
-      checkArthorAscension(ctx._engine, ctx.cardOwner, ctx.cardHeroIdx, ctx.card.id);
+      checkArthorAscension(ctx._engine, ctx.cardHeroOwner ?? ctx.cardOwner, ctx.cardHeroIdx, ctx.card.id);   // Styx 28.9.: Brettseite
     },
 
     /**

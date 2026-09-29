@@ -67,9 +67,11 @@ module.exports = {
       const gs = engine.gs;
       const pi = ctx.cardOwner;
       const heroIdx = ctx.cardHeroIdx;
+      // Styx 28.9.: „dieser Held" = Brettseite + Index, nicht Kontrolleur.
+      const feld = ctx.cardHeroOwner ?? pi;
 
       // Only trigger for cards cast BY this hero
-      if (ctx.casterIdx !== pi || ctx.heroIdx !== heroIdx) return;
+      if ((ctx.heroOwner ?? ctx.casterIdx) !== feld || ctx.heroIdx !== heroIdx) return;
 
       // Must be an Attack
       const spellData = ctx.spellCardData;
@@ -77,7 +79,7 @@ module.exports = {
 
       // Hero must still be alive
       const ps = gs.players[pi];
-      const hero = ps?.heroes?.[heroIdx];
+      const hero = ctx.attachedHero ?? gs.players[feld]?.heroes?.[heroIdx];
       if (!hero?.name || hero.hp <= 0) return;
 
       // Exactly 1 unique target was hit
@@ -162,9 +164,9 @@ module.exports = {
       // for example) don't grant the bonus prematurely.
       if ((gs.currentPhase || 0) !== 3) return; // PHASES.ACTION
 
-      // Hero must be alive
+      // Hero must be alive (Styx 28.9.: der Held selbst, Brettseite)
       const ps = gs.players[pi];
-      const hero = ps?.heroes?.[heroIdx];
+      const hero = ctx.attachedHero ?? gs.players[ctx.cardHeroOwner ?? pi]?.heroes?.[heroIdx];
       if (!hero?.name || hero.hp <= 0) return;
 
       // HOPT — one second action per turn

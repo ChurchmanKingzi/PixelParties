@@ -149,7 +149,8 @@ module.exports = {
         const inst = ctx.card;
         if (!inst || inst.zone !== 'support') return null;
         if (inst.heroIdx == null || inst.heroIdx < 0) return null;
-        return { owner: inst.controller ?? inst.owner, heroIdx: inst.heroIdx };
+        // Styx 28.9.: `ich` = Kontrolleur (geliehener Held), `owner` = Brettseite.
+        return { owner: inst.controller ?? inst.owner, heroIdx: inst.heroIdx, ich: ctx.cardOwner };
       },
       (ctx) => {
         _addBalance(ctx, 1);

@@ -38,14 +38,17 @@ const EXCLUDE_SET = new Set(['Elven Druid', 'Elven Rider']);
  * hero's turn economy. The card text explicitly preserves the school /
  * level requirement ("additional Action", not "ignore level").
  */
-function heroCanHostDruidTutor(engine, pi, heroIdx, cardData) {
+function heroCanHostDruidTutor(engine, pi, heroIdx, cardData, feld = pi) {
+  // Styx 28.9.: Wirt steht auf der Brettseite (`feld`), Sperren/Hand von `pi`.
   const ps = engine.gs.players[pi];
-  const hero = ps?.heroes?.[heroIdx];
+  const hero = engine.gs.players[feld]?.heroes?.[heroIdx];
   if (!hero?.name) return false;
   if (hero.hp <= 0) return false;
   if (hero.statuses?.frozen || hero.statuses?.stunned) return false;
-  if (ps.summonLocked) return false;
-  return engine.heroMeetsLevelReq(pi, heroIdx, cardData);
+  if (ps?.summonLocked) return false;
+  return feld === pi
+    ? engine.heroMeetsLevelReq(pi, heroIdx, cardData)
+    : engine.heroMeetsLevelReq(feld, heroIdx, cardData, { levelSourcePi: pi });
 }
 
 module.exports = {
@@ -71,11 +74,12 @@ module.exports = {
     const engine = ctx._engine;
     const ps     = engine.gs.players[ctx.cardOwner];
     if (!ps) return false;
+    const feld   = ctx.cardHeroOwner ?? ctx.cardOwner;   // Styx 28.9.: Spalte der Kreatur
 
     // Must have at least one support slot free on Druid's hero —
     // otherwise the summon cannot land.
     const heroIdx = ctx.cardHeroIdx;
-    const zones   = ps.supportZones?.[heroIdx] || [[], [], []];
+    const zones   = engine.gs.players[feld]?.supportZones?.[heroIdx] || [[], [], []];
     const hasFreeSlot = zones.some(slot => (slot || []).length === 0);
     if (!hasFreeSlot) return false;
 
@@ -84,7 +88,7 @@ module.exports = {
       if (EXCLUDE_SET.has(name)) continue;
       const cd = cardDB[name];
       if (!isElvenCreature(cd)) continue;
-      if (!heroCanHostDruidTutor(engine, ctx.cardOwner, heroIdx, cd)) continue;
+      if (!heroCanHostDruidTutor(engine, ctx.cardOwner, heroIdx, cd, feld)) continue;
       return true;
     }
     return false;
@@ -97,6 +101,7 @@ module.exports = {
     const heroIdx = ctx.cardHeroIdx;
     const ps      = gs.players[pi];
     if (!ps) return false;
+    const feld    = ctx.cardHeroOwner ?? pi;   // Styx 28.9.: Spalte der Kreatur (Brettseite)
 
     const cardDB = engine._getCardDB();
 
@@ -110,7 +115,7 @@ module.exports = {
       if (EXCLUDE_SET.has(name)) continue;
       const cd = cardDB[name];
       if (!isElvenCreature(cd)) continue;
-      if (!heroCanHostDruidTutor(engine, pi, heroIdx, cd)) continue;
+      if (!heroCanHostDruidTutor(engine, pi, heroIdx, cd, feld)) continue;
       counts[name] = (counts[name] || 0) + 1;
     }
     const gallery = Object.entries(counts)
@@ -138,7 +143,7 @@ module.exports = {
     engine._broadcastEvent('deck_search_add', { cardName: chosenName, playerIdx: pi });
 
     // ── Verify a support slot is still free on Druid's hero ──
-    const zones = ps.supportZones?.[heroIdx] || [[], [], []];
+    const zones = gs.players[feld]?.supportZones?.[heroIdx] || [[], [], []];
     const freeSlot = zones.findIndex(slot => (slot || []).length === 0);
     if (freeSlot < 0) {
       // Hero's support zone filled up between the pre-check and now
@@ -155,8 +160,9 @@ module.exports = {
     // existing mechanics (summoning sickness via turnPlayed, guardian
     // immunity, etc.) all apply.
     const summonRes = await engine.summonCreatureWithHooks(
-      chosenName, pi, heroIdx, freeSlot,
+      chosenName, feld, heroIdx, freeSlot,
       {
+        ...(feld !== pi ? { controller: pi } : {}),   // Styx 28.9.: seitenfremd, gehoert mir
         source: CARD_NAME,
         hookExtras: { _summonedBy: CARD_NAME, ...engine.deckHookExtras() },
       }
@@ -177,7 +183,7 @@ module.exports = {
     // (which pulls inward). Carries the `elem_biomancy` SFX mapping.
     engine._broadcastEvent('play_zone_animation', {
       type: 'druid_leaf_storm',
-      owner: pi,
+      owner: feld,
       heroIdx,
       zoneSlot: freeSlot,
     });

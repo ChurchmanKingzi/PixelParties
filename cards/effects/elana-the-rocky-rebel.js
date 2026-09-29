@@ -65,7 +65,7 @@ module.exports = {
 
     // Play music notes animation on Elana
     engine._broadcastEvent('play_zone_animation', {
-      type: 'music_notes', owner: pi, heroIdx, zoneSlot: -1,
+      type: 'music_notes', owner: ctx.cardHeroOwner ?? pi, heroIdx, zoneSlot: -1,   // Styx 28.9.: Brettseite
     });
     await engine._delay(400);
 

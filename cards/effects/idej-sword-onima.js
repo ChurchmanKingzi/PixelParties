@@ -37,6 +37,8 @@ module.exports = {
     afterSpellResolved: async (ctx) => {
       if (!ctx.spellCardData || ctx.spellCardData.cardType !== 'Attack') return;
       if (ctx.casterIdx !== ctx.cardOwner || ctx.heroIdx !== ctx.cardHeroIdx) return;
+      // Styx 28.9.: gleicher Index reicht nicht — gleiche Brettseite (geliehener Held).
+      if ((ctx.heroOwner ?? ctx.casterIdx) !== (ctx.cardHeroOwner ?? ctx.cardOwner)) return;
 
       const engine = ctx._engine;
       const gs = engine.gs;

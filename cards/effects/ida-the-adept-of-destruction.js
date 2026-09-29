@@ -79,7 +79,9 @@ module.exports = {
         if (e.cancelled) continue;
         // Only affects destruction_spell damage from Ida's hero slot
         if (e.type !== 'destruction_spell') continue;
-        if (e.sourceOwner !== ctx.cardOwner) continue;
+        // Styx 28.9.: Brettseite der Quelle (`heroOwner`) gegen Idas Seite —
+        // der gleich indizierte eigene Held des Kontrolleurs ist nicht Ida.
+        if ((e.source?.heroOwner ?? e.sourceOwner) !== (ctx.cardHeroOwner ?? ctx.cardOwner)) continue;
         if (e.sourceHeroIdx !== ctx.cardHeroIdx) continue;
         // ...und nur gegen Ziele des GEGNERS. Maßgeblich ist der
         // KONTROLLEUR, nicht der Besitzer: eine Kreatur, die dir
@@ -112,8 +114,9 @@ module.exports = {
       if (ctx.type !== 'destruction_spell') return;
       if (ctx.sourceHeroIdx < 0 || ctx.sourceHeroIdx !== ctx.cardHeroIdx) return;
       // Verify source belongs to same player as Ida
-      const srcOwner = ctx.source?.owner ?? ctx.source?.controller ?? -1;
-      if (srcOwner !== ctx.cardOwner) return;
+      // Styx 28.9.: Brettseite der Quelle gegen Idas Seite.
+      const srcOwner = ctx.source?.heroOwner ?? ctx.source?.owner ?? ctx.source?.controller ?? -1;
+      if (srcOwner !== (ctx.cardHeroOwner ?? ctx.cardOwner)) return;
       // ...und das Ziel muss dem GEGNER gehören. Eigene Helden sind
       // ausgenommen — der Rückstoß von Fire Bolts oder Phoenix Tackle
       // ist damit ganz normal reduzier- und negierbar (Tazune fängt
@@ -135,7 +138,8 @@ module.exports = {
       // Find which player/hero this is
       const gs = ctx.gameState;
       if (gs.heroFlags) {
-        const key = `${ctx.cardOwner}-${ctx.cardHeroIdx}`;
+        // Styx 28.9.: derselbe Schluessel wie beim Setzen (Brettseite).
+        const key = `${ctx.cardHeroOwner ?? ctx.cardOriginalOwner}-${ctx.cardHeroIdx}`;
         delete gs.heroFlags[key];
       }
     },

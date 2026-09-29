@@ -27,10 +27,10 @@ module.exports = makeCrusaderArtifact({
   // `play_ram_animation`, das Phoenix Tackle benutzt. Die Zeitachse ist
   // von dort uebernommen: der Held erreicht das Ziel bei ~12 % der
   // Flugdauer, dort sitzt der Aufprall, danach faellt der Schaden.
-  async attackAnim(ctx, { engine, pi, heroIdx, tgtOwner, tgtHeroIdx, tgtZoneSlot, impactSlot }) {
-    const hero = engine.gs.players[pi]?.heroes?.[heroIdx];
+  async attackAnim(ctx, { engine, pi, feld = pi, heroIdx, tgtOwner, tgtHeroIdx, tgtZoneSlot, impactSlot }) {
+    const hero = engine.gs.players[feld]?.heroes?.[heroIdx];   // Styx 28.9.: Brettseite
     engine._broadcastEvent('play_ram_animation', {
-      sourceOwner: pi, sourceHeroIdx: heroIdx,
+      sourceOwner: feld, sourceHeroIdx: heroIdx,
       targetOwner: tgtOwner, targetHeroIdx: tgtHeroIdx,
       targetZoneSlot: tgtZoneSlot,
       cardName: hero?.name, duration: 1100,

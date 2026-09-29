@@ -39,7 +39,8 @@ module.exports = {
   canActivateHeroEffect(ctx) {
     const pi = ctx.cardOwner;
     const heroIdx = ctx.cardHeroIdx;
-    const ps = ctx.players[pi];
+    // Styx 28.9.: Zonen auf Omikrons Brettseite.
+    const ps = ctx.players[ctx.cardHeroOwner ?? pi];
     // Need at least one free support zone on this hero
     return (ps?.supportZones?.[heroIdx] || []).some(slot => (slot || []).length === 0);
   },
@@ -51,7 +52,11 @@ module.exports = {
     const heroIdx = ctx.cardHeroIdx;
     const ps      = gs.players[pi];
     if (!ps) return false;
-    const hero    = ps.heroes?.[heroIdx];
+    // Styx 28.9.: Omikron und seine Zonen auf der Brettseite `feld`; die
+    // Illusion gehoert dem Kontrolleur `pi` (seitenfremd beschworen).
+    const feld    = ctx.cardHeroOwner ?? pi;
+    const fs      = gs.players[feld];
+    const hero    = ctx.attachedHero ?? fs?.heroes?.[heroIdx];
     if (!hero?.name) return false;
 
     const cardDB = engine._getCardDB();
@@ -72,7 +77,7 @@ module.exports = {
     const galleryCards = Object.values(cardDB)
       .filter(cd => hasCardType(cd, 'Creature') && !hasCardType(cd, 'Token') && cd.subtype !== 'Token' && !!loadCardEffect(cd.name))
       .filter(cd => !usedNames.has(cd.name))
-      .filter(cd => engine.isCreatureSummonable(cd.name, pi, heroIdx, { _bypassBeforeSummon: true }))
+      .filter(cd => engine.isCreatureSummonable(cd.name, feld, heroIdx, { _bypassBeforeSummon: true, beschwoerer: pi }))
       .sort((a, b) => a.name.localeCompare(b.name))
       .map(cd => ({ name: cd.name, source: 'omikron' }));
 
@@ -97,14 +102,15 @@ module.exports = {
 
     // ── Step 2: find a free slot on this hero ────────────────────────────
 
-    if (!ps.supportZones[heroIdx]) ps.supportZones[heroIdx] = [[], [], []];
-    const destSlot = ps.supportZones[heroIdx].findIndex(slot => (slot || []).length === 0);
+    if (!fs.supportZones[heroIdx]) fs.supportZones[heroIdx] = [[], [], []];
+    const destSlot = fs.supportZones[heroIdx].findIndex(slot => (slot || []).length === 0);
     if (destSlot < 0) return false;
 
     // ── Step 3: place the illusion ───────────────────────────────────────
 
-    ps.supportZones[heroIdx][destSlot] = [chosenName];
-    const inst = engine._trackCard(chosenName, pi, 'support', heroIdx, destSlot);
+    fs.supportZones[heroIdx][destSlot] = [chosenName];
+    const inst = engine._trackCard(chosenName, feld, 'support', heroIdx, destSlot);
+    if (feld !== pi) engine.markiereSeitenfremd(inst, pi);   // Styx 28.9.
     inst.turnPlayed = gs.turn; // Summoning sickness
 
     // Blue illusion filter
@@ -132,14 +138,14 @@ module.exports = {
     hero._omikronSummoned.push(chosenName);
 
     engine._broadcastEvent('summon_effect', {
-      owner: pi, heroIdx, zoneSlot: destSlot, cardName: chosenName,
+      owner: feld, heroIdx, zoneSlot: destSlot, cardName: chosenName,
     });
     await engine._delay(400);
 
     engine.log('omikron_illusion', {
       player: ps.username,
       creature: chosenName,
-      hero: ps.heroes[heroIdx]?.name,
+      hero: hero.name,
     });
 
     // Hooks are intentionally SKIPPED — the creature is negated before placement,

@@ -185,7 +185,7 @@ module.exports = {
       const pi = ctx.cardOwner;
       const heroIdx = ctx.cardHeroIdx;
       const ps = gs.players[pi];
-      const hero = ps?.heroes?.[heroIdx];
+      const hero = gs.players[ctx.cardHeroOwner ?? pi]?.heroes?.[heroIdx];   // Styx 28.9.: Brettseite
       if (!ps || !hero?.name || hero.hp <= 0) return;
 
       if (!(ps.mainDeck || []).includes(ABILITY_NAME)) return;
@@ -199,7 +199,7 @@ module.exports = {
 
       // Deal 50 to the hosting hero
       engine._broadcastEvent('play_zone_animation', {
-        type: 'explosion', owner: pi, heroIdx, zoneSlot: -1,
+        type: 'explosion', owner: ctx.cardHeroOwner ?? pi, heroIdx, zoneSlot: -1,
       });
       await engine._delay(400);
       // BLEIBT `other` (Als Ruling 20.8.: „eine besondere

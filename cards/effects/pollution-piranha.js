@@ -86,8 +86,11 @@ module.exports = {
       chosen = pool[0];
     } else {
       const zones = pool.map(inst => {
-        const hero = ps.heroes?.[inst.heroIdx];
+        // Styx 28.9.: seitenfremd beschworene Tokens stehen auf der Gegenseite.
+        const seite = engine.physicalSide(inst);
+        const hero = engine.gs.players[seite]?.heroes?.[inst.heroIdx];
         return {
+          owner: seite,
           heroIdx: inst.heroIdx,
           slotIdx: inst.zoneSlot,
           label: `${hero?.name || 'Hero'} — Slot ${inst.zoneSlot + 1}`,

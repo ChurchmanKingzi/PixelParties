@@ -52,9 +52,11 @@ module.exports = {
       const gs = ctx.gameState;
       const pi = ctx.cardOwner;
       const heroIdx = ctx.cardHeroIdx;
+      // Styx 28.9.: Held/Zonen auf der Brettseite `feld`, „du" = Kontrolleur `pi`.
+      const feld = ctx.cardHeroOwner ?? pi;
 
-      // Trigger only on Spells cast BY this Hero.
-      if (ctx.casterIdx !== pi || ctx.heroIdx !== heroIdx) return;
+      // Trigger only on Spells cast BY this Hero (Brettseite + Index).
+      if ((ctx.heroOwner ?? ctx.casterIdx) !== feld || ctx.heroIdx !== heroIdx) return;
 
       // Guard against recursion — never re-fire on a re-cast.
       if (ctx.isSecondCast) return;
@@ -64,7 +66,7 @@ module.exports = {
       if (gs._spellNegatedByEffect) return;
 
       const ps = gs.players[pi];
-      const hero = ps.heroes?.[heroIdx];
+      const hero = ctx.attachedHero ?? gs.players[feld]?.heroes?.[heroIdx];
       if (!hero?.name || hero.hp <= 0) return;
       if (hero.statuses?.frozen || hero.statuses?.stunned || hero.statuses?.negated) return;
 
@@ -87,7 +89,7 @@ module.exports = {
       // wildcards (Performance, etc.) so this is the canonical level
       // measurement Bartas uses too.
       const spellLevel = spellData.level || 0;
-      const dmLevel = engine.countAbilitiesForSchool('Decay Magic', ps.abilityZones[heroIdx] || []);
+      const dmLevel = engine.countAbilitiesForSchool('Decay Magic', gs.players[feld]?.abilityZones?.[heroIdx] || []);
       if (spellLevel >= dmLevel) return;
 
       // At least 1 OTHER opponent-side target must exist — otherwise
@@ -137,6 +139,7 @@ module.exports = {
       if (!spellScript?.hooks?.onPlay) return;
 
       const tempInst = engine._trackCard(ctx.spellName, pi, 'hand', heroIdx, -1);
+      if (feld !== pi) tempInst.heroOwner = feld;   // Styx 28.9.: wie der Server bei Uebernahme
 
       try {
         await engine.runHooks('onPlay', {

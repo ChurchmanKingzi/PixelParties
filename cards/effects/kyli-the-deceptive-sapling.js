@@ -101,7 +101,8 @@ function deletedPotionEntries(engine, pi) {
 function firedByOwnOccultism(ctx) {
   const src = ctx.source;
   if (!src || src.name !== OCCULTISM) return false;
-  if (src.owner !== ctx.cardOwner) return false;
+  // Styx 28.9.: Brettseite der Occultism-Instanz gegen Kylis Seite.
+  if ((src.heroOwner ?? src.owner) !== (ctx.cardHeroOwner ?? ctx.cardOwner)) return false;
   return src.heroIdx === ctx.cardHeroIdx;
 }
 
@@ -115,15 +116,18 @@ async function resolveKyli(ctx) {
   const pi = ctx.cardOwner;
   const heroIdx = ctx.cardHeroIdx;
   const ps = engine.gs?.players?.[pi];
-  const hero = ps?.heroes?.[heroIdx];
+  // Styx 28.9.: Kyli, ihre Zonen und Biomancy auf der Brettseite `feld`;
+  // Loeschstapel und Tokens gehoeren dem Kontrolleur `pi`.
+  const feld = ctx.cardHeroOwner ?? pi;
+  const hero = ctx.attachedHero ?? engine.gs?.players?.[feld]?.heroes?.[heroIdx];
   if (!hero?.name || hero.hp <= 0) return;
 
   // Skaliert mit Kylis AKTUELLER Biomancy-Stufe; ohne Biomancy kein
   // Effekt (Als Ruling — der Verweis haette dann keinen Bezug).
-  const level = biomancyLevelOf(engine, pi, heroIdx);
+  const level = biomancyLevelOf(engine, feld, heroIdx);
   if (level <= 0) return;
 
-  const frei = freeSupportSlots(engine, pi, heroIdx);
+  const frei = freeSupportSlots(engine, feld, heroIdx);
   if (frei.length === 0) return;
 
   const kandidaten = deletedPotionEntries(engine, pi);
@@ -181,7 +185,7 @@ async function resolveKyli(ctx) {
   for (const pick of picks) {
     // Jede Platzierung prueft die Zone NEU — zwischen zwei Tokens kann
     // ein Eintritts-Hook (Pes'zet & Co.) das Brett veraendert haben.
-    if (freeSupportSlots(engine, pi, heroIdx).length === 0) break;
+    if (freeSupportSlots(engine, feld, heroIdx).length === 0) break;
 
     // Erst JETZT aus dem Loeschstapel nehmen: bricht die Platzierung ab,
     // bleibt die Potion geloescht statt spurlos zu verschwinden.
@@ -190,7 +194,7 @@ async function resolveKyli(ctx) {
     if (at < 0) continue;
 
     const platziert = await placeBiomancyToken(
-      engine, pi, heroIdx, pick.name, level, { sourceName: CARD_NAME },
+      engine, pi, heroIdx, pick.name, level, { sourceName: CARD_NAME, feld },
     );
     if (!platziert) continue;
 

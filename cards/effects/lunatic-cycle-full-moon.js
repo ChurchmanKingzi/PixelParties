@@ -33,7 +33,7 @@ module.exports = {
     },
     onCardLeaveZone: (ctx) => {
       if (ctx.fromZone !== 'support') return;
-      if (ctx.fromOwner !== ctx.cardOwner
+      if ((ctx.fromOwner !== ctx.cardOwner && ctx.fromOwner !== ctx.cardHeroOwner)   // Styx 28.9.: Brettseite
         || ctx.fromHeroIdx !== ctx.card.heroIdx
         || ctx.fromZoneSlot !== ctx.card.zoneSlot) return;
       ctx.revokeAtk();

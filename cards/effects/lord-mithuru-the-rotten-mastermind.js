@@ -18,7 +18,7 @@ module.exports = {
   reduceCardLevel(cardData, engine, ownerIdx, inst, heroIdx) {
     if (!istDoppelSpell(cardData)) return 0;
     if (!inst || inst.zone !== 'hero' || heroIdx == null || heroIdx !== inst.heroIdx) return 0;
-    const hero = engine.gs.players[inst.controller ?? inst.owner]?.heroes?.[inst.heroIdx];
+    const hero = engine.gs.players[inst.owner]?.heroes?.[inst.heroIdx];   // Styx 28.9.: Heldeninstanz = Brettseite
     if (!hero?.name || hero.hp <= 0 || hero.statuses?.negated) return 0;
     return 2;
   },

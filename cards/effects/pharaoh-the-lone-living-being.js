@@ -87,15 +87,17 @@ function placeCounterIfDivinityNeeded(ctx, cd) {
   const pi = ctx.cardOwner;
   const heroIdx = ctx.cardHeroIdx;
   const hero = ctx.attachedHero;
+  // Styx 28.9.: Ability Zones und Animation auf der Brettseite `feld`.
+  const feld = ctx.cardHeroOwner ?? pi;
   if (!hero?.name || hero.hp <= 0) return;
 
   // It resolved/summoned (so WITH Divinity it was legal). Counter only
   // if it would NOT have been legal without Divinity.
-  if (couldUseWithoutDivinity(engine, pi, heroIdx, cd)) return;
+  if (couldUseWithoutDivinity(engine, feld, heroIdx, cd)) return;
 
   hero._divinityCounters = (hero._divinityCounters || 0) + 1;
   engine._broadcastEvent('play_zone_animation', {
-    type: 'johanna_cleanse', owner: pi, heroIdx, zoneSlot: -1,
+    type: 'johanna_cleanse', owner: feld, heroIdx, zoneSlot: -1,
   });
   engine.log('pharaoh_divinity_counter', {
     player: engine.gs.players[pi]?.username,
@@ -117,9 +119,8 @@ module.exports = {
      * negated). Counter if Divinity was necessary to use it.
      */
     afterSpellResolved: async (ctx) => {
-      const pi = ctx.cardOwner;
-      // Must be Pharaoh itself doing the casting.
-      if (ctx.casterIdx !== pi || ctx.heroIdx !== ctx.cardHeroIdx) return;
+      // Must be Pharaoh itself doing the casting (Styx 28.9.: Brettseite + Index).
+      if ((ctx.heroOwner ?? ctx.casterIdx) !== (ctx.cardHeroOwner ?? ctx.cardOwner) || ctx.heroIdx !== ctx.cardHeroIdx) return;
       const cd = ctx.spellCardData;
       if (!cd || (cd.cardType !== 'Spell' && cd.cardType !== 'Attack')) return;
       placeCounterIfDivinityNeeded(ctx, cd);
@@ -136,6 +137,7 @@ module.exports = {
       if (ctx.actionType !== 'creature') return;
       const pi = ctx.cardOwner;
       if (ctx.playerIdx !== pi || ctx.heroIdx !== ctx.cardHeroIdx) return;
+      if ((ctx.heroOwner ?? ctx.playerIdx) !== (ctx.cardHeroOwner ?? pi)) return;   // Styx 28.9.
       const cd = ctx._engine._getCardDB()[ctx.cardName];
       if (!cd || cd.cardType !== 'Creature') return;
       placeCounterIfDivinityNeeded(ctx, cd);

@@ -71,14 +71,15 @@ function vomWirt(ctx, quelle, typ) {
   if (quelle.zone === 'support') return false;            // Kreatur im selben Slot ist nicht der Held
   if ((quelle.heroIdx ?? -1) !== ctx.cardHeroIdx) return false;
   const seite = quelle.heroOwner ?? quelle.owner ?? quelle.controller;
-  return seite === (ctx.cardController ?? ctx.cardOwner);
+  // Styx 28.9.: Brettseite des Wirts (geliehener Held: `heroOwner` der Quelle).
+  return seite === (ctx.cardHeroOwner ?? ctx.cardController ?? ctx.cardOwner);
 }
 
 /** Freie Support Zones des ausgeruesteten Helden. */
 function freieZonen(engine, pi, heroIdx) {
   const zonen = engine.gs.players[pi]?.supportZones?.[heroIdx] || [];
   const out = [];
-  for (let z = 0; z < 3; z++) if ((zonen[z] || []).length === 0) out.push({ heroIdx, slotIdx: z });
+  for (let z = 0; z < 3; z++) if ((zonen[z] || []).length === 0) out.push({ owner: pi, heroIdx, slotIdx: z });
   return out;
 }
 
@@ -103,7 +104,7 @@ function heldKannBeschwoeren(engine, pi, heroIdx) {
  * Ablage, bleibt sie waehlbar (die Ablage fuehrt nur Namen, keine
  * Instanzen).
  */
-function beschwoerbareAusAblage(engine, pi, heroIdx, frisch) {
+function beschwoerbareAusAblage(engine, pi, heroIdx, frisch, feld = pi) {
   const ps = engine.gs.players[pi];
   if (!ps) return [];
   const cardDB = engine._getCardDB();
@@ -121,8 +122,9 @@ function beschwoerbareAusAblage(engine, pi, heroIdx, frisch) {
     // Alle vorhandenen Kopien sind gerade erst an diesem Angriff gefallen?
     const eben = frisch?.get(name) || 0;
     if (eben > 0 && (inAblage.get(name) || 0) <= eben) { gesehen.add(name); continue; }
-    if (!engine.heroMeetsLevelReq(pi, heroIdx, cd, { pileSide: 'discard', noPlacementBypass: true })) continue;
-    if (!engine.isCreatureSummonable(name, pi, heroIdx)) continue;
+    // Styx 28.9.: Held auf der Brettseite (`feld`), Ablage/Ermaessigungen von `pi`.
+    if (!engine.heroMeetsLevelReq(feld, heroIdx, cd, { pileSide: 'discard', noPlacementBypass: true, levelSourcePi: pi })) continue;
+    if (!engine.isCreatureSummonable(name, feld, heroIdx, { beschwoerer: pi })) continue;
     gesehen.add(name);
     out.push({ name, source: 'discard', level: cd.level || 0 });
   }
@@ -136,6 +138,8 @@ async function bieteBeschwoerungAn(ctx, quelle) {
   const ich = ctx.card;
   const pi = ctx.cardController ?? ctx.cardOwner;
   const heroIdx = ctx.cardHeroIdx;
+  // Styx 28.9.: Held und Zonen auf der Brettseite; Ablage und Abfragen beim Kontrolleur.
+  const feld = ctx.cardHeroOwner ?? pi;
 
   // Ein Angriff = ein Angebot, auch wenn er mehrere Ziele umlegt.
   const marke = `_skullmaelOffered_${ich.id}`;
@@ -144,15 +148,15 @@ async function bieteBeschwoerungAn(ctx, quelle) {
 
   const ps = gs.players[pi];
   if (!ps || ps.summonLocked) return;
-  if (!heldKannBeschwoeren(engine, pi, heroIdx)) return;
+  if (!heldKannBeschwoeren(engine, feld, heroIdx)) return;
 
   // Weiches Once per turn — erst NACHSEHEN, beansprucht wird beim Zugriff.
   const hoptKey = `skullmael-greatsword:${ich.id}`;
   if (gs.hoptUsed?.[`${hoptKey}:${pi}`] === gs.turn) return;
 
-  if (freieZonen(engine, pi, heroIdx).length === 0) return;
+  if (freieZonen(engine, feld, heroIdx).length === 0) return;
   const frisch = quelle._skullmaelFresh;
-  const kandidaten = beschwoerbareAusAblage(engine, pi, heroIdx, frisch);
+  const kandidaten = beschwoerbareAusAblage(engine, pi, heroIdx, frisch, feld);
   if (kandidaten.length === 0) return;
 
   // ★ ZURUECK STATT ABBRUCH (Als Vorgabe 12.9.): „Back" in der
@@ -166,7 +170,7 @@ async function bieteBeschwoerungAn(ctx, quelle) {
       type: 'cardGallery',
       cards: kandidaten.map(k => ({ name: k.name, source: 'discard', level: k.level })),
       title: CARD_NAME,
-      description: `${gs.players[pi]?.heroes?.[heroIdx]?.name} may summon a Creature from your discard pile as an additional Action.`,
+      description: `${gs.players[feld]?.heroes?.[heroIdx]?.name} may summon a Creature from your discard pile as an additional Action.`,
       confirmLabel: '💀 Summon!',
       confirmClass: 'btn-info',
       cancellable: true,
@@ -176,7 +180,7 @@ async function bieteBeschwoerungAn(ctx, quelle) {
     gewaehlt = wahl.cardName;
 
     // Zwischen Galerie und Zonenwahl kann sich das Brett aendern.
-    const zonen = freieZonen(engine, pi, heroIdx);
+    const zonen = freieZonen(engine, feld, heroIdx);
     if (zonen.length === 0) return;
     if (zonen.length === 1) { ziel = zonen[0]; break; }
 
@@ -204,7 +208,7 @@ async function bieteBeschwoerungAn(ctx, quelle) {
   // Klang haengt am Typ). Der Vorlauf laesst das Ritual laufen, bevor
   // die Karte aus der Ablage einfliegt.
   engine._broadcastEvent('play_zone_animation', {
-    type: 'undead_revival', owner: pi,
+    type: 'undead_revival', owner: feld,
     heroIdx: ziel.heroIdx, zoneSlot: ziel.slotIdx,
     duration: 1400,
   });
@@ -212,12 +216,13 @@ async function bieteBeschwoerungAn(ctx, quelle) {
 
   const inst = await engine.summonFromPile(pi, 'discard', wahl.cardName, ziel.heroIdx, ziel.slotIdx, {
     source: CARD_NAME,
+    ...(feld !== pi ? { heldSeite: feld } : {}),   // Styx 28.9.
   });
   if (!inst) return;
 
   engine.log('skullmael_greatsword_summon', {
     player: ps.username, creature: wahl.cardName,
-    hero: gs.players[pi]?.heroes?.[heroIdx]?.name,
+    hero: gs.players[feld]?.heroes?.[heroIdx]?.name,
   });
   engine.sync();
 }

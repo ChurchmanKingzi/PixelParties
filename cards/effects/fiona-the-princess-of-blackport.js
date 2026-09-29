@@ -94,8 +94,9 @@ module.exports = {
     // Spielstart (auch Puzzle-Aufstellung: server.js feuert onGameStart)
     // und Zugstart als Netz fuer Pfade ohne Zonen-Hooks (Charm-Flips,
     // Snapshot/Restore) — dasselbe Muster wie bei Arthor.
+    // Styx 28.9.: Pruefung auf der Brettseite des Helden (`cardHeroOwner`).
     onGameStart: (ctx) => {
-      checkFionaAscension(ctx._engine, ctx.cardOwner, ctx.cardHeroIdx, null);
+      checkFionaAscension(ctx._engine, ctx.cardHeroOwner ?? ctx.cardOwner, ctx.cardHeroIdx, null);
     },
     onTurnStart: (ctx) => {
       checkFionaAscension(ctx._engine, ctx.cardOriginalOwner, ctx.cardHeroIdx, null);
@@ -106,7 +107,7 @@ module.exports = {
     onCardEnterZone: (ctx) => {
       if (ctx.toZone !== 'support') return;
       if (ctx.toHeroIdx !== ctx.cardHeroIdx) return;
-      checkFionaAscension(ctx._engine, ctx.cardOwner, ctx.cardHeroIdx, null);
+      checkFionaAscension(ctx._engine, ctx.cardHeroOwner ?? ctx.cardOwner, ctx.cardHeroIdx, null);
     },
     onCardLeaveZone: (ctx) => {
       if (ctx.fromZone !== 'support') return;
@@ -114,7 +115,7 @@ module.exports = {
       // Die gehende Karte steht noch in cardInstances — ausnehmen.
       // ACHTUNG: `ctx.card` ist der LAUSCHER (Fiona selbst; _createContext
       // ueberschattet das Feld), die gehende Karte ist `ctx.leavingCard`.
-      checkFionaAscension(ctx._engine, ctx.cardOwner, ctx.cardHeroIdx, ctx.leavingCard?.id);
+      checkFionaAscension(ctx._engine, ctx.cardHeroOwner ?? ctx.cardOwner, ctx.cardHeroIdx, ctx.leavingCard?.id);
     },
 
     onStatusApplied: async (ctx) => {
@@ -124,7 +125,8 @@ module.exports = {
 
       const heroOwner = ctx.heroOwner;
       const heroIdx = ctx.heroIdx;
-      if (heroOwner !== ctx.cardOwner || heroIdx !== ctx.cardHeroIdx) return;
+      // Styx 28.9.: `heroOwner` ist die Brettseite — gegen Fionas Seite pruefen.
+      if (heroOwner !== (ctx.cardHeroOwner ?? ctx.cardOwner) || heroIdx !== ctx.cardHeroIdx) return;
 
       // Must be a negative status
       const statusName = ctx.statusName;

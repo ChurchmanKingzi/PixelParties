@@ -61,17 +61,19 @@ function eigeneSasZa(ctx) {
   const inst = ctx.card;
   const pi = ctx.cardOwner;
   const hi = inst?.heroIdx;
-  const hero = engine.gs.players[pi]?.heroes?.[hi];
+  // Styx 28.9.: Sas'Za liegt auf der Brettseite `feld`; `pi` bleibt „du".
+  const feld = ctx.cardHeroOwner ?? pi;
+  const hero = ctx.attachedHero ?? engine.gs.players[feld]?.heroes?.[hi];
   if (hero?.name !== CARD_NAME || hero.hp <= 0) return null;
-  if (engine._isHeroEffectSilenced(pi, hi)) return null;
-  return { hero, pi, hi };
+  if (engine._isHeroEffectSilenced(feld, hi)) return null;
+  return { hero, pi, hi, feld };
 }
 
 /** Auftritt beim Ausloesen — dieselbe Bauart wie „Cute Meanie Melissa". */
-async function auftritt(engine, pi, hi) {
+async function auftritt(engine, pi, hi, feld = pi) {   // Styx 28.9.: Animation auf der Brettseite
   await engine.showTriggeredEffect(CARD_NAME);
   engine._broadcastEvent('play_zone_animation', {
-    type: 'equip_flash', owner: pi, heroIdx: hi, zoneSlot: -1,
+    type: 'equip_flash', owner: feld, heroIdx: hi, zoneSlot: -1,
   });
 }
 
@@ -123,7 +125,7 @@ module.exports = {
 
       // ★★ v1147: Auftritt erst NACH dem Ja (v736: nie vor der letzten
       // Abbruchstelle).
-      await auftritt(engine, pi, hi);
+      await auftritt(engine, pi, hi, eigen.feld);
       inst._deathClaim = { to: 'hand', name: tot.name, owner: pi, by: CARD_NAME };
       engine.log('sasza_to_hand', {
         player: engine.gs.players[pi]?.username, creature: tot.name,
@@ -161,7 +163,7 @@ module.exports = {
       // ★ Gezaehlt wird die AUSLOESUNG, nicht die Kartenzahl.
       spendUse(hero, engine.gs, zaehler);
 
-      await auftritt(engine, pi, hi);
+      await auftritt(engine, pi, hi, eigen.feld);
       await engine.actionDrawCards(pi, stufe, { source: CARD_NAME });
       engine.log('sasza_draw', {
         player: engine.gs.players[pi]?.username,

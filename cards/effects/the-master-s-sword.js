@@ -32,7 +32,7 @@ module.exports = {
 
     onCardLeaveZone: (ctx) => {
       if (ctx.fromZone !== 'support') return;
-      if (ctx.fromOwner !== ctx.cardOwner || ctx.fromHeroIdx !== ctx.card.heroIdx || ctx.fromZoneSlot !== ctx.card.zoneSlot) return;
+      if ((ctx.fromOwner !== ctx.cardOwner && ctx.fromOwner !== ctx.cardHeroOwner) || ctx.fromHeroIdx !== ctx.card.heroIdx || ctx.fromZoneSlot !== ctx.card.zoneSlot) return;   // Styx 28.9.: Brettseite
       ctx.revokeAtk();
     },
 
@@ -51,8 +51,8 @@ module.exports = {
     beforeDamage: (ctx) => {
       if (ctx.type !== 'attack') return;
       if (ctx.sourceHeroIdx !== ctx.cardHeroIdx) return;
-      const sourceOwner = ctx.source?.owner ?? ctx.source?.controller ?? -1;
-      if (sourceOwner !== ctx.cardOwner) return;
+      // Styx 28.9.: „dieser Held" = Brettseite + Index (geliehener Held).
+      if (!ctx._engine.quelleIstHeld(ctx.source, ctx.cardHeroOwner ?? ctx.cardOwner, ctx.cardHeroIdx)) return;
 
       const hero = ctx.attachedHero;
       if (!hero?.name || hero.hp <= 0) return;

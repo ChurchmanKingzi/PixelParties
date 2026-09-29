@@ -87,7 +87,7 @@ module.exports = {
     const zoneSlot = target.type === 'hero' ? -1 : (target.slotIdx ?? -1);
     const PROJECTILE_MS = 1100;
     engine._broadcastEvent('play_projectile_animation', {
-      sourceOwner: pi, sourceHeroIdx: ctx.cardHeroIdx,
+      sourceOwner: ctx.cardHeroOwner ?? pi, sourceHeroIdx: ctx.cardHeroIdx,   // Styx 28.9.: Brettseite
       targetOwner: target.owner, targetHeroIdx: target.heroIdx, targetZoneSlot: zoneSlot,
       projectileClass: 'projectile-love-heart', trailClass: 'projectile-love-trail',
       duration: PROJECTILE_MS,

@@ -91,7 +91,9 @@ module.exports = {
     const gs = engine.gs;
     const pi = ctx.cardOwner;
     const heroIdx = ctx.cardHeroIdx;
-    const hero = gs.players[pi]?.heroes?.[heroIdx];
+    // Styx 28.9.: Heragas steht auf der Brettseite `feld`.
+    const feld = ctx.cardHeroOwner ?? pi;
+    const hero = ctx.attachedHero ?? gs.players[feld]?.heroes?.[heroIdx];
     if (!hero?.name || hero.hp <= 0) return false;
 
     const erlaubt = new Set(eligibleCreatures(engine, pi).map(i => i.id));
@@ -122,14 +124,14 @@ module.exports = {
     // der Treffer.
     // v1316: Treffer im Moment des Aufpralls, nicht danach.
     await engine.rammeBisKontakt({
-      sourceOwner: pi, sourceHeroIdx: heroIdx,
-      targetOwner: inst.controller ?? inst.owner,
+      sourceOwner: feld, sourceHeroIdx: heroIdx,
+      targetOwner: engine.physicalSide(inst),
       targetHeroIdx: inst.heroIdx >= 0 ? inst.heroIdx : 0,
       targetZoneSlot: inst.zoneSlot,
       cardName: hero.name, duration: 900,
     });
 
-    const source = { name: CARD_NAME, owner: pi, heroIdx };
+    const source = { name: CARD_NAME, owner: pi, heroIdx, ...(feld !== pi ? { heroOwner: feld } : {}) };
     await engine.actionDealCreatureDamage(source, inst, betrag, 'attack',
       { sourceOwner: pi, canBeNegated: true });
 
@@ -148,7 +150,8 @@ module.exports = {
       const pi = ctx.cardOwner;
       const hi = ctx.cardHeroIdx;
       const quelle = ctx.source;
-      if (!quelle || quelle.owner !== pi || quelle.heroIdx !== hi) return;
+      // Styx 28.9.: Quelle = dieser Held (Brettseite `heroOwner` + Index).
+      if (!quelle || (quelle.heroOwner ?? quelle.owner) !== (ctx.cardHeroOwner ?? pi) || quelle.heroIdx !== hi) return;
       await engine.showTriggeredEffect(CARD_NAME);   // Regel: aktivierter Effekt zeigt seine Karte
       await engine.actionDrawCards(pi, 1, { source: CARD_NAME });
       engine.log('heragas_draw', {

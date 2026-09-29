@@ -163,7 +163,7 @@ module.exports = {
      */
     onCardLeaveZone: async (ctx) => {
       if (ctx.fromZone !== 'support') return;
-      if (ctx.fromOwner !== ctx.cardOwner || ctx.fromHeroIdx !== ctx.card.heroIdx || ctx.fromZoneSlot !== ctx.card.zoneSlot) return;
+      if ((ctx.fromOwner !== ctx.cardOwner && ctx.fromOwner !== ctx.cardHeroOwner) || ctx.fromHeroIdx !== ctx.card.heroIdx || ctx.fromZoneSlot !== ctx.card.zoneSlot) return;   // Styx 28.9.: Brettseite
       const engine = ctx._engine;
       const pi = ctx.cardOwner;
 
@@ -207,8 +207,8 @@ module.exports = {
 
       // Source must be this hero
       if (ctx.sourceHeroIdx !== ctx.cardHeroIdx) return;
-      const sourceOwner = ctx.source?.owner ?? ctx.source?.controller ?? -1;
-      if (sourceOwner !== ctx.cardOwner) return;
+      // Styx 28.9.: „dieser Held" = Brettseite + Index (geliehener Held).
+      if (!ctx._engine.quelleIstHeld(ctx.source, ctx.cardHeroOwner ?? ctx.cardOwner, ctx.cardHeroIdx)) return;
 
       const engine = ctx._engine;
       const pi = ctx.cardOwner;
@@ -250,7 +250,8 @@ module.exports = {
       for (const e of ctx.entries) {
         if (e.type !== 'attack') continue;
         if ((e.source?.heroIdx ?? -1) !== heroIdx) continue;
-        if ((e.source?.owner ?? -1) !== pi) continue;
+        // Styx 28.9.: „dieser Held" = Brettseite + Index (geliehener Held).
+        if (!engine.quelleIstHeld(e.source, ctx.cardHeroOwner ?? pi, heroIdx)) continue;
         // Full negation reactions (Idej Projection, Spectral Armor
         // zero-cap, Anti Magic void, future similar) set `e.cancelled`
         // on the entry. "Negate that damage AND all associated

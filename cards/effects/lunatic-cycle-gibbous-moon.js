@@ -26,14 +26,15 @@ const BUFF = 'negative_status_immune';
 
 function grant(ctx) {
   const engine = ctx._engine;
-  const pi = ctx.cardOwner;
+  // Styx 28.9.: Held auf der Brettseite; Quelle ist der Kontrolleur.
+  const pi = ctx.cardHeroOwner ?? ctx.cardOwner;
   const hi = ctx.card.heroIdx;
   const hero = engine.gs.players[pi]?.heroes?.[hi];
   if (!hero?.name || hero.hp <= 0) return;
   if (hero.buffs?.[BUFF]) return; // already immune (any source)
   // v1067: Quelle ist Pflicht (siehe _affected-shared). Hier der eigene
   // Held — die Klausel loest damit korrekt KEINEN Gegner-Trigger aus.
-  engine.actionAddBuff(hero, pi, hi, BUFF, { source: CARD_NAME, sourceOwner: pi, permanent: true });
+  engine.actionAddBuff(hero, pi, hi, BUFF, { source: CARD_NAME, sourceOwner: ctx.cardOwner, permanent: true });
   // Mirror Divine Gift of Coolness: clear any negatives already on it.
   try {
     engine.cleanseHeroStatuses(hero, pi, hi, getNegativeStatuses(), CARD_NAME);
@@ -53,11 +54,11 @@ module.exports = {
     onGameStart: (ctx) => grant(ctx),
     onCardLeaveZone: (ctx) => {
       if (ctx.fromZone !== 'support') return;
-      if (ctx.fromOwner !== ctx.cardOwner
+      if ((ctx.fromOwner !== ctx.cardOwner && ctx.fromOwner !== ctx.cardHeroOwner)   // Styx 28.9.: Brettseite
         || ctx.fromHeroIdx !== ctx.card.heroIdx
         || ctx.fromZoneSlot !== ctx.card.zoneSlot) return;
       const engine = ctx._engine;
-      const pi = ctx.cardOwner;
+      const pi = ctx.cardHeroOwner ?? ctx.cardOwner;   // Styx 28.9.: Brettseite des Helden
       const hi = ctx.card.heroIdx;
       const hero = engine.gs.players[pi]?.heroes?.[hi];
       if (!hero) return;

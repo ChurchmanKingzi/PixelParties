@@ -3,7 +3,25 @@
 //  Uses generic bonusActions system for the combo.
 // ═══════════════════════════════════════════
 
-const { hasCardType } = require('./_hooks');
+const { hasCardType, baseCardName } = require('./_hooks');
+
+const CARD_NAME = 'Ghuanjun, the Undead Martial Artist';
+
+/**
+ * Styx 28.9.: Brettseite von `(sideOrCtrl, heroIdx)`. Die Engine ruft
+ * `canPlayCard` teils mit der Seite (Aktionsliste), teils mit dem
+ * Kontrolleur (validateActionPlay bei Uebernahme) — steht dort nicht
+ * Ghuanjun, liegt er als geliehener Held beim Gegner.
+ */
+function ghuanjunSeite(gs, pi, heroIdx) {
+  const h = gs.players[pi]?.heroes?.[heroIdx];
+  if (h?.name && baseCardName(h.name) === CARD_NAME) return pi;
+  for (let p = 0; p < (gs.players || []).length; p++) {
+    const g = gs.players[p]?.heroes?.[heroIdx];
+    if (p !== pi && g?.name && baseCardName(g.name) === CARD_NAME && g.charmedBy === pi) return p;
+  }
+  return pi;
+}
 
 module.exports = {
   activeIn: ['hero'],
@@ -24,11 +42,17 @@ module.exports = {
   },
 
   canPlayCard: (gs, pi, heroIdx, cardData, engine) => {
-    const ps = gs.players[pi];
-    const hero = ps?.heroes?.[heroIdx];
+    // Styx 28.9.: Held auf seiner Brettseite, Bonusaktion beim Kontrolleur.
+    const seite = ghuanjunSeite(gs, pi, heroIdx);
+    const hero = gs.players[seite]?.heroes?.[heroIdx];
     if (!hero) return true;
+    const ctrl = engine?.heroSideOf ? engine.heroSideOf(seite, hero) : seite;
+    const ps = gs.players[ctrl];
     // During active bonus actions: only allowed types
-    if (ps.bonusActions?.heroIdx === heroIdx && ps.bonusActions.remaining > 0) {
+    const bonus = engine?.bonusAktionFuer
+      ? engine.bonusAktionFuer(ctrl, heroIdx, seite)
+      : (ps?.bonusActions?.heroIdx === heroIdx && ps.bonusActions.remaining > 0);
+    if (bonus) {
       const allowed = ps.bonusActions.allowedTypes || [];
       if (allowed.length > 0 && !allowed.includes(cardData.cardType)) return false;
     }
@@ -87,10 +111,14 @@ module.exports = {
       const gs = engine.gs;
       const pi = ctx.cardOwner; // Effective controller (auto-resolved)
       const heroIdx = ctx.cardHeroIdx;
-      const hero = gs.players[ctx.cardOriginalOwner]?.heroes?.[heroIdx];
+      // Styx 28.9.: Brettseite des Helden; `heroOwner` im Payload ist die
+      // Seite des handelnden Helden (gleicher Index ≠ derselbe Held).
+      const feld = ctx.cardHeroOwner ?? ctx.cardOriginalOwner;
+      const hero = ctx.attachedHero ?? gs.players[feld]?.heroes?.[heroIdx];
       if (!hero?.name || hero.hp <= 0) return;
 
       if (ctx.playerIdx !== pi) return;
+      if ((ctx.heroOwner ?? ctx.playerIdx) !== feld) return;
       if (ctx.actionType !== 'attack') return;
 
       const ps = gs.players[pi];
@@ -104,7 +132,7 @@ module.exports = {
       if (gs.currentPhase !== 3) return;
 
       // ── BONUS ACTION CONTINUATION ──
-      if (ps.bonusActions?.heroIdx === heroIdx && ps.bonusActions.remaining > 0) {
+      if (engine.bonusAktionFuer(pi, heroIdx, feld)) {
         ps.bonusActions.remaining--;
         if (ps.bonusActions.remaining > 0) gs._preventPhaseAdvance = true;
         engine.sync();
@@ -128,17 +156,19 @@ module.exports = {
       if (!wantsCombo) return;
 
       hero._ghuanjunComboUsed = true;
-      ps.bonusActions = { heroIdx, remaining: 2, allowedTypes: ['Attack'] };
+      ps.bonusActions = { heroIdx, heroOwner: feld, remaining: 2, allowedTypes: ['Attack'] };
       ps.comboLockHeroIdx = heroIdx;
+      // Styx 28.9.: Seite zum Index (die Engine prueft den Combo-Lock bisher nur per Index).
+      ps.comboLockHeroOwner = feld;
 
       // Flash Ghuanjun to indicate combo activation
-      engine._broadcastEvent('play_zone_animation', { type: 'electric_strike', owner: ctx.cardOriginalOwner, heroIdx, zoneSlot: -1 });
+      engine._broadcastEvent('play_zone_animation', { type: 'electric_strike', owner: feld, heroIdx, zoneSlot: -1 });
       await engine._delay(300);
 
       const oppIdx = pi === 0 ? 1 : 0;
-      for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-        if (hi === heroIdx) continue;
-        const otherHero = ps.heroes[hi];
+      // Kontrolle statt Seite (Styx 28.9.): alle anderen Helden, die `pi` kontrolliert.
+      for (const { hero: otherHero } of engine.heroesControlledBy(pi)) {
+        if (otherHero === hero) continue;
         if (!otherHero?.name) continue;
         if (!otherHero.buffs) otherHero.buffs = {};
         otherHero.buffs.combo_locked = {
@@ -153,7 +183,8 @@ module.exports = {
 
     onAdditionalActionUsed: (ctx) => {
       if (ctx.heroIdx !== ctx.cardHeroIdx || ctx.playerIdx !== ctx.cardOwner || ctx.actionType !== 'attack') return;
-      const hero = ctx.players[ctx.cardOriginalOwner]?.heroes?.[ctx.cardHeroIdx];
+      if ((ctx.heroOwner ?? ctx.playerIdx) !== (ctx.cardHeroOwner ?? ctx.cardOriginalOwner)) return;   // Styx 28.9.
+      const hero = ctx.attachedHero ?? ctx.players[ctx.cardOriginalOwner]?.heroes?.[ctx.cardHeroIdx];
       if (!hero) return;
       if (!hero.ghuanjunAttacksUsed) hero.ghuanjunAttacksUsed = [];
       if (!hero.ghuanjunAttacksUsed.includes(ctx.playedCardName)) hero.ghuanjunAttacksUsed.push(ctx.playedCardName);
@@ -167,8 +198,9 @@ module.exports = {
     beforeDamage: (ctx) => {
       if (ctx.type !== 'attack') return;
       if (ctx.sourceHeroIdx !== ctx.cardHeroIdx) return;
-      const sourceOwner = ctx.source?.owner ?? ctx.source?.controller ?? -1;
-      if (sourceOwner !== ctx.cardOwner) return;
+      // Styx 28.9.: Brettseite der Quelle (`heroOwner`) gegen Ghuanjuns Seite.
+      const sourceOwner = ctx.source?.heroOwner ?? ctx.source?.owner ?? ctx.source?.controller ?? -1;
+      if (sourceOwner !== (ctx.cardHeroOwner ?? ctx.cardOwner)) return;
       ctx.setFlag('capAtHPMinus1', true);
 
       if (ctx.source?.usesHeroAtk) {
@@ -187,8 +219,8 @@ module.exports = {
     afterDamage: async (ctx) => {
       if (ctx.type !== 'attack') return;
       if (ctx.sourceHeroIdx !== ctx.cardHeroIdx) return;
-      const sourceOwner = ctx.source?.owner ?? ctx.source?.controller ?? -1;
-      if (sourceOwner !== ctx.cardOwner) return;
+      const sourceOwner = ctx.source?.heroOwner ?? ctx.source?.owner ?? ctx.source?.controller ?? -1;
+      if (sourceOwner !== (ctx.cardHeroOwner ?? ctx.cardOwner)) return;   // Styx 28.9.
       const engine = ctx._engine;
       const gs = engine.gs;
       const pi = ctx.cardOwner;
@@ -211,11 +243,11 @@ module.exports = {
     beforeCreatureDamageBatch: (ctx) => {
       if (!ctx.entries) return;
       const heroIdx = ctx.cardHeroIdx;
-      const pi = ctx.cardOwner; // Effective controller (auto-resolved)
+      const feld = ctx.cardHeroOwner ?? ctx.cardOwner;   // Styx 28.9.: Brettseite
       const hero = ctx.players?.[ctx.cardOriginalOwner]?.heroes?.[heroIdx];
       for (const e of ctx.entries) {
         if (e.type !== 'attack' || e.cancelled) continue;
-        if ((e.source?.heroIdx ?? -1) !== heroIdx || (e.source?.owner ?? -1) !== pi) continue;
+        if ((e.source?.heroIdx ?? -1) !== heroIdx || (e.source?.heroOwner ?? e.source?.owner ?? -1) !== feld) continue;
         e.capAtHPMinus1 = true;
         // Only correct attacks that use hero.atk for damage
         if (e.source?.usesHeroAtk && hero) {
@@ -235,9 +267,10 @@ module.exports = {
       const pi = ctx.cardOwner; // Effective controller (auto-resolved)
       const oppIdx = pi === 0 ? 1 : 0;
       const heroIdx = ctx.cardHeroIdx;
+      const feld = ctx.cardHeroOwner ?? pi;   // Styx 28.9.: Brettseite
       for (const e of ctx.entries) {
         if (e.type !== 'attack') continue;
-        if ((e.source?.heroIdx ?? -1) !== heroIdx || (e.source?.owner ?? -1) !== pi) continue;
+        if ((e.source?.heroIdx ?? -1) !== heroIdx || (e.source?.heroOwner ?? e.source?.owner ?? -1) !== feld) continue;
         // Full negation (Spectral Armor zero-cap, Anti Magic void
         // on a Spell-typed attack, future similar) → no hit, no
         // immortal grant per "and all associated effects".

@@ -267,7 +267,7 @@ module.exports = {
         srcOwner: ownerIdx, srcHeroIdx: targetOwnerIdx === ownerIdx ? ctx.cardHeroIdx : -1,
         fromOwner: targetOwnerIdx,
         fromHeroIdx: (gs.players[targetOwnerIdx]?.heroes || []).indexOf(target),
-        toOwner: ownerIdx, toHeroIdx: ctx.cardHeroIdx,
+        toOwner: ctx.cardHeroOwner ?? ownerIdx, toHeroIdx: ctx.cardHeroIdx,   // Styx 28.9.: Brettseite
       });
       await engine._delay(ANIM_FLY_MS);
 
@@ -365,7 +365,7 @@ module.exports = {
           : (candidate.inst.controller ?? candidate.inst.owner),
         fromHeroIdx: candidate.inst.heroIdx,
         fromZoneSlot: candidate.inst.zoneSlot,
-        toOwner: ownerIdx, toHeroIdx: ctx.cardHeroIdx,
+        toOwner: ctx.cardHeroOwner ?? ownerIdx, toHeroIdx: ctx.cardHeroIdx,   // Styx 28.9.: Brettseite
       });
       await engine._delay(ANIM_FLY_MS);
 
