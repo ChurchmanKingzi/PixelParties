@@ -1747,6 +1747,11 @@ function _ppZielwahlMitte() {
   };
 }
 
+// ★ v1484: Bedienelemente der Zielwahl-Box und ihr Hover-Rand (siehe die
+// Durchsicht in DraggablePanel).
+const ZW_KNOPF_SEL = 'button, a, input, select, textarea, label';
+const ZW_KNOPF_RAND = 10;
+
 function DraggablePanel({ children, className, style, zielwahl }) {
   const [pos, setPos] = useState({ x: 0, y: 0 });
   const [dragging, setDragging] = useState(false);
@@ -1813,6 +1818,20 @@ function DraggablePanel({ children, className, style, zielwahl }) {
         // Liegt das Ereignisziel IM Panel, ist es eines der aktiven
         // Elemente (nur die bekommen Zeigerereignisse) → deckend lassen.
         an = drin && !(letzt.ziel && el.contains(letzt.ziel));
+        // ★ v1484 (Als Vorgabe 29.9.: „Die Bereiche direkt um Buttons auf
+        // dem Fenster herum sollten on-hover noch NICHT das Fenster
+        // transparent machen. Wenn *nur* exakt die Buttons das Fenster
+        // beibehalten, fühlt sich das seltsam an, ein kleiner Rand drumrum
+        // sollte helfen."): Rand von `ZW_KNOPF_RAND` px um jedes
+        // Bedienelement — dort bleibt die Box deckend. Nur die Optik:
+        // ein Klick in diesem Rand geht weiter durch zum Ziel darunter.
+        if (an) {
+          for (const k of el.querySelectorAll(ZW_KNOPF_SEL)) {
+            const kr = k.getBoundingClientRect();
+            if (kr.width && letzt.x >= kr.left - ZW_KNOPF_RAND && letzt.x <= kr.right + ZW_KNOPF_RAND
+              && letzt.y >= kr.top - ZW_KNOPF_RAND && letzt.y <= kr.bottom + ZW_KNOPF_RAND) { an = false; break; }
+          }
+        }
       }
       if (el.hasAttribute('data-durchsicht') !== an) el.toggleAttribute('data-durchsicht', an);
     };
