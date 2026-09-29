@@ -28,7 +28,7 @@ B24 = [BOUNCE12[(k // 2) % 12] for k in range(24)]  # gemächlich: ein Federn je
 BLINK = {14: 'halb', 15: 'zu', 16: 'zu', 17: 'halb', 38: 'halb', 39: 'zu', 40: 'zu', 41: 'halb'}
 
 V_ = {
-    'quetza': dict(slug='quetzahuitl-receiver-of-sacrifices', pads=(10, 10, 6, 3)),
+    'quetza': dict(slug='quetzahuitl-receiver-of-sacrifices', pads=(21, 23, 6, 4)),
     'emerald': dict(slug='quetzahuitl-the-emerald-dragon', pads=(3, 3, 6, 6),
                     skin='Quetzahuitl, Receiver of Sacrifices'),
     'lyta': dict(slug='little-lyta-the-amazon-princess', knee=20, pads=(4, 2, 3, 1)),
@@ -162,6 +162,48 @@ QZ_BLINK = {'halb': [((72, 79), '051c09'), ((73, 79), '051c09')],
                    ((75, 83), '051c09')]}
 
 
+def rot_wing(src, pivot, ang, span, oy):
+    """Flügel um sein Schultergelenk drehen (ang in Grad, positiv = im Uhrzeigersinn) und entlang des
+    Radius perspektivisch verkürzen (span <= 1). Rückwärts abgebildet mit 3x3-Überabtastung und
+    Mehrheitsfarbe: keine Mischfarben, die Palette bleibt erhalten."""
+    m = src[:, :, 3] > 0
+    cols, inv = np.unique(src[m][:, :3], axis=0, return_inverse=True)
+    idx = np.full(src.shape[:2], -1)
+    idx[m] = inv.ravel()
+    Y, X = np.mgrid[0:H, 0:W]
+    px_, py_ = pivot[0] + PL, pivot[1] + PT + oy
+    a = math.radians(ang)
+    c, s = math.cos(-a), math.sin(-a)
+    votes = np.zeros((len(cols) + 1, H * W), int)
+    for sx in (-0.33, 0.0, 0.33):
+        for sy in (-0.33, 0.0, 0.33):
+            dx, dy = X + sx - px_, Y + sy - py_
+            qx = np.rint(pivot[0] + (dx * c - dy * s) / span).astype(int)
+            qy = np.rint(pivot[1] + (dx * s + dy * c) / span).astype(int)
+            ok = (qx >= 0) & (qx < SW) & (qy >= 0) & (qy < SH)
+            k = np.where(ok, idx[np.clip(qy, 0, SH - 1), np.clip(qx, 0, SW - 1)], -1)
+            np.add.at(votes, (k.ravel() + 1, np.arange(H * W)), 1)
+    best = votes.argmax(0)
+    n = votes.max(0)
+    rest = votes[1:].argmax(0) + 1
+    take = (best == 0) & (n < 5) & (votes[1:].max(0) >= 4)
+    best = np.where(take, rest, best)
+    out = np.zeros((H, W, 4), int)
+    sel = (best > 0).reshape(H, W)
+    out[sel, :3] = cols[best.reshape(H, W)[sel] - 1]
+    out[sel, 3] = 255
+    return out
+
+
+QZ_PIVOTS = ((51, 70), (58, 67))                        # Schultergelenke (links, rechts)
+QZ_FLAP = [                                             # (Winkel nach außen/unten, Länge, Körper-y) – 16 Frames:
+    (0, 1.0, 0), (-6, 1.0, 1), (-10, 1.0, 2), (-12, 1.0, 3),       # fällt 1 px je Frame, Flügel heben sich
+    (40, 0.9, 0), (85, 0.72, -1), (100, 0.62, -2), (95, 0.64, -2),  # Schlag: schnell 3 px hoch, dann 1 px
+    (80, 0.7, -2), (60, 0.78, -2), (45, 0.85, -1), (30, 0.9, -1),   # Erholen: Flügel öffnen sich wieder
+    (18, 0.95, -1), (8, 0.98, 0), (3, 1.0, 0), (0, 1.0, 0)]
+QZ_CACHE = {}
+
+
 def f_quetza(i):
     global QZ
     if QZ is None:
@@ -169,15 +211,20 @@ def f_quetza(i):
     wl, wr, body = QZ
     body = body.copy()
     blink(body, i, QZ_BLINK)
-    ph = 3 * 2 * math.pi * i / N                          # drei kräftige Schläge je Loop
-    lean = 8.0 * math.sin(ph)                             # > 0: Spitzen nach außen (Abschlag), < 0: innen
-    squeeze = 1.0 - 0.2 * max(0.0, math.sin(ph))
-    hover = -round(3.0 * math.sin(ph - 0.5) + 3.0 * math.sin(0.5))   # der Abschlag trägt ihn hoch
+    ang, span, dy = QZ_FLAP[i % 16]                       # drei Schläge je Loop
     out = np.zeros((H, W, 4), int)
-    wing_rows(out, wl, -1, lean, squeeze, PL, PT + hover)
-    wing_rows(out, wr, 1, lean, squeeze, PL, PT + hover)
-    paste(out, body, PL, PT + hover)
-    flutter(out, body, i, PL, PT + hover, list(range(70, 80)), [], range(76, SW), amp=1.2, speed=4,
+    for part, pivot, side in ((wl, QZ_PIVOTS[0], -1), (wr, QZ_PIVOTS[1], 1)):
+        key = (side, ang, span, dy)
+        if key not in QZ_CACHE:
+            QZ_CACHE[key] = part_rot = rot_wing(part, pivot, side * ang, span, dy) if ang or span < 1 else None
+        w = QZ_CACHE[key]
+        if w is None:
+            paste(out, part, PL, PT + dy)
+        else:
+            m = w[:, :, 3] > 0
+            out[m] = w[m]
+    paste(out, body, PL, PT + dy)
+    flutter(out, body, i, PL, PT + dy, list(range(70, 80)), [], range(76, SW), amp=1.2, speed=4,
             ok=lambda c: hexc(c) in QZ_CREST)
     return out
 
@@ -189,30 +236,30 @@ EM_BLINK = {'halb': [((68, 20), '946c2d'), ((71, 23), '946c2d')],
             'zu': [((68, 20), '000000'), ((71, 23), '000000')]}
 
 
+EM_PIECES = [(0, 28, 3), (28, 45, 2), (45, EM_HEAD, 1)]   # Leibstücke (Spalten) und wie weit sie nachrücken
+
+
 def f_emerald(i):
+    """Der Leib zieht sich zusammen, ohne schmaler zu werden: die Stücke rücken starr zum Kopf hin
+    und schieben sich dabei übereinander (das kopfnähere liegt oben), eine sanfte Welle läuft durch."""
     t = 2 * math.pi * i / N
     s = SRC.copy()
     blink(s, i, EM_BLINK)
     hover = -round(1.5 * math.sin(t))
     pull = 0.5 - 0.5 * math.cos(2 * t)                    # zweimal je Loop: der Leib zieht sich zusammen
-    squeeze = 1.0 - 0.1 * pull
-    amp = 1.6 + 2.4 * pull                                # zusammengezogen wirft er größere Wellen
     c = -12 + (SW + 24) * ((i % 24) / 24)                 # Leuchten läuft zweimal von links nach rechts
     out = np.zeros((H, W, 4), int)
-    for xd in range(SW):
-        x = xd if xd >= EM_HEAD else EM_HEAD - round((EM_HEAD - xd) / squeeze)
-        if x < 0:
-            continue
-        k = 2 * math.pi * x / 44
-        dy = round(amp * math.sin(k - 2 * t) - 1.6 * math.sin(k)) + hover
-        if xd >= EM_HEAD:                                 # der Kopf schwingt nur sanft mit
-            dy = round(1.6 * (math.sin(2 * math.pi * EM_HEAD / 44 - 2 * t) - math.sin(2 * math.pi * EM_HEAD / 44))) + hover
-        for y in np.nonzero(s[:, x, 3])[0]:
-            col = s[y, x]
-            hx = hexc(col)
-            if hx in EM_GOLD and abs(x - c) < 5:
-                col = rgb(EM_GOLD[hx])
-            dot(out, xd + PL, y + PT + dy, col)
+    for x0, x1, reach in EM_PIECES + [(EM_HEAD, SW, 0)]:
+        sh = round(reach * pull)
+        for x in range(x0, x1):
+            k = 2 * math.pi * min(x, EM_HEAD) / 44
+            dy = round(1.0 * (math.sin(k - 2 * t) - math.sin(k))) + hover
+            for y in np.nonzero(s[:, x, 3])[0]:
+                col = s[y, x]
+                hx = hexc(col)
+                if hx in EM_GOLD and abs(x - c) < 5:
+                    col = rgb(EM_GOLD[hx])
+                dot(out, x + sh + PL, y + PT + dy, col)
     return out
 
 
@@ -221,14 +268,15 @@ LY_SPEAR = 20                                           # ab dieser Spalte: der 
 LY_HAIR = {'994c2e', 'fdeac0', 'f7bd8f', 'fcd7ab', 'ec9772'}
 LY_FACE = {(6, 11): '303030', (7, 11): 'd5a462', (8, 11): 'd5a462', (11, 11): 'd5a462', (12, 11): 'd5a462',
            (13, 11): '303030', (6, 12): '303030', (13, 12): '303030', (9, 12): 'f6cd8b', (10, 12): 'f6cd8b',
-           (7, 12): '203a8c', (8, 12): '203a8c', (11, 12): '203a8c', (12, 12): '203a8c',
-           (7, 13): '4f9cf0', (8, 13): '4f9cf0', (11, 13): '4f9cf0', (12, 13): '4f9cf0'}
+           (7, 12): 'd0d4e0', (8, 12): '2f5fc0', (11, 12): '2f5fc0', (12, 12): 'd0d4e0',    # außen weiß, innen
+           (7, 13): 'ffffff', (8, 13): '6aa8ff', (11, 13): '6aa8ff', (12, 13): 'ffffff'}   # blau, unten heller
 LY_BLINK = {'halb': [((x, 12), '311800') for x in (7, 8, 11, 12)],
             'zu': [((x, 12), 'f6cd8b') for x in (7, 8, 11, 12)] + [((x, 13), '311800') for x in (7, 8, 11, 12)]}
 HEART = {(0, 0): 'ff41ff', (2, 0): 'ffa4ff', (0, 1): 'ff41ff', (1, 1): 'ff74ff', (2, 1): 'ff74ff', (1, 2): 'ff41ff'}
 HEART_BIG = {(-1, -1): 'ff41ff', (0, -1): 'ff74ff', (2, -1): 'ff74ff', (3, -1): 'ffa4ff',
              (-1, 0): 'ff41ff', (0, 0): 'ff74ff', (1, 0): 'ff74ff', (2, 0): 'ff74ff', (3, 0): 'ffa4ff',
              (0, 1): 'ff41ff', (1, 1): 'ff74ff', (2, 1): 'ff74ff', (1, 2): 'ff41ff'}
+LY_DROOL = [2, 2, 3, 3, 3, 4, 4, 4, 4, 2, 2, 2]    # Länge des Sabberfadens (ab dem Mundwinkel)
 LY_HEARTS = [((6, 11), -1, 0), ((11, 11), 1, 12)]       # (links oben, Flugrichtung, Phase)
 
 
@@ -283,6 +331,7 @@ def f_lyta(i):
     for (x, y), c in LY_FACE.items():                     # die Herzen weg: darunter ihre blauen Augen
         s[y, x] = rgb(c)
     blink(s, i, LY_BLINK)
+    s[15, 11] = s[16, 11] = 0                             # der Sabberfaden wird eigens animiert
     b = B24[i % 24]
     out = np.zeros((H, W, 4), int)
     body = s.copy()
@@ -290,6 +339,12 @@ def f_lyta(i):
     draw_bounce(out, body, b, KNEE, PT, PL)
     lyta_wind(out, body, i, PL, PT + b)
     paste(out, SRC, PL, PT, mask=_xs >= LY_SPEAR)
+    a = i % 12                                            # der Sabberfaden: wird länger, ein Tropfen reißt ab
+    n = LY_DROOL[a]
+    for k in range(n):
+        dot(out, 11 + PL, 15 + k + PT + b, rgb('b8f5ff' if k < n - 1 else '8beeff'))
+    if a >= 9:
+        dot(out, 11 + PL, 15 + 3 + (a - 8) + PT + b, rgb('8beeff'))
     for (hx0, hy0), side, ph in LY_HEARTS:               # die Herzen: eigene Partikel vor den Augen
         a = (i + ph) % 24
         if a < 14:                                        # vor dem Auge, schlägt zweimal
@@ -315,7 +370,8 @@ PE_STROKES = [                                          # Freude-Striche: Pixel,
     ([(14, 4), (15, 4), (16, 4), (17, 5), (18, 6), (18, 7), (18, 8)], (1, -1)),
     ([(0, 7), (1, 7), (2, 7), (3, 7), (4, 7)], (-1, 0)),
 ]
-PE_BURST = [0, 1, 1, 2, None, None]                     # nach außen platzen, weg, neu aufploppen
+PE_BURST = [0, 1, 2]                                    # aufblitzen, nach außen rücken, weg (6er-Takt)
+PE_PHASE = [0, 3, 1, 4, 2]
 PE_TORSO = 21                                           # diese Rumpfzeile wächst beim Hochkommen aus dem Fass
 PE_RIM = 20                                             # ab dieser Zeile verdeckt das Fass alles außer der Öffnung
 
@@ -341,11 +397,11 @@ def f_pete(i):
         y = 23 - k
         for x in np.nonzero(body[PE_TORSO, :, 3] & hole[y, :, 3])[0]:
             dot(out, x + PL, y + PT, body[PE_TORSO, x])
-    for j, (pts, (ux, uy)) in enumerate(PE_STROKES):
-        a = (i - 4 - j % 2) % 16
-        d = PE_BURST[a] if a < len(PE_BURST) else 0
-        if d is None:
+    for j, (pts, (ux, uy)) in enumerate(PE_STROKES):     # jeder Strich blitzt kurz auf und ist wieder weg
+        a = (i + PE_PHASE[j]) % 6
+        if a >= len(PE_BURST):
             continue
+        d = PE_BURST[a]
         for x, y in pts:
             dot(out, x + ux * d + PL, y + uy * d + PT + dy, rgb('ffd500' if d < 2 else 'ffe766'))
     return out
