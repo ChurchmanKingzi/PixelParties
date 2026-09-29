@@ -35,7 +35,7 @@ V_ = {
     'pete': dict(slug='monsieur-pete-the-booty-raider', pads=(4, 4, 4, 1)),
     'sparrow': dict(slug='sparrow-the-bumbling-buffoon', pads=(3, 3, 4, 4)),
     'pinta': dict(slug='pinta-the-singing-ship', pads=(8, 8, 10, 1)),
-    'quisto': dict(slug='don-quisto-the-gold-seeker', knee=19, pads=(2, 13, 8, 1)),
+    'quisto': dict(slug='don-quisto-the-gold-seeker', knee=19, pads=(2, 14, 10, 1)),
     'sasza': dict(slug='sasza-the-snaka-adventurer', knee=17, pads=(3, 3, 3, 3)),
 }
 V = next((v for v in sys.argv[2:] if v in V_), 'quetza')
@@ -609,10 +609,11 @@ def pinta_base(i):
             if not fm[yy, xx] and face[yy, xx, 3] and hexc(face[yy, xx]) in PI_SAIL and 13 <= xx <= 20:
                 s[yy, xx] = face[yy, xx]
     bob = 1 if math.sin(2 * t) > 0.25 else 0              # das Schiff taucht sacht ein und hebt sich wieder
+    sway = round(2.4 * math.sin(t))                       # und treibt auf den Wellen vor und zurück
     out = np.zeros((H, W, 4), int)
     for y, x in zip(*np.nonzero(s[:, :, 3])):
         if y + bob < 31:
-            dot(out, x + PL, y + bob + PT, s[y, x])
+            dot(out, x + sway + PL, y + bob + PT, s[y, x])
     wl = water_layer(i)
     m = wl[:, :, 3] > 0
     out[m] = wl[m]
@@ -635,7 +636,7 @@ def f_pinta(i):
             x0, y0 = rng.uniform(0, W - 4), rng.uniform(H * 0.25, H * 0.7)
             ph, drift = rng.uniform(0, 6.3), rng.uniform(-0.25, 0.25)
             path = [(int(round(x0 + drift * a + 1.2 * math.sin(0.5 * a + ph))), int(round(y0 - 0.8 * a))) for a in range(L)]
-            ok = all(0 <= x + dx < W and 0 <= y + dy < H and not fig[y + dy, x + dx]
+            ok = all(1 <= x + dx < W - 1 and 1 <= y + dy < H - 1 and not fig[y + dy, x + dx]
                      for x, y in path for (dx, dy) in tpl[k])
             if ok and sum(1 for r in PI_NOTES if min((e - r[0]) % N, (r[0] - e) % N) <= 3) < 2:
                 PI_NOTES.append((e, L, k, path))
@@ -659,6 +660,14 @@ QU_BLINK = {'halb': [((7, 9), '000000')],
 QU_MUZZLE = 25                                          # letzte Spalte der Handkanone
 QU_HOT = {'692110', '592500', '591000', '593e00', '591b00'}
 QU_SHOTS = (6, 22, 38)                                  # Schüsse
+QU_EMBER = ['4a1406', '7a200c', 'a8301a', 'd8481c', 'f47a22', 'ffb440', 'fff0a0']
+
+
+def _hash(*v):
+    h = 2166136261
+    for k in v:
+        h = ((h ^ (k & 0xffffffff)) * 16777619) & 0xffffffff
+    return h
 QU_FLASH = {0: {(0, 0): 'ffffff', (1, 0): 'ffffff', (0, -1): 'fff6a0', (0, 1): 'fff6a0', (2, 0): 'fff6a0',
                 (1, -1): 'ffd23c', (1, 1): 'ffd23c', (3, 0): 'ffd23c', (2, -2): 'ff8a1e', (2, 2): 'ff8a1e',
                 (4, 0): 'ff8a1e', (0, -2): 'ffd23c', (0, 2): 'ffd23c'},
@@ -673,14 +682,13 @@ def quisto_base(i):
     blink(s, i, QU_BLINK)
     since = min((i - st) % N for st in QU_SHOTS)
     heat = max(0.0, 1.0 - since / 10)                      # nach dem Schuss glüht die Mündung, kühlt ab
-    glow = 0.35 + 0.25 * math.sin(2 * math.pi * i / 8)    # und glimmt immer ein wenig
-    f = max(heat, glow)
+    glow = 0.5 + 0.5 * math.sin(2 * math.pi * i / 8)      # und glimmt immer
     for y in range(SH):
         for x in range(QU_MUZZLE - 2, QU_MUZZLE + 1):
-            if s[y, x, 3] and hexc(s[y, x]) in QU_HOT:
-                c = s[y, x]
-                hot = rgb('ff7a1e') if f > 0.8 else rgb('e8461c') if f > 0.5 else rgb('a8301a')
-                s[y, x] = hot if (x == QU_MUZZLE or f > 0.5) else c
+            if s[y, x, 3] and hexc(s[y, x]) in QU_HOT:    # Glut: nie einfarbig – Verlauf, zur Mitte heißer,
+                lvl = 1 + 2.4 * heat + 0.8 * glow + (x - QU_MUZZLE + 1) * 0.8 - 0.35 * abs(y - 12.5)
+                lvl += (_hash(x, y, i // 2) % 3) - 1      # jedes Pixel flackert für sich
+                s[y, x] = rgb(QU_EMBER[max(0, min(len(QU_EMBER) - 1, round(lvl)))])
     out = np.zeros((H, W, 4), int)
     draw_bounce(out, s, B24[i % 24], KNEE, PT, PL)
     return out
@@ -709,12 +717,21 @@ def f_quisto(i):
                         c = 'b8b2aa' if (xx + yy) % 2 else '9a948c'
                         if xx > QU_MUZZLE or (0 <= xx + PL < W and not out[yy, xx + PL, 3]):
                             dot(out, xx + PL, yy, rgb(c, max(50, 220 - 15 * k)))
-    for w in range(0, N, 6):                              # aus der glimmenden Öffnung kräuseln stetig Rauchfäden
+    for w in range(0, N, 2):                              # aus der glimmenden Öffnung qualmt es stetig
         a = (i - w) % N
-        if a < 6:
-            x = QU_MUZZLE + 1 + a
-            y = my - 1 + (w // 6) % 3 - round(0.6 * a + 0.8 * math.sin(a + w))
-            dot(out, x + PL, y, rgb('b8b2aa', 150 - 20 * a))
+        L = 13 + _hash(w) % 5
+        if a < L:
+            j = _hash(w, 7)
+            x = QU_MUZZLE + 1.5 + 0.55 * a + 0.4 * math.sin(0.8 * a + j)
+            y = my - 1.5 + (j % 4) - 0.7 * a
+            r = 0.9 + 0.13 * a                            # die Schwaden wachsen und verblassen
+            al = max(50, 215 - 12 * a)
+            for yy in range(int(y - 2), int(y + 3)):
+                for xx in range(int(x - 2), int(x + 3)):
+                    if math.hypot(xx - x, yy - y) <= r and xx > QU_MUZZLE and 0 <= xx + PL < W:
+                        c = 'c8c2ba' if (xx + yy + a) % 3 else '8e8880'
+                        if out[yy, xx + PL, 3] < al:
+                            dot(out, xx + PL, yy, rgb(c, al))
     return out
 
 
