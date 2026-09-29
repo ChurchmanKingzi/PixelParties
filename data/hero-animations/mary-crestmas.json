@@ -1,0 +1,16 @@
+{
+  "hero": "Mary Crestmas",
+  "sheet": "mary-crestmas.png",
+  "frameWidth": 40,
+  "frameHeight": 43,
+  "frames": 48,
+  "frameMs": 90,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 9,
+  "padLeft": 7,
+  "padRight": 9,
+  "padBottom": 4,
+  "faceX": 19.0,
+  "footY": 39
+}
