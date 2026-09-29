@@ -53,6 +53,7 @@ import numpy as np
 import cv2
 from gimpformats.gimpXcfDocument import GimpDocument
 from assemble_hawaii import layer, layer_over, save_parts, only, shift
+from xcf_scan import patch_gimpformats
 
 
 def near(a, x, y, dil=0):
@@ -93,6 +94,7 @@ def top_left(a):
 
 
 def main(path):
+    patch_gimpformats()                                   # sonst werden manche Ebenen falsch dekodiert
     doc = GimpDocument(path)
     L = doc.raw_layers
     g = lambda n: opaque(layer(doc, L, n))
@@ -128,10 +130,12 @@ def main(path):
     one('alice-the-wonderous-girl', layer_over(g('Ebene #571'), g('Ebene #572')))
     one('mega-warrior-karian', g('Ebene #301'))
     one('sett-dunking-on-you', g('SETT-Kopie'))
-    robe = g('Ebene #294')                                # Robe über Arthor (Gesicht, Edelstein, Beine)
-    base = near(g('Arthor'), 285, 195, dil=1)
-    (rx, ry), (bx, by) = top_left(robe), top_left(base)
-    one('emperor-arthor', layer_over(shift(base, rx - bx, ry - by), robe))
+    robe = layer(doc, L, 'Ebene #294')                    # Robe über Arthor (Gesicht, Edelstein, Beine);
+    base = near(layer(doc, L, 'Arthor'), 285, 195, dil=1)
+    (rx, ry), (bx, by) = top_left(robe), top_left(base)   # Arthor liegt 1 px rechts der linken Robenkante
+    robe = only(robe, robe[:, :, 3] == 255)               # gemalt werden nur die deckenden Pixel
+    base = only(base, base[:, :, 3] == 255)
+    one('emperor-arthor', layer_over(shift(base, rx - bx + 1, ry - by), robe))
     one('nieht-the-yellow-flash', g('Minato'))
     one('beato-the-golden-witch', g('Beatrice'))
     save_parts('elana-the-digital-diva', [('body', g('MIKU ELANA')), ('guitar', g('Ebene #557')),
