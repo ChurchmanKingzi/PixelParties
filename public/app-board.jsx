@@ -3898,6 +3898,41 @@ function FuriousAngerEffect({ x, y, w = 80, h = 110 }) {
   );
 }
 
+
+// ── Applause Counter (Fun-Fun Circus, Als Vorgabe 29.9.) ────────────
+// Pixel-Icon zweier klatschender Haende mit der aktuellen Anzahl darauf,
+// unten mittig auf der Karte (auf dem Brett knapp UEBER der HP-Zahl, die
+// dort selbst unten mittig sitzt). Sprite als SVG-Daten-URI mit
+// `crispEdges`, gezeichnet mit `image-rendering: pixelated`.
+const PP_APPLAUSE_ICON = (() => {
+  const zeilen = [
+    '........MM........', '..M.....MM.....M..', '...M..KKKKKK..M...', '.....KSKKSSSK.....',
+    '....KSSKSSSSSK....', '...KSHHHSHHHHSK...', '...SHHHHSHHHHHS...', '..KSSSSSKSSSSSSK..',
+    '.KSSSSSSKSSSSSSSK.', '.KDSSSSSDDSSSSSDK.', '.KSSSSSDKKDSSSSSK.', 'KDSSSSDK..KDSSSSDK',
+    'KDDSSDK....KDSSDDK', 'KKDDDK......KDDDKK', '.KKKK........KKKK.',
+  ];
+  const FARBE = { K: '#1a0f08', S: '#ffd24a', H: '#fff2b0', D: '#e08a1e', M: '#ffffff' };
+  let rects = '';
+  zeilen.forEach((z, y) => [...z].forEach((c, x) => {
+    if (FARBE[c]) rects += `<rect x="${x}" y="${y}" width="1" height="1" fill="${FARBE[c]}"/>`;
+  }));
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="15" viewBox="0 0 18 15" shape-rendering="crispEdges">${rects}</svg>`;
+  return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+})();
+
+function ApplauseBadge({ n, hand }) {
+  if (!(n > 0)) return null;
+  return (
+    <div className={'applause-badge' + (hand ? ' applause-badge-hand' : '')}
+      onMouseEnter={e => showGameTooltip(e, `Applause Counters: ${n}.`)}
+      onMouseLeave={hideGameTooltip}>
+      <img className="applause-icon" src={PP_APPLAUSE_ICON} alt="" draggable={false} />
+      <span className="applause-num">{n}</span>
+    </div>
+  );
+}
+window.ApplauseBadge = ApplauseBadge;
+
 // Seitenverhaeltnis der Kartenbilder (750 × 1050). Kopien von Brettkarten,
 // die eine Animation bewegt, nehmen die BREITE der Karte auf dem Brett
 // und diese Hoehe — das Bildschirm-Rechteck der gekippten Karte ist zu
@@ -43681,6 +43716,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                       onMouseLeave={hideGameTooltip}
                     >🌀</div> : null}
                     {cc?.burned ? <BurnedOverlay /> : null}
+                    {cc?.applause > 0 ? <ApplauseBadge n={cc.applause} /> : null}
                     {cc?.bleeding ? <BleedingOverlay /> : null}
                     {cc?.frozen ? <FrozenOverlay /> : null}
                     {cc?._zoneAura === 'necro_flicker' ? <NecroFlickerAura /> : null}
@@ -43920,6 +43956,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                   ) : (
                     <img src={opp.cardback || "/cardback.png"} style={{ width: '100%', height: '100%', objectFit: 'cover' }} draggable={false} />
                   )}
+                  {revealEntry && (opp.handApplause?.[i] > 0) ? <ApplauseBadge n={opp.handApplause[i]} hand /> : null}
                 </div>
               );
             })}
@@ -45008,6 +45045,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                         </div>
                       );
                     })()}
+                    {(me.handApplause?.[item.origIdx] > 0) && <ApplauseBadge n={me.handApplause[item.origIdx]} hand />}
                     {handEffectiveCost != null && (
                       <div className="hand-cost-override"
                         onMouseEnter={e => {
