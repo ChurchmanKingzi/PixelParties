@@ -2062,7 +2062,7 @@ def halffrozen_base(i):
         inner = xs[:2] if inward < 0 else xs[-2:]
         for x, y in pts:                                # frei gewordene Stellen: innen der schmale Unterarm
             if (x, y) not in new:
-                out[y + PT + b, x + PL] = rgb(arm) if (x + dx in inner and y >= 12) else 0
+                out[y + PT + b, x + PL] = rgb(arm) if (x in inner and y >= 12) else 0
         for x, y in pts:
             out[y - k + PT + b, x + dx + PL] = s[y, x]
     return out
@@ -2121,10 +2121,21 @@ def f_molinda(i):
         body[y, x] = rgb(c)
     S = 8.0 * (0.5 - 0.5 * math.cos(4 * t))             # vier kräftige Flügelschläge je Loop
     out = np.zeros((H, W, 4), int)
-    for y, x in zip(*np.nonzero(wings[:, :, 3])):
-        side = -1 if x < SW / 2 else 1
+    wy = PT + fy - round(1.5 * S / 8)
+    for y in range(SH):                                 # jede Flügelzeile rückt nach außen, innen wächst sie mit
         u = max(0, y - 4) / 22
-        out[y + PT + fy - round(1.5 * S / 8), x + PL + fx + side * round(S * u)] = wings[y, x]
+        dx = round(S * u)
+        for side, xs in ((-1, range(0, SW // 2)), (1, range(SW // 2, SW))):
+            seg = [x for x in xs if wings[y, x, 3]]
+            if not seg:
+                continue
+            inner = max(seg) if side < 0 else min(seg)
+            fill = next((wings[y, x] for x in sorted(seg, key=lambda v: -side * v) if hexc(wings[y, x]) != '585371'),
+                        wings[y, inner])
+            for x in seg:
+                out[y + wy, x + PL + fx + side * dx] = wings[y, x]
+            for k in range(dx):                         # die Lücke zum Kopf füllt der Flügel
+                out[y + wy, inner + PL + fx + side * k] = fill
     src = body.copy()
     if jig:                                             # Brust: die hellen Blöcke rutschen 1 px nach (Nachbarzeile füllt nach)
         for x0, x1 in ((5, 8), (11, 14)):
@@ -2138,13 +2149,28 @@ def f_molinda(i):
                         src[y, x] = col[k + 1]
     hx, _ = dm_fly(t - 0.7)
     curl = round(1.2 * math.sin(4 * t))                 # die Locke oben wackelt
-    for y, x in zip(*np.nonzero(src[:, :, 3])):
-        dx = 0
-        if y <= 13 and (x <= 4 or x >= SW - 5) and hexc(body[y, x]) in DM_HAIR:
-            dx = round((hx - fx) * min(1.0, y / 12))    # Zöpfe: oben am Kopf fest, unten schleppen sie nach
-        elif y <= 1:
-            dx = curl if y == 0 else round(curl / 2)
-        out[y + PT + fy, x + PL + fx + dx] = src[y, x]
+    tails = src.copy()
+    for y in range(2, 14):                              # Zöpfe: oben am Kopf fest, unten schleppen sie waagrecht nach
+        dx = round((hx - fx) * min(1.0, y / 12))
+        if not dx:
+            continue
+        for side, xs in ((-1, range(0, 5)), (1, range(SW - 1, SW - 6, -1))):
+            seg = [x for x in xs if src[y, x, 3] and hexc(src[y, x]) in DM_HAIR]
+            if not seg:
+                continue
+            fillc = next((src[y, x] for x in reversed(seg) if hexc(src[y, x]) not in ('7c0629', '421428')), src[y, seg[-1]])
+            for x in seg:
+                tails[y, x] = 0
+            for x in seg:
+                if 0 <= x + dx < SW:
+                    tails[y, x + dx] = src[y, x]
+            if dx * side > 0:                           # nach außen: innen rückt Haar nach, nie eine Lücke
+                for x in range(min(seg), max(seg) + 1):
+                    if not tails[y, x, 3]:
+                        tails[y, x] = fillc
+    for y, x in zip(*np.nonzero(tails[:, :, 3])):
+        dx = (curl if y == 0 else round(curl / 2)) if y <= 1 else 0   # die Locke oben wackelt
+        out[y + PT + fy, x + PL + fx + dx] = tails[y, x]
     for k, (e, x0, y0, vx) in enumerate(DM_NOTES):
         a = (i - e) % N
         if a >= 12:
@@ -2277,32 +2303,6 @@ AB_LENS = {'919cd0', 'b4b1d0', '86515c', '674050'}
 AB_BOOMS = [(4, -4, 3), (13, 17, 6), (22, -4, 14), (31, 17, 2), (40, -4, 17)]
 
 
-def alien_boom(out, x, y, a, r=2):
-    """Plasma-Explosion: weißer Blitz, grünlicher Ball, dunkelgrüner Ring, dann Dunst."""
-    pts = {}
-    if a == 0:
-        pts = {(0, 0): rgb('ffffff'), (1, 0): rgb('e8ffd0'), (-1, 0): rgb('e8ffd0'), (0, 1): rgb('e8ffd0'),
-               (0, -1): rgb('e8ffd0')}
-    elif a <= 4:
-        rad = 1 + (a - 1) * r / 3
-        for dy in range(-r - 2, r + 3):
-            for dx in range(-r - 2, r + 3):
-                d = math.hypot(dx, dy)
-                if d <= rad + 0.5:
-                    q = d / (rad + 0.5)
-                    if a == 4 and q < 0.5:
-                        continue
-                    pts[(dx, dy)] = rgb('e8ffd0' if q < 0.3 and a < 3 else 'a8ff60' if q < 0.55 else
-                                        '40d040' if q < 0.8 else '1a7a3a')
-    elif a < 9:
-        k = a - 5
-        for j, (dx, dy) in enumerate(((0, 0), (-1, 0), (1, -1), (0, -1), (-1, -1), (1, 0))):
-            if j < 6 - k:
-                pts[(dx, dy - k // 2)] = rgb('6a8a70' if j % 2 else '80a088', max(40, 190 - 35 * k))
-    for (dx, dy), c in pts.items():
-        dot(out, x + dx, y + dy, c)
-
-
 AB_CLAP = {k: d for st in (3, 15, 27, 39) for k, d in zip(range(st, st + 4), (1, 2, 2, 1))}   # wie Bartas
 AB_IMPACT = {k: j for st in (3, 15, 27, 39) for j, k in enumerate((st + 1, st + 2))}
 AB_FIST_L, AB_FIST_R = (0, 4, 12, 15), (9, 13, 12, 15)
@@ -2311,7 +2311,7 @@ AB_FIST_L, AB_FIST_R = (0, 4, 12, 15), (9, 13, 12, 15)
 def f_alienbartas(i):
     """Wie Bartas: alle 12 Frames schlägt er die Fäuste vor dem Bauch zusammen (mit Aufprall-Funken).
     Dazu federt er, die Alien-Linse pulsiert grünlich, er blinzelt mit dem echten Auge, und ringsum
-    platzen grüne Plasma-Bomben."""
+    platzen Bomben."""
     s = SRC.copy()
     blink(s, i)
     t = 2 * math.pi * i / N
@@ -2325,8 +2325,8 @@ def f_alienbartas(i):
     out = np.zeros((H, W, 4), int)
     for e, x, y in AB_BOOMS:
         a = (i - e) % N
-        if a < 9:
-            alien_boom(out, x + PL, y + PT, a)
+        if a < 10:
+            boom(out, x + PL, y + PT, a)
     fig = bounce_frame(s, b)
     d = AB_CLAP.get(i, 0)
     if d:
@@ -2343,8 +2343,8 @@ def f_alienbartas(i):
     k = AB_IMPACT.get(i)
     if k is not None:                                   # Aufprall zwischen den Fäusten
         cx, cy = 6 + PL, 13 + PT + b
-        for dx, dy in ((0, -2 - k), (1, -2 - k), (0, 3 + k), (1, 3 + k)):
-            dot(out, cx + dx, cy + dy, rgb('e8ffd0'))
+        for dx, dy in ((0, 3 + k), (1, 3 + k)):         # nur unterhalb (oben säße es am Kinn)
+            dot(out, cx + dx, cy + dy, rgb('fffbd0'))
     return out
 
 
