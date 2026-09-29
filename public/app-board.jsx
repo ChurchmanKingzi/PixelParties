@@ -1753,6 +1753,24 @@ const ZW_KNOPF_SEL = 'button, a, input, select, textarea, label';
 const ZW_KNOPF_RAND = 10;
 // ★ v1488: alles, was im Panel von sich aus Zeigerereignisse bekommt.
 const ZW_AKTIV_SEL = ZW_KNOPF_SEL + ', .panel-zielwahl-aktiv, .panel-zielwahl-griff';
+// ★ v1489: Was unter der Box „im Weg" sein kann — Zonen mit Karte, Karten
+// selbst (Stapel, Hand) und wählbare LEERE Zielzonen (Zonenwahl,
+// Beschwörungsplätze, Chain-Ziele), die sonst verdeckt blieben.
+const ZW_KARTE_SEL = '.zone-has-card, .board-card, [data-card-name], .zone-pick-target, '
+  + '.potion-target-valid, .board-zone-play-target, .chain-pick-valid';
+
+// ★ v1489: Liegt unter dem Zielwahl-Panel an (x, y) eine Karte? Geprüft
+// wird das oberste Element, das nicht zum Panel gehört — also genau das,
+// was ein Klick durch die durchsichtige Box treffen würde.
+function _ppKarteUnterPanel(panel, x, y) {
+  const liste = document.elementsFromPoint(x, y);
+  for (const e of liste) {
+    if (e === panel || panel.contains(e)) continue;
+    const k = e.closest ? e.closest(ZW_KARTE_SEL) : null;
+    return !!(k && !panel.contains(k));
+  }
+  return false;
+}
 
 function DraggablePanel({ children, className, style, zielwahl }) {
   const [pos, setPos] = useState({ x: 0, y: 0 });
@@ -1818,7 +1836,7 @@ function DraggablePanel({ children, className, style, zielwahl }) {
       // dedizierten Stellen außen links/rechts verschieben. Das soll immer
       // möglich sein, wenn die Box nicht transparent ist und man nicht
       // gerade über einem Button hovert."): Steht der Zeiger im deckenden
-      // Bereich (Rand um die Knöpfe, s. u.), aber nicht auf einem aktiven
+      // Bereich (★ v1489: überall ohne Karte darunter, s. u.), aber nicht auf einem aktiven
       // Element, setzt die Prüfung `data-greifbar` — CSS schaltet dann den
       // Zeiger für den ganzen Körper ein, ein Mausdruck dort startet über
       // `onDown` das Ziehen. Wird die Box durchsichtig, fällt das Attribut
@@ -1833,7 +1851,15 @@ function DraggablePanel({ children, className, style, zielwahl }) {
         // `closest` statt `el.contains` — mit `data-greifbar` bekommen
         // auch Text und Kästen des Panels Zeigerereignisse.
         const aktiv = letzt.ziel && letzt.ziel.closest ? letzt.ziel.closest(ZW_AKTIV_SEL) : null;
+        // ★ v1489 (Als Vorgabe 29.9.: „Sie soll exakt dann transparent
+        // werden, wenn unter ihr an der Stelle des Cursors eine Karte liegt
+        // und dort kein Button ist. Nur dann ist sie ja im Weg!"): Vorher
+        // wurde der ganze Körper durchsichtig. Jetzt nur, wenn
+        // `_ppKarteUnterPanel` unter dem Zeiger eine Karte (oder eine
+        // wählbare leere Zielzone, z. B. bei „Select a Zone") findet.
+        // Überall sonst im Körper bleibt die Box deckend und greifbar.
         an = drin && !(aktiv && el.contains(aktiv));
+        if (an) greifbar = true;
         // ★ v1484 (Als Vorgabe 29.9.: „Die Bereiche direkt um Buttons auf
         // dem Fenster herum sollten on-hover noch NICHT das Fenster
         // transparent machen. Wenn *nur* exakt die Buttons das Fenster
@@ -1850,9 +1876,11 @@ function DraggablePanel({ children, className, style, zielwahl }) {
             // begrenzt schon auf die Box). Seitlich bleibt es beim Rand:
             // die Lücke zwischen den Knöpfen liegt über dem mittleren Helden.
             if (kr.width && letzt.x >= kr.left - ZW_KNOPF_RAND && letzt.x <= kr.right + ZW_KNOPF_RAND
-              && letzt.y >= kr.top - ZW_KNOPF_RAND) { an = false; greifbar = true; break; }
+              && letzt.y >= kr.top - ZW_KNOPF_RAND) { an = false; break; }
           }
         }
+        if (an && !_ppKarteUnterPanel(el, letzt.x, letzt.y)) an = false;
+        if (an) greifbar = false;
       }
       if (el.hasAttribute('data-durchsicht') !== an) el.toggleAttribute('data-durchsicht', an);
       if (el.hasAttribute('data-greifbar') !== greifbar) el.toggleAttribute('data-greifbar', greifbar);
