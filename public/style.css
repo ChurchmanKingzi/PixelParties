@@ -23549,6 +23549,14 @@ body.pp-dialog-offen .foil-diamond-rare:not(.modal-overlay *) {
 .first-choice-panel.panel-zielwahl[data-durchsicht] {
   opacity: .25;
 }
+/* ★ v1488 (Als Vorgabe 29.9.: Box überall verschiebbar, wo sie deckend
+   ist und kein Knopf unter dem Zeiger liegt): Das Skript setzt
+   `data-greifbar`, solange der Zeiger im deckenden Rand um die Knöpfe
+   steht — dann nimmt der ganze Körper den Zeiger an (erbt auf die
+   Kinder), ein Mausdruck startet das Ziehen. */
+.first-choice-panel.panel-zielwahl[data-greifbar] {
+  pointer-events: auto;
+}
 /* Griffe: die beiden seitlichen Polsterstreifen (dort sitzen die
    Pfeil-Ornamente — sie sind der sichtbare Zieh-Hinweis). Bewusst NICHT
    die Titelzeile: die steht mittig und damit genau über den mittleren
