@@ -2099,6 +2099,16 @@ DM_NOTE = ['.##', '.#.', '##.', '##.']
 DM_NOTES = [(3, -5, 12, -0.12), (15, 21, 10, 0.12), (27, -5, 16, -0.1), (39, 21, 14, 0.1)]
 
 
+DM_HEART = {(15, 10): 'bf3961', (17, 10): 'aa244c', (14, 11): 'bf3961', (15, 11): '7c0629', (16, 11): 'aa244c',
+            (17, 11): '7c0629', (18, 11): None, (15, 12): '7c0629', (16, 12): '7c0629', (17, 12): None,
+            (16, 13): '7c0629'}                          # das Herz neben dem Gesicht (dahinter: Haar bzw. frei)
+DM_HEART_PX = [((0, 0), 'f75981'), ((2, 0), 'f75981'), ((-1, 1), 'dd4b76'), ((0, 1), 'f75981'), ((1, 1), 'f75981'),
+               ((2, 1), 'f9a4b5'), ((3, 1), 'f75981'), ((0, 2), 'dd4b76'), ((1, 2), 'f75981'), ((2, 2), 'f75981'),
+               ((1, 3), 'dd4b76')]
+DM_HEART_SMALL = [((0, 0), 'f75981'), ((2, 0), 'f75981'), ((0, 1), 'f75981'), ((1, 1), 'f9a4b5'), ((2, 1), 'f75981'),
+                  ((1, 2), 'dd4b76')]
+# Herzchen steigen neben ihr auf, unabhängig von ihrem Flug: (Start, x, y, Drift) im Bild
+DM_HEARTS = [(0, 33.0, 15.0, 0.1), (16, 5.0, 12.0, -0.1), (32, 34.0, 17.0, 0.08)]
 DM_HAIR = {'7c0629', 'ea638e', 'f67ba2', 'bf3961', 'aa244c', 'ce466f', 'dd4b76', 'f75981', 'f9a4b5', '421428'}
 DM_SING = 'oohooccohoocccoohhoocoohooc' [:24]               # o offen, h halb, c zu – sie singt
 DM_MOUTH = {'c': [], 'h': [((10, 12), '7c0629')], 'o': [((9, 12), '7c0629'), ((10, 12), '5a0a20')]}
@@ -2119,6 +2129,8 @@ def f_molinda(i):
     jig = max(-1, min(1, by - fy))
     for (x, y), c in DM_MOUTH[DM_SING[i % 24]]:
         body[y, x] = rgb(c)
+    for (x, y), c in DM_HEART.items():                  # das Herz löst sich als eigenes Teilchen
+        body[y, x] = rgb(c) if c else 0
     S = 8.0 * (0.5 - 0.5 * math.cos(4 * t))             # vier kräftige Flügelschläge je Loop
     out = np.zeros((H, W, 4), int)
     wy = PT + fy - round(1.5 * S / 8)
@@ -2134,8 +2146,9 @@ def f_molinda(i):
                         wings[y, inner])
             for x in seg:
                 out[y + wy, x + PL + fx + side * dx] = wings[y, x]
-            for k in range(dx):                         # die Lücke zum Kopf füllt der Flügel
-                out[y + wy, inner + PL + fx + side * k] = fill
+            if y <= 13:                                 # nur am Kopf: dort füllt der Flügel jede Lücke
+                for k in range(dx):
+                    out[y + wy, inner + PL + fx + side * k] = fill
     src = body.copy()
     if jig:                                             # Brust: die hellen Blöcke rutschen 1 px nach (Nachbarzeile füllt nach)
         for x0, x1 in ((5, 8), (11, 14)):
@@ -2171,6 +2184,15 @@ def f_molinda(i):
     for y, x in zip(*np.nonzero(tails[:, :, 3])):
         dx = (curl if y == 0 else round(curl / 2)) if y <= 1 else 0   # die Locke oben wackelt
         out[y + PT + fy, x + PL + fx + dx] = tails[y, x]
+    for e, x0, y0, vx in DM_HEARTS:                     # Herzchen: wachsen, steigen schaukelnd auf, verblassen
+        a = (i - e) % N
+        if a >= 16:
+            continue
+        hx_, hy_ = round(x0 + vx * a + 1.2 * math.sin(0.6 * a)), round(y0 - 0.7 * a)
+        al = 255 if a < 12 else int(255 * (16 - a) / 4)
+        for (dx, dy), c in (DM_HEART_SMALL if a < 3 or a >= 13 else DM_HEART_PX):
+            cc = rgb(c)
+            dot(out, hx_ + dx, hy_ + dy, [cc[0], cc[1], cc[2], al])
     for k, (e, x0, y0, vx) in enumerate(DM_NOTES):
         a = (i - e) % N
         if a >= 12:
