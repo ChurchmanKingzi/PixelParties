@@ -1,0 +1,348 @@
+# -*- coding: utf-8 -*-
+"""Idle-Animationen für die Nachzügler aus Motive.xcf (zweite Runde).
+
+Aufruf: python3 motive_late.py <tag> [ms] <variante>
+
+Frame 0 ist immer die Ruhepose.
+
+* peszet:   Pes'zet, the Plague Bringer federt; seine beiden Schlangenarme bewegen sich unabhängig von
+            ihm (spaltentreu geschert, an der Schulter fest – sie bleiben immer mit ihm verbunden), reißen
+            die Mäuler auf und stoßen grünes Giftgas aus.
+* notandras: Definitely not Andras, the Human Weapon feuert reihum aus allen vier Rohren: Mündungsblitz,
+            die Kugel fliegt seitlich davon, das Rohr glüht nach.
+* megaandras: Mega-Weapon Andras federt, die gelben Schulterlichter blinken, die Leuchten am Rumpf glühen.
+* champmizune: Regional Champ Mizune (Augen geschlossen) atmet, ihr Mantel wogt, um sie kreisen und
+            spritzen Wassertropfen.
+* storyteller: Chuck, the Storyteller erzählt: der Mund geht im Redefluss auf und zu, die Hand gestikuliert,
+            über ihm schwebt und funkelt das goldene Ideenblatt; das Mädchen im Bett hört zu und blinzelt.
+* gueldefaber: Güldefaber of the Fellowship federt und blinzelt, die Flügel an seinem Helm schlagen sacht.
+"""
+import math
+import os
+import sys
+import numpy as np
+from PIL import Image
+from anim_common import rgb, save_outputs, BOUNCE12, draw_bounce, sparkle_pixels, ring8
+from flap_common import shear_flap
+
+N = 48
+OUT = os.environ.get('ML_OUT', '.')
+B24 = [BOUNCE12[(k // 2) % 12] for k in range(24)]  # gemächlich: ein Federn je 24 Frames
+BLINK = {14: 'halb', 15: 'zu', 16: 'zu', 17: 'halb', 38: 'halb', 39: 'zu', 40: 'zu', 41: 'halb'}
+
+V_ = {
+    'peszet': dict(slug='peszet-the-plague-bringer', knee=21, pads=(14, 13, 3, 1)),
+    'notandras': dict(slug='definitely-not-andras-the-human-weapon', knee=19, pads=(18, 18, 3, 1)),
+    'megaandras': dict(slug='mega-weapon-andras', knee=19, pads=(3, 3, 3, 1), skin='Andras, the Human Weapon'),
+    'champmizune': dict(slug='regional-champ-mizune', knee=17, pads=(6, 7, 3, 2), skin='Silent Water Mizune'),
+    'storyteller': dict(slug='chuck-the-storyteller', pads=(3, 3, 4, 1)),
+    'gueldefaber': dict(slug='g-ldefaber-of-the-fellowship', knee=16, pads=(3, 3, 3, 1),
+                        skin='Güldefaber, the King of Dwarfs'),
+}
+V = next((v for v in sys.argv[2:] if v in V_), 'peszet')
+C = V_[V]
+SLUG = C['slug']
+
+
+def load(part=None):
+    n = f'src/{SLUG}-{part}.png' if part else f'src/{SLUG}.png'
+    return np.array(Image.open(n).convert('RGBA')).astype(int)
+
+
+SRC = load()
+SH, SW = SRC.shape[:2]
+KNEE = C.get('knee', SH)
+PL, PR, PT, PB = C['pads']
+H, W = SH + PT + PB, SW + PL + PR
+_ys, _xs = np.mgrid[0:SH, 0:SW]
+
+
+def hexc(c):
+    return '%02x%02x%02x' % tuple(int(v) for v in c[:3])
+
+
+def dot(out, x, y, c):
+    if 0 <= y < out.shape[0] and 0 <= x < out.shape[1]:
+        out[y, x] = c
+
+
+def blend(out, x, y, c):
+    if not (0 <= y < out.shape[0] and 0 <= x < out.shape[1]) or c[3] <= 0:
+        return
+    a = c[3] / 255
+    if not out[y, x, 3]:
+        out[y, x] = c
+        return
+    out[y, x, :3] = [int(c[k] * a + out[y, x, k] * (1 - a)) for k in range(3)]
+    out[y, x, 3] = 255
+
+
+def paste(out, a, ox, oy):
+    for y, x in zip(*np.nonzero(a[:, :, 3])):
+        dot(out, x + ox, y + oy, a[y, x])
+
+
+def blink(s, i, table):
+    st = BLINK.get(i)
+    if st:
+        for (x, y), c in table[st]:
+            s[y, x] = rgb(c)
+
+
+def flutter(out, s, i, ox, oy, rows, left, right, amp=2.0, speed=6, ok=None):
+    t = 2 * math.pi * i / N
+    env = 0.5 - 0.5 * math.cos(2 * t)
+    for side, xs in ((-1, left), (1, right)):
+        dxs = [round(amp * env * (0.5 + 0.5 * math.sin(speed * t - 0.9 * k + (0 if side < 0 else 1.7))))
+               for k in range(len(rows))]
+        for k in range(1, len(dxs)):
+            dxs[k] = max(dxs[k - 1] - 1, min(dxs[k - 1] + 1, dxs[k]))
+        for k, y in enumerate(rows):
+            if dxs[k]:
+                for x in xs:
+                    if s[y, x, 3] and (ok is None or ok(s[y, x])):
+                        dot(out, x + side * dxs[k] + ox, y + oy, s[y, x])
+
+
+def figure_mask(base_fn):
+    fig = np.zeros((H, W), bool)
+    for k in range(N):
+        fig |= base_fn(k)[:, :, 3] > 0
+    return fig | ring8(fig)
+
+
+# ---------------------------------------------------------------- Pes'zet
+PZ_PIVOT = {-1: 14, 1: 25}                              # Schultern: innen davon bleibt der Arm stehen
+PZ_ARM = {-1: (0.13, 0.0, 3), 1: (0.13, 2.4, 2)}         # Ausschlag, Phase, Frequenz je Arm
+PZ_BITE = {-1: range(6, 18), 1: range(28, 40)}          # Maul offen (Frames im Loop)
+PZ_GAS = ['8fd14f', '6fb03a', '4f8a2a', '3d6b22']
+
+
+def peszet_arms(i, b):
+    """Die Schlangenarme: spaltentreu an der Schulter geschert, das Maul (Unterkiefer) klappt auf."""
+    t = 2 * math.pi * i / N
+    out = np.zeros((H, W, 4), int)
+    heads = {}
+    for side, part in ((-1, 'arml'), (1, 'armr')):
+        a = load(part).copy()
+        amp, ph, fr = PZ_ARM[side]
+        lift = amp * (math.sin(fr * t + ph) - math.sin(ph))
+        if i % N in PZ_BITE[side]:                        # Maul auf: der Unterkiefer (ab Zeile 13) sinkt 1 px
+            xs = range(0, 9) if side < 0 else range(SW - 9, SW)
+            jaw = np.zeros((SH, SW), bool)
+            for x in xs:
+                jaw[13:, x] = a[13:, x, 3] > 0
+            moved = a.copy()
+            moved[jaw] = 0
+            for y, x in zip(*np.nonzero(jaw)):
+                moved[y + 1, x] = a[y, x]
+            for x in xs:
+                if jaw[13, x] and a[12, x, 3]:
+                    moved[13, x] = rgb('690000')          # der offene Schlund
+            a = moved
+        m = a[:, :, 3] > 0
+        shear_flap(a, m & ((_xs < PZ_PIVOT[side]) if side < 0 else (_xs > PZ_PIVOT[side])), PZ_PIVOT[side], side,
+                   lift, 1.0, out, (PL, PT + b), curve=1.3)
+        for y, x in zip(*np.nonzero(m & ((_xs >= PZ_PIVOT[side]) if side < 0 else (_xs <= PZ_PIVOT[side])))):
+            dot(out, x + PL, y + PT + b, a[y, x])
+        far = PZ_PIVOT[side] if side < 0 else SW - 1 - PZ_PIVOT[side]
+        hx = 0 if side < 0 else SW - 1
+        heads[side] = (hx + PL, 14 + PT + b - round(lift * far))
+    return out, heads
+
+
+def peszet_base(i):
+    b = B24[i % 24]
+    out = np.zeros((H, W, 4), int)
+    draw_bounce(out, load('body'), b, KNEE, PT, PL)
+    arms, _ = peszet_arms(i, b)
+    m = arms[:, :, 3] > 0
+    out[m] = arms[m]
+    return out
+
+
+def f_peszet(i):
+    out = peszet_base(i)
+    b = B24[i % 24]
+    _, heads = peszet_arms(i, b)
+    for side in (-1, 1):                                  # Giftgas quillt aus dem offenen Maul
+        start = PZ_BITE[side][0] + 1
+        for k in range(5):
+            a = (i - start - 2 * k) % N
+            if a < 14:
+                hx, hy = heads[side] if a == 0 else heads[side]
+                x = hx + side * (2 + 0.6 * a) + 0.6 * math.sin(a + k)
+                y = hy + 1 - 0.55 * a + k
+                r = 1.0 + 0.16 * a
+                al = max(40, 220 - 13 * a)
+                for yy in range(int(y - 2), int(y + 3)):
+                    for xx in range(int(x - 2), int(x + 3)):
+                        if math.hypot(xx - x, yy - y) <= r and 0 <= xx < W and 0 <= yy < H and not out[yy, xx, 3]:
+                            dot(out, xx, yy, rgb(PZ_GAS[min(3, (a + xx + yy) % 4 if a > 8 else (xx + yy) % 2)], al))
+    return out
+
+
+# ---------------------------------------------------------------- Definitely not Andras
+NA_BARRELS = [(10, 10, -1, 0), (23, 10, 1, 12), (10, 15, -1, 24), (23, 15, 1, 36)]   # (x, y, Richtung, Start)
+NA_FLASH = {0: [(0, 0, 'ffffff'), (1, 0, 'fff6a0'), (0, -1, 'ffd23c'), (0, 1, 'ffd23c'), (2, 0, 'ffd23c')],
+            1: [(0, 0, 'fff6a0'), (1, 0, 'ff8a1e'), (0, -1, 'ff8a1e'), (0, 1, 'ff8a1e')],
+            2: [(0, 0, 'ff8a1e')]}
+
+
+def f_notandras(i):
+    """Er feuert reihum aus allen vier Rohren (je Rohr zwei Schüsse pro Loop): Mündungsblitz, die Kugel
+    fliegt seitlich davon, das Rohr glüht nach; der Rumpf zuckt beim Rückstoß."""
+    s = SRC.copy()
+    b = B24[i % 24]
+    out = np.zeros((H, W, 4), int)
+    kick = 0
+    for bx, by, side, st in NA_BARRELS:
+        for rep in (0, 6):
+            if (i - st - rep) % N == 0:
+                kick = -side
+    draw_bounce(out, s, b, KNEE, PT, PL, dx_fn=(lambda x, y: kick) if kick else None)
+    for bx, by, side, st in NA_BARRELS:
+        for rep in (0, 6):
+            a = (i - st - rep) % N
+            ex = (PL - 1 if side < 0 else PL + SW) + kick      # das Rohrende am Rand des Mechs
+            ey = by + PT + b
+            if a in NA_FLASH:
+                for dx, dy, c in NA_FLASH[a]:
+                    dot(out, ex + side * dx, ey + dy, rgb(c))
+            if 1 <= a < 6:                                # die Kugel mit kurzer Leuchtspur
+                x = ex + side * (1 + 3 * a)
+                dot(out, x, ey, rgb('fff6a0'))
+                dot(out, x - side, ey, rgb('ffd23c'))
+                dot(out, x - 2 * side, ey, rgb('ff8a1e', 160))
+            if a < 8:                                     # die Mündung glüht nach
+                dot(out, bx + PL + kick, ey, rgb('ffb440' if a < 4 else 'ff5020'))
+    return out
+
+
+# ---------------------------------------------------------------- Mega-Weapon Andras
+def f_megaandras(i):
+    """Er federt, die gelben Schulterlichter blinken im Wechsel, die Leuchten am Rumpf glühen."""
+    s = SRC.copy()
+    on = (i // 6) % 2
+    for y, x in zip(*np.nonzero(s[:, :, 3])):
+        c = s[y, x]
+        if c[0] > 200 and c[1] > 180 and c[2] < 120:      # gelbe Lichter
+            if (x < SW // 2) == bool(on):
+                s[y, x] = [int(c[0] * 0.7), int(c[1] * 0.7), int(c[2] * 0.7), 255]
+    b = B24[i % 24]
+    out = np.zeros((H, W, 4), int)
+    draw_bounce(out, s, b, KNEE, PT, PL)
+    return out
+
+
+# ---------------------------------------------------------------- Regional Champ Mizune
+CM_COAT = {'0f494d', '1a6568', '297978', '3a9294'}
+CM_DROPS = None
+
+
+def f_champmizune(i):
+    """Sie atmet (Augen geschlossen), ihr Mantel wogt; um sie kreisen Wassertropfen, die auf ihrer
+    Bahn glitzern, und ab und zu spritzt es neben ihr auf."""
+    t = 2 * math.pi * i / N
+    s = SRC.copy()
+    b = B24[i % 24]
+    out = np.zeros((H, W, 4), int)
+    draw_bounce(out, s, b, KNEE, PT, PL)
+    flutter(out, s, i, PL, PT + b, list(range(13, 22)), range(0, 4), range(SW - 4, SW), amp=1.2, speed=3,
+            ok=lambda c: hexc(c) in CM_COAT)
+    cx, cy = PL + SW / 2, PT + 13
+    for k in range(7):                                    # Tropfen auf einer schrägen Ellipse um sie
+        ang = 2 * t * (1 if k % 2 == 0 else 1) + 2 * math.pi * k / 7
+        x = cx + (SW / 2 + 4.5) * math.cos(ang)
+        y = cy + 9 * math.sin(ang) + 2.5 * math.cos(ang)
+        front = math.sin(ang) > 0
+        xi, yi = round(x), round(y)
+        if not front and out[yi, xi, 3]:
+            continue                                      # hinter ihr verschwindet der Tropfen
+        dot(out, xi, yi, rgb('4fa8ff' if front else '2f78d8'))
+        dot(out, xi, yi - 1, rgb('bfe4ff' if (i + k) % 6 == 0 else '7fc4ff', 230))
+        tx, ty = round(x - 1.6 * math.cos(ang + 1.57)), round(y - 1.6 * math.sin(ang + 1.57))
+        if not out[ty, tx, 3]:
+            dot(out, tx, ty, rgb('4fa8ff', 110))          # kurze Spur hinter dem Tropfen
+    for st, sx in ((6, PL - 2), (22, PL + SW + 1), (38, PL + 2)):   # Spritzer am Boden neben ihr
+        a = (i - st) % N
+        if a < 6:
+            x0 = sx
+            gy = PT + SH + b - 1
+            for dx, dy in ((-a, -a // 2), (a, -a // 2), (0, -a)):
+                dot(out, x0 + dx // 2, gy + dy, rgb('9fd8ff', 220 - 30 * a))
+    return out
+
+
+# ---------------------------------------------------------------- Chuck, the Storyteller
+ST_MOUTH = [((13, 16), 'f6bd7b'), ((14, 16), 'f6bd7b'), ((13, 17), 'd5a462'), ((14, 17), 'd5a462')]
+ST_TALK = [1, 1, 0, 1, 1, 1, 0, 0, 1, 0, 1, 1, 1, 0, 0, 0, 1, 1, 0, 1, 1, 0, 1, 1,
+           1, 0, 0, 1, 1, 1, 0, 1, 0, 0, 1, 1, 0, 1, 1, 1, 0, 0, 0, 1, 1, 0, 0, 0]
+ST_GIRL = {'halb': [((x, 7), '413704') for x in (24, 25, 28, 29)],
+           'zu': [((x, 7), 'fce7d6') for x in (24, 25, 28, 29)] + [((x, 8), '413704') for x in (24, 25, 28, 29)]}
+
+
+def f_storyteller(i):
+    """Chuck erzählt: der Mund geht im Redefluss auf und zu, die Hand gestikuliert, sein Kopf wippt beim
+    Erzählen; über ihm schwebt das goldene Ideenblatt und funkelt. Das Mädchen im Bett hört zu, atmet und
+    blinzelt (versetzt zu ihm)."""
+    t = 2 * math.pi * i / N
+    girl, chair, hands, body, hand, idea = (load(p) for p in ('girl', 'chair', 'hands', 'body', 'hand', 'idea'))
+    girl = girl.copy()
+    st = BLINK.get((i + 20) % N)
+    if st:
+        for (x, y), c in ST_GIRL[st]:
+            girl[y, x] = rgb(c)
+    body = body.copy()
+    if not ST_TALK[i] or i == 0:                          # Mund zu (Ruhepose: zu)
+        for (x, y), c in ST_MOUTH:
+            body[y, x] = rgb(c)
+    out = np.zeros((H, W, 4), int)
+    gb = 1 if (i % 24) in range(8, 14) else 0             # sie atmet unter der Decke
+    for y, x in zip(*np.nonzero(girl[:, :, 3])):
+        dot(out, x + PL, y + PT + (gb if y <= 9 else 0), girl[y, x])
+    paste(out, chair, PL, PT)
+    nod = 1 if ST_TALK[i] and (i % 8) in (2, 3) else 0     # beim Erzählen wippt sein Oberkörper
+    gest = -round(1.5 * (0.5 - 0.5 * math.cos(3 * t)))     # die Hand hebt sich zur Geste
+    paste(out, hands, PL, PT + nod)
+    for y, x in zip(*np.nonzero(body[:, :, 3])):
+        dot(out, x + PL, y + PT + (nod if y <= 22 else 0), body[y, x])
+    paste(out, hand, PL, PT + gest + nod)
+    bob = -round(1.5 * math.sin(2 * t))                    # das Ideenblatt schwebt und funkelt
+    glow = (i % 12) in (0, 1, 2)
+    for y, x in zip(*np.nonzero(idea[:, :, 3])):
+        c = idea[y, x]
+        if glow:
+            c = [min(255, int(c[k] + (255 - c[k]) * 0.45)) for k in range(3)] + [255]
+        dot(out, x + PL, y + PT + bob, c)
+    for (x, y), c in sparkle_pixels(i, N, [(7 + PL, 5 + PT + bob, 4), (1 + PL, 11 + PT + bob, 28)],
+                                    rgb('fffbd0'), rgb('f5e000')).items():
+        dot(out, x, y, c)
+    return out
+
+
+# ---------------------------------------------------------------- Güldefaber of the Fellowship
+GF_BLINK = {'halb': [((6, 7), '430103'), ((11, 7), '430103')],
+            'zu': [((6, 7), '430103'), ((11, 7), '430103'), ((6, 8), '261510'), ((11, 8), '261510')]}
+
+
+def f_gueldefaber(i):
+    """Er federt und blinzelt, die Flügel an seinem Helm schlagen sacht."""
+    s = SRC.copy()
+    blink(s, i, GF_BLINK)
+    b = B24[i % 24]
+    out = np.zeros((H, W, 4), int)
+    draw_bounce(out, s, b, KNEE, PT, PL)
+    flutter(out, s, i, PL, PT + b, list(range(8, 16)), range(0, 3), range(SW - 3, SW), amp=1.2, speed=4,
+            ok=lambda c: c[0] > 120 and abs(int(c[0]) - int(c[2])) < 60)
+    return out
+
+
+FRAME = dict(peszet=f_peszet, notandras=f_notandras, megaandras=f_megaandras, champmizune=f_champmizune,
+             storyteller=f_storyteller, gueldefaber=f_gueldefaber)
+
+if __name__ == '__main__':
+    tag = sys.argv[1] if len(sys.argv) > 1 else 'v'
+    frames = [FRAME[V](i) for i in range(N)]
+    ms = int(sys.argv[2]) if len(sys.argv) > 2 and sys.argv[2].isdigit() else 90
+    save_outputs(f'{OUT}/{V}_idle_{tag}', frames, ms, scale=6 if W < 90 else 3, check_edges=True)

@@ -49,6 +49,17 @@ Skins:
 Nachzügler:
 * Sas'Za, the Snaka Adventurer: die mittlere Figur (blaue Haare) aus „Sas'Za“, dahinter ihr Bogen
   „Sas'Za #1“ (Teil `-bow`).
+* Pes'zet, the Plague Bringer: „Pesssst“, die beiden Schlangenarme aus „Pesssst #4“ als Teile `-arml`/`-armr`.
+* Definitely not Andras, the Human Weapon: „Ascended Andras“.
+* Mega-Weapon Andras (Skin): „Mega-Andras“.
+* Regional Champ Mizune (Skin): die Figur unten rechts in „Wassili“ (ohne die Tropfen; die werden als
+  Wasser-Partikel neu animiert).
+* Chuck, the Storyteller: der erzählende Chuck aus „Ebene #413“ mit den Händen aus „Ebene #701“ und
+  „Ebene #625“ (ohne das goldene Blatt, Teil `-idea`) auf dem Stuhl „Ebene #60“; neben ihm das Mädchen im
+  Bett „InyaInBed“ (Teil `-girl`).
+* Güldefaber of the Fellowship (Skin) gibt es in keiner Ebene mehr: `src/g-ldefaber-of-the-fellowship.png` ist
+  aus dem Kartenbild rekonstruiert (Pixelraster zurückgerechnet, freigestellt, Farben reduziert) und wird von
+  diesem Skript nicht erzeugt.
 
 Aufruf:  python3 assemble_motive.py <pfad/zu/Motive.xcf>
 """
@@ -167,6 +178,19 @@ def main(path):
     one('alien-invader-bartas', g('Bartas skin'))
     one('tharx-the-king-of-conquerors', g('Ebene #286'))
     save_parts('sasza-the-snaka-adventurer', [('bow', g("Sas'Za #1")), ('body', near(g("Sas'Za"), 336, 143))])
+    arms = g('Pesssst #4')                                # die zwei Schlangenarme, links und rechts
+    xs = np.nonzero(arms[:, :, 3].any(0))[0]
+    mid = (xs.min() + xs.max()) // 2
+    save_parts('peszet-the-plague-bringer', [('body', g('Pesssst')), ('arml', box(arms, 0, 0, mid, 10000)),
+                                             ('armr', box(arms, mid, 0, 10000, 10000))])
+    one('definitely-not-andras-the-human-weapon', g('Ascended Andras'))
+    one('mega-weapon-andras', g('Mega-Andras'))
+    one('regional-champ-mizune', near(g('Wassili'), 342, 332))
+    idea = g('Ebene #625')                                # das goldene Blatt oben links ist ein eigener Teil
+    gold = near(idea, 274, 154)[:, :, 3] > 0
+    save_parts('chuck-the-storyteller', [('girl', g('InyaInBed')), ('chair', g('Ebene #60')), ('hands', g('Ebene #701')),
+                                         ('body', g('Ebene #413')), ('hand', only(idea, ~gold)),
+                                         ('idea', only(idea, gold))])
 
 
 if __name__ == '__main__':
