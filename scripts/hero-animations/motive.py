@@ -1656,8 +1656,10 @@ TB_PIVOT = (20.5, 17.5)                                 # Faust
 TB_REST = 1.75                                          # in Ruhe gesenkt (links unten)
 # Hin und her, praktisch durchgehend (8 Frames je Hin- und Rückhieb): (Winkel, Spur von, Spur bis) –
 # die Spur liegt immer direkt hinter der Klinge und verschwindet von ihrem Anfang her
-TB_CYCLE = [(1.72, 1.2, 1.67), (0.95, 1.0, 2.0), (-0.1, -0.05, 2.0), (-0.1, -0.05, 0.9),
-            (0.7, -0.3, 0.65), (1.35, 0.2, 1.3), (1.72, 0.8, 1.67), (1.72, 1.3, 1.67)]   # unten endet die Klinge an der Spitze der Spur
+TB_CYCLE = [(1.72, 1.3, 1.67), (0.95, 1.0, 2.0), (-0.1, -0.05, 2.0), (-0.1, -0.05, 0.9),
+            (0.7, -0.3, 0.65), (1.35, -0.3, 1.3), (1.72, -0.3, 1.67), (1.72, 0.8, 1.67)]
+TB_BACK = {0, 4, 5, 6, 7}                               # Rückhieb: die Spur ist gespiegelt (dick an der Klinge)
+TB_AXIS = 0.86                                          # Winkelhalbierende des Bogens (Spiegelachse)   # unten endet die Klinge an der Spitze der Spur
 
 
 def _tb_masks():
@@ -1695,6 +1697,16 @@ def tb_blade(out, px_, py_, ang):
 if V == 'battlemaniac':
     TB_HILT, TB_HILT_M, TB_WEDGE, TB_BODY, TB_ARM = _tb_masks()
     TB_ANG = np.arctan2(_ys + 0.5 - TB_PIVOT[1], _xs + 0.5 - TB_PIVOT[0])
+    TB_MIRROR = np.zeros_like(SRC)                     # der Bogen an der Achse gespiegelt (Rückwärts-Abbildung)
+    _ux, _uy = math.cos(TB_AXIS), math.sin(TB_AXIS)
+    for _y in range(SH):
+        for _x in range(SW):
+            _vx, _vy = _x + 0.5 - TB_PIVOT[0], _y + 0.5 - TB_PIVOT[1]
+            _d = _vx * _ux + _vy * _uy
+            _sx, _sy = int(math.floor(TB_PIVOT[0] + 2 * _d * _ux - _vx)), int(math.floor(TB_PIVOT[1] + 2 * _d * _uy - _vy))
+            if 0 <= _sx < SW and 0 <= _sy < SH and TB_WEDGE[_sy, _sx]:
+                TB_MIRROR[_y, _x] = SRC[_sy, _sx]
+    TB_MIRROR_M = TB_MIRROR[:, :, 3] > 0
 
 
 def f_battlemaniac(i):
@@ -1712,9 +1724,11 @@ def f_battlemaniac(i):
     k = max(-1, min(3, k))
     arm_dy = lambda x: round(k * (x - 13) / 8)
     out = np.zeros((H, W, 4), int)
-    m = TB_WEDGE & (TB_ANG >= lo) & (TB_ANG <= hi)      # die Spur geht mit der Faust mit (keine Lücke)
+    back = i % 8 in TB_BACK
+    src, wm = (TB_MIRROR, TB_MIRROR_M) if back else (s, TB_WEDGE)
+    m = wm & (TB_ANG >= lo) & (TB_ANG <= hi)            # die Spur geht mit der Faust mit (keine Lücke)
     for y, x in zip(*np.nonzero(m)):
-        out[y + PT + k, x + PL] = s[y, x]
+        out[y + PT + k, x + PL] = src[y, x]
     tb_blade(out, TB_PIVOT[0] + PL, TB_PIVOT[1] + PT + k, ang)
     hilt = rotate_part(TB_HILT, TB_HILT_M, TB_PIVOT, ang, (H, W), (PL, PT + k))
     m = hilt[:, :, 3] > 0
