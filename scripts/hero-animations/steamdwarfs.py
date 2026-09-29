@@ -35,7 +35,7 @@ V_ = {
     'pete': dict(slug='monsieur-pete-the-booty-raider', pads=(4, 4, 4, 1)),
     'sparrow': dict(slug='sparrow-the-bumbling-buffoon', pads=(3, 3, 4, 4)),
     'pinta': dict(slug='pinta-the-singing-ship', pads=(8, 8, 10, 1)),
-    'quisto': dict(slug='don-quisto-the-gold-seeker', knee=19, pads=(2, 10, 8, 1)),
+    'quisto': dict(slug='don-quisto-the-gold-seeker', knee=19, pads=(2, 13, 8, 1)),
     'sasza': dict(slug='sasza-the-snaka-adventurer', knee=17, pads=(3, 3, 3, 3)),
 }
 V = next((v for v in sys.argv[2:] if v in V_), 'quetza')
@@ -484,6 +484,7 @@ def f_sparrow(i):
     t = 2 * math.pi * i / N
     s = SRC.copy()
     blink(s, i, SP_BLINK)
+    s[13, 8] = s[14, 8] = 0                               # der Sabberfaden wird eigens animiert
     dy = -round(2.4 * math.sin(2 * t))
     lag = -round(2.4 * math.sin(2 * t - 0.7))             # die Beine hängen einen Tick hinterher
     out = np.zeros((H, W, 4), int)
@@ -496,6 +497,12 @@ def f_sparrow(i):
                     dot(out, x + PL, 21 + dy + k + PT, s[21, x])
     flutter(out, s, i, PL, PT + dy, list(range(12, 21)), range(0, 5), range(11, SW), amp=1.3, speed=4,
             ok=lambda c: hexc(c) in SP_COAT)
+    a = i % 12                                            # er sabbert: der Faden wird länger, ein Tropfen reißt ab
+    n = LY_DROOL[a]
+    for k in range(n):
+        dot(out, 8 + PL, 13 + k + PT + dy, rgb('ccffff' if k < n - 1 else '88ffff'))
+    if a >= 9:
+        dot(out, 8 + PL, 13 + 3 + 2 * (a - 8) + PT + dy, rgb('88ffff'))
     return out
 
 
@@ -519,33 +526,84 @@ def note_templates():
     return res
 
 
+PI_SAIL = {'696969', 'f5f5f5', '9b9b9b', 'd7d7d7', 'b9b9b9'}
+PI_SAILS = [(0, 14, 6, 24, 1.6, 0.0), (14, 26, 1, 28, 2.2, 0.6), (26, 99, 4, 22, 1.6, 1.2)]   # Spalten, Zeilen, Bauch, Phase
+PI_MOUTH = {'zu': [((7, 24), '370f05'), ((8, 24), '370f05'), ((7, 25), 'cd733c'), ((8, 25), 'cd733c'),
+                   ((8, 26), 'b95f3c')],
+            'halb': [((7, 25), '6c0000'), ((8, 25), '6c0000'), ((8, 26), 'b95f3c')]}
+PI_SING = ['auf', 'auf', 'halb', 'zu', 'halb', 'auf', 'auf', 'auf', 'halb', 'zu', 'zu', 'halb']
+
+
+def sails(s, i):
+    """Die Segel blähen sich im Wind: in jeder Zeile rückt die windabgewandte (linke) Kante des Segels
+    samt Kontur nach außen, bauchig (in der Segelmitte am weitesten), dazwischen wächst Segeltuch nach."""
+    t = 2 * math.pi * i / N
+    out = s.copy()
+    sail = lambda y, x: s[y, x, 3] > 0 and hexc(s[y, x]) in PI_SAIL
+    for x0, x1, top, bot, amp, ph in PI_SAILS:
+        wind = 0.5 - 0.5 * math.cos(2 * t - ph)
+        for y in range(top, bot + 1):
+            dx = round(amp * math.sin(math.pi * (y - top) / (bot - top)) * wind)
+            if not dx:
+                continue
+            xs = [x for x in range(max(1, x0), min(SW, x1)) if sail(y, x) and not sail(y, x - 1)]
+            for xl in xs:                                 # linke Kante jedes Segelstücks
+                if xl + 1 >= SW or not sail(y, xl + 1):
+                    continue
+                edge, cloth = s[y, xl], s[y, xl + 1]
+                for k in range(1, dx + 1):
+                    out[y, xl - k + 1] = cloth
+                out[y, xl - dx] = edge
+    return out
+
+
+def water_layer(i):
+    """Neu gezeichnetes Meer unter dem Schiff: zwei überlagerte Wellenzüge laufen durch, auf den Kämmen
+    Schaum, darunter wird das Wasser dunkler, Glitzer wandert mit."""
+    t = 2 * math.pi * i / N
+    out = np.zeros((H, W, 4), int)
+    span = {29: (6, 37), 30: (6, 37), 31: (8, 35), 32: (11, 32), 33: (15, 28)}
+    surf = {}
+    for x in range(span[29][0], span[29][1] + 1):
+        surf[x] = 30 + round(0.7 * math.sin(0.55 * x - 4 * t) + 0.45 * math.sin(0.95 * x + 2 * t) - 0.2)
+    for x, y0 in surf.items():
+        for y in range(y0, 34):
+            lo, hi = span[y]
+            if not lo <= x <= hi:
+                continue
+            d = y - y0
+            crest = d == 0 and surf.get(x - 1, 99) >= y0 and surf.get(x + 1, 99) >= y0
+            c = 'd9ffff' if crest else 'b1f5ff' if d == 0 else '2573eb' if d == 1 else '1b5fcd' if d == 2 else '11419b'
+            if y == 33 and (x + i // 3) % 3 == 0:
+                continue                                  # der untere Rand franst aus
+            out[y + PT, x + PL] = rgb(c)
+    for k in range(4):                                    # Glitzer wandert mit den Wellen
+        gx = 10 + (k * 7 + i // 2) % 24
+        gy = surf.get(gx, 30) + 1
+        if gy <= 32:
+            out[gy + PT, gx + PL] = rgb('d9ffff')
+    return out
+
+
 def pinta_base(i):
     t = 2 * math.pi * i / N
     s = SRC.copy()
     blink(s, i, PI_BLINK)
-    if (i // 3) % 2:                                      # sie singt: der Mund geht auf
-        for x in (16, 17, 18):
-            s[20, x] = rgb('000000')
-            s[21, x] = rgb('5a1010')
+    st = PI_SING[i % 12]                                  # sie singt: der Mund am Bug geht auf und zu
+    if st != 'auf':
+        for (x, y), c in PI_MOUTH[st]:
+            s[y, x] = rgb(c)
     water = np.array([[s[y, x, 3] > 0 and hexc(s[y, x]) in PI_WATER for x in range(SW)] for y in range(SH)])
+    s[water] = 0
+    s = sails(s, i)
     bob = 1 if math.sin(2 * t) > 0.25 else 0              # das Schiff taucht sacht ein und hebt sich wieder
     out = np.zeros((H, W, 4), int)
-    for y, x in zip(*np.nonzero(s[:, :, 3] & ~water)):
-        if y + bob < 30 or bob == 0:
+    for y, x in zip(*np.nonzero(s[:, :, 3])):
+        if y + bob < 31:
             dot(out, x + PL, y + bob + PT, s[y, x])
-    for y in range(SH):                                   # die Wellen wogen: jede Zeile schwappt hin und her
-        xs = [x for x in range(SW) if water[y, x]]
-        if not xs:
-            continue
-        off = round(1.6 * math.sin(2 * t - 0.9 * (y - 29)) - 1.6 * math.sin(-0.9 * (y - 29)))
-        for x in xs:
-            src = xs[(xs.index(x) + off) % len(xs)]
-            dot(out, x + PL, y + PT, s[y, src])
-    for k in range(3):                                    # Schaumkronen laufen über die Wasserkante
-        cx = 12 + (k * 8 + i // 2) % 23
-        if water[30, min(SW - 1, cx)]:
-            dot(out, cx + PL, 29 + PT, rgb('d9ffff'))
-            dot(out, cx + 1 + PL, 29 + PT, rgb('b1f5ff'))
+    wl = water_layer(i)
+    m = wl[:, :, 3] > 0
+    out[m] = wl[m]
     return out
 
 
@@ -635,11 +693,22 @@ def f_quisto(i):
         if a in QU_FLASH:
             for (dx, dy), c in QU_FLASH[a].items():
                 dot(out, QU_MUZZLE + 1 + dx + PL, my + dy, rgb(c))
-        if 2 <= a < 12:                                   # Rauch zieht nach oben weg
-            k = a - 2
-            for j, (dx, dy) in enumerate(((0, 0), (1, 0), (0, -1), (1, -1))):
-                if j < 4 - k // 3:
-                    dot(out, QU_MUZZLE + 3 + dx + k // 3 + PL, my - 2 - k + dy, rgb('9a948c' if j % 2 else 'b8b2aa', max(60, 210 - 18 * k)))
+        if 1 <= a < 13:                                   # danach quillt Rauch aus der Öffnung und zieht davon
+            k = a - 1
+            cx, cy = QU_MUZZLE + 2 + 0.6 * k, 12.5 + PT + b - 0.5 * k
+            r = 1.0 + 0.16 * k
+            for yy in range(int(cy - 2), int(cy + 3)):
+                for xx in range(int(cx - 2), int(cx + 3)):
+                    if math.hypot(xx - cx, yy - cy) <= r:
+                        c = 'b8b2aa' if (xx + yy) % 2 else '9a948c'
+                        if xx > QU_MUZZLE or (0 <= xx + PL < W and not out[yy, xx + PL, 3]):
+                            dot(out, xx + PL, yy, rgb(c, max(50, 220 - 15 * k)))
+    for w in range(0, N, 6):                              # aus der glimmenden Öffnung kräuseln stetig Rauchfäden
+        a = (i - w) % N
+        if a < 6:
+            x = QU_MUZZLE + 1 + a
+            y = my - 1 + (w // 6) % 3 - round(0.6 * a + 0.8 * math.sin(a + w))
+            dot(out, x + PL, y, rgb('b8b2aa', 150 - 20 * a))
     return out
 
 
@@ -653,6 +722,9 @@ SZ_SCALES = {'3f5d1d', '6c8527', '0c3304', '311800', '0f0a04'}
 def f_sasza(i):
     """Sas'Za atmet und blinzelt, ihre blauen Haarspitzen wippen, der Schlangenleib unten wogt sacht."""
     s = SRC.copy()
+    for y in range(8, 21):                                # die Bogensehne von Spitze zu Spitze (hinter ihr)
+        if not s[y, 4, 3]:
+            s[y, 4] = rgb('d8ccb0')
     blink(s, i, SZ_BLINK)
     b = B24[i % 24]
     out = np.zeros((H, W, 4), int)
