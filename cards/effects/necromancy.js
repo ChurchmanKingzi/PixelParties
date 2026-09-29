@@ -315,6 +315,10 @@ module.exports = {
     // matching "the CURRENT body was Necromancy-summoned" semantics).
     inst.counters = inst.counters || {};
     inst.counters._summonedByNecromancy = true;
+    // Host-Held mitstempeln (Sett: „Creatures summoned by the effect of
+    // THIS Hero's Necromancy"). Brettseite + Heldenplatz sind der Anker;
+    // der Stempel stirbt wie `_summonedByNecromancy` mit der Instanz.
+    inst.counters._necromancyHost = { side: feld, heroIdx };
 
     // Tick the per-turn summon counter. Other "summon from outside the
     // board" paths (Raise the Minions, Skeleton Necromancer, Thep, Soul
