@@ -12,8 +12,8 @@
   unter ihm.
 * Lizbeth, the Reaper of the Light: „Lizbeth“ (Sense samt Lichtstrahlen).
 * Johanna, Crusader of Light: „Johanna“.
-* Calamitusk, the Chaorc War Chief: „Calamitustk-Kopie“, der Arm „Calamitustk-Kopie #1“
-  und das Banner „Ebene #53“ als Teile `-arm` / `-banner`.
+* Calamitusk, the Chaorc War Chief: „Calamitustk-Kopie“ und das Banner „Ebene #53“ als Teil
+  `-banner` (die Lücke in der Stange geschlossen); ohne den Fetzen „Calamitustk-Kopie #1“.
 * Grand Inquisitor Karian: „Karian“ (nur der Inquisitor mit dem Schwert).
 * Flamebathed Waflav (Ascended): „Flamebathed Waflav“ und die Feuerflügel
   „Flamebathed Waflav #1“ als Teil `-wings`.
@@ -134,6 +134,22 @@ def rot180_at_grip(sword, ref):
     return shift(r, int(round(tx - gx)), int(round(ty - gy)))
 
 
+def close_pole(a):
+    """Senkrechte Lücken in der Bannerstange (unterhalb des Tuchs) mit dem Pixel darüber füllen."""
+    op = a[:, :, 3] > 0
+    ys, xs = np.nonzero(op)
+    rows = op.sum(1)
+    cloth_bottom = int(max(y for y in range(a.shape[0]) if rows[y] > 6))
+    for x in range(a.shape[1]):
+        col = np.nonzero(op[cloth_bottom + 1:, x])[0] + cloth_bottom + 1
+        if len(col) < 2:
+            continue
+        for y in range(col.min(), col.max()):
+            if not op[y, x]:
+                a[y, x] = a[y - 1, x]
+                op[y, x] = True
+
+
 def main(path):
     doc = GimpDocument(path)
     L = doc.raw_layers
@@ -157,8 +173,9 @@ def main(path):
         ('body', body), ('sword', sword), ('hand', hand), ('staff', g('Ebene #154')), ('chain', g('Ebene #157'))])
     save_parts('lizbeth-the-reaper-of-the-light', [('body', g('Lizbeth'))])
     save_parts('johanna-crusader-of-light', [('body', g('Johanna'))])
-    save_parts('calamitusk-the-chaorc-war-chief', [('body', g('Calamitustk-Kopie')), ('arm', g('Calamitustk-Kopie #1')),
-                                                   ('banner', g('Ebene #53'))])
+    banner = g('Ebene #53')                              # ohne „Calamitustk-Kopie #1“ (überflüssiger Fetzen);
+    close_pole(banner)                                   # die darunter verdeckte Lücke der Stange schließen
+    save_parts('calamitusk-the-chaorc-war-chief', [('body', g('Calamitustk-Kopie')), ('banner', banner)])
     save_parts('grand-inquisitor-karian', [('body', g('Karian'))])
     save_parts('flamebathed-waflav', [('wings', g('Flamebathed Waflav #1')), ('body', g('Flamebathed Waflav'))])
     save_parts('luna-pele-the-flame-dancer', [('body', near(g('Luna Tepe'), 286, 452))])

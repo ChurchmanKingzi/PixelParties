@@ -30,6 +30,14 @@ Fetzen ab. Frame 0 ist immer das Originalbild.
 * moana:    Tempeste Moana singt (der Mund geht in Phrasen auf und zu), neben ihr steigen kleine
             Noten auf, ringsum fällt Regen, die Haare wehen im Wind, sie tanzt langsam
             (Hüftschwung, sacht federnd).
+* lizbeth:  die Sensenklinge besteht aus Licht und leuchtet pulsierend mit Lichthof, die
+            Lichtstrahlen flackern nach außen; sie federt und blinzelt.
+* johanna:  schwebt, die Kugel aus reinem Licht pulsiert hell mit Lichthof; das Licht hellt sie
+            nahe der Kugel warm auf, weiter weg liegt sie im Schatten; sie blinzelt.
+* calamitusk: hebt und senkt das Banner (die Stange gleitet durch die Hand), das Tuch weht im
+            Wind; von den Krallen rechts tropft Blut.
+* karian:   spricht und klagt an (Mund, erhobener Zeigearm), die Klinge fährt blitzschnell ein
+            und schnappt wie eine Schlange wieder aus; er federt und blinzelt.
 """
 import math
 import os
@@ -66,6 +74,19 @@ V_ = {
                       blink={'halb': [((7, 12), '630000'), ((10, 12), '0093b3')],
                              'zu': [((7, 11), '3f0909'), ((10, 11), '152f66'), ((7, 12), '000000'), ((10, 12), '000000')]}),
     'moana': dict(slug='tempeste-moana-the-rain-singer', pads=(9, 9, 9, 2)),
+    'lizbeth': dict(slug='lizbeth-the-reaper-of-the-light', knee=30, pads=(4, 4, 4, 2),
+                    blink={'halb': [((5, 20), 'f6bd98'), ((6, 20), 'f6bd98'), ((9, 20), 'f6bd98'), ((10, 20), 'f6bd98')],
+                           'zu': [((5, 20), 'f6bd98'), ((6, 20), 'f6bd98'), ((9, 20), 'f6bd98'), ((10, 20), 'f6bd98'),
+                                  ((5, 21), '000000'), ((6, 21), '000000'), ((9, 21), '000000'), ((10, 21), '000000')]}),
+    'johanna': dict(slug='johanna-crusader-of-light', pads=(4, 4, 5, 4),
+                    blink={'halb': [((5, 8), 'f7bc97'), ((6, 8), 'f7bc97'), ((9, 8), 'f7bc97'), ((10, 8), 'f7bc97')],
+                           'zu': [((5, 8), 'f7bc97'), ((6, 8), 'f7bc97'), ((9, 8), 'f7bc97'), ((10, 8), 'f7bc97'),
+                                  ((5, 9), '000200'), ((6, 9), '000200'), ((9, 9), '000200'), ((10, 9), '000200')]}),
+    'calamitusk': dict(slug='calamitusk-the-chaorc-war-chief', part='body', pads=(4, 4, 5, 2)),
+    'karian': dict(slug='grand-inquisitor-karian', knee=19, pads=(5, 4, 4, 2),
+                   blink={'halb': [((6, 5), '000000'), ((11, 5), '000000')],
+                          'zu': [((6, 5), '000000'), ((11, 5), '000000'), ((6, 6), 'f6bd7b'), ((7, 6), 'f6bd7b'),
+                                 ((10, 6), 'f6bd7b'), ((11, 6), 'f6bd7b')]}),
 }
 V = next((v for v in sys.argv[2:] if v in V_), 'taio')
 C = V_[V]
@@ -87,6 +108,10 @@ _ys, _xs = np.mgrid[0:SH, 0:SW]
 
 def hexc(c):
     return '%02x%02x%02x' % tuple(int(v) for v in c[:3])
+
+
+def lighten(c, f):
+    return [int(c[0] + (255 - c[0]) * f), int(c[1] + (255 - c[1]) * f), int(c[2] + (255 - c[2]) * f), int(c[3])]
 
 
 def lum(c):
@@ -566,8 +591,205 @@ def draw_notes(out, i):
 
 
 
+# --- Etappe 3 -------------------------------------------------------------------
+BLOOD = (rgb('5c0000'), rgb('9a0000'), rgb('d42a2a'))
+
+
+def drop_pixels(t, x, y, ground, cols=BLOOD):
+    """Tropfen bildet sich bei (x, y), löst sich, fällt beschleunigt und zerplatzt am Boden."""
+    dk, md, hl = cols
+    if t < 0:
+        return {}
+    if t < 2:
+        return {(x, y): md}
+    if t < 4:
+        return {(x, y): md, (x, y + 1): hl}
+    k = t - 4
+    yd = y + 2 + (k * (k + 1)) // 2
+    if yd < ground:
+        return {(x, yd - 1): dk, (x, yd): md} if k else {(x, yd - 1): md, (x, yd): hl}
+    k_hit = next(k2 for k2 in range(40) if y + 2 + (k2 * (k2 + 1)) // 2 >= ground)
+    if k - k_hit == 0:
+        return {(x, ground): md, (x - 1, ground): dk, (x + 1, ground): dk}
+    if k - k_hit == 1:
+        return {(x - 1, ground): dk, (x + 1, ground): dk}
+    return {}
+
+
+def knee_put(out, s, b, ox=None, oy=None):
+    ox = PL if ox is None else ox
+    oy = PT if oy is None else oy
+    put(out, s, ox, oy, dy_fn=lambda x, y: b if y < KNEE else 0)
+    if b < 0:
+        y = KNEE - 1
+        for x in range(s.shape[1]):
+            if s[y, x, 3] and s[KNEE, x, 3] and not out[y + oy, x + ox, 3]:
+                out[y + oy, x + ox] = s[y, x]
+
+
+def f_lizbeth(i):
+    """Die Sensenklinge besteht aus Licht: sie leuchtet pulsierend (bis fast weiß) mit einem
+    Lichthof, die Lichtstrahlen flackern und wandern nach außen; Lizbeth federt und blinzelt."""
+    s = SRC.copy()
+    blink(s, i)
+    op = s[:, :, 3] > 0
+    gold = {'bea62c', '917f22', 'ffe871', 'fffffb'}
+    light = op & (_ys <= 14) & np.array([[hexc(s[y, x]) in gold for x in range(SW)] for y in range(SH)])
+    rays = light & (_xs >= 21)
+    blade = light & ~rays
+    f = 0.5 - 0.5 * math.cos(2 * math.pi * 3 * i / N)
+    for y, x in zip(*np.nonzero(blade)):
+        s[y, x] = lighten(rgb(hexc(s[y, x])), 0.25 + 0.45 * f)
+    ray_px = [(x, y) for y, x in zip(*np.nonzero(rays))]
+    s[rays] = 0
+    b = BOUNCE12[i % 12]
+    out = np.zeros((H, W, 4), int)
+    halo = ring8(np.pad(blade, 2)[2:-2, 2:-2])
+    halo2 = ring8(halo | blade) & ~halo & ~blade
+    dy = lambda y: b if y < KNEE else 0
+    for m, a0 in ((halo2, 40 + 50 * f), (halo, 90 + 90 * f)):   # Lichthof um die Klinge
+        for y, x in zip(*np.nonzero(m)):
+            if not op[y, x]:
+                out[y + PT + dy(y), x + PL] = rgb('fff4b0', int(a0))
+    tmp = np.zeros((H, W, 4), int)
+    knee_put(tmp, s, b)
+    fill_pinholes(tmp)
+    m = tmp[:, :, 3] > 0
+    out[m] = tmp[m]
+    for x, y in ray_px:                                  # Strahlen: laufende Lichtwelle nach außen
+        d = math.hypot(x - 18, y - 6)
+        v = 0.5 + 0.5 * math.sin(0.9 * d - 2 * math.pi * 4 * i / N)
+        if v > 0.25:
+            out[y + PT + dy(y), x + PL] = rgb('fffffb', int(120 + 135 * v))
+    return out
+
+
+def f_johanna(i):
+    """Johanna schwebt und hält eine Kugel aus reinem Licht, die hell pulsiert: das Licht hellt
+    die Figur nahe der Kugel warm auf, weiter weg liegt sie im Schatten; um die Kugel ein Lichthof."""
+    s = SRC.copy()
+    blink(s, i)
+    op = s[:, :, 3] > 0
+    orb = op & np.array([[hexc(s[y, x]) in ('ffff82', 'ffffb3', 'ffffe3') for x in range(SW)] for y in range(SH)])
+    cy, cx = np.mean(np.nonzero(orb)[0]), np.mean(np.nonzero(orb)[1])
+    f = 0.5 - 0.5 * math.cos(2 * math.pi * 3 * i / N)
+    for y, x in zip(*np.nonzero(op)):
+        c = s[y, x].astype(float)
+        if orb[y, x]:
+            s[y, x] = lighten(rgb(hexc(c)), 0.35 + 0.55 * f)
+            continue
+        d = math.hypot(x - cx, (y - cy) * 1.1)
+        shade = min(0.42, 0.045 * d)                     # Schatten: je weiter von der Kugel, desto dunkler
+        lit = max(0.0, 1 - d / 6.5) * (0.35 + 0.35 * f)  # warmes Licht nahe der Kugel
+        base = c[:3] * (1 - shade) + np.array([30, 10, 60]) * shade
+        col = base * (1 - lit) + np.array([255, 246, 200]) * lit
+        s[y, x] = [int(v) for v in col] + [255]
+    hv = int(round(1.4 * math.sin(2 * math.pi * 2 * i / N)))
+    out = np.zeros((H, W, 4), int)
+    put(out, s, PL, PT + hv)
+    for r, a0 in ((1, 150), (2, 70)):                    # Lichthof um die Kugel (nur außerhalb der Figur)
+        for y in range(H):
+            for x in range(W):
+                if out[y, x, 3]:
+                    continue
+                d = math.hypot(x - PL - cx, (y - PT - hv - cy) * 1.1)
+                if d <= 3.5 + r + 1.2 * f and d > 2.5:
+                    out[y, x] = rgb('fff6c0', int(a0 * (0.5 + 0.5 * f)))
+    return out
+
+
+BANNER = None
+
+
+def f_calamitusk(i):
+    """Calamitusk hebt und senkt das Banner (die Stange gleitet durch seine Hand), das Tuch weht im
+    Wind (von links, unten stärker, oben an der Querstange fest); von den Krallen rechts tropft Blut."""
+    body, banner = SRC.copy(), load('banner')
+    bop = banner[:, :, 3] > 0
+    rows = bop.sum(1)
+    cloth_rows = [y for y in range(SH) if rows[y] > 6]
+    top, bot = cloth_rows[0], cloth_rows[-1]
+    pole = bop & (_ys > bot)
+    cloth = bop & ~pole
+    w = 2 * math.pi * i / N
+    lift = -int(round(3 * (0.5 - 0.5 * math.cos(2 * w))))   # Banner zweimal pro Loop heben und senken
+
+    def wind(x, y):                                      # Tuch weht nach rechts, unten stärker
+        if cloth[y, x] and y > top + 1:
+            t_ = (y - top) / (bot - top)
+            return int(round(1.6 * t_ * (0.5 + 0.5 * math.sin(4 * w - 0.5 * y)) - 1.6 * t_ * (0.5 + 0.5 * math.sin(-0.5 * y))))
+        return 0
+    out = np.zeros((H, W, 4), int)
+    put(out, np.where(cloth[:, :, None], banner, 0), PL, PT + lift, dx_fn=wind)
+    pys, pxs = np.nonzero(pole)
+    for x in sorted(set(pxs.tolist())):                  # Stange: vom Tuch (gehoben) bis in die Hand (fest)
+        col = pys[pxs == x]
+        for y in range(bot + 1 + lift, col.max() + 1):
+            sy = min(col.max(), max(col.min(), y - lift if y - lift <= col.max() else y))
+            out[y + PT, x + PL] = banner[sy, x]
+    put(out, body, PL, PT)
+    for x0, t0 in ((34, 3), (37, 21), (34, 35)):         # Blut tropft von den Krallen
+        t_ = (i - t0) % N
+        if t_ < 20:
+            for (x, y), c in drop_pixels(t_, x0 + PL, 49 + PT, SH - 1 + PT).items():
+                if 0 < x < W - 1 and 0 < y < H - 1:
+                    out[y, x] = c
+    return out
+
+
+KARIAN_TALK = [0, 0, 1, 0, 0, 2, 0, 0, 1, 0, 2, 2, 0, 0, 0, 1, 0, 0, 2, 0, 1, 0, 0, 0,
+               0, 1, 0, 2, 0, 0, 1, 1, 0, 0, 2, 0, 0, 1, 0, 0, 0, 2, 2, 0, 0, 1, 0, 0]
+KARIAN_ARM = [0] * 18 + [1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 1] + [0] * 16      # anklagend zeigen
+# Klinge: Länge (Anteil) und Schlängeln: fährt blitzschnell ein, schnappt wie eine Schlange aus
+KARIAN_BLADE = [(1, 0)] * 8 + [(0.5, 0), (0, 0), (0, 0), (0, 0), (0.45, 2), (1, 2), (1, 1), (1, 0.5)] + [(1, 0)] * 12 + \
+               [(0.4, 0), (0, 0), (0, 0), (0.5, 2), (1, 2), (1, 1), (1, 0.5)] + [(1, 0)] * 13
+
+
+def f_karian(i):
+    """Karian spricht und klagt an: der Mund geht, zwischendurch hebt er den Arm und zeigt; die
+    Klinge fährt blitzschnell ein und schnappt wie eine Schlange wieder aus (schlängelnd)."""
+    s = SRC.copy()
+    blink(s, i)
+    mo = KARIAN_TALK[i]
+    if mo >= 1:
+        s[9, 8] = s[9, 9] = rgb('f6bd7b')
+    if mo == 2:
+        s[8, 8] = s[8, 9] = rgb('f6bd7b')
+        s[9, 8] = s[9, 9] = rgb('600000')
+    op = s[:, :, 3] > 0
+    blade = op & (_xs >= 14) & (_ys >= 17) & np.array([[hexc(s[y, x]) in ('f6ffff', '944ad5') for x in range(SW)] for y in range(SH)])
+    bpx = {(x, y): s[y, x].copy() for y, x in zip(*np.nonzero(blade))}
+    s[blade] = 0
+    arm = np.zeros_like(s)
+    sel = op & (_xs <= 4) & (_ys >= 10) & (_ys <= 15)
+    arm[sel] = s[sel]
+    lift = KARIAN_ARM[i]
+    b = BOUNCE12[i % 12]
+    out = np.zeros((H, W, 4), int)
+    knee_put(out, s, b)
+    if lift:                                             # Arm hoch und nach vorn (Original bleibt darunter)
+        put(out, arm, PL - (1 if lift == 2 else 0), PT + b - lift)
+    L, amp = KARIAN_BLADE[i]
+    y0 = 17
+    ys_ = sorted({y for (_, y) in bpx})
+    n = int(round(L * len(ys_)))
+    offs, prev = {}, 0                                   # Schlängeln: je Zeile höchstens 1 px Versatz zur vorigen
+    for k in range(len(ys_)):
+        want = int(round(amp * math.sin(0.75 * k - 2 * math.pi * 3 * i / N) * min(1.0, k / 4)))
+        prev = prev + max(-1, min(1, want - prev))
+        offs[k] = prev
+    for (x, y), c in bpx.items():
+        k = y - y0
+        if k >= n:
+            continue
+        yy = y + PT + (b if y < KNEE else 0)
+        out[yy, x + PL + offs.get(k, 0)] = c
+    fill_pinholes(out)
+    return out
+
+
 FRAME = dict(taio=f_taio, taioasc=f_taioasc, waflav=f_waflav, pele=f_pele, tempeste=f_fairy, tempeluna=f_fairy,
-             moana=f_moana)
+             moana=f_moana, lizbeth=f_lizbeth, johanna=f_johanna, calamitusk=f_calamitusk, karian=f_karian)
 
 if __name__ == '__main__':
     tag = sys.argv[1] if len(sys.argv) > 1 else 'v'
