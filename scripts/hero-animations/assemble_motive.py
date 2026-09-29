@@ -120,9 +120,9 @@ def main(path):
     # ---- Skins
     one('ida-the-fire-princess', g('Ebene #203'))
     chuck = g('Mizune und Chuck-Kopie')
-    bubble = near(chuck, 190, 141)
-    body = chuck.copy()
-    body[bubble[:, :, 3] > 0] = 0
+    top = top_left(chuck)[1]                              # die Blase: die obersten 11 Zeilen (mit Schwanz)
+    bubble = box(chuck, 0, 0, 10000, top + 11)
+    body = box(chuck, 0, top + 11, 10000, 10000)
     save_parts('one-chuck-man', [('body', body), ('bubble', bubble)])
     one('duke-omikron', g('Duke Omikron'))
     one('alice-the-wonderous-girl', layer_over(g('Ebene #571'), g('Ebene #572')))

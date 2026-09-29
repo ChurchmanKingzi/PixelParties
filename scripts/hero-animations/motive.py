@@ -35,6 +35,19 @@ Frame 0 ist immer die Ruhepose.
 * omikron:  Omikron, the Faceless Illusionist: links und rechts tauchen unregelmäßig Trugbilder mit
             Bildfehlern und rot glühenden Augen auf; die grauen Haare wehen wild, das Monokel blitzt,
             er hebt und senkt die Arme.
+Skins:
+* idafire:  Ida the Fire Princess sitzt in ihrem Flammenring (die Lücken zwischen Flamme und Körper
+            sind geschlossen): der Ring brennt innen, Zungen lecken über ihn hinaus; sie blinzelt.
+* chuck:    One Chuck Man: die OK-Blase hüpft, verschwindet und ploppt wieder auf; er atmet, blinzelt.
+* duke:     Duke Omikron: wie Omikron (Trugbilder mit Bildfehlern, wehende Haare, Monokel).
+* alice:    Alice the Wonderous Girl atmet ruhig im Bett, blinzelt, um sie funkeln Sterne.
+* megakarian: Mega-Warrior Karian: der Umhang weht, er atmet und blinzelt.
+* settdunk: Sett Dunking on You schwebt, die Tentakel wabern, die Kapuzenspitze schwingt nach, das
+            blaue Auge glimmt.
+* emperor:  Emperor Arthor atmet und blinzelt, der Edelstein an seiner Hand leuchtet und funkelt.
+* yellowflash: Nieht the Yellow Flash: das Cape flattert, er blinzelt; zweimal je Loop ist er im
+            gelben Blitz weg und im gelben Blitz wieder da.
+
 * mizune:   Silent Water Mizune spricht; um ihn steigen viele Wasserblasen auf, wachsen und platzen;
             er atmet und blinzelt.
 """
@@ -95,6 +108,23 @@ V_ = {
     'dajan': dict(slug='legendary-explorer-dajan', knee=20, pads=(3, 5, 5, 1),
                   blink=eyes([(12, 13, 8, 9), (16, 17, 8, 9)], 'd9ba8d', line='170f14')),
     'omikron': dict(slug='omikron-the-faceless-illusionist', knee=20, pads=(16, 16, 4, 1)),
+    'idafire': dict(slug='ida-the-fire-princess', pads=(6, 6, 9, 1), skin='Ida, the Adept of Destruction',
+                    blink=eyes([(6, 7, 11, 12), (10, 11, 11, 12)], 'd2a077')),
+    'chuck': dict(slug='one-chuck-man', knee=26, pads=(4, 4, 4, 1), skin='Chuck, the Crazy Veteran',
+                  blink={'halb': [((4, 15), 'd5d5d5'), ((5, 15), 'd5d5d5')],
+                         'zu': [((4, 15), '130900'), ((5, 15), '130900')]}),
+    'duke': dict(slug='duke-omikron', knee=21, pads=(16, 16, 4, 1), skin='Omikron, the Faceless Illusionist',
+                 hair={'3e0403', 'cd0000', '70090a', '95050e'}, monocle=10, hands=[]),
+    'alice': dict(slug='alice-the-wonderous-girl', knee=15, pads=(7, 7, 6, 1), skin='Alice, the Puppeteer Girl',
+                  blink=eyes([(4, 5, 9, 10), (8, 9, 9, 10)], 'f5ce88', line='311700')),
+    'megakarian': dict(slug='mega-warrior-karian', knee=20, pads=(4, 4, 3, 1), skin='Grand Inquisitor Karian',
+                       blink=eyes([(9, 10, 8, 9), (13, 14, 8, 9)], 'ffe6d5', line='311800')),
+    'settdunk': dict(slug='sett-dunking-on-you', pads=(3, 3, 3, 3), skin='Sett, the Adept of Necromancy'),
+    'emperor': dict(slug='emperor-arthor', knee=20, pads=(3, 4, 3, 1), skin='Arthor, the King of Blackport',
+                    blink={'halb': [((x, 7), '7e6b62') for x in (6, 7, 9, 10)],
+                           'zu': [((x, 7), '000000') for x in (6, 7, 9, 10)]}),
+    'yellowflash': dict(slug='nieht-the-yellow-flash', knee=20, pads=(4, 4, 5, 2), skin='Nieht, the Blitz Blade',
+                        blink=eyes([(19, 20, 10, 11), (23, 24, 10, 11)], 'fde1d2', line='000200')),
 }
 V = next((v for v in sys.argv[2:] if v in V_), 'alex')
 C = V_[V]
@@ -1021,19 +1051,21 @@ def f_omikron(i):
     b = B24[i % 24]
     t = 2 * math.pi * i / N
     k = (i - 16) % N                                    # das Monokel blitzt
+    my = C.get('monocle', 9)
+    hair = C.get('hair', HAIR)
     if k < 3:
-        s[9, 12] = rgb('ffffff')
-        s[9, 13] = rgb('fff7d0')
+        s[my, 12] = rgb('ffffff')
+        s[my, 13] = rgb('fff7d0')
     fig = bounce_frame(s, b)
-    flutter(fig, s, i, PL, PT + b, list(range(0, 13)), range(0, 5), range(17, SW), amp=2.4, speed=8,
-            ok=lambda c: hexc(c) in HAIR, erratic=0.5, pause=False)  # die grauen Haare wehen wild, ohne Pause
+    flutter(fig, s, i, PL, PT + b, list(range(0, 14)), range(0, 5), range(SW - 5, SW), amp=2.4, speed=8,
+            ok=lambda c: hexc(c) in hair, erratic=0.5, pause=False)  # die Haare wehen wild, ohne Pause
     lift = -round(2 * (0.5 - 0.5 * math.cos(2 * t)))   # Arme heben und senken
-    for (x0, x1, y0, y1), toward in OM_HANDS:          # beim Heben ziehen die Hände nach innen
+    for (x0, x1, y0, y1), toward in C.get('hands', OM_HANDS):   # beim Heben ziehen die Hände nach innen
         m = np.zeros((SH, SW), bool)
         m[y0:y1 + 1, x0:x1 + 1] = SRC[y0:y1 + 1, x0:x1 + 1, 3] > 0
         inward = 1 if lift <= -1 else 0
         move_part(fig, s, m, toward * inward, lift, PL, PT + b, toward=toward if not inward else 0)
-    for (x, y), c in sparkle_pixels(i, N, [(12 + PL, 9 + PT + b, 16)], rgb('fff7d0'), rgb('cfc592')).items():
+    for (x, y), c in sparkle_pixels(i, N, [(12 + PL, my + PT + b, 16)], rgb('fff7d0'), rgb('cfc592')).items():
         dot(fig, x, y, c)
     out = np.zeros_like(fig)
     for st, dur, dx in ILLU:                            # Trugbilder tauchen unregelmäßig auf, mit Bildfehlern
@@ -1058,9 +1090,207 @@ def f_omikron(i):
     return out
 
 
+# ================================================================ Skins
+# ---------------------------------------------------------------- Ida the Fire Princess
+FIRE_COLS = {'f42700', 'f44a00', 'f46600', 'f47b22', 'f6c40e', 'f6e70e', 'f6ec56', 'f7f5b8'}
+FUEL = None
+
+
+def fuel_masks():
+    """Flammenring (mit geschlossenen Lücken zwischen Flamme und Körper) und die Prinzessin selbst."""
+    global FUEL
+    if FUEL is None:
+        op = SRC[:, :, 3] > 0
+        fl = op & np.array([[hexc(SRC[y, x]) in FIRE_COLS for x in range(SW)] for y in range(SH)])
+        girl = op & ~fl
+        fill = np.zeros_like(fl)
+        for y in range(SH):
+            for x in range(SW):
+                if op[y, x]:
+                    continue
+                left = any(fl[y, max(0, x - k)] for k in (1, 2))
+                right = any(op[y, min(SW - 1, x + k)] for k in (1, 2))
+                left2 = any(op[y, max(0, x - k)] for k in (1, 2))
+                right2 = any(fl[y, min(SW - 1, x + k)] for k in (1, 2))
+                if (left and right) or (left2 and right2):
+                    fill[y, x] = True
+        FUEL = (fl | fill, girl)
+    return FUEL
+
+
+def f_idafire(i):
+    fuel, girl = fuel_masks()
+    s = SRC.copy()
+    blink(s, i)
+    out = np.zeros((H, W, 4), int)
+    for y, x in zip(*np.nonzero(girl)):
+        out[y + PT, x + PL] = s[y, x]
+    big = np.zeros((H, W), bool)
+    big[PT:PT + SH, PL:PL + SW] = fuel
+    fire_aura(out, big, i)                              # Zungen lecken über den Flammenring hinaus
+    import cv2
+    depth = cv2.distanceTransform((np.pad(fuel | girl, 1)).astype(np.uint8), cv2.DIST_L2, 3)[1:-1, 1:-1]
+    k1, k2 = 2 * math.pi * 6 / N, 2 * math.pi * 10 / N
+    for y, x in zip(*np.nonzero(fuel)):                 # der Ring selbst brennt: Hitze steigt innen auf
+        ph = 1.6 * math.sin(0.7 * x) + 0.9 * math.sin(1.9 * x + 0.5)
+        v = depth[y, x] + 0.8 * math.sin(k1 * (y + i) + ph) + 0.35 * math.sin(k2 * (y + i) + 2 * ph)
+        c = FLAME[0] if v < 1.5 else FLAME[1] if v < 2.5 else FLAME[2] if v < 3.5 else FLAME[3]
+        out[y + PT, x + PL] = rgb(c)
+    return out
+
+
+# ---------------------------------------------------------------- One Chuck Man
+def f_chuck(i):
+    s = load('body')
+    blink(s, i)
+    bub = load('bubble')
+    b = B24[i % 24]
+    out = bounce_frame(s, b)
+    k = i % 48                                          # die OK-Blase: hüpft, platzt weg, ploppt wieder auf
+    if k < 32:
+        dy = -1 if (k // 4) % 2 else 0
+    elif k < 40:
+        dy = None
+    else:
+        dy = {40: 'tip', 41: 'tail', 42: -2, 43: -1}.get(k, 0)
+    if dy is None:
+        return out
+    ys, xs = np.nonzero(bub[:, :, 3])
+    if dy == 'tip':
+        dot(out, 6 + PL, 10 + PT + b, rgb('000000'))
+        return out
+    if dy == 'tail':
+        for y, x in zip(ys, xs):
+            if y >= 8:
+                out[y + PT + b, x + PL] = bub[y, x]
+        return out
+    for y, x in zip(ys, xs):
+        yy = y + (dy if y < 8 else 0)
+        out[yy + PT + b, x + PL] = bub[y, x]
+    if dy < 0:                                          # der Schwanz bleibt am Kopf
+        for x in range(SW):
+            if bub[8, x, 3] and not out[7 + PT + b, x + PL, 3] and dy == -2:
+                out[7 + PT + b, x + PL] = bub[8, x]
+    return out
+
+
+# ---------------------------------------------------------------- Alice the Wonderous Girl
+def f_alice(i):
+    s = SRC.copy()
+    blink(s, i)
+    b = [0] * 6 + [-1] * 12 + [0] * 6
+    out = bounce_frame(s, b[i % 24])                    # sie atmet ruhig
+    for (x, y), c in sparkle_pixels(i, N, [(-3 + PL, 4 + PT, 3), (SW + 2 + PL, 8 + PT, 15), (-2 + PL, 14 + PT, 27),
+                                           (SW + 1 + PL, 17 + PT, 39)], rgb('fff6c0'), rgb('f8e161')).items():
+        dot(out, x, y, c)
+    return out
+
+
+# ---------------------------------------------------------------- Mega-Warrior Karian
+CAPE_MK = {'692c27', '9f3d32', '9e3d34', '452624', '51211f'}
+
+
+def f_megakarian(i):
+    s = SRC.copy()
+    blink(s, i)
+    b = B24[i % 24]
+    out = bounce_frame(s, b)
+    flutter(out, s, i, PL, PT + b, list(range(8, 22)), range(0, 5), range(19, SW), amp=2.0, speed=4,
+            ok=lambda c: hexc(c) in CAPE_MK)
+    return out
+
+
+# ---------------------------------------------------------------- Sett Dunking on You
+def f_settdunk(i):
+    s = SRC.copy()
+    t = 2 * math.pi * i / N
+    hover = -round(1.4 * math.sin(2 * t)) if i else 0
+    glow = 0.5 - 0.5 * math.cos(3 * t)
+    for y, x in zip(*np.nonzero(s[:, :, 3])):           # das blaue Auge glimmt
+        if hexc(SRC[y, x]) == '00ecfe':
+            s[y, x] = lighten(s[y, x], 0.6 * glow)
+    out = np.zeros((H, W, 4), int)
+    for y, x in zip(*np.nonzero(s[:, :, 3])):
+        dx = 0
+        if y >= 18:                                     # die Tentakel wabern, zu den Spitzen stärker
+            u = min(1.0, (y - 17) / 7)
+            dx = round(1.6 * u * (math.sin(2 * t * 2 + 0.25 * x - 0.5 * (y - 18)) - math.sin(0.25 * x - 0.5 * (y - 18))))
+        dy = hover
+        if y <= 4:                                      # die Kapuzenspitze schwingt nach
+            dx += round(0.9 * (math.sin(2 * t - 1.2) - math.sin(-1.2)) * (5 - y) / 5)
+        out[y + PT + dy, x + PL + dx] = s[y, x]
+    return out
+
+
+# ---------------------------------------------------------------- Emperor Arthor
+GEM_EA = {'68a6a6', '91e6e6', '80cccc', '508080', 'ffffff'}
+
+
+def f_emperor(i):
+    s = SRC.copy()
+    blink(s, i)
+    g = 0.5 - 0.5 * math.cos(2 * math.pi * 2 * i / N)
+    for y, x in zip(*np.nonzero(s[:, :, 3])):           # der Edelstein am Stab leuchtet
+        if x >= 17 and hexc(SRC[y, x]) in GEM_EA:
+            s[y, x] = lighten(s[y, x], 0.5 * g)
+    b = B24[i % 24]
+    out = bounce_frame(s, b)
+    for (x, y), c in sparkle_pixels(i, N, [(19 + PL, 11 + PT + b, 8), (20 + PL, 12 + PT + b, 32)],
+                                    rgb('e8ffff'), rgb('91e6e6')).items():
+        dot(out, x, y, c)
+    return out
+
+
+# ---------------------------------------------------------------- Nieht the Yellow Flash
+YF_GONE = {6: 'flash', 7: 'glow', 8: 'none', 9: 'none', 10: 'back', 28: 'flash', 29: 'glow', 30: 'none',
+           31: 'none', 32: 'back'}
+YF_CAPE = {'4d1009', '801b0f', 'b42f1e', 'f2f0d9', 'bda47b', '998564'}
+
+
+def yellow_burst(out, cx, cy, r, alpha, front=False):
+    """Gelber Blitz: heller Kern, vier lange und vier kurze Strahlen (front: auch über der Figur)."""
+    pts = {}
+    for dy in range(-2, 3):
+        for dx in range(-2, 3):
+            if abs(dx) + abs(dy) <= 2:
+                pts[(dx, dy)] = ('ffffff' if abs(dx) + abs(dy) <= 1 else 'fff39a', 1.0)
+    for k in range(3, r + 1):
+        f = 1 - (k - 2) / (r - 1)
+        for dx, dy in ((k, 0), (-k, 0), (0, k), (0, -k)):
+            pts[(dx, dy)] = ('fff39a' if k < r * 0.6 else 'f9e149', f)
+        if k <= r // 2 + 1:
+            for dx, dy in ((k - 1, k - 1), (-k + 1, k - 1), (k - 1, -k + 1), (-k + 1, -k + 1)):
+                pts[(dx, dy)] = ('f9e149', f * 0.8)
+    for (dx, dy), (c, f) in pts.items():
+        x, y = cx + dx, cy + dy
+        if 0 <= x < W and 0 <= y < H and (front or not out[y, x, 3]):
+            out[y, x] = rgb(c, int(alpha * f))
+
+
+def f_yellowflash(i):
+    s = SRC.copy()
+    blink(s, i)
+    b = B24[i % 24]
+    g = YF_GONE.get(i)
+    cx, cy = PL + SW // 2, PT + 12 + b
+    if g in ('glow', 'none'):                           # der gelbe Blitz: weg …
+        out = np.zeros((H, W, 4), int)
+        if g == 'glow':
+            yellow_burst(out, cx, cy, 6, 170)
+        return out
+    out = bounce_frame(s, b)
+    flutter(out, s, i, PL, PT + b, list(range(12, 19)), range(0, 12), range(28, SW), amp=2.0, speed=6,
+            ok=lambda c: hexc(c) in YF_CAPE)
+    if g in ('flash', 'back'):                          # … und im gelben Blitz wieder da
+        yellow_burst(out, cx, cy, 10, 255, front=True)
+    return out
+
+
 FRAME = dict(alex=f_alex, doq=f_doq, grisgar=f_grisgar, nieht=f_nieht, kohta=f_kohta, bill=f_bill,
              sabrina=f_sabrina, mizune=f_mizune, bartas=f_bartas, gon=f_gon, ida=f_ida, vacarn=f_vacarn,
-             solrym=f_solrym, dajan=f_dajan, omikron=f_omikron)
+             solrym=f_solrym, dajan=f_dajan, omikron=f_omikron, idafire=f_idafire, chuck=f_chuck,
+             duke=f_omikron, alice=f_alice, megakarian=f_megakarian, settdunk=f_settdunk, emperor=f_emperor,
+             yellowflash=f_yellowflash)
 
 if __name__ == '__main__':
     tag = sys.argv[1] if len(sys.argv) > 1 else 'v'
