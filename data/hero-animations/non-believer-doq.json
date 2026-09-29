@@ -1,0 +1,17 @@
+{
+  "hero": "Non-Believer Doq",
+  "sheet": "non-believer-doq.png",
+  "frameWidth": 23,
+  "frameHeight": 30,
+  "frames": 48,
+  "frameMs": 90,
+  "loop": true,
+  "layout": "horizontal",
+  "skinOf": "Great Detective Doq",
+  "padTop": 2,
+  "padLeft": 1,
+  "padRight": 1,
+  "padBottom": 2,
+  "faceX": 9.0,
+  "footY": 28
+}

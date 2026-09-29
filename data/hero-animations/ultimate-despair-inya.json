@@ -1,0 +1,16 @@
+{
+  "hero": "Ultimate Despair Inya",
+  "sheet": "ultimate-despair-inya.png",
+  "frameWidth": 34,
+  "frameHeight": 47,
+  "frames": 48,
+  "frameMs": 90,
+  "loop": true,
+  "layout": "horizontal",
+  "skinOf": "Card Game Player Inya",
+  "padTop": 2,
+  "padLeft": 1,
+  "padRight": 1,
+  "padBottom": 1,
+  "faceX": 17.0
+}

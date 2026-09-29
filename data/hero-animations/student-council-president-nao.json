@@ -1,0 +1,17 @@
+{
+  "hero": "Student Council President Nao",
+  "sheet": "student-council-president-nao.png",
+  "frameWidth": 36,
+  "frameHeight": 29,
+  "frames": 48,
+  "frameMs": 90,
+  "loop": true,
+  "layout": "horizontal",
+  "skinOf": "Nao, the Barrier Priestess",
+  "padTop": 2,
+  "padLeft": 3,
+  "padRight": 1,
+  "padBottom": 4,
+  "faceX": 23.0,
+  "footY": 25
+}

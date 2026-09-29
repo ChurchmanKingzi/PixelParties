@@ -328,6 +328,15 @@ kopiert, daneben liegt eine JSON-Datei mit den Metadaten. Die erzeugten
 | `late5.py` | `final 90 mary` | `mary_idle_final_sheet.png` | `mary-crestmas` |
 | `late5.py` | `final 90 beato` | `beato_idle_final_sheet.png` | `beato-the-eternal-butterfly` |
 | `monia.py` | `final 70 bot` | `bot_monia_idle_final_sheet.png` | `monia-bot-the-foretold-rescuer-of-coolness` |
+| `skins_last.py` | `final 90 bill` | `bill_idle_final_sheet.png` | `bills-worst-nightmare` (Skin) |
+| `skins_last.py` | `final 90 semi` | `semi_idle_final_sheet.png` | `creepy-villager-girl-semi` (Skin) |
+| `skins_last.py` | `final 90 doq` | `doq_idle_final_sheet.png` | `non-believer-doq` (Skin) |
+| `skins_last.py` | `final 90 thundergod` | `thundergod_idle_final_sheet.png` | `thunder-god-sol-rym` (Skin) |
+| `skins_last.py` | `final 90 inya` | `inya_idle_final_sheet.png` | `ultimate-despair-inya` (Skin) |
+| `skins_last.py` | `final 90 johanna` | `johanna_idle_final_sheet.png` | `mega-priestess-johanna` (Skin) |
+| `skins_last.py` | `final 90 nao` | `nao_idle_final_sheet.png` | `student-council-president-nao` (Skin) |
+| `skins_last.py` | `final 90 rhabi` | `rhabi_idle_final_sheet.png` | `rhabi-the-human-hunter` (Skin) |
+| `skins_last.py` | `final 90 kasperov` | `kasperov_idle_final_sheet.png` | `kasperov-the-king-of-the-east` (Skin; auch für „Kasperov the King of the East1“) |
 
 `bubbles.py` ohne `gross` erzeugt eine auf Hero-Größe verkleinerte Variante
 (Sprite aus `bubbles_downscale.py`), die aktuell nicht verwendet wird.
@@ -373,6 +382,7 @@ python3 xcf_extract.py MotiveMoe.xcf assemble src/cute-princess-mary.png "Mary-K
 | Hel, the Bound Specter | `MotiveArcanum.xcf` | ebenfalls per `assemble_late.py` (Kapuzengestalt „Ebene #55“ und Dolch „Ebene #112“ als `-knife`, voll deckend statt 40 % wie im xcf) |
 | Cecilia, the Harrowing Crusader; Fiona, the Empty Vessel of a Forgotten Sorceress; Mary Crestmas; Beato, the Eternal Butterfly | – | in keiner xcf-Datei vorhanden, aus den Kartenbildern rekonstruiert (Pixelraster zurückgerechnet, Figur freigestellt): Cecilias Körper ab dem Gesicht stammt aus `bad-birthday-girl-cecilia.png`, nur Piratenhut und Auge aus der Karte; Fiona ohne die lila Blitz-Aura (die Blitze sind Partikel); Marys von Lichtern verdeckte Mütze ist die von Santa Klaus |
 | Monia Bot, the Foretold Rescuer of Coolness | – | vom Nutzer gezeichnet, deckungsgleich mit Cool Rescuer Monia (gleicher Ausschnitt, nur längere Düsenflammen); Körper und Feuer als `-body`/`-flames` getrennt nach den vier Flammenfarben |
+| Die letzten Skins (Bills Worst Nightmare, Creepy Villager Girl Semi, Non-Believer Doq, Thunder God Sol Rym, Ultimate Despair Inya, Mega-Priestess Johanna, Student Council President Nao, RhaBi the Human Hunter, Kasperov the King of the East) | `Motive.xcf`, `MotiveDeepsea.xcf`, Skin-Kartenbilder | reproduzierbar per `python3 assemble_skins_last.py <verzeichnis mit den xcf>` (Zuordnung im Skriptkopf; Non-Believer Doq nur als Differenz zweier Szenenebenen, Creepy Villager Girl Semi nach dem Kartenbild umgefärbt, Kasperov the King of the East aus dem Kartenbild ausgeschnitten; bewegliche Teile: Bills Haube `-mask`, Sol Ryms Wolke `-cloud`, Inyas `-girl`/`-bear`, Naos `-wings`, RhaBis vier Arme `-arml`/`-armr`/`-arml2`/`-armr2`) |
 
 Neue Datei durchsuchen: `xcf_scan.py dump` legt alle Ebenen einzeln ab,
 `xcf_scan.py match <ordner> --heroes` gleicht sie mit allen noch nicht

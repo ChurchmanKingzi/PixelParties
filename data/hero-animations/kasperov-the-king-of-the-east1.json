@@ -1,0 +1,16 @@
+{
+  "hero": "Kasperov the King of the East1",
+  "sheet": "kasperov-the-king-of-the-east.png",
+  "frameWidth": 25,
+  "frameHeight": 28,
+  "frames": 48,
+  "frameMs": 90,
+  "loop": true,
+  "layout": "horizontal",
+  "skinOf": "Kasperov, the King of Kings [B]",
+  "padTop": 2,
+  "padLeft": 3,
+  "padRight": 2,
+  "padBottom": 1,
+  "faceX": 13.0
+}
