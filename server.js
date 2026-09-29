@@ -3874,6 +3874,8 @@ function parseDeck(row) {
 // bleibt nur die Verdrahtung. Neue Kategorie = Eintrag in
 // data/sc-rewards.json (+ ggf. eine Bedingung in sc-rewards.js).
 const scRewardsModul = require('./sc-rewards');
+// Puzzle-Schwierigkeiten = Ordner unter data/puzzles/ (Reihenfolge = Anzeige in der Library).
+const PUZZLE_SCHWIERIGKEITEN = ['easy', 'medium', 'hard', 'impossible'];
 const { createScRewards, isCpuUserId, cpuOpponentKey } = scRewardsModul;
 const scRewards = createScRewards({ db, uuidv4, getActiveDaily, getCardDB });
 
@@ -15583,7 +15585,7 @@ io.on('connection', (socket) => {
     if (!currentUser) return;
     try {
       const puzzlesDir = path.join(__dirname, 'data', 'puzzles');
-      const difficulties = ['easy', 'medium', 'hard'];
+      const difficulties = PUZZLE_SCHWIERIGKEITEN;
       const puzzles = [];
 
       for (const diff of difficulties) {
@@ -15622,6 +15624,7 @@ io.on('connection', (socket) => {
 
     (async () => {
       try {
+        if (!PUZZLE_SCHWIERIGKEITEN.includes(difficulty)) { socket.emit('puzzle_error', 'Puzzle not found'); return; }
         const filePath = path.join(__dirname, 'data', 'puzzles', difficulty, puzzleId.split('/')[1] + '.json');
         if (!fs.existsSync(filePath)) { socket.emit('puzzle_error', 'Puzzle not found'); return; }
 

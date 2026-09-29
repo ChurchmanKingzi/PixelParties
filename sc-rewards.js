@@ -179,7 +179,7 @@ const DAILY_BETRAG = Object.freeze({ zweiHelden: 50, dreiHelden: 100, wiederholu
  *   Puzzle-Erstabschluss je Schwierigkeit (vorher 3/6/10),
  *   Cube-Turnier je menschlichem Teilnehmer (vorher Platz 1: 5, Platz 2: 2).
  */
-const PUZZLE_BETRAG = Object.freeze({ easy: 15, medium: 30, hard: 50 });
+const PUZZLE_BETRAG = Object.freeze({ easy: 15, medium: 30, hard: 50, impossible: 100 });
 const CUBE_BETRAG = Object.freeze({ ersterJeMensch: 25, zweiterJeMensch: 10 });
 
 /** Belegte Support Zones am Ende — alle Helden, Island Zones eingeschlossen. */

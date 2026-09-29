@@ -2171,10 +2171,10 @@ function MainMenu() {
               ) : puzzleList.length === 0 ? (
                 <div style={{ color: 'var(--text2)', textAlign: 'center', padding: 30, fontSize: 13 }}>No puzzles available yet.</div>
               ) : (
-                ['easy', 'medium', 'hard'].map(diff => {
+                ['easy', 'medium', 'hard', 'impossible'].map(diff => {
                   const puzzles = puzzleList.filter(p => p.difficulty === diff);
                   if (puzzles.length === 0) return null;
-                  const diffColors = { easy: '#33ff88', medium: '#ffaa00', hard: '#ff4444' };
+                  const diffColors = { easy: '#33ff88', medium: '#ffaa00', hard: '#ff4444', impossible: '#c455ff' };
                   // v1402: Betrag kommt vom Server (Anzeige = Auszahlung).
                   const scReward = { [diff]: puzzles[0]?.scBetrag ?? 0 };
                   return (
