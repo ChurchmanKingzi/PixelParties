@@ -131,7 +131,7 @@ module.exports = {
 
       // „The user" — der wirkende Held.
       const heroIdx = ctx.cardHeroIdx;
-      const user = heroIdx >= 0 ? ps.heroes?.[heroIdx] : null;
+      const user = heroIdx >= 0 ? (ctx.attachedHero || gs.players[ctx.cardHeroOwner ?? pi]?.heroes?.[heroIdx]) : null;   // Als Befund 29.9.: Brettseite des Wirkers
       if (!user?.name || user.hp <= 0) { gs._spellCancelled = true; return false; }
 
       const ziele = kandidaten(engine, pi);
@@ -174,10 +174,10 @@ module.exports = {
       // die Quelle fuer `heroScriptOf`. Dadurch wirken ab v1186 auch
       // die VERTRAEGE des kopierten Helden (Flags wie Lunas
       // `firewallModifiers`), nicht mehr nur seine Hooks.
-      const wissen = engine.grantHeroEffect(pi, heroIdx, ziel.cardName,
+      const wissen = engine.grantHeroEffect(ctx.cardHeroOwner ?? pi, heroIdx, ziel.cardName,   // Als Befund 29.9.: Brettseite des Wirkers
         { grund: 'dangerousKnowledge' });
       if (!wissen) return false;          // schon gelernt oder eigener Name
-      await engine.finishGainedHeroEffects(pi, heroIdx);
+      await engine.finishGainedHeroEffects(ctx.cardHeroOwner ?? pi, heroIdx);   // Als Befund 29.9.: Brettseite des Wirkers
 
       if (!ps._dangerousKnowledgeGained) ps._dangerousKnowledgeGained = new Set();
       ps._dangerousKnowledgeGained.add(baseCardName(ziel.cardName));
@@ -189,7 +189,7 @@ module.exports = {
       // der Client zeigt die Namen ganz oben und die vollen Texte im
       // vorhandenen „Inherited Effects"-Block.
       engine._broadcastEvent('play_zone_animation', {
-        type: 'gold_sparkle', owner: pi, heroIdx, zoneSlot: -1,
+        type: 'gold_sparkle', owner: ctx.cardHeroOwner ?? pi, heroIdx, zoneSlot: -1,   // Als Befund 29.9.: Brettseite des Wirkers
       });
       engine.log('dangerous_knowledge', {
         player: ps.username, hero: user.name, learned: ziel.cardName,

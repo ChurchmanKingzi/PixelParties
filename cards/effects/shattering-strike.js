@@ -82,7 +82,7 @@ module.exports = {
         cancellable: true,
       });
       if (!target) return;
-      const attackSource = { name: CARD_NAME, owner: pi, heroIdx, controller: pi };
+      const attackSource = { name: CARD_NAME, owner: pi, heroIdx, controller: pi, heroOwner: ctx.cardHeroOwner ?? pi };   // Als Befund 29.9.: Brettseite des Angreifers
       const amount = await engine._fireAttackDeclare(attackSource, target, atk);
 
       let hits = 0, defeats = 0;

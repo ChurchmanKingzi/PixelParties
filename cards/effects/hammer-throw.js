@@ -48,7 +48,7 @@ module.exports = {
         confirmLabel: `🔨 Throw! (${atk})`,
         confirmClass: 'btn-danger',
         cancellable: true,
-        condition: (t) => !(t.type === 'hero' && t.owner === pi && t.heroIdx === heroIdx),
+        condition: (t) => !(t.type === 'hero' && t.owner === (ctx.cardHeroOwner ?? pi) && t.heroIdx === heroIdx),   // Als Befund 29.9.: Brettseite des Angreifers
       });
 
       if (!target) return;
@@ -61,7 +61,7 @@ module.exports = {
       // attacks" effects) fires AFTER target pick but BEFORE the
       // projectile + impact + damage. Listeners may mutate the
       // about-to-deal damage.
-      const attackSource = { name: 'Hammer Throw', owner: pi, heroIdx, controller: pi, usesHeroAtk: true };
+      const attackSource = { name: 'Hammer Throw', owner: pi, heroIdx, controller: pi, heroOwner: ctx.cardHeroOwner ?? pi, usesHeroAtk: true };   // Als Befund 29.9.: Brettseite des Angreifers
       const finalAtk = await engine._fireAttackDeclare(attackSource, target, atk);
 
       // Spinning hammer projectile animation

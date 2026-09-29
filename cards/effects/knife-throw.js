@@ -129,7 +129,7 @@ module.exports = {
         confirmLabel: `🔪 Throw! (${damage})`,
         confirmClass: 'btn-danger',
         cancellable: false,          // Das Artefakt ist bereits bezahlt.
-        condition: (t) => !(t.type === 'hero' && t.owner === pi && t.heroIdx === heroIdx),
+        condition: (t) => !(t.type === 'hero' && t.owner === (ctx.cardHeroOwner ?? pi) && t.heroIdx === heroIdx),   // Als Befund 29.9.: Brettseite des Angreifers
       });
 
       // ── ③ Der Zug ist fuer weitere Attacks zu, sobald die Karte
@@ -144,7 +144,7 @@ module.exports = {
       const impactSlot = target.type === 'hero' ? -1 : target.slotIdx;
 
       const attackSource = {
-        name: CARD_NAME, owner: pi, heroIdx, controller: pi, usesHeroAtk: true,
+        name: CARD_NAME, owner: pi, heroIdx, controller: pi, heroOwner: ctx.cardHeroOwner ?? pi, usesHeroAtk: true,   // Als Befund 29.9.: Brettseite des Angreifers
       };
       const finalDmg = await engine._fireAttackDeclare(attackSource, target, damage);
 

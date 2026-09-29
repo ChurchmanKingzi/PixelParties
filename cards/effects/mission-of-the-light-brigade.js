@@ -132,7 +132,7 @@ module.exports = {
 
       await engine.showTriggeredEffect(CARD_NAME, { playerIdx: pi });
       engine._broadcastEvent('play_zone_animation', {
-        type: 'gold_sparkle', owner: pi, heroIdx: ctx.cardHeroIdx, zoneSlot: -1,
+        type: 'gold_sparkle', owner: ctx.cardHeroOwner ?? pi, heroIdx: ctx.cardHeroIdx, zoneSlot: -1,   // Als Befund 29.9.: Brettseite des Wirkers
       });
       engine.log('mission_light_brigade', { player: ps.username, count: LADUNGEN });
       engine.sync();

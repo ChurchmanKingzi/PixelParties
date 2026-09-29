@@ -87,10 +87,10 @@ module.exports = {
         confirmLabel: `🌪️ Storm! (${dmg})`,
         confirmClass: 'btn-danger',
         cancellable: false,
-        condition: (t) => !(t.type === 'hero' && t.owner === pi && t.heroIdx === heroIdx),
+        condition: (t) => !(t.type === 'hero' && t.owner === (ctx.cardHeroOwner ?? pi) && t.heroIdx === heroIdx),   // Als Befund 29.9.: Brettseite des Angreifers
       });
       if (!target) return;
-      const attackSource = { name: CARD_NAME, owner: pi, heroIdx, controller: pi };
+      const attackSource = { name: CARD_NAME, owner: pi, heroIdx, controller: pi, heroOwner: ctx.cardHeroOwner ?? pi };   // Als Befund 29.9.: Brettseite des Angreifers
       const finalDmg = await engine._fireAttackDeclare(attackSource, target, dmg);
       const impactSlot = target.type === 'hero' ? -1 : target.slotIdx;
       engine._broadcastEvent('play_zone_animation', {

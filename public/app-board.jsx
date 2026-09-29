@@ -31547,7 +31547,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     // pulst golden auf, bevor ihre Abwürfe fliegen — der Spieler sieht,
     // WELCHER Effekt gleich wirkt. Klassen-Neustart via Reflow, damit
     // schnelle Folge-Glows sichtbar neu zünden.
-    const onEffectGlow = ({ cardName, origin, sfx, playerIdx, zone, heroIdx, zoneSlot }) => {
+    const onEffectGlow = ({ cardName, origin, sfx, playerIdx, zone, heroIdx, zoneSlot, boardOwner }) => {
       if (!cardName) return;
       if (sfx && window.playSFX) window.playSFX(sfx, { dedupe: 300, category: 'effect' });
       try {
@@ -31558,11 +31558,13 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         // Effekt dem EIGENEN Spieler gehoert (die CPU-Hydra darf meine
         // Handkopie nicht anzuenden).
         const ownerLabel = typeof playerIdx === 'number' ? (playerIdx === myIdx ? 'me' : 'opp') : null;
+        // 29.9.: Brett-Platz auf der BRETTSEITE (geliehener Held steht drueben).
+        const brettLabel = typeof boardOwner === 'number' ? (boardOwner === myIdx ? 'me' : 'opp') : ownerLabel;
         let nodes = null;
-        if (ownerLabel && zone === 'support' && heroIdx >= 0 && zoneSlot >= 0) {
-          nodes = document.querySelectorAll(`[data-support-zone][data-support-owner="${ownerLabel}"][data-support-hero="${heroIdx}"][data-support-slot="${zoneSlot}"]`);
-        } else if (ownerLabel && zone === 'hero' && heroIdx >= 0) {
-          nodes = document.querySelectorAll(`[data-hero-zone][data-hero-owner="${ownerLabel}"][data-hero-idx="${heroIdx}"]`);
+        if (brettLabel && zone === 'support' && heroIdx >= 0 && zoneSlot >= 0) {
+          nodes = document.querySelectorAll(`[data-support-zone][data-support-owner="${brettLabel}"][data-support-hero="${heroIdx}"][data-support-slot="${zoneSlot}"]`);
+        } else if (brettLabel && zone === 'hero' && heroIdx >= 0) {
+          nodes = document.querySelectorAll(`[data-hero-zone][data-hero-owner="${brettLabel}"][data-hero-idx="${heroIdx}"]`);
         }
         if (!nodes || nodes.length === 0) nodes = document.querySelectorAll(sel);
         nodes.forEach(el => {

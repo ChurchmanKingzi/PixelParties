@@ -84,7 +84,7 @@ module.exports = {
       // Vorhandener Negierungs-Effekt (deepsea_idol_negate) statt eines
       // neuen: er zeigt genau das, was hier passiert — ein Effekt wird
       // abgewuergt. Ein eigener Typ waere Zierde ohne Zusatznutzen.
-      type: 'deepsea_idol_negate', owner: pi, heroIdx: casterHeroIdx, zoneSlot: -1,
+      type: 'deepsea_idol_negate', owner: selfLink?.heroOwner ?? selfLink?.casterOwner ?? pi, heroIdx: casterHeroIdx, zoneSlot: -1,   // Als Befund 29.9.: Brettseite des Wirkers (geliehener Held)
     });
     await engine._delay(420);
 

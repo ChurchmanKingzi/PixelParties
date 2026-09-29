@@ -8421,7 +8421,7 @@ async function doActivateCreatureEffect(room, pi, { heroIdx, zoneSlot, charmedOw
     gs._spellCasterCreature = inst;
     let resolved;
     try {
-      resolved = await script.onCreatureEffect(ctx);
+      resolved = await room.engine._alsAkteur(ctx, () => script.onCreatureEffect(ctx));   // 29.9.: Animationen auf die Brettseite
       if (room.engine.nimmOpferFizzle()) resolved = true;   // v1313: fizzelt, aber verbraucht
       // Karten mit eigener Zielwahl haben den Auftritt schon selbst
       // ausgeloest; alle anderen bekommen ihn hier, nach dem Effekt.
@@ -8788,7 +8788,7 @@ async function doActivateFreeAbility(room, pi, { heroIdx, zoneIdx, zoneKind, cha
     }
 
     const ctx = room.engine._createContext(inst, {});
-    const resolved = await script.onFreeActivate(ctx, level);
+    const resolved = await room.engine._alsAkteur(ctx, () => script.onFreeActivate(ctx, level));
     // ── AUFTRITT ERST HIER (12.8., Als Befund an "Trade") ────────────
     // Vorher stand der Auftritt direkt hinter dem Chain-Fenster, also
     // VOR `onFreeActivate` und damit vor jeder Abfrage der Karte. Bei
@@ -9682,7 +9682,7 @@ async function doActivateAbility(room, pi, { heroIdx, zoneIdx, zoneKind, charmed
     // (no-op for humans / PvP / MCTS sim; idempotent below).
     room.engine.maybeFireCpuRevealEarly();
     const ctx = room.engine._createContext(inst, {});
-    let result = await script.onActivate(ctx, level);
+    let result = await room.engine._alsAkteur(ctx, () => script.onActivate(ctx, level));
     if (room.engine.nimmOpferFizzle()) result = true;   // v1313: fizzelt, aber verbraucht
     // Auftritt NACH dem Handler (siehe doActivateFreeAbility) — eine
     // abgebrochene Aktivierung darf keine Karte einblenden.
@@ -10278,7 +10278,7 @@ async function doActivateEquipEffect(room, pi, { heroIdx, zoneSlot }) {
     // (`'board'`), NICHT in der Hand. Angemeldet vor dem Handler,
     // ausgeloest erst danach.
     room.engine.armEffectAnnounce(cardName, pi, 'board');
-    let resolved = await script.onEquipEffect(ctx);
+    let resolved = await room.engine._alsAkteur(ctx, () => script.onEquipEffect(ctx));
     if (room.engine.nimmOpferFizzle()) resolved = true;   // v1313: fizzelt, aber verbraucht
     if (resolved !== false) room.engine.announceActiveEffect();
     room.engine.clearEffectAnnounce();

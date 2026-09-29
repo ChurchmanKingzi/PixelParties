@@ -175,7 +175,7 @@ module.exports = {
       // ★ v1392: über die EINE Stelle für Mehrfachtreffer; Schaden je
       // Ziel abgestuft (`amount`). Reaktionsfenster wie bisher aus.
       await engine.dealDamageToTargets(
-        { name: CARD_NAME, owner: pi, heroIdx: casterHeroIdx, controller: pi },
+        { name: CARD_NAME, owner: pi, heroIdx: casterHeroIdx, controller: pi, heroOwner: ctx.cardHeroOwner ?? pi },   // Als Befund 29.9.: Brettseite des Angreifers
         treffer.map(e => ({ type: 'hero', owner: e.pi, heroIdx: e.heroIdx, amount: DAMAGE_JE_ARTEFAKT * e.gefallen })),
         { damageType: 'destruction_spell', sourceName: CARD_NAME, hitDelay: 0,
           surpriseCheck: false, postTargetCheck: false },

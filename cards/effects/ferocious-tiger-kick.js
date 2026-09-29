@@ -58,7 +58,7 @@ module.exports = {
         confirmLabel: `🐯 Tiger Kick! (${baseAtk})`,
         confirmClass: 'btn-danger',
         cancellable: true,
-        condition: (t) => !(t.type === 'hero' && t.owner === pi && t.heroIdx === heroIdx),
+        condition: (t) => !(t.type === 'hero' && t.owner === (ctx.cardHeroOwner ?? pi) && t.heroIdx === heroIdx),   // Als Befund 29.9.: Brettseite des Angreifers
       });
 
       if (!target) return; // Cancelled
@@ -71,7 +71,7 @@ module.exports = {
       // attacks" effects) fires AFTER target pick but BEFORE the
       // animation + damage. Listeners may mutate the about-to-deal
       // damage.
-      const attackSource = { name: 'Ferocious Tiger Kick', owner: pi, heroIdx, controller: pi, usesHeroAtk: true };
+      const attackSource = { name: 'Ferocious Tiger Kick', owner: pi, heroIdx, controller: pi, heroOwner: ctx.cardHeroOwner ?? pi, usesHeroAtk: true };   // Als Befund 29.9.: Brettseite des Angreifers
       const finalDmg = await engine._fireAttackDeclare(attackSource, target, baseAtk);
 
       // Ram animation: hero charges to target and back

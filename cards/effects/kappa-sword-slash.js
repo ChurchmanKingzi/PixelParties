@@ -142,7 +142,7 @@ module.exports = {
       // attacks" effects) fires AFTER target pick + cost payment but
       // BEFORE the animation + damage. Listeners may mutate the
       // about-to-deal damage.
-      const attackSource = { name: CARD_NAME, owner: pi, heroIdx: ctx.cardHeroIdx, controller: pi };
+      const attackSource = { name: CARD_NAME, owner: pi, heroIdx: ctx.cardHeroIdx, controller: pi, heroOwner: ctx.cardHeroOwner ?? pi };   // Als Befund 29.9.: Brettseite des Angreifers
       const finalDmg = await engine._fireAttackDeclare(attackSource, target, SLASH_DMG);
 
       // Slash animation on the target.

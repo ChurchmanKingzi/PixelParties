@@ -55,10 +55,10 @@ module.exports = {
       // Toras (and any hero with singleTargetAttack) restricts Attacks to 1 target total.
       // The engine already capped hero selection to 1, but Whirlwind's secondary creature
       // hits count as additional targets — skip them when the restriction is active.
-      const heroFlag = gs.heroFlags?.[`${pi}-${heroIdx}`];
+      const heroFlag = gs.heroFlags?.[`${ctx.cardHeroOwner ?? pi}-${heroIdx}`];   // Als Befund 29.9.: Brettseite des Angreifers
       const singleTargetOnly = !!heroFlag?.singleTargetAttack;
 
-      const attackSource = { name: 'Whirlwind Strike', owner: pi, heroIdx, controller: pi, usesHeroAtk: true };
+      const attackSource = { name: 'Whirlwind Strike', owner: pi, heroIdx, controller: pi, heroOwner: ctx.cardHeroOwner ?? pi, usesHeroAtk: true };   // Als Befund 29.9.: Brettseite des Angreifers
 
       // Pre-resolution hook (Doq's guess, future "when this Hero
       // attacks" effects) — fires AFTER multi-target pick but BEFORE
@@ -71,7 +71,7 @@ module.exports = {
 
       // ── ANIMATION: spin up on attacker ──
       engine._broadcastEvent('play_zone_animation', {
-        type: 'whirlwind_spin', owner: pi, heroIdx, zoneSlot: -1,
+        type: 'whirlwind_spin', owner: ctx.cardHeroOwner ?? pi, heroIdx, zoneSlot: -1,   // Als Befund 29.9.: Brettseite des Angreifers
       });
       await engine._delay(400);
 

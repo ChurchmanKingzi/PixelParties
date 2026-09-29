@@ -205,7 +205,7 @@ module.exports = {
         // attacks" effects) fires BEFORE the damage. The damage is
         // self-inflicted on the user's own hero — pass that as the
         // target so listeners can see what's about to be hit.
-        const attackSource = { name: CARD_NAME, owner: pi, heroIdx, controller: pi };
+        const attackSource = { name: CARD_NAME, owner: pi, heroIdx, controller: pi, heroOwner: ctx.cardHeroOwner ?? pi };   // Als Befund 29.9.: Brettseite des Angreifers
         const selfTarget = { type: 'hero', owner: pi, heroIdx, cardName: userHero.name };
         const finalDmg = await engine._fireAttackDeclare(attackSource, selfTarget, maxHp);
         await engine.actionDealDamage(attackSource, userHero, finalDmg, 'attack');

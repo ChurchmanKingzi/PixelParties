@@ -105,11 +105,11 @@ module.exports = {
         confirmLabel: `🗡️ Strike! (${dmg})`,
         confirmClass: 'btn-danger',
         cancellable: false,
-        condition: (t) => !(t.type === 'hero' && t.owner === pi && t.heroIdx === heroIdx),
+        condition: (t) => !(t.type === 'hero' && t.owner === (ctx.cardHeroOwner ?? pi) && t.heroIdx === heroIdx),   // Als Befund 29.9.: Brettseite des Angreifers
       });
       if (!target) return;
 
-      const quelle = { name: CARD_NAME, owner: pi, heroIdx, controller: pi };
+      const quelle = { name: CARD_NAME, owner: pi, heroIdx, controller: pi, heroOwner: ctx.cardHeroOwner ?? pi };   // Als Befund 29.9.: Brettseite des Angreifers
       const endgueltig = await engine._fireAttackDeclare(quelle, target, dmg);
       const slot = target.type === 'hero' ? -1 : target.slotIdx;
       engine._broadcastEvent('play_zone_animation', {
