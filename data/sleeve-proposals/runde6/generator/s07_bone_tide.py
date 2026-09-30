@@ -17,13 +17,16 @@ Quellen (Motive.xcf):
   Ebene 58 „Skele Mage #1“   – Skeleton Mage (Karte Skeleton Mage, Sichtbar #313).
   Ebene 54 „Healer Skele #2“ – Skeleton Healer (Karte, Sichtbar #314).
   Ebenen 790/794/796/792/787 – Skeleton Reaper, Death Knight, Burning Skele, Skeleton Wizard, Cosmic Skele
-                               (dunkle Szenenfassungen, hier als Schatten im Nebel).
+                               (dunkle Szenenfassungen, violett getönt als Schatten im Nebel; Reaper-Sense wegen
+                               der riesigen Sense am Ende weggelassen).
   Ebene 1286 „Dark Land“     – Kartenwelt der Vacarn-Karte: Geröll-, Fels-, Trümmer- und Violett-Textur.
 Selbst gezeichnet: Nebel/Horizont, Felsgrate, Schatten, roter Schein.
 
 Skalierung (Tiefenebenen):
-  Hintergrund 2× (125×175): violetter Himmel/Nebel, Felsgrate, Geröllboden, Schattenheer im Nebel, Fledermäuse
-  Mittelgrund 3× (84×117):  vier helle Skelette in Keilformation + Schatten, roter Schein hinter Vacarn
+  Hintergrund 2× (125×175): violetter Himmel/Nebel, Schluchtwände, Geröllboden, Schattenheer im Nebel (Burning,
+                            Death Knight, Wizard, Cosmic), Schädelfledermäuse, zweite Reihe: Magier, Heiler,
+                            Spitzhut-Skelett in der Nebelzunge
+  Mittelgrund 3× (84×117):  zwei Bogenschützen als Flanke + Schatten, roter Schein hinter Vacarn (drei Stufen)
   Vordergrund 6× (42×59):   Vacarn + Schatten
 """
 import math, random
