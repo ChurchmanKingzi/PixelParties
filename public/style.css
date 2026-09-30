@@ -24645,7 +24645,12 @@ body.pp-dialog-offen .foil-diamond-rare:not(.modal-overlay *) {
   width: calc(22px * var(--board-scale, 1)); height: calc(18px * var(--board-scale, 1));
   z-index: 6; pointer-events: auto;
 }
-.applause-badge-hand { bottom: 15px; width: 26px; height: 22px; }
+.applause-badge-hand {
+  /* Die eigene Handleiste haengt unten aus dem Bildschirm (`--hand-senkung`):
+     der Zaehler sitzt um diesen Ueberstand hoeher, sonst liegt er ausserhalb. */
+  bottom: calc(var(--hand-senkung, 0px) + var(--hand-card-h, 90px) * 0.16 + 15px);
+  width: 26px; height: 22px;
+}
 .applause-icon { display: block; width: 100%; height: 100%; image-rendering: pixelated; image-rendering: crisp-edges; }
 .applause-num {
   position: absolute; left: 0; right: 0; bottom: -2px; text-align: center; line-height: 1;

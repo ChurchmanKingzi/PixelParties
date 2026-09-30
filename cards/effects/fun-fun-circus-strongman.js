@@ -1,11 +1,11 @@
 // ═══════════════════════════════════════════
 //  CARD EFFECT: "Fun-Fun Circus Strongman"
-//  Creature (Magic Arts / Summoning Magic Lv2, Normal, 10 HP) — PP MBS
+//  Creature (Magic Arts / Summoning Magic Lv3, Normal, 10 HP) — PP MBS
 //
 //  „When this Creature is summoned, it gains current and max HP equal to
 //   10 times the total number of Applause Counters on the board.
 //   Whenever a target is defeated, place 1 Applause Counter on this
-//   Creature. You may once per turn deal damage equal to 20 times the
+//   Creature. You may once per turn deal damage equal to 10 times the
 //   number of Applause Counters on the board to any target on the board."
 //
 //  ── AUSLEGUNG ───────────────────────────────────────────────────────
@@ -18,7 +18,7 @@
 //    mit drei Opfern = drei Counter). Hooks `onCreatureDeath` + `onHeroKO`.
 //    Ein eigener Tod zaehlt nicht (die Instanz ist weg).
 //  • ③ Freier Creature-Effekt (kostet keine Aktion), einmal pro Zug
-//    (Engine-HOPT). Schaden = 20 × Brett-Summe ZUM AUFLOESEN, Typ
+//    (Engine-HOPT). Schaden = 10 × Brett-Summe ZUM AUFLOESEN, Typ
 //    `creature`. Bei Summe 0 nicht aktivierbar (0 Schaden waere
 //    Leerlauf).
 // ═══════════════════════════════════════════
@@ -27,7 +27,7 @@ const { boardTotal, placeApplause } = require('./_applause-shared');
 
 const CARD_NAME = 'Fun-Fun Circus Strongman';
 const HP_PRO_COUNTER = 10;
-const SCHADEN_PRO_COUNTER = 20;
+const SCHADEN_PRO_COUNTER = 10;
 
 async function zaehlerNachTod(ctx, quelleId) {
   const engine = ctx._engine;
@@ -64,7 +64,7 @@ module.exports = {
       damageType: 'normal',
       baseDamage: schaden,
       title: CARD_NAME,
-      description: `Deal ${schaden} damage (20 × ${summe} Applause Counters) to a target.`,
+      description: `Deal ${schaden} damage (10 × ${summe} Applause Counters) to a target.`,
       confirmLabel: `💪 ${schaden} Damage!`,
       confirmClass: 'btn-danger',
       cancellable: true,

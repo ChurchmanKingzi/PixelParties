@@ -10,7 +10,8 @@
 //    • Has _illusionSummon = true (blue filter)
 //    • Has current and max HP set to 1
 //    • Is negated until the start of your next
-//      turn (actionNegateCreature with timed buff)
+//      turn (actionNegateCreature with timed buff,
+//      expiresAtTurn = gs.turn + 2 — turn counter ticks per player)
 //    • Its on-summon hooks (onPlay / onCardEnterZone)
 //      are suppressed (skipHooks: true) because
 //      negation is applied BEFORE placement
@@ -120,10 +121,12 @@ module.exports = {
     inst.counters.maxHp     = 1;
     inst.counters.currentHp = 1;
 
-    // Negate until the start of Omikron owner's NEXT turn
-    // expiresAtTurn = gs.turn + 1 when expiresForPlayer === pi
+    // Negate until the start of Omikron owner's NEXT turn.
+    // `gs.turn` zaehlt pro Spielerwechsel: die naechste eigene Runde ist
+    // `turn + 2` (turn + 1 ist die des Gegners — dort greift
+    // `expiresForPlayer === pi` nie, die Negation haette ewig gehalten).
     await engine.actionNegateCreature(inst, CARD_NAME, {
-      expiresAtTurn:    gs.turn + 1,
+      expiresAtTurn:    gs.activePlayer === pi ? gs.turn + 2 : gs.turn + 1,
       expiresForPlayer: pi,
       buffKey:          'omikron_negated',
       selfInflicted:    true,
