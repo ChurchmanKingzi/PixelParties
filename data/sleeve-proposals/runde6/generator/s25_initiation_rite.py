@@ -14,9 +14,9 @@ Quellen (MotiveGrailWar.xcf):
       sein Körper steckt hinter dem Neuling (Ebenen geprüft: scene_layers/card_region_layers der Szene 738 liefern
       keine weitere Klaus-Ebene). Daher:
         – Klaus-Brustbild = Zeilen 0–17 der Gruppe ohne die Haarpixel des Neulings; die so frei werdenden Stellen
-          innerhalb der Kapuzen-Silhouette mit dem dunklen Kapuzeninneren (32,32,32) gefüllt und die Kutte in den
-          Kapuzenfarben (Umriss 25/Saum 82/Fläche 42) um 6 Zeilen nach unten fortgesetzt, unten ins Dunkel
-          aufgelöst (leichte Ergänzung, Farben und Pixelgröße des Sprites).
+          unter der Kapuze als Kutte in den Kapuzenfarben (Umriss 25, heller Saum 82/58, Fläche 42, Falte 32)
+          mit schräg abfallenden Schultern bis Zeile 25 fortgesetzt und unten ins Dunkel aufgelöst; alle
+          Originalpixel (Kapuze, Gesicht, Dolch, Hand) liegen obenauf (leichte Ergänzung im Stil des Sprites).
         – Neuling = Zeilen 12–30 der Gruppe ohne Klaus-Pixel (vollständig, er steht vor Klaus).
       Linke Gruppe derselben Ebene (Box x 249–263, y 116–171): drei Kultisten hintereinander; rechts gespiegelt und
       mit umgefärbtem Haar als zweite Reihe (symmetrische Aufstellung).
@@ -27,7 +27,7 @@ Selbst gezeichnet: Dunkelheit über dem Gewölbe, Fackelschein, rotes Bodenglüh
 
 Skalierung:
   Hintergrund (Gewölbe, Neuling, Kultistenreihen, Licht)   – 2× (Raster 125×175)
-  Vordergrund (Klaus-Brustbild 18×24 → 144×192)            – 8× (Raster 32×44)
+  Vordergrund (Klaus-Brustbild 22×26 → 176×208)            – 8× (Raster 32×44)
 """
 import math
 import numpy as np
@@ -45,30 +45,33 @@ def is_novice_px(p):
     return tuple(int(v) for v in p[:3]) in NOVICE
 
 
-# ---------------- Klaus-Brustbild
-bust = np.zeros((24, 18, 4), np.uint8)
+# ---------------- Klaus-Brustbild (Sprite um 2 Spalten je Seite verbreitert, damit die Schultern Platz haben)
+P = 2
+bust = np.zeros((26, 18 + 2 * P, 4), np.uint8)
 for y in range(18):
     for x in range(18):
         p = grp[y, x]
         if p[3] and not is_novice_px(p):
-            bust[y, x] = p
-HOOD_IN, OUT, RIM, FILL, FILL2 = (32, 32, 32), (25, 25, 25), (82, 82, 82), (42, 42, 42), (50, 50, 50)
-for y in range(12, 18):                          # Löcher (Haar des Neulings) innerhalb der Kapuze füllen
-    xs = [x for x in range(18) if bust[y, x, 3]]
-    lo = 2 if y >= 16 else min(xs)
-    for x in range(lo, 17 if y >= 13 else max(xs)):
-        if not bust[y, x, 3]:
-            bust[y, x] = (*HOOD_IN, 255)
-for y in range(18, 24):                          # Kutte: Schultern nach unten fortgesetzt
-    lo, hi = max(0, 2 - (y - 17)), 17
+            bust[y, x + P] = p
+HOOD_IN, OUT, RIM, FILL, FOLD = (32, 32, 32), (25, 25, 25), (82, 82, 82), (42, 42, 42), (32, 32, 32)
+keep = bust.copy()                                   # Originalpixel (Kapuze, Gesicht, Dolch, Hand) bleiben obenauf
+W2 = bust.shape[1]
+for y in range(12, 26):
+    t = (y - 12) / 13
+    lo = round((4 + P) - t * 5)                      # linker Umriss: von der Kapuze schräg zur Schulter
+    hi = round((16 + P) + t * 4)                     # rechter Umriss
+    hi = min(hi, W2 - 1); lo = max(lo, 0)
     for x in range(lo, hi + 1):
-        c = FILL if (x + y) % 4 else FILL2
-        if x == lo or x == hi: c = OUT
-        elif x == lo + 1: c = RIM
+        c = FILL
+        if x in (lo, hi): c = OUT
+        elif x == lo + 1 or x == hi - 1: c = RIM if x == lo + 1 else (58, 58, 58)
+        elif x == (lo + hi) // 2 + 1 and y > 14: c = FOLD
         bust[y, x] = (*c, 255)
-for y in range(19, 24):                          # unten ins Dunkel auflösen (gedithert)
-    for x in range(18):
-        if bay(x, y) < (y - 18) / 5.5:
+m = keep[..., 3] > 0
+bust[m] = keep[m]
+for y in range(20, 26):                              # unten ins Dunkel auflösen (gedithert)
+    for x in range(W2):
+        if bust[y, x, 3] and bay(x, y) < (y - 19) / 6.5:
             bust[y, x, 3] = 0
 
 # ---------------- Neuling (kniend)
@@ -146,6 +149,6 @@ for cx, s in ((34, cult), (125 - 34, cult_r)):
 # ================================================================ 8×: Klaus
 fw, fh = grid(8)                                           # 32×44
 fg = rgba(fw, fh)
-put(fg, bust, 16 - 9, 3)                                   # Canvas x 56–200, y 24–216
+put(fg, bust, 16 - 11, 3)                                  # Canvas x 40–216, y 24–232
 
 print(finish([(bg, 2), (fg, 8)], '25_initiation_rite.png'))

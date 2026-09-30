@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
 """05 Field Study – Gegner „Big Stomp!“, Held: Kit, the Shark Researcher (Base-Version).
-Big Stomp!: Kit, der Hai-Forscher, steht auf einer Lichtung der Gigantisaurier-Insel; hinter ihm stapft der
-riesige Brachion durch den Wald, dessen Trittsiegel quer über die Lichtung führen – Kit ist ihm auf der Spur.
+Big Stomp!: Kit, der Hai-Forscher, steht auf einer Lichtung der Gigantisaurier-Insel; hinter ihm steht der riesige
+Brachion (gespiegelt) mit den Füßen auf der Lichtung vor dem Waldrand und reckt den Hals über ihn, seine Trittsiegel
+führen quer über die Lichtung – Kit ist ihm auf der Spur.
 Wald und Dinosaurier im Stil der Gigantisaurier-Karten (Draufsicht-Karte mit Kreaturen darauf).
 
 Quellen:
@@ -14,7 +15,7 @@ Quellen:
 Selbst gezeichnet: Trittsiegel, Schatten.
 
 Skalierung:
-  Insel, Brachion, Trittsiegel, Schatten – 3× (84×117)
+  Insel, Brachion (gespiegelt), Trittsiegel, Schatten – 3× (84×117)
   Kit                                    – 5× (50×70)
 """
 import math, random
