@@ -39,13 +39,43 @@ def native(name):
     return np.median(c, axis=2).astype(np.uint8)
 
 
+def native_sharp(name, cx, cy, size):
+    """Wie native(), aber auf dem echten Sprite-Raster (8 Kartenpixel je Pixel): Phase aus der Umgebung des Motivs,
+    Blockfarbe aus der Blockmitte. Für enge Zooms, wo das feinere 4er-Raster nur weiche Übergangsfarben zeigt."""
+    a = np.array(Image.open(_LUT[norm(name)]).convert('RGB'))[168:568, 70:680]
+    m = 8
+    x0, y0 = max(0, cx * 4 - size * 2), max(0, cy * 4 - size * 2)
+    reg = a[y0:y0 + size * 4, x0:x0 + size * 4].astype(int)
+    best = None
+    for py in range(m):
+        for px in range(m):
+            b = reg[py:, px:]
+            h, w = b.shape[0] // m, b.shape[1] // m
+            v = b[:h * m, :w * m].reshape(h, m, w, m, 3).std(axis=(1, 3)).mean()
+            if best is None or v < best[0]:
+                best = (v, px, py)
+    _, px, py = best
+    b = a[py:, px:]
+    h, w = b.shape[0] // m, b.shape[1] // m
+    b = b[:h * m, :w * m].reshape(h, m, w, m, 3)[:, 2:6, :, 2:6]
+    nat = np.median(b.transpose(0, 2, 1, 3, 4).reshape(h, w, -1, 3), axis=2).astype(np.uint8)
+    return nat, (cx * 4 - px) // m, (cy * 4 - py) // m
+
+
 def avatar(name, cx, cy, size=CROP):
-    n = native(name)
+    if size < CROP:
+        n, cx, cy = native_sharp(name, cx, cy, size)
+        size //= 2
+        k = max(SCALE, round(200 / size))
+    else:
+        n = native(name)
+        k = SCALE
     h, w = n.shape[:2]
     x0 = max(0, min(w - size, cx - size // 2))
     y0 = max(0, min(h - size, cy - size // 2))
     im = Image.fromarray(n[y0:y0 + size, x0:x0 + size])
-    k = SCALE if size == CROP else max(SCALE, round(CROP * SCALE / size))
+    if size * k != CROP * SCALE or k != SCALE:
+        im = im.quantize(colors=32, method=Image.Quantize.MEDIANCUT, dither=Image.Dither.NONE).convert('RGB')
     return im.resize((size * k, size * k), Image.NEAREST)
 
 
