@@ -2732,7 +2732,7 @@ function ProfileScreen() {
             )}
 
             {/* Divider */}
-            <div style={{ borderTop: '1px solid var(--bg4)', margin: '16px 0' }} />
+            <div style={{ borderTop: '1px solid var(--bg4)', margin: 'calc(var(--pv) * 1.4) 0' }} />
 
             {/* In-game speech-bubble messages. Shown above your avatar to
                 both players when a match ends — your Victory line if you win,
@@ -2750,7 +2750,7 @@ function ProfileScreen() {
               />
               <div style={{ textAlign: 'right', fontSize: 9, color: 'var(--text2)', marginTop: 2 }}>{victoryMsg.length}/80</div>
             </div>
-            <div style={{ marginTop: 12 }}>
+            <div style={{ marginTop: 'calc(var(--pv) * 1)' }}>
               <div className="profile-section-label">DEFEAT MESSAGE</div>
               <textarea
                 className="profile-bio-input"
@@ -2764,7 +2764,7 @@ function ProfileScreen() {
             </div>
 
             {/* Profile Backup */}
-            <div style={{ borderTop: '1px solid var(--bg4)', margin: '12px 0', paddingTop: 12 }}>
+            <div style={{ borderTop: '1px solid var(--bg4)', margin: 'calc(var(--pv) * 1) 0', paddingTop: 'calc(var(--pv) * 1)' }}>
               <div className="profile-section-label">PROFILE BACKUP</div>
               {/* Export/Import buttons hidden — profile data now persists via Turso DB */}
               <div style={{ fontSize: 9, color: 'var(--text2)', marginTop: 6, textAlign: 'center' }}>
@@ -2773,8 +2773,8 @@ function ProfileScreen() {
             </div>
 
             {/* Save button at bottom of identity panel */}
-            <div style={{ marginTop: 'auto', paddingTop: 16 }}>
-              <button className="btn btn-success" style={{ width: '100%', padding: '12px 0', fontSize: 14 }} onClick={save} disabled={saving || !isDirty}>
+            <div style={{ marginTop: 'auto', paddingTop: 'calc(var(--pv) * 1.2)' }}>
+              <button className="btn btn-success" style={{ width: '100%', padding: 'calc(var(--pv) * 1.3) 0', fontSize: 14 }} onClick={save} disabled={saving || !isDirty}>
                 {saving ? '...' : isDirty ? 'SAVE PROFILE' : 'NO CHANGES'}
               </button>
             </div>
@@ -2790,9 +2790,15 @@ function ProfileScreen() {
             <div style={{ display: 'flex', gap: 28, alignItems: 'stretch' }}>
 
               {/* Sleeve — large preview */}
-              <div className="profile-cardback-preview profile-cardback-xl profile-cardback-clickable" onClick={() => setShowSleeveGallery(true)}>
-                <img src={displayCardback} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                <div className="profile-cardback-hover-overlay">CHANGE</div>
+              <div className="profile-sleeve-col">
+                <div className="profile-cardback-preview profile-cardback-xl profile-cardback-clickable" onClick={() => setShowSleeveGallery(true)}>
+                  <img src={displayCardback} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  <div className="profile-cardback-hover-overlay">CHANGE</div>
+                </div>
+                <button className="btn" style={{ padding: '6px 16px', fontSize: 11, width: '100%' }}
+                  onClick={() => setShowSleeveGallery(true)}>
+                  CHANGE SLEEVE
+                </button>
               </div>
 
               {/* Middle: stacked info */}
@@ -2824,20 +2830,6 @@ function ProfileScreen() {
                       style={{ width: 44, height: 34, border: '1px solid var(--bg4)', cursor: 'pointer', background: 'none', padding: 0 }} />
                     <span style={{ color, fontWeight: 700, fontSize: 18 }}>{user.username}</span>
                     <span style={{ fontSize: 11, color: 'var(--text2)', marginLeft: 4 }}>Preview</span>
-                  </div>
-                </div>
-
-                {/* Sleeve info */}
-                <div style={{ paddingTop: 14, paddingBottom: 14, borderBottom: '1px solid var(--bg4)', display: 'flex', flexDirection: 'column', gap: 6 }}>
-                  <div className="profile-section-label">SLEEVE</div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <div style={{ fontSize: 13, color: 'var(--text)', fontWeight: 600, flex: 1 }}>
-                      {cardback ? 'Custom Sleeve' : 'Default Sleeve'}
-                    </div>
-                    <button className="btn" style={{ padding: '6px 16px', fontSize: 11 }}
-                      onClick={() => setShowSleeveGallery(true)}>
-                      CHANGE
-                    </button>
                   </div>
                 </div>
 
@@ -5105,15 +5097,6 @@ function SingleplayerScreen() {
                       </>
                     ) : (
                       <span className="vscpu-chip vscpu-chip--leise">No matches yet</span>
-                    )}
-                    {/* Gegner-Sleeve: nach `sleeveNeed` Siegen gehört sie dem Spieler. */}
-                    {op.sleeve && (
-                      <span className={'vscpu-chip' + ((op.wins || 0) >= op.sleeveNeed ? ' vscpu-chip--sleeve' : ' vscpu-chip--leise')}
-                        title={(op.wins || 0) >= op.sleeveNeed
-                          ? 'Sleeve earned: ' + op.sleeve.name
-                          : 'Win ' + op.sleeveNeed + ' times to earn the sleeve “' + op.sleeve.name + '”'}>
-                        🃏 {(op.wins || 0) >= op.sleeveNeed ? '✓' : Math.min(op.wins || 0, op.sleeveNeed) + '/' + op.sleeveNeed}
-                      </span>
                     )}
                   </>}
                 />

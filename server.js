@@ -6134,7 +6134,13 @@ function endCpuBattle(room, winnerIdx, reason) {
             const pr = await battleTracks.progressFor(humanUserId, opponentDeckId);
             if (pr && pr.wins < pr.need) theme = { name: pr.name + "'s Theme", hero: pr.name, wins: pr.wins, need: pr.need };
           } catch { /* Anzeige-Hilfe */ }
-          progress = { wins, unlocks, theme };
+          // Fortschritt zur Gegner-Sleeve dieser CPU (fuenf Siege), solange sie noch nicht frei ist.
+          let sleeve = null;
+          try {
+            const sl = cpuSleeves.forDeck(opponentDeckId);
+            if (sl && wins < cpuSleeves.UNLOCK_WINS) sleeve = { name: sl.name, wins, need: cpuSleeves.UNLOCK_WINS };
+          } catch { /* Anzeige-Hilfe */ }
+          progress = { wins, unlocks, theme, sleeve };
         }
       } catch (err) {
         console.error('[CPU battle] npc_stats/unlock update error:', err.message);
