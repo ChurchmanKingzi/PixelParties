@@ -19,7 +19,7 @@ Funken, Aschefeld (Sprenkel), Aschepfad, Lichtschein der Flammenköpfe, Bodensch
 
 Skalierung:
   Hintergrund (Himmel, Horizontglut, Hügel, Boden, Pfad, Licht)        – 2× (Raster 125×175)
-  Mittelgrund (Rottweiler, Pinpom, Shepherd + Schatten, eine Gruppe)   – 3× (Raster 84×117)
+  Mittelgrund (Rottweiler, Pinpom, Shepherd + Schatten, eine Gruppe)   – 4× (Raster 63×88)
   Vordergrund (Orthos 18×23 → 108×138, Schatten)                       – 6× (Raster 42×59)
 """
 import math, random
@@ -37,7 +37,7 @@ dog = {n: sprite('o27_' + n, GN, [i], box=b) for n, i, b in (
 HOR = 128                                        # Horizont (Canvas-Pixel)
 
 # ---------------------------------------------------------------- Pfad (Canvas-Koordinaten, Catmull-Rom)
-PTS = [(112, HOR), (100, 140), (132, 156), (150, 172), (128, 192), (122, 240), (125, 300), (125, 360)]
+PTS = [(128, HOR), (122, 150), (125, 200), (125, 300), (125, 360)]
 
 
 def catmull(pts, n=40):
@@ -100,8 +100,8 @@ for y in range(h2, bh):
 # Lichtschein der Flammenköpfe (auf Boden und Meute)
 glow(bg, 62.5, 100, 56, 34, (190, 70, 24), .38)
 
-# ================================================================ 3×-Ebene: die Meute als Gruppe dicht hinter Orthos
-mw, mh = grid(3)
+# ================================================================ 4×-Ebene: die Meute als Gruppe dicht hinter Orthos
+mw, mh = grid(4)
 mid = rgba(mw, mh)
 
 
@@ -114,10 +114,10 @@ def dog_at(layer_, s, cx, feet):
     put(layer_, s, int(round(cx - w / 2)), feet - h)
 
 
-# Fußpunkte im 3×-Raster (Canvas: Rottweiler 99/192, Pinpom 126/201, Shepherd 153/195)
-dog_at(mid, dog['rottweiler'], 33, 64)
-dog_at(mid, dog['shepherd'], 51, 65)
-dog_at(mid, dog['pinpom'], 42, 67)
+# Fußpunkte im 4×-Raster (Canvas: Rottweiler x 88/y 176, Shepherd 162/180, Pinpom vorn in der Mitte 125/184)
+dog_at(mid, dog['rottweiler'], 22, 44)
+dog_at(mid, dog['shepherd'], 40.5, 45)
+dog_at(mid, dog['pinpom'], 31.25, 46)
 
 # ================================================================ 6×-Ebene: Orthos
 fw, fh = grid(6)                     # 42×59
@@ -127,4 +127,4 @@ for x in range(OX + 3, OX + 16):
     setp(fg, x, OF, (8, 4, 6), 190)
 put(fg, orthos, OX, OF - orthos.shape[0])
 
-print(finish([(bg, 2), (mid, 3), (fg, 6)], '27_hellhounds_trail.png'))
+print(finish([(bg, 2), (mid, 4), (fg, 6)], '27_hellhounds_trail.png'))
