@@ -45,12 +45,14 @@ function loadTrackNames() {
   } catch { return { generic: {}, themes: [] }; }
 }
 
-/** Archetyp-Themes, deren Datei existiert: [{ id, name, archetype }] in Dateilisten-Reihenfolge der JSON. */
+/** Archetyp-Themes, deren Datei existiert: [{ id, name, archetype }], alphabetisch nach Archetyp. */
 function listThemeTracks(musicDir, names = loadTrackNames()) {
   let files;
   try { files = new Set(fs.readdirSync(musicDir).map(f => (THEME_RE.exec(f) || [])[1]).filter(Boolean).map(x => x.toLowerCase())); }
   catch { return []; }
-  return names.themes.filter(t => files.has(t.id)).map(t => ({ id: t.id, name: t.name, archetype: t.archetype }));
+  // Alphabetisch nach Archetyp (die Reihenfolge der JSON folgt der Kartenanzahl und taugt nicht als Anzeige).
+  return names.themes.filter(t => files.has(t.id)).map(t => ({ id: t.id, name: t.name, archetype: t.archetype }))
+    .sort((a, b) => a.archetype.localeCompare(b.archetype, 'en', { sensitivity: 'base' }));
 }
 
 /** Allgemeine Tracks im Musikordner, numerisch sortiert (battle2 vor battle10). */

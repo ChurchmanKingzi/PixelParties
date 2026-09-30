@@ -2929,29 +2929,45 @@ function ProfileScreen() {
           {/* Battle Track Modal */}
           {showTrackGallery && trackData && (() => {
             const sel = user.battleTrack || null;
-            const row = (id, label, sub, locked) => (
+            const row = (id, label, sub, locked) => {
+              const playing = previewTrack === id;
+              return (
               <div key={id || 'default'} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 10px',
-                border: '1px solid ' + (sel === id ? 'var(--accent)' : 'var(--bg4)'), borderRadius: 4,
-                background: sel === id ? 'rgba(0,240,255,.07)' : 'transparent', opacity: locked ? 0.75 : 1 }}>
+                border: '1px solid ' + (playing ? 'var(--accent)' : (sel === id ? 'var(--text2)' : 'var(--bg4)')), borderRadius: 4,
+                background: playing ? 'rgba(0,240,255,.16)' : (sel === id ? 'rgba(255,255,255,.05)' : 'transparent'),
+                boxShadow: playing ? '0 0 12px rgba(0,240,255,.45), inset 3px 0 0 var(--accent)' : 'none',
+                opacity: locked ? 0.75 : 1, transition: 'background .15s, box-shadow .15s' }}>
                 <button className="btn" style={{ padding: '4px 10px', fontSize: 11, minWidth: 34 }}
-                  title={previewTrack === id ? 'Stop preview' : 'Preview'}
+                  title={playing ? 'Stop preview' : 'Preview'}
                   disabled={id == null}
                   onClick={() => togglePreview(id)}>
-                  {previewTrack === id ? '■' : '▶'}
+                  {playing ? '■' : '▶'}
                 </button>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>{locked ? '🔒 ' : ''}{label}</div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: playing ? 'var(--accent)' : 'var(--text)' }}>{locked ? '🔒 ' : ''}{label}</div>
                   {sub ? <div style={{ fontSize: 10, color: 'var(--text2)' }}>{sub}</div> : null}
                 </div>
+                {playing && (
+                  <span className="pp-eq" title="Now playing" style={{ display: 'inline-flex', alignItems: 'flex-end', gap: 2, height: 14 }}>
+                    <i /><i /><i /><i />
+                    <b style={{ fontSize: 10, color: 'var(--accent)', marginLeft: 6, alignSelf: 'center', letterSpacing: 1 }}>NOW PLAYING</b>
+                  </span>
+                )}
                 {sel === id
-                  ? <span style={{ fontSize: 10, color: 'var(--accent)', fontWeight: 700 }}>SELECTED</span>
+                  ? <span style={{ fontSize: 10, color: 'var(--text2)', fontWeight: 700 }}>✓ SELECTED</span>
                   : <button className="btn" style={{ padding: '4px 12px', fontSize: 10 }} disabled={locked}
                       onClick={() => selectBattleTrack(id)}>SELECT</button>}
               </div>
-            );
+              );
+            };
             return (
               <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) closeTrackGallery(); }}>
                 <div className="modal" style={{ maxWidth: 520, width: '90vw', maxHeight: '80vh', display: 'flex', flexDirection: 'column' }}>
+                  <style>{`
+                    @keyframes ppEq { 0%,100% { height: 3px; } 50% { height: 14px; } }
+                    .pp-eq i { display: block; width: 3px; height: 3px; background: var(--accent); border-radius: 1px; animation: ppEq .8s ease-in-out infinite; }
+                    .pp-eq i:nth-child(2) { animation-delay: .2s; } .pp-eq i:nth-child(3) { animation-delay: .4s; } .pp-eq i:nth-child(4) { animation-delay: .1s; }
+                  `}</style>
                   <div style={{ display: 'flex', alignItems: 'center', marginBottom: 6 }}>
                     <h3 className="orbit-font" style={{ fontSize: 14, color: 'var(--accent)', flex: 1 }}>BATTLE MUSIC</h3>
                     <button className="btn" style={{ padding: '4px 12px', fontSize: 10 }} onClick={closeTrackGallery}>✕ CLOSE</button>
