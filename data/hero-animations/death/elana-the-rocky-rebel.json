@@ -5,7 +5,7 @@
   "corpse": "elana-the-rocky-rebel-corpse.png",
   "frameWidth": 62,
   "frameHeight": 34,
-  "frames": 28,
+  "frames": 31,
   "frameMs": 70,
   "loop": false,
   "layout": "horizontal",
