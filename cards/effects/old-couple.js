@@ -9,15 +9,28 @@
 //   of the turn afterwards."
 //
 //  ── ALS VORGABEN (11.9.) ──────────────────────────────────────────
-//  · „level 1/2/3 or lower" haengt am SUPPORT-MAGIC-Level des NUTZERS:
-//    wer Support Magic 2 hat, darf auf Beschwoerungen bis Level 2
-//    reagieren.
+//  · „level 1/2/3 or lower" haengt am SUPPORT-MAGIC-Level des WIRKERS
+//    (Old-Couple-Nutzer): wer Support Magic 2 hat, darf auf Beschwoerungen
+//    bis Level 2 reagieren — auch wenn ein ANDERER Held beschworen hat.
 //  · Die Karte BESCHWOERT — sie ignoriert also nichts. Die zweite
 //    Kreatur muss vom selben Helden REGULAER beschwoerbar sein: sein
 //    Summoning-Magic-Level muss reichen, eine Support Zone frei sein,
 //    keine Sperre greifen, und die Karte selbst muss es zulassen
 //    (`canSummon`). Daraus folgt die Spielbarkeit: Old Couple ist NUR
 //    einsetzbar, wenn es im Deck wirklich eine solche Kreatur gibt.
+//
+//  ── WIRKER ≠ BESCHWOERER (Als Klarstellung, Kartentext) ────────────
+//  Der Kartentext verlangt NICHT, dass der Old-Couple-Nutzer selbst
+//  beschwoert hat. Zwei Rollen, die nicht derselbe Held sein muessen:
+//    · WIRKER — ein eigener Held, der Old Couple wirken kann (Support
+//      Magic). SEIN Support-Magic-Level bestimmt, bis zu welchem Kreatur-
+//      Level die Karte reagieren darf („level 1/2/3 or lower"). Die Engine
+//      bietet nur wirkfaehige Helden an; `reactionCasterAllowed` filtert
+//      zusaetzlich aufs Level.
+//    · BESCHWOERER — der Held, der die ausloesende Kreatur beschworen hat
+//      („with the same Hero"): ER beschwoert auch den Partner aus dem
+//      Deck (sein Summoning-Magic-Level, seine freie Support Zone).
+//  Frueher musste der BESCHWOERER selbst Support Magic haben.
 //
 //  ── WO DAS FENSTER HERKOMMT ───────────────────────────────────────
 //  `onCreatureSummoned` stand seit jeher in der Fensterliste der
@@ -43,6 +56,16 @@ const CARD_NAME = 'Old Couple';
 /** Support-Magic-Level des Helden, 0 wenn er die Karte gar nicht wirken darf. */
 function supportLevel(engine, pi, heroIdx) {
   return engine.effectiveSchoolLevelForCaster('Support Magic', pi, heroIdx) || 0;
+}
+
+/** Hoechstes Support-Magic-Level unter den lebenden eigenen Helden (Wirker). */
+function besteWirkerStufe(engine, pi) {
+  let best = 0;
+  (engine.gs.players[pi]?.heroes || []).forEach((h, hi) => {
+    if (!h?.name || h.hp <= 0) return;
+    best = Math.max(best, supportLevel(engine, pi, hi));
+  });
+  return best;
 }
 
 /**
@@ -117,10 +140,9 @@ function fensterPasst(gs, pi, engine, chainCtx) {
   const hero = gs.players[pi]?.heroes?.[heroIdx];
   if (!hero?.name || hero.hp <= 0) return null;
 
-  // „with level 1/2/3 or lower" — die Stufe kommt vom NUTZER-Helden.
-  // Das ist derselbe Held, der gleich beschwoeren soll („with the same
-  // Hero"), also muss ER die Karte wirken koennen.
-  const stufe = supportLevel(engine, pi, heroIdx);
+  // „with level 1/2/3 or lower" — die Stufe kommt vom WIRKER (irgendein
+  // eigener Held mit Support Magic), nicht zwingend vom Beschwoerer.
+  const stufe = besteWirkerStufe(engine, pi);
   if (stufe <= 0) return null;
   const level = h.level ?? 0;
   if (level > stufe) return null;
@@ -136,6 +158,13 @@ module.exports = {
   // Ohne diese Bedingung meldete sich die Karte in JEDEM Kettenfenster
   // als spielbar (Lehre v830, Pawn Chain).
   reactionCondition: (gs, pi, engine, chainCtx) => !!fensterPasst(gs, pi, engine, chainCtx),
+
+  /** Nur Helden, deren Support-Magic-Level fuer die Kreatur reicht, duerfen wirken. */
+  reactionCasterAllowed(gs, pi, heroIdx, engine, chainCtx) {
+    const fenster = fensterPasst(gs, pi, engine, chainCtx);
+    if (!fenster) return false;
+    return supportLevel(engine, pi, heroIdx) >= fenster.level;
+  },
 
   async resolve(engine, pi, _selectedIds, _validTargets, _opts, chainCtx) {
     const gs = engine.gs;
