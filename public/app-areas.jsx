@@ -1373,8 +1373,8 @@ const AcidRainOverlay = React.memo(function AcidRainOverlay() {
 //  ZEHN AREAS IM KARTENSTIL (v1415, Al 25.9.) — nach Als Kartenmotiven:
 //  Cottage at the Forest's Edge, Crystal Well, Dark Ocean, Deepsea
 //  Castle, Doom Clock, Graveyard of Limited Power, Paraseed Greenhouse,
-//  Rioting Village, Slippery Ice, Smuggler's Pier. Alle Kunsthoehe 100,
-//  alle `opaque` (ganze Szenen). Kunst per Generator gemalt, der nicht im
+//  Rioting Village, Slippery Ice, Smuggler's Pier. Alle Kunsthoehe 100
+//  (Slippery Ice seit 30.9.: 240 = Originalgroesse der Vorlage), alle `opaque` (ganze Szenen). Kunst per Generator gemalt, der nicht im
 //  Projekt liegt; Bilder unter public/areas/<slug>/.
 // ═══════════════════════════════════════════════════════════════════
 
@@ -2890,162 +2890,129 @@ const RiotingVillageOverlay = React.memo(function RiotingVillageOverlay() {
 });
 
 // ── SLIPPERY ICE ─────────────────────────────────────────────────────
-//  Karte: lavendelweiße Eisfläche mit diagonalen Glanzstreifen, blaues
-//  Wasser mit Wellenzeichen, Pinguine rutschen auf dem Bauch.
-//  v1433 (Al 25.9.): Wasser aufgehübscht — treppige Eiskante wie auf der
-//  Karte mit sichtbarer Eisdicke, Schaum an der Kante, Tiefe nach unten,
-//  Wellenzeichen und Lichtreflexe, die über drei Bilder wandern, dazu
-//  treibende Schollen. Pinguine detaillierter (Gesicht mit roter Wange,
-//  Glanz auf dem Rücken, schlagende Flossen) mit dem Bewegungsschleier
-//  der Karte. Statt des Schilds ein STACHELIGER EISBLOCK, der ebenfalls
-//  herumrutscht. Eis mit Rissen und Schneewehen. Licht IMMER oben rechts.
+//  Karte: lavendelweisse Eisfläche mit Felsgraten, gestreiftes Eis, ein
+//  Wasserloch; Pinguine und ein Eisblock schlittern mit Schmierlinien.
 //
-//  Überarbeitung v1441 (Al 25.9.: „deine haben ein anderes Level" — auf
-//  das Niveau der v1440-Szenen gebracht). Dieselbe Szene, neu gemalt:
-//  tile.png — Kachel 128: Eis als unregelmäßiges Pixelrauschen mit den
-//  diagonalen Glanzstreifen der Karte (/, Rillen mit Glanzkante, breite
-//  weiche Glanzbahnen), klare dunkle Eisfenster, gerade Eisrisse mit
-//  heller Bruchfläche, eingeschlossene Luftblasen, Kratzspuren entlang
-//  der Rutschbahnen, flache Schneewehen (Schweif nach links, oben rechts
-//  beleuchtet, Schlagschatten unten links); treppige Eiskante mit heller
-//  Lippe, Schneewülsten, 5 Pixel Eisdicke (Schichtlinie, Glanzstriche,
-//  Tropfnasen) und dunkler Wasserlinie. water.png — 3 Bilder: Rauschen,
-//  Dünung, untergetauchter Eissockel unter der Kante, Wellenzeichen der
-//  Karte in versetzten Reihen, wandernde Glanzlichter. foam.png — Schaum
-//  an der Wasserlinie (3 Bilder). center.png — Mittelstück 256, damit die
-//  Kachel nicht sichtbar wiederholt: links eine treppige Eiszunge mit
-//  einem unter klarem Eis eingefrorenen Fisch und Eisbrocken, rechts eine
-//  große treibende Scholle mit Schneewehe, oben ein Rissnetz;
-//  center-foam.png — deren Schaum (3 Bilder). drift.png — Schneefahnen.
-//  Sprites: penguin.png (3 Bilder mit Schleier + Eissplittern),
-//  spikeblock.png (2 Bilder, Deckfläche/Seite/Stirn, Schatten, eingefro-
-//  rener Fisch, wandernder Glanz), floe.png (3 Schollen), swimmer.png
-//  (schwimmender Pinguin mit Bugwelle), fish.png (springender Fisch).
-//  Animiert: Wasser und Schaum, Schneetreiben zieht nach links (Wind von
-//  rechts), Pinguine rutschen und schlagen mit den Flossen, der Eisblock
-//  ruckt an und rutscht, Schollen treiben, ein Pinguin schwimmt, Fische
-//  springen, Eis funkelt. Licht IMMER oben rechts.
+//  Überarbeitung (Al 30.9.: „die echten Area-Grafiken als Grundlage, nur
+//  aufpoliert, detailreicher und animiert — nicht komplett neu gezeichnet"):
+//  Alle Bilder stammen jetzt aus Als Arbeitsdatei Motive.xcf (herausge-
+//  zoomtes Slippery Ice: Hintergrund „Ebene #109“, Pinguin und Eisblock mit
+//  wenig/viel Schmierlinien). Das Skript scripts/areas/slippery_ice.py
+//  zerlegt sie nur für die Animation; die früher frei gemalten Bilder
+//  (Schollen, Fische, Schwimmer, Mittelstück …) sind weg. Kunsthöhe 240 =
+//  Originalgrösse der Grafik, 1 Kunstpixel = 1 Pixel der Vorlage.
+//  bg.png     — Hintergrund als Spiegelkachel 618 breit (Original in der
+//               Mitte; nach links/rechts gespiegelt, damit es auf jedem
+//               Brett lückenlos weitergeht). Aufgehübscht: Schatten der
+//               Felsgrate und Reif auf den Felsen, Eisdicke am Wasserloch,
+//               Risse, Kratzspuren der Rutschbahn. Das Wasserloch ist
+//               ausgestanzt — darunter liegt
+//  water.png  — das Wasser aus der Vorlage in 3 Bildern (Textur wandert,
+//               Glanzlichter, Schatten der Eiskante, Schaum am Ufer),
+//  sparkle.png— Funkelkreuze auf dem gestreiften Eis (3 Bilder),
+//  drift.png  — Schneetreiben (Wind von rechts, zieht nach links).
+//  penguin.png / spikeblock.png — die Vorlage-Sprites in Schmierstufen:
+//               Pinguin [stark, mittel, leicht, Stillstand], Eisblock
+//               [stark, leicht, Stillstand].
+//  Bewegung: EIN Akteur pro Bahn, damit sich nichts überlappt. Bahn A
+//  (y 156, die einzige Zeile ohne Fels und Wasserloch über die ganze
+//  Breite): ein Pinguin rauscht von rechts nach links durch. Unten links
+//  (links vom Wasserloch): ein Pinguin und der Eisblock schiessen mit
+//  starker Schmierlinie an, bremsen (Schmierlinie wird kürzer) und bleiben
+//  stehen, ehe sie ausgeblendet werden und von vorn beginnen. Der Pinguin
+//  fliegt nach links, der Block nach rechts — wie in der Vorlage.
+//  Licht IMMER oben rechts.
 const SLI = '/areas/slippery-ice/';
-const SLI_MITTE = 256;              // Mittelstück; Stück-x 128 = Brettmitte
-// v1434 (Al 25.9.: „zu viele Akteure, sie überlappen sich ständig —
-// pro Höhenebene nur einen"): feste Bahnen, jede mit genau EINEM
-// Akteur. Die Bahnen überschneiden sich nicht (Pinguin 10 hoch, Eisblock
-// 30 hoch), und die unterste endet über der höchsten Stufe der
-// Eiskante (Lippe y 61) — so rutscht nie etwas auf etwas anderem oder im Wasser.
-const SLI_BAHNEN = [
-  { art: 'pinguin', y: 0 },
-  { art: 'block', y: 11 },
-  { art: 'pinguin', y: 41 },
-  { art: 'pinguin', y: 51 },
-];
-// Schollen treiben nur dort, wo das Mittelstück (Eiszunge links, große
-// Scholle rechts) frei lässt.
-const SLI_SCHOLLEN = [-170, -40, 5, 105, 160];
-const SLI_FISCHE = [[-150, 90], [-30, 93], [100, 89], [175, 92]];   // Sprungstellen (x neben der Mitte, y)
+const SLI_H = 240;                  // Kunsthöhe (= Originalgrösse der Vorlage)
+const SLI_KACHEL = 618;             // Breite der Spiegelkachel
 const SlipperyIceOverlay = React.memo(function SlipperyIceOverlay() {
-  const bahnen = useMemo(() => SLI_BAHNEN.slice(0, Math.max(2, ppFxN(SLI_BAHNEN.length))), []);
-  // v1435 (Al 25.9.): Richtungen fest — der zweite Pinguin rutscht nach
-  // links, die anderen nach rechts; der Block startet nach links.
-  const pinguine = useMemo(() => bahnen.filter(b => b.art === 'pinguin').map((b, i) => ({
-    y: b.y, dur: 7 + Math.random() * 6, delay: -Math.random() * 12, rtl: i === 1,
-    bob: 1.1 + Math.random() * .8, flosse: .38 + Math.random() * .14,
-  })), [bahnen]);
-  const bloecke = useMemo(() => bahnen.filter(b => b.art === 'block').map(b => ({
-    y: b.y, von: 50 + Math.random() * 60, bis: -120 + Math.random() * 40,
-    dur: 7 + Math.random() * 5, delay: 0,
-  })), [bahnen]);
-  const schollen = useMemo(() => SLI_SCHOLLEN.slice(0, ppFxN(SLI_SCHOLLEN.length)).map((x, i) => ({
-    x: x + (Math.random() - .5) * 10, y: 86 + Math.random() * 8, v: i % 3,
-    dur: 9 + Math.random() * 6, delay: -Math.random() * 10,
-  })), []);
-  const schwimmer = useMemo(() => ppZufall(ppFxN(1), () => ({
-    y: 92 + Math.random() * 2, dur: 55 + Math.random() * 20, delay: -Math.random() * 50, rtl: Math.random() < .5,
-  })), []);
-  const fische = useMemo(() => SLI_FISCHE.slice(0, ppFxN(SLI_FISCHE.length)).map(() => ({
-    dur: 7 + Math.random() * 6, delay: -Math.random() * 12,
-  })), []);
-  const funken = useMemo(() => ppZufall(ppFxN(10), () => ({
-    x: Math.random() * 100, y: 3 + Math.random() * 54, dur: 1.8 + Math.random() * 2, delay: -Math.random() * 4,
-  })), []);
+  // Zeitversätze zufällig, damit sich die Bahnen nicht im Gleichschritt bewegen.
+  const lauf = useMemo(() => ({
+    a: { t: 9 + Math.random() * 3, d: -Math.random() * 9 },
+    b: { t: 12 + Math.random() * 3, d: -Math.random() * 12 },
+    k: { t: 10 + Math.random() * 3, d: -Math.random() * 10 },
+  }), []);
+  const zeit = (l) => ({ '--t': l.t.toFixed(2) + 's', '--d': l.d.toFixed(2) + 's' });
   return (
-    <PixelScene artH={100} bg="#d2d1f7" className="slippery-ice-overlay">
-      <PixelBand src={SLI + 'water.png'} style={{ backgroundSize: 'auto 300%', animation: 'ppBand3 2.1s steps(1) infinite' }} />
-      {schollen.map((s, i) => (
-        <i key={'s' + i} className="pp-area-dyn sli-scholle" style={{
-          left: ppArtX(s.x, 0), top: ppArt(s.y), backgroundPosition: `${s.v * 50}% 0`,
-          animation: `sliTreiben ${s.dur.toFixed(2)}s steps(8) ${s.delay.toFixed(2)}s infinite alternate`,
-        }} />
-      ))}
-      {schwimmer.map((s, i) => (
-        <div key={'w' + i} className="pp-area-dyn sli-quer" style={{ top: ppArt(s.y), animation: `${s.rtl ? 'sliQuerRtl' : 'sliQuerLtr'} ${s.dur.toFixed(1)}s linear ${s.delay.toFixed(1)}s infinite` }}>
-          <i className="sli-schwimmer" style={{ transform: s.rtl ? 'scaleX(-1)' : undefined }} />
+    <PixelScene artH={SLI_H} bg="#d6d3ff" className="slippery-ice-overlay">
+      <PixelBand src={SLI + 'water.png'} style={{ backgroundSize: 'auto 300%', animation: 'ppBand3 1.5s steps(1) infinite' }} />
+      <PixelBand src={SLI + 'bg.png'} />
+      <PixelBand src={SLI + 'sparkle.png'} style={{ backgroundSize: 'auto 300%', animation: 'ppBand3 2.4s steps(1) infinite' }} />
+      {/* Bahn A: Pinguin rauscht von rechts nach links über die ganze Breite */}
+      <div className="pp-area-dyn sli-quer sli-durch" style={{ top: ppArt(156), ...zeit(lauf.a) }}>
+        <div className="sli-ruckeln">
+          <i className="sli-pinguin sli-puls" />
         </div>
-      ))}
-      {fische.map((f, i) => (
-        <i key={'h' + i} className="pp-area-dyn sli-fisch" style={{
-          left: ppArtX(SLI_FISCHE[i][0] - 6, 0), top: ppArt(SLI_FISCHE[i][1] - 11),
-          animationDuration: f.dur.toFixed(2) + 's', animationDelay: f.delay.toFixed(2) + 's',
-        }} />
-      ))}
-      <PixelBand src={SLI + 'tile.png'} />
-      <PixelBand src={SLI + 'foam.png'} style={{ backgroundSize: 'auto 300%', animation: 'ppBand3 1.6s steps(1) infinite' }} />
-      <PixelPiece src={SLI + 'center.png'} w={SLI_MITTE} />
-      <PixelPiece src={SLI + 'center-foam.png'} w={SLI_MITTE} style={{ backgroundSize: '100% 300%', animation: 'ppBand3 1.6s steps(1) infinite' }} />
+      </div>
+      {/* Unten links: Pinguin bremst bis zum Stillstand */}
+      <div className="pp-area-dyn sli-quer sli-bremse-pinguin" style={{ top: ppArt(213), ...zeit(lauf.b) }}>
+        <i className="sli-pinguin sli-stufen-pinguin" />
+      </div>
+      {/* Unten links: Eisblock schiesst nach rechts, bremst, bleibt stehen */}
+      <div className="pp-area-dyn sli-quer sli-bremse-block" style={{ top: ppArt(183), ...zeit(lauf.k) }}>
+        <i className="sli-block sli-stufen-block" />
+        <i className="sli-glint" />
+      </div>
       <div className="pp-pixel-layer pp-area-dyn sli-wind" />
-      {funken.map((f, i) => (
-        <i key={'f' + i} className="pp-area-dyn pp-px-funkeln" style={{ left: f.x + '%', top: ppArt(f.y), animation: `ppFunkeln ${f.dur.toFixed(2)}s steps(1) ${f.delay.toFixed(2)}s infinite` }} />
-      ))}
-      {bloecke.map((b, i) => (
-        <i key={'b' + i} className="sli-block" style={{
-          left: ppArtX(-18, 0), top: ppArt(b.y), '--von': ppArt(b.von), '--bis': ppArt(b.bis),
-          animation: `sliBlock ${b.dur.toFixed(2)}s cubic-bezier(.35,0,.25,1) ${b.delay.toFixed(2)}s infinite alternate, sliGlanz 3.2s steps(1) infinite`,
-        }} />
-      ))}
-      {pinguine.map((p, i) => (
-        <div key={'p' + i} className="pp-area-dyn sli-quer" style={{ top: ppArt(p.y), animation: `${p.rtl ? 'sliQuerRtl' : 'sliQuerLtr'} ${p.dur.toFixed(2)}s linear ${p.delay.toFixed(2)}s infinite` }}>
-          <div className="sli-rutscher" style={{ transform: p.rtl ? 'scaleX(-1)' : undefined, animationDuration: p.bob.toFixed(2) + 's' }}>
-            <i className="sli-pinguin" style={{ animationDuration: p.flosse.toFixed(2) + 's' }} />
-          </div>
-        </div>
-      ))}
       <div className="pp-rand-dim" />
       <style>{`
         .sli-quer { position: absolute; left: 0; }
-        @keyframes sliQuerLtr { from { transform: translateX(calc(-60 * var(--px))); } to { transform: translateX(calc(100cqw + 4 * var(--px))); } }
-        @keyframes sliQuerRtl { from { transform: translateX(calc(100cqw + 4 * var(--px))); } to { transform: translateX(calc(-60 * var(--px))); } }
-        .sli-rutscher { animation: sliRuckeln 1.4s steps(2) infinite; }
+        .sli-bremse-pinguin, .sli-bremse-block { left: 50%; opacity: 0; }
+        /* Bahn A: 58 % der Zeit unterwegs, dann ausserhalb des Bildes warten */
+        .sli-durch { animation: sliDurch var(--t) linear var(--d) infinite; }
+        @keyframes sliDurch {
+          0% { transform: translateX(calc(100cqw + 4 * var(--px))); }
+          58%, 100% { transform: translateX(calc(-108 * var(--px))); }
+        }
+        .sli-ruckeln { animation: sliRuckeln 1.4s steps(2) infinite; }
         @keyframes sliRuckeln { 0% { translate: 0 0; } 50% { translate: 0 calc(-1 * var(--px)); } }
-        .sli-pinguin { display: block; width: calc(56 * var(--px)); height: calc(10 * var(--px)); background: url(${SLI}penguin.png) 0 0 / 300% 100% no-repeat; animation: ppSprite3 .45s steps(1) infinite; }
-        .sli-block {
-          position: absolute; width: calc(36 * var(--px)); height: calc(30 * var(--px));
-          background: url(${SLI}spikeblock.png) 0 0 / 200% 100% no-repeat;
+        /* Pinguin [stark, mittel, leicht, Stillstand], 104×22 pro Bild */
+        .sli-pinguin { display: block; width: calc(104 * var(--px)); height: calc(22 * var(--px)); background: url(${SLI}penguin.png) 0 0 / 400% 100% no-repeat; }
+        .sli-puls { animation: sliPuls .9s steps(1) infinite; }
+        @keyframes sliPuls {
+          0% { background-position: 0 0; } 30% { background-position: 33.333% 0; }
+          50% { background-position: 0 0; } 75% { background-position: 66.667% 0; }
         }
-        @keyframes sliBlock {
-          0% { transform: translateX(var(--von)); } 8% { transform: translateX(var(--von)) translateY(calc(-1 * var(--px))); }
-          12% { transform: translateX(var(--von)); } 100% { transform: translateX(var(--bis)); }
+        /* Bremsen: anschiessen (Spur lang), Spur wird kürzer, Stillstand, ausblenden */
+        .sli-bremse-pinguin { animation: sliBremseL var(--t) linear var(--d) infinite; }
+        @keyframes sliBremseL {
+          0% { transform: translateX(calc(-95 * var(--px))); opacity: 0; }
+          2% { transform: translateX(calc(-95 * var(--px))); opacity: 1; animation-timing-function: cubic-bezier(.15,.55,.25,1); }
+          32%, 68% { transform: translateX(calc(-205 * var(--px))); opacity: 1; }
+          76%, 100% { transform: translateX(calc(-205 * var(--px))); opacity: 0; }
         }
-        @keyframes sliGlanz { 0% { background-position: 0 0; } 50% { background-position: 100% 0; } }
-        .sli-scholle { position: absolute; width: calc(12 * var(--px)); height: calc(6 * var(--px)); background: url(${SLI}floe.png) 0 0 / 300% 100% no-repeat; }
-        @keyframes sliTreiben {
-          0% { transform: translate(0, 0); } 25% { transform: translate(calc(2 * var(--px)), var(--px)); }
-          50% { transform: translate(calc(4 * var(--px)), 0); } 75% { transform: translate(calc(6 * var(--px)), var(--px)); }
-          100% { transform: translate(calc(8 * var(--px)), 0); }
+        .sli-stufen-pinguin { background-position: 33.333% 0; animation: sliStufenP var(--t) steps(1) var(--d) infinite; }
+        @keyframes sliStufenP {
+          0%, 8% { background-position: 33.333% 0; } 8.01%, 18% { background-position: 66.667% 0; } 18.01%, 100% { background-position: 100% 0; }
         }
-        .sli-schwimmer { display: block; width: calc(20 * var(--px)); height: calc(7 * var(--px)); background: url(${SLI}swimmer.png) 0 0 / 200% 100% no-repeat; animation: ppSprite2 .7s steps(1) infinite; }
-        .sli-fisch {
-          position: absolute; width: calc(12 * var(--px)); height: calc(12 * var(--px));
-          background: url(${SLI}fish.png) 0 0 / 800% 100% no-repeat; animation-name: sliFisch; animation-timing-function: steps(1); animation-iteration-count: infinite;
+        /* Eisblock [stark, leicht, Stillstand], 114×27 pro Bild; der Block sitzt
+           am RECHTEN Bildrand (Schmierlinie links), Ruhe: rechte Kante bei -36 */
+        .sli-bremse-block { animation: sliBremseR var(--t) linear var(--d) infinite; }
+        @keyframes sliBremseR {
+          0% { transform: translateX(calc(-300 * var(--px))); opacity: 0; }
+          2% { transform: translateX(calc(-300 * var(--px))); opacity: 1; animation-timing-function: cubic-bezier(.15,.55,.25,1); }
+          32%, 68% { transform: translateX(calc(-150 * var(--px))); opacity: 1; }
+          76%, 100% { transform: translateX(calc(-150 * var(--px))); opacity: 0; }
         }
-        @keyframes sliFisch {
-          0% { background-position: 0 0; } 1.6% { background-position: calc(100% / 7) 0; } 3.2% { background-position: calc(200% / 7) 0; }
-          4.8% { background-position: calc(300% / 7) 0; } 6.4% { background-position: calc(400% / 7) 0; } 8% { background-position: calc(500% / 7) 0; }
-          9.6% { background-position: calc(600% / 7) 0; } 11.2%, 100% { background-position: 0 0; }
+        .sli-block { display: block; width: calc(114 * var(--px)); height: calc(27 * var(--px)); background: url(${SLI}spikeblock.png) 0 0 / 300% 100% no-repeat; }
+        .sli-stufen-block { animation: sliStufenB var(--t) steps(1) var(--d) infinite; }
+        @keyframes sliStufenB {
+          0%, 10% { background-position: 0 0; } 10.01%, 20% { background-position: 50% 0; } 20.01%, 100% { background-position: 100% 0; }
         }
+        /* Glitzern auf der lichten Kante des Blocks (oben rechts) */
+        .sli-glint {
+          position: absolute; left: calc(103 * var(--px)); top: calc(3 * var(--px)); width: calc(3 * var(--px)); height: calc(3 * var(--px)); opacity: 0;
+          background:
+            linear-gradient(#fff, #fff) 50% 0 / var(--px) 100% no-repeat,
+            linear-gradient(#fff, #fff) 0 50% / 100% var(--px) no-repeat;
+          animation: ppFunkeln 2.6s steps(1) infinite;
+        }
+        /* Schneetreiben zieht nach links (Wind von rechts), pixelweise */
         .sli-wind {
-          position: absolute; inset: 0; background: url(${SLI}drift.png) 50% 0 / auto 100% repeat-x; opacity: .7;
-          animation: sliWind 16s steps(128) infinite;
+          position: absolute; inset: 0; background: url(${SLI}drift.png) 50% 0 / auto 100% repeat-x; opacity: .85;
+          animation: sliWind 40s steps(${SLI_KACHEL}) infinite;
         }
-        @keyframes sliWind { from { background-position: 50% 0; } to { background-position: calc(50% - 128 * var(--px)) 0; } }
+        @keyframes sliWind { from { background-position: 50% 0; } to { background-position: calc(50% - ${SLI_KACHEL} * var(--px)) 0; } }
       `}</style>
     </PixelScene>
   );
