@@ -24787,11 +24787,11 @@ function ResultCeremony({ won, spectator, title, subtitle, rewards, total, eloCh
         {cpuProgress && cpuProgress.wins > 0 && (
           <div className="pp-cer-sieg">
             <div className="pp-cer-sieg-zahl">🏆 {ppOrdinal(cpuProgress.wins)} victory{oppName ? ' against ' + oppName : ''}!</div>
-            {cpuProgress.theme && (
-              <div className="pp-cer-sieg-theme">🎵 {cpuProgress.theme.hero ? heroDisplayName(cpuProgress.theme.hero) + "'s Theme" : cpuProgress.theme.name}: {cpuProgress.theme.wins} / {cpuProgress.theme.need} wins to unlock</div>
-            )}
             {cpuProgress.sleeve && (
               <div className="pp-cer-sieg-theme">🃏 {cpuProgress.sleeve.name}: {cpuProgress.sleeve.wins} / {cpuProgress.sleeve.need} wins to unlock</div>
+            )}
+            {cpuProgress.theme && (
+              <div className="pp-cer-sieg-theme">🎵 {cpuProgress.theme.hero ? heroDisplayName(cpuProgress.theme.hero) + "'s Theme" : cpuProgress.theme.name}: {cpuProgress.theme.wins} / {cpuProgress.theme.need} wins to unlock</div>
             )}
           </div>
         )}
