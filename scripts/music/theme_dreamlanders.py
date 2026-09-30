@@ -210,7 +210,6 @@ for i in range(16):
     bass(b, ch, 'drive', 104)
     groove(b, 'collide', 1.04 if second else 1.0)
     line = arpline(ch, rev=(i % 2 == 1))
-    if i in (7, 15): line = [(0, 1, melroot(ch) + 4), (1, 1, melroot(ch) + 7), (2, 2, melroot(ch) + 4)] if False else arpline(ch, True)
     melody(b, line, 98, 'lead'); melody(b, line, 82, 'charang', False)
     for p in tones(ch, 3): song.add('stab', song.bar(b) + 1.5, 0.8, p + 12, 70); song.add('stab', song.bar(b) + 3, 0.8, p + 12, 74)
     song.add('oohs', song.bar(b), 3.95, tones(ch, 4)[1] + 12, 78)

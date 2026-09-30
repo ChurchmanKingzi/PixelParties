@@ -166,7 +166,6 @@ for i in range(8):
     b = 8 + i; ch = CH_T[i]
     bass(b, ch, 96); stabs(b, ch, 82); groove(b, 'B', 0.95 + i * 0.01)
     line(b, MEL_T[i], ['theremin', 'music'], [98, 80]); tremolo(b, ch, 62 + i * 2)
-    song.add('howl', song.bar(b), 3.9, TRI[ch][0] + 24, 42) if False else None
 toll(8, 0, 54, 96); toll(12, 0, 54, 92); crash(8, 104); fill(15, big=True)
 
 # Halbmond 16–23: neue Harmonik, Orgel, Toms
@@ -208,7 +207,7 @@ for i in range(8):
     b = 48 + i; ch = CH_H[i]
     bass(b, ch, 98, busy=True); stabs(b, ch, 84); groove(b, 'B', 1.04 - i * 0.01)
     line(b, MEL_H[i], ['theremin', 'music'], [98 - i, 84]); tremolo(b, ch, 70 - i * 2); organ(b, ch, 62)
-    song.add('howl', song.bar(b), 3.9, nt(CTR[i]) + 12 if False else nt(CTR[i]) - 12, 50)
+    song.add('howl', song.bar(b), 3.9, chk(nt(CTR[i]) - 12), 50)
     if i % 2 == 0: toll(b, 0, 54, 96 - i * 2)
 crash(48, 108); howl(52, 0, 4, nt('E5'), 84); fill(51); fill(55)
 

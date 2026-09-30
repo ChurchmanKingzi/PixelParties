@@ -44,7 +44,7 @@ def nm(s):
 DYN = [0.0] * BARS
 def _dyn(a, b, v0, v1):
     for i in range(a, b): DYN[i] = v0 + (v1 - v0) * (i - a) / max(1, b - a - 1)
-_dyn(0, 8, 0.88, 0.94); _dyn(8, 24, 0.92, 0.98); _dyn(24, 40, 0.96, 1.02); _dyn(40, 44, 0.90, 0.92)
+_dyn(0, 8, 1.0, 1.0); _dyn(8, 24, 0.92, 0.98); _dyn(24, 40, 0.96, 1.02); _dyn(40, 44, 0.90, 0.92)
 _dyn(44, 48, 0.94, 1.05); _dyn(48, 60, 1.04, 1.06); _dyn(60, 64, 0.96, 0.9)
 # Stopps: ab diesem Beat schweigt alles (außer force)
 STOP = {23: 3, 31: 2, 39: 2, 59: 2}
@@ -177,14 +177,17 @@ def cannon(b, t=0.0, vel=100):
 
 # ---- Arrangement --------------------------------------------------------------------------------
 for b in range(BARS):
-    oompah(b, 94 if b < 8 else 100, 72 if b < 8 else 80, light=(40 <= b < 44))
+    oompah(b, 100, 84 if b < 8 else 80, light=(40 <= b < 44))
 # Pauke unterstützt Takt 1 jeder 4er-Gruppe im Intro/Höhepunkt
 for b in list(range(0, 8, 2)) + list(range(48, 60, 2)):
     note('timp', 4 * b, 0.5, place(CH[CHORDS[b]][0], 41, 36, 48), 90)
 
 # Intro 0–7
-for b in range(0, 8): snare_march(b, 0 if b < 4 else 1)
+for b in range(0, 8): snare_march(b, 1)
 play('whistle', 4, [[(2, .5, 'F5'), (2.5, .5, 'D5'), (3, 1, 'F5')], [(2, 1, 'G5'), (3, 1, 'F5')], [(2, .5, 'F5'), (2.5, .5, 'Bb5'), (3, 1, 'A5')], [(2, .5, 'A5'), (2.5, .5, 'C6'), (3, .5, 'A5')]], vel=78)
+for b in range(0, 8):       # Xylophon-Achtelpuls + Kazoo-Kichern im Intro
+    for t in (0.5, 1.5, 2.5, 3.5): note('xylo', 4 * b + t, 0.3, place(CH[CHORDS[b]][1][int(t) % 3], 72, 64, 80), 76, 0.6)
+    note('clar', 4 * b + 3, 0.5, place(CH[CHORDS[b]][1][2], 62, 58, 70), 80, 0.8)
 for b in range(2, 8): note('glock', 4 * b + 1.5, 0.4, place(CH[CHORDS[b]][1][0], 84, 72, 91), 74, 0.6)
 fill(7, 0)
 # Thema A 8–23

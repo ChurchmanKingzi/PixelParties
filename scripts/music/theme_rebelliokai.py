@@ -144,10 +144,6 @@ def pad(inst, b, vel, dur=3.95, octv=4):
     s = song.bar(b); r = ROOTS[b]
     for pc in (r, (r + 7) % 12): song.add(inst, s, dur, n(pc, octv) if pc >= r else n(pc, octv + 1), vel)
 
-def bell_kane(b, vel=84, dense=False):
-    s = song.bar(b)
-    for i in range(8): song.dr(s + i * .5 + (0 if dense else .5) if not dense else s + i * .5, COWBELL, vel - (10 if i % 2 == 0 else 0)) if (dense or i < 4) else None
-
 def kane(b, vel=86, dense=False):
     """Kane (Cowbell): Festival-Glocke. dicht = Achtel, sonst Gegenschläge."""
     s = song.bar(b)
@@ -247,7 +243,7 @@ for k, base in enumerate((40, 48)):
         if i % 2 == 0: crash(b, 98 if i else 112)
     for j in range(8):
         mel('flute', base + j, HY[j], 100); mel('oboe', base + j, HY[j], 88, shift=-12 if k == 0 else 0)
-        if k == 1: mel('whistle', base + j, [(o, d, p) for o, d, p in HY[j] if d >= 1.5][:1] or [(0, .5, 'A5')], 82, shift=12 if False else 0)
+        if k == 1: mel('whistle', base + j, [(o, d, p) for o, d, p in HY[j] if d >= 1.5][:1] or [(0, .5, 'A5')], 82)
     for b in (base, base + 4): stab(b, 0, 108, 1.4)
     for b in (base + 2, base + 6): stab(b, 2, 100, .7)
     fill(base + 3, 88, 118); fill(base + 7, 100, 127)
@@ -289,8 +285,8 @@ for i in range(8):
     shami(b, 'c', 90); pad('strings', b, 74); pad('choir', b, 70)
 crash(72, 108)
 for j in range(6):
-    mel('flute', 72 + j, HEAD, 98 + j, shift=[0, 0, -2 if False else 0, 0, 0, 0][j])
-    mel('oboe', 72 + j, HEAD, 88, shift=0)
+    mel('flute', 72 + j, HEAD, 98 + j)
+    mel('oboe', 72 + j, HEAD, 88)
     song.add('koto', song.bar(72 + j) + 3.5, .4, nt('A5'), 90)
 for j in (6, 7):
     for i in range(16): song.add('flute', song.bar(72 + j) + i * .25, .24, chk(nt(['A5', 'G5', 'Eb5', 'D5', 'Bb4', 'A4', 'G4', 'Eb4'][i % 8]) if j == 6 else nt(['Eb4', 'G4', 'A4', 'Bb4', 'D5', 'Eb5', 'G5', 'A5'][i % 8])), ramp(i, 16, 84, 108))

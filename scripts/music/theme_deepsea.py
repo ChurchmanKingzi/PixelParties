@@ -235,7 +235,6 @@ crash(36, 118); shock(36, 0, 'Bbm', 122)
 for i in range(16):
     b, k, sec = 36 + i, i % 8, i // 8
     ch = (CHORDS_A1 if sec == 0 else CHORDS_A2)[k]
-    if sec == 1 and k in (1, 2, 5): ch = (['Bbm', 'B', 'E', 'Gb', 'Ebm', 'Gb', 'B', 'F'])[k] if False else ch
     mel = (MEL_A1 if sec == 0 else MEL_A2)[k]
     pedal(b, ch, 96); org(b, ch, 86); heart(b, ch, 104)
     groove(b, 'C', 1.0 + 0.04 * sec)
