@@ -60,7 +60,7 @@ if __name__ == '__main__':
     import json, os
     root = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..')
     # Namen für die Auswahl (Laufzeit) — zusammen mit den benannten Allgemein-Tracks
-    out = {'generic': {'battle4': 'Heroic Charge', 'battle5': 'Dark Cathedral', 'battle6': 'Cyber Chase',
+    out = {'generic': {'battle1': 'First Blood', 'battle2': 'Shadow Duel', 'battle3': 'Full Tilt', 'battle4': 'Heroic Charge', 'battle5': 'Dark Cathedral', 'battle6': 'Cyber Chase',
                        'battle7': 'Arena Rock', 'battle8': 'Mystic Grove', 'battle9': 'Epic Finale',
                        'battle10': "Trickster's Game"},
            'themes': [{'id': 'theme_' + s, 'name': t, 'archetype': a} for a, s, t, _ in THEMES]}
