@@ -2564,6 +2564,7 @@ function ProfileScreen() {
 
   const quickSaveSleeve = async (newSleeve) => {
     setCardback(newSleeve);
+    if (window.playSFX) window.playSFX('shuffle');   // Sleeve gewechselt
     setShowSleeveGallery(false);
     try {
       const data = await api('/profile', { method: 'PUT', body: JSON.stringify({
