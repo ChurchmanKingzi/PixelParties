@@ -5614,6 +5614,15 @@ function sendSpectatorGameState(room) {
 async function endGame(room, winnerIdx, reason) {
   const gs = room.gameState;
   if (!gs || gs.result) return;
+  // ★ Bugfix (Ranked-Bo3 endete nach 1:1 als 2:1): `gs.result` wird erst NACH
+  // mehreren DB-Awaits gesetzt (Elo, Statistik, Historie). Feuert die Engine
+  // das Spielende in diesem Fenster ein zweites Mal (mehrere
+  // `checkAllHeroesDead`-Aufrufer, Deck-Out + Heldentod …), passierte der
+  // zweite Aufruf den Riegel oben und zaehlte `setScore` doppelt — ein
+  // einziger Sieg von P2 machte aus 1:1 ein 1:2 und beendete den Satz.
+  // Der Riegel ist synchron (vor dem ersten await) und haengt am Spiel.
+  if (gs._endGameLaeuft) return;
+  gs._endGameLaeuft = true;
   const isRanked = room.type === 'ranked';
   const loserIdx = winnerIdx === 0 ? 1 : 0;
   const winner = gs.players[winnerIdx];
