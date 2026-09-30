@@ -108,10 +108,10 @@ cv.paste(up(mid, 3), 0, 0)
 # ---------------------------------------------------------------- Baaliel 5×
 FG = rgba(50, 70)
 bw, bh = baal.shape[1], baal.shape[0]
-bx, by = 15, 66 - bh                        # Gesichtsmitte (Spalte 10) auf x = 375 von 750
+bx, by = 15, 62 - bh                        # Gesichtsmitte (Spalte 10) auf x = 375 von 750
 for y in range(70):
     for x in range(50):
-        d = ((x + .5 - 25) / 9) ** 2 + ((y + .5 - 65.5) / 1.6) ** 2
+        d = ((x + .5 - 25) / 9) ** 2 + ((y + .5 - 61.5) / 1.6) ** 2
         if d < 1 and bay(x, y) < 0.7:
             FG[y, x] = (10, 2, 2, 150)
 put(FG, baal, bx, by)
