@@ -42,7 +42,7 @@ WALL_B = 47 - Y0                                                # Mauerfuß
 tre = crop_alpha(layer(BD, 196))
 th, tw = tre.shape[:2]
 tx = (GX0 + GX1) // 2 - tw // 2
-ty = GY1 - th + 12                       # nur die Goldhaufen-Oberkante ragt ins Tor
+ty = GY1 - th + 1                        # Goldhaufen liegt auf dem Boden hinter dem Gitter
 inner = np.zeros((GH, GW), bool)
 for y in range(GY0, GY1):
     for x in range(GX0, GX1):

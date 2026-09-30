@@ -74,8 +74,8 @@ def stand(s, cx, fl=False):
     x = int(cx - s.shape[1] / 2); y = GY + 3 - s.shape[0]
     put(p2, s, x, y); return (x + s.shape[1] // 2, y)
 heads = []
-put(p2, monst, -13, GY + 6 - monst.shape[0]); put(p2, flip(monst), 125 + 13 - monst.shape[1], GY + 6 - monst.shape[0])
-heads.append(stand(witch, 36)); heads.append(stand(wolf, 62)); heads.append(stand(pirate, 88, True))
+put(p2, monst, -9, GY + 6 - monst.shape[0]); put(p2, flip(monst), 125 + 9 - monst.shape[1], GY + 6 - monst.shape[0])
+heads.append(stand(witch, 40)); heads.append(stand(wolf, 62)); heads.append(stand(pirate, 85, True))
 # Deepsea Counter: je Kreatur eine Kette kleiner roter Blasen, die senkrecht zu Siphem aufsteigt
 BUB = [(255, 150, 150), (214, 40, 52), (120, 14, 30)]
 def bubble(x, y, r):
