@@ -33,7 +33,7 @@ from gkit36_40 import *  # noqa
 rnd = random.Random(36)
 W2, H2 = 125, 175
 CX0, CY0 = 222, 150                   # Ausschnitt aus Ebene 103 (Torhaus)
-SHIFT = 30                            # Torhaus im Raster um 30 Zeilen nach unten → Himmel darüber
+SHIFT = 45                            # Torhaus im Raster um 45 Zeilen nach unten → Himmel darüber
 
 # ------------------------------------------------------------------ Torhaus vorbereiten (Figuren entfernen)
 full = layer('Motive', 103).copy()
@@ -46,12 +46,11 @@ for y, x in zip(*np.nonzero(mask)):
     for dx in (16, -16, 32, -32):
         if not mask[y, x + dx]: full[y, x] = full[y, x + dx]; break
 # Banner über dem Tor → an den linken Turm; an seine alte Stelle Mauer aus 16 px Entfernung
-banner = full[219:238, 280:294].copy()
+BY0, BY1, BX0, BX1 = 220, 240, 277, 294
+banner = full[BY0:BY1, BX0:BX1].copy()
 brgb = banner[..., :3].astype(int)
-banner[..., 3] = np.where(((brgb[..., 0] > brgb[..., 1] + 25) | (brgb[..., 0] > 150)), 255, 0).astype(np.uint8)
-for y in range(219, 238):
-    for x in range(280, 294):
-        if banner[y - 219, x - 280, 3]: full[y, x] = full[y, x - 16]
+banner[..., 3] = np.where(brgb.max(-1) - brgb.min(-1) > 18, 255, 0).astype(np.uint8)      # Wand ist grau
+bb_ = bbox(banner); banner = banner[bb_[1]:bb_[3], bb_[0]:bb_[2]]
 gate = full[CY0:CY0 + H2 - SHIFT, CX0:CX0 + W2].copy()
 gate[..., 3] = 255
 
@@ -96,19 +95,6 @@ for _ in range(34):
     x, y = rnd.randrange(3, W2 - 3), rnd.randrange(2, HOR - 12)
     if math.hypot(x - MX, y - MY) > MR + 10: bg.a[y, x, :3] = (200, 206, 230) if rnd.random() < 0.6 else (130, 140, 190)
 
-# Tentakel der Spawn Mother hinter dem linken Turm (2×, gleiche Ebene wie das Torhaus)
-T = layer('MotiveIndia', 399)[312:336, 328:365].copy()
-sprite('o36_tentacle', 'MotiveIndia', [399], box=(328, 312, 365, 336))
-T = flip(T)                                                   # Spitze nach links, Wurzel rechts hinter dem Turm
-TX, TY = 2, SHIFT + (178 - CY0) - 22
-for y in range(T.shape[0]):
-    for x in range(T.shape[1]):
-        a = T[y, x, 3] / 255.0
-        if a <= 0: continue
-        c = np.array(T[y, x, :3], float) * np.array((0.78, 0.74, 0.92))
-        q = dith(min(1.0, a * 1.15), TX + x, TY + y, 4)
-        if q > 0: bg.blend(TX + x, TY + y, tuple(c), q)
-
 # Torhaus nachts: dunkel, kühl, Mondlicht von rechts oben hellt rechte Turmhälften leicht auf
 g = gate.astype(float)
 for y in range(g.shape[0]):
@@ -142,11 +128,11 @@ for x in range(W2):
 
 # Banner am linken Turm, Schwert am rechten Turm
 b_ = banner.copy(); b_[..., :3] = np.clip(b_[..., :3].astype(float) * np.array((0.75, 0.7, 0.9)), 0, 255)
-bg.paste(b_, (TOWERS[0][0] + TOWERS[0][1]) // 2 - b_.shape[1] // 2, SHIFT + (186 - CY0))
-sw = sprite('o36_sword', 'Motive', [911])
+bg.paste(b_, (TOWERS[0][0] + TOWERS[0][1]) // 2 - b_.shape[1] // 2, SHIFT + (188 - CY0))
+sw = rot90(sprite('o36_sword', 'Motive', [911]), 1)          # senkrecht, Spitze nach unten
 sw2 = sw.copy(); sw2[..., :3] = np.clip(sw2[..., :3].astype(float) * np.array((0.85, 0.85, 0.98)), 0, 255)
 SWX = (TOWERS[1][0] + TOWERS[1][1]) // 2 - sw.shape[1] // 2
-bg.paste(sw2, SWX, SHIFT + (192 - CY0))
+bg.paste(sw2, SWX, SHIFT + (184 - CY0))
 
 # ================================================================== Vordergrund 6× (42×59)
 W6, H6 = 42, 59
@@ -162,4 +148,4 @@ fg.paste(art, AX, AY)
 
 cv = compose_planes([bg, fg])
 save(cv, '36_blackport_nightfall.png')
-print('ok', art.shape, 'gate bottom row (canvas):', 2 * (SHIFT + 287 - CY0), 'feet:', 6 * (FEET + 1))
+print('ok', art.shape, sw.shape, banner.shape)

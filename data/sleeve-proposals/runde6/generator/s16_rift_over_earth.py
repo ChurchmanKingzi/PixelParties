@@ -69,16 +69,18 @@ for y in range(TIP - 6, EY - 44):
     for x in range(int(ECX - half), int(ECX + half) + 1):
         if 0 <= x < 125 and p2[y, x, 3] == 0:
             f = 1 - abs(x + 0.5 - ECX) / half
-            if f * 0.8 > bayer(x, y) + 0.1:
+            lv = int(f * 2.6 + bayer(x, y))
+            if lv:
                 c = tuple(int(v) for v in cv.a[y * 2, x * 2])
-                p2[y, x] = list(mix(c, (150, 24, 44), 0.28)) + [255]
+                p2[y, x] = list(mix(c, (160, 26, 48), (0, 0.22, 0.36, 0.48)[min(3, lv)])) + [255]
 # Erde, oberer Rand vom Blick rötlich angestrahlt
 put(p2, earth, EX - 50, EY - 50)
-for y in range(EY - 50, EY - 30):
-    for x in range(EX - 40, EX + 41):
-        if 0 <= y < 175 and p2[y, x, 3] and math.hypot(x + 0.5 - EX, y + 0.5 - EY) > 50 - 2 - (EY - 30 - y) * 0.2:
-            if bayer(x, y) < 0.6:
-                p2[y, x, :3] = mix(tuple(int(v) for v in p2[y, x, :3]), (220, 60, 70), 0.35)
+for y in range(EY - 50, EY - 24):
+    for x in range(EX - 36, EX + 37):
+        if 0 <= y < 175 and p2[y, x, 3]:
+            g = (1 - (y - (EY - 50)) / 26) * (1 - abs(x - EX) / 37)      # Lichtfleck oben mittig, auslaufend
+            lv = int(g * 3 + bayer(x, y))
+            if lv: p2[y, x, :3] = mix(tuple(int(v) for v in p2[y, x, :3]), (210, 50, 70), (0, 0.18, 0.3, 0.42)[min(3, lv)])
 # Life-Searcher links, sinkt mit Suchstrahl auf die Erde
 SX, SY = 20, 88
 put(p2, search, SX, SY)

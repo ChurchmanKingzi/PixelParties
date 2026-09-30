@@ -77,11 +77,14 @@ def bolt(dst, x, y, length, rnd, fork=True):
     (weiß), seitlich 1 px bläulicher Schein; optional ein kurzer Seitenast."""
     pts = [(x, y)]; d = rnd.choice((-1, 1)); yy = y; xx = x
     while yy < y + length:
-        n = rnd.randint(3, 6)
+        n = rnd.choice((2, 3, 5, 7, 9))                    # unregelmäßige Segmente
+        steep = rnd.random() < 0.5                          # steil (x nur jede 2. Zeile) oder flach
         for i in range(n):
-            yy += 1; xx += d if i < n - 1 or rnd.random() < 0.5 else 0
+            yy += 1
+            if not steep or i % 2 == 0:
+                xx += d
             pts.append((xx, yy))
-        d = -d
+        d = -d if rnd.random() < 0.75 else d
     br = []
     if fork:
         k = len(pts) // 2; fx, fy = pts[k]; dd = rnd.choice((-1, 1))
