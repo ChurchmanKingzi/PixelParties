@@ -7202,7 +7202,13 @@ function cpuPickTargets(engine, validTargets, config, promptedPlayerIdx) {
   // Determine intent. Healing/buff cards typically have side='own' or only
   // own-targets valid. Damage cards have baseDamage or damageType, or target
   // the opponent side.
-  const isHealCard = looksLikeHeal(cd, config);
+  // Attacks, die NEBENBEI heilen (Ferocious Tiger Kick: „the user is healed
+  // for any damage this Attack dealt") sind Schadenskarten, keine Heilkarten.
+  // Als Heilkarte gelesen, fand die Heil-Wahl kein Ziel und die CPU brach die
+  // abbrechbare Zielwahl ab — die Attacke verpuffte (Ghuanjuns Combo-Folge-
+  // Attacken laufen ohne MCTS-Zielplan genau durch diesen Pfad).
+  const isHealCard = looksLikeHeal(cd, config)
+    && !(config?.isHeal !== true && cd?.cardType === 'Attack' && damageAmount > 0);
   const isBuffCard = !isHealCard && looksLikeBuff(cd, config);
 
   // Multi-select bound: promptMultiTarget passes `maxTotal`, simpler callers
