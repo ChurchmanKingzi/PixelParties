@@ -1,21 +1,22 @@
 # -*- coding: utf-8 -*-
 """10 Hammerfall – Gegner „Cool Gang“ (Structure Deck Cool Gang), Held: Thorad, Strength of Coolness.
 
-Bildidee: Ruhemoment vor dem Sturm – Thorad steht auf einem Felsgipfel über dem Wolkenmeer, neben ihm steckt sein
-schwerer Hammer (Hammer Throw, Ragnarock) mit dem Kopf voran im Fels; hinter ihm bricht das Gewitter los, Blitze
-schlagen in die fernen Gipfel. Kein Hallen-Motiv (Wowhalla), nur Berg und Himmel.
+Bildidee: Thorad (Thor der Cool Gang) steht auf einem Felsgipfel über dem Wolkenmeer im Gewitter; sein geworfener
+Hammer (Hammer Throw) fliegt waagerecht über den Himmel, ein Blitz aus der Wolkendecke schlägt in den Hammerkopf,
+ein zweiter fern in einen Gipfel (Ragnarock). Diagonale: Held unten links, Hammer oben rechts. Kein Hallen-Motiv.
 
 Quellen (MotiveCoolhalla.xcf):
   Ebene 221 „Ebene #16“  – Base-Thorad (rechte Figur; Szene „Sichtbar #5“ = Ebene 264, Lage 173,50; 0 px Abweichung).
                            (NICHT 219: Variante mit rotem Zeigefinger „Burning Finger“.)
   Ebene 124 „Ebene #103“ – eiserner Hammer (16×23).
-  Ebene 218 „Ebene #24“  – Blitze (Gewitterszene Sichtbar #13), einzelner verzweigter Blitz 39×94, zugeschnitten.
+  Ebene 218 „Ebene #24“  – Blitze (Gewitterszene Sichtbar #13), einzelner verzweigter Blitz 39×94, zugeschnitten/gespiegelt.
   Ebene 82 „Ebene #137“  – graue Felsbrocken (die zwei unteren Brocken) als Gipfel, abgedunkelt.
-Selbst gezeichnet: Gewitterhimmel, Wolkendecke, Wolkenmeer, ferne Gipfel, Blitzschein, Lichtkanten, Felssplitter.
+Selbst gezeichnet: Gewitterhimmel, Wolkendecke, Wolkenmeer, ferne Gipfel, Blitzschein/Hof um den Hammer, Lichtkanten.
 
 Skalierung (Tiefenebenen):
   Hintergrund 2× (125×175): Himmel, Wolkendecke, Blitze, ferne Gipfel, Wolkenmeer
-  Vordergrund 5× (50×70):   Gipfelfels, Thorad, Hammer (180° gedreht, im Fels steckend)
+  Mittelgrund 4× (63×88):   fliegender Hammer (90° gedreht) mit Lichthof und Funken
+  Vordergrund 5× (50×70):   Gipfelfels (Brocken abgedunkelt), Thorad
 """
 import math, random
 import numpy as np
@@ -128,7 +129,7 @@ W5, H5 = 50, 70
 fg = np.zeros((H5, W5, 4), np.uint8)
 bx = 25 - boulder.shape[1] // 2
 by = 57
-put(fg, boulder, bx, by, 0.6)
+put(fg, boulder, bx, by, 0.45)
 for i in range(boulder.shape[1]):                     # Blitzlicht auf den Felskuppen
     col = np.nonzero(boulder[:, i, 3])[0]
     if len(col) and 0 <= bx + i < W5 and by + col[0] < H5: fg[by + col[0], bx + i, :3] = (150, 156, 190)
@@ -155,14 +156,12 @@ hm = rot90(hammer, 3)                                 # waagerecht, Kopf voran n
 hm = hm if hm[:, -4:, 3].sum() > hm[:, :4, 3].sum() else flip(hm)
 hcx, hcy = HAM[0] * 2 / 4, HAM[1] * 2 / 4             # Hammerkopf-Mitte im 4×-Raster
 hx0 = int(round(hcx - hm.shape[1] + 4)); hy0 = int(round(hcy - hm.shape[0] / 2))
-# Fahrtstreifen hinter dem Stiel (drei kurze Striche, hell/dunkel) – der Hammer ist geworfen und fliegt
-for k, (dy, ln) in enumerate([(4, 7), (7, 11), (10, 6)]):
-    yy = hy0 + dy
-    for i in range(ln):
-        xx = hx0 - 1 - i - (k % 2)
-        if 0 <= xx < W4 and 0 <= yy < H4 and i % 4 != 3:
-            mid[yy, xx, :3] = (220, 228, 255) if i % 2 == 0 else (140, 150, 196)
-            mid[yy, xx, 3] = max(60, 230 - i * 14)
+# Blitzschein um den Hammer (weicher Hof im 4×-Raster, geordnetes Dithering)
+for y in range(H4):
+    for x in range(W4):
+        dd = math.hypot(x + 0.5 - (hx0 + hm.shape[1] - 4), (y + 0.5 - (hy0 + hm.shape[0] / 2)) * 1.2)
+        if dd < 13 and (1 - dd / 13) * 0.7 > BAY[y % 4, x % 4]:
+            mid[y, x, :3] = (150, 170, 230); mid[y, x, 3] = 70
 put(mid, hm, hx0, hy0)
 for (dx, dy) in [(hm.shape[1], -1), (hm.shape[1] + 1, 3), (hm.shape[1] - 2, -2), (hm.shape[1] - 1, hm.shape[0] + 1)]:
     x, y = hx0 + dx, hy0 + dy                          # Funken am Hammerkopf

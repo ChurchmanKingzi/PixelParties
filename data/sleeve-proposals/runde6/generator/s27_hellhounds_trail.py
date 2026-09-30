@@ -5,8 +5,8 @@ Held: Orthos, the Loyal Guard Dog.
 Idee (Reise/Nachtmarsch, ruhig): Orthos, der zweiköpfige Wachhund mit brennenden Köpfen (Base-Karte), kommt groß
 auf dem Aschepfad auf den Betrachter zu. Dicht hinter ihm folgt als kleine Gruppe seine Loyal-Meute – in der
 Mitte die Cover-Karte Loyal Pinpom, links der Rottweiler, rechts der Shepherd (Kartentext: ein „Loyal“ ruft den
-nächsten herbei). Der Pfad windet sich über das dunkle Aschefeld seiner Karte zum Horizont, an dem die Glut des
-Feuerfelds als roter Schein hinter den Hügeln steht; der Schein seiner Flammenköpfe liegt auf Boden und Meute.
+nächsten herbei). Hinter ihnen liegt das dunkle Aschefeld seiner Karte, am Horizont steht die Glut des
+Feuerfelds als roter Schein hinter den Hügeln; der Schein seiner Flammenköpfe liegt auf Boden und Meute.
 
 Quellen:
   MotiveGN.xcf  Ebene 155 „Orthos“: Orthos mit Flammenköpfen (Box x 168–186, y 330–353; die darüber anstoßende
@@ -37,7 +37,7 @@ dog = {n: sprite('o27_' + n, GN, [i], box=b) for n, i, b in (
 HOR = 128                                        # Horizont (Canvas-Pixel)
 
 # ---------------------------------------------------------------- Pfad (Canvas-Koordinaten, Catmull-Rom)
-PTS = [(128, HOR), (122, 150), (125, 200), (125, 300), (125, 360)]
+PTS = [(124, 166), (124, 205), (125, 300), (125, 360)]   # Pfad beginnt unter der Meute (hinten verdeckt)
 
 
 def catmull(pts, n=40):
@@ -86,7 +86,7 @@ for y in range(h2, bh):
         bg[y, x, :3] = G[1] if r < .6 else (G[0] if r < .85 else G[2])
 # Pfad
 PC = [(64, 52, 50), (80, 66, 60), (94, 80, 72)]
-for y in range(h2, bh):
+for y in range(84, bh):
     cy = y * 2 + 1
     cx = path_x(cy) / 2
     wdt = 1.5 + 17 * ((cy - HOR) / (350 - HOR)) ** 1.3
@@ -98,7 +98,7 @@ for y in range(h2, bh):
         elif d < wdt + 1:
             bg[y, x, :3] = (24, 15, 16)
 # Lichtschein der Flammenköpfe (auf Boden und Meute)
-glow(bg, 62.5, 100, 56, 34, (190, 70, 24), .38)
+glow(bg, 62.5, 106, 50, 26, (190, 70, 24), .3)
 
 # ================================================================ 4×-Ebene: die Meute als Gruppe dicht hinter Orthos
 mw, mh = grid(4)

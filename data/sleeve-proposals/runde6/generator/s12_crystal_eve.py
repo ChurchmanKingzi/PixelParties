@@ -83,7 +83,7 @@ def tex(src, h, w):
 
 
 # ================================================================== Geometrie
-WX3, WY3 = 42 - well.shape[1] // 2, 23                    # Brunnen im 3×-Raster (Canvas y 69)
+WX3, WY3 = 42 - well.shape[1] // 2, 29                    # Brunnen im 3×-Raster (Canvas y 87)
 WCX, WCY = 125, (WY3 + 17) * 3                            # Wassermitte (Canvas)
 MX5, MFEET5 = 25 - mary.shape[1] // 2, 63                 # Mary im 5×-Raster (Füße Canvas y 315)
 
@@ -92,20 +92,41 @@ W2, H2 = 125, 175
 bg = np.zeros((H2, W2, 4), np.uint8); bg[..., 3] = 255
 snow = tex(SNOW, H2, W2)
 NIGHT = np.array((22, 30, 70))
-GLOW = np.array((150, 220, 255))
+GLOW = np.array((120, 235, 235))
+HOR = 36                                                  # Horizont (Canvas y 72)
+SKY_T, SKY_B = np.array((8, 10, 30)), np.array((34, 44, 92))
+HILL = np.array((70, 84, 130))
 for y in range(H2):
     for x in range(W2):
-        t = y / H2
-        f = 0.36 + 0.22 * t                                 # Platz nach vorn heller
-        c = snow[y, x] * f + NIGHT * (1 - f) * 0.9
-        d = math.hypot((x + 0.5) * 2 - WCX, ((y + 0.5) * 2 - WCY) * 1.3)
-        L = max(0, 1 - d / 150) ** 1.3                      # Lichtschein des Kristallbrunnens
+        if y < HOR:
+            t = y / HOR
+            c = SKY_T * (1 - t) + SKY_B * t
+        else:
+            t = (y - HOR) / (H2 - HOR)
+            f = 0.30 + 0.30 * t                             # Platz nach vorn heller
+            c = snow[y, x] * f + NIGHT * (1 - f) * 0.9
+        d = math.hypot((x + 0.5) * 2 - WCX, ((y + 0.5) * 2 - WCY) * 1.4)
+        L = max(0, 1 - d / 105) ** 0.9 if y >= HOR else 0  # Lichtschein des Kristallbrunnens auf dem Schnee
         q = math.floor(L * 5 + BAY[y % 4, x % 4]) / 5
-        c = c + (GLOW - c) * 0.35 * q
+        c = c + (GLOW - c) * 0.55 * q
         bg[y, x, :3] = np.clip(c, 0, 255)
+# Sterne
+for _ in range(22):
+    x, y = rnd.randrange(0, W2), rnd.randrange(0, HOR - 10)
+    bg[y, x, :3] = (200, 210, 255)
+# ferne verschneite Hügel mit den warmen Fensterlichtern des Dorfes
+for x in range(W2):
+    top = int(HOR - 5 - 3 * math.sin(x * 0.11 + 1) - 2 * math.sin(x * 0.31))
+    for y in range(top, HOR + 1):
+        bg[y, x, :3] = HILL * (0.8 if y > top else 1.1)
+for (x, y) in [(8, HOR - 2), (14, HOR - 3), (15, HOR - 1), (31, HOR - 2), (47, HOR - 4), (48, HOR - 2), (77, HOR - 3),
+               (92, HOR - 1), (93, HOR - 3), (109, HOR - 2), (118, HOR - 4)]:
+    bg[y, x, :3] = (255, 206, 110)
+for x in range(W2):
+    bg[HOR + 1, x, :3] = (bg[HOR + 1, x, :3] * 0.7).astype(np.uint8)
 # Lichterkette: zwei durchhängende Bögen über dem Platz, Birnchen in den Farben der Dorf-Lichterketten
 BULBS = [(230, 40, 40), (40, 190, 60), (60, 110, 230), (240, 200, 40), (200, 60, 200)]
-for (xa, xb, ya, sag) in [(-2, 64, 14, 11), (61, 127, 14, 11)]:
+for (xa, xb, ya, sag) in [(-2, 64, 11, 10), (61, 127, 11, 10)]:
     k = 0
     for x in range(xa, xb + 1):
         t = (x - xa) / (xb - xa)
@@ -116,7 +137,7 @@ for (xa, xb, ya, sag) in [(-2, 64, 14, 11), (61, 127, 14, 11)]:
                 bg[y + 1, x, :3] = BULBS[k % 5]; k += 1
                 bg[y + 2, x, :3] = np.clip(np.array(BULBS[(k - 1) % 5]) * 0.6, 0, 255)
 # Schneeflocken
-for _ in range(40):
+for _ in range(46):
     x, y = rnd.randrange(0, W2), rnd.randrange(0, H2)
     bg[y, x, :3] = (236, 240, 255)
 

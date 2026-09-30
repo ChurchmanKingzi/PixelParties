@@ -2,10 +2,11 @@
 """39 Black Ice Hall – Gegner „Slip 'n Slide“, Held: Hel, the Bound Specter.
 
 Der geheime Kerzensaal aus Hels Base-Karte, aber der Boden ist zu schwarzem Spiegeleis gefroren (Slippery Ice:
-diagonale Glanzstreifen, Kerzenlicht spiegelt sich). Hel schwebt halbtransparent mit ihrem fahlen Schein zwischen den
+wenige schwache Glanzstreifen, Kerzenlicht spiegelt sich). Ein kräftiger fahler Geisterschein hinter Hel stellt
+ihre dunkle Gestalt frei. Hel schwebt halbtransparent mit ihrem fahlen Schein zwischen den
 Kerzenleuchtern, ihr Artefakt in den Händen (an das sie gebunden ist), unter ihr ihr dunkler Schatten und ihr blasses
-Spiegelbild im Eis. Hinter ihr schlittern von links ein Slippery Pengu (bäuchlings) und von rechts ein Slippery Polar (auf
-Rollen) über das Eis aufeinander zu – die Slippery-Kreaturen rutschen in jedem Zug eine Zone weiter.
+Spiegelbild im Eis. Hinter ihr schlittern auf einer gemeinsamen Bodenlinie (mit Schatten, Rutschspur und Spiegelung im Eis) von links
+ein Slippery Pengu (bäuchlings) und von rechts ein Slippery Polar (auf Rollen) aufeinander zu – die Slippery-Kreaturen rutschen in jedem Zug eine Zone weiter.
 
 Quellen (MotiveArcanum.xcf):
   Ebene 32 „Ebene #55“ (Hel) + 31 „Ebene #112“ (Artefakt in ihren Händen) – so auf der Base-Karte „Hel, the Bound
@@ -63,9 +64,8 @@ for y in range(H2):
         c = bg.a[y, x, :3].astype(float)
         c = c * 0.85 + np.array((14, 30, 52)) * 0.6
         bg.a[y, x, :3] = np.clip(c, 0, 255)
-        s = (x + y) % 14
-        if s in (0, 1): bg.blend(x, y, ICE_HI, 0.16 if s == 0 else 0.10)
-        elif s == 3 and (x // 7 + y // 7) % 2 == 0: bg.blend(x, y, ICE_HI, 0.07)
+        s = (x + y) % 29                                   # nur wenige, schwache Glanzstreifen
+        if s == 0 and (x // 12) % 3 != 1: bg.blend(x, y, ICE_HI, 0.09)
 
 # Spiegelungen der Leuchter/Thron im Eis (senkrecht gespiegelt unter ihren Füßen, abgeschwächt)
 def mirror_region(x0, x1, y_top, y_foot, depth, a0=0.40):
@@ -87,46 +87,52 @@ for fx in (24, 29, 34, 88, 93, 98):
         if floor[69 + k, fx] and (k + fx) % 3 != 0:
             bg.blend(fx, 69 + k, WARM, 0.22 * (1 - k / 14))
 
-# Slippery Pengu (bäuchlings, von links) und Slippery Polar (auf Rollen, von rechts) rutschen hinter Hel vorbei
-peng = flip(sprite('o39_pengu', 'Motive', [804]))       # Original blickt nach links → gespiegelt, rutscht nach rechts
-polar = sprite('o39_polar', 'Motive', [785])            # blickt nach links, rollt zur Mitte
-for s_, x0, foot in ((peng, 2, 96), (polar, 123 - polar.shape[1], 96)):
-    h, w = s_.shape[:2]
-    y0 = foot - h + 1
-    # Spiegelung im Eis
-    for k in range(1, 9):
-        ty = foot + k; sy = h - k
-        if sy < 0: break
-        for i in range(w):
-            if s_[sy, i, 3] and 0 <= x0 + i < W2 and floor[ty, x0 + i]:
-                bg.blend(x0 + i, ty, s_[sy, i, :3], 0.30 * (1 - k / 9))
-    bg.paste(s_, x0, y0)
-# kurze Rutschspuren (helle Kratzer im Eis) hinter beiden
-for x in range(0, 6):
-    if floor[97, x]: bg.blend(x, 97, ICE_HI, 0.35)
-for x in range(120, 125):
-    if floor[97, x]: bg.blend(x, 97, ICE_HI, 0.35)
-
-# Hels Schein (Ebene 34 als Vorbild) auf dem 2×-Raster: weicher, gerasterter Hof um ihre Gestalt
-GL = (190, 222, 214)
-gcx, gcy = 62.5, 90
-for y in range(H2):
-    for x in range(W2):
-        d = math.hypot((x + 0.5 - gcx) / 1.0, (y + 0.5 - gcy) / 1.3)
-        v = 0.42 * max(0.0, 1 - d / 34) ** 1.5
-        q = dith(v, x, y, 5)
-        if q > 0: bg.blend(x, y, GL, q)
-# Hels Schatten (dunkelroter Fleck wie auf der Karte) auf dem Eis
-for xx in range(-9, 10):
-    for yy in range(-2, 3):
-        if (xx / 9.5) ** 2 + (yy / 2.4) ** 2 <= 1: bg.blend(62 + xx, 132 + yy, (34, 4, 10), 0.75)
-
 # Gesamtabdunklung zum Rand (Saal im Dunkeln, Mitte vom Geisterlicht erhellt)
 for y in range(H2):
     for x in range(W2):
         d = math.hypot((x + 0.5 - 62.5) / 62.5, (y + 0.5 - 95) / 95)
         q = dith(0.55 * max(0.0, d - 0.55) / 0.6, x, y, 4)
         if q > 0: bg.blend(x, y, (2, 4, 10), q)
+
+# Hels Schein (Ebene 34 als Vorbild) auf dem 2×-Raster – nach der Abdunklung, damit er kräftig bleibt: weicher, gerasterter Hof um ihre Gestalt
+GL = (200, 234, 222)
+gcx, gcy = 62.5, 86
+for y in range(H2):
+    for x in range(W2):
+        d = math.hypot((x + 0.5 - gcx) / 1.0, (y + 0.5 - gcy) / 1.3)
+        v = 0.92 * max(0.0, 1 - d / 46) ** 0.8           # kräftiger Geisterschein: Hel steht dunkel davor frei
+        q = dith(v, x, y, 5)
+        if q > 0: bg.blend(x, y, GL, q)
+# Slippery Pengu (bäuchlings, von links) und Slippery Polar (auf Rollen, von rechts) schlittern auf dem Eis vor den
+# Leuchtern hinter Hel vorbei – Bodenlinie Zeile 86 (vor den Leuchterfüßen in Zeile 69, hinter der Stufe ab Zeile 100)
+peng = flip(sprite('o39_pengu', 'Motive', [804]))       # Original blickt nach links → gespiegelt, rutscht nach rechts
+polar = sprite('o39_polar', 'Motive', [785])            # blickt nach links, rollt zur Mitte
+FOOT2 = 86
+for s_, x0, trail in ((peng, 3, (0, 12)), (polar, 124 - polar.shape[1], (124 - 10, 125))):
+    h, w = s_.shape[:2]
+    y0 = FOOT2 - h + 1
+    cols = [i for i in range(w) if s_[:, i, 3].any()]
+    # Rutschspur: helle Kratzer im Eis hinter dem Tier (auf der Bodenlinie)
+    for x in range(*trail):
+        for yy, a in ((FOOT2 + 1, 0.45), (FOOT2 - 1, 0.25)):
+            if floor[yy, x] and (x + yy) % 4: bg.blend(x, yy, (190, 206, 236), a)
+    # Schatten direkt unter dem Körper (Bodenkontakt)
+    for i in range(min(cols), max(cols) + 1):
+        for yy, a in ((FOOT2, 0.75), (FOOT2 + 1, 0.45)):
+            if 0 <= x0 + i < W2: bg.blend(x0 + i, yy, (4, 8, 18), a)
+    # Spiegelung im Eis
+    for k in range(2, 12):
+        ty = FOOT2 + k; sy = h - k + 1
+        if sy < 0: break
+        for i in range(w):
+            if s_[sy, i, 3] and 0 <= x0 + i < W2 and floor[ty, x0 + i]:
+                bg.blend(x0 + i, ty, s_[sy, i, :3], 0.38 * (1 - k / 12))
+    bg.paste(s_, x0, y0)
+
+# Hels Schatten (dunkelroter Fleck wie auf der Karte) auf dem Eis
+for xx in range(-9, 10):
+    for yy in range(-2, 3):
+        if (xx / 9.5) ** 2 + (yy / 2.4) ** 2 <= 1: bg.blend(62 + xx, 132 + yy, (34, 4, 10), 0.75)
 
 # ================================================================== Vordergrund 5× (50×70)
 W5, H5 = 50, 70
@@ -148,7 +154,7 @@ for j in range(ref.shape[0]):
         c = np.array(ref[j, i, :3], float) * 0.6 + np.array((40, 60, 100)) * 0.4
         fg.px(HX + i, y, tuple(int(v) for v in c), int(255 * a))
 # Hel selbst, halbtransparent wie auf der Karte
-fg.paste(hel, HX, HY, alpha=0.82)
+fg.paste(hel, HX, HY, alpha=0.90)
 
 cv = compose_planes([bg, fg])
 save(cv, '39_black_ice_hall.png')
