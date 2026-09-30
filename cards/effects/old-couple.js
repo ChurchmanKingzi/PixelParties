@@ -19,6 +19,18 @@
 //    (`canSummon`). Daraus folgt die Spielbarkeit: Old Couple ist NUR
 //    einsetzbar, wenn es im Deck wirklich eine solche Kreatur gibt.
 //
+//  ── WIRKER ≠ BESCHWOERER (Bugfix, Bericht: „Old Couple fragt nicht") ─
+//  Zwei Rollen, die nicht derselbe Held sein muessen:
+//    · WIRKER — ein eigener Held mit Support Magic. Sein Support-Magic-
+//      Level bestimmt, bis zu welchem Kreatur-Level Old Couple reagieren
+//      darf. Die Engine bietet nur Helden an, die den Spell wirken
+//      koennen (`reactionCasterAllowed` filtert zusaetzlich aufs Level).
+//    · BESCHWOERER — der Held, der die ausloesende Kreatur beschworen hat
+//      („with the same Hero"): er beschwoert auch den Partner.
+//  Bis jetzt musste der BESCHWOERER selbst Support Magic haben — beschwor
+//  ein anderer Held (ohne Support Magic) als Kazena, kam nie ein Angebot,
+//  obwohl Kazena Old Couple haette wirken koennen.
+//
 //  ── WO DAS FENSTER HERKOMMT ───────────────────────────────────────
 //  `onCreatureSummoned` stand seit jeher in der Fensterliste der
 //  Engine, wurde aber nie gefeuert — v873 tut das an der einen Stelle,
@@ -27,8 +39,13 @@
 //  ── DIE SPERRE DANACH ─────────────────────────────────────────────
 //  „You cannot summon Creatures for the rest of the turn afterwards."
 //  = `ps.summonLocked`, derselbe Riegel, den die Engine ohnehin an
-//  allen Beschwoerungswegen prueft. Er wird NACH der eigenen
-//  Beschwoerung gesetzt — sonst blockierte er sich selbst.
+//  allen Beschwoerungswegen prueft. Er wird VOR der Beschwoerung des
+//  Partners gesetzt (Bugfix): dessen Beschwoerungs-Effekte (Cloudy Slime
+//  „place a level 0 Creature …") laufen schon in
+//  `summonCreatureWithHooks` und waeren sonst noch nicht gesperrt.
+//  `summonCreatureWithHooks` selbst prueft `summonLocked` nicht — der
+//  Riegel blockiert die eigene Beschwoerung also nicht. Scheitert sie,
+//  wird er zurueckgenommen.
 // ═══════════════════════════════════════════
 
 const { hasCardType, sameCardName, cardVariantTag } = require('./_hooks');
@@ -38,6 +55,16 @@ const CARD_NAME = 'Old Couple';
 /** Support-Magic-Level des Helden, 0 wenn er die Karte gar nicht wirken darf. */
 function supportLevel(engine, pi, heroIdx) {
   return engine.effectiveSchoolLevelForCaster('Support Magic', pi, heroIdx) || 0;
+}
+
+/** Hoechstes Support-Magic-Level unter den lebenden eigenen Helden (Wirker). */
+function besteWirkerStufe(engine, pi) {
+  let best = 0;
+  (engine.gs.players[pi]?.heroes || []).forEach((h, hi) => {
+    if (!h?.name || h.hp <= 0) return;
+    best = Math.max(best, supportLevel(engine, pi, hi));
+  });
+  return best;
 }
 
 /**
@@ -112,10 +139,9 @@ function fensterPasst(gs, pi, engine, chainCtx) {
   const hero = gs.players[pi]?.heroes?.[heroIdx];
   if (!hero?.name || hero.hp <= 0) return null;
 
-  // „with level 1/2/3 or lower" — die Stufe kommt vom NUTZER-Helden.
-  // Das ist derselbe Held, der gleich beschwoeren soll („with the same
-  // Hero"), also muss ER die Karte wirken koennen.
-  const stufe = supportLevel(engine, pi, heroIdx);
+  // „with level 1/2/3 or lower" — die Stufe kommt vom WIRKER (irgendein
+  // eigener Held mit Support Magic), nicht zwingend vom Beschwoerer.
+  const stufe = besteWirkerStufe(engine, pi);
   if (stufe <= 0) return null;
   const level = h.level ?? 0;
   if (level > stufe) return null;
@@ -131,6 +157,13 @@ module.exports = {
   // Ohne diese Bedingung meldete sich die Karte in JEDEM Kettenfenster
   // als spielbar (Lehre v830, Pawn Chain).
   reactionCondition: (gs, pi, engine, chainCtx) => !!fensterPasst(gs, pi, engine, chainCtx),
+
+  /** Nur Helden, deren Support-Magic-Level fuer die Kreatur reicht, duerfen wirken. */
+  reactionCasterAllowed(gs, pi, heroIdx, engine, chainCtx) {
+    const fenster = fensterPasst(gs, pi, engine, chainCtx);
+    if (!fenster) return false;
+    return supportLevel(engine, pi, heroIdx) >= fenster.level;
+  },
 
   async resolve(engine, pi, _selectedIds, _validTargets, _opts, chainCtx) {
     const gs = engine.gs;
@@ -178,10 +211,14 @@ module.exports = {
     engine._broadcastEvent('card_reveal', { cardName: gewaehlt, playerIdx: pi });
     await engine._delay(350);
 
+    // Sperre VOR der Beschwoerung (siehe Kopfkommentar); bei Scheitern zurueck.
+    const warGesperrt = !!ps.summonLocked;
+    ps.summonLocked = true;
     const res = await engine.summonCreatureWithHooks(gewaehlt, pi, heroIdx, slot, {
       source: CARD_NAME, hookExtras: engine.deckHookExtras(),   // v1393
     });
     if (!res?.inst) {
+      ps.summonLocked = warGesperrt;
       // Beschwoerung abgelehnt: die Karte gehoert zurueck ins Deck,
       // nicht in die Ablage — sie hat das Deck nie wirklich verlassen.
       engine.deckRueckgabe(genommen);   // v1393
@@ -190,8 +227,7 @@ module.exports = {
     }
 
     // „You cannot summon Creatures for the rest of the turn afterwards."
-    // ERST JETZT setzen (siehe Kopfkommentar).
-    ps.summonLocked = true;
+    // (Riegel steht seit vor der Beschwoerung, siehe oben.)
 
     engine.log('old_couple', {
       player: ps.username, trigger: name, summoned: gewaehlt,
