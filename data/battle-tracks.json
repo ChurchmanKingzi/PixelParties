@@ -1,5 +1,8 @@
 {
   "generic": {
+    "battle1": "First Blood",
+    "battle2": "Shadow Duel",
+    "battle3": "Full Tilt",
     "battle4": "Heroic Charge",
     "battle5": "Dark Cathedral",
     "battle6": "Cyber Chase",
