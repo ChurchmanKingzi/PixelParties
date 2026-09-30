@@ -42,8 +42,6 @@ PICKS = [
     ("DonQuisto",      "Don Quisto, the Gold Seeker",            63, 55),
     ("CactusCreature", "Cactus Creature", 77, 50, 64),
     ("CybugBee", "Cybug BEE", 77, 50, 100),
-    ("Elana", "Elana, the Rocky Rebel", 77, 70, 64),
-    ("Triceras", "Gigantisaur Triceras", 77, 55, 80),
     ("Stegon", "Gigantisaur Stegon", 77, 55, 100),
     ("Greatmaw", "Greatmaw Siren", 77, 50, 70),
     ("BearRider", "Mischief Militia - Bear Rider", 77, 57, 56),
