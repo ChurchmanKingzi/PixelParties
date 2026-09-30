@@ -32,7 +32,20 @@ lilly = sprite('o18_lilly', M, [973])                        # 18×25, = Sichtba
 # Sparkfly-Arbeiterin: Körper 160 + Flügel 158 (linke Biene), Königin: 177 Körper + 176 Beine + 175 Krone
 body = layer(R, 160)[244:276, 82:108].copy(); wing = layer(R, 158)[244:276, 82:108].copy()
 bb = bbox(X.over(body, wing)); body = body[bb[1]:bb[3], bb[0]:bb[2]]; wing = wing[bb[1]:bb[3], bb[0]:bb[2]]
-queen = compose(R, [175, 176, 177])
+red = layer(R, 159)[244:276, 82:108].copy()[bb[1]:bb[3], bb[0]:bb[2]]      # roter Fleck der Sparkfly Attendant
+att = body.copy(); att[red[..., 3] > 0] = red[red[..., 3] > 0]
+# Goldsack: vorderer Sack der Ebene 1379 „Wealth“ (oval freigestellt, Truhenglanz oben entfernt, Sackhals ergänzt)
+W_ = layer(M, 1379)[184:208, 126:154].copy()
+yy, xx = np.mgrid[184:208, 126:154]
+W_[((xx + 0.5 - 140) / 10) ** 2 + ((yy + 0.5 - 199) / 6.6) ** 2 > 1] = 0
+W_[(yy < 196) & (W_[..., 0] > 200)] = 0
+b_ = bbox(W_); sack0 = W_[b_[1]:b_[3], b_[0]:b_[2]]
+sack = np.zeros((sack0.shape[0] + 3, sack0.shape[1], 4), np.uint8); sack[3:] = sack0
+cx_ = sack.shape[1] // 2
+for (dx, dy, c) in [(-1, 0, (90, 57, 32)), (0, 0, (123, 83, 43)), (1, 0, (90, 57, 32)),
+                    (-1, 1, (109, 55, 21)), (0, 1, (157, 106, 55)), (1, 1, (109, 55, 21)),
+                    (-2, 2, (90, 57, 32)), (-1, 2, (162, 89, 44)), (0, 2, (157, 106, 55)), (1, 2, (162, 89, 44)), (2, 2, (90, 57, 32))]:
+    sack[dy, cx_ + dx] = list(c) + [255]
 chest = sprite('o18_chest', M, [1386])                      # Treasure Chest 24×16
 hall = layer(G, 663)                                        # „Rathaus aussen“ (320×240-Karte)
 
@@ -71,13 +84,20 @@ wings2 = rgba(125, 175)
 def bee(x, y, fl=False):
     b_, w_ = (flip(body), flip(wing)) if fl else (body, wing)
     put(wings2, w_, x, y); put(p2, b_, x, y)
-put(p2, queen, 86, 20)                                      # Königin (mit Hive's Crown) schwebt rechts über dem Platz
-# zwei Arbeiterinnen tragen die Schatztruhe vom Fenster zu Lilly hinab
-put(p2, chest, 22, 70)
-bee(14, 54); bee(32, 54)
+def carry(load, lx, ly, bees):
+    """Last zuerst, dann die Tiere darüber: ihre Beine greifen über die Oberkante der Last."""
+    put(p2, load, lx, ly)
+    for (b_, x, y, fl) in bees:
+        bs = flip(b_) if fl else b_
+        put(wings2, flip(wing) if fl else wing, x, y); put(p2, bs, x, y)
+# zwei Arbeiterinnen tragen die Schatztruhe (Beine auf dem Deckel)
+carry(chest, 23, 66, [(body, 14, 53, False), (body, 31, 53, True)])
+# eine Attendant (roter Fleck) trägt einen Goldsack vom Fenster herab, eine Arbeiterin einen zweiten
+carry(sack, 92, 51, [(att, 91, 38, False)])
+carry(sack, 78, 86, [(body, 77, 73, True)])
 # Funkeln der Treasure-Chest-Karte (Ebene 1384) um die Truhe
 spark = [p for p in parts(compose(M, [1384]), dil=0) if p.shape[0] >= 3]
-for sp, (x, y) in zip(spark, [(16, 74), (48, 72), (44, 88), (18, 88), (30, 94)]):
+for sp, (x, y) in zip(spark, [(17, 80), (50, 74), (46, 88), (20, 90), (34, 92)]):
     put(p2, sp, x, y)
 # Schatten der fliegenden Tiere auf dem Pflaster (1 Rasterpunkt dunkler, 2×)
 def shade(cx, cy, rx, ry):
@@ -85,7 +105,7 @@ def shade(cx, cy, rx, ry):
         for x in range(cx - rx, cx + rx + 1):
             if ((x - cx) / rx) ** 2 + ((y - cy) / ry) ** 2 <= 1 and 0 <= x < 125 and 0 <= y < 175:
                 cv.a[y * 2:y * 2 + 2, x * 2:x * 2 + 2] = (cv.a[y * 2:y * 2 + 2, x * 2:x * 2 + 2] * 0.6).astype(np.uint8)
-shade(34, 104, 14, 3); shade(97, 90, 9, 2)
+shade(35, 108, 13, 3); shade(101, 100, 7, 2); shade(87, 112, 7, 2)
 blit(cv, p2, 2)
 cv.paste(up(wings2, 2), 0, 0, alpha=0.7)                    # Flügel wie in den Kartenszenen durchscheinend (70 %)
 cv.paste(up(p2, 2), 0, 0)                                   # Körper über die Flügel

@@ -3,7 +3,7 @@
 Held/Hauptmotiv: Baaliel, the Demon General (Base-Karte).
 
 Idee (Beschuss, Tiefenstaffelung): Baaliel steht groß und mittig vorn auf dunklem Basalt vor einem Lavastrom
-und gibt mit ausgebreiteten Armen den Feuerbefehl. Seine Höllenbatterie schießt eine Salve: fünf Feuerbälle
+und gibt mit ausgebreiteten Armen den Feuerbefehl. Seine Höllenbatterie schießt eine Salve: vier Feuerbälle
 (Karte „Fireball“ aus dem Deck) ziehen auf parallelen Bahnen schräg von rechts oben nach links unten – Kopf
 voran, Schweif hinterher, die fernen kleiner – auf den fernen Hügel links, an dem die Einschläge glühen.
 Horned Demons (Cover-Karte) in zwei Tiefen: zwei nahe als Ehrenwache links/rechts, drei ferne im Glutdunst.
@@ -18,7 +18,7 @@ Selbst gezeichnet: Himmelsverlauf (geordnetes Dithering), ferne Hügelsilhouette
                 um den Brand, Schatten.
 Skalierung (Tiefenebenen):
   Himmel, Hügel, Einschlagglut, 3 ferne Feuerbälle, 3 ferne Horned Demons, Lavaboden – 2×-Raster (125×175)
-  2 nahe Feuerbälle, 2 nahe Horned Demons – 3×-Raster (84×117) (deutlich vor/über den 2×-Dingen)
+  1 naher Feuerball, 2 nahe Horned Demons – 3×-Raster (84×117) (deutlich vor/über den 2×-Dingen)
   Baaliel 20×28 → 100×140 – 5× (Vordergrund; keine andere Figur auf seiner Höhe neben ihm)
 """
 import math
@@ -77,11 +77,11 @@ for y in range(TY - 26, TY + 6):
             q = dith(1 - d, x, y, 3) * 0.5
             bg[y, x, :3] = (bg[y, x, :3] * (1 - q) + np.array([255, 150, 60]) * q).astype(np.uint8)
 # ferne Feuerbälle der Salve, alle auf parallelen Bahnen nach links unten zum Hügel
-for (x, y) in ((TX + 10, TY - 20), (TX + 40, TY - 30), (TX + 72, TY - 42)):
+for (x, y) in ((30, 42), (54, 34), (80, 25)):
     put(bg, shot, x, y)
 # drei ferne Horned Demons im Glutdunst (dunkler), verteilt auf der Ebene
 fd = shade(demon, 0.7, (40, 6, 6))
-for FDX, FDY in ((44, 84), (84, 86), (110, 83)):
+for FDX, FDY in ((38, 85), (64, 80), (90, 86)):
     for xx in range(FDX - 7, FDX + 7):
         if 0 <= xx < GW and bay(xx, FDY) < 0.7: bg[FDY, xx, :3] = (bg[FDY, xx, :3] * 0.5).astype(np.uint8)
     put(bg, fd, FDX - demon.shape[1] // 2, FDY - demon.shape[0] + 1)
@@ -93,7 +93,7 @@ blit(cv, bg, 2)
 MW, MH = grid(3)
 mid = rgba(MW, MH)
 # nahe Feuerbälle oben rechts, parallel zu den fernen
-for (x, y) in ((50, 8), (66, 24)):
+for (x, y) in ((44, 2),):
     put(mid, shot, x, y)
 # zwei nahe Horned Demons links und rechts (Ehrenwache), Füße bei Zeile 70 (Leinwand y 210)
 for NDX in (13, 71):
