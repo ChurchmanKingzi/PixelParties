@@ -2260,7 +2260,7 @@ function ProfilSchalter({ an, gesperrt, onToggle, label, tipp, zeigeTipp, verste
 }
 
 function ProfileScreen() {
-  const { user, setUser, setScreen, notify } = useContext(AppContext);
+  const { user, setUser, setScreen, notify, setBgmMode } = useContext(AppContext);
   const [color, setColor] = useState(user.color || '#00f0ff');
   const [avatar, setAvatar] = useState(user.avatar);
   const [cardback, setCardback] = useState(user.cardback);
@@ -2315,6 +2315,48 @@ function ProfileScreen() {
   const [uploadedCardbacks, setUploadedCardbacks] = useState([]);
   const [ownedSleeves, setOwnedSleeves] = useState([]);
   const [sleeveNames, setSleeveNames] = useState({});
+
+  // Battle-Track: gewählter Kampf-Track (der Gegner hört ihn). Allgemeine
+  // Tracks stehen offen, CPU-Themen werden nach 10 Siegen gegen die CPU frei.
+  const [showTrackGallery, setShowTrackGallery] = useState(false);
+  const [trackData, setTrackData] = useState(null);
+  const [previewTrack, setPreviewTrack] = useState(null);
+  const previewActive = useRef(false);
+  const loadTracks = useCallback(() => {
+    api('/battle-tracks').then(setTrackData).catch(() => {});
+  }, []);
+  useEffect(() => { loadTracks(); }, [loadTracks]);
+  // Vorhören läuft über den Musik-Manager (Lautstärke, Ducking, lückenloser Loop);
+  // beim Schließen bzw. Verlassen des Profils zurück zur Menümusik.
+  const stopTrackPreview = useCallback(() => {
+    if (!previewActive.current) return;
+    previewActive.current = false;
+    setPreviewTrack(null);
+    if (setBgmMode) setBgmMode('menu');
+  }, [setBgmMode]);
+  useEffect(() => () => { if (previewActive.current && setBgmMode) setBgmMode('menu'); }, [setBgmMode]);
+  const togglePreview = (id) => {
+    if (previewTrack === id) { stopTrackPreview(); return; }
+    previewActive.current = true;
+    setPreviewTrack(id);
+    if (setBgmMode) setBgmMode('battle:' + id);
+  };
+  const closeTrackGallery = () => { stopTrackPreview(); setShowTrackGallery(false); };
+  const selectBattleTrack = async (id) => {
+    try {
+      const data = await api('/profile', { method: 'PUT', body: JSON.stringify({ battleTrack: id }) });
+      setUser(data.user);
+      setTrackData(d => d ? { ...d, selected: id } : d);
+      notify(id ? 'Battle track selected!' : 'Default battle track selected.', 'success');
+    } catch (e) { notify(e.message, 'error'); }
+  };
+  const battleTrackName = (id) => {
+    if (!id) return 'Default';
+    const cpu = trackData && trackData.cpu.find(c => c.id === id);
+    if (cpu) return cpu.name + "'s Theme";
+    const m = /^battle(\d+)$/.exec(id);
+    return m ? 'Battle ' + m[1] : id;
+  };
 
   // Avatar gallery
   const [showAvatarGallery, setShowAvatarGallery] = useState(false);
@@ -2797,6 +2839,20 @@ function ProfileScreen() {
                   </div>
                 </div>
 
+                {/* Battle music */}
+                <div style={{ paddingTop: 14, paddingBottom: 14, borderBottom: '1px solid var(--bg4)', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <div className="profile-section-label">BATTLE MUSIC</div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <div style={{ fontSize: 13, color: 'var(--text)', fontWeight: 600, flex: 1 }}>
+                      {'♪ ' + battleTrackName(user.battleTrack)}
+                    </div>
+                    <button className="btn" style={{ padding: '6px 16px', fontSize: 11 }}
+                      onClick={() => { loadTracks(); setShowTrackGallery(true); }}>
+                      CHANGE
+                    </button>
+                  </div>
+                </div>
+
                 {/* Board info */}
                 <div style={{ paddingTop: 14, flex: 1, display: 'flex', flexDirection: 'column', gap: 6 }}>
                   <div className="profile-section-label">BOARD</div>
@@ -2867,6 +2923,51 @@ function ProfileScreen() {
 
             </div>
           </div>
+
+          {/* Battle Track Modal */}
+          {showTrackGallery && trackData && (() => {
+            const sel = user.battleTrack || null;
+            const row = (id, label, sub, locked) => (
+              <div key={id || 'default'} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 10px',
+                border: '1px solid ' + (sel === id ? 'var(--accent)' : 'var(--bg4)'), borderRadius: 4,
+                background: sel === id ? 'rgba(0,240,255,.07)' : 'transparent', opacity: locked ? 0.75 : 1 }}>
+                <button className="btn" style={{ padding: '4px 10px', fontSize: 11, minWidth: 34 }}
+                  title={previewTrack === id ? 'Stop preview' : 'Preview'}
+                  disabled={id == null}
+                  onClick={() => togglePreview(id)}>
+                  {previewTrack === id ? '■' : '▶'}
+                </button>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>{locked ? '🔒 ' : ''}{label}</div>
+                  {sub ? <div style={{ fontSize: 10, color: 'var(--text2)' }}>{sub}</div> : null}
+                </div>
+                {sel === id
+                  ? <span style={{ fontSize: 10, color: 'var(--accent)', fontWeight: 700 }}>SELECTED</span>
+                  : <button className="btn" style={{ padding: '4px 12px', fontSize: 10 }} disabled={locked}
+                      onClick={() => selectBattleTrack(id)}>SELECT</button>}
+              </div>
+            );
+            return (
+              <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) closeTrackGallery(); }}>
+                <div className="modal" style={{ maxWidth: 520, width: '90vw', maxHeight: '80vh', display: 'flex', flexDirection: 'column' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', marginBottom: 6 }}>
+                    <h3 className="orbit-font" style={{ fontSize: 14, color: 'var(--accent)', flex: 1 }}>BATTLE MUSIC</h3>
+                    <button className="btn" style={{ padding: '4px 12px', fontSize: 10 }} onClick={closeTrackGallery}>✕ CLOSE</button>
+                  </div>
+                  <div style={{ fontSize: 11, color: 'var(--text2)', marginBottom: 12 }}>
+                    Your opponent hears the track you pick here. Beat a CPU {trackData.need} times to unlock its theme.
+                  </div>
+                  <div style={{ overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    {row(null, 'Default', 'The standard battle theme', false)}
+                    {trackData.generic.map(id => row(id, 'Battle ' + id.replace('battle', ''), null, false))}
+                    <div className="profile-section-label" style={{ marginTop: 10 }}>OPPONENT THEMES</div>
+                    {trackData.cpu.map(c => row(c.id, c.name + "'s Theme",
+                      c.unlocked ? 'Unlocked' : (c.wins + ' / ' + trackData.need + ' wins'), !c.unlocked))}
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
 
           {/* Sleeve Gallery Modal */}
           {showSleeveGallery && (

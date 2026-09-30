@@ -910,6 +910,8 @@ async function initDatabase() {
   try { await db.execute("ALTER TABLE decks ADD COLUMN cube_draft_meta TEXT DEFAULT NULL"); } catch {}
   try { await db.execute('ALTER TABLE users ADD COLUMN sc INTEGER DEFAULT 0'); } catch {}
   try { await db.execute("ALTER TABLE users ADD COLUMN board TEXT DEFAULT NULL"); } catch {}
+  // Gewählter Battle-Track (battle-tracks.js): 'battle<N>' oder Slug eines CPU-Themas; NULL = Standard.
+  try { await db.execute("ALTER TABLE users ADD COLUMN battle_track TEXT DEFAULT NULL"); } catch {}
   try { await db.execute("ALTER TABLE users ADD COLUMN hide_tutorial INTEGER DEFAULT 0"); } catch {}
   try { await db.execute("ALTER TABLE users ADD COLUMN play_animations INTEGER DEFAULT 1"); } catch {}
   // v1463: animierte Helden auf dem Brett (Display Heroes) und ihr
@@ -1900,7 +1902,7 @@ app.get('/api/auth/me', authMiddleware, async (req, res) => {
 });
 
 function sanitizeUser(u) {
-  return { id: u.id, username: u.username, elo: u.elo, eloCube: u.elo_cube == null ? 1000 : u.elo_cube, color: u.color, avatar: u.avatar, cardback: u.cardback, board: u.board || null, bio: u.bio || '', victoryMsg: u.victory_msg || '', defeatMsg: u.defeat_msg || '', wins: u.wins || 0, losses: u.losses || 0, sc: u.sc || 0, created_at: u.created_at, hide_tutorial: u.hide_tutorial || 0, play_animations: u.play_animations == null ? 1 : (u.play_animations ? 1 : 0), display_heroes: u.display_heroes == null ? 1 : (u.display_heroes ? 1 : 0), dynamic_heroes: (u.display_heroes === 0) ? 0 : (u.dynamic_heroes == null ? 1 : (u.dynamic_heroes ? 1 : 0)), defaultSampleDeckId: u.default_sample_deck_id || null, email: u.email || null, emailVerified: !!u.email_verified, isGuest: !!u.is_guest };
+  return { id: u.id, username: u.username, elo: u.elo, eloCube: u.elo_cube == null ? 1000 : u.elo_cube, color: u.color, avatar: u.avatar, cardback: u.cardback, board: u.board || null, battleTrack: u.battle_track || null, bio: u.bio || '', victoryMsg: u.victory_msg || '', defeatMsg: u.defeat_msg || '', wins: u.wins || 0, losses: u.losses || 0, sc: u.sc || 0, created_at: u.created_at, hide_tutorial: u.hide_tutorial || 0, play_animations: u.play_animations == null ? 1 : (u.play_animations ? 1 : 0), display_heroes: u.display_heroes == null ? 1 : (u.display_heroes ? 1 : 0), dynamic_heroes: (u.display_heroes === 0) ? 0 : (u.dynamic_heroes == null ? 1 : (u.dynamic_heroes ? 1 : 0)), defaultSampleDeckId: u.default_sample_deck_id || null, email: u.email || null, emailVerified: !!u.email_verified, isGuest: !!u.is_guest };
 }
 
 // ===== PROFILE ROUTES =====
@@ -1914,6 +1916,18 @@ app.get('/api/profile/check-username', authMiddleware, async (req, res) => {
   if (containsProfanity(name)) return res.json({ available: false, reason: 'Inappropriate language' });
   const taken = await db.get('SELECT 1 FROM users WHERE username = ? COLLATE NOCASE AND id != ?', [name, req.user.userId]);
   res.json({ available: !taken, reason: taken ? 'Already taken' : 'Available' });
+});
+
+// Auswahlliste der Battle-Tracks: allgemeine + CPU-Themen samt Freischalt-Stand.
+app.get('/api/battle-tracks', authMiddleware, async (req, res) => {
+  try {
+    const list = await battleTracks.listFor(req.user.userId);
+    const row = await db.get('SELECT battle_track FROM users WHERE id = ?', [req.user.userId]);
+    res.json({ ...list, selected: row?.battle_track || null });
+  } catch (err) {
+    console.error('[battle-tracks] list error:', err.message);
+    res.status(500).json({ error: 'Could not load battle tracks.' });
+  }
 });
 
 app.put('/api/profile', authMiddleware, async (req, res) => {
@@ -1939,6 +1953,10 @@ app.put('/api/profile', authMiddleware, async (req, res) => {
       return res.status(409).json({ error: 'Username already taken' });
     }
   }
+  // Battle-Track: nur wählbar, was freigeschaltet ist (battle-tracks.js).
+  if (b.battleTrack !== undefined && !(await battleTracks.isSelectable(req.user.userId, b.battleTrack))) {
+    return res.status(403).json({ error: 'This battle track is not unlocked yet.' });
+  }
   // Update only the fields the client actually sent, so single-field
   // quick-saves (avatar, sleeve, …) never clobber the others.
   const sets = [];
@@ -1949,6 +1967,7 @@ app.put('/api/profile', authMiddleware, async (req, res) => {
   if (b.cardback !== undefined)   { sets.push('cardback = ?');    vals.push(b.cardback || null); }
   if (b.bio !== undefined)        { sets.push('bio = ?');         vals.push((b.bio || '').slice(0, 200)); }
   if (b.board !== undefined)      { sets.push('board = ?');       vals.push(b.board || null); }
+  if (b.battleTrack !== undefined){ sets.push('battle_track = ?'); vals.push(b.battleTrack ? String(b.battleTrack).toLowerCase() : null); }
   if (b.victoryMsg !== undefined) { sets.push('victory_msg = ?'); vals.push(String(b.victoryMsg || '').slice(0, MESSAGE_MAX_LEN)); }
   if (b.defeatMsg !== undefined)  { sets.push('defeat_msg = ?');  vals.push(String(b.defeatMsg || '').slice(0, MESSAGE_MAX_LEN)); }
   if (sets.length) {
@@ -4682,6 +4701,9 @@ function sendGameState(room, playerIdx, extra) {
     // Gegnerspezifisches Battle-Theme (Slug ohne 'bgm_'-Präfix und
     // Endung). null → der Client nimmt das generische Kampfthema.
     cpuBgm: cpuBgmForRoom(room),
+    // PvP: der gewählte Track des GEGNERS (Sitz gegenüber). Zuschauer bekommen
+    // in sendSpectatorGameState den Track von Sitz 0.
+    oppBgm: room.type === 'singleplayer' ? null : (gs.players?.[1 - playerIdx]?.battleTrack || null),
     setScore: room.setScore || [0, 0], format: room.format || 1, winsNeeded: room.winsNeeded || 1,
     // Compute fresh per-sync so per-turn gates (Deepsea `canSummon`,
     // etc.) flip to "blocked" the moment the first copy is summoned.
@@ -5479,6 +5501,9 @@ function sendSpectatorGameState(room) {
     // Gegnerspezifisches Battle-Theme (Slug ohne 'bgm_'-Präfix und
     // Endung). null → der Client nimmt das generische Kampfthema.
     cpuBgm: cpuBgmForRoom(room),
+    // PvP: der gewählte Track des GEGNERS (Sitz gegenüber). Zuschauer bekommen
+    // in sendSpectatorGameState den Track von Sitz 0.
+    oppBgm: room.type === 'singleplayer' ? null : (gs.players?.[0]?.battleTrack || null),
     setScore: room.setScore || [0, 0], format: room.format || 1, winsNeeded: room.winsNeeded || 1,
     summonBlocked: gs.summonBlocked || [],
     abilitySupportHeroes: [],
@@ -6065,6 +6090,9 @@ function endCpuBattle(room, winnerIdx, reason) {
           if (newlyUnlocked.length && humanSid) {
             io.to(humanSid).emit('opponents_unlocked', { opponents: newlyUnlocked });
           }
+          // Zehnter Sieg gegen diese CPU → ihr Battle-Track ist im Profil wählbar.
+          const freigeschaltet = await battleTracks.unlockedByWin(humanUserId, opponentDeckId);
+          if (freigeschaltet && humanSid) io.to(humanSid).emit('battle_track_unlocked', freigeschaltet);
         }
       } catch (err) {
         console.error('[CPU battle] npc_stats/unlock update error:', err.message);
@@ -6174,6 +6202,10 @@ function bgmSlugForHero(heroName) {
   }
   return best;
 }
+// Wählbare Battle-Tracks im Profil (siehe battle-tracks.js).
+const battleTracks = require('./battle-tracks').createBattleTracks({
+  db, loadSampleDecks, bgmSlugForHero, musicDir: path.join(__dirname, 'public', 'music'),
+});
 /** Namen aller Abilities mit `isWildcardAbility` (einmal ermittelt). */
 let _wildcardAbilCache = null;
 function wildcardAbilityNames() {
@@ -12880,6 +12912,8 @@ async function setupGameState(room) {
     const sideDeck = (room._currentDecks?.[idx]?.sideDeck || []).slice();
     playerStates.push({ userId:p.userId, username:(usr?.username||p.username), socketId:p.socketId,
       color:usr ? (usr.color||'#00f0ff') : NICHT_MENSCH_FARBE, avatar:usr?.avatar||null, cardback:usr?.cardback||null, board:usr?.board||null,
+      // Gewählter Battle-Track (geprüft: nur Freigeschaltetes); der GEGNER hört ihn.
+      battleTrack: usr ? await battleTracks.resolveForBattle(p.userId, usr.battle_track) : null,
       victoryMsg, defeatMsg, heroKilledMsg, middleHeroKilledMsg, greetingMsg, barkBounce,
       heroes, abilityZones, surpriseZones:[[],[],[]], supportZones:[[[],[],[]],[[],[],[]],[[],[],[]]],
       // Top-first list of card names that are publicly known to be on
