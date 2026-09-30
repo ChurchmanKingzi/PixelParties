@@ -24667,7 +24667,18 @@ function schedulePlaySideDeckAppear(selector, slotBaseIdx, count) {
 //  Zuschauer oder ein Gast, gibt es keine eigenen Rewards — dann laeuft
 //  nur Titel → Ende (und `extra` zeigt die alte Zusammenfassung).
 // ═══════════════════════════════════════════════════════════════
-function ResultCeremony({ won, spectator, title, subtitle, rewards, total, eloChanges, myName, oppName, extra, children }) {
+// 1 → "1st", 2 → "2nd", 3 → "3rd", 11 → "11th", 21 → "21st" …
+function ppOrdinal(n) {
+  const r100 = n % 100, r10 = n % 10;
+  if (r100 >= 11 && r100 <= 13) return n + 'th';
+  return n + (r10 === 1 ? 'st' : r10 === 2 ? 'nd' : r10 === 3 ? 'rd' : 'th');
+}
+// Symbol je Freischalt-Art (Victory-Screen); unbekannte Arten bekommen das Geschenk.
+const PP_UNLOCK_ICON = { music: '🎵', sleeve: '🃏' };
+const PP_UNLOCK_TEXT = { music: 'New battle track unlocked!', sleeve: 'New sleeve unlocked!' };
+
+// cpuProgress: { wins, unlocks: [{ kind, name, image }], theme: { name, wins, need } } — nur nach einem Sieg über eine CPU.
+function ResultCeremony({ won, spectator, title, subtitle, rewards, total, eloChanges, myName, oppName, extra, cpuProgress, children }) {
   const n = rewards.length;
   const ENDE = n + 1;
   const [stufe, setStufe] = useState(0);
@@ -24701,6 +24712,10 @@ function ResultCeremony({ won, spectator, title, subtitle, rewards, total, eloCh
     }
   }, [fertig]);
   const ueberspringen = () => { if (!fertig) setStufe(ENDE); };
+  const anzahlFrei = (cpuProgress && cpuProgress.unlocks) ? cpuProgress.unlocks.length : 0;
+  useEffect(() => {
+    if (fertig && anzahlFrei > 0 && window.playSFX) window.playSFX('ascension', { dedupe: 300 });
+  }, [fertig, anzahlFrei]);
   const farbe = spectator ? '#ffd700' : (won ? '#ffd700' : '#ff5577');
   // ★ v1263 (Al 21.9.): „Player-Namen und Avatare UEBER dem Background,
   // genau wie die Sprechblasen." Die echten Cluster sitzen in den
@@ -24769,6 +24784,14 @@ function ResultCeremony({ won, spectator, title, subtitle, rewards, total, eloCh
           ))}
         </div>
         {subtitle && <div className="pp-cer-unter">{subtitle}</div>}
+        {cpuProgress && cpuProgress.wins > 0 && (
+          <div className="pp-cer-sieg">
+            <div className="pp-cer-sieg-zahl">🏆 {ppOrdinal(cpuProgress.wins)} victory{oppName ? ' against ' + oppName : ''}!</div>
+            {cpuProgress.theme && (
+              <div className="pp-cer-sieg-theme">🎵 {cpuProgress.theme.hero ? heroDisplayName(cpuProgress.theme.hero) + "'s Theme" : cpuProgress.theme.name}: {cpuProgress.theme.wins} / {cpuProgress.theme.need} wins to unlock</div>
+            )}
+          </div>
+        )}
         {n > 0 && (
           <div className="pp-cer-rewards">
             {rewards.map((r, i) => (
@@ -24799,6 +24822,21 @@ function ResultCeremony({ won, spectator, title, subtitle, rewards, total, eloCh
           </div>
         )}
         {extra}
+        {fertig && cpuProgress && cpuProgress.unlocks && cpuProgress.unlocks.length > 0 && (
+          <div className="pp-cer-freischaltungen pp-cer-fade">
+            {cpuProgress.unlocks.map((u, i) => (
+              <div key={(u.kind || '') + (u.id || u.name) + i} className={'pp-cer-freischaltung pp-cer-frei-' + (u.kind || 'unlock')}>
+                {u.image
+                  ? <img className="pp-cer-frei-bild" src={u.image} alt="" />
+                  : <span className="pp-cer-frei-icon">{PP_UNLOCK_ICON[u.kind] || '🎁'}</span>}
+                <div>
+                  <div className="pp-cer-frei-titel">{PP_UNLOCK_TEXT[u.kind] || 'Unlocked!'}</div>
+                  <div className="pp-cer-frei-name">{(u.kind === 'music' && u.hero) ? heroDisplayName(u.hero) + "'s Theme" : u.name}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
         {fertig && eloChanges && (
           <div className="pp-cer-elo pp-cer-fade">
             {eloChanges.map(ec => (
@@ -48108,7 +48146,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             : (gameState.isCpuBattle && opp?.username === 'CPU')
               ? heroDisplayName(opp.heroes?.[1]?.name || opp.heroes?.find(h => h?.name)?.name || opp.username)
               : opp?.username}
-          extra={(isSpectator || user?.isGuest) ? renderSCEarned() : null}>
+          extra={(isSpectator || user?.isGuest) ? renderSCEarned() : null}
+          cpuProgress={(!isSpectator && iWon && result.cpuProgress) ? result.cpuProgress : null}>
             {!isSpectator && ((decks && decks.length > 0) || (sampleDecks || []).some(d => isDeckLegal(d).legal)) && (
               <div style={{ marginBottom: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
                 <label style={{ fontSize: 14, color: 'var(--text2)', fontWeight: 600 }}>🃏 Deck:</label>

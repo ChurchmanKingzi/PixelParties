@@ -20888,6 +20888,19 @@ img, .card-tooltip-img img { image-rendering: pixelated; }
   100% { transform: translateY(0) scale(1); opacity: 1; }
 }
 .pp-cer-unter { font-size: 15px; color: var(--text2); margin-bottom: 18px; animation: ppCerFade .6s .5s both; }
+.pp-cer-sieg { margin: -8px 0 16px; animation: ppCerFade .6s .7s both; }
+.pp-cer-sieg-zahl { font-size: 18px; font-weight: 700; color: #ffd700; text-shadow: 2px 2px 0 rgba(0,0,0,.6); }
+.pp-cer-sieg-theme { margin-top: 4px; font-size: 12px; color: var(--text2); }
+.pp-cer-freischaltungen { display: flex; flex-direction: column; align-items: center; gap: 8px; margin: 6px 0 14px; }
+.pp-cer-freischaltung {
+  display: flex; align-items: center; gap: 12px; min-width: 260px; max-width: 92vw; padding: 10px 16px; text-align: left;
+  background: rgba(255,215,0,.10); border: 2px solid #ffd700;
+  box-shadow: 4px 4px 0 rgba(0,0,0,.5), 0 0 18px rgba(255,215,0,.35), inset 0 0 14px rgba(255,215,0,.10);
+}
+.pp-cer-frei-icon { font-size: 30px; line-height: 1; }
+.pp-cer-frei-bild { height: 54px; width: auto; border-radius: 3px; box-shadow: 2px 2px 0 rgba(0,0,0,.5); }
+.pp-cer-frei-titel { font-size: 11px; letter-spacing: 1px; text-transform: uppercase; color: #ffd700; }
+.pp-cer-frei-name { font-size: 16px; font-weight: 700; color: var(--text); }
 .pp-cer-rewards { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin: 6px 0 12px; }
 .pp-cer-reward {
   position: relative; width: 168px; min-height: 84px; padding: 10px 12px 12px;

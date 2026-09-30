@@ -6078,7 +6078,10 @@ function endCpuBattle(room, winnerIdx, reason) {
   if (humanUserId && opponentDeckId) {
     const humanWon = winnerIdx === 0 ? 1 : 0;
     const humanLost = winnerIdx === 0 ? 0 : 1;
-    (async () => {
+    // Ergebnis (Siegzähler + Freischaltungen) für den Victory-Screen: der SC-Block
+    // unten wartet darauf, bevor er das Ergebnis final synchronisiert.
+    room._cpuProgressP = (async () => {
+      let progress = null;
       try {
         // Read the pre-update win count so we can detect milestone
         // crossings (each happens exactly once since wins climb by 1).
@@ -6119,16 +6122,24 @@ function endCpuBattle(room, winnerIdx, reason) {
           if (newlyUnlocked.length && humanSid) {
             io.to(humanSid).emit('opponents_unlocked', { opponents: newlyUnlocked });
           }
-          // Zehnter Sieg gegen diese CPU → ihr Battle-Track ist im Profil wählbar.
-          const freigeschaltet = await battleTracks.unlockedByWin(humanUserId, opponentDeckId);
-          if (freigeschaltet && humanSid) io.to(humanSid).emit('battle_track_unlocked', freigeschaltet);
-          // Fünfter Sieg gegen diese CPU → ihre Sleeve gehört dem Spieler.
-          const trophaee = await cpuSleeves.unlockedByWin(humanUserId, opponentDeckId);
-          if (trophaee && humanSid) io.to(humanSid).emit('sleeve_unlocked', trophaee);
+        }
+        // Victory-Screen: der wievielte Sieg gegen diese CPU, plus alles, was er freischaltet
+        // (Battle-Track ab dem zehnten Sieg, später auch Sleeves — siehe cpu-unlocks.js).
+        if (humanWon) {
+          const wins = preWins + 1;
+          const unlocks = await collectCpuUnlocks({ userId: humanUserId, opponentDeckId, wins, preWins, isGuest: !!guestRow?.is_guest });
+          // Fortschritt zum Battle-Track dieser CPU, solange er noch nicht frei ist.
+          let theme = null;
+          try {
+            const pr = await battleTracks.progressFor(humanUserId, opponentDeckId);
+            if (pr && pr.wins < pr.need) theme = { name: pr.name + "'s Theme", hero: pr.name, wins: pr.wins, need: pr.need };
+          } catch { /* Anzeige-Hilfe */ }
+          progress = { wins, unlocks, theme };
         }
       } catch (err) {
         console.error('[CPU battle] npc_stats/unlock update error:', err.message);
       }
+      return progress;
     })();
   }
 
@@ -6153,6 +6164,11 @@ function endCpuBattle(room, winnerIdx, reason) {
           console.error('[CPU battle] SC evaluation error:', err.message);
         }
         gs.result.scAwarded = entry.total;
+        // Siegzähler + Freischaltungen (siehe room._cpuProgressP oben) vor dem finalen Sync ins Ergebnis.
+        try {
+          const prog = await room._cpuProgressP;
+          if (prog) gs.result.cpuProgress = prog;
+        } catch { /* Anzeige-Hilfe */ }
         if (entry.total > 0 && sid) io.to(sid).emit('sc_earned', entry);
         const updated = await db.get('SELECT wins, losses, elo, elo_cube, sc FROM users WHERE id = ?', [userId]);
         if (updated && sid) io.to(sid).emit('user_stats_updated', updated);
@@ -6238,11 +6254,23 @@ function bgmSlugForHero(heroName) {
 const battleTracks = require('./battle-tracks').createBattleTracks({
   db, loadSampleDecks, bgmSlugForHero, musicDir: path.join(__dirname, 'public', 'music'),
 });
+// Freischaltungen durch CPU-Siege werden auf dem Victory-Screen gemeldet (cpu-unlocks.js).
+// Weitere Systeme (z. B. Sleeves) melden sich mit registerCpuUnlockSource an.
+const { registerCpuUnlockSource, collectCpuUnlocks } = require('./cpu-unlocks');
+registerCpuUnlockSource(async (ctx) => {
+  const u = await battleTracks.unlockedByWin(ctx.userId, ctx.opponentDeckId);
+  return u ? { kind: 'music', id: u.id, name: u.name + "'s Theme", hero: u.name } : null;
+});
 // Gegner-Sleeves: jede CPU spielt mit ihrer eigenen, fünf Siege schalten sie frei (cpu-sleeves.js).
 const cpuSleeves = require('./cpu-sleeves').createCpuSleeves({
   db, loadSampleDecks,
   mapFile: path.join(__dirname, 'data', 'shop', 'cpu-sleeves.json'),
   sleevesDir: path.join(__dirname, 'data', 'shop', 'sleeves'),
+});
+// Fünfter Sieg gegen eine CPU → ihre Gegner-Sleeve gehört dem Spieler (Meldung im Victory-Screen).
+registerCpuUnlockSource(async (ctx) => {
+  const u = await cpuSleeves.unlockedByWin(ctx.userId, ctx.opponentDeckId);
+  return u ? { kind: 'sleeve', id: u.id, name: u.name, image: '/data/shop/sleeves/' + u.file } : null;
 });
 /** Namen aller Abilities mit `isWildcardAbility` (einmal ermittelt). */
 let _wildcardAbilCache = null;

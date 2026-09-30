@@ -2,136 +2,178 @@
 //  CARD EFFECT: "Psychic Scout"
 //  Creature (Summoning Magic Lv1, 50 HP)
 //
-//  Two passive effects:
+//  „You may once per turn summon a level 0 Creature from your hand as an
+//   additional Action with the corresponding Hero. While you control this
+//   Creature, any damage your level 0 Creatures take is reduced by 50."
 //
-//  1) ADDITIONAL ACTION: Once per turn, the
-//     controller may summon a level-0 Creature
-//     from their hand as an additional Action.
-//     Unconditional — no "must be first summon"
-//     restriction like Slime Rancher's, no
-//     archetype gate, just "any Lv0 Creature".
+//  1) AKTIVER Kreatureneffekt (HOPT, `creatureEffect`): Der Spieler
+//     klickt den Scout, waehlt eine Level-0-Kreatur aus der Hand und
+//     beschwoert sie in eine freie Support Zone des ENTSPRECHENDEN Helden
+//     (der Held, in dessen Spalte der Scout steht). Vorher war das ein
+//     passiver Zusatzaktions-Grant (`grantAdditionalAction`) — der bot
+//     keine Aktivierung an (Bugfix).
+//     „As an additional Action": Kreatureneffekte kosten ohnehin keine
+//     Aktion, die Beschwoerung laeuft deshalb direkt ueber
+//     `summonCreatureWithHooks` (Vorbild: Elven Druid / SnowItAll). Der
+//     Held muss die Kreatur regulaer beschwoeren koennen (lebend, nicht
+//     eingefroren/betaeubt, Summoning-Magic-Stufe, keine Beschwoerungs-
+//     Sperre, karteneigene Schranken).
 //
-//  2) DAMAGE REDUCTION: While Psychic Scout is on
-//     the board, any damage the controller's
-//     level-0 Creatures take is reduced by 100
-//     (floored at 0).
-//
-//  Implementation
-//  ──────────────
-//  • Additional action wiring follows the standard
-//    register-then-grant pattern from Slime Rancher:
-//      - `onPlay` registers the action type AND
-//        grants it for this instance.
-//      - `onTurnStart` re-grants on the owner's
-//        turn so a fresh "once per turn" slot is
-//        available each round.
-//    The engine's `consumeAdditionalAction` path
-//    consumes the grant when a Lv0 Creature gets
-//    played; the filter on the action type makes
-//    sure only Lv0 Creatures match.
-//
-//  • Stacking: each Scout instance carries its
-//    own grant. Two Scouts on board = two free
-//    Lv0 summons per turn. Matches Slime Rancher's
-//    multi-instance behaviour.
-//
-//  • Damage reduction uses `beforeCreatureDamageBatch`
-//    and reads `e.originalLevel === 0` (the same
-//    field Diamond's Lv0 status-immunity effect
-//    consults — set in `_engine.js` ~L19554 from
-//    the card-data level). "Original level" matches
-//    Diamond's convention: a Lv0 Creature whose
-//    effective level got boosted by Slime Rancher /
-//    similar still counts as Lv0 for this passive.
-//
-//  • `cannotBeReduced` (true-damage flag — Acid Vial,
-//    future un-reducible sources) is respected, so
-//    the protection composes cleanly with the rest
-//    of the damage pipeline.
-//
-//  • Self isn't covered — Psychic Scout is Lv1, so
-//    its own damage is unaffected. The protection
-//    is for the Lv0 swarm it commands.
+//  2) SCHADENSMINDERUNG (passiv, 50): `beforeCreatureDamageBatch` — jeder
+//     Schaden, den EIGENE Level-0-Kreaturen (`originalLevel === 0`,
+//     Kontrolle statt Seite) nehmen, sinkt um 50 (Boden 0). Unreduzierbarer
+//     Schaden (`cannotBeReduced`) geht durch. Der Scout selbst (Lv1) ist
+//     nicht erfasst.
 // ═══════════════════════════════════════════
 
-const { hasCardType } = require('./_hooks');
+const { isOwnSideSummonableCreature } = require('./_hooks');
 
-const CARD_NAME         = 'Psychic Scout';
-const ADDITIONAL_TYPE   = 'psychic_scout_lv0_summon';
-const DAMAGE_REDUCTION  = 100;
+const CARD_NAME        = 'Psychic Scout';
+const DAMAGE_REDUCTION = 50;
 
-/** Idempotent type-registration helper. Safe to call from both
- *  `onPlay` and `onTurnStart` — the engine just overwrites the slot
- *  with the same config. */
-function _registerScoutAction(engine) {
-  engine.registerAdditionalActionType(ADDITIONAL_TYPE, {
-    label: CARD_NAME,
-    allowedCategories: ['creature'],
-    filter: (cardData) => {
-      return hasCardType(cardData, 'Creature') && (cardData?.level ?? -1) === 0;
-    },
-  });
+/** Kann `heroIdx` (Brettseite `feld`) jetzt regulaer beschwoeren? */
+function heroCanHost(engine, pi, heroIdx, cd, name, feld = pi, handIdx = null) {
+  const ps = engine.gs.players[pi];
+  const hero = engine.gs.players[feld]?.heroes?.[heroIdx];
+  if (!hero?.name || hero.hp <= 0) return false;
+  if (hero.statuses?.frozen || hero.statuses?.stunned) return false;
+  if (ps?.summonLocked) return false;
+  try { if (engine.getSummonBlocked(pi).includes(name)) return false; } catch { /* defekte Sperre sprengt die Karte nicht */ }
+  if (!(feld === pi
+    ? engine.heroMeetsLevelReq(pi, heroIdx, cd)
+    : engine.heroMeetsLevelReq(feld, heroIdx, cd, { levelSourcePi: pi }))) return false;
+  if (!engine.isCreatureSummonable(name, pi, heroIdx)) return false;
+  return true;
+}
+
+/** Handindizes der Level-0-Kreaturen, die der Held beschwoeren darf. */
+function summonableHandIndices(engine, pi, heroIdx, feld) {
+  const ps = engine.gs.players[pi];
+  const cardDB = engine._getCardDB();
+  const out = [];
+  for (let i = 0; i < (ps?.hand || []).length; i++) {
+    const cn = ps.hand[i];
+    const cd = cardDB[cn];
+    if (!cd || !isOwnSideSummonableCreature(cd, cn)) continue;
+    if (engine.effectiveCardLevel(cd, pi, { handIdx: i }) !== 0) continue;   // „level 0"
+    if (!heroCanHost(engine, pi, heroIdx, cd, cn, feld, i)) continue;
+    out.push(i);
+  }
+  return out;
+}
+
+/** Freie Support Zones des entsprechenden Helden. */
+function freeSlots(engine, feld, heroIdx) {
+  const zones = engine.gs.players[feld]?.supportZones?.[heroIdx] || [];
+  const out = [];
+  for (let z = 0; z < 3; z++) if ((zones[z] || []).length === 0) out.push({ owner: feld, heroIdx, slotIdx: z });
+  return out;
 }
 
 module.exports = {
   activeIn: ['support'],
+  creatureEffect: true,
+
+  canActivateCreatureEffect(ctx) {
+    const engine = ctx._engine;
+    const feld = ctx.cardHeroOwner ?? ctx.cardOwner;   // Spalte der Kreatur
+    const heroIdx = ctx.cardHeroIdx;
+    if (freeSlots(engine, feld, heroIdx).length === 0) return false;
+    return summonableHandIndices(engine, ctx.cardOwner, heroIdx, feld).length > 0;
+  },
+
+  async onCreatureEffect(ctx) {
+    const engine = ctx._engine;
+    const pi = ctx.cardOwner;
+    const ps = engine.gs.players[pi];
+    const feld = ctx.cardHeroOwner ?? pi;
+    const heroIdx = ctx.cardHeroIdx;
+    if (!ps?.hand) return false;
+
+    // Aufdeck-Banner erst bei Bestaetigung zeigen (wie SnowItAll): ein
+    // Abbruch kostet nichts (kein Banner, kein HOPT).
+    const savedReveal = engine.gs._pendingCardReveal;
+    delete engine.gs._pendingCardReveal;
+    const savedPlayLog = engine.gs._pendingPlayLog;
+    delete engine.gs._pendingPlayLog;
+    const automat = engine.isCpuPlayer(pi) || engine._inMctsSim || engine._fastMode;
+
+    let chosenName = null;
+    let dest = null;
+    let rueck = 0;
+    while (!dest) {
+      const eligible = summonableHandIndices(engine, pi, heroIdx, feld);
+      if (eligible.length === 0) return false;
+      const einzige = eligible.length === 1;
+      let idx;
+      if (einzige) idx = eligible[0];
+      else {
+        const picked = await engine.promptGeneric(pi, {
+          type: 'pickHandCard',
+          title: CARD_NAME,
+          description: 'Click a Level 0 Creature in your hand to summon with the corresponding Hero.',
+          eligibleIndices: eligible,
+          confirmLabel: '🔮 Summon!',
+          cancellable: true,
+        });
+        if (!picked || picked.cancelled || picked.handIndex == null) return false;
+        idx = picked.handIndex;
+      }
+      chosenName = ps.hand[idx];
+      if (!chosenName) return false;
+
+      const slots = freeSlots(engine, feld, heroIdx);
+      if (slots.length === 0) return false;
+      if (slots.length === 1) { dest = slots[0]; break; }
+      const pick = await ctx.promptZonePick(slots, {
+        title: CARD_NAME,
+        description: einzige ? `Place ${chosenName} into a free Support Zone.` : `Place ${chosenName} into a free Support Zone. Cancel to pick a different Creature.`,
+        cancellable: true,
+      });
+      const treffer = pick && !pick.cancelled
+        ? slots.find(s => s.heroIdx === pick.heroIdx && s.slotIdx === pick.slotIdx) : null;
+      if (!treffer) {
+        rueck++;
+        if (automat || rueck > 20) { dest = slots[0]; break; }   // Automat / Notbremse: erste freie Zone
+        if (einzige) return false;                                  // kein „zurueck": ganz abbrechen
+        chosenName = null;
+        continue;
+      }
+      dest = treffer;
+    }
+
+    if (savedReveal) engine.gs._pendingCardReveal = savedReveal;
+    if (savedPlayLog) engine.gs._pendingPlayLog = savedPlayLog;
+    engine._firePendingCardReveal();
+
+    const handIdx = ps.hand.indexOf(chosenName);
+    if (handIdx < 0) return false;
+    engine.takeFromPileSync(ps, 'hand', handIdx);
+    const res = await engine.summonCreatureWithHooks(chosenName, dest.owner, dest.heroIdx, dest.slotIdx, {
+      source: CARD_NAME,
+      ...(feld !== pi ? { controller: pi } : {}),   // Kontrolle statt Seite (Styx 28.9.)
+    });
+    if (!res?.inst) {
+      engine.returnToPile(ps, 'hand', chosenName, handIdx);   // Beschwoerung abgelehnt: Karte zurueck
+      return false;
+    }
+    engine.log('psychic_scout_summon', { player: ps.username, summoned: chosenName, heroIdx: dest.heroIdx, slotIdx: dest.slotIdx });
+    engine.sync();
+    return true;
+  },
 
   hooks: {
-    /**
-     * On summon: register the action type AND grant THIS Scout's
-     * once-per-turn additional Lv0 summon. The grant is consumed by
-     * the engine when the controller plays a matching Creature.
-     */
-    onPlay: async (ctx) => {
-      // Only react to OUR OWN summon (the engine fires onPlay for
-      // every tracked listener — without this gate every existing
-      // Scout would re-grant when ANY new card lands).
-      if (ctx.playedCard?.id !== ctx.card?.id) return;
-      const engine = ctx._engine;
-      _registerScoutAction(engine);
-      ctx.grantAdditionalAction(ADDITIONAL_TYPE);
-      engine.sync();
-    },
-
-    /**
-     * On the controller's turn start: refresh the grant so the player
-     * gets a fresh "once per turn" Lv0 summon each round. Mirrors
-     * Slime Rancher's restoration pattern.
-     */
-    onTurnStart: async (ctx) => {
-      if (!ctx.isMyTurn) return;
-      const engine = ctx._engine;
-      _registerScoutAction(engine);
-      ctx.grantAdditionalAction(ADDITIONAL_TYPE);
-    },
-
-    /**
-     * Damage-reduction passive. Walks every entry in the batch and,
-     * for each entry whose target is an own-side Lv0 Creature, shaves
-     * `DAMAGE_REDUCTION` off the amount (floor 0). True damage
-     * (`cannotBeReduced`) bypasses, matching the Wall of Deri
-     * convention.
-     */
     beforeCreatureDamageBatch: async (ctx) => {
       const pi = ctx.cardOwner;
       const entries = ctx.entries;
       if (!entries || entries.length === 0) return;
-
       for (const e of entries) {
         if (e.cancelled) continue;
         if (e.cannotBeReduced) continue;
-        // "Your level 0 Creatures" — controller-aware so Diplomacy /
-        // Dark Gear loaned Creatures count as the current controller's.
-        const entryOwner = e.inst?.controller ?? e.inst?.owner;
+        const entryOwner = e.inst?.controller ?? e.inst?.owner;   // „your level 0 Creatures" (Kontrolle)
         if (entryOwner !== pi) continue;
-        // `originalLevel` is stamped on every entry by
-        // `processCreatureDamageBatch` (~L19554). Matches Diamond's
-        // Lv0-status-immunity convention — a level-boosted Lv0
-        // Creature still counts as Lv0 for this passive.
-        if (e.originalLevel !== 0) continue;
-        if (e.amount > 0) {
-          e.modifyAmount(-Math.min(DAMAGE_REDUCTION, e.amount));   // flat (Punkt vor Strich)
-        }
+        if (e.originalLevel !== 0) continue;                       // wie Diamond: Original-Level
+        if (e.amount > 0) e.modifyAmount(-Math.min(DAMAGE_REDUCTION, e.amount));   // flat (Punkt vor Strich)
       }
     },
   },
