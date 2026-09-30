@@ -56,9 +56,9 @@ for _ in range(80):
 for (x, y) in [(34, 30), (218, 40), (26, 200), (226, 250), (40, 318), (210, 312)]:
     for dx, dy in ((0, 0), (1, 0), (-1, 0), (0, 1), (0, -1)): cv.px(x + dx, y + dy, (170, 190, 255) if (dx or dy) else (255, 255, 255))
 
-# ---------- 2×: Argos-Körper, nach außen zunehmend transparent (Alpha je ganzem 2×-Pixel) ----------
-AXc, AYc = 62.5, 55                                    # Augenmitte im 2×-Raster (250er: x125, y110)
-ox, oy = int(AXc - REX), int(AYc - REY)
+# ---------- 3×: Argos-Körper, nach außen zunehmend transparent (Alpha je ganzem 3×-Pixel) ----------
+AG = 3
+ox, oy = -12, -44                                      # Referenz im 3×-Raster: Augenmitte bei 250er x124/y112
 for j in range(ref.shape[0]):
     for i in range(ref.shape[1]):
         a0 = ref[j, i, 3] / 255
@@ -67,17 +67,18 @@ for j in range(ref.shape[0]):
         fade = 1.0 if d < 20 else max(0.0, 1 - (d - 20) / 52) ** 1.2
         a_ = a0 * fade
         if a_ < 0.04: continue
-        X_, Y_ = (ox + i) * 2, (oy + j) * 2
+        X_, Y_ = (ox + i) * AG + 1, (oy + j) * AG     # +1: Augenmitte exakt auf x 125 (750er: 375)
         if not (0 <= X_ < 250 and 0 <= Y_ < 350): continue
-        blk = cv.a[Y_:Y_ + 2, X_:X_ + 2].astype(float)
-        cv.a[Y_:Y_ + 2, X_:X_ + 2] = (blk * (1 - a_) + ref[j, i, :3] * a_).astype(np.uint8)
+        blk = cv.a[Y_:Y_ + AG, X_:X_ + AG].astype(float)
+        cv.a[Y_:Y_ + AG, X_:X_ + AG] = (blk * (1 - a_) + ref[j, i, :3] * a_).astype(np.uint8)
+EYE_BOTTOM = (oy + 106) * AG                           # 250er y186
 
-# ---------- 2×: Blickkegel, Kreaturen, Strahlen ----------
+# ---------- 2×: Blickkegel und Kreaturen (ohne Suchstrahlen) ----------
 p2 = rgba(125, 175)
 CS = 3                                                 # Würfel 3× (108×108), Vordergrund
-CXp, CYp = 125 - 54, 212                               # Würfel im 250er-Raster: x71–179, y212–320
-ecx = AXc
-y0, y1 = int(AYc + 26), CYp // 2 + 2
+CXp, CYp = 125 - 54, 210                               # Würfel im 250er-Raster: x71–179, y210–318
+ecx = 62.5
+y0, y1 = EYE_BOTTOM // 2 - 2, CYp // 2 + 2
 for y in range(y0, y1):
     t = (y - y0) / max(1, y1 - y0)
     half = 4 + 16 * t
@@ -87,26 +88,23 @@ for y in range(y0, y1):
         if lv:
             c = tuple(int(v) for v in cv.a[y * 2, x * 2])
             p2[y, x] = list(mix(c, (160, 26, 48), (0, 0.2, 0.34, 0.46)[min(3, lv)])) + [255]
-S_L, S_R = (32, 52), (74, 52)                          # Life-Searcher über den oberen Würfelecken
-put(p2, search, *S_L); put(p2, flip(search), *S_R)
+put(p2, search, 15, 54); put(p2, flip(search), 125 - 15 - 19, 54)   # zwei Life-Searcher links/rechts des Auges
 def trail(x, y, dx, dy, n=8):
     for k in range(1, n):
         px_, py_ = x + dx * k, y + dy * k
         if 0 <= px_ < 125 and 0 <= py_ < 175 and p2[py_, px_, 3] == 0 and bayer(px_, py_) * n < n + 1 - k:
             p2[py_, px_] = list(mix(tuple(int(v) for v in cv.a[py_ * 2, px_ * 2]), (140, 230, 200), 0.55 - k * 0.05)) + [255]
-for (x, y) in [(96, 110), (99, 134)]:                  # zwei Analyzer rechts, fliegen zum Würfel
+for (x, y) in [(94, 110), (97, 134)]:                  # zwei Analyzer rechts, fliegen zum Würfel
     trail(x + 17, y + 2, 2, -1); trail(x + 17, y + 6, 2, -1)
     put(p2, flip(anal), x, y)
-put(p2, gath, 4, 128); put(p2, rock, 22, 118)           # Gatherer links unten mit Asteroid
+put(p2, gath, 5, 126); put(p2, rock, 23, 116)           # Gatherer links unten mit Asteroid
 blit(cv, p2, 2)
-for (sx, sy) in (S_L, S_R):
-    cv.paste(up(beam, 2), (sx + 5) * 2, (sy + 33) * 2, alpha=0.45)
 
-# ---------- 3×: Erdwürfel (vorn, größer), oben rot angestrahlt ----------
+# ---------- 3×: Erdwürfel (vorn), oben rot angestrahlt ----------
 c3 = cube.copy()
 for y in range(10):
     for x in range(36):
         if c3[y, x, 3] and bayer(x, y) < 0.55 - y * 0.05:
             c3[y, x, :3] = mix(tuple(int(v) for v in c3[y, x, :3]), (210, 50, 70), 0.35)
-cv.paste(up(c3, CS), CXp, CYp)                        # Strahlen enden auf der Würfeloberfläche
+cv.paste(up(c3, CS), CXp, CYp)
 print(save(cv, '16_rift_over_earth.png'))

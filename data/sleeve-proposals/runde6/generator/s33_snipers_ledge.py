@@ -17,7 +17,7 @@ Selbst gezeichnet: Abendhimmel, Wolkenstreifen, Hügelketten, Umriss der Felsnas
 Skalierung (Tiefenebenen):
   Hintergrund: Himmel, Wolken, Hügelketten, Tal     – 2× (125×175)
   Mittelgrund: Felsnase mit Grasnarbe, Schatten      – 3× (84×117)
-  Vordergrund: Darge                                  – 6× (42×59); Darge 138×162 px, Füße y 264, Gesichtsmitte x = 375/750
+  Vordergrund: Darge                                  – 6× (42×59); Darge 138×162 px, Füße y 288, Gesichtsmitte x = 375/750
 """
 import math, random
 import numpy as np
@@ -70,7 +70,7 @@ for base, per, amp, ph, col in RIDGES:
 # ---------------- Mittelgrund 3× (84×117): Felsnase ---------------------------------------------------------------
 mw, mh = grid(3)
 mg = rgba(mw, mh)
-TOP = 88                                                         # Kuppe (3×) → y 264
+TOP = 96                                                         # Kuppe (3×) → y 288
 g = grass[..., :3].astype(float)
 r = rock[..., :3].astype(float)
 for y in range(TOP - 2, mh):
@@ -95,7 +95,7 @@ shade_ellipse(mg, 42.5, TOP + 1.2, 17, 1.4, 0.55)                # Bodenschatten
 # ---------------- Vordergrund 6× (42×59): Darge -------------------------------------------------------------------
 fw, fh = grid(6)
 fg = rgba(fw, fh)
-DF = 44                                                          # Füße → y 264
+DF = 48                                                          # Füße → y 288
 DX = (fw - darge.shape[1]) // 2
 put(fg, darge, DX, DF - darge.shape[0])
 
