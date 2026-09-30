@@ -1,6 +1,6 @@
 # Konzepte Runde 6 (NN | Name | Idee)
 25 | Initiation Rite | Klaus (Körper von vorn, nur Messer-Arm ausgestreckt) steht groß vor der Kellertür, hinter ihm im Gewölbe kniet der Neuling im roten Decay-Glühen zwischen je zwei Kultisten (kein Pentagramm)
-26 | Three-Link Storm | Action: Sol Rym thront auf seiner Gewitterwolke über der nächtlichen See; ein Kettenblitz springt über drei Felsnadeln und wird von Sprung zu Sprung dünner (200/150/100) – ohne Lampe, ohne Teppich
+26 | Three-Link Storm | Action: Sol Rym thront auf seiner Gewitterwolke über der nächtlichen See; ein Kettenblitz schlägt ins Meer und springt über die Wasseroberfläche, von Sprung zu Sprung dünner (200/150/100) – ohne Lampe, ohne Teppich
 27 | Hellhound's Trail | Ruhiger Nachtmarsch: Orthos mit brennenden Köpfen kommt groß auf den Betrachter zu, dicht hinter ihm die Loyal-Meute als geschlossene Gruppe (Pinpom vorn), am Horizont nur die Glut des Feuerfelds
 28 | Specimen Wing | Schaukasten/Labor: Nero Zira hängt an seinen Kabeln vor dem Aquariumfenster seines Labors, dahinter schwimmen Infected Greatmaw, Greatmaw Shark und Remora – Kreaturen in seinen Support-Zonen machen ihn stärker
 29 | Knock at the Window | Blick durch Fenster: nachts aus der „Cottage at the Forest's Edge“ hinaus – draußen schwebt Waflav riesig mit glühenden Flügeln vor Mond und Waldrand, drinnen Kerze auf dem Fensterbrett (Morph and Kill: das Monster jagt)

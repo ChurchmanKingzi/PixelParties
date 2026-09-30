@@ -4,9 +4,8 @@ Held/Hauptmotiv: Idej Lord Daiyo (Base-Karte).
 
 Idee (Porträt mit Transparenz, Nacht): Daiyo, der grüne, halb durchsichtige Geist-Samurai seiner Karte,
 schwebt groß vor dem nächtlichen Tempelpavillon der Kogarasu-Karte (Cover); Pavillon und Kirschblütenhain
-liegen dunkel im Mondlicht, damit die grüne Geisterfigur leuchtet; nur wenige Blüten treiben. Rechts hinter
-ihm, höher und deutlich seitlich versetzt, schwebt EIN Nachbild seiner selbst (nur der Körper, im Schachbrett
-der 5×-Pixel gedithert) – seine Idej Projection (wird ihm zu Spielbeginn angelegt und fängt Schaden ab).
+liegen dunkel im Mondlicht, damit die grüne Geisterfigur leuchtet; nur wenige Blüten treiben. Sein Gesicht liegt
+genau in der Bildmitte; kein Nachbild (Nutzer-Feedback).
 
 Quellen:
   MotiveSteamDwarfs.xcf  Kartenszene „Idej Lord Daiyo“ = Ebene 402 „Sichtbar #4“ (Lage 83,71, exakter Treffer):
@@ -21,7 +20,7 @@ Quellen:
                          Pavillon und Bäume im Mondlicht abgedunkelt/violett getönt.
 Selbst gezeichnet: Nachthimmel (geordnetes Dithering), Mond mit Hof, Boden, grüner Schein des Geistes.
 Skalierung: Hintergrund (Himmel, Pavillon, Kirschbäume, Blüten, grüner Schein) – 2×-Raster (125×175);
-            Daiyo (24×41 → 120×205) und sein Nachbild – 5×.
+            Daiyo (24×41 → 120×205) – 5×.
 """
 import math
 from common import *  # noqa
@@ -37,11 +36,11 @@ sword = layer(BS, 406)[Y0:Y1, X0:X1].copy()
 Image.fromarray(over(over(body, sword), hand)).save(os.path.join(xcfkit.CACHE, 'o24_daiyo.png'))
 
 
-def daiyo_on(dst, k, ox, oy, a_body, a_sword, with_sword=True, echo=False):
+def daiyo_on(dst, k, ox, oy, a_body, a_sword):
     """Daiyo in Pixelgröße k auf dst (RGB-Array des 250×350-Rasters) legen – Ebenen in Kartenreihenfolge
     (Körper, darüber Schwert, darüber Hand) mit eigener Deckkraft."""
-    for s, a in (((body, a_body), (sword, a_sword), (hand, a_body)) if with_sword else ((body, a_body),)):
-        u = up(hsv_shift(s, 45, 0.8, 1.15) if echo else s, k)
+    for s, a in ((body, a_body), (sword, a_sword), (hand, a_body)):
+        u = up(s, k)
         h, w = u.shape[:2]
         X0_, Y0_ = max(0, ox), max(0, oy)
         X1_, Y1_ = min(dst.shape[1], ox + w), min(dst.shape[0], oy + h)
@@ -119,10 +118,10 @@ for y in range(34, G - 10):
 cv = Canvas(W, H)
 blit(cv, bg, 2)
 
-# ---------------------------------------------------------------- Nachbild (Idej Projection) + Daiyo 5×
+# ---------------------------------------------------------------- Daiyo 5×
 k = 5
 dw, dh = (X1 - X0) * k, (Y1 - Y0) * k
-DX, DY = 42, 116
+DX, DY = 50, 116                           # Gesichtsmitte (Szene x = 122, zwischen den Augen) auf x = 375 von 750
 # grüner Schein hinter Daiyo und auf dem Boden (Raster 2×, gedithert)
 gx, gy = (DX + 7 * k + 45) / 2, (DY + 80) / 2
 for y in range(GH):
@@ -134,22 +133,5 @@ for y in range(GH):
             cv.a[y * 2:(y + 1) * 2, x * 2:(x + 1) * 2] = (c * (1 - q) + np.array([70, 255, 110]) * q).astype(np.uint8)
 
 
-def echo_on(dst, k, ox, oy, a):
-    """Ein Nachbild: nur der Körper, im Schachbrett der 5×-Pixel gedithert (jeder zweite Pixel)."""
-    b = body.copy()
-    yy, xx = np.mgrid[0:b.shape[0], 0:b.shape[1]]
-    b[((xx + yy) % 2) == 1, 3] = 0
-    u = up(b, k)
-    h, w = u.shape[:2]
-    X0_, Y0_ = max(0, ox), max(0, oy)
-    X1_, Y1_ = min(dst.shape[1], ox + w), min(dst.shape[0], oy + h)
-    u = u[Y0_ - oy:Y1_ - oy, X0_ - ox:X1_ - ox]
-    sub = dst[Y0_:Y1_, X0_:X1_].astype(float)
-    m = (u[..., 3] >= 128)[..., None]
-    dst[Y0_:Y1_, X0_:X1_] = np.where(m, u[..., :3] * a + sub * (1 - a), sub).astype(np.uint8)
-
-
-# ein Nachbild rechts hinten, höher und deutlich seitlich versetzt
-echo_on(cv.a, k, DX + 76, DY - 30, 0.55)
 daiyo_on(cv.a, k, DX, DY, 0.73, 1.0)
 print(save(cv, '24_afterimage.png'))

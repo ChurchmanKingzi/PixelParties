@@ -1,15 +1,17 @@
 # -*- coding: utf-8 -*-
 """18 „Sticky Fingers“ – Gegner „Flying Sparks“, Held: Lilly, the Charming Infiltrator (Base).
 
-Bildidee (Nachtszene/Erzählung): Nachts vor dem Rathaus – oben steht das Giebelfenster offen und leuchtet warm; zwei
-Sparkfly-Arbeiterinnen schleppen die funkelnde Schatztruhe (Treasure Chest) heraus, die gekrönte Sparkfly Queen
-(Coverkarte, mit Hive's Crown) wacht rechts; vorn steht Lilly und streckt frech die Zunge heraus. Die Sparkflies sind
-ihre Komplizen: Worker/Queen holen Karten des Gegners, Lilly zieht dafür (ihre Fähigkeit).
+Bildidee (Nachtszene/Erzählung, Überarbeitung nach Nutzer-Feedback – ohne Königin): Nachts vor dem Rathaus steht oben
+das Giebelfenster offen und leuchtet warm; Sparkflies schleppen die Beute heraus: zwei Worker tragen die funkelnde
+Schatztruhe (ihre Beine greifen über den Deckel), eine Attendant (roter Fleck) und eine weitere Worker tragen je einen
+Goldsack. Vorn steht Lilly und streckt frech die Zunge heraus – die Sparkflies sind ihre Komplizen.
 
 Quellen:
   Lilly (Base)    = Motive.xcf Ebene 973 „Lilly“ (18×25; = Sichtbar #256, Ebene 140, Kartenlage 281,137, 0 px Abweichung)
   Sparkfly-Arbeiterin = MotiveRussia.xcf Ebene 160 (Körper) + 158 (Flügel, 70 % auf ganzen Pixeln), linke Biene
-  Sparkfly Queen  = MotiveRussia.xcf Ebenen 177 (Körper) + 176 (Beine) + 175 (Krone) (Hive's Crown-Szenen 145/147)
+  Sparkfly Attendant = dieselbe Biene + roter Fleck Ebene 159 „Ebene #60“ (Karte Sichtbar #11, Ebene 147)
+  Goldsack        = Motive.xcf Ebene 1379 „Wealth“: vorderer Sack, oval freigestellt, Truhenglanz entfernt, Sackhals
+                    (3 Zeilen) in den Sackfarben ergänzt
   Treasure Chest  = Motive.xcf Ebene 1386 + Funkeln aus Ebene 1384 „Treasure Chest #4“
   Rathaus         = MotiveGrailWar.xcf Ebene 663 „Rathaus aussen“, Ausschnitt x230–480/y113–299 (ohne FPS-Anzeige,
                     Teich und Passant), Platz nach unten mit Pflaster-Kachel x424–456/y268–300 verlängert
@@ -17,7 +19,7 @@ Selbst gezeichnet: Nachtfärbung, Fensterlicht und Lichtschein, Schatten der Tie
 
 Skalierung (Ausgabe = 250×350-Raster × 3):
   Rathaus, Pflaster, Fensterlicht                   – 1×
-  Sparkflies, Queen, Truhe, Funkeln, Flugschatten   – 2× (125×175)
+  Sparkflies, Truhe, Goldsäcke, Funkeln, Flugschatten – 2× (125×175)
   Lilly + Fußschatten                               – 5× (50×70)
 """
 import math, random

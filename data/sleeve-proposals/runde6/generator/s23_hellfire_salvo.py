@@ -81,7 +81,7 @@ for (x, y) in ((30, 42), (54, 34), (80, 25)):
     put(bg, shot, x, y)
 # drei ferne Horned Demons im Glutdunst (dunkler), verteilt auf der Ebene
 fd = shade(demon, 0.7, (40, 6, 6))
-for FDX, FDY in ((38, 85), (64, 80), (90, 86)):
+for FDX, FDY in ((40, 85), (62, 80), (84, 86)):
     for xx in range(FDX - 7, FDX + 7):
         if 0 <= xx < GW and bay(xx, FDY) < 0.7: bg[FDY, xx, :3] = (bg[FDY, xx, :3] * 0.5).astype(np.uint8)
     put(bg, fd, FDX - demon.shape[1] // 2, FDY - demon.shape[0] + 1)

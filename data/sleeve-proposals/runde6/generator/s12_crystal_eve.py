@@ -7,11 +7,9 @@ Lichtern funkelt; über dem Platz hängt eine Lichterkette, es schneit. Ihre „
 schenkt dem Gegner Karten und zieht selbst nach.
 
 Quellen:
-  MotiveBoons.xcf  Ebene 71 „Ebene #6“ – flache Weihnachtsdorf-Szene (Mary-Karte: Mary auf der Bühne vor rotem Vorhang).
-                   Base-Mary = Bühnenfigur (weißer Schleier mit grünlichem Glanz, OHNE rote Mütze; die rot bemützte
-                   Mary auf dem Platz ist eine andere Fassung), Ausschnitt x 115–140, y 243–267, vom Vorhang freigestellt
-                   (Zeilen 2–18 Spanne zwischen den Schleierkanten, darunter nur Nicht-Vorhang-Pixel). Kein eigener
-                   Ebenen-Sprite vorhanden. Außerdem die Schnee-Textur des Platzes.
+  data/hero-animations/mary-crestmas.png – Marys Spiel-Sprite (Frame 0) mit Santa-Mütze, Musiknoten weggelassen
+                   (nach Nutzer-Feedback; die frühere Freistellung aus MotiveBoons 71 ohne Mütze ist ersetzt).
+  MotiveBoons.xcf  Ebene 71 „Ebene #6“ – Schnee-Textur des Dorfplatzes (reine Schneefläche x 165–213, y 357–397).
   MotiveBritain.xcf Ebene 16 „Ebene #210“ – Crystal Well (Karte Crystal Well, Szene Sichtbar #47 = Ebene 14,
                    Lage 190,437); Ebene 15 „Ebene #211“ – dessen Funkeln.
 Selbst gezeichnet: Nachttönung, Lichtschein des Brunnens, Lichterkette, Schneeflocken, Schatten.
@@ -53,10 +51,15 @@ def mary_sprite(L):
     return out[ys.min():ys.max() + 1, xs.min():xs.max() + 1]
 
 
-mary = mary_sprite(L71)                                   # 24×24
 import os
 from PIL import Image
-Image.fromarray(mary).save(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'sprites6', 'o12_mary.png'))
+# Marys Spiel-Sprite (hero-animations, Frame 0) – Base-Mary MIT Santa-Mütze; nur die Figur (Musiknoten weggelassen)
+_anim = np.array(Image.open('/home/user/PixelParties/data/hero-animations/mary-crestmas.png').convert('RGBA'))
+_f0 = _anim[:, 0:40].copy()
+_f0[..., 3] = np.where(_f0[..., 3] >= 128, 255, 0)
+mary = sorted(parts(_f0, dil=0), key=lambda p: -(p[..., 3] > 0).sum())[0]
+_cache = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'sprites6', 'o12_mary.png')
+Image.fromarray(mary).save(_cache)
 well = sprite('o12_well16', 'MotiveBritain', [16])        # Brunnen ohne Funkeln
 sparkle_layer = compose('MotiveBritain', [15], crop=False)
 wb = bbox(compose('MotiveBritain', [16], crop=False))
@@ -144,12 +147,16 @@ for _ in range(46):
 # ================================================================== Mittelgrund 3× (84×117)
 W3, H3 = 84, 117
 mid = np.zeros((H3, W3, 4), np.uint8)
-# Schatten des Brunnens im Schnee
-for i in range(-24, 25):
-    for dy in (0, 1):
-        x, y = 42 + i, WY3 + well.shape[0] - 1 + dy
-        if abs(i) < 24 - dy * 3:
-            mid[y, x, :3] = (26, 34, 70); mid[y, x, 3] = 120
+# Schatten des Brunnens: flache Ellipse genau unter dem Brunnenfuß (Mitte auf der unteren Edelsteinreihe),
+# damit der Brunnen auf dem Schnee steht statt zu schweben
+wcols = np.nonzero(well[..., 3].any(0))[0]
+wcx = WX3 + (wcols.min() + wcols.max() + 1) / 2
+wby = WY3 + well.shape[0] - 3
+for y in range(int(wby - 4), int(wby + 4)):
+    for x in range(W3):
+        d = ((x + 0.5 - wcx) / 27) ** 2 + ((y + 0.5 - wby) / 3.6) ** 2
+        if d < 1:
+            mid[y, x, :3] = (26, 34, 70); mid[y, x, 3] = 110
 put(mid, well, WX3, WY3)
 sm = sparks[..., 3] > 0
 for (j, i) in zip(*np.nonzero(sm)):

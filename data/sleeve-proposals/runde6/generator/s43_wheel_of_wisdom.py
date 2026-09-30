@@ -4,25 +4,23 @@
 Neues Motiv (Nutzer-Feedback: aus den Elementen seiner eigenen Karte gebaut): Archibald steht in seiner
 dämmrigen Halle vor der großen Glasrosette seiner Base-Karte. Die fünf farbigen Felder zeigen – wie auf der Karte –
 die fünf Gestalten des Kartenmotivs (Schattengestalt mit rotem Auge, rothaarige Kämpferin, braunhaarige Schützin,
-Mann mit Hut und Pelzkragen, Hexe mit Spitzhut). Das Licht fällt in bunten Bahnen durch die Rosette auf den
-Parkettboden, auf dem der Erzmagier mit Stab und violetten Funkelsternen steht; zu seinen Füßen der violette
-Sternenstoff aus seinem Kartenmotiv.
+Mann mit Hut und Pelzkragen, Hexe mit Spitzhut). Das Licht fällt bunt durch die Rosette auf den
+Parkettboden der Halle, auf dem der Erzmagier mit Stab und violetten Funkelsternen steht.
 
 Quellen (alle Motive.xcf, Szene der Karte „Archibald, the Archmage“ = Sichtbar #43, Ebene 98, Lage 247,117):
   Ebene 436 „ARCHMAGE“ + 435 „Archmage #9“ (Archibald mit Funkelsternen; Komposit pixelgleich mit der Szene,
             354 deckende Pixel, 0 Abweichungen). NICHT Ebene 434 „Gandalf“ (graue Variante).
-  Ebene 444 „Archmage“ (farbige Glasfelder), 440 „Archmage #4“ (Bleiruten-Netz), 441 „Archmage #3“ (Ring),
+  Ebene 441 „Archmage #3“ (farbige Glasfelder), 440 „Archmage #4“ (Bleiruten-Netz), 444 „Archmage“ (Ring),
             439 „Archmage #1“ (Ring mit fünf Speichen) – die Rosette.
   Ebene 438 „Archmage #6“ – die fünf Gestalten, die auf der Karte (vergrößert, halbtransparent) in den fünf
             Feldern erscheinen; hier im Raster der Rosette, zu 75 % ins Glas gemischt.
-  Ebene 442 „Archmage #7“ – violetter Sternenstoff (Teppich zu Archibalds Füßen).
   Sichtbar #43 (Ebene 98), Ausschnitt x 240–256, y 184–200: Parkettkachel der Halle (16×16, periodisch).
-Selbst gezeichnet: Mauer der Halle, steinerne Fensterlaibung, Lichtbahnen und farbiger Lichtfleck am Boden,
+Selbst gezeichnet: Mauer der Halle, steinerne Fensterlaibung, Lichtschein, farbiger Lichtfleck am Boden,
 Hinterleuchtung der Glasfelder, Kontaktschatten.
 
 Skalierung (Tiefenebenen):
-  Hintergrund (Mauer, Rosette 76×76 → 152×152, fünf Gestalten, Lichtbahnen)   – 2×-Raster (125×175)
-  Vordergrund (Archibald 25×31 → 125×155, Parkett, Sternenteppich, Lichtfleck)  – 5×-Raster (50×70)
+  Hintergrund (Mauer, Rosette 76×76 → 152×152, fünf Gestalten, Lichtschein)    – 2×-Raster (125×175)
+  Vordergrund (Archibald 25×31 → 125×155, Parkett, Lichtfleck)                 – 5×-Raster (50×70)
 """
 import math
 import numpy as np
@@ -31,13 +29,16 @@ from kitH import *  # noqa
 BM = 'Motive'
 arch = sprite('o43_archibald', BM, [435, 436])                       # 25×31 inkl. Funkeln
 ros_box = (246, 106, 322, 182)
-glass = sprite('o43_glass', BM, [444], box=ros_box)                  # Farbfelder (nicht zugeschnitten: gleicher Ausschnitt)
-mesh = sprite('o43_mesh', BM, [440, 441, 439], box=ros_box)          # Bleiruten, Ring, Speichen
+glass = raw_cached('o43_glass', BM, 441, ros_box)                   # Farbfelder (Ausschnitte deckungsgleich)
+mesh = np.zeros_like(glass)
+for i in (439, 444, 440):                                            # Speichen, Ring, Bleiruten-Netz
+    part = raw_cached('o43_mesh%d' % i, BM, i, ros_box)
+    m = part[..., 3] >= 128
+    mesh[m] = part[m]
 # Die fünf Gestalten (Ebene 438), einzeln ausgeschnitten: (Schlüssel, Box in Leinwandkoordinaten)
 FIG_BOX = {'shadow': (259, 112, 281, 138), 'red': (286, 112, 309, 138), 'girl': (247, 138, 273, 165),
            'hat': (295, 139, 320, 167), 'witch': (274, 150, 294, 181)}
 figs = {k: sprite('o43_fig_' + k, BM, [438], box=b) for k, b in FIG_BOX.items()}
-cloth = sprite('o43_cloth', BM, [442])                               # 128×77 Sternenstoff
 tile = sprite('o43_parquet', BM, [98], box=(240, 184, 256, 200))     # 16×16 Parkett (in der Szene abgedunkelt)
 
 # ================================================================== Hintergrund 2× (125×175)
@@ -83,21 +84,10 @@ for k, (dx, dy) in FIG_POS.items():
 put(bg, mesh, GX, GY)                        # Bleiruten über allem
 dark_vignette(bg, strength=0.55, r0=0.3, cx=RCX, cy=RCY + 20)
 
-# Lichtbahnen: fünf breite, farbige, geditherte Bahnen vom Fenster schräg nach unten auf den Boden
-BEAMS = [((200, 200, 210), -0.55), ((230, 120, 60), 0.5), ((220, 70, 50), -0.9), ((70, 110, 200), 0.85),
-         ((110, 200, 150), 0.0)]
-for col, slope in BEAMS:
-    col = np.array(col, float)
-    for y in range(int(RCY + R * 0.6), h2):
-        t = (y - (RCY + R * 0.6)) / (h2 - RCY - R * 0.6)
-        cx = RCX + slope * R * 0.55 + slope * 30 * t
-        half = 5 + 7 * t
-        for x in range(int(cx - half), int(cx + half) + 1):
-            if 0 <= x < w2:
-                e = 1 - abs(x + .5 - cx) / half
-                a = 0.16 * e * (1 - 0.4 * t)
-                if a > BAY[y % 4, x % 4] * 0.35:
-                    bg[y, x, :3] = (bg[y, x, :3] * (1 - 0.22) + col * 0.22).astype(np.uint8)
+# Farben der fünf Felder (für den Lichtfleck am Boden)
+BEAMS = [((200, 200, 210), 0), ((230, 120, 60), 0), ((220, 70, 50), 0), ((70, 110, 200), 0), ((110, 200, 150), 0)]
+# weicher Lichtschein des Glases auf der Wand darunter
+glow(bg, RCX, RCY + R + 6, 34, (150, 120, 190), 0.25, ry=14, steps=2)
 
 # ================================================================== Vordergrund 5× (50×70)
 w5, h5 = grid(5)
@@ -110,15 +100,6 @@ for y in range(FLOOR, h5):
         fg[y, x, 3] = 255
 for x in range(w5):                          # Übergang Wand/Boden: Sockelleiste
     fg[FLOOR, x, :3] = (22, 16, 30)
-# Sternenteppich (Ausschnitt aus dem Sternenstoff) als Läufer unter Archibald
-RUG = cloth[20:29, 40:70]
-rx0 = w5 // 2 - RUG.shape[1] // 2
-for j in range(RUG.shape[0]):
-    for i in range(RUG.shape[1]):
-        X, Y = rx0 + i, FLOOR + 2 + j
-        if 0 <= X < w5 and Y < h5 and RUG[j, i, 3]:
-            edge = i in (0, RUG.shape[1] - 1)
-            fg[Y, X, :3] = (40, 16, 70) if edge else RUG[j, i, :3]
 # farbiger Lichtfleck der Rosette auf Parkett und Teppich (zwei Stufen, gedithert)
 for y in range(FLOOR + 1, h5):
     for x in range(w5):
@@ -131,7 +112,7 @@ for y in range(FLOOR + 1, h5):
                 fg[y, x, :3] = (fg[y, x, :3] * (1 - q) + col * q).astype(np.uint8)
 ah, aw = arch.shape[:2]
 AX = w5 // 2 - aw // 2
-AFEET = FLOOR + 4                            # steht auf dem Teppich (y 320–325)
+AFEET = FLOOR + 4                            # steht auf dem Parkett (y 320–325)
 for x in range(AX + 5, AX + aw - 3):
     setp(fg, x, AFEET, (26, 10, 44))         # Kontaktschatten
 put(fg, arch, AX, AFEET - ah)

@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """11 Silken Descent – Gegner „Creepy Crawlies“ (Structure Deck Creepy Crawlies), Held: Alleria, the Queen of Spiders.
 
-Bildidee: Tief unten im Spinnenbau (Spider Hive). Durch ein Loch in der Höhlendecke fällt ein schmaler Lichtstrahl;
+Bildidee: Tief unten im Spinnenbau (Spider Hive). Von oben fällt ein schmaler Lichtstrahl herein;
 an ihrem eigenen Faden lässt sich Alleria (Base, eine Hand am Faden wie auf ihrer Karte) lautlos in den Lichtkegel
 hinab. Ringsum in der Erdwand lauern ihre Spinnen: aus den Löchern glühen rote Augenpaare, kleine Spinnen klettern
 die Wand hinauf, rechts hängt eine Crimson Skull Spider an ihrem roten Faden, am Boden krabbeln Spinnen ins Licht.
@@ -16,10 +16,11 @@ Quellen:
   MotiveGN.xcf        Ebene 267 „SPODDERS“ – Spinnen der Creepy-Crawlies-Karten (Spider Hive u. a.): krabbelnde
                       Spinnen, kletternde Spinnen, Spinnen im Erdloch (Kuppel mit roten Augen).
   MotiveGN.xcf        Ebene 421 „Klippen“ – Erdwand-/Bodentextur der Spinnenhöhlen-Karten.
-Selbst gezeichnet: Dunkelheit, Deckenloch, Lichtkegel, Lichtfleck, Fadenverlängerungen, Schatten.
+Selbst gezeichnet: Dunkelheit, Lichtkegel von oben, Lichtfleck, Schatten am Boden, Fadenverlängerungen (Allerias Faden
+reicht bis zum oberen Bildrand und endet direkt an ihrer Hand).
 
 Skalierung (Tiefenebenen):
-  Hintergrund 2× (125×175): Erdwand, Deckenloch, Lichtkegel, Spinnen in Löchern/an der Wand, Boden mit Spinnen
+  Hintergrund 2× (125×175): Erdwand, Lichtkegel, Spinnen in Löchern/an der Wand, Boden mit Spinnen und Schatten
   Mittelgrund 3× (84×117):  Crimson Skull Spider mit rotem Faden
   Vordergrund 5× (50×70):   Alleria mit ihrem Faden (1 Rasterpixel breit, hell/dunkel)
 """
@@ -68,7 +69,7 @@ AX5, AY5 = 9, 14                  # Alleria (Teil) im 5×-Raster → Canvas x 45
 HAND_X5 = AX5 + 7                 # Fadenspalte im 5×-Raster (Canvas x 80–85)
 HOLE_X = (HAND_X5 * 5 + 2.5) / 2  # Deckenloch-Mitte im 2×-Raster
 FLOOR = 141                       # Boden (2×-Raster, Canvas y 282)
-HOLE_Y = 18                       # Unterkante Deckenloch (2×-Raster, Canvas y 36)
+HOLE_Y = 0                        # Licht fällt von oben (über dem Bildrand) herein
 
 # ================================================================== Hintergrund 2× (125×175)
 W2, H2 = 125, 175
@@ -112,15 +113,12 @@ for y in range(H2):
 for x in range(W2):
     bg[FLOOR, x, :3] = (bg[FLOOR, x, :3] * 0.5).astype(np.uint8)
 
-# Deckenloch: gezackte Öffnung in der Höhlendecke, dahinter Tageslicht/grünes Blätterdach
-for y in range(HOLE_Y - 7, HOLE_Y + 1):
-    for x in range(W2):
-        dy = (HOLE_Y - y) / 7
-        w = 12 * math.sqrt(max(0, 1 - dy * dy)) + 1.2 * math.sin(x * 1.3 + y)
-        dx = abs(x + 0.5 - HOLE_X)
-        if dx < w:
-            bg[y, x, :3] = (222, 236, 178) if dx < w - 3 else (150, 184, 104)
-            if dx > w - 1 or y == HOLE_Y: bg[y, x, :3] = (70, 52, 30)
+# Schatten Allerias und der Crimson Skull Spider im Lichtfleck auf dem Boden
+for (cx, cy, rx, ry) in [(66, FLOOR + 13, 17, 3.2), (100, FLOOR + 9, 6, 1.6)]:
+    for y in range(int(cy - ry) - 1, int(cy + ry) + 2):
+        for x in range(int(cx - rx) - 1, int(cx + rx) + 2):
+            if 0 <= x < W2 and 0 <= y < H2 and ((x + 0.5 - cx) / rx) ** 2 + ((y + 0.5 - cy) / ry) ** 2 < 1:
+                bg[y, x, :3] = (bg[y, x, :3] * 0.45).astype(np.uint8)
 # Spinnen in Erdlöchern (Kuppel mit roten Augen) links und rechts an der Wand, im Dunkeln
 for (x, y, k) in [(12, 40, 0), (22, 70, 1), (12, 100, 0), (26, 124, 1), (100, 34, 1), (108, 62, 0),
                   (96, 88, 0), (110, 116, 1), (84, 128, 0)]:
@@ -161,9 +159,9 @@ W5, H5 = 50, 70
 fg = np.zeros((H5, W5, 4), np.uint8)
 # Faden von der Decke bis zur Hand (1 Rasterpixel, hell/dunkel abwechselnd wie im Original)
 light_c, dark_c = (225, 225, 225), (160, 160, 160)
-for y in range(int(HOLE_Y * 2 / 5) - 1, AY5 + 9):              # beginnt im hellen Deckenloch
-    fg[y, HAND_X5, :3] = light_c if y % 2 == 0 else dark_c; fg[y, HAND_X5, 3] = 255
 put(fg, alleria, AX5, AY5)
+for y in range(0, AY5 + 9):                  # vom oberen Bildrand bis an die Hand (Handpixel Zeile AY5+9)
+    fg[y, HAND_X5, :3] = light_c if y % 2 == 0 else dark_c; fg[y, HAND_X5, 3] = 255
 
 # ================================================================== zusammensetzen
 cv = Canvas(250, 350)

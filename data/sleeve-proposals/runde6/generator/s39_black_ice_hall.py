@@ -108,25 +108,25 @@ for y in range(H2):
 peng = flip(sprite('o39_pengu', 'Motive', [804]))       # Original blickt nach links → gespiegelt, rutscht nach rechts
 polar = sprite('o39_polar', 'Motive', [785])            # blickt nach links, rollt zur Mitte
 FOOT2 = 86
-for s_, x0, trail in ((peng, 3, (0, 12)), (polar, 124 - polar.shape[1], (124 - 10, 125))):
+for s_, x0, trail in ((peng, 3, (0, 10)), (polar, 124 - polar.shape[1], (124 - 8, 125))):
     h, w = s_.shape[:2]
-    y0 = FOOT2 - h + 1
-    cols = [i for i in range(w) if s_[:, i, 3].any()]
-    # Rutschspur: helle Kratzer im Eis hinter dem Tier (auf der Bodenlinie)
+    bottoms = {i: int(np.nonzero(s_[:, i, 3])[0].max()) for i in range(w) if s_[:, i, 3].any()}
+    ground = int(np.percentile(list(bottoms.values()), 80))          # Bauch bzw. Räder = Bodenkontakt
+    y0 = FOOT2 - ground
+    # Rutschspur: helle Kratzer im Eis hinter dem Tier, genau auf der Bodenlinie
     for x in range(*trail):
-        for yy, a in ((FOOT2 + 1, 0.45), (FOOT2 - 1, 0.25)):
-            if floor[yy, x] and (x + yy) % 4: bg.blend(x, yy, (190, 206, 236), a)
-    # Schatten direkt unter dem Körper (Bodenkontakt)
-    for i in range(min(cols), max(cols) + 1):
-        for yy, a in ((FOOT2, 0.75), (FOOT2 + 1, 0.45)):
-            if 0 <= x0 + i < W2: bg.blend(x0 + i, yy, (4, 8, 18), a)
-    # Spiegelung im Eis
-    for k in range(2, 12):
-        ty = FOOT2 + k; sy = h - k + 1
-        if sy < 0: break
-        for i in range(w):
-            if s_[sy, i, 3] and 0 <= x0 + i < W2 and floor[ty, x0 + i]:
-                bg.blend(x0 + i, ty, s_[sy, i, :3], 0.38 * (1 - k / 12))
+        if floor[FOOT2 + 1, x] and x % 3: bg.blend(x, FOOT2 + 1, (190, 206, 236), 0.40)
+    # Kontaktschatten direkt unter jeder Spalte, die den Boden berührt (1–2 Zeilen, keine Lücke)
+    for i, bt in bottoms.items():
+        if bt < ground - 2 or not (0 <= x0 + i < W2): continue
+        bg.blend(x0 + i, y0 + bt + 1, (4, 8, 18), 0.75)
+        if bt >= ground: bg.blend(x0 + i, y0 + bt + 2, (4, 8, 18), 0.35)
+    # Spiegelung im Eis, beginnt direkt unter dem Schatten
+    for k in range(1, 10):
+        for i, bt in bottoms.items():
+            sy = bt - k + 1; ty = y0 + bt + 1 + k
+            if sy < 0 or not (0 <= x0 + i < W2) or ty >= H2 or not floor[ty, x0 + i]: continue
+            if s_[sy, i, 3]: bg.blend(x0 + i, ty, s_[sy, i, :3], 0.34 * (1 - k / 10))
     bg.paste(s_, x0, y0)
 
 # Hels Schatten (dunkelroter Fleck wie auf der Karte) auf dem Eis
