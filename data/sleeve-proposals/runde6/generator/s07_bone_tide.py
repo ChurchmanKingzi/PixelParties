@@ -221,7 +221,7 @@ cv = Canvas(250, 350)
 cv.paste(up(bg, 2), 0, 0)
 cv.paste(up(glow, 3), -1, 0)
 cv.paste(up(mid, 3), -1, 0)
-cv.paste(up(fg, 6), -1, 0)
+cv.paste(up(fg, 6), 2, 0)                         # Gesichtsmitte (Sprite-Spalte 10,5) auf x = 125 → 375 von 750
 vignette(cv, 0.35, 0.62)
 save(cv, '07_bone_tide.png')
 print('ok')
