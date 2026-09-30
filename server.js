@@ -12497,11 +12497,15 @@ async function cubeMatchEnd(room, match, winnerSeat, io) {
   const eliminatedThisRound = round.filter(m => m.resolved && m.loserSeat != null).map(m => m.loserSeat);
   // Placement = 1 + bracketSize - (number of round-end survivors)
   // For final round, placement = 2 (runner-up).
-  // Simpler: assign placement = 2^(rounds - currentRoundIdx) + 1.
+  // Simpler: assign placement = 2^(rounds - currentRoundIdx - 1) + 1.
   const totalRounds = Math.log2(cd.bracket.bracketSize);
   const isFinalRound = cd.bracket.currentRoundIdx === totalRounds - 1;
   if (match.loserSeat != null) {
-    cd.standings[match.loserSeat] = isFinalRound ? 2 : Math.pow(2, totalRounds - cd.bracket.currentRoundIdx) + 1;
+    // Erster Platz des Verlierer-Blocks dieser Runde: Bracket 4 → Runde 0: 3
+    // (Platz 3-4); Bracket 8 → Runde 0: 5, Runde 1: 3. (Bugfix: der Exponent
+    // war um 1 zu gross — Platz 5 statt 3 bei drei Spielern, und im Ranked-
+    // Cube-Elo ein Delta jenseits von -K.)
+    cd.standings[match.loserSeat] = isFinalRound ? 2 : Math.pow(2, totalRounds - cd.bracket.currentRoundIdx - 1) + 1;
   }
 
   cubeTournamentBroadcast(room, io);
@@ -12572,7 +12576,12 @@ async function cubeFinalizeTournament(room, io) {
   // SC + ELO payouts.
   const humanCount = humansBuilt.length;
   const isRanked = room.type === 'ranked';
-  for (const s of standings) {
+  // Ein Turnier mit nur EINEM Menschen war nie umkaempft (alle anderen wurden
+  // per Vote-Kick zu Bots): weder SC noch Elo. Sonst liesse sich mit einem
+  // zweiten Konto — Raum starten, Konto trennen, Vote-Kick — in einer Minute
+  // der Erstplatz-Bonus abholen (Cube-Test).
+  const unumkaempft = humanCount < 2;
+  for (const s of (unumkaempft ? [] : standings)) {
     const player = room.players[s.seat];
     let scAward = 0;
     // v1402: Beträge an EINER Stelle (sc-rewards.js), ×5.
@@ -12589,7 +12598,7 @@ async function cubeFinalizeTournament(room, io) {
     if (isRanked) {
       // Placement 1 → +K, 2 → +K/2, etc. Last → -K.
       const K = 24;
-      const norm = (humanCount - s.placement) / Math.max(1, humanCount - 1); // 1.0 for 1st, 0.0 for last
+      const norm = Math.max(0, Math.min(1, (humanCount - s.placement) / Math.max(1, humanCount - 1))); // 1.0 for 1st, 0.0 for last
       let delta = Math.round(K * (norm - 0.5) * 2); // -K..+K range
       // Vote-kicked players take a flat -K loss regardless of placement.
       if (player.cubeKickLoss) delta = -K;
@@ -12597,6 +12606,16 @@ async function cubeFinalizeTournament(room, io) {
         await db.run('UPDATE users SET elo_cube = MAX(0, elo_cube + ?) WHERE id = ?', [delta, player.userId]);
         if (player.socketId) io.to(player.socketId).emit('cube_elo_update', { delta, placement: s.placement });
       } catch (err) { console.error('[cubeFinalize] ELO error:', err.message); }
+    }
+  }
+  // Vote-Kick-Strafe: wer per Vote-Kick zum Bot wurde, steht nicht in den
+  // Standings (kein Deck) — die im Draft vermerkte Strafe (`cubeKickLoss`) lief
+  // deshalb nie. Ranked: flach −K, wenn das Turnier umkaempft war.
+  if (isRanked && !unumkaempft) {
+    for (const p of room.players) {
+      if (!p.cubeKickLoss || !p.userId || String(p.userId).startsWith('bot:')) continue;
+      try { await db.run('UPDATE users SET elo_cube = MAX(0, elo_cube + ?) WHERE id = ?', [-24, p.userId]); }
+      catch (err) { console.error('[cubeFinalize] Kick-ELO error:', err.message); }
     }
   }
   cubeTournamentBroadcast(room, io);
@@ -17864,6 +17883,42 @@ function handleLeaveRoom(socket, roomId, user) {
   if (!room) return;
 
   socket.leave('room:' + roomId);
+
+  // ★ Cube Draft NACH der Lobby (Draft, Deckbau, Turnier): ein Sitz wird nie
+  // entfernt und der Raum nie zerstoert, wenn ein Mensch geht oder die
+  // Verbindung verliert. Bugfix (Cube-Test): der Trennungs-Handler rief am
+  // Ende `handleLeaveRoom` fuer JEDEN Raum des Nutzers — die Sitze schoben
+  // sich zusammen (Bot 1 rutschte auf den Platz des Gegangenen, alle
+  // sitzindizierten Draft-Daten passten nicht mehr), Vote-Kick und
+  // Wiederverbinden (`join_room`) fanden den Sitz nicht mehr, und ging der
+  // Gastgeber, wurde der ganze Raum samt Draft zerstoert. Jetzt bleibt der
+  // Sitz mit `socketId = null` bestehen (Wiederverbinden / Vote-Kick, siehe
+  // dort); waehrend des Drafts pausiert der Draft.
+  if (room.cubeDraft && room.cubeDraft.phase !== 'lobby') {
+    const sitz = room.players.findIndex(p => p.userId === user.userId && !p.isBot);
+    if (sitz >= 0) {
+      if (room.players[sitz].socketId === socket.id) room.players[sitz].socketId = null;
+      if (room.cubeDraft.phase === 'drafting' && room.cubeDraft.draftState && !room.cubeDraft.draftState.suspended) {
+        cubeDraftSuspend(room, `${room.players[sitz].username} disconnected`, io);
+      }
+    } else {
+      room.spectators = room.spectators.filter(s => s.username !== user.username);
+    }
+    // Ist kein Mensch mehr online, den Raum nach einer Karenzzeit aufraeumen
+    // (sonst bliebe ein pausierter Draft fuer immer im Speicher).
+    if (!room.players.some(p => !p.isBot && p.socketId) && !room._verlassenTimer) {
+      room._verlassenTimer = setTimeout(() => {
+        const r = rooms.get(roomId);
+        if (r) {
+          delete r._verlassenTimer;
+          if (!r.players.some(p => !p.isBot && p.socketId)) { destroyRoom(roomId); io.emit('rooms', getRoomList()); }
+        }
+      }, 10 * 60 * 1000);
+    }
+    io.to('room:' + roomId).emit('room_update', sanitizeRoom(room));
+    io.emit('rooms', getRoomList());
+    return;
+  }
 
   if (room.hostId === user.userId) {
     // Cube Draft rooms in the LOBBY phase: promote the next-joined human
