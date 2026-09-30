@@ -10593,7 +10593,7 @@ class GameEngine {
       if (ps.mainDeck.length === 0) {
         this.log('deck_out', { player: ps.username });
         // Deck out = instant loss
-        if (!this.gs.result) {
+        if (!this.gs.result && !this.gs._endGameLaeuft) {
           const winnerIdx = playerIdx === 0 ? 1 : 0;
           this.log('deck_out_loss', { loser: ps.username, winner: this.gs.players[winnerIdx]?.username });
           if (this._inMctsSim) {
@@ -45523,7 +45523,7 @@ this._deathWatch = (this._deathWatchStack || []).length
    * If so, the other player wins.
    */
   async checkAllHeroesDead() {
-    if (this.gs.result) return; // Game already over
+    if (this.gs.result || this.gs._endGameLaeuft) return; // Game already over (or being finalised)
 
     // ── Simultanschaden (8.8.) ───────────────────────────────────────
     // Trifft eine Karte das GANZE Brett auf einmal, darf nicht der erste
