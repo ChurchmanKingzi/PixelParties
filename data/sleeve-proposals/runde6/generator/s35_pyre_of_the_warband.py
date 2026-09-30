@@ -6,7 +6,7 @@ Idee: Nacht im Krater des Chaorc-Lagers (ORKLAGER seiner Kartenszene). Vorn steh
 Kriegsbanner mit dem Flammenauge; hinter ihm lodert das große Opferfeuer des Lagers (Pyre Grill Master). Am Feuer
 wartet links ein rot vermummter Chaorc, rechts steht Asriel, the Sapling Sacrificer (Cover-Karte des Decks) mit
 seinem blutigen Opfermesser – Opfer bringen, damit neue Chaorcs und Dämonen kommen. Vorn wie auf der Heldenkarte die
-brennende Kiste und der Geldsack; oben auf dem Kraterrand die schrägen Palisadenpfähle.
+brennende Kiste und der Geldsack, rechts ein Kistenstapel des Lagers.
 
 Quellen:
   MotiveHawaii.xcf Ebene 137 „Calamitustk-Kopie“ + 133 „Ebene #53“ (Banner) – Base-Calamitusk, geprüft gegen Szene
@@ -14,13 +14,13 @@ Quellen:
                    verdeckt, Figur sonst pixelgleich). 138 „Calamitustk“ weicht in 152 px ab (nicht verwendet).
                    Ebene 123 (Flammen) + 130 (Scheitholz-Kreuz, rechter Teil) – großes Lagerfeuer der Pyre-Grill-Karte.
                    Ebene 129 „Ebene #60“ – rot vermummter Chaorc. Ebene 139 (Feuer) + 141 „ORKLAGER“ (Kiste, Geldsack,
-                   Palisadenpfähle: 130 linker Teil) – wie auf der Heldenkarte.
+                   Kistenstapel) – wie auf der Heldenkarte.
                    Ebene 269 „Ebene #4“ – Kachel Lagerboden (16×16) und Kraterhang (16×16).
   MotiveGrailWar.xcf Ebene 156 „Asriel“ – Asriel mit blutigem Messer (Szene 151, Karte Asriel, Lage 256,81).
 Selbst gezeichnet: Nachthimmel mit Feuerschein, Kraterrand-Kante, Lichtschein, Bodenschatten.
 
 Skalierung (Tiefenebenen):
-  Hintergrund: Himmel, Kraterhang, Palisade, Boden, Feuer, Chaorc, Asriel   – 2× (125×175)
+  Hintergrund: Himmel, Kraterhang, Boden, Feuer, Chaorc, Asriel, Kisten     – 2× (125×175)
   Mittelgrund: brennende Kiste, Geldsack                                    – 3× (84×117)
   Vordergrund: Calamitusk mit Banner                                       – 4× (63×88); 152×208 px
 """
@@ -83,6 +83,13 @@ glow(bg, PX, PB - 18, 60, (255, 120, 40), 0.5, ry=46)
 glow(bg, PX, PB + 4, 52, (255, 150, 60), 0.35, ry=30)
 shade_ellipse(bg, PX, PB - 1, 26, 2.2, 0.55)
 put(bg, pyre, PX - pyre.shape[1] // 2, PB - pyre.shape[0])
+# Kistenstapel des Lagers rechts auf halber Tiefe
+crate = cached('o35_crate', lambda: parts(layer(H, 141), dil=1)[4])
+crD = mul(crate, (0.62, 0.52, 0.46), (14, 4, 0))
+shade_ellipse(bg, 98, 110, 15, 1.8, 0.5)
+put(bg, crD, 84, 110 - 16)
+put(bg, crD, 98, 110 - 16)
+put(bg, crD, 91, 110 - 32)
 # Chaorc links, Asriel rechts am Feuer
 for s, cx in ((chaorc, 26), (asriel, 99)):
     shade_ellipse(bg, cx, PB - 1, s.shape[1] / 2 + 1, 1.5, 0.5)

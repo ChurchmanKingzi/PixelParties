@@ -156,10 +156,10 @@ hm = hm if hm[:, -4:, 3].sum() > hm[:, :4, 3].sum() else flip(hm)
 hcx, hcy = HAM[0] * 2 / 4, HAM[1] * 2 / 4             # Hammerkopf-Mitte im 4×-Raster
 hx0 = int(round(hcx - hm.shape[1] + 4)); hy0 = int(round(hcy - hm.shape[0] / 2))
 # Fahrtstreifen hinter dem Stiel (drei kurze Striche, hell/dunkel) – der Hammer ist geworfen und fliegt
-for k, (dy, ln) in enumerate([(2, 9), (5, 13), (8, 8)]):
+for k, (dy, ln) in enumerate([(4, 7), (7, 11), (10, 6)]):
     yy = hy0 + dy
     for i in range(ln):
-        xx = hx0 - 2 - i - k
+        xx = hx0 - 1 - i - (k % 2)
         if 0 <= xx < W4 and 0 <= yy < H4 and i % 4 != 3:
             mid[yy, xx, :3] = (220, 228, 255) if i % 2 == 0 else (140, 150, 196)
             mid[yy, xx, 3] = max(60, 230 - i * 14)
