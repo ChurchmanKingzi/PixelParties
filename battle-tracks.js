@@ -5,10 +5,16 @@
 //  (PvP), und umgekehrt hört man den Track des Gegners. Gegen eine CPU
 //  läuft deren Thema (`cpuBgm`, siehe server.js) — unabhängig von der Wahl.
 //
-//  Zwei Sorten Tracks, beide liegen als `public/music/bgm_<id>.ogg`:
+//  Drei Sorten Tracks, alle liegen als `public/music/bgm_<id>.ogg`:
 //   • ALLGEMEINE Tracks `battle1`, `battle2`, … — stehen jedem offen.
 //     Neue Dateien nach dem Muster `bgm_battle<Zahl>.ogg` erscheinen
 //     ohne Codeänderung in der Auswahl.
+//   • ARCHETYP-THEMES `theme_<slug>` (z. B. `theme_deepsea`) — je ein Track
+//     für jeden Archetyp mit mehr als drei Karten, ebenfalls frei wählbar.
+//     Sie sind zum Rollenspielen gedacht und haben Namen. Titel und
+//     Archetyp stehen in `data/battle-tracks.json` (erzeugt von
+//     `scripts/music/themes_spec.py`); gelistet wird nur, was als Datei
+//     existiert.
 //   • CPU-Themen (`zi`, `null`, …) — frei nach ZEHN Siegen gegen diese CPU
 //     (`UNLOCK_WINS`). Der Stand wird nicht gespeichert, sondern aus
 //     `npc_stats` abgeleitet: wirkt damit auch rückwirkend für bereits
@@ -28,6 +34,24 @@ const path = require('path');
 const UNLOCK_WINS = 10;
 
 const GENERIC_RE = /^bgm_(battle\d+)\.(ogg|mp3|wav)$/i;
+const THEME_RE = /^bgm_(theme_[a-z0-9]+)\.(ogg|mp3|wav)$/i;
+const NAMES_FILE = path.join(__dirname, 'data', 'battle-tracks.json');
+
+/** Titel der Tracks aus data/battle-tracks.json (fehlt die Datei → leer). */
+function loadTrackNames() {
+  try {
+    const j = JSON.parse(fs.readFileSync(NAMES_FILE, 'utf-8'));
+    return { generic: j.generic || {}, themes: Array.isArray(j.themes) ? j.themes : [] };
+  } catch { return { generic: {}, themes: [] }; }
+}
+
+/** Archetyp-Themes, deren Datei existiert: [{ id, name, archetype }] in Dateilisten-Reihenfolge der JSON. */
+function listThemeTracks(musicDir, names = loadTrackNames()) {
+  let files;
+  try { files = new Set(fs.readdirSync(musicDir).map(f => (THEME_RE.exec(f) || [])[1]).filter(Boolean).map(x => x.toLowerCase())); }
+  catch { return []; }
+  return names.themes.filter(t => files.has(t.id)).map(t => ({ id: t.id, name: t.name, archetype: t.archetype }));
+}
 
 /** Allgemeine Tracks im Musikordner, numerisch sortiert (battle2 vor battle10). */
 function listGenericTracks(musicDir) {
@@ -100,7 +124,13 @@ function createBattleTracks(deps) {
       const w = wins.get(e.slug) || 0;
       return { id: e.slug, name: e.name, wins: w, unlocked: w >= UNLOCK_WINS };
     }).sort((a, b) => (b.unlocked - a.unlocked) || a.name.localeCompare(b.name));
-    return { need: UNLOCK_WINS, generic: listGenericTracks(musicDir), cpu };
+    const names = loadTrackNames();
+    return {
+      need: UNLOCK_WINS,
+      generic: listGenericTracks(musicDir).map(id => ({ id, name: names.generic[id] || 'Battle ' + id.slice(6) })),
+      themes: listThemeTracks(musicDir, names),
+      cpu,
+    };
   }
 
   /** Darf dieser Spieler den Track wählen? (null = Standard = immer.) */
@@ -108,6 +138,7 @@ function createBattleTracks(deps) {
     if (track == null || track === '') return true;
     const id = String(track).toLowerCase();
     if (listGenericTracks(musicDir).includes(id)) return true;
+    if (listThemeTracks(musicDir).some(t => t.id === id)) return true;
     const { byDeck, bySlug } = cpuIndex();
     if (!bySlug.has(id)) return false;
     return ((await winsFor(userId, byDeck)).get(id) || 0) >= UNLOCK_WINS;
@@ -139,4 +170,4 @@ function createBattleTracks(deps) {
   return { listFor, isSelectable, resolveForBattle, unlockedByWin };
 }
 
-module.exports = { UNLOCK_WINS, listGenericTracks, buildCpuIndex, winsPerSlug, crossedUnlock, createBattleTracks };
+module.exports = { UNLOCK_WINS, listGenericTracks, listThemeTracks, loadTrackNames, buildCpuIndex, winsPerSlug, crossedUnlock, createBattleTracks };

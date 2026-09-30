@@ -2352,6 +2352,8 @@ function ProfileScreen() {
   };
   const battleTrackName = (id) => {
     if (!id) return 'Default';
+    const found = trackData && (trackData.generic.find(g => g.id === id) || trackData.themes.find(t => t.id === id));
+    if (found) return found.name;
     const cpu = trackData && trackData.cpu.find(c => c.id === id);
     if (cpu) return cpu.name + "'s Theme";
     const m = /^battle(\d+)$/.exec(id);
@@ -2959,7 +2961,9 @@ function ProfileScreen() {
                   </div>
                   <div style={{ overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: 6 }}>
                     {row(null, 'Default', 'The standard battle theme', false)}
-                    {trackData.generic.map(id => row(id, 'Battle ' + id.replace('battle', ''), null, false))}
+                    {trackData.generic.map(g => row(g.id, g.name, null, false))}
+                    {trackData.themes.length > 0 && <div className="profile-section-label" style={{ marginTop: 10 }}>ARCHETYPE THEMES</div>}
+                    {trackData.themes.map(t => row(t.id, t.name, t.archetype, false))}
                     <div className="profile-section-label" style={{ marginTop: 10 }}>OPPONENT THEMES</div>
                     {trackData.cpu.map(c => row(c.id, c.name + "'s Theme",
                       c.unlocked ? 'Unlocked' : (c.wins + ' / ' + trackData.need + ' wins'), !c.unlocked))}

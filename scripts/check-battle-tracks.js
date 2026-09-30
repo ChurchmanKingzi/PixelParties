@@ -3,13 +3,30 @@
 'use strict';
 const assert = require('assert');
 const path = require('path');
-const { UNLOCK_WINS, listGenericTracks, buildCpuIndex, winsPerSlug, crossedUnlock, createBattleTracks } = require('../battle-tracks');
+const { UNLOCK_WINS, listGenericTracks, listThemeTracks, loadTrackNames, buildCpuIndex, winsPerSlug, crossedUnlock, createBattleTracks } = require('../battle-tracks');
 
 const musicDir = path.join(__dirname, '..', 'public', 'music');
 const generic = listGenericTracks(musicDir);
 assert(generic.includes('battle1'), 'battle1 fehlt');
 assert.deepStrictEqual(generic, [...generic].sort((a, b) => parseInt(a.slice(6)) - parseInt(b.slice(6))), 'nicht numerisch sortiert');
 assert(!generic.includes('battle'), 'der Standard-Track "battle" ist kein wählbarer Eintrag');
+
+// Archetyp-Themes: jeder Eintrag der JSON hat Titel + Archetyp, IDs sind eindeutig und dateitauglich,
+// Archetypen existieren in cards.json; gelistet wird nur, was als Datei da ist.
+const names = loadTrackNames();
+const cards = require('../data/cards.json');
+const archetypes = new Set(cards.flatMap(c => (c.archetype || '').split(',').map(x => x.trim()).filter(Boolean)));
+const ids = new Set();
+for (const t of names.themes) {
+  assert(/^theme_[a-z0-9]+$/.test(t.id), 'ungueltige ID ' + t.id);
+  assert(t.name && t.archetype, 'Titel/Archetyp fehlt: ' + t.id);
+  assert(!ids.has(t.id), 'doppelte ID ' + t.id); ids.add(t.id);
+  assert(archetypes.has(t.archetype), 'Archetyp unbekannt: ' + t.archetype);
+}
+const present = listThemeTracks(musicDir);
+assert(present.every(t => ids.has(t.id)));
+for (const g of Object.keys(names.generic)) assert(generic.includes(g), 'benannter Track ohne Datei: ' + g);
+console.log('themes: ' + names.themes.length + ' benannt, ' + present.length + ' mit Datei');
 
 // Schwelle: genau der 10. Sieg schaltet frei, nie doppelt.
 assert.strictEqual(UNLOCK_WINS, 10);
