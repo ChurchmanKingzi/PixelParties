@@ -26,6 +26,17 @@ function _heroHasAbilities(ps, hi) {
   return false;
 }
 
+/**
+ * Wie die oberste Ability des Stapels ANGEZEIGT wird: Performance sieht
+ * aus wie die Ability darunter (Kopie). Zaehlt man mehrere Performance
+ * uebereinander, gilt die naechste Nicht-Performance darunter.
+ */
+function _anzeigeName(slot) {
+  let i = slot.length - 1;
+  while (i > 0 && slot[i] === 'Performance') i--;
+  return slot[i];
+}
+
 /** Build the abilityChoice gallery — one entry per top-of-stack ability. */
 function _buildAbilityGallery(ps, hi) {
   const zones = ps.abilityZones?.[hi] || [];
@@ -35,9 +46,15 @@ function _buildAbilityGallery(ps, hi) {
     if (slot.length === 0) continue;
     // Top of stack — that's what gets discarded by an "ability discard"
     // step (mirrors Noble Mummy Guards' bounce behavior).
+    // `name` = Anzeigename (Performance zeigt die kopierte Ability),
+    // `realName` = die tatsaechlich oberste Karte. `source` traegt die
+    // Zone (kommt in der Antwort zurueck, trennt gleich aussehende
+    // Eintraege); `label` verhindert den irrefuehrenden „DECK"-Stempel.
     out.push({
-      name: slot[slot.length - 1],
-      source: 'ability',
+      name: _anzeigeName(slot),
+      realName: slot[slot.length - 1],
+      source: `ability:${z}`,
+      label: 'ABILITY',
       _zoneSlot: z,
       _stackHeight: slot.length,
     });
@@ -145,16 +162,18 @@ module.exports = {
 
     let chosen = picked?.cardName;
     let chosenSlot = -1;
+    const _ausQuelle = /^ability:(\d+)$/.exec(picked?.source || '');
     // Match by name → pick the matching gallery entry's _zoneSlot. If
     // the engine returned no choice (CPU defer / disconnect / etc.),
     // fall back to the LAST gallery entry — symmetric to the
     // Noble-Mummy-Guards "bounce a different ability" fallback so the
     // gem still does something meaningful.
     const entry = chosen
-      ? gallery.find(g => g.name === chosen)
+      ? ((_ausQuelle && gallery.find(g => g._zoneSlot === Number(_ausQuelle[1])))
+        || gallery.find(g => g.name === chosen))
       : gallery[gallery.length - 1];
     if (entry) {
-      chosen = entry.name;
+      chosen = entry.realName;   // die tatsaechlich oberste Karte (bei Performance nicht der Anzeigename)
       chosenSlot = entry._zoneSlot;
     }
 
