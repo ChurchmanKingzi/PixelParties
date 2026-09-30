@@ -42,7 +42,7 @@ PICKS = [
     ("DonQuisto",      "Don Quisto, the Gold Seeker",            63, 55),
     ("CactusCreature", "Cactus Creature", 77, 50, 64),
     ("CybugBee", "Cybug BEE", 77, 50, 100),
-    ("Stegon", "Gigantisaur Stegon", 77, 55, 100),
+    ("Stegon", "Gigantisaur Stegon", 50, 55, 100),
     ("Greatmaw", "Greatmaw Siren", 77, 50, 70),
     ("BearRider", "Mischief Militia - Bear Rider", 77, 57, 56),
     ("GreenDragoneer", "Green Dragoneer", 72, 57, 60),
