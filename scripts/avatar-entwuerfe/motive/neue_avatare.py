@@ -28,7 +28,7 @@ def card_native(i, m):
     return cv2.resize(a, (round(610 / m), round(400 / m)), interpolation=cv2.INTER_AREA).astype(np.float32)
 
 
-REF = json.load(open('/home/user/refine_layers.json'))
+REF = json.load(open('/home/user/refine_layers.json')) if os.path.exists('/home/user/refine_layers.json') else {}
 MAX_ERR = 0.012
 
 
