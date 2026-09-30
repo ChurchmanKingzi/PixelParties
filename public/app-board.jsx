@@ -30960,6 +30960,22 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   useEffect(() => { if (summonOrRevealPick && window.playSFX) window.playSFX('ui_prompt_open'); }, [summonOrRevealPick]);
 
   const [showSurrender, setShowSurrender] = useState(false);
+  // Surrender Match zwischen den Spielen (Side-Decking / Startspieler-Wahl): Zwei-Schritt-Bestaetigung.
+  const [confirmSurrenderMatch, setConfirmSurrenderMatch] = useState(false);
+  const surrenderMatchZwischen = (
+    <div style={{ display: 'flex', gap: 8, justifyContent: 'center', marginTop: 12 }}>
+      {!confirmSurrenderMatch ? (
+        <button className="btn" style={{ padding: '6px 16px', fontSize: 11, borderColor: '#ff2222', color: '#ff2222' }}
+          onClick={() => setConfirmSurrenderMatch(true)}>🏳️ Surrender Match</button>
+      ) : (<>
+        <span style={{ fontSize: 11, color: 'var(--danger)', alignSelf: 'center' }}>Give up the whole match?</span>
+        <button className="btn btn-danger" style={{ padding: '6px 16px', fontSize: 11 }}
+          onClick={() => { setConfirmSurrenderMatch(false); socket.emit('surrender_match', { roomId: gameState.roomId }); }}>Yes</button>
+        <button className="btn" style={{ padding: '6px 16px', fontSize: 11 }}
+          onClick={() => setConfirmSurrenderMatch(false)}>No</button>
+      </>)}
+    </div>
+  );
   const surrenderOpenedAt = React.useRef(0);
   const [sideDeckPhase, setSideDeckPhase] = useState(null); // { currentDeck, originalDeck, opponentDone, setScore, format }
   const [sideDeckDone, setSideDeckDone] = useState(false);
@@ -46489,6 +46505,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                   {sideDeckDone ? '✅ Waiting for opponent...' : '✔ Done Siding'}
                 </button>
               </div>
+              {surrenderMatchZwischen}
             </div>
           </div>
         );
@@ -47711,6 +47728,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               GO SECOND
             </button>
           </div>
+          {(gameState.format || 1) > 1 && surrenderMatchZwischen}
         </DraggablePanel>
       )}
 
