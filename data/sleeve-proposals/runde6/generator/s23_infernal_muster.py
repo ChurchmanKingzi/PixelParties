@@ -3,8 +3,8 @@
 Held/Hauptmotiv: Baaliel, the Demon General (Base-Karte).
 
 Idee (Aufmarsch, Tiefenstaffelung): Baaliel steht vorn mit ausgebreiteten Armen und nimmt die Parade ab.
-Hinter ihm ist auf dem glühenden Lavafeld sein Heer angetreten – Horned Demons (Cover-Karte) in drei
-Reihen, keilförmig auf ihn zulaufend, nach hinten dunkler im Rauch. Über dem Horizont geht das Höllenfeuer
+Hinter ihm ist auf dem glühenden Lavafeld sein Heer angetreten – Horned Demons (Cover-Karte) in zwei
+Reihen (hinten sieben, vorn vier, die Mitte für ihn frei), nach hinten dunkler im Rauch. Über dem Horizont geht das Höllenfeuer
 seiner „Batterie“ nieder: Feuerschweife stürzen aus dem schwarzroten Himmel in die Ferne (Burn-Deck:
 Fireball, Explosion, Victory Phoenix Cannon, Laser Volley). Kartentext: Baaliel beschwört Horned Demons
 ohne Levelgrenze; jede Niederlage gibt allen Horned Demons einen Demon Counter.
@@ -15,7 +15,8 @@ Quellen (Motive.xcf):
                Szene erzeugt, daher kein pixelgenauer Treffer in einer „Sichtbar“-Ebene – Form und Farben
                visuell geprüft).
   Horned Demon: Ebene 573 „Horned Demon“ (16×29, Cover-Karte).
-  Lavafeld:    Ebene 1550 „Lava“ (Boden; Ausschnitt, zum Horizont hin abgedunkelt).
+  Lavafeld:    Ebene 1044 „Hell“ (Basaltboden mit Lavastrom; Ausschnitt x 150–275, y 186–297,
+               zum Horizont hin abgedunkelt).
   Feuerschweife: Ebene 577 „Armageddon“ (drei der fallenden Feuerschweife).
 Selbst gezeichnet: Himmelsverlauf schwarzrot→Glut (geordnetes Dithering), Horizont-Dunst, Schatten unter
                Baaliel, Abdunkelung der hinteren Reihen.
@@ -49,17 +50,27 @@ for y in range(HOR):
             q = dith((t - 0.6) / 0.4, x, y, 6); c = MID * (1 - q) + GLOW * q
         bg[y, x, :3] = c; bg[y, x, 3] = 255
 # Feuerschweife (fallen hinter dem Horizont nieder)
-for (x, y, i) in ((14, 6, 2), (97, 0, 3), (58, 16, 0), (36, -6, 1)):
+for (x, y, i) in ((18, 2, 3), (98, 12, 1), (66, HOR - 33 + 2, 0)):
     s = streaks[i]
-    put(bg, s, x, min(y, HOR - s.shape[0] + 4))
+    put(bg, s, x, y)
+# Einschlag am Horizont (Schein hinter dem Heer, gedithert)
+IX, IY = 72, HOR
+for y in range(HOR - 10, HOR + 2):
+    for x in range(IX - 20, IX + 20):
+        d = math.hypot((x + .5 - IX) / 20, (y + .5 - IY) / 9)
+        if d < 1 and 0 <= x < GW:
+            q = dith(1 - d, x, y, 3)
+            bg[y, x, :3] = (bg[y, x, :3] * (1 - q * 0.6) + np.array([255, 190, 80]) * q * 0.6).astype(np.uint8)
 # Lavafeld
-lava = layer(B, 1550)
-LX0, LY0 = 150, 60
+lava = layer(B, 1044)
+LX0, LY0 = 150, 186
 for y in range(HOR, GH):
     for x in range(GW):
         c = lava[LY0 + (y - HOR), LX0 + x, :3].astype(float)
+        if c.max() < 16:                                        # Lücken der Ebene (schwarz) → Basalt
+            c = np.array([44, 8, 6], float)
         t = (y - HOR) / (GH - HOR)
-        f = 0.35 + 0.6 * dith(min(1.0, t * 1.6), x, y, 4)       # zum Horizont dunkler (Rauch)
+        f = 0.3 + 0.55 * dith(min(1.0, t * 1.4), x, y, 4)       # zum Horizont dunkler (Rauch)
         bg[y, x, :3] = (c * f + np.array([40, 6, 6]) * (1 - f)).clip(0, 255).astype(np.uint8)
         bg[y, x, 3] = 255
 # Horizontlinie: Glutdunst
@@ -70,9 +81,8 @@ for x in range(GW):
 # Heer: drei Reihen, keilförmig; hintere Reihen dunkler
 AX = 62
 ranks = [   # (Fußlinie, x-Mittelpunkte, Helligkeit)
-    (80, [AX - 48, AX - 32, AX - 16, AX, AX + 16, AX + 32, AX + 48], 0.55),
-    (90, [AX - 56, AX - 40, AX - 24, AX + 24, AX + 40, AX + 56], 0.72),
-    (100, [AX - 50, AX - 34, AX + 34, AX + 50], 0.9),
+    (82, [AX - 48, AX - 32, AX - 16, AX, AX + 16, AX + 32, AX + 48], 0.6),
+    (94, [AX - 40, AX - 24, AX + 24, AX + 40], 0.8),
 ]
 dh, dw = demon.shape[:2]
 for foot, xs, br in ranks:
