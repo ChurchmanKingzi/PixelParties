@@ -2,27 +2,27 @@
 """36 Blackport Nightfall – Gegner „Shadows over Blackport“, Held: Arthor, the King of Blackport.
 
 Mondnacht vor dem Torhaus der Burg Blackport. Der alte König Arthor (Base: weißer Bart, dunkler Rock) steht groß
-auf dem Pflaster vor seinem Tor; hinter ihm ragen die zwei Rundtürme und die Brüstung des Balkons (auf dem er auf
-seiner Karte sitzt) als dunkle Silhouette in den hellen Mondhimmel. Am linken Turm hängt das violette Chevron-Banner
+auf dem Pflaster vor seinem Tor; die zwei Rundtürme ragen bis zum oberen Bildrand, zwischen ihnen steht der Vollmond
+über der Brüstung des Balkons (auf dem er auf seiner Karte sitzt). Am linken Turm hängt das violette Chevron-Banner
 von Blackport, am rechten Turm – wie auf seiner Karte an der Burgmauer – das Legendary Sword of a Barbarian King,
 das Arthor zum „Inheritor of the Barbarian Sword“ (Cover-Karte) macht – senkrecht aufgestellt als Gegenstück zum
 Banner. „Shadows over Blackport“ erzählt die Mondnacht selbst: der König hält Wache vor dem schlafenden Tor.
 
-Quellen (Motive.xcf):
-  Ebene 951 „Arthor-Kopie“ – Base-Arthor (Karte „Arthor, the King of Blackport“ = Sichtbar #294, Ebene 103,
-  Lage 247,169; Oberkörper pixelgleich, auf der Karte sitzt er hinter der Balkonbrüstung). Hier die ganze stehende
-  Figur aus 951 (nur Arthor, x262–292/y183–214), keine Ascended-Version (910).
-  Ebene 103 „Sichtbar #294“ – Torhaus der Karte (Ausschnitt x222–347/y150–325): alles oberhalb der Turmkronen und
-  der Balkonbrüstung durch Himmel ersetzt; die drei Balkonfiguren (Masken 948/951/949) mit Nachbarsteinen übermalt;
+Quellen:
+  runde6/refs/arthor_full.png – Arthors vollständiger Base-Sprite (18×25, Nutzer-Referenz; Kopf/Oberkörper wie
+  Motive.xcf Ebene 951 „Arthor-Kopie“ = Karte „Arthor, the King of Blackport“, Sichtbar #294, Lage 247,169, dazu
+  die Arme). Keine Ascended-Version (910).
+Motive.xcf:
+  Ebene 103 „Sichtbar #294“ – Torhaus der Karte (Ausschnitt x222–347/y150–325): Turmschäfte mit ihrer 8-Zeilen-
+  Periode bis zum oberen Rand weitergekachelt, über Brüstung/Außenmauer Himmel; die drei Balkonfiguren (Masken 948/951/949) mit Nachbarsteinen übermalt;
   das Banner über dem Tor (x277–294/y220–237, Maske: alles Nicht-Graue) an den linken Turm versetzt.
   Ebene 911 „Legendary Sword“ – Karte „Legendary Sword of a Barbarian King“ (dort an der Burgmauer; hier um 90°
   gedreht am rechten Turm).
-Selbst gezeichnet: Himmel, Mond, Sterne, Zinnen auf den Turmkronen (Farben der Brüstungssteine), Mondlicht auf der
-Fassade, Schatten.
+Selbst gezeichnet: Himmel, Mond, Sterne, Mondlicht auf der Fassade, Schatten.
 
 Skalierung (Tiefenebenen):
-  Hintergrund (Himmel, Mond, Sterne, Torhaus, Zinnen, Banner, Schwert) – 2× (125×175)
-  Vordergrund (Arthor 14×25 → 84×150 px, Schatten)               – 6× (42×59, um 1 px versetzt)
+  Hintergrund (Himmel, Mond, Sterne, Torhaus, Banner, Schwert) – 2× (125×175)
+  Vordergrund (Arthor 18×25 → 108×150 px, Gesichtsmitte x 375/750, Schatten) – 6× (42×59, um 1 px versetzt)
 """
 import math, random
 import numpy as np

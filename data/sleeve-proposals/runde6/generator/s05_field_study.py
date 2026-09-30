@@ -31,7 +31,7 @@ _k40 = compose('MotiveDeepsea', [38, 40], crop=False)[205:233, 322:347]
 _kit = _k39.copy(); _kit[18:] = _k40[18:]
 kit_ = trimmed(_kit)
 trex = sprite('o05_trex', 'MotiveGrailWar', [513])            # Gigantisaur King Trex (80×59)
-grass = compose('MotiveGrailWar', [515], crop=False)[322:338, 88:104].copy()   # Graskachel (16×16)
+grass = compose('MotiveGrailWar', [515], crop=False)[340:356, 92:108].copy()   # Graskachel der Lichtung (16×16)
 
 # ---- Ebene 1: Abendhimmel, T-Rex-Silhouette, Waldrand, Wiese (2×, 125×175) ----------------------
 W2, H2 = 125, 175
@@ -73,7 +73,7 @@ for y in range(HOR + 8, H2):
         c = c * np.array([0.78, 0.64, 0.58]) * (0.55 + 0.35 * d)
         p2[y, x] = list(np.clip(c, 0, 255).astype(np.uint8)) + [255]
 # dreizehige Trittsiegel des T-Rex quer über die Wiese (Zehen zeigen zum Wald)
-MUD, MUD2 = (40, 38, 16), (26, 24, 10)
+MUD, MUD2 = (46, 40, 18), (28, 24, 10)
 def footprint(cx, cy):
     for (dx, dy) in [(0, -1), (0, -2), (0, -3), (-1, -1), (-2, -2), (1, -1), (2, -2), (-2, 1), (2, 1)]:
         p2[cy + dy, cx + dx, :3] = MUD

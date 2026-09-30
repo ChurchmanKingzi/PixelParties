@@ -13,7 +13,7 @@ Quellen (alle Motive.xcf, Szene der Karte „Archibald, the Archmage“ = Sichtb
   Ebene 441 „Archmage #3“ (farbige Glasfelder), 440 „Archmage #4“ (Bleiruten-Netz), 444 „Archmage“ (Ring),
             439 „Archmage #1“ (Ring mit fünf Speichen) – die Rosette.
   Ebene 438 „Archmage #6“ – die fünf Gestalten, die auf der Karte (vergrößert, halbtransparent) in den fünf
-            Feldern erscheinen; hier im Raster der Rosette, zu 75 % ins Glas gemischt.
+            Feldern erscheinen; hier im Raster der Rosette, zu 85 % über das Glas gemalt.
   Sichtbar #43 (Ebene 98), Ausschnitt x 240–256, y 184–200: Parkettkachel der Halle (16×16, periodisch).
 Selbst gezeichnet: Mauer der Halle, steinerne Fensterlaibung, Lichtschein, farbiger Lichtfleck am Boden,
 Hinterleuchtung der Glasfelder, Kontaktschatten.
@@ -30,11 +30,12 @@ BM = 'Motive'
 arch = sprite('o43_archibald', BM, [435, 436])                       # 25×31 inkl. Funkeln
 ros_box = (246, 106, 322, 182)
 glass = raw_cached('o43_glass', BM, 441, ros_box)                   # Farbfelder (Ausschnitte deckungsgleich)
-mesh = np.zeros_like(glass)
-for i in (439, 444, 440):                                            # Speichen, Ring, Bleiruten-Netz
+net = raw_cached('o43_mesh440', BM, 440, ros_box)                    # Bleiruten-Netz
+frame_lines = np.zeros_like(glass)
+for i in (439, 444):                                                 # Ring mit fünf Speichen, äußerer Ring
     part = raw_cached('o43_mesh%d' % i, BM, i, ros_box)
     m = part[..., 3] >= 128
-    mesh[m] = part[m]
+    frame_lines[m] = part[m]
 # Die fünf Gestalten (Ebene 438), einzeln ausgeschnitten: (Schlüssel, Box in Leinwandkoordinaten)
 FIG_BOX = {'shadow': (259, 112, 281, 138), 'red': (286, 112, 309, 138), 'girl': (247, 138, 273, 165),
            'hat': (295, 139, 320, 167), 'witch': (274, 150, 294, 181)}
@@ -70,18 +71,20 @@ GX, GY = int(RCX - gw / 2), int(RCY - gh / 2)
 lit = glass.copy()
 lit[..., :3] = np.clip(glass[..., :3].astype(float) * 1.08 + 18, 0, 255).astype(np.uint8)
 put(bg, lit, GX, GY)
-# Die fünf Gestalten in ihren Feldern (Lage wie auf der Karte), 75 % ins Glas gemischt
-FIG_POS = {'shadow': (-17, -26), 'red': (7, -26), 'girl': (-27, 0), 'hat': (4, 1), 'witch': (-9, 8)}
-for k, (dx, dy) in FIG_POS.items():
+put(bg, net, GX, GY)                         # Bleiruten-Netz unter den Bildern
+# Die fünf Gestalten mittig in ihren Feldern (Anordnung wie auf der Karte), zu 85 % über das Glas gemalt
+FIG_CEN = {'shadow': (-15, -18), 'red': (14, -18), 'girl': (-22, 6), 'hat': (20, 5), 'witch': (-1, 21)}
+for k, (dx, dy) in FIG_CEN.items():
     f = figs[k]
-    fx, fy = int(RCX + dx), int(RCY + dy)
+    fx, fy = int(round(RCX + dx - f.shape[1] / 2)), int(round(RCY + dy - f.shape[0] / 2))
     for j in range(f.shape[0]):
         for i in range(f.shape[1]):
             if f[j, i, 3]:
                 X, Y = fx + i, fy + j
-                if math.hypot(X + .5 - RCX, Y + .5 - RCY) < R - 1:
-                    bg[Y, X, :3] = (bg[Y, X, :3] * 0.25 + f[j, i, :3] * 0.75).astype(np.uint8)
-put(bg, mesh, GX, GY)                        # Bleiruten über allem
+                if math.hypot(X + .5 - RCX, Y + .5 - RCY) < R - 1.5:
+                    c = np.clip(f[j, i, :3].astype(float) * 1.15 + 14, 0, 255)
+                    bg[Y, X, :3] = (bg[Y, X, :3] * 0.15 + c * 0.85).astype(np.uint8)
+put(bg, frame_lines, GX, GY)                 # Speichen und Ring obenauf
 dark_vignette(bg, strength=0.55, r0=0.3, cx=RCX, cy=RCY + 20)
 
 # Farben der fünf Felder (für den Lichtfleck am Boden)
@@ -93,7 +96,7 @@ glow(bg, RCX, RCY + R + 6, 34, (150, 120, 190), 0.25, ry=14, steps=2)
 w5, h5 = grid(5)
 fg = rgba(w5, h5)
 FLOOR = 60                                   # Oberkante des Bodens (y 300)
-T = np.clip(tile[..., :3].astype(float) * 1.35, 0, 255).astype(np.uint8)   # Parkett, etwas aufgehellt
+T = np.clip(tile[..., :3].astype(float) * 0.85, 0, 255).astype(np.uint8)   # Parkett, im Dämmer der Halle
 for y in range(FLOOR, h5):
     for x in range(w5):
         fg[y, x, :3] = T[(y - FLOOR) % 16, (x + 5) % 16]
@@ -107,7 +110,7 @@ for y in range(FLOOR + 1, h5):
         if d < 1:
             seg = int(((math.atan2(y - FLOOR - 5, x - 25) + math.pi) / (2 * math.pi)) * 5) % 5
             col = np.array(BEAMS[seg][0], float)
-            q = 0.22 if d < 0.6 else 0.12
+            q = 0.30 if d < 0.6 else 0.16
             if BAY[y % 4, x % 4] < 0.8:
                 fg[y, x, :3] = (fg[y, x, :3] * (1 - q) + col * q).astype(np.uint8)
 ah, aw = arch.shape[:2]
