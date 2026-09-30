@@ -1957,6 +1957,13 @@ app.put('/api/profile', authMiddleware, async (req, res) => {
   if (b.battleTrack !== undefined && !(await battleTracks.isSelectable(req.user.userId, b.battleTrack))) {
     return res.status(403).json({ error: 'This battle track is not unlocked yet.' });
   }
+  // Gegner-Sleeves (cpu-sleeves.js): erst nach fünf Siegen gegen diese CPU.
+  if (b.cardback) {
+    const m = /^\/data\/shop\/sleeves\/([^/]+)\.png$/.exec(String(b.cardback));
+    if (m && cpuSleeves.isCpuSleeve(m[1]) && !(await cpuSleeves.ownedIds(req.user.userId)).includes(m[1])) {
+      return res.status(403).json({ error: 'This sleeve is not unlocked yet.' });
+    }
+  }
   // Update only the fields the client actually sent, so single-field
   // quick-saves (avatar, sleeve, …) never clobber the others.
   const sets = [];
@@ -3435,6 +3442,9 @@ app.get('/api/sample-decks/gallery', authMiddleware, async (req, res) => {
       middleHero,
       wins: stat?.wins || 0,
       losses: stat?.losses || 0,
+      // Gegner-Sleeve dieser CPU (cpu-sleeves.js) — frei ab `sleeveNeed` Siegen.
+      sleeve: cpuSleeves.forDeck(d.id),
+      sleeveNeed: cpuSleeves.UNLOCK_WINS,
     };
   });
   enriched.sort((a, b) => {
@@ -3587,10 +3597,11 @@ function getAvailableSkins() {
 // GET /api/shop/catalog — all available shop items
 app.get('/api/shop/catalog', (req, res) => {
   const avatars = scanShopDir('avatars').map(f => ({ id: path.basename(f, path.extname(f)), file: f }));
+  // Gegner-Sleeves liegen im selben Ordner, sind aber nicht käuflich (cpu-sleeves.js).
   const sleeves = scanShopDir('sleeves').map(f => {
     const id = path.basename(f, path.extname(f));
     return { id, file: f, name: sleeveDisplayName(id) };
-  }).sort((a, b) => a.name.localeCompare(b.name));
+  }).filter(s => !cpuSleeves.isCpuSleeve(s.id)).sort((a, b) => a.name.localeCompare(b.name));
   const boards = scanShopDir('boards').filter(f => /^board\d+\./i.test(f)).map(f => ({ id: path.basename(f, path.extname(f)), file: f }));
 
   // Skins: only for heroes whose cards exist in ./cards
@@ -3630,8 +3641,22 @@ app.get('/api/shop/owned', authMiddleware, async (req, res) => {
   for (const r of rows) {
     if (owned[r.item_type]) owned[r.item_type].push(r.item_id);
   }
-  const names = { sleeve: Object.fromEntries(owned.sleeve.map(id => [id, sleeveDisplayName(id)])) };
+  // Freigeschaltete Gegner-Sleeves gehören dem Spieler wie gekaufte.
+  const cpuOwned = await cpuSleeves.ownedIds(req.user.userId);
+  for (const id of cpuOwned) if (!owned.sleeve.includes(id)) owned.sleeve.push(id);
+  const names = { sleeve: Object.fromEntries(owned.sleeve.map(id => [id, cpuSleeves.nameOf(id) || sleeveDisplayName(id)])) };
   res.json({ owned, names });
+});
+
+// GET /api/shop/cpu-sleeves — Gegner-Sleeves mit Fortschritt (cpu-sleeves.js)
+app.get('/api/shop/cpu-sleeves', authMiddleware, async (req, res) => {
+  try {
+    const unlocked = await getUnlockedOpponentIds(req.user.userId);
+    res.json({ need: cpuSleeves.UNLOCK_WINS, sleeves: await cpuSleeves.listFor(req.user.userId, unlocked) });
+  } catch (err) {
+    console.error('[cpu-sleeves] list error:', err.message);
+    res.status(500).json({ error: 'Could not load opponent sleeves' });
+  }
 });
 
 // POST /api/shop/buy — buy a specific item
@@ -3649,6 +3674,9 @@ app.post('/api/shop/buy', authMiddleware, async (req, res) => {
     const subdir = itemType === 'avatar' ? 'avatars' : itemType === 'sleeve' ? 'sleeves' : 'boards';
     const files = scanShopDir(subdir).map(f => path.basename(f, path.extname(f)));
     if (!files.includes(itemId)) return res.status(404).json({ error: 'Item not found' });
+    if (itemType === 'sleeve' && cpuSleeves.isCpuSleeve(itemId)) {
+      return res.status(403).json({ error: 'This sleeve can only be earned by defeating its CPU opponent.' });
+    }
   }
 
   // Check already owned
@@ -3699,7 +3727,8 @@ app.post('/api/shop/buy-random', authMiddleware, async (req, res) => {
   if ((user.sc || 0) < price) return res.status(400).json({ error: 'Not enough SC' });
 
   const subdir = itemType === 'avatar' ? 'avatars' : 'sleeves';
-  const allItems = scanShopDir(subdir).map(f => path.basename(f, path.extname(f)));
+  const allItems = scanShopDir(subdir).map(f => path.basename(f, path.extname(f)))
+    .filter(id => itemType !== 'sleeve' || !cpuSleeves.isCpuSleeve(id));
   const ownedRows = await db.all('SELECT item_id FROM user_shop_items WHERE user_id = ? AND item_type = ?', [req.user.userId, itemType]);
   const ownedSet = new Set(ownedRows.map(r => r.item_id));
 
@@ -3863,7 +3892,7 @@ app.get('/api/profile/standard-avatars', (req, res) => {
 
 // Standard sleeves (shop items in data/shop/sleeves/)
 app.get('/api/profile/standard-sleeves', (req, res) => {
-  const files = scanShopDir('sleeves');
+  const files = scanShopDir('sleeves').filter(f => !cpuSleeves.isCpuSleeve(path.basename(f, path.extname(f))));
   res.json({ sleeves: files });
 });
 
@@ -6093,6 +6122,9 @@ function endCpuBattle(room, winnerIdx, reason) {
           // Zehnter Sieg gegen diese CPU → ihr Battle-Track ist im Profil wählbar.
           const freigeschaltet = await battleTracks.unlockedByWin(humanUserId, opponentDeckId);
           if (freigeschaltet && humanSid) io.to(humanSid).emit('battle_track_unlocked', freigeschaltet);
+          // Fünfter Sieg gegen diese CPU → ihre Sleeve gehört dem Spieler.
+          const trophaee = await cpuSleeves.unlockedByWin(humanUserId, opponentDeckId);
+          if (trophaee && humanSid) io.to(humanSid).emit('sleeve_unlocked', trophaee);
         }
       } catch (err) {
         console.error('[CPU battle] npc_stats/unlock update error:', err.message);
@@ -6205,6 +6237,12 @@ function bgmSlugForHero(heroName) {
 // Wählbare Battle-Tracks im Profil (siehe battle-tracks.js).
 const battleTracks = require('./battle-tracks').createBattleTracks({
   db, loadSampleDecks, bgmSlugForHero, musicDir: path.join(__dirname, 'public', 'music'),
+});
+// Gegner-Sleeves: jede CPU spielt mit ihrer eigenen, fünf Siege schalten sie frei (cpu-sleeves.js).
+const cpuSleeves = require('./cpu-sleeves').createCpuSleeves({
+  db, loadSampleDecks,
+  mapFile: path.join(__dirname, 'data', 'shop', 'cpu-sleeves.json'),
+  sleevesDir: path.join(__dirname, 'data', 'shop', 'sleeves'),
 });
 /** Namen aller Abilities mit `isWildcardAbility` (einmal ermittelt). */
 let _wildcardAbilCache = null;
@@ -15855,6 +15893,10 @@ io.on('connection', (socket) => {
     socket.join('room:' + roomId);
 
     await setupGameState(room);
+    // Die CPU spielt mit ihrer eigenen Gegner-Sleeve (cpu-sleeves.js).
+    if (!campaign && room.gameState.players?.[1]) {
+      room.gameState.players[1].cardback = cpuSleeves.urlForDeck(cpuDeckId) || room.gameState.players[1].cardback || null;
+    }
     if (campaign) {
       room.gameState.isCampaign = true;
       room.gameState.campaignRetry = campaign.retry !== false;

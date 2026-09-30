@@ -2601,7 +2601,17 @@ function OpponentUnlockPopup() {
       if (data && data.name && notify) notify('New battle track unlocked: ' + data.name + "'s Theme! Pick it under Profile → Battle Music.", 'success');
     };
     socket.on('battle_track_unlocked', onTrack);
-    return () => { socket.off('opponents_unlocked', onUnlocked); socket.off('battle_track_unlocked', onTrack); };
+    // Fünfter Sieg gegen eine CPU: ihre Gegner-Sleeve gehört jetzt dem Spieler
+    // (cpu-sleeves.js). Läuft durch dieselbe Warteschlange wie neue Gegner.
+    const onSleeve = (data) => {
+      if (data && data.id) setQueue(q => [...q, { ...data, kind: 'sleeve', id: 'sleeve:' + data.id }]);
+    };
+    socket.on('sleeve_unlocked', onSleeve);
+    return () => {
+      socket.off('opponents_unlocked', onUnlocked);
+      socket.off('battle_track_unlocked', onTrack);
+      socket.off('sleeve_unlocked', onSleeve);
+    };
   }, [notify]);
 
   const current = queue.length ? queue[0] : null;
@@ -2618,6 +2628,7 @@ function OpponentUnlockPopup() {
 
   if (!current) return null;
   const heroArt = typeof HeroArtCrop === 'function';
+  const isSleeve = current.kind === 'sleeve';
 
   return (
     <div
@@ -2681,27 +2692,41 @@ function OpponentUnlockPopup() {
           <div className="orbit-font" style={{
             fontSize: 15, fontWeight: 800, letterSpacing: 3, color: '#ffd76a',
             marginBottom: 18, animation: 'ppUnlockTitle 2.2s ease-in-out infinite',
-          }}>✦ NEW OPPONENT UNLOCKED ✦</div>
+          }}>{isSleeve ? '✦ OPPONENT SLEEVE EARNED ✦' : '✦ NEW OPPONENT UNLOCKED ✦'}</div>
 
-          {/* Hero portrait in a gold frame */}
+          {/* Hero portrait (or the earned sleeve) in a gold frame */}
           <div style={{
             display: 'inline-block', padding: 4, borderRadius: 10,
             border: '2px solid #ffcf52', background: '#0a0a12',
             boxShadow: '0 0 18px rgba(255,190,50,.5)', marginBottom: 18,
           }}>
-            {heroArt
-              ? <HeroArtCrop heroName={current.middleHero} width={300} />
-              : <div style={{ width: 300, height: 200, background: '#1a1a28' }} />}
+            {isSleeve
+              ? <img src={'/data/shop/sleeves/' + encodeURIComponent(current.file)} draggable={false}
+                  style={{ display: 'block', width: 200, height: 280, imageRendering: 'pixelated', borderRadius: 6 }} />
+              : heroArt
+                ? <HeroArtCrop heroName={current.middleHero} width={300} />
+                : <div style={{ width: 300, height: 200, background: '#1a1a28' }} />}
           </div>
 
-          <div style={{ fontSize: 16, color: 'var(--text)', lineHeight: 1.5, marginBottom: 22 }}>
-            You unlocked{' '}
-            <span className="orbit-font" style={{
-              color: '#ffe08a', fontWeight: 800, fontSize: 20,
-              textShadow: '0 0 12px rgba(255,190,50,.7)',
-            }}>{current.middleHero || current.name}</span>{' '}
-            as a new opponent!
-          </div>
+          {isSleeve ? (
+            <div style={{ fontSize: 16, color: 'var(--text)', lineHeight: 1.5, marginBottom: 22 }}>
+              You defeated {current.middleHero || current.opponent || 'this opponent'} five times and earned the sleeve{' '}
+              <span className="orbit-font" style={{
+                color: '#ffe08a', fontWeight: 800, fontSize: 20,
+                textShadow: '0 0 12px rgba(255,190,50,.7)',
+              }}>{current.name}</span>!
+              <div style={{ fontSize: 12, color: 'var(--text2)', marginTop: 6 }}>Equip it in your Profile or in the Shop.</div>
+            </div>
+          ) : (
+            <div style={{ fontSize: 16, color: 'var(--text)', lineHeight: 1.5, marginBottom: 22 }}>
+              You unlocked{' '}
+              <span className="orbit-font" style={{
+                color: '#ffe08a', fontWeight: 800, fontSize: 20,
+                textShadow: '0 0 12px rgba(255,190,50,.7)',
+              }}>{current.middleHero || current.name}</span>{' '}
+              as a new opponent!
+            </div>
+          )}
 
           <button
             onClick={dismiss}
