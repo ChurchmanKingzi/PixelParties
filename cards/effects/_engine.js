@@ -28400,6 +28400,17 @@ this._deathWatch = (this._deathWatchStack || []).length
       // in eine Methode, die andere Module überschreiben dürfen.
       return response;
     }
+    // ── PROMPTS NIE UEBERSCHREIBEN ──────────────────────────────────
+    // `_pendingGenericPrompt` ist ein EINZELNER Platz. Fragte ein zweiter
+    // Aufrufer, waehrend der erste noch offen war (z.B. Fun-Fun Circus
+    // Clown am Zugende und ein Slippery-Pengu-Dialog), ueberschrieb er
+    // ihn: der erste Dialog verschwand sofort, sein Versprechen wurde nie
+    // aufgeloest und die Kette dahinter haengte fuer immer. Stattdessen
+    // warten wir, bis der offene Prompt beantwortet ist.
+    while (this._pendingGenericPrompt) {
+      await new Promise(r => { (this._genericPromptQueue ||= []).push(r); });
+      if (this._aborted) return null;
+    }
     this.beginHumanWait();   // v848: siehe beginHumanWait
     return new Promise((resolve) => {
       this._pendingGenericPrompt = { resolve };
@@ -28570,6 +28581,9 @@ this._deathWatch = (this._deathWatchStack || []).length
     const promptType = this.gs.effectPrompt?.type;
     const wasGerryRewritten = !!this.gs.effectPrompt?._gerryRewritten;
     this._pendingGenericPrompt = null;
+    // Naechsten wartenden Prompt (siehe promptGeneric) freigeben.
+    const _wartend = this._genericPromptQueue?.shift();
+    if (_wartend) _wartend();
     this.endHumanWait();     // v848
     this.gs.effectPrompt = null;
     const declined = !!response?.cancelled || (response && response.confirmed === false);
@@ -28794,6 +28808,10 @@ this._deathWatch = (this._deathWatchStack || []).length
    */
   abort() {
     this._aborted = true;
+    // Wartende Prompts freigeben, damit die alte Kette auslaeuft.
+    const q = this._genericPromptQueue || [];
+    this._genericPromptQueue = [];
+    for (const r of q) r();
   }
 
   /**

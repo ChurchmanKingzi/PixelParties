@@ -161,7 +161,8 @@ module.exports = {
     });
     res.inst.counters.negated_placement = 1;
     await engine.actionAddCreatureBuff(res.inst, NEGATED_BUFF, {
-      expiresAtTurn: engine.gs.turn + 1,
+      // `gs.turn` zaehlt pro Spielerwechsel: naechste eigene Runde = +2.
+      expiresAtTurn: engine.gs.activePlayer === pi ? engine.gs.turn + 2 : engine.gs.turn + 1,
       expiresForPlayer: pi,
       clearCountersOnExpire: ['negated', 'negated_placement'],
       source: CARD_NAME,
@@ -169,7 +170,7 @@ module.exports = {
 
     engine.log('vullary_summon', {
       player: ps.username, summoned: chosenName,
-      bypassedLevel: true, negatedUntilTurn: engine.gs.turn + 1,
+      bypassedLevel: true, negatedUntilTurn: engine.gs.activePlayer === pi ? engine.gs.turn + 2 : engine.gs.turn + 1,
     });
     engine.sync();
     return true;
