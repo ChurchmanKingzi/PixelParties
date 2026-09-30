@@ -5637,7 +5637,10 @@ async function endGame(room, winnerIdx, reason, opts = {}) {
   // Der Riegel ist synchron (vor dem ersten await) und haengt am Spiel.
   if (gs._endGameLaeuft && !nurSatzende) return;
   gs._endGameLaeuft = true;
-  const isRanked = room.type === 'ranked';
+  // Cube-Turnierspiele (Kindraeume) erben `type: 'ranked'` vom Turnier, zaehlen
+  // aber NICHT fuers normale Elo/`ranked_games` — dafuer gibt es das Cube-Elo
+  // (`cubeFinalizeTournament`).
+  const isRanked = room.type === 'ranked' && !room.parentCubeRoomId;
   const loserIdx = winnerIdx === 0 ? 1 : 0;
   const winner = gs.players[winnerIdx];
   const loser = gs.players[loserIdx];
