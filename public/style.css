@@ -21971,6 +21971,7 @@ body.pp-dialog-offen .foil-diamond-rare:not(.modal-overlay *) {
   box-shadow: 2px 2px 0 rgba(0,0,0,.45);
 }
 .vscpu-chip--leise { opacity: .75; font-weight: 600; }
+.vscpu-chip--sleeve { color: #ffd700; border-color: rgba(255,215,0,.6); }
 
 /* ── Zufalls-Kachel: Spielautomat durch die Gegner ── */
 .vscpu-zufall { position: relative; overflow: hidden; background: #0a0a12; }
@@ -24683,3 +24684,20 @@ body.pp-dialog-offen .foil-diamond-rare:not(.modal-overlay *) {
   93%      { transform: scale(1.03, .97); }
   100%     { transform: scale(1, 1); }
 }
+
+/* ── Gegner-Sleeves im Shop (cpu-sleeves.js): Trophäen mit Fortschritt ── */
+.shop-cpu-sleeves-intro { font-size: 12px; color: #ffd700; font-weight: 700; letter-spacing: .3px; }
+.shop-cpu-sleeve:not(.shop-owned) { cursor: default; }
+.shop-cpu-sleeve-hidden .shop-item-img-wrap img { filter: brightness(0.12) blur(3px) !important; }
+.shop-cpu-progress { width: 100%; padding: 2px 8px 6px; text-align: center; }
+.shop-cpu-progress-label {
+  font-size: 9px; color: var(--text2);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.shop-cpu-progress-bar {
+  height: 6px; margin: 4px 0 3px;
+  background: rgba(8, 8, 16, .8);
+  box-shadow: 0 0 0 1px rgba(255, 215, 0, .45);
+}
+.shop-cpu-progress-bar > span { display: block; height: 100%; background: linear-gradient(90deg, #b8860b, #ffd700); }
+.shop-cpu-progress-count { font-size: 9px; color: #ffd700; font-weight: 700; }

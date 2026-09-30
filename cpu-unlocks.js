@@ -2,7 +2,7 @@
 //  FREISCHALTUNGEN DURCH CPU-SIEGE (Sammelstelle für den Victory-Screen)
 //
 //  Wer eine CPU besiegt, kann dadurch etwas freischalten — heute deren
-//  Battle-Track (battle-tracks.js), künftig auch Sleeves (eigenes System).
+//  Battle-Track (battle-tracks.js) und ihre Gegner-Sleeve (cpu-sleeves.js).
 //  Der Victory-Screen zeigt jede Freischaltung als Meldung. Damit er nicht
 //  jedes System einzeln kennen muss, meldet sich jede Quelle hier an:
 //

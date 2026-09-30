@@ -1,0 +1,224 @@
+{
+  "sleeves": [
+    {
+      "deckId": "sample-Heal Burn",
+      "id": "searing-grace",
+      "name": "Searing Grace"
+    },
+    {
+      "deckId": "sample-Suicide Bombers",
+      "id": "blast-radius",
+      "name": "Blast Radius"
+    },
+    {
+      "deckId": "sample-Venom Swamp",
+      "id": "tainted-fountain",
+      "name": "Tainted Fountain"
+    },
+    {
+      "deckId": "sample-Structure Deck Bamboo Warrior",
+      "id": "shield-shrine",
+      "name": "Shield Shrine"
+    },
+    {
+      "deckId": "sample-Structure Deck Big Stomp",
+      "id": "field-study",
+      "name": "Field Study"
+    },
+    {
+      "deckId": "sample-Structure Deck Bloody King Zi",
+      "id": "crimson-campaign",
+      "name": "Crimson Campaign"
+    },
+    {
+      "deckId": "sample-Structure Deck Bone Rush",
+      "id": "bone-tide",
+      "name": "Bone Tide"
+    },
+    {
+      "deckId": "sample-Structure Deck Boom Boom Kaboom",
+      "id": "live-fire-test",
+      "name": "Live Fire Test"
+    },
+    {
+      "deckId": "sample-Structure Deck Burning Inferno",
+      "id": "caldera-dance",
+      "name": "Caldera Dance"
+    },
+    {
+      "deckId": "sample-Structure Deck Cool Gang",
+      "id": "serpent-breaker",
+      "name": "Serpent Breaker"
+    },
+    {
+      "deckId": "sample-Structure Deck Creepy Crawlies",
+      "id": "silken-descent",
+      "name": "Silken Descent"
+    },
+    {
+      "deckId": "sample-Structure Deck Crystal Gifts",
+      "id": "crystal-eve",
+      "name": "Crystal Eve"
+    },
+    {
+      "deckId": "sample-Structure Deck Cute Commando",
+      "id": "phoenix-call",
+      "name": "Phoenix Call"
+    },
+    {
+      "deckId": "sample-Structure Deck Dance of the Butterflies",
+      "id": "moonlit-waltz",
+      "name": "Moonlit Waltz"
+    },
+    {
+      "deckId": "sample-Structure Deck Deepsea Terror",
+      "id": "red-tide",
+      "name": "Red Tide"
+    },
+    {
+      "deckId": "sample-Structure Deck Depths of the Cosmos",
+      "id": "rift-over-earth",
+      "name": "Rift over Earth"
+    },
+    {
+      "deckId": "sample-Structure Deck Elven Vanguard",
+      "id": "glade-of-the-vanguard",
+      "name": "Glade of the Vanguard"
+    },
+    {
+      "deckId": "sample-Structure Deck Flying Sparks",
+      "id": "sticky-fingers",
+      "name": "Sticky Fingers"
+    },
+    {
+      "deckId": "sample-Structure Deck Gates to Hell",
+      "id": "hellgate-spring",
+      "name": "Hellgate Spring"
+    },
+    {
+      "deckId": "sample-Structure Deck Gather That Storm",
+      "id": "stormward-drift",
+      "name": "Stormward Drift"
+    },
+    {
+      "deckId": "sample-Structure Deck Great Weapon Master",
+      "id": "hall-of-arms",
+      "name": "Hall of Arms"
+    },
+    {
+      "deckId": "sample-Structure Deck Guardians of the Treasure Cave",
+      "id": "vengeful-vigil",
+      "name": "Vengeful Vigil"
+    },
+    {
+      "deckId": "sample-Structure Deck Hellfire Battery",
+      "id": "hellfire-salvo",
+      "name": "Hellfire Salvo"
+    },
+    {
+      "deckId": "sample-Structure Deck Idej Illusions",
+      "id": "afterimage",
+      "name": "Afterimage"
+    },
+    {
+      "deckId": "sample-Structure Deck Join our Cult",
+      "id": "initiation-rite",
+      "name": "Initiation Rite"
+    },
+    {
+      "deckId": "sample-Structure Deck Lightning Caller",
+      "id": "three-link-storm",
+      "name": "Three-Link Storm"
+    },
+    {
+      "deckId": "sample-Structure Deck Mans Best Friends",
+      "id": "hellhounds-trail",
+      "name": "Hellhound's Trail"
+    },
+    {
+      "deckId": "sample-Structure Deck Mawstruck",
+      "id": "specimen-wing",
+      "name": "Specimen Wing"
+    },
+    {
+      "deckId": "sample-Structure Deck Morph and Kill",
+      "id": "knock-at-the-window",
+      "name": "Knock at the Window"
+    },
+    {
+      "deckId": "sample-Structure Deck Null and Void",
+      "id": "severed-spell",
+      "name": "Severed Spell"
+    },
+    {
+      "deckId": "sample-Structure Deck One-Two-Punch",
+      "id": "tiger-and-ox",
+      "name": "Tiger and Ox"
+    },
+    {
+      "deckId": "sample-Structure Deck Parts of the Soul",
+      "id": "scribe-of-souls",
+      "name": "Scribe of Souls"
+    },
+    {
+      "deckId": "sample-Structure Deck Pew-Pew",
+      "id": "volley-at-dusk",
+      "name": "Volley at Dusk"
+    },
+    {
+      "deckId": "sample-Structure Deck Poison Torture",
+      "id": "tormentors-den",
+      "name": "Tormentor's Den"
+    },
+    {
+      "deckId": "sample-Structure Deck Sacrificial Demons",
+      "id": "pyre-of-the-warband",
+      "name": "Pyre of the Warband"
+    },
+    {
+      "deckId": "sample-Structure Deck Shadows over Blackport",
+      "id": "blackport-nightfall",
+      "name": "Blackport Nightfall"
+    },
+    {
+      "deckId": "sample-Structure Deck Shifting Sandlands",
+      "id": "sandtrap-oasis",
+      "name": "Sandtrap Oasis"
+    },
+    {
+      "deckId": "sample-Structure Deck Slimy Infestation",
+      "id": "new-flock",
+      "name": "New Flock"
+    },
+    {
+      "deckId": "sample-Structure Deck Slip n Slide",
+      "id": "black-ice-hall",
+      "name": "Black Ice Hall"
+    },
+    {
+      "deckId": "sample-Structure Deck Spell Industrialization",
+      "id": "smog-drill",
+      "name": "Smog Drill"
+    },
+    {
+      "deckId": "sample-Structure Deck Steam Dwarf Mines",
+      "id": "rampart-of-deri",
+      "name": "Rampart of Deri"
+    },
+    {
+      "deckId": "sample-Structure Deck Sun Fencer Frenzy",
+      "id": "sunforged-summit",
+      "name": "Sunforged Summit"
+    },
+    {
+      "deckId": "sample-Structure Deck To Attain Divinity",
+      "id": "apotheosis-steps",
+      "name": "Apotheosis Steps"
+    },
+    {
+      "deckId": "sample-Structure Deck_ Grand Rebellion",
+      "id": "sakura-mirror",
+      "name": "Sakura Mirror"
+    }
+  ]
+}

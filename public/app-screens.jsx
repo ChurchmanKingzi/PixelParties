@@ -3335,6 +3335,8 @@ function ShopScreen() {
   const [catalog, setCatalog] = useState(null);
   const [owned, setOwned] = useState({ avatar: [], sleeve: [], board: [], skin: [] });
   const [structureCatalog, setStructureCatalog] = useState(null); // { decks, price, randomPrice, defaultDeckId }
+  // Gegner-Sleeves (cpu-sleeves.js): nicht käuflich, fünf Siege gegen die CPU schalten sie frei.
+  const [cpuSleeves, setCpuSleeves] = useState({ need: 5, sleeves: [] });
   const [loading, setLoading] = useState(true);
   const [buying, setBuying] = useState(false);
   const [tab, setTab] = useState('skins');
@@ -3368,14 +3370,16 @@ function ShopScreen() {
   useEffect(() => {
     (async () => {
       try {
-        const [catData, ownData, structData] = await Promise.all([
+        const [catData, ownData, structData, cpuData] = await Promise.all([
           api('/shop/catalog'),
           api('/shop/owned'),
           api('/shop/structure-decks'),
+          api('/shop/cpu-sleeves').catch(() => null),
         ]);
         setCatalog(catData);
         setOwned(ownData.owned);
         setStructureCatalog(structData);
+        if (cpuData) setCpuSleeves(cpuData);
       } catch (e) { notify(e.message, 'error'); }
       setLoading(false);
     })();
@@ -3670,6 +3674,55 @@ function ShopScreen() {
     );
   };
 
+  // Gegner-Sleeves: Trophäen aus dem Singleplayer. Freigeschaltete lassen sich
+  // ausrüsten wie gekaufte; gesperrte zeigen den Fortschritt gegen ihre CPU.
+  // Noch unbekannte Gegner bleiben verdeckt, damit nichts vorweggenommen wird.
+  const renderCpuSleeves = () => {
+    const list = cpuSleeves.sleeves || [];
+    if (list.length === 0) return <div className="shop-empty">No opponent sleeves available yet</div>;
+    const need = cpuSleeves.need || 5;
+    const earned = list.filter(it => it.unlocked).length;
+    return (
+      <React.Fragment>
+        <div className="shop-random-wrap">
+          <div className="shop-cpu-sleeves-intro">🏆 Every CPU opponent plays with its own sleeve. Defeat an opponent {need} times to claim it!</div>
+          <span className="shop-random-hint">{earned} / {list.length} earned</span>
+        </div>
+        <div className="shop-grid">
+          {list.map(item => {
+            const isOwned = item.unlocked;
+            const equipped = isOwned && isEquipped('sleeve', item.id);
+            const hidden = !isOwned && !item.opponentKnown;
+            return (
+              <div key={item.id} className={'shop-item shop-cpu-sleeve' + (isOwned ? ' shop-owned' : ' shop-unowned-skin') + (equipped ? ' shop-equipped' : '') + (hidden ? ' shop-cpu-sleeve-hidden' : '')}
+                onClick={() => isOwned && !equipped && equipItem('sleeve', item.id)}>
+                <span className="shop-item-zier" aria-hidden="true" />
+                <div className="shop-item-img-wrap">
+                  <img src={'/data/shop/sleeves/' + encodeURIComponent(item.file)} draggable={false}
+                    className={isOwned ? '' : 'shop-skin-locked'} />
+                  {equipped ? <div className="shop-owned-badge shop-equipped-badge">EQUIPPED</div>
+                    : isOwned ? <div className="shop-owned-badge">OWNED</div> : (
+                      <div className="shop-lock-overlay">
+                        <span className="shop-lock-badge" aria-label="Locked">🔒</span>
+                      </div>
+                    )}
+                </div>
+                <div className="shop-item-name" title={hidden ? '???' : item.name}>{hidden ? '???' : item.name}</div>
+                {!isOwned && (
+                  <div className="shop-cpu-progress" title={hidden ? 'Unlock this opponent in Singleplayer first' : 'Defeat ' + (item.middleHero || item.opponent) + ' ' + need + ' times'}>
+                    <div className="shop-cpu-progress-label">{hidden ? 'Unknown opponent' : 'vs. ' + (item.middleHero || item.opponent)}</div>
+                    <div className="shop-cpu-progress-bar"><span style={{ width: Math.round(100 * item.wins / need) + '%' }} /></div>
+                    <div className="shop-cpu-progress-count">{item.wins} / {need} wins</div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </React.Fragment>
+    );
+  };
+
   const renderSkinGrid = () => {
     if ((catalog.skins || []).length === 0) return <div className="shop-empty">No skins available yet</div>;
     const allOwned = ownedSet.skin;
@@ -3814,6 +3867,7 @@ function ShopScreen() {
     { id: 'skins', label: '🎨 Skins', count: (catalog.skins || []).length },
     { id: 'avatars', label: '👤 Avatars', count: (catalog.avatars || []).length },
     { id: 'sleeves', label: '🃏 Sleeves', count: (catalog.sleeves || []).length },
+    { id: 'cpuSleeves', label: '🏆 Opponent Sleeves', count: (cpuSleeves.sleeves || []).length },
     { id: 'boards', label: '🎮 Boards', count: (catalog.boards || []).length },
     { id: 'structures', label: '📜 Structure Decks', count: (structureCatalog?.decks || []).length },
   ];
@@ -3874,6 +3928,7 @@ function ShopScreen() {
         {tab === 'skins' && renderSkinGrid()}
         {tab === 'avatars' && renderItemGrid(catalog.avatars || [], 'avatar', '/data/shop/avatars/')}
         {tab === 'sleeves' && renderItemGrid(catalog.sleeves || [], 'sleeve', '/data/shop/sleeves/')}
+        {tab === 'cpuSleeves' && renderCpuSleeves()}
         {tab === 'boards' && renderItemGrid(catalog.boards || [], 'board', '/data/shop/boards/')}
         {tab === 'structures' && renderStructureDecks()}
       </div>
@@ -5042,14 +5097,25 @@ function SingleplayerScreen() {
                   onClick={() => startBattle(op.id)}
                   bild={() => <HeroArtCrop heroName={op.middleHero} width={208} />}
                   name={op.middleHero || op.name}
-                  fuss={total > 0 ? (
-                    <>
-                      <span className="vscpu-chip">W {op.wins || 0}</span>
-                      <span className="vscpu-chip">L {op.losses || 0}</span>
-                    </>
-                  ) : (
-                    <span className="vscpu-chip vscpu-chip--leise">No matches yet</span>
-                  )}
+                  fuss={<>
+                    {total > 0 ? (
+                      <>
+                        <span className="vscpu-chip">W {op.wins || 0}</span>
+                        <span className="vscpu-chip">L {op.losses || 0}</span>
+                      </>
+                    ) : (
+                      <span className="vscpu-chip vscpu-chip--leise">No matches yet</span>
+                    )}
+                    {/* Gegner-Sleeve: nach `sleeveNeed` Siegen gehört sie dem Spieler. */}
+                    {op.sleeve && (
+                      <span className={'vscpu-chip' + ((op.wins || 0) >= op.sleeveNeed ? ' vscpu-chip--sleeve' : ' vscpu-chip--leise')}
+                        title={(op.wins || 0) >= op.sleeveNeed
+                          ? 'Sleeve earned: ' + op.sleeve.name
+                          : 'Win ' + op.sleeveNeed + ' times to earn the sleeve “' + op.sleeve.name + '”'}>
+                        🃏 {(op.wins || 0) >= op.sleeveNeed ? '✓' : Math.min(op.wins || 0, op.sleeveNeed) + '/' + op.sleeveNeed}
+                      </span>
+                    )}
+                  </>}
                 />
               );
             })}
