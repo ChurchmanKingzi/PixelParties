@@ -135,10 +135,16 @@ module.exports = {
       // If the new ability was stacked, the top card IS the new one — pick a different slot
       if (attachedInst && attachedInst.zoneSlot === z) continue;
       const topCard = slot[slot.length - 1];
+      // Performance sieht aus wie die Ability darunter — so zeigt es auch
+      // die Auswahl (mehrere Performance uebereinander: die naechste
+      // Nicht-Performance darunter).
+      let ai = slot.length - 1;
+      while (ai > 0 && slot[ai] === 'Performance') ai--;
+      const shown = slot[ai];
       options.push({
         id: `ability-${z}`,
-        label: `${topCard} (Lv${slot.length})`,
-        description: `Return ${topCard} to its owner's hand.`,
+        label: `${shown} (Lv${slot.length})`,
+        description: `Return ${shown} to its owner's hand.`,
         zoneIdx: z,
         topCardName: topCard,
         color: '#cc8844',
