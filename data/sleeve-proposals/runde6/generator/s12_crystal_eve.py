@@ -57,7 +57,18 @@ from PIL import Image
 _anim = np.array(Image.open('/home/user/PixelParties/data/hero-animations/mary-crestmas.png').convert('RGBA'))
 _f0 = _anim[:, 0:40].copy()
 _f0[..., 3] = np.where(_f0[..., 3] >= 128, 255, 0)
-mary = sorted(parts(_f0, dil=1), key=lambda p: -(p[..., 3] > 0).sum())[0]
+import cv2
+_m = (_f0[..., 3] > 0).astype(np.uint8)
+_n, _lab, _st, _ = cv2.connectedComponentsWithStats(_m, connectivity=8)
+_big = 1 + int(np.argmax(_st[1:, cv2.CC_STAT_AREA]))
+bx0, by0, bw, bh = _st[_big, :4]
+_keep = np.zeros(_m.shape, bool)
+for k in range(1, _n):                         # Hauptfigur + anliegende Teile (Mützen-Bommel), keine Noten
+    x, y, w, h = _st[k, :4]
+    if x >= bx0 - 2 and x + w <= bx0 + bw + 2 and y >= by0 - 3 and y + h <= by0 + bh + 2: _keep |= _lab == k
+_f0[~_keep, 3] = 0
+ys, xs = np.nonzero(_keep)
+mary = _f0[ys.min():ys.max() + 1, xs.min():xs.max() + 1]
 _cache = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'sprites6', 'o12_mary.png')
 Image.fromarray(mary).save(_cache)
 well = sprite('o12_well16', 'MotiveBritain', [16])        # Brunnen ohne Funkeln
@@ -154,9 +165,9 @@ wcx = WX3 + (wcols.min() + wcols.max() + 1) / 2
 wby = WY3 + well.shape[0] - 3
 for y in range(int(wby - 4), int(wby + 4)):
     for x in range(W3):
-        d = ((x + 0.5 - wcx) / 27) ** 2 + ((y + 0.5 - wby) / 3.6) ** 2
+        d = ((x + 0.5 - wcx) / 23) ** 2 + ((y + 0.5 - wby) / 3.2) ** 2
         if d < 1:
-            mid[y, x, :3] = (26, 34, 70); mid[y, x, 3] = 110
+            mid[y, x, :3] = (26, 34, 70); mid[y, x, 3] = 90
 put(mid, well, WX3, WY3)
 sm = sparks[..., 3] > 0
 for (j, i) in zip(*np.nonzero(sm)):

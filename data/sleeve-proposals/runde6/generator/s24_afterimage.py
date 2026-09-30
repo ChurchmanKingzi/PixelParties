@@ -121,7 +121,7 @@ blit(cv, bg, 2)
 # ---------------------------------------------------------------- Daiyo 5×
 k = 5
 dw, dh = (X1 - X0) * k, (Y1 - Y0) * k
-DX, DY = 50, 116                           # Gesichtsmitte (Szene x = 122, zwischen den Augen) auf x = 375 von 750
+DX, DY = 55, 116                           # Gesichtsmitte (zwischen den Augen, Szene x = 121) auf x = 375 von 750
 # grüner Schein hinter Daiyo und auf dem Boden (Raster 2×, gedithert)
 gx, gy = (DX + 7 * k + 45) / 2, (DY + 80) / 2
 for y in range(GH):
