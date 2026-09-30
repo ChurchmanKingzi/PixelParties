@@ -76,12 +76,14 @@ def build():
             dark = sum(cc) <= 120 or cc == (85, 83, 87)
             if cc in HAND and 14 <= x <= 19 and 9 <= y <= 13:
                 m['arm_f'][y, x] = True
-            elif cc in HAND and 8 <= x <= 11 and 16 <= y <= 19:
+            elif cc in HAND and 8 <= x <= 11 and 16 <= y <= 20:
                 m['arm_s'][y, x] = True
             elif y >= 21 and dark and x <= 8:
                 m['leg_l'][y, x] = True
             elif y >= 21 and dark and x >= 9:
                 m['leg_r'][y, x] = True
+            elif y >= 20 and x >= 5 and (is_red(c) or cc == (242, 255, 255)):
+                m['guitar'][y, x] = True        # unterer Korpus (mit Glanzpunkten)
             elif is_green(c) and x < 17 and y <= 14:
                 m['head'][y, x] = True
             elif is_green(c):
@@ -126,6 +128,18 @@ def finish(parts):
         for x in range(5, 12):
             if T[y, x, 3] == 0:
                 T[y, x] = SHIRT if (x + y) % 3 else SHIRT2
+    # Körper, der unter der Gitarre verborgen war: rechte Rumpfseite, Bauch,
+    # Hüfte/Shorts bis zu den Beinen
+    for y in range(16, 20):
+        for x in (12, 13):
+            if T[y, x, 3] == 0:
+                T[y, x] = BLACK if x == 13 else (SHIRT if (x + y) % 2 else SHIRT2)
+    for y in (20, 21):
+        for x in range(4, 14):
+            if T[y, x, 3] == 0:
+                T[y, x] = SHIRT if (x + y) % 3 else SHIRT2
+    for x in range(4, 14):
+        T[22, x] = BLACK if T[22, x, 3] == 0 and (x in (7, 8, 9) or x >= 11) else T[22, x]
     # Hals/Nacken unter dem Kopf: dunkle Zeile (vom Kopf verdeckt)
     for x in range(5, 11):
         if T[14, x, 3] == 0:

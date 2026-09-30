@@ -288,9 +288,9 @@ KEYS = {
              ll_w=95, lr_w=72, gx=27, gy=-1, gang=405),
     15: dict(rx=0, rot=90, head_w=96, af_w=95, as_w=-40, eyes=1,
              ll_w=84, lr_w=80, gx=27, gy=2, gang=405),
-    17: dict(rx=0, rot=90, head_w=100, af_w=85, as_w=-65, eyes=1,
+    17: dict(rx=0, rot=90, head_w=100, af_w=95, as_w=-110, eyes=1,
              ll_w=84, lr_w=92, gx=27, gy=2, gang=405),
-    22: dict(rx=0, rot=90, head_w=104, af_w=80, as_w=-85, eyes=1,
+    22: dict(rx=0, rot=90, head_w=104, af_w=110, as_w=-240, eyes=1,
              ll_w=88, lr_w=96, gx=27, gy=2, gang=405),
 }
 LAST = 30
