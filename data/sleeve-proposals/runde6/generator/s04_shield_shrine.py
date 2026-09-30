@@ -68,14 +68,14 @@ for hx in (17, 66):
 put(p3, shield, (W3 - shield.shape[1]) // 2, SCY - shield.shape[0] // 2)
 put(p3, curt, (W3 - curt.shape[1]) // 2, -24)                # Vorhänge nur als oberer Behang
 # Bodenschatten unter Xiong (Füße bei 250er-y 305 → 3×-Reihe 102)
-shadow_ellipse(p3, 42.3, 101.8, 15, 2.2, a=0.5)
+shadow_ellipse(p3, 45.6, 101.8, 15, 2.2, a=0.5)
 cv = Canvas(250, 350)
 blit(cv, p3, 3, -1, 0)
 
 # ---- Ebene 2: Xiong (5×, 50×70) -------------------------------------------------------------------
 W5, H5 = 50, 70
 p5 = rgba(W5, H5)
-XX, XY = (W5 - xiong.shape[1]) // 2, 61 - xiong.shape[0]
+XX, XY = 9, 61 - xiong.shape[0]                             # Gesichtsmitte (Sprite-x 16) → 250er-x 125
 put(p5, xiong, XX, XY)
 blit(cv, p5, 5, 0, 0)
 print(save(cv, '04_shield_shrine.png'))

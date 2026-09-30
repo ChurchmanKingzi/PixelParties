@@ -2,7 +2,8 @@
 """17 „Glade of the Vanguard“ – Gegner „Elven Vanguard“, Held: Maya, the Nature Fairy (Base).
 
 Bildidee (Draufsicht wie Mayas Karte): Über einer Waldlichtung schwebt Maya in ihrer Rankenkrone; unten auf der
-Lichtung steht ihre Elven Vanguard – der Elven Leader zwischen zwei Elven Archers wie auf der Coverkarte – und grüne
+Lichtung steht ihre Elven Vanguard – der Elven Leader zwischen zwei Elven Archers wie auf der Coverkarte, hinter ihm
+der Elven Druid mit leuchtendem Stab – und grüne
 Heilfunken leuchten über ihnen (Mayas Fähigkeit: +50 HP für Kreaturen in den Support-Zonen). Ringsum Laubbäume des
 Elfenwalds, eine Blumengruppe.
 
@@ -13,6 +14,7 @@ Quellen:
                     Alpha < 70 (ausblendende Enden) entfallen. Die grün geflügelte/türkis umrandete Figur in 11 sind
                     Varianten und bleiben weg.
   Elven Leader + 2 Elven Archer = MotiveGrailWar.xcf Ebene 555 „Elven Leader“ (Karte Sichtbar Ebene 747)
+  Elven Druid     = MotiveGrailWar.xcf Ebene 139 „Elven Druid“ (Karte Sichtbar Ebene 136, Lage 49,213)
   Wald            = MotiveGrailWar.xcf Ebene 589 „Berserker Wald“: Laubbäume einzeln freigestellt (Krone aus Ebene 141
                     + Wurzeln unter dem Stamm), Waldboden-Kachel x238–270/y96–128 (gespiegelt gekachelt),
                     Blumengruppe x76–98/y112–134
@@ -110,7 +112,8 @@ def stand(s, cx, fy, fl=False):
     s = flip(s) if fl else s
     put(p2, s, int(cx - s.shape[1] / 2), fy - s.shape[0]); return (int(cx), fy - s.shape[0])
 tops = []
-tops.append(stand(archer, 40, 152)); tops.append(stand(archer, 84, 152, True)); tops.append(stand(leader, 62, 156))
+tops.append(stand(druid, 62, 151))                          # Elven Druid hinter dem Leader
+tops.append(stand(archer, 40, 153)); tops.append(stand(archer, 84, 153, True)); tops.append(stand(leader, 62, 158))
 # grüne Heilfunken über den Elfen (+HP)
 GRN = [(200, 255, 170), (110, 220, 90)]
 for (x, y) in tops:

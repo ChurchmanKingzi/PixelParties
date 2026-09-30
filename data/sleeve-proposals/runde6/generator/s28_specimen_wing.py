@@ -129,6 +129,6 @@ glow(bg, 62, FLOOR + 1, 64, 14, (90, 190, 210), .3)
 # ================================================================== 3×-Ebene: Nero Zira
 fw, fh = grid(3)                     # 84×117
 fg = rgba(fw, fh)
-NX, NY = 7, 4                        # Kabel kommen oben aus der Decke (unter dem Rahmen), Hände vor dem Fensterrahmen
+NX, NY = 7, 2                        # Kabelenden liegen unter dem oberen Rahmen, Hände vor dem Fensterrahmen
 put(fg, nero, NX, NY)
 print(finish([(bg, 2), (fg, 3)], '28_specimen_wing.png'))

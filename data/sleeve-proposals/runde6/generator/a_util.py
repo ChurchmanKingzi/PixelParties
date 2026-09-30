@@ -69,9 +69,13 @@ def preview(fname, form='ornate', pal='gold', st='ruby', st2=None):
     out = SP + 'fr_' + fname
     args = [src, out, form, pal, st] + ([st2] if st2 else [])
     F.apply(*args)
+    # ohne Interpolation: beide Bilder exakt auf das 250er-Raster (÷3, nearest), dann ×2 nearest
     a = Image.open(src).convert('RGB'); b = Image.open(out).convert('RGB')
+    def red(im):
+        w, h = im.size[0] // 3, im.size[1] // 3
+        return im.resize((w, h), Image.NEAREST).resize((w * 2, h * 2), Image.NEAREST)
+    a, b = red(a), red(b)
     S = Image.new('RGB', (a.size[0] + b.size[0] + 10, max(a.size[1], b.size[1])), (30, 30, 30))
     S.paste(a, (0, 0)); S.paste(b, (a.size[0] + 10, 0))
-    S = S.resize((S.size[0] * 2 // 3, S.size[1] * 2 // 3), Image.LANCZOS)
     S.save(SP + 'pv_' + fname)
     return SP + 'pv_' + fname

@@ -5,7 +5,7 @@ Layn steht groß hinter der grauen Zinnenbrüstung seiner Base-Karte, die Hände
 Minenhalle der Steam Dwarfs, die sich hinter ihm als EINE zusammenhängende Tiefe öffnet: vorn quert eine steinerne
 Förderbrücke mit Schienen die Halle, ihre Pfeiler stehen im Lavafluss am Grund; auf der Brücke steht als Blickpunkt
 der Steam Dwarf Dragon Pilot (Cover-Karte). Weiter hinten arbeiten auf zwei versetzten Felsbänken der Wand der
-Miner (bohrt über die Kante in den Fels) und der Brewer, ihre Dampffahnen steigen ins Dunkel.
+Exterminator (sein Flammenstrahl schießt über die Kante hinab) und der Brewer; ihre Dampffahnen steigen ins Dunkel.
 (Layn: „erhöhe die HP jeder Kreatur, die du beschwörst“ – der Verteidiger und seine Zwergenarmee.)
 
 Quellen:
@@ -15,15 +15,16 @@ Quellen:
                   Komposit [246, 250, 245] pixelgleich mit der Szene (0 Abweichungen); hier Ausschnitt x 213–263,
                   y 262–308. NICHT „Ascended Layn“ (Ebenen 203/204).
   MotiveSteamDwarfs.xcf  Ebene 445 „Ebene #1“ (Felswand-Kachel der Lavamine, auch als Mauerwerk von Brücke und
-                  Pfeilern), Ebene 444 „Ebene #32“ (Lava-Kachel), Steam Dwarf Miner [437, 438, 439] (Sichtbar 435),
+                  Pfeilern), Ebene 444 „Ebene #32“ (Lava-Kachel), Steam Dwarf Exterminator [433 Flammenstrahl, 434 Zwerg]
+                  (Sichtbar 430; das brennende Opfer 432 ist weggelassen),
                   Steam Dwarf Brewer [440, 441] (Sichtbar 15), Steam Dwarf Dragon Pilot [429] (Sichtbar 400,
                   Cover-Karte), Dampffahnen Ebene 431 „Ebene #6“ (in den Szenen halbtransparent – hier als echte
                   Mischfarbe je ganzem Pixel).
 Selbst gezeichnet: Felsbänke mit Kante und Schlagschatten, Brückenfahrbahn mit Schienen und Schwellen, Pfeiler,
-Lava-Uferlinie, Widerschein, Abdunklung zum Rand, Bohrstaub, Kontaktschatten, Schattenzeile unter der Brüstung.
+Lava-Uferlinie, Widerschein, Abdunklung zum Rand, Kontaktschatten, Schattenzeile unter der Brüstung.
 
 Skalierung (Tiefenebenen):
-  Hintergrund (Felswand, Felsbänke, Miner, Brewer, Dampf, Lavafluss)     – 2×-Raster (125×175)
+  Hintergrund (Felswand, Felsbänke, Exterminator, Brewer, Dampf, Lavafluss)     – 2×-Raster (125×175)
   Mittelgrund (Förderbrücke, Pfeiler, Dragon Pilot 30×52 → 90×156)       – 3×-Raster (84×117)
   Vordergrund (Layn, Brüstung mit Zinnen, 50×32 → 250×160)               – 5×-Raster (50×70)
 """
@@ -35,7 +36,7 @@ BD, BS = 'MotiveDeri', 'MotiveSteamDwarfs'
 # ------------------------------------------------------------------ Sprites
 layn = sprite('o41_layn5', BD, [246, 250, 245], box=(213, 262, 263, 308))  # 50×32 inkl. Brüstung
 mine = sprite('o41_mine', BS, [445])                                        # 320×240
-miner = sprite('o41_miner', BS, [437, 438, 439])
+exterminator = sprite('o41_ext', BS, [433, 434])      # Steam Dwarf Exterminator mit Flammenstrahl (20×47)
 brewer = sprite('o41_brewer', BS, [440, 441])
 pilot = sprite('o41_pilot', BS, [429])
 steam = sprite('o41_steam', BS, [431])
@@ -44,7 +45,7 @@ lava = sprite('o41_lava', BS, [444])          # Lavafeld (320×240)
 
 # ================================================================== Hintergrund 2× (125×175)
 # Eine zusammenhängende Minenhalle: hinten die Felswand (Kacheln der Lavamine, 16 px periodisch) mit zwei
-# Felsbänken, auf denen Miner und Brewer arbeiten; unten der Lavafluss am Grund der Halle.
+# Felsbänken, auf denen Exterminator und Brewer arbeiten; unten der Lavafluss am Grund der Halle.
 w2, h2 = grid(2)
 bg = rgba(w2, h2)
 bg[..., 3] = 255
@@ -104,14 +105,14 @@ def blend_put(s, x, y, a):
 
 
 pA, pB = PUFFS[1], PUFFS[3]                  # die beiden hohen Dreier-Fahnen
-# Miner oben links: steht auf der Felsbank, bohrt über ihre Kante in die Stirnseite (Bohrerspitze im Fels)
+# Exterminator links auf der unteren Felsbank: steht auf der Bank, sein Flammenstrahl schießt nach vorn über die
+# Kante hinab (Flamme vor der Stirnseite, wie auf der Karte vor seinem Körper)
 MY = 62                                      # Oberfläche der unteren Felsbank (y 124)
 ledge(10, 42, MY)
-mx = 14
-blend_put(pA, mx + 11 - pA.shape[1] // 2, MY - 28 + 3 - pA.shape[0], 0.5)
-put(bg, darken(miner, 0.9), mx, MY - 28)    # Körperunterkante (Zeile 27) auf der Felsbank
-for (dx, dy, c) in [(8, 12, (120, 100, 96)), (14, 11, (150, 120, 110)), (7, 10, (96, 80, 80)), (15, 13, (96, 80, 80))]:
-    setp(bg, mx + dx, MY + dy, c)            # Bohrstaub an der Spitze
+ex = 16
+EFEET = 29                                   # unterste Körperzeile (Tank) im Sprite; darunter nur die Flamme
+blend_put(pA, ex + 10 - pA.shape[1] // 2, MY - EFEET + 2 - pA.shape[0], 0.5)
+put(bg, exterminator, ex, MY - EFEET - 1)
 # Brewer höher und weiter hinten auf einer zweiten Bank, versetzt zur Mitte hin
 BY = 38                                      # (y 76)
 ledge(34, 62, BY)

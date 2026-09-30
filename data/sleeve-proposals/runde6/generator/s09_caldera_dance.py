@@ -8,17 +8,19 @@ Sonnenuntergang).
 
 Quellen (MotiveHawaii.xcf):
   Ebene 262 „Luna Tepe“  – Base-Luna Pele mit Flammenhaar/-aura (Figur der Heldenkarte, Szene „Sichtbar #51“ = Ebene 5,
-                            Lage 248,426; Pixel identisch) und die Flammensäulen derselben Karte (60×16 / 35×14).
-  Ebene 265 „Ebene #92“  – Lava-Streifen der Karte (Lavafluss, 64×16), gekachelt als Lavasee.
+                            Lage 248,426; Pixel identisch).
+  Ebene 258 „Ebene #20“  – einzelne hohe Flammensäule (Dance of the Flame Pillars), links normal, rechts gespiegelt.
+  refs/lava_autotiles.png – Lava-Autotile des Nutzers (48×64, 16-px-Kacheln): Oberkanten- und Mittelkachel als Lavasee.
   Ebene 57 „Ebene #121“, 59 „Ebene #119“ – Basaltfelsen mit Zellmuster (Kraterwand-Textur, Felsinsel).
 Selbst gezeichnet: Himmel, Lichtführung der Kraterwände, Glutsaum, Glutringe um Säulen/Insel, Funken.
 
 Skalierung (Tiefenebenen):
-  Hintergrund 2× (125×175): Himmel, Kraterwände, Lavasee, vier Flammensäulen mit Glutringen
+  Hintergrund 2× (125×175): Himmel, Kraterwände, Lavasee (Autotile), zwei Flammensäulen (links/rechts) mit Glutringen
   Mittelgrund 3× (84×117):  aufsteigende Funken
   Vordergrund 5× (50×70):   Basaltinsel und Luna Pele
 """
-import math, random
+import math, random, os
+from PIL import Image
 import numpy as np
 from common import *  # noqa
 
@@ -32,6 +34,7 @@ pp_ = parts(t262[436:528, 139:336], dil=1)
 luna = [p for p in pp_ if p.shape[:2] == (32, 22)][0]
 pillar_big = [p for p in pp_ if p.shape[:2] == (60, 16)][0]
 pillar_small = [p for p in pp_ if p.shape[:2] == (35, 14)][0]
+pillar_tall = sorted(parts(sprite('o09_258', B, [258]), dil=1), key=lambda p: -p.shape[0])[0]   # eine einzelne hohe Säule
 lava = sprite('o09_lava', B, [265])[..., :3].astype(float)          # 16×64
 basalt = sprite('o09_basalt', B, [57])                               # 66×61
 rock = sprite('o09_rock', B, [59])                                   # 34×49
@@ -93,26 +96,19 @@ for x in range(W2):
     if 0 <= top < H2:                                  # Grat im Gegenlicht
         bg[top, x, :3] = (120, 50, 30)
 
-# Lavasee: erkaltete Basaltkruste (Zellmuster des Felsens 57, perspektivisch gestaucht), in den Zellfugen glüht die
-# Lava (Farben aus dem Lava-Streifen 265); zum Ufer hin mehr offene Lava
-edge_lv = 30          # Zellfugen des Basalts (dunkelste Stufe 28)
+# Lavasee aus der Lava-Autotile-Textur des Nutzers (refs/lava_autotiles.png, 48×64, 16-px-Kacheln im RPG-Maker-
+# Aufbau): oberste Kachelreihe = Oberkanten-Kachel (Krustenrand mit Lava darunter), darunter die reine Lava-Mittelkachel.
+LAV = np.array(Image.open(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'refs', 'lava_autotiles.png'))
+               .convert('RGB')).astype(float)
+T_TOP = LAV[16:32, 16:32]                      # Oberkante
+T_MID = LAV[32:48, 16:32]                      # Mitte (reine Lava)
 for y in range(LAKE, H2):
     k = y - LAKE
     for x in range(W2):
-        c = btex(int(k * 1.6) + 3, x + int(k * 0.3))
-        lv = lava[(k * 3) % 16, (x + k * 7) % 64]
-        crack = c.mean() <= edge_lv
-        near = abs(x + 0.5 - W2 / 2) < 30 and k > 30          # Glutring um die Insel wird separat gezeichnet
-        f = 0.55 + 0.45 * min(1, k / 40)
-        if crack:
-            col = lv * f
-        else:
-            col = c * 0.8 + np.array((40, 10, 4)) * f
-        bg[y, x, :3] = np.clip(col, 0, 255)
-# Uferkante: dunkler Basaltsaum mit Glutkante
-for x in range(W2):
-    bg[LAKE, x, :3] = (255, 214, 120) if x % 3 else (255, 160, 60)
-    bg[LAKE - 1, x, :3] = (140, 44, 20)
+        t = T_TOP if k < 16 else T_MID
+        c = t[k % 16, (x + 5) % 16]
+        f = 0.72 + 0.28 * min(1, k / 40)          # hinten (am Ufer) etwas dunkler
+        bg[y, x, :3] = np.clip(c * f, 0, 255)
 
 # Flammensäulen (2×): zwei große links und rechts (wie auf ihrer Karte), Fuß jeweils im See
 FR = ((255, 214, 120), (255, 150, 50))
@@ -126,8 +122,8 @@ def ring2(dst, cx, cy, rx, ry):
             if 0.7 <= d < 1.0: dst[y, x, :3] = FR[0] if d < 0.85 else FR[1]
 
 
-for cx, fy, s in ((22, LAKE + 12, pillar_big), (103, LAKE + 12, pillar_big)):
-    ring2(bg, cx, fy, 8 if s is pillar_big else 6, 2)
+for cx, fy, s in ((22, LAKE + 12, pillar_tall), (103, LAKE + 12, flip(pillar_tall))):
+    ring2(bg, cx, fy, 8, 2)
     put(bg, s, cx - s.shape[1] // 2, fy + 1 - s.shape[0])
 
 # ================================================================== Mittelgrund 3× (84×117)

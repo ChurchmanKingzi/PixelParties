@@ -74,7 +74,7 @@ for gx in (40, 85):
 fw, fh = grid(5)                       # 50×70
 fg = rgba(fw, fh)
 # Waflav mittig in der Öffnung
-put(fg, waflav, (WX0 + WX1) // 2 - 14, 12)
+put(fg, waflav, (WX0 + WX1) // 2 - 14, 15)
 wall = rgba(fw, fh)
 for y in range(fh):
     for x in range(fw):
@@ -104,7 +104,7 @@ for y in range(fh):
     for x in range(fw):
         if wall[y, x, 3] == 0: continue
         f = .42
-        dc = math.hypot((x + .5 - 12) / 14, (y + .5 - 48) / 11)
+        dc = math.hypot((x + .5 - 10) / 14, (y + .5 - 48) / 11)
         k = math.floor(max(0, 1 - dc) ** 1.2 * 4 + bay(x, y)) / 4
         f += .75 * k
         do = min(abs(x + .5 - WX0), abs(x + .5 - WX1), abs(y + .5 - WY0)) if y < WY1 else 99
@@ -112,6 +112,6 @@ for y in range(fh):
         col = L[y, x] * f + np.array([60, 26, 0]) * ko * .5
         wall[y, x, :3] = col.clip(0, 255)
 # Kerze auf dem Brett (links), Flammenschein
-put(wall, candle, 10, SY - candle.shape[0])
+put(wall, candle, 8, SY - candle.shape[0])
 
 print(finish([(bg, 2), (fg, 5), (wall, 5)], '29_knock_at_the_window.png'))

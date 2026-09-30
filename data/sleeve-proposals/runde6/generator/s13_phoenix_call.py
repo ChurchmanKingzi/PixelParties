@@ -1,17 +1,19 @@
 # -*- coding: utf-8 -*-
 """13 „Phoenix Call“ – Gegner „Cute Commando“ (sample-Structure Deck Cute Commando), Held: Cute Annoyance Mini (Base).
 
-Bildidee (Action, asymmetrisch): Mini schwebt groß als Kommandantin am blauen Himmel ihrer Moe-Inselwelt und grinst
-den Betrachter an; hinter ihr stürzt auf ihr Kommando die Cute Phoenix (Coverkarte) als senkrechte Feuersäule auf den
-Säulenplatz der Relic-Insel – genau wie im Kartenbild „Cute Phoenix“ (Feuersäule über der Säulenruine). Eine
-Flügel-Bunny und eine Cute Cat aus ihrem Deck fliegen zum Einschlag. (Andere Idee als „Kitten Escort“: kein Herz,
+Bildidee (Action; Überarbeitung: Mini mittig, Gesichtsmitte auf x = 375 von 750): Mini schwebt groß als Kommandantin
+am blauen Himmel ihrer Moe-Inselwelt und grinst den Betrachter an; rechts hinter ihr stürzt auf ihr Kommando die Cute Phoenix (Coverkarte) als senkrechte Feuersäule auf den
+Säulenplatz der Relic-Insel – genau wie im Kartenbild „Cute Phoenix“ (Feuersäule über der Säulenruine). Ihr kleines
+Cute-Kommando – zwei Cute Birds, zwei Cute Bunnies, zwei Cute Cats und ein weiterer Cute Bird – fliegt im Bogen von
+links oben zum Einschlag. (Andere Idee als „Kitten Escort“: kein Herz,
 keine Katzen-Eskorte, sondern der Beschwörungsangriff ihres Decks.)
 
 Quellen (MotiveMoe.xcf):
   Mini            = Ebenen 497 „Mini #2“ + 498 „Mini“ (Base; = Sichtbar #124, Lage 100,259, 0 px Abweichung, vgl. Runde 5)
   Cute Phoenix    = Ebene 420 „Cute Phoenix #1“ (= Sichtbar #94, Karte „Cute Phoenix“, Lage 167,167, 100 % deckungsgleich)
   Relic-Insel     = Ebene 478 „Relic-Insel“ (Säulenplatz derselben Kartenszene), Altar unter der Feuersäule
-  Cute Bunny      = Ebene 429 „Cute Bunny #1“ (frontal fliegende Fledermausflügel-Bunny, 36×18)
+  Cute Bunny      = Ebene 429 „Cute Bunny #1“ (frontal fliegende Fledermausflügel-Bunny 36×18, seitliche 28×19)
+  Cute Bird       = Ebene 433 „Cute Bird“ (weiße Vögel 20×12 / 16×11)
   Cute Cat        = Ebene 492 „Cute Cat“ (geflügelte Katze, 23×13)
   Himmel          = Ebene 553 „Hintergrund“ (Moe-Himmel mit Schleierwölkchen), Ausschnitt x150–400/y200–550
 Selbst gezeichnet: Feuersäule (senkrechte Flammenzungen in 5 Feuerfarben, 1×), warmer Säulenschein auf dem Himmel und
@@ -19,7 +21,7 @@ Lichtfleck auf dem Platz (geordnet gedithert). Die weichen Glow-Ebenen 421/422 d
 
 Skalierung (Ausgabe = 250×350-Raster × 3):
   Himmel, Relic-Insel, Feuersäule, Phoenix, Schein   – 1× (250×350, Originalpixel)
-  Cute Bunny, Cute Cat                               – 2× (125×175)
+  Cute Birds, Cute Bunnies, Cute Cats               – 2× (125×175)
   Mini                                               – 5× (50×70)
 """
 import math, random
@@ -41,7 +43,7 @@ sky = layer(B, 553)[200:550, 150:400].copy()                     # Moe-Himmel mi
 # ---------- 1×: Himmel, Relic-Insel, Feuersäule, Phoenix ----------
 cv = Canvas(250, 350)
 cv.a[:] = sky[..., :3]
-PX = 172                     # Achse der Feuersäule
+PX = 204                     # Achse der Feuersäule
 IX, IY = PX - 105, 196       # Relic-Insel so, dass der Altar (x250,y152 in der Ebene) unter der Säule liegt
 p1 = rgba(250, 350)
 put(p1, relic, IX, IY)
@@ -81,11 +83,17 @@ blit(cv, p1, 1)
 
 # ---------- 2×: Kommando ----------
 p2 = rgba(125, 175)
-put(p2, bunny, 13, 104); put(p2, cat, 24, 134)
+# kleines Cute-Kommando (Cute Birds, Bunnies, Cats) im Bogen von links oben zum Einschlag
+doves = [p for p in parts(compose(B, [433]), dil=1) if p.shape in ((12, 20, 4), (11, 16, 4))]
+lying = [p for p in bunnies if p.shape == (19, 28, 4)][0]     # zweite Cute Bunny (seitlich fliegend)
+put(p2, doves[0], 13, 22); put(p2, flip(doves[3]), 27, 12)
+put(p2, bunny, 11, 96); put(p2, flip(lying), 16, 120)
+put(p2, cat, 42, 110); put(p2, flip(cat), 64, 98)
+put(p2, doves[5], 80, 116)
 blit(cv, p2, 2)
 
 # ---------- 5×: Mini ----------
 p5 = rgba(50, 70)
-put(p5, mini, 5, 12)
+put(p5, mini, 8, 12)                      # Gesichtsmitte auf x = 125 (750er: 375)
 blit(cv, p5, 5)
 print(save(cv, '13_phoenix_call.png'))
