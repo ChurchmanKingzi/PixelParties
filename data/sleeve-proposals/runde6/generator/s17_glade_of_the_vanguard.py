@@ -1,5 +1,27 @@
 # -*- coding: utf-8 -*-
-"""17 – Gegner „Elven Vanguard“, Held: Maya, the Nature Fairy (Base). Entwurf."""
+"""17 „Glade of the Vanguard“ – Gegner „Elven Vanguard“, Held: Maya, the Nature Fairy (Base).
+
+Bildidee (Draufsicht wie Mayas Karte): Über einer Waldlichtung schwebt Maya in ihrer Rankenkrone; unten auf der
+Lichtung steht ihre Elven Vanguard – der Elven Leader zwischen zwei Elven Archers wie auf der Coverkarte – und grüne
+Heilfunken leuchten über ihnen (Mayas Fähigkeit: +50 HP für Kreaturen in den Support-Zonen). Ringsum Laubbäume des
+Elfenwalds, eine Blumengruppe.
+
+Quellen:
+  Maya (Base)     = MotiveSteamDwarfs.xcf Ebene 11 „Maya #5“ (Teil x244–266/y441–461, weiße Flügel) unter der
+                    Rankenkrone Ebene 9 „Maya #2“ (Teil x238–271/y432–479); geprüft gegen Sichtbar #102 (Ebene 8,
+                    Karte Lage 217,427): Figur 0 px Abweichung außer Stellen, die die Ranken überdecken; Ranken mit
+                    Alpha < 70 (ausblendende Enden) entfallen. Die grün geflügelte/türkis umrandete Figur in 11 sind
+                    Varianten und bleiben weg.
+  Elven Leader + 2 Elven Archer = MotiveGrailWar.xcf Ebene 555 „Elven Leader“ (Karte Sichtbar Ebene 747)
+  Wald            = MotiveGrailWar.xcf Ebene 589 „Berserker Wald“: Laubbäume einzeln freigestellt (Krone aus Ebene 141
+                    + Wurzeln unter dem Stamm), Waldboden-Kachel x238–270/y96–128 (gespiegelt gekachelt),
+                    Blumengruppe x76–98/y112–134
+Selbst gezeichnet: Lichtfleck der Lichtung (gedithert), grüne Heilfunken.
+
+Skalierung (Ausgabe = 250×350-Raster × 3):
+  Waldboden, Bäume, Blumen, Elfen, Funken           – 2× (125×175)
+  Maya mit Rankenkrone                              – 4× (63×88)
+"""
 import math, random
 from c_util import *  # noqa
 import numpy as np

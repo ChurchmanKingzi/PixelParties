@@ -1,5 +1,24 @@
 # -*- coding: utf-8 -*-
-"""16 – Gegner „Depths of the Cosmos“, Held: Argos, the Eye of the Cosmos (Base). Entwurf."""
+"""16 „Rift over Earth“ – Gegner „Depths of the Cosmos“, Held: Argos, the Eye of the Cosmos (Base).
+
+Bildidee (kosmische Weite, Diagonale): Argos’ rote Schlitzpupille hängt wie ein Riss links oben im All; aus ihr strömen
+die Analyzer-Sichelschiffe diagonal nach rechts unten zur Erdkugel, über der ein Life-Searcher mit grünem Suchstrahl
+schwebt; links unten sammelt ein Gatherer Asteroiden. Argos beschwört „Cosmic Depths“-Kreaturen – kein reines
+Riesenauge, sondern Auge + Flotte + Ziel (≠ Close Encounter/Earthrise: keine Invader-Untertasse, kein Würfel/Mond).
+
+Quellen (MotiveBoons.xcf):
+  Argos (Base)    = Ebene 38 „Argos“ (23×54; identisch mit 36, Pupillenmitte offen)
+  Analyzer        = Ebene 34 (Sichelschiff aus Karte „Analyzer from the Cosmic Depths“, Sichtbar #13 Lage 170,293)
+  Life-Searcher   = Ebene 22 (+ Suchstrahl 23, halbtransparent 45 % auf ganzen 2×-Pixeln), Karte Sichtbar #19
+  Gatherer        = Ebene 28 (+ Asteroiden 29), Karte „Gatherer from the Cosmic Depths“
+  Erde            = Ebene 80 „Hintergrund“ (Erdkugel, runder Ausschnitt r=50 um 280,325)
+Selbst gezeichnet: Allverlauf, Sterne, dunkelroter Schein um das Auge (gedithert, Pupille frei).
+
+Skalierung (Ausgabe = 250×350-Raster × 3):
+  All, Sterne, Erde                                 – 1×
+  Schein, Analyzer, Life-Searcher, Strahl, Gatherer, Asteroiden – 2× (125×175)
+  Argos                                             – 4× (63×88)
+"""
 import math, random
 from c_util import *  # noqa
 import numpy as np

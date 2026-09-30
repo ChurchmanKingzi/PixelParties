@@ -6,8 +6,8 @@ Idee (Beschuss, Tiefenstaffelung): Baaliel steht groß vorn auf dunklem Basalt v
 mit ausgebreiteten Armen den Feuerbefehl. Seine Höllenbatterie schießt: zwei Feuerbälle (Karte „Fireball“ aus
 dem Deck) ziehen schräg von rechts oben nach links unten über den Himmel – Kopf voran, Schweif hinterher, der
 fernere kleiner – genau auf die feindliche Stellung auf dem fernen Hügel links, wo ein früherer Treffer schon
-lichterloh brennt. Zwei Horned Demons (Cover-Karte) stehen in verschiedener Tiefe bereit: einer näher rechts,
-einer weiter hinten links am Fuß des Hügels.
+lichterloh brennt. Zwei Horned Demons (Cover-Karte) stehen in verschiedener Tiefe bereit: einer näher links,
+einer weiter hinten rechts im Glutdunst.
 
 Quellen (Motive.xcf):
   Baaliel:      Ebene 571 „Baaliel“ (20×28, vollständige Figur; das Kartenbild ist aus einer vergrößerten Szene
@@ -82,11 +82,12 @@ for y in range(TY - 26, TY + 6):
 put(bg, fire, TX - fire.shape[1] // 2, TY - fire.shape[0] + 6)   # Flammenfuß sitzt auf der Kuppe
 # ferner Feuerball kurz vor dem Ziel
 put(bg, shot, TX + 12, TY - 22)
-# ferner Horned Demon links am Hügelfuß (dunkler, im Glutdunst)
+# ferner Horned Demon rechts hinten (dunkler, im Glutdunst)
 fd = shade(demon, 0.7, (40, 6, 6))
-for xx in range(16, 30):
-    if bay(xx, 88) < 0.7: bg[88, xx, :3] = (bg[88, xx, :3] * 0.5).astype(np.uint8)
-put(bg, fd, 23 - demon.shape[1] // 2, 88 - demon.shape[0] + 1)
+FDX, FDY = 104, 86
+for xx in range(FDX - 7, FDX + 7):
+    if bay(xx, FDY) < 0.7: bg[FDY, xx, :3] = (bg[FDY, xx, :3] * 0.5).astype(np.uint8)
+put(bg, fd, FDX - demon.shape[1] // 2, FDY - demon.shape[0] + 1)
 
 cv = Canvas(W, H)
 blit(cv, bg, 2)
@@ -96,22 +97,23 @@ MW, MH = grid(3)
 mid = rgba(MW, MH)
 # naher Feuerball oben rechts, auf derselben Bahn wie der ferne
 put(mid, shot, 52, 10)
-# naher Horned Demon rechts, Füße bei Zeile 70 (Leinwand y 210)
+# naher Horned Demon links, Füße bei Zeile 70 (Leinwand y 210)
+NDX = 13
 for y in range(MH):
     for x in range(MW):
-        d = ((x + .5 - 68) / 8) ** 2 + ((y + .5 - 69.5) / 1.4) ** 2
+        d = ((x + .5 - NDX) / 8) ** 2 + ((y + .5 - 69.5) / 1.4) ** 2
         if d < 1 and bay(x, y) < 0.7:
             mid[y, x] = (10, 2, 2, 150)
-put(mid, demon, 68 - demon.shape[1] // 2, 70 - demon.shape[0])
+put(mid, demon, NDX - demon.shape[1] // 2, 70 - demon.shape[0])
 cv.paste(up(mid, 3), 0, 0)
 
 # ---------------------------------------------------------------- Baaliel 5×
 FG = rgba(50, 70)
 bw, bh = baal.shape[1], baal.shape[0]
-bx, by = 23 - bw // 2, 66 - bh
+bx, by = 27 - bw // 2, 66 - bh
 for y in range(70):
     for x in range(50):
-        d = ((x + .5 - 23) / 9) ** 2 + ((y + .5 - 65.5) / 1.6) ** 2
+        d = ((x + .5 - 27) / 9) ** 2 + ((y + .5 - 65.5) / 1.6) ** 2
         if d < 1 and bay(x, y) < 0.7:
             FG[y, x] = (10, 2, 2, 150)
 put(FG, baal, bx, by)

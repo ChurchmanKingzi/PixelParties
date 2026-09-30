@@ -1,6 +1,26 @@
 # -*- coding: utf-8 -*-
-"""13 – Gegner „Cute Commando“ (sample-Structure Deck Cute Commando), Held: Cute Annoyance Mini (Base).
-Entwurf 2.
+"""13 „Phoenix Call“ – Gegner „Cute Commando“ (sample-Structure Deck Cute Commando), Held: Cute Annoyance Mini (Base).
+
+Bildidee (Action, asymmetrisch): Mini schwebt groß als Kommandantin am blauen Himmel ihrer Moe-Inselwelt und grinst
+den Betrachter an; hinter ihr stürzt auf ihr Kommando die Cute Phoenix (Coverkarte) als senkrechte Feuersäule auf den
+Säulenplatz der Relic-Insel – genau wie im Kartenbild „Cute Phoenix“ (Feuersäule über der Säulenruine). Eine
+Flügel-Bunny und eine Cute Cat aus ihrem Deck fliegen zum Einschlag. (Andere Idee als „Kitten Escort“: kein Herz,
+keine Katzen-Eskorte, sondern der Beschwörungsangriff ihres Decks.)
+
+Quellen (MotiveMoe.xcf):
+  Mini            = Ebenen 497 „Mini #2“ + 498 „Mini“ (Base; = Sichtbar #124, Lage 100,259, 0 px Abweichung, vgl. Runde 5)
+  Cute Phoenix    = Ebene 420 „Cute Phoenix #1“ (= Sichtbar #94, Karte „Cute Phoenix“, Lage 167,167, 100 % deckungsgleich)
+  Relic-Insel     = Ebene 478 „Relic-Insel“ (Säulenplatz derselben Kartenszene), Altar unter der Feuersäule
+  Cute Bunny      = Ebene 429 „Cute Bunny #1“ (frontal fliegende Fledermausflügel-Bunny, 36×18)
+  Cute Cat        = Ebene 492 „Cute Cat“ (geflügelte Katze, 23×13)
+  Himmel          = Ebene 553 „Hintergrund“ (Moe-Himmel mit Schleierwölkchen), Ausschnitt x150–400/y200–550
+Selbst gezeichnet: Feuersäule (senkrechte Flammenzungen in 5 Feuerfarben, 1×), warmer Säulenschein auf dem Himmel und
+Lichtfleck auf dem Platz (geordnet gedithert). Die weichen Glow-Ebenen 421/422 der Karte (Alpha-Verläufe) bleiben weg.
+
+Skalierung (Ausgabe = 250×350-Raster × 3):
+  Himmel, Relic-Insel, Feuersäule, Phoenix, Schein   – 1× (250×350, Originalpixel)
+  Cute Bunny, Cute Cat                               – 2× (125×175)
+  Mini                                               – 5× (50×70)
 """
 import math, random
 from c_util import *  # noqa
@@ -68,4 +88,4 @@ blit(cv, p2, 2)
 p5 = rgba(50, 70)
 put(p5, mini, 5, 12)
 blit(cv, p5, 5)
-print(save(cv, '13_cute_commando.png'))
+print(save(cv, '13_phoenix_call.png'))

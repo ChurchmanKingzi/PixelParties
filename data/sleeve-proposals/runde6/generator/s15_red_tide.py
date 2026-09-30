@@ -1,5 +1,26 @@
 # -*- coding: utf-8 -*-
-"""15 – Gegner „Deepsea Terror“, Held: Siphem, the Deepsea Demon (Base). Entwurf."""
+"""15 „Red Tide“ – Gegner „Deepsea Terror“, Held: Siphem, the Deepsea Demon (Base).
+
+Bildidee (Porträt von unten, Heerführer): Siphem schwebt mit ausgebreiteten Flügeln im roten Licht, das von rechts oben
+durch das Wasser fällt (wie in seinem Kartenbild); unten auf dem dunklen Meeresgrund zwischen zwei Deepsea
+Monstrosities (Totholz-Korallen mit roten Adern) stehen Deepsea Witch, Deepsea Werewolf und Deepsea Pirate und blicken
+zu ihm auf. Aus jeder Kreatur steigt eine Kette roter Blasen zu ihm – seine Deepsea Counters (Leadership/Decay Magic:
+zurückgeholte Kreaturen werden zu Countern). Kein Schloss, kein Cthulhu (≠ Deepsea Awakening/Count of the Deep).
+
+Quellen (MotiveDeepsea.xcf):
+  Siphem (Base)   = Ebene 301 „Siphem“ + rotes Randlicht Ebene 300 „Siphem #1“, wie in Sichtbar #107 (Ebene 34,
+                    Karte „Siphem“, Lage 245,277) mit ca. 25 % Deckkraft nur auf Siphems Pixeln gemischt
+                    (per Farbvergleich mit der Szene bestimmt; die Szenen-Gesamtabdunklung ×0,72 entfällt)
+  Deepsea Witch   = Ebene 309 „Witch #1“;  Deepsea Werewolf = Ebene 329 „Werewolf“
+  Deepsea Pirate  = Ebene 310 „Pirate“ (nur die Figur x270–295, ohne den Klumpen rechts), gespiegelt
+  Deepsea Monstrosity = Ebene 339 „Monstrosity“ (links, rechts gespiegelt)
+Selbst gezeichnet: Wasserverlauf (rot oben → Tiefseeblau), Lichtbahnen, Meeresgrund, Counter-Blasen.
+
+Skalierung (Ausgabe = 250×350-Raster × 3):
+  Wasser, Lichtbahnen                               – 1×
+  Meeresgrund, Kreaturen, Blasen                    – 2× (125×175)
+  Siphem                                            – 5× (50×70)
+"""
 import math, random
 from c_util import *  # noqa
 import numpy as np

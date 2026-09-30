@@ -1,23 +1,27 @@
 # -*- coding: utf-8 -*-
 """33 Volley at Dusk – Gegner „Pew-Pew!“ (sample-Structure Deck Pew-Pew), Held: Bow Sniper Darge (Base).
 
-Idee: Abenddämmerung auf einer Hügelkuppe (bewusst NICHT die Deri-Mauer seiner Karte, die Sleeve 41 nutzt): Darge
-steht mit seinem Bogen auf dem Grat und hat eben geschossen – die drei Pfeile seiner Heldenkarte (Regenbogen-,
-Flammen- und Bombenpfeil mit Bewegungsspuren) fächern sich genau wie im Kartenbild auf den Betrachter zu: Wir sind
-das eine Ziel, das er mit jeder „Arrow“-Reaktion härter trifft. Der Flammenpfeil beleuchtet den Hang, rechts
-glüht der Horizont.
+Idee: Abenddämmerung auf einer Felsnase hoch über einem Tal (bewusst NICHT die Deri-Mauer seiner Karte, die Sleeve 41
+nutzt): Darge steht links mit seinem Bogen am Rand; seine Pfeile fliegen waagrecht vom Bogen weg über das Tal nach
+rechts auf genau EIN Ziel – den Gegner aus der Cover-Karte „Angelfeather Arrow“, der drüben auf einer Felsnadel
+steht. Der Angelfeather Arrow hat ihn samt weißer Flugspur schon durchbohrt (Anordnung wie im Kartenbild), Flammen-
+und Giftpfeil sind noch unterwegs – jeder weitere „Arrow“ auf dasselbe Ziel macht Darges Angriff stärker.
 
 Quellen:
   MotiveDeri.xcf Ebene 248 „Darge“ + mittlerer Bogen aus Ebene 244 „Darge #1“ (x 244–248) – Base-Darge, geprüft
                  gegen Szene 53 (Kartenbild „Bow Sniper Darge“, Lage 203,273; dort hinter den Zinnen verdeckt, das
-                 Sprite ist vollständig). Ebene 242 „Darge #2“ – die drei Pfeile mit Bewegungsspur (Alpha je Pixel
-                 der 4×-Ebene, wie im Original).
-  Motive.xcf Szene 88 „Sichtbar #297“ (Karte Flame Arrow) – Gras-Kachel 16×16 (gespiegelt gekachelt, aufgehellt).
-Selbst gezeichnet: Abendhimmel, Wolkenstreifen, ferne Hügel, Grat-Kante, Lichtschein, Bodenschatten.
+                 Sprite ist vollständig).
+  Motive.xcf     Szene 85 „Sichtbar #300“ (Karte Angelfeather Arrow): Ebene 1108 (Gegner), 1107 linker Teil (weißer
+                 Federpfeil), 1109 (weiße Flugspur, weiches Alpha je 2×-Pixel) in Originalanordnung zusammengesetzt;
+                 Ebene 1105 rechter Teil (Flammenpfeil der Karte Flame Arrow), 1102 (Poisoned Arrow).
+                 Szene 88 (Karte Flame Arrow) – Gras-Kachel 16×16; Ebene 1286 „Dark Land“ – Felskachel.
+Selbst gezeichnet: Abendhimmel, Wolkenstreifen, Hügelstaffeln, Form von Felsnase und Felsnadel, kurze Flugstriche
+hinter Flammen- und Giftpfeil, Lichtschein, Bodenschatten.
 
 Skalierung (Tiefenebenen):
-  Hintergrund: Himmel, Wolken, ferne Hügel         – 2× (125×175)
-  Vordergrund: Grashügel, Darge, Pfeile, Schatten  – 4× (63×88); Darge 88×112 px, Pfeilfächer 212×140 px
+  Hintergrund: Himmel, Wolken, Tal, Felsnadel, Ziel, fliegende Pfeile, Flugspur – 2× (125×175)
+                (über dem Tal = weiter weg; Ziel 38×70 px, Pfeile 44–50 px lang)
+  Vordergrund: Felsnase, Darge, Schatten                                      – 4× (63×88); Darge 88×112 px
 """
 import math, random
 import numpy as np
@@ -32,11 +36,26 @@ def _darge():
     bow = layer(D, 244).copy(); bow[:, :244] = 0; bow[:, 249:] = 0
     a = xcfkit.over(bow, a)                       # Darge liegt über dem Bogen (Stapel: 244 unter 248)
     a[..., 3] = np.where(a[..., 3] >= 128, 255, 0)
-    return a[272:330, 219:276].copy()             # gemeinsames Fenster mit den Pfeilen
+    return a[272:330, 219:276].copy()             # Fenster ab (219,272)
 
 
 darge = cached('o33_darge_win', _darge)          # 57×58, Fenster ab (219,272)
-arrows = cached('o33_arrows_win', lambda: layer(D, 242)[272:330, 219:276].copy())
+
+
+def _hit():
+    arrow = layer('Motive', 1107).copy(); arrow[:, 190:] = 0            # nur der Federpfeil, nicht die Flügel
+    a = compose('Motive', [1108], crop=False)
+    a = xcfkit.over(a, arrow)
+    a[..., 3] = np.where(a[..., 3] >= 128, 255, 0)
+    trail = layer('Motive', 1109)
+    out = xcfkit.over(trail, a)                                        # Flugspur liegt unter Gegner und Pfeil
+    out[..., 3] = np.maximum(a[..., 3], trail[..., 3])
+    return out[112:152, 140:186].copy()                               # Fenster ab (140,112)
+
+
+hit = cached('o33_hit_win', _hit)                                      # Gegner, Angelfeather Arrow, Spur
+flame_arrow = cached('o33_flame_arrow', lambda: parts(layer('Motive', 1105), dil=1)[1])
+poison_arrow = cached('o33_poison_arrow', lambda: parts(layer('Motive', 1102), dil=1)[0])
 grass = cached('o33_grass', lambda: layer('Motive', 88)[66:82, 240:256].copy())
 
 # ---------------- Hintergrund 2× (125×175) ------------------------------------------------------------------
@@ -72,10 +91,48 @@ for base, per, amp, ph, col in RIDGES:
             bg[hy, x, :3] = (np.array(col) * 1.35).clip(0, 255).astype(np.uint8)
 glow(bg, 98, 112, 40, (255, 170, 110), 0.2, ry=30)
 
+# ---------------- Felsnadel mit dem Ziel, fliegende Pfeile (2×, jenseits des Tals) -------------------------------
+rockB = cached('o33_rock', lambda: layer('Motive', 1286)[180:212, 244:284].copy())[..., :3].astype(float)
+TOP = 103                                                        # Standfläche der Felsnadel (2×) → y 206
+for y in range(TOP, bh):
+    d = y - TOP
+    x0 = 86 - int(d * 0.16) - (1 if (y // 4) % 2 else 0)
+    x1 = 104 + int(d * 0.14) + (1 if (y // 6) % 2 else 0)
+    for x in range(x0, min(bw, x1)):
+        c = rockB[y % 32, x % 40] * np.array([0.8, 0.62, 0.7]) * 0.6
+        if x <= x0 + 1: c = c * 1.5 + np.array([36, 16, 0])         # Abendlicht auf der linken Kante
+        if d == 0: c = c * 1.4
+        bg[y, x, :3] = c.clip(0, 255).astype(np.uint8)
+# Gegner mit durchbohrendem Angelfeather Arrow und Flugspur (Originalanordnung), Füße auf der Felsnadel
+HX, HY = 72, TOP - (150 - 112)                                   # Fenster (140,112) → Spalte 72
+for y in range(hit.shape[0]):
+    for x in range(hit.shape[1]):
+        X, Y = HX + x, HY + y
+        al = hit[y, x, 3] / 255
+        if al > 0 and 0 <= X < bw and 0 <= Y < bh:
+            q = math.floor(al * 4 + BAYER[Y % 4, X % 4] * 0.999) / 4
+            if q > 0: bg[Y, X, :3] = (bg[Y, X, :3] * (1 - q) + hit[y, x, :3] * q).astype(np.uint8)
+shade_ellipse(bg, HX + (163 - 140), TOP + 0.3, 8, 1.2, 0.5)
+
+
+def streak(y, x0, x1, col):
+    for x in range(x0, x1):
+        if (x - x0) % 3 != 2 and 0 <= x < bw: bg[y, x, :3] = col
+
+
+# Flammenpfeil (oben) und Giftpfeil (unten) auf dem Weg vom Bogen zum Ziel, mit kurzen Flugstrichen
+FA = (61, 73); PA = (58, 90)
+streak(FA[1] + 5, FA[0] - 12, FA[0] - 1, (250, 190, 120))
+streak(FA[1] + 7, FA[0] - 8, FA[0] - 1, (230, 150, 100))
+streak(PA[1] + 3, PA[0] - 12, PA[0] - 1, (170, 220, 150))
+put(bg, flame_arrow, FA[0], FA[1])
+put(bg, poison_arrow, PA[0], PA[1])
+glow(bg, FA[0] + 19, FA[1] + 5, 9, (255, 190, 90), 0.4)
+
 # ---------------- Vordergrund 4× (63×88): Felsvorsprung, Darge, Pfeile --------------------------------------------
 fw, fh = grid(4)
 ground = rgba(fw, fh)
-GX0 = 3                                                          # Fenster-Ursprung (219,272) → Spalte 3
+GX0 = 0                                                          # Fenster-Ursprung (219,272) → Spalte 0
 GY0 = 22                                                         # → Zeile 22 (y 88)
 FEET = GY0 + (302 - 272)                                         # Fußzeile 52 → y 208
 g = grass[..., :3].astype(float)
@@ -96,15 +153,11 @@ shade_ellipse(ground, GX0 + (236 - 219) + 0.5, FEET + 0.2, 11, 1.3, 0.55)
 
 fig = rgba(fw, fh)
 put(fig, darge, GX0, GY0)
-arr = rgba(fw, fh)
-h, w = arrows.shape[:2]
-arr[GY0:GY0 + h, GX0:GX0 + w] = arrows
 
 st = Stack()
 st.add(bg, 2)
-st.add(ground, 4, ox=1)
-st.add(fig, 4, ox=1)
-st.add(arr, 4, ox=1)
+st.add(ground, 4, ox=0)
+st.add(fig, 4, ox=0)
 save(st.canvas(), '33_volley_at_dusk.png')
 if __name__ == '__main__':
     print(preview('33_volley_at_dusk.png', 'twist', 'bronze', 'emerald', 'amber'))

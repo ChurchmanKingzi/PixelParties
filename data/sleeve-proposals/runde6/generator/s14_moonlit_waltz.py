@@ -1,5 +1,29 @@
 # -*- coding: utf-8 -*-
-"""14 – Gegner „Dance of the Butterflies“, Held: Beato, the Butterfly Witch (Base). Entwurf."""
+"""14 „Moonlit Waltz“ – Gegner „Dance of the Butterflies“, Held: Beato, the Butterfly Witch (Base).
+
+Bildidee (Spiegelung im Wasser, Ruhemoment/Tanz): Nachts schwebt Beato zwinkernd mit ihren goldenen
+Schmetterlingsflügeln über dem stillen Teich ihres Mondgartens, umtanzt vom Ring ihrer kleinen türkisen Schmetterlinge
+(wie im Kartenbild); am Ufer Blütenbüsche und Blumen aus ihrem Garten, oben der Mond mit einem großen Moonlight
+Butterfly. Unter ihr spiegelt sich alles im Wasser (senkrecht gespiegelt, türkis abgedunkelt, Wellenlinien).
+
+Quellen (Motive.xcf):
+  Beato (Base)    = Ebene 648 „Beato“ (Figur + kleine türkise Schmetterlinge; großer Schmetterling bei x338 entfernt)
+                    + Ebene 649 „Beato #1“, nur Teil x274–304/y299–321 (goldenes Flügelpaar hinter ihr);
+                    zusammen pixelgleich mit Sichtbar #120 (Ebene 25) bzw. #116 (Ebene 30): 0 px Abweichung.
+                    Die blonde Figur in 649 (x375) ist die Variante „Eternal Butterfly“ und bleibt weg. Die Heldenkarte
+                    selbst ist türkis überfärbt (Filter) – Formen/Zwinkern/Flügel stimmen überein.
+  Schmetterlingsring = die 12 kleinen Schmetterlinge ihres Kartenbilds (aus 648), zu einer Ellipse um sie gelegt
+  Moonlight Butterfly = Ebene 625 (türkiser Schmetterling der Karte „Moonlight Butterfly“)
+  Blütenbusch, Blumen = Ebene 651 „Schachbrett“ (Beatos Garten), Busch x191–211/y176–196 (Oval freigestellt),
+                    Blumengruppe x191–211/y191–210 (Blüten farblich vom Rasen getrennt)
+  Mond            = MotiveBoons.xcf Ebene 73
+Selbst gezeichnet: Nachthimmel, Sterne, Mondhof, Heckenkante, Wasser, Glitzerbahn, Wellenlinien, Spiegelung.
+
+Skalierung (Ausgabe = 250×350-Raster × 3):
+  Himmel, Sterne                                    – 1×
+  Mond, Moonlight Butterfly, Ufer, Wasser, Glitzer  – 2× (125×175)
+  Beato, Schmetterlingsring, Spiegelung             – 4× (63×88)
+"""
 import math, random
 from c_util import *  # noqa
 import numpy as np
@@ -54,7 +78,7 @@ for y in range(0, WL2):
         if p2[y, x, 3] == 0 and d < 19 and (19 - d) / 8 > bayer(x, y):
             c = tuple(int(v) for v in cv.a[y * 2, x * 2])
             p2[y, x] = list(mix(c, (150, 200, 205), 0.22)) + [255]
-put(p2, mbut, 20, 22)
+put(p2, mbut, 13, 12)
 # Heckenkante: dunkle Silhouette mit Blütenbüschen
 HED = (12, 34, 30)
 for x in range(W2):
