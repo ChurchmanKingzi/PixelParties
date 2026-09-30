@@ -123,5 +123,5 @@ put(sky, flip(low), 10, 150)
 
 cv = Canvas(W, H)
 blit(cv, sky, 2)
-blit(cv, fg, 4)
+blit(cv, fg, 4, ox=-1)                  # +1 Einheit nach rechts: Kopfmitte genau auf x = 375 von 750
 print(save(cv, '20_stormward_drift.png'))
