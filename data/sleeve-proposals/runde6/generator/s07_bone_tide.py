@@ -13,8 +13,8 @@ Quellen (Motive.xcf):
                                (NICHT 763 „VACARN“: andere Version mit geschlossenem Mund.)
   Ebene 1225 „Vacarn #4“     – roter Schein der Base-Karte (weichgezeichnet) → als geordnetes Dithering nachgezeichnet.
   Ebene 73 „Skele Archer #1“ – Skeleton Archer (Karte, Sichtbar #310), gespiegelt für die linke Flanke.
-  Ebene 1226 „Vacarn #1“     – Bogenschütze (rechte Flanke), Schädelfledermäuse (Skeleton Skull Bat).
-                               (Das seitlich blickende Skelett mit Spitzhut derselben Ebene nach Nutzer-Feedback entfernt.)
+  Ebene 1226 „Vacarn #1“     – Bogenschütze (rechte Flanke). (Die Schädel/Skull Bats derselben Ebene und das seitlich
+                               blickende Spitzhut-Skelett nach Nutzer-Feedback 1+2 entfernt.)
   Ebene 58 „Skele Mage #1“   – Skeleton Mage (Karte Skeleton Mage, Sichtbar #313).
   Ebene 54 „Healer Skele #2“ – Skeleton Healer (Karte, Sichtbar #314).
   Ebenen 790/794/796/792/787 – Skeleton Reaper, Death Knight, Burning Skele, Skeleton Wizard, Cosmic Skele
@@ -24,8 +24,8 @@ Quellen (Motive.xcf):
 Selbst gezeichnet: Nebel/Horizont, Felsgrate, Schatten, roter Schein.
 
 Skalierung (Tiefenebenen):
-  Hintergrund 2× (125×175): violetter Himmel/Nebel, Schluchtwände, Geröllboden, Schattenheer im Nebel (Burning,
-                            Death Knight, Wizard, Cosmic) auf dem Horizont, Schädelfledermäuse, zweite Reihe:
+  Hintergrund 2× (125×175): violetter Himmel/Nebel, Schluchtwände, Geröllboden, Schattenheer (Burning,
+                            Death Knight, Wizard, Cosmic) auf dem Horizont, zweite Reihe:
                             Magier und Heiler auf dem schwarzen Geröllboden (kein Nebel auf dem Boden)
   Mittelgrund 3× (84×117):  zwei Bogenschützen als Flanke + Schatten, roter Schein hinter Vacarn (drei Stufen)
   Vordergrund 6× (42×59):   Vacarn + Schatten
@@ -177,8 +177,6 @@ for n, cx in line:
     yb = foot - (h - 1) + (2 if n == 'reaper' else 0)
     shadow(bg, cx, foot + 1, w - 4, a=0.6)
     put(bg, s, cx - w // 2, yb)
-# Schädelfledermäuse am Himmel (2×)
-put(bg, bats[0], 24, 22); put(bg, flip(bats[-1]), 90, 18)
 # helle Skelette der zweiten Reihe (2×): Magier und Heiler auf dem dunklen Geröllboden
 for s_, cx, fy in [(mage, 45, 80), (healer, 80, 80)]:
     h, w = s_.shape[:2]

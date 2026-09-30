@@ -1,15 +1,16 @@
 # -*- coding: utf-8 -*-
 """06 Crimson Campaign – Gegner „Bloody King Zi“, Held: Timeless King Zi (Base-Version).
 Feldherr im blutroten Abendlicht: Zi steht groß auf dem verschneiten Feld seiner Heimat, links und rechts von ihm
-stecken seine zwei blau-goldenen Standarten (die Szepter seiner Kartenszene) im Schnee. Fern am Horizont steht
-Skulltop Castle – das weiße Schloss mit Goldkuppeln und blauen Fahnen aus seiner Kartenwelt – vor rot glühendem
-Himmel.
+stecken seine zwei blau-goldenen Standarten (die Szepter seiner Kartenszene) im Schnee. Zi schwebt deutlich über seinem Schatten. Fern am
+Horizont steht Skulltop Castle – das weiße Schloss mit Goldkuppeln und blauen Fahnen auf einem verschneiten
+Riesenschädel – vor rot glühendem Himmel.
 
 Quellen (MotiveGrailWar.xcf):
   Ebene 487 „Zi“: Base-Zi mit Sternumhang (26×28), in Sichtbar #169 (Ebene 30, Kartenbild „Timeless King Zi“,
       Lage 227,108) sichtbar (99 %, Kartenszene leicht abgedunkelt).
   Ebene 485 „Zi #2“: die zwei Szepter/Standarten seiner Kartenszene.
-  Ebene 490 „Skulltop Castle“ (31×31; = Referenz skulltop_castle_ref.png), leicht in Abendlicht getönt.
+  Ebene 490 „Skulltop Castle“ + 496 „Gigantisaur Skull“ (das Schloss sitzt wie in Sichtbar #54 auf dem verschneiten
+      Riesenschädel; = Referenz skulltop_castle_ref.png), leicht in Abendlicht getönt.
   Ebene 476 „Ebene #139“: Schneefläche seiner Kartenszene (als Bodentextur, rot getönt).
 Selbst gezeichnet: Abendhimmel, ferner Bergkamm, Schneewellen, Schatten.
 
@@ -26,7 +27,7 @@ B = 'MotiveGrailWar'
 zi = sprite('o06_zi', B, [487])                               # Base-Zi mit Sternumhang (26×28), = Sichtbar #169
 std = parts(compose(B, [485]), dil=1)[0]                      # „Zi #2“: Standarte (7×36)
 snow = compose(B, [476], crop=False)[284:309, 143:303]        # Schneefläche (ohne Eisgrate/Kanten)
-castle = sprite('o06_skulltop', B, [490])                     # Skulltop Castle (31×31)
+castle = sprite('o06_skulltop', B, [490, 496])                # Skulltop Castle (490) auf dem Gigantisaur-Schädel (496), 50×63
 
 # ---- Ebene 1: Abendhimmel, ferner Bergkamm (1×) ----------------------------------------------
 cv = Canvas(250, 350)
@@ -62,24 +63,24 @@ for (y0, amp, ph) in [(G0 + 6, 2, 0.3), (G0 + 20, 3, 1.7), (G0 + 42, 3, 2.9)]:
         y = int(y0 + amp * math.sin(x * 0.09 + ph))
         p2[y, x, :3] = mix(p2[y, x, :3], (250, 200, 210), 0.45)
         p2[y + 1, x, :3] = mix(p2[y + 1, x, :3], (120, 60, 90), 0.25)
-# Skulltop Castle fern am Horizont rechts (auf dem Schneefeld), im Abendlicht getönt
+# Skulltop Castle – das Schloss auf dem verschneiten Riesenschädel – fern am Horizont rechts, im Abendlicht getönt
 ck = castle.copy()
 ck[..., :3] = (ck[..., :3] * 0.72 + np.array([236, 140, 110]) * 0.28).astype(np.uint8)
-put(p2, ck, 80, G0 + 2 - ck.shape[0])
+put(p2, ck, 68, G0 + 3 - ck.shape[0])
 # Zis zwei Standarten stecken links und rechts im Schnee
 SY = 118
 put(p2, std, 14, SY - std.shape[0])
 put(p2, std, W2 - 14 - std.shape[1], SY - std.shape[0])
 for sx in (14 + 3.5, W2 - 14 - 3.5):
     shadow_ellipse(p2, sx, SY, 4, 1.0, col=(60, 10, 30), a=0.4)
-# Bodenschatten unter Zi (Füße bei 250er-y 310 → 2×-Reihe 155)
-shadow_ellipse(p2, 62.5, 155, 20, 3.5, col=(60, 10, 30), a=0.5)
+# Bodenschatten unter Zi (250er-y 310 → 2×-Reihe 155); Zi selbst schwebt 36 px höher
+shadow_ellipse(p2, 62.5, 155, 16, 2.6, col=(60, 10, 30), a=0.45)   # Zi schwebt deutlich darüber
 blit(cv, p2, 2)
 
 # ---- Ebene 3: Zi (6×, 42×59) --------------------------------------------------------------------
 W6, H6 = 42, 59
 p6 = rgba(W6, H6)
-ZX, ZY = (W6 - zi.shape[1]) // 2, 52 - zi.shape[0]
+ZX, ZY = (W6 - zi.shape[1]) // 2, 46 - zi.shape[0]            # 6 Zeilen (36 px) über dem Schatten
 put(p6, zi, ZX, ZY)
 blit(cv, p6, 6, -1, -2)
 print(save(cv, '06_crimson_campaign.png'))
