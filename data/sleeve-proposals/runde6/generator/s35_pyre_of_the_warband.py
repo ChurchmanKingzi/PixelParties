@@ -3,7 +3,7 @@
 the Chaorc War Chief (Base).
 
 Idee: Nacht im Krater des Chaorc-Lagers (ORKLAGER seiner Kartenszene). Ganz vorn steht Calamitusk groß und vom
-Feuer hinter ihm rot umrandet; direkt hinter ihm ist sein Kriegsbanner mit dem Flammenauge in den Boden gerammt
+Feuer hinter ihm rot umrandet; links neben/hinter ihm ist sein Kriegsbanner mit dem Flammenauge in den Boden gerammt
 (auf der Heldenkarte hält er es – hier steht es hinter ihm, damit er selbst das Hauptmotiv bleibt). Weit hinten im
 Krater lodert das große Opferfeuer (Pyre Grill Master), links davon ein rot vermummter Chaorc, rechts Asriel, the
 Sapling Sacrificer (Cover-Karte) mit blutigem Opfermesser – alle mit Bodenschatten im Feuerschein. Opfer bringen,
@@ -13,7 +13,8 @@ Quellen:
   MotiveHawaii.xcf Ebene 137 „Calamitustk-Kopie“ – Base-Calamitusk, geprüft gegen Szene 132 „Sichtbar #17“
                    (Kartenbild, Lage 136,105; 11 px Abweichung nur am Bannerstab, der dort vor seiner Hand liegt);
                    138 „Calamitustk“ weicht in 152 px ab (nicht verwendet). Ebene 133 „Ebene #53“ – sein Banner
-                   (Querstange im Kartenbild vom Kartenrand verdeckt), hier einzeln hinter ihm aufgepflanzt.
+                   (Querstange im Kartenbild vom Kartenrand verdeckt), hier einzeln links hinter ihm aufgepflanzt; die Lücke im
+                   Stab (dort lag seine Hand) mit der Stabzeile darüber geschlossen.
                    Ebene 123 (Flammen) + 130 (Scheitholz-Kreuz, rechter Teil) – Lagerfeuer der Pyre-Grill-Karte.
                    Ebene 129 „Ebene #60“ – rot vermummter Chaorc. Ebene 269 „Ebene #4“ – Kachel Lagerboden (16×16)
                    und Kraterhang (16×16).
@@ -34,7 +35,8 @@ H = 'MotiveHawaii'
 rnd = random.Random(35)
 
 cala = sprite('o35_calamitusk_body', H, [137])                 # 22×21
-banner = sprite('o35_banner', H, [133])                          # 36×43
+banner = sprite('o35_banner', H, [133]).copy()                   # 36×43
+banner[36] = banner[35]            # Lücke im Stab, wo auf der Karte seine Hand lag, mit dem Stab darüber geschlossen
 def _pyre():
     logs = layer(H, 130).copy(); logs[:, :150] = 0                # nur das Scheitholz-Kreuz unter dem Feuer
     a = xcfkit.over(logs, layer(H, 123))                           # Flammen (123) liegen über dem Holz (130)
@@ -77,7 +79,7 @@ for x in range(bw):                                              # Hangfuß
 PX, PB = 62, 63                                                  # Feuer-Mitte (Spalte), Fußzeile (2×) → y 126
 glow(bg, PX, PB - 18, 62, (255, 120, 40), 0.5, ry=44)
 glow(bg, PX, PB + 6, 58, (255, 150, 60), 0.38, ry=34)
-glow(bg, 62.5, 150, 46, (200, 90, 40), 0.3, ry=22)              # Feuerlicht auf dem Boden um Calamitusk
+glow(bg, 68, 150, 46, (200, 90, 40), 0.3, ry=22)              # Feuerlicht auf dem Boden um Calamitusk
 shade_ellipse(bg, PX, PB - 0.5, 24, 2.4, 0.5)
 put(bg, pyre, PX - pyre.shape[1] // 2, PB - pyre.shape[0])
 # Chaorc links, Asriel rechts am Feuer, mit Schatten vom Feuer weg
@@ -89,11 +91,11 @@ for s_, cx, dx in ((chaorc, 28, -3), (asriel, 97, 3)):
 # ---------------- Mittelgrund 3× (84×117): aufgepflanztes Banner -------------------------------------------------
 mw, mh = grid(3)
 mg = rgba(mw, mh)
-BB = 84                                                           # Stabfuß (3×) → y 252, hinter Calamitusk
-bx = (mw - banner.shape[1]) // 2 + 3
+BB = 83                                                           # Stabfuß (3×) → y 249, links neben/hinter Calamitusk
+bx = 3                                                            # Stab bei x ≈ 62
 for y in range(BB - 1, BB + 2):                                   # Schatten am Stabfuß
-    for x in range(bx + 2, bx + 14):
-        d = ((x + .5 - bx - 7.5) / 6) ** 2 + ((y + .5 - BB) / 1.3) ** 2
+    for x in range(bx + 12, bx + 24):
+        d = ((x + .5 - bx - 18) / 5) ** 2 + ((y + .5 - BB) / 1.3) ** 2
         if d < 1: mg[y, x] = (0, 0, 0, 110)
 put(mg, mul(banner, (0.92, 0.88, 0.86)), bx, BB - banner.shape[0] + 1)
 
@@ -103,8 +105,8 @@ fg = rgba(fw, fh)
 CF = 55                                                           # Füße → y 330
 CX = (fw - cala.shape[1]) // 2
 for y in range(CF - 1, CF + 1):                                   # Bodenschatten (6×), nach vorn geworfen
-    for x in range(CX - 2, CX + cala.shape[1] + 3):
-        d = ((x + .5 - CX - cala.shape[1] / 2) / (cala.shape[1] / 2 + 3)) ** 2 + ((y + .5 - CF + 0.3) / 1.2) ** 2
+    for x in range(CX - 1, CX + cala.shape[1] + 1):
+        d = ((x + .5 - CX - cala.shape[1] / 2) / (cala.shape[1] / 2 + 1)) ** 2 + ((y + .5 - CF + 0.3) / 1.2) ** 2
         if d < 1: fg[y, x] = (0, 0, 0, 120)
 cl = mul(cala, (1.3, 1.18, 1.12), (14, 6, 0))                     # im Feuerschein etwas aufgehellt
 m = cl[..., 3] > 0
@@ -117,7 +119,7 @@ put(fg, cl, CX, CF - cala.shape[0])
 st = Stack()
 st.add(bg, 2)
 st.add(mg, 3)
-st.add(fg, 6, ox=-1)
+st.add(fg, 6, ox=11)
 save(st.canvas(), '35_pyre_of_the_warband.png')
 if __name__ == '__main__':
     print(preview('35_pyre_of_the_warband.png', 'industrial', 'iron', 'lava', 'onyx'))

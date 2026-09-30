@@ -36,7 +36,7 @@ W3, H3 = 84, 117
 MX, MY = 60, 262
 p3 = isle[MY:MY + H3, MX:MX + W3].copy()
 p3[..., 3] = 255
-BX, BY = 7, 9
+BX, BY = 16, 16                                              # gespiegelt: Hals nach links oben, Blick zu Kit
 # Wald etwas abdunkeln, die Lichtung bleibt hell (Kit hebt sich ab)
 c = p3[..., :3].astype(int)
 forest = (c[..., 1] < 120) | (c[..., 0] > c[..., 1])
@@ -54,10 +54,10 @@ def footprint(cx, cy):
         p3[cy - 4, x, :3] = mix(p3[cy - 4, x, :3], RIM, 0.5)
     for dx in (-3, 0, 3):
         p3[cy - 4, cx + dx, :3] = MUD2; p3[cy - 5, cx + dx, :3] = MUD
-for (x, y) in [(60, 108), (52, 97), (61, 86), (53, 75)]:
+for (x, y) in [(62, 110), (55, 99), (63, 88), (56, 78)]:
     footprint(x, y)
-shadow_ellipse(p3, BX + 36, BY + brach.shape[0] - 1, 26, 3.2, a=0.45)
-put(p3, brach, BX, BY)
+shadow_ellipse(p3, BX + 36, BY + brach.shape[0] - 1, 24, 3.0, a=0.45)
+put(p3, brach[:, ::-1], BX, BY)
 # Bodenschatten unter Kit (Füße bei 250er-y 305 → 3×-Reihe 102)
 shadow_ellipse(p3, 34.5, 102, 10, 1.8, a=0.4)
 cv = Canvas(250, 350)

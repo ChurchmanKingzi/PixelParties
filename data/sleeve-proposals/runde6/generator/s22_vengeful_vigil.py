@@ -15,7 +15,7 @@ Quellen:
                             Ebene 57 „Zhu“ (stehender Zhu, 100 % in Szene 55 „Sichtbar #12“).
                             Ebene 37 „Ebene #41“ (Wächterhof: Mauer mit Gittertor, Pflaster; Ausschnitt
                             x 121–184, y 3–91, ohne den „FPS“-Schriftzug).
-  MotiveDeepsea.xcf         Ebene 196 „Deepsea Treasure“ (nur die Goldpixel, ohne Truhe) – hinter den Gitterstäben.
+  MotiveDeepsea.xcf         Ebene 196 „Deepsea Treasure“ (nur der Goldüberlauf unten links, 16×10) – als Goldhaufen hinter den Gitterstäben.
 Selbst gezeichnet: Nachtabdunkelung mit warmem Torschein (geordnetes Dithering), Schatten der Figuren.
 Skalierung: alles 4× (Raster 63×88) – Hof, Tor, Schatz, Zhu und Mao im selben Spielmaßstab.
 """
@@ -38,11 +38,13 @@ court[..., 3] = 255
 GX0, GX1, GY0, GY1 = 144 - X0, 160 - X0, 15 - Y0, 48 - Y0      # Gittertor (Raster)
 WALL_B = 47 - Y0                                                # Mauerfuß
 
-# Schatz hinter dem Gitter: nur die schwarzen Innenflächen des Tores, unterer Teil
+# Schatz hinter dem Gitter: Goldhaufen (unterer linker Goldüberlauf der Schatztruhe, 16×10) liegt am Boden
 tre = crop_alpha(layer(BD, 196))
-th, tw = tre.shape[:2]
-tx = (GX0 + GX1) // 2 - tw // 2
-ty = GY1 - th + 1                        # Goldhaufen liegt auf dem Boden hinter dem Gitter
+heap = tre[24:34, 1:17].copy()
+hc = heap[..., :3].astype(int)
+heap[..., 3] = np.where((heap[..., 3] > 0) & (hc[..., 0] > 140) & (hc[..., 2] < 120), 255, 0)
+hh, hw = heap.shape[:2]
+tx, ty = GX0, GY1 - hh
 inner = np.zeros((GH, GW), bool)
 for y in range(GY0, GY1):
     for x in range(GX0, GX1):
@@ -52,9 +54,8 @@ for y in range(GH):
     for x in range(GW):
         if inner[y, x]:
             sy, sx = y - ty, x - tx
-            c = tre[sy, sx] if (0 <= sy < th and 0 <= sx < tw) else None
-            if c is not None and c[3] > 0 and int(c[0]) > 140 and int(c[2]) < 120:   # nur Gold, ohne Truhe
-                court[y, x, :3] = c[:3]
+            if 0 <= sy < hh and 0 <= sx < hw and heap[sy, sx, 3] > 0:
+                court[y, x, :3] = heap[sy, sx, :3]
             else:
                 court[y, x, :3] = (4, 3, 8)
 
