@@ -1,6 +1,23 @@
 # -*- coding: utf-8 -*-
 """01 Searing Grace – Gegner „Heal Burn“, Held: Nao, the Barrier Priestess (Base-Version).
-(Docstring wird nach Fertigstellung ergänzt.)
+Heiliges Feuer statt Heilung: Nao steht groß im weißen Kern ihres Barrierenscheins, hinter ihr breiten sich
+die Feuerflügel ihrer eigenen Kartenszene aus (Heal Burn: jede Heilung wird zu Schaden). Hintergrund ist der goldene
+Tempel („Schatzgrotte“) ihrer Karte mit den zwei rankenbewachsenen Steinmasken und der Stachelreihe am Wandfuß.
+Unten steigen grüne Heilkreuze auf, die sich nach oben zur Flamme hin gelb und orange verfärben.
+
+Quellen (Motive.xcf):
+  Ebene 477 „NAO-Kopie“, Ausschnitt x285–335/y190–262: Base-Nao mit goldenem Stab (31×24). Gegen Sichtbar #42
+      (Ebene 99, Kartenbild „Nao, the Barrier Priestess“, Lage 278,193) geprüft: Kopf/Oberkörper pixelgleich,
+      Unterkörper und Dreizackspitze sind im Kartenbild vom Glühen überdeckt (daher nur ~55 % exakt).
+  Ebenen 475 + 476 „Ebene #34/#33“: Feuerflügel der Kartenszene (nur die große Flamme um Nao, abgelöster Funke entfernt).
+  Ebene 471 „Ebene #538“ (weißer Barrierenschein) als Vorbild für den selbst gezeichneten Kernschein.
+  Ebene 1080 „Schatzgrotte-Kopie“: Ziegelwand-, Flechtboden- und Stachelreihen-Kacheln, Steinmasken mit Ranken
+      (per Farbregel aus der Wand gelöst).
+Selbst gezeichnet: Kernschein (gedithert), Heilkreuze, Abdunklung, Bodenschatten.
+
+Skalierung (Ausgabe = 250×350-Raster × 3):
+  Tempelwand, Boden, Masken, Feuerflügel, Schein, Heilkreuze, Schatten – 2× (125×175)
+  Nao                                                               – 5× (50×70)
 """
 import math, random
 from a_util import *  # noqa
@@ -112,4 +129,4 @@ NY = 58 - nao.shape[0]
 put(p5, nao, NX, NY)
 blit(cv, p5, 5, 0, 0)
 print(save(cv, '01_searing_grace.png'))
-print(preview('01_searing_grace.png', 'ornate', 'gold', 'ruby'))
+print(preview('01_searing_grace.png', 'ornate', 'gold', 'ruby', 'topaz'))

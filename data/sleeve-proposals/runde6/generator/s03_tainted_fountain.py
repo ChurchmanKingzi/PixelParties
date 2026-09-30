@@ -1,6 +1,23 @@
 # -*- coding: utf-8 -*-
 """03 Tainted Fountain – Gegner „Venom Swamp“, Held: Zsos'Ssar, the Serpent Warlord (Base-Version).
-(Docstring wird nach Fertigstellung ergänzt.)
+Poisoned Well: Nachts auf dem Dorfplatz von Deri steht Zsos'Ssar mit Hellebarde vor dem Brunnenbecken. Sein
+Schlangengewimmel gleitet links über den Beckenrand ins Wasser – von dort aus färbt sich das Becken violett (die
+vergiftete Fassung der Karte), hinten rechts ist es noch blau. Giftdunst liegt über dem Wasser, violetter Schein
+auf dem Pflaster, der Rest des Platzes versinkt im Dunkel.
+
+Quellen:
+  Motive.xcf Ebene 521 „Snecko“ = Base-Zsos'Ssar mit Hellebarde und Blütenkrone (23×35), in Sichtbar #148
+      (Ebene 405, Kartenbild „Zsos'Ssar, the Serpent Warlord“, Lage 333,224) zu 100 % pixelgleich.
+  Motive.xcf Ebene 515 „Ebene #512“: das Schlangengewimmel derselben Kartenszene (leicht abgedunkelt).
+  MotiveDeri.xcf Ebene 178 „Stadt“ (Dorfplatz mit Brunnen) und Ebene 179 „Ebene #40“ (dieselbe Stadt mit violettem
+      Giftwasser = Kartenbild „Poisoned Well“, Sichtbar #14 Lage 220,203), Ausschnitt x202–327/y223–398.
+      Die eingebackenen Figuren der Szene wurden mit Pflaster aus 32/48 px versetzten Zeilen übermalt
+      (Pflaster hat senkrecht Periode 16).
+Selbst gezeichnet: Giftgrenze (gedithert), Nachtfärbung, Giftschein, Dunstschwaden, Vignette, Schatten.
+
+Skalierung:
+  Dorfplatz, Becken, Schlangen, Dunst, Schein, Schatten – 2× (125×175)
+  Zsos'Ssar                                            – 5× (50×70)
 """
 import math, random
 from a_util import *  # noqa
@@ -54,18 +71,18 @@ for y in range(PY0, PY1):
 water_p = (np.abs(p2[..., :3].astype(int) - pois[..., :3].astype(int)).max(-1) == 0) & \
           (np.abs(clean[..., :3].astype(int) - pois[..., :3].astype(int)).max(-1) > 20)
 water_p[:PY0] = False; water_p[PY1:] = False; water_p[:, :PX0] = False; water_p[:, PX1:] = False
-NIGHT = np.array([0.40, 0.44, 0.66])
+NIGHT = np.array([0.48, 0.50, 0.70])
 out = (p2[..., :3] * NIGHT).astype(np.uint8)
-out[water_p] = (p2[..., :3][water_p] * np.array([0.95, 0.85, 1.0])).astype(np.uint8)
+out[water_p] = np.clip(p2[..., :3][water_p] * np.array([1.12, 0.95, 1.12]), 0, 255).astype(np.uint8)
 p2[..., :3] = out
 # violetter Giftschein auf dem Pflaster rund ums vergiftete Becken (gedithert)
 for y in range(H2):
     for x in range(W2):
-        if water_p[y, x]: continue
+        if water_p[y, x] or (PX0 + 3 <= x < PX1 - 3 and PY0 + 3 <= y < PY1 - 4): continue
         d = math.hypot(x - 45, (y - 58) * 1.1)
-        t = max(0, 1 - d / 62)
-        if t > 0 and t * 1.3 > bayer(x, y) + 0.15:
-            p2[y, x, :3] = mix(p2[y, x, :3], (120, 60, 170), 0.3)
+        t = max(0, 1 - d / 75)
+        if t > 0 and t * 1.5 > bayer(x, y) + 0.1:
+            p2[y, x, :3] = mix(p2[y, x, :3], (140, 70, 190), 0.3 if t < 0.5 else 0.42)
 put(p2, darken(swarm, 0.85), SNX, SNY)
 # Giftdunst: flache, halbtransparente Schwaden über dem violetten Wasser (selbst gezeichnet, 2×, gedithert)
 for (cx, cy, rx, ry) in [(44, 40, 16, 4), (62, 26, 12, 3), (36, 18, 10, 3), (56, 56, 14, 3)]:

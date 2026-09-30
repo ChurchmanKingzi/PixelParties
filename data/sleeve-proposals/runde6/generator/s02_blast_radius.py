@@ -1,6 +1,20 @@
 # -*- coding: utf-8 -*-
 """02 Blast Radius – Gegner „Suicide Bombers“, Held: Bomb Berserker Bartas (Base-Version).
-(Docstring wird nach Fertigstellung ergänzt.)
+Bartas steht mit verschränkten Armen unbeeindruckt vorn auf dem Lavastein, während hinter ihm eine gewaltige
+Explosion aufblüht (Suicide Bombers: die Helden sprengen sich selbst mit in die Luft). Am Horizont glüht ein
+Lavaband, eine flache Druckwelle läuft über den Boden, Splitter fliegen; das Gegenlicht wirft seinen Schatten lang
+nach vorn.
+
+Quellen (Motive.xcf):
+  Ebene 1476 „Bartas“: Base-Bartas (14×25), in Sichtbar #267 (Ebene 129, Kartenbild „Bomb Berserker Bartas“,
+      Lage 278,78) zu 100 % pixelgleich sichtbar. (Nicht verwendet: 1474 „Bartas skin“.)
+  Ebene 1481 „Explosion“ (69×84), nach Helligkeit in eine Glutpalette umgefärbt.
+  Ebene 1477 „Bartas #2“ (Lavastein-Kachel, Splitter), Ebene 1475 „Bartas #6“ (Lavakachel) – beide aus Bartas' Kartenszene.
+Selbst gezeichnet: Himmelverlauf, Glutschein, Druckwelle, Schatten (gespiegelte Silhouette, halbtransparent).
+
+Skalierung:
+  Himmel, Explosion, Boden, Lavaband, Druckwelle, Splitter – 3× (84×117)
+  Bartas und sein Schatten                                – 6× (42×59)
 """
 import math, random
 from a_util import *  # noqa

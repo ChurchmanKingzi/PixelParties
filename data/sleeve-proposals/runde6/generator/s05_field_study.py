@@ -1,12 +1,33 @@
 # -*- coding: utf-8 -*-
 """05 Field Study – Gegner „Big Stomp!“, Held: Kit, the Shark Researcher (Base-Version).
-(Docstring wird nach Fertigstellung ergänzt.)
+Big Stomp!: Kit, der Hai-Forscher, steht auf einer Lichtung der Gigantisaurier-Insel; hinter ihm stapft der
+riesige Brachion durch den Wald, dessen Trittsiegel quer über die Lichtung führen – Kit ist ihm auf der Spur.
+Wald und Dinosaurier im Stil der Gigantisaurier-Karten (Draufsicht-Karte mit Kreaturen darauf).
+
+Quellen:
+  MotiveDeepsea.xcf Ebene 38 „Ebene #49“ (Hut) + 39 „Kit-Kopie“ (= Kartenbild „Kit, the Shark Researcher“,
+      Sichtbar #37 Lage 305,192, sitzend hinter einem Stuhl, offener Mund); ab der Hüfte die stehenden Beine aus
+      Ebene 40 „Kit“ (im Kartenbild vom Stuhl verdeckt).
+  MotiveGrailWar.xcf Ebene 503 „Brachion“ (69×53), in Sichtbar #61 (Kartenbild „Gigantisaur Brachion“) zu 100 % gleich.
+  MotiveGrailWar.xcf Ebene 515 „Ebene #153“: Inselkarte der Gigantisaurier-Karten, Ausschnitt x60–144/y262–379
+      (Wald leicht abgedunkelt).
+Selbst gezeichnet: Trittsiegel, Schatten.
+
+Skalierung:
+  Insel, Brachion, Trittsiegel, Schatten – 3× (84×117)
+  Kit                                    – 5× (50×70)
 """
 import math, random
 from a_util import *  # noqa
 import numpy as np
 
-kit_ = sprite('o05_kit', 'MotiveDeepsea', [38, 40])           # Base-Kit: Hut (38) + Kit (40), = Sichtbar #37
+# Base-Kit: Hut (38) + „Kit-Kopie“ (39, sitzend, = Kartenbild Sichtbar #37 inkl. offenem Mund) – für den
+# stehenden Kit werden ab der Hüfte (Zeile 18 des Ausschnitts) die Beine aus „Kit“ (40, stehend) genommen;
+# im Kartenbild verdeckt der Stuhl diese Zeilen.
+_k39 = compose('MotiveDeepsea', [38, 39], crop=False)[205:233, 322:347]
+_k40 = compose('MotiveDeepsea', [38, 40], crop=False)[205:233, 322:347]
+_kit = _k39.copy(); _kit[18:] = _k40[18:]
+kit_ = trimmed(_kit)
 brach = sprite('o05_brachion', 'MotiveGrailWar', [503])       # Gigantisaur Brachion (69×53), = Sichtbar #61
 isle = compose('MotiveGrailWar', [515], crop=False)           # Insel-Karte der Gigantisaurier-Karten
 
@@ -49,4 +70,4 @@ KX, KY = (W5 - kit_.shape[1]) // 2 - 6, 61 - kit_.shape[0]
 put(p5, kit_, KX, KY)
 blit(cv, p5, 5, 0, 0)
 print(save(cv, '05_field_study.png'))
-print(preview('05_field_study.png', 'wave', 'wood', 'emerald'))
+print(preview('05_field_study.png', 'wave', 'wood', 'amber'))

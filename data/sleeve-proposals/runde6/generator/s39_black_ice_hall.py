@@ -42,7 +42,7 @@ for y in range(26, 90):
     row = [orig[y, xx] for xx in list(range(39, 43)) + list(range(83, 87))
            if orig[y, xx, 2] >= orig[y, xx, 0] and int(orig[y, xx, :3].astype(int).sum()) < 200]
     for x in range(42, 84):
-        if y < FLOOR_TOP: room[y, x] = orig[y, x - 32]
+        if y < FLOOR_TOP + 2: room[y, x] = orig[y, 104 + (x - 104) % 16]      # Mauer + Sockelleiste
         else: room[y, x] = row[rnd.randrange(len(row))] if row else pool[rnd.randrange(len(pool))]
 # Leuchter-Anschnitte am unteren Rand entfernen (ruhiger Vordergrund)
 LOW = 119                            # Unterkante der Stufe – darunter der vordere Boden, ganz neu aus Bodenpixeln

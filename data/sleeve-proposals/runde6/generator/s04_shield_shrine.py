@@ -1,6 +1,20 @@
 # -*- coding: utf-8 -*-
 """04 Shield Shrine – Gegner „Bamboo Warrior“, Held: Xiong, the Bamboo Guardian (Base-Version).
-(Docstring wird nach Fertigstellung ergänzt.)
+Xiong hält Ehrenwache in der Palasthalle der Bamboo-Shield-Karte: hinter ihm hängt zwischen den roten Vorhängen
+und vor den Drachenreliefs sein Bamboo Shield im Lichtschein (Bamboo Warrior: Schild und Karten kehren aus dem
+Ablagestapel zurück, Xiong holt sie sich nach jedem Sieg), vorn der braune Ziegelboden.
+
+Quellen (MotiveChina.xcf):
+  Ebene 5 „Xiong“: Base-Xiong mit quer gehaltenem Bambusstab (35×27), in Sichtbar #4 (Ebene 4, Kartenbild
+      „Xiong, the Bamboo Guardian“, Lage 411,349) zu 100 % pixelgleich. (Nicht verwendet: 11 „Bamboo Statt #1“,
+      andere Pose der Bamboo-Staff-Karte.)
+  Ebene 3 „Bamboo Shield #1“ (rote Vorhänge), 16 „Bamboo Shield“, 24 „Palace #4“ (Drachenreliefs),
+      26 „Palace #3“ (Ziegel) – alle aus Sichtbar #5 (Kartenbild „Bamboo Shield“, Lage 316,243).
+Selbst gezeichnet: Wandfüllung hinter den Reliefs, Lichtschein, Abdunklung/Vignette, Fußleiste, Schatten.
+
+Skalierung:
+  Halle (Reliefs, Vorhänge, Schild, Boden, Schatten) – 3× (84×117)
+  Xiong                                             – 5× (50×70)
 """
 import math, random
 from a_util import *  # noqa
@@ -10,7 +24,6 @@ B = 'MotiveChina'
 xiong = sprite('o04_xiong', B, [5])                          # Base-Xiong mit Bambusstab (35×27), = Sichtbar #4
 curt = sprite('o04_curtains', B, [3])                        # rote Vorhänge der Bamboo-Shield-Karte (84×53)
 shield = sprite('o04_shield', B, [16])                       # Bamboo Shield (20×25)
-throne = sprite('o04_throne', B, [15])                       # steinerner Thron „Palace“ (34×34)
 relief = compose(B, [24], crop=False)                        # Drachenrelief-Paneele „Palace #4“
 bricks = sprite('o04_bricks', B, [26])                       # braune Ziegel „Palace #3“
 
@@ -36,7 +49,6 @@ for y in range(FLOOR, H3):
 # Schatten der Wand auf den Boden (Fußleiste)
 for x in range(W3):
     p3[FLOOR, x, :3] = (40, 22, 14)
-# Thron, darüber der Bamboo Shield, oben die Vorhänge (wie im Kartenbild)
 # Wand und Boden abdunkeln (Schild, Vorhänge und Xiong sollen leuchten)
 p3[:FLOOR, :, :3] = (p3[:FLOOR, :, :3] * 0.58).astype(np.uint8)
 for y in range(FLOOR, H3):
@@ -57,6 +69,8 @@ for y in range(H3):
         t = max(0, d - 0.5) / 0.6 * 3
         k = int(t) + (1 if t - int(t) > bayer(x, y) else 0)
         if k: p3[y, x, :3] = (p3[y, x, :3] * (1 - 0.16 * min(k, 3))).astype(np.uint8)
+# Bodenschatten unter Xiong (Füße bei 250er-y 305 → 3×-Reihe 102)
+shadow_ellipse(p3, 42.3, 101.8, 15, 2.2, a=0.5)
 cv = Canvas(250, 350)
 blit(cv, p3, 3, -1, 0)
 
@@ -64,8 +78,6 @@ blit(cv, p3, 3, -1, 0)
 W5, H5 = 50, 70
 p5 = rgba(W5, H5)
 XX, XY = (W5 - xiong.shape[1]) // 2, 61 - xiong.shape[0]
-s5 = rgba(W5, H5)
-shadow_ellipse(s5, W5 / 2, 61, 10, 1.6, a=1.0)
 put(p5, xiong, XX, XY)
 blit(cv, p5, 5, 0, 0)
 print(save(cv, '04_shield_shrine.png'))
