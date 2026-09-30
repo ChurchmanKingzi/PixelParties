@@ -2587,7 +2587,6 @@ function MusicManager({ bgmMode }) {
 //  display one after another.
 // ═══════════════════════════════════════════
 function OpponentUnlockPopup() {
-  const { notify } = useContext(AppContext);
   const [queue, setQueue] = useState([]);
 
   useEffect(() => {
@@ -2596,13 +2595,8 @@ function OpponentUnlockPopup() {
       if (list.length) setQueue(q => [...q, ...list]);
     };
     socket.on('opponents_unlocked', onUnlocked);
-    // Zehnter Sieg gegen eine CPU: ihr Battle-Track ist jetzt wählbar.
-    const onTrack = (data) => {
-      if (data && data.name && notify) notify('New battle track unlocked: ' + data.name + "'s Theme! Pick it under Profile → Battle Music.", 'success');
-    };
-    socket.on('battle_track_unlocked', onTrack);
-    return () => { socket.off('opponents_unlocked', onUnlocked); socket.off('battle_track_unlocked', onTrack); };
-  }, [notify]);
+    return () => socket.off('opponents_unlocked', onUnlocked);
+  }, []);
 
   const current = queue.length ? queue[0] : null;
   const dismiss = useCallback(() => setQueue(q => q.slice(1)), []);
