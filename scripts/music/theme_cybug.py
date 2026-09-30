@@ -74,7 +74,7 @@ def bassline(b, ch, vel=100, sparse=False):
         song.add('bass', s + st * .25, .22, r, vel + (10 if st == 0 else 0))
     if not sparse:
         for st in (2, 10): song.add('bass', s + st * .25, .2, r + 12, vel - 18)
-        song.add('bass', s + 13 * .25, .2, r + 7 if ch not in ('Ebm',) else r + 7, vel - 26)
+        song.add('bass', s + 13 * .25, .2, r + 7, vel - 26)
 def sub(b, ch, vel=84):
     for off in (0, 2): song.add('sub', song.bar(b) + off, 1.9, bassroot(ch), vel)
 def seqr(b, ch, vel, pat=0, lo=60, hi=79):
@@ -115,7 +115,7 @@ def drums(b, kind, v=1.0):
         for off in (.75, 1.75, 2.75, 3.5): d(off, KICK, 96)
         d(1, CLAP, 116); d(3, CLAP, 118); d(1, SNARE, 108); d(3, SNARE, 112)
         for i in range(16): d(i * .25, HAT, 122 if i % 4 == 2 else 100 if i % 2 == 0 else 84)
-        for i in range(8): d(i * .5 + .5 if i < 8 else 0, COWBELL, 94) if i < 4 else None
+        for off in (.5, 1.5, 2.5, 3.5): d(off, COWBELL, 94)
         d(2.5, TOM_L, 92); d(3.25, TOM_M, 94)
     elif kind == 'beat':                   # Herzschlag im Break
         d(0, KICK, 108); d(1.5, KICK, 92); d(2, KICK, 104); d(3.5, SIDESTICK, 96)
@@ -228,7 +228,6 @@ for i, ch in enumerate(CH_E):
     seqr(b, ch, 70 + i * 3, pat=2, lo=60, hi=79); pad(b, ch, 60 + i * 3); trill(b, ch, 52 + i * 5, lo=76, hi=90)
     if i % 2 == 0: line(b, motif(ch, 'hold'), ['lead'], [92 + i * 2])
     if i in (3, 5): fill(b)
-line(71, [(0,.25,'Gb5'),(.25,.25,'Bb5'),(.5,.25,'Db6'),(.75,.25,'Gb6'),(1,1,'Bb6'),(2,1.6,'Db6')], ['lead'], [108]) if False else None
 line(71, [(0,.25,'Gb5'),(.25,.25,'Bb5'),(.5,.25,'Db6'),(.75,.25,'Gb6'),(1,1,'Db6'),(2,1.6,'Bb5')], ['lead', 'lead2'], [108, 84])
 fill(71, big=True)
 

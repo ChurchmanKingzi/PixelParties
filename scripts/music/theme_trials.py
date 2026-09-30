@@ -12,7 +12,7 @@ Aufbau (Takte, 0-basiert):
   12–19  Loyalty         Es-Dur: Chor-Hymne, Streicher, Harfe (Treue, Gefolgschaft)
   20–27  Knowledge       Cembalo + Klarinette/Oboe im Kanon (Stufenläufe), Orgel, Holzblock-Sechzehntel
   28–35  Annoyance       Spöttisches „Nänä-nänä“ (Piccolo/Klarinette/Xylophon), Fagott-Oom-Pah, Kuhglocke
-  36–43  Coolness        Gedämpfte Trompete + Saxophon, gehender Kontrabass, Vibraphon, lässiger Backbeat
+  36–43  Coolness        Saxophon (ab Takt 40 mit Trompete), gehender Akustikbass, Harfen-Comping, lässiger Backbeat
   44–55  The Final Trial Tutti: Trompeten/Blech/Chor/Orgel, Pauken-Wirbel, Motiv + Hymne + Spott kombiniert
   56–59  Rückführung     Ruf-Motiv in den Hörnern, Dominante Bb → Sprung auf Takt 0
 
@@ -36,10 +36,9 @@ song.inst('harpsi',  'harpsichord', 88, 76)
 song.inst('horns',   'horns',    92, 40)
 song.inst('trombone','trombone', 90, 78)
 song.inst('trumpet', 'trumpet',  90, 72)
-song.inst('brass',   'brass',    82, 54)
 song.inst('choir',   'choir',    86, 64)
 song.inst('winds',   'clarinet', 90, 34)    # Kanon / Spott / Bassoon-Ersatz je nach Abschnitt
-song.inst('cool',    'sax',      92, 82)    # Coolness-Lead (dazu gedämpfte Trompete über 'muted')
+song.inst('cool',    'sax',      92, 82)    # Coolness-Lead
 song.inst('hit',     'hit',      98, 64)
 
 NAMES = {'C': C, 'D': D, 'Eb': Eb, 'E': E, 'F': F, 'G': G, 'Ab': Ab, 'A': A, 'Bb': Bb, 'B': B, 'Db': Db, 'Gb': Gb}
@@ -255,16 +254,15 @@ fill(31); fill(35, big=True)
 
 # ---- Coolness 36–43 ---------------------------------------------------------------------------------
 hit(36, 0, 'Cm', 100, 0.6); crash(36, 96)
-song.inst('muted', 'muted', 86, 46); song.inst('vibes', 'vibes', 80, 90)
 for i in range(8):
     b, ch = 36 + i, CH_5[i]; s = song.bar(b)
     r, t = rootb(ch), tri(ch, 2)
     for k, p in enumerate((r, r + CH[ch][1], r + 7, r + CH[ch][1])): song.add('acbass', s + k, 0.9, p, 98)
     song.add('contra', s, 3.9, rootc(ch), 76)
     timp(b, ch, 'q', 74); groove(b, 'cool', 1.0)
-    for off in (0.5, 2.5): song.add('vibes', s + off, 0.9, tri(ch, 4)[1], 82); song.add('vibes', s + off, 0.9, tri(ch, 4)[2], 78)
+    for off in (0.5, 2.5): song.add('harp', s + off, 0.9, tri(ch, 4)[1], 84); song.add('harp', s + off, 0.9, tri(ch, 4)[2], 80)
     line(b, MEL_5[i], ['cool'], [96])
-    if i >= 4: line(b, MEL_5[i], ['muted'], [80])
+    if i >= 4: line(b, MEL_5[i], ['trumpet'], [70], shift=0)
     sustain(b, ch, 'strings', 56, 3)
 fill(39); fill(43, big=True)
 
@@ -274,7 +272,7 @@ for i in range(12):
     b = 44 + i
     ch, mel = (CH_6[i], MEL_6[i]) if i < 8 else (CH_6B[i - 8], MEL_6B[i - 8])
     pedal(b, ch, 104); march_bass(b, ch, 100); timp(b, ch, 'gallop', 104); groove(b, 'final', 1.0)
-    line(b, mel, ['trumpet', 'brass', 'horns'], [100, 88, 86]); line(b, mel, ['trombone'], [90], shift=-24)
+    line(b, mel, ['trumpet', 'horns'], [100, 88]); line(b, mel, ['trombone'], [90], shift=-24)
     sustain(b, ch, 'choir', 92, 4); sustain(b, ch, 'organ', 76, 3); strum_march(b, ch, 74)
     if i >= 8: harp_arp(b, ch, 84)
     if i in (0, 4, 8): crash(b, 108)

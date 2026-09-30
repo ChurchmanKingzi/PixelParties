@@ -79,11 +79,9 @@ def riff(b, ch, inst='sitar', vel=80, octv=4, dens=1):
 
 def run(b, ch, inst, vel, octv=5, up=True):
     """Marktgewusel: 16tel-Lauf durch die Skala (steigend/fallend)."""
-    s = song.bar(b); r = CH[ch][0]
-    sc = sorted([(12 * octv + 12 + ((r + x) % 12) if False else 0) for x in ()]) or []
-    steps = [0, 1, 4, 5, 6, 7, 10, 11]           # Halbtöne über A (A Bb C# D E F G# A')
+    s = song.bar(b)
     base = n(A, octv)
-    seq = [base + x if x < 12 else base + 12 for x in [0, 1, 4, 5, 7, 8, 11, 12]]
+    seq = [base + x for x in (0, 1, 4, 5, 7, 8, 11, 12)]           # A B♭ C♯ D E F G♯ A'
     if not up: seq = seq[::-1]
     for i in range(8): song.add(inst, s + 2 + i * 0.25, 0.24, seq[i], vel + i)
 

@@ -56,13 +56,13 @@ def mel(inst, bar, notes, vel=90, shift=0):
 def dr(beat, note, vel, dur=.2): song.dr(S(beat), note, min(127, vel), dur)
 
 # ---- Akkorde --------------------------------------------------------------------------
-CH = {'Em': (E, (0, 3, 7)), 'D': (D, (0, 4, 7)), 'A': (A, (0, 4, 7)), 'G': (G, (0, 4, 7)), 'C': (C, (0, 4, 7)), 'Bm': (B, (0, 3, 7))}
+CH = {'Em': (E, (0, 3, 7)), 'D': (D, (0, 4, 7)), 'A': (A, (0, 4, 7)), 'G': (G, (0, 4, 7)), 'Bm': (B, (0, 3, 7))}
 INTRO = ['Em'] * 4 + ['Em', 'Em', 'D', 'A']
 AP = ['Em', 'Em', 'D', 'D', 'Em', 'A', 'D', 'Em']
 BP1 = ['G', 'D', 'Em', 'A', 'G', 'D', 'A', 'A']
 BP2 = ['G', 'D', 'Em', 'A', 'G', 'A', 'Bm', 'Bm']
-CP1 = ['Em', 'C', 'D', 'Em', 'Em', 'C', 'D', 'A']
-CP2 = ['Em', 'C', 'D', 'Em', 'G', 'D', 'A', 'A']
+CP1 = ['Em', 'G', 'D', 'Em', 'Em', 'G', 'D', 'A']
+CP2 = ['Em', 'G', 'D', 'Em', 'G', 'D', 'A', 'A']
 DP = ['Em', 'Em', 'Em', 'Em', 'D', 'D', 'A', 'A']
 PROG = INTRO + AP + AP + BP1 + BP2 + CP1 + CP2 + DP
 assert len(PROG) == BARS
@@ -79,7 +79,6 @@ def oompah(b, vel=98, walk=False):
     s = song.bar(b); r = root(b, 2)
     if r > n(G, 2): r -= 12
     put('tuba', s, .9, r, vel); put('tuba', s + 2, .9, r + 7, vel - 8)
-    put('tuba', s + 1, .4, r + 12 if False else r, vel - 22) if False else None
     if walk: put('tuba', s + 3.5, .4, r + 7, vel - 12)
 
 def chops(b, vel=80):
@@ -144,7 +143,7 @@ def stab(b, beat, vel=104, dur=.7, inst=('brass', 'tpt')):
         for p in t: put(nm, song.bar(b) + beat, dur, p + (12 if nm == 'tpt' else 0), vel)
 
 def anvil(b, beat=3, vel=86):
-    p = n(E, 4) if PROG[b] in ('Em', 'C', 'G') else n(D, 4) if PROG[b] == 'D' else n(A, 4)
+    p = n(E, 4) if PROG[b] in ('Em', 'G') else n(D, 4) if PROG[b] == 'D' else n(A, 4)
     put('bell', song.bar(b) + beat, 1.0, p if p % 12 in SCALE else n(E, 4), vel)
 
 def pedal_pipes(b, vel=70, octv=3):
@@ -171,10 +170,6 @@ BM1 = [[(0, 1, 'B4'), (1, 1, 'D5'), (2, 1.5, 'G5'), (3.5, .5, 'F#5')],
        [(0, 1, 'A5'), (1, 1, 'F#5'), (2, 2, 'D5')],
        [(0, .5, 'E5'), (.5, .5, 'F#5'), (1, .5, 'G5'), (1.5, .5, 'A5'), (2, 2, 'A5')],
        [(0, 2, 'C#5'), (2, 2, 'E5')]]
-BM2 = BM1[:5] + [[(0, 1, 'E5'), (1, 1, 'A5'), (2, 2, 'C#6')],
-                 [(0, 1, 'D5'), (1, 1, 'F#5'), (2, 1, 'B5'), (3, 1, 'A5')],
-                 [(0, 2, 'F#5'), (2, 1, 'D5'), (3, 1, 'F#5')]]
-BM2[5:8] = [BM2[5], BM2[6], BM2[7]]
 BM2 = [BM1[0], BM1[1], BM1[2], BM1[3], BM1[4], [(0, 1, 'E5'), (1, 1, 'A5'), (2, 2, 'C#6')],
        [(0, 1, 'D5'), (1, 1, 'F#5'), (2, 1, 'B5'), (3, 1, 'A5')], [(0, 2, 'F#5'), (2, 1, 'D5'), (3, 1, 'F#5')]]
 HYA = [[(0, 1.5, 'E5'), (1.5, .5, 'G5'), (2, 2, 'B5')],
@@ -192,7 +187,7 @@ HYB = HYA[:4] + [[(0, 1, 'D5'), (1, 1, 'G5'), (2, 1, 'B5'), (3, 1, 'D6')],
 # Gegenstimme Posaune (tief, Terzen/Quinten unter der Melodie) — Hauptnoten
 def tbn_line(b, vel=84):
     t = tones(b, 3); s = song.bar(b)
-    for off, p in ((0, t[0]), (1.5, t[2]), (2, t[1] if False else t[0]), (3.5, t[2])): put('tbn', s + off, .9 if off != 1.5 else .4, p + 12 if p < n(E, 3) else p, vel)
+    for off, p in ((0, t[0]), (1.5, t[2]), (2, t[0]), (3.5, t[2])): put('tbn', s + off, .9 if off != 1.5 else .4, p + 12 if p < n(E, 3) else p, vel)
 
 # ============================ KOMPOSITION ============================================
 # ---- Intro 0–7 ----
@@ -215,7 +210,7 @@ for k, base in enumerate((8, 16)):
     crash(base, 108)
     for j in range(8):
         mel('acc', base + j, T[j], 96)
-        if k == 1: mel('harm', base + j, T[j], 80, 12 if False else 0); mel('tpt', base + j, T[j], 70, -12 if False else 0)
+        if k == 1: mel('harm', base + j, T[j], 80, 0); mel('tpt', base + j, T[j], 70, -0)
     if k == 1:
         put('whistle', song.bar(base + 3) + 3, .9, nt('B5'), 86)
         for b in (base, base + 4): organ(b, 62)
@@ -251,7 +246,7 @@ for k, (base, hy) in enumerate(((40, HYA), (48, HYB))):
     for b in (base, base + 4): stab(b, 0, 108, 1.3)
     for b in (base + 2, base + 6): stab(b, 2, 100, .7)
     put('whistle', song.bar(base + 3) + 3, .9, nt('B5'), 90)
-    put('whistle', song.bar(base + 7) + 2, 1.9, nt('E6') if False else nt('B5'), 88)
+    put('whistle', song.bar(base + 7) + 2, 1.9, nt('B5'), 88)
     fill(base + 3, 88, 118); fill(base + 7, 100, 127)
 
 # ---- Überdruck D 56–63 ----
