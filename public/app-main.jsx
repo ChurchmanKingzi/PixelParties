@@ -2284,7 +2284,7 @@ function _bgmResolveTrack(target) {
     }
     return el;
   }
-  const m = /^battle:([a-z0-9]+)$/.exec(String(target || ''));
+  const m = /^battle:([a-z0-9_]+)$/.exec(String(target || ''));
   if (!m) return null;
   return _bgmBattleSrc('/music/bgm_' + m[1] + '.ogg');
 }

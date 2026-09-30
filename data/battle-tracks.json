@@ -1,0 +1,253 @@
+{
+  "generic": {
+    "battle4": "Heroic Charge",
+    "battle5": "Dark Cathedral",
+    "battle6": "Cyber Chase",
+    "battle7": "Arena Rock",
+    "battle8": "Mystic Grove",
+    "battle9": "Epic Finale",
+    "battle10": "Trickster's Game"
+  },
+  "themes": [
+    {
+      "id": "theme_futuretech",
+      "name": "Prototype Protocol",
+      "archetype": "Future Tech"
+    },
+    {
+      "id": "theme_deepsea",
+      "name": "Lullaby of the Abyss",
+      "archetype": "Deepsea"
+    },
+    {
+      "id": "theme_pollution",
+      "name": "Acid Rain Requiem",
+      "archetype": "Pollution"
+    },
+    {
+      "id": "theme_cute",
+      "name": "Sugar Rush Showdown",
+      "archetype": "Cute"
+    },
+    {
+      "id": "theme_cool",
+      "name": "Too Cool to Lose",
+      "archetype": "Cool"
+    },
+    {
+      "id": "theme_skeletons",
+      "name": "Dance of Dry Bones",
+      "archetype": "Skeletons"
+    },
+    {
+      "id": "theme_chess",
+      "name": "Checkmate Gambit",
+      "archetype": "Chess"
+    },
+    {
+      "id": "theme_guardianbeasts",
+      "name": "Temple Guardians' Oath",
+      "archetype": "Guardian Beasts"
+    },
+    {
+      "id": "theme_mischiefmilitia",
+      "name": "Frostbite Foolery",
+      "archetype": "Mischief Militia"
+    },
+    {
+      "id": "theme_spiders",
+      "name": "The Weaver's Web",
+      "archetype": "Spiders"
+    },
+    {
+      "id": "theme_slimes",
+      "name": "Gelatinous Groove",
+      "archetype": "Slimes"
+    },
+    {
+      "id": "theme_idej",
+      "name": "Way of the Blade",
+      "archetype": "Idej"
+    },
+    {
+      "id": "theme_crystals",
+      "name": "Shards of Radiance",
+      "archetype": "Crystals"
+    },
+    {
+      "id": "theme_dreamlanders",
+      "name": "Lucid Collision",
+      "archetype": "Dream Landers"
+    },
+    {
+      "id": "theme_rebelliokai",
+      "name": "Yokai Uprising",
+      "archetype": "Rebelliokai"
+    },
+    {
+      "id": "theme_gigantisaurs",
+      "name": "Stampede of Giants",
+      "archetype": "Gigantisaurs"
+    },
+    {
+      "id": "theme_cosmicdepths",
+      "name": "Whispers Beyond the Void",
+      "archetype": "Cosmic Depths"
+    },
+    {
+      "id": "theme_arrows",
+      "name": "The Archer's Journey",
+      "archetype": "Arrows"
+    },
+    {
+      "id": "theme_harpyformers",
+      "name": "Harpy Jam Session",
+      "archetype": "Harpyformers"
+    },
+    {
+      "id": "theme_hellcircles",
+      "name": "Descent Through Nine Circles",
+      "archetype": "Hell Circles"
+    },
+    {
+      "id": "theme_loyals",
+      "name": "Faithful to the End",
+      "archetype": "Loyals"
+    },
+    {
+      "id": "theme_slippery",
+      "name": "Slip 'n' Slide Showdown",
+      "archetype": "Slippery"
+    },
+    {
+      "id": "theme_soulshards",
+      "name": "Weighing of the Souls",
+      "archetype": "Soul Shards"
+    },
+    {
+      "id": "theme_pacman",
+      "name": "Curse of the Dunes",
+      "archetype": "PACMAN"
+    },
+    {
+      "id": "theme_doomclock",
+      "name": "The Jaguar's Countdown",
+      "archetype": "Doom Clock"
+    },
+    {
+      "id": "theme_raceboats",
+      "name": "Regatta Rush",
+      "archetype": "Race Boats"
+    },
+    {
+      "id": "theme_drago",
+      "name": "Dragoneer's Ascent",
+      "archetype": "Drago"
+    },
+    {
+      "id": "theme_chaorcs",
+      "name": "Calamitusk's Rampage",
+      "archetype": "Chaorcs"
+    },
+    {
+      "id": "theme_warcounselors",
+      "name": "Council of War",
+      "archetype": "War Counselors"
+    },
+    {
+      "id": "theme_puppets",
+      "name": "Strings of Fate",
+      "archetype": "Puppets"
+    },
+    {
+      "id": "theme_cybug",
+      "name": "Chrome Swarm",
+      "archetype": "Cybug"
+    },
+    {
+      "id": "theme_lunatic",
+      "name": "Moonstruck Madness",
+      "archetype": "Lunatic"
+    },
+    {
+      "id": "theme_monkees",
+      "name": "Banana Brawl",
+      "archetype": "Monkees"
+    },
+    {
+      "id": "theme_debtotron",
+      "name": "Interest Rate Inferno",
+      "archetype": "Debt-O-Tron"
+    },
+    {
+      "id": "theme_paraseed",
+      "name": "Spore Symphony",
+      "archetype": "Paraseed"
+    },
+    {
+      "id": "theme_bomblebees",
+      "name": "Buzzbomb Blitz",
+      "archetype": "Bomblebees"
+    },
+    {
+      "id": "theme_waflav",
+      "name": "Shapeshifter's Fury",
+      "archetype": "Waflav"
+    },
+    {
+      "id": "theme_spices",
+      "name": "Spice Bazaar Standoff",
+      "archetype": "Spices"
+    },
+    {
+      "id": "theme_steamdwarfs",
+      "name": "Boiler Room Brawl",
+      "archetype": "Steam Dwarfs"
+    },
+    {
+      "id": "theme_trials",
+      "name": "The Final Trial",
+      "archetype": "Trials"
+    },
+    {
+      "id": "theme_cyclingdemons",
+      "name": "Infernal Carousel",
+      "archetype": "Cycling Demons"
+    },
+    {
+      "id": "theme_elven",
+      "name": "Song of the Silverwood",
+      "archetype": "Elven"
+    },
+    {
+      "id": "theme_tuscan",
+      "name": "Duel in Tusca",
+      "archetype": "Tuscan"
+    },
+    {
+      "id": "theme_sparkfly",
+      "name": "The Hive Awakens",
+      "archetype": "Sparkfly"
+    },
+    {
+      "id": "theme_bondedcompanions",
+      "name": "Bonds Unbroken",
+      "archetype": "Bonded Companions"
+    },
+    {
+      "id": "theme_greatmaw",
+      "name": "Jaws of the Deep",
+      "archetype": "Greatmaw"
+    },
+    {
+      "id": "theme_cardinalbeasts",
+      "name": "Four Winds Convergence",
+      "archetype": "Cardinal Beasts"
+    },
+    {
+      "id": "theme_funfuncircus",
+      "name": "Big Top Bedlam",
+      "archetype": "Fun-Fun Circus"
+    }
+  ]
+}
