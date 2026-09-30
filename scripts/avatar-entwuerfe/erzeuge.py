@@ -39,30 +39,31 @@ def native(name):
     return np.median(c, axis=2).astype(np.uint8)
 
 
-def avatar(name, cx, cy):
+def avatar(name, cx, cy, size=CROP):
     n = native(name)
     h, w = n.shape[:2]
-    x0 = max(0, min(w - CROP, cx - CROP // 2))
-    y0 = max(0, min(h - CROP, cy - CROP // 2))
-    im = Image.fromarray(n[y0:y0 + CROP, x0:x0 + CROP])
-    return im.resize((CROP * SCALE, CROP * SCALE), Image.NEAREST)
+    x0 = max(0, min(w - size, cx - size // 2))
+    y0 = max(0, min(h - size, cy - size // 2))
+    im = Image.fromarray(n[y0:y0 + size, x0:x0 + size])
+    k = SCALE if size == CROP else max(SCALE, round(CROP * SCALE / size))
+    return im.resize((size * k, size * k), Image.NEAREST)
 
 
 def main():
     args = [a for a in sys.argv[1:] if not a.startswith('--')]
     picks = [p for p in PICKS if not args or p[0] in args]
     os.makedirs(OUT, exist_ok=True)
-    for pid, name, cx, cy in picks:
-        avatar(name, cx, cy).save(os.path.join(OUT, pid + '.png'))
+    for pid, name, cx, cy, *z in picks:
+        avatar(name, cx, cy, *z).save(os.path.join(OUT, pid + '.png'))
     if '--sheet' in sys.argv:
         cols, t = 8, CROP * SCALE // 2
         rows = (len(picks) + cols - 1) // cols
         sheet = Image.new('RGB', (cols * (t + 6), rows * (t + 18)), (24, 24, 24))
         d = ImageDraw.Draw(sheet)
-        for k, (pid, name, cx, cy) in enumerate(picks):
+        for k, (pid, name, cx, cy, *z) in enumerate(picks):
             x, y = (k % cols) * (t + 6), (k // cols) * (t + 18)
             d.text((x + 2, y + 2), pid, fill=(255, 255, 0))
-            sheet.paste(avatar(name, cx, cy).resize((t, t), Image.NEAREST), (x + 2, y + 16))
+            sheet.paste(avatar(name, cx, cy, *z).resize((t, t), Image.NEAREST), (x + 2, y + 16))
         sheet.save(os.path.join(OUT, '00_uebersicht.png'))
     print(len(picks), 'Avatare ->', OUT)
 
