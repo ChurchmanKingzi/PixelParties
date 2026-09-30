@@ -22,7 +22,7 @@ Rahmen + Shop: `generator/build_frames_r6.py` (erzeugt `frames_r6.json` aus den 
 | 07 | Bone Tide | Bone Rush | Vacarn, the Dark Goblin Necromancer | bone-tide.png | bone/gothic/ruby/amethyst |
 | 08 | Live Fire Test | Boom Boom Kaboom! | Andras, the Human Weapon | live-fire-test.png | industrial/iron/amber/ruby |
 | 09 | Caldera Dance | Burning Inferno | Luna Pele, the Flame Dancer | caldera-dance.png | stone/bronze/lava/topaz |
-| 10 | Serpent Breaker | Cool Gang | Thorad, Strength of Coolness | serpent-breaker.png | twist/iron/topaz/sapphire |
+| 10 | Wowhalla Watch | Cool Gang | Thorad, Strength of Coolness | wowhalla-watch.png | twist/iron/topaz/sapphire |
 | 11 | Silken Descent | Creepy Crawlies | Alleria, the Queen of Spiders | silken-descent.png | filigree/ebony/ruby/amethyst |
 | 12 | Crystal Eve | Crystal Gifts | Mary Crestmas | crystal-eve.png | icicle/ice/ruby/emerald |
 | 13 | Phoenix Call | Cute Commando | Cute Annoyance Mini | phoenix-call.png | twist/gold/ruby/sapphire |
@@ -45,7 +45,7 @@ Rahmen + Shop: `generator/build_frames_r6.py` (erzeugt `frames_r6.json` aus den 
 | 30 | Severed Spell | Null and Void | Null, the Mage Slayer | severed-spell.png | moulding/ebony/amethyst/amber |
 | 31 | Tiger and Ox | One-Two-Punch! | Ghuanjun, the Undead Martial Artist | tiger-and-ox.png | meander/lacquer/lava/jade |
 | 32 | Scribe of Souls | Parts of the Soul | Thep, the Court Scribe | scribe-of-souls.png | arch/gold/cyan/sapphire |
-| 33 | Volley at Dusk | Pew-Pew! | Bow Sniper Darge | volley-at-dusk.png | twist/bronze/emerald/amber |
+| 33 | Arrow Gallery | Pew-Pew! | Bow Sniper Darge | arrow-gallery.png | twist/bronze/emerald/amber |
 | 34 | Tormentor's Den | Poison Torture | Reiza, the Chief Tormentor | tormentors-den.png | bone/gothic/amethyst/lime |
 | 35 | Pyre of the Warband | Sacrificial Demons | Calamitusk, the Chaorc War Chief | pyre-of-the-warband.png | industrial/iron/lava/onyx |
 | 36 | Blackport Nightfall | Shadows over Blackport | Arthor, the King of Blackport | blackport-nightfall.png | ornate/gothic/amethyst/ruby |
@@ -55,5 +55,7 @@ Rahmen + Shop: `generator/build_frames_r6.py` (erzeugt `frames_r6.json` aus den 
 | 40 | Smog Drill | Spell Industrialization | Victorica, the Eternal Empress | smog-drill.png | industrial/brass/amethyst/topaz |
 | 41 | Rampart of Deri | Steam Dwarf Mines | Layn, Defender of Deri | rampart-of-deri.png | industrial/iron/lava |
 | 42 | Sunforged Summit | Sun Fencer Frenzy | Taio, the Sun Fencer | sunforged-summit.png | arch/bronze/amber |
-| 43 | Apotheosis Steps | To Attain Divinity | Archibald, the Archmage | apotheosis-steps.png | meander/gold/jade/amethyst |
+| 43 | Wheel of Wisdom | To Attain Divinity | Archibald, the Archmage | wheel-of-wisdom.png | filigree/gothic/amethyst |
 | 44 | Sakura Mirror | Grand Rebellion! | Champion, the Stormbringer | sakura-mirror.png | wave/lacquer/rose |
+
+Nutzer-Feedback zum ersten Durchgang: `FEEDBACK_1.md` (umgesetzt), Referenzbilder in `refs/`.
