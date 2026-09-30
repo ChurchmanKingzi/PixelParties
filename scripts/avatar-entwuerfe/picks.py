@@ -7,7 +7,7 @@ PICKS = [
     ("BalladHarpy",    "Ballad Harpyformer",                     70, 52),
     ("Blackstache",    "Blackstache, Scourge of the Pixel Seas", 76, 52),
     ("Mellvy",         "Bonded Companion Mellvy",                76, 45),
-    ("Orphy",          "Bonded Companion Orphy",                 52, 50),
+    ("Orphy",          "Bonded Companion Orphy",                 61, 50),
     ("Censpartan",     "Censpartan War Counselor",               84, 52),
     ("Crum",           "Crum, the Class Pet",                    76, 50),
     ("Molinda",        "Cute Angel Molinda",                     76, 50),
@@ -45,5 +45,5 @@ PICKS = [
     ("CircusClown",    "Fun-Fun Circus Clown",                   76, 50),
     ("Asriel",         "Asriel, the Sapling Sacrificer",         76, 50),
     ("Freshya",        "Freshya, Beauty of Coolness",            76, 50),
-    ("DonQuisto",      "Don Quisto, the Gold Seeker",            54, 55),
+    ("DonQuisto",      "Don Quisto, the Gold Seeker",            63, 55),
 ]
