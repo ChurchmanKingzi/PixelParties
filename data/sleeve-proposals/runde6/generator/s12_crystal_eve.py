@@ -57,7 +57,7 @@ from PIL import Image
 _anim = np.array(Image.open('/home/user/PixelParties/data/hero-animations/mary-crestmas.png').convert('RGBA'))
 _f0 = _anim[:, 0:40].copy()
 _f0[..., 3] = np.where(_f0[..., 3] >= 128, 255, 0)
-mary = sorted(parts(_f0, dil=0), key=lambda p: -(p[..., 3] > 0).sum())[0]
+mary = sorted(parts(_f0, dil=1), key=lambda p: -(p[..., 3] > 0).sum())[0]
 _cache = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'sprites6', 'o12_mary.png')
 Image.fromarray(mary).save(_cache)
 well = sprite('o12_well16', 'MotiveBritain', [16])        # Brunnen ohne Funkeln
@@ -86,7 +86,7 @@ def tex(src, h, w):
 
 
 # ================================================================== Geometrie
-WX3, WY3 = 42 - well.shape[1] // 2, 29                    # Brunnen im 3×-Raster (Canvas y 87)
+WX3, WY3 = 42 - well.shape[1] // 2, 20                    # Brunnen im 3×-Raster (Canvas y 60)
 WCX, WCY = 125, (WY3 + 17) * 3                            # Wassermitte (Canvas)
 MX5, MFEET5 = 25 - mary.shape[1] // 2, 63                 # Mary im 5×-Raster (Füße Canvas y 315)
 

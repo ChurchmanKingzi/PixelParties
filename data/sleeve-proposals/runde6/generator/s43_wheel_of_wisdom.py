@@ -14,12 +14,12 @@ Quellen (alle Motive.xcf, Szene der Karte „Archibald, the Archmage“ = Sichtb
             439 „Archmage #1“ (Ring mit fünf Speichen) – die Rosette.
   Ebene 438 „Archmage #6“ – die fünf Gestalten, die auf der Karte (vergrößert, halbtransparent) in den fünf
             Feldern erscheinen; hier im Raster der Rosette, zu 85 % über das Glas gemalt.
-  Sichtbar #43 (Ebene 98), Ausschnitt x 240–256, y 184–200: Parkettkachel der Halle (16×16, periodisch).
-Selbst gezeichnet: Mauer der Halle, steinerne Fensterlaibung, Lichtschein, farbiger Lichtfleck am Boden,
+  Sichtbar #43 (Ebene 98), Ausschnitt x 240–256, y 184–200: Parkett der Halle – daraus die Farben der Dielen.
+Selbst gezeichnet: Mauer der Halle, steinerne Fensterlaibung, Dielenboden, farbiger Lichtfleck am Boden,
 Hinterleuchtung der Glasfelder, Kontaktschatten.
 
 Skalierung (Tiefenebenen):
-  Hintergrund (Mauer, Rosette 76×76 → 152×152, fünf Gestalten, Lichtschein)    – 2×-Raster (125×175)
+  Hintergrund (Mauer, Rosette 76×76 → 152×152, fünf Gestalten)                – 2×-Raster (125×175)
   Vordergrund (Archibald 25×31 → 125×155, Parkett, Lichtfleck)                 – 5×-Raster (50×70)
 """
 import math
@@ -89,17 +89,21 @@ dark_vignette(bg, strength=0.55, r0=0.3, cx=RCX, cy=RCY + 20)
 
 # Farben der fünf Felder (für den Lichtfleck am Boden)
 BEAMS = [((200, 200, 210), 0), ((230, 120, 60), 0), ((220, 70, 50), 0), ((70, 110, 200), 0), ((110, 200, 150), 0)]
-# weicher Lichtschein des Glases auf der Wand darunter
-glow(bg, RCX, RCY + R + 6, 34, (150, 120, 190), 0.25, ry=14, steps=2)
 
 # ================================================================== Vordergrund 5× (50×70)
 w5, h5 = grid(5)
 fg = rgba(w5, h5)
 FLOOR = 60                                   # Oberkante des Bodens (y 300)
-T = np.clip(tile[..., :3].astype(float) * 0.85, 0, 255).astype(np.uint8)   # Parkett, im Dämmer der Halle
+# Boden: dunkle Dielen in den Farben des Hallenparketts (Kachel aus der Szene: Mittelwert und Fugenfarbe)
+base = tile[..., :3].reshape(-1, 3).astype(float)
+c_mid = base.mean(0) * 0.9
+c_dark = base.min(0) * 0.8
+c_lite = np.clip(base.mean(0) * 1.15, 0, 255)
 for y in range(FLOOR, h5):
     for x in range(w5):
-        fg[y, x, :3] = T[(y - FLOOR) % 16, (x + 5) % 16]
+        r = y - FLOOR
+        seam = (r % 3 == 2) or ((x + (r // 3) * 5) % 9 == 0)
+        fg[y, x, :3] = (c_dark if seam else (c_lite if r % 3 == 0 else c_mid)).astype(np.uint8)
         fg[y, x, 3] = 255
 for x in range(w5):                          # Übergang Wand/Boden: Sockelleiste
     fg[FLOOR, x, :3] = (22, 16, 30)
