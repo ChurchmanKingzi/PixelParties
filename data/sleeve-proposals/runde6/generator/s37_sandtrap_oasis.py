@@ -12,7 +12,7 @@ Quellen (MotiveEgypt.xcf):
   „Ebene #78“ (Wüste) pixelgleich mit „Sichtbar #52“ (Ebene 1) im Ausschnitt x350–460/y355–460 (0 Pixel Abweichung);
   das ist die Szene der Karte „Bakhm, the Desert Digger“ (Kartenbild gefiltert, gleiche Pose, gleicher Kaktus).
   Aus Ebene 132 zusätzlich nur der Tonnenkaktus hinter dem Schädel (x364–380/y377–395), in Originallage zu Bakhm.
-  Ebene 234 „Hintergrund“ – Nilufer mit Bucht, Wüste, Kakteen, Schädel (Ausschnitt x334–418/y296–413); Objekte,
+  Ebene 234 „Hintergrund“ – Nilufer mit Bucht, Wüste, Kakteen, Schädel (Ausschnitt x334–418/y306–423); Objekte,
   die unter Bakhm/Trichter/Kamel lägen, sind mit der 16-px-periodischen Sandtextur überdeckt.
   Ebenen 67 „Ebene #103“ + 65 „Ebene #128“ – das Kamel der Karte „Pure Advantage Camel“ (Sichtbar Ebene 62, blickt
   wie dort nach links, hier zum Wasser); die schwarze Gestalt 66 der Karte weggelassen.
@@ -26,7 +26,7 @@ from gkit36_40 import *  # noqa
 
 rnd = random.Random(37)
 W2, H2 = 84, 117                   # EIN Raster 3× (Bakhm samt Sandtrichter größer)
-SX0, SY0 = 334, 296                # Ausschnitt aus Ebene 234
+SX0, SY0 = 334, 306                # Ausschnitt aus Ebene 234
 
 # ------------------------------------------------------------------ Hintergrund: Nilufer + Wüste
 L234 = layer('MotiveEgypt', 234)
@@ -61,7 +61,7 @@ def erase(x0, y0, x1, y1):
 
 
 BX, BY = 16 - 363, 12 - 377        # Versatz Original → Raster (Trichter links bei x 16, Bakhm oben bei y 12)
-CX, CY = 16, 87                    # Kamel links oben; Maul am Wasser
+CX, CY = 8, 84                    # Kamel links oben; Maul am Wasser
 PROTECT = [(16, 12, 16 + 92, 12 + 71), (CX - 2, CY - 2, CX + 32, CY + 27)]
 import cv2
 om = np.array([[is_obj(c) for c in row] for row in bg.a[..., :3]]).astype(np.uint8)
@@ -76,7 +76,7 @@ for k in range(1, n_):
 # ------------------------------------------------------------------ Kamelspur (selbst gezeichnet)
 # Paarweise Hufabdrücke (je 2×2 dunkle Delle mit hellem Rand darunter), von rechts am Trichterrand vorbei zum Kamel
 DENT, RIM = (122, 92, 52), (236, 214, 152)
-pts = [(86, 92), (74, 96), (62, 100), (52, 104), (47, 106)]
+pts = [(86, 88), (72, 93), (58, 98), (47, 102), (41, 104)]
 steps = []
 for (x0, y0), (x1, y1) in zip(pts, pts[1:]):
     n = int(math.hypot(x1 - x0, y1 - y0) / 3.4)
