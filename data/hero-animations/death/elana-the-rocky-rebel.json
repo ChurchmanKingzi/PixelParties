@@ -1,0 +1,19 @@
+{
+  "hero": "Elana, the Rocky Rebel",
+  "kind": "death",
+  "sheet": "elana-the-rocky-rebel.png",
+  "corpse": "elana-the-rocky-rebel-corpse.png",
+  "frameWidth": 62,
+  "frameHeight": 34,
+  "frames": 28,
+  "frameMs": 70,
+  "loop": false,
+  "layout": "horizontal",
+  "padTop": 9,
+  "padLeft": 6,
+  "padRight": 31,
+  "padBottom": 0,
+  "faceX": 15.5,
+  "footY": 34,
+  "startsFromIdleFrame": 0
+}
