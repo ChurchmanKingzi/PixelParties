@@ -71,7 +71,7 @@ def strum(b, ch, vel=74, sh=0):
 def wave(b, ch, vel=70, sh=0):
     """Wellenbewegung: Harfen-Triolen auf- und abwärts (2 Wellen pro Takt)."""
     s = song.bar(b); t = tones(ch, 60, sh); arp = [t[0], t[1], t[2], t[0] + 12, t[2], t[1]]
-    for i in range(12): song.add('harp', s + i / 3, 0.4, arp[i % 6] + (12 if i >= 6 else 0) - (12 if i >= 6 and arp[i % 6] + 12 > 84 else 0), vel + (8 if i % 3 == 0 else 0))
+    for i in range(12): song.add('harp', s + i / 3, 0.4, arp[i % 6], vel + (8 if i % 3 == 0 else 0))
 def hey(b, beat, ch, vel=88, sh=0):
     """Crew-Ruf „Hey-Ho“: zwei kurze Akkordschläge im Chor."""
     for off in (0, 0.5):
@@ -88,7 +88,7 @@ def groove(b, kind, v=1.0):
     elif kind == 'polka':
         d(0, KICK, 114); d(2, KICK, 106); d(1, SNARE, 108); d(3, SNARE, 110)
         for i in range(8): d(i * 0.5, HAT, 106 if i % 2 else 92)
-        d(0.5, TOM_L, 74); d(2.5, TOM_L, 74); d(1.5, COWBELL, 70) if False else None
+        d(0.5, TOM_L, 74); d(2.5, TOM_L, 74)
     elif kind == 'wave':                               # wogend: Ruderschlag + Sidestick
         d(0, KICK, 108); d(2, KICK, 96); d(0, TOM_L, 100); d(2, TOM_M, 92)
         d(1, SIDESTICK, 104); d(3, SIDESTICK, 108); d(3.5, TOM_H, 84)
@@ -99,7 +99,6 @@ def groove(b, kind, v=1.0):
         d(1, SNARE, 112); d(3, SNARE, 114); d(1.75, SNARE, 90); d(3.75, SNARE, 92)
         for i in range(8): d(i * 0.5, RIDE, 110 if i % 2 else 96)
         d(0.5, COWBELL, 86); d(1.5, COWBELL, 86); d(2.5, COWBELL, 86); d(3.5, COWBELL, 86)
-        d(0, CRASH, 84) if False else None
 def fill(b, big=False):
     s = song.bar(b); toms = [TOM_H, TOM_HH, TOM_M, TOM_L]
     for i in range(8): song.dr(s + 2.0 + i * 0.25, toms[min(3, i // 2)], ramp(i, 8, 88, 118), 0.2)
@@ -172,7 +171,6 @@ line(2, [(0, 1, 'A4'), (1, .5, 'B4'), (1.5, .5, 'A4'), (2, 2, 'F#4')], ['violin'
 line(3, [(0, 1, 'D5'), (1, 1, 'D5'), (2, 2, 'A4')], ['violin'], [92])
 line(6, MEL_A1[6], ['violin'], [92]); line(7, MEL_A1[7], ['violin'], [98])
 hey(3, 3.0, 'D', 80)
-for b, v in ((4, 60), (5, 70)): song.dr(song.bar(b), CRASH, v, 0.4) if False else None
 snare_roll(7, 0, 3.5, 60, 110); fill(3); fill(7, big=True)
 
 # ---- A Shanty (8–23) -------------------------------------------------------------------------
@@ -216,7 +214,7 @@ for i in range(16):
     groove(b, 'sprint', 1.0 + 0.03 * sec)
     line(b, mel, ['violin', 'accmel', 'brass'], [100, 84, 74 if sec == 0 else 84], sh=SH)
     line(b, mel, ['whistle'], [78 + 6 * sec], sh=SH + 12)
-    if sec == 1: line(b, MEL_B2[k] if False else mel, ['choir'], [60], sh=SH - 12)
+    if sec == 1: line(b, mel, ['choir'], [60], sh=SH - 12)
     if k in (1, 3, 5, 7): hey(b, 3.0, ch, 92, SH)
     if k == 0 and b != 40: crash(b, 108)
 fill(43); fill(47); fill(51); fill(55, big=True)
@@ -247,7 +245,7 @@ for i in range(8):
     b = 64 + i; ch = CHORDS_E[i]
     oompah(b, ch, 100 + i, tuba=True); pah(b, ch, 78 + i * 2)
     if i < 6: groove(b, 'sprint', 1.0)
-    else: snare_roll(b, 0, 4, 60 + (i - 6) * 20, 100 + (i - 6) * 20); groove(b, 'wave', 0.9) if False else None
+    else: snare_roll(b, 0, 4, 60 + (i - 6) * 20, 100 + (i - 6) * 20)
     strum(b, ch, 72 + i * 2) if i < 6 else None
     for p in tones(ch, 55): song.add('choir', song.bar(b), 3.9, p, 56 + i * 4)
     if i < 7:

@@ -299,7 +299,6 @@ for i in range(8):
     for p in tri(E_['m'] - 12, E_['sc'], k): song.add('organ', song.bar(b), 3.98, p, 62 + i * 3)
     for j in range(8): song.add('harp', song.bar(b) + j * .5, .9, tri(E_['m'], E_['sc'], k)[[0, 1, 2, 1, 0, 1, 2, 1][j]], 70 + i * 2)
     if i >= 2: [song.add('trem', song.bar(b), 3.98, p, 58 + i * 4) for p in tri(E_['m'], E_['sc'], k)]
-for off in (0, 1, 2): pass
 line(64, 'home', [(0, 1.5, 4), (1.5, .5, 3), (2, 1, 2), (3, 1, 4)], 'flute', 90)
 line(65, 'home', [(0, 1, 5), (1, .5, 4), (1.5, .5, 3), (2, 2, 2)], 'flute', 90)
 line(66, 'home', [(0, 1, 6), (1, 1, 4), (2, 1, 2), (3, 1, 3)], 'brass', 92)
