@@ -8,9 +8,10 @@ Spiegelbild im Eis. Hinter ihr schlittern von links ein Slippery Pengu (bäuchli
 Rollen) über das Eis aufeinander zu – die Slippery-Kreaturen rutschen in jedem Zug eine Zone weiter.
 
 Quellen (MotiveArcanum.xcf):
-  Ebene 32 „Ebene #55“ (Hel) + 31 „Ebene #112“ (Artefakt in ihren Händen) + 34 „Ebene #102“ (Schein) + 29
-  „Ebene #110“ (Schein und Schatten) – so auf der Base-Karte „Hel, the Bound Specter“ (Sichtbar #34 = Ebene 28,
-  Lage 599,150; dort halbtransparent). Ebene 30 „Ebene #89“ (Ketten) ist auf der Karte NICHT zu sehen → weggelassen.
+  Ebene 32 „Ebene #55“ (Hel) + 31 „Ebene #112“ (Artefakt in ihren Händen) – so auf der Base-Karte „Hel, the Bound
+  Specter“ (Sichtbar #34 = Ebene 28, Lage 599,150; dort halbtransparent mit fahlem Schein und dunkelrotem Schatten).
+  Schein (Ebene 34 „Ebene #102“) und Schatten (Ebene 29 „Ebene #110“) sind weiche Verläufe → nach ihrem Vorbild im
+  2×-Raster neu gerastert. Ebene 30 „Ebene #89“ (Ketten) ist auf der Karte NICHT zu sehen → weggelassen.
   Ebene 154 „GEHEIMRAUM“ – der Saal der Karte (Mauer, Kerzenleuchter, Boden), Ausschnitt x630–755/y120–295;
   Thron und Tischchen dieses Saals entfernt (Mauer/Boden aus derselben Ebene fortgesetzt).
 Motive.xcf: Ebene 804 „Pengu“ (Karte „Slippery Pengu“, gespiegelt), 785 „Polar“ (Karte „Slippery Polar“).
