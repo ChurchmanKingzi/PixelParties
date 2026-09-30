@@ -61,7 +61,7 @@ well = sprite('o12_well16', 'MotiveBritain', [16])        # Brunnen ohne Funkeln
 sparkle_layer = compose('MotiveBritain', [15], crop=False)
 wb = bbox(compose('MotiveBritain', [16], crop=False))
 sparks = sparkle_layer[wb[1] - 6:wb[3] + 6, wb[0] - 6:wb[2] + 6]      # Funkeln in Brunnen-Koordinaten (+6)
-SNOW = L71[430:465, 163:213, :3].astype(float)
+SNOW = L71[357:397, 165:213, :3].astype(float)       # reine Schneefläche des Platzes
 
 
 def put(dst, s, x, y, f=1.0):
