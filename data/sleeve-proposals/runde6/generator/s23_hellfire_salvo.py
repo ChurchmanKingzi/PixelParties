@@ -2,25 +2,23 @@
 """23 Hellfire Salvo – Gegner „Hellfire Battery“ (sample-Structure Deck Hellfire Battery),
 Held/Hauptmotiv: Baaliel, the Demon General (Base-Karte).
 
-Idee (Beschuss, Tiefenstaffelung): Baaliel steht groß vorn auf dunklem Basalt vor einem Lavastrom und gibt
-mit ausgebreiteten Armen den Feuerbefehl. Seine Höllenbatterie schießt: zwei Feuerbälle (Karte „Fireball“ aus
-dem Deck) ziehen schräg von rechts oben nach links unten über den Himmel – Kopf voran, Schweif hinterher, der
-fernere kleiner – genau auf die feindliche Stellung auf dem fernen Hügel links, wo ein früherer Treffer schon
-lichterloh brennt. Zwei Horned Demons (Cover-Karte) stehen in verschiedener Tiefe bereit: einer näher links,
-einer weiter hinten rechts im Glutdunst.
+Idee (Beschuss, Tiefenstaffelung): Baaliel steht groß und mittig vorn auf dunklem Basalt vor einem Lavastrom
+und gibt mit ausgebreiteten Armen den Feuerbefehl. Seine Höllenbatterie schießt eine Salve: fünf Feuerbälle
+(Karte „Fireball“ aus dem Deck) ziehen auf parallelen Bahnen schräg von rechts oben nach links unten – Kopf
+voran, Schweif hinterher, die fernen kleiner – auf den fernen Hügel links, an dem die Einschläge glühen.
+Horned Demons (Cover-Karte) in zwei Tiefen: zwei nahe als Ehrenwache links/rechts, drei ferne im Glutdunst.
 
 Quellen (Motive.xcf):
   Baaliel:      Ebene 571 „Baaliel“ (20×28, vollständige Figur; das Kartenbild ist aus einer vergrößerten Szene
                 erzeugt, daher kein pixelgenauer „Sichtbar“-Treffer – Form/Farben visuell mit der Karte geprüft).
   Horned Demon: Ebene 573 „Horned Demon“ (16×29, Cover-Karte).
   Feuerball:    Ebene 1539 „Fireball“ (nur das Geschoss, 19×11; gespiegelt, um 20° geneigt).
-  Brand am Ziel: Ebene 1537 „Fireball #2“ (auflodernde Flammen, 24×38).
   Boden:        Ebene 1044 „Hell“ (Basalt mit Lavastrom; Ausschnitt x 150–275, y 186–297).
 Selbst gezeichnet: Himmelsverlauf (geordnetes Dithering), ferne Hügelsilhouette, Glutschein am Horizont und
                 um den Brand, Schatten.
 Skalierung (Tiefenebenen):
-  Himmel, Hügel, Brand, ferner Feuerball, ferner Horned Demon, Lavaboden – 2×-Raster (125×175)
-  naher Feuerball, naher Horned Demon – 3×-Raster (84×117) (beide deutlich weiter vorn/höher als die 2×-Dinge)
+  Himmel, Hügel, Einschlagglut, 3 ferne Feuerbälle, 3 ferne Horned Demons, Lavaboden – 2×-Raster (125×175)
+  2 nahe Feuerbälle, 2 nahe Horned Demons – 3×-Raster (84×117) (deutlich vor/über den 2×-Dingen)
   Baaliel 20×28 → 100×140 – 5× (Vordergrund; keine andere Figur auf seiner Höhe neben ihm)
 """
 import math
@@ -31,7 +29,6 @@ B = 'Motive'
 baal = crop_alpha(layer(B, 571))
 demon = crop_alpha(layer(B, 573))
 fb = [p for p in parts(layer(B, 1539), dil=0, minpx=5) if p.shape[:2] == (11, 19)][0]
-fire = crop_alpha(layer(B, 1537))
 Image.fromarray(baal).save(os.path.join(xcfkit.CACHE, 'o23_baaliel.png'))
 Image.fromarray(demon).save(os.path.join(xcfkit.CACHE, 'o23_horned_demon.png'))
 Image.fromarray(fb).save(os.path.join(xcfkit.CACHE, 'o23_fireball.png'))
@@ -71,7 +68,7 @@ for x in range(GW):
     for y in range(top, HOR + 1):
         bg[y, x, :3] = HILL
     setp(bg, x, top, (96, 30, 20))
-# Brand auf der Hügelkuppe (Ziel), Glutschein darum
+# Einschlagglut auf der Hügelkuppe (Ziel der Salve), gedithert
 TX, TY = 20, int(HOR - 16)
 for y in range(TY - 26, TY + 6):
     for x in range(TX - 20, TX + 22):
@@ -79,15 +76,15 @@ for y in range(TY - 26, TY + 6):
         if d < 1 and 0 <= x < GW and 0 <= y < GH:
             q = dith(1 - d, x, y, 3) * 0.5
             bg[y, x, :3] = (bg[y, x, :3] * (1 - q) + np.array([255, 150, 60]) * q).astype(np.uint8)
-put(bg, fire, TX - fire.shape[1] // 2, TY - fire.shape[0] + 6)   # Flammenfuß sitzt auf der Kuppe
-# ferner Feuerball kurz vor dem Ziel
-put(bg, shot, TX + 12, TY - 22)
-# ferner Horned Demon rechts hinten (dunkler, im Glutdunst)
+# ferne Feuerbälle der Salve, alle auf parallelen Bahnen nach links unten zum Hügel
+for (x, y) in ((TX + 10, TY - 20), (TX + 40, TY - 30), (TX + 72, TY - 42)):
+    put(bg, shot, x, y)
+# drei ferne Horned Demons im Glutdunst (dunkler), verteilt auf der Ebene
 fd = shade(demon, 0.7, (40, 6, 6))
-FDX, FDY = 104, 86
-for xx in range(FDX - 7, FDX + 7):
-    if bay(xx, FDY) < 0.7: bg[FDY, xx, :3] = (bg[FDY, xx, :3] * 0.5).astype(np.uint8)
-put(bg, fd, FDX - demon.shape[1] // 2, FDY - demon.shape[0] + 1)
+for FDX, FDY in ((44, 84), (84, 86), (110, 83)):
+    for xx in range(FDX - 7, FDX + 7):
+        if 0 <= xx < GW and bay(xx, FDY) < 0.7: bg[FDY, xx, :3] = (bg[FDY, xx, :3] * 0.5).astype(np.uint8)
+    put(bg, fd, FDX - demon.shape[1] // 2, FDY - demon.shape[0] + 1)
 
 cv = Canvas(W, H)
 blit(cv, bg, 2)
@@ -95,25 +92,26 @@ blit(cv, bg, 2)
 # ---------------------------------------------------------------- 3×-Ebene (84×117)
 MW, MH = grid(3)
 mid = rgba(MW, MH)
-# naher Feuerball oben rechts, auf derselben Bahn wie der ferne
-put(mid, shot, 52, 10)
-# naher Horned Demon links, Füße bei Zeile 70 (Leinwand y 210)
-NDX = 13
-for y in range(MH):
-    for x in range(MW):
-        d = ((x + .5 - NDX) / 8) ** 2 + ((y + .5 - 69.5) / 1.4) ** 2
-        if d < 1 and bay(x, y) < 0.7:
-            mid[y, x] = (10, 2, 2, 150)
-put(mid, demon, NDX - demon.shape[1] // 2, 70 - demon.shape[0])
+# nahe Feuerbälle oben rechts, parallel zu den fernen
+for (x, y) in ((50, 8), (66, 24)):
+    put(mid, shot, x, y)
+# zwei nahe Horned Demons links und rechts (Ehrenwache), Füße bei Zeile 70 (Leinwand y 210)
+for NDX in (13, 71):
+    for y in range(MH):
+        for x in range(MW):
+            d = ((x + .5 - NDX) / 8) ** 2 + ((y + .5 - 69.5) / 1.4) ** 2
+            if d < 1 and bay(x, y) < 0.7:
+                mid[y, x] = (10, 2, 2, 150)
+    put(mid, demon if NDX < 42 else flip(demon), NDX - demon.shape[1] // 2, 70 - demon.shape[0])
 cv.paste(up(mid, 3), 0, 0)
 
 # ---------------------------------------------------------------- Baaliel 5×
 FG = rgba(50, 70)
 bw, bh = baal.shape[1], baal.shape[0]
-bx, by = 27 - bw // 2, 66 - bh
+bx, by = 15, 66 - bh                        # Gesichtsmitte (Spalte 10) auf x = 375 von 750
 for y in range(70):
     for x in range(50):
-        d = ((x + .5 - 27) / 9) ** 2 + ((y + .5 - 65.5) / 1.6) ** 2
+        d = ((x + .5 - 25) / 9) ** 2 + ((y + .5 - 65.5) / 1.6) ** 2
         if d < 1 and bay(x, y) < 0.7:
             FG[y, x] = (10, 2, 2, 150)
 put(FG, baal, bx, by)

@@ -3,9 +3,9 @@
 Held: Orthos, the Loyal Guard Dog.
 
 Idee (Reise/Nachtmarsch, ruhig): Orthos, der zweiköpfige Wachhund mit brennenden Köpfen (Base-Karte), kommt groß
-auf dem Aschepfad auf den Betrachter zu. Dicht hinter ihm folgt als kleine Gruppe seine Loyal-Meute – in der
-Mitte die Cover-Karte Loyal Pinpom, links der Rottweiler, rechts der Shepherd (Kartentext: ein „Loyal“ ruft den
-nächsten herbei). Hinter ihnen liegt das dunkle Aschefeld seiner Karte, am Horizont steht die Glut des
+auf dem Aschepfad auf den Betrachter zu. Dicht hinter ihm folgt als geschlossene Gruppe seine Loyal-Meute – vorn
+in der Mitte die Cover-Karte Loyal Pinpom, links der Rottweiler, rechts der Shepherd, dahinter in einer zweiten Reihe
+Terrier, Labradoodle, Hountriever und Loyal Bone Dog (Kartentext: ein „Loyal“ ruft den nächsten herbei). Hinter ihnen liegt das dunkle Aschefeld seiner Karte, am Horizont steht die Glut des
 Feuerfelds als roter Schein hinter den Hügeln; der Schein seiner Flammenköpfe liegt auf Boden und Meute.
 
 Quellen:
@@ -13,13 +13,15 @@ Quellen:
                 Flamme des Feuerfelds abgeschnitten), geprüft gegen Kartenszene Sichtbar #87 (Ebene 149,
                 Kartenausschnitt Lage 139,314; Form gleich, Karte nur rötlich abgedunkelt).
                 Loyal-Hunde (Kartenbild-Ebenen, geprüft per scenes_with gegen ihre Sichtbar-Szenen 158/162/166):
-                159 „Pinpom“, 163 „Rottweiler“, 167 „Shepherd“.
+                159 „Pinpom“, 163 „Rottweiler“, 167 „Shepherd“, 161 „Terrier“, 165 „Labradoodle“, 169 „Hountriever“.
+  Motive.xcf    Ebene 558 „Bone Dog“ (Box x 342–356, y 223–240), Szene Sichtbar #102.
 Selbst gezeichnet: Nachthimmel mit Glutschein am Horizont, Hügelsilhouetten mit glühenden Kanten, wenige
 Funken, Aschefeld (Sprenkel), Aschepfad, Lichtschein der Flammenköpfe, Bodenschatten.
 
 Skalierung:
   Hintergrund (Himmel, Horizontglut, Hügel, Boden, Pfad, Licht)        – 2× (Raster 125×175)
-  Mittelgrund (Rottweiler, Pinpom, Shepherd + Schatten, eine Gruppe)   – 4× (Raster 63×88)
+  hintere Reihe (Terrier, Labradoodle, Hountriever, Bone Dog + Schatten) – 3× (Raster 84×117)
+  vordere Reihe (Rottweiler, Pinpom, Shepherd + Schatten)               – 4× (Raster 63×88)
   Vordergrund (Orthos 18×23 → 108×138, Schatten)                       – 6× (Raster 42×59)
 """
 import math, random
@@ -32,12 +34,14 @@ GN = 'MotiveGN'
 orthos = sprite('o27_orthos', GN, [155], box=(168, 330, 186, 353))
 dog = {n: sprite('o27_' + n, GN, [i], box=b) for n, i, b in (
     ('pinpom', 159, (131, 289, 144, 302)), ('rottweiler', 163, (177, 289, 191, 307)),
-    ('shepherd', 167, (195, 287, 211, 306)))}
+    ('shepherd', 167, (195, 287, 211, 306)), ('terrier', 161, (204, 241, 217, 256)),
+    ('labradoodle', 165, (341, 350, 357, 368)), ('hountriever', 169, (155, 328, 169, 345)))}
+dog['bonedog'] = sprite('o27_bonedog', 'Motive', [558], box=(342, 223, 356, 240))
 
-HOR = 128                                        # Horizont (Canvas-Pixel)
+HOR = 100                                        # Horizont (Canvas-Pixel)
 
 # ---------------------------------------------------------------- Pfad (Canvas-Koordinaten, Catmull-Rom)
-PTS = [(124, 166), (124, 205), (125, 300), (125, 360)]   # Pfad beginnt unter der Meute (hinten verdeckt)
+PTS = [(124, 150), (124, 205), (125, 300), (125, 360)]   # Pfad beginnt unter der Meute (hinten verdeckt)
 
 
 def catmull(pts, n=40):
@@ -86,7 +90,7 @@ for y in range(h2, bh):
         bg[y, x, :3] = G[1] if r < .6 else (G[0] if r < .85 else G[2])
 # Pfad
 PC = [(64, 52, 50), (80, 66, 60), (94, 80, 72)]
-for y in range(84, bh):
+for y in range(76, bh):
     cy = y * 2 + 1
     cx = path_x(cy) / 2
     wdt = 1.5 + 17 * ((cy - HOR) / (350 - HOR)) ** 1.3
@@ -98,23 +102,28 @@ for y in range(84, bh):
         elif d < wdt + 1:
             bg[y, x, :3] = (24, 15, 16)
 # Lichtschein der Flammenköpfe (auf Boden und Meute)
-glow(bg, 62.5, 106, 50, 26, (190, 70, 24), .3)
+glow(bg, 62.5, 96, 56, 34, (190, 70, 24), .3)
 
-# ================================================================ 4×-Ebene: die Meute als Gruppe dicht hinter Orthos
-mw, mh = grid(4)
-mid = rgba(mw, mh)
+# ================================================================ 3×-Ebene: hintere Reihe der Meute
+bk = rgba(*grid(3))
 
 
-def dog_at(layer_, s, cx, feet):
-    h, w = s.shape[:2]
+def dog_at(layer_, s_, cx, feet):
+    h, w = s_.shape[:2]
     for x in range(int(cx - w / 2) - 1, int(cx + w / 2) + 1):
         for dy in (0, 1):
             if bay(x, feet + dy) < (.85 if dy == 0 else .45):
                 setp(layer_, x, feet + dy - 1, (10, 5, 7), 190)
-    put(layer_, s, int(round(cx - w / 2)), feet - h)
+    put(layer_, s_, int(round(cx - w / 2)), feet - h)
 
 
-# Fußpunkte im 4×-Raster (Canvas: Rottweiler x 88/y 176, Shepherd 162/180, Pinpom vorn in der Mitte 125/184)
+# Canvas-Fußpunkte: Terrier 60/123, Labradoodle 102/120, Hountriever 147/120, Bone Dog 189/123
+for n, cx, feet in (('terrier', 20, 41), ('labradoodle', 34, 40), ('hountriever', 49, 40), ('bonedog', 63, 41)):
+    dog_at(bk, dog[n], cx, feet)
+
+# ================================================================ 4×-Ebene: vordere Reihe, Pinpom vorn in der Mitte
+mid = rgba(*grid(4))
+# Canvas-Fußpunkte: Rottweiler 88/176, Shepherd 162/180, Pinpom 125/184
 dog_at(mid, dog['rottweiler'], 22, 44)
 dog_at(mid, dog['shepherd'], 40.5, 45)
 dog_at(mid, dog['pinpom'], 31.25, 46)
@@ -127,4 +136,4 @@ for x in range(OX + 3, OX + 16):
     setp(fg, x, OF, (8, 4, 6), 190)
 put(fg, orthos, OX, OF - orthos.shape[0])
 
-print(finish([(bg, 2), (mid, 4), (fg, 6)], '27_hellhounds_trail.png'))
+print(finish([(bg, 2), (bk, 3), (mid, 4), (fg, 6)], '27_hellhounds_trail.png'))

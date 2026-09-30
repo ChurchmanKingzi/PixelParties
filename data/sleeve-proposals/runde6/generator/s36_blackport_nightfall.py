@@ -28,6 +28,8 @@ import math, random
 import numpy as np
 import cv2
 from gkit36_40 import *  # noqa
+import os
+HERE_R6 = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..')
 
 rnd = random.Random(36)
 W2, H2 = 125, 175
@@ -77,7 +79,7 @@ for y in range(H2):
     for x in range(W2):
         bg.a[y, x, :3] = mix(TOP, BOT, dith(t, x, y, 6)); bg.a[y, x, 3] = 255
 # Mond oben rechts mit Hof
-MX, MY, MR = 92, 26, 12
+MX, MY, MR = 63.5, 40, 12                 # Mond mittig zwischen den Türmen
 for y in range(H2):
     for x in range(W2):
         d = math.hypot(x + 0.5 - MX, y + 0.5 - MY)
@@ -110,33 +112,35 @@ for y in range(g.shape[0]):
 gate[..., :3] = g[..., :3].astype(np.uint8)
 bg.paste(gate, 0, SHIFT)
 
-# Zinnen auf den Turmkronen (Merlons 3 breit, 3 hoch, Lücke 2; Steinfarben der Brüstung, nachts)
-MER_D, MER_L = (40, 42, 62), (78, 82, 108)
+# Türme bis zum oberen Bildrand verlängern: Turmschaft mit seiner 8-Zeilen-Periode (Quelle Zeilen 186–202) nach
+# oben weitergekachelt (nachts gefärbt wie der Rest), damit der Himmel nur zwischen den Türmen offen bleibt
+TT = SHIFT + (178 - CY0)
 for (a0, a1) in TOWERS:
-    y0 = SHIFT + (178 - CY0)
-    x = a0
-    while x + 3 <= a1:
-        for dx in range(3):
-            for dy in range(1, 4):
-                bg.a[y0 - dy, x + dx, :3] = MER_L if (dy == 3 or dx == 2) else MER_D
-        x += 5
+    for y in range(0, TT):
+        src = (186 - CY0) + ((y - TT) % 16)
+        for x in range(a0, a1):
+            c = gate[src, x, :3].astype(float) * (1.0 - 0.18 * (1 - y / TT))      # nach oben etwas dunkler
+            bg.a[y, x, :3] = np.clip(c, 0, 255)
 # Kante der Brüstung und Außenmauer mit hellem Mondsaum
 for x in range(W2):
     y = SHIFT + top_of(x)
+    if any(a0 <= x < a1 for a0, a1 in TOWERS): continue
     if 0 <= y < H2: bg.a[y, x, :3] = mix(tuple(bg.a[y, x, :3]), (120, 130, 170), 0.5)
 
 # Banner am linken Turm, Schwert am rechten Turm
 b_ = banner.copy(); b_[..., :3] = np.clip(b_[..., :3].astype(float) * np.array((0.75, 0.7, 0.9)), 0, 255)
-bg.paste(b_, (TOWERS[0][0] + TOWERS[0][1]) // 2 - b_.shape[1] // 2, SHIFT + (188 - CY0))
+bg.paste(b_, (TOWERS[0][0] + TOWERS[0][1]) // 2 - b_.shape[1] // 2, 44)
 sw = rot90(sprite('o36_sword', 'Motive', [911]), 1)          # senkrecht aufgestellt, Spitze nach oben
 sw2 = sw.copy(); sw2[..., :3] = np.clip(sw2[..., :3].astype(float) * np.array((0.85, 0.85, 0.98)), 0, 255)
 SWX = (TOWERS[1][0] + TOWERS[1][1]) // 2 - sw.shape[1] // 2
-bg.paste(sw2, SWX, SHIFT + (184 - CY0))
+bg.paste(sw2, SWX, 38)
 
 # ================================================================== Vordergrund 6× (42×59)
 W6, H6 = 42, 59
 fg = Plane(W6, H6, 6, ox=-1)
-art = sprite('o36_arthor', 'Motive', [951], box=(262, 183, 292, 214))
+from PIL import Image
+art = np.array(Image.open(os.path.join(HERE_R6, 'refs', 'arthor_full.png')).convert('RGBA'))   # Arthors vollständiger Sprite (Nutzer-Referenz)
+art[..., 3] = np.where(art[..., 3] >= 128, 255, 0)
 ah, aw = art.shape[:2]
 FEET = 53
 AX, AY = 21 - aw // 2, FEET - ah + 1

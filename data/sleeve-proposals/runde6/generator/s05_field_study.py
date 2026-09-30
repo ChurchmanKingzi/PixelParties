@@ -1,22 +1,23 @@
 # -*- coding: utf-8 -*-
 """05 Field Study – Gegner „Big Stomp!“, Held: Kit, the Shark Researcher (Base-Version).
-Big Stomp!: Kit, der Hai-Forscher, steht auf einer Lichtung der Gigantisaurier-Insel; hinter ihm steht der riesige
-Brachion (gespiegelt) mit den Füßen auf der Lichtung vor dem Waldrand und reckt den Hals über ihn, seine Trittsiegel
-führen quer über die Lichtung – Kit ist ihm auf der Spur.
-Wald und Dinosaurier im Stil der Gigantisaurier-Karten (Draufsicht-Karte mit Kreaturen darauf).
+Big Stomp!: Kit, der Hai-Forscher, steht auf einer Lichtung der Gigantisaurier-Insel und folgt einer Fährte aus
+dreizehigen Trittsiegeln – hinter ihm, am Waldrand, ragt schon die riesige Schattensilhouette des T-Rex (Gigantisaur
+King Trex) auf und beugt das aufgerissene Maul über ihn.
+Wald im Stil der Gigantisaurier-Karten (Draufsicht-Karte mit Kreaturen darauf).
 
 Quellen:
   MotiveDeepsea.xcf Ebene 38 „Ebene #49“ (Hut) + 39 „Kit-Kopie“ (= Kartenbild „Kit, the Shark Researcher“,
       Sichtbar #37 Lage 305,192, sitzend hinter einem Stuhl, offener Mund); ab der Hüfte die stehenden Beine aus
       Ebene 40 „Kit“ (im Kartenbild vom Stuhl verdeckt).
-  MotiveGrailWar.xcf Ebene 503 „Brachion“ (69×53), in Sichtbar #61 (Kartenbild „Gigantisaur Brachion“) zu 100 % gleich.
-  MotiveGrailWar.xcf Ebene 515 „Ebene #153“: Inselkarte der Gigantisaurier-Karten, Ausschnitt x60–144/y262–379
-      (Wald leicht abgedunkelt).
-Selbst gezeichnet: Trittsiegel, Schatten.
+  MotiveGrailWar.xcf Ebene 513 „Trex“ (80×59, Kartenbild „Gigantisaur King Trex“) – als dunkle,
+      halbtransparente Silhouette (ganze 3×-Pixel mit Alpha).
+  MotiveGrailWar.xcf Ebene 515 „Ebene #153“: Inselkarte der Gigantisaurier-Karten, Ausschnitt x280–364/y105–222
+      (Erdlichtung am Waldrand, Wald leicht abgedunkelt).
+Selbst gezeichnet: dreizehige Trittsiegel, Schatten.
 
-Skalierung:
-  Insel, Brachion (gespiegelt), Trittsiegel, Schatten – 3× (84×117)
-  Kit                                    – 5× (50×70)
+Skalierung (Ausgabe = 250×350-Raster × 3):
+  Insel, T-Rex-Silhouette, Trittsiegel, Schatten – 3× (84×117)
+  Kit                                              – 5× (50×70)
 """
 import math, random
 from a_util import *  # noqa
@@ -29,36 +30,42 @@ _k39 = compose('MotiveDeepsea', [38, 39], crop=False)[205:233, 322:347]
 _k40 = compose('MotiveDeepsea', [38, 40], crop=False)[205:233, 322:347]
 _kit = _k39.copy(); _kit[18:] = _k40[18:]
 kit_ = trimmed(_kit)
-brach = sprite('o05_brachion', 'MotiveGrailWar', [503])       # Gigantisaur Brachion (69×53), = Sichtbar #61
+trex = sprite('o05_trex', 'MotiveGrailWar', [513])            # Gigantisaur King Trex (80×59)
 isle = compose('MotiveGrailWar', [515], crop=False)           # Insel-Karte der Gigantisaurier-Karten
 
-# ---- Ebene 1: Urwaldinsel + Brachion (3×, 84×117) ---------------------------------------------
+# ---- Ebene 1: Urwaldinsel + T-Rex-Schatten (3×, 84×117) ---------------------------------------------
 W3, H3 = 84, 117
-MX, MY = 60, 262
+MX, MY = 280, 105                                            # offene Erdlichtung am Waldrand
 p3 = isle[MY:MY + H3, MX:MX + W3].copy()
 p3[..., 3] = 255
-BX, BY = 16, 16                                              # gespiegelt: Hals nach links oben, Blick zu Kit
+TX, TY = W3 - trex.shape[1] + 2, 22                         # Maul rechts oben über der Lichtung, Schwanz im Wald
 # Wald etwas abdunkeln, die Lichtung bleibt hell (Kit hebt sich ab)
 c = p3[..., :3].astype(int)
 forest = (c[..., 1] < 120) | (c[..., 0] > c[..., 1])
 p3[..., :3][forest] = (p3[..., :3][forest] * 0.78).astype(np.uint8)
 # Fußspuren des Brachion quer über die Lichtung (selbst gezeichnet: runde Trittsiegel mit drei Zehen)
-MUD, MUD2, RIM = (58, 64, 22), (44, 46, 16), (150, 206, 70)
+MUD, MUD2, RIM = (96, 62, 30), (70, 42, 20), (214, 172, 110)
 def footprint(cx, cy):
-    """Trittsiegel: plattgetretener Grasrand (hell) oben, Mulde (dunkel), drei Zehenkerben vorn."""
-    for y in range(cy - 3, cy + 4):
-        for x in range(cx - 4, cx + 5):
-            d = ((x + 0.5 - cx - 0.5) / 4.2) ** 2 + ((y + 0.5 - cy - 0.5) / 3.1) ** 2
-            if d < 1:
-                p3[y, x, :3] = MUD2 if d < 0.35 else MUD
-    for x in range(cx - 3, cx + 5):
-        p3[cy - 4, x, :3] = mix(p3[cy - 4, x, :3], RIM, 0.5)
-    for dx in (-3, 0, 3):
-        p3[cy - 4, cx + dx, :3] = MUD2; p3[cy - 5, cx + dx, :3] = MUD
-for (x, y) in [(62, 110), (55, 99), (63, 88), (56, 78)]:
+    """Dreizehiges Trittsiegel (T-Rex): Ballen, drei Zehen nach vorn (oben), heller Grasrand."""
+    pts2 = [(0, 0), (1, 0), (-1, 0), (0, 1), (1, 1), (-1, 1), (0, 2)]              # Ballen (dunkel)
+    pts1 = [(0, -1), (0, -2), (0, -3), (0, -4), (-1, -1), (-2, -2), (-3, -3), (1, -1), (2, -2), (3, -3),
+            (-2, 1), (2, 1)]                                                     # Zehen
+    for (dx, dy) in pts1: p3[cy + dy, cx + dx, :3] = MUD
+    for (dx, dy) in pts2: p3[cy + dy, cx + dx, :3] = MUD2
+    for (dx, dy) in [(0, -5), (-4, -4), (4, -4)]:
+        p3[cy + dy, cx + dx, :3] = mix(p3[cy + dy, cx + dx, :3], RIM, 0.6)
+for (x, y) in [(66, 108), (57, 97), (66, 86), (57, 75)]:
     footprint(x, y)
-shadow_ellipse(p3, BX + 36, BY + brach.shape[0] - 1, 24, 3.0, a=0.45)
-put(p3, brach[:, ::-1], BX, BY)
+# Schattensilhouette des T-Rex fällt über die Lichtung (dunkel, halbtransparent auf ganzen 3×-Pixeln)
+sil = trex.copy()
+m = sil[..., 3] > 0
+sil[m, :3] = (14, 22, 12); sil[m, 3] = 190
+cv0 = p3.copy()
+for y in range(sil.shape[0]):
+    for x in range(sil.shape[1]):
+        yy, xx = TY + y, TX + x
+        if m[y, x] and 0 <= yy < H3 and 0 <= xx < W3:
+            p3[yy, xx, :3] = (p3[yy, xx, :3] * 0.42 + np.array([26, 16, 10]) * 0.58).astype(np.uint8)
 # Bodenschatten unter Kit (Füße bei 250er-y 305 → 3×-Reihe 102)
 shadow_ellipse(p3, 34.5, 102, 10, 1.8, a=0.4)
 cv = Canvas(250, 350)

@@ -14,6 +14,7 @@ Quellen (Motive.xcf):
   Ebene 1225 „Vacarn #4“     – roter Schein der Base-Karte (weichgezeichnet) → als geordnetes Dithering nachgezeichnet.
   Ebene 73 „Skele Archer #1“ – Skeleton Archer (Karte, Sichtbar #310), gespiegelt für die linke Flanke.
   Ebene 1226 „Vacarn #1“     – Bogenschütze (rechte Flanke), Schädelfledermäuse (Skeleton Skull Bat).
+                               (Das seitlich blickende Skelett mit Spitzhut derselben Ebene nach Nutzer-Feedback entfernt.)
   Ebene 58 „Skele Mage #1“   – Skeleton Mage (Karte Skeleton Mage, Sichtbar #313).
   Ebene 54 „Healer Skele #2“ – Skeleton Healer (Karte, Sichtbar #314).
   Ebenen 790/794/796/792/787 – Skeleton Reaper, Death Knight, Burning Skele, Skeleton Wizard, Cosmic Skele
@@ -24,8 +25,8 @@ Selbst gezeichnet: Nebel/Horizont, Felsgrate, Schatten, roter Schein.
 
 Skalierung (Tiefenebenen):
   Hintergrund 2× (125×175): violetter Himmel/Nebel, Schluchtwände, Geröllboden, Schattenheer im Nebel (Burning,
-                            Death Knight, Wizard, Cosmic), Schädelfledermäuse, zweite Reihe: Magier, Heiler,
-                            Spitzhut-Skelett in der Nebelzunge
+                            Death Knight, Wizard, Cosmic) auf dem Horizont, Schädelfledermäuse, zweite Reihe:
+                            Magier und Heiler auf dem schwarzen Geröllboden (kein Nebel auf dem Boden)
   Mittelgrund 3× (84×117):  zwei Bogenschützen als Flanke + Schatten, roter Schein hinter Vacarn (drei Stufen)
   Vordergrund 6× (42×59):   Vacarn + Schatten
 """
@@ -157,38 +158,29 @@ for (cx, cy, rx, ry) in [(10, 150, 16, 12), (116, 142, 14, 10), (22, 96, 10, 5),
             if d < 1 - 0.25 * math.sin(x * 0.9 + y * 0.7):
                 t = (y - HOR - 4) / (H2 - HOR - 4)
                 bg[y, x, :3] = np.clip(rub[y, x] * (0.4 + 0.5 * t), 0, 255)
-# Nebelzunge, die aus der Schlucht über den Boden kriecht
-for y in range(HOR - 2, HOR + 26):
-    for x in range(W2):
-        d = abs(x + 0.5 - W2 / 2)
-        w = 20 + (y - HOR) * 1.4
-        if d > w: continue
-        a = 0.42 * (1 - d / w) * (1 - max(0, y - HOR) / 26)
-        if a > BAY[y % 4, x % 4]:
-            bg[y, x, :3] = (bg[y, x, :3] * 0.5 + MIST * 0.5).astype(np.uint8)
-
 # Schattenheer im Nebel (2×, violett eingefärbt, auf dem Horizont)
 
 
-def ghost(s, k=0.38):
+def ghost(s, k=0.25):
     o = s.copy().astype(float)
     o[..., :3] = o[..., :3] * (1 - k) + np.array((70, 48, 120)) * k
     return o.astype(np.uint8)
 
 
-foot = HOR + 3
-line = [('burn', 44), ('dk', 58), ('wiz', 72), ('cosmic', 84)]
+foot = HOR + 7                                # Füße auf dem schwarzen Geröll, nicht im Nebel
+line = [('burn', 25), ('dk', 38), ('wiz', 88), ('cosmic', 101)]
 for n, cx in line:
     s = ghost(shadows[n])
     h, w = s.shape[:2]
     if n == 'reaper':
         h0 = h
     yb = foot - (h - 1) + (2 if n == 'reaper' else 0)
+    shadow(bg, cx, foot + 1, w - 4, a=0.6)
     put(bg, s, cx - w // 2, yb)
 # Schädelfledermäuse am Himmel (2×)
 put(bg, bats[0], 24, 22); put(bg, flip(bats[-1]), 90, 18)
-# helle Skelette der zweiten Reihe (2×): Magier und Heiler in der Nebelzunge
-for s_, cx, fy in [(wizard, 62, 75), (mage, 43, 80), (healer, 82, 80)]:
+# helle Skelette der zweiten Reihe (2×): Magier und Heiler auf dem dunklen Geröllboden
+for s_, cx, fy in [(mage, 45, 80), (healer, 80, 80)]:
     h, w = s_.shape[:2]
     shadow(bg, cx, fy + 1, w - 4, a=0.5)
     put(bg, s_, cx - w // 2, fy - h + 1)

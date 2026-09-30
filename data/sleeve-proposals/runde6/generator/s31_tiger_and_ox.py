@@ -150,7 +150,7 @@ def aura(arr, s, x0, y0, col, strength, grow=2):
 put(sp, tiger, TX, TY)
 put(sp, mul(ox, (1.3, 1.3, 1.25)), OX, OY)
 ghost = sp.copy()
-ghost[..., 3] = np.where(sp[..., 3] > 0, 205, 0)                 # halbtransparent, je 4×-Pixel
+ghost[..., 3] = np.where(sp[..., 3] > 0, 128, 0)                 # 50 % transparent, je 4×-Pixel (Nutzerwunsch)
 
 # ---------------- Vordergrund 6× (42×59): Ghuanjun --------------------------------------------------------------
 fw, fh = grid(6)

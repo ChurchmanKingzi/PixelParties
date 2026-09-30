@@ -41,7 +41,7 @@ sky = layer(B, 553)[200:550, 150:400].copy()                     # Moe-Himmel mi
 # ---------- 1×: Himmel, Relic-Insel, Feuersäule, Phoenix ----------
 cv = Canvas(250, 350)
 cv.a[:] = sky[..., :3]
-PX = 172                     # Achse der Feuersäule
+PX = 204                     # Achse der Feuersäule
 IX, IY = PX - 105, 196       # Relic-Insel so, dass der Altar (x250,y152 in der Ebene) unter der Säule liegt
 p1 = rgba(250, 350)
 put(p1, relic, IX, IY)
@@ -81,11 +81,17 @@ blit(cv, p1, 1)
 
 # ---------- 2×: Kommando ----------
 p2 = rgba(125, 175)
-put(p2, bunny, 13, 104); put(p2, cat, 24, 134)
+# kleines Cute-Kommando (Cute Birds, Bunnies, Cats) im Bogen von links oben zum Einschlag
+doves = [p for p in parts(compose(B, [433]), dil=1) if p.shape in ((12, 20, 4), (11, 16, 4))]
+lying = [p for p in bunnies if p.shape == (19, 28, 4)][0]     # zweite Cute Bunny (seitlich fliegend)
+put(p2, doves[0], 13, 22); put(p2, flip(doves[3]), 27, 12)
+put(p2, bunny, 11, 96); put(p2, flip(lying), 16, 120)
+put(p2, cat, 42, 110); put(p2, flip(cat), 64, 98)
+put(p2, doves[5], 80, 116)
 blit(cv, p2, 2)
 
 # ---------- 5×: Mini ----------
 p5 = rgba(50, 70)
-put(p5, mini, 5, 12)
+put(p5, mini, 8, 12)                      # Gesichtsmitte auf x = 125 (750er: 375)
 blit(cv, p5, 5)
 print(save(cv, '13_phoenix_call.png'))

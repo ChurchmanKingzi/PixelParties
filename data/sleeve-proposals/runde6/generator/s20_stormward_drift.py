@@ -12,7 +12,7 @@ Gewittergrau.
 Quellen (MotiveMoe.xcf):
   Tarleinn: Ebene 166 „Tarleinn“ (Figur + 4 Herzen + 3 Noten, alles Teil des Kartenbildes), geprüft gegen
             Kartenszene Ebene 155 „Sichtbar #103“ (Lage 143,111; 100 % deckungsgleich).
-  Insel:    Kartenszene Ebene 155, Ausschnitt x 141–204, y 70–158, Maske = Ebene 478 „Relic-Insel“ ∪ 166
+  Insel:    Kartenszene Ebene 155, Ausschnitt x 151–214, y 70–158, Maske = Ebene 478 „Relic-Insel“ ∪ 166
             (so sind Grasfläche, Felskante, Blumen, Säule mit Statue pixelgleich wie auf der Karte).
   Wolken:   Ebene 123 „Ebene #20“ (Wolke aus dem Kartenhintergrund) – für die Sturmwolken grau umgefärbt,
             gespiegelt, mehrfach gestaffelt; für die Wolken tief unten hell belassen.
@@ -29,7 +29,7 @@ B = 'MotiveMoe'
 rnd = random.Random(20)
 
 # ---------------------------------------------------------------- Vordergrund 4× (63×88)
-FX, FY = 141, 70
+FX, FY = 151, 70                    # Kopfmitte (x≈182) auf x = 375 von 750
 FW, FH = grid(4)
 fg = scene_masked(B, 155, [478, 166], box=(FX, FY, FX + FW, FY + FH))
 tar_m = layer(B, 166)[FY:FY + FH, FX:FX + FW, 3] > 0

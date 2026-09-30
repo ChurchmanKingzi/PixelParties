@@ -12,25 +12,25 @@ Quellen (MotiveEgypt.xcf):
   „Ebene #78“ (Wüste) pixelgleich mit „Sichtbar #52“ (Ebene 1) im Ausschnitt x350–460/y355–460 (0 Pixel Abweichung);
   das ist die Szene der Karte „Bakhm, the Desert Digger“ (Kartenbild gefiltert, gleiche Pose, gleicher Kaktus).
   Aus Ebene 132 zusätzlich nur der Tonnenkaktus hinter dem Schädel (x364–380/y377–395), in Originallage zu Bakhm.
-  Ebene 234 „Hintergrund“ – Nilufer mit Bucht, Wüste, Kakteen, Schädel (Ausschnitt x318–443/y280–455); die drei
-  Objekte, die unter Bakhm/Trichter/Kamel lägen, sind mit der 16-px-periodischen Sandtextur überdeckt.
+  Ebene 234 „Hintergrund“ – Nilufer mit Bucht, Wüste, Kakteen, Schädel (Ausschnitt x334–418/y296–413); Objekte,
+  die unter Bakhm/Trichter/Kamel lägen, sind mit der 16-px-periodischen Sandtextur überdeckt.
   Ebenen 67 „Ebene #103“ + 65 „Ebene #128“ – das Kamel der Karte „Pure Advantage Camel“ (Sichtbar Ebene 62, blickt
   wie dort nach links, hier zum Wasser); die schwarze Gestalt 66 der Karte weggelassen.
 Selbst gezeichnet: Kamelspur (Hufabdrücke), Schlagschatten, Trinkkreise im Wasser.
 
-Skalierung: EIN Raster, alles 2× (125×175): Wüste, Nil, Trichter, Bakhm (57×64 → 114×128 px), Kamel, Spur.
+Skalierung: EIN Raster, alles 3× (84×117): Wüste, Nil, Trichter, Bakhm (57×64 → 171×192 px), Kamel, Spur.
 """
 import math, random
 import numpy as np
 from gkit36_40 import *  # noqa
 
 rnd = random.Random(37)
-W2, H2 = 125, 175
-SX0, SY0 = 318, 280                # Ausschnitt aus Ebene 234
+W2, H2 = 84, 117                   # EIN Raster 3× (Bakhm samt Sandtrichter größer)
+SX0, SY0 = 334, 296                # Ausschnitt aus Ebene 234
 
 # ------------------------------------------------------------------ Hintergrund: Nilufer + Wüste
 L234 = layer('MotiveEgypt', 234)
-bg = Plane(W2, H2, 2)
+bg = Plane(W2, H2, 3)
 bg.a[:] = L234[SY0:SY0 + H2, SX0:SX0 + W2]
 rgb = bg.a[..., :3].astype(int)
 water = rgb[..., 2] > rgb[..., 0] + 60
@@ -60,14 +60,23 @@ def erase(x0, y0, x1, y1):
                         bg.a[y, x, :3] = bg.a[yy, xx, :3]; break
 
 
-erase(38, 66, 60, 100)        # Säulenkaktus links der Mitte (unter Bakhms Schädel)
-erase(66, 76, 92, 96)         # Schädel (unter dem Trichter)
-erase(85, 124, 108, 146)      # Tonnenkaktus unten (unter der Kamelspur)
+BX, BY = 16 - 363, 12 - 377        # Versatz Original → Raster (Trichter links bei x 16, Bakhm oben bei y 12)
+CX, CY = 16, 87                    # Kamel links oben; Maul am Wasser
+PROTECT = [(16, 12, 16 + 92, 12 + 71), (CX - 2, CY - 2, CX + 32, CY + 27)]
+import cv2
+om = np.array([[is_obj(c) for c in row] for row in bg.a[..., :3]]).astype(np.uint8)
+n_, lab_ = cv2.connectedComponents(cv2.dilate(om, np.ones((3, 3), np.uint8)), connectivity=8)
+for k in range(1, n_):
+    ys, xs = np.nonzero((lab_ == k) & (om > 0))
+    if len(ys) == 0: continue
+    x0, y0, x1, y1 = xs.min(), ys.min(), xs.max() + 1, ys.max() + 1
+    if any(x0 < p[2] and x1 > p[0] and y0 < p[3] and y1 > p[1] for p in PROTECT):
+        erase(max(0, x0 - 1), max(0, y0 - 1), min(W2, x1 + 1), min(H2, y1 + 1))   # Objekt unter Bakhm/Kamel
 
 # ------------------------------------------------------------------ Kamelspur (selbst gezeichnet)
 # Paarweise Hufabdrücke (je 2×2 dunkle Delle mit hellem Rand darunter), von rechts am Trichterrand vorbei zum Kamel
 DENT, RIM = (122, 92, 52), (236, 214, 152)
-pts = [(126, 104), (112, 112), (98, 121), (86, 130), (75, 138), (68, 144)]
+pts = [(86, 92), (74, 96), (62, 100), (52, 104), (47, 106)]
 steps = []
 for (x0, y0), (x1, y1) in zip(pts, pts[1:]):
     n = int(math.hypot(x1 - x0, y1 - y0) / 3.4)
@@ -91,7 +100,6 @@ cactus_box = (364, 377, 381, 396)
 cac = L132[cactus_box[1]:cactus_box[3], cactus_box[0]:cactus_box[2]].copy()
 cm = np.array([[is_obj(c) for c in row] for row in cac[..., :3]])
 cac[~cm] = 0
-BX, BY = 44 - 363, 42 - 377        # Versatz Original → Raster (Trichter links bei x 44, Bakhm oben bei y 42)
 # Tonnenkaktus liegt HINTER Bakhm → zuerst
 bg.paste(cac, cactus_box[0] + BX, cactus_box[1] + BY)
 bb = bbox(bak_full)
@@ -101,13 +109,13 @@ bg.paste(bak_full[bb[1]:bb[3], bb[0]:bb[2]], bb[0] + BX, bb[1] + BY)
 camel = compose('MotiveEgypt', [65, 67])
 sprite('o37_camel', 'MotiveEgypt', [65, 67])
 ch, cw = camel.shape[:2]
-CX, CY = 38, 132                   # links oben; Maul am Wasser
 bg.paste(silhouette(camel, (70, 48, 24)), CX + 1, CY + 2, alpha=0.40)
 bg.paste(camel, CX, CY)
 # Trinkkreise vor dem Maul (zwei helle Wellenbögen im Wasser)
 RING = (123, 173, 239)
-for (x, y) in ((33, 140), (34, 139), (35, 139), (36, 140), (31, 143), (32, 142), (33, 141), (37, 141), (38, 142)):
-    if water[y, x]: bg.a[y, x, :3] = RING
+for (dx, dy) in ((-5, 8), (-4, 7), (-3, 7), (-2, 8), (-7, 11), (-6, 10), (-5, 9), (-1, 9), (0, 10)):
+    x, y = CX + dx, CY + dy
+    if 0 <= x < W2 and water[y, x]: bg.a[y, x, :3] = RING
 
 cv = compose_planes([bg])
 save(cv, '37_sandtrap_oasis.png')

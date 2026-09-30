@@ -90,7 +90,7 @@ ghosts = rgba(mw, mh)
 put(ghosts, spirit(sekhem), 42 - sekhem.shape[1] // 2, 11)       # → Mitte x 125, y 33..108
 put(ghosts, spirit(ka), 21 - ka.shape[1] // 2, 24)
 put(ghosts, spirit(khet), 63 - khet.shape[1] // 2, 24)
-ghosts[..., 3] = np.where(ghosts[..., 3] > 0, 215, 0)
+ghosts[..., 3] = np.where(ghosts[..., 3] > 0, 128, 0)            # 50 % transparent (Nutzerwunsch)
 
 JF = 108                                                          # Fußlinie der Krüge (3×) → y 324
 for jx in (8, mw - 8 - jar.shape[1]):

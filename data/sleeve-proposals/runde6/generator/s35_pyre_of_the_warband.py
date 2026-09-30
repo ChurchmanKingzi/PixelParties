@@ -5,9 +5,9 @@ the Chaorc War Chief (Base).
 Idee: Nacht im Krater des Chaorc-Lagers (ORKLAGER seiner Kartenszene). Ganz vorn steht Calamitusk groß und vom
 Feuer hinter ihm rot umrandet; links neben/hinter ihm ist sein Kriegsbanner mit dem Flammenauge in den Boden gerammt
 (auf der Heldenkarte hält er es – hier steht es hinter ihm, damit er selbst das Hauptmotiv bleibt). Weit hinten im
-Krater lodert das große Opferfeuer (Pyre Grill Master), links davon ein rot vermummter Chaorc, rechts Asriel, the
-Sapling Sacrificer (Cover-Karte) mit blutigem Opfermesser – alle mit Bodenschatten im Feuerschein. Opfer bringen,
-damit neue Chaorcs kommen.
+Krater lodert das große Opferfeuer (Pyre Grill Master); um das Feuer steht seine Horde – links zwei rot vermummte
+Chaorcs, rechts ein weiterer und der Chaorc Ruin Mourner mit seinen Schädeln – alle mit Bodenschatten im
+Feuerschein. Opfer bringen, damit neue Chaorcs kommen.
 
 Quellen:
   MotiveHawaii.xcf Ebene 137 „Calamitustk-Kopie“ – Base-Calamitusk, geprüft gegen Szene 132 „Sichtbar #17“
@@ -18,12 +18,12 @@ Quellen:
                    Ebene 123 (Flammen) + 130 (Scheitholz-Kreuz, rechter Teil) – Lagerfeuer der Pyre-Grill-Karte.
                    Ebene 129 „Ebene #60“ – rot vermummter Chaorc. Ebene 269 „Ebene #4“ – Kachel Lagerboden (16×16)
                    und Kraterhang (16×16).
-  MotiveGrailWar.xcf Ebene 156 „Asriel“ – Asriel mit blutigem Messer (Szene 151, Karte Asriel, Lage 256,81).
+                   Ebene 128 „Ebene #83“ (zwei rot vermummte Chaorcs, getrennt) und 111 „Ruin Mourner“.
 Selbst gezeichnet: Nachthimmel mit Feuerschein, Kraterrand-Kante, Lichtschein, Bodenschatten, roter Lichtsaum
 (Oberkanten-Pixel von Calamitusk im 6×-Raster aufgehellt/getönt).
 
 Skalierung (Tiefenebenen):
-  Hintergrund: Himmel, Kraterhang, Boden, Feuer, Chaorc, Asriel, Schatten   – 2× (125×175)
+  Hintergrund: Himmel, Kraterhang, Boden, Feuer, vier Chaorcs, Schatten    – 2× (125×175)
   Mittelgrund: Banner mit Stab und Schatten                                – 3× (84×117); 108×129 px
   Vordergrund: Calamitusk + Bodenschatten                                  – 6× (42×59); 132×126 px
 """
@@ -46,7 +46,9 @@ def _pyre():
 
 pyre = cached('o35_pyre', _pyre)                                   # 50×42
 chaorc = sprite('o35_chaorc', H, [129])
-asriel = sprite('o35_asriel', 'MotiveGrailWar', [156])
+horde = cached('o35_horde', lambda: layer(H, 128))
+hooded_a, hooded_b = parts(horde, dil=1)[:2]
+mourner = sprite('o35_mourner', H, [111])
 dirt = cached('o35_dirt', lambda: layer(H, 269)[60:76, 120:136].copy())
 slope = cached('o35_slope', lambda: layer(H, 269)[160:176, 66:82].copy())
 
@@ -76,22 +78,23 @@ for y in range(bh):
 for x in range(bw):                                              # Hangfuß
     bg[FLOOR, x, :3] = (bg[FLOOR, x, :3] * 0.6).astype(np.uint8)
 # Feuerschein
-PX, PB = 62, 63                                                  # Feuer-Mitte (Spalte), Fußzeile (2×) → y 126
+PX, PB = 62, 60                                                  # Feuer-Mitte (Spalte), Fußzeile (2×) → y 120
 glow(bg, PX, PB - 18, 62, (255, 120, 40), 0.5, ry=44)
 glow(bg, PX, PB + 6, 58, (255, 150, 60), 0.38, ry=34)
 glow(bg, 68, 150, 46, (200, 90, 40), 0.3, ry=22)              # Feuerlicht auf dem Boden um Calamitusk
 shade_ellipse(bg, PX, PB - 0.5, 24, 2.4, 0.5)
 put(bg, pyre, PX - pyre.shape[1] // 2, PB - pyre.shape[0])
-# Chaorc links, Asriel rechts am Feuer, mit Schatten vom Feuer weg
-for s_, cx, dx in ((chaorc, 28, -3), (asriel, 97, 3)):
-    shade_ellipse(bg, cx + dx, PB - 0.5, s_.shape[1] / 2 + 3, 1.6, 0.45)
+# Chaorc-Horde ums Feuer (je zwei links/rechts, einer jeweils etwas weiter vorn), Schatten vom Feuer weg
+for s_, cx, fy, dx in ((mourner, 22, PB, -3), (flip(hooded_a), 40, PB + 3, -2),
+                       (hooded_b, 88, PB + 3, 2), (chaorc, 105, PB, 3)):
+    shade_ellipse(bg, cx + dx, fy - 0.5, s_.shape[1] / 2 + 3, 1.6, 0.45)
     lit = mul(s_, (1.12, 1.0, 0.9), (18, 6, 0))
-    put(bg, lit, cx - s_.shape[1] // 2, PB - s_.shape[0])
+    put(bg, lit, cx - s_.shape[1] // 2, fy - s_.shape[0])
 
 # ---------------- Mittelgrund 3× (84×117): aufgepflanztes Banner -------------------------------------------------
 mw, mh = grid(3)
 mg = rgba(mw, mh)
-BB = 83                                                           # Stabfuß (3×) → y 249, links neben/hinter Calamitusk
+BB = 87                                                           # Stabfuß (3×) → y 261, links neben/hinter Calamitusk
 bx = 3                                                            # Stab bei x ≈ 62
 for y in range(BB - 1, BB + 2):                                   # Schatten am Stabfuß
     for x in range(bx + 12, bx + 24):

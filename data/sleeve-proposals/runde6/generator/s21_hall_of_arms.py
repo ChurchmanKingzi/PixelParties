@@ -4,8 +4,8 @@ Held/Hauptmotiv (und Cover-Karte): Toras, Master of all Weapons (Base-Karte).
 
 Idee (Porträt in der Waffenhalle, Wand streng symmetrisch): Toras steht mitten in seiner Halle im Schloss
 von Blackport, frontal, mit dem Schwert in der Linken und der riesigen weißen Krummklinge in der Rechten –
-genau wie auf seiner Karte. Die Wand hinter ihm ist als Trophäenwand geordnet: links und rechts je ein
-grünes Banner der Halle, darüber hängen als Paar die beiden Schilde seines Decks (Shield of Life und
+genau wie auf seiner Karte. Die Wand hinter ihm ist als Trophäenwand geordnet: ganz links und rechts je ein
+grünes Banner der Halle, dazwischen (ohne Überschneidung) hängen als Paar die beiden Schilde seines Decks (Shield of Life und
 Shield of Death), und über seinem Kopf liegt – wie im Kartenbild – das grüne Schwert quer an der Wand.
 Kartentext: +40 Angriff je Artefakt mit anderem Namen → die Halle ist voller verschiedener Waffen.
 
@@ -93,12 +93,13 @@ for y in range(GH):
 # Banner links (original) und rechts (gespiegelt), symmetrisch zur Achse
 bw = ban.shape[1]
 BY = 7
-put(hall, ban, 1, BY)
-put(hall, flip(ban), 2 * AX + 1 - 1 - bw, BY)
+BX = -2                                   # Banner ganz außen (teils unter dem Rahmen), damit sie die Schilde nicht berühren
+put(hall, ban, BX, BY)
+put(hall, flip(ban), 2 * AX + 1 - BX - bw, BY)
 # Schildpaar über dem Kopf: Life links, Death rechts
 SY = 9
-put(hall, life, AX - 1 - life.shape[1], SY)
-put(hall, death, AX + 2, SY + 1)
+put(hall, life, 15, SY)                   # Life x 15–32 und Death x 35–47: Paar mittig, je 2 px Abstand zu den Bannern
+put(hall, death, 35, SY + 1)
 # grünes Schwert quer über dem Kopf (Lage wie im Kartenbild: 1 px über dem Scheitel)
 tw = toras.shape[1]
 TX = AX - (318 - TB[0])           # Körpermitte (x≈318) auf die Achse

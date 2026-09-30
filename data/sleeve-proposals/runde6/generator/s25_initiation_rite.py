@@ -1,36 +1,34 @@
 # -*- coding: utf-8 -*-
 """25 Initiation Rite – Gegner „Join our Cult!“ (sample-Structure Deck Join our Cult), Held: Klaus, the Cult Leader.
 
-Idee (Porträt-Close-up über der Zeremonie): Aus dem Dunkel über seinem Kultkeller erhebt sich Klaus groß als
-Brustbild – Kapuze, blaues Haar, rotes Auge, erhobener Opferdolch –, links und rechts von ihm lodern die zwei
-Wandfackeln. Klein darunter auf dem Steinboden des Gewölbes kniet der braunhaarige Neuling seiner Base-Karte in
-einem fahlen roten Decay-Glühen („Join our Cult!“), flankiert von zwei gleich aufgestellten Reihen seiner
-Kultisten in schwarzen Kutten. Kein Pentagramm.
+Idee (Porträt vor der Zeremonie): Klaus – Kapuze, blaues Haar, rotes Auge – steht groß im Vordergrund vor der
+Tür seines Kultkellers, den Messer-Arm mit dem erhobenen Opferdolch ausgestreckt, der andere Arm hängt. Hinter
+ihm im fackelbeleuchteten Gewölbe kniet der braunhaarige Neuling seiner Base-Karte in einem fahlen roten
+Decay-Glühen („Join our Cult!“), links und rechts je zwei Kultisten in schwarzen Kutten. Kein Pentagramm.
 
-Quellen (MotiveGrailWar.xcf):
-  Ebene 526 „Kultisten“, rechte Gruppe (Box x 279–297, y 123–154) = die Figurengruppe der Base-Karte
-      „Klaus, the Cult Leader“ (Kartenszene Sichtbar #48 = Ebene 738, Lage 222,66; die Karte zeigt sie
-      weichgezeichnet/vergrößert). Auf der Karte existiert von Klaus nur der Kopf mit Kapuze, Dolch und Hand –
-      sein Körper steckt hinter dem Neuling (Ebenen geprüft: scene_layers/card_region_layers der Szene 738 liefern
-      keine weitere Klaus-Ebene). Daher:
-        – Klaus-Brustbild = Zeilen 0–17 der Gruppe ohne die Haarpixel des Neulings; die so frei werdenden Stellen
-          unter der Kapuze als Kutte in den Kapuzenfarben (Umriss 25, heller Saum 82/58, Fläche 42, Falte 32)
-          mit schräg abfallenden Schultern bis Zeile 22 fortgesetzt und unten ins Dunkel aufgelöst; alle
-          Originalpixel (Kapuze, Gesicht, Dolch, Hand) liegen obenauf (leichte Ergänzung im Stil des Sprites).
-        – Neuling = Zeilen 12–30 der Gruppe ohne Klaus-Pixel (vollständig, er steht vor Klaus).
-      Linke Gruppe derselben Ebene (Box x 249–263, y 116–171): drei Kultisten hintereinander; rechts gespiegelt und
-      mit umgefärbtem Haar als zweite Reihe (symmetrische Aufstellung).
-  Ebene 532 „Ebene #145“ – Kultkeller mit brennenden Fackeln (Ausschnitt x 234–359, y 26–201); Ritualkreis
-      (x 268–326, y 125–186) mit der Bodenkachel (16×16, x 282–298, y 108–124) übermalt, die fünf eingebauten
-      Kultisten per 16-px-Periode aus den Nachbarspalten übermalt.
-Selbst gezeichnet: Dunkelheit über dem Gewölbe, Fackelschein, rotes Bodenglühen, Bodenschatten.
+Quellen:
+  runde6/refs/klaus_body_front.png (Nutzer-Referenz, 20×25): Klaus' Körper von vorn. Übernommen bis auf den
+      rechten Arm: der ausgestreckte rechte Ärmel (Zeilen 13–16, Spalten 16–19) wurde entfernt und derselbe Ärmel
+      um 90° gedreht und auf 9 Zeilen verlängert als hängender Arm an die Schulter gesetzt – nur der Messer-Arm
+      (links im Bild) bleibt ausgestreckt.
+  MotiveGrailWar.xcf
+    Ebene 526 „Kultisten“, rechte Gruppe (Box x 279–297, y 123–154) = Figurengruppe der Base-Karte
+      (Kartenszene Sichtbar #48 = Ebene 738, Lage 222,66, weichgezeichnet): daraus der Dolch (Spalten 1–2,
+      Zeilen 6–12; über die ausgestreckte Hand gesetzt) und der kniende Neuling (Zeilen 12–30 ohne Klaus-Pixel).
+    Linke Gruppe derselben Ebene (Box x 249–263, y 116–171): die unteren zwei Kultisten (grauhaarig, kahl; Haar-
+      spitze der oberen Kultistin entfernt); rechts gespiegelt, graues Haar braun getönt (symmetrische Aufstellung).
+    Ebene 532 „Ebene #145“ – Kultkeller mit brennenden Fackeln, Tür und beleuchtetem Gang davor (Ausschnitt
+      x 234–359, y 60–235); Ritualkreis (x 268–326, y 125–186) mit der Bodenkachel (16×16, x 282–298, y 108–124)
+      übermalt, die fünf eingebauten Kultisten per 16-px-Periode aus den Nachbarspalten übermalt.
+Selbst gezeichnet: Abdunklung, Fackelschein, rotes Bodenglühen, Bodenschatten.
 
 Skalierung:
-  Hintergrund (Gewölbe, Neuling, Kultistenreihen, Licht)   – 2× (Raster 125×175)
-  Vordergrund (Klaus-Brustbild 22×23 → 176×184)            – 8× (Raster 32×44)
+  Hintergrund (Gewölbe, Neuling, Kultisten, Licht)   – 2× (Raster 125×175)
+  Vordergrund (Klaus 20×25 → 120×150, Schatten)      – 6× (Raster 42×59)
 """
-import math
+import math, os
 import numpy as np
+from PIL import Image
 from ekit_25_30 import *  # noqa
 
 GW = 'MotiveGrailWar'
@@ -45,34 +43,23 @@ def is_novice_px(p):
     return tuple(int(v) for v in p[:3]) in NOVICE
 
 
-# ---------------- Klaus-Brustbild (Sprite um 2 Spalten je Seite verbreitert, damit die Schultern Platz haben)
-P = 2
-bust = np.zeros((23, 18 + 2 * P, 4), np.uint8)
-for y in range(18):
-    for x in range(18):
+# ---------------- Klaus von vorn (Nutzer-Referenz runde6/refs/klaus_body_front.png, 20×25)
+REF = np.array(Image.open(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'refs',
+                                       'klaus_body_front.png')).convert('RGBA'))
+klaus = REF.copy()
+seg = REF[13:17, 14:20].copy()                         # rechter Ärmel waagrecht (4 Zeilen × 6 Spalten)
+klaus[13:17, 16:20] = 0
+arm = np.rot90(seg, -1)                                # als hängender Ärmel senkrecht gestellt …
+arm = np.concatenate([arm[:3], arm[2:4], arm[2:4], arm[3:]], 0)   # … und auf 9 Zeilen verlängert
+for y in range(arm.shape[0]):
+    for x in range(arm.shape[1]):
+        if arm[y, x, 3]:
+            klaus[13 + y, 15 + x] = arm[y, x]
+for y in range(6, 13):                                 # Dolch der Kartengruppe über der ausgestreckten linken Hand
+    for x in (1, 2):
         p = grp[y, x]
-        if p[3] and not is_novice_px(p):
-            bust[y, x + P] = p
-HOOD_IN, OUT, RIM, FILL, FOLD = (32, 32, 32), (25, 25, 25), (82, 82, 82), (42, 42, 42), (32, 32, 32)
-keep = bust.copy()                                   # Originalpixel (Kapuze, Gesicht, Dolch, Hand) bleiben obenauf
-W2 = bust.shape[1]
-for y in range(12, 23):
-    t = (y - 12) / 10
-    lo = round((4 + P) - t * 4)                      # linker Umriss: von der Kapuze schräg zur Schulter
-    hi = round((16 + P) + t * 3)                     # rechter Umriss
-    hi = min(hi, W2 - 1); lo = max(lo, 0)
-    for x in range(lo, hi + 1):
-        c = FILL
-        if x in (lo, hi): c = OUT
-        elif x == lo + 1 or x == hi - 1: c = RIM if x == lo + 1 else (58, 58, 58)
-        elif x == (lo + hi) // 2 + 1 and y > 14: c = FOLD
-        bust[y, x] = (*c, 255)
-m = keep[..., 3] > 0
-bust[m] = keep[m]
-for y in range(18, 23):                              # unten ins Dunkel auflösen (gedithert)
-    for x in range(W2):
-        if bust[y, x, 3] and bay(x, y) < (y - 17) / 5.5:
-            bust[y, x, 3] = 0
+        if p[3] and tuple(int(v) for v in p[:3]) in ((191, 198, 198), (246, 246, 246)):
+            klaus[y, x - 1] = p
 
 # ---------------- Neuling (kniend)
 novice = np.zeros((19, 18, 4), np.uint8)
@@ -99,12 +86,12 @@ for (x0, y0, x1, y1), dxs in boxes:
             for dx in dxs:
                 if not M[y, x + dx]:
                     hall[y, x] = src[y, x + dx]; break
-X0, Y0 = 234, 26
+X0, Y0 = 234, 60
 bw, bh = grid(2)
 bg = hall[Y0:Y0 + bh, X0:X0 + bw].copy()
 bg[..., 3] = 255
 TORCH = [(256 - X0, 96 - Y0), (336 - X0, 96 - Y0)]
-NX, NY = 62.5, 146                 # Fußpunkt des Neulings (Canvas 125, 292)
+NX, NY = 62.5, 76                  # Fußpunkt des Neulings (Canvas 125, 152)
 out = bg[..., :3].astype(float)
 for y in range(bh):
     for x in range(bw):
@@ -115,7 +102,7 @@ for y in range(bh):
         d = math.hypot((x + .5 - NX) / 30, (y + .5 - (NY - 8)) / 22)
         rg = math.floor(max(0, 1 - d) ** 1.1 * 4 + bay(x, y)) / 4
         c = out[y, x] * min(lt, 1.0) + np.array([140, 10, 18]) * rg * .6
-        top = max(0.0, min(1.0, (46 - y) / 14))            # Dunkel über dem Gewölbe
+        top = max(0.0, min(1.0, (14 - y) / 10))            # Dunkel über dem Gewölbe
         q = math.floor(top * 4 + bay(x, y)) / 4
         out[y, x] = c * (1 - q) + np.array([5, 3, 8]) * q
 bg[..., :3] = out.clip(0, 255).astype(np.uint8)
@@ -135,20 +122,30 @@ def shadow(a, cx, y, w):
 # Neuling in der Mitte, zwei Kultistenreihen symmetrisch (rechts gespiegelt, Haar umgefärbt)
 shadow(bg, NX, NY, 16)
 put(bg, novice, int(NX - 9), NY - novice.shape[0] + 1)
+# nur die beiden unteren Kultisten der Reihe (grauhaarig + kahl); die Haarspitze der oberen Kultistin entfernt
+cult2 = cult[14:].copy()
+for y in range(4):
+    for x in range(cult2.shape[1]):
+        c_ = cult2[y, x, :3].astype(int)
+        if cult2[y, x, 3] and c_[0] > c_[2] + 40:
+            cult2[y, x] = 0
+cult = crop_alpha(cult2)
 cult_r = flip(cult)
-hair = np.zeros(cult_r.shape[:2], bool)
-hsv = cult_r[..., :3].astype(int)
-hair = (hsv[..., 0] > hsv[..., 2] + 40) & (cult_r[..., 3] > 0)        # warme Töne = Haar/Haut
-skin = (hsv[..., 0] > 200) & (hsv[..., 1] > 150)
-cult_r = hsv_shift(cult_r, dh=-25, ds=.8, dv=.8, mask=hair & ~skin)
-CY = 156                                                     # Fußzeile der Reihen (Canvas 312)
-for cx, s in ((34, cult), (125 - 34, cult_r)):
+g_ = cult_r[..., :3].astype(int)                                      # rechte Reihe: graues Haar braun getönt
+grey_hair = (cult_r[..., 3] > 0) & (np.abs(g_[..., 0] - g_[..., 2]) < 12) & (g_.max(-1) > 70)
+grey_hair[12:] = False
+cult_r[grey_hair, :3] = (cult_r[grey_hair, :3] * np.array([.9, .62, .42])).astype(np.uint8)
+CY = 96                                                      # Fußzeile der Reihen (Canvas 192)
+for cx, s in ((36, cult), (125 - 36, cult_r)):
     shadow(bg, cx, CY, 12)
     put(bg, s, int(cx - s.shape[1] / 2), CY - s.shape[0] + 1)
 
-# ================================================================ 8×: Klaus
-fw, fh = grid(8)                                           # 32×44
+# ================================================================ 6×: Klaus im Vordergrund vor der Kellertür
+fw, fh = grid(6)                                           # 42×59
 fg = rgba(fw, fh)
-put(fg, bust, 16 - 11, 3)                                  # Canvas x 40–216, y 24–208
+KX, KB = 11, 53                                            # linke Kante, Fußzeile (Canvas x 66–186, y 318–323)
+for x in range(KX + 5, KX + 16):
+    if bay(x, KB + 1) < .8: setp(fg, x, KB + 1, (10, 5, 8), 190)
+put(fg, klaus, KX, KB - klaus.shape[0] + 1)
 
-print(finish([(bg, 2), (fg, 8)], '25_initiation_rite.png'))
+print(finish([(bg, 2), (fg, 6)], '25_initiation_rite.png'))
