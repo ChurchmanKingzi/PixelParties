@@ -5,7 +5,8 @@ Neues Motiv (Nutzer-Feedback: aus den Elementen seiner eigenen Karte gebaut): Ar
 dämmrigen Halle vor der großen Glasrosette seiner Base-Karte. Die fünf farbigen Felder zeigen – wie auf der Karte –
 die fünf Gestalten des Kartenmotivs (Schattengestalt mit rotem Auge, rothaarige Kämpferin, braunhaarige Schützin,
 Mann mit Hut und Pelzkragen, Hexe mit Spitzhut). Das Licht fällt bunt durch die Rosette auf den
-Parkettboden der Halle, auf dem der Erzmagier mit Stab und violetten Funkelsternen steht.
+Parkettboden der Halle, auf dem der Erzmagier mit Stab und violetten Funkelsternen steht. Seine Gesichtsmitte
+liegt exakt auf x = 375 von 750 (am PNG nachgemessen: Nase x 360–390).
 
 Quellen (alle Motive.xcf, Szene der Karte „Archibald, the Archmage“ = Sichtbar #43, Ebene 98, Lage 247,117):
   Ebene 436 „ARCHMAGE“ + 435 „Archmage #9“ (Archibald mit Funkelsternen; Komposit pixelgleich mit der Szene,
@@ -118,7 +119,8 @@ for y in range(FLOOR + 1, h5):
             if BAY[y % 4, x % 4] < 0.8:
                 fg[y, x, :3] = (fg[y, x, :3] * (1 - q) + col * q).astype(np.uint8)
 ah, aw = arch.shape[:2]
-AX = w5 // 2 - aw // 2
+FACE_MID = 16                                # Gesichtsmitte im Sprite: Grenze zwischen den Nasenspalten 15|16
+AX = w5 // 2 - FACE_MID                      # → Gesichtsmitte bei x = 25·5·3 = 375 von 750
 AFEET = FLOOR + 4                            # steht auf dem Parkett (y 320–325)
 for x in range(AX + 5, AX + aw - 3):
     setp(fg, x, AFEET, (26, 10, 44))         # Kontaktschatten

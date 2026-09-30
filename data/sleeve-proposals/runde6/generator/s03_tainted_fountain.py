@@ -88,15 +88,15 @@ for (cx, cy, rx, ry) in [(18, 30, 12, 2.5), (64, 26, 12, 2.5), (40, 8, 14, 2.5),
             if d < 1 and (1 - d) * 1.4 > bayer(x, y) + 0.25:
                 p3[y, x, :3] = mix(p3[y, x, :3], (200, 160, 236), 0.45)
 # Bodenschatten für Zsos'Ssar (Füße bei 250er-y 312 → 3×-Reihe 104)
-shadow_ellipse(p3, 37.5, 104, 13, 2.2, a=0.5)
+shadow_ellipse(p3, 40.5, 104, 13, 2.2, a=0.5)
 cv = Canvas(250, 350)
 blit(cv, p3, 3, -1, 0)
 
 # ---- Ebene 2: Zsos'Ssar (6×, 42×59) ---------------------------------------------------------------
 W6, H6 = 42, 59
 p6 = rgba(W6, H6)
-ZX, ZY = 4, 52 - zsos.shape[0]                               # Gesichtsmitte (Sprite-x 16,5) → 250er-x 125
+ZX, ZY = 5, 52 - zsos.shape[0]                               # Gesicht = Sprite-Spalten 10–19 (Mitte 15,0) → 250er-x 125
 put(p6, zsos, ZX, ZY)
-blit(cv, p6, 6, 2, 0)
+blit(cv, p6, 6, 5, 0)                                         # gemessen: Gesichtsmitte x = 375 (von 750)
 print(save(cv, '03_tainted_fountain.png'))
 print(preview('03_tainted_fountain.png', 'twist', 'bronze', 'emerald', 'amethyst'))

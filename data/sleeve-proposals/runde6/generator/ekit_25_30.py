@@ -98,13 +98,16 @@ def line(a, x0, y0, x1, y1, col, al=255):
 
 
 def finish(layers, fname):
-    """layers: Liste (rgba, k) von hinten nach vorn; jede Ebene wird einmal ganzzahlig hochskaliert."""
+    """layers: Liste (rgba, k[, dx, dy]) von hinten nach vorn; jede Ebene wird einmal ganzzahlig hochskaliert
+    und optional als Ganzes um (dx, dy) Canvas-Pixel verschoben (Feinausrichtung, Pixelgröße bleibt einheitlich)."""
     cv = Canvas(W, H)
-    for arr, k in layers:
+    for L in layers:
+        arr, k = L[0], L[1]
+        dx, dy = (L[2], L[3]) if len(L) > 2 else (0, 0)
         a = arr
         if a.shape[2] == 3:
             a = np.dstack([a, np.full(a.shape[:2], 255, np.uint8)])
-        cv.paste(up(a, k)[:H, :W], 0, 0)
+        cv.paste(up(a, k), dx, dy)
     return save(cv, fname)
 
 

@@ -9,7 +9,7 @@ genau in der Bildmitte; kein Nachbild (Nutzer-Feedback).
 
 Quellen:
   MotiveSteamDwarfs.xcf  Kartenszene „Idej Lord Daiyo“ = Ebene 402 „Sichtbar #4“ (Lage 83,71, exakter Treffer):
-                         Ebene 407 „Ebene #23“ (Daiyo, grün; in der Karte mit ~73 % Deckkraft über dem
+                         Ebene 407 „Ebene #23“ (Daiyo, grün; in der Karte ~73 % Deckkraft, hier auf Wunsch gedimmt: 62 %, Farben ×0,8; über dem
                          Hintergrund – hier ebenso), Ebene 405 „Ebene #24“ (Hand am Griff, ~75 %),
                          Ebene 406 „Ebene #22“ (weißes Schwert, deckend). (Gleiche Figur wie MotiveJapan 160 „Daiyo“.)
                          Nicht verwendet: 403/404 (verblasste bzw. schwarze Variante, in der Karte ausgeblendet).
@@ -128,10 +128,12 @@ for y in range(GH):
     for x in range(GW):
         d = math.hypot((x + .5 - gx) / 34, (y + .5 - gy) / 48)
         if d < 1:
-            q = dith((1 - d), x, y, 4) * 0.22
+            q = dith((1 - d), x, y, 4) * 0.12
             c = cv.a[y * 2:(y + 1) * 2, x * 2:(x + 1) * 2].astype(float)
             cv.a[y * 2:(y + 1) * 2, x * 2:(x + 1) * 2] = (c * (1 - q) + np.array([70, 255, 110]) * q).astype(np.uint8)
 
 
-daiyo_on(cv.a, k, DX, DY, 0.73, 1.0)
+# gedimmt (Nutzer-Feedback 2): Grün etwas dunkler und ein wenig durchscheinender, Schwert leicht gedämpft
+body = shade(body, 0.8, (10, 30, 20)); hand = shade(hand, 0.8, (10, 30, 20)); sword = shade(sword, 0.85, (20, 30, 30))
+daiyo_on(cv.a, k, DX, DY, 0.62, 1.0)
 print(save(cv, '24_afterimage.png'))

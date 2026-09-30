@@ -112,7 +112,7 @@ def stand(s, cx, fy, fl=False):
     s = flip(s) if fl else s
     put(p2, s, int(cx - s.shape[1] / 2), fy - s.shape[0]); return (int(cx), fy - s.shape[0])
 tops = []
-tops.append(stand(druid, 62, 151))                          # Elven Druid hinter dem Leader
+tops.append(stand(druid, 62, 141))                          # Elven Druid hinter dem Leader
 tops.append(stand(archer, 40, 153)); tops.append(stand(archer, 84, 153, True)); tops.append(stand(leader, 62, 158))
 # grüne Heilfunken über den Elfen (+HP)
 GRN = [(200, 255, 170), (110, 220, 90)]

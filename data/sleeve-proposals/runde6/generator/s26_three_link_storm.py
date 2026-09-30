@@ -3,24 +3,23 @@
 Held: Sol Rym, the Thunder Djinn.
 
 Idee (Action, Nachtgewitter über dem Meer): Sol Rym thront – wie auf seiner Base-Karte – auf seiner schwarzen
-Gewitterwolke, die als Wolkenbank quer über den Himmel liegt. Unter ihm springt ein einziger Kettenblitz
-(Cover-Karte Chain Lightning, die er unabhängig von ihrem Level wirken darf) dreimal über die Oberfläche der
-nächtlichen See: 200 – 150 – 100 Schaden, der Blitz wird von Sprung zu Sprung dünner. An den Einschlägen
-spritzt das Wasser auf, Glanzringe und Spiegelungen liegen auf dem Meer. Kein Lampen-/Teppichmotiv (vgl. „Djinn's Lamp“).
+Gewitterwolke, die als Wolkenbank quer über den Himmel liegt. Aus der Wolke zucken viele Blitze: ferne, blasse
+bis zum Horizont, zwei große an den Seiten und der Hauptblitz (Cover-Karte Chain Lightning, die er unabhängig von
+ihrem Level wirken darf) mitten ins Meer; die Einschläge glühen und spiegeln sich im Wasser. Kein Lampen-/Teppichmotiv (vgl. „Djinn's Lamp“).
 
 Quellen:
   Motive.xcf    Ebene 1509 „Sol Rym“ + 1519 „Ebene #639“ (seine Gewitterwolke) – Base-Karte, geprüft gegen die
                 Kartenszene Sichtbar #162 (Ebene 372, Kartenausschnitt Lage 208,68; 1509 ist dort zu 96 % deckungsgleich,
                 Wolke unter ihm wie auf der Karte). Der Kartenblitz 1502 wird nicht übernommen (seine Ebene enthält
-                die getroffenen Figuren der Karte); der Kettenblitz ist in genau dessen Farben gezeichnet
+                die getroffenen Figuren der Karte); alle Blitze sind in genau dessen Farben gezeichnet
                 (Kern 255,255,255 / Saum 255,255,122).
   MotiveGN.xcf  Ebene 353 „Klippe #1“ – zwei dunkle Gewitterwolken-Sprites (x 183–252/y 155–172, x 248–317/y 148–155)
                 als ferne Wolken hoch am Himmel (keine dunklen Schemen am Horizont).
-Selbst gezeichnet: Nachthimmel, Meer mit Wellenlinien und Spiegelungen, Einschlagspritzer und Glanzringe, Kettenblitz mit kleinen
-Verästelungen, Einschlagglühen.
+Selbst gezeichnet: Nachthimmel, Meer mit Wellenlinien und Spiegelungen, Blitze mit kleinen Verästelungen,
+Einschlagglühen.
 
 Skalierung:
-  Hintergrund (Himmel, ferne Wolken, Meer, Einschläge, Blitze, Glühen)       – 2× (Raster 125×175)
+  Hintergrund (Himmel, ferne Wolken, Meer, Blitze, Glühen)                  – 2× (Raster 125×175)
   Vordergrund (Sol Rym + seine Wolke, 81×31 → 405×155, seitlich angeschnitten) – 5× (Raster 50×70)
 """
 import math, random
@@ -51,23 +50,10 @@ for y in range(HOR + 2, bh, 1):
             if rnd.random() < .7:
                 setp(bg, x + i, y, (34, 50, 84) if t < .5 else (26, 40, 70))
 
-# Einschlagstellen im Meer (x, Wasserlinie, Größe): vorn groß, nach hinten kleiner
-STACKS = [(38, 150, 150, 1.0), (94, 142, 142, .75), (64, 137, 137, .5)]     # (x, Einschlag, Wasserlinie, Größe)
-for cx, top, base, sz in STACKS:
-    rx = 7 * sz + 2
-    for x in range(int(cx - rx) - 1, int(cx + rx) + 2):          # flacher Glanzring auf dem Wasser
-        for y in range(base - 2, base + 3):
-            d = math.hypot((x + .5 - cx) / rx, (y + .5 - base) / (1.6 * sz + .6))
-            if .7 < d < 1.05:
-                setp(bg, x, y, (170, 190, 210) if y <= base else (110, 130, 170))
-            elif d <= .7 and bay(x, y) < .5:
-                setp(bg, x, y, (210, 220, 200))
-    for i in range(int(10 * sz) + 3):                             # Einschlagspritzer
-        dx = rnd.uniform(-1, 1) * (3 * sz + 1)
-        h_ = rnd.uniform(1, 6 * sz + 2) * (1 - abs(dx) / (3 * sz + 2))
-        setp(bg, int(round(cx + dx)), int(round(base - h_)), (230, 240, 250) if rnd.random() < .6 else (150, 180, 220))
+# Einschlagstelle des Hauptblitzes im Meer (x, Wasserlinie) – ohne Spritzer, ohne Sprünge über das Wasser
+HIT = (38, 150)
 
-# Kettenblitz (Farben des Kartenblitzes): Wolke → Einschlag 1 → 2 → 3 über die Wasseroberfläche, von Sprung zu Sprung dünner
+# Blitze in den Farben des Kartenblitzes
 CORE, EDGE = (255, 255, 255), (255, 255, 122)
 
 
@@ -102,15 +88,12 @@ def bolt(p0, p1, width, seed, branches=2, core=None, edge=None):
             setp(bg, x, y, EDGE_)
 
 
-HITS = [(c, t) for c, t, b_, h_ in STACKS]
-# Einschlagglühen + Spiegelungen im Wasser
-for (hx, hy), s in zip(HITS, (.6, .45, .3)):
-    glow(bg, hx + .5, hy + .5, 9 * s + 4, 7 * s + 3, (255, 250, 170), s * .8, steps=2)
-for (cx, top, base, sz_), s in zip(STACKS, (.5, .38, .26)):
-    for y in range(base + 3, min(bh, base + 3 + int(40 * s))):
-        for x in range(cx - 1, cx + 2):
-            if rnd.random() < s * (1 - (y - base) / (40 * s + 4)):
-                setp(bg, x + rnd.choice((-1, 0, 1)), y, (200, 200, 130))
+# Einschlagglühen + Spiegelung des Hauptblitzes im Wasser
+glow(bg, HIT[0] + .5, HIT[1], 8, 3, (240, 240, 170), .5, steps=2)
+for y in range(HIT[1] + 3, min(bh, HIT[1] + 23)):
+    for x in range(HIT[0] - 1, HIT[0] + 2):
+        if rnd.random() < .5 * (1 - (y - HIT[1]) / 24):
+            setp(bg, x + rnd.choice((-1, 0, 1)), y, (200, 200, 130))
 # weitere Blitze der Gewitterwolke: ferne (blass, 1 Pixel) bis zum Horizont, mittlere (2 Pixel) bis aufs Wasser
 FAR_B = [((8, 76), (4, HOR)), ((20, 80), (27, HOR)), ((104, 80), (97, HOR)), ((117, 76), (121, HOR)),
          ((86, 86), (80, HOR + 1))]
@@ -120,9 +103,7 @@ for i, (a_, b_) in enumerate(FAR_B):
 for i, (a_, b_) in enumerate((((10, 78), (16, 158)), ((114, 80), (108, 162)))):
     glow(bg, b_[0] + .5, b_[1], 7, 3, (230, 230, 170), .45, steps=2)
     bolt(a_, b_, 2, 60 + i, 3)
-bolt((62, 86), HITS[0], 3, 1, 3)
-bolt(HITS[0], HITS[1], 2, 2, 2)
-bolt(HITS[1], HITS[2], 1, 3, 1)
+bolt((62, 86), HIT, 3, 1, 3)                  # Hauptblitz (Chain Lightning) von der Wolke ins Meer
 
 # ================================================================ 5×-Ebene: Sol Rym auf seiner Wolke
 fw, fh = grid(5)                              # 50×70

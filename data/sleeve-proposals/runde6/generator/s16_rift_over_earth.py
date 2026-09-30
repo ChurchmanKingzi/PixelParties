@@ -24,7 +24,7 @@ Skalierung (Ausgabe = 250×350-Raster × 3):
   All, Sterne                                                      – 1×
   Argos (Körper 196×158), Würfel, Blickkegel, alle Kreaturen, Strahlen – 2× (125×175)
 """
-import math, random
+import math, random, os
 from c_util import *  # noqa
 import numpy as np
 import cv2
@@ -32,22 +32,11 @@ import cv2
 B = 'MotiveBoons'
 rnd = random.Random(16)
 
-# --- Argos: Körper 41 + 40, Auge 38 mit schwarz gefüllter Pupille ---
-eye = layer(B, 38).copy()
-m = (eye[..., 3] > 0).astype(np.uint8)
-ff = m.copy(); h_, w_ = ff.shape
-mask = np.zeros((h_ + 2, w_ + 2), np.uint8)
-cv2.floodFill(ff, mask, (0, 0), 1)
-holes = (ff == 0)                                    # vom Auge umschlossene Pixel = Pupille
-eye[holes] = [0, 0, 0, 255]
-body = layer(B, 41).copy(); inner = layer(B, 40)
-body[inner[..., 3] > 0] = inner[inner[..., 3] > 0]
-body[eye[..., 3] > 0] = eye[eye[..., 3] > 0]
-bx0, by0, bx1, by1 = bbox(body)
-argos = body[by0:by1, bx0:bx1]                        # 98×79
-EYE_IN = (169 - bx0, 300 - by0)                       # Auge im Argos-Sprite
-print('argos', argos.shape, 'eye at', EYE_IN)
-
+# --- Argos: kohärenter Schattenkörper mit Auge aus der Nutzer-Referenz refs/argos_body.png (113×167, RGBA) ---
+# (in den exportierten xcf-Ebenen nicht gefunden; Ebenen 41/40 sind nur eine grobe Vorform). Pupille schwarz.
+from PIL import Image
+ref = np.array(Image.open(os.path.join(HERE, '..', 'refs', 'argos_body.png')).convert('RGBA'))
+REX, REY = 53.5, 81.5                                  # Augenmitte in der Referenz (rotes Auge x43–63, y57–106)
 cube = sprite('o16_cube', B, [74])                   # 36×36
 search = parts(compose(B, [22]), dil=1)[0]           # 19×34
 beam = [p for p in parts(compose(B, [23]), dil=1) if p.shape[0] == 29][0]
@@ -67,47 +56,57 @@ for _ in range(80):
 for (x, y) in [(34, 30), (218, 40), (26, 200), (226, 250), (40, 318), (210, 312)]:
     for dx, dy in ((0, 0), (1, 0), (-1, 0), (0, 1), (0, -1)): cv.px(x + dx, y + dy, (170, 190, 255) if (dx or dy) else (255, 255, 255))
 
-# ---------- 2×: Argos, Würfel, Kreaturen ----------
+# ---------- 2×: Argos-Körper, nach außen zunehmend transparent (Alpha je ganzem 2×-Pixel) ----------
+AXc, AYc = 62.5, 55                                    # Augenmitte im 2×-Raster (250er: x125, y110)
+ox, oy = int(AXc - REX), int(AYc - REY)
+for j in range(ref.shape[0]):
+    for i in range(ref.shape[1]):
+        a0 = ref[j, i, 3] / 255
+        if a0 == 0: continue
+        d = math.hypot((i + 0.5 - REX) / 1.0, (j + 0.5 - REY) / 1.25)
+        fade = 1.0 if d < 20 else max(0.0, 1 - (d - 20) / 52) ** 1.2
+        a_ = a0 * fade
+        if a_ < 0.04: continue
+        X_, Y_ = (ox + i) * 2, (oy + j) * 2
+        if not (0 <= X_ < 250 and 0 <= Y_ < 350): continue
+        blk = cv.a[Y_:Y_ + 2, X_:X_ + 2].astype(float)
+        cv.a[Y_:Y_ + 2, X_:X_ + 2] = (blk * (1 - a_) + ref[j, i, :3] * a_).astype(np.uint8)
+
+# ---------- 2×: Blickkegel, Kreaturen, Strahlen ----------
 p2 = rgba(125, 175)
-AX, AY = (125 - argos.shape[1]) // 2, 6               # Argos oben mittig (250er: x28–224, y12–170)
-CX, CY = (125 - 36) // 2, 118                         # Würfel (250er: y236–308)
-ecx = AX + EYE_IN[0] + 11.5
-# Blickkegel vom Körperrand zum Würfel
-y0, y1 = AY + 76, CY + 2
+CS = 3                                                 # Würfel 3× (108×108), Vordergrund
+CXp, CYp = 125 - 54, 212                               # Würfel im 250er-Raster: x71–179, y212–320
+ecx = AXc
+y0, y1 = int(AYc + 26), CYp // 2 + 2
 for y in range(y0, y1):
     t = (y - y0) / max(1, y1 - y0)
-    half = 6 + 14 * t
+    half = 4 + 16 * t
     for x in range(int(ecx - half), int(ecx + half) + 1):
         f = 1 - abs(x + 0.5 - ecx) / half
         lv = int(f * 2.4 + bayer(x, y))
         if lv:
             c = tuple(int(v) for v in cv.a[y * 2, x * 2])
             p2[y, x] = list(mix(c, (160, 26, 48), (0, 0.2, 0.34, 0.46)[min(3, lv)])) + [255]
-put(p2, cube, CX, CY)
-put(p2, argos, AX, AY)                                 # Schattenkörper hinter den Kreaturen
-for y in range(CY, CY + 10):                          # roter Schein auf der Würfeloberseite
-    for x in range(CX, CX + 36):
-        if p2[y, x, 3] and bayer(x, y) < 0.55 - (y - CY) * 0.05:
-            p2[y, x, :3] = mix(tuple(int(v) for v in p2[y, x, :3]), (210, 50, 70), 0.35)
-cube_lit = p2[CY:CY + 36, CX:CX + 36].copy()
-cube_lit[cube[..., 3] == 0] = 0
-# zwei Life-Searcher über dem Würfel, gespiegelt
-S_L, S_R = (CX - 3, 78), (CX + 36 - 16, 78)
+S_L, S_R = (32, 52), (74, 52)                          # Life-Searcher über den oberen Würfelecken
 put(p2, search, *S_L); put(p2, flip(search), *S_R)
-# zwei Analyzer rechts, fliegen nach links unten zum Würfel (Spur nach rechts oben)
 def trail(x, y, dx, dy, n=8):
     for k in range(1, n):
         px_, py_ = x + dx * k, y + dy * k
         if 0 <= px_ < 125 and 0 <= py_ < 175 and p2[py_, px_, 3] == 0 and bayer(px_, py_) * n < n + 1 - k:
             p2[py_, px_] = list(mix(tuple(int(v) for v in cv.a[py_ * 2, px_ * 2]), (140, 230, 200), 0.55 - k * 0.05)) + [255]
-for (x, y) in [(96, 104), (100, 128)]:
+for (x, y) in [(96, 110), (99, 134)]:                  # zwei Analyzer rechts, fliegen zum Würfel
     trail(x + 17, y + 2, 2, -1); trail(x + 17, y + 6, 2, -1)
     put(p2, flip(anal), x, y)
-# Gatherer links unten mit Asteroid
-put(p2, rock, 30, 150)
-put(p2, gath, 4, 128)
+put(p2, gath, 4, 128); put(p2, rock, 22, 118)           # Gatherer links unten mit Asteroid
 blit(cv, p2, 2)
 for (sx, sy) in (S_L, S_R):
     cv.paste(up(beam, 2), (sx + 5) * 2, (sy + 33) * 2, alpha=0.45)
-cv.paste(up(cube_lit, 2), CX * 2, CY * 2)             # Strahlen enden auf der Würfeloberfläche
+
+# ---------- 3×: Erdwürfel (vorn, größer), oben rot angestrahlt ----------
+c3 = cube.copy()
+for y in range(10):
+    for x in range(36):
+        if c3[y, x, 3] and bayer(x, y) < 0.55 - y * 0.05:
+            c3[y, x, :3] = mix(tuple(int(v) for v in c3[y, x, :3]), (210, 50, 70), 0.35)
+cv.paste(up(c3, CS), CXp, CYp)                        # Strahlen enden auf der Würfeloberfläche
 print(save(cv, '16_rift_over_earth.png'))

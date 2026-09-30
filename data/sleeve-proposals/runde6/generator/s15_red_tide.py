@@ -2,8 +2,9 @@
 """15 „Red Tide“ – Gegner „Deepsea Terror“, Held: Siphem, the Deepsea Demon (Base).
 
 Bildidee (Überarbeitung nach Nutzer-Feedback): Siphem steht mit ausgebreiteten Flügeln breitbeinig auf dem dunklen
-Meeresgrund, hinter ihm geht groß der rote Mond der Tiefsee auf; vor dem Mond ragt als schwarze Silhouette der Dark
-Deepsea God empor und überragt ihn. Links und rechts rahmen zwei Deepsea Monstrosities (tote Korallenbäume mit
+Meeresgrund, hinter ihm geht groß der rote Mond der Tiefsee auf; ganz hinten, noch hinter dem Mond, türmt sich riesig der
+Dark Deepsea God auf – sein echter Sprite unter einer 95-%-Schwarz-Ebene, nur Kopf, Flügel und Klauen ragen um den
+Mond herum. Links und rechts rahmen zwei Deepsea Monstrosities (tote Korallenbäume mit
 roten Adern) die Szene. Kein Schloss (≠ Deepsea Awakening/Count of the Deep). Die frühere Armee und die Counter-Blasen
 sind entfallen – sie verschwanden hinter Siphems Flügeln.
 
@@ -11,13 +12,14 @@ Quellen (MotiveDeepsea.xcf):
   Siphem (Base)   = Ebene 301 „Siphem“ + rotes Randlicht Ebene 300 „Siphem #1“, wie in Sichtbar #107 (Ebene 34,
                     Karte „Siphem“, Lage 245,277) mit ca. 25 % Deckkraft nur auf Siphems Pixeln gemischt
   roter Mond      = Ebene 378 „Ebene #187“ (86×86)
-  Dark Deepsea God = Ebene 308 „DDG“ (75×57), als schwarze Silhouette (einfarbig, 2 Dunkelstufen am Rand weg)
+  Dark Deepsea God = Ebene 308 „DDG“ (75×57), Farben × 0,05 (= 95 % Schwarz darüber), 3×
   Deepsea Monstrosity = Ebene 339 (links, rechts gespiegelt)
 Selbst gezeichnet: Wasserverlauf, Mondschein, Meeresgrund, Siphems Bodenschatten.
 
 Skalierung (Ausgabe = 250×350-Raster × 3):
   Wasser                                            – 1×
-  Mond, DDG-Silhouette, Meeresgrund, Monstrosities – 2× (125×175)
+  Dark Deepsea God (hinter dem Mond)                – 3× (84×117, 225×171 px)
+  Mond, Meeresgrund, Monstrosities                  – 2× (125×175)
   Siphem + Schatten                                 – 5× (50×70)
 """
 import math, random
@@ -38,7 +40,7 @@ def P(i, box=None):
     bb = bbox(a); return a[bb[1]:bb[3], bb[0]:bb[2]]
 
 monst = P(339, (190, 265, 240, 325)); moon = P(378); ddg = P(308)
-ddg_sil = silhouette(ddg, (6, 4, 12))
+ddg_dark = darken(ddg, 0.05)                             # echter Sprite unter einer 95-%-Schwarz-Ebene
 
 # ---------- 1×: Wasser ----------
 cv = Canvas(250, 350)
@@ -47,9 +49,14 @@ for y in range(350):
     for x in range(250):
         cv.a[y, x] = grad_pick(WAT, y / 330, x, y)
 
-# ---------- 2×: Mond, Gott-Silhouette, Grund, Monstrosities ----------
+# ---------- 3×: der Dark Deepsea God, riesig und weit hinten (hinter dem Mond) ----------
+p3 = rgba(84, 117)
+put(p3, ddg_dark, (84 - 75) // 2, 5)
+blit(cv, p3, 3, -1, 0)
+
+# ---------- 2×: Mond, Grund, Monstrosities ----------
 p2 = rgba(125, 175)
-MX, MY = (125 - 86) // 2, 14                          # Mond: 250er x78–250?, y28–200
+MX, MY = (125 - 86) // 2, 22                          # Mond: 250er x38–210, y44–216
 MCX, MCY = MX + 43, MY + 43
 for y in range(175):                                   # Mondschein: zwei Ringe
     for x in range(125):
@@ -60,7 +67,6 @@ for y in range(175):                                   # Mondschein: zwei Ringe
                 c = tuple(int(v) for v in cv.a[y * 2, x * 2])
                 p2[y, x] = list(mix(c, (150, 30, 44), (0, 0.18, 0.32, 0.4)[min(3, lv)])) + [255]
 put(p2, moon, MX, MY)
-put(p2, ddg_sil, (125 - 75) // 2, MY + 6)            # der Dark Deepsea God als Schatten vor dem Mond
 GY = 136                                              # Horizont des Meeresgrunds (250er: y272)
 GR = [(24, 20, 36), (18, 16, 30), (12, 12, 24)]
 for x in range(125):

@@ -1,10 +1,11 @@
 # -*- coding: utf-8 -*-
 """25 Initiation Rite – Gegner „Join our Cult!“ (sample-Structure Deck Join our Cult), Held: Klaus, the Cult Leader.
 
-Idee (Porträt vor der Zeremonie): Klaus – Kapuze, blaues Haar, rotes Auge – steht groß im Vordergrund vor der
-Tür seines Kultkellers, den Messer-Arm mit dem erhobenen Opferdolch ausgestreckt, der andere Arm hängt. Hinter
-ihm im fackelbeleuchteten Gewölbe kniet der braunhaarige Neuling seiner Base-Karte in einem fahlen roten
-Decay-Glühen („Join our Cult!“), links und rechts je zwei Kultisten in schwarzen Kutten. Kein Pentagramm.
+Idee (Kultführer über seiner Gemeinde): Klaus – Kapuze, blaues Haar, rotes Auge – steht groß oben in der
+Altarnische seines Kultkellers zwischen den zwei lodernden Wandfackeln, den Messer-Arm mit dem erhobenen
+Opferdolch ausgestreckt, der andere Arm hängt. Unter ihm auf dem Gewölbeboden kniet der braunhaarige Neuling seiner
+Base-Karte in einem fahlen roten Decay-Glühen („Join our Cult!“), links und rechts je zwei Kultisten in schwarzen
+Kutten. Kein Pentagramm. Gesichtsmitte exakt auf x = 375 (von 750), per Feinverschiebung der ganzen 6×-Ebene.
 
 Quellen:
   runde6/refs/klaus_body_front.png (Nutzer-Referenz, 20×25): Klaus' Körper von vorn. Übernommen bis auf den
@@ -17,14 +18,15 @@ Quellen:
       Zeilen 6–12; über die ausgestreckte Hand gesetzt) und der kniende Neuling (Zeilen 12–30 ohne Klaus-Pixel).
     Linke Gruppe derselben Ebene (Box x 249–263, y 116–171): die unteren zwei Kultisten (grauhaarig, kahl; Haar-
       spitze der oberen Kultistin entfernt); rechts gespiegelt, graues Haar braun getönt (symmetrische Aufstellung).
-    Ebene 532 „Ebene #145“ – Kultkeller mit brennenden Fackeln, Tür und beleuchtetem Gang davor (Ausschnitt
-      x 234–359, y 60–235); Ritualkreis (x 268–326, y 125–186) mit der Bodenkachel (16×16, x 282–298, y 108–124)
+    Ebene 532 „Ebene #145“ – Kultkeller mit Altarnische und brennenden Fackeln (Ausschnitt
+      x 234–359, y 27–202); Ritualkreis (x 268–326, y 125–186) mit der Bodenkachel (16×16, x 282–298, y 108–124)
       übermalt, die fünf eingebauten Kultisten per 16-px-Periode aus den Nachbarspalten übermalt.
 Selbst gezeichnet: Abdunklung, Fackelschein, rotes Bodenglühen, Bodenschatten.
 
 Skalierung:
   Hintergrund (Gewölbe, Neuling, Kultisten, Licht)   – 2× (Raster 125×175)
-  Vordergrund (Klaus 20×25 → 120×150, Schatten)      – 6× (Raster 42×59)
+  Vordergrund (Klaus 20×25 → 120×150, Schatten)      – 6× (Raster 42×59, als Ganzes um DX Canvas-Pixel
+                                                      verschoben, damit die Gesichtsmitte auf x 125 liegt)
 """
 import math, os
 import numpy as np
@@ -86,12 +88,12 @@ for (x0, y0, x1, y1), dxs in boxes:
             for dx in dxs:
                 if not M[y, x + dx]:
                     hall[y, x] = src[y, x + dx]; break
-X0, Y0 = 234, 60
+X0, Y0 = 234, 27
 bw, bh = grid(2)
 bg = hall[Y0:Y0 + bh, X0:X0 + bw].copy()
 bg[..., 3] = 255
 TORCH = [(256 - X0, 96 - Y0), (336 - X0, 96 - Y0)]
-NX, NY = 62.5, 76                  # Fußpunkt des Neulings (Canvas 125, 152)
+NX, NY = 62.5, 131                 # Fußpunkt des Neulings (Canvas 125, 262)
 out = bg[..., :3].astype(float)
 for y in range(bh):
     for x in range(bw):
@@ -102,7 +104,7 @@ for y in range(bh):
         d = math.hypot((x + .5 - NX) / 30, (y + .5 - (NY - 8)) / 22)
         rg = math.floor(max(0, 1 - d) ** 1.1 * 4 + bay(x, y)) / 4
         c = out[y, x] * min(lt, 1.0) + np.array([140, 10, 18]) * rg * .6
-        top = max(0.0, min(1.0, (14 - y) / 10))            # Dunkel über dem Gewölbe
+        top = max(0.0, min(1.0, (50 - y) / 14))            # Dunkel über dem Gewölbe (fremde Nachbarräume)
         q = math.floor(top * 4 + bay(x, y)) / 4
         out[y, x] = c * (1 - q) + np.array([5, 3, 8]) * q
 bg[..., :3] = out.clip(0, 255).astype(np.uint8)
@@ -135,7 +137,7 @@ g_ = cult_r[..., :3].astype(int)                                      # rechte R
 grey_hair = (cult_r[..., 3] > 0) & (np.abs(g_[..., 0] - g_[..., 2]) < 12) & (g_.max(-1) > 70)
 grey_hair[12:] = False
 cult_r[grey_hair, :3] = (cult_r[grey_hair, :3] * np.array([.9, .62, .42])).astype(np.uint8)
-CY = 96                                                      # Fußzeile der Reihen (Canvas 192)
+CY = 150                                                     # Fußzeile der Reihen (Canvas 300)
 for cx, s in ((36, cult), (125 - 36, cult_r)):
     shadow(bg, cx, CY, 12)
     put(bg, s, int(cx - s.shape[1] / 2), CY - s.shape[0] + 1)
@@ -143,9 +145,16 @@ for cx, s in ((36, cult), (125 - 36, cult_r)):
 # ================================================================ 6×: Klaus im Vordergrund vor der Kellertür
 fw, fh = grid(6)                                           # 42×59
 fg = rgba(fw, fh)
-KX, KB = 11, 53                                            # linke Kante, Fußzeile (Canvas x 66–186, y 318–323)
+KX, KB = 11, 29                                            # linke Kante, Fußzeile (Canvas y 30–179): Klaus steht oben
+                                                           # in der Altarnische über seiner Gemeinde
 for x in range(KX + 5, KX + 16):
     if bay(x, KB + 1) < .8: setp(fg, x, KB + 1, (10, 5, 8), 190)
 put(fg, klaus, KX, KB - klaus.shape[0] + 1)
+# Gesichtsmitte exakt auf Canvas x 125 (= 375 von 750): Mitte der Gesichtspixel (nicht grau) in Zeilen 4–12
+face = [x for y in range(4, 13) for x in range(klaus.shape[1])
+        if klaus[y, x, 3] and np.ptp(klaus[y, x, :3].astype(int)) > 20]
+FC = (min(face) + max(face) + 1) / 2                       # Gesichtsmitte in Sprite-Spalten
+DX = int(round(125 - (KX + FC) * 6))                       # Feinverschiebung der ganzen 6×-Ebene
+print('Gesichtsmitte Sprite', FC, '-> Canvas', (KX + FC) * 6 + DX, '/ 750er:', ((KX + FC) * 6 + DX) * 3)
 
-print(finish([(bg, 2), (fg, 6)], '25_initiation_rite.png'))
+print(finish([(bg, 2), (fg, 6, DX, 0)], '25_initiation_rite.png'))

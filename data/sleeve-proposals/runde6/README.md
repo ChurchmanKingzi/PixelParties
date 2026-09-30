@@ -38,14 +38,14 @@ Rahmen + Shop: `generator/build_frames_r6.py` (erzeugt `frames_r6.json` aus den 
 | 23 | Hellfire Salvo | Hellfire Battery | Baaliel, the Demon General | hellfire-salvo.png | industrial/iron/lava |
 | 24 | Afterimage | Idej Illusions | Idej Lord Daiyo | afterimage.png | arch/lacquer/jade |
 | 25 | Initiation Rite | Join our Cult! | Klaus, the Cult Leader | initiation-rite.png | arch/gothic/ruby/sapphire |
-| 26 | Three-Link Storm | Lightning Caller | Sol Rym, the Thunder Djinn | three-link-storm.png | wave/sea/topaz/sapphire |
+| 26 | Thunderhead | Lightning Caller | Sol Rym, the Thunder Djinn | thunderhead.png | wave/sea/topaz/sapphire |
 | 27 | Hellhound's Trail | Man's Best Friends | Orthos, the Loyal Guard Dog | hellhounds-trail.png | stone/iron/lava |
 | 28 | Specimen Wing | Mawstruck | Nero Zira, the Mastermind | specimen-wing.png | industrial/iron/cyan |
 | 29 | Knock at the Window | Morph and Kill! | Waflav, the Metamorphing Monstrosity | knock-at-the-window.png | double/bronze/emerald/amber |
 | 30 | Severed Spell | Null and Void | Null, the Mage Slayer | severed-spell.png | moulding/ebony/amethyst/amber |
 | 31 | Tiger and Ox | One-Two-Punch! | Ghuanjun, the Undead Martial Artist | tiger-and-ox.png | meander/lacquer/lava/jade |
 | 32 | Scribe of Souls | Parts of the Soul | Thep, the Court Scribe | scribe-of-souls.png | arch/gold/cyan/sapphire |
-| 33 | Arrow Gallery | Pew-Pew! | Bow Sniper Darge | arrow-gallery.png | twist/bronze/emerald/amber |
+| 33 | Sniper's Ledge | Pew-Pew! | Bow Sniper Darge | snipers-ledge.png | twist/bronze/emerald/amber |
 | 34 | Tormentor's Den | Poison Torture | Reiza, the Chief Tormentor | tormentors-den.png | bone/gothic/amethyst/lime |
 | 35 | Pyre of the Warband | Sacrificial Demons | Calamitusk, the Chaorc War Chief | pyre-of-the-warband.png | industrial/iron/lava/onyx |
 | 36 | Blackport Nightfall | Shadows over Blackport | Arthor, the King of Blackport | blackport-nightfall.png | ornate/gothic/amethyst/ruby |
@@ -58,4 +58,4 @@ Rahmen + Shop: `generator/build_frames_r6.py` (erzeugt `frames_r6.json` aus den 
 | 43 | Wheel of Wisdom | To Attain Divinity | Archibald, the Archmage | wheel-of-wisdom.png | filigree/gothic/amethyst |
 | 44 | Sakura Mirror | Grand Rebellion! | Champion, the Stormbringer | sakura-mirror.png | wave/lacquer/rose |
 
-Nutzer-Feedback zum ersten Durchgang: `FEEDBACK_1.md` (umgesetzt), Referenzbilder in `refs/`.
+Nutzer-Feedback: `FEEDBACK_1.md` und `FEEDBACK_2.md` (beide umgesetzt), Referenzbilder in `refs/`.

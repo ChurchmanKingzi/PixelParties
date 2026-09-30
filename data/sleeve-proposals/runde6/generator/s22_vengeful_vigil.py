@@ -106,10 +106,10 @@ blit(cv, court, 2)
 # ---------------------------------------------------------------- Mao 5× vorn
 FG = rgba(50, 70)
 mw, mh = mao.shape[1], mao.shape[0]
-mx, my = 11, 67 - mh                     # Kopfmitte (Spalte 14 der Figur) auf x = 125 (375 von 750)
+mx, my = 11, 63 - mh                     # Kopfmitte (Spalte 14 der Figur) auf x = 125 (375 von 750)
 for y in range(70):
     for x in range(50):
-        d = ((x + .5 - (mx + mw / 2)) / 12) ** 2 + ((y + .5 - 66.5) / 1.8) ** 2
+        d = ((x + .5 - (mx + mw / 2)) / 12) ** 2 + ((y + .5 - 62.5) / 1.8) ** 2
         if d < 1 and bay(x, y) < 0.7:
             FG[y, x] = (6, 2, 10, 150)
 put(FG, mao, mx, my)
