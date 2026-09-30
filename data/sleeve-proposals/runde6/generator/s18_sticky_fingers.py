@@ -2,14 +2,16 @@
 """18 „Sticky Fingers“ – Gegner „Flying Sparks“, Held: Lilly, the Charming Infiltrator (Base).
 
 Bildidee (Nachtszene/Erzählung, Überarbeitung nach Nutzer-Feedback – ohne Königin): Nachts vor dem Rathaus steht oben
-das Giebelfenster offen und leuchtet warm; Sparkflies schleppen die Beute heraus: zwei Worker tragen die funkelnde
-Schatztruhe (ihre Beine greifen über den Deckel), eine Attendant (roter Fleck) und eine weitere Worker tragen je einen
-Goldsack. Vorn steht Lilly und streckt frech die Zunge heraus – die Sparkflies sind ihre Komplizen.
+das Giebelfenster offen und leuchtet warm; Sparkflies schleppen die Beute heraus: zwei Sparkfly Attendants (roter
+Fleck) tragen die funkelnde Schatztruhe (ihre Beine greifen über den Deckel), zwei Sparkfly Worker tragen statt ihres
+Honigtopfs je einen Goldsack. Vorn steht Lilly und streckt frech die Zunge heraus – die Sparkflies sind ihre Komplizen.
 
 Quellen:
   Lilly (Base)    = Motive.xcf Ebene 973 „Lilly“ (18×25; = Sichtbar #256, Ebene 140, Kartenlage 281,137, 0 px Abweichung)
-  Sparkfly-Arbeiterin = MotiveRussia.xcf Ebene 160 (Körper) + 158 (Flügel, 70 % auf ganzen Pixeln), linke Biene
-  Sparkfly Attendant = dieselbe Biene + roter Fleck Ebene 159 „Ebene #60“ (Karte Sichtbar #11, Ebene 147)
+  Sparkfly Attendant = MotiveRussia.xcf Ebene 160 (Körper) + 158 (Flügel, 70 % auf ganzen Pixeln), linke Biene
+                    + roter Fleck Ebene 159 „Ebene #60“ (Karte Sichtbar #11, Ebene 147)
+  Sparkfly Worker = MotiveRussia.xcf Ebene 166 (Körper) + 165/168 (Flügel, 70 %), Karte Sichtbar #13 (Ebene 145);
+                    ihr Honigtopf 167 ist durch den Goldsack ersetzt
   Goldsack        = Motive.xcf Ebene 1379 „Wealth“: vorderer Sack, oval freigestellt, Truhenglanz entfernt, Sackhals
                     (3 Zeilen) in den Sackfarben ergänzt
   Treasure Chest  = Motive.xcf Ebene 1386 + Funkeln aus Ebene 1384 „Treasure Chest #4“
@@ -86,17 +88,20 @@ wings2 = rgba(125, 175)
 def bee(x, y, fl=False):
     b_, w_ = (flip(body), flip(wing)) if fl else (body, wing)
     put(wings2, w_, x, y); put(p2, b_, x, y)
+# Sparkfly Worker (Karte Sichtbar #13, Ebene 145): Körper 166 + Flügel 165/168, ohne ihren Honigtopf 167
+wk_body = compose(R, [166], crop=False)[284:306, 99:128]
+wk_wing = compose(R, [165, 168], crop=False)[284:306, 99:128]
+wb = bbox(X.over(wk_body.copy(), wk_wing)); wk_body = wk_body[wb[1]:wb[3], wb[0]:wb[2]]; wk_wing = wk_wing[wb[1]:wb[3], wb[0]:wb[2]]
 def carry(load, lx, ly, bees):
     """Last zuerst, dann die Tiere darüber: ihre Beine greifen über die Oberkante der Last."""
     put(p2, load, lx, ly)
-    for (b_, x, y, fl) in bees:
-        bs = flip(b_) if fl else b_
-        put(wings2, flip(wing) if fl else wing, x, y); put(p2, bs, x, y)
-# zwei Arbeiterinnen tragen die Schatztruhe (Beine auf dem Deckel)
-carry(chest, 23, 66, [(body, 14, 53, False), (body, 31, 53, True)])
-# eine Attendant (roter Fleck) trägt einen Goldsack vom Fenster herab, eine Arbeiterin einen zweiten
-carry(sack, 92, 51, [(att, 91, 38, False)])
-carry(sack, 78, 86, [(body, 77, 73, True)])
+    for (b_, w_, x, y, fl) in bees:
+        put(wings2, flip(w_) if fl else w_, x, y); put(p2, flip(b_) if fl else b_, x, y)
+# zwei Sparkfly Attendants (roter Fleck) tragen die Schatztruhe (Beine auf dem Deckel)
+carry(chest, 23, 66, [(att, wing, 14, 53, False), (att, wing, 31, 53, True)])
+# zwei Sparkfly Worker tragen statt ihres Honigtopfs je einen Goldsack
+carry(sack, 85, 50, [(wk_body, wk_wing, 86, 36, False)])
+carry(sack, 71, 86, [(wk_body, wk_wing, 72, 72, True)])
 # Funkeln der Treasure-Chest-Karte (Ebene 1384) um die Truhe
 spark = [p for p in parts(compose(M, [1384]), dil=0) if p.shape[0] >= 3]
 for sp, (x, y) in zip(spark, [(17, 80), (50, 74), (46, 88), (20, 90), (34, 92)]):

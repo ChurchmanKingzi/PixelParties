@@ -1,10 +1,11 @@
 # -*- coding: utf-8 -*-
 """25 Initiation Rite – Gegner „Join our Cult!“ (sample-Structure Deck Join our Cult), Held: Klaus, the Cult Leader.
 
-Idee (Porträt vor der Zeremonie): Klaus – Kapuze, blaues Haar, rotes Auge – steht groß im Vordergrund vor der
-Tür seines Kultkellers, den Messer-Arm mit dem erhobenen Opferdolch ausgestreckt, der andere Arm hängt. Hinter
-ihm im fackelbeleuchteten Gewölbe kniet der braunhaarige Neuling seiner Base-Karte in einem fahlen roten
-Decay-Glühen („Join our Cult!“), links und rechts je zwei Kultisten in schwarzen Kutten. Kein Pentagramm.
+Idee (Kultführer über seiner Gemeinde): Klaus – Kapuze, blaues Haar, rotes Auge – steht groß oben in der
+Altarnische seines Kultkellers zwischen den zwei lodernden Wandfackeln, den Messer-Arm mit dem erhobenen
+Opferdolch ausgestreckt, der andere Arm hängt. Unter ihm auf dem Gewölbeboden kniet der braunhaarige Neuling seiner
+Base-Karte in einem fahlen roten Decay-Glühen („Join our Cult!“), links und rechts je zwei Kultisten in schwarzen
+Kutten. Kein Pentagramm. Gesichtsmitte exakt auf x = 375 (von 750), per Feinverschiebung der ganzen 6×-Ebene.
 
 Quellen:
   runde6/refs/klaus_body_front.png (Nutzer-Referenz, 20×25): Klaus' Körper von vorn. Übernommen bis auf den
@@ -17,14 +18,15 @@ Quellen:
       Zeilen 6–12; über die ausgestreckte Hand gesetzt) und der kniende Neuling (Zeilen 12–30 ohne Klaus-Pixel).
     Linke Gruppe derselben Ebene (Box x 249–263, y 116–171): die unteren zwei Kultisten (grauhaarig, kahl; Haar-
       spitze der oberen Kultistin entfernt); rechts gespiegelt, graues Haar braun getönt (symmetrische Aufstellung).
-    Ebene 532 „Ebene #145“ – Kultkeller mit brennenden Fackeln, Tür und beleuchtetem Gang davor (Ausschnitt
-      x 234–359, y 60–235); Ritualkreis (x 268–326, y 125–186) mit der Bodenkachel (16×16, x 282–298, y 108–124)
+    Ebene 532 „Ebene #145“ – Kultkeller mit Altarnische und brennenden Fackeln (Ausschnitt
+      x 234–359, y 27–202); Ritualkreis (x 268–326, y 125–186) mit der Bodenkachel (16×16, x 282–298, y 108–124)
       übermalt, die fünf eingebauten Kultisten per 16-px-Periode aus den Nachbarspalten übermalt.
 Selbst gezeichnet: Abdunklung, Fackelschein, rotes Bodenglühen, Bodenschatten.
 
 Skalierung:
   Hintergrund (Gewölbe, Neuling, Kultisten, Licht)   – 2× (Raster 125×175)
-  Vordergrund (Klaus 20×25 → 120×150, Schatten)      – 6× (Raster 42×59)
+  Vordergrund (Klaus 20×25 → 120×150, Schatten)      – 6× (Raster 42×59, als Ganzes um DX Canvas-Pixel
+                                                      verschoben, damit die Gesichtsmitte auf x 125 liegt)
 """
 import math, os
 import numpy as np
@@ -102,7 +104,7 @@ for y in range(bh):
         d = math.hypot((x + .5 - NX) / 30, (y + .5 - (NY - 8)) / 22)
         rg = math.floor(max(0, 1 - d) ** 1.1 * 4 + bay(x, y)) / 4
         c = out[y, x] * min(lt, 1.0) + np.array([140, 10, 18]) * rg * .6
-        top = max(0.0, min(1.0, (42 - y) / 14))            # Dunkel über dem Gewölbe (fremde Nachbarräume)
+        top = max(0.0, min(1.0, (50 - y) / 14))            # Dunkel über dem Gewölbe (fremde Nachbarräume)
         q = math.floor(top * 4 + bay(x, y)) / 4
         out[y, x] = c * (1 - q) + np.array([5, 3, 8]) * q
 bg[..., :3] = out.clip(0, 255).astype(np.uint8)

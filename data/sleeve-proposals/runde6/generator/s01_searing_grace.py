@@ -57,12 +57,20 @@ for y in range(WALL):
 for y in range(WALL, H2):
     for x in range(W2):
         p2[y, x] = parq[(y - WALL) % 16, (x + 6) % 16]
-# Stachelreihe am Wandfuß (wie in der Kartenszene)
+# Kante zwischen Wand und Boden (Sockelleiste in den Randfarben des Tempels, selbst gezeichnet)
+LEDGE = [(250, 206, 110), (214, 140, 48), (120, 44, 18)]
+for i, c in enumerate(LEDGE):
+    for x in range(W2): p2[WALL + i, x] = list(c) + [255]
+# Stachelreihe vollständig auf dem Boden, direkt vor der Wandkante (wie in der Kartenszene)
 for x0 in range(-10, W2, 64):
-    put(p2, spikes, x0, WALL - 2)
+    put(p2, spikes, x0, WALL + 3)
 # zwei Steinmasken mit Ranken, symmetrisch
-put(p2, maskL, 12, 22)
-put(p2, maskR, W2 - 12 - maskR.shape[1], 22)
+MLX, MRX, MY_ = 12, W2 - 12 - maskR.shape[1], 22
+put(p2, maskL, MLX, MY_)
+put(p2, maskR, MRX, MY_)
+# Augen der Masken (Löcher im Stein, in der Szene rot) – nach der Abdunklung leuchtend rot gesetzt
+EYES = [(MLX + 19, MY_ + 16), (MLX + 19, MY_ + 17), (MLX + 26, MY_ + 16), (MLX + 26, MY_ + 17),
+        (MRX + 4, MY_ + 15), (MRX + 4, MY_ + 16), (MRX + 11, MY_ + 15), (MRX + 11, MY_ + 16)]
 # Raum nach oben und zu den Rändern hin abdunkeln (Tempel im Halbdunkel)
 for y in range(H2):
     for x in range(W2):
@@ -71,6 +79,8 @@ for y in range(H2):
         f *= 1 - 0.35 * dx * dx
         if y >= WALL: f = (0.72 - 0.3 * (y - WALL) / (H2 - WALL)) * (1 - 0.3 * dx * dx)
         p2[y, x, :3] = (p2[y, x, :3] * f).astype(np.uint8)
+for (x, y) in EYES:
+    p2[y, x, :3] = (236, 36, 28)
 
 # Bodenschatten unter Nao (Füße bei 250er-y 290 → 2×-Reihe 145)
 shadow_ellipse(p2, 62.5, 144.8, 15, 2.8, a=0.5)
@@ -81,7 +91,7 @@ blit(cv, p2, 2)
 W5, H5 = 50, 70
 NX = 6                                                   # Gesichtsmitte (Sprite-x 19) → 250er-x 125
 NY = 58 - nao.shape[0]
-BCX, BCY, BR = 23.5, NY + 11.0, 18.0                     # Barrierenkugel um Nao (samt Stab)
+BCX, BCY, BR = 25.0, NY + 11.0, 18.0                     # Barrierenkugel, waagrecht auf Naos Gesicht zentriert
 # halbtransparente Füllung + Rand der Barriere (ganze 5×-Pixel, Alpha)
 bar = rgba(W5, H5)
 for y in range(H5):
@@ -94,9 +104,7 @@ for y in range(H5):
             else:          bar[y, x] = [220, 244, 255, 46 + int(40 * e)]   # zarte Füllung, zum Rand dichter
 for (x, y) in [(13, int(BCY) - 12), (12, int(BCY) - 11), (14, int(BCY) - 13), (11, int(BCY) - 10)]:
     bar[y, x] = [255, 255, 255, 255]                           # Glanzlicht oben links
-cv.paste(up(bar, 5), 0, 0)
-p5 = rgba(W5, H5)
-put(p5, nao, NX, NY)
+p5 = rgba(W5, H5)                                        # Feuer-Ebene (hinter der Barriere)
 F1, F2, F3, F4 = (255, 250, 214), (255, 214, 80), (246, 120, 30), (200, 40, 20)
 def impact(ang0, spread):
     """Einschlag am Kugelrand: Glutkern, Funken, zu beiden Seiten am Rand zerfließende Flammenzungen."""
@@ -127,9 +135,13 @@ def impact(ang0, spread):
 angR = -0.85
 IX, IY = impact(angR, 12)
 fbR = fireball[:, ::-1]
-put(p5, fbR, IX + 1, IY - fbR.shape[0] // 2 - 1)
+put(p5, fbR, IX - 2, IY - fbR.shape[0] // 2 - 1)            # Kopf taucht hinter die Barrierenhaut
 # zweiter Feuerball fliegt von links oben heran, gleich trifft er die Kugel am Scheitel
 put(p5, fireball, 1, int(BCY - BR) - 7)
 blit(cv, p5, 5, 0, 0)
+cv.paste(up(bar, 5), 0, 0)                               # Barriere liegt über den Feuerbällen
+pn = rgba(W5, H5)
+put(pn, nao, NX, NY)
+blit(cv, pn, 5, 0, 0)
 print(save(cv, '01_searing_grace.png'))
 print(preview('01_searing_grace.png', 'ornate', 'gold', 'ruby', 'topaz'))

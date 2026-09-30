@@ -2,9 +2,9 @@
 """33 Sniper's Ledge – Gegner „Pew-Pew!“ (sample-Structure Deck Pew-Pew), Held: Bow Sniper Darge (Base).
 
 Idee (Freiluft, Nutzerwunsch „auf eine Klippe ins Freie“): In der Abenddämmerung steht Darge groß und frontal mit
-seinem Bogen auf der grasbewachsenen Kuppe einer Felsnase, die steil über einem weiten Tal aufragt – der Scharfschütze
-auf seinem Aussichtsposten. Hinter ihm glüht der Abendhimmel über gestaffelten Hügelketten, links und rechts fällt
-der Blick tief ins dunkle Tal. Keine fliegenden Pfeile (seine Pose schießt nach vorn).
+seinem Bogen auf der grasbewachsenen Kante einer Felsnase, die von links ins Bild ragt und rechts steil ins weite Tal
+abbricht – der Scharfschütze auf seinem Aussichtsposten. Hinter ihm glüht der Abendhimmel über gestaffelten
+Hügelketten, die Abbruchkante fängt das letzte Licht. Keine fliegenden Pfeile (seine Pose schießt nach vorn).
 
 Quellen:
   MotiveDeri.xcf Ebene 248 „Darge“ + mittlerer Bogen aus Ebene 244 „Darge #1“ (x 244–248) – Base-Darge, geprüft
@@ -75,13 +75,11 @@ g = grass[..., :3].astype(float)
 r = rock[..., :3].astype(float)
 for y in range(TOP - 2, mh):
     d = y - TOP
-    # Felskuppe, die Flanken fallen steil und leicht schräg bis zum unteren Rand ab (fest verwurzelt)
-    half = 33 + max(0, d) * 0.45 + (1 if (y // 3) % 2 else 0) + (1 if (y // 7) % 3 == 0 else 0)
-    cx = 42 + 0.12 * max(0, d)
+    # Felsnase ragt von links ins Bild; rechts bricht die Klippe steil (leicht unterschnitten) ins Tal ab
+    xr = 68 - max(0, d) * 0.42 - (1 if (y // 4) % 2 else 0) - (2 if (y // 9) % 3 == 1 else 0)
     for x in range(mw):
-        dx = abs(x + .5 - cx)
-        if dx > half: continue
-        crest = TOP - 2 + 2.2 * (dx / 34) ** 2 * 1.0                # gewölbte Oberkante
+        if x > xr: continue
+        crest = TOP - 1 + (1.6 * ((x - xr + 6) / 6) ** 2 if x > xr - 6 else 0) + (0.8 if x < 8 else 0)
         if y < crest: continue
         if y - crest < 3:                                        # Grasnarbe
             tx, ty = x % 32, y % 32
@@ -90,8 +88,7 @@ for y in range(TOP - 2, mh):
             if y - crest < 1: c = c * 1.2 + np.array([40, 22, 0])   # Gegenlicht-Saum auf der Kante
         else:
             c = r[y % 32, x % 40] * np.array([1.0, 0.84, 0.8]) * (1.0 - 0.02 * (y - TOP))
-            if x + .5 - cx > half - 2: c = c * 1.3 + np.array([40, 18, 0])   # Abendlicht auf der rechten Flanke
-            if x + .5 - cx < -half + 2: c = c * 0.7
+            if x > xr - 2: c = c * 1.35 + np.array([44, 20, 0])  # Abendlicht auf der Abbruchkante
         mg[y, x] = list(c.clip(0, 255).astype(np.uint8)) + [255]
 shade_ellipse(mg, 42.5, TOP + 1.2, 17, 1.4, 0.55)                # Bodenschatten unter Darge
 
