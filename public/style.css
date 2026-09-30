@@ -1233,9 +1233,8 @@ select optgroup {
    nicht. Am Fächer ändert sie nichts Sichtbares: eine Karte ist
    rechteckig und damit 180°-symmetrisch, die Neigung liest sich nach
    der Drehung genauso — nur das Bild steht auf dem Kopf. */
-.game-hand-opp .game-hand-cards > .board-card.hand-card.face-down {
-  rotate: calc(180deg + var(--fan-rot, 0deg));
-}
+/* Verdeckte Gegnerkarten stehen NICHT mehr auf dem Kopf (Al 30.9.): sie
+   tragen nur den Faecherwinkel der Grundregel. */
 /* ★ v1250: Der negative Rand von v1234 ist weg. Er stammt aus der
    Zeit, als die Karte selbst das Flex-Element war und die Überlappung
    nicht aus dem Layout kommen konnte; seit der Platz schrumpft
@@ -10177,20 +10176,7 @@ body.pp-dragging-card.pp-dragging-card.pp-dragging-card * {
   100% { transform: translateY(0) scale(2); opacity: 0; }
 }
 
-/* ★ v1260 (Al 20.9.): Gegnerische Stapel (Main- und Potion-Deck) um
-   180° gedreht — „sonst sieht es seltsam aus, wenn Karten vom Gegner
-   gezogen werden und sich in der Hand ploetzlich umdrehen". Gedreht
-   wird nur die Rueckseite (das <img>), damit Zaehler und Leerlabel
-   lesbar bleiben. Der gegnerische Ziehflug (`OppDrawAnimCard`, eine
-   `.face-down`-Karte) dreht seine Rueckseite genauso — die Karte kommt
-   damit gedreht vom Stapel, fliegt gedreht und liegt gedreht in der
-   Hand (dort traegt `.face-down` seit jeher 180° + Faecherwinkel). */
-[data-opp-deck] > img,
-[data-opp-potion-deck] > img,
-/* ★ v1264 (Al 22.9.): auch im Puzzle-Editor — Main-, Potion- und Side
-   Deck des Gegners (Klasse aus `stapelZone`, app-puzzle.jsx). */
-.pz-stapel-gegner > img,
-.draw-anim-card > .board-card.face-down > img { rotate: 180deg; }
+/* Gegnerische Stapel, Ziehflug und verdeckte Handkarten werden nicht mehr um 180° gedreht (Al 30.9.). */
 
 /* Hand Pick selection (Shard of Chaos) */
 /* ★ v1259 (Als Befund 20.9., Staff of the Teleporter): „Die Highlights
