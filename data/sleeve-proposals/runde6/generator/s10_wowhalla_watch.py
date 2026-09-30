@@ -13,7 +13,8 @@ Quellen (MotiveCoolhalla.xcf, gemeinsames Koordinatensystem, Ausschnitt x 122–
   Ebene 221 „Ebene #16“  – Base-Thorad (rechte Figur; Szene „Sichtbar #5“ = Ebene 264, Lage 173,50; 0 px Abweichung).
   Ebene 253 „Ebene #11“  – Wowhalla-Schloss; 254 – Zahnräder; 251 – Eissaum am Schlossfuß.
   Ebene 257 „Ebene #12“  – Himmel mit Wolken; 255/256 – Schneehügel (diagonale Streifen, nach unten fortgesetzt).
-  Ebene 207 „Ebene #32“  – Regenbogen (vollständig, 134×37).
+  Ebene 207 „Ebene #32“  – Regenbogen: Bandfarben/-stärke (7×3 px) übernommen, als vollständiger Bogen hinter dem
+                           Schloss bis zum Boden fortgeführt (Feedback 3).
   Ebenen 215+214         – Wowkyrie auf dem Einhorn mit Regenbogenspur (Karte Wowkyrie, Szene Ebene 262).
   Ebenen 125+124+123     – Swagdri mit erhobenem Hammer (Karte „Swagdri, Forger of Coolness“, Szene Ebene 122).
   Ebene 201 „Ebene #84“  – Phatnir, Roboter mit Goldkette (Karte „Phatnir, Prototype of Coolness“).
@@ -94,7 +95,21 @@ bg = np.zeros((H1, W1, 4), np.uint8); bg[..., 3] = 255
 SH = sky.shape[0]
 yy = np.clip(np.arange(H1) + Y0, 0, SH - 1)
 bg[..., :3] = sky[yy][:, X0:X0 + W1, :3]
-put(bg, rainbow, 125 - rainbow.shape[1] // 2, 14)                  # ganzer Bogen über dem Schloss
+# Regenbogen als vollständiger, logischer Bogen hinter dem Schloss: dieselben 7 Bänder à 3 px und Farben wie Ebene 207
+# (Mitte), dieselben Kanten (oberste Bandzeile heller, unterste dunkler); die Schenkel laufen hinter den Seitentürmen
+# und dem Schnee bis zum Boden hinab und enden nirgends im Himmel.
+BANDS = [tuple(int(v) for v in sprite('o10_rainbow', B, [207])[y, 67, :3]) for y in range(0, 21, 3)]
+RCX, RCY, ROUT = 125, 128, 112                                      # Mittelpunkt/Außenradius (Canvas-Pixel)
+for y in range(0, RCY + 60):
+    for x in range(W1):
+        d = math.hypot(x + 0.5 - RCX, y + 0.5 - RCY)
+        k = ROUT - d
+        if 0 <= k < 21 and y < 300:
+            b_, r_ = int(k // 3), int(k) % 3
+            c = BANDS[b_]
+            if r_ == 0: c = tuple(min(255, int(v + (255 - v) * 0.35)) for v in c)
+            elif r_ == 2: c = shade(c, 0.8)
+            bg[y, x, :3] = c
 put(bg, wowkyrie, 14, 58)                                            # Wowkyrie reitet von links heran
 full = rest.copy()
 cm = castle[..., 3] > 0
