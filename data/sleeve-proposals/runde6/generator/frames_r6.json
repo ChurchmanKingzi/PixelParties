@@ -1,0 +1,354 @@
+{
+ "01_searing_grace.png": [
+  "Searing Grace",
+  "ornate",
+  "gold",
+  "ruby",
+  "topaz",
+  "sample-Heal Burn"
+ ],
+ "02_blast_radius.png": [
+  "Blast Radius",
+  "industrial",
+  "iron",
+  "lava",
+  null,
+  "sample-Suicide Bombers"
+ ],
+ "03_tainted_fountain.png": [
+  "Tainted Fountain",
+  "twist",
+  "bronze",
+  "emerald",
+  "amethyst",
+  "sample-Venom Swamp"
+ ],
+ "04_shield_shrine.png": [
+  "Shield Shrine",
+  "bamboo",
+  "bamboo",
+  "jade",
+  null,
+  "sample-Structure Deck Bamboo Warrior"
+ ],
+ "05_field_study.png": [
+  "Field Study",
+  "wave",
+  "wood",
+  "amber",
+  null,
+  "sample-Structure Deck Big Stomp"
+ ],
+ "06_crimson_campaign.png": [
+  "Crimson Campaign",
+  "cosmic",
+  "ice",
+  "ruby",
+  "sapphire",
+  "sample-Structure Deck Bloody King Zi"
+ ],
+ "07_bone_tide.png": [
+  "Bone Tide",
+  "bone",
+  "gothic",
+  "ruby",
+  "amethyst",
+  "sample-Structure Deck Bone Rush"
+ ],
+ "08_live_fire_test.png": [
+  "Live Fire Test",
+  "industrial",
+  "iron",
+  "amber",
+  "ruby",
+  "sample-Structure Deck Boom Boom Kaboom"
+ ],
+ "09_caldera_dance.png": [
+  "Caldera Dance",
+  "stone",
+  "bronze",
+  "lava",
+  "topaz",
+  "sample-Structure Deck Burning Inferno"
+ ],
+ "10_hammerfall.png": [
+  "Hammerfall",
+  "twist",
+  "iron",
+  "topaz",
+  "sapphire",
+  "sample-Structure Deck Cool Gang"
+ ],
+ "11_silken_descent.png": [
+  "Silken Descent",
+  "filigree",
+  "ebony",
+  "ruby",
+  "amethyst",
+  "sample-Structure Deck Creepy Crawlies"
+ ],
+ "12_crystal_eve.png": [
+  "Crystal Eve",
+  "icicle",
+  "ice",
+  "ruby",
+  "emerald",
+  "sample-Structure Deck Crystal Gifts"
+ ],
+ "13_phoenix_call.png": [
+  "Phoenix Call",
+  "twist",
+  "gold",
+  "ruby",
+  "sapphire",
+  "sample-Structure Deck Cute Commando"
+ ],
+ "14_moonlit_waltz.png": [
+  "Moonlit Waltz",
+  "double",
+  "silver",
+  "amethyst",
+  "topaz",
+  "sample-Structure Deck Dance of the Butterflies"
+ ],
+ "15_red_tide.png": [
+  "Red Tide",
+  "wave",
+  "sea",
+  "ruby",
+  null,
+  "sample-Structure Deck Deepsea Terror"
+ ],
+ "16_rift_over_earth.png": [
+  "Rift over Earth",
+  "cosmic",
+  "cosmic",
+  "ruby",
+  "emerald",
+  "sample-Structure Deck Depths of the Cosmos"
+ ],
+ "17_glade_of_the_vanguard.png": [
+  "Glade of the Vanguard",
+  "filigree",
+  "wood",
+  "emerald",
+  "jade",
+  "sample-Structure Deck Elven Vanguard"
+ ],
+ "18_sticky_fingers.png": [
+  "Sticky Fingers",
+  "moulding",
+  "bronze",
+  "amber",
+  "rose",
+  "sample-Structure Deck Flying Sparks"
+ ],
+ "19_hellgate_spring.png": [
+  "Hellgate Spring",
+  "wave",
+  "sea",
+  "ruby",
+  null,
+  "sample-Structure Deck Gates to Hell"
+ ],
+ "20_stormward_drift.png": [
+  "Stormward Drift",
+  "twist",
+  "silver",
+  "sapphire",
+  null,
+  "sample-Structure Deck Gather That Storm"
+ ],
+ "21_hall_of_arms.png": [
+  "Hall of Arms",
+  "ornate",
+  "gold",
+  "emerald",
+  null,
+  "sample-Structure Deck Great Weapon Master"
+ ],
+ "22_vengeful_vigil.png": [
+  "Vengeful Vigil",
+  "bamboo",
+  "lacquer",
+  "amber",
+  null,
+  "sample-Structure Deck Guardians of the Treasure Cave"
+ ],
+ "23_hellfire_salvo.png": [
+  "Hellfire Salvo",
+  "industrial",
+  "iron",
+  "lava",
+  null,
+  "sample-Structure Deck Hellfire Battery"
+ ],
+ "24_afterimage.png": [
+  "Afterimage",
+  "arch",
+  "lacquer",
+  "jade",
+  null,
+  "sample-Structure Deck Idej Illusions"
+ ],
+ "25_initiation_rite.png": [
+  "Initiation Rite",
+  "arch",
+  "gothic",
+  "ruby",
+  "sapphire",
+  "sample-Structure Deck Join our Cult"
+ ],
+ "26_three_link_storm.png": [
+  "Three-Link Storm",
+  "wave",
+  "sea",
+  "topaz",
+  "sapphire",
+  "sample-Structure Deck Lightning Caller"
+ ],
+ "27_hellhounds_trail.png": [
+  "Hellhound's Trail",
+  "stone",
+  "iron",
+  "lava",
+  null,
+  "sample-Structure Deck Mans Best Friends"
+ ],
+ "28_specimen_wing.png": [
+  "Specimen Wing",
+  "industrial",
+  "iron",
+  "cyan",
+  null,
+  "sample-Structure Deck Mawstruck"
+ ],
+ "29_knock_at_the_window.png": [
+  "Knock at the Window",
+  "double",
+  "bronze",
+  "emerald",
+  "amber",
+  "sample-Structure Deck Morph and Kill"
+ ],
+ "30_severed_spell.png": [
+  "Severed Spell",
+  "moulding",
+  "ebony",
+  "amethyst",
+  "amber",
+  "sample-Structure Deck Null and Void"
+ ],
+ "31_tiger_and_ox.png": [
+  "Tiger and Ox",
+  "meander",
+  "lacquer",
+  "lava",
+  "jade",
+  "sample-Structure Deck One-Two-Punch"
+ ],
+ "32_scribe_of_souls.png": [
+  "Scribe of Souls",
+  "arch",
+  "gold",
+  "cyan",
+  "sapphire",
+  "sample-Structure Deck Parts of the Soul"
+ ],
+ "33_volley_at_dusk.png": [
+  "Volley at Dusk",
+  "twist",
+  "bronze",
+  "emerald",
+  "amber",
+  "sample-Structure Deck Pew-Pew"
+ ],
+ "34_tormentors_den.png": [
+  "Tormentor's Den",
+  "bone",
+  "gothic",
+  "amethyst",
+  "lime",
+  "sample-Structure Deck Poison Torture"
+ ],
+ "35_pyre_of_the_warband.png": [
+  "Pyre of the Warband",
+  "industrial",
+  "iron",
+  "lava",
+  "onyx",
+  "sample-Structure Deck Sacrificial Demons"
+ ],
+ "36_blackport_nightfall.png": [
+  "Blackport Nightfall",
+  "ornate",
+  "gothic",
+  "amethyst",
+  "ruby",
+  "sample-Structure Deck Shadows over Blackport"
+ ],
+ "37_sandtrap_oasis.png": [
+  "Sandtrap Oasis",
+  "stone",
+  "stone",
+  "amber",
+  "jade",
+  "sample-Structure Deck Shifting Sandlands"
+ ],
+ "38_new_flock.png": [
+  "New Flock",
+  "arch",
+  "silver",
+  "ruby",
+  "amethyst",
+  "sample-Structure Deck Slimy Infestation"
+ ],
+ "39_black_ice_hall.png": [
+  "Black Ice Hall",
+  "icicle",
+  "ice",
+  "emerald",
+  "sapphire",
+  "sample-Structure Deck Slip n Slide"
+ ],
+ "40_smog_drill.png": [
+  "Smog Drill",
+  "industrial",
+  "brass",
+  "amethyst",
+  "topaz",
+  "sample-Structure Deck Spell Industrialization"
+ ],
+ "41_rampart_of_deri.png": [
+  "Rampart of Deri",
+  "industrial",
+  "iron",
+  "lava",
+  null,
+  "sample-Structure Deck Steam Dwarf Mines"
+ ],
+ "42_sunforged_summit.png": [
+  "Sunforged Summit",
+  "arch",
+  "bronze",
+  "amber",
+  null,
+  "sample-Structure Deck Sun Fencer Frenzy"
+ ],
+ "43_apotheosis_steps.png": [
+  "Apotheosis Steps",
+  "meander",
+  "gold",
+  "jade",
+  "amethyst",
+  "sample-Structure Deck To Attain Divinity"
+ ],
+ "44_sakura_mirror.png": [
+  "Sakura Mirror",
+  "wave",
+  "lacquer",
+  "rose",
+  null,
+  "sample-Structure Deck_ Grand Rebellion"
+ ]
+}
