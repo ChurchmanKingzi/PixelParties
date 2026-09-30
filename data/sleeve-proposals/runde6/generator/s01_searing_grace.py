@@ -58,9 +58,7 @@ for y in range(WALL, H2):
     for x in range(W2):
         p2[y, x] = parq[(y - WALL) % 16, (x + 6) % 16]
 # Kante zwischen Wand und Boden (Sockelleiste in den Randfarben des Tempels, selbst gezeichnet)
-LEDGE = [(250, 206, 110), (214, 140, 48), (120, 44, 18)]
-for i, c in enumerate(LEDGE):
-    for x in range(W2): p2[WALL + i, x] = list(c) + [255]
+LEDGE = [(214, 164, 80), (170, 104, 36), (86, 30, 12)]          # wird nach der Abdunklung gesetzt (s. u.)
 # Stachelreihe vollständig auf dem Boden, direkt vor der Wandkante (wie in der Kartenszene)
 for x0 in range(-10, W2, 64):
     put(p2, spikes, x0, WALL + 3)
@@ -81,6 +79,10 @@ for y in range(H2):
         p2[y, x, :3] = (p2[y, x, :3] * f).astype(np.uint8)
 for (x, y) in EYES:
     p2[y, x, :3] = (236, 36, 28)
+for i, c in enumerate(LEDGE):
+    for x in range(W2):
+        dx = (x + 0.5 - W2 / 2) / (W2 / 2)
+        p2[WALL + i, x, :3] = (np.array(c) * (1 - 0.3 * dx * dx)).astype(np.uint8)
 
 # Bodenschatten unter Nao (Füße bei 250er-y 290 → 2×-Reihe 145)
 shadow_ellipse(p2, 62.5, 144.8, 15, 2.8, a=0.5)

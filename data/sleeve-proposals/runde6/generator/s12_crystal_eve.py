@@ -158,16 +158,18 @@ for _ in range(46):
 # ================================================================== Mittelgrund 3× (84×117)
 W3, H3 = 84, 117
 mid = np.zeros((H3, W3, 4), np.uint8)
-# Schatten des Brunnens: flache Ellipse genau unter dem Brunnenfuß (Mitte auf der unteren Edelsteinreihe),
-# damit der Brunnen auf dem Schnee steht statt zu schweben
-wcols = np.nonzero(well[..., 3].any(0))[0]
-wcx = WX3 + (wcols.min() + wcols.max() + 1) / 2
-wby = WY3 + well.shape[0] - 3
-for y in range(int(wby - 4), int(wby + 4)):
-    for x in range(W3):
-        d = ((x + 0.5 - wcx) / 23) ** 2 + ((y + 0.5 - wby) / 3.2) ** 2
-        if d < 1:
-            mid[y, x, :3] = (26, 34, 70); mid[y, x, 3] = 90
+# Schatten des Brunnens in derselben Draufsicht-Perspektive wie der Brunnen: nur der vordere Fuß des Rings wirft
+# einen flachen Schatten – die untere Umrisslinie des Brunnens um 2 Rasterzeilen nach unten versetzt, als schmaler
+# Halbmond, der unter dem Edelsteinkranz hervorschaut (keine frei schwebende Scheibe)
+wa = well[..., 3] > 0
+for x in range(well.shape[1]):
+    ys = np.nonzero(wa[:, x])[0]
+    if len(ys) == 0: continue
+    yb = ys.max()
+    for d in (1, 2):
+        Y, X = WY3 + yb + d, WX3 + x
+        if 0 <= Y < H3 and 0 <= X < W3 and (d == 1 or 3 < x < well.shape[1] - 4):
+            mid[Y, X, :3] = (30, 38, 78); mid[Y, X, 3] = 150 if d == 1 else 90
 put(mid, well, WX3, WY3)
 sm = sparks[..., 3] > 0
 for (j, i) in zip(*np.nonzero(sm)):
