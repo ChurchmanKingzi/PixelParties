@@ -1,36 +1,29 @@
 # -*- coding: utf-8 -*-
 """03 Tainted Fountain – Gegner „Venom Swamp“, Held: Zsos'Ssar, the Serpent Warlord (Base-Version).
-Poisoned Well: Nachts auf dem Dorfplatz von Deri steht Zsos'Ssar mit Hellebarde vor dem Brunnenbecken. Sein
-Schlangengewimmel gleitet links über den Beckenrand ins Wasser – von dort aus färbt sich das Becken violett (die
-vergiftete Fassung der Karte), hinten rechts ist es noch blau. Giftdunst liegt über dem Wasser, violetter Schein
-auf dem Pflaster, der Rest des Platzes versinkt im Dunkel.
+Poisoned Well (Cover): Abends auf dem Dorfplatz von Deri steht Zsos'Ssar groß mit Hellebarde vor dem Brunnenbecken,
+dessen Wasser er vergiftet hat – das Becken leuchtet giftviolett (die vergiftete Fassung der Kartenszene), Giftblasen
+steigen auf, Dunst zieht über das Wasser, der violette Schein fällt auf Pflaster und Beckenrand. Die Steinstatue in
+der Beckenmitte ragt über ihm auf.
 
 Quellen:
   Motive.xcf Ebene 521 „Snecko“ = Base-Zsos'Ssar mit Hellebarde und Blütenkrone (23×35), in Sichtbar #148
       (Ebene 405, Kartenbild „Zsos'Ssar, the Serpent Warlord“, Lage 333,224) zu 100 % pixelgleich.
-  Motive.xcf Ebene 515 „Ebene #512“: das Schlangengewimmel derselben Kartenszene (leicht abgedunkelt).
-  MotiveDeri.xcf Ebene 178 „Stadt“ (Dorfplatz mit Brunnen) und Ebene 179 „Ebene #40“ (dieselbe Stadt mit violettem
-      Giftwasser = Kartenbild „Poisoned Well“, Sichtbar #14 Lage 220,203), Ausschnitt x202–327/y223–398.
-      Die eingebackenen Figuren der Szene wurden mit Pflaster aus 32/48 px versetzten Zeilen übermalt
-      (Pflaster hat senkrecht Periode 16).
-Selbst gezeichnet: Giftgrenze (gedithert), Nachtfärbung, Giftschein, Dunstschwaden, Vignette, Schatten.
+  MotiveDeri.xcf Ebene 179 „Ebene #40“: Dorfplatz von Deri mit violettem Giftwasser (= Kartenbild „Poisoned Well“,
+      Sichtbar #14 Lage 220,203), Ausschnitt x224–308/y229–346. Die eingebackenen Figuren der Szene wurden mit
+      Pflaster aus 32/48 px versetzten Zeilen übermalt (Pflaster hat senkrecht Periode 16).
+Selbst gezeichnet: Abendfärbung, Giftschein, Giftblasen, Dunstschwaden, Schatten.
 
-Skalierung:
-  Dorfplatz, Becken, Schlangen, Dunst, Schein, Schatten – 2× (125×175)
-  Zsos'Ssar                                            – 5× (50×70)
+Skalierung (Ausgabe = 250×350-Raster × 3):
+  Dorfplatz, Brunnen, Statue, Blasen, Dunst, Schein, Schatten – 3× (84×117)
+  Zsos'Ssar                                                    – 6× (42×59)
 """
 import math, random
 from a_util import *  # noqa
 import numpy as np
 
-rnd = random.Random(3)
-
-# ---- Quellen -------------------------------------------------------------------------------
 zsos = sprite('o03_zsos', 'Motive', [521])                   # „Snecko“ = Base-Zsos'Ssar (23×35), Sichtbar #148
-swarm = sprite('o03_swarm', 'Motive', [515])                 # Schlangengewimmel seiner Kartenszene (42×43)
-CX0, CY0 = 202, 175                                          # Ausschnitt des Dorfplatzes (125×175)
-clean_full = compose('MotiveDeri', [178], crop=False)       # „Stadt“ (Dorfplatz von Deri)
-pois_full = compose('MotiveDeri', [179], crop=False)        # „Ebene #40“: dieselbe Stadt vergiftet (Poisoned Well)
+CX0, CY0 = 202, 175                                          # Bezug der Flickkoordinaten (alter Ausschnitt)
+pois_full = compose('MotiveDeri', [179], crop=False)        # „Ebene #40“: Deri mit vergiftetem Brunnen
 
 
 def depeople(full):
@@ -50,64 +43,60 @@ def depeople(full):
     return f
 
 
-CX1, CY1 = 202, 223                                          # Bildausschnitt (Becken oben im Bild)
-clean = depeople(clean_full)[CY1:CY1 + 175, CX1:CX1 + 125].copy()
-pois = depeople(pois_full)[CY1:CY1 + 175, CX1:CX1 + 125].copy()
-
-# ---- Ebene 1: Dorfplatz bei Nacht, Becken halb vergiftet, Schlangen (2×, 125×175) ------------
-W2, H2 = 125, 175
-PX0, PY0, PX1, PY1 = 25, 12, 104, 89                        # Becken (inkl. Rand) im Ausschnitt
-SNX, SNY = 14, 50                                             # Schlangengewimmel links vorn am Beckenrand
-SRC = (26, 84)                                               # Eintrittsstelle des Gifts
-p2 = clean.copy()
-# Gift breitet sich von links vorn aus: Wasserpixel innerhalb eines welligen Radius aus der vergifteten Fassung
-for y in range(PY0, PY1):
-    for x in range(PX0, PX1):
-        d = math.hypot(x - SRC[0], (y - SRC[1]) * 1.1)
-        edge = 54 + 4 * math.sin(y * 0.35) + 3 * math.sin(x * 0.5 + 1)
-        if d < edge - 3 or (d < edge + 3 and (d - edge + 3) / 6 < bayer(x, y)):
-            p2[y, x] = pois[y, x]
-# Nacht: kühl abdunkeln, nur das Giftwasser leuchtet
-water_p = (np.abs(p2[..., :3].astype(int) - pois[..., :3].astype(int)).max(-1) == 0) & \
-          (np.abs(clean[..., :3].astype(int) - pois[..., :3].astype(int)).max(-1) > 20)
-water_p[:PY0] = False; water_p[PY1:] = False; water_p[:, :PX0] = False; water_p[:, PX1:] = False
-NIGHT = np.array([0.48, 0.50, 0.70])
-out = (p2[..., :3] * NIGHT).astype(np.uint8)
-out[water_p] = np.clip(p2[..., :3][water_p] * np.array([1.12, 0.95, 1.12]), 0, 255).astype(np.uint8)
-p2[..., :3] = out
-# violetter Giftschein auf dem Pflaster rund ums vergiftete Becken (gedithert)
-for y in range(H2):
-    for x in range(W2):
-        if water_p[y, x] or (PX0 + 3 <= x < PX1 - 3 and PY0 + 3 <= y < PY1 - 4): continue
-        d = math.hypot(x - 45, (y - 58) * 1.1)
-        t = max(0, 1 - d / 75)
-        if t > 0 and t * 1.5 > bayer(x, y) + 0.1:
-            p2[y, x, :3] = mix(p2[y, x, :3], (140, 70, 190), 0.3 if t < 0.5 else 0.42)
-put(p2, darken(swarm, 0.85), SNX, SNY)
-# Giftdunst: flache, halbtransparente Schwaden über dem violetten Wasser (selbst gezeichnet, 2×, gedithert)
-for (cx, cy, rx, ry) in [(44, 40, 16, 4), (62, 26, 12, 3), (36, 18, 10, 3), (56, 56, 14, 3)]:
-    for y in range(cy - ry, cy + ry + 1):
+# ---- Ebene 1: Brunnen und Dorfplatz im Abendlicht (3×, 84×117) ---------------------------------
+CX1, CY1 = 224, 229                                          # Bildausschnitt 84×117: Brunnen füllt die obere Hälfte
+W3, H3 = 84, 117
+p3 = depeople(pois_full)[CY1:CY1 + H3, CX1:CX1 + W3].copy()
+p3[..., 3] = 255
+p3[100:117, 0:22] = p3[84:101, 0:22]                         # Wegweiser links unten durch Pflaster ersetzen
+PX0, PY0, PX1, PY1 = 4, 4, 81, 83                            # Becken inkl. Rand im Ausschnitt
+c = p3[..., :3].astype(int)
+water = (c[..., 2] > 150) & (c[..., 0] > 90) & (c[..., 1] < 140)       # violettes Giftwasser
+water[:PY0] = False; water[PY1:] = False
+# Abendstimmung: alles kühl abdunkeln, das Giftwasser leuchtet
+out = (p3[..., :3] * np.array([0.55, 0.55, 0.72])).astype(np.uint8)
+# Wasser: zur Beckenmitte hin heller (leuchtendes Gift), zu den Rändern dunkler
+yy, xx = np.mgrid[0:H3, 0:W3]
+rad = np.hypot((xx - 42) / 40.0, (yy - 42) / 40.0)
+gain = (1.18 - 0.35 * np.clip(rad, 0, 1))[..., None]
+wv = np.clip(p3[..., :3].astype(float) * np.array([1.0, 0.9, 1.0]) * gain, 0, 255).astype(np.uint8)
+out[water] = wv[water]
+p3[..., :3] = out
+# violetter Giftschein auf Rand und Pflaster (gedithert, 2 Stufen)
+for y in range(H3):
+    for x in range(W3):
+        if water[y, x]: continue
+        dx = max(PX0 - x, 0, x - PX1); dy = max(PY0 - y, 0, y - PY1)
+        d = math.hypot(dx, dy * 1.2)
+        if PX0 + 3 <= x <= PX1 - 3 and PY0 + 3 <= y <= PY1 - 3: continue   # Statue im Becken bleibt steingrau
+        t = max(0.0, 1 - d / 26) if d > 0 else 0.8
+        if t > 0 and t * 1.4 > bayer(x, y) + 0.2:
+            p3[y, x, :3] = mix(p3[y, x, :3], (150, 80, 200), 0.28 if t < 0.6 else 0.4)
+# Giftblasen im Wasser (kleine Ringe mit Glanzpunkt, selbst gezeichnet)
+BUB, BUBL = (214, 170, 245), (250, 236, 255)
+for (x, y, r) in [(14, 20, 2), (22, 58, 1), (66, 16, 1), (70, 50, 2), (12, 70, 1), (56, 72, 1), (30, 38, 1)]:
+    for yy in range(y - r - 1, y + r + 2):
+        for xx in range(x - r - 1, x + r + 2):
+            dd = math.hypot(xx + 0.5 - x - 0.5, yy + 0.5 - y - 0.5)
+            if r - 0.5 <= dd < r + 0.6: p3[yy, xx, :3] = BUB
+    p3[y - r + (1 if r > 1 else 0), x - r + (1 if r > 1 else 0), :3] = BUBL
+# Giftdunst: flache, halbtransparente Schwaden über dem Wasser (gedithert)
+for (cx, cy, rx, ry) in [(18, 30, 12, 2.5), (64, 26, 12, 2.5), (40, 8, 14, 2.5), (60, 64, 9, 2)]:
+    for y in range(int(cy - ry), int(cy + ry) + 1):
         for x in range(cx - rx, cx + rx + 1):
             d = ((x - cx) / rx) ** 2 + ((y - cy) / ry) ** 2
-            if d < 1 and (1 - d) * 1.4 > bayer(x, y) + 0.2:
-                p2[y, x, :3] = mix(p2[y, x, :3], (190, 140, 230), 0.4)
-# Nachtvignette: Ränder und Ecken versinken im Dunkel (gedithert in 3 Stufen)
-for y in range(H2):
-    for x in range(W2):
-        d = math.hypot((x + 0.5 - 62) / 70.0, (y + 0.5 - 70) / 105.0)
-        t = max(0.0, d - 0.55) / 0.45 * 3
-        k = int(t) + (1 if t - int(t) > bayer(x, y) else 0)
-        if k > 0: p2[y, x, :3] = (p2[y, x, :3] * (1 - 0.18 * min(k, 3))).astype(np.uint8)
-# Bodenschatten für Zsos'Ssar (Füße bei 250er-y 310 → 2×-Reihe 155)
-shadow_ellipse(p2, 76, 155.5, 12, 2.4, a=0.5)
+            if d < 1 and (1 - d) * 1.4 > bayer(x, y) + 0.25:
+                p3[y, x, :3] = mix(p3[y, x, :3], (200, 160, 236), 0.45)
+# Bodenschatten für Zsos'Ssar (Füße bei 250er-y 312 → 3×-Reihe 104)
+shadow_ellipse(p3, 46.5, 104, 13, 2.2, a=0.5)
 cv = Canvas(250, 350)
-blit(cv, p2, 2)
+blit(cv, p3, 3, -1, 0)
 
-# ---- Ebene 2: Zsos'Ssar (5×, 50×70) --------------------------------------------------------------
-W5, H5 = 50, 70
-p5 = rgba(W5, H5)
-ZX, ZY = 21, 62 - zsos.shape[0]
-put(p5, zsos, ZX, ZY)
-blit(cv, p5, 5, 0, 0)
+# ---- Ebene 2: Zsos'Ssar (6×, 42×59) ---------------------------------------------------------------
+W6, H6 = 42, 59
+p6 = rgba(W6, H6)
+ZX, ZY = 12, 52 - zsos.shape[0]
+put(p6, zsos, ZX, ZY)
+blit(cv, p6, 6, 0, 0)
 print(save(cv, '03_tainted_fountain.png'))
 print(preview('03_tainted_fountain.png', 'twist', 'bronze', 'emerald', 'amethyst'))

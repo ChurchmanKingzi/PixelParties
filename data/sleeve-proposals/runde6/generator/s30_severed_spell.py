@@ -8,10 +8,11 @@ vorbei und zerfallen um die Klinge in violetten Null-Staub (Kartentext: negiert 
 Deck voller Waffen-Angriffe gegen Magier). Der Thron hinter ihm ist leer – der Herr des Saals ist aufgestanden. Violetter Schein hinter Null.
 
 Quellen (MotiveArcanum.xcf, Kartenszene Sichtbar #41 = Ebene 1, Kartenausschnitt Lage 644,206):
-  Null (Base-Karte): Ebene 8 „Null“ (Rüstung) + 5 „Null #1“ (rote Bruststeine) + 7 „Null #2“ (vorgestreckter Arm),
+  Null (Base-Karte): Ebene 6 „Null-Kopie“ (Rüstung; die Kopie ist die Kartenfassung – Ebene 8 „Null“ weicht an der
+  linken Schulter in 47 Pixeln ab) + 5 „Null #1“ (rote Bruststeine) + 7 „Null #2“ (vorgestreckter Arm),
   Effekte seiner Karte: 4 „Null #3“ (violette Klinge, nur x ≥ 632), 3 „Null #5“ (violette Staubpunkte),
   2 „Null #4“ (Feuerzauber). Gruppe x 632–709, y 200–256 in genau der Anordnung der Kartenszene
-  (Vergleich mit Sichtbar #41: 0 Abweichungen außerhalb des Hintergrunds); die gerade Schnittkante des Feuers
+  (pixelgenau geprüft gegen Sichtbar #41: 0 abweichende Pixel); die gerade Schnittkante des Feuers
   am Kartenrand liegt außerhalb des Bildes.
   Ebene 154 „GEHEIMRAUM“ (Thronsaal) – Ausschnitt x 630–755, y 110–285.
 Bearbeitet: Beistelltisch mit Flasche hinter Nulls Kopf entfernt (Boden ergänzt, rechte Thron-Armlehne gespiegelt).
@@ -25,7 +26,7 @@ import numpy as np
 from ekit_25_30 import *  # noqa
 
 D = 'MotiveArcanum'
-group = compose(D, [2, 3, 4, 5, 7, 8], crop=False)[200:256, 632:712].copy()   # native Kartenanordnung
+group = compose(D, [2, 3, 4, 5, 6, 7], crop=False)[200:256, 632:712].copy()   # native Kartenanordnung
 
 # ================================================================ 2×: Thronsaal
 bw, bh = grid(2)

@@ -118,4 +118,4 @@ st.add(mg, 3)
 st.add(fg, 5, ox=3)
 save(st.canvas(), '32_scribe_of_souls.png')
 if __name__ == '__main__':
-    print(preview('32_scribe_of_souls.png', 'arch', 'gold', 'cyan', 'lapis' if False else 'sapphire'))
+    print(preview('32_scribe_of_souls.png', 'arch', 'gold', 'cyan', 'sapphire'))
