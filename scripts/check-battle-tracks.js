@@ -68,5 +68,20 @@ assert.strictEqual(winsPerSlug([{ opponent_deck_id: 'sample-A', wins: 6 }, { opp
   rows = [{ opponent_deck_id: 'sample-A', wins: 11 }];
   assert.strictEqual(await bt.unlockedByWin('u', 'sample-A'), null, 'nur der zehnte Sieg meldet');
   assert.strictEqual(await bt.unlockedByWin('u', 'sample-B'), null);
+  // progressFor: Fortschritt zum Track der gespielten CPU (alle Decks der Figur zusammen)
+  rows = [{ opponent_deck_id: 'sample-A', wins: 3 }, { opponent_deck_id: 'sample-A2', wins: 4 }];
+  assert.deepStrictEqual(await bt.progressFor('u', 'sample-A'), { id: 'null', name: 'Null, the Mage Slayer', wins: 7, need: 10 });
+  assert.strictEqual(await bt.progressFor('u', 'sample-B'), null);
+
+  // cpu-unlocks: Quellen melden Eintraege; Fehler einer Quelle blockieren die anderen nicht
+  const { registerCpuUnlockSource, collectCpuUnlocks } = require('../cpu-unlocks');
+  registerCpuUnlockSource(async (ctx) => ({ kind: 'music', id: 'x', name: 'Test Theme ' + ctx.wins }));
+  registerCpuUnlockSource(async () => { throw new Error('kaputte Quelle'); });
+  registerCpuUnlockSource(async () => [{ kind: 'sleeve', name: 'Sleeve A', image: '/a.png' }, { name: '' }, null]);
+  const origErr = console.error; console.error = () => {};
+  const got = await collectCpuUnlocks({ userId: 'u', wins: 10 });
+  console.error = origErr;
+  assert.deepStrictEqual(got.map(g => g.kind + ':' + g.name), ['music:Test Theme 10', 'sleeve:Sleeve A']);
+  assert.strictEqual(got[1].image, '/a.png');
   console.log('battle-tracks: OK (' + generic.length + ' allgemeine Tracks)');
 })().catch(e => { console.error(e); process.exit(1); });
