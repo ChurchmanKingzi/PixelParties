@@ -5,8 +5,8 @@ Mondnacht vor dem Torhaus der Burg Blackport. Der alte König Arthor (Base: wei�
 auf dem Pflaster vor seinem Tor; hinter ihm ragen die zwei Rundtürme und die Brüstung des Balkons (auf dem er auf
 seiner Karte sitzt) als dunkle Silhouette in den hellen Mondhimmel. Am linken Turm hängt das violette Chevron-Banner
 von Blackport, am rechten Turm – wie auf seiner Karte an der Burgmauer – das Legendary Sword of a Barbarian King,
-das Arthor zum „Inheritor of the Barbarian Sword“ (Cover-Karte) macht. Die einzige Bedrohung kommt von hinten
-links: ein Tentakel der Spawn Mother schiebt sich hinter dem linken Turm in den Mondschein.
+das Arthor zum „Inheritor of the Barbarian Sword“ (Cover-Karte) macht – senkrecht aufgestellt als Gegenstück zum
+Banner. „Shadows over Blackport“ erzählt die Mondnacht selbst: der König hält Wache vor dem schlafenden Tor.
 
 Quellen (Motive.xcf):
   Ebene 951 „Arthor-Kopie“ – Base-Arthor (Karte „Arthor, the King of Blackport“ = Sichtbar #294, Ebene 103,
@@ -14,15 +14,14 @@ Quellen (Motive.xcf):
   Figur aus 951 (nur Arthor, x262–292/y183–214), keine Ascended-Version (910).
   Ebene 103 „Sichtbar #294“ – Torhaus der Karte (Ausschnitt x222–347/y150–325): alles oberhalb der Turmkronen und
   der Balkonbrüstung durch Himmel ersetzt; die drei Balkonfiguren (Masken 948/951/949) mit Nachbarsteinen übermalt;
-  das Banner (x280–293/y219–237) an den linken Turm versetzt.
-  Ebene 911 „Legendary Sword“ – Karte „Legendary Sword of a Barbarian King“ (waagrecht an der Wand wie dort).
-MotiveIndia.xcf: Ebene 399 „Ebene #60“ – nur der Tentakel oben links (x328–364/y312–335), Tentakel der Karte
-  „The Spawn Mother“ (Sichtbar Ebene 3, Lage 328,317); das ausgeblendete Ende verschwindet hinter dem Turm.
+  das Banner über dem Tor (x277–294/y220–237, Maske: alles Nicht-Graue) an den linken Turm versetzt.
+  Ebene 911 „Legendary Sword“ – Karte „Legendary Sword of a Barbarian King“ (dort an der Burgmauer; hier um 90°
+  gedreht am rechten Turm).
 Selbst gezeichnet: Himmel, Mond, Sterne, Zinnen auf den Turmkronen (Farben der Brüstungssteine), Mondlicht auf der
 Fassade, Schatten.
 
 Skalierung (Tiefenebenen):
-  Hintergrund (Himmel, Mond, Torhaus, Banner, Schwert, Tentakel) – 2× (125×175)
+  Hintergrund (Himmel, Mond, Sterne, Torhaus, Zinnen, Banner, Schwert) – 2× (125×175)
   Vordergrund (Arthor 14×25 → 84×150 px, Schatten)               – 6× (42×59, um 1 px versetzt)
 """
 import math, random
@@ -46,7 +45,7 @@ for y, x in zip(*np.nonzero(mask)):
     for dx in (16, -16, 32, -32):
         if not mask[y, x + dx]: full[y, x] = full[y, x + dx]; break
 # Banner über dem Tor → an den linken Turm; an seine alte Stelle Mauer aus 16 px Entfernung
-BY0, BY1, BX0, BX1 = 220, 240, 277, 294
+BY0, BY1, BX0, BX1 = 220, 237, 277, 294
 banner = full[BY0:BY1, BX0:BX1].copy()
 brgb = banner[..., :3].astype(int)
 banner[..., 3] = np.where(brgb.max(-1) - brgb.min(-1) > 18, 255, 0).astype(np.uint8)      # Wand ist grau
@@ -129,7 +128,7 @@ for x in range(W2):
 # Banner am linken Turm, Schwert am rechten Turm
 b_ = banner.copy(); b_[..., :3] = np.clip(b_[..., :3].astype(float) * np.array((0.75, 0.7, 0.9)), 0, 255)
 bg.paste(b_, (TOWERS[0][0] + TOWERS[0][1]) // 2 - b_.shape[1] // 2, SHIFT + (188 - CY0))
-sw = rot90(sprite('o36_sword', 'Motive', [911]), 1)          # senkrecht, Spitze nach unten
+sw = rot90(sprite('o36_sword', 'Motive', [911]), 1)          # senkrecht aufgestellt, Spitze nach oben
 sw2 = sw.copy(); sw2[..., :3] = np.clip(sw2[..., :3].astype(float) * np.array((0.85, 0.85, 0.98)), 0, 255)
 SWX = (TOWERS[1][0] + TOWERS[1][1]) // 2 - sw.shape[1] // 2
 bg.paste(sw2, SWX, SHIFT + (184 - CY0))

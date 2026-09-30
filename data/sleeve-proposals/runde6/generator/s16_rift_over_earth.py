@@ -49,7 +49,7 @@ for (x, y) in [(40, 40), (212, 70), (30, 190), (222, 214)]:
 
 # ---------- 2×: Erde, Blickkegel, Begleiter ----------
 p2 = rgba(125, 175)
-AX4, AY4 = 20, 2                                     # Argos im 4×-Raster (63×88): x80–172, y8–224 im 250er-Raster
+AX4, AY4 = 20, 4                                     # Argos im 4×-Raster (63×88): x80–172, y16–232 im 250er-Raster
 ECX, ECY = (AX4 + 11.5) * 2, (AY4 + 27) * 2          # Augenmitte im 2×-Raster
 TIP = (AY4 + 54) * 2                                 # Augenspitze unten (2×)
 EX, EY = 62, 128 + 50                                # Erdmittelpunkt im 2×-Raster (Oberkante y128 → 256 im 250er-Raster)

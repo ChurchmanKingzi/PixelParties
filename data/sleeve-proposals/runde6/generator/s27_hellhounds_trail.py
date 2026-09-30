@@ -2,24 +2,25 @@
 """27 Hellhound's Trail – Gegner „Man's Best Friends“ (sample-Structure Deck Mans Best Friends),
 Held: Orthos, the Loyal Guard Dog.
 
-Idee (Reise/Nachtmarsch): Orthos, der zweiköpfige Wachhund mit brennenden Köpfen (Base-Karte), kommt groß auf den
-Betrachter zu. Hinter ihm windet sich ein Aschepfad durch das glühende Feuerfeld seiner Karte bis zum Horizont,
-und auf dem Pfad folgt ihm im Gänsemarsch seine Loyal-Meute: vorn die Cover-Karte Loyal Pinpom und der Rottweiler,
-weiter hinten Terrier, Shepherd und Hountriever (Kartentext: ein „Loyal“ ruft den nächsten herbei).
+Idee (Reise/Nachtmarsch, ruhig): Orthos, der zweiköpfige Wachhund mit brennenden Köpfen (Base-Karte), kommt groß
+auf dem Aschepfad auf den Betrachter zu. Dicht hinter ihm folgt als kleine Gruppe seine Loyal-Meute – in der
+Mitte die Cover-Karte Loyal Pinpom, links der Rottweiler, rechts der Shepherd (Kartentext: ein „Loyal“ ruft den
+nächsten herbei). Der Pfad windet sich über das dunkle Aschefeld seiner Karte zum Horizont, an dem die Glut des
+Feuerfelds als roter Schein hinter den Hügeln steht; der Schein seiner Flammenköpfe liegt auf Boden und Meute.
 
 Quellen:
   MotiveGN.xcf  Ebene 155 „Orthos“: Orthos mit Flammenköpfen (Box x 168–186, y 330–353; die darüber anstoßende
                 Flamme des Feuerfelds abgeschnitten), geprüft gegen Kartenszene Sichtbar #87 (Ebene 149,
-                Kartenausschnitt Lage 139,314); aus derselben Ebene die Feuerfeld-Flamme (x 158–167, y 336–347).
-                Loyal-Hunde (je Kartenbild-Ebene, geprüft per scenes_with gegen ihre Sichtbar-Szenen 158/162/160/166/168):
-                159 „Pinpom“, 163 „Rottweiler“, 161 „Terrier“, 167 „Shepherd“, 169 „Hountriever“.
-Selbst gezeichnet: Nachthimmel mit rotem Horizontschein, Hügelsilhouetten, Glutfunken, Aschefeld (Sprenkel),
-Aschepfad, Lichtschein der Flammen und der Flammenköpfe auf dem Boden, Bodenschatten.
+                Kartenausschnitt Lage 139,314; Form gleich, Karte nur rötlich abgedunkelt).
+                Loyal-Hunde (Kartenbild-Ebenen, geprüft per scenes_with gegen ihre Sichtbar-Szenen 158/162/166):
+                159 „Pinpom“, 163 „Rottweiler“, 167 „Shepherd“.
+Selbst gezeichnet: Nachthimmel mit Glutschein am Horizont, Hügelsilhouetten mit glühenden Kanten, wenige
+Funken, Aschefeld (Sprenkel), Aschepfad, Lichtschein der Flammenköpfe, Bodenschatten.
 
 Skalierung:
-  Hintergrund (Himmel, Hügel, Boden, Pfad, ferne Flammen, Terrier/Shepherd/Hountriever) – 2× (Raster 125×175)
-  Mittelgrund (Pinpom, Rottweiler, nahe Flammen, ihre Schatten)                          – 3× (Raster 84×117)
-  Vordergrund (Orthos 18×23 → 108×138, Schatten)                                         – 6× (Raster 42×59)
+  Hintergrund (Himmel, Horizontglut, Hügel, Boden, Pfad, Licht)        – 2× (Raster 125×175)
+  Mittelgrund (Rottweiler, Pinpom, Shepherd + Schatten, eine Gruppe)   – 3× (Raster 84×117)
+  Vordergrund (Orthos 18×23 → 108×138, Schatten)                       – 6× (Raster 42×59)
 """
 import math, random
 import numpy as np
@@ -29,16 +30,14 @@ rnd = random.Random(27)
 GN = 'MotiveGN'
 
 orthos = sprite('o27_orthos', GN, [155], box=(168, 330, 186, 353))
-flame = sprite('o27_flame', GN, [155], box=(158, 336, 167, 347))
 dog = {n: sprite('o27_' + n, GN, [i], box=b) for n, i, b in (
     ('pinpom', 159, (131, 289, 144, 302)), ('rottweiler', 163, (177, 289, 191, 307)),
-    ('terrier', 161, (204, 241, 217, 256)), ('shepherd', 167, (195, 287, 211, 306)),
-    ('hountriever', 169, (155, 328, 169, 345)))}
+    ('shepherd', 167, (195, 287, 211, 306)))}
 
-HOR = 118                                        # Horizont (Canvas-Pixel)
+HOR = 128                                        # Horizont (Canvas-Pixel)
 
 # ---------------------------------------------------------------- Pfad (Canvas-Koordinaten, Catmull-Rom)
-PTS = [(116, HOR), (98, 130), (146, 146), (160, 158), (112, 172), (62, 196), (56, 228), (150, 250), (196, 270), (190, 290), (125, 330), (125, 360)]
+PTS = [(112, HOR), (100, 140), (132, 156), (150, 172), (128, 192), (122, 240), (125, 300), (125, 360)]
 
 
 def catmull(pts, n=40):
@@ -57,34 +56,36 @@ CURVE = catmull(PTS)
 
 
 def path_x(y):
-    best = min(CURVE, key=lambda p: abs(p[1] - y))
-    return best[0]
+    return min(CURVE, key=lambda p: abs(p[1] - y))[0]
 
 
 # ================================================================ 2×-Ebene
 bw, bh = grid(2)
 bg = rgba(bw, bh, (0, 0, 0))
 h2 = HOR // 2
-vgrad(bg, 0, 0, bw, h2, [(10, 6, 14), (18, 8, 20), (34, 10, 22), (62, 16, 20), (104, 30, 20)])
-# ferne Hügel (zwei Schichten)
+vgrad(bg, 0, 0, bw, h2, [(8, 5, 12), (14, 7, 18), (26, 9, 20), (48, 13, 18), (84, 24, 18)])
+# Glut des Feuerfelds hinter dem Horizont (breiter, gestufter Schein)
+sky = np.zeros((bh, bw), bool); sky[:h2] = True
+glow(bg, 62, h2 + 2, 110, 22, (230, 90, 30), .55, mask=sky)
+glow(bg, 62, h2 + 2, 70, 12, (255, 160, 60), .35, mask=sky)
+# ferne Hügel mit glühender Kante
 for x in range(bw):
-    t1 = h2 - 7 - 4 * math.sin(x * .07 + 1) - 2 * math.sin(x * .19)
-    t2 = h2 - 3 - 2.5 * math.sin(x * .11 + 3) - 1.5 * math.sin(x * .31)
+    t1 = h2 - 6 - 3.5 * math.sin(x * .07 + 1) - 1.5 * math.sin(x * .19)
+    t2 = h2 - 2.5 - 2 * math.sin(x * .11 + 3) - 1.2 * math.sin(x * .31)
     for y in range(int(t1), h2):
-        bg[y, x, :3] = (40, 14, 20) if y > t1 + .5 else (86, 28, 24)
+        bg[y, x, :3] = (38, 12, 18) if y > t1 + .5 else (150, 52, 26)
     for y in range(int(t2), h2):
-        bg[y, x, :3] = (24, 10, 14) if y > t2 + .5 else (60, 20, 20)
-# Aschefeld (Sprenkel in der Farbe der Kartenszene), nach vorn etwas heller
-G = [(26, 16, 18), (34, 22, 22), (42, 27, 26), (54, 33, 30)]
+        bg[y, x, :3] = (22, 9, 13) if y > t2 + .5 else (110, 36, 22)
+for _ in range(6):                                # wenige Funken über der Glut
+    setp(bg, rnd.randrange(12, bw - 12), rnd.randrange(h2 - 22, h2 - 8), (250, 170, 70))
+# Aschefeld (ruhige Sprenkel in den Farben der Kartenszene)
+G = [(26, 16, 18), (32, 21, 21), (40, 26, 25)]
 for y in range(h2, bh):
-    t = (y - h2) / (bh - h2)
     for x in range(bw):
         r = rnd.random()
-        i = 1 if r < .55 else (0 if r < .8 else 2)
-        if t > .45 and r > .93: i = 3
-        bg[y, x, :3] = G[i]
-# Pfad: Breite wächst nach vorn, dunkle Kante
-PC = [(66, 54, 52), (84, 70, 64), (100, 86, 78)]
+        bg[y, x, :3] = G[1] if r < .6 else (G[0] if r < .85 else G[2])
+# Pfad
+PC = [(64, 52, 50), (80, 66, 60), (94, 80, 72)]
 for y in range(h2, bh):
     cy = y * 2 + 1
     cx = path_x(cy) / 2
@@ -95,47 +96,28 @@ for y in range(h2, bh):
             r = rnd.random()
             bg[y, x, :3] = PC[1] if r < .6 else (PC[0] if r < .85 else PC[2])
         elif d < wdt + 1:
-            bg[y, x, :3] = (28, 18, 18)
-# Horizontschein
-glow(bg, 62, h2, 90, 26, (150, 40, 20), .35, mask=np.arange(bh)[:, None].repeat(bw, 1) < h2)
-# ferne Flammen des Feuerfelds (2×) mit Glutschein
-FAR = [(20, 70), (104, 64), (12, 100), (36, 82)]
-for fx, fy in FAR:
-    glow(bg, fx + 4.5, fy + 10, 11, 5, (200, 60, 20), .45)
-for fx, fy in FAR:
-    put(bg, flame, fx, fy)
-# Funken am Himmel
-for _ in range(10):
-    x = rnd.randrange(8, bw - 8); y = rnd.randrange(14, h2 - 8)
-    setp(bg, x, y, (230, 110, 40) if rnd.random() < .6 else (250, 190, 80))
-# Lichtschein der Flammenköpfe rund um Orthos auf dem Boden
-glow(bg, 62.5, 150, 58, 30, (190, 70, 24), .38)
+            bg[y, x, :3] = (24, 15, 16)
+# Lichtschein der Flammenköpfe (auf Boden und Meute)
+glow(bg, 62.5, 100, 56, 34, (190, 70, 24), .38)
+
+# ================================================================ 3×-Ebene: die Meute als Gruppe dicht hinter Orthos
+mw, mh = grid(3)
+mid = rgba(mw, mh)
 
 
 def dog_at(layer_, s, cx, feet):
-    """Hund mittig über dem Fußpunkt, mit kleinem Schatten."""
     h, w = s.shape[:2]
     for x in range(int(cx - w / 2) - 1, int(cx + w / 2) + 1):
         for dy in (0, 1):
-            if bay(x, feet + dy) < (.8 if dy == 0 else .4):
-                setp(layer_, x, feet + dy - 1, (10, 6, 8), 170)
+            if bay(x, feet + dy) < (.85 if dy == 0 else .45):
+                setp(layer_, x, feet + dy - 1, (10, 5, 7), 190)
     put(layer_, s, int(round(cx - w / 2)), feet - h)
 
 
-# ferne Meute (2×)
-for n, feet in (('hountriever', 66), ('shepherd', 76), ('terrier', 86)):
-    cy = feet * 2
-    dog_at(bg, dog[n], path_x(cy) / 2, feet)
-
-# ================================================================ 3×-Ebene
-mw, mh = grid(3)
-mid = rgba(mw, mh)
-for n, feet in (('rottweiler', 76), ('pinpom', 90)):
-    cy = feet * 3
-    dog_at(mid, dog[n], path_x(cy) / 3, feet)
-NEAR = [(4, 88), (66, 62)]
-for fx, fy in NEAR:
-    put(mid, flame, fx, fy)
+# Fußpunkte im 3×-Raster (Canvas: Rottweiler 99/192, Pinpom 126/201, Shepherd 153/195)
+dog_at(mid, dog['rottweiler'], 33, 64)
+dog_at(mid, dog['shepherd'], 51, 65)
+dog_at(mid, dog['pinpom'], 42, 67)
 
 # ================================================================ 6×-Ebene: Orthos
 fw, fh = grid(6)                     # 42×59
