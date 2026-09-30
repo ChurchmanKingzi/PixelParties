@@ -1053,7 +1053,10 @@ function PlayScreen() {
       // `cpuBgm` ganz, liegt es an der Server-Seite (oder an einem alten
       // Serverprozess); ist es gesetzt und die Musik stimmt trotzdem
       // nicht, liegt es am Musik-Manager darunter.
-      const mode = gameState.cpuBgm ? 'battle:' + gameState.cpuBgm : 'battle';
+      // CPU-Kampf: Thema der CPU. PvP: der gewählte Track des Gegners
+      // (`oppBgm`, Profil → Battle Music). Sonst der Standard.
+      const bgmSlug = gameState.cpuBgm || gameState.oppBgm;
+      const mode = bgmSlug ? 'battle:' + bgmSlug : 'battle';
       if (window.__ppBgmLast !== mode) {
         window.__ppBgmLast = mode;
         console.log('[bgm] Zustand: isCpuBattle =', gameState.isCpuBattle,
@@ -2584,6 +2587,7 @@ function MusicManager({ bgmMode }) {
 //  display one after another.
 // ═══════════════════════════════════════════
 function OpponentUnlockPopup() {
+  const { notify } = useContext(AppContext);
   const [queue, setQueue] = useState([]);
 
   useEffect(() => {
@@ -2592,8 +2596,13 @@ function OpponentUnlockPopup() {
       if (list.length) setQueue(q => [...q, ...list]);
     };
     socket.on('opponents_unlocked', onUnlocked);
-    return () => socket.off('opponents_unlocked', onUnlocked);
-  }, []);
+    // Zehnter Sieg gegen eine CPU: ihr Battle-Track ist jetzt wählbar.
+    const onTrack = (data) => {
+      if (data && data.name && notify) notify('New battle track unlocked: ' + data.name + "'s Theme! Pick it under Profile → Battle Music.", 'success');
+    };
+    socket.on('battle_track_unlocked', onTrack);
+    return () => { socket.off('opponents_unlocked', onUnlocked); socket.off('battle_track_unlocked', onTrack); };
+  }, [notify]);
 
   const current = queue.length ? queue[0] : null;
   const dismiss = useCallback(() => setQueue(q => q.slice(1)), []);

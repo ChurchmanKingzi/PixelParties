@@ -910,6 +910,8 @@ async function initDatabase() {
   try { await db.execute("ALTER TABLE decks ADD COLUMN cube_draft_meta TEXT DEFAULT NULL"); } catch {}
   try { await db.execute('ALTER TABLE users ADD COLUMN sc INTEGER DEFAULT 0'); } catch {}
   try { await db.execute("ALTER TABLE users ADD COLUMN board TEXT DEFAULT NULL"); } catch {}
+  // Gewählter Battle-Track (battle-tracks.js): 'battle<N>' oder Slug eines CPU-Themas; NULL = Standard.
+  try { await db.execute("ALTER TABLE users ADD COLUMN battle_track TEXT DEFAULT NULL"); } catch {}
   try { await db.execute("ALTER TABLE users ADD COLUMN hide_tutorial INTEGER DEFAULT 0"); } catch {}
   try { await db.execute("ALTER TABLE users ADD COLUMN play_animations INTEGER DEFAULT 1"); } catch {}
   // v1463: animierte Helden auf dem Brett (Display Heroes) und ihr
@@ -1900,7 +1902,7 @@ app.get('/api/auth/me', authMiddleware, async (req, res) => {
 });
 
 function sanitizeUser(u) {
-  return { id: u.id, username: u.username, elo: u.elo, eloCube: u.elo_cube == null ? 1000 : u.elo_cube, color: u.color, avatar: u.avatar, cardback: u.cardback, board: u.board || null, bio: u.bio || '', victoryMsg: u.victory_msg || '', defeatMsg: u.defeat_msg || '', wins: u.wins || 0, losses: u.losses || 0, sc: u.sc || 0, created_at: u.created_at, hide_tutorial: u.hide_tutorial || 0, play_animations: u.play_animations == null ? 1 : (u.play_animations ? 1 : 0), display_heroes: u.display_heroes == null ? 1 : (u.display_heroes ? 1 : 0), dynamic_heroes: (u.display_heroes === 0) ? 0 : (u.dynamic_heroes == null ? 1 : (u.dynamic_heroes ? 1 : 0)), defaultSampleDeckId: u.default_sample_deck_id || null, email: u.email || null, emailVerified: !!u.email_verified, isGuest: !!u.is_guest };
+  return { id: u.id, username: u.username, elo: u.elo, eloCube: u.elo_cube == null ? 1000 : u.elo_cube, color: u.color, avatar: u.avatar, cardback: u.cardback, board: u.board || null, battleTrack: u.battle_track || null, bio: u.bio || '', victoryMsg: u.victory_msg || '', defeatMsg: u.defeat_msg || '', wins: u.wins || 0, losses: u.losses || 0, sc: u.sc || 0, created_at: u.created_at, hide_tutorial: u.hide_tutorial || 0, play_animations: u.play_animations == null ? 1 : (u.play_animations ? 1 : 0), display_heroes: u.display_heroes == null ? 1 : (u.display_heroes ? 1 : 0), dynamic_heroes: (u.display_heroes === 0) ? 0 : (u.dynamic_heroes == null ? 1 : (u.dynamic_heroes ? 1 : 0)), defaultSampleDeckId: u.default_sample_deck_id || null, email: u.email || null, emailVerified: !!u.email_verified, isGuest: !!u.is_guest };
 }
 
 // ===== PROFILE ROUTES =====
@@ -1914,6 +1916,18 @@ app.get('/api/profile/check-username', authMiddleware, async (req, res) => {
   if (containsProfanity(name)) return res.json({ available: false, reason: 'Inappropriate language' });
   const taken = await db.get('SELECT 1 FROM users WHERE username = ? COLLATE NOCASE AND id != ?', [name, req.user.userId]);
   res.json({ available: !taken, reason: taken ? 'Already taken' : 'Available' });
+});
+
+// Auswahlliste der Battle-Tracks: allgemeine + CPU-Themen samt Freischalt-Stand.
+app.get('/api/battle-tracks', authMiddleware, async (req, res) => {
+  try {
+    const list = await battleTracks.listFor(req.user.userId);
+    const row = await db.get('SELECT battle_track FROM users WHERE id = ?', [req.user.userId]);
+    res.json({ ...list, selected: row?.battle_track || null });
+  } catch (err) {
+    console.error('[battle-tracks] list error:', err.message);
+    res.status(500).json({ error: 'Could not load battle tracks.' });
+  }
 });
 
 app.put('/api/profile', authMiddleware, async (req, res) => {
@@ -1939,6 +1953,10 @@ app.put('/api/profile', authMiddleware, async (req, res) => {
       return res.status(409).json({ error: 'Username already taken' });
     }
   }
+  // Battle-Track: nur wählbar, was freigeschaltet ist (battle-tracks.js).
+  if (b.battleTrack !== undefined && !(await battleTracks.isSelectable(req.user.userId, b.battleTrack))) {
+    return res.status(403).json({ error: 'This battle track is not unlocked yet.' });
+  }
   // Update only the fields the client actually sent, so single-field
   // quick-saves (avatar, sleeve, …) never clobber the others.
   const sets = [];
@@ -1949,6 +1967,7 @@ app.put('/api/profile', authMiddleware, async (req, res) => {
   if (b.cardback !== undefined)   { sets.push('cardback = ?');    vals.push(b.cardback || null); }
   if (b.bio !== undefined)        { sets.push('bio = ?');         vals.push((b.bio || '').slice(0, 200)); }
   if (b.board !== undefined)      { sets.push('board = ?');       vals.push(b.board || null); }
+  if (b.battleTrack !== undefined){ sets.push('battle_track = ?'); vals.push(b.battleTrack ? String(b.battleTrack).toLowerCase() : null); }
   if (b.victoryMsg !== undefined) { sets.push('victory_msg = ?'); vals.push(String(b.victoryMsg || '').slice(0, MESSAGE_MAX_LEN)); }
   if (b.defeatMsg !== undefined)  { sets.push('defeat_msg = ?');  vals.push(String(b.defeatMsg || '').slice(0, MESSAGE_MAX_LEN)); }
   if (sets.length) {
@@ -4682,6 +4701,9 @@ function sendGameState(room, playerIdx, extra) {
     // Gegnerspezifisches Battle-Theme (Slug ohne 'bgm_'-Präfix und
     // Endung). null → der Client nimmt das generische Kampfthema.
     cpuBgm: cpuBgmForRoom(room),
+    // PvP: der gewählte Track des GEGNERS (Sitz gegenüber). Zuschauer bekommen
+    // in sendSpectatorGameState den Track von Sitz 0.
+    oppBgm: room.type === 'singleplayer' ? null : (gs.players?.[1 - playerIdx]?.battleTrack || null),
     setScore: room.setScore || [0, 0], format: room.format || 1, winsNeeded: room.winsNeeded || 1,
     // Compute fresh per-sync so per-turn gates (Deepsea `canSummon`,
     // etc.) flip to "blocked" the moment the first copy is summoned.
@@ -5479,6 +5501,9 @@ function sendSpectatorGameState(room) {
     // Gegnerspezifisches Battle-Theme (Slug ohne 'bgm_'-Präfix und
     // Endung). null → der Client nimmt das generische Kampfthema.
     cpuBgm: cpuBgmForRoom(room),
+    // PvP: der gewählte Track des GEGNERS (Sitz gegenüber). Zuschauer bekommen
+    // in sendSpectatorGameState den Track von Sitz 0.
+    oppBgm: room.type === 'singleplayer' ? null : (gs.players?.[0]?.battleTrack || null),
     setScore: room.setScore || [0, 0], format: room.format || 1, winsNeeded: room.winsNeeded || 1,
     summonBlocked: gs.summonBlocked || [],
     abilitySupportHeroes: [],
@@ -5611,18 +5636,46 @@ function sendSpectatorGameState(room) {
   }
 }
 
-async function endGame(room, winnerIdx, reason) {
+/**
+ * Spielende. `opts`:
+ *   • `satzEnde`     — der ganze Satz endet mit diesem Spiel (Surrender Match
+ *                      mitten im Spiel). Das laufende Spiel zaehlt normal als
+ *                      Sieg des Gegners; der Satzstand wird NICHT vorab auf
+ *                      `winsNeeded` gesetzt (das hat den Stand verfaelscht,
+ *                      z. B. 3:0 im Bo3, und den Satzverlauf der SC-Belohnungen).
+ *   • `nurSatzende`  — Surrender Match ZWISCHEN zwei Spielen (Ergebnisbildschirm,
+ *                      Sidedeck-Phase, Wahl des Startspielers): das letzte Spiel
+ *                      ist schon gewertet. Es wird nur der Satz beendet — Elo,
+ *                      Ergebnis, Sync — ohne ein weiteres Spiel zu zaehlen.
+ */
+async function endGame(room, winnerIdx, reason, opts = {}) {
   const gs = room.gameState;
-  if (!gs || gs.result) return;
-  const isRanked = room.type === 'ranked';
+  const nurSatzende = !!opts.nurSatzende;
+  if (!gs) return;
+  if (nurSatzende ? (room.status === 'finished' || gs.result?.setOver) : gs.result) return;
+  // ★ Bugfix (Ranked-Bo3 endete nach 1:1 als 2:1): `gs.result` wird erst NACH
+  // mehreren DB-Awaits gesetzt (Elo, Statistik, Historie). Feuert die Engine
+  // das Spielende in diesem Fenster ein zweites Mal (mehrere
+  // `checkAllHeroesDead`-Aufrufer, Deck-Out + Heldentod …), passierte der
+  // zweite Aufruf den Riegel oben und zaehlte `setScore` doppelt — ein
+  // einziger Sieg von P2 machte aus 1:1 ein 1:2 und beendete den Satz.
+  // Der Riegel ist synchron (vor dem ersten await) und haengt am Spiel.
+  if (gs._endGameLaeuft && !nurSatzende) return;
+  gs._endGameLaeuft = true;
+  // Cube-Turnierspiele (Kindraeume) erben `type: 'ranked'` vom Turnier, zaehlen
+  // aber NICHT fuers normale Elo/`ranked_games` — dafuer gibt es das Cube-Elo
+  // (`cubeFinalizeTournament`).
+  const isRanked = room.type === 'ranked' && !room.parentCubeRoomId;
   const loserIdx = winnerIdx === 0 ? 1 : 0;
   const winner = gs.players[winnerIdx];
   const loser = gs.players[loserIdx];
 
   // Update set score
-  scRewardsModul.noteSetGame(room, winnerIdx);   // v1382: Satzverlauf (Clean/Reverse Sweep)
-  room.setScore[winnerIdx]++;
-  const setOver = room.setScore[winnerIdx] >= room.winsNeeded;
+  if (!nurSatzende) {
+    scRewardsModul.noteSetGame(room, winnerIdx);   // v1382: Satzverlauf (Clean/Reverse Sweep)
+    room.setScore[winnerIdx]++;
+  }
+  const setOver = nurSatzende || !!opts.satzEnde || room.setScore[winnerIdx] >= room.winsNeeded;
 
   // Elo only changes when the full set is decided
   let eloChanges = null;
@@ -5645,9 +5698,10 @@ async function endGame(room, winnerIdx, reason) {
   }
 
   // Always track wins/losses and hero stats per round
-  await db.run('UPDATE users SET wins = wins + 1 WHERE id = ?', [winner.userId]);
-  await db.run('UPDATE users SET losses = losses + 1 WHERE id = ?', [loser.userId]);
-  for (const ps of [winner, loser]) {
+  // (nicht bei `nurSatzende`: das letzte Spiel ist schon gebucht)
+  if (!nurSatzende) await db.run('UPDATE users SET wins = wins + 1 WHERE id = ?', [winner.userId]);
+  if (!nurSatzende) await db.run('UPDATE users SET losses = losses + 1 WHERE id = ?', [loser.userId]);
+  for (const ps of (nurSatzende ? [] : [winner, loser])) {
     const won = ps === winner;
     for (const h of ps.heroes) {
       if (h.name) await db.run('INSERT INTO hero_stats (user_id, hero_name, wins, losses) VALUES (?, ?, ?, ?) ON CONFLICT(user_id, hero_name) DO UPDATE SET wins = wins + excluded.wins, losses = losses + excluded.losses', [ps.userId, h.name, won ? 1 : 0, won ? 0 : 1]);
@@ -5671,6 +5725,17 @@ async function endGame(room, winnerIdx, reason) {
     clearTimeout(room._setAdvanceTimer);
     delete room._setAdvanceTimer;
   }
+  if (nurSatzende) {
+    // Zwischen zwei Spielen: offene Sidedeck-Phase / Startspieler-Wahl abraeumen,
+    // sonst haengt der Satz ohne Ergebnis (Bericht: Surrender Match dazwischen).
+    delete room._sideDeckPhase;
+    delete room._sideDeckDone;
+    delete room._pendingRematch;
+    for (let i = 0; i < 2; i++) {
+      const sid = gs.players[i]?.socketId;
+      if (sid) io.to(sid).emit('side_deck_complete');
+    }
+  }
   for (let i = 0; i < 2; i++) sendGameState(room, i); sendSpectatorGameState(room);
   io.emit('rooms', getRoomList());
 
@@ -5686,6 +5751,7 @@ async function endGame(room, winnerIdx, reason) {
 
   // ── SC reward evaluation ──
   try {
+    if (nurSatzende) throw new Error('__kein_sc__');   // Spiel wurde schon bewertet
     // Katalog + Daily-Challenge-Bonus als ein Paket je Spieler (ein
     // kombinierter sc_earned-Toast) — Logik in sc-rewards.js.
     const scResults = await scRewards.evaluateWithDailyBonus(room, winnerIdx, reason);
@@ -5700,7 +5766,7 @@ async function endGame(room, winnerIdx, reason) {
       sendToSpectators(room, 'sc_earned_spectator', scResults);
     }
   } catch (err) {
-    console.error('[SC] Error evaluating rewards:', err.message);
+    if (err.message !== '__kein_sc__') console.error('[SC] Error evaluating rewards:', err.message);
   }
 
   // Auto-advance to next round after 4 seconds (if set not over)
@@ -6024,6 +6090,9 @@ function endCpuBattle(room, winnerIdx, reason) {
           if (newlyUnlocked.length && humanSid) {
             io.to(humanSid).emit('opponents_unlocked', { opponents: newlyUnlocked });
           }
+          // Zehnter Sieg gegen diese CPU → ihr Battle-Track ist im Profil wählbar.
+          const freigeschaltet = await battleTracks.unlockedByWin(humanUserId, opponentDeckId);
+          if (freigeschaltet && humanSid) io.to(humanSid).emit('battle_track_unlocked', freigeschaltet);
         }
       } catch (err) {
         console.error('[CPU battle] npc_stats/unlock update error:', err.message);
@@ -6133,6 +6202,10 @@ function bgmSlugForHero(heroName) {
   }
   return best;
 }
+// Wählbare Battle-Tracks im Profil (siehe battle-tracks.js).
+const battleTracks = require('./battle-tracks').createBattleTracks({
+  db, loadSampleDecks, bgmSlugForHero, musicDir: path.join(__dirname, 'public', 'music'),
+});
 /** Namen aller Abilities mit `isWildcardAbility` (einmal ermittelt). */
 let _wildcardAbilCache = null;
 function wildcardAbilityNames() {
@@ -12459,11 +12532,15 @@ async function cubeMatchEnd(room, match, winnerSeat, io) {
   const eliminatedThisRound = round.filter(m => m.resolved && m.loserSeat != null).map(m => m.loserSeat);
   // Placement = 1 + bracketSize - (number of round-end survivors)
   // For final round, placement = 2 (runner-up).
-  // Simpler: assign placement = 2^(rounds - currentRoundIdx) + 1.
+  // Simpler: assign placement = 2^(rounds - currentRoundIdx - 1) + 1.
   const totalRounds = Math.log2(cd.bracket.bracketSize);
   const isFinalRound = cd.bracket.currentRoundIdx === totalRounds - 1;
   if (match.loserSeat != null) {
-    cd.standings[match.loserSeat] = isFinalRound ? 2 : Math.pow(2, totalRounds - cd.bracket.currentRoundIdx) + 1;
+    // Erster Platz des Verlierer-Blocks dieser Runde: Bracket 4 → Runde 0: 3
+    // (Platz 3-4); Bracket 8 → Runde 0: 5, Runde 1: 3. (Bugfix: der Exponent
+    // war um 1 zu gross — Platz 5 statt 3 bei drei Spielern, und im Ranked-
+    // Cube-Elo ein Delta jenseits von -K.)
+    cd.standings[match.loserSeat] = isFinalRound ? 2 : Math.pow(2, totalRounds - cd.bracket.currentRoundIdx - 1) + 1;
   }
 
   cubeTournamentBroadcast(room, io);
@@ -12534,7 +12611,12 @@ async function cubeFinalizeTournament(room, io) {
   // SC + ELO payouts.
   const humanCount = humansBuilt.length;
   const isRanked = room.type === 'ranked';
-  for (const s of standings) {
+  // Ein Turnier mit nur EINEM Menschen war nie umkaempft (alle anderen wurden
+  // per Vote-Kick zu Bots): weder SC noch Elo. Sonst liesse sich mit einem
+  // zweiten Konto — Raum starten, Konto trennen, Vote-Kick — in einer Minute
+  // der Erstplatz-Bonus abholen (Cube-Test).
+  const unumkaempft = humanCount < 2;
+  for (const s of (unumkaempft ? [] : standings)) {
     const player = room.players[s.seat];
     let scAward = 0;
     // v1402: Beträge an EINER Stelle (sc-rewards.js), ×5.
@@ -12551,7 +12633,7 @@ async function cubeFinalizeTournament(room, io) {
     if (isRanked) {
       // Placement 1 → +K, 2 → +K/2, etc. Last → -K.
       const K = 24;
-      const norm = (humanCount - s.placement) / Math.max(1, humanCount - 1); // 1.0 for 1st, 0.0 for last
+      const norm = Math.max(0, Math.min(1, (humanCount - s.placement) / Math.max(1, humanCount - 1))); // 1.0 for 1st, 0.0 for last
       let delta = Math.round(K * (norm - 0.5) * 2); // -K..+K range
       // Vote-kicked players take a flat -K loss regardless of placement.
       if (player.cubeKickLoss) delta = -K;
@@ -12559,6 +12641,16 @@ async function cubeFinalizeTournament(room, io) {
         await db.run('UPDATE users SET elo_cube = MAX(0, elo_cube + ?) WHERE id = ?', [delta, player.userId]);
         if (player.socketId) io.to(player.socketId).emit('cube_elo_update', { delta, placement: s.placement });
       } catch (err) { console.error('[cubeFinalize] ELO error:', err.message); }
+    }
+  }
+  // Vote-Kick-Strafe: wer per Vote-Kick zum Bot wurde, steht nicht in den
+  // Standings (kein Deck) — die im Draft vermerkte Strafe (`cubeKickLoss`) lief
+  // deshalb nie. Ranked: flach −K, wenn das Turnier umkaempft war.
+  if (isRanked && !unumkaempft) {
+    for (const p of room.players) {
+      if (!p.cubeKickLoss || !p.userId || String(p.userId).startsWith('bot:')) continue;
+      try { await db.run('UPDATE users SET elo_cube = MAX(0, elo_cube + ?) WHERE id = ?', [-24, p.userId]); }
+      catch (err) { console.error('[cubeFinalize] Kick-ELO error:', err.message); }
     }
   }
   cubeTournamentBroadcast(room, io);
@@ -12820,6 +12912,8 @@ async function setupGameState(room) {
     const sideDeck = (room._currentDecks?.[idx]?.sideDeck || []).slice();
     playerStates.push({ userId:p.userId, username:(usr?.username||p.username), socketId:p.socketId,
       color:usr ? (usr.color||'#00f0ff') : NICHT_MENSCH_FARBE, avatar:usr?.avatar||null, cardback:usr?.cardback||null, board:usr?.board||null,
+      // Gewählter Battle-Track (geprüft: nur Freigeschaltetes); der GEGNER hört ihn.
+      battleTrack: usr ? await battleTracks.resolveForBattle(p.userId, usr.battle_track) : null,
       victoryMsg, defeatMsg, heroKilledMsg, middleHeroKilledMsg, greetingMsg, barkBounce,
       heroes, abilityZones, surpriseZones:[[],[],[]], supportZones:[[[],[],[]],[[],[],[]],[[],[],[]]],
       // Top-first list of card names that are publicly known to be on
@@ -14653,10 +14747,15 @@ io.on('connection', (socket) => {
     const pi = room.gameState.players.findIndex(ps => ps.userId === currentUser.userId);
     if (pi < 0) return;
     const winnerIdx = pi === 0 ? 1 : 0;
-    // Set the winner's score to winsNeeded to end the set
-    room.setScore[winnerIdx] = room.winsNeeded;
-    if (!room.gameState.result) {
-      await endGame(room, winnerIdx, 'surrender');
+    // Satz beenden. Mitten im Spiel: das laufende Spiel zaehlt als Sieg des
+    // Gegners und beendet den Satz; zwischen zwei Spielen: nur den Satz
+    // beenden (siehe `endGame`). Der Satzstand wird nicht mehr vorab
+    // manipuliert.
+    if (room.gameState.result) {
+      if (room.status === 'finished' || room.gameState.result.setOver) return;
+      await endGame(room, winnerIdx, 'surrender', { nurSatzende: true });
+    } else {
+      await endGame(room, winnerIdx, 'surrender', { satzEnde: true });
     }
   });
 
@@ -17821,6 +17920,42 @@ function handleLeaveRoom(socket, roomId, user) {
   if (!room) return;
 
   socket.leave('room:' + roomId);
+
+  // ★ Cube Draft NACH der Lobby (Draft, Deckbau, Turnier): ein Sitz wird nie
+  // entfernt und der Raum nie zerstoert, wenn ein Mensch geht oder die
+  // Verbindung verliert. Bugfix (Cube-Test): der Trennungs-Handler rief am
+  // Ende `handleLeaveRoom` fuer JEDEN Raum des Nutzers — die Sitze schoben
+  // sich zusammen (Bot 1 rutschte auf den Platz des Gegangenen, alle
+  // sitzindizierten Draft-Daten passten nicht mehr), Vote-Kick und
+  // Wiederverbinden (`join_room`) fanden den Sitz nicht mehr, und ging der
+  // Gastgeber, wurde der ganze Raum samt Draft zerstoert. Jetzt bleibt der
+  // Sitz mit `socketId = null` bestehen (Wiederverbinden / Vote-Kick, siehe
+  // dort); waehrend des Drafts pausiert der Draft.
+  if (room.cubeDraft && room.cubeDraft.phase !== 'lobby') {
+    const sitz = room.players.findIndex(p => p.userId === user.userId && !p.isBot);
+    if (sitz >= 0) {
+      if (room.players[sitz].socketId === socket.id) room.players[sitz].socketId = null;
+      if (room.cubeDraft.phase === 'drafting' && room.cubeDraft.draftState && !room.cubeDraft.draftState.suspended) {
+        cubeDraftSuspend(room, `${room.players[sitz].username} disconnected`, io);
+      }
+    } else {
+      room.spectators = room.spectators.filter(s => s.username !== user.username);
+    }
+    // Ist kein Mensch mehr online, den Raum nach einer Karenzzeit aufraeumen
+    // (sonst bliebe ein pausierter Draft fuer immer im Speicher).
+    if (!room.players.some(p => !p.isBot && p.socketId) && !room._verlassenTimer) {
+      room._verlassenTimer = setTimeout(() => {
+        const r = rooms.get(roomId);
+        if (r) {
+          delete r._verlassenTimer;
+          if (!r.players.some(p => !p.isBot && p.socketId)) { destroyRoom(roomId); io.emit('rooms', getRoomList()); }
+        }
+      }, 10 * 60 * 1000);
+    }
+    io.to('room:' + roomId).emit('room_update', sanitizeRoom(room));
+    io.emit('rooms', getRoomList());
+    return;
+  }
 
   if (room.hostId === user.userId) {
     // Cube Draft rooms in the LOBBY phase: promote the next-joined human

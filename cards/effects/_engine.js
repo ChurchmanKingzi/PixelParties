@@ -10593,7 +10593,7 @@ class GameEngine {
       if (ps.mainDeck.length === 0) {
         this.log('deck_out', { player: ps.username });
         // Deck out = instant loss
-        if (!this.gs.result) {
+        if (!this.gs.result && !this.gs._endGameLaeuft) {
           const winnerIdx = playerIdx === 0 ? 1 : 0;
           this.log('deck_out_loss', { loser: ps.username, winner: this.gs.players[winnerIdx]?.username });
           if (this._inMctsSim) {
@@ -11938,7 +11938,7 @@ class GameEngine {
     // Defending the Gate: protect support zone cards
     if (!opts.ignoreGateShield && !_u && targetCard.zone === 'support') {
       const _gq = this._gateQuelleVon(source, opts);   // v1377
-      await this._triggerGateCheck(targetCard.controller ?? targetCard.owner, source?.name || opts.sourceName || null, _gq);
+      await this._triggerGateCheck(targetCard.controller ?? targetCard.owner, source?.name || opts.sourceName || null, _gq, targetCard.name);
       if (this._isGateShielded(targetCard.controller ?? targetCard.owner, _gq)) {
         this.log('destroy_blocked', { card: targetCard.name, reason: 'Defending the Gate' });
         return;
@@ -12633,7 +12633,7 @@ class GameEngine {
     }
     if (!opts.ignoreGateShield && !_u && fromZone === 'support' && toZone !== 'support') {
       await this._triggerGateCheck(cardInstance.controller ?? cardInstance.owner,
-        opts.deathSource?.name || opts.source?.name || opts.sourceName || null, _gqM);
+        opts.deathSource?.name || opts.source?.name || opts.sourceName || null, _gqM, cardInstance.name);
       if (this._isGateShielded(cardInstance.controller ?? cardInstance.owner, _gqM)) return;
     }
 
@@ -29044,7 +29044,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     return undefined;
   }
 
-  async _triggerGateCheck(targetOwnerIdx, sourceName = null, quelleBesitzer = undefined) {
+  async _triggerGateCheck(targetOwnerIdx, sourceName = null, quelleBesitzer = undefined, zielName = null) {
     if (!this._gateQuelleIstGegner(targetOwnerIdx, quelleBesitzer)) return false;   // v1377
     // ── v386: Zaehler fuer das Gate-Korrelat ────────────────────────
     // Die Abbruchrate folgte in den A/B-Laeufen der Zahl der
@@ -29108,13 +29108,27 @@ this._deathWatch = (this._deathWatchStack || []).length
       // handlers). Only a truly unknown source falls back to a generic.
       const _pend = this.gs._pendingPlayLog?.data;
       const _trigger = sourceName || _pend?.card || _pend?.effect || null;
+      // Welche Karten das Gate schuetzt: ALLE belegten Support Zones des
+      // Spielers (der Schild neutralisiert jeden Effekt auf Support-Karten
+      // fuer den Rest der Aufloesung). Namen gebuendelt („Name ×2").
+      const _geschuetzt = new Map();
+      for (const seite of new Set([targetOwnerIdx, gateSeite])) {
+        for (const zonen of (this.gs.players[seite]?.supportZones || [])) {
+          for (const slot of (zonen || [])) {
+            const n = Array.isArray(slot) ? slot[slot.length - 1] : slot;
+            if (n) _geschuetzt.set(n, (_geschuetzt.get(n) || 0) + 1);
+          }
+        }
+      }
+      const _liste = [..._geschuetzt].map(([n, c]) => c > 1 ? `${n} ×${c}` : n).join(', ');
+      const _ziel = zielName ? ` "${zielName}"` : ' your Support Zone cards';
       const _msg = _trigger
-        ? `The opponent's "${_trigger}" is about to affect your Support Zone cards!`
-        : `An opponent effect is about to affect your Support Zone cards!`;
+        ? `The opponent's "${_trigger}" is about to affect${_ziel}!`
+        : `An opponent effect is about to affect${_ziel}!`;
       const confirmed = await this.promptGeneric(targetOwnerIdx, {
         type: 'confirm',
         title: gateName,
-        message: `${_msg} Activate ${gateName} on ${heroName} to protect them?`,
+        message: `${_msg} Activate ${gateName} on ${heroName} to protect ${_liste ? `your Support Zone cards: ${_liste}` : 'them'}?`,
         showCard: gateName,
         confirmLabel: '🛡️ Defend!',
         cancelLabel: 'No',
@@ -45523,7 +45537,7 @@ this._deathWatch = (this._deathWatchStack || []).length
    * If so, the other player wins.
    */
   async checkAllHeroesDead() {
-    if (this.gs.result) return; // Game already over
+    if (this.gs.result || this.gs._endGameLaeuft) return; // Game already over (or being finalised)
 
     // ── Simultanschaden (8.8.) ───────────────────────────────────────
     // Trifft eine Karte das GANZE Brett auf einmal, darf nicht der erste
