@@ -2,14 +2,14 @@
 //  CARD EFFECT: "Fun-Fun Circus Director"
 //  Creature (Magic Arts / Summoning Magic Lv2, Normal, 90 HP) — PP MBS
 //
-//  „For every 5 Applause Counters on the board, your Resource Phase
+//  „For every 15 Applause Counters on the board, your Resource Phase
 //   repeats an additional time. Whenever another "Fun-Fun Circus"
 //   Creature is defeated, you may discard 1 card to move all its
 //   Applause Counters to this Creature, then discard a second card to
 //   add it back to your hand instead of sending it to the discard pile."
 //
 //  ── AUSLEGUNG ───────────────────────────────────────────────────────
-//  • ① Resource Phase: `extraResourcePhases` = ⌊Brett-Summe / 5⌋, LIVE zu
+//  • ① Resource Phase: `extraResourcePhases` = ⌊Brett-Summe / 15⌋, LIVE zu
 //    Phasenbeginn (Engine: `_extraResourcePhases`, `case RESOURCE`). Jede
 //    Wiederholung ist die volle Phase (Ziehen 1, 4 Gold, Phasenende-
 //    Boni); mehrere Directors addieren sich. Nur die EIGENE Phase; eine
@@ -65,7 +65,7 @@ module.exports = {
 
   // ① Zusaetzliche Resource Phasen — Engine liest das je Spielerzug.
   extraResourcePhases(engine) {
-    return Math.floor(boardTotal(engine) / 5);
+    return Math.floor(boardTotal(engine) / 15);
   },
 
   // CPU: kostenlose Aufwertung — Abwurf-Prompts vom Lernkanal, sonst ja.

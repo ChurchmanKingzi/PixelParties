@@ -41,6 +41,53 @@ function meineZaehlerTraeger(engine, pi) {
     istBrettCreature(engine, i) && (i.controller ?? i.owner) === pi && zaehler(i) > 0);
 }
 
+/** Eine Angebotsrunde. Rueckgabe: weiter anbieten? (false = Schluss.) */
+async function angebotsRunde(engine, pi, runde) {
+  const gs = engine.gs;
+  const ps = gs.players[pi];
+  if (!(ps.hand || []).includes(CARD_NAME)) return false;
+  const traeger = meineZaehlerTraeger(engine, pi);
+  if (traeger.length === 0) return false;
+  if (eligibleSummonZones(engine, pi, CARD_NAME, { nachKontrolle: true }).length === 0) return false;
+
+  const ja = await engine.promptGeneric(pi, {
+    type: 'confirm', title: CARD_NAME, showCard: CARD_NAME,
+    message: `Remove 1 Applause Counter from a card on your side to immediately summon ${CARD_NAME} from your hand as an additional Action?`,
+    confirmLabel: '🤡 Summon!', cancelLabel: 'No', cancellable: true,
+  });
+  if (!engine._confirmSaidYes(ja)) return false;
+
+  // Counter-Quelle waehlen (bei nur einer automatisch).
+  let quelle = traeger[0];
+  if (traeger.length > 1) {
+    const zonen = traeger.map(i => ({
+      owner: engine.physicalSide(i), heroIdx: i.heroIdx, slotIdx: i.zoneSlot,
+      label: `${i.name} — ${zaehler(i)} Applause`,
+    }));
+    const wahl = await engine.promptGeneric(pi, {
+      type: 'zonePick', title: CARD_NAME,
+      description: 'Choose the card to remove 1 Applause Counter from.',
+      zones: zonen, cancellable: true, heroShortcut: false,
+    });
+    if (!wahl || wahl.cancelled) return false;
+    quelle = traeger.find(i => i.heroIdx === wahl.heroIdx && i.zoneSlot === wahl.slotIdx
+      && engine.physicalSide(i) === (wahl.owner ?? engine.physicalSide(i))) || null;
+    if (!quelle) return false;
+  }
+
+  const ok = await sofortAusHandBeschwoeren(engine, pi, CARD_NAME, {
+    source: CARD_NAME,
+    // Zusagepunkt: Zone ist gewaehlt — jetzt kostet es den Counter.
+    nachZonenwahl: async () => {
+      removeApplause(engine, quelle, 1);
+      await engine.showTriggeredEffect(CARD_NAME, { playerIdx: pi, source: `clown:${gs.turn}:${runde}` });
+    },
+  });
+  if (!ok) return false;                                        // Zonenwahl abgebrochen
+  engine.log('clown_summon', { player: ps.username, from: quelle.name });
+  return true;
+}
+
 async function angebotAmZugende(ctx) {
   const engine = ctx._engine;
   const gs = engine.gs;
@@ -53,46 +100,16 @@ async function angebotAmZugende(ctx) {
   gs._clownAngebot = gs.turn;
 
   for (let runde = 0; runde < 20; runde++) {
-    if (!(ps.hand || []).includes(CARD_NAME)) break;
-    const traeger = meineZaehlerTraeger(engine, pi);
-    if (traeger.length === 0) break;
-    if (eligibleSummonZones(engine, pi, CARD_NAME, { nachKontrolle: true }).length === 0) break;
-
-    const ja = await engine.promptGeneric(pi, {
-      type: 'confirm', title: CARD_NAME, showCard: CARD_NAME,
-      message: `Remove 1 Applause Counter from a card on your side to immediately summon ${CARD_NAME} from your hand as an additional Action?`,
-      confirmLabel: '🤡 Summon!', cancelLabel: 'No', cancellable: true,
-    });
-    if (!engine._confirmSaidYes(ja)) break;
-
-    // Counter-Quelle waehlen (bei nur einer automatisch).
-    let quelle = traeger[0];
-    if (traeger.length > 1) {
-      const zonen = traeger.map(i => ({
-        owner: engine.physicalSide(i), heroIdx: i.heroIdx, slotIdx: i.zoneSlot,
-        label: `${i.name} — ${zaehler(i)} Applause`,
-      }));
-      const wahl = await engine.promptGeneric(pi, {
-        type: 'zonePick', title: CARD_NAME,
-        description: 'Choose the card to remove 1 Applause Counter from.',
-        zones: zonen, cancellable: true, heroShortcut: false,
-      });
-      if (!wahl || wahl.cancelled) break;
-      quelle = traeger.find(i => i.heroIdx === wahl.heroIdx && i.zoneSlot === wahl.slotIdx
-        && engine.physicalSide(i) === (wahl.owner ?? engine.physicalSide(i))) || null;
-      if (!quelle) break;
+    // Jede Runde einzeln abgesichert: ein Fehler in einer Beschwoerung darf
+    // die weiteren Clowns am selben Zugende nicht stillschweigend kappen.
+    let weiter = false;
+    try {
+      weiter = await angebotsRunde(engine, pi, runde);
+    } catch (err) {
+      console.error(`[${CARD_NAME}] Runde ${runde}:`, err.message);
+      engine.log('clown_round_error', { player: ps.username, round: runde, error: String(err.message || '').slice(0, 200) });
     }
-
-    const ok = await sofortAusHandBeschwoeren(engine, pi, CARD_NAME, {
-      source: CARD_NAME,
-      // Zusagepunkt: Zone ist gewaehlt — jetzt kostet es den Counter.
-      nachZonenwahl: async () => {
-        removeApplause(engine, quelle, 1);
-        await engine.showTriggeredEffect(CARD_NAME, { playerIdx: pi, source: `clown:${gs.turn}:${runde}` });
-      },
-    });
-    if (!ok) break;                                             // Zonenwahl abgebrochen
-    engine.log('clown_summon', { player: ps.username, from: quelle.name });
+    if (!weiter) break;
   }
   engine.sync();
 }
