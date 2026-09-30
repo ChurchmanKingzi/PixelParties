@@ -28,30 +28,25 @@ def card_native(i, m):
     return cv2.resize(a, (round(610 / m), round(400 / m)), interpolation=cv2.INTER_AREA).astype(np.float32)
 
 
+REF = json.load(open('/home/user/refine_layers.json'))
+MAX_ERR = 0.012
+
+
 def frame(i):
-    """(RGB-Array der Szene in nativen Motiv-Pixeln, Score, Quelle) oder None."""
-    sc, m, f, idx, name, x, y = LOC[str(i)][0]
-    if sc > 0.02:
+    """(RGB-Array der Szene in nativen Motiv-Pixeln, Fehler, Quelle) oder None, wenn keine gute Ebene gefunden wurde."""
+    if str(i) not in REF:
+        return None
+    e, f, idx, m, x, y = REF[str(i)]
+    if e > MAX_ERR:
         return None
     key = (f, idx)
     if key not in _cache:
         _cache[key] = np.array(Image.open(f'{E}/{f}/crops/{idx:04d}.png').convert('RGBA'))
-    c = _cache[key]
     meta = [l for l in json.load(open(f'{E}/{f}/layers.json'))['layers'] if l['index'] == idx][0]
-    bx, by = meta['bx'], meta['by']
     t = card_native(i, m)
     th, tw = t.shape[:2]
-    best = None
-    for dy in range(-4, 5):
-        for dx in range(-4, 5):
-            X, Y = x + dx - bx, y + dy - by
-            if X < 0 or Y < 0 or Y + th > c.shape[0] or X + tw > c.shape[1]:
-                continue
-            e = ((c[Y:Y + th, X:X + tw, :3].astype(np.float32) - t) ** 2).mean()
-            if best is None or e < best[0]:
-                best = (e, X, Y)
-    e, X, Y = best
-    return c[Y:Y + th, X:X + tw, :3], sc, f'{f[6:] or "Motive"}#{idx}@{bx + X},{by + Y} m{m}'
+    X, Y = x - meta['bx'], y - meta['by']
+    return _cache[key][Y:Y + th, X:X + tw, :3], e, f'{f[6:] or "Motive"}#{idx}@{x},{y} m{m}'
 
 
 def avatar(card, cx, cy, size=64):
