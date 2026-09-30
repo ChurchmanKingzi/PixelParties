@@ -14,7 +14,7 @@ Aufbau (Takte, 0-basiert):
   40–55  Höhepunkt C    Oboe + Sax in Oktaven, Chor, Blech-Hits, Zweiunddreißigstel-Toms
   56–63  Rückführung D  Thema A leise in der Marimba, Wirbel, Dominant (A) → zurück zu Takt 0
 
-Harmonie: D (Dur, Fis), Es (bII), g-Moll, c-Moll, A als Dominante; alle Melodietöne
+Harmonie: D (Dur, Fis), Es (bII), g-Moll, c-Moll, A als offene Quinte (Dominante); alle Melodietöne
 liegen in der Hijaz-Skala (per Assert geprüft).
 Aufruf:  python3 scripts/music/theme_pacman.py <soundfont.sf2> [ausgabe.ogg]
 """
@@ -47,7 +47,7 @@ def nt(s):
     assert p % 12 in SCALE, f'Ton außerhalb Hijaz: {s}'
     return p
 
-CH = {'D': (D, (0, 4, 7)), 'Eb': (Eb, (0, 4, 7)), 'Gm': (G, (0, 3, 7)), 'Cm': (C, (0, 3, 7)), 'A': (A, (0, 4, 7))}
+CH = {'D': (D, (0, 4, 7)), 'Eb': (Eb, (0, 4, 7)), 'Gm': (G, (0, 3, 7)), 'Cm': (C, (0, 3, 7)), 'A': (A, (0, 7, 12))}     # Dominante als offene Quinte (kein Cis, bleibt in Hijaz)
 def root(ch, o=2): return n(CH[ch][0], o)
 def ramp(i, cnt, a, b): return a + (b - a) * i / max(1, cnt - 1)
 def chord(ch, o): r = n(CH[ch][0], o); return [r + x for x in CH[ch][1]]
@@ -224,8 +224,6 @@ for i in range(16):
     oud(b, ch, 92, True)
     bass(b, ch, 104, 'b'); pedal(b, ch, 88)
     line(b, M_C[k], ['oboe', 'sax', 'brass'], [100, 88, 72], shift=0)
-    line(b, M_C[k], ['sax'], [0]) if False else None
-    choir(b, ch, 0) if False else None
     for p in chord(ch, 4): song.add('choir', song.bar(b), 3.98, p + 12 if CH[ch][0] >= 5 else p, 84)
     accord(b, ch, 66); marimba_pulse(b, ch, 78)
     if k in (0, 4): crash(b, 100)
