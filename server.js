@@ -5611,9 +5611,23 @@ function sendSpectatorGameState(room) {
   }
 }
 
-async function endGame(room, winnerIdx, reason) {
+/**
+ * Spielende. `opts`:
+ *   • `satzEnde`     — der ganze Satz endet mit diesem Spiel (Surrender Match
+ *                      mitten im Spiel). Das laufende Spiel zaehlt normal als
+ *                      Sieg des Gegners; der Satzstand wird NICHT vorab auf
+ *                      `winsNeeded` gesetzt (das hat den Stand verfaelscht,
+ *                      z. B. 3:0 im Bo3, und den Satzverlauf der SC-Belohnungen).
+ *   • `nurSatzende`  — Surrender Match ZWISCHEN zwei Spielen (Ergebnisbildschirm,
+ *                      Sidedeck-Phase, Wahl des Startspielers): das letzte Spiel
+ *                      ist schon gewertet. Es wird nur der Satz beendet — Elo,
+ *                      Ergebnis, Sync — ohne ein weiteres Spiel zu zaehlen.
+ */
+async function endGame(room, winnerIdx, reason, opts = {}) {
   const gs = room.gameState;
-  if (!gs || gs.result) return;
+  const nurSatzende = !!opts.nurSatzende;
+  if (!gs) return;
+  if (nurSatzende ? (room.status === 'finished' || gs.result?.setOver) : gs.result) return;
   // ★ Bugfix (Ranked-Bo3 endete nach 1:1 als 2:1): `gs.result` wird erst NACH
   // mehreren DB-Awaits gesetzt (Elo, Statistik, Historie). Feuert die Engine
   // das Spielende in diesem Fenster ein zweites Mal (mehrere
@@ -5621,7 +5635,7 @@ async function endGame(room, winnerIdx, reason) {
   // zweite Aufruf den Riegel oben und zaehlte `setScore` doppelt — ein
   // einziger Sieg von P2 machte aus 1:1 ein 1:2 und beendete den Satz.
   // Der Riegel ist synchron (vor dem ersten await) und haengt am Spiel.
-  if (gs._endGameLaeuft) return;
+  if (gs._endGameLaeuft && !nurSatzende) return;
   gs._endGameLaeuft = true;
   const isRanked = room.type === 'ranked';
   const loserIdx = winnerIdx === 0 ? 1 : 0;
@@ -5629,9 +5643,11 @@ async function endGame(room, winnerIdx, reason) {
   const loser = gs.players[loserIdx];
 
   // Update set score
-  scRewardsModul.noteSetGame(room, winnerIdx);   // v1382: Satzverlauf (Clean/Reverse Sweep)
-  room.setScore[winnerIdx]++;
-  const setOver = room.setScore[winnerIdx] >= room.winsNeeded;
+  if (!nurSatzende) {
+    scRewardsModul.noteSetGame(room, winnerIdx);   // v1382: Satzverlauf (Clean/Reverse Sweep)
+    room.setScore[winnerIdx]++;
+  }
+  const setOver = nurSatzende || !!opts.satzEnde || room.setScore[winnerIdx] >= room.winsNeeded;
 
   // Elo only changes when the full set is decided
   let eloChanges = null;
@@ -5654,9 +5670,10 @@ async function endGame(room, winnerIdx, reason) {
   }
 
   // Always track wins/losses and hero stats per round
-  await db.run('UPDATE users SET wins = wins + 1 WHERE id = ?', [winner.userId]);
-  await db.run('UPDATE users SET losses = losses + 1 WHERE id = ?', [loser.userId]);
-  for (const ps of [winner, loser]) {
+  // (nicht bei `nurSatzende`: das letzte Spiel ist schon gebucht)
+  if (!nurSatzende) await db.run('UPDATE users SET wins = wins + 1 WHERE id = ?', [winner.userId]);
+  if (!nurSatzende) await db.run('UPDATE users SET losses = losses + 1 WHERE id = ?', [loser.userId]);
+  for (const ps of (nurSatzende ? [] : [winner, loser])) {
     const won = ps === winner;
     for (const h of ps.heroes) {
       if (h.name) await db.run('INSERT INTO hero_stats (user_id, hero_name, wins, losses) VALUES (?, ?, ?, ?) ON CONFLICT(user_id, hero_name) DO UPDATE SET wins = wins + excluded.wins, losses = losses + excluded.losses', [ps.userId, h.name, won ? 1 : 0, won ? 0 : 1]);
@@ -5680,6 +5697,17 @@ async function endGame(room, winnerIdx, reason) {
     clearTimeout(room._setAdvanceTimer);
     delete room._setAdvanceTimer;
   }
+  if (nurSatzende) {
+    // Zwischen zwei Spielen: offene Sidedeck-Phase / Startspieler-Wahl abraeumen,
+    // sonst haengt der Satz ohne Ergebnis (Bericht: Surrender Match dazwischen).
+    delete room._sideDeckPhase;
+    delete room._sideDeckDone;
+    delete room._pendingRematch;
+    for (let i = 0; i < 2; i++) {
+      const sid = gs.players[i]?.socketId;
+      if (sid) io.to(sid).emit('side_deck_complete');
+    }
+  }
   for (let i = 0; i < 2; i++) sendGameState(room, i); sendSpectatorGameState(room);
   io.emit('rooms', getRoomList());
 
@@ -5695,6 +5723,7 @@ async function endGame(room, winnerIdx, reason) {
 
   // ── SC reward evaluation ──
   try {
+    if (nurSatzende) throw new Error('__kein_sc__');   // Spiel wurde schon bewertet
     // Katalog + Daily-Challenge-Bonus als ein Paket je Spieler (ein
     // kombinierter sc_earned-Toast) — Logik in sc-rewards.js.
     const scResults = await scRewards.evaluateWithDailyBonus(room, winnerIdx, reason);
@@ -5709,7 +5738,7 @@ async function endGame(room, winnerIdx, reason) {
       sendToSpectators(room, 'sc_earned_spectator', scResults);
     }
   } catch (err) {
-    console.error('[SC] Error evaluating rewards:', err.message);
+    if (err.message !== '__kein_sc__') console.error('[SC] Error evaluating rewards:', err.message);
   }
 
   // Auto-advance to next round after 4 seconds (if set not over)
@@ -14662,10 +14691,15 @@ io.on('connection', (socket) => {
     const pi = room.gameState.players.findIndex(ps => ps.userId === currentUser.userId);
     if (pi < 0) return;
     const winnerIdx = pi === 0 ? 1 : 0;
-    // Set the winner's score to winsNeeded to end the set
-    room.setScore[winnerIdx] = room.winsNeeded;
-    if (!room.gameState.result) {
-      await endGame(room, winnerIdx, 'surrender');
+    // Satz beenden. Mitten im Spiel: das laufende Spiel zaehlt als Sieg des
+    // Gegners und beendet den Satz; zwischen zwei Spielen: nur den Satz
+    // beenden (siehe `endGame`). Der Satzstand wird nicht mehr vorab
+    // manipuliert.
+    if (room.gameState.result) {
+      if (room.status === 'finished' || room.gameState.result.setOver) return;
+      await endGame(room, winnerIdx, 'surrender', { nurSatzende: true });
+    } else {
+      await endGame(room, winnerIdx, 'surrender', { satzEnde: true });
     }
   });
 
