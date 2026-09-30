@@ -24677,7 +24677,7 @@ function ppOrdinal(n) {
 const PP_UNLOCK_ICON = { music: '🎵', sleeve: '🃏' };
 const PP_UNLOCK_TEXT = { music: 'New battle track unlocked!', sleeve: 'New sleeve unlocked!' };
 
-// cpuProgress: { wins, unlocks: [{ kind, name, image }], theme: { name, wins, need } } — nur nach einem Sieg über eine CPU.
+// cpuProgress: { wins, unlocks: [{ kind, name, image }], theme: { name, wins, need }, sleeve: { name, wins, need } } — nur nach einem Sieg über eine CPU.
 function ResultCeremony({ won, spectator, title, subtitle, rewards, total, eloChanges, myName, oppName, extra, cpuProgress, children }) {
   const n = rewards.length;
   const ENDE = n + 1;
@@ -24789,6 +24789,9 @@ function ResultCeremony({ won, spectator, title, subtitle, rewards, total, eloCh
             <div className="pp-cer-sieg-zahl">🏆 {ppOrdinal(cpuProgress.wins)} victory{oppName ? ' against ' + oppName : ''}!</div>
             {cpuProgress.theme && (
               <div className="pp-cer-sieg-theme">🎵 {cpuProgress.theme.hero ? heroDisplayName(cpuProgress.theme.hero) + "'s Theme" : cpuProgress.theme.name}: {cpuProgress.theme.wins} / {cpuProgress.theme.need} wins to unlock</div>
+            )}
+            {cpuProgress.sleeve && (
+              <div className="pp-cer-sieg-theme">🃏 {cpuProgress.sleeve.name}: {cpuProgress.sleeve.wins} / {cpuProgress.sleeve.need} wins to unlock</div>
             )}
           </div>
         )}
