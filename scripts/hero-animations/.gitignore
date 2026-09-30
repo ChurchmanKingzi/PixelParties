@@ -2,3 +2,5 @@
 *.gif
 *sheet*.png
 __pycache__/
+*_contact.png
+*_corpse.png
