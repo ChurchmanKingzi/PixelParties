@@ -4,10 +4,9 @@ Held/Hauptmotiv: Idej Lord Daiyo (Base-Karte).
 
 Idee (Porträt mit Transparenz, Nacht): Daiyo, der grüne, halb durchsichtige Geist-Samurai seiner Karte,
 schwebt groß vor dem nächtlichen Tempelpavillon der Kogarasu-Karte (Cover); Pavillon und Kirschblütenhain
-liegen dunkel im Mondlicht, damit die grüne Geisterfigur leuchtet; nur wenige Blüten treiben. Links und rechts
-hinter ihm schweben zwei blassere, ins Türkis verschobene Nachbilder seiner selbst (ohne Schwert) – seine Idej
-Projections (sie werden ihm zu Spielbeginn angelegt und fangen Schaden ab): Man weiß nicht, welcher der
-echte ist. Der dunkle Innenraum des Pavillons liegt genau hinter ihm, damit das Grün leuchtet.
+liegen dunkel im Mondlicht, damit die grüne Geisterfigur leuchtet; nur wenige Blüten treiben. Rechts hinter
+ihm, höher und deutlich seitlich versetzt, schwebt EIN Nachbild seiner selbst (nur der Körper, im Schachbrett
+der 5×-Pixel gedithert) – seine Idej Projection (wird ihm zu Spielbeginn angelegt und fängt Schaden ab).
 
 Quellen:
   MotiveSteamDwarfs.xcf  Kartenszene „Idej Lord Daiyo“ = Ebene 402 „Sichtbar #4“ (Lage 83,71, exakter Treffer):
@@ -15,14 +14,14 @@ Quellen:
                          Hintergrund – hier ebenso), Ebene 405 „Ebene #24“ (Hand am Griff, ~75 %),
                          Ebene 406 „Ebene #22“ (weißes Schwert, deckend). (Gleiche Figur wie MotiveJapan 160 „Daiyo“.)
                          Nicht verwendet: 403/404 (verblasste bzw. schwarze Variante, in der Karte ausgeblendet).
-  MotiveJapan.xcf        Kogarasu-Kartenszene Ebene 3: Ebene 247 „Ebene“ (Abendhimmel mit Wolken),
+  MotiveJapan.xcf        Kogarasu-Kartenszene Ebene 3:
                          236 „House Todugawin“ + 231 „Ebene #73“ + 237 „Ebene #149“ (Pavillon mit Shoji),
-                         217 „Ebene #2“ (Kirschbaumreihe; weitere Reihen davor versetzt/gespiegelt),
-                         142 „KIRSCHBLÜTEN“ (treibende Blüten).
-Selbst gezeichnet: Abdunkelung des Himmels zum oberen Rand (gedithert), grüner Schein des Geistes auf dem
-                         Pavillon-Inneren.
+                         217 „Ebene #2“ (Kirschbaumreihe; links/rechts gespiegelt fortgesetzt),
+                         142 „KIRSCHBLÜTEN“ (wenige treibende und gefallene Blüten).
+                         Pavillon und Bäume im Mondlicht abgedunkelt/violett getönt.
+Selbst gezeichnet: Nachthimmel (geordnetes Dithering), Mond mit Hof, Boden, grüner Schein des Geistes.
 Skalierung: Hintergrund (Himmel, Pavillon, Kirschbäume, Blüten, grüner Schein) – 2×-Raster (125×175);
-            Daiyo + Nachbilder (24×41 → 120×205) – 5×; die Nachbilder sind dieselbe 5×-Figur, nur blasser.
+            Daiyo (24×41 → 120×205) und sein Nachbild – 5×.
 """
 import math
 from common import *  # noqa
@@ -123,7 +122,7 @@ blit(cv, bg, 2)
 # ---------------------------------------------------------------- Nachbild (Idej Projection) + Daiyo 5×
 k = 5
 dw, dh = (X1 - X0) * k, (Y1 - Y0) * k
-DX, DY = 48, 116
+DX, DY = 42, 116
 # grüner Schein hinter Daiyo und auf dem Boden (Raster 2×, gedithert)
 gx, gy = (DX + 7 * k + 45) / 2, (DY + 80) / 2
 for y in range(GH):
@@ -151,6 +150,6 @@ def echo_on(dst, k, ox, oy, a):
 
 
 # ein Nachbild rechts hinten, höher und deutlich seitlich versetzt
-echo_on(cv.a, k, DX + 78, DY - 28, 0.55)
+echo_on(cv.a, k, DX + 76, DY - 30, 0.55)
 daiyo_on(cv.a, k, DX, DY, 0.73, 1.0)
 print(save(cv, '24_afterimage.png'))
