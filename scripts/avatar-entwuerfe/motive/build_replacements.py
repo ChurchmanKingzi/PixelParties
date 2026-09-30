@@ -30,6 +30,7 @@ for n,b in S.items():
     if fx is not None and not (fx<=sx+w/2<=fx+fw and fy<=sy+h/2<=fy+fh): fx=fy=None; src='ohne'
     side=int(np.ceil(max(w,h)/0.72)); side+=side%2
     side=min(side,int(fh))
+    if n=='avatar14': side=16
     cx,cy=sx+w/2,sy+h/2
     x0=int(round(cx-side/2)); y0=int(round(cy-side/2))
     if fx is not None:
