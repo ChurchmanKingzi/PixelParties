@@ -6,6 +6,9 @@ SP='/tmp/claude-0/-home-user-PixelParties/ba24cb66-9bb9-5fd5-a116-fde55cc1f4a5/s
 items=json.load(open(SP+'/items.json'))
 CAND=[12,26,35,42,43,53,63,79,85,88,89,90,91,96,97,105,132,133,137,140,145,152,153,159,180,181,188,189,203,205,224,226,233,243,264,265,303,306,308,316,325,335,350,354,356,363,366,368,374,388,397,401,403,410,420,442,463,467,469,497,501,507,513,514,515,519,523,524,525,526,3,14,21,22,58,61,72,84,147,168,167,45,57,74,76,100,101,102,110,111,113,117,118,128,130,136,141,144,146,148,149,150,151,154,155,156,157,158,160,161,164,165,166,169,170,171,172,173,174,175,176,177,178,179,182,183,184,185,186,187,190,191,192,193,194,195,196,197,198,199,201,202,206,207,208,209,210,211,212,213,214,215,216,217,218,219,220,221,222,223,225,227,228,229,230,231,232,234,235,236,237,238,239,240,241,242,244,245,246,247,248,249,250,251,252,253,254,255,256,257,258,259,260,261,262,263]
 CAND=[c for c in dict.fromkeys(CAND) if c<len(items)]
+if os.environ.get('LOC_IDS'): CAND=[int(x) for x in os.environ['LOC_IDS'].split(',')]
+MS=tuple(int(x) for x in os.environ.get('LOC_MS','8,6,10').split(','))
+OUTF=os.environ.get('LOC_OUT','/home/user/locate_cards.json')
 def cardart(i):
     f=items[i]['file']; p=f'{R}/cards/{f}'
     a=np.array(Image.open(p).convert('RGB'))[168:568,70:680]
@@ -24,7 +27,7 @@ def init():
         BIG.append(cv2.resize(rgb,(w//2,h//2),interpolation=cv2.INTER_AREA).astype(np.float32))
 def work(i):
     a=cardart(i); best=[]
-    for m in (8,6,10):
+    for m in MS:
         tw,th=round(610/m/2),round(400/m/2)
         t=cv2.resize(a,(tw,th),interpolation=cv2.INTER_AREA).astype(np.float32)
         for li,b in enumerate(BIG):
@@ -40,5 +43,7 @@ if __name__=='__main__':
     print(len(LAY),'Ebenen',len(CAND),'Karten',flush=True)
     with Pool(4,initializer=init) as p:
         res=dict(p.imap_unordered(work,CAND,chunksize=2))
-    json.dump(res,open('/home/user/locate_cards.json','w'))
+    old=json.load(open('/home/user/locate_cards.json')) if os.path.exists('/home/user/locate_cards.json') else {}
+    old.update({str(k):v for k,v in res.items()})
+    json.dump(old,open(OUTF,'w'))
     print('fertig')
