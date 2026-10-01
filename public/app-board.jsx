@@ -15264,6 +15264,61 @@ const ANIM_REGISTRY = {
       );
     };
   })(),
+  golem_smash_ice: (() => {
+    // ★ Golem Smash: beim Einschlag des Rammstosses spritzen EIS-Partikel —
+    // ein heller Frostblitz, ein Stossring und Eissplitter (rautenfoermig),
+    // die nach aussen fliegen und dabei verblassen. Eigene Keyframes im
+    // eigenen <style> (siehe check-anim-keyframes).
+    const FARBEN = ['#e8f8ff', '#bfe6ff', '#8fd0f5', '#cfeeff', '#6fb9e6'];
+    return function GolemSmashIceEffect({ x, y }) {
+      const splitter = useMemo(() => Array.from({ length: ppFxN(34) }, () => {
+        const w = Math.random() * Math.PI * 2;
+        const v = 26 + Math.random() * 80;
+        return {
+          dx: Math.cos(w) * v, dy: Math.sin(w) * v * 0.85 - 6,
+          size: 4 + Math.random() * 8,
+          color: FARBEN[Math.floor(Math.random() * FARBEN.length)],
+          rot: Math.round(Math.random() * 200 - 100),
+          delay: Math.round(Math.random() * 60),
+          dur: Math.round(420 + Math.random() * 380),
+        };
+      }), []);
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+          <div style={{ position: 'absolute', left: -46, top: -46, width: 92, height: 92, borderRadius: '50%',
+            background: 'radial-gradient(circle, rgba(235,250,255,.95) 0%, rgba(150,215,255,.55) 45%, rgba(150,215,255,0) 72%)',
+            animation: 'golemIceFlash 380ms ease-out forwards' }} />
+          <div style={{ position: 'absolute', left: -40, top: -40, width: 80, height: 80, borderRadius: '50%',
+            border: '3px solid #bfe6ff', boxShadow: '0 0 14px #8fd0f5',
+            animation: 'golemIceRing 520ms ease-out forwards' }} />
+          {splitter.map((k, i) => (
+            <i key={'gsi' + i} style={{
+              position: 'absolute', left: 0, top: 0, width: k.size, height: k.size,
+              marginLeft: -k.size / 2, marginTop: -k.size / 2,
+              background: k.color, boxShadow: '0 0 5px #cfeeff',
+              '--dx': k.dx + 'px', '--dy': k.dy + 'px', '--rot': k.rot + 'deg',
+              animation: `golemIceShard ${k.dur}ms cubic-bezier(.15,.7,.35,1) ${k.delay}ms forwards`,
+            }} />
+          ))}
+          <style>{`
+            @keyframes golemIceFlash {
+              0%   { opacity: 0; transform: scale(.3); }
+              25%  { opacity: 1; transform: scale(1); }
+              100% { opacity: 0; transform: scale(1.9); }
+            }
+            @keyframes golemIceRing {
+              0%   { opacity: .95; transform: scale(.3); }
+              100% { opacity: 0;   transform: scale(2.6); }
+            }
+            @keyframes golemIceShard {
+              0%   { opacity: 1; transform: translate(0, 0) rotate(45deg) scale(1); }
+              100% { opacity: 0; transform: translate(var(--dx), calc(var(--dy) + 18px)) rotate(calc(45deg + var(--rot))) scale(.3); }
+            }
+          `}</style>
+        </div>
+      );
+    };
+  })(),
   wind: WindEffect,
   shadow_summon: ShadowSummonEffect,
   gold_sparkle: GoldSparkleEffect,

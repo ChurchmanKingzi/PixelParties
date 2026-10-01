@@ -2980,6 +2980,11 @@ const ZONE_ANIM_SFX = {
   // Shattering Strike (v814): kleinerer Hammer, dumpferer Einschlag mit Erde.
   shattering_strike:       { name: 'heavy_impact', opts: { rate: 1.15, volume: 0.85, delay: 300 } },
   tiger_impact:            { name: 'heavy_impact' },
+  // Golem Smash: Rammstoss-Einschlag + Eissplitter.
+  golem_smash_ice: [
+    { name: 'heavy_impact', opts: { rate: 0.9, volume: 1.0 } },
+    { name: 'elem_ice',     opts: { rate: 1.1, volume: 0.9, delay: 40 } },
+  ],
   ox_impact:               { name: 'heavy_impact' },
   snake_impact:            { name: 'heavy_impact' },
   dumbbell_pump:           { name: 'heavy_impact' },

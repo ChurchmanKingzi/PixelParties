@@ -18610,3 +18610,8 @@ Creature (Normal, Lv 0, 10 HP, `PP MBS1`). `onTurnEnd` je Golem (nur eigener Zug
 
 - Skript `remote-detonator.js`: `isTargetingArtifact` + `proactivePlay`. Spielbar nur mit mindestens einem eigenen offenen „Sentient Bomb Golems" im Support. Zielwahl (abbrechbar, Held oder Kreatur, nie die eigenen Golems) → `resolve` loescht ALLE eigenen Golems (`actionMoveCard` → Geloescht, Kosten, nicht „besiegt") und verursacht 200 × Anzahl Schaden (`actionDealDamage` / `actionDealCreatureDamage`, Typ `artifact`).
 - Animationen: `explosion` auf jedem Golem, am Ziel `explosion` (1 Golem) bzw. `mega_explosion` (≥ 2).
+
+## Golem Smash (Attack, Lv 2, Fighting)
+
+- Skript `golem-smash.js`. Ablauf: Regler `optionPicker` (`renderAs: 'slider'`, 0 … min(10, Decksize), Abbruch = Karte abgebrochen) → Zielwahl (`promptDamageTarget`, Schaden = `hero.atk` + 10 × Menge im Fenster, abbrechbar) → erst DANN `actionMillCards(deleteMode)` (nur wirklich geloeschte Karten zaehlen) → `_fireAttackDeclare` → `play_ram_animation` (der Anwender rammt) + `golem_smash_ice` am Einschlag → Schaden Typ `attack` auf genau EIN Ziel.
+- Neue Zonen-Animation `golem_smash_ice` (Frostblitz, Stossring, Eissplitter), Klang `heavy_impact` + `elem_ice` in `ZONE_ANIM_SFX`.
