@@ -8315,7 +8315,11 @@ class GameEngine {
       const proj = this._projectedAmount(hookCtx);
       const betrag = Math.max(0, (proj !== undefined ? proj : hookCtx.amount) || 0);
       this.log('experimental_poison_heal', { target: this._heroLabel(target), amount: betrag });
-      if (betrag > 0) await this.actionHealHero(source, target, betrag);
+      if (betrag > 0) {
+        await this.actionHealHero(source, target, betrag);
+        // Gift, das die Max HP senken WUERDE (Paraseed), erhoeht sie stattdessen.
+        await this.runHooks('onPoisonHealedInstead', { target, amount: betrag, source, _bypassDeadHeroFilter: true });
+      }
       return { dealt: 0, cancelled: true };
     }
     if (hookCtx.cancelled) return { dealt: 0, cancelled: true };
@@ -10278,8 +10282,6 @@ class GameEngine {
    */
   decreaseMaxHp(hero, amount) {
     if (!hero || hero.hp === undefined) return 0;
-    // Experimental Potion: eine Senkung der Max HP erhoeht sie stattdessen.
-    if (hero._experimentalPotion && amount > 0) { this.increaseMaxHp(hero, amount); return 0; }
     const currentMax = hero.maxHp || hero.hp;
     const effective = Math.min(amount, currentMax - 1); // Never below 1
     if (effective <= 0) return 0;

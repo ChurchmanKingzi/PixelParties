@@ -4,7 +4,7 @@
 //
 //  „Choose a target you control and inflict 1 Stack of Poison to it. All
 //   Poison damage the target would receive for the rest of the game is
-//   applied as healing instead, and any effects that would reduce its max
+//   applied as healing instead, and any Poison that would reduce its max
 //   HP increase its max HP instead."
 //
 //  ── AUSLEGUNG ─────────────────────────────────────────────────────
@@ -16,10 +16,13 @@
 //    `counters.experimentalPotion` (verschwindet mit der Kreatur im Spiel).
 //  • Giftschaden → Heilung: zentral in der Engine (`actionDealDamage` bei Typ
 //    `poison` nach allen Zu-/Abschlaegen; `_processCreatureDamageBatchKern`
-//    fuer Kreaturen). Max-HP-Senkung → Erhoehung: `decreaseMaxHp` (Held) und
-//    `decreaseCreatureMaxHp` (Kreatur); sie erhoehen ueber `increaseMaxHp`
-//    (aktuelle HP steigen wie dort ueblich mit). Paraseeds direkte
-//    Obergrenzen-Abzuege treffen nie, weil der Gifttick zuvor zu Heilung wird.
+//    fuer Kreaturen).
+//  • „any Poison that would reduce its max HP": NUR Gift — das ist Paraseeds
+//    Giftschaden, der sonst die Obergrenze des Wirts frisst. Weil der Gifttick des
+//    markierten Helden zu Heilung wird, feuert die Engine dabei den Haken
+//    `onPoisonHealedInstead`; Paraseed erhoeht dann die Max HP um den Betrag statt
+//    sie zu senken. Andere Max-HP-Senkungen (Toughness, Gobbo, Rha-Bi …) bleiben
+//    unberuehrt.
 // ═══════════════════════════════════════════
 
 const CARD_NAME = 'Experimental Potion';
@@ -37,7 +40,7 @@ module.exports = {
   },
 
   targetingConfig: {
-    description: 'Choose a target you control: Poison it (1 stack). Poison damage heals it and max HP reductions raise its max HP — for the rest of the game.',
+    description: 'Choose a target you control: Poison it (1 stack). Poison damage heals it and Poison that would reduce its max HP raises it instead — for the rest of the game.',
     confirmLabel: '🧪 Experiment!',
     confirmClass: 'btn-success',
     cancellable: true,

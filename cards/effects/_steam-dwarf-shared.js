@@ -152,8 +152,6 @@ function decreaseCreatureMaxHp(engine, inst, amount) {
   if (!inst || amount <= 0) return 0;
   const cd = engine._getCardDB()[inst.name];
   if (!inst.counters) inst.counters = {};
-  // Experimental Potion: eine Senkung der Max HP erhoeht sie stattdessen.
-  if (inst.counters.experimentalPotion) { engine.increaseMaxHp(inst, amount); return 0; }
   const baseMax = inst.counters.maxHp ?? cd?.hp ?? 0;
   if (baseMax <= 0) return 0;
 
