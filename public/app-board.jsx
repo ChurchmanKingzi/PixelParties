@@ -24088,11 +24088,14 @@ function CardNamePickerPrompt({ ep, onRespond }) {
   // Only show cards that have images (exist in AVAILABLE_MAP), exclude Tokens
   const names = useMemo(() => {
     const avMap = window.AVAILABLE_MAP || {};
+    // `ep.cardNames` (vom Server) schraenkt die Auswahl ein — z. B. Kassaran: schon
+    // angesagte Namen fallen weg. Ohne Liste gilt wie bisher alles mit Bild.
+    const erlaubt = Array.isArray(ep.cardNames) && ep.cardNames.length > 0 ? new Set(ep.cardNames) : null;
     return Object.keys(avMap).filter(n => {
       const cd = CARDS_BY_NAME[n];
-      return cd && cd.cardType !== 'Token';
+      return cd && cd.cardType !== 'Token' && (!erlaubt || erlaubt.has(n));
     }).sort((a, b) => a.localeCompare(b));
-  }, []);
+  }, [ep.cardNames]);
   const filtered = filter ? names.filter(n => n.toLowerCase().includes(filter.toLowerCase())) : names;
   return (
     <div className="modal-overlay" onClick={ep.cancellable !== false ? () => onRespond({ cancelled: true }) : undefined}>
@@ -30354,6 +30357,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         // from the Future beim Spielstart (Phase 0/Gegnerzug), sonst ging nur Drag&Drop.
         if (!dimmed && ((isMyTurn && (currentPhase === 2 || currentPhase === 3 || currentPhase === 4)) || isHeroAction) && card) {
           if (card.cardType === 'Potion') {
+            // Klang beim Anklicken — Potions ohne Ziel (Elixir of Quickness & Co.) liefen bisher stumm.
+            if (window.playSFX) window.playSFX('spell_cast', { category: null, dedupe: 200 });
             socket.emit('use_potion', { roomId: gameState.roomId, cardName, handIndex: idx, fromCreation: fromCreation || undefined,
           });
           } else if (isEquipPlayable && (gameState.ownSideSummonArtifacts || []).includes(cardName)) {
@@ -31085,6 +31090,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         });
       } else if (isPotionActivatable) {
         // Potion dragged outside hand — activate
+        if (window.playSFX) window.playSFX('spell_cast', { category: null, dedupe: 200 });
         socket.emit('use_potion', { roomId: gameState.roomId, cardName, handIndex: idx, fromCreation: fromCreation || undefined,
           });
       }

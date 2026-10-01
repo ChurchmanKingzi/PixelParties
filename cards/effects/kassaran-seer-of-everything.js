@@ -67,6 +67,7 @@ async function bearbeiteZug(ctx, kartenName) {
   await engine.showTriggeredEffect(kartenName, { playerIdx: pi });
   const ok = await engine.actionAddCardFromDeckToHand(pi, kopie, { source: CARD_NAME, reveal: false });
   if (!ok) return null;
+  engine.markLastStartingCounted(pi, 1);   // genau DIESE Kopie zaehlt als Starthand
   hero._kassaranAdded.names.push(basis);
   engine.log('kassaran_add', { player: ps.username, card: kartenName });
   engine.sync();
@@ -107,6 +108,7 @@ module.exports = {
         .filter(n => db[n] && db[n].cardType !== 'Token')
         .sort((a, b) => a.localeCompare(b));
       const gewaehlt = [...deklariert(hero)];
+      let versuche = 0;
       while (gewaehlt.length < ANZAHL) {
         const frei = alle.filter(n => !gewaehlt.some(g => baseCardName(g) === baseCardName(n)));
         const wahl = await engine.promptGeneric(pi, {
@@ -115,7 +117,11 @@ module.exports = {
           cardNames: frei, cancellable: false,
         });
         const name = wahl?.cardName;
-        if (!name || !frei.includes(name)) { gewaehlt.push(frei[gewaehlt.length % Math.max(1, frei.length)]); continue; }
+        // Nur ein NOCH NICHT angesagter Name zaehlt — sonst neu fragen (die drei muessen verschieden sein).
+        if (!name || !frei.includes(name)) {
+          if (++versuche > 25) { gewaehlt.push(frei[0]); versuche = 0; }
+          continue;
+        }
         gewaehlt.push(name);
       }
       hero._kassaranDeclared = gewaehlt;

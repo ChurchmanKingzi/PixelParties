@@ -29,16 +29,17 @@ module.exports = {
   },
 
   startingHand: {
-    async resolve(engine, pi) {
+    async resolve(engine, pi, opts = {}) {
       const ps = engine.gs.players[pi];
       if (!ps) return null;
       const ok = await engine.promptStartingHandYesNo(pi, CARD_NAME,
         'You may immediately reveal it to draw 2 cards. Those cards count as part of your starting hand.',
         '👁️ Reveal & draw 2!');
       if (!ok) return null;
-      engine.revealHandCopy(pi, CARD_NAME);   // bleibt aufgedeckt, bis sie die Hand verlaesst
+      engine.revealHandCopy(pi, CARD_NAME, opts.handIdx);   // DIESE Kopie bleibt aufgedeckt, bis sie die Hand verlaesst
       await engine.showTriggeredEffect(CARD_NAME, { playerIdx: pi });
       const gezogen = await engine.actionDrawCards(pi, 2, { source: CARD_NAME });
+      engine.markLastStartingCounted(pi, gezogen.length);   // zaehlen als Starthand
       engine.log('glimpse_of_the_future', { player: ps.username, drawn: gezogen.map(c => c.name) });
       engine.sync();
       return { counted: gezogen.map(c => c.name) };

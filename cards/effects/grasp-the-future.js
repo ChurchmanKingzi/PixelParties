@@ -35,7 +35,7 @@ module.exports = {
   },
 
   startingHand: {
-    async resolve(engine, pi) {
+    async resolve(engine, pi, opts = {}) {
       const ps = engine.gs.players[pi];
       if (!ps) return null;
       if (skipIfSearchBlocked(engine, pi, CARD_NAME)) return null;   // unter der Such-Sperre kein Angebot
@@ -62,7 +62,7 @@ module.exports = {
       if (!gewaehlt) return null;
 
       // Beide Karten bleiben aufgedeckt, bis sie die Hand verlassen.
-      engine.revealHandCopy(pi, CARD_NAME);
+      engine.revealHandCopy(pi, CARD_NAME, opts.handIdx);
       engine.revealHandCopy(pi, gewaehlt, wahl.handIndex);
       await engine.showTriggeredEffect(CARD_NAME, { playerIdx: pi });
       await engine.showTriggeredEffect(gewaehlt, { playerIdx: pi });

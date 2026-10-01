@@ -55,18 +55,22 @@ module.exports = {
   },
 
   startingHand: {
-    async resolve(engine, pi) {
+    async resolve(engine, pi, opts = {}) {
       const ps = engine.gs.players[pi];
       if (!ps) return null;
       // Eine noch NICHT selbst aufgedeckte Kopie suchen.
-      const idx = (ps.hand || []).findIndex((n, i) => n === CARD_NAME && !kopieOffen(ps, i));
+      // Die zaehlende Kopie (`opts.handIdx`), sonst die erste noch nicht selbst aufgedeckte.
+      const idx = ((ps.hand || [])[opts.handIdx] === CARD_NAME && !kopieOffen(ps, opts.handIdx))
+        ? opts.handIdx
+        : (ps.hand || []).findIndex((n, i) => n === CARD_NAME && !kopieOffen(ps, i));
       if (idx < 0) return null;
       const ok = await engine.promptStartingHandYesNo(pi, CARD_NAME,
         'You may immediately reveal it. You can only play this card while it is revealed by its own effect.',
         '👁️ Reveal!');
       if (!ok) return null;
       // Die Hand kann sich waehrend der Abfrage nicht aendern, aber sicher ist sicher.
-      const jetzt = (ps.hand || []).findIndex((n, i) => n === CARD_NAME && !kopieOffen(ps, i));
+      const jetzt = (ps.hand || [])[idx] === CARD_NAME ? idx
+        : (ps.hand || []).findIndex((n, i) => n === CARD_NAME && !kopieOffen(ps, i));
       if (jetzt < 0) return null;
       if (!ps._selfRevealedHandIndices) ps._selfRevealedHandIndices = {};
       ps._selfRevealedHandIndices[jetzt] = true;

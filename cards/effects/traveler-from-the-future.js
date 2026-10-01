@@ -65,6 +65,10 @@ module.exports = {
       const meine = engine.cardInstances.filter(c => c.name === CARD_NAME && c.zone === 'support'
         && (c.controller ?? c.owner) === pi && !c.faceDown).map(c => c.id).sort();
       if (meine.length > 0 && meine[0] !== ctx.card.id) return;
+      // Genau die frisch gezogene Kopie zaehlt als Starthand.
+      const ps = gs.players[pi];
+      const letzte = (ps?.hand || []).length - 1;
+      engine.markStartingCounted(pi, (ps?.hand || [])[letzte] === name ? letzte : (ps?.hand || []).lastIndexOf(name));
       await engine.processStartingHandDraw(pi, [name], { window: 'resource' });
     },
   },
