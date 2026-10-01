@@ -26292,7 +26292,13 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       // Detect newly drawn cards (added at end of hand)
       const newDeckCount = me.deckCount || 0;
       const newPotionCount = me.potionDeckCount || 0;
-      const deckDecreased = newDeckCount < prevDeckCountRef.current || newPotionCount < prevPotionDeckCountRef.current;
+      // Herkunft nach dem ECHTEN Abgang, nicht nach dem Kartentyp: sank nur das Potion
+      // Deck, kommt die Karte von dort; sank nur das Main Deck, vom Main Deck (eine
+      // Potion im Main Deck — z. B. per Grasp the Future gesucht — fliegt also vom
+      // Main Deck los). Nur wenn beide sinken, entscheidet der Typ.
+      const mainDeckDecreased = newDeckCount < prevDeckCountRef.current;
+      const potionDeckDecreased = newPotionCount < prevPotionDeckCountRef.current;
+      const deckDecreased = mainDeckDecreased || potionDeckDecreased;
       const newDiscardLenForHand = (me.discardPile || []).length;
       const discardDecreased = newDiscardLenForHand < prevHandDiscardLenRef.current;
       prevDeckCountRef.current = newDeckCount;
@@ -26406,7 +26412,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           const newAnims = [];
           for (let i = autoStart; i < newHand.length; i++) {
             const isPotion = CARDS_BY_NAME[newHand[i]]?.cardType === 'Potion';
-            const srcRect = (isPotion && potionRect) ? potionRect : deckRect;
+            const ausPotionDeck = potionDeckDecreased && !mainDeckDecreased ? true
+              : (mainDeckDecreased && !potionDeckDecreased ? false : isPotion);
+            const srcRect = (ausPotionDeck && potionRect) ? potionRect : deckRect;
             newAnims.push({
               id: Date.now() + Math.random() + i,
               cardName: newHand[i],
