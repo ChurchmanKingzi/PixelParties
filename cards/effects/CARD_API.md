@@ -18587,3 +18587,7 @@ Hero (`PP MBS1`, 450 HP / 80 ATK). Text ohne „except Creatures" (neu).
 ## ★ HEART OF CARDS — Ansage-Artefakt mit Bild-Stream an den Gegner
 
 Artifact (Subtyp Normal — in der Datenbank stand fälschlich „Reaction“, korrigiert; Kosten 4, gebannt, `PP MBS1`), nur in der eigenen Runde spielbar (`canActivate` prüft `activePlayer`). Ansage über `cardNamePicker` (abbrechbar, 1×/Zug-Stempel erst nach der Ansage), die angesagte Karte geht als `card_reveal` NUR an den Gegner (`toPlayers`), danach fliegt die oberste Deckkarte in die Mitte des Bildschirms (`mill_center_reveal`, beide Seiten) und weiter: Treffer (`baseCardName`) → Hand + 2 Karten ziehen, sonst in den Deleted Pile (Zustand wird erst nach der Landung umgebucht).
+
+## ★ LOVELY TEDDY — Kreatureneffekt, der fremde aktive Effekte leiht
+
+Creature (Normal, Lv 1, 50 HP, `PP MBS1`). „Once per turn choose a Creature your opponent controls. You may use that Creature's active effects as if you controlled it for the rest of the turn." Gleicher Weg wie **Aligning Goals**: `actionStealCreature` (Kontrollwechsel bis Zugende, `skipTakeControlHook`), Animation `dark_control`. Ziele: offene gegnerische Kreaturen mit `creatureEffect`, noch nicht geliehen. Kein Gold, keine Zusatzaktion (der Text nennt beides nicht). Die Rundensperre je Kreatur (`creature-effect:<instId>`) bleibt bestehen — hat der Gegner den Effekt schon benutzt, bleibt er gesperrt.
