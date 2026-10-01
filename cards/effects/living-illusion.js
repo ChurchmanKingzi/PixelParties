@@ -6,7 +6,11 @@
 //  Search your deck for a level-3-or-lower Creature
 //  and place it into the user's free Support Zone.
 //  Then place Pollution Tokens equal to the Creature's
-//  level + 1 into your free Support Zones.
+//  level + 1 into your free Support Zones. You cannot
+//  summon Creatures for the rest of the turn afterwards
+//  (`ps.summonLocked`, wie bei Create Illusion — erst nach
+//  gelungener Aufloesung gesetzt, die Engine loest die Sperre
+//  zum naechsten Zugbeginn).
 //
 //  Inherent additional Action: playable from hand in
 //  any Main Phase as well as the Action Phase, and
@@ -228,6 +232,9 @@ module.exports = {
         title: 'Living Illusion',
         cancellable: false,
       });
+
+      // „You cannot summon Creatures for the rest of the turn afterwards."
+      ps.summonLocked = true;
 
       engine.log('living_illusion', {
         player: ps.username, creature: creatureName,
