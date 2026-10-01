@@ -18051,6 +18051,11 @@ this._deathWatch = (this._deathWatchStack || []).length
       const inst = this.cardInstances.find(c => c.owner === pi && c.zone === 'discard' && c.name === cardName);
       if (inst) {
         const before = (ps.deletedPile || []).length;
+        // Ausdruecklicher Flug Ablage → Geloescht, VOR dem Zustandswechsel
+        // (gleiche Reihenfolge wie das Zugende-Loeschen vom Brett). Ohne ihn
+        // rechnet der Diff-Detektor des Clients allein und die Karte blieb
+        // einen Moment sichtbar im Ablagestapel (Als Befund, Diamond).
+        this._pileFlight(pi, cardName, 'discard', 'deleted');
         await this.actionMoveCard(inst, ZONES.DELETED, -1, -1, { source: opts.source, sourceOwner: opts.sourceOwner });
         return (ps.deletedPile || []).length > before;
       }
