@@ -3269,7 +3269,7 @@
     "hp": 450,
     "atk": 80,
     "cost": null,
-    "effect": "When this is one of your starting Heroes, your Potion Deck must consist of exactly 15 Normal or Attachment Spells with different names, except Creatures, whose total levels do not exceed 15. You may spend your Action to reveal the top 2 cards of your Potion Deck and immediately have this Hero perform all Spells among them in order as additional Actions, regardless of their levels. You can only activate this effect if this was one of your starting Heroes. If this is one of your starting Heroes, you can never draw cards from your Potion Deck.",
+    "effect": "When this is one of your starting Heroes, your Potion Deck must consist of exactly 15 Normal or Attachment Spells with different names whose total levels do not exceed 15. You may spend your Action to reveal the top 2 cards of your Potion Deck and immediately have this Hero perform all Spells among them in order as additional Actions, regardless of their levels. You can only activate this effect if this was one of your starting Heroes. If this is one of your starting Heroes, you can never draw cards from your Potion Deck.",
     "archetype": "",
     "setID": "PP MBS1",
     "banned": "",

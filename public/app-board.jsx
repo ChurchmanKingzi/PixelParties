@@ -15137,6 +15137,66 @@ const ANIM_REGISTRY = {
       );
     };
   })(),
+  red_lightning: (() => {
+    // ★ Chaos-Diamond, the Cracked Keeper: ROTER LICHTBLITZ auf dem Helden
+    // beim Aktivieren. Drei gezackte Blitze (rot mit weissem Kern), ein
+    // greller roter Schein und ein kurzer Stossring. Eigene Keyframes im
+    // eigenen <style> (siehe check-anim-keyframes).
+    return function RedLightningEffect({ x, y }) {
+      const blitze = useMemo(() => [-38, 4, 40].map((dx, i) => {
+        // Gezackte Linie von oben nach unten, je Blitz anders.
+        const pts = [];
+        let px = 0;
+        for (let k = 0; k <= 7; k++) {
+          px += (Math.random() - 0.5) * 22;
+          pts.push(`${(px).toFixed(1)},${(-70 + k * 20).toFixed(1)}`);
+        }
+        return { dx, pts: pts.join(' '), verzug: i * 70 };
+      }), []);
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+          <div style={{
+            position: 'absolute', left: -90, top: -90, width: 180, height: 180, borderRadius: '50%',
+            background: 'radial-gradient(circle, rgba(255,255,255,.95) 0%, rgba(255,40,40,.85) 22%, rgba(190,0,0,.45) 52%, rgba(120,0,0,0) 75%)',
+            animation: 'redLightningGlow 780ms ease-out forwards',
+          }} />
+          <div style={{
+            position: 'absolute', left: -50, top: -50, width: 100, height: 100, borderRadius: '50%',
+            border: '3px solid rgba(255,70,70,.95)', boxShadow: '0 0 18px rgba(255,0,0,.9)',
+            animation: 'redLightningRing 640ms ease-out forwards',
+          }} />
+          {blitze.map((b, i) => (
+            <svg key={'rl' + i} width="120" height="160" viewBox="-60 -80 120 160"
+              style={{ position: 'absolute', left: b.dx - 60, top: -80, overflow: 'visible',
+                animation: `redLightningBolt 520ms linear ${b.verzug}ms forwards`, opacity: 0 }}>
+              <polyline points={b.pts} fill="none" stroke="#ff1a1a" strokeWidth="7" strokeLinejoin="round" strokeLinecap="round"
+                style={{ filter: 'drop-shadow(0 0 7px #ff0000)' }} />
+              <polyline points={b.pts} fill="none" stroke="#ffffff" strokeWidth="2.4" strokeLinejoin="round" strokeLinecap="round" />
+            </svg>
+          ))}
+          <style>{`
+            @keyframes redLightningGlow {
+              0%   { opacity: 0; transform: scale(.3); }
+              14%  { opacity: 1; transform: scale(.95); }
+              100% { opacity: 0; transform: scale(1.35); }
+            }
+            @keyframes redLightningRing {
+              0%   { opacity: .95; transform: scale(.3); }
+              100% { opacity: 0;   transform: scale(2.1); }
+            }
+            @keyframes redLightningBolt {
+              0%   { opacity: 0; }
+              8%   { opacity: 1; }
+              22%  { opacity: .25; }
+              36%  { opacity: 1; }
+              60%  { opacity: .4; }
+              100% { opacity: 0; }
+            }
+          `}</style>
+        </div>
+      );
+    };
+  })(),
   wind: WindEffect,
   shadow_summon: ShadowSummonEffect,
   gold_sparkle: GoldSparkleEffect,
