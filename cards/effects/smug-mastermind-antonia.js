@@ -172,6 +172,11 @@ async function runAntoniaEffect(ctx) {
   // interleaved discard-everything from another hook). Refund silently.
   if ((ps.hand || []).length === 0) return false;
 
+  // Ihr Kartenbild an den GEGNER streamen, sobald der Effekt wirklich
+  // ausgeloest wird (Ziel bestaetigt) — sonst ist fuer ihn unklar, was
+  // gerade seine Karte entfernt hat (Als Vorgabe).
+  await engine.showTriggeredEffect('Smug Mastermind Antonia', { playerIdx: pi });
+
   await engine.actionPromptForceDiscard(pi, 1, {
       costFor: 'Smug Mastermind Antonia',          // ★ v1041: Kosten-Abwurf-Lernkanal
       costKind: 'disrupt',
