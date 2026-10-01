@@ -15319,6 +15319,53 @@ const ANIM_REGISTRY = {
       );
     };
   })(),
+  level_down: (() => {
+    // ★ Looming Threat: die STUFE einer Handkreatur sinkt am Zugende — dunkelviolette Pfeile
+    // sinken ueber der Karte ab, ein „-1" schwebt nach unten und verblasst. Eigene Keyframes im
+    // eigenen <style> (siehe check-anim-keyframes). Gespielt ueber `play_hand_card_animation`.
+    return function LevelDownEffect({ x, y }) {
+      const pfeile = useMemo(() => Array.from({ length: ppFxN(7) }, (_, i) => ({
+        dx: (i - 3) * 11 + (Math.random() - 0.5) * 6,
+        delay: i * 70 + Math.round(Math.random() * 40),
+        size: 14 + Math.round(Math.random() * 8),
+      })), []);
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+          <div style={{ position: 'absolute', left: -46, top: -46, width: 92, height: 92, borderRadius: '50%',
+            background: 'radial-gradient(circle, rgba(150,60,200,.55) 0%, rgba(90,20,140,.3) 50%, rgba(90,20,140,0) 72%)',
+            animation: 'levelDownGlow 800ms ease-out forwards' }} />
+          {pfeile.map((a, i) => (
+            <span key={'ld' + i} style={{
+              position: 'absolute', left: a.dx, top: -30, fontSize: a.size, lineHeight: 1,
+              color: '#c07bff', textShadow: '0 0 6px #7a1fc2',
+              animation: `levelDownArrow 700ms ease-in ${a.delay}ms forwards`, opacity: 0,
+            }}>▼</span>
+          ))}
+          <span className="orbit-font" style={{
+            position: 'absolute', left: -18, top: -16, fontSize: 26, fontWeight: 800, color: '#e3b8ff',
+            textShadow: '0 0 8px #8a2be2, 0 2px 0 #3b0a5c', animation: 'levelDownText 900ms ease-out forwards',
+          }}>-1</span>
+          <style>{`
+            @keyframes levelDownGlow {
+              0%   { opacity: 0; transform: scale(.4); }
+              30%  { opacity: 1; transform: scale(1); }
+              100% { opacity: 0; transform: scale(1.5); }
+            }
+            @keyframes levelDownArrow {
+              0%   { opacity: 0; transform: translateY(-22px); }
+              25%  { opacity: 1; }
+              100% { opacity: 0; transform: translateY(46px); }
+            }
+            @keyframes levelDownText {
+              0%   { opacity: 0; transform: translateY(-14px) scale(.6); }
+              25%  { opacity: 1; transform: translateY(0) scale(1.15); }
+              100% { opacity: 0; transform: translateY(30px) scale(1); }
+            }
+          `}</style>
+        </div>
+      );
+    };
+  })(),
   wind: WindEffect,
   shadow_summon: ShadowSummonEffect,
   gold_sparkle: GoldSparkleEffect,

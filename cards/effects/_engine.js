@@ -21150,8 +21150,15 @@ this._deathWatch = (this._deathWatchStack || []).length
       ps._handLevelOffsetsTransient[idx] = Math.min(cur, -map[k]);
       geaendert = true;
       this.log('hand_level_countdown', { player: ps.username, card: ps.hand[idx], reductions: map[k] });
+      // Animation auf der Handkarte: die Stufe sinkt.
+      this._broadcastEvent('play_hand_card_animation', {
+        owner: pi, handIdx: idx, animType: 'level_down', count: 1, duration: 900,
+      });
     }
-    if (geaendert) this.sync();
+    if (geaendert) {
+      this.sync();
+      await this._delay(950);   // die Animation soll sichtbar ablaufen, bevor das Zugende weiterlaeuft
+    }
   }
 
   /** Die Handkopie an `idx` als „Teil der Starthand" markieren. */

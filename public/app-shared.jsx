@@ -2677,6 +2677,7 @@ const ZONE_ANIM_SFX = {
   // Zahlenaenderung.
   battery_charge:          { name: 'elem_lightning', opts: { rate: 1.5, volume: 0.45 } },
   modifier_sparkle:        { name: 'buff', opts: { rate: 1.25, volume: 0.5 } },
+  level_down:              { name: 'debuff', opts: { rate: 0.9, volume: 0.7 } },   // Looming Threat: Stufe sinkt
   // Gangster Angel — Schusssalve (`gunshot_barrage`). `projectile` ist
   // der vorhandene Geschossklang; schneller abgespielt wird daraus ein
   // trockener Schuss statt eines fliegenden Pfeils. Leise gehalten:
