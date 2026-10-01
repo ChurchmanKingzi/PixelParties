@@ -9215,6 +9215,25 @@ class GameEngine {
    */
 
   /**
+   * Spielerindex der Karte/des Effekts, die einen Helden besiegt haben — oder -1.
+   * Quellen mit Besitzer (`owner`/`controller`/`sourceOwner`) liefern ihn direkt;
+   * ein Statustick (Gift, Brand …) hat keinen und wird dem Spieler zugerechnet, der
+   * den Status gesetzt hat (`statuses[...].appliedBy`).
+   */
+  _todesVerursacher(target, source) {
+    const eig = [source?.owner, source?.controller, source?.sourceOwner].find(v => v === 0 || v === 1);
+    if (eig === 0 || eig === 1) return eig;
+    if (source?.name) {
+      for (const [key, def] of Object.entries(STATUS_EFFECTS)) {
+        if (def?.damageSourceName !== source.name) continue;
+        const by = target?.statuses?.[key]?.appliedBy;
+        if (by === 0 || by === 1) return by;
+      }
+    }
+    return -1;
+  }
+
+  /**
    * Der vollstaendige Todesablauf, NACHDEM `ON_HERO_KO` gelaufen ist
    * und der Held immer noch bei 0 HP steht.
    *
@@ -9275,11 +9294,27 @@ class GameEngine {
       }
     }
 
+    let _ersterDurchlauf = false;
+    let _toeterBesitzer = -1;
     if (!target._koProcessed) {
+      _ersterDurchlauf = true;
+      // Wer hat den Tod verursacht? Vor dem Aufraeumen berechnen — es leert `statuses`.
+      _toeterBesitzer = this._todesVerursacher(target, source);
       target._koProcessed = true;
       // Ausruestungen abwerfen, Inselzonen raeumen — der „when dying"-Teil.
       await this.handleHeroDeathCleanup(target);
       if (!opts.skipBark) this._maybeFireCpuHeroKilledBark(target, source);
+    }
+
+    // ★ ENDGUELTIGER TOD: der Held ist gefallen und keine Rettung (Guardian Angel
+    // & Co., die HP schon waehrend ON_HERO_KO wiederherstellen) hat gegriffen —
+    // dieser Ablauf startet dann gar nicht. Ein Extra-Leben danach ist eine
+    // WIEDERBELEBUNG: der Tod hat stattgefunden, deshalb feuert dieser Haken
+    // VOR `_consumeExtraLife` (Mausoleum Worm).
+    if (_ersterDurchlauf && target.hp <= 0) {
+      await this.runHooks('onHeroDefeatFinal', {
+        hero: target, source, killerOwner: _toeterBesitzer, _bypassDeadHeroFilter: true,
+      });
     }
 
     if (this._consumeExtraLife(target, ownerIdx)) {

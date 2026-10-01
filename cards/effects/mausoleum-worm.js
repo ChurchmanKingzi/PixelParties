@@ -10,10 +10,11 @@
 //  ── AUSLEGUNG ─────────────────────────────────────────────────────
 //  • Lauscher aus der ABLAGE (Muster Grave Worm: breite `activeIn` + zustands-
 //    basierter Ablage-Check, `bypassDeadHeroFilter`), ausgeloest vom
-//    Helden-KO-Haken. „Hero you control" = jeder von mir kontrollierte Held
+//    ENDGUELTIGEN Tod (`onHeroDefeatFinal`, Engine: nach dem Aufraeumen, vor dem
+//    Extra-Leben). Verhinderte Tode (Guardian Angel & Co.) loesen NICHT aus,
+//    Wiederbelebungen nach dem Tod schon. „Hero you control" = jeder von mir kontrollierte Held
 //    (auch geliehen). „by an opponent's card or effect": die Quelle des
-//    Schadens hat einen Besitzer, und der ist NICHT ich. Quellen ohne Besitzer
-//    (Statustick wie Gift/Brand) gelten NICHT als Karte des Gegners.
+//    Schadens hat einen Besitzer, und der ist NICHT ich. Statusticks (Gift, Brand …) zaehlen dem Spieler, der den Status gesetzt hat (`appliedBy`).
 //  • „place": PLATZIEREN (`placeFromPile`) — keine Stufen-/Aktionspruefung, auch
 //    auf den Platz eines gefallenen Helden; nur freie, nicht versiegelte/
 //    gesperrte Plaetze des GEFALLENEN Helden. Freiwillig (Ja/Nein, Zonenwahl).
@@ -42,14 +43,15 @@ module.exports = {
   },
 
   hooks: {
-    onHeroKO: async (ctx) => {
+    // Endgueltiger Tod (nicht Rettung, aber auch Wiederbelebung danach) — siehe Engine.
+    onHeroDefeatFinal: async (ctx) => {
       const engine = ctx._engine;
       const gs = engine.gs;
       const pi = ctx.cardOwner;
       const ps = gs.players[pi];
       if (!ps) return;
       const gefallen = ctx.hero;
-      if (!gefallen?.name || gefallen.hp > 0) return;
+      if (!gefallen?.name || gefallen.hp > 0) return;   // gerettet? dann feuert dieser Haken gar nicht
       if ((ps.discardPile || []).indexOf(CARD_NAME) < 0) return;      // nur aus MEINER Ablage
       if (gs.hoptUsed?.[`${HOPT_KEY}:${pi}`] === gs.turn) return;
 
@@ -63,8 +65,9 @@ module.exports = {
       if (engine.heroSideOf(seite, gefallen) !== pi) return;           // „a Hero you control"
 
       // „by an opponent's card or effect": Quelle mit Besitzer ≠ ich.
-      const quelle = ctx.source || null;
-      const quellBesitzer = quelle?.owner ?? quelle?.controller ?? quelle?.sourceOwner;
+      // Der Verursacher kommt von der Engine: Besitzer der Quelle, bei Statusticks der Spieler,
+      // der den Status gesetzt hat.
+      const quellBesitzer = ctx.killerOwner;
       if (quellBesitzer !== 0 && quellBesitzer !== 1) return;
       if (quellBesitzer === pi) return;
 
