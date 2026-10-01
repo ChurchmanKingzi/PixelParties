@@ -40650,7 +40650,45 @@ this._deathWatch = (this._deathWatchStack || []).length
       if (filteredOpp.length === 0) continue;
       sets.push([...own, ...filteredOpp]);
     }
+    for (const z of this._kommunikationsGeraetSets(playerIdx, heroIdx)) sets.push(z);
     return sets;
+  }
+
+  /** Traegt der Held (Brettseite `seite`, `heroIdx`) ein offenes „Communication Device"? */
+  heldTraegtKommunikationsGeraet(seite, heroIdx) {
+    return (this.cardInstances || []).some(c =>
+      c.zone === ZONES.SUPPORT && c.name === 'Communication Device' && !c.faceDown
+      && c.heroIdx === heroIdx && this.physicalSide(c) === seite);
+  }
+
+  /**
+   * ★ Communication Device: „All Heroes you control equipped with a
+   * Communication Device can use any Spells any other Hero you control with a
+   * Communication Device equipped to it can use."
+   *
+   * Je ANDEREM, DAUERHAFT kontrollierten (eigene Spalte oder `permaControlBy`),
+   * lebenden Helden des Kontrolleurs mit Geraet kommt EIN Kandidat dazu: dessen
+   * Ability-Zonen (+ Support-Abilities). Nie summiert — wie bei den Leihhelden
+   * reicht, dass EINE Quelle die Stufe traegt. Empfaenger ist jeder kontrollierte
+   * Held mit Geraet, auch ein nur geliehener (Charme, Styx …); als Quelle zaehlen
+   * nur dauerhaft kontrollierte (Als Vorgabe).
+   */
+  _kommunikationsGeraetSets(playerIdx, heroIdx) {
+    const out = [];
+    if (!this.heldTraegtKommunikationsGeraet(playerIdx, heroIdx)) return out;
+    const hero = this.gs.players[playerIdx]?.heroes?.[heroIdx];
+    if (!hero?.name) return out;
+    const kontrolleur = this.heroSideOf(playerIdx, hero);
+    for (const q of this.heroesControlledBy(kontrolleur, { permanentOnly: true })) {
+      if (q.physOwner === playerIdx && q.heroIdx === heroIdx) continue;
+      if (!(q.hero.hp > 0)) continue;
+      if (!this.heldTraegtKommunikationsGeraet(q.physOwner, q.heroIdx)) continue;
+      out.push([
+        ...(this.gs.players[q.physOwner]?.abilityZones?.[q.heroIdx] || [[], [], []]),
+        ...this.heroSupportAbilityStacks(q.physOwner, q.heroIdx),
+      ]);
+    }
+    return out;
   }
 
   /**
