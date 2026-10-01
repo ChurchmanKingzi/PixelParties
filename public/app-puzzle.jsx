@@ -392,6 +392,8 @@ const PUZZLE_HERO_COUNTER_BADGES = [
   // muessen im Editor setzbar sein — ohne Eintrag hier gibt es weder
   // Abzeichen noch Eingabefeld.
   { key: '_investCounters',    icon: '🪙', label: 'Invest Counters' },
+  // Diamond, the Keeper of Peace: Selbstschaden bisher (Aufstieg ab 150).
+  { key: '_diamondSelfLoss',   icon: '💎', label: 'Self Damage inflicted' },
   // Puppets (v707): Luck Counter auf dem Helden (Lucky Puppet Laki).
   { key: '_luckCounter',       icon: '🍀', label: 'Luck Counters', row: 'puppet' },
 ];
@@ -5060,12 +5062,22 @@ function PuzzleCreator() {
                 </div>
               </div>
             )}
+            {/* Diamond, the Keeper of Peace: „Self Damage inflicted so far" —
+                die HP, die sie durch ihren eigenen Effekt verloren hat.
+                150+ ist die Aufstiegsbedingung von „Diamond, the Bulwark of
+                Peace". Gespeichert als `hero._diamondSelfLoss`. */}
             {editDiamondLoss != null && (
               <div style={{ marginBottom: 14 }}>
                 <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: 1 }}>
-                  💎 Ascension
+                  💎 Self Damage inflicted so far
                 </span>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
+                  <button className="btn"
+                    style={{ padding: '6px 12px', fontSize: 12, minWidth: 36 }}
+                    disabled={(editDiamondLoss || 0) <= 0}
+                    onClick={() => setEditDiamondLoss(Math.max(0, (editDiamondLoss || 0) - 30))}>
+                    −30
+                  </button>
                   <input className="input" type="number" min={0}
                     value={editDiamondLoss ?? 0}
                     onChange={(e) => {
@@ -5073,10 +5085,15 @@ function PuzzleCreator() {
                       setEditDiamondLoss(Number.isFinite(n) && n >= 0 ? n : 0);
                     }}
                     onKeyDown={(e) => e.key === 'Enter' && saveStats()}
-                    style={{ flex: 1, textAlign: 'center', fontSize: 13, fontWeight: 700 }} />
+                    style={{ flex: 1, textAlign: 'center', fontSize: 13, fontWeight: 700, color: '#7fe8ff' }} />
+                  <button className="btn"
+                    style={{ padding: '6px 12px', fontSize: 12, minWidth: 36 }}
+                    onClick={() => setEditDiamondLoss((editDiamondLoss || 0) + 30)}>
+                    +30
+                  </button>
                 </div>
                 <div style={{ fontSize: 10, color: 'var(--text2)', opacity: 0.7, marginTop: 4 }}>
-                  HP lost due to her own effect. 150 or more is required for "Diamond, the Bulwark of Peace".
+                  HP lost due to her own effect so far. {(editDiamondLoss || 0) >= 150 ? '✔ Enough' : 'Needs 150'} for "Diamond, the Bulwark of Peace".
                 </div>
               </div>
             )}
