@@ -2162,7 +2162,7 @@ function MainMenu() {
             {scFloat && (
               <div key={scFloat.id} className="sc-float-reward" onAnimationEnd={() => setScFloat(null)}>
                 <span>+{scFloat.amount}</span>
-                <img src="/sc.png" alt="SC" style={{ width: 22, height: 22 }} draggable={false} />
+                <img src="/data/sc.png" alt="SC" style={{ width: 22, height: 22, imageRendering: 'pixelated' }} draggable={false} />
               </div>
             )}
             <div style={{ flex: 1, overflowY: 'auto', padding: '10px 20px 20px' }}>
