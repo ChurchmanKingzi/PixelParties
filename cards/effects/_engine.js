@@ -20653,6 +20653,9 @@ this._deathWatch = (this._deathWatchStack || []).length
         const _brettIdx = pool.indexOf(cardName);
         if (_brettIdx >= 0) { pool.splice(_brettIdx, 1); this.sync(); }
       }
+    } else if (fromZone === 'deck' && opts.bereitsInAblage) {
+      // Die Karte liegt SCHON in der Ablage (Chaos-Diamond: Aufdecken vor
+      // dem Wirken) — weder Flug noch zweiter Eintrag.
     } else if (fromZone === 'deck') {
       this._broadcastEvent('play_pile_transfer', {
         // `opts.ablageFlugVon`: woher der Flug in die Ablage startet, wenn die

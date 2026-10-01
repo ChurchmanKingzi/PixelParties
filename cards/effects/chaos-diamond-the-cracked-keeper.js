@@ -32,11 +32,10 @@
 //     Feldes, werden dort umgedreht und fliegen weiter in die ABLAGE
 //     (`mill_center_reveal` mit `from: 'potionDeck'`; derselbe Ablauf wie
 //     die Mills mit Mitte-Aufdecken). ERST DANACH giesst der Held jeden
-//     SPELL daraus der Reihe nach: er wird aus der Ablage geholt und ueber
-//     `_castSpellImmediately` gewirkt (der echte Zusatzaktions-Weg: Zielwahl,
-//     Reaktionsfenster, Wisdom-Kosten wie bei Friedhelm; Stufen gelten
-//     ausdruecklich NICHT), danach fliegt er aus der Mitte zurueck in die
-//     Ablage. Nach dem Aufdecken ist es Pflicht: Abbruch in der Zielwahl
+//     SPELL daraus der Reihe nach: er bleibt in der Ablage liegen und wird
+//     ueber `_castSpellImmediately` gewirkt (`bereitsInAblage`; der echte
+//     Zusatzaktions-Weg: Zielwahl, Reaktionsfenster, Wisdom-Kosten wie bei
+//     Friedhelm; Stufen gelten ausdruecklich NICHT). Nach dem Aufdecken ist es Pflicht: Abbruch in der Zielwahl
 //     ist gesperrt (`_forceNonCancellable`). Ist der Held zwischendurch
 //     handlungsunfaehig (gefallen, Frozen, Stunned, Negated), bleiben die
 //     noch nicht gewirkten Spells einfach in der Ablage. Die Aktion ist in
@@ -127,17 +126,17 @@ module.exports = {
     });
     await engine._delay(namen.length * REVEAL_MS + 150);
 
-    // ② Danach der Reihe nach WIRKEN (Als Vorgabe). Jeder Spell wird dafuer
-    // aus der Ablage geholt und regulaer gewirkt; danach kehrt er (aus der
-    // Mitte fliegend) in die Ablage zurueck. Kann der Held nicht mehr
-    // handeln (gefallen, Frozen, Stunned, Negated) oder laesst sich der Spell
-    // nicht holen/wirken, bleibt er einfach in der Ablage liegen.
+    // ② Danach der Reihe nach WIRKEN (Als Vorgabe). Die Spells liegen schon
+    // in der Ablage und bleiben dort sichtbar liegen, waehrend sie regulaer
+    // gewirkt werden. Kann der Held nicht mehr handeln (gefallen, Frozen,
+    // Stunned, Negated), werden die uebrigen nicht gewirkt.
     let gewirkt = 0;
     for (const k of aufgedeckt) {
       if (!k.istSpell) continue;                      // Nicht-Spells bleiben liegen
       if (!kannHandeln(engine, feld, heroIdx)) continue;
-      const geholt = await engine.takeFromPile(pi, 'discard', k.name, { source: CARD_NAME, last: true });
-      if (!geholt) continue;
+      // Der Spell BLEIBT in der Ablage liegen und wird dort gewirkt
+      // (`bereitsInAblage`): sichtbar im Stapel, kein Heraus-und-Zurueck.
+      if (!(ps.discardPile || []).includes(k.name)) continue;
 
       engine._forceNonCancellable = (engine._forceNonCancellable || 0) + 1;
       let r = null;
@@ -146,19 +145,14 @@ module.exports = {
           fromZone: 'deck',
           pool: [k.name],
           poolIndex: 0,
-          ablageFlugVon: 'boardCenter',
+          bereitsInAblage: true,
           by: CARD_NAME,
           ...(feld !== pi ? { heroOwner: feld } : {}),
         });
       } finally {
         engine._forceNonCancellable--;
       }
-      if (r?.cancelled) {
-        // zurueck in die Ablage
-        ps.discardPile.push(k.name);
-        engine._trackCard(k.name, pi, 'discard');
-        engine.sync();
-      } else gewirkt++;
+      if (!r?.cancelled) gewirkt++;
     }
 
     engine.log('chaos_diamond_cast', { player: ps.username, revealed: namen, cast: gewirkt });
