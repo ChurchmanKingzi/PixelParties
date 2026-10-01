@@ -9,10 +9,10 @@
   "trainWinRate": "handgesetzt",
   "handTuned": true,
   "cardValues": {
-    "Fun-Fun Circus Clown": 50,
-    "Fun-Fun Circus Elephant": 38,
-    "Fun-Fun Circus Director": 38,
-    "Fun-Fun Circus Strongman": 38,
+    "Fun-Fun Circus Clown": 70,
+    "Fun-Fun Circus Elephant": 22,
+    "Fun-Fun Circus Director": 26,
+    "Fun-Fun Circus Strongman": 24,
     "Crum, the Class Pet": 22,
     "Summoning Magic": 30,
     "Magic Arts": 30,
@@ -21,16 +21,16 @@
     "Aquatic Shield": 18,
     "Unwanted Audience": 10,
     "Aquatic Spear": 10,
-    "Idol of Crestina": 12,
+    "Idol of Crestina": 30,
     "Staff of the Teleporter": 6,
     "Treasure Chest": 6,
-    "Golden Bananas": 6,
     "Pocket Catapult": 8,
     "Cloud Pillow": 10,
     "Thicket": 8,
     "Invisibility Cloak": 12,
     "Summoning Circle": 10,
-    "Flying Island in the Sky": 10
+    "Flying Island in the Sky": 10,
+    "Teleportal": 28
   },
   "timing": {
     "Fun-Fun Circus Clown": {
