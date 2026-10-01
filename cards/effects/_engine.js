@@ -12197,6 +12197,8 @@ class GameEngine {
       // Genau das stand in Als Protokoll: zwei „Start"-Zeilen fuer
       // dieselbe Karte, 26 ms auseinander.
       const _selbstLoeschend = !!loadCardEffect(targetCard.name)?.deletesSelfOnDeath;
+      // Ghazma: besiegte Kreaturen werden geloescht (Umleitung ueber `_redirectToDeleted`).
+      if (isCreatureTarget && !_selbstLoeschend && this._gefalleneKreaturenGeloescht()) targetCard._redirectToDeleted = true;
       const _zielPile = (targetCard._redirectToDeleted || _selbstLoeschend) ? 'deleted' : 'discard';
       if (isBoardZone) {
         const payload = {
@@ -12241,6 +12243,22 @@ class GameEngine {
    * sterbende Instanz enttrackt ist. `herkunft` haelt fest, wo die
    * Creature stand und seit wann (fuer Flug und `turnPlayed`).
    */
+  /**
+   * ★ „Creatures that are defeated are deleted" (Ghazma, the Worm Feeder): gilt, solange ein
+   * LEBENDER, nicht negierter Held beider Seiten das Skript-Flag `defeatedCreaturesAreDeleted`
+   * traegt. Besiegte Kreaturen (Schaden UND Zerstoerung) gehen dann in den Geloescht-Stapel
+   * ihres Besitzers statt in die Ablage.
+   */
+  _gefalleneKreaturenGeloescht() {
+    for (const ps of this.gs.players || []) {
+      for (const h of ps?.heroes || []) {
+        if (!h?.name || !(h.hp > 0) || h.statuses?.negated) continue;
+        if (this.heroScript(h)?.defeatedCreaturesAreDeleted) return true;
+      }
+    }
+    return false;
+  }
+
   /**
    * Kadaver-Halter (v686): der Client soll die beanspruchte Creature
    * an ihrem Slot WEITERZEIGEN, obwohl sie im Zustand gleich gesplict
@@ -21207,6 +21225,8 @@ this._deathWatch = (this._deathWatchStack || []).length
     this._lastPhaseBeforeTurnStart = null;
 
     this.gs.currentPhase = PHASES.START;
+    // Stand der Geloescht-Stapel bei Zugbeginn („deleted this turn" — Ghazma, the Worm Feeder).
+    this.gs._geloeschtBeiZugbeginn = (this.gs.players || []).map(p => [...(p?.deletedPile || [])]);
 
     // ── Clear stale `_preventPhaseAdvance` flag ──
     // The flag is one-shot: hooks like Giga Steroids, Ghuanjun's combo,
@@ -44834,8 +44854,20 @@ this._deathWatch = (this._deathWatchStack || []).length
       //
       // Derselbe Fehler wie bei den acht Flugwegen (v1133): eine
       // Absicherung an EINER Stelle ist keine Absicherung.
-      const _selbstLoeschend = !!loadCardEffect(e.inst.name)?.deletesSelfOnDeath;
-      if ((effectiveCd && hasCardType(effectiveCd, 'Token')) || _selbstLoeschend) {
+      const _ghazmaLoescht = this._gefalleneKreaturenGeloescht();
+      const _selbstLoeschend = !!loadCardEffect(e.inst.name)?.deletesSelfOnDeath || _ghazmaLoescht;
+      // Loesch-Rettung („deleted from anywhere", Ash Worms) greift auch hier, wenn Ghazma
+      // die Niederlage zu einem Loeschen macht (die Instanz ist schon aus dem Platz).
+      let _gerettet = false;
+      if (_ghazmaLoescht && !(effectiveCd && hasCardType(effectiveCd, 'Token')) && loadCardEffect(e.inst.name)?.beforeDelete) {
+        _gerettet = await this._tryBeforeDelete(e.inst.name, e.inst.originalOwner, {
+          fromZone: 'support', fromInstance: null, source: 'Ghazma',
+        });
+        if (_gerettet) this.log('delete_rescued', { card: e.inst.name, from: 'support', source: 'Ghazma' });
+      }
+      if (_gerettet) {
+        _creatureDest = 'rescued';
+      } else if ((effectiveCd && hasCardType(effectiveCd, 'Token')) || _selbstLoeschend) {
         creatureDiscardPs.deletedPile.push(e.inst.name);
         _creatureDest = 'deleted';
       } else {
@@ -44856,7 +44888,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       // client queries an empty same-indexed slot on owner's board
       // and animates a phantom card. The discard pile destination
       // still routes to `originalOwner` so cards always go home.
-      this._broadcastEvent('play_pile_transfer', {
+      if (_creatureDest !== 'rescued') this._broadcastEvent('play_pile_transfer', {
         fromOwner: physicalSide,
         toOwner:   e.inst.originalOwner,
         cardName:  e.inst.name,

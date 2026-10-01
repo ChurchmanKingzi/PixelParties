@@ -18651,3 +18651,8 @@ Karten: End of the Future, Traveler from the Future, Grasp the Future, Glimpse o
 
 - **Welche Kopie zaehlt als Starthand?** Hand-Indexfeld `ps._startingCountedHandIndices` (folgt der PHYSISCHEN Kopie): gestempelt vom Startblatt-Fenster (alle Handkarten), von Traveler (die frisch gezogene Karte), von Kassaran (die hinzugefuegte Kopie) und von Glimpse (die gezogenen Karten) via `engine.markStartingCounted` / `markLastStartingCounted`. `processStartingHandDraw` waehlt per `engine.startingCopyIdx(pi, name)` die markierte Kopie und reicht sie als `handIdx` an `startingHand.resolve` (Aufdecken trifft genau diese Kopie, nicht eine gleichnamige andere).
 - `cardNamePicker`: der Client beachtet jetzt `ep.cardNames` als Einschraenkung (Kassaran: schon angesagte Namen fallen weg).
+
+## Ghazma, the Worm Feeder
+
+- Skript `ghazma-the-worm-feeder.js`: Flag `defeatedCreaturesAreDeleted` → `engine._gefalleneKreaturenGeloescht()` (lebender, nicht negierter Held beider Seiten). Beide Todespfade (Schadens-Batch in `_processCreatureDamageBatchKern`, Zerstoerung in `actionDestroyCard` ueber `_redirectToDeleted`) lenken besiegte Kreaturen in den Geloescht-Stapel des Besitzers; im Batch-Pfad greift dabei die Loesch-Rettung (`beforeDelete`, Ash Worms).
+- Zugende (`onTurnEnd`, einmal je Zug ueber `gs._ghazmaZugende`): Kreaturen im Geloescht-Stapel des Spielers am Zug, die schon bei Zugbeginn dort lagen (Schnappschuss `gs._geloeschtBeiZugbeginn`, in `startTurn`, mengenweise je Name), werden in sein Deck gemischt; er zieht so viele Karten (max. 2).
