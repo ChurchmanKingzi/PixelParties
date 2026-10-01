@@ -3,32 +3,33 @@ Name: Fun-Fun Circus
 Cover: Fun-Fun Circus Clown
 
 == HEROES ==
-Nomu, Wanderer of Worlds
-Bakhm, the Desert Digger
+Maho, the Cute Magical Girl
 Silent Water Mizune
+Kit, the Shark Researcher
 
 == MAIN DECK ==
 4x Fun-Fun Circus Clown
-3x Fun-Fun Circus Elephant
+4x Fun-Fun Circus Elephant
 3x Fun-Fun Circus Director
 3x Fun-Fun Circus Strongman
-4x Summoning Magic
-3x Magic Arts
-4x Destruction Magic
-3x Rain of Arrows
+5x Summoning Magic
+5x Magic Arts
+3x Spectral Armor
+2x Aquatic Shield
+3x Skull Carpet Bombing
+2x Unwanted Audience
+1x Aquatic Spear
 3x Treasure Chest
 2x Golden Bananas
-2x Pocket Catapult
-4x Cute Cheese
-1x Book of Doom
-2x Cloud Pillow
-3x Invisibility Cloak
-2x Shield of Life
-1x Homerun!
-4x Booby Trap
-4x Pure Advantage Camel
-2x Spider Avalanche
-3x Cosmic Skeleton
+3x Pocket Catapult
+3x Cloud Pillow
+2x Thicket
+2x Invisibility Cloak
+3x Idol of Crestina
+2x Staff of the Teleporter
+1x Summoning Circle
+2x Flying Island in the Sky
+2x Crum, the Class Pet
 
 == POTION DECK ==
 
