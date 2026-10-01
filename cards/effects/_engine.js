@@ -11153,6 +11153,8 @@ class GameEngine {
     // Hand-lock gate — same rule as the main-deck draw path. A locked
     // hand can't receive cards from any source for the rest of the turn.
     if (ps.handLocked || ps.drawLocked) return [];   // Potion-Ziehen ist ein Draw → drawLocked greift
+    // Chaos-Diamond (Starthero): „you can never draw cards from your Potion Deck".
+    if (ps.potionDrawBanned) return [];
 
     // Fire batch-level draw hook (Intrude, Tuscan Mystic …).
     // ★ v1361: IMMER — auch in der Resource Phase. Ein Zug aus dem Potion

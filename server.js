@@ -2302,7 +2302,7 @@ app.get('/api/profile/deck-stats', authMiddleware, async (req, res) => {
     const pc = potions.length;
     const mainOk = main.length === 60;
     const heroOk = heldenzahlOk(heroes);   // v1167: Zhigao-Aufstellung hat zwei
-    const potionOk = pc === 0 || (pc >= 5 && pc <= 15);
+    const potionOk = potionDeckGroesseOk(heroes, pc);
     const legal = mainOk && heroOk && potionOk;
     if (legal) legalCount++;
     // Use cover card if set, otherwise pick a random card
@@ -2842,6 +2842,15 @@ function benoetigteHeldenzahl(heroes) {
   // Kopien-Familie: „Zhigao, the Heavenly Emperor (2)" & Co. zaehlen mit.
   return namen.some(n => n === ZHIGAO_HELD || n.startsWith(ZHIGAO_HELD + ' (')) ? 2 : 3;
 }
+// „Chaos-Diamond, the Cracked Keeper": „When this is one of your starting
+// Heroes, your Potion Deck must consist of exactly 15 Normal or Attachment
+// Spells …" — mit ihm im Team ist die Potion-Deck-Groesse GENAU 15.
+const CHAOS_DIAMOND_HELD = 'Chaos-Diamond, the Cracked Keeper';
+function potionDeckGroesseOk(heroes, pc) {
+  const mitChaos = (heroes || []).some(h => h && (typeof h === 'string' ? h : h.hero) === CHAOS_DIAMOND_HELD);
+  return mitChaos ? pc === 15 : (pc === 0 || (pc >= 5 && pc <= 15));
+}
+
 function heldenzahlOk(heroes) {
   const echte = (heroes || []).filter(h => h && (typeof h === 'string' ? h : h.hero));
   return echte.length === benoetigteHeldenzahl(echte);
@@ -2854,7 +2863,7 @@ function isCustomDeckRowLegal(row) {
     const heroes = JSON.parse(row.heroes || '[]').filter(h => h && h.hero);
     const potions = JSON.parse(row.potion_deck || '[]');
     const pc = potions.length;
-    return main.length === 60 && heldenzahlOk(heroes) && (pc === 0 || (pc >= 5 && pc <= 15));   // v1167
+    return main.length === 60 && heldenzahlOk(heroes) && potionDeckGroesseOk(heroes, pc);   // v1167
   } catch { return false; }
 }
 
@@ -5936,7 +5945,10 @@ function countCombinedPotions(cardDB, deck) {
   for (const cn of (deck.mainDeck || [])) {
     if (cardDB[cn]?.cardType === 'Potion') n++;
   }
-  n += (deck.potionDeck || []).length; // Potion Deck holds Potions only
+  // Nur echte Potions — mit Chaos-Diamond liegen Spells im Potion Deck.
+  for (const cn of (deck.potionDeck || [])) {
+    if (cardDB[cn]?.cardType === 'Potion') n++;
+  }
   return n;
 }
 

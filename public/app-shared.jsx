@@ -2984,6 +2984,8 @@ const ZONE_ANIM_SFX = {
   field_standard_rally:    { name: 'buff' },
   // Silent — redundant with a log or purely decorative
   gold_sparkle:            null,
+  // Chaos-Diamond: roter Lichtblitz beim Aktivieren.
+  red_lightning:           { name: 'elem_lightning', opts: { rate: 0.85, volume: 1.0 } },
   heal_sparkle:            null,
   healing_hearts:          null,
   slimy_heal_goo:          null,
@@ -3911,6 +3913,31 @@ function requiredHeroCount(deck) {
 }
 window.requiredHeroCount = requiredHeroCount;
 
+// ── „Chaos-Diamond, the Cracked Keeper" ─────────────────────────────
+// „When this is one of your starting Heroes, your Potion Deck must
+// consist of exactly 15 Normal or Attachment Spells with different
+// names whose total levels do not exceed 15." — mit ihm im Team liegen
+// im Potion Deck SPELLS statt Potions. `deck.heroes` sind die Starthelden.
+const CHAOS_DIAMOND = 'Chaos-Diamond, the Cracked Keeper';
+const CHAOS_POTION_DECK_SIZE = 15;
+const CHAOS_MAX_TOTAL_LEVEL = 15;
+function hasChaosDiamond(deck) {
+  return (deck?.heroes || []).some(h => h && sameCopyFamily(h.hero, CHAOS_DIAMOND));
+}
+/** Normal- oder Attachment-SPELL (keine Attacks, Creatures, Reactions, Surprises, Areas). */
+function isChaosPotionSpell(card) {
+  return !!card && card.cardType === 'Spell' && (card.subtype === 'Normal' || card.subtype === 'Attachment');
+}
+function chaosSpellLevel(name) {
+  const lv = window.CARDS_BY_NAME[name]?.level;
+  return typeof lv === 'number' ? lv : 0;
+}
+function chaosTotalLevel(names) {
+  return (names || []).reduce((n, name) => n + chaosSpellLevel(name), 0);
+}
+window.hasChaosDiamond = hasChaosDiamond;
+window.isChaosPotionSpell = isChaosPotionSpell;
+
 function isDeckLegal(deck) {
   if (!deck) return { legal: false, reasons: ['No deck'] };
   const reasons = [];
@@ -3928,7 +3955,19 @@ function isDeckLegal(deck) {
       : 'Need exactly 3 Heroes (' + filledHeroes.length + '/3)');
   }
   const pc = (deck.potionDeck || []).length;
-  if (pc !== 0 && (pc < 5 || pc > 15)) reasons.push('Potion Deck must have 0 or 5-15 cards (' + pc + ')');
+  if (hasChaosDiamond(deck)) {
+    // Chaos-Diamond: genau 15 Normal-/Attachment-Spells, alle verschieden,
+    // Gesamtlevel hoechstens 15.
+    const pd = deck.potionDeck || [];
+    if (pc !== CHAOS_POTION_DECK_SIZE) reasons.push('With ' + CHAOS_DIAMOND + ' the Potion Deck needs exactly ' + CHAOS_POTION_DECK_SIZE + ' Spells (' + pc + '/' + CHAOS_POTION_DECK_SIZE + ')');
+    if (pd.some(n => !isChaosPotionSpell(window.CARDS_BY_NAME[n]))) reasons.push('With ' + CHAOS_DIAMOND + ' the Potion Deck may only contain Normal or Attachment Spells');
+    if (new Set(pd.map(copyFamilyKey)).size !== pd.length) reasons.push('With ' + CHAOS_DIAMOND + ' the Potion Deck needs Spells with different names');
+    const lvl = chaosTotalLevel(pd);
+    if (lvl > CHAOS_MAX_TOTAL_LEVEL) reasons.push('With ' + CHAOS_DIAMOND + ' the Spells\' total levels cannot exceed ' + CHAOS_MAX_TOTAL_LEVEL + ' (' + lvl + '/' + CHAOS_MAX_TOTAL_LEVEL + ')');
+  } else {
+    if (pc !== 0 && (pc < 5 || pc > 15)) reasons.push('Potion Deck must have 0 or 5-15 cards (' + pc + ')');
+    if ((deck.potionDeck || []).some(n => window.CARDS_BY_NAME[n]?.cardType !== 'Potion')) reasons.push('Potion Deck may only contain Potions');
+  }
   // Potions im Main Deck brauchen Nicolas ODER einen Gewuerz-Platz
   // („Secret Spice"-Artefakte, siehe spiceMainDeckAllowance).
   const mainPotions = (deck.mainDeck || []).filter(n => window.CARDS_BY_NAME[n]?.cardType === 'Potion');
@@ -4124,7 +4163,9 @@ function spiceExemptMainPotions(deck) {
 /** Potions, die gegen die 15er-Grenze zaehlen (Gewuerz-Plaetze ausgenommen). */
 function countedPotions(deck) {
   const imMain = (deck?.mainDeck || []).filter(n => window.CARDS_BY_NAME[n]?.cardType === 'Potion').length;
-  return (deck?.potionDeck || []).length + Math.max(0, imMain - spiceExemptMainPotions(deck));
+  // Nur echte Potions: bei Chaos-Diamond liegen Spells im Potion Deck.
+  const imPotionDeck = (deck?.potionDeck || []).filter(n => window.CARDS_BY_NAME[n]?.cardType === 'Potion').length;
+  return imPotionDeck + Math.max(0, imMain - spiceExemptMainPotions(deck));
 }
 
 // Heroes whose card text explicitly allows multiple copies in the team
@@ -4275,6 +4316,17 @@ function canAddCard(deck, cardName, section) {
     return true;
   }
   if (section === 'potion') {
+    // Chaos-Diamond: das Potion Deck nimmt NUR Normal-/Attachment-Spells,
+    // je Name eine Kopie, Gesamtlevel hoechstens 15.
+    if (hasChaosDiamond(deck)) {
+      if (!isChaosPotionSpell(card)) return false;
+      const pd = deck.potionDeck || [];
+      if (pd.length >= CHAOS_POTION_DECK_SIZE) return false;
+      if (pd.some(n => sameCopyFamily(n, cardName))) return false;
+      if (chaosTotalLevel(pd) + chaosSpellLevel(cardName) > CHAOS_MAX_TOTAL_LEVEL) return false;
+      if (countInDeck(deck, cardName) >= effMax) return false;
+      return true;
+    }
     if (ct !== 'Potion') return false;
     if ((deck.potionDeck || []).length >= 15) return false;
     // Gemeinsame Grenze ueber Main- und Potion-Deck: hoechstens 15
