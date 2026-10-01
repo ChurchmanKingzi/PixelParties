@@ -28,6 +28,10 @@
 //    sie belegte; ist er wieder belegt/gesperrt → kein Angebot.
 //    Einmal pro Runde und SPIELER (Heldensperre), nur gezaehlt, wenn
 //    der Effekt wirklich lief. Abbruch der Wahl = „no".
+//  • Aufstiegsbonus (Als Vorgabe): bis zu DREI Creatures aus Hand, Deck
+//    und/oder Ablage waehlen und LOESCHEN. Je Wahl eine Galerie ueber alle
+//    drei Quellen (abbrechbar = „Done"); die geloeschten Creatures speisen
+//    danach Effekt 2.
 // ═══════════════════════════════════════════
 
 const { isPileCreature } = require('./_hooks');
@@ -52,6 +56,27 @@ function kandidaten(engine, pi, ausser) {
     .map(([name, count]) => ({ name, source: 'deleted', count }));
 }
 
+const BONUS_MAX = 3;
+
+/** Alle Creatures aus Hand, Deck und Ablage, je (Quelle, Name) entdoppelt. */
+function bonusKandidaten(engine, pi) {
+  const ps = engine.gs.players[pi];
+  const db = engine._getCardDB();
+  const out = [];
+  for (const [pile, arr] of [['hand', ps.hand], ['deck', ps.mainDeck], ['discard', ps.discardPile]]) {
+    if ((pile === 'deck' || pile === 'discard') && !engine.pileOutAllowed(pi, pile, { source: { name: CARD_NAME, owner: pi } })) continue;
+    const zaehler = new Map();
+    for (const n of arr || []) {
+      if (!isPileCreature(db[n])) continue;
+      zaehler.set(n, (zaehler.get(n) || 0) + 1);
+    }
+    for (const [name, count] of [...zaehler.entries()].sort(([a], [b]) => a.localeCompare(b))) {
+      out.push({ name, source: pile, count });
+    }
+  }
+  return out;
+}
+
 module.exports = {
   activeIn: ['hero'],
 
@@ -62,6 +87,31 @@ module.exports = {
     const hero = gs?.players?.[heroOwner ?? pi]?.heroes?.[heroIdx];
     if (!hero || hero.name !== BASIS) return false;
     return (hero._diamondSelfLoss || 0) >= VERLUST;
+  },
+
+  /** Aufstiegsbonus: bis zu 3 Creatures aus Hand/Deck/Ablage loeschen. */
+  async onAscensionBonus(engine, pi, heroIdx, heroOwner) {
+    const ps = engine.gs.players[pi];
+    if (!ps) return;
+    for (let runde = 0; runde < BONUS_MAX; runde++) {
+      const karten = bonusKandidaten(engine, pi);
+      if (karten.length === 0) break;
+      const wahl = await engine.promptGeneric(pi, {
+        type: 'cardGallery', title: CARD_NAME, source: CARD_NAME,
+        description: `Ascension Bonus: choose a Creature from your hand, deck or discard pile to delete (${runde + 1}/${BONUS_MAX}).`,
+        cards: karten, confirmLabel: '💎 Delete!',
+        // Abbruch = „Done" („bis zu drei"); die Karte ist ohnehin schon aufgestiegen.
+        cancellable: true, cancelLabel: '✔ Done',
+        searchable: true, searchPlaceholder: 'Filter by name…',
+      });
+      if (!wahl || wahl.cancelled || !wahl.cardName) break;
+      const pile = wahl.source;
+      if (!karten.some(k => k.name === wahl.cardName && k.source === pile)) break;
+      const ok = await engine.deleteFromPile(pi, pile, wahl.cardName, { source: CARD_NAME });
+      if (!ok) break;
+      engine.log('diamond_bonus_delete', { player: ps.username, card: wahl.cardName, from: pile });
+    }
+    engine.sync();
   },
 
   hooks: {
