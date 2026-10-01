@@ -5093,7 +5093,7 @@ function PuzzleCreator() {
                   </button>
                 </div>
                 <div style={{ fontSize: 10, color: 'var(--text2)', opacity: 0.7, marginTop: 4 }}>
-                  HP lost due to her own effect so far. {(editDiamondLoss || 0) >= 150 ? '✔ Enough' : 'Needs 150'} for "Diamond, the Bulwark of Peace".
+                  HP lost due to her own effect so far.
                 </div>
               </div>
             )}
