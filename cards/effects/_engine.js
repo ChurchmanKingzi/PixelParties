@@ -3593,6 +3593,12 @@ class GameEngine {
       const cps = this.gs.players?.[ctrl];
       if (cps) cps._lastCreatureDefeatedTurn = this.gs.turn;
     }
+    // Rewrite History: „defeated by an opponent's card or effect" — Protokoll je
+    // Ablage-Besitzer (Name, Zug, PHYSISCHER Platz, Verursacher). Der Hub laeuft vor
+    // `_untrackCard`, die Instanz ist also noch auffindbar.
+    if (hookName === HOOKS.ON_CREATURE_DEATH && hookCtx.creature) {
+      this._rewriteProtokoll(hookCtx);
+    }
     if (hookName === HOOKS.ON_CREATURE_DEATH && !hookCtx._skipPostDefeatReaction) {
       await this._checkCreatureDefeatedHandReactions(hookCtx.creature, hookCtx.source);
       // ★ v1292: dieselbe Stelle speist auch das SAMMEL-Fenster
@@ -21322,6 +21328,13 @@ this._deathWatch = (this._deathWatchStack || []).length
     // before clearing it). Wiping it at turn-start makes every player
     // start with a clean slate; cards that need the flag set THIS turn
     // re-stamp it from their own hooks on the active turn.
+    // Rewrite History: Fenster „seit dem Ende deines letzten Zuges" — Zugnummer des
+    // vorigen und des laufenden eigenen Zuges des Aktiven merken.
+    {
+      const aktiv = this.gs.players?.[this.gs.activePlayer];
+      if (aktiv) { aktiv._rhVorigerZug = aktiv._rhAktuellerZug ?? 0; aktiv._rhAktuellerZug = this.gs.turn; }
+    }
+
     delete this.gs._preventPhaseAdvance;
 
     // ── Revert charmed heroes (Charme Lv3) ──
@@ -31519,6 +31532,33 @@ this._deathWatch = (this._deathWatchStack || []).length
         this._niederlagen = [];
         await this._liefereNiederlagen(liste);
       }
+    }
+  }
+
+  /**
+   * Rewrite History — vermerkt einen Kreaturentod, wenn ihn eine Karte/ein Effekt des
+   * GEGNERS verursacht hat. `ps._rewriteLog` gehoert dem Besitzer der Ablage, in die die
+   * Karte faellt; Eintrag = { name, turn, side, heroIdx, zoneSlot } mit der PHYSISCHEN
+   * Brettseite (dort liegt die Zone, in die die Karte zurueckkehrt).
+   */
+  _rewriteProtokoll(hookCtx) {
+    try {
+      const c = hookCtx.creature;
+      const quelle = hookCtx.source;
+      const srcOwner = quelle?.controller ?? quelle?.owner ?? -1;
+      const victimCtrl = c.controller ?? c.owner;
+      if (srcOwner !== 0 && srcOwner !== 1) return;
+      if (srcOwner === victimCtrl) return;
+      const inst = this.cardInstances.find(x => x.id === c.instId);
+      const side = inst ? this.physicalSide(inst) : c.owner;
+      const ablage = c.originalOwner ?? c.owner;
+      const ps = this.gs.players?.[ablage];
+      if (!ps) return;
+      (ps._rewriteLog || (ps._rewriteLog = [])).push({
+        name: c.name, turn: this.gs.turn, side, heroIdx: c.heroIdx, zoneSlot: c.zoneSlot,
+      });
+    } catch (err) {
+      console.error('[rewriteProtokoll]', err.message);
     }
   }
 
