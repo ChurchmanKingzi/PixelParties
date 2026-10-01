@@ -15389,6 +15389,53 @@ const ANIM_REGISTRY = {
       );
     };
   })(),
+  time_rewind: (() => {
+    // ★ Rewrite History: eine Uhr erscheint über der Zone, ihre Zeiger drehen sich schnell
+    // RÜCKWÄRTS, zwei Ringe laufen nach innen zusammen. Eigene Keyframes im eigenen <style>
+    // (siehe check-anim-keyframes).
+    return function TimeRewindEffect({ x, y }) {
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+          <div style={{ position: 'absolute', left: -60, top: -60, width: 120, height: 120, borderRadius: '50%',
+            border: '2px solid #e8c77a', boxShadow: '0 0 14px #d9a93c', opacity: 0,
+            animation: 'rewindRing 700ms ease-in forwards' }} />
+          <div style={{ position: 'absolute', left: -60, top: -60, width: 120, height: 120, borderRadius: '50%',
+            border: '2px dashed #f4e2b0', opacity: 0,
+            animation: 'rewindRing 700ms ease-in 160ms forwards' }} />
+          <div style={{ position: 'absolute', left: -34, top: -34, width: 68, height: 68, borderRadius: '50%',
+            background: 'radial-gradient(circle, rgba(255,244,214,.92) 0%, rgba(233,196,106,.55) 60%, rgba(233,196,106,0) 74%)',
+            border: '3px solid #c99a2e', boxShadow: '0 0 18px #e8c77a', opacity: 0,
+            animation: 'rewindFace 900ms ease-out forwards' }}>
+            <i style={{ position: 'absolute', left: 31, top: 8, width: 3, height: 26, background: '#5a3f0e', borderRadius: 2,
+              transformOrigin: '50% 100%', animation: 'rewindHand 800ms cubic-bezier(.4,0,.2,1) forwards' }} />
+            <i style={{ position: 'absolute', left: 31, top: 16, width: 3, height: 18, background: '#5a3f0e', borderRadius: 2,
+              transformOrigin: '50% 100%', animation: 'rewindHandSlow 800ms cubic-bezier(.4,0,.2,1) forwards' }} />
+          </div>
+          <style>{`
+            @keyframes rewindFace {
+              0%   { opacity: 0; transform: scale(.4); }
+              20%  { opacity: 1; transform: scale(1); }
+              80%  { opacity: 1; transform: scale(1); }
+              100% { opacity: 0; transform: scale(1.25); }
+            }
+            @keyframes rewindHand {
+              0%   { transform: rotate(0deg); }
+              100% { transform: rotate(-1080deg); }
+            }
+            @keyframes rewindHandSlow {
+              0%   { transform: rotate(0deg); }
+              100% { transform: rotate(-270deg); }
+            }
+            @keyframes rewindRing {
+              0%   { opacity: 0;  transform: scale(2.2); }
+              25%  { opacity: .9; }
+              100% { opacity: 0;  transform: scale(.3); }
+            }
+          `}</style>
+        </div>
+      );
+    };
+  })(),
   level_down: (() => {
     // ★ Looming Threat: die STUFE einer Handkreatur sinkt am Zugende — dunkelviolette Pfeile
     // sinken ueber der Karte ab, ein „-1" schwebt nach unten und verblasst. Eigene Keyframes im
