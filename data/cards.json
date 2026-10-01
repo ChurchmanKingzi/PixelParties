@@ -16646,7 +16646,7 @@
     "hp": null,
     "atk": null,
     "cost": null,
-    "effect": "1) You may once per turn search your deck for 1 card, reveal it and place it face-down on top of your deck.\nImmediately end your turn afterwards.\n2) You may once per turn search your deck for up to 2 cards, reveal them, and place them face-down on top of your deck in any order.\nImmediately end your turn afterwards.\n3) You may once per turn search your deck for up to 3 cards, reveal them, and place them face-down on top of your deck in any order.\nImmediately end your turn afterwards.",
+    "effect": "1) You may once per turn search your deck for 1 card, reveal it and place it face-down on top of your deck.\nImmediately end your turn afterwards.\n2) You may once per turn search your deck for up to 2 different cards, reveal them, and place them face-down on top of your deck in any order.\nImmediately end your turn afterwards.\n3) You may once per turn search your deck for up to 3 different cards, reveal them, and place them face-down on top of your deck in any order.\nImmediately end your turn afterwards.",
     "archetype": "",
     "setID": "PP SET01",
     "banned": "",
