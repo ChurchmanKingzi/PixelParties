@@ -96,6 +96,25 @@ module.exports = {
       engine.sync();
     },
 
+    // ── Experimental Potion: Gift, das die Obergrenze fressen WUERDE, hebt sie ──
+    // Der Giftschaden des markierten Wirts wurde zu Heilung (Engine); statt die
+    // Max HP um den Betrag zu senken, steigen sie um ihn.
+    onPoisonHealedInstead: async (ctx) => {
+      const engine = ctx._engine;
+      const ziel = ctx.target;
+      if (!ziel || ziel.hp === undefined) return;          // nur Helden
+      const wirt = engine.gs.players[ctx.card.owner]?.heroes?.[ctx.card.heroIdx];
+      if (!wirt || wirt !== ziel) return;                  // nur der eigene Wirt
+      // EINMAL je Tick (kleinste Instanz-ID rechnet ab), wie in afterDamage.
+      const geschwister = paraseedsOnHero(engine, ctx.card.owner, ctx.card.heroIdx)
+        .map(i => i.id).sort();
+      if (geschwister.length > 0 && geschwister[0] !== ctx.card.id) return;
+      const betrag = ctx.amount ?? 0;
+      if (!(betrag > 0)) return;
+      engine.increaseMaxHp(ziel, betrag, { alsoHealCurrent: false });   // „max HP" allein — die aktuellen HP heilt schon die Giftheilung
+      engine.sync();
+    },
+
     // ── Zustands-Abgleich ────────────────────────────────────────
     // „While this Creature is in a Hero's Support Zone, that Hero is
     // Poisoned" ist ein ZUSTAND, kein Ausloeser. Ein Weg fuehrt ohne

@@ -18619,7 +18619,8 @@ Creature (Normal, Lv 0, 10 HP, `PP MBS1`). `onTurnEnd` je Golem (nur eigener Zug
 ## Experimental Potion (Potion, Textfassung des Users)
 
 - Skript `experimental-potion.js`: eigenes Ziel (Held oder Kreatur), 1 Stapel Gift; setzt dauerhaft `hero._experimentalPotion` bzw. `inst.counters.experimentalPotion` (auch bei wirkungslosem Gift).
-- Engine: in `actionDealDamage` wird Schaden vom Typ `poison` nach allen Modifikatoren zu `actionHealHero` (Rueckgabe `{dealt:0, cancelled:true}`); in `_processCreatureDamageBatchKern` werden Gift-Eintraege markierter Kreaturen zu `actionHealCreature`. `decreaseMaxHp` (Held) und `decreaseCreatureMaxHp` (`_steam-dwarf-shared.js`) rufen bei gesetztem Merkmal `increaseMaxHp` und liefern 0 (kein Abzug). Direkte `maxHp`-Schreiber umgehen das (z. B. Paraseed — dort greift aber vorher schon die Heilung).
+- Engine: in `actionDealDamage` wird Schaden vom Typ `poison` nach allen Modifikatoren zu `actionHealHero` (Rueckgabe `{dealt:0, cancelled:true}`) und feuert danach den Haken `onPoisonHealedInstead` (`target`, `amount`, `source`); in `_processCreatureDamageBatchKern` werden Gift-Eintraege markierter Kreaturen zu `actionHealCreature`.
+- "Any Poison that would reduce its max HP": NUR Gift (Paraseeds Obergrenzen-Abzug). Paraseed hoert auf `onPoisonHealedInstead` und erhoeht die Max HP des Wirts um den Betrag (`increaseMaxHp`, `alsoHealCurrent: false`). Andere Max-HP-Senkungen (`decreaseMaxHp` & Co.) sind unberuehrt.
 
 ## Communication Device (Equipment)
 
