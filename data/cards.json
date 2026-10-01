@@ -13133,7 +13133,7 @@
     "hp": null,
     "atk": null,
     "cost": null,
-    "effect": "Search your deck for a level 3 or lower Creature and place it into the user's free Support Zone. Then, place Pollution Tokens equal to the Creature's level +1 into your free Support Zones. This counts as an additional Action.",
+    "effect": "Search your deck for a level 3 or lower Creature and place it into the user's free Support Zone. Then, place Pollution Tokens equal to the Creature's level +1 into your free Support Zones. You cannot summon Creatures for the rest of the turn afterwards. This counts as an additional Action.",
     "archetype": "Pollution",
     "setID": "PP MSGB",
     "banned": "",
