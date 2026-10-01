@@ -7173,6 +7173,22 @@ class GameEngine {
   }
 
   /**
+   * Traegt dieser Held ein Anhaengsel, das ihn gegen NEGATIVE Status
+   * schuetzt? (Skript-Flag `immuneToNegativeStatuses: true`, Petrification
+   * Break: „it cannot be affected by negative status effects".) `playerIdx`
+   * ist die Brettseite des Helden. Anders als Light Ball schuetzt es den
+   * TRAEGER selbst.
+   */
+  heroHasStatusImmunityAttachment(playerIdx, heroIdx) {
+    for (const inst of this.cardInstances || []) {
+      if (inst.zone !== ZONES.SUPPORT || inst.faceDown) continue;
+      if (this.physicalSide(inst) !== playerIdx || inst.heroIdx !== heroIdx) continue;
+      if (loadCardEffect(inst.counters?._effectOverride || inst.name)?.immuneToNegativeStatuses) return true;
+    }
+    return false;
+  }
+
+  /**
    * Johanna, Crusader of Light: schuetzt die ANDEREN Helden ihres
    * Kontrolleurs vor negativen Status (lebend, nicht Frozen/Stunned/
    * Negated). ★ Styx 28.9.: nach Kontrolle — eine geliehene Johanna
@@ -16122,6 +16138,11 @@ this._deathWatch = (this._deathWatchStack || []).length
           // attachment (`_lightBallProtects` skips the target's own
           // heroIdx). See helper docstring for the CC carve-out.
           const tgtHeroIdx = (ownerPs?.heroes || []).indexOf(target);
+          if (tgtHeroIdx >= 0 && this.heroHasStatusImmunityAttachment(ownerIdx, tgtHeroIdx)) {
+            this.log('status_blocked', { target: this._heroLabel(target), status: statusName, reason: 'status_immunity_attachment' });
+            playBlockedAnim();
+            return false;
+          }
           if (tgtHeroIdx >= 0 && this._lightBallProtects(ownerIdx, 'hero', tgtHeroIdx)) {
             this.log('status_blocked', { target: this._heroLabel(target), status: statusName, reason: 'light_ball_protected' });
             playBlockedAnim();
@@ -42240,6 +42261,14 @@ this._deathWatch = (this._deathWatchStack || []).length
       // Artifacts that freeze / stun / negate Heroes) honours it too.
       if (this._lightBallProtects(playerIdx, 'hero', heroIdx)) {
         this.log('status_blocked', { target: hero.name, status: statusName, reason: 'light_ball_protected' });
+        playBlockedAnim();
+        return;
+      }
+
+      // Anhaengsel mit `immuneToNegativeStatuses` (Petrification Break):
+      // schuetzt den TRAEGER selbst.
+      if (this.heroHasStatusImmunityAttachment(playerIdx, heroIdx)) {
+        this.log('status_blocked', { target: hero.name, status: statusName, reason: 'status_immunity_attachment' });
         playBlockedAnim();
         return;
       }
