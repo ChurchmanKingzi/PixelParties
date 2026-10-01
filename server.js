@@ -1172,6 +1172,16 @@ async function initDatabase() {
     } catch (err) { console.error('[Shop] Sleeve-Migration', e.formerId, '->', e.id, 'fehlgeschlagen:', err.message); }
   }
 
+  // Ausgerüstete Shop-Avatare/-Sleeves, deren Datei entfernt wurde, zurücksetzen (idempotent).
+  for (const [col, sub] of [['avatar', 'avatars'], ['cardback', 'sleeves']]) {
+    try {
+      const rows = await db.all(`SELECT id, ${col} AS v FROM users WHERE ${col} LIKE ?`, ['/data/shop/' + sub + '/%']);
+      for (const r of rows) {
+        if (liveShopRef(r.v, sub) === null) await db.run(`UPDATE users SET ${col} = NULL WHERE id = ?`, [r.id]);
+      }
+    } catch (err) { console.error('[Shop] Bereinigung', col, 'fehlgeschlagen:', err.message); }
+  }
+
   // Puzzle completions table
   await db.execute(`CREATE TABLE IF NOT EXISTS puzzle_completions (
     user_id TEXT NOT NULL,
@@ -1901,8 +1911,29 @@ app.get('/api/auth/me', authMiddleware, async (req, res) => {
   res.json({ user: sanitizeUser(userForResponse), token: req.authToken });
 });
 
+// ★ Fehlende Shop-Bilder (entfernte Avatare/Sleeves/Boards) werden nirgends mehr angezeigt:
+// weder in der Besitzliste noch als Ausrüstung im Profil oder im Spiel. Die Käufe bleiben in
+// der Datenbank, nur die Anzeige filtert gegen die Dateien auf der Platte (30 s zwischengespeichert).
+const _shopIdCache = {};
+function shopIds(subdir) {
+  const c = _shopIdCache[subdir]; const now = Date.now();
+  if (c && now - c.t < 30000) return c.ids;
+  const ids = new Set(scanShopDir(subdir).map(f => path.basename(f, path.extname(f))));
+  _shopIdCache[subdir] = { t: now, ids };
+  return ids;
+}
+/** Shop-Pfad (/data/shop/<subdir>/<id>.png) -> unverändert, wenn die Datei existiert, sonst null.
+ *  Alles andere (Uploads als data-URL, Standard-Avatare, null) bleibt unangetastet. */
+function liveShopRef(url, subdir) {
+  const m = new RegExp('^/data/shop/' + subdir + '/([^/]+)\\.[a-z]+$', 'i').exec(String(url || ''));
+  if (!m) return url || null;
+  let id = m[1];
+  try { id = decodeURIComponent(id); } catch {}
+  return shopIds(subdir).has(id) ? url : null;
+}
+
 function sanitizeUser(u) {
-  return { id: u.id, username: u.username, elo: u.elo, eloCube: u.elo_cube == null ? 1000 : u.elo_cube, color: u.color, avatar: u.avatar, cardback: u.cardback, board: u.board || null, battleTrack: u.battle_track || null, bio: u.bio || '', victoryMsg: u.victory_msg || '', defeatMsg: u.defeat_msg || '', wins: u.wins || 0, losses: u.losses || 0, sc: u.sc || 0, created_at: u.created_at, hide_tutorial: u.hide_tutorial || 0, play_animations: u.play_animations == null ? 1 : (u.play_animations ? 1 : 0), display_heroes: u.display_heroes == null ? 1 : (u.display_heroes ? 1 : 0), dynamic_heroes: (u.display_heroes === 0) ? 0 : (u.dynamic_heroes == null ? 1 : (u.dynamic_heroes ? 1 : 0)), defaultSampleDeckId: u.default_sample_deck_id || null, email: u.email || null, emailVerified: !!u.email_verified, isGuest: !!u.is_guest };
+  return { id: u.id, username: u.username, elo: u.elo, eloCube: u.elo_cube == null ? 1000 : u.elo_cube, color: u.color, avatar: liveShopRef(u.avatar, 'avatars'), cardback: liveShopRef(u.cardback, 'sleeves'), board: u.board || null, battleTrack: u.battle_track || null, bio: u.bio || '', victoryMsg: u.victory_msg || '', defeatMsg: u.defeat_msg || '', wins: u.wins || 0, losses: u.losses || 0, sc: u.sc || 0, created_at: u.created_at, hide_tutorial: u.hide_tutorial || 0, play_animations: u.play_animations == null ? 1 : (u.play_animations ? 1 : 0), display_heroes: u.display_heroes == null ? 1 : (u.display_heroes ? 1 : 0), dynamic_heroes: (u.display_heroes === 0) ? 0 : (u.dynamic_heroes == null ? 1 : (u.dynamic_heroes ? 1 : 0)), defaultSampleDeckId: u.default_sample_deck_id || null, email: u.email || null, emailVerified: !!u.email_verified, isGuest: !!u.is_guest };
 }
 
 // ===== PROFILE ROUTES =====
@@ -3644,6 +3675,10 @@ app.get('/api/shop/owned', authMiddleware, async (req, res) => {
   // Freigeschaltete Gegner-Sleeves gehören dem Spieler wie gekaufte.
   const cpuOwned = await cpuSleeves.ownedIds(req.user.userId);
   for (const id of cpuOwned) if (!owned.sleeve.includes(id)) owned.sleeve.push(id);
+  // Entfernte Avatare/Sleeves/Boards (Datei fehlt) nicht mehr anzeigen.
+  owned.avatar = owned.avatar.filter(id => shopIds('avatars').has(id));
+  owned.sleeve = owned.sleeve.filter(id => shopIds('sleeves').has(id));
+  owned.board = owned.board.filter(id => shopIds('boards').has(id));
   const names = { sleeve: Object.fromEntries(owned.sleeve.map(id => [id, cpuSleeves.nameOf(id) || sleeveDisplayName(id)])) };
   res.json({ owned, names });
 });
@@ -12983,7 +13018,7 @@ async function setupGameState(room) {
     // Divine Gift of Edge consume names directly from this list.
     const sideDeck = (room._currentDecks?.[idx]?.sideDeck || []).slice();
     playerStates.push({ userId:p.userId, username:(usr?.username||p.username), socketId:p.socketId,
-      color:usr ? (usr.color||'#00f0ff') : NICHT_MENSCH_FARBE, avatar:usr?.avatar||null, cardback:usr?.cardback||null, board:usr?.board||null,
+      color:usr ? (usr.color||'#00f0ff') : NICHT_MENSCH_FARBE, avatar:liveShopRef(usr?.avatar,'avatars'), cardback:liveShopRef(usr?.cardback,'sleeves'), board:usr?.board||null,
       // Gewählter Battle-Track (geprüft: nur Freigeschaltetes); der GEGNER hört ihn.
       battleTrack: usr ? await battleTracks.resolveForBattle(p.userId, usr.battle_track) : null,
       victoryMsg, defeatMsg, heroKilledMsg, middleHeroKilledMsg, greetingMsg, barkBounce,
@@ -15068,13 +15103,13 @@ io.on('connection', (socket) => {
     const p0 = buildPlayerState(puzzleData.players[0], currentUser.userId, currentUser.username, socket.id, puzzleData.hand || []);
     const p1 = buildPlayerState(puzzleData.players[1], 'cpu-puzzle', 'CPU', null, puzzleData.oppHand || []);
     if (usr) {
-      p0.color = usr.color || '#00f0ff'; p0.avatar = usr.avatar;
-      p0.cardback = usr.cardback; p0.board = usr.board;
+      p0.color = usr.color || '#00f0ff'; p0.avatar = liveShopRef(usr.avatar, 'avatars');
+      p0.cardback = liveShopRef(usr.cardback, 'sleeves'); p0.board = usr.board;
       // Apply the player's chosen board skin to the CPU side too so the
       // whole puzzle playfield — including the opponent's Area Zone —
       // uses the same skin as a normal game instead of the default.
       p1.board = usr.board;
-      p1.cardback = usr.cardback;
+      p1.cardback = liveShopRef(usr.cardback, 'sleeves');
     }
 
     const gs = {
