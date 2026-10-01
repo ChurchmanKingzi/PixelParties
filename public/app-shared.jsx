@@ -2993,7 +2993,16 @@ const ZONE_ANIM_SFX = {
     { name: 'elem_water', opts: { rate: 0.9, volume: 0.8, delay: 260 } },
   ],
   // Rewrite History: Zeit laeuft zurueck, magisches Funkeln.
-  time_rewind:             { name: 'spell_cast', opts: { rate: 0.8, volume: 0.9 } },
+  time_rewind: [
+    { name: 'spell_cast', opts: { rate: 0.8, volume: 0.7 } },
+    { name: 'doom_tick', opts: { rate: 1.35, volume: 1.1, delay: 0, dedupe: 0, category: null } },
+    { name: 'doom_tick', opts: { rate: 1.3, volume: 1.1, delay: 70, dedupe: 0, category: null } },
+    { name: 'doom_tick', opts: { rate: 1.25, volume: 1.1, delay: 150, dedupe: 0, category: null } },
+    { name: 'doom_tick', opts: { rate: 1.2, volume: 1.1, delay: 240, dedupe: 0, category: null } },
+    { name: 'doom_tick', opts: { rate: 1.15, volume: 1.1, delay: 350, dedupe: 0, category: null } },
+    { name: 'doom_tick', opts: { rate: 1.1, volume: 1.1, delay: 480, dedupe: 0, category: null } },
+    { name: 'doom_tick', opts: { rate: 1.05, volume: 1.1, delay: 630, dedupe: 0, category: null } },
+  ],
   ox_impact:               { name: 'heavy_impact' },
   snake_impact:            { name: 'heavy_impact' },
   dumbbell_pump:           { name: 'heavy_impact' },
