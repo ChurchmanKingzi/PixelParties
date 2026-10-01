@@ -54,10 +54,7 @@ module.exports = {
       const gs = engine.gs;
       const pi = ctx.cardController ?? ctx.cardOwner;
       if (ctx.playerIdx !== pi) return;
-      // ★ TEMPORAER (zum Testen im Puzzle-Editor): JEDE gezogene Karte zaehlt als
-      // Starthand. Urspruenglich nur die der eigenen Resource Phase:
-      //   if (gs.activePlayer !== pi || gs.currentPhase !== PHASES.RESOURCE) return;
-      // TODO(temp): wieder einschalten, sobald der Test durch ist.
+      if (gs.activePlayer !== pi || gs.currentPhase !== PHASES.RESOURCE) return;
       if ((engine._startingHandDepth || 0) > 0) return;     // schon in einer Auswertung
       const name = ctx.drawnCardName;
       if (!name) return;

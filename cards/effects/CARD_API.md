@@ -18676,6 +18676,5 @@ Karten: End of the Future, Traveler from the Future, Grasp the Future, Glimpse o
 - Zeitfenster „seit dem Ende deines letzten Zuges": `startTurn` stempelt `ps._rhVorigerZug` / `ps._rhAktuellerZug` (Zugnummern); zählt `entry.turn > _rhVorigerZug`.
 - Kandidat: noch in der eigenen Ablage, Zone (physisch, auch bei geliehenen Helden) FREI, Karte darf die Ablage verlassen. Rückkehr per `summonFromDiscard(..., { mode: 'revive', heldSeite })` → kein `onPlay`/`onCardEnterZone` (keine On-Summon-Effekte), nur `onRevive`. Animation `time_rewind` (rückwärts laufende Uhr).
 
-- **TEMP (Puzzle-Test):** `TEMP_ALLE_ZAEHLEN = true` in `rewrite-history.js` — alle Creatures der eigenen Ablage zählen, Zone zufällig aus den freien Zonen eigener Helden; Protokoll/Zeitfenster/Verursacher werden ignoriert. Zurück auf `false` setzen, wenn der Test durch ist.
 
 - `time_rewind`-SFX: Schimmer + 7 `doom_tick`-Ticks (Rate 1.35→1.05, dichter am Anfang, passend zum abbremsenden Zeiger).
