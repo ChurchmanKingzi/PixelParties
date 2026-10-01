@@ -750,6 +750,10 @@ class GameEngine {
     // End of the Future: „revealed BY ITS OWN EFFECT" — eigene Marke je
     // physischer Kopie (andere Aufdeck-Effekte zaehlen ausdruecklich nicht).
     this.registerHandIndexedField('_selfRevealedHandIndices', { kind: 'boolean' });
+    // „Zaehlt als Teil der Starthand": Marke je PHYSISCHER Kopie (Startblatt-Fenster, Traveler,
+    // Kassaran). Folgt der Karte durch Hand-Splices; so trifft der Effekt genau DIE Kopie, die
+    // zaehlt — nicht eine gleichnamige andere (Glimpse-Kopie von Kassaran vs. gezogene Glimpse).
+    this.registerHandIndexedField('_startingCountedHandIndices', { kind: 'boolean' });
     // Rocky Slime's per-instance level reductions. The captured offset
     // is consumed by safePlaceInSupport when the same card lands on
     // the board — `inst.counters.level` keeps the reduction post-summon
@@ -21002,6 +21006,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     for (const pi of [erster, erster === 0 ? 1 : 0]) {
       const ps = this.gs.players[pi];
       if (!ps) continue;
+      for (let k = 0; k < (ps.hand || []).length; k++) this.markStartingCounted(pi, k);
       await this.processStartingHandDraw(pi, [...(ps.hand || [])], { window: 'start' });
     }
     this.sync();
@@ -21040,6 +21045,8 @@ this._deathWatch = (this._deathWatchStack || []).length
           });
           if (hinzu.length > 0) queue.push(...hinzu);
         }
+        const handIdx = this.startingCopyIdx(pi, name);
+        if (handIdx >= 0 && ps._startingCountedHandIndices) delete ps._startingCountedHandIndices[handIdx];
         const spec = loadCardEffect(name)?.startingHand;
         if (!spec || typeof spec.resolve !== 'function') continue;
         const schonBehandelt = behandelt.get(name) || 0;
@@ -21048,13 +21055,39 @@ this._deathWatch = (this._deathWatchStack || []).length
         behandelt.set(name, schonBehandelt + 1);
         if (typeof spec.canTrigger === 'function' && !spec.canTrigger(this, pi, name)) continue;
         let res = null;
-        try { res = await spec.resolve(this, pi, { cardName: name, ...opts }); }
+        try { res = await spec.resolve(this, pi, { cardName: name, handIdx, ...opts }); }
         catch (err) { console.error(`[startingHand] ${name} warf:`, err.message); }
         if (res && Array.isArray(res.counted)) queue.push(...res.counted);
       }
     } finally {
       this._startingHandDepth -= 1;
     }
+  }
+
+  /** Die Handkopie an `idx` als „Teil der Starthand" markieren. */
+  markStartingCounted(pi, idx) {
+    const ps = this.gs.players[pi];
+    if (!ps || idx == null || idx < 0 || idx >= (ps.hand || []).length) return;
+    if (!ps._startingCountedHandIndices) ps._startingCountedHandIndices = {};
+    ps._startingCountedHandIndices[idx] = true;
+  }
+
+  /** Die letzten `n` Handkarten markieren (frisch gezogen/hinzugefuegt). */
+  markLastStartingCounted(pi, n) {
+    const len = (this.gs.players[pi]?.hand || []).length;
+    for (let k = Math.max(0, len - n); k < len; k++) this.markStartingCounted(pi, k);
+  }
+
+  /**
+   * Handindex der Kopie von `cardName`, die als Starthand zaehlt: die erste markierte
+   * Kopie, sonst die erste gleichnamige. -1, wenn keine auf der Hand liegt.
+   */
+  startingCopyIdx(pi, cardName) {
+    const ps = this.gs.players[pi];
+    const hand = ps?.hand || [];
+    const marks = ps?._startingCountedHandIndices || {};
+    const m = hand.findIndex((n, k) => n === cardName && marks[k]);
+    return m >= 0 ? m : hand.indexOf(cardName);
   }
 
   /**
