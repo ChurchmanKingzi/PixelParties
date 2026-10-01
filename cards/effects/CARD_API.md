@@ -18564,3 +18564,11 @@ Ascended Hero (`PP MBS1`, 300 HP / 100 ATK) auf „Chuck, the Crazy Veteran". Ba
 - **Aufstiegsbonus:** volle Heilung (`actionHealHero`), dann bis zu 3 Wahlen aus ALLEN Abilities außer Performance (`source: 'outside'`, abbrechbar = „Done"). Jede Kopie wird sofort angelegt; die Galerie zeigt je Runde nur, was jetzt noch passt (`entscheide`): ein Stapel je Ability (Stufe ≤ 3), 3 Ability-Zonen, mit Xalibur/Xal weitere VERSCHIEDENE in freie Support Zones, verwahrte/versiegelte Zonen zählen mit. `cards.json` trägt den Bonus als `startingAbility1` („Any 3 Abilities from outside the game").
 - **Schild:** `beforeDamage` setzt 0, solange der Kontrolleur andere Helden mit HP > 0 hat (ein im selben Flächenschlag nur vorgemerkter Tod zählt hier noch als lebend). Wie bei Chuck, the Crazy Veteran gilt er nicht gegen True Damage.
 - **Ziehen:** „performs an Action" über `handlungsHooks` + `_bleedTriggersForAction` (Reaktionen eingeschlossen), 2 Karten über `actionDrawCardsAnimated`.
+
+## ★ DIAMOND, THE BULWARK OF PEACE — Aufstieg über Selbstschaden-Zähler
+
+Ascended Hero (`PP MBS1`, 600 HP / 100 ATK) auf „Diamond, the Keeper of Peace".
+
+- **Bedingung:** `hero._diamondSelfLoss >= 150` — die Basisform summiert die HP, die sie durch ihren Schutz-Selbstschaden TATSÄCHLICH verloren hat (Heilung mindert den Zähler nicht), und meldet `ascensionReady`/`ascensionTarget` (`meldeAufstieg`, wie Cecilia). Normaler Aufstieg per Drag aus der Hand, kein Zwang. Der Zähler ist im Puzzle-Editor setzbar (💎 Ascension, Server-Loader liest `h._diamondSelfLoss`).
+- **Status-Immunität:** wie die Basis (`beforeCreatureDamageBatch`, `isStatusDamage`, `originalLevel === 0`). Die Schutz-Hälfte der Basis hat die Bulwark-Form NICHT.
+- **Nachlegen:** `onCreatureDeath` für jede eigene (Kontrolleur) Creature, einmal pro Runde und Spieler (`heldenSperre 'diamond-bulwark'`). Galerie (abbrechbar = „No") mit gedruckten Level-0-Creatures aus dem Gelöscht-Stapel mit anderem Namen; danach `deleteFromPile` des Kadavers und `placeFromPile('deleted', …)` in denselben Platz. Kein Angebot, wenn der Kadaver nicht in der Ablage liegt (beansprucht), der Platz wieder belegt/gesperrt ist oder keine Karte passt.
