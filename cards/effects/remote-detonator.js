@@ -1,17 +1,14 @@
 // ═══════════════════════════════════════════
 //  CARD EFFECT: "Remote Detonator"
-//  Artifact (Subtyp Reaction laut Datenbank, Kosten 0, PP MBS1)
+//  Artifact (Subtyp Normal — in der Datenbank korrigiert, vorher Reaction; Kosten 0, PP MBS1)
 //
 //  „Delete as many copies of \"Sentient Bomb Golems\" you control as
 //   possible to play this card. Choose a target and deal 200 damage times
 //   the number of deleted copies to it."
 //
 //  ── AUSLEGUNG ─────────────────────────────────────────────────────
-//  • Der Text nennt keinen Ausloeser, nur den Subtyp „Reaction" (wie bei
-//    Heart of Cards, wo sich das als Datenbankfehler herausstellte) → die
-//    Karte ist ueber `proactivePlay` aus der Hand spielbar und haengt sich
-//    nicht in Reaktionsfenster. Sollte der Subtyp „Normal" gemeint sein,
-//    genuegt die Korrektur in `cards.json`.
+//  • Ein ganz normales Artefakt (Subtyp Normal): in der eigenen Runde aus der Hand
+//    spielbar. `proactivePlay` bleibt harmlos gesetzt.
 //  • „you control" + „copies": offene Golems AUF DEM BRETT unter meiner
 //    Kontrolle (Hand/Deck sind nichts, was man „kontrolliert").
 //    „as many as possible" = ALLE. Spielbar nur mit mindestens einem
