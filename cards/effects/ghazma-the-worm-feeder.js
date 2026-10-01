@@ -55,8 +55,9 @@ module.exports = {
       });
       const zurueck = [];
       for (let k = indizes.length - 1; k >= 0; k--) {
-        const [n] = ps.deletedPile.splice(indizes[k], 1);
-        zurueck.unshift(n);
+        // Stapel-Schicht statt direktem Splice (Sperren/Verwahrung gelten; null = bleibt liegen).
+        const genommen = engine.takeFromPileSync(pi, 'deleted', indizes[k], { source: CARD_NAME });
+        if (genommen) zurueck.unshift(genommen.name);
       }
       if (zurueck.length === 0) return;
 
