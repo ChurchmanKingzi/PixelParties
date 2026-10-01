@@ -18573,3 +18573,11 @@ Ascended Hero (`PP MBS1`, 600 HP / 100 ATK) auf „Diamond, the Keeper of Peace"
 - **Status-Immunität:** wie die Basis (`beforeCreatureDamageBatch`, `isStatusDamage`, `originalLevel === 0`). Die Schutz-Hälfte der Basis hat die Bulwark-Form NICHT.
 - **Nachlegen:** `onCreatureDeath` für jede eigene (Kontrolleur) Creature, einmal pro Runde und Spieler (`heldenSperre 'diamond-bulwark'`). Galerie (abbrechbar = „No") mit gedruckten Level-0-Creatures aus dem Gelöscht-Stapel mit anderem Namen; danach `deleteFromPile` des Kadavers und `placeFromPile('deleted', …)` in denselben Platz. Kein Angebot, wenn der Kadaver nicht in der Ablage liegt (beansprucht), der Platz wieder belegt/gesperrt ist oder keine Karte passt.
 - **Aufstiegsbonus (nachgetragen):** `onAscensionBonus` — bis zu 3 Wahlen je eine Galerie über alle Creatures in Hand, Deck und Ablage (Quelle je Eintrag, abbrechbar = „Done"), jede gewählte Karte wird per `deleteFromPile` gelöscht. `cards.json` trägt den Bonus als `startingAbility1`.
+
+## ★ CHAOS-DIAMOND, THE CRACKED KEEPER — Deckbau-Klausel + Zauber aus dem Potion Deck
+
+Hero (`PP MBS1`, 450 HP / 80 ATK). Text ohne „except Creatures" (neu).
+
+- **Deckbau (Client `app-shared.jsx`, Server `potionDeckGroesseOk`):** mit ihm im Team (`deck.heroes` = Starthelden) nimmt das Potion Deck NUR Normal-/Attachment-**Spells** (`isChaosPotionSpell`), je Name eine Kopie, Gesamtlevel ≤ 15, genau 15 Karten (`canAddCard`, `isDeckLegal`; Server prüft die Größe). `countedPotions` zählt im Potion Deck nur noch echte Potions. Deckbuilder-Kontextmenü „Add to Potion Deck" für Spells.
+- **Starthero:** `onGameStart` stempelt `hero._chaosStarting` und `ps.potionDrawBanned`; `actionDrawFromPotionDeck` liest den Bann („never draw", bleibt auch beim Tod des Helden). Ohne Stempel (später ins Spiel gekommen) weder Effekt noch Bann.
+- **Effekt (Aktion):** zwei oberste Karten des Potion Decks aufdecken (`card_reveal`, beide Seiten), jeden Spell davon der Reihe nach über `_castSpellImmediately` (`fromZone: 'deck'`, `pool: ps.potionDeck`) als Zusatzaktion wirken; Stufen egal, Abbruch gesperrt; handlungsunfähig → Rest bleibt liegen. Auftritt: Zonen-Animation `red_lightning` (Registry in `app-board.jsx`, Klang `elem_lightning` in `ZONE_ANIM_SFX`).
