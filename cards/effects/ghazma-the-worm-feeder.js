@@ -70,6 +70,11 @@ module.exports = {
       engine.log('ghazma_shuffle_back', { player: ps.username, cards: zurueck });
       engine.sync();
 
+      // Die Rueckflug-Karten muessen im Client ANKOMMEN (Deckzaehler steigt), bevor gezogen wird —
+      // sonst sieht er nur den Nettostand (Deck unveraendert, Hand +n) und deutet den Zug als
+      // Karte vom Gegner (Hand/Brett) statt aus dem Deck.
+      await engine._delay(900);
+
       const n = Math.min(MAX_ZIEHEN, zurueck.length);
       await engine.actionDrawCards(pi, n, { source: CARD_NAME });
       engine.sync();
