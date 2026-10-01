@@ -394,6 +394,14 @@ select option,
 select optgroup {
   font-family: var(--font-body), sans-serif;
 }
+/* ★ Suchleisten & Co.: Eingabefelder erben die Schrift NICHT vom body (der
+   Browser setzt eine Systemschrift) — viele Felder (Filter in Galerien und
+   Stapelansichten, Puzzle-Editor …) tragen keine eigene Klasse und standen
+   deshalb in der Systemschrift. `:where` hat Spezifitaet 0: jede Klasse mit
+   eigener Schrift (z. B. Monospace-Felder) behaelt Vorrang. */
+:where(input, textarea) {
+  font-family: var(--font-body), sans-serif;
+}
 select option,
 select optgroup {
   background: var(--bg);

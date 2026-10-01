@@ -17,7 +17,9 @@
 //    Ansage wird dem GEGNER als Kartenbild gestreamt (`card_reveal`,
 //    nur an ihn), damit sofort erkennbar ist, was gerade geschieht
 //    (Als Vorgabe).
-//  • „reveal the top card": die oberste Karte wird beiden Seiten gezeigt.
+//  • „reveal the top card": die oberste Karte fliegt in die MITTE des
+//    Bildschirms und wird dort umgedreht (beide Seiten), danach in die Hand
+//    (Treffer) oder den Geloescht-Stapel (`mill_center_reveal`).
 //    Treffer = Name-Gleichheit ueber `baseCardName` (die [B]/[W]-Hinweise
 //    sind kein Teil des Namens, v875). Treffer → auf die Hand
 //    (`actionAddCardFromDeckToHand`), danach 2 Karten ziehen. Sonst wird
@@ -31,6 +33,7 @@ const { baseCardName } = require('./_hooks');
 
 const CARD_NAME = 'Heart of Cards';
 const HOPT_KEY = 'heart-of-cards';
+const SCHAU_MS = 1100;   // Deck → Mitte → Umdrehen → Ziel (wie `MILL_CENTER_REVEAL_MS`)
 
 function schonGespielt(gs, pi) {
   return gs.hoptUsed?.[`${HOPT_KEY}:${pi}`] === gs.turn;
@@ -90,20 +93,32 @@ module.exports = {
     engine.log('heart_of_cards_declare', { player: ps.username, declared: genannt });
     await engine._delay(1200);
 
-    // ③ Oberste Karte aufdecken (beide Seiten).
+    // ③ Die oberste Karte fliegt vom Deck in die MITTE des Bildschirms, wird
+    // dort umgedreht (beide Seiten sehen sie) und fliegt dann weiter: bei
+    // Treffer in die HAND, sonst in den GELOESCHT-Stapel (derselbe Ablauf wie
+    // Chaos Magic / die Mills mit Mitte-Aufdecken). Der Zustand wird erst
+    // nach der Landung umgebucht, damit die Karte nicht doppelt zu sehen ist.
     const oben = ps.mainDeck[0];
     if (oben == null) return true;
-    engine._broadcastEvent('card_reveal', { cardName: oben });
-    await engine._delay(1200);
-
     const treffer = baseCardName(oben) === baseCardName(genannt);
     engine.log('heart_of_cards_reveal', { player: ps.username, declared: genannt, revealed: oben, hit: treffer });
 
+    engine._broadcastEvent('mill_center_reveal', {
+      owner: pi, cardNames: [oben], dest: treffer ? 'hand' : 'deleted', revealMs: SCHAU_MS,
+    });
+    await engine._delay(SCHAU_MS);
+
     if (treffer) {
-      await engine.actionAddCardFromDeckToHand(pi, oben, { source: CARD_NAME, reveal: true });
+      await engine.actionAddCardFromDeckToHand(pi, oben, {
+        source: CARD_NAME, reveal: false, _skipFlight: true,
+      });
+      engine.sync();
       await engine.actionDrawCards(pi, 2, { source: CARD_NAME });
-    } else {
-      await engine.deleteFromPile(pi, 'deck', oben, { source: CARD_NAME });
+    } else if (await engine.takeFromPile(pi, 'deck', 0, { source: CARD_NAME })) {
+      if (!ps.deletedPile) ps.deletedPile = [];
+      ps.deletedPile.push(oben);
+      engine._trackCard(oben, pi, 'deleted');
+      engine.log('card_deleted', { player: ps.username, card: oben, from: 'deck', by: CARD_NAME });
     }
     engine.sync();
     return true;
