@@ -6174,7 +6174,8 @@ function canCardTypeEnterSection(deck, cardName, section) {
     return true;
   }
   if (section === 'potion') {
-    return ct === 'Potion';
+    // Chaos-Diamond im Team: Normal-/Attachment-Spells statt Potions.
+    return hasChaosDiamond(deck) ? isChaosPotionSpell(card) : ct === 'Potion';
   }
   if (section === 'hero') {
     return ct === 'Hero' && !isNonStartingHero(cardName); // v704

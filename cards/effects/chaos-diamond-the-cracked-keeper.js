@@ -28,16 +28,17 @@
 //     der Held faellt (der Text sagt „never").
 //
 //  3) EFFEKT (Aktion): die obersten 2 Karten des Potion Decks werden
-//     aufgedeckt (beide Seiten sehen sie), danach giesst der Held jeden
-//     SPELL darunter der Reihe nach ueber `_castSpellImmediately` — der
+//     ZUSAMMEN aufgedeckt (beide Seiten sehen sie), danach giesst der
+//     Held jeden SPELL darunter der Reihe nach ueber `_castSpellImmediately` — der
 //     echte Zusatzaktions-Weg (Zielwahl, Reaktionsfenster, Ablage,
 //     Wisdom-Kosten wie bei Friedhelm), Stufenanforderungen gelten
 //     ausdruecklich NICHT. Nach dem Aufdecken ist es Pflicht:
 //     Abbruch in der Zielwahl ist gesperrt (`_forceNonCancellable`).
 //     Ist der Held zwischendurch handlungsunfaehig (gefallen, Frozen,
-//     Stunned, Negated), faellt der Rest aus und die Karte bleibt
-//     oben im Deck. Nicht-Spells unter den beiden bleiben ungenutzt
-//     liegen. Beim Aktivieren zeigt der Held einen roten Lichtblitz
+//     Stunned, Negated) oder bricht ein Spell ab, wandern die aufgedeckten,
+//     nicht aufgeloesten Spells in die ABLAGE. Die Aktion ist in jedem
+//     Fall verbraucht (auch wenn kein Spell wirkte). Nicht-Spells unter den
+//     beiden bleiben ungenutzt liegen. Beim Aktivieren zeigt der Held einen roten Lichtblitz
 //     (`red_lightning`, Client: app-board.jsx ANIM_REGISTRY).
 // ═══════════════════════════════════════════
 
@@ -77,8 +78,7 @@ module.exports = {
     if (!hero?.name || hero.hp <= 0) return false;
     // „You can only activate this effect if this was one of your starting Heroes."
     if (!hero._chaosStarting) return false;
-    // Ohne Spell unter den obersten zwei bliebe die Aktion wirkungslos.
-    return oberste(engine, pi).some(k => k.istSpell);
+    return oberste(engine, pi).length > 0;
   },
 
   cpuShouldUseHeroEffect(engine, pi) {
@@ -99,7 +99,7 @@ module.exports = {
     const feld = ctx.cardHeroOwner ?? pi;
 
     const aufgedeckt = oberste(engine, pi);
-    if (!aufgedeckt.some(k => k.istSpell)) return false;
+    if (aufgedeckt.length === 0) return false;
 
     // Der Auftritt: roter Lichtblitz auf dem Helden.
     engine._broadcastEvent('play_zone_animation', {
@@ -107,42 +107,56 @@ module.exports = {
     });
     await engine._delay(450);
 
-    // Aufdecken: beide Seiten sehen die Karten, eine nach der anderen.
+    // ① BEIDE Karten werden ZUSAMMEN aufgedeckt (Als Vorgabe), erst danach
+    // wird aufgeloest.
     for (const k of aufgedeckt) {
       engine._broadcastEvent('card_reveal', { cardName: k.name });
       engine.log('hand_card_revealed', { player: ps.username, card: k.name, by: CARD_NAME });
-      await engine._delay(REVEAL_MS);
     }
+    await engine._delay(REVEAL_MS);
 
-    // Reihenfolge von oben nach unten; jeder Spell wird frisch im Deck gesucht,
-    // weil der Vorgaenger es schon verlassen hat.
-    let gewirkt = 0;
+    // ② Der Reihe nach wirken. Jeder Spell wird frisch im Deck gesucht, weil
+    // der Vorgaenger es schon verlassen hat. Was aufgedeckt wurde, aber nicht
+    // gewirkt werden kann (Held handlungsunfaehig, Spell bricht ab), geht
+    // in die Ablage — nie zurueck aufs Deck.
+    const verfallen = [];
     for (const k of aufgedeckt) {
-      if (!k.istSpell) continue;
-      if (!kannHandeln(engine, feld, heroIdx)) break;
+      if (!k.istSpell) continue;                      // Nicht-Spells bleiben liegen
       const poolIndex = (ps.potionDeck || []).indexOf(k.name);
       if (poolIndex < 0) continue;
+      if (!kannHandeln(engine, feld, heroIdx)) { verfallen.push(k.name); continue; }
 
       engine._forceNonCancellable = (engine._forceNonCancellable || 0) + 1;
+      let r = null;
       try {
-        const r = await engine._castSpellImmediately(pi, heroIdx, k.name, {
+        r = await engine._castSpellImmediately(pi, heroIdx, k.name, {
           fromZone: 'deck',
           pool: ps.potionDeck,
           poolIndex,
           by: CARD_NAME,
           ...(feld !== pi ? { heroOwner: feld } : {}),
         });
-        if (!r?.cancelled) gewirkt++;
       } finally {
         engine._forceNonCancellable--;
       }
+      if (r?.cancelled) verfallen.push(k.name);       // kam zurueck aufs Deck → ablegen
     }
 
-    engine.log('chaos_diamond_cast', { player: ps.username, spells: gewirkt });
+    for (const name of verfallen) {
+      if (!(await engine.takeFromPile(pi, 'potionDeck', name, { source: CARD_NAME }))) continue;
+      if (!ps.discardPile) ps.discardPile = [];
+      ps.discardPile.push(name);
+      engine._trackCard(name, pi, 'discard');
+      engine._pileFlight(pi, name, 'potionDeck', 'discard');
+      engine.log('chaos_diamond_discard', { player: ps.username, card: name });
+      engine.sync();
+      await engine._delay(300);
+    }
+
+    engine.log('chaos_diamond_cast', { player: ps.username, revealed: aufgedeckt.map(k => k.name), unresolved: verfallen });
     engine.sync();
-    // Mindestens ein Spell lief → Aktion verbraucht. Sonst (alles
-    // abgebrochen/unmoeglich) bekommt der Spieler sie zurueck.
-    return gewirkt > 0;
+    // Die Aktion ist verbraucht, auch wenn kein Spell wirkte („Eigene Schuld").
+    return true;
   },
 
   hooks: {

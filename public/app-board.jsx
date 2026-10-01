@@ -31132,6 +31132,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   const surrenderOpenedAt = React.useRef(0);
   const [sideDeckPhase, setSideDeckPhase] = useState(null); // { currentDeck, originalDeck, opponentDone, setScore, format }
   const [sideDeckDone, setSideDeckDone] = useState(false);
+  const [sideDeckNotice, setSideDeckNotice] = useState('');   // Ablehnungsgrund des Servers (Chaos-Diamond)
   const [sideDeckSel, setSideDeckSel] = useState(null); // { pool: 'main'|'potion'|'side'|'hero', idx: number }
   const [scEarned, setScEarned] = useState(null); // { rewards: [{id,title,amount,description}], total }
 
@@ -39859,6 +39860,11 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     const onSideDeckOppDone = () => {
       setSideDeckPhase(prev => prev ? { ...prev, opponentDone: true } : null);
     };
+    // Server lehnt einen Tausch ab (z. B. Chaos-Diamond): Grund kurz zeigen.
+    const onSideDeckRejected = ({ reason }) => {
+      setSideDeckNotice(String(reason || ''));
+      setTimeout(() => setSideDeckNotice(''), 6000);
+    };
     const onSideDeckComplete = () => {
       setSideDeckPhase(null);
       setSideDeckDone(false);
@@ -39866,11 +39872,13 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     socket.on('side_deck_phase', onSideDeckPhase);
     socket.on('side_deck_update', onSideDeckUpdate);
     socket.on('side_deck_opponent_done', onSideDeckOppDone);
+    socket.on('side_deck_rejected', onSideDeckRejected);
     socket.on('side_deck_complete', onSideDeckComplete);
     return () => {
       socket.off('side_deck_phase', onSideDeckPhase);
       socket.off('side_deck_update', onSideDeckUpdate);
       socket.off('side_deck_opponent_done', onSideDeckOppDone);
+      socket.off('side_deck_rejected', onSideDeckRejected);
       socket.off('side_deck_complete', onSideDeckComplete);
     };
   }, []);
@@ -46494,6 +46502,24 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             simDeck.heroes[toIdx] = { hero: fromName, ability1: null, ability2: null };
             simDeck.sideDeck[fromIdx] = toName;
           }
+          // ── Chaos-Diamond (Spiegel von server.js `side_deck_swap`) ──
+          // Rein: nur mit gemerkter Spell-Liste und leerem Potion Deck.
+          // Potion Deck mit Chaos: Tausch muss verschiedene Namen und
+          // Gesamtlevel ≤ 15 halten; Verschieben ist gesperrt.
+          const CHAOS = 'Chaos-Diamond, the Cracked Keeper';
+          if ((fromPool === 'side' && toPool === 'hero' && fromName === CHAOS)
+              || (fromPool === 'hero' && toPool === 'side' && toName === CHAOS)) {
+            const gemerkt = dk.chaosSpellMemory;
+            if (!Array.isArray(gemerkt) || gemerkt.length !== 15) return false;
+            if (potionCards.length > 0) return false;
+          }
+          if ((fromPool === 'potion' || toPool === 'potion') && window.hasChaosDiamond(simDeck)) {
+            const pd = [...potionCards];
+            const pi2 = fromPool === 'potion' ? fromIdx : toIdx;
+            pd[pi2] = fromPool === 'potion' ? toName : fromName;
+            if (new Set(pd).size !== pd.length) return false;
+            if (pd.reduce((n, nm) => n + (CARDS_BY_NAME[nm]?.level || 0), 0) > 15) return false;
+          }
           // Use canCardTypeEnterSection to validate both directions
           const canEnter = window.canCardTypeEnterSection;
           if (!canEnter(simDeck, fromName, toPool)) return false;
@@ -46624,6 +46650,11 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               <div style={{ fontSize: 11, color: 'var(--text2)', marginBottom: 12, lineHeight: 1.5 }}>
                 Click a card to select it, then click a card in the Side Deck (or vice versa) to swap them. Heroes can only be swapped with Side Deck Heroes.
               </div>
+              {sideDeckNotice && (
+                <div style={{ fontSize: 12, color: '#ffb347', marginBottom: 10, padding: '6px 10px', borderRadius: 6, background: 'rgba(255,170,0,.1)', border: '1px solid rgba(255,170,0,.35)' }}>
+                  ⚠ {sideDeckNotice}
+                </div>
+              )}
 
               {/* Heroes */}
               <div style={sectionStyle}>
