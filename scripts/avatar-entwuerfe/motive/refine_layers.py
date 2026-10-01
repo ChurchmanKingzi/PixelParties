@@ -11,12 +11,15 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'
 from picks import PICKS
 
 todo = {}
+best = {int(k): tuple(v) for k, v in N.REF.items()}      # schon berechnete Karten behalten
 for pid, card, *_ in PICKS:
     i = N.IDX[N.norm(card)]
+    if i in best:
+        continue
     for rank, (sc, m, f, idx, name, x, y) in enumerate(N.LOC[str(i)][:3]):
         if sc <= 0.02:
             todo.setdefault(f, []).append((i, m, x, y, rank))
-best = {}
+cur = {}
 for f, jobs in todo.items():
     meta = json.load(open(f'{N.E}/{f}/layers.json'))['layers']
     tmpl = {}
@@ -37,8 +40,9 @@ for f, jobs in todo.items():
                     if (w[..., 3] < 255).mean() > 0.02:
                         continue
                     e = float(((w[..., :3].astype(np.float32) - t) ** 2).mean() / 255 ** 2)
-                    if i not in best or e < best[i][0]:
-                        best[i] = (e, f, l['index'], m, x + dx, y + dy)
+                    if i not in cur or e < cur[i][0]:
+                        cur[i] = (e, f, l['index'], m, x + dx, y + dy)
     print(f, len(jobs), flush=True)
+best.update(cur)
 json.dump({str(k): v for k, v in best.items()}, open('/home/user/refine_layers.json', 'w'))
 print('fertig', len(best))
