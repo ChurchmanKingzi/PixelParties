@@ -15236,6 +15236,34 @@ const ANIM_REGISTRY = {
       );
     };
   })(),
+  mega_explosion: (() => {
+    // ★ Sentient Bomb Golems: RIESIGE Explosion auf einem Platz — die normale
+    // `explosion` dreifach vergroessert, dazu ein weiter Stossring. Die
+    // Explosion zeichnet ihre Teile selbst (position: fixed); der
+    // transformierte Huellkasten wird zu deren Bezugsrahmen und skaliert sie.
+    return function MegaExplosionEffect({ x, y, opacity }) {
+      return (
+        <div style={{
+          position: 'fixed', left: x, top: y, width: 0, height: 0,
+          transform: 'scale(2.9)', transformOrigin: '0 0',
+          pointerEvents: 'none', zIndex: 10160,
+        }}>
+          <ExplosionEffect x={0} y={0} opacity={opacity} />
+          <div style={{
+            position: 'absolute', left: -60, top: -60, width: 120, height: 120, borderRadius: '50%',
+            border: '4px solid rgba(255,190,80,.95)', boxShadow: '0 0 22px rgba(255,120,20,.9)',
+            animation: 'megaExplosionRing 700ms ease-out forwards',
+          }} />
+          <style>{`
+            @keyframes megaExplosionRing {
+              0%   { opacity: .95; transform: scale(.3); }
+              100% { opacity: 0;   transform: scale(2.4); }
+            }
+          `}</style>
+        </div>
+      );
+    };
+  })(),
   wind: WindEffect,
   shadow_summon: ShadowSummonEffect,
   gold_sparkle: GoldSparkleEffect,
