@@ -10,7 +10,7 @@
 //  ── AUSLEGUNG ─────────────────────────────────────────────────────
 //  • Startblatt-Fenster (siehe Glimpse of the Future). Gewaehlt wird eine
 //    ANDERE Handkarte — jede ausser einer Kopie von „Grasp the Future" (auch
-//    ein weiterer Starthand-Zauber). Beide Karten werden aufgedeckt (dem
+//    ein weiterer Starthand-Zauber). Beide Karten werden aufgedeckt und BLEIBEN es, bis sie die Hand verlassen (dem
 //    Gegner als Bild gezeigt), UNABHAENGIG davon, ob das Deck eine Kopie hat.
 //  • Gibt es eine Kopie im Deck, kommt sie aufgedeckt auf die Hand; sonst
 //    bleibt es beim Aufdecken. Die geholte Karte zaehlt NICHT als Starthand
@@ -61,6 +61,9 @@ module.exports = {
       const gewaehlt = ps.hand[wahl.handIndex];
       if (!gewaehlt) return null;
 
+      // Beide Karten bleiben aufgedeckt, bis sie die Hand verlassen.
+      engine.revealHandCopy(pi, CARD_NAME);
+      engine.revealHandCopy(pi, gewaehlt, wahl.handIndex);
       await engine.showTriggeredEffect(CARD_NAME, { playerIdx: pi });
       await engine.showTriggeredEffect(gewaehlt, { playerIdx: pi });
       const geholt = await engine.actionAddCardFromDeckToHand(pi, gewaehlt, { source: CARD_NAME, reveal: true });

@@ -9,8 +9,8 @@
 //  ── AUSLEGUNG ─────────────────────────────────────────────────────
 //  • Der Effekt hat KEINEN eigenen Spielzug: er laeuft im Startblatt-Fenster
 //    der Engine (`processStartingHandDraw`) bzw. wenn die Karte ueber Traveler
-//    from the Future als Starthand zaehlt. Die Karte selbst bleibt auf der
-//    Hand (sie wird nur aufgedeckt — dem Gegner als Kartenbild gezeigt).
+//    from the Future als Starthand zaehlt. Die Karte bleibt auf der
+//    Hand und bleibt AUFGEDECKT, bis sie die Hand verlaesst (dauerhafte Aufdeckung).
 //  • „Those cards count as part of your starting hand": die gezogenen Karten
 //    werden an die Startblatt-Auswertung zurueckgegeben (`counted`) — ein
 //    weiteres Glimpse oder End of the Future darunter loest also ebenfalls aus.
@@ -36,6 +36,7 @@ module.exports = {
         'You may immediately reveal it to draw 2 cards. Those cards count as part of your starting hand.',
         '👁️ Reveal & draw 2!');
       if (!ok) return null;
+      engine.revealHandCopy(pi, CARD_NAME);   // bleibt aufgedeckt, bis sie die Hand verlaesst
       await engine.showTriggeredEffect(CARD_NAME, { playerIdx: pi });
       const gezogen = await engine.actionDrawCards(pi, 2, { source: CARD_NAME });
       engine.log('glimpse_of_the_future', { player: ps.username, drawn: gezogen.map(c => c.name) });

@@ -20977,6 +20977,24 @@ this._deathWatch = (this._deathWatchStack || []).length
   }
 
   /**
+   * Eine Handkopie dauerhaft AUFDECKEN (bis sie die Hand verlaesst): Marke in
+   * `_permanentlyRevealedHandIndices`, der Gegner sieht sie. `idx` benennt die
+   * Kopie; ohne `idx` die erste noch verdeckte Kopie von `cardName`.
+   * @returns {number} der aufgedeckte Handindex oder -1
+   */
+  revealHandCopy(pi, cardName, idx = null) {
+    const ps = this.gs.players[pi];
+    if (!ps) return -1;
+    if (!ps._permanentlyRevealedHandIndices) ps._permanentlyRevealedHandIndices = {};
+    const i = (idx != null && (ps.hand || [])[idx] === cardName)
+      ? idx
+      : (ps.hand || []).findIndex((n, k) => n === cardName && !ps._permanentlyRevealedHandIndices[k]);
+    if (i < 0) return -1;
+    ps._permanentlyRevealedHandIndices[i] = true;
+    return i;
+  }
+
+  /**
    * Standardabfrage der Startblatt-Karten: das Ja/Nein-Protokoll (`confirm`) mit
    * dem Kartenbild. @returns {Promise<boolean>}
    */

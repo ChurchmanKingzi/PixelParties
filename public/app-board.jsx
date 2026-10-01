@@ -30311,7 +30311,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           return;
         }
         // Click (no drag) — check for potion or non-equip artifact activation
-        if (!dimmed && isMyTurn && (currentPhase === 2 || currentPhase === 3 || currentPhase === 4) && card) {
+        // `isHeroAction`: ein offener Zusatzaktions-Prompt (heroAction) macht seine
+        // Karten auch AUSSERHALB der eigenen Action Phase klickbar — z. B. Traveler
+        // from the Future beim Spielstart (Phase 0/Gegnerzug), sonst ging nur Drag&Drop.
+        if (!dimmed && ((isMyTurn && (currentPhase === 2 || currentPhase === 3 || currentPhase === 4)) || isHeroAction) && card) {
           if (card.cardType === 'Potion') {
             socket.emit('use_potion', { roomId: gameState.roomId, cardName, handIndex: idx, fromCreation: fromCreation || undefined,
           });
