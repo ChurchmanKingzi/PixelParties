@@ -1555,7 +1555,7 @@ function PlayScreen() {
                   setDecks(prev => prev.map(d => ({ ...d, isDefault: false })));
                   setUser(u => u ? { ...u, defaultSampleDeckId: id } : u);
                 }
-              } catch {}
+              } catch (err) { notify('Could not save your default deck: ' + (err?.message || 'unknown error'), 'error'); }
             }} style={{ fontSize: 12, minWidth: 180, padding: '4px 8px', borderColor: 'var(--accent)', color: 'var(--text)' }}>
             {decks.filter(d => !isCubeDeck(d) && d.mode !== 'drafted').map(d => <option key={d.id} value={d.id}>{d.name} {isDeckLegal(d).legal ? '✓' : '✗'}{d.isDefault ? ' ★' : ''}</option>)}
             {sampleDecks.filter(d => isDeckLegal(d).legal).length > 0 && <option disabled>── Sample Decks ──</option>}

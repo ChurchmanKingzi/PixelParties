@@ -13781,6 +13781,43 @@ this._deathWatch = (this._deathWatchStack || []).length
    * @param {number} zoneSlot - Desired zone slot
    * @returns {{ inst: CardInstance, actualSlot: number } | null}
    */
+  /**
+   * Drain pending hand-indexed-field captures for `cardName` onto the new
+   * support instance. The splice interceptor stamped these onto
+   * `ps._handIndexedFieldPending` RIGHT BEFORE rebase dropped the matching
+   * hand entry. Each registered field with an `onCardSummonedFromHand`
+   * callback gets a one-shot opportunity to apply state to the new
+   * instance (Rocky Slime stamps `inst.counters.level`, Fun-Fun Circus
+   * Elephant carries its Applause Counters). Keyed on cardName so an
+   * unrelated intervening summon can't claim a capture meant for a
+   * different card. Called from EVERY hand → support path (summon AND
+   * placement) — placements used to skip it and lost the Elephant's
+   * collected Applause Counters.
+   */
+  _drainHandIndexedPending(ps, cardName, inst) {
+    if (ps._handIndexedFieldPending) {
+      for (const [fieldName, fieldDef] of this._handIndexedFields) {
+        if (!fieldDef.onCardSummonedFromHand) continue;
+        const pending = ps._handIndexedFieldPending[fieldName];
+        if (!pending || pending.cardName !== cardName) continue;
+        try {
+          fieldDef.onCardSummonedFromHand({
+            engine: this, inst,
+            value: pending.value,
+            cardName,
+            handIdx: pending.handIdx,
+          });
+        } catch (err) {
+          console.error(`[handIndexedField:${fieldName}] onCardSummonedFromHand threw:`, err.message);
+        }
+        delete ps._handIndexedFieldPending[fieldName];
+      }
+      if (Object.keys(ps._handIndexedFieldPending).length === 0) {
+        delete ps._handIndexedFieldPending;
+      }
+    }
+  }
+
   safePlaceInSupport(cardName, playerIdx, heroIdx, zoneSlot, opts = {}) {
     const ps = this.gs.players[playerIdx];
     if (!ps) return null;
@@ -13889,36 +13926,8 @@ this._deathWatch = (this._deathWatchStack || []).length
     // Styx 28.9.: `markiereSeitenfremd` setzt auch den Kartenbesitzer —
     // Ablage/Hand gehen an den Beschwoerer, nicht an den Brettbesitzer.
     if (opts.controller != null && opts.controller !== playerIdx) this.markiereSeitenfremd(inst, opts.controller);
-    // Drain pending hand-indexed-field captures for this cardName. The
-    // splice interceptor stamped these onto `ps._handIndexedFieldPending`
-    // RIGHT BEFORE rebase dropped the matching hand entry. Each
-    // registered field with an `onCardSummonedFromHand` callback gets
-    // a one-shot opportunity to apply state to the new support instance
-    // (Rocky Slime stamps `inst.counters.level` so the reduction
-    // survives turn-start +1 and only dies when the inst goes to
-    // discard). Keyed on cardName so an unrelated intervening summon
-    // can't claim a capture meant for a different card.
-    if (ps._handIndexedFieldPending) {
-      for (const [fieldName, fieldDef] of this._handIndexedFields) {
-        if (!fieldDef.onCardSummonedFromHand) continue;
-        const pending = ps._handIndexedFieldPending[fieldName];
-        if (!pending || pending.cardName !== cardName) continue;
-        try {
-          fieldDef.onCardSummonedFromHand({
-            engine: this, inst,
-            value: pending.value,
-            cardName,
-            handIdx: pending.handIdx,
-          });
-        } catch (err) {
-          console.error(`[handIndexedField:${fieldName}] onCardSummonedFromHand threw:`, err.message);
-        }
-        delete ps._handIndexedFieldPending[fieldName];
-      }
-      if (Object.keys(ps._handIndexedFieldPending).length === 0) {
-        delete ps._handIndexedFieldPending;
-      }
-    }
+    // Hand-indexed Felder (Rocky Slime, Elephant-Applause) auf die neue Instanz uebertragen.
+    this._drainHandIndexedPending(ps, cardName, inst);
     // Track creature summons this turn
     const cardDB = this._getCardDB();
     const cd = cardDB[cardName];
@@ -24438,6 +24447,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     inst.counters = inst.counters || {};
     if (feld !== playerIdx) this.markiereSeitenfremd(inst, playerIdx);
     inst.counters.isPlacement = 1;
+    if (source === 'hand') this._drainHandIndexedPending(ps, cardName, inst);   // Elephant-Counter bleiben erhalten
     inst.turnPlayed = gs.turn || 0;
     if (_letheBonus > 0) inst.counters._letheLevelBonus = _letheBonus;
     // v1389: aus der Ablage → Lethe, Heimkehr, SC, Signal (EINE Stelle).

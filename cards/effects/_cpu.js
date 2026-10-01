@@ -6654,6 +6654,21 @@ function installCpuBrain(engine) {
     if (!validTargets || validTargets.length === 0) return [];
     throwIfAborted(engine, 'promptEffectTarget');
 
+    // ── AUSGEGRAUTE (`ineligible`) ZIELE SIND FUER DIE KI NICHT WAEHLBAR ──
+    // Geschuetzte Ziele (Butterfly Cloud `untargetable`, Stealth, Invisibility,
+    // `blocksTargeting`-Vertraege …) kommen als MARKIERTE Eintraege an, damit der
+    // Mensch sie ausgegraut sieht. Den Riegel dazu (`_waehlbar`) hat nur die
+    // Engine-Methode — und dieser Wrapper kehrt fuer die CPU zurueck, OHNE sie
+    // je aufzurufen: Plan, Prior und Heuristik sahen die volle Liste, die CPU
+    // konnte einen Butterfly-Cloud-Helden also gezielt angreifen (Tester-Meldung).
+    // Fuer KI-Waehler (CPU, Rollouts) wird die Liste deshalb hier bereinigt; der
+    // Mensch bekommt sie unveraendert zum Anzeigen.
+    if ((engine.isCpuPlayer(playerIdx) || engine._inMctsSim || engine._fastMode)
+        && validTargets.some(t => t && t.ineligible)) {
+      validTargets = validTargets.filter(t => !(t && t.ineligible));
+      if (validTargets.length === 0) return [];
+    }
+
     // ── MCTS scripted plan (peek, consume only on match) ──
     let scriptedPick = null;
     if (engine.isCpuPlayer(playerIdx) && Array.isArray(engine._mctsTargetPlan) && engine._mctsTargetPlan.length > 0) {

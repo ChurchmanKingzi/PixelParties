@@ -4836,6 +4836,13 @@ function SingleplayerScreen() {
     const selected = personalDecks.find(d => d.id === selectedDeck)
                   || sampleDecks.find(d => d.id === selectedDeck);
     const legalSelected = selected && isDeckLegal(selected).legal ? selected : null;
+    // Das GEWAEHLTE Deck ist nicht spielbar: nicht stillschweigend ein anderes nehmen
+    // (Tester: „ich wechsle das Deck, im Spiel ist trotzdem das alte") — Grund nennen.
+    if (selected && !legalSelected) {
+      const v = isDeckLegal(selected);
+      notify(`"${selected.name}" is not a legal deck: ${(v.reasons || []).join(', ') || 'incomplete'}`, 'error');
+      return;
+    }
     const playerDeck = legalSelected
                     || legalPersonal.find(d => d.isDefault)
                     || legalPersonal[0]
@@ -4987,7 +4994,7 @@ function SingleplayerScreen() {
                   setPersonalDecks(prev => prev.map(d => ({ ...d, isDefault: false })));
                   setUser(u => u ? { ...u, defaultSampleDeckId: id } : u);
                 }
-              } catch {}
+              } catch (err) { notify('Could not save your default deck: ' + (err?.message || 'unknown error'), 'error'); }
             }} style={{ fontSize: 12, minWidth: 180, padding: '4px 8px', borderColor: 'var(--player-color)', color: 'var(--text)' }}>
             {personalDecks.map(d => <option key={d.id} value={d.id}>{d.name} {isDeckLegal(d).legal ? '✓' : '✗'}{d.isDefault ? ' ★' : ''}</option>)}
             {sampleDecks.filter(d => isDeckLegal(d).legal).length > 0 && <option disabled>── Sample Decks ──</option>}

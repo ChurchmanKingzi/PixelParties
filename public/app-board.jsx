@@ -24677,6 +24677,37 @@ function ppOrdinal(n) {
 const PP_UNLOCK_ICON = { music: '🎵', sleeve: '🃏' };
 const PP_UNLOCK_TEXT = { music: 'New battle track unlocked!', sleeve: 'New sleeve unlocked!' };
 
+// ★ Grund des Spielendes als Klartext (Als Befund: ein Spieler „verlor aus dem Nichts" — es war ein
+// Deck-Out, das er nicht bemerkt hatte). EINE Stelle fuer alle Ergebnis-Anzeigen. `ich`: 'win' | 'lose' |
+// null (Zuschauer). Rueckgabe: '' wenn es keinen besonderen Text gibt.
+function ppGameOverText(reason, ich, loserName, winnerName) {
+  const lose = ich === 'lose', win = ich === 'win', zuschauer = ich == null;
+  switch (reason) {
+    case 'deck_out':
+      return zuschauer ? `💀 DECK OUT — ${loserName} had to draw from an empty deck!`
+        : lose ? '💀 DECK OUT — You had to draw a card from an empty deck and lose the game!'
+        : '💀 DECK OUT — Your opponent had to draw from an empty deck!';
+    case 'doom_clock':
+      return zuschauer ? `☠️ The Doom Clock reached 20 Doom Counters — ${loserName} loses!`
+        : lose ? '☠️ The Doom Clock reached 20 Doom Counters — you lose!' : '☠️ The Doom Clock reached 20 Doom Counters — your opponent loses!';
+    case 'cardinal_beast':
+      return zuschauer ? `${winnerName} controls all four Cardinal Beasts!`
+        : win ? 'You control all four Cardinal Beasts!' : 'Your opponent controls all four Cardinal Beasts!';
+    case 'carris_time_out':
+      return zuschauer ? `${loserName}'s time ran out (Carris, the Time Keeper)!`
+        : lose ? 'Your time ran out — Carris, the Time Keeper collected his Time Counters!' : "Your opponent's time ran out (Carris, the Time Keeper)!";
+    case 'quetzahuitl_defeated':
+      return zuschauer ? `${loserName}'s Quetzahuitl was defeated!`
+        : lose ? 'Your Quetzahuitl, Receiver of Sacrifices was defeated!' : "Your opponent's Quetzahuitl was defeated!";
+    case 'draw_resolved':
+      return zuschauer ? `Both sides were wiped out — ${loserName} loses the tie!`
+        : lose ? 'Both sides were wiped out — you lose the tie!' : 'Both sides were wiped out — you win the tie!';
+    case 'final_trial':
+      return zuschauer ? `${winnerName} completed The Final Trial!` : win ? 'You completed The Final Trial!' : 'Your opponent completed The Final Trial!';
+    default: return '';
+  }
+}
+
 // cpuProgress: { wins, unlocks: [{ kind, name, image }], theme: { name, wins, need }, sleeve: { name, wins, need } } — nur nach einem Sieg über eine CPU.
 function ResultCeremony({ won, spectator, title, subtitle, rewards, total, eloChanges, myName, oppName, extra, cpuProgress, children }) {
   const n = rewards.length;
@@ -24783,7 +24814,7 @@ function ResultCeremony({ won, spectator, title, subtitle, rewards, total, eloCh
             <span key={i} className="pp-cer-buchstabe" style={{ animationDelay: (i * 55) + 'ms' }}>{b === ' ' ? '\u00a0' : b}</span>
           ))}
         </div>
-        {subtitle && <div className="pp-cer-unter">{subtitle}</div>}
+        {subtitle && <div className={'pp-cer-unter' + (/^(💀|☠️)/.test(subtitle) ? ' pp-cer-unter-grund' : '')}>{subtitle}</div>}
         {cpuProgress && cpuProgress.wins > 0 && (
           <div className="pp-cer-sieg">
             <div className="pp-cer-sieg-zahl">🏆 {ppOrdinal(cpuProgress.wins)} victory{oppName ? ' against ' + oppName : ''}!</div>
@@ -47976,7 +48007,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             <div style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 16 }}>
               {result.reason === 'disconnect_timeout' ? `${result.loserName} timed out` :
                result.reason === 'surrender' ? `${result.loserName} surrendered` :
-               result.reason === 'all_heroes_dead' ? `All of ${result.loserName}'s heroes defeated!` : ''}
+               result.reason === 'all_heroes_dead' ? `All of ${result.loserName}'s heroes defeated!` :
+               ppGameOverText(result.reason, isSpectator ? null : (iWon ? 'win' : 'lose'), result.loserName, result.winnerName)}
             </div>
             {result.eloChanges && (
               <div style={{ marginBottom: 20 }}>
@@ -48132,12 +48164,14 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             isSpectator ? (
               r.reason === 'disconnect_timeout' ? `${r.loserName} timed out` :
               r.reason === 'surrender' ? `${r.loserName} surrendered` :
-              r.reason === 'all_heroes_dead' ? `All of ${r.loserName}'s heroes defeated!` : ''
+              r.reason === 'all_heroes_dead' ? `All of ${r.loserName}'s heroes defeated!` :
+              ppGameOverText(r.reason, null, r.loserName, r.winnerName)
             ) : (
               r.reason === 'disconnect_timeout' ? 'Opponent timed out' :
               r.reason === 'opponent_left' ? 'Opponent left the game' :
               r.reason === 'surrender' ? (w ? 'Opponent surrendered' : 'You surrendered') :
-              r.reason === 'all_heroes_dead' ? (w ? 'All enemy heroes defeated!' : 'All your heroes were defeated') : ''
+              r.reason === 'all_heroes_dead' ? (w ? 'All enemy heroes defeated!' : 'All your heroes were defeated') :
+              ppGameOverText(r.reason, w ? 'win' : 'lose', r.loserName, r.winnerName)
             )); })()}
           rewards={(!isSpectator && scEarned && !user?.isGuest) ? (scEarned.rewards || []) : []}
           total={(!isSpectator && scEarned && !user?.isGuest) ? (scEarned.total || 0) : 0}
