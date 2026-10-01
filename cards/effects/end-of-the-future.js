@@ -39,9 +39,8 @@ module.exports = {
   /** CPU: das Angebot annehmen. */
   cpuResponse(engine, kind, promptData) {
     if (kind !== 'generic' || promptData?.title !== CARD_NAME) return undefined;
-    if (promptData.type !== 'cardGallery') return undefined;
-    const k = (promptData.cards || [])[0];
-    return k ? { cardName: k.name, source: k.source } : undefined;
+    if (promptData.type === 'confirm') return true;
+    return undefined;
   },
 
   /** Grauton nach Name: mindestens EINE selbst aufgedeckte Kopie auf der Hand. */

@@ -20977,17 +20977,18 @@ this._deathWatch = (this._deathWatchStack || []).length
   }
 
   /**
-   * Standardabfrage der Startblatt-Karten: die Karte als Galerie mit
-   * Ja/Nein. @returns {Promise<boolean>}
+   * Standardabfrage der Startblatt-Karten: das Ja/Nein-Protokoll (`confirm`) mit
+   * dem Kartenbild. @returns {Promise<boolean>}
    */
   async promptStartingHandYesNo(pi, cardName, description, confirmLabel) {
-    const wahl = await this.promptGeneric(pi, {
-      type: 'cardGallery', title: cardName, source: cardName,
-      description,
-      cards: [{ name: cardName, source: 'hand', count: 1 }],
-      confirmLabel: confirmLabel || 'Yes', cancellable: true, cancelLabel: 'No',
+    // Das bestehende Ja/Nein-Protokoll (`confirm`) mit dem Kartenbild rechts.
+    const antwort = await this.promptGeneric(pi, {
+      type: 'confirm', title: cardName, showCard: cardName,
+      message: description,
+      confirmLabel: confirmLabel || 'Yes', cancelLabel: 'No',
+      cancellable: true, _cpuAutoConfirm: true,
     });
-    return !!(wahl && !wahl.cancelled);
+    return !!(antwort && !antwort.cancelled && antwort.confirmed !== false);
   }
 
   /**
