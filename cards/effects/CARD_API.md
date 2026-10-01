@@ -18555,3 +18555,12 @@ Vier Karten (Strongman, Elephant, Director, Clown; `PP MBS`, Archetyp „Fun-Fun
 - **Elephant-Animation `elephant_stomp`** (Pixelfuß fällt, Aufprall bei 33 % der 1000 ms, Staub/Risse/Stoßring; das Ziel wird per `pp-elephant-squash` flachgetreten): Zonen-Animation, Klang `ZONE_ANIM_SFX.elephant_stomp` (Sequenz). Der Schaden fällt in den Aufprall (`_delay(440)` nach dem Broadcast).
 - **Director:** jede Abwurf-Stufe wirft ihre Karte SOFORT ab (`_noGlow`, kein 500-ms-Glow davor), erst dann folgt der Auftritt, das Verschieben und die zweite Frage.
 - **Einzelner Knopf in Zielwahl-Boxen** (`.panel-zielwahl-knoepfe > :only-child`) sitzt mittig; die Heldenlücke gilt nur für zwei Knöpfe.
+
+## ★ CHUCK, THE STORYTELLER — erzwungener Aufstieg aus dem Tod + Abilities von ausserhalb (Neuer Text)
+
+Ascended Hero (`PP MBS1`, 300 HP / 100 ATK) auf „Chuck, the Crazy Veteran". Bauform wie Bloom, the Continent Corruptor.
+
+- **Aufstieg:** `ascendsFromDefeat`, `onHeroKO` aus der Hand ruft `performAscension` selbst (Pflicht, kein Prompt). „Defeated by taking damage" = der KO-Hook trägt `isSacrifice` NICHT (nur der Nicht-Schaden-Pfad setzt es; True Damage gibt keinen `type` mit, zählt aber). „Other undefeated Heroes" = HP > 0 zum Zeitpunkt des Todes. „Cannot be ignored or substituted" → `isAscensionConditionUnskippable` liest den gedruckten Text.
+- **Aufstiegsbonus:** volle Heilung (`actionHealHero`), dann bis zu 3 Wahlen aus ALLEN Abilities (`source: 'outside'`, abbrechbar = „Done"). Jede Kopie wird sofort angelegt; die Galerie zeigt je Runde nur, was jetzt noch passt (`entscheide`): ein Stapel je Ability (Stufe ≤ 3), 3 Ability-Zonen, mit Xalibur/Xal weitere VERSCHIEDENE in freie Support Zones, verwahrte/versiegelte Zonen zählen mit. `cards.json` trägt den Bonus als `startingAbility1` („Any 3 Abilities from outside the game").
+- **Schild:** `beforeDamage` setzt 0, solange der Kontrolleur andere Helden mit HP > 0 hat (ein im selben Flächenschlag nur vorgemerkter Tod zählt hier noch als lebend). Wie bei Chuck, the Crazy Veteran gilt er nicht gegen True Damage.
+- **Ziehen:** „performs an Action" über `handlungsHooks` + `_bleedTriggersForAction` (Reaktionen eingeschlossen), 2 Karten über `actionDrawCardsAnimated`.
