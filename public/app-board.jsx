@@ -15197,6 +15197,45 @@ const ANIM_REGISTRY = {
       );
     };
   })(),
+  heart_expand: (() => {
+    // ★ Lovely Teddy: ein HERZ auf dem gewaehlten Ziel, das sich ausdehnt
+    // und dabei durchsichtig wird. Pixel-Herz aus Rechtecken (9×8), eigene
+    // Keyframes im eigenen <style> (siehe check-anim-keyframes).
+    const MUSTER = [
+      '.XX...XX.',
+      'XXXX.XXXX',
+      'XXXXXXXXX',
+      'XXXXXXXXX',
+      '.XXXXXXX.',
+      '..XXXXX..',
+      '...XXX...',
+      '....X....',
+    ];
+    const FELDER = [];
+    MUSTER.forEach((zeile, y) => [...zeile].forEach((c, x) => { if (c === 'X') FELDER.push([x, y]); }));
+    return function HeartExpandEffect({ x, y }) {
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+          <svg width="72" height="64" viewBox="0 0 9 8" shapeRendering="crispEdges"
+            style={{ position: 'absolute', left: -36, top: -32, overflow: 'visible',
+              filter: 'drop-shadow(0 0 6px rgba(255,60,110,.9))',
+              animation: 'heartExpandFade 1000ms ease-out forwards' }}>
+            {FELDER.map(([fx, fy]) => (
+              <rect key={fx + '-' + fy} x={fx} y={fy} width="1" height="1"
+                fill={fy <= 1 && fx <= 1 ? '#ffd1de' : (fy >= 4 ? '#e0194f' : '#ff3b6b')} />
+            ))}
+          </svg>
+          <style>{`
+            @keyframes heartExpandFade {
+              0%   { opacity: 0;   transform: scale(.35); }
+              12%  { opacity: 1;   transform: scale(.6); }
+              100% { opacity: 0;   transform: scale(2.6); }
+            }
+          `}</style>
+        </div>
+      );
+    };
+  })(),
   wind: WindEffect,
   shadow_summon: ShadowSummonEffect,
   gold_sparkle: GoldSparkleEffect,

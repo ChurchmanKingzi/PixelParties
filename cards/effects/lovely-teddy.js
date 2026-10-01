@@ -20,7 +20,8 @@
 //    bleibt sie gesperrt).
 //  • Ziele: offene gegnerische Kreaturen MIT aktivem Effekt, die nicht
 //    schon geliehen sind. Gegen Immunitaet (Cardinal Beasts) laeuft der
-//    Wechsel ins Leere.
+//    Wechsel ins Leere. Auftritt: ein expandierendes, ausblendendes Herz
+//    (`heart_expand`) auf dem Ziel.
 //  • Anders als bei Aligning Goals kostet das weder Gold noch gilt es als
 //    zusaetzliche Aktion — der Text sagt davon nichts.
 // ═══════════════════════════════════════════
@@ -94,8 +95,9 @@ module.exports = {
       return true;   // der Effekt lief (die Wahl war getroffen), das Ziel ist immun
     }
 
-    engine._broadcastEvent('dark_control', {
-      owner: target.owner, heroIdx: target.heroIdx, zoneSlot: inst.zoneSlot,
+    // Ein HERZ auf dem Ziel, das sich ausdehnt und dabei durchsichtig wird.
+    engine._broadcastEvent('play_zone_animation', {
+      type: 'heart_expand', owner: engine.physicalSide(inst), heroIdx: inst.heroIdx, zoneSlot: inst.zoneSlot,
     });
     await engine._delay(900);
 
