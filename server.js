@@ -18635,7 +18635,18 @@ async function runTrainingBatch() {
     d && Array.isArray(d.heroes) && d.heroes.length > 0
     && Array.isArray(d.mainDeck) && d.mainDeck.length > 0);
   const norm = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, '');
-  const pinned = samples.find(d => norm(d.name).includes(norm(pinName)) || norm(pinName).includes(norm(d.name)));
+  // PP_TRAIN_DECK_FILE=<pfad>: eigenes Deck (Deck-Textformat) statt eines Sample-Decks
+  // pinnen — z. B. data/CustomDecks/Fun-Fun Circus.txt. Es steht dann NICHT im Gegnerfeld.
+  let pinned;
+  if (process.env.PP_TRAIN_DECK_FILE) {
+    const df = path.resolve(process.env.PP_TRAIN_DECK_FILE);
+    const tmp = fs.mkdtempSync(path.join(require('os').tmpdir(), 'pp-train-'));
+    fs.copyFileSync(df, path.join(tmp, path.basename(df)));
+    pinned = loadSampleDecks(tmp)[0];
+    if (!pinned) { console.error('[train] PP_TRAIN_DECK_FILE nicht lesbar:', df); process.exit(1); }
+  } else {
+    pinned = samples.find(d => norm(d.name).includes(norm(pinName)) || norm(pinName).includes(norm(d.name)));
+  }
   if (!pinned) {
     console.error(`[train] pinned deck not found: "${pinName}" — available: ${samples.map(d => d.name).join(', ')}`);
     process.exit(1);
