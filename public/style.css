@@ -20887,6 +20887,9 @@ img, .card-tooltip-img img { image-rendering: pixelated; }
   100% { transform: translateY(0) scale(1); opacity: 1; }
 }
 .pp-cer-unter { font-size: 15px; color: var(--text2); margin-bottom: 18px; animation: ppCerFade .6s .5s both; }
+/* Besondere Spielende-Gruende (Deck-Out, Doom Clock): gross und unuebersehbar. */
+.pp-cer-unter-grund { font-size: 20px; font-weight: 700; color: #ffd0d8; text-shadow: 0 0 14px rgba(255,51,102,.7), 2px 2px 0 rgba(0,0,0,.6); }
+.pp-cer-win .pp-cer-unter-grund { color: #fff2b8; text-shadow: 0 0 14px rgba(255,215,0,.6), 2px 2px 0 rgba(0,0,0,.6); }
 .pp-cer-sieg { margin: -8px 0 34px; animation: ppCerFade .6s .7s both; }
 .pp-cer-sieg-zahl { font-size: 18px; font-weight: 700; color: #ffd700; text-shadow: 2px 2px 0 rgba(0,0,0,.6); }
 .pp-cer-sieg-theme { margin-top: 4px; font-size: 12px; color: var(--text2); }
