@@ -28363,6 +28363,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   // SCHRUMPFEN, nicht beim Wachsen — eine Karte, die IN den Stapel
   // fliegt, muss weiter verdeckt bleiben, bis sie landet.
   const stapelLaengeRef = useRef(null);
+  // Offene Verdeckungen der ABFLIEGENDEN Stapelkarte (siehe der
+  // `play_pile_transfer`-Handler): { pile, owner, card, len, release }.
+  const quellVerdeckungen = useRef([]);
   // ★★ v1229 (Als Befund: „kann nach wie vor zu einem deutlich
   // kuerzeren Aufblitzen kommen, allerdings auch nicht immer").
   // `useEffect` laeuft NACH dem Zeichnen — genau ein Bild lang stand
@@ -28385,6 +28388,21 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     if (jetzt.oppX < vorher.oppX) setOppDeletedHidden(0);
   }, [me?.discardPile?.length, opp?.discardPile?.length,
       me?.deletedPile?.length, opp?.deletedPile?.length]);
+
+  // Verdeckung der abfliegenden Karte aufloesen, sobald sich der INHALT des
+  // Stapelkopfs aendert — auch bei gleichbleibender Laenge (Karte raus UND
+  // Karte rein im selben Takt). Vor dem Zeichnen, wie die Laengenwache.
+  useLayoutEffect(() => {
+    const recs = quellVerdeckungen.current;
+    if (!recs.length) return;
+    for (const r of recs) {
+      if (r.done) continue;
+      const spieler = gameState.players?.[r.owner];
+      const stapel = (r.pile === 'discard' ? spieler?.discardPile : spieler?.deletedPile) || [];
+      if (stapel.length !== r.len || stapel[stapel.length - 1] !== r.card) r.release();
+    }
+    quellVerdeckungen.current = recs.filter(r => !r.done);
+  }, [gameState]);
 
   // ★ v1227: Ein neuer Dialog startet mit leerem Suchfeld.
   useEffect(() => { setGalerieFilter(''); },
@@ -36446,7 +36464,20 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           // wieder aufgedeckt. Der Regelfall ist die Laengenwache
           // weiter unten — sie loest die Verdeckung in dem Moment, in
           // dem der Stapel wirklich kuerzer wird.
-          setTimeout(() => setzen(p => Math.max(0, p - 1)), 1200);
+          // ★ Dazu der Abgleich auf INHALT (`quellVerdeckungen`): wird der
+          // Stapel im selben Takt kuerzer UND laenger (eine Karte fliegt
+          // hinaus, eine hinein), bleibt seine Laenge gleich und die
+          // Laengenwache sieht nichts — die Verdeckung hielt dann bis zum
+          // Notnagel und der Stapel wirkte 1–2 s leer (Diamond).
+          const rec = {
+            pile: from, owner: srcOwner, card: cardName, len: stapel.length, done: false,
+            release: () => { if (rec.done) return; rec.done = true; setzen(p => Math.max(0, p - 1)); },
+          };
+          quellVerdeckungen.current.push(rec);
+          setTimeout(() => {
+            rec.release();
+            quellVerdeckungen.current = quellVerdeckungen.current.filter(r => !r.done);
+          }, 1200);
         }
       }
       const srcEl = elementFor(from, srcIsMe, { heroIdx: fromHeroIdx, slotIdx: fromSlotIdx, handIdx: fromHandIdx, permId: fromPermId });
