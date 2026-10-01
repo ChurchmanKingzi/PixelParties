@@ -18166,6 +18166,13 @@ this._deathWatch = (this._deathWatchStack || []).length
     }
     const taken = await this.takeFromPile(pi, pile, cardName, opts);
     if (!taken) return false;
+    // „deleted from anywhere"-Rettung (Ash Worms, Cute Hydra): zwischen Entnahme und
+    // Geloescht-Stapel — auch fuer Karten ohne verfolgte Instanz (Deck, Hand, Puzzle-Ablage).
+    if (await this._tryBeforeDelete(taken.name, pi, { fromZone: pile, source: opts.source || null })) {
+      this.log('delete_rescued', { player: ps.username, card: taken.name, source: opts.source || null });
+      this.sync();
+      return true;
+    }
     if (!ps.deletedPile) ps.deletedPile = [];
     ps.deletedPile.push(taken.name);
     this._trackCard(taken.name, pi, ZONES.DELETED);
@@ -23402,6 +23409,21 @@ this._deathWatch = (this._deathWatchStack || []).length
   async actionDeleteFromDeckAnimated(playerIdx, cards, opts = {}) {
     const ps = this.gs.players[playerIdx];
     if (!ps || !Array.isArray(cards) || cards.length === 0) return;
+    // „deleted from anywhere"-Rettung vorab (Ash Worms, Cute Hydra): gerettete Karten
+    // fliegen nicht zum Geloescht-Stapel.
+    {
+      const bleibt = [];
+      for (const c of cards) {
+        if (loadCardEffect(c)?.beforeDelete
+            && await this._tryBeforeDelete(c, playerIdx, { fromZone: 'deck', source: opts.source || null })) {
+          this.log('delete_rescued', { player: ps.username, card: c, source: opts.source || null });
+          continue;
+        }
+        bleibt.push(c);
+      }
+      cards = bleibt;
+      if (cards.length === 0) { this.sync(); return; }
+    }
     this._broadcastEvent('deck_to_deleted', { owner: playerIdx, cards });
     for (let i = 0; i < cards.length; i++) {
       // Erste Karte: volle Flugzeit. Jede weitere: der Staffelabstand.

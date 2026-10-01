@@ -33671,6 +33671,14 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     //  arcs. On impact, a dark-red rupture explodes outward with a
     //  lingering smoke/ember afterglow. Plays over ~1.5s total.
     const onEraserBeam = ({ sourceOwner, sourceHeroIdx, targetOwner, targetHeroIdx, targetZoneSlot }) => {
+      // KLANG (der Strahl lief bisher stumm — eigener Socket-Kanal, kein ZONE_ANIM_SFX):
+      // Aufladen (0–350 ms) → Strahl + Schlag bei 350 ms → tiefer Einschlag. `category: null`,
+      // damit der „effect"-Sperrfilter keinen der drei Klaenge verschluckt.
+      if (window.playSFX) {
+        window.playSFX('elem_dark', { rate: 0.6, volume: 0.9, category: null, dedupe: 300 });
+        setTimeout(() => window.playSFX('orbital_laser', { rate: 0.8, volume: 1.2, category: null, dedupe: 300 }), 350);
+        setTimeout(() => window.playSFX('heavy_impact', { rate: 0.6, volume: 1.2, category: null, dedupe: 300 }), 480);
+      }
       const srcLabel = sourceOwner === myIdx ? 'me' : 'opp';
       const tgtLabel = targetOwner === myIdx ? 'me' : 'opp';
       const srcEl = document.querySelector(`[data-hero-zone][data-hero-owner="${srcLabel}"][data-hero-idx="${sourceHeroIdx}"]`);
