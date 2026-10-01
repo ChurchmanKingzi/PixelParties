@@ -146,6 +146,12 @@ module.exports = {
         cancellable: false,
       });
       if (!ziel) return;
+      // Auch das Ziel bekommt eine riesige Explosion.
+      engine._broadcastEvent('play_zone_animation', {
+        type: 'mega_explosion', owner: ziel.owner, heroIdx: ziel.heroIdx,
+        zoneSlot: ziel.type === 'hero' ? -1 : ziel.slotIdx,
+      });
+      await engine._delay(550);
       if (ziel.type === 'hero') {
         const h = gs.players[ziel.owner]?.heroes?.[ziel.heroIdx];
         if (h && h.hp > 0) await ctx.dealDamage(h, SCHADEN, 'creature');
