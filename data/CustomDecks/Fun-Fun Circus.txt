@@ -8,23 +8,25 @@ Bakhm, the Desert Digger
 Silent Water Mizune
 
 == MAIN DECK ==
-5x Adventurousness
-4x Booby Trap
-2x Book of Doom
-4x Cosmic Skeleton
-4x Cute Cheese
-4x Destruction Magic
-4x Golden Ankh
-3x Magnetic Glove
-4x Pure Advantage Camel
-4x Rain of Arrows
-4x Summoning Magic
-4x Magic Arts
-1x Spider Avalanche
 4x Fun-Fun Circus Clown
 3x Fun-Fun Circus Elephant
 3x Fun-Fun Circus Director
 3x Fun-Fun Circus Strongman
+4x Summoning Magic
+3x Magic Arts
+4x Destruction Magic
+3x Rain of Arrows
+3x Treasure Chest
+2x Golden Bananas
+3x Pocket Catapult
+4x Cute Cheese
+3x Book of Doom
+2x Cloud Pillow
+3x Golden Ankh
+4x Booby Trap
+4x Pure Advantage Camel
+2x Spider Avalanche
+3x Cosmic Skeleton
 
 == POTION DECK ==
 
