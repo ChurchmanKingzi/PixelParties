@@ -22,12 +22,16 @@ const { skipIfSearchBlocked } = require('./_search-shared');
 const CARD_NAME = 'Grasp the Future';
 
 module.exports = {
-  /** CPU: Angebot annehmen und die erste passende Karte waehlen. */
+  /** CPU: Angebot annehmen und die erste passende Handkarte waehlen. */
   cpuResponse(engine, kind, promptData) {
     if (kind !== 'generic' || promptData?.title !== CARD_NAME) return undefined;
-    if (promptData.type !== 'cardGallery') return undefined;
-    const k = (promptData.cards || [])[0];
-    return k ? { cardName: k.name, source: k.source } : undefined;
+    if (promptData.type === 'confirm') return true;
+    if (promptData.type === 'pickHandCard') {
+      const hand = engine?.gs?.players?.[engine?._cpuPlayerIdx]?.hand || [];
+      const idx = (promptData.eligibleIndices || [])[0];
+      return idx == null ? undefined : { handIndex: idx, cardName: hand[idx] };
+    }
+    return undefined;
   },
 
   startingHand: {
@@ -35,25 +39,27 @@ module.exports = {
       const ps = engine.gs.players[pi];
       if (!ps) return null;
       if (skipIfSearchBlocked(engine, pi, CARD_NAME)) return null;   // unter der Such-Sperre kein Angebot
-      const andere = {};
-      for (const n of ps.hand || []) if (n !== CARD_NAME) andere[n] = (andere[n] || 0) + 1;
-      const namen = Object.keys(andere);
-      if (namen.length === 0) return null;
+      // Jede ANDERE Handkarte (nicht „Grasp the Future") ist waehlbar.
+      const erlaubt = [];
+      (ps.hand || []).forEach((n, idx) => { if (n !== CARD_NAME) erlaubt.push(idx); });
+      if (erlaubt.length === 0) return null;
 
       const ok = await engine.promptStartingHandYesNo(pi, CARD_NAME,
         'You may immediately reveal it and another card in your hand. Search your deck for a copy of that card, reveal it and add it to your hand.',
         '👁️ Reveal!');
       if (!ok) return null;
 
+      // Das bestehende Handkarten-Protokoll (`pickHandCard`).
       const wahl = await engine.promptGeneric(pi, {
-        type: 'cardGallery', title: CARD_NAME, source: CARD_NAME,
+        type: 'pickHandCard', title: CARD_NAME,
         description: 'Choose another card in your hand to reveal. A copy of it is searched from your deck.',
-        cards: namen.map(n => ({ name: n, source: 'hand', count: andere[n] })),
-        confirmLabel: '🔎 Reveal & search!', cancellable: true, cancelLabel: 'Cancel',
+        eligibleIndices: erlaubt,
+        cancellable: true,
         searchToHand: true, searchPile: 'deck',   // = suchAbfrage('deck')
       });
-      if (!wahl || wahl.cancelled || !andere[wahl.cardName]) return null;
-      const gewaehlt = wahl.cardName;
+      if (!wahl || wahl.cancelled || wahl.handIndex == null || !erlaubt.includes(wahl.handIndex)) return null;
+      const gewaehlt = ps.hand[wahl.handIndex];
+      if (!gewaehlt) return null;
 
       await engine.showTriggeredEffect(CARD_NAME, { playerIdx: pi });
       await engine.showTriggeredEffect(gewaehlt, { playerIdx: pi });
