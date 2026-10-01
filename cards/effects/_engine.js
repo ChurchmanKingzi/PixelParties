@@ -8302,6 +8302,19 @@ class GameEngine {
       });
       hookCtx.cancelled = false;
     }
+    // ── Experimental Potion: Giftschaden heilt stattdessen ────────────
+    // Dauerhaftes Zielmerkmal (`hero._experimentalPotion`, „for the rest of
+    // the game"). Der ENDGUELTIGE Betrag (nach allen Zu-/Abschlaegen) wird
+    // statt Schaden geheilt. Nie bei 0 HP: Heilung wuerde einen Gefallenen
+    // zurueckholen.
+    if (type === 'poison' && !hookCtx.cancelled && target?.hp !== undefined
+        && target._experimentalPotion && target.hp > 0) {
+      const proj = this._projectedAmount(hookCtx);
+      const betrag = Math.max(0, (proj !== undefined ? proj : hookCtx.amount) || 0);
+      this.log('experimental_poison_heal', { target: this._heroLabel(target), amount: betrag });
+      if (betrag > 0) await this.actionHealHero(source, target, betrag);
+      return { dealt: 0, cancelled: true };
+    }
     if (hookCtx.cancelled) return { dealt: 0, cancelled: true };
 
     // ── Anti Magic immunity ──
@@ -10203,6 +10216,8 @@ class GameEngine {
    */
   decreaseMaxHp(hero, amount) {
     if (!hero || hero.hp === undefined) return 0;
+    // Experimental Potion: eine Senkung der Max HP erhoeht sie stattdessen.
+    if (hero._experimentalPotion && amount > 0) { this.increaseMaxHp(hero, amount); return 0; }
     const currentMax = hero.maxHp || hero.hp;
     const effective = Math.min(amount, currentMax - 1); // Never below 1
     if (effective <= 0) return 0;
@@ -43582,6 +43597,22 @@ this._deathWatch = (this._deathWatchStack || []).length
     // Filter out face-down surprise creatures — they cannot be damaged
     entries = entries.filter(e => !e.inst?.faceDown);
     if (entries.length === 0) return;
+
+    // Experimental Potion: Giftschaden an einer markierten Kreatur heilt
+    // sie stattdessen (`counters.experimentalPotion`).
+    {
+      const heil = entries.filter(e => e.type === 'poison' && e.inst?.counters?.experimentalPotion);
+      if (heil.length > 0) {
+        entries = entries.filter(e => !heil.includes(e));
+        for (const e of heil) {
+          if (!(e.amount > 0)) continue;
+          this.log('experimental_poison_heal', { target: e.inst.name, amount: e.amount });
+          await this.actionHealCreature(e.source || { name: 'Poison' }, e.inst, e.amount);
+        }
+        this.sync();
+        if (entries.length === 0) return;
+      }
+    }
 
     // v704 (Puppets): Shared HP pool — Schaden an Puppet-Tokens geht an
     // den Helden der Spalte (siehe _reroutePooledCreatureDamage).
