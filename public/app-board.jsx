@@ -37395,7 +37395,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     // das Flugziel NACH dem Umdrehen in der Mitte: 'discard' (Vorgabe),
     // 'deleted', 'deck' (zurueck ins Deck) oder 'hand'. Ohne das Feld
     // bleibt alles wie bisher.
-    const onMillCenterReveal = ({ owner, cardNames, revealMs, deleteMode, dest, startDelayMs, destHeroIdx, destSlotIdx }) => {
+    const onMillCenterReveal = ({ owner, cardNames, revealMs, deleteMode, dest, startDelayMs, destHeroIdx, destSlotIdx, from }) => {
       if (!Array.isArray(cardNames) || cardNames.length === 0) return;
       const isMe    = owner === myIdx;
       const perCard = revealMs || 1100;
@@ -37420,7 +37420,12 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         const pending = isMe ? deckToDiscardPendingMeRef.current : deckToDiscardPendingOppRef.current;
         if (pending[ziel]) pending[ziel].push(...cardNames);
       }
-      const deckEl = document.querySelector(isMe ? '[data-my-deck]' : '[data-opp-deck]');
+      // `from: 'potionDeck'` (Chaos-Diamond): Start am TRANK-Deck; ist es
+      // gerade leer gespielt (Element nicht eingehaengt), am Hauptdeck.
+      const deckEl = (from === 'potionDeck'
+          ? document.querySelector(isMe ? '[data-my-potion-deck]' : '[data-opp-potion-deck]')
+          : null)
+        || document.querySelector(isMe ? '[data-my-deck]' : '[data-opp-deck]');
       if (!deckEl) return;
       const dr = deckEl.getBoundingClientRect();
       const sx = dr.left;
