@@ -15324,6 +15324,19 @@ const ANIM_REGISTRY = {
     // sinken ueber der Karte ab, ein „-1" schwebt nach unten und verblasst. Eigene Keyframes im
     // eigenen <style> (siehe check-anim-keyframes). Gespielt ueber `play_hand_card_animation`.
     return function LevelDownEffect({ x, y }) {
+      // Auch hier schwillt die Handkarte voruebergehend an und wird dunkler (wie `loom_swell`).
+      useEffect(() => {
+        let best = null, bestD = Infinity;
+        document.querySelectorAll('.game-hand-me [data-hand-idx], .game-hand-opp [data-hand-idx]').forEach(el => {
+          const r = el.getBoundingClientRect();
+          const d = Math.abs(r.left + r.width / 2 - x) + Math.abs(r.top + r.height / 2 - y);
+          if (d < bestD) { bestD = d; best = el; }
+        });
+        if (!best || bestD > 120) return undefined;
+        best.classList.add('loom-swell-card');
+        const t = setTimeout(() => best && best.classList.remove('loom-swell-card'), 1250);
+        return () => { clearTimeout(t); best && best.classList.remove('loom-swell-card'); };
+      }, []);
       const pfeile = useMemo(() => Array.from({ length: ppFxN(7) }, (_, i) => ({
         dx: (i - 3) * 11 + (Math.random() - 0.5) * 6,
         delay: i * 70 + Math.round(Math.random() * 40),
@@ -15346,6 +15359,13 @@ const ANIM_REGISTRY = {
             textShadow: '0 0 8px #8a2be2, 0 2px 0 #3b0a5c', animation: 'levelDownText 900ms ease-out forwards',
           }}>-1</span>
           <style>{`
+            .loom-swell-card { animation: loomSwellCard 1100ms ease-in-out; z-index: 50; position: relative; }
+            @keyframes loomSwellCard {
+              0%   { scale: 1;    filter: brightness(1)   saturate(1); }
+              40%  { scale: 1.38; filter: brightness(.38) saturate(.7); }
+              60%  { scale: 1.38; filter: brightness(.38) saturate(.7); }
+              100% { scale: 1;    filter: brightness(1)   saturate(1); }
+            }
             @keyframes levelDownGlow {
               0%   { opacity: 0; transform: scale(.4); }
               30%  { opacity: 1; transform: scale(1); }
