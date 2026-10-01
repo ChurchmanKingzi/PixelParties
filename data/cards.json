@@ -12341,7 +12341,7 @@
     "hp": 400,
     "atk": 50,
     "cost": null,
-    "effect": "You may up to 3 times per turn declare a card name and reveal the top card of your deck. If it has the declared name, add it to your hand, otherwise place it back on top of your deck and negate this effect for the rest of the turn. This effect ignores any effects that would prevent you from drawing cards.",
+    "effect": "At the start of the game, declare 3 card names. When you draw a card with a declared name, you may reveal it and add a copy of it from your deck to your hand. Cards added that way count as being part of your starting hand. You may only add a card with the same name once per turn with this effect.",
     "archetype": "",
     "setID": "PP SET01",
     "banned": "Banned",

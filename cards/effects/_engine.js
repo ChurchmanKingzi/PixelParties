@@ -21031,6 +21031,15 @@ this._deathWatch = (this._deathWatchStack || []).length
       for (let i = 0; i < queue.length; i++) {
         if (this.gs.result) break;
         const name = queue[i];
+        // Hero-/Brett-Lauscher auf „diese Karte wurde als Teil der Starthand gezogen"
+        // (Kassaran): `counted` sammelt hinzugefuegte Karten, die ebenfalls als Starthand gelten.
+        if (!opts._nurEffekt && !this.gs.result) {
+          const hinzu = [];
+          await this.runHooks('onStartingHandCardDrawn', {
+            playerIdx: pi, drawnCardName: name, counted: hinzu, _skipReactionCheck: true,
+          });
+          if (hinzu.length > 0) queue.push(...hinzu);
+        }
         const spec = loadCardEffect(name)?.startingHand;
         if (!spec || typeof spec.resolve !== 'function') continue;
         const schonBehandelt = behandelt.get(name) || 0;

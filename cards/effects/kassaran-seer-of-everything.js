@@ -1,233 +1,143 @@
 // ═══════════════════════════════════════════
 //  CARD EFFECT: "Kassaran, Seer of Everything"
-//  Hero — Multi-use Hero Effect
+//  Hero — passiver Effekt (NEUE FASSUNG, ersetzt den frueheren Zuruf-Effekt)
 //
-//  "You may up to 3 times per turn declare a card
-//   name and reveal the top card of your deck. If
-//   it has the declared name, add it to your
-//   hand, otherwise negate this effect for the
-//   rest of the turn. This effect ignores any
-//   effects that would prevent you from drawing
-//   cards."
+//  „At the start of the game, declare 3 card names. When you draw a card with
+//   a declared name, you may reveal it and add a copy of it from your deck to
+//   your hand. Cards added that way count as being part of your starting hand.
+//   You may only add a card with the same name once per turn with this effect."
 //
-//  Implementation notes:
-//   • Multi-use vs. standard heroEffect — engine
-//     auto-stamps HOPT on truthy return from
-//     onHeroEffect, which would gate re-activation
-//     to once per turn. Wir setzen deshalb
-//     `ctx._skipHeroEffectHopt = true` (Gegenstueck
-//     zu `_skipCreatureEffectHopt`), fuehren den
-//     Verbrauch selbst auf dem Helden
-//     (gemeinsamer Rundenzaehler, Schluessel `kassaran`) und gaten ueber
-//     `canActivateHeroEffect`. Der frueher genutzte
-//     Weg "immer false zurueckgeben" bedeutete fuer
-//     die Engine zugleich "abgebrochen" und hat
-//     `onAnyActionResolved` sowie die CPU-Erkennung
-//     mit ausgehebelt. Der pending reveal/log wird
-//     weiterhin manuell VOR dem Ende gefeuert, damit
-//     der Gegner die Aktivierung zum Zeitpunkt der
-//     Ansage sieht und nicht erst danach.
-//   • Mismatch lock-out — a wrong call sets
-//     `_kassaranNegatedThisTurn` on the hero; the
-//     activation gate refuses subsequent uses
-//     until the next owner turn. Both flags clear
-//     on `onTurnStart` for the owner.
-//   • Hand-lock bypass — match path uses
-//     `actionAddCardFromDeckToHand(.. _bypassHandLock: true)`
-//     so Kazena / Pollution / future hand-locks
-//     can't gate the matched draw. The effect
-//     itself doesn't draw on mismatch, so no
-//     bypass is needed there.
-//   • Reveal channel — both match and miss fire a
-//     `kassaran_reveal_flip` broadcast that drives
-//     a custom client-side animation: the top card
-//     flies to viewport center, flips face-up,
-//     holds, then continues to the destination
-//     (hand on match, back to deck top on miss).
-//     The animation IS the stream — no popup, no
-//     deck_search_add. The match path then mutates
-//     hand state directly (with the
-//     pileTransferToHandPending suppressor on the
-//     client absorbing the auto-draw-anim that
-//     would otherwise double-fire on the upcoming
-//     hand-grew sync). The miss path pushes the
-//     revealed name into `deckTopVisible` so the
-//     card renders semi-transparently on top of
-//     the deck pile (same Premonition mechanic).
+//  ── AUSLEGUNG ─────────────────────────────────────────────────────
+//  • „At the start of the game": der Hook `onBeforeHandDraw` (vor dem Ziehen der
+//    Starthaende — wie Bill; laeuft auch im Puzzle). Drei VERSCHIEDENE Namen,
+//    Pflicht (`cardNamePicker`, je eine Abfrage, schon gewaehlte fallen weg).
+//    Gespeichert am Helden: `hero._kassaranDeclared`.
+//  • „When you draw a card with a declared name": jede Ziehung des Besitzers —
+//    ueber `onDraw` (Zug, Effekte) UND ueber die Starthand (Startblatt-Fenster der
+//    Engine, Haken `onStartingHandCardDrawn`: die Starthand ist ebenfalls
+//    „gezogen"). Namensvergleich ueber `baseCardName`.
+//  • „you may reveal it and add a copy of it": Ja/Nein (`confirm` mit Kartenbild),
+//    die gezogene Karte wird dem Gegner als Bild gezeigt (`showTriggeredEffect`),
+//    eine KOPIE aus dem Deck kommt auf die Hand (`actionAddCardFromDeckToHand`).
+//    Gibt es keine Kopie im Deck, wird nichts angeboten.
+//  • „count as being part of your starting hand": die hinzugefuegte Karte laeuft
+//    durch `processStartingHandDraw` — im Startblatt-Fenster ueber die Warteschlange
+//    der laufenden Auswertung (`ctx.counted`), sonst als eigener Aufruf.
+//  • „once per turn with the same name": je Name und Zug (`baseCardName`) ein Mal;
+//    ein Ablehnen verbraucht nichts.
 // ═══════════════════════════════════════════
 
 const CARD_NAME = 'Kassaran, Seer of Everything';
-const { usesLeft, spendUse } = require('./_charges');
-// v875: Namensvergleiche ueber den BASISNAMEN (siehe CARD_API).
+const ANZAHL = 3;
 const { baseCardName } = require('./_hooks');
-const USE_KEY = 'kassaran';
-const MAX_USES_PER_TURN = 3;
+
+/** Der Held, dem dieser Hook gehoert (Brettseite), und seine Deklarationen. */
+function deklariert(hero) {
+  return Array.isArray(hero?._kassaranDeclared) ? hero._kassaranDeclared : [];
+}
+
+/**
+ * Die Ziehung einer Karte bearbeiten: Angebot, Aufdecken, Kopie holen.
+ * @returns {Promise<string|null>} Name der hinzugefuegten Karte oder null
+ */
+async function bearbeiteZug(ctx, kartenName) {
+  const engine = ctx._engine;
+  const gs = engine.gs;
+  const pi = ctx.cardOwner;
+  const ps = gs.players[pi];
+  const hero = ctx.attachedHero || gs.players[ctx.cardHeroOwner ?? pi]?.heroes?.[ctx.cardHeroIdx];
+  if (!ps || !hero?.name || hero.hp <= 0 || !kartenName) return null;
+  const basis = baseCardName(kartenName);
+  if (!deklariert(hero).some(n => baseCardName(n) === basis)) return null;
+
+  // „once per turn with the same name"
+  if (!hero._kassaranAdded || hero._kassaranAdded.turn !== gs.turn) hero._kassaranAdded = { turn: gs.turn, names: [] };
+  if (hero._kassaranAdded.names.includes(basis)) return null;
+  // Eine Kopie muss im Deck liegen.
+  const kopie = (ps.mainDeck || []).find(n => baseCardName(n) === basis);
+  if (!kopie) return null;
+
+  const antwort = await engine.promptGeneric(pi, {
+    type: 'confirm', title: CARD_NAME, showCard: kartenName,
+    message: `You drew "${kartenName}" (declared). Reveal it and add a copy of it from your deck to your hand?`,
+    confirmLabel: '🔮 Reveal & add!', cancelLabel: 'No', cancellable: true, _cpuAutoConfirm: true,
+  });
+  if (!antwort || antwort.cancelled || antwort.confirmed === false) return null;
+
+  await engine.showTriggeredEffect(kartenName, { playerIdx: pi });
+  const ok = await engine.actionAddCardFromDeckToHand(pi, kopie, { source: CARD_NAME, reveal: false });
+  if (!ok) return null;
+  hero._kassaranAdded.names.push(basis);
+  engine.log('kassaran_add', { player: ps.username, card: kartenName });
+  engine.sync();
+  return kopie;
+}
 
 module.exports = {
-  // Ladungsanzeige am Heldenportrait (Als Vorgabe 16.8.).
-  chargesPerTurn: MAX_USES_PER_TURN,
-  chargeKey: USE_KEY,
   activeIn: ['hero'],
-  heroEffect: true,
 
-  /**
-   * Gate: hero alive (engine pre-checks), used < 3 times this turn,
-   * not negated this turn, deck has at least 1 card to reveal.
-   * Engine's standard alive / not-frozen / not-stunned / HOPT checks
-   * still apply on top — HOPT is never stamped (we always return
-   * false), so it never gates us out.
-   */
-  canActivateHeroEffect(ctx) {
-    const engine = ctx._engine;
-    const gs = engine.gs;
-    const pi = ctx.cardOwner;
-    const ps = gs.players[pi];
-    if (!ps) return false;
-    const hero = ctx.attachedHero;
-    if (!hero) return false;
-    if (hero._kassaranNegatedThisTurn) return false;
-    if (usesLeft(hero, engine?.gs, { key: USE_KEY, max: MAX_USES_PER_TURN }) <= 0) return false;
-    // Hand-locked is NOT a gate here — Kassaran's text "ignores any
-    // effects that would prevent you from drawing cards" means he
-    // activates regardless. The match-path bypass (below) is what
-    // actually carries the card through the lock.
-    return (ps.mainDeck || []).length > 0;
-  },
-
-  async onHeroEffect(ctx) {
-    const engine = ctx._engine;
-    const gs = engine.gs;
-    const pi = ctx.cardOwner;
-    const ps = gs.players[pi];
-    const hero = ctx.attachedHero;
-    if (!ps || !hero) return false;
-    if ((ps.mainDeck || []).length === 0) return false;
-    if (hero._kassaranNegatedThisTurn) return false;
-    if (usesLeft(hero, engine?.gs, { key: USE_KEY, max: MAX_USES_PER_TURN }) <= 0) return false;
-
-    // ── Step 1: declare a card name (Luck's cardNamePicker UI) ─────
-    // Filter to main-deck-eligible card types — only Spell / Attack /
-    // Creature can sit on top of the deck, so showing the player
-    // Heroes / Abilities / Potions / Tokens would just be noise.
-    const cardDB = engine._getCardDB();
-    const allNames = Object.keys(cardDB).filter(n => {
-      const cd = cardDB[n];
-      if (!cd) return false;
-      const ct = cd.cardType;
-      return ct === 'Spell' || ct === 'Attack' || ct === 'Creature';
-    }).sort((a, b) => a.localeCompare(b));
-
-    const result = await engine.promptGeneric(pi, {
-      type: 'cardNamePicker',
-      title: CARD_NAME,
-      description: 'Declare a Card name. The top of your deck will be revealed; matching it adds the card to your Hand, missing negates this effect for the rest of the turn.',
-      cardNames: allNames,
-      cancellable: true,
-    });
-    if (!result || result.cancelled || !result.cardName) {
-      // Cancelled before committing — no use spent, no HOPT stamped.
-      return false;
+  /** CPU: die drei haeufigsten Kartennamen des eigenen Decks ansagen, Angebote annehmen. */
+  cpuResponse(engine, kind, promptData) {
+    if (kind !== 'generic') return undefined;
+    if (promptData?.type === 'confirm' && promptData.title === CARD_NAME) return true;
+    if (promptData?.type === 'cardNamePicker' && promptData.title === CARD_NAME) {
+      const pi = engine?._cpuPlayerIdx;
+      const deck = engine?.gs?.players?.[pi]?.mainDeck || [];
+      const zaehler = new Map();
+      for (const n of deck) zaehler.set(n, (zaehler.get(n) || 0) + 1);
+      const frei = new Set(promptData.cardNames || []);
+      const beste = [...zaehler.entries()].filter(([n]) => frei.has(n)).sort((a, b) => b[1] - a[1])[0];
+      return beste ? { cardName: beste[0] } : (promptData.cardNames?.[0] ? { cardName: promptData.cardNames[0] } : undefined);
     }
-    const declared = result.cardName;
-
-    // The activator has now committed to the declaration. Fire the
-    // pending hero-effect reveal + log here so opp sees Kassaran
-    // activated on EVERY use (the false-return below would otherwise
-    // delete both server-side without firing).
-    engine._firePendingCardReveal();
-
-    // Spend the use.
-    spendUse(hero, gs, { key: USE_KEY, max: MAX_USES_PER_TURN });
-
-    const topCard = ps.mainDeck[0];
-    const matched = (baseCardName(topCard) === baseCardName(declared));   // v875
-
-    engine.log('kassaran_declare', {
-      player: ps.username, declared, revealed: topCard, matched,
-      use: MAX_USES_PER_TURN - usesLeft(hero, gs, { key: USE_KEY, max: MAX_USES_PER_TURN }),
-    });
-
-    // Broadcast the flip animation to both clients BEFORE mutating
-    // any state. The client's match-path handler bumps the
-    // `pileTransferToHandPending` suppressor as soon as the event
-    // arrives, so the upcoming hand-grew sync (below) doesn't trigger
-    // its own auto-draw animation on top of our custom one.
-    // `toHandIdx` is the index where the new card will live after the
-    // push (= current hand length); the client uses it to target the
-    // exact landing slot AND to hide that slot via `bounceReturnHidden`
-    // so the freshly-rendered card doesn't pop in mid-flight.
-    // Animation duration on the client is 2000ms — keep the engine
-    // delay matched so state mutation lands roughly when the card
-    // visually settles into the destination.
-    engine._broadcastEvent('kassaran_reveal_flip', {
-      owner: pi, cardName: topCard, outcome: matched ? 'match' : 'miss',
-      toHandIdx: matched ? ps.hand.length : -1,
-    });
-    await engine._delay(2000);
-
-    if (matched) {
-      // ── Match: card moves from deck to hand ──
-      // Done inline rather than via actionAddCardFromDeckToHand so
-      // the helper's deck_search_add broadcast / deckSearchReveal
-      // popup don't fire on top of our custom flip animation. The
-      // hand-lock bypass is intrinsic to this path: we're not calling
-      // through any helper that gates on `handLocked`. Hooks that
-      // matter (ON_CARD_ADDED_TO_HAND for tutor-reactive cards) are
-      // fired manually below.
-      // v1397: Entnahme über die Stapel-Schicht (Deckkopf-Sicht inklusive),
-      // Zugang über die Hand-Stelle — die feuert onCardAddedToHand und
-      // die Tutor-Notiz selbst.
-      engine.takeFromPileSync(ps, 'deck', 0, { source: CARD_NAME, _bypassPileLock: true });   // Als Ruling 25.9.: Kassaran läuft IMMER, egal welche Sperren
-      await engine.handZugang(ps, topCard, { von: 'deck', source: CARD_NAME });
-      engine.log('kassaran_match', { player: ps.username, card: topCard });
-    } else {
-      // ── Miss: card stays on deck, becomes publicly known ──
-      // Push the revealed name into deckTopVisible (Premonition's
-      // shared mechanic) so both players keep seeing the top card
-      // semi-transparently after the flip animation completes.
-      if (!ps.deckTopVisible) ps.deckTopVisible = [];
-      if (ps.deckTopVisible.length === 0) ps.deckTopVisible.push(topCard);
-      else if (ps.deckTopVisible[0] !== topCard) ps.deckTopVisible[0] = topCard;
-
-      // Lock Kassaran out for the rest of the turn — `canActivate-
-      // HeroEffect` checks this flag.
-      hero._kassaranNegatedThisTurn = true;
-    }
-
-    engine.sync();
-
-    // Die Nutzung hat stattgefunden — das melden wir mit `true` und
-    // unterdrücken NUR den Sperr-Stempel über das dafür vorgesehene
-    // Flag. Früher stand hier `return false`; dieser Rückgabewert
-    // bedeutet für die Engine aber gleichzeitig "abgebrochen", und das
-    // hatte zwei Nebenwirkungen: `onAnyActionResolved` (Flashbang zählt
-    // Helden-Effekte als Aktion) feuerte für Kassaran nie, und die CPU
-    // konnte "gefeuert" nicht von "abgebrochen" unterscheiden und kam
-    // dadurch nur auf eine Nutzung je Main Phase statt auf drei.
-    ctx._skipHeroEffectHopt = true;
-    return true;
+    return undefined;
   },
 
   hooks: {
-    /**
-     * Reset per-turn state at the start of the OWNER's turn. The
-     * negation lock-out runs "for the rest of the turn", so it lifts
-     * when the next own-turn begins; same scoping as the use counter.
-     */
-    onTurnStart: (ctx) => {
-      // Styx 28.9.: Zug des Kontrolleurs („you"), nicht der Brettseite.
-      if (ctx.activePlayer !== ctx.cardOwner) return;
-      const hero = ctx.attachedHero;
-      if (!hero) return;
-      // ── KEINE Ruecksetzung der Nutzungen mehr (v421) ────────────
-      // Hier stand `delete hero._kassaranUsesThisTurn` — und der Hook
-      // steigt zwei Zeilen darueber aus, wenn NICHT der Besitzer am Zug
-      // ist. Damit galten die 3 Nutzungen fuer den eigenen UND den
-      // Gegnerzug zusammen. Als Regel: X-mal je Spielerzug. Der
-      // gemeinsame Rundenzaehler stempelt die Runde mit und setzt sich
-      // selbst zurueck. (Vierter Fall dieser Art nach Archer, Golden
-      // Vermin und Lethe.)
-      if (hero._kassaranNegatedThisTurn) delete hero._kassaranNegatedThisTurn;
+    /** „At the start of the game, declare 3 card names." */
+    onBeforeHandDraw: async (ctx) => {
+      const engine = ctx._engine;
+      const gs = engine.gs;
+      const pi = ctx.cardOwner;
+      const hero = ctx.attachedHero || gs.players[ctx.cardHeroOwner ?? pi]?.heroes?.[ctx.cardHeroIdx];
+      if (!hero?.name) return;
+      if (deklariert(hero).length >= ANZAHL) return;   // z. B. im Puzzle vorgegeben
+
+      const db = engine._getCardDB();
+      const alle = Object.keys(db)
+        .filter(n => db[n] && db[n].cardType !== 'Token')
+        .sort((a, b) => a.localeCompare(b));
+      const gewaehlt = [...deklariert(hero)];
+      while (gewaehlt.length < ANZAHL) {
+        const frei = alle.filter(n => !gewaehlt.some(g => baseCardName(g) === baseCardName(n)));
+        const wahl = await engine.promptGeneric(pi, {
+          type: 'cardNamePicker', title: CARD_NAME,
+          description: `Declare card name ${gewaehlt.length + 1}/${ANZAHL}. When you draw a card with a declared name, you may reveal it and add a copy from your deck.`,
+          cardNames: frei, cancellable: false,
+        });
+        const name = wahl?.cardName;
+        if (!name || !frei.includes(name)) { gewaehlt.push(frei[gewaehlt.length % Math.max(1, frei.length)]); continue; }
+        gewaehlt.push(name);
+      }
+      hero._kassaranDeclared = gewaehlt;
+      engine.log('kassaran_declare', { player: gs.players[pi]?.username, names: gewaehlt });
+      engine.sync();
+    },
+
+    /** Zug- und Effekt-Ziehungen: die hinzugefuegte Karte zaehlt als Starthand. */
+    onDraw: async (ctx) => {
+      if (ctx.cardZone !== 'hero') return;
+      const engine = ctx._engine;
+      if (ctx.playerIdx !== ctx.cardOwner) return;
+      if ((engine._startingHandDepth || 0) > 0) return;       // Starthand-Ziehungen laufen im Fenster
+      const hinzu = await bearbeiteZug(ctx, ctx.drawnCardName);
+      if (hinzu) await engine.processStartingHandDraw(ctx.cardOwner, [hinzu], { window: 'kassaran' });
+    },
+
+    /** Starthand-Karten (Startblatt-Fenster der Engine). */
+    onStartingHandCardDrawn: async (ctx) => {
+      if (ctx.playerIdx !== ctx.cardOwner) return;
+      const hinzu = await bearbeiteZug(ctx, ctx.drawnCardName);
+      if (hinzu && Array.isArray(ctx.counted)) ctx.counted.push(hinzu);   // zaehlt als Starthand
     },
   },
 };
