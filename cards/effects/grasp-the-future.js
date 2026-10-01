@@ -17,6 +17,8 @@
 //    (der Text sagt das nur bei Glimpse und Traveler).
 // ═══════════════════════════════════════════
 
+const { skipIfSearchBlocked } = require('./_search-shared');
+
 const CARD_NAME = 'Grasp the Future';
 
 module.exports = {
@@ -32,6 +34,7 @@ module.exports = {
     async resolve(engine, pi) {
       const ps = engine.gs.players[pi];
       if (!ps) return null;
+      if (skipIfSearchBlocked(engine, pi, CARD_NAME)) return null;   // unter der Such-Sperre kein Angebot
       const andere = {};
       for (const n of ps.hand || []) if (n !== CARD_NAME) andere[n] = (andere[n] || 0) + 1;
       const namen = Object.keys(andere);
@@ -47,6 +50,7 @@ module.exports = {
         description: 'Choose another card in your hand to reveal. A copy of it is searched from your deck.',
         cards: namen.map(n => ({ name: n, source: 'hand', count: andere[n] })),
         confirmLabel: '🔎 Reveal & search!', cancellable: true, cancelLabel: 'Cancel',
+        searchToHand: true, searchPile: 'deck',   // = suchAbfrage('deck')
       });
       if (!wahl || wahl.cancelled || !andere[wahl.cardName]) return null;
       const gewaehlt = wahl.cardName;
