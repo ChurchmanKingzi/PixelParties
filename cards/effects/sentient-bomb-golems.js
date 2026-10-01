@@ -138,6 +138,7 @@ module.exports = {
 
       // „… to choose a target and deal 999 damage to it" — Pflicht.
       const ziel = await ctx.promptDamageTarget({
+        // pflichtwahl: die Golems sind schon besiegt (Zusagepunkt) und der Text erzwingt die Wahl
         side: 'any', types: ['hero', 'creature'], damageType: 'creature',
         baseDamage: SCHADEN, title: CARD_NAME,
         description: `Choose a target and deal ${SCHADEN} damage to it.`,
