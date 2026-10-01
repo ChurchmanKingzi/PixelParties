@@ -26711,6 +26711,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   // ★ 18.8. von 130 auf 190 ms (Al: „der Delay zwischen den einzelnen
   // Creatures ist minimal zu kurz").
   const PILE_FLIGHT_STAGGER_MS = 190;
+  // Vorlauf, um den das Aufdecken der Zielkarte VOR ihrer Landung kommt
+  // (Neuaufbau des Bretts braucht Zeit; die Flugkopie deckt den Platz noch).
+  const PILE_AUFDECKEN_VORLAUF_MS = 90;
 
   // Helper: create anims from board rects for unmatched pile entries
   const animsFromBoard = (entries, boardRects, dest, destSelector, side) => {
@@ -36896,8 +36899,14 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         // Rechnung benutzt die Engine fuer `landAtMs` beim
         // Selbstloesch-Transit. Mit `durationMs + 120` erschien die
         // Karte spuerbar zu spaet (Als Befund 19.8.).
+        // ★ Das Aufdecken kommt VOR der Landung an: `setHidden` loest einen
+        // Neuaufbau des grossen Spielbretts aus, und der braucht Zeit. Kam
+        // es erst auf die Millisekunde zur Landung, war die fliegende Kopie
+        // (die in den letzten 20 % ausblendet) schon weg, bevor die echte
+        // Karte im Stapel stand — ein kurzes Loch (Als Befund, Diamond).
+        // Die Kopie liegt in diesem Moment noch deckend ueber dem Platz.
         setTimeout(() => setHidden(prev => Math.max(0, prev - 1)),
-          (laneDelay || 0) + Math.round(durationMs * 0.8));
+          Math.max(0, (laneDelay || 0) + Math.round(durationMs * 0.8) - PILE_AUFDECKEN_VORLAUF_MS));
       }
       // ★ LANDEKLANG (Als Befund 26.9., Idej-Anlegen zu Spielbeginn war
       // stumm). Gegenstueck zu `sfx` (Abflug): ein Flug darf auch einen
