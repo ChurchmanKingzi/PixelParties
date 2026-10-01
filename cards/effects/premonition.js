@@ -4,8 +4,11 @@
 //  any of own Phase 2 / 3 / 4)
 //
 //  Lv1: Search your deck for 1 card.
-//  Lv2: Search your deck for up to 2 cards.
-//  Lv3: Search your deck for up to 3 cards.
+//  Lv2: Search your deck for up to 2 DIFFERENT cards.
+//  Lv3: Search your deck for up to 3 DIFFERENT cards.
+//  „Different" = verschiedene NAMEN (`baseCardName`, die [B]/[W]-Hinweise
+//  zaehlen nicht zum Namen): was in dieser Aktivierung schon abgelegt
+//  wurde, steht in den folgenden Galerien nicht mehr zur Wahl.
 //
 //  Reveal each searched card to the opponent
 //  (deckSearchReveal popup, same stream pattern
@@ -37,6 +40,8 @@
 //  The tracker is shifted on draw and cleared
 //  on shuffle so visibility decays naturally.
 // ═══════════════════════════════════════════
+
+const { baseCardName } = require('./_hooks');
 
 const CARD_NAME = 'Premonition';
 
@@ -103,11 +108,18 @@ module.exports = {
 
       // Deduplicated gallery with copy counts (same shape Magnetic Glove
       // builds for its tutor prompt).
+      // Verschiedene Namen: bereits abgelegte Karten dieser Aktivierung sind raus.
+      const schonGewaehlt = new Set((ps.deckTopVisible || []).slice(0, picksTaken).map(n => baseCardName(n)));
       const countMap = {};
-      for (const name of available) countMap[name] = (countMap[name] || 0) + 1;
+      for (const name of available) {
+        if (schonGewaehlt.has(baseCardName(name))) continue;
+        countMap[name] = (countMap[name] || 0) + 1;
+      }
       const galleryCards = Object.entries(countMap)
         .sort(([a], [b]) => a.localeCompare(b))
         .map(([name, count]) => ({ name, source: 'deck', count }));
+
+      if (galleryCards.length === 0) break;   // keine weitere Karte mit anderem Namen
 
       const cancellable = picksTaken >= minPicks;
       const slotLabel = `${picksTaken + 1}/${maxPicks}`;
