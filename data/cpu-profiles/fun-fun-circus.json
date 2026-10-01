@@ -1,36 +1,66 @@
 {
   "deck": "Fun-Fun Circus",
   "heroes": [
+    "Maho, the Cute Magical Girl",
     "Silent Water Mizune",
-    "Kit, the Shark Researcher",
-    "Beato, the Butterfly Witch"
+    "Kit, the Shark Researcher"
   ],
   "games": 1000,
   "trainWinRate": "handgesetzt",
   "handTuned": true,
   "cardValues": {
-    "Fun-Fun Circus Clown": 45,
-    "Fun-Fun Circus Director": 30,
-    "Fun-Fun Circus Strongman": 25,
-    "Fun-Fun Circus Elephant": 22,
-    "Teleportal": 18,
-    "Idol of Crestina": 14,
-    "Summoning Magic": 16,
-    "Magic Arts": 16
+    "Fun-Fun Circus Clown": 50,
+    "Fun-Fun Circus Elephant": 38,
+    "Fun-Fun Circus Director": 38,
+    "Fun-Fun Circus Strongman": 38,
+    "Crum, the Class Pet": 22,
+    "Summoning Magic": 30,
+    "Magic Arts": 30,
+    "Skull Carpet Bombing": 26,
+    "Spectral Armor": 18,
+    "Aquatic Shield": 18,
+    "Unwanted Audience": 10,
+    "Aquatic Spear": 10,
+    "Idol of Crestina": 12,
+    "Staff of the Teleporter": 6,
+    "Treasure Chest": 6,
+    "Golden Bananas": 6,
+    "Pocket Catapult": 8,
+    "Cloud Pillow": 10,
+    "Thicket": 8,
+    "Invisibility Cloak": 12,
+    "Summoning Circle": 10,
+    "Flying Island in the Sky": 10
   },
   "timing": {
     "Fun-Fun Circus Clown": {
-      "early": 1.4,
+      "early": 1.5,
       "mid": 1.0,
       "late": 0.8
+    },
+    "Summoning Magic": {
+      "early": 1.5,
+      "mid": 1.0,
+      "late": 0.6
+    },
+    "Magic Arts": {
+      "early": 1.5,
+      "mid": 1.0,
+      "late": 0.6
     }
   },
   "pairBonuses": {
+    "Fun-Fun Circus Clown|Fun-Fun Circus Elephant": 10,
+    "Fun-Fun Circus Clown|Fun-Fun Circus Strongman": 10,
     "Fun-Fun Circus Clown|Fun-Fun Circus Director": 10,
-    "Fun-Fun Circus Clown|Fun-Fun Circus Strongman": 10
+    "Fun-Fun Circus Clown|Summoning Magic": 15
   },
   "abilityPriors": {
-    "Summoning Magic@Silent Water Mizune": 150,
-    "Magic Arts@Silent Water Mizune": 150
+    "Summoning Magic@Maho, the Cute Magical Girl": 200,
+    "Magic Arts@Silent Water Mizune": 200,
+    "Summoning Magic@Silent Water Mizune": 120,
+    "Magic Arts@Maho, the Cute Magical Girl": 120,
+    "Magic Arts@Kit, the Shark Researcher": 100,
+    "Summoning Magic@Kit, the Shark Researcher": 100
   }
 }
