@@ -16,8 +16,8 @@
 //  • „At the end of every turn": jeder Zugende (eigenes wie gegnerisches), einmal je
 //    Zug, auch wenn zwei Ghazmas im Spiel sind. „The turn player's deleted
 //    Creatures" = die Kreaturen im Geloescht-Stapel des Spielers, der am Zug war;
-//    „not deleted this turn" = sie lagen schon bei Zugbeginn dort (Schnappschuss
-//    `gs._geloeschtBeiZugbeginn`, mengenweise je Name). Sie werden in das Deck ihres
+//    „not deleted this turn" = sie kamen VOR diesem Zug in den Stapel — je KARTE
+//    ueber Zeitstempel (`ps._deletedStamps`, `engine._geloeschtZuege`), nicht ueber Namen. Sie werden in das Deck ihres
 //    Besitzers (= dieser Stapel) gemischt, danach zieht der Spieler am Zug so viele
 //    Karten, hoechstens 2.
 // ═══════════════════════════════════════════
@@ -44,22 +44,24 @@ module.exports = {
       gs._ghazmaZugende = gs.turn;
 
       const db = engine._getCardDB();
-      // Mengenweiser Vergleich mit dem Stand bei Zugbeginn.
-      const vorher = {};
-      for (const n of (gs._geloeschtBeiZugbeginn?.[pi] || [])) vorher[n] = (vorher[n] || 0) + 1;
-      const zurueck = [];
-      const rest = [];
-      for (const n of (ps.deletedPile || [])) {
+      // Je KARTE: ein Eintrag zaehlt, wenn er VOR diesem Zug in den Stapel kam (Zeitstempel
+      // `ps._deletedStamps`) — Namensvergleiche versagen, wenn eine gleichnamige Karte im selben
+      // Zug den Stapel verlaesst und eine neue hineinkommt.
+      const zuege = engine._geloeschtZuege(pi);
+      const indizes = [];
+      (ps.deletedPile || []).forEach((n, k) => {
         const cd = db[n];
-        if (cd && hasCardType(cd, 'Creature') && (vorher[n] || 0) > 0) {
-          vorher[n] -= 1;
-          zurueck.push(n);
-        } else rest.push(n);
+        if (cd && hasCardType(cd, 'Creature') && zuege[k] < gs.turn) indizes.push(k);
+      });
+      const zurueck = [];
+      for (let k = indizes.length - 1; k >= 0; k--) {
+        // Stapel-Schicht statt direktem Splice (Sperren/Verwahrung gelten; null = bleibt liegen).
+        const genommen = engine.takeFromPileSync(pi, 'deleted', indizes[k], { source: CARD_NAME });
+        if (genommen) zurueck.unshift(genommen.name);
       }
       if (zurueck.length === 0) return;
 
       await engine.showTriggeredEffect(CARD_NAME, { playerIdx: pi });
-      ps.deletedPile = rest;
       for (const n of zurueck) {
         ps.mainDeck.push(n);
         engine._pileFlight(pi, n, 'deleted', 'deck');
