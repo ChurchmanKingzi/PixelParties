@@ -46984,14 +46984,18 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                   siehe PileSearchModal) — der autoFocus riss sonst beim
                   Oeffnen jeder Such-Galerie die Tastatur hoch. */}
               {cards.length >= 8 && !(window.ppIsPhone && window.ppIsPhone()) && (
-                <input type="text" value={galerieFilter} autoFocus
-                  onChange={e => setGalerieFilter(e.target.value)}
-                  placeholder="🔍 Filter by name..."
-                  style={{
-                    width: '100%', padding: '6px 10px', marginBottom: 10, fontSize: 12,
-                    background: 'var(--bg2)', border: '1px solid var(--bg4)', borderRadius: 6,
-                    color: 'var(--text1)', outline: 'none', boxSizing: 'border-box',
-                  }} />
+                // Mitscrollend (Als Vorgabe): das ganze Panel scrollt, die Leiste
+                // klebt oben (top −16 = Innenabstand der `.deck-viewer-modal`).
+                <div style={{ position: 'sticky', top: -16, zIndex: 20, background: 'var(--bg2)', padding: '10px 0 8px' }}>
+                  <input type="text" value={galerieFilter} autoFocus
+                    onChange={e => setGalerieFilter(e.target.value)}
+                    placeholder="🔍 Filter by name..."
+                    style={{
+                      width: '100%', padding: '6px 10px', fontSize: 12,
+                      background: 'var(--bg2)', border: '1px solid var(--bg4)', borderRadius: 6,
+                      color: 'var(--text1)', outline: 'none', boxSizing: 'border-box',
+                    }} />
+                </div>
               )}
               <PileGrid>
                 {cards.filter(entry => {

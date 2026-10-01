@@ -19,7 +19,8 @@
 //  („Immediately … play"), kein Angebot.
 //   • `ascendsFromDefeat: true` — der Aufstieg traegt einen GEFALLENEN
 //     Helden; der Aufstiegsbonus stellt die HP wieder her.
-//   • `onHeroKO` feuert aus der HAND und ruft `performAscension` selbst.
+//   • `onHeroKO` feuert aus der HAND, FRAGT den Spieler (Als Vorgabe:
+//     Ablehnen = Chuck faellt normal) und ruft `performAscension` selbst.
 //     „Defeated by taking damage" = der KO-Hook traegt `isSacrifice`
 //     NICHT (nur der Niederlage-Pfad ohne Schaden setzt es), das gilt
 //     auch fuer True Damage, der keinen `type` mitgibt.
@@ -58,6 +59,8 @@ const CARD_NAME = 'Chuck, the Storyteller';
 const BASIS = 'Chuck, the Crazy Veteran';
 const MAX_WAHLEN = 3;
 const HEAL_QUELLE_NAME = CARD_NAME;
+// Als Vorgabe: „Performance" ist fuer den Bonus ausdruecklich KEINE Option.
+const AUSGESCHLOSSEN = new Set(['Performance']);
 
 /** Stempel, den der KO-Hook setzt und die Bedingung liest. */
 function stempelKey(hs, heroIdx) { return `chuckAscend:${hs}-${heroIdx}`; }
@@ -94,7 +97,7 @@ function freieSupportZone(engine, hs, heroIdx) {
  */
 function entscheide(engine, pi, hs, heroIdx, name) {
   const script = loadCardEffect(name);
-  if (!script) return null;
+  if (!script || AUSGESCHLOSSEN.has(name)) return null;
   if (script.restrictedAttachment) return null;
   if (script.canAttachToHero && !script.canAttachToHero(engine.gs, pi, heroIdx, engine)) return null;
 
@@ -122,6 +125,7 @@ function abilityPool(engine) {
   const out = [];
   for (const name of Object.keys(db)) {
     if (!hasCardType(db[name], 'Ability')) continue;
+    if (AUSGESCHLOSSEN.has(name)) continue;
     if (!loadCardEffect(name)) continue;
     out.push(name);
   }
@@ -293,13 +297,27 @@ module.exports = {
       // „while you still control other undefeated Heroes".
       if (!hatAndereLebende(engine, pi, gefallen, false)) return;
 
-      const handIdx = (gs.players[pi]?.hand || []).indexOf(CARD_NAME);
-      if (handIdx < 0) return;
+      if ((gs.players[pi]?.hand || []).indexOf(CARD_NAME) < 0) return;
+
+      // Als Vorgabe: der Spieler wird GEFRAGT, bevor Chuck aufsteigt.
+      // Ablehnen = Chuck faellt normal, die Karte bleibt auf der Hand.
+      // Die CPU sagt immer ja.
+      const antwort = await engine.promptGeneric(pi, {
+        type: 'confirm', title: CARD_NAME, showCard: CARD_NAME,
+        message: `${BASIS} was defeated. Play ${CARD_NAME} on top of it?`,
+        confirmLabel: '✨ Ascend!', cancelLabel: 'No, thanks',
+        cancellable: true, _cpuAutoConfirm: true,
+      });
+      if (!antwort || antwort.cancelled || antwort.confirmed === false) return;
+      if (gefallen.hp > 0) return;                    // waehrend der Frage gerettet
+      if ((gs.players[pi]?.hand || []).indexOf(CARD_NAME) < 0) return;
 
       if (!gs._chuckAscendReady) gs._chuckAscendReady = {};
       gs._chuckAscendReady[stempelKey(owner, heroIdx)] = gs.turn;
       try {
         await engine.showTriggeredEffect(CARD_NAME);
+        // Index frisch: die Frage kann die Hand veraendert haben.
+        const handIdx = (gs.players[pi]?.hand || []).indexOf(CARD_NAME);
         await engine.performAscension(pi, heroIdx, CARD_NAME, handIdx,
           owner !== pi ? { heroOwner: owner } : {});
       } finally {
