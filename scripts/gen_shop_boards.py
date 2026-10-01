@@ -123,93 +123,77 @@ def icon_discard(cv, n):
 
 ICONS = {'area': icon_area, 'delete': icon_delete, 'discard': icon_discard}
 
-# ── Runen-Glyphen (Theme „Runen“, je Zone eine andere) ─────────────────────
-GLYPHS = [
- ["X..X..X", "X..X..X", ".X.X.X.", "..XXX..", "...X...", "...X...", "...X...", "...X...", "...X...", "...X...", "...X..."],
- ["X......", "X.XX...", "X.X.X..", "X.X..X.", "X.X.X..", "X.XX...", "X......", "X......", "X......", "X......", "X......"],
- ["...X...", "..X.X..", ".X...X.", "X..X..X", ".X.X.X.", "..XXX..", ".X.X.X.", "X..X..X", ".X...X.", "..X.X..", "...X..."],
- ["XXXX...", "X...X..", "X....X.", "X...X..", "XXXX...", "X...X..", "X....X.", "X...X..", "XXXX...", "X......", "X......"],
-]
+# ── Theme „Zahnrad“ (dunkel): Nietenplatte, Eck-Zahnräder, großes Zahnrad ───
+def gear(cv, cx, cy, rb, rt, teeth, col, phase=0.0):
+    for y in range(GH):
+        for x in range(GW):
+            dx, dy = x - cx, y - cy
+            d = math.hypot(dx, dy)
+            if d <= rb or (d <= rt and math.cos(teeth * (math.atan2(dy, dx) + phase)) > 0.1):
+                cv.put(x, y, col)
 
-# ── Theme „Runen“ (dunkel): Streifenfeld, Nietenrahmen, Rundumleiste, Panel ──
-def theme_runen(p, zt, n):
+def rivet(cv, x, y, p):
+    cv.put(x, y, p['hi']); cv.put(x + 1, y + 1, p['dk'])
+
+def theme_zahnrad(p, zt, n):
     cv = Canvas(p['dk'])
+    cv.rect(2, 2, GW - 3, GH - 3, p['m'])
     cv.frame(2, 2, GW - 3, GH - 3, p['lo'])
-    for y in range(3, GH - 3):
-        for x in range(3, GW - 3):
-            s = (x + y) % 8
-            cv.put(x, y, p['hi'] if s == 0 else (p['m'] if s < 5 else p['lo']))
-    # Runen-Ticks im äußeren Rand
-    for x in range(3, GW - 3, 3):
-        cv.put(x, 0, p['lo']); cv.put(x, 1, p['lo']); cv.put(x, GH - 1, p['lo']); cv.put(x, GH - 2, p['lo'])
-    for y in range(5, GH - 5, 3):
-        cv.put(0, y, p['lo']); cv.put(1, y, p['lo']); cv.put(GW - 1, y, p['lo']); cv.put(GW - 2, y, p['lo'])
-    # Eck-Nieten (2x2 + Schatten)
-    for (x, y) in [(4, 4), (GW - 6, 4), (4, GH - 6), (GW - 6, GH - 6)]:
-        cv.rect(x, y, x + 1, y + 1, p['hi']); cv.put(x + 2, y + 1, p['dk']); cv.put(x + 1, y + 2, p['dk']); cv.put(x + 2, y + 2, p['dk'])
-    # Panel mit Abschrägung
-    x0, y0, x1, y1 = 7, 11, 22, 30
-    cv.rect(x0, y0, x1, y1, p['m'])
-    cv.frame(x0 - 1, y0 - 1, x1 + 1, y1 + 1, p['dk'])
-    for x in range(x0, x1 + 1): cv.put(x, y0, p['hi']); cv.put(x, y1, p['lo'])
-    for y in range(y0, y1 + 1): cv.put(x0, y, p['hi']); cv.put(x1, y, p['lo'])
-    for (x, y) in [(x0 - 1, y0 - 1), (x1 + 1, y0 - 1), (x0 - 1, y1 + 1), (x1 + 1, y1 + 1)]:
-        cv.put(x, y, p['lo'])
-    # Zierstreifen über/unter dem Panel
-    for x in range(x0, x1 + 1, 2):
-        cv.put(x, y0 - 3, p['dk']); cv.put(x, y1 + 3, p['dk'])
+    # Plattenfugen mit Fasenlinie, versetzte senkrechte Fugen
+    for y in (13, 28):
+        for x in range(3, GW - 3): cv.put(x, y, p['dk']); cv.put(x, y + 1, p['hi'])
+    for x in (9, 20):
+        for y in range(3, 13): cv.put(x, y, p['dk']); cv.put(x + 1, y, p['hi'])
+        for y in range(30, GH - 3): cv.put(x, y, p['dk']); cv.put(x + 1, y, p['hi'])
+    for x in range(5, GW - 4, 5):
+        rivet(cv, x, 11, p); rivet(cv, x, 31, p)
+    for y in (6, GH - 8): rivet(cv, 5, y, p); rivet(cv, GW - 7, y, p)
+    # Eck-Zahnräder (mit dunkler Kontur, vom Rand angeschnitten)
+    for i, (x, y) in enumerate([(2, 2), (GW - 3, 2), (2, GH - 3), (GW - 3, GH - 3)]):
+        ph = i * 0.4
+        gear(cv, x, y, 5.2, 7.4, 6, p['dk'], ph)
+        gear(cv, x, y, 4.2, 6.2, 6, p['hi'], ph)
+        cv.disc(x, y, 2.2, p['dk']); cv.disc(x, y, 1.0, p['m'])
+    # Großes Zahnrad als Kartusche
+    gear(cv, CX, CY, 12.0, 14.2, 12, p['dk'])
+    gear(cv, CX, CY, 11.0, 13.2, 12, p['hi'], 0.0)
+    cv.ring(CX, CY, 11.4, p['lo'])
+    cv.disc(CX, CY, 10.6, p['dk']); cv.disc(CX, CY, 10.0, p['m'])
     if zt in ICONS: ICONS[zt](cv, n)
-    else:
-        g = GLYPHS[ZONES.index(zt) % 4]
-        cv.bitmap(g, round(CX - 3), round(CY - 5), p['hi'] if zt != 'support' else p['dk'], shadow=p['dk'] if zt != 'support' else p['lo'])
+    else:   # kleines Zahnrad mit Loch
+        c = p['hi'] if zt != 'support' else p['dk']
+        gear(cv, CX, CY, 4.8, 7.2, 8, c, 0.2)
+        cv.disc(CX, CY, 2.4, p['dk'] if zt != 'support' else p['lo']); cv.disc(CX, CY, 1.0, c)
     return cv
 
-# ── Theme „Schuppen“ (dunkel): Fischschuppen, Nieten-Leiste, Ovalkartusche ───
-def theme_schuppen(p, zt, n):
+# ── Theme „Wellen“ (dunkel): Wasserwellen, Seilrahmen, Bullauge, Anker ───────
+ANKER = [
+ "....XXX....", "....X.X....", "....XXX....", ".....X.....", "..XXXXXXX..", ".....X.....", ".....X.....",
+ ".....X.....", "X....X....X", "XX...X...XX", ".X...X...X.", "..X..X..X..", "...XXXXX...", "....XXX....",
+]
+def theme_wellen(p, zt, n):
     cv = Canvas(p['dk'])
-    R, SW, SH = 4.6, 8, 4
-    for y in range(2, GH - 2):
-        for x in range(2, GW - 2):
-            best = None
-            for j in range(-1, GH // SH + 3):
-                cy = j * SH + 1
-                off = (SW // 2) if j % 2 else 0
-                for i in range(-1, GW // SW + 3):
-                    cx = i * SW + off
-                    d = math.hypot((x - cx) / 1.0, (y - cy) / 0.95)
-                    if d <= R and (best is None or cy > best[1]): best = (cx, cy, d)
-            if best is None: cv.put(x, y, p['lo']); continue
-            cx, cy, d = best
-            if d > R - 1.1 or (y > cy + 1 and d > R - 1.6): c = p['lo']
-            elif y < cy - 1: c = p['hi']
-            else: c = p['m']
-            cv.put(x, y, c)
-    cv.frame(2, 2, GW - 3, GH - 3, p['dk'])
-    cv.frame(1, 1, GW - 2, GH - 2, p['lo'])
-    # Nietenleisten oben und unten
-    for x in range(5, GW - 4, 4):
-        cv.put(x, 0, p['hi']); cv.put(x, GH - 1, p['hi'])
-    for y in range(6, GH - 5, 5):
-        cv.put(0, y, p['hi']); cv.put(GW - 1, y, p['hi'])
-    # Ovalkartusche
     for y in range(GH):
         for x in range(GW):
-            d = math.hypot((x - CX) / 9.2, (y - CY) / 12.5)
-            if d <= 1.0: cv.put(x, y, p['m'] if d < 0.86 else p['dk'])
-            elif d <= 1.1: cv.put(x, y, p['dk'])
+            t = (y + 2.4 * math.sin(x * 0.45 + y * 0.12) + 1.0 * math.sin(x * 0.9 + 2)) % 9
+            cv.put(x, y, p['hi'] if t < 1.5 else (p['m'] if t < 5.0 else (p['dk'] if 7.4 <= t < 8.3 else p['lo'])))
+            if 1 <= t < 1.6 and (x * 5 + y) % 4 == 0: cv.put(x, y, p['hi'])
+    # Seilrahmen
     for y in range(GH):
         for x in range(GW):
-            d = math.hypot((x - CX) / 9.2, (y - CY) / 12.5)
-            if 0.86 <= d < 1.0: cv.put(x, y, p['hi'] if (x + y) % 2 else p['lo'])
+            e = min(x, GW - 1 - x, y, GH - 1 - y)
+            if e == 0 or e == 3: cv.put(x, y, p['dk'])
+            elif e <= 2: cv.put(x, y, p['hi'] if (x + y) % 4 < 2 else p['lo'])
+    # Bullauge
+    cv.disc(CX, CY, 13.0, p['dk']); cv.disc(CX, CY, 12.0, p['hi']); cv.disc(CX, CY, 10.9, p['lo'])
+    cv.disc(CX, CY, 10.4, p['dk']); cv.disc(CX, CY, 10.0, p['m'])
+    for k in range(8):
+        a = k * math.pi / 4 + math.pi / 8
+        cv.put(round(CX + 11.5 * math.cos(a)), round(CY + 11.5 * math.sin(a)), p['dk'])
     if zt in ICONS: ICONS[zt](cv, n)
-    else:   # Edelstein-Raute
-        c = p['hi'] if zt != 'support' else p['dk']; sh = p['lo'] if zt != 'support' else p['lo']
-        for dy in range(-7, 8):
-            w = 7 - abs(dy)
-            for dx in range(-w, w + 1):
-                cv.put(round(CX) + dx, round(CY) + dy, c if (dx + dy) % 5 else p['m'] if dy < 0 else sh)
-        cv.line(round(CX) - 7, round(CY), round(CX) + 7, round(CY), p['dk'])
-        cv.line(round(CX), round(CY) - 7, round(CX), round(CY) + 7, p['dk'])
+    else:
+        c = p['hi'] if zt != 'support' else p['dk']; sh = p['dk'] if zt != 'support' else p['lo']
+        cv.bitmap(ANKER, round(CX) - 5, round(CY) - 7, c, shadow=sh)
     return cv
 
 # ── Theme „Sterne“ (dunkel): Sternenhimmel, Sternbild, Lichterkette, Rosette ──
@@ -312,8 +296,8 @@ def theme_kristall(p, zt, n):
     return cv
 
 THEMES = {
-    'board3': dict(name='Runen',    fn=theme_runen),
-    'board4': dict(name='Schuppen', fn=theme_schuppen),
+    'board3': dict(name='Zahnrad',  fn=theme_zahnrad),
+    'board4': dict(name='Wellen',   fn=theme_wellen),
     'board5': dict(name='Sterne',   fn=theme_sterne),
     'board6': dict(name='Kristall', fn=theme_kristall),
 }
