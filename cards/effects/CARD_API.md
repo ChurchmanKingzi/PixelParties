@@ -18624,3 +18624,12 @@ Creature (Normal, Lv 0, 10 HP, `PP MBS1`). `onTurnEnd` je Golem (nur eigener Zug
 ## Communication Device (Equipment)
 
 - Skript `communication-device.js` (nur Markierung). Der Effekt sitzt in `_getCandidateAbilityZoneSets` → `_kommunikationsGeraetSets`: ein Held (Brettseite, Index) mit offenem Geraet bekommt je ANDEREM, dauerhaft kontrollierten (`heroesControlledBy(…, {permanentOnly:true})`), lebenden Helden mit Geraet dessen Ability-Zonen (+ Support-Abilities) als weiteren Kandidaten fuer `heroMeetsLevelReq` und die Wisdom-Kosten. Nie summiert. Empfaenger darf auch ein geliehener Held sein (der Kontroll-Equip-Weg legt das Geraet dort an, wenn seine Support Zones frei/nicht gesperrt sind). Hilfsfunktion: `engine.heldTraegtKommunikationsGeraet(seite, heroIdx)`.
+
+## „The Future"-Mini-Archetyp (Startblatt-Effekte)
+
+Karten: End of the Future, Traveler from the Future, Grasp the Future, Glimpse of the Future.
+
+- **Startblatt-Fenster:** `engine.runStartingHandWindow()` (aus `startGame`, nicht im Puzzle) — Startspieler zuerst, dann der Gegner; „Starthand" = die Hand bei `startGame` (vor der Mulligan-Abfrage bzw. nach Mulligan die neu gezogenen fuenf). Die erste Karte des ersten Zuges zaehlt nicht.
+- **Vertrag:** Skript `startingHand: { canTrigger?(engine, pi, name), resolve(engine, pi, { cardName }) → { counted?: string[] } | null }`. `engine.processStartingHandDraw(pi, cardNames)` arbeitet die Karten der Reihe nach ab (jede Kopie einzeln); `counted` haengt weitere Karten hinten an (Glimpse). `engine._startingHandDepth > 0` = innerhalb einer Auswertung. Standardabfrage: `engine.promptStartingHandYesNo`. Aufdecken fuer den Gegner: `showTriggeredEffect(name, { playerIdx })`.
+- **Traveler:** Passiv-Hook `onDraw` (Resource Phase des aktiven Spielers, Kontrolle) ruft `processStartingHandDraw(pi, [gezogene Karte])`; Beschwoerung als Zusatzaktion ueber `performImmediateActionAnyHero` (nur diese Kreatur, abbrechbar).
+- **End of the Future:** Handindex-Feld `_selfRevealedHandIndices` (nur durch den eigenen Effekt gesetzt, folgt der Kopie, faellt mit dem Verlassen der Hand) + normale dauerhafte Aufdeckung; Gate `spellPlayCondition` (nach Name) und neuer Skriptvertrag `canPlayFromHandIdx(gs, pi, handIdx, engine)` in `validateActionPlay` (konkrete Kopie). Schaden 50 × Hand ohne die gespielte Kopie, Zugende ueber `_terrorForceEndTurn`.
