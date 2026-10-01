@@ -22,6 +22,30 @@
 
 
 const { heldenSperreKey } = require('./_hero-hopt-shared');   // v1275: Heldensperre pro Spieler (Ruling 22.9.)
+
+const CARD_NAME = 'Diamond, the Keeper of Peace';
+const AUFSTIEG_ZIEL = 'Diamond, the Bulwark of Peace';
+const AUFSTIEG_VERLUST = 150;
+
+/**
+ * Aufstiegsbereitschaft an den Client melden („has lost at least 150 HP
+ * due to its own effect"). Nur eine Anzeige — die verbindliche
+ * Pruefung steht als `ascensionCondition` auf der aufgestiegenen Karte.
+ * Der Zaehler `hero._diamondSelfLoss` summiert die HP, die Diamond
+ * durch den Schutz-Selbstschaden TATSAECHLICH verloren hat (Heilung
+ * mindert ihn nicht); im Puzzle-Editor setzbar.
+ */
+function meldeAufstieg(hero) {
+  if (!hero || hero.name !== CARD_NAME) return;
+  if ((hero._diamondSelfLoss || 0) >= AUFSTIEG_VERLUST) {
+    hero.ascensionReady = true;
+    hero.ascensionTarget = AUFSTIEG_ZIEL;
+  } else if (hero.ascensionTarget === AUFSTIEG_ZIEL) {
+    delete hero.ascensionReady;
+    delete hero.ascensionTarget;
+  }
+}
+
 module.exports = {
   // CPU: confirm Diamond's "protect your Creatures?" prompt — the default
   // brain declines cancellable confirms outside a card-cast (damage trigger),
@@ -133,8 +157,29 @@ module.exports = {
       // Deal damage to Diamond (type 'other', can kill)
       // v845: Quelle mit Besitzer (siehe Angry Cheese) — sonst zaehlt der
       // Selbstschaden fuer Hooks wie Tazunes Schild als besitzerlos.
+      const hpVorher = hero.hp;
       await engine.actionDealDamage({ name: 'Diamond, the Keeper of Peace', owner: pi, controller: pi }, hero, selfDamage, 'other');
+      // Aufstiegsbedingung der Bulwark-Form: HP, die sie durch DIESEN
+      // Effekt wirklich verloren hat (Schilde/Kuerzungen zaehlen nicht mit).
+      const verloren = Math.max(0, hpVorher - Math.max(0, hero.hp));
+      if (verloren > 0) hero._diamondSelfLoss = (hero._diamondSelfLoss || 0) + verloren;
+      meldeAufstieg(hero);
       engine.sync();
     },
+
+    // Anzeige nachziehen (Puzzle-Editor-Wert, geraeumte Marken) — wie
+    // bei Cecilia. Styx 28.9.: der Held selbst (Brettseite).
+    onTurnStart: (ctx) => {
+      const ps = ctx._engine?.gs?.players?.[ctx.cardHeroOwner ?? ctx.cardOwner];
+      meldeAufstieg(ctx.attachedHero ?? ps?.heroes?.[ctx.card?.heroIdx]);
+    },
+    onGameStart: (ctx) => {
+      const ps = ctx._engine?.gs?.players?.[ctx.cardHeroOwner ?? ctx.cardOwner];
+      meldeAufstieg(ctx.attachedHero ?? ps?.heroes?.[ctx.card?.heroIdx]);
+    },
   },
+
+  // Fuer die aufgestiegene Form und Tests.
+  _AUFSTIEG_ZIEL: AUFSTIEG_ZIEL,
+  _AUFSTIEG_VERLUST: AUFSTIEG_VERLUST,
 };

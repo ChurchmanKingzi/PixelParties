@@ -2571,6 +2571,10 @@ function PuzzleCreator() {
   // ueberhaupt nicht testen — dieselbe Begruendung wie bei Waflavs
   // Evolution Counters. Null fuer alle anderen Helden.
   const [editCeciliaDefeated, setEditCeciliaDefeated] = useState(null);
+  // Diamond, the Keeper of Peace: HP, die sie durch ihren eigenen Effekt
+  // verloren hat (`hero._diamondSelfLoss`) — Aufstiegsbedingung von
+  // „Diamond, the Bulwark of Peace" (150). Null fuer andere Helden.
+  const [editDiamondLoss, setEditDiamondLoss] = useState(null);
   // v1143: Schadens-Historie (`hero._jeGetroffen`). Null = Abschnitt zu.
   const [editJeGetroffen, setEditJeGetroffen] = useState(null);
   // Kopfgeld-Marke (v904, Vena). Liegt als `hero._bountyBy` auf dem
@@ -2688,6 +2692,7 @@ function PuzzleCreator() {
     setEditEvolutionCounter(null);
     setEditInvestCounter(null);
     setEditCeciliaDefeated(null);
+    setEditDiamondLoss(null);
     setEditJeGetroffen(null);
     setEditBalanceCounter(null);
     setEditApplause(null);
@@ -2729,6 +2734,9 @@ function PuzzleCreator() {
       setEditPreserveCounter(null);
       setEditCeciliaDefeated(h.name === 'Cecilia, the Harrowing Crusader'
         ? !!h._ceciliaDefeatedOnce
+        : null);
+      setEditDiamondLoss(h.name === 'Diamond, the Keeper of Peace'
+        ? (h._diamondSelfLoss || 0)
         : null);
       setEditBountyMark(venaAufSeite(players[si === 0 ? 1 : 0])
         ? (h._bountyBy === (si === 0 ? 1 : 0))
@@ -2910,6 +2918,11 @@ function PuzzleCreator() {
         } else if (editCeciliaDefeated != null) {
           delete p.heroes[hi]._ceciliaDefeatedOnce;
         }
+        if (editDiamondLoss != null && editDiamondLoss > 0) {
+          p.heroes[hi]._diamondSelfLoss = editDiamondLoss;
+        } else if (editDiamondLoss != null) {
+          delete p.heroes[hi]._diamondSelfLoss;
+        }
         // v1143: ausdruecklich true/false speichern — „nicht gesetzt"
         // bedeutet im Loader „aus den HP ableiten".
         if (editJeGetroffen != null) p.heroes[hi]._jeGetroffen = !!editJeGetroffen;
@@ -3070,7 +3083,7 @@ function PuzzleCreator() {
       return p;
     });
     setEditTarget(null);
-  }, [editTarget, editHp, editMaxHp, editAtk, editStatuses, editBuffs, editBiomancyLevel, editAttachedHero, editHeadCounter, editLinkedHeroSlot, editChangeCounter, editEvolutionCounter, editInvestCounter, editCeciliaDefeated, editJeGetroffen, editBountyMark, editBalanceCounter, editApplause, editBunnyBombCounter, editDemonCounter, editSparkflyGifts, editAntiMagicLevel, updatePlayer, getCard, statusScopePasst]);
+  }, [editTarget, editHp, editMaxHp, editAtk, editStatuses, editBuffs, editBiomancyLevel, editAttachedHero, editHeadCounter, editLinkedHeroSlot, editChangeCounter, editEvolutionCounter, editInvestCounter, editCeciliaDefeated, editDiamondLoss, editJeGetroffen, editBountyMark, editBalanceCounter, editApplause, editBunnyBombCounter, editDemonCounter, editSparkflyGifts, editAntiMagicLevel, updatePlayer, getCard, statusScopePasst]);
 
   const toggleHeroDead = useCallback(() => {
     if (!editTarget || editTarget.zt !== 'hero') return;
@@ -5044,6 +5057,26 @@ function PuzzleCreator() {
                 </label>
                 <div style={{ fontSize: 10, color: 'var(--text2)', marginTop: 4 }}>
                   Required for "Rescued Damsel Cecilia".
+                </div>
+              </div>
+            )}
+            {editDiamondLoss != null && (
+              <div style={{ marginBottom: 14 }}>
+                <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: 1 }}>
+                  💎 Ascension
+                </span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
+                  <input className="input" type="number" min={0}
+                    value={editDiamondLoss ?? 0}
+                    onChange={(e) => {
+                      const n = parseInt(e.target.value, 10);
+                      setEditDiamondLoss(Number.isFinite(n) && n >= 0 ? n : 0);
+                    }}
+                    onKeyDown={(e) => e.key === 'Enter' && saveStats()}
+                    style={{ flex: 1, textAlign: 'center', fontSize: 13, fontWeight: 700 }} />
+                </div>
+                <div style={{ fontSize: 10, color: 'var(--text2)', opacity: 0.7, marginTop: 4 }}>
+                  HP lost due to her own effect. 150 or more is required for "Diamond, the Bulwark of Peace".
                 </div>
               </div>
             )}

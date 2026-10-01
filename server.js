@@ -14987,6 +14987,11 @@ io.on('connection', (socket) => {
         if (h._ceciliaDefeatedOnce) {
           out._ceciliaDefeatedOnce = true;
         }
+        // Diamond, the Keeper of Peace: durch den eigenen Effekt verlorene
+        // HP — Aufstiegsbedingung von „Diamond, the Bulwark of Peace".
+        if (typeof h._diamondSelfLoss === 'number' && h._diamondSelfLoss > 0) {
+          out._diamondSelfLoss = h._diamondSelfLoss;
+        }
         // ★★ v1143 („Forbidden Curse of Aging"): „has not taken any damage
         // yet this game". Im Puzzle hat nie ein Schaden stattgefunden, der
         // Merker `_jeGetroffen` fehlte also JEDEM Helden — auch einem mit
