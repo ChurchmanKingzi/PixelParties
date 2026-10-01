@@ -8,8 +8,8 @@
 //   cards in your hand. You can only play 1 \"Mausoleum Worm\" per turn."
 //
 //  ── AUSLEGUNG ─────────────────────────────────────────────────────
-//  • Lauscher aus der ABLAGE (Muster Grave Worm: breite `activeIn` + zustands-
-//    basierter Ablage-Check, `bypassDeadHeroFilter`), ausgeloest vom
+//  • Lauscher aus der ABLAGE OHNE Instanz (`discardHooks`, `engine._runDiscardHooks`
+//    — Puzzle-Vorgaben und Mills legen Karten ohne verfolgte Instanz ab), ausgeloest vom
 //    ENDGUELTIGEN Tod (`onHeroDefeatFinal`, Engine: nach dem Aufraeumen, vor dem
 //    Extra-Leben). Verhinderte Tode (Guardian Angel & Co.) loesen NICHT aus,
 //    Wiederbelebungen nach dem Tod schon. „Hero you control" = jeder von mir kontrollierte Held
@@ -30,11 +30,6 @@ const HOPT_KEY = 'mausoleum-worm';
 const ZIEL_HAND = 8;
 
 module.exports = {
-  // Wie Grave Worm: nicht jeder Ablageweg haelt `inst.zone` sauber — breit
-  // lauschen und unten zustandsbasiert pruefen.
-  activeIn: ['hand', 'support', 'discard', 'deleted', 'deck'],
-  bypassDeadHeroFilter: true,
-
   /** CPU: Angebot annehmen. */
   cpuResponse(engine, kind, promptData) {
     if (kind !== 'generic' || promptData?.title !== CARD_NAME) return undefined;
@@ -42,7 +37,11 @@ module.exports = {
     return undefined;
   },
 
-  hooks: {
+  hooks: {},   // der Lader ignoriert Skripte ohne `hooks`
+
+  // Ablage-Lauscher OHNE Instanz (`engine._runDiscardHooks`): Puzzle-Vorgaben, Mills & Co.
+  // legen Karten ohne verfolgte Instanz in die Ablage — ein instanzgebundener Haken sah sie nie.
+  discardHooks: {
     // Endgueltiger Tod (nicht Rettung, aber auch Wiederbelebung danach) — siehe Engine.
     onHeroDefeatFinal: async (ctx) => {
       const engine = ctx._engine;

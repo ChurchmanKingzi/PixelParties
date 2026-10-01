@@ -9215,6 +9215,29 @@ class GameEngine {
    */
 
   /**
+   * ★ ABLAGE-LAUSCHER OHNE INSTANZ. Karten, die „from your discard pile" auf ein
+   * Ereignis reagieren (Mausoleum Worm), exportieren `discardHooks: { <hook>(ctx) }`.
+   * Die Engine ruft sie fuer jeden Namen in der Ablage JEDES Spielers auf — unabhaengig
+   * davon, ob die Karte dort als Instanz verfolgt wird. Puzzle-Vorgaben, Mills und
+   * andere Wege legen Ablagekarten ohne Instanz ab; ein instanzgebundener Lauscher sah
+   * sie dann nie. `ctx.cardOwner` = Besitzer der Ablage, `ctx.cardName` = Kartenname.
+   */
+  async _runDiscardHooks(hookName, extra = {}) {
+    if (this._inMctsSim && this._fastMode === undefined) return;
+    for (let pi = 0; pi < (this.gs.players || []).length; pi++) {
+      const ps = this.gs.players[pi];
+      const namen = [...new Set(ps?.discardPile || [])];
+      for (const name of namen) {
+        const fn = loadCardEffect(name)?.discardHooks?.[hookName];
+        if (typeof fn !== 'function') continue;
+        if (this.gs.result) return;
+        try { await fn({ _engine: this, cardName: name, cardOwner: pi, ...extra }); }
+        catch (err) { console.error(`[discardHooks] ${name}.${hookName} warf:`, err.message); }
+      }
+    }
+  }
+
+  /**
    * Spielerindex der Karte/des Effekts, die einen Helden besiegt haben — oder -1.
    * Quellen mit Besitzer (`owner`/`controller`/`sourceOwner`) liefern ihn direkt;
    * ein Statustick (Gift, Brand …) hat keinen und wird dem Spieler zugerechnet, der
@@ -9315,6 +9338,7 @@ class GameEngine {
       await this.runHooks('onHeroDefeatFinal', {
         hero: target, source, killerOwner: _toeterBesitzer, _bypassDeadHeroFilter: true,
       });
+      await this._runDiscardHooks('onHeroDefeatFinal', { hero: target, source, killerOwner: _toeterBesitzer });
     }
 
     if (this._consumeExtraLife(target, ownerIdx)) {
