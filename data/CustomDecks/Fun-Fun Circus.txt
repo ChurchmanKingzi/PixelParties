@@ -5,28 +5,30 @@ Cover: Fun-Fun Circus Clown
 == HEROES ==
 Maho, the Cute Magical Girl
 Silent Water Mizune
-Layn, Defender of Deri
+Kit, the Shark Researcher
 
 == MAIN DECK ==
 4x Fun-Fun Circus Clown
 3x Fun-Fun Circus Elephant
 3x Fun-Fun Circus Director
 3x Fun-Fun Circus Strongman
-5x Summoning Magic
-5x Magic Arts
+6x Magic Arts
+4x Summoning Magic
+4x Iceage
+3x Spectral Armor
+2x Aquatic Shield
 4x Cute Cheese
-4x Teleportal
-4x Idol of Crestina
-4x Spectral Armor
-3x Aquatic Shield
-1x Unwanted Audience
+2x Magnetic Glove
+3x Teleportal
+3x Idol of Crestina
+3x Crum, the Class Pet
 3x Cloud Pillow
-3x Thicket
-2x Invisibility Cloak
-4x Crum, the Class Pet
-1x Summoning Circle
-2x Treasure Chest
+2x Thicket
 2x Flying Island in the Sky
+3x Treasure Chest
+2x Invisibility Cloak
+1x Summoning Circle
+1x Unwanted Audience
 
 == POTION DECK ==
 

@@ -3,7 +3,7 @@
   "heroes": [
     "Maho, the Cute Magical Girl",
     "Silent Water Mizune",
-    "Layn, Defender of Deri"
+    "Kit, the Shark Researcher"
   ],
   "games": 1000,
   "trainWinRate": "handgesetzt",
@@ -15,7 +15,7 @@
     "Fun-Fun Circus Strongman": 24,
     "Crum, the Class Pet": 22,
     "Summoning Magic": 30,
-    "Magic Arts": 30,
+    "Magic Arts": 40,
     "Spectral Armor": 18,
     "Aquatic Shield": 18,
     "Unwanted Audience": 10,
@@ -30,7 +30,9 @@
     "Summoning Circle": 10,
     "Flying Island in the Sky": 10,
     "Teleportal": 28,
-    "Cute Cheese": 40
+    "Cute Cheese": 40,
+    "Iceage": 45,
+    "Magnetic Glove": 20
   },
   "timing": {
     "Fun-Fun Circus Clown": {
@@ -60,7 +62,7 @@
     "Magic Arts@Silent Water Mizune": 200,
     "Summoning Magic@Silent Water Mizune": 120,
     "Magic Arts@Maho, the Cute Magical Girl": 120,
-    "Summoning Magic@Layn, Defender of Deri": 60,
-    "Magic Arts@Layn, Defender of Deri": 60
+    "Magic Arts@Kit, the Shark Researcher": 100,
+    "Summoning Magic@Kit, the Shark Researcher": 100
   }
 }
