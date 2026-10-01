@@ -25,4 +25,6 @@
 
 module.exports = {
   isEquip: true,
+  // Passive Karte ohne Ziele („All Heroes …" ist keine Mehrfachtreffer-Wirkung).
+  neverMultiTarget: true,
 };
