@@ -152,7 +152,7 @@ PICKS = [
     ("Ankylos", "Gigantisaur Ankylos", 93, 53, 100),
     ("GoldenVermin", "Golden Vermin", 77, 57, 100),
     ("Kohta", "Kohta, the Silent Observer", 61, 53, 50),
-    ("MadameGuillotine", "Madame Guillotine, the Great Equalizer", 73, 50, 56),
+    ("MadameGuillotine", "Madame Guillotine, the Great Equalizer", 73, 42, 56),
     ("Orthos", "Orthos, the Loyal Guard Dog", 77, 60, 64),
     ("Paraseed", "Paraseed", 77, 60, 56),
     ("Rakah", "Rakah, the Loan Shark", 79, 52, 60),
