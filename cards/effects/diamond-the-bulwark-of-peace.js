@@ -27,7 +27,7 @@
 //    `placeFromPile` aus dem Geloescht-Stapel in genau den Platz, den
 //    sie belegte; ist er wieder belegt/gesperrt → kein Angebot.
 //    Einmal pro Runde und SPIELER (Heldensperre), nur gezaehlt, wenn
-//    der Effekt wirklich lief. Abbruch der Wahl = „no".
+//    der Effekt wirklich lief. Erst ein Ja/Nein-Confirm, dann die Galerie; Abbruch = „no".
 //  • Aufstiegsbonus (Als Vorgabe): bis zu DREI Creatures aus Hand, Deck
 //    und/oder Ablage waehlen und LOESCHEN. Je Wahl eine Galerie ueber alle
 //    drei Quellen (abbrechbar = „Done"); die geloeschten Creatures speisen
@@ -162,11 +162,21 @@ module.exports = {
         engine.isCreatureSummonable(k.name, feld, heroIdx, { _bypassBeforeSummon: true }));
       if (karten.length === 0) return;
 
+      // ① Ja/Nein — das etablierte Layout fuer „you may" (grosse Knoepfe,
+      // Kartenbild der Quelle), danach ② die Wahl ohne Kopfblock.
+      const ja = await engine.promptGeneric(pi, {
+        type: 'confirm', title: CARD_NAME, showCard: CARD_NAME,
+        message: `${tot.name} was defeated. Delete it to place one of your deleted level 0 Creatures into the same Support Zone?`,
+        confirmLabel: '💎 Yes, place one!', cancelLabel: 'No',
+        cancellable: true, gerrymanderEligible: true,
+      });
+      if (!ja || ja.cancelled || ja.confirmed === false) return;
+
       const wahl = await engine.promptGeneric(pi, {
-        type: 'cardGallery', title: CARD_NAME, source: CARD_NAME, showCard: CARD_NAME,
-        description: `${tot.name} was defeated. Delete it to place one of your deleted level 0 Creatures into the same Support Zone?`,
+        type: 'cardGallery', title: CARD_NAME, source: CARD_NAME,
+        description: `Choose a deleted level 0 Creature to place into the Support Zone of ${tot.name}.`,
         cards: karten, confirmLabel: '💎 Place!', cancellable: true,
-        cancelLabel: 'No',
+        cancelLabel: '✕ Cancel',
       });
       if (!wahl || wahl.cancelled || !wahl.cardName) return;
       if (!karten.some(k => k.name === wahl.cardName)) return;
