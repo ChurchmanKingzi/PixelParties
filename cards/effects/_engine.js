@@ -18051,15 +18051,15 @@ this._deathWatch = (this._deathWatchStack || []).length
       const inst = this.cardInstances.find(c => c.owner === pi && c.zone === 'discard' && c.name === cardName);
       if (inst) {
         const before = (ps.deletedPile || []).length;
-        // Ausdruecklicher Flug Ablage → Geloescht, VOR dem Zustandswechsel
-        // (gleiche Reihenfolge wie das Zugende-Loeschen vom Brett). Ohne ihn
-        // rechnet der Diff-Detektor des Clients allein und die Karte blieb
-        // einen Moment sichtbar im Ablagestapel (Als Befund, Diamond).
-        this._pileFlight(pi, cardName, 'discard', 'deleted');
         await this.actionMoveCard(inst, ZONES.DELETED, -1, -1, { source: opts.source, sourceOwner: opts.sourceOwner });
-        // `actionMoveCard` synct auf diesem Weg nicht selbst: ohne diesen
-        // Aufruf erschien die Karte erst beim naechsten Sync des Aufrufers
-        // im Geloescht-Stapel — deutlich NACH dem Flug (Als Befund, Diamond).
+        // Ausdruecklicher Flug Ablage → Geloescht UND neuer Stapelstand im
+        // SELBEN Takt: erst der Zustand, dann Flug-Ereignis und Sync ohne
+        // `await` dazwischen (Reihenfolge wie Bonegrinder). Der Flug VOR
+        // dem Verschieben zu senden war falsch — `actionMoveCard` laeuft
+        // ueber Hooks und Pausen, der Flug war gelandet, bevor der Stapel
+        // wuchs, und die Karte erschien verzoegert im Geloescht-Stapel
+        // (Als Befund, Diamond).
+        if ((ps.deletedPile || []).length > before) this._pileFlight(pi, cardName, 'discard', 'deleted');
         this.sync();
         return (ps.deletedPile || []).length > before;
       }
