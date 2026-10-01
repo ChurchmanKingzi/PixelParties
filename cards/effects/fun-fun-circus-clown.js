@@ -118,6 +118,12 @@ module.exports = {
   activeIn: ['hand', 'support'],
   creatureEffect: true,
 
+  // CPU: Applause Counter sind fuer die Sofortbewertung unsichtbar — ohne
+  // dieses Flag feuert der Clown-Effekt beim CPU nie (gemessen: 0 Zaehler in
+  // 6 Partien), und der ganze Archetyp bleibt tot. Gleiche Begruendung wie
+  // bei den Cardinal Beasts.
+  cpuMeta: { alwaysCommit: true },
+
   canActivateCreatureEffect(ctx) {
     return circusCreatures(ctx._engine, ctx.card).length > 0;
   },

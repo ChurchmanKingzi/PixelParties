@@ -14,6 +14,7 @@ Kit, the Shark Researcher
 3x Fun-Fun Circus Strongman
 5x Summoning Magic
 5x Magic Arts
+4x Cute Cheese
 4x Teleportal
 4x Idol of Crestina
 4x Spectral Armor
@@ -24,10 +25,8 @@ Kit, the Shark Researcher
 2x Invisibility Cloak
 4x Crum, the Class Pet
 1x Summoning Circle
-2x Pocket Catapult
 2x Treasure Chest
 2x Flying Island in the Sky
-2x Staff of the Teleporter
 
 == POTION DECK ==
 
