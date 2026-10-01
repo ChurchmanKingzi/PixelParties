@@ -20655,7 +20655,10 @@ this._deathWatch = (this._deathWatchStack || []).length
       }
     } else if (fromZone === 'deck') {
       this._broadcastEvent('play_pile_transfer', {
-        owner: playerIdx, cardName, from: 'deck', to: 'discard',
+        // `opts.ablageFlugVon`: woher der Flug in die Ablage startet, wenn die
+        // Karte nicht wirklich aus dem Deck kam (Chaos-Diamond: aus der
+        // Brettmitte, nachdem sie aus der Ablage geholt wurde).
+        owner: playerIdx, cardName, from: opts.ablageFlugVon || 'deck', to: 'discard',
       });
       ps.discardPile.push(cardName);
     } else {
