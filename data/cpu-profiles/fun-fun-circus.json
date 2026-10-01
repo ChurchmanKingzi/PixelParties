@@ -5,64 +5,375 @@
     "Silent Water Mizune",
     "Kit, the Shark Researcher"
   ],
-  "games": 1000,
-  "trainWinRate": "handgesetzt",
-  "handTuned": true,
+  "games": 352,
+  "trainWinRate": "17.3%",
+  "trainedAt": "2026-10-01T21:17:49.493Z",
+  "meanTurns": 21.5,
   "cardValues": {
-    "Fun-Fun Circus Clown": 70,
-    "Fun-Fun Circus Elephant": 22,
-    "Fun-Fun Circus Director": 26,
-    "Fun-Fun Circus Strongman": 24,
-    "Crum, the Class Pet": 22,
-    "Summoning Magic": 30,
-    "Magic Arts": 40,
-    "Spectral Armor": 18,
-    "Aquatic Shield": 18,
-    "Unwanted Audience": 10,
-    "Aquatic Spear": 10,
-    "Idol of Crestina": 30,
-    "Staff of the Teleporter": 6,
-    "Treasure Chest": 6,
-    "Pocket Catapult": 8,
-    "Cloud Pillow": 10,
-    "Thicket": 8,
-    "Invisibility Cloak": 12,
-    "Summoning Circle": 10,
-    "Flying Island in the Sky": 10,
-    "Teleportal": 28,
-    "Cute Cheese": 40,
-    "Iceage": 45,
-    "Magnetic Glove": 20
+    "Fun-Fun Circus Clown": 87.1,
+    "Magic Arts": 33,
+    "Cute Cheese": 40.9,
+    "Cloud Pillow": 14.4,
+    "Fun-Fun Circus Director": 69.3,
+    "Fun-Fun Circus Elephant": 64.9,
+    "Magnetic Glove": 15.3,
+    "Flying Island in the Sky": 17.3,
+    "Treasure Chest": 12.1,
+    "Summoning Magic": 10.3,
+    "Crum, the Class Pet": 29.8,
+    "Iceage": 79.8,
+    "Unwanted Audience": 8.3,
+    "Thicket": 20.9,
+    "Idol of Crestina": 36.5,
+    "Spectral Armor": 8,
+    "Fun-Fun Circus Strongman": 62.7,
+    "Aquatic Shield": 8.6,
+    "Summoning Circle": 13.7,
+    "Invisibility Cloak": 9
   },
   "timing": {
     "Fun-Fun Circus Clown": {
-      "early": 1.5,
-      "mid": 1.0,
-      "late": 0.8
-    },
-    "Summoning Magic": {
-      "early": 1.5,
-      "mid": 1.0,
-      "late": 0.6
+      "early": 0.75,
+      "mid": 0.75,
+      "late": 1.3
     },
     "Magic Arts": {
-      "early": 1.5,
-      "mid": 1.0,
-      "late": 0.6
+      "early": 0.75,
+      "mid": 0.75,
+      "late": 1.3
+    },
+    "Cute Cheese": {
+      "early": 0.75,
+      "mid": 0.88,
+      "late": 1.3
+    },
+    "Cloud Pillow": {
+      "early": 0.94,
+      "mid": 0.93,
+      "late": 1.12
+    },
+    "Fun-Fun Circus Director": {
+      "early": 0.84,
+      "mid": 0.75,
+      "late": 1.3
+    },
+    "Fun-Fun Circus Elephant": {
+      "early": 0.8,
+      "mid": 0.88,
+      "late": 1.3
+    },
+    "Magnetic Glove": {
+      "early": 0.94,
+      "mid": 0.88,
+      "late": 1.18
+    },
+    "Flying Island in the Sky": {
+      "early": 0.85,
+      "mid": 1.03,
+      "late": 1.12
+    },
+    "Treasure Chest": {
+      "early": 0.79,
+      "mid": 1,
+      "late": 1.21
+    },
+    "Summoning Magic": {
+      "early": 0.75,
+      "mid": 1.08,
+      "late": 1.3
+    },
+    "Crum, the Class Pet": {
+      "early": 0.86,
+      "mid": 1.08,
+      "late": 1.06
+    },
+    "Iceage": {
+      "early": 0.75,
+      "mid": 0.75,
+      "late": 1.3
+    },
+    "Unwanted Audience": {
+      "early": 1.07,
+      "mid": 1.01,
+      "late": 0.93
+    },
+    "Thicket": {
+      "early": 0.97,
+      "mid": 0.96,
+      "late": 1.07
+    },
+    "Idol of Crestina": {
+      "early": 0.94,
+      "mid": 0.76,
+      "late": 1.3
+    },
+    "Spectral Armor": {
+      "early": 1.22,
+      "mid": 0.86,
+      "late": 0.92
+    },
+    "Fun-Fun Circus Strongman": {
+      "early": 0.75,
+      "mid": 1.06,
+      "late": 1.23
+    },
+    "Aquatic Shield": {
+      "early": 1.1,
+      "mid": 0.89,
+      "late": 1.01
+    },
+    "Summoning Circle": {
+      "early": 0.95,
+      "mid": 0.99,
+      "late": 1.06
+    },
+    "Invisibility Cloak": {
+      "early": 1.16,
+      "mid": 0.82,
+      "late": 1.02
     }
   },
   "pairBonuses": {
-    "Fun-Fun Circus Clown|Fun-Fun Circus Elephant": 10,
-    "Fun-Fun Circus Clown|Fun-Fun Circus Strongman": 10,
-    "Fun-Fun Circus Clown|Fun-Fun Circus Director": 10,
-    "Fun-Fun Circus Clown|Summoning Magic": 15
+    "Cloud Pillow|Fun-Fun Circus Clown": 4.7,
+    "Fun-Fun Circus Clown|dc:Aquatic Shield": 4.8,
+    "Fun-Fun Circus Clown|dc:Spectral Armor": 4.4,
+    "Fun-Fun Circus Clown|dc:Fun-Fun Circus Director": 4.1,
+    "Fun-Fun Circus Clown|dc:Invisibility Cloak": 5.4,
+    "Fun-Fun Circus Clown|dc:Unwanted Audience": 4.1,
+    "Fun-Fun Circus Clown|dc:Flying Island in the Sky": 5.2,
+    "Fun-Fun Circus Clown|dc:Iceage": 4.4,
+    "Fun-Fun Circus Clown|Summoning Circle": 4.8,
+    "Magic Arts|dc:Aquatic Shield": 4.1,
+    "Magic Arts|dc:Spectral Armor": 5.3,
+    "Magic Arts|dc:Fun-Fun Circus Elephant": 4.6,
+    "Magic Arts|dc:Crum, the Class Pet": 4.9,
+    "Magic Arts|dc:Idol of Crestina": 4.5,
+    "Magic Arts|dc:Invisibility Cloak": 5.1,
+    "Cute Cheese|dc:Aquatic Shield": 10.4,
+    "Cute Cheese|dc:Idol of Crestina": 8.9,
+    "Fun-Fun Circus Elephant|dc:Unwanted Audience": 19.8,
+    "Fun-Fun Circus Elephant|dc:Invisibility Cloak": 8.3,
+    "Magnetic Glove|dc:Cloud Pillow": 9,
+    "Magnetic Glove|dc:Idol of Crestina": 8.9,
+    "Magnetic Glove|dc:Crum, the Class Pet": 11.7,
+    "Summoning Magic|dc:Aquatic Shield": 5.3,
+    "Summoning Magic|dc:Cute Cheese": 4.8,
+    "Summoning Magic|dc:Magnetic Glove": 4.6,
+    "Summoning Magic|dc:Iceage": 6.3,
+    "Summoning Magic|dc:Spectral Armor": 5,
+    "Summoning Magic|dc:Thicket": 6.2,
+    "Summoning Magic|dc:Idol of Crestina": 6.1,
+    "Summoning Magic|dc:Invisibility Cloak": 6.3,
+    "Iceage|dc:Spectral Armor": 15.7,
+    "Iceage|dc:Invisibility Cloak": 13,
+    "Invisibility Cloak|Spectral Armor": 11.6,
+    "Summoning Circle|dc:Fun-Fun Circus Strongman": 23.8,
+    "Summoning Circle|dc:Unwanted Audience": 23.4
   },
-  "abilityPriors": {
-    "Summoning Magic@Maho, the Cute Magical Girl": 200,
-    "Magic Arts@Silent Water Mizune": 200,
-    "Summoning Magic@Silent Water Mizune": 120,
-    "Magic Arts@Maho, the Cute Magical Girl": 120,
-    "Magic Arts@Kit, the Shark Researcher": 100,
-    "Summoning Magic@Kit, the Shark Researcher": 100
-  }
+  "cardValueDeltasByStanding": {
+    "behind": {
+      "Magic Arts": 7.8,
+      "Fun-Fun Circus Clown": 7.2,
+      "Treasure Chest": 10.9,
+      "Summoning Magic": 7.2,
+      "Iceage": 8.4,
+      "Idol of Crestina": 14.8,
+      "Fun-Fun Circus Strongman": 13.9
+    }
+  },
+  "standingEvalThreshold": 2045,
+  "targetPriors": {
+    "Fun-Fun Circus Elephant": {
+      "row:hosted:0": -8.5,
+      "pos:1": -11.4,
+      "row:free:0": -7.3,
+      "hp:min": -7.3,
+      "row:creatures:2": 19.9,
+      "row:free:1": 14.8,
+      "row:hosted:1-2": 7,
+      "pos:0": 11.6
+    },
+    "Spectral Armor": {
+      "row:free:2": -8.9,
+      "row:free:3": -6.5,
+      "pos:1": -10,
+      "row:creatures:1": -10.5,
+      "row:creatures:2": 14.9
+    },
+    "Fun-Fun Circus Strongman": {
+      "hp:max": -6.5,
+      "row:creatures:0": -13.9,
+      "row:free:2": -11.7,
+      "row:hosted:0": -16.4,
+      "row:creatures:3": 14.5,
+      "row:free:0": 12.3,
+      "row:hosted:3-4": 20,
+      "row:creatures:2": 17,
+      "row:creatures:1": 6.2,
+      "row:free:3": -14.5,
+      "side:own": -6.7,
+      "row:hosted:5+": 20
+    },
+    "Occultism": {
+      "row:creatures:1": 7.7,
+      "row:hosted:3-4": -8.4
+    }
+  },
+  "costDiscardRules": {
+    "Fun-Fun Circus Director": 8.1,
+    "Inventing|handSmall": 2.9,
+    "Inventing|boardWide": -4.9,
+    "Inventing|deckDeep": 2.4,
+    "Inventing|handTiny": -2.1,
+    "Inventing|early": 12,
+    "Inventing|boardThin": 7.5,
+    "Inventing|late": -7,
+    "Inventing|handFull": 1.5,
+    "Fun-Fun Circus Director|handFull": 12,
+    "Fun-Fun Circus Director|late": 7.7,
+    "Fun-Fun Circus Director|boardWide": 7,
+    "Fun-Fun Circus Director|guardCheap": 7.1,
+    "Fun-Fun Circus Director|guardSquishy": 7.7,
+    "Fun-Fun Circus Director|mid": 4.5,
+    "Fun-Fun Circus Director|handTiny": 10,
+    "tag:handSmall": -5.4,
+    "tag:mid": 2.3,
+    "tag:boardWide": 1.2,
+    "tag:deckDeep": 2.1,
+    "tag:handTiny": 4.2,
+    "tag:handFull": 8.5,
+    "tag:late": 1.3,
+    "tag:guardCheap": 6.1,
+    "tag:guardSquishy": 6.6,
+    "tag:early": 12,
+    "tag:boardThin": 5.7
+  },
+  "reactionRules": {
+    "Idol of Crestina": {
+      "late": 7.1,
+      "early": 9.2,
+      "mid": 3.1
+    },
+    "Spectral Armor": {
+      "mid": 7.1,
+      "early": -13.5
+    },
+    "Invisibility Cloak": {
+      "mid": 8.8,
+      "late": 18.7,
+      "early": 8.8
+    }
+  },
+  "synergyRules": {
+    "Crum, the Class Pet": {
+      "syn:Fun-Fun Circus Director": -5.7,
+      "syn:Fun-Fun Circus Elephant": -7.3
+    },
+    "Fun-Fun Circus Elephant": {
+      "syn:Fun-Fun Circus Director": -5,
+      "syn:Crum, the Class Pet": -5.5
+    },
+    "Fun-Fun Circus Clown": {
+      "syn:Fun-Fun Circus Director": -7.5
+    },
+    "Fun-Fun Circus Director": {
+      "syn:Fun-Fun Circus Clown": -5.2,
+      "syn:Fun-Fun Circus Elephant": -5.7
+    }
+  },
+  "placementRules": {
+    "plc:slack:0": -3.1,
+    "plc:slack:1": 3.2
+  },
+  "playOrderRules": {
+    "pord:board:voll": 1.5,
+    "pord:hd:0": 1.8,
+    "pord:hp:unter": 2.2,
+    "pord:hp:lo": -2.2
+  },
+  "tutorPickRules": {
+    "Cute Cheese→Fun-Fun Circus Director": 2.7,
+    "Cute Cheese→Fun-Fun Circus Clown": 2.3,
+    "Cute Cheese→Fun-Fun Circus Strongman": -4.9,
+    "Kit, the Shark Researcher→Fun-Fun Circus Elephant": 3.6,
+    "Kit, the Shark Researcher→Fun-Fun Circus Strongman": -2.8,
+    "Kit, the Shark Researcher→Fun-Fun Circus Director": -3.5,
+    "Kit, the Shark Researcher→Crum, the Class Pet": 3.8,
+    "Idol of Crestina→Magic Arts": -2.2,
+    "Idol of Crestina→Idol of Crestina": -6.5,
+    "Idol of Crestina→Iceage": -20,
+    "Idol of Crestina→Unwanted Audience": -14.2,
+    "Idol of Crestina→Fun-Fun Circus Director": 18.6,
+    "Idol of Crestina→Summoning Magic": -3.1,
+    "Idol of Crestina→Aquatic Shield": -4.8,
+    "Idol of Crestina→Fun-Fun Circus Clown": -15.5,
+    "Idol of Crestina→Flying Island in the Sky": 18.8,
+    "Idol of Crestina→Fun-Fun Circus Elephant": 20,
+    "Idol of Crestina→Crum, the Class Pet": 15.9,
+    "Idol of Crestina→Spectral Armor": 3.3,
+    "Idol of Crestina→Fun-Fun Circus Strongman": -6.5,
+    "Idol of Crestina→Cloud Pillow": 5.9,
+    "Idol of Crestina→Teleportal": -13.5,
+    "Magic Lamp→Acid Vial": -2.3,
+    "Magnetic Glove→Magic Arts": -10.7,
+    "Magnetic Glove→Summoning Magic": 18.9,
+    "Enigma, the Seller of Secrets→Fun-Fun Circus Director": 6.3,
+    "Enigma, the Seller of Secrets→Spectral Armor": 15,
+    "Enigma, the Seller of Secrets→Teleportal": -3.1,
+    "Enigma, the Seller of Secrets→Fun-Fun Circus Elephant": -3.1,
+    "Enigma, the Seller of Secrets→Fun-Fun Circus Clown": 19.3,
+    "Enigma, the Seller of Secrets→Summoning Magic": 6.1,
+    "Enigma, the Seller of Secrets→Thicket": 8.7,
+    "Enigma, the Seller of Secrets→Iceage": 5.6,
+    "Enigma, the Seller of Secrets→Crum, the Class Pet": -20,
+    "Enigma, the Seller of Secrets→Cute Cheese": -12.5,
+    "The Cosmic Depths→Fun-Fun Circus Strongman": -19
+  },
+  "abilityPriors": {},
+  "equipPriors": {},
+  "lockPenalties": {},
+  "reviveTargets": {},
+  "reviveAbilities": {},
+  "startHandValues": {
+    "Cloud Pillow": 5.7,
+    "Aquatic Shield": 1.9,
+    "Crum, the Class Pet": -3,
+    "Fun-Fun Circus Elephant": 4.8,
+    "Thicket": 1,
+    "Iceage": -4.8,
+    "Treasure Chest": -5.1,
+    "Fun-Fun Circus Strongman": 3.4,
+    "Invisibility Cloak": -1.3,
+    "Cute Cheese": 1,
+    "Magic Arts": -1.6,
+    "Idol of Crestina": 2.9,
+    "Magnetic Glove": 4.7,
+    "Spectral Armor": 5.7,
+    "Summoning Magic": -5.8,
+    "Fun-Fun Circus Director": 1.9,
+    "Unwanted Audience": -4,
+    "Flying Island in the Sky": -6.2
+  },
+  "mulliganStats": {
+    "games": 352,
+    "mullRate": "13.4%",
+    "winAfterMull": "19.1%",
+    "winAfterKeep": "17%"
+  },
+  "heroEffectTiming": {
+    "Silent Water Mizune@hand:4+": 4.5,
+    "Silent Water Mizune@hand:2-3": 6.2
+  },
+  "boardPairs": {
+    "Fun-Fun Circus Director|Summoning Magic": 6.6,
+    "Creativity|Fun-Fun Circus Clown": 15,
+    "Fun-Fun Circus Strongman|Magic Arts": 9.6,
+    "Fun-Fun Circus Strongman|Summoning Magic": 9.6,
+    "Crum, the Class Pet|Fun-Fun Circus Elephant": -15,
+    "Adventurousness|Summoning Magic": -13.5,
+    "Charme|Summoning Magic": -14,
+    "Fun-Fun Circus Clown|Fun-Fun Circus Elephant": 15
+  },
+  "protectionRules": {},
+  "gameStartPicks": {}
 }
