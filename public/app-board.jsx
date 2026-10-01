@@ -46956,16 +46956,6 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         return (
           <div className="modal-overlay" onClick={ep.cancellable !== false ? () => respondToPrompt({ cancelled: true }) : undefined}>
             <DraggablePanel className="modal animate-in deck-viewer-modal" style={{ maxWidth: 600 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                <span className="orbit-font" style={{ fontSize: 13, color: 'var(--accent)' }}>
-                  {ep.title || 'Select a Card'}
-                </span>
-                {ep.cancellable !== false && (
-                  <button className="btn" style={{ padding: '4px 12px', fontSize: 10 }}
-                    onClick={() => respondToPrompt({ cancelled: true })}>{ep.cancelLabel || '✕ CANCEL'}</button>
-                )}
-              </div>
-              <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 12 }}>{ep.description}</div>
               {/* v693: Worauf reagiere ich? Kartenbild der Ursprungskarte. */}
               {ep.showCard && CARDS_BY_NAME[ep.showCard] && (
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12, padding: 8, borderRadius: 8, background: 'rgba(255,255,255,.04)', border: '1px solid rgba(255,255,255,.08)' }}>
@@ -46975,6 +46965,20 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                   <div style={{ fontSize: 11, color: 'var(--text2)' }}>Reacting to <b style={{ color: 'var(--text)' }}>{ep.showCard}</b></div>
                 </div>
               )}
+              {/* Mitscrollend (Als Vorgabe): Titel, Beschreibung und Suchleiste
+                  bilden EINEN klebenden Kopf (top −16 = Innenabstand der
+                  `.deck-viewer-modal`) und bleiben immer im Bild. */}
+              <div style={{ position: 'sticky', top: -16, zIndex: 20, background: 'var(--bg2)', padding: '16px 0 0', marginTop: (ep.showCard && CARDS_BY_NAME[ep.showCard]) ? -4 : -16 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                <span className="orbit-font" style={{ fontSize: 13, color: 'var(--accent)' }}>
+                  {ep.title || 'Select a Card'}
+                </span>
+                {ep.cancellable !== false && (
+                  <button className="btn" style={{ padding: '4px 12px', fontSize: 10 }}
+                    onClick={() => respondToPrompt({ cancelled: true })}>{ep.cancelLabel || '✕ CANCEL'}</button>
+                )}
+              </div>
+              <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 8 }}>{ep.description}</div>
               {/* ★★ v1227 (Als Vorgabe): Suchfeld. Erst ab acht Eintraegen —
                   darunter sieht man ohnehin alles auf einen Blick, und ein
                   Feld ueber vier Karten ist nur Rand. Gefiltert wird nach
@@ -46984,9 +46988,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                   siehe PileSearchModal) — der autoFocus riss sonst beim
                   Oeffnen jeder Such-Galerie die Tastatur hoch. */}
               {cards.length >= 8 && !(window.ppIsPhone && window.ppIsPhone()) && (
-                // Mitscrollend (Als Vorgabe): das ganze Panel scrollt, die Leiste
-                // klebt oben (top −16 = Innenabstand der `.deck-viewer-modal`).
-                <div style={{ position: 'sticky', top: -16, zIndex: 20, background: 'var(--bg2)', padding: '10px 0 8px' }}>
+                <div style={{ paddingBottom: 8 }}>
                   <input type="text" value={galerieFilter} autoFocus
                     onChange={e => setGalerieFilter(e.target.value)}
                     placeholder="🔍 Filter by name..."
@@ -46997,6 +46999,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     }} />
                 </div>
               )}
+              </div>
               <PileGrid>
                 {cards.filter(entry => {
                   const f = galerieFilter.trim().toLowerCase();
