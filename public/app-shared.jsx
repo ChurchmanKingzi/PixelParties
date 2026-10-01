@@ -2921,6 +2921,8 @@ const ZONE_ANIM_SFX = {
   // tiefer und lauter, mit `elem_fire` als Nachhall darueber gaebe es
   // keinen zweiten Kanal — bleibt beim Einzelklang.
   explosion:               { name: 'heavy_impact', opts: { rate: 0.75, volume: 0.9 } },
+  // Sentient Bomb Golems: riesige Explosion — tiefer und lauter als die normale.
+  mega_explosion:          { name: 'heavy_impact', opts: { rate: 0.5, volume: 1.0 } },
   // `electric_strike` war ebenfalls STUMM — dieselbe Luecke wie bei
   // `explosion` (v559). Genutzt u.a. von Misfire und der Uebernahme des
   // Future Tech Control Device. `elem_lightning` ist der passende
