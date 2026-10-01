@@ -130,7 +130,7 @@ def gear(cv, cx, cy, rb, rt, teeth, col, phase=0.0):
             dx, dy = x - cx, y - cy
             d = math.hypot(dx, dy)
             if d <= rb or (d <= rt and math.cos(teeth * (math.atan2(dy, dx) + phase)) > 0.1):
-                cv.put(x, y, col)
+                cv.put(x, y, col(dx, dy) if callable(col) else col)
 
 def rivet(cv, x, y, p):
     cv.put(x, y, p['hi']); cv.put(x + 1, y + 1, p['dk'])
@@ -148,12 +148,17 @@ def theme_zahnrad(p, zt, n):
     for x in range(5, GW - 4, 5):
         rivet(cv, x, 11, p); rivet(cv, x, 31, p)
     for y in (6, GH - 8): rivet(cv, 5, y, p); rivet(cv, GW - 7, y, p)
-    # Eck-Zahnräder (mit dunkler Kontur, vom Rand angeschnitten)
+    # Eck-Zahnräder: dunkle Mulde, helle Kontur, schattierter Radkörper
     for i, (x, y) in enumerate([(2, 2), (GW - 3, 2), (2, GH - 3), (GW - 3, GH - 3)]):
         ph = i * 0.4
-        gear(cv, x, y, 5.2, 7.4, 6, p['dk'], ph)
-        gear(cv, x, y, 4.2, 6.2, 6, p['hi'], ph)
-        cv.disc(x, y, 2.2, p['dk']); cv.disc(x, y, 1.0, p['m'])
+        sx, sy = (1 if x < CX else -1), (1 if y < CY else -1)
+        cv.disc(x, y, 7.4, p['dk'])                       # Mulde
+        cv.ring(x, y, 7.4, p['hi'])                       # Muldenrand (hell)
+        gear(cv, x, y, 4.6, 6.4, 6, p['dk'], ph)          # Kontur (dunkel)
+        gear(cv, x, y, 3.8, 5.6, 6, p['lo'], ph)          # Kontur (innen)
+        gear(cv, x, y, 3.0, 4.8, 6,
+             lambda dx, dy, sx=sx, sy=sy: p['hi'] if (dx * sx + dy * sy) < 2 else p['m'], ph)
+        cv.disc(x, y, 1.8, p['dk']); cv.disc(x, y, 0.8, p['hi'])
     # Großes Zahnrad als Kartusche
     gear(cv, CX, CY, 12.0, 14.2, 12, p['dk'])
     gear(cv, CX, CY, 11.0, 13.2, 12, p['hi'], 0.0)
