@@ -3,7 +3,7 @@
   "heroes": [
     "Maho, the Cute Magical Girl",
     "Silent Water Mizune",
-    "Kit, the Shark Researcher"
+    "Layn, Defender of Deri"
   ],
   "games": 1000,
   "trainWinRate": "handgesetzt",
@@ -60,7 +60,7 @@
     "Magic Arts@Silent Water Mizune": 200,
     "Summoning Magic@Silent Water Mizune": 120,
     "Magic Arts@Maho, the Cute Magical Girl": 120,
-    "Magic Arts@Kit, the Shark Researcher": 100,
-    "Summoning Magic@Kit, the Shark Researcher": 100
+    "Summoning Magic@Layn, Defender of Deri": 60,
+    "Magic Arts@Layn, Defender of Deri": 60
   }
 }
