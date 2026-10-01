@@ -57,6 +57,7 @@ const GEPRUEFT = {
   'Idej Projection':          'kein onPlay — der Prompt gehoert dem angelegten Anhaengsel',
   'Intrude':                  'Prompt im Reaktions-Hook des Anhaengsels',
   'Laser Volley':             'fragt den GEGNER, Folgeentscheidung nach der Aufloesung',
+  'Grasp the Future':         'Startblatt-Effekt (startingHand), kein Handweg - Abbruch heisst nichts aufdecken, die Karte bleibt auf der Hand',
   'Spider Dance':             'Deck-Suche mit `minSelect: 0` — Abbruch heisst „nichts suchen", nicht „Zauber zurueck"',
 };
 

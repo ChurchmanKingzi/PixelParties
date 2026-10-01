@@ -747,6 +747,9 @@ class GameEngine {
     this.registerHandIndexedField('_revealedHandIndices', { kind: 'boolean' });
     // Bamboo Shield's permanent reveal flags (survive turn boundaries).
     this.registerHandIndexedField('_permanentlyRevealedHandIndices', { kind: 'boolean' });
+    // End of the Future: „revealed BY ITS OWN EFFECT" — eigene Marke je
+    // physischer Kopie (andere Aufdeck-Effekte zaehlen ausdruecklich nicht).
+    this.registerHandIndexedField('_selfRevealedHandIndices', { kind: 'boolean' });
     // Rocky Slime's per-instance level reductions. The captured offset
     // is consumed by safePlaceInSupport when the same card lands on
     // the board — `inst.counters.level` keeps the reduction post-summon
@@ -19753,6 +19756,9 @@ this._deathWatch = (this._deathWatchStack || []).length
 
     // Custom play conditions (spells/attacks)
     if (script?.spellPlayCondition && !script.spellPlayCondition(gs, pi, this)) return null;
+    // Pro-KOPIE-Gate (End of the Future: nur die selbst aufgedeckte Kopie).
+    if (typeof script?.canPlayFromHandIdx === 'function' && handIndex != null && handIndex >= 0
+        && !script.canPlayFromHandIdx(gs, pi, handIndex, this)) return null;
 
     // v856: Pflichtziel (siehe `hasRequiredTargetKind`). Derselbe
     // Vertrag, den `getBlockedSpells` fuer den Grauton liest — hier als
@@ -20909,6 +20915,82 @@ this._deathWatch = (this._deathWatchStack || []).length
   }
 
   /**
+   * ★ STARTBLATT-FENSTER („When you draw this card as part of your starting
+   * hand", Mini-Archetyp „the Future", Als Vorgabe).
+   *
+   * „Starthand" = die ersten fuenf Karten je Hand: die Hand VOR der
+   * Mulligan-Abfrage bzw. nach einem Mulligan die fuenf neu gezogenen
+   * Karten — also genau die Hand, die bei `startGame` auf der Hand liegt.
+   * Die erste Karte des ersten Zuges zaehlt NICHT mehr. Startspieler
+   * zuerst, dann der Gegner.
+   */
+  async runStartingHandWindow() {
+    if (this._inMctsSim || this.gs.result) return;
+    const erster = this.gs.activePlayer === 1 ? 1 : 0;
+    for (const pi of [erster, erster === 0 ? 1 : 0]) {
+      const ps = this.gs.players[pi];
+      if (!ps) continue;
+      await this.processStartingHandDraw(pi, [...(ps.hand || [])], { window: 'start' });
+    }
+    this.sync();
+  }
+
+  /**
+   * Verarbeitet Karten, die als „Teil der Starthand gezogen" gelten. Jede
+   * Karte mit Skriptvertrag `startingHand: { canTrigger?(engine, pi, name),
+   * resolve(engine, pi, { cardName }) → { counted?: string[] } }` bekommt
+   * ihr Angebot. `counted` = weitere Karten, die dadurch ebenfalls als
+   * Starthand gelten (Glimpse of the Future) — sie werden hinten angehaengt.
+   * Mehrere Kopien einer Karte werden einzeln behandelt (je eine Kopie auf
+   * der Hand). Verschachtelte Aufrufe (Traveler waehrend einer Auswertung)
+   * sind ueber `_startingHandDepth` erkennbar.
+   *
+   * @param {number} pi
+   * @param {string[]} cardNames  die als Starthand zaehlenden Karten
+   */
+  async processStartingHandDraw(pi, cardNames, opts = {}) {
+    if (this._inMctsSim || !Array.isArray(cardNames) || cardNames.length === 0) return;
+    const ps = this.gs.players[pi];
+    if (!ps) return;
+    this._startingHandDepth = (this._startingHandDepth || 0) + 1;
+    try {
+      const queue = [...cardNames];
+      const behandelt = new Map();   // Name → bereits abgearbeitete Kopien
+      for (let i = 0; i < queue.length; i++) {
+        if (this.gs.result) break;
+        const name = queue[i];
+        const spec = loadCardEffect(name)?.startingHand;
+        if (!spec || typeof spec.resolve !== 'function') continue;
+        const schonBehandelt = behandelt.get(name) || 0;
+        const aufDerHand = (ps.hand || []).filter(n => n === name).length;
+        if (aufDerHand <= schonBehandelt && !spec.worksOutsideHand) continue;
+        behandelt.set(name, schonBehandelt + 1);
+        if (typeof spec.canTrigger === 'function' && !spec.canTrigger(this, pi, name)) continue;
+        let res = null;
+        try { res = await spec.resolve(this, pi, { cardName: name, ...opts }); }
+        catch (err) { console.error(`[startingHand] ${name} warf:`, err.message); }
+        if (res && Array.isArray(res.counted)) queue.push(...res.counted);
+      }
+    } finally {
+      this._startingHandDepth -= 1;
+    }
+  }
+
+  /**
+   * Standardabfrage der Startblatt-Karten: die Karte als Galerie mit
+   * Ja/Nein. @returns {Promise<boolean>}
+   */
+  async promptStartingHandYesNo(pi, cardName, description, confirmLabel) {
+    const wahl = await this.promptGeneric(pi, {
+      type: 'cardGallery', title: cardName, source: cardName,
+      description,
+      cards: [{ name: cardName, source: 'hand', count: 1 }],
+      confirmLabel: confirmLabel || 'Yes', cancellable: true, cancelLabel: 'No',
+    });
+    return !!(wahl && !wahl.cancelled);
+  }
+
+  /**
    * Start the game's first turn. Call once after init().
    */
   async startGame() {
@@ -20940,6 +21022,9 @@ this._deathWatch = (this._deathWatchStack || []).length
         }
       }
     }
+    // „When you draw this card as part of your starting hand" — Startspieler
+    // zuerst, dann der andere. Nicht im Puzzle (dort gibt es kein Ziehen).
+    if (!this.isPuzzle) await this.runStartingHandWindow();
     await this.runHooks(HOOKS.ON_GAME_START, {});
     await this.startTurn();
 
