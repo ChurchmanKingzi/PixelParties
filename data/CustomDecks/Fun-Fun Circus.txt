@@ -1,33 +1,35 @@
 === PIXEL PARTIES DECK ===
 Name: Fun-Fun Circus
-Cover: Fun-Fun Circus Elephant
+Cover: Fun-Fun Circus Clown
 
 == HEROES ==
 Silent Water Mizune
 Kit, the Shark Researcher
-Nomu, Wanderer of Worlds
+Beato, the Butterfly Witch
 
 == MAIN DECK ==
 4x Fun-Fun Circus Clown
-4x Fun-Fun Circus Elephant
-4x Fun-Fun Circus Director
+3x Fun-Fun Circus Director
+3x Fun-Fun Circus Elephant
 4x Fun-Fun Circus Strongman
-8x Summoning Magic
-8x Magic Arts
+5x Summoning Magic
+5x Magic Arts
 1x Creativity
-3x First Contact
 3x Teleportal
 1x Aurora Borealis
-4x Idol of Crestina
+3x Idol of Crestina
 2x Staff of the Teleporter
-2x Staff of Illusions
-1x Forbidden Grimoire of a Forgotten Sorceress
+2x Forbidden Grimoire of a Forgotten Sorceress
+2x Flying Island in the Sky
 2x Golden Bananas
-2x Pocket Catapult
-2x Burned Contract
-2x Thicket
-2x Cloud Pillow
-1x Smuggler's Pier
+2x Treasure Chest
+4x Pocket Catapult
+3x Cloud Pillow
+3x Thicket
+3x Burned Contract
+2x Poisoned Meat
+2x Thunder Trumpet
+1x Summoning Circle
 
 == POTION DECK ==
 

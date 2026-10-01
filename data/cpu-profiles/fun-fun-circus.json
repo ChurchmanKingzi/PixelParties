@@ -1,0 +1,36 @@
+{
+  "deck": "Fun-Fun Circus",
+  "heroes": [
+    "Silent Water Mizune",
+    "Kit, the Shark Researcher",
+    "Beato, the Butterfly Witch"
+  ],
+  "games": 1000,
+  "trainWinRate": "handgesetzt",
+  "handTuned": true,
+  "cardValues": {
+    "Fun-Fun Circus Clown": 45,
+    "Fun-Fun Circus Director": 30,
+    "Fun-Fun Circus Strongman": 25,
+    "Fun-Fun Circus Elephant": 22,
+    "Teleportal": 18,
+    "Idol of Crestina": 14,
+    "Summoning Magic": 16,
+    "Magic Arts": 16
+  },
+  "timing": {
+    "Fun-Fun Circus Clown": {
+      "early": 1.4,
+      "mid": 1.0,
+      "late": 0.8
+    }
+  },
+  "pairBonuses": {
+    "Fun-Fun Circus Clown|Fun-Fun Circus Director": 10,
+    "Fun-Fun Circus Clown|Fun-Fun Circus Strongman": 10
+  },
+  "abilityPriors": {
+    "Summoning Magic@Silent Water Mizune": 150,
+    "Magic Arts@Silent Water Mizune": 150
+  }
+}
