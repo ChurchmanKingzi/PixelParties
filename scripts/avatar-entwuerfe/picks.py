@@ -142,7 +142,6 @@ PICKS = [
     ("DwarfDragonPilot", "Steam Dwarf Dragon Pilot", 77, 63, 70),
     ("DwarfExterminator", "Steam Dwarf Exterminator", 77, 57, 56),
     ("Shapeshifter", "???, the Shapeshifter", 77, 53, 70),
-    ("CountryHarpyformer", "Country Harpyformer", 40, 40, 44),
     ("ElvenForager", "Elven Forager", 83, 57, 50),
     ("ElvenLeader", "Elven Leader", 77, 63, 60),
     ("Ethan", "Ethan, the Prodigy", 77, 49, 50),
