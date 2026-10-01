@@ -18605,3 +18605,8 @@ Spell (Attachment, Support Magic, Lv 0, `PP MBS1`). „Can only be used by a Stu
 ## ★ SENTIENT BOMB GOLEMS — Nachlegen am Zugende, Explosion bei drei Kopien
 
 Creature (Normal, Lv 0, 10 HP, `PP MBS1`). `onTurnEnd` je Golem (nur eigener Zug): (1) hat die Seite in diesem Zug noch keinen Golem beschworen (`ps._golemSummonTurn`, gestempelt über `onCardEnterZone` bei jedem Golem, der in die eigene Zone kommt), darf sie aus Hand oder Deck einen in einen freien Platz desselben Helden legen (`placeFromPile`, Galerie mit Quelle, abbrechbar); (2) **Prüffenster NACH dem Nachlegen** (Als Vorgabe): hat der Held jetzt 3 Golems, werden alle besiegt (`actionDestroyCard`), dargestellt als DREI riesige Explosionen, je eine auf einem Golem (Zonen-Animation `mega_explosion`: die `explosion` ×2,9 mit Stoßring; Registry in `app-board.jsx`, Klang `heavy_impact` tief), danach Pflicht-Zielwahl und 999 Schaden. Jeder Golem wickelt nur seinen Helden ab; bereits besiegte steigen aus. **Remote Detonator** (Artifact, nutzt dieselben Golems) ist noch nicht gebaut.
+
+## Remote Detonator (Artifact, Reaction laut DB)
+
+- Skript `remote-detonator.js`: `isTargetingArtifact` + `proactivePlay`. Spielbar nur mit mindestens einem eigenen offenen „Sentient Bomb Golems" im Support. Zielwahl (abbrechbar, Held oder Kreatur, nie die eigenen Golems) → `resolve` loescht ALLE eigenen Golems (`actionMoveCard` → Geloescht, Kosten, nicht „besiegt") und verursacht 200 × Anzahl Schaden (`actionDealDamage` / `actionDealCreatureDamage`, Typ `artifact`).
+- Animationen: `explosion` auf jedem Golem, am Ziel `explosion` (1 Golem) bzw. `mega_explosion` (≥ 2).
