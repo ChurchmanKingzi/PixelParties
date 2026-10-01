@@ -18942,7 +18942,25 @@ async function runBo3Gauntlet() {
       const candIdx = gameNo % 2;                       // Sitzplatz wechselt je Partie
       gameNo++;
       let rec;
-      try { rec = await runHeadlessTrainingGame(cand, opp, candIdx, {}); }
+      const gOpts = {};
+      if (process.env.PP_BO3_TRACE === '1') {
+        // Brett-Spur je Zug: HP der Helden + Creatures (mit Applause) beider Seiten
+        gOpts.attachProbeSink = (engine) => {
+          let last = -1;
+          const iv = setInterval(() => {
+            try {
+              const gs = engine.gs; if (!gs || gs.turn === last) return; last = gs.turn;
+              const side = (pi) => gs.players[pi].heroes.map(h => `${(h.name || '?').split(',')[0]}:${h.hp}`).join(' ')
+                + ' | gold=' + gs.players[pi].gold + ' hand=' + gs.players[pi].hand.length
+                + ' | ' + engine.cardInstances.filter(i => i.zone === 'support' && (i.controller ?? i.owner) === pi)
+                  .map(i => `${i.name.replace('Fun-Fun Circus ', 'FF-')}${i.counters?.applause ? '(' + i.counters.applause + ')' : ''}`).join(',');
+              console.log(`[TRACE] t=${gs.turn} ap=${gs.activePlayer}\n   P${candIdx}(ich): ${side(candIdx)}\n   P${1 - candIdx}(opp): ${side(1 - candIdx)}`);
+            } catch { /* Trace darf nie stoeren */ }
+          }, 200);
+          if (iv.unref) iv.unref();
+        };
+      }
+      try { rec = await runHeadlessTrainingGame(cand, opp, candIdx, gOpts); }
       catch (err) { console.error('[bo3] Spiel warf:', err.message); rec = { outcome: null, reason: 'threw' }; }
       let res = rec.outcome === 1 ? 'W' : rec.outcome === 0 ? 'L' : '?';
       if (res === '?' && ++tries > 2) res = 'L';
