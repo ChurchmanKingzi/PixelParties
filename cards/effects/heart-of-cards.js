@@ -1,6 +1,6 @@
 // ═══════════════════════════════════════════
 //  CARD EFFECT: "Heart of Cards"
-//  Artifact (Subtyp Reaction, Kosten 4, gebannt — implementiert trotzdem)
+//  Artifact (Subtyp Normal, Kosten 4, gebannt — implementiert trotzdem)
 //
 //  „Declare a card name and reveal the top card of your deck. If it is
 //   the declared card, add it to your hand and draw 2 cards. Otherwise,
@@ -8,9 +8,10 @@
 //   turn."
 //
 //  ── AUSLEGUNG ─────────────────────────────────────────────────────
-//  • Der Text nennt KEINEN Ausloeser, nur den Subtyp „Reaction". Die
-//    Karte ist deshalb ueber `proactivePlay` aus der Hand spielbar (wie
-//    Juice); in die Reaktionsfenster haengt sie sich nicht von allein.
+//  • Ein ganz normales Artefakt (Subtyp Normal — die Datenbank sagte
+//    faelschlich "Reaction", korrigiert): nur in der EIGENEN Runde
+//    spielbar, ueber `canActivate` zusaetzlich auf den aktiven Spieler
+//    festgenagelt.
 //  • „Declare a card name": `cardNamePicker` ueber alle Karten (ohne
 //    Token), abbrechbar — Abbruch heisst „nichts ist passiert". Die
 //    Ansage wird dem GEGNER als Kartenbild gestreamt (`card_reveal`,
@@ -36,10 +37,8 @@ function schonGespielt(gs, pi) {
 }
 
 module.exports = {
-  // Subtyp „Reaction" ohne Ausloeser: aus der Hand spielbar.
-  proactivePlay: true,
-
   canActivate(gs, pi, engine) {
+    if (gs.activePlayer !== pi) return false;   // nur in der eigenen Runde
     if (schonGespielt(gs, pi)) return false;
     return (gs.players[pi]?.mainDeck || []).length > 0;
   },

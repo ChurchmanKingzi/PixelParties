@@ -18586,4 +18586,4 @@ Hero (`PP MBS1`, 450 HP / 80 ATK). Text ohne „except Creatures" (neu).
 
 ## ★ HEART OF CARDS — Ansage-Artefakt mit Bild-Stream an den Gegner
 
-Artifact (Subtyp Reaction, Kosten 4, gebannt, `PP MBS1`). Der Text nennt keinen Auslöser → `proactivePlay: true` (aus der Hand spielbar, sonst blockt der Server Reaction-Artefakte). Ansage über `cardNamePicker` (abbrechbar, 1×/Zug-Stempel erst nach der Ansage), die angesagte Karte geht als `card_reveal` NUR an den Gegner (`toPlayers`), danach wird die oberste Deckkarte beiden gezeigt: Treffer (`baseCardName`) → Hand + 2 Karten ziehen, sonst `deleteFromPile`.
+Artifact (Subtyp Normal — in der Datenbank stand fälschlich „Reaction“, korrigiert; Kosten 4, gebannt, `PP MBS1`), nur in der eigenen Runde spielbar (`canActivate` prüft `activePlayer`). Ansage über `cardNamePicker` (abbrechbar, 1×/Zug-Stempel erst nach der Ansage), die angesagte Karte geht als `card_reveal` NUR an den Gegner (`toPlayers`), danach wird die oberste Deckkarte beiden gezeigt: Treffer (`baseCardName`) → Hand + 2 Karten ziehen, sonst `deleteFromPile`.
