@@ -98,6 +98,11 @@ module.exports = {
       engine.revealHandCopy(pi, name, idx);
       if (!ps._handLevelCountdown) ps._handLevelCountdown = {};
       ps._handLevelCountdown[idx] = 0;
+      // Die Karte schwillt voruebergehend an und wird dunkler, ehe sie zur Normalform zurueckkehrt.
+      engine._broadcastEvent('play_hand_card_animation', {
+        owner: pi, handIdx: idx, animType: 'loom_swell', duration: 1100,
+      });
+      await engine._delay(1150);
       await engine.showTriggeredEffect(name, { playerIdx: pi });
       engine.log('looming_threat', { player: ps.username, card: name });
       engine.sync();

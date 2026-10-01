@@ -15366,6 +15366,49 @@ const ANIM_REGISTRY = {
       );
     };
   })(),
+  loom_swell: (() => {
+    // ★ Looming Threat (erste Aktivierung): die HANDKARTE selbst schwillt voruebergehend an und
+    // wird dunkler, ehe sie in ihre normale Form zurueckkehrt. Der Effekt faehrt die echte
+    // Handkarte (Klasse mit `scale` + `filter`, unabhaengig vom Layout-`transform`) und legt ein
+    // dunkles Pulsieren darueber. Eigene Keyframes im eigenen <style> (check-anim-keyframes).
+    return function LoomSwellEffect({ x, y }) {
+      useEffect(() => {
+        // Die Handkarte unter (x, y) suchen — beide Haende, naechster Mittelpunkt.
+        let best = null, bestD = Infinity;
+        document.querySelectorAll('.game-hand-me [data-hand-idx], .game-hand-opp [data-hand-idx]').forEach(el => {
+          const r = el.getBoundingClientRect();
+          const d = Math.abs(r.left + r.width / 2 - x) + Math.abs(r.top + r.height / 2 - y);
+          if (d < bestD) { bestD = d; best = el; }
+        });
+        if (!best || bestD > 120) return undefined;
+        best.classList.add('loom-swell-card');
+        const t = setTimeout(() => best && best.classList.remove('loom-swell-card'), 1250);
+        return () => { clearTimeout(t); best && best.classList.remove('loom-swell-card'); };
+      }, []);
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+          <div style={{ position: 'absolute', left: -54, top: -66, width: 108, height: 132, borderRadius: 10,
+            background: 'radial-gradient(ellipse, rgba(40,0,70,.65) 0%, rgba(20,0,40,.4) 60%, rgba(20,0,40,0) 78%)',
+            animation: 'loomSwellShade 1100ms ease-in-out forwards', opacity: 0 }} />
+          <style>{`
+            .loom-swell-card { animation: loomSwellCard 1100ms ease-in-out; z-index: 50; position: relative; }
+            @keyframes loomSwellCard {
+              0%   { scale: 1;    filter: brightness(1)   saturate(1); }
+              40%  { scale: 1.38; filter: brightness(.38) saturate(.7); }
+              60%  { scale: 1.38; filter: brightness(.38) saturate(.7); }
+              100% { scale: 1;    filter: brightness(1)   saturate(1); }
+            }
+            @keyframes loomSwellShade {
+              0%   { opacity: 0;  transform: scale(.9); }
+              40%  { opacity: 1;  transform: scale(1.4); }
+              60%  { opacity: 1;  transform: scale(1.4); }
+              100% { opacity: 0;  transform: scale(1); }
+            }
+          `}</style>
+        </div>
+      );
+    };
+  })(),
   wind: WindEffect,
   shadow_summon: ShadowSummonEffect,
   gold_sparkle: GoldSparkleEffect,
