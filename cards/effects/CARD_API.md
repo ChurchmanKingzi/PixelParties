@@ -18593,3 +18593,11 @@ Artifact (Subtyp Normal — in der Datenbank stand fälschlich „Reaction“, k
 Creature (Normal, Lv 1, 50 HP, `PP MBS1`). „Once per turn choose a Creature your opponent controls. You may use that Creature's active effects as if you controlled it for the rest of the turn." Gleicher Weg wie **Aligning Goals**: `actionStealCreature` (Kontrollwechsel bis Zugende, `skipTakeControlHook`), Animation `dark_control`. Ziele: offene gegnerische Kreaturen mit `creatureEffect`, noch nicht geliehen. Kein Gold, keine Zusatzaktion (der Text nennt beides nicht). Die Rundensperre je Kreatur (`creature-effect:<instId>`) bleibt bestehen — hat der Gegner den Effekt schon benutzt, bleibt er gesperrt.
 - **Fix (geliehene Kreaturen, zentral):** `_alice-shared.stackAt` zählte nach KONTROLLEUR — eine per `actionStealCreature` geliehene Kreatur (Aligning Goals, Lovely Teddy, Deepsea Succubus …) tauchte so am gleichen Held/Slot als zweite Kreatur im Platz des Entleihers auf (`supportStacks` → „Kopie, die sich den Platz teilt"). Jetzt zählt nur, was PHYSISCH auf der eigenen Seite liegt (`engine.physicalSide`).
 - **Auftritt:** Zonen-Animation `heart_expand` (Pixel-Herz, dehnt sich aus und blendet aus; Registry in `app-board.jsx`, Klang `buff`).
+
+## ★ PETRIFICATION BREAK — Spell, den nur ein betäubter Held wirken darf
+
+Spell (Attachment, Support Magic, Lv 0, `PP MBS1`). „Can only be used by a Stunned Hero. Heal the user from its Stun and attach this card to it. While attached: cannot be affected by negative status effects, damage halved (rounded up)."
+
+- **Betäubter Wirker:** Muster Outbreak — `canPlayWithHero` + `canPlayDespiteStatuses` (Engine-Freibrief in `validateActionPlay`) + `spellPlayCondition` (betäubter eigener Held mit freiem Support-Platz). Wirt = der Nutzer; Anlegen über `placeAttachment` (Zonen-Hinweis des Drops, sonst linkester freier Platz — kein Prompt, auch im Sofort-Guss), danach `cleanseHeroStatuses(…, ['stunned'])`.
+- **Neuer Engine-Vertrag `immuneToNegativeStatuses: true`** (Skript-Flag eines Anhängsels): `engine.heroHasStatusImmunityAttachment(seite, heroIdx)` blockt NEUE negative Status an beiden Status-Wegen (`addHeroStatus`, `actionAddStatus`). Bereits liegende Status bleiben (die Karte heilt nur die Betäubung).
+- **Schaden halbiert:** `beforeDamage` des Anhängsels, `Math.ceil(Betrag / 2)`, jeder Schadenstyp.
