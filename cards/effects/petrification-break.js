@@ -70,7 +70,14 @@ module.exports = {
   spellPlayCondition(gs, pi, engine) {
     return nutzer(gs, pi, engine).length > 0;
   },
-  attachmentHosts(gs, pi, engine) { return attachmentHostsFor(gs, pi, engine, { sides: [pi] }); },
+  // Empfaenger = NUR die Zonen eines BETAEUBTEN Helden: er ist der Nutzer.
+  // Der Client trennt bei Anlege-Karten Empfaenger und Wirker; ohne diese
+  // Einschraenkung liess sich die Karte auf einen gesunden Helden ziehen
+  // und wirkte trotzdem ueber den betaeubten.
+  attachmentHosts(gs, pi, engine) {
+    return attachmentHostsFor(gs, pi, engine, { sides: [pi] })
+      .filter(h => istBetaeubt(gs.players[h.owner]?.heroes?.[h.heroIdx]));
+  },
 
   cpuShouldPlay(engine, pi) {
     return nutzer(engine.gs, pi, engine).length > 0;
@@ -90,6 +97,14 @@ module.exports = {
       const heroIdx = ctx.cardHeroIdx;
       const user = ctx.attachedHero || gs.players[seite]?.heroes?.[heroIdx];
       if (!istBetaeubt(user)) { gs._spellCancelled = true; return; }
+      // Wurde auf einen ANDEREN Helden gezogen als den Nutzer, ist das kein
+      // gueltiger Empfaenger („only the Stunned Hero itself").
+      const hinweis = gs._attachmentHeroIdx;
+      const hinweisSeite = (gs._attachmentOwner === 0 || gs._attachmentOwner === 1) ? gs._attachmentOwner : pi;
+      if (hinweis != null && hinweis >= 0 && (hinweis !== heroIdx || hinweisSeite !== seite)) {
+        gs._spellCancelled = true;
+        return;
+      }
 
       // ① Anlegen — der NUTZER ist der Wirt, es gibt nichts zu waehlen: der
       // gezogene Zonen-Hinweis des Servers gilt, sonst der linkeste freie
