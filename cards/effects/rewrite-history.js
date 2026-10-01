@@ -31,6 +31,22 @@ const { isOwnSideSummonableCreature, hasCardType } = require('./_hooks');
 
 const CARD_NAME = 'Rewrite History';
 
+// TODO(temp): reiner Testwert fuers Puzzle — ALLE Creatures der eigenen Ablage zaehlen (egal
+// wann/wodurch sie dorthin kamen) und bekommen eine willkuerliche freie Support Zone eines
+// eigenen Helden. Zum Zurueckbauen auf false setzen; die echte Logik darunter bleibt unberuehrt.
+const TEMP_ALLE_ZAEHLEN = true;
+
+/** Freie Zonen der eigenen lebenden Helden: [{ side, heroIdx, zoneSlot }]. */
+function freieEigeneZonen(gs, pi) {
+  const out = [];
+  const ps = gs.players[pi];
+  (ps?.heroes || []).forEach((h, hi) => {
+    if (!h?.name || h.hp <= 0) return;
+    for (let z = 0; z < 3; z++) if (zoneFrei(gs, pi, hi, z)) out.push({ side: pi, heroIdx: hi, zoneSlot: z });
+  });
+  return out;
+}
+
 function zoneFrei(gs, side, heroIdx, slot) {
   const hero = gs.players[side]?.heroes?.[heroIdx];
   if (!hero?.name) return false;
@@ -45,6 +61,19 @@ function kandidaten(engine, pi, maxLevel) {
   const db = engine._getCardDB();
   const seit = ps._rhVorigerZug ?? 0;
   const out = [];
+  if (TEMP_ALLE_ZAEHLEN) {
+    if (freieEigeneZonen(gs, pi).length === 0) return out;
+    for (const name of new Set(ps.discardPile || [])) {
+      if (!engine.darfAusAblageAufsFeld(name)) continue;
+      const cd = db[name];
+      if (!cd || !isOwnSideSummonableCreature(cd, name)) continue;
+      if (hasCardType(cd, 'Token') || cd.subtype === 'Token') continue;
+      const level = engine.effectiveCardLevel(cd, pi, { pileSide: 'discard' });
+      if (level > maxLevel) continue;
+      out.push({ eintrag: { name, turn: 0, side: -1, heroIdx: -1, zoneSlot: -1, _temp: true }, level });
+    }
+    return out;
+  }
   for (const e of (ps._rewriteLog || [])) {
     if (e.turn <= seit) continue;
     if (!(ps.discardPile || []).includes(e.name)) continue;
@@ -132,7 +161,12 @@ module.exports = {
         wahl = treffer[parseInt(opt.optionId, 10)] || treffer[0];
       }
 
-      const e = wahl.eintrag;
+      let e = wahl.eintrag;
+      if (e._temp) {
+        const frei = freieEigeneZonen(gs, pi);
+        if (frei.length === 0) { gs._spellCancelled = true; return; }
+        e = { ...e, ...frei[Math.floor(Math.random() * frei.length)] };
+      }
       const idx = (ps.discardPile || []).indexOf(name);
       if (idx < 0 || !zoneFrei(gs, e.side, e.heroIdx, e.zoneSlot)) { gs._spellCancelled = true; return; }
 
