@@ -2987,6 +2987,11 @@ const ZONE_ANIM_SFX = {
     { name: 'heavy_impact', opts: { rate: 0.9, volume: 1.0 } },
     { name: 'elem_ice',     opts: { rate: 1.1, volume: 0.9, delay: 40 } },
   ],
+  // Tempeste Moana: Regen prasselt aufs Ziel.
+  moana_rain: [
+    { name: 'elem_water', opts: { rate: 1.2, volume: 1.0 } },
+    { name: 'elem_water', opts: { rate: 0.9, volume: 0.8, delay: 260 } },
+  ],
   ox_impact:               { name: 'heavy_impact' },
   snake_impact:            { name: 'heavy_impact' },
   dumbbell_pump:           { name: 'heavy_impact' },

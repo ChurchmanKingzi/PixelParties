@@ -15319,6 +15319,76 @@ const ANIM_REGISTRY = {
       );
     };
   })(),
+  moana_rain: (() => {
+    // ★ Tempeste Moana: offensiver Regen — schräge blaue Regenstriche prasseln auf das Ziel,
+    // dazwischen steigen Notensymbole auf, am Boden spritzt ein Ring. Eigene Keyframes im
+    // eigenen <style> (siehe check-anim-keyframes).
+    const NOTEN = ['♪', '♫', '♩', '♬'];
+    const FARBEN = ['#d8f0ff', '#9fd4ff', '#6db8f5', '#bfe3ff', '#4f9de0'];
+    return function MoanaRainEffect({ x, y }) {
+      const tropfen = useMemo(() => Array.from({ length: ppFxN(46) }, () => ({
+        left: Math.round(Math.random() * 130 - 65),
+        len: 18 + Math.random() * 26,
+        color: FARBEN[Math.floor(Math.random() * FARBEN.length)],
+        delay: Math.round(Math.random() * 520),
+        dur: Math.round(340 + Math.random() * 220),
+      })), []);
+      const noten = useMemo(() => Array.from({ length: ppFxN(7) }, (_, i) => ({
+        glyph: NOTEN[i % NOTEN.length],
+        left: Math.round(Math.random() * 100 - 50),
+        delay: Math.round(Math.random() * 500),
+        dur: Math.round(800 + Math.random() * 400),
+        size: 16 + Math.random() * 12,
+      })), []);
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+          <div style={{ position: 'absolute', left: -70, top: -50, width: 140, height: 100, borderRadius: '50%',
+            background: 'radial-gradient(ellipse, rgba(110,180,245,.45) 0%, rgba(110,180,245,0) 70%)',
+            animation: 'moanaMist 1100ms ease-out forwards' }} />
+          {tropfen.map((d, i) => (
+            <i key={'mr' + i} style={{
+              position: 'absolute', left: d.left, top: -110, width: 2, height: d.len,
+              background: `linear-gradient(to bottom, rgba(255,255,255,0), ${d.color})`,
+              boxShadow: `0 0 4px ${d.color}`, transformOrigin: 'top center', opacity: 0,
+              animation: `moanaDrop ${d.dur}ms linear ${d.delay}ms forwards`,
+            }} />
+          ))}
+          {noten.map((n, i) => (
+            <b key={'mn' + i} style={{
+              position: 'absolute', left: n.left, top: 10, fontSize: n.size, color: '#eaf6ff',
+              textShadow: '0 0 8px #6db8f5', opacity: 0,
+              animation: `moanaNote ${n.dur}ms ease-out ${n.delay}ms forwards`,
+            }}>{n.glyph}</b>
+          ))}
+          <div style={{ position: 'absolute', left: -46, top: -16, width: 92, height: 32, borderRadius: '50%',
+            border: '2px solid #bfe3ff', boxShadow: '0 0 12px #6db8f5', opacity: 0,
+            animation: 'moanaSplash 520ms ease-out 480ms forwards' }} />
+          <style>{`
+            @keyframes moanaMist {
+              0%   { opacity: 0; transform: scale(.5); }
+              30%  { opacity: 1; transform: scale(1); }
+              100% { opacity: 0; transform: scale(1.3); }
+            }
+            @keyframes moanaDrop {
+              0%   { opacity: 0; transform: translate(-26px, 0) rotate(-18deg); }
+              15%  { opacity: 1; }
+              85%  { opacity: 1; }
+              100% { opacity: 0; transform: translate(26px, 120px) rotate(-18deg); }
+            }
+            @keyframes moanaNote {
+              0%   { opacity: 0; transform: translateY(0) rotate(-10deg); }
+              25%  { opacity: 1; }
+              100% { opacity: 0; transform: translateY(-70px) rotate(14deg); }
+            }
+            @keyframes moanaSplash {
+              0%   { opacity: .9; transform: scale(.3); }
+              100% { opacity: 0;  transform: scale(1.8); }
+            }
+          `}</style>
+        </div>
+      );
+    };
+  })(),
   level_down: (() => {
     // ★ Looming Threat: die STUFE einer Handkreatur sinkt am Zugende — dunkelviolette Pfeile
     // sinken ueber der Karte ab, ein „-1" schwebt nach unten und verblasst. Eigene Keyframes im

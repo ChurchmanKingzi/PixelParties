@@ -21686,7 +21686,7 @@
     "hp": 400,
     "atk": 40,
     "cost": null,
-    "effect": "The first 2 Artifacts equipped and Spells attached to any Hero each turn also count as Creatures with 50 HP. If an Artifact's or Spell's HP are reduced to 0, it is sent to the discard pile. Equipping an Artifact or attaching a Spell also counts as summoning it as a Creature.",
+    "effect": "The first 2 Artifacts equipped and Spells attached to any Hero each turn also count as Creatures with 50 HP. If an Artifact's or Spell's HP are reduced to 0, it is sent to the discard pile. Equipping an Artifact or attaching a Spell also counts as summoning it as a Creature. You may once per turn deal damage equal to 50 times the number of Creatures on the board that are originally Equipments or Attachments to any target.",
     "archetype": "",
     "setID": "PP MSHW",
     "banned": "Banned",
