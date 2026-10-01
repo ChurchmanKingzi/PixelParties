@@ -9,21 +9,23 @@ Silent Water Mizune
 
 == MAIN DECK ==
 5x Adventurousness
+2x Afflicted Vermin
 4x Booby Trap
 2x Book of Doom
 4x Cosmic Skeleton
 4x Cute Cheese
 4x Destruction Magic
-3x Golden Ankh
+4x Golden Ankh
 3x Magnetic Glove
 4x Pure Advantage Camel
 4x Rain of Arrows
+2x Spider Avalanche
 4x Summoning Magic
 4x Fun-Fun Circus Clown
-4x Fun-Fun Circus Elephant
-4x Fun-Fun Circus Director
-3x Fun-Fun Circus Strongman
-4x Magic Arts
+2x Fun-Fun Circus Elephant
+2x Fun-Fun Circus Strongman
+2x Magic Arts
+2x Mummy Maker Machine
 
 == POTION DECK ==
 
