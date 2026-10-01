@@ -18658,3 +18658,8 @@ Karten: End of the Future, Traveler from the Future, Grasp the Future, Glimpse o
 - Zugende (`onTurnEnd`, einmal je Zug ueber `gs._ghazmaZugende`): Kreaturen im Geloescht-Stapel des Spielers am Zug, die schon bei Zugbeginn dort lagen (Schnappschuss `gs._geloeschtBeiZugbeginn`, in `startTurn`, mengenweise je Name), werden in sein Deck gemischt; er zieht so viele Karten (max. 2).
 
 - **„Deleted this turn" je KARTE (Ghazma):** Der Gelöscht-Stapel besteht nur aus Namen; ein Namensvergleich versagt, wenn eine gleichnamige Karte den Stapel verlässt und im selben Zug eine neue hineinkommt. Deshalb führt `ps._deletedStamps` parallel zu `ps.deletedPile` den Zug, in dem jeder Eintrag hineinkam (`push`/`unshift`/`splice`/`pop`/`shift` des Stapels werden pro Instanz überlagert, `engine._geloeschtVerfolgen(pi)` beim `init` und je `startTurn`; `engine._geloeschtZuege(pi)` gleicht beim Lesen ab). Der frühere Schnappschuss `gs._geloeschtBeiZugbeginn` ist entfernt.
+
+## Looming Threat (Spell, Lv 1)
+
+- Skript `looming-threat.js`: spielbar ohne aufgedeckte Handkarten (`_revealedHandIndices` / `_permanentlyRevealedHandIndices` / `_selfRevealedHandIndices`) und mit einer Kreatur der Stufe 4+ auf der Hand (`effectiveCardLevel(cd, pi, { handIdx })`); Kartenwahl `pickHandCard`; dauerhafte Aufdeckung der Kopie (`revealHandCopy`); `inherentAction`.
+- Stufensenkung: Handindex-Feld `_handLevelCountdown` (je Kopie, Wert = bisherige Senkungen); `engine._handStufenZaehler(pi)` laeuft in der END-Phase des Besitzers (nach `_processForceKills`), erhoeht den Zaehler und traegt `_handLevelOffsetsTransient[idx] = -n` ein (nur in der Hand, kein Uebertrag aufs Brett; der Client zeigt es als Stufenabzeichen). Der Zaehler haengt an der Kopie, nicht am Zauber.

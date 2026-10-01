@@ -754,6 +754,9 @@ class GameEngine {
     // Kassaran). Folgt der Karte durch Hand-Splices; so trifft der Effekt genau DIE Kopie, die
     // zaehlt — nicht eine gleichnamige andere (Glimpse-Kopie von Kassaran vs. gezogene Glimpse).
     this.registerHandIndexedField('_startingCountedHandIndices', { kind: 'boolean' });
+    // Looming Threat: Handkopie mit „am Zugende Stufe -1" — Wert = bisherige Senkungen. Folgt der
+    // physischen Kopie, faellt weg, sobald sie die Hand verlaesst (`_handStufenZaehler`).
+    this.registerHandIndexedField('_handLevelCountdown', { kind: 'value' });
     // Rocky Slime's per-instance level reductions. The captured offset
     // is consumed by safePlaceInSupport when the same card lands on
     // the board — `inst.counters.level` keeps the reduction post-summon
@@ -21128,6 +21131,29 @@ this._deathWatch = (this._deathWatchStack || []).length
     }
   }
 
+  /**
+   * Looming Threat: am ENDE jedes eigenen Zuges sinkt die Stufe jeder markierten Handkopie um 1,
+   * solange sie auf der Hand liegt (`ps._handLevelCountdown[idx]` = bisherige Senkungen; der
+   * Handrabatt steht in `_handLevelOffsetsTransient`, wirkt nur in der Hand).
+   */
+  async _handStufenZaehler(pi) {
+    const ps = this.gs.players[pi];
+    const map = ps?._handLevelCountdown;
+    if (!ps || !map) return;
+    let geaendert = false;
+    for (const k of Object.keys(map)) {
+      const idx = Number(k);
+      if (!(ps.hand || [])[idx]) { delete map[k]; continue; }
+      map[k] = (map[k] || 0) + 1;
+      if (!ps._handLevelOffsetsTransient) ps._handLevelOffsetsTransient = {};
+      const cur = ps._handLevelOffsetsTransient[idx] || 0;
+      ps._handLevelOffsetsTransient[idx] = Math.min(cur, -map[k]);
+      geaendert = true;
+      this.log('hand_level_countdown', { player: ps.username, card: ps.hand[idx], reductions: map[k] });
+    }
+    if (geaendert) this.sync();
+  }
+
   /** Die Handkopie an `idx` als „Teil der Starthand" markieren. */
   markStartingCounted(pi, idx) {
     const ps = this.gs.players[pi];
@@ -21770,6 +21796,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         await this._flushSurpriseDrawChecks();
         // Process forced kills (Golden Ankh, etc.) — un-negatable
         await this._processForceKills();
+        await this._handStufenZaehler(this.gs.activePlayer);   // Looming Threat: Stufe -1 am Zugende
         await this._delay(300);
         // Enforce hand size limit — regulärer Rundenende-Check; Big Gwens
         // Area-Bypass gilt hier ausdrücklich NICHT (nur der Pollution-
