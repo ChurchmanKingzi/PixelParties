@@ -57,7 +57,6 @@ function kandidaten(engine, pi, ausser) {
 }
 
 const BONUS_MAX = 3;
-const PILE_FLUG_MS = 1000;   // Flug Ablage → Geloescht samt Reihung im Client
 
 /** Alle Creatures aus Hand, Deck und Ablage, je (Quelle, Name) entdoppelt. */
 function bonusKandidaten(engine, pi) {
@@ -193,11 +192,6 @@ module.exports = {
       // „delete it" — zuerst, dann nachlegen (die geloeschte Karte darf
       // wegen „different name" nicht selbst zurueckkommen).
       if (!(await engine.deleteFromPile(besitzer, 'discard', tot.name, { source: CARD_NAME }))) return;
-      // Der Client verdeckt die OBERSTE Karte des Geloescht-Stapels, solange
-      // der Flug dorthin laeuft. Verlaesst die nachgelegte Creature den Stapel
-      // schon waehrend dieses Flugs, stand dort „leer", bis er landete (bei
-      // genau einer Karte im Stapel 1–2 s). Deshalb erst landen lassen.
-      await engine._delay(PILE_FLUG_MS);
       await engine.placeFromPile(pi, 'deleted', wahl.cardName, heroIdx, slot, {
         source: CARD_NAME, ...(feld !== pi ? { heldSeite: feld } : {}),
       });
