@@ -26215,6 +26215,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   // opponent." Owns its own ref so it doesn't collide with the hand→pile
   // auto-animation's separate discard-length tracking further down.
   const prevHandDiscardLenRef = useRef((me.discardPile || []).length);
+  // Stapel, die zwischen zwei Handaenderungen SCHRUMPFTEN (Merker; die Referenzstaende laufen
+  // auch ohne Handaenderung mit, damit ein Wachstum — Ghazma mischt Karten zurueck ins Deck und
+  // zieht danach — nicht den Vergleich verfaelscht: sonst wirkte das Ziehen wie „vom Gegner").
+  const deckShrankRef = useRef({ main: false, potion: false, discard: false });
   const roomJustChanged = gameState.roomId !== prevRoomIdRef.current;
   // On retry/new game (roomId changes), reset hand length tracking to suppress draw animations
   if (roomJustChanged) {
@@ -26280,6 +26284,14 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       return;
     }
     const newKey = JSON.stringify(me.hand || []);
+    if (newKey === handKeyRef.current) {
+      // Hand unveraendert: Stapelstaende mitfuehren, Schrumpfen vormerken.
+      const dc = me.deckCount || 0, pc = me.potionDeckCount || 0, ac = (me.discardPile || []).length;
+      if (dc < prevDeckCountRef.current) deckShrankRef.current.main = true;
+      if (pc < prevPotionDeckCountRef.current) deckShrankRef.current.potion = true;
+      if (ac < prevHandDiscardLenRef.current) deckShrankRef.current.discard = true;
+      prevDeckCountRef.current = dc; prevPotionDeckCountRef.current = pc; prevHandDiscardLenRef.current = ac;
+    }
     if (newKey !== handKeyRef.current) {
       const newHand = me.hand || [];
       const prevLen = prevHandLenRef.current;
@@ -26299,11 +26311,12 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       // Deck, kommt die Karte von dort; sank nur das Main Deck, vom Main Deck (eine
       // Potion im Main Deck — z. B. per Grasp the Future gesucht — fliegt also vom
       // Main Deck los). Nur wenn beide sinken, entscheidet der Typ.
-      const mainDeckDecreased = newDeckCount < prevDeckCountRef.current;
-      const potionDeckDecreased = newPotionCount < prevPotionDeckCountRef.current;
+      const mainDeckDecreased = newDeckCount < prevDeckCountRef.current || deckShrankRef.current.main;
+      const potionDeckDecreased = newPotionCount < prevPotionDeckCountRef.current || deckShrankRef.current.potion;
       const deckDecreased = mainDeckDecreased || potionDeckDecreased;
       const newDiscardLenForHand = (me.discardPile || []).length;
-      const discardDecreased = newDiscardLenForHand < prevHandDiscardLenRef.current;
+      const discardDecreased = newDiscardLenForHand < prevHandDiscardLenRef.current || deckShrankRef.current.discard;
+      deckShrankRef.current = { main: false, potion: false, discard: false };
       prevDeckCountRef.current = newDeckCount;
       prevPotionDeckCountRef.current = newPotionCount;
       prevHandDiscardLenRef.current = newDiscardLenForHand;
