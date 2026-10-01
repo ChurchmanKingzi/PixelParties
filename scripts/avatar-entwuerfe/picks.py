@@ -80,7 +80,7 @@ PICKS = [
     ("Remora", "Greatmaw Remora", 77, 53, 100),
     ("Heragas", "Heragas, the Monster Slayer", 77, 57, 70),
     ("InvaderToken", "Invader Token", 77, 67, 100),
-    ("Junshi", "Junshi, the Tactical Genius", 70, 54, 50),
+    ("Junshi", "Junshi, the Tactical Genius", 78, 54, 50),
     ("Kit", "Kit, the Shark Researcher", 60, 57, 56),
     ("CuteSpider", "Cute Spider", 77, 47, 56),
     ("MonsterNest", "Monster Nest", 77, 53, 64),
