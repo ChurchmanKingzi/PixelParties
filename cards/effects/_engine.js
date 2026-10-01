@@ -20886,6 +20886,10 @@ this._deathWatch = (this._deathWatchStack || []).length
       title: config.title || 'Immediate Action',
       description: config.description || 'Use an Action with any Hero!',
       cancellable: config.cancellable !== undefined ? config.cancellable : false,
+      // Der Client schaltet diese Handkarte sofort „scharf": passende Helden und
+      // freie Support Zones leuchten und sind anklickbar, ohne die Karte erst
+      // anzuklicken (Drag&Drop bleibt moeglich). Nur eine Kreatur.
+      ...(config.autoArmCard ? { autoArmCard: config.autoArmCard } : {}),
     });
 
     if (!actionResult || actionResult.cancelled) return { played: false };
