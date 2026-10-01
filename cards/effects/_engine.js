@@ -18057,6 +18057,10 @@ this._deathWatch = (this._deathWatchStack || []).length
         // einen Moment sichtbar im Ablagestapel (Als Befund, Diamond).
         this._pileFlight(pi, cardName, 'discard', 'deleted');
         await this.actionMoveCard(inst, ZONES.DELETED, -1, -1, { source: opts.source, sourceOwner: opts.sourceOwner });
+        // `actionMoveCard` synct auf diesem Weg nicht selbst: ohne diesen
+        // Aufruf erschien die Karte erst beim naechsten Sync des Aufrufers
+        // im Geloescht-Stapel — deutlich NACH dem Flug (Als Befund, Diamond).
+        this.sync();
         return (ps.deletedPile || []).length > before;
       }
     }
