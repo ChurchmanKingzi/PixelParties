@@ -2984,6 +2984,8 @@ const ZONE_ANIM_SFX = {
   field_standard_rally:    { name: 'buff' },
   // Silent — redundant with a log or purely decorative
   gold_sparkle:            null,
+  // Lovely Teddy: expandierendes Herz.
+  heart_expand:            { name: 'buff', opts: { rate: 1.15, volume: 0.8 } },
   // Chaos-Diamond: roter Lichtblitz beim Aktivieren.
   red_lightning:           { name: 'elem_lightning', opts: { rate: 0.85, volume: 1.0 } },
   heal_sparkle:            null,

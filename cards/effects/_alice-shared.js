@@ -98,6 +98,12 @@ function stackAt(engine, pi, heroIdx, slotIdx, feld = pi) {
     // Styx 28.9.: Platz auf der Gegenspalte (uebernommener Held) — nur
     // die Kreaturen, die dort PHYSISCH stehen.
     if (feld !== pi && inst.owner !== feld) continue;
+    // ★ Eine GELIEHENE Kreatur (Aligning Goals, Lovely Teddy, Deepsea
+    // Succubus …) wechselt nur den KONTROLLEUR, sie liegt weiter auf dem
+    // Brett ihres Besitzers. Ohne diese Zeile zaehlte sie am gleichen
+    // Held/Slot als zweite Kreatur im Platz des Entleihers — eine
+    // Scheinkopie, die sich den Platz mit seiner eigenen Kreatur teilte.
+    if (feld === pi && typeof engine.physicalSide === 'function' && engine.physicalSide(inst) !== pi) continue;
     if (inst.heroIdx !== heroIdx || inst.zoneSlot !== slotIdx) continue;
     if (inst.faceDown) continue;
     const cd = engine.getEffectiveCardData?.(inst) || cardDB[inst.name];
