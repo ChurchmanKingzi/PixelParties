@@ -2233,6 +2233,7 @@ class GameEngine {
       // (Luna Kiai's "this specific copy is revealed") auto-shifts when
       // cards get spliced out of hand. Safe to re-call; it's idempotent.
       this._installHandRevealInterceptor(pi);
+      this._geloeschtVerfolgen(pi);   // Zeitstempel je Eintrag des Geloescht-Stapels
     }
 
     return this;
@@ -12244,6 +12245,51 @@ class GameEngine {
    * Creature stand und seit wann (fuer Flug und `turnPlayed`).
    */
   /**
+   * ★ ZEITSTEMPEL JE EINTRAG DES GELOESCHT-STAPELS. Der Stapel besteht nur aus Namen; ein
+   * Namensvergleich (oder -zaehler) kann nicht sagen, WELCHE Karte „in diesem Zug geloescht"
+   * wurde, wenn dieselbe Karte den Stapel verlaesst und eine gleiche im selben Zug neu
+   * hineinkommt. Deshalb fuehrt `ps._deletedStamps` parallel zu `ps.deletedPile` den Zug, in
+   * dem jeder Eintrag hineinkam (-1 = vor der Verfolgung). Die Instanz-Methoden `push`,
+   * `unshift`, `splice`, `pop`, `shift` des Stapels werden dazu (nicht aufzaehlbar) ueberlagert;
+   * andere Schreibwege (`length = 0`) gleicht `_geloeschtZuege` beim Lesen ab.
+   */
+  _geloeschtVerfolgen(pi) {
+    const ps = this.gs.players[pi];
+    if (!ps) return;
+    if (!ps.deletedPile) ps.deletedPile = [];
+    const arr = ps.deletedPile;
+    if (arr._stempelVerfolgt) return;
+    if (!Array.isArray(ps._deletedStamps) || ps._deletedStamps.length !== arr.length) {
+      ps._deletedStamps = arr.map(() => -1);
+    }
+    const engine = this;
+    const stamps = () => ps._deletedStamps;
+    const jetzt = () => engine.gs.turn;
+    const def = (name, fn) => Object.defineProperty(arr, name, { value: fn, enumerable: false, configurable: true, writable: true });
+    def('_stempelVerfolgt', true);
+    def('push', function (...items) { stamps().push(...items.map(jetzt)); return Array.prototype.push.apply(this, items); });
+    def('unshift', function (...items) { stamps().unshift(...items.map(jetzt)); return Array.prototype.unshift.apply(this, items); });
+    def('pop', function () { stamps().pop(); return Array.prototype.pop.call(this); });
+    def('shift', function () { stamps().shift(); return Array.prototype.shift.call(this); });
+    def('splice', function (...args) {
+      const sargs = args.length > 2 ? [args[0], args[1], ...args.slice(2).map(jetzt)] : args;
+      Array.prototype.splice.apply(stamps(), sargs);
+      return Array.prototype.splice.apply(this, args);
+    });
+  }
+
+  /** Die Zug-Stempel des Geloescht-Stapels von `pi`, abgeglichen auf die Stapellaenge. */
+  _geloeschtZuege(pi) {
+    this._geloeschtVerfolgen(pi);
+    const ps = this.gs.players[pi];
+    const n = ps.deletedPile.length;
+    const st = ps._deletedStamps;
+    if (st.length > n) st.length = n;
+    while (st.length < n) st.push(this.gs.turn);   // unverfolgt hineingelegt → zaehlt als „in diesem Zug"
+    return st;
+  }
+
+  /**
    * ★ „Creatures that are defeated are deleted" (Ghazma, the Worm Feeder): gilt, solange ein
    * LEBENDER, nicht negierter Held beider Seiten das Skript-Flag `defeatedCreaturesAreDeleted`
    * traegt. Besiegte Kreaturen (Schaden UND Zerstoerung) gehen dann in den Geloescht-Stapel
@@ -21225,8 +21271,8 @@ this._deathWatch = (this._deathWatchStack || []).length
     this._lastPhaseBeforeTurnStart = null;
 
     this.gs.currentPhase = PHASES.START;
-    // Stand der Geloescht-Stapel bei Zugbeginn („deleted this turn" — Ghazma, the Worm Feeder).
-    this.gs._geloeschtBeiZugbeginn = (this.gs.players || []).map(p => [...(p?.deletedPile || [])]);
+    // „Deleted this turn" je KARTE (Ghazma, the Worm Feeder): Zeitstempel je Stapeleintrag.
+    for (let p = 0; p < (this.gs.players || []).length; p++) this._geloeschtVerfolgen(p);
 
     // ── Clear stale `_preventPhaseAdvance` flag ──
     // The flag is one-shot: hooks like Giga Steroids, Ghuanjun's combo,
