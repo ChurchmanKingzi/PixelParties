@@ -2953,8 +2953,8 @@ app.delete('/api/decks/:id', authMiddleware, async (req, res) => {
 });
 
 // ===== SAMPLE DECKS =====
-function loadSampleDecks() {
-  const dir = path.join(__dirname, 'data', 'SampleDecks');
+function loadSampleDecks(dirOverride) {
+  const dir = dirOverride || path.join(__dirname, 'data', 'SampleDecks');
   if (!fs.existsSync(dir)) return [];
 
   const cardsByName = getCardDB();
@@ -18879,6 +18879,88 @@ async function runTrainingBatch() {
 }
 
 // ═══════════════════════════════════════════════════════════════════
+//  BEST-OF-THREE-GAUNTLET (PP_BO3=1)
+//  Ein eigenes Deck (Datei im Deck-Textformat) tritt gegen zufaellig
+//  gezogene Sample-Decks (Structure/Starter) jeweils im Best-of-Three an.
+//
+//    PP_BO3=1 PP_BO3_DECK=data/CustomDecks/<datei>.txt node server.js
+//    PP_BO3_OPPONENTS=10        Anzahl Gegner (Vorgabe 10)
+//    PP_BO3_SEED=<zahl>         Seed der Gegnerauswahl (Vorgabe 1)
+//    PP_BO3_SLICE=k/n           nur jeder n-te Gegner ab k (Parallelisierung)
+//    PP_BO3_OPP=<substr,...>    feste Gegnerliste statt Zufall
+//    PP_BO3_OUT=<pfad>          JSONL-Ergebnis (Vorgabe data/training/bo3-...)
+//
+//  Beide Seiten pilotiert das normale CPU-Gehirn (Profile der Gegner an,
+//  wie im echten CPU-Spiel). Unentschieden/Abbrueche werden bis zu
+//  zweimal wiederholt, danach zaehlen sie als Niederlage des Prueflings.
+// ═══════════════════════════════════════════════════════════════════
+async function runBo3Gauntlet() {
+  await initDatabase();   // setupGameState liest Nutzer-/Skin-Tabellen
+  setCpuVerbose(process.env.PP_TRAIN_VERBOSE === '1');
+  setRolloutHorizon(parseInt(process.env.PP_TRAIN_HORIZON || '2', 10));
+  const norm = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, '');
+  const deckPath = path.resolve(process.env.PP_BO3_DECK || '');
+  if (!process.env.PP_BO3_DECK || !fs.existsSync(deckPath)) {
+    console.error('[bo3] PP_BO3_DECK fehlt oder Datei nicht gefunden:', deckPath); process.exit(1);
+  }
+  // Das Pruefling-Deck liegt in einem eigenen Ordner; loadSampleDecks
+  // liest ein ganzes Verzeichnis, daher in ein Temp-Verzeichnis spiegeln.
+  const tmpDir = fs.mkdtempSync(path.join(require('os').tmpdir(), 'pp-bo3-'));
+  fs.copyFileSync(deckPath, path.join(tmpDir, path.basename(deckPath)));
+  const cand = loadSampleDecks(tmpDir)[0];
+  if (!cand) { console.error('[bo3] Deck nicht lesbar (Kopfzeile "=== PIXEL PARTIES DECK ==="?)'); process.exit(1); }
+  const db = getCardDB();
+  const missing = [...cand.mainDeck, ...cand.potionDeck, ...cand.heroes.map(h => h.hero)].filter(n => n && !db[n]);
+  if (missing.length) { console.error('[bo3] unbekannte Karten:', [...new Set(missing)].join(', ')); process.exit(1); }
+  if (cand.mainDeck.length !== 60) console.warn(`[bo3] ACHTUNG: Maindeck hat ${cand.mainDeck.length} statt 60 Karten`);
+
+  const field = loadSampleDecks().filter(d => d && d.heroes.length > 0 && d.mainDeck.length > 0);
+  let opps;
+  const fixed = (process.env.PP_BO3_OPP || '').split(',').map(norm).filter(Boolean);
+  if (fixed.length) {
+    opps = fixed.map(f => field.find(d => norm(d.name).includes(f) || norm(d.id).includes(f))).filter(Boolean);
+  } else {
+    let seed = parseInt(process.env.PP_BO3_SEED || '1', 10) >>> 0;
+    const rnd = () => { seed = (seed + 0x6D2B79F5) >>> 0; let t = seed; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+    const pool = [...field];
+    for (let i = pool.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [pool[i], pool[j]] = [pool[j], pool[i]]; }
+    opps = pool.slice(0, parseInt(process.env.PP_BO3_OPPONENTS || '10', 10));
+  }
+  const slice = (process.env.PP_BO3_SLICE || '').match(/^(\d+)\/(\d+)$/);
+  const allOpps = opps;
+  if (slice) opps = opps.filter((_, i) => i % parseInt(slice[2], 10) === parseInt(slice[1], 10));
+  console.log(`[bo3] "${cand.name}" vs ${allOpps.length} Gegner: ${allOpps.map(d => d.name).join(' | ')}`);
+  if (slice) console.log(`[bo3] Slice ${slice[1]}/${slice[2]}: ${opps.map(d => d.name).join(' | ')}`);
+
+  const outPath = process.env.PP_BO3_OUT || path.join(__dirname, 'data', 'training', `bo3-${norm(cand.name)}-${Date.now()}.jsonl`);
+  fs.mkdirSync(path.dirname(outPath), { recursive: true });
+  let matchWins = 0, matchLosses = 0;
+  for (const opp of opps) {
+    let w = 0, l = 0, tries = 0, gameNo = 0;
+    const games = [];
+    while (w < 2 && l < 2) {
+      const candIdx = gameNo % 2;                       // Sitzplatz wechselt je Partie
+      gameNo++;
+      let rec;
+      try { rec = await runHeadlessTrainingGame(cand, opp, candIdx, {}); }
+      catch (err) { console.error('[bo3] Spiel warf:', err.message); rec = { outcome: null, reason: 'threw' }; }
+      let res = rec.outcome === 1 ? 'W' : rec.outcome === 0 ? 'L' : '?';
+      if (res === '?' && ++tries > 2) res = 'L';
+      if (res === '?') { console.log(`[bo3]   Abbruch/Unentschieden (${rec.reason}) — wiederhole`); gameNo--; continue; }
+      if (res === 'W') w++; else l++;
+      games.push({ res, seat: candIdx, turns: rec.turns, reason: rec.reason });
+      console.log(`[bo3]   ${opp.name}: Partie ${w + l} ${res} (${rec.turns}t, ${rec.reason}) -> ${w}:${l}`);
+      if (typeof global.gc === 'function') { try { global.gc(); } catch {} }
+    }
+    const won = w === 2;
+    if (won) matchWins++; else matchLosses++;
+    fs.appendFileSync(outPath, JSON.stringify({ deck: cand.name, opponent: opp.name, won, score: `${w}:${l}`, games }) + '\n', { encoding: 'utf-8' });
+    console.log(`[bo3] MATCH ${won ? 'GEWONNEN' : 'VERLOREN'} gegen ${opp.name} (${w}:${l}) — Zwischenstand ${matchWins}-${matchLosses}`);
+  }
+  console.log(`[bo3] FERTIG (diese Slice): ${matchWins} Matches gewonnen, ${matchLosses} verloren -> ${outPath}`);
+}
+
+// ═══════════════════════════════════════════════════════════════════
 //  BANDBREITEN-MESSSTAND (PP_NETTEST=1)
 //
 //  Beantwortet die Frage „was kosten mich diese Partien LIVE an
@@ -20417,7 +20499,11 @@ app.get('*', (req, res, next) => {
 // Headless training mode — no DB, no socket server. Sample decks come
 // from data/SampleDecks and setupGameState short-circuits on the
 // injected room._currentDecks, so the whole batch runs engine-only.
-if (process.env.PP_TRAIN) {
+if (process.env.PP_BO3) {
+  runBo3Gauntlet()
+    .then(() => process.exit(0))
+    .catch(err => { console.error('[bo3] fehlgeschlagen:', err); process.exit(1); });
+} else if (process.env.PP_TRAIN) {
   runTrainingBatch()
     .then(() => process.exit(0))
     .catch(err => { console.error('[train] batch failed:', err); process.exit(1); });
