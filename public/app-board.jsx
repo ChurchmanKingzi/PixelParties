@@ -28524,6 +28524,25 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     }
   }, [gameState.effectPrompt, myIdx]);
 
+  // Zusatzaktions-Prompt mit `autoArmCard` (Traveler from the Future): die Handkarte
+  // ist SOFORT scharf — passende Helden/Support Zones leuchten und sind anklickbar,
+  // ohne die Karte erst anzuklicken. Drag&Drop bleibt moeglich (gleiche Prompt-Antwort).
+  useEffect(() => {
+    const ap = gameState.effectPrompt;
+    const aktiv = ap?.type === 'heroAction' && ap.ownerIdx === myIdx && ap.autoArmCard;
+    if (aktiv) {
+      const idx = (me.hand || []).indexOf(ap.autoArmCard);
+      const kd = CARDS_BY_NAME[ap.autoArmCard];
+      if (idx >= 0 && kd) {
+        setCrossSidePlayPick(prev => (prev && prev.isHeroActionArm && prev.cardName === ap.autoArmCard)
+          ? prev
+          : { cardName: ap.autoArmCard, handIndex: idx, card: kd, isHeroActionArm: true });
+        return;
+      }
+    }
+    setCrossSidePlayPick(prev => (prev && prev.isHeroActionArm) ? null : prev);
+  }, [gameState.effectPrompt, myIdx, (me.hand || []).length]);
+
   // Play a single open cue whenever any hand-card target picker appears.
   useEffect(() => { if (spellHeroPick && window.playSFX) window.playSFX('ui_prompt_open'); }, [spellHeroPick]);
   useEffect(() => { if (abilityAttachPick && window.playSFX) window.playSFX('ui_prompt_open'); }, [abilityAttachPick]);
@@ -28977,6 +28996,17 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         // clicks send the caster's own index (server treats as own);
         // a free-side equip clicked on an opp Hero pins the opp index.
         targetOwner: destination.ownerIdx,
+      });
+      return;
+    }
+    // Scharf geschaltete Zusatzaktions-Karte (Traveler): die Antwort geht an den Prompt.
+    if (destination?._heroAction) {
+      const aktuell = hand.indexOf(cardName);
+      if (aktuell < 0) return;
+      if (window.playSFX) window.playSFX('ui_click');
+      socket.emit('effect_prompt_response', {
+        roomId: gameState.roomId,
+        response: { cardName, handIndex: aktuell, heroIdx: destination.heroIdx, zoneSlot: destination.slotIdx },
       });
       return;
     }
@@ -42230,7 +42260,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           // Frozen); cross-side Creature picks keep the both-sides rule.
           const _csppIsEquip = !!crossSidePlayPick?.isEquip;
           const _csppIsFreeSideEquip = !!crossSidePlayPick?.isFreeSideEquip;
-          const _csppHeroEligible = !!crossSidePlayPick && hero?.hp > 0
+          const _csppArmOk = !crossSidePlayPick?.isHeroActionArm
+            || (!isOpp && ((gameState.effectPrompt?.heroIndicesByCard || {})[crossSidePlayPick.cardName] || []).includes(i));
+          const _csppHeroEligible = !!crossSidePlayPick && _csppArmOk && hero?.hp > 0
             && (!_csppIsEquip || ((!isOpp || _csppIsFreeSideEquip) && !hero?.statuses?.frozen
               && equipBezahlbarAuf(me, myIdx, crossSidePlayPick.cardName, crossSidePlayPick.card, crossSidePlayPick.handIndex, pi, i)));
           const _csppHeroFreeSlot = _csppHeroEligible
@@ -42266,7 +42298,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 setCrossSidePlayPick(null);
                 routeCrossSideSummon(cspp.cardName, cspp.handIndex, cspp.card, {
                   ownerIdx: pi, heroIdx: i, slotIdx: _csppHeroFreeSlot,
-                  _isEquip: cspp.isEquip,
+                  _isEquip: cspp.isEquip, _heroAction: !!cspp.isHeroActionArm,
                 });
               }
             : attachPickEligibleHero
@@ -43646,7 +43678,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               // Heroes; cross-side Creature picks keep the both-sides rule.
               const _csppSlotIsEquip = !!crossSidePlayPick?.isEquip;
               const _csppSlotIsFreeSideEquip = !!crossSidePlayPick?.isFreeSideEquip;
+              const _csppSlotArmOk = !crossSidePlayPick?.isHeroActionArm
+                || (!isOpp && ((gameState.effectPrompt?.heroIndicesByCard || {})[crossSidePlayPick.cardName] || []).includes(i));
               const isCsppEmptySlot = !!crossSidePlayPick
+                && _csppSlotArmOk
                 && cards.length === 0
                 && (_csppSide.heroes?.[i]?.hp > 0)
                 && z < ((_csppSide.supportZones?.[i] || []).length || 3)
@@ -43695,7 +43730,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     setCrossSidePlayPick(null);
                     routeCrossSideSummon(cspp.cardName, cspp.handIndex, cspp.card, {
                       ownerIdx: pi, heroIdx: i, slotIdx: z,
-                      _isEquip: cspp.isEquip,
+                      _isEquip: cspp.isEquip, _heroAction: !!cspp.isHeroActionArm,
                     });
                   } : isPendingBounceTarget ? () => {
                     // Click-to-swap: dispatches play_creature as if the

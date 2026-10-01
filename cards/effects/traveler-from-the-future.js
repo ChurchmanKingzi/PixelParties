@@ -38,6 +38,7 @@ module.exports = {
         allowedCardTypes: ['Creature'],
         cardNameFilter: (n) => n === CARD_NAME,
         skipAbilities: true, skipHeroEffects: true,
+        autoArmCard: CARD_NAME,   // Helden/Zonen sofort anklickbar (Drag&Drop geht weiter)
         cancellable: true,
       });
       engine.log('traveler_from_the_future', { player: ps.username, summoned: !!res?.played });
