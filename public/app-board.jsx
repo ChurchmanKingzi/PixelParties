@@ -24921,10 +24921,10 @@ function CardReorderPrompt({ ep, onRespond }) {
   const slotRefs = useRef([]);
   const orderRef = useRef(order);
   orderRef.current = order;
-  const tausche = (a, b) => {
+  const tausche = (a, b, stumm) => {
     if (a == null || b == null || a === b) return;
     setOrder(prev => { const n = prev.slice(); [n[a], n[b]] = [n[b], n[a]]; return n; });
-    if (window.playSFX) window.playSFX('ui_click', { volume: 0.5 });
+    if (!stumm && window.playSFX) window.playSFX('ui_click', { volume: 0.5 });
   };
   const verschiebe = (von, nach) => {   // ◀ ▶: Nachbar tauschen
     if (nach < 0 || nach >= order.length) return;
@@ -24956,7 +24956,9 @@ function CardReorderPrompt({ ep, onRespond }) {
       window.removeEventListener('pointercancel', ende);
       if (aktiv) {
         const ziel = ueberKarte(ev.clientX, ev.clientY);
-        if (ziel != null && ziel !== pos) tausche(pos, ziel);
+        if (ziel != null && ziel !== pos) tausche(pos, ziel, true);
+        // Jedes Ablegen klingt gleich — auch wenn die Karte auf ihrem Platz bleibt (Als Befund 2.10.).
+        if (window.playSFX) window.playSFX('placement', { volume: 0.8 });
       }
       setDrag(null);
     };
