@@ -8303,6 +8303,86 @@ const ANIM_REGISTRY = {
       );
     };
   })(),
+  // Rool, the Troll Guard — „disrupted": ein Troll-Hieb auf den Boden unter dem Ziel. Erst ein Aufschlag-Blitz mit
+  // Druckring, dann reissen gezackte Spalten radial auf, Gesteinsbrocken fliegen, und ein grosses „×2" springt
+  // auf und schwebt davon (doppelter Schaden). Warmes Rot/Orange = Debuff.
+  rool_disrupt: (function () {
+    return function RoolDisruptEffect({ x, y, opacity }) {
+      const brocken = useMemo(() => Array.from({ length: ppFxN(14) }, () => {
+        const angle = Math.random() * Math.PI * 2;
+        const speed = 24 + Math.random() * 46;
+        return {
+          dx: Math.cos(angle) * speed, dy: Math.sin(angle) * speed - 16,
+          size: 3 + Math.random() * 6,
+          color: ['#8a4a2a', '#b5651d', '#d98a3d', '#6a3a1e', '#e8b070'][Math.floor(Math.random() * 5)],
+          delay: 80 + Math.random() * 60, dur: 420 + Math.random() * 320,
+        };
+      }), []);
+      const risse = useMemo(() => [-35, 38, 100, 152, 215, 268, 320].slice(0, ppFxN(7)).map((w, i) => ({ w, len: 36 + (i % 3) * 12 })), []);
+      const wrapperOpacity = (typeof opacity === 'number' && opacity >= 0 && opacity <= 1) ? opacity : 1;
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100, opacity: wrapperOpacity }}>
+          <div style={{
+            position: 'absolute', left: -44, top: -44, width: 88, height: 88, borderRadius: '50%',
+            background: 'radial-gradient(circle, rgba(255,190,90,.9) 0%, rgba(220,100,40,.55) 42%, rgba(120,40,10,0) 76%)',
+            boxShadow: '0 0 26px rgba(255,140,50,.8), 0 0 48px rgba(200,70,20,.5)',
+            animation: 'roolDisruptFlash 520ms ease-out forwards',
+          }} />
+          <div style={{
+            position: 'absolute', left: -22, top: -22, width: 44, height: 44, borderRadius: '50%',
+            border: '4px solid rgba(255,170,80,.9)',
+            animation: 'roolDisruptRing 640ms ease-out forwards',
+          }} />
+          {risse.map((r, i) => (
+            <div key={i} style={{
+              position: 'absolute', left: 0, top: 0, width: r.len, height: 3, transformOrigin: '0 50%',
+              transform: `rotate(${r.w}deg) scaleX(0)`,
+              background: 'linear-gradient(90deg, #ffd08a 0%, #e0702a 45%, #5a1e08 100%)',
+              boxShadow: '0 0 6px rgba(255,140,50,.9)',
+              clipPath: 'polygon(0 40%, 18% 0, 34% 60%, 52% 10%, 70% 70%, 100% 50%, 70% 100%, 40% 70%, 20% 100%, 0 60%)',
+              animation: `roolDisruptCrack 560ms ease-out ${60 + i * 25}ms forwards`,
+              '--rw': r.w + 'deg',
+            }} />
+          ))}
+          {brocken.map((b, i) => (
+            <div key={'b' + i} className="anim-explosion-particle" style={{
+              '--dx': b.dx + 'px', '--dy': b.dy + 'px', '--size': b.size + 'px', '--color': b.color,
+              animationDelay: b.delay + 'ms', animationDuration: b.dur + 'ms',
+            }} />
+          ))}
+          <div style={{
+            position: 'absolute', left: -30, top: -34, width: 60, textAlign: 'center',
+            fontFamily: 'var(--font-display, var(--font-body)), sans-serif', fontWeight: 900, fontSize: 30,
+            color: '#ffe3a8', textShadow: '0 0 8px rgba(255,120,40,.95), 2px 3px 0 rgba(90,25,5,.95)',
+            opacity: 0, animation: 'roolDisruptX2 1100ms ease-out 180ms forwards',
+          }}>×2</div>
+          <style>{`
+            @keyframes roolDisruptFlash {
+              0%   { opacity: 0; transform: scale(0.25); }
+              28%  { opacity: 1; transform: scale(1.05); }
+              100% { opacity: 0; transform: scale(1.55); }
+            }
+            @keyframes roolDisruptRing {
+              0%   { opacity: 0; transform: scale(0.3); }
+              25%  { opacity: .95; }
+              100% { opacity: 0; transform: scale(3.2); }
+            }
+            @keyframes roolDisruptCrack {
+              0%   { opacity: 0; transform: rotate(var(--rw)) scaleX(0); }
+              30%  { opacity: 1; transform: rotate(var(--rw)) scaleX(1); }
+              100% { opacity: 0; transform: rotate(var(--rw)) scaleX(1.15); }
+            }
+            @keyframes roolDisruptX2 {
+              0%   { opacity: 0; transform: translateY(8px) scale(0.3) rotate(-10deg); }
+              22%  { opacity: 1; transform: translateY(-4px) scale(1.45) rotate(4deg); }
+              40%  { transform: translateY(-8px) scale(1.1) rotate(-3deg); }
+              100% { opacity: 0; transform: translateY(-34px) scale(1.2) rotate(0deg); }
+            }
+          `}</style>
+        </div>
+      );
+    };
+  })(),
   shield_bubble: ShieldBubbleEffect,
   stun_strike: StunStrikeEffect,
   niu_powerup: NiuPowerUpEffect,
