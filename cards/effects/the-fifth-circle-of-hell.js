@@ -46,6 +46,16 @@ module.exports = {
       ps._fifthCircleTurn = gs.turn;
       gs._naechsterEinzelschadenX2 = { turn: gs.turn, owner: pi, source: CARD_NAME };
       await engine.showTriggeredEffect(CARD_NAME, { playerIdx: pi });
+      // Die komplette Gegnerseite geht einmal in Flammen auf (Helden + Support Zonen).
+      const oi = pi === 0 ? 1 : 0;
+      const ziele = [];
+      (gs.players[oi]?.heroes || []).forEach((h, hi) => {
+        if (!h?.name) return;
+        ziele.push({ owner: oi, heroIdx: hi, zoneSlot: -1, cardName: h.name });
+        for (let z = 0; z < 3; z++) ziele.push({ owner: oi, heroIdx: hi, zoneSlot: z });
+      });
+      engine._broadcastEvent('play_zone_animation', { type: 'fifth_circle_flames', zoneType: 'board', owner: oi, heroIdx: -1, zoneSlot: -1, targets: ziele, duration: 2000 });
+      await engine._delay(1300);
       engine.log('fifth_circle_armed', { player: ps.username });
       engine.sync();
     },

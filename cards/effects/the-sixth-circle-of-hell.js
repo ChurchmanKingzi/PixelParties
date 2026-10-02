@@ -60,6 +60,8 @@ module.exports = {
       if (!gewaehlt || gewaehlt.length === 0) return;
       const ziel = ziele.find(t => t.id === gewaehlt[0]);
       if (!ziel) return;
+      engine._broadcastEvent('play_zone_animation', { type: 'hell_charm', owner: oi, heroIdx: ziel.heroIdx, zoneSlot: -1 });
+      await engine._delay(600);
       const erg = await temporaereKontrolle(engine, {
         controllerPi: pi, ownerPi: oi, heroIdx: ziel.heroIdx,
         sourceName: CARD_NAME, marker: 'onlyFromController', supportZonesLocked: false,
