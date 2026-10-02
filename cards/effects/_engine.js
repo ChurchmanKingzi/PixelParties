@@ -12326,7 +12326,17 @@ class GameEngine {
       let script = null;
       try { script = loadCardEffect(name); } catch { script = null; }
       if (!script?.onDeletedFromAnywhere) continue;
-      (this._loeschWarteschlange || (this._loeschWarteschlange = [])).push({ pi, name });
+      // ★ VORRANG: The Third Circle of Hell und alles, was waehrend seiner Aufloesung (Zeigen, Areas
+      // loeschen, Rest loeschen) in den Geloescht-Stapel kommt, wird VOR den schon wartenden Angeboten
+      // abgearbeitet — andere frisch geloeschte Kreise feuern erst danach. Vorrang vererbt sich auf
+      // alles, was ein Vorrang-Angebot selbst ausloest; innerhalb des Vorrangs bleibt die Reihenfolge.
+      const vorrang = name === 'The Third Circle of Hell' || !!this._laufenderVorrang;
+      const q = this._loeschWarteschlange || (this._loeschWarteschlange = []);
+      if (vorrang) {
+        let ix = 0;
+        while (ix < q.length && q[ix].vorrang) ix++;
+        q.splice(ix, 0, { pi, name, vorrang: true });
+      } else q.push({ pi, name });
     }
     if (!this._loeschWarteschlange?.length || this._loeschAbholungAngemeldet) return;
     this._loeschAbholungAngemeldet = true;
@@ -12336,8 +12346,10 @@ class GameEngine {
       try {
         for (let n = 0; this._loeschWarteschlange.length > 0 && n < 24; n++) {
           const e = this._loeschWarteschlange.shift();
+          this._laufenderVorrang = !!e.vorrang;
           try { await loadCardEffect(e.name)?.onDeletedFromAnywhere?.(this, e.pi, e.name); }
           catch (err) { console.error(`[onDeletedFromAnywhere] ${e.name}:`, err.message); }
+          finally { this._laufenderVorrang = false; }
         }
       } finally {
         this._loeschWarteschlange.length = 0;
