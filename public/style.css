@@ -7196,7 +7196,10 @@ body.pp-dragging-card.pp-dragging-card.pp-dragging-card * {
   width: 64px;
   height: 90px;
   pointer-events: none;
-  z-index: 10100;
+  /* Unter den Auswahl-Fenstern (Panel 10080, Kampf-Modal 10085), damit
+     Creature-/Zonen-Auswahl waehrend des Resolves ueber der gehaltenen
+     Karte in der Bildschirmmitte liegen. */
+  z-index: 10070;
   perspective: 800px;
   animation: colored-snow-reveal-in 1500ms cubic-bezier(.4,.1,.3,1) forwards;
 }
