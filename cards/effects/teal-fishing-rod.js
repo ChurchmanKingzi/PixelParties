@@ -23,6 +23,7 @@ const { isPileCreature } = require('./_hooks');
 
 const CARD_NAME = 'Teal Fishing Rod';
 const HOPT = (pi) => `teal-fishing-rod:${pi}`;
+const ANGEL_MS = 2600;   // Dauer der Angel-Animation (`fishing_catch`, muss zur Client-Animation passen)
 
 /** Level-0-Creatures der Ablage, die nicht in diesem Zug hineinkamen; entdoppelt. */
 function kandidaten(engine, pi) {
@@ -110,10 +111,18 @@ module.exports = {
     if (!gs.hoptUsed) gs.hoptUsed = {};
     gs.hoptUsed[HOPT(pi)] = gs.turn;
 
-    // ③ Platzieren ueber die Stapel-Schicht (Flug aus der Ablage, Sperren, Lethe-Stempel, On-Summon-Hooks).
+    // ③ Die Creature wird aus der Ablage „geangelt": Haken packt sie, sie pendelt an der Schnur und wird in die Zone
+    // abgeseilt (`fishing_catch`, ~2,6 s). Der Standardflug entfaellt (`skipPileTransfer`); gelegt wird erst, wenn
+    // die Animation die Zone erreicht hat.
+    engine._broadcastEvent('fishing_catch', {
+      owner: pi, cardName: gewaehlt, toOwner: ziel.owner, toHeroIdx: ziel.heroIdx, toSlotIdx: ziel.slotIdx, durationMs: ANGEL_MS,
+    });
+    await engine._delay(ANGEL_MS);
+    // Platzieren ueber die Stapel-Schicht (Sperren, Lethe-Stempel, On-Summon-Hooks).
     const res = await engine.placeFromPile(pi, 'discard', gewaehlt, ziel.heroIdx, ziel.slotIdx, {
       source: CARD_NAME,
       heldSeite: ziel.owner,
+      placeOpts: { skipPileTransfer: true },
     });
     if (!res) {
       engine.log('teal_fishing_rod_fizzle', { player: ps.username, card: gewaehlt });

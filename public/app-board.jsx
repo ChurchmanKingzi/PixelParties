@@ -34111,6 +34111,82 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     };
     socket.on('area_descend', onAreaDescend);
 
+    // ── Teal Fishing Rod: die Creature wird aus der Ablage „geangelt" ──────────────────────────
+    // Eine Angelschnur haengt an einem Punkt ueber der Ziel-Zone; der Haken packt die Karte im Ablagestapel,
+    // zieht sie hoch zum Aufhaengepunkt, sie pendelt hin und her (gedaempfte Schwingung) und wird dann in die
+    // Ziel-Zone abgeseilt. Reine DOM-/rAF-Animation (Schnur = gedrehtes Element zwischen Anker und Karte).
+    const onFishingCatch = ({ owner, cardName, toOwner, toHeroIdx, toSlotIdx, durationMs }) => {
+      if (window._playAnimations === false) return;
+      const ownerLabel = owner === myIdx ? 'me' : 'opp';
+      const toLabel = (toOwner ?? owner) === myIdx ? 'me' : 'opp';
+      const pileEl = document.querySelector(owner === myIdx ? '[data-my-discard]' : '[data-opp-discard]');
+      const zoneEl = document.querySelector(`[data-support-zone][data-support-owner="${toLabel}"][data-support-hero="${toHeroIdx}"][data-support-slot="${toSlotIdx}"]`);
+      if (!pileEl || !zoneEl) return;
+      const pr = pileEl.getBoundingClientRect(), zr = zoneEl.getBoundingClientRect();
+      const total = durationMs || 2600;
+      const T1 = 0.26 * total, T2 = 0.80 * total;              // 0–T1: einholen, T1–T2: Pendeln, T2–total: abseilen
+      const imgUrl = window.cardImageUrl ? window.cardImageUrl(cardName) : null;
+      const cardW = Math.max(58, Math.min(zr.width, 110)), cardH = cardW * 1.4;
+      const startX = pr.left + pr.width / 2, startY = pr.top + pr.height / 2;
+      const zx = zr.left + zr.width / 2, zy = zr.top + zr.height / 2;
+      const ax = zx, ay = Math.max(8, zy - 300);                  // Aufhaengepunkt der Schnur (Rutenspitze)
+      const L0 = 190;                                             // Schnurlaenge beim Pendeln
+      const mk = (css) => { const e = document.createElement('div'); e.style.cssText = 'position:fixed;pointer-events:none;' + css; document.body.appendChild(e); return e; };
+      const rute = mk(`left:${ax - 3}px;top:${ay - 12}px;width:6px;height:6px;border-radius:50%;background:#c9a24a;box-shadow:0 0 8px #e8c870;z-index:10020;`);
+      const schnur = mk(`left:0;top:0;width:2px;height:10px;background:linear-gradient(to bottom,#f4ecd0,#bfae80);box-shadow:0 0 4px rgba(255,240,200,.7);transform-origin:50% 0;z-index:10018;`);
+      const haken = mk(`left:0;top:0;width:12px;height:12px;border:3px solid #d8d0b0;border-top-color:transparent;border-radius:50%;z-index:10022;box-shadow:0 0 6px rgba(255,255,230,.7);`);
+      const karte = mk(`left:0;top:0;width:${cardW}px;height:${cardH}px;border-radius:5px;z-index:10019;box-shadow:0 6px 18px rgba(0,0,0,.55),0 0 14px rgba(120,200,255,.7);border:2px solid rgba(190,230,255,.9);overflow:hidden;background:linear-gradient(135deg,#7ac4e8,#2c6c94);`);
+      karte.className = 'card-flight';
+      if (imgUrl) { const im = document.createElement('img'); im.src = imgUrl; im.draggable = false; im.style.cssText = 'width:100%;height:100%;object-fit:cover;'; karte.appendChild(im); }
+      const sfx = (name, opts, at) => setTimeout(() => { if (window.playSFX) window.playSFX(name, { ...opts, dedupe: 0 }); }, at);
+      sfx('elem_water', { rate: 1.35, volume: 1.2 }, 0);              // Auswerfen/Platschen
+      sfx('reveal', { rate: 0.9, volume: 1.0 }, 0.18 * total);          // Haken packt zu
+      sfx('elem_wind', { rate: 1.6, volume: 0.7 }, T1);                 // Schwung beim Pendeln
+      sfx('elem_wind', { rate: 1.3, volume: 0.55 }, T1 + (T2 - T1) * 0.45);
+      sfx('placement', { rate: 0.95, volume: 1.0 }, total - 60);        // sanftes Aufsetzen
+      const t0 = performance.now();
+      const ease = (u) => 1 - Math.pow(1 - u, 3);
+      const rahmen = (jetzt) => {
+        const t = jetzt - t0;
+        let cx, cy, rot = 0, sc = 1, fade = 1;                      // Kartenmitte
+        if (t < T1) {                                               // einholen: Stapel → Aufhaengeposition (gekruemmt)
+          const u = ease(t / T1);
+          const hx = ax, hy = ay + L0 + cardH * 0.5;
+          cx = startX + (hx - startX) * u;
+          cy = startY + (hy - startY) * u - Math.sin(u * Math.PI) * 60;
+          sc = 0.55 + 0.45 * u;
+          rot = (1 - u) * -10;
+        } else if (t < T2) {                                        // Pendeln: gedaempft um den Aufhaengepunkt
+          const u = (t - T1) / (T2 - T1);
+          const th = 0.62 * Math.exp(-2.4 * u) * Math.cos(u * Math.PI * 5.2);
+          const L = L0 + cardH * 0.5;
+          cx = ax + Math.sin(th) * L; cy = ay + Math.cos(th) * L;
+          rot = th * 57.3;
+        } else {                                                    // abseilen in die Zone
+          const u = ease((t - T2) / (total - T2));
+          const L = L0 + cardH * 0.5;
+          const th = 0.03 * Math.cos((t - T2) / 60) * (1 - u);
+          const fx = ax + Math.sin(th) * L, fy = ay + Math.cos(th) * L;
+          cx = fx + (zx - fx) * u; cy = fy + (zy - fy) * u;
+          rot = th * 57.3 * (1 - u); sc = 1 - 0.18 * u;
+        }
+        karte.style.transform = `translate(${cx - cardW / 2}px, ${cy - cardH / 2}px) rotate(${rot}deg) scale(${sc})`;
+        // Schnur: von der Rutenspitze zur Oberkante der Karte (Haken sitzt dort)
+        const topX = cx + Math.sin(rot / 57.3) * (cardH / 2) * sc, topY = cy - Math.cos(rot / 57.3) * (cardH / 2) * sc;
+        const dx = topX - ax, dy = topY - ay;
+        const len = Math.max(4, Math.hypot(dx, dy));
+        schnur.style.transform = `translate(${ax - 1}px, ${ay}px) rotate(${Math.atan2(dx, dy) * -57.3}deg)`;
+        schnur.style.height = len + 'px';
+        haken.style.transform = `translate(${topX - 6}px, ${topY - 8}px)`;
+        if (t > total - 260) { fade = Math.max(0, (total - t) / 260); }
+        karte.style.opacity = String(fade); haken.style.opacity = String(fade); schnur.style.opacity = String(Math.min(1, fade * 1.2)); rute.style.opacity = String(fade);
+        if (t < total) requestAnimationFrame(rahmen);
+        else { [rute, schnur, haken, karte].forEach(e => e.remove()); }
+      };
+      requestAnimationFrame(rahmen);
+    };
+    socket.on('fishing_catch', onFishingCatch);
+
     // ── Eraser Beam ──
     //  One of the deadliest Spells in the game. A thick blood-red energy
     //  beam lances from caster to target, wrapped in crackling lightning
@@ -40045,6 +40121,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       socket.off('qinglong_lightning', onQinglongLightning);
       socket.off('red_lightning_rain', onRedLightningRain);
       socket.off('area_descend', onAreaDescend);
+      socket.off('fishing_catch', onFishingCatch);
       socket.off('eraser_beam', onEraserBeam);
       socket.off('cooldin_terraform', onCooldinTerraform);
       socket.off('big_gwen_clock_activation', onBigGwenClockActivation);
