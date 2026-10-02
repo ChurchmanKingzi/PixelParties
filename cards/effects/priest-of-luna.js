@@ -43,6 +43,10 @@ async function anbieten(ctx, opferName) {
   });
   if (!engine._confirmSaidYes(ja)) return;
 
+  // Kartenbild SOFORT nach dem Ja streamen (Als Befund 2.10.): die Zielwahl oeffnet das Surprise-Fenster des Gegners
+  // (Booby Trap …) — er muss vorher gesehen haben, WELCHE Creature hier wirkt.
+  await engine.showTriggeredEffect(CARD_NAME, { playerIdx: pi });
+
   // Brandziel: jedes Ziel auf dem Brett, das noch nicht brennt.
   const ziel = await ctx.promptDamageTarget({
     side: 'any', types: ['hero', 'creature'], damageType: 'status',
@@ -67,8 +71,6 @@ async function anbieten(ctx, opferName) {
   // ── Commit ──
   if (!gs.hoptUsed) gs.hoptUsed = {};
   gs.hoptUsed[sperre(inst)] = gs.turn;
-  // Das Kartenbild des Priesters ZUERST streamen — dann erst fliegen die beiden Creatures ins Deck.
-  await engine.showTriggeredEffect(CARD_NAME, { playerIdx: pi });
   if (!(await mischeZurueck(engine, pi, namen, CARD_NAME))) return;
 
   const anim = { owner: ziel.owner, heroIdx: ziel.heroIdx, zoneSlot: ziel.type === 'hero' ? -1 : ziel.slotIdx };

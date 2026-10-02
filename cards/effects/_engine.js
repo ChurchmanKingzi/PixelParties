@@ -6891,6 +6891,13 @@ class GameEngine {
   async showTriggeredEffect(cardName, opts = {}) {
     if (!cardName || this._inMctsSim || this._fastMode) return;
 
+    // Schon VOR dem Surprise-Fenster gezeigt (`_creatureEffektVorSurprise`): der eigene Aufruf der Karte entfaellt einmal.
+    const auto = this._autoAnnounce;
+    if (auto && !opts._auto) {
+      this._autoAnnounce = null;
+      if (auto.card === cardName && this._currentEffectSource === auto.src) return;   // derselbe laufende Effekt
+    }
+
     // Entprellung je Quelle (dieselbe Bauart wie `effectSourceGlow`).
     const src = opts.source;
     const win = opts.windowMs ?? 0;
@@ -29568,6 +29575,21 @@ this._deathWatch = (this._deathWatchStack || []).length
     return !!cd && hasCardType(cd, 'Creature');
   }
 
+  /**
+   * Passiver Creature-Effekt, dessen Zielwahl gleich ein Surprise-Fenster oeffnet: Auftritt JETZT, nicht erst nach der
+   * Aufloesung. `_autoAnnounce` laesst den spaeteren eigenen Aufruf der Karte (`showTriggeredEffect`) einmal entfallen,
+   * damit sie nicht doppelt erscheint.
+   */
+  async _creatureEffektVorSurprise(sourceInfo) {
+    const quelle = this._currentEffectSource;
+    if (!quelle?.cardName || !this._isCreatureSourcedLink(quelle)) return;
+    if (this._activationSource?.cardName === quelle.cardName) return;   // aktiver Weg: Reveal der Aktivierung
+    const owner = (quelle.owner === 0 || quelle.owner === 1) ? quelle.owner : sourceInfo?.owner;
+    if (owner !== 0 && owner !== 1) return;
+    await this.showTriggeredEffect(quelle.cardName, { playerIdx: owner, windowMs: 3000, _auto: true });
+    this._autoAnnounce = { card: quelle.cardName, src: quelle };
+  }
+
   claimHOPT(key, playerIdx) {
     if (!this.gs.hoptUsed) this.gs.hoptUsed = {};
     const hoptKey = `${key}:${playerIdx}`;
@@ -33717,6 +33739,11 @@ this._deathWatch = (this._deathWatchStack || []).length
           const hostName = ps.heroes[hostHeroIdx]?.name || `Hero ${hostHeroIdx + 1}`;
           promptMsg += ` (Activate via Brain Spider — Surprise is set on ${hostName}.)`;
         }
+
+        // ★ Als Befund 2.10. (Priest of Luna / Booby Trap): wirkt eine CREATURE ueber einen Hook von allein (passiver
+        // Effekt), muss ihr Kartenbild VOR der Surprise-Abfrage gestreamt sein — der Reaktor soll sehen, WELCHE Creature hier
+        // zielt, bevor er gefragt wird. Aktive Aktivierungen zeigen sich ohnehin ueber den Reveal der Aktivierung.
+        await this._creatureEffektVorSurprise(sourceInfo);
 
         const confirmed = await this.promptGeneric(reaktor, {
           type: 'confirm',
