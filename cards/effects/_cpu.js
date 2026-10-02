@@ -8567,16 +8567,16 @@ function isLikelyNegation(cd) {
 // ─── Heal / buff detection heuristics ───────────────────────────────────
 
 /**
- * Schadens-Prompt einer ABILITY (Occultism: 50/100/150 auf ein frei
- * gewaehltes Ziel). Abilities fehlten in der Schadenskarten-Erkennung
- * (`Attack`/`Spell`/`Artifact`), also blieben eigene Ziele in der Liste
+ * Schadens-Prompt einer ABILITY oder eines POTIONS (Occultism: 50/100/150,
+ * Acid Vial: 150 auf ein frei gewaehltes Ziel). Beide fehlten in der
+ * Schadenskarten-Erkennung (`Attack`/`Spell`/`Artifact`), also blieben eigene Ziele in der Liste
  * und der MCTS-Plan konnte sie waehlen — Meldung: die CPU beschoss mit
  * ihrem eigenen Occultism die eigenen Helden und nahm sich damit selbst
  * aus dem Spiel. Selbstschaden (`selfDamage`/Recoil) und ausdrueckliches
  * `allowOwnSide` bleiben ausgenommen.
  */
 function isAbilityDamagePrompt(cd, config) {
-  return cd?.cardType === 'Ability'
+  return (cd?.cardType === 'Ability' || cd?.cardType === 'Potion')
     && inferDamage(config || {}) > 0
     && config?.dealsDamage !== false
     && !config?.allowOwnSide
