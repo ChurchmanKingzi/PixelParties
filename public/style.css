@@ -10548,7 +10548,9 @@ body.pp-dragging-card.pp-dragging-card.pp-dragging-card * {
 }
 /* When chain is visible, shift tooltip to the left of the chain panel */
 body:has(.reaction-chain-overlay) .board-tooltip {
-  right: 196px;
+  /* Der Tooltip endet knapp VOR der Ketten-Anzeige: `--chain-schub` misst GameBoard aus deren tatsaechlicher linker
+     Kante (Abstand zum rechten Rand + 8 px); 196px ist nur der Rueckfall, falls die Messung nie laeuft. */
+  right: var(--chain-schub, 196px);
 }
 
 /* In battle / puzzle-player mode the player's hand strip
@@ -10563,7 +10565,10 @@ body:has(.reaction-chain-overlay) .board-tooltip {
    shop / deck builder don't render `.game-hand-me`, so the rule
    is naturally scoped via `body:has`. */
 body:has(.game-hand-me) .board-tooltip {
-  bottom: var(--hand-min-h);
+  /* Die eigene Handleiste ist um `--hand-senkung` KUERZER als `--hand-min-h` (ihre Karten haengen unten heraus, siehe
+     `.game-hand-me`). Der Tooltip reicht deshalb bis an die ECHTE Oberkante der Leiste — vorher blieb ein sichtbarer
+     Spalt zwischen Tooltip und Hand. */
+  bottom: calc(var(--hand-min-h) - var(--hand-senkung, 0px));
 }
 
 /* ★ v1269 (Al 22.9.: „waehrend Overlays wie dem der Weapon Collecting
@@ -13697,7 +13702,7 @@ body:has(.modal-overlay) .tooltip {
   box-shadow: -4px 0 20px rgba(0,0,0,.6);
 }
 body:has(.reaction-chain-overlay) .board-tooltip-token {
-  right: calc(360px + 196px);
+  right: calc(360px + var(--chain-schub, 196px));
 }
 
 /* ===== TURN INDICATOR ON AVATARS ===== */
