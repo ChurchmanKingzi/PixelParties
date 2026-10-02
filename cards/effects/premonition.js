@@ -13,9 +13,8 @@
 //  Reveal each searched card to the opponent
 //  (deckSearchReveal popup, same stream pattern
 //  Magnetic Glove uses) and place it face-down
-//  on top of your deck. The placement order is
-//  the pick order — the last picked card ends
-//  up on the very top (drawn next).
+//  on top of your deck „in any order": after the picks the player orders them
+//  in one scry dialog (`engine.promptDeckReorder`, drag & drop).
 //
 //  Immediately end your turn afterwards.
 //
@@ -171,6 +170,19 @@ module.exports = {
       });
 
       picksTaken++;
+    }
+
+    // „in any order": mit 2+ Karten ordnet der Spieler die abgelegten Karten in EINEM Scry-Dialog (`promptDeckReorder`);
+    // die Karten sind per `deckSearchReveal` oeffentlich, die Fluege sehen beide Spieler. Position 1 = als naechstes gezogen.
+    if (picksTaken > 1) {
+      const gestapelt = ps.mainDeck.slice(0, picksTaken);
+      const { top: geordnet } = await engine.promptDeckReorder(pi, pi, gestapelt, {
+        title: CARD_NAME, publicFlights: true,
+        description: `Drag the ${gestapelt.length} cards into the order you want them on top of your deck. Position 1 (left) is drawn next.`,
+      });
+      for (let k = 0; k < geordnet.length; k++) ps.mainDeck[k] = geordnet[k];
+      const darunter = (ps.deckTopVisible || []).slice(picksTaken);
+      ps.deckTopVisible = geordnet.concat(darunter);
     }
 
     // "Immediately end your turn afterwards." Set the rider that
