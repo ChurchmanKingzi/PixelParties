@@ -1,9 +1,14 @@
 # Promo-Clips
 
-Echtes Footage aus dem laufenden Simulator (lokaler Server, Headless-Chromium, 1600×900).
-Jeder Clip liegt als GIF (720 px, 256 Farben) und als MP4 (1600×900, nahezu verlustfrei) vor.
-Aufnahme per Screencast mit hoher JPEG-Qualität, Schriften (Pixel Intv, Press Start 2P, Rajdhani, Orbitron) lokal eingebunden.
-Die Clips sind in Echtzeit an Zuggrenzen geschnitten (jeweils bis kurz in das Banner des Folgezugs).
+Echtes Footage aus dem laufenden Simulator (lokaler Server, Chromium in einem virtuellen Bildschirm, 1280×720).
+Jeder Clip liegt als GIF (720 px breit, 256 Farben, **30 fps**) und als MP4 (1280×720, **30 fps**) vor.
+
+**Wie die Flüssigkeit zustande kommt:** Der Browser rendert das Spiel ohne GPU und schafft in Echtzeit nur 20–40 fps.
+Deshalb lief die Aufnahme in halber Spielgeschwindigkeit (Uhren, Timer und CSS-Animationen in Browser und Server um den Faktor 2 gedehnt,
+Mitschnitt mit festen 30 fps) und wurde danach auf Echtzeit beschleunigt. Ergebnis: 30 fps ohne Ruckeln
+(0,8 % doppelte Bilder über alle Clips). Die Spielgeschwindigkeit der Clips ist normal.
+
+Die Clips sind an Zuggrenzen geschnitten (jeweils bis kurz in das Banner des Folgezugs). Das Siegbildschirm-Overlay ist herausgeschnitten.
 
 Identität in allen Clips: Der Spieler heißt **Kingzi**, hat einen zufällig gewählten Shop-Avatar (`LovingPuppetPavi`)
 und die Sleeve `life-serum`. Der Gegner trägt die Sleeve seiner CPU (Suicide Bombers: `blast-radius`, Venom Swamp: `tainted-fountain`).
@@ -17,17 +22,18 @@ zusätzlich alle Handkarten) per Hover vorgestellt, bevor der Zug gespielt wird.
 
 | Partie | Unten (Kingzi) | Oben (CPU) | Ergebnis | Clips |
 |---|---|---|---|---|
-| 1 | Suicide Bombers | Venom Swamp | Suicide Bombers gewinnt (Zug 11) | `partie1_zug01` bis `partie1_zug11` |
-| 2 | Venom Swamp | Suicide Bombers | Suicide Bombers (CPU) gewinnt (Zug 12) | `partie2_zug01` bis `partie2_zug11` |
+| 1 | Suicide Bombers | Venom Swamp | Suicide Bombers gewinnt (Zug 14) | `partie1_zug01` bis `partie1_zug13` |
+| 2 | Venom Swamp | Suicide Bombers | Venom Swamp gewinnt (Zug 13) | `partie2_zug01` bis `partie2_zug13` |
 
 Präsentation: `partie1_zug01` (Kingzi: Hand + Board), `partie1_zug02` (CPU-Board), `partie2_zug01` (CPU-Board), `partie2_zug02` (Kingzi: Hand + Board).
+In Partie 1 endet der letzte Zug (14) nach 0,1 s mit dem Sieg und ist deshalb im Clip `partie1_zug13` enthalten.
 
 ## Weitere Modi
 
 | Datei | Modus | Inhalt |
 |---|---|---|
-| `vscpu_1_start` | VS CPU (gegen Zsos'Ssar) | Gegnerwahl, Mulligan, erster Zug |
+| `vscpu_1_start` | VS CPU (gegen Zsos'Ssar) | Gegnerwahl, Mulligan, erster Gegnerzug |
 | `vscpu_2_my_turn` | VS CPU | Eigener Zug: Hand mit Tooltips, Board, Zug beenden |
-| `vscpu_3_opponent_turn` | VS CPU | Kompletter Gegnerzug bis „Your turn!“ |
+| `vscpu_3_opponent_turn` | VS CPU | Kompletter Gegnerzug inkl. „Magic Lamp“-Auswahl bis „Your turn!“ |
 | `deckbuilder` | Deck-Editor | Starter-Deck laden, Karten ansehen, Datenbank durchblättern und suchen |
 | `shop` | Shop | Skins, Avatare, Sleeves, Gegner-Sleeves, Boards |
