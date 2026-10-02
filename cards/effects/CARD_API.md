@@ -8370,6 +8370,15 @@ aus vorhandenen Stücken gebaut:
    Prüfung), und es läuft der ganze normale Spielweg: Zielwahl,
    Reaktionsfenster, Kosten, Auflösung.
 
+**Unspielbare Karten bleiben unspielbar** (Als Befund 2.10., End of the
+Future). „Als käme sie von der Hand" gilt auch für die inhärenten
+Sperren: die Galerie filtert zusätzlich mit
+**`engine.getBlockedSpells(pi, namen)`** (neuer optionaler 2. Parameter =
+andere Quelle als die Hand; sonst unverändert) — `spellPlayCondition`,
+Einmal-pro-Spiel, Attack/Spell-Sperren, Pflichtziel. Karten mit
+Pro-Kopie-Gate (`canPlayFromHandIdx`) sind nur von der Hand spielbar und
+fehlen in der Galerie.
+
 **Kein Umweg über die Hand, kein zweiter Dialog** (Als Vorgabe 12.9.).
 Der erste Anlauf legte die Karte auf die Hand und rief
 `performImmediateAction` mit `cardNameFilter` — funktional richtig, aber

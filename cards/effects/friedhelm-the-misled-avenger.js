@@ -42,6 +42,8 @@
 //  Sofortaktion ist die Karte, die damit bezahlt wurde, kein Zusatz.
 // ═══════════════════════════════════════════
 
+const { loadCardEffect } = require('./_loader');
+
 const CARD_NAME = 'Friedhelm, the Misled Avenger';
 
 /** Attacks und Spells im Deck, die DIESER Held spielen koennte. */
@@ -51,12 +53,20 @@ function spielbareDeckkarten(engine, pi, heroIdx, feld = pi) {
   const db = engine._getCardDB();
   const gesehen = new Set();
   const out = [];
+  // Dieselben inhaerenten Sperren wie beim Handspiel (spellPlayCondition, Einmal-pro-Spiel, Attack/Spell-Sperren,
+  // Pflichtziel): „as if you played it from your hand" heisst auch, dass unspielbare Karten unspielbar BLEIBEN
+  // (End of the Future: nur die selbst aufgedeckte Kopie auf der Hand).
+  const gesperrt = new Set(engine.getBlockedSpells(pi, ps?.mainDeck || []));
   for (const name of (ps?.mainDeck || [])) {
     if (gesehen.has(name)) continue;
     gesehen.add(name);
     const cd = db[name];
     if (!cd) continue;
     if (cd.cardType !== 'Attack' && cd.cardType !== 'Spell') continue;
+    if (gesperrt.has(name)) continue;
+    const skript = loadCardEffect(name);
+    // Karten mit Pro-Kopie-Gate (canPlayFromHandIdx) sind nur von der Hand spielbar.
+    if (typeof skript?.canPlayFromHandIdx === 'function') continue;
     // Schul- und Stufenpruefung wie beim Handspiel. Ohne sie bietet die
     // Karte Zuege an, die `validateActionPlay` danach ablehnt — und die
     // Karte waere aus dem Deck heraus und die Aktion weg.
