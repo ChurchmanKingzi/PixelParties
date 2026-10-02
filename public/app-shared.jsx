@@ -2750,6 +2750,12 @@ const ZONE_ANIM_SFX = {
   // Lightning — covered by dedicated qinglong/red_lightning_rain socket events
   // Ice
   cold_coffin_encase:      { name: 'elem_ice' },
+  // Eis-Einhuellung beim Einfrieren einer Kreatur/eines Helden (`applyCreatureStatus`/`addHeroStatus` mit
+  // `animationType: 'ice_encase'`; u. a. Instant Cryo Stasis): Eisklang plus dumpfer Frost-Knacks.
+  ice_encase: [
+    { name: 'elem_ice',     opts: { rate: 1.0,  volume: 1.0 } },
+    { name: 'heavy_impact', opts: { rate: 1.3,  volume: 0.45, delay: 260, category: null, dedupe: 0 } },
+  ],
   biseria_ice_engulf:      { name: 'elem_ice' },
   // Divine Gift of Forgetting — confused question marks above heroes
   forgetting_question_mark: { name: 'elem_dark', opts: { rate: 1.4 } },
@@ -6438,6 +6444,8 @@ function StatusBadges({ statuses, counters, buffs, isHero, player, cardName, isO
   // „bis zum Ende des Zuges" — bei einer 2-Runden-Negierung schlicht
   // falsch. `restrunden` rechnet sie in Runden um; den Bezugspunkt
   // (den laufenden Zug) stellt das Brett global bereit.
+  // Ab dieser Restdauer gilt ein Status als „fuer immer" (Kartentext „for the rest of the game", Dauer 9999): Tooltip „Lasts forever", Zaehler ∞.
+  const STATUS_FOREVER = 999;
   const restrunden = (statusData) => {
     if (!statusData || typeof statusData !== 'object') return null;
     if (statusData.duration != null && statusData.duration > 1) return statusData.duration;
@@ -6482,6 +6490,7 @@ function StatusBadges({ statuses, counters, buffs, isHero, player, cardName, isO
   };
   const dur = (statusData, statusKey) => {
     const n = statusKey ? restrundenFuer(statusKey, statusData) : restrunden(statusData);
+    if (n >= STATUS_FOREVER) return ' Lasts forever.';   // „fuer den Rest des Spiels" (Dauer 9999)
     if (n) return ` Lasts for ${n} of its owner's turns.`;
     return ' Wears off at the end of its owner\'s turn.';
   };
@@ -6515,7 +6524,7 @@ function StatusBadges({ statuses, counters, buffs, isHero, player, cardName, isO
       badges.push({
         key: 'stunned', icon: '🗿',
         tooltip: "Stunned (Petrified): Cannot act and has its effects and Abilities negated. Takes 0 damage from all sources. (Medusa's Curse)"
-          + (stDauer ? ` Lasts for ${stDauer} of its owner's turns.` : ''),
+          + (stDauer ? (stDauer >= STATUS_FOREVER ? ' Lasts forever.' : ` Lasts for ${stDauer} of its owner's turns.`) : ''),
         duration: stDauer,
       });
     } else {
@@ -6871,7 +6880,7 @@ function StatusBadges({ statuses, counters, buffs, isHero, player, cardName, isO
           onMouseEnter={e => { showGameTooltip(e, b.tooltip); showBoardTip(); }}
           onMouseLeave={() => { hideGameTooltip(); hideBoardTip(); }}>
           <PxIcon z={b.icon} />
-          {b.duration != null && <span className="status-badge-duration">{b.duration}</span>}
+          {b.duration != null && <span className="status-badge-duration">{b.duration >= STATUS_FOREVER ? '∞' : b.duration}</span>}
         </div>
       ))}
     </div>
