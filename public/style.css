@@ -1194,8 +1194,11 @@ select optgroup {
 
 /* Der Platz im Duell: NUR verschoben, nie gedreht. */
 .game-hand-me .hand-slot {
-  translate: 0 var(--fan-shift, 0px);
-  transition: transform .15s, translate .15s ease-out;
+  /* Als Vorgabe 2.10.: `top` statt `translate` — `translate` macht den Platz zum Stapelkontext und sperrte die
+     Abzeichen-Ebene (`.hand-badge-layer`, z 100) unter den Karten der Nachbarplaetze ein. */
+  position: relative;
+  top: var(--fan-shift, 0px);
+  transition: transform .15s, top .15s ease-out;
 }
 /* Der Winkel sitzt auf der Karte im Platz — mit dem Drehpunkt der
    Neigung (unten), was sich wie aufgefächertes Halten liest. */
