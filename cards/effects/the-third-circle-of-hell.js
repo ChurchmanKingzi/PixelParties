@@ -15,12 +15,14 @@
 //    alle eigenen Areas loeschen; unter den gezeigten Area-Zaubern einen waehlen (Pflicht, wenn es
 //    einen gibt) und ihn ueber die echte Zusatzaktions-Abfrage spielen („if possible": bricht der
 //    Spieler ab oder kann kein Held ihn wirken, entfaellt er); alle uebrigen gezeigten Karten —
-//    auch ein nicht gespielter Area-Zauber — werden geloescht (mit Loesch-Rettung, Flug).
+//    auch ein nicht gespielter Area-Zauber — werden geloescht (mit Loesch-Rettung). Der Flug zum
+//    Geloescht-Stapel ist die Aufdeck-Animation selbst (`deleteMode`); danach kommt KEIN zweiter Flug.
 //  • Der gespielte Area-Zauber kommt aus dem DECK, nicht aus dem Geloescht-Stapel: er zaehlt nicht
 //    als „played a deleted Area" der anderen Kreise.
 // ═══════════════════════════════════════════
 
 const { hasCardType } = require('./_hooks');
+const { loadCardEffect } = require('./_loader');
 const { alleEigenenAreasLoeschen, cpuBejahen } = require('./_hell-circles-shared');
 
 const CARD_NAME = 'The Third Circle of Hell';
@@ -28,6 +30,21 @@ const ANZAHL = 6;
 
 function istAreaZauber(cd) {
   return !!cd && hasCardType(cd, 'Spell') && (cd.subtype || '').toLowerCase() === 'area';
+}
+
+/** Die uebrigen aufgedeckten Karten in den Geloescht-Stapel legen, ohne neue Animation (mit Loesch-Rettung). */
+async function restOhneFlugLoeschen(engine, pi, karten) {
+  const ps = engine.gs.players[pi];
+  engine._geloeschtVerfolgen(pi);
+  for (const name of karten) {
+    if (loadCardEffect(name)?.beforeDelete
+        && await engine._tryBeforeDelete(name, pi, { fromZone: 'deck', source: CARD_NAME })) {
+      engine.log('delete_rescued', { player: ps.username, card: name, source: CARD_NAME });
+      continue;
+    }
+    ps.deletedPile.push(name);
+  }
+  engine.sync();
 }
 
 module.exports = {
@@ -117,7 +134,9 @@ module.exports = {
     }
 
     // ④ Den Rest loeschen.
-    if (gezeigt.length > 0) await engine.actionDeleteFromDeckAnimated(pi, gezeigt, { source: CARD_NAME, settle: 300 });
+    // Der Flug „Deck → Mitte → Geloescht-Stapel" lief schon beim Aufdecken (`deleteMode`); hier nur noch den
+    // Zustand nachziehen — KEIN zweiter Flug vom Deck.
+    if (gezeigt.length > 0) await restOhneFlugLoeschen(engine, pi, gezeigt);
     engine.log('third_circle', { player: ps.username, revealed: ANZAHL, played: gespielt, deleted: gezeigt.length });
     engine.sync();
   },
