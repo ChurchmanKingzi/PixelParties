@@ -61,6 +61,7 @@ function zonenFuer(engine, pi, cardName) {
 
 module.exports = {
   activeIn: ['support'],
+  creatureEffect: true,   // OHNE dieses Kennzeichen listet der Server die Creature nicht als aktivierbar (nicht anklickbar!)
   hooks: {},   // rein aktiver Effekt + passive Engine-Pruefung (`_wurzelAktiv`); der Lader will ein `hooks`-Feld sehen
   blockedByPileLock: true,
   blockedBySummonLock: true,
