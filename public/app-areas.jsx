@@ -54,7 +54,7 @@ const AREA_OVERLAYS = {
   'The Fifth Circle of Hell':     { tier: 'opaque',      C: () => <FifthCircleOfHellOverlay /> },   // Pixelart (2.10.)
   'The Sixth Circle of Hell':     { tier: 'opaque',      C: () => <SixthCircleOfHellOverlay /> },   // Pixelart (2.10.)
   'The Seventh Circle of Hell':   { tier: 'opaque',      C: () => <SeventhCircleOfHellOverlay /> },   // Pixelart (2.10.)
-  'The Eighth Circle of Hell':    { tier: 'opaque',      C: () => <HellCircleOverlay stufe={8} /> },   // Platzhalter-Szene (prozedural)
+  'The Eighth Circle of Hell':    { tier: 'opaque',      C: () => <EighthCircleOfHellOverlay /> },   // Pixelart (2.10.)
   "Tarleinn's Floating Island":   { tier: 'opaque',      C: () => <FloatingIslandOverlay /> },   // v1440: Kartenstil (vorher translucent)
   'Deepsea Castle':               { tier: 'opaque',      C: () => <DeepseaCastleOverlay /> },   // v1415: Kartenstil, ganze Szene
   'War Council Gathering Place':  { tier: 'opaque',      C: () => <WarCouncilOverlay /> },   // v1440: Kartenstil (vorher translucent)
@@ -5667,69 +5667,70 @@ const SeventhCircleOfHellOverlay = React.memo(function SeventhCircleOfHellOverla
 });
 
 // ═══════════════════════════════════════════════════════════════════
-//  THE SECOND … EIGHTH CIRCLE OF HELL — Hintergruende (Platzhalter-Szenen)
+//  THE EIGHTH CIRCLE OF HELL (Fraud) — Pixelart-Hintergrund (PANORAMA)
 //
-//  Prozedurale Platzhalter-Szenen fuer Kreis 8, bis dessen Pixelart vorliegt (Zweiter bis Siebter haben sie schon): dunkler Farbverlauf,
-//  eine Horizontlinie, aufsteigende Funken/Glut und ein kreis-spezifisches Motiv. Jeder Kreis hat
-//  seine eigene Farbwelt (Dante: 6 Ketzerei/Grabfeuer, 7 Gewalt/Blutfluss, 8 Betrug/Tinte). Wieder `pp-area-dyn` fuer alles Bewegte
-//  (faellt mit „keine Animationen" weg); eigene Keyframes im eigenen <style>.
+//  Ein gehoernter Daemon (braun, Geweih, Hauer) zeigt dem Reisenden ein violettes Strudelportal in der
+//  Pflasterwand und verspricht den Ausweg — in Wahrheit fuehrt es tiefer hinein. Rechts und links Lavastroeme;
+//  der Reisende steht von hinten im Vordergrund (gelbes Buendel, roter Umhang). EIN Panorama (256 breit, mittig);
+//  die Pflasterwand (back.png) setzt sich seitlich fort. Farben aus der Kartenvorlage.
+//
+//  Ebenen (Kunsthoehe 100; Generator ausserhalb des Projekts): back.png — Pflasterkachel 128; ground.png —
+//  Boden + Portalrahmen (256, mittig); portal.png — Strudel (24 Bilder 72×80, 3 Arme, 4 s); flow-a/-b.png —
+//  Lavastroeme (24 Bilder 36×100 / 44×100, fliessen nach unten, 6 s); demon.png (12 Bilder 50×54, Zeigearm
+//  nach rechts); traveler.png (12 Bilder 38×42, von hinten); ember.png. ALLE Animationen teilen die Periode 12 s.
 // ═══════════════════════════════════════════════════════════════════
-const HELL_KREISE = {
-  6: { himmel: ['#220b05', '#6a2208', '#3a1006'], boden: '#180703', glut: ['#ff8a2a', '#ff5a10', '#ffd27a'], motiv: 'feuer' },
-  7: { himmel: ['#1d0406', '#5c0a12', '#33060b'], boden: '#140204', glut: ['#ff3a3a', '#c20f1a', '#ff9a9a'], motiv: 'blut' },
-  8: { himmel: ['#05060f', '#141a3a', '#0a0d24'], boden: '#030409', glut: ['#8fa4ff', '#4f63d6', '#d4dcff'], motiv: 'tinte' },
-};
-const HellCircleOverlay = React.memo(function HellCircleOverlay({ stufe }) {
-  const cfg = HELL_KREISE[stufe] || HELL_KREISE[6];
-  const funken = useMemo(() => ppZufall(ppFxN(26), (i) => ({
-    x: Math.random() * 100, dur: 9 + Math.random() * 11, delay: -Math.random() * 20,
-    size: 2 + Math.floor(Math.random() * 3), farbe: cfg.glut[i % cfg.glut.length], drift: (Math.random() - .5) * 18,
-  })), [stufe]);
-  const motive = useMemo(() => ppZufall(ppFxN(cfg.motiv === 'regen' || cfg.motiv === 'sturm' ? 18 : 9), () => ({
-    x: Math.random() * 100, dur: 3 + Math.random() * 5, delay: -Math.random() * 8, len: 8 + Math.random() * 18,
-  })), [stufe]);
+const EIX = '/areas/eighth-circle-of-hell/';
+const EG_PAN = 256;
+const EG = (x) => ppArtX(x, EG_PAN);
+const EG_DAEMON = [0,0,1,1,0,2,2,3,3,4,4,3,3,6,6,0,5,5,0,7,7,0,8,0,0,9,9,10,10,6,6,0,11,11,0,1,1,0,0,0];
+const EG_REISE = [0,0,1,1,0,2,2,0,3,3,0,4,4,5,5,4,0,6,6,7,7,6,0,8,8,0,9,9,0,10,10,0,11,11,0,1,1,0,0,0];
+const EighthCircleOfHellOverlay = React.memo(function EighthCircleOfHellOverlay() {
+  const funken = useMemo(() => Array.from({ length: 28 }, (_, i) => {
+    const dur = [3, 4, 6][i % 3];
+    const links = i % 2 === 0;
+    return { x: (links ? -126 + ((i * 13) % 34) : 82 + ((i * 11) % 40)), y0: 84 - (i % 4) * 8, dur, k: i % 3, delay: -((i * 0.83) % dur), drift: ((i % 5) - 2) * 3 };
+  }), []);
   return (
-    <div className={'hell-circle-overlay hc-' + cfg.motiv} style={{
-      position: 'absolute', inset: 0, pointerEvents: 'none', overflow: 'hidden',
-      background: `linear-gradient(180deg, ${cfg.himmel[0]} 0%, ${cfg.himmel[1]} 38%, ${cfg.himmel[2]} 52%, ${cfg.boden} 53%, ${cfg.boden} 100%)`,
-    }}>
-      {/* Horizont-Glimmen */}
-      <div style={{ position: 'absolute', left: 0, right: 0, top: '49%', height: '6%',
-        background: `linear-gradient(180deg, transparent, ${cfg.glut[0]}33, transparent)` }} />
-      {/* Kreis-Motiv */}
-      {motive.map((m, i) => (
-        <i key={'m' + i} className="pp-area-dyn hc-motiv" style={{
-          left: m.x + '%', height: m.len + '%', background: `linear-gradient(180deg, transparent, ${cfg.glut[i % 3]}88)`,
-          animation: `hcMotiv ${m.dur}s linear ${m.delay}s infinite`,
-        }} />
-      ))}
-      {/* Funken / Glut */}
-      {funken.map((f, i) => (
-        <i key={'f' + i} className="pp-area-dyn hc-funke" style={{
-          left: f.x + '%', width: f.size, height: f.size, background: f.farbe, boxShadow: `0 0 4px ${f.farbe}`,
-          '--drift': f.drift + 'vw', animation: `hcSteigen ${f.dur}s linear ${f.delay}s infinite`,
-        }} />
-      ))}
-      {/* Randabdunklung — die Karten bleiben das Hellste */}
-      <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(ellipse at 50% 55%, transparent 55%, rgba(0,0,0,.45) 100%)' }} />
+    <PixelScene artH={100} bg="#200000" className="eighth-circle-overlay">
+      <PixelBand src={EIX + 'back.png'} style={{ backgroundPosition: '50% 0' }} />
+      <PixelPiece src={EIX + 'ground.png'} w={EG_PAN} />
+      <div className="eg-volk">
+        <i className="pp-area-dyn eg-glut" style={{ left: EG(150 - 56), animation: 'egGlut 3s ease-in-out infinite alternate' }} />
+        <i className="eg-portal" style={{ left: EG(150 - 36), animation: 'egPortal 4s steps(1) infinite' }} />
+        <i className="eg-fluss a" style={{ left: EG(2), animation: 'egFluss 6s steps(1) infinite' }} />
+        <i className="eg-fluss b" style={{ left: EG(208), animation: 'egFluss 6s steps(1) -2s infinite' }} />
+        <i className="eg-daemon" style={{ left: EG(44), animation: 'egDaemon 6s steps(1) infinite' }} />
+        <i className="eg-reise" style={{ left: EG(117), animation: 'egReise 6s steps(1) -2.3s infinite' }} />
+        {funken.map((e, i) => (
+          <i key={'e' + i} className="pp-area-dyn eg-funke" style={{
+            left: ppArtX(e.x, 0), top: ppArt(e.y0), backgroundPositionX: (e.k * 50) + '%', '--dx': ppArt(e.drift),
+            animation: `egFunke ${e.dur}s linear ${e.delay}s infinite`,
+          }} />
+        ))}
+      </div>
+      <div className="pp-rand-dim" />
       <style>{`
-        .hell-circle-overlay .hc-funke { position: absolute; bottom: -2%; opacity: 0; }
-        .hell-circle-overlay .hc-motiv { position: absolute; top: -20%; width: 2px; opacity: 0; transform: rotate(14deg); }
-        .hell-circle-overlay.hc-sturm .hc-motiv, .hell-circle-overlay.hc-tinte .hc-motiv { transform: rotate(62deg); width: 3px; }
-        .hell-circle-overlay.hc-gold .hc-motiv { width: 4px; border-radius: 50%; height: 4% !important; }
-        .hell-circle-overlay.hc-blasen .hc-motiv { width: 6px; border-radius: 50%; height: 3% !important; }
-        @keyframes hcSteigen {
-          0%   { transform: translate(0, 0); opacity: 0; }
-          12%  { opacity: .9; }
-          100% { transform: translate(var(--drift), -70vh); opacity: 0; }
-        }
-        @keyframes hcMotiv {
-          0%   { transform: translate(0, 0) rotate(14deg); opacity: 0; }
-          15%  { opacity: .8; }
-          100% { transform: translate(-6vw, 110vh) rotate(14deg); opacity: 0; }
+        .eg-volk { position: absolute; inset: 0; }
+        .eg-portal { position: absolute; top: 0; width: calc(72 * var(--px)); height: calc(80 * var(--px)); background: url(${EIX}portal.png) 0 0 / 2400% 100% no-repeat; }
+        @keyframes egPortal { ${sxReihe(24)} }
+        .eg-glut { position: absolute; top: calc(-20 * var(--px)); width: calc(112 * var(--px)); height: calc(120 * var(--px)); opacity: .5;
+          background: radial-gradient(ellipse at 50% 50%, rgba(150,60,220,.30), rgba(110,30,190,.12) 50%, rgba(80,0,160,0) 72%); }
+        @keyframes egGlut { from { opacity: .3; } to { opacity: .9; } }
+        .eg-fluss { position: absolute; top: 0; height: calc(100 * var(--px)); background-size: 2400% 100%; background-repeat: no-repeat; }
+        .eg-fluss.a { width: calc(36 * var(--px)); background-image: url(${EIX}flow-a.png); }
+        .eg-fluss.b { width: calc(44 * var(--px)); background-image: url(${EIX}flow-b.png); }
+        @keyframes egFluss { ${sxReihe(24)} }
+        .eg-daemon { position: absolute; top: calc(28 * var(--px)); width: calc(50 * var(--px)); height: calc(54 * var(--px)); background: url(${EIX}demon.png) 0 0 / ${12 * 100}% 100% no-repeat; }
+        @keyframes egDaemon { ${sxFolge(EG_DAEMON, 12)} }
+        .eg-reise { position: absolute; top: calc(58 * var(--px)); width: calc(38 * var(--px)); height: calc(42 * var(--px)); background: url(${EIX}traveler.png) 0 0 / ${12 * 100}% 100% no-repeat; }
+        @keyframes egReise { ${sxFolge(EG_REISE, 12)} }
+        .eg-funke { position: absolute; width: calc(3 * var(--px)); height: calc(3 * var(--px)); opacity: 0; background: url(${EIX}ember.png) 0 0 / 300% 100% no-repeat; z-index: 5; }
+        @keyframes egFunke {
+          0% { opacity: 0; transform: translate(0, 0); } 10% { opacity: 1; }
+          80% { opacity: .8; } 100% { opacity: 0; transform: translate(var(--dx), calc(-50 * var(--px))); }
         }
       `}</style>
-    </div>
+    </PixelScene>
   );
 });
 
