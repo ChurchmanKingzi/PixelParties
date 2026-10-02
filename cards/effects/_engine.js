@@ -28804,6 +28804,15 @@ this._deathWatch = (this._deathWatchStack || []).length
     // Bild setzt, behaelt es.
     promptData = this._surpriseBildLinks(promptData);
 
+    // ★ Als Befund 2.10. (Priest of Luna / Booby Trap, gilt fuer ALLE Creatures): JEDE Reaktions-Abfrage (Surprise-Aktivierung
+    // oder Hand-Reaktion) setzt voraus, dass der Gegner schon GESEHEN hat, welche Karte gerade wirkt. Zentral hier statt an den
+    // ~25 Fenstern einzeln: noch ausstehender Reveal der Aktivierung wird jetzt gefeuert, ein passiver Creature-Effekt
+    // (Hook) bekommt seinen Auftritt.
+    if (promptData && promptData.type === 'confirm'
+        && (promptData.showCardLeft || promptData._handReactionWindow)) {
+      await this._quellenAuftrittVorReaktion(playerIdx);
+    }
+
     // ══ SUCH-SPERRE GREIFT VOR DER ABFRAGE (v1117, Als Testbefund 15.9.)
     //
     // Al: „Ich habe einen Hell Fox verloren, waehrend ich under siege
@@ -29573,6 +29582,18 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (link.cardType === 'CreatureEffect' || link.cardType === 'Creature') return true;
     const cd = this._getCardDB()[link.cardName];
     return !!cd && hasCardType(cd, 'Creature');
+  }
+
+  /** Vor einer Reaktions-Abfrage an `reaktor`: Auftritt der gerade wirkenden Karte sicherstellen. */
+  async _quellenAuftrittVorReaktion(reaktor) {
+    if (this._inMctsSim || this._fastMode) return;
+    // Aktive Aktivierung (Klick/CPU): der Reveal ist vorgemerkt und wuerde sonst erst nach der Aufloesung gezeigt.
+    const offen = this.gs._pendingCardReveal;
+    if (offen && offen.ownerIdx !== reaktor) this._firePendingCardReveal();
+    // Passiver Hook-Effekt einer Creature des ANDEREN Spielers.
+    const quelle = this._currentEffectSource;
+    const qOwner = quelle && (quelle.owner === 0 || quelle.owner === 1) ? quelle.owner : null;
+    if (quelle && qOwner !== reaktor) await this._creatureEffektVorSurprise({ owner: qOwner });
   }
 
   /**
@@ -33739,11 +33760,6 @@ this._deathWatch = (this._deathWatchStack || []).length
           const hostName = ps.heroes[hostHeroIdx]?.name || `Hero ${hostHeroIdx + 1}`;
           promptMsg += ` (Activate via Brain Spider — Surprise is set on ${hostName}.)`;
         }
-
-        // ★ Als Befund 2.10. (Priest of Luna / Booby Trap): wirkt eine CREATURE ueber einen Hook von allein (passiver
-        // Effekt), muss ihr Kartenbild VOR der Surprise-Abfrage gestreamt sein — der Reaktor soll sehen, WELCHE Creature hier
-        // zielt, bevor er gefragt wird. Aktive Aktivierungen zeigen sich ohnehin ueber den Reveal der Aktivierung.
-        await this._creatureEffektVorSurprise(sourceInfo);
 
         const confirmed = await this.promptGeneric(reaktor, {
           type: 'confirm',
