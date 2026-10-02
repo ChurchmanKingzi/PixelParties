@@ -10,9 +10,9 @@
 //
 //  ── ABLAUF ────────────────────────────────────────────────────────
 //  1. Die obersten bis zu 5 Karten sehen (nur der Spieler selbst — kein Reveal).
-//  2. Reihenfolge waehlen: je Platz eine Galerie, von oben nach unten; die letzte
-//     Karte ergibt sich von selbst. Die Reihenfolge ist OHNE „oeffentlich sichtbar"
-//     (`deckTopVisible` bleibt leer) — der Gegner sieht nichts.
+//  2. Reihenfolge waehlen: Dialog `cardReorder` — alle Karten in einer Reihe, Platz 1 (links) = als naechstes
+//     gezogen, Umsortieren per Drag & Drop, „Confirm"; danach fliegen die Karten sichtbar (nur fuer den Spieler) in
+//     INVERSER Reihenfolge (5, 4, 3, 2, 1) aufs Deck. Die Reihenfolge ist NICHT oeffentlich (`deckTopVisible` bleibt leer).
 //  3. „You may shuffle": Ja/Nein; Ja mischt das ganze Deck (die Reihenfolge ist dann hinfaellig).
 //  4. „Then, draw 1 card": eine Karte ziehen (auch wenn gemischt wurde).
 //  Beschwoerung, nicht Platzierung (`isPlacement` loest nichts aus).
@@ -25,7 +25,7 @@ module.exports = {
   // CPU: Reihenfolge belassen (erste Karte), nicht mischen.
   cpuResponse(engine, kind, promptData) {
     if (kind !== 'generic' || promptData?.title !== CARD_NAME) return undefined;
-    if (promptData.type === 'cardGallery') return { cardName: promptData.cards?.[0]?.name };
+    if (promptData.type === 'cardReorder') return { order: (promptData.cards || []).map((_, k) => k) };
     if (promptData.type === 'confirm') return { confirmed: false };
     return undefined;
   },
@@ -44,22 +44,27 @@ module.exports = {
       // ── 1.+2. Die obersten Karten ansehen und ordnen ──
       const n = Math.min(ANZAHL, (ps.mainDeck || []).length);
       if (n > 1) {
-        const rest = ps.mainDeck.slice(0, n);
-        const geordnet = [];
-        while (rest.length > 1) {
-          const wahl = await engine.promptGeneric(pi, {
-            type: 'cardGallery',
-            cards: rest.map(name => ({ name, source: 'deck' })),   // jede Karte einzeln — Duplikate NICHT zu „×2“ zusammenfassen
-            title: CARD_NAME, source: CARD_NAME,
-            description: `Put these cards back in any order. Choose the card for position ${geordnet.length + 1} of ${n} (position 1 is drawn next).`,
-            confirmLabel: '📚 Place', confirmClass: 'btn-info',
-            cancellable: false,
-          });
-          const name = wahl?.cardName;
-          const i = name ? rest.indexOf(name) : -1;
-          geordnet.push(...rest.splice(i >= 0 ? i : 0, 1));
+        const oben = ps.mainDeck.slice(0, n);
+        // Ein Dialog: die Karten stehen in einer Reihe (links = Platz 1 = als naechstes gezogen), der Spieler sortiert per
+        // Drag & Drop um und bestaetigt. Antwort `{ order: [urspruengliche Indizes in neuer Reihenfolge] }`.
+        const wahl = await engine.promptGeneric(pi, {
+          type: 'cardReorder',
+          cards: oben.map(name => ({ name, source: 'deck' })),   // jede Karte einzeln, Duplikate nicht zusammenfassen
+          title: CARD_NAME, source: CARD_NAME,
+          description: 'Drag the cards into the order you want to put them back on your deck. Position 1 (left) is drawn next.',
+          confirmLabel: '✔ Confirm',
+          cancellable: false,
+        });
+        let reihenfolge = Array.isArray(wahl?.order) ? wahl.order.filter(k => Number.isInteger(k) && k >= 0 && k < n) : [];
+        if (new Set(reihenfolge).size !== n) reihenfolge = oben.map((_, k) => k);   // ungueltige Antwort: Reihenfolge belassen
+        const geordnet = reihenfolge.map(k => oben[k]);
+        // Sichtbar zurueck aufs Deck: in INVERSER Reihenfolge (5, 4, 3, 2, zuletzt 1) — nur der Spieler sieht die Karten.
+        for (let k = geordnet.length - 1; k >= 0; k--) {
+          engine._broadcastEvent('play_pile_transfer', {
+            owner: pi, cardName: geordnet[k], from: 'boardCenter', to: 'deck', sfx: 'placement',
+          }, { toPlayers: [pi] });
+          await engine._delay(380);
         }
-        geordnet.push(...rest);
         engine.reorderDeck(pi, geordnet, { source: CARD_NAME });
       }
       engine.log('scavenging_crane_look', { player: ps.username, count: n });

@@ -24907,6 +24907,88 @@ function PileSearchModal({ title, cards, onClose, preserveOrder = false, ownerLe
 }
 
 // Status select prompt component (for Beer, etc.) — must be a proper component for hooks
+// ═══════════════════════════════════════════
+//  Prompt „cardReorder" (Scavenging Crane: „look at the top 5 cards and put them back in any order")
+//  Karten stehen in EINER Reihe, Platz 1 (links) = als naechstes gezogen. Umsortiert wird per Drag & Drop innerhalb der
+//  Box (alternativ per ◀ ▶ unter jeder Karte — fuer Touch). „Confirm" schickt `{ order: [urspruengliche Indizes …] }`.
+// ═══════════════════════════════════════════
+function CardReorderPrompt({ ep, onRespond }) {
+  const cards = ep.cards || [];
+  const [order, setOrder] = useState(() => cards.map((_, i) => i));
+  const [dragFrom, setDragFrom] = useState(null);
+  const [dragOver, setDragOver] = useState(null);
+  const verschiebe = (von, nach) => {
+    if (von == null || nach == null || von === nach) return;
+    setOrder(prev => {
+      const n = prev.slice();
+      const [k] = n.splice(von, 1);
+      n.splice(nach, 0, k);
+      return n;
+    });
+    if (window.playSFX) window.playSFX('ui_click', { volume: 0.5 });
+  };
+  const fertig = () => {
+    if (window.playSFX) window.playSFX('ui_click');
+    onRespond({ order });
+  };
+  return (
+    <div className="modal-overlay">
+      <DraggablePanel className="modal animate-in deck-viewer-modal" style={{ maxWidth: 760 }}>
+        <div className="orbit-font" style={{ fontSize: 13, color: 'var(--accent)', marginBottom: 6 }}>{ep.title || 'Reorder'}</div>
+        <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 12 }}>
+          {ep.description || 'Drag the cards into the order you want. Position 1 is drawn next.'}
+        </div>
+        <div style={{ display: 'flex', gap: 10, justifyContent: 'center', alignItems: 'flex-start', padding: '6px 4px 10px' }}>
+          {order.map((ci, pos) => {
+            const entry = cards[ci];
+            const card = entry ? CARDS_BY_NAME[entry.name] : null;
+            const aktiv = dragOver === pos && dragFrom != null && dragFrom !== pos;
+            return (
+              <div key={ci}
+                draggable
+                onDragStart={(e) => { setDragFrom(pos); try { e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', String(pos)); } catch (_) {} }}
+                onDragOver={(e) => { e.preventDefault(); if (dragOver !== pos) setDragOver(pos); }}
+                onDragLeave={() => { if (dragOver === pos) setDragOver(null); }}
+                onDrop={(e) => { e.preventDefault(); verschiebe(dragFrom, pos); setDragFrom(null); setDragOver(null); }}
+                onDragEnd={() => { setDragFrom(null); setDragOver(null); }}
+                style={{
+                  width: 104, flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6,
+                  cursor: 'grab', opacity: dragFrom === pos ? 0.45 : 1,
+                  transform: aktiv ? 'translateY(-6px) scale(1.04)' : 'none', transition: 'transform .12s',
+                }}>
+                <div style={{
+                  minWidth: 26, textAlign: 'center', padding: '2px 8px', borderRadius: 10, fontSize: 13, fontWeight: 800,
+                  background: pos === 0 ? 'var(--accent)' : 'rgba(255,255,255,.12)', color: pos === 0 ? '#001018' : 'var(--text)',
+                  border: '1px solid rgba(255,255,255,.25)',
+                }}>{pos + 1}</div>
+                <div style={{
+                  width: 104, height: 146, borderRadius: 6, overflow: 'hidden',
+                  boxShadow: aktiv ? '0 0 0 2px var(--accent), 0 0 14px rgba(120,220,255,.7)' : '0 2px 8px rgba(0,0,0,.5)',
+                }}>
+                  {card ? <CardMini card={card} style={{ width: '100%', height: '100%' }} />
+                    : <div style={{ padding: 6, fontSize: 11 }}>{entry?.name}</div>}
+                </div>
+                <div style={{ fontSize: 10, color: 'var(--text2)', minHeight: 12 }}>{pos === 0 ? 'drawn next' : ''}</div>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <button className="btn" disabled={pos === 0} style={{ padding: '1px 8px', fontSize: 11 }}
+                    onClick={() => verschiebe(pos, pos - 1)}>◀</button>
+                  <button className="btn" disabled={pos === order.length - 1} style={{ padding: '1px 8px', fontSize: 11 }}
+                    onClick={() => verschiebe(pos, pos + 1)}>▶</button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'center', marginTop: 8 }}>
+          <button className="btn btn-info" style={{ padding: '8px 26px', fontSize: 13 }} onClick={fertig}>
+            {ep.confirmLabel || '✔ Confirm'}
+          </button>
+        </div>
+      </DraggablePanel>
+    </div>
+  );
+}
+
 function CardGalleryMultiPrompt({ ep, onRespond }) {
   const cards = ep.cards || [];
   // `ep.validCounts` (optional): array of integers — only those exact
@@ -48151,6 +48233,11 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           </div>
         );
       })()}
+
+      {/* ── Effect Prompt: Karten umsortieren (Scavenging Crane) ── */}
+      {isMyEffectPrompt && ep.type === 'cardReorder' && (
+        <CardReorderPrompt key={(ep.cards || []).map(c => c.name).join('|')} ep={ep} onRespond={respondToPrompt} />
+      )}
 
       {/* ── Effect Prompt: Multi-Select Card Gallery ── */}
       {isMyEffectPrompt && ep.type === 'cardGalleryMulti' && (
