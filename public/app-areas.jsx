@@ -5098,13 +5098,17 @@ const WowhallaOverlay = React.memo(function WowhallaOverlay() {
 //  Ebenen (Kunsthoehe 100; per Generator gemalt, der nicht im Projekt liegt): tile.png — Kachel 128
 //  mit ZWEI Bildern untereinander (128×200): Ziegelwand mit Felsband (y 36), drei Reihen Augen
 //  (versetzt) und zweitem Felsband (y 73); Bild 2 = Herzschlag (groessere, hellere Herzen);
-//  girl.png — nahe Frauen (3 Bilder 12×20: stehen, Kopf links, Kopf rechts; 2 Varianten untereinander);
-//  girl-far.png — ferne Frauen auf dem oberen Felsband (3 Bilder 9×13, 2 Varianten);
+//  girl.png — nahe Frauen (6 Bilder 12×20, siehe LC_FOLGE; 2 Varianten untereinander);
+//  girl-far.png — ferne Frauen auf dem oberen Felsband (6 Bilder 9×13, 2 Varianten);
 //  heart.png — aufsteigendes Herz (2 Bilder 7×5).
 // ═══════════════════════════════════════════════════════════════════
 const LC = '/areas/second-circle-of-hell/';
 // Alle Animationen teilen die Periode 12 s (6/12 s Wiegen, 4/6 s Herzen, 3 s Herzschlag) → nahtlose Schleife.
 const LC_DAUER = [6, 12, 12];
+// Frauen: 6 Bilder (0 ruhig, 1 Kopf links, 2 Kopf rechts, 3 Einatmen, 4/5 Haar weht links/rechts); 30 Schritte je Zyklus.
+const LC_FOLGE = [0,0,3,3,0,0,1,1,1,0,0,4,4,0, 2,2,2,0,0,5,5,0,0,3,3,0,0,1,0,0];
+const LC_BILDER = 6;
+const LC_KEYFRAMES = LC_FOLGE.map((b, i) => `${(i * 100 / LC_FOLGE.length).toFixed(3)}% { background-position-x: ${(b * 100 / (LC_BILDER - 1)).toFixed(3)}%; }`).join(' ');
 const LC_NAH = { feet: 73, w: 12, h: 20, xs: [-84, -52, -18, 16, 50, 84] };
 const LC_FERN = { feet: 36, w: 9, h: 13, xs: [-92, -68, -44, -20, 4, 28, 52, 76, 100] };
 const SecondCircleOfHellOverlay = React.memo(function SecondCircleOfHellOverlay() {
@@ -5158,12 +5162,8 @@ const SecondCircleOfHellOverlay = React.memo(function SecondCircleOfHellOverlay(
           62%, 66% { background-position: 0 0; } 68%, 76% { background-position: 0 100%; } 78%, 100% { background-position: 0 0; }
         }
         .lc-volk { position: absolute; inset: 0; }
-        .lc-frau { position: absolute; background-size: 300% 200%; background-repeat: no-repeat; background-position-x: 0%; }
-        /* Bilder: 0 stehen, 1 Kopf links, 2 Kopf rechts — sie wiegen sich */
-        @keyframes lcSchmachten {
-          0% { background-position-x: 0%; } 22% { background-position-x: 50%; } 38% { background-position-x: 0%; }
-          60% { background-position-x: 100%; } 78% { background-position-x: 0%; }
-        }
+        .lc-frau { position: absolute; background-size: ${LC_BILDER * 100}% 200%; background-repeat: no-repeat; background-position-x: 0%; }
+        @keyframes lcSchmachten { ${LC_KEYFRAMES} }
         .lc-herz {
           position: absolute; width: calc(7 * var(--px)); height: calc(5 * var(--px)); opacity: 0;
           background: url(${LC}heart.png) 0 0 / 200% 100% no-repeat; z-index: 120;
@@ -5173,7 +5173,7 @@ const SecondCircleOfHellOverlay = React.memo(function SecondCircleOfHellOverlay(
           80% { opacity: .8; } 100% { opacity: 0; transform: translate(var(--dx, 0px), calc(-16 * var(--px))); }
         }
         /* Herzaugen: aus (0–35 %), an (35–80 %), aus */
-        .lc-liebe { background-size: 300% 200%; }
+        .lc-liebe { background-size: ${LC_BILDER * 100}% 200%; }
         @keyframes lcLiebe { 0%, 34% { opacity: 0; } 35%, 79% { opacity: 1; } 80%, 100% { opacity: 0; } }
       `}</style>
     </PixelScene>
