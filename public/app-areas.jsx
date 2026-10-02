@@ -48,6 +48,13 @@ const AREA_OVERLAYS = {
   'Graveyard of Limited Power':   { tier: 'opaque',      C: () => <GraveyardOfLimitedPowerOverlay /> },   // v1415: Kartenstil, ganze Szene
   'Paraseed Greenhouse':          { tier: 'opaque',      C: () => <ParaseedGreenhouseOverlay /> },   // v1415: Kartenstil, ganze Szene
   'The First Circle of Hell':     { tier: 'opaque',      C: () => <FirstCircleOfHellOverlay /> },   // v1440: Kartenstil (vorher translucent)
+  'The Second Circle of Hell':    { tier: 'opaque',      C: () => <HellCircleOverlay stufe={2} /> },   // Platzhalter-Szene (prozedural)
+  'The Third Circle of Hell':    { tier: 'opaque',      C: () => <HellCircleOverlay stufe={3} /> },   // Platzhalter-Szene (prozedural)
+  'The Fourth Circle of Hell':    { tier: 'opaque',      C: () => <HellCircleOverlay stufe={4} /> },   // Platzhalter-Szene (prozedural)
+  'The Fifth Circle of Hell':    { tier: 'opaque',      C: () => <HellCircleOverlay stufe={5} /> },   // Platzhalter-Szene (prozedural)
+  'The Sixth Circle of Hell':    { tier: 'opaque',      C: () => <HellCircleOverlay stufe={6} /> },   // Platzhalter-Szene (prozedural)
+  'The Seventh Circle of Hell':    { tier: 'opaque',      C: () => <HellCircleOverlay stufe={7} /> },   // Platzhalter-Szene (prozedural)
+  'The Eighth Circle of Hell':    { tier: 'opaque',      C: () => <HellCircleOverlay stufe={8} /> },   // Platzhalter-Szene (prozedural)
   "Tarleinn's Floating Island":   { tier: 'opaque',      C: () => <FloatingIslandOverlay /> },   // v1440: Kartenstil (vorher translucent)
   'Deepsea Castle':               { tier: 'opaque',      C: () => <DeepseaCastleOverlay /> },   // v1415: Kartenstil, ganze Szene
   'War Council Gathering Place':  { tier: 'opaque',      C: () => <WarCouncilOverlay /> },   // v1440: Kartenstil (vorher translucent)
@@ -5078,6 +5085,78 @@ const WowhallaOverlay = React.memo(function WowhallaOverlay() {
         }
       `}</style>
     </PixelScene>
+  );
+});
+
+// ═══════════════════════════════════════════════════════════════════
+//  THE SECOND … EIGHTH CIRCLE OF HELL — Hintergruende (Platzhalter-Szenen)
+//
+//  Prozedurale Szenen im Stil des Ersten Kreises, bis echte Pixelart vorliegt: dunkler Farbverlauf,
+//  eine Horizontlinie, aufsteigende Funken/Glut und ein kreis-spezifisches Motiv. Jeder Kreis hat
+//  seine eigene Farbwelt (Dante: 2 Wollust/Sturm, 3 Voellerei/Schlamm, 4 Geiz/Gold, 5 Zorn/Styx,
+//  6 Ketzerei/Grabfeuer, 7 Gewalt/Blutfluss, 8 Betrug/Tinte). Wieder `pp-area-dyn` fuer alles Bewegte
+//  (faellt mit „keine Animationen" weg); eigene Keyframes im eigenen <style>.
+// ═══════════════════════════════════════════════════════════════════
+const HELL_KREISE = {
+  2: { himmel: ['#1d0f24', '#4b1d49', '#2a1030'], boden: '#14081a', glut: ['#ff9bd0', '#c76bff', '#ffd1ec'], motiv: 'sturm' },
+  3: { himmel: ['#0f1a10', '#2d3a1c', '#1a2410'], boden: '#0b1209', glut: ['#a9c46a', '#6b8f3a', '#d6e59b'], motiv: 'regen' },
+  4: { himmel: ['#1a1405', '#4a3a0c', '#2a2008'], boden: '#120d03', glut: ['#ffd24a', '#ffb000', '#fff0a0'], motiv: 'gold' },
+  5: { himmel: ['#07161a', '#103b44', '#0a2328'], boden: '#04100f', glut: ['#58e0d0', '#2aa6a0', '#b5fff4'], motiv: 'blasen' },
+  6: { himmel: ['#220b05', '#6a2208', '#3a1006'], boden: '#180703', glut: ['#ff8a2a', '#ff5a10', '#ffd27a'], motiv: 'feuer' },
+  7: { himmel: ['#1d0406', '#5c0a12', '#33060b'], boden: '#140204', glut: ['#ff3a3a', '#c20f1a', '#ff9a9a'], motiv: 'blut' },
+  8: { himmel: ['#05060f', '#141a3a', '#0a0d24'], boden: '#030409', glut: ['#8fa4ff', '#4f63d6', '#d4dcff'], motiv: 'tinte' },
+};
+const HellCircleOverlay = React.memo(function HellCircleOverlay({ stufe }) {
+  const cfg = HELL_KREISE[stufe] || HELL_KREISE[2];
+  const funken = useMemo(() => ppZufall(ppFxN(26), (i) => ({
+    x: Math.random() * 100, dur: 9 + Math.random() * 11, delay: -Math.random() * 20,
+    size: 2 + Math.floor(Math.random() * 3), farbe: cfg.glut[i % cfg.glut.length], drift: (Math.random() - .5) * 18,
+  })), [stufe]);
+  const motive = useMemo(() => ppZufall(ppFxN(cfg.motiv === 'regen' || cfg.motiv === 'sturm' ? 18 : 9), () => ({
+    x: Math.random() * 100, dur: 3 + Math.random() * 5, delay: -Math.random() * 8, len: 8 + Math.random() * 18,
+  })), [stufe]);
+  return (
+    <div className={'hell-circle-overlay hc-' + cfg.motiv} style={{
+      position: 'absolute', inset: 0, pointerEvents: 'none', overflow: 'hidden',
+      background: `linear-gradient(180deg, ${cfg.himmel[0]} 0%, ${cfg.himmel[1]} 38%, ${cfg.himmel[2]} 52%, ${cfg.boden} 53%, ${cfg.boden} 100%)`,
+    }}>
+      {/* Horizont-Glimmen */}
+      <div style={{ position: 'absolute', left: 0, right: 0, top: '49%', height: '6%',
+        background: `linear-gradient(180deg, transparent, ${cfg.glut[0]}33, transparent)` }} />
+      {/* Kreis-Motiv */}
+      {motive.map((m, i) => (
+        <i key={'m' + i} className="pp-area-dyn hc-motiv" style={{
+          left: m.x + '%', height: m.len + '%', background: `linear-gradient(180deg, transparent, ${cfg.glut[i % 3]}88)`,
+          animation: `hcMotiv ${m.dur}s linear ${m.delay}s infinite`,
+        }} />
+      ))}
+      {/* Funken / Glut */}
+      {funken.map((f, i) => (
+        <i key={'f' + i} className="pp-area-dyn hc-funke" style={{
+          left: f.x + '%', width: f.size, height: f.size, background: f.farbe, boxShadow: `0 0 4px ${f.farbe}`,
+          '--drift': f.drift + 'vw', animation: `hcSteigen ${f.dur}s linear ${f.delay}s infinite`,
+        }} />
+      ))}
+      {/* Randabdunklung — die Karten bleiben das Hellste */}
+      <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(ellipse at 50% 55%, transparent 55%, rgba(0,0,0,.45) 100%)' }} />
+      <style>{`
+        .hell-circle-overlay .hc-funke { position: absolute; bottom: -2%; opacity: 0; }
+        .hell-circle-overlay .hc-motiv { position: absolute; top: -20%; width: 2px; opacity: 0; transform: rotate(14deg); }
+        .hell-circle-overlay.hc-sturm .hc-motiv, .hell-circle-overlay.hc-tinte .hc-motiv { transform: rotate(62deg); width: 3px; }
+        .hell-circle-overlay.hc-gold .hc-motiv { width: 4px; border-radius: 50%; height: 4% !important; }
+        .hell-circle-overlay.hc-blasen .hc-motiv { width: 6px; border-radius: 50%; height: 3% !important; }
+        @keyframes hcSteigen {
+          0%   { transform: translate(0, 0); opacity: 0; }
+          12%  { opacity: .9; }
+          100% { transform: translate(var(--drift), -70vh); opacity: 0; }
+        }
+        @keyframes hcMotiv {
+          0%   { transform: translate(0, 0) rotate(14deg); opacity: 0; }
+          15%  { opacity: .8; }
+          100% { transform: translate(-6vw, 110vh) rotate(14deg); opacity: 0; }
+        }
+      `}</style>
+    </div>
   );
 });
 

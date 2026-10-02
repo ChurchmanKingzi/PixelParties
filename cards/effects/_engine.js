@@ -8254,6 +8254,12 @@ class GameEngine {
       this.log('unstoppable_damage', { target: this._heroLabel(target), source: source?.name });
     }
 
+    // ★ The Fifth Circle of Hell: „the next damage that exactly 1 target takes this turn is
+    // doubled". Stempel `gs._naechsterEinzelschadenX2`; hier der Heldenpfad (ein einzelner
+    // Schadensaufruf ausserhalb eines Flaechenschlags = genau ein Ziel). Verdopplung als
+    // Multiplikator (Punkt vor Strich, wie `multiplyAmount`).
+    this._naechsterEinzelschadenVerdoppeln(hookCtx);
+
     await this.runHooks(HOOKS.BEFORE_DAMAGE, hookCtx);
 
     // ── `cannotBeIncreased` (v579) ───────────────────────────────────
@@ -12276,14 +12282,67 @@ class GameEngine {
     const jetzt = () => engine.gs.turn;
     const def = (name, fn) => Object.defineProperty(arr, name, { value: fn, enumerable: false, configurable: true, writable: true });
     def('_stempelVerfolgt', true);
-    def('push', function (...items) { stamps().push(...items.map(jetzt)); return Array.prototype.push.apply(this, items); });
-    def('unshift', function (...items) { stamps().unshift(...items.map(jetzt)); return Array.prototype.unshift.apply(this, items); });
+    def('push', function (...items) { stamps().push(...items.map(jetzt)); const r = Array.prototype.push.apply(this, items); engine._geloeschtMeldung(pi, items); return r; });
+    def('unshift', function (...items) { stamps().unshift(...items.map(jetzt)); const r = Array.prototype.unshift.apply(this, items); engine._geloeschtMeldung(pi, items); return r; });
     def('pop', function () { stamps().pop(); return Array.prototype.pop.call(this); });
     def('shift', function () { stamps().shift(); return Array.prototype.shift.call(this); });
     def('splice', function (...args) {
       const sargs = args.length > 2 ? [args[0], args[1], ...args.slice(2).map(jetzt)] : args;
       Array.prototype.splice.apply(stamps(), sargs);
       return Array.prototype.splice.apply(this, args);
+    });
+  }
+
+  /**
+   * ★ The Fifth Circle of Hell — verbraucht den Stempel „naechster Einzelschaden verdoppelt"
+   * (`gs._naechsterEinzelschadenX2 = { turn, owner }`) an einem Schadensereignis: `target` ist
+   * der Hook-Kontext des Heldenpfads oder ein Kreaturen-Eintrag (beide tragen `amount`, der
+   * Kreaturen-Eintrag zusaetzlich die Sammler-Helfer). Gilt nur im selben Zug, nur fuer Schaden
+   * > 0, und nicht mitten in einem Flaechenschlag (`_deferGameOverCheck`).
+   */
+  _naechsterEinzelschadenVerdoppeln(ziel) {
+    const st = this.gs._naechsterEinzelschadenX2;
+    if (!st || !ziel) return;
+    if (st.turn !== this.gs.turn) { delete this.gs._naechsterEinzelschadenX2; return; }
+    if ((this.gs._deferGameOverCheck || 0) > 0) return;
+    if (!((ziel.amount || 0) > 0)) return;
+    if (typeof ziel.multiplyAmount === 'function') ziel.multiplyAmount(2);
+    else ziel._mul = (ziel._mul ?? 1) * 2;
+    delete this.gs._naechsterEinzelschadenX2;
+    this.log('next_single_damage_doubled', { by: st.source || null });
+  }
+
+  /**
+   * ★ „WENN DIESE KARTE GELOESCHT WIRD" — EINE Stelle (Circles of Hell). Jede Karte, die in den
+   * Geloescht-Stapel von `pi` gelangt (egal ueber welchen der vielen Loeschwege — alle laufen
+   * ueber `push`/`unshift` dieses Stapels), wird gemeldet. Hat ihr Skript `onDeletedFromAnywhere`
+   * (async (engine, pi, cardName) => void), reiht die Engine den Aufruf in die Nach-Ketten-Aktionen
+   * ein: dort ist das Brett ruhig, und Karten-Angebote (Zusatzaktion) sind spielbar. Eigene
+   * Zurueckleger setzen `_geloeschtStumm`, damit ihre Stapel-Bewegung nichts ausloest.
+   */
+  _geloeschtMeldung(pi, items) {
+    if (this._geloeschtStumm > 0 || !items?.length) return;
+    for (const name of items) {
+      let script = null;
+      try { script = loadCardEffect(name); } catch { script = null; }
+      if (!script?.onDeletedFromAnywhere) continue;
+      (this._loeschWarteschlange || (this._loeschWarteschlange = [])).push({ pi, name });
+    }
+    if (!this._loeschWarteschlange?.length || this._loeschAbholungAngemeldet) return;
+    this._loeschAbholungAngemeldet = true;
+    // EINE Nach-Ketten-Aktion arbeitet die ganze Warteschlange ab — auch Loeschungen, die
+    // waehrend der Abarbeitung entstehen (Kreis A loescht Kreis B …). Obergrenze gegen Endlosketten.
+    this.queuePostChainAction(async () => {
+      try {
+        for (let n = 0; this._loeschWarteschlange.length > 0 && n < 24; n++) {
+          const e = this._loeschWarteschlange.shift();
+          try { await loadCardEffect(e.name)?.onDeletedFromAnywhere?.(this, e.pi, e.name); }
+          catch (err) { console.error(`[onDeletedFromAnywhere] ${e.name}:`, err.message); }
+        }
+      } finally {
+        this._loeschWarteschlange.length = 0;
+        this._loeschAbholungAngemeldet = false;
+      }
     });
   }
 
@@ -20867,7 +20926,10 @@ this._deathWatch = (this._deathWatchStack || []).length
         this.sync();
       }
     }
-    this._untrackCard(inst.id);
+    // ★ Hat sich die Hand-Instanz selbst aufs Brett gelegt (Area-Zauber: `placeArea` stellt DIESELBE
+    // Instanz in die Area-Zone), gehoert sie jetzt dem Brett — ausgetragen wuerde sie zum Geist:
+    // `gs.areaZones` haelt den Namen, aber kein Hook der Area laeuft mehr (The Circles of Hell).
+    if (!(_aufsBrett && inst.zone && inst.zone !== 'hand')) this._untrackCard(inst.id);
     // v1338: ohne Abfrage aufgeloest → jetzt zeigen (idempotent).
     this.gussAuftrittBeenden(_auftritt);
     this.log('immediate_action', { hero: hero.name, card: cardName, cardType: cardData.cardType, by: opts.by || null, from: fromZone });
@@ -21652,6 +21714,7 @@ this._deathWatch = (this._deathWatchStack || []).length
 
     // Now fire turn-start hooks (Barker, Slime level-ups, Rancher restore, etc.)
     await this.runHooks(HOOKS.ON_TURN_START, { turn: this.gs.turn, activePlayer: this.gs.activePlayer });
+    try { await this._runPostChainActions(); } catch (err) { console.error('[Engine] Nach-Ketten-Aktionen (Zugbeginn):', err.message); }   // Circles of Hell: Loeschungen durch Zugbeginn-Effekte sofort anbieten
     this.sync();
     await this.runPhase(PHASES.START);
   }
@@ -22363,6 +22426,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       if (_liveTurnEnd) this._turnEndHooksDoneForTurn = this.gs.turn;
       try {
         await this.runHooks(HOOKS.ON_TURN_END, { turn: this.gs.turn, activePlayer: this.gs.activePlayer });
+        await this._runPostChainActions();
       } catch (err) {
         console.error('[Engine] ⚠️  ON_TURN_END abgebrochen — Zugübergabe läuft trotzdem weiter:', err.message);
         this.log('turn_end_hooks_aborted', {
@@ -26154,7 +26218,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // ebenfalls vor dem Wechsel — `removeArea` war der Ausreisser.
     await this.runHooks('onCardLeaveZone', {
       card: cardInstance, leavingCard: cardInstance,
-      fromZone: 'area',
+      fromZone: 'area', toZone: 'discard', source: sourceName,
       fromOwner: ownerIdx, fromHeroIdx: -1, fromZoneSlot: -1,
       _skipReactionCheck: true,
     });
@@ -26171,6 +26235,51 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (!opts._skipLimitEnforce) {
       await this.enforceAreaLimit(ownerIdx, 'area limit');
     }
+  }
+
+  /**
+   * ★ AREA LOESCHEN (Circles of Hell) — Gegenstueck zu `removeArea`: die Area geht vom Brett in
+   * den GELOESCHT-Stapel ihres Besitzers statt in die Ablage. Der Leave-Hook feuert wie bei
+   * `removeArea` VOR dem Zonenwechsel (mit `toZone: 'deleted'`, `source`), der Stapel-Eintrag
+   * danach — dessen Push meldet die Karte ueber `_geloeschtMeldung` an ihr „wenn geloescht"-Skript.
+   * `opts.skipProtection` fuer eigene Loeschungen (Kreis-Klauseln: „delete all Areas you control").
+   */
+  async deleteArea(cardInstance, sourceName = 'unknown', opts = {}) {
+    const gs = this.gs;
+    const ownerIdx = cardInstance.owner;
+    const ps = gs.players[ownerIdx];
+    if (!ps || cardInstance.zone !== 'area') return false;
+    const cardName = cardInstance.name;
+    if (!opts.skipProtection) {
+      const quelle = opts.source || { name: sourceName, owner: opts.sourceOwner };
+      const quellBesitzer = opts.sourceOwner != null ? opts.sourceOwner : this.gs.activePlayer;
+      if (await this.tryAreaProtection(cardInstance, quelle, quellBesitzer, { fromEngineGate: true })) {
+        this.log('area_protected', { player: ps.username, area: cardName, by: sourceName });
+        this.sync();
+        return false;
+      }
+    }
+    this._broadcastEvent('play_pile_transfer', { owner: ownerIdx, cardName, from: 'area', to: 'deleted' });
+    if (gs.areaZones?.[ownerIdx]) {
+      const idx = gs.areaZones[ownerIdx].indexOf(cardName);
+      if (idx >= 0) gs.areaZones[ownerIdx].splice(idx, 1);
+    }
+    this.log('area_deleted', { player: ps.username, area: cardName, by: sourceName });
+    await this.runHooks('onCardLeaveZone', {
+      card: cardInstance, leavingCard: cardInstance,
+      fromZone: 'area', toZone: 'deleted', source: sourceName,
+      fromOwner: ownerIdx, fromHeroIdx: -1, fromZoneSlot: -1,
+      _skipReactionCheck: true,
+    });
+    cardInstance.zone = 'deleted';
+    if (!ps.deletedPile) ps.deletedPile = [];
+    this._geloeschtVerfolgen(ownerIdx);
+    ps.deletedPile.push(cardName);   // Push-Ueberlagerung meldet die Karte (`_geloeschtMeldung`)
+    this.syncAlleAtkAuren();
+    this.sync();
+    await this._delay(750);
+    if (!opts._skipLimitEnforce) await this.enforceAreaLimit(ownerIdx, 'area limit');
+    return true;
   }
 
   /** Remove every Area except those owned by `excludePlayerIdx`. */
@@ -44318,6 +44427,13 @@ this._deathWatch = (this._deathWatchStack || []).length
     // `modifyAmount`. Nach dem Verrechnen (unten) ist `amount` wieder
     // eine plain Zahl.
     for (const e of entries) this._armCreatureEntry(e);
+
+    // ★ The Fifth Circle of Hell (Kreaturenseite): ein Durchgang mit genau EINEM Eintrag = genau
+    // ein Ziel; der Stempel wird dann auf diesen Eintrag angewandt und verbraucht.
+    {
+      const lebend = entries.filter(e => e && !e.cancelled);
+      if (lebend.length === 1) this._naechsterEinzelschadenVerdoppeln(lebend[0]);
+    }
 
     // Fire batch hook — cards like Diamond can inspect/cancel entries
     await this.runHooks(HOOKS.BEFORE_CREATURE_DAMAGE_BATCH, {
