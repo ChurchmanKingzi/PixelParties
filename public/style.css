@@ -24726,7 +24726,7 @@ body.fifth-curse-me [data-hero-zone][data-hero-owner="me"],
 body.fifth-curse-me [data-support-zone].zone-has-card[data-support-owner="me"],
 body.fifth-curse-opp [data-hero-zone][data-hero-owner="opp"],
 body.fifth-curse-opp [data-support-zone].zone-has-card[data-support-owner="opp"] {
-  animation: fifthCurseFlicker 3.6s ease-in-out infinite;
+  animation: fifthCurseFlicker 2.2s ease-in-out infinite;
 }
 @keyframes fifthCurseFlicker {
   0%   { filter: none; }
