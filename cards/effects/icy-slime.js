@@ -84,7 +84,7 @@ module.exports = {
             source: 'Icy Slime',
             // Dieselbe Rechnung wie beim Helden — der Kreatur-Zaehler
             // laeuft ebenfalls nur am Zugende des Kontrolleurs herunter.
-            frozenDuration: frostDauer(ctx.cardOwner, target.owner),
+            duration: frostDauer(ctx.cardOwner, target.owner),   // (`frozenDuration` kennt applyCreatureStatus nicht)
           });
         }
       }
