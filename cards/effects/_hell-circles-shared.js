@@ -23,11 +23,11 @@
 //    wird gesetzt, sobald es kein Zurueck mehr gibt (nach dem unumkehrbaren Loeschen der Areas, vor
 //    dem abbrechbaren Spiel-Dialog) und bei Abbruch des Dialogs wieder aufgehoben. Durch das Loeschen
 //    ausgeloeste Angebote anderer Kreise laufen erst danach (Warteschlange) und sehen den Endstand.
-//  • „Play as an additional Action": die Karte geht kurz aus dem Geloescht-Stapel auf die Hand
-//    und wird ueber die ECHTE Zusatzaktions-Abfrage (`performImmediateActionAnyHero`, nur dieser
-//    Zauber) gespielt — mit Wirker-Wahl, Schulpruefung, Kette. Wird die Abfrage abgebrochen oder
-//    ist kein Wirker faehig, geht sie unveraendert in den Geloescht-Stapel zurueck. Das Angebot
-//    entfaellt still, wenn kein eigener Held den Zauber wirken kann.
+//  • „Play as an additional Action": die Karte wird DIREKT aus dem Geloescht-Stapel gewirkt (nie ueber die
+//    Hand): ohne moeglichen Wirker entfaellt das Angebot still; nach „Ja" fragt die Engine bei mehreren
+//    Wirkern sofort „Which Hero casts …?" (mit Abbrechen — dann bleibt alles unberuehrt, auch die Sperre),
+//    bei genau einem wirkt dieser ohne Rueckfrage. Das Wirken laeuft ueber `_castSpellImmediately`
+//    (Schulpruefung, Kette, Zusatzaktion) mit einem Wegwerf-Pool statt der Hand.
 // ═══════════════════════════════════════════
 
 const { hasCardType } = require('./_hooks');
@@ -51,59 +51,54 @@ async function alleEigenenAreasLoeschen(engine, pi, quelle) {
   return insts.length;
 }
 
-/** Kann irgendein lebender eigener Held `name` als Zusatzaktion wirken? Reine Probe: die Karte liegt
- *  nur fuer die Dauer der Abfrage hinten in der Hand (kein Zustandsversand, keine Instanz). */
-function heldKannWirken(engine, pi, name) {
+/** Alle eigenen lebenden Helden, die `name` als Zusatzaktion wirken koennen (als Ziel-Eintraege fuer
+ *  `promptEffectTarget`). Reine Probe: die Karte liegt nur fuer die Dauer der Abfrage hinten in der Hand
+ *  (kein Zustandsversand, keine Instanz). */
+function moeglicheWirker(engine, pi, name) {
   const ps = engine.gs.players[pi];
-  if (!ps) return false;
+  if (!ps) return [];
   const alteLaenge = ps.hand.length;
   ps.hand[alteLaenge] = name;
+  const out = [];
   try {
     for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
       const h = ps.heroes[hi];
       if (!h?.name || h.hp <= 0) continue;
-      if (engine.getHeroEligibleActionCards(pi, hi).includes(name)) return true;
+      if (engine.getHeroEligibleActionCards(pi, hi).includes(name)) {
+        out.push({ id: `hero-${pi}-${hi}`, type: 'hero', owner: pi, heroIdx: hi, cardName: h.name });
+      }
     }
-    return false;
   } finally {
     ps.hand.length = alteLaenge;
   }
+  return out;
 }
 
-/** Karte vom Stapel (`pile`) fuer die Zusatzaktion kurz auf die Hand legen. */
-async function aufHandLegen(engine, pi, pile, name, quelle) {
+/** Karte still (ohne „wenn geloescht"-Meldung) aus dem Geloescht-Stapel nehmen. */
+async function ausGeloeschtEntnehmen(engine, pi, name, quelle) {
   engine._geloeschtStumm = (engine._geloeschtStumm || 0) + 1;
-  let taken = null;
-  try { taken = await engine.takeFromPile(pi, pile, name, { source: quelle }); }
+  try { return !!(await engine.takeFromPile(pi, 'deleted', name, { source: quelle })); }
   finally { engine._geloeschtStumm--; }
-  if (!taken) return false;
-  const inst = engine.handZugangSync(pi, taken.name, { source: quelle, von: pile });
-  if (inst === false) return false;
-  const ps = engine.gs.players[pi];
-  engine._pileFlight(pi, taken.name, pile, 'hand', { toHandIdx: ps.hand.length - 1, finalHandSize: ps.hand.length });
-  return true;
 }
 
-/** Nicht gespielte Karte aus der Hand zurueck in den Geloescht-Stapel (ohne neue Meldung). */
-function zurueckInGeloescht(engine, pi, name) {
+/** Nicht gewirkte Karte still zurueck in den Geloescht-Stapel. */
+function inGeloeschtZurueck(engine, pi, name) {
   const ps = engine.gs.players[pi];
-  const idx = (ps.hand || []).lastIndexOf(name);
-  if (idx < 0) return;
-  const inst = [...engine.cardInstances].reverse().find(c => c.name === name && c.zone === 'hand' && c.owner === pi);
   engine._geloeschtStumm = (engine._geloeschtStumm || 0) + 1;
   try {
-    engine.takeFromPileSync(pi, 'hand', idx, { source: 'Circle of Hell' });
-    if (inst) engine._untrackCard(inst.id);
     engine._geloeschtVerfolgen(pi);
     ps.deletedPile.push(name);
   } finally { engine._geloeschtStumm--; }
-  engine._pileFlight(pi, name, 'hand', 'deleted');
   engine.sync();
 }
 
 /**
  * Die gemeinsame Klausel (2.–8. Kreis). `opts.verbotenWennQuelleSelbst` ist unbenutzt; die Karten
  * unterscheiden sich im Wortlaut („by an effect" / „by another card's effect"), nicht im Ablauf.
+ *
+ * Ablauf: ohne moeglichen Wirker kein Angebot → Ja/Nein → bei mehreren Wirkern DIREKTE Wirker-Wahl
+ * (mit Abbrechen, noch vor jeder Aenderung am Brett), bei einem Wirker sofort → alle eigenen Areas
+ * loeschen → Karte direkt aus dem Geloescht-Stapel wirken (NICHT ueber die Hand).
  */
 async function loeschenUndSpielen(engine, pi, name, opts = {}) {
   const gs = engine.gs;
@@ -111,7 +106,8 @@ async function loeschenUndSpielen(engine, pi, name, opts = {}) {
   if (!ps) return false;
   if (ps._deletedAreaPlayedTurn === gs.turn) return false;
   if (!(ps.deletedPile || []).includes(name)) return false;          // inzwischen weg (z. B. zurueckgeholt)
-  if (!heldKannWirken(engine, pi, name)) return false;               // kein Wirker → Angebot entfaellt still
+  let wirker = moeglicheWirker(engine, pi, name);
+  if (wirker.length === 0) return false;                             // kein Wirker → Angebot entfaellt still
 
   await engine.showTriggeredEffect?.(name, { playerIdx: pi });
   const antwort = await engine.promptGeneric(pi, {
@@ -126,32 +122,52 @@ async function loeschenUndSpielen(engine, pi, name, opts = {}) {
   });
   if (!engine._confirmSaidYes(antwort)) return false;
 
-  // Die Sperre wird erst gesetzt, wenn es kein Zurueck mehr gibt, und bei Abbruch wieder aufgehoben:
-  // die Areas sind danach geloescht (nicht rueckgaengig), das Spielen selbst aber abbrechbar. Die durch
-  // die Loeschung ausgeloesten Angebote anderer Kreise laufen erst NACH dieser Funktion (Warteschlange)
-  // und sehen daher den endgueltigen Stand der Sperre.
+  // Wirker-Wahl (mit Abbrechen) — VOR dem unumkehrbaren Loeschen der Areas.
+  wirker = moeglicheWirker(engine, pi, name);                        // das Brett kann sich waehrend der Abfrage geaendert haben
+  if (wirker.length === 0 || !(ps.deletedPile || []).includes(name)) return false;
+  let held = wirker[0];
+  if (wirker.length > 1) {
+    const pick = await engine.promptEffectTarget(pi, wirker, {
+      title: name,
+      description: `Which Hero casts ${name}? (Cancel leaves it in the deleted pile.)`,
+      confirmLabel: '🔥 Cast!',
+      confirmClass: 'btn-danger',
+      cancellable: true,
+      exclusiveTypes: true,
+      maxPerType: { hero: 1 },
+      maxTotal: 1,
+    });
+    if (!pick || pick.length === 0) return false;                    // Abbruch: nichts geschieht, keine Sperre
+    held = wirker.find(w => w.id === pick[0]) || wirker[0];
+  }
+
   const sperreVorher = ps._deletedAreaPlayedTurn;
   await alleEigenenAreasLoeschen(engine, pi, name);
 
   if (!(ps.deletedPile || []).includes(name)) return false;
-  if (!(await aufHandLegen(engine, pi, 'deleted', name, name))) return false;
-  ps._deletedAreaPlayedTurn = gs.turn;   // ab hier nur noch der abbrechbare Spiel-Dialog
+  if (!(await ausGeloeschtEntnehmen(engine, pi, name, name))) return false;
+  ps._deletedAreaPlayedTurn = gs.turn;   // ab hier gibt es kein Zurueck mehr (die Areas sind weg)
 
-  const res = await engine.performImmediateActionAnyHero(pi, {
-    title: name,
-    description: `Play "${name}" as an additional Action — or cancel to leave it in the deleted pile.`,
-    allowedCardTypes: ['Spell'],
-    cardNameFilter: (n) => n === name,
-    skipAbilities: true, skipHeroEffects: true,
-    cancellable: true,
-  });
-  if (!res?.played) {
-    zurueckInGeloescht(engine, pi, name);
-    ps._deletedAreaPlayedTurn = sperreVorher;   // abgebrochen: Sperre wieder aufheben
+  // Die Karte wird direkt aus dem Geloescht-Stapel gewirkt: ein Wegwerf-Pool ersetzt die Hand.
+  const pool = [name];
+  let res = null;
+  try {
+    res = await engine._castSpellImmediately(pi, held.heroIdx, name, {
+      fromZone: 'hand', pool, poolIndex: 0, by: name, alsZusatzaktion: true,
+    });
+  } catch (err) {
+    console.error(`[${name}] Wirken aus dem Geloescht-Stapel:`, err.message);
   }
-  engine.log('hell_circle_replayed', { player: ps.username, card: name, played: !!res?.played });
+  const gewirkt = !!res && !res.cancelled;
+  if (!gewirkt) {
+    // Der Guss kam nicht zustande (Abbruch in der Karte, Fehler): Karte zurueck, Sperre wieder auf.
+    if (!(ps.deletedPile || []).includes(name) && !(ps.discardPile || []).includes(name)
+        && !engine.getAreas(pi).some(i => i.name === name)) inGeloeschtZurueck(engine, pi, name);
+    ps._deletedAreaPlayedTurn = sperreVorher;
+  }
+  engine.log('hell_circle_replayed', { player: ps.username, card: name, played: gewirkt, hero: held.cardName });
   engine.sync();
-  return !!res?.played;
+  return gewirkt;
 }
 
 const cpuBejahen = {
@@ -164,5 +180,5 @@ const cpuBejahen = {
 
 module.exports = {
   HELL_AREA_COMMON, verlaesstBrett, alleEigenenAreasLoeschen,
-  loeschenUndSpielen, aufHandLegen, zurueckInGeloescht, heldKannWirken, cpuBejahen, hasCardType,
+  loeschenUndSpielen, moeglicheWirker, ausGeloeschtEntnehmen, inGeloeschtZurueck, cpuBejahen, hasCardType,
 };
