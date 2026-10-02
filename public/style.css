@@ -17343,7 +17343,8 @@ body:has(.textbox-overlay) .tooltip {
     color-mix(in srgb, var(--hand-accent, #00f0ff) 60%, transparent) 84%,
     transparent 100%);
   pointer-events: none;
-  z-index: 3;
+  /* Als Vorgabe 2.10.: Handkarten liegen ÜBER den Trennlinien (Fächerebene ≥ 1). */
+  z-index: 0;
 }
 .game-hand-me::before, .game-hand-opp::before { left: var(--hand-strich); }
 .game-hand-me::after,  .game-hand-opp::after  { right: var(--hand-strich); }
@@ -24790,3 +24791,28 @@ body.summon-pick .board-zone:not(.zone-drag-valid):not(.board-zone-play-target) 
   opacity: .55;
   transition: filter .15s, opacity .15s;
 }
+
+/* ── Handkarten-Abzeichen ÜBER allen Karten (Als Vorgabe 2.10.) ─────
+   Level-/Kosten-Abzeichen sitzen in einer eigenen Ebene NEBEN der Karte (nicht darin: die Karte trägt ein z-index und
+   sperrte sie unter ihren Nachbarn ein). Die Ebene deckt die Karte exakt ab, dreht sich mit dem Fächerwinkel und
+   zoomt beim Hover mit — z-index 100 liegt über der gehoverten Karte (60). `.hand-slot` ist kein Stapelkontext. */
+.game-hand-me .hand-slot > .hand-badge-layer {
+  position: absolute;
+  left: 0; top: 0;
+  width: var(--hand-card-w);
+  height: var(--hand-card-h);
+  rotate: var(--fan-rot, 0deg);
+  transform-origin: 50% 50%;
+  transition: transform .16s ease-out, rotate .16s ease-out;
+  z-index: 100;
+  pointer-events: none;
+}
+.game-hand-me .hand-slot > .hand-badge-layer > * { pointer-events: none; }
+.game-hand-me .game-hand-cards:not([data-pp-dragging]) .hand-slot > .board-card:hover + .hand-badge-layer {
+  transform: translateY(calc(-1 * var(--hand-hover-lift)))
+             scale(var(--hand-hover-scale))
+             rotate(var(--hand-tilt, 0deg));
+}
+
+/* Als Vorgabe 2.10.: die Handkarten (samt Hover-Zoom) liegen über den Trennlinien und Clustern der Handzeile. */
+.game-hand-me .game-hand-cards { z-index: 5; }

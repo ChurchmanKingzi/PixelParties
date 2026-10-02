@@ -46687,7 +46687,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     onTouchStart={(e) => onHandMouseDown(e, item.origIdx)}
                     onMouseEnter={() => isAnyDiscard && setHoveredPileCard(item.card)}
                     onMouseLeave={() => isAnyDiscard && setHoveredPileCard(null)}>
-                    <BoardCard cardName={item.card} noTooltip={isAnyDiscard} skins={gameSkins}>
+                    <BoardCard cardName={item.card} noTooltip={isAnyDiscard} skins={gameSkins} />
+                    {(handEffectiveLevel != null || handEffectiveCost != null) && <div className="hand-badge-layer">
                     {handEffectiveLevel != null && (() => {
                       // "Boosted" = effective level is HIGHER than the
                       // printed base (Mana Absorbing Crystal's +1).
@@ -46733,7 +46734,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                         ◆{handEffectiveCost}
                       </div>
                     )}
-                    </BoardCard>
+                    </div>}
                     {istFrischErschienen(item.origIdx) && <HandMaterializeFxInline />}
                     {(me.handApplause?.[item.origIdx] > 0) && <ApplauseBadge n={me.handApplause[item.origIdx]} hand akey={`h:${myIdx}:${item.origIdx}`} />}
                     {isHandLockBlocked && <div className="hand-lock-indicator">⦸</div>}
