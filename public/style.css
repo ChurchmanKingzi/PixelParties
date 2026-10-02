@@ -24780,3 +24780,12 @@ body.fifth-curse-opp [data-support-zone].zone-has-card[data-support-owner="opp"]
 .zone-permanent-activatable::after {
   pointer-events: none;
 }
+
+
+/* ★ Klick-Beschwoerung einer Creature (Als Vorgabe 2.10.): alles ausser den moeglichen Caster-Helden (`board-zone-play-target`),
+   ihren freien Support Zonen (`zone-drag-valid`) und der Handkarte selbst wird ausgegraut. */
+body.summon-pick .board-zone:not(.zone-drag-valid):not(.board-zone-play-target) {
+  filter: grayscale(.85) brightness(.5);
+  opacity: .55;
+  transition: filter .15s, opacity .15s;
+}

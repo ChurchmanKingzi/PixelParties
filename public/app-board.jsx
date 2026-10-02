@@ -29297,6 +29297,12 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
 
   // Play a single open cue whenever any hand-card target picker appears.
   useEffect(() => { if (spellHeroPick && window.playSFX) window.playSFX('ui_prompt_open'); }, [spellHeroPick]);
+  // Klick-Beschwoerung einer Creature: Body-Klasse, damit CSS alles ausser Caster-Helden, freien Zonen und der Karte selbst ausgraut.
+  const summonPickAktiv = !!(spellHeroPick && (spellHeroPick.isCreature || spellHeroPick.isArtifactCreature));
+  useEffect(() => {
+    document.body.classList.toggle('summon-pick', summonPickAktiv);
+    return () => document.body.classList.remove('summon-pick');
+  }, [summonPickAktiv]);
   useEffect(() => { if (abilityAttachPick && window.playSFX) window.playSFX('ui_prompt_open'); }, [abilityAttachPick]);
   useEffect(() => { if (pendingBouncePick && window.playSFX) window.playSFX('ui_prompt_open'); }, [pendingBouncePick]);
   useEffect(() => { if (pendingAdditionalPlay && window.playSFX) window.playSFX('ui_prompt_open'); }, [pendingAdditionalPlay]);
@@ -46500,7 +46506,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                   && handEffectiveCost > handCardData.cost;
                 return (
                   <div key={'h-' + item.origIdx} data-hand-idx={item.origIdx} data-card-name={item.card} data-card-type={CARDS_BY_NAME[item.card]?.cardType || ''} data-touch-drag="1"
-                    className={'hand-slot' + (isBeingDragged ? ' hand-dragging' : '') + (dimmed ? ' hand-card-dimmed' : '') + (isAnyDiscard && isForceDiscardEligible ? ' hand-discard-target' : '') + (isAnyDiscard && !isForceDiscardEligible ? ' hand-card-dimmed' : '') + (isAttachEligible ? ' hand-card-attach-eligible' : '') + (isAbilityAttach && !isAttachEligible ? ' hand-card-attach-dimmed' : '') + (isHandPickSelected ? ' hand-pick-selected' : '') + (isHandPickEligible && !isHandPickSelected && !isHandPickTypeFull && !isHandPickMaxed && !isHandPickNameLocked ? ' hand-pick-eligible' : '') + ((isHandPickTypeFull || isHandPickMaxed || isHandPickNameLocked) ? ' hand-card-dimmed' : '') + (isPickHandCardEligible ? ' hand-pick-eligible' : '') + (isPickHandCardUrgent ? ' hand-pick-eligible-urgent' : '') + (isPickHandCardDimmed ? ' hand-card-dimmed' : '') + (isZonePickHandHighlight ? ' hand-pick-eligible-urgent' : '') + (isZonePickHandQueued ? ' hand-pick-eligible' : '') + (isZonePickHandDimmed ? ' hand-card-dimmed' : '') + (isPotionHandTargetSelected ? ' hand-pick-selected' : (isPotionHandTarget ? ' hand-pick-eligible' : '')) + (isStNicolasEscrowed ? ' hand-card-st-nicolas-escrowed' : '') + ((isStealMarked || isStealHighlighted) ? ' blind-pick-selected' : '') + (isRevealed ? ' hand-card-revealed' : '') + (istFrischErschienen(item.origIdx) ? ' hand-card-materializing' : '')}
+                    className={'hand-slot' + (isBeingDragged ? ' hand-dragging' : '') + (dimmed ? ' hand-card-dimmed' : '') + (isAnyDiscard && isForceDiscardEligible ? ' hand-discard-target' : '') + (isAnyDiscard && !isForceDiscardEligible ? ' hand-card-dimmed' : '') + (isAttachEligible ? ' hand-card-attach-eligible' : '') + (isAbilityAttach && !isAttachEligible ? ' hand-card-attach-dimmed' : '') + (isHandPickSelected ? ' hand-pick-selected' : '') + (isHandPickEligible && !isHandPickSelected && !isHandPickTypeFull && !isHandPickMaxed && !isHandPickNameLocked ? ' hand-pick-eligible' : '') + ((isHandPickTypeFull || isHandPickMaxed || isHandPickNameLocked) ? ' hand-card-dimmed' : '') + (isPickHandCardEligible ? ' hand-pick-eligible' : '') + (isPickHandCardUrgent ? ' hand-pick-eligible-urgent' : '') + (isPickHandCardDimmed ? ' hand-card-dimmed' : '') + ((spellHeroPick && (spellHeroPick.isCreature || spellHeroPick.isArtifactCreature) && item.origIdx !== spellHeroPick.handIndex) ? ' hand-card-dimmed' : '') + (isZonePickHandHighlight ? ' hand-pick-eligible-urgent' : '') + (isZonePickHandQueued ? ' hand-pick-eligible' : '') + (isZonePickHandDimmed ? ' hand-card-dimmed' : '') + (isPotionHandTargetSelected ? ' hand-pick-selected' : (isPotionHandTarget ? ' hand-pick-eligible' : '')) + (isStNicolasEscrowed ? ' hand-card-st-nicolas-escrowed' : '') + ((isStealMarked || isStealHighlighted) ? ' blind-pick-selected' : '') + (isRevealed ? ' hand-card-revealed' : '') + (istFrischErschienen(item.origIdx) ? ' hand-card-materializing' : '')}
                     style={{
                       // ★ v1233: Der Faecher haengt am PLATZ, nicht an
                       // der Karte — siehe „HANDFAECHER" in style.css.
@@ -48713,16 +48719,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         </DraggablePanel>
       )}
 
-      {/* Creature per Klick beschwoeren: KEIN Box-Menue — Caster-Helden und freie Support Zonen leuchten auf dem Brett. */}
-      {spellHeroPick && !result && (spellHeroPick.isCreature || spellHeroPick.isArtifactCreature) && (
-        <div style={{
-          position: 'fixed', top: 54, left: '50%', transform: 'translateX(-50%)', zIndex: 9000, pointerEvents: 'none',
-          padding: '6px 16px', borderRadius: 20, fontSize: 12, color: 'var(--text)', whiteSpace: 'nowrap',
-          background: 'rgba(10,14,22,.82)', border: '1px solid var(--accent)', boxShadow: '0 2px 12px rgba(0,0,0,.5)',
-        }}>
-          🐾 Summon <b>{spellHeroPick.cardName}</b>: click a highlighted Hero or Support Zone · Esc to cancel
-        </div>
-      )}
+      {/* Creature per Klick beschwoeren: KEIN Box-Menue und kein Hinweistext — Caster-Helden und freie Support Zonen leuchten,
+          alles andere wird ausgegraut (Body-Klasse `summon-pick`, CSS in style.css). */}
       {spellHeroPick && !result && !(spellHeroPick.isCreature || spellHeroPick.isArtifactCreature) && (
         <DraggablePanel className="first-choice-panel animate-in" style={{ borderColor: 'var(--accent)' }}>
           <div className="orbit-font" style={{ fontSize: 13, color: 'var(--accent)', marginBottom: 4 }}>
