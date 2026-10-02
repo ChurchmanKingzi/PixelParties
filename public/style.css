@@ -24719,3 +24719,23 @@ body.pp-dialog-offen .foil-diamond-rare:not(.modal-overlay *) {
 }
 .shop-cpu-progress-bar > span { display: block; height: 100%; background: linear-gradient(90deg, #b8860b, #ffd700); }
 .shop-cpu-progress-count { font-size: 9px; color: #ffd700; font-weight: 700; }
+
+/* The Fifth Circle of Hell - solange der Debuff (naechster Einzelschaden x2) steht, flackern alle Helden und
+   Creatures des betroffenen Spielers langsam und leicht lila. Klassen setzt app-board.jsx am body. */
+body.fifth-curse-me [data-hero-zone][data-hero-owner="me"],
+body.fifth-curse-me [data-support-zone].zone-has-card[data-support-owner="me"],
+body.fifth-curse-opp [data-hero-zone][data-hero-owner="opp"],
+body.fifth-curse-opp [data-support-zone].zone-has-card[data-support-owner="opp"] {
+  animation: fifthCurseFlicker 3.6s ease-in-out infinite;
+}
+@keyframes fifthCurseFlicker {
+  0%   { filter: none; }
+  22%  { filter: drop-shadow(0 0 5px rgba(170, 80, 255, .55)) brightness(1.05) saturate(1.15) hue-rotate(14deg); }
+  38%  { filter: drop-shadow(0 0 2px rgba(170, 80, 255, .25)) brightness(1.01) hue-rotate(5deg); }
+  62%  { filter: drop-shadow(0 0 8px rgba(190, 90, 255, .7)) brightness(1.08) saturate(1.2) hue-rotate(20deg); }
+  100% { filter: none; }
+}
+:root.no-animations body.fifth-curse-me [data-hero-zone],
+:root.no-animations body.fifth-curse-me [data-support-zone],
+:root.no-animations body.fifth-curse-opp [data-hero-zone],
+:root.no-animations body.fifth-curse-opp [data-support-zone] { animation: none; }

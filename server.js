@@ -4760,6 +4760,9 @@ function sendGameState(room, playerIdx, extra) {
     // 5.8.: "ich sehe immer 0"). Ohne diese Zeile blieb der Spiegel
     // serverseitig stehen und kam nie beim Client an.
     doomCounters: gs.doomCounters || null,
+    // The Fifth Circle of Hell: Debuff (naechster Einzelschaden x2) aktiv - betroffen ist der Gegner des Stempelnden.
+    fifthCircle: (gs._naechsterEinzelschadenX2 && gs._naechsterEinzelschadenX2.turn === gs.turn && (gs._naechsterEinzelschadenX2.owner === 0 || gs._naechsterEinzelschadenX2.owner === 1))
+      ? { affected: 1 - gs._naechsterEinzelschadenX2.owner } : null,
     turn: gs.turn, activePlayer: gs.activePlayer, currentPhase: gs.currentPhase || 0,
     result: gs.result || null, rematchRequests: gs.rematchRequests || [],
     isPuzzle: gs.isPuzzle || false,
@@ -5560,6 +5563,9 @@ function sendSpectatorGameState(room) {
     // 5.8.: "ich sehe immer 0"). Ohne diese Zeile blieb der Spiegel
     // serverseitig stehen und kam nie beim Client an.
     doomCounters: gs.doomCounters || null,
+    // The Fifth Circle of Hell: Debuff (naechster Einzelschaden x2) aktiv - betroffen ist der Gegner des Stempelnden.
+    fifthCircle: (gs._naechsterEinzelschadenX2 && gs._naechsterEinzelschadenX2.turn === gs.turn && (gs._naechsterEinzelschadenX2.owner === 0 || gs._naechsterEinzelschadenX2.owner === 1))
+      ? { affected: 1 - gs._naechsterEinzelschadenX2.owner } : null,
     turn: gs.turn, activePlayer: gs.activePlayer, currentPhase: gs.currentPhase || 0,
     result: gs.result || null, rematchRequests: gs.rematchRequests || [],
     isPuzzle: gs.isPuzzle || false,
