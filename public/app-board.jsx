@@ -15583,41 +15583,61 @@ const ANIM_REGISTRY = {
       );
     };
   })(),
-  // ★ The Seventh Circle: Lavafontaene — Lavaschein am Boden, drei Fontaenen steigen auf, Tropfen regnen in Boegen.
+  // ★ The Seventh Circle: Lavasaeule — Glutpfuetze und Risse am Boden, eine gewaltige Hauptsaeule mit Seitenstrahlen
+  // schiesst weit ueber das Ziel hinaus, oben quillt ein Feuerpilz, Brocken und Tropfen regnen in weiten Boegen herab.
   lava_fountain: (() => {
-    const FARBEN = ['#F8F5B5', '#F6E318', '#EEAF2E', '#F27525', '#C92E26'];
+    const FARBEN = ['#F8F5B5', '#F6E318', '#EEAF2E', '#F27525', '#C92E26', '#8a1a18'];
     return function LavaFountainEffect({ x, y }) {
-      const strahlen = useMemo(() => [-1, 0, 1].map((k, i) => ({
-        left: k * 15 - 7, h: 74 - Math.abs(k) * 20 + Math.random() * 10, delay: i === 1 ? 0 : 90, dur: 760 + Math.random() * 120,
-      })), []);
-      const tropfen = useMemo(() => Array.from({ length: ppFxN(30) }, () => {
+      const strahlen = useMemo(() => [
+        { k: 0,  w: 40, h: 230, delay: 0 },
+        { k: -1, w: 24, h: 150, delay: 70 }, { k: 1, w: 24, h: 160, delay: 50 },
+        { k: -2, w: 16, h: 100, delay: 140 }, { k: 2, w: 16, h: 110, delay: 120 },
+      ].map(j => ({ ...j, left: j.k * 30 - j.w / 2, dur: 1000 + Math.round(Math.random() * 160) })), []);
+      const tropfen = useMemo(() => Array.from({ length: ppFxN(58) }, () => {
         const w = (Math.random() - .5) * 2;
-        return { dx: Math.round(w * 52), hoch: 40 + Math.random() * 64, delay: Math.round(60 + Math.random() * 420),
-          dur: Math.round(700 + Math.random() * 320), size: 3 + Math.round(Math.random() * 3), farbe: FARBEN[Math.floor(Math.random() * FARBEN.length)] };
+        return { dx: Math.round(w * 110), hoch: 80 + Math.random() * 190, delay: Math.round(40 + Math.random() * 520),
+          dur: Math.round(820 + Math.random() * 480), size: 4 + Math.round(Math.random() * 6), farbe: FARBEN[Math.floor(Math.random() * FARBEN.length)] };
       }), []);
+      const risse = useMemo(() => Array.from({ length: 7 }, (_, i) => ({ winkel: -80 + i * 27 + (Math.random() - .5) * 10, len: 44 + Math.random() * 40 })), []);
       return (
         <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
-          <div style={{ position: 'absolute', left: -62, top: 4, width: 124, height: 46, borderRadius: '50%',
-            background: 'radial-gradient(ellipse, rgba(246,227,24,.8) 0%, rgba(242,117,37,.65) 38%, rgba(201,46,38,.35) 62%, rgba(85,10,4,0) 78%)',
-            opacity: 0, animation: 'lvfPool 1300ms ease-out forwards' }} />
-          {strahlen.map((s, i) => (
-            <i key={'j' + i} style={{ position: 'absolute', left: s.left, top: 30 - s.h, width: 14, height: s.h, transformOrigin: '50% 100%',
-              clipPath: 'polygon(30% 100%, 0% 62%, 22% 30%, 50% 0%, 78% 30%, 100% 62%, 70% 100%)',
-              background: 'linear-gradient(to top, #C92E26 0%, #F27525 35%, #EEAF2E 65%, #F8F5B5 100%)',
-              boxShadow: '0 0 8px #F27525', opacity: 0, animation: `lvfJet ${s.dur}ms ease-out ${s.delay}ms forwards` }} />
+          <div style={{ position: 'absolute', left: -150, top: -230, width: 300, height: 300, borderRadius: '50%',
+            background: 'radial-gradient(circle, rgba(246,120,24,.5) 0%, rgba(201,46,38,.28) 45%, rgba(85,10,4,0) 72%)',
+            opacity: 0, animation: 'lvfHaze 1500ms ease-out forwards' }} />
+          <div style={{ position: 'absolute', left: -120, top: -4, width: 240, height: 84, borderRadius: '50%',
+            background: 'radial-gradient(ellipse, rgba(248,245,181,.95) 0%, rgba(246,227,24,.8) 22%, rgba(242,117,37,.7) 48%, rgba(201,46,38,.4) 68%, rgba(85,10,4,0) 80%)',
+            opacity: 0, animation: 'lvfPool 1600ms ease-out forwards' }} />
+          {risse.map((r, i) => (
+            <i key={'r' + i} style={{ position: 'absolute', left: 0, top: 36, width: r.len, height: 3, transformOrigin: '0 50%',
+              background: 'linear-gradient(to right, #F8F5B5, #F27525 55%, rgba(201,46,38,0))', boxShadow: '0 0 6px #F27525',
+              transform: `rotate(${r.winkel}deg) scaleX(0)`, opacity: 0, '--w': r.winkel + 'deg', animation: 'lvfCrack 1100ms ease-out 60ms forwards' }} />
           ))}
+          {strahlen.map((s, i) => (
+            <i key={'j' + i} style={{ position: 'absolute', left: s.left, top: 38 - s.h, width: s.w, height: s.h, transformOrigin: '50% 100%',
+              clipPath: 'polygon(32% 100%, 4% 70%, 20% 42%, 34% 22%, 50% 0%, 66% 22%, 80% 42%, 96% 70%, 68% 100%)',
+              background: 'linear-gradient(to top, #8a1a18 0%, #C92E26 14%, #F27525 40%, #EEAF2E 68%, #F8F5B5 100%)',
+              boxShadow: '0 0 14px #F27525', opacity: 0, animation: `lvfJet ${s.dur}ms cubic-bezier(.15,.8,.3,1) ${s.delay}ms forwards` }} />
+          ))}
+          <div style={{ position: 'absolute', left: -58, top: -226, width: 116, height: 70, borderRadius: '50%',
+            background: 'radial-gradient(ellipse, #F8F5B5 0%, #F6E318 28%, #F27525 58%, rgba(201,46,38,0) 78%)',
+            boxShadow: '0 0 22px #F27525', opacity: 0, animation: 'lvfCap 1100ms ease-out 260ms forwards' }} />
           {tropfen.map((d, i) => (
-            <b key={'t' + i} style={{ position: 'absolute', left: 0, top: 18, width: d.size, height: d.size, borderRadius: '50%',
-              background: d.farbe, boxShadow: `0 0 4px ${d.farbe}`, opacity: 0, '--dx': d.dx + 'px', '--hoch': -d.hoch + 'px',
+            <b key={'t' + i} style={{ position: 'absolute', left: 0, top: 30, width: d.size, height: d.size * 1.2, borderRadius: '50%',
+              background: d.farbe, boxShadow: `0 0 6px ${d.farbe}`, opacity: 0, '--dx': d.dx + 'px', '--hoch': -d.hoch + 'px',
               animation: `lvfDrop ${d.dur}ms cubic-bezier(.3,.7,.5,1) ${d.delay}ms forwards` }} />
           ))}
-          <div style={{ position: 'absolute', left: -50, top: 18, width: 100, height: 26, borderRadius: '50%',
-            border: '2px solid #EEAF2E', boxShadow: '0 0 10px #F27525', opacity: 0, animation: 'lvfRing 620ms ease-out 180ms forwards' }} />
+          {[0, 1].map(i => (
+            <div key={'q' + i} style={{ position: 'absolute', left: -86, top: 12, width: 172, height: 48, borderRadius: '50%',
+              border: `3px solid ${i ? '#F27525' : '#F6E318'}`, boxShadow: '0 0 14px #F27525', opacity: 0, animation: `lvfRing 760ms ease-out ${140 + i * 150}ms forwards` }} />
+          ))}
           <style>{`
-            @keyframes lvfPool { 0% { opacity: 0; transform: scale(.4); } 25% { opacity: 1; transform: scale(1); } 100% { opacity: 0; transform: scale(1.2); } }
-            @keyframes lvfJet { 0% { opacity: 0; transform: scaleY(.05); } 22% { opacity: 1; transform: scaleY(1); } 70% { opacity: 1; transform: scaleY(.9); } 100% { opacity: 0; transform: scaleY(.3); } }
-            @keyframes lvfDrop { 0% { opacity: 0; transform: translate(0, 0); } 12% { opacity: 1; } 55% { opacity: 1; transform: translate(calc(var(--dx) * .6), var(--hoch)); } 100% { opacity: 0; transform: translate(var(--dx), 26px); } }
-            @keyframes lvfRing { 0% { opacity: .9; transform: scale(.3); } 100% { opacity: 0; transform: scale(1.7); } }
+            @keyframes lvfHaze { 0% { opacity: 0; transform: scale(.5); } 30% { opacity: 1; transform: scale(1); } 100% { opacity: 0; transform: scale(1.25); } }
+            @keyframes lvfPool { 0% { opacity: 0; transform: scale(.3); } 22% { opacity: 1; transform: scale(1); } 100% { opacity: 0; transform: scale(1.25); } }
+            @keyframes lvfCrack { 0% { opacity: 0; transform: rotate(var(--w)) scaleX(0); } 25% { opacity: 1; transform: rotate(var(--w)) scaleX(1); } 100% { opacity: 0; transform: rotate(var(--w)) scaleX(1.1); } }
+            @keyframes lvfJet { 0% { opacity: 0; transform: scaleY(.04); } 20% { opacity: 1; transform: scaleY(1); } 60% { opacity: 1; transform: scaleY(.92) scaleX(1.08); } 100% { opacity: 0; transform: scaleY(.25) scaleX(.7); } }
+            @keyframes lvfCap { 0% { opacity: 0; transform: scale(.2); } 35% { opacity: 1; transform: scale(1.1); } 100% { opacity: 0; transform: scale(1.5) translateY(-16px); } }
+            @keyframes lvfDrop { 0% { opacity: 0; transform: translate(0, 0); } 10% { opacity: 1; } 52% { opacity: 1; transform: translate(calc(var(--dx) * .6), var(--hoch)); } 100% { opacity: 0; transform: translate(var(--dx), 34px); } }
+            @keyframes lvfRing { 0% { opacity: .95; transform: scale(.2); } 100% { opacity: 0; transform: scale(1.9); } }
           `}</style>
         </div>
       );
@@ -27165,6 +27185,15 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   // ── Chat & Action Log state ──
   const [actionLog, setActionLog] = useState([]);
   // Clear action log when a new game starts (rematch) to prevent ID collisions
+  // ★ The Fifth Circle: solange der Debuff (naechster Einzelschaden x2) steht, flackern alle Helden und Creatures
+  // des betroffenen Spielers langsam und leicht lila (Klassen am body, Regeln in style.css).
+  useEffect(() => {
+    const f = gameState.fifthCircle;
+    const seite = f ? (f.affected === myIdx ? 'me' : 'opp') : null;
+    document.body.classList.toggle('fifth-curse-me', seite === 'me');
+    document.body.classList.toggle('fifth-curse-opp', seite === 'opp');
+    return () => { document.body.classList.remove('fifth-curse-me', 'fifth-curse-opp'); };
+  }, [gameState.fifthCircle ? gameState.fifthCircle.affected : null, myIdx]);
   const prevMulliganRef = useRef(false);
   useEffect(() => {
     if (gameState.mulliganPending && !prevMulliganRef.current) {
