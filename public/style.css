@@ -7417,8 +7417,9 @@ body.pp-dragging-card.pp-dragging-card.pp-dragging-card * {
    tooltips. Auto-pointer so the hover-tooltip explains the discount. */
 .hand-cost-override {
   position: absolute;
-  left: 4px;
-  top: 4px;
+  /* Als Vorgabe 2.10.: rechts auf Hoehe des Level-Abzeichens (`.creature-level`), wo bei anderen Karten das verringerte Level steht */
+  right: 2px;
+  top: 45%;
   padding: 2px 5px;
   background: rgba(20, 30, 60, 0.92);
   border: 1px solid #44aaff;
