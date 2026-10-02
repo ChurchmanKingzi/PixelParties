@@ -24819,3 +24819,12 @@ body.summon-pick .board-zone:not(.zone-drag-valid):not(.board-zone-play-target) 
 
 /* Als Vorgabe 2.10.: die Handkarten (samt Hover-Zoom) liegen über den Trennlinien und Clustern der Handzeile. */
 .game-hand-me .game-hand-cards { z-index: 5; }
+
+/* Helden-Sprite ausgegraut, wenn seine Heldenzone ausgegraut ist (Als Vorgabe 2.10.). Filter nur auf Steher/Schatten/Effekte,
+   nicht auf Ebene und Platz (sie muessen das 3D behalten). */
+.hero-idle-platz.hero-idle-abgeblendet .hero-idle-steher {
+  filter: grayscale(.85) brightness(.5) drop-shadow(0 calc(1px * var(--board-scale)) 0 rgba(0,0,0,.6));
+  opacity: .55;
+}
+.hero-idle-platz.hero-idle-abgeblendet .hero-idle-schatten,
+.hero-idle-platz.hero-idle-abgeblendet .hero-idle-fx { opacity: .4; }
