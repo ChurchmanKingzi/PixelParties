@@ -20,9 +20,9 @@
 //    ruhig ist (am Zugbeginn/-ende sofort). „By an effect" ist keine Einschraenkung auf bestimmte
 //    Quellen — alles ausser der eigenen Rueckholung der Klausel.
 //  • „Have not played a deleted Area yet this turn": `ps._deletedAreaPlayedTurn`. Der Stempel
-//    wird beim BESTAETIGEN gesetzt (nicht erst beim Wirken): die Klausel loescht zuerst alle
-//    eigenen Areas, und eine dadurch geloeschte weitere Kreis-Karte soll nicht ihrerseits eine
-//    zweite Rueckholung im selben Zug anbieten.
+//    wird gesetzt, sobald es kein Zurueck mehr gibt (nach dem unumkehrbaren Loeschen der Areas, vor
+//    dem abbrechbaren Spiel-Dialog) und bei Abbruch des Dialogs wieder aufgehoben. Durch das Loeschen
+//    ausgeloeste Angebote anderer Kreise laufen erst danach (Warteschlange) und sehen den Endstand.
 //  • „Play as an additional Action": die Karte geht kurz aus dem Geloescht-Stapel auf die Hand
 //    und wird ueber die ECHTE Zusatzaktions-Abfrage (`performImmediateActionAnyHero`, nur dieser
 //    Zauber) gespielt — mit Wirker-Wahl, Schulpruefung, Kette. Wird die Abfrage abgebrochen oder
@@ -126,11 +126,16 @@ async function loeschenUndSpielen(engine, pi, name, opts = {}) {
   });
   if (!engine._confirmSaidYes(antwort)) return false;
 
-  ps._deletedAreaPlayedTurn = gs.turn;
+  // Die Sperre wird erst gesetzt, wenn es kein Zurueck mehr gibt, und bei Abbruch wieder aufgehoben:
+  // die Areas sind danach geloescht (nicht rueckgaengig), das Spielen selbst aber abbrechbar. Die durch
+  // die Loeschung ausgeloesten Angebote anderer Kreise laufen erst NACH dieser Funktion (Warteschlange)
+  // und sehen daher den endgueltigen Stand der Sperre.
+  const sperreVorher = ps._deletedAreaPlayedTurn;
   await alleEigenenAreasLoeschen(engine, pi, name);
 
   if (!(ps.deletedPile || []).includes(name)) return false;
   if (!(await aufHandLegen(engine, pi, 'deleted', name, name))) return false;
+  ps._deletedAreaPlayedTurn = gs.turn;   // ab hier nur noch der abbrechbare Spiel-Dialog
 
   const res = await engine.performImmediateActionAnyHero(pi, {
     title: name,
@@ -140,7 +145,10 @@ async function loeschenUndSpielen(engine, pi, name, opts = {}) {
     skipAbilities: true, skipHeroEffects: true,
     cancellable: true,
   });
-  if (!res?.played) zurueckInGeloescht(engine, pi, name);
+  if (!res?.played) {
+    zurueckInGeloescht(engine, pi, name);
+    ps._deletedAreaPlayedTurn = sperreVorher;   // abgebrochen: Sperre wieder aufheben
+  }
   engine.log('hell_circle_replayed', { player: ps.username, card: name, played: !!res?.played });
   engine.sync();
   return !!res?.played;

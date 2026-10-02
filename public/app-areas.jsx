@@ -48,7 +48,7 @@ const AREA_OVERLAYS = {
   'Graveyard of Limited Power':   { tier: 'opaque',      C: () => <GraveyardOfLimitedPowerOverlay /> },   // v1415: Kartenstil, ganze Szene
   'Paraseed Greenhouse':          { tier: 'opaque',      C: () => <ParaseedGreenhouseOverlay /> },   // v1415: Kartenstil, ganze Szene
   'The First Circle of Hell':     { tier: 'opaque',      C: () => <FirstCircleOfHellOverlay /> },   // v1440: Kartenstil (vorher translucent)
-  'The Second Circle of Hell':    { tier: 'opaque',      C: () => <HellCircleOverlay stufe={2} /> },   // Platzhalter-Szene (prozedural)
+  'The Second Circle of Hell':    { tier: 'opaque',      C: () => <SecondCircleOfHellOverlay /> },   // Pixelart (2.10.)
   'The Third Circle of Hell':    { tier: 'opaque',      C: () => <HellCircleOverlay stufe={3} /> },   // Platzhalter-Szene (prozedural)
   'The Fourth Circle of Hell':    { tier: 'opaque',      C: () => <HellCircleOverlay stufe={4} /> },   // Platzhalter-Szene (prozedural)
   'The Fifth Circle of Hell':    { tier: 'opaque',      C: () => <HellCircleOverlay stufe={5} /> },   // Platzhalter-Szene (prozedural)
@@ -5089,16 +5089,91 @@ const WowhallaOverlay = React.memo(function WowhallaOverlay() {
 });
 
 // ═══════════════════════════════════════════════════════════════════
+//  THE SECOND CIRCLE OF HELL — der Kreis der Wollust (Al 2.10.)
+//
+//  Karte: eine Felswand voller riesiger, starrender Augen mit Herzen darin; darauf stehen
+//  wunderschoene rosahaarige Frauen und schmachten, ebenfalls mit Herzen in den Augen.
+//  Palette nach dem Kartenbild: Violett-Toene, Pink, Grau-Weiss der Augenraender.
+//
+//  Ebenen (Kunsthoehe 100; per Generator gemalt, der nicht im Projekt liegt): tile.png — Kachel 128
+//  mit ZWEI Bildern untereinander (128×200): Ziegelwand mit Felsband (y 36), drei Reihen Augen
+//  (versetzt) und zweitem Felsband (y 73); Bild 2 = Herzschlag (groessere, hellere Herzen);
+//  girl.png — nahe Frauen (3 Bilder 12×20: stehen, Kopf links, Kopf rechts; 2 Varianten untereinander);
+//  girl-far.png — ferne Frauen auf dem oberen Felsband (3 Bilder 9×13, 2 Varianten);
+//  heart.png — aufsteigendes Herz (2 Bilder 7×5).
+// ═══════════════════════════════════════════════════════════════════
+const LC = '/areas/second-circle-of-hell/';
+const LC_NAH = { feet: 73, w: 12, h: 20, xs: [-84, -52, -18, 16, 50, 84] };
+const LC_FERN = { feet: 36, w: 9, h: 13, xs: [-92, -68, -44, -20, 4, 28, 52, 76, 100] };
+const SecondCircleOfHellOverlay = React.memo(function SecondCircleOfHellOverlay() {
+  const frauen = useMemo(() => {
+    const mach = (typ, art) => typ.xs.map((x, i) => ({
+      art, x, v: (i + (art === 'fern' ? 1 : 0)) % 2, dur: 6 + (i % 4) * 1.3, delay: -((i * 2.7) % 9),
+      w: typ.w, h: typ.h, feet: typ.feet,
+    }));
+    return [...mach(LC_FERN, 'fern'), ...mach(LC_NAH, 'nah')];
+  }, []);
+  const herzen = useMemo(() => ppZufall(ppFxN(9), (i) => {
+    const f = frauen[(i * 5 + 3) % frauen.length];
+    return { x: f.x + (Math.random() - .5) * 6, y: f.feet - f.h + 2, dur: 4 + Math.random() * 3, delay: -Math.random() * 7, f: i % 2 };
+  }), [frauen]);
+  return (
+    <PixelScene artH={100} bg="#1e0a2c" className="second-circle-overlay">
+      <PixelBand src={LC + 'tile.png'} className="lc-wand" style={{ backgroundSize: 'auto 200%', backgroundPosition: '0 0' }} />
+      <div className="lc-volk">
+        {frauen.map((f, i) => (
+          <i key={'f' + i} className="lc-frau" style={{
+            left: ppArtX(f.x - f.w / 2, 0), top: ppArt(f.feet - f.h + 3), width: ppArt(f.w), height: ppArt(f.h),
+            zIndex: f.feet, backgroundImage: `url(${LC}${f.art === 'fern' ? 'girl-far' : 'girl'}.png)`,
+            backgroundPositionY: f.v ? '100%' : '0%',
+            animation: `lcSchmachten ${f.dur}s steps(1) ${f.delay}s infinite`,
+          }} />
+        ))}
+        {herzen.map((h, i) => (
+          <i key={'h' + i} className="pp-area-dyn lc-herz" style={{
+            left: ppArtX(h.x - 3.5, 0), top: ppArt(h.y), backgroundPositionX: h.f ? '100%' : '0%',
+            animation: `lcHerz ${h.dur}s linear ${h.delay}s infinite`,
+          }} />
+        ))}
+      </div>
+      <div className="pp-rand-dim" />
+      <style>{`
+        .lc-wand { animation: lcPuls 3.4s steps(1) infinite; }
+        /* Herzschlag der Augen: Bild 2 kurz, dann wieder Bild 1 */
+        @keyframes lcPuls {
+          0%, 52% { background-position: 0 0; } 54%, 60% { background-position: 0 100%; }
+          62%, 66% { background-position: 0 0; } 68%, 76% { background-position: 0 100%; } 78%, 100% { background-position: 0 0; }
+        }
+        .lc-volk { position: absolute; inset: 0; }
+        .lc-frau { position: absolute; background-size: 300% 200%; background-repeat: no-repeat; background-position-x: 0%; }
+        /* Bilder: 0 stehen, 1 Kopf links, 2 Kopf rechts — sie wiegen sich */
+        @keyframes lcSchmachten {
+          0% { background-position-x: 0%; } 22% { background-position-x: 50%; } 38% { background-position-x: 0%; }
+          60% { background-position-x: 100%; } 78% { background-position-x: 0%; }
+        }
+        .lc-herz {
+          position: absolute; width: calc(7 * var(--px)); height: calc(5 * var(--px)); opacity: 0;
+          background: url(${LC}heart.png) 0 0 / 200% 100% no-repeat; z-index: 120;
+        }
+        @keyframes lcHerz {
+          0% { opacity: 0; transform: translateY(0); } 15% { opacity: .95; }
+          80% { opacity: .8; } 100% { opacity: 0; transform: translateY(calc(-14 * var(--px))); }
+        }
+      `}</style>
+    </PixelScene>
+  );
+});
+
+// ═══════════════════════════════════════════════════════════════════
 //  THE SECOND … EIGHTH CIRCLE OF HELL — Hintergruende (Platzhalter-Szenen)
 //
-//  Prozedurale Szenen im Stil des Ersten Kreises, bis echte Pixelart vorliegt: dunkler Farbverlauf,
+//  Prozedurale Platzhalter-Szenen fuer die Kreise 3–8, bis deren Pixelart vorliegt (der Zweite hat sie schon): dunkler Farbverlauf,
 //  eine Horizontlinie, aufsteigende Funken/Glut und ein kreis-spezifisches Motiv. Jeder Kreis hat
-//  seine eigene Farbwelt (Dante: 2 Wollust/Sturm, 3 Voellerei/Schlamm, 4 Geiz/Gold, 5 Zorn/Styx,
+//  seine eigene Farbwelt (Dante: 3 Voellerei/Schlamm, 4 Geiz/Gold, 5 Zorn/Styx,
 //  6 Ketzerei/Grabfeuer, 7 Gewalt/Blutfluss, 8 Betrug/Tinte). Wieder `pp-area-dyn` fuer alles Bewegte
 //  (faellt mit „keine Animationen" weg); eigene Keyframes im eigenen <style>.
 // ═══════════════════════════════════════════════════════════════════
 const HELL_KREISE = {
-  2: { himmel: ['#1d0f24', '#4b1d49', '#2a1030'], boden: '#14081a', glut: ['#ff9bd0', '#c76bff', '#ffd1ec'], motiv: 'sturm' },
   3: { himmel: ['#0f1a10', '#2d3a1c', '#1a2410'], boden: '#0b1209', glut: ['#a9c46a', '#6b8f3a', '#d6e59b'], motiv: 'regen' },
   4: { himmel: ['#1a1405', '#4a3a0c', '#2a2008'], boden: '#120d03', glut: ['#ffd24a', '#ffb000', '#fff0a0'], motiv: 'gold' },
   5: { himmel: ['#07161a', '#103b44', '#0a2328'], boden: '#04100f', glut: ['#58e0d0', '#2aa6a0', '#b5fff4'], motiv: 'blasen' },
@@ -5107,7 +5182,7 @@ const HELL_KREISE = {
   8: { himmel: ['#05060f', '#141a3a', '#0a0d24'], boden: '#030409', glut: ['#8fa4ff', '#4f63d6', '#d4dcff'], motiv: 'tinte' },
 };
 const HellCircleOverlay = React.memo(function HellCircleOverlay({ stufe }) {
-  const cfg = HELL_KREISE[stufe] || HELL_KREISE[2];
+  const cfg = HELL_KREISE[stufe] || HELL_KREISE[3];
   const funken = useMemo(() => ppZufall(ppFxN(26), (i) => ({
     x: Math.random() * 100, dur: 9 + Math.random() * 11, delay: -Math.random() * 20,
     size: 2 + Math.floor(Math.random() * 3), farbe: cfg.glut[i % cfg.glut.length], drift: (Math.random() - .5) * 18,
