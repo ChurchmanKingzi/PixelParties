@@ -8291,7 +8291,7 @@
     "hp": 400,
     "atk": 100,
     "cost": null,
-    "effect": "You may spend your Action to use an Attack or Spell from your deck with this Hero as if you played it from your hand, but if you do, that Attack or Spell cannot affect more than 1 target. This Hero can never perform more than 1 Action per turn.",
+    "effect": "You may spend your Action to use an Attack or Spell from your deck with this Hero as if you played it from your hand. This Hero can never perform more than 1 Action per turn.",
     "archetype": "",
     "setID": "PP MSRU",
     "banned": "",

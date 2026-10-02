@@ -8350,8 +8350,9 @@ Soldier, Wendy) brauchen ihn beim Bau.
 
 Hero, 400 HP / 100 ATK, Hunting + Hunting. Für die Aktion des Zuges eine
 Attack oder einen Spell AUS DEM DECK spielen, als käme die Karte von der
-Hand — die dann aber nur 1 Ziel treffen darf. Und: höchstens 1 Aktion je
-Zug.
+Hand. Und: höchstens 1 Aktion je Zug — ZUSATZAKTIONEN eingeschlossen.
+(Text geändert: die frühere Klausel „that Attack or Spell cannot affect
+more than 1 target" ist weggefallen.)
 
 **Aus dem Deck spielen** gibt es im Bestand sonst nirgends. Der Weg ist
 aus vorhandenen Stücken gebaut:
@@ -8382,18 +8383,23 @@ verschachtelte Auflösungen sich nicht gegenseitig freigeben.
 `promptEffectTarget` und `promptGeneric` lesen ihn und überschreiben
 `cancellable`. Hoch- und runterzählen gehört in ein `try/finally`.
 
-**`forcesSingleTargetAny` (neu)** — dieselbe Maschinerie wie Idas
-`forcesSingleTarget`, aber ohne die Beschränkung auf Destruction Spells.
-Beide Leser (`promptMultiTarget`, `actionAoeHit`) kennen jetzt beide
-Flaggen; Idas bleibt typgebunden. Die Flagge steht NUR während dieser
-einen Auflösung und wird im `finally` abgeräumt — auch nach Abbruch oder
-Fehler. Bliebe sie stehen, wären auch normal gespielte Karten des Helden
-einzelzielig.
+**`forcesSingleTargetAny` wird von Friedhelm nicht mehr gesetzt.** Die
+Engine-Leser (`promptMultiTarget`, `actionAoeHit`) kennen die Flagge
+weiterhin; die Karte nimmt sie nicht mehr in Anspruch, und gespielte
+AoE-Karten treffen normal alle Ziele.
 
-**„Can never perform more than 1 Action per turn"** ist ein vorhandener
-Engine-Vertrag: `hero._maxActionsPerTurn = 1` im `onGameStart`, gelesen
-an drei Stellen (Aktivierungslisten, Spielbarkeit, Sofortaktionen).
-Denselben Weg nimmt „Sol Rym, the Thunder Djinn".
+**„Can never perform more than 1 Action per turn" — Zusatzaktionen
+zählen mit.** Vorhandener Engine-Vertrag: `hero._maxActionsPerTurn = 1`
+im `onGameStart` (wie Sol Rym). Der Zähler `_actionsThisTurn` wird in
+`server.js` aber nur bei regulären Zügen erhöht; zusätzliche und
+inhärente Aktionen (Quick Attack, Aggressive Town Guard, …) liefen daran
+vorbei. Friedhelm lauscht deshalb auf **`onAnyActionResolved`** (feuert
+in JEDEM Aktionspfad) und setzt `_actionsThisTurn` auf mindestens 1, wenn
+die Aktion von IHM kam (`ctx.heroIdx === ctx.cardHeroIdx`, Brettseite über
+`heroOwner`). Danach sperren die vorhandenen Grenzprüfungen
+(Aktivierungslisten, Spielbarkeit, Sofortaktionen) alles Weitere — egal,
+ob die erste Aktion regulär, zusätzlich, von der Hand oder über seinen
+Heldeneffekt kam. Handlungen anderer Helden zählen nicht.
 
 **Zwei geratene APIs, beide vor dem Ausliefern gefunden:**
 `engine.canHeroPlayCard` existiert nicht (das ist eine CLIENT-Funktion) —
@@ -8414,9 +8420,8 @@ korrekter Form: `_cycling-demons-shared.js`
 (`entries.push({ name, source: 'discard' })`), Barker, Cloudy Slime.
 
 **AoE-Karten gehören ausdrücklich dazu** (Als Ruling 12.9.): sie werden
-angeboten und treffen dann — wie bei Ida — nur ein Ziel. Der Filter
-schließt sie deshalb NICHT aus; das erledigt
-`forcesSingleTargetAny` zur Auflösung.
+angeboten und treffen normal alle Ziele (frühere Einzelziel-Regel ist
+mit dem neuen Kartentext entfallen).
 
 
 ## Deck-Cast: Flug in die Ablage (v938, Als Befund 12.9.)
