@@ -51,7 +51,7 @@ const AREA_OVERLAYS = {
   'The Second Circle of Hell':    { tier: 'opaque',      C: () => <SecondCircleOfHellOverlay /> },   // Pixelart (2.10.)
   'The Third Circle of Hell':     { tier: 'opaque',      C: () => <ThirdCircleOfHellOverlay /> },   // Pixelart (2.10.)
   'The Fourth Circle of Hell':    { tier: 'opaque',      C: () => <FourthCircleOfHellOverlay /> },   // Pixelart (2.10.)
-  'The Fifth Circle of Hell':    { tier: 'opaque',      C: () => <HellCircleOverlay stufe={5} /> },   // Platzhalter-Szene (prozedural)
+  'The Fifth Circle of Hell':     { tier: 'opaque',      C: () => <FifthCircleOfHellOverlay /> },   // Pixelart (2.10.)
   'The Sixth Circle of Hell':    { tier: 'opaque',      C: () => <HellCircleOverlay stufe={6} /> },   // Platzhalter-Szene (prozedural)
   'The Seventh Circle of Hell':    { tier: 'opaque',      C: () => <HellCircleOverlay stufe={7} /> },   // Platzhalter-Szene (prozedural)
   'The Eighth Circle of Hell':    { tier: 'opaque',      C: () => <HellCircleOverlay stufe={8} /> },   // Platzhalter-Szene (prozedural)
@@ -5373,22 +5373,128 @@ const FourthCircleOfHellOverlay = React.memo(function FourthCircleOfHellOverlay(
 });
 
 // ═══════════════════════════════════════════════════════════════════
+//  THE FIFTH CIRCLE OF HELL — der Kreis des Zorns (Al 2.10.)
+//
+//  Karte: ein verbrannter, aschiger Backsteinraum; links und rechts schiessen riesige Feuerfontaenen
+//  auf, in der Mitte steht ein Abenteurer mit Flammenhaar, zusammengebissenen Zaehnen und wuetend
+//  gesenkten Brauen (dunkle Ruestung, roter Umhang, Guertelschnalle). Detailstandard (siehe CARD_API
+//  „Area-Pixelart-Standard"): Rampen + Dithering, Konturen, Kleindetails.
+//
+//  Ebenen (Kunsthoehe 100; per Generator gemalt, der nicht im Projekt liegt): back.png — Kachel 128:
+//  verkohlte Backsteine (Russ, Ascheflecken, glimmende Risse, Schein der Fontaenen), Ascheboden mit
+//  Glut; front.png — Ascheschutt, liegt UEBER den Figuren; fountain-a.png / fountain-b.png — Fontaenen
+//  (8 Bilder 30×64 / 22×48, aus mehreren schwankenden Zungen, periodisch); hairflame.png — Flammenhaar
+//  (8 Bilder 22×18); hero.png — Abenteurer (12 Bilder 26×36, siehe FI_FOLGE; 2 Varianten: roter Umhang,
+//  violetter Umhang); ember.png — Glutfunke (3 Bilder 3×3); ash.png — Aschflocke (3 Bilder 3×3).
+//  Links ausgerichtet; Fontaenen alle 64 Kunstpixel (x 16, 80, …), Figuren dazwischen (x 48, 112, …).
+//  ALLE Animationen teilen die Periode 12 s (Dauern 0,15/1,2/3/4/6/12 s) → nahtlose Schleife.
+// ═══════════════════════════════════════════════════════════════════
+const FII = '/areas/fifth-circle-of-hell/';
+// Abenteurer: 12 Bilder (0 knirscht, 1 schwer atmen, 2/3 Blick links/rechts, 4/5 Bruellen, 6 Faust, 7 beide Faeuste,
+// 8 droht, 9 Arme weit, 10 Blinzeln, 11 Umhang weht); 40 Schritte je Zyklus (6 s: 0,15 s je Bild).
+const FI_FOLGE = [0,0,1,1,0,0,2,2,0,3,3,0,4,5,4,5,4,0,0,6,7,7,6,0,8,8,9,9,0,0,10,0,11,11,0,0,1,1,0,0];
+const FI_BILDER = 12;
+const FI_KEYFRAMES = FI_FOLGE.map((b, i) => `${(i * 100 / FI_FOLGE.length).toFixed(3)}% { background-position-x: ${(b * 100 / (FI_BILDER - 1)).toFixed(3)}%; }`).join(' ');
+const FI_BREITE = 384;                                  // so weit werden Figuren/Fontaenen/Partikel verteilt (Kunstpixel)
+const FifthCircleOfHellOverlay = React.memo(function FifthCircleOfHellOverlay() {
+  const fontaenen = useMemo(() => Array.from({ length: Math.ceil(FI_BREITE / 64) }, (_, k) => ({
+    x: 16 + 64 * k, gross: k % 2 === 0, delay: -((k * 0.45) % 1.2),
+  })), []);
+  const helden = useMemo(() => Array.from({ length: Math.ceil(FI_BREITE / 64) }, (_, k) => ({
+    x: 48 + 64 * k, v: k % 2, delay: -((k * 1.7) % 6), flamme: -((k * 0.35) % 1.2),
+  })), []);
+  const funken = useMemo(() => Array.from({ length: 34 }, (_, i) => {
+    const dur = [3, 4, 6][i % 3];
+    return { x: 16 + 64 * (i % 6) + ((i * 7) % 24) - 12, y0: 62 - (i % 5) * 4, dur, k: i % 3, delay: -((i * 0.77) % dur), drift: ((i % 5) - 2) * 3 };
+  }), []);
+  const asche = useMemo(() => Array.from({ length: 26 }, (_, i) => {
+    const dur = [6, 12][i % 2];
+    return { x: ((i * 29) % FI_BREITE), k: i % 3, dur, delay: -((i * 1.9) % dur), drift: 8 + (i % 4) * 4 };
+  }), []);
+  return (
+    <PixelScene artH={100} bg="#140806" className="fifth-circle-overlay">
+      <PixelBand src={FII + 'back.png'} style={{ backgroundPosition: '0 0' }} />
+      <div className="fi-volk">
+        {fontaenen.map((f, i) => (
+          <React.Fragment key={'f' + i}>
+            <i className="pp-area-dyn fi-glut" style={{ left: ppArt(f.x - 30), animation: `fiGlut 3s ease-in-out ${f.delay}s infinite alternate` }} />
+            <i className={'fi-fontaene ' + (f.gross ? 'gross' : 'klein')} style={{
+              left: ppArt(f.x - (f.gross ? 15 : 11)), top: ppArt(f.gross ? 8 : 24),
+              animation: `${f.gross ? 'fiFontA' : 'fiFontB'} 1.2s steps(1) ${f.delay}s infinite`,
+            }} />
+          </React.Fragment>
+        ))}
+        {helden.map((h, i) => (
+          <React.Fragment key={'h' + i}>
+            <i className="fi-held" style={{
+              left: ppArt(h.x - 13), backgroundPositionY: h.v ? '100%' : '0%',
+              animation: `fiHeld 6s steps(1) ${h.delay}s infinite`,
+            }} />
+            <i className="fi-haar" style={{ left: ppArt(h.x - 11), animation: `fiHaar 1.2s steps(1) ${h.flamme}s infinite` }} />
+          </React.Fragment>
+        ))}
+        {funken.map((e, i) => (
+          <i key={'e' + i} className="pp-area-dyn fi-funke" style={{
+            left: ppArt(e.x), top: ppArt(e.y0), backgroundPositionX: (e.k * 50) + '%', '--dx': ppArt(e.drift),
+            animation: `fiFunke ${e.dur}s linear ${e.delay}s infinite`,
+          }} />
+        ))}
+      </div>
+      <PixelBand src={FII + 'front.png'} style={{ backgroundPosition: '0 0' }} />
+      <div className="fi-volk">
+        {asche.map((a, i) => (
+          <i key={'a' + i} className="pp-area-dyn fi-asche" style={{
+            left: ppArt(a.x), backgroundPositionX: (a.k * 50) + '%', '--dx': ppArt(a.drift),
+            animation: `fiAsche ${a.dur}s linear ${a.delay}s infinite`,
+          }} />
+        ))}
+      </div>
+      <div className="pp-rand-dim" />
+      <style>{`
+        .fi-volk { position: absolute; inset: 0; }
+        .fi-fontaene { position: absolute; }
+        .fi-fontaene.gross { width: calc(30 * var(--px)); height: calc(64 * var(--px)); background: url(${FII}fountain-a.png) 0 0 / 800% 100% no-repeat; }
+        .fi-fontaene.klein { width: calc(22 * var(--px)); height: calc(48 * var(--px)); background: url(${FII}fountain-b.png) 0 0 / 800% 100% no-repeat; }
+        @keyframes fiFontA { ${[0,1,2,3,4,5,6,7].map(b => `${(b * 12.5)}% { background-position-x: ${(b * 100 / 7).toFixed(3)}%; }`).join(' ')} }
+        @keyframes fiFontB { ${[0,1,2,3,4,5,6,7].map(b => `${(b * 12.5)}% { background-position-x: ${(b * 100 / 7).toFixed(3)}%; }`).join(' ')} }
+        /* Schein der Fontaenen: warmes Pulsieren */
+        .fi-glut { position: absolute; top: calc(10 * var(--px)); width: calc(60 * var(--px)); height: calc(80 * var(--px)); opacity: .5;
+          background: radial-gradient(ellipse at 50% 62%, rgba(255,160,50,.34), rgba(255,100,20,.14) 45%, rgba(255,80,10,0) 70%); }
+        @keyframes fiGlut { from { opacity: .35; } to { opacity: .8; } }
+        .fi-held { position: absolute; top: calc(42 * var(--px)); width: calc(26 * var(--px)); height: calc(36 * var(--px)); background: url(${FII}hero.png) 0 0 / ${FI_BILDER * 100}% 200% no-repeat; }
+        @keyframes fiHeld { ${FI_KEYFRAMES} }
+        .fi-haar { position: absolute; top: calc(30 * var(--px)); width: calc(22 * var(--px)); height: calc(18 * var(--px)); background: url(${FII}hairflame.png) 0 0 / 800% 100% no-repeat; }
+        @keyframes fiHaar { ${[0,1,2,3,4,5,6,7].map(b => `${(b * 12.5)}% { background-position-x: ${(b * 100 / 7).toFixed(3)}%; }`).join(' ')} }
+        .fi-funke { position: absolute; width: calc(3 * var(--px)); height: calc(3 * var(--px)); opacity: 0; background: url(${FII}ember.png) 0 0 / 300% 100% no-repeat; z-index: 5; }
+        @keyframes fiFunke {
+          0% { opacity: 0; transform: translate(0, 0); } 10% { opacity: 1; }
+          80% { opacity: .8; } 100% { opacity: 0; transform: translate(var(--dx), calc(-48 * var(--px))); }
+        }
+        .fi-asche { position: absolute; top: calc(-4 * var(--px)); width: calc(3 * var(--px)); height: calc(3 * var(--px)); opacity: 0; background: url(${FII}ash.png) 0 0 / 300% 100% no-repeat; }
+        @keyframes fiAsche {
+          0% { opacity: 0; transform: translate(0, 0); } 8% { opacity: .8; }
+          90% { opacity: .7; } 100% { opacity: 0; transform: translate(var(--dx), calc(98 * var(--px))); }
+        }
+      `}</style>
+    </PixelScene>
+  );
+});
+
+// ═══════════════════════════════════════════════════════════════════
 //  THE SECOND … EIGHTH CIRCLE OF HELL — Hintergruende (Platzhalter-Szenen)
 //
-//  Prozedurale Platzhalter-Szenen fuer die Kreise 5–8, bis deren Pixelart vorliegt (Zweiter bis Vierter haben sie schon): dunkler Farbverlauf,
+//  Prozedurale Platzhalter-Szenen fuer die Kreise 6–8, bis deren Pixelart vorliegt (Zweiter bis Fuenfter haben sie schon): dunkler Farbverlauf,
 //  eine Horizontlinie, aufsteigende Funken/Glut und ein kreis-spezifisches Motiv. Jeder Kreis hat
-//  seine eigene Farbwelt (Dante: 5 Zorn/Styx,
-//  6 Ketzerei/Grabfeuer, 7 Gewalt/Blutfluss, 8 Betrug/Tinte). Wieder `pp-area-dyn` fuer alles Bewegte
+//  seine eigene Farbwelt (Dante: 6 Ketzerei/Grabfeuer, 7 Gewalt/Blutfluss, 8 Betrug/Tinte). Wieder `pp-area-dyn` fuer alles Bewegte
 //  (faellt mit „keine Animationen" weg); eigene Keyframes im eigenen <style>.
 // ═══════════════════════════════════════════════════════════════════
 const HELL_KREISE = {
-  5: { himmel: ['#07161a', '#103b44', '#0a2328'], boden: '#04100f', glut: ['#58e0d0', '#2aa6a0', '#b5fff4'], motiv: 'blasen' },
   6: { himmel: ['#220b05', '#6a2208', '#3a1006'], boden: '#180703', glut: ['#ff8a2a', '#ff5a10', '#ffd27a'], motiv: 'feuer' },
   7: { himmel: ['#1d0406', '#5c0a12', '#33060b'], boden: '#140204', glut: ['#ff3a3a', '#c20f1a', '#ff9a9a'], motiv: 'blut' },
   8: { himmel: ['#05060f', '#141a3a', '#0a0d24'], boden: '#030409', glut: ['#8fa4ff', '#4f63d6', '#d4dcff'], motiv: 'tinte' },
 };
 const HellCircleOverlay = React.memo(function HellCircleOverlay({ stufe }) {
-  const cfg = HELL_KREISE[stufe] || HELL_KREISE[5];
+  const cfg = HELL_KREISE[stufe] || HELL_KREISE[6];
   const funken = useMemo(() => ppZufall(ppFxN(26), (i) => ({
     x: Math.random() * 100, dur: 9 + Math.random() * 11, delay: -Math.random() * 20,
     size: 2 + Math.floor(Math.random() * 3), farbe: cfg.glut[i % cfg.glut.length], drift: (Math.random() - .5) * 18,
