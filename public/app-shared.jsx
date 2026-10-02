@@ -4045,7 +4045,14 @@ function isDeckLegal(deck) {
     if (n !== CUBE_SIZE) reasons.push('Cube needs exactly ' + CUBE_SIZE + ' cards (' + n + '/' + CUBE_SIZE + ')');
     return { legal: reasons.length === 0, reasons };
   }
-  if ((deck.mainDeck || []).length !== 60) reasons.push('Main deck needs exactly 60 cards (' + (deck.mainDeck||[]).length + '/60)');
+  {
+    const mainMax = mainDeckMax(deck);
+    const mainN = (deck.mainDeck || []).length;
+    if (mainMax === 60 ? mainN !== 60 : (mainN < 60 || mainN > mainMax)) {
+      reasons.push(mainMax === 60 ? 'Main deck needs exactly 60 cards (' + mainN + '/60)'
+        : 'Main deck needs 60 to ' + mainMax + ' cards (' + mainN + ')');
+    }
+  }
   const filledHeroes = (deck.heroes || []).filter(h => h && h.hero);
   const heroSoll = requiredHeroCount(deck);
   if (filledHeroes.length !== heroSoll) {
@@ -4121,6 +4128,28 @@ const SACRED_JEWEL = 'The Sacred Jewel';
 function hasSacredJewelArtifactBonus(deck) {
   return countInDeck(deck, SACRED_JEWEL) >= 4;
 }
+
+// „The Sacred Blade": „If you have 4 copies of this card in your deck, your
+// deck may contain 5 copies of every Attack, Spell and Creature." — Gegenstueck
+// zum Sacred Jewel (Artifacts) und Cecilia (Attacks, Spells, Artifacts).
+const SACRED_BLADE = 'The Sacred Blade';
+const SACRED_BLADE_TYPES = new Set(['Attack', 'Spell', 'Creature']);
+function hasSacredBladeBonus(deck) {
+  return countInDeck(deck, SACRED_BLADE) >= 4;
+}
+
+// „The Sacred Mirror": „If you have 4 copies of this card in your deck, your
+// deck may contain up to 80 cards." — das Main Deck darf dann 60 bis 80 Karten
+// haben (sonst genau 60). Cube-Decks haben ihre eigene Groesse.
+const SACRED_MIRROR = 'The Sacred Mirror';
+function hasSacredMirrorBonus(deck) {
+  return countInDeck(deck, SACRED_MIRROR) >= 4;
+}
+function mainDeckMax(deck) {
+  if (isCubeDeck(deck)) return CUBE_SIZE;
+  return hasSacredMirrorBonus(deck) ? 80 : 60;
+}
+window.mainDeckMax = mainDeckMax;
 
 // "Cecilia, the Harrowing Crusader": *"When you play this Hero, you may
 // play up to 5 copies of any Attacks, Spells and Artifacts in your
@@ -4362,6 +4391,7 @@ function getCardMax(deck, cardName) {
   let max = 4;
   if (ct === 'Artifact' && hasSacredJewelArtifactBonus(deck)) max = Math.max(max, 5);
   if (CECILIA_TYPES.has(ct) && hasCeciliaCopyBonus(deck)) max = Math.max(max, 5);
+  if (SACRED_BLADE_TYPES.has(ct) && hasSacredBladeBonus(deck)) max = Math.max(max, 5);
   return max;
 }
 
@@ -4389,7 +4419,7 @@ function canAddCard(deck, cardName, section) {
     // slot still caps at 1 of each Hero (handled in the 'hero'
     // branch below), so global cap stays at 5 (1 team + 4 main).
     if (ct === 'Hero') {
-      if ((deck.mainDeck || []).length >= 60) return false;
+      if ((deck.mainDeck || []).length >= mainDeckMax(deck)) return false;
       const inMain = (deck.mainDeck || []).filter(n => sameCopyFamily(n, cardName)).length;
       if (inMain >= 4) return false;
       if (countInDeck(deck, cardName) >= effMax) return false;
@@ -4404,12 +4434,12 @@ function canAddCard(deck, cardName, section) {
       // im Main Deck liegt, tut das.
       const ueberGewuerz = countInMainDeck(deck, cardName) < spiceMainDeckAllowance(deck, cardName);
       if (!ueberGewuerz && !hasNicolasHero(deck)) return false;
-      if ((deck.mainDeck || []).length >= 60) return false;
+      if ((deck.mainDeck || []).length >= mainDeckMax(deck)) return false;
       if (!ueberGewuerz && countedPotions(deck) >= 15) return false;
       if (countInDeck(deck, cardName) >= effMax) return false;
       return true;
     }
-    if ((deck.mainDeck || []).length >= 60) return false;
+    if ((deck.mainDeck || []).length >= mainDeckMax(deck)) return false;
     if (effMax === Infinity) return true;
     if (countInDeck(deck, cardName) >= effMax) return false;
     return true;
@@ -4513,6 +4543,12 @@ function trimOverLimitCopies(deck) {
       }
       if (count <= max) break;
     }
+  }
+  // ── Groesse des Main Decks (Sacred Mirror) ─────────────────────
+  // Faellt der Spiegel unter 4 Kopien, sind nur noch 60 Karten erlaubt: der Ueberhang wird von hinten gekappt.
+  if (!isCubeDeck(out)) {
+    const grenze = mainDeckMax(out);
+    if (out.mainDeck.length > grenze) out.mainDeck.length = grenze;
   }
   // ── Gewuerz-Plaetze im MAIN Deck (v948) ─────────────────────────
   // Faellt ein „Secret Spice" (oder Zamorin) aus dem Deck, verlieren

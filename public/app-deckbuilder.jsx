@@ -1229,7 +1229,7 @@ function DeckBuilder() {
     return items.slice(0, capacity);
   };
   const buildDeckDisplay = (section, cards) => {
-    const cap = SECTION_CAP[section] || 60;
+    const cap = section === 'main' ? Math.max(60, (window.mainDeckMax ? window.mainDeckMax(currentDeck) : 60)) : (SECTION_CAP[section] || 60);
     const baseItems = () => padToCapacity(
       cards.map((c, i) => ({ card: c, origIdx: i, isGap: false, isEmpty: false })), cap
     );
@@ -1755,7 +1755,7 @@ function DeckBuilder() {
 
             {/* ── MAIN DECK ── */}
             <DropSection sectionId="main" onDrop={(d, mx, my) => handleDrop('main', d, mx, my)} onDragPos={onGalleryDragPos} className="deck-section">
-              <SecHeader sec="main" color="#44aaff" icon="📋" label="MAIN DECK" count={(currentDeck?.mainDeck||[]).length} max={60}
+              <SecHeader sec="main" color="#44aaff" icon="📋" label="MAIN DECK" count={(currentDeck?.mainDeck||[]).length} max={window.mainDeckMax ? window.mainDeckMax(currentDeck) : 60}
                 extra={<><TipBtn tip="Shuffle" className="btn" style={{ padding:'2px 6px', fontSize:8 }} onClick={shuffleMain}>🔀</TipBtn><TipBtn tip="Sort" className="btn" style={{ padding:'2px 6px', fontSize:8 }} onClick={() => sortSec('main')}>↕</TipBtn></>} />
               <div className={'deck-section-body' + (handHighlight ? ' hand-veil' : '')} data-deck-section="main">
                 {buildDeckDisplay('main', currentDeck?.mainDeck || []).map((item, idx) => {

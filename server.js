@@ -2300,7 +2300,7 @@ app.get('/api/profile/deck-stats', authMiddleware, async (req, res) => {
     const heroes = JSON.parse(d.heroes || '[]').filter(h => h && h.hero);
     const potions = JSON.parse(d.potion_deck || '[]');
     const pc = potions.length;
-    const mainOk = main.length === 60;
+    const mainOk = mainDeckSizeOk(main, JSON.parse(d.side_deck || '[]'));
     const heroOk = heldenzahlOk(heroes);   // v1167: Zhigao-Aufstellung hat zwei
     const potionOk = potionDeckGroesseOk(heroes, pc);
     const legal = mainOk && heroOk && potionOk;
@@ -2625,6 +2625,13 @@ function loadCampaignDeck(slug) {
   catch (err) { console.error('[Campaign] Deck', clean, 'unlesbar:', err.message); return null; }
 }
 
+// „The Sacred Mirror": mit 4 Kopien im Deck darf das Main Deck bis zu 80 Karten haben (sonst genau 60) —
+// Gegenstueck zu `mainDeckMax` in app-shared.jsx.
+function mainDeckSizeOk(main, side) {
+  const spiegel = [...(main || []), ...(side || [])].filter(n => n === 'The Sacred Mirror').length;
+  return spiegel >= 4 ? (main.length >= 60 && main.length <= 80) : main.length === 60;
+}
+
 function campaignDeckLegal(deck) {
   if (!deck) return false;
   if ((deck.mainDeck || []).length !== 60) return false;
@@ -2863,7 +2870,7 @@ function isCustomDeckRowLegal(row) {
     const heroes = JSON.parse(row.heroes || '[]').filter(h => h && h.hero);
     const potions = JSON.parse(row.potion_deck || '[]');
     const pc = potions.length;
-    return main.length === 60 && heldenzahlOk(heroes) && potionDeckGroesseOk(heroes, pc);   // v1167
+    return mainDeckSizeOk(main, JSON.parse(row.side_deck || '[]')) && heldenzahlOk(heroes) && potionDeckGroesseOk(heroes, pc);   // v1167
   } catch { return false; }
 }
 
@@ -15301,6 +15308,8 @@ io.on('connection', (socket) => {
       const scr = room.engine._loadCardEffect
         ? room.engine._loadCardEffect(inst.name)
         : require('./cards/effects/_loader').loadCardEffect(inst.name);
+      // Stowaway: „unaffected by all other cards and effects" gilt auch bei Puzzle-Start-Platzierung.
+      if (scr?.unaffectedByOthers) { inst.counters = inst.counters || {}; inst.counters._cardinalImmune = true; }
       const statusName = scr?.attachmentStatus;
       const buffName = scr?.attachmentBuff;
       if (!statusName && !buffName) continue;

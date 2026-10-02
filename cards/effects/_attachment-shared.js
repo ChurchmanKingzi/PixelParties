@@ -346,7 +346,7 @@ function anhaengselStatusHooks(CARD_NAME, STATUS_NAME, optionen = {}) {
         if (kopie.zone !== 'support') continue;
         engine.log('status_remove', { target: kopie.name, status: 'attachment', by: STATUS_NAME });
         // ★★ v1143b: sichtbar — der EINE Brett→Ablage-Weg mit Flug.
-        await engine.sendBoardCardToDiscard(kopie, { source: { name: STATUS_NAME } });
+        await engine.anhaengselAbraeumen(kopie, { name: STATUS_NAME });
       }
       engine.sync();
     };
