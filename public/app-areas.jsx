@@ -5276,7 +5276,7 @@ const ThirdCircleOfHellOverlay = React.memo(function ThirdCircleOfHellOverlay() 
 //  Wand, Hort-Boden, ferne und mittlere Reihe (Truhen, Saecke, Muenzhaufen); front.png — vorderste
 //  Reihe, liegt UEBER den Figuren (deren Beine verschwinden im Gold); hero.png — Abenteurer (12 Bilder
 //  26×36, siehe FC_FOLGE; 2 Varianten: goldblond/rot, rotblond/gruen); coin-fall.png — brennende
-//  Muenzen (3 Laengen je 9×36); spark.png — Einschlagfunken (4 Bilder 9×7); sparkle.png — Glitzerkreuz
+//  Muenzen (3 Laengen × 4 Flackerbilder je 13×36; Spur entgegen der Flugrichtung nach rechts unten); spark.png — Einschlagfunken (4 Bilder 9×7); sparkle.png — Glitzerkreuz
 //  (4 Bilder 5×5). Links ausgerichtet (Positionen in Kunstpixeln vom linken Rand).
 //  ALLE Animationen teilen die Periode 12 s (Dauern 3/4/6/12 s) → nahtlose Schleife.
 // ═══════════════════════════════════════════════════════════════════
@@ -5292,7 +5292,7 @@ const FourthCircleOfHellOverlay = React.memo(function FourthCircleOfHellOverlay(
   })), []);
   const hagel = useMemo(() => Array.from({ length: 30 }, (_, i) => {
     const dur = [3, 4, 6][i % 3];
-    return { x: 6 + ((i * 13.7) % 380), k: (i * 5) % 3, dur, delay: -((i * 0.83) % dur) };
+    return { x: -10 + ((i * 13.7) % 380), k: (i * 5) % 3, dur, delay: -((i * 0.83) % dur), flackern: -((i * 0.13) % 0.4) };
   }), []);
   const glitzer = useMemo(() => Array.from({ length: 22 }, (_, i) => {
     const dur = [3, 4, 6, 12][i % 4];
@@ -5306,11 +5306,11 @@ const FourthCircleOfHellOverlay = React.memo(function FourthCircleOfHellOverlay(
         {hagel.map((h, i) => (
           <React.Fragment key={'h' + i}>
             <i className="pp-area-dyn fc4-muenze" style={{
-              left: ppArt(h.x), backgroundPositionX: (h.k * 50) + '%',
-              animation: `fc4Fall ${h.dur}s linear ${h.delay}s infinite`,
+              left: ppArt(h.x), '--k': h.k,
+              animation: `fc4Fall ${h.dur}s linear ${h.delay}s infinite, fc4Schweif 0.4s steps(1) ${h.flackern}s infinite`,
             }} />
             <i className="pp-area-dyn fc4-funke" style={{
-              left: ppArt(h.x - 2), animation: `fc4Funke ${h.dur}s steps(1) ${h.delay}s infinite`,
+              left: ppArt(h.x + 9 + 16 - 4), animation: `fc4Funke ${h.dur}s steps(1) ${h.delay}s infinite`,
             }} />
           </React.Fragment>
         ))}
@@ -5339,13 +5339,18 @@ const FourthCircleOfHellOverlay = React.memo(function FourthCircleOfHellOverlay(
         }
         @keyframes fc4Puls { from { opacity: .55; } to { opacity: 1; } }
         .fc4-muenze {
-          position: absolute; top: calc(-36 * var(--px)); width: calc(9 * var(--px)); height: calc(36 * var(--px)); opacity: 0;
-          background: url(${FCI}coin-fall.png) 0 0 / 300% 100% no-repeat;
+          position: absolute; top: calc(-36 * var(--px)); width: calc(13 * var(--px)); height: calc(36 * var(--px)); opacity: 0;
+          background: url(${FCI}coin-fall.png) 0 0 / 1200% 100% no-repeat;
         }
-        /* Fall bis zur Oberkante des Horts (y 46), dort verschwindet die Muenze im Gold */
+        /* Flug nach rechts unten, parallel zur Flammenspur (Steigung 1:5: 16 px quer auf 80 px Fall) bis zur Oberkante
+           des Horts (y 46), dort verschwindet die Muenze im Gold. Die Spur flackert (4 Bilder je Laenge, --k = Laenge). */
         @keyframes fc4Fall {
-          0% { opacity: 0; transform: translateY(0); } 4% { opacity: 1; }
-          90% { opacity: 1; transform: translateY(calc(80 * var(--px))); } 100% { opacity: 0; transform: translateY(calc(84 * var(--px))); }
+          0% { opacity: 0; transform: translate(0, 0); } 4% { opacity: 1; }
+          90% { opacity: 1; transform: translate(calc(16 * var(--px)), calc(80 * var(--px))); } 100% { opacity: 0; transform: translate(calc(16.8 * var(--px)), calc(84 * var(--px))); }
+        }
+        @keyframes fc4Schweif {
+          0% { background-position-x: calc((var(--k) * 4) * 9.0909%); } 25% { background-position-x: calc((var(--k) * 4 + 1) * 9.0909%); }
+          50% { background-position-x: calc((var(--k) * 4 + 2) * 9.0909%); } 75% { background-position-x: calc((var(--k) * 4 + 3) * 9.0909%); }
         }
         .fc4-funke {
           position: absolute; top: calc(42 * var(--px)); width: calc(9 * var(--px)); height: calc(7 * var(--px)); opacity: 0;
