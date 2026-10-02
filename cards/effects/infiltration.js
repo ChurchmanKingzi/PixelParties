@@ -134,16 +134,16 @@ async function _activateLv2or3(engine, gs, pi, oi, ps, ops, level) {
   });
   await engine._delay(700);
 
-  // Strip the peekCount cards off the top, then re-bottom the
-  // un-picked ones in their original (top-first) order. The card
-  // text says "any order" — preserving deck order is the natural
-  // default; an explicit ordering prompt would be added if a
-  // future card actually needs control here.
+  // Strip the peekCount cards off the top, then re-bottom the un-picked ones.
   if ((await engine.takeTop(ops, peekCount, { source: CARD_NAME })).length !== peekCount) return;   // v820: Stapel-Schicht
-  for (let i = 0; i < peeked.length; i++) {
-    if (i === pickedIdx) continue;
-    ops.mainDeck.push(peeked[i]);
-  }
+  // „in any order": bleiben 2+ Karten uebrig, ordnet der Spieler sie in EINEM Scry-Dialog (`promptDeckReorder`); die
+  // erste Karte liegt am dichtesten am Rest des Decks. Die Karten sind dem Gegner unbekannt — Fluege nur fuer den Spieler.
+  const uebrig = peeked.filter((_, i) => i !== pickedIdx);
+  const { top: unten } = await engine.promptDeckReorder(pi, oi, uebrig, {
+    title: CARD_NAME,
+    description: `Drag the remaining ${uebrig.length} cards into the order you want to place them at the BOTTOM of ${ops.username}'s deck. Position 1 sits closest to the rest of their deck.`,
+  });
+  for (const name of unten) ops.mainDeck.push(name);
 
   // Add the picked card to our hand.
   await engine.handZugang(ps, pickedName, { von: 'fremdesDeck', source: CARD_NAME });   // v1396: aus dem GEGNERISCHEN Deck — keine Suche, nicht „from your deck“ (Als Ruling 25.9.)

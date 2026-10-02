@@ -187,40 +187,12 @@ module.exports = {
       return true;
     }
 
-    // Multiple cards → opp picks the order top-down, one card per
-    // prompt. Position 1 = drawn next. The last card has no choice and
-    // is placed automatically.
-    const orderedTopFirst = [];
-    const pool = stripped.slice();
-    while (pool.length > 1) {
-      const slotNum = orderedTopFirst.length + 1;
-      const choice = await engine.promptGeneric(oi, {
-        type: 'cardGallery',
-        cards: pool.map(name => ({ name, source: 'deck' })),
-        title: CARD_NAME,
-        description: `Choose which card sits at position ${slotNum} of ${stripped.length} on top of your deck (position 1 is drawn next).`,
-        confirmLabel: '📚 Place',
-        confirmClass: 'btn-info',
-        cancellable: false,
-      });
-      if (!choice?.cardName) {
-        // Defensive: opp somehow declined a non-cancellable prompt.
-        // Fall back to current pool order so the deck doesn't lose
-        // cards.
-        orderedTopFirst.push(...pool);
-        pool.length = 0;
-        break;
-      }
-      const idx = pool.indexOf(choice.cardName);
-      if (idx < 0) {
-        orderedTopFirst.push(...pool);
-        pool.length = 0;
-        break;
-      }
-      orderedTopFirst.push(pool[idx]);
-      pool.splice(idx, 1);
-    }
-    if (pool.length === 1) orderedTopFirst.push(pool[0]);
+    // Multiple cards → opp orders them in ONE scry dialog (`engine.promptDeckReorder`: drag & drop, confirm, inverse flights
+    // back onto the deck; the cards are public, so both players see the flights). Position 1 = drawn next.
+    const { top: orderedTopFirst } = await engine.promptDeckReorder(oi, oi, stripped, {
+      title: CARD_NAME, publicFlights: true,
+      description: `${ps.username} took 2 cards. Drag the remaining ${stripped.length} cards into the order you want to put them back on top of your deck. Position 1 (left) is drawn next.`,
+    });
 
     // Place ordered cards on top of opp's deck — orderedTopFirst[0]
     // becomes mainDeck[0] (drawn next). unshift in reverse so the

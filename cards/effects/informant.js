@@ -109,69 +109,18 @@ module.exports = {
       return false;
     }
 
-    // ── 2) Karten fuer OBEN waehlen (Reihenfolge = Klickreihenfolge) ─
-    let oben = [];
-    if (entnommen.length === 1) {
-      // Eine Karte: nur noch oben oder unten — eine Ja/Nein-Frage.
-      const rauf = await engine.promptGeneric(pi, {
-        type: 'confirm',
-        title: CARD_NAME,
-        showCard: entnommen[0],
-        message: `Place "${entnommen[0]}" on TOP of ${ops.username}'s deck? (No = bottom)`,
-        confirmLabel: '⬆️ Top', cancelLabel: '⬇️ Bottom',
-        cancellable: true,
-      });
-      oben = rauf ? [entnommen[0]] : [];
-    } else {
-      const wahl = await engine.promptGeneric(pi, {
-        type: 'cardGalleryMulti',
-        cards: entnommen.map((name, i) => ({ name, source: 'deck', _idx: i })),
-        title: CARD_NAME,
-        description: `Top ${entnommen.length} of ${ops.username}'s deck. Pick the cards to put back on TOP — in the order they will be drawn (first pick is drawn next). Everything you leave unpicked goes to the BOTTOM.`,
-        minSelect: 0,
-        // `selectCount` ist der Name, den der Galerie-Prompt fuehrt
-        // (v864); `maxSelect` steht als Zweitname daneben, damit die
-        // Absicht auch ohne Blick in den Client lesbar bleibt.
-        selectCount: entnommen.length,
-        maxSelect: entnommen.length,
-        confirmLabel: '⬆️ Place on top',
-        cancellable: false,
-      });
-      oben = Array.isArray(wahl?.selectedIndices)
-        ? wahl.selectedIndices.map(i => entnommen[i]).filter(Boolean)
-        : (wahl?.selectedCards || []).slice();
-    }
-
-    // Rest = unten. Ueber eine ZAEHLLISTE abziehen, damit gleichnamige
-    // Karten richtig aufgeteilt werden (zwei „Fireball" im Fenster: eine
-    // oben, eine unten).
-    const rest = entnommen.slice();
-    for (const name of oben) {
-      const i = rest.indexOf(name);
-      if (i >= 0) rest.splice(i, 1);
-    }
-
-    // ── 3) Reihenfolge fuer UNTEN, nur wenn es dort etwas zu ordnen gibt
-    let unten = rest;
-    if (rest.length > 1) {
-      const wahl = await engine.promptGeneric(pi, {
-        type: 'cardGalleryMulti',
-        cards: rest.map((name, i) => ({ name, source: 'deck', _idx: i })),
-        title: CARD_NAME,
-        description: `These go to the BOTTOM of ${ops.username}'s deck. Pick them in the order they should sit — first pick ends up closest to the rest of the deck (drawn first of this group).`,
-        minSelect: rest.length,
-        selectCount: rest.length,
-        maxSelect: rest.length,
-        confirmLabel: '⬇️ Place on bottom',
-        cancellable: false,
-      });
-      const sortiert = Array.isArray(wahl?.selectedIndices)
-        ? wahl.selectedIndices.map(i => rest[i]).filter(Boolean)
-        : (wahl?.selectedCards || []);
-      // Defensiv: kam nichts Brauchbares zurueck, bleibt die
-      // urspruengliche Reihenfolge — es darf keine Karte verloren gehen.
-      unten = (sortiert.length === rest.length) ? sortiert : rest;
-    }
+    // ── 2)+3) EIN Scry-Dialog (`engine.promptDeckReorder` mit Trennmarke) ──────────────────────────────
+    // Die Karten stehen in einer Reihe, dazu eine Trennmarke: alles DAVOR kommt oben aufs Deck (links = als naechstes
+    // gezogen), alles DAHINTER unten (die erste Karte hinter der Marke liegt am dichtesten am Rest des Decks). Per Drag & Drop
+    // umsortieren und zwischen den Gruppen verschieben; danach fliegen die Karten sichtbar (beiden Spielern) aufs Deck.
+    const gruppen = await engine.promptDeckReorder(pi, oi, entnommen, {
+      title: CARD_NAME, publicFlights: true, splitMarker: true,
+      splitLabel: 'Cards after this marker go to the BOTTOM',
+      description: `Top ${entnommen.length} of ${ops.username}'s deck. Drag the cards into the order you want. Cards BEFORE the marker go on TOP (position 1 is drawn next), cards AFTER it go to the BOTTOM.`,
+      confirmLabel: '✔ Place',
+    });
+    const oben = gruppen.top;
+    const unten = gruppen.bottom;
 
     // ── 4) Einsortieren ─────────────────────────────────────────────
     // Oben: rueckwaerts per unshift, damit die ZUERST gewaehlte Karte

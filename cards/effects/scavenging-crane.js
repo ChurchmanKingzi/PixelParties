@@ -45,26 +45,12 @@ module.exports = {
       const n = Math.min(ANZAHL, (ps.mainDeck || []).length);
       if (n > 1) {
         const oben = ps.mainDeck.slice(0, n);
-        // Ein Dialog: die Karten stehen in einer Reihe (links = Platz 1 = als naechstes gezogen), der Spieler sortiert per
-        // Drag & Drop um und bestaetigt. Antwort `{ order: [urspruengliche Indizes in neuer Reihenfolge] }`.
-        const wahl = await engine.promptGeneric(pi, {
-          type: 'cardReorder',
-          cards: oben.map(name => ({ name, source: 'deck' })),   // jede Karte einzeln, Duplikate nicht zusammenfassen
-          title: CARD_NAME, source: CARD_NAME,
+        // Ein Dialog (`engine.promptDeckReorder`): Drag & Drop, Confirm, danach fliegen die Karten (nur fuer den Spieler sichtbar)
+        // in INVERSER Reihenfolge aufs Deck.
+        const { top: geordnet } = await engine.promptDeckReorder(pi, pi, oben, {
+          title: CARD_NAME,
           description: 'Drag the cards into the order you want to put them back on your deck. Position 1 (left) is drawn next.',
-          confirmLabel: '✔ Confirm',
-          cancellable: false,
         });
-        let reihenfolge = Array.isArray(wahl?.order) ? wahl.order.filter(k => Number.isInteger(k) && k >= 0 && k < n) : [];
-        if (new Set(reihenfolge).size !== n) reihenfolge = oben.map((_, k) => k);   // ungueltige Antwort: Reihenfolge belassen
-        const geordnet = reihenfolge.map(k => oben[k]);
-        // Sichtbar zurueck aufs Deck: in INVERSER Reihenfolge (5, 4, 3, 2, zuletzt 1) — nur der Spieler sieht die Karten.
-        for (let k = geordnet.length - 1; k >= 0; k--) {
-          engine._broadcastEvent('play_pile_transfer', {
-            owner: pi, cardName: geordnet[k], from: 'boardCenter', to: 'deck', sfx: 'placement',
-          }, { toPlayers: [pi] });
-          await engine._delay(380);
-        }
         engine.reorderDeck(pi, geordnet, { source: CARD_NAME });
       }
       engine.log('scavenging_crane_look', { player: ps.username, count: n });

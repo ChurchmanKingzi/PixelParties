@@ -25071,7 +25071,9 @@ function PileSearchModal({ title, cards, onClose, preserveOrder = false, ownerLe
 // ═══════════════════════════════════════════
 function CardReorderPrompt({ ep, onRespond }) {
   const cards = ep.cards || [];
-  const [order, setOrder] = useState(() => cards.map((_, i) => i));
+  // `ep.splitMarker`: eine Trennmarke (-1) liegt mit in der Reihe — Karten davor kommen OBEN aufs Deck, dahinter UNTEN (Informant).
+  const [order, setOrder] = useState(() => cards.map((_, i) => i).concat(ep.splitMarker ? [-1] : []));
+  const markerPos = order.indexOf(-1);
   // Ziehen per POINTER-Ereignissen statt HTML5-Drag (Als Befund 2.10.: das native Ziehen kam gegen das Verschieben
   // der Box nicht an): ein Geisterbild folgt dem Zeiger, beim Loslassen ueber einer anderen Karte werden BEIDE VERTAUSCHT.
   const [drag, setDrag] = useState(null);   // { pos, x, y, over }
@@ -25142,6 +25144,9 @@ function CardReorderPrompt({ ep, onRespond }) {
             const card = entry ? CARDS_BY_NAME[entry.name] : null;
             const ziel = !!drag && drag.over === pos && drag.pos !== pos;
             const gezogen = !!drag && drag.pos === pos;
+            const istMarke = ci === -1;
+            const inUnten = markerPos >= 0 && pos > markerPos;
+            const gruppenNr = markerPos >= 0 ? (inUnten ? pos - markerPos : pos + 1) : pos + 1;
             return (
               <div key={ci} ref={el => { slotRefs.current[pos] = el; }}
                 onPointerDown={(e) => start(e, pos)}
@@ -25152,19 +25157,39 @@ function CardReorderPrompt({ ep, onRespond }) {
                   cursor: drag ? 'grabbing' : 'grab', opacity: gezogen ? 0.35 : 1, touchAction: 'none', userSelect: 'none',
                   transform: ziel ? 'translateY(-6px) scale(1.05)' : 'none', transition: 'transform .12s',
                 }}>
-                <div style={{
-                  minWidth: 26, textAlign: 'center', padding: '2px 8px', borderRadius: 10, fontSize: 13, fontWeight: 800,
-                  background: pos === 0 ? 'var(--accent)' : 'rgba(255,255,255,.12)', color: pos === 0 ? '#001018' : 'var(--text)',
-                  border: '1px solid rgba(255,255,255,.25)',
-                }}>{pos + 1}</div>
-                <div style={{
-                  width: 104, height: 146, borderRadius: 6, overflow: 'hidden', pointerEvents: 'none',
-                  boxShadow: ziel ? '0 0 0 3px var(--accent), 0 0 16px rgba(120,220,255,.8)' : '0 2px 8px rgba(0,0,0,.5)',
-                }}>
-                  {card ? <CardMini card={card} style={{ width: '100%', height: '100%' }} />
-                    : <div style={{ padding: 6, fontSize: 11 }}>{entry?.name}</div>}
-                </div>
-                <div style={{ fontSize: 10, color: 'var(--text2)', minHeight: 12 }}>{pos === 0 ? 'drawn next' : ''}</div>
+                {istMarke ? (
+                  <>
+                    <div style={{ minWidth: 26, minHeight: 22 }} />
+                    <div style={{
+                      width: 104, height: 146, borderRadius: 6, pointerEvents: 'none', boxSizing: 'border-box',
+                      border: '2px dashed var(--accent)', display: 'flex', flexDirection: 'column', alignItems: 'center',
+                      justifyContent: 'center', gap: 8, textAlign: 'center', padding: 6, fontSize: 12, fontWeight: 800,
+                      color: 'var(--accent)', background: 'rgba(120,220,255,.07)',
+                      boxShadow: ziel ? '0 0 0 3px var(--accent), 0 0 16px rgba(120,220,255,.8)' : 'none',
+                    }}>
+                      <div style={{ fontSize: 22 }}>⇅</div>
+                      <div>{ep.splitLabel || 'Cards after this marker go to the BOTTOM'}</div>
+                    </div>
+                    <div style={{ fontSize: 10, color: 'var(--text2)', minHeight: 12 }}>drag me</div>
+                  </>
+                ) : (
+                  <>
+                    <div style={{
+                      minWidth: 26, textAlign: 'center', padding: '2px 8px', borderRadius: 10, fontSize: 13, fontWeight: 800,
+                      background: pos === 0 ? 'var(--accent)' : 'rgba(255,255,255,.12)', color: pos === 0 ? '#001018' : 'var(--text)',
+                      border: '1px solid rgba(255,255,255,.25)',
+                    }}>{markerPos >= 0 ? (inUnten ? '⬇ ' : '⬆ ') + gruppenNr : gruppenNr}</div>
+                    <div style={{
+                      width: 104, height: 146, borderRadius: 6, overflow: 'hidden', pointerEvents: 'none',
+                      boxShadow: ziel ? '0 0 0 3px var(--accent), 0 0 16px rgba(120,220,255,.8)' : '0 2px 8px rgba(0,0,0,.5)',
+                      opacity: inUnten ? 0.8 : 1,
+                    }}>
+                      {card ? <CardMini card={card} style={{ width: '100%', height: '100%' }} />
+                        : <div style={{ padding: 6, fontSize: 11 }}>{entry?.name}</div>}
+                    </div>
+                    <div style={{ fontSize: 10, color: 'var(--text2)', minHeight: 12 }}>{pos === 0 ? 'drawn next' : ''}</div>
+                  </>
+                )}
                 <div style={{ display: 'flex', gap: 6 }} onPointerDown={(e) => e.stopPropagation()}>
                   <button className="btn" disabled={pos === 0} style={{ padding: '1px 8px', fontSize: 11 }}
                     onClick={() => verschiebe(pos, pos - 1)}>◀</button>

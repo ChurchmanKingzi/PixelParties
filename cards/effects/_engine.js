@@ -1746,6 +1746,11 @@ class GameEngine {
     // forever because the hand size never shrinks.
     const promptPi = promptedPlayerIdx != null ? promptedPlayerIdx : this._cpuPlayerIdx;
 
+    // Umsortier-Dialog (`promptDeckReorder`): die CPU belaesst die Reihenfolge (bei Trennmarke: alles oben).
+    if (promptData.type === 'cardReorder') {
+      return { order: (promptData.cards || []).map((_, k) => k).concat(promptData.splitMarker ? [-1] : []) };
+    }
+
     // ── Card-specific handler (extensible per-card CPU logic) ──
     const cardName = promptData.title || promptData.source;
     if (cardName) {
@@ -18477,6 +18482,52 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (ps.deckTopVisible && ps.deckTopVisible.length > 0) ps.deckTopVisible.length = 0;
     this.log('deck_reordered', { player: ps.username, top: top.length, by: opts.source || null });
     return true;
+  }
+
+  /**
+   * Einheitlicher Scry-/Umsortier-Dialog (Scavenging Crane, Enigma, Informant, Infiltration, Premonition): der Spieler
+   * `promptPi` ordnet die Karten `names` (top-first) per Drag & Drop (`cardReorder`), bestaetigt, und die Karten fliegen
+   * sichtbar in INVERSER Reihenfolge (letzte zuerst) zurueck aufs Deck von `deckOwner`.
+   *
+   * Mit `opts.splitMarker` liegt eine Trennmarke in der Reihe: Karten davor kommen OBEN, dahinter UNTEN
+   * (Informant); Rueckgabe dann `{ top, bottom }`, sonst `{ top: geordnet, bottom: [] }`.
+   * `opts.publicFlights`: die Fluege sehen BEIDE Spieler (oeffentliche Karten), sonst nur `promptPi`.
+   * Die Funktion bewegt KEINE Karten im Spielzustand — der Aufrufer legt sie selbst ab (`reorderDeck`, `unshift`, `push`).
+   */
+  async promptDeckReorder(promptPi, deckOwner, names, opts = {}) {
+    const n = names.length;
+    if (n === 0) return { top: [], bottom: [] };
+    if (n === 1 && !opts.splitMarker) return { top: names.slice(), bottom: [] };
+    const wahl = await this.promptGeneric(promptPi, {
+      type: 'cardReorder',
+      cards: names.map(name => ({ name, source: 'deck' })),   // jede Karte einzeln, Duplikate nicht zusammenfassen
+      title: opts.title || 'Reorder', source: opts.title || undefined,
+      description: opts.description || 'Drag the cards into the order you want. Position 1 is drawn next.',
+      confirmLabel: opts.confirmLabel || '✔ Confirm',
+      splitMarker: !!opts.splitMarker, splitLabel: opts.splitLabel,
+      cancellable: false,
+    });
+    let reihenfolge = Array.isArray(wahl?.order) ? wahl.order.filter(k => Number.isInteger(k)) : [];
+    const sollLaenge = n + (opts.splitMarker ? 1 : 0);
+    const gueltig = reihenfolge.length === sollLaenge
+      && new Set(reihenfolge).size === sollLaenge
+      && reihenfolge.every(k => (k >= 0 && k < n) || (opts.splitMarker && k === -1));
+    if (!gueltig) reihenfolge = names.map((_, k) => k).concat(opts.splitMarker ? [-1] : []);   // ungueltig: belassen (Marke am Ende = alles oben)
+    const marke = reihenfolge.indexOf(-1);
+    const geordnet = reihenfolge.filter(k => k >= 0).map(k => names[k]);
+    const top = marke >= 0 ? reihenfolge.slice(0, marke).map(k => names[k]) : geordnet;
+    const bottom = marke >= 0 ? reihenfolge.slice(marke + 1).map(k => names[k]) : [];
+    // Fluege: erst die untere Gruppe (letzte zuerst), dann die obere in inverser Reihenfolge — die oberste Karte landet zuletzt.
+    const flug = [...bottom.slice().reverse(), ...top.slice().reverse()];
+    if (!this._fastMode) {
+      for (const cardName of flug) {
+        this._broadcastEvent('play_pile_transfer', {
+          owner: deckOwner, cardName, from: 'boardCenter', to: 'deck', sfx: 'placement',
+        }, opts.publicFlights ? undefined : { toPlayers: [promptPi] });
+        await this._delay(380);
+      }
+    }
+    return { top, bottom };
   }
 
   /**
