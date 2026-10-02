@@ -1,14 +1,15 @@
-# Promo-GIFs
+# Promo-Clips
 
-Echtes Footage aus dem laufenden Simulator (lokaler Server, Headless-Chromium, 1600×900 aufgenommen, als GIF skaliert).
+Echtes Footage aus dem laufenden Simulator (lokaler Server, Headless-Chromium, 1600×900 aufgenommen).
+Jeder Clip ist als GIF (640 px) und als MP4 (1280 px, deutlich schärfer und kleiner) vorhanden.
+Die Clips sind an Zuggrenzen geschnitten, ungekürzt und in Echtzeit.
 
 | Datei | Modus | Inhalt |
 |---|---|---|
-| `battle_spells.gif` | CPU vs. CPU (Zuschauer) | Zauber (Heavy Hit, Snow Cannon), Blitz-/Eis-Effekte, Schadenszahlen |
-| `battle_flames.gif` | CPU vs. CPU (Zuschauer) | Boom Boom Kaboom vs. Hellfire Battery, Feuer-Effekte, Zugwechsel |
-| `vscpu_start.gif` | VS CPU | Gegnerwahl, „You go second“, Mulligan |
-| `vscpu_hand.gif` | VS CPU | Eigene Hand, Karten-Tooltips |
-| `vscpu_opponent_turn.gif` | VS CPU | Gegnerzug mit Karteneffekten |
-| `deckbuilder.gif` | Deck-Editor | Starter-Deck, Kartendatenbank mit Tooltips |
-| `shop_skins.gif` | Shop | Skins mit Hero-Tooltips |
-| `shop_tabs.gif` | Shop | Avatare, Sleeves, Gegner-Sleeves, Boards |
+| `battle_round_1` | CPU vs. CPU (Zuschauer) | Komplette Runde (Hellfire Battery + Boom Boom Kaboom): Zauber, Blitz-/Eis-Effekte, Schaden |
+| `battle_round_2` | CPU vs. CPU (Zuschauer) | Weitere komplette Runde, Feuer-Effekte |
+| `vscpu_1_start` | VS CPU | Gegnerwahl, „You go second“, Mulligan, erster Gegnerzug |
+| `vscpu_2_my_turn` | VS CPU | Eigener Zug: Hand mit Tooltips, Board, Zug beenden |
+| `vscpu_3_opponent_turn` | VS CPU | Kompletter Gegnerzug mit Karteneffekten bis „Your turn!“ |
+| `deckbuilder` | Deck-Editor | Starter-Deck laden, Karten ansehen, Datenbank durchblättern und suchen |
+| `shop` | Shop | Skins, Avatare, Sleeves, Gegner-Sleeves, Boards |
