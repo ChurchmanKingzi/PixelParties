@@ -70,27 +70,40 @@ module.exports = {
     if (!engine._confirmSaidYes(antwort)) return;
     ps._thirdCircleTurn = gs.turn;
 
-    // ① Oberste Karten zeigen (vom Deck genommen, bis sie gespielt/geloescht sind).
-    let gezeigt = [];
+    // ① Oberste Karten zeigen — Karte fuer Karte (wie die Mills): vom Deck nehmen → Mitte → Geloescht-Stapel;
+    // jede Karte LANDET am Ende IHRER Animation im Stapel. `revealMs` gilt je Karte; der Server wartet die
+    // ganze Folge ab, sonst laufen Loeschung und die Angebote der anderen Kreise der Animation davon.
+    // Area-Zauber bleiben bis zur Wahl (③) in der Schwebe: sie liegen erst nach ③ im Stapel (bzw. werden gespielt).
+    const db = engine._getCardDB();
+    const aufdeckMs = 1100;
+    let gezeigt = [];            // die noch offenen Karten (Area-Zauber)
+    let genommenAnz = 0, geloeschtAnz = 0;
+    engine._geloeschtVerfolgen(pi);
     for (let i = 0; i < ANZAHL && ps.mainDeck.length > 0; i++) {
       const genommen = engine.takeFromPileSync(pi, 'deck', 0, { source: CARD_NAME });
       if (!genommen) break;
       if (ps.deckTopVisible && ps.deckTopVisible.length > 0) ps.deckTopVisible.shift();
-      gezeigt = [...gezeigt, genommen.name];
+      genommenAnz++;
+      const name = genommen.name;
+      const offen = istAreaZauber(db[name]);
+      if (!offen && loadCardEffect(name)?.beforeDelete
+          && await engine._tryBeforeDelete(name, pi, { fromZone: 'deck', source: CARD_NAME })) {
+        engine.log('delete_rescued', { player: ps.username, card: name, source: CARD_NAME });
+        continue;                                    // gerettet: fliegt nicht zum Stapel
+      }
+      engine._broadcastEvent('mill_center_reveal', { owner: pi, cardNames: [name], deleteMode: true, revealMs: aufdeckMs });
+      engine.sync();
+      await engine._delay(aufdeckMs);
+      if (offen) gezeigt.push(name);
+      else { ps.deletedPile.push(name); geloeschtAnz++; engine.sync(); }
     }
-    if (gezeigt.length === 0) return;
-    // `revealMs` gilt JE KARTE: der Client deckt sie nacheinander auf (wie bei den Mills). Der Server wartet die
-    // GANZE Folge ab, sonst laufen Loeschung und die Angebote der anderen Kreise der Animation davon.
-    const aufdeckMs = 1100;
-    engine._broadcastEvent('mill_center_reveal', { owner: pi, cardNames: gezeigt, deleteMode: true, revealMs: aufdeckMs });
-    engine.sync();
-    await engine._delay(gezeigt.length * aufdeckMs + 150);
+    if (genommenAnz === 0) return;
+    await engine._delay(150);
 
     // ② Alle eigenen Areas loeschen.
     await alleEigenenAreasLoeschen(engine, pi, CARD_NAME);
 
     // ③ Area-Zauber waehlen und als Zusatzaktion spielen.
-    const db = engine._getCardDB();
     const kandidaten = [...new Set(gezeigt.filter(n => istAreaZauber(db[n])))];
     let gespielt = null;
     if (kandidaten.length > 0) {
@@ -136,8 +149,8 @@ module.exports = {
     // ④ Den Rest loeschen.
     // Der Flug „Deck → Mitte → Geloescht-Stapel" lief schon beim Aufdecken (`deleteMode`); hier nur noch den
     // Zustand nachziehen — KEIN zweiter Flug vom Deck.
-    if (gezeigt.length > 0) await restOhneFlugLoeschen(engine, pi, gezeigt);
-    engine.log('third_circle', { player: ps.username, revealed: ANZAHL, played: gespielt, deleted: gezeigt.length });
+    if (gezeigt.length > 0) { await restOhneFlugLoeschen(engine, pi, gezeigt); geloeschtAnz += gezeigt.length; }
+    engine.log('third_circle', { player: ps.username, revealed: genommenAnz, played: gespielt, deleted: geloeschtAnz });
     engine.sync();
   },
 
