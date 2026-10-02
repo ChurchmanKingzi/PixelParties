@@ -24751,3 +24751,18 @@ body.fifth-curse-opp [data-support-zone].zone-has-card[data-support-owner="opp"]
 :root.no-animations body.fifth-curse-me [data-support-zone],
 :root.no-animations body.fifth-curse-opp [data-hero-zone],
 :root.no-animations body.fifth-curse-opp [data-support-zone] { animation: none; }
+
+/* ★ Groessere Hover-Flaeche fuer Abzeichen (Als Wunsch 2.10.): ein unsichtbarer Rand von 4 px um jedes Status-/Buff-
+   Abzeichen — auch die Pixel knapp ausserhalb des Kreises zeigen den Tooltip. Das Pseudo-Element gehoert zum Abzeichen,
+   ein Eintritt dort zaehlt als Hover des Abzeichens. */
+.status-badge,
+.buff-icon { position: relative; }
+.status-badge::before,
+.buff-icon::before {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  border-radius: 50%;
+  background: transparent;
+  pointer-events: auto;
+}
