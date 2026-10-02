@@ -18733,3 +18733,5 @@ Pflasterwand (`back.png`) mit violettem Strudelportal (`portal.png`, 24 Bilder, 
 fließen nach unten, 6 s) und Glut. Panorama 256 breit, mittig. Farben aus der Kartenvorlage.
 
 - **Puzzle-Start und „wenn gelöscht"-Angebote (Circles of Hell):** Der Puzzle-Start (`createPuzzleGame` in `server.js`) umgeht `startTurn`; `_runPostChainActions()` wird dort deshalb nach dem `onTurnStart`-Hook eigens aufgerufen, sonst blieben durch den Zugbeginn ausgelöste Löschungen (z. B. The First Circle of Hell leert die Ablage) bis zur ersten Aktion in der Warteschlange.
+
+- **Vorrang in der Lösch-Warteschlange:** The Third Circle of Hell und alles, was während seiner Auflösung in den Gelöscht-Stapel kommt (Areas, die es löscht; die übrigen aufgedeckten Karten), wird vor den schon wartenden „wenn gelöscht"-Angeboten abgearbeitet (`_geloeschtMeldung`: Einträge mit `vorrang`, `engine._laufenderVorrang` vererbt den Vorrang auf Folge-Löschungen; Reihenfolge innerhalb des Vorrangs bleibt). Andere frisch gelöschte Kreise (z. B. durch The First Circle) feuern erst danach.
