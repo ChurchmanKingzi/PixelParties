@@ -67,6 +67,9 @@ function spielbareDeckkarten(engine, pi, heroIdx, feld = pi) {
     const skript = loadCardEffect(name);
     // Karten mit Pro-Kopie-Gate (canPlayFromHandIdx) sind nur von der Hand spielbar.
     if (typeof skript?.canPlayFromHandIdx === 'function') continue;
+    // Karten, die aus der Hand nichts bewirken (`neverPlayable`: Reaction-/Coolness-Karten, Startblatt-Zauber wie
+    // Grasp the Future) lassen sich auch aus dem Deck nicht „spielen".
+    if (skript?.neverPlayable) continue;
     // Schul- und Stufenpruefung wie beim Handspiel. Ohne sie bietet die
     // Karte Zuege an, die `validateActionPlay` danach ablehnt — und die
     // Karte waere aus dem Deck heraus und die Aktion weg.

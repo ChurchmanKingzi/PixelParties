@@ -21,6 +21,8 @@
 const CARD_NAME = 'Glimpse of the Future';
 
 module.exports = {
+  // Wirkt nur im Startblatt-Fenster; aus der Hand gespielt tut die Karte nichts → ausgegraut und fuer Friedhelm & Co. nicht waehlbar.
+  neverPlayable: true,
   /** CPU: das Angebot annehmen. */
   cpuResponse(engine, kind, promptData) {
     if (kind !== 'generic' || promptData?.title !== CARD_NAME) return undefined;

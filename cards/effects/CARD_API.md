@@ -8377,7 +8377,10 @@ Sperren: die Galerie filtert zusätzlich mit
 andere Quelle als die Hand; sonst unverändert) — `spellPlayCondition`,
 Einmal-pro-Spiel, Attack/Spell-Sperren, Pflichtziel. Karten mit
 Pro-Kopie-Gate (`canPlayFromHandIdx`) sind nur von der Hand spielbar und
-fehlen in der Galerie.
+fehlen in der Galerie. Ebenso Skripte mit **`neverPlayable`** (wirken aus
+der Hand nicht) — dazu tragen jetzt auch „Grasp the Future" und „Glimpse
+of the Future" das Flag (reine Startblatt-Zauber; aus der Hand sind sie
+damit ausgegraut, das Startblatt-Fenster ist davon unberührt).
 
 **Kein Umweg über die Hand, kein zweiter Dialog** (Als Vorgabe 12.9.).
 Der erste Anlauf legte die Karte auf die Hand und rief

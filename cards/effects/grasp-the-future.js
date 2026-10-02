@@ -22,6 +22,8 @@ const { skipIfSearchBlocked } = require('./_search-shared');
 const CARD_NAME = 'Grasp the Future';
 
 module.exports = {
+  // Wirkt nur im Startblatt-Fenster; aus der Hand gespielt tut die Karte nichts → ausgegraut und fuer Friedhelm & Co. nicht waehlbar.
+  neverPlayable: true,
   /** CPU: Angebot annehmen und die erste passende Handkarte waehlen. */
   cpuResponse(engine, kind, promptData) {
     if (kind !== 'generic' || promptData?.title !== CARD_NAME) return undefined;
