@@ -18877,6 +18877,9 @@ this._deathWatch = (this._deathWatchStack || []).length
       }
       // Spells/Attacks with custom play conditions
       if (script?.spellPlayCondition && !script.spellPlayCondition(this.gs, playerIdx, this)) continue;
+      // Per-Hero-Gate der KARTE (Lesson in the Arts, Living Illusion) gilt auch fuer geschenkte Zusatzaktionen.
+      if (script?.canPlayWithHero && !this._mitWirker(playerIdx, heroIdx, fremd ? hs : null,
+          () => script.canPlayWithHero(this.gs, playerIdx, heroIdx, cd, this))) continue;
       seen.add(cardName);
       eligible.push(cardName);
     }

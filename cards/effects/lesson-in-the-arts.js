@@ -11,11 +11,15 @@
 //  • Zusaetzliche Anlage (`skipAbilityGivenCheck`): verbraucht das Anlegen des Helden NICHT; die Zielzone
 //    folgt `abilityZielZone` (Stapel bis Level 3, verwahrte/versiegelte Zonen). Auch Magic Arts ueber
 //    Level 3 hinaus gibt es nicht — passt keine Kopie mehr, endet die Auswahl.
+//  • Per-Hero-Gate `canPlayWithHero`: Helden ohne Platz fuer Magic Arts (Zonen voll, Stapel auf Lv3) sind keine legalen
+//    Nutzer (Client graut sie aus, der Server lehnt sie ab).
 //  • Spielbar nur mit mindestens 1 Magic Arts auf Hand/Deck UND einem Nutzer, der es aufnehmen kann.
 //  • Deck-Kopien laufen als Durchgang ueber die Hand (`handZugangSync` von 'transit') in die kanonische
 //    Anlegeroutine; wurde aus dem Deck genommen, wird es am Ende einmal gemischt.
 //  • „Immediately end your turn afterwards": `gs._spellEndsTurn = true` (Zug-Ende-Schutz greift, wie Premonition).
 // ═══════════════════════════════════════════
+
+const { heldSeite } = require('./_hooks');
 
 const CARD_NAME = 'Lesson in the Arts';
 const ABILITY = 'Magic Arts';
@@ -31,6 +35,14 @@ function kopien(ps, quelle) {
 }
 
 module.exports = {
+
+  /** Per-Hero-Gate: nur Helden, die noch eine Kopie Magic Arts aufnehmen koennen (freie Zone / Stapel < Lv3), sind legale Nutzer. */
+  canPlayWithHero(gs, pi, heroIdx, cd, engine) {
+    const hs = heldSeite(gs, pi, heroIdx);
+    const hero = gs.players[hs]?.heroes?.[heroIdx];
+    if (!hero?.name || hero.hp <= 0) return false;
+    return !engine || kannAufnehmen(engine, hs, heroIdx);
+  },
 
   spellPlayCondition(gs, pi, engine) {
     const ps = gs.players[pi];
