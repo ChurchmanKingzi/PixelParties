@@ -5586,7 +5586,7 @@ const SixthCircleOfHellOverlay = React.memo(function SixthCircleOfHellOverlay() 
 //  seitlich fort. Farben aus der Kartenvorlage.
 //
 //  Ebenen (Kunsthoehe 100; Generator ausserhalb des Projekts): back.png — Pflasterkachel 128; statue.png —
-//  Statue (256, Wasserlinie y 76); lava.png — See (8 Bilder 128×26, periodisch, 4 s; Kacheln im Gleichtakt) ueber
+//  Statue (256, Wasserlinie y 76); lava.png — See (24 Bilder 128×26, periodisch, 4 s; Kacheln im Gleichtakt) ueber
 //  der Statue; bank.png — Felsufer/Felsen VOR dem See (256); hero.png (12 Bilder, 2 Varianten, wie Sixth Circle);
 //  eyes.png (4 Bilder 30×5, pulsierende Augen); blood.png (4 Bilder 7×42, Blutrinnsale mit laufenden Wellen);
 //  mist-a/-b.png (Nebelkacheln 128×40, driften waagerecht, 12 s bzw. 6 s je Kachelbreite); bubble.png (Lavablase,
@@ -5638,8 +5638,8 @@ const SeventhCircleOfHellOverlay = React.memo(function SeventhCircleOfHellOverla
       <div className="pp-rand-dim" />
       <style>{`
         .sv-volk { position: absolute; inset: 0; }
-        .sv-see { position: absolute; top: calc(${SV_LAVA - 2} * var(--px)); width: calc(128 * var(--px)); height: calc(26 * var(--px)); background: url(${SVX}lava.png) 0 0 / 800% 100% no-repeat; }
-        @keyframes svSee { ${sxReihe(8)} }
+        .sv-see { position: absolute; top: calc(${SV_LAVA - 2} * var(--px)); width: calc(128 * var(--px)); height: calc(26 * var(--px)); background: url(${SVX}lava.png) 0 0 / 2400% 100% no-repeat; }
+        @keyframes svSee { ${sxReihe(24)} }
         .sv-held { position: absolute; top: calc(${SV_LAVA - 36} * var(--px)); width: calc(26 * var(--px)); height: calc(36 * var(--px)); background: url(${SVX}hero.png) 0 0 / ${12 * 100}% 200% no-repeat; }
         @keyframes svHeld { ${sxFolge(SX_HELD, 12)} }
         .sv-augen { position: absolute; top: calc(31 * var(--px)); width: calc(30 * var(--px)); height: calc(5 * var(--px)); background: url(${SVX}eyes.png) 0 0 / 400% 100% no-repeat; }
