@@ -37,6 +37,9 @@ module.exports = {
       const anzahl = (ps?.deletedPile || []).length + (weg.nachZone === 'deleted' ? 1 : 0);
       if (anzahl <= 0) return;
       await engine.showTriggeredEffect(CARD_NAME, { playerIdx: pi });
+      // Goldrausch aus der Area-Zone (Animation + Muenzklang)
+      engine._broadcastEvent('play_zone_animation', { type: 'hell_coins', owner: pi, zoneType: 'area', heroIdx: -1, zoneSlot: -1 });
+      await engine._delay(350);
       await engine.actionGainGold(pi, anzahl, { source: CARD_NAME });
       engine.log('fourth_circle_gold', { player: ps.username, gold: anzahl });
       engine.sync();

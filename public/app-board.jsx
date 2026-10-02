@@ -15549,6 +15549,153 @@ const ANIM_REGISTRY = {
   wind: WindEffect,
   shadow_summon: ShadowSummonEffect,
   gold_sparkle: GoldSparkleEffect,
+  // ── Circles of Hell (Animationen) ──────────────────────────────────
+  // Farben aus den Pixelart-Hintergruenden der Kreise (Flammen #F8F5B5 … #550A04).
+  // ★ The Sixth Circle: Hoellen-Charme — blutrote Siegelringe, aufsteigende Schlieren, dunkler Blitz.
+  hell_charm: (() => {
+    return function HellCharmEffect({ x, y }) {
+      const schlieren = useMemo(() => Array.from({ length: ppFxN(10) }, (_, i) => ({
+        left: Math.round((i - 4.5) * 9 + (Math.random() - .5) * 6), delay: Math.round(Math.random() * 420),
+        dur: Math.round(780 + Math.random() * 360), h: 26 + Math.random() * 26,
+        farbe: ['#C92E26', '#8a1a18', '#a02ca8', '#F27525'][i % 4],
+      })), []);
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+          <div style={{ position: 'absolute', left: -60, top: -60, width: 120, height: 120, borderRadius: '50%',
+            background: 'radial-gradient(circle, rgba(201,46,38,.7) 0%, rgba(90,10,40,.45) 50%, rgba(20,0,20,0) 72%)',
+            opacity: 0, animation: 'hcCharmFlash 1100ms ease-out forwards' }} />
+          {[0, 1].map(i => (
+            <div key={'r' + i} style={{ position: 'absolute', left: -42, top: -42, width: 84, height: 84, borderRadius: '50%',
+              border: `2px ${i ? 'dashed' : 'solid'} ${i ? '#F27525' : '#C92E26'}`, boxShadow: '0 0 10px #C92E26',
+              opacity: 0, animation: `hcCharmRing 1000ms ease-out ${i * 200}ms forwards` }} />
+          ))}
+          {schlieren.map((d, i) => (
+            <i key={'s' + i} style={{ position: 'absolute', left: d.left, top: 24, width: 3, height: d.h, borderRadius: 2,
+              background: `linear-gradient(to top, ${d.farbe}, rgba(0,0,0,0))`, opacity: 0,
+              animation: `hcCharmWisp ${d.dur}ms ease-out ${d.delay}ms forwards` }} />
+          ))}
+          <style>{`
+            @keyframes hcCharmFlash { 0% { opacity: 0; transform: scale(.4); } 30% { opacity: 1; transform: scale(1); } 100% { opacity: 0; transform: scale(1.5); } }
+            @keyframes hcCharmRing { 0% { opacity: .95; transform: scale(.3) rotate(0deg); } 100% { opacity: 0; transform: scale(1.6) rotate(120deg); } }
+            @keyframes hcCharmWisp { 0% { opacity: 0; transform: translateY(0) scaleY(.4); } 25% { opacity: 1; } 100% { opacity: 0; transform: translateY(-64px) scaleY(1.2); } }
+          `}</style>
+        </div>
+      );
+    };
+  })(),
+  // ★ The Seventh Circle: Lavafontaene — Lavaschein am Boden, drei Fontaenen steigen auf, Tropfen regnen in Boegen.
+  lava_fountain: (() => {
+    const FARBEN = ['#F8F5B5', '#F6E318', '#EEAF2E', '#F27525', '#C92E26'];
+    return function LavaFountainEffect({ x, y }) {
+      const strahlen = useMemo(() => [-1, 0, 1].map((k, i) => ({
+        left: k * 15 - 7, h: 74 - Math.abs(k) * 20 + Math.random() * 10, delay: i === 1 ? 0 : 90, dur: 760 + Math.random() * 120,
+      })), []);
+      const tropfen = useMemo(() => Array.from({ length: ppFxN(30) }, () => {
+        const w = (Math.random() - .5) * 2;
+        return { dx: Math.round(w * 52), hoch: 40 + Math.random() * 64, delay: Math.round(60 + Math.random() * 420),
+          dur: Math.round(700 + Math.random() * 320), size: 3 + Math.round(Math.random() * 3), farbe: FARBEN[Math.floor(Math.random() * FARBEN.length)] };
+      }), []);
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+          <div style={{ position: 'absolute', left: -62, top: 4, width: 124, height: 46, borderRadius: '50%',
+            background: 'radial-gradient(ellipse, rgba(246,227,24,.8) 0%, rgba(242,117,37,.65) 38%, rgba(201,46,38,.35) 62%, rgba(85,10,4,0) 78%)',
+            opacity: 0, animation: 'lvfPool 1300ms ease-out forwards' }} />
+          {strahlen.map((s, i) => (
+            <i key={'j' + i} style={{ position: 'absolute', left: s.left, top: 30 - s.h, width: 14, height: s.h, transformOrigin: '50% 100%',
+              clipPath: 'polygon(30% 100%, 0% 62%, 22% 30%, 50% 0%, 78% 30%, 100% 62%, 70% 100%)',
+              background: 'linear-gradient(to top, #C92E26 0%, #F27525 35%, #EEAF2E 65%, #F8F5B5 100%)',
+              boxShadow: '0 0 8px #F27525', opacity: 0, animation: `lvfJet ${s.dur}ms ease-out ${s.delay}ms forwards` }} />
+          ))}
+          {tropfen.map((d, i) => (
+            <b key={'t' + i} style={{ position: 'absolute', left: 0, top: 18, width: d.size, height: d.size, borderRadius: '50%',
+              background: d.farbe, boxShadow: `0 0 4px ${d.farbe}`, opacity: 0, '--dx': d.dx + 'px', '--hoch': -d.hoch + 'px',
+              animation: `lvfDrop ${d.dur}ms cubic-bezier(.3,.7,.5,1) ${d.delay}ms forwards` }} />
+          ))}
+          <div style={{ position: 'absolute', left: -50, top: 18, width: 100, height: 26, borderRadius: '50%',
+            border: '2px solid #EEAF2E', boxShadow: '0 0 10px #F27525', opacity: 0, animation: 'lvfRing 620ms ease-out 180ms forwards' }} />
+          <style>{`
+            @keyframes lvfPool { 0% { opacity: 0; transform: scale(.4); } 25% { opacity: 1; transform: scale(1); } 100% { opacity: 0; transform: scale(1.2); } }
+            @keyframes lvfJet { 0% { opacity: 0; transform: scaleY(.05); } 22% { opacity: 1; transform: scaleY(1); } 70% { opacity: 1; transform: scaleY(.9); } 100% { opacity: 0; transform: scaleY(.3); } }
+            @keyframes lvfDrop { 0% { opacity: 0; transform: translate(0, 0); } 12% { opacity: 1; } 55% { opacity: 1; transform: translate(calc(var(--dx) * .6), var(--hoch)); } 100% { opacity: 0; transform: translate(var(--dx), 26px); } }
+            @keyframes lvfRing { 0% { opacity: .9; transform: scale(.3); } 100% { opacity: 0; transform: scale(1.7); } }
+          `}</style>
+        </div>
+      );
+    };
+  })(),
+  // ★ The Fifth Circle: die GANZE Gegnerseite geht in Flammen auf. Kommt ueber `zoneType: 'board'` mit `targets`
+  // (Helden + Support Zonen der Seite); `targetPoints` hat die Bildschirmrechtecke. Je Rechteck eine Flammenbank.
+  fifth_circle_flames: (() => {
+    return function FifthCircleFlamesEffect({ targetPoints }) {
+      const punkte = Array.isArray(targetPoints) ? targetPoints : [];
+      const zungen = useMemo(() => punkte.map(() => Array.from({ length: ppFxN(7) }, (_, k) => ({
+        pos: (k + .5) / 7, delay: Math.round(Math.random() * 380), h: .7 + Math.random() * .6, dur: Math.round(1100 + Math.random() * 500),
+      }))), [punkte.length]);
+      const funken = useMemo(() => punkte.map(() => Array.from({ length: ppFxN(5) }, () => ({
+        pos: Math.random(), delay: Math.round(200 + Math.random() * 900), dx: Math.round((Math.random() - .5) * 30),
+        farbe: ['#F8F5B5', '#F6E318', '#EEAF2E', '#F27525'][Math.floor(Math.random() * 4)],
+      }))), [punkte.length]);
+      return (
+        <div style={{ position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 10100 }}>
+          {punkte.map((p, i) => (
+            <div key={'f' + i} style={{ position: 'absolute', left: p.x - p.w / 2, top: p.y - p.h / 2, width: p.w, height: p.h }}>
+              <div style={{ position: 'absolute', inset: -6, borderRadius: 8,
+                background: 'radial-gradient(ellipse at 50% 80%, rgba(246,227,24,.55), rgba(242,117,37,.4) 45%, rgba(201,46,38,0) 75%)',
+                opacity: 0, animation: 'fcfGlow 1900ms ease-in-out forwards' }} />
+              {zungen[i].map((z, k) => (
+                <i key={'z' + k} style={{ position: 'absolute', bottom: -4, left: `calc(${z.pos * 100}% - ${p.w * .09}px)`, width: p.w * .18, height: p.h * (.85 * z.h), transformOrigin: '50% 100%',
+                  clipPath: 'polygon(50% 0%, 78% 38%, 100% 100%, 0% 100%, 22% 38%)',
+                  background: 'linear-gradient(to top, #C92E26 0%, #F27525 40%, #EEAF2E 72%, #F8F5B5 100%)',
+                  opacity: 0, animation: `fcfTongue ${z.dur}ms ease-out ${z.delay}ms forwards` }} />
+              ))}
+              {funken[i].map((f, k) => (
+                <b key={'e' + k} style={{ position: 'absolute', left: `${f.pos * 100}%`, bottom: p.h * .4, width: 3, height: 3, background: f.farbe, boxShadow: `0 0 4px ${f.farbe}`,
+                  opacity: 0, '--dx': f.dx + 'px', animation: `fcfEmber 1000ms ease-out ${f.delay}ms forwards` }} />
+              ))}
+            </div>
+          ))}
+          <style>{`
+            @keyframes fcfGlow { 0% { opacity: 0; } 25% { opacity: 1; } 75% { opacity: .85; } 100% { opacity: 0; } }
+            @keyframes fcfTongue {
+              0% { opacity: 0; transform: scale(.4, .05); } 20% { opacity: 1; transform: scale(1, 1); }
+              40% { transform: scale(.9, 1.15) skewX(4deg); } 60% { transform: scale(1.05, .95) skewX(-4deg); }
+              80% { opacity: .9; transform: scale(.9, 1.1) skewX(3deg); } 100% { opacity: 0; transform: scale(.6, .4); }
+            }
+            @keyframes fcfEmber { 0% { opacity: 0; transform: translate(0, 0); } 15% { opacity: 1; } 100% { opacity: 0; transform: translate(var(--dx), -54px); } }
+          `}</style>
+        </div>
+      );
+    };
+  })(),
+  // ★ The Fourth Circle: Goldrausch — Muenzen springen aus der Area-Zone und fallen klimpernd zurueck.
+  hell_coins: (() => {
+    return function HellCoinsEffect({ x, y }) {
+      const muenzen = useMemo(() => Array.from({ length: ppFxN(18) }, () => ({
+        dx: Math.round((Math.random() - .5) * 120), hoch: 30 + Math.random() * 60, delay: Math.round(Math.random() * 380),
+        dur: Math.round(760 + Math.random() * 300), size: 9 + Math.round(Math.random() * 4),
+      })), []);
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+          <div style={{ position: 'absolute', left: -50, top: -30, width: 100, height: 60, borderRadius: '50%',
+            background: 'radial-gradient(ellipse, rgba(246,227,24,.65), rgba(238,175,46,.3) 55%, rgba(238,175,46,0) 76%)',
+            opacity: 0, animation: 'hcnGlow 1200ms ease-out forwards' }} />
+          {muenzen.map((m, i) => (
+            <b key={'c' + i} style={{ position: 'absolute', left: -m.size / 2, top: 0, width: m.size, height: m.size, borderRadius: '50%',
+              background: 'radial-gradient(circle at 35% 30%, #F8F5B5 0%, #F6E318 40%, #EEAF2E 75%, #9a6a10 100%)', border: '1px solid #6a4408',
+              opacity: 0, '--dx': m.dx + 'px', '--hoch': -m.hoch + 'px', animation: `hcnCoin ${m.dur}ms cubic-bezier(.3,.7,.5,1) ${m.delay}ms forwards` }} />
+          ))}
+          <style>{`
+            @keyframes hcnGlow { 0% { opacity: 0; transform: scale(.5); } 30% { opacity: 1; transform: scale(1); } 100% { opacity: 0; transform: scale(1.2); } }
+            @keyframes hcnCoin {
+              0% { opacity: 0; transform: translate(0, 0) rotateY(0deg); } 10% { opacity: 1; }
+              50% { opacity: 1; transform: translate(calc(var(--dx) * .6), var(--hoch)) rotateY(540deg); }
+              100% { opacity: 0; transform: translate(var(--dx), 22px) rotateY(1080deg); }
+            }
+          `}</style>
+        </div>
+      );
+    };
+  })(),
   doom_counter: DoomCounterEffect,   // v1421
   diamond_sparkle: DiamondSparkleEffect,
   // ── Puppets (v706): Aliase mit eigenem Klang je Token (ZONE_ANIM_SFX) ──

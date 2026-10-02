@@ -26,10 +26,10 @@ const ABGANG = 150;
 
 async function schadenAuf(engine, quelle, ziel, betrag) {
   engine._broadcastEvent('play_zone_animation', {
-    type: 'explosion', owner: ziel.owner, heroIdx: ziel.heroIdx,
+    type: 'lava_fountain', owner: ziel.owner, heroIdx: ziel.heroIdx,
     zoneSlot: ziel.type === 'hero' ? -1 : ziel.slotIdx,
   });
-  await engine._delay(450);
+  await engine._delay(650);
   if (ziel.type === 'hero') {
     const h = engine.gs.players[ziel.owner]?.heroes?.[ziel.heroIdx];
     if (h && h.hp > 0) await engine.actionDealDamage(quelle, h, betrag, 'other');

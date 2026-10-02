@@ -3020,6 +3020,27 @@ const ZONE_ANIM_SFX = {
   field_standard_rally:    { name: 'buff' },
   // Silent — redundant with a log or purely decorative
   gold_sparkle:            null,
+  // Circles of Hell: Hoellen-Charme (Sixth), Lavafontaene (Seventh), Flammenmeer der Gegnerseite (Fifth), Goldrausch (Fourth).
+  hell_charm: [
+    { name: 'elem_dark', opts: { rate: 0.65, volume: 1.0 } },
+    { name: 'debuff',    opts: { rate: 0.8,  volume: 0.8, delay: 180, category: null, dedupe: 0 } },
+    { name: 'elem_fire', opts: { rate: 0.7,  volume: 0.55, delay: 380, category: null, dedupe: 0 } },
+  ],
+  lava_fountain: [
+    { name: 'elem_fire',    opts: { rate: 0.6, volume: 1.0 } },
+    { name: 'heavy_impact', opts: { rate: 0.7, volume: 0.9, delay: 60, category: null, dedupe: 0 } },
+    { name: 'elem_fire',    opts: { rate: 0.85, volume: 0.7, delay: 420, category: null, dedupe: 0 } },
+  ],
+  fifth_circle_flames: [
+    { name: 'elem_fire', opts: { rate: 0.55, volume: 1.0 } },
+    { name: 'elem_fire', opts: { rate: 0.75, volume: 0.9, delay: 260, category: null, dedupe: 0 } },
+    { name: 'elem_fire', opts: { rate: 0.95, volume: 0.7, delay: 700, category: null, dedupe: 0 } },
+  ],
+  hell_coins: [
+    { name: 'gold_gain', opts: { rate: 1.0,  volume: 1.0 } },
+    { name: 'gold_gain', opts: { rate: 1.15, volume: 0.85, delay: 170, category: null, dedupe: 0 } },
+    { name: 'gold_gain', opts: { rate: 1.3,  volume: 0.7,  delay: 360, category: null, dedupe: 0 } },
+  ],
   // Lovely Teddy: expandierendes Herz.
   heart_expand:            { name: 'buff', opts: { rate: 1.15, volume: 0.8 } },
   // Chaos-Diamond: roter Lichtblitz beim Aktivieren.

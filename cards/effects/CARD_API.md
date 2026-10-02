@@ -18738,3 +18738,10 @@ fließen nach unten, 6 s) und Glut. Panorama 256 breit, mittig. Farben aus der K
 - **Third Circle: Aufdeck-Dauer:** `mill_center_reveal.revealMs` gilt JE KARTE (der Client deckt nacheinander auf); The Third Circle of Hell wartet deshalb `Anzahl × revealMs + 150` ms, bevor es löscht und die Warteschlange mit den Angeboten der anderen Kreise weiterläuft — vorher liefen diese der Animation davon.
 - **Third Circle: kein zweiter Flug:** Die aufgedeckten Karten fliegen schon in der Aufdeck-Animation (`mill_center_reveal`, `deleteMode`) zum Gelöscht-Stapel; die übrigen werden danach nur noch im Zustand nachgezogen (`restOhneFlugLoeschen`, mit Lösch-Rettung, ohne `deck_to_deleted`).
 - **Third Circle: Karte für Karte:** Das Aufdecken läuft wie bei den Mills einzeln (`mill_center_reveal` je Karte, `deleteMode`, `revealMs` je Karte); jede Nicht-Area-Karte wird am Ende IHRER Animation in `deletedPile` gelegt (+`sync`), der Server wartet je Karte `revealMs`. Area-Zauber bleiben bis zur Wahl offen und werden danach gespielt bzw. (Rest) ohne neuen Flug nachgezogen (`restOhneFlugLoeschen`). Gerettete Karten (`beforeDelete`) fliegen nicht.
+
+### Circles of Hell — Animationen und Sounds
+Vier eigene Zonen-Animationen (`public/app-board.jsx` `ANIM_REGISTRY`, Klänge in `app-shared.jsx` `ZONE_ANIM_SFX`; Klang hängt an der Animation, nicht am Log):
+- **Sixth:** `hell_charm` auf dem übernommenen Helden (Siegelringe, Schlieren; `elem_dark` + `debuff` + `elem_fire`), vor `temporaereKontrolle`.
+- **Seventh:** `lava_fountain` (drei Lavastrahlen, Tropfen, Glutpfütze; `elem_fire`/`heavy_impact`) statt `explosion` — in `schadenAuf`, gilt für BEIDE Schadenswege (Zugende 100 / Abgang 150).
+- **Fifth:** `fifth_circle_flames` über `zoneType: 'board'` + `targets` (alle Helden und Support Zonen der Gegnerseite; die Komponente bekommt `targetPoints`), einmal beim Auslösen („when sent to the discard pile or deleted").
+- **Fourth:** `hell_coins` auf der Area-Zone des Besitzers (Münzen, Glanz; dreifaches `gold_gain`) vor dem Goldgewinn.
