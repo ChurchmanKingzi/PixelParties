@@ -62,9 +62,12 @@ module.exports = {
       gezeigt = [...gezeigt, genommen.name];
     }
     if (gezeigt.length === 0) return;
-    engine._broadcastEvent('mill_center_reveal', { owner: pi, cardNames: gezeigt, deleteMode: true, revealMs: 1800 });
+    // `revealMs` gilt JE KARTE: der Client deckt sie nacheinander auf (wie bei den Mills). Der Server wartet die
+    // GANZE Folge ab, sonst laufen Loeschung und die Angebote der anderen Kreise der Animation davon.
+    const aufdeckMs = 1100;
+    engine._broadcastEvent('mill_center_reveal', { owner: pi, cardNames: gezeigt, deleteMode: true, revealMs: aufdeckMs });
     engine.sync();
-    await engine._delay(1900);
+    await engine._delay(gezeigt.length * aufdeckMs + 150);
 
     // ② Alle eigenen Areas loeschen.
     await alleEigenenAreasLoeschen(engine, pi, CARD_NAME);
