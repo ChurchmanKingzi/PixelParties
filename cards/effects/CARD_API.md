@@ -2532,6 +2532,8 @@ in the `hooks` object. Each receives a `ctx` object (see next section).
 | `onChainStart` | Chain begins | — |
 | `onChainResolve` | Chain link resolves | — |
 | `onEffectNegated` | An effect was negated | `negatedCard` |
+| `onNegationDealt` | A player negated an opponent's chain card / Surprise ("Whenever you negate an opponent's card or effect", Natas) | `negatorOwner`, `negatedOwner`, `negatedCardName`, `kind` (`'chain'`/`'surprise'`) — `cardName` ist der Lauscher, nicht die negierte Karte |
+| `onResourceDrawReplace` | Resource Phase, nach den Hand-Reaktionen, vor dem Standard-Zug; ein Held darf das Ziehen ersetzen, indem er `gs._skipResourceDraw = true` setzt (Natas) | `playerIdx` (Zugspieler) |
 | `onReactionActivated` | Reaction added to chain | `reactionCardName` |
 | `onCardActivation` | Card effect about to resolve | `cardName` |
 | `afterSpellResolved` | Spell/Attack fully resolved | `spellName`, `damageTargets`, `heroIdx`, `casterIdx` |
