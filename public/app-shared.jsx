@@ -6099,7 +6099,7 @@ function CardMini({ card, onClick, onRightClick, count, maxCount, dimmed, style,
         data-card-mini={card.name} data-in-gallery={inGallery ? '1' : undefined}>
         <CardFoil card={card} />
         {imgUrl ? (
-          <img src={imgUrl} alt={card.name}
+          <img src={imgUrl} alt={card.name} loading="lazy" decoding="async"
             style={{ position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'cover', borderRadius:1 }}
             draggable={false} />
         ) : (
