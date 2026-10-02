@@ -18,6 +18,7 @@
 //  • Der Buff endet, sobald die Zusage eingeloest ODER verfallen ist: Verfall am
 //    Ende der Action Phase des naechsten Zuges (auch bei totem Helden), Verlust
 //    der Zusage an eine andere zweite Aktion (Fizzle) oder Verlassen der Ablage.
+//  • INHERENTE Zusatzaktion: das Spielen der Karte kostet selbst keine Aktion.
 //  • Puzzle-Editor: Helden koennen den Buff `calm` zugewiesen bekommen. Dafuer
 //    legt `ensureCalmProviders` zu Spielbeginn eine unsichtbare Anbieter-Instanz
 //    an; die Zusage gilt dann gleich in der ersten Action Phase.
@@ -109,6 +110,15 @@ module.exports = {
   requiresTarget: true,
   spellVisual: { impact: { type: 'blessed_skill_burst' }, impactMs: 260 },
   ensureCalmProviders,
+
+  // INHERENTE Zusatzaktion (Als Korrektur 2.10.): das Spielen selbst kostet keine Aktion (Archer-Muster /
+  // Weapon Unleashing) — nur in Main Phase 1 oder der Action Phase.
+  inherentAction: true,
+  canActivate(gs, pi, engine) {
+    if (!gs || (gs.currentPhase !== 2 && gs.currentPhase !== 3)) return false;
+    if (!engine) return true;
+    try { return kontrollierteHeldenZiele(engine, pi).length >= 2; } catch { return true; }
+  },
 
   /** Grauton: ohne einen weiteren lebenden Helden gibt es nichts zu waehlen. */
   spellPlayCondition(gs, pi, engine) {
