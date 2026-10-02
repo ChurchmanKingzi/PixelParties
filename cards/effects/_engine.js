@@ -12283,6 +12283,7 @@ class GameEngine {
   _geloeschtVerfolgen(pi) {
     const ps = this.gs.players[pi];
     if (!ps) return;
+    this._ablageUmleitungVerfolgen(pi);   // The Root of all Evil (Creatures → Geloescht statt Ablage)
     if (!ps.deletedPile) ps.deletedPile = [];
     const arr = ps.deletedPile;
     if (arr._stempelVerfolgt) return;
@@ -12382,12 +12383,60 @@ class GameEngine {
   }
 
   /**
+   * ★ The Root of all Evil: „Creatures that would be sent to either player's discard pile are deleted instead."
+   * Gilt, solange EINE aktive Root auf dem Brett steht (Support Zone, offen, Effekt nicht unterdrueckt: nicht
+   * Frozen/Stunned/Negated …), fuer BEIDE Ablagen. Besiegte Kreaturen laufen ueber `_gefalleneKreaturenGeloescht`
+   * (beide Todespfade), alle anderen Wege in die Ablage (Handabwurf, Mill, …) ueber die `push`-Umleitung unten.
+   */
+  _wurzelAktiv() {
+    for (const inst of this.cardInstances || []) {
+      if (inst.name !== 'The Root of all Evil' || inst.zone !== 'support' || inst.faceDown) continue;
+      if (this.isCreatureEffectSuppressed(inst, { honorNegStatusImmune: false })) continue;
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * Ueberlagert `push`/`unshift` der Ablage von `pi` (nicht aufzaehlbar): solange `_wurzelAktiv()`, gehen Creature-
+   * Namen in den GELOESCHT-Stapel (mit seiner Meldung `_geloeschtMeldung`) statt in die Ablage. Wird beim Init und je
+   * Zugbeginn mit `_geloeschtVerfolgen` angelegt; `disableDiscardToDelete` legt sie nach dem Entfernen neu an.
+   */
+  _ablageUmleitungVerfolgen(pi) {
+    const ps = this.gs.players[pi];
+    if (!ps) return;
+    if (!ps.discardPile) ps.discardPile = [];
+    const arr = ps.discardPile;
+    if (arr._umleitungVerfolgt) return;
+    const engine = this;
+    const def = (name, fn) => Object.defineProperty(arr, name, { value: fn, enumerable: false, configurable: true, writable: true });
+    def('_umleitungVerfolgt', true);
+    const filtern = (items) => {
+      if (!items.length || !engine._wurzelAktiv()) return items;
+      const db = engine._getCardDB();
+      const rest = [];
+      for (const n of items) {
+        const cd = db[n];
+        if (cd && hasCardType(cd, 'Creature')) {
+          engine._geloeschtVerfolgen(pi);
+          ps.deletedPile.push(n);
+          engine.log('card_deleted', { card: n, player: ps.username, source: 'The Root of all Evil' });
+        } else rest.push(n);
+      }
+      return rest;
+    };
+    def('push', function (...items) { return Array.prototype.push.apply(this, filtern(items)); });
+    def('unshift', function (...items) { return Array.prototype.unshift.apply(this, filtern(items)); });
+  }
+
+  /**
    * ★ „Creatures that are defeated are deleted" (Ghazma, the Worm Feeder): gilt, solange ein
    * LEBENDER, nicht negierter Held beider Seiten das Skript-Flag `defeatedCreaturesAreDeleted`
    * traegt. Besiegte Kreaturen (Schaden UND Zerstoerung) gehen dann in den Geloescht-Stapel
    * ihres Besitzers statt in die Ablage.
    */
   _gefalleneKreaturenGeloescht() {
+    if (this._wurzelAktiv()) return true;   // The Root of all Evil: Creatures, die in eine Ablage kaemen, werden geloescht
     for (const ps of this.gs.players || []) {
       for (const h of ps?.heroes || []) {
         if (!h?.name || !(h.hp > 0) || h.statuses?.negated) continue;
@@ -15379,6 +15428,8 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (!ps || !ps._discardToDeleteActive) return;
     delete ps._discardToDeleteActive;
     delete ps.discardPile.push; // Remove instance override, restoring Array.prototype.push
+    delete ps.discardPile._umleitungVerfolgt;
+    this._ablageUmleitungVerfolgen(playerIdx);   // The Root of all Evil: Umleitung wieder anlegen
   }
 
   /**
