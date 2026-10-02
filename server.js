@@ -7158,7 +7158,7 @@ async function doPlayArtifact(room, pi, { cardName, handIndex, heroIdx, zoneSlot
         },
       });
 
-      if (chainResult.negated) await room.engine.routeNegatedInitialCard(pi, cardName, chainResult);
+      if (chainResult.negated) await room.engine.routeNegatedInitialCard(pi, cardName, chainResult, handIndex);
     } catch (err) {
       console.error('[Engine] doPlayArtifact (equip) error:', err.message);
     }
@@ -7407,8 +7407,8 @@ async function doPlayArtifact(room, pi, { cardName, handIndex, heroIdx, zoneSlot
         // Negiert: `resolve` lief nie, die Karte liegt also noch in der
         // Hand. Erst entnehmen, dann routen — sonst laege sie doppelt
         // (Hand UND Ablage).
-        entnimmHandkarte();
-        await room.engine.routeNegatedInitialCard(pi, cardName, chainResult);
+        const _negHandIdx = entnimmHandkarte();
+        await room.engine.routeNegatedInitialCard(pi, cardName, chainResult, _negHandIdx);   // Flug startet an ihrem echten Handplatz
       }
     } catch (err) {
       console.error('[Engine] doPlayArtifact (creature) error:', err.message);
@@ -11397,7 +11397,9 @@ async function doUsePotion(room, pi, { cardName, handIndex, fromCreation }) {
       const pileOwner = room.engine._consumeHandCardOrigin(pi, cardName);
       const pilePs = gs.players[pileOwner];
       if (chainResult.negated) {
-        await room.engine.routeNegatedInitialCard(pileOwner, cardName, chainResult);
+        // `currentIdx`: der Handplatz VOR dem Entnehmen — sonst startet der Flug (Local Idol: Trank → andere Hand)
+        // mittig im Handcontainer statt an ihrer echten Position.
+        await room.engine.routeNegatedInitialCard(pileOwner, cardName, chainResult, currentIdx);
       } else if (chainResult.resolveResult?.placed) {
         checkPotionLock(ps, gs, pi);
       } else {
