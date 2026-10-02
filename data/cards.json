@@ -25529,5 +25529,23 @@
     "spellSchool1": "Magic Arts",
     "spellSchool2": "Summoning Magic",
     "foil": null
+    },
+  {
+    "name": "Lesson in the Arts",
+    "cardType": "Spell",
+    "subtype": "Normal",
+    "level": 0,
+    "hp": null,
+    "atk": null,
+    "cost": null,
+    "effect": "Attach up to 3 copies of Magic Arts from your hand or deck to the user as additional attachments. Immediately end your turn afterwards.",
+    "archetype": "",
+    "setID": "PP MBS",
+    "banned": "",
+    "startingAbility1": "",
+    "startingAbility2": "",
+    "spellSchool1": "Magic Arts",
+    "spellSchool2": "",
+    "foil": null
   }
 ]
