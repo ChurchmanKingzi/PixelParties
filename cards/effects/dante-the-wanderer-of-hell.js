@@ -57,7 +57,7 @@ async function handkarteLoeschen(engine, pi, name) {
   const idx = ps.hand.indexOf(name);
   if (idx < 0) return false;
   const inst = engine.findCards({ owner: pi, zone: 'hand', name })[0] || null;
-  ps.hand.splice(idx, 1);
+  engine.takeFromPileSync(pi, 'hand', idx, { source: CARD_NAME });   // Stapel-Schicht (kein direktes Splicen)
   const gerettet = await engine._tryBeforeDelete(name, pi, { fromZone: 'hand', fromInstance: inst, source: CARD_NAME });
   if (gerettet) { engine.log('delete_rescued', { player: ps.username, card: name, source: CARD_NAME }); engine.sync(); return false; }
   engine._pileFlight(pi, name, 'hand', 'deleted', { fromHandIdx: idx });
