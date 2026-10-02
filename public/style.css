@@ -24766,3 +24766,17 @@ body.fifth-curse-opp [data-support-zone].zone-has-card[data-support-owner="opp"]
   background: transparent;
   pointer-events: auto;
 }
+
+/* ★ Aktivierungs-Zeichen ueber Abzeichen (Als Befund 2.10.): die bereit-Symbole der Zonen (⚔ Heldeneffekt, ⚡ Ability,
+   ⚙ Equip, ✦, 💚, ⚖) ragen mit z-index 10 in die obere rechte Ecke — genau dort, wo die Buff-Abzeichen stehen — und
+   fingen deren Hover teilweise ab. Reine Anzeige: durchlaessig, der Klick geht an die Zone dahinter. */
+.zone-hero-effect-active::after,
+.zone-hero-effect-active::before,
+.zone-ability-activatable::after,
+.zone-ability-free-activatable::after,
+.zone-creature-activatable::after,
+.zone-equip-activatable::after,
+.zone-friendship-active::after,
+.zone-permanent-activatable::after {
+  pointer-events: none;
+}
