@@ -1,0 +1,15 @@
+{
+  "hero": "Natas, the Master of Hell",
+  "sheet": "natas-the-master-of-hell.png",
+  "frameWidth": 22,
+  "frameHeight": 27,
+  "frames": 48,
+  "frameMs": 90,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 2,
+  "padLeft": 2,
+  "padRight": 2,
+  "padBottom": 1,
+  "faceX": 9
+}

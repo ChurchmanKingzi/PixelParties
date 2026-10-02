@@ -337,6 +337,7 @@ kopiert, daneben liegt eine JSON-Datei mit den Metadaten. Die erzeugten
 | `skins_last.py` | `final 90 nao` | `nao_idle_final_sheet.png` | `student-council-president-nao` (Skin) |
 | `skins_last.py` | `final 90 rhabi` | `rhabi_idle_final_sheet.png` | `rhabi-the-human-hunter` (Skin) |
 | `skins_last.py` | `final 90 kasperov` | `kasperov_idle_final_sheet.png` | `kasperov-the-king-of-the-east` (Skin; auch für „Kasperov the King of the East1“) |
+| `natas.py` | `final 90` | `natas_idle_final_sheet.png` | `natas-the-master-of-hell` |
 
 `bubbles.py` ohne `gross` erzeugt eine auf Hero-Größe verkleinerte Variante
 (Sprite aus `bubbles_downscale.py`), die aktuell nicht verwendet wird.
@@ -383,6 +384,7 @@ python3 xcf_extract.py MotiveMoe.xcf assemble src/cute-princess-mary.png "Mary-K
 | Cecilia, the Harrowing Crusader; Fiona, the Empty Vessel of a Forgotten Sorceress; Mary Crestmas; Beato, the Eternal Butterfly | – | in keiner xcf-Datei vorhanden, aus den Kartenbildern rekonstruiert (Pixelraster zurückgerechnet, Figur freigestellt): Cecilias Körper ab dem Gesicht stammt aus `bad-birthday-girl-cecilia.png`, nur Piratenhut und Auge aus der Karte; Fiona ohne die lila Blitz-Aura (die Blitze sind Partikel); Marys von Lichtern verdeckte Mütze ist die von Santa Klaus |
 | Monia Bot, the Foretold Rescuer of Coolness | – | vom Nutzer gezeichnet, deckungsgleich mit Cool Rescuer Monia (gleicher Ausschnitt, nur längere Düsenflammen); Körper und Feuer als `-body`/`-flames` getrennt nach den vier Flammenfarben |
 | Die letzten Skins (Bills Worst Nightmare, Creepy Villager Girl Semi, Non-Believer Doq, Thunder God Sol Rym, Ultimate Despair Inya, Mega-Priestess Johanna, Student Council President Nao, RhaBi the Human Hunter, Kasperov the King of the East) | `Motive.xcf`, `MotiveDeepsea.xcf`, Skin-Kartenbilder | reproduzierbar per `python3 assemble_skins_last.py <verzeichnis mit den xcf>` (Zuordnung im Skriptkopf; Non-Believer Doq nur als Differenz zweier Szenenebenen, Creepy Villager Girl Semi nach dem Kartenbild umgefärbt, Kasperov the King of the East aus dem Kartenbild ausgeschnitten; bewegliche Teile: Bills Haube `-mask`, Sol Ryms Wolke `-cloud`, Inyas `-girl`/`-bear`, Naos `-wings`, RhaBis vier Arme `-arml`/`-armr`/`-arml2`/`-armr2`) |
+| Natas, the Master of Hell | `Motive.xcf` | reproduzierbar per `python3 assemble_natas.py <Motive.xcf>` (nur der Ausschnitt um ihn, x 276–293, y 58–81; Teile `-body` „Natas“, `-arms` „Natas #1“, `-head` „Natas #2“, `-glint` „Natas #3“ (Glanzkreuz, nur als Funkeln), `-aura` „Natas #5“ (roter Höllenschatten, im xcf 10 %, die Deckkraft setzt `natas.py`); Höllentor „Natas #4“ und die beiden Schattendämonen gehören zur Szene; der Ordner `heroes/natas-the-master-of-hell/` im Sprite-Repo enthält dieselben Teile und die Idle-Frames) |
 
 Neue Datei durchsuchen: `xcf_scan.py dump` legt alle Ebenen einzeln ab,
 `xcf_scan.py match <ordner> --heroes` gleicht sie mit allen noch nicht
