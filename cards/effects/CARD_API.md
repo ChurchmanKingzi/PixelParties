@@ -18847,3 +18847,9 @@ Jede Reaktions-Abfrage an den Gegner (Surprise-Aktivierung oder Hand-Reaktion mi
 ### Neuer Abfrage-Typ `cardReorder` (Scavenging Crane, Als Vorgabe 2.10.)
 
 `engine.promptGeneric(pi, { type: 'cardReorder', cards: [{ name, source }], title, description, confirmLabel, cancellable: false })` → `{ order: [urspruengliche Indizes in neuer Reihenfolge] }`. Client: `CardReorderPrompt` (`app-board.jsx`) — alle Karten in EINER Reihe, Platz 1 (links) = als nächstes gezogen, Umsortieren per Drag & Drop innerhalb der Box (◀ ▶ unter jeder Karte für Touch), „Confirm“ schickt die Reihenfolge. Privat: `effectPromptFuer` (server.js) schickt die Karten dieses Typs nur an den Besitzer. Danach fliegen die Karten sichtbar (nur für den Besitzer, `{ toPlayers: [pi] }`) von der Brettmitte (`from: 'boardCenter'`) in INVERSER Reihenfolge (5, 4, 3, 2, 1) aufs Deck; `engine.reorderDeck` schreibt die neue Reihenfolge. Ungültige Antwort → Reihenfolge bleibt; CPU: Reihenfolge belassen.
+
+### Creature per Klick beschwören: Board-Highlights statt Box-Menü (Als Vorgabe 2.10.)
+
+Gibt es beim Klick auf eine Creature in der Hand mehrere mögliche Caster (`spellHeroPick` mit `isCreature`/`isArtifactCreature`), öffnet sich KEIN Box-Menü mehr. Stattdessen leuchten die möglichen Caster-Helden (inkl. geliehener Helden der Gegenspalte) und ihre freien Support Zonen wie beim Drag & Drop (`zone-drag-valid`); ein Klick auf eine Zone beschwört dorthin (`commitSpellHeroPick({ …eintrag, zoneSlot })`), ein Klick auf den Helden in seine erste freie Zone. Ein kleiner Hinweis oben („Esc to cancel“) ersetzt die Box; Esc bricht ab. Spells/Attacks/Surprises/Aufstieg behalten ihr Menü.
+
+`cardReorder`-Dialog: das Umsortieren läuft jetzt über Pointer-Ereignisse (Geisterbild per Portal am Zeiger, Loslassen über einer anderen Karte VERTAUSCHT beide); das native HTML5-Ziehen kam gegen das Verschieben der Box nicht an. ◀ ▶ bleiben.

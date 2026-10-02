@@ -24915,22 +24915,61 @@ function PileSearchModal({ title, cards, onClose, preserveOrder = false, ownerLe
 function CardReorderPrompt({ ep, onRespond }) {
   const cards = ep.cards || [];
   const [order, setOrder] = useState(() => cards.map((_, i) => i));
-  const [dragFrom, setDragFrom] = useState(null);
-  const [dragOver, setDragOver] = useState(null);
-  const verschiebe = (von, nach) => {
-    if (von == null || nach == null || von === nach) return;
-    setOrder(prev => {
-      const n = prev.slice();
-      const [k] = n.splice(von, 1);
-      n.splice(nach, 0, k);
-      return n;
-    });
+  // Ziehen per POINTER-Ereignissen statt HTML5-Drag (Als Befund 2.10.: das native Ziehen kam gegen das Verschieben
+  // der Box nicht an): ein Geisterbild folgt dem Zeiger, beim Loslassen ueber einer anderen Karte werden BEIDE VERTAUSCHT.
+  const [drag, setDrag] = useState(null);   // { pos, x, y, over }
+  const slotRefs = useRef([]);
+  const orderRef = useRef(order);
+  orderRef.current = order;
+  const tausche = (a, b) => {
+    if (a == null || b == null || a === b) return;
+    setOrder(prev => { const n = prev.slice(); [n[a], n[b]] = [n[b], n[a]]; return n; });
     if (window.playSFX) window.playSFX('ui_click', { volume: 0.5 });
+  };
+  const verschiebe = (von, nach) => {   // ◀ ▶: Nachbar tauschen
+    if (nach < 0 || nach >= order.length) return;
+    tausche(von, nach);
+  };
+  const ueberKarte = (x, y) => {
+    for (let k = 0; k < slotRefs.current.length; k++) {
+      const el = slotRefs.current[k];
+      if (!el) continue;
+      const r = el.getBoundingClientRect();
+      if (x >= r.left - 4 && x <= r.right + 4 && y >= r.top - 30 && y <= r.bottom + 30) return k;
+    }
+    return null;
+  };
+  const start = (e, pos) => {
+    if (e.button != null && e.button !== 0) return;
+    e.stopPropagation();   // die DraggablePanel darf nicht mitziehen
+    const sx = e.clientX, sy = e.clientY;
+    let aktiv = false;
+    const move = (ev) => {
+      if (!aktiv && Math.hypot(ev.clientX - sx, ev.clientY - sy) < 5) return;
+      aktiv = true;
+      ev.preventDefault();
+      setDrag({ pos, x: ev.clientX, y: ev.clientY, over: ueberKarte(ev.clientX, ev.clientY) });
+    };
+    const ende = (ev) => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', ende);
+      window.removeEventListener('pointercancel', ende);
+      if (aktiv) {
+        const ziel = ueberKarte(ev.clientX, ev.clientY);
+        if (ziel != null && ziel !== pos) tausche(pos, ziel);
+      }
+      setDrag(null);
+    };
+    window.addEventListener('pointermove', move, { passive: false });
+    window.addEventListener('pointerup', ende);
+    window.addEventListener('pointercancel', ende);
   };
   const fertig = () => {
     if (window.playSFX) window.playSFX('ui_click');
     onRespond({ order });
   };
+  const ghostEntry = drag ? cards[order[drag.pos]] : null;
+  const ghostCard = ghostEntry ? CARDS_BY_NAME[ghostEntry.name] : null;
   return (
     <div className="modal-overlay">
       <DraggablePanel className="modal animate-in deck-viewer-modal" style={{ maxWidth: 760 }}>
@@ -24942,19 +24981,17 @@ function CardReorderPrompt({ ep, onRespond }) {
           {order.map((ci, pos) => {
             const entry = cards[ci];
             const card = entry ? CARDS_BY_NAME[entry.name] : null;
-            const aktiv = dragOver === pos && dragFrom != null && dragFrom !== pos;
+            const ziel = !!drag && drag.over === pos && drag.pos !== pos;
+            const gezogen = !!drag && drag.pos === pos;
             return (
-              <div key={ci}
-                draggable
-                onDragStart={(e) => { setDragFrom(pos); try { e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', String(pos)); } catch (_) {} }}
-                onDragOver={(e) => { e.preventDefault(); if (dragOver !== pos) setDragOver(pos); }}
-                onDragLeave={() => { if (dragOver === pos) setDragOver(null); }}
-                onDrop={(e) => { e.preventDefault(); verschiebe(dragFrom, pos); setDragFrom(null); setDragOver(null); }}
-                onDragEnd={() => { setDragFrom(null); setDragOver(null); }}
+              <div key={ci} ref={el => { slotRefs.current[pos] = el; }}
+                onPointerDown={(e) => start(e, pos)}
+                onMouseDown={(e) => e.stopPropagation()}
+                onTouchStart={(e) => e.stopPropagation()}
                 style={{
                   width: 104, flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6,
-                  cursor: 'grab', opacity: dragFrom === pos ? 0.45 : 1,
-                  transform: aktiv ? 'translateY(-6px) scale(1.04)' : 'none', transition: 'transform .12s',
+                  cursor: drag ? 'grabbing' : 'grab', opacity: gezogen ? 0.35 : 1, touchAction: 'none', userSelect: 'none',
+                  transform: ziel ? 'translateY(-6px) scale(1.05)' : 'none', transition: 'transform .12s',
                 }}>
                 <div style={{
                   minWidth: 26, textAlign: 'center', padding: '2px 8px', borderRadius: 10, fontSize: 13, fontWeight: 800,
@@ -24962,14 +24999,14 @@ function CardReorderPrompt({ ep, onRespond }) {
                   border: '1px solid rgba(255,255,255,.25)',
                 }}>{pos + 1}</div>
                 <div style={{
-                  width: 104, height: 146, borderRadius: 6, overflow: 'hidden',
-                  boxShadow: aktiv ? '0 0 0 2px var(--accent), 0 0 14px rgba(120,220,255,.7)' : '0 2px 8px rgba(0,0,0,.5)',
+                  width: 104, height: 146, borderRadius: 6, overflow: 'hidden', pointerEvents: 'none',
+                  boxShadow: ziel ? '0 0 0 3px var(--accent), 0 0 16px rgba(120,220,255,.8)' : '0 2px 8px rgba(0,0,0,.5)',
                 }}>
                   {card ? <CardMini card={card} style={{ width: '100%', height: '100%' }} />
                     : <div style={{ padding: 6, fontSize: 11 }}>{entry?.name}</div>}
                 </div>
                 <div style={{ fontSize: 10, color: 'var(--text2)', minHeight: 12 }}>{pos === 0 ? 'drawn next' : ''}</div>
-                <div style={{ display: 'flex', gap: 6 }}>
+                <div style={{ display: 'flex', gap: 6 }} onPointerDown={(e) => e.stopPropagation()}>
                   <button className="btn" disabled={pos === 0} style={{ padding: '1px 8px', fontSize: 11 }}
                     onClick={() => verschiebe(pos, pos - 1)}>◀</button>
                   <button className="btn" disabled={pos === order.length - 1} style={{ padding: '1px 8px', fontSize: 11 }}
@@ -24984,6 +25021,16 @@ function CardReorderPrompt({ ep, onRespond }) {
             {ep.confirmLabel || '✔ Confirm'}
           </button>
         </div>
+        {drag && ghostCard && ReactDOM.createPortal((
+          // Per Portal an den body: die DraggablePanel traegt ein transform, `position: fixed` wuerde sich sonst auf sie beziehen.
+          <div style={{
+            position: 'fixed', left: drag.x - 52, top: drag.y - 73, width: 104, height: 146, zIndex: 10050,
+            pointerEvents: 'none', borderRadius: 6, overflow: 'hidden', opacity: 0.92,
+            boxShadow: '0 8px 24px rgba(0,0,0,.7)', transform: 'rotate(-3deg)',
+          }}>
+            <CardMini card={ghostCard} style={{ width: '100%', height: '100%' }} />
+          </div>
+        ), document.body)}
       </DraggablePanel>
     </div>
   );
@@ -43095,7 +43142,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           // gleichwertig zum Namens-Button.
           const spellPickEntry = (spellHeroPick && ownerLabel === 'me')
             ? (spellHeroPick.eligible || []).find(e => e.creatureInstId == null && e.charmedOwner == null && e.idx === i) || null
-            : null;
+            : (spellHeroPick && ownerLabel === 'opp' && (spellHeroPick.isCreature || spellHeroPick.isArtifactCreature))
+              // geliehene (charmed) Caster der Gegenspalte sind ebenfalls anklickbar
+              ? (spellHeroPick.eligible || []).find(e => e.creatureInstId == null && e.charmedOwner === pi && e.idx === i) || null
+              : null;
           // ★★ v1164: traegt ein Status dieses Helden eine Klick-Option
           // fuer MICH (`_klickHeilung.by`), ist er in meinem Zug
           // anklickbar — solange nichts anderes laeuft.
@@ -44271,6 +44321,14 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               // but triggered by pendingBouncePick (clicking a Deepsea
               // card in hand). Covers BOTH bounce-candidate slots
               // (occupied) and free-slot targets.
+              // ★ Als Vorgabe 2.10.: Creature per KLICK beschwoeren — statt eines Box-Menues leuchten die moeglichen
+              // Caster-Helden UND ihre freien Support Zonen wie beim Drag & Drop; Klick auf eine Zone beschwoert dorthin.
+              const _summonPickEntry = (spellHeroPick && (spellHeroPick.isCreature || spellHeroPick.isArtifactCreature))
+                ? (spellHeroPick.eligible || []).find(e => e.creatureInstId == null && e.idx === i
+                    && (e.charmedOwner != null ? e.charmedOwner === pi : pi === myIdx)
+                    && ((cards || []).length === 0 || e.zoneSlot === z)) || null
+                : null;
+              const isSummonPickZone = !!_summonPickEntry;
               const _bpPickOwn = !!pendingBouncePick;
               const isPendingBounceTarget = _bpPickOwn && (pendingBouncePick.bounceTargets || []).some(t => (t.owner ?? myIdx) === pi && t.heroIdx === i && t.slotIdx === z);
               // Valid drop zones come in two flavors that now coexist:
@@ -44523,7 +44581,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 || brackleSourceHidden.has(`${pi}-${i}-${z}`)
                 || pusherFlungHidden.has(`${pi}-${i}-${z}`);
               return (
-                <div key={z} className={'board-zone board-zone-support' + (cards.length > 0 ? ' zone-has-card' : '') + ((gameState.creatureCounters || {})[`${pi}-${i}-${z}`]?._zoneAura === 'necro_flicker' ? ' board-zone-aura' : '') + (isIsland ? ' board-zone-island' : '') + ((isPlayTarget || isAutoTarget) ? ' board-zone-play-target' : '') + (isValidEquipTarget ? ' potion-target-valid' : '') + (isValidEquipTarget && equipTargetIds.some(id => accentGreenTargetIds.has(id)) ? ' potion-target-accent-green' : '') + (isValidEquipTarget && pt?.config?.autoConfirm ? ' borrow-pick-target' : '') + (isIneligibleEquipTarget ? ' potion-target-ineligible' : '') + (isSelectedEquipTarget ? ' potion-target-selected' : '') + (isEquipExploding ? ' zone-exploding' : '') + (isSummonGlow ? ' zone-summon-glow' : '') + (equipTargetIds.some(id => oppTargetHighlight.includes(id)) ? ' opp-target-highlight' : '') + (isZonePickTarget ? ' zone-pick-target' : '') + (isAbilitySupportTarget ? ' board-zone-play-target' : '') + (supportAbilityEntry ? ' zone-ability-activatable' : '') + (abilityFlash && abilityFlash.zoneKind === 'support' && abilityFlash.owner === (isOpp ? oppIdx : myIdx) && abilityFlash.heroIdx === i && abilityFlash.zoneIdx === z ? ' zone-ability-activated' : '') + (istSupportAbility && (isDead || isFrozenOrStunnedSup) ? ' board-zone-dead' : '') + ((isDragValidZoneAny || isCsppEmptySlot) ? ' zone-drag-valid' : '') + (isDragInvalidZone ? (cards.length > 0 ? ' board-zone-dead' : ' zone-drag-invalid') : '') + ((isBouncePlaceTarget || isPendingBounceTarget) ? ' zone-bounce-place-target' : '') + (isProviderZone ? ' zone-provider-highlight' : '') + (isProviderSelectionActive && !isProviderZone ? ' zone-provider-dimmed' : '') + ((isHeroActionZoneDimmed && !isCsppEmptySlot) ? ' zone-drag-invalid' : '') + (isCreatureActivatable ? ' zone-creature-activatable' : '') + (isCreatureActivatable && istArtefaktKreatur ? ' zone-artifact-creature' : '') + (isEquipActivatable ? ' zone-equip-activatable' : '') + (isEquipActivatable && equipEffectEntry?.crossSide ? ' zone-equip-crossside' : '') + (isBakhmSurpriseActive ? ' surprise-drop-active' : isBakhmSurpriseTarget ? ' surprise-drop-eligible' : '') + (isSkatesCreature ? ' zone-skates-creature' : '') + (isSkatesCreatureSelected ? ' zone-skates-selected' : '') + (isSkatesDest ? ' zone-skates-dest' : '') + (isSlipperyCreature ? ' zone-slippery-creature' : '') + (isSlipperyCreatureSelected ? ' zone-slippery-selected' : '') + (isSlipperyDest ? ' zone-slippery-dest' : '') + (isSlipperySwap ? ' zone-slippery-dest' : '') + (isChainPickCreatureValid ? ' chain-pick-valid' : '') + (isChainPickCreatureSelected ? ' chain-pick-selected' : '') + (isStolen ? ' hero-charmed' : '')}
+                <div key={z} className={'board-zone board-zone-support' + (cards.length > 0 ? ' zone-has-card' : '') + ((gameState.creatureCounters || {})[`${pi}-${i}-${z}`]?._zoneAura === 'necro_flicker' ? ' board-zone-aura' : '') + (isIsland ? ' board-zone-island' : '') + ((isPlayTarget || isAutoTarget) ? ' board-zone-play-target' : '') + (isValidEquipTarget ? ' potion-target-valid' : '') + (isValidEquipTarget && equipTargetIds.some(id => accentGreenTargetIds.has(id)) ? ' potion-target-accent-green' : '') + (isValidEquipTarget && pt?.config?.autoConfirm ? ' borrow-pick-target' : '') + (isIneligibleEquipTarget ? ' potion-target-ineligible' : '') + (isSelectedEquipTarget ? ' potion-target-selected' : '') + (isEquipExploding ? ' zone-exploding' : '') + (isSummonGlow ? ' zone-summon-glow' : '') + (equipTargetIds.some(id => oppTargetHighlight.includes(id)) ? ' opp-target-highlight' : '') + (isZonePickTarget ? ' zone-pick-target' : '') + (isAbilitySupportTarget ? ' board-zone-play-target' : '') + (supportAbilityEntry ? ' zone-ability-activatable' : '') + (abilityFlash && abilityFlash.zoneKind === 'support' && abilityFlash.owner === (isOpp ? oppIdx : myIdx) && abilityFlash.heroIdx === i && abilityFlash.zoneIdx === z ? ' zone-ability-activated' : '') + (istSupportAbility && (isDead || isFrozenOrStunnedSup) ? ' board-zone-dead' : '') + ((isDragValidZoneAny || isCsppEmptySlot || isSummonPickZone) ? ' zone-drag-valid' : '') + (isDragInvalidZone ? (cards.length > 0 ? ' board-zone-dead' : ' zone-drag-invalid') : '') + ((isBouncePlaceTarget || isPendingBounceTarget) ? ' zone-bounce-place-target' : '') + (isProviderZone ? ' zone-provider-highlight' : '') + (isProviderSelectionActive && !isProviderZone ? ' zone-provider-dimmed' : '') + ((isHeroActionZoneDimmed && !isCsppEmptySlot) ? ' zone-drag-invalid' : '') + (isCreatureActivatable ? ' zone-creature-activatable' : '') + (isCreatureActivatable && istArtefaktKreatur ? ' zone-artifact-creature' : '') + (isEquipActivatable ? ' zone-equip-activatable' : '') + (isEquipActivatable && equipEffectEntry?.crossSide ? ' zone-equip-crossside' : '') + (isBakhmSurpriseActive ? ' surprise-drop-active' : isBakhmSurpriseTarget ? ' surprise-drop-eligible' : '') + (isSkatesCreature ? ' zone-skates-creature' : '') + (isSkatesCreatureSelected ? ' zone-skates-selected' : '') + (isSkatesDest ? ' zone-skates-dest' : '') + (isSlipperyCreature ? ' zone-slippery-creature' : '') + (isSlipperyCreatureSelected ? ' zone-slippery-selected' : '') + (isSlipperyDest ? ' zone-slippery-dest' : '') + (isSlipperySwap ? ' zone-slippery-dest' : '') + (isChainPickCreatureValid ? ' chain-pick-valid' : '') + (isChainPickCreatureSelected ? ' chain-pick-selected' : '') + (isStolen ? ' hero-charmed' : '')}
                   data-support-zone="1" data-support-hero={i} data-support-slot={z} data-support-owner={ownerLabel} data-support-island={isIsland ? 'true' : 'false'} data-card-name={cards[0] || ''}
                   data-versiegelt={ppVerwahrung(gameState.players?.[pi], i, 'support', z).versiegelt ? '1' : undefined}
                   onClick={supportAbilityEntry ? () => {
@@ -44547,6 +44605,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                       ownerIdx: pi, heroIdx: i, slotIdx: z,
                       _isEquip: cspp.isEquip, _heroAction: !!cspp.isHeroActionArm,
                     });
+                  } : isSummonPickZone ? () => {
+                    // Klick-Beschwoerung: diese Zone ist das Ziel (Zone des Casters bzw. ihr freier Platz).
+                    commitSpellHeroPick({ ..._summonPickEntry, zoneSlot: z });
                   } : isPendingBounceTarget ? () => {
                     // Click-to-swap: dispatches play_creature as if the
                     // card had been dragged here. Server treats the
@@ -44625,7 +44686,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     }
                   } : isZonePickTarget ? () => respondToPrompt({ owner: pi, heroIdx: i, slotIdx: z }) : isValidEquipTarget ? () => equipTargetIds.forEach(id => togglePotionTarget(id)) : undefined}
                   style={zsMerge('support', {
-                    ...((isCsppEmptySlot || isValidEquipTarget || isZonePickTarget || isProviderZone || isCreatureActivatable || isEquipActivatable || isSkatesCreature || isSkatesDest || isSlipperyCreature || isSlipperyDest || isChainPickCreatureValid) ? { cursor: 'pointer' } : undefined),
+                    ...((isCsppEmptySlot || isSummonPickZone || isValidEquipTarget || isZonePickTarget || isProviderZone || isCreatureActivatable || isEquipActivatable || isSkatesCreature || isSkatesDest || isSlipperyCreature || isSlipperyDest || isChainPickCreatureValid) ? { cursor: 'pointer' } : undefined),
                     ...(isStolen && stolenColor ? { '--charmed-color': stolenColor } : undefined),
                   })}
                   ref={(el) => {
@@ -48652,7 +48713,17 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         </DraggablePanel>
       )}
 
-      {spellHeroPick && !result && (
+      {/* Creature per Klick beschwoeren: KEIN Box-Menue — Caster-Helden und freie Support Zonen leuchten auf dem Brett. */}
+      {spellHeroPick && !result && (spellHeroPick.isCreature || spellHeroPick.isArtifactCreature) && (
+        <div style={{
+          position: 'fixed', top: 54, left: '50%', transform: 'translateX(-50%)', zIndex: 9000, pointerEvents: 'none',
+          padding: '6px 16px', borderRadius: 20, fontSize: 12, color: 'var(--text)', whiteSpace: 'nowrap',
+          background: 'rgba(10,14,22,.82)', border: '1px solid var(--accent)', boxShadow: '0 2px 12px rgba(0,0,0,.5)',
+        }}>
+          🐾 Summon <b>{spellHeroPick.cardName}</b>: click a highlighted Hero or Support Zone · Esc to cancel
+        </div>
+      )}
+      {spellHeroPick && !result && !(spellHeroPick.isCreature || spellHeroPick.isArtifactCreature) && (
         <DraggablePanel className="first-choice-panel animate-in" style={{ borderColor: 'var(--accent)' }}>
           <div className="orbit-font" style={{ fontSize: 13, color: 'var(--accent)', marginBottom: 4 }}>
             {spellHeroPick.isSurprise ? '🎭' : spellHeroPick.isAscension ? '🦋' : spellHeroPick.isCreature ? '🐾' : spellHeroPick.card?.cardType === 'Attack' ? '⚔️' : '✦'} {spellHeroPick.isSurprise ? 'Set' : spellHeroPick.isAscension ? 'Ascend' : spellHeroPick.isCreature ? 'Summon' : 'Play'} {spellHeroPick.cardName}
