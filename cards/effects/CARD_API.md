@@ -18716,3 +18716,8 @@ Jeder neue Area-Hintergrund wird mit **demselben Detailgrad** gemalt wie Cottage
 - **Verankerung:** bewegte Elemente müssen am Untergrund ansetzen (Fontänen stehen in Glutlachen im Boden, Figuren-Beine verschwinden hinter der Vorderebene).
 - **Abnahme:** nach jedem Hintergrund ein GIF (12 s, 20 fps) an den Auftraggeber.
 Der Generator (reines Python, PNG-Schreiber + `shade.py` mit `dth`/`ramp`/`mix`) liegt bewusst nicht im Projekt, wie bei den übrigen Szenen.
+
+### The Sixth Circle of Hell — Hintergrund (Pixelart)
+Lavahimmel (`sky.png`, 8 Bilder, periodisch) über roter Backsteinwand; Richter-Gott mit Goldkrone/Hasenohren (`god.png`, Zeigearm nach links),
+Ketzer (`hero.png`, 12 Bilder, 2 Umhangvarianten), Kapuzen-Dämon im Vordergrund (`demon.png`), Eisenspieße, Grabfeuer in Wandnischen
+(`grave-fire.png`), Lavatropfen, Glut. Alle Figuren 12 Bilder, 4-zusammenhängend, 12-s-Schleife nahtlos geprüft. Farben aus dem Kartenbild.
