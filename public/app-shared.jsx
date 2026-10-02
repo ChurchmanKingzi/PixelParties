@@ -3378,6 +3378,21 @@ if (typeof document !== 'undefined') {
     else playSFX('ui_click', { dedupe: 60 });
   }, { capture: true });
 
+  // ── JEDE AUSWAHL AUF DEM BRETT KLINGT (Als Regel 2.10.: „jede Aktion des Spielers gibt einen Sound als Feedback") ──
+  // Zonen und Helden, die gerade als Wahl leuchten (Klick-Beschwoerung, Zielwahl, Zonenwahl, Anlegen, Tausch, aktivierbare
+  // Effekte …), tragen bekannte Markierungs-Klassen. Ein Klick darauf klingt zentral wie ein Klick — nicht an jedem der
+  // Dutzend Handler einzeln (dort fehlte er z. B. bei Stowaways Ziel-Held/-Zone). `dedupe` faengt die Handler ab, die
+  // schon selbst `ui_click` spielen; anders benannte Klaenge (Aktivierung) laufen unberuehrt daneben.
+  const WAHL_ZONE = '.board-zone-play-target, .zone-drag-valid, .zone-pick-target, .potion-target-valid, .chain-pick-valid, '
+    + '.zone-bounce-place-target, .zone-provider-highlight, .zone-skates-dest, .zone-slippery-dest, .attach-pick-target, '
+    + '.zone-creature-activatable, .zone-equip-activatable, .zone-ability-activatable, .zone-hero-effect-active';
+  document.addEventListener('click', (e) => {
+    const z = e.target.closest && e.target.closest('.board-zone');
+    if (!z || !z.matches(WAHL_ZONE)) return;
+    if (e.target.closest('button, [role="button"], .tab')) return;   // Knoepfe klingen ueber den Knopf-Listener
+    playSFX('ui_click', { dedupe: 120 });
+  }, { capture: true });
+
   // ── ESCAPE KLINGT IMMER (Als Regel 17.8.) ─────────────────────────
   // „Ein Menue/Submenue per Escape zu schliessen, sollte IMMER ein
   //  Geraeusch machen!"
