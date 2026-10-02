@@ -5098,16 +5098,17 @@ const WowhallaOverlay = React.memo(function WowhallaOverlay() {
 //  Ebenen (Kunsthoehe 100; per Generator gemalt, der nicht im Projekt liegt): tile.png — Kachel 128
 //  mit ZWEI Bildern untereinander (128×200): Ziegelwand mit Felsband (y 36), drei Reihen Augen
 //  (versetzt) und zweitem Felsband (y 73); Bild 2 = Herzschlag (groessere, hellere Herzen);
-//  girl.png — nahe Frauen (6 Bilder 12×20, siehe LC_FOLGE; 2 Varianten untereinander);
-//  girl-far.png — ferne Frauen auf dem oberen Felsband (6 Bilder 9×13, 2 Varianten);
+//  girl.png — nahe Frauen (12 Bilder 12×20, siehe LC_FOLGE; 2 Varianten untereinander);
+//  girl-far.png — ferne Frauen auf dem oberen Felsband (12 Bilder 9×13, 2 Varianten);
 //  heart.png — aufsteigendes Herz (2 Bilder 7×5).
 // ═══════════════════════════════════════════════════════════════════
 const LC = '/areas/second-circle-of-hell/';
 // Alle Animationen teilen die Periode 12 s (6/12 s Wiegen, 4/6 s Herzen, 3 s Herzschlag) → nahtlose Schleife.
-const LC_DAUER = [6, 12, 12];
-// Frauen: 6 Bilder (0 ruhig, 1 Kopf links, 2 Kopf rechts, 3 Einatmen, 4/5 Haar weht links/rechts); 30 Schritte je Zyklus.
-const LC_FOLGE = [0,0,3,3,0,0,1,1,1,0,0,4,4,0, 2,2,2,0,0,5,5,0,0,3,3,0,0,1,0,0];
-const LC_BILDER = 6;
+const LC_DAUER = [6, 6, 6];   // 40 Schritte in 6 s; 6 s teilt die Periode 12 s
+// Frauen: 12 Bilder (0 ruhig, 1/2 Kopf links/rechts, 3 Einatmen, 4/5 Haar weht, 6/7 Kopf+Haar gegenlaeufig, 8 Haende an den Wangen,
+// 9 Seufzen, 10 Blinzeln (Herzaugen aus), 11 Rock schwingt); 40 Schritte je Zyklus (6 s: 0,15 s je Bild).
+const LC_FOLGE = [0,0,3,3,0,0,1,1,6,6,1,0,0,4,4,0,2,2,7,7,2,0,5,5,0,8,8,8,9,9,0,10,0,0,3,3,11,11,0,0];
+const LC_BILDER = 12;
 const LC_KEYFRAMES = LC_FOLGE.map((b, i) => `${(i * 100 / LC_FOLGE.length).toFixed(3)}% { background-position-x: ${(b * 100 / (LC_BILDER - 1)).toFixed(3)}%; }`).join(' ');
 const LC_NAH = { feet: 73, w: 12, h: 20, xs: [-84, -52, -18, 16, 50, 84] };
 const LC_FERN = { feet: 36, w: 9, h: 13, xs: [-92, -68, -44, -20, 4, 28, 52, 76, 100] };
