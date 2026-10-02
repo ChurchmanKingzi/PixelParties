@@ -18843,3 +18843,7 @@ Jede Reaktions-Abfrage an den Gegner (Surprise-Aktivierung oder Hand-Reaktion mi
 - Priest of Luna / Tempeste zeigen sich zusätzlich sofort nach dem „Ja“.
 
 **Rool, the Troll Guard — Update (Als Vorgabe 2.10.).** Text jetzt „deals damage to a target you control“ (ohne „another“): der Geber steht ohnehin auf der Gegenseite, die Zusatzprüfung „nicht dasselbe Ziel“ entfällt. Neue Animation `rool_disrupt` (Troll-Hieb: Blitz, Druckring, aufreißende Spalten, Brocken, aufspringendes „×2“; Klang `debuff` in `ZONE_ANIM_SFX`), ausgelöst über `addAnim` des Debuffs (Held und Creature).
+
+### Neuer Abfrage-Typ `cardReorder` (Scavenging Crane, Als Vorgabe 2.10.)
+
+`engine.promptGeneric(pi, { type: 'cardReorder', cards: [{ name, source }], title, description, confirmLabel, cancellable: false })` → `{ order: [urspruengliche Indizes in neuer Reihenfolge] }`. Client: `CardReorderPrompt` (`app-board.jsx`) — alle Karten in EINER Reihe, Platz 1 (links) = als nächstes gezogen, Umsortieren per Drag & Drop innerhalb der Box (◀ ▶ unter jeder Karte für Touch), „Confirm“ schickt die Reihenfolge. Privat: `effectPromptFuer` (server.js) schickt die Karten dieses Typs nur an den Besitzer. Danach fliegen die Karten sichtbar (nur für den Besitzer, `{ toPlayers: [pi] }`) von der Brettmitte (`from: 'boardCenter'`) in INVERSER Reihenfolge (5, 4, 3, 2, 1) aufs Deck; `engine.reorderDeck` schreibt die neue Reihenfolge. Ungültige Antwort → Reihenfolge bleibt; CPU: Reihenfolge belassen.

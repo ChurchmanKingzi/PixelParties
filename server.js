@@ -2632,6 +2632,15 @@ function mainDeckSizeOk(main, side) {
   return spiegel >= 4 ? (main.length >= 60 && main.length <= 80) : main.length === 60;
 }
 
+/**
+ * Abfrage-Zustand fuer einen Empfaenger. Private Abfragen (Typ `cardReorder`: Scavenging Crane sortiert die obersten Karten
+ * des EIGENEN Decks) schicken ihre Karten NUR an den Besitzer — Gegner und Zuschauer sehen sie nicht.
+ */
+function effectPromptFuer(ep, empfaengerIdx) {
+  if (!ep || ep.type !== 'cardReorder' || ep.ownerIdx === empfaengerIdx) return ep || null;
+  return { ...ep, cards: [], description: '' };
+}
+
 function campaignDeckLegal(deck) {
   if (!deck) return false;
   if ((deck.mainDeck || []).length !== 60) return false;
@@ -4928,7 +4937,7 @@ function sendGameState(room, playerIdx, extra) {
     potionTargeting: gs.potionTargeting || null,
     // v1150: Zielmarken (#1, #2 …) — siehe `engine.setzeZielMarke`.
     zielMarken: gs.zielMarken || [],
-    effectPrompt: gs.effectPrompt || null,
+    effectPrompt: effectPromptFuer(gs.effectPrompt, playerIdx),
     surprisePending: gs.surprisePending || false,
     heroEffectPending: gs.heroEffectPending || null,
     creatureCounters: room.engine ? (() => {
@@ -5614,7 +5623,7 @@ function sendSpectatorGameState(room) {
       config: gs.potionTargeting.config,
       validTargets: gs.potionTargeting.validTargets,
     } : null,
-    effectPrompt: gs.effectPrompt || null,
+    effectPrompt: effectPromptFuer(gs.effectPrompt, -1),
     surprisePending: gs.surprisePending || false,
     heroEffectPending: gs.heroEffectPending || null,
     creatureCounters: room.engine ? (() => {
