@@ -29458,7 +29458,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   useEffect(() => { if (spellHeroPick && window.playSFX) window.playSFX('ui_prompt_open'); }, [spellHeroPick]);
   useEffect(() => { if (crossSidePlayPick && window.playSFX) window.playSFX('ui_prompt_open'); }, [crossSidePlayPick]);
   // Klick-Beschwoerung einer Creature: Body-Klasse, damit CSS alles ausser Caster-Helden, freien Zonen und der Karte selbst ausgraut.
-  const summonPickAktiv = !!((spellHeroPick && (spellHeroPick.isCreature || spellHeroPick.isArtifactCreature)) || crossSidePlayPick);   // auch Klick-Wahl auf JEDE Zone (Stowaway, Chilly Wizard)
+  const summonPickAktiv = !!(spellHeroPick || crossSidePlayPick);   // auch Klick-Wahl auf JEDE Zone (Stowaway, Chilly Wizard)
   useEffect(() => {
     document.body.classList.toggle('summon-pick', summonPickAktiv);
     return () => document.body.classList.remove('summon-pick');
@@ -31383,6 +31383,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                       idx: c.heroIdx,
                       name: `${c.cardName} (Creature)`,
                       creatureInstId: c.creatureInstId,
+                      zoneSlot: c.zoneSlot,
                     });
                   }
                 }
@@ -43308,7 +43309,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           // gleichwertig zum Namens-Button.
           const spellPickEntry = (spellHeroPick && ownerLabel === 'me')
             ? (spellHeroPick.eligible || []).find(e => e.creatureInstId == null && e.charmedOwner == null && e.idx === i) || null
-            : (spellHeroPick && ownerLabel === 'opp' && (spellHeroPick.isCreature || spellHeroPick.isArtifactCreature))
+            : (spellHeroPick && ownerLabel === 'opp')
               // geliehene (charmed) Caster der Gegenspalte sind ebenfalls anklickbar
               ? (spellHeroPick.eligible || []).find(e => e.creatureInstId == null && e.charmedOwner === pi && e.idx === i) || null
               : null;
@@ -44494,7 +44495,11 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     && (e.charmedOwner != null ? e.charmedOwner === pi : pi === myIdx)
                     && ((cards || []).length === 0 || e.zoneSlot === z)) || null
                 : null;
-              const isSummonPickZone = !!_summonPickEntry;
+              // Creature-Caster eines Zaubers (Wolflesia): die Zone der Creature selbst ist das Klickziel.
+              const _casterPickEntry = (spellHeroPick && !(spellHeroPick.isCreature || spellHeroPick.isArtifactCreature) && pi === myIdx)
+                ? (spellHeroPick.eligible || []).find(e => e.creatureInstId != null && e.idx === i && e.zoneSlot === z) || null
+                : null;
+              const isSummonPickZone = !!_summonPickEntry || !!_casterPickEntry;
               const _bpPickOwn = !!pendingBouncePick;
               const isPendingBounceTarget = _bpPickOwn && (pendingBouncePick.bounceTargets || []).some(t => (t.owner ?? myIdx) === pi && t.heroIdx === i && t.slotIdx === z);
               // Valid drop zones come in two flavors that now coexist:
@@ -44773,7 +44778,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     });
                   } : isSummonPickZone ? () => {
                     // Klick-Beschwoerung: diese Zone ist das Ziel (Zone des Casters bzw. ihr freier Platz).
-                    commitSpellHeroPick({ ..._summonPickEntry, zoneSlot: z });
+                    commitSpellHeroPick(_casterPickEntry || { ..._summonPickEntry, zoneSlot: z });
                   } : isPendingBounceTarget ? () => {
                     // Click-to-swap: dispatches play_creature as if the
                     // card had been dragged here. Server treats the
@@ -46666,7 +46671,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                   && handEffectiveCost > handCardData.cost;
                 return (
                   <div key={'h-' + item.origIdx} data-hand-idx={item.origIdx} data-card-name={item.card} data-card-type={CARDS_BY_NAME[item.card]?.cardType || ''} data-touch-drag="1"
-                    className={'hand-slot' + (isBeingDragged ? ' hand-dragging' : '') + (dimmed ? ' hand-card-dimmed' : '') + (isAnyDiscard && isForceDiscardEligible ? ' hand-discard-target' : '') + (isAnyDiscard && !isForceDiscardEligible ? ' hand-card-dimmed' : '') + (isAttachEligible ? ' hand-card-attach-eligible' : '') + (isAbilityAttach && !isAttachEligible ? ' hand-card-attach-dimmed' : '') + (isHandPickSelected ? ' hand-pick-selected' : '') + (isHandPickEligible && !isHandPickSelected && !isHandPickTypeFull && !isHandPickMaxed && !isHandPickNameLocked ? ' hand-pick-eligible' : '') + ((isHandPickTypeFull || isHandPickMaxed || isHandPickNameLocked) ? ' hand-card-dimmed' : '') + (isPickHandCardEligible ? ' hand-pick-eligible' : '') + (isPickHandCardUrgent ? ' hand-pick-eligible-urgent' : '') + (isPickHandCardDimmed ? ' hand-card-dimmed' : '') + ((spellHeroPick && (spellHeroPick.isCreature || spellHeroPick.isArtifactCreature) && item.origIdx !== spellHeroPick.handIndex) ? ' hand-card-dimmed' : '') + ((crossSidePlayPick && item.origIdx !== crossSidePlayPick.handIndex) ? ' hand-card-dimmed' : '') + (isZonePickHandHighlight ? ' hand-pick-eligible-urgent' : '') + (isZonePickHandQueued ? ' hand-pick-eligible' : '') + (isZonePickHandDimmed ? ' hand-card-dimmed' : '') + (isPotionHandTargetSelected ? ' hand-pick-selected' : (isPotionHandTarget ? ' hand-pick-eligible' : '')) + (isStNicolasEscrowed ? ' hand-card-st-nicolas-escrowed' : '') + ((isStealMarked || isStealHighlighted) ? ' blind-pick-selected' : '') + (isRevealed ? ' hand-card-revealed' : '') + (istFrischErschienen(item.origIdx) ? ' hand-card-materializing' : '')}
+                    className={'hand-slot' + (isBeingDragged ? ' hand-dragging' : '') + (dimmed ? ' hand-card-dimmed' : '') + (isAnyDiscard && isForceDiscardEligible ? ' hand-discard-target' : '') + (isAnyDiscard && !isForceDiscardEligible ? ' hand-card-dimmed' : '') + (isAttachEligible ? ' hand-card-attach-eligible' : '') + (isAbilityAttach && !isAttachEligible ? ' hand-card-attach-dimmed' : '') + (isHandPickSelected ? ' hand-pick-selected' : '') + (isHandPickEligible && !isHandPickSelected && !isHandPickTypeFull && !isHandPickMaxed && !isHandPickNameLocked ? ' hand-pick-eligible' : '') + ((isHandPickTypeFull || isHandPickMaxed || isHandPickNameLocked) ? ' hand-card-dimmed' : '') + (isPickHandCardEligible ? ' hand-pick-eligible' : '') + (isPickHandCardUrgent ? ' hand-pick-eligible-urgent' : '') + (isPickHandCardDimmed ? ' hand-card-dimmed' : '') + ((spellHeroPick && item.origIdx !== spellHeroPick.handIndex) ? ' hand-card-dimmed' : '') + ((crossSidePlayPick && item.origIdx !== crossSidePlayPick.handIndex) ? ' hand-card-dimmed' : '') + (isZonePickHandHighlight ? ' hand-pick-eligible-urgent' : '') + (isZonePickHandQueued ? ' hand-pick-eligible' : '') + (isZonePickHandDimmed ? ' hand-card-dimmed' : '') + (isPotionHandTargetSelected ? ' hand-pick-selected' : (isPotionHandTarget ? ' hand-pick-eligible' : '')) + (isStNicolasEscrowed ? ' hand-card-st-nicolas-escrowed' : '') + ((isStealMarked || isStealHighlighted) ? ' blind-pick-selected' : '') + (isRevealed ? ' hand-card-revealed' : '') + (istFrischErschienen(item.origIdx) ? ' hand-card-materializing' : '')}
                     style={{
                       // ★ v1233: Der Faecher haengt am PLATZ, nicht an
                       // der Karte — siehe „HANDFAECHER" in style.css.
@@ -48881,38 +48886,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         </DraggablePanel>
       )}
 
-      {/* Creature per Klick beschwoeren: KEIN Box-Menue und kein Hinweistext — Caster-Helden und freie Support Zonen leuchten,
-          alles andere wird ausgegraut (Body-Klasse `summon-pick`, CSS in style.css). */}
-      {spellHeroPick && !result && !(spellHeroPick.isCreature || spellHeroPick.isArtifactCreature) && (
-        <DraggablePanel className="first-choice-panel animate-in" style={{ borderColor: 'var(--accent)' }}>
-          <div className="orbit-font" style={{ fontSize: 13, color: 'var(--accent)', marginBottom: 4 }}>
-            {spellHeroPick.isSurprise ? '🎭' : spellHeroPick.isAscension ? '🦋' : spellHeroPick.isCreature ? '🐾' : spellHeroPick.card?.cardType === 'Attack' ? '⚔️' : '✦'} {spellHeroPick.isSurprise ? 'Set' : spellHeroPick.isAscension ? 'Ascend' : spellHeroPick.isCreature ? 'Summon' : 'Play'} {spellHeroPick.cardName}
-          </div>
-          <div style={{ fontSize: 11, color: 'var(--text2)', marginBottom: 12 }}>{spellHeroPick.isSurprise ? 'Choose a Hero to set this Surprise face-down:' : spellHeroPick.isAscension ? 'Choose a Hero to Ascend:' : spellHeroPick.isCreature ? 'Choose a Hero to summon this Creature:' : 'Choose a Hero to play this card:'}</div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {spellHeroPick.eligible.map(h => {
-              const isCreatureCaster = h.creatureInstId != null;
-              const keyStr = isCreatureCaster
-                ? `cr:${h.creatureInstId}`
-                : (h.charmedOwner != null ? 'c' : '') + h.idx;
-              const borderColor = isCreatureCaster ? '#7fffaa'
-                : (h.charmedOwner != null ? '#ff69b4' : 'var(--accent)');
-              const label = isCreatureCaster
-                ? `🐾 ${h.name}`
-                : (h.charmedOwner != null ? `💕 ${h.name} (charmed)` : (me.heroes[h.idx]?.name || 'Hero ' + (h.idx + 1)));
-              return (
-              <button key={keyStr} className="btn" style={{ padding: '8px 16px', fontSize: 12, borderColor, color: borderColor, textAlign: 'left' }}
-                onClick={() => commitSpellHeroPick(h)}>
-                {label}
-              </button>
-            );
-            })}
-            <button className="btn" style={{ padding: '6px 16px', fontSize: 11, borderColor: 'var(--danger)', color: 'var(--danger)', marginTop: 4 }}
-              onClick={() => setSpellHeroPick(null)}>Cancel</button>
-          </div>
-        </DraggablePanel>
-      )}
-
+      {/* Karte per Klick spielen (Creature, Spell, Attack, Surprise, Ascension): KEIN Box-Menue und kein Hinweistext — die moeglichen
+          Nutzer (Helden, Caster-Creatures, freie Support Zonen) leuchten, alles andere wird ausgegraut (Body-Klasse `summon-pick`,
+          CSS in style.css); Abbruch per Escape. */}
       {/* ── Summon-or-Reveal Picker (hand-activated Creatures like Luna Kiai) ── */}
       {summonOrRevealPick && !result && (() => {
         const p = summonOrRevealPick;
