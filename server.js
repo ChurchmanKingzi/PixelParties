@@ -8663,6 +8663,7 @@ async function doActivateCreatureEffect(room, pi, { heroIdx, zoneSlot, charmedOw
     // countered), refund any consumed additional-action provider, and
     // bail without running the script's onCreatureEffect.
     if (creatureEffectChainResult?.negated) {
+      room.engine.beendeDarkDeal(inst);
       if (charmedHeroCreature) {
         inst.controller = origController;
         inst.owner = origOwner;
@@ -8737,6 +8738,7 @@ async function doActivateCreatureEffect(room, pi, { heroIdx, zoneSlot, charmedOw
       room.engine._promptCardStack.pop();
       room.engine._currentEffectSource = prevSrc;
       room.engine._activeCreatureEffect = prevAktiv;
+      room.engine.beendeDarkDeal(inst);   // Dark Deal: die Kontrolle „fuer diesen Moment" endet mit dem Effekt
     }
 
     if (charmedHeroCreature) {

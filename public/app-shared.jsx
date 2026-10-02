@@ -3060,6 +3060,15 @@ const ZONE_ANIM_SFX = {
     { name: 'elem_fire', opts: { rate: 0.75, volume: 0.9, delay: 260, category: null, dedupe: 0 } },
     { name: 'elem_fire', opts: { rate: 0.95, volume: 0.7, delay: 700, category: null, dedupe: 0 } },
   ],
+  // Dark Deal: schwarzer Nebel + Goldmuenzen — dunkler Ton, Debuff-Ton, drei klimpernde Muenzen, Nachhall.
+  dark_deal: [
+    { name: 'elem_dark', opts: { rate: 0.6,  volume: 1.4 } },
+    { name: 'debuff',    opts: { rate: 0.7,  volume: 0.9, delay: 120, category: null, dedupe: 0 } },
+    { name: 'gold_gain', opts: { rate: 1.0,  volume: 1.1, delay: 250, category: null, dedupe: 0 } },
+    { name: 'gold_gain', opts: { rate: 1.15, volume: 1.0, delay: 430, category: null, dedupe: 0 } },
+    { name: 'gold_gain', opts: { rate: 1.3,  volume: 0.9, delay: 620, category: null, dedupe: 0 } },
+    { name: 'elem_dark', opts: { rate: 0.8,  volume: 1.0, delay: 700, category: null, dedupe: 0 } },
+  ],
   hell_coins: [
     { name: 'gold_gain', opts: { rate: 1.0,  volume: 1.0 } },
     { name: 'gold_gain', opts: { rate: 1.15, volume: 0.85, delay: 170, category: null, dedupe: 0 } },

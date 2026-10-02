@@ -3664,6 +3664,18 @@ class GameEngine {
   }
 
   /**
+   * Dark Deal: Ende der „fuer diesen Moment"-Kontrolle — stellt `stolenBy` auf den Wert vor der Reaktion zurueck.
+   * Der Server ruft es nach dem aktiven Kreatureneffekt (auch bei Negierung/Fehler).
+   */
+  beendeDarkDeal(inst) {
+    if (!inst || inst._darkDealVon == null) return;
+    if (inst._darkDealVorher == null) delete inst.stolenBy; else inst.stolenBy = inst._darkDealVorher;
+    delete inst._darkDealVon;
+    delete inst._darkDealVorher;
+    this.sync();
+  }
+
+  /**
    * Effektive Seiten einer Instanz (Styx 28.9. aus `_createContext` gezogen,
    * damit Kontext und Engine-Filter nie auseinanderlaufen):
    * `owner`/`controller` = wer mit der Karte handelt (Charme, gestohlene und

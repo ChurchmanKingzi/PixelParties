@@ -15687,6 +15687,59 @@ const ANIM_REGISTRY = {
       );
     };
   })(),
+  // ★ Dark Deal: schwarzer Nebel wabert um die Creature, Goldmuenzen kreisen um sie und blitzen auf — der Pakt.
+  dark_deal: (() => {
+    return function DarkDealEffect({ x, y, w, h }) {
+      const cw = w || 100, ch = h || 140;
+      const nebel = useMemo(() => Array.from({ length: ppFxN(14) }, (_, i) => {
+        const a = (i / 14) * Math.PI * 2 + Math.random() * 0.4;
+        return {
+          sx: Math.cos(a) * cw * 0.5, sy: Math.sin(a) * ch * 0.5,
+          dx: Math.cos(a + 1.1) * 38, dy: -20 - Math.random() * 40,
+          size: 46 + Math.random() * 44, delay: Math.round(Math.random() * 450), dur: Math.round(1100 + Math.random() * 600),
+        };
+      }), [cw, ch]);
+      const muenzen = useMemo(() => Array.from({ length: ppFxN(16) }, (_, i) => {
+        const a = (i / 16) * Math.PI * 2 + Math.random() * 0.3;
+        const rx = cw * 0.62, ry = ch * 0.56;
+        return {
+          x0: Math.cos(a) * rx, y0: Math.sin(a) * ry,
+          x1: Math.cos(a + 0.9) * rx, y1: Math.sin(a + 0.9) * ry,
+          x2: Math.cos(a + 1.8) * rx * 1.15, y2: Math.sin(a + 1.8) * ry * 1.15 - 18,
+          size: 9 + Math.round(Math.random() * 5), delay: Math.round(Math.random() * 500), dur: Math.round(900 + Math.random() * 400),
+        };
+      }), [cw, ch]);
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+          <div style={{ position: 'absolute', left: -cw / 2 - 8, top: -ch / 2 - 8, width: cw + 16, height: ch + 16, borderRadius: 8,
+            background: 'radial-gradient(ellipse at center, rgba(8,0,16,.88) 0%, rgba(20,0,36,.6) 55%, rgba(20,0,36,0) 100%)',
+            opacity: 0, animation: 'ddShade 1500ms ease-in-out forwards' }} />
+          {nebel.map((n, i) => (
+            <i key={'n' + i} style={{ position: 'absolute', left: n.sx - n.size / 2, top: n.sy - n.size / 2, width: n.size, height: n.size, borderRadius: '50%',
+              background: 'radial-gradient(circle, rgba(6,0,12,.95) 0%, rgba(28,6,44,.7) 50%, rgba(28,6,44,0) 76%)', filter: 'blur(5px)',
+              opacity: 0, '--dx': n.dx + 'px', '--dy': n.dy + 'px', animation: `ddMist ${n.dur}ms ease-in-out ${n.delay}ms forwards` }} />
+          ))}
+          {muenzen.map((m, i) => (
+            <b key={'c' + i} style={{ position: 'absolute', left: -m.size / 2, top: -m.size / 2, width: m.size, height: m.size, borderRadius: '50%',
+              background: 'radial-gradient(circle at 35% 30%, #F8F5B5 0%, #F6E318 40%, #EEAF2E 75%, #9a6a10 100%)', border: '1px solid #6a4408',
+              boxShadow: '0 0 6px rgba(246,227,24,.8)', opacity: 0,
+              '--x0': m.x0 + 'px', '--y0': m.y0 + 'px', '--x1': m.x1 + 'px', '--y1': m.y1 + 'px', '--x2': m.x2 + 'px', '--y2': m.y2 + 'px',
+              animation: `ddCoin ${m.dur}ms ease-in-out ${m.delay}ms forwards` }} />
+          ))}
+          <style>{`
+            @keyframes ddShade { 0% { opacity: 0; } 30% { opacity: 1; } 70% { opacity: .85; } 100% { opacity: 0; } }
+            @keyframes ddMist { 0% { opacity: 0; transform: translate(0, 0) scale(.4); } 30% { opacity: 1; } 100% { opacity: 0; transform: translate(var(--dx), var(--dy)) scale(1.5) rotate(40deg); } }
+            @keyframes ddCoin {
+              0%   { opacity: 0; transform: translate(var(--x0), var(--y0)) rotateY(0deg) scale(.4); }
+              15%  { opacity: 1; transform: translate(var(--x0), var(--y0)) rotateY(120deg) scale(1); }
+              55%  { opacity: 1; transform: translate(var(--x1), var(--y1)) rotateY(520deg) scale(1.1); }
+              100% { opacity: 0; transform: translate(var(--x2), var(--y2)) rotateY(1000deg) scale(.7); }
+            }
+          `}</style>
+        </div>
+      );
+    };
+  })(),
   // ★ The Fourth Circle: Goldrausch — Muenzen springen aus der Area-Zone und fallen klimpernd zurueck.
   hell_coins: (() => {
     return function HellCoinsEffect({ x, y }) {
