@@ -3069,6 +3069,13 @@ const ZONE_ANIM_SFX = {
     { name: 'gold_gain', opts: { rate: 1.3,  volume: 0.9, delay: 620, category: null, dedupe: 0 } },
     { name: 'elem_dark', opts: { rate: 0.8,  volume: 1.0, delay: 700, category: null, dedupe: 0 } },
   ],
+  // The Root of all Evil: schwarzer Nebel ueber der geloeschten Creature — tiefer dunkler Ton, dumpfes Grollen, Nachhall.
+  root_evil_mist: [
+    { name: 'elem_dark',    opts: { rate: 0.5,  volume: 1.5 } },
+    { name: 'heavy_impact', opts: { rate: 0.55, volume: 0.8, delay: 120, category: null, dedupe: 0 } },
+    { name: 'debuff',       opts: { rate: 0.6,  volume: 0.9, delay: 300, category: null, dedupe: 0 } },
+    { name: 'elem_dark',    opts: { rate: 0.7,  volume: 1.0, delay: 650, category: null, dedupe: 0 } },
+  ],
   hell_coins: [
     { name: 'gold_gain', opts: { rate: 1.0,  volume: 1.0 } },
     { name: 'gold_gain', opts: { rate: 1.15, volume: 0.85, delay: 170, category: null, dedupe: 0 } },

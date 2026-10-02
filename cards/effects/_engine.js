@@ -12226,7 +12226,10 @@ class GameEngine {
       // dieselbe Karte, 26 ms auseinander.
       const _selbstLoeschend = !!loadCardEffect(targetCard.name)?.deletesSelfOnDeath;
       // Ghazma: besiegte Kreaturen werden geloescht (Umleitung ueber `_redirectToDeleted`).
-      if (isCreatureTarget && !_selbstLoeschend && this._gefalleneKreaturenGeloescht()) targetCard._redirectToDeleted = true;
+      if (isCreatureTarget && !_selbstLoeschend && this._gefalleneKreaturenGeloescht()) {
+        targetCard._redirectToDeleted = true;
+        if (this._wurzelAktiv() && isBoardZone && fromZone === ZONES.SUPPORT) this._wurzelNebel(targetCard.owner, targetCard.heroIdx, targetCard.zoneSlot);
+      }
       const _zielPile = (targetCard._redirectToDeleted || _selbstLoeschend) ? 'deleted' : 'discard';
       if (isBoardZone) {
         const payload = {
@@ -12388,6 +12391,11 @@ class GameEngine {
    * Frozen/Stunned/Negated …), fuer BEIDE Ablagen. Besiegte Kreaturen laufen ueber `_gefalleneKreaturenGeloescht`
    * (beide Todespfade), alle anderen Wege in die Ablage (Handabwurf, Mill, …) ueber die `push`-Umleitung unten.
    */
+  /** Schwarzer, unheilvoller Nebel ueber einer Creature, die die Root loescht (Zonen-Animation `root_evil_mist`). */
+  _wurzelNebel(owner, heroIdx, zoneSlot) {
+    this._broadcastEvent('play_zone_animation', { type: 'root_evil_mist', owner, heroIdx, zoneSlot });
+  }
+
   _wurzelAktiv() {
     for (const inst of this.cardInstances || []) {
       if (inst.name !== 'The Root of all Evil' || inst.zone !== 'support' || inst.faceDown) continue;
@@ -45172,6 +45180,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       // Derselbe Fehler wie bei den acht Flugwegen (v1133): eine
       // Absicherung an EINER Stelle ist keine Absicherung.
       const _ghazmaLoescht = this._gefalleneKreaturenGeloescht();
+      if (_ghazmaLoescht && this._wurzelAktiv()) this._wurzelNebel(e.inst.owner, e.inst.heroIdx, e.inst.zoneSlot);   // Root: schwarzer Nebel
       const _selbstLoeschend = !!loadCardEffect(e.inst.name)?.deletesSelfOnDeath || _ghazmaLoescht;
       // Loesch-Rettung („deleted from anywhere", Ash Worms) greift auch hier, wenn Ghazma
       // die Niederlage zu einem Loeschen macht (die Instanz ist schon aus dem Platz).
@@ -46730,6 +46739,27 @@ this._deathWatch = (this._deathWatchStack || []).length
     // could trip the 5s "no progress" timeout even though the hook is
     // healthy and just waiting on visual pacing.
     this._hookProgressTick = (this._hookProgressTick || 0) + 1;
+    // ★ The Root of all Evil: Creatures, die in eine Ablage kaemen, landen im GELOESCHT-Stapel — die Fluege dorthin
+    // muessen das auch zeigen. Zentral hier umgeschrieben (statt an jedem der vielen Flug-Aufrufe): Flug zur Ablage
+    // → Flug zum Geloescht-Stapel; Deck→Ablage-Animationen werden nach Creatures (Loeschmodus) und Rest geteilt.
+    if (this._wurzelAktiv()) {
+      const db = this._getCardDB();
+      const istKreatur = (n) => { const cd = db[n]; return !!cd && hasCardType(cd, 'Creature'); };
+      if (event === 'play_pile_transfer' && data && data.to === 'discard' && data.cardName && istKreatur(data.cardName)) {
+        data = { ...data, to: 'deleted' };
+      } else if (event === 'deck_to_discard_animation' && data && Array.isArray(data.cardNames) && !data.deleteMode) {
+        const kr = data.cardNames.filter(istKreatur);
+        if (kr.length) {
+          const rest = data.cardNames.filter(n => !istKreatur(n));
+          this._broadcastEvent(event, { ...data, cardNames: kr, deleteMode: true }, opts);
+          if (!rest.length) return;
+          data = { ...data, cardNames: rest };
+        }
+      } else if (event === 'mill_center_reveal' && data && !data.deleteMode && Array.isArray(data.cardNames)
+                 && data.cardNames.length && data.cardNames.every(istKreatur)) {
+        data = { ...data, deleteMode: true };
+      }
+    }
     // Self-play teardown nulls `this.room` to break the room↔engine ref
     // cycle, but tail-async work (a switchTurn → cpuTurn chain that was
     // already queued) can still reach this method. Bail silently rather
