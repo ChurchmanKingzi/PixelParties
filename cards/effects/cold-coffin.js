@@ -125,9 +125,12 @@ module.exports = {
           c.heroIdx === target.heroIdx && c.zoneSlot === target.slotIdx
         );
         if (inst) {
+          // „for the rest of the game": nie ablaufende Dauer. Seit dem Fix des 1-Zug-Freeze taut ein Freeze OHNE
+          // `frozenDuration` am Zugende auf — dauerhafte Freezes muessen die Dauer also ausdruecklich mitgeben.
           const applied = await engine.applyCreatureStatus(inst, 'frozen', {
             sourceOwner: pi,
             source: 'Cold Coffin',
+            duration: 9999,
           });
           if (applied) {
             // The engine's cleanseCreatureStatuses() checks for key+'Unhealable'
