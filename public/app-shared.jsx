@@ -2782,6 +2782,7 @@ const ZONE_ANIM_SFX = {
   // Divine Gift of Skill — gold-and-violet scholar burst on the blessed Hero
   blessed_skill_burst:    { name: 'elem_holy' },
   rool_disrupt:           { name: 'heavy_impact', opts: { rate: 0.55, volume: 2.0 } },
+  stowaway_tentacles:     { name: 'elem_biomancy', opts: { rate: 0.8, volume: 1.4 } },
   // Acid / poison (poison has its own sound per user)
   acid_splash:             { name: 'elem_acid' },
   plague_smoke:            { name: 'poison' },

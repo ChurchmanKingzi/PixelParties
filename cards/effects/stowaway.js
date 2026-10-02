@@ -174,7 +174,7 @@ module.exports = {
       // Der Held dieser Zone wird negiert (echter, heilbarer Status).
       const ok = setzeAnhaengselStatus(engine, inst.owner, inst.heroIdx, CARD_NAME, 'negated');
       if (!ok) { await loeschen(engine, inst, 'no_host'); return; }   // Hero Zone ohne lebenden Helden: nichts zu negieren
-      engine._broadcastEvent('play_zone_animation', { type: 'silence_seal', owner: inst.owner, heroIdx: inst.heroIdx, zoneSlot: -1 });
+      engine._broadcastEvent('play_zone_animation', { type: 'stowaway_tentacles', owner: inst.owner, heroIdx: inst.heroIdx, zoneSlot: -1, duration: 2700 });   // rosa Tentakel umklammern den Wirt
       engine.log('stowaway_negates', {
         hero: engine.gs.players[inst.owner]?.heroes?.[inst.heroIdx]?.name,
       });
