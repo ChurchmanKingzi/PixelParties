@@ -2782,7 +2782,16 @@ const ZONE_ANIM_SFX = {
   // Divine Gift of Skill — gold-and-violet scholar burst on the blessed Hero
   blessed_skill_burst:    { name: 'elem_holy' },
   rool_disrupt:           { name: 'heavy_impact', opts: { rate: 0.55, volume: 2.0 } },
-  stowaway_tentacles:     { name: 'elem_biomancy', opts: { rate: 0.8, volume: 1.4 } },
+  // Tentakel (4,2 s): schleimiges Heranwachsen, zwei Aufschlaege beim Packen, zweimal Zudruecken, Loesen.
+  stowaway_tentacles:     [
+    { name: 'elem_biomancy', opts: { rate: 0.7, volume: 2.0, delay: 0 } },
+    { name: 'heavy_impact',  opts: { rate: 0.85, volume: 1.2, delay: 520 } },
+    { name: 'elem_biomancy', opts: { rate: 0.6, volume: 2.0, delay: 900 } },
+    { name: 'heavy_impact',  opts: { rate: 0.5, volume: 1.8, delay: 1500 } },
+    { name: 'debuff',        opts: { rate: 0.6, volume: 1.6, delay: 1650 } },
+    { name: 'heavy_impact',  opts: { rate: 0.45, volume: 1.8, delay: 2150 } },
+    { name: 'status_remove', opts: { rate: 0.7, volume: 1.4, delay: 3300 } },
+  ],
   // Acid / poison (poison has its own sound per user)
   acid_splash:             { name: 'elem_acid' },
   plague_smoke:            { name: 'poison' },
