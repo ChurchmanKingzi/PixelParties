@@ -9,7 +9,7 @@
 //  ── AUSLEGUNG ─────────────────────────────────────────────────────
 //  • Fenster: die Kette um die Aktivierung eines AKTIVEN Kreatureneffekts (`cardType: 'CreatureEffect'`,
 //    wie bei Gigantisaur Skull). Nur eine GEGNERISCHE Creature, deren Skript einen Ziel waehlenden Effekt
-//    hat (`requiresTarget`, dasselbe Kennzeichen wie das Blinded-Tor), und nur, solange sie aktiv ist
+//    hat (`requiresTarget` ODER Zielwahl-Aufruf im Quelltext — nicht alle Skripte tragen das Kennzeichen), und nur, solange sie aktiv ist
 //    (nicht Frozen/Stunned/Negated …).
 //  • „You choose the target … treated as controlled by you": fuer die Dauer dieser einen Aktivierung gilt die
 //    Creature als von DIR kontrolliert — `inst.stolenBy = ich` (dieselbe Marke wie beim vorueber-
@@ -20,9 +20,28 @@
 //  • Bild/Klang: `dark_deal` — schwarzer Nebel und Goldmuenzen um die Creature.
 // ═══════════════════════════════════════════
 
-const { loadCardEffect } = require('./_loader');
+const fs = require('fs');
+const path = require('path');
+const { loadCardEffect, nameToFile } = require('./_loader');
 
 const CARD_NAME = 'Dark Deal';
+
+// „Chooses a target": das Kennzeichen `requiresTarget` fehlt bei etlichen Skripten, die trotzdem ein Ziel waehlen
+// lassen — deshalb zusaetzlich der Quelltext (Zielwahl-Aufrufe), je Name gemerkt.
+const ZIELWAHL = /prompt(Damage|Effect)?Target\s*\(|promptTarget\s*\(|promptZonePick|zonePick/;
+const _zielCache = new Map();
+function waehltZiel(name, script) {
+  if (script?.requiresTarget) return true;
+  if (_zielCache.has(name)) return _zielCache.get(name);
+  let ja = false;
+  try {
+    const file = nameToFile(name);
+    const pfad = path.isAbsolute(file) ? file : path.join(__dirname, file.endsWith('.js') ? file : file + '.js');
+    ja = ZIELWAHL.test(fs.readFileSync(pfad, 'utf8'));
+  } catch { ja = false; }
+  _zielCache.set(name, ja);
+  return ja;
+}
 
 module.exports = {
   spellVisual: { impact: { type: 'dark_deal' }, impactMs: 260 },
@@ -42,7 +61,7 @@ module.exports = {
     if (!inst || inst.zone !== 'support') return false;
     if (inst.stolenBy === pi || inst._darkDealVon != null) return false;       // schon von mir kontrolliert
     const script = loadCardEffect(inst.name);
-    if (!script?.requiresTarget || !script.onCreatureEffect) return false;      // „chooses a target"
+    if (!script?.onCreatureEffect || !waehltZiel(inst.name, script)) return false;   // „chooses a target"
     if (engine.isCreatureEffectSuppressed(inst)) return false;
     return true;
   },
