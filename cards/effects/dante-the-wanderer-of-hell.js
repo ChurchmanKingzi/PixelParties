@@ -19,8 +19,8 @@
 //    ziehen wie sein Level, danach (Level − 1) Karten aus der Hand loeschen (frei waehlbar; bei Level 0/1
 //    entfaellt das Loeschen). Das Loeschen ist ein Selbst-Abwurf (kein Gegner-Effekt).
 //  • Weg 2: alle eigenen Areas loeschen (Schutzfenster wie bei jedem fremden Loeschen), danach eine eigene
-//    GELOESCHTE Area (Level ≤ 3, dieselbe Regel wie bei den Area-Tutoren, `isTutorableArea`) waehlen — auch eine
-//    gerade eben geloeschte — und DIREKT ins Spiel bringen: ihr `onPlay` laeuft, aber sie wird nicht gewirkt (kein
+//    GELOESCHTE Area (Level ≤ 3, dieselbe Regel wie bei den Area-Tutoren, `isTutorableArea`), die schon VOR dem Loeschen im Stapel lag, waehlen (NICHT eine gerade
+//    von Dante geloeschte) — und DIREKT ins Spiel bringen: ihr `onPlay` laeuft, aber sie wird nicht gewirkt (kein
 //    Wirker, keine Kosten, keine Zusatzaktion) und zaehlt nicht als „played a deleted Area" der Circles. Gibt es
 //    keine, bleibt es beim Loeschen. Die Karte kommt aus dem Geloescht-Stapel (still, ohne neue Meldung).
 // ═══════════════════════════════════════════
@@ -92,9 +92,13 @@ async function weg1(engine, pi, k) {
 
 async function weg2(engine, pi) {
   const ps = engine.gs.players[pi];
+  // Wahl NUR unter den Areas, die schon VOR dem Loeschen im Geloescht-Stapel lagen — frisch von Dante geloeschte
+  // stehen nicht zur Wahl (Kartentext: „delete any Areas you currently control and THEN bring one of your
+  // deleted Areas" — gemeint sind die bereits geloeschten).
+  const vorher = geloeschteAreas(engine, pi);
   const areas = engine.getAreas(pi).slice();
   for (const inst of areas) await engine.deleteArea(inst, CARD_NAME, { _skipLimitEnforce: true });
-  const kandidaten = geloeschteAreas(engine, pi);
+  const kandidaten = vorher.filter(n => (ps.deletedPile || []).includes(n));
   let gebracht = null;
   if (kandidaten.length > 0) {
     const db = engine._getCardDB();
