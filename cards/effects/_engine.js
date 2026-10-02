@@ -43319,16 +43319,21 @@ this._deathWatch = (this._deathWatchStack || []).length
       // Decrement multi-turn creature freeze durations (Divine Gift of Biseria, etc.)
       // `frozenDuration` is the controller-turn countdown; `frozen` itself
       // stays a truthy `1` for the existing engine checks.
+      // ★ Als Befund 2.10. (Iceage): ein Freeze OHNE `frozenDuration` (= 1 Zug, `applyCreatureStatus` legt den Zaehler nur ab
+      // Dauer 2 an) taute bei Kreaturen NIE auf — die Schleife ueberging sie. Fehlend zaehlt als 1, wie beim Helden.
       for (const inst of this.cardInstances) {
         if (inst.owner !== ap || inst.zone !== 'support') continue;
-        if (!inst.counters.frozenDuration) continue;
-        if (inst.counters.frozenDuration > 1) {
+        if (!inst.counters.frozen) continue;
+        if ((inst.counters.frozenDuration || 1) > 1) {
           inst.counters.frozenDuration--;
           this.log('status_tick', { target: inst.name, status: 'frozen', remaining: inst.counters.frozenDuration });
         } else {
           delete inst.counters.frozen;
           delete inst.counters.frozenDuration;
           delete inst.counters.frozenAppliedBy;
+          delete inst.counters.frozenAppliedByHero;
+          delete inst.counters.frozenAppliedByInst;
+          delete inst.counters.frozenAppliedByCard;
           this.log('status_remove', { target: inst.name, status: 'frozen', by: 'duration' });
         }
       }
