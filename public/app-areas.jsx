@@ -5190,17 +5190,22 @@ const SecondCircleOfHellOverlay = React.memo(function SecondCircleOfHellOverlay(
 //
 //  Ebenen (Kunsthoehe 100; per Generator gemalt, der nicht im Projekt liegt): tile.png — Kachel 128
 //  mit ZWEI Bildern untereinander (128×200): Boden, Stuehle, Tisch (Gedecke, Kelche, Truthaehne,
-//  Flaschen, Kerzen), grosse Platten am Rand; Bild 2 = Kerzenflackern; glutton.png — Fresser (3 Bilder
-//  18×20: kauen, Mund auf, Keule; 2 Varianten); steam.png — Dampf (3 Bilder 7×14).
+//  Flaschen, Kerzen), grosse Platten am Rand; Bild 2 = Kerzenflackern; glutton.png — Fresser (12 Bilder
+//  18×20, siehe TC_FOLGE; 2 Varianten); steam.png — Dampf (3 Bilder 7×14).
 //  Feinschliff: geordnetes Dithering, mehrstufiges Shading (Licht oben rechts), Glut in den Fugen,
 //  gemaserte Bretter, schattierte Speisen/Kelche/Kerzen/Truthaehne und Figuren (gleiche Groesse und Aussehen).
 //  Die Kachel ist links ausgerichtet (Positionen der Aufbauten in Kunstpixeln vom linken Rand).
 //  ALLE Animationen teilen die Periode 12 s → nahtlose Schleife.
 // ═══════════════════════════════════════════════════════════════════
 const TCI = '/areas/third-circle-of-hell/';
+// Fresser: 12 Bilder (0 ruhig, 1 kaut, 2 Backen voll, 3–5 Keule hebt sich, 6 Biss, 7 kaut mit Keule, 8 Keule sinkt,
+// 9 schluckt, 10 Blinzeln, 11 Einatmen). Ablauf: 40 Schritte in 6 s (0,15 s je Bild); 6 s teilt die Periode 12 s.
+const TC_FOLGE = [0,0,0,11,11,0,0,0, 3,4,5,5,6,6,5,6, 7,2,1,2,1,2,8,1, 2,1,9,9,0,10,0,0, 11,11,0,0,0,11,0,0];
+const TC_BILDER = 12;
+const TC_KEYFRAMES = TC_FOLGE.map((b, i) => `${(i * 100 / TC_FOLGE.length).toFixed(3)}% { background-position-x: ${(b * 100 / (TC_BILDER - 1)).toFixed(3)}%; }`).join(' ');
 const ThirdCircleOfHellOverlay = React.memo(function ThirdCircleOfHellOverlay() {
   const fresser = useMemo(() => Array.from({ length: 10 }, (_, k) => k).filter(k => k % 3 !== 1).map((k, i) => {
-    const dur = [6, 12, 6][i % 3];
+    const dur = 6;
     return { x: 16 + 32 * k, v: k % 2, dur, delay: -((i * 1.7) % dur) };
   }), []);
   const dampf = useMemo(() => {
@@ -5242,12 +5247,8 @@ const ThirdCircleOfHellOverlay = React.memo(function ThirdCircleOfHellOverlay() 
           60%, 69% { background-position: 0 100%; } 70%, 100% { background-position: 0 0; }
         }
         .tc-volk { position: absolute; inset: 0; }
-        .tc-fresser { position: absolute; background: url(${TCI}glutton.png) 0 0 / 300% 200% no-repeat; }
-        /* Bilder: 0 kaut, 1 Mund auf, 2 Keule am Mund */
-        @keyframes tcFressen {
-          0% { background-position-x: 0%; } 25% { background-position-x: 50%; } 40% { background-position-x: 100%; }
-          58% { background-position-x: 50%; } 70% { background-position-x: 0%; } 85% { background-position-x: 50%; }
-        }
+        .tc-fresser { position: absolute; background: url(${TCI}glutton.png) 0 0 / ${TC_BILDER * 100}% 200% no-repeat; }
+        @keyframes tcFressen { ${TC_KEYFRAMES} }
         .tc-dampf {
           position: absolute; width: calc(7 * var(--px)); height: calc(14 * var(--px)); opacity: 0;
           background: url(${TCI}steam.png) 0 0 / 300% 100% no-repeat; z-index: 100;
