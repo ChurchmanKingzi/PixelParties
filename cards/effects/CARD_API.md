@@ -18721,3 +18721,8 @@ Der Generator (reines Python, PNG-Schreiber + `shade.py` mit `dth`/`ramp`/`mix`)
 **Panorama** (kein Kachel-Loop mit wiederholten Figuren): `panorama.png` 256 breit, mittig, Wandkachel `back.png` setzt die Wand seitlich fort. Lavahimmel (`sky.png`, 8 Bilder, periodisch; alle Kacheln im Gleichtakt) über roter Backsteinwand; Richter-Gott mit Flügelhelm (Asterix-Art, rote Kappe + Goldband + graue Flügel) (`god.png`, Zeigearm nach links),
 Ketzer (`hero.png`, 12 Bilder, 2 Umhangvarianten), Kapuzen-Dämon im Vordergrund (`demon.png`), Eisenspieße, Grabfeuer in Wandnischen
 (`grave-fire.png`), Lavatropfen, Glut. Alle Figuren 12 Bilder, 4-zusammenhängend, 12-s-Schleife nahtlos geprüft. Farben aus dem Kartenbild.
+
+### The Seventh Circle of Hell — Hintergrund (Pixelart, Panorama)
+Lavasee (`lava.png`, 8 Bilder, 4 s, Kacheln im Gleichtakt) vor Pflasterwand (`back.png`), riesige Dämonenstatue (`statue.png`, 256 breit, mittig,
+Wasserlinie y 76) mit pulsierenden Augen (`eyes.png`) und Blutrinnsalen (`blood.png`, laufende Wellen), Felsufer (`bank.png`) mit dem Ketzer
+(`hero.png`), feuriger Nebel (`mist-a/-b.png`, driftet waagerecht über 12 s/6 s je Kachelbreite), Lavablasen (`bubble.png`), Glut. Farben aus der Kartenvorlage.

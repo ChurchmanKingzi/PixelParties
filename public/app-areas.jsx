@@ -53,7 +53,7 @@ const AREA_OVERLAYS = {
   'The Fourth Circle of Hell':    { tier: 'opaque',      C: () => <FourthCircleOfHellOverlay /> },   // Pixelart (2.10.)
   'The Fifth Circle of Hell':     { tier: 'opaque',      C: () => <FifthCircleOfHellOverlay /> },   // Pixelart (2.10.)
   'The Sixth Circle of Hell':     { tier: 'opaque',      C: () => <SixthCircleOfHellOverlay /> },   // Pixelart (2.10.)
-  'The Seventh Circle of Hell':    { tier: 'opaque',      C: () => <HellCircleOverlay stufe={7} /> },   // Platzhalter-Szene (prozedural)
+  'The Seventh Circle of Hell':   { tier: 'opaque',      C: () => <SeventhCircleOfHellOverlay /> },   // Pixelart (2.10.)
   'The Eighth Circle of Hell':    { tier: 'opaque',      C: () => <HellCircleOverlay stufe={8} /> },   // Platzhalter-Szene (prozedural)
   "Tarleinn's Floating Island":   { tier: 'opaque',      C: () => <FloatingIslandOverlay /> },   // v1440: Kartenstil (vorher translucent)
   'Deepsea Castle':               { tier: 'opaque',      C: () => <DeepseaCastleOverlay /> },   // v1415: Kartenstil, ganze Szene
@@ -5578,9 +5578,98 @@ const SixthCircleOfHellOverlay = React.memo(function SixthCircleOfHellOverlay() 
 });
 
 // ═══════════════════════════════════════════════════════════════════
+//  THE SEVENTH CIRCLE OF HELL (Violence) — Pixelart-Hintergrund (PANORAMA)
+//
+//  Ein Lavasee vor einer rot-orangen Pflasterwand, in der Mitte eine riesige Daemonenstatue (Stein, Hoerner,
+//  glimmende Augen), der Blut aus den Augen laeuft; feuriger Nebel zieht ueber den See; links ein Felsufer,
+//  auf dem der Ketzer steht. Wie der Sixth Circle EIN Panorama (256 breit, mittig); Wand/See setzen sich
+//  seitlich fort. Farben aus der Kartenvorlage.
+//
+//  Ebenen (Kunsthoehe 100; Generator ausserhalb des Projekts): back.png — Pflasterkachel 128; statue.png —
+//  Statue (256, Wasserlinie y 76); lava.png — See (8 Bilder 128×26, periodisch, 4 s; Kacheln im Gleichtakt) ueber
+//  der Statue; bank.png — Felsufer/Felsen VOR dem See (256); hero.png (12 Bilder, 2 Varianten, wie Sixth Circle);
+//  eyes.png (4 Bilder 30×5, pulsierende Augen); blood.png (4 Bilder 7×42, Blutrinnsale mit laufenden Wellen);
+//  mist-a/-b.png (Nebelkacheln 128×40, driften waagerecht, 12 s bzw. 6 s je Kachelbreite); bubble.png (Lavablase,
+//  6 Bilder 9×7); ember.png (Glut). ALLE Animationen teilen die Periode 12 s → nahtlose Schleife.
+// ═══════════════════════════════════════════════════════════════════
+const SVX = '/areas/seventh-circle-of-hell/';
+const SV_PAN = 256;
+const SV = (x) => ppArtX(x, SV_PAN);
+const SV_LAVA = 76;
+const SV_BLASE = [null,null,null,null,null,null,null,null,null,null,null,null,null,null,0,0,1,1,2,2,3,4,5,5];
+const SV_BLASE_KF = SV_BLASE.map((b, i) => `${(i * 100 / SV_BLASE.length).toFixed(3)}% { ${b === null ? 'opacity: 0;' : `opacity: 1; background-position-x: ${(b * 100 / 5).toFixed(3)}%;`} }`).join(' ');
+const SeventhCircleOfHellOverlay = React.memo(function SeventhCircleOfHellOverlay() {
+  const see = useMemo(() => Array.from({ length: 12 }, (_, k) => k - 6), []);
+  const blasen = useMemo(() => Array.from({ length: 16 }, (_, i) => ({
+    x: -230 + ((i * 71 + 13) % 460), y: SV_LAVA + 4 + ((i * 5) % 17), delay: -((i * 1.37) % 6),
+  })), []);
+  const funken = useMemo(() => Array.from({ length: 30 }, (_, i) => {
+    const dur = [3, 4, 6][i % 3];
+    return { x: -230 + ((i * 59 + 7) % 460), y0: SV_LAVA + 6 + (i % 4) * 4, dur, k: i % 3, delay: -((i * 0.79) % dur), drift: ((i % 5) - 2) * 3 };
+  }), []);
+  return (
+    <PixelScene artH={100} bg="#200000" className="seventh-circle-overlay">
+      <PixelBand src={SVX + 'back.png'} style={{ backgroundPosition: '50% 0' }} />
+      <PixelPiece src={SVX + 'statue.png'} w={SV_PAN} />
+      <div className="sv-volk">
+        {see.map((k) => (
+          <i key={'s' + k} className="sv-see" style={{ left: `calc(50% + ${-64 + 128 * k} * var(--px))`, animation: 'svSee 4s steps(1) infinite' }} />
+        ))}
+      </div>
+      <PixelPiece src={SVX + 'bank.png'} w={SV_PAN} />
+      <div className="sv-volk">
+        <i className="pp-area-dyn sv-augenglut" style={{ left: SV(113 - 6), animation: 'svGlut 2s ease-in-out infinite alternate' }} />
+        <i className="sv-held" style={{ left: SV(30), animation: 'svHeld 6s steps(1) -1.7s infinite' }} />
+        <i className="sv-augen" style={{ left: SV(113), animation: 'svAugen 2s steps(1) infinite' }} />
+        <i className="sv-blut" style={{ left: SV(128 - 8 - 2), animation: 'svBlut 1s steps(1) infinite' }} />
+        <i className="sv-blut" style={{ left: SV(128 + 8 - 2), animation: 'svBlut 1s steps(1) -.5s infinite' }} />
+        {blasen.map((b, i) => (
+          <i key={'b' + i} className="pp-area-dyn sv-blase" style={{ left: ppArtX(b.x, 0), top: ppArt(b.y), animation: `svBlase 6s steps(1) ${b.delay}s infinite` }} />
+        ))}
+        {funken.map((e, i) => (
+          <i key={'e' + i} className="pp-area-dyn sv-funke" style={{
+            left: ppArtX(e.x, 0), top: ppArt(e.y0), backgroundPositionX: (e.k * 50) + '%', '--dx': ppArt(e.drift),
+            animation: `svFunke ${e.dur}s linear ${e.delay}s infinite`,
+          }} />
+        ))}
+        <i className="pp-area-dyn sv-nebel a" />
+        <i className="pp-area-dyn sv-nebel b" />
+      </div>
+      <div className="pp-rand-dim" />
+      <style>{`
+        .sv-volk { position: absolute; inset: 0; }
+        .sv-see { position: absolute; top: calc(${SV_LAVA - 2} * var(--px)); width: calc(128 * var(--px)); height: calc(26 * var(--px)); background: url(${SVX}lava.png) 0 0 / 800% 100% no-repeat; }
+        @keyframes svSee { ${sxReihe(8)} }
+        .sv-held { position: absolute; top: calc(${SV_LAVA - 36} * var(--px)); width: calc(26 * var(--px)); height: calc(36 * var(--px)); background: url(${SVX}hero.png) 0 0 / ${12 * 100}% 200% no-repeat; }
+        @keyframes svHeld { ${sxFolge(SX_HELD, 12)} }
+        .sv-augen { position: absolute; top: calc(31 * var(--px)); width: calc(30 * var(--px)); height: calc(5 * var(--px)); background: url(${SVX}eyes.png) 0 0 / 400% 100% no-repeat; }
+        @keyframes svAugen { ${sxReihe(4)} }
+        .sv-augenglut { position: absolute; top: calc(20 * var(--px)); width: calc(42 * var(--px)); height: calc(28 * var(--px)); opacity: .5;
+          background: radial-gradient(ellipse at 50% 50%, rgba(255,40,20,.30), rgba(255,20,10,.1) 50%, rgba(255,0,0,0) 72%); }
+        @keyframes svGlut { from { opacity: .3; } to { opacity: .85; } }
+        .sv-blut { position: absolute; top: calc(36 * var(--px)); width: calc(7 * var(--px)); height: calc(42 * var(--px)); background: url(${SVX}blood.png) 0 0 / 400% 100% no-repeat; }
+        @keyframes svBlut { ${sxReihe(4)} }
+        .sv-blase { position: absolute; width: calc(9 * var(--px)); height: calc(7 * var(--px)); opacity: 0; background: url(${SVX}bubble.png) 0 0 / 600% 100% no-repeat; }
+        @keyframes svBlase { ${SV_BLASE_KF} }
+        .sv-funke { position: absolute; width: calc(3 * var(--px)); height: calc(3 * var(--px)); opacity: 0; background: url(${SVX}ember.png) 0 0 / 300% 100% no-repeat; z-index: 5; }
+        @keyframes svFunke {
+          0% { opacity: 0; transform: translate(0, 0); } 10% { opacity: 1; }
+          80% { opacity: .8; } 100% { opacity: 0; transform: translate(var(--dx), calc(-50 * var(--px))); }
+        }
+        .sv-nebel { position: absolute; left: 0; right: 0; height: calc(40 * var(--px)); background-repeat: repeat-x; background-size: auto 100%; }
+        .sv-nebel.a { top: calc(46 * var(--px)); background-image: url(${SVX}mist-a.png); animation: svNebelA 12s linear infinite; opacity: .6; }
+        .sv-nebel.b { top: calc(58 * var(--px)); background-image: url(${SVX}mist-b.png); animation: svNebelB 6s linear infinite; opacity: .6; }
+        @keyframes svNebelA { from { background-position-x: 0; } to { background-position-x: calc(128 * var(--px)); } }
+        @keyframes svNebelB { from { background-position-x: 0; } to { background-position-x: calc(-128 * var(--px)); } }
+      `}</style>
+    </PixelScene>
+  );
+});
+
+// ═══════════════════════════════════════════════════════════════════
 //  THE SECOND … EIGHTH CIRCLE OF HELL — Hintergruende (Platzhalter-Szenen)
 //
-//  Prozedurale Platzhalter-Szenen fuer die Kreise 7–8, bis deren Pixelart vorliegt (Zweiter bis Sechster haben sie schon): dunkler Farbverlauf,
+//  Prozedurale Platzhalter-Szenen fuer Kreis 8, bis dessen Pixelart vorliegt (Zweiter bis Siebter haben sie schon): dunkler Farbverlauf,
 //  eine Horizontlinie, aufsteigende Funken/Glut und ein kreis-spezifisches Motiv. Jeder Kreis hat
 //  seine eigene Farbwelt (Dante: 6 Ketzerei/Grabfeuer, 7 Gewalt/Blutfluss, 8 Betrug/Tinte). Wieder `pp-area-dyn` fuer alles Bewegte
 //  (faellt mit „keine Animationen" weg); eigene Keyframes im eigenen <style>.
