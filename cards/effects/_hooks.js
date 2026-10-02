@@ -106,6 +106,10 @@ const HOOKS = {
 
   // ── Resources ──
   ON_RESOURCE_GAIN:  'onResourceGain',
+  // Resource Phase, nach den Hand-Reaktionen und VOR dem Standard-Zug:
+  // ein Held darf das Ziehen ersetzen (Natas), indem er `gs._skipResourceDraw`
+  // setzt. ctx: { playerIdx } (Zugspieler).
+  ON_RESOURCE_DRAW_REPLACE: 'onResourceDrawReplace',
   // Ein Effekt hat Karten ins eigene Deck zurueckgemischt. `count` ist
   // die Zahl DIESES Effekts, nicht der Rundensumme (Hatusbal).
   ON_SHUFFLED_BACK_TO_DECK: 'onShuffledBackToDeck',
@@ -144,6 +148,10 @@ const HOOKS = {
   ON_CHAIN_START:    'onChainStart',
   ON_CHAIN_RESOLVE:  'onChainResolve',
   ON_EFFECT_NEGATED: 'onEffectNegated',
+  // Natas, the Master of Hell: "Whenever you negate an opponent's card or effect".
+  // ctx: { negatorOwner, negatedOwner, negatedCardName, kind: 'chain' | 'surprise' }
+  // (`cardName` waere der Name des LAUSCHERS — deshalb `negatedCardName`.)
+  ON_NEGATION_DEALT: 'onNegationDealt',
 
   // ── Creature damage (batched) ──
   BEFORE_CREATURE_DAMAGE_BATCH: 'beforeCreatureDamageBatch',

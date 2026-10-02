@@ -10637,7 +10637,7 @@ class GameEngine {
    * @param {object}       source - { name, owner, heroIdx } of the effect source
    * @param {CardInstance} inst   - Target creature instance
    */
-  async actionApplyCreaturePoison(source, inst) {
+  async actionApplyCreaturePoison(source, inst, stacks = 1) {
     if (!inst || inst.zone !== 'support') return;
     if (!this.canApplyCreatureStatus(inst, 'poisoned')) return;
 
@@ -10655,7 +10655,7 @@ class GameEngine {
     // creature-status listener (Bear Rider, Chilly Wizard, Colored
     // Snow, future status-aware Creatures) sees this poison tick.
     await this.applyCreatureStatus(inst, 'poisoned', {
-      stacks: 1,
+      stacks,
       addStacks: true,
       sourceOwner: source?.owner ?? -1,
       source,
@@ -21955,6 +21955,12 @@ this._deathWatch = (this._deathWatchStack || []).length
           // and may set `gs._skipResourceDraw` from inside their resolve
           // to replace the standard draw with their own effect.
           await this._checkResourcePhaseReactions(activeP);
+          // Heldeneffekte, die das Ziehen ersetzen (Natas: „instead of
+          // drawing a card … you may add …"). Greifen nur, wenn nicht
+          // schon eine Reaktion (Idol of Crestina) das Ziehen ersetzt hat.
+          if (!this.gs._skipResourceDraw) {
+            await this.runHooks(HOOKS.ON_RESOURCE_DRAW_REPLACE, { playerIdx: activeP, _skipReactionCheck: true });
+          }
           // Draw 1 card (unless an Idol-style reaction replaced it).
           // `_isResourceDraw: true` flags this as the standard auto-draw
           // so listeners (Analyzer / Gatherer) can skip it — they only
@@ -35732,6 +35738,9 @@ this._deathWatch = (this._deathWatchStack || []).length
         card: cardName, player: this.gs.players[steuerer]?.username ?? ps.username,
         by: surpriseHookCtx._surpriseNegatedBy || 'a reaction',
       });
+      await this._meldeNegation({
+        negatedOwner: steuerer, negatorOwner: undefined, cardName, kind: 'surprise',
+      });
     }
 
     // Fire afterSpellResolved for Spell-type surprises (Toxic Trap, Magic
@@ -36028,7 +36037,7 @@ this._deathWatch = (this._deathWatchStack || []).length
   /** Hooks that should NOT trigger reaction checks */
   static REACTION_SKIP_HOOKS = new Set([
     'onPlay', 'onCardEnterZone', 'onPhaseStart', 'onGameStart', 'onBeforeHandDraw',
-    'onChainStart', 'onChainResolve', 'onEffectNegated',
+    'onChainStart', 'onChainResolve', 'onEffectNegated', 'onNegationDealt', 'onResourceDrawReplace',
     'beforeDamage', 'afterDamage', 'beforeLevelChange',
     'onResourceSpend', 'onReactionActivated', 'onCardActivation',
     'onActionUsed', 'onAdditionalActionUsed', 'onReactionResolved',
@@ -36937,6 +36946,13 @@ this._deathWatch = (this._deathWatchStack || []).length
             this.sync();
           }
         }
+        // „Whenever you negate an opponent's card or effect" (Natas).
+        if (link.negated) {
+          await this._meldeNegation({
+            negatedOwner: link.owner, negatorOwner: link.negatedBy,
+            cardName: link.cardName, kind: 'chain',
+          });
+        }
       } else {
         // Resolve glow
         this._broadcastEvent('reaction_chain_link_resolving', {
@@ -36947,7 +36963,16 @@ this._deathWatch = (this._deathWatchStack || []).length
         if (link.resolve) {
           try {
             delete this.gs._discardOutDeclined;
-            const result = await link.resolve(chain, i);
+            // Wer gerade aufloest, ist der Negierer, falls das Glied
+            // ein anderes negiert (`negateChainLink` liest das).
+            const _vorherAufloeser = this._rxResolvingOwner;
+            this._rxResolvingOwner = link.owner;
+            let result;
+            try {
+              result = await link.resolve(chain, i);
+            } finally {
+              this._rxResolvingOwner = _vorherAufloeser;
+            }
             if (link.isInitialCard) link.resolveResult = this._applyDiscardOutDecline(link.cardName, result);
           } catch (err) {
             console.error(`[Engine] Chain resolve failed for "${link.cardName}":`, err.message);
@@ -37086,6 +37111,8 @@ this._deathWatch = (this._deathWatchStack || []).length
   negateChainLink(chain, linkIndex, opts = {}) {
     if (linkIndex >= 0 && linkIndex < chain.length) {
       chain[linkIndex].negated = true;
+      // Negierer = Besitzer des gerade aufloesenden Glieds (s. `_resolveReactionChain`).
+      if (Number.isInteger(this._rxResolvingOwner)) chain[linkIndex].negatedBy = this._rxResolvingOwner;
       if (opts.negationStyle) chain[linkIndex].negationStyle = opts.negationStyle;
       // `deleteCard` → the negated card is removed from the game
       // (deleted pile) instead of going to its owner's discard pile.
@@ -37105,6 +37132,20 @@ this._deathWatch = (this._deathWatchStack || []).length
       // routeNegatedInitialCard.
       if (opts.toDeck) chain[linkIndex]._negatedToDeck = true;
     }
+  }
+
+  /**
+   * Meldet „ein Spieler hat eine Karte/einen Effekt des Gegners negiert"
+   * (Natas). Ohne bekannten Negierer gilt im 1-gegen-1 der andere Spieler.
+   * Negiert jemand seine EIGENE Karte, ist das keine gegnerische — kein Hook.
+   */
+  async _meldeNegation({ negatedOwner, negatorOwner, cardName, kind }) {
+    if (!Number.isInteger(negatedOwner)) return;
+    const negator = Number.isInteger(negatorOwner) ? negatorOwner : 1 - negatedOwner;
+    if (negator === negatedOwner) return;
+    await this.runHooks(HOOKS.ON_NEGATION_DEALT, {
+      negatorOwner: negator, negatedOwner, negatedCardName: cardName, kind, _skipReactionCheck: true,
+    });
   }
 
   /**
