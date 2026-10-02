@@ -3326,7 +3326,7 @@ function PuzzleCreator() {
       tooltip: 'Untargetable: the opponent can\'t choose this Hero with Attacks, Spells or Creature effects while its controller has other Heroes that can be chosen.' },
     // Calm Diatribe: zweite Aktion in der Action Phase; bleibt auch bei totem Helden bis zum Phasenende.
     { key: 'calm', label: '🕊️ Calm', color: '#9ad7c4', scope: 'hero',
-      tooltip: 'Calm: this Hero may perform a second Action during the Action Phase (as an additional Action). Fades at the end of that Action Phase if unused, even if the Hero is defeated.' },
+      tooltip: 'Calm: this Hero may perform a second Action during the first Action Phase (as an additional Action). Fades at the end of that Action Phase if unused, even if the Hero is defeated.' },
     { key: 'cloudy', label: '☁️ Cloudy', color: '#88bbdd',
       tooltip: 'Cloudy: takes half damage from all sources.' },
     { key: 'freeze_immune', label: '🔥 Freeze Immune', color: '#ff8844',

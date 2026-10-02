@@ -10,6 +10,9 @@
 //  • Der gewaehlte Held bekommt den Buff `calm` (Abzeichen am Helden). Er
 //    ueberlebt den Tod des Helden — er ist eine NACHWIRKUNG
 //    (`NACHWIRKUNGEN` im Engine-Todesraeumer, wie `blessed_skill`).
+//  • ZWEI ABZEICHEN: `calm` (🌙) kuendigt die zweite Aktion nur AN (gilt erst im naechsten Zug);
+//    zu Beginn dieses Zuges wechselt es zu `calm_ready` (🕊️), dessen Tooltip sagt, dass die
+//    zweite Aktion in DIESER Action Phase bereitsteht. Beide sind Nachwirkungen.
 //  • Die Zusage haengt — wie bei Weapon Unleashing — an der Karten-INSTANZ, die
 //    nach dem Resolve in der Ablage weiterlebt (`_spellKeepInstance`). Sie wird
 //    ERST zu Beginn des naechsten eigenen Zuges eingerichtet (heldengebundene
@@ -29,7 +32,8 @@ const { heldSeite } = require('./_hooks');
 
 const CARD_NAME = 'Calm Diatribe';
 const TYPE_ID_PREFIX = 'second_action:calm-diatribe:';
-const BUFF = 'calm';
+const BUFF = 'calm';             // angekuendigt: gilt erst im naechsten Zug
+const BUFF_READY = 'calm_ready'; // aktiv: die zweite Aktion steht in DIESER Action Phase bereit
 
 /** Lebende Helden, die `pi` KONTROLLIERT — Ziel-IDs bleiben physisch (Styx 28.9.). */
 function kontrollierteHeldenZiele(engine, pi) {
@@ -56,11 +60,12 @@ function entferneCalm(engine, inst) {
   const seite = c._grantSeite ?? inst.owner;
   const hi = c._calmHero;
   const hero = engine.gs.players[seite]?.heroes?.[hi];
-  if (!hero?.buffs?.[BUFF]) return;
+  if (!hero?.buffs?.[BUFF] && !hero?.buffs?.[BUFF_READY]) return;
   const anderer = engine.cardInstances.some(o => o.id !== inst.id && o.counters?._calmLive
     && o.counters._calmHero === hi && (o.counters._grantSeite ?? o.owner) === seite);
   if (anderer) return;
   delete hero.buffs[BUFF];
+  delete hero.buffs[BUFF_READY];
   engine.log('calm_faded', { hero: hero.name });
   engine.sync();
 }
@@ -72,6 +77,11 @@ function richteZusageEin(engine, inst) {
   const hero = engine.gs.players[c._grantSeite ?? inst.owner]?.heroes?.[c._calmHero];
   if (!hero?.name) return;
   c._calmGranted = true;
+  // Das Abzeichen wechselt von „angekuendigt" (`calm`) zu „bereit" (`calm_ready`).
+  if (hero.buffs?.[BUFF]) {
+    hero.buffs[BUFF_READY] = { ...hero.buffs[BUFF], activatedTurn: engine.gs.turn };
+    delete hero.buffs[BUFF];
+  }
   const typeId = `${TYPE_ID_PREFIX}${inst.id}`;
   engine.registerAdditionalActionType(typeId, {
     label: hero.name,

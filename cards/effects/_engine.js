@@ -45706,7 +45706,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       //     sie enden wie immer mit dem Zug.
       //   • `second_action_grant` (Weapon Unleashing): „soll im Tod nicht
       //     verfallen — und der Badge soll ausnahmsweise bestehenbleiben."
-      const NACHWIRKUNGEN = new Set(['blessed_skill', 'second_action_grant', 'calm']);
+      const NACHWIRKUNGEN = new Set(['blessed_skill', 'second_action_grant', 'calm', 'calm_ready']);
       if (hero.buffs && typeof hero.buffs === 'object') {
         const bleibtAmHelden = (quelle) => typeof quelle === 'string' && quelle
           && this.cardInstances.some(c => c.owner === pi && c.zone === 'support'
