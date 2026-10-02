@@ -21,8 +21,9 @@
 //        (`engine._ablageUmleitungVerfolgen`) — beides prueft `engine._wurzelAktiv()`.
 //    Tokens werden ohnehin geloescht. Die Karte selbst wird beim Verlassen des Bretts ebenfalls geloescht, wenn sie
 //    als Creature in die Ablage ginge (solange SIE aktiv ist — sie ist ja noch auf dem Brett, wenn sie stirbt).
-//  • Bekannte Grenze: Wege, die direkt in die Ablage schreiben, aber Name und Zustand selbst animieren
-//    (Pile-Fluege), zeigen weiter den Flug zur Ablage; der Zustand (Geloescht-Stapel) stimmt.
+//  • Fluege: `engine._broadcastEvent` schreibt Fluege Creature → Ablage zentral auf Flug → Geloescht-Stapel um
+//    (`play_pile_transfer`, `deck_to_discard_animation`, einzelne `mill_center_reveal`). Eine auf dem Brett besiegte
+//    Creature bekommt zusaetzlich den schwarzen Nebel `root_evil_mist`; die Beschwoerung zeigt `necromancy_summon`.
 // ═══════════════════════════════════════════
 const { isPileCreature } = require('./_hooks');
 
@@ -104,6 +105,11 @@ module.exports = {
       if (!ziel) return false;
     }
 
+    // Necromancy-Animation auf der Ziel-Zone, dann erst platzieren (wie bei der Necromancy-Ability).
+    engine._broadcastEvent('play_zone_animation', {
+      type: 'necromancy_summon', owner: ziel.owner, heroIdx: ziel.heroIdx, zoneSlot: ziel.slotIdx,
+    });
+    await engine._delay(800);
     const res = await engine.placeFromPile(pi, 'discard', gewaehlt, ziel.heroIdx, ziel.slotIdx, {
       source: CARD_NAME, heldSeite: ziel.owner,
     });

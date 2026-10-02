@@ -15740,6 +15740,45 @@ const ANIM_REGISTRY = {
       );
     };
   })(),
+  // ★ The Root of all Evil: schwarzer, unheilvoller Nebel legt sich ueber die Creature, die geloescht wird — dichte Schwaden,
+  // ein dunkelroter Schimmer und aufsteigende Aschefunken.
+  root_evil_mist: (() => {
+    return function RootEvilMistEffect({ x, y, w, h }) {
+      const cw = w || 100, ch = h || 140;
+      const schwaden = useMemo(() => Array.from({ length: ppFxN(16) }, (_, i) => {
+        const a = Math.random() * Math.PI * 2, r = Math.random();
+        return {
+          sx: Math.cos(a) * cw * 0.45 * r, sy: Math.sin(a) * ch * 0.45 * r + ch * 0.1,
+          dx: (Math.random() - 0.5) * 50, dy: -30 - Math.random() * 60,
+          size: 54 + Math.random() * 52, delay: Math.round(Math.random() * 400), dur: Math.round(1100 + Math.random() * 700),
+        };
+      }), [cw, ch]);
+      const funken = useMemo(() => Array.from({ length: ppFxN(10) }, () => ({
+        x: (Math.random() - 0.5) * cw, delay: Math.round(300 + Math.random() * 700), dur: Math.round(700 + Math.random() * 500), size: 2 + Math.round(Math.random() * 2),
+      })), [cw]);
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+          <div style={{ position: 'absolute', left: -cw / 2 - 10, top: -ch / 2 - 10, width: cw + 20, height: ch + 20, borderRadius: 8,
+            background: 'radial-gradient(ellipse at center, rgba(4,0,8,.95) 0%, rgba(24,0,16,.75) 55%, rgba(60,0,20,.0) 100%)',
+            opacity: 0, animation: 'remShade 1700ms ease-in-out forwards' }} />
+          {schwaden.map((n, i) => (
+            <i key={'s' + i} style={{ position: 'absolute', left: n.sx - n.size / 2, top: n.sy - n.size / 2, width: n.size, height: n.size, borderRadius: '50%',
+              background: 'radial-gradient(circle, rgba(2,0,6,.97) 0%, rgba(20,0,18,.8) 48%, rgba(60,0,24,0) 76%)', filter: 'blur(6px)',
+              opacity: 0, '--dx': n.dx + 'px', '--dy': n.dy + 'px', animation: `remMist ${n.dur}ms ease-in-out ${n.delay}ms forwards` }} />
+          ))}
+          {funken.map((f, i) => (
+            <b key={'f' + i} style={{ position: 'absolute', left: f.x, top: ch * 0.2, width: f.size, height: f.size, background: '#8a1a18', boxShadow: '0 0 6px #C92E26',
+              opacity: 0, animation: `remAsh ${f.dur}ms ease-out ${f.delay}ms forwards` }} />
+          ))}
+          <style>{`
+            @keyframes remShade { 0% { opacity: 0; } 30% { opacity: 1; } 75% { opacity: .9; } 100% { opacity: 0; } }
+            @keyframes remMist { 0% { opacity: 0; transform: translate(0, 0) scale(.4); } 30% { opacity: 1; } 100% { opacity: 0; transform: translate(var(--dx), var(--dy)) scale(1.6) rotate(50deg); } }
+            @keyframes remAsh { 0% { opacity: 0; transform: translateY(0); } 20% { opacity: 1; } 100% { opacity: 0; transform: translateY(-70px); } }
+          `}</style>
+        </div>
+      );
+    };
+  })(),
   // ★ The Fourth Circle: Goldrausch — Muenzen springen aus der Area-Zone und fallen klimpernd zurueck.
   hell_coins: (() => {
     return function HellCoinsEffect({ x, y }) {
