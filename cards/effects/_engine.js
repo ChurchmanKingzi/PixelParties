@@ -22952,13 +22952,14 @@ this._deathWatch = (this._deathWatchStack || []).length
     return true;
   }
 
-  getBlockedSpells(playerIdx) {
+  // `namen`: optional eine andere Quelle als die Hand (Friedhelm prueft damit sein Deck gegen dieselben Sperren).
+  getBlockedSpells(playerIdx, namen = null) {
     const ps = this.gs.players[playerIdx];
     if (!ps) return [];
     const blocked = [];
     const seen = new Set();
     const allCards = this._getCardDB();
-    for (const cardName of (ps.hand || [])) {
+    for (const cardName of (namen || ps.hand || [])) {
       if (seen.has(cardName)) continue;
       seen.add(cardName);
       const script = loadCardEffect(cardName);
