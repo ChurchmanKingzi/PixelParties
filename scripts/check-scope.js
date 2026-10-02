@@ -63,7 +63,7 @@ const GLOBALS = new Set([
   'parseInt', 'parseFloat', 'isNaN', 'isFinite', 'undefined', 'NaN', 'Infinity',
   'encodeURI', 'decodeURI', 'encodeURIComponent', 'decodeURIComponent', 'escape', 'unescape',
   'ArrayBuffer', 'SharedArrayBuffer', 'DataView', 'Atomics',
-  'Int8Array', 'Uint8Array', 'Uint8ClampedArray', 'Int16Array', 'Uint16Array',
+  'Int8Array', 'Uint8Array', 'Uint8ClampedArray', 'ImageData', 'Int16Array', 'Uint16Array',
   'Int32Array', 'Uint32Array', 'Float32Array', 'Float64Array', 'BigInt64Array', 'BigUint64Array',
   'TextEncoder', 'TextDecoder', 'URL', 'URLSearchParams', 'AbortController', 'AbortSignal',
   'crypto', 'performance', 'fetch', 'Headers', 'Request', 'Response', 'Blob', 'FormData',

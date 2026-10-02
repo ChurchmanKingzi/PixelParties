@@ -2,11 +2,13 @@
 //  HERO EFFECT: "Friedhelm, the Misled Avenger"
 //
 //  „You may spend your Action to use an Attack or Spell from your deck
-//   with this Hero as if you played it from your hand, but if you do,
-//   that Attack or Spell cannot affect more than 1 target. This Hero
-//   can never perform more than 1 Action per turn."
+//   with this Hero as if you played it from your hand. This Hero can
+//   never perform more than 1 Action per turn."
+//   (Kartentext gegenueber der Vorlage geaendert: der Einzelziel-Zusatz
+//   „but if you do, that Attack or Spell cannot affect more than 1 target"
+//   entfaellt; `data/cards.json` traegt den neuen Text.)
 //
-//  DREI TEILE
+//  ZWEI TEILE (der fruehere dritte, „EIN ZIEL", ist weggefallen)
 //
 //   • AUS DEM DECK SPIELEN. Es gibt im Bestand keine zweite Karte, die
 //     das tut — der Weg ist deshalb aus vorhandenen Stuecken gebaut:
@@ -23,17 +25,17 @@
 //     muesste (Als Vorgabe 12.9.). Die Zielwahl ist NICHT abbrechbar —
 //     `_forceNonCancellable` (v741).
 //
-//   • EIN ZIEL. `gs.heroFlags[<pi>-<heroIdx>].forcesSingleTargetAny`
-//     (v935) — dieselbe Maschinerie wie Idas `forcesSingleTarget`, nur
-//     ohne die Beschraenkung auf Destruction Spells. Die Flagge steht
-//     NUR waehrend dieser einen Aufloesung; danach raeumt der
-//     `finally`-Zweig sie ab, sonst blieben auch normal gespielte
-//     Karten des Helden einzelzielig.
-//
-//   • EINE AKTION JE ZUG. `hero._maxActionsPerTurn = 1` beim
-//     Spielbeginn — vorhandener Engine-Vertrag, denselben Weg nimmt
-//     „Sol Rym, the Thunder Djinn". Die Engine liest ihn an drei
-//     Stellen (Aktivierungslisten, Spielbarkeit, Sofortaktionen).
+//   • EINE AKTION JE ZUG — ZUSATZAKTIONEN ZAEHLEN MIT. `hero._maxActionsPerTurn = 1`
+//     beim Spielbeginn — vorhandener Engine-Vertrag (wie Sol Rym, the Thunder
+//     Djinn), den die Engine an mehreren Stellen liest (Aktivierungslisten,
+//     Spielbarkeit, Sofortaktionen). „1 Action per turn" schliesst ausdruecklich
+//     ZUSATZAKTIONEN ein (Quick Attack, Aggressive Town Guard, Coffee, …): jede
+//     Aktion dieses Helden — regulaer, zusaetzlich oder inhaerent, von der Hand,
+//     per Zusatzaktions-Abfrage oder ueber seinen eigenen Effekt — verbraucht die
+//     eine Aktion. Dafuer lauscht er auf `onAnyActionResolved` (feuert JEDER
+//     Aktionsweg; Waechter `check-action-hook`) und setzt `_actionsThisTurn` auf
+//     mindestens 1; danach sperrt der Vertrag ihn fuer alles Weitere (Spielen,
+//     Zusatzaktionen, Heldeneffekt).
 //
 //  AKTIONSKOSTEN: `heroEffectActionCost: true` — „spend your Action"
 //  steht ausdruecklich da (★-Regel 7.9.). Die anschliessende
@@ -126,6 +128,21 @@ module.exports = {
   },
 
   hooks: {
+    // „1 Action per turn" schliesst ZUSATZAKTIONEN ein: jede aufgeloeste Aktion DIESES Helden verbraucht die eine
+    // Aktion — auch eine zusaetzliche/inhaerente von der Hand oder ueber seinen Effekt. Danach sperrt der
+    // `_maxActionsPerTurn`-Vertrag ihn fuer alles Weitere.
+    onAnyActionResolved: (ctx) => {
+      const engine = ctx._engine;
+      const pi = ctx.cardOwner;
+      const feld = ctx.cardHeroOwner ?? pi;
+      const hero = engine?.gs?.players?.[feld]?.heroes?.[ctx.cardHeroIdx];
+      if (!hero?.name) return;
+      const handelnd = ctx.heroOwner ?? ctx.playerIdx;
+      if (ctx.heroIdx !== ctx.cardHeroIdx || (handelnd !== pi && handelnd !== feld)) return;
+      if (!hero._maxActionsPerTurn) hero._maxActionsPerTurn = 1;
+      hero._actionsThisTurn = Math.max(hero._actionsThisTurn || 0, 1);
+    },
+
     // „can never perform more than 1 Action per turn" — vorhandener
     // Engine-Vertrag, gesetzt wie bei Sol Rym.
     onGameStart: (ctx) => {
@@ -150,7 +167,7 @@ module.exports = {
     const wahl = await ctx.promptCardGallery(kandidaten, {
       title: CARD_NAME,
       source: CARD_NAME,
-      description: 'Choose an Attack or Spell from your deck to use with this Hero. It cannot affect more than 1 target.',
+      description: 'Choose an Attack or Spell from your deck to use with this Hero.',
       confirmLabel: '⚔️ Use it!',
       cancellable: true,
     });
@@ -176,39 +193,21 @@ module.exports = {
     // Zielwahl ist nicht abbrechbar (`_forceNonCancellable` unten).
     await engine.showTriggeredEffect(name, { playerIdx: pi });
 
-    const key = `${feld}-${heroIdx}`;   // heroFlags liegen auf der Brettseite
-    const vorher = gs.heroFlags?.[key];
+    // Die Zielwahl ist NICHT abbrechbar: die Aktion ist bezahlt und die Karte verlaesst das Deck.
+    // `_forceNonCancellable` ist der vorhandene Zaehler dafuer (v741), den auch der erzwungene Kreatureneffekt nimmt —
+    // als Zaehler, nicht als Schalter, damit verschachtelte Aufloesungen sich nicht gegenseitig freigeben.
+    engine._forceNonCancellable = (engine._forceNonCancellable || 0) + 1;
     try {
-      // „cannot affect more than 1 target" — nur fuer DIESE Aufloesung.
-      if (!gs.heroFlags) gs.heroFlags = {};
-      gs.heroFlags[key] = { ...(vorher || {}), forcesSingleTargetAny: true };
-
-      // Die Zielwahl ist NICHT abbrechbar: die Aktion ist bezahlt und
-      // die Karte verlaesst das Deck. `_forceNonCancellable` ist der
-      // vorhandene Zaehler dafuer (v741), den auch der erzwungene
-      // Kreatureffekt nimmt — als Zaehler, nicht als Schalter, damit
-      // verschachtelte Aufloesungen sich nicht gegenseitig freigeben.
-      engine._forceNonCancellable = (engine._forceNonCancellable || 0) + 1;
-      try {
-        const r = await engine._castSpellImmediately(pi, heroIdx, name, {
-          fromZone: 'deck',
-          pool: ps.mainDeck,
-          poolIndex,
-          by: CARD_NAME,
-          ...(feld !== pi ? { heroOwner: feld } : {}),   // Als Vorgabe 29.9.
-        });
-        if (r?.cancelled) return false;
-      } finally {
-        engine._forceNonCancellable--;
-      }
+      const r = await engine._castSpellImmediately(pi, heroIdx, name, {
+        fromZone: 'deck',
+        pool: ps.mainDeck,
+        poolIndex,
+        by: CARD_NAME,
+        ...(feld !== pi ? { heroOwner: feld } : {}),   // Als Vorgabe 29.9.
+      });
+      if (r?.cancelled) return false;
     } finally {
-      // Flagge IMMER abraeumen — auch nach einem Fehler mitten in der
-      // Aufloesung. Bliebe sie stehen, waeren auch normal gespielte
-      // Karten dieses Helden einzelzielig.
-      if (gs.heroFlags) {
-        if (vorher) gs.heroFlags[key] = vorher;
-        else delete gs.heroFlags[key];
-      }
+      engine._forceNonCancellable--;
     }
 
     engine.log('friedhelm_deck_play', { player: ps.username, card: name });
