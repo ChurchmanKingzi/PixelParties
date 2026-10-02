@@ -17,6 +17,8 @@
 //    (`negateEffects`); Level/Schule des Helden sind egal. Die Zone eines beliebigen
 //    kontrollierten Helden (auch besiegt, solange die Hero Zone belegt ist — wie
 //    The Root of all Evil).
+//  • Beschwoerungseinschraenkungen: `canSummon` filtert Kandidaten/Zonen (`isCreatureSummonable`);
+//    `beforeSummon` (Opfer o.ae.) wird nach der Zonenwahl bezahlt, ein Abbruch verbraucht den Key nicht.
 //  • „Negate its effects for the rest of the turn": Negation mit Ablauf am Beginn des naechsten
 //    Zuges (`expiresAtTurn`), eigenverursacht.
 //  • „You cannot perform an Action for the rest of the turn": spielerweiter Rundenstempel
@@ -54,6 +56,8 @@ function zonenFuer(engine, pi, cardName) {
   for (const { physOwner, heroIdx: hi, hero: h } of engine.heroesControlledBy(pi)) {
     if (!h?.name) continue;
     if (engine.isSupportZoneLocked(physOwner, hi, { source: CARD_NAME, cardName, via: 'place' })) continue;
+    // Beschwoerungseinschraenkungen (`canSummon`, z.B. benoetigte Opfer) gelten auch hier.
+    if (cardName && !engine.isCreatureSummonable(cardName, physOwner, hi)) continue;
     for (let si = 0; si < 3; si++) {
       if (engine.supportSlotBelegt(physOwner, hi, si)) continue;
       out.push({ owner: physOwner, heroIdx: hi, slotIdx: si, label: `${h.name} — Slot ${si + 1}` });
@@ -136,6 +140,12 @@ module.exports = {
         || (z.owner == null ? zonen.find(gleich) : null) || null;
       if (!ziel) return { cancelled: true };
     }
+
+    // Beschwoerungskosten (`beforeSummon`, z.B. Opfer) zahlen — Abbruch: Karte bleibt unverbraucht.
+    const kostenOk = await engine._runBeforeSummon(name, pi, ziel.heroIdx,
+      { _isNormalSummon: false, ...(ziel.owner !== pi ? { heldSeite: ziel.owner } : {}) }, ziel.slotIdx);
+    if (!kostenOk) return { cancelled: true };
+    engine.takeTributeSummonExtras(name, pi);   // Opfer-Stempel verbrauchen (Platzieren feuert keine Beschwoerungs-Hooks)
 
     // ── Commit: ab hier ist die Karte gespielt ──
     engine.claimHOPT('masters-key', pi);
