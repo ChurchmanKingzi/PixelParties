@@ -41,12 +41,12 @@ async function bezahlen(ctx, opferName) {
     confirmLabel: '🛡️ Negate', cancelLabel: 'No', cancellable: true, _ownerIdx: pi,
   });
   if (!engine._confirmSaidYes(ja)) return false;
+  // Kartenbild SOFORT nach dem Ja streamen (Als Befund 2.10.) — vor jedem Surprise-Fenster und vor dem Flug der Karten.
+  await engine.showTriggeredEffect(CARD_NAME, { playerIdx: pi });
   const namen = await waehleKosten(engine, pi, KOSTEN, CARD_NAME);
   if (!namen) return false;
   if (!gs.hoptUsed) gs.hoptUsed = {};
   gs.hoptUsed[sperre(inst)] = gs.turn;
-  // Das Kartenbild des Priesters ZUERST streamen — dann erst fliegen die beiden Creatures ins Deck.
-  await engine.showTriggeredEffect(CARD_NAME, { playerIdx: pi });
   if (!(await mischeZurueck(engine, pi, namen, CARD_NAME))) return false;
   engine.log('priest_of_tempeste', { player: gs.players[pi]?.username, shuffled: namen, target: opferName });
   return true;
