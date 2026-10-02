@@ -22371,7 +22371,7 @@
     "hp": 200,
     "atk": null,
     "cost": null,
-    "effect": "You may once per turn choose a Creature from your discard pile, except \"The Root of all Evil\", and place it into the free Support Zone of any Hero you control. The HP of Creatures summoned this way become 1. Creatures that would be sent to either player's discard pile are deleted instead.",
+    "effect": "You may once per turn choose a Creature from your discard pile, except \"The Root of all Evil\", and place it into the free Support Zone of any Hero you control. Creatures that would be sent to either player's discard pile are deleted instead.",
     "archetype": "",
     "setID": "PP MBS1",
     "banned": "",
