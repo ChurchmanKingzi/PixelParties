@@ -12,7 +12,7 @@
 //  ── AUSLEGUNG ─────────────────────────────────────────────────────
 //  • Aktiver Effekt (einmal pro Zug, Engine-Sperre je Instanz): eine Creature der EIGENEN Ablage ausser
 //    „The Root of all Evil" (beliebiges Level) waehlen und per `placeFromPile` in eine freie Support Zone eines
-//    kontrollierten, lebenden Helden legen (Platzieren, kein Beschwoeren; On-Summon feuert). Abbrechbar — ein
+//    kontrollierten Helden legen (auch einem besiegten — nur die Hero Zone darf nicht leer sein) (Platzieren, kein Beschwoeren; On-Summon feuert). Abbrechbar — ein
 //    Abbruch verbraucht den Effekt nicht.
 //  • Passiv: solange diese Karte aktiv auf dem Brett steht (Support Zone, offen, nicht Frozen/Stunned/Negated),
 //    werden Creatures, die in die Ablage JEDES Spielers kaemen, stattdessen geloescht:
@@ -44,11 +44,12 @@ function kandidaten(engine, pi) {
   return [...zaehler.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([name, count]) => ({ name, source: 'discard', count }));
 }
 
-/** Freie Plaetze lebender, kontrollierter Helden, auf denen diese Creature liegen darf. */
+/** Freie Plaetze kontrollierter Helden-Zonen, auf denen diese Creature liegen darf — AUCH besiegter Helden: die Root
+ *  beschwoert in IRGENDEINE freie Support Zone, solange die zugehoerige Hero Zone nicht leer ist (Name vorhanden). */
 function zonenFuer(engine, pi, cardName) {
   const out = [];
   for (const { physOwner, heroIdx: hi, hero: h } of engine.heroesControlledBy(pi)) {
-    if (!h?.name || h.hp <= 0) continue;
+    if (!h?.name) continue;
     if (engine.isSupportZoneLocked(physOwner, hi, { source: CARD_NAME, cardName, via: 'place' })) continue;
     if (cardName && !engine.isCreatureSummonable(cardName, physOwner, hi, { _bypassBeforeSummon: true })) continue;
     for (let si = 0; si < 3; si++) {
