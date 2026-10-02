@@ -8535,15 +8535,15 @@ const ANIM_REGISTRY = {
         if (!el || window._playAnimations === false) return undefined;
         const ctx = el.getContext('2d');
         const img = ctx.createImageData(gw, gh);
-        const DAUER = 2600;
+        const DAUER = 4200;
         const t0 = performance.now();
         let raf = 0, letzte = -1;
         const schritt = (jetzt) => {
           const t = Math.min(1, (jetzt - t0) / DAUER);
-          const fr = Math.floor(t * 52);                          // ~20 Bilder/s: ruhige Pixelart-Taktung
+          const fr = Math.floor(t * 84);                          // ~20 Bilder/s: ruhige Pixelart-Taktung
           if (fr !== letzte) {
             letzte = fr;
-            img.data.set(tentakelFrame(gw, gh, fr / 52, 1));
+            img.data.set(tentakelFrame(gw, gh, fr / 84, 1));
             ctx.putImageData(img, 0, 0);
           }
           if (t < 1) raf = requestAnimationFrame(schritt);
@@ -29455,8 +29455,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
 
   // Play a single open cue whenever any hand-card target picker appears.
   useEffect(() => { if (spellHeroPick && window.playSFX) window.playSFX('ui_prompt_open'); }, [spellHeroPick]);
+  useEffect(() => { if (crossSidePlayPick && window.playSFX) window.playSFX('ui_prompt_open'); }, [crossSidePlayPick]);
   // Klick-Beschwoerung einer Creature: Body-Klasse, damit CSS alles ausser Caster-Helden, freien Zonen und der Karte selbst ausgraut.
-  const summonPickAktiv = !!(spellHeroPick && (spellHeroPick.isCreature || spellHeroPick.isArtifactCreature));
+  const summonPickAktiv = !!((spellHeroPick && (spellHeroPick.isCreature || spellHeroPick.isArtifactCreature)) || crossSidePlayPick);   // auch Klick-Wahl auf JEDE Zone (Stowaway, Chilly Wizard)
   useEffect(() => {
     document.body.classList.toggle('summon-pick', summonPickAktiv);
     return () => document.body.classList.remove('summon-pick');
@@ -46664,7 +46665,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                   && handEffectiveCost > handCardData.cost;
                 return (
                   <div key={'h-' + item.origIdx} data-hand-idx={item.origIdx} data-card-name={item.card} data-card-type={CARDS_BY_NAME[item.card]?.cardType || ''} data-touch-drag="1"
-                    className={'hand-slot' + (isBeingDragged ? ' hand-dragging' : '') + (dimmed ? ' hand-card-dimmed' : '') + (isAnyDiscard && isForceDiscardEligible ? ' hand-discard-target' : '') + (isAnyDiscard && !isForceDiscardEligible ? ' hand-card-dimmed' : '') + (isAttachEligible ? ' hand-card-attach-eligible' : '') + (isAbilityAttach && !isAttachEligible ? ' hand-card-attach-dimmed' : '') + (isHandPickSelected ? ' hand-pick-selected' : '') + (isHandPickEligible && !isHandPickSelected && !isHandPickTypeFull && !isHandPickMaxed && !isHandPickNameLocked ? ' hand-pick-eligible' : '') + ((isHandPickTypeFull || isHandPickMaxed || isHandPickNameLocked) ? ' hand-card-dimmed' : '') + (isPickHandCardEligible ? ' hand-pick-eligible' : '') + (isPickHandCardUrgent ? ' hand-pick-eligible-urgent' : '') + (isPickHandCardDimmed ? ' hand-card-dimmed' : '') + ((spellHeroPick && (spellHeroPick.isCreature || spellHeroPick.isArtifactCreature) && item.origIdx !== spellHeroPick.handIndex) ? ' hand-card-dimmed' : '') + (isZonePickHandHighlight ? ' hand-pick-eligible-urgent' : '') + (isZonePickHandQueued ? ' hand-pick-eligible' : '') + (isZonePickHandDimmed ? ' hand-card-dimmed' : '') + (isPotionHandTargetSelected ? ' hand-pick-selected' : (isPotionHandTarget ? ' hand-pick-eligible' : '')) + (isStNicolasEscrowed ? ' hand-card-st-nicolas-escrowed' : '') + ((isStealMarked || isStealHighlighted) ? ' blind-pick-selected' : '') + (isRevealed ? ' hand-card-revealed' : '') + (istFrischErschienen(item.origIdx) ? ' hand-card-materializing' : '')}
+                    className={'hand-slot' + (isBeingDragged ? ' hand-dragging' : '') + (dimmed ? ' hand-card-dimmed' : '') + (isAnyDiscard && isForceDiscardEligible ? ' hand-discard-target' : '') + (isAnyDiscard && !isForceDiscardEligible ? ' hand-card-dimmed' : '') + (isAttachEligible ? ' hand-card-attach-eligible' : '') + (isAbilityAttach && !isAttachEligible ? ' hand-card-attach-dimmed' : '') + (isHandPickSelected ? ' hand-pick-selected' : '') + (isHandPickEligible && !isHandPickSelected && !isHandPickTypeFull && !isHandPickMaxed && !isHandPickNameLocked ? ' hand-pick-eligible' : '') + ((isHandPickTypeFull || isHandPickMaxed || isHandPickNameLocked) ? ' hand-card-dimmed' : '') + (isPickHandCardEligible ? ' hand-pick-eligible' : '') + (isPickHandCardUrgent ? ' hand-pick-eligible-urgent' : '') + (isPickHandCardDimmed ? ' hand-card-dimmed' : '') + ((spellHeroPick && (spellHeroPick.isCreature || spellHeroPick.isArtifactCreature) && item.origIdx !== spellHeroPick.handIndex) ? ' hand-card-dimmed' : '') + ((crossSidePlayPick && item.origIdx !== crossSidePlayPick.handIndex) ? ' hand-card-dimmed' : '') + (isZonePickHandHighlight ? ' hand-pick-eligible-urgent' : '') + (isZonePickHandQueued ? ' hand-pick-eligible' : '') + (isZonePickHandDimmed ? ' hand-card-dimmed' : '') + (isPotionHandTargetSelected ? ' hand-pick-selected' : (isPotionHandTarget ? ' hand-pick-eligible' : '')) + (isStNicolasEscrowed ? ' hand-card-st-nicolas-escrowed' : '') + ((isStealMarked || isStealHighlighted) ? ' blind-pick-selected' : '') + (isRevealed ? ' hand-card-revealed' : '') + (istFrischErschienen(item.origIdx) ? ' hand-card-materializing' : '')}
                     style={{
                       // ★ v1233: Der Faecher haengt am PLATZ, nicht an
                       // der Karte — siehe „HANDFAECHER" in style.css.
