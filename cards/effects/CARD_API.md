@@ -18718,6 +18718,6 @@ Jeder neue Area-Hintergrund wird mit **demselben Detailgrad** gemalt wie Cottage
 Der Generator (reines Python, PNG-Schreiber + `shade.py` mit `dth`/`ramp`/`mix`) liegt bewusst nicht im Projekt, wie bei den übrigen Szenen.
 
 ### The Sixth Circle of Hell — Hintergrund (Pixelart)
-Lavahimmel (`sky.png`, 8 Bilder, periodisch) über roter Backsteinwand; Richter-Gott mit Goldkrone/Hasenohren (`god.png`, Zeigearm nach links),
+**Panorama** (kein Kachel-Loop mit wiederholten Figuren): `panorama.png` 256 breit, mittig, Wandkachel `back.png` setzt die Wand seitlich fort. Lavahimmel (`sky.png`, 8 Bilder, periodisch; alle Kacheln im Gleichtakt) über roter Backsteinwand; Richter-Gott mit Flügelhelm (Asterix-Art, rote Kappe + Goldband + graue Flügel) (`god.png`, Zeigearm nach links),
 Ketzer (`hero.png`, 12 Bilder, 2 Umhangvarianten), Kapuzen-Dämon im Vordergrund (`demon.png`), Eisenspieße, Grabfeuer in Wandnischen
 (`grave-fire.png`), Lavatropfen, Glut. Alle Figuren 12 Bilder, 4-zusammenhängend, 12-s-Schleife nahtlos geprüft. Farben aus dem Kartenbild.

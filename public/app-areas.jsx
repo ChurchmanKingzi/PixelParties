@@ -5487,13 +5487,13 @@ const FifthCircleOfHellOverlay = React.memo(function FifthCircleOfHellOverlay() 
 // ═══════════════════════════════════════════════════════════════════
 //  THE SIXTH CIRCLE OF HELL (Heresy) — Pixelart-Hintergrund
 //
-//  Klassische Hoellenszene wie auf der Karte: Lavahimmel ueber einer roten Backsteinwand; rechts ein
-//  bartiger Richter-Gott mit Goldkrone und Hasenohren, der anklagend auf den Ketzer zeigt; in der Mitte
+//  Klassische Hoellenszene wie auf der Karte als EIN PANORAMA (nicht als Kachel mit wiederholten Figuren): Lavahimmel ueber einer roten Backsteinwand; rechts ein
+//  bartiger Richter-Gott mit Fluegelhelm (Asterix-Art) und Goldband, der anklagend auf den Ketzer zeigt; in der Mitte
 //  der blonde Ketzer; unten ein Kapuzen-Daemon, der ihm einfluestert; ganz rechts Eisenspiesse; in den
 //  Wandnischen brennen Grabfeuer. Farben aus der Kartenvorlage (Histogramm).
 //
-//  Ebenen (Kunsthoehe 100; Generator liegt ausserhalb des Projekts): back.png — Kachel 128: Wand, Boden,
-//  Nischen, Sockel, Spiesse; sky.png — Lavahimmel (8 Bilder 128×46, periodisch in x und Zeit; Tropfen an der
+//  Ebenen (Kunsthoehe 100; Generator liegt ausserhalb des Projekts): panorama.png — EIN Versatzstueck 256 breit, mittig (Wand, Boden,
+//  Nischen, Sockel, Spiesse; Figuren: Ketzer x70, Gott x118, Daemon x55); back.png — Wandkachel 128, setzt die Wand links/rechts davon fort; sky.png — Lavahimmel (8 Bilder 128×46, periodisch in x und Zeit; Tropfen an der
 //  Unterkante); god.png (12 Bilder 46×48, Zeigearm nach links), hero.png (12 Bilder 26×36, 2 Varianten),
 //  demon.png (12 Bilder 38×36); grave-fire.png (8 Bilder 12×18); ember.png (3 Bilder 3×3); front.png —
 //  Bodenschutt VOR den Figuren. ALLE Animationen teilen die Periode 12 s (0,15/0,5/1,2/4/6 s).
@@ -5504,49 +5504,48 @@ const SX_GOTT = [0,0,1,1,0,0,2,2,0,3,3,0,4,0,5,5,6,6,7,7,8,8,7,7,9,9,9,7,7,0,10,
 const SX_DAEMON = [0,0,1,1,0,2,2,3,3,0,4,4,0,5,6,6,7,7,6,6,7,7,8,8,6,0,9,9,9,0,10,0,0,11,11,0,0,1,1,0];
 const sxFolge = (folge, n) => folge.map((b, i) => `${(i * 100 / folge.length).toFixed(3)}% { background-position-x: ${(b * 100 / (n - 1)).toFixed(3)}%; }`).join(' ');
 const sxReihe = (n) => Array.from({ length: n }, (_, b) => `${(b * 100 / n).toFixed(3)}% { background-position-x: ${(b * 100 / (n - 1)).toFixed(3)}%; }`).join(' ');
-const SX_BREITE = 512;
+const SX_PAN = 256;                                       // Breite des Panoramas (Kunstpixel), mittig; links/rechts setzt die Wand (back.png) fort
+const SX = (x) => ppArtX(x, SX_PAN);                     // Kunstpixel-x im Panorama → Position
 const SixthCircleOfHellOverlay = React.memo(function SixthCircleOfHellOverlay() {
-  const kacheln = useMemo(() => Array.from({ length: SX_BREITE / 128 }, (_, k) => ({
-    x: 128 * k, v: k % 2, dH: -((k * 2.3) % 6), dG: -((k * 3.1) % 6), dD: -((k * 1.7) % 6),
-    dHimmel: -((k * 1.3) % 4), dF: -((k * 0.37) % 1.2),
-  })), []);
-  const funken = useMemo(() => Array.from({ length: 30 }, (_, i) => {
+  const funken = useMemo(() => Array.from({ length: 36 }, (_, i) => {
     const dur = [3, 4, 6][i % 3];
-    return { x: ((i * 37) % SX_BREITE), y0: 84 - (i % 4) * 6, dur, k: i % 3, delay: -((i * 0.83) % dur), drift: ((i % 5) - 2) * 3 };
+    return { x: -240 + ((i * 53) % 480), y0: 84 - (i % 4) * 6, dur, k: i % 3, delay: -((i * 0.83) % dur), drift: ((i % 5) - 2) * 3 };
   }), []);
-  const tropfen = useMemo(() => Array.from({ length: 14 }, (_, i) => {
+  const tropfen = useMemo(() => Array.from({ length: 16 }, (_, i) => {
     const dur = [3, 4][i % 2];
-    return { x: ((i * 47 + 9) % SX_BREITE), dur, k: i % 3, delay: -((i * 0.61) % dur) };
+    return { x: -240 + ((i * 61 + 9) % 480), dur, k: i % 3, delay: -((i * 0.61) % dur) };
   }), []);
+  const himmel = useMemo(() => Array.from({ length: 12 }, (_, k) => k - 6), []);
   return (
     <PixelScene artH={100} bg="#140000" className="sixth-circle-overlay">
-      <PixelBand src={SXX + 'back.png'} style={{ backgroundPosition: '0 0' }} />
+      <PixelBand src={SXX + 'back.png'} style={{ backgroundPosition: '50% 0' }} />
+      <PixelPiece src={SXX + 'panorama.png'} w={SX_PAN} />
       <div className="sx-volk">
-        {kacheln.map((t, i) => (
-          <React.Fragment key={'t' + i}>
-            <i className="sx-himmel" style={{ left: ppArt(t.x), animation: `sxHimmel 4s steps(1) ${t.dHimmel}s infinite` }} />
-            <i className="pp-area-dyn sx-glut" style={{ left: ppArt(t.x + 2), top: ppArt(44), animation: `sxGlut 3s ease-in-out ${t.dF}s infinite alternate` }} />
-            <i className="pp-area-dyn sx-glut" style={{ left: ppArt(t.x + 52), top: ppArt(30), animation: `sxGlut 3s ease-in-out ${t.dF - 1}s infinite alternate` }} />
-            <i className="sx-feuer" style={{ left: ppArt(t.x + 9), top: ppArt(49), animation: `sxFeuer 1.2s steps(1) ${t.dF}s infinite` }} />
-            <i className="sx-feuer" style={{ left: ppArt(t.x + 58), top: ppArt(33), animation: `sxFeuer 1.2s steps(1) ${t.dF - .5}s infinite` }} />
-            <i className="sx-gott" style={{ left: ppArt(t.x + 62), animation: `sxGott 6s steps(1) ${t.dG}s infinite` }} />
-            <i className="sx-held" style={{ left: ppArt(t.x + 27), backgroundPositionY: t.v ? '100%' : '0%', animation: `sxHeld 6s steps(1) ${t.dH}s infinite` }} />
-            <i className="sx-daemon" style={{ left: ppArt(t.x + 12), animation: `sxDaemon 6s steps(1) ${t.dD}s infinite` }} />
+        {himmel.map((k) => (
+          <i key={'h' + k} className="sx-himmel" style={{ left: `calc(50% + ${-64 + 128 * k} * var(--px))`, animation: 'sxHimmel 4s steps(1) infinite' }} />
+        ))}
+        {[[34, 46, 0], [100, 34, -0.5], [196, 42, -0.9]].map(([nx, ny, d], i) => (
+          <React.Fragment key={'n' + i}>
+            <i className="pp-area-dyn sx-glut" style={{ left: SX(nx - 5), top: ppArt(ny - 8), animation: `sxGlut 3s ease-in-out ${d}s infinite alternate` }} />
+            <i className="sx-feuer" style={{ left: SX(nx + 1), top: ppArt(ny + 3), animation: `sxFeuer 1.2s steps(1) ${d * .6}s infinite` }} />
           </React.Fragment>
         ))}
+        <i className="sx-gott" style={{ left: SX(118), animation: 'sxGott 6s steps(1) infinite' }} />
+        <i className="sx-held" style={{ left: SX(70), animation: 'sxHeld 6s steps(1) -1.7s infinite' }} />
+        <i className="sx-daemon" style={{ left: SX(55), animation: 'sxDaemon 6s steps(1) -3.1s infinite' }} />
         {tropfen.map((e, i) => (
           <i key={'d' + i} className="pp-area-dyn sx-tropfen" style={{
-            left: ppArt(e.x), backgroundPositionX: (e.k * 50) + '%', animation: `sxTropf ${e.dur}s ease-in ${e.delay}s infinite`,
+            left: ppArtX(e.x, 0), backgroundPositionX: (e.k * 50) + '%', animation: `sxTropf ${e.dur}s ease-in ${e.delay}s infinite`,
           }} />
         ))}
         {funken.map((e, i) => (
           <i key={'e' + i} className="pp-area-dyn sx-funke" style={{
-            left: ppArt(e.x), top: ppArt(e.y0), backgroundPositionX: (e.k * 50) + '%', '--dx': ppArt(e.drift),
+            left: ppArtX(e.x, 0), top: ppArt(e.y0), backgroundPositionX: (e.k * 50) + '%', '--dx': ppArt(e.drift),
             animation: `sxFunke ${e.dur}s linear ${e.delay}s infinite`,
           }} />
         ))}
       </div>
-      <PixelBand src={SXX + 'front.png'} style={{ backgroundPosition: '0 0' }} />
+      <PixelBand src={SXX + 'front.png'} style={{ backgroundPosition: '50% 0' }} />
       <div className="pp-rand-dim" />
       <style>{`
         .sx-volk { position: absolute; inset: 0; }
