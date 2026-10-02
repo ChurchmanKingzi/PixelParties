@@ -8303,44 +8303,54 @@ const ANIM_REGISTRY = {
       );
     };
   })(),
-  // Rool, the Troll Guard — „disrupted": ein Troll-Hieb auf den Boden unter dem Ziel. Erst ein Aufschlag-Blitz mit
-  // Druckring, dann reissen gezackte Spalten radial auf, Gesteinsbrocken fliegen, und ein grosses „×2" springt
-  // auf und schwebt davon (doppelter Schaden). Warmes Rot/Orange = Debuff.
+  // Rool, the Troll Guard — „disrupted": ein wuchtiger Troll-Hieb auf das Ziel. Dunkelroter Druckkegel + gleissender Blitz,
+  // zwei Schockringe, breite glühende Spalten, fliegende Brocken und ein riesiges „×2", das aufschlaegt und nachglueht
+  // (doppelter Schaden). Warmes Rot/Orange = Debuff. Gross und laenger (~1,7 s), damit man es sofort bemerkt.
   rool_disrupt: (function () {
     return function RoolDisruptEffect({ x, y, opacity }) {
-      const brocken = useMemo(() => Array.from({ length: ppFxN(14) }, () => {
+      const brocken = useMemo(() => Array.from({ length: ppFxN(30) }, () => {
         const angle = Math.random() * Math.PI * 2;
-        const speed = 24 + Math.random() * 46;
+        const speed = 50 + Math.random() * 110;
         return {
-          dx: Math.cos(angle) * speed, dy: Math.sin(angle) * speed - 16,
-          size: 3 + Math.random() * 6,
-          color: ['#8a4a2a', '#b5651d', '#d98a3d', '#6a3a1e', '#e8b070'][Math.floor(Math.random() * 5)],
-          delay: 80 + Math.random() * 60, dur: 420 + Math.random() * 320,
+          dx: Math.cos(angle) * speed, dy: Math.sin(angle) * speed - 30,
+          size: 5 + Math.random() * 11,
+          color: ['#8a4a2a', '#b5651d', '#ff8a2a', '#6a3a1e', '#ffc070', '#ff5a1a'][Math.floor(Math.random() * 6)],
+          delay: 60 + Math.random() * 90, dur: 560 + Math.random() * 520,
         };
       }), []);
-      const risse = useMemo(() => [-35, 38, 100, 152, 215, 268, 320].slice(0, ppFxN(7)).map((w, i) => ({ w, len: 36 + (i % 3) * 12 })), []);
+      const risse = useMemo(() => [-35, 12, 60, 102, 150, 198, 245, 292, 330].slice(0, ppFxN(9)).map((w, i) => ({ w, len: 74 + (i % 3) * 26 })), []);
       const wrapperOpacity = (typeof opacity === 'number' && opacity >= 0 && opacity <= 1) ? opacity : 1;
       return (
         <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100, opacity: wrapperOpacity }}>
+          {/* dunkelroter Druckkegel unter allem */}
           <div style={{
-            position: 'absolute', left: -44, top: -44, width: 88, height: 88, borderRadius: '50%',
-            background: 'radial-gradient(circle, rgba(255,190,90,.9) 0%, rgba(220,100,40,.55) 42%, rgba(120,40,10,0) 76%)',
-            boxShadow: '0 0 26px rgba(255,140,50,.8), 0 0 48px rgba(200,70,20,.5)',
-            animation: 'roolDisruptFlash 520ms ease-out forwards',
+            position: 'absolute', left: -120, top: -120, width: 240, height: 240, borderRadius: '50%',
+            background: 'radial-gradient(circle, rgba(90,10,0,.75) 0%, rgba(150,30,5,.45) 45%, rgba(100,20,0,0) 72%)',
+            animation: 'roolDisruptDark 1500ms ease-out forwards',
           }} />
+          {/* gleissender Aufschlag */}
           <div style={{
-            position: 'absolute', left: -22, top: -22, width: 44, height: 44, borderRadius: '50%',
-            border: '4px solid rgba(255,170,80,.9)',
-            animation: 'roolDisruptRing 640ms ease-out forwards',
+            position: 'absolute', left: -95, top: -95, width: 190, height: 190, borderRadius: '50%',
+            background: 'radial-gradient(circle, rgba(255,235,170,1) 0%, rgba(255,150,50,.85) 32%, rgba(220,70,15,.45) 58%, rgba(120,30,5,0) 78%)',
+            boxShadow: '0 0 60px rgba(255,150,50,.95), 0 0 120px rgba(220,70,20,.7)',
+            animation: 'roolDisruptFlash 760ms ease-out forwards',
           }} />
+          {[0, 150].map((dl, k) => (
+            <div key={'r' + k} style={{
+              position: 'absolute', left: -40, top: -40, width: 80, height: 80, borderRadius: '50%',
+              border: (k ? 5 : 8) + 'px solid rgba(255,175,80,.95)',
+              boxShadow: '0 0 18px rgba(255,120,40,.9)',
+              animation: `roolDisruptRing ${900 + k * 250}ms ease-out ${dl}ms forwards`,
+            }} />
+          ))}
           {risse.map((r, i) => (
             <div key={i} style={{
-              position: 'absolute', left: 0, top: 0, width: r.len, height: 3, transformOrigin: '0 50%',
+              position: 'absolute', left: 0, top: -4, width: r.len, height: 8, transformOrigin: '0 50%',
               transform: `rotate(${r.w}deg) scaleX(0)`,
-              background: 'linear-gradient(90deg, #ffd08a 0%, #e0702a 45%, #5a1e08 100%)',
-              boxShadow: '0 0 6px rgba(255,140,50,.9)',
-              clipPath: 'polygon(0 40%, 18% 0, 34% 60%, 52% 10%, 70% 70%, 100% 50%, 70% 100%, 40% 70%, 20% 100%, 0 60%)',
-              animation: `roolDisruptCrack 560ms ease-out ${60 + i * 25}ms forwards`,
+              background: 'linear-gradient(90deg, #fff0c0 0%, #ffa040 30%, #e0501a 65%, #4a1204 100%)',
+              boxShadow: '0 0 12px rgba(255,140,50,1), 0 0 24px rgba(220,70,20,.8)',
+              clipPath: 'polygon(0 35%, 14% 0, 30% 62%, 48% 8%, 66% 72%, 84% 20%, 100% 50%, 84% 100%, 62% 66%, 40% 100%, 20% 70%, 0 65%)',
+              animation: `roolDisruptCrack 1100ms ease-out ${50 + i * 30}ms forwards`,
               '--rw': r.w + 'deg',
             }} />
           ))}
@@ -8351,32 +8361,42 @@ const ANIM_REGISTRY = {
             }} />
           ))}
           <div style={{
-            position: 'absolute', left: -30, top: -34, width: 60, textAlign: 'center',
-            fontFamily: 'var(--font-display, var(--font-body)), sans-serif', fontWeight: 900, fontSize: 30,
-            color: '#ffe3a8', textShadow: '0 0 8px rgba(255,120,40,.95), 2px 3px 0 rgba(90,25,5,.95)',
-            opacity: 0, animation: 'roolDisruptX2 1100ms ease-out 180ms forwards',
+            position: 'absolute', left: -70, top: -62, width: 140, textAlign: 'center',
+            fontFamily: 'var(--font-display, var(--font-body)), sans-serif', fontWeight: 900, fontSize: 76,
+            color: '#fff1c8', WebkitTextStroke: '3px #7a1c04',
+            textShadow: '0 0 14px rgba(255,140,40,1), 0 0 34px rgba(255,90,20,.95), 4px 6px 0 rgba(70,15,2,.95)',
+            opacity: 0, animation: 'roolDisruptX2 1500ms cubic-bezier(.2,.9,.3,1) 160ms forwards',
           }}>×2</div>
           <style>{`
+            @keyframes roolDisruptDark {
+              0%   { opacity: 0; transform: scale(0.4); }
+              15%  { opacity: 1; transform: scale(1); }
+              70%  { opacity: .75; transform: scale(1.1); }
+              100% { opacity: 0; transform: scale(1.25); }
+            }
             @keyframes roolDisruptFlash {
-              0%   { opacity: 0; transform: scale(0.25); }
-              28%  { opacity: 1; transform: scale(1.05); }
-              100% { opacity: 0; transform: scale(1.55); }
+              0%   { opacity: 0; transform: scale(0.2); }
+              22%  { opacity: 1; transform: scale(1.1); }
+              100% { opacity: 0; transform: scale(1.9); }
             }
             @keyframes roolDisruptRing {
-              0%   { opacity: 0; transform: scale(0.3); }
-              25%  { opacity: .95; }
-              100% { opacity: 0; transform: scale(3.2); }
+              0%   { opacity: 0; transform: scale(0.25); }
+              18%  { opacity: 1; }
+              100% { opacity: 0; transform: scale(5.2); }
             }
             @keyframes roolDisruptCrack {
               0%   { opacity: 0; transform: rotate(var(--rw)) scaleX(0); }
-              30%  { opacity: 1; transform: rotate(var(--rw)) scaleX(1); }
-              100% { opacity: 0; transform: rotate(var(--rw)) scaleX(1.15); }
+              22%  { opacity: 1; transform: rotate(var(--rw)) scaleX(1); }
+              70%  { opacity: .9; transform: rotate(var(--rw)) scaleX(1.05); }
+              100% { opacity: 0; transform: rotate(var(--rw)) scaleX(1.2); }
             }
             @keyframes roolDisruptX2 {
-              0%   { opacity: 0; transform: translateY(8px) scale(0.3) rotate(-10deg); }
-              22%  { opacity: 1; transform: translateY(-4px) scale(1.45) rotate(4deg); }
-              40%  { transform: translateY(-8px) scale(1.1) rotate(-3deg); }
-              100% { opacity: 0; transform: translateY(-34px) scale(1.2) rotate(0deg); }
+              0%   { opacity: 0; transform: translateY(20px) scale(0.2) rotate(-14deg); }
+              16%  { opacity: 1; transform: translateY(-6px) scale(1.7) rotate(5deg); }
+              28%  { transform: translateY(-10px) scale(1.2) rotate(-3deg); }
+              36%  { transform: translateY(-10px) scale(1.32) rotate(2deg); }
+              72%  { opacity: 1; transform: translateY(-14px) scale(1.2) rotate(0deg); }
+              100% { opacity: 0; transform: translateY(-60px) scale(1.3) rotate(0deg); }
             }
           `}</style>
         </div>
