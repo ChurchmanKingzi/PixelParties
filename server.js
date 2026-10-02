@@ -15862,6 +15862,8 @@ io.on('connection', (socket) => {
         // Puzzles skip the normal Resource/Action phases and jump straight to Main Phase 1.
         // Fire onTurnStart so cards that rely on it for per-turn setup (Slime Rancher,
         // additional actions, etc.) are correctly initialised before the player acts.
+        // Calm (Puzzle-Editor-Buff): Anbieter-Instanzen fuer Helden mit `buffs.calm` anlegen, bevor der Zugbeginn feuert.
+        try { require('./cards/effects/calm-diatribe').ensureCalmProviders(room.engine); } catch (err) { console.error('[Puzzle] Calm-Anbieter:', err.message); }
         await room.engine.runHooks('onTurnStart', { playerIdx: 0, _skipReactionCheck: true });
         // Nach-Ketten-Aktionen abarbeiten, die der Zugbeginn eingereiht hat (Circles of Hell: „wenn geloescht"-
         // Angebote nach The First Circle of Hell u. a.) — der Puzzle-Start umgeht `startTurn`, das sie sonst abholt.
