@@ -25024,7 +25024,7 @@ function CardReorderPrompt({ ep, onRespond }) {
         {drag && ghostCard && ReactDOM.createPortal((
           // Per Portal an den body: die DraggablePanel traegt ein transform, `position: fixed` wuerde sich sonst auf sie beziehen.
           <div style={{
-            position: 'fixed', left: drag.x - 52, top: drag.y - 73, width: 104, height: 146, zIndex: 10050,
+            position: 'fixed', left: drag.x - 52, top: drag.y - 73, width: 104, height: 146, zIndex: 2147483000,
             pointerEvents: 'none', borderRadius: 6, overflow: 'hidden', opacity: 0.92,
             boxShadow: '0 8px 24px rgba(0,0,0,.7)', transform: 'rotate(-3deg)',
           }}>
