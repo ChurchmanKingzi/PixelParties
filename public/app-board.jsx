@@ -34157,15 +34157,17 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           sc = 0.55 + 0.45 * u;
           rot = (1 - u) * -10;
         } else if (t < T2) {                                        // Pendeln: gedaempft um den Aufhaengepunkt
+          // Faengt bei th = 0 an (genau dort, wo das Einholen endet) und schwingt aus der Ruhe heraus an —
+          // sonst sprang die Karte beim Phasenwechsel. 2,5 Perioden → endet wieder bei th = 0.
           const u = (t - T1) / (T2 - T1);
-          const th = 0.62 * Math.exp(-2.4 * u) * Math.cos(u * Math.PI * 5.2);
+          const th = 0.5 * Math.exp(-2.2 * u) * Math.sin(u * Math.PI * 5) * (1 - Math.exp(-u * 9));
           const L = L0 + cardH * 0.5;
           cx = ax + Math.sin(th) * L; cy = ay + Math.cos(th) * L;
           rot = th * 57.3;
         } else {                                                    // abseilen in die Zone
           const u = ease((t - T2) / (total - T2));
           const L = L0 + cardH * 0.5;
-          const th = 0.03 * Math.cos((t - T2) / 60) * (1 - u);
+          const th = 0;
           const fx = ax + Math.sin(th) * L, fy = ay + Math.cos(th) * L;
           cx = fx + (zx - fx) * u; cy = fy + (zy - fy) * u;
           rot = th * 57.3 * (1 - u); sc = 1 - 0.18 * u;
