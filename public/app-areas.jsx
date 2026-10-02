@@ -5103,19 +5103,22 @@ const WowhallaOverlay = React.memo(function WowhallaOverlay() {
 //  heart.png — aufsteigendes Herz (2 Bilder 7×5).
 // ═══════════════════════════════════════════════════════════════════
 const LC = '/areas/second-circle-of-hell/';
+// Alle Animationen teilen die Periode 12 s (6/12 s Wiegen, 4/6 s Herzen, 3 s Herzschlag) → nahtlose Schleife.
+const LC_DAUER = [6, 12, 12];
 const LC_NAH = { feet: 73, w: 12, h: 20, xs: [-84, -52, -18, 16, 50, 84] };
 const LC_FERN = { feet: 36, w: 9, h: 13, xs: [-92, -68, -44, -20, 4, 28, 52, 76, 100] };
 const SecondCircleOfHellOverlay = React.memo(function SecondCircleOfHellOverlay() {
   const frauen = useMemo(() => {
     const mach = (typ, art) => typ.xs.map((x, i) => ({
-      art, x, v: (i + (art === 'fern' ? 1 : 0)) % 2, dur: 6 + (i % 4) * 1.3, delay: -((i * 2.7) % 9),
+      art, x, v: (i + (art === 'fern' ? 1 : 0)) % 2, dur: LC_DAUER[i % 3], delay: -((i * 2.7) % 12),
       w: typ.w, h: typ.h, feet: typ.feet,
     }));
     return [...mach(LC_FERN, 'fern'), ...mach(LC_NAH, 'nah')];
   }, []);
-  const herzen = useMemo(() => ppZufall(ppFxN(9), (i) => {
-    const f = frauen[(i * 5 + 3) % frauen.length];
-    return { x: f.x + (Math.random() - .5) * 6, y: f.feet - f.h + 2, dur: 4 + Math.random() * 3, delay: -Math.random() * 7, f: i % 2 };
+  // Jede Frau schickt Herzen; Dauern 4 s / 6 s teilen die Periode (12 s), damit alles nahtlos schleift.
+  const herzen = useMemo(() => frauen.map((f, i) => {
+    const dur = i % 2 ? 4 : 6;
+    return { x: f.x + ((i * 7) % 5 - 2), y: f.feet - f.h + 2, dur, delay: -((i * 1.9) % dur), f: i % 2 };
   }), [frauen]);
   return (
     <PixelScene artH={100} bg="#1e0a2c" className="second-circle-overlay">
@@ -5138,7 +5141,7 @@ const SecondCircleOfHellOverlay = React.memo(function SecondCircleOfHellOverlay(
       </div>
       <div className="pp-rand-dim" />
       <style>{`
-        .lc-wand { animation: lcPuls 3.4s steps(1) infinite; }
+        .lc-wand { animation: lcPuls 3s steps(1) infinite; }
         /* Herzschlag der Augen: Bild 2 kurz, dann wieder Bild 1 */
         @keyframes lcPuls {
           0%, 52% { background-position: 0 0; } 54%, 60% { background-position: 0 100%; }
