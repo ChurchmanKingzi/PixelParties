@@ -11495,7 +11495,7 @@
     "hp": null,
     "atk": null,
     "cost": null,
-    "effect": "This Spell has no effect when you play it from your hand. This Spell can only be attached to an \"Idej\" Hero by its own effect. When the attached Hero would take any damage, you may discard this card from that Hero to negate that damage and all associated effects to that Hero.",
+    "effect": "Your deck may contain up to 6 copies of this card. This Spell has no effect when you play it from your hand. This Spell can only be attached to an \"Idej\" Hero by its own effect. When the attached Hero would take any damage, you may discard this card from that Hero to negate that damage and all associated effects to that Hero.",
     "archetype": "",
     "setID": "PP MSJP",
     "banned": "",
@@ -11503,7 +11503,8 @@
     "spellSchool2": "",
     "startingAbility1": "",
     "startingAbility2": "",
-    "foil": null
+    "foil": null,
+    "maxCopies": 6
   },
   {
     "name": "Idej Projector",
