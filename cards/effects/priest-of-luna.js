@@ -67,8 +67,9 @@ async function anbieten(ctx, opferName) {
   // ── Commit ──
   if (!gs.hoptUsed) gs.hoptUsed = {};
   gs.hoptUsed[sperre(inst)] = gs.turn;
-  if (!(await mischeZurueck(engine, pi, namen, CARD_NAME))) return;
+  // Das Kartenbild des Priesters ZUERST streamen — dann erst fliegen die beiden Creatures ins Deck.
   await engine.showTriggeredEffect(CARD_NAME, { playerIdx: pi });
+  if (!(await mischeZurueck(engine, pi, namen, CARD_NAME))) return;
 
   const anim = { owner: ziel.owner, heroIdx: ziel.heroIdx, zoneSlot: ziel.type === 'hero' ? -1 : ziel.slotIdx };
   engine._broadcastEvent('play_zone_animation', { type: 'flame_strike', ...anim });
