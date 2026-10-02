@@ -49,7 +49,7 @@ const AREA_OVERLAYS = {
   'Paraseed Greenhouse':          { tier: 'opaque',      C: () => <ParaseedGreenhouseOverlay /> },   // v1415: Kartenstil, ganze Szene
   'The First Circle of Hell':     { tier: 'opaque',      C: () => <FirstCircleOfHellOverlay /> },   // v1440: Kartenstil (vorher translucent)
   'The Second Circle of Hell':    { tier: 'opaque',      C: () => <SecondCircleOfHellOverlay /> },   // Pixelart (2.10.)
-  'The Third Circle of Hell':    { tier: 'opaque',      C: () => <HellCircleOverlay stufe={3} /> },   // Platzhalter-Szene (prozedural)
+  'The Third Circle of Hell':     { tier: 'opaque',      C: () => <ThirdCircleOfHellOverlay /> },   // Pixelart (2.10.)
   'The Fourth Circle of Hell':    { tier: 'opaque',      C: () => <HellCircleOverlay stufe={4} /> },   // Platzhalter-Szene (prozedural)
   'The Fifth Circle of Hell':    { tier: 'opaque',      C: () => <HellCircleOverlay stufe={5} /> },   // Platzhalter-Szene (prozedural)
   'The Sixth Circle of Hell':    { tier: 'opaque',      C: () => <HellCircleOverlay stufe={6} /> },   // Platzhalter-Szene (prozedural)
@@ -5181,16 +5181,95 @@ const SecondCircleOfHellOverlay = React.memo(function SecondCircleOfHellOverlay(
 });
 
 // ═══════════════════════════════════════════════════════════════════
+//  THE THIRD CIRCLE OF HELL — der Kreis der Voelllerei (Al 2.10.)
+//
+//  Karte: ein Banketttisch auf Hoellenboden, Teller mit Truthaehnen und Braten ueberall drumrum,
+//  Dampf steigt auf, Kerzen scheinen, es gibt Wein — ein Festmahl. Palette nach dem Kartenbild:
+//  rot-orange Hoellenboden, Holztisch, lindgruene Platten, Braten, Violett fuer die Kelche.
+//  Draufsicht; die Fresser sitzen frontal hinter dem Tisch (wie auf der Karte).
+//
+//  Ebenen (Kunsthoehe 100; per Generator gemalt, der nicht im Projekt liegt): tile.png — Kachel 128
+//  mit ZWEI Bildern untereinander (128×200): Boden, Stuehle, Tisch (Gedecke, Kelche, Truthaehne,
+//  Flaschen, Kerzen), grosse Platten am Rand; Bild 2 = Kerzenflackern; glutton.png — Fresser (3 Bilder
+//  18×20: kauen, Mund auf, Keule; 2 Varianten); steam.png — Dampf (3 Bilder 7×14).
+//  Die Kachel ist links ausgerichtet (Positionen der Aufbauten in Kunstpixeln vom linken Rand).
+//  ALLE Animationen teilen die Periode 12 s → nahtlose Schleife.
+// ═══════════════════════════════════════════════════════════════════
+const TCI = '/areas/third-circle-of-hell/';
+const ThirdCircleOfHellOverlay = React.memo(function ThirdCircleOfHellOverlay() {
+  const fresser = useMemo(() => Array.from({ length: 10 }, (_, k) => k).filter(k => k % 3 !== 1).map((k, i) => {
+    const dur = [6, 12, 6][i % 3];
+    return { x: 16 + 32 * k, v: k % 2, dur, delay: -((i * 1.7) % dur) };
+  }), []);
+  const dampf = useMemo(() => {
+    const out = [];
+    for (let k = 0; k < 5; k++) {
+      for (const [x0, y0] of [[32 + 64 * k, 29], [64 * k, 72]]) {
+        [-3, 3].forEach((dx, j) => {
+          const dur = (k + j) % 2 ? 4 : 6;
+          out.push({ x: x0 + dx, y: y0, dur, delay: -(((k * 1.3 + j * 2.1) % dur)), bild: -(((k + j) * 0.4) % 1.2) });
+        });
+      }
+    }
+    return out;
+  }, []);
+  return (
+    <PixelScene artH={100} bg="#4a0a0a" className="third-circle-overlay">
+      <PixelBand src={TCI + 'tile.png'} className="tc-wand" style={{ backgroundSize: 'auto 200%', backgroundPosition: '0 0' }} />
+      <div className="tc-volk">
+        {fresser.map((f, i) => (
+          <i key={'fr' + i} className="tc-fresser" style={{
+            left: ppArt(f.x - 9), top: ppArt(11), width: ppArt(18), height: ppArt(20),
+            backgroundPositionY: f.v ? '100%' : '0%',
+            animation: `tcFressen ${f.dur}s steps(1) ${f.delay}s infinite`,
+          }} />
+        ))}
+        {dampf.map((d, i) => (
+          <i key={'d' + i} className="pp-area-dyn tc-dampf" style={{
+            left: ppArt(d.x - 3.5), top: ppArt(d.y),
+            animation: `tcDampf ${d.dur}s linear ${d.delay}s infinite, tcDampfBild 1.2s steps(1) ${d.bild}s infinite`,
+          }} />
+        ))}
+      </div>
+      <div className="pp-rand-dim" />
+      <style>{`
+        .tc-wand { animation: tcFlackern 1.5s steps(1) infinite; }
+        /* Kerzenflackern: Bild 2 unregelmaessig kurz */
+        @keyframes tcFlackern {
+          0%, 19% { background-position: 0 0; } 20%, 34% { background-position: 0 100%; } 35%, 59% { background-position: 0 0; }
+          60%, 69% { background-position: 0 100%; } 70%, 100% { background-position: 0 0; }
+        }
+        .tc-volk { position: absolute; inset: 0; }
+        .tc-fresser { position: absolute; background: url(${TCI}glutton.png) 0 0 / 300% 200% no-repeat; }
+        /* Bilder: 0 kaut, 1 Mund auf, 2 Keule am Mund */
+        @keyframes tcFressen {
+          0% { background-position-x: 0%; } 25% { background-position-x: 50%; } 40% { background-position-x: 100%; }
+          58% { background-position-x: 50%; } 70% { background-position-x: 0%; } 85% { background-position-x: 50%; }
+        }
+        .tc-dampf {
+          position: absolute; width: calc(7 * var(--px)); height: calc(14 * var(--px)); opacity: 0;
+          background: url(${TCI}steam.png) 0 0 / 300% 100% no-repeat; z-index: 100;
+        }
+        @keyframes tcDampf {
+          0% { opacity: 0; transform: translateY(calc(6 * var(--px))); } 20% { opacity: .85; }
+          70% { opacity: .5; } 100% { opacity: 0; transform: translateY(calc(-10 * var(--px))); }
+        }
+        @keyframes tcDampfBild { 0% { background-position-x: 0%; } 33% { background-position-x: 50%; } 66% { background-position-x: 100%; } }
+      `}</style>
+    </PixelScene>
+  );
+});
+
+// ═══════════════════════════════════════════════════════════════════
 //  THE SECOND … EIGHTH CIRCLE OF HELL — Hintergruende (Platzhalter-Szenen)
 //
-//  Prozedurale Platzhalter-Szenen fuer die Kreise 3–8, bis deren Pixelart vorliegt (der Zweite hat sie schon): dunkler Farbverlauf,
+//  Prozedurale Platzhalter-Szenen fuer die Kreise 4–8, bis deren Pixelart vorliegt (Zweiter und Dritter haben sie schon): dunkler Farbverlauf,
 //  eine Horizontlinie, aufsteigende Funken/Glut und ein kreis-spezifisches Motiv. Jeder Kreis hat
-//  seine eigene Farbwelt (Dante: 3 Voellerei/Schlamm, 4 Geiz/Gold, 5 Zorn/Styx,
+//  seine eigene Farbwelt (Dante: 4 Geiz/Gold, 5 Zorn/Styx,
 //  6 Ketzerei/Grabfeuer, 7 Gewalt/Blutfluss, 8 Betrug/Tinte). Wieder `pp-area-dyn` fuer alles Bewegte
 //  (faellt mit „keine Animationen" weg); eigene Keyframes im eigenen <style>.
 // ═══════════════════════════════════════════════════════════════════
 const HELL_KREISE = {
-  3: { himmel: ['#0f1a10', '#2d3a1c', '#1a2410'], boden: '#0b1209', glut: ['#a9c46a', '#6b8f3a', '#d6e59b'], motiv: 'regen' },
   4: { himmel: ['#1a1405', '#4a3a0c', '#2a2008'], boden: '#120d03', glut: ['#ffd24a', '#ffb000', '#fff0a0'], motiv: 'gold' },
   5: { himmel: ['#07161a', '#103b44', '#0a2328'], boden: '#04100f', glut: ['#58e0d0', '#2aa6a0', '#b5fff4'], motiv: 'blasen' },
   6: { himmel: ['#220b05', '#6a2208', '#3a1006'], boden: '#180703', glut: ['#ff8a2a', '#ff5a10', '#ffd27a'], motiv: 'feuer' },
@@ -5198,7 +5277,7 @@ const HELL_KREISE = {
   8: { himmel: ['#05060f', '#141a3a', '#0a0d24'], boden: '#030409', glut: ['#8fa4ff', '#4f63d6', '#d4dcff'], motiv: 'tinte' },
 };
 const HellCircleOverlay = React.memo(function HellCircleOverlay({ stufe }) {
-  const cfg = HELL_KREISE[stufe] || HELL_KREISE[3];
+  const cfg = HELL_KREISE[stufe] || HELL_KREISE[4];
   const funken = useMemo(() => ppZufall(ppFxN(26), (i) => ({
     x: Math.random() * 100, dur: 9 + Math.random() * 11, delay: -Math.random() * 20,
     size: 2 + Math.floor(Math.random() * 3), farbe: cfg.glut[i % cfg.glut.length], drift: (Math.random() - .5) * 18,
