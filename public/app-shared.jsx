@@ -6378,6 +6378,29 @@ function GameTooltip() {
     if (!tip?.el) return undefined;
     return startTooltipWatchdog(() => tip.el, hideGameTooltip);
   }, [tip]);
+  // ★ Rand-Klammer (Als Befund 2.10., Calm-Abzeichen): lange Tooltips (bis 280 px) ragten bei Abzeichen am rechten
+  // Bildrand ueber das Fenster hinaus und waren dort abgeschnitten. Nach dem Layout messen: reicht der Kasten ueber den
+  // rechten Rand, springt er auf die LINKE Seite seines Ankers; oben/unten wird in das Fenster geschoben.
+  const boxRef = useRef(null);
+  useLayoutEffect(() => {
+    const el = boxRef.current;
+    if (!el || !tip) return;
+    el.style.translate = '';
+    const r = el.getBoundingClientRect();
+    const vw = window.innerWidth, vh = window.innerHeight, rand = 6;
+    let dx = 0, dy = 0;
+    if (r.right > vw - rand) {
+      const anker = !tip.atCursor && tip.el && tip.el.isConnected ? tip.el.getBoundingClientRect() : null;
+      dx = anker ? (anker.left - 6 - r.width) - r.left : (vw - rand - r.right);
+    }
+    if (r.left + dx < rand) dx = rand - r.left;
+    if (r.top < rand) dy = rand - r.top;
+    else if (r.bottom > vh - rand) dy = vh - rand - r.bottom;
+    if (dx || dy) {
+      const s = ppLayoutXY(0, 0, tip.el && tip.el.isConnected ? tip.el : null).s || 1;
+      el.style.translate = `${dx / s}px ${dy / s}px`;
+    }
+  }, [tip]);
   if (!tip) return null;
   // Element-anchored tips center vertically on the source's right
   // edge; cursor-anchored tips drop straight at the offset point so
@@ -6392,7 +6415,7 @@ function GameTooltip() {
     // Gleichstand entscheidet der Stapelkontext, also mal so, mal so.
     // Jetzt eindeutig darueber, aber weiterhin unter den Animationen
     // (ab 10150) und dem Entfernen-Knopf des Editors.
-    <div className="game-tooltip" style={{ position: 'fixed', left: pos.x, top: pos.y, transform, zIndex: 10020, pointerEvents: 'none' }}>
+    <div className="game-tooltip" ref={boxRef} style={{ position: 'fixed', width: 'max-content', left: pos.x, top: pos.y, transform, zIndex: 10020, pointerEvents: 'none' }}>
       {tip.text}
     </div>
   );
