@@ -2781,7 +2781,7 @@ const ZONE_ANIM_SFX = {
   deepsea_summon_whirlpool: { name: 'elem_water', opts: { rate: 0.7 } },
   // Divine Gift of Skill — gold-and-violet scholar burst on the blessed Hero
   blessed_skill_burst:    { name: 'elem_holy' },
-  rool_disrupt:           { name: 'debuff', opts: { rate: 0.7, volume: 1.3 } },
+  rool_disrupt:           { name: 'heavy_impact', opts: { rate: 0.55, volume: 2.0 } },
   // Acid / poison (poison has its own sound per user)
   acid_splash:             { name: 'elem_acid' },
   plague_smoke:            { name: 'poison' },

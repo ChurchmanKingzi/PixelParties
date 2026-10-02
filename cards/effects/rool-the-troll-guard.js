@@ -12,7 +12,7 @@
 //    des Rool-Kontrolleurs (Held oder Creature, Rool selbst eingeschlossen). Der Geber
 //    steht auf der Gegenseite, ein Opfer ist also nie derselbe wie der Geber. Statusschaden
 //    (Burn, Poison …) hat keinen Schadensgeber; nur echter Schaden (> 0) zaehlt.
-//  • Animation `rool_disrupt` (Troll-Hieb mit Rissen und „×2", mit Klang) auf dem betroffenen Ziel.
+//  • Animation `rool_disrupt` (wuchtiger Troll-Hieb, ~1,7 s, mit Bildschirmwackeln und Klang) auf dem betroffenen Ziel.
 //  • „it takes double damage": der Schadensgeber bekommt den DEBUFF `disrupted`
 //    („Takes double damage from all sources", ×2 im Punkt-vor-Strich-Sammler,
 //    gleiche Wirkung wie Disruption Ray) — als Debuff dargestellt (rotes Abzeichen).
@@ -49,12 +49,19 @@ async function verdoppeln(engine, geber, roolBesitzer) {
   const gegner = roolBesitzer === 0 ? 1 : 0;
   // „Ende deines naechsten Zuges": naechster Zug des Rool-Kontrolleurs, Ablauf am Beginn des Zuges danach.
   const meinNaechster = gs.activePlayer === roolBesitzer ? gs.turn + 2 : gs.turn + 1;
-  const opts = { expiresAtTurn: meinNaechster + 1, expiresForPlayer: gegner, source: CARD_NAME, sourceOwner: roolBesitzer, addAnim: 'rool_disrupt' };
+  const opts = { expiresAtTurn: meinNaechster + 1, expiresForPlayer: gegner, source: CARD_NAME, sourceOwner: roolBesitzer };
+  // Wuchtiger Auftritt (Als Befund 2.10.: war zu schwach): Bildschirmwackeln + grosse Animation (~1,7 s) auf dem Ziel.
+  const anim = geber.kind === 'hero'
+    ? { owner: geber.side, heroIdx: geber.heroIdx, zoneSlot: -1 }
+    : { owner: geber.inst.owner, heroIdx: geber.inst.heroIdx, zoneSlot: geber.inst.zoneSlot };
+  engine._broadcastEvent('play_screen_shake', { intensity: 'medium' });
+  engine._broadcastEvent('play_zone_animation', { type: 'rool_disrupt', ...anim, duration: 1700 });
   if (geber.kind === 'hero') {
     await engine.actionAddBuff(geber.hero, geber.side, geber.heroIdx, BUFF, { ...opts, sourceOwner: roolBesitzer });
   } else {
     await engine.actionAddCreatureBuff(geber.inst, BUFF, opts);
   }
+  await engine._delay(500);
   engine.log('rool_double_damage', { target: geber.kind === 'hero' ? geber.hero.name : geber.inst.name });
 }
 
