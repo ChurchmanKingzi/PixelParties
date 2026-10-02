@@ -18708,6 +18708,7 @@ Jeder neue Area-Hintergrund wird mit **demselben Detailgrad** gemalt wie Cottage
 - **Geordnetes Dithering** (Bayer 4×4) für alle Verläufe und Übergänge statt harter Flächen: Himmel/Vignette, Schatten unter Kanten/Tisch, Glut, Kerzenschein, Augenhöhlen.
 - **Struktur statt Rauschen:** Steine/Bretter/Ziegel mit eigener Kanten-Beleuchtung, Maserung, Astlöcher, Risse, Flecken; Rauschen nur grob (2×2) und selten.
 - **Figuren und Objekte** mit dunkler Kontur, mehrstufig schattiert, Glanzlichter, Kleindetails (Perlen, Knöpfe, Etiketten, Kräuter …).
+- **Keine Lücken in Animationsbildern:** Köpfe/Haar nie so verschieben, dass eine Zeile frei bleibt; Generator prüft jedes Bild auf 4-Nachbar-Zusammenhang (inkl. Kontur) und bricht sonst ab.
 - **Animation fließend:** Figuren mit ≥ 6 (besser 12) Bildern und einer Schrittfolge (`*_FOLGE`, ≈ 0,15–0,2 s je Schritt), Zusatzbewegung (Atmen, Blinzeln, Haar) statt nur 2–3 Posen.
 - **Nahtlos:** alle Animationen teilen die Periode 12 s (Dauern 3/4/6/12 s); Kacheln nur mit Mustern, deren Abstand 128 teilt. Prüfung: Bild bei t == Bild bei t + 12 s (Playwright, Animationen per `getAnimations()` auf feste Zeiten setzen).
 - **Abnahme:** nach jedem Hintergrund ein GIF (12 s, 20 fps) an den Auftraggeber.
