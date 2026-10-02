@@ -5676,13 +5676,13 @@ const SeventhCircleOfHellOverlay = React.memo(function SeventhCircleOfHellOverla
 //
 //  Ebenen (Kunsthoehe 100; Generator ausserhalb des Projekts): back.png — Pflasterkachel 128; ground.png —
 //  Boden + Portalrahmen (256, mittig); portal.png — Strudel (24 Bilder 72×80, 3 Arme, 4 s); flow-a/-b.png —
-//  Lavastroeme (24 Bilder 36×100 / 44×100, fliessen nach unten, 6 s); demon.png (12 Bilder 50×54, Zeigearm
+//  Lavastroeme (24 Bilder 36×100 / 44×100, fliessen nach unten, 6 s); demon.png (24 Bilder 50×54, Zeigearm
 //  nach rechts); traveler.png (12 Bilder 38×42, von hinten); ember.png. ALLE Animationen teilen die Periode 12 s.
 // ═══════════════════════════════════════════════════════════════════
 const EIX = '/areas/eighth-circle-of-hell/';
 const EG_PAN = 256;
 const EG = (x) => ppArtX(x, EG_PAN);
-const EG_DAEMON = [0,0,1,1,0,2,2,3,3,4,4,3,3,6,6,0,5,5,0,7,7,0,8,0,0,9,9,10,10,6,6,0,11,11,0,1,1,0,0,0];
+const EG_DAEMON = [0,0,1,1,0,2,3,4,5,5,6,7,7,8,9,9,10,11,12,12,13,14,15,0,0,1,1,0,16,17,17,16,0,18,0,0,2,3,4,5,5,6,7,19,19,19,11,12,20,21,21,20,22,23,23,22,15,0,1,0];   // 60 Schritte in 6 s (0,1 s je Schritt), 24 Bilder inkl. Zwischenstellungen des Arms
 const EG_REISE = [0,0,1,1,0,2,2,0,3,3,0,4,4,5,5,4,0,6,6,7,7,6,0,8,8,0,9,9,0,10,10,0,11,11,0,1,1,0,0,0];
 const EighthCircleOfHellOverlay = React.memo(function EighthCircleOfHellOverlay() {
   const funken = useMemo(() => Array.from({ length: 28 }, (_, i) => {
@@ -5720,8 +5720,8 @@ const EighthCircleOfHellOverlay = React.memo(function EighthCircleOfHellOverlay(
         .eg-fluss.a { width: calc(36 * var(--px)); background-image: url(${EIX}flow-a.png); }
         .eg-fluss.b { width: calc(44 * var(--px)); background-image: url(${EIX}flow-b.png); }
         @keyframes egFluss { ${sxReihe(24)} }
-        .eg-daemon { position: absolute; top: calc(28 * var(--px)); width: calc(50 * var(--px)); height: calc(54 * var(--px)); background: url(${EIX}demon.png) 0 0 / ${12 * 100}% 100% no-repeat; }
-        @keyframes egDaemon { ${sxFolge(EG_DAEMON, 12)} }
+        .eg-daemon { position: absolute; top: calc(28 * var(--px)); width: calc(50 * var(--px)); height: calc(54 * var(--px)); background: url(${EIX}demon.png) 0 0 / ${24 * 100}% 100% no-repeat; }
+        @keyframes egDaemon { ${sxFolge(EG_DAEMON, 24)} }
         .eg-reise { position: absolute; top: calc(58 * var(--px)); width: calc(38 * var(--px)); height: calc(42 * var(--px)); background: url(${EIX}traveler.png) 0 0 / ${12 * 100}% 100% no-repeat; }
         @keyframes egReise { ${sxFolge(EG_REISE, 12)} }
         .eg-funke { position: absolute; width: calc(3 * var(--px)); height: calc(3 * var(--px)); opacity: 0; background: url(${EIX}ember.png) 0 0 / 300% 100% no-repeat; z-index: 5; }
