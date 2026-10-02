@@ -18731,3 +18731,5 @@ Wasserlinie y 76) mit pulsierenden Augen (`eyes.png`) und Blutrinnsalen (`blood.
 Pflasterwand (`back.png`) mit violettem Strudelportal (`portal.png`, 24 Bilder, 3 Arme, 4 s; Steinring in `ground.png`), gehörntem Dämon mit Zeigearm
 (`demon.png`, 12 Bilder), Reisendem von hinten (`traveler.png`, 12 Bilder: gelbes Bündel, roter Umhang), Lavaströmen links/rechts (`flow-a/-b.png`, 24 Bilder,
 fließen nach unten, 6 s) und Glut. Panorama 256 breit, mittig. Farben aus der Kartenvorlage.
+
+- **Puzzle-Start und „wenn gelöscht"-Angebote (Circles of Hell):** Der Puzzle-Start (`createPuzzleGame` in `server.js`) umgeht `startTurn`; `_runPostChainActions()` wird dort deshalb nach dem `onTurnStart`-Hook eigens aufgerufen, sonst blieben durch den Zugbeginn ausgelöste Löschungen (z. B. The First Circle of Hell leert die Ablage) bis zur ersten Aktion in der Warteschlange.

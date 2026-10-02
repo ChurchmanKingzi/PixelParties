@@ -15855,6 +15855,9 @@ io.on('connection', (socket) => {
         // Fire onTurnStart so cards that rely on it for per-turn setup (Slime Rancher,
         // additional actions, etc.) are correctly initialised before the player acts.
         await room.engine.runHooks('onTurnStart', { playerIdx: 0, _skipReactionCheck: true });
+        // Nach-Ketten-Aktionen abarbeiten, die der Zugbeginn eingereiht hat (Circles of Hell: „wenn geloescht"-
+        // Angebote nach The First Circle of Hell u. a.) — der Puzzle-Start umgeht `startTurn`, das sie sonst abholt.
+        try { await room.engine._runPostChainActions(); } catch (err) { console.error('[Puzzle] Nach-Ketten-Aktionen (Zugbeginn):', err.message); }
         gs.currentPhase = 2; // PHASES.MAIN1
         gs.unactivatableArtifacts = room.engine.getUnactivatableArtifacts(0);
         room.engine.log('phase_start', { phase: 'Main Phase 1' });
