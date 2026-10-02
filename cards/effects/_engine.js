@@ -6745,6 +6745,23 @@ class GameEngine {
     return true;
   }
 
+  /**
+   * Eine Status tragende Karte nach dem Heilen ihres Status abraeumen. Standard: in die Ablage (mit Flug).
+   * `deleteOnCleanse` am Kartenskript (Stowaway): stattdessen GELOESCHT — unaufhaltsam, auch wenn die Karte
+   * sonst „unaffected by all other cards and effects" ist.
+   */
+  async anhaengselAbraeumen(inst, source) {
+    if (!inst) return false;
+    if (loadCardEffect(inst.name)?.deleteOnCleanse) {
+      await this.actionMoveCard(inst, 'deleted', -1, -1, {
+        source: typeof source === 'string' ? source : (source?.name || 'Cleanse'),
+        sourceOwner: inst.controller ?? inst.owner, unaufhaltsam: true,
+      });
+      return true;
+    }
+    return this.sendBoardCardToDiscard(inst, { source: typeof source === 'string' ? { name: source } : source });
+  }
+
   async cleanseAttachmentByKey(key, source) {
     const id = String(key || '').startsWith('attach:') ? String(key).slice(7) : null;
     if (!id) return false;
@@ -6753,7 +6770,7 @@ class GameEngine {
     this.log('status_remove', { target: inst.name, status: 'attachment', by: source });
     // ★★ v1143b: ueber den EINEN Brett→Ablage-Weg — vorher fehlte der
     // Flug, und `{ source }` landete im Parameter `toHeroIdx`.
-    await this.sendBoardCardToDiscard(inst, { source: { name: source } });
+    await this.anhaengselAbraeumen(inst, { name: source });
     return true;
   }
 
@@ -6764,7 +6781,7 @@ class GameEngine {
       && loadCardEffect(inst.name)?.countsAsNegativeStatus);
     for (const inst of treffer) {
       this.log('status_remove', { target: inst.name, status: 'attachment', by: source });
-      await this.sendBoardCardToDiscard(inst, { source: { name: source } });   // v1143b: mit Flug
+      await this.anhaengselAbraeumen(inst, { name: source });   // v1143b: mit Flug; Stowaway: geloescht
     }
     return treffer.length;
   }
