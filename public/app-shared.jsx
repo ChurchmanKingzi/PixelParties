@@ -2749,12 +2749,30 @@ const ZONE_ANIM_SFX = {
   hell_fox_death:          { name: 'elem_fire', opts: { rate: 0.85 } },
   // Lightning — covered by dedicated qinglong/red_lightning_rain socket events
   // Ice
-  cold_coffin_encase:      { name: 'elem_ice' },
+  // Cold Coffin / Instant Cryo Stasis: JEDE der vier Eisplatten macht einen eigenen, deutlichen Klang, wenn sie in
+  // Position kommt (Platten laufen 400 ms und starten bei 0/40/80/120 ms → Ankunft bei 400/440/480/520 ms), dazu der
+  // Schlag, wenn sie sich treffen (Slam bei 380 ms), und ein Anflug-Klang zu Beginn. Kein Dedupe/Kategorie: jeder Klang zaehlt.
+  cold_coffin_encase: [
+    { name: 'elem_ice',     opts: { rate: 0.9,  volume: 1.3 } },
+    { name: 'elem_ice',     opts: { rate: 1.45, volume: 1.0,  delay: 60,  category: null, dedupe: 0 } },
+    { name: 'heavy_impact', opts: { rate: 1.55, volume: 1.3,  delay: 395, category: null, dedupe: 0 } },
+    { name: 'elem_ice',     opts: { rate: 1.35, volume: 1.4,  delay: 400, category: null, dedupe: 0 } },
+    { name: 'heavy_impact', opts: { rate: 1.4,  volume: 1.3,  delay: 440, category: null, dedupe: 0 } },
+    { name: 'elem_ice',     opts: { rate: 1.2,  volume: 1.4,  delay: 445, category: null, dedupe: 0 } },
+    { name: 'heavy_impact', opts: { rate: 1.25, volume: 1.3,  delay: 480, category: null, dedupe: 0 } },
+    { name: 'elem_ice',     opts: { rate: 1.05, volume: 1.4,  delay: 485, category: null, dedupe: 0 } },
+    { name: 'heavy_impact', opts: { rate: 1.1,  volume: 1.3,  delay: 520, category: null, dedupe: 0 } },
+    { name: 'elem_ice',     opts: { rate: 0.9,  volume: 1.4,  delay: 525, category: null, dedupe: 0 } },
+    { name: 'heavy_impact', opts: { rate: 0.65, volume: 1.5,  delay: 560, category: null, dedupe: 0 } },
+    { name: 'elem_ice',     opts: { rate: 0.7,  volume: 1.5,  delay: 570, category: null, dedupe: 0 } },
+  ],
   // Eis-Einhuellung beim Einfrieren einer Kreatur/eines Helden (`applyCreatureStatus`/`addHeroStatus` mit
   // `animationType: 'ice_encase'`; u. a. Instant Cryo Stasis): Eisklang plus dumpfer Frost-Knacks.
   ice_encase: [
-    { name: 'elem_ice',     opts: { rate: 1.0,  volume: 1.0 } },
-    { name: 'heavy_impact', opts: { rate: 1.3,  volume: 0.45, delay: 260, category: null, dedupe: 0 } },
+    { name: 'elem_ice',     opts: { rate: 1.0,  volume: 1.3 } },
+    { name: 'elem_ice',     opts: { rate: 1.3,  volume: 1.1,  delay: 150, category: null, dedupe: 0 } },
+    { name: 'heavy_impact', opts: { rate: 1.3,  volume: 1.0,  delay: 300, category: null, dedupe: 0 } },
+    { name: 'elem_ice',     opts: { rate: 0.8,  volume: 1.3,  delay: 330, category: null, dedupe: 0 } },
   ],
   biseria_ice_engulf:      { name: 'elem_ice' },
   // Divine Gift of Forgetting — confused question marks above heroes
