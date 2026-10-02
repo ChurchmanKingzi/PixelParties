@@ -7963,6 +7963,7 @@ body.pp-dragging-card.pp-dragging-card.pp-dragging-card * {
 .reaction-chain-overlay {
   position: fixed;
   right: 82px;
+  transition: right .18s ease;
   bottom: 30%;
   z-index: 10040;
   display: flex;
@@ -7970,6 +7971,15 @@ body.pp-dragging-card.pp-dragging-card.pp-dragging-card * {
   align-items: flex-end;
   gap: 6px;
   pointer-events: none;
+}
+/* Tooltip rechts, Ketten-Anzeige links daneben: erscheint ein Hover-Tooltip, wandert die GANZE Anzeige links an ihn
+   heran (Tooltip-Breite + 8 px); verschwindet er, geht sie zurueck. Mit Token-Tooltip (steht links vom Haupt-
+   Tooltip, gleiche Breite) entsprechend eine Spalte weiter. */
+body:has(.board-tooltip) .reaction-chain-overlay {
+  right: calc(var(--tt-col-w, 360px) + 8px);
+}
+body:has(.board-tooltip-token) .reaction-chain-overlay {
+  right: calc(var(--tt-col-w, 360px) * 2 + 8px);
 }
 .reaction-chain-label {
   font-size: 11px;
@@ -10547,11 +10557,8 @@ body.pp-dragging-card.pp-dragging-card.pp-dragging-card * {
   font-size: 14px;
 }
 /* When chain is visible, shift tooltip to the left of the chain panel */
-body:has(.reaction-chain-overlay) .board-tooltip {
-  /* Der Tooltip endet knapp VOR der Ketten-Anzeige: `--chain-schub` misst GameBoard aus deren tatsaechlicher linker
-     Kante (Abstand zum rechten Rand + 8 px); 196px ist nur der Rueckfall, falls die Messung nie laeuft. */
-  right: var(--chain-schub, 196px);
-}
+/* Der Tooltip steht IMMER buendig rechts; die Ketten-Anzeige weicht ihm aus (siehe `.reaction-chain-overlay` weiter
+   unten: solange ein Tooltip steht, rueckt sie links neben ihn, danach zurueck). */
 
 /* In battle / puzzle-player mode the player's hand strip
   (`.game-hand-me`, z-index 10000) renders ABOVE the tooltip
@@ -13701,9 +13708,7 @@ body:has(.modal-overlay) .tooltip {
   border-left: 1px solid rgba(255,170,0,.4);
   box-shadow: -4px 0 20px rgba(0,0,0,.6);
 }
-body:has(.reaction-chain-overlay) .board-tooltip-token {
-  right: calc(360px + var(--chain-schub, 196px));
-}
+
 
 /* ===== TURN INDICATOR ON AVATARS ===== */
 .avatar-active {
@@ -16680,6 +16685,8 @@ body:has(.textbox-overlay) .tooltip {
      `.board-tooltip > div:last-child { display: none }` ist RAUS.) */
   .board-tooltip img { max-width: 100%; }
   .board-tooltip-token { display: none !important; }
+  /* Schmaler Tooltip (240px) → die Ketten-Anzeige rueckt entsprechend weniger. */
+  body:has(.board-tooltip) .reaction-chain-overlay { right: calc(240px + 8px); }
 
   /* Scale down status/buff/immune icons */
   .status-badge { width: 12px !important; height: 12px !important; font-size: 7px !important; }
