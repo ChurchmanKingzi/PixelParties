@@ -8403,6 +8403,162 @@ const ANIM_REGISTRY = {
       );
     };
   })(),
+  // Stowaway: rosa Tentakel kommen von aussen herein und umklammern das Ziel (Als Vorgabe 2.10., Kartenbild als Vorlage).
+  // Prozedurale Pixelart auf einem kleinen Raster, hochskaliert mit `image-rendering: pixelated`: Zylinder-Schattierung ueber
+  // einen Tiefenpuffer, Licht von oben links, 4×4-Bayer-Dithering zwischen fuenf Rosa-/Purpurtoenen, dunkle Kontur, helle
+  // Saugnaepfe auf der Innenseite; waehrend des Zudrueckens legt sich ein gedithert dunkler Schleier (Negation) aufs Ziel und
+  // am Ende loesen sich die Tentakel Pixel fuer Pixel auf. Keyframes entfallen (eigene Zeichenschleife); Klang am Typ.
+  stowaway_tentacles: (function () {
+    // ── Stowaway: rosa Tentakel umklammern das Ziel (prozedurale Pixelart) ──────────────────────────
+    // Reines Zeichnen auf ein kleines Raster (gw×gh) — das Ergebnis wird mit `image-rendering: pixelated` hochskaliert.
+    // Je Tentakel: Pfad von draussen spiralfoermig um das Ziel; jeder Pfadpunkt stempelt eine Scheibe, ein Tiefenpuffer haelt die
+    // naechste Mittellinie je Pixel (Zylinder-Look); Licht von oben links, 4×4-Bayer-Dithering zwischen fuenf Rosa-/Purpurtoenen,
+    // dunkle Kontur, helle Saugnaepfe auf der Innenseite.
+    const FARBEN = ['#2b1229', '#5b2a4e', '#8e4a76', '#c97a9d', '#f2b6ca'].map(h => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)]);
+    const KONTUR = [26, 9, 24];
+    const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5].map(v => v / 16);
+    function tentakelFrame(gw, gh, t, seed) {
+      const buf = new Uint8ClampedArray(gw * gh * 4);
+      const tiefe = new Float32Array(gw * gh).fill(9);
+      const cx = gw / 2, cy = gh / 2;
+      // Ziel = Ellipse in der Rastermitte (die Karte macht etwa 55 % des Rasters aus)
+      const A1 = gw * 0.25, B1 = gh * 0.29;            // enge Umklammerung (Kartenrand)
+      const A0 = gw * 0.66, B0 = gh * 0.66;            // Startkreis: ausserhalb des Rasters — die Tentakel kommen von draussen herein
+      const ease = (x) => 1 - Math.pow(1 - Math.min(1, Math.max(0, x)), 3);
+      const rnd = (n) => { const x = Math.sin((n + seed) * 127.1) * 43758.5453; return x - Math.floor(x); };
+      // Zeitachse (0..1): wachsen 0–.34, zudruecken .34–.58 (zwei Pulse), halten .58–.78, loesen .78–1
+      const grow = t / 0.34;
+      const squeeze = Math.min(1, Math.max(0, (t - 0.34) / 0.24));
+      const puls = squeeze > 0 && t < 0.78 ? Math.sin(squeeze * Math.PI * 2) * 0.03 : 0;
+      const loesen = t > 0.78 ? ease((t - 0.78) / 0.22) : 0;
+      const enge = (squeeze > 0 ? 0.1 * ease(squeeze) : 0) - puls;
+      const N = 5;
+      const tentakel = [];
+      const D = Math.PI / 180;
+      const START = [135, 45, 200, 340, 270], DIR = [1, -1, -1, 1, 1], SWEEP = [215, 215, 160, 160, 130], FIN = [1.0, 1.0, 0.72, 0.72, 0.9];
+      for (let k = 0; k < N; k++) {
+        tentakel.push({ w0: START[k] * D, dir: DIR[k], sweep: SWEEP[k] * D, fin: FIN[k], delay: k * 0.05, ph: rnd(k + 9) * 6.28, dicke: 3.7 + rnd(k + 3) * 0.7 });
+      }
+      const pfad = (T, u) => {
+        // u 0..1 entlang des Tentakels; Radius schrumpft von aussen nach innen, Winkel dreht um das Ziel
+        const e = ease(u);
+        const a = (A0 + (A1 * T.fin * (1 - enge) - A0) * e) * (1 + loesen * 0.12);
+        const b = (B0 + (B1 * T.fin * (1 - enge) - B0) * e) * (1 + loesen * 0.12);
+        const th = T.w0 + T.dir * T.sweep * u * (1 - 0.18 * loesen);
+        const wob = Math.sin(u * 8.5 + t * 14 + T.ph) * (2.4 * (1 - u * 0.6)) * (1 - squeeze * 0.7);
+        return [cx + (a + wob) * Math.cos(th), cy + (b + wob) * Math.sin(th), th];
+      };
+      const L = [-0.52, -0.62, 0.59];                    // Licht von oben links
+      const sauger = [];
+      for (let k = 0; k < N; k++) {
+        const T = tentakel[k];
+        const ende = ease(Math.min(1, Math.max(0, (grow - T.delay * 3)))) * (1 - loesen * 0.55);
+        if (ende <= 0.02) continue;
+        const schritte = 90;
+        for (let s = 0; s <= schritte; s++) {
+          const u = (s / schritte) * ende;
+          const [px, py, th] = pfad(T, u);
+          // Dicke: Wurzel breit, Spitze duenn; waehrend des Zudrueckens leicht dicker
+          const r = Math.max(0.9, T.dicke * (1 - 0.82 * Math.pow(u / Math.max(ende, 0.0001), 1.2) * (ende)) * (1 + squeeze * 0.18));
+          const rr = Math.ceil(r + 1);
+          for (let dy = -rr; dy <= rr; dy++) {
+            for (let dx = -rr; dx <= rr; dx++) {
+              const X = Math.round(px) + dx, Y = Math.round(py) + dy;
+              if (X < 0 || Y < 0 || X >= gw || Y >= gh) continue;
+              const nx = (X - px) / r, ny = (Y - py) / r;
+              const d = Math.hypot(nx, ny);
+              if (d > 1) continue;
+              const idx = Y * gw + X;
+              if (d >= tiefe[idx]) continue;
+              tiefe[idx] = d;
+              if (d > 0.84) { buf[idx * 4] = KONTUR[0]; buf[idx * 4 + 1] = KONTUR[1]; buf[idx * 4 + 2] = KONTUR[2]; buf[idx * 4 + 3] = 255; continue; }
+              const nz = Math.sqrt(Math.max(0, 1 - d * d));
+              const lam = Math.max(0, nx * L[0] + ny * L[1] + nz * L[2]);
+              const v = Math.min(0.999, Math.max(0, lam * 0.95 + (BAYER[(Y & 3) * 4 + (X & 3)] - 0.5) * 0.3 + 0.04));
+              const c = FARBEN[Math.min(4, Math.floor(v * 5))];
+              buf[idx * 4] = c[0]; buf[idx * 4 + 1] = c[1]; buf[idx * 4 + 2] = c[2]; buf[idx * 4 + 3] = 255;
+            }
+          }
+          // Saugnaepfe: auf der Innenseite in Abstaenden, nur im dickeren Teil
+          if (s % 9 === 4 && r > 1.9) {
+            const ix = cx - px, iy = cy - py, il = Math.hypot(ix, iy) || 1;
+            sauger.push([px + (ix / il) * r * 0.45, py + (iy / il) * r * 0.45, r]);
+          }
+        }
+        // Spitze: kleiner heller Punkt
+      }
+      for (const [sx, sy, r] of sauger) {
+        const X = Math.round(sx), Y = Math.round(sy);
+        const s2 = r > 3 ? 2 : 1;
+        for (let dy = 0; dy < s2; dy++) for (let dx = 0; dx < s2; dx++) {
+          const x = X + dx, y = Y + dy;
+          if (x < 0 || y < 0 || x >= gw || y >= gh) continue;
+          const idx = y * gw + x;
+          if (buf[idx * 4 + 3] === 0) continue;
+          buf[idx * 4] = 250; buf[idx * 4 + 1] = 214; buf[idx * 4 + 2] = 224;
+        }
+        const ring = [[X - 1, Y], [X, Y - 1], [X + s2, Y + s2 - 1]];
+        for (const [x, y] of ring) {
+          if (x < 0 || y < 0 || x >= gw || y >= gh) continue;
+          const idx = y * gw + x;
+          if (buf[idx * 4 + 3] === 0) continue;
+          buf[idx * 4] = 92; buf[idx * 4 + 1] = 36; buf[idx * 4 + 2] = 72;
+        }
+      }
+      // Dunkler, gedithert aufgehellter Schleier auf dem Ziel waehrend des Zudrueckens (Negation) — bleibt Pixelart
+      if (squeeze > 0 && loesen < 1) {
+        const dichte = 0.3 * ease(squeeze) * (1 - loesen);
+        for (let Y = 0; Y < gh; Y++) for (let X = 0; X < gw; X++) {
+          const idx = Y * gw + X;
+          if (buf[idx * 4 + 3]) continue;
+          const ex = (X - cx) / (A1 * 1.02), ey = (Y - cy) / (B1 * 1.02);
+          if (ex * ex + ey * ey > 1) continue;
+          if (BAYER[(Y & 3) * 4 + (X & 3)] < dichte) { buf[idx * 4] = 43; buf[idx * 4 + 1] = 18; buf[idx * 4 + 2] = 41; buf[idx * 4 + 3] = 210; }
+        }
+      }
+      // Ausblenden beim Loesen (Bayer-gedithert statt Alpha-Verlauf — bleibt Pixelart)
+      if (loesen > 0) {
+        for (let Y = 0; Y < gh; Y++) for (let X = 0; X < gw; X++) {
+          const idx = Y * gw + X;
+          if (buf[idx * 4 + 3] && BAYER[(Y & 3) * 4 + (X & 3)] < loesen) buf[idx * 4 + 3] = 0;
+        }
+      }
+      return buf;
+    }
+    return function StowawayTentaclesEffect({ x, y, w, h }) {
+      const zw = Math.max(60, w || 100), zh = Math.max(80, h || 140);
+      const s = Math.max(2, Math.round(zw / 32));                 // Bildschirmpixel je Rasterpixel
+      const gw = Math.ceil((zw * 2.0) / s), gh = Math.ceil((zh * 1.72) / s);
+      const cvs = useRef(null);
+      useEffect(() => {
+        const el = cvs.current;
+        if (!el || window._playAnimations === false) return undefined;
+        const ctx = el.getContext('2d');
+        const img = ctx.createImageData(gw, gh);
+        const DAUER = 2600;
+        const t0 = performance.now();
+        let raf = 0, letzte = -1;
+        const schritt = (jetzt) => {
+          const t = Math.min(1, (jetzt - t0) / DAUER);
+          const fr = Math.floor(t * 52);                          // ~20 Bilder/s: ruhige Pixelart-Taktung
+          if (fr !== letzte) {
+            letzte = fr;
+            img.data.set(tentakelFrame(gw, gh, fr / 52, 1));
+            ctx.putImageData(img, 0, 0);
+          }
+          if (t < 1) raf = requestAnimationFrame(schritt);
+        };
+        raf = requestAnimationFrame(schritt);
+        return () => cancelAnimationFrame(raf);
+      }, []);
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100, transform: 'translate(-50%, -50%)' }}>
+          <canvas ref={cvs} width={gw} height={gh}
+            style={{ width: gw * s, height: gh * s, imageRendering: 'pixelated', display: 'block', filter: 'drop-shadow(0 0 6px rgba(120,30,90,.55))' }} />
+        </div>
+      );
+    };
+  })(),
   shield_bubble: ShieldBubbleEffect,
   stun_strike: StunStrikeEffect,
   niu_powerup: NiuPowerUpEffect,
