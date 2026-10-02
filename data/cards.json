@@ -17979,7 +17979,7 @@
     "hp": 450,
     "atk": 90,
     "cost": null,
-    "effect": "When a target your opponent controls deals damage to another target you control, it takes double damage until the end of your next turn.",
+    "effect": "When a target your opponent controls deals damage to a target you control, it takes double damage until the end of your next turn.",
     "archetype": "",
     "setID": "PP MSIN",
     "banned": "",

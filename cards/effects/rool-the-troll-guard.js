@@ -2,15 +2,17 @@
 //  HERO EFFECT: "Rool, the Troll Guard"
 //  Hero · 450 HP · 90 ATK
 //
-//  „When a target your opponent controls deals damage to another target
-//   you control, it takes double damage until the end of your next turn."
+//  „When a target your opponent controls deals damage to a target you control,
+//   it takes double damage until the end of your next turn."
+//   (Text gegenueber der Vorlage geaendert — Als Vorgabe 2.10.: nicht mehr „another target".)
 //
 //  ── AUSLEGUNG ─────────────────────────────────────────────────────
 //  • „A target … deals damage": ein Held (Attack, Spell, Heldeneffekt) oder eine
-//    Creature (Effekt) des Gegners ist die QUELLE eines Treffers auf ein ANDERES Ziel
-//    des Rool-Kontrolleurs (Held oder Creature). Rool selbst darf Opfer sein
-//    („another target" bezieht sich auf den Schadensgeber). Statusschaden (Burn,
-//    Poison …) hat keinen Schadensgeber; nur echter Schaden (> 0) zaehlt.
+//    Creature (Effekt) des Gegners ist die QUELLE eines Treffers auf ein Ziel
+//    des Rool-Kontrolleurs (Held oder Creature, Rool selbst eingeschlossen). Der Geber
+//    steht auf der Gegenseite, ein Opfer ist also nie derselbe wie der Geber. Statusschaden
+//    (Burn, Poison …) hat keinen Schadensgeber; nur echter Schaden (> 0) zaehlt.
+//  • Animation `rool_disrupt` (Troll-Hieb mit Rissen und „×2", mit Klang) auf dem betroffenen Ziel.
 //  • „it takes double damage": der Schadensgeber bekommt den DEBUFF `disrupted`
 //    („Takes double damage from all sources", ×2 im Punkt-vor-Strich-Sammler,
 //    gleiche Wirkung wie Disruption Ray) — als Debuff dargestellt (rotes Abzeichen).
@@ -47,7 +49,7 @@ async function verdoppeln(engine, geber, roolBesitzer) {
   const gegner = roolBesitzer === 0 ? 1 : 0;
   // „Ende deines naechsten Zuges": naechster Zug des Rool-Kontrolleurs, Ablauf am Beginn des Zuges danach.
   const meinNaechster = gs.activePlayer === roolBesitzer ? gs.turn + 2 : gs.turn + 1;
-  const opts = { expiresAtTurn: meinNaechster + 1, expiresForPlayer: gegner, source: CARD_NAME, sourceOwner: roolBesitzer };
+  const opts = { expiresAtTurn: meinNaechster + 1, expiresForPlayer: gegner, source: CARD_NAME, sourceOwner: roolBesitzer, addAnim: 'rool_disrupt' };
   if (geber.kind === 'hero') {
     await engine.actionAddBuff(geber.hero, geber.side, geber.heroIdx, BUFF, { ...opts, sourceOwner: roolBesitzer });
   } else {
@@ -57,13 +59,12 @@ async function verdoppeln(engine, geber, roolBesitzer) {
 }
 
 /** Gemeinsame Pruefung; gibt den Schadensgeber zurueck, wenn die Regel greift. */
-function geberFuerTreffer(engine, ctx, source, opferGleich) {
+function geberFuerTreffer(engine, ctx, source) {
   const roolBesitzer = ctx.cardOwner;
   const rool = ctx.attachedHero ?? engine.gs.players[ctx.cardHeroOwner ?? roolBesitzer]?.heroes?.[ctx.cardHeroIdx];
   if (!rool?.name || rool.hp <= 0) return null;
   const geber = schadensGeber(engine, source);
   if (!geber || geber.controller === roolBesitzer) return null;   // „your opponent controls"
-  if (opferGleich(geber)) return null;                            // „another target"
   return { geber, roolBesitzer };
 }
 
@@ -79,8 +80,7 @@ module.exports = {
       const opferOwner = engine._findHeroOwner(ctx.target);
       if (opferOwner < 0) return;
       const opferKontrolle = engine.heroSideOf(opferOwner, ctx.target);
-      const r = geberFuerTreffer(engine, ctx, ctx.source,
-        (g) => g.kind === 'hero' && g.hero === ctx.target);
+      const r = geberFuerTreffer(engine, ctx, ctx.source);
       if (!r || opferKontrolle !== r.roolBesitzer) return;
       await verdoppeln(engine, r.geber, r.roolBesitzer);
     },
@@ -93,8 +93,7 @@ module.exports = {
         if (!e || e.cancelled || e.isStatusDamage) continue;
         if (!((e.realDealt ?? e.amount) > 0) || !e.inst) continue;
         if ((e.inst.controller ?? e.inst.owner) !== ctx.cardOwner) continue;
-        const r = geberFuerTreffer(engine, ctx, e.source,
-          (g) => g.kind === 'creature' && g.inst.id === e.inst.id);
+        const r = geberFuerTreffer(engine, ctx, e.source);
         if (!r) continue;
         await verdoppeln(engine, r.geber, r.roolBesitzer);
       }

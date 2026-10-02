@@ -18841,3 +18841,5 @@ Jede Reaktions-Abfrage an den Gegner (Surprise-Aktivierung oder Hand-Reaktion mi
 - **Aktiver Effekt** (Klick/CPU): der vorgemerkte `_pendingCardReveal` wird jetzt gefeuert (sonst käme er erst nach der Auflösung — betraf Creature-Effekte ohne eigene Zielwahl, z. B. Flächenschaden, im PvP).
 - **Passiver Hook-Effekt einer Creature** (`_currentEffectSource`, Besitzer ≠ Reaktor, kein aktiver Weg): `_creatureEffektVorSurprise` → `showTriggeredEffect` sofort. `_autoAnnounce` lässt den späteren eigenen Aufruf derselben Karte im selben Effekt entfallen (kein Doppelbild).
 - Priest of Luna / Tempeste zeigen sich zusätzlich sofort nach dem „Ja“.
+
+**Rool, the Troll Guard — Update (Als Vorgabe 2.10.).** Text jetzt „deals damage to a target you control“ (ohne „another“): der Geber steht ohnehin auf der Gegenseite, die Zusatzprüfung „nicht dasselbe Ziel“ entfällt. Neue Animation `rool_disrupt` (Troll-Hieb: Blitz, Druckring, aufreißende Spalten, Brocken, aufspringendes „×2“; Klang `debuff` in `ZONE_ANIM_SFX`), ausgelöst über `addAnim` des Debuffs (Held und Creature).
