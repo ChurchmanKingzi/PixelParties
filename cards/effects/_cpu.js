@@ -6703,6 +6703,24 @@ function installCpuBrain(engine) {
       if (verschenkt) scriptedPick = null;
     }
 
+    // ── Ability-Schaden: nie auf die eigene Seite (Occultism-Meldung) ──
+    // Wie beim Heal-Befund (v1470) probiert die Variantensuche JEDES Ziel
+    // durch, auch eigene Helden; ein verrauschter Rollout kann dort vorn
+    // liegen. Liegen eigene UND gegnerische Ziele zur Wahl, verwirft das
+    // einen Plan, der eigene Ziele enthaelt — `cpuPickTargets` entscheidet
+    // dann (inkl. der pileFuel-Ausnahme fuer eigene Kreaturen).
+    const _abDmgCd = (config.source || config.title)
+      ? engine._getCardDB()[config.source || config.title] : null;
+    const _abDmgOwnBan = isAbilityDamagePrompt(_abDmgCd, config)
+      && engine.isCpuPlayer(playerIdx)
+      && validTargets.some(t => t && t.owner === playerIdx)
+      && validTargets.some(t => t && t.owner != null && t.owner !== playerIdx);
+    const _hatEigenes = (ids) => ids.some(id => {
+      const t = validTargets.find(x => x && x.id === id);
+      return t && t.owner === playerIdx;
+    });
+    if (_abDmgOwnBan && scriptedPick && _hatEigenes(scriptedPick)) scriptedPick = null;
+
     // ── Fast-mode non-CPU: auto-respond (prevents hangs in rollouts) ──
     // Default model of opp behaviour: passive — cancellable prompts get
     // declined (Anti-Magic, Shield of Life, Cure-style reactions stay
@@ -6816,6 +6834,7 @@ function installCpuBrain(engine) {
           }
         }
       }
+      if (_abDmgOwnBan && priorPick && _hatEigenes(priorPick)) priorPick = null;
       const picked = (cardPick !== undefined) ? cardPick
         : (scriptedPick || priorPick || engine._getCpuTargetResponse(validTargets, config, playerIdx));
       // Log-Stempel für den Recorder (record.targetPicks): die FINALE
@@ -6849,7 +6868,7 @@ function installCpuBrain(engine) {
           || (recCd?.cardType === 'Spell' && inferDamage(config) > 0);
         const recHasOwn = validTargets.some(t => t.owner === playerIdx);
         const recHasEnemy = validTargets.some(t => t.owner != null && t.owner !== playerIdx);
-        const recDropOwn = recIsDamage && recHasOwn && recHasEnemy
+        const recDropOwn = (recIsDamage || isAbilityDamagePrompt(recCd, config)) && recHasOwn && recHasEnemy
           && !config.allowOwnSide
           && !config.selfDamage
           && !config.appliesStatus
@@ -7132,7 +7151,8 @@ function cpuPickTargets(engine, validTargets, config, promptedPlayerIdx) {
   // any of these so long as `damageAmount > 0`.
   const isDamageCard = cd?.cardType === 'Attack'
     || (cd?.cardType === 'Spell' && damageAmount > 0)
-    || (cd?.cardType === 'Artifact' && damageAmount > 0);
+    || (cd?.cardType === 'Artifact' && damageAmount > 0)
+    || isAbilityDamagePrompt(cd, config);
   const allowSelfDestruct = isDamageCard
     && damageAmount > 0
     && ownTargets.length > 0
@@ -8545,6 +8565,23 @@ function isLikelyNegation(cd) {
 }
 
 // ─── Heal / buff detection heuristics ───────────────────────────────────
+
+/**
+ * Schadens-Prompt einer ABILITY (Occultism: 50/100/150 auf ein frei
+ * gewaehltes Ziel). Abilities fehlten in der Schadenskarten-Erkennung
+ * (`Attack`/`Spell`/`Artifact`), also blieben eigene Ziele in der Liste
+ * und der MCTS-Plan konnte sie waehlen — Meldung: die CPU beschoss mit
+ * ihrem eigenen Occultism die eigenen Helden und nahm sich damit selbst
+ * aus dem Spiel. Selbstschaden (`selfDamage`/Recoil) und ausdrueckliches
+ * `allowOwnSide` bleiben ausgenommen.
+ */
+function isAbilityDamagePrompt(cd, config) {
+  return cd?.cardType === 'Ability'
+    && inferDamage(config || {}) > 0
+    && config?.dealsDamage !== false
+    && !config?.allowOwnSide
+    && !config?.selfDamage;
+}
 
 function looksLikeHeal(cd, config) {
   if (!cd && !config) return false;
