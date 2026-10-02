@@ -49,7 +49,7 @@ module.exports = {
         while (rest.length > 1) {
           const wahl = await engine.promptGeneric(pi, {
             type: 'cardGallery',
-            cards: [...new Set(rest)].map(name => ({ name, source: 'deck', count: rest.filter(x => x === name).length })),
+            cards: rest.map(name => ({ name, source: 'deck' })),   // jede Karte einzeln — Duplikate NICHT zu „×2“ zusammenfassen
             title: CARD_NAME, source: CARD_NAME,
             description: `Put these cards back in any order. Choose the card for position ${geordnet.length + 1} of ${n} (position 1 is drawn next).`,
             confirmLabel: '📚 Place', confirmClass: 'btn-info',
