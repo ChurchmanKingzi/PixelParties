@@ -1622,7 +1622,9 @@ function DeckBuilder() {
         {/* ── CENTER: ALL DECK SECTIONS ── */}
         <div className="db-panel-center" style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minWidth: 0 }}>
 
-          {/* Scrollable deck body */}
+          {/* Scrollable deck body. Kleinansicht (FoilKleinContext): ein Cube mit 512 Karten trug sonst ~80 Foil-Karten mit voller
+              Foil-Schicht (Baender, Funken, Staub, animierte Rahmen) — das war der Scroll-Lag (Als Befund 2.10.). */}
+          <FoilKleinContext.Provider value={true}>
           <div style={{ flex: 1, overflowY: 'auto', padding: '8px 10px' }}>
 
             {isCube && (
@@ -1815,6 +1817,7 @@ function DeckBuilder() {
             </>}
 
           </div>
+          </FoilKleinContext.Provider>
         </div>
 
         {/* ── RIGHT: CARD DATABASE ── */}
