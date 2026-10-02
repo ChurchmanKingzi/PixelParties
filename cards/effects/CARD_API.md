@@ -18678,3 +18678,25 @@ Karten: End of the Future, Traveler from the Future, Grasp the Future, Glimpse o
 
 
 - `time_rewind`-SFX: Schimmer + 7 `doom_tick`-Ticks (Rate 1.35→1.05, dichter am Anfang, passend zum abbremsenden Zeiger).
+
+## The Circles of Hell (2.–8. Kreis, Area-Zauber, Archetyp „Hell Circles")
+
+Skripte `the-{second…eighth}-circle-of-hell.js` + geteiltes Modul `_hell-circles-shared.js`. Alle: `activeIn: ['hand','area']`, `onPlay` aus der Hand → `placeArea`.
+
+**Engine-Bausteine (neu):**
+- `engine.deleteArea(inst, quelle, { skipProtection })` — Area vom Brett in den GELÖSCHT-Stapel (Gegenstück zu `removeArea`). `onCardLeaveZone` feuert jetzt bei beiden mit `toZone: 'discard' | 'deleted'` und `source` (Leave-Hook VOR dem Zonenwechsel; Karten lesen so „sent to the discard pile or deleted from the board" in EINEM Haken, Hilfsfunktion `verlaesstBrett(ctx)`).
+- **„Wenn diese Karte gelöscht wird" — EINE Stelle:** `_geloeschtVerfolgen` überlagert `push`/`unshift` des Gelöscht-Stapels und meldet jeden Eintrag an `engine._geloeschtMeldung(pi, namen)`. Hat das Skript `onDeletedFromAnywhere(engine, pi, name)`, läuft es als Nach-Ketten-Aktion (`queuePostChainAction`; eine Aktion arbeitet die Warteschlange `_loeschWarteschlange` inkl. neu entstehender Löschungen ab, max. 24). `_runPostChainActions()` wird jetzt auch nach `ON_TURN_START` und `ON_TURN_END` aufgerufen (Löschungen durch Zugbeginn-/Zugende-Effekte, z. B. The First Circle of Hell, werden sofort angeboten). Eigene Rück-/Hinbewegungen setzen `engine._geloeschtStumm++/--`.
+- `engine._naechsterEinzelschadenVerdoppeln(ziel)` — Stempel `gs._naechsterEinzelschadenX2 = { turn, owner, source }`: verdoppelt (Faktor 2 im Punkt-vor-Strich-Sammler) das nächste Schadensereignis > 0 mit genau einem Ziel (Heldenpfad: ein Aufruf außerhalb `_deferGameOverCheck`; Kreaturenpfad: Durchgang mit genau einem Eintrag).
+- **Fix `_castSpellImmediately`:** legte sich die Hand-Instanz selbst aufs Brett (Area-Zauber: `placeArea` stellt dieselbe Instanz in die Area-Zone), wurde sie danach ausgetragen — die Area war ein Geist (Name in `gs.areaZones`, aber keine Instanz → keine Hooks). Jetzt bleibt sie getrackt, wenn `_spellPlacedOnBoard` gesetzt ist und die Instanz nicht mehr in der Hand liegt.
+
+**Gemeinsame Klausel (2.–8., `loeschenUndSpielen`):** „When this card is deleted by an effect and you have not played a deleted Area yet this turn, you may immediately delete all Areas you control and play this deleted Spell as an additional Action." Sperre `ps._deletedAreaPlayedTurn` (beim BESTÄTIGEN gesetzt, damit die selbst gelöschten Areas nicht ihrerseits eine zweite Rückholung auslösen). Angebot entfällt still, wenn kein eigener Held den Zauber wirken kann (`heldKannWirken`, Probe ohne Zustandsversand). Spielen: Karte kurz Gelöscht → Hand, echte Zusatzaktions-Abfrage (`performImmediateActionAnyHero`, nur dieser Zauber, abbrechbar); bei Abbruch zurück in den Gelöscht-Stapel (stumm).
+
+- **2.:** beim Abgang vom Brett eine eigene gelöschte Karte (die schon vorher dort lag) auf die Hand (`addFromPileToHand(…,'deleted')`; Such-Sperre: `searchToHand`).
+- **3.:** KEINE Rückholung; jede Löschung (einmal je Zug, `ps._thirdCircleTurn`): oberste 6 Deckkarten zeigen (`mill_center_reveal`), alle eigenen Areas löschen, Area-Zauber daraus wählen und als Zusatzaktion spielen („if possible"), Rest per `actionDeleteFromDeckAnimated` löschen.
+- **4.:** beim Abgang Gold = Zahl der eigenen gelöschten Karten (bei Löschung zählt die Karte selbst mit).
+- **5.:** beim Abgang (einmal je Zug) → Stempel „nächster Einzelschaden ×2".
+- **6.:** beim Abgang optional einen gegnerischen Helden bis Zugende übernehmen — `temporaereKontrolle` mit Marke `onlyFromController` (wie Golden Apple), keine Support-Zonen-Sperre.
+- **7.:** Zugende jedes Zuges: Spieler am Zug wählt (Pflicht) ein eigenes Ziel, 100 Schaden; beim Abgang wählt der Besitzer (Pflicht) ein beliebiges Ziel, 150 Schaden (Typ `other`).
+- **8.:** `beforeDrawBatch` (Effekt-Ziehen, nicht „Draw for turn"): der GEGNER des Ziehenden darf diese Area (egal welcher Seite) löschen und gleich viele Karten ziehen — wortgetreu für beide Seiten. Diese Löschung löst die Rückhol-Klausel nicht aus („another card's effect").
+
+Hintergründe: `HellCircleOverlay` (prozedurale Platzhalter-Szenen, je Kreis eigene Farbwelt) in `public/app-areas.jsx`, bis echte Pixelart vorliegt.
