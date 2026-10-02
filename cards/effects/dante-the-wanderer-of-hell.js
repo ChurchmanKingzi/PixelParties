@@ -117,10 +117,13 @@ async function weg2(engine, pi) {
     }
     if (await ausGeloeschtEntnehmen(engine, pi, wahl, CARD_NAME)) {
       const inst = engine._trackCard(wahl, pi, 'hand', -1, -1);
-      await engine.runHooks('onPlay', {
-        _onlyCard: inst, playedCard: inst, cardName: wahl, zone: 'hand', heroIdx: -1, _skipReactionCheck: true,
-      });
-      if (inst.zone !== 'area') await engine.placeArea(pi, inst);   // Rueckfall fuer Areas ohne eigenes Platzieren
+      engine._areaFromPile = 'deleted';                  // die Area fliegt vom Geloescht-Stapel ins Feld
+      try {
+        await engine.runHooks('onPlay', {
+          _onlyCard: inst, playedCard: inst, cardName: wahl, zone: 'hand', heroIdx: -1, _skipReactionCheck: true,
+        });
+        if (inst.zone !== 'area') await engine.placeArea(pi, inst);   // Rueckfall fuer Areas ohne eigenes Platzieren
+      } finally { delete engine._areaFromPile; }
       gebracht = wahl;
     }
   }
