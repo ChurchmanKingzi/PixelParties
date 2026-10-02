@@ -25547,5 +25547,23 @@
     "spellSchool1": "Magic Arts",
     "spellSchool2": "",
     "foil": null
+  },
+  {
+    "name": "Natas, the Master of Hell",
+    "cardType": "Hero",
+    "subtype": "",
+    "level": null,
+    "hp": 400,
+    "atk": 40,
+    "cost": null,
+    "effect": "During your Resource Phase, instead of drawing a card from your deck, you may add a \"The Master's Plan\" from outside the game to your hand. Whenever you negate an opponent's card or effect, inflict 2 Stacks of Poison to any target on the board.",
+    "archetype": "",
+    "setID": "PP MBS",
+    "banned": "",
+    "startingAbility1": "Decay Magic",
+    "startingAbility2": "Diplomacy",
+    "spellSchool1": "",
+    "spellSchool2": "",
+    "foil": "secret_rare"
   }
 ]
