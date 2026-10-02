@@ -18700,3 +18700,15 @@ Skripte `the-{second…eighth}-circle-of-hell.js` + geteiltes Modul `_hell-circl
 - **8.:** `beforeDrawBatch` (Effekt-Ziehen, nicht „Draw for turn"): der GEGNER des Ziehenden darf diese Area (egal welcher Seite) löschen und gleich viele Karten ziehen — wortgetreu für beide Seiten. Diese Löschung löst die Rückhol-Klausel nicht aus („another card's effect").
 
 Hintergründe (`public/app-areas.jsx`): **2. Kreis** = echte Pixelart `SecondCircleOfHellOverlay` (`public/areas/second-circle-of-hell/`: `tile.png` 128×200 mit zwei Bildern = Herzschlag der Augen, `girl.png`, `girl-far.png`, `heart.png`); **3. Kreis** = `ThirdCircleOfHellOverlay` (`public/areas/third-circle-of-hell/`: `tile.png` 128×200 (Bild 2 = Kerzenflackern), `glutton.png` 12 Bilder × 2 Varianten (18×20, Ablauf `TC_FOLGE`: 40 Schritte in 6 s), `steam.png` (3×7×14); links ausgerichtet, Periode 12 s; hoher Detailgrad: Dithering, mehrstufiges Shading); die Kreise 4–8 sind bis zur Pixelart prozedurale Platzhalter (`HellCircleOverlay`, je Kreis eigene Farbwelt).
+
+## ★ Area-Pixelart-Standard (Al 2.10., ab dem Third Circle; Second Circle nachgezogen)
+
+Jeder neue Area-Hintergrund wird mit **demselben Detailgrad** gemalt wie Cottage / Graveyard / Third Circle:
+- **Shading mit Rampen:** jede Fläche über eine 5–7-stufige Palette, Licht IMMER oben rechts (oben/rechts heller, links/unten dunkler); Kanten, Lichter und Schlagschatten explizit.
+- **Geordnetes Dithering** (Bayer 4×4) für alle Verläufe und Übergänge statt harter Flächen: Himmel/Vignette, Schatten unter Kanten/Tisch, Glut, Kerzenschein, Augenhöhlen.
+- **Struktur statt Rauschen:** Steine/Bretter/Ziegel mit eigener Kanten-Beleuchtung, Maserung, Astlöcher, Risse, Flecken; Rauschen nur grob (2×2) und selten.
+- **Figuren und Objekte** mit dunkler Kontur, mehrstufig schattiert, Glanzlichter, Kleindetails (Perlen, Knöpfe, Etiketten, Kräuter …).
+- **Animation fließend:** Figuren mit ≥ 6 (besser 12) Bildern und einer Schrittfolge (`*_FOLGE`, ≈ 0,15–0,2 s je Schritt), Zusatzbewegung (Atmen, Blinzeln, Haar) statt nur 2–3 Posen.
+- **Nahtlos:** alle Animationen teilen die Periode 12 s (Dauern 3/4/6/12 s); Kacheln nur mit Mustern, deren Abstand 128 teilt. Prüfung: Bild bei t == Bild bei t + 12 s (Playwright, Animationen per `getAnimations()` auf feste Zeiten setzen).
+- **Abnahme:** nach jedem Hintergrund ein GIF (12 s, 20 fps) an den Auftraggeber.
+Der Generator (reines Python, PNG-Schreiber + `shade.py` mit `dth`/`ramp`/`mix`) liegt bewusst nicht im Projekt, wie bei den übrigen Szenen.
