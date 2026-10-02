@@ -5394,6 +5394,9 @@ const FII = '/areas/fifth-circle-of-hell/';
 // 8 droht, 9 Arme weit, 10 Blinzeln, 11 Umhang weht); 40 Schritte je Zyklus (6 s: 0,15 s je Bild).
 const FI_FOLGE = [0,0,1,1,0,0,2,2,0,3,3,0,4,5,4,5,4,0,0,6,7,7,6,0,8,8,9,9,0,0,10,0,11,11,0,0,1,1,0,0];
 const FI_BILDER = 12;
+// Kopfversatz je Heldenbild (dx, dy in Kunstpixeln; = head_dx bzw. head_dy + body_dy der Pose): das Flammenhaar wandert mit dem Kopf.
+const FI_KOPF = [[0,0],[0,2],[-1,0],[1,0],[0,0],[0,1],[0,0],[0,1],[1,0],[0,0],[0,0],[-1,0]];
+const FI_KOPF_KEYFRAMES = FI_FOLGE.map((b, i) => `${(i * 100 / FI_FOLGE.length).toFixed(3)}% { transform: translate(calc(${FI_KOPF[b][0]} * var(--px)), calc(${FI_KOPF[b][1]} * var(--px))); }`).join(' ');
 const FI_KEYFRAMES = FI_FOLGE.map((b, i) => `${(i * 100 / FI_FOLGE.length).toFixed(3)}% { background-position-x: ${(b * 100 / (FI_BILDER - 1)).toFixed(3)}%; }`).join(' ');
 const FI_BREITE = 384;                                  // so weit werden Figuren/Fontaenen/Partikel verteilt (Kunstpixel)
 const FifthCircleOfHellOverlay = React.memo(function FifthCircleOfHellOverlay() {
@@ -5430,7 +5433,7 @@ const FifthCircleOfHellOverlay = React.memo(function FifthCircleOfHellOverlay() 
               left: ppArt(h.x - 13), backgroundPositionY: h.v ? '100%' : '0%',
               animation: `fiHeld 6s steps(1) ${h.delay}s infinite`,
             }} />
-            <i className="fi-haar" style={{ left: ppArt(h.x - 18), animation: `fiHaar 1.2s steps(1) ${h.flamme}s infinite` }} />
+            <i className="fi-haar" style={{ left: ppArt(h.x - 18), animation: `fiHaar 1.2s steps(1) ${h.flamme}s infinite, fiHaarPos 6s steps(1) ${h.delay}s infinite` }} />
           </React.Fragment>
         ))}
         {funken.map((e, i) => (
@@ -5464,6 +5467,7 @@ const FifthCircleOfHellOverlay = React.memo(function FifthCircleOfHellOverlay() 
         .fi-held { position: absolute; top: calc(42 * var(--px)); width: calc(26 * var(--px)); height: calc(36 * var(--px)); background: url(${FII}hero.png) 0 0 / ${FI_BILDER * 100}% 200% no-repeat; }
         @keyframes fiHeld { ${FI_KEYFRAMES} }
         .fi-haar { position: absolute; top: calc(26 * var(--px)); width: calc(36 * var(--px)); height: calc(34 * var(--px)); background: url(${FII}hairflame.png) 0 0 / 800% 100% no-repeat; }
+        @keyframes fiHaarPos { ${FI_KOPF_KEYFRAMES} }
         @keyframes fiHaar { ${[0,1,2,3,4,5,6,7].map(b => `${(b * 12.5)}% { background-position-x: ${(b * 100 / 7).toFixed(3)}%; }`).join(' ')} }
         .fi-funke { position: absolute; width: calc(3 * var(--px)); height: calc(3 * var(--px)); opacity: 0; background: url(${FII}ember.png) 0 0 / 300% 100% no-repeat; z-index: 5; }
         @keyframes fiFunke {

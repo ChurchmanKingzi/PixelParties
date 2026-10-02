@@ -18712,6 +18712,7 @@ Jeder neue Area-Hintergrund wird mit **demselben Detailgrad** gemalt wie Cottage
 - **Animation fließend:** Figuren mit ≥ 6 (besser 12) Bildern und einer Schrittfolge (`*_FOLGE`, ≈ 0,15–0,2 s je Schritt), Zusatzbewegung (Atmen, Blinzeln, Haar) statt nur 2–3 Posen.
 - **Nahtlos:** alle Animationen teilen die Periode 12 s (Dauern 3/4/6/12 s); Kacheln nur mit Mustern, deren Abstand 128 teilt. Prüfung: Bild bei t == Bild bei t + 12 s (Playwright, Animationen per `getAnimations()` auf feste Zeiten setzen).
 - **Farben aus der Vorlage:** Palette direkt aus dem Kartenbild ziehen (z. B. mit `convert … -colors 12 -format %c histogram:info:-`), nicht schätzen; Feuer: `#F8F5B5`/`#F6E318`/`#EEAF2E`/`#F27525`/`#C92E26`/`#550A04`.
+- **Mitbewegte Anbauteile:** Overlays an Figuren (Flammenhaar, Hüte, Reittiere …) übernehmen den Versatz der Pose (zweite Animation `transform: translate` mit derselben Schrittfolge und demselben Delay wie die Figur).
 - **Verankerung:** bewegte Elemente müssen am Untergrund ansetzen (Fontänen stehen in Glutlachen im Boden, Figuren-Beine verschwinden hinter der Vorderebene).
 - **Abnahme:** nach jedem Hintergrund ein GIF (12 s, 20 fps) an den Auftraggeber.
 Der Generator (reines Python, PNG-Schreiber + `shade.py` mit `dth`/`ramp`/`mix`) liegt bewusst nicht im Projekt, wie bei den übrigen Szenen.
