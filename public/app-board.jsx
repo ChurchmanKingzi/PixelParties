@@ -288,7 +288,7 @@ function applyCrystalCostMods(me, cardName, baseCost) {
   return baseCost * 2;
 }
 
-function BoardCard({ cardName, faceDown, flipped, label, hp, maxHp, atk, hpPosition, style, noTooltip, skins, tooltipCardOverride, inheritedEffects, copiedHeroes, revealTooltipWhenFaceDown, abilities, effectiveLevel, stampBonus, showLevelBadge }) {
+function BoardCard({ cardName, faceDown, flipped, label, hp, maxHp, atk, hpPosition, style, noTooltip, skins, tooltipCardOverride, inheritedEffects, copiedHeroes, revealTooltipWhenFaceDown, abilities, effectiveLevel, stampBonus, showLevelBadge, children }) {
   const card = faceDown ? null : CARDS_BY_NAME[cardName];
   const imgUrl = card ? cardImageUrl(card.name, skins) : null;
   // A caller (e.g. Biomancy Token in the puzzle builder) can override what
@@ -424,6 +424,7 @@ function BoardCard({ cardName, faceDown, flipped, label, hp, maxHp, atk, hpPosit
           </div>
         )
       )}
+      {children}
     </div>
   );
 }
@@ -46686,8 +46687,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     onTouchStart={(e) => onHandMouseDown(e, item.origIdx)}
                     onMouseEnter={() => isAnyDiscard && setHoveredPileCard(item.card)}
                     onMouseLeave={() => isAnyDiscard && setHoveredPileCard(null)}>
-                    <BoardCard cardName={item.card} noTooltip={isAnyDiscard} skins={gameSkins} />
-                    {istFrischErschienen(item.origIdx) && <HandMaterializeFxInline />}
+                    <BoardCard cardName={item.card} noTooltip={isAnyDiscard} skins={gameSkins}>
                     {handEffectiveLevel != null && (() => {
                       // "Boosted" = effective level is HIGHER than the
                       // printed base (Mana Absorbing Crystal's +1).
@@ -46711,7 +46711,6 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                         </div>
                       );
                     })()}
-                    {(me.handApplause?.[item.origIdx] > 0) && <ApplauseBadge n={me.handApplause[item.origIdx]} hand akey={`h:${myIdx}:${item.origIdx}`} />}
                     {handEffectiveCost != null && (
                       <div className="hand-cost-override"
                         onMouseEnter={e => {
@@ -46734,6 +46733,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                         ◆{handEffectiveCost}
                       </div>
                     )}
+                    </BoardCard>
+                    {istFrischErschienen(item.origIdx) && <HandMaterializeFxInline />}
+                    {(me.handApplause?.[item.origIdx] > 0) && <ApplauseBadge n={me.handApplause[item.origIdx]} hand akey={`h:${myIdx}:${item.origIdx}`} />}
                     {isHandLockBlocked && <div className="hand-lock-indicator">⦸</div>}
                   </div>
                 );
