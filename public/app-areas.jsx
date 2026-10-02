@@ -5181,20 +5181,19 @@ const SecondCircleOfHellOverlay = React.memo(function SecondCircleOfHellOverlay(
 });
 
 // ═══════════════════════════════════════════════════════════════════
-//  THE THIRD CIRCLE OF HELL — der Kreis der Voelllerei (Al 2.10., Feinschliff: viel mehr Detailgrad)
+//  THE THIRD CIRCLE OF HELL — der Kreis der Voelllerei (Al 2.10., Feinschliff: mehr Detailgrad)
 //
 //  Karte: ein Banketttisch auf Hoellenboden, Teller mit Truthaehnen und Braten ueberall drumrum,
 //  Dampf steigt auf, Kerzen scheinen, es gibt Wein — ein Festmahl. Palette nach dem Kartenbild:
 //  rot-orange Hoellenboden, Holztisch, lindgruene Platten, Braten, Violett fuer die Kelche.
-//  Draufsicht; die Fresser sitzen frontal hinter dem Tisch. Ihr Aussehen folgt der Karte: wilder goldener
-//  Haarschopf, grosses weisses Auge mit gruener Pupille, cyanfarbene Traene, dunkelrote Robe mit Perlenkragen.
+//  Draufsicht; die Fresser sitzen frontal hinter dem Tisch (wie auf der Karte).
 //
 //  Ebenen (Kunsthoehe 100; per Generator gemalt, der nicht im Projekt liegt): tile.png — Kachel 128
-//  mit ZWEI Bildern untereinander (128×200): Boden (Backsteine mit Licht/Schatten, Glut in den Fugen,
-//  Risse), Stuehle, Tisch (gemaserte Bretter, Astloecher, Naegel, Flecken), Gedecke, Kelche, Truthaehne,
-//  Flaschen, Kerzen mit Haltern, grosse Platten am Rand; Bild 2 = Kerzenflackern; glutton.png — Fresser
-//  (4 Bilder 30×32: kauen, Backen voll, Keule am Mund, Blinzeln; 2 Varianten untereinander:
-//  goldblond / rotblond); steam.png — Dampf (3 Bilder 8×16).
+//  mit ZWEI Bildern untereinander (128×200): Boden, Stuehle, Tisch (Gedecke, Kelche, Truthaehne,
+//  Flaschen, Kerzen), grosse Platten am Rand; Bild 2 = Kerzenflackern; glutton.png — Fresser (3 Bilder
+//  18×20: kauen, Mund auf, Keule; 2 Varianten); steam.png — Dampf (3 Bilder 7×14).
+//  Feinschliff: geordnetes Dithering, mehrstufiges Shading (Licht oben rechts), Glut in den Fugen,
+//  gemaserte Bretter, schattierte Speisen/Kelche/Kerzen/Truthaehne und Figuren (gleiche Groesse und Aussehen).
 //  Die Kachel ist links ausgerichtet (Positionen der Aufbauten in Kunstpixeln vom linken Rand).
 //  ALLE Animationen teilen die Periode 12 s → nahtlose Schleife.
 // ═══════════════════════════════════════════════════════════════════
@@ -5202,7 +5201,7 @@ const TCI = '/areas/third-circle-of-hell/';
 const ThirdCircleOfHellOverlay = React.memo(function ThirdCircleOfHellOverlay() {
   const fresser = useMemo(() => Array.from({ length: 10 }, (_, k) => k).filter(k => k % 3 !== 1).map((k, i) => {
     const dur = [6, 12, 6][i % 3];
-    return { x: 16 + 32 * k, v: i % 2, dur, delay: -((i * 1.7) % dur) };
+    return { x: 16 + 32 * k, v: k % 2, dur, delay: -((i * 1.7) % dur) };
   }), []);
   const dampf = useMemo(() => {
     const out = [];
@@ -5217,19 +5216,19 @@ const ThirdCircleOfHellOverlay = React.memo(function ThirdCircleOfHellOverlay() 
     return out;
   }, []);
   return (
-    <PixelScene artH={100} bg="#4a0404" className="third-circle-overlay">
+    <PixelScene artH={100} bg="#4a0a0a" className="third-circle-overlay">
       <PixelBand src={TCI + 'tile.png'} className="tc-wand" style={{ backgroundSize: 'auto 200%', backgroundPosition: '0 0' }} />
       <div className="tc-volk">
         {fresser.map((f, i) => (
           <i key={'fr' + i} className="tc-fresser" style={{
-            left: ppArt(f.x - 15), top: ppArt(-1), width: ppArt(30), height: ppArt(32),
+            left: ppArt(f.x - 9), top: ppArt(11), width: ppArt(18), height: ppArt(20),
             backgroundPositionY: f.v ? '100%' : '0%',
             animation: `tcFressen ${f.dur}s steps(1) ${f.delay}s infinite`,
           }} />
         ))}
         {dampf.map((d, i) => (
           <i key={'d' + i} className="pp-area-dyn tc-dampf" style={{
-            left: ppArt(d.x - 4), top: ppArt(d.y),
+            left: ppArt(d.x - 3.5), top: ppArt(d.y),
             animation: `tcDampf ${d.dur}s linear ${d.delay}s infinite, tcDampfBild 1.2s steps(1) ${d.bild}s infinite`,
           }} />
         ))}
@@ -5243,20 +5242,19 @@ const ThirdCircleOfHellOverlay = React.memo(function ThirdCircleOfHellOverlay() 
           60%, 69% { background-position: 0 100%; } 70%, 100% { background-position: 0 0; }
         }
         .tc-volk { position: absolute; inset: 0; }
-        .tc-fresser { position: absolute; background: url(${TCI}glutton.png) 0 0 / 400% 200% no-repeat; }
-        /* Bilder: 0 kaut, 1 Backen voll, 2 Keule am Mund, 3 Blinzeln */
+        .tc-fresser { position: absolute; background: url(${TCI}glutton.png) 0 0 / 300% 200% no-repeat; }
+        /* Bilder: 0 kaut, 1 Mund auf, 2 Keule am Mund */
         @keyframes tcFressen {
-          0% { background-position-x: 0%; } 12% { background-position-x: 33.333%; } 24% { background-position-x: 0%; }
-          36% { background-position-x: 66.667%; } 52% { background-position-x: 33.333%; } 64% { background-position-x: 0%; }
-          85% { background-position-x: 100%; } 88% { background-position-x: 0%; }
+          0% { background-position-x: 0%; } 25% { background-position-x: 50%; } 40% { background-position-x: 100%; }
+          58% { background-position-x: 50%; } 70% { background-position-x: 0%; } 85% { background-position-x: 50%; }
         }
         .tc-dampf {
-          position: absolute; width: calc(8 * var(--px)); height: calc(16 * var(--px)); opacity: 0;
+          position: absolute; width: calc(7 * var(--px)); height: calc(14 * var(--px)); opacity: 0;
           background: url(${TCI}steam.png) 0 0 / 300% 100% no-repeat; z-index: 100;
         }
         @keyframes tcDampf {
           0% { opacity: 0; transform: translateY(calc(6 * var(--px))); } 20% { opacity: .85; }
-          70% { opacity: .5; } 100% { opacity: 0; transform: translateY(calc(-12 * var(--px))); }
+          70% { opacity: .5; } 100% { opacity: 0; transform: translateY(calc(-10 * var(--px))); }
         }
         @keyframes tcDampfBild { 0% { background-position-x: 0%; } 33% { background-position-x: 50%; } 66% { background-position-x: 100%; } }
       `}</style>
