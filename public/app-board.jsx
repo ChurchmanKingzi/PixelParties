@@ -26293,22 +26293,6 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   // zusammengeschobenen Leiste — der Kartentooltip war damit ein
   // Streifen. Die Bounds der aufgeklappten Spalte sind die gewollte
   // Breite; ob sie gerade sichtbar ist, darf daran nichts aendern.
-  // Ketten-Anzeige (Reaction Chain): der Tooltip rueckt nur so weit nach links, wie die Anzeige wirklich breit ist
-  // (`--chain-schub` = Abstand ihrer linken Kante zum rechten Rand + 8 px). Ohne Anzeige wird die Variable entfernt.
-  useEffect(() => {
-    const messen = () => {
-      const root = document.documentElement;
-      const ov = document.querySelector('.reaction-chain-cards') || document.querySelector('.reaction-chain-overlay');
-      if (!ov) { root.style.removeProperty('--chain-schub'); return; }
-      const r = ov.getBoundingClientRect();
-      if (r.width <= 0) return;
-      // `.board-tooltip` ist `position: fixed` im Fenster-Koordinatensystem; die UI-Skalierung steckt schon im Rechteck.
-      root.style.setProperty('--chain-schub', Math.max(0, Math.round(window.innerWidth - r.left + 8)) + 'px');
-    };
-    messen();
-    const takt = setInterval(messen, 200);
-    return () => { clearInterval(takt); document.documentElement.style.removeProperty('--chain-schub'); };
-  }, []);
   const ttBreiteRef = useRef(null);
   useEffect(() => {
     const apply = () => {
