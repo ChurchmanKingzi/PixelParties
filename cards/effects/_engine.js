@@ -26163,7 +26163,10 @@ this._deathWatch = (this._deathWatchStack || []).length
     }
 
     this.log('area_placed', { player: ps.username, area: cardName });
-    this._broadcastEvent('area_descend', { owner: playerIdx, cardName });
+    // `fromPile` ('deleted' | 'discard' | 'deck'): die Area fliegt von diesem Stapel ins Feld statt von oben herabzufallen.
+    // Aufrufer geben es ueber `opts.fromPile` oder den Rahmen `this._areaFromPile` mit (die Area platziert sich selbst
+    // in ihrem `onPlay`, wo kein Parameter durchgereicht werden kann).
+    this._broadcastEvent('area_descend', { owner: playerIdx, cardName, fromPile: opts.fromPile || this._areaFromPile || null });
 
     await this.runHooks('onCardEnterZone', {
       enteringCard: cardInstance, toZone: 'area', toHeroIdx: -1,

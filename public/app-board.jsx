@@ -33961,7 +33961,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     };
     socket.on('red_lightning_rain', onRedLightningRain);
     // ── Area card placement: big flashy descend + shockwave ──
-    const onAreaDescend = ({ owner, cardName }) => {
+    const onAreaDescend = ({ owner, cardName, fromPile }) => {
       const ownerLabel = owner === myIdx ? 'me' : 'opp';
       const tgtEl = document.querySelector(`[data-area-zone][data-area-owner="${ownerLabel}"]`);
       if (!tgtEl) return;
@@ -33980,6 +33980,12 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             75%  { transform: translate(-50%, 0) rotateZ(4deg) scale(1.35); filter: brightness(1.9) drop-shadow(0 0 28px rgba(255,240,160,.9)); }
             82%  { transform: translate(-50%, 12px) rotateZ(-2deg) scale(1.18); filter: brightness(1.4) drop-shadow(0 0 18px rgba(255,220,120,.6)); }
             90%  { transform: translate(-50%, -4px) rotateZ(1deg) scale(1.22); filter: brightness(1.3); }
+            100% { transform: translate(-50%, 0) rotateZ(0deg) scale(1); opacity: 1; filter: brightness(1); }
+          }
+          @keyframes areaPileFly {
+            0%   { transform: translate(calc(-50% + var(--fdx)), var(--fdy)) rotateZ(-10deg) scale(var(--fsc)); opacity: 1; filter: brightness(1.3) drop-shadow(0 0 10px rgba(255,200,100,.6)); }
+            70%  { transform: translate(-50%, 0) rotateZ(3deg) scale(1.3); filter: brightness(1.8) drop-shadow(0 0 26px rgba(255,240,160,.9)); }
+            85%  { transform: translate(-50%, 6px) rotateZ(-1deg) scale(1.12); filter: brightness(1.3); }
             100% { transform: translate(-50%, 0) rotateZ(0deg) scale(1); opacity: 1; filter: brightness(1); }
           }
           @keyframes areaImpactRing {
@@ -34025,6 +34031,20 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         `pointer-events:none`, `z-index:10010`,
         `animation:areaCardFall 1.1s cubic-bezier(0.6, -0.05, 0.4, 1.2) forwards`,
       ].join(';');
+      // Kommt die Area von einem Stapel (Geloescht/Ablage/Deck), fliegt sie von dort ins Feld, statt herabzufallen.
+      if (fromPile) {
+        const pileSel = fromPile === 'deleted' ? (owner === myIdx ? '[data-my-deleted]' : '[data-opp-deleted]')
+          : fromPile === 'discard' ? (owner === myIdx ? '[data-my-discard]' : '[data-opp-discard]')
+          : (owner === myIdx ? '[data-my-deck]' : '[data-opp-deck]');
+        const pileEl = document.querySelector(pileSel);
+        if (pileEl) {
+          const pr = pileEl.getBoundingClientRect();
+          cardEl.style.setProperty('--fdx', (pr.left + pr.width / 2 - cx) + 'px');
+          cardEl.style.setProperty('--fdy', (pr.top + pr.height / 2 - cy) + 'px');
+          cardEl.style.setProperty('--fsc', String(Math.max(0.25, pr.width / cardW)));
+          cardEl.style.animation = 'areaPileFly 1.1s cubic-bezier(0.45, 0, 0.35, 1) forwards';
+        }
+      }
       if (imgUrl) {
         const img = document.createElement('img');
         img.src = imgUrl;

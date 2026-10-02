@@ -151,13 +151,14 @@ async function loeschenUndSpielen(engine, pi, name, opts = {}) {
   // Die Karte wird direkt aus dem Geloescht-Stapel gewirkt: ein Wegwerf-Pool ersetzt die Hand.
   const pool = [name];
   let res = null;
+  engine._areaFromPile = 'deleted';   // die Area fliegt vom Geloescht-Stapel ins Feld
   try {
     res = await engine._castSpellImmediately(pi, held.heroIdx, name, {
       fromZone: 'hand', pool, poolIndex: 0, by: name, alsZusatzaktion: true,
     });
   } catch (err) {
     console.error(`[${name}] Wirken aus dem Geloescht-Stapel:`, err.message);
-  }
+  } finally { delete engine._areaFromPile; }
   const gewirkt = !!res && !res.cancelled;
   if (!gewirkt) {
     // Der Guss kam nicht zustande (Abbruch in der Karte, Fehler): Karte zurueck, Sperre wieder auf.
