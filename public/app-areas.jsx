@@ -5383,8 +5383,8 @@ const FourthCircleOfHellOverlay = React.memo(function FourthCircleOfHellOverlay(
 //  Ebenen (Kunsthoehe 100; per Generator gemalt, der nicht im Projekt liegt): back.png — Kachel 128:
 //  verkohlte Backsteine (Russ, Ascheflecken, glimmende Risse, Schein der Fontaenen), Ascheboden mit
 //  Glut; front.png — Ascheschutt, liegt UEBER den Figuren; fountain-a.png / fountain-b.png — Fontaenen
-//  (8 Bilder 30×64 / 22×48, aus mehreren schwankenden Zungen, periodisch); hairflame.png — Flammenhaar
-//  (8 Bilder 22×18); hero.png — Abenteurer (12 Bilder 26×36, siehe FI_FOLGE; 2 Varianten: roter Umhang,
+//  (8 Bilder 30×72 / 22×56, aus mehreren schwankenden Zungen, stehen in Glutlachen im Boden, periodisch);
+//  hairflame.png — Flammenhaar, das der Kopfform folgt (Haar, Oberkopf, Wangen; Gesicht frei; 8 Bilder 36×34); hero.png — Abenteurer (12 Bilder 26×36, siehe FI_FOLGE; 2 Varianten: roter Umhang,
 //  violetter Umhang); ember.png — Glutfunke (3 Bilder 3×3); ash.png — Aschflocke (3 Bilder 3×3).
 //  Links ausgerichtet; Fontaenen alle 64 Kunstpixel (x 16, 80, …), Figuren dazwischen (x 48, 112, …).
 //  ALLE Animationen teilen die Periode 12 s (Dauern 0,15/1,2/3/4/6/12 s) → nahtlose Schleife.
@@ -5419,7 +5419,7 @@ const FifthCircleOfHellOverlay = React.memo(function FifthCircleOfHellOverlay() 
           <React.Fragment key={'f' + i}>
             <i className="pp-area-dyn fi-glut" style={{ left: ppArt(f.x - 30), animation: `fiGlut 3s ease-in-out ${f.delay}s infinite alternate` }} />
             <i className={'fi-fontaene ' + (f.gross ? 'gross' : 'klein')} style={{
-              left: ppArt(f.x - (f.gross ? 15 : 11)), top: ppArt(f.gross ? 8 : 24),
+              left: ppArt(f.x - (f.gross ? 15 : 11)), top: ppArt(f.gross ? 14 : 30),
               animation: `${f.gross ? 'fiFontA' : 'fiFontB'} 1.2s steps(1) ${f.delay}s infinite`,
             }} />
           </React.Fragment>
@@ -5430,7 +5430,7 @@ const FifthCircleOfHellOverlay = React.memo(function FifthCircleOfHellOverlay() 
               left: ppArt(h.x - 13), backgroundPositionY: h.v ? '100%' : '0%',
               animation: `fiHeld 6s steps(1) ${h.delay}s infinite`,
             }} />
-            <i className="fi-haar" style={{ left: ppArt(h.x - 11), animation: `fiHaar 1.2s steps(1) ${h.flamme}s infinite` }} />
+            <i className="fi-haar" style={{ left: ppArt(h.x - 18), animation: `fiHaar 1.2s steps(1) ${h.flamme}s infinite` }} />
           </React.Fragment>
         ))}
         {funken.map((e, i) => (
@@ -5453,8 +5453,8 @@ const FifthCircleOfHellOverlay = React.memo(function FifthCircleOfHellOverlay() 
       <style>{`
         .fi-volk { position: absolute; inset: 0; }
         .fi-fontaene { position: absolute; }
-        .fi-fontaene.gross { width: calc(30 * var(--px)); height: calc(64 * var(--px)); background: url(${FII}fountain-a.png) 0 0 / 800% 100% no-repeat; }
-        .fi-fontaene.klein { width: calc(22 * var(--px)); height: calc(48 * var(--px)); background: url(${FII}fountain-b.png) 0 0 / 800% 100% no-repeat; }
+        .fi-fontaene.gross { width: calc(30 * var(--px)); height: calc(72 * var(--px)); background: url(${FII}fountain-a.png) 0 0 / 800% 100% no-repeat; }
+        .fi-fontaene.klein { width: calc(22 * var(--px)); height: calc(56 * var(--px)); background: url(${FII}fountain-b.png) 0 0 / 800% 100% no-repeat; }
         @keyframes fiFontA { ${[0,1,2,3,4,5,6,7].map(b => `${(b * 12.5)}% { background-position-x: ${(b * 100 / 7).toFixed(3)}%; }`).join(' ')} }
         @keyframes fiFontB { ${[0,1,2,3,4,5,6,7].map(b => `${(b * 12.5)}% { background-position-x: ${(b * 100 / 7).toFixed(3)}%; }`).join(' ')} }
         /* Schein der Fontaenen: warmes Pulsieren */
@@ -5463,7 +5463,7 @@ const FifthCircleOfHellOverlay = React.memo(function FifthCircleOfHellOverlay() 
         @keyframes fiGlut { from { opacity: .35; } to { opacity: .8; } }
         .fi-held { position: absolute; top: calc(42 * var(--px)); width: calc(26 * var(--px)); height: calc(36 * var(--px)); background: url(${FII}hero.png) 0 0 / ${FI_BILDER * 100}% 200% no-repeat; }
         @keyframes fiHeld { ${FI_KEYFRAMES} }
-        .fi-haar { position: absolute; top: calc(30 * var(--px)); width: calc(22 * var(--px)); height: calc(18 * var(--px)); background: url(${FII}hairflame.png) 0 0 / 800% 100% no-repeat; }
+        .fi-haar { position: absolute; top: calc(26 * var(--px)); width: calc(36 * var(--px)); height: calc(34 * var(--px)); background: url(${FII}hairflame.png) 0 0 / 800% 100% no-repeat; }
         @keyframes fiHaar { ${[0,1,2,3,4,5,6,7].map(b => `${(b * 12.5)}% { background-position-x: ${(b * 100 / 7).toFixed(3)}%; }`).join(' ')} }
         .fi-funke { position: absolute; width: calc(3 * var(--px)); height: calc(3 * var(--px)); opacity: 0; background: url(${FII}ember.png) 0 0 / 300% 100% no-repeat; z-index: 5; }
         @keyframes fiFunke {
