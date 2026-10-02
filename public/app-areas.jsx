@@ -52,7 +52,7 @@ const AREA_OVERLAYS = {
   'The Third Circle of Hell':     { tier: 'opaque',      C: () => <ThirdCircleOfHellOverlay /> },   // Pixelart (2.10.)
   'The Fourth Circle of Hell':    { tier: 'opaque',      C: () => <FourthCircleOfHellOverlay /> },   // Pixelart (2.10.)
   'The Fifth Circle of Hell':     { tier: 'opaque',      C: () => <FifthCircleOfHellOverlay /> },   // Pixelart (2.10.)
-  'The Sixth Circle of Hell':    { tier: 'opaque',      C: () => <HellCircleOverlay stufe={6} /> },   // Platzhalter-Szene (prozedural)
+  'The Sixth Circle of Hell':     { tier: 'opaque',      C: () => <SixthCircleOfHellOverlay /> },   // Pixelart (2.10.)
   'The Seventh Circle of Hell':    { tier: 'opaque',      C: () => <HellCircleOverlay stufe={7} /> },   // Platzhalter-Szene (prozedural)
   'The Eighth Circle of Hell':    { tier: 'opaque',      C: () => <HellCircleOverlay stufe={8} /> },   // Platzhalter-Szene (prozedural)
   "Tarleinn's Floating Island":   { tier: 'opaque',      C: () => <FloatingIslandOverlay /> },   // v1440: Kartenstil (vorher translucent)
@@ -5485,9 +5485,103 @@ const FifthCircleOfHellOverlay = React.memo(function FifthCircleOfHellOverlay() 
 });
 
 // ═══════════════════════════════════════════════════════════════════
+//  THE SIXTH CIRCLE OF HELL (Heresy) — Pixelart-Hintergrund
+//
+//  Klassische Hoellenszene wie auf der Karte: Lavahimmel ueber einer roten Backsteinwand; rechts ein
+//  bartiger Richter-Gott mit Goldkrone und Hasenohren, der anklagend auf den Ketzer zeigt; in der Mitte
+//  der blonde Ketzer; unten ein Kapuzen-Daemon, der ihm einfluestert; ganz rechts Eisenspiesse; in den
+//  Wandnischen brennen Grabfeuer. Farben aus der Kartenvorlage (Histogramm).
+//
+//  Ebenen (Kunsthoehe 100; Generator liegt ausserhalb des Projekts): back.png — Kachel 128: Wand, Boden,
+//  Nischen, Sockel, Spiesse; sky.png — Lavahimmel (8 Bilder 128×46, periodisch in x und Zeit; Tropfen an der
+//  Unterkante); god.png (12 Bilder 46×48, Zeigearm nach links), hero.png (12 Bilder 26×36, 2 Varianten),
+//  demon.png (12 Bilder 38×36); grave-fire.png (8 Bilder 12×18); ember.png (3 Bilder 3×3); front.png —
+//  Bodenschutt VOR den Figuren. ALLE Animationen teilen die Periode 12 s (0,15/0,5/1,2/4/6 s).
+// ═══════════════════════════════════════════════════════════════════
+const SXX = '/areas/sixth-circle-of-hell/';
+const SX_HELD = [0,0,1,1,0,2,2,0,3,3,0,4,4,0,5,5,0,6,6,7,7,6,0,8,8,9,9,0,10,0,0,11,11,0,0,1,1,0,0,0];
+const SX_GOTT = [0,0,1,1,0,0,2,2,0,3,3,0,4,0,5,5,6,6,7,7,8,8,7,7,9,9,9,7,7,0,10,0,0,11,11,0,0,1,1,0];
+const SX_DAEMON = [0,0,1,1,0,2,2,3,3,0,4,4,0,5,6,6,7,7,6,6,7,7,8,8,6,0,9,9,9,0,10,0,0,11,11,0,0,1,1,0];
+const sxFolge = (folge, n) => folge.map((b, i) => `${(i * 100 / folge.length).toFixed(3)}% { background-position-x: ${(b * 100 / (n - 1)).toFixed(3)}%; }`).join(' ');
+const sxReihe = (n) => Array.from({ length: n }, (_, b) => `${(b * 100 / n).toFixed(3)}% { background-position-x: ${(b * 100 / (n - 1)).toFixed(3)}%; }`).join(' ');
+const SX_BREITE = 512;
+const SixthCircleOfHellOverlay = React.memo(function SixthCircleOfHellOverlay() {
+  const kacheln = useMemo(() => Array.from({ length: SX_BREITE / 128 }, (_, k) => ({
+    x: 128 * k, v: k % 2, dH: -((k * 2.3) % 6), dG: -((k * 3.1) % 6), dD: -((k * 1.7) % 6),
+    dHimmel: -((k * 1.3) % 4), dF: -((k * 0.37) % 1.2),
+  })), []);
+  const funken = useMemo(() => Array.from({ length: 30 }, (_, i) => {
+    const dur = [3, 4, 6][i % 3];
+    return { x: ((i * 37) % SX_BREITE), y0: 84 - (i % 4) * 6, dur, k: i % 3, delay: -((i * 0.83) % dur), drift: ((i % 5) - 2) * 3 };
+  }), []);
+  const tropfen = useMemo(() => Array.from({ length: 14 }, (_, i) => {
+    const dur = [3, 4][i % 2];
+    return { x: ((i * 47 + 9) % SX_BREITE), dur, k: i % 3, delay: -((i * 0.61) % dur) };
+  }), []);
+  return (
+    <PixelScene artH={100} bg="#140000" className="sixth-circle-overlay">
+      <PixelBand src={SXX + 'back.png'} style={{ backgroundPosition: '0 0' }} />
+      <div className="sx-volk">
+        {kacheln.map((t, i) => (
+          <React.Fragment key={'t' + i}>
+            <i className="sx-himmel" style={{ left: ppArt(t.x), animation: `sxHimmel 4s steps(1) ${t.dHimmel}s infinite` }} />
+            <i className="pp-area-dyn sx-glut" style={{ left: ppArt(t.x + 2), top: ppArt(44), animation: `sxGlut 3s ease-in-out ${t.dF}s infinite alternate` }} />
+            <i className="pp-area-dyn sx-glut" style={{ left: ppArt(t.x + 52), top: ppArt(30), animation: `sxGlut 3s ease-in-out ${t.dF - 1}s infinite alternate` }} />
+            <i className="sx-feuer" style={{ left: ppArt(t.x + 9), top: ppArt(49), animation: `sxFeuer 1.2s steps(1) ${t.dF}s infinite` }} />
+            <i className="sx-feuer" style={{ left: ppArt(t.x + 58), top: ppArt(33), animation: `sxFeuer 1.2s steps(1) ${t.dF - .5}s infinite` }} />
+            <i className="sx-gott" style={{ left: ppArt(t.x + 62), animation: `sxGott 6s steps(1) ${t.dG}s infinite` }} />
+            <i className="sx-held" style={{ left: ppArt(t.x + 27), backgroundPositionY: t.v ? '100%' : '0%', animation: `sxHeld 6s steps(1) ${t.dH}s infinite` }} />
+            <i className="sx-daemon" style={{ left: ppArt(t.x + 12), animation: `sxDaemon 6s steps(1) ${t.dD}s infinite` }} />
+          </React.Fragment>
+        ))}
+        {tropfen.map((e, i) => (
+          <i key={'d' + i} className="pp-area-dyn sx-tropfen" style={{
+            left: ppArt(e.x), backgroundPositionX: (e.k * 50) + '%', animation: `sxTropf ${e.dur}s ease-in ${e.delay}s infinite`,
+          }} />
+        ))}
+        {funken.map((e, i) => (
+          <i key={'e' + i} className="pp-area-dyn sx-funke" style={{
+            left: ppArt(e.x), top: ppArt(e.y0), backgroundPositionX: (e.k * 50) + '%', '--dx': ppArt(e.drift),
+            animation: `sxFunke ${e.dur}s linear ${e.delay}s infinite`,
+          }} />
+        ))}
+      </div>
+      <PixelBand src={SXX + 'front.png'} style={{ backgroundPosition: '0 0' }} />
+      <div className="pp-rand-dim" />
+      <style>{`
+        .sx-volk { position: absolute; inset: 0; }
+        .sx-himmel { position: absolute; top: 0; width: calc(128 * var(--px)); height: calc(46 * var(--px)); background: url(${SXX}sky.png) 0 0 / 800% 100% no-repeat; }
+        @keyframes sxHimmel { ${sxReihe(8)} }
+        .sx-feuer { position: absolute; width: calc(12 * var(--px)); height: calc(18 * var(--px)); background: url(${SXX}grave-fire.png) 0 0 / 800% 100% no-repeat; }
+        @keyframes sxFeuer { ${sxReihe(8)} }
+        .sx-glut { position: absolute; width: calc(24 * var(--px)); height: calc(34 * var(--px)); opacity: .5;
+          background: radial-gradient(ellipse at 50% 60%, rgba(255,150,40,.32), rgba(255,90,20,.12) 50%, rgba(255,80,10,0) 72%); }
+        @keyframes sxGlut { from { opacity: .3; } to { opacity: .8; } }
+        .sx-gott { position: absolute; top: calc(31 * var(--px)); width: calc(46 * var(--px)); height: calc(48 * var(--px)); background: url(${SXX}god.png) 0 0 / ${12 * 100}% 100% no-repeat; }
+        @keyframes sxGott { ${sxFolge(SX_GOTT, 12)} }
+        .sx-held { position: absolute; top: calc(46 * var(--px)); width: calc(26 * var(--px)); height: calc(36 * var(--px)); background: url(${SXX}hero.png) 0 0 / ${12 * 100}% 200% no-repeat; }
+        @keyframes sxHeld { ${sxFolge(SX_HELD, 12)} }
+        .sx-daemon { position: absolute; top: calc(64 * var(--px)); width: calc(38 * var(--px)); height: calc(36 * var(--px)); background: url(${SXX}demon.png) 0 0 / ${12 * 100}% 100% no-repeat; }
+        @keyframes sxDaemon { ${sxFolge(SX_DAEMON, 12)} }
+        .sx-funke { position: absolute; width: calc(3 * var(--px)); height: calc(3 * var(--px)); opacity: 0; background: url(${SXX}ember.png) 0 0 / 300% 100% no-repeat; z-index: 5; }
+        @keyframes sxFunke {
+          0% { opacity: 0; transform: translate(0, 0); } 10% { opacity: 1; }
+          80% { opacity: .8; } 100% { opacity: 0; transform: translate(var(--dx), calc(-44 * var(--px))); }
+        }
+        .sx-tropfen { position: absolute; top: calc(32 * var(--px)); width: calc(3 * var(--px)); height: calc(3 * var(--px)); opacity: 0; background: url(${SXX}ember.png) 0 0 / 300% 100% no-repeat; }
+        @keyframes sxTropf {
+          0% { opacity: 0; transform: translateY(0); } 12% { opacity: 1; }
+          85% { opacity: .9; } 100% { opacity: 0; transform: translateY(calc(46 * var(--px))); }
+        }
+      `}</style>
+    </PixelScene>
+  );
+});
+
+// ═══════════════════════════════════════════════════════════════════
 //  THE SECOND … EIGHTH CIRCLE OF HELL — Hintergruende (Platzhalter-Szenen)
 //
-//  Prozedurale Platzhalter-Szenen fuer die Kreise 6–8, bis deren Pixelart vorliegt (Zweiter bis Fuenfter haben sie schon): dunkler Farbverlauf,
+//  Prozedurale Platzhalter-Szenen fuer die Kreise 7–8, bis deren Pixelart vorliegt (Zweiter bis Sechster haben sie schon): dunkler Farbverlauf,
 //  eine Horizontlinie, aufsteigende Funken/Glut und ein kreis-spezifisches Motiv. Jeder Kreis hat
 //  seine eigene Farbwelt (Dante: 6 Ketzerei/Grabfeuer, 7 Gewalt/Blutfluss, 8 Betrug/Tinte). Wieder `pp-area-dyn` fuer alles Bewegte
 //  (faellt mit „keine Animationen" weg); eigene Keyframes im eigenen <style>.
