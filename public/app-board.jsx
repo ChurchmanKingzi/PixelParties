@@ -2781,7 +2781,7 @@ function HeroStatusPartikel({ effekte, kern, s, mitteX, fw, fh, saat }) {
 // `versteinert`: zusätzlich Steinoptik (kriecht von unten nach oben).
 // `eingefroren`: zusätzlich eine Eiskruste um die Figur (v1457/v1458).
 // `effekte`: weitere Status als Leerzeichen-Liste (Tönung + Partikel, v1459).
-function HeroIdleSprite({ cardName, angehalten, versteinert, eingefroren, effekte, unsichtbar, eingeklappt }) {
+function HeroIdleSprite({ cardName, angehalten, versteinert, eingefroren, effekte, unsichtbar, eingeklappt, abgeblendet }) {
   const key = HeroIdleAnims.slug(cardName);
   // Eisblock: 'da' solange Frozen, danach kurz 'schmilzt' (zerspringt),
   // dann 'weg'.
@@ -3065,7 +3065,7 @@ function HeroIdleSprite({ cardName, angehalten, versteinert, eingefroren, effekt
       {anker}
       {ReactDOM.createPortal(
         <div ref={platzRef} data-held={cardName}
-          className={'hero-idle-platz' + (versteinert ? ' hero-idle-stein' : '') + (angehalten ? ' hero-idle-angehalten' : '') + (unsichtbar ? ' hero-idle-unsichtbar' : '')}>
+          className={'hero-idle-platz' + (versteinert ? ' hero-idle-stein' : '') + (angehalten ? ' hero-idle-angehalten' : '') + (unsichtbar ? ' hero-idle-unsichtbar' : '') + (abgeblendet ? ' hero-idle-abgeblendet' : '')}>
           <div className="hero-idle-schatten" style={schattenStil} />
           <div className="hero-idle-steher" style={steherStil}>
             <div className="hero-idle-holo" style={{ transformOrigin: drehpunkt }}>
@@ -43519,7 +43519,11 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                       hero.statuses?.charmed ? 'charmed' : '',
                     ].filter(Boolean).join(' ')}
                     versteinert={!!(isStunned?._petrified || isStunned?._baihuPetrify)}
-                    unsichtbar={!!isInvisible} />
+                    unsichtbar={!!isInvisible}
+                    // Ausgegraut wie die Heldenzone selbst (Zone traegt `board-zone-dead` bzw. wird bei der Klick-Wahl abgedunkelt):
+                    // die Figur lebt in einer eigenen Ebene und bekommt den Filter der Zone nicht mit.
+                    abgeblendet={!!(abilityIneligible || equipIneligible || creatureIneligible || spellAttackIneligible || surpriseIneligible || ascensionIneligible || pickHeroDropIneligible || heroActionDimmed || additionalActionDimmed || attachPickHeroDim
+                      || (summonPickAktiv && !(abilityTarget || equipTarget || spellTarget || surpriseTarget || ascensionTarget || pickHeroDropTarget || attachPickEligibleHero || isCsppHeroTarget || spellPickEntry)))} />
                 )}
                 {/* v1462: mit animierter Figur (`figurDa`) übernimmt die Figur
                     die Darstellung; die Gift-Stapelzahl bleibt als Zahl. */}
