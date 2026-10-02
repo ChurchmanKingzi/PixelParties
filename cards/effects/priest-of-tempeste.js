@@ -45,8 +45,9 @@ async function bezahlen(ctx, opferName) {
   if (!namen) return false;
   if (!gs.hoptUsed) gs.hoptUsed = {};
   gs.hoptUsed[sperre(inst)] = gs.turn;
-  if (!(await mischeZurueck(engine, pi, namen, CARD_NAME))) return false;
+  // Das Kartenbild des Priesters ZUERST streamen — dann erst fliegen die beiden Creatures ins Deck.
   await engine.showTriggeredEffect(CARD_NAME, { playerIdx: pi });
+  if (!(await mischeZurueck(engine, pi, namen, CARD_NAME))) return false;
   engine.log('priest_of_tempeste', { player: gs.players[pi]?.username, shuffled: namen, target: opferName });
   return true;
 }
