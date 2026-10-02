@@ -5110,32 +5110,42 @@ const LC_FERN = { feet: 36, w: 9, h: 13, xs: [-92, -68, -44, -20, 4, 28, 52, 76,
 const SecondCircleOfHellOverlay = React.memo(function SecondCircleOfHellOverlay() {
   const frauen = useMemo(() => {
     const mach = (typ, art) => typ.xs.map((x, i) => ({
-      art, x, v: (i + (art === 'fern' ? 1 : 0)) % 2, dur: LC_DAUER[i % 3], delay: -((i * 2.7) % 12),
+      art, x, v: (i + (art === 'fern' ? 1 : 0)) % 2, dur: LC_DAUER[i % 3], delay: -((i * 2.7) % 12), liebe: i % 2 ? 3 : 6, liebeDelay: -((i * 1.3) % 6),
       w: typ.w, h: typ.h, feet: typ.feet,
     }));
     return [...mach(LC_FERN, 'fern'), ...mach(LC_NAH, 'nah')];
   }, []);
-  // Jede Frau schickt Herzen; Dauern 4 s / 6 s teilen die Periode (12 s), damit alles nahtlos schleift.
-  const herzen = useMemo(() => frauen.map((f, i) => {
-    const dur = i % 2 ? 4 : 6;
-    return { x: f.x + ((i * 7) % 5 - 2), y: f.feet - f.h + 2, dur, delay: -((i * 1.9) % dur), f: i % 2 };
-  }), [frauen]);
+  // Jede Frau schickt DREI Herzen (4 s / 6 s / 12 s, gegeneinander versetzt); alle Dauern teilen die Periode
+  // 12 s, damit alles nahtlos schleift.
+  const herzen = useMemo(() => frauen.flatMap((f, i) => [4, 6, 12].map((dur, k) => ({
+    x: f.x + ((i * 7 + k * 3) % 7 - 3), y: f.feet - f.h + 2, dur, delay: -(((i * 1.9 + k * 2.3) % dur)),
+    f: (i + k) % 2, dx: ((i + k) % 3 - 1) * 2,
+  }))), [frauen]);
   return (
     <PixelScene artH={100} bg="#1e0a2c" className="second-circle-overlay">
       <PixelBand src={LC + 'tile.png'} className="lc-wand" style={{ backgroundSize: 'auto 200%', backgroundPosition: '0 0' }} />
       <div className="lc-volk">
         {frauen.map((f, i) => (
-          <i key={'f' + i} className="lc-frau" style={{
-            left: ppArtX(f.x - f.w / 2, 0), top: ppArt(f.feet - f.h + 3), width: ppArt(f.w), height: ppArt(f.h),
-            zIndex: f.feet, backgroundImage: `url(${LC}${f.art === 'fern' ? 'girl-far' : 'girl'}.png)`,
-            backgroundPositionY: f.v ? '100%' : '0%',
-            animation: `lcSchmachten ${f.dur}s steps(1) ${f.delay}s infinite`,
-          }} />
+          <React.Fragment key={'f' + i}>
+            <i className="lc-frau" style={{
+              left: ppArtX(f.x - f.w / 2, 0), top: ppArt(f.feet - f.h + 3), width: ppArt(f.w), height: ppArt(f.h),
+              zIndex: f.feet, backgroundImage: `url(${LC}${f.art === 'fern' ? 'girl-far' : 'girl'}.png)`,
+              backgroundPositionY: f.v ? '100%' : '0%',
+              animation: `lcSchmachten ${f.dur}s steps(1) ${f.delay}s infinite`,
+            }} />
+            {/* Herzaugen: gleiches Bild wie der Kopf (wiegt mit), erscheinen und verschwinden */}
+            <i className="pp-area-dyn lc-frau lc-liebe" style={{
+              left: ppArtX(f.x - f.w / 2, 0), top: ppArt(f.feet - f.h + 3), width: ppArt(f.w), height: ppArt(f.h),
+              zIndex: f.feet + 1, backgroundImage: `url(${LC}${f.art === 'fern' ? 'girl-far-love' : 'girl-love'}.png)`,
+              backgroundPositionY: f.v ? '100%' : '0%',
+              animation: `lcSchmachten ${f.dur}s steps(1) ${f.delay}s infinite, lcLiebe ${f.liebe}s steps(1) ${f.liebeDelay}s infinite`,
+            }} />
+          </React.Fragment>
         ))}
         {herzen.map((h, i) => (
           <i key={'h' + i} className="pp-area-dyn lc-herz" style={{
             left: ppArtX(h.x - 3.5, 0), top: ppArt(h.y), backgroundPositionX: h.f ? '100%' : '0%',
-            animation: `lcHerz ${h.dur}s linear ${h.delay}s infinite`,
+            '--dx': ppArt(h.dx), animation: `lcHerz ${h.dur}s linear ${h.delay}s infinite`,
           }} />
         ))}
       </div>
@@ -5159,9 +5169,12 @@ const SecondCircleOfHellOverlay = React.memo(function SecondCircleOfHellOverlay(
           background: url(${LC}heart.png) 0 0 / 200% 100% no-repeat; z-index: 120;
         }
         @keyframes lcHerz {
-          0% { opacity: 0; transform: translateY(0); } 15% { opacity: .95; }
-          80% { opacity: .8; } 100% { opacity: 0; transform: translateY(calc(-14 * var(--px))); }
+          0% { opacity: 0; transform: translate(0, 0); } 15% { opacity: .95; }
+          80% { opacity: .8; } 100% { opacity: 0; transform: translate(var(--dx, 0px), calc(-16 * var(--px))); }
         }
+        /* Herzaugen: aus (0–35 %), an (35–80 %), aus */
+        .lc-liebe { background-size: 300% 200%; }
+        @keyframes lcLiebe { 0%, 34% { opacity: 0; } 35%, 79% { opacity: 1; } 80%, 100% { opacity: 0; } }
       `}</style>
     </PixelScene>
   );
