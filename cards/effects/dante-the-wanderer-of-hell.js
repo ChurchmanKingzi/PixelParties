@@ -9,7 +9,9 @@
 //
 //  ── AUSLEGUNG ─────────────────────────────────────────────────────
 //  • Aktiver Held-Effekt, einmal pro Zug (Held-Effekt-Sperre der Engine); zwei Wege, einer pro Aktivierung.
-//    Gibt es nur einen moeglichen Weg, entfaellt die Wegwahl; mit beiden fragt Dante zuerst (abbrechbar).
+//    Mit loeschbarem Spell in der Hand geht es DIREKT in den Handwahl-Modus (`forceDiscardCancellable`, gueltige
+//    Spells leuchten, Escape = Abbruch ohne Verbrauch); gibt es auch Areas, bietet derselbe Modus einen Knopf
+//    „Delete Areas instead". Ohne loeschbaren Spell nur Weg 2 (mit kurzer Bestaetigung, abbrechbar).
 //  • Weg 1: Spell (Kartentyp Spell, KEINE Attack) mit WIRKSAMEM Level ≤ 3 aus der eigenen Hand waehlen und
 //    LOESCHEN (Loesch-Rettung moeglich; wird er gerettet, ist „if you do" nicht erfuellt). Dann so viele Karten
 //    ziehen wie sein Level, danach (Level − 1) Karten aus der Hand loeschen (frei waehlbar; bei Level 0/1
@@ -69,22 +71,9 @@ async function handkarteLoeschen(engine, pi, name) {
   return true;
 }
 
-async function weg1(engine, pi, cancellable) {
+/** Spell loeschen, ziehen, Level−1 Karten loeschen. `k` = {name, level}. */
+async function weg1(engine, pi, k) {
   const ps = engine.gs.players[pi];
-  const kandidaten = spellsInHand(engine, pi);
-  if (kandidaten.length === 0) return false;
-  const wahl = await engine.promptGeneric(pi, {
-    type: 'cardGallery',
-    cards: kandidaten.map(k => ({ name: k.name, source: 'hand', level: k.level })),
-    title: CARD_NAME,
-    description: 'Choose a level 3 or lower Spell from your hand to delete. Draw cards equal to its level, then delete that many cards -1 from your hand.',
-    confirmLabel: '🔥 Delete it!',
-    confirmClass: 'btn-danger',
-    cancellable,
-  });
-  if (!wahl || wahl.cancelled || !wahl.cardName) return false;
-  const k = kandidaten.find(c => c.name === wahl.cardName);
-  if (!k) return false;
   if (!(await handkarteLoeschen(engine, pi, k.name))) return true;       // gerettet: Aktivierung verbraucht, kein Ziehen
   const n = Math.max(0, k.level);
   if (n > 0) await engine.actionDrawCards(pi, n, { source: CARD_NAME });
@@ -151,26 +140,48 @@ module.exports = {
   async onHeroEffect(ctx) {
     const engine = ctx._engine;
     const pi = ctx.cardOwner;
-    const hand = spellsInHand(engine, pi).length > 0;
+    const ps = engine.gs.players[pi];
+    const spells = spellsInHand(engine, pi);
     const area = geloeschteAreas(engine, pi).length > 0 || engine.getAreas(pi).length > 0;
-    if (!hand && !area) return false;
-    let weg = hand ? 1 : 2;
-    if (hand && area) {
-      const o = await engine.promptGeneric(pi, {
-        type: 'optionPicker',
-        title: CARD_NAME,
-        description: 'Choose one.',
-        options: [
-          { id: '1', label: '📜 Delete a Spell from your hand, draw, then delete cards' },
-          { id: '2', label: '🔥 Delete your Areas, then bring a deleted Area into play' },
-        ],
-        cancellable: true,
+    if (spells.length === 0 && !area) return false;
+
+    // Weg 2 allein (keine loeschbare Handkarte): kurze Bestaetigung, dann die Areas.
+    if (spells.length === 0) {
+      const ja = await engine.promptGeneric(pi, {
+        type: 'confirm', title: CARD_NAME, showCard: CARD_NAME,
+        message: 'Delete all Areas you control and bring one of your deleted Areas into play?',
+        confirmLabel: '🔥 Do it!', cancelLabel: 'Cancel', cancellable: true,
       });
-      if (!o || o.cancelled) return false;
-      weg = o.optionId === '2' ? 2 : 1;
+      if (!engine._confirmSaidYes(ja)) return false;
+      await engine.showTriggeredEffect?.(CARD_NAME, { playerIdx: pi });
+      return await weg2(engine, pi);
     }
+
+    // Direkt in den Handwahl-Modus: gueltige Spells leuchten, alles andere ist ausgegraut. Escape/Cancel bricht
+    // ab (Effekt NICHT verbraucht); mit Areas gibt es zusaetzlich den Knopf fuer den zweiten Weg.
+    const namen = new Set(spells.map(s => s.name));
+    const erlaubt = [];
+    (ps.hand || []).forEach((n, i) => { if (namen.has(n)) erlaubt.push(i); });
+    const antwort = await engine.promptGeneric(pi, {
+      type: 'forceDiscardCancellable',
+      title: CARD_NAME,
+      description: 'Delete a level 3 or lower Spell from your hand, draw cards equal to its level, then delete that many cards -1.',
+      instruction: area ? 'Click a highlighted Spell to delete it, or choose the Area option.' : 'Click a highlighted Spell to delete it.',
+      cancelLabel: 'Cancel (Esc)',
+      ...(area ? { altLabel: '🔥 Delete Areas instead' } : {}),
+      eligibleIndices: erlaubt,
+      eligibleCards: [...namen],
+      cancellable: true,
+    });
+    if (!antwort || antwort.cancelled) return false;
+    if (antwort.alt) {
+      if (!area) return false;
+      await engine.showTriggeredEffect?.(CARD_NAME, { playerIdx: pi });
+      return await weg2(engine, pi);
+    }
+    const k = spells.find(s => s.name === antwort.cardName);
+    if (!k) return false;
     await engine.showTriggeredEffect?.(CARD_NAME, { playerIdx: pi });
-    if (weg === 1) return await weg1(engine, pi, true);
-    return await weg2(engine, pi);
+    return await weg1(engine, pi, k);
   },
 };

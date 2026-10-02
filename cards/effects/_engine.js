@@ -26277,6 +26277,9 @@ this._deathWatch = (this._deathWatchStack || []).length
       if (idx >= 0) gs.areaZones[ownerIdx].splice(idx, 1);
     }
     this.log('area_deleted', { player: ps.username, area: cardName, by: sourceName });
+    // Die Area verlaesst die Zone SOFORT sichtbar, im Takt des Fluges — nicht erst nach den Abgangs-Effekten
+    // (die koennen Sekunden dauern: Abfragen, Animationen), sonst bliebe sie waehrend des Fluges stehen.
+    this.sync();
     await this.runHooks('onCardLeaveZone', {
       card: cardInstance, leavingCard: cardInstance,
       fromZone: 'area', toZone: 'deleted', source: sourceName,

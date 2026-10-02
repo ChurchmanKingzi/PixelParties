@@ -28338,7 +28338,11 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
 
     // Cancellable Force Discard mode (Training, etc.) — all cards are selectable
     const forceDiscardCancellable = gameState.effectPrompt?.type === 'forceDiscardCancellable' && gameState.effectPrompt.ownerIdx === myIdx;
-    if (forceDiscardCancellable) return false;
+    if (forceDiscardCancellable) {
+      // Optional: `eligibleCards` (Namen) graut alle anderen Handkarten aus (Dante) — ohne Liste ist alles waehlbar.
+      const namen = gameState.effectPrompt.eligibleCards;
+      return Array.isArray(namen) ? !namen.includes(cardName) : false;
+    }
 
     // Pick Hand Card mode — only eligible indices are clickable; dim
     // the rest so the player's eye lands on the legal picks.
@@ -48381,6 +48385,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           <div style={{ fontSize: 11, color: 'var(--danger)', opacity: .8, marginBottom: 12 }}>{ep.instruction || 'Click a card in your hand to discard it.'}</div>
           <button className="btn" style={{ padding: '6px 16px', fontSize: 11, borderColor: 'var(--danger)', color: 'var(--danger)' }}
             onClick={() => respondToPrompt({ cancelled: true })}>{ep.cancelLabel || 'Cancel (Esc)'}</button>
+          {ep.altLabel && (
+            <button className="btn" style={{ padding: '6px 16px', fontSize: 11, marginLeft: 8, borderColor: '#F27525', color: '#F27525' }}
+              onClick={() => respondToPrompt({ alt: true })}>{ep.altLabel}</button>
+          )}
         </DraggablePanel>
       )}
 
