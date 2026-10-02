@@ -74,7 +74,7 @@ module.exports = {
         c.owner === target.owner && c.zone === 'support' && c.heroIdx === target.heroIdx && c.zoneSlot === target.slotIdx);
       if (inst && inst.zone === 'support') {
         const ok = await engine.applyCreatureStatus(inst, 'frozen', {
-          duration: 9999, sourceOwner: pi, source: CARD_NAME, animationType: 'ice_encase',
+          duration: 9999, sourceOwner: pi, source: CARD_NAME,   // Bild kommt von cold_coffin_encase (oben)
         });
         if (ok) engine.log('freeze_applied', { target: inst.name, by: CARD_NAME, permanent: true });
       }

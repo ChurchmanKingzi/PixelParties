@@ -255,6 +255,7 @@ Alle unter `node scripts/<name>.js`, alle Exit 1 bei Verstoß:
 | `check-gallery-entries` | Galerie-Einträge mit `cardName` statt `name` |
 | `check-flight-targets` | Flüge ins Brett ohne `toHeroIdx`/`toSlotIdx` |
 | `check-anim-keyframes` | Animationen, deren Keyframes nirgends stehen |
+| `check-anim-sounds` | **Jede** Animation in `ANIM_REGISTRY` braucht einen Klang in `ZONE_ANIM_SFX`; neue stumme Animationen fallen durch. Altbestand steht in `scripts/anim-sounds-baseline.json` (Ratsche — darf nur schrumpfen; `--update` nach dem Ergänzen eines Klangs) |
 | `check-search-template` | Such-Galerien ohne `searchToHand`-Kennzeichnung |
 | `check-ascension-bonus` | Ascended Hero mit Bonus in `cards.json`, aber ohne `onAscensionBonus` bzw. ohne die Ability im Code (v1264) |
 | `check-hero-hopt` | Heldenskript mit „once per turn", das seine Sperre an Heldenplatz oder Instanz bindet statt pro Spieler (v1275) |
@@ -18761,3 +18762,5 @@ Aktiver Held-Effekt, einmal pro Zug (Held-Effekt-Sperre der Engine), zwei Wege (
 
 ### Instant Cryo Stasis (Spell, Decay Magic Lv1, Normal)
 Gegnerische Creature (nicht schon Frozen) wählen und für den Rest des Spiels einfrieren (`applyCreatureStatus(inst, 'frozen', { duration: 9999 })` — tickt nie ab, aber anders als Cold Coffin NICHT `frozenUnhealable`: Entfroster/Heilung wirken). Zusätzliche Aktion, wenn der Wirker mindestens Decay Magic 2 hat (`inherentAction(gs, pi, heroIdx, engine)` über `countAbilitiesForSchool`). Ausgegraut ohne einfrierbare gegnerische Creature (`spellPlayCondition`); Abbruch der Zielwahl gibt die Karte zurück. Bild/Klang: `cold_coffin_encase` (auch bei Negierung via `spellVisual`).
+- **Anzeige „für immer":** Eine Status-Restdauer ab 999 (Kartentext „for the rest of the game", technisch Dauer 9999) zeigt der Tooltip als „Lasts forever." und das Badge als ∞ statt „9999" (`StatusBadges`, `STATUS_FOREVER`).
+- **Eis-Einhüllung** (`ice_encase`, Statusanimation beim Einfrieren) hat jetzt einen Klang (`elem_ice` + Frost-Knacks). Instant Cryo Stasis zeigt nur noch `cold_coffin_encase` (kein doppeltes Bild mehr).
