@@ -50,7 +50,7 @@ const AREA_OVERLAYS = {
   'The First Circle of Hell':     { tier: 'opaque',      C: () => <FirstCircleOfHellOverlay /> },   // v1440: Kartenstil (vorher translucent)
   'The Second Circle of Hell':    { tier: 'opaque',      C: () => <SecondCircleOfHellOverlay /> },   // Pixelart (2.10.)
   'The Third Circle of Hell':     { tier: 'opaque',      C: () => <ThirdCircleOfHellOverlay /> },   // Pixelart (2.10.)
-  'The Fourth Circle of Hell':    { tier: 'opaque',      C: () => <HellCircleOverlay stufe={4} /> },   // Platzhalter-Szene (prozedural)
+  'The Fourth Circle of Hell':    { tier: 'opaque',      C: () => <FourthCircleOfHellOverlay /> },   // Pixelart (2.10.)
   'The Fifth Circle of Hell':    { tier: 'opaque',      C: () => <HellCircleOverlay stufe={5} /> },   // Platzhalter-Szene (prozedural)
   'The Sixth Circle of Hell':    { tier: 'opaque',      C: () => <HellCircleOverlay stufe={6} /> },   // Platzhalter-Szene (prozedural)
   'The Seventh Circle of Hell':    { tier: 'opaque',      C: () => <HellCircleOverlay stufe={7} /> },   // Platzhalter-Szene (prozedural)
@@ -5265,23 +5265,125 @@ const ThirdCircleOfHellOverlay = React.memo(function ThirdCircleOfHellOverlay() 
 });
 
 // ═══════════════════════════════════════════════════════════════════
+//  THE FOURTH CIRCLE OF HELL — der Kreis des Geizes (Al 2.10.)
+//
+//  Karte: dunkle rote Backsteinwand, davor ein Hort aus Muenzen, Saecken und Truhen voller Gold; es
+//  hagelt konstant brennende Muenzen, cremefarbene Glitzerkreuze funkeln, mittendrin steht ein
+//  Abenteurer (goldener Haarschopf, gruene Augen, rote Kapuze/Umhang, dunkle Ruestung, roter Schal).
+//  Detailstandard (siehe CARD_API „Area-Pixelart-Standard"): Rampen + Dithering, Konturen, Kleindetails.
+//
+//  Ebenen (Kunsthoehe 100; per Generator gemalt, der nicht im Projekt liegt): back.png — Kachel 128:
+//  Wand, Hort-Boden, ferne und mittlere Reihe (Truhen, Saecke, Muenzhaufen); front.png — vorderste
+//  Reihe, liegt UEBER den Figuren (deren Beine verschwinden im Gold); hero.png — Abenteurer (12 Bilder
+//  26×36, siehe FC_FOLGE; 2 Varianten: goldblond/rot, rotblond/gruen); coin-fall.png — brennende
+//  Muenzen (3 Laengen je 9×36); spark.png — Einschlagfunken (4 Bilder 9×7); sparkle.png — Glitzerkreuz
+//  (4 Bilder 5×5). Links ausgerichtet (Positionen in Kunstpixeln vom linken Rand).
+//  ALLE Animationen teilen die Periode 12 s (Dauern 3/4/6/12 s) → nahtlose Schleife.
+// ═══════════════════════════════════════════════════════════════════
+const FCI = '/areas/fourth-circle-of-hell/';
+// Abenteurer: 12 Bilder (0 ruhig, 1 atmen, 2/3 Kopf links/rechts, 4/5 Lachen, 6 Muenze greifen, 7 heben, 8 vors Auge,
+// 9 Probebiss, 10 Blinzeln, 11 Umhang weht); 40 Schritte je Zyklus (6 s: 0,15 s je Bild).
+const FC_FOLGE = [0,0,1,1,0,0,2,2,0,3,3,0,4,5,4,5,4,0,0,6,7,7,8,8,9,9,0,0,10,0,11,11,0,0,1,1,0,2,0,0];
+const FC_BILDER = 12;
+const FC_KEYFRAMES = FC_FOLGE.map((b, i) => `${(i * 100 / FC_FOLGE.length).toFixed(3)}% { background-position-x: ${(b * 100 / (FC_BILDER - 1)).toFixed(3)}%; }`).join(' ');
+const FourthCircleOfHellOverlay = React.memo(function FourthCircleOfHellOverlay() {
+  const helden = useMemo(() => Array.from({ length: 6 }, (_, i) => ({
+    x: (i % 2 ? 104 : 40) + 128 * Math.floor(i / 2), v: i % 2, delay: -((i * 1.7) % 6),
+  })), []);
+  const hagel = useMemo(() => Array.from({ length: 30 }, (_, i) => {
+    const dur = [3, 4, 6][i % 3];
+    return { x: 6 + ((i * 13.7) % 380), k: (i * 5) % 3, dur, delay: -((i * 0.83) % dur) };
+  }), []);
+  const glitzer = useMemo(() => Array.from({ length: 22 }, (_, i) => {
+    const dur = [3, 4, 6, 12][i % 4];
+    return { x: (i * 53 + 7) % 380, y: i < 15 ? 3 + (i * 29) % 40 : 52 + (i * 17) % 38, dur, delay: -((i * 1.1) % dur) };
+  }), []);
+  return (
+    <PixelScene artH={100} bg="#0a0000" className="fourth-circle-overlay">
+      <PixelBand src={FCI + 'back.png'} style={{ backgroundPosition: '0 0' }} />
+      <div className="pp-area-dyn fc4-glut" />
+      <div className="fc4-volk">
+        {hagel.map((h, i) => (
+          <React.Fragment key={'h' + i}>
+            <i className="pp-area-dyn fc4-muenze" style={{
+              left: ppArt(h.x), backgroundPositionX: (h.k * 50) + '%',
+              animation: `fc4Fall ${h.dur}s linear ${h.delay}s infinite`,
+            }} />
+            <i className="pp-area-dyn fc4-funke" style={{
+              left: ppArt(h.x - 2), animation: `fc4Funke ${h.dur}s steps(1) ${h.delay}s infinite`,
+            }} />
+          </React.Fragment>
+        ))}
+        {helden.map((f, i) => (
+          <i key={'hero' + i} className="fc4-held" style={{
+            left: ppArt(f.x - 13), backgroundPositionY: f.v ? '100%' : '0%',
+            animation: `fc4Held ${6}s steps(1) ${f.delay}s infinite`,
+          }} />
+        ))}
+      </div>
+      <PixelBand src={FCI + 'front.png'} style={{ backgroundPosition: '0 0' }} />
+      <div className="fc4-volk">
+        {glitzer.map((g, i) => (
+          <i key={'g' + i} className="pp-area-dyn fc4-glitzer" style={{
+            left: ppArt(g.x), top: ppArt(g.y), animation: `fc4Glitzer ${g.dur}s steps(1) ${g.delay}s infinite`,
+          }} />
+        ))}
+      </div>
+      <div className="pp-rand-dim" />
+      <style>{`
+        .fc4-volk { position: absolute; inset: 0; }
+        .fc4-glut {
+          position: absolute; inset: 0; opacity: .85;
+          background: linear-gradient(to top, rgba(255,196,64,.30), rgba(255,140,30,.12) 38%, rgba(255,120,20,0) 62%);
+          animation: fc4Puls 6s ease-in-out infinite alternate;
+        }
+        @keyframes fc4Puls { from { opacity: .55; } to { opacity: 1; } }
+        .fc4-muenze {
+          position: absolute; top: calc(-36 * var(--px)); width: calc(9 * var(--px)); height: calc(36 * var(--px)); opacity: 0;
+          background: url(${FCI}coin-fall.png) 0 0 / 300% 100% no-repeat;
+        }
+        /* Fall bis zur Oberkante des Horts (y 46), dort verschwindet die Muenze im Gold */
+        @keyframes fc4Fall {
+          0% { opacity: 0; transform: translateY(0); } 4% { opacity: 1; }
+          90% { opacity: 1; transform: translateY(calc(80 * var(--px))); } 100% { opacity: 0; transform: translateY(calc(84 * var(--px))); }
+        }
+        .fc4-funke {
+          position: absolute; top: calc(42 * var(--px)); width: calc(9 * var(--px)); height: calc(7 * var(--px)); opacity: 0;
+          background: url(${FCI}spark.png) 0 0 / 400% 100% no-repeat; z-index: 3;
+        }
+        @keyframes fc4Funke {
+          0%, 89% { opacity: 0; } 90% { opacity: 1; background-position-x: 0%; } 93% { background-position-x: 33.333%; }
+          96% { background-position-x: 66.667%; } 99% { background-position-x: 100%; } 100% { opacity: 0; }
+        }
+        .fc4-held { position: absolute; top: calc(44 * var(--px)); width: calc(26 * var(--px)); height: calc(36 * var(--px)); background: url(${FCI}hero.png) 0 0 / ${FC_BILDER * 100}% 200% no-repeat; }
+        @keyframes fc4Held { ${FC_KEYFRAMES} }
+        .fc4-glitzer { position: absolute; width: calc(5 * var(--px)); height: calc(5 * var(--px)); opacity: 0; background: url(${FCI}sparkle.png) 0 0 / 400% 100% no-repeat; }
+        @keyframes fc4Glitzer {
+          0% { opacity: 1; background-position-x: 0%; } 6% { background-position-x: 33.333%; } 12% { background-position-x: 66.667%; }
+          18% { background-position-x: 100%; } 26%, 100% { opacity: 0; }
+        }
+      `}</style>
+    </PixelScene>
+  );
+});
+
+// ═══════════════════════════════════════════════════════════════════
 //  THE SECOND … EIGHTH CIRCLE OF HELL — Hintergruende (Platzhalter-Szenen)
 //
-//  Prozedurale Platzhalter-Szenen fuer die Kreise 4–8, bis deren Pixelart vorliegt (Zweiter und Dritter haben sie schon): dunkler Farbverlauf,
+//  Prozedurale Platzhalter-Szenen fuer die Kreise 5–8, bis deren Pixelart vorliegt (Zweiter bis Vierter haben sie schon): dunkler Farbverlauf,
 //  eine Horizontlinie, aufsteigende Funken/Glut und ein kreis-spezifisches Motiv. Jeder Kreis hat
-//  seine eigene Farbwelt (Dante: 4 Geiz/Gold, 5 Zorn/Styx,
+//  seine eigene Farbwelt (Dante: 5 Zorn/Styx,
 //  6 Ketzerei/Grabfeuer, 7 Gewalt/Blutfluss, 8 Betrug/Tinte). Wieder `pp-area-dyn` fuer alles Bewegte
 //  (faellt mit „keine Animationen" weg); eigene Keyframes im eigenen <style>.
 // ═══════════════════════════════════════════════════════════════════
 const HELL_KREISE = {
-  4: { himmel: ['#1a1405', '#4a3a0c', '#2a2008'], boden: '#120d03', glut: ['#ffd24a', '#ffb000', '#fff0a0'], motiv: 'gold' },
   5: { himmel: ['#07161a', '#103b44', '#0a2328'], boden: '#04100f', glut: ['#58e0d0', '#2aa6a0', '#b5fff4'], motiv: 'blasen' },
   6: { himmel: ['#220b05', '#6a2208', '#3a1006'], boden: '#180703', glut: ['#ff8a2a', '#ff5a10', '#ffd27a'], motiv: 'feuer' },
   7: { himmel: ['#1d0406', '#5c0a12', '#33060b'], boden: '#140204', glut: ['#ff3a3a', '#c20f1a', '#ff9a9a'], motiv: 'blut' },
   8: { himmel: ['#05060f', '#141a3a', '#0a0d24'], boden: '#030409', glut: ['#8fa4ff', '#4f63d6', '#d4dcff'], motiv: 'tinte' },
 };
 const HellCircleOverlay = React.memo(function HellCircleOverlay({ stufe }) {
-  const cfg = HELL_KREISE[stufe] || HELL_KREISE[4];
+  const cfg = HELL_KREISE[stufe] || HELL_KREISE[5];
   const funken = useMemo(() => ppZufall(ppFxN(26), (i) => ({
     x: Math.random() * 100, dur: 9 + Math.random() * 11, delay: -Math.random() * 20,
     size: 2 + Math.floor(Math.random() * 3), farbe: cfg.glut[i % cfg.glut.length], drift: (Math.random() - .5) * 18,
