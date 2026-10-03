@@ -2,13 +2,13 @@
 //  CARD EFFECT: "Shamanic Curse"
 //  Spell (Reaction) — Decay Magic Lv3
 //
-//  When the opponent plays a Spell, increase that
-//  Spell's level by 1. If the caster can no longer
+//  When an opponent's Hero uses a Spell, increase that
+//  Spell's level by 1. If the Hero can no longer
 //  meet the level requirement — even via Wisdom
 //  coverage they can actually pay for in hand cards
 //  — the Spell is negated and sent to the discard
-//  pile. In that case the caster gets a bonus
-//  Action to replace the one they just wasted.
+//  pile. In that case the opponent may immediately
+//  perform an additional Action afterwards.
 // ═══════════════════════════════════════════
 
 module.exports = {
@@ -101,21 +101,21 @@ module.exports = {
     // Uncoverable → negate the Spell.
     engine.negateChainLink(chain, targetIndex);
 
-    // Refund a replacement Action ONLY if the negated Spell actually
-    // consumed the caster's main turn Action. Inherent additional-Action
-    // Spells (the Divine Gifts) and additional-action plays never spent
-    // it — handing back a bonus Action there would strand the caster with
-    // a phantom Action that traps them in the Action Phase (the reported
-    // "Divine Gift of the Deepsea negated → soft-lock" bug). doPlaySpell
-    // stamps `gs._spellConsumedMainAction` to exactly this disposition,
-    // readable here because Shamanic Curse resolves inside the negated
-    // Spell's own chain-reaction window.
-    if (gs._spellConsumedMainAction) {
-      oppPs._bonusMainActions = (oppPs._bonusMainActions || 0) + 1;
-      if (castingHi >= 0) {
-        oppPs.bonusActions = { heroIdx: castingHi, remaining: 1 };
-      }
-    }
+    // „If it does, your opponent may immediately perform an ADDITIONAL
+    // Action afterwards" (Text 3.10.) — unabhaengig davon, ob der Zauber
+    // die Hauptaktion gekostet hat. Wie bei The Master's Plan NACH der
+    // ganzen Kette angeboten (waehrend der Kette sperrt der Reaktionsriegel
+    // noch jedes Kartenspiel) und abbrechbar. Das ersetzt die fruehere
+    // Bonus-Hauptaktion, die bei Zusatzaktions-Zaubern (Divine Gifts)
+    // eine Phantom-Aktion hinterliess.
+    engine.queuePostChainAction(async () => {
+      await engine.performImmediateActionAnyHero(oppIdx, {
+        title: 'Shamanic Curse',
+        description: 'Your Spell was negated. You may perform an additional Action with any Hero — or skip.',
+        cancellable: true,
+      });
+      engine.sync();
+    });
 
     engine.log('shamanic_curse_negate', {
       player: gs.players[pi]?.username,
