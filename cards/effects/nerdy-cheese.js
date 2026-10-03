@@ -115,6 +115,15 @@ module.exports = {
       return;
     }
 
+    // Krates, the Smartass & Co.: Suche des Gegners umgebaut → Karten bereits verteilt
+    // („a Spell with the same name" ist namensgebunden: es gibt nur diese eine Karte).
+    if (await engine.interceptDeckSearch(pi, result.cardName, {
+      source: 'Nerdy Cheese',
+      searchSpec: { label: `copy of ${result.cardName}`, filter: (cd, n) => baseCardName(n) === baseCardName(result.cardName) },
+    })) {
+      engine.sync();
+      return;
+    }
     if (!(await engine.takeFromPile(ps, 'deck', tutorIdx, { source: 'Nerdy Cheese', toHand: true }))) return;   // v820: Stapel-Schicht
     const tutorInst = await engine.handZugang(ps, result.cardName, { von: 'deck' });
     engine._broadcastEvent('deck_search_add', { cardName: result.cardName, playerIdx: pi });

@@ -162,6 +162,17 @@ module.exports = {
     const cardDB = engine._getCardDB();
     const chosenCd = cardDB[chosenName];
     if (!chosenCd) return false;
+    // Krates, the Smartass & Co.: Suche des Gegners umgebaut → Karten bereits verteilt,
+    // der Beschwörungs-Zusatz entfällt (die Karte liegt nicht wie geplant auf der Hand).
+    const kratesNamen = new Set(candidates.map(c => c.name));
+    if (await engine.interceptDeckSearch(pi, chosenName, {
+      source: CARD_NAME, searchSpec: { label: 'Cute Creature', filter: (cd, n) => kratesNamen.has(n) },
+    })) {
+      engine.shuffleDeck?.(pi, 'main');
+      engine.log('mini_tutor', { player: ps.username, card: chosenName, krates: true });
+      engine.sync();
+      return true;
+    }
     const _taken_deckIdx = await engine.takeFromPile(ps, 'deck', chosenName, { source: CARD_NAME, toHand: true });   // v820: Stapel-Schicht
     if (!_taken_deckIdx) return false;
     const newInst = await engine.handZugang(ps, chosenName, { von: 'deck', source: CARD_NAME });
