@@ -128,7 +128,7 @@ module.exports = {
       }
       const res = await engine.dealDamageToTargets({ ...quelle, cardInstance: ctx.card }, ziele, {
         damage: DAMAGE, damageType: 'decay_spell', sourceName: CARD_NAME,
-        chosenSurprises: false, istFlaeche: true, hitDelay: 0,
+        istFlaeche: true, hitDelay: 0,
         wirkung: async () => {
           for (const z of ziele) {
             if (z.type === 'hero') {

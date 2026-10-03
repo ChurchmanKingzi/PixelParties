@@ -121,7 +121,17 @@ module.exports = {
   // NEGIERT, laeuft sein Effekt-Rumpf nie — die Engine spielt dann diese
   // Bilder, damit der abgewehrte Zauber trotzdem zu sehen ist. Im
   // normalen Weg bleibt es bei den Broadcasts im Effekt selbst.
-  spellVisual: { impact: { type: 'armageddon' }, impactMs: 260 },
+  // Negiert: dieselbe Feuerwelle wie im Effekt (Brett-Zone, volle Laufzeit), mittlere Wucht.
+  async spellVisual(engine, info) {
+    const staerke = 0.6;
+    engine._broadcastEvent('play_zone_animation', {
+      type: 'armageddon', power: staerke, damage: 270,
+      duration: Math.round(1800 + 1400 * staerke),
+      zoneType: 'board', owner: info.heroOwner ?? info.owner ?? 0, heroIdx: -1, zoneSlot: -1,
+      originOwner: info.heroOwner ?? info.owner ?? 0, originHeroIdx: info.heroIdx ?? 0,
+    });
+    await engine._delay(Math.round(650 + 450 * staerke));
+  },
 
   hooks: {
     onPlay: async (ctx) => {
@@ -160,14 +170,18 @@ module.exports = {
       // skaliert mit dem Schaden: 50 → Glimmen, ab 450 → volle Wucht.
       // Obere Ebene (kein `layer: 'background'`): das Feuer liegt UEBER
       // den Karten. Gewartet wird, bis die Welle das Brett erreicht hat.
-      const staerke = Math.max(0.1, Math.min(1, dmg / 450));
-      engine._broadcastEvent('play_zone_animation', {
-        type: 'armageddon', power: staerke, damage: dmg,
-        duration: Math.round(1800 + 1400 * staerke),
-        zoneType: 'board', owner: pi, heroIdx: -1, zoneSlot: -1,
-        originOwner: pi, originHeroIdx: ctx.cardHeroIdx,
-      });
-      await engine._delay(Math.round(650 + 450 * staerke));
+      // Animation als `vorWirkung`: erst reagieren die Ziele, dann kommt die Feuerwelle
+      // (negiert → die Engine zeigt sie genau einmal selbst, kein Doppelbild).
+      const feuerwelle = async () => {
+        const staerke = Math.max(0.1, Math.min(1, dmg / 450));
+        engine._broadcastEvent('play_zone_animation', {
+          type: 'armageddon', power: staerke, damage: dmg,
+          duration: Math.round(1800 + 1400 * staerke),
+          zoneType: 'board', owner: pi, heroIdx: -1, zoneSlot: -1,
+          originOwner: pi, originHeroIdx: ctx.cardHeroIdx,
+        });
+        await engine._delay(Math.round(650 + 450 * staerke));
+      };
 
       // ═══ ZWEI KLAMMERN UM DEN SCHLAG ════════════════════════════
       //
@@ -202,7 +216,7 @@ module.exports = {
       // „the player controlling the most Creatures" meint den Stand
       // NACH der Aufloesung.
       // ★★ Prinzip fuer jeden Flaechenschlag (Al 3.10.): markieren (Immunitaeten inklusive) → die
-      // getroffenen Ziele reagieren (Helden-Surprises inkl. „chosen by", Hand-Reaktionen — VOR dem
+      // getroffenen Ziele reagieren (Helden-Surprises (nicht „chosen by"), Hand-Reaktionen — VOR dem
       // ersten Schaden; negiert eine, faellt ALLES weg) → alle Ziele nehmen Schaden → ERST DANN werden
       // die Tode ausgewertet. Das macht `dealDamageToTargets` (Klammer + Anti-AoE-Fenster inklusive).
       const ziele = [
@@ -213,7 +227,8 @@ module.exports = {
       try {
         res = await engine.dealDamageToTargets({ ...quelle, cardInstance: ctx.card }, ziele, {
           damage: dmg, damageType: 'destruction_spell', sourceName: CARD_NAME,
-          chosenSurprises: true, istFlaeche: true, hitDelay: 0,
+          istFlaeche: true, hitDelay: 0,
+          vorWirkung: feuerwelle,
         });
       } finally {
         gs._deferGameOverCheck = Math.max(0, (gs._deferGameOverCheck || 1) - 1);

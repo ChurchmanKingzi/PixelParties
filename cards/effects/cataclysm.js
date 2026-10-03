@@ -28,7 +28,8 @@ module.exports = {
   // laeuft ihr Effekt-Rumpf nie — die Engine spielt dann diese Bilder.
   // Im normalen Weg bleibt es bei den Broadcasts im Effekt selbst.
   spellVisual: {
-    impact: { type: 'cataclysm' }, impactMs: 260,
+    // duration 3000: sonst haengt die Komponente nach 1000 ms ab, bevor der Komet einschlaegt (keine Detonation).
+    impact: { type: 'cataclysm', duration: 3000 }, impactMs: 1560,
   },
 
   // Active in 'hand' so the level reduction hook fires while in hand.
@@ -79,38 +80,24 @@ module.exports = {
         creatureTargets.push(inst);
       }
 
-      // ── Animation: meteor falls from top-right into centre ──
-      // Anchored to the caster's hero element so playAnimation has a
-      // valid DOM target — the Cataclysm React component itself ignores
-      // the (x,y) position and renders to the full viewport.
-      //
-      // `duration: 3000` is CRITICAL: play_zone_animation defaults the
-      // component lifetime to 1000ms (`onZoneAnim` → playAnimation),
-      // which unmounts the component mid-fall — the meteor vanished and
-      // the impact (every impact sub-animation is keyed `delay: 1300ms`)
-      // never rendered at all. The full sequence is fall (1300ms) +
-      // screen-engulfing explosion / shockwave / embers (~1450ms more);
-      // 3000ms keeps it mounted through the whole thing with margin.
-      engine._broadcastEvent('play_zone_animation', {
-        type: 'cataclysm', owner: pi,
-        heroIdx: Math.max(0, heroIdx), zoneSlot: -1,
-        duration: 3000,
-      });
-      // The meteor takes ~1.3s to reach the centre; the `cataclysm`
-      // component then detonates a screen-engulfing explosion at the
-      // impact point. We do NOT fire per-target flame bursts anymore —
-      // the one giant blast IS the impact, and the old per-target loop
-      // + extra delay is exactly what made the meteor-touchdown→effect
-      // gap feel so long. Wait for touchdown, give the blast a beat to
-      // bloom over the whole board, then resolve damage so the
-      // explosion reads as dealing it.
-      await engine._delay(1300);
-      await engine._delay(260);
+      // Animation (Komet) läuft als `vorWirkung`: ERST reagieren die getroffenen Ziele (Booby Trap …),
+      // dann fällt der Komet — wird der Zauber negiert, zeigt die Engine ihn genau einmal selbst.
+      const kometAnimation = async () => {
+        engine._broadcastEvent('play_zone_animation', {
+          type: 'cataclysm', owner: pi,
+          heroIdx: Math.max(0, heroIdx), zoneSlot: -1,
+          duration: 3000,   // KRITISCH: sonst hängt die Komponente nach 1000 ms ab (Einschlag bei 1300 ms)
+        });
+        // Der Komet braucht ~1,3 s bis zur Mitte, dann blüht die Explosion über das ganze Brett;
+        // erst danach der Schaden, damit die Explosion ihn „austeilt".
+        await engine._delay(1300);
+        await engine._delay(260);
+      };
 
       // ── Resolve damage — EIN Flaechenschlag (Prinzip: markieren → reagieren → wirken → Tode) ──
       // `dealDamageToTargets` markiert die Ziele (Immunitaeten inklusive), laesst die getroffenen
       // Ziele reagieren (Helden-Surprises und Hand-Reaktionen, VOR dem ersten Schaden; „is chosen by"-
-      // Surprises wie Frost Rune duerfen hier mitreagieren), trifft dann ALLE Ziele und wertet
+      // Surprises wie Frost Rune bleiben zu — ein Flaechenschlag waehlt niemanden), trifft dann ALLE Ziele und wertet
       // erst danach die Tode aus (Helden-KOs aufgeschoben, Kreaturen in EINEM Stapel). Negiert eine
       // Reaktion den Zauber, faellt der Schaden an ALLEN Zielen weg — und die Areas bleiben liegen.
       const ziele = [
@@ -119,7 +106,8 @@ module.exports = {
       ];
       const res = await engine.dealDamageToTargets(ctx.card, ziele, {
         damage: DAMAGE, damageType: 'destruction_spell', sourceName: CARD_NAME,
-        chosenSurprises: true, istFlaeche: true, hitDelay: 0,
+        istFlaeche: true, hitDelay: 0,
+        vorWirkung: kometAnimation,
       });
       if (res?.cancelled) return;
       engine.sync();

@@ -12,8 +12,12 @@ module.exports = {
   // ★★ v1182 — ENTKOPPELTE BILDER (CARD_API): wird die Karte NEGIERT,
   // laeuft ihr Effekt-Rumpf nie — die Engine spielt dann diese Bilder.
   // Im normalen Weg bleibt es bei den Broadcasts im Effekt selbst.
-  spellVisual: {
-    impact: { type: 'whirlwind_spin' }, impactMs: 260,
+  // Negiert (Frost Rune …): der ANGREIFER wirbelt los, nicht die Ziele.
+  async spellVisual(engine, info) {
+    engine._broadcastEvent('play_zone_animation', {
+      type: 'whirlwind_spin', owner: info.heroOwner ?? info.owner, heroIdx: info.heroIdx, zoneSlot: -1,
+    });
+    await engine._delay(400);
   },
 
   hooks: {
@@ -48,6 +52,9 @@ module.exports = {
         confirmClass: 'btn-danger',
         cancellable: true,
         _skipPostTargetReactions: true,
+        // Die Helden werden NACHEINANDER getroffen (wie Chain Lightning): das Surprise-Fenster
+        // (Frost Rune, Booby Trap …) öffnet erst, wenn der jeweilige Held an der Reihe ist.
+        _skipSurpriseCheck: true,
       });
 
       if (selectedHeroes.length === 0) return;
@@ -126,7 +133,8 @@ module.exports = {
             cardName: e.inst.name,
           })),
         ];
-        await engine.preDamageMultiTargetWindow(attackSource, allTgts);
+        const _negR = await engine.preDamageMultiTargetWindow(attackSource, allTgts);
+        if (_negR?.effectNegated) return;
       }
 
       // ★ v1042 („Interference"): EIN Schlag, mehrere Ziele — Helden UND
@@ -139,9 +147,13 @@ module.exports = {
         creatures: allCreatureEntries, source: attackSource, type: 'attack', sourceOwner: ctx.cardOwner,
       });
       try {
-      // ── RAM + DAMAGE per hero target ──
-      for (let ti = 0; ti < heroDamageTargets.length; ti++) {
+      // ── NACHEINANDER: je Held erst er selbst (Surprise-Fenster an GENAU diesem Treffer), dann ──
+      // ── alle Kreaturen in seinen Support Zones. Negiert ein Surprise (Frost Rune …) den Angriff, ──
+      // ── endet er sofort: spätere Helden werden nie angezielt. ──
+      let abgebrochen = false;
+      for (let ti = 0; ti < heroDamageTargets.length && !abgebrochen; ti++) {
         const { hero: tgtHero, tgt } = heroDamageTargets[ti];
+        if (ti > 0 && (gs._spellNegatedByEffect || engine._isEffectSourceNegated?.(attackSource))) break;
 
         // Fast ram
         engine._broadcastEvent('play_ram_animation', {
@@ -151,29 +163,34 @@ module.exports = {
         });
         await engine._delay(100);
 
-        // Explosion on hero
-        engine._broadcastEvent('play_zone_animation', {
-          type: 'explosion', owner: tgt.owner, heroIdx: tgt.heroIdx, zoneSlot: -1,
-        });
+        // Deal damage to the hero (öffnet das Surprise-Fenster dieses Helden)
+        if (tgtHero.hp > 0) {
+          // Explosion nur, wenn der Treffer nicht abgefangen wird — sie liegt hinter dem Fenster
+          const vorherHp = tgtHero.hp;
+          const r = await engine.actionDealDamage(attackSource, tgtHero, finalAtk, 'attack');
+          if (r?.surpriseNegated || r?.effectNegated) { abgebrochen = true; break; }
+          if (tgtHero.hp < vorherHp || !r?.cancelled) {
+            engine._broadcastEvent('play_zone_animation', {
+              type: 'explosion', owner: tgt.owner, heroIdx: tgt.heroIdx, zoneSlot: -1,
+            });
+          }
+        }
 
-        // Deal damage to the hero
-        await engine.actionDealDamage(attackSource, tgtHero, finalAtk, 'attack');
+        // Creatures in this hero's support zones (one batch per hero)
+        const seine = allCreatureEntries.filter(e => e.tgtHeroIdx === tgt.heroIdx && e.inst.owner === tgt.owner && e.inst.zone === 'support');
+        if (seine.length > 0) {
+          for (const e of seine) {
+            engine._broadcastEvent('play_zone_animation', {
+              type: 'explosion', owner: e.inst.owner, heroIdx: e.inst.heroIdx, zoneSlot: e.inst.zoneSlot,
+            });
+          }
+          await engine.processCreatureDamageBatch(seine);
+        }
 
         // Brief pause before second target
         if (ti < heroDamageTargets.length - 1) {
           await engine._delay(200);
         }
-      }
-
-      // ── Creature damage (all at once via batch) ──
-      if (allCreatureEntries.length > 0) {
-        // Play explosion on each creature zone
-        for (const e of allCreatureEntries) {
-          engine._broadcastEvent('play_zone_animation', {
-            type: 'explosion', owner: e.inst.owner, heroIdx: e.inst.heroIdx, zoneSlot: e.inst.zoneSlot,
-          });
-        }
-        await engine.processCreatureDamageBatch(allCreatureEntries);
       }
       } finally {
         await engine.endMultiHit();

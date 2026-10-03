@@ -26929,7 +26929,8 @@ this._deathWatch = (this._deathWatchStack || []).length
     const owner = (typeof quelle === 'object')
       ? (quelle.controller ?? quelle.owner) : undefined;
     return this.spielZauberBilder(name, {
-      owner, heroIdx: (typeof quelle === 'object' ? quelle.heroIdx : undefined),
+      owner, heroOwner: (typeof quelle === 'object' ? quelle.heroOwner : undefined),
+      heroIdx: (typeof quelle === 'object' ? quelle.heroIdx : undefined),
       zoneSlot: (typeof quelle === 'object' ? quelle.zoneSlot : undefined),
       targets: ziele, negiert: true,
     });
@@ -33963,6 +33964,10 @@ this._deathWatch = (this._deathWatchStack || []).length
           chosenCreature: viaCreature ? target : null,
         };
 
+        // Ein Surprise reagiert nie auf die Effekte seines EIGENEN Spielers: trifft sich ein Angreifer
+        // z.B. mit Cataclysm selbst, darf seine Booby Trap / Frost Rune nicht gegen ihn ausloesen.
+        if (sourceInfo.controller != null && sourceInfo.controller >= 0 && sourceInfo.controller === reaktor) continue;
+
         // ★ v1323 (Tester-Befund 23.9.: Butterfly Cloud loeste Frost Rune
         // aus). Ein Flaechenschlag WAEHLT niemanden — Surprises, deren Text
         // „is chosen by / targeted by" verlangt, oeffnen bei `_isAoeCheck`
@@ -34583,6 +34588,10 @@ this._deathWatch = (this._deathWatchStack || []).length
     syntheticSource = this._rewriteSourceForCreatureCaster(syntheticSource);
     const keys = [];
     this._aoeSurpriseKeys = keys;
+    // Flaechenschlag: waehlt niemanden → „chosen by"-Surprises (Frost Rune) bleiben zu.
+    const hadAoeFlag2 = syntheticSource._isAoeCheck;
+    syntheticSource._isAoeCheck = true;
+    try {
     for (const t of heroes) {
       const hero = gs.players[t.owner]?.heroes?.[t.heroIdx];
       if (!hero?.name || hero.hp <= 0 || hero.statuses?.shielded) continue;
@@ -34608,6 +34617,9 @@ this._deathWatch = (this._deathWatchStack || []).length
         await this.negationsBilder(source, heroes.map(h => ({ type: 'hero', owner: h.owner, heroIdx: h.heroIdx, cardName: h.cardName })), result);
         return result;
       }
+    }
+    } finally {
+      if (!hadAoeFlag2) delete syntheticSource._isAoeCheck;
     }
     return null;
   }
@@ -44492,15 +44504,16 @@ this._deathWatch = (this._deathWatchStack || []).length
       const aoeTargets = reagierHelden.map(h => ({
         type: 'hero', owner: h.owner, heroIdx: h.heroIdx, cardName: h.hero.name,
       }));
-      // `chosenSurprises`: „is chosen by"-Surprises (Frost Rune …) duerfen mitreagieren
-      // (Cataclysm, Armageddon …). Standard: ein Flaechenschlag waehlt niemanden (v1323).
-      const aoeCheck = hatInstanz && !opts.chosenSurprises;
-      if (aoeCheck) quelle._isAoeCheck = true;
+      // Ein Flaechenschlag WAEHLT niemanden: „is chosen by / targeted by"-Surprises (Frost Rune,
+      // Flooding …) oeffnen nicht (v1323, zentral im Fenster); „hit by"-Surprises (Booby Trap) schon.
+      // Gestempelt wird die Reaktionsquelle selbst — auch bei Quell-Objekten (Heat Wave, Forbidden Zone).
+      const hadAoeFlag = reaktionsQuelle?._isAoeCheck;
+      if (reaktionsQuelle && typeof reaktionsQuelle === 'object') reaktionsQuelle._isAoeCheck = true;
       let surpriseResult;
       try {
         surpriseResult = await this._checkSurpriseWindow(aoeTargets, reaktionsQuelle, { damageType });
       } finally {
-        if (aoeCheck) delete quelle._isAoeCheck;
+        if (reaktionsQuelle && typeof reaktionsQuelle === 'object' && !hadAoeFlag) delete reaktionsQuelle._isAoeCheck;
       }
       // Abgefragte Helden vormerken: der spaetere Treffer oeffnet das Fenster nicht noch einmal.
       if (!gs._surpriseCheckedHeroes) gs._surpriseCheckedHeroes = new Set();
@@ -44549,6 +44562,11 @@ this._deathWatch = (this._deathWatchStack || []).length
         return { heroes: [], creatures: [], cancelled: true };
       }
     }
+
+    // ── Zwischenschritt: erst NACH dem Reagieren (und nur, wenn nichts negiert wurde) laeuft das
+    // Bild der Karte (Komet, Feuerwelle …). Wird die Quelle negiert, spielt die Engine stattdessen
+    // genau EINMAL ihr `spellVisual` — kein doppelter Einschlag.
+    if (typeof opts.vorWirkung === 'function') await opts.vorWirkung();
 
     await this._spieleWellenAnimation(config, quelle || quellObjekt, pi, heroIdx, [
       ...allHeroes.map(e => ({ owner: e.owner, heroIdx: e.heroIdx, zoneSlot: -1 })),

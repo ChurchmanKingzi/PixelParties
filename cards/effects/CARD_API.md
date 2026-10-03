@@ -16359,8 +16359,15 @@ await engine.dealDamageToTargets(quelle, ziele, {
    für Zusatzwirkungen wie Bound/Burned; läuft auch ohne Schaden).
 4. **Tode** — erst DANACH werden alle verursachten Tode ausgewertet (`endMultiHit`).
 
-`opts.chosenSurprises: true` lässt „is chosen by"-Surprises (Frost Rune) mitreagieren
-(Cataclysm, Armageddon); Standard ist aus (ein Flächenschlag wählt niemanden, v1323).
+Ein Flächenschlag WÄHLT niemanden: „is chosen by / targeted by"-Surprises (Frost Rune, Flooding …)
+öffnen dabei nie (die Engine stempelt `_isAoeCheck` auf die Reaktionsquelle); „hit by"-Surprises
+(Booby Trap) schon. Ein Surprise reagiert außerdem nie auf Effekte seines EIGENEN Spielers.
+`opts.vorWirkung()` läuft NACH dem Reagieren und nur, wenn nichts negiert wurde: dort gehört das
+Kartenbild hin (Komet, Feuerwelle). Wird die Quelle negiert, spielt die Engine ihr `spellVisual`
+genau einmal — kein Doppelbild. Ein `spellVisual` mit Zonen-Animation braucht dieselbe `duration`
+wie im Effekt (Cataclysm: 3000), sonst hängt die Komponente nach 1000 ms ab.
+**Nacheinander** zielende Angriffe (Whirlwind Strike, Chain Lightning): `_skipSurpriseCheck: true`
+im Picker, das Surprise-Fenster öffnet dann am jeweiligen Treffer (`actionDealDamage`).
 `opts.amount` je Ziel erlaubt gemischte Wirkung (Heat Wave: 0 = nur Status).
 **Aufeinanderfolgende** Effekte (Chain Lightning, Ricochet, Bottled Lightning) bleiben
 bewusst sequenziell — dort trifft jeder Treffer für sich.
