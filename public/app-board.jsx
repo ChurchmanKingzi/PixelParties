@@ -34658,6 +34658,144 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       }, 820);
     };
     socket.on('area_descend', onAreaDescend);
+    // ── Mountain Boars: Wildschwein-Horde rennt von rechts nach links ueber die Area ──
+    // Das Sprite wird einmal zur Laufzeit aus einem Zeichen-Raster auf ein Canvas gemalt
+    // (2 Laufphasen nebeneinander), damit keine Bilddatei noetig ist.
+    const onMountainBoarsStampede = ({ owner, durationMs }) => {
+      const ownerLabel = owner === myIdx ? 'me' : 'opp';
+      const tgtEl = document.querySelector(`[data-area-zone][data-area-owner="${ownerLabel}"]`);
+      if (!tgtEl) return;
+      const tr = tgtEl.getBoundingClientRect();
+      const total = durationMs || 1700;
+
+      if (!window._boarSheetUrl) {
+        const PAL = { o: '#2a1414', b: '#8a4b3a', h: '#c47a58', d: '#6a3328', t: '#f6d2a8', e: '#f5f0e0', r: '#e0507a' };
+        const BODY = [
+          '.........o.o.o.o.o.o........',
+          '.........oohhhhhhhhhhoo.....',
+          '.......oobbhhhbbbbbbbbboo...',
+          '.....oobbbbbbbbbbbbbbbbbbo..',
+          '...oobbbbbbbbbbbbbbbbbbbbbo.',
+          '..obbbbebbbbbbbbbbbbbbbbbbbo',
+          '.ottobbbbbbbdddbbbbbbbbbbbo.',
+          '.ottrbbbbbbbbbbbbbbbbbbbbbo.',
+          '..oobbbbbbbbbbbbbbbbbbbbbo..',
+          '....obbbbbbbbbbbbbbbbbbbo...',
+        ];
+        const LEGS_A = [
+          '.....ob.bo....ob..bo........',
+          '.....oo.oo....oo..oo........',
+        ];
+        const LEGS_B = [
+          '......ob.bo..ob....bo.......',
+          '......oo.oo..oo....oo.......',
+        ];
+        const W = 28, H = BODY.length + 2;
+        const cv = document.createElement('canvas');
+        cv.width = W * 2; cv.height = H;
+        const g = cv.getContext('2d');
+        [LEGS_A, LEGS_B].forEach((legs, f) => {
+          [...BODY, ...legs].forEach((row, y) => {
+            for (let x = 0; x < W; x++) {
+              const ch = row[x];
+              if (!ch || ch === '.') continue;
+              g.fillStyle = PAL[ch] || PAL.b;
+              g.fillRect(f * W + x, y, 1, 1);
+            }
+          });
+        });
+        window._boarSheetUrl = cv.toDataURL('image/png');
+        window._boarSheetDims = { W, H };
+      }
+      const { W, H } = window._boarSheetDims;
+
+      if (!document.getElementById('boar-stampede-kf')) {
+        const style = document.createElement('style');
+        style.id = 'boar-stampede-kf';
+        style.textContent = `
+          @keyframes boarRun { from { transform: translateX(var(--bx0)); } to { transform: translateX(var(--bx1)); } }
+          @keyframes boarHop { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-9px); } }
+          @keyframes boarLegs { 0% { background-position: 0 0; } 50% { background-position: calc(var(--bw) * -1) 0; } 100% { background-position: 0 0; } }
+          @keyframes boarDust {
+            0%   { opacity: 0; transform: translate(-50%, -50%) scale(0.3); }
+            20%  { opacity: .85; }
+            100% { opacity: 0; transform: translate(calc(-50% + var(--ddx)), calc(-50% + var(--ddy))) scale(1.9); }
+          }
+          @keyframes boarAreaShake { 0%,100% { transform: translate(0,0); } 25% { transform: translate(-2px,1px); } 50% { transform: translate(2px,-1px); } 75% { transform: translate(-1px,-1px); } }
+        `;
+        document.head.appendChild(style);
+      }
+
+      if (window.playSFX) {
+        window.playSFX('heavy_impact', { rate: 0.5, volume: 0.9, category: null, dedupe: 200 });
+        setTimeout(() => window.playSFX('heavy_impact', { rate: 0.6, volume: 0.8, category: null, dedupe: 200 }), 450);
+        setTimeout(() => window.playSFX('heavy_impact', { rate: 0.55, volume: 0.8, category: null, dedupe: 200 }), 900);
+      }
+
+      // Area wackelt unter den Hufen.
+      tgtEl.style.animation = `boarAreaShake .18s linear ${Math.ceil(total / 180)}`;
+      setTimeout(() => { tgtEl.style.animation = ''; }, total + 100);
+
+      const scale = Math.max(3, Math.min(6, Math.round(tr.height / 22)));
+      const bw = W * scale, bh = H * scale;
+      const x0 = window.innerWidth + bw;                 // rechts ausserhalb
+      const x1 = -bw * 2;                                // links ausserhalb
+      const travel = x0 - x1;
+      const lanes = 3, boars = 9;
+      const cy = tr.top + tr.height / 2;
+      const rm = (arr) => arr[Math.floor(Math.random() * arr.length)];
+      for (let i = 0; i < boars; i++) {
+        const lane = i % lanes;
+        const laneY = cy - bh / 2 + (lane - 1) * Math.max(10, tr.height * 0.28);
+        const startDelay = Math.floor(i / lanes) * 260 + lane * 90 + Math.random() * 60;
+        const runMs = Math.max(700, total - startDelay - 150);
+        const wrap = document.createElement('div');
+        wrap.className = 'card-flight';                  // von der No-Animations-Regel ausgenommen
+        wrap.style.cssText = [
+          'position:fixed', 'left:0', `top:${laneY}px`, `width:${bw}px`, `height:${bh}px`,
+          'pointer-events:none', `z-index:${10008 + lane}`,
+          `--bx0:${x0}px`, `--bx1:${x1}px`,
+          `animation:boarRun ${runMs}ms linear ${startDelay}ms both`,
+          'will-change:transform',
+        ].join(';');
+        const sprite = document.createElement('div');
+        sprite.style.cssText = [
+          `width:${bw}px`, `height:${bh}px`, `--bw:${bw}px`,
+          `background:url(${window._boarSheetUrl}) 0 0 / ${bw * 2}px ${bh}px no-repeat`,
+          'image-rendering:pixelated',
+          `animation:boarLegs .24s steps(1) infinite, boarHop .24s ease-in-out infinite`,
+          'filter:drop-shadow(0 6px 3px rgba(0,0,0,.35))',
+        ].join(';');
+        wrap.appendChild(sprite);
+        document.body.appendChild(wrap);
+        setTimeout(() => wrap.remove(), startDelay + runMs + 100);
+
+        // Staubwolken: hinter dem Eber (rechts davon), solange er ueber das Feld laeuft.
+        const t0 = Date.now() + startDelay;
+        const dustTimer = setInterval(() => {
+          const el = Date.now() - t0;
+          if (el < 0) return;
+          if (el > runMs) { clearInterval(dustTimer); return; }
+          const bx = x0 - travel * (el / runMs);        // aktuelle linke Kante des Ebers
+          if (bx > window.innerWidth + bw || bx < -bw) return;
+          const size = bh * (0.45 + Math.random() * 0.5);
+          const p = document.createElement('div');
+          const shade = 170 + Math.floor(Math.random() * 50);
+          p.style.cssText = [
+            'position:fixed', `left:${bx + bw * 0.95}px`, `top:${laneY + bh * (0.8 + Math.random() * 0.2)}px`,
+            `width:${size}px`, `height:${size}px`, 'border-radius:50%',
+            `background:radial-gradient(circle, rgba(${shade},${shade - 30},${shade - 80},.9) 0%, rgba(${shade - 30},${shade - 55},${shade - 100},.5) 55%, transparent 75%)`,
+            'pointer-events:none', `z-index:${10007 + lane}`,
+            `--ddx:${40 + Math.random() * 50}px`, `--ddy:${-(10 + Math.random() * 35)}px`,
+            `animation:boarDust ${650 + Math.random() * 300}ms ease-out forwards`,
+          ].join(';');
+          document.body.appendChild(p);
+          setTimeout(() => p.remove(), 1000);
+        }, 55);
+        setTimeout(() => clearInterval(dustTimer), startDelay + runMs + 200);
+      }
+    };
+    socket.on('mountain_boars_stampede', onMountainBoarsStampede);
 
     // ── Teal Fishing Rod: die Creature wird aus der Ablage „geangelt" ──────────────────────────
     // Eine Angelschnur haengt an einem Punkt ueber der Ziel-Zone; der Haken packt die Karte im Ablagestapel,
@@ -40676,7 +40814,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       socket.off('cardinal_beast_win', onCardinalBeastWin);
       socket.off('qinglong_lightning', onQinglongLightning);
       socket.off('red_lightning_rain', onRedLightningRain);
-      socket.off('area_descend', onAreaDescend);
+      socket.off('area_descend', onAreaDescend); socket.off('mountain_boars_stampede', onMountainBoarsStampede);
       socket.off('fishing_catch', onFishingCatch);
       socket.off('eraser_beam', onEraserBeam);
       socket.off('cooldin_terraform', onCooldinTerraform);
