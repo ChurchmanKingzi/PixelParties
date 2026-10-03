@@ -25238,6 +25238,8 @@ function CardReorderPrompt({ ep, onRespond }) {
   const slotRefs = useRef([]);
   const orderRef = useRef(order);
   orderRef.current = order;
+  // Beim Schliessen des Prompts die Tooltip-Sperre loesen (sonst bliebe sie haengen).
+  useEffect(() => () => { _boardTooltipLocked = false; setBoardTooltip(null); }, []);
   const tausche = (a, b, stumm) => {
     if (a == null || b == null || a === b) return;
     setOrder(prev => { const n = prev.slice(); [n[a], n[b]] = [n[b], n[a]]; return n; });
@@ -25310,6 +25312,10 @@ function CardReorderPrompt({ ep, onRespond }) {
                 onPointerDown={(e) => start(e, pos)}
                 onMouseDown={(e) => e.stopPropagation()}
                 onTouchStart={(e) => e.stopPropagation()}
+                // Die Karte selbst ist pointer-events:none (damit Ziehen beim Slot landet) — deshalb liegt der
+                // Hover-Tooltip hier am Slot, mit Sperre gegen das 300-ms-Aufraeumen (wie bei TriggerCardSlot).
+                onMouseEnter={() => { if (card) { _boardTooltipLocked = true; setBoardTooltip(card); } }}
+                onMouseLeave={() => { _boardTooltipLocked = false; setBoardTooltip(null); }}
                 style={{
                   width: 104, flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6,
                   cursor: drag ? 'grabbing' : 'grab', opacity: gezogen ? 0.35 : 1, touchAction: 'none', userSelect: 'none',
