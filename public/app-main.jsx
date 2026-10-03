@@ -707,31 +707,6 @@ function CubeDraftBuildScreen({ lobby, build, leaveRoom, notify, user }) {
                 ))}
               </div>
             </div>
-            {[
-              { key: 'potion', title: hasChaos ? 'POTION DECK (15 Spells)' : 'POTION DECK (0 or 5–15)', cards: potionDeck, max: POTION_MAX, remove: removePotion, ok: potionOk },
-              { key: 'side', title: 'SIDE DECK', cards: sideDeck, max: SIDE_MAX, remove: removeSide, ok: true },
-            ].map(sec => (
-              <div key={sec.key} style={{ flex: 1, minWidth: 0 }}>
-                <div className="orbit-font" style={{ fontSize: 11, color: sec.ok ? 'var(--text2)' : 'var(--danger)', marginBottom: 6, fontWeight: 700, letterSpacing: 1 }}>
-                  {sec.title} ({sec.cards.length}/{sec.max})
-                </div>
-                <div style={{ height: 118, overflowY: 'auto', border: '1px solid var(--bg4)', borderRadius: 4, padding: 4 }}>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(50px, 1fr))', gap: 4 }}>
-                    {sec.cards.map((name, i) => (
-                      <div key={i + '-' + name} style={{ aspectRatio: '5 / 7', cursor: 'pointer' }}
-                        onClick={() => sec.remove(i)} title="Click to remove">
-                        <CardMini card={cardDB[name]} onClick={() => {}} style={{ width: '100%', height: '100%' }} />
-                      </div>
-                    ))}
-                    {sec.cards.length === 0 && (
-                      <div style={{ gridColumn: '1/-1', textAlign: 'center', padding: 10, color: 'var(--text2)', fontSize: 10, fontStyle: 'italic' }}>
-                        {sec.key === 'potion' ? 'Shift+click a card to add' : 'Right-click a card to add'}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            ))}
           </div>
 
           <div className="orbit-font" style={{ fontSize: 11, color: 'var(--text2)', fontWeight: 700, letterSpacing: 1 }}>
@@ -757,6 +732,35 @@ function CubeDraftBuildScreen({ lobby, build, leaveRoom, notify, user }) {
                 }}>{mainDeck.length + i + 1}</div>
               ))}
             </div>
+          </div>
+
+          {/* Potion Deck + Side Deck UNTER dem Main Deck */}
+          <div style={{ display: 'flex', gap: 14, alignItems: 'flex-start', flexShrink: 0 }}>
+            {[
+              { key: 'potion', title: hasChaos ? 'POTION DECK (15 Spells)' : 'POTION DECK (0 or 5–15)', cards: potionDeck, max: POTION_MAX, remove: removePotion, ok: potionOk },
+              { key: 'side', title: 'SIDE DECK', cards: sideDeck, max: SIDE_MAX, remove: removeSide, ok: true },
+            ].map(sec => (
+              <div key={sec.key} style={{ flex: 1, minWidth: 0 }}>
+                <div className="orbit-font" style={{ fontSize: 11, color: sec.ok ? 'var(--text2)' : 'var(--danger)', marginBottom: 6, fontWeight: 700, letterSpacing: 1 }}>
+                  {sec.title} ({sec.cards.length}/{sec.max})
+                </div>
+                <div style={{ height: 132, overflowY: 'auto', border: '1px solid var(--bg4)', borderRadius: 4, padding: 4 }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(50px, 1fr))', gap: 4 }}>
+                    {sec.cards.map((name, i) => (
+                      <div key={i + '-' + name} style={{ aspectRatio: '5 / 7', cursor: 'pointer' }}
+                        onClick={() => sec.remove(i)} title="Click to remove">
+                        <CardMini card={cardDB[name]} onClick={() => {}} style={{ width: '100%', height: '100%' }} />
+                      </div>
+                    ))}
+                    {sec.cards.length === 0 && (
+                      <div style={{ gridColumn: '1/-1', textAlign: 'center', padding: 10, color: 'var(--text2)', fontSize: 10, fontStyle: 'italic' }}>
+                        {sec.key === 'potion' ? 'Shift+click a card to add' : 'Right-click a card to add'}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
 
@@ -1201,7 +1205,9 @@ function PlayScreen() {
     const onRoomClosed = () => { setLobby(null); setGameState(null); setCubeDraftState(null); notify('Room was closed by host', 'error'); };
     const onJoinError = (msg) => notify(msg, 'error');
     const onPlayerJoined = (data) => setPlayerJoined(data.username);
-    const onGameStarted = (r) => { setLobby(r); if (window.playSFX) window.playSFX('match_found'); };
+    // Ein Cube-Match (Kindraum) darf den Turnierraum nicht als `lobby` ablösen — sonst fällt
+    // der Spieler nach dem Match in eine tote Lobby statt zurück ins Bracket.
+    const onGameStarted = (r) => { setLobby(prev => (prev?.cubeDraft && prev.id !== r?.id) ? prev : r); if (window.playSFX) window.playSFX('match_found'); };
     const onGameState = (state) => { if (window.ppZustandVeraltet?.(state)) return; setGameState(state); };
     const onCubeDraftState = (state) => { setCubeDraftState(state); };
     const onCubeBuildState = (state) => { setCubeBuildState(state); };
