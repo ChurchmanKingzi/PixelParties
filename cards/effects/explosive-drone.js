@@ -125,8 +125,9 @@ async function reagiereAufTod(ctx, opferName) {
     CARD_NAME, feld, ziel.heroIdx, ziel.slotIdx,
     // `fromHandIdx` laesst die Karte sichtbar von der Hand in die Zone
     // fliegen — ohne das erscheint sie dort einfach (v933).
-    { source: CARD_NAME, fromHandIdx: handIdx, ...(feld !== pi ? { controller: pi } : {}) },
+    { source: CARD_NAME, fromHandIdx: handIdx, summonWindow: true, ...(feld !== pi ? { controller: pi } : {}) },
   );
+  if (res?.negated) return;   // Off Duty & co.: Karte ist schon geroutet
   if (!res?.inst) { engine.handZugangSync(ps, CARD_NAME, { von: 'rueckgabe', ohneInstanz: true }); return; }   // v1395
 
   engine.log('explosive_drone_summon', { player: ps.username, defeated: opferName });

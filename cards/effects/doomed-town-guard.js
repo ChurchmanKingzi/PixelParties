@@ -133,8 +133,9 @@ async function reagiereAufTod(ctx, opferName) {
   engine.takeFromPileSync(ps, 'hand', handIdx);
   const res = await engine.summonCreatureWithHooks(
     CARD_NAME, feld, dest.heroIdx, dest.slotIdx, // `fromHandIdx`: Flug von der Hand in die Zone (v933)
-        { source: CARD_NAME, fromHandIdx: handIdx, ...(feld !== pi ? { controller: pi } : {}) },
+        { source: CARD_NAME, fromHandIdx: handIdx, summonWindow: true, ...(feld !== pi ? { controller: pi } : {}) },
   );
+  if (res?.negated) return;   // Off Duty & co.: Karte ist schon geroutet
   if (!res?.inst) { engine.handZugangSync(ps, CARD_NAME, { von: 'rueckgabe', ohneInstanz: true }); return; }   // v1395
 
   ps._dtgSummonedForDeath = gs.turn;

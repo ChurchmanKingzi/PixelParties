@@ -14467,7 +14467,33 @@ this._deathWatch = (this._deathWatchStack || []).length
    * Beschwoerung derselbe Haken wie beim regulaeren Spielweg.
    */
   async summonCreatureWithHooks(cardName, playerIdx, heroIdx, zoneSlot = -1, opts = {}) {
-    const { alsZusatzaktion, ...rest } = opts || {};
+    const { alsZusatzaktion, summonWindow, ...rest } = opts || {};
+    // ── BESCHWOERUNGS-KETTENFENSTER (Off Duty & co., Ruling 3.10.) ───────
+    // Opt-in `summonWindow: true` — fuer Beschwoerungen, die NICHT ueber die
+    // Kette des Handspiels laufen (Reaktions-Creatures aus der Hand: Explosive
+    // Drone, Enhanced Guard Dog, …). Das Fenster oeffnet VOR dem Landen;
+    // negiert, kommt `{ negated: true, inst: null }` zurueck — die Karte
+    // ist dann schon geroutet (Deck/Loeschstapel/Ablage), der Aufrufer
+    // gibt sie NICHT in die Hand zurueck. Herkunft Hand (`fromHand` /
+    // `fromHandIdx`) → kein `fromBoard` (Master's Plan, Lunar Eclipse).
+    if (summonWindow && !this._inMctsSim && this._placementReactorHeld(rest.controller ?? playerIdx)) {
+      const _besitzer = rest.controller ?? playerIdx;
+      const _aeussere = this._inReactionCheck;
+      let k;
+      try {
+        k = await this.executeCardWithChain({
+          cardName, owner: _besitzer, cardType: 'Creature', goldCost: 0, resolve: null,
+          fromBoard: !(rest.fromHand || rest.fromHandIdx != null), isPlacement: true,
+        });
+      } finally {
+        this._inReactionCheck = _aeussere;
+      }
+      if (k?.negated) {
+        await this._negatedPlacementRoute(cardName, _besitzer, (rest.fromHandIdx != null) ? 'handGone' : 'none',
+          { sourceIdx: rest.fromHandIdx }, k);
+        return { negated: true, inst: null, actualSlot: -1 };
+      }
+    }
     const ergebnis = await this._summonCreatureWithHooksKern(cardName, playerIdx, heroIdx, zoneSlot, rest);
     if (alsZusatzaktion && ergebnis?.inst) {
       // Die Aktion gehoert dem BESCHWOERER (`controller`), nicht der
@@ -37321,6 +37347,10 @@ this._deathWatch = (this._deathWatchStack || []).length
       if (zi >= 0) sz.splice(zi, 1);
       if (opts.instId != null) this._untrackCard(opts.instId);
       this.sync();
+    } else if (source === 'handGone') {
+      // Karte wurde vom Aufrufer schon aus der Hand genommen — nur der Flug fehlt.
+      von = 'hand';
+      handIdx = opts.sourceIdx;
     } else if (source === 'support') {
       // Bakhm-Slot: Abflug aus der Support-Zone (Karte lag bis jetzt sichtbar dort).
       von = 'support';
