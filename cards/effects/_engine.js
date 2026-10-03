@@ -30,7 +30,7 @@ const MAX_CHAIN_DEPTH = 10;   // Prevent infinite chain loops
 const MAX_PENDING_TRIGGERS = 200;
 // Flugzeit einer Surprise-Kreatur von ihrer Surprise Zone in die
 // Support Zone (Als Vorgabe 19.8.).
-const SURPRISE_FLUG_MS = 260;
+const SURPRISE_FLUG_MS = 740;   // Als Befund 3.10.: Flug (700 ms) + Versteck-Ende der Ziel-Zone (720 ms) abwarten — erst DANN Summon-Effekt und On-Summon-Fenster, die Creature steht sichtbar auf dem Brett
 // Landezeitpunkt eines Coolness-Stack-Fluges: die `pileTransfer`-
 // Keyframes zeigen die Karte bei 80 % voll am Ziel, die letzten 20 %
 // sind das Ausblenden. Bei 700 ms Flug also 560 ms. Erst dann wird die
