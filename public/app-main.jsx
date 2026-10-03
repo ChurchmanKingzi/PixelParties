@@ -264,13 +264,16 @@ function CubeDraftScreen({ lobby, draft, leaveRoom, notify }) {
           </div>
           <div style={{
             flex: 1, display: 'grid',
-            gridTemplateColumns: 'repeat(8, 1fr)',
-            gridAutoRows: '1fr',
+            // minmax(0,1fr): sonst blaeht der Karten-Inhalt (min-content) die
+            // Spalten auf und die 7./8. Spalte rutscht aus dem Bild.
+            gridTemplateColumns: 'repeat(8, minmax(0, 1fr))',
+            gridAutoRows: 'min-content',
             gap: 6, padding: 4,
             opacity: draft.myPicked ? 0.45 : 1,
             transition: 'opacity .25s',
-            alignContent: 'center',
-            maxHeight: '100%',
+            alignContent: 'start',
+            minHeight: 0, minWidth: 0,
+            overflowY: 'auto', overflowX: 'hidden',
           }}>
             {draft.myPack.map((cardName, idx) => (
               <div key={idx} style={{
