@@ -145,75 +145,18 @@ async function _explode(ctx, excludeKey) {
   // dealing the damage and open its per-Hero Surprise window.
   const source = { name: CARD_NAME, owner: pi, heroIdx: -1 };
 
-  // Consolidated pre-damage hand-reaction window over the full target
-  // list (Sculpture Guards / Spectral Armor / etc.) — same as Cataclysm.
-  const allTargets = [
-    ...heroTargets.map(ht => ({
-      type: 'hero', owner: ht.owner, heroIdx: ht.heroIdx,
-      cardName: gs.players[ht.owner]?.heroes?.[ht.heroIdx]?.name,
-    })),
-    ...creatureTargets.map(inst => ({
-      type: 'creature', owner: inst.controller ?? inst.owner,
-      heroIdx: inst.heroIdx, slotIdx: inst.zoneSlot, cardName: inst.name,
-    })),
+  // AoE-Prinzip (markieren/Immunität → reagieren → wirken → Tode): NUR dieser
+  // 100er-Splash ist ein Flächenschlag — der Angriffsschaden des Trägers läuft getrennt.
+  // Surprises/Hand-Reaktionen reagieren VOR dem ersten Schaden; die Explosionen laufen
+  // auf allen Zielen gleichzeitig.
+  const ziele = [
+    ...heroTargets.map(ht => ({ type: 'hero', owner: ht.owner, heroIdx: ht.heroIdx })),
+    ...creatureTargets.filter(i => i && i.zone === 'support').map(inst => ({ type: 'creature', inst })),
   ];
-  await engine.preDamageMultiTargetWindow(source, allTargets, { simultan: true, damageType: 'artifact' });   // Flaechenschlag: Surprises VOR dem ersten Schaden
-
-  // Explosion flash on every recipient, then a beat before impact.
-  for (const ht of heroTargets) {
-    engine._broadcastEvent('play_zone_animation', {
-      type: 'explosion', owner: ht.owner, heroIdx: ht.heroIdx, zoneSlot: -1,
-    });
-  }
-  for (const inst of creatureTargets) {
-    engine._broadcastEvent('play_zone_animation', {
-      type: 'explosion', owner: inst.owner,
-      heroIdx: inst.heroIdx, zoneSlot: inst.zoneSlot,
-    });
-  }
-  await engine._delay(450);
-
-  // ★ v1043 („Interference", Als Ruling 12.9.): NUR dieser 100er-Splash
-  // ist ein Flaechenschlag — der urspruengliche Angriffsschaden des
-  // Traegers laeuft getrennt davon und bleibt unberuehrt. Die Klammer
-  // sitzt deshalb eng um die Splash-Phase.
-  // ★★ v1185: dieselbe enge Klammer, jetzt mit Kreaturenmeldung an das
-  // Anti-AoE-Fenster (Deepsea Idol).
-  {
-    const splashKreaturen = creatureTargets.filter(i => i && i.zone === 'support');
-    await engine.beginAoeStrike(
-      heroTargets.filter(ht => (gs.players[ht.owner]?.heroes?.[ht.heroIdx]?.hp || 0) > 0).length
-      + splashKreaturen.length,
-      {
-        creatures: splashKreaturen, source,
-        amount: SPLASH_DAMAGE, type: 'artifact', sourceOwner: pi,
-      });
-  }
-  try {
-  // Heroes — sequential so each afterDamage / KO chain resolves
-  // cleanly. The `heroIdx: -1` source (above) is what keeps Booby
-  // Trap & co. from chaining; we deliberately do NOT pass
-  // `skipSurpriseCheck` so damage-mitigation Surprises still get
-  // their window. `ctx.dealDamage` has no opts/source arg, so call
-  // `actionDealDamage` directly with the synthetic source.
-  for (const ht of heroTargets) {
-    const live = gs.players[ht.owner]?.heroes?.[ht.heroIdx];
-    if (!live || live.hp <= 0) continue;
-    await engine.actionDealDamage(source, live, SPLASH_DAMAGE, 'artifact');
-  }
-  // Creatures — through the creature-damage pipeline (immunities,
-  // batch hook, post-death cleanup).
-  for (const inst of creatureTargets) {
-    if (!inst || inst.zone !== 'support') continue;
-    await engine.actionDealCreatureDamage(
-      source, inst, SPLASH_DAMAGE, 'artifact',
-      { sourceOwner: pi, canBeNegated: true }
-    );
-  }
-
-  } finally {
-    await engine.endMultiHit();
-  }
+  await engine.dealDamageToTargets(source, ziele, {
+    damage: SPLASH_DAMAGE, damageType: 'artifact', sourceName: CARD_NAME,
+    animationType: 'explosion', animDelay: 450, hitDelay: 0, istFlaeche: true,
+  });
 
   engine.log('explosivo_sword', {
     player: gs.players[pi]?.username,

@@ -155,17 +155,6 @@ module.exports = {
         // liefe die Regel an zwei Stellen auseinander.
       }
 
-      // Echter Flaechenschlag: die Helden-Surprises (Frost Rune, Booby Trap …) entscheiden sich VOR dem
-      // ersten Schaden — negiert eine den Zauber, faellt der Schaden an ALLEN Zielen weg.
-      {
-        const vorab = await engine.aoeSurpriseVorab(
-          { ...quelle, heroOwner: ctx.cardHeroOwner ?? pi },
-          helden.map(h => ({ type: 'hero', owner: h.p, heroIdx: h.hi, cardName: h.hero.name })),
-          { damageType: 'destruction_spell', reaktionsQuelle: ctx.card },
-        );
-        if (vorab?.effectNegated) return;
-      }
-
       // ★★ v1146 (Al 17.9.): eigene Animation — Feuerball vom Wirker,
       // der das ganze Brett einhuellt, Flammen und Feuerregen. Staerke
       // skaliert mit dem Schaden: 50 → Glimmen, ab 450 → volle Wucht.
@@ -212,29 +201,24 @@ module.exports = {
       // zaehlt Kreaturen mit, die der Zauber gerade weggeraeumt hat —
       // „the player controlling the most Creatures" meint den Stand
       // NACH der Aufloesung.
-      // ★★ v1185: die Klammer meldet dem Anti-AoE-Fenster (Deepsea Idol)
-      // die vollstaendige Kreaturenliste des Schlags — sonst sieht es je
-      // Kreatur einen Batch der Groesse 1 und geht nie auf.
-      if (zielzahl >= 2) {
-        await engine.beginAoeStrike(zielzahl, {
-          creatures: kreaturen, source: quelle,
-          amount: dmg, type: 'destruction_spell', sourceOwner: pi,
-        });
-      }
+      // ★★ Prinzip fuer jeden Flaechenschlag (Al 3.10.): markieren (Immunitaeten inklusive) → die
+      // getroffenen Ziele reagieren (Helden-Surprises inkl. „chosen by", Hand-Reaktionen — VOR dem
+      // ersten Schaden; negiert eine, faellt ALLES weg) → alle Ziele nehmen Schaden → ERST DANN werden
+      // die Tode ausgewertet. Das macht `dealDamageToTargets` (Klammer + Anti-AoE-Fenster inklusive).
+      const ziele = [
+        ...helden.map(h => ({ type: 'hero', owner: h.p, heroIdx: h.hi })),
+        ...kreaturen.map(inst => ({ type: 'creature', inst })),
+      ];
+      let res;
       try {
-        for (const { hero } of helden) {
-          if (hero.hp <= 0) continue;
-          await engine.actionDealDamage(quelle, hero, dmg, 'destruction_spell');
-        }
-        for (const inst of kreaturen) {
-          if (inst.zone !== 'support') continue;
-          await engine.actionDealCreatureDamage(quelle, inst, dmg, 'destruction_spell',
-            { sourceOwner: pi, canBeNegated: true });
-        }
+        res = await engine.dealDamageToTargets({ ...quelle, cardInstance: ctx.card }, ziele, {
+          damage: dmg, damageType: 'destruction_spell', sourceName: CARD_NAME,
+          chosenSurprises: true, istFlaeche: true, hitDelay: 0,
+        });
       } finally {
-        if (zielzahl >= 2) await engine.endMultiHit();
         gs._deferGameOverCheck = Math.max(0, (gs._deferGameOverCheck || 1) - 1);
       }
+      if (res?.cancelled) { engine.sync(); return; }   // negiert: nichts geschieht, kein Zugende, keine Schadenssperre
 
       // ── Wer gewinnt, falls WIRKLICH alle Helden gefallen sind? ────
       // ★ Al 14.9.: die Sonderregel gilt NUR fuer die totale

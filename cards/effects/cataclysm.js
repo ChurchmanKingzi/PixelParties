@@ -107,69 +107,22 @@ module.exports = {
       await engine._delay(1300);
       await engine._delay(260);
 
-      // ── Resolve damage ──
-      const source = { name: CARD_NAME, owner: pi, heroIdx, heroOwner: ctx.cardHeroOwner ?? pi };   // Als Befund 29.9.: Brettseite des Wirkers
-
-      // Pre-damage post-target hand-reaction window — ONE consolidated
-      // prompt per source for Sculpture Guards / Spectral Armor / etc.
-      // covering the full hero + creature target list.
-      const allTargets = [
-        ...heroTargets.map(ht => ({
-          type: 'hero', owner: ht.owner, heroIdx: ht.heroIdx,
-          cardName: gs.players[ht.owner]?.heroes?.[ht.heroIdx]?.name,
-        })),
-        ...creatureTargets.map(inst => ({
-          type: 'creature', owner: inst.controller ?? inst.owner,
-          heroIdx: inst.heroIdx, slotIdx: inst.zoneSlot,
-          cardName: inst.name,
-        })),
+      // ── Resolve damage — EIN Flaechenschlag (Prinzip: markieren → reagieren → wirken → Tode) ──
+      // `dealDamageToTargets` markiert die Ziele (Immunitaeten inklusive), laesst die getroffenen
+      // Ziele reagieren (Helden-Surprises und Hand-Reaktionen, VOR dem ersten Schaden; „is chosen by"-
+      // Surprises wie Frost Rune duerfen hier mitreagieren), trifft dann ALLE Ziele und wertet
+      // erst danach die Tode aus (Helden-KOs aufgeschoben, Kreaturen in EINEM Stapel). Negiert eine
+      // Reaktion den Zauber, faellt der Schaden an ALLEN Zielen weg — und die Areas bleiben liegen.
+      const ziele = [
+        ...heroTargets.map(ht => ({ type: 'hero', owner: ht.owner, heroIdx: ht.heroIdx })),
+        ...creatureTargets.map(inst => ({ type: 'creature', inst })),
       ];
-      // A post-target reaction (Storm Ring / Invisibility Cloak) may
-      // fully negate this Spell here. `preDamageMultiTargetWindow` now
-      // returns the result + sets `_spellNegatedByEffect`; bail BEFORE
-      // any damage AND before the Area wipe so the WHOLE Spell is
-      // negated (no side effects) — the play handler routes the card to
-      // discard as negated.
-      // `simultan`: echter Flaechenschlag — Surprises (Frost Rune, Booby Trap …) entscheiden sich VOR dem
-      // ersten Schaden; negiert eine, fällt der Schaden an ALLEN Zielen weg (und die Areas bleiben).
-      const _negR = await engine.preDamageMultiTargetWindow(source, allTargets, { simultan: true, damageType: 'destruction_spell' });
-      if (_negR?.effectNegated) return;
-
-      // ★ v1043 („Interference"): EIN Schlag auf mehrere Ziele.
-      // Gezaehlt wird, was WIRKLICH getroffen wird — bei nur einem
-      // lebenden Ziel greift der Schutz nicht (Als Vorgabe 12.9.).
-      // ★★ v1185: `beginAoeStrike` statt `beginMultiHit` — die Klammer
-      // meldet dem Anti-AoE-Fenster (Deepsea Idol) zusaetzlich die
-      // Kreaturen des Schlags.
-      {
-        const lebendeHelden = heroTargets.filter(ht => (gs.players[ht.owner]?.heroes?.[ht.heroIdx]?.hp || 0) > 0).length;
-        const lebendeKreaturen = creatureTargets.filter(i => i.zone === 'support');
-        await engine.beginAoeStrike(lebendeHelden + lebendeKreaturen.length, {
-          creatures: lebendeKreaturen, source,
-          amount: DAMAGE, type: 'destruction_spell', sourceOwner: pi,
-        });
-      }
-      try {
-      // Heroes — sequential dealDamage so afterDamage hooks fire cleanly per target.
-      for (const ht of heroTargets) {
-        const live = gs.players[ht.owner]?.heroes?.[ht.heroIdx];
-        if (!live || live.hp <= 0) continue;
-        await ctx.dealDamage(live, DAMAGE, 'destruction_spell');
-      }
-      // Creatures — batch via dealCreatureDamage. Each call invokes the
-      // creature-damage pipeline (immunities, batch hook, post-death cleanup).
-      for (const inst of creatureTargets) {
-        if (inst.zone !== 'support') continue;
-        await engine.actionDealCreatureDamage(
-          source, inst, DAMAGE, 'destruction_spell',
-          { sourceOwner: pi, canBeNegated: true }
-        );
-      }
-
+      const res = await engine.dealDamageToTargets(ctx.card, ziele, {
+        damage: DAMAGE, damageType: 'destruction_spell', sourceName: CARD_NAME,
+        chosenSurprises: true, istFlaeche: true, hitDelay: 0,
+      });
+      if (res?.cancelled) return;
       engine.sync();
-      } finally {
-        await engine.endMultiHit();
-      }
       await engine._delay(300);
 
       // ── Wipe every Area on the board ──

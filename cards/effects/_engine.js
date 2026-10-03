@@ -44403,6 +44403,21 @@ this._deathWatch = (this._deathWatchStack || []).length
    *   getroffen — Book of Doom)
    * @returns {{ heroes, creatures, cancelled }}
    */
+  /**
+   * Ist dieser Held gegen DIESEN Flaechenschlag immun (Schritt 1 „Markieren")?
+   * Dieselben Gruende wie im Schadenspfad: Erstrunden-Schutz, Submerged, Effekt-Immunitaet.
+   */
+  _aoeHeldImmun(owner, heroIdx, hero, quelle, opts = {}) {
+    if (!hero?.name || hero.hp <= 0) return true;
+    if (hero.statuses?.shielded) return true;
+    const prot = this.gs.firstTurnProtectedPlayer;
+    const verursacher = quelle?.owner ?? quelle?.controller ?? this.gs.activePlayer;
+    if (prot != null && owner === prot && verursacher !== prot) return true;
+    if (opts.canBeNegated !== false && this.isSubmergedProtected?.(owner, hero)) return true;
+    if (this.hasEffectImmunity?.(owner, heroIdx, quelle)) return true;
+    return false;
+  }
+
   async dealDamageToTargets(quelle, targets, opts = {}) {
     const gs = this.gs;
     const config = opts;
@@ -44462,31 +44477,74 @@ this._deathWatch = (this._deathWatchStack || []).length
       for (const e of kept) creatureEntries.push(e);
     }
 
-    if (opts.surpriseCheck !== false && hitHeroes.length > 0) {
-      const aoeTargets = hitHeroes.map(h => ({
+    // ── SCHRITT 1: MARKIEREN — wer wird WIRKLICH getroffen? ─────────────
+    // Immunitaeten werden hier schon einbezogen, damit nur tatsaechlich
+    // getroffene Ziele reagieren (Frost Rune eines immunen Helden loest nicht aus).
+    // Heldenseitig: Shielded (oben), Erstrunden-Schutz, Submerged, Effekt-Immunitaet;
+    // Kreaturen ueber dieselbe Markierung wie der Schadensstapel.
+    this._markCreatureDamageImmunity(creatureEntries);
+    const reagierHelden = hitHeroes.filter(h => !this._aoeHeldImmun(h.owner, h.heroIdx, h.hero, quellObjekt, opts));
+    const reagierKreaturen = creatureEntries.filter(e => !e._immuneCreature);
+
+    // ── SCHRITT 2: REAGIEREN — Surprises, danach Hand-Reaktionen ────────
+    // Negiert die Quelle hier, trifft der Schlag KEIN Ziel.
+    if (opts.surpriseCheck !== false && reagierHelden.length > 0) {
+      const aoeTargets = reagierHelden.map(h => ({
         type: 'hero', owner: h.owner, heroIdx: h.heroIdx, cardName: h.hero.name,
       }));
-      if (hatInstanz) quelle._isAoeCheck = true;
-      const surpriseResult = await this._checkSurpriseWindow(aoeTargets, reaktionsQuelle, { damageType });
-      if (hatInstanz) delete quelle._isAoeCheck;
+      // `chosenSurprises`: „is chosen by"-Surprises (Frost Rune …) duerfen mitreagieren
+      // (Cataclysm, Armageddon …). Standard: ein Flaechenschlag waehlt niemanden (v1323).
+      const aoeCheck = hatInstanz && !opts.chosenSurprises;
+      if (aoeCheck) quelle._isAoeCheck = true;
+      let surpriseResult;
+      try {
+        surpriseResult = await this._checkSurpriseWindow(aoeTargets, reaktionsQuelle, { damageType });
+      } finally {
+        if (aoeCheck) delete quelle._isAoeCheck;
+      }
+      // Abgefragte Helden vormerken: der spaetere Treffer oeffnet das Fenster nicht noch einmal.
+      if (!gs._surpriseCheckedHeroes) gs._surpriseCheckedHeroes = new Set();
+      const merkKeys = this._aoeSurpriseKeys || (this._aoeSurpriseKeys = []);
+      for (const t of aoeTargets) {
+        const k = `${t.owner}-${t.heroIdx}`;
+        if (!gs._surpriseCheckedHeroes.has(k)) { gs._surpriseCheckedHeroes.add(k); merkKeys.push(k); }
+      }
       if (surpriseResult?.effectNegated) {
+        if ((gs._spellResolutionDepth || 0) > 0) gs._spellNegatedByEffect = true;
+        const nkey = this._effectNegationKey(reaktionsQuelle);
+        if (nkey != null) {
+          if (!gs._negatedEffectSources) gs._negatedEffectSources = new Set();
+          gs._negatedEffectSources.add(nkey);
+        }
+        for (const k of merkKeys) gs._surpriseCheckedHeroes.delete(k);
+        this._aoeSurpriseKeys = null;
         await this.negationsBilder(reaktionsQuelle, aoeTargets, surpriseResult);
         return { heroes: [], creatures: [], cancelled: true };
       }
     }
 
-    if (opts.postTargetCheck !== false && (hitHeroes.length > 0 || creatureEntries.length > 0)) {
+    if (opts.postTargetCheck !== false && (reagierHelden.length > 0 || reagierKreaturen.length > 0)) {
       const aoeTargets2 = [
-        ...hitHeroes.map(h => ({
+        ...reagierHelden.map(h => ({
           type: 'hero', owner: h.owner, heroIdx: h.heroIdx, cardName: h.hero.name,
         })),
-        ...creatureEntries.map(e => ({
+        ...reagierKreaturen.map(e => ({
           type: 'creature', owner: this.physicalSide(e.inst), heroIdx: e.inst.heroIdx,
           slotIdx: e.inst.zoneSlot, cardName: e.inst.name,
         })),
       ];
       const ptResult = await this._checkPostTargetHandReactions(aoeTargets2, reaktionsQuelle, { damageType });
       if (ptResult?.effectNegated) {
+        // Wie in `preDamageMultiTargetWindow`: die Quelle gilt als negiert (Karte wandert als negiert
+        // in die Ablage, kein weiterer Schaden dieser Aufloesung), Vormerkungen werden geraeumt.
+        if ((gs._spellResolutionDepth || 0) > 0) gs._spellNegatedByEffect = true;
+        const nkey2 = this._effectNegationKey(reaktionsQuelle);
+        if (nkey2 != null) {
+          if (!gs._negatedEffectSources) gs._negatedEffectSources = new Set();
+          gs._negatedEffectSources.add(nkey2);
+        }
+        for (const k of (this._aoeSurpriseKeys || [])) gs._surpriseCheckedHeroes?.delete(k);
+        this._aoeSurpriseKeys = null;
         await this.negationsBilder(reaktionsQuelle, aoeTargets2, ptResult);   // v1182
         return { heroes: [], creatures: [], cancelled: true };
       }
@@ -44518,11 +44576,17 @@ this._deathWatch = (this._deathWatchStack || []).length
     }
 
     const hatSchaden = hitHeroes.some(h => h.amount > 0) || creatureEntries.some(e => e.amount > 0);
+    if (!hatSchaden && typeof opts.wirkung === 'function') {
+      // Reine Statuswirkung ohne Schaden (z.B. Heat Wave an Ungebrannten): trotzdem nach dem Reagieren.
+      await opts.wirkung({ heroes: hitHeroes, creatures: creatureEntries.map(e => e.inst) });
+    }
     if (hatSchaden) {
       // Interference-Klammer UND Idol-Fenster in einem (beginAoeStrike);
       // die Kreaturen gehen danach in EINEM Stapel.
-      await this.beginAoeStrike(hitHeroes.length + creatureEntries.length, {
-        creatures: creatureEntries.map(e => ({ inst: e.inst, amount: e.amount, type: e.type })),
+      const _schadenHelden = hitHeroes.filter(h => h.amount > 0);
+      const _schadenKreaturen = creatureEntries.filter(e => e.amount > 0);
+      await this.beginAoeStrike(_schadenHelden.length + _schadenKreaturen.length, {
+        creatures: _schadenKreaturen.map(e => ({ inst: e.inst, amount: e.amount, type: e.type })),
         source: quellObjekt, amount: damage, type: damageType, sourceOwner: pi,
         canBeNegated: opts.canBeNegated !== false,
       });
@@ -44543,6 +44607,10 @@ this._deathWatch = (this._deathWatchStack || []).length
         }
         const mitSchaden = creatureEntries.filter(e => e.amount > 0);
         if (mitSchaden.length > 0) await this.processCreatureDamageBatch(mitSchaden);
+        // ── SCHRITT 3b: Zusatzwirkung (Status, Sperren …) — noch VOR der Todesauswertung ──
+        if (typeof opts.wirkung === 'function') {
+          await opts.wirkung({ heroes: hitHeroes, creatures: creatureEntries.map(e => e.inst) });
+        }
       } finally {
         // Vorgemerkte Heldentode JETZT — nach dem letzten Treffer.
         await this.endMultiHit();

@@ -175,89 +175,19 @@ async function _spreadDamage(engine, pi, targetCtrlPi, source, amount, type) {
   // Rocket-Sneeze source when no original source was supplied.
   const carriedSource = source || { name: CARD_NAME, owner: pi };
 
-  // Pre-damage post-target window for the redirect itself — gives SG
-  // / SA / BS / HR / CIB on the OPP side a chance to consolidate. The
-  // engine's `_inPreDamageReaction` guard prevents own-side per-
-  // target windows from re-firing, but the post-target hub is a
-  // separate path and stays open.
-  {
-    const tgts = [
-      ...heroHits.map(({ hi, po }) => {
-        const h = gs.players[po]?.heroes?.[hi];
-        return { type: 'hero', owner: po, heroIdx: hi, cardName: h?.name };
-      }),
-      ...creatureHitIds.map(id => {
-        const inst = engine.cardInstances.find(c => c.id === id);
-        if (!inst) return null;
-        return {
-          type: 'creature',
-          owner: inst.controller ?? inst.owner,
-          heroIdx: inst.heroIdx, slotIdx: inst.zoneSlot,
-          cardName: inst.name,
-        };
-      }).filter(Boolean),
-    ];
-    if (tgts.length > 0) {
-      await engine.preDamageMultiTargetWindow(carriedSource, tgts);
-    }
-  }
-
-  // Phase 1: simultaneous explosion animations on every affected
-  // target. Broadcasts are flushed synchronously to the client, so
-  // every explosion event arrives before the JS yields — they mount
-  // and play in the same frame. Fires for ALL targets in the redirect
-  // list, including ones that will fizzle damage downstream (sculpture-
-  // shielded, immune, etc.) — the visual is "everyone gets hit by the
-  // sneeze", separate from whether the damage actually lands. Mirror
-  // of Guardian Beast Hou's two-phase pattern (anim → delay → damage).
-  for (const { hi, po } of heroHits) {
-    engine._broadcastEvent('play_zone_animation', {
-      type: 'explosion', owner: po, heroIdx: hi, zoneSlot: -1,
-    });
-  }
-  for (const id of creatureHitIds) {
-    const inst = engine.cardInstances.find(c => c.id === id);
-    if (!inst) continue;
-    engine._broadcastEvent('play_zone_animation', {
-      type: 'explosion',
-      owner: inst.controller ?? inst.owner,
-      heroIdx: inst.heroIdx, zoneSlot: inst.zoneSlot,
-    });
-  }
-  // Shared beat so the explosions play out before HP starts dropping.
-  if (heroHits.length > 0 || creatureHitIds.length > 0) {
-    await engine._delay(450);
-  }
-
-  // ★★ v1185: Flaechenklammer + Anti-AoE-Fenster. „That damage is dealt
-  // to ALL targets your opponent controls instead" macht aus einem
-  // Einzeltreffer einen Flaechenschlag — beides fehlte bisher.
-  await engine.beginAoeStrike(heroHits.length + creatureHitIds.length, {
-    creatures: creatureHitIds
+  // AoE-Prinzip (markieren/Immunität → reagieren → wirken → Tode): ein zentraler
+  // Schlag auf alle Ziele des Gegners. Surprises/Hand-Reaktionen (SG/SA/BS/HR/CIB)
+  // reagieren VOR dem ersten Schaden; Explosionen gehen auf alle Ziele gleichzeitig.
+  const ziele = [
+    ...heroHits.map(({ hi, po }) => ({ type: 'hero', owner: po, heroIdx: hi })),
+    ...creatureHitIds
       .map(id => engine.cardInstances.find(c => c.id === id))
-      .filter(Boolean),
-    source: carriedSource, amount, type, sourceOwner: pi,
+      .filter(Boolean)
+      .map(inst => ({ type: 'creature', inst })),
+  ];
+  if (ziele.length === 0) return;
+  await engine.dealDamageToTargets(carriedSource, ziele, {
+    damage: amount, damageType: type, sourceName: CARD_NAME,
+    animationType: 'explosion', animDelay: 450, hitDelay: 0, istFlaeche: true,
   });
-  try {
-  // Phase 2: deliver hero damage in turn order — sequential so
-  // afterDamage hooks settle per target.
-  for (const { hi, po } of heroHits) {
-    const live = gs.players[po]?.heroes?.[hi];
-    if (!live?.name || live.hp <= 0) continue;
-    await engine.actionDealDamage(carriedSource, live, amount, type);
-  }
-
-  // Deliver creature damage by id-lookup (instance might have moved /
-  // died from a prior hit in the same batch).
-  for (const id of creatureHitIds) {
-    const inst = engine.cardInstances.find(c => c.id === id);
-    if (!inst || inst.zone !== 'support') continue;
-    await engine.actionDealCreatureDamage(
-      carriedSource, inst, amount, type,
-      { sourceOwner: pi, canBeNegated: true },
-    );
-  }
-  } finally {
-    await engine.endMultiHit();
-  }
 }

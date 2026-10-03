@@ -105,99 +105,51 @@ module.exports = {
       const expiresAtTurn    = gs.turn + 2;
       const expiresForPlayer = pi;
 
-      // Pre-damage post-target hand-reaction window — one consolidated
-      // prompt per source for Sculpture Guards / Spectral Armor.
-      {
-        const allTgts = [];
-        for (const t of heroTargets) {
-          const h = gs.players[t.owner]?.heroes?.[t.heroIdx];
-          if (!h?.name || h.hp <= 0) continue;
-          allTgts.push({ type: 'hero', owner: t.owner, heroIdx: t.heroIdx, cardName: h.name });
-        }
-        for (const id of creatureTargetIds) {
-          const inst = engine.cardInstances.find(c => c.id === id);
-          if (!inst || inst.zone !== 'support') continue;
-          allTgts.push({
-            type: 'creature', owner: inst.controller ?? inst.owner,
-            heroIdx: inst.heroIdx, slotIdx: inst.zoneSlot, cardName: inst.name,
-          });
-        }
-        const _negR = await engine.preDamageMultiTargetWindow(
-          { name: CARD_NAME, owner: pi, heroIdx, heroOwner: ctx.cardHeroOwner ?? pi },   // Als Befund 29.9.: Brettseite des Wirkers
-          allTgts,
-          { simultan: true, damageType: 'decay_spell' },   // echter Flaechenschlag: Surprises VOR dem ersten Schaden
-        );
-        // Full-negate reaction (Storm Ring / Invisibility Cloak): bail
-        // BEFORE damage, the Bound lockout, and creature negation so
-        // the whole Spell is negated with no side effects.
-        if (_negR?.effectNegated) return;
-      }
-
-      // ★ v1043 („Interference"): ein Schlag, Helden UND Kreaturen.
-      // Gezaehlt wird, was WIRKLICH getroffen wird — bei nur einem
-      // lebenden Ziel greift der Schutz nicht.
-      // ★★ v1185: Klammer meldet die Kreaturen an das Anti-AoE-Fenster.
-      await engine.beginAoeStrike(
-        heroTargets.filter(t => (gs.players[t.owner]?.heroes?.[t.heroIdx]?.hp || 0) > 0).length + creatureTargetIds.length,
-        {
-          creatures: creatureTargetIds
-            .map(id => engine.cardInstances.find(c => c.id === id))
-            .filter(Boolean),
-          source: { name: CARD_NAME, owner: pi, heroIdx, heroOwner: ctx.cardHeroOwner ?? pi },   // Als Befund 29.9.: Brettseite des Wirkers
-          amount: DAMAGE, type: 'decay_spell', sourceOwner: pi,
-        });
-      try {
-      // ── Step 3: deal damage + apply lockout to every alive opp Hero ──
+      // AoE-Prinzip (markieren/Immunität → reagieren → wirken → Tode): EIN zentraler
+      // Schlag. Surprises/Hand-Reaktionen reagieren VOR dem ersten Schaden; wird die
+      // Quelle negiert (Storm Ring / Invisibility Cloak / Frost Rune …), trifft sie
+      // NIEMANDEN — kein Schaden, keine Bound-Sperre, keine Kreaturen-Negation.
+      const quelle = { name: CARD_NAME, owner: pi, heroIdx, heroOwner: ctx.cardHeroOwner ?? pi };   // Als Befund 29.9.: Brettseite des Wirkers
+      const ziele = [];
       for (const t of heroTargets) {
-        const hero = gs.players[t.owner]?.heroes?.[t.heroIdx];
-        if (!hero || hero.hp <= 0) continue;
-        const r = await ctx.dealDamage(hero, DAMAGE, 'decay_spell');
-        // Damage fully cancelled by a reaction (Idej Projection,
-        // Spectral Armor zero-cap, Anti Magic void) → "and all
-        // associated effects" rule: skip the bound rider too.
-        if (r?.cancelled) continue;
-        // After-damage state: hero may have died from the hit. Skip the
-        // lockout in that case — a dead hero can't act anyway, and
-        // adding a status to a corpse breaks the "alive heroes only"
-        // contract elsewhere in the engine.
-        const stillAlive = gs.players[t.owner]?.heroes?.[t.heroIdx];
-        if (!stillAlive || stillAlive.hp <= 0) continue;
-        await engine.addHeroStatus(t.owner, t.heroIdx, 'bound', {
-          appliedBy: pi,
-          expiresAtTurn,
-          expiresForPlayer,
-          _skipReactionCheck: true,
-        });
+        const h = gs.players[t.owner]?.heroes?.[t.heroIdx];
+        if (h?.name && h.hp > 0) ziele.push({ type: 'hero', owner: t.owner, heroIdx: t.heroIdx });
       }
-
-      // ── Step 4: damage opp Creatures + negate survivors ──
       for (const id of creatureTargetIds) {
         const inst = engine.cardInstances.find(c => c.id === id);
-        if (!inst || inst.zone !== 'support') continue;
-        const r = await engine.actionDealCreatureDamage(
-          { name: CARD_NAME, owner: pi, heroIdx, heroOwner: ctx.cardHeroOwner ?? pi },   // Als Befund 29.9.: Brettseite des Wirkers
-          inst, DAMAGE, 'decay_spell',
-          { sourceOwner: pi, canBeNegated: true },
-        );
-        // Same "and all associated effects" rule for the creature
-        // half — skip the negate rider when the damage was fully
-        // cancelled (Spectral Armor zero-cap, future creature
-        // damage-negation reactions).
-        if (r?.cancelled) continue;
-        // Verify the creature is still on the board after damage.
-        const stillOn = engine.cardInstances.find(c => c.id === id);
-        if (!stillOn || stillOn.zone !== 'support') continue;
-        // canApplyCreatureStatus respects _cardinalImmune + faceDown +
-        // gate-shield, so this doesn't need its own immunity guard.
-        if (!engine.canApplyCreatureStatus(stillOn, 'negated')) continue;
-        await engine.actionNegateCreature(stillOn, CARD_NAME, {
-          expiresAtTurn,
-          expiresForPlayer,
-        });
+        if (inst && inst.zone === 'support') ziele.push({ type: 'creature', inst });
       }
-      } finally {
-        await engine.endMultiHit();
+      // „…and all associated effects": wo der Schaden vollständig verpufft (Spectral Armor,
+      // Anti Magic …), entfällt auch der Zusatz — erkannt am unveränderten HP-Stand.
+      const hpVorher = new Map();
+      for (const z of ziele) {
+        if (z.type === 'hero') hpVorher.set(`h${z.owner}-${z.heroIdx}`, gs.players[z.owner]?.heroes?.[z.heroIdx]?.hp);
+        else hpVorher.set(`c${z.inst.id}`, z.inst.counters?.currentHp ?? 0);
       }
+      const res = await engine.dealDamageToTargets({ ...quelle, cardInstance: ctx.card }, ziele, {
+        damage: DAMAGE, damageType: 'decay_spell', sourceName: CARD_NAME,
+        chosenSurprises: false, istFlaeche: true, hitDelay: 0,
+        wirkung: async () => {
+          for (const z of ziele) {
+            if (z.type === 'hero') {
+              const hero = gs.players[z.owner]?.heroes?.[z.heroIdx];
+              if (!hero || hero.hp <= 0) continue;
+              if (!(hero.hp < hpVorher.get(`h${z.owner}-${z.heroIdx}`))) continue;   // Schaden verpufft
+              await engine.addHeroStatus(z.owner, z.heroIdx, 'bound', {
+                appliedBy: pi, expiresAtTurn, expiresForPlayer, _skipReactionCheck: true,
+              });
+            } else {
+              const stillOn = engine.cardInstances.find(c => c.id === z.inst.id);
+              const hpJetzt = stillOn?.counters?.currentHp ?? 0;
+              if (!stillOn || stillOn.zone !== 'support' || hpJetzt <= 0) continue;
+              if (!(hpJetzt < hpVorher.get(`c${z.inst.id}`))) continue;           // Schaden verpufft
+              if (!engine.canApplyCreatureStatus(stillOn, 'negated')) continue;
+              await engine.actionNegateCreature(stillOn, CARD_NAME, { expiresAtTurn, expiresForPlayer });
+            }
+          }
+        },
+      });
+      if (res?.cancelled) return;
 
       // ── Step 5: route the spell into the deleted pile ──
       // Block the standard discard-pile routing in server.js. The flag
