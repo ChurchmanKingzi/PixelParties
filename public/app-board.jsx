@@ -3288,6 +3288,51 @@ function ExplosionEffect({ x, y, opacity }) {
   );
 }
 
+// ★ Surprise-Creature-Aufdecken (Als Wunsch 3.10.: der Booby-Trap-Explosionseffekt
+// passt nicht zu einer Creature, die aus ihrer Surprise-Zone springt).
+// „Ueberraschung!": heller Pixelblitz, ein Pixel-Ausrufezeichen poppt hoch,
+// bunte Pixelfunken spritzen fan-foermig nach oben, Staubpixel stieben am
+// Boden auseinander. Alles eckig und gestuft (`steps()`), der Pixelierer
+// macht den Rest.
+function SurpriseCreatureRevealEffect({ x, y }) {
+  const funken = useMemo(() => Array.from({ length: ppFxN(14) }, (_, i) => {
+    const winkel = -Math.PI * (0.12 + 0.76 * (i / 13)) + (Math.random() - 0.5) * 0.18;   // Faecher nach oben
+    const weite = 34 + Math.random() * 40;
+    return {
+      dx: Math.cos(winkel) * weite, dy: Math.sin(winkel) * weite,
+      size: 4 + Math.floor(Math.random() * 3) * 2,
+      farbe: ['#7df9ff', '#ffe066', '#ff7ad9', '#ffffff', '#9d7bff'][i % 5],
+      delay: Math.floor(Math.random() * 90), dur: 420 + Math.random() * 200,
+    };
+  }), []);
+  const staub = useMemo(() => Array.from({ length: ppFxN(8) }, (_, i) => ({
+    dx: (i < 4 ? -1 : 1) * (14 + (i % 4) * 11), dy: 8 + (i % 3) * 3,
+    size: 5 + (i % 2) * 3, delay: 60 + (i % 4) * 40, dur: 420 + (i % 3) * 80,
+  })), []);
+  return (
+    <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+      <div className="anim-scr-blitz" />
+      <div className="anim-scr-ring" />
+      {staub.map((s, i) => (
+        <div key={'d' + i} className="anim-scr-staub" style={{
+          width: s.size, height: s.size, left: -s.size / 2, top: -s.size / 2,
+          '--dx': s.dx + 'px', '--dy': s.dy + 'px', animationDelay: s.delay + 'ms', animationDuration: s.dur + 'ms',
+        }} />
+      ))}
+      {funken.map((f, i) => (
+        <div key={'f' + i} className="anim-scr-funke" style={{
+          width: f.size, height: f.size, left: -f.size / 2, top: -f.size / 2, background: f.farbe,
+          '--dx': f.dx + 'px', '--dy': f.dy + 'px', animationDelay: f.delay + 'ms', animationDuration: f.dur + 'ms',
+        }} />
+      ))}
+      <div className="anim-scr-ausruf">
+        <span className="anim-scr-ausruf-strich" />
+        <span className="anim-scr-ausruf-punkt" />
+      </div>
+    </div>
+  );
+}
+
 function FreezeEffect({ x, y, w, h }) {
   // Snowballs from right side + ice crystal burst
   const snowballs = useMemo(() => Array.from({ length: ppFxN(8) }, (_, i) => ({
@@ -8247,6 +8292,7 @@ const ANIM_REGISTRY = {
     };
   })(),
   explosion: ExplosionEffect,
+  surprise_creature_reveal: SurpriseCreatureRevealEffect,   // Creature-Surprise springt aus ihrer Zone
   // Disruption Ray impact — a sickly-green toxic burst (flash + two
   // expanding rings + lime shrapnel). Reuses the shared
   // `.anim-explosion-particle` class for the shrapnel so it stays lean;
@@ -35743,7 +35789,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       }, 1800);
     };
     socket.on('creature_damage_floater', onCreatureDamageFloater);
-    const onSurpriseFlip = ({ owner, heroIdx, cardName, isBakhmSlot, bakhmZoneSlot }) => {
+    const onSurpriseFlip = ({ owner, heroIdx, cardName, isBakhmSlot, bakhmZoneSlot, isCreature }) => {
       const ownerLabel = owner === myIdx ? 'me' : 'opp';
       let el;
       if (isBakhmSlot && bakhmZoneSlot >= 0) {
@@ -35753,7 +35799,13 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       }
       if (el) {
         el.classList.add('surprise-flipping');
-        playAnimation('explosion', el, { duration: 1000 });
+        if (isCreature) {
+          // Creature-Surprise: eigene Aufdeck-Animation statt der Booby-Trap-Explosion.
+          if (window.playSFXForZoneAnim) window.playSFXForZoneAnim('surprise_creature_reveal', {});
+          playAnimation('surprise_creature_reveal', el, { duration: 1000 });
+        } else {
+          playAnimation('explosion', el, { duration: 1000 });
+        }
         setTimeout(() => el.classList.remove('surprise-flipping'), 1200);
       }
     };

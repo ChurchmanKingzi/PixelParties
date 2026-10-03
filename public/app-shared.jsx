@@ -2460,6 +2460,12 @@ const ZONE_ANIM_SFX = {
     { name: 'slash',           opts: { rate: 1.3,  volume: 1.0, delay: 280, category: null, dedupe: 300 } },
     { name: 'critical_strike', opts: { rate: 0.85, volume: 0.7, delay: 330, category: null, dedupe: 300 } },
   ],
+  // Creature-Surprise springt aus ihrer Zone (Camel & Co.): Aufdeck-Knacks
+  // plus helles Funkeln — die zweite Lage ohne Kategorie, sonst schluckt sie die erste.
+  surprise_creature_reveal: [
+    { name: 'ability_activate', opts: { rate: 1.5, volume: 0.8 } },
+    { name: 'buff',             opts: { rate: 1.7, volume: 0.55, delay: 140, category: null, dedupe: 0 } },
+  ],
   undead_revival: [
     { name: 'elem_dark', opts: { rate: 0.8, volume: 1.0 } },
     { name: 'summon',    opts: { rate: 0.85, volume: 0.9, delay: 660, category: null, dedupe: 700 } },
