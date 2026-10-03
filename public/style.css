@@ -24985,3 +24985,12 @@ body.summon-pick .board-zone:not(.zone-drag-valid):not(.board-zone-play-target) 
 @keyframes sfBlitz { 0% { opacity: 0; transform: translate(-50%, -50%) scale(.2); } 30% { opacity: 1; } 100% { opacity: 0; transform: translate(-50%, -50%) scale(1.5); } }
 @keyframes sfRing { 0% { opacity: 1; transform: scale(.3); } 100% { opacity: 0; transform: scale(2.4); } }
 @keyframes sfFunke { 0% { opacity: 1; transform: rotate(var(--sfw, 0deg)) translateX(6px) scaleX(.4); } 100% { opacity: 0; transform: rotate(var(--sfw, 0deg)) translateX(46px) scaleX(1); } }
+
+/* Cube-Draft: freigehaltene Spalte rechts in Breite des grossen Karten-Tooltips (GALLERY_W = 400). */
+.cube-draft-tt-gutter { width: 400px; }
+@media (max-height: 500px) { .cube-draft-tt-gutter { width: 240px; } }
+@media (max-height: 500px) and (max-width: 700px) { .cube-draft-tt-gutter { width: 192px; } }
+/* Der grosse Tooltip ist bildschirmhoch — auch die Sammlung unten haelt Platz frei. */
+.cube-draft-pool-bar { padding-right: calc(12px + 400px) !important; }
+@media (max-height: 500px) { .cube-draft-pool-bar { padding-right: calc(12px + 240px) !important; } }
+@media (max-height: 500px) and (max-width: 700px) { .cube-draft-pool-bar { padding-right: calc(12px + 192px) !important; } }

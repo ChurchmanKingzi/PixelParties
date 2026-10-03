@@ -314,7 +314,7 @@ function CubeDraftScreen({ lobby, draft, leaveRoom, notify }) {
                 }}
                 onMouseEnter={() => setHoveredCard(cardName)}
                 onMouseLeave={() => setHoveredCard(null)}>
-                <CardMini noTooltip card={window.CARDS_BY_NAME?.[cardName]} onClick={() => {}} style={{ width: '100%', height: '100%' }} />
+                <CardMini card={window.CARDS_BY_NAME?.[cardName]} onClick={() => {}} style={{ width: '100%', height: '100%' }} />
               </div>
             ))}
           </div>
@@ -323,37 +323,13 @@ function CubeDraftScreen({ lobby, draft, leaveRoom, notify }) {
           </div>
         </div>
 
-        {/* RIGHT — tooltip preview */}
-        <div style={{ width: 240, padding: 12, borderLeft: '1px solid var(--bg4)', background: 'var(--bg)', display: 'flex', flexDirection: 'column' }}>
-          <div className="orbit-font" style={{ fontSize: 11, color: 'var(--text2)', marginBottom: 8, fontWeight: 700, letterSpacing: 1 }}>
-            CARD PREVIEW
-          </div>
-          {hoveredCard && window.CARDS_BY_NAME?.[hoveredCard] ? (
-            <div style={{ flex: 1, overflowY: 'auto' }}>
-              <div style={{ width: '100%', aspectRatio: '5 / 7', marginBottom: 8 }}>
-                <CardMini noTooltip card={window.CARDS_BY_NAME[hoveredCard]} onClick={() => {}} style={{ width: '100%', height: '100%' }} />
-              </div>
-              <div style={{ fontSize: 11, color: 'var(--text)', lineHeight: 1.4 }}>
-                <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--accent)', marginBottom: 4 }}>{hoveredCard}</div>
-                <div style={{ color: 'var(--text2)', marginBottom: 6 }}>
-                  {window.CARDS_BY_NAME[hoveredCard].cardType}
-                  {window.CARDS_BY_NAME[hoveredCard].subtype && ` · ${window.CARDS_BY_NAME[hoveredCard].subtype}`}
-                </div>
-                <div style={{ whiteSpace: 'pre-wrap', fontSize: 10 }}>
-                  {window.CARDS_BY_NAME[hoveredCard].effect || ''}
-                </div>
-              </div>
-            </div>
-          ) : (
-            <div style={{ flex: 1, color: 'var(--text2)', fontSize: 11, textAlign: 'center', padding: '20px 0', fontStyle: 'italic' }}>
-              Hover any card to preview.
-            </div>
-          )}
-        </div>
+        {/* RIGHT — freigehaltene Spalte in Breite des grossen Karten-Tooltips
+            (rechte Leiste, siehe CardSideTooltip), damit er keine Karten ueberdeckt. */}
+        <div className="cube-draft-tt-gutter" style={{ flexShrink: 0 }} />
       </div>
 
       {/* BOTTOM — drafted pool */}
-      <div style={{ borderTop: '1px solid var(--bg4)', background: 'var(--bg2)', padding: '8px 12px', maxHeight: '32%', display: 'flex', flexDirection: 'column' }}>
+      <div className="cube-draft-pool-bar" style={{ borderTop: '1px solid var(--bg4)', background: 'var(--bg2)', padding: '8px 12px', maxHeight: '32%', display: 'flex', flexDirection: 'column' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
           <span className="orbit-font" style={{ fontSize: 11, color: 'var(--text2)', fontWeight: 700, letterSpacing: 1 }}>
             DRAFTED ({poolOrder.length}/64)
@@ -378,7 +354,7 @@ function CubeDraftScreen({ lobby, draft, leaveRoom, notify }) {
                   border: dragOverIdx === idx ? '2px solid var(--accent)' : '2px solid transparent',
                   borderRadius: 4, transition: 'border-color .1s',
                 }}>
-                <CardMini noTooltip card={window.CARDS_BY_NAME?.[name]} onClick={() => {}} style={{ width: '100%', height: '100%' }} />
+                <CardMini card={window.CARDS_BY_NAME?.[name]} onClick={() => {}} style={{ width: '100%', height: '100%' }} />
               </div>
             ))}
             {poolOrder.length === 0 && (
