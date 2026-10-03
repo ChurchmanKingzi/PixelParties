@@ -15718,6 +15718,19 @@ this._deathWatch = (this._deathWatchStack || []).length
    */
   _tagHandCardOrigin(holderIdx, cardName, originalOwner) {
     if (!Number.isInteger(holderIdx) || !Number.isInteger(originalOwner) || holderIdx === originalOwner) return null;
+    // ★ Als Befund 3.10. („Enigma/Infiltration: gestohlene Karte wegen Handlimit abgeworfen — landet in MEINER
+    // Ablage"): `handZugang` legt schon eine Hand-Instanz an; ein zweites `_trackCard` hier erzeugte eine DOPPELTE,
+    // und `_handCardPileOwner` las die erste (ungetaggte) → eigene Ablage. Gibt es fuer die frisch hinzugekommene Karte
+    // bereits eine Instanz (Instanzen >= Handkarten gleichen Namens), wird die letzte ungetaggte markiert statt einer neuen.
+    const ps = this.gs.players[holderIdx];
+    const handCount = ps ? (ps.hand || []).filter(n => n === cardName).length : 0;
+    const insts = this.cardInstances.filter(c => c.zone === 'hand' && c.owner === holderIdx && c.name === cardName);
+    const untagged = insts.filter(c => c.originalOwner == null || c.originalOwner === holderIdx);
+    if (insts.length >= handCount && untagged.length > 0) {
+      const vorhanden = untagged[untagged.length - 1];
+      vorhanden.originalOwner = originalOwner;
+      return vorhanden;
+    }
     const inst = this._trackCard(cardName, holderIdx, 'hand');
     if (inst) inst.originalOwner = originalOwner;
     return inst;
