@@ -20,6 +20,7 @@
 //    (Zugzaehler zaehlt je Spielerwechsel): laeuft der Treffer im Zug des Gegners,
 //    ist es dessen naechster Zug, sonst der uebernaechste; der Buff verfaellt am
 //    Beginn des Zuges DANACH (`_processBuffExpiry`).
+//  • Der Effekt feuert NUR, wenn der Schadensgeber `disrupted` nicht schon hat (Als Befund 3.10.).
 //  • Rool muss leben und darf nicht stummgeschaltet sein (Engine-Standard fuer
 //    Heldenhooks).
 // ═══════════════════════════════════════════
@@ -46,6 +47,11 @@ function schadensGeber(engine, source) {
 /** Verdoppelungs-Debuff auf den Schadensgeber legen. */
 async function verdoppeln(engine, geber, roolBesitzer) {
   const gs = engine.gs;
+  // Nur feuern, wenn der Schadensgeber den Debuff NICHT schon hat (kein Neuauslösen, keine Animation).
+  const schonDa = geber.kind === 'hero'
+    ? !!geber.hero.buffs?.[BUFF]
+    : !!geber.inst.counters?.buffs?.[BUFF];
+  if (schonDa) return;
   const gegner = roolBesitzer === 0 ? 1 : 0;
   // „Ende deines naechsten Zuges": naechster Zug des Rool-Kontrolleurs, Ablauf am Beginn des Zuges danach.
   const meinNaechster = gs.activePlayer === roolBesitzer ? gs.turn + 2 : gs.turn + 1;

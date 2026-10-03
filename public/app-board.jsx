@@ -24580,8 +24580,10 @@ function ZielMarkenEbene({ marken, blitze, myIdx }) {
   );
 }
 
-function GameAnimationRenderer({ type, x, y, w, h, ...rest }) {
+function GameAnimationRenderer({ type, x, y, w, h, _gemountet, prewarm, ...rest }) {
   const Component = ANIM_REGISTRY[type];
+  // Lebensdauer-Uhr erst NACH dem Pixelieren starten (s. playAnimation).
+  useEffect(() => { if (typeof _gemountet === 'function') _gemountet(); }, []);
   // ★ v1446: Pixelart-Umstellung — der Pixelierer (app-shared.jsx) setzt
   // die Grafiken der Animation einmal beim Einblenden in Pixelart mit
   // Dithering um, vor dem ersten Bild (useLayoutEffect).
@@ -24593,7 +24595,9 @@ function GameAnimationRenderer({ type, x, y, w, h, ...rest }) {
   // come from `play_zone_animation` payloads via `onZoneAnim` →
   // `playAnimation(..., options)` → setGameAnims spread → here.
   return (
-    <div ref={huelle} style={{ display: 'contents' }}>
+    <div ref={huelle} style={prewarm
+      ? { position: 'fixed', inset: 0, opacity: 0, pointerEvents: 'none', zIndex: -1 }
+      : { display: 'contents' }}>
       <Component x={x} y={y} w={w} h={h} {...rest} />
     </div>
   );
@@ -41200,9 +41204,35 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     // (unten) haengt sie damit in die verschiebbare Welt-Huelle.
     // Anker ausserhalb (Goldanzeige, Hand) bleiben Fenster-Effekte.
     const _wo = window.ppFxWeltAnker ? window.ppFxWeltAnker(el) : { welt: false, dx: 0, dy: 0 };
-    setGameAnims(prev => [...prev, { id, type, x: r.left + r.width / 2 + _wo.dx, y: r.top + r.height / 2 + _wo.dy, w: r.width, h: r.height, welt: _wo.welt, ...options }]);
-    setTimeout(() => setGameAnims(prev => prev.filter(a => a.id !== id)), dur);
+    // ★ Als Befund 3.10. (Kometen-Animation „unsichtbar / spielt spaeter"): die Lebensdauer beginnt erst,
+    // wenn die Animation WIRKLICH eingehaengt ist (`_gemountet`, vom Renderer nach dem Pixelieren
+    // gerufen). Vorher lief die Uhr schon waehrend des ersten Pixelierens (mehrere 100 ms bis Sekunden
+    // auf einer kalten Seite) — der Komet wurde dann nach Bruchteilen seiner Zeit wieder entfernt.
+    // Der zweite Timer ist nur das Netz, falls der Renderer nie meldet.
+    const entfernen = () => setGameAnims(prev => prev.filter(a => a.id !== id));
+    let gestartet = false;
+    const _gemountet = () => { if (gestartet) return; gestartet = true; setTimeout(entfernen, dur); };
+    setGameAnims(prev => [...prev, { id, type, x: r.left + r.width / 2 + _wo.dx, y: r.top + r.height / 2 + _wo.dy, w: r.width, h: r.height, welt: _wo.welt, ...options, _gemountet }]);
+    setTimeout(() => { if (!gestartet) { gestartet = true; entfernen(); } }, dur + 6000);
   };
+
+  // ★ Vorwaermen (Als Befund 3.10.): die ersten Pixelbilder grosser, bildschirmfuellender Animationen
+  // (Komet) kosten auf einer kalten Seite Hunderte Millisekunden — der Komet kam dann spaeter als die
+  // Schadenszahlen. Einmal kurz UNSICHTBAR (opacity 0, volle Masse) eingehaengt, liegen die Bilder im
+  // Zwischenspeicher, bevor der erste echte Zauber faellt.
+  useEffect(() => {
+    if (window._playAnimations === false) return undefined;
+    const t = setTimeout(() => {
+      for (const type of ['cataclysm']) {
+        const id = Date.now() + Math.random();
+        setGameAnims(prev => [...prev, {
+          id, type, x: window.innerWidth / 2, y: window.innerHeight / 2, w: 100, h: 100, welt: false, prewarm: true,
+          _gemountet: () => setTimeout(() => setGameAnims(p => p.filter(a => a.id !== id)), 300),
+        }]);
+      }
+    }, 1200);
+    return () => clearTimeout(t);
+  }, []);
 
   // Listen for potion resolved — trigger explosion animation
   useEffect(() => {

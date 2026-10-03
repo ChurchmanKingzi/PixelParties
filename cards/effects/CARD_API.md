@@ -16361,7 +16361,7 @@ await engine.dealDamageToTargets(quelle, ziele, {
 
 Ein Flächenschlag WÄHLT niemanden: „is chosen by / targeted by"-Surprises (Frost Rune, Flooding …)
 öffnen dabei nie (die Engine stempelt `_isAoeCheck` auf die Reaktionsquelle); „hit by"-Surprises
-(Booby Trap) schon. Ein Surprise reagiert außerdem nie auf Effekte seines EIGENEN Spielers.
+(Booby Trap) schon. Ein Held löst seine Surprise nie gegen SICH SELBST aus (Selbsttreffer), wohl aber gegen einen verbündeten Helden.
 `opts.vorWirkung()` läuft NACH dem Reagieren und nur, wenn nichts negiert wurde: dort gehört das
 Kartenbild hin (Komet, Feuerwelle). Wird die Quelle negiert, spielt die Engine ihr `spellVisual`
 genau einmal — kein Doppelbild. Ein `spellVisual` mit Zonen-Animation braucht dieselbe `duration`
