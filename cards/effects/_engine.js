@@ -11317,7 +11317,7 @@ class GameEngine {
     if (opts.source) await this.effectSourceGlow(opts.sourceOwner ?? playerIdx, opts.source);
     await this._paceHandDiscard();   // v696: Abstand zum vorigen Hand-Abwurf
     for (let i = 0; i < toDiscard; i++) {
-      const cardName = ps.hand.pop();
+      const cardName = ps.hand.splice(ps.hand.length - 1, 1)[0];   // per splice (nicht pop): Herkunft des Platzes wird so mitgefuehrt
       const fromHandIdx = ps.hand.length; // Pre-Splice-Index des gepoppten Slots
       // Gestohlene Karten gehen zurück ins Ursprungs-Deck — siehe
       // `_handCardPileOwner` und actionDiscardHandCard.
@@ -15659,7 +15659,26 @@ this._deathWatch = (this._deathWatchStack || []).length
   _handShuffleBackFullyBlocked(pi) {
     if (require('./_crystals-shared').shuffleIntoDeckBlocked(this, pi)) return true;
     if (!this._opponentBlocksShuffleBack(pi)) return false;
-    return this.shuffleBackEligibleHandCards(pi).length === 0;
+    return this.shuffleBackEligibleHandSlots(pi).length === 0;
+  }
+
+  /** Deck-Besitzer der Handkarte auf Platz `idx` — die HERKUNFT des Platzes (eigene Karte = Halter). */
+  _handSlotDeckOwner(pi, idx) {
+    const o = this._handOriginAt(this.gs.players[pi], idx);
+    return (o != null) ? o : pi;
+  }
+
+  /**
+   * Plaetze der Hand, die gerade zurueckgemischt werden duerfen — platzgenau (Herkunft), nicht namensbasiert:
+   * Mit Hatusbal-Sperre bleiben nur Plaetze GESTOHLENER Karten, auch wenn daneben eine eigene Kopie desselben
+   * Namens liegt.
+   */
+  shuffleBackEligibleHandSlots(pi) {
+    const ps = this.gs.players[pi];
+    if (!ps) return [];
+    const alle = (ps.hand || []).map((_, i) => i);
+    if (!this._opponentBlocksShuffleBack(pi)) return alle;
+    return alle.filter(i => this._handSlotDeckOwner(pi, i) !== pi);
   }
 
   shuffleBackEligibleHandCards(pi, namen) {
@@ -15872,9 +15891,18 @@ this._deathWatch = (this._deathWatchStack || []).length
     // `handIndices` (optional, parallel zu `cardNames`, Indizes VOR dem ersten Entfernen): damit entscheidet der
     // Handplatz ueber die Herkunft, nicht der Name. Bereits entfernte niedrigere Plaetze schieben nach.
     const entfernt = [];
+    const hatusbalSperre = this._opponentBlocksShuffleBack(playerIdx);
     for (let ci = 0; ci < cardNames.length; ci++) {
       const cardName = cardNames[ci];
-      if (!erlaubt.has(cardName)) continue;
+      const hatPlatz = Array.isArray(handIndices) && Number.isInteger(handIndices[ci]);
+      if (hatPlatz) {
+        // Platzgenau: bei Hatusbal-Sperre nur Plaetze gestohlener Karten (Herkunft statt Name).
+        const p = handIndices[ci] - entfernt.filter(k => k < handIndices[ci]).length;
+        if (hatusbalSperre && this._handSlotDeckOwner(playerIdx, p) === playerIdx) {
+          this.log('shuffle_back_blocked', { player: gs.players[playerIdx]?.username, cards: [cardName] });
+          continue;
+        }
+      } else if (!erlaubt.has(cardName)) continue;
       let hint = null;
       if (Array.isArray(handIndices) && Number.isInteger(handIndices[ci])) {
         hint = handIndices[ci] - entfernt.filter(k => k < handIndices[ci]).length;
@@ -16148,7 +16176,7 @@ this._deathWatch = (this._deathWatchStack || []).length
           // popped slot (pre-pop) = post-pop length, captured BEFORE
           // the pop mutation.
           resolvedHandIdx = ps.hand.length - 1;
-          const cardName = ps.hand.pop();
+          const cardName = ps.hand.splice(ps.hand.length - 1, 1)[0];   // per splice (nicht pop): Herkunft des Platzes wird so mitgefuehrt
           if (cardName) {
             resolvedCardName = cardName;
             // Snapshot the instance BEFORE delete-rescue runs (rescue
@@ -16483,7 +16511,7 @@ this._deathWatch = (this._deathWatchStack || []).length
 
       if (!result || result.cardName == null) {
         // Safety: if prompt fails, auto-remove from end of hand
-        const cardName = ps.hand.pop();
+        const cardName = ps.hand.splice(ps.hand.length - 1, 1)[0];   // per splice (nicht pop): Herkunft des Platzes wird so mitgefuehrt
         if (cardName != null) await finishMove(cardName, ps.hand.length);
         continue;
       }
@@ -16496,7 +16524,7 @@ this._deathWatch = (this._deathWatchStack || []).length
           // Stale/mismatched response — the named card isn't in hand. Pop
           // the last card so we still make progress; without this, `continue`
           // loops forever when the hand mutated between response and check.
-          const cardName = ps.hand.pop();
+          const cardName = ps.hand.splice(ps.hand.length - 1, 1)[0];   // per splice (nicht pop): Herkunft des Platzes wird so mitgefuehrt
           if (cardName != null) await finishMove(cardName);
           continue;
         }

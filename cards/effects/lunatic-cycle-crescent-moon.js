@@ -64,10 +64,10 @@ module.exports = {
         // In-hand multi-select — the player clicks the cards in their
         // OWN hand to choose what to shuffle back (the `handPick`
         // prompt; same UX as Leadership), NOT a modal gallery.
-        const waehlbar = new Set(engine.shuffleBackEligibleHandCards(pi));
+        const waehlbar = new Set(engine.shuffleBackEligibleHandSlots(pi));
         const eligibleIndices = ps.hand
           .map((_, i) => i)
-          .filter(i => waehlbar.has(ps.hand[i]));
+          .filter(i => waehlbar.has(i));
         if (eligibleIndices.length === 0) return;
         const result = await engine.promptGeneric(pi, {
           type: 'handPick',

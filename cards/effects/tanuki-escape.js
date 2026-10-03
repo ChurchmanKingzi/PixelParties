@@ -163,10 +163,10 @@ module.exports = {
       let shuffledPlaetze;
       if (budget > 0 && (ps.hand || []).length > 0) {
         const cap = Math.min(budget, ps.hand.length);
-        const waehlbar = new Set(engine.shuffleBackEligibleHandCards(pi));
+        const waehlbar = new Set(engine.shuffleBackEligibleHandSlots(pi));
         const eligibleIndices = ps.hand
           .map((_, i) => i)
-          .filter(i => waehlbar.has(ps.hand[i]));
+          .filter(i => waehlbar.has(i));
         const handPick = await engine.promptGeneric(pi, {
           type:           'handPick',
           title:          CARD_NAME,

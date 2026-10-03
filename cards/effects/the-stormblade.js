@@ -124,7 +124,8 @@ async function sturmzyklus(engine, pi, anlass, klingenSeite) {
   if (engine._stormbladeLaeuft) return false;
   engine._stormbladeLaeuft = true;
   try {
-    const waehlbar = engine.shuffleBackEligibleHandCards(pi);
+    const waehlbarPlaetze = engine.shuffleBackEligibleHandSlots(pi);   // platzgenau (Herkunft), nicht per Name
+    const waehlbar = waehlbarPlaetze.map(i => ps.hand[i]);
     if (waehlbar.length === 0) return false;
 
     // ★ v1156: Auftritt beim Ausloesen — vor der Auswahl, die nicht
@@ -134,8 +135,7 @@ async function sturmzyklus(engine, pi, anlass, klingenSeite) {
     let namen;
     let plaetze;   // Handplaetze zu `namen` (nur bei Auswahl) — die Herkunft entscheidet, nicht der Name
     if (anlass === 'action') {
-      const erlaubt = new Set(waehlbar);
-      const eligibleIndices = ps.hand.map((_, i) => i).filter(i => erlaubt.has(ps.hand[i]));
+      const eligibleIndices = waehlbarPlaetze.slice();
       const wahl = await engine.promptGeneric(pi, {
         type: 'handPick',
         title: CARD_NAME,
@@ -157,6 +157,7 @@ async function sturmzyklus(engine, pi, anlass, klingenSeite) {
       }
     } else {
       namen = waehlbar;       // Treffer: die ganze (mischbare) Hand
+      plaetze = waehlbarPlaetze;
     }
 
     const { potionCount, totalReturned } = await engine.actionMulliganCards(pi, namen, plaetze);

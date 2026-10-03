@@ -33,10 +33,10 @@ module.exports = {
     }
 
     // Build eligible indices (all hand cards except the resolving potion)
-    const waehlbar = new Set(engine.shuffleBackEligibleHandCards(pi));
+    const waehlbar = new Set(engine.shuffleBackEligibleHandSlots(pi));
     const eligibleIndices = ps.hand
       .map((_, i) => i)
-      .filter(i => i !== resolvingIdx && waehlbar.has(ps.hand[i]));
+      .filter(i => i !== resolvingIdx && waehlbar.has(i));
 
     // If no cards to pick from (hand is just the potion), skip picking and draw 1
     if (eligibleIndices.length === 0) {

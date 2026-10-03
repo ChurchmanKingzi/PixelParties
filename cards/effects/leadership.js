@@ -58,10 +58,10 @@ module.exports = {
     // GESTOHLENE Karten waehlbar — die gehen ins Deck ihres Besitzers
     // zurueck, und das ist nicht "their deck" im Sinne von Hatusbals
     // Text (Als Ruling 16.8.).
-    const waehlbar = new Set(engine.shuffleBackEligibleHandCards(pi));
+    const waehlbar = new Set(engine.shuffleBackEligibleHandSlots(pi));
     const eligibleIndices = ps.hand
       .map((_, i) => i)
-      .filter(i => waehlbar.has(ps.hand[i]));
+      .filter(i => waehlbar.has(i));
     if (eligibleIndices.length === 0) return false;
 
     const result = await engine.promptGeneric(pi, {

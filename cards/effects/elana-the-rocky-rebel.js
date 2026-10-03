@@ -77,9 +77,10 @@ module.exports = {
     // Zahl haengt also an dem, was TATSAECHLICH zurueckging, nicht an
     // der urspruenglichen Handgroesse. `drawCount` wird deshalb unten
     // neu berechnet.
-    const cardNamesToReturn = engine.shuffleBackEligibleHandCards(pi);
+    const plaetzeToReturn = engine.shuffleBackEligibleHandSlots(pi);   // platzgenau: die Herkunft entscheidet
+    const cardNamesToReturn = plaetzeToReturn.map(i => ps.hand[i]);
     const { ownDeckCount, potionCount, totalReturned } =
-      await engine.actionMulliganCards(pi, cardNamesToReturn);
+      await engine.actionMulliganCards(pi, cardNamesToReturn, plaetzeToReturn);
 
     // "the same number of cards +1" — gemessen an dem, was wirklich
     // zurueckging, ★ ueber BEIDE Decks (Als Regel 17.8.): eine
