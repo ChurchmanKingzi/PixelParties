@@ -5475,6 +5475,26 @@ eine Area als alt).
 
 ---
 
+### Held-Vertrag `interceptsOppDeckSearch` — die Deck-Suche des Gegners umbauen (Krates)
+
+Ein Heldenskript mit `interceptsOppDeckSearch: true` und
+`async interceptOppDeckSearch(engine, { searcher, holder, heroIdx, firstName, opts })`
+bekommt jede Ein-Karten-Suche des GEGNERS, bevor die Karte das Deck verlässt
+(`engine._checkOppDeckSearchInterceptors`, gerufen in
+`actionAddCardFromDeckToHand` neben dem Cybug-BEE-Fenster). `true` = vollständig
+erledigt; `actionAddCardFromDeckToHand` liefert dann `'krates'` (wahrheitswertig,
+damit Aufrufer wie Brainstorming nicht „abgebrochen" melden), `searchDeckForNamedCard`
+überspringt Reveal/Flug. Stumme (Frozen/Stunned/Negated) und tote Helden greifen nicht.
+**MEHRFACH-TUTOREN melden `_noKrates: true`** an `actionAddCardFromDeckToHand`
+(Beato, Cute Dog, Divine Gift of Creation, Future Tech Database/Lamp, Kitsune
+Transformation, Spider Dance, Tamed Hell Fox, Tanuki Escape, Trial of Loyalty, Kopernikos
+Zusatzkarte) — jeder NEUE Mehrfach-Tutor muss das auch tun.
+**Bekannte Lücke:** Tutoren, die per `takeFromPile(…, toHand)` + `handZugang(von:'deck')`
+arbeiten (Bifab, Cute Annoyance Mini, Slippery Narw, Life Searcher, Nerdy Cheese-Zweitkarte,
+Aurora Borealis …), laufen nicht durch das Tor und werden von Krates (noch) nicht erfasst.
+
+---
+
 ### `cannotBeIncreased` — "this damage cannot be increased" (v579)
 
 > Future Tech Doomsday Bomb is the first card with this clause. It is

@@ -10627,6 +10627,12 @@ class GameEngine {
       ...(opts.flugStil ? { flugStil: opts.flugStil } : {}),   // 26.9.
     });
     if (!ok) return null;
+    // Krates & Co. haben die Suche umgebaut und selbst aufgedeckt/verteilt.
+    if (ok === 'krates') {
+      if (opts.shuffle !== false) this.shuffleDeck(playerIdx);
+      this.sync();
+      return cardName;
+    }
 
     await this.revealSearchedCards(playerIdx, [cardName], title);
 
@@ -24132,6 +24138,17 @@ this._deathWatch = (this._deathWatchStack || []).length
       if (preSearchResult?.searchRedirected) return false;
     }
 
+    // ── Held-Vertrag `interceptsOppDeckSearch` (Krates, the Smartass) ──
+    // Der GEGNER des Suchenden kann die Suche umbauen: er (nicht der
+    // Suchende) entscheidet dann, wer was bekommt. Dieselbe Stelle wie das
+    // Surprise-Fenster oben — die Karte liegt noch im Deck. `'krates'`
+    // (wahrheitswertig!) heisst: vollstaendig erledigt; Aufrufer, die auf
+    // `false` mit „Effekt abgebrochen" reagieren (Brainstorming), sehen so
+    // eine gelungene Suche. Mehrfach-Tutoren melden `_noKrates: true`.
+    if (!opts._skipSurpriseCheck && !opts._noKrates) {
+      if (await this._checkOppDeckSearchInterceptors(pi, cardName, opts)) return 'krates';
+    }
+
     ps.mainDeck.splice(idx, 1);
     // If the spliced card was the top of the deck and that top was
     // publicly known (Premonition stash, Kassaran reveal), shift the
@@ -24199,6 +24216,33 @@ this._deathWatch = (this._deathWatchStack || []).length
       });
     }
     return true;
+  }
+
+  /**
+   * Held-Vertrag `interceptsOppDeckSearch` — Heldenskripte des GEGNERS, die eine
+   * Deck-Suche (genau EINE Karte, schon gewaehlt, noch im Deck) umbauen.
+   * `async interceptOppDeckSearch(engine, { searcher, holder, heroIdx, firstName, opts })`
+   * → true = die Suche ist vollstaendig erledigt (Karten verteilt).
+   * Stumme (eingefrorene/betaeubte/negierte) und tote Helden greifen nicht ein.
+   */
+  async _checkOppDeckSearchInterceptors(searcherIdx, cardName, opts = {}) {
+    if (this._inDeckSearchIntercept || this._fastMode) return false;
+    const holder = searcherIdx === 0 ? 1 : 0;
+    const heroes = this.gs.players[holder]?.heroes || [];
+    for (let hi = 0; hi < heroes.length; hi++) {
+      const hero = heroes[hi];
+      if (!hero?.name || hero.hp <= 0) continue;
+      const script = loadCardEffect(hero.name);
+      if (!script?.interceptsOppDeckSearch || typeof script.interceptOppDeckSearch !== 'function') continue;
+      if (this._isHeroEffectSilenced(holder, hi)) continue;
+      this._inDeckSearchIntercept = true;
+      try {
+        if (await script.interceptOppDeckSearch(this, { searcher: searcherIdx, holder, heroIdx: hi, firstName: cardName, opts })) return true;
+      } finally {
+        this._inDeckSearchIntercept = false;
+      }
+    }
+    return false;
   }
 
   /**

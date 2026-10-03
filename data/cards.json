@@ -12648,7 +12648,7 @@
     "hp": 400,
     "atk": 40,
     "cost": null,
-    "effect": "Whenever an effect would allow your opponent to search their deck for a card and add it to their hand, they must search for 2 appropriate cards with different names instead, if possible, and reveal them to you. You pick one of them to add to their hand, then add the other one to your hand.",
+    "effect": "Whenever an effect would allow your opponent to search their deck for a card and add it to their hand, they must search for up to 3 appropriate cards with different names instead, if possible, and reveal them. You pick one of them to add to your hand, then pick one to add to their hand. The remaining card is deleted.",
     "archetype": "",
     "setID": "PP MS1",
     "banned": "",

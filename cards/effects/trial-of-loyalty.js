@@ -166,6 +166,7 @@ module.exports = {
         if (ps.mainDeck.indexOf(name) < 0) continue;
         await engine.actionAddCardFromDeckToHand(pi, name, {
           source: CARD_NAME,
+          _noKrates: true,   // Mehrfach-Tutor: Krates greift nur bei Ein-Karten-Suchen
           reveal: false, // gesammeltes Aufdecken gleich darunter
         });
         added.push(name);

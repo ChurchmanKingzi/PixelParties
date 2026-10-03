@@ -95,6 +95,7 @@ module.exports = {
       await engine._delay(SCHAU_MS);
       await engine.actionAddCardFromDeckToHand(pi, name, {
         source: CARD_NAME, reveal: false, _skipFlight: true,
+        _noKrates: true,   // Mehrfach-Tutor: Krates greift nur bei Ein-Karten-Suchen
       });
       engine.sync();
     }

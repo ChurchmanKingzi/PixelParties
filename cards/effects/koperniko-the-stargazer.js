@@ -110,6 +110,7 @@ async function zusatzSuche(engine, pi, heroIdx, tally, feld = pi) {
     source: CARD_NAME,
     reveal: true,                        // „reveal it\"
     shuffle: true,
+    _noKrates: true,                     // Zusatzkarte derselben Suche
   });
   return true;
 }

@@ -81,6 +81,7 @@ module.exports = {
         if (ps.mainDeck.indexOf(name) < 0) continue;
         await engine.actionAddCardFromDeckToHand(pi, name, {
           source: 'Divine Gift of Creation',
+          _noKrates: true,   // Mehrfach-Tutor: Krates greift nur bei Ein-Karten-Suchen
           reveal: false,
         });
       }
