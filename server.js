@@ -12383,6 +12383,14 @@ function validateDraftedDeck(deck, pool, cardDB) {
     return { ok: false, reason: `Main deck must be exactly 60 cards (currently ${mainDeck.length})` };
   }
 
+  // Potion Deck: 0 oder 5–15 (mit Chaos-Diamond genau 15); Side Deck: hoechstens 15.
+  if (!potionDeckGroesseOk(heroes.filter(h => h && h.hero), potionDeck.length)) {
+    return { ok: false, reason: `Potion Deck must be 0 or 5–15 cards (currently ${potionDeck.length})` };
+  }
+  if (sideDeck.length > 15) {
+    return { ok: false, reason: `Side Deck may have at most 15 cards (currently ${sideDeck.length})` };
+  }
+
   // Tally usage against the pool.
   const used = {};
   for (const h of heroes) {
@@ -12725,8 +12733,36 @@ async function cubeStartMatch(room, match, io) {
     return;
   }
 
+  cubeAutoSpectate(room, childRoom);
+
   console.log(`[cube_tournament] room ${room.id} round ${cd.bracket.currentRoundIdx} match ${match.matchIdx} started in child ${childRoomId}: ${p1.username} vs ${p2.username} (Bo${match.bo})`);
   cubeTournamentBroadcast(room, io);
+}
+
+/** Nimmt alle gerade unbeschaeftigten Mitglieder des Turnierraums (Spieler ohne
+ *  laufendes Match und Zuschauer) automatisch als Zuschauer in das neu gestartete
+ *  Match mit. Wer schon ein anderes Match schaut (parallele Spiele), bleibt dort —
+ *  per Tab laesst sich jederzeit wechseln. */
+function cubeAutoSpectate(parent, childRoom) {
+  const childRooms = [...rooms.values()].filter(r => r.parentCubeRoomId === parent.id);
+  let attached = 0;
+  for (const member of [...parent.players, ...parent.spectators]) {
+    if (!member.socketId || member.isBot || !member.userId) continue;
+    // Spielt selbst (dieses oder ein anderes laufendes Match)?
+    if (childRooms.some(r => r.players.some(p => p.userId === member.userId))) continue;
+    // Schaut bereits ein anderes Match?
+    if (childRooms.some(r => r.id !== childRoom.id && r.spectators.some(s => s.userId === member.userId))) continue;
+    if (childRoom.spectators.some(s => s.userId === member.userId)) continue;
+    const sock = io.sockets.sockets.get(member.socketId);
+    if (!sock) continue;
+    childRoom.spectators.push({
+      username: member.username, userId: member.userId, socketId: member.socketId,
+      color: member.color || '#888', avatar: member.avatar || null,
+    });
+    sock.join('room:' + childRoom.id);
+    attached++;
+  }
+  if (attached && childRoom.gameState) sendSpectatorGameState(childRoom);
 }
 
 async function cubeMatchEnd(room, match, winnerSeat, io) {

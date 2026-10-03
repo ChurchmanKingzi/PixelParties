@@ -412,8 +412,9 @@ function CubeDraftBuildScreen({ lobby, build, leaveRoom, notify, user }) {
   const [deckName, setDeckName] = useState('');
   const [heroes, setHeroes] = useState([null, null, null]); // each: { hero, ability1, ability2 } | null
   const [mainDeck, setMainDeck] = useState([]);
+  const [potionDeck, setPotionDeck] = useState([]);
+  const [sideDeck, setSideDeck] = useState([]);
   const [filter, setFilter] = useState('');
-  const [hovered, setHovered] = useState(null);
 
   // One-time bootstrap: seed deck name and auto-fill hero slots from
   // the drafted heroes (so the player isn't staring at empty slots).
@@ -440,8 +441,10 @@ function CubeDraftBuildScreen({ lobby, build, leaveRoom, notify, user }) {
     const c = {};
     for (const h of heroes) if (h?.hero) c[h.hero] = (c[h.hero] || 0) + 1;
     for (const n of mainDeck) c[n] = (c[n] || 0) + 1;
+    for (const n of potionDeck) c[n] = (c[n] || 0) + 1;
+    for (const n of sideDeck) c[n] = (c[n] || 0) + 1;
     return c;
-  }, [heroes, mainDeck]);
+  }, [heroes, mainDeck, potionDeck, sideDeck]);
 
   const isFreeAbility = (name) => cardDB[name]?.cardType === 'Ability' && name !== 'Performance';
 
@@ -496,8 +499,28 @@ function CubeDraftBuildScreen({ lobby, build, leaveRoom, notify, user }) {
   const addToMain = (name) => {
     if (mainDeck.length >= 60) return;
     if (remainingFor(name) <= 0) return;
+    if (window.canCardTypeEnterSection && !window.canCardTypeEnterSection(deckForRules, name, 'main')) return;
     setMainDeck(prev => [...prev, name]);
   };
+
+  const POTION_MAX = 15, SIDE_MAX = 15;
+  const deckForRules = { heroes };
+  const addToPotion = (name) => {
+    if (potionDeck.length >= POTION_MAX) return false;
+    if (remainingFor(name) <= 0) return false;
+    if (window.canCardTypeEnterSection && !window.canCardTypeEnterSection(deckForRules, name, 'potion')) return false;
+    setPotionDeck(prev => [...prev, name]);
+    return true;
+  };
+  const addToSide = (name) => {
+    if (sideDeck.length >= SIDE_MAX) return false;
+    if (remainingFor(name) <= 0) return false;
+    if (cardDB[name]?.cardType === 'Token') return false;
+    setSideDeck(prev => [...prev, name]);
+    return true;
+  };
+  const removePotion = (idx) => setPotionDeck(prev => prev.filter((_, i) => i !== idx));
+  const removeSide = (idx) => setSideDeck(prev => prev.filter((_, i) => i !== idx));
 
   const removeHero = (slotIdx) => {
     setHeroes(prev => prev.map((s, i) => i === slotIdx ? null : s));
@@ -514,18 +537,31 @@ function CubeDraftBuildScreen({ lobby, build, leaveRoom, notify, user }) {
       const filled = heroes.filter(h => h?.hero).length;
       if (filled < requiredHeroes) addToHero(name);
       else addToMain(name);
+    } else if (ct === 'Potion') {
+      // Potions gehoeren ins Potion Deck; ist es voll, geht es (mit Nicolas) ins Main Deck.
+      if (!addToPotion(name)) addToMain(name);
     } else {
       addToMain(name);
     }
+  };
+  // Shift+Klick → Potion Deck, Rechtsklick → Side Deck, Klick → automatisch.
+  const onCardPointer = (e, name) => {
+    if (e.shiftKey) { if (!addToPotion(name)) notify('Cannot add to Potion Deck', 'error'); return; }
+    onCardClick(name);
   };
 
   const filledHeroes = heroes.filter(h => h?.hero).length;
   const heroOk = filledHeroes === requiredHeroes;
   const mainOk = mainDeck.length === 60;
-  const deckLegal = heroOk && mainOk && deckName.trim().length > 0;
+  const hasChaos = !!(window.hasChaosDiamond && window.hasChaosDiamond({ heroes }));
+  const potionOk = hasChaos ? potionDeck.length === 15 : (potionDeck.length === 0 || (potionDeck.length >= 5 && potionDeck.length <= 15));
+  const mainPotionsOk = hasChaos || (window.hasNicolasHero && window.hasNicolasHero({ heroes })) || !mainDeck.some(n => cardDB[n]?.cardType === 'Potion');
+  const deckLegal = heroOk && mainOk && potionOk && mainPotionsOk && deckName.trim().length > 0;
   const deckProblems = [];
   if (!heroOk) deckProblems.push(`Need ${requiredHeroes} hero${requiredHeroes === 1 ? '' : 'es'} (have ${filledHeroes})`);
   if (!mainOk) deckProblems.push(`Main deck must be 60 cards (have ${mainDeck.length})`);
+  if (!potionOk) deckProblems.push(hasChaos ? `Potion Deck must be exactly 15 (have ${potionDeck.length})` : `Potion Deck must be 0 or 5–15 (have ${potionDeck.length})`);
+  if (!mainPotionsOk) deckProblems.push('Potions in the Main Deck need Nicolas');
   if (!deckName.trim()) deckProblems.push('Deck needs a name');
 
   const submitReady = () => {
@@ -536,8 +572,8 @@ function CubeDraftBuildScreen({ lobby, build, leaveRoom, notify, user }) {
         name: deckName.trim(),
         heroes,
         mainDeck,
-        potionDeck: [],
-        sideDeck: [],
+        potionDeck,
+        sideDeck,
       },
     });
   };
@@ -643,44 +679,70 @@ function CubeDraftBuildScreen({ lobby, build, leaveRoom, notify, user }) {
 
       <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
         {/* LEFT — Deck under construction */}
-        <div style={{ flex: 1, padding: 12, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-          <div className="orbit-font" style={{ fontSize: 11, color: 'var(--text2)', marginBottom: 6, fontWeight: 700, letterSpacing: 1 }}>
-            HEROES ({filledHeroes}/{requiredHeroes})
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginBottom: 16 }}>
-            {heroes.map((h, i) => (
-              <div key={i} style={{
-                aspectRatio: '5 / 7',
-                border: h?.hero ? '2px solid var(--accent)' : '2px dashed var(--bg4)',
-                borderRadius: 4, position: 'relative',
-                cursor: h?.hero ? 'pointer' : 'default',
-                opacity: i >= requiredHeroes ? .35 : 1,
-              }}
-                onClick={() => h?.hero && removeHero(i)}
-                onMouseEnter={() => h?.hero && setHovered(h.hero)}
-                onMouseLeave={() => setHovered(null)}>
-                {h?.hero ? (
-                  <CardMini card={cardDB[h.hero]} onClick={() => {}} style={{ width: '100%', height: '100%' }} />
-                ) : (
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', height: '100%', color: 'var(--text2)', fontSize: 11 }}>
-                    Hero {i + 1}
+        <div style={{ flex: 1, minWidth: 0, padding: 12, display: 'flex', flexDirection: 'column', overflow: 'hidden', gap: 10 }}>
+          {/* Heroes + Potion Deck + Side Deck nebeneinander, kompakt */}
+          <div style={{ display: 'flex', gap: 14, alignItems: 'flex-start', flexShrink: 0 }}>
+            <div style={{ flexShrink: 0 }}>
+              <div className="orbit-font" style={{ fontSize: 11, color: 'var(--text2)', marginBottom: 6, fontWeight: 700, letterSpacing: 1 }}>
+                HEROES ({filledHeroes}/{requiredHeroes})
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 84px)', gap: 6 }}>
+                {heroes.map((h, i) => (
+                  <div key={i} style={{
+                    aspectRatio: '5 / 7',
+                    border: h?.hero ? '2px solid var(--accent)' : '2px dashed var(--bg4)',
+                    borderRadius: 4, position: 'relative',
+                    cursor: h?.hero ? 'pointer' : 'default',
+                    opacity: i >= requiredHeroes ? .35 : 1,
+                  }}
+                    onClick={() => h?.hero && removeHero(i)}>
+                    {h?.hero ? (
+                      <CardMini card={cardDB[h.hero]} onClick={() => {}} style={{ width: '100%', height: '100%' }} />
+                    ) : (
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', height: '100%', color: 'var(--text2)', fontSize: 11 }}>
+                        Hero {i + 1}
+                      </div>
+                    )}
                   </div>
-                )}
+                ))}
+              </div>
+            </div>
+            {[
+              { key: 'potion', title: hasChaos ? 'POTION DECK (15 Spells)' : 'POTION DECK (0 or 5–15)', cards: potionDeck, max: POTION_MAX, remove: removePotion, ok: potionOk },
+              { key: 'side', title: 'SIDE DECK', cards: sideDeck, max: SIDE_MAX, remove: removeSide, ok: true },
+            ].map(sec => (
+              <div key={sec.key} style={{ flex: 1, minWidth: 0 }}>
+                <div className="orbit-font" style={{ fontSize: 11, color: sec.ok ? 'var(--text2)' : 'var(--danger)', marginBottom: 6, fontWeight: 700, letterSpacing: 1 }}>
+                  {sec.title} ({sec.cards.length}/{sec.max})
+                </div>
+                <div style={{ height: 118, overflowY: 'auto', border: '1px solid var(--bg4)', borderRadius: 4, padding: 4 }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(50px, 1fr))', gap: 4 }}>
+                    {sec.cards.map((name, i) => (
+                      <div key={i + '-' + name} style={{ aspectRatio: '5 / 7', cursor: 'pointer' }}
+                        onClick={() => sec.remove(i)} title="Click to remove">
+                        <CardMini card={cardDB[name]} onClick={() => {}} style={{ width: '100%', height: '100%' }} />
+                      </div>
+                    ))}
+                    {sec.cards.length === 0 && (
+                      <div style={{ gridColumn: '1/-1', textAlign: 'center', padding: 10, color: 'var(--text2)', fontSize: 10, fontStyle: 'italic' }}>
+                        {sec.key === 'potion' ? 'Shift+click a card to add' : 'Right-click a card to add'}
+                      </div>
+                    )}
+                  </div>
+                </div>
               </div>
             ))}
           </div>
 
-          <div className="orbit-font" style={{ fontSize: 11, color: 'var(--text2)', marginBottom: 6, fontWeight: 700, letterSpacing: 1 }}>
+          <div className="orbit-font" style={{ fontSize: 11, color: 'var(--text2)', fontWeight: 700, letterSpacing: 1 }}>
             MAIN DECK ({mainDeck.length}/60)
           </div>
-          <div style={{ flex: 1, overflowY: 'auto', border: '1px solid var(--bg4)', borderRadius: 4, padding: 4 }}>
+          <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', border: '1px solid var(--bg4)', borderRadius: 4, padding: 4 }}>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(64px, 1fr))', gap: 4 }}>
               {mainDeck.map((name, i) => (
                 <div key={i + '-' + name}
                   style={{ aspectRatio: '5 / 7', cursor: 'pointer' }}
                   onClick={() => removeMain(i)}
-                  onMouseEnter={() => setHovered(name)}
-                  onMouseLeave={() => setHovered(null)}
                   title="Click to remove">
                   <CardMini card={cardDB[name]} onClick={() => {}} style={{ width: '100%', height: '100%' }} />
                 </div>
@@ -698,38 +760,12 @@ function CubeDraftBuildScreen({ lobby, build, leaveRoom, notify, user }) {
           </div>
         </div>
 
-        {/* MIDDLE — Tooltip preview */}
-        <div style={{ width: 220, padding: 12, borderLeft: '1px solid var(--bg4)', borderRight: '1px solid var(--bg4)', background: 'var(--bg)' }}>
-          <div className="orbit-font" style={{ fontSize: 11, color: 'var(--text2)', marginBottom: 8, fontWeight: 700, letterSpacing: 1 }}>
-            CARD PREVIEW
-          </div>
-          {hovered && cardDB[hovered] ? (
-            <>
-              <div style={{ width: '100%', aspectRatio: '5 / 7', marginBottom: 8 }}>
-                <CardMini card={cardDB[hovered]} onClick={() => {}} style={{ width: '100%', height: '100%' }} />
-              </div>
-              <div style={{ fontSize: 11, color: 'var(--text)' }}>
-                <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--accent)', marginBottom: 4 }}>{hovered}</div>
-                <div style={{ color: 'var(--text2)', marginBottom: 6 }}>
-                  {cardDB[hovered].cardType}{cardDB[hovered].subtype && ` · ${cardDB[hovered].subtype}`}
-                </div>
-                <div style={{ whiteSpace: 'pre-wrap', fontSize: 10, lineHeight: 1.4 }}>
-                  {cardDB[hovered].effect || ''}
-                </div>
-              </div>
-            </>
-          ) : (
-            <div style={{ color: 'var(--text2)', fontSize: 11, textAlign: 'center', padding: '20px 0', fontStyle: 'italic' }}>
-              Hover any card to preview.
-            </div>
-          )}
-        </div>
-
         {/* RIGHT — Available cards (drafted pool + free abilities) */}
         <div style={{ width: 360, padding: 12, background: 'var(--bg2)', display: 'flex', flexDirection: 'column' }}>
           <div className="orbit-font" style={{ fontSize: 11, color: 'var(--text2)', marginBottom: 6, fontWeight: 700, letterSpacing: 1 }}>
             AVAILABLE CARDS
           </div>
+          <div style={{ fontSize: 9, color: 'var(--text2)', marginBottom: 6 }}>Click: add · Shift+click: Potion Deck · Right-click: Side Deck</div>
           <input className="input" placeholder="🔍 Filter by name..." value={filter} onChange={e => setFilter(e.target.value)}
             style={{ marginBottom: 8, fontSize: 11, padding: '4px 8px' }} />
           <div style={{ flex: 1, overflowY: 'auto' }}>
@@ -739,9 +775,8 @@ function CubeDraftBuildScreen({ lobby, build, leaveRoom, notify, user }) {
                 const dimmed = remaining <= 0;
                 return (
                   <div key={name}
-                    onClick={() => !dimmed && onCardClick(name)}
-                    onMouseEnter={() => setHovered(name)}
-                    onMouseLeave={() => setHovered(null)}
+                    onClick={(e) => !dimmed && onCardPointer(e, name)}
+                    onContextMenu={(e) => { e.preventDefault(); if (!dimmed && !addToSide(name)) notify('Side Deck is full', 'error'); }}
                     style={{
                       aspectRatio: '5 / 7',
                       cursor: dimmed ? 'not-allowed' : 'pointer',
@@ -770,6 +805,9 @@ function CubeDraftBuildScreen({ lobby, build, leaveRoom, notify, user }) {
             </div>
           </div>
         </div>
+
+        {/* Platz fuer den grossen Karten-Tooltip (rechte Leiste), damit er keine Karten ueberdeckt */}
+        <div className="cube-draft-tt-gutter" style={{ flexShrink: 0 }} />
       </div>
     </div>
   );
