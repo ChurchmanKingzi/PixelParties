@@ -50,6 +50,10 @@ module.exports = {
 
   isReaction: true,
   requiresTarget: false,
+  // Reagiert auch auf das PLATZIEREN einer Creature per Effekt
+  // (`actionPlaceCreature` oeffnet das Fenster nur, wenn der Gegner so
+  // eine Karte auf der Hand hat).
+  reactsToPlacement: true,
 
   /**
    * Nur auf die BESCHWOERUNG EINER GEGNERISCHEN KREATUR aus der Hand.
@@ -62,7 +66,7 @@ module.exports = {
     if (!letzter) return false;
     if (letzter.owner === pi) return false;            // muss der Gegner sein
     if (letzter.cardType !== 'Creature') return false; // nur Beschwoerungen
-    if (letzter.fromBoard) return false;               // aus der HAND
+    if (letzter.fromBoard && !letzter.isPlacement) return false;   // aus der HAND — oder Platzierung
     return true;
   },
 
@@ -96,6 +100,7 @@ module.exports = {
 
     // ── Ersatzaktion — nur bei einer ECHTEN Aktion ────────────────
     if (!ziel.isInitialCard) return;
+    if (ziel.isPlacement) return;   // Platzierung ist keine Aktion
     const cardDB = engine._getCardDB();
     const cd = cardDB[ziel.cardName];
     const script = loadCardEffect(ziel.cardName);

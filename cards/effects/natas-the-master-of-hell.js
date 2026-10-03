@@ -3,9 +3,10 @@
 //  Hero — Decay Magic / Diplomacy, 400 HP, 40 ATK (PP MBS)
 //
 //  „During your Resource Phase, instead of drawing a card from your
-//   deck, you may add a "The Master's Plan" from outside the game to
-//   your hand. Whenever you negate an opponent's card or effect,
-//   inflict 2 Stacks of Poison to any target on the board."
+//   deck, you may add a copy of "The Master's Plan" from outside the game
+//   to your hand. Whenever you negate an opponent's card or effect via
+//   the effect of "The Master's Plan", inflict 2 Stacks of Poison to any
+//   target on the board."
 //
 //  ① RESOURCE PHASE — `onResourceDrawReplace` (Engine, Resource Phase
 //    nach den Hand-Reaktionen, vor dem Standard-Zug). Ja-Frage je
@@ -17,8 +18,9 @@
 //
 //  ② NEGATION — `onNegationDealt` (Engine, `_meldeNegation`; Felder
 //    `negatorOwner`, `negatedOwner`, `negatedCardName`, `kind`): feuert,
-//    wenn eine Karte/ein Effekt des Gegners in der Kette oder eine
-//    gegnerische Surprise vom Besitzer dieses Helden negiert wird.
+//    wenn eine Karte/ein Effekt des Gegners in der Kette vom Besitzer
+//    dieses Helden NEGIERT wird — hier nur, wenn die negierende Karte
+//    „The Master's Plan" ist (`ctx.negatedByCard`; Ruling 3.10.).
 //    Pflichtwirkung („inflict"): ein Ziel waehlen, 2 Poison-Stacks.
 //    Ziele wie Poison Vial: Helden und Kreaturen beider Seiten, ohne
 //    Poison-Immune. Keine Ziele → verpufft.
@@ -125,6 +127,7 @@ module.exports = {
       const pi = ctx.cardOwner;
       if (ctx.negatorOwner !== pi) return;            // nur eigene Negationen
       if (ctx.negatedOwner === pi) return;            // nur Karten des GEGNERS
+      if (ctx.negatedByCard !== PLAN) return;         // nur „via the effect of The Master's Plan"
 
       const targets = buildPoisonTargets(engine);
       if (targets.length === 0) return;

@@ -24985,6 +24985,25 @@ this._deathWatch = (this._deathWatchStack || []).length
     const source = opts.source || 'hand';
     const sourceName = opts.sourceName || 'Placement';
 
+    // ── PLATZIERUNG NEGIEREN (Off Duty, Ruling 3.10.: „summons" gilt auch
+    // fuer das PLATZIEREN per Effekt) ────────────────────────────────────
+    // Das Kettenfenster oeffnet VOR jeder Entnahme und jedem Landen —
+    // negiert, findet die Platzierung nie statt. Nur offen, wenn der
+    // Gegner eine Handkarte mit `reactsToPlacement` haelt (sonst kein
+    // Fenster, kein Prompt-Laerm, keine CPU-Kosten).
+    if (!opts._skipPlacementWindow && !this._inMctsSim
+        && !this._inReactionCheck && !gs._chainResolvingLock
+        && this._placementReactorHeld(playerIdx)) {
+      const kette = await this.executeCardWithChain({
+        cardName, owner: playerIdx, cardType: 'Creature', goldCost: 0,
+        resolve: null, fromBoard: true, isPlacement: true,
+      });
+      if (kette?.negated) {
+        await this._negatedPlacementToDeck(cardName, playerIdx, source, opts);
+        return null;
+      }
+    }
+
     let _handFlug = false;
     let _ablage = null;   // v1389: Entnahme-Beleg bei source 'discard'
     if (source === 'hand') {
@@ -36069,6 +36088,10 @@ this._deathWatch = (this._deathWatchStack || []).length
       // activate). Reactions like "The Master's Plan" gate on this so they
       // only fire when the opponent actually plays a card from hand.
       fromBoard: !!fromBoard,
+      // Platzierung per Effekt (`actionPlaceCreature`): kein Kartenspiel aus
+      // der Hand, keine Aktion — nur Reaktionen mit `reactsToPlacement`
+      // (Off Duty) greifen ein.
+      isPlacement: !!cardInfo.isPlacement,
       goldCost: goldCost || 0,
       isInitialCard: true,
       negated: false,
@@ -36950,7 +36973,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         if (link.negated) {
           await this._meldeNegation({
             negatedOwner: link.owner, negatorOwner: link.negatedBy,
-            cardName: link.cardName, kind: 'chain',
+            cardName: link.cardName, kind: 'chain', negatedByCard: link.negatedByCard,
           });
         }
       } else {
@@ -36966,12 +36989,15 @@ this._deathWatch = (this._deathWatchStack || []).length
             // Wer gerade aufloest, ist der Negierer, falls das Glied
             // ein anderes negiert (`negateChainLink` liest das).
             const _vorherAufloeser = this._rxResolvingOwner;
+            const _vorherKarte = this._rxResolvingCard;
             this._rxResolvingOwner = link.owner;
+            this._rxResolvingCard = link.cardName;
             let result;
             try {
               result = await link.resolve(chain, i);
             } finally {
               this._rxResolvingOwner = _vorherAufloeser;
+              this._rxResolvingCard = _vorherKarte;
             }
             if (link.isInitialCard) link.resolveResult = this._applyDiscardOutDecline(link.cardName, result);
           } catch (err) {
@@ -37113,6 +37139,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       chain[linkIndex].negated = true;
       // Negierer = Besitzer des gerade aufloesenden Glieds (s. `_resolveReactionChain`).
       if (Number.isInteger(this._rxResolvingOwner)) chain[linkIndex].negatedBy = this._rxResolvingOwner;
+      if (this._rxResolvingCard) chain[linkIndex].negatedByCard = this._rxResolvingCard;
       if (opts.negationStyle) chain[linkIndex].negationStyle = opts.negationStyle;
       // `deleteCard` → the negated card is removed from the game
       // (deleted pile) instead of going to its owner's discard pile.
@@ -37139,13 +37166,51 @@ this._deathWatch = (this._deathWatchStack || []).length
    * (Natas). Ohne bekannten Negierer gilt im 1-gegen-1 der andere Spieler.
    * Negiert jemand seine EIGENE Karte, ist das keine gegnerische — kein Hook.
    */
-  async _meldeNegation({ negatedOwner, negatorOwner, cardName, kind }) {
+  async _meldeNegation({ negatedOwner, negatorOwner, cardName, kind, negatedByCard }) {
     if (!Number.isInteger(negatedOwner)) return;
     const negator = Number.isInteger(negatorOwner) ? negatorOwner : 1 - negatedOwner;
     if (negator === negatedOwner) return;
     await this.runHooks(HOOKS.ON_NEGATION_DEALT, {
-      negatorOwner: negator, negatedOwner, negatedCardName: cardName, kind, _skipReactionCheck: true,
+      negatorOwner: negator, negatedOwner, negatedCardName: cardName, kind, negatedByCard, _skipReactionCheck: true,
     });
+  }
+
+  /** Haelt der Gegner von `playerIdx` eine Handkarte, die auf Platzierungen reagiert? */
+  _placementReactorHeld(playerIdx) {
+    const opp = this.gs.players[playerIdx === 0 ? 1 : 0];
+    if (!opp || !(opp.hand || []).length) return false;
+    return opp.hand.some(n => !!loadCardEffect(n)?.reactsToPlacement);
+  }
+
+  /**
+   * Eine per Effekt platzierte Creature wurde (Off Duty) negiert: sie
+   * wandert zurueck INS DECK und wird gemischt. Quelle Hand/Ablage: die
+   * Karte wird dort entnommen; bei jeder anderen Quelle hat der Aufrufer
+   * sie schon entnommen — sie kommt nur ins Deck.
+   */
+  async _negatedPlacementToDeck(cardName, playerIdx, source, opts = {}) {
+    const ps = this.gs.players[playerIdx];
+    if (!ps) return;
+    let von = 'hand', handIdx;
+    if (source === 'hand') {
+      handIdx = opts.sourceIdx != null ? opts.sourceIdx : (ps.hand || []).indexOf(cardName);
+      if (handIdx >= 0 && ps.hand[handIdx] === cardName) ps.hand.splice(handIdx, 1);
+    } else if (source === 'discard') {
+      von = 'discard';
+      const pile = this.gs.players[opts.pileOwner ?? playerIdx]?.discardPile || [];
+      const i = opts.sourceIdx != null ? opts.sourceIdx : pile.indexOf(cardName);
+      if (i >= 0 && pile[i] === cardName) pile.splice(i, 1);
+    }
+    this._broadcastEvent('play_pile_transfer', {
+      owner: playerIdx, cardName, from: von, to: 'deck',
+      ...(von === 'hand' && Number.isInteger(handIdx) && handIdx >= 0 ? { fromHandIdx: handIdx } : {}),
+    });
+    await this._delay(650);
+    if (!ps.mainDeck) ps.mainDeck = [];
+    ps.mainDeck.push(cardName);
+    this.shuffleDeck(playerIdx);
+    this.log('negated_to_deck', { card: cardName, player: ps.username, placement: true });
+    this.sync();
   }
 
   /**

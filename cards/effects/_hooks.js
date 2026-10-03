@@ -149,7 +149,7 @@ const HOOKS = {
   ON_CHAIN_RESOLVE:  'onChainResolve',
   ON_EFFECT_NEGATED: 'onEffectNegated',
   // Natas, the Master of Hell: "Whenever you negate an opponent's card or effect".
-  // ctx: { negatorOwner, negatedOwner, negatedCardName, kind: 'chain' | 'surprise' }
+  // ctx: { negatorOwner, negatedOwner, negatedCardName, kind: 'chain' | 'surprise', negatedByCard (Name der negierenden Karte, nur Chain) }
   // (`cardName` waere der Name des LAUSCHERS — deshalb `negatedCardName`.)
   ON_NEGATION_DEALT: 'onNegationDealt',
 
