@@ -3494,7 +3494,7 @@ class GameEngine {
     }
 
     // After hooks, check for equip/summon/ability-triggered surprises
-    if (hookName === 'onCardEnterZone' && !this._inSurpriseResolution && !hookCtx._skipReactionCheck) {
+    if (hookName === 'onCardEnterZone' && !this._surpriseNestingBlocked() && !hookCtx._skipReactionCheck) {
       const enteringCard = hookCtx.enteringCard;
       const toZone = hookCtx.toZone;
       if (enteringCard && toZone === 'support') {
@@ -3576,7 +3576,7 @@ class GameEngine {
       if (_lockCard && await this._enforceSupportZoneLock(_lockCard)) return;
     }
 
-    if (hookName === 'onCardEnterZone' && !this._inSurpriseResolution
+    if (hookName === 'onCardEnterZone' && !this._surpriseNestingBlocked()
         && !hookCtx._skipEnterSupportSurprise
         && hookCtx.toZone === 'support') {
       const _eintritt = hookCtx.enteringCard || hookCtx.card || null;
@@ -29984,7 +29984,7 @@ this._deathWatch = (this._deathWatchStack || []).length
   }
 
   async _checkSurpriseOnEquip(equipOwnerIdx, equipHeroIdx, equipCard) {
-    if (this._inSurpriseResolution) return null;
+    if (this._surpriseNestingBlocked()) return null;
     const opponentIdx = equipOwnerIdx === 0 ? 1 : 0;
     const equipInfo = { equipOwner: equipOwnerIdx, equipHeroIdx, cardName: equipCard?.name, cardInstance: equipCard };
     const equipPlayerName = this.gs.players[equipOwnerIdx]?.username || 'Opponent';
@@ -30090,6 +30090,17 @@ this._deathWatch = (this._deathWatchStack || []).length
    * @param {object} promptConfig - { title, message, showCard, confirmLabel }
    * @returns {object|null} Result from _activateSurprise
    */
+  /**
+   * Surprises duerfen waehrend der Aufloesung einer anderen Surprise
+   * ausloesen (Ruling 3.10.: Camel gegen Camel, Surprise-Beschwoerungen,
+   * Zuege/Schaden/Status aus Surprise-Effekten). Gesperrt ist nur
+   * Selbst-Rekursion je Held (`_activeSurpriseHeroes`) und ein hartes
+   * Tiefenlimit gegen Endlosketten.
+   */
+  _surpriseNestingBlocked() {
+    return (this._surpriseResolutionDepth || 0) >= 6;
+  }
+
   async _scanSurpriseEntriesForPlayer(playerIdx, triggerFlag, triggerInfo, promptConfig) {
     const entries = this._getAllSurpriseEntries(playerIdx);
     this.gs._surprisePendingCount = (this.gs._surprisePendingCount || 0) + 1;
@@ -30101,6 +30112,8 @@ this._deathWatch = (this._deathWatchStack || []).length
       // Als Vorgabe 29.9.: `playerIdx` = Ausloeser (Kontrolleur), `seite` =
       // Brettseite der Zone. Ausloeser bekommen die Seite als 6. Argument.
       const seite = entry.seite ?? playerIdx;
+      // Ein Held, dessen Surprise gerade aufloest, oeffnet kein zweites Fenster.
+      if (this._activeSurpriseHeroes?.has(`${seite}-${entry.heroIdx}`)) continue;
 
       if (script.surpriseTrigger && !script.surpriseTrigger(this.gs, playerIdx, entry.heroIdx, triggerInfo, this, seite)) continue;
       // Typed trigger filter: when `script[triggerFlag]` is a function
@@ -30170,7 +30183,7 @@ this._deathWatch = (this._deathWatchStack || []).length
   }
 
   async _checkSurpriseOnHeroEffect(activatorIdx, heroIdx, effectName, heroOwner = activatorIdx) {
-    if (this._inSurpriseResolution) return null;
+    if (this._surpriseNestingBlocked()) return null;
     const opponentIdx = activatorIdx === 0 ? 1 : 0;
     // Styx 28.9.: `heroOwner` = Brettseite des Helden (uebernommen: Gegenseite).
     const heroEffectInfo = { activatorIdx, heroIdx, effectName, heroOwner };
@@ -30182,7 +30195,7 @@ this._deathWatch = (this._deathWatchStack || []).length
   }
 
   async _checkSurpriseOnAbility(attachOwnerIdx, attachHeroIdx, attachCard, zoneOwnerIdx = attachOwnerIdx) {
-    if (this._inSurpriseResolution) return null;
+    if (this._surpriseNestingBlocked()) return null;
     const opponentIdx = attachOwnerIdx === 0 ? 1 : 0;
     // Styx 28.9.: `attachOwner` = wer anlegt (Kontrolleur), `zoneOwner` =
     // Brettseite des Helden, an dem die Ability liegt. Beim Anlegen an einen
@@ -30219,7 +30232,7 @@ this._deathWatch = (this._deathWatchStack || []).length
    *   genauso abbrechen wie eine Negation aus der Kette.
    */
   async _checkSurpriseOnAbilityActivation(activatorIdx, heroIdx, zoneIdx, abilityName, heroOwner = activatorIdx) {
-    if (this._inSurpriseResolution) return null;
+    if (this._surpriseNestingBlocked()) return null;
     const opponentIdx = activatorIdx === 0 ? 1 : 0;
     // Styx 28.9.: `heroOwner` = Brettseite des Helden (uebernommen: Gegenseite);
     // Stufe und Heldenname kommen von dort, nicht von der Aktivierer-Seite.
@@ -30280,7 +30293,7 @@ this._deathWatch = (this._deathWatchStack || []).length
    * frisches „you deal damage".
    */
   async _checkSurpriseOnDealtDamage(targetInfo, source, amount, type) {
-    if (this._inSurpriseResolution) return null;
+    if (this._surpriseNestingBlocked()) return null;
     if (!targetInfo || !(amount > 0)) return null;
     if (type === 'status' || type === 'burn' || type === 'poison') return null;
     // Als Vorgabe 29.9.: „you deal damage" = der handelnde SPIELER — bei
@@ -30316,7 +30329,7 @@ this._deathWatch = (this._deathWatchStack || []).length
   }
 
   async _checkSurpriseAfterDamage(target, source, amount, type, opts = {}) {
-    if (this._inSurpriseResolution) return null;
+    if (this._surpriseNestingBlocked()) return null;
     if (!target || !(amount > 0)) return null;
     const targetOwner = this._findHeroOwner(target);
     if (targetOwner < 0) return null;
@@ -30379,7 +30392,7 @@ this._deathWatch = (this._deathWatchStack || []).length
    *   sagt dem Aufrufer, dass der Held wieder steht.
    */
   async _checkSurpriseOnHeroDefeat(defeatedHero, source, ownerIdx) {
-    if (this._inSurpriseResolution) return null;
+    if (this._surpriseNestingBlocked()) return null;
     if (!defeatedHero) return null;
     const besitzer = (ownerIdx != null && ownerIdx >= 0)
       ? ownerIdx : this._findHeroOwner(defeatedHero);
@@ -30434,7 +30447,7 @@ this._deathWatch = (this._deathWatchStack || []).length
    * kein Platzieren.
    */
   async _checkSurpriseOnPlacement(placerIdx, cardInstance, zoneKind) {
-    if (this._inSurpriseResolution) return null;
+    if (this._surpriseNestingBlocked()) return null;
     if (!cardInstance || placerIdx == null || placerIdx < 0) return null;
     const opponentIdx = placerIdx === 0 ? 1 : 0;
     const cd = this._getCardDB()[cardInstance.name];
@@ -30457,7 +30470,7 @@ this._deathWatch = (this._deathWatchStack || []).length
   }
 
   async _checkSurpriseOnSummon(summonerIdx, summonedCard) {
-    if (this._inSurpriseResolution) return null;
+    if (this._surpriseNestingBlocked()) return null;
     // Face-down Surprise Creatures placed onto a support zone (Bakhm
     // Hosts) go through `onCardEnterZone` with `toZone='support'`,
     // which dispatches here. That's a SET, not a summon — the card
@@ -30505,7 +30518,7 @@ this._deathWatch = (this._deathWatchStack || []).length
    * wie beim Beschwoerungs-Fenster.
    */
   async _checkSurpriseOnCreatureEnterSupport(enterCard, extras = {}) {
-    if (this._inSurpriseResolution) return null;
+    if (this._surpriseNestingBlocked()) return null;
     if (!enterCard || enterCard.faceDown) return null;
     const cd = this._getCardDB()[enterCard.name];
     if (!cd || !hasCardType(cd, 'Creature')) return null;
@@ -30554,7 +30567,7 @@ this._deathWatch = (this._deathWatchStack || []).length
    * Filterfunktion wie bei jedem anderen getypten Ausloeser).
    */
   async _checkSurpriseOnSurpriseDiscarded(info) {
-    if (this._inSurpriseResolution) return null;
+    if (this._surpriseNestingBlocked()) return null;
     const ownerIdx = info?.zoneOwner;
     if (!Number.isInteger(ownerIdx) || ownerIdx < 0) return null;
     const heldName = this.gs.players[ownerIdx]?.heroes?.[info.fromHeroIdx]?.name || 'a Hero';
@@ -30568,7 +30581,7 @@ this._deathWatch = (this._deathWatchStack || []).length
   }
 
   async _checkSurpriseOnStatus(targetOwnerIdx, targetHeroIdx, statusName, opts) {
-    if (this._inSurpriseResolution) return null;
+    if (this._surpriseNestingBlocked()) return null;
     // Als Vorgabe 29.9.: es reagiert, wer den Helden kontrolliert.
     const reaktor = this.surpriseKontrolleur(targetOwnerIdx, targetHeroIdx);
     const statusInfo = { targetOwner: targetOwnerIdx, targetHeroIdx, targetController: reaktor, statusName, opts };
@@ -30609,7 +30622,7 @@ this._deathWatch = (this._deathWatchStack || []).length
    * @param {number} amount       - The post-hook Gold amount about to be applied
    */
   async _checkSurpriseOnResourceGain(activatorIdx, amount) {
-    if (this._inSurpriseResolution) return null;
+    if (this._surpriseNestingBlocked()) return null;
     if (!(amount > 0)) return null;
     const opponentIdx = activatorIdx === 0 ? 1 : 0;
     const activatorName = this.gs.players[activatorIdx]?.username || 'Opponent';
@@ -30627,7 +30640,7 @@ this._deathWatch = (this._deathWatchStack || []).length
    * @param {number} drawnCount - How many cards were drawn
    */
   async _checkSurpriseOnDraw(drawingPlayerIdx, drawnCount) {
-    if (this._inSurpriseResolution) return null;
+    if (this._surpriseNestingBlocked()) return null;
     const opponentIdx = drawingPlayerIdx === 0 ? 1 : 0;
     const drawPlayerName = this.gs.players[drawingPlayerIdx]?.username || 'Opponent';
     const drawInfo = { drawingPlayer: drawingPlayerIdx, count: drawnCount, phase: this.gs.currentPhase };
@@ -30652,7 +30665,7 @@ this._deathWatch = (this._deathWatchStack || []).length
    * re-trigger another Surprise on the same window).
    */
   async _checkSurpriseBeforeOppDraw(drawingPlayerIdx, count) {
-    if (this._inSurpriseResolution) return null;
+    if (this._surpriseNestingBlocked()) return null;
     // MCTS rollouts simulate thousands of turns; a per-draw surprise
     // scan would dominate the brain's deliberation budget and bloat
     // every rollout with prompt-resolution machinery the brain doesn't
@@ -30685,7 +30698,7 @@ this._deathWatch = (this._deathWatchStack || []).length
    * controller's hand itself).
    */
   async _checkSurpriseBeforeOppDeckSearch(searcherIdx, cardName) {
-    if (this._inSurpriseResolution) return null;
+    if (this._surpriseNestingBlocked()) return null;
     // Same MCTS / fast-mode skip as `_checkSurpriseBeforeOppDraw` —
     // see that helper for the rationale.
     if (this._inMctsSim || this._fastMode) return null;
@@ -30722,7 +30735,7 @@ this._deathWatch = (this._deathWatchStack || []).length
    * @param {number} endingPlayerIdx - The player whose turn just ended.
    */
   async _checkSurpriseOnTurnEnd(endingPlayerIdx) {
-    if (this._inSurpriseResolution) return null;
+    if (this._surpriseNestingBlocked()) return null;
     const info = {
       endingPlayer: endingPlayerIdx,
       turn: this.gs.turn,
@@ -35898,7 +35911,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         });
         await this.runHooks('onCardEnterZone', {
           enteringCard: inst, toZone: 'support', toHeroIdx: heroIdx,
-          _skipReactionCheck: true,
+          _skipReactionCheck: false,   // Surprise-Beschwoerung = Beschwoerung (Ruling 3.10.)
         });
         await this.runHooks('onSurpriseCreaturePlaced', {
           surpriseCardName: cardName, surpriseOwner: playerIdx, heroIdx,
@@ -35935,7 +35948,31 @@ this._deathWatch = (this._deathWatchStack || []).length
     // is consumed without resolving — its Creature is never placed; it
     // falls through to the discard branch below.
     const cardData = this._getCardDB()[cardName];
-    if (!surpriseNegated && hasCardType(cardData, 'Creature')) {
+    // ── BESCHWOERUNG DURCH EINE KREATUR-SURPRISE NEGIERBAR (Off Duty,
+    // Ruling 3.10.): die Surprise-Kreatur landet per Aktivierung auf dem
+    // Feld — das ist eine Beschwoerung und oeffnet vorher ihr Kettenfenster
+    // (Herkunft Surprise Zone = nicht Hand → `fromBoard`).
+    let _beschwoerungNegiert = null;
+    if (!surpriseNegated && hasCardType(cardData, 'Creature') && !isBakhmSlot && !this._inMctsSim
+        && this._placementReactorHeld(steuerer ?? playerIdx)) {
+      const _aeussere = this._inReactionCheck;
+      try {
+        const k = await this.executeCardWithChain({
+          cardName, owner: steuerer ?? playerIdx, cardType: 'Creature', goldCost: 0,
+          resolve: null, fromBoard: true, isPlacement: true,
+        });
+        if (k?.negated) _beschwoerungNegiert = k;
+      } finally {
+        this._inReactionCheck = _aeussere;
+      }
+    }
+    if (_beschwoerungNegiert) {
+      // Wie eine negierte Karte: Off Duty → Deck, Lunar Eclipse → Loeschstapel,
+      // sonst Ablage des KARTENBESITZERS.
+      const _besitzer = (inst?.originalOwner === 0 || inst?.originalOwner === 1) ? inst.originalOwner : playerIdx;
+      if (inst) this._untrackCard(inst.id);
+      await this._negatedPlacementRoute(cardName, _besitzer, 'none', {}, _beschwoerungNegiert);
+    } else if (!surpriseNegated && hasCardType(cardData, 'Creature')) {
       // Place face-up as permanent creature in first free support zone
       const placed = this.safePlaceInSupport(cardName, playerIdx, heroIdx, -1);
       if (placed && inst) {
@@ -35992,7 +36029,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         });
         await this.runHooks('onCardEnterZone', {
           enteringCard: inst, toZone: 'support', toHeroIdx: heroIdx,
-          _skipReactionCheck: true,
+          _skipReactionCheck: false,   // Surprise-Beschwoerung = Beschwoerung (Ruling 3.10.)
         });
         // Fire hook for Bakhm's 80-damage chain
         await this.runHooks('onSurpriseCreaturePlaced', {
