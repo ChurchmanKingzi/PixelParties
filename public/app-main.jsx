@@ -70,6 +70,21 @@ function CubeDraftScreen({ lobby, draft, leaveRoom, notify }) {
   const startedAt = useRef(Date.now());
   useEffect(() => { startedAt.current = Date.now(); }, [draft?.round, draft?.pickInRound, draft?.suspended]);
 
+  // Pack-Flaeche vermessen: Kartengroesse so waehlen, dass ALLE Karten
+  // (8 pro Reihe) ohne Scrollen in Breite UND Hoehe passen.
+  const packBoxRef = useRef(null);
+  const [packBox, setPackBox] = useState({ w: 0, h: 0 });
+  const packVisible = !!draft && !draft.isSpectator;
+  useEffect(() => {
+    const el = packBoxRef.current;
+    if (!el) return;
+    const measure = () => setPackBox(prev => (prev.w === el.clientWidth && prev.h === el.clientHeight) ? prev : { w: el.clientWidth, h: el.clientHeight });
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [packVisible]);
+
   if (!draft) {
     return (
       <div className="screen-full">
@@ -258,22 +273,26 @@ function CubeDraftScreen({ lobby, draft, leaveRoom, notify }) {
         </div>
 
         {/* CENTER — pack */}
-        <div style={{ flex: 1, padding: '16px 20px', display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+        <div style={{ flex: 1, padding: '16px 20px', display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: 0 }}>
           <div className="orbit-font" style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 10, textAlign: 'center', fontWeight: 600 }}>
             {draft.myPicked ? 'WAITING FOR OTHER DRAFTERS…' : 'PICK A CARD FROM THIS PACK'}
           </div>
+          <div ref={packBoxRef} style={{ flex: 1, minHeight: 0, minWidth: 0, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          {(() => {
+            const GAP = 6, COLS = 8;
+            const rows = Math.max(1, Math.ceil(draft.myPack.length / COLS));
+            const wByWidth = (packBox.w - GAP * (COLS - 1)) / COLS;
+            const wByHeight = ((packBox.h - GAP * (rows - 1)) / rows) * 5 / 7;
+            const cardW = Math.max(40, Math.floor(Math.min(wByWidth, wByHeight)));
+            return (
           <div style={{
-            flex: 1, display: 'grid',
-            // minmax(0,1fr): sonst blaeht der Karten-Inhalt (min-content) die
-            // Spalten auf und die 7./8. Spalte rutscht aus dem Bild.
-            gridTemplateColumns: 'repeat(8, minmax(0, 1fr))',
-            gridAutoRows: 'min-content',
-            gap: 6, padding: 4,
+            display: 'grid',
+            gridTemplateColumns: `repeat(${COLS}, ${cardW}px)`,
+            gridAutoRows: `${Math.round(cardW * 7 / 5)}px`,
+            gap: GAP,
             opacity: draft.myPicked ? 0.45 : 1,
             transition: 'opacity .25s',
-            alignContent: 'start',
-            minHeight: 0, minWidth: 0,
-            overflowY: 'auto', overflowX: 'hidden',
+            visibility: packBox.w ? 'visible' : 'hidden',
           }}>
             {draft.myPack.map((cardName, idx) => (
               <div key={idx} style={{
@@ -289,6 +308,9 @@ function CubeDraftScreen({ lobby, draft, leaveRoom, notify }) {
                 <CardMini card={window.CARDS_BY_NAME?.[cardName]} onClick={() => {}} style={{ width: '100%', height: '100%' }} />
               </div>
             ))}
+          </div>
+            );
+          })()}
           </div>
         </div>
 
