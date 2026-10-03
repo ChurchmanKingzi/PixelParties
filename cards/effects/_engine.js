@@ -3485,7 +3485,11 @@ class GameEngine {
     }
 
     // After hooks resolve, check for reaction cards (unless suppressed)
-    if (!this._inReactionCheck && !hookCtx._skipReactionCheck && !hookCtx._isReaction) {
+    // Ausnahme `onCreatureSummoned` (Ruling 3.10.): eine NEUE Beschwoerung
+    // mitten in einer laufenden Kette oeffnet trotzdem ihr eigenes
+    // On-Summon-Fenster.
+    if ((!this._inReactionCheck || hookName === 'onCreatureSummoned')
+        && !hookCtx._skipReactionCheck && !hookCtx._isReaction) {
       await this._checkReactionCards(hookName, hookCtx);
     }
 
@@ -24994,13 +24998,23 @@ this._deathWatch = (this._deathWatchStack || []).length
     // `fromBoard` haengt NUR am Herkunftsort (Ruling 3.10.): aus der HAND
     // platziert zaehlt wie ein Kartenspiel aus der Hand (The Master's Plan,
     // Lunar Eclipse), von woanders nicht — unabhaengig von „place"/„summon".
+    // Auch MITTEN in einer laufenden Kette (Platzierung durch ein
+    // aufloesendes Kettenglied): jede neue Beschwoerung/Platzierung loest
+    // ihr eigenes Fenster aus (Ruling 3.10.). `executeCardWithChain`
+    // setzt `_inReactionCheck` beim Verlassen auf false — der Wert der
+    // aeusseren Kette wird deshalb gesichert und wiederhergestellt.
     if (!opts._skipPlacementWindow && !this._inMctsSim
-        && !this._inReactionCheck && !gs._chainResolvingLock
         && this._placementReactorHeld(playerIdx)) {
-      const kette = await this.executeCardWithChain({
-        cardName, owner: playerIdx, cardType: 'Creature', goldCost: 0,
-        resolve: null, fromBoard: source !== 'hand', isPlacement: true,
-      });
+      const _aeussereKette = this._inReactionCheck;
+      let kette;
+      try {
+        kette = await this.executeCardWithChain({
+          cardName, owner: playerIdx, cardType: 'Creature', goldCost: 0,
+          resolve: null, fromBoard: source !== 'hand', isPlacement: true,
+        });
+      } finally {
+        this._inReactionCheck = _aeussereKette;
+      }
       if (kette?.negated) {
         await this._negatedPlacementRoute(cardName, playerIdx, source, opts, kette);
         return null;
@@ -36203,6 +36217,9 @@ this._deathWatch = (this._deathWatchStack || []).length
       };
     }
 
+    // Vorgaenger sichern: ein verschachteltes Fenster (On-Summon mitten in
+    // einer Kette) darf das Flag der aeusseren Kette nicht loeschen.
+    const _aeussereKette = this._inReactionCheck;
     this._inReactionCheck = true;
     try {
       // Forward the hookName + hookCtx so reactions can inspect the
@@ -36213,7 +36230,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         hookCtx._initialCardNegated = initialLink.negated;
       }
     } finally {
-      this._inReactionCheck = false;
+      this._inReactionCheck = _aeussereKette;
     }
     // NOTE: deliberately NO `_runPostChainActions()` here.
     // `_checkReactionCards` runs from `runHooks` for nearly every
