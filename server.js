@@ -8381,6 +8381,11 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
       // haelt er den Spieler weiterhin hier.
       ps._actionsPlayedThisPhase = (ps._actionsPlayedThisPhase || 0) + 1;
       await room.engine.advanceToPhase(pi, 4);
+    } else if (isActionPhase && (isInherentAction || becameFreeAction) && !gs._preventPhaseAdvance
+               && actionCounterIncrementedHere) {
+      // ★ Die ERSTE Aktion der Phase bleibt gratis (siehe doPlayCreature):
+      // den oben fuer DIESES Spiel gesetzten Zaehler wieder zuruecknehmen.
+      ps._actionsPlayedThisPhase = Math.max(0, (ps._actionsPlayedThisPhase || 0) - 1);
     }
     if (isActionPhase && additionalConsumed && !gs._preventPhaseAdvance) {
       // Only `isSecondActionGrant` providers gate the post-action-2
@@ -9727,6 +9732,11 @@ async function doPlayCreature(room, pi, { cardName, handIndex, heroIdx, zoneSlot
       // ist die zweite Aktion der Phase.
       ps._actionsPlayedThisPhase = (ps._actionsPlayedThisPhase || 0) + 1;
       await room.engine.advanceToPhase(pi, 4);
+    } else if (isActionPhase && effectiveIsInherent && actionCounterIncrementedHere) {
+      // ★ Die ERSTE Aktion der Phase bleibt gratis: der Zaehler wurde oben
+      // schon fuer DIESES Spiel hochgesetzt — wieder zuruecknehmen, sonst
+      // zaehlt die naechste echte Aktion als „zweite" und die Phase endet.
+      ps._actionsPlayedThisPhase = Math.max(0, (ps._actionsPlayedThisPhase || 0) - 1);
     }
     if (isActionPhase && usingAdditional) {
       // Only `isSecondActionGrant` providers gate the post-action-2

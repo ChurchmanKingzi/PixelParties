@@ -37751,7 +37751,10 @@ this._deathWatch = (this._deathWatchStack || []).length
     const ps = this.gs?.players?.[playerIdx];
     if (!ps) return false;
     if (this.gs.currentPhase !== PHASES.ACTION) return false;
-    return (ps._actionsPlayedThisPhase || 0) >= 1;
+    // Der Zaehler enthaelt das gerade gespielte Spiel schon (Server: Anfang von
+    // `doPlaySpell`/`doPlayCreature`) — „nicht die erste Aktion" heisst also >= 2.
+    // (Bei >= 1 beendete JEDE inhaerente Karte als erste Aktion die Action Phase.)
+    return (ps._actionsPlayedThisPhase || 0) >= 2;
   }
 
   /**

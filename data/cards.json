@@ -7121,7 +7121,7 @@
     "hp": 1,
     "atk": null,
     "cost": null,
-    "effect": "Summon this card into the free Support Zone of a Hero your opponent controls. When this Creature would be affected by a card or effect, its controller may discard 2 cards to negate any effects that card or effect would have on it (including damage). When this Creature is defeated, the player who summoned it may search their deck for up to 2 cards with different names, reveal them, and add them to their hand.",
+    "effect": "Summon this card into the free Support Zone of a Hero your opponent controls. When this Creature would be affected by a card or effect, its controller may discard 2 cards to negate any effects that card or effect would have on it (including damage). When this Creature is defeated, the player who summoned it may search their deck for up to 2 cards with different names, reveal them, and add them to their hand. Summoning this Creature counts as an additional Action.",
     "archetype": "",
     "setID": "PP MS1",
     "banned": "Banned",
