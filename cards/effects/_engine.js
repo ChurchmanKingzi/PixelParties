@@ -14670,9 +14670,13 @@ this._deathWatch = (this._deathWatchStack || []).length
       // same flag on both hooks. Without this, hookExtras was only
       // visible inside onPlay and the entering-zone path was blind
       // to whether this was a hero-gated summon vs a placement.
+      // On-Summon-Fenster (Surprise-on-Summon, `onCreatureSummoned`) gehoeren
+      // zu JEDER Beschwoerung, egal ob Handspiel, Effekt oder Platzierung
+      // (Ruling 3.10.) — nur ausdrueckliches `skipReactionCheck: true` (Puppets)
+      // schaltet sie ab. `onPlay` oben bleibt beim alten Standard.
       await this.runHooks('onCardEnterZone', {
         enteringCard: inst, toZone: 'support', toHeroIdx: heroIdx,
-        _skipReactionCheck: opts.skipReactionCheck !== false,
+        _skipReactionCheck: opts.skipReactionCheck === true,
         _bypassDeadHeroFilter: onDeadHero || isPlacement,
         _isPlacement: isPlacement,
         ...(opts.hookExtras || {}),
@@ -25206,7 +25210,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       });
       await this.runHooks('onCardEnterZone', {
         enteringCard: inst, toZone: ZONES.SUPPORT, toHeroIdx: heroIdx,
-        _skipReactionCheck: true,
+        _skipReactionCheck: opts.skipReactionCheck === true,   // Platzierung = Beschwoerung fuer On-Summon-Trigger (Ruling 3.10.)
         _bypassDeadHeroFilter: true,
         _isPlacement: true,
         ...discardSummonExtras,
