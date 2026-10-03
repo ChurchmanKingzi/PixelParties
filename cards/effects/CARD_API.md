@@ -5500,6 +5500,21 @@ bleiben draußen. Pillar of Light (erzwungene Suche des Gegners) ist bewusst NIC
 
 ---
 
+### Echter Flächenschlag vs. Kettentreffer — Surprise-Fenster (Cataclysm, Armageddon, Forbidden Zone …)
+
+Trifft ein Effekt alle Ziele GLEICHZEITIG (Cataclysm, Armageddon, Forbidden Zone, Explosivo's Sword),
+müssen sich die Helden-Surprises (Frost Rune, Booby Trap …) VOR dem ersten Schaden entscheiden;
+negiert eine den Zauber, fällt der Schaden an ALLEN Zielen weg (bei Cataclysm bleiben auch die Areas).
+Treffer NACHEINANDER (Chain Lightning, Ricochet, Bottled Lightning, Qinglong) lassen das Fenster am
+jeweiligen Treffer — dort ist „bis zum Surprise-Helden getroffen, dann negiert" richtig.
+- Manuelle Schleife mit `preDamageMultiTargetWindow`: `{ simultan: true, damageType }` als 3. Argument.
+- Manuelle Schleife ohne dieses Fenster (Armageddon): `engine.aoeSurpriseVorab(quelle, heldenZiele, { damageType, reaktionsQuelle })`
+  vor dem ersten Treffer; `effectNegated` → sofort abbrechen.
+- `dealDamageToTargets`/`aoeHit` und Laser Volley/Holy Selection haben ihr eigenes Vorab-Fenster (`_isAoeCheck`).
+`endMultiHit` räumt die Vormerkungen (`_surpriseCheckedHeroes`) von nie getroffenen Helden weg.
+
+---
+
 ### `cannotBeIncreased` — "this damage cannot be increased" (v579)
 
 > Future Tech Doomsday Bomb is the first card with this clause. It is

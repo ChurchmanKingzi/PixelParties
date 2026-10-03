@@ -34482,8 +34482,17 @@ this._deathWatch = (this._deathWatchStack || []).length
    * the reaction cards ensure that downstream per-target / per-batch
    * windows don't re-prompt for the same chain.
    */
-  async preDamageMultiTargetWindow(source, targets) {
+  async preDamageMultiTargetWindow(source, targets, opts = {}) {
     if (!Array.isArray(targets) || targets.length === 0) return;
+    // ★ ECHTER FLAECHENSCHLAG (`opts.simultan`, Cataclysm & Co.): alle Ziele werden
+    // GLEICHZEITIG getroffen — die Helden-Surprises (Frost Rune, Booby Trap …) muessen
+    // sich VOR dem ersten Schaden entscheiden. Negiert eine den Zauber, faellt der
+    // Schaden an ALLEN Zielen weg. (Chain Lightning & Co. treffen nacheinander und
+    // lassen das Surprise-Fenster am jeweiligen Treffer — also OHNE `simultan`.)
+    if (opts.simultan) {
+      const sr = await this.aoeSurpriseVorab(source, targets, opts);
+      if (sr?.effectNegated) return sr;
+    }
     const normalized = targets.map(t => {
       if (t.type === 'hero') {
         return { type: 'hero', owner: t.owner, heroIdx: t.heroIdx, cardName: t.cardName };
@@ -34542,6 +34551,65 @@ this._deathWatch = (this._deathWatchStack || []).length
       await this.negationsBilder(source, normalized, ptResult);
     }
     return ptResult;
+  }
+
+  /**
+   * ★ VORAB-SURPRISE-FENSTER FUER ECHTE FLAECHENSCHLAEGE.
+   *
+   * Dieselben Fenster wie beim Einzeltreffer (`actionDealDamage`, Heldenfenster),
+   * nur VOR dem ersten Schaden und fuer alle Helden des Schlags — in Brettreihenfolge
+   * wie die Treffer. Wehrt eine Surprise den Zauber ab (`effectNegated`), wird er wie bei
+   * einer Post-Target-Negation behandelt (`_spellNegatedByEffect` /
+   * `_negatedEffectSources`, Negationsbilder) und der Aufrufer bricht ab. Abgefragte Helden
+   * werden in `_surpriseCheckedHeroes` vorgemerkt, damit der spaetere Treffer das Fenster nicht
+   * ein zweites Mal oeffnet; `endMultiHit` raeumt Vormerkungen weg, die nie getroffen wurden.
+   *
+   * @param {object} source  { name, owner, heroIdx, … } oder CardInstance
+   * @param {Array}  targets { type: 'hero'|'creature', owner, heroIdx, cardName }
+   * @param {object} opts    damageType (Standard 'destruction_spell'), reaktionsQuelle
+   * @returns {Promise<object|null>} das Surprise-Ergebnis bei Negation, sonst null
+   */
+  async aoeSurpriseVorab(source, targets, opts = {}) {
+    const gs = this.gs;
+    const type = opts.damageType || 'destruction_spell';
+    const SKIP = new Set(['status', 'burn', 'poison', 'recoil', 'other']);
+    if (SKIP.has(type) || !(source?.owner >= 0 && source?.heroIdx >= 0)) return null;
+    if (!gs._surpriseCheckedHeroes) gs._surpriseCheckedHeroes = new Set();
+    const heroes = (targets || []).filter(t => t?.type === 'hero');
+    let syntheticSource = opts.reaktionsQuelle || source.cardInstance
+      || (source.id && source.zone ? source : null)
+      || { name: source.name, controller: source.controller ?? source.owner, owner: source.owner,
+           heroIdx: source.heroIdx, zone: source.zone || 'hand' };
+    syntheticSource = this._rewriteSourceForCreatureCaster(syntheticSource);
+    const keys = [];
+    this._aoeSurpriseKeys = keys;
+    for (const t of heroes) {
+      const hero = gs.players[t.owner]?.heroes?.[t.heroIdx];
+      if (!hero?.name || hero.hp <= 0 || hero.statuses?.shielded) continue;
+      if ((gs.players[t.owner]?.surpriseZones?.[t.heroIdx] || []).length === 0) continue;   // wie der Einzeltreffer
+      if (this.hasEffectImmunity(t.owner, t.heroIdx, source)) continue;
+      const heroKey = `${t.owner}-${t.heroIdx}`;
+      if (gs._surpriseCheckedHeroes.has(heroKey)) continue;
+      const result = await this._checkSurpriseWindow(
+        [{ type: 'hero', owner: t.owner, heroIdx: t.heroIdx, cardName: hero.name }],
+        syntheticSource, { damageType: type },
+      );
+      gs._surpriseCheckedHeroes.add(heroKey);
+      keys.push(heroKey);
+      if (result?.effectNegated) {
+        if ((gs._spellResolutionDepth || 0) > 0) gs._spellNegatedByEffect = true;
+        const nkey = this._effectNegationKey(source);
+        if (nkey != null) {
+          if (!gs._negatedEffectSources) gs._negatedEffectSources = new Set();
+          gs._negatedEffectSources.add(nkey);
+        }
+        for (const k of keys) gs._surpriseCheckedHeroes.delete(k);
+        this._aoeSurpriseKeys = null;
+        await this.negationsBilder(source, heroes.map(h => ({ type: 'hero', owner: h.owner, heroIdx: h.heroIdx, cardName: h.cardName })), result);
+        return result;
+      }
+    }
+    return null;
   }
 
   /**
@@ -37989,6 +38057,11 @@ this._deathWatch = (this._deathWatchStack || []).length
    * nebenher weiter.
    */
   async endMultiHit() {
+    // Vorab-Surprise-Vormerkungen (`aoeSurpriseVorab`), die nie getroffen wurden (tote Helden), wegraeumen.
+    if (this._aoeSurpriseKeys) {
+      for (const k of this._aoeSurpriseKeys) this.gs._surpriseCheckedHeroes?.delete(k);
+      this._aoeSurpriseKeys = null;
+    }
     if (!this._multiHitScope) return;
     try {
       await this._todesAufschubAbschliessen();

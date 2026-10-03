@@ -130,7 +130,9 @@ module.exports = {
       // any damage AND before the Area wipe so the WHOLE Spell is
       // negated (no side effects) — the play handler routes the card to
       // discard as negated.
-      const _negR = await engine.preDamageMultiTargetWindow(source, allTargets);
+      // `simultan`: echter Flaechenschlag — Surprises (Frost Rune, Booby Trap …) entscheiden sich VOR dem
+      // ersten Schaden; negiert eine, fällt der Schaden an ALLEN Zielen weg (und die Areas bleiben).
+      const _negR = await engine.preDamageMultiTargetWindow(source, allTargets, { simultan: true, damageType: 'destruction_spell' });
       if (_negR?.effectNegated) return;
 
       // ★ v1043 („Interference"): EIN Schlag auf mehrere Ziele.
