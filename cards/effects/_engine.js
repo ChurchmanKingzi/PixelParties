@@ -26881,7 +26881,7 @@ this._deathWatch = (this._deathWatchStack || []).length
    * Zerschellen an „MOE Shield"s Herzen). Eine Reaktion meldet ihren
    * Nachlauf als `nachBilder` im Rueckgabewert.
    */
-  async negationsBilder(quelle, ziele, ergebnis) {
+  async negationsBilder(quelle, ziele, ergebnis, opts = {}) {
     // ★★ v1181 (Al 17.9.): Die Abwehr soll KURZ NACH dem Beginn der
     // Zauberbilder sichtbar werden — dafuer startet ihr `waehrendBilder`
     // parallel (nicht abgewartet), die Karte legt ihre eigene Pause fest.
@@ -26890,7 +26890,8 @@ this._deathWatch = (this._deathWatchStack || []).length
       Promise.resolve(waehrend(this, { targets: ziele, quelle }))
         .catch(err => console.error('[negationsBilder] Nebenlauf:', err.message));
     }
-    await this.spielNegierteZauberBilder(quelle, ziele);
+    // `ohneZauberBilder`: die Karte hat ihre Bilder schon VOR dem Reagieren gespielt (Cataclysm …) — kein zweites Mal.
+    if (!opts.ohneZauberBilder) await this.spielNegierteZauberBilder(quelle, ziele);
     const nach = ergebnis?.nachBilder;
     if (typeof nach === 'function') {
       try { await nach(this, { targets: ziele, quelle }); }
@@ -44532,7 +44533,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         }
         for (const k of merkKeys) gs._surpriseCheckedHeroes.delete(k);
         this._aoeSurpriseKeys = null;
-        await this.negationsBilder(reaktionsQuelle, aoeTargets, surpriseResult);
+        await this.negationsBilder(reaktionsQuelle, aoeTargets, surpriseResult, { ohneZauberBilder: !!opts.bilderGespielt });
         return { heroes: [], creatures: [], cancelled: true };
       }
     }
@@ -44559,15 +44560,10 @@ this._deathWatch = (this._deathWatchStack || []).length
         }
         for (const k of (this._aoeSurpriseKeys || [])) gs._surpriseCheckedHeroes?.delete(k);
         this._aoeSurpriseKeys = null;
-        await this.negationsBilder(reaktionsQuelle, aoeTargets2, ptResult);   // v1182
+        await this.negationsBilder(reaktionsQuelle, aoeTargets2, ptResult, { ohneZauberBilder: !!opts.bilderGespielt });   // v1182
         return { heroes: [], creatures: [], cancelled: true };
       }
     }
-
-    // ── Zwischenschritt: erst NACH dem Reagieren (und nur, wenn nichts negiert wurde) laeuft das
-    // Bild der Karte (Komet, Feuerwelle …). Wird die Quelle negiert, spielt die Engine stattdessen
-    // genau EINMAL ihr `spellVisual` — kein doppelter Einschlag.
-    if (typeof opts.vorWirkung === 'function') await opts.vorWirkung();
 
     await this._spieleWellenAnimation(config, quelle || quellObjekt, pi, heroIdx, [
       ...allHeroes.map(e => ({ owner: e.owner, heroIdx: e.heroIdx, zoneSlot: -1 })),

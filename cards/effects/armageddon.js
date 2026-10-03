@@ -170,8 +170,7 @@ module.exports = {
       // skaliert mit dem Schaden: 50 → Glimmen, ab 450 → volle Wucht.
       // Obere Ebene (kein `layer: 'background'`): das Feuer liegt UEBER
       // den Karten. Gewartet wird, bis die Welle das Brett erreicht hat.
-      // Animation als `vorWirkung`: erst reagieren die Ziele, dann kommt die Feuerwelle
-      // (negiert → die Engine zeigt sie genau einmal selbst, kein Doppelbild).
+      // Animation VOR dem Reaktionsfenster; bei Negation kein zweites Bild (`bilderGespielt`).
       const feuerwelle = async () => {
         const staerke = Math.max(0.1, Math.min(1, dmg / 450));
         engine._broadcastEvent('play_zone_animation', {
@@ -225,10 +224,11 @@ module.exports = {
       ];
       let res;
       try {
+        await feuerwelle();   // Feuerwelle VOR dem Reaktionsfenster, genau einmal
         res = await engine.dealDamageToTargets({ ...quelle, cardInstance: ctx.card }, ziele, {
           damage: dmg, damageType: 'destruction_spell', sourceName: CARD_NAME,
           istFlaeche: true, hitDelay: 0,
-          vorWirkung: feuerwelle,
+          bilderGespielt: true,
         });
       } finally {
         gs._deferGameOverCheck = Math.max(0, (gs._deferGameOverCheck || 1) - 1);

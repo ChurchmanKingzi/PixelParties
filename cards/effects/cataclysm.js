@@ -27,9 +27,13 @@ module.exports = {
   // ★★ v1182 — ENTKOPPELTE BILDER (CARD_API): wird die Karte NEGIERT,
   // laeuft ihr Effekt-Rumpf nie — die Engine spielt dann diese Bilder.
   // Im normalen Weg bleibt es bei den Broadcasts im Effekt selbst.
-  spellVisual: {
-    // duration 3000: sonst haengt die Komponente nach 1000 ms ab, bevor der Komet einschlaegt (keine Detonation).
-    impact: { type: 'cataclysm', duration: 3000 }, impactMs: 1560,
+  // Negiert, bevor der Effekt lief: EIN Komet (nicht einer je Ziel — `impact` feuert je Ziel).
+  async spellVisual(engine, info) {
+    engine._broadcastEvent('play_zone_animation', {
+      type: 'cataclysm', owner: info.heroOwner ?? info.owner ?? 0,
+      heroIdx: Math.max(0, info.heroIdx ?? 0), zoneSlot: -1, duration: 3000,
+    });
+    await engine._delay(1560);
   },
 
   // Active in 'hand' so the level reduction hook fires while in hand.
@@ -80,8 +84,8 @@ module.exports = {
         creatureTargets.push(inst);
       }
 
-      // Animation (Komet) läuft als `vorWirkung`: ERST reagieren die getroffenen Ziele (Booby Trap …),
-      // dann fällt der Komet — wird der Zauber negiert, zeigt die Engine ihn genau einmal selbst.
+      // Animation (Komet) läuft VOR dem Reaktionsfenster (Als Befund 3.10.) und genau einmal:
+      // wird der Zauber danach negiert, spielt die Engine ihn nicht noch einmal (`bilderGespielt`).
       const kometAnimation = async () => {
         engine._broadcastEvent('play_zone_animation', {
           type: 'cataclysm', owner: pi,
@@ -104,10 +108,11 @@ module.exports = {
         ...heroTargets.map(ht => ({ type: 'hero', owner: ht.owner, heroIdx: ht.heroIdx })),
         ...creatureTargets.map(inst => ({ type: 'creature', inst })),
       ];
+      await kometAnimation();   // Komet VOR dem Reaktionsfenster
       const res = await engine.dealDamageToTargets(ctx.card, ziele, {
         damage: DAMAGE, damageType: 'destruction_spell', sourceName: CARD_NAME,
         istFlaeche: true, hitDelay: 0,
-        vorWirkung: kometAnimation,
+        bilderGespielt: true,   // der Komet ist schon gefallen — bei Negation kein zweiter
       });
       if (res?.cancelled) return;
       engine.sync();
