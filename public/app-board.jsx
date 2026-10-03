@@ -3289,46 +3289,35 @@ function ExplosionEffect({ x, y, opacity }) {
 }
 
 // ★ Surprise-Creature-Aufdecken (Als Wunsch 3.10.: der Booby-Trap-Explosionseffekt
-// passt nicht zu einer Creature, die aus ihrer Surprise-Zone springt).
-// „Ueberraschung!": heller Pixelblitz, ein Pixel-Ausrufezeichen poppt hoch,
-// bunte Pixelfunken spritzen fan-foermig nach oben, Staubpixel stieben am
-// Boden auseinander. Alles eckig und gestuft (`steps()`), der Pixelierer
-// macht den Rest.
-function SurpriseCreatureRevealEffect({ x, y }) {
-  const funken = useMemo(() => Array.from({ length: ppFxN(14) }, (_, i) => {
-    const winkel = -Math.PI * (0.12 + 0.76 * (i / 13)) + (Math.random() - 0.5) * 0.18;   // Faecher nach oben
-    const weite = 34 + Math.random() * 40;
+// passt nicht zu einer Creature; „Gruen ist immer die Farbe fuer Creatures /
+// Beschwoerungen"). Ein gruener Beschwoerungskreis legt sich um die Zone,
+// dehnt sich aus und wird dabei transparent, ein zweiter folgt versetzt;
+// gruene Pixelpartikel steigen auf. Der Pixelierer macht Pixelart daraus.
+function SurpriseCreatureRevealEffect({ x, y, w, h }) {
+  const d = Math.round(Math.max(w || 70, h || 100) * 0.95);
+  const partikel = useMemo(() => Array.from({ length: ppFxN(22) }, (_, i) => {
+    const winkel = Math.random() * Math.PI * 2;
+    const rad = d * (0.28 + Math.random() * 0.22);
     return {
-      dx: Math.cos(winkel) * weite, dy: Math.sin(winkel) * weite,
-      size: 4 + Math.floor(Math.random() * 3) * 2,
-      farbe: ['#7df9ff', '#ffe066', '#ff7ad9', '#ffffff', '#9d7bff'][i % 5],
-      delay: Math.floor(Math.random() * 90), dur: 420 + Math.random() * 200,
+      sx: Math.cos(winkel) * rad, sy: Math.sin(winkel) * rad * 0.8,   // Start auf dem Kreis
+      dx: (Math.random() - 0.5) * 18, dy: -(26 + Math.random() * 42), // steigen auf
+      size: 3 + Math.floor(Math.random() * 3) * 2,
+      farbe: ['#3dff7a', '#8dffb0', '#1fcf5a', '#d6ffe3', '#66ff99'][i % 5],
+      delay: Math.floor(Math.random() * 260), dur: 480 + Math.random() * 360,
     };
-  }), []);
-  const staub = useMemo(() => Array.from({ length: ppFxN(8) }, (_, i) => ({
-    dx: (i < 4 ? -1 : 1) * (14 + (i % 4) * 11), dy: 8 + (i % 3) * 3,
-    size: 5 + (i % 2) * 3, delay: 60 + (i % 4) * 40, dur: 420 + (i % 3) * 80,
-  })), []);
+  }), [d]);
   return (
     <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
-      <div className="anim-scr-blitz" />
-      <div className="anim-scr-ring" />
-      {staub.map((s, i) => (
-        <div key={'d' + i} className="anim-scr-staub" style={{
-          width: s.size, height: s.size, left: -s.size / 2, top: -s.size / 2,
-          '--dx': s.dx + 'px', '--dy': s.dy + 'px', animationDelay: s.delay + 'ms', animationDuration: s.dur + 'ms',
-        }} />
-      ))}
-      {funken.map((f, i) => (
+      <div className="anim-scr-kreis" style={{ width: d, height: d, left: -d / 2, top: -d / 2 }} />
+      <div className="anim-scr-kreis anim-scr-kreis-zwei" style={{ width: d, height: d, left: -d / 2, top: -d / 2 }} />
+      <div className="anim-scr-runen" style={{ width: d * 0.8, height: d * 0.8, left: -d * 0.4, top: -d * 0.4 }} />
+      <div className="anim-scr-glut" style={{ width: d, height: d, left: -d / 2, top: -d / 2 }} />
+      {partikel.map((f, i) => (
         <div key={'f' + i} className="anim-scr-funke" style={{
-          width: f.size, height: f.size, left: -f.size / 2, top: -f.size / 2, background: f.farbe,
+          width: f.size, height: f.size, left: f.sx - f.size / 2, top: f.sy - f.size / 2, background: f.farbe,
           '--dx': f.dx + 'px', '--dy': f.dy + 'px', animationDelay: f.delay + 'ms', animationDuration: f.dur + 'ms',
         }} />
       ))}
-      <div className="anim-scr-ausruf">
-        <span className="anim-scr-ausruf-strich" />
-        <span className="anim-scr-ausruf-punkt" />
-      </div>
     </div>
   );
 }

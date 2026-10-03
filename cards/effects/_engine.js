@@ -36009,20 +36009,20 @@ this._deathWatch = (this._deathWatchStack || []).length
         // Bakhm-Slots sind ausgenommen: dort liegt die Kreatur bereits
         // in ihrer Support Zone und klappt nur auf.
         if (!fromDiscard && !fromDeck && !isBakhmSlot) {
-          // ★ ZUERST SYNCEN (Als Befund 19.8.: „die Surprise Creatures
-          // verschwinden erst am ENDE der Bewegung statt an ihrem
-          // Anfang"). Der Ausschnitt aus der Surprise Zone und das
-          // Setzen in die Support Zone sind im Zustand laengst
-          // passiert — ohne diesen Push sieht der Client beides erst,
-          // wenn der Flug vorbei ist, und die Karte klebt waehrend des
-          // ganzen Fluges noch in ihrer alten Zone.
-          this.sync();
+          // ★ ERST DER FLUG, DANN DER SYNC (Als Befund 3.10.: die Creature
+          // „blitzte" kurz in ihrer Ziel-Zone auf, verschwand und flog erst
+          // dann). Der Client versteckt die Ziel-Zone beim Eintreffen des
+          // Flug-Events; kam der Sync (Karte steht im Zustand schon in der
+          // Support Zone) VOR dem Event, rendert sie dort einen Frame lang.
+          // Der Sync folgt dem Event ohne Pause — die Karte verlaesst die
+          // Surprise Zone damit trotzdem am START des Fluges (Als Befund 19.8.).
           this._broadcastEvent('play_pile_transfer', {
             owner: playerIdx, cardName,
             from: 'surprise', to: 'support',
             fromHeroIdx: hostHeroIdx,
             toHeroIdx: heroIdx, toSlotIdx: placed.actualSlot,
           });
+          this.sync();
           await this._delay(SURPRISE_FLUG_MS);
         }
         this._broadcastEvent('summon_effect', { owner: playerIdx, heroIdx, zoneSlot: placed.actualSlot, cardName });
