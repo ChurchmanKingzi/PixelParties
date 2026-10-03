@@ -16349,6 +16349,22 @@ await engine.dealDamageToTargets(quelle, ziele, {
 // Kurzform im Kartenkontext: await ctx.dealDamageToTargets(ziele, opts)
 ```
 
+**AoE-Prinzip (Als Auftrag, MANDATORY für jeden echten Flächenschlag):**
+1. **Markieren** — die Zielmenge steht fest, Immunität ist schon einbezogen
+   (`_aoeHeldImmun`, `_markCreatureDamageImmunity`): nur wirklich Getroffene reagieren.
+2. **Reagieren** — alle Getroffenen dürfen reagieren (Surprises, Hand-Reaktionen), BEVOR
+   irgendwer Schaden nimmt. Wird die Quelle negiert, trifft sie KEIN Ziel
+   (`res.cancelled` → Karte tut nichts weiter).
+3. **Wirken** — Schaden, Status, Sperren auf alle Ziele (`opts.wirkung({ heroes, creatures })`
+   für Zusatzwirkungen wie Bound/Burned; läuft auch ohne Schaden).
+4. **Tode** — erst DANACH werden alle verursachten Tode ausgewertet (`endMultiHit`).
+
+`opts.chosenSurprises: true` lässt „is chosen by"-Surprises (Frost Rune) mitreagieren
+(Cataclysm, Armageddon); Standard ist aus (ein Flächenschlag wählt niemanden, v1323).
+`opts.amount` je Ziel erlaubt gemischte Wirkung (Heat Wave: 0 = nur Status).
+**Aufeinanderfolgende** Effekte (Chain Lightning, Ricochet, Bottled Lightning) bleiben
+bewusst sequenziell — dort trifft jeder Treffer für sich.
+
 `quelle`: CardInstance oder `{ name, owner, heroIdx, controller?, cardInstance? }`.
 `ziele`: `{ type: 'hero', owner, heroIdx }` bzw. `{ type: 'creature', inst }`
 (Prompt-Form mit `cardInstance`/`slotIdx` geht auch); `amount` je Ziel für

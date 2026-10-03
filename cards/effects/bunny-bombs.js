@@ -163,32 +163,15 @@ module.exports = {
         }
         await engine._delay(300);
 
-        // ★★ v1185: Flaechenklammer + Anti-AoE-Fenster. „Deal damage …
-        // to all targets on the board" ist ein Schlag auf mehrere Ziele —
-        // beides fehlte bisher.
-        {
-          const lebendeHelden = heroes.filter(t => t.hero.hp > 0);
-          const lebendeKreaturen = creatures.filter(i => i.zone === 'support');
-          await engine.beginAoeStrike(lebendeHelden.length + lebendeKreaturen.length, {
-            creatures: lebendeKreaturen, source: ctx.card,
-            amount: damage, type: 'creature', sourceOwner: pi,
-          });
-        }
-        try {
-        for (const t of heroes) {
-          if (t.hero.hp <= 0) continue;                     // schon gefallen
-          await ctx.dealDamage(t.hero, damage, 'creature');
-        }
-        for (const inst of creatures) {
-          if (inst.zone !== 'support') continue;            // zwischenzeitlich weg
-          await engine.actionDealCreatureDamage(
-            ctx.card, inst, damage, 'creature',
-            { sourceOwner: pi, canBeNegated: true },
-          );
-        }
-        } finally {
-          await engine.endMultiHit();
-        }
+        // AoE-Prinzip (markieren/Immunität → reagieren → wirken → Tode): ein
+        // zentraler Schlag auf alle Ziele; Tode werden erst danach ausgewertet.
+        const ziele = [
+          ...heroes.filter(t => t.hero.hp > 0).map(t => ({ type: 'hero', owner: t.pi, heroIdx: t.hi })),
+          ...creatures.filter(i => i.zone === 'support').map(inst => ({ type: 'creature', inst })),
+        ];
+        await engine.dealDamageToTargets(ctx.card, ziele, {
+          damage, damageType: 'creature', sourceName: CARD_NAME, istFlaeche: true, hitDelay: 0,
+        });
       } finally {
         gs._deferGameOverCheck = Math.max(0, (gs._deferGameOverCheck || 1) - 1);
       }

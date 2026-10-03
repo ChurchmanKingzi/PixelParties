@@ -182,34 +182,16 @@ module.exports = {
           // EIN Quellobjekt fuer den ganzen Schlag — Reaktionen und die
           // Effekt-Immunitaet sehen ihn als EINEN Vorgang.
           const quelle = { name: CARD_NAME, owner: besitzer, heroIdx: inst.heroIdx };
-          // ★★ v1185: Flaechenklammer + Anti-AoE-Fenster. „All targets on
-          // the board take damage" ist ein Schlag auf mehrere Ziele —
-          // beides fehlte.
-          const lebendeHelden = helden.filter(t => (gs.players[t.owner]?.heroes?.[t.heroIdx]?.hp || 0) > 0);
-          const lebendeKreaturen = kreaturen
-            .map(t => t.cardInstance)
-            .filter(i => i && i.zone === 'support');
-          await engine.beginAoeStrike(lebendeHelden.length + lebendeKreaturen.length, {
-            creatures: lebendeKreaturen, source: quelle,
-            amount: schaden, type: 'artifact', sourceOwner: besitzer,
+          // AoE-Prinzip: markieren/Immunität → reagieren → wirken → Tode danach.
+          const ziele = [
+            ...helden.map(t => ({ type: 'hero', owner: t.owner, heroIdx: t.heroIdx })),
+            ...kreaturen.filter(t => t.cardInstance?.zone === 'support')
+              .map(t => ({ type: 'creature', inst: t.cardInstance })),
+          ];
+          await engine.dealDamageToTargets(quelle, ziele, {
+            damage: schaden, damageType: 'artifact', sourceName: CARD_NAME,
+            istFlaeche: true, hitDelay: 0, trefferOpts: { cannotBeIncreased: true },
           });
-          try {
-          for (const t of helden) {
-            const held = gs.players[t.owner]?.heroes?.[t.heroIdx];
-            if (!held?.name || held.hp <= 0) continue;
-            await engine.actionDealDamage(quelle, held, schaden, 'artifact',
-              { cannotBeIncreased: true });
-          }
-          for (const t of kreaturen) {
-            if (!t.cardInstance || t.cardInstance.zone !== 'support') continue;
-            await engine.actionDealCreatureDamage(
-              quelle, t.cardInstance, schaden, 'artifact',
-              { sourceOwner: besitzer, canBeNegated: true, cannotBeIncreased: true },
-            );
-          }
-          } finally {
-            await engine.endMultiHit();
-          }
         }
       } finally {
         gs._deferGameOverCheck = Math.max(0, (gs._deferGameOverCheck || 1) - 1);

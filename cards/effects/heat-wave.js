@@ -202,90 +202,39 @@ module.exports = {
       // Burned", meaning prior to this cast.)
       const preBurned = targets.map(t => targetIsBurned(engine, t));
 
-      // Mark Heat Wave's spell instance as AoE for the duration of the
-      // damage loop. Surprises that opt out of AoE triggers (Mountain
-      // Tear River — "in response to TARGETING effects" — explicitly
-      // skips when this flag is set on the source) read this through
-      // `sourceInfo.cardInstance._isAoeCheck`. The engine's own AoE
-      // batch path (`actionApplyDamageBatch`) already does the same
-      // bracketing; Heat Wave doesn't go through that path because it
-      // resolves per-target manually (each target either gets Burned
-      // or takes damage based on prior state), so we set the flag
-      // here to keep the AoE semantics consistent.
-      const sourceInst = ctx.card;
-      const hadFlag = sourceInst?._isAoeCheck;
-      if (sourceInst) sourceInst._isAoeCheck = true;
-      // ★★ v1185: Flaechenklammer + Anti-AoE-Fenster. „Every target on
-      // the board" ist der Lehrbuchfall — es fehlte trotzdem beides.
-      // Gemeldet wird nur, was WIRKLICH Schaden nimmt: die schon
-      // brennenden Ziele (der Rest bekommt Burned, keinen Schaden), und
-      // nur, solange die Schadenssperre nicht laeuft.
-      {
-        const schadensZiele = damageLocked
-          ? []
-          : targets.filter((t, i) => preBurned[i]);
-        await engine.beginAoeStrike(schadensZiele.length, {
-          creatures: schadensZiele
-            .filter(t => t.type !== 'hero')
-            .map(t => engine.cardInstances.find(c => c.id === t.inst.id))
-            .filter(Boolean),
-          source: { name: CARD_NAME, owner: pi, heroIdx, heroOwner: ctx.cardHeroOwner ?? pi },   // Als Befund 29.9.: Brettseite des Wirkers
-          amount: DAMAGE, type: 'destruction_spell', sourceOwner: pi,
-        });
-      }
-      try {
-      for (let i = 0; i < targets.length; i++) {
-        const t = targets[i];
-        const wasBurned = preBurned[i];
-        if (wasBurned) {
-          // Already Burned → 150 damage (suppressed by damage-lock).
-          if (damageLocked) continue;
-          if (t.type === 'hero') {
-            const hero = gs.players[t.owner]?.heroes?.[t.heroIdx];
-            if (hero && hero.hp > 0) {
-              await ctx.dealDamage(hero, DAMAGE, 'destruction_spell');
-            }
-          } else {
-            const inst = engine.cardInstances.find(c => c.id === t.inst.id);
-            if (inst && inst.zone === 'support') {
-              await engine.actionDealCreatureDamage(
-                { name: CARD_NAME, owner: pi, heroIdx, heroOwner: ctx.cardHeroOwner ?? pi },   // Als Befund 29.9.: Brettseite des Wirkers
-                inst, DAMAGE, 'destruction_spell',
-                { sourceOwner: pi, canBeNegated: true },
-              );
+      // AoE-Prinzip (markieren/Immunität → reagieren → wirken → Tode): alle Ziele
+      // werden getroffen (auch immune, nur für die Animation), schon Brennende nehmen
+      // Schaden, die anderen bekommen Burned — das läuft in `wirkung`, VOR den Toden.
+      const quelle = { name: CARD_NAME, owner: pi, heroIdx, heroOwner: ctx.cardHeroOwner ?? pi };   // Als Befund 29.9.: Brettseite des Wirkers
+      const ziele = targets.map((t, i) => {
+        const amount = (preBurned[i] && !damageLocked) ? DAMAGE : 0;
+        return t.type === 'hero'
+          ? { type: 'hero', owner: t.owner, heroIdx: t.heroIdx, amount }
+          : { type: 'creature', inst: engine.cardInstances.find(c => c.id === t.inst.id), amount };
+      });
+      await engine.dealDamageToTargets({ ...quelle, cardInstance: ctx.card }, ziele, {
+        damage: DAMAGE, damageType: 'destruction_spell', sourceName: CARD_NAME,
+        istFlaeche: true, hitDelay: 0,
+        wirkung: async () => {
+          for (let i = 0; i < targets.length; i++) {
+            const t = targets[i];
+            if (preBurned[i] || !targetCanBeBurned(engine, t, pi)) continue;
+            if (t.type === 'hero') {
+              await engine.addHeroStatus(t.owner, t.heroIdx, 'burned', {
+                permanent: true, appliedBy: pi, _skipReactionCheck: true,
+              });
+            } else {
+              const inst = engine.cardInstances.find(c => c.id === t.inst.id);
+              if (inst && inst.zone === 'support') {
+                const applied = await engine.applyCreatureStatus(inst, 'burned', {
+                  sourceOwner: pi, source: CARD_NAME,
+                });
+                if (applied) engine.log('creature_burned', { card: inst.name, owner: inst.owner, by: CARD_NAME });
+              }
             }
           }
-        } else if (targetCanBeBurned(engine, t, pi)) {
-          // Not yet burned + not immune → apply Burned (permanent).
-          if (t.type === 'hero') {
-            await engine.addHeroStatus(t.owner, t.heroIdx, 'burned', {
-              permanent: true,
-              appliedBy: pi,
-              _skipReactionCheck: true,
-            });
-          } else {
-            const inst = engine.cardInstances.find(c => c.id === t.inst.id);
-            if (inst) {
-              const applied = await engine.applyCreatureStatus(inst, 'burned', {
-                sourceOwner: pi,
-                source: CARD_NAME,
-              });
-              if (applied) engine.log('creature_burned', {
-                card: inst.name, owner: inst.owner, by: CARD_NAME,
-              });
-            }
-          }
-        }
-        // Else: burn-immune + not yet burned → nothing (animation
-        // already played, which matches the user's spec).
-      }
-      } finally {
-        await engine.endMultiHit();
-        // Restore the AoE flag. Defensive: only delete if WE set it —
-        // a parent path that already had it set keeps it (currently
-        // no such caller, but cheap idempotent cleanup).
-        if (sourceInst && !hadFlag) delete sourceInst._isAoeCheck;
-      }
+        },
+      });
 
       engine.log('heat_wave', {
         player: ps.username,
