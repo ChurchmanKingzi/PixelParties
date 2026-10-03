@@ -21009,7 +21009,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     const _aeussererLog = this.gs._spellDamageLog;
     this.gs._spellDamageLog = [];
     if (opts.excludeTargets) this.gs._spellExcludeTargets = opts.excludeTargets;
-    if ((this.gs._spellResolutionDepth || 0) === 0) delete this.gs._spellNegatedByEffect;
+    if ((this.gs._spellResolutionDepth || 0) === 0) { delete this.gs._spellNegatedByEffect; this._visLog = []; }
     this.gs._spellResolutionDepth = (this.gs._spellResolutionDepth || 0) + 1;
     if (cardData.cardType === 'Spell') this._pushResolvingSpell(cardName);
     // ★ v1303 (Als Vorgabe 23.9.): der Auftritt der schenkenden Karte
@@ -26830,11 +26830,13 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (!bilder && info.negiert) bilder = this._standardZauberBilder(cardName);
     if (!bilder) return false;
     const ziele = (info.targets || []).filter(Boolean);
-    const daten = { cardName, negiert: false, ...info, targets: ziele };
+    // Negiert: was der Effekt-Rumpf schon gezeigt hat, nicht noch einmal (Funktionen lesen `schonGezeigt`).
+    const schonGezeigt = info.negiert ? this._schonGezeigt() : { zone: new Set(), proj: false };
+    const daten = { cardName, negiert: false, ...info, targets: ziele, schonGezeigt };
     try {
       if (typeof bilder === 'function') { await bilder(this, daten); return true; }
 
-      const proj = bilder.projectile;
+      const proj = schonGezeigt.proj ? null : bilder.projectile;
       if (proj && ziele.length > 0 && (daten.owner === 0 || daten.owner === 1)) {
         const stagger = bilder.stagger ?? 0;
         for (let i = 0; i < ziele.length; i++) {
@@ -26852,7 +26854,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         await this._delay(flug);
       }
 
-      const einschlag = bilder.impact;
+      const einschlag = (bilder.impact && schonGezeigt.zone.has(bilder.impact.type)) ? null : bilder.impact;
       if (einschlag && ziele.length > 0) {
         for (const t of ziele) {
           this._broadcastEvent('play_zone_animation', {
@@ -26922,6 +26924,20 @@ this._deathWatch = (this._deathWatchStack || []).length
       impact: { type: nach.impact },
       impactMs: 260,
     };
+  }
+
+  /** Welche Bilder hat die laufende Aufloesung schon gesendet? { zone:Set<Typ>, proj:bool } */
+  _schonGezeigt() {
+    const jetzt = Date.now();
+    const zone = new Set(); let proj = false;
+    // Innerhalb einer Zauber-Aufloesung gilt das ganze Protokoll (Spieler koennen in Abfragen lange
+    // ueberlegen); ausserhalb nur die letzten Sekunden, weil dort nichts zuruecksetzt.
+    const inAufloesung = (this.gs._spellResolutionDepth || 0) > 0;
+    for (const e of (this._visLog || [])) {
+      if (!inAufloesung && jetzt - e.t > 8000) continue;
+      if (e.kind === 'zone') zone.add(e.type); else proj = true;
+    }
+    return { zone, proj };
   }
 
   async spielNegierteZauberBilder(quelle, ziele) {
@@ -47393,6 +47409,16 @@ this._deathWatch = (this._deathWatchStack || []).length
     // could trip the 5s "no progress" timeout even though the hook is
     // healthy and just waiting on visual pacing.
     this._hookProgressTick = (this._hookProgressTick || 0) + 1;
+    // ★ Bilder-Protokoll (Als Befund 3.10., „Animation spielt nach der Negation noch einmal"): was die
+    // laufende Aufloesung schon gezeigt hat, damit `spielZauberBilder` es bei einer Negation NICHT
+    // ein zweites Mal abspielt (siehe `_schonGezeigt`).
+    if (event === 'play_zone_animation' && data && data.type) {
+      (this._visLog || (this._visLog = [])).push({ kind: 'zone', type: data.type, t: Date.now() });
+      if (this._visLog.length > 80) this._visLog.splice(0, this._visLog.length - 80);
+    } else if (event === 'play_projectile_animation' || event === 'play_ram_animation' || event === 'play_beam_animation') {
+      (this._visLog || (this._visLog = [])).push({ kind: 'proj', type: event, t: Date.now() });
+      if (this._visLog.length > 80) this._visLog.splice(0, this._visLog.length - 80);
+    }
     // ★ The Root of all Evil: Creatures, die in eine Ablage kaemen, landen im GELOESCHT-Stapel — die Fluege dorthin
     // muessen das auch zeigen. Zentral hier umgeschrieben (statt an jedem der vielen Flug-Aufrufe): Flug zur Ablage
     // → Flug zum Geloescht-Stapel; Deck→Ablage-Animationen werden nach Creatures (Loeschmodus) und Rest geteilt.

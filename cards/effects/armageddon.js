@@ -123,6 +123,7 @@ module.exports = {
   // normalen Weg bleibt es bei den Broadcasts im Effekt selbst.
   // Negiert: dieselbe Feuerwelle wie im Effekt (Brett-Zone, volle Laufzeit), mittlere Wucht.
   async spellVisual(engine, info) {
+    if (info.schonGezeigt?.zone?.has('armageddon')) return;   // der Effekt hat sein Bild schon gespielt
     const staerke = 0.6;
     engine._broadcastEvent('play_zone_animation', {
       type: 'armageddon', power: staerke, damage: 270,

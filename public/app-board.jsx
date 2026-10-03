@@ -11488,6 +11488,78 @@ const ANIM_REGISTRY = {
       );
     };
   })(),
+  // ★★ Heat Wave (Als Vorgabe 3.10.): rote, heisse Winde mit Flammen dazwischen, die das GANZE
+  // Spielfeld einhuellen. Zwei Schwaden rollen quer ueber das Brett (wabernde Windbaender in Rot
+  // bis Orange), zwischen ihnen schlagen Flammen auf, ein Hitzeschleier liegt ueber allem, Glut
+  // treibt mit dem Wind. Brettweit (`zoneType: 'board'`), obere Ebene.
+  heat_wave: (() => {
+    const zufall = (start) => {
+      let t = start >>> 0;
+      return () => { t = (t * 1664525 + 1013904223) >>> 0; return t / 4294967296; };
+    };
+    return function HeatWaveEffect({ x, y, w, h, duration }) {
+      const W = Math.max(w || 900, 320), H = Math.max(h || 560, 240);
+      const links = x - W / 2, oben = y - H / 2;
+      const dauer = duration || 2800;
+      const teile = useMemo(() => {
+        const r = zufall(Math.round(W * 5 + H * 11 + 77));
+        const n = ppFxN(15);
+        const winde = Array.from({ length: n }, (_, i) => {
+          const laenge = W * (0.6 + r() * 0.55);
+          return {
+            yy: ((i + 0.5) / n) * H + (r() - 0.5) * (H / n) * 0.8,
+            laenge, hoehe: 12 + r() * 26,
+            verzug: Math.round(r() * 650), lauf: Math.round(1150 + r() * 700),
+            amp: 5 + r() * 15, wabern: Math.round(380 + r() * 320),
+            heiss: r() > 0.55,
+          };
+        });
+        const flammen = Array.from({ length: ppFxN(44) }, () => ({
+          fx: r() * W, fy: H * 0.08 + r() * H * 0.88, groesse: 24 + r() * 36,
+          verzug: Math.round(280 + r() * 1100), laenge: Math.round(620 + r() * 520),
+          kipp: Math.round((r() - 0.5) * 22),
+        }));
+        const glut = Array.from({ length: ppFxN(38) }, () => ({
+          gx: r() * W * 0.6, gy: r() * H, groesse: 3 + r() * 4,
+          verzug: Math.round(r() * 1500), steig: 40 + r() * 130, drift: W * (0.25 + r() * 0.45),
+          lauf: Math.round(900 + r() * 800),
+        }));
+        return { winde, flammen, glut };
+      }, [W, H]);
+      return (
+        <div className="hw-root" aria-hidden="true" style={{ left: links, top: oben, width: W, height: H }}>
+          <div className="hw-schleier" style={{ animation: `hwSchleier ${dauer}ms ease-in-out forwards` }} />
+          <div className="hw-boden" style={{ animation: `hwSchleier ${dauer}ms ease-in-out forwards` }} />
+          {teile.winde.map((v, i) => (
+            <div key={'hwv' + i} className="hw-wind" style={{
+              top: v.yy - v.hoehe / 2, width: v.laenge, height: v.hoehe,
+              '--hw-von': (-v.laenge) + 'px', '--hw-bis': W + 'px', '--hw-amp': v.amp + 'px',
+              animation: `hwWindZug ${v.lauf}ms cubic-bezier(.3,.1,.55,1) ${v.verzug}ms both`,
+            }}>
+              <div className={'hw-wind-kern' + (v.heiss ? ' hw-heiss' : '')} style={{
+                animation: `hwWabern ${v.wabern}ms ease-in-out ${v.verzug}ms infinite alternate`,
+              }} />
+            </div>
+          ))}
+          {teile.flammen.map((f, i) => (
+            <div key={'hwf' + i} className="hw-flamme" style={{
+              left: f.fx, top: f.fy, width: f.groesse, height: f.groesse * 1.7,
+              marginLeft: -f.groesse / 2, marginTop: -f.groesse * 1.5,
+              '--hw-kipp': f.kipp + 'deg',
+              animation: `hwFlamme ${f.laenge}ms ease-out ${f.verzug}ms both`,
+            }} />
+          ))}
+          {teile.glut.map((g, i) => (
+            <div key={'hwg' + i} className="hw-glut" style={{
+              left: g.gx, top: g.gy, width: g.groesse, height: g.groesse,
+              '--hw-steig': (-g.steig) + 'px', '--hw-drift': g.drift + 'px',
+              animation: `hwGlut ${g.lauf}ms ease-out ${g.verzug}ms both`,
+            }} />
+          ))}
+        </div>
+      );
+    };
+  })(),
   // ★★ v1173 — „Alluring Light\": das Anlock-Leuchten (Al 17.9.: „wieder
   // in der Bildschirmmitte statt auf dem Ziel, und zu klein und zu
   // kurz\"). Es las `x`/`y` gar nicht — `.lure-beacon` stand per CSS bei
