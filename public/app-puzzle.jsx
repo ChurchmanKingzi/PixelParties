@@ -2026,7 +2026,8 @@ function PuzzleCreator() {
       }
     }
     const ghost = document.createElement('div');
-    ghost.style.cssText = `position:absolute;top:-1000px;left:-1000px;width:${gb}px;height:${gh}px;border:2px solid var(--accent,#0ff);border-radius:4px;background:var(--bg3,#222);overflow:hidden;`;
+    ghost.id = 'pz-drag-ghost';
+    ghost.style.cssText = `position:fixed;left:${Math.round(e.clientX - hx)}px;top:${Math.round(e.clientY - hy)}px;width:${gb}px;height:${gh}px;border:2px solid var(--accent,#0ff);border-radius:4px;background:var(--bg3,#222);overflow:hidden;pointer-events:none;z-index:100000;box-sizing:border-box;box-shadow:0 4px 14px rgba(0,0,0,.55);`;
     const url = cardImageUrl(cardName);
     // ★ Ziehbild OHNE Nachladen: das Browser-Ziehbild wird im Moment von
     // `setDragImage` aufgenommen. Ein frisch erzeugtes <img> ist dann noch
@@ -2061,9 +2062,36 @@ function PuzzleCreator() {
       ghost.style.fontSize = '8px';
       ghost.style.padding = '4px';
     }
+    // ★ EIGENES Ziehbild statt des nativen: Opera/Chromium zeigte das per
+    // `setDragImage` gesetzte Bild im Puzzle-Editor nicht (der Deck-Editor, der
+    // das native Quellbild nimmt, funktionierte). Deshalb bekommt der Browser
+    // nur ein unsichtbares 1x1-Bild, und die Karte folgt dem Zeiger als
+    // gewoehnliches DOM-Element (position:fixed, ohne Mausfang) — das malt
+    // jeder Browser gleich. Nachgefuehrt ueber `dragover`/`drag`, entfernt bei
+    // `dragend`/`drop`.
+    document.getElementById('pz-drag-ghost')?.remove();
     document.body.appendChild(ghost);
-    e.dataTransfer.setDragImage(ghost, hx, hy);
-    setTimeout(() => { try { document.body.removeChild(ghost); } catch {} }, 0);
+    const leer = document.createElement('div');
+    leer.style.cssText = 'position:absolute;top:-1000px;left:-1000px;width:1px;height:1px;opacity:0;';
+    document.body.appendChild(leer);
+    e.dataTransfer.setDragImage(leer, 0, 0);
+    setTimeout(() => { try { document.body.removeChild(leer); } catch {} }, 0);
+    const folge = (ev) => {
+      if (!ev.clientX && !ev.clientY) return;          // Firefox: `drag` meldet 0/0
+      ghost.style.left = Math.round(ev.clientX - hx) + 'px';
+      ghost.style.top = Math.round(ev.clientY - hy) + 'px';
+    };
+    const ende = () => {
+      document.removeEventListener('dragover', folge, true);
+      document.removeEventListener('drag', folge, true);
+      document.removeEventListener('dragend', ende, true);
+      document.removeEventListener('drop', ende, true);
+      try { ghost.remove(); } catch {}
+    };
+    document.addEventListener('dragover', folge, true);
+    document.addEventListener('drag', folge, true);
+    document.addEventListener('dragend', ende, true);
+    document.addEventListener('drop', ende, true);
   }, []);
   const onDragEnd = useCallback(() => { ziehRiegelLoesen(); setDragCardName(null); setDragHandIdx(null); setDragSource(null); setDragHandSource(null); setDragOverZone(null); setDropGap(null); setZiehLaeuft(false); dragEntityData.current = null;
     // ★ v1210: Neigung zuruecknehmen. Am Ziehende UND nicht erst beim
