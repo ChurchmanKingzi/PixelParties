@@ -5463,6 +5463,18 @@ must not slip past it (same reasoning as `neverPlayable`).
 
 ---
 
+**Action Phase & Area-Stempel (Mountain Boars):** `discardEffect` ist
+standardmäßig nur in den Main Phases anklickbar. Ein Skript mit
+`discardEffectInActionPhase: true` ist zusätzlich in der Action Phase
+benutzbar (Sammler `getDiscardEntries` und Server-Tor `doActivateDiscardEffect`
+prüfen das je Eintrag). Außerdem stempelt `placeArea` jede Area mit
+`counters._areaPlacedTurn = gs.turn` — damit lässt sich „Area, die in
+diesem Zug nicht gespielt wurde" prüfen (`turnPlayed` taugt nicht, es
+stammt vom Tracking in der Hand; ohne Stempel, z.B. Puzzle-Aufbau, gilt
+eine Area als alt).
+
+---
+
 ### `cannotBeIncreased` — "this damage cannot be increased" (v579)
 
 > Future Tech Doomsday Bomb is the first card with this clause. It is
