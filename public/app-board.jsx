@@ -46470,7 +46470,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                   <span style={{ color: 'var(--success)' }}>{gameState.setScore?.[myIdx] || 0}</span>
                   <span style={{ color: 'var(--text2)', margin: '0 8px' }}>—</span>
                   <span style={{ color: 'var(--danger)' }}>{gameState.setScore?.[oppIdx] || 0}</span>
-                  <span style={{ fontSize: 10, color: 'var(--text2)', marginLeft: 10 }}>Bo{gameState.format}</span>
+                  {/* „BoN" haengt AUSSERHALB des Kastens: sonst schiebt es den Spielstand aus der Mitte. */}
+                  <span className="set-score-bo">Bo{gameState.format}</span>
                 </div>
               )}
             </div>

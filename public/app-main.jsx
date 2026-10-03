@@ -413,9 +413,9 @@ function CubeDraftScreen({ lobby, draft, leaveRoom, notify }) {
                     : (dragInsert === poolOrder.length && idx === poolOrder.length - 1 ? '3px 0 0 0 var(--accent)' : 'none'),
                   borderRadius: 4,
                 }}>
-                <div style={{ width: '100%', height: '100%', filter: gray ? 'grayscale(1) brightness(.5)' : 'none', opacity: gray ? .6 : 1, transition: 'filter .15s, opacity .15s' }}>
-                  <CardMini card={window.CARDS_BY_NAME?.[name]} onClick={() => {}} style={{ width: '100%', height: '100%' }} />
-                </div>
+                {/* Filter an der Karte selbst, nicht an einem Vorfahren (sonst haengt der fixe Tooltip im gefilterten Kasten). */}
+                <CardMini card={window.CARDS_BY_NAME?.[name]} onClick={() => {}}
+                  style={{ width: '100%', height: '100%', filter: gray ? 'grayscale(1) brightness(.5)' : 'none', opacity: gray ? .6 : 1, transition: 'filter .15s, opacity .15s' }} />
               </div>
             ))}
             {poolOrder.length === 0 && (
@@ -858,10 +858,11 @@ function CubeDraftBuildScreen({ lobby, build, leaveRoom, notify, user }) {
                     style={{
                       aspectRatio: '5 / 7',
                       cursor: dimmed ? 'not-allowed' : 'pointer',
-                      filter: dimmed ? 'grayscale(.8) brightness(.6)' : 'none',
                       position: 'relative',
                     }}>
-                    <CardMini card={cardDB[name]} onClick={() => {}} style={{ width: '100%', height: '100%' }} />
+                    {/* `filter` NICHT am Wrapper: ein Vorfahre mit `filter` wird zum Bezugsrahmen fuer `position: fixed` und
+                        liess den Tooltip riesig im Kasten statt in der rechten Leiste erscheinen. Der Filter sitzt an der Karte. */}
+                    <CardMini card={cardDB[name]} onClick={() => {}} style={{ width: '100%', height: '100%', filter: dimmed ? 'grayscale(.8) brightness(.6)' : 'none' }} />
                     <div style={{
                       position: 'absolute', bottom: 2, right: 2,
                       background: free ? 'rgba(154,216,255,.85)' : 'rgba(0,0,0,.85)',

@@ -12551,6 +12551,16 @@ body:has(.modal-overlay) .tooltip {
   z-index: 100;
   pointer-events: none;
 }
+/* „BoN" rechts NEBEN dem Kasten, damit der Spielstand selbst exakt in der Brettmitte sitzt. */
+.set-score-bo {
+  position: absolute;
+  left: calc(100% + calc(8px * var(--board-scale)));
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: calc(10px * var(--board-scale));
+  color: var(--text2);
+  white-space: nowrap;
+}
 
 /* ===== SET COMPLETE FIREWORKS ===== */
 
