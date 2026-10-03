@@ -30098,7 +30098,7 @@ this._deathWatch = (this._deathWatchStack || []).length
    * Tiefenlimit gegen Endlosketten.
    */
   _surpriseNestingBlocked() {
-    return (this._surpriseResolutionDepth || 0) >= 6;
+    return (this._surpriseResolutionDepth || 0) >= 10;
   }
 
   async _scanSurpriseEntriesForPlayer(playerIdx, triggerFlag, triggerInfo, promptConfig) {
@@ -35886,6 +35886,9 @@ this._deathWatch = (this._deathWatchStack || []).length
           ps.discardPile.push(cardName);
           this._untrackCard(inst.id);
         }
+      } else if (inst && await this._bakhmAufdeckenNegiert(inst, cardName, playerIdx, steuerer, heroIdx, bakhmZoneSlot)) {
+        // Das Aufdecken IST die Platzierung (Ruling 3.10.): negiert (Off Duty) —
+        // die Karte flog bereits aus ihrer Support-Zone ab.
       } else if (inst) {
       // Bakhm slot: creature is already in the support zone — just stays face-up
         inst.turnPlayed = this.gs.turn || 0; // Enforce summoning sickness on flip
@@ -37255,6 +37258,31 @@ this._deathWatch = (this._deathWatchStack || []).length
     });
   }
 
+  /**
+   * Bakhm-Slot: das Aufdecken einer Creature-Surprise ist ihre Beschwoerung.
+   * Kettenfenster (Off Duty & co.) bei noch sichtbarer Karte; negiert →
+   * Abflug aus der Support-Zone. @returns {boolean} true = negiert.
+   */
+  async _bakhmAufdeckenNegiert(inst, cardName, playerIdx, steuerer, heroIdx, slotIdx) {
+    if (this._inMctsSim || !this._placementReactorHeld(steuerer ?? playerIdx)) return false;
+    const _aeussere = this._inReactionCheck;
+    let k;
+    try {
+      k = await this.executeCardWithChain({
+        cardName, owner: steuerer ?? playerIdx, cardType: 'Creature', goldCost: 0,
+        resolve: null, fromBoard: true, isPlacement: true,
+      });
+    } finally {
+      this._inReactionCheck = _aeussere;
+    }
+    if (!k?.negated) return false;
+    const besitzer = (inst?.originalOwner === 0 || inst?.originalOwner === 1) ? inst.originalOwner : playerIdx;
+    await this._negatedPlacementRoute(cardName, besitzer, 'support', {
+      zoneOwner: playerIdx, hostHeroIdx: heroIdx, slotIdx, instId: inst.id,
+    }, k);
+    return true;
+  }
+
   /** Haelt der Gegner von `playerIdx` eine Handkarte, die auf Platzierungen reagiert? */
   _placementReactorHeld(playerIdx) {
     const opp = this.gs.players[playerIdx === 0 ? 1 : 0];
@@ -37285,6 +37313,14 @@ this._deathWatch = (this._deathWatchStack || []).length
       if (zi >= 0) sz.splice(zi, 1);
       if (opts.instId != null) this._untrackCard(opts.instId);
       this.sync();
+    } else if (source === 'support') {
+      // Bakhm-Slot: Abflug aus der Support-Zone (Karte lag bis jetzt sichtbar dort).
+      von = 'support';
+      vonHeld = opts.hostHeroIdx;
+      const zone = this.gs.players[opts.zoneOwner ?? playerIdx]?.supportZones?.[opts.hostHeroIdx];
+      if (zone && zone[opts.slotIdx]) zone[opts.slotIdx] = [];
+      if (opts.instId != null) this._untrackCard(opts.instId);
+      this.sync();
     } else if (source === 'none') {
       von = null;
     } else if (source === 'hand') {
@@ -37304,6 +37340,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         to: nachDeck ? 'deck' : (nachGeloescht ? 'deleted' : 'discard'),
         ...(von === 'hand' && Number.isInteger(handIdx) && handIdx >= 0 ? { fromHandIdx: handIdx } : {}),
         ...(von === 'surprise' && Number.isInteger(vonHeld) ? { fromHeroIdx: vonHeld } : {}),
+        ...(von === 'support' && Number.isInteger(vonHeld) ? { fromHeroIdx: vonHeld, fromSlotIdx: opts.slotIdx } : {}),
       });
       await this._delay(650);
     }
