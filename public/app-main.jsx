@@ -30,7 +30,8 @@ function CubeDraftScreen({ lobby, draft, leaveRoom, notify }) {
   // append; removed cards (shouldn't happen during draft, but defensive)
   // drop out. Drag-reorder mutates this list only.
   useEffect(() => {
-    const incoming = draft?.myPool || [];
+    // Sofort-Anzeige: die gewaehlte Karte landet unten, ohne das Rundenende abzuwarten.
+    const incoming = [...(draft?.myPool || []), ...(draft?.myPendingPick ? [draft.myPendingPick] : [])];
     setPoolOrder(prev => {
       const prevSet = new Set(prev.map((_, i) => i));
       // Build new order by counts: each card name has N copies in
@@ -54,7 +55,7 @@ function CubeDraftScreen({ lobby, draft, leaveRoom, notify }) {
       }
       return next;
     });
-  }, [draft?.myPool?.length]);
+  }, [draft?.myPool?.length, draft?.myPendingPick, draft?.myPicked]);
 
   // Live-tick the displayed timer locally so the budget visibly counts
   // down between server broadcasts (which only fire on pick windows).
@@ -301,6 +302,9 @@ function CubeDraftScreen({ lobby, draft, leaveRoom, notify }) {
               }}
                 onClick={() => {
                   if (!canPick) return;
+                  // Optimistisch: Karte sofort in die eigene Sammlung (Server bestaetigt per State).
+                  setPoolOrder(prev => [...prev, cardName]);
+                  if (window.playSFX) window.playSFX('draw', { dedupe: 150 });
                   socket.emit('cube_draft_pick', { roomId: lobby.id, cardName });
                 }}
                 onMouseEnter={() => setHoveredCard(cardName)}
@@ -1036,6 +1040,7 @@ function PlayScreen() {
   const [joinTarget, setJoinTarget] = useState(null);
   const [lobby, setLobby] = useState(null);
   const [playerJoined, setPlayerJoined] = useState(null);
+  const roomMemberCountRef = useRef({ id: null, n: 0 });
   // Cube Draft live state — populated by `cube_draft_state` socket
   // events (one per pick window). Cleared when the user leaves the
   // room or the draft completes (phase → 'building'). Exists alongside
@@ -1160,8 +1165,16 @@ function PlayScreen() {
     socket.emit('get_rooms');
 
     const onRooms = (r) => setRooms(r);
-    const onRoomJoined = (r) => setLobby(r);
-    const onRoomUpdate = (r) => setLobby(prev => prev ? r : null);
+    const onRoomJoined = (r) => { roomMemberCountRef.current = { id: r?.id, n: (r?.players?.length || 0) + (r?.spectators?.length || 0) }; setLobby(r); };
+    const onRoomUpdate = (r) => {
+      // Akustisches Feedback, wenn jemand einem Draft-Raum beitritt (Spieler oder Zuschauer).
+      const n = (r?.players?.length || 0) + (r?.spectators?.length || 0);
+      if (r?.cubeDraft && roomMemberCountRef.current.id === r.id && n > roomMemberCountRef.current.n && window.playSFX) {
+        window.playSFX('ping', { dedupe: 300 });
+      }
+      roomMemberCountRef.current = { id: r?.id, n };
+      setLobby(prev => prev ? r : null);
+    };
     const onRoomClosed = () => { setLobby(null); setGameState(null); setCubeDraftState(null); notify('Room was closed by host', 'error'); };
     const onJoinError = (msg) => notify(msg, 'error');
     const onPlayerJoined = (data) => setPlayerJoined(data.username);

@@ -11984,6 +11984,8 @@ function cubeDraftPlayerView(room, seatIdx) {
     myPack: draft.currentPacks[seatIdx] || [],
     myPool: draft.pools[seatIdx] || [],
     myPicked: draft.pendingPicks[seatIdx] != null,
+    // Bereits gewaehlte, aber noch nicht aufgeloeste Karte — der Client zeigt sie sofort im Pool.
+    myPendingPick: draft.pendingPicks[seatIdx] || null,
     seatPicked: draft.pendingPicks.map(p => p != null),
     packTimerSec: cd.packTimerSec,
     pickTimerSec: cd.pickTimerSec,
