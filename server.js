@@ -12553,9 +12553,11 @@ function cubeTournamentBroadcast(room, io) {
     flow: cd.flow,
     prelimsBo: cd.prelimsBo,
     finaleBo: cd.finaleBo,
+    thirdPlace: !!cd.thirdPlace,
     bracketSize: cd.bracket.bracketSize,
     rounds: cd.bracket.rounds.map(round => round.map(m => ({
       matchIdx: m.matchIdx,
+      thirdPlace: !!m.thirdPlace,
       p1Seat: m.p1Seat,
       p2Seat: m.p2Seat,
       p1Username: m.p1Seat != null ? room.players[m.p1Seat]?.username : null,
@@ -12610,7 +12612,8 @@ function cubeTournamentStartCurrentRound(room, io) {
   // Match length: prelimsBo for non-final rounds, finaleBo for the final round.
   const isFinalRound = cd.bracket.currentRoundIdx === Math.log2(cd.bracket.bracketSize) - 1;
   const bo = isFinalRound ? cd.finaleBo : cd.prelimsBo;
-  for (const m of round) m.bo = bo;
+  // Das Spiel um Platz 3 laeuft wie ein Vorrundenspiel (prelimsBo), nicht als Finale.
+  for (const m of round) m.bo = m.thirdPlace ? cd.prelimsBo : bo;
 
   if (cd.flow === 'consecutive') {
     // Find the first unresolved match without a child room and start it.
@@ -12762,7 +12765,11 @@ async function cubeMatchEnd(room, match, winnerSeat, io) {
   // Simpler: assign placement = 2^(rounds - currentRoundIdx - 1) + 1.
   const totalRounds = Math.log2(cd.bracket.bracketSize);
   const isFinalRound = cd.bracket.currentRoundIdx === totalRounds - 1;
-  if (match.loserSeat != null) {
+  if (match.thirdPlace) {
+    // Spiel um Platz 3: Sieger 3., Verlierer 4. (ueberschreibt den geteilten 3-4-Block).
+    cd.standings[winnerSeat] = 3;
+    if (match.loserSeat != null) cd.standings[match.loserSeat] = 4;
+  } else if (match.loserSeat != null) {
     // Erster Platz des Verlierer-Blocks dieser Runde: Bracket 4 → Runde 0: 3
     // (Platz 3-4); Bracket 8 → Runde 0: 5, Runde 1: 3. (Bugfix: der Exponent
     // war um 1 zu gross — Platz 5 statt 3 bei drei Spielern, und im Ranked-
@@ -12789,7 +12796,8 @@ async function cubeTournamentAdvanceIfReady(room, io) {
   if (round.some(m => !m.resolved)) return; // not done yet
 
   // Round done. Build next round from winners — paired sequentially.
-  const winners = round.map(m => m.winnerSeat);
+  // Das Spiel um Platz 3 zaehlt nicht als Bracket-Fortschritt — nur Hauptspiele liefern Sieger.
+  const winners = round.filter(m => !m.thirdPlace).map(m => m.winnerSeat);
   if (winners.length === 1) {
     // Tournament complete.
     cd.standings[winners[0]] = 1; // 1st place
@@ -12810,6 +12818,23 @@ async function cubeTournamentAdvanceIfReady(room, io) {
     });
     if (a == null && b != null) nextRoundMatches[nextRoundMatches.length - 1].winnerSeat = b;
     if (b == null && a != null) nextRoundMatches[nextRoundMatches.length - 1].winnerSeat = a;
+  }
+  // Halbfinale beendet (die naechste Runde ist das Finale) und Spiel um Platz 3
+  // aktiv: die beiden Halbfinal-Verlierer treffen aufeinander. Bei einem Freilos
+  // im Halbfinale gibt es keinen zweiten Verlierer — dann entfaellt das Spiel.
+  if (cd.thirdPlace && winners.length === 2) {
+    const losers = round.filter(m => !m.thirdPlace).map(m => m.loserSeat);
+    if (losers.length === 2 && losers[0] != null && losers[1] != null) {
+      nextRoundMatches.push({
+        matchIdx: nextRoundMatches.length,
+        thirdPlace: true,
+        p1Seat: losers[0], p2Seat: losers[1],
+        winnerSeat: null, loserSeat: null,
+        childRoomId: null,
+        bo: cd.prelimsBo,
+        resolved: false,
+      });
+    }
   }
   cd.bracket.rounds.push(nextRoundMatches);
   cd.bracket.currentRoundIdx++;
@@ -13427,6 +13452,8 @@ io.on('connection', (socket) => {
           prelimsBo: [1, 3, 5].includes(cubeDraft.prelimsBo) ? cubeDraft.prelimsBo : 1,
           finaleBo: [1, 3, 5].includes(cubeDraft.finaleBo) ? cubeDraft.finaleBo : 3,
           flow: cubeDraft.flow === 'consecutive' ? 'consecutive' : 'simultaneous',
+          // Optional: Spiel um Platz 3 (Halbfinal-Verlierer) neben dem Finale.
+          thirdPlace: !!cubeDraft.thirdPlace,
           // Lifecycle phase for the cube run as a whole. `lobby` until
           // the host hits Start; then `drafting`, `building`, `tournament`,
           // `complete`. Mirrors room.status but lives at the cube layer.
@@ -18310,6 +18337,7 @@ function sanitizeRoom(room, forUser) {
       prelimsBo: room.cubeDraft.prelimsBo,
       finaleBo: room.cubeDraft.finaleBo,
       flow: room.cubeDraft.flow,
+      thirdPlace: !!room.cubeDraft.thirdPlace,
       phase: room.cubeDraft.phase,
     } : null,
   };

@@ -926,6 +926,9 @@ function CubeDraftMatchCard({ match, mySeat, currentRound }) {
       overflow: 'hidden',
       position: 'relative',
     }}>
+      {match.thirdPlace && (
+        <div className="orbit-font" style={{ padding: '3px 10px', fontSize: 9, fontWeight: 700, letterSpacing: 1, color: '#cd8b4a', background: 'rgba(205,139,74,.12)' }}>🥉 3RD PLACE</div>
+      )}
       {live && (
         <div style={{ position: 'absolute', top: 4, right: 6, fontSize: 9, color: 'var(--accent3)', fontWeight: 700, animation: 'pulse 1.2s infinite' }}>
           LIVE
@@ -1015,6 +1018,7 @@ function PlayScreen() {
   const [draftPrelimsBo, setDraftPrelimsBo] = useState(1);
   const [draftFinaleBo, setDraftFinaleBo] = useState(3);
   const [draftFlow, setDraftFlow] = useState('simultaneous'); // 'simultaneous' | 'consecutive'
+  const [draftThirdPlace, setDraftThirdPlace] = useState(false); // Spiel um Platz 3
   const [playerPw, setPlayerPw] = useState('');
   const [specPw, setSpecPw] = useState('');
   const [joinPw, setJoinPw] = useState('');
@@ -1256,6 +1260,7 @@ function PlayScreen() {
           prelimsBo: draftPrelimsBo,
           finaleBo: draftFinaleBo,
           flow: draftFlow,
+          thirdPlace: draftThirdPlace,
         },
       });
       setCreating(false);
@@ -1406,6 +1411,7 @@ function PlayScreen() {
               )}
               <div>🎮 Prelims: <strong style={{ color: 'var(--text)' }}>Bo{lobby.cubeDraft.prelimsBo}</strong></div>
               <div>🏆 Finale: <strong style={{ color: 'var(--text)' }}>Bo{lobby.cubeDraft.finaleBo}</strong></div>
+              <div>🥉 Third-place match: <strong style={{ color: 'var(--text)' }}>{lobby.cubeDraft.thirdPlace ? 'Yes' : 'No'}</strong></div>
               <div style={{ gridColumn: '1/3' }}>🔁 Match flow: <strong style={{ color: 'var(--text)' }}>{lobby.cubeDraft.flow === 'consecutive' ? 'Consecutive (one game at a time)' : 'Simultaneous (parallel games)'}</strong></div>
             </div>
 
@@ -1782,6 +1788,14 @@ function PlayScreen() {
                       <button className={'btn' + (draftFinaleBo === 1 ? ' btn-format-active' : '')} onClick={() => setDraftFinaleBo(1)} style={{ flex: 1 }}>Bo1</button>
                       <button className={'btn' + (draftFinaleBo === 3 ? ' btn-format-active' : '')} onClick={() => setDraftFinaleBo(3)} style={{ flex: 1 }}>Bo3</button>
                       <button className={'btn' + (draftFinaleBo === 5 ? ' btn-format-active' : '')} onClick={() => setDraftFinaleBo(5)} style={{ flex: 1 }}>Bo5</button>
+                    </div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 11, color: 'var(--text2)', marginBottom: 4 }}>Third-place match</div>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <button className={'btn' + (!draftThirdPlace ? ' btn-format-active' : '')} onClick={() => setDraftThirdPlace(false)} style={{ flex: 1 }}>NO</button>
+                      <button className={'btn' + (draftThirdPlace ? ' btn-format-active' : '')} onClick={() => setDraftThirdPlace(true)} style={{ flex: 1 }}
+                        title="The two semifinal losers play a match for 3rd place alongside the final.">YES</button>
                     </div>
                   </div>
                   <div>
