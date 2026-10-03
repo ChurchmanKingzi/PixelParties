@@ -28,6 +28,13 @@
 //      `beforeSummon` lässt WÄHLEN — normale Aktion oder Area löschen
 //      (dann Zusatzaktion, `gs._summonModeUpgradedToInherent`).
 //  Platzierungen durch Karteneffekte (`!_isNormalSummon`) kennen keinen Preis.
+//  Das Wahlfenster bringt seinen eigenen Cancel-Knopf mit — kein eigener Eintrag.
+//
+//  ── ANIMATION ─────────────────────────────────────────────────────
+//  Jeder Area-Löschweg (Hand, Ablage) spielt vor dem Löschen die Horde:
+//  Broadcast `mountain_boars_stampede` (Client: app-board.jsx), Wildschweine
+//  rennen mit Staub von rechts nach links über die Area, dann fliegt sie in den
+//  Gelöscht-Stapel (`deleteArea`).
 //
 //  ── AUS DER ABLAGE ────────────────────────────────────────────────
 //  Nur über den Area-Weg: Ablage-Dialog → Karte anklicken
@@ -40,6 +47,7 @@ const { areaTargetId } = require('./_targeting-shared');
 const { mainActionSlotFree } = require('./_of-kings-shared');
 
 const CARD_NAME = 'Mountain Boars';
+const STAMPEDE_MS = 1700;   // Dauer der Wildschwein-Animation
 
 /** Alle löschbaren Areas (nicht in diesem Zug platziert) als Ziele. */
 function areaZiele(engine) {
@@ -82,6 +90,10 @@ async function areaLoeschen(engine, pi, beschreibung) {
   // Nach der Abfrage neu einsammeln — das Brett kann sich bewegt haben.
   const eintrag = areaZiele(engine).find(z => z.id === id);
   if (!eintrag?.cardInstance) return false;
+  // Wildschwein-Horde rennt von rechts nach links über die Area (Client:
+  // `mountain_boars_stampede`); danach fliegt die Area in den Gelöscht-Stapel.
+  engine._broadcastEvent('mountain_boars_stampede', { owner: eintrag.owner, durationMs: STAMPEDE_MS });
+  await engine._delay(STAMPEDE_MS - 150);
   const geloescht = await engine.deleteArea(eintrag.cardInstance, CARD_NAME, { sourceOwner: pi });
   if (!geloescht) return false;
   engine.log('mountain_boars_delete_area', {
@@ -135,12 +147,11 @@ module.exports = {
       options: [
         { id: 'special', label: '🐗 Delete an Area (additional Action)', description: 'Delete an Area that was not played this turn. Costs no Action.' },
         { id: 'normal', label: '⚔️ Normal Action', description: 'Uses this Hero\'s Action, no Area is deleted.' },
-        { id: 'cancel', label: '✕ Cancel', description: 'Don\'t summon.' },
       ],
       cancellable: true,
     });
     const id = wahl?.optionId;
-    if (!wahl || wahl.cancelled || id === 'cancel') return false;
+    if (!wahl || wahl.cancelled) return false;       // Abbrechen-Knopf des Wahlfensters
     if (id !== 'special') return true;                // normal — Aktion ist schon verbucht
     const bezahlt = await areaLoeschen(engine, pi,
       `Delete an Area that was not played this turn to summon ${CARD_NAME} as an additional Action.`);
