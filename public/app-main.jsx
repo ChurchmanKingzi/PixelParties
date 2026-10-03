@@ -23,9 +23,16 @@ let _pendingGameState = null;
 function CubeDraftScreen({ lobby, draft, leaveRoom, notify }) {
   const [hoveredCard, setHoveredCard] = useState(null);
   const [filter, setFilter] = useState('');
-  const [poolOrder, setPoolOrder] = useState([]); // local custom ordering
-  const [dragSrc, setDragSrc] = useState(null);
-  const [dragOverIdx, setDragOverIdx] = useState(null);
+  // Lokale Sammlung: { id, name, gray } — frei umsortierbar, einzeln abgrauen.
+  const [poolOrder, setPoolOrder] = useState([]);
+  const poolIdRef = useRef(1);
+  const newPoolEntry = (name) => ({ id: poolIdRef.current++, name, gray: false });
+  // Pointer-Drag der gedrafteten Karten (wie Handkarten): Klick = Abgrauen toggeln,
+  // Ziehen = verschieben, Einfuegemarke zeigt die Zielposition.
+  const [dragSrc, setDragSrc] = useState(null);       // Index der gezogenen Karte
+  const [dragInsert, setDragInsert] = useState(null); // Einfuegeposition 0..n
+  const [dragPos, setDragPos] = useState(null);       // {x, y} fuer das Geisterbild
+  const dragRef = useRef(null);                       // { idx, startX, startY, active, insert }
   // Sofort-Pick: die geklickte Karte verschwindet aus dem Pack, noch bevor der Server antwortet.
   const [optimisticPick, setOptimisticPick] = useState(null);
   useEffect(() => { setOptimisticPick(null); }, [draft?.round, draft?.pickInRound]);
@@ -36,29 +43,80 @@ function CubeDraftScreen({ lobby, draft, leaveRoom, notify }) {
     // Sofort-Anzeige: die gewaehlte Karte landet unten, ohne das Rundenende abzuwarten.
     const incoming = [...(draft?.myPool || []), ...(draft?.myPendingPick ? [draft.myPendingPick] : [])];
     setPoolOrder(prev => {
-      const prevSet = new Set(prev.map((_, i) => i));
       // Build new order by counts: each card name has N copies in
       // incoming. Walk prev and keep entries whose card+occurrence
       // still exists in incoming, then append new ones.
       const remainingCounts = {};
       for (const c of incoming) remainingCounts[c] = (remainingCounts[c] || 0) + 1;
       const next = [];
-      for (const c of prev) {
-        if ((remainingCounts[c] || 0) > 0) {
-          next.push(c);
-          remainingCounts[c]--;
+      for (const e of prev) {
+        if ((remainingCounts[e.name] || 0) > 0) {
+          next.push(e);
+          remainingCounts[e.name]--;
         }
       }
       // Append new cards (in incoming order) that weren't in prev.
       for (const c of incoming) {
         if ((remainingCounts[c] || 0) > 0) {
-          next.push(c);
+          next.push(newPoolEntry(c));
           remainingCounts[c]--;
         }
       }
       return next;
     });
   }, [draft?.myPool?.length, draft?.myPendingPick, draft?.myPicked]);
+
+  // Globale Pointer-Listener fuer das Ziehen (einmal montiert; alle Zustandsaenderungen
+  // laufen ueber funktionale Updates bzw. Refs, daher keine veralteten Closures).
+  useEffect(() => {
+    const insertFromPoint = (x, y) => {
+      const el = document.elementFromPoint(x, y)?.closest?.('[data-pool-idx]');
+      if (!el) return null;
+      const idx = parseInt(el.getAttribute('data-pool-idx'), 10);
+      const r = el.getBoundingClientRect();
+      return x > r.left + r.width / 2 ? idx + 1 : idx;
+    };
+    const move = (e) => {
+      const d = dragRef.current;
+      if (!d) return;
+      if (!d.active) {
+        if (Math.hypot(e.clientX - d.startX, e.clientY - d.startY) < 6) return;
+        d.active = true;
+        setDragSrc(d.idx);
+      }
+      d.insert = insertFromPoint(e.clientX, e.clientY);
+      setDragInsert(d.insert);
+      setDragPos({ x: e.clientX, y: e.clientY });
+    };
+    const up = () => {
+      const d = dragRef.current;
+      dragRef.current = null;
+      if (!d) return;
+      if (d.active) {
+        const from = d.idx, ins = d.insert;
+        if (ins != null) {
+          setPoolOrder(prev => {
+            const arr = [...prev];
+            const [moved] = arr.splice(from, 1);
+            arr.splice(ins > from ? ins - 1 : ins, 0, moved);
+            return arr;
+          });
+        }
+      } else {
+        // Einfacher Klick: Abgrauen toggeln (relevant / weniger relevant).
+        setPoolOrder(prev => prev.map((e, i) => i === d.idx ? { ...e, gray: !e.gray } : e));
+      }
+      setDragSrc(null); setDragInsert(null); setDragPos(null);
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+    window.addEventListener('pointercancel', up);
+    return () => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+      window.removeEventListener('pointercancel', up);
+    };
+  }, []);
 
   // Live-tick the displayed timer locally so the budget visibly counts
   // down between server broadcasts (which only fire on pick windows).
@@ -152,18 +210,8 @@ function CubeDraftScreen({ lobby, draft, leaveRoom, notify }) {
 
   // Filter pool by name search.
   const visiblePool = poolOrder
-    .map((c, i) => ({ name: c, idx: i }))
+    .map((e, i) => ({ name: e.name, gray: e.gray, id: e.id, idx: i }))
     .filter(e => !filter || e.name.toLowerCase().includes(filter.toLowerCase()));
-
-  const reorderPool = (fromIdx, toIdx) => {
-    if (fromIdx === toIdx || toIdx < 0) return;
-    setPoolOrder(prev => {
-      const arr = [...prev];
-      const [moved] = arr.splice(fromIdx, 1);
-      arr.splice(toIdx > fromIdx ? toIdx - 1 : toIdx, 0, moved);
-      return arr;
-    });
-  };
 
   // Player ring shown top-left. Always rooted at "me" so the local seat
   // is at index 0; subsequent entries follow the snake direction so the
@@ -318,7 +366,7 @@ function CubeDraftScreen({ lobby, draft, leaveRoom, notify }) {
                 onClick={() => {
                   if (!canPick) return;
                   // Optimistisch: Karte sofort in die eigene Sammlung (Server bestaetigt per State).
-                  setPoolOrder(prev => [...prev, cardName]);
+                  setPoolOrder(prev => [...prev, newPoolEntry(cardName)]);
                   setOptimisticPick(cardName);
                   if (window.playSFX) window.playSFX('draw', { dedupe: 150 });
                   socket.emit('cube_draft_pick', { roomId: lobby.id, cardName });
@@ -347,25 +395,26 @@ function CubeDraftScreen({ lobby, draft, leaveRoom, notify }) {
           </span>
           <input className="input" placeholder="🔍 Filter by name..." value={filter} onChange={e => setFilter(e.target.value)}
             style={{ flex: 1, maxWidth: 280, fontSize: 11, padding: '4px 8px' }} />
-          <span style={{ fontSize: 10, color: 'var(--text2)' }}>{filter ? `${visiblePool.length} match${visiblePool.length === 1 ? '' : 'es'}` : 'Drag to reorder'}</span>
+          <span style={{ fontSize: 10, color: 'var(--text2)' }}>{filter ? `${visiblePool.length} match${visiblePool.length === 1 ? '' : 'es'}` : 'Click: gray out · Drag: reorder'}</span>
         </div>
         <div style={{ flex: 1, overflowY: 'auto' }}>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(64px, 1fr))', gap: 4 }}>
-            {visiblePool.map(({ name, idx }) => (
-              <div key={idx + '-' + name}
-                draggable
-                onDragStart={e => { setDragSrc(idx); e.dataTransfer.effectAllowed = 'move'; }}
-                onDragOver={e => { e.preventDefault(); setDragOverIdx(idx); }}
-                onDrop={e => { e.preventDefault(); if (dragSrc != null) reorderPool(dragSrc, idx); setDragSrc(null); setDragOverIdx(null); }}
-                onDragEnd={() => { setDragSrc(null); setDragOverIdx(null); }}
-                onMouseEnter={() => setHoveredCard(name)}
-                onMouseLeave={() => setHoveredCard(null)}
+            {visiblePool.map(({ name, gray, id, idx }) => (
+              <div key={id}
+                data-pool-idx={idx}
+                onPointerDown={e => { if (e.button !== 0) return; dragRef.current = { idx, startX: e.clientX, startY: e.clientY, active: false, insert: null }; }}
+                onDragStart={e => e.preventDefault()}
                 style={{
-                  aspectRatio: '5 / 7', cursor: 'grab',
-                  border: dragOverIdx === idx ? '2px solid var(--accent)' : '2px solid transparent',
-                  borderRadius: 4, transition: 'border-color .1s',
+                  aspectRatio: '5 / 7', cursor: dragSrc != null ? 'grabbing' : 'grab',
+                  userSelect: 'none', touchAction: 'none', position: 'relative',
+                  opacity: dragSrc === idx ? .35 : 1,
+                  boxShadow: dragInsert === idx ? '-3px 0 0 0 var(--accent)'
+                    : (dragInsert === poolOrder.length && idx === poolOrder.length - 1 ? '3px 0 0 0 var(--accent)' : 'none'),
+                  borderRadius: 4,
                 }}>
-                <CardMini card={window.CARDS_BY_NAME?.[name]} onClick={() => {}} style={{ width: '100%', height: '100%' }} />
+                <div style={{ width: '100%', height: '100%', filter: gray ? 'grayscale(1) brightness(.5)' : 'none', opacity: gray ? .6 : 1, transition: 'filter .15s, opacity .15s' }}>
+                  <CardMini card={window.CARDS_BY_NAME?.[name]} onClick={() => {}} style={{ width: '100%', height: '100%' }} />
+                </div>
               </div>
             ))}
             {poolOrder.length === 0 && (
@@ -376,6 +425,11 @@ function CubeDraftScreen({ lobby, draft, leaveRoom, notify }) {
           </div>
         </div>
       </div>
+      {dragSrc != null && dragPos && poolOrder[dragSrc] && (
+        <div style={{ position: 'fixed', left: dragPos.x - 32, top: dragPos.y - 45, width: 64, height: 90, pointerEvents: 'none', zIndex: 10000, opacity: .9, transform: 'rotate(3deg)' }}>
+          <CardMini noTooltip card={window.CARDS_BY_NAME?.[poolOrder[dragSrc].name]} onClick={() => {}} style={{ width: '100%', height: '100%' }} />
+        </div>
+      )}
     </div>
   );
 }
