@@ -33964,9 +33964,10 @@ this._deathWatch = (this._deathWatchStack || []).length
           chosenCreature: viaCreature ? target : null,
         };
 
-        // Ein Surprise reagiert nie auf die Effekte seines EIGENEN Spielers: trifft sich ein Angreifer
-        // z.B. mit Cataclysm selbst, darf seine Booby Trap / Frost Rune nicht gegen ihn ausloesen.
-        if (sourceInfo.controller != null && sourceInfo.controller >= 0 && sourceInfo.controller === reaktor) continue;
+        // Ein Held loest seine Surprise nie GEGEN SICH SELBST aus: trifft er sich z.B. mit Cataclysm
+        // selbst, bleibt seine Booby Trap zu. Ein verbuendeter Held (gleicher Spieler, anderer Held)
+        // darf sie dagegen sehr wohl ausloesen.
+        if (sourceInfo.owner === tOwner && sourceInfo.heroIdx === tHeroIdx) continue;
 
         // ★ v1323 (Tester-Befund 23.9.: Butterfly Cloud loeste Frost Rune
         // aus). Ein Flaechenschlag WAEHLT niemanden — Surprises, deren Text

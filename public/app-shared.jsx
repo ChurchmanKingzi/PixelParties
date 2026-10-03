@@ -237,14 +237,34 @@ function ppPxBild(key, w, h, male, faktor = 4) {
   if (hit !== undefined) return hit;
   let url = '';
   try {
+    // Schnellweg (Als Befund 3.10.: der erste Komet eines Seitenaufrufs stand ~2,4 s, weil jedes
+    // Pixel ein eigenes `fillRect` mit neuem `fillStyle`-String war): die Pixel gehen in EIN
+    // ImageData, das Ergebnis wird per drawImage ohne Glättung `faktor`-fach vergrößert.
+    const klein = document.createElement('canvas');
+    klein.width = w; klein.height = h;
+    const kctx = klein.getContext('2d');
+    const bild = kctx.createImageData(w, h);
+    const d = bild.data;
+    male((x, y, f) => {
+      if (!f || !(f[3] > 0)) return;
+      x |= 0; y |= 0;
+      if (x < 0 || y < 0 || x >= w || y >= h) return;
+      const i = (y * w + x) * 4;
+      const a = Math.min(1, f[3]);
+      const ba = d[i + 3] / 255;
+      const oa = a + ba * (1 - a);                       // source-over, wie die früheren fillRect-Aufrufe
+      const mix = (neu, alt) => (neu * a + alt * ba * (1 - a)) / oa;
+      d[i]     = mix(f[0] | 0, d[i]);
+      d[i + 1] = mix(f[1] | 0, d[i + 1]);
+      d[i + 2] = mix(f[2] | 0, d[i + 2]);
+      d[i + 3] = Math.round(oa * 255);
+    });
+    kctx.putImageData(bild, 0, 0);
     const c = document.createElement('canvas');
     c.width = w * faktor; c.height = h * faktor;
     const ctx = c.getContext('2d');
-    male((x, y, f) => {
-      if (!f || !(f[3] > 0)) return;
-      ctx.fillStyle = `rgba(${f[0] | 0},${f[1] | 0},${f[2] | 0},${f[3]})`;
-      ctx.fillRect(x * faktor, y * faktor, faktor, faktor);
-    });
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(klein, 0, 0, c.width, c.height);
     url = c.toDataURL('image/png');
   } catch { url = ''; }
   if (_ppPxCache.size >= PP_PX_CACHE_MAX) _ppPxCache.delete(_ppPxCache.keys().next().value);
