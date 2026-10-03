@@ -9154,7 +9154,20 @@ class GameEngine {
   _todesAufschubBeginnen() {
     const a = this._todesAufschub;
     if (a) { a.tiefe += 1; return; }
-    this._todesAufschub = { tiefe: 1, liste: [] };
+    this._todesAufschub = { tiefe: 1, liste: [], nachher: [] };
+  }
+
+  /**
+   * Wirkung, die erst NACH dem letzten Treffer eines Flaechenschlags laufen darf (Rool, the Troll
+   * Guard: der Doppelschaden-Debuff darf nicht mitten im Schlag wirken). Laeuft gerade ein Schlag
+   * (Klammer offen), wird `fn` vorgemerkt und beim Schliessen VOR den Toden abgearbeitet; sonst
+   * `false` zurueck, und der Aufrufer wirkt sofort.
+   */
+  nachFlaechenschlag(fn) {
+    const a = this._todesAufschub;
+    if (!a || typeof fn !== 'function') return false;
+    (a.nachher || (a.nachher = [])).push(fn);
+    return true;
   }
 
   /** Aufschub schliessen; der aeusserste wickelt alle vorgemerkten Tode
@@ -9164,6 +9177,10 @@ class GameEngine {
     if (!a) return;
     if (a.tiefe > 1) { a.tiefe -= 1; return; }
     this._todesAufschub = null;
+    // Aller Schaden ist durch: vorgemerkte Nachwirkungen (Rool …) jetzt, vor der Todesauswertung.
+    for (const fn of (a.nachher || [])) {
+      try { await fn(); } catch (err) { console.error('[nachFlaechenschlag]', err.message); }
+    }
     if (a.liste.length === 0) return;
     // Ein Sammler um ALLE Kreaturentode des Schlags: „one or more of your
     // Creatures are defeated" sieht die ganze Liste auf einmal.

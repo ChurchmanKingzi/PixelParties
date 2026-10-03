@@ -20,6 +20,8 @@
 //    (Zugzaehler zaehlt je Spielerwechsel): laeuft der Treffer im Zug des Gegners,
 //    ist es dessen naechster Zug, sonst der uebernaechste; der Buff verfaellt am
 //    Beginn des Zuges DANACH (`_processBuffExpiry`).
+//  • Mitten in einem Flächenschlag (Klammer offen) kommt der Debuff erst NACH dem letzten Treffer,
+//    vor der Todesauswertung (`engine.nachFlaechenschlag`).
 //  • Der Effekt feuert NUR, wenn der Schadensgeber `disrupted` nicht schon hat (Als Befund 3.10.).
 //  • Rool muss leben und darf nicht stummgeschaltet sein (Engine-Standard fuer
 //    Heldenhooks).
@@ -47,6 +49,8 @@ function schadensGeber(engine, source) {
 /** Verdoppelungs-Debuff auf den Schadensgeber legen. */
 async function verdoppeln(engine, geber, roolBesitzer) {
   const gs = engine.gs;
+  // Der Geber darf nicht schon gefallen/weg sein (der Debuff kommt evtl. erst nach einem Flaechenschlag).
+  if (geber.kind === 'hero' ? !(geber.hero.hp > 0) : geber.inst.zone !== 'support') return;
   // Nur feuern, wenn der Schadensgeber den Debuff NICHT schon hat (kein Neuauslösen, keine Animation).
   const schonDa = geber.kind === 'hero'
     ? !!geber.hero.buffs?.[BUFF]
@@ -95,7 +99,10 @@ module.exports = {
       const opferKontrolle = engine.heroSideOf(opferOwner, ctx.target);
       const r = geberFuerTreffer(engine, ctx, ctx.source);
       if (!r || opferKontrolle !== r.roolBesitzer) return;
-      await verdoppeln(engine, r.geber, r.roolBesitzer);
+      // Mitten in einem Flaechenschlag erst NACH dem letzten Treffer (Als Befund 3.10.).
+      if (!engine.nachFlaechenschlag(() => verdoppeln(engine, r.geber, r.roolBesitzer))) {
+        await verdoppeln(engine, r.geber, r.roolBesitzer);
+      }
     },
 
     /** Creature-Ziele getroffen (Stapel). */
@@ -108,7 +115,9 @@ module.exports = {
         if ((e.inst.controller ?? e.inst.owner) !== ctx.cardOwner) continue;
         const r = geberFuerTreffer(engine, ctx, e.source);
         if (!r) continue;
-        await verdoppeln(engine, r.geber, r.roolBesitzer);
+        if (!engine.nachFlaechenschlag(() => verdoppeln(engine, r.geber, r.roolBesitzer))) {
+          await verdoppeln(engine, r.geber, r.roolBesitzer);
+        }
       }
     },
   },
