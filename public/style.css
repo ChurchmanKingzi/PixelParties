@@ -21882,12 +21882,12 @@ img, .card-tooltip-img img { image-rendering: pixelated; }
 /* v1299: waehrend ein grosser Karten-Dialog offen ist (HintergrundPause,
    app-shared), stehen die Endlos-Animationen DAHINTER still — Foil-
    Schichten, Leuchtrahmen, Zonen-Glanz. Im Dialog selbst laeuft alles. */
-/* Ausnahme: der grosse Seiten-Tooltip (`.card-tooltip`, Vorschau-Karte der Pile-Ansicht) liegt NICHT im
+/* Ausnahme: der grosse Seiten-Tooltip (`.board-tooltip` im Spiel / `.card-tooltip`, Vorschau-Karte der Pile-Ansicht) liegt NICHT im
    `.modal-overlay`, gehoert aber zum Dialog — sein Foil muss weiterlaufen (Als Befund 3.10.: „eingefroren"). */
-body.pp-dialog-offen .foil-shine-overlay:not(.modal-overlay .foil-shine-overlay):not(.card-tooltip .foil-shine-overlay) *,
-body.pp-dialog-offen .foil-rahmen:not(.modal-overlay .foil-rahmen):not(.card-tooltip .foil-rahmen) *,
-body.pp-dialog-offen .foil-secret-rare:not(.modal-overlay *):not(.card-tooltip *),
-body.pp-dialog-offen .foil-diamond-rare:not(.modal-overlay *):not(.card-tooltip *) {
+body.pp-dialog-offen .foil-shine-overlay:not(.modal-overlay .foil-shine-overlay):not(.card-tooltip .foil-shine-overlay):not(.board-tooltip .foil-shine-overlay) *,
+body.pp-dialog-offen .foil-rahmen:not(.modal-overlay .foil-rahmen):not(.card-tooltip .foil-rahmen):not(.board-tooltip .foil-rahmen) *,
+body.pp-dialog-offen .foil-secret-rare:not(.modal-overlay *):not(.card-tooltip *):not(.board-tooltip *),
+body.pp-dialog-offen .foil-diamond-rare:not(.modal-overlay *):not(.card-tooltip *):not(.board-tooltip *) {
   animation-play-state: paused !important;
 }
 
