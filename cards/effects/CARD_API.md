@@ -10805,6 +10805,12 @@ auch das ergibt sich aus demselben Riegel.
 **Die erste Aktion der Phase bleibt ausgenommen:** eine inhärente Karte
 vor jeder anderen Aktion ist weiterhin gratis.
 
+*Korrektur:* `_actionsPlayedThisPhase` wird am Anfang von `doPlaySpell`/`doPlayCreature`
+schon für das gerade gespielte Spiel hochgesetzt. `inherentCountsAsExtraAction` prüft deshalb
+`>= 2` (nicht `>= 1`), und eine inhärente ERSTE Aktion nimmt den Zähler am Ende wieder zurück —
+vorher beendete jede inhärente Karte (Quick Attack, Aggressive Town Guard, Elusive Hind …) als erste
+Aktion der Action Phase die Phase.
+
 
 ## ★ Ausgrauung während einer Sofort-Aktion mit freier Heldenwahl (v1020, Als Befund 12.9.)
 
