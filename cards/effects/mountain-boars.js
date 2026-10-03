@@ -33,8 +33,9 @@
 //  ── ANIMATION ─────────────────────────────────────────────────────
 //  Jeder Area-Löschweg (Hand, Ablage) spielt vor dem Löschen die Horde:
 //  Broadcast `mountain_boars_stampede` (Client: app-board.jsx), Wildschweine
-//  rennen mit Staub von rechts nach links über die Area, dann fliegt sie in den
-//  Gelöscht-Stapel (`deleteArea`).
+//  rennen mit Staub von rechts nach links über die Area. Sobald der LETZTE Eber
+//  über sie hinweg ist (`PASS_MS`), fliegt sie in den Gelöscht-Stapel
+//  (`deleteArea`); die Tiere laufen währenddessen aus dem Bild.
 //
 //  ── AUS DER ABLAGE ────────────────────────────────────────────────
 //  Nur über den Area-Weg: Ablage-Dialog → Karte anklicken
@@ -47,7 +48,7 @@ const { areaTargetId } = require('./_targeting-shared');
 const { mainActionSlotFree } = require('./_of-kings-shared');
 
 const CARD_NAME = 'Mountain Boars';
-const STAMPEDE_MS = 1700;   // Dauer der Wildschwein-Animation
+const PASS_MS = 1700;   // Zeitpunkt, zu dem der letzte Eber die Area passiert hat → dann fliegt sie
 
 /** Alle löschbaren Areas (nicht in diesem Zug platziert) als Ziele. */
 function areaZiele(engine) {
@@ -92,8 +93,8 @@ async function areaLoeschen(engine, pi, beschreibung) {
   if (!eintrag?.cardInstance) return false;
   // Wildschwein-Horde rennt von rechts nach links über die Area (Client:
   // `mountain_boars_stampede`); danach fliegt die Area in den Gelöscht-Stapel.
-  engine._broadcastEvent('mountain_boars_stampede', { owner: eintrag.owner, durationMs: STAMPEDE_MS });
-  await engine._delay(STAMPEDE_MS - 150);
+  engine._broadcastEvent('mountain_boars_stampede', { owner: eintrag.owner, passMs: PASS_MS });
+  await engine._delay(PASS_MS);
   const geloescht = await engine.deleteArea(eintrag.cardInstance, CARD_NAME, { sourceOwner: pi });
   if (!geloescht) return false;
   engine.log('mountain_boars_delete_area', {
