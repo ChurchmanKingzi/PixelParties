@@ -160,6 +160,7 @@ module.exports = {
       // route to the potion deck automatically; only the main-deck
       // fraction interacts with the tutor step).
       let shuffledNames = [];
+      let shuffledPlaetze;
       if (budget > 0 && (ps.hand || []).length > 0) {
         const cap = Math.min(budget, ps.hand.length);
         const waehlbar = new Set(engine.shuffleBackEligibleHandCards(pi));
@@ -181,15 +182,15 @@ module.exports = {
           // descending handIndex so any name-based splices in the
           // mulligan helper still resolve to the right slot if duplicate
           // names exist (peel right-to-left).
-          shuffledNames = [...handPick.selectedCards]
-            .sort((a, b) => b.handIndex - a.handIndex)
-            .map(s => s.cardName);
+          const sortiert = [...handPick.selectedCards].sort((a, b) => b.handIndex - a.handIndex);
+          shuffledNames = sortiert.map(s => s.cardName);
+          shuffledPlaetze = sortiert.map(s => s.handIndex);
         }
       }
 
       let zurueckgegangen = 0;
       if (shuffledNames.length > 0) {
-        const r = await engine.actionMulliganCards(pi, shuffledNames);
+        const r = await engine.actionMulliganCards(pi, shuffledNames, shuffledPlaetze);
         zurueckgegangen = r.totalReturned || 0;
         await engine._delay(280);
       }

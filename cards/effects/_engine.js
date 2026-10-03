@@ -2312,7 +2312,7 @@ class GameEngine {
           for (let i = 0; i < (delCount ?? 0) && start + i < this.length; i++) {
             const idx = start + i;
             const v = om ? om[idx] : null;
-            rec.push({ cardName: this[idx], owner: (v != null && v > 0) ? v - 1 : null });
+            rec.push({ cardName: this[idx], owner: (v && v.n === this[idx] && Number.isInteger(v.o)) ? v.o : null });
           }
           ps._handOriginsRemoved = rec;
         }
@@ -15676,18 +15676,28 @@ this._deathWatch = (this._deathWatchStack || []).length
     return kandidaten.filter(n => this.handCardDeckOwner(pi, n) !== pi);
   }
 
-  returnHandCardToDeck(holderIdx, cardName) {
+  returnHandCardToDeck(holderIdx, cardName, handIdxHint) {
     const ps = this.gs.players[holderIdx];
     if (!ps) return null;
 
-    const handIdx = ps.hand.indexOf(cardName);
+    // Herkunft entscheidet, nicht der Name (Leadership: „mischt gestohlene Karten in MEIN Deck"): mit Platz-Hinweis
+    // zaehlt die Herkunft dieses Platzes; ohne Hinweis die erste Kopie dieses Namens.
+    const slotGenau = Number.isInteger(handIdxHint) && ps.hand[handIdxHint] === cardName;
+    const handIdx = slotGenau ? handIdxHint : ps.hand.indexOf(cardName);
     if (handIdx < 0) return null;
 
-    // Find tracked instance to determine original owner — v1261: siehe
-    // `_handInstanzFuer`; der alte Ersatzgriff traf die Instanz des
-    // GEGNERS, wenn der dieselbe Karte hielt.
-    const inst = this._handInstanzFuer(holderIdx, cardName);
-    const originalOwner = inst?.originalOwner ?? holderIdx;
+    let originalOwner, inst;
+    if (slotGenau) {
+      const o = this._handOriginAt(ps, handIdx);
+      originalOwner = (o != null && o !== holderIdx) ? o : holderIdx;
+      inst = this._pickHandInstByOrigin(holderIdx, cardName, originalOwner !== holderIdx);
+    } else {
+      // Find tracked instance to determine original owner — v1261: siehe
+      // `_handInstanzFuer`; der alte Ersatzgriff traf die Instanz des
+      // GEGNERS, wenn der dieselbe Karte hielt.
+      inst = this._handInstanzFuer(holderIdx, cardName);
+      originalOwner = inst?.originalOwner ?? holderIdx;
+    }
     const ownerPs = this.gs.players[originalOwner];
     if (!ownerPs) return null;
 
@@ -15743,10 +15753,11 @@ this._deathWatch = (this._deathWatchStack || []).length
         let slot = Number.isInteger(handIdx) && hps.hand[handIdx] === cardName ? handIdx : -1;
         if (slot < 0) {
           for (let k = hps.hand.length - 1; k >= 0; k--) {
-            if (hps.hand[k] === cardName && !hps._handOriginals[k]) { slot = k; break; }
+            const bel = hps._handOriginals[k];
+            if (hps.hand[k] === cardName && !(bel && bel.n === cardName)) { slot = k; break; }
           }
         }
-        if (slot >= 0) hps._handOriginals[slot] = originalOwner + 1;
+        if (slot >= 0) hps._handOriginals[slot] = { o: originalOwner, n: cardName };   // Name zur Absicherung gegen veraltete Eintraege (pop/push)
       }
     }
     // ★ Als Befund 3.10. („Enigma/Infiltration: gestohlene Karte wegen Handlimit abgeworfen — landet in MEINER
@@ -15820,7 +15831,7 @@ this._deathWatch = (this._deathWatchStack || []).length
    * @param {string[]} cardNames - Card names to return (order preserved)
    * @returns {{ potionCount: number }} - Number of potions returned (for draw routing)
    */
-  async actionMulliganCards(playerIdx, cardNames) {
+  async actionMulliganCards(playerIdx, cardNames, handIndices) {
     const gs = this.gs;
     let potionCount = 0;
     // ── ZWEI VERSCHIEDENE ZAEHLUNGEN, bewusst getrennt ────────────────
@@ -15858,9 +15869,18 @@ this._deathWatch = (this._deathWatchStack || []).length
       });
     }
 
-    for (const cardName of cardNames) {
+    // `handIndices` (optional, parallel zu `cardNames`, Indizes VOR dem ersten Entfernen): damit entscheidet der
+    // Handplatz ueber die Herkunft, nicht der Name. Bereits entfernte niedrigere Plaetze schieben nach.
+    const entfernt = [];
+    for (let ci = 0; ci < cardNames.length; ci++) {
+      const cardName = cardNames[ci];
       if (!erlaubt.has(cardName)) continue;
-      const result = this.returnHandCardToDeck(playerIdx, cardName);
+      let hint = null;
+      if (Array.isArray(handIndices) && Number.isInteger(handIndices[ci])) {
+        hint = handIndices[ci] - entfernt.filter(k => k < handIndices[ci]).length;
+      }
+      const result = this.returnHandCardToDeck(playerIdx, cardName, hint);
+      if (result && Array.isArray(handIndices) && Number.isInteger(handIndices[ci])) entfernt.push(handIndices[ci]);
       if (result) {
         if (result.isPotion) potionCount++;
         insgesamt++;
@@ -24080,13 +24100,19 @@ this._deathWatch = (this._deathWatchStack || []).length
    * Wohin gehört diese Handkarte beim Ablegen/Löschen? Normalfall: der
    * Halter. Gestohlene Karten: ihr Ursprungs-Deck.
    */
+  /** Ursprungsbesitzer der Handkarte auf Platz `idx` (null = eigene Karte); veraltete Eintraege werden ignoriert. */
+  _handOriginAt(ps, idx) {
+    const v = ps?._handOriginals?.[idx];
+    return (v && v.n === ps.hand?.[idx] && Number.isInteger(v.o)) ? v.o : null;
+  }
+
   _handCardPileOwner(holderIdx, cardName, handIdx) {
     // Herkunft entscheidet, nicht der Name: erst der Platz (vor dem Splice, `handIdx`), dann die beim Entfernen
     // festgehaltene Herkunft (nach dem Splice), erst zuletzt die namensbasierte Instanz.
     const hps = this.gs.players[holderIdx];
     if (Number.isInteger(handIdx) && hps?.hand?.[handIdx] === cardName) {
-      const v = hps._handOriginals?.[handIdx];
-      return (v != null && v > 0 && v - 1 !== holderIdx) ? v - 1 : holderIdx;
+      const o = this._handOriginAt(hps, handIdx);
+      return (o != null && o !== holderIdx) ? o : holderIdx;
     }
     const rem = this._takeRemovedHandOrigin(holderIdx, cardName);
     if (rem.found) {

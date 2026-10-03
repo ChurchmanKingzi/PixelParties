@@ -85,7 +85,7 @@ module.exports = {
     const cardNamesToReturn = sortedByIdx.map(s => s.cardName);
 
     // Mulligan cards back to deck (handles animation, opponent routing, shuffling)
-    const { potionCount, totalReturned } = await engine.actionMulliganCards(pi, cardNamesToReturn);
+    const { potionCount, totalReturned } = await engine.actionMulliganCards(pi, cardNamesToReturn, sortedByIdx.map(s => s.handIndex));   // Plaetze mitgeben: die Herkunft entscheidet, nicht der Name
 
     engine.log('leadership_shuffle', {
       player: ps.username, count, returned: totalReturned, level, bonus: bonusDraw,

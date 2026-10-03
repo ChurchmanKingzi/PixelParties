@@ -118,14 +118,13 @@ module.exports = {
     // name and re-resolves the index each iteration, so technically
     // ordering only matters for log readability. Match Leadership's
     // convention.
-    const cardNamesToReturn = [...selected]
-      .sort((a, b) => b.handIndex - a.handIndex)
-      .map(s => s.cardName);
+    const selectedSorted = [...selected].sort((a, b) => b.handIndex - a.handIndex);
+    const cardNamesToReturn = selectedSorted.map(s => s.cardName);
 
     let potionCount = 0;
     let totalReturned = 0;
     if (cardNamesToReturn.length > 0) {
-      const mulliganResult = await engine.actionMulliganCards(pi, cardNamesToReturn);
+      const mulliganResult = await engine.actionMulliganCards(pi, cardNamesToReturn, selectedSorted.map(s => s.handIndex));
       potionCount = mulliganResult.potionCount || 0;
       totalReturned = mulliganResult.totalReturned || 0;
     }

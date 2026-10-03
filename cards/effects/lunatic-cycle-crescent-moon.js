@@ -89,7 +89,7 @@ module.exports = {
 
         // actionMulliganCards handles shuffle-back animation, opponent
         // routing, deck shuffle, and reports how many were potions.
-        const { potionCount, totalReturned } = await engine.actionMulliganCards(pi, namesToReturn);
+        const { potionCount, totalReturned } = await engine.actionMulliganCards(pi, namesToReturn, sortedByIdx.map(s => s.handIndex));
         engine.log('lunatic_crescent_cycle', { player: ps.username, count, returned: totalReturned });
         engine.sync();
         await engine._delay(400);

@@ -78,7 +78,7 @@ module.exports = {
       const cardNamesToReturn = sortedByIdx.map(s => s.cardName);
 
       // Mulligan cards back to deck (handles animation, opponent routing, shuffling)
-      const mulligan = await engine.actionMulliganCards(pi, cardNamesToReturn);
+      const mulligan = await engine.actionMulliganCards(pi, cardNamesToReturn, sortedByIdx.map(s => s.handIndex));
       const potionCount = mulligan.potionCount || 0;
       totalReturned = mulligan.totalReturned || 0;
 

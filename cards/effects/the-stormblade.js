@@ -132,6 +132,7 @@ async function sturmzyklus(engine, pi, anlass, klingenSeite) {
     await engine.announceHookActivation(CARD_NAME, klingenSeite ?? pi);
 
     let namen;
+    let plaetze;   // Handplaetze zu `namen` (nur bei Auswahl) — die Herkunft entscheidet, nicht der Name
     if (anlass === 'action') {
       const erlaubt = new Set(waehlbar);
       const eligibleIndices = ps.hand.map((_, i) => i).filter(i => erlaubt.has(ps.hand[i]));
@@ -147,7 +148,9 @@ async function sturmzyklus(engine, pi, anlass, klingenSeite) {
       });
       const gewaehlt = Array.isArray(wahl?.selectedCards) ? wahl.selectedCards : [];
       // Von hinten nach vorn, damit die Indizes stabil bleiben.
-      namen = [...gewaehlt].sort((x, y) => y.handIndex - x.handIndex).map(k => k.cardName);
+      const gewSortiert = [...gewaehlt].sort((x, y) => y.handIndex - x.handIndex);
+      namen = gewSortiert.map(k => k.cardName);
+      plaetze = gewSortiert.map(k => k.handIndex);
       if (namen.length === 0) {
         engine.log('stormblade_cycle', { player: ps.username, returned: 0, anlass });
         return true;          // 0 gewaehlt: ausgeloest, nichts zu tun
@@ -156,7 +159,7 @@ async function sturmzyklus(engine, pi, anlass, klingenSeite) {
       namen = waehlbar;       // Treffer: die ganze (mischbare) Hand
     }
 
-    const { potionCount, totalReturned } = await engine.actionMulliganCards(pi, namen);
+    const { potionCount, totalReturned } = await engine.actionMulliganCards(pi, namen, plaetze);
     if (!(totalReturned > 0)) return false;
 
     engine.log('stormblade_cycle', {
