@@ -24870,3 +24870,60 @@ body.summon-pick .board-zone:not(.zone-drag-valid):not(.board-zone-play-target) 
   15% { opacity: 1; }
   100% { transform: translate(var(--dx), var(--dy)); opacity: 0; }
 }
+
+/* ── Surefire Shot: schneeweisser, extrem schneller Pfeil ───────────────── */
+.sf-fx { position: fixed; left: 0; top: 0; width: 0; height: 0; pointer-events: none; z-index: 10096; }
+.sf-flug {
+  position: fixed; width: 0; height: 0;
+  animation-name: sfFlug; animation-timing-function: linear; animation-fill-mode: forwards;
+  will-change: transform;
+}
+.sf-koerper { position: absolute; left: 0; top: 0; width: 0; height: 0; animation: sfWeg 110ms linear var(--sfd, 170ms) forwards; }
+@keyframes sfWeg { from { opacity: 1; } to { opacity: 0; } }
+.sf-pfeil {
+  position: absolute; left: 0; top: 0; transform: translate(-100%, -50%);   /* Spitze liegt auf der Flugposition */
+  filter: drop-shadow(0 0 3px #fff) drop-shadow(0 0 9px rgba(200,230,255,.95)) drop-shadow(0 0 18px rgba(170,210,255,.7));
+}
+.sf-schweif {
+  position: absolute; left: -96px; top: 0; width: 360px; height: 7px;
+  transform: translate(-100%, -50%); border-radius: 999px;
+  background: linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(235,245,255,.55) 60%, rgba(255,255,255,.95) 100%);
+  filter: blur(2px);
+}
+.sf-spur-rot { position: fixed; height: 0; transform-origin: 0 50%; }
+.sf-spur {
+  position: absolute; left: 0; top: -2px; width: 100%; height: 4px; border-radius: 999px;
+  transform-origin: 0 50%; transform: scaleX(0);
+  background: linear-gradient(90deg, rgba(255,255,255,.35), #fff 70%, #fff);
+  box-shadow: 0 0 8px 2px rgba(255,255,255,.9), 0 0 22px 6px rgba(190,222,255,.6);
+  animation: sfSpurWachs var(--sfd, 170ms) linear forwards, sfSpurAus 320ms ease-out var(--sfd, 170ms) forwards;
+}
+.sf-muendung {
+  position: fixed; width: 46px; height: 46px; border-radius: 50%; transform: translate(-50%, -50%) scale(.2); opacity: 0;
+  background: radial-gradient(circle, #fff 0%, rgba(215,235,255,.85) 35%, rgba(255,255,255,0) 72%);
+  animation: sfBlitz 260ms ease-out forwards;
+}
+.sf-einschlag { position: fixed; width: 0; height: 0; }
+.sf-einschlag > i { position: absolute; display: block; opacity: 0; }
+.sf-blitz {
+  left: 0; top: 0; width: 90px; height: 90px; border-radius: 50%;
+  background: radial-gradient(circle, #fff 0%, rgba(235,245,255,.9) 30%, rgba(255,255,255,0) 70%);
+  animation: sfBlitz 340ms ease-out forwards;
+}
+.sf-ring {
+  left: -28px; top: -28px; width: 56px; height: 56px; border-radius: 50%;
+  border: 3px solid #fff; box-shadow: 0 0 14px 3px rgba(255,255,255,.9);
+  animation: sfRing 380ms ease-out forwards;
+}
+.sf-funke {
+  left: 0; top: 0; width: var(--sfl, 20px); height: 2px; border-radius: 2px; transform-origin: 0 50%;
+  background: linear-gradient(90deg, #fff, rgba(255,255,255,0));
+  box-shadow: 0 0 5px 1px rgba(255,255,255,.9);
+  animation: sfFunke 340ms ease-out forwards;
+}
+@keyframes sfFlug { 0% { transform: translate(0, 0); } 100% { transform: translate(var(--sfx, 0), var(--sfy, 0)); } }
+@keyframes sfSpurWachs { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+@keyframes sfSpurAus { from { opacity: 1; } to { opacity: 0; } }
+@keyframes sfBlitz { 0% { opacity: 0; transform: translate(-50%, -50%) scale(.2); } 30% { opacity: 1; } 100% { opacity: 0; transform: translate(-50%, -50%) scale(1.5); } }
+@keyframes sfRing { 0% { opacity: 1; transform: scale(.3); } 100% { opacity: 0; transform: scale(2.4); } }
+@keyframes sfFunke { 0% { opacity: 1; transform: rotate(var(--sfw, 0deg)) translateX(6px) scaleX(.4); } 100% { opacity: 0; transform: rotate(var(--sfw, 0deg)) translateX(46px) scaleX(1); } }

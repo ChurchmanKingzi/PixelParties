@@ -5348,6 +5348,53 @@ function DunkelBlastStrahl({ p }) {
   );
 }
 
+/**
+ * „Surefire Shot": ein schneeweisser, EXTREM schneller Pfeil vom Schuetzen zum Ziel
+ * (`projectileShape: 'surefire'`). Der Pfeil legt die Strecke in ~170 ms zurueck; damit man
+ * ihn trotzdem sieht, bleibt eine gleissend weisse Leuchtspur stehen, die dem Pfeil
+ * nachwaechst und danach ausblendet. Muendungsblitz am Schuetzen, Einschlagsblitz mit Ring und
+ * Funken am Ziel (startet genau bei der Ankunft).
+ */
+function WeissPfeil({ p }) {
+  const dx = p.tgtX - p.srcX, dy = p.tgtY - p.srcY;
+  const laenge = Math.max(1, Math.hypot(dx, dy));
+  const winkel = Math.atan2(dy, dx) * 180 / Math.PI;
+  const dauer = p.dur || 170;
+  const funken = useMemo(() => Array.from({ length: 10 }, (_, i) => ({
+    w: i * 36 + ((i * 17) % 13), l: 16 + ((i * 29) % 22),
+  })), [p.id]);
+  return (
+    <div className="sf-fx" aria-hidden="true" style={{ '--sfd': dauer + 'ms' }}>
+      <div className="sf-muendung" style={{ left: p.srcX, top: p.srcY }} />
+      <div className="sf-spur-rot" style={{ left: p.srcX, top: p.srcY, width: laenge, transform: `rotate(${winkel}deg)` }}>
+        <div className="sf-spur" />
+      </div>
+      <div className="sf-flug" style={{
+        left: p.srcX, top: p.srcY, '--sfx': dx + 'px', '--sfy': dy + 'px', animationDuration: dauer + 'ms',
+      }}>
+        <div className="sf-koerper" style={{ transform: `rotate(${winkel}deg)` }}>
+          <span className="sf-schweif" />
+          <svg className="sf-pfeil" viewBox="0 0 96 12" width="96" height="12" xmlns="http://www.w3.org/2000/svg">
+            <polygon points="0,0.5 12,6 0,11.5" fill="#ffffff" />
+            <polygon points="8,0.5 20,6 8,11.5" fill="#eef6ff" />
+            <rect x="12" y="5" width="62" height="2" fill="#ffffff" />
+            <polygon points="72,0 96,6 72,12" fill="#ffffff" />
+          </svg>
+        </div>
+      </div>
+      <div className="sf-einschlag" style={{ left: p.tgtX, top: p.tgtY, animationDelay: dauer + 'ms' }}>
+        <i className="sf-blitz" style={{ animationDelay: dauer + 'ms' }} />
+        <i className="sf-ring" style={{ animationDelay: dauer + 'ms' }} />
+        {funken.map((f, i) => (
+          <i key={'sff' + i} className="sf-funke" style={{
+            '--sfw': f.w + 'deg', '--sfl': f.l + 'px', animationDelay: dauer + 'ms',
+          }} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function SandStrahl({ p }) {
   const dx = p.tgtX - p.srcX, dy = p.tgtY - p.srcY;
   const laenge = Math.max(1, Math.hypot(dx, dy));
@@ -36478,7 +36525,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         angle: angleDeg,
         dur,
       }]);
-      setTimeout(() => setProjectileAnims(prev => prev.filter(a => a.id !== id)), dur + 200);
+      // Surefire-Pfeil: Einschlagsblitz (≈ 380 ms) läuft nach der Ankunft weiter.
+      setTimeout(() => setProjectileAnims(prev => prev.filter(a => a.id !== id)), dur + (projectileShape === 'surefire' ? 700 : 200));
     };
     socket.on('play_projectile_animation', onProjectileAnimation);
     // ★ WEAPON STORM (v805, Als Vorgabe): eine Barrage aus 10-20
@@ -47491,6 +47539,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         <SandStrahl key={p.id} p={p} />
       ) : p.projectileShape === 'darkBlast' ? (
         <DunkelBlastStrahl key={p.id} p={p} />
+      ) : p.projectileShape === 'surefire' ? (
+        <WeissPfeil key={p.id} p={p} />
       ) : (
         <div key={p.id} className="projectile-anim" style={{
           left: p.srcX, top: p.srcY,
