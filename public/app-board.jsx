@@ -34659,9 +34659,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     };
     socket.on('area_descend', onAreaDescend);
     // ── Mountain Boars: Wildschwein-Horde rennt von rechts nach links ueber die Area ──
-    // Das Sprite wird einmal zur Laufzeit prozedural gemalt (Silhouette aus Ellipsen, Licht von
-    // oben links, 5 Fellstufen mit Bayer-Dithering, dunkle Kontur, Rueckenborsten, Hauer, Auge;
-    // 2 Laufphasen nebeneinander) — keine Bilddatei noetig.
+    // Sprites: public/anim/mountain-boar-run.png — 3 Laufphasen (je 31x18) aus dem Karten-Art,
+    // interpolationslos vergroessert. Phasenfolge A-B-C-B per `boarLegs`.
     // `passMs`: Zeitpunkt, zu dem der LETZTE Eber die Area passiert hat (der Server laesst die
     // Area genau dann losfliegen); die Tiere laufen danach weiter aus dem Bild.
     const onMountainBoarsStampede = ({ owner, passMs }) => {
@@ -34670,114 +34669,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       if (!tgtEl) return;
       const tr = tgtEl.getBoundingClientRect();
       const pass = passMs || 1500;
-
-      if (!window._boarSheetUrl) {
-        const W = 48, H = 30;
-        const TONES = ['#4a2622', '#6e382c', '#8f4d3a', '#b46a4a', '#d48c62'];   // Schatten → Licht
-        const OUT = '#22100f', HOOF = '#18090a', HOOF_HI = '#5a3a30';
-        const BAYER = [[0, 8, 2, 10], [12, 4, 14, 6], [3, 11, 1, 9], [15, 7, 13, 5]];
-        const hash = (x, y) => { let h = (x * 374761393 + y * 668265263) | 0; h = (h ^ (h >> 13)) * 1274126177 | 0; return ((h ^ (h >> 16)) & 255) / 255; };
-        const inEll = (x, y, cx, cy, rx, ry) => ((x - cx) / rx) ** 2 + ((y - cy) / ry) ** 2 <= 1;
-        const cv = document.createElement('canvas');
-        cv.width = W * 2; cv.height = H;
-        const g = cv.getContext('2d');
-
-        const drawFrame = (f) => {
-          const px = Array.from({ length: H }, () => Array(W).fill(null));   // { lum, kind }
-          const put = (x, y, lum, kind) => { if (x >= 0 && x < W && y >= 0 && y < H) px[y][x] = { lum, kind }; };
-          const lightOf = (x, y, cx, cy, rx, ry) => {
-            const nx = (x - cx) / rx, ny = (y - cy) / ry;
-            return 0.55 - 0.55 * ny - 0.25 * nx;      // oben/links hell, unten/rechts dunkel
-          };
-          // Hinterbeine/Vorderbeine: ferne Seite dunkler, Phase f verschiebt den Schritt.
-          const swing = f === 0 ? [3, -3, -3, 3] : [-3, 3, 3, -3];
-          const legX = [12, 18, 33, 39];
-          const far = [true, false, true, false];
-          for (let i = 0; i < 4; i++) {
-            const lift = (f === 0) === (i % 2 === 0) ? 0 : 3;
-            const x0 = legX[i] + swing[i];
-            for (let y = 19; y < 28 - lift; y++) {
-              const kneeBend = y > 23 ? (swing[i] > 0 ? 1 : -1) : 0;
-              for (let x = 0; x < 3; x++) {
-                const lum = (far[i] ? -0.15 : 0.1) + (x === 0 ? 0.25 : x === 2 ? -0.2 : 0);
-                put(x0 + x + kneeBend, y, lum, y >= 26 - lift ? 'hoof' : 'body');
-              }
-            }
-          }
-          // Rumpf + Schulterbuckel + Kopf + Schnauze + Ohr + Schwanz
-          for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
-            let lum = null;
-            if (inEll(x, y, 29, 13, 15.5, 9.5)) lum = lightOf(x, y, 29, 13, 15.5, 9.5);
-            if (inEll(x, y, 21, 11, 10.5, 9.5)) lum = Math.max(lum ?? -9, lightOf(x, y, 21, 11, 10.5, 9.5) + 0.08);
-            if (inEll(x, y, 10, 16, 7.5, 6.5))  lum = lightOf(x, y, 10, 16, 7.5, 6.5) - 0.02;
-            if (inEll(x, y, 4.5, 18, 4, 3.4))   lum = lightOf(x, y, 4.5, 18, 4, 3.4) + 0.12;   // Schnauze
-            if (lum != null) put(x, y, lum, 'body');
-          }
-          [[13, 8], [14, 7], [15, 7], [14, 8], [15, 8], [16, 9], [14, 9], [15, 9], [13, 9]].forEach(([x, y]) => put(x, y, 0.2, 'body'));   // Ohr
-          [[44, 11], [45, 10], [45, 9], [46, 9], [46, 8]].forEach(([x, y]) => put(x, y, -0.05, 'body'));                                    // Ringelschwanz
-          // Rueckenborsten: dunkle Zacken ueber der oberen Kante des Rumpfs
-          for (let x = 17; x < 44; x += 2) {
-            let top = null;
-            for (let y = 0; y < H; y++) if (px[y][x] && px[y][x].kind === 'body') { top = y; break; }
-            if (top == null) continue;
-            const hgt = 2 + ((x * 7) % 3);
-            for (let k = 1; k <= hgt; k++) put(x, top - k, -0.55, 'bristle');
-            if (hgt > 2) put(x + 1, top - 1, -0.55, 'bristle');
-          }
-          // Hauer
-          [[3, 21], [4, 22], [5, 22], [6, 21], [6, 20], [7, 19]].forEach(([x, y]) => put(x, y, 0, 'tusk'));
-
-          // Kontur: jedes gefuellte Pixel mit leerem 4er-Nachbarn (nicht Hauer/Huf)
-          const filled = (x, y) => y >= 0 && y < H && x >= 0 && x < W && px[y][x];
-          const outline = [];
-          for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
-            const c = px[y][x];
-            if (!c) continue;
-            if (!(filled(x - 1, y) && filled(x + 1, y) && filled(x, y - 1) && filled(x, y + 1))) outline.push([x, y, c.kind]);
-          }
-          const ox = f * W;
-          // Farben + Dithering
-          for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
-            const c = px[y][x];
-            if (!c) continue;
-            let col;
-            if (c.kind === 'tusk') col = '#f3dcb4';
-            else if (c.kind === 'hoof') col = (x + y) % 3 === 0 ? HOOF_HI : HOOF;
-            else if (c.kind === 'bristle') col = ((x + y) & 1) ? '#2a1412' : '#3a1c16';
-            else {
-              // Fell-Textur: deterministisches Rauschen + Bayer-Schwelle → harte Pixel-Uebergaenge
-              let lum = c.lum + (hash(x, y) - 0.5) * 0.22;
-              // Bauchschatten (unterer Rumpf) bekommt ein dichteres Schachbrett
-              if (y > 17 && y < 23) lum -= 0.18 * ((x + y) & 1 ? 1 : 0.4);
-              const v = Math.max(0, Math.min(0.999, lum)) * (TONES.length - 1);
-              const base = Math.floor(v);
-              const frac = v - base;
-              const idx = base + (frac * 16 > BAYER[y & 3][x & 3] ? 1 : 0);
-              col = TONES[Math.min(TONES.length - 1, idx)];
-            }
-            g.fillStyle = col;
-            g.fillRect(ox + x, y, 1, 1);
-          }
-          g.fillStyle = OUT;
-          for (const [x, y, kind] of outline) {
-            if (kind === 'tusk' || kind === 'hoof' || kind === 'bristle') continue;
-            g.fillRect(ox + x, y, 1, 1);
-          }
-          // Gesicht: Auge mit Glanzpunkt, Nasenspitze, Nasenloch, Maullinie
-          g.fillStyle = '#120808'; g.fillRect(ox + 9, 13, 2, 2);
-          g.fillStyle = '#f2e6cc'; g.fillRect(ox + 9, 13, 1, 1);
-          g.fillStyle = '#e0607e'; g.fillRect(ox + 1, 17, 2, 2);
-          g.fillStyle = '#7a2a3a'; g.fillRect(ox + 2, 17, 1, 1);
-          g.fillStyle = '#2a1210'; g.fillRect(ox + 5, 20, 5, 1);
-          // Fell-Glanzlichter auf dem Ruecken
-          g.fillStyle = '#e6a878';
-          [[24, 4], [27, 4], [31, 5], [20, 6], [34, 6]].forEach(([x, y]) => { if (px[y]?.[x]) g.fillRect(ox + x, y, 1, 1); });
-        };
-        drawFrame(0); drawFrame(1);
-        window._boarSheetUrl = cv.toDataURL('image/png');
-        window._boarSheetDims = { W, H };
-      }
-      const { W, H } = window._boarSheetDims;
+      const W = 31, H = 18;
+      const sheetUrl = '/anim/mountain-boar-run.png';
 
       if (!document.getElementById('boar-stampede-kf')) {
         const style = document.createElement('style');
@@ -34785,7 +34678,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         style.textContent = `
           @keyframes boarRun { from { transform: translateX(var(--bx0)); } to { transform: translateX(var(--bx1)); } }
           @keyframes boarHop { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-7px); } }
-          @keyframes boarLegs { 0% { background-position: 0 0; } 50% { background-position: calc(var(--bw) * -1) 0; } 100% { background-position: 0 0; } }
+          @keyframes boarLegs { 0% { background-position: 0 0; } 25% { background-position: calc(var(--bw) * -1) 0; } 50% { background-position: calc(var(--bw) * -2) 0; } 75% { background-position: calc(var(--bw) * -1) 0; } 100% { background-position: 0 0; } }
           @keyframes boarDust {
             0%   { opacity: 0; transform: translate(-50%, -50%) scale(0.3); }
             20%  { opacity: .85; }
@@ -34801,7 +34694,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         setTimeout(() => window.playSFX('heavy_impact', { rate: 0.55, volume: 0.8, category: null, dedupe: 200 }), 900);
       }
 
-      const scale = Math.max(2, Math.min(5, Math.round(tr.height / 26)));
+      const scale = Math.max(3, Math.min(6, Math.round(tr.height / 20)));
       const bw = W * scale, bh = H * scale;
       const x0 = window.innerWidth + bw;                 // rechts ausserhalb
       const x1 = -bw * 2;                                // links ausserhalb
@@ -34831,9 +34724,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         const sprite = document.createElement('div');
         sprite.style.cssText = [
           `width:${bw}px`, `height:${bh}px`, `--bw:${bw}px`,
-          `background:url(${window._boarSheetUrl}) 0 0 / ${bw * 2}px ${bh}px no-repeat`,
+          `background:url(${sheetUrl}) 0 0 / ${bw * 3}px ${bh}px no-repeat`,
           'image-rendering:pixelated',
-          `animation:boarLegs .22s steps(1) infinite, boarHop .22s ease-in-out infinite`,
+          `animation:boarLegs .32s steps(1, end) infinite, boarHop .32s ease-in-out infinite`,
           'filter:drop-shadow(0 6px 3px rgba(0,0,0,.35))',
         ].join(';');
         wrap.appendChild(sprite);
