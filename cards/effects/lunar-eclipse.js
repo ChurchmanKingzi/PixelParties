@@ -51,6 +51,7 @@ module.exports = {
 
   isSurprise: true,
   isReaction: true,
+  reactsToPlacement: true,   // aus der HAND platzierte Creatures zaehlen als Handspiel (fromBoard-Herkunft)
   // Stays face-up in its Surprise Zone for the whole chain; the
   // engine's end-of-chain surprise-reaction cleanup sends it to
   // discard AFTER the negated card is processed. This flag stops

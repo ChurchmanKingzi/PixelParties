@@ -34,6 +34,10 @@ module.exports = {
   spellVisual: { impact: { type: 'plague_smoke' }, impactMs: 260 },
 
   isReaction: true,
+  // Auch auf eine Platzierung AUS DER HAND per Effekt (Herkunftsort zaehlt,
+  // nicht „place"/„summon") — `actionPlaceCreature` setzt `fromBoard`
+  // genau dann, wenn die Quelle nicht die Hand ist.
+  reactsToPlacement: true,
 
   // Cannot be played proactively
   canActivate: () => false,
@@ -122,6 +126,7 @@ module.exports = {
     // Reactions played from hand during a chain do NOT spend Actions — only initial
     // cards (Attack/Spell/Creature/action-cost Ability) do.
     if (!targetLink.isInitialCard) return;
+    if (targetLink.isPlacement) return;   // Platzierung kostet keine Aktion
 
     const cardDB = engine._getCardDB();
     const negatedData = cardDB[targetLink.cardName];

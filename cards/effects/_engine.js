@@ -24989,17 +24989,20 @@ this._deathWatch = (this._deathWatchStack || []).length
     // fuer das PLATZIEREN per Effekt) ────────────────────────────────────
     // Das Kettenfenster oeffnet VOR jeder Entnahme und jedem Landen —
     // negiert, findet die Platzierung nie statt. Nur offen, wenn der
-    // Gegner eine Handkarte mit `reactsToPlacement` haelt (sonst kein
-    // Fenster, kein Prompt-Laerm, keine CPU-Kosten).
+    // Gegner eine Karte mit `reactsToPlacement` haelt (Hand oder Surprise-
+    // Zone; sonst kein Fenster, kein Prompt-Laerm, keine CPU-Kosten).
+    // `fromBoard` haengt NUR am Herkunftsort (Ruling 3.10.): aus der HAND
+    // platziert zaehlt wie ein Kartenspiel aus der Hand (The Master's Plan,
+    // Lunar Eclipse), von woanders nicht — unabhaengig von „place"/„summon".
     if (!opts._skipPlacementWindow && !this._inMctsSim
         && !this._inReactionCheck && !gs._chainResolvingLock
         && this._placementReactorHeld(playerIdx)) {
       const kette = await this.executeCardWithChain({
         cardName, owner: playerIdx, cardType: 'Creature', goldCost: 0,
-        resolve: null, fromBoard: true, isPlacement: true,
+        resolve: null, fromBoard: source !== 'hand', isPlacement: true,
       });
       if (kette?.negated) {
-        await this._negatedPlacementToDeck(cardName, playerIdx, source, opts);
+        await this._negatedPlacementRoute(cardName, playerIdx, source, opts, kette);
         return null;
       }
     }
@@ -37178,17 +37181,20 @@ this._deathWatch = (this._deathWatchStack || []).length
   /** Haelt der Gegner von `playerIdx` eine Handkarte, die auf Platzierungen reagiert? */
   _placementReactorHeld(playerIdx) {
     const opp = this.gs.players[playerIdx === 0 ? 1 : 0];
-    if (!opp || !(opp.hand || []).length) return false;
-    return opp.hand.some(n => !!loadCardEffect(n)?.reactsToPlacement);
+    if (!opp) return false;
+    const traegt = (n) => !!loadCardEffect(n)?.reactsToPlacement;
+    if ((opp.hand || []).some(traegt)) return true;
+    return (opp.surpriseZones || []).some(z => (z || []).some(traegt));
   }
 
   /**
-   * Eine per Effekt platzierte Creature wurde (Off Duty) negiert: sie
-   * wandert zurueck INS DECK und wird gemischt. Quelle Hand/Ablage: die
-   * Karte wird dort entnommen; bei jeder anderen Quelle hat der Aufrufer
-   * sie schon entnommen — sie kommt nur ins Deck.
+   * Eine per Effekt platzierte Creature wurde negiert. Ziel wie bei einer
+   * negierten Karte: Off Duty → INS DECK (gemischt), Lunar Eclipse →
+   * Loeschstapel, sonst Ablage. Quelle Hand/Ablage: die Karte wird dort
+   * entnommen; bei jeder anderen Quelle hat der Aufrufer sie schon
+   * entnommen.
    */
-  async _negatedPlacementToDeck(cardName, playerIdx, source, opts = {}) {
+  async _negatedPlacementRoute(cardName, playerIdx, source, opts = {}, kette = {}) {
     const ps = this.gs.players[playerIdx];
     if (!ps) return;
     let von = 'hand', handIdx;
@@ -37201,15 +37207,25 @@ this._deathWatch = (this._deathWatchStack || []).length
       const i = opts.sourceIdx != null ? opts.sourceIdx : pile.indexOf(cardName);
       if (i >= 0 && pile[i] === cardName) pile.splice(i, 1);
     }
+    const nachDeck = !!kette?.negatedToDeck;
+    const nachGeloescht = !nachDeck && !!kette?.negatedToDeleted;
     this._broadcastEvent('play_pile_transfer', {
-      owner: playerIdx, cardName, from: von, to: 'deck',
+      owner: playerIdx, cardName, from: von,
+      to: nachDeck ? 'deck' : (nachGeloescht ? 'deleted' : 'discard'),
       ...(von === 'hand' && Number.isInteger(handIdx) && handIdx >= 0 ? { fromHandIdx: handIdx } : {}),
     });
     await this._delay(650);
-    if (!ps.mainDeck) ps.mainDeck = [];
-    ps.mainDeck.push(cardName);
-    this.shuffleDeck(playerIdx);
-    this.log('negated_to_deck', { card: cardName, player: ps.username, placement: true });
+    if (nachDeck) {
+      if (!ps.mainDeck) ps.mainDeck = [];
+      ps.mainDeck.push(cardName);
+      this.shuffleDeck(playerIdx);
+      this.log('negated_to_deck', { card: cardName, player: ps.username, placement: true });
+    } else {
+      const pile = nachGeloescht ? 'deletedPile' : 'discardPile';
+      if (!ps[pile]) ps[pile] = [];
+      ps[pile].push(cardName);
+      this.log('placement_negated', { card: cardName, player: ps.username, to: pile });
+    }
     this.sync();
   }
 
