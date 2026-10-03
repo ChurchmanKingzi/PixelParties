@@ -2028,7 +2028,28 @@ function PuzzleCreator() {
     const ghost = document.createElement('div');
     ghost.style.cssText = `position:absolute;top:-1000px;left:-1000px;width:${gb}px;height:${gh}px;border:2px solid var(--accent,#0ff);border-radius:4px;background:var(--bg3,#222);overflow:hidden;`;
     const url = cardImageUrl(cardName);
-    if (url) {
+    // ★ Ziehbild OHNE Nachladen: das Browser-Ziehbild wird im Moment von
+    // `setDragImage` aufgenommen. Ein frisch erzeugtes <img> ist dann noch
+    // nicht geladen/dekodiert (`complete: false`, gemessen) — die Karte im
+    // Ziehbild blieb leer. Die gezogene Karte zeigt ihr Bild aber schon;
+    // deshalb wird DAS (fertig dekodierte) Bild synchron auf ein Canvas
+    // gemalt, das sofort gerendert wird.
+    const quellBild = q && q.querySelector ? q.querySelector('img') : null;
+    if (quellBild && quellBild.complete && quellBild.naturalWidth > 0) {
+      const dpr = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
+      const cv = document.createElement('canvas');
+      cv.width = Math.round(gb * dpr); cv.height = Math.round(gh * dpr);
+      cv.style.cssText = 'width:100%;height:100%;display:block;';
+      const cx = cv.getContext('2d');
+      cx.imageSmoothingEnabled = false;
+      // object-fit: cover — mittig zuschneiden
+      const sw = quellBild.naturalWidth, sh = quellBild.naturalHeight;
+      const ziel = cv.width / cv.height, quelle = sw / sh;
+      let sx = 0, sy = 0, sbw = sw, sbh = sh;
+      if (quelle > ziel) { sbw = sh * ziel; sx = (sw - sbw) / 2; } else { sbh = sw / ziel; sy = (sh - sbh) / 2; }
+      cx.drawImage(quellBild, sx, sy, sbw, sbh, 0, 0, cv.width, cv.height);
+      ghost.appendChild(cv);
+    } else if (url) {
       const img = document.createElement('img');
       img.src = url;
       img.style.cssText = 'width:100%;height:100%;object-fit:cover;display:block;';
