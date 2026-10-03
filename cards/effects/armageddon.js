@@ -155,6 +155,17 @@ module.exports = {
         // liefe die Regel an zwei Stellen auseinander.
       }
 
+      // Echter Flaechenschlag: die Helden-Surprises (Frost Rune, Booby Trap …) entscheiden sich VOR dem
+      // ersten Schaden — negiert eine den Zauber, faellt der Schaden an ALLEN Zielen weg.
+      {
+        const vorab = await engine.aoeSurpriseVorab(
+          { ...quelle, heroOwner: ctx.cardHeroOwner ?? pi },
+          helden.map(h => ({ type: 'hero', owner: h.p, heroIdx: h.hi, cardName: h.hero.name })),
+          { damageType: 'destruction_spell', reaktionsQuelle: ctx.card },
+        );
+        if (vorab?.effectNegated) return;
+      }
+
       // ★★ v1146 (Al 17.9.): eigene Animation — Feuerball vom Wirker,
       // der das ganze Brett einhuellt, Flammen und Feuerregen. Staerke
       // skaliert mit dem Schaden: 50 → Glimmen, ab 450 → volle Wucht.

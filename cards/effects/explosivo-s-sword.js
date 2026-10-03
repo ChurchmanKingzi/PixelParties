@@ -157,7 +157,7 @@ async function _explode(ctx, excludeKey) {
       heroIdx: inst.heroIdx, slotIdx: inst.zoneSlot, cardName: inst.name,
     })),
   ];
-  await engine.preDamageMultiTargetWindow(source, allTargets);
+  await engine.preDamageMultiTargetWindow(source, allTargets, { simultan: true, damageType: 'artifact' });   // Flaechenschlag: Surprises VOR dem ersten Schaden
 
   // Explosion flash on every recipient, then a beat before impact.
   for (const ht of heroTargets) {

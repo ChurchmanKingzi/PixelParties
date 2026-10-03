@@ -125,6 +125,7 @@ module.exports = {
         const _negR = await engine.preDamageMultiTargetWindow(
           { name: CARD_NAME, owner: pi, heroIdx, heroOwner: ctx.cardHeroOwner ?? pi },   // Als Befund 29.9.: Brettseite des Wirkers
           allTgts,
+          { simultan: true, damageType: 'decay_spell' },   // echter Flaechenschlag: Surprises VOR dem ersten Schaden
         );
         // Full-negate reaction (Storm Ring / Invisibility Cloak): bail
         // BEFORE damage, the Bound lockout, and creature negation so
