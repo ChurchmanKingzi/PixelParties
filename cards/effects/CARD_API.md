@@ -5489,9 +5489,14 @@ damit Aufrufer wie Brainstorming nicht „abgebrochen" melden), `searchDeckForNa
 (Beato, Cute Dog, Divine Gift of Creation, Future Tech Database/Lamp, Kitsune
 Transformation, Spider Dance, Tamed Hell Fox, Tanuki Escape, Trial of Loyalty, Kopernikos
 Zusatzkarte) — jeder NEUE Mehrfach-Tutor muss das auch tun.
-**Bekannte Lücke:** Tutoren, die per `takeFromPile(…, toHand)` + `handZugang(von:'deck')`
-arbeiten (Bifab, Cute Annoyance Mini, Slippery Narw, Life Searcher, Nerdy Cheese-Zweitkarte,
-Aurora Borealis …), laufen nicht durch das Tor und werden von Krates (noch) nicht erfasst.
+**Tutoren mit eigenem Ablauf** (`takeFromPile` + `handZugang`, kein
+`actionAddCardFromDeckToHand`) rufen VOR der Entnahme
+`if (await engine.interceptDeckSearch(pi, name, { source, searchSpec })) { …mischen, enden… }`
+(Bifab, Cute Annoyance Mini, Life Searcher, Nerdy Cheese-Zweitkarte, Slippery Narw (nur Deck-Zweig),
+Gate to the Armory (nur Deck-Zweig), Chaorc Friendly Fireballer (nur Deck-Zweig)). Jeder NEUE Ein-Karten-Tutor
+mit eigenem Hand-Zugang muss das auch tun; Mehrfach-Tutoren (Aurora Borealis, Guardian Beast Shu, Mass
+Multiplication, Debt-O-Tron …) und Nicht-Suchen (Spice Mortar, Deepsea Treasure, Birthday Present, Sid)
+bleiben draußen. Pillar of Light (erzwungene Suche des Gegners) ist bewusst NICHT erfasst.
 
 ---
 

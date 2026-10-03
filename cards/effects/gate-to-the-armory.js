@@ -233,8 +233,19 @@ module.exports = {
         return true;
       })();
 
+      // Krates, the Smartass & Co.: Suche des Gegners umgebaut → Karten bereits verteilt;
+      // weder Direkt-Ausrüsten noch Hand-Zugang gibt es dann (nur für den DECK-Zweig).
+      const kratesUmgebaut = pickedEntry.source === 'deck' && await engine.interceptDeckSearch(pi, pickedName, {
+        source: CARD_NAME, searchSpec: { label: 'Artifact', filter: (cd) => hasCardType(cd, 'Artifact') },
+      });
+      if (kratesUmgebaut) {
+        engine.shuffleDeck(pi);
+        engine.log('gate_to_armory_tutor', { player: ps.username, card: pickedName, source: 'deck', krates: true });
+        engine.sync();
+      }
+
       let direkt = false;
-      if (canOfferEquip) {
+      if (canOfferEquip && !kratesUmgebaut) {
         direkt = !!(await ctx.promptConfirmEffect({
           title: CARD_NAME,
           message: `Equip ${pickedName} directly to ${userHero.name}?`,
@@ -243,6 +254,7 @@ module.exports = {
         }));
       }
 
+      if (!kratesUmgebaut) {
       // Remove the chosen copy from its source pile.
       const sourcePile = pickedEntry.source === 'deck' ? ps.mainDeck : ps.discardPile;
       const idx = sourcePile.indexOf(pickedName);
@@ -318,6 +330,7 @@ module.exports = {
         engine.sync();
         await engine._delay(450);
       }
+      } // !kratesUmgebaut
 
       // ── End-turn clause ──
       // Only when this play actually used the inherent grant (no main

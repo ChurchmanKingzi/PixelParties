@@ -100,8 +100,18 @@ module.exports = {
     // Pay the cost: delete the top-of-Stack copy of Bifab.
     await ctx.popCoolnessStackTo(pi, 'delete', { source: CARD_NAME });
 
+    // Krates, the Smartass & Co.: Suche des Gegners umgebaut → Karten bereits verteilt.
+    const kratesUmgebaut = await engine.interceptDeckSearch(pi, choice.cardName, {
+      source: CARD_NAME, searchSpec: { label: 'card', filter: null },
+    });
+    if (kratesUmgebaut) {
+      engine.shuffleDeck(pi, 'main');
+      engine.log('bifab_search', { player: ps.username, card: choice.cardName, krates: true });
+    }
+
     // Move chosen card from deck to hand.
-    const _taken_deckIdx = await engine.takeFromPile(ps, 'deck', choice.cardName, { source: CARD_NAME, toHand: true });   // v820: Stapel-Schicht
+    const _taken_deckIdx = kratesUmgebaut ? null
+      : await engine.takeFromPile(ps, 'deck', choice.cardName, { source: CARD_NAME, toHand: true });   // v820: Stapel-Schicht
     if (_taken_deckIdx) {
       await engine.handZugang(ps, choice.cardName, { von: 'deck', source: CARD_NAME });
       // Shuffle the remaining deck.

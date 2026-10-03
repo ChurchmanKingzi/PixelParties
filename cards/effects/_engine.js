@@ -24219,6 +24219,21 @@ this._deathWatch = (this._deathWatchStack || []).length
   }
 
   /**
+   * ÖFFENTLICHES Tor für Tutoren, die die Karte NICHT über
+   * `actionAddCardFromDeckToHand` auf die Hand holen (eigener Ablauf mit
+   * `takeFromPile` + `handZugang`): VOR der Entnahme rufen. `true` = ein Held des
+   * Gegners (Krates) hat die Suche umgebaut und die Karten verteilt — der Tutor
+   * nimmt dann nichts mehr selbst, mischt ggf. das Deck und beendet seinen Effekt.
+   * Nur für Suchen nach EXAKT EINER Karte (Mehrfach-Tutoren rufen es nicht).
+   * `opts.searchSpec` wie bei `actionAddCardFromDeckToHand` (`{ label, filter(cd, name) }`).
+   */
+  async interceptDeckSearch(pi, cardName, opts = {}) {
+    pi = this._resolvePi(pi);
+    if (!(this.gs.players[pi]?.mainDeck || []).includes(cardName)) return false;
+    return await this._checkOppDeckSearchInterceptors(pi, cardName, opts);
+  }
+
+  /**
    * Held-Vertrag `interceptsOppDeckSearch` — Heldenskripte des GEGNERS, die eine
    * Deck-Suche (genau EINE Karte, schon gewaehlt, noch im Deck) umbauen.
    * `async interceptOppDeckSearch(engine, { searcher, holder, heroIdx, firstName, opts })`

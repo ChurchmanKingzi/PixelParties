@@ -114,6 +114,16 @@ module.exports = {
       });
       if (!pick?.cardName) return;
       const chosen = pick.cardName;
+      // Krates, the Smartass & Co.: Suche des Gegners umgebaut → Karten bereits verteilt.
+      const kratesNamen = new Set(stillEligible);
+      if (await engine.interceptDeckSearch(pi, chosen, {
+        source: CARD_NAME, searchSpec: { label: 'Cosmic Depths card', filter: (cd, n) => kratesNamen.has(n) },
+      })) {
+        engine.shuffleDeck(pi);
+        engine.log('life_searcher_search', { player: ps.username, card: chosen, krates: true });
+        engine.sync();
+        return;
+      }
       const _taken_idx = await engine.takeFromPile(ps, 'deck', chosen, { source: CARD_NAME, toHand: true });   // v820: Stapel-Schicht
       if (!_taken_idx) return;
       const inst = await engine.handZugang(ps, chosen, { von: 'deck', source: CARD_NAME });

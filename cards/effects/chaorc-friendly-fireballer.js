@@ -252,6 +252,16 @@ module.exports = {
       if (idx < 0) return;
 
       if (from === 'deck') {
+        // Krates, the Smartass & Co.: Suche des Gegners umgebaut → Karten bereits verteilt
+        // („a Fireball" ist namensgebunden: es gibt nur diese eine Karte).
+        if (await engine.interceptDeckSearch(pi, FIREBALL, {
+          source: CARD_NAME, searchSpec: { label: FIREBALL, filter: (cd, n) => n === FIREBALL },
+        })) {
+          engine.shuffleDeck(pi);
+          engine.log('friendly_fireballer_tutor', { player: ps.username, from, krates: true });
+          engine.sync();
+          return;
+        }
         // Deck search reveal — the card flies in from the deck pile.
         pile.splice(idx, 1);
         engine.handZugangSync(ps, FIREBALL, { source: CARD_NAME, ohneInstanz: true });
