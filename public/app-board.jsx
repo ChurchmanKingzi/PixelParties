@@ -34721,7 +34721,6 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             20%  { opacity: .85; }
             100% { opacity: 0; transform: translate(calc(-50% + var(--ddx)), calc(-50% + var(--ddy))) scale(1.9); }
           }
-          @keyframes boarAreaShake { 0%,100% { transform: translate(0,0); } 25% { transform: translate(-2px,1px); } 50% { transform: translate(2px,-1px); } 75% { transform: translate(-1px,-1px); } }
         `;
         document.head.appendChild(style);
       }
@@ -34731,10 +34730,6 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         setTimeout(() => window.playSFX('heavy_impact', { rate: 0.6, volume: 0.8, category: null, dedupe: 200 }), 450);
         setTimeout(() => window.playSFX('heavy_impact', { rate: 0.55, volume: 0.8, category: null, dedupe: 200 }), 900);
       }
-
-      // Area wackelt unter den Hufen.
-      tgtEl.style.animation = `boarAreaShake .18s linear ${Math.ceil(total / 180)}`;
-      setTimeout(() => { tgtEl.style.animation = ''; }, total + 100);
 
       const scale = Math.max(3, Math.min(6, Math.round(tr.height / 22)));
       const bw = W * scale, bh = H * scale;
