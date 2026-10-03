@@ -10479,7 +10479,9 @@ async function doActivateDiscardEffect(room, pi, { instId }) {
   if (!room?.engine || !room.gameState) return false;
   const gs = room.gameState;
   if (pi !== gs.activePlayer) return false;
-  if (gs.currentPhase !== 2 && gs.currentPhase !== 4) return false;
+  // Action Phase (3): nur fuer Skripte mit `discardEffectInActionPhase`;
+  // das prueft der Sammler (`getDiscardEntries`) unten pro Eintrag.
+  if (gs.currentPhase !== 2 && gs.currentPhase !== 3 && gs.currentPhase !== 4) return false;
   if (gs.potionTargeting) return false;
   if (gs._chainResolvingLock) return false;
   if (gs._forceDiscardLock === pi) return false;

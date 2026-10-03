@@ -7537,6 +7537,9 @@ class GameEngine {
     const aktiv = this.gs.activePlayer === playerIdx;
     const phase = this.gs.currentPhase;
     const imZug = aktiv && (phase === 2 || phase === 4);
+    // Ablage-Effekte mit `discardEffectInActionPhase` (Mountain Boars: Zusatz-
+    // beschwoerung) duerfen auch in der Action Phase benutzt werden.
+    const imZugAktion = aktiv && phase === 3;
     const aliase = (ps._ftAliase || []).filter(a => a && a.turn === this.gs.turn);
 
     const out = [];
@@ -7552,9 +7555,10 @@ class GameEngine {
       if (inst) vergeben.add(inst.id);
 
       let usable = false;
-      if (inst && imZug) {
+      if (inst && (imZug || imZugAktion)) {
         const script = loadCardEffect(inst.counters?._effectOverride || cardName);
-        if (script?.discardEffect && typeof script.onDiscardEffect === 'function') {
+        if (script?.discardEffect && typeof script.onDiscardEffect === 'function'
+            && (imZug || script.discardEffectInActionPhase)) {
           usable = true;
           if (typeof script.canActivateDiscardEffect === 'function') {
             try {
@@ -26355,6 +26359,10 @@ this._deathWatch = (this._deathWatchStack || []).length
     cardInstance.zone = 'area';
     cardInstance.heroIdx = -1;
     cardInstance.zoneSlot = -1;
+    // Einzug-Zug der Area („played this turn" — Mountain Boars). `turnPlayed`
+    // taugt nicht: es stammt vom Tracking in der Hand, nicht vom Platzieren.
+    if (!cardInstance.counters) cardInstance.counters = {};
+    cardInstance.counters._areaPlacedTurn = gs.turn || 0;
 
     const resolvingName = ps._resolvingCard?.name;
     if (resolvingName && resolvingName !== cardName) {
