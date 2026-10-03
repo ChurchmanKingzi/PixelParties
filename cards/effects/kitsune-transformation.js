@@ -374,6 +374,7 @@ module.exports = {
             });
             const ok = await engine.actionAddCardFromDeckToHand(pi, name, {
               source: CARD_NAME,
+              _noKrates: true,   // Mehrfach-Tutor: Krates greift nur bei Ein-Karten-Suchen
               reveal: true,
             });
             if (ok) tutored.push(name);

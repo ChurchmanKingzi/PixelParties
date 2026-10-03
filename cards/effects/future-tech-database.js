@@ -72,6 +72,7 @@ module.exports = {
       gewaehlt.push(name);
       await engine.actionAddCardFromDeckToHand(pi, name, {
         source: CARD_NAME, reveal: true,
+        _noKrates: true,   // Mehrfach-Tutor: Krates greift nur bei Ein-Karten-Suchen
       });
       await engine._delay(200);
     }

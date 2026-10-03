@@ -381,6 +381,8 @@ function loadCardEffect(cardName) {
         // aus der Ladung gefallen. (In der Gegenprobe aufgefallen.)
         || !!mod.discardEffect
         || typeof mod.onDiscardEffect === 'function'
+        // Held, der die Deck-Suche des Gegners umbaut (Krates) — ganzer Inhalt ist dieser Vertrag.
+        || !!mod.interceptsOppDeckSearch
         // Ruecknahme einer geliehenen Identitaet (v573). Wird vom
         // Zugende-Sweep `_expireBorrowedIdentities` gerufen, nicht ueber
         // die Hook-Kette — also wieder dieselbe Klasse: eine Karte,

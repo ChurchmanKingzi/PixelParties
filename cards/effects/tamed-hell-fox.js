@@ -85,10 +85,10 @@ module.exports = {
 
       const first = await pickOne(engine, pi, ps.mainDeck || [], null);
       if (!first) return;
-      if (!(await engine.actionAddCardFromDeckToHand(pi, first, { reveal: true, source: CARD_NAME, sourceOwner: pi }))) return;
+      if (!(await engine.actionAddCardFromDeckToHand(pi, first, { reveal: true, source: CARD_NAME, sourceOwner: pi, _noKrates: true }))) return;
       const second = await pickOne(engine, pi, ps.mainDeck || [], first);
       if (!second) { engine.log('tamed_hell_fox', { player: ps.username, searched: [first] }); engine.sync(); return; }
-      if (!(await engine.actionAddCardFromDeckToHand(pi, second, { reveal: true, source: CARD_NAME, sourceOwner: pi }))) return;
+      if (!(await engine.actionAddCardFromDeckToHand(pi, second, { reveal: true, source: CARD_NAME, sourceOwner: pi, _noKrates: true }))) return;
 
       // Zwei gesucht: Namenssperre + Selbstloeschung.
       if (!ps._creationLockedNames) ps._creationLockedNames = new Set();
