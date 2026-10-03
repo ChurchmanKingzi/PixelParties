@@ -24994,3 +24994,28 @@ body.summon-pick .board-zone:not(.zone-drag-valid):not(.board-zone-play-target) 
 .cube-draft-pool-bar { padding-right: calc(12px + 400px) !important; }
 @media (max-height: 500px) { .cube-draft-pool-bar { padding-right: calc(12px + 240px) !important; } }
 @media (max-height: 500px) and (max-width: 700px) { .cube-draft-pool-bar { padding-right: calc(12px + 192px) !important; } }
+
+/* Reservierter Tooltip-Bereich im Cube-Draft: sichtbar markiert, der grosse Tooltip legt sich darueber. */
+.cube-draft-tt-gutter {
+  position: relative;
+  box-sizing: border-box;
+  border-left: 2px dashed var(--bg4);
+  background: repeating-linear-gradient(135deg, rgba(255,255,255,.015) 0 10px, transparent 10px 20px);
+}
+.cube-draft-tt-gutter::before {
+  content: 'CARD PREVIEW\A hover a card';
+  white-space: pre;
+  position: absolute; top: 12px; left: 0; right: 0;
+  text-align: center;
+  font-size: 11px; font-weight: 700; letter-spacing: 1px; line-height: 1.8;
+  color: var(--text2); opacity: .6;
+}
+.cube-draft-pool-bar { position: relative; }
+.cube-draft-pool-bar::after {
+  content: ''; position: absolute; top: 0; bottom: 0; right: 0; width: 400px;
+  border-left: 2px dashed var(--bg4);
+  background: repeating-linear-gradient(135deg, rgba(255,255,255,.015) 0 10px, transparent 10px 20px);
+  pointer-events: none;
+}
+@media (max-height: 500px) { .cube-draft-pool-bar::after { width: 240px; } }
+@media (max-height: 500px) and (max-width: 700px) { .cube-draft-pool-bar::after { width: 192px; } }

@@ -26,6 +26,9 @@ function CubeDraftScreen({ lobby, draft, leaveRoom, notify }) {
   const [poolOrder, setPoolOrder] = useState([]); // local custom ordering
   const [dragSrc, setDragSrc] = useState(null);
   const [dragOverIdx, setDragOverIdx] = useState(null);
+  // Sofort-Pick: die geklickte Karte verschwindet aus dem Pack, noch bevor der Server antwortet.
+  const [optimisticPick, setOptimisticPick] = useState(null);
+  useEffect(() => { setOptimisticPick(null); }, [draft?.round, draft?.pickInRound]);
   // Mirror server-pushed pool into local custom-ordered list. New cards
   // append; removed cards (shouldn't happen during draft, but defensive)
   // drop out. Drag-reorder mutates this list only.
@@ -127,7 +130,14 @@ function CubeDraftScreen({ lobby, draft, leaveRoom, notify }) {
     );
   }
 
-  const canPick = !draft.myPicked && !draft.suspended && draft.myPack.length > 0;
+  const canPick = !draft.myPicked && !optimisticPick && !draft.suspended && draft.myPack.length > 0;
+  // Angezeigtes Pack = Server-Pack ohne die bereits gewaehlte Karte (eine Kopie).
+  const shownPack = (() => {
+    const picked = draft.myPendingPick || optimisticPick;
+    if (!picked) return draft.myPack;
+    const i = draft.myPack.indexOf(picked);
+    return i < 0 ? draft.myPack : draft.myPack.filter((_, k) => k !== i);
+  })();
   const totalRemainingMs = (draft.remainingMs || 0) - (draft.myPicked || draft.suspended ? 0 : (tick * 0)); // tick is just to re-render
   // Actual countdown: server gave us remainingMs at the time of last
   // broadcast. We don't have a precise client-side anchor for the window
@@ -286,7 +296,7 @@ function CubeDraftScreen({ lobby, draft, leaveRoom, notify }) {
           <div ref={packBoxRef} style={{ flex: 1, minHeight: 0, minWidth: 0, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           {(() => {
             const GAP = 6, COLS = 8;
-            const rows = Math.max(1, Math.ceil(draft.myPack.length / COLS));
+            const rows = Math.max(1, Math.ceil(shownPack.length / COLS));
             const wByWidth = (packBox.w - GAP * (COLS - 1)) / COLS;
             const wByHeight = ((packBox.h - GAP * (rows - 1)) / rows) * 5 / 7;
             const cardW = Math.max(40, Math.floor(Math.min(wByWidth, wByHeight)));
@@ -300,7 +310,7 @@ function CubeDraftScreen({ lobby, draft, leaveRoom, notify }) {
             transition: 'opacity .25s',
             visibility: packBox.w ? 'visible' : 'hidden',
           }}>
-            {draft.myPack.map((cardName, idx) => (
+            {shownPack.map((cardName, idx) => (
               <div key={idx} style={{
                 position: 'relative', cursor: canPick ? 'pointer' : 'default',
                 aspectRatio: '5 / 7', minHeight: 0,
@@ -309,6 +319,7 @@ function CubeDraftScreen({ lobby, draft, leaveRoom, notify }) {
                   if (!canPick) return;
                   // Optimistisch: Karte sofort in die eigene Sammlung (Server bestaetigt per State).
                   setPoolOrder(prev => [...prev, cardName]);
+                  setOptimisticPick(cardName);
                   if (window.playSFX) window.playSFX('draw', { dedupe: 150 });
                   socket.emit('cube_draft_pick', { roomId: lobby.id, cardName });
                 }}
