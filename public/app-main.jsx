@@ -95,6 +95,7 @@ function CubeDraftScreen({ lobby, draft, leaveRoom, notify }) {
       if (d.active) {
         const from = d.idx, ins = d.insert;
         if (ins != null) {
+          if (window.playSFX) window.playSFX('placement', { dedupe: 80 });
           setPoolOrder(prev => {
             const arr = [...prev];
             const [moved] = arr.splice(from, 1);
@@ -551,6 +552,7 @@ function CubeDraftBuildScreen({ lobby, build, leaveRoom, notify, user }) {
   const addToHero = (name) => {
     if (cardDB[name]?.cardType !== 'Hero') return;
     if (remainingFor(name) <= 0) return;
+    sfx('draw');
     setHeroes(prev => {
       const slots = [...prev];
       const empty = slots.findIndex(s => !s?.hero);
@@ -565,9 +567,12 @@ function CubeDraftBuildScreen({ lobby, build, leaveRoom, notify, user }) {
     if (mainDeck.length >= 60) return;
     if (remainingFor(name) <= 0) return;
     if (window.canCardTypeEnterSection && !window.canCardTypeEnterSection(deckForRules, name, 'main')) return;
+    sfx('draw');
     setMainDeck(prev => [...prev, name]);
   };
 
+  // Klaenge wie im normalen Deckbauer: Hinzufuegen = draw, Entfernen = discard.
+  const sfx = (n) => { if (window.playSFX) window.playSFX(n, { dedupe: 40 }); };
   const POTION_MAX = 15, SIDE_MAX = 15;
   const deckForRules = { heroes };
   const addToPotion = (name) => {
@@ -575,6 +580,7 @@ function CubeDraftBuildScreen({ lobby, build, leaveRoom, notify, user }) {
     if (remainingFor(name) <= 0) return false;
     if (window.canCardTypeEnterSection && !window.canCardTypeEnterSection(deckForRules, name, 'potion')) return false;
     setPotionDeck(prev => [...prev, name]);
+    sfx('draw');
     return true;
   };
   const addToSide = (name) => {
@@ -582,16 +588,19 @@ function CubeDraftBuildScreen({ lobby, build, leaveRoom, notify, user }) {
     if (remainingFor(name) <= 0) return false;
     if (cardDB[name]?.cardType === 'Token') return false;
     setSideDeck(prev => [...prev, name]);
+    sfx('draw');
     return true;
   };
-  const removePotion = (idx) => setPotionDeck(prev => prev.filter((_, i) => i !== idx));
-  const removeSide = (idx) => setSideDeck(prev => prev.filter((_, i) => i !== idx));
+  const removePotion = (idx) => { sfx('discard'); setPotionDeck(prev => prev.filter((_, i) => i !== idx)); };
+  const removeSide = (idx) => { sfx('discard'); setSideDeck(prev => prev.filter((_, i) => i !== idx)); };
 
   const removeHero = (slotIdx) => {
+    sfx('discard');
     setHeroes(prev => prev.map((s, i) => i === slotIdx ? null : s));
   };
 
   const removeMain = (idx) => {
+    sfx('discard');
     setMainDeck(prev => prev.filter((_, i) => i !== idx));
   };
 
