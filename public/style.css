@@ -25019,3 +25019,21 @@ body.summon-pick .board-zone:not(.zone-drag-valid):not(.board-zone-play-target) 
 }
 @media (max-height: 500px) { .cube-draft-pool-bar::after { width: 240px; } }
 @media (max-height: 500px) and (max-width: 700px) { .cube-draft-pool-bar::after { width: 192px; } }
+
+/* ── Cube-Draft: Siegerehrung ───────────────────────────────────────── */
+.podium-stage { display: flex; align-items: flex-end; justify-content: center; gap: 14px; min-height: 250px; }
+.podium-col { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; text-align: center; }
+.podium-name { margin-bottom: 8px; transform: translateY(14px); transition: opacity .5s .25s, transform .5s .25s; }
+.podium-shown .podium-name { transform: none; }
+.podium-block { width: 100%; display: flex; align-items: center; justify-content: center; border-radius: 6px 6px 0 0;
+  transform: scaleY(0); transform-origin: bottom; transition: transform .55s cubic-bezier(.2,.9,.3,1.2), box-shadow .6s; }
+.podium-shown .podium-block { transform: scaleY(1); }
+.podium-trophy { display: inline-block; animation: podiumBounce 1.4s ease-in-out infinite; filter: drop-shadow(0 0 12px rgba(255,215,0,.8)); }
+@keyframes podiumBounce { 0%,100% { transform: translateY(0) scale(1); } 50% { transform: translateY(-8px) scale(1.08); } }
+.podium-confetti { position: absolute; inset: 38px 0 0 0; overflow: hidden; pointer-events: none; z-index: 5; }
+.podium-confetti span { position: absolute; top: -20px; border-radius: 2px; opacity: .9; animation-name: podiumConfetti; animation-timing-function: linear; animation-iteration-count: infinite; }
+@keyframes podiumConfetti { 0% { top: -20px; margin-left: 0; } 50% { margin-left: 22px; } 100% { top: 105%; margin-left: -16px; } }
+@media (prefers-reduced-motion: reduce) {
+  .podium-block, .podium-name { transition: none; transform: none; }
+  .podium-trophy, .podium-confetti span { animation: none; }
+}

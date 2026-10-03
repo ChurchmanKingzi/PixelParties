@@ -1063,26 +1063,73 @@ function CubeDraftMatchCard({ match, mySeat, currentRound }) {
 function CubeDraftFinalStandings({ lobby, tournament, leaveRoom }) {
   const standings = tournament.finalStandings || [];
   const winner = standings.find(s => s.placement === 1);
+  const mySeat = tournament.mySeat;
+  // Siegerehrung: Podest mit den ersten drei Plaetzen (bei geteiltem Platz 3 der erste Eintrag).
+  const podium = [1, 2, 3].map(pl => standings.find(s => s.placement === pl) || null);
+  const [stage, setStage] = useState(0);   // 0 leer · 1 Platz 3 · 2 Platz 2 · 3 Sieger · 4 Konfetti + Tabelle
+  const confetti = useMemo(() => Array.from({ length: 46 }, (_, i) => ({
+    left: Math.round(Math.random() * 100),
+    delay: (Math.random() * 3).toFixed(2),
+    dur: (3.2 + Math.random() * 2.6).toFixed(2),
+    size: 6 + Math.round(Math.random() * 7),
+    color: ['#ffd700', '#ff6b9d', '#00f0ff', '#9aff6b', '#c58bff', '#ffffff'][i % 6],
+    rot: Math.round(Math.random() * 360),
+  })), []);
+  useEffect(() => {
+    const play = (n, o) => { if (window.playSFX) window.playSFX(n, o); };
+    const t = [
+      setTimeout(() => { setStage(1); play('placement'); }, 500),
+      setTimeout(() => { setStage(2); play('placement'); }, 1500),
+      setTimeout(() => { setStage(3); play('victory'); }, 2700),
+      setTimeout(() => setStage(4), 3600),
+    ];
+    return () => t.forEach(clearTimeout);
+  }, []);
+  const step = (place, label, height, color, medal) => {
+    const e = podium[place - 1];
+    const shown = stage >= (place === 3 ? 1 : place === 2 ? 2 : 3);
+    if (!e) return <div key={place} style={{ width: 150 }} />;
+    const me = e.seat === mySeat;
+    return (
+      <div key={place} className={'podium-col' + (shown ? ' podium-shown' : '')} style={{ width: 150 }}>
+        <div className="podium-name" style={{ opacity: shown ? 1 : 0 }}>
+          <div className={place === 1 ? 'podium-trophy' : ''} style={{ fontSize: place === 1 ? 54 : 34, lineHeight: 1.1 }}>{medal}</div>
+          <div className="orbit-font" style={{ fontSize: place === 1 ? 17 : 13, fontWeight: 800, color, wordBreak: 'break-word' }}>{e.username}</div>
+          {me && <div style={{ fontSize: 10, color: 'var(--accent)', fontWeight: 700 }}>★ YOU</div>}
+        </div>
+        <div className="podium-block" style={{ height, background: `linear-gradient(180deg, ${color}55, ${color}18)`, borderTop: `3px solid ${color}`, boxShadow: shown ? `0 0 22px ${color}66` : 'none' }}>
+          <div className="orbit-font" style={{ fontSize: 26, fontWeight: 800, color }}>{label}</div>
+        </div>
+      </div>
+    );
+  };
   return (
-    <div className="screen-full" style={{ background: 'radial-gradient(ellipse at center, rgba(255,215,0,.12) 0%, var(--bg) 70%)' }}>
+    <div className="screen-full" style={{ background: 'radial-gradient(ellipse at 50% 30%, rgba(255,215,0,.16) 0%, var(--bg) 70%)', position: 'relative', overflow: 'hidden' }}>
       <div className="top-bar">
         <button className="btn" onClick={leaveRoom}>← LEAVE</button>
         <h2 className="orbit-font" style={{ fontSize: 14, color: '#ffd700' }}>🏆 TOURNAMENT COMPLETE</h2>
         <VolumeControl />
       </div>
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-start', overflow: 'auto', padding: 32 }}>
+      {stage >= 4 && (
+        <div className="podium-confetti" aria-hidden="true">
+          {confetti.map((c, i) => (
+            <span key={i} style={{ left: c.left + '%', width: c.size, height: Math.round(c.size * 1.6), background: c.color,
+              animationDelay: c.delay + 's', animationDuration: c.dur + 's', transform: `rotate(${c.rot}deg)` }} />
+          ))}
+        </div>
+      )}
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-start', overflow: 'auto', padding: 24 }}>
         {winner && (
-          <div style={{ textAlign: 'center', marginBottom: 32, animation: 'pulse 2s infinite' }}>
-            <div style={{ fontSize: 80, marginBottom: 8 }}>🏆</div>
-            <div className="orbit-font" style={{ fontSize: 28, color: '#ffd700', fontWeight: 800, marginBottom: 6 }}>
-              {winner.username}
-            </div>
-            <div className="orbit-font" style={{ fontSize: 14, color: 'var(--text)' }}>
-              CHAMPION OF {tournament.cubeName}
-            </div>
+          <div className="orbit-font" style={{ fontSize: 13, color: 'var(--text)', letterSpacing: 2, marginBottom: 14, opacity: stage >= 3 ? 1 : .35, transition: 'opacity .6s' }}>
+            CHAMPION OF {tournament.cubeName}
           </div>
         )}
-        <div className="panel" style={{ width: '100%', maxWidth: 720, padding: 20 }}>
+        <div className="podium-stage">
+          {step(2, '2', 104, '#cfd4dc', '🥈')}
+          {step(1, '1', 148, '#ffd700', '🥇')}
+          {step(3, '3', 72, '#cd7f32', '🥉')}
+        </div>
+        <div className="panel" style={{ width: '100%', maxWidth: 720, padding: 20, marginTop: 22, opacity: stage >= 4 ? 1 : 0, transform: stage >= 4 ? 'none' : 'translateY(16px)', transition: 'opacity .6s, transform .6s' }}>
           <div className="orbit-font" style={{ fontSize: 14, color: 'var(--accent)', marginBottom: 16, textAlign: 'center', fontWeight: 700, letterSpacing: 1 }}>
             FINAL STANDINGS
           </div>
@@ -1098,7 +1145,7 @@ function CubeDraftFinalStandings({ lobby, tournament, leaveRoom }) {
                 #{s.placement}
               </div>
               <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 14, fontWeight: 700 }}>{s.username}</div>
+                <div style={{ fontSize: 14, fontWeight: 700 }}>{s.username}{s.seat === mySeat ? '  ★' : ''}</div>
                 {s.heroes.length > 0 && (
                   <div style={{ fontSize: 11, color: 'var(--text2)', marginTop: 2 }}>
                     Heroes: {s.heroes.join(' · ')}
