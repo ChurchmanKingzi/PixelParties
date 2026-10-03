@@ -65,6 +65,11 @@ function CubeDraftScreen({ lobby, draft, leaveRoom, notify }) {
     return () => clearInterval(t);
   }, [draft?.suspended, draft?.myPicked, draft?.round, draft?.pickInRound]);
 
+  // Hooks muessen VOR den fruehen Returns stehen (sonst React #310, sobald
+  // `draft` von null auf gesetzt wechselt).
+  const startedAt = useRef(Date.now());
+  useEffect(() => { startedAt.current = Date.now(); }, [draft?.round, draft?.pickInRound, draft?.suspended]);
+
   if (!draft) {
     return (
       <div className="screen-full">
@@ -107,8 +112,6 @@ function CubeDraftScreen({ lobby, draft, leaveRoom, notify }) {
   // broadcast. We don't have a precise client-side anchor for the window
   // start, so we just tick down from that snapshot. This drifts slightly
   // but the next server broadcast (every pick) re-syncs.
-  const startedAt = useRef(Date.now());
-  useEffect(() => { startedAt.current = Date.now(); }, [draft?.round, draft?.pickInRound, draft?.suspended]);
   const elapsedClient = (draft.myPicked || draft.suspended) ? 0 : (Date.now() - startedAt.current);
   const displayRemainingMs = Math.max(0, (draft.remainingMs || 0) - elapsedClient);
   const m = Math.floor(displayRemainingMs / 60000);
