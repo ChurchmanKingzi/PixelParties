@@ -45539,13 +45539,16 @@ this._deathWatch = (this._deathWatchStack || []).length
     // (or the flag goes with it), and the few survivors that hit the
     // flag erroneously (post-pre-defeat-save heal-back, etc.) get the
     // flag cleared on the spot.
+    // Die Nummer des Stapels (statt `true`) macht „im selben Schlag gestorben" nachpruefbar: Graveworm darf
+    // nicht auf Tode reagieren, die GLEICHZEITIG mit seinem eigenen geschehen (siehe `deathInfo.todStapel`).
+    const _todStapelNr = (this._todStapelNr = (this._todStapelNr || 0) + 1);
     for (const e of entries) {
       if (e.cancelled || !e.inst) continue;
       const projected = Math.max(0, e.amount);
       if (projected <= 0) continue;
       if ((e.inst.counters.currentHp || 0) > 0
           && projected >= e.inst.counters.currentHp) {
-        e.inst.counters._dyingThisBatch = true;
+        e.inst.counters._dyingThisBatch = _todStapelNr;
       }
     }
 
@@ -45980,7 +45983,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // etc.) can attribute the death to the correct side — a cross-side
     // placed Chilly Wizard dying counts as the CONTROLLER's creature,
     // not the original owner's.
-    const deathInfo = { name: e.inst.name, owner: e.inst.owner, originalOwner: e.inst.originalOwner, controller: e.inst.controller ?? e.inst.owner, heroIdx: e.inst.heroIdx, zoneSlot: e.inst.zoneSlot, instId: e.inst.id, level: this.kreaturLevelJetzt(e.inst) };   // v1334: level
+    const deathInfo = { name: e.inst.name, owner: e.inst.owner, originalOwner: e.inst.originalOwner, controller: e.inst.controller ?? e.inst.owner, heroIdx: e.inst.heroIdx, zoneSlot: e.inst.zoneSlot, instId: e.inst.id, level: this.kreaturLevelJetzt(e.inst), todStapel: (typeof e.inst.counters?._dyingThisBatch === 'number') ? e.inst.counters._dyingThisBatch : null };   // v1334: level; todStapel: Schadens-Stapel, in dem sie stirbt
     // If this creature contributed to hand-size math (e.g. Royal Corgi's
     // -3 bonus, or a hypothetical reducer-creature), flag the owner for a
     // hand-limit recheck once the batch settles.

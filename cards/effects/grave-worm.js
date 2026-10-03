@@ -133,12 +133,25 @@ module.exports = {
 
       // ── Path A: re-track when GRAVE WORM ITSELF dies ──
       if (death.name === CARD_NAME && death.instId === ctx.card.id) {
+        // Merken, in welchem Schlag (Schadens-Stapel) dieser Wurm gestorben ist — auf Spielebene, nicht an einer
+        // Listener-Instanz: veraltete Listener-Kopien aus anderen Zonen duerfen es nicht umgehen. Tode im SELBEN
+        // Schlag (Flaechenschaden) geschehen gleichzeitig; der Wurm lag dabei noch nicht „in der Ablage".
+        if (death.todStapel != null) {
+          const gsw = engine.gs;
+          if (!gsw._graveWormTodStapel) gsw._graveWormTodStapel = {};
+          gsw._graveWormTodStapel[death.originalOwner ?? death.owner] = death.todStapel;
+        }
         const ownerPs = engine.gs.players[death.originalOwner ?? death.owner];
         if (!ownerPs) return;
         if ((ownerPs.discardPile || []).indexOf(CARD_NAME) < 0) return;
         engine._trackCard(CARD_NAME, death.originalOwner ?? death.owner, 'discard');
         return;
       }
+
+      // „… except \"Grave Worm\"": stirbt ein Grave Worm (egal welcher), loest das NIE den Effekt aus.
+      if (death.name === CARD_NAME) return;
+      // Gleichzeitiger Tod im selben Schlag wie der eigene (Flaechenschaden): nicht reagieren.
+      if (death.todStapel != null && engine.gs._graveWormTodStapel?.[ctx.cardOwner] === death.todStapel) return;
 
       // ── Path B: revive trigger ──
       // Multi-copy dedup. The first Grave Worm listener to clear the
@@ -155,11 +168,8 @@ module.exports = {
       // and is an actual Creature. Side attribution uses CONTROLLER —
       // a Creature you gave to opp via Chilly Wizard's cross-side
       // placement counts as opp's creature dying, not yours. The card
-      // text's "except Grave Worm" carve-out is an anti-self-revive
-      // guard, NOT a blanket exclusion of Grave Worm deaths — sibling
-      // Worms in discard SHOULD react to a Grave Worm dying. So we
-      // only skip when the dying inst IS this listener (via id match
-      // at Path A above).
+      // text's "except Grave Worm" carve-out schliesst JEDEN Grave Worm
+      // aus (auch Geschwister-Kopien in der Ablage) — siehe oben.
       const dyingController = death.controller ?? death.owner;
       if (dyingController !== pi) return;
       const cardDB = engine._getCardDB();
