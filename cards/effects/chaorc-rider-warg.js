@@ -135,17 +135,12 @@ module.exports = {
 
       const handIdx = ps.hand.indexOf(CARD_NAME);
       engine.takeFromPileSync(ps, 'hand', handIdx);
-      // Kontrolle statt Seite (Styx 28.9.): der Engine-Flug nimmt die
-      // Feldseite als Hand — bei der Gegenspalte den Flug selbst senden.
-      if (seite !== pi) {
-        engine._broadcastEvent('play_pile_transfer', {
-          owner: pi, cardName: CARD_NAME, from: 'hand', to: 'support', fromHandIdx: handIdx,
-          toHeroIdx: dest.heroIdx, toSlotIdx: dest.slotIdx, toOwner: seite,
-        });
-      }
+      // Flug Hand → Zone (auch in die Gegenspalte, Styx 28.9.) und das Abwarten des
+      // Flugs vor Hooks/Fenstern erledigt `summonCreatureWithHooks` zentral ueber
+      // `fromHandIdx` + `controller` — kein eigener Flug-Broadcast mehr.
       const res = await engine.summonCreatureWithHooks(
         CARD_NAME, seite, dest.heroIdx, dest.slotIdx, // `fromHandIdx`: Flug von der Hand in die Zone (v933)
-        { source: CARD_NAME, fromHand: true, summonWindow: true, ...(seite !== pi ? { controller: pi } : { fromHandIdx: handIdx }) },
+        { source: CARD_NAME, fromHand: true, fromHandIdx: handIdx, summonWindow: true, ...(seite !== pi ? { controller: pi } : {}) },
       );
       if (res?.negated) return;   // Off Duty & co.: Karte ist schon geroutet
       if (!res?.inst) { engine.handZugangSync(ps, CARD_NAME, { von: 'rueckgabe', ohneInstanz: true }); return; }   // v1395
