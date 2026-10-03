@@ -35733,7 +35733,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       // ★ 26.9.: `opts.ohneFlip` — die aufrufende Karte hat das Aufdecken
       // schon selbst gezeigt (Telekinesis: die Karte schwebt hoch, dreht
       // sich in der Luft um und landet offen).
-      if (!opts.ohneFlip) this._broadcastEvent('surprise_flip', { owner: playerIdx, heroIdx: hostHeroIdx, cardName, isBakhmSlot, bakhmZoneSlot });
+      if (!opts.ohneFlip) this._broadcastEvent('surprise_flip', { owner: playerIdx, heroIdx: hostHeroIdx, cardName, isBakhmSlot, bakhmZoneSlot, isCreature: !!hasCardType(this._getCardDB()[cardName], 'Creature') });   // Creature-Surprises bekommen eine eigene Aufdeck-Animation
     }
 
     // Reveal card to opponent and spectators
@@ -36704,7 +36704,7 @@ this._deathWatch = (this._deathWatchStack || []).length
           c.owner === sSeite && c.zone === ZONES.SURPRISE
           && c.heroIdx === sHeroIdx && c.name === chosenName);
         if (sInst) sInst.faceDown = false;
-        this._broadcastEvent('surprise_flip', { owner: sSeite, heroIdx: sHeroIdx, cardName: chosenName });
+        this._broadcastEvent('surprise_flip', { owner: sSeite, heroIdx: sHeroIdx, cardName: chosenName, isCreature: !!hasCardType(this._getCardDB()[chosenName], 'Creature') });
         this._broadcastEvent('card_reveal', { cardName: chosenName });
         // `source` unterscheidet die beiden gleichnamigen Logs: aus der
         // Surprise-Zone ist es eine ECHTE Aktivierung einer gesetzten
