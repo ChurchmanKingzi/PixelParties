@@ -30,7 +30,7 @@ const MAX_CHAIN_DEPTH = 10;   // Prevent infinite chain loops
 const MAX_PENDING_TRIGGERS = 200;
 // Flugzeit einer Surprise-Kreatur von ihrer Surprise Zone in die
 // Support Zone (Als Vorgabe 19.8.).
-const SURPRISE_FLUG_MS = 740;   // Als Befund 3.10.: Flug (700 ms) + Versteck-Ende der Ziel-Zone (720 ms) abwarten — erst DANN Summon-Effekt und On-Summon-Fenster, die Creature steht sichtbar auf dem Brett
+const SURPRISE_FLUG_MS = 260;
 // Landezeitpunkt eines Coolness-Stack-Fluges: die `pileTransfer`-
 // Keyframes zeigen die Karte bei 80 % voll am Ziel, die letzten 20 %
 // sind das Ausblenden. Bei 700 ms Flug also 560 ms. Erst dann wird die
@@ -14471,28 +14471,33 @@ this._deathWatch = (this._deathWatchStack || []).length
     // ── BESCHWOERUNGS-KETTENFENSTER (Off Duty & co., Ruling 3.10.) ───────
     // Opt-in `summonWindow: true` — fuer Beschwoerungen, die NICHT ueber die
     // Kette des Handspiels laufen (Reaktions-Creatures aus der Hand: Explosive
-    // Drone, Enhanced Guard Dog, …). Das Fenster oeffnet VOR dem Landen;
-    // negiert, kommt `{ negated: true, inst: null }` zurueck — die Karte
+    // Drone, Enhanced Guard Dog, …). Das Fenster oeffnet NACH dem Landen
+    // (Creature sichtbar im Zielplatz, vor den Hooks); negiert, kommt `{ negated: true, inst: null }` zurueck — die Karte
     // ist dann schon geroutet (Deck/Loeschstapel/Ablage), der Aufrufer
     // gibt sie NICHT in die Hand zurueck. Herkunft Hand (`fromHand` /
     // `fromHandIdx`) → kein `fromBoard` (Master's Plan, Lunar Eclipse).
     if (summonWindow && !this._inMctsSim && this._placementReactorHeld(rest.controller ?? playerIdx)) {
       const _besitzer = rest.controller ?? playerIdx;
-      const _aeussere = this._inReactionCheck;
-      let k;
-      try {
-        k = await this.executeCardWithChain({
-          cardName, owner: _besitzer, cardType: 'Creature', goldCost: 0, resolve: null,
-          fromBoard: !(rest.fromHand || rest.fromHandIdx != null), isPlacement: true,
-        });
-      } finally {
-        this._inReactionCheck = _aeussere;
-      }
-      if (k?.negated) {
-        await this._negatedPlacementRoute(cardName, _besitzer, (rest.fromHandIdx != null) ? 'handGone' : 'none',
-          { sourceIdx: rest.fromHandIdx }, k);
-        return { negated: true, inst: null, actualSlot: -1 };
-      }
+      // Das Fenster oeffnet NACH dem Landen (Ruling 3.10.): die Creature
+      // steht erst sichtbar auf dem Brett, dann feuert Off Duty & co. —
+      // negiert, fliegt sie von dort ins Deck (bzw. Loeschstapel/Ablage).
+      rest._landungsFenster = async (inst, actualSlot) => {
+        const _aeussere = this._inReactionCheck;
+        let k;
+        try {
+          k = await this.executeCardWithChain({
+            cardName, owner: _besitzer, cardType: 'Creature', goldCost: 0, resolve: null,
+            fromBoard: !(rest.fromHand || rest.fromHandIdx != null), isPlacement: true,
+          });
+        } finally {
+          this._inReactionCheck = _aeussere;
+        }
+        if (!k?.negated) return false;
+        await this._negatedPlacementRoute(cardName, _besitzer, 'support', {
+          zoneOwner: playerIdx, hostHeroIdx: heroIdx, slotIdx: actualSlot, instId: inst?.id,
+        }, k);
+        return true;
+      };
     }
     const ergebnis = await this._summonCreatureWithHooksKern(cardName, playerIdx, heroIdx, zoneSlot, rest);
     if (alsZusatzaktion && ergebnis?.inst) {
@@ -14655,6 +14660,14 @@ this._deathWatch = (this._deathWatchStack || []).length
     // in MCTS-Rollouts, wo `sync()` zwar frueh aussteigt, aber eben
     // je Rollout-Schritt).
     if (opts.syncOnPlacement) this.sync();
+    // Reaktions-Creature aus der Hand (Flug oben gesendet): den Flug
+    // ABWARTEN (700 ms + Versteck-Ende der Zone, 720 ms), bevor Summon-Effekt,
+    // Hooks und Fenster laufen — die Creature steht dann sichtbar auf dem
+    // Brett (Als Befund 3.10.).
+    if (opts.fromHandIdx != null && opts.fromHandIdx >= 0 && !this._fastMode && !this._inMctsSim) {
+      this.sync();
+      await this._delay(740);
+    }
 
     // Default-on summon glow — broadcasts `summon_effect` on the
     // destination slot so any special-summon path (Cute Bunny hand-
@@ -14670,6 +14683,11 @@ this._deathWatch = (this._deathWatchStack || []).length
       this._broadcastEvent('summon_effect', {
         owner: playerIdx, heroIdx, zoneSlot: actualSlot, cardName,
       });
+    }
+
+    // Beschwoerungs-Kettenfenster NACH dem Landen (`summonWindow`, s. oben).
+    if (typeof opts._landungsFenster === 'function') {
+      if (await opts._landungsFenster(inst, actualSlot)) return { negated: true, inst: null, actualSlot: -1 };
     }
 
     if (!opts.skipHooks) {
