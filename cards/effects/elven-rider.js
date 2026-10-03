@@ -260,8 +260,9 @@ module.exports = {
           // das erscheint die Kreatur ohne Bewegung im Slot — der
           // HOOK-Weg sendet den Flug nicht von selbst, anders als der
           // regulaere Spielweg im Server.
-          { source: `${CARD_NAME} reaction`, skipBeforeSummon: false, fromHandIdx: handIdx }
+          { source: `${CARD_NAME} reaction`, skipBeforeSummon: false, fromHandIdx: handIdx, summonWindow: true }
         );
+        if (res?.negated) return;   // Off Duty & co.: Karte ist schon geroutet
         if (!res) {
           // Extremely unlikely (no free slot after all). Put back.
           engine.handZugangSync(ps, CARD_NAME, { source: CARD_NAME, ohneInstanz: true });
