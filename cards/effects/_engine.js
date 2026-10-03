@@ -10849,7 +10849,10 @@ class GameEngine {
     if (drawn.length > 0) await this._checkReactiveHandLimits(playerIdx);
 
     // Accumulate draws for batched surprise check (flushed after effect resolution)
-    if (drawn.length > 0 && this.gs.currentPhase !== PHASES.RESOURCE && !this._inSurpriseResolution) {
+    // Auch Zuege WAEHREND einer Surprise-Aufloesung zaehlen (Pure Advantage Camel
+    // gegen Pure Advantage Camel): sie werden vorgemerkt und vom Flush NACH
+    // der laufenden Aufloesung abgearbeitet.
+    if (drawn.length > 0 && this.gs.currentPhase !== PHASES.RESOURCE) {
       if (!this._pendingSurpriseDraws) this._pendingSurpriseDraws = {};
       this._pendingSurpriseDraws[playerIdx] = (this._pendingSurpriseDraws[playerIdx] || 0) + drawn.length;
     }
@@ -11377,7 +11380,10 @@ class GameEngine {
       }
     }
     // Accumulate for surprise draw checks (same as regular draws)
-    if (drawn.length > 0 && this.gs.currentPhase !== PHASES.RESOURCE && !this._inSurpriseResolution) {
+    // Auch Zuege WAEHREND einer Surprise-Aufloesung zaehlen (Pure Advantage Camel
+    // gegen Pure Advantage Camel): sie werden vorgemerkt und vom Flush NACH
+    // der laufenden Aufloesung abgearbeitet.
+    if (drawn.length > 0 && this.gs.currentPhase !== PHASES.RESOURCE) {
       if (!this._pendingSurpriseDraws) this._pendingSurpriseDraws = {};
       this._pendingSurpriseDraws[playerIdx] = (this._pendingSurpriseDraws[playerIdx] || 0) + drawn.length;
     }
@@ -30752,7 +30758,12 @@ this._deathWatch = (this._deathWatchStack || []).length
     delete this.gs._gateShieldActive;
     delete this.gs._gateDeclined;
 
-    if (this._pendingSurpriseDraws && !this._inSurpriseResolution) {
+    // Schleife: Zuege, die eine ausgeloeste Surprise SELBST macht (Camel →
+    // zieht), landen waehrend der Aufloesung neu in `_pendingSurpriseDraws`
+    // und oeffnen danach das Fenster der Gegenseite. Endlich, weil jede
+    // Surprise nur einmal ausloest.
+    let _runden = 0;
+    while (this._pendingSurpriseDraws && !this._inSurpriseResolution && _runden++ < 20) {
       const pending = this._pendingSurpriseDraws;
       this._pendingSurpriseDraws = null;
       for (const [piStr, count] of Object.entries(pending)) {
