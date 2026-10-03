@@ -35890,6 +35890,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       // Bakhm slot: creature is already in the support zone — just stays face-up
         inst.turnPlayed = this.gs.turn || 0; // Enforce summoning sickness on flip
         this._broadcastEvent('summon_effect', { owner: playerIdx, heroIdx, zoneSlot: bakhmZoneSlot, cardName });
+        this.log('creature_summoned', { player: this.gs.players[steuerer ?? playerIdx]?.username, card: cardName, hero: this.gs.players[playerIdx]?.heroes?.[heroIdx]?.name });   // Klang (Als Befund 3.10.)
         this._broadcastEvent('play_zone_animation', {
           type: 'gold_sparkle', owner: playerIdx, heroIdx, zoneSlot: bakhmZoneSlot,
         });
@@ -35934,24 +35935,12 @@ this._deathWatch = (this._deathWatchStack || []).length
       this.sync();
       return result;
     }
-    // NOW remove from surprise zone. The physical zone is the HOST
-    // hero's (which equals the activator unless Brain Spider's cross-
-    // host clause is in play). `fromDeck` activations never had a
-    // surprise-zone entry to begin with — skip the splice.
-    if (!fromDeck) {
-      const surpriseZone = ps.surpriseZones[hostHeroIdx];
-      const szIdx = surpriseZone.indexOf(cardName);
-      if (szIdx >= 0) surpriseZone.splice(szIdx, 1);
-    }
-
-    // After resolution: place creature or discard. A negated Surprise
-    // is consumed without resolving — its Creature is never placed; it
-    // falls through to the discard branch below.
     const cardData = this._getCardDB()[cardName];
     // ── BESCHWOERUNG DURCH EINE KREATUR-SURPRISE NEGIERBAR (Off Duty,
     // Ruling 3.10.): die Surprise-Kreatur landet per Aktivierung auf dem
     // Feld — das ist eine Beschwoerung und oeffnet vorher ihr Kettenfenster
-    // (Herkunft Surprise Zone = nicht Hand → `fromBoard`).
+    // (Herkunft Surprise Zone = nicht Hand → `fromBoard`). Die Karte
+    // liegt dabei noch OFFEN in ihrer Surprise Zone (erst danach Splice).
     let _beschwoerungNegiert = null;
     if (!surpriseNegated && hasCardType(cardData, 'Creature') && !isBakhmSlot && !this._inMctsSim
         && this._placementReactorHeld(steuerer ?? playerIdx)) {
@@ -35966,12 +35955,28 @@ this._deathWatch = (this._deathWatchStack || []).length
         this._inReactionCheck = _aeussere;
       }
     }
+    // NOW remove from surprise zone. The physical zone is the HOST
+    // hero's (which equals the activator unless Brain Spider's cross-
+    // host clause is in play). `fromDeck` activations never had a
+    // surprise-zone entry to begin with — skip the splice. Eine negierte
+    // Beschwoerung leert die Zone erst im Abflug (`_negatedPlacementRoute`).
+    if (!fromDeck && !_beschwoerungNegiert) {
+      const surpriseZone = ps.surpriseZones[hostHeroIdx];
+      const szIdx = surpriseZone.indexOf(cardName);
+      if (szIdx >= 0) surpriseZone.splice(szIdx, 1);
+    }
+
+    // After resolution: place creature or discard. A negated Surprise
+    // is consumed without resolving — its Creature is never placed; it
+    // falls through to the discard branch below.
     if (_beschwoerungNegiert) {
       // Wie eine negierte Karte: Off Duty → Deck, Lunar Eclipse → Loeschstapel,
-      // sonst Ablage des KARTENBESITZERS.
+      // sonst Ablage des KARTENBESITZERS. Die Karte lag bis jetzt OFFEN in
+      // der Surprise Zone und fliegt VON DORT ab (Als Befund 3.10.).
       const _besitzer = (inst?.originalOwner === 0 || inst?.originalOwner === 1) ? inst.originalOwner : playerIdx;
-      if (inst) this._untrackCard(inst.id);
-      await this._negatedPlacementRoute(cardName, _besitzer, 'none', {}, _beschwoerungNegiert);
+      await this._negatedPlacementRoute(cardName, _besitzer, fromDeck ? 'none' : 'surprise', {
+        zoneOwner: playerIdx, hostHeroIdx, instId: inst?.id,
+      }, _beschwoerungNegiert);
     } else if (!surpriseNegated && hasCardType(cardData, 'Creature')) {
       // Place face-up as permanent creature in first free support zone
       const placed = this.safePlaceInSupport(cardName, playerIdx, heroIdx, -1);
@@ -36018,6 +36023,9 @@ this._deathWatch = (this._deathWatchStack || []).length
           await this._delay(SURPRISE_FLUG_MS);
         }
         this._broadcastEvent('summon_effect', { owner: playerIdx, heroIdx, zoneSlot: placed.actualSlot, cardName });
+        // Klang der Beschwoerung (Als Befund 3.10.: Surprise-Creatures waren stumm) —
+        // der Client spielt `summon` auf das `creature_summoned`-Log.
+        this.log('creature_summoned', { player: this.gs.players[steuerer ?? playerIdx]?.username, card: cardName, hero: this.gs.players[playerIdx]?.heroes?.[heroIdx]?.name });
         // Extra flashy animation for surprise creature summon
         this._broadcastEvent('play_zone_animation', {
           type: 'gold_sparkle', owner: playerIdx, heroIdx, zoneSlot: placed.actualSlot,
@@ -37266,8 +37274,20 @@ this._deathWatch = (this._deathWatchStack || []).length
   async _negatedPlacementRoute(cardName, playerIdx, source, opts = {}, kette = {}) {
     const ps = this.gs.players[playerIdx];
     if (!ps) return;
-    let von = 'hand', handIdx;
-    if (source === 'hand') {
+    let von = 'hand', handIdx, vonHeld;
+    if (source === 'surprise') {
+      // Abflug aus der Surprise Zone: Eintrag + Instanz zuerst raus und
+      // synchen (die Karte verschwindet am START des Flugs), dann fliegt sie.
+      von = 'surprise';
+      vonHeld = opts.hostHeroIdx;
+      const sz = this.gs.players[opts.zoneOwner ?? playerIdx]?.surpriseZones?.[opts.hostHeroIdx];
+      const zi = sz ? sz.indexOf(cardName) : -1;
+      if (zi >= 0) sz.splice(zi, 1);
+      if (opts.instId != null) this._untrackCard(opts.instId);
+      this.sync();
+    } else if (source === 'none') {
+      von = null;
+    } else if (source === 'hand') {
       handIdx = opts.sourceIdx != null ? opts.sourceIdx : (ps.hand || []).indexOf(cardName);
       if (handIdx >= 0 && ps.hand[handIdx] === cardName) ps.hand.splice(handIdx, 1);
     } else if (source === 'discard') {
@@ -37278,12 +37298,15 @@ this._deathWatch = (this._deathWatchStack || []).length
     }
     const nachDeck = !!kette?.negatedToDeck;
     const nachGeloescht = !nachDeck && !!kette?.negatedToDeleted;
-    this._broadcastEvent('play_pile_transfer', {
-      owner: playerIdx, cardName, from: von,
-      to: nachDeck ? 'deck' : (nachGeloescht ? 'deleted' : 'discard'),
-      ...(von === 'hand' && Number.isInteger(handIdx) && handIdx >= 0 ? { fromHandIdx: handIdx } : {}),
-    });
-    await this._delay(650);
+    if (von) {
+      this._broadcastEvent('play_pile_transfer', {
+        owner: playerIdx, cardName, from: von,
+        to: nachDeck ? 'deck' : (nachGeloescht ? 'deleted' : 'discard'),
+        ...(von === 'hand' && Number.isInteger(handIdx) && handIdx >= 0 ? { fromHandIdx: handIdx } : {}),
+        ...(von === 'surprise' && Number.isInteger(vonHeld) ? { fromHeroIdx: vonHeld } : {}),
+      });
+      await this._delay(650);
+    }
     if (nachDeck) {
       if (!ps.mainDeck) ps.mainDeck = [];
       ps.mainDeck.push(cardName);
