@@ -6868,7 +6868,7 @@ async function doPlayAbilityFremd(room, pi, { cardName, handIndex, heroIdx, zone
   const abZones = hps.abilityZones[heroIdx];
   // Kartenbesitzer (Ablage-Ziel) aus der Herkunft der Handkarte: eine
   // gestohlene Handkarte gehoert weiter ihrem Ursprungsspieler.
-  const kartenBesitzer = fromCreation ? pi : engine._handCardPileOwner(pi, cardName);
+  const kartenBesitzer = fromCreation ? pi : engine._handCardPileOwner(pi, cardName, handIndex);
   if (!abZones[ziel]) abZones[ziel] = [];
   abZones[ziel].push(cardName);
   (fromCreation ? ps.creationZone : ps.hand).splice(handIndex, 1);
@@ -8119,7 +8119,7 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
     // v1312: hat der Spell die Hand schon selbst verlassen
     // (`aufloesenderSpellInDieAblage`, Shooting Star), ist auch seine
     // Herkunft schon verbraucht — nicht ein zweites Mal ziehen.
-    const spellPileOwner = resolveHi >= 0 ? room.engine._consumeHandCardOrigin(pi, cardName) : pi;
+    const spellPileOwner = resolveHi >= 0 ? room.engine._consumeHandCardOrigin(pi, cardName, fromCreation ? undefined : resolveHi) : pi;
     if (resolveHi >= 0 && !gs._spellPlacedOnBoard && !gs._spellReturnToHand) {
       room.engine._broadcastEvent('play_pile_transfer', {
         fromOwner: pi, toOwner: spellPileOwner, cardName,
@@ -10950,7 +10950,7 @@ async function doConfirmPotion(room, pi, { selectedIds }) {
     // der Flug nicht: er trug EINEN `owner` fuer beide Enden. Jetzt
     // wird die Herkunft VOR dem Flug gelesen und der Flug endet dort,
     // wo die Karte auch landet.
-    const pileOwner = room.engine._consumeHandCardOrigin(pi, potionName);
+    const pileOwner = room.engine._consumeHandCardOrigin(pi, potionName, fromCreation ? undefined : hi);
     const pilePs = gs.players[pileOwner];
     if (!_gestohlen) room.engine._broadcastEvent('play_pile_transfer', {
       fromOwner: pi, toOwner: pileOwner, cardName: potionName,
@@ -11753,15 +11753,21 @@ async function doUseArtifactEffect(room, pi, { cardName, handIndex, fromCreation
         // v692: gestohlen (Key) → kein Ablage-Flug, routeNegatedInitialCard
         // fliegt Hand → Hand (Als Befund 1.9., doppelter Flug).
         const _gestohlen = chainResult.negated && Number.isInteger(chainResult.negatedToHandOf);
+        // Gestohlene Karte (Herkunft des PLATZES, nicht des Namens): der Artefakt-Abwurf gehoert in die Ablage
+        // ihres urspruenglichen Besitzers — wie bei Zaubern und Traenken.
+        const _pileOwnerVorab = fromCreation ? pi : room.engine._handCardPileOwner(pi, cardName, currentIdx);
         if (!gs._spellPlacedOnBoard && !_gestohlen) {
           room.engine._broadcastEvent('play_pile_transfer', {
             owner: pi, cardName,
             from: fromCreation ? 'creation' : 'hand',
             to: script.deleteOnUse ? 'deleted' : 'discard',
             fromHandIdx: currentIdx,
+            ...(_pileOwnerVorab !== pi ? { fromOwner: pi, toOwner: _pileOwnerVorab } : {}),
           });
         }
         (fromCreation ? ps.creationZone : ps.hand).splice(currentIdx, 1);
+        const _artefaktBesitzer = (fromCreation || chainResult.negated) ? pi : room.engine._consumeHandCardOrigin(pi, cardName);
+        const _artefaktPs = room.gameState.players[_artefaktBesitzer] || ps;
         room.engine.notePlayedFromHand(pi);
         if (chainResult.negated) await room.engine.routeNegatedInitialCard(pi, cardName, chainResult, currentIdx);
         else if (gs._spellPlacedOnBoard) {
@@ -11774,8 +11780,8 @@ async function doUseArtifactEffect(room, pi, { cardName, handIndex, fromCreation
           // flag-consume logic in doPlaySpell (~L3853).
           delete gs._spellPlacedOnBoard;
         }
-        else if (script.deleteOnUse) ps.deletedPile.push(cardName);
-        else ps.discardPile.push(cardName);
+        else if (script.deleteOnUse) _artefaktPs.deletedPile.push(cardName);
+        else _artefaktPs.discardPile.push(cardName);
       }
     }
   } catch (err) {

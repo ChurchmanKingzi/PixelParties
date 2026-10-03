@@ -748,6 +748,9 @@ class GameEngine {
     // „leer" faellt). Entscheidet, in wessen Ablage/Deck eine Karte zurueckkehrt — die HERKUNFT, nie der Name:
     // liegt neben einer gestohlenen Karte eine eigene gleichen Namens auf der Hand, bleiben beide getrennt.
     this.registerHandIndexedField('_handOriginals', { kind: 'value' });
+    // Welcher PHYSISCHE Handplatz gerade aufgeloest wird (siehe `beginHandResolve`): getrennt von der n-ten Kopie, damit
+    // eine gestohlene Kopie neben eigenen gleichen Namens nicht verwechselt wird.
+    this.registerHandIndexedField('_handResolving', { kind: 'value' });
     this.registerHandIndexedField('_revealedHandIndices', { kind: 'boolean' });
     // Bamboo Shield's permanent reveal flags (survive turn boundaries).
     this.registerHandIndexedField('_permanentlyRevealedHandIndices', { kind: 'boolean' });
@@ -15819,7 +15822,19 @@ this._deathWatch = (this._deathWatchStack || []).length
     return (foreign ? all.find(tagged) : all.find(c => !tagged(c))) || all[0] || null;
   }
 
-  _consumeHandCardOrigin(pi, cardName) {
+  _consumeHandCardOrigin(pi, cardName, handIdx) {
+    // VOR dem Splice (Platz bekannt): die Herkunft dieses Platzes entscheidet, nicht der Name.
+    const hps = this.gs.players[pi];
+    if (Number.isInteger(handIdx) && hps?.hand?.[handIdx] === cardName) {
+      const o = this._handOriginAt(hps, handIdx);
+      const owner = (o != null && o !== pi) ? o : pi;
+      if (owner !== pi) {
+        const foreign = this.cardInstances.find(c => c.zone === 'hand' && c.owner === pi && c.name === cardName
+          && c.originalOwner != null && c.originalOwner !== pi);
+        if (foreign) this._untrackCard(foreign.id);
+      }
+      return owner;
+    }
     const rem = this._takeRemovedHandOrigin(pi, cardName);
     if (rem.found) {
       const owner = (rem.owner != null && rem.owner !== pi) ? rem.owner : pi;

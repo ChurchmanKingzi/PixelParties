@@ -56,6 +56,10 @@ function beginHandResolve(ps, cardName, handIndex, fromCreation) {
   // „Die wievielte Kopie von `cardName` ist der geklickte Slot?"
   const nth = hand.slice(0, handIndex + 1).filter(c => c === cardName).length;
   ps._resolvingCard = { name: cardName, nth, fromCreation: !!fromCreation };
+  // Den PHYSISCHEN Platz mitfuehren (handindiziertes Feld, wandert bei Splices/Umsortieren mit): gleichnamige Karten
+  // sind per `nth` nicht unterscheidbar — und damit nicht deren HERKUNFT (gestohlene Kopie neben eigener).
+  if (!fromCreation && handIndex >= 0 && hand[handIndex] === cardName) ps._handResolving = { [handIndex]: { n: cardName } };
+  else ps._handResolving = null;
   return ps._resolvingCard;
 }
 
@@ -67,6 +71,12 @@ function getResolvingHandIndex(ps) {
   if (!ps?._resolvingCard) return -1;
   const { name, nth, fromCreation } = ps._resolvingCard;
   const hand = quelleVon(ps, fromCreation);
+  if (!fromCreation && ps._handResolving) {
+    for (const kStr of Object.keys(ps._handResolving)) {
+      const k = +kStr;
+      if (ps._handResolving[kStr]?.n === name && hand[k] === name) return k;
+    }
+  }
   let count = 0;
   let letzte = -1;
   for (let i = 0; i < hand.length; i++) {
@@ -110,6 +120,7 @@ function commitHandResolve(ps, opts = {}) {
   const idx = getResolvingHandIndex(ps);
   const ausVorrat = ps._resolvingCard.fromCreation;
   ps._resolvingCard = null;
+  ps._handResolving = null;
   if (idx < 0) return -1;
   // ★ Aus DERSELBEN Liste entnehmen, in der gesucht wurde.
   quelleVon(ps, ausVorrat).splice(idx, 1);
@@ -119,7 +130,7 @@ function commitHandResolve(ps, opts = {}) {
 
 /** Merker verwerfen, ohne die Karte zu entnehmen (Abbruch/Fehler). */
 function abortHandResolve(ps) {
-  if (ps) ps._resolvingCard = null;
+  if (ps) { ps._resolvingCard = null; ps._handResolving = null; }
 }
 
 /**

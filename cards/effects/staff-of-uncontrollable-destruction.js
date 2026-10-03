@@ -69,20 +69,24 @@ module.exports = {
     // dispatching any actionDiscardHandCard call — onDiscard listeners
     // can mutate the hand (re-routing, draw replacements, etc.) so
     // iterating live indices would skip / double-discard cards.
-    const toDiscardNames = [];
-    for (let i = 0; i < ps.hand.length; i++) {
+    // PLATZGENAU (von hinten nach vorn): Der Abwurf muss genau den Platz treffen, denn die HERKUNFT der Karte
+    // entscheidet ueber ihre Ablage — nicht der Name. Frueher lief der Abwurf mit Index -1 ueber die erste Kopie
+    // des Namens; mit eigenen UND gestohlenen Karten gleichen Namens landete dann auch die gestohlene Kopie in
+    // der eigenen Ablage. Von hinten nach vorn bleiben die niedrigeren Plaetze stabil.
+    const toDiscard = [];
+    for (let i = ps.hand.length - 1; i >= 0; i--) {
       if (i === staffIdx) continue;
-      toDiscardNames.push(ps.hand[i]);
+      toDiscard.push({ idx: i, name: ps.hand[i] });
     }
-    const count = toDiscardNames.length;
+    const count = toDiscard.length;
 
     // All hand-dump discards land in one forced-discard batch so on-
     // discard reactors (Glass of Marbles, Skull Necklace, …) wait
     // until every card has hit the pile before resolving — matches
     // the engine-wide "discards first, reactors after" ordering.
     await engine.withDiscardBatch(pi, { source: CARD_NAME }, async () => {
-      for (const cardName of toDiscardNames) {
-        await engine.actionDiscardHandCard(pi, cardName, -1, { source: CARD_NAME });
+      for (const { idx, name } of toDiscard) {
+        await engine.actionDiscardHandCard(pi, name, idx, { source: CARD_NAME });
       }
     });
 
