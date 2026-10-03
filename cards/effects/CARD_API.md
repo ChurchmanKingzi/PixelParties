@@ -16362,10 +16362,10 @@ await engine.dealDamageToTargets(quelle, ziele, {
 Ein Flächenschlag WÄHLT niemanden: „is chosen by / targeted by"-Surprises (Frost Rune, Flooding …)
 öffnen dabei nie (die Engine stempelt `_isAoeCheck` auf die Reaktionsquelle); „hit by"-Surprises
 (Booby Trap) schon. Ein Held löst seine Surprise nie gegen SICH SELBST aus (Selbsttreffer), wohl aber gegen einen verbündeten Helden.
-`opts.vorWirkung()` läuft NACH dem Reagieren und nur, wenn nichts negiert wurde: dort gehört das
-Kartenbild hin (Komet, Feuerwelle). Wird die Quelle negiert, spielt die Engine ihr `spellVisual`
-genau einmal — kein Doppelbild. Ein `spellVisual` mit Zonen-Animation braucht dieselbe `duration`
-wie im Effekt (Cataclysm: 3000), sonst hängt die Komponente nach 1000 ms ab.
+`opts.bilderGespielt: true`: die Karte hat ihr Bild (Komet, Feuerwelle) VOR dem Reaktionsfenster
+gespielt — bei Negation spielt die Engine kein zweites. Ein deklaratives `spellVisual.impact` feuert
+JE ZIEL (bei Flächenzaubern 4+ Kometen): Flächenzauber brauchen ein `spellVisual` als Funktion mit
+EINEM Broadcast (Cataclysm: `duration: 3000`, sonst hängt die Komponente nach 1000 ms ab).
 **Nacheinander** zielende Angriffe (Whirlwind Strike, Chain Lightning): `_skipSurpriseCheck: true`
 im Picker, das Surprise-Fenster öffnet dann am jeweiligen Treffer (`actionDealDamage`).
 `opts.amount` je Ziel erlaubt gemischte Wirkung (Heat Wave: 0 = nur Status).
