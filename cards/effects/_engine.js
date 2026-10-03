@@ -744,6 +744,10 @@ class GameEngine {
    */
   _registerBuiltinHandIndexedFields() {
     // Luna Kiai's per-turn reveal flags (cleared at turn start).
+    // Herkunft gestohlener Handkarten PRO PLATZ (Wert = Ursprungsbesitzer + 1, damit Spieler 0 nicht als
+    // „leer" faellt). Entscheidet, in wessen Ablage/Deck eine Karte zurueckkehrt — die HERKUNFT, nie der Name:
+    // liegt neben einer gestohlenen Karte eine eigene gleichen Namens auf der Hand, bleiben beide getrennt.
+    this.registerHandIndexedField('_handOriginals', { kind: 'value' });
     this.registerHandIndexedField('_revealedHandIndices', { kind: 'boolean' });
     // Bamboo Shield's permanent reveal flags (survive turn boundaries).
     this.registerHandIndexedField('_permanentlyRevealedHandIndices', { kind: 'boolean' });
@@ -2300,6 +2304,18 @@ class GameEngine {
         // every splice so a stale capture from an earlier discard can't
         // bleed into a later unrelated summon.
         delete ps._handIndexedFieldPending;
+        // Herkunft der entfernten Karten festhalten, damit Ablage-/Spiel-Wege NACH dem Splice noch wissen, ob die
+        // Karte gestohlen war (siehe `_handCardPileOwner`). Nur bei echtem Entfernen ueberschreiben.
+        if ((delCount ?? 0) > 0) {
+          const om = ps._handOriginals;
+          const rec = [];
+          for (let i = 0; i < (delCount ?? 0) && start + i < this.length; i++) {
+            const idx = start + i;
+            const v = om ? om[idx] : null;
+            rec.push({ cardName: this[idx], owner: (v != null && v > 0) ? v - 1 : null });
+          }
+          ps._handOriginsRemoved = rec;
+        }
         if ((delCount ?? 0) > 0) {
           for (const [fieldName, fieldDef] of engine._handIndexedFields) {
             if (!fieldDef.onCardSummonedFromHand) continue;
@@ -11496,7 +11512,7 @@ class GameEngine {
     const idx = (opts.idx != null && opts.idx >= 0 && opts.idx <= ps.hand.length) ? opts.idx : ps.hand.length;
     ps.hand.splice(idx, 0, cardName);
     const inst = opts.ohneInstanz ? null : this._trackCard(cardName, pi, ZONES.HAND);
-    if (opts.originalOwner != null && opts.originalOwner !== pi) this._tagHandCardOrigin(pi, cardName, opts.originalOwner);
+    if (opts.originalOwner != null && opts.originalOwner !== pi) this._tagHandCardOrigin(pi, cardName, opts.originalOwner, idx);
     this._autoRevealOnEnterHand(pi, idx, cardName);
     this.log('card_added_to_hand', { player: ps.username, card: cardName, by: opts.source || null, from: opts.von || null });
     this.sync();
@@ -13764,7 +13780,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         to: this.gs.players[pileOwner]?.username, via: 'discard',
       });
     }
-    const inst = this.findCards({ owner: playerIdx, zone: ZONES.HAND, name: cardName })[0];
+    const inst = this._pickHandInstByOrigin(playerIdx, cardName, pileOwner !== playerIdx);
     if (inst) { inst.zone = ZONES.DISCARD; inst.owner = pileOwner; }
     // Participate in the forced-discard batch counter when an outer
     // `withDiscardBatch` wrapper has opened one. This lets effects
@@ -15716,8 +15732,23 @@ this._deathWatch = (this._deathWatchStack || []).length
    * Ablage des URSPRUENGLICHEN Besitzers; `actionMulliganCards` legt
    * sie in DESSEN Deck zurueck. Fuer gestohlene Karten (Key).
    */
-  _tagHandCardOrigin(holderIdx, cardName, originalOwner) {
+  _tagHandCardOrigin(holderIdx, cardName, originalOwner, handIdx) {
     if (!Number.isInteger(holderIdx) || !Number.isInteger(originalOwner) || holderIdx === originalOwner) return null;
+    // Platz-Markierung: die frisch hinzugekommene Karte (explizit `handIdx`, sonst die letzte noch unmarkierte
+    // Kopie dieses Namens — frisch Hinzugekommenes steht hinten).
+    {
+      const hps = this.gs.players[holderIdx];
+      if (hps && Array.isArray(hps.hand)) {
+        if (!hps._handOriginals) hps._handOriginals = {};
+        let slot = Number.isInteger(handIdx) && hps.hand[handIdx] === cardName ? handIdx : -1;
+        if (slot < 0) {
+          for (let k = hps.hand.length - 1; k >= 0; k--) {
+            if (hps.hand[k] === cardName && !hps._handOriginals[k]) { slot = k; break; }
+          }
+        }
+        if (slot >= 0) hps._handOriginals[slot] = originalOwner + 1;
+      }
+    }
     // ★ Als Befund 3.10. („Enigma/Infiltration: gestohlene Karte wegen Handlimit abgeworfen — landet in MEINER
     // Ablage"): `handZugang` legt schon eine Hand-Instanz an; ein zweites `_trackCard` hier erzeugte eine DOPPELTE,
     // und `_handCardPileOwner` las die erste (ungetaggte) → eigene Ablage. Gibt es fuer die frisch hinzugekommene Karte
@@ -15736,7 +15767,39 @@ this._deathWatch = (this._deathWatchStack || []).length
     return inst;
   }
 
+  /**
+   * Herkunft einer gerade ENTFERNTEN Handkarte (siehe Splice-Interceptor): { found, owner } — `owner` null = eigene
+   * Karte. Der Eintrag wird verbraucht. Ohne Treffer `found: false` (Aufruf vor dem Splice o. Ae.).
+   */
+  _takeRemovedHandOrigin(pi, cardName) {
+    const ps = this.gs.players[pi];
+    const rec = ps?._handOriginsRemoved;
+    if (!rec || rec.length === 0) return { found: false, owner: null };
+    const i = rec.findIndex(e => e.cardName === cardName);
+    if (i < 0) return { found: false, owner: null };
+    const [e] = rec.splice(i, 1);
+    if (rec.length === 0) delete ps._handOriginsRemoved;
+    return { found: true, owner: e.owner };
+  }
+
+  /** Hand-Instanz passend zur Herkunft: fremde Karte → die markierte, eigene → eine unmarkierte. */
+  _pickHandInstByOrigin(pi, cardName, foreign) {
+    const all = this.findCards({ owner: pi, zone: ZONES.HAND, name: cardName });
+    const tagged = c => c.originalOwner != null && c.originalOwner !== pi;
+    return (foreign ? all.find(tagged) : all.find(c => !tagged(c))) || all[0] || null;
+  }
+
   _consumeHandCardOrigin(pi, cardName) {
+    const rem = this._takeRemovedHandOrigin(pi, cardName);
+    if (rem.found) {
+      const owner = (rem.owner != null && rem.owner !== pi) ? rem.owner : pi;
+      if (owner !== pi) {
+        const foreign = this.cardInstances.find(c => c.zone === 'hand' && c.owner === pi && c.name === cardName
+          && c.originalOwner != null && c.originalOwner !== pi);
+        if (foreign) this._untrackCard(foreign.id);
+      }
+      return owner;
+    }
     const foreign = this.cardInstances.find(c =>
       c.zone === 'hand' && c.owner === pi && c.name === cardName
       && c.originalOwner != null && c.originalOwner !== pi
@@ -16351,7 +16414,9 @@ this._deathWatch = (this._deathWatchStack || []).length
       // the card actually landed in the pile (caller should fire the
       // on-delete / on-discard hook); false if rescued.
       const finishMove = async (cardName, fromHandIdx = -1) => {
-        const inst = this.findCards({ owner: playerIdx, zone: ZONES.HAND, name: cardName })[0] || null;
+        // Herkunft zuerst (vor der Instanzwahl): die markierte Instanz gehoert zur fremden Karte.
+        const pileOwner = this._handCardPileOwner(playerIdx, cardName);
+        const inst = this._pickHandInstByOrigin(playerIdx, cardName, pileOwner !== playerIdx);
         // ★ v1469 (Als Befund 28.9.: „Wenn ich eine gegnerische Karte via
         // gegnerischer ‚Magic Lamp' erhalte und diese abwerfe (Hand Size
         // Limit am Rundenende), wird sie auf MEINEN Discard geschickt statt
@@ -16363,7 +16428,6 @@ this._deathWatch = (this._deathWatchStack || []).length
         // eigenen Stapel. Jetzt derselbe Weg: fremde Karten (Magic Lamp,
         // Diebstahl, aus fremder Ablage geholt) gehen auf den Ablage- bzw.
         // Loeschstapel ihres URSPRUENGLICHEN Besitzers.
-        const pileOwner = this._handCardPileOwner(playerIdx, cardName);
         const pilePs = this.gs.players[pileOwner] || ps;
         if (deleteMode) {
           const rescued = await this._tryBeforeDelete(cardName, playerIdx, {
@@ -24016,7 +24080,20 @@ this._deathWatch = (this._deathWatchStack || []).length
    * Wohin gehört diese Handkarte beim Ablegen/Löschen? Normalfall: der
    * Halter. Gestohlene Karten: ihr Ursprungs-Deck.
    */
-  _handCardPileOwner(holderIdx, cardName) {
+  _handCardPileOwner(holderIdx, cardName, handIdx) {
+    // Herkunft entscheidet, nicht der Name: erst der Platz (vor dem Splice, `handIdx`), dann die beim Entfernen
+    // festgehaltene Herkunft (nach dem Splice), erst zuletzt die namensbasierte Instanz.
+    const hps = this.gs.players[holderIdx];
+    if (Number.isInteger(handIdx) && hps?.hand?.[handIdx] === cardName) {
+      const v = hps._handOriginals?.[handIdx];
+      return (v != null && v > 0 && v - 1 !== holderIdx) ? v - 1 : holderIdx;
+    }
+    const rem = this._takeRemovedHandOrigin(holderIdx, cardName);
+    if (rem.found) {
+      // Fuer die Folgeaufrufe (z. B. `_consumeHandCardOrigin` im selben Ablauf) wieder hinlegen.
+      (hps._handOriginsRemoved = hps._handOriginsRemoved || []).unshift({ cardName, owner: rem.owner });
+      return (rem.owner != null && rem.owner !== holderIdx) ? rem.owner : holderIdx;
+    }
     const inst = this.findCards({ owner: holderIdx, zone: ZONES.HAND, name: cardName })[0];
     const orig = inst?.originalOwner;
     return (orig != null && orig !== holderIdx) ? orig : holderIdx;
@@ -41537,7 +41614,7 @@ this._deathWatch = (this._deathWatchStack || []).length
 
     // Kartenbesitzer (Ablage-Ziel) wie in `doPlayAbilityFremd` — vor dem Splice.
     const kartenBesitzer = fremd
-      ? (typeof this._handCardPileOwner === 'function' ? this._handCardPileOwner(playerIdx, cardName) : playerIdx)
+      ? (typeof this._handCardPileOwner === 'function' ? this._handCardPileOwner(playerIdx, cardName, verifyIdx) : playerIdx)
       : null;
 
     // Execute: remove from hand, add to zone
