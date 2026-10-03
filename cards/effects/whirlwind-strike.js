@@ -14,6 +14,7 @@ module.exports = {
   // Im normalen Weg bleibt es bei den Broadcasts im Effekt selbst.
   // Negiert (Frost Rune …): der ANGREIFER wirbelt los, nicht die Ziele.
   async spellVisual(engine, info) {
+    if (info.schonGezeigt?.zone?.has('whirlwind_spin')) return;   // der Effekt hat sein Bild schon gespielt
     engine._broadcastEvent('play_zone_animation', {
       type: 'whirlwind_spin', owner: info.heroOwner ?? info.owner, heroIdx: info.heroIdx, zoneSlot: -1,
     });

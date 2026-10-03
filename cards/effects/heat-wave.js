@@ -122,13 +122,22 @@ function collectTargets(engine, pi, casterHeroIdx) {
   return targets;
 }
 
+/** Brettweite Heat-Wave-Animation (Client: `heat_wave`); wartet, bis die Schwaden das Brett erfasst haben. */
+async function heissWindBild(engine, owner) {
+  engine._broadcastEvent('play_zone_animation', {
+    type: 'heat_wave', zoneType: 'board', owner, heroIdx: -1, zoneSlot: -1, duration: 2800,
+  });
+  await engine._delay(1300);
+}
+
 module.exports = {
   // ★★ v1182 — ENTKOPPELTE BILDER (CARD_API): wird die Karte NEGIERT,
   // laeuft ihr Effekt-Rumpf nie — die Engine spielt dann diese Bilder.
   // Im normalen Weg bleibt es bei den Broadcasts im Effekt selbst.
-  spellVisual: {
-    projectile: { emoji: '🔥', trailClass: 'projectile-flame-trail', duration: 520 },
-    stagger: 110, flightMs: 330,
+  // Negiert, bevor der Effekt lief: dasselbe Bild, EIN Broadcast.
+  async spellVisual(engine, info) {
+    if (info.schonGezeigt?.zone?.has('heat_wave')) return;   // der Effekt hat es schon gespielt
+    await heissWindBild(engine, info.heroOwner ?? info.owner ?? 0);
   },
 
   /**
@@ -174,25 +183,10 @@ module.exports = {
       const targets = collectTargets(engine, ctx.cardHeroOwner ?? pi, heroIdx);
       if (targets.length === 0) return;
 
-      // ── Animation: flame projectiles from caster to EVERY target ──
-      // User spec: "wide lines of flames shooting at all targets except
-      // the user (even immune ones!)". We fire the projectiles first
-      // (all at once — the client handles each one's fly-time in
-      // parallel), wait briefly for impact, then resolve effects.
-      for (const t of targets) {
-        engine._broadcastEvent('play_projectile_animation', {
-          sourceOwner:   ctx.cardHeroOwner,
-          sourceHeroIdx: heroIdx,
-          targetOwner:   t.owner,
-          targetHeroIdx: t.heroIdx,
-          targetZoneSlot: t.type === 'creature' ? t.slotIdx : -1,
-          emoji: '🔥',
-          emojiStyle: { fontSize: 44 },
-          trailClass: 'projectile-flame-trail',
-          duration: 520,
-        });
-      }
-      await engine._delay(460);
+      // ── Animation: heisse rote Winde mit Flammen, die das ganze Brett einhuellen ──
+      // (Als Vorgabe 3.10.) Brettweit, EIN Broadcast — laeuft VOR dem Reaktionsfenster;
+      // wird der Zauber danach negiert, spielt die Engine kein zweites Bild (`bilderGespielt`).
+      await heissWindBild(engine, ctx.cardHeroOwner ?? pi);
 
       // ── Resolve effects ──
       // Snapshot burn-state BEFORE any status/damage application so the
@@ -214,7 +208,7 @@ module.exports = {
       });
       await engine.dealDamageToTargets({ ...quelle, cardInstance: ctx.card }, ziele, {
         damage: DAMAGE, damageType: 'destruction_spell', sourceName: CARD_NAME,
-        istFlaeche: true, hitDelay: 0,
+        istFlaeche: true, hitDelay: 0, bilderGespielt: true,
         wirkung: async () => {
           for (let i = 0; i < targets.length; i++) {
             const t = targets[i];

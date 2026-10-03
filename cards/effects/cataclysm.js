@@ -29,6 +29,7 @@ module.exports = {
   // Im normalen Weg bleibt es bei den Broadcasts im Effekt selbst.
   // Negiert, bevor der Effekt lief: EIN Komet (nicht einer je Ziel — `impact` feuert je Ziel).
   async spellVisual(engine, info) {
+    if (info.schonGezeigt?.zone?.has('cataclysm')) return;   // der Effekt hat sein Bild schon gespielt
     engine._broadcastEvent('play_zone_animation', {
       type: 'cataclysm', owner: info.heroOwner ?? info.owner ?? 0,
       heroIdx: Math.max(0, info.heroIdx ?? 0), zoneSlot: -1, duration: 3000,

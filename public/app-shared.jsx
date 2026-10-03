@@ -2522,6 +2522,13 @@ const ZONE_ANIM_SFX = {
     { name: 'elem_fire',    opts: { rate: 0.8,  volume: 0.85, delay: 900,  category: null, dedupe: 0 } },
     { name: 'heavy_impact', opts: { rate: 0.8,  volume: 0.7,  delay: 1300, category: null, dedupe: 0 } },
   ],
+  // ★★ Heat Wave: Fauchen der heissen Winde (zwei Schwaden), dazwischen das Aufschlagen der Flammen.
+  heat_wave: [
+    { name: 'elem_wind', opts: { rate: 0.75, volume: 1.0 } },
+    { name: 'elem_fire', opts: { rate: 0.7,  volume: 0.95, delay: 280, category: null, dedupe: 0 } },
+    { name: 'elem_wind', opts: { rate: 0.9,  volume: 0.8,  delay: 800, category: null, dedupe: 0 } },
+    { name: 'elem_fire', opts: { rate: 0.85, volume: 0.7,  delay: 1200, category: null, dedupe: 0 } },
+  ],
   // ★★ v1154 — Enthauptung: das Pfeifen der Klinge, der Treffer, der
   // dumpfe Nachschlag unter der Fontaene.
   decapitation: [

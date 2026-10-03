@@ -167,6 +167,7 @@ module.exports = {
         galerie.push({ name: n, source: 'deck', count: zaehler[n] });
       }
       if (galerie.length === 0) return;
+      await engine.showTriggeredEffect(CARD_NAME, { playerIdx: pi });
       const max = Math.min(2, galerie.length);
       const antwort = await engine.promptGeneric(pi, {
         type: 'cardGalleryMulti', searchToHand: true,

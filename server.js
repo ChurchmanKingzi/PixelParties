@@ -7712,7 +7712,7 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
     // Stale-flag safety net — mirror of the engine-side resolution starts:
   // clear a leaked `_spellNegatedByEffect` when an OUTERMOST spell
   // resolution begins (see preDamageMultiTargetWindow's depth-0 notes).
-  if ((gs._spellResolutionDepth || 0) === 0) delete gs._spellNegatedByEffect;
+  if ((gs._spellResolutionDepth || 0) === 0) { delete gs._spellNegatedByEffect; room.engine._visLog = []; }
   gs._spellResolutionDepth = (gs._spellResolutionDepth || 0) + 1;
   // Resolving-Spell name stack: paired with the depth counter so
   // `addHeroStatus` / `actionAddBuff` / `_actionHealHeroImpl` can
