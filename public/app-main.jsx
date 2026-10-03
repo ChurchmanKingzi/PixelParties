@@ -76,6 +76,11 @@ function CubeDraftScreen({ lobby, draft, leaveRoom, notify }) {
   const packBoxRef = useRef(null);
   const [packBox, setPackBox] = useState({ w: 0, h: 0 });
   const packVisible = !!draft && !draft.isSpectator;
+  // Klang, sobald ein neues Pack vor einem liegt (Draftbeginn und jede Runde).
+  useEffect(() => {
+    if (!packVisible || draft.suspended) return;
+    if (window.playSFX) window.playSFX('shuffle', { dedupe: 300 });
+  }, [packVisible, draft?.round, draft?.pickInRound]);
   useEffect(() => {
     const el = packBoxRef.current;
     if (!el) return;
@@ -309,7 +314,7 @@ function CubeDraftScreen({ lobby, draft, leaveRoom, notify }) {
                 }}
                 onMouseEnter={() => setHoveredCard(cardName)}
                 onMouseLeave={() => setHoveredCard(null)}>
-                <CardMini card={window.CARDS_BY_NAME?.[cardName]} onClick={() => {}} style={{ width: '100%', height: '100%' }} />
+                <CardMini noTooltip card={window.CARDS_BY_NAME?.[cardName]} onClick={() => {}} style={{ width: '100%', height: '100%' }} />
               </div>
             ))}
           </div>
@@ -326,7 +331,7 @@ function CubeDraftScreen({ lobby, draft, leaveRoom, notify }) {
           {hoveredCard && window.CARDS_BY_NAME?.[hoveredCard] ? (
             <div style={{ flex: 1, overflowY: 'auto' }}>
               <div style={{ width: '100%', aspectRatio: '5 / 7', marginBottom: 8 }}>
-                <CardMini card={window.CARDS_BY_NAME[hoveredCard]} onClick={() => {}} style={{ width: '100%', height: '100%' }} />
+                <CardMini noTooltip card={window.CARDS_BY_NAME[hoveredCard]} onClick={() => {}} style={{ width: '100%', height: '100%' }} />
               </div>
               <div style={{ fontSize: 11, color: 'var(--text)', lineHeight: 1.4 }}>
                 <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--accent)', marginBottom: 4 }}>{hoveredCard}</div>
@@ -373,7 +378,7 @@ function CubeDraftScreen({ lobby, draft, leaveRoom, notify }) {
                   border: dragOverIdx === idx ? '2px solid var(--accent)' : '2px solid transparent',
                   borderRadius: 4, transition: 'border-color .1s',
                 }}>
-                <CardMini card={window.CARDS_BY_NAME?.[name]} onClick={() => {}} style={{ width: '100%', height: '100%' }} />
+                <CardMini noTooltip card={window.CARDS_BY_NAME?.[name]} onClick={() => {}} style={{ width: '100%', height: '100%' }} />
               </div>
             ))}
             {poolOrder.length === 0 && (

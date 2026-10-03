@@ -6026,7 +6026,7 @@ const TOP_BAR_H = 41; // top bar approximate height
 //   • `onTouchDragStart(e)`: Haken fuer den Aufrufer, der eine Karte per
 //     Finger ziehbar machen will (Deck-Editor-Galerie: [[app-deckbuilder]]).
 //     Wird zusaetzlich zum Langdruck-Timer bei `touchstart` gerufen.
-function CardMini({ card, onClick, onRightClick, count, maxCount, dimmed, style, dragData, inGallery, isCover, skins, onTouchDragStart }) {
+function CardMini({ card, onClick, onRightClick, count, maxCount, dimmed, style, dragData, inGallery, isCover, skins, onTouchDragStart, noTooltip }) {
   const [tt, setTT] = useState(null);
   const tapRef = useRef({ at: 0, timer: null });
   useEffect(() => () => clearTimeout(tapRef.current.timer), []);
@@ -6054,6 +6054,7 @@ function CardMini({ card, onClick, onRightClick, count, maxCount, dimmed, style,
   }, [card.name]);
 
   const show = (e) => {
+    if (noTooltip) return;
     if (window.activeDragData || window.deckDragState) return;
     if (useSharedTooltip) {
       window._boardTooltipSetter(card);
@@ -6062,6 +6063,7 @@ function CardMini({ card, onClick, onRightClick, count, maxCount, dimmed, style,
     }
   };
   const hide = () => {
+    if (noTooltip) return;
     if (useSharedTooltip) {
       window._boardTooltipSetter(null);
     } else {
@@ -6094,6 +6096,7 @@ function CardMini({ card, onClick, onRightClick, count, maxCount, dimmed, style,
     window._longPressFired = false;
     window._longPressTimer = setTimeout(() => {
       window._longPressFired = true;
+      if (noTooltip) return;
       setTapTooltip(card.name);
       if (useSharedTooltip) window._boardTooltipSetter(card); else setTT(true);
     }, LONG_PRESS_MS);
