@@ -5136,6 +5136,12 @@ class GameEngine {
           confirmLabel: config.confirmLabel || 'Attack!',
           confirmClass: config.confirmClass || 'btn-danger',
           cancellable: config.cancellable !== false,
+          // ★ „Kann jedes Ziel waehlen" (Truth-Seeing Eye, `ignoresTargetingRestrictions`:
+          // Piercer of Heavens, Surefire Shot): die Schalter MUESSEN bis in
+          // `promptEffectTarget` durchgereicht werden — dessen `blocksTargeting`-Nachlauf
+          // (Stealth, Jetpack …) markierte Helden sonst trotz der Ausnahme wieder als unwaehlbar.
+          ignoreUntargetable: config.ignoreUntargetable,
+          _truthSeeingEye: config._truthSeeingEye,
           // General rule: a prompt that asks the player to activate an
           // effect / aim it / cancel shows the source card's image, so
           // they always see WHICH card is prompting. Defaults to this
@@ -5716,6 +5722,9 @@ class GameEngine {
           confirmLabel: config.confirmLabel || 'Confirm',
           confirmClass: config.confirmClass || 'btn-danger',
           cancellable: config.cancellable !== false,
+          // siehe `promptDamageTarget`: Ausnahmen bis ins `blocksTargeting`-Backstop durchreichen
+          ignoreUntargetable: config.ignoreUntargetable,
+          _truthSeeingEye: config._truthSeeingEye,
           // General rule: show the source card's image in the picker.
           previewCardName: config.previewCardName || cardInstance.name,
           // v1443: die AUSLOESENDE Karte einer Reaktion (Skeleton Demon) —
