@@ -219,6 +219,16 @@
       "deckId": "sample-Structure Deck_ Grand Rebellion",
       "id": "sakura-mirror",
       "name": "Sakura Mirror"
+    },
+    {
+      "deckId": "planned:chaos-diamond",
+      "id": "spellstorm",
+      "name": "Spellstorm"
+    },
+    {
+      "deckId": "planned:bubbles",
+      "id": "fluffy-bulwark",
+      "name": "Fluffy Bulwark"
     }
   ]
 }
