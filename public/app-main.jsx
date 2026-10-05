@@ -1739,7 +1739,6 @@ function PlayScreen() {
 
   return (
     <div className="screen-full">
-      {user && !user.isGuest && <SocialChatWindow meId={user.id} />}
       <div className="top-bar">
         <button className="btn" onClick={() => setScreen('menu')}>← BACK</button>
         <h2 className="orbit-font" style={{ fontSize: 22, fontWeight: 800, color: 'var(--player-color)' }}>ONLINE LOBBY</h2>
