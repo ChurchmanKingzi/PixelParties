@@ -10409,7 +10409,9 @@ class GameEngine {
     if (effective <= 0) return 0;
 
     hero.maxHp = currentMax - effective;
-    hero.hp = Math.max(1, Math.min(hero.hp, hero.maxHp));
+    // Ein LEBENDER Held faellt nie unter 1 HP; ein gefallener (0 HP) bleibt gefallen —
+    // sonst belebte der Abgang einer Toughness ihn mit 1 HP wieder.
+    if (hero.hp > 0) hero.hp = Math.max(1, Math.min(hero.hp, hero.maxHp));
 
     this.log('max_hp_decrease', { hero: this._heroLabel(hero), amount: effective, newMax: hero.maxHp });
     return effective;
