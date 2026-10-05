@@ -1,0 +1,16 @@
+{
+  "hero": "Captain-Commander Damus",
+  "sheet": "captain-commander-damus.png",
+  "frameWidth": 26,
+  "frameHeight": 43,
+  "frames": 48,
+  "frameMs": 90,
+  "loop": true,
+  "layout": "horizontal",
+  "skinOf": "Damus, the Prophet of Apocalypse",
+  "padTop": 12,
+  "padLeft": 3,
+  "padRight": 3,
+  "padBottom": 1,
+  "faceX": 15
+}
