@@ -266,11 +266,10 @@ for i in range(16):
     b = 20 + i; ch = PROG[b]; g, k = i // 4, i % 4
     level = [0, 1, 2, 3][k] if g % 2 == 0 else [1, 2, 3, 4][k]
     subpad(b, ch, 88)
-    bass16(b, ch, ['eighth', 'gallop', 'sixteenth', 'sixteenth'][min(3, g if k < 2 else 2 + (g > 1))] if False else ('gallop' if k < 2 else 'sixteenth'), 98)
+    bass16(b, ch, 'gallop' if k < 2 else 'sixteenth', 98)
     acc_bar(b, ch, level, 66 + g * 4 + k * 3, cyc=[tones(ch, 48)[0], tones(ch, 48)[2], tones(ch, 48)[3], crack(tones(ch, 48)[0])] if g >= 2 else None)
     groove(b, 'B', 1.0 + g * .02)
     r5 = rootnote(ch, 72)
-    if i % 2 == 0: notes = [(o, d, p) for o, d, p in []]
     mel = riss(r5 if i % 2 == 0 else step(r5, 2), 2 if i % 2 == 0 else 3)
     for off, dur, p in mel: song.add('lead', S(b, off), dur * .94, chk(p), 90 + g * 2)
     if g >= 1:
@@ -278,7 +277,7 @@ for i in range(16):
     if i % 2 == 1: pad(b, ch, 64 + g * 4)
     if k in (1, 3): stabs(b, ch, 70 + g * 4, (0, 1.5, 3) if k == 1 else (0, .75, 1.5, 2.25, 3))
     # Alarm-Sirenen steigen mit den Warnstufen
-    siren('sir1', S(b, 0), 4, rootnote(ch, 72 + (g % 2) * 0), 76 + g * 4, 0, 5 + g, 1.0 + (g >= 2))
+    siren('sir1', S(b, 0), 4, rootnote(ch, 72), 76 + g * 4, 0, 5 + g, 1.0 + (g >= 2))
     if g >= 2 and k % 2 == 0: siren('sir2', S(b, 0), 8, rootnote(ch, 60), 74, -3, 6 + g - 2, 2.0)
     if k == 3:                                                       # Stutter-Ausbruch am Gruppenende
         cell = [nt('C#5'), nt('D5'), nt('G5')][:3] if g % 2 == 0 else [chk(step(r5, 0)), chk(step(r5, 1)), chk(step(r5, 3))]
