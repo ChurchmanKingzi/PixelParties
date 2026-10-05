@@ -5520,9 +5520,39 @@ function sendGameState(room, playerIdx, extra) {
     //
     // Mit einer laufenden Nummer kann der Client einen veralteten
     // Zustand erkennen und verwerfen.
-    stateSeq: (room._stateSeq = (room._stateSeq || 0) + 1),
   };
+  // ★ IDENTISCHE ZUSTAENDE NICHT NOCHMAL SCHICKEN. Gemessen an einer echten
+  // Partie (Mensch gegen CPU): 19-33 % der `game_state`-Nachrichten waren bis
+  // auf `stateSeq` byte-identisch zum vorigen — die Engine ruft `sync()` nach
+  // jedem Mikroschritt, auch wenn der Spieler davon nichts sieht. Jede davon
+  // kostet den Client Parsen UND einen kompletten Neuaufbau des Bretts (neue
+  // Objektidentitaet), ohne dass sich etwas geaendert haette.
+  //  • Der Aufbau oben bleibt unveraendert (er hat Nebenwirkungen, siehe
+  //    Terror-Block) — nur der Versand entfaellt.
+  //  • Der Cache haengt am Spielereintrag UND an der Socket-ID: ein neuer
+  //    Socket (Reconnect, Neuladen, anderer Tab) bekommt immer einen vollen
+  //    Zustand. `extra` (challengeStart, reconnected) erzwingt ebenfalls.
+  //  • `stateSeq` zaehlt nur noch tatsaechlich gesendete Zustaende.
+  //  • Abschalten: PP_STATE_DEDUPE=0.
+  let sig = null;
+  if (STATE_DEDUPE) {
+    sig = JSON.stringify(state);
+    const vorher = _zustandsCache.get(p);
+    if (!extra && vorher && vorher.socketId === p.socketId && vorher.sig === sig) return;
+  }
+  state.stateSeq = (room._stateSeq = (room._stateSeq || 0) + 1);
+  if (sig !== null) _zustandsCache.set(p, { socketId: p.socketId, sig });
   io.to(p.socketId).emit('game_state', state);
+}
+
+// Zuletzt an einen Spieler gesendeter Zustand (ohne stateSeq), siehe `sendGameState`.
+const STATE_DEDUPE = process.env.PP_STATE_DEDUPE !== '0';
+const _zustandsCache = new WeakMap();
+/** Wie `sendGameState`, schickt aber IMMER — fuer Resync (Client soll sicher den Serverstand sehen). */
+function sendGameStateErzwungen(room, playerIdx) {
+  const p = room.players && room.players[playerIdx];
+  if (p) _zustandsCache.delete(p);
+  sendGameState(room, playerIdx);
 }
 
 function sendToSpectators(room, event, data) {
@@ -13642,7 +13672,7 @@ io.on('connection', (socket) => {
       const gs = room.gameState;
       if (!gs || gs.result || (room._stateSeq || 0) !== zaehler0) return;
       socket.emit('action_rejected', { action: event });
-      sendGameState(room, pi);
+      sendGameStateErzwungen(room, pi);
     }, AKTION_VERWORFEN_NACH_MS);
   });
   const socketIP = getSocketIP(socket);
@@ -15013,7 +15043,7 @@ io.on('connection', (socket) => {
     // offene Frage sicher vor sich hat. Ohne Nummer (aeltere Seite): wie bisher.
     const offenId = room.gameState.effectPrompt.promptId;
     if (promptId != null && offenId != null && promptId !== offenId) {
-      sendGameState(room, pi);
+      sendGameStateErzwungen(room, pi);
       return;
     }
     // Reject force-discard of the specific resolving card instance
