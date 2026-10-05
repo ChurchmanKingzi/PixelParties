@@ -14555,6 +14555,12 @@ io.on('connection', (socket) => {
           surpriseCardName: cardName, surpriseOwner: pi, heroIdx,
           zoneSlot: freeSlot, cardInstance: inst,
         });
+        // „A player may summon a Creature placed by this effect as an
+        // additional Action" — eine ausgefuehrte Aktion. Dieser Handler
+        // beschwor sie bisher, ohne sie irgendwo zu melden: Back to Basics
+        // (SC) blieb stehen. Vor dem Zieh-Surprise-Flush, wie in
+        // `doPlayCreature` (Aktions-Hook zuerst).
+        await room.engine.meldeBeschwoerungAlsAktion(pi, heroIdx, cardName, inst);
         await room.engine._flushSurpriseDrawChecks();
         // Check summon triggers
         await room.engine._checkSurpriseOnSummon(pi, inst);

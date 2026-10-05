@@ -13,9 +13,26 @@
 //  beim ersten Regelwechsel auseinander.
 // ═══════════════════════════════════════════
 
+const { hatEffekt } = require('./_gained-effects-shared');
+
 const IFRIT = 'Ifrit';
 const ARMAGEDDON = 'Armageddon';
 const DAMUS = 'Damus, the Prophet of Apocalypse';
+
+/**
+ * ★ Traegt dieser Held Damus' Effekt — als Damus selbst ODER als
+ * GEWONNENER Effekt („This Hero gains the effects of …": Pseudonia & Co.)?
+ *
+ * Als Befund (Tester): Pseudonia erbte Damus' Armageddon-Verbilligung nicht.
+ * Die Vertraege am Heldenskript laufen ueber `heroScriptOf` und kommen
+ * deshalb auch bei Pseudonia an — aber Damus' eigener Code und dieser
+ * Helfer fragten ausdruecklich `hero.name === DAMUS` und blieben fuer jeden
+ * Erben stumm. EIN Ort fuer diese Frage, damit kein weiterer Aufrufer sie
+ * wieder am Namen festmacht.
+ */
+function hatDamusEffekt(hero) {
+  return hatEffekt(hero, DAMUS);
+}
 
 /** Alle „Ifrit"-Kreaturen, die `pi` gerade KONTROLLIERT. */
 function ifritsOf(engine, pi) {
@@ -34,7 +51,7 @@ function damusActive(engine, pi) {
   const ps = engine.gs.players[pi];
   for (let hi = 0; hi < (ps?.heroes || []).length; hi++) {
     const hero = ps.heroes[hi];
-    if (hero?.name !== DAMUS) continue;
+    if (!hatDamusEffekt(hero)) continue;
     if (hero.hp <= 0) continue;
     if (engine._isHeroEffectSilenced(pi, hi)) continue;
     return { hero, heroIdx: hi };
@@ -58,7 +75,14 @@ function sourceSide(source) {
   return (typeof s === 'number') ? s : -1;
 }
 
+/** Wirkt Damus' Effekt am Helden (pi, hi) gerade — lebend, nicht stummgeschaltet? */
+function damusEffektWirkt(engine, pi, hi) {
+  const hero = engine.gs.players[pi]?.heroes?.[hi];
+  if (!hatDamusEffekt(hero) || hero.hp <= 0) return false;
+  return !engine._isHeroEffectSilenced(pi, hi);
+}
+
 module.exports = {
   IFRIT, ARMAGEDDON, DAMUS,
-  ifritsOf, damusActive, isArmageddon, sourceSide,
+  ifritsOf, damusActive, damusEffektWirkt, hatDamusEffekt, isArmageddon, sourceSide,
 };

@@ -172,6 +172,11 @@ module.exports = {
       player: ps.username, summoned: chosenName,
       bypassedLevel: true, negatedUntilTurn: engine.gs.activePlayer === pi ? engine.gs.turn + 2 : engine.gs.turn + 1,
     });
+    // „… summon a level 3 or lower Creature … as an additional Action with
+    // the corresponding Hero": ist eine ausgefuehrte Aktion. Die Platzierung
+    // oben laeuft ueber `actionPlaceCreature` (umgeht Level/Schule) und
+    // meldet sie nicht von selbst — Back to Basics (SC) blieb stehen.
+    await engine.meldeBeschwoerungAlsAktion(pi, heroIdx, chosenName, res.inst);
     engine.sync();
     return true;
   },

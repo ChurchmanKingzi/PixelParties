@@ -12,12 +12,14 @@
 //  Engine zieht die Senkung von der erhoehten Stufe ab.
 // ═══════════════════════════════════════════
 const { istDoppelSpell } = require('./_double-shared');
+const { istHeldenTraeger } = require('./_gained-effects-shared');
 
 module.exports = {
   activeIn: ['hero'],
   reduceCardLevel(cardData, engine, ownerIdx, inst, heroIdx) {
     if (!istDoppelSpell(cardData)) return 0;
-    if (!inst || inst.zone !== 'hero' || heroIdx == null || heroIdx !== inst.heroIdx) return 0;
+    // Traeger: eigene Helden-Instanz ODER gewonnener Effekt (Pseudonia & Co.).
+    if (!istHeldenTraeger(inst) || heroIdx == null || heroIdx !== inst.heroIdx) return 0;
     const hero = engine.gs.players[inst.owner]?.heroes?.[inst.heroIdx];   // Styx 28.9.: Heldeninstanz = Brettseite
     if (!hero?.name || hero.hp <= 0 || hero.statuses?.negated) return 0;
     return 2;
