@@ -244,11 +244,15 @@ module.exports = {
             title: CARD_NAME,
             showCard: CARD_NAME,
             message: `Play ${CARD_NAME} as an additional Action? If you do, all ${vorhanden.length === 1 ? 'Ability' : 'Abilities'} attached to ${wirtsHeld.name} are sent to the discard pile. Otherwise it uses this Hero's normal Action.`,
-            confirmLabel: '⚡ Additional Action (discard Abilities)',
+            confirmLabel: '⚡ Additional Action',
             cancelLabel: '⚔️ Normal Action',
-            // „You may send all Abilities …" ist ein „may"-Effekt (Gerrymander gilt), und das zweite
-            // Feld IST die Antwort „normale Aktion" — es bricht nicht den Zauber ab.
+            // Zwei gleichwertige Wege, gleich grosse Knoepfe (Als Vorgabe 5.10.). Das zweite Feld IST die
+            // Antwort „normale Aktion" — es bricht nicht den Zauber ab. `cancellable` bleibt wahr (der
+            // Lern-Kanal und das CPU-Gehirn lesen die Frage als „optIn"), Gerrymander aber ausdruecklich
+            // NICHT: die Wahl der Aktionsart gehoert dem Spieler.
             cancellable: true,
+            gerrymanderEligible: false,
+            equalButtons: true,
             // Lern-Kanal der Kostenabwägung (`abilityLossChoice`): eigener Schlüssel, damit die
             // Ziehfrage derselben Karte die Grundrate nicht verfälscht, plus die Lage-Tags.
             decisionKey: KEY_KOSTEN,

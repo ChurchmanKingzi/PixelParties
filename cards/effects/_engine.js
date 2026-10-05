@@ -29619,6 +29619,14 @@ this._deathWatch = (this._deathWatchStack || []).length
     //     Supply Chain) have neither flag — they're not a player
     //     choice between effect paths, just an undo button on the
     //     cast itself.
+    // ★ Ausdrueckliches `gerrymanderEligible: false` ist ein AUSSTIEG (Als
+    // Vorgabe 5.10.): eine Wahl zwischen ZWEI WEGEN, nicht ein „may"-Effekt —
+    // z. B. „Zusatzaktion gegen Kosten ODER normale Aktion" (Quest of the
+    // Chosen One, Gate to the Armory, Board of Kings). Der Ausstieg war in
+    // `promptConfirmEffect` schon dokumentiert, griff aber nie, sobald ein
+    // ausdrueckliches `showCard` am Prompt stand (die zweite Bedingung unten
+    // machte den Confirm trotzdem zulaessig).
+    if (promptData.gerrymanderEligible === false) return null;
     let mode = null;
     if (promptData.type === 'optionPicker'
         && Array.isArray(promptData.options) && promptData.options.length >= 2
