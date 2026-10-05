@@ -1,0 +1,16 @@
+{
+  "hero": "Berserking Null",
+  "sheet": "berserking-null.png",
+  "frameWidth": 75,
+  "frameHeight": 45,
+  "frames": 32,
+  "frameMs": 80,
+  "loop": true,
+  "layout": "horizontal",
+  "skinOf": "Null, the Mage Slayer",
+  "padTop": 4,
+  "padLeft": 2,
+  "padRight": 3,
+  "padBottom": 2,
+  "faceX": 49.0
+}
