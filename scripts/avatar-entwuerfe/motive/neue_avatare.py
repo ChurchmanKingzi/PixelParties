@@ -28,6 +28,7 @@ def card_native(i, m):
     return cv2.resize(a, (round(610 / m), round(400 / m)), interpolation=cv2.INTER_AREA).astype(np.float32)
 
 
+OVERRIDES = json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'overrides.json'), encoding='utf-8'))
 REF = json.load(open('/home/user/refine_layers.json')) if os.path.exists('/home/user/refine_layers.json') else {}
 MAX_ERR = 0.012
 
@@ -37,6 +38,9 @@ def frame(i):
     if str(i) not in REF:
         return None
     e, f, idx, m, x, y = REF[str(i)]
+    ov = OVERRIDES.get(items[i]['name'])
+    if ov:
+        idx = ov['layer']
     if e > MAX_ERR:
         return None
     key = (f, idx)
