@@ -11,8 +11,7 @@ Frame 0 ist die Ruhepose.
   Hand: zweimal je Loop hebt er sie (der Ärmel staucht sich, nichts wird gedehnt) und unterstreicht seine
   Worte mit kleinen Schlägen; der weiße Mantel füllt den Raum zwischen Körper und Arm (keine Lücke).
   Bei den Betonungen nickt er.
-* Der ganze Oberkörper ist in Bewegung: er atmet (sackt ein, ohne Dehnung) und wiegt sich beim Reden langsam
-  hin und her; das Schwert geht mit.
+* Der ganze Oberkörper atmet (sackt ein, ohne Dehnung); Schwert, Flammen und Mantel gehen mit.
 * Die Kopfflammen züngeln besonders hoch, ihre Spitzen wehen seitlich, Fetzen reißen ab.
 """
 import math
@@ -71,12 +70,11 @@ KNEE = 25                           # ab hier (Beine) bleibt er stehen
 
 
 def body_shift(i, y):
-    """Der ganze Oberkörper bewegt sich: er atmet (sackt alle 12 Frames 1 px ein, Zeilen rücken zusammen)
-    und wiegt sich beim Reden langsam hin und her (nach oben hin weiter – Zeile an Zeile, keine Lücke)."""
+    """Der ganze Oberkörper atmet: alle 12 Frames sackt er 1 px ein (die Zeilen rücken an der Hüfte zusammen,
+    nichts wird gedehnt); seitlich lehnt er sich nicht."""
     if y >= KNEE:
         return 0, 0
-    lean = 1.4 * math.sin(2 * math.pi * i / N) + 0.6 * math.sin(2 * math.pi * 3 * i / N + 0.8)
-    return round(lean * (KNEE - y) / KNEE), (1 if (i % 12) in (5, 6, 7, 8) else 0)
+    return 0, (1 if (i % 12) in (5, 6, 7, 8) else 0)
 
 
 def frame(i):
