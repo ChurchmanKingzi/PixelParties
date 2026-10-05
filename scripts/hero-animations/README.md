@@ -75,7 +75,7 @@ kopiert, daneben liegt eine JSON-Datei mit den Metadaten. Die erzeugten
 | `mithuru.py` | `final` | `mithuru_idle_final_sheet.png` | `lord-mithuru-the-rotten-mastermind` |
 | `thalia.py` | `final` | `thalia_idle_final_sheet.png` | `thalia-the-fun-fairy` |
 | `null.py` | `final` | `null_idle_final_sheet.png` | `null-the-mage-slayer` |
-| `berserker.py` (+ `berserker_sprite.py`) | `final 80` | `berserker_idle_final_sheet.png` | `berserker-null` (Skin) |
+| `berserker.py` (+ `berserker_sprite.py`) | `final 80` | `berserker_idle_final_sheet.png` | `berserking-null` (Skin) |
 | `maho.py` | `final` | `maho_idle_final_sheet.png` | `maho-the-cute-magical-girl` |
 | `atta.py` | `final` | `atta_idle_final_sheet.png` | `atta-speaker-of-desires` |
 | `nomu.py` | `final` | `nomu_idle_final_sheet.png` | `nomu-wanderer-of-worlds` |

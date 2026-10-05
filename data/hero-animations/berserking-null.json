@@ -1,6 +1,6 @@
 {
-  "hero": "Berserker Null",
-  "sheet": "berserker-null.png",
+  "hero": "Berserking Null",
+  "sheet": "berserking-null.png",
   "frameWidth": 72,
   "frameHeight": 44,
   "frames": 32,

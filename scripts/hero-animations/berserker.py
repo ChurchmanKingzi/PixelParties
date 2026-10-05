@@ -2,7 +2,7 @@
 """Idle-Animation für den Skin „Berserker“ (Fate/Zero) von Null, the Mage Slayer.
 
 Teile (berserker_sprite.py): Körper + blutiges Plattenschwert
-(src/berserker-null-{body,blade}.png). Die Bänder, der Visier-Schweif, das Blut
+(src/berserking-null-{body,blade}.png). Die Bänder, der Visier-Schweif, das Blut
 und die Funken entstehen erst in der Animation.
 * Schweres Atmen: der Oberkörper samt Arm und Schwert hebt sich 1 px, die Füße
   bleiben stehen (die Zeile darüber wird gedehnt – keine Lücke).
@@ -19,8 +19,8 @@ from PIL import Image
 import numpy as np
 from anim_common import rgb, save_outputs
 
-BODY = np.array(Image.open('src/berserker-null-body.png').convert('RGBA')).astype(int)
-BLADE = np.array(Image.open('src/berserker-null-blade.png').convert('RGBA')).astype(int)
+BODY = np.array(Image.open('src/berserking-null-body.png').convert('RGBA')).astype(int)
+BLADE = np.array(Image.open('src/berserking-null-blade.png').convert('RGBA')).astype(int)
 CY = 3                                               # darüber ist die Leinwand leer
 BODY, BLADE = BODY[CY:], BLADE[CY:]
 SH, SW = BODY.shape[:2]

@@ -8,9 +8,9 @@ blutiges Plattenschwert ersetzt. Die Leinwand ist größer als bei Null (Platz f
 die längere Klinge, die Hörner und Berserkers wehende Bänder).
 
 Erzeugt (alle gleich groß, deckungsgleich):
-  src/berserker-null-body.png    Körper (ohne Bänder, die kommen in der Animation)
-  src/berserker-null-blade.png   das blutige Schwert
-  src/berserker-null.png         beides zusammen (Vorschau/Kartenbild)
+  src/berserking-null-body.png    Körper (ohne Bänder, die kommen in der Animation)
+  src/berserking-null-blade.png   das blutige Schwert
+  src/berserking-null.png         beides zusammen (Vorschau/Kartenbild)
 Aufruf (aus scripts/hero-animations):  python3 berserker_sprite.py
 """
 import os
@@ -133,10 +133,10 @@ if __name__ == '__main__':
     al = comp(b, s)[:, :, 3] > 0
     ys, xs = np.nonzero(al)
     print('Inhalt x', xs.min(), xs.max(), 'y', ys.min(), ys.max())
-    save(b, 'berserker-null-body')
-    save(s, 'berserker-null-blade')
+    save(b, 'berserking-null-body')
+    save(s, 'berserking-null-blade')
     c = comp(s, b)
-    save(c, 'berserker-null')
+    save(c, 'berserking-null')
     im = Image.fromarray(c.astype(np.uint8))
     bg = Image.new('RGBA', im.size, (120, 120, 120, 255))
     bg.alpha_composite(im)
