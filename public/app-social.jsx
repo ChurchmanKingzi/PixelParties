@@ -174,7 +174,7 @@ function WhosOnlineList({ meId, onOpen }) {
             onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpen(r); } }}>
           <SocialLamp status={r.status} />
           <span className="social-name" style={{ color: r.color || 'var(--accent)' }}>{r.name}</span>
-          {r.challenge && <span className="social-badge social-badge--challenge" title="Open challenge">⚔</span>}
+          {r.challenge && <span className="social-badge social-badge--challenge" title="Open challenge">!</span>}
           {r.unread > 0 && <span className="social-badge" title="Unread messages">{r.unread > 99 ? '99+' : r.unread}</span>}
         </li>
       ))}
@@ -301,14 +301,14 @@ function DmChatWindow({ peer, meId, onClose }) {
         <button className="btn social-challenge-btn" disabled={!canChallenge}
                 title={canChallenge ? 'Unranked, best of 1' : (blocked ? "You can't challenge this player" : name + ' is offline')}
                 onClick={() => challenge(false)}>
-          <span>Challenge {name}</span><small>UNRANKED</small>
+          Challenge (Unranked)
         </button>
         <button className="btn social-challenge-btn ranked" disabled={!canChallenge}
                 title={canChallenge ? 'Ranked, best of 3' : (blocked ? "You can't challenge this player" : name + ' is offline')}
                 onClick={() => challenge(true)}>
-          <span>Challenge {name}</span><small>RANKED</small>
+          Challenge (Ranked)
         </button>
-        <button className={'btn social-block-btn' + (iBlocked ? ' on' : '')} onClick={toggleBlock}>
+        <button className="btn social-block-btn" onClick={toggleBlock}>
           {iBlocked ? 'UNBLOCK' : (confirmBlock ? 'SURE?' : 'BLOCK')}
         </button>
       </div>
@@ -346,17 +346,19 @@ function DmChatWindow({ peer, meId, onClose }) {
 /** Das offene Chatfenster — jeder Bildschirm mit Spielerliste hängt es einmal ein. */
 function SocialChatWindow({ meId }) {
   useSocial();
+  // Wer in ein anderes Menü wechselt und zurückkommt, findet keinen offenen Chat mehr vor.
+  useEffect(() => () => socialCloseChat(), []);
   if (!_social.chatPeer) return null;
   return <DmChatWindow peer={_social.chatPeer} meId={meId} onClose={socialCloseChat} />;
 }
 
 /** Eigenständiger Kasten (Online-Lobby): dieselbe Liste und dieselben Chats wie im Hauptmenü.
- *  Das Chatfenster (`SocialChatWindow`) hängt der Bildschirm selbst auf Wurzelebene ein. */
+ *  Das Chatfenster deckt den Kasten in voller Höhe und Breite ab. */
 function SocialSidePanel({ meId }) {
   const counts = socialTabCounts(meId);
   useSocial();
   return (
-    <div className="lobby-spalte lobby-social ornate-frame pp-menuekasten" style={{ display: 'flex', flexDirection: 'column' }}>
+    <div className="lobby-spalte lobby-social ornate-frame pp-menuekasten" style={{ display: 'flex', flexDirection: 'column', position: 'relative' }}>
       <div className="orbit-font lobby-spalten-titel" style={{ padding: '10px 16px', fontSize: 12, fontWeight: 700, color: 'var(--accent)', display: 'flex', alignItems: 'center', gap: 8 }}>
         <span className="social-lamp social-lamp--online" />
         WHO'S ONLINE ({counts.online})
@@ -365,6 +367,7 @@ function SocialSidePanel({ meId }) {
       <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: 8 }}>
         <WhosOnlineList meId={meId} onOpen={socialOpenChat} />
       </div>
+      <SocialChatWindow meId={meId} />
     </div>
   );
 }
