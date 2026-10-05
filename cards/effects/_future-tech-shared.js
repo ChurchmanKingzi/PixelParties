@@ -121,6 +121,8 @@ function zaehleInAblage(gs, pi, name) {
   const ps = gs?.players?.[pi];
   if (!ps || !name) return 0;
   let n = (ps.discardPile || []).reduce((s, k) => s + (k === name ? 1 : 0), 0);
+  // Die gerade gewirkte Karte liegt (Chaos-Diamond) schon in der Ablage — sie zaehlt sich nicht mit.
+  if (gs._inAblageGewirkt && gs._inAblageGewirkt.pi === pi && gs._inAblageGewirkt.name === name && n > 0) n--;
   for (const a of aktiveAliase(gs, pi)) {
     if (a.als === name) n++;
     if (a.echt === name) n--;
