@@ -1,14 +1,14 @@
 # -*- coding: utf-8 -*-
 """Idle-Animation für den Skin „Berserker“ (Fate/Zero) von Null, the Mage Slayer.
 
-Teile (berserker_sprite.py): Körper + blutiges Plattenschwert
-(src/berserking-null-{body,blade}.png). Die Bänder, der Visier-Schweif, das Blut
-und die Funken entstehen erst in der Animation.
+Ebenen (src/berserking-null-{blade,body,extras}.png, übereinander in dieser Reihenfolge):
+blutiges Plattenschwert, Körper, Extras (rotes Sichel-Visier + blaue Haarbänder). Der
+Visier-Schweif, das Blut und die Funken entstehen erst in der Animation.
 * Schweres Atmen: der Oberkörper samt Arm und Schwert hebt sich 1 px, die Füße
   bleiben stehen (die Zeile darüber wird gedehnt – keine Lücke).
 * Das rote Sichel-Visier glüht im Takt auf; ab und zu zieht ein Lichtschweif
   davon über die Schulter nach oben und verglimmt.
-* Berserkers blaue Haarbänder wehen vom Helm nach rechts (Welle entlang der Bänder).
+* Berserkers blaue Haarbänder wehen (Welle von den Ansätzen zur Spitze).
 * Über das Schwert läuft ein roter Energiestoß vom Heft zur Spitze.
 * Blut tropft von der Klinge zu Boden und zerplatzt; rote Funken steigen auf.
 Aufruf (aus scripts/hero-animations):  python3 berserker.py final
@@ -19,17 +19,21 @@ from PIL import Image
 import numpy as np
 from anim_common import rgb, save_outputs
 
+# Ebenen aus dem Skin-Sprite (alle gleich groß, deckungsgleich); Stapel: Schwert, Körper, Extras
 BODY = np.array(Image.open('src/berserking-null-body.png').convert('RGBA')).astype(int)
 BLADE = np.array(Image.open('src/berserking-null-blade.png').convert('RGBA')).astype(int)
-CY = 3                                               # darüber ist die Leinwand leer
-BODY, BLADE = BODY[CY:], BLADE[CY:]
+EXTRA = np.array(Image.open('src/berserking-null-extras.png').convert('RGBA')).astype(int)   # Bänder + Visier
+CX, CY, CR, CB = 3, 2, 73, 41                        # Zuschnitt auf den Inhalt
+BODY, BLADE, EXTRA = (l[CY:CB, CX:CR] for l in (BODY, BLADE, EXTRA))
 SH, SW = BODY.shape[:2]
-PL, PR, PT, PB = 2, 6, 7, 2
+PL, PR, PT, PB = 2, 3, 4, 2
 H, W = SH + PT + PB, SW + PL + PR
 N = 32
-FEET = 29 - CY                                       # ab hier stehen die Füße (Null: 22 + 7)
-GROUND = 36 - CY                                     # unterste Zeile der Füße
-VISOR_Y, VISOR_X = 16 - CY, 52                       # rechtes Ende der Sichel (Schweif startet hier)
+FEET = 34 - CY                                       # ab hier stehen die Füße (Körper endet in Zeile 40)
+GROUND = 40 - CY                                     # unterste Zeile der Füße
+VISOR_Y, VISOR_X = 18 - CY, 54 - CX                  # rechtes Ende der Sichel (Schweif startet hier)
+ROOT_X = 52 - CX                                     # ab hier beginnen die Bänder (Ansatz fest)
+OUTLINE = (5, 4, 10)
 BAND = [rgb(h) for h in ('1b2470', '2f43c8', '6f8cff', 'c4d2ff')]
 BLOOD = [rgb(h) for h in ('2e0000', '6e0505', 'a80d0d', 'd92b24', 'ff7a66')]
 GLOW = [rgb(h) for h in ('8a0010', 'ff2438', 'ff6a5a', 'ffb8a8', 'ffe6dc')]
@@ -57,34 +61,24 @@ def line(pts):
     return out
 
 
+def is_band(p):
+    return p[3] > 0 and p[2] > p[0]
+
+
 def ribbons(out, i, b):
-    """Drei Haarbänder wehen vom Helm nach rechts (hinter der Figur): zur Spitze hin schmaler,
-    eine Welle läuft entlang der Bänder, oben ein heller Saum."""
-    # (Startpunkt, Steigung, Länge, Amplitude, Phase, Dicke am Ansatz)
-    strands = [((50, 10), -0.45, 17, 3.0, 0.0, 3), ((51, 13), -0.08, 16, 2.8, 2.1, 3), ((48, 8), -0.85, 13, 2.2, 4.2, 2)]
-    for (x0, y0), sl, ln, amp, ph, th in strands:
-        cols = {}
-        for k in range(ln + 1):
-            u = k / ln
-            y = y0 + sl * k + amp * u * math.sin(2 * math.pi * i / N - 0.5 * k + ph)
-            t = th if u < 0.45 else (max(1, th - 1) if u < 0.8 else 1)
-            for d in range(t):
-                cols[(x0 + k, round(y) + d)] = BAND[2] if d == 0 else (BAND[0] if d == t - 1 and t > 1 else BAND[1])
-        for (x, y), c in cols.items():
-            yy, xx = y + PT + b - CY, x + PL
-            if 1 <= yy < H - 1 and 1 <= xx < W - 1 and not out[yy, xx, 3]:
-                out[yy, xx] = c
-        # senkrechte Lücken zwischen benachbarten Spalten füllen (Band bleibt zusammenhängend)
-        for x in sorted({x for x, _ in cols})[:-1]:
-            ys0 = [y for (xx, y) in cols if xx == x]
-            ys1 = [y for (xx, y) in cols if xx == x + 1]
-            lo, hi = max(min(ys0), min(ys1)), min(max(ys0), max(ys1))
-            if min(ys0) > max(ys1) or min(ys1) > max(ys0):
-                a_, b_ = (max(ys1), min(ys0)) if min(ys0) > max(ys1) else (max(ys0), min(ys1))
-                for y in range(a_ + 1, b_):
-                    yy, xx = y + PT + b - CY, x + PL
-                    if 1 <= yy < H - 1 and 1 <= xx < W - 1 and not out[yy, xx, 3]:
-                        out[yy, xx] = BAND[1]
+    """Die Bänder der Extras-Ebene wehen: eine Welle läuft von den Ansätzen nach rechts (nur senkrechte
+    Verschiebung, zur Spitze hin stärker; Lücken zwischen Spalten werden gefüllt)."""
+    def dy(x):
+        u = min(1.0, max(0.0, (x - ROOT_X) / 16))
+        return int(round(2.6 * u * math.sin(2 * math.pi * i / N - 0.45 * (x - ROOT_X))))
+    for y, x in zip(*np.nonzero(EXTRA[:, :, 3])):
+        if not is_band(EXTRA[y, x]):
+            continue
+        d0, d1 = dy(x), dy(x + 1)
+        for d in range(min(d0, d1), max(d0, d1) + 1):
+            yy, xx = y + d + PT + b, x + PL
+            if 1 <= yy < H - 1 and 1 <= xx < W - 1:
+                out[yy, xx] = EXTRA[y, x]
 
 
 def trail(out, i, b):
@@ -111,38 +105,43 @@ def draw(out, s, b):
         out[y + PT + (b if y < FEET else 0), x + PL] = s[y, x]
 
 
+def is_red(p):
+    return p[3] > 0 and p[0] > p[1] + 30 and p[0] > p[2] + 30
+
+
 def frame(i):
     out = np.zeros((H, W, 4), int)
     b = breath(i)
-    ribbons(out, i, b)
-    body = BODY.copy()
-    ph = (math.sin(2 * math.pi * i / 16) + 1) / 2          # Visier atmet mit
-    for y, x in zip(*np.nonzero(body[:, :, 3])):
-        k = VIS.get(tuple(body[y, x, :3]))
-        if k is not None:
-            body[y, x] = GLOW[min(3, k + (1 if ph > 0.8 and k < 3 else 0))]
     blade = BLADE.copy()
-    pos = 27 - (i % 16) * 1.7                              # Energiestoß: Heft -> Spitze
+    pos = 30 - CX - (i % 16) * 1.8                         # Energiestoß: Heft -> Spitze
     for y, x in np.argwhere(BLADE[:, :, 3] > 0):
-        if tuple(BLADE[y, x, :3]) == (5, 4, 10):           # Kontur bleibt
+        if not is_red(BLADE[y, x]):                        # Kontur und Heft bleiben
             continue
         d = abs(x - pos)
         if d < 0.6:
             blade[y, x] = GLOW[3]
         elif d < 1.5:
             blade[y, x] = BLOOD[4]
-    for s in (blade, body):
+    for s in (blade, BODY):
         draw(out, s, b)
     if b:                                                   # Zeile über den Füßen dehnen
         y = FEET - 1
         for x in range(SW):
             if BODY[y, x, 3] and not out[y + PT, x + PL, 3]:
-                out[y + PT, x + PL] = body[y, x]
+                out[y + PT, x + PL] = BODY[y, x]
+    ph = (math.sin(2 * math.pi * i / 16) + 1) / 2          # Visier atmet mit
+    vis = EXTRA.copy()
+    for y, x in zip(*np.nonzero(EXTRA[:, :, 3])):
+        k = VIS.get(tuple(EXTRA[y, x, :3]))
+        if k is not None:
+            vis[y, x] = GLOW[min(3, k + (1 if ph > 0.8 and k < 3 else 0))]
+            out[y + PT + b, x + PL] = vis[y, x]
+    ribbons(out, i, b)
     trail(out, i, b)
-    # Blut tropft von der Klinge
-    for x0, t0 in ((12, 2), (20, 18)):
+    # Blut tropft von der Klinge (zwei Stellen an der Unterkante)
+    for x0, t0 in ((12 - CX, 2), (25 - CX, 18)):
         t = (i - t0) % N
-        yb = 22 - CY + PT + b
+        yb = 28 - CY + PT + b
         if t < 5:                                           # Tropfen bildet sich
             out[yb, x0 + PL] = BLOOD[2]
             if t >= 3:
@@ -160,7 +159,7 @@ def frame(i):
                     out[y, x0 + PL - dx] = BLOOD[1 + (dx > 1)]
                     out[y, x0 + PL + dx] = BLOOD[1 + (dx > 1)]
     # Funken steigen von der Klinge auf
-    seeds = [(x, y) for y, x in np.argwhere(BLADE[:, :, 3] > 0) if y <= 13 - CY + 1]
+    seeds = [(x, y) for y, x in np.argwhere(BLADE[:, :, 3] > 0) if y <= 22 - CY and is_red(BLADE[y, x])]
     for m in range(9):
         t = (i + m * 3) % 16
         gen = ((i + m * 3) // 16) % (N // 16)
