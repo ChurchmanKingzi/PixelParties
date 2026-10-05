@@ -11,7 +11,9 @@ Frame 0 ist die Ruhepose.
   Hand: zweimal je Loop hebt er sie (der Ärmel staucht sich, nichts wird gedehnt) und unterstreicht seine
   Worte mit kleinen Schlägen; der weiße Mantel füllt den Raum zwischen Körper und Arm (keine Lücke).
   Bei den Betonungen nickt er.
-* Das Schwert hält er ruhig.
+* Der ganze Oberkörper ist in Bewegung: er atmet (sackt ein, ohne Dehnung) und wiegt sich beim Reden langsam
+  hin und her; das Schwert geht mit.
+* Die Kopfflammen züngeln besonders hoch, ihre Spitzen wehen seitlich, Fetzen reißen ab.
 """
 import math
 import os
@@ -23,7 +25,7 @@ from anim_common import rgb, save_outputs
 N = 48
 OUT = os.environ.get('DA_OUT', '.')
 SLUG = 'captain-commander-damus'
-PL, PR, PT, PB = 2, 2, 8, 1
+PL, PR, PT, PB = 3, 3, 12, 1
 
 
 def load(part):
@@ -65,6 +67,18 @@ def dot(out, x, y, c):
         out[y, x] = c
 
 
+KNEE = 25                           # ab hier (Beine) bleibt er stehen
+
+
+def body_shift(i, y):
+    """Der ganze Oberkörper bewegt sich: er atmet (sackt alle 12 Frames 1 px ein, Zeilen rücken zusammen)
+    und wiegt sich beim Reden langsam hin und her (nach oben hin weiter – Zeile an Zeile, keine Lücke)."""
+    if y >= KNEE:
+        return 0, 0
+    lean = 1.4 * math.sin(2 * math.pi * i / N) + 0.6 * math.sin(2 * math.pi * 3 * i / N + 0.8)
+    return round(lean * (KNEE - y) / KNEE), (1 if (i % 12) in (5, 6, 7, 8) else 0)
+
+
 def frame(i):
     s = BODY.copy()
     st = TALK[i]
@@ -75,6 +89,7 @@ def frame(i):
     L = lift(i)
     out = np.zeros((H, W, 4), int)
     for y, x in zip(*np.nonzero(s[:, :, 3])):
+        bx, by = body_shift(i, y)
         dx = dy = 0
         if y <= HEAD_ROW and x > SWORD_X:
             dy = nod
@@ -82,17 +97,17 @@ def frame(i):
             dy = -round(L * (y - ARM_Y0) / (ARM_Y1 - ARM_Y0))
             if y >= 20 and L == 2:
                 dx = 1                                    # oben weist die Hand leicht nach außen
-        dot(out, x + PL + dx, y + PT + dy, s[y, x])
-    coat_x = COAT_X + PL                                  # hebt er die Hand, geht der weiße Mantel weiter
-    for y in range(COAT_Y0, COAT_Y1 + 1):
-        yy = y + PT
+        dot(out, x + PL + dx + bx, y + PT + dy + by, s[y, x])
+    for y in range(COAT_Y0, COAT_Y1 + 1):                 # hebt er die Hand, geht der weiße Mantel weiter
+        bx, by = body_shift(i, y)
+        coat_x, yy = COAT_X + PL + bx, y + PT + by
         if not (out[yy, coat_x, 3] and BODY[y, COAT_X, 3] and min(BODY[y, COAT_X, :3]) > 150):
             continue
         right = [x for x in range(coat_x + 1, coat_x + 5) if out[yy, x, 3]]
         if right:                                         # Lücke zwischen Mantel und Arm: Mantel füllt sie
             for x in range(coat_x + 1, right[0]):
                 out[yy, x] = BODY[y, COAT_X]
-        elif lift(i):                                     # unter der gehobenen Hand: Mantel mit Kontur
+        elif L:                                           # unter der gehobenen Hand: Mantel mit Kontur
             out[yy, coat_x + 1] = BODY[y, COAT_X]
             out[yy, coat_x + 2] = rgb('030303')
     for x in range(SW):                                   # Flammen lodern spaltenweise
@@ -101,9 +116,14 @@ def frame(i):
             continue
         y0, y1 = min(col), max(col)
         n = y1 - y0 + 1
-        grow = 1.0 + 0.45 * rnd(x, i) + 0.25 * rnd(x + 50, i // 2) - 0.1
-        m = max(n, int(round(n * grow)))
-        oy = PT + (NOD.get(i, 0) if x > SWORD_X else 0)
+        head = x > SWORD_X
+        if head:                                          # am Kopf züngeln die Flammen hoch hinaus
+            grow = 1.0 + 0.95 * rnd(x, i) ** 1.5 + 0.35 * rnd(x + 50, i // 2)
+        else:
+            grow = 1.0 + 0.5 * rnd(x, i) + 0.2 * rnd(x + 50, i // 2)
+        m = min(n + (7 if head else 4), max(n, int(round(n * grow))))
+        bx, by = body_shift(i, y1)
+        oy = PT + by + (nod if head else 0)
         for j in range(m):
             sy = y0 + min(n - 1, int(j * n / m))
             if not FIRE[sy, x, 3]:
@@ -111,21 +131,29 @@ def frame(i):
             c = tuple(FIRE[sy, x])
             k = CORE.index(c) if c in CORE else 2
             r = rnd(x * 13 + sy, i)
-            if r > 0.72:                                  # Glut flackert
+            if r > 0.6:                                   # Glut flackert
                 k = max(0, k - 1) if rnd(x + sy, i + 7) > 0.5 else min(3, k + 1)
+            tip = m - 1 - j                               # Abstand von unten
+            yy = y1 - tip + oy
+            sway = 0
+            if j < m - n // 2:                            # die Zungenspitzen wehen seitlich
+                sway = round((1.2 if head else 0.7) * math.sin(0.9 * i + 1.7 * x) * (1 - j / (m - n // 2)))
             if j < m - n:                                 # die neu hinzugekommene Spitze ist kühler
-                k = max(k, 2)
-            dot(out, x + PL, y1 - (m - 1 - j) + oy, CORE[k])
+                k = max(k, 2 if j > (m - n) // 2 else 3)
+            dot(out, x + PL + bx + sway, yy, CORE[k])
+        if head and rnd(x + 99, i) > 0.7:                 # abreißende Flammenfetzen über der Spitze
+            ty = y1 - m + oy - 1 - int(2 * rnd(x + 7, i))
+            if ty >= 1:
+                dot(out, x + PL + bx + round(math.sin(1.3 * i + x)), ty, CORE[2 if rnd(x, i + 3) > 0.4 else 3])
     for k in range(7):                                    # Funken steigen über den Feuern auf
         a = (i * 2 + k * 7) % 14
         sx = [1, 3, 6, 9, 12, 15, 2][k]
         top = min((y for y in range(SH) if FIRE[y, sx, 3]), default=0)
         x = sx + PL + round(0.8 * math.sin(0.9 * a + k))
-        y = top + PT - 2 - a
+        y = top + PT - 4 - a
         if y >= 1 and not out[y, x, 3]:
             dot(out, x, y, CORE[1] if a < 6 else rgb('f47b22', 200))
     return out
-
 
 if __name__ == '__main__':
     tag = sys.argv[1] if len(sys.argv) > 1 else 'v'
