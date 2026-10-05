@@ -4546,8 +4546,8 @@ function ZufallsGegnerBild({ gegner, schnell, width = 240 }) {
   );
 }
 
-function HeroArtCrop({ heroName, width = 160 }) {
-  const src = heroName ? cardImageUrl(heroName) : null;
+function HeroArtCrop({ heroName, width = 160, skinName = null }) {
+  const src = skinName ? skinImageUrl(skinName) : (heroName ? cardImageUrl(heroName) : null);
   if (!src) {
     return (
       <div style={{

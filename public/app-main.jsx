@@ -2818,8 +2818,13 @@ function OpponentUnlockPopup() {
       const list = (data && data.opponents) || [];
       if (list.length) setQueue(q => [...q, ...list]);
     };
+    // Skin-Game gewonnen: derselbe Popup-Rahmen, nur mit Skin-Bild und -Text.
+    const onSkinUnlocked = (data) => {
+      if (data && data.skinName) setQueue(q => [...q, { kind: 'skin', id: 'skin:' + data.skinName, skinName: data.skinName, heroName: data.heroName }]);
+    };
     socket.on('opponents_unlocked', onUnlocked);
-    return () => socket.off('opponents_unlocked', onUnlocked);
+    socket.on('skin_unlocked', onSkinUnlocked);
+    return () => { socket.off('opponents_unlocked', onUnlocked); socket.off('skin_unlocked', onSkinUnlocked); };
   }, []);
 
   const current = queue.length ? queue[0] : null;
@@ -2899,7 +2904,7 @@ function OpponentUnlockPopup() {
           <div className="orbit-font" style={{
             fontSize: 15, fontWeight: 800, letterSpacing: 3, color: '#ffd76a',
             marginBottom: 18, animation: 'ppUnlockTitle 2.2s ease-in-out infinite',
-          }}>✦ NEW OPPONENT UNLOCKED ✦</div>
+          }}>{current.kind === 'skin' ? '✦ NEW SKIN UNLOCKED ✦' : '✦ NEW OPPONENT UNLOCKED ✦'}</div>
 
           {/* Hero portrait in a gold frame */}
           <div style={{
@@ -2908,7 +2913,7 @@ function OpponentUnlockPopup() {
             boxShadow: '0 0 18px rgba(255,190,50,.5)', marginBottom: 18,
           }}>
             {heroArt
-              ? <HeroArtCrop heroName={current.middleHero} width={300} />
+              ? <HeroArtCrop heroName={current.kind === 'skin' ? current.heroName : current.middleHero} skinName={current.kind === 'skin' ? current.skinName : null} width={300} />
               : <div style={{ width: 300, height: 200, background: '#1a1a28' }} />}
           </div>
 
@@ -2917,8 +2922,8 @@ function OpponentUnlockPopup() {
             <span className="orbit-font" style={{
               color: '#ffe08a', fontWeight: 800, fontSize: 20,
               textShadow: '0 0 12px rgba(255,190,50,.7)',
-            }}>{current.middleHero || current.name}</span>{' '}
-            as a new opponent!
+            }}>{current.kind === 'skin' ? current.skinName : (current.middleHero || current.name)}</span>{' '}
+            {current.kind === 'skin' ? <>as a new skin for <b>{current.heroName}</b>!</> : 'as a new opponent!'}
           </div>
 
           <button

@@ -3588,6 +3588,39 @@ app.get('/api/hero-animations', async (req, res) => {
 // Gegenstueck zum Wegfall der SC-Tageskappe und den vielen neuen
 // Belohnungen (auch gegen CPUs). Vorher 10 / 5 / 10 / 5. Der Client liest
 // die Preise nur noch hier ab (keine Rueckfallwerte mehr im Shop-Screen).
+// ===== CPU-SKIN-SYSTEM =====
+// Bei einer normalen CPU-Herausforderung traegt der mittlere Held des Gegners
+// mit dieser Wahrscheinlichkeit einen zufaelligen Skin (alle Varianten des
+// Helden sind moeglich, auch schon freigeschaltete). Gewinnt der Mensch ein
+// solches „Skin-Game“ und besitzt den Skin noch nicht, schaltet er ihn frei.
+// TEST: vorerst 100 % — fuer den Normalbetrieb auf 0.10 setzen.
+const CPU_SKIN_CHANCE = 1.0;
+
+/** Zufaelliger Skin des mittleren Helden eines CPU-Decks — null, wenn keiner wuerfelt/existiert. */
+function rollCpuSkin(cpuDeck) {
+  if (!(Math.random() < CPU_SKIN_CHANCE)) return null;
+  const middle = cpuDeck?.heroes?.[1];
+  const heroName = typeof middle === 'string' ? middle : (middle?.hero || middle?.name || null);
+  if (!heroName) return null;
+  const skinFiles = new Set(scanSkinFiles().map(f => path.basename(f, path.extname(f))));
+  const pool = (SKINS_DATA[heroName] || []).filter(n => skinFiles.has(n));
+  if (!pool.length) return null;
+  return { heroName, skinName: pool[Math.floor(Math.random() * pool.length)] };
+}
+
+/** Skin freischalten, falls noch nicht im Besitz. Liefert true, wenn er NEU freigeschaltet wurde. */
+async function unlockCpuSkin(userId, skinName) {
+  if (!userId || !skinName) return false;
+  const owned = await db.get(
+    "SELECT id FROM user_shop_items WHERE user_id = ? AND item_type = 'skin' AND item_id = ?",
+    [userId, skinName]
+  );
+  if (owned) return false;
+  await db.run('INSERT INTO user_shop_items (id, user_id, item_type, item_id) VALUES (?, ?, ?, ?)',
+    [uuidv4(), userId, 'skin', skinName]);
+  return true;
+}
+
 const SHOP_PRICES = { avatar: 50, sleeve: 50, board: 50, skin: 50 };
 const RANDOM_PRICES = { skin: 25, avatar: 25, sleeve: 25 };
 const STRUCTURE_DECK_PRICE = 50;
@@ -6259,6 +6292,15 @@ function endCpuBattle(room, winnerIdx, reason) {
           if (newlyUnlocked.length && humanSid) {
             io.to(humanSid).emit('opponents_unlocked', { opponents: newlyUnlocked });
           }
+        }
+        // Skin-Game gewonnen → Skin des mittleren Gegner-Helden freischalten (falls noch nicht im
+        // Besitz). Das Popup kommt wie bei neuen Gegnern als eigenes Socket-Ereignis.
+        if (humanWon && room._cpuSkin) {
+          try {
+            if (await unlockCpuSkin(humanUserId, room._cpuSkin.skinName) && humanSid) {
+              io.to(humanSid).emit('skin_unlocked', { skinName: room._cpuSkin.skinName, heroName: room._cpuSkin.heroName });
+            }
+          } catch (err) { console.error('[CPU battle] Skin-Freischaltung fehlgeschlagen:', err.message); }
         }
         // Victory-Screen: der wievielte Sieg gegen diese CPU, plus alles, was er freischaltet
         // (Battle-Track ab dem zehnten Sieg, später auch Sleeves — siehe cpu-unlocks.js).
@@ -16212,6 +16254,12 @@ io.on('connection', (socket) => {
       skins: d.skins || {},
     }));
 
+    // CPU-Skin-System: ggf. traegt der mittlere Gegner-Held einen Skin.
+    // Kampagnen-Duelle sind ausgenommen (feste Gegner mit eigener Story).
+    const cpuSnapshot = snapshotDeck(cpuDeck);
+    const cpuSkin = campaign ? null : rollCpuSkin(cpuDeck);
+    if (cpuSkin) cpuSnapshot.skins = { ...(cpuSnapshot.skins || {}), [cpuSkin.heroName]: cpuSkin.skinName };
+
     const roomId = 'sp-' + uuidv4().substring(0, 8);
     const room = {
       id: roomId, host: currentUser.username, hostId: currentUser.userId,
@@ -16225,9 +16273,11 @@ io.on('connection', (socket) => {
       gameState: null, chatHistory: [], privateChatHistory: {},
       // Pre-populate _currentDecks so setupGameState uses our fetched decks
       // directly instead of re-querying per-player (which would fail for the CPU user).
-      _currentDecks: [snapshotDeck(playerDeck), snapshotDeck(cpuDeck)],
+      _currentDecks: [snapshotDeck(playerDeck), cpuSnapshot],
       // Merker für die Revanche-Behandlung und den Abschluss.
       _campaign: campaign || null,
+      // Skin-Game: Skin des mittleren Gegner-Helden (siehe CPU-SKIN-SYSTEM).
+      _cpuSkin: cpuSkin,
     };
     rooms.set(roomId, room);
     socket.join('room:' + roomId);
