@@ -91,7 +91,46 @@ function attachmentHostsFor(gs, pi, engine, opts = {}) {
   return candidateHosts(gs, pi, engine, opts).map(h => ({ owner: h.side, heroIdx: h.heroIdx, slotIdx: h.slotIdx }));
 }
 
+/**
+ * Wirtswahl MIT Treffer-Fenstern: legt ein Anhaengsel-Spell sich an einen
+ * GEGNERISCHEN Helden (Overheal Shock, Curse, Berserk, …), „trifft" der Spell
+ * ihn — Reaktionen wie Anti Magic Shield und Surprises („when chosen by a
+ * Spell": Booby Trap, Frost Rune …) duerfen darauf antworten. Frueher oeffnete
+ * nur Curse sein Surprise-Fenster von Hand, die Hand-Reaktionen fehlten ueberall.
+ * Negiert eine Reaktion den Spell: kein Wirt, `_spellNegatedByEffect` gesetzt.
+ */
 async function pickAttachmentHost(ctx, CARD_NAME, opts = {}) {
+  const host = await _pickAttachmentHostRaw(ctx, CARD_NAME, opts);
+  if (!host) return host;
+  const engine = ctx._engine;
+  const gs = engine.gs;
+  const pi = ctx.cardOwner;
+  if (host.owner === pi || opts.skipHitWindows) return host;
+  const hero = gs.players[host.owner]?.heroes?.[host.heroIdx];
+  if (!hero?.name) return host;
+  const ziel = [{ type: 'hero', owner: host.owner, heroIdx: host.heroIdx, cardName: hero.name }];
+  const quelle = ctx.card;
+  let negiert = null;
+  const sr = await engine._checkSurpriseWindow(ziel, quelle, {});
+  if (sr?.effectNegated) negiert = sr;
+  if (!negiert && !engine._inPostTargetWindow) {
+    engine._inPostTargetWindow = true;
+    try {
+      const pt = await engine._checkPostTargetHandReactions(ziel, quelle, { dealsDamage: false, ausZielwahl: true });
+      if (pt?.effectNegated) negiert = pt;
+    } finally { engine._inPostTargetWindow = false; }
+  }
+  if (negiert) {
+    await engine.negationsBilder(quelle, ziel, negiert);
+    gs._spellNegatedByEffect = true;
+    engine.log('attachment_negated', { card: CARD_NAME, target: hero.name });
+    engine.sync();
+    return null;
+  }
+  return host;
+}
+
+async function _pickAttachmentHostRaw(ctx, CARD_NAME, opts = {}) {
   const engine = ctx._engine;
   const gs = engine.gs;
   const pi = ctx.cardOwner;
