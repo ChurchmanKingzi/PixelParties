@@ -86,8 +86,11 @@ function addEvo(engine, pi, heroIdx, n, source) {
       player: engine.gs.players[pi]?.username, hero: hero.name,
       amount: gained, total: getEvo(hero), source: source || null,
     });
+    // `evolution_counter`: gold_sparkle-Bild MIT Klang (das nackte
+    // gold_sparkle ist stumm). Läuft über play_zone_animation, also
+    // hören es beide Seiten.
     engine._broadcastEvent('play_zone_animation', {
-      type: 'gold_sparkle', owner: pi, heroIdx, zoneSlot: -1,
+      type: 'evolution_counter', owner: pi, heroIdx, zoneSlot: -1,
     });
   }
   refreshAscensionTargets(engine, pi);
