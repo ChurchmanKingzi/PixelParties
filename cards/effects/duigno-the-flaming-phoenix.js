@@ -80,6 +80,8 @@ module.exports = {
   },
 
   activeIn: ['support'],
+  // Engine liest das fuer Zusatz-Casts, die WAEHREND der zweiten Aktion laufen (Chaos-Diamond).
+  sperrtZusatzaktionenNachVerbrauch: true,
 
   hooks: {
     // Lebenszyklus des Zuschlags (Abzeichen, Phasenriegel, Verpuffen,

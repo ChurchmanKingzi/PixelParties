@@ -10415,6 +10415,7 @@ async function doActivateHeroEffect(room, pi, { heroIdx, charmedOwner, chosenEff
       isActionCost,
       isActionPhase,
       istZusatzaktion: !!consumedAdditionalHeroInst,
+      zusatzInst: consumedAdditionalHeroInst || null,
       hauptSlotVerbraucht: mainSlotConsumedHere,
       onCancel: refundActionCost,
     });
