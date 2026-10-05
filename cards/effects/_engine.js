@@ -21224,6 +21224,10 @@ this._deathWatch = (this._deathWatchStack || []).length
     // Als Vorgabe 29.9.: Wirker-Seite fuer Stufenabfragen (wie doPlaySpell).
     const _wirkerVorher = this.gs._wirkerSeite;
     this.gs._wirkerSeite = { pi: playerIdx, heroIdx, heroOwner: wirkerSeite };
+    // Liegt die Karte schon in der Ablage (Chaos-Diamond), zaehlt sie sich
+    // nicht selbst mit („keine Karte zaehlt sich selbst", `zaehleInAblage`).
+    const _ablageVorher = this.gs._inAblageGewirkt;
+    if (opts.bereitsInAblage) this.gs._inAblageGewirkt = { pi: playerIdx, name: cardName };
     try {
       // ★ v1323 (Tester-Befund 23.9.: Yukana + Supply Chain zog nur bis 6):
       // waehrend der Aufloesung gilt die Karte als „aufloesend" — Effekte,
@@ -21279,6 +21283,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       delete this.gs._spellNegatedByEffect;
     } finally {
       if (_wirkerVorher === undefined) delete this.gs._wirkerSeite; else this.gs._wirkerSeite = _wirkerVorher;
+      if (_ablageVorher === undefined) delete this.gs._inAblageGewirkt; else this.gs._inAblageGewirkt = _ablageVorher;
       // v1469: aeusseres Protokoll zurueck (auch bei Fehler/Abbruch).
       if (_aeussererLog === undefined) delete this.gs._spellDamageLog;
       else this.gs._spellDamageLog = _aeussererLog;
@@ -21305,6 +21310,15 @@ this._deathWatch = (this._deathWatchStack || []).length
 
     const abgebrochen = this.gs._spellCancelled && !this.gs._spellNegatedByEffect;
     this.gs._spellCancelled = _cancelVorher;
+    // „Only 1 per game" (Hymn of Rebirth, Divine Gift …): auch der Sofort-Guss
+    // verbraucht das Einmal-Limit — der regulaere Weg stempelt in server.js.
+    if (!abgebrochen && cardData.cardType === 'Spell') {
+      const _opgScript = loadCardEffect(cardName);
+      if (_opgScript?.oncePerGame || _opgScript?.oncePerGameKey) {
+        if (!ps._oncePerGameUsed) ps._oncePerGameUsed = new Set();
+        ps._oncePerGameUsed.add(_opgScript.oncePerGameKey || cardName);
+      }
+    }
     if (abgebrochen) {
       // ★ v979: Aus der HAND ist nichts zurueckzulegen — die Karte hat
       // sie nie verlassen, und es ist auch nichts geflogen. Nur der
