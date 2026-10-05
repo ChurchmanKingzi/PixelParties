@@ -91,7 +91,85 @@ function attachmentHostsFor(gs, pi, engine, opts = {}) {
   return candidateHosts(gs, pi, engine, opts).map(h => ({ owner: h.side, heroIdx: h.heroIdx, slotIdx: h.slotIdx }));
 }
 
+/**
+ * Wirtswahl MIT Treffer-Fenstern: legt ein Anhaengsel-Spell sich an einen
+ * GEGNERISCHEN Helden (Overheal Shock, Curse, Berserk, …), „trifft" der Spell
+ * ihn — Surprises („chosen by a Spell": Booby Trap, Frost Rune …), Hand-
+ * Reaktionen (Anti Magic Shield …) und Umlenker (Challenge, Martyry,
+ * Anti-Magnet, Monia Bot …) duerfen darauf antworten. Alle Fenster stehen
+ * HIER und nicht im Ziel-Prompt, damit sie auch bei Drop-Hinweis und
+ * Automatik-Wahl (kein Prompt) oeffnen und nie doppelt fragen.
+ *
+ * Umlenkung: nur auf einen anderen HELDEN mit freiem Support-Slot —
+ * Kreaturen sind keine legalen Ziele eines Anhaengsels (die Zielliste fuer
+ * die Umlenker enthaelt nur solche Helden). Negiert eine Reaktion den Spell:
+ * kein Wirt, `_spellNegatedByEffect` gesetzt.
+ */
 async function pickAttachmentHost(ctx, CARD_NAME, opts = {}) {
+  let host = await _pickAttachmentHostRaw(ctx, CARD_NAME, opts);
+  if (!host || opts.skipHitWindows) return host;
+  const engine = ctx._engine;
+  const gs = engine.gs;
+  const pi = ctx.cardOwner;
+  if (host.owner === pi) return host;
+  const quelle = ctx.card;
+
+  // Surprise + Hand-Reaktion auf EINEN getroffenen Helden. true = negiert.
+  const trefferFenster = async (h) => {
+    const hero = gs.players[h.owner]?.heroes?.[h.heroIdx];
+    if (!hero?.name) return false;
+    const ziel = [{ type: 'hero', owner: h.owner, heroIdx: h.heroIdx, cardName: hero.name }];
+    let negiert = null;
+    const sr = await engine._checkSurpriseWindow(ziel, quelle, {});
+    if (sr?.effectNegated) negiert = sr;
+    if (!negiert && !engine._inPostTargetWindow) {
+      engine._inPostTargetWindow = true;
+      try {
+        // `newTargets` (Dream World Switcheroo & Co.) lenken auf KREATUREN um —
+        // fuer ein Anhaengsel kein legales Ziel, also ignoriert.
+        const pt = await engine._checkPostTargetHandReactions(ziel, quelle, { dealsDamage: false, ausZielwahl: true });
+        if (pt?.effectNegated) negiert = pt;
+      } finally { engine._inPostTargetWindow = false; }
+    }
+    if (!negiert) return false;
+    await engine.negationsBilder(quelle, ziel, negiert);
+    gs._spellNegatedByEffect = true;
+    engine.log('attachment_negated', { card: CARD_NAME, target: hero.name });
+    engine.sync();
+    return true;
+  };
+
+  if (await trefferFenster(host)) return null;
+
+  // Umlenkung: nur auf andere HELDEN, die den Spell wirklich tragen koennten.
+  const gedimmt = (c) => !!opts.heroDim?.(gs.players[c.side]?.heroes?.[c.heroIdx], c.heroIdx, c.side, engine);
+  const ziele = [];
+  for (const c of candidateHosts(gs, pi, engine, opts)) {
+    if (gedimmt(c) || ziele.some(z => z.owner === c.side && z.heroIdx === c.heroIdx)) continue;
+    ziele.push({ id: `hero-${c.side}-${c.heroIdx}`, type: 'hero', owner: c.side, heroIdx: c.heroIdx,
+      cardName: gs.players[c.side].heroes[c.heroIdx].name, _autoSlot: c.slotIdx });
+  }
+  const alt = `hero-${host.owner}-${host.heroIdx}`;
+  if (ziele.some(z => z.id === alt) && ziele.length > 1) {
+    const ids = await engine.applyRedirectWindows(
+      [alt], ziele, { title: CARD_NAME }, engine._redirectSourceFor(pi, { sourceCard: quelle }));
+    if (Array.isArray(ids) && ids.length === 0) {
+      gs._spellNegatedByEffect = true;      // Umlenker hat den Spell negiert (z. B. Rolling Boulder)
+      engine.sync();
+      return null;
+    }
+    const neu = Array.isArray(ids) ? ziele.find(z => z.id === ids[0]) : null;
+    if (neu && neu.id !== alt) {
+      engine.log('attachment_redirected', { card: CARD_NAME, to: neu.cardName });
+      host = { owner: neu.owner, heroIdx: neu.heroIdx, slotIdx: neu._autoSlot };
+      // Der neue Held wird seinerseits „getroffen" (nur gegnerische Helden).
+      if (host.owner !== pi && await trefferFenster(host)) return null;
+    }
+  }
+  return host;
+}
+
+async function _pickAttachmentHostRaw(ctx, CARD_NAME, opts = {}) {
   const engine = ctx._engine;
   const gs = engine.gs;
   const pi = ctx.cardOwner;
@@ -173,6 +251,8 @@ async function pickAttachmentHost(ctx, CARD_NAME, opts = {}) {
     description: opts.description || `Choose a Hero (leftmost free Support Zone) or a specific empty Support Zone to attach ${CARD_NAME} to.`,
     confirmLabel: opts.confirmLabel || '📎 Attach!', confirmClass: opts.confirmClass || 'btn-success',
     cancellable: opts.cancellable !== false, exclusiveTypes: true, maxPerType: { hero: 1, equip: 1 }, maxTotal: 1, greenSelect: true,
+    // Treffer-Fenster liegen in `pickAttachmentHost` (s. dort) — hier nicht doppelt.
+    _skipSurpriseCheck: true, _skipPostTargetReactions: true, _skipRedirectCheck: true,
     ...(opts.promptExtras || {}),
   });
   if (!result || result.length === 0) { gs._spellCancelled = true; return null; }

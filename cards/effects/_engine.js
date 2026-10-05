@@ -2773,6 +2773,14 @@ class GameEngine {
   }
 
   async runHooks(hookName, hookCtx = {}) {
+    // Zentrale Buchfuehrung „welcher Spell wurde diesen Zug schon gewirkt"
+    // (Eraser Beam: „only Spell this turn"). Frueher stempelte nur ein Hook
+    // der Eraser-Beam-INSTANZ — fehlte sie in dem Moment (Karte im Deck,
+    // spaeter gezogen, aufgedeckt), blieb der Stempel aus.
+    if (hookName === 'afterSpellResolved' && hookCtx && hookCtx.spellName && hookCtx.spellName !== 'Eraser Beam') {
+      const sp = this.gs.players[hookCtx.casterIdx];
+      if (sp) sp._spellResolvedTurn = this.gs.turn;
+    }
     // v1365: vorgemerkte Arbeit „nach dem Abgang" (eigene Entfern-Wege).
     if (this._nachAbgang && this._nachAbgang.length > 0 && !this._nachAbgangLaeuft) {
       await this._nachAbgangAbarbeiten();
@@ -10401,7 +10409,9 @@ class GameEngine {
     if (effective <= 0) return 0;
 
     hero.maxHp = currentMax - effective;
-    hero.hp = Math.max(1, Math.min(hero.hp, hero.maxHp));
+    // Ein LEBENDER Held faellt nie unter 1 HP; ein gefallener (0 HP) bleibt gefallen —
+    // sonst belebte der Abgang einer Toughness ihn mit 1 HP wieder.
+    if (hero.hp > 0) hero.hp = Math.max(1, Math.min(hero.hp, hero.maxHp));
 
     this.log('max_hp_decrease', { hero: this._heroLabel(hero), amount: effective, newMax: hero.maxHp });
     return effective;
@@ -21113,8 +21123,19 @@ this._deathWatch = (this._deathWatchStack || []).length
   }
 
   /** Darf dieser Held diesen Spell JETZT wirken (ohne Hand, ohne Stufen)? */
-  kannSofortWirken(playerIdx, heroIdx, cardName, wirkerSeite = playerIdx) {
+  kannSofortWirken(playerIdx, heroIdx, cardName, wirkerSeite = playerIdx, { alsZusatzaktion = false } = {}) {
     try {
+      // Der Guss ist eine ZUSATZAKTION (Chaos-Diamond): Duigno („cannot perform
+      // any other additional Actions") und Mission of the Light Brigade sperren sie.
+      if (alsZusatzaktion && (this.additionalActionsLocked(playerIdx) || this.missionLockActive(playerIdx))) return false;
+      // Die Aktivierung selbst war Duignos zweite Aktion: dessen Sperre
+      // („if you do, no other additional Actions") greift schon jetzt.
+      if (alsZusatzaktion) {
+        const zi = this.gs._heroEffectZusatzInst;
+        const zs = zi ? loadCardEffect(zi.counters?._effectOverride || zi.name) : null;
+        if (zs?.sperrtZusatzaktionenNachVerbrauch
+            && !Object.values(zi.counters?.aaGrants || {}).some(n => n > 0)) return false;
+      }
       return !!this.validateActionPlay(playerIdx, cardName, -1, heroIdx, ['Spell'], {
         sofortGuss: true,
         ...(wirkerSeite !== playerIdx ? { charmedOwner: wirkerSeite } : {}),
@@ -21139,7 +21160,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // Moment des Wirkens geprueft — Status (Nulled, Silenced, Frozen, tot),
     // Spell-Sperren (Eraser Beam), Spielbedingungen und Einmal-pro-Spiel.
     // Faellt eine Pruefung durch, fizzelt der Spell: er wird nicht gewirkt.
-    if (opts.pruefen && cardData.cardType === 'Spell' && !this.kannSofortWirken(playerIdx, heroIdx, cardName, wirkerSeite)) {
+    if (opts.pruefen && cardData.cardType === 'Spell' && !this.kannSofortWirken(playerIdx, heroIdx, cardName, wirkerSeite, { alsZusatzaktion: !!opts.pruefenZusatz })) {
       this.log('immediate_cast_fizzled', { player: ps.username, hero: hero.name, card: cardName, by: opts.by || null });
       await this.zeigeFizzle(cardName, { playerIdx, grund: 'cannot_cast_now' });
       return { cancelled: true, fizzled: true };
@@ -21216,6 +21237,10 @@ this._deathWatch = (this._deathWatchStack || []).length
     // Als Vorgabe 29.9.: Wirker-Seite fuer Stufenabfragen (wie doPlaySpell).
     const _wirkerVorher = this.gs._wirkerSeite;
     this.gs._wirkerSeite = { pi: playerIdx, heroIdx, heroOwner: wirkerSeite };
+    // Liegt die Karte schon in der Ablage (Chaos-Diamond), zaehlt sie sich
+    // nicht selbst mit („keine Karte zaehlt sich selbst", `zaehleInAblage`).
+    const _ablageVorher = this.gs._inAblageGewirkt;
+    if (opts.bereitsInAblage) this.gs._inAblageGewirkt = { pi: playerIdx, name: cardName };
     try {
       // ★ v1323 (Tester-Befund 23.9.: Yukana + Supply Chain zog nur bis 6):
       // waehrend der Aufloesung gilt die Karte als „aufloesend" — Effekte,
@@ -21271,6 +21296,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       delete this.gs._spellNegatedByEffect;
     } finally {
       if (_wirkerVorher === undefined) delete this.gs._wirkerSeite; else this.gs._wirkerSeite = _wirkerVorher;
+      if (_ablageVorher === undefined) delete this.gs._inAblageGewirkt; else this.gs._inAblageGewirkt = _ablageVorher;
       // v1469: aeusseres Protokoll zurueck (auch bei Fehler/Abbruch).
       if (_aeussererLog === undefined) delete this.gs._spellDamageLog;
       else this.gs._spellDamageLog = _aeussererLog;
@@ -21297,6 +21323,15 @@ this._deathWatch = (this._deathWatchStack || []).length
 
     const abgebrochen = this.gs._spellCancelled && !this.gs._spellNegatedByEffect;
     this.gs._spellCancelled = _cancelVorher;
+    // „Only 1 per game" (Hymn of Rebirth, Divine Gift …): auch der Sofort-Guss
+    // verbraucht das Einmal-Limit — der regulaere Weg stempelt in server.js.
+    if (!abgebrochen && cardData.cardType === 'Spell') {
+      const _opgScript = loadCardEffect(cardName);
+      if (_opgScript?.oncePerGame || _opgScript?.oncePerGameKey) {
+        if (!ps._oncePerGameUsed) ps._oncePerGameUsed = new Set();
+        ps._oncePerGameUsed.add(_opgScript.oncePerGameKey || cardName);
+      }
+    }
     if (abgebrochen) {
       // ★ v979: Aus der HAND ist nichts zurueckzulegen — die Karte hat
       // sie nie verlassen, und es ist auch nichts geflogen. Nur der
@@ -40203,7 +40238,16 @@ this._deathWatch = (this._deathWatchStack || []).length
     const ctx = this._createContext(chosen.inst, {});
     this.armEffectAnnounce(chosen.name, pi, 'board');   // v349
     let gerryVeto = false;
-    let resolved = await this._alsAkteur(ctx, () => chosen.script.onHeroEffect(ctx));
+    // Welcher Zusatzaktions-Geber hat diese Aktivierung bezahlt? (Chaos-Diamond:
+    // Duignos zweite Aktion sperrt dessen Zusatz-Casts schon waehrend des Effekts.)
+    const _zusatzVorher = this.gs._heroEffectZusatzInst;
+    this.gs._heroEffectZusatzInst = opts.zusatzInst || null;
+    let resolved;
+    try {
+      resolved = await this._alsAkteur(ctx, () => chosen.script.onHeroEffect(ctx));
+    } finally {
+      if (_zusatzVorher === undefined) delete this.gs._heroEffectZusatzInst; else this.gs._heroEffectZusatzInst = _zusatzVorher;
+    }
     if (this.nimmOpferFizzle()) resolved = true;   // v1313: gerettetes Opfer → fizzelt, aber verbraucht
     if (resolved !== false) this.announceActiveEffect();
     this.clearEffectAnnounce();
