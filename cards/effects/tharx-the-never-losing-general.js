@@ -1,8 +1,8 @@
 // ═══════════════════════════════════════════
 //  CARD EFFECT: "Tharx, the Never-Losing General"
 //  Hero — Active effect (soft once per turn).
-//  Draw half as many cards as Creatures you
-//  control (rounded up). Draws are blocked
+//  Draw as many cards as you control Creatures
+//  that were not summoned this turn. Draws are blocked
 //  by handLocked (generic actionDrawCards).
 //  Animation: gold sparkle on Tharx.
 // ═══════════════════════════════════════════
@@ -25,15 +25,10 @@ module.exports = {
   activeIn: ['hero'],
   heroEffect: true,
 
-  // CPU threat assessment (draw supporter). Draws ceil(N/2) cards, where N
-  // is the number of Creatures the owner currently controls.
+  // CPU threat assessment (draw supporter). Draws N cards, where N is the
+  // number of Creatures the owner controls that were not summoned this turn.
   supportYield(ctx) {
-    const ps = ctx.engine.gs.players[ctx.pi];
-    let count = 0;
-    for (const heroZones of (ps?.supportZones || [])) {
-      for (const z of (heroZones || [])) if ((z || []).length > 0) count++;
-    }
-    return { drawsPerTurn: Math.ceil(count / 2) };
+    return { drawsPerTurn: _countCreatures(ctx.engine, ctx.pi) };
   },
 
   canActivateHeroEffect(ctx) {
@@ -53,11 +48,11 @@ module.exports = {
     const creatureCount = _countCreatures(engine, pi);
     if (creatureCount <= 0) return false;
 
-    const drawCount = Math.ceil(creatureCount / 2);
+    const drawCount = creatureCount;
 
     const confirmed = await ctx.promptConfirmEffect({
       title: 'Tharx, the Never-Losing General',
-      message: `Draw ${drawCount} card${drawCount !== 1 ? 's' : ''}? (${creatureCount} Creature${creatureCount !== 1 ? 's' : ''} controlled)`,
+      message: `Draw ${drawCount} card${drawCount !== 1 ? 's' : ''}? (${creatureCount} Creature${creatureCount !== 1 ? 's' : ''} not summoned this turn)`,
     });
     if (!confirmed) return false;
 
@@ -76,11 +71,14 @@ module.exports = {
   },
 };
 
+/** Creatures, die der Spieler kontrolliert und die NICHT in diesem Zug beschworen wurden. */
 function _countCreatures(engine, pi) {
+  const turn = engine.gs?.turn || 0;
   const cardDB = engine._getCardDB();
   let count = 0;
   for (const inst of engine.cardInstances) {
     if ((inst.controller ?? inst.owner) !== pi || inst.zone !== 'support') continue;
+    if ((inst.turnPlayed || 0) === turn) continue;   // diesen Zug beschworen → zaehlt nicht
     const cd = inst.counters?._cardDataOverride || cardDB[inst.name]; // token-override-aware (Biomancy Token — Als AoE-Report)
     if (cd && hasCardType(cd, 'Creature')) count++;
   }
