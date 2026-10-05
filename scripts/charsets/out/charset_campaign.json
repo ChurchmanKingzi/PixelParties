@@ -1,0 +1,41 @@
+{
+  "format": "RPG Maker 2000/2003 Charset",
+  "sheet": [
+    288,
+    256
+  ],
+  "cell": [
+    24,
+    32
+  ],
+  "columns": [
+    "Schritt A",
+    "Stand",
+    "Schritt B"
+  ],
+  "rows": [
+    "up",
+    "right",
+    "down",
+    "left"
+  ],
+  "slots": {
+    "0": "Tobi",
+    "1": "Wendy",
+    "2": "Mithuru",
+    "3": "Ethan",
+    "4": "Ellie",
+    "5": "Georgie"
+  },
+  "large": [
+    {
+      "name": "Crum",
+      "cell": [
+        32,
+        32
+      ],
+      "file": "Crum_walk.png"
+    }
+  ],
+  "palette_colors": 127
+}
