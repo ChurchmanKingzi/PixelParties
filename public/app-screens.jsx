@@ -1106,6 +1106,11 @@ function MenuLeaderboardPanel({ top, height }) {
   const { user } = useContext(AppContext);
   const [players, setPlayers] = useState(null);
   const [live, setLive] = useState(null);
+  // Der Kasten teilt sich zwei Ansichten: Top Players und Who's Online (social.js / app-social.jsx).
+  const [tab, setTab] = useState('top');
+  const [chatPeer, setChatPeer] = useState(null);
+  useSocial();
+  const counts = socialTabCounts(user.id);
 
   useEffect(() => {
     let alive = true;
@@ -1129,7 +1134,23 @@ function MenuLeaderboardPanel({ top, height }) {
             ? <span>{live.playersOnline} online · {live.gamesLive} game{live.gamesLive === 1 ? '' : 's'} live</span>
             : <span style={{ color: 'var(--text2)' }}>connecting…</span>}
         </div>
-        <h3 className="menu-side-title"><PixelIcon name="pokal" className="menu-side-title-icon" />TOP PLAYERS</h3>
+        <div className="menu-side-tabs" role="tablist">
+          <button role="tab" aria-selected={tab === 'top'} className={'menu-side-tab' + (tab === 'top' ? ' active' : '')}
+                  onClick={() => setTab('top')}>
+            <PixelIcon name="pokal" className="menu-side-title-icon" />TOP PLAYERS
+          </button>
+          <button role="tab" aria-selected={tab === 'online'} className={'menu-side-tab' + (tab === 'online' ? ' active' : '')}
+                  onClick={() => setTab('online')}>
+            <span className="social-lamp social-lamp--online social-tab-lamp" />ONLINE
+            <span className="menu-side-tab-count">{counts.online}</span>
+            {counts.unread > 0 && <span className="social-badge">{counts.unread > 99 ? '99+' : counts.unread}</span>}
+          </button>
+        </div>
+        {tab === 'online' ? (
+          <div className="menu-side-scroll">
+            <WhosOnlineList meId={user.id} onOpen={setChatPeer} />
+          </div>
+        ) : (
         <div className="menu-side-scroll">
           {players === null ? (
             <div className="menu-side-empty">Loading…</div>
@@ -1151,7 +1172,9 @@ function MenuLeaderboardPanel({ top, height }) {
             </ol>
           )}
         </div>
+        )}
       </div>
+      {chatPeer && <DmChatWindow peer={chatPeer} meId={user.id} onClose={() => setChatPeer(null)} />}
     </aside>
   );
 }

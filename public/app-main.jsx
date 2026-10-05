@@ -3069,7 +3069,8 @@ function App() {
 
     // Listen for game reconnection
     const onReconnectGame = (state) => {
-      if (state.reconnected) {
+      // `challengeStart`: eine angenommene Herausforderung (social.js) schickt beide Spieler aus dem Menü ins Spiel.
+      if (state.reconnected || state.challengeStart) {
         // Puzzle games are ephemeral — don't reconnect, just clean up
         if (state.isPuzzle) {
           socket.emit('leave_game', { roomId: state.roomId });
@@ -3205,6 +3206,8 @@ function App() {
       <MusicManager bgmMode={user ? bgmMode : 'login'} />
       <TextBox />
       <OpponentUnlockPopup />
+      {/* Who's Online / private Chats / Herausforderungen (app-social.jsx) */}
+      <SocialHost user={user} bgmMode={bgmMode} />
       {/* v1289: Spielerprofil-Popup (Top-Spieler-Listen), app-player-profile.jsx */}
       <PlayerProfilePopupHost />
       {notif && <Notification key={notif.id} message={notif.message} type={notif.type} onClose={() => setNotif(null)} />}
