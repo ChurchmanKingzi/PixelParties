@@ -178,6 +178,19 @@ function aktion(tracking, ctx, env) {
 }
 
 /**
+ * Back to Basics: eine Zusatzaktion wurde benutzt — OHNE dass die Handlung
+ * als Aktion im Sinne der Engine gilt. Fuer Wege, die regeltechnisch keine
+ * Aktion sind (freier Heldeneffekt, Platzieren einer Reaktionskarte) und
+ * deshalb nicht ueber `onAnyActionResolved` laufen duerfen (Bleed, Flashbang,
+ * Madame Guillotine …), aber den Bonus ausdruecklich beenden (Als Vorgabe
+ * 5.10. nach Testerbericht: Damus' Ifrit-Platzierung, Pawn Chain).
+ */
+function zusatzaktion(tracking, pi) {
+  const t = tracking?.[pi];
+  if (t) t.usedAdditionalAction = true;
+}
+
+/**
  * Wer hat besiegt? Dieselbe Regel wie der Coreling-Stempel in
  * `runHooks` (v744): die Quelle muss einem Spieler gehören, und zwar
  * NICHT der Seite des Opfers. Status-Ticks ohne Verursacher und eigene
@@ -356,4 +369,4 @@ function heldVerlor(tracking, owner, hero, amount, heroes, opts = {}) {
 /** Hook-Namen, die `beiHook` auswertet — Vorfilter für `runHooks`. */
 const HOOKS_MIT_ZAEHLER = new Set(['onAnyActionResolved', 'onHeroRevive', 'afterResourceSpend', 'afterSpellResolved', 'onSurpriseActivated', 'afterPotionUsed', 'onCreatureDeath']);
 
-module.exports = { HOOKS_MIT_ZAEHLER, heldTod, fastBesiegtPruefen, neu, startHp, zustand, plagenAnHeld, ablageBeschwoerung, hpSumme, schaden, aktion, treffer, heldVerlor, heldBesiegt, heilung, kette, beiHook, taeterVon };
+module.exports = { HOOKS_MIT_ZAEHLER, heldTod, fastBesiegtPruefen, neu, startHp, zustand, plagenAnHeld, ablageBeschwoerung, hpSumme, schaden, aktion, zusatzaktion, treffer, heldVerlor, heldBesiegt, heilung, kette, beiHook, taeterVon };

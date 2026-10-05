@@ -171,6 +171,12 @@ module.exports = {
     );
     if (!res?.inst) { engine.handZugangSync(ps, IFRIT, { von: 'rueckgabe', ohneInstanz: true }); return false; }   // v1395
 
+    // SC „Back to Basics": die Platzierung ist ein freier Heldeneffekt und
+    // damit keine Aktion (Ruling 4.8.), beendet den Bonus aber trotzdem
+    // (Als Vorgabe 5.10. nach Testerbericht). Nur der SC-Zaehler — keine
+    // Aktions-Hooks. `pi` = Kontrolleur; gilt auch fuer einen Erben (Pseudonia).
+    engine.meldeScZusatzaktion(pi);
+
     engine._broadcastEvent('summon_effect', {
       owner: feld, heroIdx: ziel.heroIdx, zoneSlot: ziel.slotIdx,
     });

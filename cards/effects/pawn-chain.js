@@ -65,6 +65,10 @@ module.exports = {
     if (!zoneFree(engine, pi, deathInfo.heroIdx, deathInfo.zoneSlot)) { await engine.zeigeFizzle(CARD_NAME, { playerIdx: pi, grund: 'zone_taken' }); return; }   // v1360
     const inst = await placeFromHandOrDeck(engine, pi, pick, deathInfo.heroIdx, deathInfo.zoneSlot, CARD_NAME);
     if (!inst) await engine.zeigeFizzle(CARD_NAME, { playerIdx: pi, grund: 'place_refused' });   // v1360
+    // „… place it … as an additional Action": beendet den SC „Back to Basics".
+    // Nur der SC-Zaehler — Platzieren bleibt keine Aktion im Sinne der Engine
+    // (siehe Kopf), also keine Aktions-Hooks. Nur bei gelungener Platzierung.
+    if (inst) engine.meldeScZusatzaktion(pi);
     engine.log('pawn_chain', { player: gs.players[pi]?.username, placed: pick.name, from: pick.source, ok: !!inst });
     engine.sync();
   },

@@ -14573,6 +14573,18 @@ this._deathWatch = (this._deathWatchStack || []).length
     return ergebnis;
   }
 
+  /**
+   * Nur der SC-Zaehler „Back to Basics": `playerIdx` hat eine Zusatzaktion
+   * benutzt. Loest KEINE Aktions-Hooks aus (Bleed, Flashbang, Madame
+   * Guillotine …) — fuer Wege, die regeltechnisch keine Aktion sind, den
+   * Bonus aber trotzdem beenden (Damus' Ifrit-Platzierung, Pawn Chain).
+   * Wege, die eine echte Aktion sind, nehmen `meldeBeschwoerungAlsAktion`.
+   */
+  meldeScZusatzaktion(playerIdx) {
+    if (this._inMctsSim || this._fastMode) return;
+    ScTracking.zusatzaktion(this.gs?._scTracking, playerIdx);
+  }
+
   /** Meldet eine Beschwoerung „as an additional Action" als ausgefuehrte Aktion. */
   async meldeBeschwoerungAlsAktion(playerIdx, heroIdx, cardName, inst = null, heroOwner = playerIdx) {
     await this.runHooks('onAnyActionResolved', {
