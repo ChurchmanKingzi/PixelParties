@@ -35,6 +35,7 @@
 // ═══════════════════════════════════════════
 
 const { IFRIT, ARMAGEDDON, ifritsOf, sourceSide } = require('./_apocalypse-shared');
+const { hatEffekt, istHeldenTraeger } = require('./_gained-effects-shared');
 
 const CARD_NAME = 'Damus, the Prophet of Apocalypse';
 
@@ -79,13 +80,24 @@ module.exports = {
     // ★★ v1146: der EIGENE Platz steht in der Helden-INSTANZ, nicht in
     // `heroIdx` — das ist der Wirker. „Armageddon in your hand" gilt fuer
     // jeden eigenen Wirker, nicht nur fuer Damus selbst.
-    if (!inst || inst.zone !== 'hero') return 0;
+    // ★ Traeger: die eigene Helden-Instanz (Zone `hero`) ODER die
+    // unsichtbare Instanz eines GEWONNENEN Effekts („This Hero gains the
+    // effects of …", Pseudonia): Support-Instanz ohne Zonenplatz mit
+    // `_gainedEffectOnly`, ihr `heroIdx` ist der des ERBEN. Vorher stand
+    // hier nur `zone === 'hero'` und `hero.name === Damus` — jeder Erbe
+    // bekam die Verbilligung nie.
+    if (!istHeldenTraeger(inst)) return 0;
     const seite = inst.owner, platz = inst.heroIdx;
     const hero = engine.gs.players[seite]?.heroes?.[platz];
     // Kontrolle statt Seite (Styx 28.9.): physische Seite des Helden ist
     // `seite`; „your hand" gehoert seinem Kontrolleur.
     if (engine.heroSideOf(seite, hero) !== ownerIdx) return 0;
-    if (hero?.name !== CARD_NAME || hero.hp <= 0) return 0;
+    // Die eigene Helden-Instanz zaehlt nur, solange der Platz noch DAMUS
+    // haelt; ein Traeger nur, solange der Erbe den Effekt noch hat.
+    const traegtEffekt = inst.zone === 'hero'
+      ? hero?.name === CARD_NAME
+      : hatEffekt(hero, CARD_NAME);
+    if (!traegtEffekt || hero.hp <= 0) return 0;
     if (engine._isHeroEffectSilenced(seite, platz)) return 0;
     return ifritsOf(engine, ownerIdx).length;
   },
@@ -158,6 +170,12 @@ module.exports = {
       },
     );
     if (!res?.inst) { engine.handZugangSync(ps, IFRIT, { von: 'rueckgabe', ohneInstanz: true }); return false; }   // v1395
+
+    // SC „Back to Basics": die Platzierung ist ein freier Heldeneffekt und
+    // damit keine Aktion (Ruling 4.8.), beendet den Bonus aber trotzdem
+    // (Als Vorgabe 5.10. nach Testerbericht). Nur der SC-Zaehler — keine
+    // Aktions-Hooks. `pi` = Kontrolleur; gilt auch fuer einen Erben (Pseudonia).
+    engine.meldeScZusatzaktion(pi);
 
     engine._broadcastEvent('summon_effect', {
       owner: feld, heroIdx: ziel.heroIdx, zoneSlot: ziel.slotIdx,

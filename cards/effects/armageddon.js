@@ -45,7 +45,7 @@
 // ═══════════════════════════════════════════
 
 const { loadCardEffect } = require('./_loader');
-const { IFRIT, ARMAGEDDON, ifritsOf, damusActive } = require('./_apocalypse-shared');
+const { IFRIT, ARMAGEDDON, ifritsOf, damusEffektWirkt } = require('./_apocalypse-shared');
 
 const CARD_NAME = ARMAGEDDON;
 const GRUNDSCHADEN = 50;
@@ -110,10 +110,12 @@ function istKreatur(engine, inst) {
 }
 
 function heldGefeit(engine, pi, heroIdx) {
-  const d = damusActive(engine, pi);
-  if (!d || d.heroIdx !== heroIdx) return false;
+  // Genau DIESER Held muss Damus' Effekt tragen (als Damus oder als
+  // gewonnener Effekt, Pseudonia) — nicht „irgendein Damus auf der Seite".
+  if (!damusEffektWirkt(engine, pi, heroIdx)) return false;
+  const hero = engine.gs.players[pi]?.heroes?.[heroIdx];
   // „While you control at least 1 «Ifrit» Creature." — „you" = Kontrolleur (Styx 28.9.)
-  return ifritsOf(engine, engine.heroSideOf(pi, d.hero)).length > 0;
+  return ifritsOf(engine, engine.heroSideOf(pi, hero)).length > 0;
 }
 
 module.exports = {

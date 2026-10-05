@@ -225,6 +225,11 @@ async function summonFromStack(engine, pi, cardName) {
     toZone: 'support', toOwner: pi, toHeroIdx: heroIdx,
     fromZone: 'coolnessStack',
   });
+  // „… summon it as an additional Action from there": eine ausgefuehrte
+  // Aktion. Dieser Weg setzt die Karte selbst (nicht ueber
+  // `summonCreatureWithHooks`) und meldete sie bisher nirgends — Back to
+  // Basics (SC) blieb stehen, Madame Guillotine & Co. sahen nichts.
+  await engine.meldeBeschwoerungAlsAktion(pi, heroIdx, cardName, placed.inst);
   return { played: true, additionalAction: true };
 }
 

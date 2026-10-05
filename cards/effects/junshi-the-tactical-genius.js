@@ -27,6 +27,7 @@
 //     (`zusageAuftritt`, Als Vorgabe 23.9.).
 // ═══════════════════════════════════════════
 const { hasCardType, hasSpellSchool } = require('./_hooks');
+const { istHeldenTraeger } = require('./_gained-effects-shared');
 const { heldenSperreFrei, heldenSperreSetzen, heldenSperreFreigeben } = require('./_hero-hopt-shared');
 
 const CARD_NAME = 'Junshi, the Tactical Genius';
@@ -64,7 +65,8 @@ module.exports = {
   reduceCardLevel(cardData, engine, ownerIdx, inst, _heroIdx, evalOpts) {
     if (!cardData || cardData.cardType !== 'Spell' || !hasSpellSchool(cardData, SCHULE)) return 0;
     if (evalOpts?.pileSide) return 0;
-    if (!inst || inst.zone !== 'hero' || !heldWirkt(engine, inst)) return 0;
+    // Traeger: eigene Helden-Instanz ODER gewonnener Effekt (Pseudonia & Co.).
+    if (!istHeldenTraeger(inst) || !heldWirkt(engine, inst)) return 0;
     return eigeneKreaturen(engine, ownerIdx);
   },
 

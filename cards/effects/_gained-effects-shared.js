@@ -63,6 +63,34 @@ function gainedNames(hero) {
 }
 
 /**
+ * ★ Traegt dieser Held den Effekt der Karte `kartenName` — als die Karte
+ * SELBST oder als GEWONNENEN Effekt?
+ *
+ * Fuer Skripte, die in ihren Vertraegen (`reduceCardLevel`, …) nach „dem
+ * eigenen Helden" suchen. Eine Pruefung `hero.name === CARD_NAME` laesst
+ * jeden Erben (Pseudonia & Co.) stumm zurueck: der Vertrag selbst kommt ueber
+ * `heroScriptOf` an, aber der Code darin erkennt den Erben nicht als sich.
+ */
+function hatEffekt(hero, kartenName) {
+  if (!hero?.name || !kartenName) return false;
+  return hero.name === kartenName || gainedNames(hero).includes(kartenName);
+}
+
+/**
+ * ★ Ist `inst` ein TRAEGER fuer einen Heldenvertrag — die eigene Helden-
+ * Instanz (Zone `hero`) oder die Instanz eines GEWONNENEN Effekts?
+ *
+ * Gewonnene Effekte haengen an einer Karteninstanz in der Zone `support`
+ * (unsichtbar ohne Platz, oder die angelegte Fee bei Tempeluna) mit
+ * `counters._gainedEffectFor` = Platz des ERBEN. Eine Zonenpruefung
+ * `inst.zone !== 'hero'` schliesst sie aus. Ihr `heroIdx` ist der des Erben,
+ * `hero` also dort der Traeger des Effekts, nicht die Karte, die ihn druckt.
+ */
+function istHeldenTraeger(inst) {
+  return !!inst && (inst.zone === 'hero' || inst.counters?._gainedEffectFor != null);
+}
+
+/**
  * ★ v1285 — WESSEN gedruckter Effekt liefert den AKTIVEN Heldeneffekt?
  *
  * Als Befund 22.9.: „hat Pseudonia einen Effekt geerbt, soll ein Klick
@@ -176,6 +204,8 @@ function gainedEffectTexts(hero, cardDB) {
 module.exports = {
   GAINED_EFFECT_DENYLIST,
   gainedNames,
+  hatEffekt,
+  istHeldenTraeger,
   heroEffectSource,
   eigenesHeldenSkript,
   heroScriptsOf,

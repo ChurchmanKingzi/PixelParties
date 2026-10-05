@@ -40,6 +40,7 @@
 // Doppelschul-Karten gehoeren BEIDEN Schulen an (Als Ruling 16.8.).
 // Nie `spellSchool1 === …` vergleichen — siehe Helferkommentar.
 const { hasSpellSchool } = require('./_hooks');
+const { hatEffekt } = require('./_gained-effects-shared');
 
 const CARD_NAME = 'Thalia, the Fun Fairy';
 
@@ -58,7 +59,7 @@ function getThaliaFriendshipLevel(engine, ownerIdx) {
   if (!ps?.heroes) return 0;
   for (let hi = 0; hi < ps.heroes.length; hi++) {
     const hero = ps.heroes[hi];
-    if (!hero?.name || hero.name !== CARD_NAME) continue;
+    if (!hatEffekt(hero, CARD_NAME)) continue;
     if (hero.hp <= 0) return 0;
     if (hero.statuses?.negated || hero.statuses?.frozen || hero.statuses?.stunned) return 0;
     const abZones = ps.abilityZones?.[hi] || [];
@@ -87,7 +88,7 @@ function hasActiveThaliaOnSide(engine, ownerIdx) {
   const ps = engine.gs?.players?.[ownerIdx];
   if (!ps?.heroes) return false;
   for (const hero of ps.heroes) {
-    if (!hero?.name || hero.name !== CARD_NAME) continue;
+    if (!hatEffekt(hero, CARD_NAME)) continue;
     if (hero.hp <= 0) continue;
     if (hero.statuses?.negated || hero.statuses?.frozen || hero.statuses?.stunned) continue;
     return true;
