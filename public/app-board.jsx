@@ -2200,20 +2200,51 @@ const HeroIdleAnims = (() => {
 
   // ── Gemeinsame Schleife ──────────────────────────────────────
   const schritte = new Set();
-  let raf = 0;
-  function tick(now) {
-    raf = 0;
-    if (schritte.size) { try { ebeneAbgleichen(); } catch {} }
-    for (const s of schritte) { try { s(now); } catch {} }
-    if (schritte.size) raf = requestAnimationFrame(tick);
+  // ★ Perf (Telefon-Befund: „unspielbar") — ZWEI Funde, beide gemessen:
+  //
+  // 1. `ebeneAbgleichen` las in JEDEM Bild `getComputedStyle(plane)` und
+  //    vier `offset*`-Werte der Brettebene. Lage und Zonenabgleich laufen
+  //    jetzt nur noch, wenn ein Beobachter „schmutzig" gemeldet hat, plus
+  //    ein Sicherheitsnetz alle PRUEF_MS (600 ms) für alles, was kein Beobachter
+  //    sieht.
+  //
+  // 2. Die Schleife selbst lief per `requestAnimationFrame`. Eine
+  //    laufende rAF-Schleife — auch eine leere — zwingt Chrome zu einem
+  //    Hauptthread-Frame je Vsync, und in JEDEM dieser Frames wird für
+  //    JEDE laufende CSS-Animation der Stil neu berechnet (Invalidierungs-
+  //    grund „Animation"), selbst wenn sie auf dem Compositor läuft.
+  //    Mit den ~57 Endlos-Animationen des Bretts (Motes, Foil, Pulse)
+  //    waren das ~3 400 Recalcs je Sekunde: 45 % der Hauptthread-Zeit
+  //    bei 4× gedrosselter CPU, im Ruhezustand. Ein Timer erzeugt diesen
+  //    Frame NICHT von selbst; ein Hauptthread-Frame entsteht jetzt nur
+  //    noch, wenn tatsächlich ein Sprite-Frame gemalt wird (~11/s).
+  const PRUEF_MS = 600;
+  const TAKT_MS = 20;
+  let pruefSchmutz = true, pruefZuletzt = -Infinity;
+  let takt = 0;
+  function markiere() { pruefSchmutz = true; }
+  function naechsterTakt() { if (!takt && schritte.size) takt = setTimeout(tick, TAKT_MS); }
+  function tick() {
+    takt = 0;
+    const now = performance.now();
+    const pruefen = pruefSchmutz || now - pruefZuletzt >= PRUEF_MS;
+    if (pruefen) { pruefSchmutz = false; pruefZuletzt = now; }
+    if (schritte.size && pruefen) { try { ebeneAbgleichen(); } catch {} }
+    for (const s of schritte) { try { s(now, pruefen); } catch {} }
+    naechsterTakt();
   }
   const diagnose = new Map();   // Schritt → { held, frames, st, zustand }
   function anmelden(schritt, info) {
     schritte.add(schritt);
     if (info) diagnose.set(schritt, info);
     try { ebeneAbgleichen(); } catch {}
-    if (!raf) raf = requestAnimationFrame(tick);
+    markiere();
+    naechsterTakt();
     return () => { schritte.delete(schritt); diagnose.delete(schritt); };
+  }
+  if (typeof window !== 'undefined') {
+    window.addEventListener('resize', markiere, { passive: true });
+    window.addEventListener('orientationchange', markiere, { passive: true });
   }
   // Konsolenhilfe (v1456): Zustand aller Figuren auf dem Brett.
   if (typeof window !== 'undefined') {
@@ -2233,18 +2264,43 @@ const HeroIdleAnims = (() => {
 
   // ── Sprite-Ebene (v1451) ─────────────────────────────────────
   // Die Ebene übernimmt Lage, Größe und Transformation der Brettebene.
-  // Abgeglichen wird in jedem Bild, solange Figuren stehen — aber nur
-  // geschrieben, wenn sich etwas geändert hat (Maßstab, Scroll-Modus,
-  // Kamera, Telefon-Rückfall). Die Neigung wird wie bei den Flugkarten
+  // Abgeglichen wird, solange Figuren stehen, wenn ein Beobachter eine
+  // Änderung meldet (siehe `markiere`, seit der Perf-Umstellung nicht mehr
+  // in jedem Bild) — und geschrieben nur bei echter Änderung (Maßstab,
+  // Scroll-Modus, Kamera, Telefon-Rückfall). Die Neigung wird wie bei den Flugkarten
   // (`readBoardTiltDeg`) aus der tatsächlich gerenderten Matrix gelesen.
   let ebeneEl = null, ebenePlane = null, ebeneStand = '';
+  let ebeneRO = null, ebeneMO = null;
   const ebeneHoerer = new Set();
   function setzeEbene(el) {
     if (el === ebeneEl) return;
     ebeneEl = el;
     ebenePlane = null;
     ebeneStand = '';
+    markiere();
     ebeneHoerer.forEach(f => { try { f(el); } catch {} });
+  }
+  // Meldet „schmutz", sobald sich Größe der Ebene/ihres Wrappers ändert
+  // oder `class`/`style`/`data-pp-dragging` der Ebene oder eines Vorfahren
+  // (inkl. <html>: `--board-scale`, `--center-offset`, Scroll-Modus).
+  function beobachteEbene(plane) {
+    try {
+      if (ebeneRO) ebeneRO.disconnect();
+      if (ebeneMO) ebeneMO.disconnect();
+      ebeneRO = ebeneMO = null;
+      if (!plane) return;
+      if (typeof ResizeObserver !== 'undefined') {
+        ebeneRO = new ResizeObserver(markiere);
+        ebeneRO.observe(plane);
+        if (plane.parentElement) ebeneRO.observe(plane.parentElement);
+      }
+      if (typeof MutationObserver !== 'undefined') {
+        ebeneMO = new MutationObserver(markiere);
+        for (let e = plane; e; e = e.parentElement) {
+          ebeneMO.observe(e, { attributes: true, attributeFilter: ['class', 'style', 'data-pp-dragging'] });
+        }
+      }
+    } catch {}
   }
   function abonniereEbene(f) {
     ebeneHoerer.add(f);
@@ -2255,6 +2311,7 @@ const HeroIdleAnims = (() => {
     if (!el || !el.isConnected) return;
     if (!ebenePlane || !ebenePlane.isConnected) {
       ebenePlane = el.parentElement ? el.parentElement.querySelector(':scope > .board-plane') : null;
+      beobachteEbene(ebenePlane);
     }
     const plane = ebenePlane;
     if (!plane) return;
@@ -2394,7 +2451,7 @@ const HeroIdleAnims = (() => {
 
   return {
     slug, hole, schonDa: (key) => fertig.get(key), anmelden, steinSheet,
-    setzeEbene, abonniereEbene, ebene: () => ebeneEl, lageInEbene,
+    setzeEbene, abonniereEbene, ebene: () => ebeneEl, lageInEbene, markiere,
     // v1462: steht für diesen Helden eine Figur auf dem Brett? (Liste
     // geladen, Sheet vorhanden und nicht fehlgeschlagen)
     ladeListe,
@@ -2812,6 +2869,7 @@ function HeroIdleSprite({ cardName, angehalten, versteinert, eingefroren, effekt
   zustand.current.angehalten = !!angehalten;
   zustand.current.versteinert = !!versteinert;
   zustand.current.effekte = effekte || '';
+  if (zustand.current.eingeklappt !== !!eingeklappt) HeroIdleAnims.markiere();
   zustand.current.eingeklappt = !!eingeklappt;
 
   useEffect(() => {
@@ -2927,6 +2985,11 @@ function HeroIdleSprite({ cardName, angehalten, versteinert, eingefroren, effekt
         platz.classList.toggle('hero-idle-zurueck', !weg);
       }
     };
+    // Hover wird nicht mehr in jedem Bild per `:matches(':hover')`
+    // erfragt, sondern per Ereignis gemeldet.
+    const hoverMelden = () => HeroIdleAnims.markiere();
+    zone.addEventListener('mouseenter', hoverMelden);
+    zone.addEventListener('mouseleave', hoverMelden);
     const holo = platz.querySelector('.hero-idle-holo');
     const auftauchenFertig = (e) => {
       if (e.animationName === 'heroHoloAuftauchen') platz.classList.remove('hero-idle-zurueck');
@@ -2950,7 +3013,7 @@ function HeroIdleSprite({ cardName, angehalten, versteinert, eingefroren, effekt
       }
     };
     st.schritte = 0;
-    const abmelden = HeroIdleAnims.anmelden((now) => {
+    const abmelden = HeroIdleAnims.anmelden((now, pruefen) => {
       const dt = st.zuletzt == null ? 0 : Math.min(now - st.zuletzt, 1000);
       st.zuletzt = now;
       st.schritte++;
@@ -2965,7 +3028,9 @@ function HeroIdleSprite({ cardName, angehalten, versteinert, eingefroren, effekt
       }
       if (z.versteinert) { if (st.stein < 1) st.stein = Math.min(1, st.stein + dt / 900); }
       else st.stein = 0;
-      sicher('Zonenlage', folgeZone);
+      // Zonenlage/Hover nur bei „schmutz" (Beobachter, Hover-Ereignis,
+      // 600-ms-Netz) — siehe Kopf der gemeinsamen Schleife.
+      if (pruefen) sicher('Zonenlage', folgeZone);
       // Pulsierende Tönung (Cursed/Charmed): kurzes Aufflashen je
       // 1,2 s, in acht Stufen — gemalt wird nur beim Stufenwechsel.
       const effNun = zustand.current.effekte || '';
@@ -2996,6 +3061,8 @@ function HeroIdleSprite({ cardName, angehalten, versteinert, eingefroren, effekt
     return () => {
       abmelden();
       if (ro) ro.disconnect();
+      zone.removeEventListener('mouseenter', hoverMelden);
+      zone.removeEventListener('mouseleave', hoverMelden);
       if (holo) holo.removeEventListener('animationend', auftauchenFertig);
     };
   }, [eintrag, ebene]);
@@ -41014,7 +41081,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   useEffect(() => {
     const el = boardCenterRef.current;
     if (!el) return;
-    const check = () => {
+    const checkRaw = () => {
       // ── WAEHREND EINES KARTENZUGS NICHT MESSEN (v798) ──────────────
       // Al: „Wenn ich eine Karte dragge, hat sie leichte Latenz […] und
       // fliegt leicht hinter meinem Cursor her."
@@ -41210,6 +41277,40 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         }
       }
     };
+    // ★ Perf (Telefon-Befund: „unspielbar") — `checkRaw` liefen nach
+    // JEDEM Render, und jeder Lauf schaltet `board-flat-measure` zweimal
+    // um (das Layout des GANZEN Bretts wird ungueltig) und liest dutzende
+    // Rechtecke. Im Profil eines gedrosselten Telefon-Profils waren das
+    // `getBoundingClientRect` 31 % + `ppEchterUeberstand` 16 % der
+    // gesamten Zeit waehrend einer Partie — 127 Long Tasks (bis 980 ms)
+    // in 43 s. Die Brettgeometrie haengt aber nur an Fenster, Massstab
+    // und der STRUKTUR (Zahl der Zonen und Reihenkinder: Flying Islands,
+    // Area-Zonen), nicht daran, dass sich irgendein Zustand gerendert
+    // hat. Renders messen deshalb nur noch, wenn sich diese Signatur
+    // aendert; ResizeObserver und `resize` messen weiterhin IMMER
+    // (`checkBald`). Haben sich die Ausgaben eines Laufs veraendert
+    // (Mittelversatz, Anker, Ueberstand), folgt ein begrenzter Nachlauf —
+    // das ersetzt den frueheren „naechsten Render", auf den sich die
+    // Konvergenz oben verlassen hat.
+    const geoSig = () => {
+      // Fenstergroesse bewusst NICHT hier: `innerWidth` kann selbst ein
+      // Layout erzwingen, und `resize` misst ohnehin immer (`checkBald`).
+      let sig = document.documentElement.style.getPropertyValue('--board-scale')
+        + '|' + el.querySelectorAll('.board-zone').length;
+      el.querySelectorAll('.board-plane .board-row').forEach(row => { sig += ',' + row.children.length; });
+      return sig;
+    };
+    const ausgabeSig = () => el.style.cssText + '|' + el.className + '|' + (el.scrollLeft | 0);
+    const check = () => {
+      const vorher = ausgabeSig();
+      checkRaw();
+      el._ppCheckSig = geoSig();
+      if (ausgabeSig() !== vorher) {
+        if ((el._ppCheckNach || 0) < 8) { el._ppCheckNach = (el._ppCheckNach || 0) + 1; checkBald(); }
+      } else {
+        el._ppCheckNach = 0;
+      }
+    };
     // GEBUENDELT auf ein Bild (v798): mehrere Renders innerhalb eines
     // Rahmens (Zustandsketten, Socket-Nachrichten, ResizeObserver und
     // der Render danach) loesten bisher jeweils eine eigene volle
@@ -41248,18 +41349,38 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       if (checkRaf) return;
       checkRaf = requestAnimationFrame(() => { checkRaf = 0; checkGedrosselt(); });
     };
-    checkGedrosselt();
-    const obs = new ResizeObserver(checkBald);
+    // Render-Anlass: nur messen, wenn sich die Struktur-Signatur geaendert
+    // hat — ODER wenn der vorige Effekt-Lauf eine anstehende Messung
+    // (rAF/Timer von Resize, Nachlauf, Drossel) beim Aufraeumen abbrechen
+    // musste. Dieser Effekt hat kein Dependency-Array und baut sich nach
+    // JEDEM Render neu auf; frueher holte der bedingungslose Aufruf hier
+    // alles nach, jetzt traegt `_ppCheckAusstehend` es ueber den Neustart.
+    if (el._ppCheckAusstehend || el._ppCheckSig !== geoSig()) {
+      el._ppCheckAusstehend = false;
+      checkGedrosselt();
+    }
+    // Der Beobachter meldet jede Groessenaenderung — im Spiel meist nur
+    // die HOEHE (Handleisten, Overlays, Massstab). `checkRaw` bestimmt
+    // aber nur Waagerechtes (Scrollmodus, Mittelversatz, Anker, Ueberstand);
+    // das aendert sich nicht, solange Breite und Struktur-Signatur
+    // gleich bleiben. Fenster-`resize` misst weiter immer.
+    const obs = new ResizeObserver((eintraege) => {
+      const w = eintraege[eintraege.length - 1].contentRect.width;
+      const gleich = el._ppRoBreite !== undefined && Math.abs(w - el._ppRoBreite) < 0.5
+        && el._ppCheckSig === geoSig();
+      el._ppRoBreite = w;
+      if (!gleich) checkBald();
+    });
     obs.observe(el);
     window.addEventListener('resize', checkBald);
     return () => {
       obs.disconnect();
       window.removeEventListener('resize', checkBald);
-      if (checkRaf) cancelAnimationFrame(checkRaf);
+      if (checkRaf) { cancelAnimationFrame(checkRaf); el._ppCheckAusstehend = true; }
       // ★ v1257: Trailing-Timer der Telefon-Drossel mit abraeumen. Der
       // Effekt laeuft nach jedem Render neu — der Timer haengt deshalb
       // am Element (ueberlebt Neustarts) und wird hier zentral geleert.
-      if (el._ppCheckTimer) { clearTimeout(el._ppCheckTimer); el._ppCheckTimer = 0; }
+      if (el._ppCheckTimer) { clearTimeout(el._ppCheckTimer); el._ppCheckTimer = 0; el._ppCheckAusstehend = true; }
     };
   });
 
