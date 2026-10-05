@@ -1,6 +1,6 @@
 // ═══════════════════════════════════════════
 //  CARD EFFECT: "Intrude"
-//  Spell (Attachment, Decay Magic Lv0)
+//  Spell (Attachment, Decay Magic Lv1)
 //
 //  Places itself in the caster's first free
 //  Support Zone. Only one Intrude per player.
