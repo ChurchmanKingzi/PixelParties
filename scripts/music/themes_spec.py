@@ -56,6 +56,13 @@ THEMES = [
  ('Cardinal Beasts', 'cardinalbeasts', 'Four Winds Convergence', 'Vier Himmelsbestien (Baihu, Qinglong, Xuanwu, Zhuque): vier Abschnitte je eigenes Element/Himmelsrichtung (Metall/Holz/Wasser/Feuer) über gemeinsamem majestätischem Thema, chinesische Pentatonik, Gongs, Erhu-artige Violine, Chor; ~112 BPM.'),
  ('Fun-Fun Circus', 'funfuncircus', 'Big Top Bedlam', 'Zirkus außer Kontrolle: Calliope-Orgel, Tuba-Oompah, Piccolo, Xylophon, Zirkusdirektor-Fanfare, halsbrecherischer Galopp im 4/4 (Can-Can-artig) mit Clown-Slapstick-Stopps; ~176 BPM. Muss klar anders klingen als battle10 (Schelmenstück, g-Moll-Swing).'),
 ]
+# Eigene Titel für Helden-Themes (bgm_<slug>.ogg, Slug = Heldenname ohne Titel). Ohne Eintrag
+# heißt ein Helden-Theme in der Auswahl „<Held>'s Theme“.
+HERO_TITLES = {
+    'chaosdiamond': ('Chaos-Diamond, the Cracked Keeper', 'Critical Meltdown'),
+    'bubbles': ('Bubbles, the Bouncy Bunny', 'Big Bunny Bounce'),
+}
+
 if __name__ == '__main__':
     import json, os
     root = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..')
@@ -63,6 +70,7 @@ if __name__ == '__main__':
     out = {'generic': {'battle1': 'First Blood', 'battle2': 'Shadow Duel', 'battle3': 'Full Tilt', 'battle4': 'Heroic Charge', 'battle5': 'Dark Cathedral', 'battle6': 'Cyber Chase',
                        'battle7': 'Arena Rock', 'battle8': 'Mystic Grove', 'battle9': 'Epic Finale',
                        'battle10': "Trickster's Game"},
+           'cpu': {slug: title for slug, (_, title) in HERO_TITLES.items()},
            'themes': [{'id': 'theme_' + s, 'name': t, 'archetype': a} for a, s, t, _ in THEMES]}
     with open(os.path.join(root, 'data', 'battle-tracks.json'), 'w', encoding='utf-8') as f:
         json.dump(out, f, ensure_ascii=False, indent=2); f.write('\n')

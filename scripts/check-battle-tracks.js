@@ -2,6 +2,7 @@
 // Aufruf: node scripts/check-battle-tracks.js
 'use strict';
 const assert = require('assert');
+const fs = require('fs');
 const path = require('path');
 const { UNLOCK_WINS, listGenericTracks, listThemeTracks, loadTrackNames, buildCpuIndex, winsPerSlug, crossedUnlock, createBattleTracks } = require('../battle-tracks');
 
@@ -26,6 +27,10 @@ for (const t of names.themes) {
 const present = listThemeTracks(musicDir);
 assert(present.every(t => ids.has(t.id)));
 for (const g of Object.keys(names.generic)) assert(generic.includes(g), 'benannter Track ohne Datei: ' + g);
+for (const [slug, title] of Object.entries(names.cpu || {})) {
+  assert(/^[a-z0-9]+$/.test(slug) && title, 'ungueltiger Helden-Titel ' + slug);
+  assert(fs.existsSync(path.join(musicDir, 'bgm_' + slug + '.ogg')), 'Helden-Theme ohne Datei: ' + slug);
+}
 console.log('themes: ' + names.themes.length + ' benannt, ' + present.length + ' mit Datei');
 
 // Schwelle: genau der 10. Sieg schaltet frei, nie doppelt.
@@ -53,7 +58,7 @@ assert.strictEqual(winsPerSlug([{ opponent_deck_id: 'sample-A', wins: 6 }, { opp
   const bt = createBattleTracks({ db, loadSampleDecks: () => decks, bgmSlugForHero: slugForHero, musicDir });
 
   let list = await bt.listFor('u');
-  assert.deepStrictEqual(list.cpu, [{ id: 'null', name: 'Null, the Mage Slayer', wins: 9, unlocked: false }]);
+  assert.deepStrictEqual(list.cpu, [{ id: 'null', name: 'Null, the Mage Slayer', title: null, wins: 9, unlocked: false }]);
   assert(!(await bt.isSelectable('u', 'null')), '9 Siege reichen nicht');
   assert(await bt.isSelectable('u', 'battle1'), 'allgemeine Tracks sind offen');
   assert(await bt.isSelectable('u', null), 'Standard ist immer wählbar');
@@ -62,7 +67,7 @@ assert.strictEqual(winsPerSlug([{ opponent_deck_id: 'sample-A', wins: 6 }, { opp
   assert.strictEqual(await bt.resolveForBattle('u', 'null'), null, 'gesperrte Wahl wird im Kampf ignoriert');
 
   rows = [{ opponent_deck_id: 'sample-A', wins: 10 }];               // Stand NACH dem zehnten Sieg
-  assert.deepStrictEqual(await bt.unlockedByWin('u', 'sample-A'), { id: 'null', name: 'Null, the Mage Slayer' });
+  assert.deepStrictEqual(await bt.unlockedByWin('u', 'sample-A'), { id: 'null', name: 'Null, the Mage Slayer', title: null });
   assert(await bt.isSelectable('u', 'NULL'), 'Gross-/Kleinschreibung egal');
   assert.strictEqual(await bt.resolveForBattle('u', 'null'), 'null');
   rows = [{ opponent_deck_id: 'sample-A', wins: 11 }];
@@ -70,7 +75,7 @@ assert.strictEqual(winsPerSlug([{ opponent_deck_id: 'sample-A', wins: 6 }, { opp
   assert.strictEqual(await bt.unlockedByWin('u', 'sample-B'), null);
   // progressFor: Fortschritt zum Track der gespielten CPU (alle Decks der Figur zusammen)
   rows = [{ opponent_deck_id: 'sample-A', wins: 3 }, { opponent_deck_id: 'sample-A2', wins: 4 }];
-  assert.deepStrictEqual(await bt.progressFor('u', 'sample-A'), { id: 'null', name: 'Null, the Mage Slayer', wins: 7, need: 10 });
+  assert.deepStrictEqual(await bt.progressFor('u', 'sample-A'), { id: 'null', name: 'Null, the Mage Slayer', title: null, wins: 7, need: 10 });
   assert.strictEqual(await bt.progressFor('u', 'sample-B'), null);
 
   // cpu-unlocks: Quellen melden Eintraege; Fehler einer Quelle blockieren die anderen nicht

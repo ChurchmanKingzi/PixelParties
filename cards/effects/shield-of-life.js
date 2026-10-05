@@ -4,8 +4,9 @@
 //
 //  When the equipped Hero takes damage from an
 //  opponent's card/effect (not self, not status)
-//  and survives, controller selects any target
-//  to heal for 100 HP. Once per turn.
+//  and survives, controller chooses a target
+//  THEY CONTROL (Hero or Creature) and heals it
+//  for 100 HP. Once per turn.
 //
 //  Animation: heal sparkle on target.
 // ═══════════════════════════════════════════
@@ -105,13 +106,14 @@ module.exports = {
       const pi = ctx.cardOwner; // Effective controller
       const heroIdx = card.heroIdx;
 
-      // Prompt: select any hero or creature target. Renamed from `target`
+      // Prompt: select a hero or creature target THE CONTROLLER CONTROLS
+      // (Kartentext: „choose a target you control"). Renamed from `target`
       // to avoid shadowing the damaged-hero `target` from this hook's ctx.
       const healTarget = await ctx.promptDamageTarget({
-        side: 'any',
+        side: 'my',
         types: ['hero', 'creature'],
         title: 'Shield of Life',
-        description: `${ctx.attachedHero?.name || 'Hero'} survived damage! Choose a target to heal for 100 HP.`,
+        description: `${ctx.attachedHero?.name || 'Hero'} survived damage! Choose a target you control to heal for 100 HP.`,
         confirmLabel: '💚 Heal! (100)',
         confirmClass: 'btn-success',
         cancellable: true,

@@ -55,3 +55,14 @@ Maximal 15 melodische Stimmen (+ Schlagzeug). Aufruf: `python3 scripts/music/<sk
 Ergebnis pro Track: `scripts/music/theme_<slug>.py` und `public/music/bgm_theme_<slug>.ogg`.
 Der Titel steht im Docstring des Skripts und in `data/battle-tracks.json` (nicht ändern).
 Nichts committen/pushen, keine anderen Dateien ändern.
+
+## Lange Stücke (Draft-Musik u. Ä.)
+Für Tracks, die nicht ein Duell, sondern eine lange Tätigkeit begleiten (z. B. Draft, 30+ Minuten):
+* Länge ca. 9–11 Minuten in ganzen Takten. Der Client dekodiert jeden Track vollständig (≈ 350 kB je Sekunde),
+  10 Minuten sind etwa 210 MB — nicht länger als ≈ 11 Minuten gehen.
+* Der Track muss auch nach mehreren Durchläufen nicht ermüden: viele Abschnitte („Szenen“) mit wechselnder
+  Tonart, Klangfarbe und Dichte; Motive werden verwandelt (Umkehrung, Dehnung, Sequenz, Gegenstimme), nicht
+  wiederholt. Atempausen und Dichtewechsel sind erwünscht. Der Anfang muss zum Ende passen (Loop).
+* `song.program(name, beat, instrument)` wechselt die Instrumente einer Stimme mitten im Stück — so passen mehr
+  als 15 Klangfarben auf die 15 Kanäle.
+* Der Render dauert länger (Minuten); Arbeitsspeicher reicht (16 GB).
