@@ -11870,6 +11870,58 @@ function cubeShuffle(arr) {
   return a;
 }
 
+/**
+ * Draft-Packs bauen: 32 Packs a 16 Karten, jede Karte genau einmal.
+ *
+ * Drei "Toepfe" werden moeglichst GLEICHMAESSIG auf alle Packs verteilt:
+ *   1) Heroes (cardType 'Hero')
+ *   2) Rare       (foil 'rare')            — Heroes dieser Seltenheit zaehlen mit
+ *   3) Ueber Rare (secret_rare, diamond_rare, alles andere mit Foil) — ein grosser
+ *      Topf, ebenfalls inkl. der bereits verteilten Heroes dieser Seltenheit
+ * Je Topf geht die naechste Karte in das Pack mit der bisher geringsten Anzahl
+ * dieses Topfes (Gleichstand: das Pack mit weniger Karten, dann Zufall). Danach
+ * fuellen die uebrigen Karten die freien Plaetze. Gibt es nicht genau
+ * packCount*packSize Karten, bleibt es beim reinen Zufallsschnitt.
+ */
+function cubeBuildPacks(cubeCards, cardDB, packCount = CUBE_PACKS_PER_ROUND * CUBE_ROUNDS, packSize = CUBE_PACK_SIZE) {
+  const shuffled = cubeShuffle(cubeCards);
+  const packs = Array.from({ length: packCount }, () => []);
+  if (shuffled.length !== packCount * packSize) {
+    for (let i = 0; i < packCount; i++) packs[i] = shuffled.slice(i * packSize, (i + 1) * packSize);
+    return packs;
+  }
+  const info = (name) => {
+    const cd = cardDB[name] || {};
+    return { hero: cd.cardType === 'Hero', tier: cd.foil === 'rare' ? 1 : (cd.foil ? 2 : 0) };
+  };
+  // Zaehler je Topf und Pack: [heroes, rare, ueberRare]
+  const cnt = packs.map(() => [0, 0, 0]);
+  const place = (name, potIdx) => {
+    let best = [], bestKey = null;
+    for (let i = 0; i < packCount; i++) {
+      if (packs[i].length >= packSize) continue;
+      const key = potIdx == null ? [-(packSize - packs[i].length)] : [cnt[i][potIdx], packs[i].length];
+      if (bestKey == null || key[0] < bestKey[0] || (key[0] === bestKey[0] && (key[1] ?? 0) < (bestKey[1] ?? 0))) { bestKey = key; best = [i]; }
+      else if (key[0] === bestKey[0] && (key[1] ?? 0) === (bestKey[1] ?? 0)) best.push(i);
+    }
+    const pick = best[Math.floor(Math.random() * best.length)];
+    packs[pick].push(name);
+    const inf = info(name);
+    if (inf.hero) cnt[pick][0]++;
+    if (inf.tier === 1) cnt[pick][1]++;
+    if (inf.tier === 2) cnt[pick][2]++;
+  };
+  const heroes = shuffled.filter(n => info(n).hero);
+  const rares = shuffled.filter(n => !info(n).hero && info(n).tier === 1);
+  const supers = shuffled.filter(n => !info(n).hero && info(n).tier === 2);
+  const rest = shuffled.filter(n => !info(n).hero && info(n).tier === 0);
+  for (const n of heroes) place(n, 0);
+  for (const n of rares) place(n, 1);
+  for (const n of supers) place(n, 2);
+  for (const n of rest) place(n, null);
+  return packs.map(pk => cubeShuffle(pk));
+}
+
 /** Effective remaining-pack-budget for a seat, accounting for time
  *  already elapsed in the open pick window. Returns ms; clamps to 0. */
 function cubeDraftSeatRemainingMs(draft, seatIdx) {
@@ -11908,12 +11960,8 @@ async function cubeDraftStart(room, db, parseDeck, io) {
     return;
   }
 
-  // Shuffle cube into 32 packs of 16. Each cube card appears exactly once.
-  const shuffled = cubeShuffle(cubeCards);
-  const packs = [];
-  for (let i = 0; i < CUBE_PACKS_PER_ROUND * CUBE_ROUNDS; i++) {
-    packs.push(shuffled.slice(i * CUBE_PACK_SIZE, (i + 1) * CUBE_PACK_SIZE));
-  }
+  // 32 Packs a 16 (Heroes / Rare / Ueber-Rare gleichmaessig verteilt, s. cubeBuildPacks).
+  const packs = cubeBuildPacks(cubeCards, getCardDB());
   // Cache the original (unshuffled) cube card list — used by
   // cubeDraftFinalize for the "0 heroes drafted" auto-assign rule
   // (need the cube contents to know which heroes are NOT in the cube).
