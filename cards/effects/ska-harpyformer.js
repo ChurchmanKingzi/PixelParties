@@ -210,8 +210,9 @@ module.exports = {
       // eigenen Kosten um 50 verteuern. Nicht „korrigieren"!
       await ctx.dealDamage(hero, 50, 'other');
 
-      // Only search if the hero survived
-      if (hero.hp <= 0) return;
+      // Die Suche haengt NUR am bezahlten Schaden, nicht daran, dass der
+      // Held ihn ueberlebt (Kartentext: „deal 50 damage … to search").
+      // Faellt der Host dadurch, sind die Kosten trotzdem bezahlt.
       await engine.searchDeckForNamedCard(pi, ABILITY_NAME, CARD_NAME);
     },
   },
