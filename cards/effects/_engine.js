@@ -2939,6 +2939,10 @@ class GameEngine {
         console.warn(`[Engine] ⚠️  Karteneffekte in Zug ${this.gs?.turn} stillgelegt `
           + `(erster unterdrueckter Hook: ${hookName}, bereits ${this._hooksFiredThisTurn} Hooks gefeuert). `
           + `Ab hier loest in diesem Zug KEIN Kartentrigger mehr aus.`);
+        // Auch dem Spieler sagen: ein Trigger, der ausbleibt, sah bisher aus
+        // wie ein Spielfehler, ohne dass irgendwo etwas stand. Der Eintrag
+        // landet im Action-Log (Darstellung: `formatLogEntry`, app-board).
+        try { this.log('hooks_killed', { turn: this.gs?.turn, hook: hookName, fired: this._hooksFiredThisTurn }); } catch { /* Protokoll ist Beiwerk */ }
       }
       return;
     }
@@ -29546,7 +29550,15 @@ this._deathWatch = (this._deathWatchStack || []).length
     this.beginHumanWait();   // v848: siehe beginHumanWait
     return new Promise((resolve) => {
       this._pendingGenericPrompt = { resolve };
-      this.gs.effectPrompt = { ...promptData, ownerIdx: playerIdx };
+      // ★ Jede Frage bekommt eine laufende Nummer. Der Client schickt sie
+      // mit der Antwort zurueck (`effect_prompt_response`), und
+      // `resolveGenericPrompt` verwirft Antworten auf eine FRUEHERE Frage.
+      // Ohne das trifft bei Lag ein Doppeltipp (oder ein verspaeteter
+      // Klick auf einen schon verschwundenen Dialog) die NAECHSTE Frage —
+      // z.B. eine „may"-Abfrage, die direkt auf die erste folgt — und
+      // beantwortet sie unbeabsichtigt.
+      this._promptSeq = (this._promptSeq || 0) + 1;
+      this.gs.effectPrompt = { ...promptData, ownerIdx: playerIdx, promptId: this._promptSeq };
       this.sync();
     });
   }
@@ -29699,9 +29711,17 @@ this._deathWatch = (this._deathWatchStack || []).length
   /**
    * Resolve a pending generic prompt. Called by server socket handler.
    * @param {object} response - { cancelled, ...typeSpecificData }
+   * @param {number} [promptId] - Nummer der Frage, auf die geantwortet wird
+   *   (aus `gs.effectPrompt.promptId`); weicht sie von der offenen ab, wird
+   *   die Antwort verworfen und `false` geliefert.
    */
-  resolveGenericPrompt(response) {
+  resolveGenericPrompt(response, promptId) {
     if (!this._pendingGenericPrompt) return false;
+    // Antwort auf eine frueher gestellte Frage (Doppeltipp, Lag): nicht
+    // auf die jetzt offene anwenden. Clients ohne Nummer (aeltere
+    // Seiten, Tutorial-Prompts ohne Nummer) bleiben unberuehrt.
+    const offen = this.gs.effectPrompt && this.gs.effectPrompt.promptId;
+    if (promptId != null && offen != null && promptId !== offen) return false;
     const { resolve } = this._pendingGenericPrompt;
     // Track whether this prompt was a Gerrymander-rewritten "may"
     // confirm that the chooser DECLINED on behalf of the original

@@ -13601,8 +13601,50 @@ function buildGameDiagnosis(room, winnerIdx, reason) {
   return parts.join(' | ');
 }
 
+// ★ Spieleraktionen, bei denen ein STILL verworfener Versuch dem Spieler
+// gemeldet wird (siehe `socket.onAny` im Verbindungs-Handler). Bewusst nur
+// Ereignisse, die bei Erfolg IMMER einen neuen Zustand ausloesen — keine
+// Zeiger-/Ziel-/Chat-Ereignisse.
+const AKTIONS_EREIGNISSE = new Set([
+  'advance_phase', 'play_ability', 'play_surprise', 'summon_ushabti',
+  'activate_ability', 'activate_free_ability', 'activate_hero_effect',
+  'activate_area_effect', 'activate_creature_effect', 'trigger_treacherous_crystal',
+  'activate_discard_effect', 'activate_equip_effect', 'activate_permanent',
+  'play_from_coolness_stack', 'activate_hand_card', 'play_creature', 'play_spell',
+  'play_artifact', 'use_potion', 'use_artifact_effect', 'confirm_potion', 'ascend_hero',
+]);
+// So lange darf eine Aktion ohne jeden neuen Zustand bleiben, bevor sie als
+// verworfen gilt. Grosszuegig: manche Karten haengen vor dem ersten Zustand
+// eine Anzeige-Verzoegerung vor.
+const AKTION_VERWORFEN_NACH_MS = 2000;
+
 io.on('connection', (socket) => {
   let currentUser = null;
+
+  // ★ RUECKMELDUNG BEI STILL VERWORFENEN AKTIONEN. Die Handler (und die
+  // Engine dahinter: `advancePhase`, `validateActionPlay`, Index-Pruefungen,
+  // Sperren) brechen bei ungueltiger Lage mit einem nackten `return` ab — der
+  // Spieler sieht nichts, auf einem langsamen Geraet wirkt das wie ein
+  // verschluckter Tipper. `onAny` feuert VOR den eigentlichen Handlern, also
+  // merken wir uns hier den Zustandszaehler und pruefen nach einer Frist,
+  // ob die Aktion irgendeinen neuen Zustand ausgeloest hat. Wenn nicht:
+  // dem Absender Bescheid geben und ihm den aktuellen Zustand schicken, damit
+  // sein Bildschirm sicher dem Server entspricht. Kein Handler wird veraendert.
+  socket.onAny((event, params) => {
+    if (!currentUser || !AKTIONS_EREIGNISSE.has(event)) return;
+    const room = rooms.get(params && params.roomId);
+    if (!room?.gameState) return;
+    const pi = room.gameState.players.findIndex(ps => ps.userId === currentUser.userId);
+    if (pi < 0) return;
+    const zaehler0 = room._stateSeq || 0;
+    setTimeout(() => {
+      if (rooms.get(room.id) !== room) return;
+      const gs = room.gameState;
+      if (!gs || gs.result || (room._stateSeq || 0) !== zaehler0) return;
+      socket.emit('action_rejected', { action: event });
+      sendGameState(room, pi);
+    }, AKTION_VERWORFEN_NACH_MS);
+  });
   const socketIP = getSocketIP(socket);
   social.onConnection(socket);
 
@@ -14960,19 +15002,27 @@ io.on('connection', (socket) => {
   });
 
   // General-purpose effect prompt response (confirm, card gallery, zone pick)
-  socket.on('effect_prompt_response', ({ roomId, response }) => {
+  socket.on('effect_prompt_response', ({ roomId, response, promptId }) => {
     if (!currentUser) return;
     const room = rooms.get(roomId);
     if (!room?.engine || !room.gameState?.effectPrompt) return;
     const pi = room.gameState.players.findIndex(ps => ps.userId === currentUser.userId);
     if (pi !== room.gameState.effectPrompt.ownerIdx) return;
+    // Antwort auf eine FRUEHERE Frage (Doppeltipp, Lag): nicht auf die jetzt
+    // offene anwenden. Der Client bekommt den aktuellen Zustand, damit er die
+    // offene Frage sicher vor sich hat. Ohne Nummer (aeltere Seite): wie bisher.
+    const offenId = room.gameState.effectPrompt.promptId;
+    if (promptId != null && offenId != null && promptId !== offenId) {
+      sendGameState(room, pi);
+      return;
+    }
     // Reject force-discard of the specific resolving card instance
     const epType = room.gameState.effectPrompt.type;
     if ((epType === 'forceDiscard' || epType === 'forceDiscardCancellable') && response?.handIndex != null) {
       const ps = room.gameState.players[pi];
       if (ps._resolvingCard && response.handIndex === getResolvingHandIndex(ps)) return;
     }
-    room.engine.resolveGenericPrompt(response);
+    room.engine.resolveGenericPrompt(response, promptId);
   });
 
   // Relay blind-pick selection to the victim so they see highlighted cards

@@ -26419,6 +26419,28 @@ const ChatPanel = React.memo(function ChatPanel({ roomId, participants: particip
   && a.onToggleCollapse === b.onToggleCollapse
   && _teilnehmerSchluessel(a.participants) === _teilnehmerSchluessel(b.participants));
 
+// ★ Antwort auf eine Effekt-Abfrage (`gameState.effectPrompt`) senden —
+// der EINZIGE Weg dafuer. Zwei Absicherungen gegen Lag und Doppeltipp:
+//  1. Die Nummer der Frage (`promptId`) geht mit. Der Server verwirft
+//     Antworten auf eine fruehere Frage, statt sie der jetzt offenen
+//     unterzuschieben (z.B. einer „may"-Abfrage direkt nach der ersten).
+//  2. Dieselbe Frage wird nicht zweimal kurz hintereinander beantwortet.
+//     Das Fenster ist kurz, damit eine vom Server abgelehnte Antwort
+//     (z.B. der gerade wirkenden Karte als Abwurf) gleich neu versucht
+//     werden kann.
+let _ppPromptLetzte = { id: null, t: 0 };
+function ppSendePromptAntwort(gameState, response) {
+  const ep = gameState && gameState.effectPrompt;
+  const pid = ep ? ep.promptId : undefined;
+  if (pid != null) {
+    const jetzt = performance.now();
+    if (_ppPromptLetzte.id === pid && jetzt - _ppPromptLetzte.t < 600) return false;
+    _ppPromptLetzte = { id: pid, t: jetzt };
+  }
+  socket.emit('effect_prompt_response', { roomId: gameState.roomId, response, promptId: pid });
+  return true;
+}
+
 function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck, setSelectedDeck, cubeMatchInfo }) {
   useHoverDurchSchleier();   // v1270: Tooltips durch den Dialog-Schleier
   const { user, setUser, notify, setBgmMode } = useContext(AppContext);
@@ -29595,10 +29617,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         if (pick.isCreature && h.zoneSlot != null) {
           response.zoneSlot = h.zoneSlot;
         }
-        socket.emit('effect_prompt_response', {
-          roomId: gameState.roomId,
-          response,
-        });
+        ppSendePromptAntwort(gameState, response);
       } else if (pick.isArtifactCreature) {
         // Artifact Creature: derselbe Picker, aber der Weg
         // aufs Feld ist `play_artifact` (doPlayArtifact hat
@@ -30179,10 +30198,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       const aktuell = hand.indexOf(cardName);
       if (aktuell < 0) return;
       if (window.playSFX) window.playSFX('ui_click');
-      socket.emit('effect_prompt_response', {
-        roomId: gameState.roomId,
-        response: { cardName, handIndex: aktuell, heroIdx: destination.heroIdx, zoneSlot: destination.slotIdx },
-      });
+      ppSendePromptAntwort(gameState, { cardName, handIndex: aktuell, heroIdx: destination.heroIdx, zoneSlot: destination.slotIdx });
       return;
     }
     const eligible = getEligibleSummoners(cardName);
@@ -30294,7 +30310,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       const eligible = gameState.effectPrompt.eligibleIndices;
       if (eligible && !eligible.includes(idx)) return; // Not an eligible card for this discard
       if (e.cancelable) e.preventDefault();
-      socket.emit('effect_prompt_response', { roomId: gameState.roomId, response: { cardName, handIndex: idx } });
+      ppSendePromptAntwort(gameState, { cardName, handIndex: idx });
       return;
     }
 
@@ -30307,7 +30323,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       const eligible = gameState.effectPrompt.eligibleIndices;
       if (eligible && !eligible.includes(idx)) return;
       if (e.cancelable) e.preventDefault();
-      socket.emit('effect_prompt_response', { roomId: gameState.roomId, response: { cardName, handIndex: idx } });
+      ppSendePromptAntwort(gameState, { cardName, handIndex: idx });
       return;
     }
 
@@ -30342,7 +30358,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       if (resolvingHandIndex >= 0 && resolvingHandIndex === idx) return;
       if (!pickHandCardDragMode) {
         if (e.cancelable) e.preventDefault();
-        socket.emit('effect_prompt_response', { roomId: gameState.roomId, response: { cardName, handIndex: idx } });
+        ppSendePromptAntwort(gameState, { cardName, handIndex: idx });
         return;
       }
       // Drag-summon mode — DON'T emit yet. Fall through to the drag-
@@ -30424,7 +30440,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     if (abilityAttachPick && abilityAttachPick.handIndex === idx) {
       if (e.cancelable) e.preventDefault();
       if (abilityAttachPick.source === 'effectPrompt' && abilityAttachPick.cancellable !== false) {
-        socket.emit('effect_prompt_response', { roomId: gameState.roomId, response: { cancelled: true } });
+        ppSendePromptAntwort(gameState, { cancelled: true });
       }
       setAbilityAttachPick(null);
       return;
@@ -31447,10 +31463,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       if (pickHandCardDragMode) {
         if (!dragging) {
           if (window.playSFX) window.playSFX('ui_click');
-          socket.emit('effect_prompt_response', {
-            roomId: gameState.roomId,
-            response: { cardName, handIndex: idx },
-          });
+          ppSendePromptAntwort(gameState, { cardName, handIndex: idx });
           setHandDrag(null); setPlayDrag(null); setAbilityDrag(null);
           return;
         }
@@ -31458,15 +31471,12 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           if (!prev) return null;
           if (prev.targetHero >= 0 && (prev.targetSlot >= 0 || prev.pickHandCardHeroDrop)) {
             if (window.playSFX) window.playSFX('ui_click');
-            socket.emit('effect_prompt_response', {
-              roomId: gameState.roomId,
-              response: {
+            ppSendePromptAntwort(gameState, {
                 cardName: prev.cardName,
                 handIndex: prev.idx,
                 targetHeroIdx: prev.targetHero,
                 targetSlotIdx: prev.targetSlot,
-              },
-            });
+              });
           }
           // Else: dragged but no valid drop — cancel silently. The
           // prompt stays open so the player can try again.
@@ -31599,10 +31609,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             // side to only what THIS hero can legally cast, so the
             // dispatch is always safe.
             if (isHeroAction && heroActionPrompt.heroIdx !== undefined) {
-              socket.emit('effect_prompt_response', {
-                roomId: gameState.roomId,
-                response: { cardName, handIndex: idx, fromCreation, heroIdx: heroActionPrompt.heroIdx },
-              });
+              ppSendePromptAntwort(gameState, { cardName, handIndex: idx, fromCreation, heroIdx: heroActionPrompt.heroIdx });
             } else {
               // Either Action Phase normal play OR any-hero heroAction
               // (Guardian Beast Hu via `performImmediateActionAnyHero`
@@ -31651,10 +31658,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 // `play_spell` would fail server-side because no
                 // additional-action token covers the card.
                 if (isHeroAction) {
-                  socket.emit('effect_prompt_response', {
-                    roomId: gameState.roomId,
-                    response: { cardName, handIndex: idx, fromCreation, heroIdx: eligible[0].idx },
-                  });
+                  ppSendePromptAntwort(gameState, { cardName, handIndex: idx, fromCreation, heroIdx: eligible[0].idx });
                 } else {
                   socket.emit('play_spell', { roomId: gameState.roomId, cardName, handIndex: idx, fromCreation, heroIdx: eligible[0].idx, charmedOwner: eligible[0].charmedOwner, viaCreatureInstId: eligible[0].creatureInstId });
                 }
@@ -31689,10 +31693,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               if (lockedHi !== undefined) {
                 const lockedSlot = findFreeSupportSlot(me, lockedHi);
                 if (lockedSlot >= 0) {
-                  socket.emit('effect_prompt_response', {
-                    roomId: gameState.roomId,
-                    response: { cardName, handIndex: idx, fromCreation, heroIdx: lockedHi, zoneSlot: lockedSlot },
-                  });
+                  ppSendePromptAntwort(gameState, { cardName, handIndex: idx, fromCreation, heroIdx: lockedHi, zoneSlot: lockedSlot });
                 }
               } else {
                 // Any-hero mode — narrow heroes to those the SERVER
@@ -31714,10 +31715,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                   eligible.push({ idx: hi, name: h.name, zoneSlot: slot });
                 }
                 if (eligible.length === 1) {
-                  socket.emit('effect_prompt_response', {
-                    roomId: gameState.roomId,
-                    response: { cardName, handIndex: idx, fromCreation, heroIdx: eligible[0].idx, zoneSlot: eligible[0].zoneSlot },
-                  });
+                  ppSendePromptAntwort(gameState, { cardName, handIndex: idx, fromCreation, heroIdx: eligible[0].idx, zoneSlot: eligible[0].zoneSlot });
                 } else if (eligible.length > 1) {
                   setSpellHeroPick({ cardName, handIndex: idx, fromCreation, card, eligible, isCreature: true, isHeroAction: true });
                 }
@@ -32009,10 +32007,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           if (!prev || prev.targetHero < 0) return null;
           // During abilityAttach prompt — send as effect_prompt_response
           if (isAbilityAttachEligible) {
-            socket.emit('effect_prompt_response', {
-              roomId: gameState.roomId,
-              response: { cardName: prev.cardName, handIndex: prev.idx, heroIdx: prev.targetHero, zoneSlot: prev.targetZone },
-            });
+            ppSendePromptAntwort(gameState, { cardName: prev.cardName, handIndex: prev.idx, heroIdx: prev.targetHero, zoneSlot: prev.targetZone });
           } else {
             socket.emit('play_ability', {
               roomId: gameState.roomId,
@@ -32080,15 +32075,12 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           // before this fix. Always include both `heroIdx` AND
           // `zoneSlot` so both engine paths resolve cleanly.
           if (isHeroAction) {
-            socket.emit('effect_prompt_response', {
-              roomId: gameState.roomId,
-              response: {
+            ppSendePromptAntwort(gameState, {
                 cardName: prev.cardName,
                 handIndex: prev.idx,
                 heroIdx: prev.targetHero,
                 zoneSlot: prev.targetSlot,
-              },
-            });
+              });
             return null;
           }
 
@@ -32184,10 +32176,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
 
           // Hero Action mode (Coffee) — send as effect_prompt_response
           if (isHeroAction) {
-            socket.emit('effect_prompt_response', {
-              roomId: gameState.roomId,
-              response: { cardName: prev.cardName, handIndex: prev.idx, heroIdx: prev.targetHero },
-            });
+            ppSendePromptAntwort(gameState, { cardName: prev.cardName, handIndex: prev.idx, heroIdx: prev.targetHero });
             return null;
           }
 
@@ -41065,6 +41054,22 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     };
   }, []);
 
+  // ── Verworfene Aktion: der Server hat eine Aktion ohne jede Wirkung
+  // abgebrochen (ungueltige Lage, Sperre, Zug vorbei …) und uns den aktuellen
+  // Zustand geschickt. Hier nur der Hinweis dazu — hoechstens alle 3 s, damit
+  // wiederholtes Tippen die Anzeige nicht zumuellt.
+  useEffect(() => {
+    let zuletzt = 0;
+    const onActionRejected = () => {
+      const jetzt = Date.now();
+      if (jetzt - zuletzt < 3000) return;
+      zuletzt = jetzt;
+      if (notify) notify('That action isn\'t possible right now.', 'error');
+    };
+    socket.on('action_rejected', onActionRejected);
+    return () => { socket.off('action_rejected', onActionRejected); };
+  }, [notify]);
+
   // ── Action Log socket listener (Chat: v1374 in `ChatPanel`) ──
   useEffect(() => {
     const onActionLog = (entry) => {
@@ -41637,7 +41642,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           return;
         }
         if (abilityAttachPick.source === 'effectPrompt') {
-          socket.emit('effect_prompt_response', { roomId: gameState.roomId, response: { cancelled: true } });
+          ppSendePromptAntwort(gameState, { cancelled: true });
         }
         setAbilityAttachPick(null);
         return;
@@ -41653,7 +41658,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         return;
       }
       if (gameState.effectPrompt && gameState.effectPrompt.ownerIdx === myIdx && gameState.effectPrompt.cancellable !== false) {
-        socket.emit('effect_prompt_response', { roomId: gameState.roomId, response: { cancelled: true } });
+        ppSendePromptAntwort(gameState, { cancelled: true });
       } else if (gameState.potionTargeting && gameState.potionTargeting.ownerIdx === myIdx) {
         if (gameState.potionTargeting.config?.cancellable === false) return;
         socket.emit('cancel_potion', { roomId: gameState.roomId });
@@ -41694,7 +41699,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       if (showSurrender) { if (!gameState.isPuzzle) handleSurrender(); return; }
       if (showEndTurnConfirm) { confirmEndTurn(); return; }
       if (isMyPrompt && (ep.type === 'confirm' || ep.type === 'deckSearchReveal')) {
-        socket.emit('effect_prompt_response', { roomId: gameState.roomId, response: { confirmed: true } }); return;
+        ppSendePromptAntwort(gameState, { confirmed: true }); return;
       }
       if (isMyPotion && potionSelection.length > 0) {
         // Check min required
@@ -42685,7 +42690,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     return () => window.removeEventListener('keydown', handleKey, true);
   }, [chainPickData, chainPickSelected.length, chainPickCanConfirm]);
   const respondToPrompt = (response) => {
-    socket.emit('effect_prompt_response', { roomId: gameState.roomId, response });
+    ppSendePromptAntwort(gameState, response);
   };
 
   // Escape key dismisses deckSearchReveal prompts (opponent's search result confirmation)
@@ -42855,6 +42860,11 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     // ── Diagnose-Einträge des Zugablaufs (8.8.) ──
     if (t === 'hook_timeout') {
       return <span style={{ color: '#ff9944' }}>⏱ Effect of {cName(entry.card)} timed out ({entry.hook})</span>;
+    }
+    // Sicherheitsgrenze des Zuges erreicht: bis zum Zugende loest keine Karte
+    // mehr aus. Ohne diese Zeile blieb ein Trigger einfach aus, ohne Hinweis.
+    if (t === 'hooks_killed') {
+      return <span style={{ color: '#ff9944' }}>⚠ Safety limit reached in turn {entry.turn}: card effects are switched off for the rest of this turn</span>;
     }
     if (t === 'stale_end_phase_dropped') {
       return <span style={{ color: '#ff9944' }}>⏱ Late End Phase from turn {entry.enteredOnTurn} discarded</span>;
@@ -43814,10 +43824,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                   // Server-driven tutor (Alex, …) — resolve the pending prompt.
                   // The server owns the actual placement; we just report
                   // where the player chose to land.
-                  socket.emit('effect_prompt_response', {
-                    roomId: gameState.roomId,
-                    response: { heroIdx: i, zoneSlot: targetSlot },
-                  });
+                  ppSendePromptAntwort(gameState, { heroIdx: i, zoneSlot: targetSlot });
                   setAbilityAttachPick(null);
                   return;
                 }
@@ -44656,10 +44663,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                   ? () => {
                       const pick = abilityAttachPick;
                       if (pick.source === 'effectPrompt') {
-                        socket.emit('effect_prompt_response', {
-                          roomId: gameState.roomId,
-                          response: { heroIdx: i, zoneSlot: z },
-                        });
+                        ppSendePromptAntwort(gameState, { heroIdx: i, zoneSlot: z });
                         setAbilityAttachPick(null);
                         return;
                       }
@@ -47259,10 +47263,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                         if (czPrompt) {
                           if (!czWaehlbar) return;
                           if (e.cancelable) e.preventDefault();
-                          socket.emit('effect_prompt_response', {
-                            roomId: gameState.roomId,
-                            response: { creationIndex: item.origIdx },
-                          });
+                          ppSendePromptAntwort(gameState, { creationIndex: item.origIdx });
                           return;
                         }
                         onHandMouseDown(e, item.origIdx, true);
@@ -49304,7 +49305,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 const pa = pendingAbilityActivation;
                 setPendingAbilityActivation(null);
                 if (pa.isHeroAction) {
-                  socket.emit('effect_prompt_response', { roomId: gameState.roomId, response: { abilityActivation: true, heroIdx: pa.heroIdx, zoneIdx: pa.zoneIdx } });
+                  ppSendePromptAntwort(gameState, { abilityActivation: true, heroIdx: pa.heroIdx, zoneIdx: pa.zoneIdx });
                 } else {
                   socket.emit('activate_ability', { roomId: gameState.roomId, heroIdx: pa.heroIdx, zoneIdx: pa.zoneIdx, zoneKind: pa.zoneKind, charmedOwner: pa.charmedOwner, borrowedFromOwner: pa.borrowedFromOwner });
                 }
