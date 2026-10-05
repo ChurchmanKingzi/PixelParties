@@ -59,6 +59,9 @@ module.exports = {
   activeIn: ['hero'],
   heroEffect: true,
 
+  // Fester CPU-Bonus fuer Effekte, die Aktionen herausschummeln (Als Auftrag 5.10., `_cpu.js`).
+  cpuMeta: { cheatsActions: true },
+
   canActivateHeroEffect(ctx) {
     const engine = ctx._engine;
     const pi = ctx.cardOwner;

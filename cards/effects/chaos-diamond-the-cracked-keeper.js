@@ -69,7 +69,8 @@ module.exports = {
   // „You may spend your Action"
   heroEffectActionCost: true,
 
-  cpuMeta: { usesAction: true, dealsDamage: true },
+  // `cheatsActions`: fester CPU-Bonus fuer Effekte, die Aktionen herausschummeln (Als Auftrag 5.10., `_cpu.js`).
+  cpuMeta: { usesAction: true, dealsDamage: true, cheatsActions: true },
 
   canActivateHeroEffect(ctx) {
     const engine = ctx._engine;

@@ -129,6 +129,9 @@ module.exports = {
   // Spends Zi's Action (server-side action-economy in doActivateHeroEffect).
   heroEffectActionCost: true,
 
+  // Fester CPU-Bonus fuer Effekte, die Aktionen herausschummeln (Als Auftrag 5.10., `_cpu.js`).
+  cpuMeta: { cheatsActions: true },
+
   /**
    * CPU response for the OPPONENT-pick step (`birthdayPresentPick`).
    * When the human casts Zi, the CPU is the opponent and must choose
