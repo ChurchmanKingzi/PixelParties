@@ -188,6 +188,11 @@ module.exports = {
       const isActionPhase = gs.currentPhase === 3;
       const casterActed = (casterPs?.heroesActedThisTurn || []).includes(casterHeroIdx);
       const isNormalActionMode = isActionPhase && !casterActed;
+      // Sofort gewirkt (Chaos-Diamond, Friedhelm …): der Guss IST schon die
+      // Zusatzaktion — jeder Held mit freiem Support-Slot ist Ziel, und es
+      // wird KEINE weitere Aktion verbraucht (kein `_spellForcesActionConsume`).
+      const sofort = !!gs._immediateActionContext;
+      const weiteZiele = isNormalActionMode || sofort;
 
       // ── Build target list ──
       // Heroes with a free Support slot are eligible to host the
@@ -200,9 +205,9 @@ module.exports = {
       // der Aufloesung → Curse verpufft (Discard, kein Refund) — die
       // Nutzerspezifikation von einst; `_spellCancelled` bleibt also aus.
       const sides = [pi, pi === 0 ? 1 : 0];
-      const heroFilter = (hero, hi, side) => isNormalActionMode || _heroQualifiesForCurse(engine, hero, side, hi);
+      const heroFilter = (hero, hi, side) => weiteZiele || _heroQualifiesForCurse(engine, hero, side, hi);
       if (candidateHosts(gs, pi, engine, { sides, heroFilter }).length === 0) {
-        engine.log('curse_fizzle', { player: gs.players[pi]?.username, reason: isNormalActionMode ? 'no_free_support_slots' : 'no_qualifying_targets_at_resolve' });
+        engine.log('curse_fizzle', { player: gs.players[pi]?.username, reason: weiteZiele ? 'no_free_support_slots' : 'no_qualifying_targets_at_resolve' });
         return;
       }
       // ★★ v1145: dieselbe Zielwahl-Sprache wie „Forbidden Curse of
@@ -212,9 +217,11 @@ module.exports = {
       const host = await pickAttachmentHost(ctx, CARD_NAME, {
         sides,
         heroAccent: (hero, hi, side) => (qualifiziert(hero, hi, side) ? 'green' : null),
-        heroDim: isNormalActionMode ? null : (hero, hi, side) => !qualifiziert(hero, hi, side),
+        heroDim: weiteZiele ? null : (hero, hi, side) => !qualifiziert(hero, hi, side),
         ignoreDropHints: true,
-        description: isNormalActionMode
+        description: sofort
+          ? 'Attach Curse to any Hero.'
+          : isNormalActionMode
           ? 'Attach Curse to any Hero. Green Heroes carry a cleansable status and no Spell — against them this becomes an additional Action.'
           : 'Attach Curse to a green Hero (a cleansable status and no Spell attached). This is an additional Action.',
         confirmLabel: '🧿 Curse!', confirmClass: 'btn-danger',
