@@ -21121,8 +21121,19 @@ this._deathWatch = (this._deathWatchStack || []).length
   }
 
   /** Darf dieser Held diesen Spell JETZT wirken (ohne Hand, ohne Stufen)? */
-  kannSofortWirken(playerIdx, heroIdx, cardName, wirkerSeite = playerIdx) {
+  kannSofortWirken(playerIdx, heroIdx, cardName, wirkerSeite = playerIdx, { alsZusatzaktion = false } = {}) {
     try {
+      // Der Guss ist eine ZUSATZAKTION (Chaos-Diamond): Duigno („cannot perform
+      // any other additional Actions") und Mission of the Light Brigade sperren sie.
+      if (alsZusatzaktion && (this.additionalActionsLocked(playerIdx) || this.missionLockActive(playerIdx))) return false;
+      // Die Aktivierung selbst war Duignos zweite Aktion: dessen Sperre
+      // („if you do, no other additional Actions") greift schon jetzt.
+      if (alsZusatzaktion) {
+        const zi = this.gs._heroEffectZusatzInst;
+        const zs = zi ? loadCardEffect(zi.counters?._effectOverride || zi.name) : null;
+        if (zs?.sperrtZusatzaktionenNachVerbrauch
+            && !Object.values(zi.counters?.aaGrants || {}).some(n => n > 0)) return false;
+      }
       return !!this.validateActionPlay(playerIdx, cardName, -1, heroIdx, ['Spell'], {
         sofortGuss: true,
         ...(wirkerSeite !== playerIdx ? { charmedOwner: wirkerSeite } : {}),
@@ -21147,7 +21158,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // Moment des Wirkens geprueft — Status (Nulled, Silenced, Frozen, tot),
     // Spell-Sperren (Eraser Beam), Spielbedingungen und Einmal-pro-Spiel.
     // Faellt eine Pruefung durch, fizzelt der Spell: er wird nicht gewirkt.
-    if (opts.pruefen && cardData.cardType === 'Spell' && !this.kannSofortWirken(playerIdx, heroIdx, cardName, wirkerSeite)) {
+    if (opts.pruefen && cardData.cardType === 'Spell' && !this.kannSofortWirken(playerIdx, heroIdx, cardName, wirkerSeite, { alsZusatzaktion: !!opts.pruefenZusatz })) {
       this.log('immediate_cast_fizzled', { player: ps.username, hero: hero.name, card: cardName, by: opts.by || null });
       await this.zeigeFizzle(cardName, { playerIdx, grund: 'cannot_cast_now' });
       return { cancelled: true, fizzled: true };
@@ -40225,7 +40236,16 @@ this._deathWatch = (this._deathWatchStack || []).length
     const ctx = this._createContext(chosen.inst, {});
     this.armEffectAnnounce(chosen.name, pi, 'board');   // v349
     let gerryVeto = false;
-    let resolved = await this._alsAkteur(ctx, () => chosen.script.onHeroEffect(ctx));
+    // Welcher Zusatzaktions-Geber hat diese Aktivierung bezahlt? (Chaos-Diamond:
+    // Duignos zweite Aktion sperrt dessen Zusatz-Casts schon waehrend des Effekts.)
+    const _zusatzVorher = this.gs._heroEffectZusatzInst;
+    this.gs._heroEffectZusatzInst = opts.zusatzInst || null;
+    let resolved;
+    try {
+      resolved = await this._alsAkteur(ctx, () => chosen.script.onHeroEffect(ctx));
+    } finally {
+      if (_zusatzVorher === undefined) delete this.gs._heroEffectZusatzInst; else this.gs._heroEffectZusatzInst = _zusatzVorher;
+    }
     if (this.nimmOpferFizzle()) resolved = true;   // v1313: gerettetes Opfer → fizzelt, aber verbraucht
     if (resolved !== false) this.announceActiveEffect();
     this.clearEffectAnnounce();

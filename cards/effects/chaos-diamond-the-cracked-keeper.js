@@ -146,6 +146,7 @@ module.exports = {
           pool: [k.name],
           poolIndex: 0,
           bereitsInAblage: true,
+          pruefenZusatz: true,   // die Casts sind Zusatzaktionen: Duigno, Mission … sperren sie
           pruefen: true,    // faellt der Spell JETZT durch (Null Zone, Eraser Beam …) → fizzelt
           by: CARD_NAME,
           ...(feld !== pi ? { heroOwner: feld } : {}),
