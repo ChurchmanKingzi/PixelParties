@@ -69,12 +69,18 @@ def dot(out, x, y, c):
 KNEE = 25                           # ab hier (Beine) bleibt er stehen
 
 
-def body_shift(i, y):
+SWORD_HAND_X = 5                    # Schwert samt Hand und Griff (Spalten bis hier) bewegen sich als Ganzes
+
+
+def body_shift(i, y, x=None):
     """Der ganze Oberkörper atmet: alle 12 Frames sackt er 1 px ein (die Zeilen rücken an der Hüfte zusammen,
-    nichts wird gedehnt); seitlich lehnt er sich nicht."""
+    nichts wird gedehnt); seitlich lehnt er sich nicht. Schwert, Hand und Griff sacken als starres Stück mit."""
+    b = 1 if (i % 12) in (5, 6, 7, 8) else 0
+    if x is not None and x <= SWORD_HAND_X:
+        return 0, b
     if y >= KNEE:
         return 0, 0
-    return 0, (1 if (i % 12) in (5, 6, 7, 8) else 0)
+    return 0, b
 
 
 def frame(i):
@@ -87,7 +93,7 @@ def frame(i):
     L = lift(i)
     out = np.zeros((H, W, 4), int)
     for y, x in zip(*np.nonzero(s[:, :, 3])):
-        bx, by = body_shift(i, y)
+        bx, by = body_shift(i, y, x)
         dx = dy = 0
         if y <= HEAD_ROW and x > SWORD_X:
             dy = nod
@@ -120,7 +126,7 @@ def frame(i):
         else:
             grow = 1.0 + 0.5 * rnd(x, i) + 0.2 * rnd(x + 50, i // 2)
         m = min(n + (7 if head else 4), max(n, int(round(n * grow))))
-        bx, by = body_shift(i, y1)
+        bx, by = body_shift(i, y1, x)
         oy = PT + by + (nod if head else 0)
         for j in range(m):
             sy = y0 + min(n - 1, int(j * n / m))
