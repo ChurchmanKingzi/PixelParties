@@ -679,4 +679,4 @@ def check_composition():
 check_composition()
 if os.environ.get('DRAFT_NORENDER'): raise SystemExit(0)
 sf2, out = cli_paths('bgm_draft.ogg')
-song.render(sf2, out, target_rms=0.22)
+song.render(sf2, out, target_rms=0.18, saturate=False, compress=True)  # kein tanh: Klavier/Harfe-Spitzen würden sonst verzerren

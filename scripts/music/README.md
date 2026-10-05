@@ -66,3 +66,11 @@ Für Tracks, die nicht ein Duell, sondern eine lange Tätigkeit begleiten (z. B.
 * `song.program(name, beat, instrument)` wechselt die Instrumente einer Stimme mitten im Stück — so passen mehr
   als 15 Klangfarben auf die 15 Kanäle.
 * Der Render dauert länger (Minuten); Arbeitsspeicher reicht (16 GB).
+
+## Lautheit: Sättigung oder Kompressor?
+`song.render` hat zwei Lautheits-Ketten:
+* Standard (`saturate=True`): weiche tanh-Sättigung, dann Limiter. Gut für schlagzeuglastige Duell-Tracks, **verzerrt aber
+  spitzenreiche, akustische Klänge** (Klavier, Harfe, Zupfer, Glocken; Crest-Faktor > 10) hörbar.
+* `saturate=False, compress=True`: sanfter Kompressor (3,5:1, Schwelle = Ziel-RMS) + Lookahead-Limiter — kein Verzerren.
+  Für Draft-Musik und alle leiseren/akustischen Stücke verwenden (z. B. `target_rms=0.18`).
+FluidSynth rendert intern in 32-Bit-Float (`-O float`); das 16-Bit-Standardformat clippte vor der Normalisierung.
