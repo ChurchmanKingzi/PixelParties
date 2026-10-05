@@ -20031,7 +20031,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (gs._forceDiscardLock === pi) return null;
     // Ebenso waehrend einer laufenden Reaktionskette — sonst schiebt
     // sich per Spam-Klick eine Aktivierung zwischen die Kettenglieder.
-    if (gs._chainResolvingLock) return null;
+    if (gs._chainResolvingLock && !opts.sofortGuss) return null;
     // Boris beim Gegner: Steal-/Kontroll-Karten sind nicht spielbar.
     if (this.isBorisBlocked(cardName, pi)) return null;
 
@@ -20096,7 +20096,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // `_resolvingCard` is set AFTER validation in the play handlers
     // and cleared on every success / failure / cancel path, so
     // sequential plays are unaffected.
-    if (ps._resolvingCard) return null;
+    if (ps._resolvingCard && !opts.sofortGuss) return null;
 
     // Hand validation
     // ★ 28.8.: die Quelle kann die Hand ODER Crestinas Vorrat sein.
@@ -20105,9 +20105,14 @@ this._deathWatch = (this._deathWatchStack || []).length
     // Vorrat gerade nicht benutzbar (Crestina tot, weg, eingefroren,
     // negiert), liefert der Helfer `null` und die Karte ist damit
     // unspielbar; dieselbe Wahrheit, die auch das Ausgrauen liest.
-    const quelle = this.handSourceList(pi, opts.fromCreation);
-    if (!quelle) return null;
-    if (handIndex < 0 || handIndex >= quelle.length || quelle[handIndex] !== cardName) return null;
+    // ★ `opts.sofortGuss`: der Spell kommt NICHT aus der Hand, sondern wird
+    // sofort gewirkt (Chaos-Diamond, Chaos Magic). Dann entfallen Hand-
+    // und Stufenpruefung; alle Status-, Sperr- und Bedingungs-Tore gelten.
+    if (!opts.sofortGuss) {
+      const quelle = this.handSourceList(pi, opts.fromCreation);
+      if (!quelle) return null;
+      if (handIndex < 0 || handIndex >= quelle.length || quelle[handIndex] !== cardName) return null;
+    }
 
     // Card data lookup (uses engine's cached card DB)
     const cardData = this._getCardDB()[cardName];
@@ -20324,7 +20329,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // school/level requirement when the matching additional-action
     // type is flagged `bypassesCasterRequirement: true`.
     const _bypassesCasterReq = this.canBypassCasterRequirementForSpell(heroOwner, heroIdx, cardData, cardName);
-    if (!_bypassesCasterReq && !this.heroMeetsLevelReq(heroOwner, heroIdx, cardData)) return null;
+    if (!opts.sofortGuss && !_bypassesCasterReq && !this.heroMeetsLevelReq(heroOwner, heroIdx, cardData)) return null;
 
     // Load card script
     const script = loadCardEffect(cardName);
@@ -20488,7 +20493,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // die Karte noch auf der Hand liegt (Handindex-Rabatte sind nach dem
     // Splice weg). Forbidden Grimoire misst hier, ob der Spell OHNE sie
     // spielbar gewesen waere. Rein synchron, kein Reaktionsfenster.
-    this._notifyPlayValidated(heroOwner, heroIdx, cardData, handIndex);
+    if (!opts.sofortGuss) this._notifyPlayValidated(heroOwner, heroIdx, cardData, handIndex);
 
     return { ps, cardData, hero, script, isActionPhase, isMainPhase, isInherentAction, wasBerserkGranted };
   }
@@ -21107,6 +21112,19 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (handle.vorher && !this.gs._pendingCardReveal) this.gs._pendingCardReveal = handle.vorher;
   }
 
+  /** Darf dieser Held diesen Spell JETZT wirken (ohne Hand, ohne Stufen)? */
+  kannSofortWirken(playerIdx, heroIdx, cardName, wirkerSeite = playerIdx) {
+    try {
+      return !!this.validateActionPlay(playerIdx, cardName, -1, heroIdx, ['Spell'], {
+        sofortGuss: true,
+        ...(wirkerSeite !== playerIdx ? { charmedOwner: wirkerSeite } : {}),
+      });
+    } catch (err) {
+      console.error('[kannSofortWirken]', cardName, err.message);
+      return false;
+    }
+  }
+
   async _castSpellImmediately(playerIdx, heroIdx, cardName, opts = {}) {
     const ps = this.gs.players[playerIdx];
     // Als Vorgabe 29.9.: `opts.heroOwner` = Brettseite eines GELIEHENEN
@@ -21117,6 +21135,15 @@ this._deathWatch = (this._deathWatchStack || []).length
     const hero = this.gs.players[wirkerSeite]?.heroes?.[heroIdx];
     const cardData = this._getCardDB()[cardName];
     if (!ps || !hero || !cardData) return { cancelled: true };
+    // ★ `opts.pruefen` (Chaos-Diamond, Chaos Magic): der Spell wird erst im
+    // Moment des Wirkens geprueft — Status (Nulled, Silenced, Frozen, tot),
+    // Spell-Sperren (Eraser Beam), Spielbedingungen und Einmal-pro-Spiel.
+    // Faellt eine Pruefung durch, fizzelt der Spell: er wird nicht gewirkt.
+    if (opts.pruefen && cardData.cardType === 'Spell' && !this.kannSofortWirken(playerIdx, heroIdx, cardName, wirkerSeite)) {
+      this.log('immediate_cast_fizzled', { player: ps.username, hero: hero.name, card: cardName, by: opts.by || null });
+      await this.zeigeFizzle(cardName, { playerIdx, grund: 'cannot_cast_now' });
+      return { cancelled: true, fizzled: true };
+    }
     const pool = opts.pool || ps.hand;
     const poolIndex = typeof opts.poolIndex === 'number' ? opts.poolIndex : pool.indexOf(cardName);
     if (poolIndex < 0 || pool[poolIndex] !== cardName) return { cancelled: true };
@@ -21195,6 +21222,15 @@ this._deathWatch = (this._deathWatchStack || []).length
       // die die Hand zaehlen (`handSizeWithoutResolving`), lassen sie dann
       // aus, wie im regulaeren Zauber-Weg. Ein laufender aeusserer Guss
       // (Learning im Zweitguss) wird danach wiederhergestellt.
+      // Aktivierungskosten (Eraser Beam: 3 Pollution Tokens) — wie im
+      // regulaeren Zauber-Weg VOR der Aufloesung.
+      if (cardData.cardType === 'Spell') {
+        const _kostenScript = loadCardEffect(cardName);
+        if (_kostenScript?.payActivationCost) {
+          try { await _kostenScript.payActivationCost(this._createContext(inst, {})); }
+          catch (err) { console.error(`[Engine] payActivationCost for ${cardName} failed:`, err.message); }
+        }
+      }
       const _onPlay = () => this.runHooks('onPlay', { _onlyCard: inst, playedCard: inst, cardName, zone: 'hand', heroIdx, _skipReactionCheck: true });
       // ★★ v1364 (Als Befund Sticky Wand + Call of the Deepsea): legt sich
       // der Sofort-Guss selbst aufs Brett (Attachment → `placeAttachment`

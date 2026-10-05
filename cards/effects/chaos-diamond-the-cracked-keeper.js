@@ -146,6 +146,7 @@ module.exports = {
           pool: [k.name],
           poolIndex: 0,
           bereitsInAblage: true,
+          pruefen: true,    // faellt der Spell JETZT durch (Null Zone, Eraser Beam …) → fizzelt
           by: CARD_NAME,
           ...(feld !== pi ? { heroOwner: feld } : {}),
         });
@@ -153,6 +154,7 @@ module.exports = {
         engine._forceNonCancellable--;
       }
       if (!r?.cancelled) gewirkt++;
+      else if (r?.fizzled) engine.log('chaos_diamond_fizzle', { player: ps.username, card: k.name });
     }
 
     engine.log('chaos_diamond_cast', { player: ps.username, revealed: namen, cast: gewirkt });

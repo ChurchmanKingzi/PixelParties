@@ -56,6 +56,7 @@
 
 const { hasCardType } = require('./_hooks');
 
+const { loadCardEffect } = require('./_loader');
 const CARD_NAME = 'Chaos Magic';
 const MAX_REVEALS = 5;
 const REVEAL_MS = 2000; // matches the kassaran-flip CSS duration
@@ -137,10 +138,20 @@ module.exports = {
         // level / spell-school gating is inherently skipped. Mirrors
         // the Victory Phoenix Cannon sub-cast (incl. its accepted
         // tradeoff of resetting the spell-tracking globals).
+        // Die Stufe ist egal, alles andere (Nulled, Sperren, Spielbedingung
+        // der Karte) gilt: kann der Held den Spell jetzt nicht wirken, fizzelt er.
+        if (!engine.kannSofortWirken(pi, heroIdx, found)) {
+          engine.log('chaos_magic_fizzle', { player: ps.username, reason: 'cannot_cast_found_spell', spell: found });
+          await engine.zeigeFizzle(found, { playerIdx: pi, grund: 'cannot_cast_now' });
+          engine.sync();
+          return;
+        }
         gs._spellDamageLog = [];
         gs._spellExcludeTargets = [];
         const subInst = engine._trackCard(found, pi, 'hand', heroIdx, -1);
         try {
+          const _kosten = loadCardEffect(found)?.payActivationCost;
+          if (typeof _kosten === 'function') await _kosten.call(loadCardEffect(found), engine._createContext(subInst, {}));
           await engine.runHooks('onPlay', {
             _onlyCard: subInst, playedCard: subInst,
             cardName: found, zone: 'hand', heroIdx,
