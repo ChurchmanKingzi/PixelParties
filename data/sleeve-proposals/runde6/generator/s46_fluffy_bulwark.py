@@ -3,30 +3,28 @@
 Held/Hauptmotiv: Bubbles, the Bouncy Bunny (Base-Karte).
 
 Idee (≠ Shop-Sleeve „Fun-Fun Circus“: dort Manege im rot-weißen Zelt mit Elefant, Clown, Director frontal):
-Tag über den Wolken der Moe-Welt, wo der Fun-Fun Circus auf seiner schwebenden Insel spielt (Szenen der
-Circus-Karten). Bubbles sitzt groß als weiche Schutzmauer auf dem Pflasterplatz der Insel – genau wie auf seiner
-Karte mit dem schlafenden Mädchen samt Armbrust auf dem Bauch und dem kleinen Hasen an der Schulter; hinter und
-neben ihm hält sich die Fun-Fun-Truppe in Sicherheit (Heldentext: er fängt den Schaden der Kreaturen ab):
-links der Elephant und der Clown auf seinem Ball, rechts der Director und der Strongman. Am Himmel steigen Ballons
-auf, Applaus-Feuerwerk (Clown-Karte) blüht; unter der Insel hängen die Ranken ins Blau.
+Nacht über der schwebenden Zirkusinsel der Moe-Welt, Abschlussfeuerwerk der Fun-Fun-Show. Bubbles sitzt groß und
+nah (Brustbild, der Unterkörper verschwindet hinter dem unteren Rahmen) auf dem Gras der Insel – wie auf seiner
+Karte mit dem schlafenden Mädchen samt Armbrust auf dem Bauch und dem kleinen Hasen an der Schulter; hinter seinen
+Schultern spähen Clown (auf seinem Ball) und Director hervor, Bubbles schirmt sie ab (Heldentext: er fängt den
+Schaden der Kreaturen ab). Über ihnen blüht Feuerwerk in vielen Farben und Größen, gestaffelt in zwei Tiefen.
 
 Quellen:
   Motive.xcf (Held, gegen „Sichtbar #122“ = Ebene 23 geprüft, im Kartenfenster bis auf den Fensterrand
   pixelgleich): 593 „Bubbles the Bouncy Bunny“, 591 „Bubbles the Bulky Bunny #2“ (liegendes Mädchen),
-  588 „… #3“ (Schatten des Mädchens, Ebenendeckkraft 50 %), 589 „… “ (kleiner Hase), Armbrust aus 585
+  588 „… #3“ (Schatten des Mädchens, Ebenendeckkraft 50 %), 589 (kleiner Hase), Armbrust aus 585
   (Ausschnitt x248–268/y245–264).
-  MotiveMoe.xcf: 36 Clown (Fun-Fun Circus Clown); 28+25+27 Director, 26 Hutschatten 50 %; 13+12+14+10+11 Elephant
-  (gegen die Karten-Szenen 33/24/7 pixelgleich); 19+17+18+21 Strongman + aus 20 der Haarschopf mit dem
-  1-t-Gewicht in der Hand (Aufschrift „1T“ übermalt – kein Text; die drei „10T“-Gewichte weggelassen);
-  38 Feuerwerk (3 von 5 Sternen), 23 Ballons (Gruppe + Paar), 478 „Relic-Insel“ (alle acht Säulen und die
-  Reliquienkiste entfernt: Gras aus einer 16×16-Graskachel der Insel, Pflaster aus 16–64 px daneben, Inselkante
-  unter den hinteren Säulen zwischen den Nachbarspalten interpoliert), 553 „Hintergrund“ (Himmel mit Wolken,
-  Ausschnitt x20–270/y160–510).
-Selbst gezeichnet: nur die Schatten (Ellipsen, ganze Pixel mit Deckkraft).
+  MotiveMoe.xcf: 36 Fun Circus Clown; 28+25+27 Director, 26 Hutschatten 50 % (gegen Karten-Szenen 33/24
+  pixelgleich); 38 Feuerwerkssterne der Clown-Karte (zwei, fern); 553 „Hintergrund“ (Moe-Himmel mit Wolken,
+  Ausschnitt x20–270/y160–510, nachtblau umgefärbt); 478 „Relic-Insel“ (16×16-Graskachel für die Inselkante).
+Selbst gezeichnet: Nachtfärbung, Sterne, Feuerwerk (Speichen mit gepunkteten Enden im Stil und in den Farben der
+Feuerwerkssterne aus 38, Radien 4–20 px, 8–16 Speichen, eine Leuchtspur), Inselkante, Schatten.
 
-Skalierung: alles in EINEM 1×-Raster (250×350 → 3 px je Sprite-Pixel), Originalgrößen beider xcf-Dateien:
-Bubbles 116×123 → 348×369 px. Gemessen am PNG: Augen x 339–368 und 381–410 → Gesichtsmitte x = 375,0
-(Mund 351–395, 373,5 – der Mund des Sprites sitzt einen halben Pixel links).
+Skalierung (nach Nutzer-Feedback „Held deutlich größer“, reingezoomt):
+  fern – 1×-Raster (250×350): Nachthimmel, Sterne, kleines Feuerwerk
+  nah – 2×-Raster (125×175, um 1 px nach rechts versetzt): großes Feuerwerk, Inselkante, Clown, Director,
+  Bubbles (116×123 → 696×738 px).
+  Gemessen am PNG: Augen x 303–362 und 387–446 → Gesichtsmitte x = 375,0.
 """
 import math, random
 import numpy as np
@@ -58,92 +56,90 @@ EYE_C = 59                                                              # Augen 
 clown = keep('o46_clown', compose(MO, [36]))
 dirc = compose(MO, [28, 25, 27], crop=False); dirc = over(dirc, lay(MO, 26, 0.5))
 dirc = keep('o46_director', crop_alpha(dirc))
-eleph = keep('o46_elephant', compose(MO, [13, 12, 14, 10, 11]))
-st = compose(MO, [19, 17, 18, 21], crop=False)
-mal = layer(MO, 20).copy(); mm = np.zeros(mal.shape[:2], bool); mm[95:117, 326:348] = True; mal[~mm] = 0
-wh = (mal[..., 0] == 255) & (mal[..., 3] > 0); mal[wh, :3] = (74, 74, 74)        # Aufschrift entfernt (kein Text)
-st = keep('o46_strongman', crop_alpha(over(st, mal)))
-fw = parts(crop_alpha(layer(MO, 38)), dil=1)                                      # vier Feuerwerkssterne
-print('troupe', clown.shape, dirc.shape, eleph.shape, st.shape, len(fw))
+fw = parts(crop_alpha(layer(MO, 38)), dil=1)                                      # Feuerwerkssterne (13×13)
 
-# ------------------------------------------------------------------ Hintergrund: Moe-Himmel, Relic-Insel
+# ================================================================== Ebene 1 (fern, 1×-Raster 250×350): Nachthimmel
 W, H = 250, 350
-P = Plane(W, H, 1)
-sky = layer(MO, 553)[160:510, 20:270]
-P.paste(sky, 0, 0)
+P1 = Plane(W, H, 1)
+sky = layer(MO, 553)[160:510, 20:270].astype(float)                      # Moe-Himmel mit Wolken
+for y in range(H):
+    t = y / H
+    base = np.array(mix((6, 8, 26), (34, 26, 70), t ** 1.3))             # Nacht: oben fast schwarz, unten violett
+    cl = np.clip((sky[y, :, 0] - 20) / 200.0, 0, 1)                      # Wolkenanteil (Himmelblau hat kaum Rot)
+    P1.a[y, :, :3] = np.clip(base[None, :] * (1 - cl[:, None]) + np.array((58, 60, 96))[None, :] * cl[:, None], 0, 255)
+    P1.a[y, :, 3] = 255
+for i in range(60):                                                      # ein paar Sterne
+    x, y = rnd.randrange(2, W - 2), rnd.randrange(2, 200)
+    if sky[y, x, 0] < 40: P1.a[y, x, :3] = (200, 205, 235) if rnd.random() < 0.5 else (120, 120, 170)
 
-isl = crop_alpha(layer(MO, 478)).copy()                                 # 240×240
-# alle acht Säulen und die Reliquienkiste entfernen (dort sitzt Bubbles): Säulenpixel (graue Steine in den
-# Kästen) werden aus Gras bzw. Pflaster 16/32 px daneben ersetzt
-import cv2
-I_ = isl.astype(int); sat = I_[..., :3].max(-1) - I_[..., :3].min(-1)
-isgrass = (I_[..., 1] > I_[..., 0] + 15) & (I_[..., 1] > I_[..., 2] + 15)
-PM = np.zeros(sat.shape, bool)
-for x0, y0, x1, y1 in [(46, 76, 65, 115), (79, 92, 97, 131), (110, 92, 129, 131), (143, 76, 163, 115), (94, 64, 114, 82),
-                       (46, 12, 65, 50), (143, 12, 163, 50), (79, 0, 98, 36), (110, 0, 129, 36)]:
-    PM[y0:y1, x0:x1] |= (sat[y0:y1, x0:x1] < 22) & (isl[y0:y1, x0:x1, 3] > 0)
-PM = cv2.dilate(PM.astype(np.uint8), np.ones((3, 3), np.uint8)) > 0
-src = isl.copy()
-# Säulenschäfte, die über die hintere Inselkante in den Himmel ragen, werden durchsichtig; die Kante unter einer
-# Säule wird zwischen den Nachbarspalten ohne Säule interpoliert
-TOPS = np.full(isl.shape[1], -1)
-for x in range(isl.shape[1]):
-    if not PM[:60, x].any():
-        col = np.nonzero(src[:, x, 3] > 0)[0]; TOPS[x] = col.min() if len(col) else -1
-for x in range(isl.shape[1]):
-    if TOPS[x] >= 0 or not PM[:60, x].any(): continue
-    l = x - 1
-    while l >= 0 and TOPS[l] < 0: l -= 1
-    r = x + 1
-    while r < isl.shape[1] and TOPS[r] < 0: r += 1
-    t = int(round(TOPS[l] + (TOPS[r] - TOPS[l]) * (x - l) / (r - l)))
-    isl[:t, x][PM[:t, x]] = 0; PM[:t, x] = False
-T_GR = src[32:48, 176:192].copy()                                       # saubere 16×16-Graskachel
-for y, x in zip(*np.nonzero(PM)):
-    want_cobble = 30 <= y < 110 and 50 <= x < 158
-    if not want_cobble:
-        isl[y, x] = T_GR[(y - 32) % 16, (x - 176) % 16]; continue
-    done = False
-    for dy in (0, 16, -16, 32):
-        for dx in (16, -16, 32, -32, 48, -48, 64, -64):
-            yy, xx = y + dy, x + dx
-            if 0 <= yy < isl.shape[0] and 0 <= xx < isl.shape[1] and not PM[yy, xx] and src[yy, xx, 3] > 0 \
-                    and not isgrass[yy, xx]:
-                isl[y, x] = src[yy, xx]; done = True; break
-        if done: break
-IX, IY = 20, 106
-P.paste(isl, IX, IY)
-
-# ------------------------------------------------------------------ Himmel: Ballons und Applaus-Feuerwerk
-bal = crop_alpha(layer(MO, 23))                                          # 88×100, freie Ballons mit Schnüren
-keep('o46_balloons', bal)
-BP = parts(bal, dil=1, minpx=20)                                         # einzelne Ballons samt Schnur
-for i_, (x, y) in zip((3, 0), [(188, 30), (36, 46)]):
-    P.paste(BP[i_], x, y)                                                # vom Fest aufgestiegene Ballons
-for f_, (x, y) in zip(fw, [(56, 14), (100, 36), (146, 16)]):
-    P.paste(f_, x, y)
+# Feuerwerk: Sterne aus Speichen mit gepunkteten Enden wie die Sterne der Clown-Karte (Ebene 38), in mehreren
+# Größen und Farben; ferne klein im 1×-Raster, nahe groß im 2×-Raster
+PAL = {'gold': ((183, 138, 30), (255, 180, 0), (255, 222, 130)), 'green': ((125, 158, 78), (158, 212, 80), (210, 236, 170)),
+       'cyan': ((75, 137, 164), (75, 177, 223), (170, 222, 245)), 'red': ((158, 71, 71), (212, 67, 67), (240, 160, 160)),
+       'violet': ((117, 93, 158), (144, 104, 212), (200, 180, 235)), 'pink': ((170, 70, 130), (232, 96, 170), (250, 190, 225)),
+       'white': ((150, 150, 170), (215, 215, 230), (255, 255, 255))}
 
 
-def shadow(cx, cy, rx, ry, a=110):
+def burst(pl, cx, cy, R, pal, n=12, seed=0, trail=None):
+    r = random.Random(seed)
+    dk, md, lt = PAL[pal]
+    rot = r.random() * math.pi
+    for i in range(n):
+        ang = rot + 2 * math.pi * i / n
+        L = R * (0.82 + 0.18 * r.random())
+        step = 1 if R < 8 else 2
+        k = 2 if R < 8 else 3
+        while k <= L:
+            f = k / L
+            col = lt if f < 0.35 else (md if f < 0.8 else dk)
+            pl.px(int(round(cx + math.cos(ang) * k)), int(round(cy + math.sin(ang) * k)), col)
+            k += step if f < 0.8 else step + 1
+        pl.px(int(round(cx + math.cos(ang) * (L + 2))), int(round(cy + math.sin(ang) * (L + 2))), dk)   # Funke
+    pl.px(int(cx), int(cy), lt)
+    if trail:                                                              # aufsteigende Leuchtspur
+        for yy in range(int(cy) + int(R) + 3, trail, 2):
+            pl.px(int(cx) + (1 if (yy // 2) % 3 == 0 else 0), yy, dk)
+
+
+# ferne Sterne (1×): Originalsprites der Clown-Karte und kleine gezeichnete
+for f_, (x, y) in zip([fw[0], fw[1]], [(30, 132), (204, 150)]):
+    P1.paste(f_, x, y, alpha=0.8)
+for (x, y, R, c, n, sd) in [(64, 160, 6, 'pink', 10, 1), (150, 140, 5, 'gold', 8, 2), (216, 196, 6, 'green', 10, 3),
+                            (24, 200, 5, 'cyan', 8, 4), (92, 120, 4, 'white', 8, 5)]:
+    burst(P1, x, y, R, c, n, sd)
+
+# ================================================================== Ebene 2 (2×-Raster 125×175, um 1 px versetzt)
+# Bubbles' Augenmitte (Sprite-Spalte 59,0) → 1 + 2·(3 + 59) = 125 → x 375
+P2 = Plane(125, 175, 2, ox=1)
+# nahe große Feuerwerkssterne, gestaffelt
+for (x, y, R, c, n, sd, tr) in [(30, 26, 20, 'gold', 16, 11, None), (94, 20, 16, 'pink', 14, 12, None),
+                                (66, 50, 11, 'cyan', 12, 13, 84), (108, 62, 9, 'green', 12, 14, None),
+                                (16, 66, 8, 'violet', 10, 15, None)]:
+    burst(P2, x, y, R, c, n, sd, tr)
+
+# Rückkante der Insel (Relic-Insel-Gras) hinter Bubbles – darauf stehen er und die Truppe
+isl = crop_alpha(layer(MO, 478))
+T_GR = isl[32:48, 176:192].copy()                                       # 16×16-Graskachel der Insel
+EDGE = 140
+for x in range(125):
+    e = EDGE + int(round(1.2 * math.sin(x * 0.21) + 0.8 * math.sin(x * 0.53 + 2)))
+    P2.a[e - 1, x, :3] = (92, 62, 30); P2.a[e - 1, x, 3] = 255              # dunkle Erdkante wie am Inselrand
+    for y in range(e, 175):
+        P2.a[y, x, :3] = T_GR[y % 16, x % 16, :3] * (0.55 + 0.25 * (y - e) / 25); P2.a[y, x, 3] = 255
+
+def shadow2(cx, cy, rx, ry, a=120):
     for y in range(int(cy - ry) - 1, int(cy + ry) + 2):
         for x in range(int(cx - rx) - 1, int(cx + rx) + 2):
             if ((x + 0.5 - cx) / rx) ** 2 + ((y + 0.5 - cy) / ry) ** 2 <= 1:
-                P.px(x, y, (20, 40, 20), a)
+                P2.px(x, y, (16, 30, 16), a)
 
 
-# ------------------------------------------------------------------ Figuren (von hinten nach vorn)
-FEET = IY + 116
-BX = 125 - EYE_C
-DY = IY - 118
-TROUPE = [  # (Sprite, linke Kante x, Fußzeile y) – die Truppe drängt sich hinter Bubbles in Sicherheit
-    (clown, 80, 156 + DY), (dirc, 166, 152 + DY),
-    (eleph, 38, 194 + DY), (st, 182, 192 + DY),
-]
-for spr, x, fy in TROUPE:
-    shadow(x + spr.shape[1] / 2, fy + 0.5, spr.shape[1] * 0.42, 2.2)
-    P.paste(spr, x, fy - spr.shape[0] + 1)
-shadow(125, FEET - 2, 56, 6, 120)
-P.paste(bub, BX, FEET - bub.shape[0] + 1)
+# die Truppe späht hinter seinen Schultern hervor (Füße hinter seinen Armen verdeckt)
+GX, GY = 3, 80
+P2.paste(clown, 13, 153 - clown.shape[0] + 1)
+shadow2(93 + dirc.shape[1] / 2, 150.5, 7, 1.3)
+P2.paste(dirc, 93, 150 - dirc.shape[0] + 1)
+P2.paste(bub, GX, GY)
 
-cv = compose_planes([P])
+cv = compose_planes([P1, P2])
 save(cv, '46_fluffy_bulwark.png')
