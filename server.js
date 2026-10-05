@@ -3596,8 +3596,7 @@ app.get('/api/hero-animations', async (req, res) => {
 // mit dieser Wahrscheinlichkeit einen zufaelligen Skin (alle Varianten des
 // Helden sind moeglich, auch schon freigeschaltete). Gewinnt der Mensch ein
 // solches „Skin-Game“ und besitzt den Skin noch nicht, schaltet er ihn frei.
-// TEST: vorerst 100 % — fuer den Normalbetrieb auf 0.10 setzen.
-const CPU_SKIN_CHANCE = 1.0;
+const CPU_SKIN_CHANCE = 0.10;
 
 /** Zufaelliger Skin des mittleren Helden eines CPU-Decks — null, wenn keiner wuerfelt/existiert. */
 function rollCpuSkin(cpuDeck) {
