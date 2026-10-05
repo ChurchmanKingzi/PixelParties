@@ -495,16 +495,26 @@ function instrumentiere(engine) {
     zaehle(engine, 'gen');
     // Angebot VOR dem Aufruf festhalten: die Trichter filtern ihre
     // Listen unterwegs teilweise in place.
-    let angebot = null, karte = null, art = 'generic', gesamt = null, fuer = null;
+    let angebot = null, karte = null, art = 'generic', gesamt = null, fuer = null, lernTags = null;
     try {
       const sc = promptData && promptData.showCard;
       // `menuSource` steht ausdruecklich auf den Mengenwahl-Prompts und
       // ist der verlaesslichste Kartenschluessel; danach das
       // Auto-Bild aus `_promptCardStack`, erst zuletzt der Titel (der
       // auch mal ein Effekttext ist).
-      karte = (promptData && promptData.menuSource)
+      //
+      // `decisionKey` (Als Auftrag 5.10., „Quest of the Chosen One"): eine
+      // Karte mit ZWEI Fragen („Kosten zahlen?" und „Karte ziehen?") darf
+      // der einen einen eigenen Schluessel geben — sonst landeten beide in
+      // derselben Regel, und die Grundrate des einen Tores verfaelschte das
+      // andere (Form 1 lernt je Schluessel, nie ueber Karten gemittelt).
+      karte = (promptData && promptData.decisionKey)
+        || (promptData && promptData.menuSource)
         || (sc && (sc.name || sc.cardName)) || (typeof sc === 'string' ? sc : null)
         || (promptData && (promptData.title || promptData.source)) || null;
+      // Eigene Lage-Tags der Frage (z. B. Kosten-Tags): der Trainer haengt sie
+      // an die Zustands-Tags der Zeile (`scripts/decision-channels.js`).
+      if (promptData && Array.isArray(promptData.lernTags) && promptData.lernTags.length) lernTags = promptData.lernTags.slice(0, 16);
       art = artAusTyp(promptData && promptData.type, promptData);
       const roh = promptData && (promptData.options || promptData.cards || promptData.zones);
       if (Array.isArray(roh)) { gesamt = roh.length; angebot = roh.slice(0, MAX_OPTIONEN); }
@@ -572,6 +582,7 @@ function instrumentiere(engine) {
         art, karte,
         optionen: angebot,
         gesamt,
+        ...(lernTags ? { tags: lernTags } : {}),
         // null = abgelehnt. Bei cancellable Confirms ist das der
         // Normalfall und genau die Information, die bisher fehlte.
         gewaehlt: antwortKurz(response),

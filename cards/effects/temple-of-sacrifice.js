@@ -144,6 +144,9 @@ module.exports = {
   },
 
   cpuMeta: {
+    // Auch als NORMALE Aktion in der Action Phase spielbar — lehnt der Spieler das Opfer
+    // ab, zahlt die normale Aktion (Curse-Vertrag). Als Auftrag 5.10., `optionalInherent`.
+    optionalInherent: true,
     // While Temple is on the board, sacrificing your own Creatures draws
     // cards — so the CPU should treat its Creatures as more disposable.
     // Chain source (collected from the area zone) crediting a draw's

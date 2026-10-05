@@ -147,6 +147,10 @@ module.exports = {
   requiresTarget: true,
   // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
 
+  // CPU: auch als NORMALE Aktion in der Action Phase spielbar (Als Auftrag 5.10.) —
+  // `_cpu.js` lässt inhärente Karten dort sonst aus (Vertrag `optionalInherent`).
+  cpuMeta: { optionalInherent: true },
+
   // ── Inherent grant ──
   // True iff ANY alive Hero on the board (own or opp) qualifies for
   // Curse's condition. Mirrors the engine's pattern of script-driven

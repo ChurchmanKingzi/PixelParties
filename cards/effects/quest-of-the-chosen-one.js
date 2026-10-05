@@ -31,19 +31,31 @@
 //  Zug und Kopie der Karte. Die Rückkehr einer verwahrten Ability
 //  (Madame Guillotine) ist kein Anlegen.
 //
-//  ── CPU ──────────────────────────────────────────────────────────
-//  Die CPU spielt die Karte nicht: auf dem Hauptweg gilt sie als
-//  inhärent (die CPU verschiebt solche Karten in die Main Phase), und
-//  dort sperrt `cpuPlayVeto` — die Kosten-Abwägung kennt sie nicht.
-//  Zur Sicherheit antwortet `cpuResponse` trotzdem: bei der Frage die
-//  normale Aktion, das Ziehen nimmt sie an.
+//  ── CPU (Als Auftrag 5.10.) ──────────────────────────────────────
+//  Die Karte ist für die CPU eine echte Wahl, in beiden Phasen:
+//  • Action Phase: `cpuMeta.optionalInherent` lässt sie als Kandidaten
+//    zu (sonst würden inhärente Karten dort übersprungen). Die Frage
+//    „Zusatzaktion gegen alle Abilities oder normale Aktion?" beantwortet
+//    der Kosten-Kanal.
+//  • Main Phase: dort ist die Zusatzaktion der einzige Weg. `cpuPlayVeto`
+//    fragt denselben Kanal; sagt er „zahlen", wird die Karte ohne
+//    Wertgate gespielt (`cpuMeta.alwaysCommit`), sonst entscheidet das
+//    Gate wie bei jeder anderen Karte.
+//  • Der Kosten-Kanal (`abilityLossChoice` in `_deck-profile.js`) ist
+//    lernbar: Schlüssel `Quest of the Chosen One#Kosten`, Lage-Tags
+//    `kost:*` (wie viele/welche Abilities gehen verloren, trägt die
+//    Schule das Deck, wie oft wurde sie genutzt …). Ohne Regel zahlt die
+//    CPU nur, wenn der Verlust billig ist.
+//  • Die Ziehfrage läuft über den Zieh-Kanal (`optionalDrawChoice`).
 // ═══════════════════════════════════════════
 
 const { attachmentHostsFor, candidateHosts, pickAttachmentHost, placeAttachment } = require('./_attachment-shared');
 const { mainActionSlotFree } = require('./_of-kings-shared');
 const { drawWouldBeBlocked } = require('./_draw-block-shared');
+const deckProfile = require('./_deck-profile');
 
 const CARD_NAME = 'Quest of the Chosen One';
+const KEY_KOSTEN = `${CARD_NAME}#Kosten`;   // eigener Lern-Schlüssel der Kostenfrage (Form 1, je Schlüssel)
 const MAX_ZIEHEN_PRO_ZUG = 3;
 
 /** Die Abilities, die an (Brettseite, Held) hängen — Cloak of Edge & Co. eingeschlossen. */
@@ -85,6 +97,35 @@ async function alleAbilitiesAbwerfen(engine, seite, heroIdx, pi) {
   return anzahl;
 }
 
+// ── CPU: Kosten-Entschluss der Main Phase (kein Prompt, deshalb eigene Aufzeichnung) ──
+
+/** Kann der Held `heroIdx` (eigene Seite) die Karte tragen UND die Kosten zahlen? */
+function kostenZahlbarBei(engine, pi, heroIdx) {
+  return candidateHosts(engine.gs, pi, engine, { heroFilter: wirtsFilter(engine, true) })
+    .some(h => h.side === pi && h.heroIdx === heroIdx);
+}
+
+/**
+ * „Alle Abilities dieses Helden abwerfen, um die Karte als Zusatzaktion zu
+ * spielen?" — einmal je (Zug, Phase, Held), damit wiederholte Abfragen
+ * derselben Phase dasselbe antworten (die Trainings-Exploration wuerfelt
+ * sonst bei jedem Aufruf neu) und nur EINE Zeile ins Protokoll kommt.
+ */
+function kostenEntschlussMainPhase(engine, pi, heroIdx) {
+  const gs = engine.gs;
+  const schluessel = `${gs.turn}|${gs.currentPhase}|${pi}|${heroIdx}`;
+  const sim = !!engine._inMctsSim;
+  if (!sim && engine._questKosten?.[schluessel] !== undefined) return engine._questKosten[schluessel];
+  const tags = deckProfile.abilityLossTags(engine, pi, abilitiesVon(engine, pi, heroIdx), { modus: 'pflicht' });
+  const zahlen = deckProfile.abilityLossChoice(engine, pi, KEY_KOSTEN, tags, { record: true });
+  if (!sim) {
+    if (!engine._questKosten || Object.keys(engine._questKosten).length > 24) engine._questKosten = {};
+    engine._questKosten[schluessel] = zahlen;
+    engine._questKostenLetzte = { schluessel, zahlen };
+  }
+  return zahlen;
+}
+
 module.exports = {
   // Entkoppelte Bilder (CARD_API): wird die Karte negiert, spielt die Engine diese.
   spellVisual: { impact: { type: 'gold_sparkle' }, impactMs: 260 },
@@ -114,13 +155,44 @@ module.exports = {
   },
 
   // ── CPU ──
-  cpuPlayVeto(engine, pi, heroIdx, ctx2) {
-    return !!ctx2?.additional;   // die CPU zahlt die Kosten nie
+  cpuMeta: {
+    // Als normale Aktion UND als (bezahlte) Zusatzaktion spielbar — die Action Phase
+    // der CPU lässt die Karte deshalb als Kandidat zu (siehe `_cpu.js`).
+    optionalInherent: true,
+    // Hat der Kosten-Kanal in dieser Phase „zahlen" gesagt, geht die Karte ohne
+    // Wertgate durch: die Gate-Bewertung sieht nur den Verlust der Abilities, nicht
+    // die gewonnene Aktion — genau die Abwägung, die der Kanal lernen soll.
+    alwaysCommit: (engine, pi) => {
+      const gs = engine.gs;
+      const m = engine._questKostenLetzte;
+      return !!m && m.zahlen === true && m.schluessel.startsWith(`${gs.turn}|${gs.currentPhase}|${pi}|`);
+    },
   },
+
+  /**
+   * Main Phase / Zusatzaktions-Weg (`additional: true`): hier ist das Bezahlen der EINZIGE
+   * Weg. Veto, wenn der Held nichts zahlen kann oder der Kosten-Kanal „nicht zahlen" sagt.
+   * Action Phase (`additional: false`): normale Aktion bleibt immer erlaubt, die Frage
+   * „Zusatzaktion?" stellt `onPlay`.
+   */
+  cpuPlayVeto(engine, pi, heroIdx, ctx2) {
+    if (!ctx2?.additional) return false;
+    if (engine.findAdditionalActionForCard(pi, CARD_NAME, heroIdx)) return false;   // Geber zahlt: keine Kosten
+    if (!kostenZahlbarBei(engine, pi, heroIdx)) return true;                       // dieser Held kann nicht zahlen
+    return !kostenEntschlussMainPhase(engine, pi, heroIdx);
+  },
+
   cpuResponse(engine, kind, payload) {
-    if (kind !== 'generic' || payload?.type !== 'confirm' || payload?.title !== CARD_NAME) return undefined;
-    if (/additional Action\?/.test(payload?.message || '')) return { confirmed: false };   // normale Aktion
-    return { confirmed: true };                                                            // Karte ziehen
+    if (kind !== 'generic' || payload?.type !== 'confirm') return undefined;
+    if ((payload._gerryOriginalTitle || payload.title) !== CARD_NAME) return undefined;
+    const pi = Number.isInteger(payload._ownerIdx) ? payload._ownerIdx : engine._cpuPlayerIdx;
+    // Kostenfrage: gelernte Regel / Exploration / Grundheuristik. Den Eintrag ins Protokoll
+    // schreibt der Prompt-Trichter (Schlüssel + Tags hängen am Prompt).
+    if (payload.decisionKey === KEY_KOSTEN) {
+      return { confirmed: deckProfile.abilityLossChoice(engine, pi, KEY_KOSTEN, payload.lernTags) };
+    }
+    // Ziehfrage: Zieh-Kanal (gelernte Regel je Karte, sonst Mill-Heuristik).
+    return deckProfile.optionalDrawChoice(engine, pi, CARD_NAME, 1) ? { confirmed: true } : null;
   },
 
   hooks: {
@@ -174,9 +246,13 @@ module.exports = {
             message: `Play ${CARD_NAME} as an additional Action? If you do, all ${vorhanden.length === 1 ? 'Ability' : 'Abilities'} attached to ${wirtsHeld.name} are sent to the discard pile. Otherwise it uses this Hero's normal Action.`,
             confirmLabel: '⚡ Additional Action (discard Abilities)',
             cancelLabel: '⚔️ Normal Action',
-            // Zwei gleichwertige Wege, kein „may"-Effekt: das zweite Feld IST die Antwort „normale
-            // Aktion" — es bricht nicht den Zauber ab, und kein Gerrymander darf sie umlenken.
-            cancellable: false,
+            // „You may send all Abilities …" ist ein „may"-Effekt (Gerrymander gilt), und das zweite
+            // Feld IST die Antwort „normale Aktion" — es bricht nicht den Zauber ab.
+            cancellable: true,
+            // Lern-Kanal der Kostenabwägung (`abilityLossChoice`): eigener Schlüssel, damit die
+            // Ziehfrage derselben Karte die Grundrate nicht verfälscht, plus die Lage-Tags.
+            decisionKey: KEY_KOSTEN,
+            lernTags: deckProfile.abilityLossTags(engine, pi, vorhanden, { modus: 'wahl' }),
           });
           bezahlen = engine._confirmSaidYes(antwort);
         }

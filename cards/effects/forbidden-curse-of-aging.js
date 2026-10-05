@@ -98,6 +98,10 @@ module.exports = {
   requiresTarget: true,
   activeIn: ['hand', 'support'],
 
+  // CPU: auch gegen ein Ziel OHNE Bedingung als NORMALE Aktion spielbar (Regel ③) —
+  // Als Auftrag 5.10., Vertrag `optionalInherent`.
+  cpuMeta: { optionalInherent: true },
+
   attachmentStatus: STATUS_NAME,
   blocksHostHeal: true,
   blocksHostStatusRemoval: true,
