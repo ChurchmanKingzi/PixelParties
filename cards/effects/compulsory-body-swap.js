@@ -173,6 +173,36 @@ module.exports = {
         // determines discard-pile routing; the body swap doesn't
         // transfer card ownership across decks.
       };
+      // ★ Stufenbonus-Abilities (Toughness: Max-HP, Fighting: ATK) tragen ihren
+      // Bonus am HELDEN. Wandert die Karte, muss er mit: erst bei BEIDEN Quellen
+      // abziehen, dann bei beiden Zielen aufschlagen (der Abzug laesst nie unter
+      // 1 HP fallen; zuerst-abziehen haelt Zwischenstaende sauber).
+      const bewegt = [
+        ...toFlipToB.map(inst => ({ inst, von: a, nach: b })),
+        ...toFlipToA.map(inst => ({ inst, von: b, nach: a })),
+      ].filter(m => (m.inst.counters?.hpGranted || 0) > 0 || (m.inst.counters?.atkGranted || 0) > 0);
+      const heroAt = (o) => gs.players[o.owner]?.heroes?.[o.heroIdx];
+      for (const m of bewegt) {
+        const hv = heroAt(m.von);
+        if (!hv?.name) continue;
+        const c = m.inst.counters;
+        if (c.hpGranted > 0) {
+          const eff = engine.decreaseMaxHp(hv, c.hpGranted);
+          engine._broadcastEvent('toughness_hp_change', { owner: m.von.owner, heroIdx: m.von.heroIdx, amount: -eff });
+        }
+        if (c.atkGranted > 0) engine._applyHeroAtkDelta(hv, m.von.owner, m.von.heroIdx, -c.atkGranted);
+      }
+      for (const m of bewegt) {
+        const hn = heroAt(m.nach);
+        if (!hn?.name) continue;
+        const c = m.inst.counters;
+        if (c.hpGranted > 0) {
+          const eff = engine.increaseMaxHp(hn, c.hpGranted, { alsoHealCurrent: true });
+          c.hpGranted = eff;
+          engine._broadcastEvent('toughness_hp_change', { owner: m.nach.owner, heroIdx: m.nach.heroIdx, amount: eff });
+        }
+        if (c.atkGranted > 0) engine._applyHeroAtkDelta(hn, m.nach.owner, m.nach.heroIdx, c.atkGranted);
+      }
       for (const inst of toFlipToB) repoint(inst, b.owner, b.heroIdx);
       for (const inst of toFlipToA) repoint(inst, a.owner, a.heroIdx);
 
