@@ -5,6 +5,7 @@ Ebenen: Körper (src/classmate-hel-body.png, vom Nutzer gezeichnet, mit Geisters
 (src/classmate-hel-{chair,desk}.png, classmate_hel_sprite.py).
 Frame 0 ist die Ruhepose (der Sprite genau wie gezeichnet); jede Bewegung ist als Differenz zu Frame 0
 formuliert.
+* Hel selbst ist halbtransparent (GHOST_ALPHA), die Möbel bleiben opak.
 * Der Körper schwebt nur sanft auf und ab (die ganze Figur, ±1 px) – er neigt sich nie zur Seite.
 * Die langen weißen Haarsträhnen bewegen sich unabhängig davon, geisterhaft: jede Strähne mit eigener
   Wellenphase (eine Welle läuft die Strähne hinab, zur Spitze stärker, die Strähnen schwingen nicht im
@@ -30,6 +31,7 @@ SH, SW = BODY.shape[:2]
 PL, PR, PT, PB = 14, 14, 7, 4
 H, W = SH + PT + PB, SW + PL + PR
 N = 48
+GHOST_ALPHA = 166                   # Deckkraft von Hel selbst (Möbel bleiben opak); >= 160, sonst ignoriert das Brett die Figur
 OUTLINE = (0x4c, 0x49, 0x66)
 HAIR = {(0xd4, 0xd0, 0xee), (0xaa, 0xa5, 0xd2), (0x82, 0x7d, 0xae), (0xf4, 0xf2, 0xff)}
 HAIR_Y0, HAIR_Y1 = 9, 24            # Haarsträhnen neben dem Körper (Zeilen im Sprite)
@@ -180,7 +182,15 @@ def frame(i):
         y = cy + int(round(2.6 * math.sin(a)))
         put(out, spr, x - spr.shape[1] // 2, y - spr.shape[0] // 2, flip)
     dy = -int(round(1.2 * math.sin(t)))
-    put(out, figure(i), PL - PX, PT + dy)
+    ghost = np.zeros_like(out)                      # Hel selbst: halbtransparent, Möbel opak
+    put(ghost, figure(i), PL - PX, PT + dy)
+    ghost[:, :, 3] = np.where(ghost[:, :, 3] > 0, GHOST_ALPHA, 0)
+    for y, x in zip(*np.nonzero(ghost[:, :, 3])):
+        if out[y, x, 3]:                            # liegt ein Möbelstück dahinter, mischen
+            al = GHOST_ALPHA / 255
+            out[y, x, :3] = [int(ghost[y, x, k] * al + out[y, x, k] * (1 - al)) for k in range(3)]
+        else:
+            out[y, x] = ghost[y, x]
     near = np.zeros((H, W), bool)                   # Geisterlichter nie an Figur oder Möbeln
     ys, xs = np.nonzero(out[:, :, 3])
     for y, x in zip(ys, xs):
