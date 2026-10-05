@@ -1739,6 +1739,7 @@ function PlayScreen() {
 
   return (
     <div className="screen-full">
+      {user && !user.isGuest && <SocialChatWindow meId={user.id} />}
       <div className="top-bar">
         <button className="btn" onClick={() => setScreen('menu')}>← BACK</button>
         <h2 className="orbit-font" style={{ fontSize: 22, fontWeight: 800, color: 'var(--player-color)' }}>ONLINE LOBBY</h2>
@@ -1775,6 +1776,9 @@ function PlayScreen() {
       </div>
 
       <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }} className="lobby-content animate-in">
+        {/* Who's Online + Chats + Herausforderungen — dasselbe Interface wie im Hauptmenü (app-social.jsx) */}
+        {user && !user.isGuest && <SocialSidePanel meId={user.id} />}
+
         {/* Open Games */}
         <div className="lobby-spalte ornate-frame pp-menuekasten" style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
           <div className="orbit-font lobby-spalten-titel" style={{ padding: '10px 16px', fontSize: 12, fontWeight: 700, color: 'var(--accent)' }}>

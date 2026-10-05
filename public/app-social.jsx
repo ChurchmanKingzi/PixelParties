@@ -27,6 +27,7 @@ const _social = {
   presence: [],
   state: { unread: {}, incoming: [], extras: [], blocked: [], blockedBy: [] },
   msgs: {},            // peerId -> Nachrichten (nur, was geladen wurde)
+  chatPeer: null,      // offenes Chatfenster ({ id, name, color }) — gilt für Hauptmenü UND Online-Lobby
   listeners: new Set(),
 };
 function _socialChanged() { _social.listeners.forEach(f => f()); }
@@ -40,6 +41,9 @@ function useSocial() {
   }, []);
   return _social;
 }
+
+function socialOpenChat(peer) { _social.chatPeer = peer ? { id: peer.id, name: peer.name, color: peer.color } : null; _socialChanged(); }
+function socialCloseChat() { _social.chatPeer = null; _socialChanged(); }
 
 function _socialUpsertMessage(peerId, msg) {
   const list = _social.msgs[peerId];
@@ -90,7 +94,7 @@ function SocialHost({ user, bgmMode }) {
 
   useEffect(() => {
     if (!active) {
-      _social.presence = []; _social.msgs = {};
+      _social.presence = []; _social.msgs = {}; _social.chatPeer = null;
       _social.state = { unread: {}, incoming: [], extras: [], blocked: [], blockedBy: [] };
       _socialChanged();
       return;
@@ -339,7 +343,36 @@ function DmChatWindow({ peer, meId, onClose }) {
   );
 }
 
+/** Das offene Chatfenster — jeder Bildschirm mit Spielerliste hängt es einmal ein. */
+function SocialChatWindow({ meId }) {
+  useSocial();
+  if (!_social.chatPeer) return null;
+  return <DmChatWindow peer={_social.chatPeer} meId={meId} onClose={socialCloseChat} />;
+}
+
+/** Eigenständiger Kasten (Online-Lobby): dieselbe Liste und dieselben Chats wie im Hauptmenü.
+ *  Das Chatfenster (`SocialChatWindow`) hängt der Bildschirm selbst auf Wurzelebene ein. */
+function SocialSidePanel({ meId }) {
+  const counts = socialTabCounts(meId);
+  useSocial();
+  return (
+    <div className="lobby-spalte lobby-social ornate-frame pp-menuekasten" style={{ display: 'flex', flexDirection: 'column' }}>
+      <div className="orbit-font lobby-spalten-titel" style={{ padding: '10px 16px', fontSize: 12, fontWeight: 700, color: 'var(--accent)', display: 'flex', alignItems: 'center', gap: 8 }}>
+        <span className="social-lamp social-lamp--online" />
+        WHO'S ONLINE ({counts.online})
+        {counts.unread > 0 && <span className="social-badge">{counts.unread > 99 ? '99+' : counts.unread}</span>}
+      </div>
+      <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: 8 }}>
+        <WhosOnlineList meId={meId} onOpen={socialOpenChat} />
+      </div>
+    </div>
+  );
+}
+
 window.SocialHost = SocialHost;
+window.socialOpenChat = socialOpenChat;
+window.SocialChatWindow = SocialChatWindow;
+window.SocialSidePanel = SocialSidePanel;
 window.useSocial = useSocial;
 window.socialTabCounts = socialTabCounts;
 window.WhosOnlineList = WhosOnlineList;
