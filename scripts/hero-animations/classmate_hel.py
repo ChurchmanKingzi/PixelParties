@@ -8,7 +8,7 @@ formuliert.
 * Der Körper schwebt nur sanft auf und ab (die ganze Figur, ±1 px) – er neigt sich nie zur Seite.
 * Die langen weißen Haarsträhnen bewegen sich unabhängig davon, geisterhaft: jede Strähne mit eigener
   Wellenphase (eine Welle läuft die Strähne hinab, zur Spitze stärker, die Strähnen schwingen nicht im
-  Gleichtakt), dazu schweben die Spitzen mit Verzögerung gegen den Körper auf und ab.
+  Gleichtakt; wie der Schweif in jedem Frame in Bewegung), dazu schweben die Spitzen mit Verzögerung gegen den Körper auf und ab.
 * Der Saum wellt sich (einzelne Spalten wachsen und schrumpfen im Wechsel um eine Zeile).
 * Der Geisterschweif windet sich ständig: eine Welle läuft bis in die Spitze, die abgelösten
   Pünktchen am Ende schlingern mit.
@@ -86,7 +86,7 @@ def lock_dx(i, y, side):
     jede Strähne hat ihre eigene Phase, sie schwingen also nicht im Gleichtakt."""
     u = clip01((y - 8) / (HAIR_Y1 - 8))
     ph = 0.0 if side == 0 else 1.9
-    return int(round(1.3 * u * (wave(i, y, 0.5, 2, ph) + 0.45 * wave(i, y, 0.9, 3, ph + 1.0))))
+    return int(round(1.3 * u * (wave(i, y, 0.5, 3, ph) + 0.6 * wave(i, y, 1.1, 5, ph + 1.6))))
 
 
 def lock_ev(i, y, side):
