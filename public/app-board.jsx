@@ -29648,6 +29648,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           handIndex: pick.handIndex, fromCreation: pick.fromCreation || undefined, heroIdx: h.idx,
           charmedOwner: h.charmedOwner,
           viaCreatureInstId: h.creatureInstId,
+          // Klick auf eine freie Support Zone einer Anlege-Karte: Platz und Wirt als Drop-Hinweis (wie beim Ziehen).
+          ...(h.attachSlot != null ? { attachmentZoneSlot: h.attachSlot, attachHeroIdx: h.idx } : {}),
         });
       }
   };
@@ -44962,7 +44964,23 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               const _casterPickEntry = (spellHeroPick && !(spellHeroPick.isCreature || spellHeroPick.isArtifactCreature) && pi === myIdx)
                 ? (spellHeroPick.eligible || []).find(e => e.creatureInstId != null && e.idx === i && e.zoneSlot === z) || null
                 : null;
-              const isSummonPickZone = !!_summonPickEntry || !!_casterPickEntry;
+              // ★ Als Vorgabe 5.10. (Quest of the Chosen One): Klick-Weg einer ANLEGE-KARTE — auch die LEEREN Support
+              // Zonen der waehlbaren Helden leuchten (statt ausgegraut zu werden); Klick auf eine Zone = dieser Held
+              // wirkt, und die Karte haengt sich genau dort an (Drop-Hinweise wie beim Ziehen). Nur dort, wo die Karte
+              // ihre moeglichen Plaetze meldet (`attachmentHosts` → `gameState.attachmentHostTargets`).
+              const _attachPickEntry = (spellHeroPick && spellHeroPick.card
+                  && (spellHeroPick.card.subtype || '').toLowerCase() === 'attachment'
+                  && !(spellHeroPick.isHeroAction || spellHeroPick.isCreature || spellHeroPick.isArtifactCreature
+                       || spellHeroPick.isSurprise || spellHeroPick.isAscension)
+                  && pi === myIdx && (cards || []).length === 0)
+                ? (() => {
+                    const hosts = (gameState.attachmentHostTargets || {})[spellHeroPick.cardName];
+                    if (!Array.isArray(hosts)
+                        || !hosts.some(hh => (hh.owner ?? myIdx) === myIdx && hh.heroIdx === i && hh.slotIdx === z)) return null;
+                    return (spellHeroPick.eligible || []).find(e => e.creatureInstId == null && e.charmedOwner == null && e.idx === i) || null;
+                  })()
+                : null;
+              const isSummonPickZone = !!_summonPickEntry || !!_casterPickEntry || !!_attachPickEntry;
               const _bpPickOwn = !!pendingBouncePick;
               const isPendingBounceTarget = _bpPickOwn && (pendingBouncePick.bounceTargets || []).some(t => (t.owner ?? myIdx) === pi && t.heroIdx === i && t.slotIdx === z);
               // Valid drop zones come in two flavors that now coexist:
@@ -45241,7 +45259,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     });
                   } : isSummonPickZone ? () => {
                     // Klick-Beschwoerung: diese Zone ist das Ziel (Zone des Casters bzw. ihr freier Platz).
-                    commitSpellHeroPick(_casterPickEntry || { ..._summonPickEntry, zoneSlot: z });
+                    commitSpellHeroPick(_casterPickEntry
+                      || (_attachPickEntry ? { ..._attachPickEntry, attachSlot: z } : { ..._summonPickEntry, zoneSlot: z }));
                   } : isPendingBounceTarget ? () => {
                     // Click-to-swap: dispatches play_creature as if the
                     // card had been dragged here. Server treats the
@@ -48527,22 +48546,32 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             {ep.warning && (
               <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--danger)', marginBottom: 16 }}>{ep.warning}</div>
             )}
+            {/* `equalButtons` (Als Vorgabe 5.10.): bei einer Wahl zwischen ZWEI gleichwertigen Wegen
+                („Zusatzaktion" / „normale Aktion") sind die Knoepfe gleich breit, unabhaengig von der
+                Textlaenge — ein langer Text bricht um, statt seinen Knopf aufzublasen. */}
+            {(() => {
+              const gleich = ep.equalButtons
+                ? { flex: '1 1 0', minWidth: 150, whiteSpace: 'normal', lineHeight: 1.25, textAlign: 'center' }
+                : null;
+              return (
             <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
-              <button className="btn btn-success" style={{ padding: '10px 24px', fontSize: 13 }}
+              <button className="btn btn-success" style={{ padding: '10px 24px', fontSize: 13, ...gleich }}
                 onClick={() => respondToPrompt({ confirmed: true })}>
                 {ep.confirmLabel || 'Yes'}
               </button>
               {ep.thirdOption && (
-                <button className="btn btn-info" style={{ padding: '10px 24px', fontSize: 13 }}
+                <button className="btn btn-info" style={{ padding: '10px 24px', fontSize: 13, ...gleich }}
                   onClick={() => respondToPrompt({ option: 'third' })}>
                   {ep.thirdOption}
                 </button>
               )}
-              <button className="btn" style={{ padding: '10px 24px', fontSize: 13, borderColor: 'var(--danger)', color: 'var(--danger)' }}
+              <button className="btn" style={{ padding: '10px 24px', fontSize: 13, borderColor: 'var(--danger)', color: 'var(--danger)', ...gleich }}
                 onClick={() => respondToPrompt({ cancelled: true })}>
                 {ep.cancelLabel || 'No'}
               </button>
             </div>
+              );
+            })()}
           </div>
           {ep.showCard && CARDS_BY_NAME[ep.showCard] && (() => {
             const showCardData = CARDS_BY_NAME[ep.showCard];

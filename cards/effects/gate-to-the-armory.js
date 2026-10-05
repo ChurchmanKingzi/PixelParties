@@ -162,6 +162,9 @@ module.exports = {
           confirmLabel: '⚡ Additional Action (turn ends)',
           cancelLabel: '⚔️ Normal Action',
           cancellable: true,
+          // Wahl der Aktionsart: kein Gerrymander, gleich grosse Knoepfe (Als Vorgabe 5.10.)
+          gerrymanderEligible: false,
+          equalButtons: true,
         });
         if (!asAdditional) {
           gs._spellForcesActionConsume = true;

@@ -24897,6 +24897,12 @@ body.summon-pick .board-zone:not(.zone-drag-valid):not(.board-zone-play-target) 
   opacity: .55;
   transition: filter .15s, opacity .15s;
 }
+/* ★ Als Vorgabe 5.10.: Abilities muessen im Klick-Pfad ERKENNBAR bleiben — sie entscheiden, wer wirken kann, und sind bei
+   „Quest of the Chosen One" sogar der Preis. Nur leicht abgedunkelt statt wie der Rest des Bretts. */
+body.summon-pick .board-zone.board-zone-ability:not(.zone-drag-valid):not(.board-zone-play-target) {
+  filter: grayscale(.25) brightness(.82);
+  opacity: .92;
+}
 
 /* ── Handkarten-Abzeichen ÜBER allen Karten (Als Vorgabe 2.10.) ─────
    Level-/Kosten-Abzeichen sitzen in einer eigenen Ebene NEBEN der Karte (nicht darin: die Karte trägt ein z-index und
