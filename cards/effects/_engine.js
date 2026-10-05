@@ -48154,6 +48154,11 @@ this._deathWatch = (this._deathWatchStack || []).length
     hero.hp = newHp;
     hero.maxHp = newMaxHp;
     hero.atk = newCardData.atk || hero.atk;
+    // `baseAtk` ist der GEDRUCKTE Angriff der aktuellen Form (Quick Attack,
+    // Javelin Throw, Future Tech Fists … rechnen damit). Er gehoert zur
+    // Identitaet und muss beim Formwechsel mitwandern — sonst rechnen
+    // aufgestiegene/abgestiegene Helden mit dem Wert der alten Form.
+    if (newCardData.atk) hero.baseAtk = newCardData.atk;
     // ★ v1087: IDENTITAETSWECHSEL ist kein Delta, sondern ein neuer
     // Grundwert — der Trichter passt hier nicht. ATK-Auren muessen aber
     // erfahren, dass ihre Buchfuehrung fuer diesen Helden ungueltig
@@ -48828,6 +48833,11 @@ this._deathWatch = (this._deathWatchStack || []).length
     }
     hero.name = newName;
     hero.atk = newCardData.atk || hero.atk;
+    // `baseAtk` ist der GEDRUCKTE Angriff der aktuellen Form (Quick Attack,
+    // Javelin Throw, Future Tech Fists … rechnen damit). Er gehoert zur
+    // Identitaet und muss beim Formwechsel mitwandern — sonst rechnen
+    // aufgestiegene/abgestiegene Helden mit dem Wert der alten Form.
+    if (newCardData.atk) hero.baseAtk = newCardData.atk;
     // ★ v1087: IDENTITAETSWECHSEL ist kein Delta, sondern ein neuer
     // Grundwert — der Trichter passt hier nicht. ATK-Auren muessen aber
     // erfahren, dass ihre Buchfuehrung fuer diesen Helden ungueltig
