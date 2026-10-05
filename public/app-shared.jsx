@@ -3283,6 +3283,13 @@ const ZONE_ANIM_SFX = {
   bloody_cut:              { name: 'slash',           opts: { rate: 0.7,  volume: 1 } },
   // Laki legt Luck Counter (Al: lauter, klarer als der stumme gold_sparkle).
   puppet_luck:             { name: 'gold_gain',   opts: { rate: 1.2,  volume: 1 } },
+  // Waflav bekommt Evolution Counter (Bild: gold_sparkle-Alias). Ohne
+  // Kategorie, damit der Klang nicht vom Zauber-/Effekt-Klang der
+  // Karte verschluckt wird, die die Counter legt.
+  evolution_counter: [
+    { name: 'buff',   opts: { rate: 1.2, volume: 1,   category: null } },
+    { name: 'reveal', opts: { rate: 1.5, volume: 0.6, delay: 90, category: null, dedupe: 0 } },
+  ],
   // Vinny legt Preserve Counter.
   puppet_preserve:         { name: 'elem_holy',   opts: { rate: 1.1,  volume: 0.9 } },
 };

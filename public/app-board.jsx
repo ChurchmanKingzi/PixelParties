@@ -16227,6 +16227,7 @@ const ANIM_REGISTRY = {
   puppet_swap_laki: GoldSparkleEffect,
   puppet_swap_saras: DiamondSparkleEffect,
   puppet_luck: GoldSparkleEffect,
+  evolution_counter: GoldSparkleEffect,
   puppet_preserve: ShieldBubbleEffect,
   spider_summon: SpiderSummonEffect,
   beer_bubbles: BeerBubblesEffect,
@@ -43590,8 +43591,16 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           // Karte, zeigt SIE die Status (Partikel, Tönung, Eis, Stein) — die
           // Status-Overlays der Karte entfallen dann (doppelt und teuer).
           // Helden ohne Spritesheet behalten ihre Karten-Overlays.
-          const figurName = (formPreview && formPreview.owner === pi && formPreview.heroIdx === i
+          const figurBasisName = (formPreview && formPreview.owner === pi && formPreview.heroIdx === i
             && CARDS_BY_NAME[formPreview.cardName]) ? formPreview.cardName : hero?.name;
+          // Skins sind ebenfalls animiert (`data/hero-animations/<skin-slug>`):
+          // Traegt der Besitzer dieses Helden einen Skin fuer die Karte, steht
+          // dessen Figur auf dem Brett statt der des Basis-Helden. Nach dem
+          // BESITZER (`p.deckSkins`) statt nach `gameSkins`, denn dort
+          // ueberschreibt der Gegner bei gleichem Helden den eigenen Skin.
+          // Ohne Sheet fuer den Skin faellt es auf den Basis-Helden zurueck.
+          const _figurSkin = figurBasisName ? p?.deckSkins?.[figurBasisName] : null;
+          const figurName = (_figurSkin && HeroIdleAnims.hatAnimation(_figurSkin)) ? _figurSkin : figurBasisName;
           const figurDa = !!(heldenAnzeigen && hero?.name && !isDead && !isRamming && HeroIdleAnims.hatAnimation(figurName));
           // Chain target pick
           const isChainPickValid = chainPickValidIds.has(heroTargetId);
@@ -43754,7 +43763,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     const _kopiert = Array.isArray(hero.gainedEffectNames) ? hero.gainedEffectNames : [];
                     const heroCardProps = {
                       hp: hero.hp, maxHp: hero.maxHp, atk: hero.atk, hpPosition: 'hero',
-                      skins: gameSkins, abilities: p.abilityZones?.[i],
+                      skins: p.deckSkins ? { ...gameSkins, ...p.deckSkins } : gameSkins, abilities: p.abilityZones?.[i],
                       copiedHeroes: _kopiert,
                       inheritedEffects: _kopiert
                         .map(n => ({ label: n, text: CARDS_BY_NAME[n]?.effect || '' }))
