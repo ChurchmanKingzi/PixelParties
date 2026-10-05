@@ -1,8 +1,8 @@
 {
   "hero": "Classmate Hel",
   "sheet": "classmate-hel.png",
-  "frameWidth": 45,
-  "frameHeight": 39,
+  "frameWidth": 44,
+  "frameHeight": 46,
   "frames": 48,
   "frameMs": 90,
   "loop": true,
@@ -12,6 +12,6 @@
   "padLeft": 14,
   "padRight": 14,
   "padBottom": 4,
-  "faceX": 22.5,
-  "footY": 35
+  "faceX": 22.0,
+  "footY": 34
 }
