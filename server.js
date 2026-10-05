@@ -1182,6 +1182,9 @@ async function initDatabase() {
     } catch (err) { console.error('[Shop] Bereinigung', col, 'fehlgeschlagen:', err.message); }
   }
 
+  // Private Chats, Herausforderungen, Blockierungen (social.js)
+  await social.init();
+
   // Puzzle completions table
   await db.execute(`CREATE TABLE IF NOT EXISTS puzzle_completions (
     user_id TEXT NOT NULL,
@@ -3588,6 +3591,39 @@ app.get('/api/hero-animations', async (req, res) => {
 // Gegenstueck zum Wegfall der SC-Tageskappe und den vielen neuen
 // Belohnungen (auch gegen CPUs). Vorher 10 / 5 / 10 / 5. Der Client liest
 // die Preise nur noch hier ab (keine Rueckfallwerte mehr im Shop-Screen).
+// ===== CPU-SKIN-SYSTEM =====
+// Bei einer normalen CPU-Herausforderung traegt der mittlere Held des Gegners
+// mit dieser Wahrscheinlichkeit einen zufaelligen Skin (alle Varianten des
+// Helden sind moeglich, auch schon freigeschaltete). Gewinnt der Mensch ein
+// solches „Skin-Game“ und besitzt den Skin noch nicht, schaltet er ihn frei.
+// TEST: vorerst 100 % — fuer den Normalbetrieb auf 0.10 setzen.
+const CPU_SKIN_CHANCE = 1.0;
+
+/** Zufaelliger Skin des mittleren Helden eines CPU-Decks — null, wenn keiner wuerfelt/existiert. */
+function rollCpuSkin(cpuDeck) {
+  if (!(Math.random() < CPU_SKIN_CHANCE)) return null;
+  const middle = cpuDeck?.heroes?.[1];
+  const heroName = typeof middle === 'string' ? middle : (middle?.hero || middle?.name || null);
+  if (!heroName) return null;
+  const skinFiles = new Set(scanSkinFiles().map(f => path.basename(f, path.extname(f))));
+  const pool = (SKINS_DATA[heroName] || []).filter(n => skinFiles.has(n));
+  if (!pool.length) return null;
+  return { heroName, skinName: pool[Math.floor(Math.random() * pool.length)] };
+}
+
+/** Skin freischalten, falls noch nicht im Besitz. Liefert true, wenn er NEU freigeschaltet wurde. */
+async function unlockCpuSkin(userId, skinName) {
+  if (!userId || !skinName) return false;
+  const owned = await db.get(
+    "SELECT id FROM user_shop_items WHERE user_id = ? AND item_type = 'skin' AND item_id = ?",
+    [userId, skinName]
+  );
+  if (owned) return false;
+  await db.run('INSERT INTO user_shop_items (id, user_id, item_type, item_id) VALUES (?, ?, ?, ?)',
+    [uuidv4(), userId, 'skin', skinName]);
+  return true;
+}
+
 const SHOP_PRICES = { avatar: 50, sleeve: 50, board: 50, skin: 50 };
 const RANDOM_PRICES = { skin: 25, avatar: 25, sleeve: 25 };
 const STRUCTURE_DECK_PRICE = 50;
@@ -4014,6 +4050,120 @@ function destroyRoom(roomId) {
 }
 const activeGames = new Map(); // userId -> roomId
 const disconnectTimers = new Map(); // userId -> timeout handle
+
+// ===== SOCIAL: Who's Online, private Chats, Herausforderungen (social.js) =====
+const social = require('./social').createSocial({
+  db, io, uuidv4,
+  isInGame: (userId) => activeGames.has(userId),
+  startChallengeGame: (opts) => startChallengeGame(opts),
+});
+
+/**
+ * Das aktuell gewählte Standarddeck eines Nutzers samt Legalität.
+ * Gibt es noch keins, wird einmal ein gültiges bestimmt (ensureValidDefaultDeck);
+ * ein vorhandenes, aber illegales wird NICHT stillschweigend ersetzt — die
+ * Herausforderung soll dann mit einer Fehlermeldung scheitern.
+ */
+async function resolveDefaultDeck(userId) {
+  const read = async () => ({
+    custom: await db.get('SELECT * FROM decks WHERE user_id = ? AND is_default = 1', [userId]),
+    user: await db.get('SELECT default_sample_deck_id FROM users WHERE id = ?', [userId]),
+  });
+  let { custom, user } = await read();
+  if (!custom && !user?.default_sample_deck_id) {
+    try { await ensureValidDefaultDeck(userId); } catch { /* unten: kein Deck = illegal */ }
+    ({ custom, user } = await read());
+  }
+  if (custom) {
+    const legal = (custom.mode || 'standard') !== 'cube' && isCustomDeckRowLegal(custom);
+    return { deckId: custom.id, name: custom.name, legal };
+  }
+  const sampleId = user?.default_sample_deck_id;
+  if (sampleId) {
+    const sample = loadSampleDecks().find(sd => sd.id === sampleId);
+    if (sample) {
+      let legal = true;
+      if (sample.isStructure) {
+        const owned = await db.get(
+          "SELECT id FROM user_shop_items WHERE user_id = ? AND item_type = 'structure_deck' AND item_id = ?",
+          [userId, sample.structureId]);
+        legal = !!owned;
+      }
+      return { deckId: sampleId, name: sample.name, legal };
+    }
+  }
+  return { deckId: null, name: null, legal: false };
+}
+
+/**
+ * „Accept“ einer Herausforderung: legt direkt einen Raum an (Unranked Bo1, Ranked Bo3),
+ * baut das Spiel auf und schickt beide Spieler hinein. Beide Seiten spielen mit ihrem
+ * Standarddeck; ist eines davon illegal, kommt eine Fehlermeldung statt eines Spiels.
+ * → { ok: true } | { error: 'Text für den Annehmenden' }
+ */
+async function startChallengeGame({ challengerId, challengeeId, ranked, challengerSocketId, challengeeSocketId }) {
+  const sockA = challengerSocketId ? io.sockets.sockets.get(challengerSocketId) : null;
+  const sockB = challengeeSocketId ? io.sockets.sockets.get(challengeeSocketId) : null;
+  if (!sockA) return { error: 'The challenger is no longer online.' };
+  if (!sockB) return { error: 'Connection lost.' };
+  const uA = await db.get('SELECT id, username FROM users WHERE id = ?', [challengerId]);
+  const uB = await db.get('SELECT id, username FROM users WHERE id = ?', [challengeeId]);
+  if (!uA || !uB) return { error: 'Player not found.' };
+
+  if (activeGames.has(challengeeId)) return { error: 'Finish your current game first.' };
+  if (activeGames.has(challengerId)) return { error: uA.username + ' is currently in a game.' };
+
+  const [dA, dB] = await Promise.all([resolveDefaultDeck(challengerId), resolveDefaultDeck(challengeeId)]);
+  if (!dA.legal && !dB.legal) return { error: 'Your deck and ' + uA.username + "'s deck are illegal!" };
+  if (!dB.legal) return { error: 'Your deck is illegal!' };
+  if (!dA.legal) return { error: uA.username + "'s deck is illegal!" };
+
+  // Wer gerade in einer Lobby sitzt oder zuschaut, verlässt sie; ein Cube Draft bleibt tabu.
+  for (const [u, sock] of [[uA, sockA], [uB, sockB]]) {
+    for (const r of [...rooms.values()]) {
+      if (r.type === 'singleplayer' || r.type === 'puzzle') continue;
+      const seated = r.players.some(p => p.userId === u.id) || r.spectators.some(sp => sp.userId === u.id);
+      if (!seated) continue;
+      if (r.cubeDraft) return { error: (u.id === challengeeId ? 'Leave your Cube Draft first.' : u.username + ' is in a Cube Draft.') };
+      handleLeaveRoom(sock, r.id, { userId: u.id, username: u.username });
+    }
+  }
+
+  const bo = ranked ? 3 : 1;
+  const roomId = uuidv4().substring(0, 8);
+  const room = {
+    id: roomId, host: uA.username, hostId: uA.id,
+    type: ranked ? 'ranked' : 'unranked',
+    format: bo, winsNeeded: Math.ceil(bo / 2), setScore: [0, 0],
+    playerPw: null, specPw: null, maxPlayers: 2,
+    players: [
+      { username: uA.username, userId: uA.id, socketId: sockA.id, deckId: dA.deckId, isBot: false },
+      { username: uB.username, userId: uB.id, socketId: sockB.id, deckId: dB.deckId, isBot: false },
+    ],
+    spectators: [], status: 'waiting', created: Date.now(),
+    gameState: null, chatHistory: [], privateChatHistory: {}, cubeDraft: null,
+    _fromChallenge: true,
+  };
+  rooms.set(roomId, room);
+  sockA.join('room:' + roomId);
+  sockB.join('room:' + roomId);
+  try {
+    await setupGameState(room);
+    await startGameEngine(room, roomId, Math.random() < 0.5 ? 0 : 1);
+  } catch (err) {
+    console.error('[challenge] Spielaufbau fehlgeschlagen:', err.message, err.stack);
+    for (const p of room.players) activeGames.delete(p.userId);
+    sockA.leave('room:' + roomId); sockB.leave('room:' + roomId);
+    destroyRoom(roomId);
+    io.emit('rooms', getRoomList());
+    return { error: 'Could not start the game.' };
+  }
+  // Die Clients stehen irgendwo im Menü; `challengeStart` schickt sie ins Spiel (app-main.jsx).
+  for (let i = 0; i < 2; i++) sendGameState(room, i, { challengeStart: true });
+  io.emit('rooms', getRoomList());
+  console.log(`[challenge] ${uA.username} vs ${uB.username} (${room.type}, Bo${bo}) gestartet`);
+  return { ok: true };
+}
 
 // ===== LIVE STATS =====
 // Cheap public snapshot for the main-menu hub panels: how many clients
@@ -6259,6 +6409,15 @@ function endCpuBattle(room, winnerIdx, reason) {
           if (newlyUnlocked.length && humanSid) {
             io.to(humanSid).emit('opponents_unlocked', { opponents: newlyUnlocked });
           }
+        }
+        // Skin-Game gewonnen → Skin des mittleren Gegner-Helden freischalten (falls noch nicht im
+        // Besitz). Das Popup kommt wie bei neuen Gegnern als eigenes Socket-Ereignis.
+        if (humanWon && room._cpuSkin) {
+          try {
+            if (await unlockCpuSkin(humanUserId, room._cpuSkin.skinName) && humanSid) {
+              io.to(humanSid).emit('skin_unlocked', { skinName: room._cpuSkin.skinName, heroName: room._cpuSkin.heroName });
+            }
+          } catch (err) { console.error('[CPU battle] Skin-Freischaltung fehlgeschlagen:', err.message); }
         }
         // Victory-Screen: der wievielte Sieg gegen diese CPU, plus alles, was er freischaltet
         // (Battle-Track ab dem zehnten Sieg, später auch Sleeves — siehe cpu-unlocks.js).
@@ -13446,6 +13605,7 @@ function buildGameDiagnosis(room, winnerIdx, reason) {
 io.on('connection', (socket) => {
   let currentUser = null;
   const socketIP = getSocketIP(socket);
+  social.onConnection(socket);
 
   // Entwicklerwerkzeuge nur anmelden, wenn PP_DEBUG_TOOLS=1 gesetzt ist
   // (siehe Block bei DEBUG_TOOLS_ENABLED). Ohne den Schalter existiert
@@ -13459,6 +13619,7 @@ io.on('connection', (socket) => {
     if (session) {
       currentUser = { ...session, ip: socketIP };
       socket.emit('auth_ok', session);
+      social.onAuth(socket, session);
       // Reconnect to active game
       const activeRoomId = activeGames.get(session.userId);
       if (activeRoomId) {
@@ -13508,6 +13669,7 @@ io.on('connection', (socket) => {
       currentUser.username = u.username;
       currentUser.color = u.color;
       currentUser.avatar = u.avatar;
+      social.refreshIdentity(currentUser.userId, { username: u.username, color: u.color });
     }
   });
 
@@ -16212,6 +16374,12 @@ io.on('connection', (socket) => {
       skins: d.skins || {},
     }));
 
+    // CPU-Skin-System: ggf. traegt der mittlere Gegner-Held einen Skin.
+    // Kampagnen-Duelle sind ausgenommen (feste Gegner mit eigener Story).
+    const cpuSnapshot = snapshotDeck(cpuDeck);
+    const cpuSkin = campaign ? null : rollCpuSkin(cpuDeck);
+    if (cpuSkin) cpuSnapshot.skins = { ...(cpuSnapshot.skins || {}), [cpuSkin.heroName]: cpuSkin.skinName };
+
     const roomId = 'sp-' + uuidv4().substring(0, 8);
     const room = {
       id: roomId, host: currentUser.username, hostId: currentUser.userId,
@@ -16225,9 +16393,11 @@ io.on('connection', (socket) => {
       gameState: null, chatHistory: [], privateChatHistory: {},
       // Pre-populate _currentDecks so setupGameState uses our fetched decks
       // directly instead of re-querying per-player (which would fail for the CPU user).
-      _currentDecks: [snapshotDeck(playerDeck), snapshotDeck(cpuDeck)],
+      _currentDecks: [snapshotDeck(playerDeck), cpuSnapshot],
       // Merker für die Revanche-Behandlung und den Abschluss.
       _campaign: campaign || null,
+      // Skin-Game: Skin des mittleren Gegner-Helden (siehe CPU-SKIN-SYSTEM).
+      _cpuSkin: cpuSkin,
     };
     rooms.set(roomId, room);
     socket.join('room:' + roomId);

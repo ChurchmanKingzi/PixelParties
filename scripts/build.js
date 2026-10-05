@@ -64,6 +64,7 @@ const ENTRIES = [
   'app-areas',            // v1410: Area-Hintergruende (Registry + Szenen)
   'app-screens',
   'app-player-profile',   // v1289: Spielerprofil-Popup
+  'app-social',           // Who's Online, private Chats, Herausforderungen
   'app-puzzle',
   'app-deckbuilder',
   'app-board',

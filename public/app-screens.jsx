@@ -1106,6 +1106,10 @@ function MenuLeaderboardPanel({ top, height }) {
   const { user } = useContext(AppContext);
   const [players, setPlayers] = useState(null);
   const [live, setLive] = useState(null);
+  // Der Kasten teilt sich zwei Ansichten: Top Players und Who's Online (social.js / app-social.jsx).
+  const [tab, setTab] = useState('top');
+  useSocial();
+  const counts = socialTabCounts(user.id);
 
   useEffect(() => {
     let alive = true;
@@ -1129,7 +1133,23 @@ function MenuLeaderboardPanel({ top, height }) {
             ? <span>{live.playersOnline} online · {live.gamesLive} game{live.gamesLive === 1 ? '' : 's'} live</span>
             : <span style={{ color: 'var(--text2)' }}>connecting…</span>}
         </div>
-        <h3 className="menu-side-title"><PixelIcon name="pokal" className="menu-side-title-icon" />TOP PLAYERS</h3>
+        <div className="menu-side-tabs" role="tablist">
+          <button role="tab" aria-selected={tab === 'top'} className={'menu-side-tab' + (tab === 'top' ? ' active' : '')}
+                  onClick={() => setTab('top')}>
+            <PixelIcon name="pokal" className="menu-side-title-icon" />TOP PLAYERS
+          </button>
+          <button role="tab" aria-selected={tab === 'online'} className={'menu-side-tab' + (tab === 'online' ? ' active' : '')}
+                  onClick={() => setTab('online')}>
+            <span className="social-lamp social-lamp--online social-tab-lamp" />ONLINE
+            <span className="menu-side-tab-count">{counts.online}</span>
+            {counts.unread > 0 && <span className="social-badge">{counts.unread > 99 ? '99+' : counts.unread}</span>}
+          </button>
+        </div>
+        {tab === 'online' ? (
+          <div className="menu-side-scroll">
+            <WhosOnlineList meId={user.id} onOpen={socialOpenChat} />
+          </div>
+        ) : (
         <div className="menu-side-scroll">
           {players === null ? (
             <div className="menu-side-empty">Loading…</div>
@@ -1151,7 +1171,9 @@ function MenuLeaderboardPanel({ top, height }) {
             </ol>
           )}
         </div>
+        )}
       </div>
+      <SocialChatWindow meId={user.id} />
     </aside>
   );
 }
@@ -1982,9 +2004,9 @@ function MainMenu() {
           centered in the gutter between the screen edge and the Top Players
           panel (equal gaps on both sides). Clicking either opens the profile. */}
       <div className="menu-profile-gutter" style={panelTop != null ? { top: panelTop } : undefined}>
-        <span className="orbit-font menu-player-name" onClick={() => setScreen('profile')} title="View Profile"
+        <span className="orbit-font menu-player-name" role="button" tabIndex={0} onClick={() => setScreen('profile')} title="View Profile"
           style={{ color: user.color || 'var(--accent)' }}>{user.username}</span>
-        <div className="menu-profile-avatar" onClick={() => setScreen('profile')} title="View Profile"
+        <div className="menu-profile-avatar" role="button" tabIndex={0} onClick={() => setScreen('profile')} title="View Profile"
           style={{
             color: user.color || 'var(--accent)',
             borderColor: user.color || 'var(--accent)',
@@ -2792,7 +2814,7 @@ function ProfileScreen() {
 
               {/* Sleeve — large preview */}
               <div className="profile-sleeve-col">
-                <div className="profile-cardback-preview profile-cardback-xl profile-cardback-clickable" onClick={() => setShowSleeveGallery(true)}>
+                <div className="profile-cardback-preview profile-cardback-xl profile-cardback-clickable" role="button" tabIndex={0} onClick={() => setShowSleeveGallery(true)}>
                   <img src={displayCardback} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                   <div className="profile-cardback-hover-overlay">CHANGE</div>
                 </div>
@@ -2993,7 +3015,7 @@ function ProfileScreen() {
                 <div style={{ overflowY: 'auto', flex: 1 }}>
                   <div className="profile-cb-gallery">
                     {/* Default sleeve */}
-                    <div className={'profile-cb-gallery-item' + (!cardback ? ' active' : '')} onClick={() => quickSaveSleeve(null)}>
+                    <div className={'profile-cb-gallery-item' + (!cardback ? ' active' : '')} role="button" tabIndex={0} onClick={() => quickSaveSleeve(null)}>
                       <div className="profile-cb-gallery-card">
                         <img src="/cardback.png" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                       </div>
@@ -3001,7 +3023,7 @@ function ProfileScreen() {
                     </div>
                     {/* Owned shop sleeves */}
                     {ownedSleeves.map(sleeveId => (
-                      <div key={sleeveId} className={'profile-cb-gallery-item' + (cardback === '/data/shop/sleeves/' + sleeveId + '.png' ? ' active' : '')}
+                      <div key={sleeveId} className={'profile-cb-gallery-item' + (cardback === '/data/shop/sleeves/' + sleeveId + '.png' ? ' active' : '')} role="button" tabIndex={0}
                         onClick={() => quickSaveSleeve('/data/shop/sleeves/' + sleeveId + '.png')}>
                         <div className="profile-cb-gallery-card">
                           <img src={'/data/shop/sleeves/' + encodeURIComponent(sleeveId) + '.png'} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
@@ -3011,7 +3033,7 @@ function ProfileScreen() {
                     ))}
                     {/* Previously uploaded cardbacks (legacy) */}
                     {uploadedCardbacks.map((cb, i) => (
-                      <div key={'up' + i} className={'profile-cb-gallery-item' + (cardback === cb ? ' active' : '')} onClick={() => quickSaveSleeve(cb)}>
+                      <div key={'up' + i} className={'profile-cb-gallery-item' + (cardback === cb ? ' active' : '')} role="button" tabIndex={0} onClick={() => quickSaveSleeve(cb)}>
                         <div className="profile-cb-gallery-card">
                           <img src={cb} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                         </div>
@@ -3043,7 +3065,7 @@ function ProfileScreen() {
                     {standardAvatars.map(file => {
                       const url = '/avatars/' + encodeURIComponent(file);
                       return (
-                        <div key={file} className={'profile-avatar-gallery-item' + (avatar === url ? ' active' : '')}
+                        <div key={file} className={'profile-avatar-gallery-item' + (avatar === url ? ' active' : '')} role="button" tabIndex={0}
                           onClick={() => quickSaveAvatar(url)}>
                           <div className="profile-avatar-gallery-img">
                             <img src={url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
@@ -3056,7 +3078,7 @@ function ProfileScreen() {
                     {ownedAvatars.map(avatarId => {
                       const url = '/data/shop/avatars/' + encodeURIComponent(avatarId) + '.png';
                       return (
-                        <div key={avatarId} className={'profile-avatar-gallery-item' + (avatar === url ? ' active' : '')}
+                        <div key={avatarId} className={'profile-avatar-gallery-item' + (avatar === url ? ' active' : '')} role="button" tabIndex={0}
                           onClick={() => quickSaveAvatar(url)}>
                           <div className="profile-avatar-gallery-img">
                             <img src={url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
@@ -3087,7 +3109,7 @@ function ProfileScreen() {
                 <div style={{ overflowY: 'auto', flex: 1 }}>
                   <div className="profile-cb-gallery">
                     {/* Default board */}
-                    <div className={'profile-cb-gallery-item' + (!board ? ' active' : '')} onClick={() => quickSaveBoard(null)}>
+                    <div className={'profile-cb-gallery-item' + (!board ? ' active' : '')} role="button" tabIndex={0} onClick={() => quickSaveBoard(null)}>
                       <div className="profile-cb-gallery-card" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg3)' }}>
                         <span style={{ fontSize: 11, color: 'var(--text2)' }}>Default</span>
                       </div>
@@ -3095,7 +3117,7 @@ function ProfileScreen() {
                     </div>
                     {/* Owned shop boards */}
                     {ownedBoards.map(boardId => (
-                      <div key={boardId} className={'profile-cb-gallery-item' + (board === boardId ? ' active' : '')}
+                      <div key={boardId} className={'profile-cb-gallery-item' + (board === boardId ? ' active' : '')} role="button" tabIndex={0}
                         onClick={() => quickSaveBoard(boardId)}>
                         <div className="profile-cb-gallery-card">
                           <img src={'/data/shop/boards/' + encodeURIComponent(boardId) + '.png'} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
@@ -4546,8 +4568,8 @@ function ZufallsGegnerBild({ gegner, schnell, width = 240 }) {
   );
 }
 
-function HeroArtCrop({ heroName, width = 160 }) {
-  const src = heroName ? cardImageUrl(heroName) : null;
+function HeroArtCrop({ heroName, width = 160, skinName = null }) {
+  const src = skinName ? skinImageUrl(skinName) : (heroName ? cardImageUrl(heroName) : null);
   if (!src) {
     return (
       <div style={{
