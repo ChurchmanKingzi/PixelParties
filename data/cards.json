@@ -5105,7 +5105,7 @@
     "hp": 400,
     "atk": 30,
     "cost": null,
-    "effect": "You may once per turn place an \"Ifrit\" Creature from your hand into a free Support Zone of any Hero you control. \"Ifrit\" Creatures you control take no damage from your opponent's cards or effects. The levels of \"Armageddon\" Spells in your hand are reduced by the number of \"Ifrit\" Creatures you control. While you control at least 1 \"Ifrit\" Creature, this Hero is unaffected by \"Armageddon\".",
+    "effect": "You may once per turn place an \"Ifrit\" Creature into the free Support Zone of any Hero you control. \"Ifrit\" Creatures you control take no damage from your opponent's cards or effects. The levels of \"Armageddon\" Spells in your hand are reduced by the number of \"Ifrit\" Creatures you control. While you control at least 1 \"Ifrit\" Creature, this Hero is unaffected by \"Armageddon\".",
     "archetype": "",
     "setID": "PP MBS1",
     "banned": "",
