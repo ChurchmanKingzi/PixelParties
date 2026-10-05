@@ -9,7 +9,8 @@ Frame 0 ist die Ruhepose.
   über beiden Feuern steigen Funken auf.
 * Er redet ununterbrochen (der Mund unter dem Schnurrbart geht auf und zu) und gestikuliert mit der freien
   Hand: zweimal je Loop hebt er sie (der Ärmel staucht sich, nichts wird gedehnt) und unterstreicht seine
-  Worte mit kleinen Schlägen; bei den Betonungen nickt er.
+  Worte mit kleinen Schlägen; der weiße Mantel füllt den Raum zwischen Körper und Arm (keine Lücke).
+  Bei den Betonungen nickt er.
 * Das Schwert hält er ruhig.
 """
 import math
@@ -36,6 +37,7 @@ CORE = [rgb('f7f5b8'), rgb('f6e70e'), rgb('f47b22'), rgb('ca2c29')]   # heiß ->
 HEAD_ROW = 13                       # Kopf (mit Schnurrbart) bis hier, nickt bei Betonungen
 SWORD_X = 4                         # Flammen links davon gehören zum Schwert, rechts zum Haar
 ARM_X, ARM_Y0, ARM_Y1 = 16, 15, 24  # die freie Hand: Ärmel ab Zeile 15, Hand bis Zeile 24
+COAT_X, COAT_Y0, COAT_Y1 = 15, 19, 25   # weiße Mantelkante neben der freien Hand
 MOUTH = [(11, 13), (12, 13), (11, 14), (12, 14)]
 TALK = [0, 1, 1, 0, 1, 2, 1, 0, 1, 1, 0, 0, 1, 2, 2, 1, 0, 1, 0, 1, 1, 0, 0, 1,
         1, 0, 1, 2, 1, 0, 0, 1, 1, 0, 1, 1, 2, 1, 0, 1, 0, 0, 1, 1, 0, 1, 0, 0]   # 0 zu, 1 auf, 2 weit auf
@@ -81,6 +83,18 @@ def frame(i):
             if y >= 20 and L == 2:
                 dx = 1                                    # oben weist die Hand leicht nach außen
         dot(out, x + PL + dx, y + PT + dy, s[y, x])
+    coat_x = COAT_X + PL                                  # hebt er die Hand, geht der weiße Mantel weiter
+    for y in range(COAT_Y0, COAT_Y1 + 1):
+        yy = y + PT
+        if not (out[yy, coat_x, 3] and BODY[y, COAT_X, 3] and min(BODY[y, COAT_X, :3]) > 150):
+            continue
+        right = [x for x in range(coat_x + 1, coat_x + 5) if out[yy, x, 3]]
+        if right:                                         # Lücke zwischen Mantel und Arm: Mantel füllt sie
+            for x in range(coat_x + 1, right[0]):
+                out[yy, x] = BODY[y, COAT_X]
+        elif lift(i):                                     # unter der gehobenen Hand: Mantel mit Kontur
+            out[yy, coat_x + 1] = BODY[y, COAT_X]
+            out[yy, coat_x + 2] = rgb('030303')
     for x in range(SW):                                   # Flammen lodern spaltenweise
         col = [y for y in range(SH) if FIRE[y, x, 3]]
         if not col:
