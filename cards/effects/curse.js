@@ -232,42 +232,6 @@ module.exports = {
       const tps = gs.players[targetOwner];
       const targetHero = tps.heroes[targetHeroIdx];
       if (!targetHero?.name || targetHero.hp <= 0) return;
-      // ── Surprise window ──
-      // Curse picks its target through `promptEffectTarget` (non-
-      // damage targeting). That hub does NOT fire
-      // `_checkSurpriseWindow` — only the damage-target pickers
-      // (`promptDamageTarget`, `promptMultiTarget`) and the AoE / direct-
-      // damage paths do. So a face-down Surprise on the host Hero that
-      // fires "when the user is chosen by an Attack or Spell"
-      // (Booby Trap, Flooding, Frost Rune, Mountain Tear River, …)
-      // never sees the Curse cast unless we open the window manually
-      // here. The host Hero is the implicit target regardless of
-      // whether the player clicked the hero portrait or a specific
-      // free Support slot — both mean "Curse is being attached to
-      // this Hero". `ctx.card` is the Curse hand instance, which the
-      // surprise scripts read via `sourceInfo.cardInstance` to gate
-      // on cardType / _isAoeCheck / etc.
-      const surpriseResult = await engine._checkSurpriseWindow(
-        [{ type: 'hero', owner: targetOwner, heroIdx: targetHeroIdx, cardName: targetHero.name }],
-        ctx.card,
-        {},
-      );
-      if (surpriseResult?.effectNegated) {
-        // Counter resolved — the Spell is consumed (not refunded).
-        // `_spellNegatedByEffect` is the engine's canonical "Spell
-        // was countered" signal and overrides `_spellCancelled` per
-        // the API contract (see card_api.md "Game State Communication
-        // Flags"), so the server's post-resolve path routes Curse to
-        // the caster's discard pile.
-        gs._spellNegatedByEffect = true;
-        engine.log('curse_negated_by_surprise', {
-          player: gs.players[pi]?.username,
-          target: targetHero.name,
-        });
-        engine.sync();
-        return;
-      }
-
       // ── Anti Magic gate ──
       // Curse is a Lv 0 Spell — any Anti Magic Lv 1+ attached to
       // the chosen Hero covers it. Bail BEFORE the support-zone
