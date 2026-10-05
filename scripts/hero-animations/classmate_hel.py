@@ -19,17 +19,17 @@ BODY = np.array(Image.open('src/classmate-hel-body.png').convert('RGBA')).astype
 CHAIR = np.array(Image.open('src/classmate-hel-chair.png').convert('RGBA')).astype(int)
 DESK = np.array(Image.open('src/classmate-hel-desk.png').convert('RGBA')).astype(int)
 SH, SW = BODY.shape[:2]
-PL, PR, PT, PB = 17, 17, 8, 3
+PL, PR, PT, PB = 14, 14, 7, 4
 H, W = SH + PT + PB, SW + PL + PR
 N = 48
 BLINK = {14: 'halb', 15: 'zu', 16: 'zu', 17: 'halb', 38: 'halb', 39: 'zu', 40: 'zu', 41: 'halb'}
-SKIN, EYE_DARK, MOUTH = rgb('fbe4d6'), rgb('3b2f6e'), rgb('b8454f')
-HAIR_Y0 = 15                                        # ab hier hängt das Haar neben dem Körper
+SKIN, EYE_DARK, MOUTH = rgb('fbe4d6'), rgb('3b2f6e'), rgb('cf6470')
+HAIR_Y0 = 14                                        # ab hier hängt das Haar neben dem Körper
 FUR = [  # (Sprite, Mitte x, Mitte y, gespiegelt, Umlaufrichtung, Phase)
-    (DESK, 9, 12, False, 1, 0.0),
-    (CHAIR, 8, 30, False, -1, 2.1),
-    (CHAIR, W - 9, 17, True, 1, 4.0),
-    (CHAIR, W - 9, 36, True, -1, 1.2),
+    (DESK, 8, 11, False, 1, 0.0),
+    (CHAIR, 7, 26, False, -1, 2.1),
+    (CHAIR, W - 8, 15, True, 1, 4.0),
+    (CHAIR, W - 8, 30, True, -1, 1.2),
 ]
 
 
@@ -40,7 +40,7 @@ def hair_spans():
         xs = [x for x in range(SW // 2) if BODY[y, x, 3]]
         if not xs:
             continue
-        k = [x for x in xs if tuple(BODY[y, x, :3]) == rgb('1c1530')[:3]]
+        k = [x for x in xs if tuple(BODY[y, x, :3]) == rgb('000000')[:3]]
         if len(k) >= 2:
             out[y] = (k[0], k[1] - 1)                # Haar: x0 .. x1-1 (ohne die Körperkontur)
     return out
@@ -59,13 +59,14 @@ def figure(i):
     """Körper mit Mimik und wehendem Haar (in Körper-Koordinaten)."""
     s = BODY.copy()
     st = BLINK.get(i)
-    for x in (8, 9, 14, 15):
+    for x in (6, 7, 9, 10):
         if st:
-            s[9, x] = SKIN
-            s[10, x] = EYE_DARK
+            s[8, x] = SKIN
+            s[9, x] = EYE_DARK
     if 18 <= i < 31:                                # breiteres Lächeln
-        for x in (10, 13):
-            s[12, x] = MOUTH
+        for x in (7, 8, 9):
+            s[11, x] = MOUTH
+        s[12, 8] = SKIN
     hair = np.zeros((SH, SW), bool)
     for y, (a, b) in SPANS.items():
         hair[y, a:b + 1] = True
