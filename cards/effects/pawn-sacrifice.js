@@ -45,6 +45,10 @@ function prognoseFree(engine, pi) {
 module.exports = {
   activeIn: ['hand'],
 
+  // CPU: auch als NORMALE Aktion in der Action Phase spielbar, wenn die Prognose „frei"
+  // platzt (`_spellForcesActionConsume`) — Als Auftrag 5.10., Vertrag `optionalInherent`.
+  cpuMeta: { optionalInherent: true },
+
   spellPlayCondition(gs, pi, engine) {
     if (!engine) return true;
     if (gs.hoptUsed?.[key(pi)] === gs.turn) return false;

@@ -83,6 +83,11 @@ function _firstFreeSlot(ps, heroIdx) {
 }
 
 module.exports = {
+  // CPU: in der Action Phase als NORMALE Aktion spielbar (Als Auftrag 5.10.) — die
+  // Frage „Zusatzaktion (Zugende) oder normale Aktion?" beantwortet `cpuResponse` mit
+  // der normalen Aktion; ohne diese Marke übersprang `_cpu.js` die Karte dort.
+  cpuMeta: { optionalInherent: true },
+
   /**
    * Inherent gate — returns FALSE when an Action slot is available
    * (so the engine consumes that slot and the turn keeps going).

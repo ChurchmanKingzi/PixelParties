@@ -235,7 +235,11 @@ function buildDecisionChannels(spiele, opts = {}) {
       const y = opts.label ? opts.label(d, g) : null;
       if (y === null || !Number.isFinite(y)) continue;
       // `gi` = Spielnummer. Traegt die Cluster-Korrektur in `kontrast`.
-      zeilen.push({ d, y, gi, tags: zustandsTags(d.z) });
+      // Eigene Lage-Tags der Frage (`d.g`, z. B. `kost:*` der Ability-Kosten
+      // von „Quest of the Chosen One") kommen zu den Zustands-Tags dazu —
+      // Form 1 faehrt sie additiv mit Welch-Gate, wie jeden anderen Faktor.
+      const eigene = Array.isArray(d.g) ? d.g.filter(t => typeof t === 'string') : [];
+      zeilen.push({ d, y, gi, tags: eigene.length ? zustandsTags(d.z).concat(eigene) : zustandsTags(d.z) });
     }
   }
   if (zeilen.length < 50) {
@@ -262,15 +266,31 @@ function buildDecisionChannels(spiele, opts = {}) {
     for (const [karte, rs] of Object.entries(jeKarte)) {
       const ja = rs.filter(r => r.d.f === 1);
       const nein = rs.filter(r => r.d.f !== 1);
-      const basis = kontrast(ja, nein);
-      if (basis === null) continue;
+      let basis = kontrast(ja, nein);
+      // ── KOSTENFRAGEN: nur BEDINGTE Wirkung ────────────────────────────
+      // Eine Frage mit EIGENEN Lage-Tags (`d.g`, z. B. die `kost:*`-Tags von
+      // „Quest of the Chosen One": zahlen lohnt bei billigem Verlust, schadet
+      // bei teurem) hebt sich in der Grundrate oft auf — `kontrast` liefert
+      // dann null, obwohl die Tags klar tragen. Fuer GENAU diese Schluessel
+      // gilt deshalb: keine signifikante Grundrate = Grundrate 0, und gewertet
+      // werden nur die EIGENEN Tags der Frage (jeder einzeln mit Welch-Gate,
+      // Praevalenzband und Schrumpfung, s. u.). Alle anderen Schluessel
+      // behalten das alte Verhalten: ohne signifikante Grundrate keine Regel
+      // — dort waere ein Zustands-Tag allein zu anfaellig fuer Rauschen.
+      const eigeneTagMenge = new Set();
+      for (const r of rs) if (Array.isArray(r.d.g)) for (const t of r.d.g) if (typeof t === 'string') eigeneTagMenge.add(t);
+      const nurBedingt = basis === null && eigeneTagMenge.size > 0;
+      if (basis === null) {
+        if (!nurBedingt) continue;
+        basis = 0;
+      }
       // Bedingte Deltas je Zustandsfaktor — ADDITIV, nicht gekreuzt.
       // 188 Beobachtungen ueber 80 gekreuzte Faecher waeren Rauschen,
       // und Rauschen mit hohem Gewicht ist genau das, was ein Profil
       // auf 42 % Spiegel-Winrate bringt.
       const deltas = Object.create(null);
       const alleTags = new Set();
-      for (const r of rs) for (const t of r.tags) alleTags.add(t);
+      for (const r of rs) for (const t of r.tags) if (!nurBedingt || eigeneTagMenge.has(t)) alleTags.add(t);
       for (const tag of alleTags) {
         const mit = rs.filter(r => r.tags.includes(tag));
         const prev = mit.length / rs.length;
@@ -282,6 +302,9 @@ function buildDecisionChannels(spiele, opts = {}) {
         const d = Math.round((lift - basis) * 10) / 10;
         if (Math.abs(d) >= 1.5) deltas[tag] = d;
       }
+      // Rein bedingter Schluessel ohne tragenden Tag: KEINE leere Regel — sie
+      // hielte im Training die Exploration an, ohne etwas zu entscheiden.
+      if (nurBedingt && Object.keys(deltas).length === 0) continue;
       optInRules[karte] = Object.keys(deltas).length ? { b: basis, d: deltas } : { b: basis };
     }
     stat.optIn = { zeilen: nachArt('optIn').length, karten: Object.keys(optInRules).length };

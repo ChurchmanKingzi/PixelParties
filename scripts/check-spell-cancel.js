@@ -59,6 +59,7 @@ const GEPRUEFT = {
   'Laser Volley':             'fragt den GEGNER, Folgeentscheidung nach der Aufloesung',
   'Grasp the Future':         'Startblatt-Effekt (startingHand), kein Handweg - Abbruch heisst nichts aufdecken, die Karte bleibt auf der Hand',
   'Spider Dance':             'Deck-Suche mit `minSelect: 0` — Abbruch heisst „nichts suchen", nicht „Zauber zurueck"',
+  'Quest of the Chosen One':  'die Wirtswahl des Handwegs laeuft ueber `pickAttachmentHost` (setzt das Flag selbst); die Ziehfrage liegt im Brett-Hook des Anhaengsels, die Aktionsfrage hat zwei gleichwertige Antworten',
 };
 
 const karten = JSON.parse(fs.readFileSync(KARTEN, 'utf8'));

@@ -50,6 +50,10 @@ module.exports = {
 
   reduceCardLevel: reduceLevelByOfKingsFactory(CARD_NAME),
 
+  // CPU: auch als NORMALE Aktion in der Action Phase spielbar (Wahl in onPlay) —
+  // Als Auftrag 5.10., Vertrag `optionalInherent`.
+  cpuMeta: { optionalInherent: true },
+
   /** Inhaerent, sobald ein Opfer moeglich ist (Wahl folgt in onPlay). */
   inherentAction: (gs, pi, heroIdx, engine) => {
     if (!engine) return false;

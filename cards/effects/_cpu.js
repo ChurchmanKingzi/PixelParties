@@ -630,6 +630,7 @@ async function runCpuTurn(engine, helpers) {
 
   if (!stillCpuTurn(engine, cpuIdx)) return marke(engine, `aus:runCpuTurn#4:still@zug${engine.gs.turn}p${engine.gs.activePlayer}ph${engine.gs.currentPhase}`);
   cpuLog(`→ Action Phase (currentPhase=${gs.currentPhase})`);
+  engine._cpuAPFreePlay = false;
   await runActionPhase(engine, helpers);
 
   // Combo continuation: keep firing Action-Phase plays while the engine
@@ -645,14 +646,23 @@ async function runCpuTurn(engine, helpers) {
   // HOPT but does NOT shrink the hand, so the old hand-shrink check
   // wrongly stopped here). Stop when a pass performs no action, the
   // phase advances, or the safety cap trips.
+  //
+  // ★ Dazu (Als Auftrag 5.10., `cpuMeta.optionalInherent`): wurde in der
+  // Action Phase eine OPTIONALE Karte kostenlos gespielt (bezahlte
+  // Zusatzaktion von Quest of the Chosen One, Curse auf ein
+  // qualifizierendes Ziel …), ist die Phase noch offen und die ECHTE Aktion
+  // unverbraucht — ohne diesen Durchgang erzwänge der Phasenwechsel unten
+  // sie ungenutzt. `_cpuAPFreePlay` setzt `runActionPhase` genau dann.
   let comboSafety = 8;
   while (stillCpuTurn(engine, cpuIdx)
          && engine.gs.currentPhase === 3
          && comboSafety-- > 0
          && (((gs.players[cpuIdx]?.bonusActions?.remaining || 0) > 0)
-             || hasSpendableSecondActionGrant(engine, cpuIdx))) {
+             || hasSpendableSecondActionGrant(engine, cpuIdx)
+             || engine._cpuAPFreePlay === true)) {
     const bonus = gs.players[cpuIdx]?.bonusActions?.remaining || 0;
-    cpuLog(`→ Action Phase (combo follow-up) bonus=${bonus} secondActionGrant=${hasSpendableSecondActionGrant(engine, cpuIdx)}`);
+    cpuLog(`→ Action Phase (combo follow-up) bonus=${bonus} secondActionGrant=${hasSpendableSecondActionGrant(engine, cpuIdx)} freePlay=${engine._cpuAPFreePlay === true}`);
+    engine._cpuAPFreePlay = false;
     const did = await runActionPhase(engine, helpers);
     if (!did) {
       cpuLog('  (combo follow-up performed no action — stopping loop)');
@@ -946,7 +956,19 @@ async function runActionPhase(engine, helpers) {
       // is played at phase 3, so enumerating them here makes the CPU
       // burn its real action on a card that should have been free. Defer
       // them entirely to fireAdditionalActions in Main Phase.
-      if (v.isInherentAction) continue;
+      //
+      // AUSNAHME `cpuMeta.optionalInherent` (Als Auftrag 5.10.): Karten, die
+      // sich auch als NORMALE Aktion spielen lassen und deren Zusatzaktion nur
+      // eine WAHL ist (Quest of the Chosen One, Curse, Gate to the Armory,
+      // Pawn Sacrifice, Board of Kings, Forbidden Curse of Aging, Temple of
+      // Sacrifice). Fuer sie
+      // gaebe es ohne diese Ausnahme in der Action Phase nie die Option
+      // „als normale Aktion spielen" — die CPU kaeme nur ueber den
+      // Zusatzaktions-Weg der Main Phase an sie heran, und wo der nicht greift
+      // (Kosten, Bedingung, Wertgate), verfiele die Karte. Die Karte
+      // entscheidet in ihrem `onPlay` selbst, ob sie die Aktion kostet
+      // (`_spellForcesActionConsume`); die Rollouts bewerten beide Wege mit.
+      if (v.isInherentAction && !script?.cpuMeta?.optionalInherent) continue;
       // ── Karten-Vertrag cpuPlayVeto ──
       // Kartenlokale "dieser Play ist gerade nutzlos"-Prüfung (z. B.
       // Heal ohne verletztes Ziel, ohne Nao-Overheal und ohne
@@ -1272,6 +1294,12 @@ async function runActionPhase(engine, helpers) {
       && gs.hoptUsed?.[abilityHoptKey] === gs.turn
       && hoptBefore !== gs.turn;
     cpuLog(`    ← Action Phase result: shrank=${shrank} phaseChanged=${phaseChanged}${hoptClaimed ? ' hoptClaimed=true' : ''} newPhase=${engine.gs.currentPhase}`);
+    // Optionale Karte kostenlos gespielt (Phase noch offen, Hauptaktion
+    // unverbraucht): der Aufrufer faehrt einen weiteren Durchgang.
+    if (shrank && !phaseChanged && !engine._inMctsSim && loadCardEffect(pick.cardName)?.cpuMeta?.optionalInherent
+        && (gs.players[cpuIdx]?.heroesActedThisTurn || []).length === 0) {
+      engine._cpuAPFreePlay = true;
+    }
     if (shrank || phaseChanged || hoptClaimed) return true;
     // ── Warum ist NICHTS passiert? ────────────────────────────────────
     // Ein Versuch ohne jede Wirkung ist bisher stumm: die Kandidatenliste
@@ -7756,9 +7784,12 @@ function cpuGenericChoice(engine, promptData, promptedPlayerIdx) {
     // die Oekonomie eine andere (Gold, Kette) — deshalb greift Form 1
     // dort nicht.
     if (promptData._handReactionWindow !== true && !promptData._gerryRewritten) {
-      const optName = promptData._gerryOriginalTitle || promptData.title
+      // `decisionKey` (+ `lernTags`): eine Frage mit eigenem Schluessel und
+      // eigenen Lage-Tags — dieselben, die der Trichter in `_decision-log.js`
+      // aufzeichnet, damit Lernen und Abfrage uebereinstimmen.
+      const optName = promptData.decisionKey || promptData._gerryOriginalTitle || promptData.title
         || (typeof promptData.showCard === 'string' ? promptData.showCard : null);
-      const optD = optName ? deckProfile.optInDecision(engine, cpuIdx, optName) : null;
+      const optD = optName ? deckProfile.optInDecision(engine, cpuIdx, optName, promptData.lernTags) : null;
       if (optD === 'play') return CONFIRM_YES;
       if (optD === 'skip') return null;
     }

@@ -2705,7 +2705,7 @@ function decisionStateTags(engine, pi) {
  * verschiedene optionale Trigger desselben Decks haben gegenlaeufige
  * Regeln, ein gemittelter Wert waere schaedlicher als gar keiner.
  */
-function optInDecision(engine, pi, cardName) {
+function optInDecision(engine, pi, cardName, extraTags) {
   try {
     if (!cardName) return null;
     const regel = profileFor(engine, pi)?.optInRules?.[cardName];
@@ -2715,6 +2715,10 @@ function optInDecision(engine, pi, cardName) {
       let score = regel.b || 0;
       if (regel.d) {
         for (const g of decisionStateTags(engine, pi)) score += (regel.d[g] || 0);
+        // Eigene Lage-Tags der Frage (`lernTags` am Prompt, z. B. `kost:*`) —
+        // dieselben, die der Recorder an die Zeile haengt und der Trainer
+        // zu den Zustands-Tags addiert.
+        if (Array.isArray(extraTags)) for (const g of extraTags) score += (regel.d[g] || 0);
       }
       score *= confidence(profileFor(engine, pi));
       if (score >= 3) return 'play';
@@ -3043,6 +3047,107 @@ function noteAbilityCostChoice(engine, validTargets, config, pi, pickedId) {
 }
 
 // ═══════════════════════════════════════════════════════════════════
+//  ABILITY-VERLUST-KOSTEN-KANAL (Als Auftrag 5.10., „Quest of the Chosen One")
+//
+//  „Sende ALLE Abilities des Helden in die Ablage, damit der Einsatz als
+//  Zusatzaktion zaehlt" — lohnt sich das? Eine feste Punktzahl kann das
+//  nicht beantworten: es haengt davon ab, WAS verloren geht (traegt die
+//  Schule das Deck, wie oft wurde sie genutzt, wie viele Karten), und ob
+//  die Zusatzaktion etwas wert ist.
+//
+//  Gebaut auf Form 1 („you may", `scripts/decision-channels.js`), also
+//  OHNE neues Aufzeichnungsfeld und ohne neuen Trainer-Export: die Frage
+//  traegt einen eigenen Schluessel (`decisionKey`) und ihre Lage-Tags
+//  (`lernTags`); der Recorder schreibt sie als `optIn`-Zeile, der Trainer
+//  lernt `optInRules[Schluessel]` (Grundrate + additive Deltas je Tag, mit
+//  Welch-Gate und Cluster-Korrektur), und `optInDecision` liest sie zur
+//  Laufzeit wieder aus. Beide Zugaenge — die Ja/Nein-Frage der Action Phase
+//  und der Entschluss in der Main Phase (ohne Prompt) — laufen durch
+//  `abilityLossChoice`.
+//
+//  Ohne Regel und ohne Exploration entscheidet eine vorsichtige
+//  Grundheuristik: zahlen nur, wenn keine verlorene Ability eine tragende
+//  Schule des Decks ist und es hoechstens zwei Karten sind.
+// ═══════════════════════════════════════════════════════════════════
+
+/**
+ * Lage-Tags fuer „diese Abilities gehen verloren". `eintraege` sind
+ * Elemente aus `engine.getAbilityTargets(...)` (Ability-Zone: `level` =
+ * Stapelhoehe; Support-Zonen-Karten zaehlen einfach).
+ * `extra.modus`: 'wahl' (freie Hauptaktion — Zusatzaktion oder normale
+ * Aktion) | 'pflicht' (keine Aktion frei — die Zusatzaktion ist der einzige
+ * Weg).
+ */
+function abilityLossTags(engine, pi, eintraege, extra = {}) {
+  const tags = [];
+  try {
+    const list = Array.isArray(eintraege) ? eintraege : [];
+    const karten = list.reduce((s, e) => s + Math.max(1, e?.level || 1), 0);
+    tags.push(`kost:n:${karten >= 3 ? '3+' : karten}`);
+    tags.push(`kost:arten:${list.length >= 3 ? '3+' : list.length}`);
+    let kern = false, benutzt = 0, hoechste = 0;
+    for (const e of list) {
+      if (e?.type === 'ability' && _abilityCostSchoolWeight(engine, pi, e.cardName) >= AC_SCHOOL_CORE) kern = true;
+      const u = engine._schoolUse?.[pi]?.[e?.cardName];
+      benutzt += (u?.casts || 0) + (u?.activations || 0);
+      hoechste = Math.max(hoechste, e?.level || 1);
+    }
+    tags.push(`kost:kern:${kern ? 'ja' : 'nein'}`);
+    tags.push(`kost:benutzt:${benutzt === 0 ? '0' : (benutzt <= 2 ? '1-2' : '3+')}`);
+    tags.push(`kost:stufe:${hoechste >= 3 ? '3' : hoechste}`);
+    if (extra.modus) tags.push(`kost:modus:${extra.modus}`);
+    // Spaeterer Ertrag der Karte: Abilities auf der Hand, die wieder angelegt werden koennen.
+    const db = engine._getCardDB();
+    const abilHand = (engine.gs.players[pi]?.hand || []).filter(n => db[n]?.cardType === 'Ability').length;
+    tags.push(`kost:abilhand:${abilHand === 0 ? '0' : (abilHand <= 2 ? '1-2' : '3+')}`);
+  } catch { /* Tags sind Beiwerk */ }
+  return tags;
+}
+
+/**
+ * Grundheuristik ohne Regel: nur zahlen, wenn der Verlust so klein wie
+ * moeglich ist — GENAU EINE Ability-Karte, die keine tragende Schule ist und
+ * noch nie benutzt wurde. Alles andere entscheidet erst der gelernte Kanal.
+ *
+ * Bewusst so streng: `kern` kennt nur Zauberschulen. Eine Ability wie
+ * Creativity (Passiv-Effekt, kein Zauber) laeuft als „nicht tragend", ist
+ * aber oft der Motor des Helden. Ein erster Lauf (5.10.) hat mit der
+ * lockeren Fassung („hoechstens 2 Karten") bei einem Creativity-Lv2-Helden
+ * beide Karten geopfert — die Heuristik kann den Wert eines Passivs nicht
+ * sehen, also darf sie nur Verluste freigeben, die praktisch nichts kosten.
+ */
+function abilityLossBaseline(tags) {
+  const t = tags || [];
+  return t.includes('kost:n:1') && t.includes('kost:kern:nein') && t.includes('kost:benutzt:0');
+}
+
+/**
+ * Soll gezahlt werden? Reihenfolge: gelernte Regel / Training-Exploration
+ * (`optInDecision`) > Grundheuristik. Im Puzzle gilt die Heuristik.
+ *
+ * `opts.record`: die Entscheidung selbst als `optIn`-Zeile festhalten —
+ * noetig dort, wo KEIN Prompt durch den Trichter laeuft (Entschluss in der
+ * Main Phase). Laeuft die Entscheidung ueber einen Prompt mit
+ * `decisionKey`/`lernTags`, schreibt der Trichter die Zeile selbst (sonst
+ * stuende sie doppelt im Protokoll).
+ */
+function abilityLossChoice(engine, pi, key, tags, opts = {}) {
+  let pay;
+  try {
+    const dec = engine.isPuzzle ? null : optInDecision(engine, pi, key, tags);
+    pay = dec === 'play' ? true : dec === 'skip' ? false : abilityLossBaseline(tags);
+    if (opts.record && !engine._inMctsSim && !engine.isPuzzle) {
+      try {
+        require('./_decision-log.js').notiere(engine, pi, {
+          art: 'optIn', karte: key, tags, gewaehlt: pay ? 'yes' : null,
+        });
+      } catch { /* Aufzeichnung darf nie stoeren */ }
+    }
+  } catch { pay = abilityLossBaseline(tags); }
+  return pay;
+}
+
+// ═══════════════════════════════════════════════════════════════════
 //  ZIEH-ENTSCHEIDUNGS-KANAL (v816, Als Auftrag 6.9.)
 //
 //  „You may draw N cards" — Kartenziehen ist meistens gut und wird
@@ -3235,6 +3340,9 @@ module.exports = {
   synergyFamilyName, boardPartnerTags, synergyPrior, noteSynergyTurnStart, noteSynergyTurnEnd,
   decisionStateTags,
   optInDecision,
+  abilityLossTags,
+  abilityLossBaseline,
+  abilityLossChoice,
   targetIntentBonus,
   ordinalPick,
   setOfferValue,
