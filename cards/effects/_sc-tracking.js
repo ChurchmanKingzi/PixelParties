@@ -183,7 +183,8 @@ function aktion(tracking, ctx, env) {
  * Aktion sind (freier Heldeneffekt, Platzieren einer Reaktionskarte) und
  * deshalb nicht ueber `onAnyActionResolved` laufen duerfen (Bleed, Flashbang,
  * Madame Guillotine …), aber den Bonus ausdruecklich beenden (Als Vorgabe
- * 5.10. nach Testerbericht: Damus' Ifrit-Platzierung, Pawn Chain).
+ * 5.10. nach Testerbericht: JEDER Place-Effekt — zentral in `actionPlaceCreature` —
+ * und Damus' Ifrit-Platzierung, die per `summonCreatureWithHooks` läuft).
  */
 function zusatzaktion(tracking, pi) {
   const t = tracking?.[pi];

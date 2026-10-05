@@ -14577,7 +14577,8 @@ this._deathWatch = (this._deathWatchStack || []).length
    * Nur der SC-Zaehler „Back to Basics": `playerIdx` hat eine Zusatzaktion
    * benutzt. Loest KEINE Aktions-Hooks aus (Bleed, Flashbang, Madame
    * Guillotine …) — fuer Wege, die regeltechnisch keine Aktion sind, den
-   * Bonus aber trotzdem beenden (Damus' Ifrit-Platzierung, Pawn Chain).
+   * Bonus aber trotzdem beenden: jeder Place-Effekt (zentral am Ende von
+   * `actionPlaceCreature`) und Damus' Ifrit-Platzierung (`summonCreatureWithHooks`).
    * Wege, die eine echte Aktion sind, nehmen `meldeBeschwoerungAlsAktion`.
    */
   meldeScZusatzaktion(playerIdx) {
@@ -25611,6 +25612,14 @@ this._deathWatch = (this._deathWatchStack || []).length
       });
     }
 
+    // ★ SC „Back to Basics" (Als Vorgabe 5.10.): JEDER Place-Effekt beendet den
+    // Bonus — ausdruecklich auch die, die keine Aktion sind (freie Effekte,
+    // Reaktionskarten, Handkarten-Platzierungen). Hierher laufen alle Wege
+    // (`placeFromPile`: Hand, Ablage, Deck, Stapel; `summonFromDeck/-Discard`
+    // mit `mode: 'place'`), also EINE Stelle statt jeder Karte einzeln. Nur
+    // der SC-Zaehler, keine Aktions-Hooks. Beschwoerungen (summon) bleiben
+    // davon unberuehrt; gezaehlt wird, wer die Karte platziert (`playerIdx`).
+    this.meldeScZusatzaktion(playerIdx);
     this.sync();
     return { inst };
   }
