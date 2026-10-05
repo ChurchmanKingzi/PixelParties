@@ -2200,20 +2200,51 @@ const HeroIdleAnims = (() => {
 
   // ── Gemeinsame Schleife ──────────────────────────────────────
   const schritte = new Set();
-  let raf = 0;
-  function tick(now) {
-    raf = 0;
-    if (schritte.size) { try { ebeneAbgleichen(); } catch {} }
-    for (const s of schritte) { try { s(now); } catch {} }
-    if (schritte.size) raf = requestAnimationFrame(tick);
+  // ★ Perf (Telefon-Befund: „unspielbar") — ZWEI Funde, beide gemessen:
+  //
+  // 1. `ebeneAbgleichen` las in JEDEM Bild `getComputedStyle(plane)` und
+  //    vier `offset*`-Werte der Brettebene. Lage und Zonenabgleich laufen
+  //    jetzt nur noch, wenn ein Beobachter „schmutzig" gemeldet hat, plus
+  //    ein Sicherheitsnetz alle PRUEF_MS (600 ms) für alles, was kein Beobachter
+  //    sieht.
+  //
+  // 2. Die Schleife selbst lief per `requestAnimationFrame`. Eine
+  //    laufende rAF-Schleife — auch eine leere — zwingt Chrome zu einem
+  //    Hauptthread-Frame je Vsync, und in JEDEM dieser Frames wird für
+  //    JEDE laufende CSS-Animation der Stil neu berechnet (Invalidierungs-
+  //    grund „Animation"), selbst wenn sie auf dem Compositor läuft.
+  //    Mit den ~57 Endlos-Animationen des Bretts (Motes, Foil, Pulse)
+  //    waren das ~3 400 Recalcs je Sekunde: 45 % der Hauptthread-Zeit
+  //    bei 4× gedrosselter CPU, im Ruhezustand. Ein Timer erzeugt diesen
+  //    Frame NICHT von selbst; ein Hauptthread-Frame entsteht jetzt nur
+  //    noch, wenn tatsächlich ein Sprite-Frame gemalt wird (~11/s).
+  const PRUEF_MS = 600;
+  const TAKT_MS = 20;
+  let pruefSchmutz = true, pruefZuletzt = -Infinity;
+  let takt = 0;
+  function markiere() { pruefSchmutz = true; }
+  function naechsterTakt() { if (!takt && schritte.size) takt = setTimeout(tick, TAKT_MS); }
+  function tick() {
+    takt = 0;
+    const now = performance.now();
+    const pruefen = pruefSchmutz || now - pruefZuletzt >= PRUEF_MS;
+    if (pruefen) { pruefSchmutz = false; pruefZuletzt = now; }
+    if (schritte.size && pruefen) { try { ebeneAbgleichen(); } catch {} }
+    for (const s of schritte) { try { s(now, pruefen); } catch {} }
+    naechsterTakt();
   }
   const diagnose = new Map();   // Schritt → { held, frames, st, zustand }
   function anmelden(schritt, info) {
     schritte.add(schritt);
     if (info) diagnose.set(schritt, info);
     try { ebeneAbgleichen(); } catch {}
-    if (!raf) raf = requestAnimationFrame(tick);
+    markiere();
+    naechsterTakt();
     return () => { schritte.delete(schritt); diagnose.delete(schritt); };
+  }
+  if (typeof window !== 'undefined') {
+    window.addEventListener('resize', markiere, { passive: true });
+    window.addEventListener('orientationchange', markiere, { passive: true });
   }
   // Konsolenhilfe (v1456): Zustand aller Figuren auf dem Brett.
   if (typeof window !== 'undefined') {
@@ -2233,18 +2264,43 @@ const HeroIdleAnims = (() => {
 
   // ── Sprite-Ebene (v1451) ─────────────────────────────────────
   // Die Ebene übernimmt Lage, Größe und Transformation der Brettebene.
-  // Abgeglichen wird in jedem Bild, solange Figuren stehen — aber nur
-  // geschrieben, wenn sich etwas geändert hat (Maßstab, Scroll-Modus,
-  // Kamera, Telefon-Rückfall). Die Neigung wird wie bei den Flugkarten
+  // Abgeglichen wird, solange Figuren stehen, wenn ein Beobachter eine
+  // Änderung meldet (siehe `markiere`, seit der Perf-Umstellung nicht mehr
+  // in jedem Bild) — und geschrieben nur bei echter Änderung (Maßstab,
+  // Scroll-Modus, Kamera, Telefon-Rückfall). Die Neigung wird wie bei den Flugkarten
   // (`readBoardTiltDeg`) aus der tatsächlich gerenderten Matrix gelesen.
   let ebeneEl = null, ebenePlane = null, ebeneStand = '';
+  let ebeneRO = null, ebeneMO = null;
   const ebeneHoerer = new Set();
   function setzeEbene(el) {
     if (el === ebeneEl) return;
     ebeneEl = el;
     ebenePlane = null;
     ebeneStand = '';
+    markiere();
     ebeneHoerer.forEach(f => { try { f(el); } catch {} });
+  }
+  // Meldet „schmutz", sobald sich Größe der Ebene/ihres Wrappers ändert
+  // oder `class`/`style`/`data-pp-dragging` der Ebene oder eines Vorfahren
+  // (inkl. <html>: `--board-scale`, `--center-offset`, Scroll-Modus).
+  function beobachteEbene(plane) {
+    try {
+      if (ebeneRO) ebeneRO.disconnect();
+      if (ebeneMO) ebeneMO.disconnect();
+      ebeneRO = ebeneMO = null;
+      if (!plane) return;
+      if (typeof ResizeObserver !== 'undefined') {
+        ebeneRO = new ResizeObserver(markiere);
+        ebeneRO.observe(plane);
+        if (plane.parentElement) ebeneRO.observe(plane.parentElement);
+      }
+      if (typeof MutationObserver !== 'undefined') {
+        ebeneMO = new MutationObserver(markiere);
+        for (let e = plane; e; e = e.parentElement) {
+          ebeneMO.observe(e, { attributes: true, attributeFilter: ['class', 'style', 'data-pp-dragging'] });
+        }
+      }
+    } catch {}
   }
   function abonniereEbene(f) {
     ebeneHoerer.add(f);
@@ -2255,6 +2311,7 @@ const HeroIdleAnims = (() => {
     if (!el || !el.isConnected) return;
     if (!ebenePlane || !ebenePlane.isConnected) {
       ebenePlane = el.parentElement ? el.parentElement.querySelector(':scope > .board-plane') : null;
+      beobachteEbene(ebenePlane);
     }
     const plane = ebenePlane;
     if (!plane) return;
@@ -2394,7 +2451,7 @@ const HeroIdleAnims = (() => {
 
   return {
     slug, hole, schonDa: (key) => fertig.get(key), anmelden, steinSheet,
-    setzeEbene, abonniereEbene, ebene: () => ebeneEl, lageInEbene,
+    setzeEbene, abonniereEbene, ebene: () => ebeneEl, lageInEbene, markiere,
     // v1462: steht für diesen Helden eine Figur auf dem Brett? (Liste
     // geladen, Sheet vorhanden und nicht fehlgeschlagen)
     ladeListe,
@@ -2812,6 +2869,7 @@ function HeroIdleSprite({ cardName, angehalten, versteinert, eingefroren, effekt
   zustand.current.angehalten = !!angehalten;
   zustand.current.versteinert = !!versteinert;
   zustand.current.effekte = effekte || '';
+  if (zustand.current.eingeklappt !== !!eingeklappt) HeroIdleAnims.markiere();
   zustand.current.eingeklappt = !!eingeklappt;
 
   useEffect(() => {
@@ -2927,6 +2985,11 @@ function HeroIdleSprite({ cardName, angehalten, versteinert, eingefroren, effekt
         platz.classList.toggle('hero-idle-zurueck', !weg);
       }
     };
+    // Hover wird nicht mehr in jedem Bild per `:matches(':hover')`
+    // erfragt, sondern per Ereignis gemeldet.
+    const hoverMelden = () => HeroIdleAnims.markiere();
+    zone.addEventListener('mouseenter', hoverMelden);
+    zone.addEventListener('mouseleave', hoverMelden);
     const holo = platz.querySelector('.hero-idle-holo');
     const auftauchenFertig = (e) => {
       if (e.animationName === 'heroHoloAuftauchen') platz.classList.remove('hero-idle-zurueck');
@@ -2950,7 +3013,7 @@ function HeroIdleSprite({ cardName, angehalten, versteinert, eingefroren, effekt
       }
     };
     st.schritte = 0;
-    const abmelden = HeroIdleAnims.anmelden((now) => {
+    const abmelden = HeroIdleAnims.anmelden((now, pruefen) => {
       const dt = st.zuletzt == null ? 0 : Math.min(now - st.zuletzt, 1000);
       st.zuletzt = now;
       st.schritte++;
@@ -2965,7 +3028,9 @@ function HeroIdleSprite({ cardName, angehalten, versteinert, eingefroren, effekt
       }
       if (z.versteinert) { if (st.stein < 1) st.stein = Math.min(1, st.stein + dt / 900); }
       else st.stein = 0;
-      sicher('Zonenlage', folgeZone);
+      // Zonenlage/Hover nur bei „schmutz" (Beobachter, Hover-Ereignis,
+      // 600-ms-Netz) — siehe Kopf der gemeinsamen Schleife.
+      if (pruefen) sicher('Zonenlage', folgeZone);
       // Pulsierende Tönung (Cursed/Charmed): kurzes Aufflashen je
       // 1,2 s, in acht Stufen — gemalt wird nur beim Stufenwechsel.
       const effNun = zustand.current.effekte || '';
@@ -2996,6 +3061,8 @@ function HeroIdleSprite({ cardName, angehalten, versteinert, eingefroren, effekt
     return () => {
       abmelden();
       if (ro) ro.disconnect();
+      zone.removeEventListener('mouseenter', hoverMelden);
+      zone.removeEventListener('mouseleave', hoverMelden);
       if (holo) holo.removeEventListener('animationend', auftauchenFertig);
     };
   }, [eintrag, ebene]);
@@ -26352,6 +26419,28 @@ const ChatPanel = React.memo(function ChatPanel({ roomId, participants: particip
   && a.onToggleCollapse === b.onToggleCollapse
   && _teilnehmerSchluessel(a.participants) === _teilnehmerSchluessel(b.participants));
 
+// ★ Antwort auf eine Effekt-Abfrage (`gameState.effectPrompt`) senden —
+// der EINZIGE Weg dafuer. Zwei Absicherungen gegen Lag und Doppeltipp:
+//  1. Die Nummer der Frage (`promptId`) geht mit. Der Server verwirft
+//     Antworten auf eine fruehere Frage, statt sie der jetzt offenen
+//     unterzuschieben (z.B. einer „may"-Abfrage direkt nach der ersten).
+//  2. Dieselbe Frage wird nicht zweimal kurz hintereinander beantwortet.
+//     Das Fenster ist kurz, damit eine vom Server abgelehnte Antwort
+//     (z.B. der gerade wirkenden Karte als Abwurf) gleich neu versucht
+//     werden kann.
+let _ppPromptLetzte = { id: null, t: 0 };
+function ppSendePromptAntwort(gameState, response) {
+  const ep = gameState && gameState.effectPrompt;
+  const pid = ep ? ep.promptId : undefined;
+  if (pid != null) {
+    const jetzt = performance.now();
+    if (_ppPromptLetzte.id === pid && jetzt - _ppPromptLetzte.t < 600) return false;
+    _ppPromptLetzte = { id: pid, t: jetzt };
+  }
+  socket.emit('effect_prompt_response', { roomId: gameState.roomId, response, promptId: pid });
+  return true;
+}
+
 function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck, setSelectedDeck, cubeMatchInfo }) {
   useHoverDurchSchleier();   // v1270: Tooltips durch den Dialog-Schleier
   const { user, setUser, notify, setBgmMode } = useContext(AppContext);
@@ -29528,10 +29617,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         if (pick.isCreature && h.zoneSlot != null) {
           response.zoneSlot = h.zoneSlot;
         }
-        socket.emit('effect_prompt_response', {
-          roomId: gameState.roomId,
-          response,
-        });
+        ppSendePromptAntwort(gameState, response);
       } else if (pick.isArtifactCreature) {
         // Artifact Creature: derselbe Picker, aber der Weg
         // aufs Feld ist `play_artifact` (doPlayArtifact hat
@@ -30112,10 +30198,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       const aktuell = hand.indexOf(cardName);
       if (aktuell < 0) return;
       if (window.playSFX) window.playSFX('ui_click');
-      socket.emit('effect_prompt_response', {
-        roomId: gameState.roomId,
-        response: { cardName, handIndex: aktuell, heroIdx: destination.heroIdx, zoneSlot: destination.slotIdx },
-      });
+      ppSendePromptAntwort(gameState, { cardName, handIndex: aktuell, heroIdx: destination.heroIdx, zoneSlot: destination.slotIdx });
       return;
     }
     const eligible = getEligibleSummoners(cardName);
@@ -30227,7 +30310,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       const eligible = gameState.effectPrompt.eligibleIndices;
       if (eligible && !eligible.includes(idx)) return; // Not an eligible card for this discard
       if (e.cancelable) e.preventDefault();
-      socket.emit('effect_prompt_response', { roomId: gameState.roomId, response: { cardName, handIndex: idx } });
+      ppSendePromptAntwort(gameState, { cardName, handIndex: idx });
       return;
     }
 
@@ -30240,7 +30323,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       const eligible = gameState.effectPrompt.eligibleIndices;
       if (eligible && !eligible.includes(idx)) return;
       if (e.cancelable) e.preventDefault();
-      socket.emit('effect_prompt_response', { roomId: gameState.roomId, response: { cardName, handIndex: idx } });
+      ppSendePromptAntwort(gameState, { cardName, handIndex: idx });
       return;
     }
 
@@ -30275,7 +30358,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       if (resolvingHandIndex >= 0 && resolvingHandIndex === idx) return;
       if (!pickHandCardDragMode) {
         if (e.cancelable) e.preventDefault();
-        socket.emit('effect_prompt_response', { roomId: gameState.roomId, response: { cardName, handIndex: idx } });
+        ppSendePromptAntwort(gameState, { cardName, handIndex: idx });
         return;
       }
       // Drag-summon mode — DON'T emit yet. Fall through to the drag-
@@ -30357,7 +30440,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     if (abilityAttachPick && abilityAttachPick.handIndex === idx) {
       if (e.cancelable) e.preventDefault();
       if (abilityAttachPick.source === 'effectPrompt' && abilityAttachPick.cancellable !== false) {
-        socket.emit('effect_prompt_response', { roomId: gameState.roomId, response: { cancelled: true } });
+        ppSendePromptAntwort(gameState, { cancelled: true });
       }
       setAbilityAttachPick(null);
       return;
@@ -31380,10 +31463,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       if (pickHandCardDragMode) {
         if (!dragging) {
           if (window.playSFX) window.playSFX('ui_click');
-          socket.emit('effect_prompt_response', {
-            roomId: gameState.roomId,
-            response: { cardName, handIndex: idx },
-          });
+          ppSendePromptAntwort(gameState, { cardName, handIndex: idx });
           setHandDrag(null); setPlayDrag(null); setAbilityDrag(null);
           return;
         }
@@ -31391,15 +31471,12 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           if (!prev) return null;
           if (prev.targetHero >= 0 && (prev.targetSlot >= 0 || prev.pickHandCardHeroDrop)) {
             if (window.playSFX) window.playSFX('ui_click');
-            socket.emit('effect_prompt_response', {
-              roomId: gameState.roomId,
-              response: {
+            ppSendePromptAntwort(gameState, {
                 cardName: prev.cardName,
                 handIndex: prev.idx,
                 targetHeroIdx: prev.targetHero,
                 targetSlotIdx: prev.targetSlot,
-              },
-            });
+              });
           }
           // Else: dragged but no valid drop — cancel silently. The
           // prompt stays open so the player can try again.
@@ -31532,10 +31609,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             // side to only what THIS hero can legally cast, so the
             // dispatch is always safe.
             if (isHeroAction && heroActionPrompt.heroIdx !== undefined) {
-              socket.emit('effect_prompt_response', {
-                roomId: gameState.roomId,
-                response: { cardName, handIndex: idx, fromCreation, heroIdx: heroActionPrompt.heroIdx },
-              });
+              ppSendePromptAntwort(gameState, { cardName, handIndex: idx, fromCreation, heroIdx: heroActionPrompt.heroIdx });
             } else {
               // Either Action Phase normal play OR any-hero heroAction
               // (Guardian Beast Hu via `performImmediateActionAnyHero`
@@ -31584,10 +31658,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 // `play_spell` would fail server-side because no
                 // additional-action token covers the card.
                 if (isHeroAction) {
-                  socket.emit('effect_prompt_response', {
-                    roomId: gameState.roomId,
-                    response: { cardName, handIndex: idx, fromCreation, heroIdx: eligible[0].idx },
-                  });
+                  ppSendePromptAntwort(gameState, { cardName, handIndex: idx, fromCreation, heroIdx: eligible[0].idx });
                 } else {
                   socket.emit('play_spell', { roomId: gameState.roomId, cardName, handIndex: idx, fromCreation, heroIdx: eligible[0].idx, charmedOwner: eligible[0].charmedOwner, viaCreatureInstId: eligible[0].creatureInstId });
                 }
@@ -31622,10 +31693,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               if (lockedHi !== undefined) {
                 const lockedSlot = findFreeSupportSlot(me, lockedHi);
                 if (lockedSlot >= 0) {
-                  socket.emit('effect_prompt_response', {
-                    roomId: gameState.roomId,
-                    response: { cardName, handIndex: idx, fromCreation, heroIdx: lockedHi, zoneSlot: lockedSlot },
-                  });
+                  ppSendePromptAntwort(gameState, { cardName, handIndex: idx, fromCreation, heroIdx: lockedHi, zoneSlot: lockedSlot });
                 }
               } else {
                 // Any-hero mode — narrow heroes to those the SERVER
@@ -31647,10 +31715,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                   eligible.push({ idx: hi, name: h.name, zoneSlot: slot });
                 }
                 if (eligible.length === 1) {
-                  socket.emit('effect_prompt_response', {
-                    roomId: gameState.roomId,
-                    response: { cardName, handIndex: idx, fromCreation, heroIdx: eligible[0].idx, zoneSlot: eligible[0].zoneSlot },
-                  });
+                  ppSendePromptAntwort(gameState, { cardName, handIndex: idx, fromCreation, heroIdx: eligible[0].idx, zoneSlot: eligible[0].zoneSlot });
                 } else if (eligible.length > 1) {
                   setSpellHeroPick({ cardName, handIndex: idx, fromCreation, card, eligible, isCreature: true, isHeroAction: true });
                 }
@@ -31942,10 +32007,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           if (!prev || prev.targetHero < 0) return null;
           // During abilityAttach prompt — send as effect_prompt_response
           if (isAbilityAttachEligible) {
-            socket.emit('effect_prompt_response', {
-              roomId: gameState.roomId,
-              response: { cardName: prev.cardName, handIndex: prev.idx, heroIdx: prev.targetHero, zoneSlot: prev.targetZone },
-            });
+            ppSendePromptAntwort(gameState, { cardName: prev.cardName, handIndex: prev.idx, heroIdx: prev.targetHero, zoneSlot: prev.targetZone });
           } else {
             socket.emit('play_ability', {
               roomId: gameState.roomId,
@@ -32013,15 +32075,12 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           // before this fix. Always include both `heroIdx` AND
           // `zoneSlot` so both engine paths resolve cleanly.
           if (isHeroAction) {
-            socket.emit('effect_prompt_response', {
-              roomId: gameState.roomId,
-              response: {
+            ppSendePromptAntwort(gameState, {
                 cardName: prev.cardName,
                 handIndex: prev.idx,
                 heroIdx: prev.targetHero,
                 zoneSlot: prev.targetSlot,
-              },
-            });
+              });
             return null;
           }
 
@@ -32117,10 +32176,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
 
           // Hero Action mode (Coffee) — send as effect_prompt_response
           if (isHeroAction) {
-            socket.emit('effect_prompt_response', {
-              roomId: gameState.roomId,
-              response: { cardName: prev.cardName, handIndex: prev.idx, heroIdx: prev.targetHero },
-            });
+            ppSendePromptAntwort(gameState, { cardName: prev.cardName, handIndex: prev.idx, heroIdx: prev.targetHero });
             return null;
           }
 
@@ -40998,6 +41054,22 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     };
   }, []);
 
+  // ── Verworfene Aktion: der Server hat eine Aktion ohne jede Wirkung
+  // abgebrochen (ungueltige Lage, Sperre, Zug vorbei …) und uns den aktuellen
+  // Zustand geschickt. Hier nur der Hinweis dazu — hoechstens alle 3 s, damit
+  // wiederholtes Tippen die Anzeige nicht zumuellt.
+  useEffect(() => {
+    let zuletzt = 0;
+    const onActionRejected = () => {
+      const jetzt = Date.now();
+      if (jetzt - zuletzt < 3000) return;
+      zuletzt = jetzt;
+      if (notify) notify('That action isn\'t possible right now.', 'error');
+    };
+    socket.on('action_rejected', onActionRejected);
+    return () => { socket.off('action_rejected', onActionRejected); };
+  }, [notify]);
+
   // ── Action Log socket listener (Chat: v1374 in `ChatPanel`) ──
   useEffect(() => {
     const onActionLog = (entry) => {
@@ -41014,7 +41086,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   useEffect(() => {
     const el = boardCenterRef.current;
     if (!el) return;
-    const check = () => {
+    const checkRaw = () => {
       // ── WAEHREND EINES KARTENZUGS NICHT MESSEN (v798) ──────────────
       // Al: „Wenn ich eine Karte dragge, hat sie leichte Latenz […] und
       // fliegt leicht hinter meinem Cursor her."
@@ -41210,6 +41282,40 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         }
       }
     };
+    // ★ Perf (Telefon-Befund: „unspielbar") — `checkRaw` liefen nach
+    // JEDEM Render, und jeder Lauf schaltet `board-flat-measure` zweimal
+    // um (das Layout des GANZEN Bretts wird ungueltig) und liest dutzende
+    // Rechtecke. Im Profil eines gedrosselten Telefon-Profils waren das
+    // `getBoundingClientRect` 31 % + `ppEchterUeberstand` 16 % der
+    // gesamten Zeit waehrend einer Partie — 127 Long Tasks (bis 980 ms)
+    // in 43 s. Die Brettgeometrie haengt aber nur an Fenster, Massstab
+    // und der STRUKTUR (Zahl der Zonen und Reihenkinder: Flying Islands,
+    // Area-Zonen), nicht daran, dass sich irgendein Zustand gerendert
+    // hat. Renders messen deshalb nur noch, wenn sich diese Signatur
+    // aendert; ResizeObserver und `resize` messen weiterhin IMMER
+    // (`checkBald`). Haben sich die Ausgaben eines Laufs veraendert
+    // (Mittelversatz, Anker, Ueberstand), folgt ein begrenzter Nachlauf —
+    // das ersetzt den frueheren „naechsten Render", auf den sich die
+    // Konvergenz oben verlassen hat.
+    const geoSig = () => {
+      // Fenstergroesse bewusst NICHT hier: `innerWidth` kann selbst ein
+      // Layout erzwingen, und `resize` misst ohnehin immer (`checkBald`).
+      let sig = document.documentElement.style.getPropertyValue('--board-scale')
+        + '|' + el.querySelectorAll('.board-zone').length;
+      el.querySelectorAll('.board-plane .board-row').forEach(row => { sig += ',' + row.children.length; });
+      return sig;
+    };
+    const ausgabeSig = () => el.style.cssText + '|' + el.className + '|' + (el.scrollLeft | 0);
+    const check = () => {
+      const vorher = ausgabeSig();
+      checkRaw();
+      el._ppCheckSig = geoSig();
+      if (ausgabeSig() !== vorher) {
+        if ((el._ppCheckNach || 0) < 8) { el._ppCheckNach = (el._ppCheckNach || 0) + 1; checkBald(); }
+      } else {
+        el._ppCheckNach = 0;
+      }
+    };
     // GEBUENDELT auf ein Bild (v798): mehrere Renders innerhalb eines
     // Rahmens (Zustandsketten, Socket-Nachrichten, ResizeObserver und
     // der Render danach) loesten bisher jeweils eine eigene volle
@@ -41248,18 +41354,38 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       if (checkRaf) return;
       checkRaf = requestAnimationFrame(() => { checkRaf = 0; checkGedrosselt(); });
     };
-    checkGedrosselt();
-    const obs = new ResizeObserver(checkBald);
+    // Render-Anlass: nur messen, wenn sich die Struktur-Signatur geaendert
+    // hat — ODER wenn der vorige Effekt-Lauf eine anstehende Messung
+    // (rAF/Timer von Resize, Nachlauf, Drossel) beim Aufraeumen abbrechen
+    // musste. Dieser Effekt hat kein Dependency-Array und baut sich nach
+    // JEDEM Render neu auf; frueher holte der bedingungslose Aufruf hier
+    // alles nach, jetzt traegt `_ppCheckAusstehend` es ueber den Neustart.
+    if (el._ppCheckAusstehend || el._ppCheckSig !== geoSig()) {
+      el._ppCheckAusstehend = false;
+      checkGedrosselt();
+    }
+    // Der Beobachter meldet jede Groessenaenderung — im Spiel meist nur
+    // die HOEHE (Handleisten, Overlays, Massstab). `checkRaw` bestimmt
+    // aber nur Waagerechtes (Scrollmodus, Mittelversatz, Anker, Ueberstand);
+    // das aendert sich nicht, solange Breite und Struktur-Signatur
+    // gleich bleiben. Fenster-`resize` misst weiter immer.
+    const obs = new ResizeObserver((eintraege) => {
+      const w = eintraege[eintraege.length - 1].contentRect.width;
+      const gleich = el._ppRoBreite !== undefined && Math.abs(w - el._ppRoBreite) < 0.5
+        && el._ppCheckSig === geoSig();
+      el._ppRoBreite = w;
+      if (!gleich) checkBald();
+    });
     obs.observe(el);
     window.addEventListener('resize', checkBald);
     return () => {
       obs.disconnect();
       window.removeEventListener('resize', checkBald);
-      if (checkRaf) cancelAnimationFrame(checkRaf);
+      if (checkRaf) { cancelAnimationFrame(checkRaf); el._ppCheckAusstehend = true; }
       // ★ v1257: Trailing-Timer der Telefon-Drossel mit abraeumen. Der
       // Effekt laeuft nach jedem Render neu — der Timer haengt deshalb
       // am Element (ueberlebt Neustarts) und wird hier zentral geleert.
-      if (el._ppCheckTimer) { clearTimeout(el._ppCheckTimer); el._ppCheckTimer = 0; }
+      if (el._ppCheckTimer) { clearTimeout(el._ppCheckTimer); el._ppCheckTimer = 0; el._ppCheckAusstehend = true; }
     };
   });
 
@@ -41516,7 +41642,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           return;
         }
         if (abilityAttachPick.source === 'effectPrompt') {
-          socket.emit('effect_prompt_response', { roomId: gameState.roomId, response: { cancelled: true } });
+          ppSendePromptAntwort(gameState, { cancelled: true });
         }
         setAbilityAttachPick(null);
         return;
@@ -41532,7 +41658,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         return;
       }
       if (gameState.effectPrompt && gameState.effectPrompt.ownerIdx === myIdx && gameState.effectPrompt.cancellable !== false) {
-        socket.emit('effect_prompt_response', { roomId: gameState.roomId, response: { cancelled: true } });
+        ppSendePromptAntwort(gameState, { cancelled: true });
       } else if (gameState.potionTargeting && gameState.potionTargeting.ownerIdx === myIdx) {
         if (gameState.potionTargeting.config?.cancellable === false) return;
         socket.emit('cancel_potion', { roomId: gameState.roomId });
@@ -41573,7 +41699,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       if (showSurrender) { if (!gameState.isPuzzle) handleSurrender(); return; }
       if (showEndTurnConfirm) { confirmEndTurn(); return; }
       if (isMyPrompt && (ep.type === 'confirm' || ep.type === 'deckSearchReveal')) {
-        socket.emit('effect_prompt_response', { roomId: gameState.roomId, response: { confirmed: true } }); return;
+        ppSendePromptAntwort(gameState, { confirmed: true }); return;
       }
       if (isMyPotion && potionSelection.length > 0) {
         // Check min required
@@ -42564,7 +42690,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     return () => window.removeEventListener('keydown', handleKey, true);
   }, [chainPickData, chainPickSelected.length, chainPickCanConfirm]);
   const respondToPrompt = (response) => {
-    socket.emit('effect_prompt_response', { roomId: gameState.roomId, response });
+    ppSendePromptAntwort(gameState, response);
   };
 
   // Escape key dismisses deckSearchReveal prompts (opponent's search result confirmation)
@@ -42734,6 +42860,11 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     // ── Diagnose-Einträge des Zugablaufs (8.8.) ──
     if (t === 'hook_timeout') {
       return <span style={{ color: '#ff9944' }}>⏱ Effect of {cName(entry.card)} timed out ({entry.hook})</span>;
+    }
+    // Sicherheitsgrenze des Zuges erreicht: bis zum Zugende loest keine Karte
+    // mehr aus. Ohne diese Zeile blieb ein Trigger einfach aus, ohne Hinweis.
+    if (t === 'hooks_killed') {
+      return <span style={{ color: '#ff9944' }}>⚠ Safety limit reached in turn {entry.turn}: card effects are switched off for the rest of this turn</span>;
     }
     if (t === 'stale_end_phase_dropped') {
       return <span style={{ color: '#ff9944' }}>⏱ Late End Phase from turn {entry.enteredOnTurn} discarded</span>;
@@ -43693,10 +43824,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                   // Server-driven tutor (Alex, …) — resolve the pending prompt.
                   // The server owns the actual placement; we just report
                   // where the player chose to land.
-                  socket.emit('effect_prompt_response', {
-                    roomId: gameState.roomId,
-                    response: { heroIdx: i, zoneSlot: targetSlot },
-                  });
+                  ppSendePromptAntwort(gameState, { heroIdx: i, zoneSlot: targetSlot });
                   setAbilityAttachPick(null);
                   return;
                 }
@@ -44535,10 +44663,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                   ? () => {
                       const pick = abilityAttachPick;
                       if (pick.source === 'effectPrompt') {
-                        socket.emit('effect_prompt_response', {
-                          roomId: gameState.roomId,
-                          response: { heroIdx: i, zoneSlot: z },
-                        });
+                        ppSendePromptAntwort(gameState, { heroIdx: i, zoneSlot: z });
                         setAbilityAttachPick(null);
                         return;
                       }
@@ -47138,10 +47263,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                         if (czPrompt) {
                           if (!czWaehlbar) return;
                           if (e.cancelable) e.preventDefault();
-                          socket.emit('effect_prompt_response', {
-                            roomId: gameState.roomId,
-                            response: { creationIndex: item.origIdx },
-                          });
+                          ppSendePromptAntwort(gameState, { creationIndex: item.origIdx });
                           return;
                         }
                         onHandMouseDown(e, item.origIdx, true);
@@ -49183,7 +49305,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 const pa = pendingAbilityActivation;
                 setPendingAbilityActivation(null);
                 if (pa.isHeroAction) {
-                  socket.emit('effect_prompt_response', { roomId: gameState.roomId, response: { abilityActivation: true, heroIdx: pa.heroIdx, zoneIdx: pa.zoneIdx } });
+                  ppSendePromptAntwort(gameState, { abilityActivation: true, heroIdx: pa.heroIdx, zoneIdx: pa.zoneIdx });
                 } else {
                   socket.emit('activate_ability', { roomId: gameState.roomId, heroIdx: pa.heroIdx, zoneIdx: pa.zoneIdx, zoneKind: pa.zoneKind, charmedOwner: pa.charmedOwner, borrowedFromOwner: pa.borrowedFromOwner });
                 }

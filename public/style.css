@@ -19294,6 +19294,41 @@ img, .card-tooltip-img img { image-rendering: pixelated; }
   .hand-mote:nth-child(n+17) { display: none; }
   .board-mote:nth-child(n+25) { display: none; }
 
+  /* ── BATTLE-LITE, DRITTE RUNDE (Perf, Als Befund: „unspielbar") ──
+     Gemessen (Chromium, Telefon-Profil, CPU 4x gedrosselt, Brett im
+     Leerlauf): jede laufende Endlos-Animation kostet auf dem Hauptthread
+     einen Style-Recalc je Bild, auch wenn sie nur `opacity`/`transform`
+     animiert. Die ~57 Dauerlaeufer des Bretts (24 Board-Motes, 16
+     Hand-Motes, Foil-Funken/-Baender/-Ringe) waren zusammen ~45 % der
+     Hauptthread-Zeit — im Ruhezustand, bevor ueberhaupt etwas im Spiel
+     passiert. Das sind die Dinge, die dann Eingaben und Server-Ereignisse
+     verspaeten. Alles hier ist reine Kosmetik:
+       • Hand-Motes ganz weg, vom Brett bleiben 8 Motes.
+       • Foil: Funken und Baender (je ein Layer mit Blend-Modus) weg, der
+         Schimmer steht still auf seinem Grundwert (siehe `.foil-iridescent`),
+         und von den wandernden Rahmenringen bleibt EINER stehen — die
+         Karte zeigt ihre Seltenheit weiter am Rand. */
+  .hand-mote { display: none; }
+  .board-mote { display: none; }
+  /* Aktivierbare Zonen und Co.: der Schein steht schon statisch in den
+     Basisregeln (`box-shadow … !important`), nur der Puls — ein
+     `box-shadow`-Verlauf, den der Compositor nicht kann und der selbst
+     Hauptthread-Frames erzwingt — und der Blitz-/Schwert-Hopser fallen
+     weg. Im eigenen Zug leuchten ALLE aktivierbaren Zonen zugleich. */
+  .zone-ability-activatable, .zone-creature-activatable, .zone-equip-activatable,
+  .zone-friendship-active, .zone-hero-effect-active,
+  .zone-ability-activatable::after, .zone-creature-activatable::after, .zone-equip-activatable::after,
+  .zone-friendship-active::after, .zone-hero-effect-active::after { animation: none !important; }
+  /* `html` davor: der Pixel-Baukasten (app-shared, `abzeichenExtra`) haengt
+     zur Laufzeit ein Stylesheet NACH dieses ein und setzt `.buff-icon`
+     wieder auf einen Stufenpuls — gleiche Spezifitaet, spaeter, gewinnt. */
+  html .buff-icon, html .hero-charmed { animation: none !important; }
+  .foil-sparkle, .foil-band { display: none; }
+  .foil-iridescent, .foil-iridescent-diamond,
+  .foil-iridescent::before, .foil-iridescent-diamond::before { animation: none; will-change: auto; }
+  .foil-rahmen i { animation: none; will-change: auto; }
+  .foil-rahmen i:nth-child(1) { opacity: 1; }
+
   /* ── BATTLE-LITE, ZWEITE RUNDE (v1258, Als Befunde 19.9.) ────────
      a) „Das Scrollen durch die Deck-Galerie ist immer noch etwas
         laggy." Die Galerie zeichnet bis zu 40 Karten samt Schein und
