@@ -339,6 +339,7 @@ kopiert, daneben liegt eine JSON-Datei mit den Metadaten. Die erzeugten
 | `skins_last.py` | `final 90 rhabi` | `rhabi_idle_final_sheet.png` | `rhabi-the-human-hunter` (Skin) |
 | `skins_last.py` | `final 90 kasperov` | `kasperov_idle_final_sheet.png` | `kasperov-the-king-of-the-east` (Skin; auch für „Kasperov the King of the East1“) |
 | `natas.py` | `final 90` | `natas_idle_final_sheet.png` | `natas-the-master-of-hell` |
+| `damus_skin.py` | `final 90` | `damus_skin_idle_final_sheet.png` | `captain-commander-damus` (Skin) |
 
 `bubbles.py` ohne `gross` erzeugt eine auf Hero-Größe verkleinerte Variante
 (Sprite aus `bubbles_downscale.py`), die aktuell nicht verwendet wird.
@@ -386,6 +387,7 @@ python3 xcf_extract.py MotiveMoe.xcf assemble src/cute-princess-mary.png "Mary-K
 | Monia Bot, the Foretold Rescuer of Coolness | – | vom Nutzer gezeichnet, deckungsgleich mit Cool Rescuer Monia (gleicher Ausschnitt, nur längere Düsenflammen); Körper und Feuer als `-body`/`-flames` getrennt nach den vier Flammenfarben |
 | Die letzten Skins (Bills Worst Nightmare, Creepy Villager Girl Semi, Non-Believer Doq, Thunder God Sol Rym, Ultimate Despair Inya, Mega-Priestess Johanna, Student Council President Nao, RhaBi the Human Hunter, Kasperov the King of the East) | `Motive.xcf`, `MotiveDeepsea.xcf`, Skin-Kartenbilder | reproduzierbar per `python3 assemble_skins_last.py <verzeichnis mit den xcf>` (Zuordnung im Skriptkopf; Non-Believer Doq nur als Differenz zweier Szenenebenen, Creepy Villager Girl Semi nach dem Kartenbild umgefärbt, Kasperov the King of the East aus dem Kartenbild ausgeschnitten; bewegliche Teile: Bills Haube `-mask`, Sol Ryms Wolke `-cloud`, Inyas `-girl`/`-bear`, Naos `-wings`, RhaBis vier Arme `-arml`/`-armr`/`-arml2`/`-armr2`) |
 | Natas, the Master of Hell | `Motive.xcf` | reproduzierbar per `python3 assemble_natas.py <Motive.xcf>` (nur der Ausschnitt um ihn, x 276–293, y 58–81; Teile `-body` „Natas“, `-arms` „Natas #1“, `-head` „Natas #2“, `-glint` „Natas #3“ (Glanzkreuz, nur als Funkeln), `-aura` „Natas #5“ (roter Höllenschatten, im xcf 10 %, die Deckkraft setzt `natas.py`); Höllentor „Natas #4“ und die beiden Schattendämonen gehören zur Szene; der Ordner `heroes/natas-the-master-of-hell/` im Sprite-Repo enthält dieselben Teile und die Idle-Frames) |
+| Captain-Commander Damus (Skin) | `Motive.xcf` | reproduzierbar per `python3 assemble_damus_skin.py <Motive.xcf>` (Körper „Damos Skin“ als `-body`, die Flammen auf Haar und Schwert „Damos Skin #1“ als `-flames`, im Motiv über dem Körper) |
 
 Neue Datei durchsuchen: `xcf_scan.py dump` legt alle Ebenen einzeln ab,
 `xcf_scan.py match <ordner> --heroes` gleicht sie mit allen noch nicht

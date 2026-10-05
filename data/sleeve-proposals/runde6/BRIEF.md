@@ -84,6 +84,8 @@ aus `../runde5/BRIEF.md`. Abweichungen/Ergänzungen unten gehen vor.
 42 | `sample-Structure Deck Sun Fencer Frenzy` | Sun Fencer Frenzy | **Taio, the Sun Fencer** | Kazena, the Storming Rebel; Bill, the Angry Auctioneer | Taio, Absorber of the Mountain's Heart
 43 | `sample-Structure Deck To Attain Divinity` | To Attain Divinity | **Archibald, the Archmage** | Barker, the Monster Tamer; Kazena, the Storming Rebel | Divinity
 44 | `sample-Structure Deck_ Grand Rebellion` | Grand Rebellion! | **Champion, the Stormbringer** | Johanna, Crusader of Light; Cute Nerd Magenta | Rebelliokai Courtly Kirin
+45 | `planned:chaos-diamond` | Chaos-Diamond (geplant, Deck spielt viele Zauber) | **Chaos-Diamond, the Cracked Keeper** | – | –
+46 | `planned:bubbles` | Bubbles (geplant, Fun-Fun-Circus-Archetyp) | **Bubbles, the Bouncy Bunny** | – | –
 
 ## Werkzeuge
 Wie Runde 4, aber alles unter `runde6/`: Skripte in `runde6/generator/` mit `from common import *` (Sprite-Cache
@@ -107,3 +109,8 @@ F.apply('../NN_name.png', '/tmp/claude-0/-home-user-PixelParties/957fee25-d4dc-5
   cyan, lime, magenta.
 - **Keine git-Befehle**, keine Dateien außerhalb von runde6/ ändern, fremde Dateien nicht anfassen (andere Agenten
   arbeiten parallel; concepts.md nur um eigene Zeilen ergänzen).
+
+## Nachtrag: geplante Gegner 45/46
+Zwei CPU-Gegner sind geplant, ihre Decks existieren noch nicht. Ihre Sleeves werden schon jetzt gebaut und unter den
+Platzhalter-IDs `planned:…` in `data/shop/cpu-sleeves.json` eingetragen (nicht käuflich, im Spiel noch unsichtbar).
+Sobald das Deck existiert, wird dort nur die `deckId` auf die echte Deck-ID umgestellt.

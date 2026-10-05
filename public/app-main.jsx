@@ -21,6 +21,13 @@ let _pendingGameState = null;
 //  out and you wait for the rest of the table.
 // ═══════════════════════════════════════════
 function CubeDraftScreen({ lobby, draft, leaveRoom, notify }) {
+  // Eigene Draft-Musik, solange der Screen steht (Deck-Bau danach bekommt wieder die Menümusik).
+  const { setBgmMode } = useContext(AppContext);
+  useEffect(() => {
+    if (!setBgmMode) return;
+    setBgmMode('draft');
+    return () => setBgmMode('menu');
+  }, [setBgmMode]);
   const [hoveredCard, setHoveredCard] = useState(null);
   const [filter, setFilter] = useState('');
   // Lokale Sammlung: { id, name, gray } — frei umsortierbar, einzeln abgrauen.
@@ -2077,6 +2084,9 @@ const BGM_FILES = {
   // rueckt der naechste nach (siehe `_bgmEndungsKaskade`). Sobald die
   // Endung feststeht, kann die Liste auf einen String schrumpfen.
   deckEditor: ['/music/bgm_deckeditor.ogg', '/music/bgm_deckeditor.mp3', '/music/bgm_deckeditor.wav'],
+  // Draft-Modus: laeuft, solange das Cube-Draften laeuft (CubeDraftScreen). Ein melodischer
+  // Hintergrund-Track (~3,5 Min) um ein zentrales Thema — siehe scripts/music/draft.py.
+  draft: '/music/bgm_draft.ogg',
 };
 // Endungs-Kaskade: probiert die restlichen Kandidaten der Reihe nach
 // durch, bis einer laedt. Nach dem letzten wird der Handler geloescht,
@@ -2328,6 +2338,7 @@ const _bgmDefeat = _mkBgm(BGM_FILES.defeat);
 const _bgmShop = _mkBgm(BGM_FILES.shop);
 const _bgmCampaign = _mkBgm(BGM_FILES.campaign);
 const _bgmDeckEditor = _mkBgm(BGM_FILES.deckEditor);
+const _bgmDraft = _mkBgm(BGM_FILES.draft);
 // Jedes Element, das hier steht, wird beim ersten Klick mitentsperrt.
 // Ein Ziel-Bezeichner in `setBgmMode(...)` muss ein Schluessel dieser
 // Tabelle sein (oder `battle:<slug>` / `campaign:<slug>`).
@@ -2335,7 +2346,7 @@ const _bgmTracks = {
   login: _bgmLogin, menu: _bgmMenu, battle: _bgmBattle, puzzle: _bgmPuzzle, tutorial: _bgmTutorial, tutorialAntonia: _bgmTutorialAntonia,
   puzzleCreate: _bgmPuzzleCreate, puzzleAttempt: _bgmPuzzleAttempt,
   win: _bgmWin, defeat: _bgmDefeat, shop: _bgmShop, campaign: _bgmCampaign,
-  deckEditor: _bgmDeckEditor,
+  deckEditor: _bgmDeckEditor, draft: _bgmDraft,
 };
 // Grundeinstellung ueber die Tabelle selbst — vorher stand hier eine
 // zweite, von Hand gepflegte Liste derselben Elemente, die bei jedem

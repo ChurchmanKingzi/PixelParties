@@ -55,3 +55,23 @@ Maximal 15 melodische Stimmen (+ Schlagzeug). Aufruf: `python3 scripts/music/<sk
 Ergebnis pro Track: `scripts/music/theme_<slug>.py` und `public/music/bgm_theme_<slug>.ogg`.
 Der Titel steht im Docstring des Skripts und in `data/battle-tracks.json` (nicht ändern).
 Nichts committen/pushen, keine anderen Dateien ändern.
+
+## Lange Hintergrund-Stücke (Draft-Musik u. Ä.)
+Für Tracks, die eine lange Tätigkeit begleiten (z. B. Draft, 30+ Minuten) gilt: **lieber melodisch als lang**.
+Ein erster Versuch mit 10 Minuten in 16 wandernden Szenen war abwechslungsreich, aber ohne zentrale Melodie — es fehlte
+das, woran man sich erinnert. Besser:
+* EIN einprägsames Thema (8 Takte; Motiv mit eigener rhythmischer Figur, Sequenz, Hauptschläge auf Akkordtönen),
+  das immer wiederkehrt, aber jedes Mal anders gekleidet ist (Soloinstrument, Begleitung, Oktave, Umfärbung nach Moll,
+  Rückung). Dazu ein kontrastierender Mittelteil. Länge ca. 3–4 Minuten reicht, solange das Thema trägt.
+* Ruhiger, freundlicher Puls statt Kampf; Pegel zurückhaltend (`target_rms≈0.2`, Kompressor-Kette, s. u.).
+* `song.program(name, beat, instrument)` wechselt Instrumente einer Stimme mitten im Stück, wenn mehr Klangfarben
+  als die 15 Kanäle nötig sind. `scripts/music/draft.py` ist das Muster (Form: Intro, A, A2, B, A3, C, B2, A4, Outro).
+* Der Client dekodiert jeden Track vollständig (≈ 350 kB je Sekunde): nicht über ≈ 11 Minuten gehen.
+
+## Lautheit: Sättigung oder Kompressor?
+`song.render` hat zwei Lautheits-Ketten:
+* Standard (`saturate=True`): weiche tanh-Sättigung, dann Limiter. Gut für schlagzeuglastige Duell-Tracks, **verzerrt aber
+  spitzenreiche, akustische Klänge** (Klavier, Harfe, Zupfer, Glocken; Crest-Faktor > 10) hörbar.
+* `saturate=False, compress=True`: sanfter Kompressor (3,5:1, Schwelle = Ziel-RMS) + Lookahead-Limiter — kein Verzerren.
+  Für Draft-Musik und alle leiseren/akustischen Stücke verwenden (z. B. `target_rms=0.18`).
+FluidSynth rendert intern in 32-Bit-Float (`-O float`); das 16-Bit-Standardformat clippte vor der Normalisierung.

@@ -350,5 +350,21 @@
   "rose",
   null,
   "sample-Structure Deck_ Grand Rebellion"
+ ],
+ "45_spellstorm.png": [
+  "Spellstorm",
+  "cosmic",
+  "gothic",
+  "ruby",
+  "amethyst",
+  "planned:chaos-diamond"
+ ],
+ "46_fluffy_bulwark.png": [
+  "Fluffy Bulwark",
+  "card",
+  "lacquer",
+  "rose",
+  "sapphire",
+  "planned:bubbles"
  ]
 }
