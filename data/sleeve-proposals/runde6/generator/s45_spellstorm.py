@@ -5,8 +5,8 @@ Held/Hauptmotiv: Chaos-Diamond, the Cracked Keeper (Base-Karte).
 Idee (Zaubergewitter, ≠ Shop-Sleeve „Cracked Keeper“: dort frontal riesig in seiner Höhle vor rotem Felsriss):
 Nacht über dem Geröll der Dark Land (Hintergrund seiner Karte). Chaos-Diamond steht frontal im Vordergrund, um ihn
 entladen sich gleichzeitig mehrere Destruction-Spells – wie sein Heldeneffekt, der die obersten Zauber seines
-Potion Decks auf einmal wirkt: links platzt Armageddon als Sternexplosion am Himmel und schleudert drei
-Feuerschweife schräg auf den fernen Horizont, wo ein Feuerpilz (Destruction Magic) aufblüht; rechts fährt Chain
+Potion Decks auf einmal wirkt: über ihm platzt Armageddon als Sternexplosion am Himmel, zwei vollständige
+Feuerschweife fallen links schräg auf den fernen Horizont, wo ein Feuerpilz (Destruction Magic) aufblüht; rechts fährt Chain
 Lightning aus der tief hängenden Gewitterwolke in die Ebene. Der Himmel über ihm bleibt ruhig; die Zauberlichter
 färben Wolkenunterseiten und Geröll (Glut links, Blitzlicht rechts, warmer Schein von oben).
 
@@ -16,14 +16,17 @@ Quellen (Motive.xcf):
             darüber; beide bewusst weggelassen: das Fadenkreuz würde bei 2× quer über das ganze Bild laufen, die
             rote Ranke über dem Kopf ist das Motiv der Shop-Sleeve).
   Boden:    Ebene 1286 „Dark Land“ (16×16-Kacheln: Geröll x236/y180, violette Leere x384/y96).
-  Zauber:   Ebene 577 „Armageddon“ (Sternexplosion 46×46, Feuerschweife 48/48/36 px, gespiegelt, −32° gedreht),
+  Zauber:   Ebene 577 „Armageddon“ (Sternexplosion 46×46, die beiden vollständigen 48-px-Feuerschweife, gespiegelt,
+            −32° gedreht; die 33/36-px-Stücke sind im Kartenbild oben abgeschnitten und werden nicht benutzt),
             Ebene 211 „Destruction Magic #4“ (Feuerpilz 27×24).
   Karte „Chain Lightning“: Blitz selbst gezeichnet in den Farben des Kartenblitzes (Weiß/Hellgelb), wie in 26.
 Selbst gezeichnet: Himmelsverlauf, Wolkenbank, Höhenzug, Lichtschein, Blitze, Schatten.
 
-Skalierung: alles in EINEM 2×-Raster (125×175 → 6 px je Sprite-Pixel im 750er-Bild), auch der Held
-(43×50 → 258×300 px). 3× ist nicht möglich: die Kernmitte des Helden liegt auf Sprite-Spalte 21,5, bei 9-px-Blöcken
-fiele die Gesichtsmitte auf 373,5/376,5. Gemessen am PNG: roter Kern x 354–395 → Gesichtsmitte x = 375,0.
+Skalierung (nach Nutzer-Feedback „Held deutlich größer“):
+  Hintergrund (Himmel, Wolken, Zauber, Blitz, Geröll) – 2×-Raster (125×175)
+  Held + Schatten – 4×-Raster (63×88, um 3 px nach rechts versetzt), 43×50 → 516×600 px im 750er-Bild.
+  3× geht nicht: die Kernmitte liegt auf Sprite-Spalte 21,5 → 9-px-Blöcke ergäben 373,5/376,5.
+  Gemessen am PNG: roter Kern x 333–416 → Gesichtsmitte x = 375,0.
 """
 import math, random
 import numpy as np
@@ -46,7 +49,7 @@ for i, s_ in enumerate(streaks): keep('o45_streak%d' % i, s_)
 # ================================================================== alles im 2×-Raster (125×175)
 W, H = 125, 175
 P = Plane(W, H, 2)
-HOR = 126                                   # Horizont
+HOR = 122                                   # Horizont
 TOP, MID, LOW = (8, 5, 18), (30, 16, 48), (78, 38, 88)
 for y in range(HOR):
     t = y / HOR
@@ -95,8 +98,8 @@ for y in range(H):
         elif n <= 3: col = mix(rim, (46, 28, 60), dith(n / 3.5, x, y, 4))
         else: col = mix((46, 28, 60), (22, 13, 34), dith(min(1, (n - 3) / 3), x, y, 4))
         P.a[y, x, :3] = col
-glow(16, 86, 40, (130, 54, 30), 0.25)       # Armageddon-Glut links
-glow(104, 70, 30, (110, 100, 64), 0.18)     # Blitzlicht rechts
+glow(14, 80, 36, (130, 54, 30), 0.22)       # Armageddon-Glut links
+glow(112, 70, 26, (110, 100, 64), 0.18)     # Blitzlicht rechts
 
 # Ferne: dunkler Höhenzug, davor die Ebene der Dark Land
 for x in range(W):
@@ -109,7 +112,7 @@ for y in range(HOR + 1, H):
     for x in range(W):
         c = T_GRAVEL[y % 16, x % 16, :3].astype(float) * k + np.array((10, 3, 20)) * (1 - t)
         # Zauberlicht auf dem Geröll: Glut links (Armageddon), Blitz rechts, Sternexplosion von oben
-        lo = max(0.0, 1 - math.hypot((x - 14) / 60, (y - HOR) / 26)); ly = max(0.0, 1 - math.hypot((x - 106) / 46, (y - HOR) / 18))
+        lo = max(0.0, 1 - math.hypot((x - 14) / 60, (y - HOR) / 26)); ly = max(0.0, 1 - math.hypot((x - 114) / 46, (y - HOR) / 18))
         lc = max(0.0, 1 - math.hypot((x - 62.5) / 50, (y - 160) / 16))
         c = c + np.array((70, 26, 0)) * dith(lo * 0.9, x, y, 4) + np.array((60, 58, 30)) * dith(ly * 0.8, x, y, 4) \
             + np.array((40, 22, 6)) * dith(lc * 0.6, x, y, 4)
@@ -122,14 +125,17 @@ for y in range(HOR + 1, HOR + 4):
         P.a[y, x, :3] = np.clip(c, 0, 255)
 
 # ------------------------------------------------------------------ Zauber
-# Armageddon: Sternexplosion hoch über ihm am Himmel; Feuerschweife fallen schräg nach links unten auf den
-# fernen Horizont, wo ein Feuerpilz (Destruction Magic) aufblüht
-glow(30, 40, 34, (150, 70, 30), 0.30)
-P.paste(burst, 8, 16)
-for s_, (x, y) in zip(streaks[1:4], [(26, 40), (4, 56), (36, 62)]):
+# Armageddon: Sternexplosion hoch über ihm am Himmel; zwei vollständige Feuerschweife (die beiden 48er-Schweife der
+# Karte – die 33er/36er-Stücke sind im Kartenbild oben abgeschnitten und werden nicht verwendet) fallen schräg nach
+# links unten auf den fernen Horizont, wo ein Feuerpilz (Destruction Magic) aufblüht
+BX0, BY0 = 55, 9
+glow(BX0 + 23, BY0 + 23, 34, (150, 70, 30), 0.30)
+P.paste(burst, BX0, BY0)
+full = [s_ for s_ in streaks if s_.shape[0] == 48]
+for s_, (x, y) in zip(full, [(9, 17), (28, 5)]):
     P.paste(rotate(flip(s_), -32), x, y)
-glow(22, HOR + 1, 20, (210, 96, 30), 0.45, 8)
-P.paste(fcloud, 10, HOR - 20)
+glow(8, HOR + 1, 18, (210, 96, 30), 0.45, 8)
+P.paste(fcloud, 3, HOR - 20)
 
 # Chain Lightning (in den Farben des Kartenblitzes) rechts aus der tiefen Wolke in die Ebene
 CORE, EDGE = (255, 255, 255), (255, 255, 122)
@@ -162,21 +168,22 @@ def bolt(p0, p1, width, seed, branches=2, core=CORE, edge=EDGE):
     return pts
 
 
-HIT = (106, HOR + 5)
+HIT = (114, HOR + 5)
 glow(HIT[0], HIT[1], 18, (240, 230, 130), 0.45, 6)
-glow(104, 34, 10, (200, 196, 140), 0.40, 5)                      # Austritt an der Wolkenunterkante
-pts = bolt((104, 33), HIT, 3, 7, 4)
+glow(110, 31, 10, (200, 196, 140), 0.40, 5)                      # Austritt an der Wolkenunterkante
+pts = bolt((110, 30), HIT, 3, 7, 4)
 BR = min(pts, key=lambda q: abs(q[1] - 66))                     # Abzweig der Kette an einem Knick des Hauptblitzes
-bolt(BR, (BR[0] - 14, BR[1] + 26), 1, 17, 1)
+bolt(BR, (BR[0] + 6, BR[1] + 18), 1, 17, 1)
 
-# ------------------------------------------------------------------ Held
-FEET = 160
-HX, HY = 41, FEET - hero.shape[0] + 1        # Kernmitte 41+21,5 = 62,5 → x 375
+# ------------------------------------------------------------------ Held im Vordergrund, 4× (63×88, um 3 px versetzt)
+# Kernmitte: Sprite-Spalte 21,5 → 3 + 4·(9 + 21,5) = 125 → x 375 im 750er-Bild
+F4 = Plane(63, 88, 4, ox=3)
+FEET4 = 80
 for xx in range(-22, 23):
-    for yy in range(-2, 2):
-        if (xx / 22.5) ** 2 + ((yy + 0.3) / 2.2) ** 2 <= 1:
-            P.px(62 + xx, FEET + yy, (8, 6, 14), 170)
-P.paste(hero, HX, HY)
+    for yy in range(-1, 2):
+        if (xx / 22.5) ** 2 + ((yy + 0.2) / 1.7) ** 2 <= 1:
+            F4.px(30 + xx, FEET4 + yy, (8, 6, 14), 170)
+F4.paste(hero, 9, FEET4 - hero.shape[0] + 1)
 
-cv = compose_planes([P])
+cv = compose_planes([P, F4])
 save(cv, '45_spellstorm.png')
