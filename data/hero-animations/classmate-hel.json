@@ -1,0 +1,17 @@
+{
+  "hero": "Classmate Hel",
+  "sheet": "classmate-hel.png",
+  "frameWidth": 44,
+  "frameHeight": 46,
+  "frames": 48,
+  "frameMs": 90,
+  "loop": true,
+  "layout": "horizontal",
+  "skinOf": "Hel, the Bound Specter",
+  "padTop": 7,
+  "padLeft": 14,
+  "padRight": 14,
+  "padBottom": 4,
+  "faceX": 22.0,
+  "footY": 34
+}
