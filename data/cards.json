@@ -11870,7 +11870,7 @@
     "name": "Intrude",
     "cardType": "Spell",
     "subtype": "Attachment",
-    "level": 0,
+    "level": 1,
     "hp": null,
     "atk": null,
     "cost": null,
