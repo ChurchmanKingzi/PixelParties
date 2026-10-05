@@ -452,6 +452,13 @@ function CubeDraftScreen({ lobby, draft, leaveRoom, notify }) {
 //  to remove. Player names the deck and clicks Ready when done.
 // ═══════════════════════════════════════════
 function CubeDraftBuildScreen({ lobby, build, leaveRoom, notify, user }) {
+  // Eigene, gehetzte Musik fuer den Deckbau im Draft (Timer laeuft); danach wieder Menue/Kampfmusik.
+  const { setBgmMode } = useContext(AppContext);
+  useEffect(() => {
+    if (!setBgmMode) return;
+    setBgmMode('draftBuild');
+    return () => setBgmMode('menu');
+  }, [setBgmMode]);
   const cardDB = window.CARDS_BY_NAME || {};
   const allCards = window.AVAILABLE_CARDS || [];
 
@@ -2087,6 +2094,9 @@ const BGM_FILES = {
   // Draft-Modus: laeuft, solange das Cube-Draften laeuft (CubeDraftScreen). Ein melodischer
   // Hintergrund-Track (~3,5 Min) um ein zentrales Thema — siehe scripts/music/draft.py.
   draft: '/music/bgm_draft.ogg',
+  // Deckbau im Draft (5-Minuten-Timer): erinnert an den normalen Deck-Editor, aber gehetzt —
+  // siehe scripts/music/draftbuild.py.
+  draftBuild: '/music/bgm_draftbuild.ogg',
 };
 // Endungs-Kaskade: probiert die restlichen Kandidaten der Reihe nach
 // durch, bis einer laedt. Nach dem letzten wird der Handler geloescht,
@@ -2339,6 +2349,7 @@ const _bgmShop = _mkBgm(BGM_FILES.shop);
 const _bgmCampaign = _mkBgm(BGM_FILES.campaign);
 const _bgmDeckEditor = _mkBgm(BGM_FILES.deckEditor);
 const _bgmDraft = _mkBgm(BGM_FILES.draft);
+const _bgmDraftBuild = _mkBgm(BGM_FILES.draftBuild);
 // Jedes Element, das hier steht, wird beim ersten Klick mitentsperrt.
 // Ein Ziel-Bezeichner in `setBgmMode(...)` muss ein Schluessel dieser
 // Tabelle sein (oder `battle:<slug>` / `campaign:<slug>`).
@@ -2346,7 +2357,7 @@ const _bgmTracks = {
   login: _bgmLogin, menu: _bgmMenu, battle: _bgmBattle, puzzle: _bgmPuzzle, tutorial: _bgmTutorial, tutorialAntonia: _bgmTutorialAntonia,
   puzzleCreate: _bgmPuzzleCreate, puzzleAttempt: _bgmPuzzleAttempt,
   win: _bgmWin, defeat: _bgmDefeat, shop: _bgmShop, campaign: _bgmCampaign,
-  deckEditor: _bgmDeckEditor, draft: _bgmDraft,
+  deckEditor: _bgmDeckEditor, draft: _bgmDraft, draftBuild: _bgmDraftBuild,
 };
 // Grundeinstellung ueber die Tabelle selbst — vorher stand hier eine
 // zweite, von Hand gepflegte Liste derselben Elemente, die bei jedem
