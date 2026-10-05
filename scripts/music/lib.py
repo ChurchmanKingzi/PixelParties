@@ -90,7 +90,11 @@ class Song:
         ch = 9 if name == 'drum' else self.ch[name][0]
         self.ev.append((int(round(beat * TPB)), 0, mido.Message('control_change', channel=ch, control=control, value=int(value))))
 
-    def render(self, sf2, out, gain=0.7, target_rms=0.29, verbose=True):
+    def render(self, sf2, out, gain=0.7, target_rms=0.29, verbose=True, saturate=True, compress=False):
+        """saturate=True  (Standard, bisherige Tracks): weiche tanh-Sättigung vor dem Limiter — macht Schlagzeug-
+        lastige Duell-Tracks dicht und laut, verzerrt aber spitzenreiche Klänge (Klavier, Harfe, Zupfer) hörbar.
+        saturate=False, compress=True: für akustische/leise Stücke (Draft-Musik …): sanfter Kompressor + Lookahead-
+        Limiter statt Sättigung — kein Verzerren, nur Absenken der Spitzen."""
         mid = mido.MidiFile(ticks_per_beat=TPB)
         tr = mido.MidiTrack(); mid.tracks.append(tr)
         tr.append(mido.MetaMessage('set_tempo', tempo=mido.bpm2tempo(self.bpm)))
@@ -108,16 +112,26 @@ class Song:
         tmp = tempfile.mkdtemp()
         mp, wp = os.path.join(tmp, 'n.mid'), os.path.join(tmp, 'n.wav')
         mid.save(mp)
-        subprocess.run(['fluidsynth', '-ni', '-g', str(gain), '-R', '1', '-C', '1', '-r', '44100', '-F', wp, sf2, mp],
+        subprocess.run(['fluidsynth', '-ni', '-g', str(gain), '-R', '1', '-C', '1', '-r', '44100', '-F', wp, '-T', 'wav', '-O', 'float', sf2, mp],
                        check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         data, sr = sf.read(wp, always_2d=True)
         loop_len = int(round(self.bars * self.bpb * 60 / self.bpm * sr))
         body, tail = data[:loop_len].copy(), data[loop_len:]
         k = min(len(tail), len(body)); body[:k] += tail[:k]      # Ausklang auf den Anfang
         # Lautheit + Limiter
-        body = body / np.sqrt((body ** 2).mean()) * 0.30
-        body = np.tanh(body / 0.5) * 0.5
-        body = body / np.sqrt((body ** 2).mean()) * target_rms
+        if saturate:
+            body = body / np.sqrt((body ** 2).mean()) * 0.30
+            body = np.tanh(body / 0.5) * 0.5
+            body = body / np.sqrt((body ** 2).mean()) * target_rms
+        else:
+            body = body / np.sqrt((body ** 2).mean()) * target_rms
+            if compress:
+                # 40-ms-RMS-Detektor, Schwelle = Ziel-RMS, Verhältnis 3,5:1, Pegel dann wieder auf Ziel-RMS
+                env = np.sqrt(uniform_filter1d(np.mean(body ** 2, axis=1), size=int(0.040 * sr), mode='nearest'))
+                gk = np.maximum(env / target_rms, 1.0) ** (1 / 3.5 - 1)
+                gk = uniform_filter1d(gk, size=int(0.015 * sr), mode='nearest')
+                body = body * gk[:, None]
+                body = body / np.sqrt((body ** 2).mean()) * target_rms
         CEIL = 0.91
         need = np.minimum(1.0, CEIL / np.maximum(np.abs(body).max(axis=1), 1e-9))
         la = int(0.004 * sr)
