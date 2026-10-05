@@ -18753,7 +18753,7 @@
     "hp": null,
     "atk": null,
     "cost": 4,
-    "effect": "The first time every turn the equipped Hero takes damage from an opponent's card or effect and is not defeated by that damage, heal its HP by 100 after the damage has resolved.",
+    "effect": "The first time every turn the equipped Hero takes damage from an opponent's card or effect and is not defeated by that damage, choose a target you control and heal it for 100 HP after the damage resolved.",
     "archetype": "",
     "setID": "PP MBS",
     "banned": "",

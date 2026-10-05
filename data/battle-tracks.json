@@ -11,6 +11,10 @@
     "battle9": "Epic Finale",
     "battle10": "Trickster's Game"
   },
+  "cpu": {
+    "chaosdiamond": "Critical Meltdown",
+    "bubbles": "Big Bunny Bounce"
+  },
   "themes": [
     {
       "id": "theme_futuretech",

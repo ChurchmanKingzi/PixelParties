@@ -6269,7 +6269,7 @@ function endCpuBattle(room, winnerIdx, reason) {
           let theme = null;
           try {
             const pr = await battleTracks.progressFor(humanUserId, opponentDeckId);
-            if (pr && pr.wins < pr.need) theme = { name: pr.name + "'s Theme", hero: pr.name, wins: pr.wins, need: pr.need };
+            if (pr && pr.wins < pr.need) theme = pr.title ? { name: pr.title, wins: pr.wins, need: pr.need } : { name: pr.name + "'s Theme", hero: pr.name, wins: pr.wins, need: pr.need };
           } catch { /* Anzeige-Hilfe */ }
           // Fortschritt zur Gegner-Sleeve dieser CPU (fuenf Siege), solange sie noch nicht frei ist.
           let sleeve = null;
@@ -6402,7 +6402,9 @@ const battleTracks = require('./battle-tracks').createBattleTracks({
 const { registerCpuUnlockSource, collectCpuUnlocks } = require('./cpu-unlocks');
 registerCpuUnlockSource(async (ctx) => {
   const u = await battleTracks.unlockedByWin(ctx.userId, ctx.opponentDeckId);
-  return u ? { kind: 'music', id: u.id, name: u.name + "'s Theme", hero: u.name } : null;
+  if (!u) return null;
+  // Mit eigenem Titel („Critical Meltdown“) zeigt der Client den Titel, sonst „<Held>'s Theme“.
+  return u.title ? { kind: 'music', id: u.id, name: u.title } : { kind: 'music', id: u.id, name: u.name + "'s Theme", hero: u.name };
 });
 // Gegner-Sleeves: jede CPU spielt mit ihrer eigenen, fünf Siege schalten sie frei (cpu-sleeves.js).
 const cpuSleeves = require('./cpu-sleeves').createCpuSleeves({
