@@ -62,6 +62,7 @@ module.exports = {
     const ps = gs.players[pi];
     if (!ps) return false;
     if (ps._eraserBeamPriorSpellTurn === gs.turn) return false;
+    if (ps._spellResolvedTurn === gs.turn) return false;   // zentral gestempelt (Engine.runHooks)
     if (ps._spellLockTurn === gs.turn) return false;
     return true;
   },

@@ -2773,6 +2773,14 @@ class GameEngine {
   }
 
   async runHooks(hookName, hookCtx = {}) {
+    // Zentrale Buchfuehrung „welcher Spell wurde diesen Zug schon gewirkt"
+    // (Eraser Beam: „only Spell this turn"). Frueher stempelte nur ein Hook
+    // der Eraser-Beam-INSTANZ — fehlte sie in dem Moment (Karte im Deck,
+    // spaeter gezogen, aufgedeckt), blieb der Stempel aus.
+    if (hookName === 'afterSpellResolved' && hookCtx && hookCtx.spellName && hookCtx.spellName !== 'Eraser Beam') {
+      const sp = this.gs.players[hookCtx.casterIdx];
+      if (sp) sp._spellResolvedTurn = this.gs.turn;
+    }
     // v1365: vorgemerkte Arbeit „nach dem Abgang" (eigene Entfern-Wege).
     if (this._nachAbgang && this._nachAbgang.length > 0 && !this._nachAbgangLaeuft) {
       await this._nachAbgangAbarbeiten();
