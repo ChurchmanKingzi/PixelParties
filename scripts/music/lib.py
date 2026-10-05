@@ -77,6 +77,15 @@ class Song:
 
     def dr(self, beat, note, vel=100, dur=0.2): self.add('drum', beat, dur, note, vel)
 
+    def program(self, name, beat, instrument):
+        """Instrument einer Stimme MITTEN im Stück wechseln (für lange Stücke mit mehr Klangfarben als Kanälen).
+        Der Wechsel gilt ab `beat`; Noten, die dort beginnen, klingen schon mit dem neuen Instrument."""
+        ch = self.ch[name][0]
+        prog, bank = INSTR[instrument]
+        t = int(round(beat * TPB))
+        self.ev.append((t, -1, mido.Message('control_change', channel=ch, control=0, value=bank)))
+        self.ev.append((t, -1, mido.Message('program_change', channel=ch, program=prog)))
+
     def cc(self, name, beat, control, value):
         ch = 9 if name == 'drum' else self.ch[name][0]
         self.ev.append((int(round(beat * TPB)), 0, mido.Message('control_change', channel=ch, control=control, value=int(value))))
