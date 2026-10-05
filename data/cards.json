@@ -21849,7 +21849,7 @@
     "hp": 450,
     "atk": 50,
     "cost": null,
-    "effect": "You may once per turn draw half as many cards as you control Creatures (rounded up).",
+    "effect": "You may once per turn draw as many cards as you control Creatures that were not summoned this turn.",
     "archetype": "",
     "setID": "PP SET01",
     "banned": "",
