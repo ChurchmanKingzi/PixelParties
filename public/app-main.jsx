@@ -2084,8 +2084,8 @@ const BGM_FILES = {
   // rueckt der naechste nach (siehe `_bgmEndungsKaskade`). Sobald die
   // Endung feststeht, kann die Liste auf einen String schrumpfen.
   deckEditor: ['/music/bgm_deckeditor.ogg', '/music/bgm_deckeditor.mp3', '/music/bgm_deckeditor.wav'],
-  // Draft-Modus: laeuft, solange das Cube-Draften laeuft (CubeDraftScreen). Ein Durchlauf ist
-  // ~10 Minuten lang, weil gedraftet 30+ Minuten dauert — siehe scripts/music/draft.py.
+  // Draft-Modus: laeuft, solange das Cube-Draften laeuft (CubeDraftScreen). Ein melodischer
+  // Hintergrund-Track (~3,5 Min) um ein zentrales Thema — siehe scripts/music/draft.py.
   draft: '/music/bgm_draft.ogg',
 };
 // Endungs-Kaskade: probiert die restlichen Kandidaten der Reihe nach
