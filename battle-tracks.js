@@ -41,8 +41,8 @@ const NAMES_FILE = path.join(__dirname, 'data', 'battle-tracks.json');
 function loadTrackNames() {
   try {
     const j = JSON.parse(fs.readFileSync(NAMES_FILE, 'utf-8'));
-    return { generic: j.generic || {}, themes: Array.isArray(j.themes) ? j.themes : [] };
-  } catch { return { generic: {}, themes: [] }; }
+    return { generic: j.generic || {}, cpu: j.cpu || {}, themes: Array.isArray(j.themes) ? j.themes : [] };
+  } catch { return { generic: {}, cpu: {}, themes: [] }; }
 }
 
 /** Archetyp-Themes, deren Datei existiert: [{ id, name, archetype }], alphabetisch nach Archetyp. */
@@ -112,6 +112,8 @@ function createBattleTracks(deps) {
   const { db, loadSampleDecks, bgmSlugForHero, musicDir } = deps;
 
   const cpuIndex = () => buildCpuIndex(loadSampleDecks(), bgmSlugForHero);
+  /** Eigener Titel eines Helden-Themes (data/battle-tracks.json → cpu) oder null. */
+  const cpuTitle = (slug, names) => (names.cpu && names.cpu[slug]) || null;
 
   async function winsFor(userId, byDeck) {
     const rows = await db.all('SELECT opponent_deck_id, wins FROM npc_stats WHERE user_id = ?', [userId]);
@@ -122,11 +124,11 @@ function createBattleTracks(deps) {
   async function listFor(userId) {
     const { byDeck, bySlug } = cpuIndex();
     const wins = await winsFor(userId, byDeck);
+    const names = loadTrackNames();
     const cpu = [...bySlug.values()].map(e => {
       const w = wins.get(e.slug) || 0;
-      return { id: e.slug, name: e.name, wins: w, unlocked: w >= UNLOCK_WINS };
+      return { id: e.slug, name: e.name, title: cpuTitle(e.slug, names), wins: w, unlocked: w >= UNLOCK_WINS };
     }).sort((a, b) => (b.unlocked - a.unlocked) || a.name.localeCompare(b.name));
-    const names = loadTrackNames();
     return {
       need: UNLOCK_WINS,
       generic: listGenericTracks(musicDir).map(id => ({ id, name: names.generic[id] || 'Battle ' + id.slice(6) })),
@@ -166,7 +168,7 @@ function createBattleTracks(deps) {
     const wins = await winsFor(userId, byDeck);
     const post = wins.get(slug) || 0;                 // enthält den neuen Sieg bereits
     const pre = post - 1;
-    return crossedUnlock(pre, true) ? { id: slug, name: bySlug.get(slug).name } : null;
+    return crossedUnlock(pre, true) ? { id: slug, name: bySlug.get(slug).name, title: cpuTitle(slug, loadTrackNames()) } : null;
   }
 
   /**
@@ -179,7 +181,7 @@ function createBattleTracks(deps) {
     const slug = byDeck.get(opponentDeckId);
     if (!slug) return null;
     const wins = (await winsFor(userId, byDeck)).get(slug) || 0;
-    return { id: slug, name: bySlug.get(slug).name, wins, need: UNLOCK_WINS };
+    return { id: slug, name: bySlug.get(slug).name, title: cpuTitle(slug, loadTrackNames()), wins, need: UNLOCK_WINS };
   }
 
   return { listFor, isSelectable, resolveForBattle, unlockedByWin, progressFor };
