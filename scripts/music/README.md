@@ -56,16 +56,17 @@ Ergebnis pro Track: `scripts/music/theme_<slug>.py` und `public/music/bgm_theme_
 Der Titel steht im Docstring des Skripts und in `data/battle-tracks.json` (nicht ändern).
 Nichts committen/pushen, keine anderen Dateien ändern.
 
-## Lange Stücke (Draft-Musik u. Ä.)
-Für Tracks, die nicht ein Duell, sondern eine lange Tätigkeit begleiten (z. B. Draft, 30+ Minuten):
-* Länge ca. 9–11 Minuten in ganzen Takten. Der Client dekodiert jeden Track vollständig (≈ 350 kB je Sekunde),
-  10 Minuten sind etwa 210 MB — nicht länger als ≈ 11 Minuten gehen.
-* Der Track muss auch nach mehreren Durchläufen nicht ermüden: viele Abschnitte („Szenen“) mit wechselnder
-  Tonart, Klangfarbe und Dichte; Motive werden verwandelt (Umkehrung, Dehnung, Sequenz, Gegenstimme), nicht
-  wiederholt. Atempausen und Dichtewechsel sind erwünscht. Der Anfang muss zum Ende passen (Loop).
-* `song.program(name, beat, instrument)` wechselt die Instrumente einer Stimme mitten im Stück — so passen mehr
-  als 15 Klangfarben auf die 15 Kanäle.
-* Der Render dauert länger (Minuten); Arbeitsspeicher reicht (16 GB).
+## Lange Hintergrund-Stücke (Draft-Musik u. Ä.)
+Für Tracks, die eine lange Tätigkeit begleiten (z. B. Draft, 30+ Minuten) gilt: **lieber melodisch als lang**.
+Ein erster Versuch mit 10 Minuten in 16 wandernden Szenen war abwechslungsreich, aber ohne zentrale Melodie — es fehlte
+das, woran man sich erinnert. Besser:
+* EIN einprägsames Thema (8 Takte; Motiv mit eigener rhythmischer Figur, Sequenz, Hauptschläge auf Akkordtönen),
+  das immer wiederkehrt, aber jedes Mal anders gekleidet ist (Soloinstrument, Begleitung, Oktave, Umfärbung nach Moll,
+  Rückung). Dazu ein kontrastierender Mittelteil. Länge ca. 3–4 Minuten reicht, solange das Thema trägt.
+* Ruhiger, freundlicher Puls statt Kampf; Pegel zurückhaltend (`target_rms≈0.2`, Kompressor-Kette, s. u.).
+* `song.program(name, beat, instrument)` wechselt Instrumente einer Stimme mitten im Stück, wenn mehr Klangfarben
+  als die 15 Kanäle nötig sind. `scripts/music/draft.py` ist das Muster (Form: Intro, A, A2, B, A3, C, B2, A4, Outro).
+* Der Client dekodiert jeden Track vollständig (≈ 350 kB je Sekunde): nicht über ≈ 11 Minuten gehen.
 
 ## Lautheit: Sättigung oder Kompressor?
 `song.render` hat zwei Lautheits-Ketten:
