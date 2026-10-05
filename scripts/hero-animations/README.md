@@ -324,6 +324,7 @@ kopiert, daneben liegt eine JSON-Datei mit den Metadaten. Die erzeugten
 | `late4.py` | `final 90 klaus` | `klaus_idle_final_sheet.png` | `klaus-the-cult-leader` |
 | `late4.py` | `final 90 kohtamaster` | `kohtamaster_idle_final_sheet.png` | `kohta-master-of-super-killing` |
 | `late5.py` | `final 90 hel` | `hel_idle_final_sheet.png` | `hel-the-bound-specter` |
+| `classmate_hel.py` (+ `classmate_hel_sprite.py`) | `final 90` | `classmate_idle_final_sheet.png` | `classmate-hel` (Skin) |
 | `late5.py` | `final 90 cecilia` | `cecilia_idle_final_sheet.png` | `cecilia-the-harrowing-crusader` |
 | `late5.py` | `final 90 fiona` | `fiona_idle_final_sheet.png` | `fiona-the-empty-vessel-of-a-forgotten-sorceress` |
 | `late5.py` | `final 90 mary` | `mary_idle_final_sheet.png` | `mary-crestmas` |
