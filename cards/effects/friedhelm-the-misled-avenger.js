@@ -124,6 +124,8 @@ module.exports = {
     // Verbraucht die Aktion des Zuges und spielt dafuer eine Karte aus
     // dem Deck — fuer die Aktionsplanung ein Aktionszug.
     usesAction: true,
+    // Fester CPU-Bonus fuer Effekte, die Aktionen herausschummeln (Als Auftrag 5.10., `_cpu.js`).
+    cheatsActions: true,
   },
 
   cpuResponse(engine, kind, payload) {

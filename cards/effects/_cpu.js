@@ -1129,10 +1129,7 @@ async function runActionPhase(engine, helpers) {
   if (MCTS_ENABLED && candidates.length > 0 && !inBonusAction && !nurActionAbility) {
     candidates = await mctsRankCandidates(engine, helpers, candidates);
   } else {
-    candidates.sort((a, b) =>
-      (b.level - a.level)
-      || (b.typeScore - a.typeScore)
-      || ((b.casterAtk || 0) - (a.casterAtk || 0)));
+    candidates.sort(heuristicCandidateCmp(engine));
   }
 
   // Ascension hard-priority: if the CPU has an unfulfilled Ascended Hero
@@ -9464,6 +9461,85 @@ const MCTS_RANK_BUDGET_MS = parseInt(process.env.PP_MCTS_BUDGET_MS || '20000', 1
 const MCTS_UCB1_TOTAL_PULLS = parseInt(process.env.PP_MCTS_PULLS || '80', 10);
 // UCB1 exploration constant. √2 is the textbook default. Higher = more
 // exploration (visit undervisited arms), lower = more exploitation.
+// ═══════════════════════════════════════════════════════════════════
+//  AKTIONS-CHEAT-BONUS (Als Auftrag 5.10.)
+//
+//  Hero-Effekte, die Aktionen „herausschummeln" — Zi (gedeckter Spell
+//  ohne Stufenpruefung), Chaos-Diamond (2 Potion-Deck-Spells als
+//  Zusatzaktionen), Friedhelm (Attack/Spell aus dem Deck), Yukana —
+//  sind in ihren Decks inhaerent sehr wertvoll, auch wo das
+//  schlecht MESSBAR ist: Die Rollouts sehen den Ertrag nur bruchstueckhaft
+//  (Gegenwahl, Folgewuerfe, Kartenvorteil aus dem Deck), und gelernt wird
+//  nur, was ausreichend oft vorkommt. Deshalb ein FESTER Aufschlag, den
+//  der Held selbst ueber `cpuMeta.cheatsActions: true` anfordert
+//  (optional `cpuMeta.cheatsActionsBonus` = eigene Hoehe).
+//
+//  Hoehe: in Bewertungspunkten, grob „ein halber Heldentod" — der Held-
+//  Tod-Ausschlag der Eval liegt bei ±500, ein typischer Spell bei 100-300.
+//  Stark genug, dass der Effekt gegen gewoehnliche Aktionen gewinnt, aber
+//  eine Linie, die einen Helden toetet, bleibt schlagbar. `PP_ACTION_CHEAT_BONUS`
+//  stellt ihn zum Messen um (0 = aus).
+//
+//  AUSNAHME: Effekte, die den Zug BEENDEN (`heroEffectEndsTurn`, Cooldin),
+//  bekommen keinen Bonus — er loeste sie zu frueh aus (Als Vorgabe 5.10.).
+//
+//  Wirkt an zwei Stellen: im Ranking der Action Phase (aktionskostende
+//  Effekte wie Zi, Chaos-Diamond, Friedhelm sind dort Kandidaten) und im
+//  Gate der freien Hero-Effekte (Yukana, Cooldin): dort senkt er die
+//  Schwelle, der Effekt feuert also, solange er den Stand nicht um mehr
+//  als den Bonus verschlechtert.
+// ═══════════════════════════════════════════════════════════════════
+const ACTION_CHEAT_BONUS = (() => {
+  const v = parseFloat(process.env.PP_ACTION_CHEAT_BONUS || '400');
+  return Number.isFinite(v) ? Math.max(0, v) : 400;
+})();
+
+/** Bonus eines Helden (per Name): 0, wenn sein Effekt keine Aktionen herausschummelt. */
+function heroCheatBonusByName(heroName) {
+  if (!heroName || ACTION_CHEAT_BONUS <= 0) return 0;
+  try {
+    const script = loadCardEffect(heroName);
+    // ZUGBEENDENDE Effekte (`heroEffectEndsTurn`, Cooldin) bekommen NIE einen Bonus (Als Vorgabe 5.10.):
+    // er wuerde sie fruehzeitig ausloesen und den Rest des Zuges verschenken. Fuer sie gilt weiter
+    // die Regel in `activateHeroEffects` (Main Phase 2, nach allem Uebrigen).
+    if (script?.heroEffectEndsTurn) return 0;
+    const meta = script?.cpuMeta;
+    if (!meta?.cheatsActions) return 0;
+    return (typeof meta.cheatsActionsBonus === 'number' && Number.isFinite(meta.cheatsActionsBonus))
+      ? Math.max(0, meta.cheatsActionsBonus) : ACTION_CHEAT_BONUS;
+  } catch { return 0; }
+}
+
+/** Bonus fuer das Gate der FREIEN Hero-Effekte: `desc` ist „hero-effect h<Index>" (Held der CPU-Seite). */
+function heroEffectGateCheatBonus(engine, desc) {
+  const m = /^hero-effect h(\d+)$/.exec(desc || '');
+  if (!m) return 0;
+  const pi = engine._cpuPlayerIdx ?? engine.gs?.activePlayer;
+  if (typeof pi !== 'number') return 0;
+  const h = engine.gs?.players?.[pi]?.heroes?.[Number(m[1])];
+  if (!h?.name || !(h.hp > 0)) return 0;
+  return heroCheatBonusByName(h.baseName || h.name);
+}
+
+/** Bonus eines Action-Phase-Kandidaten: nur Hero-Effekt-Aktionen (`HeroEffectAction`) koennen ihn tragen. */
+function candidateCheatBonus(engine, cand) {
+  if (!cand || cand.cardType !== 'HeroEffectAction') return 0;
+  return heroCheatBonusByName(cand.cardName);
+}
+
+/**
+ * Vergleichsfunktion der Heuristik-Reihenfolge (Stufe, Typ, Angriff) MIT
+ * vorgeschaltetem Cheat-Bonus — fuer jede Stelle, an der die Kandidaten
+ * ohne Rollouts sortiert werden (Zeitbudget, Spaetspiel, Rollout-Politik).
+ */
+function heuristicCandidateCmp(engine) {
+  return (a, b) =>
+    (candidateCheatBonus(engine, b) - candidateCheatBonus(engine, a))
+    || (b.level - a.level)
+    || (b.typeScore - a.typeScore)
+    || ((b.casterAtk || 0) - (a.casterAtk || 0));
+}
+
 const MCTS_UCB1_EXPLORE_C = 1.414;
 // Deck-Nähe-Eval (Deckout-Prävention): Default-Schwelle wenn kein
 // Profil eine gelernte deckoutDangerSize liefert, und die quadratische
@@ -13213,6 +13289,11 @@ async function mctsGatedActivation(engine, helpers, desc, actionFn, options = {}
       } catch { scoreBonus = 0; }
     }
   }
+  // Aktions-Cheat-Bonus (Als Auftrag 5.10.): freie Hero-Effekte, die Aktionen herausschummeln (Yukana),
+  // senken die Schwelle um den Bonus — der Effekt feuert, solange er den Stand nicht um
+  // mehr als den Bonus verschlechtert. Die aktionskostenden (Zi, Chaos-Diamond, Friedhelm) laufen
+  // ueber das Ranking der Action Phase, nicht ueber dieses Gate.
+  scoreBonus += heroEffectGateCheatBonus(engine, desc);
   const threshold = ((typeof overrideThreshold === 'number')
     ? overrideThreshold
     : (evaluateThroughTurnEnd ? 30 : MCTS_ACTIVATION_GATE_THRESHOLD)) + lockDelta - heroFxDelta - scoreBonus;
@@ -13334,6 +13415,8 @@ async function rankCandidatesEvalGreedy(engine, helpers, candidates) {
       engine.restore(snap);
       resetPromptCycle(engine);
     }
+    // Aktions-Cheat-Bonus (Als Auftrag 5.10.) — auch die Rollout-Politik soll diese Effekte bevorzugen.
+    if (Number.isFinite(score)) score += candidateCheatBonus(engine, cand);
     scored.push({ cand, score });
   }
   // Noise-tolerant Attack tiebreak — same rationale as the main MCTS
@@ -13398,10 +13481,7 @@ async function mctsRankCandidates(engine, helpers, candidates, rollouts = MCTS_R
     if (engine._inMctsSim && _rolloutBrain === 'evalGreedy') {
       return await rankCandidatesEvalGreedy(engine, helpers, candidates);
     }
-    const sorted = [...candidates].sort((a, b) =>
-      (b.level - a.level)
-      || (b.typeScore - a.typeScore)
-      || ((b.casterAtk || 0) - (a.casterAtk || 0)));
+    const sorted = [...candidates].sort(heuristicCandidateCmp(engine));
     return sorted;
   }
 
@@ -13464,6 +13544,13 @@ async function mctsRankCandidates(engine, helpers, candidates, rollouts = MCTS_R
       });
     }
   }
+
+  // ── Aktions-Cheat-Bonus (Als Auftrag 5.10.) ──
+  // Fester Aufschlag je Arm fuer Hero-Effekte, die Aktionen herausschummeln
+  // (`cpuMeta.cheatsActions`). Er geht in die Auswahl der naechsten Zuege (UCB1),
+  // in den Cluster-Vergleich und in die Endreihenfolge ein — sonst wuerde die
+  // Suche den Arm als „schlecht" kaum noch ziehen und der Bonus liefe ins Leere.
+  for (const arm of arms) arm.bonus = candidateCheatBonus(engine, arm.candidate);
 
   // ── PUCT-Priors: cachen + Erstziehungs-Reihenfolge ──
   // Ein learnedCardValue-Aufruf pro ARM (nicht pro Pull); die stabile
@@ -13564,7 +13651,7 @@ async function mctsRankCandidates(engine, helpers, candidates, rollouts = MCTS_R
     for (const arm of arms) {
       const ucb = arm.visits === 0
         ? Infinity
-        : (arm.scoreSum / arm.visits) + MCTS_UCB1_EXPLORE_C * Math.sqrt(lnN / arm.visits)
+        : (arm.scoreSum / arm.visits) + (arm.bonus || 0) + MCTS_UCB1_EXPLORE_C * Math.sqrt(lnN / arm.visits)
           + (arm.prior || 0) * MCTS_PUCT_SCALE / (1 + arm.visits);
       if (ucb > bestUCB) { bestUCB = ucb; bestArm = arm; }
     }
@@ -13604,11 +13691,11 @@ async function mctsRankCandidates(engine, helpers, candidates, rollouts = MCTS_R
     if (visited.length < 2) break;
     let topAvg = -Infinity;
     for (const a of visited) {
-      const avg = a.scoreSum / a.visits;
+      const avg = a.scoreSum / a.visits + (a.bonus || 0);
       if (avg > topAvg) topAvg = avg;
     }
     const epsilon = Math.max(MCTS_EXT_EPSILON_ABS, Math.abs(topAvg) * MCTS_EXT_EPSILON_PCT);
-    const cluster = visited.filter(a => (a.scoreSum / a.visits) >= topAvg - epsilon);
+    const cluster = visited.filter(a => (a.scoreSum / a.visits + (a.bonus || 0)) >= topAvg - epsilon);
     if (cluster.length < 2) break; // only one arm in the cluster — done
     // Pick the cluster member with the fewest visits to drive its SE
     // down fastest. Ties on visits → first one (deterministic).
@@ -13633,7 +13720,8 @@ async function mctsRankCandidates(engine, helpers, candidates, rollouts = MCTS_R
   const results = arms.map(arm => ({
     candidate: arm.candidate,
     variation: arm.variation,
-    avg: arm.visits > 0 ? arm.scoreSum / arm.visits : -Infinity,
+    avg: arm.visits > 0 ? arm.scoreSum / arm.visits + (arm.bonus || 0) : -Infinity,
+    bonus: arm.bonus || 0,
     visits: arm.visits,
     scored: arm.visits > 0,
   }));
@@ -13641,10 +13729,7 @@ async function mctsRankCandidates(engine, helpers, candidates, rollouts = MCTS_R
   // If no arm ever got scored, fall back to heuristic sort so the turn
   // doesn't crash.
   if (results.every(r => !r.scored)) {
-    const sorted = [...candidates].sort((a, b) =>
-      (b.level - a.level)
-      || (b.typeScore - a.typeScore)
-      || ((b.casterAtk || 0) - (a.casterAtk || 0)));
+    const sorted = [...candidates].sort(heuristicCandidateCmp(engine));
     cpuLog(`  [MCTS] budget exhausted with 0 scored arms → heuristic fallback`);
     return sorted;
   }
@@ -13676,7 +13761,7 @@ async function mctsRankCandidates(engine, helpers, candidates, rollouts = MCTS_R
   cpuLog(`  [MCTS/UCB1] ${candidates.length} cand → ${arms.length} arms, ${totalRollouts} rollouts in ${elapsed}ms${budgetExceeded ? ' [BUDGET]' : ''}:`);
   for (const r of results) {
     const vStr = r.visits > 0 ? `v=${r.visits}` : '(unscored)';
-    cpuLog(`    ${r.avg.toFixed(1).padStart(8)} ${vStr.padStart(6)} — ${r.candidate.cardType} "${r.candidate.cardName}" (lvl ${r.candidate.level}) hero=${r.candidate.heroIdx} ${r.variation.label}`);
+    cpuLog(`    ${r.avg.toFixed(1).padStart(8)} ${vStr.padStart(6)} — ${r.candidate.cardType} "${r.candidate.cardName}" (lvl ${r.candidate.level}) hero=${r.candidate.heroIdx} ${r.variation.label}${r.bonus ? ` [+${r.bonus} Aktions-Bonus]` : ''}`);
   }
 
   // De-dupe by candidate identity — keep the best-scoring variation per
@@ -13691,10 +13776,7 @@ async function mctsRankCandidates(engine, helpers, candidates, rollouts = MCTS_R
   // Any candidate not touched at all (budget cut off recon loop) → append
   // in heuristic order so the turn still has fallback plays.
   const unseen = candidates.filter(c => !seen.has(c));
-  unseen.sort((a, b) =>
-    (b.level - a.level)
-    || (b.typeScore - a.typeScore)
-    || ((b.casterAtk || 0) - (a.casterAtk || 0)));
+  unseen.sort(heuristicCandidateCmp(engine));
   for (const c of unseen) out.push({ ...c, scriptedTargetPlan: null });
   return out;
 
@@ -13712,10 +13794,7 @@ async function mctsRankCandidates(engine, helpers, candidates, rollouts = MCTS_R
         engine._trailWrite('mctsOverload', { note: err.message.slice(0, 400) });
       }
       cpuLog(`  [MCTS overload] falling through to heuristic for the rest of this turn`);
-      return [...candidates].sort((a, b) =>
-        (b.level - a.level)
-        || (b.typeScore - a.typeScore)
-        || ((b.casterAtk || 0) - (a.casterAtk || 0)));
+      return [...candidates].sort(heuristicCandidateCmp(engine));
     }
     throw err;
   }
@@ -13981,4 +14060,5 @@ async function mctsPickFromOptions(engine, options, applyFn, opts = {}) {
 // verdichtet beide zu Tags und soll sie NICHT nachbauen — eine
 // Gold-Bedarfsrechnung, die an zwei Stellen gepflegt wird, laeuft
 // garantiert auseinander. Rein additiv, kein Aufrufer geaendert.
-module.exports = { runCpuTurn, installCpuBrain, runTurbo, shouldMulliganStartingHand, setCpuVerbose, getCpuVerbose, setCpuTranscribeFn, setRolloutHorizon, getRolloutHorizon, setRolloutBrain, getRolloutBrain, mctsValueGoldVsDraw, mctsPickFromOptions, rolloutRestOfTurn, seedExploreAttempts, computeGoldDemand, mctsOpponentGoldEconomy };
+module.exports = { runCpuTurn, installCpuBrain, runTurbo, shouldMulliganStartingHand, setCpuVerbose, getCpuVerbose, setCpuTranscribeFn, setRolloutHorizon, getRolloutHorizon, setRolloutBrain, getRolloutBrain, mctsValueGoldVsDraw, mctsPickFromOptions, rolloutRestOfTurn, seedExploreAttempts, computeGoldDemand, mctsOpponentGoldEconomy,
+  _test: { heroCheatBonusByName, heroEffectGateCheatBonus, candidateCheatBonus, heuristicCandidateCmp, ACTION_CHEAT_BONUS } };
