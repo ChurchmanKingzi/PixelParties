@@ -5,9 +5,11 @@ Ebenen: Körper (src/classmate-hel-body.png, vom Nutzer gezeichnet, mit Geisters
 (src/classmate-hel-{chair,desk}.png, classmate_hel_sprite.py).
 Frame 0 ist die Ruhepose (der Sprite genau wie gezeichnet); jede Bewegung ist als Differenz zu Frame 0
 formuliert.
-* Sie schwebt sanft auf und ab (die ganze Figur).
-* Das lange weiße Haar weht: eine Welle läuft die Strähnen hinab (nach unten stärker, Wind in eine
-  Richtung), der Rock flattert im selben Wind (zum Saum hin stärker).
+* Der Körper schwebt nur sanft auf und ab (die ganze Figur, ±1 px) – er neigt sich nie zur Seite.
+* Die langen weißen Haarsträhnen bewegen sich unabhängig davon, geisterhaft: jede Strähne mit eigener
+  Wellenphase (eine Welle läuft die Strähne hinab, zur Spitze stärker, die Strähnen schwingen nicht im
+  Gleichtakt), dazu schweben die Spitzen mit Verzögerung gegen den Körper auf und ab.
+* Der Saum wellt sich (einzelne Spalten wachsen und schrumpfen im Wechsel um eine Zeile).
 * Der Geisterschweif windet sich ständig: eine Welle läuft bis in die Spitze, die abgelösten
   Pünktchen am Ende schlingern mit.
 * Vier Möbelstücke (drei Stühle, ein Pult) schweben um sie herum: jedes kreist auf einer kleinen Bahn mit
@@ -69,22 +71,29 @@ def hair_spans():
 SPANS = hair_spans()
 
 
-def wave(i, y, c, cycles=2):
+def wave(i, y, c, cycles=2, ph=0.0):
     """Differenz einer laufenden Welle zu Frame 0 (in Frame 0 genau null); cycles Perioden pro Loop."""
     w = 2 * math.pi * cycles * i / N
-    return math.sin(w - c * y) - math.sin(-c * y)
+    return math.sin(w - c * y + ph) - math.sin(-c * y + ph)
 
 
 def clip01(v):
     return min(1.0, max(0.0, v))
 
 
-def dx_hair(i, y):
-    return int(round(clip01((y - 8) / (HAIR_Y1 - 8)) * (1.0 * wave(i, y, 0.45) + 0.45 * wave(i, y, 0.9, 4))))
+def lock_dx(i, y, side):
+    """Seitlicher Versatz einer Haarsträhne: eine Welle läuft die Strähne hinab (zur Spitze hin stärker);
+    jede Strähne hat ihre eigene Phase, sie schwingen also nicht im Gleichtakt."""
+    u = clip01((y - 8) / (HAIR_Y1 - 8))
+    ph = 0.0 if side == 0 else 1.9
+    return int(round(1.3 * u * (wave(i, y, 0.5, 2, ph) + 0.45 * wave(i, y, 0.9, 3, ph + 1.0))))
 
 
-def dx_skirt(i, y):
-    return int(round(clip01((y - SKIRT_Y0 + 1) / (SKIRT_Y1 - SKIRT_Y0 + 1)) * (1.2 * wave(i, y, 0.45) + 0.5 * wave(i, y, 0.9, 4))))
+def lock_ev(i, y, side):
+    """Senkrechter Versatz: die Strähne schwebt mit Verzögerung gegen den Körper auf und ab (Spitze stärker)."""
+    u = clip01((y - 12) / (HAIR_Y1 + 2 - 12))
+    ph = 0.8 if side == 0 else 2.6
+    return int(round(1.6 * u * wave(i, 0, 0.0, 1, ph)))
 
 
 def dx_tail(i, y):
@@ -93,44 +102,54 @@ def dx_tail(i, y):
 
 
 PX = 4                              # Rand links/rechts, damit verschobene Teile Platz haben
+EXTRA_ROWS = 2                      # Platz unter dem Sprite für verlängerte Haarspitzen / Saum
 
 
 def figure(i):
-    """Der Sprite mit wehendem Haar, flatterndem Rock und sich windendem Schweif (Breite SW + 2 * PX)."""
-    out = np.zeros((SH, SW + 2 * PX, 4), int)
-    row = lambda y: np.nonzero(BODY[y, :, 3])[0]
-    for y in range(SH):
-        if not len(row(y)):
-            continue
-        if y in SPANS:                                  # Haar neben dem Körper: eigene Verschiebung
-            x0, a, b, x1 = SPANS[y]
-            dh, ds = dx_hair(i, y), dx_skirt(i, y)
-            for x in range(x0, a + 1):
-                out[y, x + PX + dh] = BODY[y, x]
-            for x in range(b, x1 + 1):
-                out[y, x + PX + dh] = BODY[y, x]
-            for x in range(a + 1, b):                   # Körper (ab dem Rock mit dem Rock)
-                out[y, x + PX + ds] = BODY[y, x]
-            lo, hi = PX + min(x0 + dh, a + 1 + ds), PX + max(x1 + dh, b - 1 + ds)
-            for x in range(lo, hi + 1):                 # Lücke zwischen Strähne und Körper schließen
-                if not out[y, x, 3]:
-                    left = x - 1
-                    while left >= lo and not out[y, left, 3]:
-                        left -= 1
-                    if left >= lo:
-                        out[y, x] = out[y, left]
-        elif SKIRT_Y0 <= y <= SKIRT_Y1:                 # Saum: ganze Zeile mit dem Rock
-            d = dx_skirt(i, y)
-            for x in row(y):
-                out[y, x + PX + d] = BODY[y, x]
-        elif y >= TAIL_Y0:                              # Geisterschweif
-            d = dx_tail(i, y)
-            for x in row(y):
-                out[y, x + PX + d] = BODY[y, x]
-        else:
-            out[y, PX:PX + SW] = BODY[y]
-    # Schweif zusammenhalten: aufeinanderfolgende Zeilen, die sich nach dem Verschieben nicht mehr berühren
-    for y in range(TAIL_Y0, SH - 1):
+    """Der Körper bleibt, wie gezeichnet (er schwebt nur als Ganzes); Haarsträhnen, Saum und Schweif bewegen
+    sich eigenständig (Breite SW + 2 * PX, Höhe SH + EXTRA_ROWS)."""
+    out = np.zeros((SH + EXTRA_ROWS, SW + 2 * PX, 4), int)
+    lockmask = np.zeros((SH, SW), bool)
+    for y, (x0, a, b, x1) in SPANS.items():
+        lockmask[y, x0:a + 1] = True
+        lockmask[y, b:x1 + 1] = True
+    # 1. Haarsträhnen (liegen unter dem Körper)
+    for side in (0, 1):
+        for y in range(HAIR_Y0, HAIR_Y1 + EXTRA_ROWS + 1):
+            sy = y - lock_ev(i, y, side)           # Zeile im Sprite, die hier erscheint (Strähne dehnt/staucht sich)
+            if sy > HAIR_Y1:                        # unter der Spitze: nichts
+                continue
+            sy = max(HAIR_Y0, sy)
+            x0, a, b, x1 = SPANS[sy]
+            dx = lock_dx(i, y, side)
+            xs = range(x0, a + 1) if side == 0 else range(b, x1 + 1)
+            for x in xs:
+                out[y, x + PX + dx] = BODY[sy, x]
+    # 2. Körper (ohne Strähnen und Schweif), unverändert
+    body = (BODY[:, :, 3] > 0) & ~lockmask
+    body[TAIL_Y0:] = False
+    for y, x in zip(*np.nonzero(body)):
+        out[y, x + PX] = BODY[y, x]
+    # 3. Lücken zwischen Strähne und Körper mit der innersten Haarspalte schließen
+    for y, (x0, a, b, x1) in SPANS.items():
+        for lo, step in ((a + 1 + PX, -1), (b - 1 + PX, 1)):
+            x = lo + step
+            while 0 <= x < out.shape[1] and not out[y, x, 3] and abs(x - lo) < 2:    # nur 1-px-Lücken füllen
+                x += step
+            if 0 <= x < out.shape[1] and out[y, x, 3] and abs(x - lo) < 3:
+                for xx in range(x, lo + step, -step):
+                    out[y, xx] = out[y, x]
+    # 4. Saum: einzelne Spalten wachsen und schrumpfen im Wechsel um eine Zeile (wellt sich, ohne zu kippen)
+    for x in range(3, 13):
+        d = wave(i, 0, 0.0, 2, -0.9 * x) > 0.9
+        if d and out[SKIRT_Y1, x + PX, 3]:
+            out[SKIRT_Y1 + 1, x + PX] = out[SKIRT_Y1, x + PX]
+    # 5. Geisterschweif
+    for y in range(TAIL_Y0, SH):
+        d = dx_tail(i, y)
+        for x in np.nonzero(BODY[y, :, 3])[0]:
+            out[y, x + PX + d] = BODY[y, x]
+    for y in range(TAIL_Y0, SH - 1):                    # Schweif zusammenhalten
         a, b = np.nonzero(out[y, :, 3])[0], np.nonzero(out[y + 1, :, 3])[0]
         if not len(a) or not len(b):
             continue
