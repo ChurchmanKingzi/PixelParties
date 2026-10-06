@@ -156,6 +156,12 @@ async function start(room, host, prep) {
   console.log(`[skilltest] Raum ${room.id}: Kampf beginnt (${n} Spieler, Startspieler ${room.players[starter].username})`);
 }
 
+/** Eigenschaft NICHT aufzählbar setzen: Timer-Handles dürfen nie in JSON-Kopien des Spielzustands (Kartenskripte klonen `gs`) landen. */
+function hide(obj, key, value) {
+  Object.defineProperty(obj, key, { value, writable: true, configurable: true, enumerable: false });
+  return value;
+}
+
 // ── Turn-Timer ─────────────────────────────────────────────────────
 function armTurnTimer(room, host) {
   const gs = room.gameState, st = gs && gs.skillTest;
@@ -166,11 +172,11 @@ function armTurnTimer(room, host) {
   if (st.botSeats.includes(seat)) return;
   const token = (st._timerToken = (st._timerToken || 0) + 1);
   st.turnDeadline = Date.now() + st.turnTimerSec * 1000;
-  st._timer = setTimeout(() => {
+  hide(st, '_timer', setTimeout(() => {
     if (gs.result || st._timerToken !== token || gs.activePlayer !== seat) return;
     // Zeit abgelaufen: der Bot-Verstand übernimmt den Zug (sonst blockiert ein Spieler alle anderen).
     host.scheduleBotTurn(room, seat, { forced: true });
-  }, st.turnTimerSec * 1000 + 500);
+  }, st.turnTimerSec * 1000 + 500));
 }
 
 // ── Hängende Prompts ───────────────────────────────────────────────
@@ -182,7 +188,7 @@ function startPromptWatchdog(room, host) {
   const gs = room.gameState, st = gs.skillTest;
   const timed = !!st.turnTimerSec;                       // ohne Zug-Timer wartet das Spiel auf Menschen beliebig lange
   const limitMs = (timed ? Math.max(st.turnTimerSec, 45) : 120) * 1000;
-  st._watch = setInterval(() => {
+  hide(st, '_watch', setInterval(() => {
     if (gs.result) return clearInterval(st._watch);
     // Letzte Sicherung: eine Aktion, die weit über das Limit hinaus hängt (aus welchem Grund auch immer),
     // wird aufgegeben, damit das Spiel weiterläuft.
@@ -208,7 +214,7 @@ function startPromptWatchdog(room, host) {
       st._promptSeen = null;
       room.engine.resolveGenericPrompt(resp === undefined ? null : resp, ep.promptId);
     } catch (e) { console.error('[skilltest] Prompt-Watchdog:', e && e.message); }
-  }, 2000);
+  }, 2000));
   if (st._watch.unref) st._watch.unref();
 }
 

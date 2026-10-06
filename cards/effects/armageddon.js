@@ -1,3 +1,4 @@
+const { isSeat } = require('./_opp');   // N-Spieler: gültiger Sitzindex
 // ═══════════════════════════════════════════
 //  CARD EFFECT: „Armageddon"
 //  Spell (Normal, Destruction Magic Lv3)
@@ -254,7 +255,7 @@ module.exports = {
       try {
         await engine.checkAllHeroesDead();
       } finally {
-        if (vorherDrawLoser === 0 || vorherDrawLoser === 1) gs._drawLoserIdx = vorherDrawLoser;
+        if (isSeat(gs, vorherDrawLoser)) gs._drawLoserIdx = vorherDrawLoser;
         else delete gs._drawLoserIdx;
       }
       if (gs.result) { engine.sync(); return; }   // Spiel ist entschieden

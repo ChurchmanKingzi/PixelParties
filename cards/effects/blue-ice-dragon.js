@@ -1,3 +1,4 @@
+const { isSeat } = require('./_opp');   // N-Spieler: gültiger Sitzindex
 // ═══════════════════════════════════════════
 //  CARD EFFECT: "Blue-Ice Dragon"
 //  Creature (Destruction Magic + Summoning Magic, Lv3, Normal) —
@@ -242,7 +243,7 @@ module.exports = {
     const heroIdx = ctx.cardHeroIdx;
     // Styx 28.9.: geliehene Helden der Gegenspalte — physische Seite des
     // Zielhelden (fehlt → pi). Opfer/Kosten zahlt weiterhin `pi`.
-    const heroOwner = (ctx.cardHeroOwner === 0 || ctx.cardHeroOwner === 1) ? ctx.cardHeroOwner : pi;
+    const heroOwner = (isSeat(gs, ctx.cardHeroOwner)) ? ctx.cardHeroOwner : pi;
 
     // Wurf auf einen belegten Platz -> mind. ein Opfer muss von diesem
     // Helden kommen, sonst wird dort kein Platz frei.

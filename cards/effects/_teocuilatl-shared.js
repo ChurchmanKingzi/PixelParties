@@ -1,3 +1,4 @@
+const { isSeat } = require('./_opp');   // N-Spieler: gültiger Sitzindex
 // ═══════════════════════════════════════════
 //  SHARED: Sacrifice-Summon der Teocuilatl-Creatures
 //
@@ -104,7 +105,7 @@ async function sacrificeSummonIntoSlot(engine, pi, req, CARD_NAME_ARG) {
   // Styx 28.9.: geliehene Helden der Gegenspalte — Platz, Zone, Ablage des
   // Bewohners und Glow auf der physischen Seite `heroOwner`; Hand, Kosten
   // und Kontrolle bei `pi`.
-  const heroOwner = (req.heroOwner === 0 || req.heroOwner === 1) ? req.heroOwner : pi;
+  const heroOwner = (isSeat(gs, req.heroOwner)) ? req.heroOwner : pi;
   const fps = gs.players[heroOwner];
   const occ = findOccupant(engine, pi, req.heroIdx, req.slotIdx, CARD_NAME_ARG, heroOwner);
   if (!occ) return false;

@@ -1,3 +1,4 @@
+const { isSeat } = require('./_opp');   // N-Spieler: gültiger Sitzindex
 // COST-DISCARD-CHANNEL: n/a — Auszahlung BEIM Abgeworfenwerden, keine Kosten (v1041)
 // ═══════════════════════════════════════════
 //  CARD EFFECT: "Skull Necklace"
@@ -125,7 +126,7 @@ async function fireSkullDamage(ctx, deleted) {
   // Nur wenn die Ableitung nichts findet (`null` — etwa weil BEIDE
   // Spieler eine Karte dieses Namens fuehren), bleibt die alte
   // Naeherung ueber `gs.activePlayer` als letzter Rueckfall stehen.
-  const verursacher = (ctx.sourceOwner === 0 || ctx.sourceOwner === 1)
+  const verursacher = (isSeat(gs, ctx.sourceOwner))
     ? ctx.sourceOwner
     : (ctx.selfInflicted ? ownerIdx : null);
   const byOpponent = verursacher != null

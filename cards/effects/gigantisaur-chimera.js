@@ -1,3 +1,4 @@
+const { isSeat } = require('./_opp');   // N-Spieler: gültiger Sitzindex
 // ═══════════════════════════════════════════
 //  CARD EFFECT: "Gigantisaur Chimera"
 //  Creature (Normal, Lv3, Summoning Magic) — Gigantisaurs
@@ -154,10 +155,10 @@ module.exports = {
     // set (defensive — every drag-drop path stamps it).
     // Styx 28.9.: geliehene Helden der Gegenspalte — die Marke gilt nur,
     // wenn auch die physische Seite (`heroOwner`, fehlt → pi) passt.
-    const heroOwner = (ctx.cardHeroOwner === 0 || ctx.cardHeroOwner === 1) ? ctx.cardHeroOwner : pi;
+    const heroOwner = (isSeat(engine, ctx.cardHeroOwner)) ? ctx.cardHeroOwner : pi;
     const req = ps._requestedNormalSummonSlot;
     const destSlot = (req?.heroIdx === ctx.cardHeroIdx
-      && ((req.heroOwner === 0 || req.heroOwner === 1) ? req.heroOwner : pi) === heroOwner
+      && ((isSeat(engine, req.heroOwner)) ? req.heroOwner : pi) === heroOwner
       ? req.slotIdx
       : 0);
 

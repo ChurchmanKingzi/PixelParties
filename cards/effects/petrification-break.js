@@ -1,3 +1,4 @@
+const { isSeat } = require('./_opp');   // N-Spieler: gültiger Sitzindex
 // ═══════════════════════════════════════════
 //  CARD EFFECT: "Petrification Break"
 //  Spell (Attachment, Support Magic, Lv 0)
@@ -100,7 +101,7 @@ module.exports = {
       // Wurde auf einen ANDEREN Helden gezogen als den Nutzer, ist das kein
       // gueltiger Empfaenger („only the Stunned Hero itself").
       const hinweis = gs._attachmentHeroIdx;
-      const hinweisSeite = (gs._attachmentOwner === 0 || gs._attachmentOwner === 1) ? gs._attachmentOwner : pi;
+      const hinweisSeite = (isSeat(gs, gs._attachmentOwner)) ? gs._attachmentOwner : pi;
       if (hinweis != null && hinweis >= 0 && (hinweis !== heroIdx || hinweisSeite !== seite)) {
         gs._spellCancelled = true;
         return;

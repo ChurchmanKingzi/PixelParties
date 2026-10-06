@@ -1,3 +1,4 @@
+const { isSeat } = require('./_opp');   // N-Spieler: gültiger Sitzindex
 // ═══════════════════════════════════════════
 //  CARD EFFECT: "The Seventh Circle of Hell"
 //  Spell (Destruction Magic Lv1, Area) — Archetyp Hell Circles
@@ -55,7 +56,7 @@ module.exports = {
       if (ctx.cardZone !== 'area') return;
       const engine = ctx._engine;
       const tp = ctx.activePlayer;
-      if (tp !== 0 && tp !== 1) return;
+      if (!isSeat(engine, tp)) return;
       const ziele = [...engine.getHeroTargets(tp), ...engine.getCreatureTargets(tp)];
       if (ziele.length === 0) return;
       await engine.showTriggeredEffect(CARD_NAME, { playerIdx: ctx.cardOwner });

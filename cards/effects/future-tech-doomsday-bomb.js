@@ -1,3 +1,4 @@
+const { isSeat } = require('./_opp');   // N-Spieler: gültiger Sitzindex
 // ═══════════════════════════════════════════
 //  CARD EFFECT: "Future Tech Doomsday Bomb"
 //  Artifact (Equipment, Cost 10)
@@ -212,7 +213,7 @@ module.exports = {
       try {
         await engine.checkAllHeroesDead();
       } finally {
-        if (vorherigerVerlierer === 0 || vorherigerVerlierer === 1) {
+        if (isSeat(gs, vorherigerVerlierer)) {
           gs._drawLoserIdx = vorherigerVerlierer;
         } else {
           delete gs._drawLoserIdx;

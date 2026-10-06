@@ -1,3 +1,4 @@
+const { isSeat } = require('./_opp');   // N-Spieler: gültiger Sitzindex
 // ═══════════════════════════════════════════
 //  CARD EFFECT: "Candlestick Squire"
 //  Creature (Summoning Magic Lv 1, 30 HP, Banned)
@@ -182,8 +183,8 @@ module.exports = {
     // Styx 28.9.: geliehene Helden der Gegenspalte — physische Seite des
     // Wurfs: aus der Absichtsmarke (`heroOwner`), sonst aus dem Kontext.
     const drop0 = ps._requestedNormalSummonSlot;
-    const ctxSeite = (ctx.cardHeroOwner === 0 || ctx.cardHeroOwner === 1) ? ctx.cardHeroOwner : pi;
-    const dropSeite = (drop0 && (drop0.heroOwner === 0 || drop0.heroOwner === 1)) ? drop0.heroOwner : ctxSeite;
+    const ctxSeite = (isSeat(engine, ctx.cardHeroOwner)) ? ctx.cardHeroOwner : pi;
+    const dropSeite = (drop0 && (isSeat(engine, drop0.heroOwner))) ? drop0.heroOwner : ctxSeite;
     let hostHeroIdx, hostFreeSlot, hostSeite = pi;
     if (ctx.viaDragDrop) {
       // Drag-drop pinned the host: use the dropped hero/slot — auf der
@@ -267,7 +268,7 @@ module.exports = {
     // Styx 28.9.: geliehene Helden der Gegenspalte — gleiche Seite wie der
     // Wurf, dann platziert der Server (der die Seite kennt) selbst.
     const sameAsDrop = drop
-      && hostSeite === ((drop.heroOwner === 0 || drop.heroOwner === 1) ? drop.heroOwner : pi)
+      && hostSeite === ((isSeat(engine, drop.heroOwner)) ? drop.heroOwner : pi)
       && hostSeite === ctxSeite
       && hostHeroIdx === ctx.cardHeroIdx
       && hostFreeSlot === drop.slotIdx;

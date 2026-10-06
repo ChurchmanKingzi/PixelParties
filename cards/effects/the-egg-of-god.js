@@ -1,4 +1,5 @@
 'use strict';
+const { isSeat } = require('./_opp');   // N-Spieler: gültiger Sitzindex
 // ═══════════════════════════════════════════
 //  CARD EFFECT: "The Egg of God"  (v1357)
 //  Creature — Summoning Magic Lv3, 50 HP
@@ -150,7 +151,7 @@ module.exports = {
     const heroIdx = ctx.cardHeroIdx;
     // Styx 28.9.: geliehene Helden der Gegenspalte — physische Seite des
     // Zielhelden (fehlt → pi). Opfer zahlt `pi`.
-    const heroOwner = (ctx.cardHeroOwner === 0 || ctx.cardHeroOwner === 1) ? ctx.cardHeroOwner : pi;
+    const heroOwner = (isSeat(engine, ctx.cardHeroOwner)) ? ctx.cardHeroOwner : pi;
     const allFullDrop = !!ps?._requestedBouncePlaceSlot;
     if (ps?._requestedBouncePlaceSlot) delete ps._requestedBouncePlaceSlot;
     const base = makeSacrificeSpec(engine);

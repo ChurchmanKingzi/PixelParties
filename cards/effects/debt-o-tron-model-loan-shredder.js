@@ -75,10 +75,8 @@ module.exports = {
     // (Als Vorgabe 16.8.). `to` haelt den Gegner auf seinem Wert fest —
     // nur der eigene Stand bewegt sich.
     engine._broadcastEvent('play_gold_crash', {
-      amounts: [gs.players[0].gold || 0, gs.players[1].gold || 0],
-      to: pi === 0
-        ? [0, gs.players[1].gold || 0]
-        : [gs.players[0].gold || 0, 0],
+      amounts: gs.players.map(p => p.gold || 0),
+      to: gs.players.map((p, i) => (i === pi ? 0 : (p.gold || 0))),
       durationMs: SHRED_MS,
       tone: 'recover',
     });

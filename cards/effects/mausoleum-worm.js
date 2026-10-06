@@ -1,3 +1,4 @@
+const { isSeat } = require('./_opp');   // N-Spieler: gültiger Sitzindex
 // ═══════════════════════════════════════════
 //  CARD EFFECT: "Mausoleum Worm"
 //  Creature (Normal, Lv 3, 50 HP, Summoning Magic)
@@ -67,7 +68,7 @@ module.exports = {
       // Der Verursacher kommt von der Engine: Besitzer der Quelle, bei Statusticks der Spieler,
       // der den Status gesetzt hat.
       const quellBesitzer = ctx.killerOwner;
-      if (quellBesitzer !== 0 && quellBesitzer !== 1) return;
+      if (!isSeat(gs, quellBesitzer)) return;
       if (quellBesitzer === pi) return;
 
       // Pro Held-KO und Zug nur EIN Angebot, egal wie viele Kopien lauschen.

@@ -177,7 +177,7 @@ module.exports = {
       const vorherGegner = gs.players[oi].gold || 0;
 
       engine._broadcastEvent('play_gold_crash', {
-        amounts: [gs.players[0].gold || 0, gs.players[1].gold || 0],
+        amounts: gs.players.map(p => p.gold || 0),
         durationMs: CRASH_MS,
       });
 

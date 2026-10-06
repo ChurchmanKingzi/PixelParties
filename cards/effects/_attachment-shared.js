@@ -1,3 +1,4 @@
+const { isSeat } = require('./_opp');   // N-Spieler: gültiger Sitzindex
 // ═══════════════════════════════════════════
 //  GETEILT: Attachment-Spells anlegen — DIE eine Auslegung (v650)
 //
@@ -192,7 +193,7 @@ async function _pickAttachmentHostRaw(ctx, CARD_NAME, opts = {}) {
   // auf moegliche Caster, DAS oeffnet dann die Zielauswahl").
   const hintHero = opts.ignoreDropHints ? null : gs._attachmentHeroIdx;
   const wanted = opts.ignoreDropHints ? null : gs._attachmentZoneSlot;
-  const hintSide = (gs._attachmentOwner === 0 || gs._attachmentOwner === 1) ? gs._attachmentOwner : pi;
+  const hintSide = (isSeat(gs, gs._attachmentOwner)) ? gs._attachmentOwner : pi;
   if (hintHero != null && hintHero >= 0) {
     const exact = hosts.find(h => h.side === hintSide && h.heroIdx === hintHero && wanted != null && wanted >= 0 && h.slotIdx === wanted);
     const any = hosts.find(h => h.side === hintSide && h.heroIdx === hintHero);

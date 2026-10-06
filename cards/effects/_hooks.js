@@ -1,3 +1,4 @@
+const { isSeat } = require('./_opp');   // N-Spieler: gültiger Sitzindex
 // ═══════════════════════════════════════════
 //  HOOK POINTS & SPEED LEVELS
 //  Add new hooks freely — just fire them with
@@ -910,7 +911,7 @@ function heroCanBeEquipped(hero) {
  */
 function heldSeite(gs, pi, heroIdx) {
   const w = gs?._wirkerSeite;
-  if (w && w.pi === pi && w.heroIdx === heroIdx && (w.heroOwner === 0 || w.heroOwner === 1)) return w.heroOwner;
+  if (w && w.pi === pi && w.heroIdx === heroIdx && (isSeat(gs, w.heroOwner))) return w.heroOwner;
   return pi;
 }
 

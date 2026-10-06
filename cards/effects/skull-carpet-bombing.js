@@ -1,3 +1,4 @@
+const { isSeat } = require('./_opp');   // N-Spieler: gültiger Sitzindex
 // ═══════════════════════════════════════════
 //  CARD EFFECT: "Skull Carpet Bombing"
 //  Spell (Surprise, Lv1, Destruction Magic + Summoning Magic) — PP MBS1
@@ -137,7 +138,7 @@ module.exports = {
     try {
       await engine.checkAllHeroesDead();
     } finally {
-      if (vorherDrawLoser === 0 || vorherDrawLoser === 1) gs._drawLoserIdx = vorherDrawLoser;
+      if (isSeat(gs, vorherDrawLoser)) gs._drawLoserIdx = vorherDrawLoser;
       else delete gs._drawLoserIdx;
     }
     if (gs.result) { engine.sync(); return null; }   // Spiel entschieden

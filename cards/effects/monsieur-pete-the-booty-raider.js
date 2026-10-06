@@ -1,3 +1,4 @@
+const { isSeat } = require('./_opp');   // N-Spieler: gültiger Sitzindex
 // ═══════════════════════════════════════════
 //  CARD EFFECT: "Monsieur Pete, the Booty Raider"
 //  Hero · 450 HP · 100 ATK · Starting Abilities: Navigation, Thieving
@@ -43,7 +44,7 @@ module.exports = {
       const q = ctx.source;
       const quellSeite = q?.controller ?? q?.owner;
       let vomGegner = false;
-      if (quellSeite === 0 || quellSeite === 1) {
+      if (isSeat(engine, quellSeite)) {
         vomGegner = quellSeite !== pi;
       } else if (q?.name && TICK_STATUS[q.name]) {
         vomGegner = engine.statusVomGegner(ziel, TICK_STATUS[q.name], pi);

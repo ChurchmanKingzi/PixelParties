@@ -15,7 +15,7 @@ const AUSLOESER_HOOKS = new Set([
 ]);
 const { handSizeWithoutResolving } = require('./_hand-resolve');   // v1288
 const { loadCardEffect } = require('./_loader');
-const { opponentOfGs, opponentsOfGs, playerCountGs } = require('./_opp');   // N-Spieler-Umbau
+const { isSeat, opponentOfGs, opponentsOfGs, playerCountGs } = require('./_opp');   // N-Spieler-Umbau
 const { gainedNames, heroScriptsOf, heroScriptOf, eigenesHeldenSkript } = require('./_gained-effects-shared');
 const { charges: ladungenLesen } = require('./_charges');
 const ScTracking = require('./_sc-tracking');   // v1381
@@ -1747,7 +1747,7 @@ class GameEngine {
    *  (`_isSelfPlay = true`) both players are treated as CPU so the brain
    *  drives both turns. */
   isCpuPlayer(pi) {
-    if (this._isSelfPlay) return pi === 0 || pi === 1;
+    if (this._isSelfPlay) return isSeat(this, pi);
     return this._cpuPlayerIdx >= 0 && pi === this._cpuPlayerIdx;
   }
 
@@ -2846,7 +2846,7 @@ class GameEngine {
     // der Zug; wer spaeter fragt, vergleicht ihn mit `gs.turn`.
     if (hookName === HOOKS.ON_DISCARD) {
       const wer = hookCtx?.playerIdx;
-      if (wer === 0 || wer === 1) {
+      if (isSeat(this, wer)) {
         if (!this.gs._discardedOnTurn) this.gs._discardedOnTurn = {};
         this.gs._discardedOnTurn[wer] = this.gs.turn;
       }
@@ -6993,7 +6993,7 @@ class GameEngine {
     const payload = {
       cardName, sfx: opts.sfx || 'ability_activate', replace: !!opts.replace,
     };
-    if (opts.playerIdx === 0 || opts.playerIdx === 1) payload.playerIdx = opts.playerIdx;
+    if (isSeat(this, opts.playerIdx)) payload.playerIdx = opts.playerIdx;
 
     // ★ WER SIEHT DEN AUFTRITT (Als Regel 12.9., verschaerft die vom
     //   12.8.): Den Auftritt der Karte, die er GERADE SELBST einsetzt,
@@ -7010,9 +7010,9 @@ class GameEngine {
     //   die will der Spieler ja gerade sehen, weil er sie nicht selbst
     //   ausgeloest hat.
     const akt = this._activationSource;
-    const aktBesitzer = (opts.playerIdx === 0 || opts.playerIdx === 1)
+    const aktBesitzer = (isSeat(this, opts.playerIdx))
       ? opts.playerIdx
-      : ((akt?.owner === 0 || akt?.owner === 1) ? akt.owner : null);
+      : ((isSeat(this, akt?.owner)) ? akt.owner : null);
     const eigenerEinsatz = !!akt && akt.cardName === cardName
       && aktBesitzer != null && (akt.owner == null || akt.owner === aktBesitzer)
       && (akt.turn == null || akt.turn === this.gs?.turn);
@@ -7450,7 +7450,7 @@ class GameEngine {
       label: String(label), quelle: quelle || null,
       // v1151: wer gewaehlt hat — der Client zeigt die Wahl des GEGNERS
       // deutlich groesser als die eigene.
-      waehler: (waehler === 0 || waehler === 1) ? waehler : null,
+      waehler: (isSeat(this, waehler)) ? waehler : null,
     };
     this.gs.zielMarken = [...(this.gs.zielMarken || []), marke];
     if (!this._inMctsSim && !this._fastMode) {
@@ -7719,7 +7719,7 @@ class GameEngine {
   _scNoteHeal(source, amount, zielSeite) {
     if (!(amount > 0) || !this.gs._scTracking) return;
     const q = source?.owner ?? source?.controller;
-    const wer = (q === 0 || q === 1) ? q : zielSeite;
+    const wer = (isSeat(this, q)) ? q : zielSeite;
     ScTracking.heilung(this.gs._scTracking[wer], amount);
   }
 
@@ -9407,13 +9407,13 @@ class GameEngine {
    * den Status gesetzt hat (`statuses[...].appliedBy`).
    */
   _todesVerursacher(target, source) {
-    const eig = [source?.owner, source?.controller, source?.sourceOwner].find(v => v === 0 || v === 1);
-    if (eig === 0 || eig === 1) return eig;
+    const eig = [source?.owner, source?.controller, source?.sourceOwner].find(v => isSeat(this, v));
+    if (isSeat(this, eig)) return eig;
     if (source?.name) {
       for (const [key, def] of Object.entries(STATUS_EFFECTS)) {
         if (def?.damageSourceName !== source.name) continue;
         const by = target?.statuses?.[key]?.appliedBy;
-        if (by === 0 || by === 1) return by;
+        if (isSeat(this, by)) return by;
       }
     }
     return -1;
@@ -9958,7 +9958,7 @@ class GameEngine {
           d.schaden += (amount || 0);
           // Gutgeschrieben wird der Seite, die den Zustand gesetzt hat.
           const by = target.statuses.healReversed.appliedBy;
-          if (by === 0 || by === 1) d.jeSeite[by] += (amount || 0);
+          if (isSeat(this, by)) d.jeSeite[by] += (amount || 0);
         } catch { /* Messung darf nie stoeren */ }
       }
       await this.actionDealDamage(source, target, amount, 'other');
@@ -11182,7 +11182,7 @@ class GameEngine {
     // vorhandenen `card_reveal`, der Spieler braucht keine Anzeige
     // fuer eine Karte, die er selbst gerade gespielt hat.
     if (from === 'hand') return;
-    if (owner !== 0 && owner !== 1) return;
+    if (!isSeat(this, owner)) return;
     // ★ v1034 (Als Regel 12.9.): DER BESITZER BEKOMMT SEINEN EIGENEN
     //   AKTIVEN EFFEKT NICHT MEHR ZU SEHEN. Frueher (Regel 12.8.) lief
     //   hier genau eine Sendung: die Kopie fuer den Aktivierenden. Der
@@ -11300,7 +11300,7 @@ class GameEngine {
    * @returns {number|null} Spielerindex des Verursachers, sonst null
    */
   _deriveEffectOwner(opts = {}, playerIdx) {
-    if (opts.sourceOwner === 0 || opts.sourceOwner === 1) return opts.sourceOwner;
+    if (isSeat(this, opts.sourceOwner)) return opts.sourceOwner;
     if (opts.selfInflicted) return playerIdx;
     const name = typeof opts.source === 'string' ? opts.source : opts.source?.name;
     if (!name) return null;
@@ -11317,7 +11317,7 @@ class GameEngine {
       if (inst?.name !== name) continue;
       if (inst.zone === ZONES.DISCARD || inst.zone === ZONES.DELETED) continue;
       const o = inst.controller ?? inst.owner;
-      if (o === 0 || o === 1) besitzer.add(o);
+      if (isSeat(this, o)) besitzer.add(o);
     }
     return besitzer.size === 1 ? [...besitzer][0] : null;
   }
@@ -11804,7 +11804,7 @@ class GameEngine {
   _noteDamageDealt(source, amount) {
     if (!(amount > 0)) return;
     const pi = source?.owner ?? source?.controller;
-    if (pi !== 0 && pi !== 1) return;
+    if (!isSeat(this, pi)) return;
     const ps = this.gs.players[pi];
     if (!ps) return;
     ps.damageDealtThisGame = (ps.damageDealtThisGame || 0) + amount;
@@ -12655,7 +12655,7 @@ class GameEngine {
         // ★ Styx 28.9.: `claim.heroOwner` = Brettseite eines geliehenen
         // Helden („this Hero's Support Zone"). Die Kreatur liegt dann dort,
         // gehoert aber dem Beanspruchenden (`claim.owner`, seitenfremd).
-        const feldSeite = (claim.heroOwner === 0 || claim.heroOwner === 1) ? claim.heroOwner : claim.owner;
+        const feldSeite = (isSeat(this, claim.heroOwner)) ? claim.heroOwner : claim.owner;
         const slots = this.gs.players[feldSeite]?.supportZones?.[claim.heroIdx];
         if (slots && (slots[claim.zoneSlot] || []).length === 0) {
           // Sichtbare Wanderung von der alten in die neue Zone —
@@ -12812,7 +12812,7 @@ class GameEngine {
     if (kandidaten.length === 0) return false;
 
     const roh = source?.controller ?? source?.owner;
-    const sourceOwner = (roh === 0 || roh === 1) ? roh : this._deriveEffectOwner({ source }, pi);
+    const sourceOwner = (isSeat(this, roh)) ? roh : this._deriveEffectOwner({ source }, pi);
     const lebende = this.heroesControlledBy(pi, { permanentOnly: true }).filter(({ hero }) => hero.hp > 0);
     const letzterHeld = lebende.length === 0 && !((ps._teleportedAway || 0) > 0);
     const info = { hero: target, heroIdx, ownerIdx: pi, source: source || null, sourceOwner, letzterHeld };
@@ -12872,7 +12872,7 @@ class GameEngine {
     if (!ps) return;
     if (this.gs.firstTurnProtectedPlayer === ownerIdx) return;
     const allCards = this._getCardDB();
-    const verursacher = (roh.sourceOwner === 0 || roh.sourceOwner === 1)
+    const verursacher = (isSeat(this, roh.sourceOwner))
       ? roh.sourceOwner
       : this._deriveEffectOwner({ source: roh.source }, ownerIdx);
     const info = { ...roh, sourceOwner: verursacher, cardData: allCards[roh.cardName] || null };
@@ -14962,7 +14962,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // (ein uebernommener Held der Gegenspalte). `playerIdx` bleibt der
     // BESCHWOERER — er zahlt die Kosten (Hand, Opfer, Gold); Held und
     // Zielplatz liegen auf `heldSeite` (`ctx.cardHeroOwner`).
-    const heldSeite = (hookExtras && (hookExtras.heldSeite === 0 || hookExtras.heldSeite === 1))
+    const heldSeite = (hookExtras && (isSeat(this, hookExtras.heldSeite)))
       ? hookExtras.heldSeite : playerIdx;
     if (reservedSlot >= 0) {
       this._reservedSummonSlot = { playerIdx: heldSeite, heroIdx, zoneSlot: reservedSlot };
@@ -15121,7 +15121,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // `opts.controller` den neuen Kontrolleur (seitenfremd). Die Quellzone
     // liegt auf der Brettseite der Kreatur (`physicalSide`), nicht beim
     // Kontrolleur (seitenfremd beschworen / gestohlen).
-    const neuerKtrl = (opts.controller === 0 || opts.controller === 1) ? opts.controller : toPlayerIdx;
+    const neuerKtrl = (isSeat(gs, opts.controller)) ? opts.controller : toPlayerIdx;
     const fromSeite = this.physicalSide(inst);
     const fromZonenPs = gs.players[fromSeite] || fromPs;
 
@@ -17106,7 +17106,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       : (opts.sourceCard && typeof opts.sourceCard === 'object') ? opts.sourceCard : null;
     const lauf = this._currentEffectSource || null;
     let spieler = opts.appliedBy ?? opts.sourceOwner ?? q?.controller ?? q?.owner ?? lauf?.owner;
-    if (spieler !== 0 && spieler !== 1) spieler = -1;
+    if (!isSeat(this, spieler)) spieler = -1;
     const qInst = q?.cardInstance || (q && q.id != null ? q : null);
     const instLebt = qInst && this.cardInstances.includes(qInst) && qInst.zone === ZONES.SUPPORT;
     const instId = instLebt ? qInst.id : (opts.appliedByInst ?? (q ? null : lauf?.instId ?? null));
@@ -17141,7 +17141,7 @@ this._deathWatch = (this._deathWatchStack || []).length
   /** Kam dieser Status vom Gegner des Besitzers? */
   statusVomGegner(ziel, statusName, besitzer) {
     const v = this.statusVerursacher(ziel, statusName);
-    return !!v && (v.spieler === 0 || v.spieler === 1) && v.spieler !== besitzer;
+    return !!v && (isSeat(this, v.spieler)) && v.spieler !== besitzer;
   }
 
   /** Verursacher in einen Helden-Statuseintrag schreiben. */
@@ -19136,7 +19136,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // Hand, Sperren und Kosten beim Kontrolleur `playerIdx`; Stufe, Zonen
     // und Heldensperren am Helden (wie der Charme-Zweig in
     // `getHeroPlayableCards`).
-    const hs = (heroOwner === 0 || heroOwner === 1) ? heroOwner : playerIdx;
+    const hs = (isSeat(this, heroOwner)) ? heroOwner : playerIdx;
     const fremd = hs !== playerIdx;
     const hps = this.gs.players[hs];
     const hero = hps?.heroes?.[heroIdx];
@@ -20727,7 +20727,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // `doPlaySpell` mit `charmedOwner` (`_castSpellImmediately` mit
     // `heroOwner`). Kreaturen, Abilities und Heldeneffekte des geliehenen
     // Helden bietet die Zusatzaktion (noch) nicht an.
-    const hs = (config.heroOwner === 0 || config.heroOwner === 1) ? config.heroOwner : playerIdx;
+    const hs = (isSeat(this, config.heroOwner)) ? config.heroOwner : playerIdx;
     const hero = this.gs.players[hs]?.heroes?.[heroIdx];
     if (!hero?.name || hero.hp <= 0) return { played: false };
     if (hs !== playerIdx && this.heroSideOf(hs, hero) !== playerIdx) return { played: false };
@@ -20867,7 +20867,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (!ps) return { played: false };
     const activatableHeroEffects = angebot.activatableHeroEffects || [];
     // Als Vorgabe 29.9.: geliehener Held — nur Attack/Spell aus der Hand.
-    const _leihSeite = (config.heroOwner === 0 || config.heroOwner === 1) && config.heroOwner !== playerIdx
+    const _leihSeite = (isSeat(this, config.heroOwner)) && config.heroOwner !== playerIdx
       ? config.heroOwner : null;
     if (_leihSeite != null && (actionResult.heroEffectActivation || actionResult.abilityActivation)) return { retry: true };
 
@@ -21206,7 +21206,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // Wirkers (Friedhelm, Yukana, Junshi unter Styx) — wie `doPlaySpell`
     // mit `charmedOwner`: Karte, Wisdom und Ablage beim Kontrolleur, der
     // Wirker (Instanz `heroOwner`, `gs._wirkerSeite`) auf der Brettseite.
-    const wirkerSeite = (opts.heroOwner === 0 || opts.heroOwner === 1) ? opts.heroOwner : playerIdx;
+    const wirkerSeite = (isSeat(this, opts.heroOwner)) ? opts.heroOwner : playerIdx;
     const hero = this.gs.players[wirkerSeite]?.heroes?.[heroIdx];
     const cardData = this._getCardDB()[cardName];
     if (!ps || !hero || !cardData) return { cancelled: true };
@@ -26185,7 +26185,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (!cardName) return;
     this._broadcastEvent('card_reveal', {
       cardName, sfx: 'negate', replace: true, fizzled: true,
-      ...(opts.playerIdx === 0 || opts.playerIdx === 1 ? { playerIdx: opts.playerIdx } : {}),
+      ...(isSeat(this, opts.playerIdx) ? { playerIdx: opts.playerIdx } : {}),
     });
     // Eigene Logzeile nur auf Wunsch — die Karten schreiben meist ihre
     // genauere selbst (egg_of_god_fizzle …).
@@ -27151,7 +27151,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       if (typeof bilder === 'function') { await bilder(this, daten); return true; }
 
       const proj = schonGezeigt.proj ? null : bilder.projectile;
-      if (proj && ziele.length > 0 && (daten.owner === 0 || daten.owner === 1)) {
+      if (proj && ziele.length > 0 && (isSeat(this, daten.owner))) {
         const stagger = bilder.stagger ?? 0;
         for (let i = 0; i < ziele.length; i++) {
           const t = ziele[i];
@@ -30172,7 +30172,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (offen && offen.ownerIdx !== reaktor) this._firePendingCardReveal();
     // Passiver Hook-Effekt einer Creature des ANDEREN Spielers.
     const quelle = this._currentEffectSource;
-    const qOwner = quelle && (quelle.owner === 0 || quelle.owner === 1) ? quelle.owner : null;
+    const qOwner = quelle && (isSeat(this, quelle.owner)) ? quelle.owner : null;
     if (quelle && qOwner !== reaktor) await this._creatureEffektVorSurprise({ owner: qOwner });
   }
 
@@ -30185,8 +30185,8 @@ this._deathWatch = (this._deathWatchStack || []).length
     const quelle = this._currentEffectSource;
     if (!quelle?.cardName || !this._isCreatureSourcedLink(quelle)) return;
     if (this._activationSource?.cardName === quelle.cardName) return;   // aktiver Weg: Reveal der Aktivierung
-    const owner = (quelle.owner === 0 || quelle.owner === 1) ? quelle.owner : sourceInfo?.owner;
-    if (owner !== 0 && owner !== 1) return;
+    const owner = (isSeat(this, quelle.owner)) ? quelle.owner : sourceInfo?.owner;
+    if (!isSeat(this, owner)) return;
     await this.showTriggeredEffect(quelle.cardName, { playerIdx: owner, windowMs: 3000, _auto: true });
     this._autoAnnounce = { card: quelle.cardName, src: quelle };
   }
@@ -32404,7 +32404,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       const quelle = hookCtx.source;
       const srcOwner = quelle?.controller ?? quelle?.owner ?? -1;
       const victimCtrl = c.controller ?? c.owner;
-      if (srcOwner !== 0 && srcOwner !== 1) return;
+      if (!isSeat(this, srcOwner)) return;
       if (srcOwner === victimCtrl) return;
       const inst = this.cardInstances.find(x => x.id === c.instId);
       const side = inst ? this.physicalSide(inst) : c.owner;
@@ -33340,10 +33340,10 @@ this._deathWatch = (this._deathWatchStack || []).length
     // bleiben; wer die Spur wieder braucht, holt sie fuer die Dauer
     // einer Messung zurueck statt sie dauerhaft mitlaufen zu lassen.
     const players = this.gs?.players || [];
-    const pi = players[0] === ps ? 0 : (players[1] === ps ? 1 : -1);
+    const pi = players.indexOf(ps);
     if (pi < 0) return;
     if (!this._rxWindowStats) this._rxWindowStats = [Object.create(null), Object.create(null)];
-    const bucket = this._rxWindowStats[pi];
+    const bucket = this._rxWindowStats[pi] || (this._rxWindowStats[pi] = Object.create(null));   // N Spieler: Eimer je Sitz
     const e = bucket[cardName] || (bucket[cardName] = { seen: 0, gold: 0, hero: 0 });
     if (e[key] != null) e[key]++;
   }
@@ -35811,7 +35811,7 @@ this._deathWatch = (this._deathWatchStack || []).length
   }
   _rxHandCardCastable(ps, cardName) {
     const players = this.gs?.players || [];
-    const pi = players[0] === ps ? 0 : (players[1] === ps ? 1 : -1);
+    const pi = players.indexOf(ps);
     if (pi < 0) return false;
     return this._rxHandCastingHero(pi, cardName) !== -1;
   }
@@ -36528,7 +36528,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       // Wie eine negierte Karte: Off Duty → Deck, Lunar Eclipse → Loeschstapel,
       // sonst Ablage des KARTENBESITZERS. Die Karte lag bis jetzt OFFEN in
       // der Surprise Zone und fliegt VON DORT ab (Als Befund 3.10.).
-      const _besitzer = (inst?.originalOwner === 0 || inst?.originalOwner === 1) ? inst.originalOwner : playerIdx;
+      const _besitzer = (isSeat(this, inst?.originalOwner)) ? inst.originalOwner : playerIdx;
       await this._negatedPlacementRoute(cardName, _besitzer, fromDeck ? 'none' : 'surprise', {
         zoneOwner: playerIdx, hostHeroIdx, instId: inst?.id,
       }, _beschwoerungNegiert);
@@ -36608,7 +36608,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         // have no zone-of-origin to fly from — the diff handler will
         // surface the new discard entry on its own.
         // Als Vorgabe 29.9.: Ablage beim KARTENBESITZER (`originalOwner`).
-        const _ablage = (inst?.originalOwner === 0 || inst?.originalOwner === 1) ? inst.originalOwner : playerIdx;
+        const _ablage = (isSeat(this, inst?.originalOwner)) ? inst.originalOwner : playerIdx;
         if (!fromDeck) {
           this._broadcastEvent('play_pile_transfer', {
             owner: playerIdx, cardName,
@@ -36627,7 +36627,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       // would otherwise pick the leftmost rect). `fromDeck` skips the
       // flight (see Creature branch above).
       // Als Vorgabe 29.9.: Ablage beim KARTENBESITZER (`originalOwner`).
-      const _ablage = (inst?.originalOwner === 0 || inst?.originalOwner === 1) ? inst.originalOwner : playerIdx;
+      const _ablage = (isSeat(this, inst?.originalOwner)) ? inst.originalOwner : playerIdx;
       if (!fromDeck) {
         this._broadcastEvent('play_pile_transfer', {
           owner: playerIdx, cardName,
@@ -37828,7 +37828,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       this._inReactionCheck = _aeussere;
     }
     if (!k?.negated) return false;
-    const besitzer = (inst?.originalOwner === 0 || inst?.originalOwner === 1) ? inst.originalOwner : playerIdx;
+    const besitzer = (isSeat(this, inst?.originalOwner)) ? inst.originalOwner : playerIdx;
     await this._negatedPlacementRoute(cardName, besitzer, 'support', {
       zoneOwner: playerIdx, hostHeroIdx: heroIdx, slotIdx, instId: inst.id,
     }, k);
@@ -41800,7 +41800,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // Zonen = `feld`, Instanz wie in `doPlayAbilityFremd` (Seite `feld`,
     // gehoert dem Kartenbesitzer). Nur mit `skipAbilityGivenCheck` — das
     // regulaere Anlegen an fremde Helden regelt der Server.
-    const feld = (opts.heroOwner === 0 || opts.heroOwner === 1) ? opts.heroOwner : playerIdx;
+    const feld = (isSeat(this, opts.heroOwner)) ? opts.heroOwner : playerIdx;
     const fremd = feld !== playerIdx;
     if (fremd && !opts.skipAbilityGivenCheck) return { success: false };
     const hps = this.gs.players[feld];
@@ -42543,7 +42543,7 @@ this._deathWatch = (this._deathWatchStack || []).length
    */
   heldSeiteFuer(pi, heroIdx) {
     const w = this.gs?._wirkerSeite;
-    if (w && w.pi === pi && w.heroIdx === heroIdx && (w.heroOwner === 0 || w.heroOwner === 1)) return w.heroOwner;
+    if (w && w.pi === pi && w.heroIdx === heroIdx && (isSeat(this, w.heroOwner))) return w.heroOwner;
     return pi;
   }
 
@@ -42561,7 +42561,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     const gs = this.gs;
     // Als Befund 29.9.: geliehener Held — „you" = `playerIdx`, der Held
     // steht in `opts.heroOwner` (Skripte: `heldSeiteFuer`).
-    const hs = (opts?.heroOwner === 0 || opts?.heroOwner === 1) ? opts.heroOwner : playerIdx;
+    const hs = (isSeat(gs, opts?.heroOwner)) ? opts.heroOwner : playerIdx;
     // ★ v1004: Unter Missions Sperre ist auch eine INHAERENTE
     // Zusatzaktion (Quick Attack) eine Zusatzaktion — sie kostet eine
     // Mission-Ladung. Ohne Ladung ist sie schlicht nicht mehr
@@ -43607,7 +43607,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // Als Vorgabe 29.9.: `opts.heroOwner` = Brettseite eines GELIEHENEN
     // Helden (Peter Röll unter Styx). Nur, wenn die Uebernahme Abilities
     // erlaubt (`kontrollRechte(…).abilities`); Zonen auf der Brettseite.
-    const hs = (opts.heroOwner === 0 || opts.heroOwner === 1) ? opts.heroOwner : playerIdx;
+    const hs = (isSeat(this, opts.heroOwner)) ? opts.heroOwner : playerIdx;
     const ps = this.gs.players[hs];
     if (!ps) return false;
     const hero = ps.heroes?.[heroIdx];
@@ -47361,12 +47361,12 @@ this._deathWatch = (this._deathWatchStack || []).length
     // beim alten Verhalten.
     if (wiped[0] && wiped[1]) {
       const hint = this.gs._drawLoserIdx;
-      const loserIdx = (hint === 0 || hint === 1) ? hint : 0;
+      const loserIdx = (isSeat(this, hint)) ? hint : 0;
       const winnerIdx = loserIdx === 0 ? 1 : 0;
       this.log('draw_resolved', {
         loser: this.gs.players[loserIdx]?.username,
         winner: this.gs.players[winnerIdx]?.username,
-        decidedBy: (hint === 0 || hint === 1) ? 'card_effect' : 'default',
+        decidedBy: (isSeat(this, hint)) ? 'card_effect' : 'default',
       });
       if (this._inMctsSim) {
         if (!this.gs.result) this.gs.result = { winnerIdx, reason: 'draw_resolved' };
@@ -47987,7 +47987,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // Aufstiegsbedingungen und -boni bekommen die Brettseite `hs` als
     // zusaetzliches Argument (`ascensionCondition(gs, pi, hi, engine, hs)`,
     // `payAscensionCost`/`onAscensionBonus(engine, pi, hi, hs)`).
-    const hs = (opts.heroOwner === 0 || opts.heroOwner === 1) ? opts.heroOwner : pi;
+    const hs = (isSeat(gs, opts.heroOwner)) ? opts.heroOwner : pi;
     const hps = gs.players[hs];
     if (!hps) return { success: false };
     const hero = hps.heroes?.[heroIdx];
@@ -48824,7 +48824,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // Als Vorgabe 29.9.: `opts.heroOwner` = Brettseite eines geliehenen
     // Helden (Tri Ad/Throne Robber unter Styx). `pi` bekommt die Form
     // (Ablage bzw. Hand beim Aufrufer), Held und Instanz liegen auf `hs`.
-    const hs = (opts.heroOwner === 0 || opts.heroOwner === 1) ? opts.heroOwner : pi;
+    const hs = (isSeat(gs, opts.heroOwner)) ? opts.heroOwner : pi;
     const hero = gs.players[hs]?.heroes?.[heroIdx];
     // ★ 28.8., `opts.evenIfDefeated`: „At the end of your opponent's next
     // turn, Descend this Hero (even if it is defeated …)". Der normale

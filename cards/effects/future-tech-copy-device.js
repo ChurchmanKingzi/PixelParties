@@ -1,3 +1,4 @@
+const { isSeat } = require('./_opp');   // N-Spieler: gültiger Sitzindex
 // ═══════════════════════════════════════════
 //  CARD EFFECT: "Future Tech Copy Device"
 //  Artifact (Normal, Cost 0)
@@ -491,7 +492,7 @@ module.exports = {
         await sk.resolve(engine, pi, [], []);
       }
     } finally {
-      if (vorherigerZwang === 0 || vorherigerZwang === 1) gs._forcedCommitPlayer = vorherigerZwang;
+      if (isSeat(gs, vorherigerZwang)) gs._forcedCommitPlayer = vorherigerZwang;
       else delete gs._forcedCommitPlayer;
     }
 

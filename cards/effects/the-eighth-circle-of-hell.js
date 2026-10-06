@@ -1,3 +1,4 @@
+const { isSeat } = require('./_opp');   // N-Spieler: gültiger Sitzindex
 // ═══════════════════════════════════════════
 //  CARD EFFECT: "The Eighth Circle of Hell"
 //  Spell (Destruction Magic Lv1, Area) — Archetyp Hell Circles
@@ -41,7 +42,7 @@ module.exports = {
       const engine = ctx._engine;
       const gs = engine.gs;
       const zieher = ctx.playerIdx;
-      if (zieher !== 0 && zieher !== 1) return;
+      if (!isSeat(gs, zieher)) return;
       const fragender = engine.opponentOf(zieher);
       if (gs._eighthCircleResolving) return;
       const anzahl = ctx.amount;

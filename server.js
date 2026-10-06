@@ -68,7 +68,7 @@ const { sendMail } = require('./mailer');
 // Identitaet in game_history und die Route leben komplett in diesem Modul.
 const playerProfile = require('./player-profile');
 const skillTest = require('./skilltest');   // Modus „Skill Test" (Lobby, Vorbereitung, Rounds)
-const { opponentOfGs, playerCountGs, emitToOpponentsGs } = require('./cards/effects/_opp');
+const { isSeat, opponentOfGs, playerCountGs, emitToOpponentsGs } = require('./cards/effects/_opp');
 
 /**
  * Enrich a puzzle-authored buffs object so each entry carries the
@@ -4933,7 +4933,7 @@ function sendGameState(room, playerIdx, extra) {
     // serverseitig stehen und kam nie beim Client an.
     doomCounters: gs.doomCounters || null,
     // The Fifth Circle of Hell: Debuff (naechster Einzelschaden x2) aktiv - betroffen ist der Gegner des Stempelnden.
-    fifthCircle: (gs._naechsterEinzelschadenX2 && gs._naechsterEinzelschadenX2.turn === gs.turn && (gs._naechsterEinzelschadenX2.owner === 0 || gs._naechsterEinzelschadenX2.owner === 1))
+    fifthCircle: (gs._naechsterEinzelschadenX2 && gs._naechsterEinzelschadenX2.turn === gs.turn && (isSeat(gs, gs._naechsterEinzelschadenX2.owner)))
       ? { affected: opponentOfGs(gs, gs._naechsterEinzelschadenX2.owner) } : null,
     turn: gs.turn, activePlayer: gs.activePlayer, currentPhase: gs.currentPhase || 0,
     result: gs.result || null, rematchRequests: gs.rematchRequests || [],
@@ -5768,7 +5768,7 @@ function sendSpectatorGameState(room) {
     // serverseitig stehen und kam nie beim Client an.
     doomCounters: gs.doomCounters || null,
     // The Fifth Circle of Hell: Debuff (naechster Einzelschaden x2) aktiv - betroffen ist der Gegner des Stempelnden.
-    fifthCircle: (gs._naechsterEinzelschadenX2 && gs._naechsterEinzelschadenX2.turn === gs.turn && (gs._naechsterEinzelschadenX2.owner === 0 || gs._naechsterEinzelschadenX2.owner === 1))
+    fifthCircle: (gs._naechsterEinzelschadenX2 && gs._naechsterEinzelschadenX2.turn === gs.turn && (isSeat(gs, gs._naechsterEinzelschadenX2.owner)))
       ? { affected: opponentOfGs(gs, gs._naechsterEinzelschadenX2.owner) } : null,
     turn: gs.turn, activePlayer: gs.activePlayer, currentPhase: gs.currentPhase || 0,
     result: gs.result || null, rematchRequests: gs.rematchRequests || [],
@@ -7114,7 +7114,7 @@ async function doPlayArtifact(room, pi, { cardName, handIndex, heroIdx, zoneSlot
   if (!room?.engine || !room.gameState) return false;
   // Als Vorgabe 29.9.: Zielseite auch als `heroOwner`/`charmedOwner` (wie
   // bei Zaubern/Kreaturen ueber geliehene Helden).
-  if (targetOwner !== 0 && targetOwner !== 1) targetOwner = heroOwner ?? charmedOwner;
+  if (!isSeat(room.gameState, targetOwner)) targetOwner = heroOwner ?? charmedOwner;
   const gs = room.gameState;
   if (pi !== gs.activePlayer) return false;
   // Hand waehrend einer erzwungenen Abwurf-Stapelabfrage gesperrt —
@@ -7216,7 +7216,7 @@ async function doPlayArtifact(room, pi, { cardName, handIndex, heroIdx, zoneSlot
   // und Kontroll-Equip (Als Vorgabe 29.9.); ungueltige Seiten lehnt der
   // Weg unten ohnehin ab.
   const { costReduction, cost } = room.engine.artifactPlayCost(pi, cardName, handIndex, {
-    heroIdx, heroOwner: _isCrossSideArtifact ? (opponentOfGs(gs, pi)) : ((targetOwner === 0 || targetOwner === 1) ? targetOwner : pi),
+    heroIdx, heroOwner: _isCrossSideArtifact ? (opponentOfGs(gs, pi)) : ((isSeat(gs, targetOwner)) ? targetOwner : pi),
   });
   if (!room.engine.canAffordGold(pi, cost, cardName)) return false;
 
@@ -7244,7 +7244,7 @@ async function doPlayArtifact(room, pi, { cardName, handIndex, heroIdx, zoneSlot
     && !_isCrossSideArtifact
     && typeof _script?.canEquipToHero !== 'function'
     && _script?.equipOwnSideOnly !== true
-    && (targetOwner === 0 || targetOwner === 1);
+    && (isSeat(gs, targetOwner));
   // ★ KONTROLL-EQUIP (Als Vorgabe 29.9.): an einen UEBERNOMMENEN Helden
   // der Gegenseite darf JEDE Ausruestung (auch mit `canEquipToHero` oder
   // `equipOwnSideOnly` — „a Hero you control"), wenn die Uebernahme
@@ -7253,7 +7253,7 @@ async function doPlayArtifact(room, pi, { cardName, handIndex, heroIdx, zoneSlot
   // dient dem Kontrolleur (`effektiveSeiten`).
   const _isKontrollEquip = _subLowerEarly === 'equipment'
     && !_isCrossSideArtifact
-    && (targetOwner === 0 || targetOwner === 1) && targetOwner !== pi
+    && (isSeat(gs, targetOwner)) && targetOwner !== pi
     && room.engine.darfFremdAusruesten(pi, targetOwner, heroIdx);
   const placementOwner = _isCrossSideArtifact
     ? (opponentOfGs(gs, pi))
@@ -7262,7 +7262,7 @@ async function doPlayArtifact(room, pi, { cardName, handIndex, heroIdx, zoneSlot
   // Kontroll-Equip (Charme, Love Shot, fremder Held): ablehnen — nie still
   // auf den gleich indizierten eigenen Helden umlenken.
   if (_subLowerEarly === 'equipment' && !_isCrossSideArtifact
-      && (targetOwner === 0 || targetOwner === 1) && targetOwner !== placementOwner) return false;
+      && (isSeat(gs, targetOwner)) && targetOwner !== placementOwner) return false;
   const placementPs = gs.players[placementOwner];
   if (!placementPs) return false;
   const hero = placementPs.heroes[heroIdx];
@@ -8054,7 +8054,7 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
     // Karte nur `heroIdx` und legte sich zwangslaeufig an den Wirker.
     if (attachHeroIdx != null && attachHeroIdx >= 0) gs._attachmentHeroIdx = attachHeroIdx;
     // v651: Zielseite eines Cross-Side-Attachments (Overheal Shock, Berserk …)
-    if (attachOwner === 0 || attachOwner === 1) gs._attachmentOwner = attachOwner;
+    if (isSeat(gs, attachOwner)) gs._attachmentOwner = attachOwner;
     // For a live CPU cast: stream the card to centre BEFORE its effect
     // resolves (no-op for humans / PvP / MCTS sim). Idempotent — the
     // post-resolution _firePendingCardReveal below then no-ops.
@@ -14683,7 +14683,7 @@ io.on('connection', (socket) => {
     if (gs._chainResolvingLock || gs._forceDiscardLock === pi) return;
     if (gs.activePlayer !== pi) return;              // „during YOUR turn"
     if (gs.effectPrompt || gs.potionTargeting) return;
-    const heroOwner = params?.heroOwner === 0 || params?.heroOwner === 1 ? params.heroOwner : pi;
+    const heroOwner = isSeat(gs, params?.heroOwner) ? params.heroOwner : pi;
     const heroIdx = params?.heroIdx;
     const hero = gs.players[heroOwner]?.heroes?.[heroIdx];
     if (!hero?.name || hero.hp <= 0) return;
@@ -15383,7 +15383,7 @@ io.on('connection', (socket) => {
     // Als Vorgabe 29.9.: `heroOwner` = Spalte des Helden. Ein geliehener
     // Held (Gegnerspalte) darf aufsteigen, solange `pi` ihn kontrolliert;
     // ein eigener Held, den gerade der Gegner kontrolliert, nicht.
-    const hs = (heroOwner === 0 || heroOwner === 1) ? heroOwner : pi;
+    const hs = (isSeat(gs, heroOwner)) ? heroOwner : pi;
     const _aufHeld = gs.players[hs]?.heroes?.[heroIdx];
     if (!_aufHeld?.name || room.engine.heroSideOf(hs, _aufHeld) !== pi) return;
     // Perform ascension via engine
@@ -18721,6 +18721,9 @@ const skillTestHost = {
   get sendGameState() { return sendGameState; },
   get sendSpectatorGameState() { return sendSpectatorGameState; },
   get doPlaySpell() { return doPlaySpell; },
+  get doPlayCreature() { return doPlayCreature; },
+  get doPlayArtifact() { return doPlayArtifact; },
+  get doPlaySurprise() { return doPlaySurprise; },
   get doActivateCreatureEffect() { return doActivateCreatureEffect; },
   get doActivateHeroEffect() { return doActivateHeroEffect; },
   destroyRoom: (id) => destroyRoom(id),
@@ -19940,7 +19943,7 @@ async function runNetBenchmarkGame(deckA, deckB, cfg, haken = {}) {
       engine.onGameOver = (_r, _w, grund) => {
         // Sieger festhalten — der Karten-Bericht braucht Sieg/Niederlage
         // je Partie, und `finish` bekommt nur den Grund gereicht.
-        if (_w === 0 || _w === 1) sieger = _w;
+        if (isSeat(engine, _w)) sieger = _w;
         if (!done) finish(grund || 'ende');
       };
       room.engine._cpuDriver = makeCpuDriver(room);
@@ -21083,4 +21086,4 @@ initDatabase().then(async () => {
 });
 
 // Für die Headless-Simulation des Skill-Test-Modus (skilltest/sim-bridge.js; PP_ST_SIM=1).
-module.exports = { skillTestHandlers: { doPlaySpell, doActivateCreatureEffect, doActivateHeroEffect, setupGameState } };
+module.exports = { skillTestHandlers: { doPlaySpell, doPlayCreature, doPlayArtifact, doPlaySurprise, doActivateCreatureEffect, doActivateHeroEffect, setupGameState } };

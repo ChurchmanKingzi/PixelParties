@@ -59,6 +59,9 @@ function simHost(roomBox) {
       room.status = 'playing';
     },
     get doPlaySpell() { return roomBox.doPlaySpell; },
+    get doPlayCreature() { return roomBox.doPlayCreature; },
+    get doPlayArtifact() { return roomBox.doPlayArtifact; },
+    get doPlaySurprise() { return roomBox.doPlaySurprise; },
     get doActivateCreatureEffect() { return roomBox.doActivateCreatureEffect; },
     get doActivateHeroEffect() { return roomBox.doActivateHeroEffect; },
   };
@@ -105,6 +108,7 @@ async function runGame(opts = {}) {
   room.players.forEach((p, i) => { p.persona = null; });
   await battle.start(room, host, prep);
   const gs = room.gameState, engine = room.engine, st = gs.skillTest;
+  if (opts.record) st.record = true;
   if (opts.weights) st.botWeights = Object.fromEntries(opts.weights.map((w, i) => [i, w]).filter(([, w]) => w));
   if (!opts.noFast) engine.enterFastMode();
 
@@ -128,6 +132,8 @@ async function runGame(opts = {}) {
     winnerIdx: gs.result && gs.result.winnerIdx, reason: gs.result && gs.result.reason,
     rounds: st.round, turns: guard, placements: gs.result && gs.result.skillTest && gs.result.skillTest.placements,
     bases, ms: Date.now() - t0, eliminated: [...st.eliminated],
+    room: opts.returnRoom ? room : undefined,
+    learnLog: st.learnLog || [], recycled: st.recycled, firstStarter: st.firstStarter,
   };
 }
 

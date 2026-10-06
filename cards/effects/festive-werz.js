@@ -148,7 +148,7 @@ module.exports = {
       //
       // Der Broadcast geht VORAUS, damit die Zaehlung mit dem Flug
       // beginnt und nicht erst, wenn das Gold laengst gebucht ist.
-      const goldVorher = [gs.players[0].gold || 0, gs.players[1].gold || 0];
+      const goldVorher = gs.players.map(p => p.gold || 0);
       const goldNachher = goldVorher.slice();
       goldNachher[pi] = Math.max(0, goldVorher[pi] - kosten);
       goldNachher[oppIdx] = goldVorher[oppIdx] + kosten;

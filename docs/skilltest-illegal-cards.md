@@ -22,6 +22,22 @@
 - Swift Eagle Warrior
 - Warrior of Teocuilatl
 
+## Zählen/löschen aus BEIDEN Ablagen (`players[0]` / `players[1]`): mit mehr als zwei Sitzen unvollständig, die Auswahl über alle Ablagen braucht eine eigene Oberfläche.
+
+- Guardian Beast Gou
+- Guardian Beast Hou
+- Guardian Beast Hu
+- Guardian Beast Ji
+- Guardian Beast Long
+- Guardian Beast Ma
+- Guardian Beast Niu
+- Guardian Beast She
+- Guardian Beast Shu
+- Guardian Beast Tu
+- Guardian Beast Yang
+- Guardian Beast Zhu
+- Mao, the Vengeful Guardian
+
 ## Sieger/Verlierer-Ableitung als „der andere Spieler“ beim Ausscheiden bzw. Besitzer-Ableitung „Gegenseite des Wirts“ — braucht eine Regel für mehrere Gegner.
 
 - Quetzahuitl, Receiver of Sacrifices

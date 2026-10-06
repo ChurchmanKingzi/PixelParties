@@ -70,6 +70,17 @@ function playerCountGs(gs) {
 }
 
 /**
+ * Ist `x` ein gültiger Sitzindex? Ersetzt die Prüfung `x === 0 || x === 1`.
+ * `gsOrEngine`: Spielzustand oder Engine (`.gs`). Normalspiel (kein `skillTest`):
+ * exakt das alte Idiom; Skill Test: jeder Sitz am Tisch.
+ */
+function isSeat(gsOrEngine, x) {
+  const g = gsOrEngine && (gsOrEngine.players ? gsOrEngine : gsOrEngine.gs);
+  if (!g || !g.skillTest) return x === 0 || x === 1;
+  return Number.isInteger(x) && x >= 0 && x < g.players.length;
+}
+
+/**
  * Ein Ereignis an die Gegner von `pi` senden (Kartenenthüllung, Flug-Animation …).
  * Normalspiel: nur der EINE Gegner — exakt das alte `io.to(oppSid).emit(...)`.
  * Skill Test: alle anderen Sitze (jeder soll die Karte sehen).
@@ -81,4 +92,4 @@ function emitToOpponentsGs(gs, io, pi, event, payload) {
   }
 }
 
-module.exports = { opponentOfGs, opponentsOfGs, playerCountGs, emitToOpponentsGs };
+module.exports = { opponentOfGs, opponentsOfGs, playerCountGs, emitToOpponentsGs, isSeat };
