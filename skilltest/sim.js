@@ -122,6 +122,7 @@ async function runGame(opts = {}) {
   if (opts.noProfileSeats) st.noProfile = [...opts.noProfileSeats];
   if (opts.weights) st.botWeights = Object.fromEntries(opts.weights.map((w, i) => [i, w]).filter(([, w]) => w));
   if (!opts.noFast) engine.enterFastMode();
+  if (opts.setupOnly) return { room, host, engine, gs, st };       // Tests: Spiel steht, noch nichts gespielt
 
   let guard = 0;
   const maxTurns = opts.maxTurns || 4000;

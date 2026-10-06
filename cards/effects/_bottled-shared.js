@@ -20,6 +20,8 @@ const { loadCardEffect } = require('./_loader');
  */
 async function runDiscardChain(engine, potionOwner, potionName) {
   const gs = engine.gs;
+  // Skill Test (mehrere Gegner): der Spieler wählt, mit wem er die Kette spielt.
+  if (gs.skillTest && engine._stChooseOpponent) await engine._stChooseOpponent(potionOwner, potionName, 'Choose the player you want to play the chain with.');
   const oppIdx = engine.opponentOf(potionOwner);
 
   // Opponent goes first

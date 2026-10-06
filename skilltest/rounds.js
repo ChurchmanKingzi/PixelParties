@@ -171,6 +171,18 @@ function pickNextSeat(engine, afterSeat) {
   return null;
 }
 
+/**
+ * "Hierhin schauen": die Anzeige der Clients folgt dem Geschehen. `actor` handelt (Zugbeginn: der Spieler am Zug),
+ * `target` ist der Spieler, dessen Ziele getroffen werden (null: keiner). Jeder Client zeigt im Hauptfeld das Brett
+ * des Ziels, wenn es nicht das eigene ist, sonst das des Handelnden (siehe GameBoard, `stInfo.watch`).
+ * `n` zählt hoch, damit auch derselbe Blick zweimal in Folge neu zieht.
+ */
+function setWatch(engine, actor, target) {
+  const st = engine && engine.gs && engine.gs.skillTest;
+  if (!st) return;
+  st.watch = { n: ((st.watch && st.watch.n) || 0) + 1, actor, target: target == null ? null : target };
+}
+
 /** Den Zug des Sitzes eröffnen (Per-Turn-Flags, Aktionsphase). */
 async function beginTurn(engine, seat) {
   const gs = engine.gs, st = stOf(engine);
@@ -179,6 +191,7 @@ async function beginTurn(engine, seat) {
   if (gs.stFocus) delete gs.stFocus[seat];      // der Fokus-Gegner gilt nur für den einen Zug
   st.turnSeat = seat;
   st.turnStartedAt = Date.now();
+  setWatch(engine, seat, null);                 // Anzeige: der Spieler am Zug
   const ps = gs.players[seat];
   ps.heroesActedThisTurn = actedHeroesOf(st, seat);   // Round-Stand: wer in dieser Round schon gehandelt hat
   ps._actionsPlayedThisPhase = 0;                      // neutral; im Zug zählt der Held (ecoEnter)
@@ -356,6 +369,18 @@ function ecoLeave(st, ps, pi, ctx) {
   ps.heroesActedThisTurn = [...union];
 }
 
+/** Wer handelt gerade? { seat, hi } für einen Helden, { seat, hi, slot, creature } für eine Kreatur (Brettseite). */
+function actingOf(engine, pi, kind, params) {
+  try {
+    const owner = params && params.charmedOwner != null ? params.charmedOwner : pi;
+    if (kind === 'activate_creature_effect') {
+      const inst = creatureInstOf(engine, pi, params || {});
+      return inst ? { seat: inst.owner, hi: inst.heroIdx, slot: inst.zoneSlot, creature: true } : null;
+    }
+    return params && params.heroIdx != null ? { seat: owner, hi: params.heroIdx } : null;
+  } catch { return null; }
+}
+
 /** Läuft ein Handler fertig und gibt dann den Zug weiter, falls eine Aktion verbraucht wurde. */
 async function act(room, pi, kind, params, fn, host) {
   const gs = room.gameState, engine = room.engine, st = gs && gs.skillTest;
@@ -366,6 +391,7 @@ async function act(room, pi, kind, params, fn, host) {
 
   gs.currentPhase = requiredPhase(room, pi, kind, params);
   st.busy = true;
+  st.acting = actingOf(engine, pi, kind, params);       // leuchtet auf den Brettern, bis die Aktion vorbei ist; danach ergraut er (erschöpft)
   st._delays = 0; engine._stPromptCounts = {};      // Schrittbudget und Wiederholungszähler dieser Aktion (siehe installRunawayBreaker / policy.chooseTargets)
   const token = (st.actToken = (st.actToken || 0) + 1);
   const ps = gs.players[pi];
@@ -387,6 +413,7 @@ async function act(room, pi, kind, params, fn, host) {
   if (st.actToken !== token) { ecoLeave(st, ps, pi, eco); return ok; }     // vom Wächter aufgegeben (siehe battle.js startPromptWatchdog)
   meter.active = false;
   st.busy = false;
+  st.acting = null;
 
   const acted = (ps.heroesActedThisTurn || []).slice(actedBefore);
   const actedHeroes = acted.slice();
@@ -420,12 +447,14 @@ async function playBaseAttack(room, pi, heroIdx, host) {
   const gs = room.gameState, engine = room.engine, ps = gs.players[pi];
   if (gs.activePlayer !== pi || (gs.skillTest && gs.skillTest.busy)) return false;
   ps.hand.push('Attack');
+  if (gs.skillTest) gs.skillTest.virtualAttack = pi;    // die Karte gibt es nur für den Server; die Oberfläche bekommt sie nie zu sehen (server.js sendGameState)
   const handIndex = ps.hand.length - 1;
   const params = { cardName: 'Attack', handIndex, heroIdx };
   const discardBefore = ps.discardPile.length;
   let ok = false;
   try { ok = await act(room, pi, 'play_spell', params, () => host.doPlaySpell(room, pi, params), host); }
   finally {
+    if (gs.skillTest) delete gs.skillTest.virtualAttack;
     // Die virtuelle Karte darf nirgends zurückbleiben (Hand, Ablage, Instanzen).
     const h = ps.hand.lastIndexOf('Attack');
     if (h >= 0) ps.hand.splice(h, 1);
@@ -450,7 +479,7 @@ async function passRound(room, pi, host) {
 }
 
 module.exports = {
-  act, playBaseAttack, actedHeroesOf, passRound, CONSUMING_KINDS, METER_HOOKS, requiredPhase, setPhaseFor,
+  act, playBaseAttack, actedHeroesOf, passRound, setWatch, CONSUMING_KINDS, METER_HOOKS, requiredPhase, setPhaseFor,
   roundOrder, nextStarter, heroKey, heroAlive, heroActors, creatureActors, hasActor, seatHasActor,
   seatAlive, livingSeats, withActive,
   startRound, endRound, beginTurn, advance, pickNextSeat, isIncapacitated,

@@ -98,6 +98,12 @@ const cards = require('../../data/cards.json'); const db = {}; cards.forEach(c =
     // Bots lösen jetzt Reaktionen und Schutz aus, einzelne Treffer werden abgewehrt: Die Zielwahl gilt als bestanden, wenn jedes Ziel angeboten wurde
     // (siehe oben) und mindestens ein Treffer landet.
     check('Gezielte Treffer auf Helden anderer Sitze (mindestens 1 landet, Reaktionen können abwehren)', hit >= 1 && tried >= 2, { hit, tried });
+    // Der Basisangriff spielt serverseitig kurz eine virtuelle „Attack"-Karte aus der Hand — die Clients dürfen sie nie sehen.
+    const gsAll = events.filter(e => e.ev === 'game_state').map(e => e.a[0]);
+    const leaked = gsAll.filter(g => g.players && g.players[g.myIndex] && (g.players[g.myIndex].hand || []).includes('Attack'));
+    check('Die virtuelle Attack-Karte erscheint in keiner Zustandsansicht der eigenen Hand', gsAll.length > 5 && leaked.length === 0, { total: gsAll.length, leaked: leaked.length });
+    const withWatch = gsAll.filter(g => g.skillTest && g.skillTest.watch && Number.isInteger(g.skillTest.watch.actor));
+    check('Der Zustand meldet den Blick (skillTest.watch) und den Handelnden (skillTest.acting)', withWatch.length > 0 && gsAll.some(g => g.skillTest && g.skillTest.acting && Number.isInteger(g.skillTest.acting.seat)), { withWatch: withWatch.length });
     socket.close();
   } catch (e) { console.error(e); process.exitCode = 1; }
   if (process.env.ST_SHOW_LOG) console.log(srv.log().split('\n').filter(l => /skilltest|Error|Fehler/.test(l)).slice(-15).join('\n'));

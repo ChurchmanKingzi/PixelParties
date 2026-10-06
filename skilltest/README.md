@@ -14,7 +14,8 @@ markierte Skill-Test-Zweige (`gs.skillTest`).
    (3–5 Helden, 1–5 Abilities, 4–12 Creatures, Rest Artifacts/Potions/Attacks/Spells; nie Ascended) aus einem
    gemeinsamen Pool — jede Karte existiert im ganzen Spiel nur einmal. Platziert wird frei (kein Level, keine Kosten),
    Abilities steigen automatisch auf Stufe 3. Der Recycler wirft jede 2. eingeworfene Karte als zufällige neue Karte
-   aus (Helden nur, solange das Brett voll ist). **Ready!** schließt die Vorbereitung ab; Timer sind einstellbar/abschaltbar.
+   aus (Helden nur, solange das Brett voll ist). **Ready!** schließt die Vorbereitung ab. Timer: Zahlenfeld je Timer, **0 = aus**
+   (`buildRoomConfig`; die alten Flaggen `prepTimerDisabled`/`turnTimerDisabled` gelten weiter).
    Die Regeln (`applyMove`, `canDrop`, …) sind rein und laufen auf Server **und** Client.
 3. **Kampf** (`battle.js`): Aus den Basen wird ein normaler `gameState` samt `GameEngine` gebaut. Startspieler ist, wer
    die meisten Karten recycelt hat (Gleichstand: Zufall); die Reihenfolge rotiert je Round rückwärts.
@@ -39,6 +40,8 @@ markierte Skill-Test-Zweige (`gs.skillTest`).
 | `bot.js` / `policy.js` | Bot (Heuristik, gewichtbare Policy, nutzt das gelernte Profil). |
 | `learn/` | Lernsystem: `profile.js` (Profil-Datei), `personas.js` (Spielstile), `keepmodel.js` (Behalten/Recyceln mit Kontext), `train.js` (Selbstspiel/Liga), `ranking.js` (Kartenliste, Verlauf, Vergleichsspiele), `background.js` (Dauerbetrieb). |
 | `sim.js` / `sim-bridge.js` | Headless-Spiele ohne Server (Tests, Training). |
+| `../public/skilltest-art.js` | Pixelart der Vorbereitung, programmatisch gemalt (Recycler mit Mund-Deckel, Fackeln, Dielenbrett, Kerkerwand, Münze; Verläufe nur über Bayer-Dithering). |
+| `../card-images.js` | Karte → Bilddatei in `./cards` (Deckbuilder-Endpoint `/api/cards/available`, Kartenpool, Personas). |
 
 ## Bots und Lernsystem
 
@@ -97,7 +100,9 @@ Sichtbar: Kartenliste (Spalte „Keep − recycle"), Paar- und Kontext-Tabellen 
 
 ## Neue Karten aufnehmen / sperren
 
-- **Pool:** Feld `skilltestLegal` in `data/cards.json` (`true`/`false` je Karte). Neue Karten müssen es haben
+- **Pool:** Es kommen nur Karten vor, die ein **Bild in `./cards`** haben (dieselbe Zuordnung wie im Deckbuilder, `card-images.js`;
+  gilt für Pool, Recycler-Auswurf und CPU-Personas; ohne Kartenordner/Bilder filtert es nichts). Dazu das
+  Feld `skilltestLegal` in `data/cards.json` (`true`/`false` je Karte). Neue Karten müssen es haben
   (`node scripts/set-skilltest-legal.js` ergänzt fehlende mit dem Standardwert; überschreibt nie).
   Vorerst gesperrte Karten und Gründe: `docs/skilltest-illegal-cards.md` (`scripts/curate-skilltest-legal.js`).
 - **Kartenskripte** dürfen nie `pi === 0 ? 1 : 0` o. Ä. schreiben. Stattdessen:
@@ -107,6 +112,10 @@ Sichtbar: Kartenliste (Spalte „Keep − recycle"), Paar- und Kontext-Tabellen 
 - **„Each opponent"-Karten** (Flächenschaden o. Ä.) sind eine Entscheidung je Karte: `opponentsOf` verwenden.
   Einzelziel-Karten dürfen alle gegnerischen Ziele treffen (die Zielwahl läuft über alle Gegner); Flächenkarten wählen
   EINEN Gegenspieler (`_stChooseAoePlayer`, wie bei Divine Gift of Fire).
+- **Karten, die „den Gegner" als Ganzes meinen** (Chain Lightning, Cardinal Beast Qinglong, die Bottled-Kette) fragen den Spieler bei
+  mehreren lebenden Gegnern per Spielerwahl, wen er treffen will: `engine._stChooseOpponent(pi, titel)` (Bots: Policy). Der Gewählte
+  wird zum Fokus des Wirkers, `opponentOf` meint danach ihn. Weitere Karten dieser Art: denselben Aufruf vor `opponentOf` setzen
+  (`if (gs.skillTest && engine._stChooseOpponent) await …`).
 
 ## Per Round statt per Turn
 
@@ -147,7 +156,11 @@ und „you may"-Fragen selbst. Kanäle in `policy.js`:
 
 Server → Client: `st_prep_*` (Vorbereitung), `st_game_over { winnerIdx, reason, placements, sc, rounds }`;
 `gameState.skillTest` (`publicState`): Round, Reihenfolge, Startspieler, Zugsitz, erschöpfte Helden/Creatures, Ausgeschiedene,
-Bot-Sitze, Timer. Client → Server: `st_attack`, `st_pass_round`, (Held-/Creature-Effekte laufen über die normalen Handler).
+Bot-Sitze, Timer, **`watch`** ({ n, actor, target }: „hierhin schauen" — Zugbeginn und Zielwahl; der Client schaltet das Hauptfeld auf das Brett
+des Ziels bzw. des Handelnden, BEVOR die Karte wirkt; Bots warten dafür kurz, `PP_ST_WATCH_MS`), **`acting`** (wer gerade handelt: leuchtet auf den
+Brettern, danach ergraut er) und `exhaustedSlots` (erschöpfte Creatures). Client → Server: `st_attack`, `st_pass_round`, (Held-/Creature-Effekte laufen
+über die normalen Handler). Der Basisangriff spielt serverseitig eine virtuelle „Attack"-Karte aus der Hand; die Clients bekommen sie nie zu sehen
+(`server.js` `stSichtHand`).
 
 ## Bekannte Grenzen (Stand jetzt)
 
@@ -177,4 +190,4 @@ Bot-Sitze, Timer. Client → Server: `st_attack`, `st_pass_round`, (Held-/Creatu
 
 ## Testschalter
 
-`PP_ST_BOT_DELAY_MS` (Denkpause der Bots, ms), `PP_ST_SIM=1` (server.js exportiert nur die Handler, startet nicht).
+`PP_ST_BOT_DELAY_MS` (Denkpause der Bots, ms), `PP_ST_WATCH_MS` (Pause des Bots, nachdem die Anzeige auf sein Ziel gewechselt hat, Standard 900 ms), `PP_ST_SIM=1` (server.js exportiert nur die Handler, startet nicht).

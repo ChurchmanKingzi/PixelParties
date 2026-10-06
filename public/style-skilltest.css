@@ -185,9 +185,16 @@
 .st-turn-yours { text-align: center; color: #ffd84a; font-size: 12px; }
 .st-pass-btn { font-size: 11px; }
 
-/* Akteure: bereite leuchten, erschöpfte sind ausgegraut */
-.board-zone-hero.st-actor-ready { box-shadow: 0 0 0 2px rgba(255,226,122,.9), 0 0 16px rgba(255,226,122,.55); cursor: pointer; }
-.board-zone-hero.st-actor-exhausted { filter: grayscale(.75) brightness(.72); }
+/* Akteure: Wer GERADE handelt, leuchtet kräftig und pulsiert (auf jedem Brett); bereite Akteure des Spielers am Zug tragen einen
+   ruhigen Rahmen; wer gehandelt hat, ist ausgegraut (Held samt Figur, Kreatur). */
+.board-zone-hero.st-actor-ready { box-shadow: 0 0 0 2px rgba(255,226,122,.75), 0 0 10px rgba(255,226,122,.35); cursor: pointer; }
+.st-actor-acting { box-shadow: 0 0 0 3px #fff4b0, 0 0 20px 6px rgba(255,226,90,.85), 0 0 44px rgba(255,200,60,.55) !important; animation: stActing .5s steps(2) infinite; position: relative; z-index: 6; }
+@keyframes stActing { 50% { box-shadow: 0 0 0 3px #ffd34e, 0 0 28px 10px rgba(255,226,90,1), 0 0 58px rgba(255,200,60,.7); } }
+.board-zone-hero.st-actor-exhausted, .board-zone-support.st-creature-exhausted { filter: grayscale(.9) brightness(.62); }
+
+/* Spielerwahl: der Gegner, dessen Brett gerade im Hauptfeld steht, ist markiert */
+.st-picker-viewed { box-shadow: 0 0 0 3px #ffd34e, 0 0 18px rgba(255,211,78,.6); background: rgba(255,211,78,.14) !important; }
+.st-picker-badge { margin-left: auto; padding: 1px 6px; font-size: 9px; letter-spacing: 1px; font-weight: 800; color: #1c1400; background: #ffd34e; box-shadow: 0 2px 0 #7a5a00; }
 .st-hero-menu { display: flex; flex-direction: column; gap: 6px; min-width: 150px; }
 .st-menu-title { font-size: 10px; color: var(--accent); text-align: center; }
 

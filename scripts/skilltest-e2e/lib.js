@@ -17,7 +17,7 @@ function startServer(extraEnv = {}) {
   return new Promise((resolve, reject) => {
     const child = spawn('node', ['server.js'], {
       cwd: ROOT,
-      env: { ...process.env, PORT: String(PORT), NODE_ENV: 'production', PP_DEMO_RECORD: '0', PP_ST_BOT_DELAY_MS: '40', ...extraEnv },
+      env: { ...process.env, PORT: String(PORT), NODE_ENV: 'production', PP_DEMO_RECORD: '0', PP_ST_BOT_DELAY_MS: '40', PP_ST_WATCH_MS: '30', ...extraEnv },
       stdio: ['ignore', 'pipe', 'pipe'],
     });
     let out = '';

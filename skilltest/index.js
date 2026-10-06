@@ -222,6 +222,21 @@ function bonusHeroesOf(gs, engine) {
   return out;
 }
 
+/** Erschöpfte Kreaturen als „Brettseite:Held:Platz" (die Oberfläche kennt keine Instanznummern). */
+function exhaustedSlotsOf(gs, engine) {
+  const out = [];
+  const ids = gs.skillTest && gs.skillTest.exhaustedCreatures;
+  if (!engine || !ids) return out;
+  for (const id of Object.keys(ids)) {
+    const inst = engine.cardInstances.find(c => String(c.id) === String(id));
+    if (!inst || inst.zone !== 'support') continue;
+    let side = inst.owner;
+    try { side = engine.physicalSide(inst); } catch { /* Brettseite = Besitzer */ }
+    out.push(side + ':' + inst.heroIdx + ':' + inst.zoneSlot);
+  }
+  return out;
+}
+
 function publicState(gs, engine) {
   const st = gs && gs.skillTest;
   if (!st) return null;
@@ -232,6 +247,9 @@ function publicState(gs, engine) {
     turnDeadline: st.turnDeadline || null, turnTimerSec: st.turnTimerSec || 0, serverNow: Date.now(),
     busy: !!st.busy,
     bonusHeroes: bonusHeroesOf(gs, engine),
+    exhaustedSlots: exhaustedSlotsOf(gs, engine),
+    watch: st.watch || null,          // Hierhin schauen (Zugbeginn, Zielwahl): die Anzeige folgt dem Geschehen
+    acting: st.acting || null,        // wer gerade handelt (leuchtet auf, bis die Aktion vorbei ist)
   };
 }
 
