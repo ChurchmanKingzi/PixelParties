@@ -25245,3 +25245,56 @@ body.summon-pick .board-zone.board-zone-ability:not(.zone-drag-valid):not(.board
 
 /* Online-Lobby: schmaler Kasten ganz links mit Spielerliste (app-social.jsx) */
 .lobby-spalte.lobby-social { flex: 0 0 300px; width: 300px; }
+
+
+/* ═══ PROFIL: ZIERRAHMEN ═══════════════════════════════════════════════
+   Als Vorgabe: „Das Profil soll grafisch aufgewertet werden; Rahmen mit
+   Schnörkeln und inneren Ecken." Dieselbe Rahmensprache wie die
+   Menüfenster (`.pp-fenster`) und Shop-Kacheln: abgeschrägter Rand in der
+   Spielerfarbe (`--zier`), Doppelring, harter Schatten und Pixel-Eck-
+   schnörkel auf `::after`. Die Abschnitte tragen sie etwas leiser (3 px
+   Rand, kleinere Schnörkel, 6-px-Ringe), damit mehrere nebeneinander
+   passen; die Identitätsspalte sitzt in einem Scrollbereich und bekommt
+   deshalb nur Rand, Innenring und Schnörkel — ohne äußere Ringe. */
+.profile-section.pp-fenster {
+  border-width: 3px;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--zier) 7%, transparent), transparent 40%),
+    rgba(0, 0, 0, .28);
+  box-shadow:
+    0 0 0 2px var(--pp-kontur),
+    0 0 0 4px color-mix(in srgb, var(--zier) 50%, #000),
+    0 0 0 6px var(--pp-kontur),
+    inset 0 0 0 1px var(--pp-kontur),
+    inset 0 0 22px color-mix(in srgb, var(--zier) 10%, transparent),
+    7px 8px 0 rgba(0, 0, 0, .42);
+}
+.profile-section.pp-fenster::after { --eck-e: 2px; inset: 3px; }
+.profile-section.pp-fenster { padding-left: 26px; padding-right: 26px; }
+.profile-right-col { gap: 20px; padding-right: 40px; padding-left: 34px; }
+
+.profile-identity-panel.pp-fenster-flach {
+  border-width: 3px;
+  margin: 8px;
+  box-shadow:
+    0 0 0 2px var(--pp-kontur),
+    inset 0 0 0 1px var(--pp-kontur),
+    inset 0 0 30px color-mix(in srgb, var(--zier) 10%, transparent);
+  background: rgba(0, 0, 0, .18);
+}
+.profile-identity-panel.pp-fenster-flach::after { --eck-e: 2px; inset: 3px; }
+.profile-identity-panel.pp-fenster-flach::before { display: none; }
+
+/* Abschnittsüberschriften als Trennband wie `.pp-fenster-kopf`. */
+.profile-section.pp-fenster .profile-section-label,
+.profile-identity-panel.pp-fenster .profile-section-label {
+  border-bottom: 2px solid color-mix(in srgb, var(--zier) 60%, #000);
+  box-shadow: 0 2px 0 var(--pp-kontur);
+  background: linear-gradient(90deg, color-mix(in srgb, var(--zier) 18%, transparent), transparent 85%);
+  padding: 4px 8px 5px;
+  color: color-mix(in srgb, var(--zier) 45%, var(--text2));
+}
+@media (max-width: 760px) {
+  .profile-section.pp-fenster { padding-left: 16px; padding-right: 16px; }
+  .profile-right-col { padding-left: 14px !important; padding-right: 22px !important; gap: 16px; }
+}
