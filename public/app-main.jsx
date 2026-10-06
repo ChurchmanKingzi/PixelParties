@@ -1191,7 +1191,7 @@ function PlayScreen() {
   // alongside the standard Ranked/Unranked split.
   const [gameMode, setGameMode] = useState('constructed'); // 'constructed' | 'draft' | 'skilltest'
   // Skill Test: 2–8 Sitze (Menschen + CPUs), Timer wahlweise aus.
-  const [skillTestOpts, setSkillTestOpts] = useState({ prepTimerSec: 300, prepTimerDisabled: false, turnTimerSec: 90, turnTimerDisabled: false });
+  const [skillTestOpts, setSkillTestOpts] = useState({ prepTimerSec: 300, turnTimerSec: 90 });
   const [draftCubeId, setDraftCubeId] = useState('');
   const [draftPackTimerSec, setDraftPackTimerSec] = useState(60);
   const [draftPickTimerSec, setDraftPickTimerSec] = useState(5);

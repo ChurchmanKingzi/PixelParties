@@ -2634,35 +2634,11 @@ function strippedKey(name) {
 const nameByStripped = {};
 getCardArray().forEach(c => { nameByStripped[strippedKey(c.name)] = c.name; });
 
+// Die Zuordnung „Karte → Bilddatei" liegt in card-images.js (gleiche Quelle nutzt der Skill Test für seinen Kartenpool).
+// Farbvarianten (v818): „Queen of Kings [B]" / „[W]" liegen als `Queen of Kings.png` / `Queen of Kings.1.png` auf der Platte.
 app.get('/api/cards/available', async (req, res) => {
-  const cardsDir = path.join(__dirname, 'cards');
   try {
-    const files = fs.readdirSync(cardsDir);
-    // Map: actual card name (with commas) → filename for image URLs
-    const available = {};
-    files
-      .filter(f => IMAGE_EXTS.has(path.extname(f).toLowerCase()))
-      .forEach(f => {
-        const stem = path.basename(f, path.extname(f));
-        const realName = nameByStripped[strippedKey(stem)] || stem;
-        available[realName] = f;
-      });
-    // ── Farbvarianten (v818, Al 6.9.): „Queen of Kings [B]" und
-    // „Queen of Kings [W]" sind in der Datenbank zwei Zeilen, auf der
-    // Platte aber `Queen of Kings.png` (schwarz) und `Queen of Kings.1.png`
-    // (weiss). Erster Fall, in dem Dateinamen systematisch von den
-    // DB-Namen abweichen — deshalb die Zuordnung hier, nicht per Umbenennen.
-    const byStem = {};
-    files.filter(f => IMAGE_EXTS.has(path.extname(f).toLowerCase()))
-      .forEach(f => { byStem[strippedKey(path.basename(f, path.extname(f)))] = f; });
-    for (const c of getCardArray()) {
-      const m = /^(.*?)\s*\[(B|W)\]$/.exec(c.name);
-      if (!m) continue;
-      const stem = m[2] === 'B' ? m[1] : `${m[1]}.1`;
-      const f = byStem[strippedKey(stem)];
-      if (f) available[c.name] = f;
-    }
-    res.json({ available });
+    res.json({ available: require('./card-images').availableImageMap(getCardArray()) });
   } catch {
     res.json({ available: {} });
   }

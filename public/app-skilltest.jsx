@@ -38,34 +38,24 @@ function SkillTestLobby({ lobby, user, leaveRoom, playerJoined, setPlayerJoined 
               : '⏳ Waiting for at least one more player or CPU...'}
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 16 }}>
+          <div className="st-lobby-grid">
             {Array.from({ length: ST_MAX_SEATS }).map((_, i) => {
               const seat = seats[i] || null;
               const heroArt = seat?.persona?.hero ? cardImageUrl(seat.persona.hero) : null;
+              const kind = !seat ? 'is-empty' : seat.isHost ? 'is-host' : seat.isBot ? 'is-cpu' : 'is-player';
               return (
-                <div key={i} className="st-seat" style={{
-                  position: 'relative',
-                  border: '2px ' + (seat ? 'solid ' : 'dashed ') + (seat ? (seat.isHost ? 'var(--accent)' : (seat.isBot ? 'var(--accent3)' : 'var(--accent2)')) : 'var(--bg4)'),
-                  borderRadius: 8, padding: '10px 6px', textAlign: 'center',
-                  background: seat ? 'rgba(0,240,255,.04)' : 'transparent',
-                  opacity: seat ? 1 : .5, minHeight: 112,
-                }}>
+                <div key={i} className={'st-seat ' + kind}>
                   {seat && seat.isBot && isHost && (
-                    <button className="btn" title="Remove CPU"
-                      style={{ position: 'absolute', top: 2, right: 2, padding: '0 6px', fontSize: 11, lineHeight: '16px' }}
+                    <button className="btn st-seat-remove" title="Remove CPU"
                       onClick={() => socket.emit('st_remove_cpu', { roomId: lobby.id, username: seat.username })}>✕</button>
                   )}
-                  <div style={{ height: 52, marginBottom: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24 }}>
+                  <div className="st-seat-art">
                     {heroArt
-                      ? <img src={heroArt} alt="" style={{ height: 52, imageRendering: 'pixelated', borderRadius: 4 }} />
-                      : (seat ? (seat.isHost ? '👑' : '⚔️') : `${i + 1}`)}
+                      ? <img src={heroArt} alt="" draggable={false} />
+                      : <span>{seat ? (seat.isHost ? '👑' : '⚔️') : `${i + 1}`}</span>}
                   </div>
-                  <div style={{ fontWeight: 700, fontSize: 11, color: seat ? 'var(--text)' : 'var(--text2)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {seat ? seat.username : 'Open Seat'}
-                  </div>
-                  <div style={{ fontSize: 9, color: 'var(--text2)', marginTop: 2 }}>
-                    {seat ? (seat.isHost ? 'HOST' : seat.isBot ? '🤖 CPU' : 'PLAYER') : ' '}
-                  </div>
+                  <div className="st-seat-name" title={seat ? seat.username : undefined}>{seat ? seat.username : 'Open Seat'}</div>
+                  <div className="st-seat-role">{seat ? (seat.isHost ? 'HOST' : seat.isBot ? '🤖 CPU' : 'PLAYER') : ' '}</div>
                 </div>
               );
             })}
@@ -137,26 +127,18 @@ function SkillTestCreateOptions({ opts, setOpts }) {
         takes turns acting with one Hero or Creature at a time. No deck needed.
       </div>
       <div style={{ display: 'flex', gap: 8 }}>
-        <div style={{ flex: 1 }}>
-          <div style={{ fontSize: 11, color: opts.prepTimerDisabled ? 'var(--bg4)' : 'var(--text2)', marginBottom: 4 }}>Preparation time (s)</div>
-          <input className="input" type="number" min={30} max={1800} value={opts.prepTimerSec}
-            onChange={e => set('prepTimerSec', e.target.value)} disabled={opts.prepTimerDisabled} />
-        </div>
-        <div style={{ flex: 1 }}>
-          <div style={{ fontSize: 11, color: opts.turnTimerDisabled ? 'var(--bg4)' : 'var(--text2)', marginBottom: 4 }}>Time per turn (s)</div>
-          <input className="input" type="number" min={15} max={600} value={opts.turnTimerSec}
-            onChange={e => set('turnTimerSec', e.target.value)} disabled={opts.turnTimerDisabled} />
-        </div>
-      </div>
-      <div style={{ display: 'flex', gap: 16 }}>
-        <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 11, color: 'var(--text2)' }}>
-          <input type="checkbox" checked={opts.prepTimerDisabled} onChange={e => set('prepTimerDisabled', e.target.checked)} />
-          No preparation timer
-        </label>
-        <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 11, color: 'var(--text2)' }}>
-          <input type="checkbox" checked={opts.turnTimerDisabled} onChange={e => set('turnTimerDisabled', e.target.checked)} />
-          No turn timer
-        </label>
+        {[['prepTimerSec', 'Preparation time (s)', 30, 1800], ['turnTimerSec', 'Time per turn (s)', 15, 600]].map(([key, label, lo, hi]) => {
+          const off = Number(opts[key]) === 0;
+          return (
+            <div key={key} style={{ flex: 1 }}>
+              <div style={{ fontSize: 11, color: 'var(--text2)', marginBottom: 4 }}>{label}</div>
+              <input className="input" type="number" min={0} max={hi} step={5} value={opts[key]}
+                title={`0 = timer off, otherwise ${lo}–${hi} seconds`}
+                onChange={e => set(key, e.target.value === '' ? '' : Math.max(0, Math.min(hi, parseInt(e.target.value, 10) || 0)))} />
+              <div style={{ fontSize: 10, marginTop: 3, color: off ? '#ffc850' : 'var(--text2)' }}>{off ? 'Timer off' : `0 = timer off (min. ${lo})`}</div>
+            </div>
+          );
+        })}
       </div>
     </>
   );

@@ -10,6 +10,17 @@
 
 const { CONFIG, HARD_EXCLUDED_TYPES } = require('./config');
 const Rules = require('../public/skilltest-rules.js');
+const { cardNamesWithImage } = require('../card-images');
+
+/**
+ * Nur Karten mit Bild in ./cards dürfen vorkommen (wie im Deckbuilder). Liefert ein Prädikat Name → bool;
+ * ohne lesbaren Kartenordner oder mit fast keinem Bild (Testumgebung ohne Kartenkunst) filtert es nichts.
+ */
+function imageFilter(cardDB) {
+  const set = cardNamesWithImage(Object.values(cardDB));
+  if (!set || set.size < 50) return () => true;
+  return (name) => set.has(name);
+}
 
 /** In welchen Typ-Topf gehört diese Karte? (null = nicht im Pool) */
 function bucketOf(card) {
@@ -33,9 +44,10 @@ class CardPool {
   constructor(cardDB, rng) {
     this.rng = rng || Math.random;
     this.buckets = Object.fromEntries(BUCKETS.map(b => [b, []]));
+    const hasImage = imageFilter(cardDB);
     for (const c of Object.values(cardDB)) {
       const b = bucketOf(c);
-      if (b) this.buckets[b].push(c.name);
+      if (b && hasImage(c.name)) this.buckets[b].push(c.name);
     }
     // Rotation: von den Cardinal Beasts ist in dieser Partie eines gesperrt (zufällig), die übrigen bleiben im Pool.
     this.banned = [];
@@ -157,4 +169,4 @@ function dealHand(pool, rng = Math.random) {
   return { hand, shape };
 }
 
-module.exports = { CardPool, bucketOf, sampleHandShape, dealHand, BUCKETS };
+module.exports = { CardPool, bucketOf, imageFilter, sampleHandShape, dealHand, BUCKETS };

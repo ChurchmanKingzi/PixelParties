@@ -26,15 +26,24 @@ function clampInt(v, [lo, hi], def) {
   return Math.max(lo, Math.min(hi, n));
 }
 
+/** Ein Timer-Feld des Raum-Dialogs: `0` (oder die ältere Flagge `…Disabled`) heißt „aus", sonst Sekunden innerhalb der Grenzen. */
+function timerOption(rawSec, rawDisabled, range, def) {
+  const n = parseInt(rawSec, 10);
+  const off = !!rawDisabled || (Number.isFinite(n) && n <= 0);
+  return { disabled: off, sec: clampInt(off ? def : rawSec, range, def) };
+}
+
 /** Aus den Rohwerten des Raum-Dialogs die Raum-Konfiguration bauen. */
 function buildRoomConfig(raw) {
   raw = raw || {};
+  const prep = timerOption(raw.prepTimerSec, raw.prepTimerDisabled, CONFIG.PREP_TIMER_RANGE, CONFIG.DEFAULT_PREP_TIMER_SEC);
+  const turn = timerOption(raw.turnTimerSec, raw.turnTimerDisabled, CONFIG.TURN_TIMER_RANGE, CONFIG.DEFAULT_TURN_TIMER_SEC);
   return {
     phase: 'lobby',
-    prepTimerDisabled: !!raw.prepTimerDisabled,
-    prepTimerSec: clampInt(raw.prepTimerSec, CONFIG.PREP_TIMER_RANGE, CONFIG.DEFAULT_PREP_TIMER_SEC),
-    turnTimerDisabled: !!raw.turnTimerDisabled,
-    turnTimerSec: clampInt(raw.turnTimerSec, CONFIG.TURN_TIMER_RANGE, CONFIG.DEFAULT_TURN_TIMER_SEC),
+    prepTimerDisabled: prep.disabled,
+    prepTimerSec: prep.sec,
+    turnTimerDisabled: turn.disabled,
+    turnTimerSec: turn.sec,
   };
 }
 
@@ -71,10 +80,11 @@ function seatsOf(room) {
 
 // ── CPU-Sitze ──────────────────────────────────────────────────────
 
-/** Alle Hero-Namen, die als CPU-Persona taugen (reiner Flavor). */
+/** Alle Hero-Namen, die als CPU-Persona taugen (reiner Flavor; nur Heroes mit Bild in ./cards). */
 function personaHeroNames() {
   const db = getCardDB();
-  return Object.values(db).filter(c => c.cardType === 'Hero').map(c => c.name);
+  const hasImage = require('./pool').imageFilter(db);
+  return Object.values(db).filter(c => c.cardType === 'Hero' && hasImage(c.name)).map(c => c.name);
 }
 
 function pickPersona(room) {

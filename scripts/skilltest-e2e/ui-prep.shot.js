@@ -37,7 +37,7 @@ const toolsDir = (process.env.NODE_PATH || '').split(path.delimiter).find(d => f
     await page.screenshot({ path: out.replace('.png', '-create.png') });
     await page.click('.modal button:has-text("CREATE")', { timeout: 5000 }).catch(async () => { await page.click('text=CREATE >> nth=-1'); });
     await page.waitForSelector('text=SKILL TEST LOBBY');
-    for (let i = 0; i < 3; i++) { await page.click('text=ADD CPU'); await sleep(150); }
+    for (let i = 0; i < (+process.env.CPUS || 7); i++) { await page.click("text=ADD CPU"); await sleep(150); }
     await page.screenshot({ path: out.replace('.png', '-lobby.png') });
     await page.click('button:has-text("START (")');
     await sleep(2500);

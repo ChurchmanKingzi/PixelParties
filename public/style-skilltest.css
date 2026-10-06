@@ -195,3 +195,27 @@
 .st-mini-stats { font-size: 10px; font-weight: 600; color: #cfe4ff; opacity: .9; white-space: nowrap; }
 /* Zusatzaktion: erschöpfter Held mit offener zweiter Aktion (bläuliches Leuchten statt Gelb) */
 .board-zone-hero.st-actor-bonus { box-shadow: 0 0 0 2px rgba(125,211,255,.95), 0 0 16px rgba(125,211,255,.55); cursor: pointer; }
+
+/* ═══ Skill Test: Lobby-Sitzraster ═══
+   minmax(0, 1fr): jede Spalte gleich breit, egal wie lang ein Name ist (mit „1fr" allein weitet der längste Name seine Spalte
+   und das Raster läuft rechts aus dem Panel). */
+.st-lobby-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-bottom: 16px; }
+.st-seat {
+  position: relative; min-width: 0; height: 132px; box-sizing: border-box; overflow: hidden;
+  display: flex; flex-direction: column; align-items: center; justify-content: flex-start; gap: 4px;
+  padding: 8px 6px 6px; text-align: center; border-radius: 8px;
+  border: 2px solid var(--bg4); background: rgba(0,240,255,.04);
+}
+.st-seat.is-empty { border-style: dashed; background: transparent; opacity: .5; }
+.st-seat.is-host { border-color: var(--accent); }
+.st-seat.is-cpu { border-color: var(--accent3); }
+.st-seat.is-player { border-color: var(--accent2); }
+.st-seat-art { flex: 0 0 64px; width: 100%; height: 64px; display: flex; align-items: center; justify-content: center; font-size: 24px; }
+.st-seat-art img { height: 64px; max-width: 100%; object-fit: contain; image-rendering: pixelated; border-radius: 4px; }
+.st-seat-name {
+  width: 100%; font-weight: 700; font-size: 11px; line-height: 1.25; color: var(--text); overflow-wrap: anywhere;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.st-seat.is-empty .st-seat-name { color: var(--text2); }
+.st-seat-role { font-size: 9px; color: var(--text2); margin-top: auto; }
+.st-seat-remove { position: absolute; top: 2px; right: 2px; padding: 0 6px; font-size: 11px; line-height: 16px; z-index: 2; }

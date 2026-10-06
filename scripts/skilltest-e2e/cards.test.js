@@ -41,6 +41,17 @@ const ABOM = 'The Golden Abomination';
   check('Je Partie fehlt genau ein Cardinal Beast (drei von vieren im Pool)', wrongLeft === 0, { wrongLeft });
   check('Jedes Cardinal Beast wird mal gesperrt (Rotation)', CONFIG.CARDINAL_BEASTS.every(n => banCount[n] > 20), banCount);
   check('Kein Future-Tech-Karte im Pool', ftInPool === 0, { ftInPool });
+  // Nur Karten mit Bild in ./cards (wie im Deckbuilder): Pool, Recycler-Nachschub und Persona-Heroes
+  const { cardNamesWithImage } = require('../../card-images');
+  const withImg = cardNamesWithImage(Object.values(cards));
+  const imgPool = new CardPool(cards);
+  const noImg = [];
+  for (const arr of Object.values(imgPool.buckets)) for (const n of arr) if (!withImg.has(n)) noImg.push(n);
+  check('Nur Karten mit Bild im Pool', withImg && withImg.size > 500 && noImg.length === 0, { noImg: noImg.slice(0, 5), n: noImg.length });
+  const someLegalNoImg = Object.values(cards).filter(c => c.skilltestLegal === true && !withImg.has(c.name));
+  check('Bildlose, sonst erlaubte Karten existieren und sind ausgeschlossen', someLegalNoImg.length > 0 && someLegalNoImg.every(c => !Object.values(imgPool.buckets).some(a => a.includes(c.name))), { n: someLegalNoImg.length });
+  for (let i = 0; i < 40; i++) { const t = imgPool.takeAny(); if (t && !withImg.has(t)) noImg.push(t); }
+  check('Auch takeAny (Recycler-Ausgabe) liefert nur Karten mit Bild', noImg.length === 0, noImg.slice(0, 5));
   check('Quetzahuitl kommt vor, aber nur in Händen mit mindestens 4 Heroes', qHands > 10 && qBad === 0, { qHands, qBad });
 
   console.log('Quetzahuitl in der Vorbereitung');
