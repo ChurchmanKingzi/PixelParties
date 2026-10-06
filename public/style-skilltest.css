@@ -191,3 +191,5 @@
 .st-turn-row[title] { cursor: pointer; }
 .st-turn-row.is-focus { box-shadow: inset 2px 0 0 #7dd3ff; }
 .st-turn-out { margin-top: 6px; color: #ff6b81; font-size: 11px; text-align: center; letter-spacing: 1px; }
+
+.st-mini-stats { font-size: 10px; font-weight: 600; color: #cfe4ff; opacity: .9; white-space: nowrap; }

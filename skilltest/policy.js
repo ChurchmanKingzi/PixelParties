@@ -16,6 +16,8 @@
 const rounds = require('./rounds');
 const { getCardDB } = require('../cards/effects/_card-db');
 
+const MAX_PROMPT_REPEATS = 24;     // so oft darf EINE Karte in einer Aktion denselben freiwilligen Ziel-Prompt stellen
+
 const DEFAULT_WEIGHTS = {
   aggression: 1.0,          // wie bereitwillig angreifen statt Effekte zu nutzen
   lowestHp: 1.0,            // Vorliebe für Ziele mit wenig HP
@@ -116,6 +118,12 @@ function chooseTargets(engine, seat, validTargets, config, base) {
         if (r !== undefined) return r;
       }
     } catch { /* weiter mit der Heuristik */ }
+  }
+  // Freiwillige „erneut"-Prompts: nach einigen Wiederholungen derselben Karte in EINER Aktion abbrechen (verhindert Endlosschleifen).
+  if (cardName && config.cancellable) {
+    const counts = engine._stPromptCounts || (engine._stPromptCounts = {});
+    const key = seat + ':' + cardName;
+    if ((counts[key] = (counts[key] || 0) + 1) > MAX_PROMPT_REPEATS) return [];
   }
   const bene = cardName ? isBeneficial(cardName) : false;
   const st = engine.gs.skillTest;

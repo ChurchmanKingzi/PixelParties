@@ -305,6 +305,7 @@ async function act(room, pi, kind, params, fn, host) {
 
   gs.currentPhase = requiredPhase(room, pi, kind, params);
   st.busy = true;
+  st._delays = 0; engine._stPromptCounts = {};      // Schrittbudget und Wiederholungszähler dieser Aktion (siehe installRunawayBreaker / policy.chooseTargets)
   const token = (st.actToken = (st.actToken || 0) + 1);
   const ps = gs.players[pi];
   const actedBefore = (ps.heroesActedThisTurn || []).length;

@@ -135,6 +135,74 @@ function prune(profile, maxPairs = 150000) {
   for (let i = 0; i < keys.length - maxPairs; i++) delete profile.pairValue[sorted[i][0]];
 }
 
+// ── Worker-Pool ────────────────────────────────────────────────────
+// Jede Partie läuft in einem Worker-Thread: eine Karte mit Endlosschleife legt dann nur diesen Worker lahm — der Pool
+// beendet ihn nach `timeoutMs` und startet einen frischen. Mehrere Worker spielen parallel.
+class WorkerPool {
+  constructor(size, timeoutMs) {
+    this.size = Math.max(1, size | 0);
+    this.timeoutMs = timeoutMs || 240000;
+    this.idle = [];            // bereite Worker
+    this.waiting = [];         // wartende Aufträge
+    this.nextId = 1;
+    this.closed = false;
+    this.count = 0;            // lebende Worker
+  }
+
+  _spawn() {
+    const { Worker } = require('worker_threads');
+    const w = new Worker(require('path').join(__dirname, 'worker.js'), { resourceLimits: { maxOldGenerationSizeMb: 2048 } });
+    this.count++;
+    w._ready = false; w._pool = this;
+    w.on('message', (m) => { if (m && m.ready) { w._ready = true; this._dispatch(); } });
+    w.on('error', (e) => { if (w._job) { const j = w._job; w._job = null; clearTimeout(j.timer); j.reject(e); } });
+    w.on('exit', () => {
+      this.count--;
+      this.idle = this.idle.filter(x => x !== w);
+      if (w._job) { const j = w._job; w._job = null; clearTimeout(j.timer); j.reject(new Error('Worker beendet')); }
+      if (!this.closed && this.waiting.length) this._ensureWorkers();
+    });
+    return w;
+  }
+
+  _ensureWorkers() {
+    const wanted = Math.min(this.size, this.count + this.waiting.length);
+    while (this.count < wanted) this.idle.push(this._spawn());
+  }
+
+  _dispatch() {
+    while (this.waiting.length) {
+      const w = this.idle.find(x => x._ready && !x._job);
+      if (!w) break;
+      const job = this.waiting.shift();
+      w._job = job;
+      job.timer = setTimeout(() => { job.reject(new Error('Zeitüberschreitung')); w._job = null; w.terminate(); }, this.timeoutMs);
+      w.once('message', function onMsg(m) {
+        if (!m || m.id !== job.id) { w.once('message', onMsg); return; }
+        clearTimeout(job.timer); w._job = null;
+        if (m.ok) job.resolve(m.rec); else job.reject(new Error(m.error));
+        w._pool._dispatch();
+      });
+      w.postMessage({ id: job.id, opts: job.opts });
+    }
+  }
+
+  /** Eine Partie spielen lassen. Wirft bei Fehler oder Zeitüberschreitung. */
+  run(opts) {
+    return new Promise((resolve, reject) => {
+      this.waiting.push({ id: this.nextId++, opts, resolve, reject });
+      this._ensureWorkers();
+      this._dispatch();
+    });
+  }
+
+  close() {
+    this.closed = true;
+    for (const w of this.idle) w.terminate();
+    this.idle = [];
+  }
+}
+
 // ── Eine Trainings-Partie ──────────────────────────────────────────
 function pickSeatCount(opts, rng) {
   if (opts.seats && typeof opts.seats === 'number') return opts.seats;
@@ -145,11 +213,11 @@ function pickSeatCount(opts, rng) {
   return bag[Math.floor(rng() * bag.length)];
 }
 
-async function playOne(profile, opts = {}, rng = Math.random) {
-  const { runGame } = require('../sim');
+async function playOne(profile, opts = {}, rng = Math.random, pool = null) {
   const n = pickSeatCount(opts, rng);
   const chosen = Array.from({ length: n }, () => pickPersona(profile, rng));
-  const rec = await runGame({ seats: n, weights: chosen.map(p => p.weights), record: true, maxTurns: opts.maxTurns || 3000, watchdogMs: opts.watchdogMs });
+  const simOpts = { seats: n, weights: chosen.map(p => p.weights), record: true, maxTurns: opts.maxTurns || 3000, watchdogMs: opts.watchdogMs };
+  const rec = pool ? await pool.run(simOpts) : await require('../sim').runGame(simOpts);
   if (rec.reason === 'sim_turn_limit') rec.placements = null;      // nicht zu Ende gespielt: keine Wertung
   return { rec, n, personaIds: chosen.map(p => p.id) };
 }
@@ -165,23 +233,31 @@ async function train(opts = {}) {
   const total = opts.games == null ? Infinity : opts.games;
   const evolveEvery = opts.evolveEvery || 150;
   const saveEvery = opts.saveEvery || 25;
-  let done = 0, failed = 0;
+  const workers = opts.workers == null ? 1 : opts.workers;
+  const pool = workers > 0 ? new WorkerPool(workers, opts.gameTimeoutMs) : null;
+  let done = 0, failed = 0, started = 0;
   const t0 = Date.now();
-  while (done + failed < total && !(opts.shouldStop && opts.shouldStop())) {
-    const g0 = Date.now();
-    try {
-      const game = await playOne(profile, opts, rng);
-      if (game.rec && game.rec.placements) { learnFrom(profile, game); done++; } else failed++;
-    } catch (e) { failed++; if (!opts.quiet) console.error('[skilltest-train] Partie fehlgeschlagen:', e && e.message); }
-    if (done > 0 && done % evolveEvery === 0) evolve(profile, rng);
-    if (done > 0 && done % saveEvery === 0) { prune(profile); profileMod.save(profile); }
-    if (opts.onGame) opts.onGame({ done, failed, profile });
-    // Last begrenzen: nach jeder Partie so lange ruhen, dass der Rechenanteil `dutyCycle` bleibt.
-    if (opts.dutyCycle && opts.dutyCycle > 0 && opts.dutyCycle < 1) {
-      const busy = Date.now() - g0;
-      await new Promise(r => setTimeout(r, Math.round(busy * (1 / opts.dutyCycle - 1))));
-    } else await new Promise(r => setImmediate(r));
-  }
+
+  const runner = async () => {
+    while (started < total && !(opts.shouldStop && opts.shouldStop())) {
+      started++;
+      const g0 = Date.now();
+      try {
+        const game = await playOne(profile, opts, rng, pool);
+        if (game.rec && game.rec.placements) { learnFrom(profile, game); done++; } else failed++;
+      } catch (e) { failed++; if (!opts.quiet) console.error('[skilltest-train] Partie fehlgeschlagen:', e && e.message); }
+      if (done > 0 && done % evolveEvery === 0) evolve(profile, rng);
+      if (done > 0 && done % saveEvery === 0) { prune(profile); profileMod.save(profile); }
+      if (opts.onGame) opts.onGame({ done, failed, profile });
+      // Last begrenzen: nach jeder Partie so lange ruhen, dass der Rechenanteil `dutyCycle` bleibt.
+      if (opts.dutyCycle && opts.dutyCycle > 0 && opts.dutyCycle < 1) {
+        const busy = Date.now() - g0;
+        await new Promise(r => setTimeout(r, Math.round(busy * (1 / opts.dutyCycle - 1))));
+      } else await new Promise(r => setImmediate(r));
+    }
+  };
+  try { await Promise.all(Array.from({ length: Math.max(1, workers) }, runner)); }
+  finally { if (pool) pool.close(); }
   prune(profile);
   profileMod.save(profile);
   if (!opts.quiet) console.log(`[skilltest-train] ${done} Partien gelernt (${failed} verworfen) in ${Math.round((Date.now() - t0) / 1000)} s — Profil v${profile.version}, ${Object.keys(profile.playValue).length} Spielwerte, ${Object.keys(profile.cardValue).length} Kartenwerte, ${Object.keys(profile.pairValue).length} Paare`);
@@ -193,22 +269,33 @@ async function train(opts = {}) {
  * Liefert die mittlere Platzierungsgüte von Sitz 0 (0 = erwartet, > 0 = besser als Zufall).
  */
 async function evaluate(opts = {}) {
-  const { runGame } = require('../sim');
   const profile = profileMod.load();
   const best = [...(profile.personas || [])].sort((a, b) => fitnessOf(b) - fitnessOf(a))[0];
   const rng = opts.rng || Math.random;
-  let sum = 0, cnt = 0, wins = 0;
-  for (let g = 0; g < (opts.games || 50); g++) {
-    const n = typeof opts.seats === 'number' ? opts.seats : 4;
-    const seat = Math.floor(rng() * n);
-    const weights = Array.from({ length: n }, (_, i) => (i === seat && best ? best.weights : null));
-    const noProfile = Array.from({ length: n }, (_, i) => i).filter(i => i !== seat);
-    const rec = await runGame({ seats: n, weights, noProfileSeats: noProfile, maxTurns: opts.maxTurns || 3000 });
-    if (!rec.placements) continue;
-    sum += placeScore(rec.placements[seat], n); cnt++;
-    if (rec.winnerIdx === seat) wins++;
-  }
+  const workers = opts.workers == null ? 1 : opts.workers;
+  const pool = workers > 0 ? new WorkerPool(workers, opts.gameTimeoutMs) : null;
+  let sum = 0, cnt = 0, wins = 0, started = 0;
+  const total = opts.games || 50;
+  const runner = async () => {
+    while (started < total) {
+      started++;
+      const n = typeof opts.seats === 'number' ? opts.seats : 4;
+      const seat = Math.floor(rng() * n);
+      const simOpts = {
+        seats: n, maxTurns: opts.maxTurns || 3000,
+        weights: Array.from({ length: n }, (_, i) => (i === seat && best ? best.weights : null)),
+        noProfileSeats: Array.from({ length: n }, (_, i) => i).filter(i => i !== seat),
+      };
+      let rec = null;
+      try { rec = pool ? await pool.run(simOpts) : await require('../sim').runGame(simOpts); } catch { rec = null; }
+      if (!rec || !rec.placements || rec.reason === 'sim_turn_limit') continue;
+      sum += placeScore(rec.placements[seat], n); cnt++;
+      if (rec.winnerIdx === seat) wins++;
+    }
+  };
+  try { await Promise.all(Array.from({ length: Math.max(1, workers) }, runner)); }
+  finally { if (pool) pool.close(); }
   return { games: cnt, meanPlaceScore: cnt ? sum / cnt : 0, winRate: cnt ? wins / cnt : 0, persona: best && best.name };
 }
 
-module.exports = { train, evaluate, learnFrom, baseFeatures, placeScore, seedPopulation, evolve, pickPersona, playOne, PLAY_VALUE_SCALE };
+module.exports = { WorkerPool, train, evaluate, learnFrom, baseFeatures, placeScore, seedPopulation, evolve, pickPersona, playOne, PLAY_VALUE_SCALE };

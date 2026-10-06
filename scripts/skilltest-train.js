@@ -4,6 +4,7 @@
 //
 //   node scripts/skilltest-train.js --games 500                 # 500 Partien, Profil danach speichern
 //   node scripts/skilltest-train.js --games 300 --seats 4       # nur 4er-Tische
+//   node scripts/skilltest-train.js --games 2000 --workers 3    # 3 Worker-Threads parallel (Standard: Kerne − 1, höchstens 3)
 //   node scripts/skilltest-train.js --games 300 --seats 3-6
 //   node scripts/skilltest-train.js --evaluate 60 --seats 4     # Vergleich: gelernt gegen Standard
 //   node scripts/skilltest-train.js --daemon --duty 0.25        # Dauerbetrieb (Hintergrundlernen), 25 % Rechenanteil
@@ -33,6 +34,7 @@ if (seatsArg && seatsArg !== true) seats = String(seatsArg).includes('-') ? Stri
     games: daemon ? null : Number(arg('games', 100)),
     seats: seats || [2, 8],
     dutyCycle: duty,
+    workers: daemon ? 1 : (arg('workers', null) ? Number(arg('workers', 1)) : Math.max(1, Math.min(3, os.cpus().length - 1))),
     quiet: !!daemon && !process.env.PP_ST_TRAIN_VERBOSE,
     shouldStop: () => stop,
   });

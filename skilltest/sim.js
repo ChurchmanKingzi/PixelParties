@@ -97,6 +97,7 @@ async function runGame(opts = {}) {
     prep.players[i].ready = true;
     bases.push(JSON.parse(JSON.stringify(prep.players[i])));
   }
+  if (opts.mutatePrep) opts.mutatePrep(prep);   // Tests: Basen vor dem Kampf gezielt verändern
   if (opts.prepOnly) return { bases };
 
   // Kampf

@@ -146,9 +146,27 @@ function installSnapshotGuard(engine) {
   };
 }
 
+/**
+ * Schrittbudget je Aktion: Karten mit „darf erneut"-Schleifen (Skeleton Reaper …) laufen ohne Grenze, wenn der
+ * Spieler nie abbricht (ein Bot bricht freiwillige Ziel-Prompts nie ab, eine Karte lässt Ziele zurückkehren …).
+ * Jede Animationspause (`_delay`) zählt; über dem Budget wird die Aktion mit einem Fehler beendet.
+ */
+const MAX_DELAYS_PER_ACTION = 6000;
+function installRunawayBreaker(engine) {
+  const orig = engine._delay.bind(engine);
+  engine._delay = (ms) => {
+    const st = engine.gs && engine.gs.skillTest;
+    if (st && st.busy && ++st._delays > MAX_DELAYS_PER_ACTION) {
+      st._delays = -1e9;                                    // nur einmal werfen
+      throw new Error('ST_RUNAWAY: die Aktion überschreitet ihr Schrittbudget (Endlosschleife einer Karte?)');
+    }
+    return orig(ms);
+  };
+}
+
 /** Kein Handlimit, keine Deck-Out-Niederlage (es gibt keine Decks). */
 function relaxRules(engine) {
   for (const ps of engine.gs.players) ps._noHandLimitUntilTurn = Infinity;
 }
 
-module.exports = { installSnapshotGuard, installPlayerChoice, installElimination, installMeter, installTurnEnd, installBotSeats, installBotBrain, relaxRules };
+module.exports = { installRunawayBreaker, installSnapshotGuard, installPlayerChoice, installElimination, installMeter, installTurnEnd, installBotSeats, installBotBrain, relaxRules };

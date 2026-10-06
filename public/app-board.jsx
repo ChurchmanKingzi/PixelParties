@@ -46757,6 +46757,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                       <div className="st-mini-head" style={{ borderColor: pl.color || '#888' }}
                         onClick={() => setStFocusPin(k)} title="Click to bring this player to the front">
                         <span className="st-mini-name">{pl.username}</span>
+                        <span className="st-mini-stats" title="Total hero HP · Gold">
+                          ❤{(pl.heroes || []).reduce((a, h) => a + (h && h.name && h.hp > 0 ? h.hp : 0), 0)} · 🪙{pl.gold ?? 0}
+                        </span>
                         {amZug && <span className="st-mini-flag">▶</span>}
                         {tot && <span className="st-mini-flag">☠</span>}
                         <span className="st-mini-zoom">⤢</span>

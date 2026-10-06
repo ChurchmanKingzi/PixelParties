@@ -140,6 +140,7 @@ async function start(room, host, prep) {
   ext.installMeter(engine);
   ext.installTurnEnd(engine, host);
   ext.installSnapshotGuard(engine);
+  ext.installRunawayBreaker(engine);
   engine._stOnTurn = (seat) => { if (skillGs.botSeats.includes(seat)) host.scheduleBotTurn(room, seat); armTurnTimer(room, host); };
   engine.init();
   ext.relaxRules(engine);
