@@ -83,11 +83,25 @@ function installBotSeats(engine, isBotSeat) {
   engine.isCpuPlayer = (pi) => !!isBotSeat(pi);
 }
 
+/**
+ * Kartenskripte (`cpuResponse`) lesen den CPU-Sitz aus `engine._cpuPlayerIdx` (Normalspiel: genau ein CPU-Sitz).
+ * Im Skill Test gibt es mehrere — für die Dauer der Antwort steht dort der gefragte Sitz, danach wieder -1.
+ */
+function withCpuSeat(engine, seat, fn) {
+  const prev = engine._cpuPlayerIdx;
+  engine._cpuPlayerIdx = seat;
+  let out;
+  try { out = fn(); } catch (e) { engine._cpuPlayerIdx = prev; throw e; }
+  if (out && typeof out.then === 'function') return out.finally(() => { engine._cpuPlayerIdx = prev; });
+  engine._cpuPlayerIdx = prev;
+  return out;
+}
+
 /** Bot-Zielwahl über die Policy (die Engine ruft sie für CPU-Sitze statt eines Prompts). */
 function installBotBrain(engine) {
   const bot = require('./bot');
   const base = engine._getCpuTargetResponse.bind(engine);
-  engine._getCpuTargetResponse = (validTargets, config = {}, pi) => bot.chooseTargets(engine, pi, validTargets, config, base);
+  engine._getCpuTargetResponse = (validTargets, config = {}, pi) => withCpuSeat(engine, pi, () => bot.chooseTargets(engine, pi, validTargets, config, base));
 }
 
 /**
@@ -117,13 +131,13 @@ function installPlayerChoice(engine) {
   };
   // Bots beantworten die Spielerwahl über die Policy (schwächster bzw. stärkster Gegner).
   const baseGeneric = engine._getCpuGenericResponse.bind(engine);
-  engine._getCpuGenericResponse = (promptData, promptedPlayerIdx) => {
+  engine._getCpuGenericResponse = (promptData, promptedPlayerIdx) => withCpuSeat(engine, promptedPlayerIdx, () => {
     if (promptData && promptData.type === 'playerPicker') {
       const pool = (promptData.allowedPlayers && promptData.allowedPlayers.length) ? promptData.allowedPlayers : living(engine.gs, promptedPlayerIdx);
       return { playerIdx: require('./bot').choosePlayer(engine, promptedPlayerIdx, pool) };
     }
     return baseGeneric(promptData, promptedPlayerIdx);
-  };
+  });
 }
 
 /**
