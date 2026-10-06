@@ -16,7 +16,7 @@ const SPACE = {
   heroEffect: [0, 2], creatureEffect: [0, 2], spell: [0.2, 2.5], summon: [0.2, 2.5], equip: [0.2, 2.5],
   healBias: [0, 3], friendlyFire: [0, 1.5], learned: [0, 2], explore: [0, 1.5],
   potion: [0, 2], abilityPlay: [0, 2], abilityUse: [0, 2], reactEager: [0, 2],
-  keepCards: [0, 8], heroHp: [0.2, 2], heroAtk: [0, 4],
+  keepCards: [0, 12], keepBias: [-0.3, 0.3], heroHp: [0.2, 2], heroAtk: [0, 4],
 };
 const KEYS = Object.keys(SPACE);
 

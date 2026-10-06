@@ -38,7 +38,8 @@ const DEFAULT_WEIGHTS = {
   learned: 1.0,             // Gewicht des gelernten Kartenwerts
   explore: 0.4,             // Neugier auf selten ausprobierte Karten (UCB)
   // Aufbau (Vorbereitung):
-  keepCards: 4,             // so viele einsetzbare Handkarten behält der Bot, der Rest geht in den Recycler
+  keepCards: 4,             // Obergrenze: so viele Handkarten behält der Bot höchstens, der Rest geht in den Recycler
+  keepBias: 0.0,            // verschiebt die Schwelle „behalten gegen recyceln" (> 0: eher behalten, < 0: eher recyceln; Einheit: Platzierungsgüte)
   heroHp: 1.0,              // Gewicht der Helden-HP bei der Heldenwahl
   heroAtk: 2.0,             // Gewicht des Helden-ATK bei der Heldenwahl
 };
@@ -436,16 +437,25 @@ function reactionVerdict(engine, seat, cardName) {
  * Basis für einen CPU-Sitz: Heroes nach Wert (HP/ATK + gelernter Kartenwert), Abilities/Support nach gelernter
  * Passung zum Hero, unbrauchbare Karten in den Recycler (mehr Gold, früherer Spielbeginn).
  */
-function prepareBase({ env, ps, room, idx, pool, noProfile, weights }) {
-  const { buildWithRecycling } = require('./autoprep');
+function prepareBase({ env, ps, room, idx, pool, noProfile, weights, record }) {
+  const { buildWithRecycling, usableInBattle } = require('./autoprep');
+  const KM = require('./learn/keepmodel');
+  const Rules = require('../public/skilltest-rules.js');
   const { CONFIG } = require('./config');
   const L = require('./learn/profile');
   const prof = noProfile ? null : profile();
   const w = Object.assign({}, DEFAULT_WEIGHTS, weights || {});
   const cv = (n) => (prof ? L.meanOf(prof.cardValue[n]) : 0);
   const pv = (a, b) => (prof ? L.meanOf(prof.pairValue[a < b ? a + '|' + b : b + '|' + a]) : 0);
+  // Behalten oder recyceln: gelernt, mit der restlichen Hand und dem Brett als Kontext (learn/keepmodel.js). Ohne Profil gilt nur
+  // die feste Vorgabe (brauchbar im Kampf → behalten). Im Training wird gelegentlich gegen die Entscheidung gespielt (Messung).
+  const decide = KM.makeDecider({
+    env, model: (prof && prof.keepModel) || KM.newModel(),
+    usable: usableInBattle, protect: (n) => Rules.HAND_ONLY_HEROES.includes(n),
+    maxKeep: Math.max(0, Math.round(w.keepCards)), bias: w.keepBias, explore: record ? Math.min(0.3, 0.25 * w.explore) : 0,
+  });
   return buildWithRecycling(env, ps, {
-    pool, config: CONFIG,
+    pool, config: CONFIG, decide, record,
     maxKeep: Math.max(0, Math.round(w.keepCards)),
     heroScore: (n, c) => w.heroHp * (c.hp || 0) + w.heroAtk * (c.atk || 0) + 150 * cv(n),
     pairScore: (hero, card) => 2 * pv(hero, card),

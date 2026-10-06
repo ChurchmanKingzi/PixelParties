@@ -37,7 +37,7 @@ markierte Skill-Test-Zweige (`gs.skillTest`).
 | `rounds.js` | Round-/Turn-Treiber, Akteure, Zugerkennung (`act`), Basisangriff. |
 | `engine-ext.js` | Einbauten in die Engine-Instanz (Ausscheiden, Zugende, Bot-Sitze, AoE-Spielerwahl …). |
 | `bot.js` / `policy.js` | Bot (Heuristik, gewichtbare Policy, nutzt das gelernte Profil). |
-| `learn/` | Lernsystem: `profile.js` (Profil-Datei), `personas.js` (Spielstile), `train.js` (Selbstspiel/Liga), `background.js` (Dauerbetrieb). |
+| `learn/` | Lernsystem: `profile.js` (Profil-Datei), `personas.js` (Spielstile), `keepmodel.js` (Behalten/Recyceln mit Kontext), `train.js` (Selbstspiel/Liga), `ranking.js` (Kartenliste, Verlauf, Vergleichsspiele), `background.js` (Dauerbetrieb). |
 | `sim.js` / `sim-bridge.js` | Headless-Spiele ohne Server (Tests, Training). |
 
 ## Bots und Lernsystem
@@ -47,13 +47,14 @@ Hero-/Creature-Effekte, Handzauber, Beschwörungen (verbrauchen den Zug) sowie A
 (`policy.prepareBase`, `autoprep.buildWithRecycling`) wählt der Bot Heroes nach Wert, verteilt Abilities/Support nach
 gelernter Passung und wirft alles Unbrauchbare in den Recycler (Gold, früherer Spielbeginn).
 
-Gelernt wird per **Selbstspiel** (headless, 2–8 Sitze gemischt, `learn/train.js`) in **drei Kanälen**, alle in einer Datei
+Gelernt wird per **Selbstspiel** (headless, 2–8 Sitze gemischt, `learn/train.js`) in **vier Kanälen**, alle in einer Datei
 (`data/skilltest-profile.json`, per `PP_ST_PROFILE` umlenkbar, atomar gespeichert, `version` zählt hoch):
 
 | Kanal | Inhalt | Wird genutzt für |
 | --- | --- | --- |
 | `playValue` | mittlerer Zuwachs der Stellungsbewertung nach dem Ausspielen einer Karte/Aktion | Reihenfolge der Aktionen, Zauber-Timing; mit UCB-Neugier für selten Gespieltes |
 | `cardValue` / `pairValue` | mittlere Platzierungsgüte von Basen mit dieser Karte bzw. diesem Paar (Held+Ability/Creature, Ability+Creature, Held+Held) | Heldenwahl, Ability-/Support-Verteilung, was recycelt wird |
+| `keepModel` | Behalten oder recyceln, **mit der restlichen Hand und dem Brett als Kontext** (siehe unten) | Welche übrigen Karten im Kampf auf der Hand bleiben, welche in den Recycler gehen |
 | `personas` | Population von Gewichtsvektoren (Aggression, Zielwahl, Fokus auf den Führenden, Effekt-/Zauber-Neigung …); Liga mit Selektion, Kreuzung, Mutation | Spielstil je CPU-Sitz (beim Kampfstart nach Fitness gezogen) |
 
 ```bash
@@ -66,6 +67,33 @@ PP_ST_TRAIN_BG=0.1 node server.js                            # … mit 10 % Rech
 Der Hintergrundprozess (`learn/background.js`) spielt unablässig CPU-Partien mit 2–8 Sitzen, ruht zwischen den Partien
 (Rechenanteil einstellbar) und schreibt das Profil fort; der Server liest es alle ~30 s nach. Ohne Profil spielen die Bots
 mit den Standard-Gewichten und der reinen Heuristik.
+
+### Behalten oder recyceln (`learn/keepmodel.js`)
+
+Nach dem Aufbau entscheidet der Bot je übriger Karte: auf der Hand behalten (Zauber, Reaktion, Trank, Ability …) oder recyceln (+4 Gold,
+früherer Spielbeginn, jede 2. Karte wirft eine neue aus)? Eine Karte lässt sich dabei **nicht im Vakuum** bewerten, deshalb ist der Kontext
+die gesamte restliche Hand UND das Brett, und nach jedem Wegwurf wird neu bewertet (fehlt der Partner, sinkt der Wert der anderen).
+
+Lineares Modell über dünn besetzte Merkmale; Ergebnis = Platzierungsgüte des Sitzes (+1 … −1):
+`b + Σ u[f] + a · Σ w[f]` mit a = +1 (behalten) / −1 (recycelt). `u` ist die Basis („wie gut ist ein Aufbau mit diesem Kontext ohnehin"),
+`w` der Kontrast; die Entscheidung liest `2 · Σ w` (Vorteil des Behaltens). Die Basis fängt die Stärke der Hand ab — starke Hände behalten
+mehr und gewinnen öfter, das darf nicht dem Behalten zugeschrieben werden.
+
+| Merkmal | Was es erfasst |
+| --- | --- |
+| `c:<Karte>`, `ty:<Typ>`, `a:<Archetyp>` | Karte, Kartentyp/Untertyp, Archetyp |
+| `fit:…:<Lücke>` | Anforderung: Wie weit liegt die verlangte Schulstufe über den Abilities der Helden auf dem Brett (0 = sofort spielbar)? Je Typ und je Karte |
+| `fitH:…:<Lücke>` | dasselbe, nachdem Abilities der gesuchten Schule **auf der Hand** die Lücke geschlossen hätten |
+| `ab:<Stufe>:<Nachfrage>` | Ability: Stufe schon auf dem Brett, Zahl der Karten in Hand/Brett, die diese Schule brauchen |
+| `syn:<Archetyp>:<Anzahl>` | Synergie: wie viele andere Karten desselben Archetyps liegen auf Hand/Brett |
+| `p:<Karte>\|<Mitspieler>`, `pa:<Karte>\|<Archetyp>` | Paare: Karte zusammen mit einer bestimmten Karte bzw. einem Archetyp auf Hand oder Brett |
+| `rc:<Stand>`, `free:<Typ>:<Zonen>` | Tempo/Gold: schon recycelte Karten, freie Support-Zonen |
+
+Ohne Beobachtungen gilt eine feste Vorgabe (im Kampf brauchbar → behalten), die mit den Beobachtungen der Karte verschwindet. Im Training wird
+mit Wahrscheinlichkeit `0,25 · explore` gegen die Entscheidung gespielt, damit beide Arme in vergleichbaren Lagen Daten bekommen.
+Persona-Gewichte: `keepCards` (Obergrenze der Handkarten), `keepBias` (Schwelle). Paare brauchen viele Partien (Tausende, mit 1300 Karten sind
+Paarkombinationen dünn besetzt); die Merkmale Typ × Stufen-Lücke, Synergie und Recycler-Stand lernen schnell und tragen über Karten hinweg.
+Sichtbar: Kartenliste (Spalte „Keep − recycle"), Paar- und Kontext-Tabellen auf `/skilltest-learning.html`, `node scripts/skilltest-report.js`.
 
 ## Neue Karten aufnehmen / sperren
 
@@ -130,7 +158,8 @@ Bot-Sitze, Timer. Client → Server: `st_attack`, `st_pass_round`, (Held-/Creatu
   alle Future-Tech-Karten (sie brauchen eine gefüllte Ablage). Freigegeben mit Sonderregel: siehe „Karten mit Sonderregeln".
 - **Bots** trinken Tränke, legen Hand-Abilities an Helden (je Held einmal pro Round), aktivieren Ability-Effekte und lösen
   Reaktionen/Surprises sowie freiwillige „you may"-Karteneffekte aus (siehe „Reaktionen der Bots"). Offen: Welche Karten der
-  Aufbau behält oder recycelt, folgt noch einer festen Regel (`autoprep.usableInBattle`) plus gelerntem Kartenwert.
+  Aufbau behält oder recycelt, wird gelernt (mit Kontext der restlichen Hand, siehe „Behalten oder recyceln"); gelernt wird erst im
+  Training — ein älteres Profil kennt Tränke, Reaktionen und Abilities auf der Hand noch nicht.
 - **Reaktionsfenster**: Die Kette (`_runReactionWindow`) fragt im Modus alle noch nicht ausgeschiedenen Sitze der Reihe nach
   (`_reactionCheckOrder`, zuletzt der aktive Sitz); Surprise-Fenster ebenso. Einzelne Hand-Fenster hängen am Besitzer des Ziels;
   einzelne Karten fragen noch „den Gegner" (Fokus bzw. nächster lebender Sitz).

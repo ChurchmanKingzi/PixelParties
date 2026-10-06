@@ -16,6 +16,7 @@
 //                                      egal ob sie später eingesetzt wurde — vergleichbar über ALLE Kartentypen (Kartenliste)
 //                                      (Kanal 2: Kartenwert für Aufbau/Recycling)
 //    pairValue    „A|B" → { n, sum }   dasselbe für Kartenpaare (Kombos, Held+Ability, Held+Creature)
+//    keepModel    Behalten/Recyceln mit Kontext (restliche Hand + Brett), siehe learn/keepmodel.js
 //    personas     [{ id, name, weights, fitness, games }]  Spielstil-Population (Kanal 3: Liga/ES)
 //    totals       Zähler (Aktionen, Spiele je Spielerzahl …)
 //
@@ -31,7 +32,7 @@ const CHECK_EVERY_MS = 30 * 1000;
 let cache = null, loadedAt = 0, fileMtime = 0;
 
 function emptyProfile() {
-  return { version: 0, games: 0, updated: null, playValue: {}, cardValue: {}, dealtValue: {}, pairValue: {}, personas: [], totals: { plays: 0, byPlayers: {} } };
+  return { version: 0, games: 0, updated: null, playValue: {}, cardValue: {}, dealtValue: {}, pairValue: {}, keepModel: null, personas: [], totals: { plays: 0, byPlayers: {} } };
 }
 
 function readFile() {

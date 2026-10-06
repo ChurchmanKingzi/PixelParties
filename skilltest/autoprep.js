@@ -139,7 +139,10 @@ function usableInBattle(c) {
  * ausgeworfenen Karten einsetzen — bis nichts Verwertbares mehr übrig ist. Jede eingeworfene Karte gibt
  * Gold, und wer am meisten recycelt, beginnt. Nichts wird ohne Pool ausgeworfen (dann nur gebaut).
  *
- * opts: { pool, config, rng, heroScore, pairScore, keepScore, maxKeep }
+ * opts: { pool, config, rng, heroScore, pairScore, keepScore, maxKeep, decide, record }
+ *  • `decide(ps) → { recycle: [Handindex…], log }` ersetzt die feste Regel (learn/keepmodel.js: Behalten/Recyceln mit dem
+ *    Kontext der restlichen Hand und des Bretts). Ohne `decide` gilt die feste Regel `usableInBattle` + `keepScore`/`maxKeep`.
+ *  • `record`: legt `ps.keepLog` an (Entscheidungen samt Merkmalen) für das Lernen.
  */
 function buildWithRecycling(env, psIn, opts = {}) {
   const { pool, config } = opts;
@@ -149,24 +152,33 @@ function buildWithRecycling(env, psIn, opts = {}) {
   const build = (ps) => autoBuild(env, ps, rng, { heroScore: opts.heroScore, pairScore: opts.pairScore, ready: false });
   let ps = build(Rules.clone(psIn));
   const ejectedAll = [], recycledAll = [];                    // für die Auswertung (Lernsystem): was kam aus dem Recycler, was ging hinein
+  const lastLog = {}, recycleLog = {};                         // Entscheidungen samt Merkmalen (opts.decide)
   if (!pool || !config) { ps.ready = true; return ps; }
   for (let pass = 0; pass < 30; pass++) {
-    const keep = [], junk = [];
-    ps.hand.forEach((n, idx) => {
-      const c = env.cards[n];
-      if (Rules.HAND_ONLY_HEROES.includes(n)) return;           // Quetzahuitl bleibt auf der Hand (greift beim Fall des letzten Heroes ein)
-      if (!usableInBattle(c)) { junk.push({ n, idx }); return; }
-      const typeBase = isReactionCard(c) ? 2 : (c.cardType === 'Spell' || c.cardType === 'Attack') ? 3 : (c.cardType === 'Artifact' || c.cardType === 'Potion' || c.cardType === 'Ability') ? 2 : 1;
-      keep.push({ n, idx, score: typeBase + keepScore(n) });
-    });
-    keep.sort((a, b) => b.score - a.score);
-    const list = [...junk, ...keep.slice(maxKeep)].sort((a, b) => b.idx - a.idx);   // höchste Indizes zuerst
+    let list;
+    if (opts.decide) {
+      const d = opts.decide(ps);
+      for (const e of d.log) lastLog[e.c] = e;
+      list = d.recycle.map(idx => ({ idx })).sort((a, b) => b.idx - a.idx);       // höchste Indizes zuerst
+    } else {
+      const keep = [], junk = [];
+      ps.hand.forEach((n, idx) => {
+        const c = env.cards[n];
+        if (Rules.HAND_ONLY_HEROES.includes(n)) return;           // Quetzahuitl bleibt auf der Hand (greift beim Fall des letzten Heroes ein)
+        if (!usableInBattle(c)) { junk.push({ n, idx }); return; }
+        const typeBase = isReactionCard(c) ? 2 : (c.cardType === 'Spell' || c.cardType === 'Attack') ? 3 : (c.cardType === 'Artifact' || c.cardType === 'Potion' || c.cardType === 'Ability') ? 2 : 1;
+        keep.push({ n, idx, score: typeBase + keepScore(n) });
+      });
+      keep.sort((a, b) => b.score - a.score);
+      list = [...junk, ...keep.slice(maxKeep)].sort((a, b) => b.idx - a.idx);   // höchste Indizes zuerst
+    }
     if (!list.length) break;
     let progressed = false;
     for (const { idx } of list) {
       const name = ps.hand[idx];
       const res = Rules.applyMove(env, ps, { type: 'recycle', from: { kind: 'hand', idx } });
       if (!res.ok) continue;                                   // z. B. Hero bei nicht vollem Board
+      if (lastLog[name]) recycleLog[name] = lastLog[name];
       ps = res.ps; progressed = true; recycledAll.push(name);
       if (ps.recycled % config.RECYCLE_EVERY === 0) {
         const ejected = pool.takeAny(config.RECYCLER_TYPE_WEIGHTS);
@@ -178,6 +190,10 @@ function buildWithRecycling(env, psIn, opts = {}) {
   }
   ps.ready = true;
   ps.ejected = ejectedAll; ps.recycledCards = recycledAll;
+  if (opts.record && opts.decide) {
+    // Lernprotokoll: wer recycelt wurde (Merkmale zum Zeitpunkt der Entscheidung) und wer am Ende noch auf der Hand liegt (letzte Bewertung)
+    ps.keepLog = [...Object.values(recycleLog), ...ps.hand.filter(n => lastLog[n] && lastLog[n].a === 1).map(n => lastLog[n])];
+  }
   return ps;
 }
 

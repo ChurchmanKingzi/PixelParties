@@ -125,6 +125,12 @@ function learnFrom(profile, game) {
     if (!profile.dealtValue) profile.dealtValue = {};
     for (const c of new Set([...(base.dealt || []), ...(base.ejected || [])])) profileMod.addObs(profile.dealtValue, c, sc);
     for (const k of f.pairs) profileMod.addObs(profile.pairValue, k, sc);
+    // Behalten/Recyceln: jede Entscheidung samt Kontext-Merkmalen lernt aus dem Ergebnis des Sitzes
+    if (base.keepLog && base.keepLog.length) {
+      const KM = require('./keepmodel');
+      if (!profile.keepModel) profile.keepModel = KM.newModel();
+      for (const d of base.keepLog) KM.update(profile.keepModel, d.f, d.a, sc);
+    }
     const per = profile.personas.find(p => p.id === personaIds[seat]);
     if (per) { per.games++; per.scoreSum += sc; per.fitness = fitnessOf(per); }
   });
@@ -132,6 +138,7 @@ function learnFrom(profile, game) {
 
 /** Tabellen klein halten: seltene Paare fallen heraus. */
 function prune(profile, maxPairs = 150000) {
+  if (profile.keepModel) require('./keepmodel').prune(profile.keepModel);
   const keys = Object.keys(profile.pairValue);
   if (keys.length <= maxPairs) return;
   const sorted = keys.map(k => [k, profile.pairValue[k].n]).sort((a, b) => a[1] - b[1]);
@@ -389,6 +396,7 @@ function exportCompact(profile, minN = 4) {
   return {
     version: profile.version, games: profile.games, updated: profile.updated,
     playValue: keep(profile.playValue, minN), cardValue: keep(profile.cardValue, minN), dealtValue: keep(profile.dealtValue, minN), pairValue: keep(profile.pairValue, Math.max(minN, 6)),
+    keepModel: profile.keepModel ? require('./keepmodel').compact(profile.keepModel) : null,
     personas: profile.personas, totals: profile.totals,
   };
 }

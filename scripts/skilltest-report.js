@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 'use strict';
 // Zeigt, was die Skill-Test-Bots gelernt haben: Vergleichsspiele (trainiert gegen untrainiert) und die nach Wert
-// sortierte Kartenliste.  Liest die Dateien des Trainers (siehe skilltest/learn/ranking.js), läuft jederzeit.
+// sortierte Kartenliste samt „Behalten statt Recyceln" (mit Kontext aus Hand und Brett). Liest die Dateien des Trainers
+// (siehe skilltest/learn/ranking.js), läuft jederzeit.
 //
 //   node scripts/skilltest-report.js                 # Verlauf der Vergleichsspiele + Top/Flop 20 Karten
 //   node scripts/skilltest-report.js --cards 100     # die ersten 100 Karten der Liste
@@ -52,4 +53,24 @@ else {
   const k = Number(arg('cards', 20)) || 20;
   console.log(`— Die ${k} besten —`); rows.slice(0, k).forEach(r => console.log(fmt(r)));
   console.log(`— Die ${k} schwächsten —`); rows.slice(-k).forEach(r => console.log(fmt(r)));
+}
+
+// Behalten statt Recyceln: gelernt mit der restlichen Hand und dem Brett als Kontext (skilltest/learn/keepmodel.js)
+if (data.keepContext && data.keepContext.length) {
+  console.log('\n═══ Behalten statt Recyceln (Vorteil in Platzierungsgüte; Kontext = restliche Hand + Brett) ═══');
+  console.log('— Kontext-Effekte über Karten hinweg (fit = Lücke zur Stufenanforderung, fitH = Lücke nach Abilities auf der Hand, syn = Archetyp-Synergie, rc = Recycler-Stand) —');
+  data.keepContext.slice(0, 20).forEach(c => console.log(`  ${sgn(c.edge).padStart(7)}  n=${String(c.n).padStart(6)}  ${c.feature}`));
+  if (data.keepPairs.length) {
+    console.log('— Stärkste Paar-Effekte (Karte | Mitspieler auf Hand oder Brett) —');
+    data.keepPairs.slice(0, 20).forEach(p => console.log(`  ${sgn(p.edge).padStart(7)}  n=${String(p.n).padStart(5)}  ${p.card}  |  ${p.other}`));
+  }
+  const kr = data.rows.filter(r => r.keepEdge != null && r.keepN >= 20).sort((a, b) => b.keepEdge - a.keepEdge);
+  if (kr.length) {
+    console.log('— Karten, die man am ehesten behält / am ehesten recycelt (nur die Karte selbst) —');
+    kr.slice(0, 10).forEach(r => console.log(`  ${sgn(r.keepEdge).padStart(7)}  n=${String(r.keepN).padStart(5)}  ${r.name}`));
+    if (kr.length > 10) {
+      console.log('  …');
+      kr.slice(Math.max(10, kr.length - 10)).forEach(r => console.log(`  ${sgn(r.keepEdge).padStart(7)}  n=${String(r.keepN).padStart(5)}  ${r.name}`));
+    }
+  }
 }

@@ -78,6 +78,13 @@
     </div>
     <div class="scroll"><table id="cards"></table></div>
   </section>
+
+  <section>
+    <h2>Keep or recycle — learned with the rest of the hand as context</h2>
+    <p class="meta">Edge = expected difference in placement score (+1 win … −1 last) between keeping a card and recycling it, given the rest of the hand and the board. Cards cannot be judged in a vacuum, so pairs and requirements are learned separately.</p>
+    <div class="scroll" style="max-height:340px"><table id="keepPairs"></table></div>
+    <div class="scroll" style="max-height:340px; margin-top:12px"><table id="keepContext"></table></div>
+  </section>
 </main>
 <script>
 (function () {
@@ -147,12 +154,22 @@
     $('count').textContent = `${rows.length} of ${rank.total} cards`;
     const maxAbs = Math.max(0.05, ...rank.rows.map(r => Math.abs(r.value)));
     const th = (k, label, num) => `<th data-k="${k}" class="${num ? 'num ' : ''}${sortKey === k ? 'sorted' + (sortAsc ? ' asc' : '') : ''}">${label}</th>`;
-    $('cards').innerHTML = '<tr>' + th('rank', '#', 1) + th('name', 'Card') + th('type', 'Type') + th('value', 'Value', 1) + th('valueN', 'Dealt (n)', 1) + th('baseValue', 'Built', 1) + th('playValue', 'Play', 1) + th('lift', 'vs. type', 1) + th('delta', 'Δ', 1) + '<th>Trend</th></tr>' +
+    $('cards').innerHTML = '<tr>' + th('rank', '#', 1) + th('name', 'Card') + th('type', 'Type') + th('value', 'Value', 1) + th('valueN', 'Dealt (n)', 1) + th('baseValue', 'Built', 1) + th('playValue', 'Play', 1) + th('lift', 'vs. type', 1) + th('keepEdge', 'Keep − recycle', 1) + th('delta', 'Δ', 1) + '<th>Trend</th></tr>' +
       rows.slice(0, 1500).map(r => `<tr><td class="num">${r.rank}</td><td>${esc(r.name)}</td><td><span class="tag">${esc(r.type)}</span></td>
         <td class="num ${cls(r.value)}"><span class="bar" style="width:${Math.round(Math.abs(r.value) / maxAbs * 70)}px;background:${r.value >= 0 ? '#33ff88' : '#ff5577'}"></span>${sgn(r.value)}</td>
         <td class="num">${r.valueN}</td><td class="num ${r.baseN ? cls(r.baseValue) : 'zero'}">${r.baseN ? sgn(r.baseValue) : '–'}</td>
         <td class="num ${r.playValue == null ? 'zero' : cls(r.playValue)}">${r.playValue == null ? '–' : sgn(r.playValue, 2)}</td>
-        <td class="num ${cls(r.lift)}">${sgn(r.lift)}</td><td class="num ${r.delta == null ? 'zero' : cls(r.delta)}">${r.delta == null ? '' : sgn(r.delta)}</td><td>${spark(r.trend)}</td></tr>`).join('');
+        <td class="num ${cls(r.lift)}">${sgn(r.lift)}</td><td class="num ${r.keepEdge == null ? 'zero' : cls(r.keepEdge)}" title="${r.keepN} observations">${r.keepEdge == null ? '–' : sgn(r.keepEdge)}</td><td class="num ${r.delta == null ? 'zero' : cls(r.delta)}">${r.delta == null ? '' : sgn(r.delta)}</td><td>${spark(r.trend)}</td></tr>`).join('');
+  }
+
+  function drawKeep() {
+    if (!rank) return;
+    const pairs = rank.keepPairs || [], ctx = rank.keepContext || [];
+    $('keepPairs').innerHTML = '<tr><th>Card</th><th>Together with (hand or board)</th><th class="num">Keep − recycle</th><th class="num">n</th></tr>' +
+      (pairs.length ? pairs.map(p => `<tr><td>${esc(p.card)}</td><td>${esc(p.other)}</td><td class="num ${cls(p.edge)}">${sgn(p.edge)}</td><td class="num">${p.n}</td></tr>`).join('') : '<tr><td colspan="4" class="zero">no pair effects learned yet</td></tr>');
+    const label = (f) => f.replace(/^fitH:/, 'Level gap after hand abilities · ').replace(/^fit:/, 'Level gap · ').replace(/^syn:/, 'Archetype synergy · ').replace(/^ab:/, 'Ability on board/needed · ').replace(/^rc:/, 'Recycled so far · ').replace(/^free:/, 'Free support zones · ').replace(/^ty:/, 'Card type · ').replace(/^a:/, 'Archetype · ');
+    $('keepContext').innerHTML = '<tr><th>Context</th><th class="num">Keep − recycle</th><th class="num">n</th></tr>' +
+      (ctx.length ? ctx.map(c => `<tr><td>${esc(label(c.feature))}</td><td class="num ${cls(c.edge)}">${sgn(c.edge)}</td><td class="num">${c.n}</td></tr>`).join('') : '<tr><td colspan="3" class="zero">no context effects learned yet</td></tr>');
   }
 
   async function load() {
@@ -165,7 +182,7 @@
       $('dot').className = 'dot' + (alive ? ' on' : '');
       $('liveText').textContent = alive ? `training live · ${st.games} games · ~${st.ratePerMin}/min` : 'trainer not running';
       $('meta').textContent = r.updated ? `${r.games} training games · list updated ${new Date(r.updated).toLocaleString()}` : 'no data yet';
-      drawBench(); drawCards();
+      drawBench(); drawCards(); drawKeep();
     } catch (e) { $('meta').textContent = 'could not load data'; }
   }
 

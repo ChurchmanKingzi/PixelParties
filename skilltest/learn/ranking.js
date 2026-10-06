@@ -12,6 +12,8 @@
 //    baseN       in wie vielen Basen die Karte stand
 //    playValue   mittlerer Stellungsgewinn beim Ausspielen/Aktivieren (alle Aktionsarten der Karte)
 //    lift        Aufbauwert minus Mittel ihres Kartentyps (was ist besser/schlechter als ihresgleichen?)
+//    keepEdge    gelernter Vorteil „Karte behalten statt recyceln" (nur die Karte selbst; Kontext-Effekte stehen in
+//                keepPairs/keepContext), keepN = Beobachtungen — siehe learn/keepmodel.js
 //    delta/trend Veränderung seit dem letzten Prüfpunkt bzw. die letzten Prüfpunkte
 //
 //  Dateien (neben dem Profil, siehe profile.FILE()):
@@ -63,6 +65,7 @@ function buildRanking(profile, history = []) {
     t.n += e.n; t.sum += e.sum;
   }
   const dealt = profile.dealtValue || {};
+  const km = profile.keepModel || null;
   const names = new Set([...Object.keys(profile.cardValue || {}), ...Object.keys(dealt)]);
   const rows = [];
   for (const name of names) {
@@ -80,6 +83,8 @@ function buildRanking(profile, history = []) {
       dealtValue, dealtN,
       baseN, baseMean: baseN ? b.sum / baseN : null, baseValue, baseSE: baseN ? 0.6 / Math.sqrt(baseN) : null,
       playN: p ? p.n : 0, playValue: p && p.n ? p.sum / p.n : null,
+      keepEdge: km && km.w['c:' + name] ? Math.round(2 * km.w['c:' + name][0] * 1e4) / 1e4 : null,
+      keepN: km && km.w['c:' + name] ? km.w['c:' + name][1] : 0,
     });
   }
   // Lift gegenüber dem Mittel des eigenen Kartentyps (gewichtet nach Beobachtungen)
@@ -102,11 +107,28 @@ function buildRanking(profile, history = []) {
     }
   }
   return {
+    keepPairs: keepPairs(km), keepContext: keepContext(km),
     updated: new Date().toISOString(), games: profile.games || 0, version: profile.version || 0, prior: PRIOR,
     types: Object.fromEntries(Object.entries(typeAgg).map(([t, a]) => [t, { cards: a.cards, mean: a.n ? a.sum / a.n : 0 }])),
     historyPoints: history.map(h => h.games),
     rows,
   };
+}
+
+/** Stärkste Paar-Effekte des Behalten/Recyceln-Modells: „Karte | Mitspieler" → Vorteil des Behaltens, wenn der Mitspieler dabei ist. */
+function keepPairs(km, top = 60, minN = 4) {
+  if (!km) return [];
+  return Object.entries(km.w).filter(([f, e]) => f.startsWith('p:') && e[1] >= minN)
+    .map(([f, e]) => { const [card, other] = f.slice(2).split('|'); return { card, other, edge: Math.round(2 * e[0] * 1e4) / 1e4, n: e[1] }; })
+    .sort((a, b) => Math.abs(b.edge) * Math.sqrt(b.n) - Math.abs(a.edge) * Math.sqrt(a.n)).slice(0, top);
+}
+
+/** Kontext-Effekte ohne Kartennamen (Typ × Stufen-Erfüllbarkeit, Synergie, Recycler-Stand …): was zählt über Karten hinweg? */
+function keepContext(km, top = 60, minN = 20) {
+  if (!km) return [];
+  return Object.entries(km.w).filter(([f, e]) => /^(fit|fitH|syn|ab|rc|free|ty|a):/.test(f) && e[1] >= minN)
+    .map(([f, e]) => ({ feature: f, edge: Math.round(2 * e[0] * 1e4) / 1e4, n: e[1] }))
+    .sort((a, b) => Math.abs(b.edge) * Math.sqrt(b.n) - Math.abs(a.edge) * Math.sqrt(a.n)).slice(0, top);
 }
 
 function readHistory(max = 400) {
