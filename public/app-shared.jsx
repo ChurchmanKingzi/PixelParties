@@ -3424,6 +3424,16 @@ if (typeof document !== 'undefined') {
     else playSFX('ui_click', { dedupe: 60 });
   }, { capture: true });
 
+  // ── MENÜ PER KLICK NEBENAN SCHLIESSEN KLINGT (Als Befund: „Ein Submenü zu schließen, indem man irgendwo anders
+  // hinklickt, erzeugt noch keinen Ton") ──
+  // Der Schleier eines Fensters (`.modal-overlay`) ist selbst kein Knopf. Ein Klick direkt auf ihn schließt das Fenster
+  // fast überall — zentral als Abbruch-Klang, `dedupe` fängt Stellen ab, die ihr `ui_cancel` schon selbst spielen.
+  document.addEventListener('click', (e) => {
+    const t = e.target;
+    if (!t || !t.classList || !t.classList.contains('modal-overlay')) return;
+    playSFX('ui_cancel', { dedupe: 250, volume: 1.0 });
+  }, { capture: true });
+
   // ── JEDE AUSWAHL AUF DEM BRETT KLINGT (Als Regel 2.10.: „jede Aktion des Spielers gibt einen Sound als Feedback") ──
   // Zonen und Helden, die gerade als Wahl leuchten (Klick-Beschwoerung, Zielwahl, Zonenwahl, Anlegen, Tausch, aktivierbare
   // Effekte …), tragen bekannte Markierungs-Klassen. Ein Klick darauf klingt zentral wie ein Klick — nicht an jedem der
@@ -6070,7 +6080,8 @@ function CardMini({ card, onClick, onRightClick, count, maxCount, dimmed, style,
     if (noTooltip) return;
     if (window.activeDragData || window.deckDragState) return;
     if (useSharedTooltip) {
-      window._boardTooltipSetter(card);
+      // Gewählter Skin gilt auch im Tooltip (CardTooltipContent liest `_skinUrl`).
+      window._boardTooltipSetter(skins && skins[card.name] ? { ...card, _skinUrl: imgUrl } : card);
     } else {
       setTT(true);
     }
@@ -7201,7 +7212,7 @@ function CardTooltipContent({ card, children, imageUrl }) {
   // imageUrl prop forces a specific asset (used by the shop to show a
   // skin portrait in the hover preview while still listing the base
   // hero's stats).
-  const imgUrl = imageUrl || cardImageUrl(card.name);
+  const imgUrl = imageUrl || card._skinUrl || cardImageUrl(card.name);
   const foilType = card.foil || null;
   const displayName = card.displayName || card.name;
   return (
