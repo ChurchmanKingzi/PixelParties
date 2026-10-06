@@ -357,6 +357,69 @@ Neue Protection-Karten: nur protMeta im Prompt + cpuResponse-Dreizeiler.
 7/7 Unit-Tests; Live-Beweis: 5 Entscheidungen/Spiel mit gemischten
 Armen in Idej Illusions.
 
+## Area-Abräumungs-Lernkanal (Form 7, Als Auftrag 6.10.)
+
+Anlass: Es gibt Situationen, Karten und ganze Decks, in denen es richtig
+ist, **eigene** Areas zu zerstören — Pressure Projectile, Hammer Skeleton
+und Excavator Bucket sind nur die ersten Karten, die es erlauben. Drei
+Gründe, alle lernbar statt hartverdrahtet:
+
+| Grund | Tag | Quelle |
+|---|---|---|
+| die Area hilft dem Gegner auch / mehr | `fit:opp>own` · `fit:eq` · `fit:own>opp` | Summe der Ability-Stufen in den Schulen der Area (`spellSchool1/2`), beide Seiten |
+| man will eine ANDERE Area ausspielen | `hand:other` · `hand:none` | Area-Karten auf der eigenen Hand (ohne die angebotene selbst) |
+| eigene Effekte triggern/skalieren beim Abräumen | `board:<Name>` (offen), `dpa:0/1-2/3+` | eigenes Brett (Helden, Support, Abilities); Areas in der eigenen Ablage |
+| Areas, die generell weg sollen | `Name@own` · `Name@opp` | Identität je Seite (das Profil gehört einem Deck — dort lernbar) |
+
+Dazu die Lage-Tags der anderen Formen (`st:*`) und `areas:own/opp:N`.
+
+**Drei Teile, ein gemeinsames Vokabular** (`cards/effects/_area-removal-shared.js`
+— Trainer und Laufzeit leiten die Tags aus DERSELBEN Funktion ab):
+
+- **Recorder** (`_decision-log.js`): steht bei einer Zielwahl eine Area zur
+  Wahl, schreibt die Zeile den ROHEN Kontext (`ar`: eigene/gegnerische
+  Areas, Area-Karten auf der Hand, eigenes Brett, Schul-Stärken, Areas in
+  der Ablage) VOR der Antwort mit. Abgeleitet wird erst im Trainer.
+- **Trainer** (`scripts/decision-channels.js`, FORM 7): Einheit ist das Paar
+  (Entscheidung × angebotene Area), Kontrast 》diese Area abgeräumt《 gegen
+  》gar nichts abgeräumt《 (Zeilen, in denen statt ihrer eine andere Area
+  gewählt wurde, zählen nicht in ihren Nicht-gewählt-Arm — im Synthetik-
+  Test erbte sonst eine gegnerische Area das Delta einer eigenen). Gelernt
+  wird getrennt je Seite: Identität, Grundrate, additive Tag-Deltas mit
+  Welch-Gate (offener Raum `board:` strenger, T ≥ 3). Breiteres
+  Prävalenzband (0,03–0,97), weil die Exploration die Wahlrate festlegt.
+  Zeilen mit gemischter Wahl (Ausrüstung ODER Area) zählen nicht.
+  Ausgabe: `profile.areaRemovalRules = { ident, base, tags }`.
+- **Laufzeit** (`_deck-profile.js`): `areaRemovalChoice` (Regel > Exploration
+  > kein Urteil) hängt in der CPU-Zielwahl vor dem Default-Picker, auch im
+  Rollout (ohne Exploration); `areaStandingValue` ist ein Eval-Term (nur
+  die gelernte Identität, halbiert, je Area ±10, Confidence-skaliert) —
+  ohne ihn sähe die Suche nie einen Nutzen im Abräumen, und die
+  Aktivierungs-Gates von Hammer Skeleton & Co. würden nie committen. Ohne
+  Training sind beide neutral (Altverhalten).
+
+**Warum die Exploration unverzichtbar ist:** Die CPU lehnt abbrechbare
+Area-Fragen per Default immer ab. Ohne bewusstes Abräumen gäbe es keinen
+》abgeräumt《-Arm, der Trainer sähe nur Nullen. In der Datensammlung
+(`PP_TRAIN=1`, nicht EVAL/AB, nur der gepinnte Spieler, nie im Rollout) wird
+mit `PP_AREA_EXPLORE` (Default 0,5; mit vorhandener Regel `PP_RULE_EXPLORE`)
+gleichmäßig aus 》ablehnen《 und allen angebotenen Areas gezogen.
+Exploriert wird nur bei REINEN Area-Fragen; gemischte Fragen entscheidet
+die Karte (Pressure Projectile ruft `areaRemovalChoice` selbst auf, wenn
+keine Ausrüstung im Angebot ist oder eine Regel existiert; ein gelernter
+Area-Wert ≥ 8 schlägt die Ausrüstung).
+
+**Neue Karte, die Areas abräumt:** nichts zu tun. Die Karte bietet ihre
+Areas als Ziele vom `type: 'area'` an (`areaTargetId`, `cardName`) und
+bleibt abbrechbar — Recorder, Exploration, Regel und Eval greifen von
+selbst. Karten mit eigenem `cpuResponse` für gemischte Fragen rufen
+`deckProfile.areaRemovalChoice` für den Area-Teil.
+
+**Prüfung (Synthetik, 900 Spiele mit eingebautem Signal):** gelernt wurden
+`Foo@own`, `Bar@opp`, `hand:other` +, `hand:none` −, `board:Trigger Card` +;
+die gegnerische Seite blieb frei von Tag-Rauschen, und die
+Negativkontrolle (Ausgang reiner Zufall) erzeugte KEINE Regel.
+
 ## Deck-Telemetrie: PP_DECK_MONITOR=1
 
 Env-gated Ressourcen-Log am Ende jedes CPU-Zugs (in _cpu.js vor dem

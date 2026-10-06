@@ -6841,8 +6841,17 @@ function installCpuBrain(engine) {
           }
         }
       }
+      // ── Area-Abräumung (Form 7) ───────────────────────────────────────
+      // Greift auch im Rollout (ohne Exploration): ohne gelernte Antwort
+      // lehnte die Suche jede abbrechbare Area-Frage ab und sähe nie, was
+      // das Abräumen bringt. `[]` ist eine gültige Antwort (nichts abräumen).
+      let areaPick = null;
+      if (cardPick === undefined && !scriptedPick) {
+        const _ar = deckProfile.areaRemovalChoice(engine, playerIdx, validTargets, config);
+        if (_ar) areaPick = _ar.ids;
+      }
       const picked = (cardPick !== undefined) ? cardPick
-        : (scriptedPick || priorPick || engine._getCpuTargetResponse(validTargets, config, playerIdx));
+        : (scriptedPick || areaPick || priorPick || engine._getCpuTargetResponse(validTargets, config, playerIdx));
       // Log-Stempel für den Recorder (record.targetPicks): die FINALE
       // Wahl, egal welcher Pfad sie traf — klassifiziert als Tags.
       try {
@@ -11685,6 +11694,13 @@ function evaluateState(engine, cpuIdx) {
   try {
     score += deckProfile.discardPileValue(engine, cpuIdx);
     score -= deckProfile.discardPileValue(engine, oppIdx);
+  } catch { /* defensiv */ }
+
+  // ── Gelernter Area-Stehwert (Form 7, Als Auftrag 6.10.) ─────────
+  // Was eine stehende Area dem Brett wert ist, kommt aus dem Wert des
+  // ABRÄUMENS (Identität je Seite). Ohne Training 0.
+  try {
+    score += deckProfile.areaStandingValue(engine, cpuIdx);
   } catch { /* defensiv */ }
 
   // ── Once-per-game spend cost ────────────────────────────────────

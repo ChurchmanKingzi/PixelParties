@@ -612,12 +612,22 @@ function instrumentiere(engine) {
   const huelleTarget = async function (playerIdx, validTargets, config = {}) {
     if (engine._inMctsSim) { zaehle(engine, 'roll'); return origTarget(playerIdx, validTargets, config); }
     zaehle(engine, 'tgt');
-    let angebot = null, karte = null;
+    let angebot = null, karte = null, areaKontext = null;
     try {
       karte = (config && (config.previewCardName || config.source || config.title)) || null;
       angebot = Array.isArray(validTargets)
         ? validTargets.slice(0, MAX_OPTIONEN).map(t => zielKurz(t, playerIdx))
         : null;
+      // ── AREA-ABRÄUMUNG (Lernkanal, Als Auftrag 6.10.) ───────────────
+      // Steht eine Area zur Wahl, wird der Kontext VOR der Antwort roh
+      // mitgeschrieben: eigene/gegnerische Areas, Area-Karten auf der
+      // Hand, eigenes Brett, Schul-Stärken beider Seiten, Areas in der
+      // Ablage. Die Tags daraus leitet der Trainer ab (gemeinsames
+      // Vokabular in `_area-removal-shared.js`) — nach der Antwort wäre
+      // der Zustand schon ein anderer.
+      if (Array.isArray(validTargets) && validTargets.some(t => t && t.type === 'area')) {
+        areaKontext = require('./_area-removal-shared').rohKontext(engine, playerIdx);
+      }
     } catch { /* egal */ }
     const gewaehlt = await origTarget(playerIdx, validTargets, config);
     try {
@@ -637,6 +647,7 @@ function instrumentiere(engine) {
           n: Array.isArray(validTargets) ? validTargets.length : 0,
           zl: angebot,                 // Angebot (Geometrie)
           wz: gewaehlteZiele,          // Gewähltes (Geometrie)
+          ...(areaKontext ? { ar: areaKontext } : {}),
           ...absicht(config),
         },
       });

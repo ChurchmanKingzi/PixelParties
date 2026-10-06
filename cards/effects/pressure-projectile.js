@@ -199,8 +199,15 @@ module.exports = {
   },
 
   /**
-   * CPU: Gegnerische Anhängsel/Ausrüstung zuerst (alle), sonst eine gegnerische
-   * Area; eigene Karten nie. Sonst auslassen.
+   * CPU. Gegnerische Anhängsel/Ausrüstung zuerst (alle), eigene Karten nie.
+   * Bei den AREAS entscheidet der Lernkanal „Area-Abräumung"
+   * (`deckProfile.areaRemovalChoice`, Form 7): gelernte Regel, in der
+   * Datensammlung Exploration — auch EIGENE Areas, die dem Gegner nützen,
+   * einer anderen Area im Weg stehen oder eigene Karten auslösen.
+   *   • Ein klar gelernter Area-Wert (≥ 8 Punkte) schlägt die Ausrüstung.
+   *   • Gibt es Ausrüstung und keine Regel, bleibt es bei der Ausrüstung —
+   *     dort wird nicht exploriert (der Moduswahl fehlt die Vergleichbarkeit).
+   *   • Ohne Regel und ohne Ausrüstung: die erste gegnerische Area (Altverhalten).
    */
   cpuResponse(engine, kind, promptData) {
     if (kind !== 'effectTarget') return undefined;
@@ -208,8 +215,21 @@ module.exports = {
     if (config?.title !== CARD_NAME || !Array.isArray(validTargets)) return undefined;
     const fremd = (t) => !t.ineligible && t.owner !== playerIdx;
     const equips = validTargets.filter(t => t.type === 'equip' && fremd(t));
+    const areas = validTargets.filter(t => t.type === 'area' && !t.ineligible);
+
+    let ar = null;
+    try {
+      const dp = require('./_deck-profile');
+      const hatRegel = !!dp.__getProfile(engine, playerIdx)?.areaRemovalRules;
+      if (areas.length && (equips.length === 0 || hatRegel)) {
+        ar = dp.areaRemovalChoice(engine, playerIdx, areas, config);
+      }
+    } catch { ar = null; }
+
+    if (ar && (ar.explored || (ar.ids.length && ar.score >= 8))) return ar.ids;
     if (equips.length > 0) return equips.map(t => t.id);
-    const area = validTargets.find(t => t.type === 'area' && fremd(t));
+    if (ar) return ar.ids;
+    const area = areas.find(fremd);
     return area ? [area.id] : [];
   },
 };

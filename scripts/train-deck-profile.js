@@ -3592,6 +3592,7 @@ function main() {
       ordinalRules: advModel.decisionChannels.ordinalRules,
       setOfferRules: advModel.decisionChannels.setOfferRules,
       poolFeatureRules: advModel.decisionChannels.poolFeatureRules,
+      areaRemovalRules: advModel.decisionChannels.areaRemovalRules,
     } : {}),
     // Gelernte Tutor-/Such-Präferenzen (Quelle→Karte).
     tutorPickRules: (advModel && advModel.tutorPickRules && Object.keys(advModel.tutorPickRules).length > 0)
