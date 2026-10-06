@@ -1009,6 +1009,8 @@ function DeckBuilder() {
 
   const validation = currentDeck ? isDeckLegal(currentDeck) : { legal: false, reasons: [] };
   const hasUnsaved = currentDeck && unsaved[currentDeck.id];
+  // Profil → Skins: der gewählte Skin je Held ersetzt die Karte; ein Deck-Skin hat Vorrang.
+  const viewSkins = { ...(user?.heroSkins || {}), ...(currentDeck?.skins || {}) };
   escStateRef.current = { showLeaveConfirm, skinGallery, ctxMenu, renaming, hasUnsaved, isSampleMode, deckDropdownOpen };
   const heroes = currentDeck?.heroes || [{ hero:null,ability1:null,ability2:null },{ hero:null,ability1:null,ability2:null },{ hero:null,ability1:null,ability2:null }];
   // ★ v992: Wie viele Helden verlangt diese Aufstellung? Mit
@@ -1668,7 +1670,7 @@ function DeckBuilder() {
                       onTouchStart={(e) => onDeckCardMouseDown(e, 'main', item.origIdx, item.card)}
                       onContextMenu={(e) => { e.preventDefault(); removeFrom(item.card, 'main', item.origIdx); }}
                       style={{ position: 'relative' }}>
-                      <CardMini card={card} onClick={cubeStackClick} isCover={item.card === currentDeck?.coverCard} skins={currentDeck?.skins} />
+                      <CardMini card={card} onClick={cubeStackClick} isCover={item.card === currentDeck?.coverCard} skins={viewSkins} />
                       {item.count > 1 && (
                         <div style={{
                           position: 'absolute', bottom: 2, right: 2,
@@ -1720,7 +1722,7 @@ function DeckBuilder() {
                           onContextMenu={(e) => { e.preventDefault(); removeFrom(h.hero, 'hero', i); }}>
                           <CardMini card={CARDS_BY_NAME[h.hero]}
                             onClick={(e) => showCoverMenu(h.hero, e, 'hero')}
-                            isCover={h.hero === currentDeck?.coverCard} skins={currentDeck?.skins} />
+                            isCover={h.hero === currentDeck?.coverCard} skins={viewSkins} />
                           <button style={{ position: 'absolute', top: -5, right: -5, background: 'var(--danger)', color: '#fff',
                             border: 'none', width: 18, height: 18, fontSize: 11, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1 }}
                             onClick={() => removeFrom(h.hero, 'hero', i)}>✕</button>
@@ -1769,7 +1771,7 @@ function DeckBuilder() {
                     onMouseDown={(e) => onDeckCardMouseDown(e, 'main', item.origIdx, item.card)}
                     onTouchStart={(e) => onDeckCardMouseDown(e, 'main', item.origIdx, item.card)}
                     onContextMenu={(e) => { e.preventDefault(); removeFrom(item.card, 'main', item.origIdx); }}>
-                    <CardMini card={card} onClick={(e) => showCoverMenu(item.card, e, 'main', item.origIdx)} isCover={item.card === currentDeck?.coverCard} skins={currentDeck?.skins} />
+                    <CardMini card={card} onClick={(e) => showCoverMenu(item.card, e, 'main', item.origIdx)} isCover={item.card === currentDeck?.coverCard} skins={viewSkins} />
                   </div>;
                 })}
               </div>
@@ -1789,7 +1791,7 @@ function DeckBuilder() {
                     onMouseDown={(e) => onDeckCardMouseDown(e, 'potion', item.origIdx, item.card)}
                     onTouchStart={(e) => onDeckCardMouseDown(e, 'potion', item.origIdx, item.card)}
                     onContextMenu={(e) => { e.preventDefault(); removeFrom(item.card, 'potion', item.origIdx); }}>
-                    <CardMini card={card} onClick={(e) => showCoverMenu(item.card, e, 'potion', item.origIdx)} isCover={item.card === currentDeck?.coverCard} skins={currentDeck?.skins} />
+                    <CardMini card={card} onClick={(e) => showCoverMenu(item.card, e, 'potion', item.origIdx)} isCover={item.card === currentDeck?.coverCard} skins={viewSkins} />
                   </div>;
                 })}
               </div>
@@ -1809,7 +1811,7 @@ function DeckBuilder() {
                     onMouseDown={(e) => onDeckCardMouseDown(e, 'side', item.origIdx, item.card)}
                     onTouchStart={(e) => onDeckCardMouseDown(e, 'side', item.origIdx, item.card)}
                     onContextMenu={(e) => { e.preventDefault(); removeFrom(item.card, 'side', item.origIdx); }}>
-                    <CardMini card={card} onClick={(e) => showCoverMenu(item.card, e, 'side', item.origIdx)} isCover={item.card === currentDeck?.coverCard} skins={currentDeck?.skins} />
+                    <CardMini card={card} onClick={(e) => showCoverMenu(item.card, e, 'side', item.origIdx)} isCover={item.card === currentDeck?.coverCard} skins={viewSkins} />
                   </div>;
                 })}
               </div>
@@ -1875,6 +1877,7 @@ function DeckBuilder() {
                 const canAny = canMain || canHero || canPotion || canSide;
                 return (
                   <CardMini key={card.name + '-' + i} card={card} dimmed={!canAny}
+                    skins={viewSkins}
                     onClick={(e) => showAddMenu(card.name, e)}
                     onRightClick={() => autoAdd(card.name)}
                     dragData={canAny ? { cardName: card.name } : null}

@@ -2303,25 +2303,74 @@ const PpIdleAnims = (() => {
   return { slug, ladeListe, meta: (name) => (liste ? liste[slug(name)] || null : null) };
 })();
 
+/**
+ * Deckende Fläche (Alpha ≥ 40) über ALLE Frames eines Sheets, in Frame-Koordinaten.
+ * Dient dazu, jede Figur auf ihre sichtbaren Pixel zu beschneiden: so stehen alle
+ * mittig und werden (ganzzahlig) gleich groß in die Box eingepasst, egal wie viel
+ * Leerraum der jeweilige Frame hat.
+ */
+const ppIdleBoxen = new Map();
+function ppIdleBox(m) {
+  if (!ppIdleBoxen.has(m.sheetUrl)) {
+    ppIdleBoxen.set(m.sheetUrl, new Promise((fertig) => {
+      const rueckfall = { x0: 0, y0: 0, x1: m.frameWidth, y1: m.frameHeight };
+      const img = new Image();
+      img.onload = () => {
+        try {
+          const w = img.naturalWidth, h = img.naturalHeight, fw = m.frameWidth, fh = m.frameHeight;
+          const c = document.createElement('canvas'); c.width = w; c.height = h;
+          const ctx = c.getContext('2d', { willReadFrequently: true });
+          ctx.drawImage(img, 0, 0);
+          const d = ctx.getImageData(0, 0, w, h).data;
+          const vertikal = m.layout === 'vertical';
+          let x0 = fw, y0 = fh, x1 = 0, y1 = 0;
+          for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+            if (d[(y * w + x) * 4 + 3] < 40) continue;
+            const lx = vertikal ? x : x % fw, ly = vertikal ? y % fh : y;
+            if (lx < x0) x0 = lx; if (lx >= x1) x1 = lx + 1;
+            if (ly < y0) y0 = ly; if (ly >= y1) y1 = ly + 1;
+          }
+          fertig(x1 > x0 && y1 > y0 ? { x0, y0, x1, y1 } : rueckfall);
+        } catch { fertig(rueckfall); }
+      };
+      img.onerror = () => fertig(rueckfall);
+      img.src = m.sheetUrl;
+    }));
+  }
+  return ppIdleBoxen.get(m.sheetUrl);
+}
+
 /** Idle-Animation per CSS (steps) — billig genug für ein ganzes Heldenraster. */
 function PpIdleSprite({ name, box = 96, grey }) {
   const [, tick] = useState(0);
   useEffect(() => { let lebt = true; PpIdleAnims.ladeListe().then(() => { if (lebt) tick(n => n + 1); }); return () => { lebt = false; }; }, []);
   const m = PpIdleAnims.meta(name);
-  const wrap = { width: box, height: box, display: 'flex', alignItems: 'flex-end', justifyContent: 'center', filter: grey ? 'grayscale(.6) brightness(.85)' : undefined, opacity: grey ? .85 : 1 };
-  if (!m) return <div style={{ ...wrap, alignItems: 'center', color: 'var(--text2)', fontSize: 10, textAlign: 'center' }}>{heroDisplayName(name)}</div>;
+  const [kern, setKern] = useState(null);
+  useEffect(() => {
+    setKern(null);
+    if (!m) return;
+    let lebt = true;
+    ppIdleBox(m).then(k => { if (lebt) setKern(k); });
+    return () => { lebt = false; };
+  }, [m && m.sheetUrl]);
+  const wrap = { width: box, height: box, display: 'flex', alignItems: 'center', justifyContent: 'center', filter: grey ? 'grayscale(.6) brightness(.85)' : undefined, opacity: grey ? .85 : 1 };
+  if (!m) return <div style={{ ...wrap, color: 'var(--text2)', fontSize: 10, textAlign: 'center' }}>{heroDisplayName(name)}</div>;
+  if (!kern) return <div style={wrap} />;
   const fw = m.frameWidth, fh = m.frameHeight, n = m.frames;
   const vertikal = m.layout === 'vertical';
-  const scale = Math.max(1, Math.floor(Math.min(box / fw, box / fh)));
+  const bw = kern.x1 - kern.x0, bh = kern.y1 - kern.y0;
+  const passt = box / Math.max(bw, bh);
+  const scale = passt >= 1 ? Math.floor(passt) : passt;   // zu große Figuren verkleinern statt abschneiden
   const id = 'ppidle-' + PpIdleAnims.slug(name);
-  const ende = vertikal ? `0 -${n * fh * scale}px` : `-${n * fw * scale}px 0`;
-  const css = `@keyframes ${id} { from { background-position: 0 0; } to { background-position: ${ende}; } }`;
+  const sx = kern.x0 * scale, sy = kern.y0 * scale;
+  const ende = vertikal ? `-${sx}px -${sy + n * fh * scale}px` : `-${sx + n * fw * scale}px -${sy}px`;
+  const css = `@keyframes ${id} { from { background-position: -${sx}px -${sy}px; } to { background-position: ${ende}; } }`;
   const dauer = Math.max(1, n * (m.frameMs || 90));
   return (
     <div style={wrap}>
       <style>{css}</style>
       <div style={{
-        width: fw * scale, height: fh * scale, imageRendering: 'pixelated',
+        width: bw * scale, height: bh * scale, imageRendering: 'pixelated',
         backgroundImage: `url("${m.sheetUrl}")`,
         backgroundSize: vertikal ? `${fw * scale}px ${n * fh * scale}px` : `${n * fw * scale}px ${fh * scale}px`,
         animation: `${id} ${dauer}ms steps(${n}) infinite`,
@@ -2401,7 +2450,7 @@ function ProfileSkinMenus({ ownedSkins, selected, onSelect, onClose }) {
             <div key={sk || 'base'} role="button" tabIndex={0}
               className={'profile-cb-gallery-item' + ((aktuell || null) === sk ? ' active' : '')}
               style={{ alignItems: 'center', padding: 6 }}
-              onClick={() => onSelect(hero, sk)}>
+              onClick={() => { onSelect(hero, sk); setHero(null); }}>
               <PpIdleSprite name={sk || hero} box={112} />
               <div className="profile-cb-gallery-label">{sk || 'Base'}</div>
             </div>
@@ -2983,7 +3032,7 @@ function ProfileScreen() {
               <div style={{ display: 'flex', flexDirection: 'column', gap: 0, minWidth: 180 }}>
 
                 {/* Battle Record */}
-                <div style={{ paddingBottom: 14, borderBottom: '1px solid var(--bg4)' }}>
+                <div style={{ paddingBottom: 9, borderBottom: '1px solid var(--bg4)' }}>
                   <div className="profile-section-label">BATTLE RECORD</div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
                     <span style={{ color: 'var(--success)', fontWeight: 700, fontSize: 15 }}>{wins}</span>
@@ -3001,7 +3050,7 @@ function ProfileScreen() {
                 </div>
 
                 {/* Name Color */}
-                <div style={{ paddingTop: 14, paddingBottom: 14, borderBottom: '1px solid var(--bg4)' }}>
+                <div style={{ paddingTop: 9, paddingBottom: 9, borderBottom: '1px solid var(--bg4)' }}>
                   <div className="profile-section-label">NAME COLOR</div>
                   <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
                     <input type="color" value={color} onChange={e => setColor(e.target.value)}
@@ -3012,7 +3061,7 @@ function ProfileScreen() {
                 </div>
 
                 {/* Battle music */}
-                <div style={{ paddingTop: 14, paddingBottom: 14, borderBottom: '1px solid var(--bg4)', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <div style={{ paddingTop: 9, paddingBottom: 9, borderBottom: '1px solid var(--bg4)', display: 'flex', flexDirection: 'column', gap: 6 }}>
                   <div className="profile-section-label">BATTLE MUSIC</div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                     <div style={{ fontSize: 13, color: 'var(--text)', fontWeight: 600, flex: 1 }}>
@@ -3026,11 +3075,11 @@ function ProfileScreen() {
                 </div>
 
                 {/* Skins */}
-                <div style={{ paddingTop: 14, paddingBottom: 14, borderBottom: '1px solid var(--bg4)', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <div style={{ paddingTop: 9, paddingBottom: 9, borderBottom: '1px solid var(--bg4)', display: 'flex', flexDirection: 'column', gap: 6 }}>
                   <div className="profile-section-label">SKINS</div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                     <div style={{ fontSize: 13, color: 'var(--text)', fontWeight: 600, flex: 1 }}>
-                      {'🎨 ' + Object.keys(user.heroSkins || {}).length + ' Hero' + (Object.keys(user.heroSkins || {}).length === 1 ? '' : 'es') + ' skinned'}
+                      {'🎨 ' + ownedSkinIds.length + (ownedSkinIds.length === 1 ? ' Skin' : ' Skins') + ' unlocked'}
                     </div>
                     <button className="btn" style={{ padding: '6px 16px', fontSize: 11 }}
                       onClick={() => setShowSkinMenu(true)}>
@@ -3040,7 +3089,7 @@ function ProfileScreen() {
                 </div>
 
                 {/* Board info */}
-                <div style={{ paddingTop: 14, flex: 1, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <div style={{ paddingTop: 9, flex: 1, display: 'flex', flexDirection: 'column', gap: 6 }}>
                   <div className="profile-section-label">BOARD</div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                     {board ? (
@@ -3314,8 +3363,8 @@ function ProfileScreen() {
             </div>
           )}
 
-          {/* v1464: SETTINGS (links) und CHANGE PASSWORD (rechts) teilen sich
-              eine Zeile — sonst passt das Profil nicht auf einen Bildschirm. */}
+          {/* SETTINGS, CHANGE PASSWORD und EMAIL & RECOVERY teilen sich eine Zeile
+              (drei Spalten) — sonst passt das Profil nicht auf einen Bildschirm. */}
           <div className="profile-zweispaltig">
           {/* Settings */}
           <div className="profile-section profile-section-wide">
@@ -3358,7 +3407,6 @@ function ProfileScreen() {
                 {pwSaving ? '...' : 'CHANGE'}
               </button>
             </div>
-          </div>
           </div>
 
           {/* Email & recovery */}
@@ -3406,6 +3454,7 @@ function ProfileScreen() {
                 )}
               </div>
             )}
+          </div>
           </div>
 
         </div>

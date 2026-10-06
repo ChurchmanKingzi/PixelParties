@@ -2799,7 +2799,7 @@ body:has(.anim-backdrop) .pp-bg-particles { display: none; }
 /* Right column — stats & customization */
 .profile-right-col {
   flex: 1;
-  overflow: hidden;
+  overflow: hidden auto;
   min-height: 0;
   padding: calc(var(--pv) * 1.8) 28px;
   display: flex;
@@ -3873,7 +3873,8 @@ body:has(.anim-backdrop) .pp-bg-particles { display: none; }
 
 /* v1464: Profil — SETTINGS und CHANGE PASSWORD nebeneinander, je die
    halbe Breite; auf schmalen Bildschirmen wieder untereinander. */
-.profile-zweispaltig { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.profile-zweispaltig { display: grid; grid-template-columns: 1fr 1fr 1.3fr; gap: 12px; }
+@media (max-width: 1100px) { .profile-zweispaltig { grid-template-columns: 1fr 1fr; } }
 @media (max-width: 760px) { .profile-zweispaltig { grid-template-columns: 1fr; } }
 .profile-schalter-spalte { display: flex; flex-direction: column; gap: 12px; }
 .profile-schalter {
