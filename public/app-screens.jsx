@@ -2281,6 +2281,227 @@ function ProfilSchalter({ an, gesperrt, onToggle, label, tipp, zeigeTipp, verste
   );
 }
 
+// ═══════════════════════════════════════════
+//  PROFIL → SKINS
+//  Zwei Untermenüs: (1) alle Helden als Idle-Animation, Helden mit freigeschaltetem
+//  Skin vorn, der Rest leicht ausgegraut, je Gruppe alphabetisch nach dem Namen
+//  OHNE Titel (`heroDisplayName`); gezeigt wird die Basis-Figur oder der aktuell
+//  gewählte Skin. (2) Klick auf einen Helden mit Skins → Basis oder beliebig viele
+//  freigeschaltete Skins. Die Auswahl liegt im Profil (`heroSkins`) und gilt als
+//  Standard für alle Decks ohne eigenen Skin für diesen Helden.
+// ═══════════════════════════════════════════
+const PpIdleAnims = (() => {
+  let liste = null, laedt = null;
+  const slug = (n) => String(n || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+  const ladeListe = () => {
+    if (!laedt) laedt = fetch('/api/hero-animations', { credentials: 'same-origin' })
+      .then(r => (r.ok ? r.json() : null))
+      .then(d => { liste = (d && d.animations) || {}; return liste; })
+      .catch(() => { laedt = null; return {}; });
+    return laedt;
+  };
+  return { slug, ladeListe, meta: (name) => (liste ? liste[slug(name)] || null : null) };
+})();
+
+/**
+ * Deckende Fläche (Alpha ≥ 40) über ALLE Frames eines Sheets, in Frame-Koordinaten.
+ * Dient dazu, jede Figur auf ihre sichtbaren Pixel zu beschneiden: so stehen alle
+ * mittig und werden (ganzzahlig) gleich groß in die Box eingepasst, egal wie viel
+ * Leerraum der jeweilige Frame hat.
+ */
+const PP_IDLE_SCALE = 3;
+const ppIdleBoxen = new Map();
+function ppIdleBox(m) {
+  if (!ppIdleBoxen.has(m.sheetUrl)) {
+    ppIdleBoxen.set(m.sheetUrl, new Promise((fertig) => {
+      const rueckfall = { x0: 0, y0: 0, x1: m.frameWidth, y1: m.frameHeight };
+      const img = new Image();
+      img.onload = () => {
+        try {
+          const w = img.naturalWidth, h = img.naturalHeight, fw = m.frameWidth, fh = m.frameHeight;
+          const c = document.createElement('canvas'); c.width = w; c.height = h;
+          const ctx = c.getContext('2d', { willReadFrequently: true });
+          ctx.drawImage(img, 0, 0);
+          const d = ctx.getImageData(0, 0, w, h).data;
+          const vertikal = m.layout === 'vertical';
+          let x0 = fw, y0 = fh, x1 = 0, y1 = 0;
+          for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+            if (d[(y * w + x) * 4 + 3] < 40) continue;
+            const lx = vertikal ? x : x % fw, ly = vertikal ? y % fh : y;
+            if (lx < x0) x0 = lx; if (lx >= x1) x1 = lx + 1;
+            if (ly < y0) y0 = ly; if (ly >= y1) y1 = ly + 1;
+          }
+          if (!(x1 > x0 && y1 > y0)) return fertig(rueckfall);
+          // Gesichtsmitte aus Frame 0 (Ruhepose; über alle Frames würden springende
+          // Figuren wie Bubbles den Rahmen verzerren): Schwerpunkt der deckenden Pixel
+          // im obersten Drittel der Figur — Rückfall, falls das Sheet kein `faceX` hat.
+          let f0x0 = fw, f0y0 = fh, f0x1 = 0, f0y1 = 0;
+          const im0 = (x, y) => (vertikal ? (y < fh) : (x < fw));
+          for (let y = 0; y < (vertikal ? fh : h); y++) for (let x = 0; x < (vertikal ? w : fw); x++) {
+            if (d[(y * w + x) * 4 + 3] < 160) continue;
+            if (x < f0x0) f0x0 = x; if (x >= f0x1) f0x1 = x + 1;
+            if (y < f0y0) f0y0 = y; if (y >= f0y1) f0y1 = y + 1;
+          }
+          if (!(f0x1 > f0x0)) { f0x0 = x0; f0x1 = x1; f0y0 = y0; f0y1 = y1; }
+          // Kopfzeile: erste Zeile, die breit genug für einen Körper ist (≥ 25 % der breitesten
+          // Zeile, mind. 5 Pixel) — dünne Spitzen (Stäbe, Hörner, Flügelenden) zählen nicht als „oben".
+          const zeilen = [];
+          for (let y = f0y0; y < f0y1; y++) {
+            let z = 0;
+            for (let x = f0x0; x < f0x1; x++) if (d[(y * w + x) * 4 + 3] >= 160) z++;
+            zeilen.push(z);
+          }
+          const schwelle = Math.max(5, Math.max(...zeilen) * 0.25);
+          let kopfZ = f0y0;
+          for (let i = 0; i < zeilen.length; i++) { if (zeilen[i] >= schwelle) { kopfZ = f0y0 + i; break; } }
+          let sum = 0, cnt = 0;
+          for (let y = kopfZ; y < Math.min(f0y1, kopfZ + 8); y++) for (let x = f0x0; x < f0x1; x++) {
+            if (d[(y * w + x) * 4 + 3] >= 160) { sum += x + 0.5; cnt++; }
+          }
+          fertig({ x0, y0, x1, y1, fx: cnt ? sum / cnt : (f0x0 + f0x1) / 2, fy: kopfZ + 4 });
+        } catch { fertig(rueckfall); }
+      };
+      img.onerror = () => fertig(rueckfall);
+      img.src = m.sheetUrl;
+    }));
+  }
+  return ppIdleBoxen.get(m.sheetUrl);
+}
+
+/** Idle-Animation per CSS (steps) — billig genug für ein ganzes Heldenraster. */
+function PpIdleSprite({ name, box = 96, grey }) {
+  const [, tick] = useState(0);
+  useEffect(() => { let lebt = true; PpIdleAnims.ladeListe().then(() => { if (lebt) tick(n => n + 1); }); return () => { lebt = false; }; }, []);
+  const m = PpIdleAnims.meta(name);
+  const [kern, setKern] = useState(null);
+  useEffect(() => {
+    setKern(null);
+    if (!m) return;
+    let lebt = true;
+    ppIdleBox(m).then(k => { if (lebt) setKern(k); });
+    return () => { lebt = false; };
+  }, [m && m.sheetUrl]);
+  const wrap = { width: box, height: box, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', filter: grey ? 'grayscale(.6) brightness(.85)' : undefined, opacity: grey ? .85 : 1 };
+  if (!m) return <div style={{ ...wrap, color: 'var(--text2)', fontSize: 10, textAlign: 'center' }}>{heroDisplayName(name)}</div>;
+  if (!kern) return <div style={wrap} />;
+  const fw = m.frameWidth, fh = m.frameHeight, n = m.frames;
+  const vertikal = m.layout === 'vertical';
+  // Überall dieselbe Pixelgröße. Passt die Figur nicht in die Box, wird auf das GESICHT
+  // zentriert (`faceX` aus dem Sheet bzw. Kopf-Schwerpunkt; senkrecht liegt der Kopf im oberen
+  // Drittel der Box) und der Rest abgeschnitten. Passt sie, steht sie in der Mitte.
+  const scale = PP_IDLE_SCALE;
+  const fenster = Math.round(box / scale);                       // Boxgröße in Sprite-Pixeln
+  const bw = kern.x1 - kern.x0, bh = kern.y1 - kern.y0;
+  const gesichtX = typeof m.faceX === 'number' ? m.faceX : kern.fx;
+  const gesichtY = typeof m.faceY === 'number' ? m.faceY : kern.fy;   // `faceY` (Gesichtsmitte) steht optional im Sheet-JSON, wie `faceX`
+  const klemme = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+  // Ganzzahlige Fensterkanten, damit die Pixel scharf bleiben.
+  const wx0 = Math.round(bw <= fenster ? kern.x0 - (fenster - bw) / 2 : klemme(gesichtX - fenster / 2, kern.x0, kern.x1 - fenster));
+  const wy0 = Math.round(bh <= fenster ? kern.y0 - (fenster - bh) / 2 : klemme(gesichtY - fenster * 0.33, kern.y0, kern.y1 - fenster));
+  const vx0 = Math.max(wx0, kern.x0), vx1 = Math.min(wx0 + fenster, kern.x1);
+  const vy0 = Math.max(wy0, kern.y0), vy1 = Math.min(wy0 + fenster, kern.y1);
+  const id = 'ppidle-' + PpIdleAnims.slug(name) + '-' + Math.round(vx0) + '-' + Math.round(vy0);
+  const sx = vx0 * scale, sy = vy0 * scale;
+  const ende = vertikal ? `-${sx}px -${sy + n * fh * scale}px` : `-${sx + n * fw * scale}px -${sy}px`;
+  const css = `@keyframes ${id} { from { background-position: -${sx}px -${sy}px; } to { background-position: ${ende}; } }`;
+  const dauer = Math.max(1, n * (m.frameMs || 90));
+  return (
+    <div style={{ ...wrap, position: 'relative', display: 'block' }}>
+      <style>{css}</style>
+      <div style={{
+        position: 'absolute', left: (vx0 - wx0) * scale, top: (vy0 - wy0) * scale,
+        width: (vx1 - vx0) * scale, height: (vy1 - vy0) * scale, imageRendering: 'pixelated',
+        backgroundRepeat: 'no-repeat',
+        backgroundImage: `url("${m.sheetUrl}")`,
+        backgroundSize: vertikal ? `${fw * scale}px ${n * fh * scale}px` : `${n * fw * scale}px ${fh * scale}px`,
+        animation: `${id} ${dauer}ms steps(${n}) infinite`,
+      }} />
+    </div>
+  );
+}
+
+function ProfileSkinMenus({ ownedSkins, selected, onSelect, onClose }) {
+  const [hero, setHero] = useState(null);   // Held, dessen Skins gerade gewählt werden
+  const heroes = useMemo(() => {
+    const own = new Set(ownedSkins);
+    const alle = (ALL_CARDS || []).filter(c => c.cardType === 'Hero');
+    const mitSkin = (c) => (SKINS_DB[c.name] || []).some(sk => own.has(sk));
+    const cmp = (a, b) => heroDisplayName(a.name).localeCompare(heroDisplayName(b.name)) || a.name.localeCompare(b.name);
+    return [...alle.filter(mitSkin).sort(cmp), ...alle.filter(c => !mitSkin(c)).sort(cmp)];
+  }, [ownedSkins]);
+  const hatSkins = (name) => (SKINS_DB[name] || []).filter(sk => ownedSkins.includes(sk));
+
+  useEffect(() => {
+    const esc = (e) => {
+      if (e.key !== 'Escape') return;
+      e.stopImmediatePropagation();
+      if (hero) setHero(null); else onClose();
+    };
+    window.addEventListener('keydown', esc, true);
+    return () => window.removeEventListener('keydown', esc, true);
+  }, [hero, onClose]);
+
+  const fenster = (titel, zurueck, inhalt, z) => (
+    <div className="modal-overlay" style={{ zIndex: z }} onClick={e => { if (e.target === e.currentTarget) zurueck(); }}>
+      <div className="modal" style={{ maxWidth: 760, width: '92vw', maxHeight: '82vh', display: 'flex', flexDirection: 'column' }}>
+        <div style={{ display: 'flex', alignItems: 'center', marginBottom: 14 }}>
+          <h3 className="orbit-font" style={{ fontSize: 14, color: 'var(--accent)', flex: 1 }}>{titel}</h3>
+          <button className="btn" style={{ padding: '4px 12px', fontSize: 10 }} onClick={zurueck}>{hero && z > 1000 ? '← BACK' : '✕ CLOSE'}</button>
+        </div>
+        <div style={{ overflowY: 'auto', flex: 1 }}>{inhalt}</div>
+      </div>
+    </div>
+  );
+
+  const hauptmenue = fenster('SKINS', onClose, (
+    <>
+      <div style={{ fontSize: 11, color: 'var(--text2)', textAlign: 'center', marginBottom: 12 }}>
+        Pick a Hero to choose which skin they wear. Heroes with unlocked skins come first.
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(112px, 1fr))', gap: 10, padding: 4 }}>
+        {heroes.map(c => {
+          const eigene = hatSkins(c.name);
+          const aktiv = selected[c.name] && eigene.includes(selected[c.name]) ? selected[c.name] : null;
+          const anzeige = aktiv || c.name;
+          return (
+            <div key={c.name} role="button" tabIndex={0}
+              className={'profile-cb-gallery-item' + (aktiv ? ' active' : '')}
+              style={{ alignItems: 'center', cursor: eigene.length ? 'pointer' : 'default', padding: 6 }}
+              onClick={() => { if (eigene.length) setHero(c.name); }}
+              onKeyDown={(e) => { if ((e.key === 'Enter' || e.key === ' ') && eigene.length) { e.preventDefault(); setHero(c.name); } }}
+              title={c.name}>
+              <PpIdleSprite name={anzeige} box={96} grey={!eigene.length} />
+              <div className="profile-cb-gallery-label" style={{ opacity: eigene.length ? 1 : .7 }}>{heroDisplayName(c.name)}</div>
+            </div>
+          );
+        })}
+      </div>
+    </>
+  ), 1000);
+
+  if (!hero) return hauptmenue;
+  const optionen = [null, ...hatSkins(hero)];
+  const aktuell = selected[hero] || null;
+  return (
+    <>
+      {hauptmenue}
+      {fenster('SKIN — ' + heroDisplayName(hero).toUpperCase(), () => setHero(null), (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: 10, padding: 4 }}>
+          {optionen.map(sk => (
+            <div key={sk || 'base'} role="button" tabIndex={0}
+              className={'profile-cb-gallery-item' + ((aktuell || null) === sk ? ' active' : '')}
+              style={{ alignItems: 'center', padding: 6 }}
+              onClick={() => { onSelect(hero, sk); setHero(null); }}>
+              <PpIdleSprite name={sk || hero} box={112} />
+              <div className="profile-cb-gallery-label">{sk || 'Base'}</div>
+            </div>
+          ))}
+        </div>
+      ), 1100)}
+    </>
+  );
+}
+
 function ProfileScreen() {
   const { user, setUser, setScreen, notify, setBgmMode } = useContext(AppContext);
   const [color, setColor] = useState(user.color || '#00f0ff');
@@ -2363,7 +2584,8 @@ function ProfileScreen() {
     setPreviewTrack(id);
     if (setBgmMode) setBgmMode('battle:' + id);
   };
-  const closeTrackGallery = () => { stopTrackPreview(); setShowTrackGallery(false); };
+  // Das Vorhören läuft beim Schließen weiter (bis man es manuell ändert oder das Profil verlässt).
+  const closeTrackGallery = () => { setShowTrackGallery(false); };
   const selectBattleTrack = async (id) => {
     try {
       const data = await api('/profile', { method: 'PUT', body: JSON.stringify({ battleTrack: id }) });
@@ -2386,6 +2608,14 @@ function ProfileScreen() {
   const [showAvatarGallery, setShowAvatarGallery] = useState(false);
   const [standardAvatars, setStandardAvatars] = useState([]);
   const [ownedAvatars, setOwnedAvatars] = useState([]);
+  const [avatarNames, setAvatarNames] = useState({}); // Gegner-Avatare tragen Namen (cpu-avatars.js)
+  // Namens-Tooltip der Avatar-Auswahl: schwebt als eigenes Element am Seitenrand (Portal), damit lange Namen an den
+  // Außenkanten nicht vom scrollbaren Rahmen der Auswahl abgeschnitten werden.
+  const [avatarTip, setAvatarTip] = useState(null); // { text, cx, top, above } | null
+  const avatarTipProps = (text) => {
+    const zeige = (e) => { const r = e.currentTarget.getBoundingClientRect(); setAvatarTip({ text, cx: r.left + r.width / 2, top: r.bottom + 4, above: r.top - 4 }); };
+    return { 'aria-label': text, onMouseEnter: zeige, onFocus: zeige, onMouseLeave: () => setAvatarTip(null), onBlur: () => setAvatarTip(null) };
+  };
 
   // Board gallery
   const [showBoardGallery, setShowBoardGallery] = useState(false);
@@ -2394,6 +2624,9 @@ function ProfileScreen() {
 
   // Top heroes
   const [topHeroes, setTopHeroes] = useState([]);
+  const [showSkinMenu, setShowSkinMenu] = useState(false);
+  const [ownedSkinIds, setOwnedSkinIds] = useState([]);
+  const [heroTip, setHeroTip] = useState(null);   // { card, imageUrl } der gehoverten Top-Heldenkarte
 
   // Play Animations toggle. The flag is stored as 0/1 on the user
   // record, with `null`/missing treated as enabled. The battle client
@@ -2434,11 +2667,21 @@ function ProfileScreen() {
     api('/profile/standard-avatars').then(d => setStandardAvatars(d.avatars || [])).catch(() => {});
     api('/shop/owned').then(d => {
       setOwnedAvatars(d.owned?.avatar || []);
+      setAvatarNames(d.names?.avatar || {});
       setOwnedSleeves(d.owned?.sleeve || []);
       setSleeveNames(d.names?.sleeve || {});
       setOwnedBoards(d.owned?.board || []);
+      setOwnedSkinIds(d.owned?.skin || []);
     }).catch(() => {});
   }, []);
+  const selectHeroSkin = async (hero, skin) => {
+    const next = { ...(user.heroSkins || {}) };
+    if (skin) next[hero] = skin; else delete next[hero];
+    try {
+      const data = await api('/profile', { method: 'PUT', body: JSON.stringify({ heroSkins: next }) });
+      setUser(data.user);
+    } catch (e) { notify(e.message, 'error'); }
+  };
 
   // Intercept Escape to close gallery modals
   useEffect(() => {
@@ -2665,12 +2908,14 @@ function ProfileScreen() {
 
         {/* ═══ LEFT COLUMN — PLAYER IDENTITY ═══ */}
         <div className="profile-identity-col">
-          <div className="profile-identity-panel">
+          <div className="profile-identity-panel pp-fenster pp-fenster-flach">
 
             {/* Avatar frame */}
             <div className="profile-hero-area">
-              <div className="profile-avatar-frame" style={{ borderColor: rank.color, boxShadow: `0 0 20px ${rank.glow}, 0 0 40px ${rank.glow}, inset 0 0 15px ${rank.glow}`, cursor: 'pointer' }}
-                onClick={() => setShowAvatarGallery(true)}>
+              {/* role="button": der globale Klick-Sound (app-shared.jsx) hört auf Knöpfe und [role="button"] */}
+              <div className="profile-avatar-frame" role="button" tabIndex={0} aria-label="Change avatar" style={{ borderColor: rank.color, boxShadow: `0 0 20px ${rank.glow}, 0 0 40px ${rank.glow}, inset 0 0 15px ${rank.glow}`, cursor: 'pointer' }}
+                onClick={() => setShowAvatarGallery(true)}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setShowAvatarGallery(true); } }}>
                 <div className="profile-avatar-inner">
                   {avatar
                     ? <img src={avatar} style={{ width: '100%', height: '100%', objectFit: 'cover', imageRendering: 'pixelated' }} />
@@ -2786,15 +3031,6 @@ function ProfileScreen() {
               <div style={{ textAlign: 'right', fontSize: 9, color: 'var(--text2)', marginTop: 2 }}>{defeatMsg.length}/80</div>
             </div>
 
-            {/* Profile Backup */}
-            <div style={{ borderTop: '1px solid var(--bg4)', margin: 'calc(var(--pv) * 1) 0', paddingTop: 'calc(var(--pv) * 1)' }}>
-              <div className="profile-section-label">PROFILE BACKUP</div>
-              {/* Export/Import buttons hidden — profile data now persists via Turso DB */}
-              <div style={{ fontSize: 9, color: 'var(--text2)', marginTop: 6, textAlign: 'center' }}>
-                Profile data is stored in the cloud and persists across updates.
-              </div>
-            </div>
-
             {/* Save button at bottom of identity panel */}
             <div style={{ marginTop: 'auto', paddingTop: 'calc(var(--pv) * 1.2)' }}>
               <button className="btn btn-success" style={{ width: '100%', padding: 'calc(var(--pv) * 1.3) 0', fontSize: 14 }} onClick={save} disabled={saving || !isDirty}>
@@ -2809,7 +3045,7 @@ function ProfileScreen() {
         <div className="profile-right-col">
 
           {/* Combined: Sleeve + Battle Record + Name Color + Top Heroes */}
-          <div className="profile-section profile-section-wide" style={{ flex: 'none' }}>
+          <div className="profile-section profile-section-wide pp-fenster" style={{ flex: 'none' }}>
             <div style={{ display: 'flex', gap: 28, alignItems: 'stretch' }}>
 
               {/* Sleeve — large preview */}
@@ -2828,7 +3064,7 @@ function ProfileScreen() {
               <div style={{ display: 'flex', flexDirection: 'column', gap: 0, minWidth: 180 }}>
 
                 {/* Battle Record */}
-                <div style={{ paddingBottom: 14, borderBottom: '1px solid var(--bg4)' }}>
+                <div style={{ paddingBottom: 9, borderBottom: '1px solid var(--bg4)' }}>
                   <div className="profile-section-label">BATTLE RECORD</div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
                     <span style={{ color: 'var(--success)', fontWeight: 700, fontSize: 15 }}>{wins}</span>
@@ -2846,7 +3082,7 @@ function ProfileScreen() {
                 </div>
 
                 {/* Name Color */}
-                <div style={{ paddingTop: 14, paddingBottom: 14, borderBottom: '1px solid var(--bg4)' }}>
+                <div style={{ paddingTop: 9, paddingBottom: 9, borderBottom: '1px solid var(--bg4)' }}>
                   <div className="profile-section-label">NAME COLOR</div>
                   <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
                     <input type="color" value={color} onChange={e => setColor(e.target.value)}
@@ -2857,7 +3093,7 @@ function ProfileScreen() {
                 </div>
 
                 {/* Battle music */}
-                <div style={{ paddingTop: 14, paddingBottom: 14, borderBottom: '1px solid var(--bg4)', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <div style={{ paddingTop: 9, paddingBottom: 9, borderBottom: '1px solid var(--bg4)', display: 'flex', flexDirection: 'column', gap: 6 }}>
                   <div className="profile-section-label">BATTLE MUSIC</div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                     <div style={{ fontSize: 13, color: 'var(--text)', fontWeight: 600, flex: 1 }}>
@@ -2870,8 +3106,22 @@ function ProfileScreen() {
                   </div>
                 </div>
 
+                {/* Skins */}
+                <div style={{ paddingTop: 9, paddingBottom: 9, borderBottom: '1px solid var(--bg4)', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <div className="profile-section-label">SKINS</div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <div style={{ fontSize: 13, color: 'var(--text)', fontWeight: 600, flex: 1 }}>
+                      {'🎨 ' + ownedSkinIds.length + (ownedSkinIds.length === 1 ? ' Skin' : ' Skins') + ' unlocked'}
+                    </div>
+                    <button className="btn" style={{ padding: '6px 16px', fontSize: 11 }}
+                      onClick={() => setShowSkinMenu(true)}>
+                      CHANGE
+                    </button>
+                  </div>
+                </div>
+
                 {/* Board info */}
-                <div style={{ paddingTop: 14, flex: 1, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <div style={{ paddingTop: 9, flex: 1, display: 'flex', flexDirection: 'column', gap: 6 }}>
                   <div className="profile-section-label">BOARD</div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                     {board ? (
@@ -2892,6 +3142,9 @@ function ProfileScreen() {
               </div>
 
               {/* Right: Top Heroes */}
+              {heroTip && window.CardSideTooltip && ReactDOM.createPortal(
+                <div className="ppf-tip-host"><window.CardSideTooltip card={heroTip.card} imgUrl={heroTip.imageUrl} /></div>,
+                document.body)}
               <div className="profile-heroes-col" style={{ borderLeft: '1px solid var(--bg4)', paddingLeft: 24, display: 'flex', flexDirection: 'column', flex: 1, minWidth: 140 }}>
                 <div className="profile-section-label">TOP HEROES</div>
                 {topHeroes.length === 0 ? (
@@ -2903,10 +3156,12 @@ function ProfileScreen() {
                 ) : (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 10, flex: 1 }}>
                     {topHeroes.map((h, i) => {
-                      const heroImg = getCardImage(h.name);
+                      const heroImg = (user.heroSkins && user.heroSkins[h.name]) ? skinImageUrl(user.heroSkins[h.name]) : getCardImage(h.name);
                       const medal = ['🥇', '🥈', '🥉'][i];
                       return (
-                        <div key={h.name} className="profile-top-hero">
+                        <div key={h.name} className="profile-top-hero"
+                          onMouseEnter={() => { const c = CARDS_BY_NAME && CARDS_BY_NAME[h.name]; if (c) setHeroTip({ card: c, imageUrl: cardImageUrl(h.name, user.heroSkins) }); }}
+                          onMouseLeave={() => setHeroTip(null)}>
                           <div className="profile-top-hero-rank">{medal}</div>
                           <div className="profile-top-hero-card">
                             {heroImg
@@ -3005,6 +3260,11 @@ function ProfileScreen() {
           })()}
 
           {/* Sleeve Gallery Modal */}
+          {showSkinMenu && (
+            <ProfileSkinMenus ownedSkins={ownedSkinIds} selected={user.heroSkins || {}}
+              onSelect={selectHeroSkin} onClose={() => setShowSkinMenu(false)} />
+          )}
+
           {showSleeveGallery && (
             <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) setShowSleeveGallery(false); }}>
               <div className="modal" style={{ maxWidth: 620, width: '90vw', maxHeight: '80vh', display: 'flex', flexDirection: 'column' }}>
@@ -3059,18 +3319,17 @@ function ProfileScreen() {
                   <h3 className="orbit-font" style={{ fontSize: 14, color: 'var(--accent)', flex: 1 }}>SELECT AVATAR</h3>
                   <button className="btn" style={{ padding: '4px 12px', fontSize: 10 }} onClick={() => setShowAvatarGallery(false)}>✕ CLOSE</button>
                 </div>
-                <div style={{ overflow: 'hidden auto', flex: 1 }}>
+                <div style={{ overflow: 'hidden auto', flex: 1 }} onScroll={() => setAvatarTip(null)}>
                   <div className="profile-avatar-gallery">
                     {/* Standard avatars (free) */}
                     {standardAvatars.map(file => {
                       const url = '/avatars/' + encodeURIComponent(file);
                       return (
                         <div key={file} className={'profile-avatar-gallery-item' + (avatar === url ? ' active' : '')} role="button" tabIndex={0}
-                          onClick={() => quickSaveAvatar(url)}>
+                          onClick={() => quickSaveAvatar(url)} {...avatarTipProps(ppCamelSpaces(file.replace(/\.[^.]+$/, '')))}>
                           <div className="profile-avatar-gallery-img">
                             <img src={url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                           </div>
-                          <div className="profile-cb-gallery-label">{file.replace(/\.[^.]+$/, '')}</div>
                         </div>
                       );
                     })}
@@ -3079,15 +3338,15 @@ function ProfileScreen() {
                       const url = '/data/shop/avatars/' + encodeURIComponent(avatarId) + '.png';
                       return (
                         <div key={avatarId} className={'profile-avatar-gallery-item' + (avatar === url ? ' active' : '')} role="button" tabIndex={0}
-                          onClick={() => quickSaveAvatar(url)}>
+                          onClick={() => quickSaveAvatar(url)} {...avatarTipProps(avatarNames[avatarId] || ppCamelSpaces(avatarId))}>
                           <div className="profile-avatar-gallery-img">
                             <img src={url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                           </div>
-                          <div className="profile-cb-gallery-label">{avatarId}</div>
                         </div>
                       );
                     })}
                   </div>
+                  {avatarTip && <PpFloatTip text={avatarTip.text} cx={avatarTip.cx} top={avatarTip.top} above={avatarTip.above} />}
                   {standardAvatars.length === 0 && ownedAvatars.length === 0 && (
                     <div style={{ textAlign: 'center', color: 'var(--text2)', fontSize: 11, marginTop: 12 }}>
                       Visit the Shop to unlock more avatars!
@@ -3136,11 +3395,11 @@ function ProfileScreen() {
             </div>
           )}
 
-          {/* v1464: SETTINGS (links) und CHANGE PASSWORD (rechts) teilen sich
-              eine Zeile — sonst passt das Profil nicht auf einen Bildschirm. */}
+          {/* SETTINGS, CHANGE PASSWORD und EMAIL & RECOVERY teilen sich eine Zeile
+              (drei Spalten) — sonst passt das Profil nicht auf einen Bildschirm. */}
           <div className="profile-zweispaltig">
           {/* Settings */}
-          <div className="profile-section profile-section-wide">
+          <div className="profile-section profile-section-wide pp-fenster">
             <div className="profile-section-label">SETTINGS</div>
             <div className="profile-schalter-spalte">
               <ProfilSchalter an={playAnimations} onToggle={togglePlayAnimations}
@@ -3165,7 +3424,7 @@ function ProfileScreen() {
           </div>
 
           {/* Change Password */}
-          <div className="profile-section profile-section-wide">
+          <div className="profile-section profile-section-wide pp-fenster">
             <div className="profile-section-label">CHANGE PASSWORD</div>
             <div className="profile-passwort-spalte">
               <input className="input" type="password" placeholder="Current password" value={oldPw}
@@ -3181,10 +3440,9 @@ function ProfileScreen() {
               </button>
             </div>
           </div>
-          </div>
 
           {/* Email & recovery */}
-          <div className="profile-section profile-section-wide">
+          <div className="profile-section profile-section-wide pp-fenster">
             <div className="profile-section-label">EMAIL &amp; RECOVERY</div>
             {user.email && !emailEditing ? (
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
@@ -3228,6 +3486,7 @@ function ProfileScreen() {
                 )}
               </div>
             )}
+          </div>
           </div>
 
         </div>
@@ -3352,6 +3611,8 @@ function ShopScreen() {
   const [structureCatalog, setStructureCatalog] = useState(null); // { decks, price, randomPrice, defaultDeckId }
   // Gegner-Sleeves (cpu-sleeves.js): nicht käuflich, fünf Siege gegen die CPU schalten sie frei.
   const [cpuSleeves, setCpuSleeves] = useState({ need: 5, sleeves: [] });
+  // Gegner-Avatare (cpu-avatars.js): nicht käuflich, der erste Sieg gegen die CPU schaltet das Portrait frei.
+  const [cpuAvatars, setCpuAvatars] = useState({ need: 1, avatars: [] });
   const [loading, setLoading] = useState(true);
   const [buying, setBuying] = useState(false);
   const [tab, setTab] = useState('skins');
@@ -3385,16 +3646,18 @@ function ShopScreen() {
   useEffect(() => {
     (async () => {
       try {
-        const [catData, ownData, structData, cpuData] = await Promise.all([
+        const [catData, ownData, structData, cpuData, cpuAvData] = await Promise.all([
           api('/shop/catalog'),
           api('/shop/owned'),
           api('/shop/structure-decks'),
           api('/shop/cpu-sleeves').catch(() => null),
+          api('/shop/cpu-avatars').catch(() => null),
         ]);
         setCatalog(catData);
         setOwned(ownData.owned);
         setStructureCatalog(structData);
         if (cpuData) setCpuSleeves(cpuData);
+        if (cpuAvData) setCpuAvatars(cpuAvData);
       } catch (e) { notify(e.message, 'error'); }
       setLoading(false);
     })();
@@ -3738,6 +4001,52 @@ function ShopScreen() {
     );
   };
 
+  const renderCpuAvatars = () => {
+    const list = cpuAvatars.avatars || [];
+    if (list.length === 0) return <div className="shop-empty">No opponent avatars available yet</div>;
+    const need = cpuAvatars.need || 1;
+    const earned = list.filter(it => it.unlocked).length;
+    return (
+      <React.Fragment>
+        <div className="shop-random-wrap">
+          <div className="shop-cpu-sleeves-intro">🏆 Every CPU opponent has a portrait. Defeat an opponent {need === 1 ? 'once' : need + ' times'} to claim it as your avatar!</div>
+          <span className="shop-random-hint">{earned} / {list.length} earned</span>
+        </div>
+        <div className="shop-grid">
+          {list.map(item => {
+            const isOwned = item.unlocked;
+            const equipped = isOwned && isEquipped('avatar', item.id);
+            const hidden = !isOwned && !item.opponentKnown;
+            return (
+              <div key={item.id} className={'shop-item shop-avatar-item shop-cpu-sleeve' + (isOwned ? ' shop-owned' : ' shop-unowned-skin') + (equipped ? ' shop-equipped' : '') + (hidden ? ' shop-cpu-sleeve-hidden' : '')}
+                onClick={() => isOwned && !equipped && equipItem('avatar', item.id)}>
+                <span className="shop-item-zier" aria-hidden="true" />
+                <div className="shop-item-img-wrap">
+                  <img src={'/data/shop/avatars/' + encodeURIComponent(item.file)} draggable={false}
+                    className={isOwned ? '' : 'shop-skin-locked'} />
+                  {equipped ? <div className="shop-owned-badge shop-equipped-badge">EQUIPPED</div>
+                    : isOwned ? <div className="shop-owned-badge">OWNED</div> : (
+                      <div className="shop-lock-overlay">
+                        <span className="shop-lock-badge" aria-label="Locked">🔒</span>
+                      </div>
+                    )}
+                </div>
+                <div className="shop-item-name" title={hidden ? '???' : item.name}>{hidden ? '???' : item.name}</div>
+                {!isOwned && (
+                  <div className="shop-cpu-progress" title={hidden ? 'Unlock this opponent in Singleplayer first' : 'Defeat ' + (item.middleHero || item.opponent) + ' ' + need + ' time' + (need === 1 ? '' : 's')}>
+                    <div className="shop-cpu-progress-label">{hidden ? 'Unknown opponent' : 'vs. ' + (item.middleHero || item.opponent)}</div>
+                    <div className="shop-cpu-progress-bar"><span style={{ width: Math.round(100 * item.wins / need) + '%' }} /></div>
+                    <div className="shop-cpu-progress-count">{item.wins} / {need} {need === 1 ? 'win' : 'wins'}</div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </React.Fragment>
+    );
+  };
+
   const renderSkinGrid = () => {
     if ((catalog.skins || []).length === 0) return <div className="shop-empty">No skins available yet</div>;
     const allOwned = ownedSet.skin;
@@ -3883,6 +4192,7 @@ function ShopScreen() {
     { id: 'avatars', label: '👤 Avatars', count: (catalog.avatars || []).length },
     { id: 'sleeves', label: '🃏 Sleeves', count: (catalog.sleeves || []).length },
     { id: 'cpuSleeves', label: '🏆 Opponent Sleeves', count: (cpuSleeves.sleeves || []).length },
+    { id: 'cpuAvatars', label: '🏆 Opponent Avatars', count: (cpuAvatars.avatars || []).length },
     { id: 'boards', label: '🎮 Boards', count: (catalog.boards || []).length },
     { id: 'structures', label: '📜 Structure Decks', count: (structureCatalog?.decks || []).length },
   ];
@@ -3944,6 +4254,7 @@ function ShopScreen() {
         {tab === 'avatars' && renderItemGrid(catalog.avatars || [], 'avatar', '/data/shop/avatars/')}
         {tab === 'sleeves' && renderItemGrid(catalog.sleeves || [], 'sleeve', '/data/shop/sleeves/')}
         {tab === 'cpuSleeves' && renderCpuSleeves()}
+        {tab === 'cpuAvatars' && renderCpuAvatars()}
         {tab === 'boards' && renderItemGrid(catalog.boards || [], 'board', '/data/shop/boards/')}
         {tab === 'structures' && renderStructureDecks()}
       </div>
@@ -4566,6 +4877,24 @@ function ZufallsGegnerBild({ gegner, schnell, width = 240 }) {
       <RollenderWuerfel rollt={schnell} />
     </div>
   );
+}
+
+/** Schwebender Namens-Tooltip (Portal in <body>, position: fixed): bleibt innerhalb des Fensters und wird von keinem
+ *  scrollbaren Rahmen abgeschnitten. Liegt unter dem Auslöser, bei Platzmangel darüber. */
+function PpFloatTip({ text, cx, top, above }) {
+  const ref = useRef(null);
+  const [pos, setPos] = useState({ left: cx, top, vis: false });
+  React.useLayoutEffect(() => {
+    const el = ref.current; if (!el) return;
+    const w = el.offsetWidth, h = el.offsetHeight;
+    const vw = document.documentElement.clientWidth, vh = window.innerHeight;
+    const left = Math.min(Math.max(cx - w / 2, 8), Math.max(8, vw - w - 8));
+    const y = (top + h > vh - 8 && above - h >= 8) ? above - h : top;
+    setPos({ left, top: y, vis: true });
+  }, [text, cx, top, above]);
+  return ReactDOM.createPortal(
+    <div ref={ref} className="pp-float-tip" style={{ left: pos.left, top: pos.top, visibility: pos.vis ? 'visible' : 'hidden' }}>{text}</div>,
+    document.body);
 }
 
 function HeroArtCrop({ heroName, width = 160, skinName = null }) {

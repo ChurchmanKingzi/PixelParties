@@ -108,6 +108,7 @@ async function start(room, host, prep) {
   applyBoards(gs, prep, cards);
   gs.turn = 0; gs.activePlayer = starter; gs.currentPhase = 0;
   gs.awaitingFirstChoice = false; gs.mulliganPending = false; delete gs.mulliganDecisions;
+  gs.isSkillTest = true;                                     // Client: zufällige Kampfmusik des Modus (BGM_SETS, gs.bgmSet)
   const st = room.skillTest;
   st.phase = 'battle';
   st.starter = starter;

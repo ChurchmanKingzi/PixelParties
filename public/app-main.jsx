@@ -1254,7 +1254,9 @@ function PlayScreen() {
       // nicht, liegt es am Musik-Manager darunter.
       // CPU-Kampf: Thema der CPU. PvP: der gewählte Track des Gegners
       // (`oppBgm`, Profil → Battle Music). Sonst der Standard.
-      const bgmSlug = gameState.cpuBgm || gameState.oppBgm;
+      // Skill Test (`bgmSet`): zufaellig eine von mehreren Kampfmusiken, je Partie stabil (BGM_SETS).
+      const bgmSlug = bgmSetPick(gameState.bgmSet, (gameState.roomId || '') + ':' + ((gameState.setScore || [0, 0]).reduce((a, b) => a + b, 0)))
+        || gameState.cpuBgm || gameState.oppBgm;
       const mode = bgmSlug ? 'battle:' + bgmSlug : 'battle';
       if (window.__ppBgmLast !== mode) {
         window.__ppBgmLast = mode;
@@ -2505,6 +2507,19 @@ window._ppDuckBgm = (phase) => {
 // fehlende Datei. Das Kampf-Element ist bereits entsperrt und bleibt es
 // auch über einen `src`-Wechsel hinweg.
 const BGM_BATTLE_DEFAULT = BGM_FILES.battle;
+// Musik-SAETZE: mehrere gleichwertige Kampfmusiken, aus denen je Partie eine zufaellig gewaehlt wird
+// (Dateien /music/bgm_<satz><n>.ogg, n = 1…Anzahl). Skill Test: bis zu 8 Spieler, zufaellige Layouts → fuenf Tracks.
+const BGM_SETS = { skilltest: 5 };
+// Die Wahl haengt nur an `seed` (Raum + Satzstand): alle Spieler der Partie hoeren denselben Track, und er
+// bleibt ueber jedes erneute Rendern gleich. Eine Revanche (anderer Satzstand) wuerfelt neu.
+function bgmSetPick(setName, seed) {
+  const count = setName ? BGM_SETS[setName] : 0;
+  if (!count) return null;
+  let h = 2166136261;
+  const s = String(setName) + '|' + String(seed);
+  for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619) >>> 0; }
+  return setName + (1 + (h % count));
+}
 function _bgmBattleSrc(url) {
   const el = _bgmTracks.battle;
   if (!el) return null;

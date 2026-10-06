@@ -127,7 +127,7 @@ class Song:
             body = body / np.sqrt((body ** 2).mean()) * target_rms
             if compress:
                 # 40-ms-RMS-Detektor, Schwelle = Ziel-RMS, Verhältnis 3,5:1, Pegel dann wieder auf Ziel-RMS
-                env = np.sqrt(uniform_filter1d(np.mean(body ** 2, axis=1), size=int(0.040 * sr), mode='nearest'))
+                env = np.sqrt(np.maximum(uniform_filter1d(np.mean(body ** 2, axis=1), size=int(0.040 * sr), mode='nearest'), 0.0))   # Rundungsfehler in digitaler Stille nie negativ
                 gk = np.maximum(env / target_rms, 1.0) ** (1 / 3.5 - 1)
                 gk = uniform_filter1d(gk, size=int(0.015 * sr), mode='nearest')
                 body = body * gk[:, None]

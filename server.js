@@ -118,6 +118,27 @@ const PROFILE_SECRET = process.env.PROFILE_SECRET || 'pxlParties_s3cret_k3y_2025
 const PUZZLE_SECRET = process.env.PUZZLE_SECRET || 'pxlParties_puzzl3_k3y_2025!';
 const profileImportUsed = new Set();
 
+// Puzzle-Skins: Helden-Slots dürfen `skin` tragen. Beim Test/Export bleiben nur Skins,
+// die zum Helden gehören UND dem Ersteller gehören — sonst wird der Skin entfernt.
+async function stripUnownedPuzzleSkins(userId, puzzleData) {
+  const rows = await db.all("SELECT item_id FROM user_shop_items WHERE user_id = ? AND item_type = 'skin'", [userId]);
+  const owned = new Set(rows.map(r => r.item_id));
+  for (const pl of (puzzleData?.players || [])) {
+    for (const h of (pl?.heroes || [])) {
+      if (!h || h.skin === undefined) continue;
+      if (!(h.name && typeof h.skin === 'string' && (SKINS_DATA[h.name] || []).includes(h.skin) && owned.has(h.skin))) delete h.skin;
+    }
+  }
+}
+// Beim Spielstart: Skin je Held in `deckSkins` übernehmen (gültige Zuordnung Held → Skin genügt).
+function puzzleDeckSkins(pz) {
+  const out = {};
+  for (const h of (pz?.heroes || [])) {
+    if (h && h.name && typeof h.skin === 'string' && (SKINS_DATA[h.name] || []).includes(h.skin)) out[h.name] = h.skin;
+  }
+  return out;
+}
+
 // ===== PUZZLE ENCRYPTION =====
 function encryptPuzzle(data) {
   const iv = crypto.randomBytes(16);
@@ -914,6 +935,9 @@ async function initDatabase() {
   try { await db.execute("ALTER TABLE users ADD COLUMN board TEXT DEFAULT NULL"); } catch {}
   // Gewählter Battle-Track (battle-tracks.js): 'battle<N>' oder Slug eines CPU-Themas; NULL = Standard.
   try { await db.execute("ALTER TABLE users ADD COLUMN battle_track TEXT DEFAULT NULL"); } catch {}
+  // Profil → Skins: gewählter Skin je Held ({ Heldenkarte: Skinname }). Gilt als
+  // Standard für jedes Deck, das für diesen Helden keinen eigenen Skin gesetzt hat.
+  try { await db.execute("ALTER TABLE users ADD COLUMN hero_skins TEXT DEFAULT '{}'"); } catch {}
   try { await db.execute("ALTER TABLE users ADD COLUMN hide_tutorial INTEGER DEFAULT 0"); } catch {}
   try { await db.execute("ALTER TABLE users ADD COLUMN play_animations INTEGER DEFAULT 1"); } catch {}
   // v1463: animierte Helden auf dem Brett (Display Heroes) und ihr
@@ -1172,6 +1196,34 @@ async function initDatabase() {
       await db.run("DELETE FROM user_shop_items WHERE item_type = 'sleeve' AND item_id = ?", [e.formerId]);
       await db.run('UPDATE users SET cardback = ? WHERE cardback = ?', ['/data/shop/sleeves/' + e.id + '.png', '/data/shop/sleeves/' + e.formerId + '.png']);
     } catch (err) { console.error('[Shop] Sleeve-Migration', e.formerId, '->', e.id, 'fehlgeschlagen:', err.message); }
+  }
+
+  // Avatare, die früher "avatarN" hießen, tragen jetzt Namen (data/shop/avatar-renames.json: { "avatar1": "Birb", … }).
+  // Gekaufte und ausgerüstete Avatare auf die neue ID umschreiben — idempotent, läuft bei jedem Start ohne Wirkung
+  // weiter. MUSS vor der Bereinigung unten laufen, sonst würden getragene Avatare mit altem Pfad zurückgesetzt.
+  let avatarRenames = {};
+  try { avatarRenames = JSON.parse(fs.readFileSync(path.join(__dirname, 'data', 'shop', 'avatar-renames.json'), 'utf-8')); }
+  catch (err) { if (err.code !== 'ENOENT') console.error('[Shop] avatar-renames.json unlesbar:', err.message); }
+  for (const [oldId, newId] of Object.entries(avatarRenames)) {
+    if (!oldId || !newId || oldId === newId) continue;
+    try {
+      await db.run("UPDATE OR IGNORE user_shop_items SET item_id = ? WHERE item_type = 'avatar' AND item_id = ?", [newId, oldId]);
+      await db.run("DELETE FROM user_shop_items WHERE item_type = 'avatar' AND item_id = ?", [oldId]);
+      await db.run('UPDATE users SET avatar = ? WHERE avatar = ?', ['/data/shop/avatars/' + newId + '.png', '/data/shop/avatars/' + oldId + '.png']);
+    } catch (err) { console.error('[Shop] Avatar-Umbenennung', oldId, '->', newId, 'fehlgeschlagen:', err.message); }
+  }
+
+  // Standard-Avatare (public/avatars/) heißen ebenfalls nicht mehr "avatarN" (data/standard-avatar-renames.json):
+  // getragene Avatare und noch offene Anmeldungen auf den neuen Pfad umschreiben (idempotent).
+  let stdRenames = {};
+  try { stdRenames = JSON.parse(fs.readFileSync(path.join(__dirname, 'data', 'standard-avatar-renames.json'), 'utf-8')); }
+  catch (err) { if (err.code !== 'ENOENT') console.error('[Avatar] standard-avatar-renames.json unlesbar:', err.message); }
+  for (const [oldId, newId] of Object.entries(stdRenames)) {
+    if (!oldId || !newId || oldId === newId) continue;
+    for (const table of ['users', 'pending_signups']) {
+      try { await db.run(`UPDATE ${table} SET avatar = ? WHERE avatar = ?`, ['/avatars/' + newId + '.png', '/avatars/' + oldId + '.png']); }
+      catch (err) { console.error('[Avatar] Umbenennung', table, oldId, '->', newId, 'fehlgeschlagen:', err.message); }
+    }
   }
 
   // Ausgerüstete Shop-Avatare/-Sleeves, deren Datei entfernt wurde, zurücksetzen (idempotent).
@@ -1920,6 +1972,10 @@ app.get('/api/auth/me', authMiddleware, async (req, res) => {
 // weder in der Besitzliste noch als Ausrüstung im Profil oder im Spiel. Die Käufe bleiben in
 // der Datenbank, nur die Anzeige filtert gegen die Dateien auf der Platte (30 s zwischengespeichert).
 const _shopIdCache = {};
+/** CamelCase-ID → Anzeigename mit Leerzeichen ("SmugEvil" → "Smug Evil", "FTGunslinger" → "FT Gunslinger"). */
+function avatarDisplayName(id) {
+  return String(id).replace(/([a-z0-9])([A-Z])/g, '$1 $2').replace(/([A-Z]+)([A-Z][a-z])/g, '$1 $2').replace(/([A-Za-z])(\d)/g, '$1 $2');
+}
 function shopIds(subdir) {
   const c = _shopIdCache[subdir]; const now = Date.now();
   if (c && now - c.t < 30000) return c.ids;
@@ -1937,8 +1993,14 @@ function liveShopRef(url, subdir) {
   return shopIds(subdir).has(id) ? url : null;
 }
 
+function parseHeroSkins(raw) {
+  try {
+    const o = JSON.parse(raw || '{}');
+    return (o && typeof o === 'object' && !Array.isArray(o)) ? o : {};
+  } catch { return {}; }
+}
 function sanitizeUser(u) {
-  return { id: u.id, username: u.username, elo: u.elo, eloCube: u.elo_cube == null ? 1000 : u.elo_cube, color: u.color, avatar: liveShopRef(u.avatar, 'avatars'), cardback: liveShopRef(u.cardback, 'sleeves'), board: u.board || null, battleTrack: u.battle_track || null, bio: u.bio || '', victoryMsg: u.victory_msg || '', defeatMsg: u.defeat_msg || '', wins: u.wins || 0, losses: u.losses || 0, sc: u.sc || 0, created_at: u.created_at, hide_tutorial: u.hide_tutorial || 0, play_animations: u.play_animations == null ? 1 : (u.play_animations ? 1 : 0), display_heroes: u.display_heroes == null ? 1 : (u.display_heroes ? 1 : 0), dynamic_heroes: (u.display_heroes === 0) ? 0 : (u.dynamic_heroes == null ? 1 : (u.dynamic_heroes ? 1 : 0)), defaultSampleDeckId: u.default_sample_deck_id || null, email: u.email || null, emailVerified: !!u.email_verified, isGuest: !!u.is_guest };
+  return { id: u.id, username: u.username, elo: u.elo, eloCube: u.elo_cube == null ? 1000 : u.elo_cube, color: u.color, avatar: liveShopRef(u.avatar, 'avatars'), cardback: liveShopRef(u.cardback, 'sleeves'), board: u.board || null, battleTrack: u.battle_track || null, heroSkins: parseHeroSkins(u.hero_skins), bio: u.bio || '', victoryMsg: u.victory_msg || '', defeatMsg: u.defeat_msg || '', wins: u.wins || 0, losses: u.losses || 0, sc: u.sc || 0, created_at: u.created_at, hide_tutorial: u.hide_tutorial || 0, play_animations: u.play_animations == null ? 1 : (u.play_animations ? 1 : 0), display_heroes: u.display_heroes == null ? 1 : (u.display_heroes ? 1 : 0), dynamic_heroes: (u.display_heroes === 0) ? 0 : (u.dynamic_heroes == null ? 1 : (u.dynamic_heroes ? 1 : 0)), defaultSampleDeckId: u.default_sample_deck_id || null, email: u.email || null, emailVerified: !!u.email_verified, isGuest: !!u.is_guest };
 }
 
 // ===== PROFILE ROUTES =====
@@ -2000,6 +2062,30 @@ app.put('/api/profile', authMiddleware, async (req, res) => {
       return res.status(403).json({ error: 'This sleeve is not unlocked yet.' });
     }
   }
+  // Gegner-Avatare (cpu-avatars.js): erst nach dem ersten Sieg gegen diese CPU.
+  if (b.avatar) {
+    const m = /^\/data\/shop\/avatars\/([^/]+)\.png$/.exec(String(b.avatar));
+    let avId = m ? m[1] : null;
+    try { if (avId) avId = decodeURIComponent(avId); } catch { /* unlesbare ID: unten als nicht freigeschaltet behandeln */ }
+    if (avId && cpuAvatars.isCpuAvatar(avId) && !(await cpuAvatars.ownedIds(req.user.userId)).includes(avId)) {
+      return res.status(403).json({ error: 'This avatar is not unlocked yet.' });
+    }
+  }
+  // Skins je Held (Profil → Skins): nur Skins, die zum Helden gehören UND dem Spieler gehören.
+  let heroSkinsClean;
+  if (b.heroSkins !== undefined) {
+    const wanted = (b.heroSkins && typeof b.heroSkins === 'object' && !Array.isArray(b.heroSkins)) ? b.heroSkins : {};
+    const ownedRows = await db.all("SELECT item_id FROM user_shop_items WHERE user_id = ? AND item_type = 'skin'", [req.user.userId]);
+    const ownedSkins = new Set(ownedRows.map(r => r.item_id));
+    heroSkinsClean = {};
+    for (const [hero, skin] of Object.entries(wanted)) {
+      if (!skin) continue;
+      if (!(SKINS_DATA[hero] || []).includes(skin) || !ownedSkins.has(skin)) {
+        return res.status(403).json({ error: 'This skin is not unlocked.' });
+      }
+      heroSkinsClean[hero] = skin;
+    }
+  }
   // Update only the fields the client actually sent, so single-field
   // quick-saves (avatar, sleeve, …) never clobber the others.
   const sets = [];
@@ -2010,6 +2096,7 @@ app.put('/api/profile', authMiddleware, async (req, res) => {
   if (b.cardback !== undefined)   { sets.push('cardback = ?');    vals.push(b.cardback || null); }
   if (b.bio !== undefined)        { sets.push('bio = ?');         vals.push((b.bio || '').slice(0, 200)); }
   if (b.board !== undefined)      { sets.push('board = ?');       vals.push(b.board || null); }
+  if (heroSkinsClean !== undefined) { sets.push('hero_skins = ?'); vals.push(JSON.stringify(heroSkinsClean)); }
   if (b.battleTrack !== undefined){ sets.push('battle_track = ?'); vals.push(b.battleTrack ? String(b.battleTrack).toLowerCase() : null); }
   if (b.victoryMsg !== undefined) { sets.push('victory_msg = ?'); vals.push(String(b.victoryMsg || '').slice(0, MESSAGE_MAX_LEN)); }
   if (b.defeatMsg !== undefined)  { sets.push('defeat_msg = ?');  vals.push(String(b.defeatMsg || '').slice(0, MESSAGE_MAX_LEN)); }
@@ -3582,6 +3669,17 @@ app.get('/api/shop/structure-decks', authMiddleware, async (req, res) => {
   });
 });
 
+// Profil-Skins als Standard: Skin je Held aus dem Profil, soweit das Deck keinen eigenen setzt.
+async function withProfileHeroSkins(userId, deck) {
+  if (!deck || !userId) return deck;
+  try {
+    const row = await db.get('SELECT hero_skins FROM users WHERE id = ?', [userId]);
+    const mine = parseHeroSkins(row?.hero_skins);
+    if (!Object.keys(mine).length) return deck;
+    return { ...deck, skins: { ...mine, ...(deck.skins || {}) } };
+  } catch { return deck; }
+}
+
 // ===== SKINS =====
 let SKINS_DATA = {};
 try { SKINS_DATA = JSON.parse(fs.readFileSync(path.join(__dirname, 'data', 'skins.json'), 'utf-8')); } catch {}
@@ -3721,7 +3819,9 @@ function getAvailableSkins() {
 
 // GET /api/shop/catalog — all available shop items
 app.get('/api/shop/catalog', (req, res) => {
-  const avatars = scanShopDir('avatars').map(f => ({ id: path.basename(f, path.extname(f)), file: f }));
+  // Gegner-Avatare liegen im selben Ordner, sind aber nicht käuflich (cpu-avatars.js).
+  const avatars = scanShopDir('avatars').map(f => ({ id: path.basename(f, path.extname(f)), file: f }))
+    .filter(a => !cpuAvatars.isCpuAvatar(a.id));
   // Gegner-Sleeves liegen im selben Ordner, sind aber nicht käuflich (cpu-sleeves.js).
   const sleeves = scanShopDir('sleeves').map(f => {
     const id = path.basename(f, path.extname(f));
@@ -3769,11 +3869,16 @@ app.get('/api/shop/owned', authMiddleware, async (req, res) => {
   // Freigeschaltete Gegner-Sleeves gehören dem Spieler wie gekaufte.
   const cpuOwned = await cpuSleeves.ownedIds(req.user.userId);
   for (const id of cpuOwned) if (!owned.sleeve.includes(id)) owned.sleeve.push(id);
+  // Freigeschaltete Gegner-Avatare (erster Sieg) ebenso.
+  for (const id of await cpuAvatars.ownedIds(req.user.userId)) if (!owned.avatar.includes(id)) owned.avatar.push(id);
   // Entfernte Avatare/Sleeves/Boards (Datei fehlt) nicht mehr anzeigen.
   owned.avatar = owned.avatar.filter(id => shopIds('avatars').has(id));
   owned.sleeve = owned.sleeve.filter(id => shopIds('sleeves').has(id));
   owned.board = owned.board.filter(id => shopIds('boards').has(id));
-  const names = { sleeve: Object.fromEntries(owned.sleeve.map(id => [id, cpuSleeves.nameOf(id) || sleeveDisplayName(id)])) };
+  const names = {
+    sleeve: Object.fromEntries(owned.sleeve.map(id => [id, cpuSleeves.nameOf(id) || sleeveDisplayName(id)])),
+    avatar: Object.fromEntries(owned.avatar.map(id => [id, cpuAvatars.nameOf(id) || avatarDisplayName(id)])),
+  };
   res.json({ owned, names });
 });
 
@@ -3785,6 +3890,17 @@ app.get('/api/shop/cpu-sleeves', authMiddleware, async (req, res) => {
   } catch (err) {
     console.error('[cpu-sleeves] list error:', err.message);
     res.status(500).json({ error: 'Could not load opponent sleeves' });
+  }
+});
+
+// GET /api/shop/cpu-avatars — Gegner-Avatare mit Fortschritt (cpu-avatars.js)
+app.get('/api/shop/cpu-avatars', authMiddleware, async (req, res) => {
+  try {
+    const unlocked = await getUnlockedOpponentIds(req.user.userId);
+    res.json({ need: cpuAvatars.UNLOCK_WINS, avatars: await cpuAvatars.listFor(req.user.userId, unlocked) });
+  } catch (err) {
+    console.error('[cpu-avatars] list error:', err.message);
+    res.status(500).json({ error: 'Could not load opponent avatars' });
   }
 });
 
@@ -3805,6 +3921,9 @@ app.post('/api/shop/buy', authMiddleware, async (req, res) => {
     if (!files.includes(itemId)) return res.status(404).json({ error: 'Item not found' });
     if (itemType === 'sleeve' && cpuSleeves.isCpuSleeve(itemId)) {
       return res.status(403).json({ error: 'This sleeve can only be earned by defeating its CPU opponent.' });
+    }
+    if (itemType === 'avatar' && cpuAvatars.isCpuAvatar(itemId)) {
+      return res.status(403).json({ error: 'This avatar can only be earned by defeating its CPU opponent.' });
     }
   }
 
@@ -3857,7 +3976,8 @@ app.post('/api/shop/buy-random', authMiddleware, async (req, res) => {
 
   const subdir = itemType === 'avatar' ? 'avatars' : 'sleeves';
   const allItems = scanShopDir(subdir).map(f => path.basename(f, path.extname(f)))
-    .filter(id => itemType !== 'sleeve' || !cpuSleeves.isCpuSleeve(id));
+    .filter(id => itemType !== 'sleeve' || !cpuSleeves.isCpuSleeve(id))
+    .filter(id => itemType !== 'avatar' || !cpuAvatars.isCpuAvatar(id));
   const ownedRows = await db.all('SELECT item_id FROM user_shop_items WHERE user_id = ? AND item_type = ?', [req.user.userId, itemType]);
   const ownedSet = new Set(ownedRows.map(r => r.item_id));
 
@@ -4984,7 +5104,10 @@ function sendGameState(room, playerIdx, extra) {
     cpuBgm: cpuBgmForRoom(room),
     // PvP: der gewählte Track des GEGNERS (Sitz gegenüber). Zuschauer bekommen
     // in sendSpectatorGameState den Track von Sitz 0.
-    oppBgm: room.type === 'singleplayer' ? null : (gs.players?.[opponentOfGs(gs, playerIdx)]?.battleTrack || null),
+    oppBgm: (room.type === 'singleplayer' || gs.isSkillTest) ? null : (gs.players?.[opponentOfGs(gs, playerIdx)]?.battleTrack || null),
+    // Skill Test (bis zu 8 Spieler, zufaellige Layouts): der Client waehlt zufaellig eine von fuenf Kampfmusiken
+    // (BGM_SETS in app-main.jsx). Setzt der Modus `gs.isSkillTest = true` (oder `gs.bgmSet = 'skilltest'`), laeuft sie.
+    isSkillTest: !!gs.isSkillTest, bgmSet: gs.bgmSet || (gs.isSkillTest ? 'skilltest' : null),
     setScore: room.setScore || [0, 0], format: room.format || 1, winsNeeded: room.winsNeeded || 1,
     // Compute fresh per-sync so per-turn gates (Deepsea `canSummon`,
     // etc.) flip to "blocked" the moment the first copy is summoned.
@@ -5819,7 +5942,8 @@ function sendSpectatorGameState(room) {
     cpuBgm: cpuBgmForRoom(room),
     // PvP: der gewählte Track des GEGNERS (Sitz gegenüber). Zuschauer bekommen
     // in sendSpectatorGameState den Track von Sitz 0.
-    oppBgm: room.type === 'singleplayer' ? null : (gs.players?.[0]?.battleTrack || null),
+    oppBgm: (room.type === 'singleplayer' || gs.isSkillTest) ? null : (gs.players?.[0]?.battleTrack || null),
+    isSkillTest: !!gs.isSkillTest, bgmSet: gs.bgmSet || (gs.isSkillTest ? 'skilltest' : null),
     setScore: room.setScore || [0, 0], format: room.format || 1, winsNeeded: room.winsNeeded || 1,
     summonBlocked: gs.summonBlocked || [],
     abilitySupportHeroes: [],
@@ -6647,6 +6771,16 @@ const cpuSleeves = require('./cpu-sleeves').createCpuSleeves({
 registerCpuUnlockSource(async (ctx) => {
   const u = await cpuSleeves.unlockedByWin(ctx.userId, ctx.opponentDeckId);
   return u ? { kind: 'sleeve', id: u.id, name: u.name, image: '/data/shop/sleeves/' + u.file } : null;
+});
+// Gegner-Avatare: der erste Sieg gegen eine CPU schaltet deren Portrait als Avatar frei (cpu-avatars.js).
+const cpuAvatars = require('./cpu-avatars').createCpuAvatars({
+  db, loadSampleDecks,
+  mapFile: path.join(__dirname, 'data', 'shop', 'cpu-avatars.json'),
+  avatarsDir: path.join(__dirname, 'data', 'shop', 'avatars'),
+});
+registerCpuUnlockSource(async (ctx) => {
+  const u = await cpuAvatars.unlockedByWin(ctx.userId, ctx.opponentDeckId);
+  return u ? { kind: 'avatar', id: u.id, name: u.name, image: '/data/shop/avatars/' + u.file } : null;
 });
 /** Namen aller Abilities mit `isWildcardAbility` (einmal ermittelt). */
 let _wildcardAbilCache = null;
@@ -13432,6 +13566,8 @@ async function setupGameState(room) {
         }
       }
 
+      deck = await withProfileHeroSkins(p.userId, deck);
+
       // Save original deck state at match start (for side-deck reset)
       if (!room._originalDecks) room._originalDecks = [{}, {}];
       room._originalDecks[idx] = JSON.parse(JSON.stringify({
@@ -15708,7 +15844,7 @@ io.on('connection', (socket) => {
         creationZone: [...(pz.creationZone || [])],
         _oncePerGameUsed: new Set(),
         _resolvingCard: null,
-        deckSkins: {},
+        deckSkins: puzzleDeckSkins(pz),
       };
     };
 
@@ -16392,16 +16528,17 @@ io.on('connection', (socket) => {
     if (!currentUser) return;
     if (activeGames.has(currentUser.userId)) { socket.emit('puzzle_error', 'Already in a game'); return; }
     if (!puzzleData?.players?.[0] || !puzzleData?.players?.[1]) { socket.emit('puzzle_error', 'Invalid puzzle data'); return; }
-    createPuzzleGame(puzzleData).catch(err => {
+    stripUnownedPuzzleSkins(currentUser.userId, puzzleData).catch(() => {}).then(() => createPuzzleGame(puzzleData)).catch(err => {
       console.error('[Puzzle] start_puzzle error:', err.message, err.stack);
       socket.emit('puzzle_error', 'Failed to start puzzle: ' + err.message);
     });
   });
 
   // Export puzzle: encrypt server-side, send back to client for download
-  socket.on('export_puzzle', (puzzleData) => {
+  socket.on('export_puzzle', async (puzzleData) => {
     if (!currentUser) return;
     try {
+      await stripUnownedPuzzleSkins(currentUser.userId, puzzleData);
       const encrypted = encryptPuzzle(puzzleData);
       socket.emit('puzzle_exported', { data: encrypted });
     } catch (err) {
@@ -16549,6 +16686,7 @@ io.on('connection', (socket) => {
       playerDeck = await fetchDeck(playerDeckId, { label: 'player' });
       cpuDeck = await fetchDeck(cpuDeckId, { allowUnownedStructure: true, label: 'cpu' });
       if (!playerDeck) { socket.emit('cpu_battle_error', 'Your deck is not available'); return; }
+      playerDeck = await withProfileHeroSkins(currentUser.userId, playerDeck);
       if (!cpuDeck) { socket.emit('cpu_battle_error', 'CPU deck is not available'); return; }
 
       // Opponents are unlock-gated. The gallery only surfaces unlocked ones,

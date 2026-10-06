@@ -299,7 +299,7 @@ kopiert, daneben liegt eine JSON-Datei mit den Metadaten. Die erzeugten
 | `steamdwarfs.py` | `final 90 sparrow` | `sparrow_idle_final_sheet.png` | `sparrow-the-bumbling-buffoon` |
 | `steamdwarfs.py` | `final 90 pinta` | `pinta_idle_final_sheet.png` | `pinta-the-singing-ship` |
 | `steamdwarfs.py` | `final 90 quisto` | `quisto_idle_final_sheet.png` | `don-quisto-the-gold-seeker` |
-| `steamdwarfs.py` | `final 90 sasza` | `sasza_idle_final_sheet.png` | `sasza-the-snaka-adventurer` |
+| `steamdwarfs.py` | `final 90 sasza` | `sasza_idle_final_sheet.png` | `sas-za-the-snaka-adventurer` |
 | `steamdwarfs.py` | `final 90 bulwark` | `bulwark_idle_final_sheet.png` | `diamond-the-bulwark-of-peace` |
 | `steamdwarfs.py` | `final 90 cecilia` | `cecilia_idle_final_sheet.png` | `rescued-damsel-cecilia` |
 | `steamdwarfs.py` | `final 90 corruptor` | `corruptor_idle_final_sheet.png` | `bloom-the-continent-corruptor` |
@@ -309,7 +309,7 @@ kopiert, daneben liegt eine JSON-Datei mit den Metadaten. Die erzeugten
 | `deepsea_late.py` | `final 90 teppesman` | `teppesman_idle_final_sheet.png` | `teppesman-the-deepsea-knight` |
 | `deepsea_late.py` | `final 90 shuchaku` | `shuchaku_idle_final_sheet.png` | `shu-chaku-the-blood-moon-projection` |
 | `deepsea_late.py` | `final 90 waflav` | `waflav_idle_final_sheet.png` | `deep-drowned-waflav` |
-| `motive_late.py` | `final 90 peszet` | `peszet_idle_final_sheet.png` | `peszet-the-plague-bringer` |
+| `motive_late.py` | `final 90 peszet` | `peszet_idle_final_sheet.png` | `pes-zet-the-plague-bringer` |
 | `motive_late.py` | `final 90 notandras` | `notandras_idle_final_sheet.png` | `definitely-not-andras-the-human-weapon` |
 | `motive_late.py` | `final 90 megaandras` | `megaandras_idle_final_sheet.png` | `mega-weapon-andras` |
 | `motive_late.py` | `final 90 champmizune` | `champmizune_idle_final_sheet.png` | `regional-champ-mizune` |

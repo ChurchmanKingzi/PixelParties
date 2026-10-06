@@ -313,7 +313,9 @@ function BoardCard({ cardName, faceDown, flipped, label, hp, maxHp, atk, hpPosit
   const tooltipCardData = (faceDown && revealTooltipWhenFaceDown)
     ? CARDS_BY_NAME[cardName]
     : card;
-  const tooltipBase = tooltipCardOverride || tooltipCardData;
+  // Gewählter Skin gilt auch im Hover-Tooltip (CardTooltipContent liest `_skinUrl`).
+  const tooltipBase0 = tooltipCardOverride || tooltipCardData;
+  const tooltipBase = (tooltipBase0 && !faceDown && skins && skins[cardName] && imgUrl) ? { ...tooltipBase0, _skinUrl: imgUrl } : tooltipBase0;
   const tooltipTarget = (() => {
     if (!tooltipBase) return null;
     const hasLiveAbilities = Array.isArray(abilities) && abilities.length > 0;
@@ -26254,8 +26256,8 @@ function ppOrdinal(n) {
   return n + (r10 === 1 ? 'st' : r10 === 2 ? 'nd' : r10 === 3 ? 'rd' : 'th');
 }
 // Symbol je Freischalt-Art (Victory-Screen); unbekannte Arten bekommen das Geschenk.
-const PP_UNLOCK_ICON = { music: '🎵', sleeve: '🃏' };
-const PP_UNLOCK_TEXT = { music: 'New battle track unlocked!', sleeve: 'New sleeve unlocked!' };
+const PP_UNLOCK_ICON = { music: '🎵', sleeve: '🃏', avatar: '👤' };
+const PP_UNLOCK_TEXT = { music: 'New battle track unlocked!', sleeve: 'New sleeve unlocked!', avatar: 'New avatar unlocked!' };
 
 // ★ Grund des Spielendes als Klartext (Als Befund: ein Spieler „verlor aus dem Nichts" — es war ein
 // Deck-Out, das er nicht bemerkt hatte). EINE Stelle fuer alle Ergebnis-Anzeigen. `ich`: 'win' | 'lose' |

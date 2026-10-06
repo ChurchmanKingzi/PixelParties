@@ -2799,7 +2799,7 @@ body:has(.anim-backdrop) .pp-bg-particles { display: none; }
 /* Right column — stats & customization */
 .profile-right-col {
   flex: 1;
-  overflow: hidden;
+  overflow: hidden auto;
   min-height: 0;
   padding: calc(var(--pv) * 1.8) 28px;
   display: flex;
@@ -3873,7 +3873,8 @@ body:has(.anim-backdrop) .pp-bg-particles { display: none; }
 
 /* v1464: Profil — SETTINGS und CHANGE PASSWORD nebeneinander, je die
    halbe Breite; auf schmalen Bildschirmen wieder untereinander. */
-.profile-zweispaltig { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.profile-zweispaltig { display: grid; grid-template-columns: 1fr 1fr 1.3fr; gap: 12px; }
+@media (max-width: 1100px) { .profile-zweispaltig { grid-template-columns: 1fr 1fr; } }
 @media (max-width: 760px) { .profile-zweispaltig { grid-template-columns: 1fr; } }
 .profile-schalter-spalte { display: flex; flex-direction: column; gap: 12px; }
 .profile-schalter {
@@ -13286,6 +13287,9 @@ body:has(.modal-overlay) .tooltip {
   flex-wrap: wrap;
   gap: 12px;
   justify-content: center;
+  /* Puffer für den Hover-Zoom (scale 1.05 ≈ 2 px je Seite): Transformationen zählen zum scrollbaren Bereich. Ohne
+     diesen Rand reichte schon der Zoom der untersten Reihe, um im Rahmen eine Scrollbar auszulösen. */
+  padding: 6px;
 }
 .profile-avatar-gallery-item {
   cursor: pointer;
@@ -13299,6 +13303,25 @@ body:has(.modal-overlay) .tooltip {
 }
 .profile-avatar-gallery-item:hover {
   transform: scale(1.05);
+}
+/* Namens-Tooltip der Avatar-Auswahl: schwebendes Element (PpFloatTip in app-screens.jsx), liegt über allem und
+   wird nicht vom scrollbaren Rahmen der Auswahl abgeschnitten. */
+.pp-float-tip {
+  position: fixed;
+  z-index: 100000;
+  pointer-events: none;
+  white-space: nowrap;
+  max-width: calc(100vw - 16px);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding: 2px 8px;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text);
+  background: var(--bg3);
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+  box-shadow: 0 2px 8px rgba(0,0,0,.6);
 }
 .profile-avatar-gallery-item:hover .profile-avatar-gallery-img {
   border-color: var(--accent);
@@ -25222,3 +25245,66 @@ body.summon-pick .board-zone.board-zone-ability:not(.zone-drag-valid):not(.board
 
 /* Online-Lobby: schmaler Kasten ganz links mit Spielerliste (app-social.jsx) */
 .lobby-spalte.lobby-social { flex: 0 0 300px; width: 300px; }
+
+
+/* ═══ PROFIL: ZIERRAHMEN ═══════════════════════════════════════════════
+   Als Vorgabe: „Das Profil soll grafisch aufgewertet werden; Rahmen mit
+   Schnörkeln und inneren Ecken." Dieselbe Rahmensprache wie die
+   Menüfenster (`.pp-fenster`) und Shop-Kacheln: abgeschrägter Rand in der
+   Spielerfarbe (`--zier`), Doppelring, harter Schatten und Pixel-Eck-
+   schnörkel auf `::after`. Die Abschnitte tragen sie etwas leiser (3 px
+   Rand, kleinere Schnörkel, 6-px-Ringe), damit mehrere nebeneinander
+   passen; die Identitätsspalte sitzt in einem Scrollbereich und bekommt
+   deshalb nur Rand, Innenring und Schnörkel — ohne äußere Ringe. */
+.profile-section.pp-fenster {
+  border-width: 3px;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--zier) 7%, transparent), transparent 40%),
+    rgba(0, 0, 0, .28);
+  box-shadow:
+    0 0 0 2px var(--pp-kontur),
+    0 0 0 4px color-mix(in srgb, var(--zier) 50%, #000),
+    0 0 0 6px var(--pp-kontur),
+    inset 0 0 0 1px var(--pp-kontur),
+    inset 0 0 22px color-mix(in srgb, var(--zier) 10%, transparent),
+    7px 8px 0 rgba(0, 0, 0, .42);
+}
+.profile-section.pp-fenster::after { --eck-e: 2px; inset: 3px; }
+.profile-section.pp-fenster { padding-left: 26px; padding-right: 26px; }
+.profile-right-col { gap: 20px; padding-right: 40px; padding-left: 34px; }
+
+.profile-identity-panel.pp-fenster-flach {
+  /* Füllt die Spalte; diese ist (siehe `.profile-layout` unten) genau so hoch wie die rechte Spalte. */
+  flex: 1 1 auto;
+  border-width: 3px;
+  margin: 8px;
+  box-shadow:
+    0 0 0 2px var(--pp-kontur),
+    inset 0 0 0 1px var(--pp-kontur),
+    inset 0 0 30px color-mix(in srgb, var(--zier) 10%, transparent);
+  /* Derselbe Untergrund wie die Abschnitte rechts (sonst wirkt das Dithering anders gefärbt). */
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--zier) 7%, transparent), transparent 40%),
+    rgba(0, 0, 0, .28);
+}
+.profile-identity-panel.pp-fenster-flach::after { --eck-e: 2px; inset: 3px; }
+.profile-identity-panel.pp-fenster-flach::before { display: none; }
+
+/* Abschnittsüberschriften als Trennband wie `.pp-fenster-kopf`. */
+.profile-section.pp-fenster .profile-section-label,
+.profile-identity-panel.pp-fenster .profile-section-label {
+  border-bottom: 2px solid color-mix(in srgb, var(--zier) 60%, #000);
+  box-shadow: 0 2px 0 var(--pp-kontur);
+  background: linear-gradient(90deg, color-mix(in srgb, var(--zier) 18%, transparent), transparent 85%);
+  padding: 4px 8px 5px;
+  color: color-mix(in srgb, var(--zier) 45%, var(--text2));
+}
+@media (max-width: 760px) {
+  .profile-section.pp-fenster { padding-left: 16px; padding-right: 16px; }
+  .profile-right-col { padding-left: 14px !important; padding-right: 22px !important; gap: 16px; }
+}
+
+/* Profil-Raster: nur so hoch wie die höhere Spalte (die linke Box dehnt sich auf die Höhe der rechten);
+   die Spalte selbst hat keinen eigenen Untergrund mehr — das geditherte Fenster gehört nur der Box. */
+.profile-layout { flex: 0 1 auto; }
+.profile-identity-col { background: none; border-right: none; }
