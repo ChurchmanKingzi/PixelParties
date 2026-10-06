@@ -1998,6 +1998,15 @@ app.put('/api/profile', authMiddleware, async (req, res) => {
       return res.status(403).json({ error: 'This sleeve is not unlocked yet.' });
     }
   }
+  // Gegner-Avatare (cpu-avatars.js): erst nach dem ersten Sieg gegen diese CPU.
+  if (b.avatar) {
+    const m = /^\/data\/shop\/avatars\/([^/]+)\.png$/.exec(String(b.avatar));
+    let avId = m ? m[1] : null;
+    try { if (avId) avId = decodeURIComponent(avId); } catch { /* unlesbare ID: unten als nicht freigeschaltet behandeln */ }
+    if (avId && cpuAvatars.isCpuAvatar(avId) && !(await cpuAvatars.ownedIds(req.user.userId)).includes(avId)) {
+      return res.status(403).json({ error: 'This avatar is not unlocked yet.' });
+    }
+  }
   // Update only the fields the client actually sent, so single-field
   // quick-saves (avatar, sleeve, …) never clobber the others.
   const sets = [];
@@ -3687,7 +3696,9 @@ function getAvailableSkins() {
 
 // GET /api/shop/catalog — all available shop items
 app.get('/api/shop/catalog', (req, res) => {
-  const avatars = scanShopDir('avatars').map(f => ({ id: path.basename(f, path.extname(f)), file: f }));
+  // Gegner-Avatare liegen im selben Ordner, sind aber nicht käuflich (cpu-avatars.js).
+  const avatars = scanShopDir('avatars').map(f => ({ id: path.basename(f, path.extname(f)), file: f }))
+    .filter(a => !cpuAvatars.isCpuAvatar(a.id));
   // Gegner-Sleeves liegen im selben Ordner, sind aber nicht käuflich (cpu-sleeves.js).
   const sleeves = scanShopDir('sleeves').map(f => {
     const id = path.basename(f, path.extname(f));
@@ -3735,11 +3746,16 @@ app.get('/api/shop/owned', authMiddleware, async (req, res) => {
   // Freigeschaltete Gegner-Sleeves gehören dem Spieler wie gekaufte.
   const cpuOwned = await cpuSleeves.ownedIds(req.user.userId);
   for (const id of cpuOwned) if (!owned.sleeve.includes(id)) owned.sleeve.push(id);
+  // Freigeschaltete Gegner-Avatare (erster Sieg) ebenso.
+  for (const id of await cpuAvatars.ownedIds(req.user.userId)) if (!owned.avatar.includes(id)) owned.avatar.push(id);
   // Entfernte Avatare/Sleeves/Boards (Datei fehlt) nicht mehr anzeigen.
   owned.avatar = owned.avatar.filter(id => shopIds('avatars').has(id));
   owned.sleeve = owned.sleeve.filter(id => shopIds('sleeves').has(id));
   owned.board = owned.board.filter(id => shopIds('boards').has(id));
-  const names = { sleeve: Object.fromEntries(owned.sleeve.map(id => [id, cpuSleeves.nameOf(id) || sleeveDisplayName(id)])) };
+  const names = {
+    sleeve: Object.fromEntries(owned.sleeve.map(id => [id, cpuSleeves.nameOf(id) || sleeveDisplayName(id)])),
+    avatar: Object.fromEntries(owned.avatar.map(id => [id, cpuAvatars.nameOf(id)]).filter(([, n]) => n)),
+  };
   res.json({ owned, names });
 });
 
@@ -3751,6 +3767,17 @@ app.get('/api/shop/cpu-sleeves', authMiddleware, async (req, res) => {
   } catch (err) {
     console.error('[cpu-sleeves] list error:', err.message);
     res.status(500).json({ error: 'Could not load opponent sleeves' });
+  }
+});
+
+// GET /api/shop/cpu-avatars — Gegner-Avatare mit Fortschritt (cpu-avatars.js)
+app.get('/api/shop/cpu-avatars', authMiddleware, async (req, res) => {
+  try {
+    const unlocked = await getUnlockedOpponentIds(req.user.userId);
+    res.json({ need: cpuAvatars.UNLOCK_WINS, avatars: await cpuAvatars.listFor(req.user.userId, unlocked) });
+  } catch (err) {
+    console.error('[cpu-avatars] list error:', err.message);
+    res.status(500).json({ error: 'Could not load opponent avatars' });
   }
 });
 
@@ -3771,6 +3798,9 @@ app.post('/api/shop/buy', authMiddleware, async (req, res) => {
     if (!files.includes(itemId)) return res.status(404).json({ error: 'Item not found' });
     if (itemType === 'sleeve' && cpuSleeves.isCpuSleeve(itemId)) {
       return res.status(403).json({ error: 'This sleeve can only be earned by defeating its CPU opponent.' });
+    }
+    if (itemType === 'avatar' && cpuAvatars.isCpuAvatar(itemId)) {
+      return res.status(403).json({ error: 'This avatar can only be earned by defeating its CPU opponent.' });
     }
   }
 
@@ -3823,7 +3853,8 @@ app.post('/api/shop/buy-random', authMiddleware, async (req, res) => {
 
   const subdir = itemType === 'avatar' ? 'avatars' : 'sleeves';
   const allItems = scanShopDir(subdir).map(f => path.basename(f, path.extname(f)))
-    .filter(id => itemType !== 'sleeve' || !cpuSleeves.isCpuSleeve(id));
+    .filter(id => itemType !== 'sleeve' || !cpuSleeves.isCpuSleeve(id))
+    .filter(id => itemType !== 'avatar' || !cpuAvatars.isCpuAvatar(id));
   const ownedRows = await db.all('SELECT item_id FROM user_shop_items WHERE user_id = ? AND item_type = ?', [req.user.userId, itemType]);
   const ownedSet = new Set(ownedRows.map(r => r.item_id));
 
@@ -6604,6 +6635,16 @@ const cpuSleeves = require('./cpu-sleeves').createCpuSleeves({
 registerCpuUnlockSource(async (ctx) => {
   const u = await cpuSleeves.unlockedByWin(ctx.userId, ctx.opponentDeckId);
   return u ? { kind: 'sleeve', id: u.id, name: u.name, image: '/data/shop/sleeves/' + u.file } : null;
+});
+// Gegner-Avatare: der erste Sieg gegen eine CPU schaltet deren Portrait als Avatar frei (cpu-avatars.js).
+const cpuAvatars = require('./cpu-avatars').createCpuAvatars({
+  db, loadSampleDecks,
+  mapFile: path.join(__dirname, 'data', 'shop', 'cpu-avatars.json'),
+  avatarsDir: path.join(__dirname, 'data', 'shop', 'avatars'),
+});
+registerCpuUnlockSource(async (ctx) => {
+  const u = await cpuAvatars.unlockedByWin(ctx.userId, ctx.opponentDeckId);
+  return u ? { kind: 'avatar', id: u.id, name: u.name, image: '/data/shop/avatars/' + u.file } : null;
 });
 /** Namen aller Abilities mit `isWildcardAbility` (einmal ermittelt). */
 let _wildcardAbilCache = null;

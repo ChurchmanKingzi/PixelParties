@@ -26234,8 +26234,8 @@ function ppOrdinal(n) {
   return n + (r10 === 1 ? 'st' : r10 === 2 ? 'nd' : r10 === 3 ? 'rd' : 'th');
 }
 // Symbol je Freischalt-Art (Victory-Screen); unbekannte Arten bekommen das Geschenk.
-const PP_UNLOCK_ICON = { music: '🎵', sleeve: '🃏' };
-const PP_UNLOCK_TEXT = { music: 'New battle track unlocked!', sleeve: 'New sleeve unlocked!' };
+const PP_UNLOCK_ICON = { music: '🎵', sleeve: '🃏', avatar: '👤' };
+const PP_UNLOCK_TEXT = { music: 'New battle track unlocked!', sleeve: 'New sleeve unlocked!', avatar: 'New avatar unlocked!' };
 
 // ★ Grund des Spielendes als Klartext (Als Befund: ein Spieler „verlor aus dem Nichts" — es war ein
 // Deck-Out, das er nicht bemerkt hatte). EINE Stelle fuer alle Ergebnis-Anzeigen. `ich`: 'win' | 'lose' |
