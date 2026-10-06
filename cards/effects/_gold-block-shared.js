@@ -41,6 +41,7 @@
 // ═══════════════════════════════════════════════════════════════════
 
 const { PHASES } = require('./_hooks');
+const { opponentOfGs } = require('./_opp');
 
 const BLOCKER_NAME = 'Tuscan Aristocrat';
 
@@ -50,7 +51,7 @@ const BLOCKER_NAME = 'Tuscan Aristocrat';
  * damit eine ausgeschaltete Kreatur auch hier nicht mehr sperrt.
  */
 function blockerAufDemBrett(engine, playerIdx) {
-  const gegnerIdx = playerIdx === 0 ? 1 : 0;
+  const gegnerIdx = opponentOfGs(engine?.gs, playerIdx);
   for (const inst of (engine?.cardInstances || [])) {
     if (inst.name !== BLOCKER_NAME) continue;
     if (inst.zone !== 'support') continue;

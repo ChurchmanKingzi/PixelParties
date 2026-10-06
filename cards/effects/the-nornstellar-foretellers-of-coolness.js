@@ -94,7 +94,7 @@ module.exports = {
       const pi = ctx.cardOwner;
 
       let deadOwner = -1;
-      for (let p = 0; p < 2; p++) {
+      for (let p = 0; p < engine.playerCount(); p++) {
         const heroes = engine.gs.players[p]?.heroes || [];
         if (heroes.includes(dyingHero)) { deadOwner = p; break; }
       }

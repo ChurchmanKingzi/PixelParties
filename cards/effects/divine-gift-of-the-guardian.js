@@ -117,7 +117,7 @@ module.exports = {
       if (handInst) engine._untrackCard(handInst.id);
 
       // Reveal card to opponent
-      const oi = pi === 0 ? 1 : 0;
+      const oi = engine.opponentOf(pi);
       engine._broadcastEvent('card_reveal', { cardName: 'Divine Gift of the Guardian', playerIdx: pi });
       engine.log('card_played', { player: ps.username, card: 'Divine Gift of the Guardian', cardType: 'Spell' });
 

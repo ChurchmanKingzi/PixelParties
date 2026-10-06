@@ -155,7 +155,7 @@ module.exports = {
     });
     if (res?.inst) {
       // „for the rest of the turn": die Negation faellt am Beginn des naechsten Zuges.
-      const naechster = gs.activePlayer === 0 ? 1 : 0;
+      const naechster = engine.opponentOf(gs.activePlayer);
       await engine.actionAddCreatureBuff(res.inst, NEG_BUFF, {
         expiresAtTurn: gs.turn + 1, expiresForPlayer: naechster,
         clearCountersOnExpire: ['negated', 'negated_placement'],

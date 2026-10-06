@@ -1,3 +1,4 @@
+const { isSeat } = require('./_opp');   // N-Spieler: gültiger Sitzindex
 // ═══════════════════════════════════════════
 //  HERO EFFECT: "Rool, the Troll Guard"
 //  Hero · 450 HP · 90 ATK
@@ -40,7 +41,7 @@ function schadensGeber(engine, source) {
   if (isCreatureSource(engine, source)) return null;   // Kreatur schon weg: kein Ziel mehr
   if (typeof source.heroIdx !== 'number' || source.heroIdx < 0) return null;
   const seite = source.heroOwner ?? source.owner ?? source.controller;
-  if (seite !== 0 && seite !== 1) return null;
+  if (!isSeat(engine, seite)) return null;
   const hero = engine.gs.players[seite]?.heroes?.[source.heroIdx];
   if (!hero?.name || hero.hp <= 0) return null;
   return { kind: 'hero', hero, side: seite, heroIdx: source.heroIdx, controller: engine.heroSideOf(seite, hero) };
@@ -56,7 +57,7 @@ async function verdoppeln(engine, geber, roolBesitzer) {
     ? !!geber.hero.buffs?.[BUFF]
     : !!geber.inst.counters?.buffs?.[BUFF];
   if (schonDa) return;
-  const gegner = roolBesitzer === 0 ? 1 : 0;
+  const gegner = engine.opponentOf(roolBesitzer);
   // „Ende deines naechsten Zuges": naechster Zug des Rool-Kontrolleurs, Ablauf am Beginn des Zuges danach.
   const meinNaechster = gs.activePlayer === roolBesitzer ? gs.turn + 2 : gs.turn + 1;
   const opts = { expiresAtTurn: meinNaechster + 1, expiresForPlayer: gegner, source: CARD_NAME, sourceOwner: roolBesitzer };

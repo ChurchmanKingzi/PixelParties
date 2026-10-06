@@ -1,3 +1,4 @@
+const { isSeat } = require('./_opp');   // N-Spieler: gültiger Sitzindex
 // ═══════════════════════════════════════════
 //  CARD EFFECT: "Waitress"
 //  Creature (Summoning Magic Lv 0, 20 HP)
@@ -224,8 +225,8 @@ module.exports = {
     // Styx 28.9.: physische Seite des Wurfs — aus der Absichtsmarke
     // (`heroOwner`), sonst aus dem Kontext; fehlt beides → pi.
     const drop0 = ps._requestedNormalSummonSlot;
-    const ctxSeite = (ctx.cardHeroOwner === 0 || ctx.cardHeroOwner === 1) ? ctx.cardHeroOwner : pi;
-    const dropSeite = (drop0 && (drop0.heroOwner === 0 || drop0.heroOwner === 1)) ? drop0.heroOwner : ctxSeite;
+    const ctxSeite = (isSeat(engine, ctx.cardHeroOwner)) ? ctx.cardHeroOwner : pi;
+    const dropSeite = (drop0 && (isSeat(engine, drop0.heroOwner))) ? drop0.heroOwner : ctxSeite;
 
     let hostHeroIdx, hostFreeSlot, hostSeite = pi;
     if (ctx.viaDragDrop) {
@@ -304,7 +305,7 @@ module.exports = {
     // Styx 28.9.: geliehene Helden der Gegenspalte — auch die Seite muss
     // zum Wurf passen; sonst platziert Waitress selbst (mit `heldSeite`).
     const sameAsDrop = drop
-      && hostSeite === ((drop.heroOwner === 0 || drop.heroOwner === 1) ? drop.heroOwner : pi)
+      && hostSeite === ((isSeat(engine, drop.heroOwner)) ? drop.heroOwner : pi)
       && hostSeite === ctxSeite
       && hostHeroIdx === ctx.cardHeroIdx
       && hostFreeSlot === drop.slotIdx;

@@ -97,7 +97,7 @@ module.exports = {
       const gs = engine.gs;
       const pi = ctx.cardOwner;
       const heroIdx = ctx.cardHeroIdx;
-      const oi = pi === 0 ? 1 : 0;
+      const oi = engine.opponentOf(pi);
       const ps = gs.players[pi];
       const ops = gs.players[oi];
       if (!ps || !ops) return;
@@ -144,7 +144,7 @@ module.exports = {
       // has hit the pile, matching the engine-wide ordering.
       // v1324: Boris darf den erzwungenen Abwurf ignorieren.
       const _anzahl = (ops.hand || []).filter(trifft).length;
-      const _boris = _anzahl > 0 && await engine.borisVerzicht(oi, _anzahl, { source: CARD_NAME, sourceOwner: 1 - oi });
+      const _boris = _anzahl > 0 && await engine.borisVerzicht(oi, _anzahl, { source: CARD_NAME, sourceOwner: pi });
       const discarded = _boris ? 0 : await engine.withDiscardBatch(oi, { source: CARD_NAME }, async () => {
         let n = 0;
         while (true) {

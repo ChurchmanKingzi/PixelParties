@@ -173,7 +173,7 @@ module.exports = {
         c.owner === pi && c.zone === 'hand' && c.name === CARD_NAME);
 
       // Reveal to opponent + spectators (same etiquette as Jump in the River).
-      const oppIdx = pi === 0 ? 1 : 0;
+      const oppIdx = engine.opponentOf(pi);
       const oppSid = gs.players[oppIdx]?.socketId;
       if (oppSid) engine.io.to(oppSid).emit('card_reveal', { cardName: CARD_NAME });
       if (engine.room?.spectators) {

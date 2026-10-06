@@ -37,7 +37,7 @@ const HOPT_PREFIX = 'dive-bomblebee';
 // the engine convention used by Bomb Arrow and other "absolute" effects
 // (see `canTargetForStatus` vs `canApplyCreatureStatus` in engine.js).
 function pickableOppCards(engine, listenerOwner) {
-  const oi = listenerOwner === 0 ? 1 : 0;
+  const oi = engine.opponentOf(listenerOwner);
   const ops = engine.gs.players[oi];
   if (!ops) return [];
 
@@ -85,7 +85,7 @@ function pickableOppCards(engine, listenerOwner) {
 async function runOpponentDeathPayload(engine, inst, opts = {}) {
   const gs = engine.gs;
   const pi = inst.controller ?? inst.owner;
-  const oi = pi === 0 ? 1 : 0;
+  const oi = engine.opponentOf(pi);
 
   const hoptKey = `${HOPT_PREFIX}:${inst.id}`;
   if (!opts.bypassHopt) {

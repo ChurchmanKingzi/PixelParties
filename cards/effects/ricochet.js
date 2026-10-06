@@ -45,6 +45,7 @@
 //  vorherigen EINSCHLAG.
 // ═══════════════════════════════════════════
 
+const { opponentOfGs } = require('./_opp');
 const CARD_NAME = 'Ricochet';
 const FLUGZEIT = 260;
 
@@ -93,7 +94,7 @@ module.exports = {
   spellPlayCondition(gs, pi, engine) {
     // Der Angreifer waehlt zuerst — ohne ein Ziel beim Gegner passiert
     // gar nichts.
-    return zieleAuf(engine, pi === 0 ? 1 : 0).length > 0;
+    return zieleAuf(engine, opponentOfGs(gs, pi)).length > 0;
   },
 
   hooks: {
@@ -129,7 +130,7 @@ module.exports = {
         // Obergrenze nur als Gurt: jede Runde verbraucht ein Ziel, die
         // Kette endet also spaetestens, wenn beide Seiten leer sind.
         for (let runde = 0; runde < 40; runde++) {
-          const gegenseite = waehler === 0 ? 1 : 0;
+          const gegenseite = engine.opponentOf(waehler);
           const frei = zieleAuf(engine, gegenseite)
             .filter(t => !gewaehlt.has(zielSchluessel(t)));
           if (frei.length === 0) break;       // „cannot choose a new target"

@@ -220,7 +220,7 @@ module.exports = {
         if (target.statuses.burned || target.statuses.burn_immune || target.statuses.immune) return;
 
         // Find which player/hero this target belongs to
-        for (let tpi = 0; tpi < 2; tpi++) {
+        for (let tpi = 0; tpi < engine.playerCount(); tpi++) {
           const tps = engine.gs.players[tpi];
           for (let thi = 0; thi < (tps.heroes || []).length; thi++) {
             if (tps.heroes[thi] === target && target.hp > 0) {

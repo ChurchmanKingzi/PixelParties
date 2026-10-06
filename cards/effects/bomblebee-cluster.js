@@ -1,3 +1,4 @@
+const { isSeat } = require('./_opp');   // N-Spieler: gültiger Sitzindex
 // ═══════════════════════════════════════════
 //  CARD EFFECT: "Bomblebee Cluster"
 //  Spell (Summoning Magic Lv2, Reaction)
@@ -88,7 +89,7 @@ module.exports = {
     // Kontrolle statt Seite (Styx 28.9.): „the same Hero" ist der Held,
     // unter dem der Ausloeser PHYSISCH steht — ueber einen uebernommenen
     // Helden der Gegenspalte beschworen, liegt der auf der anderen Seite.
-    const feld = (triggerInst.owner === 0 || triggerInst.owner === 1) ? triggerInst.owner : pi;
+    const feld = (isSeat(gs, triggerInst.owner)) ? triggerInst.owner : pi;
     const fps = gs.players[feld];
     const host = fps?.heroes?.[hostHeroIdx];
     if (!host?.name || host.hp <= 0) {

@@ -146,7 +146,7 @@ function baseFor(params, A, istEigen) {
 function usageFactor(engine, params, holderPi, A) {
   const use = engine._abilityUse;
   if (!use) return 1;
-  const other = holderPi === 0 ? 1 : 0;
+  const other = engine.opponentOf(holderPi);
   const u = (use[holderPi]?.[A] || 0) + params.crossUse * (use[other]?.[A] || 0);
   if (!(u > 0)) return 1;
   const turns = Math.max(1, Math.ceil((engine.gs?.turn || 1) / 2));
@@ -255,7 +255,7 @@ function swapGain(engine, viewPi, a, b, opts = {}) {
   const nach = [{}, {}];
   nach[a.owner][a.heroIdx] = zb;
   nach[b.owner][b.heroIdx] = za;
-  const opp = viewPi === 0 ? 1 : 0;
+  const opp = engine.opponentOf(viewPi);
   const zonenFuer = (pi) => (Object.keys(nach[pi]).length ? nach[pi] : null);
 
   const wertMe = sideValue(engine, viewPi, viewPi, zonenFuer(viewPi), params) - sideValue(engine, viewPi, viewPi, null, params);
@@ -325,7 +325,7 @@ function rankSwaps(engine, viewPi, opts = {}) {
 
 /** Schnappschuss für den Recorder: { Ability: [Stufen der lebenden Helden] } je Seite + Nutzungsraten. */
 function snapshot(engine, pi) {
-  const opp = pi === 0 ? 1 : 0;
+  const opp = engine.opponentOf(pi);
   const rate = (holder) => {
     const out = {};
     const use = engine._abilityUse?.[holder] || {};

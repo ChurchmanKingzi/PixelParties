@@ -59,7 +59,7 @@ module.exports = {
 
       // Build target list: all living heroes + creatures on the board (both players)
       const targets = [];
-      for (let pIdx = 0; pIdx < 2; pIdx++) {
+      for (let pIdx = 0; pIdx < engine.playerCount(); pIdx++) {
         const pState = gs.players[pIdx];
 
         // Heroes

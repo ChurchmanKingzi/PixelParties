@@ -32,6 +32,7 @@
 // ═══════════════════════════════════════════
 
 const { hasCardType } = require('./_hooks');
+const { opponentOfGs } = require('./_opp');
 
 const CARD_NAME = 'Arcane Lamp';
 
@@ -56,7 +57,7 @@ module.exports = {
   isTargetingArtifact: true,
 
   canActivate(gs, pi, engine) {
-    const oi = pi === 0 ? 1 : 0;
+    const oi = opponentOfGs(gs, pi);
     const ops = gs.players[oi];
     if (!ops) return false;
 
@@ -83,7 +84,7 @@ module.exports = {
   },
 
   getValidTargets(gs, pi, engine) {
-    const oi = pi === 0 ? 1 : 0;
+    const oi = opponentOfGs(gs, pi);
     const ops = gs.players[oi];
     const targets = [];
     if (!ops) return targets;

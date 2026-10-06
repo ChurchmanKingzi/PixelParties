@@ -83,7 +83,7 @@ module.exports = {
       return undefined;
     }
     try {
-      const oppHeroes = (engine.gs.players[pi === 0 ? 1 : 0]?.heroes || [])
+      const oppHeroes = (engine.gs.players[engine.opponentOf(pi)]?.heroes || [])
         .map(h => h?.name).filter(Boolean);
       const prof = profileForHeroes(oppHeroes);
       const cv = prof?.cardValues || null;
@@ -116,7 +116,7 @@ module.exports = {
       const pi = ctx.cardOwner;
       const ps = gs.players[pi];
       const sidHeroIdx = ctx.cardHeroIdx;
-      const oi = pi === 0 ? 1 : 0;
+      const oi = engine.opponentOf(pi);
       const ops = gs.players[oi];
       if (!ps || !ops) return;
       if (ps.handLocked) return; // defensive

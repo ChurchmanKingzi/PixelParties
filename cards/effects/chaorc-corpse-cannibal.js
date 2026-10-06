@@ -1,3 +1,4 @@
+const { isSeat } = require('./_opp');   // N-Spieler: gültiger Sitzindex
 // ═══════════════════════════════════════════
 //  CARD EFFECT: "Chaorc Corpse Cannibal"
 //  Creature (Summoning Magic Lv1, 50 HP)
@@ -97,7 +98,7 @@ module.exports = {
       // Kontrolle statt Seite (Styx 28.9.): der frei gewordene Platz liegt
       // auf der PHYSISCHEN Seite der geopferten Kreatur — ueber einen
       // uebernommenen Helden beschworen, ist das die Gegenspalte.
-      const feld = (inst.owner === 0 || inst.owner === 1) ? inst.owner : pi;
+      const feld = (isSeat(gs, inst.owner)) ? inst.owner : pi;
       const fps = gs.players[feld];
       const { canHeroSummon } = require('./_summon-eligibility');
       const heldDarf = () => (feld === pi

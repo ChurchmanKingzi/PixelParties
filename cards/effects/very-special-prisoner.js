@@ -223,7 +223,7 @@ module.exports = {
     if (pickedSource === 'deck') {
       engine._broadcastEvent('deck_search_add', { cardName: DIVINITY, playerIdx: pi });
       engine.shuffleDeck(pi, 'main');
-      const oi = pi === 0 ? 1 : 0;
+      const oi = engine.opponentOf(pi);
       await engine.promptGeneric(oi, {
         type: 'deckSearchReveal',
         cardName: DIVINITY,

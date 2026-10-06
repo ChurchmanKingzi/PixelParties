@@ -86,7 +86,7 @@ module.exports = {
     const engine = ctx._engine;
     const gs = engine.gs;
     const pi = ctx.cardOwner;
-    const oi = pi === 0 ? 1 : 0;
+    const oi = engine.opponentOf(pi);
     const ps = gs.players[pi];
     if (!ps) return false;
     if ((ps.mainDeck || []).length === 0) return false;

@@ -68,7 +68,7 @@ module.exports = {
       // ── Collect every target on the board (both sides, all heroes + creatures) ──
       const heroTargets = [];
       const creatureTargets = [];
-      for (let tpi = 0; tpi < 2; tpi++) {
+      for (let tpi = 0; tpi < engine.playerCount(); tpi++) {
         const tps = gs.players[tpi];
         if (!tps) continue;
         for (let hi = 0; hi < (tps.heroes || []).length; hi++) {

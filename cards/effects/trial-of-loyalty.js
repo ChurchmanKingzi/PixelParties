@@ -181,8 +181,8 @@ module.exports = {
         // ★ KEINE eigene `deck_search`-Zeile: `actionAddCardFromDeckToHand`
         // schreibt sie bereits (der Repro zeigte prompt vier statt zwei
         // Eintraege).
-        engine.noteKnownCard(pi === 0 ? 1 : 0, name, 'deck');
-        engine.noteKnownCard(pi === 0 ? 1 : 0, name, 'hand');
+        engine.noteKnownCard(engine.opponentOf(pi), name, 'deck');
+        engine.noteKnownCard(engine.opponentOf(pi), name, 'hand');
         // ★ ERST der Spielstand, DANN die Animation (Als Befund 18.8.:
         // die Voegel sassen nicht auf der frisch geholten Karte). Die
         // Reihenfolge auf der Leitung bleibt erhalten; der Client

@@ -75,7 +75,7 @@ module.exports = {
   // Picker abbrechen (Ralzish-Lehre).
   cpuShouldUseHeroEffect(engine, pi) {
     try {
-      const opp = pi === 0 ? 1 : 0;
+      const opp = engine.opponentOf(pi);
       return eligibleCreatures(engine, pi).some(i => (i.controller ?? i.owner) === opp);
     } catch { return true; }
   },

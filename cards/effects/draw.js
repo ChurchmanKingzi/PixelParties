@@ -107,7 +107,7 @@ module.exports = {
       const engine = ctx._engine;
       const gs = engine.gs;
       const pi = ctx.cardOwner;
-      const oppIdx = pi === 0 ? 1 : 0;
+      const oppIdx = engine.opponentOf(pi);
       const heroIdx = ctx.cardHeroIdx;
 
       const dm = decayLevel(engine, pi, heroIdx);

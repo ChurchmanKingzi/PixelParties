@@ -47,7 +47,7 @@ module.exports = {
       gs._naechsterEinzelschadenX2 = { turn: gs.turn, owner: pi, source: CARD_NAME };
       await engine.showTriggeredEffect(CARD_NAME, { playerIdx: pi });
       // Die komplette Gegnerseite geht einmal in Flammen auf (Helden + Support Zonen).
-      const oi = pi === 0 ? 1 : 0;
+      const oi = engine.opponentOf(pi);
       const ziele = [];
       (gs.players[oi]?.heroes || []).forEach((h, hi) => {
         if (!h?.name) return;

@@ -36,7 +36,7 @@ module.exports = {
   cpuShouldPlay(engine, pi) {
     try {
       const gs = engine.gs;
-      const opp = 1 - pi;
+      const opp = engine.opponentOf(pi);
       const ops = gs.players?.[opp];
       if (!ops) return true;
       // Kontrolle statt Seite (Styx 28.9.)

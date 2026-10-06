@@ -30,11 +30,10 @@ const { heroHasDiverHelmet, isAreaImmuneInst } = require('./_diver-helmet-shared
 
 /** Player index with strictly more discard-pile cards, or -1 on tie. */
 function playerWithMoreDiscard(gs) {
-  const a = (gs.players[0]?.discardPile || []).length;
-  const b = (gs.players[1]?.discardPile || []).length;
-  if (a > b) return 0;
-  if (b > a) return 1;
-  return -1;
+  const sizes = (gs.players || []).map(p => (p?.discardPile || []).length);
+  const max = Math.max(...sizes);
+  const first = sizes.indexOf(max);
+  return sizes.indexOf(max, first + 1) >= 0 ? -1 : first;   // N Spieler: nur ein eindeutiger Spitzenreiter zählt
 }
 
 /** Treat the source as a Creature effect iff its name resolves to a Creature card. */

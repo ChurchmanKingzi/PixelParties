@@ -105,7 +105,7 @@ module.exports = {
     // Inside an outer rollout — defer to "confirm" (the heuristic's
     // baseline) so the outer rollout simulates the same future-self
     // behavior we'll actually execute live. No nested simulation.
-    if (engine._inMctsSim || engine._fastMode) return CONFIRM;
+    if (engine._inMctsSim || engine._fastMode || engine.gs?.skillTest) return CONFIRM;   // Skill Test: keine Rollouts
 
     // Run a 1-turn rollout: take the 50 damage, play out the rest
     // of our turn + opp's full next turn, then check whether the

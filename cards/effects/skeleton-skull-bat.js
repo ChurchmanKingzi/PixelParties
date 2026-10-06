@@ -13,14 +13,14 @@ module.exports = {
   creatureEffect: true,
 
   canActivateCreatureEffect(ctx) {
-    const oi = ctx.cardOwner === 0 ? 1 : 0;
+    const oi = ctx._engine.opponentOf(ctx.cardOwner);
     const oppPs = ctx._engine.gs.players[oi];
     return (oppPs?.hand || []).length > 0;
   },
 
   async onCreatureEffect(ctx) {
     const engine = ctx._engine;
-    const oi = ctx.cardOwner === 0 ? 1 : 0;
+    const oi = engine.opponentOf(ctx.cardOwner);
     await engine.actionPromptForceDiscard(oi, 1, {
       title: CARD_NAME,
       description: 'Discard 1 card from your hand.',

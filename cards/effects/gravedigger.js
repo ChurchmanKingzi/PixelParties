@@ -174,7 +174,7 @@ module.exports = {
       if (ctx.card.counters?.isPlacement) return;        // platziert ≠ beschworen
 
       const pi = ctx.cardOwner;
-      const oi = pi === 0 ? 1 : 0;
+      const oi = engine.opponentOf(pi);
       const ops = gs.players[oi];
       if (!ops) return;
 
@@ -272,7 +272,7 @@ module.exports = {
     const engine = ctx._engine;
     const gs = engine.gs;
     const pi = engine.physicalSide(ctx.card) ?? ctx.cardOwner;
-    const oi = pi === 0 ? 1 : 0;
+    const oi = engine.opponentOf(pi);
     const ops = gs.players[oi];
     if (!ops || (ops.mainDeck || []).length === 0) return false;
 

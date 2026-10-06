@@ -9,6 +9,7 @@ const { AuthScreen, MainMenu, ProfileScreen, ShopScreen, RulesScreen, PuzzleCrea
   MenuBackgroundParticles } = window;
 const { DeckBuilder } = window;
 const { GameBoard } = window;
+const { SkillTestLobby, SkillTestCreateOptions, SkillTestPrepScreen, SkillTestBattlePending } = window;
 let _pendingGameState = null;
 
 // ═══════════════════════════════════════════
@@ -1188,7 +1189,9 @@ function PlayScreen() {
   // selection, per-pack and per-card timers, separate Prelims / Finale
   // Bo lengths, and a simultaneous-vs-consecutive game-flow toggle live
   // alongside the standard Ranked/Unranked split.
-  const [gameMode, setGameMode] = useState('constructed'); // 'constructed' | 'draft'
+  const [gameMode, setGameMode] = useState('constructed'); // 'constructed' | 'draft' | 'skilltest'
+  // Skill Test: 2–8 Sitze (Menschen + CPUs), Timer wahlweise aus.
+  const [skillTestOpts, setSkillTestOpts] = useState({ prepTimerSec: 300, prepTimerDisabled: false, turnTimerSec: 90, turnTimerDisabled: false });
   const [draftCubeId, setDraftCubeId] = useState('');
   const [draftPackTimerSec, setDraftPackTimerSec] = useState(60);
   const [draftPickTimerSec, setDraftPickTimerSec] = useState(5);
@@ -1424,6 +1427,16 @@ function PlayScreen() {
   }, [creating, gameMode, legalCubes, draftCubeId]);
 
   const createGame = () => {
+    if (gameMode === 'skilltest') {
+      socket.emit('create_room', {
+        type: 'unranked', format: 1,
+        playerPw: playerPw || null, specPw: specPw || null,
+        skillTest: { ...skillTestOpts },
+      });
+      setCreating(false);
+      setPlayerPw(''); setSpecPw('');
+      return;
+    }
     if (gameMode === 'draft') {
       if (legalCubes.length === 0) { notify('You need a legal Cube (512 cards) to host a Cube Draft.', 'error'); return; }
       if (!draftCubeId) { notify('Pick a Cube to draft from.', 'error'); return; }
@@ -1458,7 +1471,7 @@ function PlayScreen() {
   };
 
   const joinRoom = (room, asSpectator, pw) => {
-    if (!asSpectator) {
+    if (!asSpectator && !room.skillTest) {
       if (!currentDeckObj) { notify('Select a deck first', 'error'); return; }
       const v = isDeckLegal(currentDeckObj);
       if (!v.legal) { notify('Deck not legal: ' + v.reasons.join(', '), 'error'); return; }
@@ -1521,6 +1534,20 @@ function PlayScreen() {
   // === CUBE DRAFT — TOURNAMENT PHASE ===
   if (lobby && lobby.cubeDraft && lobby.cubeDraft.phase === 'tournament') {
     return <CubeDraftTournamentScreen lobby={lobby} tournament={cubeTournamentStateLocal} gameState={gameState} leaveRoom={leaveRoom} notify={notify} user={user} />;
+  }
+
+  // === SKILL TEST LOBBY ===
+  if (lobby && lobby.skillTest && lobby.skillTest.phase === 'lobby') {
+    return <SkillTestLobby lobby={lobby} user={user} leaveRoom={leaveRoom} playerJoined={playerJoined} setPlayerJoined={setPlayerJoined} />;
+  }
+
+  // === SKILL TEST — VORBEREITUNG (Basis, Recycler, Ready) ===
+  if (lobby && lobby.skillTest && lobby.skillTest.phase === 'prep') {
+    return <SkillTestPrepScreen lobby={lobby} user={user} leaveRoom={leaveRoom} notify={notify} />;
+  }
+
+  if (lobby && lobby.skillTest && lobby.skillTest.phase === 'battle') {
+    return <SkillTestBattlePending lobby={lobby} leaveRoom={leaveRoom} />;
   }
 
   // === CUBE DRAFT LOBBY VIEW ===
@@ -1799,11 +1826,12 @@ function PlayScreen() {
                     </span>
                     <div style={{ display: 'flex', gap: 6 }}>
                       {isDraft && <span className="badge" style={{ background: 'rgba(154,216,255,.14)', color: '#9ad8ff', fontSize: 11, fontWeight: 800, padding: '3px 10px', border: '1px solid rgba(154,216,255,.3)', letterSpacing: 1 }}>CUBE DRAFT</span>}
-                      {!isDraft && r.format > 1 && <span className="badge" style={{ background: 'rgba(255,255,255,.1)', color: '#fff', fontSize: 12, fontWeight: 800, padding: '3px 10px', border: '1px solid rgba(255,255,255,.2)', letterSpacing: 1 }}>Bo{r.format}</span>}
+                      {r.skillTest && <span className="badge" style={{ background: 'rgba(255,200,80,.14)', color: '#ffc850', fontSize: 11, fontWeight: 800, padding: '3px 10px', border: '1px solid rgba(255,200,80,.3)', letterSpacing: 1 }}>🎯 SKILL TEST</span>}
+                      {!isDraft && !r.skillTest && r.format > 1 && <span className="badge" style={{ background: 'rgba(255,255,255,.1)', color: '#fff', fontSize: 12, fontWeight: 800, padding: '3px 10px', border: '1px solid rgba(255,255,255,.2)', letterSpacing: 1 }}>Bo{r.format}</span>}
                       <span className="badge" style={{ background: r.type === 'ranked' ? 'rgba(255,170,0,.18)' : 'rgba(0,240,255,.15)', color: r.type === 'ranked' ? '#ffbb33' : '#00f0ff', fontSize: 11, fontWeight: 800, padding: '3px 10px', border: r.type === 'ranked' ? '1px solid rgba(255,170,0,.35)' : '1px solid rgba(0,240,255,.3)', textTransform: 'uppercase', letterSpacing: 1 }}>
                         {r.type}
                       </span>
-                      {!isDraft && r.format <= 1 && <span className="badge" style={{ background: 'rgba(255,255,255,.06)', color: 'var(--text2)', fontSize: 11, padding: '3px 10px' }}>Bo1</span>}
+                      {!isDraft && !r.skillTest && r.format <= 1 && <span className="badge" style={{ background: 'rgba(255,255,255,.06)', color: 'var(--text2)', fontSize: 11, padding: '3px 10px' }}>Bo1</span>}
                     </div>
                   </div>
                   <div style={{ fontSize: 10, color: 'var(--text2)', marginTop: 2 }}>
@@ -1907,8 +1935,13 @@ function PlayScreen() {
                     title={legalCubes.length === 0 ? 'You need a legal Cube (512 cards) to host a Cube Draft.' : 'Cube Draft tournament'}>
                     🧊 DRAFT
                   </button>
+                  <button className={'btn' + (gameMode === 'skilltest' ? ' glow-border' : '')} onClick={() => setGameMode('skilltest')} style={{ flex: 1 }}
+                    title="2–8 players: build a base from random cards, then act turn by turn">
+                    🎯 SKILL TEST
+                  </button>
                 </div>
               </div>
+              {gameMode !== 'skilltest' && (
               <div>
                 <div style={{ fontSize: 11, color: 'var(--text2)', marginBottom: 4 }}>Game Type</div>
                 <div style={{ display: 'flex', gap: 8 }}>
@@ -1916,6 +1949,8 @@ function PlayScreen() {
                   <button className={'btn btn-accent2' + (gameType === 'ranked' ? ' glow-border' : '')} onClick={() => setGameType('ranked')} style={{ flex: 1 }}>RANKED</button>
                 </div>
               </div>
+              )}
+              {gameMode === 'skilltest' && <SkillTestCreateOptions opts={skillTestOpts} setOpts={setSkillTestOpts} />}
               {gameMode === 'constructed' && (
                 <div>
                   <div style={{ fontSize: 11, color: 'var(--text2)', marginBottom: 4 }}>Format</div>

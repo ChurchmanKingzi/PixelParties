@@ -1,3 +1,4 @@
+const { isSeat } = require('./_opp');   // N-Spieler: gültiger Sitzindex
 // ═══════════════════════════════════════════
 //  CARD EFFECT: "Future Tech Doomsday Bomb"
 //  Artifact (Equipment, Cost 10)
@@ -119,7 +120,7 @@ module.exports = {
       // Der Träger — bei einer Ausrüstung auf fremder Seite ist das
       // NICHT `inst.owner` (Powder-Keg-Modell).
       const besitzer = inst.originalOwner ?? inst.owner;
-      const gegner = besitzer === 0 ? 1 : 0;
+      const gegner = engine.opponentOf(besitzer);
 
       // Nur die Attacke des AUSGERUESTETEN Helden.
       const q = ctx.source;
@@ -212,7 +213,7 @@ module.exports = {
       try {
         await engine.checkAllHeroesDead();
       } finally {
-        if (vorherigerVerlierer === 0 || vorherigerVerlierer === 1) {
+        if (isSeat(gs, vorherigerVerlierer)) {
           gs._drawLoserIdx = vorherigerVerlierer;
         } else {
           delete gs._drawLoserIdx;

@@ -33,7 +33,7 @@ function getValidTargets(gs, engine) {
   if (!engine) return [];
   const negKeys = getCleansableStatuses();
   const targets = [];
-  for (let pi = 0; pi < 2; pi++) {
+  for (let pi = 0; pi < gs.players.length; pi++) {
     const heroes = engine.getHeroTargets(pi).filter(t => {
       const hero = gs.players[pi].heroes[t.heroIdx];
       return hero.statuses && negKeys.some(k => hero.statuses[k]);
@@ -83,7 +83,7 @@ module.exports = {
 
   canActivate: (gs, pi) => {
     // Proactive check (no engine access) — optimistic, real check in getValidTargets
-    for (let phi = 0; phi < 2; phi++) {
+    for (let phi = 0; phi < gs.players.length; phi++) {
       const ps = gs.players[phi];
       for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
         const hero = ps.heroes[hi];

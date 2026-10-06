@@ -27,7 +27,7 @@ module.exports = {
   surpriseAbilityTrigger: true,
 
   canTelekinesisActivate(engine, ownerIdx) {
-    const oppIdx = ownerIdx === 0 ? 1 : 0;
+    const oppIdx = engine.opponentOf(ownerIdx);
     const oppPs = engine.gs.players[oppIdx];
     if (!oppPs) return false;
     for (let hi = 0; hi < (oppPs.heroes || []).length; hi++) {
@@ -77,7 +77,7 @@ module.exports = {
     const engine = ctx._engine;
     const gs = engine.gs;
     const pi = ctx.cardOwner;
-    const oppIdx = pi === 0 ? 1 : 0;
+    const oppIdx = engine.opponentOf(pi);
 
     let attachOwner, attachHeroIdx, attachedInst;
 

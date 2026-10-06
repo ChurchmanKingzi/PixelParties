@@ -22,7 +22,7 @@ const { hasCardType } = require('./_hooks');
 function countPoisonedTargets(gs, engine) {
   let count = 0;
   const cardDB = engine._getCardDB();
-  for (let p = 0; p < 2; p++) {
+  for (let p = 0; p < gs.players.length; p++) {
     const ps = gs.players[p];
     // Heroes
     for (const hero of (ps.heroes || [])) {

@@ -57,7 +57,7 @@ function freieZoneAmWirt(engine, inst) {
 
 /** Alle Creatures, die der Gegner kontrolliert und die man holen kann. */
 function beute(engine, pi) {
-  const oppIdx = pi === 0 ? 1 : 0;
+  const oppIdx = engine.opponentOf(pi);
   const out = [];
   for (const inst of (engine.cardInstances || [])) {
     if (inst.zone !== 'support' || inst.faceDown) continue;

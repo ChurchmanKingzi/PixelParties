@@ -39,7 +39,7 @@ module.exports = {
       const pi      = ctx.cardOwner;
       const heroIdx = ctx.cardHeroIdx;
       const ps      = gs.players[pi];
-      const oppIdx  = pi === 0 ? 1 : 0;
+      const oppIdx  = engine.opponentOf(pi);
       const oppPs   = gs.players[oppIdx];
 
       if (!ps || !oppPs) return;

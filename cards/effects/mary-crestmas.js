@@ -105,7 +105,7 @@ module.exports = {
 
       const engine = ctx._engine;
       const pi = ctx.cardOwner;
-      const oi = pi === 0 ? 1 : 0;
+      const oi = engine.opponentOf(pi);
       // „this Hero" auf der Brettseite (uebernommen: beim Gegner), Styx 28.9.
       const myHero = ctx.attachedHero;
       if (!myHero || myHero.hp <= 0) return;

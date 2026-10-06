@@ -105,7 +105,7 @@ module.exports = {
       // so we walk both player rosters by reference identity. Mirror
       // of the lookup Cannibalism does for the same reason.
       let deadOwner = -1, deadHeroIdx = -1;
-      for (let p = 0; p < 2; p++) {
+      for (let p = 0; p < engine.playerCount(); p++) {
         const heroes = gs.players[p]?.heroes || [];
         for (let h = 0; h < heroes.length; h++) {
           if (heroes[h] === dyingHero) {

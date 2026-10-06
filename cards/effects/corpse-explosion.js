@@ -80,7 +80,7 @@ async function explode(engine, defeatedControllerSide, loc) {
     engine._untrackCard(inst.id);
   }
   engine.log('corpse_explosion', {
-    victim: engine.gs.players[defeatedControllerSide === 0 ? 1 : 0]?.username,
+    victim: engine.gs.players[engine.opponentOf(defeatedControllerSide)]?.username,
   });
   engine.sync();
 }

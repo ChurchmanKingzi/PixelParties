@@ -116,7 +116,7 @@ async function _explode(ctx, excludeKey) {
   // own afterDamage / batch hooks can never re-enter.
   if (!engine.claimHOPT(HOPT_KEY, pi)) return;
 
-  const oppIdx = pi === 0 ? 1 : 0;
+  const oppIdx = engine.opponentOf(pi);
 
   // Kontrolle statt Seite (Styx 28.9.) — „all other targets your
   // opponent controls"; `owner` bleibt die physische Spalte.
@@ -216,7 +216,7 @@ module.exports = {
 
       // Identify the defeated hero so the splash never re-hits it.
       let excludeKey = null;
-      for (let tpi = 0; tpi < 2; tpi++) {
+      for (let tpi = 0; tpi < ctx._engine.playerCount(); tpi++) {
         const hs = ctx._engine.gs.players[tpi]?.heroes || [];
         const hi = hs.indexOf(target);
         if (hi >= 0) { excludeKey = `hero-${tpi}-${hi}`; break; }

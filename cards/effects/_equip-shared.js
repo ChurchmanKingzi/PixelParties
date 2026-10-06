@@ -1,3 +1,4 @@
+const { isSeat } = require('./_opp');   // N-Spieler: gültiger Sitzindex
 // ═══════════════════════════════════════════
 //  GETEILT: AUSRUESTEN DURCH EINEN EFFEKT (v1268)
 //
@@ -150,7 +151,7 @@ async function ruesteAusStapelAus(engine, pi, stapel, cardName, heroIdx, slot, o
   if (!ps) return null;
   // Als Vorgabe 29.9.: `opts.seite` = Brettseite eines uebernommenen Helden.
   // Die Karte liegt dort, gehoert aber `pi` (`originalOwner`).
-  const seite = (opts.seite === 0 || opts.seite === 1) ? opts.seite : pi;
+  const seite = (isSeat(engine, opts.seite)) ? opts.seite : pi;
   const zps = engine.gs.players[seite];
   if (!istAusruestTraeger(engine, pi, heroIdx, cardName, seite)) return null;
   if (((zps.supportZones[heroIdx] || [])[slot] || []).length > 0) return null;

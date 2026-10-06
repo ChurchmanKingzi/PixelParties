@@ -54,7 +54,7 @@ const PASS_MS = 1700;   // Zeitpunkt, zu dem der letzte Eber die Area passiert h
 function areaZiele(engine) {
   const gs = engine.gs;
   const ziele = [];
-  for (let owner = 0; owner < 2; owner++) {
+  for (let owner = 0; owner < engine.playerCount(); owner++) {
     const arr = gs.areaZones?.[owner] || [];
     for (let platz = 0; platz < arr.length; platz++) {
       const name = arr[platz];

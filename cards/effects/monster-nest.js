@@ -194,7 +194,7 @@ module.exports = {
       player: ps.username, card: chosen, nest: CARD_NAME,
     });
 
-    const oi = pi === 0 ? 1 : 0;
+    const oi = engine.opponentOf(pi);
     await engine.promptGeneric(oi, {
       type: 'deckSearchReveal',
       cardName: chosen,

@@ -162,7 +162,7 @@ module.exports = {
     // of how many copies were pulled — they all share the same name.
     if (pulled > 0) {
       await engine._delay(500);
-      const oi = pi === 0 ? 1 : 0;
+      const oi = engine.opponentOf(pi);
       await engine.promptGeneric(oi, {
         type: 'deckSearchReveal',
         searchToHand: true, searchPile: 'deck',   // v1121

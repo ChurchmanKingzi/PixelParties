@@ -121,7 +121,7 @@ module.exports = {
     if (eligible.length === 0) return null;
 
     // The opponent (the source's controller) chooses the new target.
-    const oppIdx = sourceCard?.controller ?? sourceCard?.owner ?? (pi === 0 ? 1 : 0);
+    const oppIdx = sourceCard?.controller ?? sourceCard?.owner ?? (engine.opponentOf(pi));
 
     // ── Opponent picks the replacement target ──
     let redirectTarget;

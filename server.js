@@ -67,6 +67,8 @@ const { sendMail } = require('./mailer');
 // v1289: oeffentliches Spielerprofil (Top-Players-Popup) — Schema, Deck-
 // Identitaet in game_history und die Route leben komplett in diesem Modul.
 const playerProfile = require('./player-profile');
+const skillTest = require('./skilltest');   // Modus „Skill Test" (Lobby, Vorbereitung, Rounds)
+const { isSeat, opponentOfGs, playerCountGs, emitToOpponentsGs } = require('./cards/effects/_opp');
 
 /**
  * Enrich a puzzle-authored buffs object so each entry carries the
@@ -2467,6 +2469,38 @@ app.get('/api/leaderboard', async (req, res) => {
   }
 });
 
+// ===== SKILL TEST: Lernstand der Bots (öffentlich, nur lesend) =====
+// Kartenliste nach gelerntem Wert und Vergleichsspiele „trainiert gegen untrainiert" — beides schreibt der Trainer
+// (skilltest/learn/train.js, passiv mit PP_ST_TRAIN_BG) laufend fort. Seite: /skilltest-learning.html
+app.get('/api/skilltest/ranking', (req, res) => {
+  try {
+    const learn = require('./skilltest/learn/ranking');
+    const data = learn.readRanking();
+    let rows = data.rows || [];
+    const type = String(req.query.type || '').toLowerCase();
+    if (type) rows = rows.filter(r => String(r.type).toLowerCase() === type);
+    const q = String(req.query.q || '').toLowerCase();
+    if (q) rows = rows.filter(r => r.name.toLowerCase().includes(q));
+    const minN = parseInt(req.query.minN, 10) || 0;
+    if (minN) rows = rows.filter(r => r.valueN >= minN);
+    const limit = Math.min(5000, parseInt(req.query.limit, 10) || 5000);
+    res.json({ updated: data.updated, games: data.games, version: data.version, prior: data.prior, types: data.types,
+      keepPairs: data.keepPairs || [], keepContext: data.keepContext || [], historyPoints: data.historyPoints, total: (data.rows || []).length, rows: rows.slice(0, limit), status: learn.readStatus() });
+  } catch (err) {
+    console.error('[skilltest ranking] error:', err.message);
+    res.status(500).json({ error: 'Failed to load ranking' });
+  }
+});
+app.get('/api/skilltest/benchmark', (req, res) => {
+  try {
+    const learn = require('./skilltest/learn/ranking');
+    res.json({ status: learn.readStatus(), records: learn.readBench({ max: 400 }) });
+  } catch (err) {
+    console.error('[skilltest benchmark] error:', err.message);
+    res.status(500).json({ error: 'Failed to load benchmark' });
+  }
+});
+
 // ===== HERO STATS =====
 // Smoothing for the "top Heroes" ranking. We rank by a Bayesian-shrinkage
 // score rather than raw win-rate so a Hero played once and won (100%) does
@@ -4165,6 +4199,7 @@ const rooms = new Map();
 function destroyRoom(roomId) {
   const _r = rooms.get(roomId);
   try { _r?.engine?.abort?.(); } catch { /* Abbau darf nie werfen */ }
+  try { if (_r?.skillTest) skillTest.dispose(_r); } catch { /* Abbau darf nie werfen */ }
   return rooms.delete(roomId);
 }
 const activeGames = new Map(); // userId -> roomId
@@ -4334,7 +4369,7 @@ function checkPotionLock(ps, gs, pi) {
   }
   // Check charmed opponent heroes controlled by this player
   if (gs && pi != null) {
-    const oi = pi === 0 ? 1 : 0;
+    const oi = opponentOfGs(gs, pi);
     for (const hero of (gs.players[oi]?.heroes || [])) {
       if (!hero?.name || hero.hp <= 0 || hero.statuses?.negated) continue;
       if (hero.charmedBy !== pi) continue;
@@ -4363,6 +4398,10 @@ const {
   abortHandResolve,
   eligibleIndicesWithoutResolving,
 } = require('./cards/effects/_hand-resolve.js');
+
+// N-Spieler: Spielerzahl der laufenden Partie für Broadcast-Schleifen (Normalspiel: 2,
+// auch wenn der Raum gerade keinen gameState hat).
+function roomPlayerCount(room) { return playerCountGs(room && room.gameState); }
 
 function sendGameState(room, playerIdx, extra) {
   if (room.engine?._fastMode) return; // Silent during MCTS simulations.
@@ -4448,7 +4487,7 @@ function sendGameState(room, playerIdx, extra) {
         setTimeout(() => {
           gs._terrorProcessing = false;
           room.engine.runPhase(5).then(() => { // PHASES.END = 5
-            for (let i = 0; i < 2; i++) sendGameState(room, i);
+            for (let i = 0; i < roomPlayerCount(room); i++) sendGameState(room, i);
             sendSpectatorGameState(room);
           }).catch(err => console.error('[Terror] force end error:', err.message));
         }, 500);
@@ -5046,11 +5085,12 @@ function sendGameState(room, playerIdx, extra) {
     // serverseitig stehen und kam nie beim Client an.
     doomCounters: gs.doomCounters || null,
     // The Fifth Circle of Hell: Debuff (naechster Einzelschaden x2) aktiv - betroffen ist der Gegner des Stempelnden.
-    fifthCircle: (gs._naechsterEinzelschadenX2 && gs._naechsterEinzelschadenX2.turn === gs.turn && (gs._naechsterEinzelschadenX2.owner === 0 || gs._naechsterEinzelschadenX2.owner === 1))
-      ? { affected: 1 - gs._naechsterEinzelschadenX2.owner } : null,
+    fifthCircle: (gs._naechsterEinzelschadenX2 && gs._naechsterEinzelschadenX2.turn === gs.turn && (isSeat(gs, gs._naechsterEinzelschadenX2.owner)))
+      ? { affected: opponentOfGs(gs, gs._naechsterEinzelschadenX2.owner) } : null,
     turn: gs.turn, activePlayer: gs.activePlayer, currentPhase: gs.currentPhase || 0,
     result: gs.result || null, rematchRequests: gs.rematchRequests || [],
     isPuzzle: gs.isPuzzle || false,
+    skillTest: skillTest.publicState(gs, room.engine),   // Skill Test: Round, Reihenfolge, erschöpfte Akteure …
     isTutorial: gs.isTutorial || false,
     // Kampagnen-Duell: das Kampffeld blendet damit Deck-Auswahl und
     // Revanche aus und zeigt stattdessen "Weiter" (der Ausgang gehört
@@ -5064,7 +5104,7 @@ function sendGameState(room, playerIdx, extra) {
     cpuBgm: cpuBgmForRoom(room),
     // PvP: der gewählte Track des GEGNERS (Sitz gegenüber). Zuschauer bekommen
     // in sendSpectatorGameState den Track von Sitz 0.
-    oppBgm: (room.type === 'singleplayer' || gs.isSkillTest) ? null : (gs.players?.[1 - playerIdx]?.battleTrack || null),
+    oppBgm: (room.type === 'singleplayer' || gs.isSkillTest) ? null : (gs.players?.[opponentOfGs(gs, playerIdx)]?.battleTrack || null),
     // Skill Test (bis zu 8 Spieler, zufaellige Layouts): der Client waehlt zufaellig eine von fuenf Kampfmusiken
     // (BGM_SETS in app-main.jsx). Setzt der Modus `gs.isSkillTest = true` (oder `gs.bgmSet = 'skilltest'`), laeuft sie.
     isSkillTest: !!gs.isSkillTest, bgmSet: gs.bgmSet || (gs.isSkillTest ? 'skilltest' : null),
@@ -5190,7 +5230,7 @@ function sendGameState(room, playerIdx, extra) {
     terrorCount: gs.activePlayer != null ? (gs._terrorTracking?.[gs.activePlayer] || []).length : 0,
     terrorThreshold: room.engine ? (() => {
       let threshold = Infinity;
-      for (let sp = 0; sp < 2; sp++) {
+      for (let sp = 0; sp < gs.players.length; sp++) {
         const sps = gs.players[sp]; if (!sps) continue;
         for (let hi = 0; hi < (sps.heroes || []).length; hi++) {
           const h = sps.heroes[hi];
@@ -5241,6 +5281,7 @@ function sendGameState(room, playerIdx, extra) {
         const key = `${physicalSide}-${inst.heroIdx}-${inst.zoneSlot}`;
         const hasCounters = Object.keys(inst.counters).length > 0;
         const hasSummoningSickness = inst.turnPlayed === currentTurn
+          && !room.gameState?.skillTest   // Skill Test: kein Beschwörungs-Schlaf
           && !inst.counters?._hasHaste
           // Chilly Dog (Mischief Militia) lifts summoning sickness for
           // Frozen Creatures the same player controls — the haste
@@ -5882,11 +5923,12 @@ function sendSpectatorGameState(room) {
     // serverseitig stehen und kam nie beim Client an.
     doomCounters: gs.doomCounters || null,
     // The Fifth Circle of Hell: Debuff (naechster Einzelschaden x2) aktiv - betroffen ist der Gegner des Stempelnden.
-    fifthCircle: (gs._naechsterEinzelschadenX2 && gs._naechsterEinzelschadenX2.turn === gs.turn && (gs._naechsterEinzelschadenX2.owner === 0 || gs._naechsterEinzelschadenX2.owner === 1))
-      ? { affected: 1 - gs._naechsterEinzelschadenX2.owner } : null,
+    fifthCircle: (gs._naechsterEinzelschadenX2 && gs._naechsterEinzelschadenX2.turn === gs.turn && (isSeat(gs, gs._naechsterEinzelschadenX2.owner)))
+      ? { affected: opponentOfGs(gs, gs._naechsterEinzelschadenX2.owner) } : null,
     turn: gs.turn, activePlayer: gs.activePlayer, currentPhase: gs.currentPhase || 0,
     result: gs.result || null, rematchRequests: gs.rematchRequests || [],
     isPuzzle: gs.isPuzzle || false,
+    skillTest: skillTest.publicState(gs, room.engine),   // Skill Test: Round, Reihenfolge, erschöpfte Akteure …
     isTutorial: gs.isTutorial || false,
     // Kampagnen-Duell: das Kampffeld blendet damit Deck-Auswahl und
     // Revanche aus und zeigt stattdessen "Weiter" (der Ausgang gehört
@@ -5958,6 +6000,7 @@ function sendSpectatorGameState(room) {
         const key = `${physicalSide}-${inst.heroIdx}-${inst.zoneSlot}`;
         const hasCounters = Object.keys(inst.counters).length > 0;
         const hasSummoningSickness = inst.turnPlayed === currentTurn
+          && !room.gameState?.skillTest   // Skill Test: kein Beschwörungs-Schlaf
           && !inst.counters?._hasHaste
           // Chilly Dog (Mischief Militia) lifts summoning sickness for
           // Frozen Creatures the same player controls — the haste
@@ -6889,9 +6932,8 @@ function cleanupRoom(roomId) {
 function broadcastHandToBoard(room, ownerIdx, payload, forceOwnerAnim = false) {
   if (room.engine?._fastMode) return;
   if (!room?.gameState) return;
-  const oppIdx = ownerIdx === 0 ? 1 : 0;
-  const oppSid = room.gameState.players[oppIdx]?.socketId;
-  if (oppSid) io.to(oppSid).emit('hand_to_board_fly', { ownerIdx, ...payload });
+  const oppIdx = opponentOfGs(room.gameState, ownerIdx);
+  emitToOpponentsGs(room.gameState, io, ownerIdx, 'hand_to_board_fly', { ownerIdx, ...payload });
   sendToSpectators(room, 'hand_to_board_fly', { ownerIdx, ...payload });
   // Normally the owner sees their own drag animation, so we don't echo
   // the fly back to them. For click-placed plays there's no drag —
@@ -7146,7 +7188,7 @@ async function doPlayAbility(room, pi, { cardName, handIndex, heroIdx, zoneSlot,
         }
       }
       room.engine.log('ability_negated', { card: cardName, player: ps.username });
-      for (let i = 0; i < 2; i++) sendGameState(room, i); sendSpectatorGameState(room);
+      for (let i = 0; i < roomPlayerCount(room); i++) sendGameState(room, i); sendSpectatorGameState(room);
       return true;
     }
 
@@ -7155,7 +7197,7 @@ async function doPlayAbility(room, pi, { cardName, handIndex, heroIdx, zoneSlot,
   } catch (err) {
     console.error('[Engine] doPlayAbility hooks error:', err.message, err.stack);
   }
-  for (let i = 0; i < 2; i++) sendGameState(room, i); sendSpectatorGameState(room);
+  for (let i = 0; i < roomPlayerCount(room); i++) sendGameState(room, i); sendSpectatorGameState(room);
   return true;
 }
 
@@ -7219,7 +7261,7 @@ async function doPlayAbilityFremd(room, pi, { cardName, handIndex, heroIdx, zone
       await engine.routeNegatedInitialCard(negatedAbilityOwner, cardName, chainResult, -1,
         { fromZone: 'ability', fromHeroIdx: heroIdx, fromSlotIdx: ziel });
       engine.log('ability_negated', { card: cardName, player: ps.username });
-      for (let i = 0; i < 2; i++) sendGameState(room, i); sendSpectatorGameState(room);
+      for (let i = 0; i < roomPlayerCount(room); i++) sendGameState(room, i); sendSpectatorGameState(room);
       return true;
     }
     // Herkunftsmarke der Handkarte ist jetzt an der Instanz — verbrauchen,
@@ -7230,7 +7272,7 @@ async function doPlayAbilityFremd(room, pi, { cardName, handIndex, heroIdx, zone
   } catch (err) {
     console.error('[Engine] doPlayAbilityFremd hooks error:', err.message, err.stack);
   }
-  for (let i = 0; i < 2; i++) sendGameState(room, i); sendSpectatorGameState(room);
+  for (let i = 0; i < roomPlayerCount(room); i++) sendGameState(room, i); sendSpectatorGameState(room);
   return true;
 }
 
@@ -7238,7 +7280,7 @@ async function doPlayArtifact(room, pi, { cardName, handIndex, heroIdx, zoneSlot
   if (!room?.engine || !room.gameState) return false;
   // Als Vorgabe 29.9.: Zielseite auch als `heroOwner`/`charmedOwner` (wie
   // bei Zaubern/Kreaturen ueber geliehene Helden).
-  if (targetOwner !== 0 && targetOwner !== 1) targetOwner = heroOwner ?? charmedOwner;
+  if (!isSeat(room.gameState, targetOwner)) targetOwner = heroOwner ?? charmedOwner;
   const gs = room.gameState;
   if (pi !== gs.activePlayer) return false;
   // Hand waehrend einer erzwungenen Abwurf-Stapelabfrage gesperrt —
@@ -7340,7 +7382,7 @@ async function doPlayArtifact(room, pi, { cardName, handIndex, heroIdx, zoneSlot
   // und Kontroll-Equip (Als Vorgabe 29.9.); ungueltige Seiten lehnt der
   // Weg unten ohnehin ab.
   const { costReduction, cost } = room.engine.artifactPlayCost(pi, cardName, handIndex, {
-    heroIdx, heroOwner: _isCrossSideArtifact ? (pi === 0 ? 1 : 0) : ((targetOwner === 0 || targetOwner === 1) ? targetOwner : pi),
+    heroIdx, heroOwner: _isCrossSideArtifact ? (opponentOfGs(gs, pi)) : ((isSeat(gs, targetOwner)) ? targetOwner : pi),
   });
   if (!room.engine.canAffordGold(pi, cost, cardName)) return false;
 
@@ -7368,7 +7410,7 @@ async function doPlayArtifact(room, pi, { cardName, handIndex, heroIdx, zoneSlot
     && !_isCrossSideArtifact
     && typeof _script?.canEquipToHero !== 'function'
     && _script?.equipOwnSideOnly !== true
-    && (targetOwner === 0 || targetOwner === 1);
+    && (isSeat(gs, targetOwner));
   // ★ KONTROLL-EQUIP (Als Vorgabe 29.9.): an einen UEBERNOMMENEN Helden
   // der Gegenseite darf JEDE Ausruestung (auch mit `canEquipToHero` oder
   // `equipOwnSideOnly` — „a Hero you control"), wenn die Uebernahme
@@ -7377,16 +7419,16 @@ async function doPlayArtifact(room, pi, { cardName, handIndex, heroIdx, zoneSlot
   // dient dem Kontrolleur (`effektiveSeiten`).
   const _isKontrollEquip = _subLowerEarly === 'equipment'
     && !_isCrossSideArtifact
-    && (targetOwner === 0 || targetOwner === 1) && targetOwner !== pi
+    && (isSeat(gs, targetOwner)) && targetOwner !== pi
     && room.engine.darfFremdAusruesten(pi, targetOwner, heroIdx);
   const placementOwner = _isCrossSideArtifact
-    ? (pi === 0 ? 1 : 0)
+    ? (opponentOfGs(gs, pi))
     : ((_isFreeSideEquip || _isKontrollEquip) ? targetOwner : pi);
   // Ausdruecklich die andere Seite gewuenscht, aber weder Free-Side noch
   // Kontroll-Equip (Charme, Love Shot, fremder Held): ablehnen — nie still
   // auf den gleich indizierten eigenen Helden umlenken.
   if (_subLowerEarly === 'equipment' && !_isCrossSideArtifact
-      && (targetOwner === 0 || targetOwner === 1) && targetOwner !== placementOwner) return false;
+      && (isSeat(gs, targetOwner)) && targetOwner !== placementOwner) return false;
   const placementPs = gs.players[placementOwner];
   if (!placementPs) return false;
   const hero = placementPs.heroes[heroIdx];
@@ -7435,9 +7477,8 @@ async function doPlayArtifact(room, pi, { cardName, handIndex, heroIdx, zoneSlot
     broadcastHandToBoard(room, pi, { cardName, handIndex, zoneType: 'support', heroIdx, slotIdx: finalSlot, destOwner: placementOwner }, !!clickPlaced);
 
     try {
-      const oi = pi === 0 ? 1 : 0;
-      const oppSid = gs.players[oi]?.socketId;
-      if (oppSid) io.to(oppSid).emit('card_reveal', { cardName });
+      const oi = opponentOfGs(gs, pi);
+      emitToOpponentsGs(gs, io, pi, 'card_reveal', { cardName });
       sendToSpectators(room, 'card_reveal', { cardName });
       await room.engine._delay(100);
 
@@ -7495,7 +7536,7 @@ async function doPlayArtifact(room, pi, { cardName, handIndex, heroIdx, zoneSlot
     } catch (err) {
       console.error('[Engine] doPlayArtifact (equip) error:', err.message);
     }
-    for (let i = 0; i < 2; i++) sendGameState(room, i); sendSpectatorGameState(room);
+    for (let i = 0; i < roomPlayerCount(room); i++) sendGameState(room, i); sendSpectatorGameState(room);
     return true;
   }
 
@@ -7754,7 +7795,7 @@ async function doPlayArtifact(room, pi, { cardName, handIndex, heroIdx, zoneSlot
       // Entnahme laengst passiert war.
       if (!handEntnommen) abortHandResolve(ps);
     }
-    for (let i = 0; i < 2; i++) sendGameState(room, i); sendSpectatorGameState(room);
+    for (let i = 0; i < roomPlayerCount(room); i++) sendGameState(room, i); sendSpectatorGameState(room);
     return true;
   }
 
@@ -7888,7 +7929,7 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
     room.engine.bonusAktionFuer(pi, heroIdx, charmedOwner ?? pi)
     || ((ps._bonusMainActions || 0) > 0 && actionsPlayedThisPhase === 1)
   );
-  const actionAlreadyUsed = isActionPhase && (ps.heroesActedThisTurn?.length > 0) && !hasBonusAction;
+  const actionAlreadyUsed = isActionPhase && room.engine.mainActionSpent(pi, heroIdx) && !hasBonusAction;
   // Reaction-subtype Spells / Attacks / Creatures are exempt from the
   // action-economy machinery — they never consume an action slot, never
   // burn an additional-action provider, and never bump
@@ -8003,7 +8044,7 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
       ps._bonusMainActions = 1;
     }
     if (_viaCreature) delete gs._spellCasterOverride;
-    for (let i = 0; i < 2; i++) sendGameState(room, i); sendSpectatorGameState(room);
+    for (let i = 0; i < roomPlayerCount(room); i++) sendGameState(room, i); sendSpectatorGameState(room);
     return _bail('Helden-Aktionskosten wurden nicht bezahlt (payHeroActionCost sagt nein)');
   }
   // From here on the hero cost is in 'pending' state — the try/finally
@@ -8160,7 +8201,7 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
       if (isActionPhase && !additionalConsumed && !isInherentAction) {
         await room.engine.advanceToPhase(pi, 4);
       }
-      for (let i = 0; i < 2; i++) sendGameState(room, i); sendSpectatorGameState(room);
+      for (let i = 0; i < roomPlayerCount(room); i++) sendGameState(room, i); sendSpectatorGameState(room);
       return true;
     }
 
@@ -8179,7 +8220,7 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
     // Karte nur `heroIdx` und legte sich zwangslaeufig an den Wirker.
     if (attachHeroIdx != null && attachHeroIdx >= 0) gs._attachmentHeroIdx = attachHeroIdx;
     // v651: Zielseite eines Cross-Side-Attachments (Overheal Shock, Berserk …)
-    if (attachOwner === 0 || attachOwner === 1) gs._attachmentOwner = attachOwner;
+    if (isSeat(gs, attachOwner)) gs._attachmentOwner = attachOwner;
     // For a live CPU cast: stream the card to centre BEFORE its effect
     // resolves (no-op for humans / PvP / MCTS sim). Idempotent — the
     // post-resolution _firePendingCardReveal below then no-ops.
@@ -8263,7 +8304,7 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
       // now (the finally would also catch this, but being explicit makes
       // the intent clear and matches the post-resolution release below).
       _releaseSpellDepth();
-      for (let i = 0; i < 2; i++) sendGameState(room, i); sendSpectatorGameState(room);
+      for (let i = 0; i < roomPlayerCount(room); i++) sendGameState(room, i); sendSpectatorGameState(room);
       // Diagnose: die Karte bleibt in der Hand, obwohl `true`
       // zurueckgeht — fuer die CPU sieht das aus wie ein wirkungsloser
       // Play. Der haeufigste Grund ist ein Ziel-Prompt, der leer
@@ -8765,7 +8806,7 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
     delete gs._spellConsumedMainAction;
     delete gs._gewirkteStufe;   // v1308
   }
-  for (let i = 0; i < 2; i++) sendGameState(room, i); sendSpectatorGameState(room);
+  for (let i = 0; i < roomPlayerCount(room); i++) sendGameState(room, i); sendSpectatorGameState(room);
   return true;
 }
 
@@ -8923,7 +8964,7 @@ async function doActivateCreatureEffect(room, pi, { heroIdx, zoneSlot, charmedOw
   // Frozen own-controlled Creature, mirroring the engine helper —
   // this catches puzzle-mode boards where Chilly Dog spawned
   // pre-frozen-sick allies without firing the haste-grant hook.
-  if (inst.turnPlayed === (gs.turn || 0) && !inst.counters?._hasHaste) {
+  if (inst.turnPlayed === (gs.turn || 0) && !gs.skillTest && !inst.counters?._hasHaste) {
     const ctrlForCD = inst.controller ?? inst.owner;
     const chillyDogLiftsSickness = inst.counters?.frozen
       && ctrlForCD === pi
@@ -9025,7 +9066,7 @@ async function doActivateCreatureEffect(room, pi, { heroIdx, zoneSlot, charmedOw
       gs.hoptUsed[hoptKey] = gs.turn;
       await room.engine._flushSurpriseDrawChecks();
       await room.engine._executeDeferredSurprises();
-      for (let i = 0; i < 2; i++) sendGameState(room, i); sendSpectatorGameState(room);
+      for (let i = 0; i < roomPlayerCount(room); i++) sendGameState(room, i); sendSpectatorGameState(room);
       return true;
     }
 
@@ -9181,9 +9222,9 @@ async function doActivateCreatureEffect(room, pi, { heroIdx, zoneSlot, charmedOw
     await room.engine._flushSurpriseDrawChecks();
     await room.engine._executeDeferredSurprises();
   } catch (err) {
-    console.error('[Engine] doActivateCreatureEffect error:', err.message);
+    console.error('[Engine] doActivateCreatureEffect error:', err.message, '\n' + String(err.stack || '').split('\n').slice(1, 4).join('\n'));
   }
-  for (let i = 0; i < 2; i++) sendGameState(room, i); sendSpectatorGameState(room);
+  for (let i = 0; i < roomPlayerCount(room); i++) sendGameState(room, i); sendSpectatorGameState(room);
   return true;
 }
 
@@ -9213,7 +9254,7 @@ function doTriggerTreacherousCrystal(room, pi) {
   if (pi !== gs.activePlayer) return false;
   if (gs.potionTargeting) return false;
 
-  const oi = pi === 0 ? 1 : 0;
+  const oi = opponentOfGs(gs, pi);
   const oppPs = gs.players[oi];
   if (!oppPs) return false;
   if (!(oppPs.hand || []).includes('Treacherous Crystal')) return false;
@@ -9268,7 +9309,7 @@ function doTriggerTreacherousCrystal(room, pi) {
   room.engine.log('treacherous_crystal_trigger', {
     player: gs.players[pi]?.username, stolenCount,
   });
-  for (let i = 0; i < 2; i++) sendGameState(room, i);
+  for (let i = 0; i < roomPlayerCount(room); i++) sendGameState(room, i);
   sendSpectatorGameState(room);
   return true;
 }
@@ -9404,7 +9445,7 @@ async function doActivateFreeAbility(room, pi, { heroIdx, zoneIdx, zoneKind, cha
       room.engine.clearEffectAnnounce();
       // Negation keeps HOPT consumed — the ability fired (and was countered).
       hoptReserved = false;
-      for (let i = 0; i < 2; i++) sendGameState(room, i); sendSpectatorGameState(room);
+      for (let i = 0; i < roomPlayerCount(room); i++) sendGameState(room, i); sendSpectatorGameState(room);
       return true;
     }
 
@@ -9524,7 +9565,7 @@ async function doActivateFreeAbility(room, pi, { heroIdx, zoneIdx, zoneKind, cha
     releaseHopt();
     room.engine.clearEffectAnnounce();
   }
-  for (let i = 0; i < 2; i++) sendGameState(room, i); sendSpectatorGameState(room);
+  for (let i = 0; i < roomPlayerCount(room); i++) sendGameState(room, i); sendSpectatorGameState(room);
   return true;
 }
 
@@ -9602,7 +9643,7 @@ async function doPlayCreature(room, pi, { cardName, handIndex, heroIdx, zoneSlot
     room.engine.bonusAktionFuer(pi, heroIdx, charmedOwner ?? pi)
     || ((ps._bonusMainActions || 0) > 0 && actionsPlayedThisPhase === 1)
   );
-  const actionAlreadyUsed = isActionPhase && (ps.heroesActedThisTurn?.length > 0) && !hasBonusAction;
+  const actionAlreadyUsed = isActionPhase && room.engine.mainActionSpent(pi, heroIdx) && !hasBonusAction;
   if ((isMainPhase || actionAlreadyUsed) && !usingAdditional && !isInherentAction && !isReactionSubtype) {
     // Feinaufschlüsselung: WARUM stand keine Aktion zur Verfügung?
     // Trennt "Main Phase ohne Grant" von "Aktion schon verbraucht"
@@ -9774,7 +9815,7 @@ async function doPlayCreature(room, pi, { cardName, handIndex, heroIdx, zoneSlot
     }
     delete ps._requestedBouncePlaceSlot;
     delete ps._requestedNormalSummonSlot;
-    for (let i = 0; i < 2; i++) sendGameState(room, i); sendSpectatorGameState(room);
+    for (let i = 0; i < roomPlayerCount(room); i++) sendGameState(room, i); sendSpectatorGameState(room);
     return _no('summon-fehlgeschlagen');
   }
   let _heroCostFinalized = false;
@@ -9832,7 +9873,7 @@ async function doPlayCreature(room, pi, { cardName, handIndex, heroIdx, zoneSlot
         });
         if (!hasMoreSecondAction) await room.engine.advanceToPhase(pi, 4);
       }
-      for (let i = 0; i < 2; i++) sendGameState(room, i); sendSpectatorGameState(room);
+      for (let i = 0; i < roomPlayerCount(room); i++) sendGameState(room, i); sendSpectatorGameState(room);
       return true;
     }
 
@@ -9864,7 +9905,7 @@ async function doPlayCreature(room, pi, { cardName, handIndex, heroIdx, zoneSlot
         ps._bonusMainActions = 1;
       }
       room.engine.log('creature_fizzle', { card: cardName, reason: 'beforeSummon_cancelled' });
-      for (let i = 0; i < 2; i++) sendGameState(room, i); sendSpectatorGameState(room);
+      for (let i = 0; i < roomPlayerCount(room); i++) sendGameState(room, i); sendSpectatorGameState(room);
       return true;
     }
     // `beforeSummon` may upgrade an engine-decided NORMAL summon into
@@ -9940,7 +9981,7 @@ async function doPlayCreature(room, pi, { cardName, handIndex, heroIdx, zoneSlot
           ps._bonusMainActions = 1;
         }
         room.engine.log('creature_fizzle', { card: cardName, reason: 'zone_occupied' });
-        for (let i = 0; i < 2; i++) sendGameState(room, i); sendSpectatorGameState(room);
+        for (let i = 0; i < roomPlayerCount(room); i++) sendGameState(room, i); sendSpectatorGameState(room);
         return true;
       }
       actualZoneSlot = placeResult.actualSlot;
@@ -9964,9 +10005,9 @@ async function doPlayCreature(room, pi, { cardName, handIndex, heroIdx, zoneSlot
         cardName, handIndex, zoneType: 'support', heroIdx, slotIdx: actualZoneSlot,
         destOwner: heroOwner,
       });
-      for (let i = 0; i < 2; i++) {
+      for (let i = 0; i < gs.players.length; i++) {
         const sid = gs.players[i]?.socketId;
-        if (sid) io.to(sid).emit('summon_effect', { owner: heroOwner, heroIdx, zoneSlot: actualZoneSlot, cardName });
+        if (sid && !room.engine?._inMctsSim) io.to(sid).emit('summon_effect', { owner: heroOwner, heroIdx, zoneSlot: actualZoneSlot, cardName });
       }
       sendToSpectators(room, 'summon_effect', { owner: heroOwner, heroIdx, zoneSlot: actualZoneSlot, cardName });
     }
@@ -10097,7 +10138,7 @@ async function doPlayCreature(room, pi, { cardName, handIndex, heroIdx, zoneSlot
       try { await room.engine.refundHeroActionCost(pi, heroIdx); } catch {}
     }
   }
-  for (let i = 0; i < 2; i++) sendGameState(room, i); sendSpectatorGameState(room);
+  for (let i = 0; i < roomPlayerCount(room); i++) sendGameState(room, i); sendSpectatorGameState(room);
   return true;
 }
 
@@ -10193,7 +10234,7 @@ async function doActivateAbility(room, pi, { heroIdx, zoneIdx, zoneKind, charmed
     || ((actingPs._bonusMainActions || 0) > 0 && actionsPlayedThisPhase === 1)
   );
   const actionAlreadyUsed = isActionPhase
-    && (actingPs.heroesActedThisTurn?.length > 0)
+    && room.engine.mainActionSpent(pi, heroIdx)
     && !hasBonusActionAlready;
   const needsAdditional = isMainPhase || actionAlreadyUsed;
   let consumedAdditionalInst = null;
@@ -10268,7 +10309,7 @@ async function doActivateAbility(room, pi, { heroIdx, zoneIdx, zoneKind, charmed
     }
     if (gs.hoptUsed) delete gs.hoptUsed[hoptKey];
     delete gs._pendingPlayLog;
-    for (let i = 0; i < 2; i++) sendGameState(room, i); sendSpectatorGameState(room);
+    for (let i = 0; i < roomPlayerCount(room); i++) sendGameState(room, i); sendSpectatorGameState(room);
     return false;
   }
   let _heroCostFinalized = false;
@@ -10308,16 +10349,16 @@ async function doActivateAbility(room, pi, { heroIdx, zoneIdx, zoneKind, charmed
       if (isActionPhase) await room.engine.advanceToPhase(pi, 4);
       // (additional-action providers were already consumed upfront before
       // activation, so no manual consume is needed here on negation.)
-      for (let i = 0; i < 2; i++) sendGameState(room, i); sendSpectatorGameState(room);
+      for (let i = 0; i < roomPlayerCount(room); i++) sendGameState(room, i); sendSpectatorGameState(room);
       return true;
     }
 
     const origController = inst.controller;
     const origOwner = inst.owner;
     const origHeroIdx = inst.heroIdx;
-    for (let i = 0; i < 2; i++) {
+    for (let i = 0; i < gs.players.length; i++) {
       const sid = gs.players[i]?.socketId;
-      if (sid) io.to(sid).emit('ability_activated', { owner: heroOwner, heroIdx, zoneIdx, abilityName });
+      if (sid && !room.engine?._inMctsSim) io.to(sid).emit('ability_activated', { owner: heroOwner, heroIdx, zoneIdx, abilityName });
     }
     sendToSpectators(room, 'ability_activated', { owner: heroOwner, heroIdx, zoneIdx, abilityName });
 
@@ -10396,7 +10437,7 @@ async function doActivateAbility(room, pi, { heroIdx, zoneIdx, zoneKind, charmed
           if (idx >= 0) actingPs.heroesActedThisTurn.splice(idx, 1);
         }
       }
-      for (let i = 0; i < 2; i++) sendGameState(room, i); sendSpectatorGameState(room);
+      for (let i = 0; i < roomPlayerCount(room); i++) sendGameState(room, i); sendSpectatorGameState(room);
       return true;
     }
 
@@ -10467,7 +10508,7 @@ async function doActivateAbility(room, pi, { heroIdx, zoneIdx, zoneKind, charmed
       try { await room.engine.refundHeroActionCost(heroOwner, heroIdx); } catch {}
     }
   }
-  for (let i = 0; i < 2; i++) sendGameState(room, i); sendSpectatorGameState(room);
+  for (let i = 0; i < roomPlayerCount(room); i++) sendGameState(room, i); sendSpectatorGameState(room);
   return true;
 }
 
@@ -10660,7 +10701,7 @@ async function doActivateHeroEffect(room, pi, { heroIdx, charmedOwner, chosenEff
         const actionsPlayed = actingPs._actionsPlayedThisPhase || 0;
         const hasBonus = room.engine.bonusAktionFuer(pi, heroIdx, charmedOwner ?? pi)
           || ((actingPs._bonusMainActions || 0) > 0 && actionsPlayed === 1);
-        const actionAlreadyUsed = (actingPs.heroesActedThisTurn?.length > 0) && !hasBonus;
+        const actionAlreadyUsed = room.engine.mainActionSpent(pi, heroIdx) && !hasBonus;
         if (actionAlreadyUsed) {
           // Action 2+ in Action Phase — needs a matching additional-
           // action provider, otherwise activation is illegal.
@@ -10746,7 +10787,7 @@ async function doActivateHeroEffect(room, pi, { heroIdx, charmedOwner, chosenEff
   } finally {
     delete gs._heroEffectInProgress[inProgressKey];
   }
-  for (let i = 0; i < 2; i++) sendGameState(room, i); sendSpectatorGameState(room);
+  for (let i = 0; i < roomPlayerCount(room); i++) sendGameState(room, i); sendSpectatorGameState(room);
   return true;
 }
 
@@ -10761,7 +10802,7 @@ async function doActivateAreaEffect(room, pi, { areaOwner, areaName }) {
     console.error('[doActivateAreaEffect]', err.message);
     return false;
   }
-  for (let i = 0; i < 2; i++) sendGameState(room, i); sendSpectatorGameState(room);
+  for (let i = 0; i < roomPlayerCount(room); i++) sendGameState(room, i); sendSpectatorGameState(room);
   return true;
 }
 
@@ -10784,9 +10825,8 @@ async function doActivatePermanent(room, pi, { permId, ownerIdx }) {
   if (!script.canActivatePermanent(gs, pi, permOwner, room.engine)) return false;
 
   try {
-    const oi = pi === 0 ? 1 : 0;
-    const oppSid = gs.players[oi]?.socketId;
-    if (oppSid) io.to(oppSid).emit('card_reveal', { cardName: perm.name });
+    const oi = opponentOfGs(gs, pi);
+    emitToOpponentsGs(gs, io, pi, 'card_reveal', { cardName: perm.name });
     sendToSpectators(room, 'card_reveal', { cardName: perm.name });
     room.engine.log('permanent_activated', { card: perm.name, player: gs.players[pi].username });
     // v353: Auftritt — ein Permanent liegt am Brett, also `'board'`.
@@ -10798,7 +10838,7 @@ async function doActivatePermanent(room, pi, { permId, ownerIdx }) {
   } finally {
     room.engine.clearEffectAnnounce();
   }
-  for (let i = 0; i < 2; i++) sendGameState(room, i); sendSpectatorGameState(room);
+  for (let i = 0; i < roomPlayerCount(room); i++) sendGameState(room, i); sendSpectatorGameState(room);
   return true;
 }
 
@@ -10840,7 +10880,7 @@ async function doActivateDiscardEffect(room, pi, { instId }) {
   } catch (err) {
     console.error('[doActivateDiscardEffect]', err.stack || err.message);
   }
-  for (let i = 0; i < 2; i++) sendGameState(room, i); sendSpectatorGameState(room);
+  for (let i = 0; i < roomPlayerCount(room); i++) sendGameState(room, i); sendSpectatorGameState(room);
   return true;
 }
 
@@ -10854,7 +10894,7 @@ async function doActivateEquipEffect(room, pi, { heroIdx, zoneSlot }) {
   // ★ Cross-Side (v565): eine eigene Ausruestung kann auf der
   // GEGNERSEITE liegen (Future Tech Control Device). Dann sind Held und
   // Zone die des Gegners — die Instanz gehoert trotzdem `pi`.
-  const oi = pi === 0 ? 1 : 0;
+  const oi = opponentOfGs(gs, pi);
   // ★ Eine Cross-Side-Karte liegt PER DEFINITION auf der Gegenseite
   // ihres Besitzers. Der Besitzer ergibt sich also aus der SEITE, in
   // deren Zone sie steht — `originalOwner` ist nur die Bestaetigung und
@@ -10968,7 +11008,7 @@ async function doActivateEquipEffect(room, pi, { heroIdx, zoneSlot }) {
     releaseHopt();
     room.engine.clearEffectAnnounce();
   }
-  for (let i = 0; i < 2; i++) sendGameState(room, i); sendSpectatorGameState(room);
+  for (let i = 0; i < roomPlayerCount(room); i++) sendGameState(room, i); sendSpectatorGameState(room);
   return true;
 }
 
@@ -11015,7 +11055,7 @@ async function doConfirmPotion(room, pi, { selectedIds }) {
   // Effect prompt (engine-driven from card hooks) resolves the engine promise.
   if (gs.potionTargeting.isEffectPrompt) {
     room.engine.resolveEffectPrompt(selectedIds);
-    for (let i = 0; i < 2; i++) sendGameState(room, i); sendSpectatorGameState(room);
+    for (let i = 0; i < roomPlayerCount(room); i++) sendGameState(room, i); sendSpectatorGameState(room);
     return true;
   }
 
@@ -11080,7 +11120,7 @@ async function doConfirmPotion(room, pi, { selectedIds }) {
   // gespielt wurde und in der Hand liegen blieb. Der Stash wird in den
   // `aborted`/`cancelled`-Zweigen unten wieder verworfen und feuert nur
   // bei einer Prompt-Antwort mit nicht-leerer Auswahl.
-  const oi = pi === 0 ? 1 : 0;
+  const oi = opponentOfGs(gs, pi);
   if (script.deferReveal || script.deferBroadcast) {
     gs._pendingCardReveal = { cardName: potionName, ownerIdx: pi };
     room.engine._setPendingPlayLog('card_played', {
@@ -11088,8 +11128,7 @@ async function doConfirmPotion(room, pi, { selectedIds }) {
     });
   } else {
     room.engine.log('card_played', { player: ps.username, card: potionName, cardType, cost: goldCost || 0 });
-    const oppSid = gs.players[oi]?.socketId;
-    if (oppSid) io.to(oppSid).emit('card_reveal', { cardName: potionName });
+    emitToOpponentsGs(gs, io, pi, 'card_reveal', { cardName: potionName });
     sendToSpectators(room, 'card_reveal', { cardName: potionName });
     await room.engine._delay(100);
   }
@@ -11116,9 +11155,9 @@ async function doConfirmPotion(room, pi, { selectedIds }) {
   // animation fires.
   const animationType = script.animationType || 'explosion';
   const broadcastPotionAnim = (animationType !== 'none') ? () => {
-    for (let i = 0; i < 2; i++) {
+    for (let i = 0; i < gs.players.length; i++) {
       const sid = gs.players[i]?.socketId;
-      if (sid) io.to(sid).emit('potion_resolved', { destroyedIds: selectedIds, animationType });
+      if (sid && !room.engine?._inMctsSim) io.to(sid).emit('potion_resolved', { destroyedIds: selectedIds, animationType });
     }
     sendToSpectators(room, 'potion_resolved', { destroyedIds: selectedIds, animationType });
   } : null;
@@ -11198,7 +11237,7 @@ async function doConfirmPotion(room, pi, { selectedIds }) {
       fromCreation, ownerIdx: pi, cardType, goldCost,
       validTargets: freshTargets, config,
     };
-    for (let i = 0; i < 2; i++) sendGameState(room, i); sendSpectatorGameState(room);
+    for (let i = 0; i < roomPlayerCount(room); i++) sendGameState(room, i); sendSpectatorGameState(room);
     return true;
   }
 
@@ -11210,7 +11249,7 @@ async function doConfirmPotion(room, pi, { selectedIds }) {
     // Same pending-state cleanup as the aborted branch.
     delete gs._pendingCardReveal;
     delete gs._pendingPlayLog;
-    for (let i = 0; i < 2; i++) sendGameState(room, i); sendSpectatorGameState(room);
+    for (let i = 0; i < roomPlayerCount(room); i++) sendGameState(room, i); sendSpectatorGameState(room);
     return true;
   }
 
@@ -11364,7 +11403,7 @@ async function doConfirmPotion(room, pi, { selectedIds }) {
     cardName: potionName, playedCardName: potionName, heroIdx: -1,
     _skipReactionCheck: true,
   });
-  for (let i = 0; i < 2; i++) sendGameState(room, i); sendSpectatorGameState(room);
+  for (let i = 0; i < roomPlayerCount(room); i++) sendGameState(room, i); sendSpectatorGameState(room);
   return true;
 }
 
@@ -11440,7 +11479,7 @@ async function doPlaySurprise(room, pi, { cardName, handIndex, heroIdx, bakhmSlo
     } catch (err) {
       console.error('[Engine] doPlaySurprise (bakhm) hooks error:', err.message);
     }
-    for (let i = 0; i < 2; i++) sendGameState(room, i); sendSpectatorGameState(room);
+    for (let i = 0; i < roomPlayerCount(room); i++) sendGameState(room, i); sendSpectatorGameState(room);
     return true;
   }
 
@@ -11468,7 +11507,7 @@ async function doPlaySurprise(room, pi, { cardName, handIndex, heroIdx, bakhmSlo
   } catch (err) {
     console.error('[Engine] doPlaySurprise hooks error:', err.message);
   }
-  for (let i = 0; i < 2; i++) sendGameState(room, i); sendSpectatorGameState(room);
+  for (let i = 0; i < roomPlayerCount(room); i++) sendGameState(room, i); sendSpectatorGameState(room);
   return true;
 }
 
@@ -11511,7 +11550,7 @@ async function doPlaySurpriseFremd(room, pi, { cardName, handIndex, heroIdx, fro
   } catch (err) {
     console.error('[Engine] doPlaySurpriseFremd hooks error:', err.message);
   }
-  for (let i = 0; i < 2; i++) sendGameState(room, i); sendSpectatorGameState(room);
+  for (let i = 0; i < roomPlayerCount(room); i++) sendGameState(room, i); sendSpectatorGameState(room);
   return true;
 }
 
@@ -11681,7 +11720,7 @@ async function doUsePotion(room, pi, { cardName, handIndex, fromCreation }) {
       fromCreation, ownerIdx: pi,
       cardType: 'Potion', validTargets, config: cfg,
     };
-    for (let i = 0; i < 2; i++) sendGameState(room, i); sendSpectatorGameState(room);
+    for (let i = 0; i < roomPlayerCount(room); i++) sendGameState(room, i); sendSpectatorGameState(room);
     return true;
   }
 
@@ -11692,10 +11731,9 @@ async function doUsePotion(room, pi, { cardName, handIndex, fromCreation }) {
   beginHandResolve(ps, cardName, handIndex, fromCreation);
 
   try {
-    const oi = pi === 0 ? 1 : 0;
-    const oppSid = gs.players[oi]?.socketId;
+    const oi = opponentOfGs(gs, pi);
     if (!script.deferBroadcast) {
-      if (oppSid) io.to(oppSid).emit('card_reveal', { cardName });
+      emitToOpponentsGs(gs, io, pi, 'card_reveal', { cardName });
       sendToSpectators(room, 'card_reveal', { cardName });
       await room.engine._delay(100);
     }
@@ -11727,7 +11765,7 @@ async function doUsePotion(room, pi, { cardName, handIndex, fromCreation }) {
     if (chainResult.resolveResult?.cancelled) {
       ps._resolvingCard = null;
       delete gs._pendingPlayLog;
-      for (let i = 0; i < 2; i++) sendGameState(room, i); sendSpectatorGameState(room);
+      for (let i = 0; i < roomPlayerCount(room); i++) sendGameState(room, i); sendSpectatorGameState(room);
       return true;
     }
     room.engine._firePendingPlayLog();
@@ -11800,7 +11838,7 @@ async function doUsePotion(room, pi, { cardName, handIndex, fromCreation }) {
     actionType: 'potion', playerIdx: pi, cardName, playedCardName: cardName, heroIdx: -1,
     _skipReactionCheck: true,
   });
-  for (let i = 0; i < 2; i++) sendGameState(room, i); sendSpectatorGameState(room);
+  for (let i = 0; i < roomPlayerCount(room); i++) sendGameState(room, i); sendSpectatorGameState(room);
   return true;
 }
 
@@ -11956,7 +11994,7 @@ async function doUseArtifactEffect(room, pi, { cardName, handIndex, fromCreation
       fromCreation, ownerIdx: pi,
       cardType: 'Artifact', goldCost: cost, validTargets, config,
     };
-    for (let i = 0; i < 2; i++) sendGameState(room, i); sendSpectatorGameState(room);
+    for (let i = 0; i < roomPlayerCount(room); i++) sendGameState(room, i); sendSpectatorGameState(room);
     return true;
   }
 
@@ -12020,7 +12058,7 @@ async function doUseArtifactEffect(room, pi, { cardName, handIndex, fromCreation
       delete gs._pendingCardReveal;
       delete gs._pendingPlayLog;
       ps._resolvingCard = null;
-      for (let i = 0; i < 2; i++) sendGameState(room, i); sendSpectatorGameState(room);
+      for (let i = 0; i < roomPlayerCount(room); i++) sendGameState(room, i); sendSpectatorGameState(room);
       return true;
     }
 
@@ -12153,7 +12191,7 @@ async function doUseArtifactEffect(room, pi, { cardName, handIndex, fromCreation
     }
   }
 
-  for (let i = 0; i < 2; i++) sendGameState(room, i); sendSpectatorGameState(room);
+  for (let i = 0; i < roomPlayerCount(room); i++) sendGameState(room, i); sendSpectatorGameState(room);
   return true;
 }
 
@@ -13811,6 +13849,20 @@ io.on('connection', (socket) => {
       sendGameStateErzwungen(room, pi);
     }, AKTION_VERWORFEN_NACH_MS);
   });
+  // Skill Test: vor jedem Spielereignis die zur Aktion passende Phase einstellen
+  // (Main für freie Effekte, Action für die Haupt-Aktion) — siehe skilltest/rounds.js.
+  socket.use(([event, params], next) => {
+    try {
+      if (currentUser && params && params.roomId && skillTest.isGameplayEvent(event)) {
+        const room = rooms.get(params.roomId);
+        if (room && room.skillTest && room.gameState) {
+          const pi = room.gameState.players.findIndex(ps => ps.userId === currentUser.userId);
+          if (pi >= 0) skillTest.setPhaseFor(room, pi, event, params);
+        }
+      }
+    } catch (e) { console.error('[skilltest] Phasen-Middleware:', e && e.message); }
+    next();
+  });
   const socketIP = getSocketIP(socket);
   social.onConnection(socket);
 
@@ -13831,6 +13883,12 @@ io.on('connection', (socket) => {
       const activeRoomId = activeGames.get(session.userId);
       if (activeRoomId) {
         const room = rooms.get(activeRoomId);
+        if (room?.skillTest && !room.gameState) {
+          // Skill Test in der Vorbereitung: zurück in den Raum, Basis neu senden.
+          socket.join('room:' + activeRoomId);
+          socket.emit('room_joined', sanitizeRoom(room, session.username));
+          skillTest.onRejoin(room, { userId: session.userId, username: session.username }, socket, skillTestHost);
+        }
         if (room?.gameState) {
           const t = disconnectTimers.get(session.userId);
           if (t) { clearTimeout(t); disconnectTimers.delete(session.userId); }
@@ -13855,8 +13913,13 @@ io.on('connection', (socket) => {
             if (room.chatHistory?.length || Object.keys(room.privateChatHistory || {}).length) {
               socket.emit('chat_history', { main: room.chatHistory || [], private: room.privateChatHistory || {} });
             }
-            const oi = pi === 0 ? 1 : 0;
-            sendGameState(room, oi);
+            if (room.skillTest) {
+              // Skill Test: der Mensch spielt seinen Sitz wieder selbst (die CPU hatte ihn übernommen).
+              skillTest.onRejoin(room, { userId: session.userId, username: session.username }, socket, skillTestHost);
+            } else {
+              const oi = pi === 0 ? 1 : 0;
+              sendGameState(room, oi);
+            }
             sendSpectatorGameState(room);
           }
         }
@@ -13865,6 +13928,13 @@ io.on('connection', (socket) => {
   });
 
   socket.on('get_rooms', () => socket.emit('rooms', getRoomList()));
+
+  // Skill Test: CPU-Sitze hinzufügen/entfernen, Raum starten (Host).
+  skillTest.registerLobbyHandlers(socket, {
+    io, rooms, getUser: () => currentUser, sanitizeRoom, getRoomList,
+    host: skillTestHost,
+    startPrep: (room) => skillTest.startPrep(room, skillTestHost),
+  });
 
   // Re-sync this socket's cached identity from the DB after the user edits
   // their profile (e.g. a rename), so lobby/chat/new rooms made later in the
@@ -13880,7 +13950,7 @@ io.on('connection', (socket) => {
     }
   });
 
-  socket.on('create_room', async ({ type, playerPw, specPw, deckId, format, cubeDraft }) => {
+  socket.on('create_room', async ({ type, playerPw, specPw, deckId, format, cubeDraft, skillTest: skillTestRaw }) => {
     if (!currentUser) return;
     const fmt = [1, 3, 5].includes(format) ? format : 1;
     const roomId = uuidv4().substring(0, 8);
@@ -13928,11 +13998,13 @@ io.on('connection', (socket) => {
     }
 
     const isCubeDraft = !!cubeDraftConfig;
+    // Skill Test: bis zu 8 Sitze (Menschen + CPUs), kein eigenes Deck, immer unranked.
+    const skillTestConfig = (!isCubeDraft && skillTestRaw) ? skillTest.buildRoomConfig(skillTestRaw) : null;
     const room = {
       id: roomId,
       host: currentUser.username,
       hostId: currentUser.userId,
-      type: type || 'unranked',
+      type: skillTestConfig ? 'unranked' : (type || 'unranked'),
       format: isCubeDraft ? (cubeDraftConfig.prelimsBo) : fmt,
       // For cube draft, `winsNeeded` and `setScore` apply per individual
       // tournament match, not to the room. They get reset per match in M4.
@@ -13942,8 +14014,8 @@ io.on('connection', (socket) => {
       specPw: specPw || null,
       // Cube Draft rooms: capacity is 8 (vs the standard 2). Empty seats
       // get filled with bots at start. The host is always at seat 0.
-      maxPlayers: isCubeDraft ? 8 : 2,
-      players: [{ username: currentUser.username, userId: currentUser.userId, socketId: socket.id, deckId: isCubeDraft ? null : (deckId || null), isBot: false }],
+      maxPlayers: isCubeDraft ? 8 : (skillTestConfig ? 8 : 2),
+      players: [{ username: currentUser.username, userId: currentUser.userId, socketId: socket.id, deckId: (isCubeDraft || skillTestConfig) ? null : (deckId || null), isBot: false }],
       spectators: [],
       status: 'waiting',
       created: Date.now(),
@@ -13951,6 +14023,7 @@ io.on('connection', (socket) => {
       chatHistory: [],
       privateChatHistory: {},
       cubeDraft: cubeDraftConfig,
+      skillTest: skillTestConfig,
     };
     rooms.set(roomId, room);
     socket.join('room:' + roomId);
@@ -13975,6 +14048,15 @@ io.on('connection', (socket) => {
       }
       socket.join('room:' + roomId);
       socket.emit('room_joined', sanitizeRoom(room, currentUser.username));
+      if (room.skillTest) {
+        skillTest.onRejoin(room, currentUser, socket, skillTestHost);
+        // Läuft schon ein Kampf: Spielzustand an den Wiederkehrenden (Sitz) bzw. Zuschauer schicken.
+        if (room.gameState) {
+          const spi = room.gameState.players.findIndex(ps => ps.userId === currentUser.userId);
+          if (spi >= 0) sendGameState(room, spi, { reconnected: true });
+          else sendSpectatorGameState(room);
+        }
+      }
       // Cube Draft: if the draft was suspended waiting on this seat
       // and ALL human seats now have a live socketId, resume.
       if (room.cubeDraft?.draftState?.suspended && isPlayer) {
@@ -14027,10 +14109,15 @@ io.on('connection', (socket) => {
         if (room.playerPw && password !== room.playerPw) return socket.emit('join_error', 'Wrong password');
         // Cube Draft players don't bring their own deck — they draft
         // one from the host's cube, so deckId is intentionally null.
-        const isCubeDraftRoom = !!room.cubeDraft;
+        const isCubeDraftRoom = !!room.cubeDraft || !!room.skillTest;
+        // Skill Test: Sitze nur in der Lobby-Phase vergeben (danach Zuschauer).
+        if (room.skillTest && !skillTest.isLobbyPhase(room)) {
+          room.spectators.push({ username: currentUser.username, userId: currentUser.userId, socketId: socket.id, color: currentUser.color || '#888', avatar: currentUser.avatar || null });
+        } else {
         room.players.push({ username: currentUser.username, userId: currentUser.userId, socketId: socket.id, deckId: isCubeDraftRoom ? null : (deckId || null), isBot: false });
         const hs = room.players[0]?.socketId;
         if (hs) io.to(hs).emit('player_joined', { username: currentUser.username });
+        }
       }
     }
     socket.join('room:' + roomId);
@@ -14061,8 +14148,9 @@ io.on('connection', (socket) => {
     // Cube Draft rooms must still be in the lobby phase to accept new
     // seat joiners. Once drafting starts, the seat list is locked.
     if (room.cubeDraft && room.cubeDraft.phase !== 'lobby') return socket.emit('join_error', 'Draft already started');
+    if (room.skillTest && !skillTest.isLobbyPhase(room)) return socket.emit('join_error', 'Skill Test already started');
     room.spectators = room.spectators.filter(s => s.username !== currentUser.username);
-    const isCubeDraftRoom = !!room.cubeDraft;
+    const isCubeDraftRoom = !!room.cubeDraft || !!room.skillTest;
     room.players.push({ username: currentUser.username, userId: currentUser.userId, socketId: socket.id, deckId: isCubeDraftRoom ? null : (deckId || null), isBot: false });
     const hs = room.players[0]?.socketId;
     if (hs) io.to(hs).emit('player_joined', { username: currentUser.username });
@@ -14101,6 +14189,7 @@ io.on('connection', (socket) => {
     const room = rooms.get(roomId);
     if (!room || room.hostId !== currentUser.userId || room.players.length < 2) return;
     if (room.cubeDraft) return; // Cube Draft rooms use start_cube_draft
+    if (room.skillTest) return; // Skill Test rooms use st_start
     const activePlayer = Math.random() < 0.5 ? 0 : 1;
     await setupGameState(room);
     await startGameEngine(room, roomId, activePlayer);
@@ -14420,6 +14509,24 @@ io.on('connection', (socket) => {
     const room = rooms.get(roomId); if (!room) return;
     const hadResult = !!room.gameState?.result;
 
+    // ★ Skill Test: Verlassen = Aufgeben (falls das Spiel läuft); der Raum lebt für die übrigen Spieler weiter
+    // und wird erst abgebaut, wenn kein Mensch mehr da ist.
+    if (room.skillTest && room.gameState) {
+      const spi = room.gameState.players.findIndex(ps => ps.userId === currentUser.userId);
+      if (spi >= 0 && !hadResult) await skillTest.surrender(room, spi, skillTestHost);
+      socket.leave('room:' + roomId);
+      activeGames.delete(currentUser.userId);
+      if (spi >= 0) {
+        room.gameState.players[spi].left = true;
+        if (room.players[spi]) room.players[spi].socketId = null;
+        room.gameState.players[spi].socketId = null;
+      }
+      const humansLeft = room.players.some((p, i) => !p.isBot && !room.gameState.players[i]?.left);
+      if (!humansLeft) cleanupRoom(roomId);
+      else { for (let i = 0; i < room.gameState.players.length; i++) sendGameState(room, i); sendSpectatorGameState(room); }
+      return;
+    }
+
     // If game is active and no result yet, surrendering ends the game
     if (room.gameState && !hadResult && room.status === 'playing') {
       const pi = room.gameState.players.findIndex(ps => ps.userId === currentUser.userId);
@@ -14496,7 +14603,7 @@ io.on('connection', (socket) => {
     const b = [...current].sort();
     if (a.some((c, i) => c !== b[i])) return;
     ps.creationZone = creationZone;
-    for (let i = 0; i < 2; i++) sendGameState(room, i);
+    for (let i = 0; i < roomPlayerCount(room); i++) sendGameState(room, i);
     sendSpectatorGameState(room);
   });
 
@@ -14563,7 +14670,7 @@ io.on('connection', (socket) => {
     // Without this, per-index UI state (Luna Kiai's clickable halo +
     // revealed semi-transparency) stays pinned to the OLD positions
     // until the next unrelated event drives a snapshot.
-    for (let i = 0; i < 2; i++) sendGameState(room, i);
+    for (let i = 0; i < roomPlayerCount(room); i++) sendGameState(room, i);
     sendSpectatorGameState(room);
   });
 
@@ -14577,6 +14684,7 @@ io.on('connection', (socket) => {
     if (!currentUser) return;
     const room = rooms.get(roomId);
     if (!room?.engine || !room.gameState) return;
+    if (room.skillTest) return; // Skill Test: Züge laufen über die Rounds
     const pi = room.gameState.players.findIndex(ps => ps.userId === currentUser.userId);
     if (pi < 0) return;
     if (targetPhase !== undefined) {
@@ -14703,7 +14811,7 @@ io.on('connection', (socket) => {
       } catch (err) {
         console.error('[Engine] summon_ushabti hooks error:', err.message);
       }
-      for (let i = 0; i < 2; i++) sendGameState(room, i); sendSpectatorGameState(room);
+      for (let i = 0; i < roomPlayerCount(room); i++) sendGameState(room, i); sendSpectatorGameState(room);
     })();
   });
 
@@ -14718,7 +14826,7 @@ io.on('connection', (socket) => {
     // gesperrt (Als Befund 5.8., Spam-Klick).
     if (room.gameState._chainResolvingLock
         || room.gameState._forceDiscardLock === pi) return;
-    doActivateAbility(room, pi, params).catch(err => console.error('[activate_ability]', err.message)).finally(() => room.engine?._runPostChainActions?.());
+    stAct(room, pi, 'activate_ability', params, () => doActivateAbility(room, pi, params)).catch(err => console.error('[activate_ability]', err.message)).finally(() => room.engine?._runPostChainActions?.());
   });
 
   // Activate a free-activation ability (no action cost, Main Phase only)
@@ -14751,7 +14859,7 @@ io.on('connection', (socket) => {
     if (gs._chainResolvingLock || gs._forceDiscardLock === pi) return;
     if (gs.activePlayer !== pi) return;              // „during YOUR turn"
     if (gs.effectPrompt || gs.potionTargeting) return;
-    const heroOwner = params?.heroOwner === 0 || params?.heroOwner === 1 ? params.heroOwner : pi;
+    const heroOwner = isSeat(gs, params?.heroOwner) ? params.heroOwner : pi;
     const heroIdx = params?.heroIdx;
     const hero = gs.players[heroOwner]?.heroes?.[heroIdx];
     if (!hero?.name || hero.hp <= 0) return;
@@ -14778,7 +14886,7 @@ io.on('connection', (socket) => {
     // gesperrt (Als Befund 5.8., Spam-Klick).
     if (room.gameState._chainResolvingLock
         || room.gameState._forceDiscardLock === pi) return;
-    doActivateHeroEffect(room, pi, params).catch(err => console.error('[activate_hero_effect]', err.message));
+    stAct(room, pi, 'activate_hero_effect', params, () => doActivateHeroEffect(room, pi, params)).catch(err => console.error('[activate_hero_effect]', err.message));
   });
 
   // ── ACTIVE CREATURE EFFECTS ──
@@ -14804,7 +14912,7 @@ io.on('connection', (socket) => {
     // gesperrt (Als Befund 5.8., Spam-Klick).
     if (room.gameState._chainResolvingLock
         || room.gameState._forceDiscardLock === pi) return;
-    doActivateCreatureEffect(room, pi, params).catch(err => console.error('[activate_creature_effect] error:', err.message));
+    stAct(room, pi, 'activate_creature_effect', params, () => doActivateCreatureEffect(room, pi, params)).catch(err => console.error('[activate_creature_effect] error:', err.message));
   });
 
   // Treacherous Crystal — explicit trigger emitted when the player
@@ -14872,7 +14980,7 @@ io.on('connection', (socket) => {
       } catch (err) {
         console.error('[play_from_coolness_stack]', err.message);
       }
-      for (let i = 0; i < 2; i++) sendGameState(room, i);
+      for (let i = 0; i < roomPlayerCount(room); i++) sendGameState(room, i);
       sendSpectatorGameState(room);
     })();
   });
@@ -14899,7 +15007,7 @@ io.on('connection', (socket) => {
       } catch (err) {
         console.error('[activate_hand_card]', err.message);
       }
-      for (let i = 0; i < 2; i++) sendGameState(room, i);
+      for (let i = 0; i < roomPlayerCount(room); i++) sendGameState(room, i);
       sendSpectatorGameState(room);
     })();
   });
@@ -14930,7 +15038,7 @@ io.on('connection', (socket) => {
         };
       }
     }
-    doPlayCreature(room, pi, params)
+    stAct(room, pi, 'play_creature', params, () => doPlayCreature(room, pi, params))
       .catch(err => console.error('[play_creature] error:', err.message))
       .finally(() => {
         // Clear any stale cross-side hint — if the play was negated /
@@ -14955,7 +15063,7 @@ io.on('connection', (socket) => {
     if (!room?.gameState) return;
     const pi = room.gameState.players.findIndex(ps => ps.userId === currentUser.userId);
     if (pi < 0) return;
-    doPlaySpell(room, pi, params).catch(err => console.error('[play_spell] error:', err.message)).finally(() => room.engine?._runPostChainActions?.());
+    stAct(room, pi, 'play_spell', params, () => doPlaySpell(room, pi, params)).catch(err => console.error('[play_spell] error:', err.message)).finally(() => room.engine?._runPostChainActions?.());
   });
 
   // Play an artifact from hand
@@ -15011,9 +15119,8 @@ io.on('connection', (socket) => {
     if (!room?.gameState) return;
     const pi = room.gameState.players.findIndex(ps => ps.userId === currentUser.userId);
     if (pi < 0) return;
-    const oi = pi === 0 ? 1 : 0;
-    const oppSid = room.gameState.players[oi]?.socketId;
-    if (oppSid) io.to(oppSid).emit('opponent_targeting', { selectedIds });
+    const oi = opponentOfGs(room.gameState, pi);
+    emitToOpponentsGs(room.gameState, io, pi, 'opponent_targeting', { selectedIds });
     sendToSpectators(room, 'opponent_targeting', { selectedIds });
   });
 
@@ -15024,15 +15131,14 @@ io.on('connection', (socket) => {
     if (!room?.gameState) return;
     const pi = room.gameState.players.findIndex(ps => ps.userId === currentUser.userId);
     if (pi < 0) return;
-    const oi = pi === 0 ? 1 : 0;
+    const oi = opponentOfGs(room.gameState, pi);
     // Flip perspective for opponent: sender's "me" → opponent's "opp" and vice versa
     const flipped = { ...ping };
     if (flipped.owner === 'me') flipped.owner = 'opp';
     else if (flipped.owner === 'opp') flipped.owner = 'me';
     if (flipped.type === 'hand-me') flipped.type = 'hand-opp';
     else if (flipped.type === 'hand-opp') flipped.type = 'hand-me';
-    const oppSid = room.gameState.players[oi]?.socketId;
-    if (oppSid) io.to(oppSid).emit('ping_card', { ping: flipped, color });
+    emitToOpponentsGs(room.gameState, io, pi, 'ping_card', { ping: flipped, color });
     // Spectators see from player 0's perspective — translate accordingly
     const specPing = pi === 0 ? { ...ping } : { ...flipped };
     sendToSpectators(room, 'ping_card', { ping: specPing, color });
@@ -15143,9 +15249,8 @@ io.on('connection', (socket) => {
     if (!room?.gameState) return;
     const pi = room.gameState.players.findIndex(ps => ps.userId === currentUser.userId);
     if (pi < 0) return;
-    const oi = pi === 0 ? 1 : 0;
-    const oppSid = room.gameState.players[oi]?.socketId;
-    if (oppSid) io.to(oppSid).emit('opponent_pending_placement', { owner: pi, heroIdx, zoneSlot, cardName });
+    const oi = opponentOfGs(room.gameState, pi);
+    emitToOpponentsGs(room.gameState, io, pi, 'opponent_pending_placement', { owner: pi, heroIdx, zoneSlot, cardName });
     sendToSpectators(room, 'opponent_pending_placement', { owner: pi, heroIdx, zoneSlot, cardName });
   });
   socket.on('pending_placement_clear', ({ roomId }) => {
@@ -15154,9 +15259,8 @@ io.on('connection', (socket) => {
     if (!room?.gameState) return;
     const pi = room.gameState.players.findIndex(ps => ps.userId === currentUser.userId);
     if (pi < 0) return;
-    const oi = pi === 0 ? 1 : 0;
-    const oppSid = room.gameState.players[oi]?.socketId;
-    if (oppSid) io.to(oppSid).emit('opponent_pending_placement', null);
+    const oi = opponentOfGs(room.gameState, pi);
+    emitToOpponentsGs(room.gameState, io, pi, 'opponent_pending_placement', null);
     sendToSpectators(room, 'opponent_pending_placement', null);
   });
 
@@ -15170,7 +15274,7 @@ io.on('connection', (socket) => {
     room.gameState.potionTargeting = null;
     // Resolve the engine's pending prompt so the play_spell handler can reach its cancel path
     if (room.engine) room.engine.resolveEffectPrompt(null, { cancelled: true });
-    for (let i = 0; i < 2; i++) sendGameState(room, i); sendSpectatorGameState(room);
+    for (let i = 0; i < roomPlayerCount(room); i++) sendGameState(room, i); sendSpectatorGameState(room);
   });
 
   // General-purpose effect prompt response (confirm, card gallery, zone pick)
@@ -15204,7 +15308,7 @@ io.on('connection', (socket) => {
     if (!room?.gameState) return;
     const pi = room.gameState.players.findIndex(ps => ps.userId === currentUser.userId);
     if (pi < 0) return;
-    const oppIdx = pi === 0 ? 1 : 0;
+    const oppIdx = opponentOfGs(room.gameState, pi);
     const oppSid = room.gameState.players[oppIdx]?.socketId;
     if (oppSid) io.to(oppSid).emit('blind_pick_highlight', { indices: indices || [] });
   });
@@ -15455,7 +15559,7 @@ io.on('connection', (socket) => {
     // Als Vorgabe 29.9.: `heroOwner` = Spalte des Helden. Ein geliehener
     // Held (Gegnerspalte) darf aufsteigen, solange `pi` ihn kontrolliert;
     // ein eigener Held, den gerade der Gegner kontrolliert, nicht.
-    const hs = (heroOwner === 0 || heroOwner === 1) ? heroOwner : pi;
+    const hs = (isSeat(gs, heroOwner)) ? heroOwner : pi;
     const _aufHeld = gs.players[hs]?.heroes?.[heroIdx];
     if (!_aufHeld?.name || room.engine.heroSideOf(hs, _aufHeld) !== pi) return;
     // Perform ascension via engine
@@ -15472,7 +15576,7 @@ io.on('connection', (socket) => {
     } catch (err) {
       console.error('[Engine] ascend_hero error:', err.message, err.stack);
     }
-    for (let i = 0; i < 2; i++) sendGameState(room, i);
+    for (let i = 0; i < roomPlayerCount(room); i++) sendGameState(room, i);
     sendSpectatorGameState(room);
   });
 
@@ -15484,6 +15588,7 @@ io.on('connection', (socket) => {
     if (!room?.gameState || room.gameState.result) return;
     const pi = room.gameState.players.findIndex(ps => ps.userId === currentUser.userId);
     if (pi < 0) return;
+    if (room.skillTest) { await skillTest.surrender(room, pi, skillTestHost); return; }   // Skill Test: nur dieser Sitz scheidet aus
     const winnerIdx = pi === 0 ? 1 : 0;
     if (room.type === 'puzzle') { puzzleEndGame(room, winnerIdx, 'surrender'); return; }
     await endGame(room, winnerIdx, 'surrender');
@@ -15495,6 +15600,7 @@ io.on('connection', (socket) => {
     if (!room?.gameState) return;
     const pi = room.gameState.players.findIndex(ps => ps.userId === currentUser.userId);
     if (pi < 0) return;
+    if (room.skillTest) { await skillTest.surrender(room, pi, skillTestHost); return; }
     const winnerIdx = pi === 0 ? 1 : 0;
     // Satz beenden. Mitten im Spiel: das laufende Spiel zaehlt als Sieg des
     // Gegners und beendet den Satz; zwischen zwei Spielen: nur den Satz
@@ -18623,6 +18729,11 @@ io.on('connection', (socket) => {
     if (activeRoomId) {
       const room = rooms.get(activeRoomId);
       if (room?.gameState && !room.gameState.result) {
+        // Skill Test: eigener Verbindungsverlust-Ablauf (kein Zwei-Spieler-Forfait).
+        if (room.skillTest) {
+          skillTest.onSeatLeft(room, currentUser, socket, skillTestHost);
+          return;
+        }
         // Puzzle rooms: preserve existing immediate cleanup.
         if (room.type === 'puzzle') {
           activeGames.delete(currentUser.userId);
@@ -18732,6 +18843,17 @@ function handleLeaveRoom(socket, roomId, user) {
     return;
   }
 
+  // ★ Skill Test NACH der Lobby (Vorbereitung, Kampf): Sitze bleiben bestehen,
+  // der Raum lebt weiter, solange ein Mensch online ist (Wiederverbinden per
+  // `auth`/`join_room`). Die Details (Auto-Ready, Auscheiden nach Karenzzeit)
+  // regelt das Modul selbst.
+  if (room.skillTest && !skillTest.isLobbyPhase(room)) {
+    skillTest.onSeatLeft(room, user, socket, skillTestHost, { permanent: true });
+    io.to('room:' + roomId).emit('room_update', sanitizeRoom(room));
+    io.emit('rooms', getRoomList());
+    return;
+  }
+
   if (room.hostId === user.userId) {
     // Cube Draft rooms in the LOBBY phase: promote the next-joined human
     // to host instead of destroying the room. The cube itself was
@@ -18739,7 +18861,7 @@ function handleLeaveRoom(socket, roomId, user) {
     // original host's user_id and cube card list is loaded later from
     // that user's deck row), so the new host doesn't need to own a
     // legal cube — they just inherit the chair.
-    if (room.cubeDraft && room.cubeDraft.phase === 'lobby') {
+    if ((room.cubeDraft && room.cubeDraft.phase === 'lobby') || skillTest.isLobbyPhase(room)) {
       const remainingHumans = room.players.filter(p => p.userId !== user.userId && !p.isBot);
       if (remainingHumans.length > 0) {
         // First-joined remaining human becomes host. `room.players` is
@@ -18765,6 +18887,33 @@ function handleLeaveRoom(socket, roomId, user) {
     io.to('room:' + roomId).emit('room_update', sanitizeRoom(room));
   }
   io.emit('rooms', getRoomList());
+}
+
+// Schnittstelle, über die die Skill-Test-Module (skilltest/*.js) an die
+// Server-Interna kommen, ohne server.js zu importieren (kein Zirkelbezug).
+const skillTestHost = {
+  io, rooms, activeGames, db, GameEngine,
+  get sanitizeRoom() { return sanitizeRoom; },
+  get getRoomList() { return getRoomList; },
+  get setupGameState() { return setupGameState; },
+  get sendGameState() { return sendGameState; },
+  get sendSpectatorGameState() { return sendSpectatorGameState; },
+  get doPlaySpell() { return doPlaySpell; },
+  get doPlayCreature() { return doPlayCreature; },
+  get doPlayArtifact() { return doPlayArtifact; },
+  get doPlaySurprise() { return doPlaySurprise; },
+  get doActivateCreatureEffect() { return doActivateCreatureEffect; },
+  get doActivateHeroEffect() { return doActivateHeroEffect; },
+  get doUsePotion() { return doUsePotion; },
+  get doConfirmPotion() { return doConfirmPotion; },
+  get doPlayAbility() { return doPlayAbility; },
+  get doActivateAbility() { return doActivateAbility; },
+  destroyRoom: (id) => destroyRoom(id),
+  scheduleBotTurn: (room, seat, opts) => skillTest.scheduleBotTurn(room, seat, skillTestHost, opts),
+};
+// Zugwächter des Skill-Test-Modus um die normalen Aktions-Handler (in anderen Modi ein Durchgriff).
+function stAct(room, pi, kind, params, fn) {
+  return room.skillTest ? skillTest.act(room, pi, kind, params, fn, skillTestHost) : fn();
 }
 
 function getRoomList() {
@@ -18793,6 +18942,7 @@ function getRoomList() {
         phase: r.cubeDraft.phase,
         timerDisabled: !!r.cubeDraft.timerDisabled,
       } : null,
+      skillTest: skillTest.summary(r),
     }));
 }
 
@@ -18807,10 +18957,12 @@ function sanitizeRoom(room, forUser) {
     // occupies. Bot seats won't exist until the host hits Start —
     // before that, empty seats are simply absent from this list.
     seats: (room.maxPlayers || 2) > 2
-      ? Array.from({ length: room.maxPlayers || 2 }, (_, i) => {
-          const p = room.players[i];
-          return p ? { username: p.username, isBot: !!p.isBot, isHost: p.username === room.host } : null;
-        })
+      ? (room.skillTest
+          ? skillTest.seatsOf(room)
+          : Array.from({ length: room.maxPlayers || 2 }, (_, i) => {
+              const p = room.players[i];
+              return p ? { username: p.username, isBot: !!p.isBot, isHost: p.username === room.host } : null;
+            }))
       : undefined,
     spectators: room.spectators.map(s => s.username),
     status: room.status, created: room.created,
@@ -18826,6 +18978,7 @@ function sanitizeRoom(room, forUser) {
       thirdPlace: !!room.cubeDraft.thirdPlace,
       phase: room.cubeDraft.phase,
     } : null,
+    skillTest: skillTest.summary(room),
   };
 }
 
@@ -19972,7 +20125,7 @@ async function runNetBenchmarkGame(deckA, deckB, cfg, haken = {}) {
       engine.onGameOver = (_r, _w, grund) => {
         // Sieger festhalten — der Karten-Bericht braucht Sieg/Niederlage
         // je Partie, und `finish` bekommt nur den Grund gereicht.
-        if (_w === 0 || _w === 1) sieger = _w;
+        if (isSeat(engine, _w)) sieger = _w;
         if (!done) finish(grund || 'ende');
       };
       room.engine._cpuDriver = makeCpuDriver(room);
@@ -20982,6 +21135,8 @@ if (process.env.PP_TRAIN) {
   runTrainingBatch()
     .then(() => process.exit(0))
     .catch(err => { console.error('[train] batch failed:', err); process.exit(1); });
+} else if (process.env.PP_ST_SIM === '1') {
+  // Skill-Test-Simulation (skilltest/sim.js): Modul nur laden, nichts starten.
 } else if (_nbEnv('PP_NETTEST', '') === '1') {
   // Bandbreiten-Messstand — wie der Trainingslauf ohne Datenbank und
   // ohne Socket-Server. Siehe den Block bei runNetBenchmark().
@@ -21106,8 +21261,13 @@ initDatabase().then(async () => {
       console.log('[demo-recorder] deaktiviert (PP_DEMO_RECORD=0)');
     }
     console.log(`Pixel Parties TCG running on http://localhost:${PORT}`);
+    // Skill Test: passives Lernen der Bots im Hintergrund (nur mit PP_ST_TRAIN_BG; siehe skilltest/learn/background.js).
+    try { require('./skilltest/learn/background').start(); } catch (e) { console.error('[skilltest] Hintergrund-Lernen:', e && e.message); }
   });
 }).catch(err => {
   console.error('[DB] Failed to initialize database:', err);
   process.exit(1);
 });
+
+// Für die Headless-Simulation des Skill-Test-Modus (skilltest/sim-bridge.js; PP_ST_SIM=1).
+module.exports = { skillTestHandlers: { doPlaySpell, doPlayCreature, doPlayArtifact, doPlaySurprise, doActivateCreatureEffect, doActivateHeroEffect, doUsePotion, doConfirmPotion, doPlayAbility, doActivateAbility, setupGameState } };

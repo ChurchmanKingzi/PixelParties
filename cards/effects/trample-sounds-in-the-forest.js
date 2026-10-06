@@ -1,3 +1,4 @@
+const { isSeat } = require('./_opp');   // N-Spieler: gültiger Sitzindex
 // ═══════════════════════════════════════════
 //  CARD EFFECT: "Trample Sounds in the Forest"
 //  Spell (Reaction, Magic Arts Lv1)
@@ -71,7 +72,7 @@ module.exports = {
     await engine.performImmediateAction(pi, ascendedHeroIdx, {
       title: CARD_NAME,
       description: 'Perform one free additional Action with the Ascended Hero!',
-      ...((heroOwner === 0 || heroOwner === 1) && heroOwner !== pi ? { heroOwner } : {}),
+      ...((isSeat(engine, heroOwner)) && heroOwner !== pi ? { heroOwner } : {}),
     });
   },
 };

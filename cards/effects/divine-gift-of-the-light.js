@@ -90,7 +90,7 @@ function countTriggerSources(engine, pi) {
  * geheilte HP in Schaden am Gegner uebersetzt.
  */
 function pingIstScharf(engine, pi) {
-  const oi = pi === 0 ? 1 : 0;
+  const oi = engine.opponentOf(pi);
   // Kontrolle statt Seite (Styx 28.9.)
   for (const { hero: h } of engine.heroesControlledBy(oi)) {
     if (h?.name && h.hp > 0 && h.statuses?.healReversed) return true;
@@ -249,7 +249,7 @@ module.exports = {
       // `getCreatureTargets` would otherwise include them.
       const cardDB = engine._getCardDB();
       const targets = [];
-      for (let p = 0; p < 2; p++) {
+      for (let p = 0; p < engine.playerCount(); p++) {
         targets.push(...engine.getHeroTargets(p));
         targets.push(...engine.getCreatureTargets(p).filter(t => cardDB[t.cardName]?.cardType === 'Creature'));
       }

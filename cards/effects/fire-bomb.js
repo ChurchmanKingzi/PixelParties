@@ -25,7 +25,7 @@ module.exports = {
     // ueber die Referenz am Spielzustand (gleiche Konvention wie
     // Capture Net).
     const engine = engineArg || gs._engineRef || null;
-    for (let pi = 0; pi < 2; pi++) {
+    for (let pi = 0; pi < gs.players.length; pi++) {
       const ps = gs.players[pi];
       // First-turn protection: cannot target opponent's abilities for removal (generic rule)
       // See Engine.isAbilityRemovalProtected() — use in any card that removes abilities

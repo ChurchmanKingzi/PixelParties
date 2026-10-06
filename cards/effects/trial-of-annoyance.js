@@ -59,7 +59,7 @@ module.exports = {
       const pi = ctx.cardOwner;
       const ps = gs.players[pi];
       if (!ps) { gs._spellCancelled = true; return; }
-      const oppIdx = pi === 0 ? 1 : 0;
+      const oppIdx = engine.opponentOf(pi);
       const opp = gs.players[oppIdx];
 
       // Riegel zuerst — gilt auch, wenn nichts abzuwerfen ist.

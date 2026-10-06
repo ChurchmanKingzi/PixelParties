@@ -42,6 +42,7 @@
 //  cancellation listener.
 // ═══════════════════════════════════════════
 
+const { opponentOfGs } = require('./_opp');
 const CARD_NAME    = 'Champion, the Stormbringer';
 const MAX_DISCARDS = 5;
 const STAGGER_MS   = 140; // gap between consecutive windstorm flights
@@ -49,7 +50,7 @@ const WIND_TAIL_MS = 1200; // total client-side animation length for windstorm
 
 /** Min(5, own hand, opp hand). Caps the discard prompt's max. */
 function _stormCap(gs, pi) {
-  const oi = pi === 0 ? 1 : 0;
+  const oi = opponentOfGs(gs, pi);
   const myHand = (gs.players[pi]?.hand || []).length;
   const oppHand = (gs.players[oi]?.hand || []).length;
   return Math.max(0, Math.min(MAX_DISCARDS, myHand, oppHand));
@@ -84,7 +85,7 @@ module.exports = {
     // protection either — the protection is absolute. Rather than
     // letting the player burn their Action on a fizzle, gate the
     // activation entirely while turn-1 shielding is up.
-    const oi = pi === 0 ? 1 : 0;
+    const oi = engine.opponentOf(pi);
     if (gs.firstTurnProtectedPlayer === oi) return false;
     return _stormCap(gs, pi) >= 1;
   },
@@ -93,7 +94,7 @@ module.exports = {
     const engine  = ctx._engine;
     const gs      = engine.gs;
     const pi      = ctx.cardOwner;
-    const oi      = pi === 0 ? 1 : 0;
+    const oi      = engine.opponentOf(pi);
     const ps      = gs.players[pi];
     const ops     = gs.players[oi];
     if (!ps || !ops) return false;

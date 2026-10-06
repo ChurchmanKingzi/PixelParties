@@ -34,7 +34,7 @@ module.exports = {
     if (incoming >= 100) return true;
     const gs = engine.gs;
     const pi = engine._cpuPlayerIdx;
-    const oppIdx = pi === 0 ? 1 : 0;
+    const oppIdx = engine.opponentOf(pi);
     const oppPs = gs?.players?.[oppIdx];
     if (!oppPs) return true; // can't inspect → take the sure recoil
     // Is a larger hit plausibly still coming this turn?
@@ -77,7 +77,7 @@ module.exports = {
   async afterDamageResolve(engine, pi, target, targetHeroIdx, source, amount, type) {
     const gs = engine.gs;
     const ps = gs.players[pi];
-    const oppIdx = pi === 0 ? 1 : 0;
+    const oppIdx = engine.opponentOf(pi);
     const oppPs = gs.players[oppIdx];
     if (!oppPs) return;
 

@@ -22,7 +22,7 @@ module.exports = {
       const gs = ctx.gameState;
       const pi = ctx.cardOwner;
       const heroIdx = ctx.cardHeroIdx;
-      const oppIdx = pi === 0 ? 1 : 0;
+      const oppIdx = engine.opponentOf(pi);
       const cardDB = engine._getCardDB();
       const damages = [200, 150, 100];
 

@@ -42,3 +42,6 @@ data/pixel-parties.db-shm
 __pycache__/
 data/shop/sleeve-entwuerfe/
 data/shop/avatar-entwuerfe/
+
+# Skill Test: Zwischendateien des Lernsystems (das Profil selbst data/skilltest-profile.json wird mit eingecheckt)
+data/skilltest-profile.json.tmp-*

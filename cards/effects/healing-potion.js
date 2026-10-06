@@ -26,7 +26,7 @@ module.exports = {
 
   canActivate(gs, pi, engine) {
     // Need at least one target with HP < maxHP on either side
-    for (let p = 0; p < 2; p++) {
+    for (let p = 0; p < gs.players.length; p++) {
       const ps = gs.players[p];
       for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
         const hero = ps.heroes[hi];
@@ -53,7 +53,7 @@ module.exports = {
     const cardDB = engine ? engine._getCardDB() : {};
 
     // Heroes from BOTH sides with HP < maxHP
-    for (let p = 0; p < 2; p++) {
+    for (let p = 0; p < gs.players.length; p++) {
       const ps = gs.players[p];
       for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
         const hero = ps.heroes[hi];

@@ -69,7 +69,7 @@ module.exports = {
       if (inst.faceDown) continue;
       if (inst.counters?.frozen) return true;
     }
-    for (let pi = 0; pi < 2; pi++) {
+    for (let pi = 0; pi < engine.playerCount(); pi++) {
       const ps = engine.gs.players[pi];
       if (!ps) continue;
       for (const hero of (ps.heroes || [])) {
@@ -89,7 +89,7 @@ module.exports = {
 
     // Frozen-only target list.
     const candidates = [];
-    for (let pIdx = 0; pIdx < 2; pIdx++) {
+    for (let pIdx = 0; pIdx < engine.playerCount(); pIdx++) {
       const ps = gs.players[pIdx];
       if (!ps) continue;
       for (let hi = 0; hi < (ps.heroes || []).length; hi++) {

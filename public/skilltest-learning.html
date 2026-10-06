@@ -1,0 +1,210 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Skill Test — Bot Learning</title>
+<style>
+  :root {
+    --bg: #0b0e1a; --panel: #131830; --panel2: #1a2040; --line: #2a3260; --text: #e8ecff; --dim: #8c95c4;
+    --accent: #00f0ff; --good: #33ff88; --bad: #ff5577; --warn: #ffd34e;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.45 "Rajdhani", "Segoe UI", system-ui, sans-serif; }
+  header { padding: 18px 20px 6px; display: flex; flex-wrap: wrap; gap: 12px; align-items: baseline; }
+  h1 { margin: 0; font-size: 22px; letter-spacing: 1px; color: var(--accent); }
+  .sub { color: var(--dim); }
+  .live { margin-left: auto; display: flex; gap: 8px; align-items: center; color: var(--dim); }
+  .dot { width: 9px; height: 9px; border-radius: 50%; background: #555; }
+  .dot.on { background: var(--good); box-shadow: 0 0 8px var(--good); }
+  main { padding: 6px 20px 40px; display: grid; gap: 18px; max-width: 1400px; margin: 0 auto; }
+  section { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; }
+  h2 { margin: 0 0 4px; font-size: 16px; color: var(--accent); letter-spacing: .5px; }
+  .hint { color: var(--dim); font-size: 12.5px; margin-bottom: 10px; }
+  .cards { display: flex; flex-wrap: wrap; gap: 10px; margin: 8px 0 12px; }
+  .stat { background: var(--panel2); border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px; min-width: 130px; }
+  .stat b { display: block; font-size: 20px; }
+  .stat span { color: var(--dim); font-size: 12px; }
+  svg { width: 100%; height: 240px; background: var(--panel2); border-radius: 8px; border: 1px solid var(--line); }
+  .legend { display: flex; gap: 16px; color: var(--dim); font-size: 12.5px; margin-top: 6px; flex-wrap: wrap; }
+  .legend i { display: inline-block; width: 18px; height: 3px; vertical-align: middle; margin-right: 5px; border-radius: 2px; }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { padding: 5px 8px; text-align: left; border-bottom: 1px solid #20274c; white-space: nowrap; }
+  th { color: var(--dim); font-weight: 600; cursor: pointer; user-select: none; position: sticky; top: 0; background: var(--panel); }
+  th.sorted::after { content: " ▾"; color: var(--accent); }
+  th.sorted.asc::after { content: " ▴"; }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .pos { color: var(--good); } .neg { color: var(--bad); } .zero { color: var(--dim); }
+  .bar { display: inline-block; height: 8px; border-radius: 4px; vertical-align: middle; margin-right: 6px; }
+  .tools { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
+  .tools input, .tools select { background: var(--panel2); color: var(--text); border: 1px solid var(--line); border-radius: 6px; padding: 6px 9px; font: inherit; }
+  .scroll { max-height: 640px; overflow: auto; border: 1px solid #20274c; border-radius: 8px; }
+  .tag { font-size: 11.5px; color: var(--dim); border: 1px solid var(--line); border-radius: 4px; padding: 0 5px; }
+  .spark { vertical-align: middle; }
+  details summary { cursor: pointer; color: var(--dim); }
+  .games { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+  .g { font-size: 11.5px; padding: 1px 6px; border-radius: 4px; background: #1b2347; }
+  .g.w { background: #14502e; color: #b5ffd0; }
+  .empty { color: var(--dim); padding: 16px 0; }
+</style>
+</head>
+<body>
+<header>
+  <h1>SKILL TEST — BOT LEARNING</h1>
+  <span class="sub" id="meta">loading…</span>
+  <div class="live"><span class="dot" id="dot"></span><span id="liveText">–</span></div>
+</header>
+<main>
+  <section>
+    <h2>Trained CPUs vs. untrained CPUs</h2>
+    <div class="hint">Single test games: ONE trained seat (learned profile + best play style) against untrained default bots at tables of 2, 3, 4 and 6 players.
+      Without an edge the win rate equals 1 / players. Every checkpoint is a batch of such games; the line shows how the win rate develops with the number of training games.</div>
+    <div class="cards" id="benchStats"></div>
+    <svg id="chart" viewBox="0 0 900 240" preserveAspectRatio="none"></svg>
+    <div class="legend"><span><i style="background:var(--good)"></i>win rate of the trained CPU</span><span><i style="background:var(--dim)"></i>expected without an edge</span><span><i style="background:var(--warn)"></i>mean placement score (right axis, −1 … +1)</span></div>
+    <div class="scroll" style="margin-top:12px; max-height:300px"><table id="benchTable"></table></div>
+    <details style="margin-top:8px"><summary>Single test games of the latest checkpoint</summary><div class="games" id="lastGames"></div></details>
+  </section>
+
+  <section>
+    <h2>Lookahead (search) vs. the same agent without lookahead</h2>
+    <div class="hint">One seat additionally searches (tries its best candidate actions in a simulation of the game before choosing), all other seats play the same learned style without search. Without an edge the win rate equals 1 / players.</div>
+    <div class="scroll" style="max-height:260px"><table id="lookahead"></table></div>
+  </section>
+
+  <section>
+    <h2>All cards by learned value</h2>
+    <div class="hint">Value = mean placement score (+1 win … −1 last) of all games in which the card was dealt to a bot (starting hand or recycler), shrunk toward 0 for few observations.
+      “Built” = the same for bases the card actually stood in, “Play” = average swing of the position evaluation when the card is played/activated, Δ = change since the last checkpoint. Updates continuously while training runs.</div>
+    <div class="tools">
+      <input id="q" placeholder="search card…" size="22">
+      <select id="type"><option value="">all types</option></select>
+      <select id="minN"><option value="0" selected>any sample size</option><option value="20">n ≥ 20</option><option value="50">n ≥ 50</option><option value="100">n ≥ 100</option><option value="300">n ≥ 300</option></select>
+      <span class="sub" id="count" style="align-self:center"></span>
+    </div>
+    <div class="scroll"><table id="cards"></table></div>
+  </section>
+
+  <section>
+    <h2>Keep or recycle — learned with the rest of the hand as context</h2>
+    <p class="meta">Edge = expected difference in placement score (+1 win … −1 last) between keeping a card and recycling it, given the rest of the hand and the board. Cards cannot be judged in a vacuum, so pairs and requirements are learned separately.</p>
+    <div class="scroll" style="max-height:340px"><table id="keepPairs"></table></div>
+    <div class="scroll" style="max-height:340px; margin-top:12px"><table id="keepContext"></table></div>
+  </section>
+</main>
+<script>
+(function () {
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const sgn = (x, d = 3) => (x >= 0 ? '+' : '−') + Math.abs(x).toFixed(d);
+  const cls = (x) => (Math.abs(x) < 0.005 ? 'zero' : x > 0 ? 'pos' : 'neg');
+  const pct = (x) => (x * 100).toFixed(1) + ' %';
+  let rank = null, bench = null, sortKey = 'value', sortAsc = false;
+
+  function spark(series, w = 70, h = 18) {
+    const pts = (series || []).map((v, i) => [i, v]).filter(p => p[1] != null);
+    if (pts.length < 2) return '';
+    const n = series.length, vs = pts.map(p => p[1]), lo = Math.min(...vs), hi = Math.max(...vs), r = hi - lo || 1;
+    const d = pts.map(p => `${(p[0] / (n - 1)) * w},${h - ((p[1] - lo) / r) * h}`).join(' ');
+    const up = vs[vs.length - 1] >= vs[0];
+    return `<svg class="spark" viewBox="0 0 ${w} ${h}" style="width:${w}px;height:${h}px;border:0;background:none"><polyline points="${d}" fill="none" stroke="${up ? '#33ff88' : '#ff5577'}" stroke-width="1.5"/></svg>`;
+  }
+
+  function drawBench() {
+    const all = (bench && bench.records) || [];
+    const recs = all.filter(r => !r.kind);                                   // trained vs. untrained (the lookahead comparisons have kind 'mcts')
+    drawLookahead(all.filter(r => r.kind === 'mcts'));
+    const stats = $('benchStats'), tbl = $('benchTable'), svg = $('chart');
+    if (!recs.length) {
+      stats.innerHTML = '<div class="empty">No test games yet — they run automatically every 300 training games (and once before training starts).</div>';
+      tbl.innerHTML = ''; svg.innerHTML = ''; $('lastGames').innerHTML = ''; return;
+    }
+    const last = recs[recs.length - 1], first = recs[0];
+    stats.innerHTML = `
+      <div class="stat"><b>${last.trainedGames}</b><span>training games so far</span></div>
+      <div class="stat"><b class="${cls(last.total.edge)}">${pct(last.total.winRate)}</b><span>win rate (expected ${pct(last.total.expectedWinRate)})</span></div>
+      <div class="stat"><b class="${cls(last.total.edge)}">${(last.total.edge >= 0 ? '+' : '−') + Math.abs(last.total.edge * 100).toFixed(1)} pp</b><span>edge, z = ${last.total.z.toFixed(1)}</span></div>
+      <div class="stat"><b class="${cls(last.total.meanPlaceScore)}">${sgn(last.total.meanPlaceScore)}</b><span>mean placement score</span></div>
+      <div class="stat"><b>${recs.length}</b><span>checkpoints (first at ${first.trainedGames} games)</span></div>
+      <div class="stat"><b>${esc(last.persona || '–')}</b><span>play style of the trained seat</span></div>`;
+    // chart
+    const W = 900, H = 240, L = 44, R = 44, T = 14, B = 26;
+    const xs = recs.map(r => r.trainedGames), xmin = Math.min(...xs), xmax = Math.max(...xs, xmin + 1);
+    const X = (v) => L + ((v - xmin) / (xmax - xmin)) * (W - L - R);
+    const maxY = Math.max(0.6, ...recs.map(r => r.total.winRate + 0.05)), Y = (v) => H - B - (v / maxY) * (H - T - B);
+    const Y2 = (v) => H - B - ((v + 1) / 2) * (H - T - B);
+    let g = '';
+    for (let t = 0; t <= 4; t++) { const v = (maxY * t) / 4; g += `<line x1="${L}" x2="${W - R}" y1="${Y(v)}" y2="${Y(v)}" stroke="#2a3260" stroke-width=".6"/><text x="${L - 6}" y="${Y(v) + 4}" fill="#8c95c4" font-size="11" text-anchor="end">${Math.round(v * 100)}%</text>`; }
+    const poly = (f, c, extra = '') => `<polyline fill="none" stroke="${c}" stroke-width="2" ${extra} points="${recs.map(r => X(r.trainedGames) + ',' + f(r)).join(' ')}"/>`;
+    g += poly(r => Y(r.total.expectedWinRate), '#8c95c4', 'stroke-dasharray="5 4"');
+    g += poly(r => Y2(r.total.meanPlaceScore), '#ffd34e', 'stroke-opacity=".7" stroke-width="1.5"');
+    g += poly(r => Y(r.total.winRate), '#33ff88');
+    g += recs.map(r => `<circle cx="${X(r.trainedGames)}" cy="${Y(r.total.winRate)}" r="3.2" fill="#33ff88"><title>${r.trainedGames} games: ${pct(r.total.winRate)} (${r.total.wins}/${r.total.games})</title></circle>`).join('');
+    g += `<text x="${L}" y="${H - 6}" fill="#8c95c4" font-size="11">${xmin}</text><text x="${W - R}" y="${H - 6}" fill="#8c95c4" font-size="11" text-anchor="end">${xmax} training games</text>`;
+    svg.innerHTML = g;
+    // table (newest first)
+    tbl.innerHTML = '<tr><th class="num">Training games</th><th class="num">Test games</th><th class="num">Win rate</th><th class="num">Expected</th><th class="num">Edge</th><th class="num">z</th><th class="num">Placement</th><th>By table size (wins/games)</th></tr>' +
+      recs.slice().reverse().map(r => `<tr><td class="num">${r.trainedGames}</td><td class="num">${r.total.games}</td><td class="num">${pct(r.total.winRate)}</td><td class="num">${pct(r.total.expectedWinRate)}</td>
+        <td class="num ${cls(r.total.edge)}">${(r.total.edge >= 0 ? '+' : '−') + Math.abs(r.total.edge * 100).toFixed(1)} pp</td><td class="num">${r.total.z.toFixed(1)}</td>
+        <td class="num ${cls(r.total.meanPlaceScore)}">${sgn(r.total.meanPlaceScore)}</td><td>${r.bySeats.map(b => `<span class="tag">${b.seats}P ${b.wins}/${b.games}</span>`).join(' ')}</td></tr>`).join('');
+    $('lastGames').innerHTML = (last.games || []).map(g => `<span class="g ${g.won ? 'w' : ''}" title="${g.rounds} rounds">${g.seats}P · ${g.won ? 'WIN' : 'place ' + g.place}</span>`).join('');
+  }
+
+  function drawCards() {
+    if (!rank) return;
+    const q = $('q').value.trim().toLowerCase(), type = $('type').value, minN = parseInt($('minN').value, 10) || 0;
+    let rows = (rank.rows || []).filter(r => (!type || r.type === type) && (!q || r.name.toLowerCase().includes(q)) && r.valueN >= minN);
+    const key = sortKey, dir = sortAsc ? 1 : -1;
+    rows = rows.slice().sort((a, b) => {
+      const x = key === 'name' || key === 'type' ? String(a[key]) : (a[key] == null ? -1e9 : a[key]), y = key === 'name' || key === 'type' ? String(b[key]) : (b[key] == null ? -1e9 : b[key]);
+      return (x < y ? -1 : x > y ? 1 : 0) * dir || a.rank - b.rank;
+    });
+    $('count').textContent = `${rows.length} of ${rank.total} cards`;
+    const maxAbs = Math.max(0.05, ...rank.rows.map(r => Math.abs(r.value)));
+    const th = (k, label, num) => `<th data-k="${k}" class="${num ? 'num ' : ''}${sortKey === k ? 'sorted' + (sortAsc ? ' asc' : '') : ''}">${label}</th>`;
+    $('cards').innerHTML = '<tr>' + th('rank', '#', 1) + th('name', 'Card') + th('type', 'Type') + th('value', 'Value', 1) + th('valueN', 'Dealt (n)', 1) + th('baseValue', 'Built', 1) + th('playValue', 'Play', 1) + th('lift', 'vs. type', 1) + th('keepEdge', 'Keep − recycle', 1) + th('delta', 'Δ', 1) + '<th>Trend</th></tr>' +
+      rows.slice(0, 1500).map(r => `<tr><td class="num">${r.rank}</td><td>${esc(r.name)}</td><td><span class="tag">${esc(r.type)}</span></td>
+        <td class="num ${cls(r.value)}"><span class="bar" style="width:${Math.round(Math.abs(r.value) / maxAbs * 70)}px;background:${r.value >= 0 ? '#33ff88' : '#ff5577'}"></span>${sgn(r.value)}</td>
+        <td class="num">${r.valueN}</td><td class="num ${r.baseN ? cls(r.baseValue) : 'zero'}">${r.baseN ? sgn(r.baseValue) : '–'}</td>
+        <td class="num ${r.playValue == null ? 'zero' : cls(r.playValue)}">${r.playValue == null ? '–' : sgn(r.playValue, 2)}</td>
+        <td class="num ${cls(r.lift)}">${sgn(r.lift)}</td><td class="num ${r.keepEdge == null ? 'zero' : cls(r.keepEdge)}" title="${r.keepN} observations">${r.keepEdge == null ? '–' : sgn(r.keepEdge)}</td><td class="num ${r.delta == null ? 'zero' : cls(r.delta)}">${r.delta == null ? '' : sgn(r.delta)}</td><td>${spark(r.trend)}</td></tr>`).join('');
+  }
+
+  function drawLookahead(recs) {
+    const el = $('lookahead');
+    if (!recs.length) { el.innerHTML = '<tr><td class="zero">no lookahead comparisons yet — start the trainer with --mcts-bench-every N</td></tr>'; return; }
+    el.innerHTML = '<tr><th class="num">Training games</th><th class="num">Test games</th><th class="num">Win rate</th><th class="num">Expected</th><th class="num">Edge</th><th class="num">z</th><th class="num">Placement</th></tr>' +
+      recs.slice().reverse().slice(0, 40).map(r => `<tr><td class="num">${r.trainedGames}</td><td class="num">${r.total.games}</td><td class="num">${pct(r.total.winRate)}</td><td class="num">${pct(r.total.expectedWinRate)}</td><td class="num ${cls(r.total.edge)}">${(r.total.edge >= 0 ? '+' : '−') + Math.abs(r.total.edge * 100).toFixed(1)} pp</td><td class="num">${r.total.z.toFixed(1)}</td><td class="num ${cls(r.total.meanPlaceScore)}">${sgn(r.total.meanPlaceScore)}</td></tr>`).join('');
+  }
+
+  function drawKeep() {
+    if (!rank) return;
+    const pairs = rank.keepPairs || [], ctx = rank.keepContext || [];
+    $('keepPairs').innerHTML = '<tr><th>Card</th><th>Together with (hand or board)</th><th class="num">Keep − recycle</th><th class="num">n</th></tr>' +
+      (pairs.length ? pairs.map(p => `<tr><td>${esc(p.card)}</td><td>${esc(p.other)}</td><td class="num ${cls(p.edge)}">${sgn(p.edge)}</td><td class="num">${p.n}</td></tr>`).join('') : '<tr><td colspan="4" class="zero">no pair effects learned yet</td></tr>');
+    const label = (f) => f.replace(/^fitH:/, 'Level gap after hand abilities · ').replace(/^fit:/, 'Level gap · ').replace(/^syn:/, 'Archetype synergy · ').replace(/^ab:/, 'Ability on board/needed · ').replace(/^rc:/, 'Recycled so far · ').replace(/^free:/, 'Free support zones · ').replace(/^ty:/, 'Card type · ').replace(/^a:/, 'Archetype · ');
+    $('keepContext').innerHTML = '<tr><th>Context</th><th class="num">Keep − recycle</th><th class="num">n</th></tr>' +
+      (ctx.length ? ctx.map(c => `<tr><td>${esc(label(c.feature))}</td><td class="num ${cls(c.edge)}">${sgn(c.edge)}</td><td class="num">${c.n}</td></tr>`).join('') : '<tr><td colspan="3" class="zero">no context effects learned yet</td></tr>');
+  }
+
+  async function load() {
+    try {
+      const [r, b] = await Promise.all([fetch('/api/skilltest/ranking').then(x => x.json()), fetch('/api/skilltest/benchmark').then(x => x.json())]);
+      rank = r; bench = b;
+      const sel = $('type'), have = new Set([...sel.options].map(o => o.value));
+      Object.keys(r.types || {}).sort().forEach(t => { if (!have.has(t)) { const o = document.createElement('option'); o.value = t; o.textContent = t + ' (' + r.types[t].cards + ')'; sel.appendChild(o); } });
+      const st = r.status || b.status, alive = st && Date.now() - st.t < 30000;
+      $('dot').className = 'dot' + (alive ? ' on' : '');
+      $('liveText').textContent = alive ? `training live · ${st.games} games · ~${st.ratePerMin}/min` : 'trainer not running';
+      $('meta').textContent = r.updated ? `${r.games} training games · list updated ${new Date(r.updated).toLocaleString()}` : 'no data yet';
+      drawBench(); drawCards(); drawKeep();
+    } catch (e) { $('meta').textContent = 'could not load data'; }
+  }
+
+  $('q').addEventListener('input', drawCards); $('type').addEventListener('change', drawCards); $('minN').addEventListener('change', drawCards);
+  $('cards').addEventListener('click', (e) => { const t = e.target.closest('th[data-k]'); if (!t) return; const k = t.dataset.k; if (sortKey === k) sortAsc = !sortAsc; else { sortKey = k; sortAsc = k === 'name' || k === 'type' || k === 'rank'; } drawCards(); });
+  load(); setInterval(load, 15000);
+})();
+</script>
+</body>
+</html>

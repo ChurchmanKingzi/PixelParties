@@ -255,7 +255,7 @@ module.exports = {
 
       // Reveal the chosen card to the opponent (deck-search convention).
       if (added > 0) {
-        const oi = pi === 0 ? 1 : 0;
+        const oi = engine.opponentOf(pi);
         await engine.promptGeneric(oi, {
           type: 'deckSearchReveal',
           cardName: chosenName,

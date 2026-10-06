@@ -40,7 +40,7 @@ module.exports = {
   creatureEffect: true,
 
   canActivateCreatureEffect(ctx) {
-    const oppIdx = ctx.cardOwner === 0 ? 1 : 0;
+    const oppIdx = ctx._engine.opponentOf(ctx.cardOwner);
     return (ctx._engine.gs.players[oppIdx]?.heroes || []).some(h => h?.name && h.hp > 0);
   },
 

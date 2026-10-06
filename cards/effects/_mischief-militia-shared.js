@@ -37,7 +37,7 @@ function isMischiefMilitiaCreature(cd) {
 function countFrozenTargets(engine, opts = {}) {
   if (!engine) return 0;
   let n = 0;
-  const sides = opts.side != null ? [opts.side] : [0, 1];
+  const sides = opts.side != null ? [opts.side] : engine.gs.players.map((_, i) => i);
   for (const pi of sides) {
     const ps = engine.gs.players[pi];
     if (!ps) continue;
@@ -73,7 +73,7 @@ function enumerateFrozenTargets(engine, opts = {}) {
   const wantHeroes = opts.heroes !== false;
   const wantCreatures = opts.creatures !== false;
   const out = [];
-  const sides = opts.side != null ? [opts.side] : [0, 1];
+  const sides = opts.side != null ? [opts.side] : engine.gs.players.map((_, i) => i);
 
   if (wantHeroes) {
     for (const pi of sides) {
@@ -131,7 +131,7 @@ function enumerateFreezableNonFrozenTargets(engine, opts = {}) {
   const wantHeroes = opts.heroes !== false;
   const wantCreatures = opts.creatures !== false;
   const out = [];
-  const sides = opts.side != null ? [opts.side] : [0, 1];
+  const sides = opts.side != null ? [opts.side] : engine.gs.players.map((_, i) => i);
 
   if (wantHeroes) {
     for (const pi of sides) {

@@ -33,6 +33,7 @@
 //     die Standard-Ramme) und verursacht dabei den Schaden.
 // ═══════════════════════════════════════════
 
+const { opponentOfGs } = require('./_opp');
 const CARD_NAME = 'Alluring Light';
 
 /**
@@ -71,7 +72,7 @@ module.exports = {
   requiresTarget: true,
 
   spellPlayCondition(gs, pi, engine) {
-    const oppIdx = pi === 0 ? 1 : 0;
+    const oppIdx = opponentOfGs(gs, pi);
     if (!engine) return false;
     // Kontrolle statt Seite (Styx 28.9.)
     const hatHelden = engine.heroesControlledBy(oppIdx).some(({ hero: h }) => h?.name && h.hp > 0);
@@ -85,7 +86,7 @@ module.exports = {
       const engine = ctx._engine;
       const gs = engine.gs;
       const pi = ctx.cardOwner;
-      const oppIdx = pi === 0 ? 1 : 0;
+      const oppIdx = engine.opponentOf(pi);
 
       // ── ① Den ANGREIFER waehlen: ein Held des GEGNERS ─────────────
       const gegnerZiele = kontrollierteHeldenZiele(engine, oppIdx);   // Kontrolle statt Seite (Styx 28.9.)

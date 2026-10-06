@@ -83,7 +83,7 @@ async function _resolveTopPotion(engine, pi) {
   // false positives when the opponent already has a copy of the same
   // Potion in hand (so `hand.includes(cardName)` was true before we
   // resolved anything).
-  const oppIdxForSnap = pi === 0 ? 1 : 0;
+  const oppIdxForSnap = engine.opponentOf(pi);
   const oppPsForSnap = engine.gs.players[oppIdxForSnap];
   const preSnap = {
     deletedCount: (ps.deletedPile || []).filter(c => c === cardName).length,
@@ -184,7 +184,7 @@ const REVEAL_OUT_MS = 500;
  * at least 1 to claim that destination.
  */
 function _detectPotionDestination(engine, pi, cardName, preSnap) {
-  const oppIdx = pi === 0 ? 1 : 0;
+  const oppIdx = engine.opponentOf(pi);
   const oppPs = engine.gs.players[oppIdx];
   const ps = engine.gs.players[pi];
 
@@ -291,7 +291,7 @@ module.exports = {
         targetOwner = target.controller ?? target.owner;
       } else {
         // Hero — figure out which side.
-        for (let p = 0; p < 2; p++) {
+        for (let p = 0; p < engine.playerCount(); p++) {
           if ((engine.gs.players[p]?.heroes || []).includes(target)) {
             // Kontrolle statt Seite (Styx 28.9.)
             targetOwner = engine.heroSideOf(p, target); break;

@@ -101,7 +101,7 @@ function richteZusageEin(engine, inst) {
  * (ohne Eintrag im Ablagestapel — sie ist unsichtbar) und richtet die Zusage beim ersten Zugbeginn ein.
  */
 function ensureCalmProviders(engine) {
-  for (let pi = 0; pi < 2; pi++) {
+  for (let pi = 0; pi < engine.playerCount(); pi++) {
     const heroes = engine.gs.players[pi]?.heroes || [];
     heroes.forEach((h, hi) => {
       if (!h?.buffs?.[BUFF]) return;

@@ -158,7 +158,7 @@ module.exports = {
         && (promptData.title === CARD_NAME + ' — Declare a Type')) {
       const options = promptData.options || [];
       if (options.length === 0) return undefined;
-      const oi = cpuIdx === 0 ? 1 : 0;
+      const oi = engine.opponentOf(cpuIdx);
       const oppPs = engine.gs.players?.[oi];
       if (!oppPs) return { optionId: options[0].id };
       const cardDB = engine._getCardDB();
@@ -246,7 +246,7 @@ module.exports = {
     const gs     = engine.gs;
     const turn   = gs.turn || 0;
     const pi     = ctx.cardOwner;
-    const oi     = pi === 0 ? 1 : 0;
+    const oi     = engine.opponentOf(pi);
     const inst   = ctx.card;
     const gifts  = inst?.counters?._sparkflyGifts || {};
 

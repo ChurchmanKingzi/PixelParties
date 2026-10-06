@@ -55,7 +55,7 @@ module.exports = {
   },
 
   async postTargetResolve(engine, pi, ziele, quelle) {
-    const gegner = pi === 0 ? 1 : 0;
+    const gegner = engine.opponentOf(pi);
     const traegerZiel = (ziele || []).find(t => istTraegerZiel(engine, t, pi));
     if (traegerZiel) {
       engine._broadcastEvent('play_zone_animation', {

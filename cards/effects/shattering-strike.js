@@ -26,7 +26,7 @@
 const CARD_NAME = 'Shattering Strike';
 
 function oppCreatureTargets(engine, pi) {
-  const oppIdx = pi === 0 ? 1 : 0;
+  const oppIdx = engine.opponentOf(pi);
   return engine.getCreatureTargets(oppIdx).filter(t => t.cardInstance && t.cardInstance.zone === 'support');
 }
 

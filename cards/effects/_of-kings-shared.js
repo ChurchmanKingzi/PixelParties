@@ -1,4 +1,5 @@
 'use strict';
+const { isSeat } = require('./_opp');   // N-Spieler: gültiger Sitzindex
 // ═══════════════════════════════════════════════════════════════════
 //  GETEILT: der „of Kings"-Archetyp (Schach) — v818
 //
@@ -148,10 +149,10 @@ function instAtSlot(engine, pi, heroIdx, slot) {
   return null;
 }
 
-function sourceOwnerOf(source) {
+function sourceOwnerOf(source, engine) {
   if (!source || typeof source !== 'object') return null;
   const o = source.owner ?? source.controller;
-  return (o === 0 || o === 1) ? o : null;
+  return (isSeat(engine, o)) ? o : null;
 }
 
 /**
@@ -163,7 +164,7 @@ function sourceOwnerOf(source) {
  */
 function protectorAffectable(engine, inst, source) {
   if (engine.isOmniImmune?.(inst)) return false;
-  const so = sourceOwnerOf(source);
+  const so = sourceOwnerOf(source, engine);
   if (inst.counters?._oppEffectImmune && so != null && so !== (inst.controller ?? inst.owner)) return false;
   if (inst.counters?.untargetable_by_opponent && so != null
       && inst.counters.untargetable_by_opponent_pi === so) return false;

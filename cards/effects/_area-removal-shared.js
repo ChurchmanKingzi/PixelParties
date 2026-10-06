@@ -1,4 +1,6 @@
 'use strict';
+
+const { opponentOfGs } = require('./_opp');
 // ═══════════════════════════════════════════════════════════════════
 //  AREA-ABRÄUMUNG — GEMEINSAMES VOKABULAR (Lernkanal, Als Auftrag 6.10.)
 //
@@ -107,10 +109,10 @@ function rohKontext(engine, pi) {
   try {
     const gs = engine?.gs;
     const ps = gs?.players?.[pi];
-    const os = gs?.players?.[pi === 0 ? 1 : 0];
+    const os = gs?.players?.[opponentOfGs(gs, pi)];
     const db = engine?._getCardDB ? engine._getCardDB() : {};
     k.ao = [...(gs?.areaZones?.[pi] || [])];
-    k.ap = [...(gs?.areaZones?.[pi === 0 ? 1 : 0] || [])];
+    k.ap = [...(gs?.areaZones?.[opponentOfGs(gs, pi)] || [])];
     k.hA = (ps?.hand || []).filter(n => istAreaKarte(db[n]));
     k.hC = eindeutig(k.hA).filter(n => heldKannSpielen(engine, pi, db[n]));
     k.bd = brettNamen(ps);

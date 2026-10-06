@@ -53,6 +53,7 @@
 // ═══════════════════════════════════════════
 
 const multizone = require('./_multizone-shared');
+const { opponentOfGs } = require('./_opp');
 
 const CARD_NAME = 'Boulder in a Bottle';
 const BOULDER_HP = 150;
@@ -113,7 +114,7 @@ module.exports = {
   cannotBeSacrificed: true,
 
   canActivate(gs, playerIdx) {
-    const oi = playerIdx === 0 ? 1 : 0;
+    const oi = opponentOfGs(gs, playerIdx);
     const heroes = gs.players[oi]?.heroes || [];
     for (let hi = 0; hi < heroes.length; hi++) {
       if (!heroes[hi]?.name) continue;
@@ -123,7 +124,7 @@ module.exports = {
   },
 
   getValidTargets(gs, playerIdx) {
-    const oi = playerIdx === 0 ? 1 : 0;
+    const oi = opponentOfGs(gs, playerIdx);
     const out = [];
     const heroes = gs.players[oi]?.heroes || [];
     for (let hi = 0; hi < heroes.length; hi++) {

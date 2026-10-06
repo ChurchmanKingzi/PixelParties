@@ -81,7 +81,7 @@ module.exports = {
         await engine.actionDrawCards(pi, karten, { source: CARD_NAME });
         engine.log('dirty_smuggler_draw', { player: ps.username, cards: karten });
         // „negate this Creature's effect for the rest of the turn": Ablauf am Beginn des naechsten Zuges.
-        const naechster = gs.activePlayer === 0 ? 1 : 0;
+        const naechster = engine.opponentOf(gs.activePlayer);
         await engine.actionNegateCreature(inst, CARD_NAME, {
           selfInflicted: true,
           expiresAtTurn: gs.turn + 1,

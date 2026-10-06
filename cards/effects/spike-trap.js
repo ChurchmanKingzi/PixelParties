@@ -51,7 +51,7 @@ module.exports = {
     const engine = ctx._engine;
     const gs = engine.gs;
     const ownerPi = ctx.cardOwner;
-    const oppPi = ownerPi === 0 ? 1 : 0;
+    const oppPi = engine.opponentOf(ownerPi);
     const opp = gs.players[oppPi];
 
     // Opp counter-window: discard 2 to negate Spike Trap. Only offered

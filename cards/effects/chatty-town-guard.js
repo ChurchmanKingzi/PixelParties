@@ -22,7 +22,7 @@ module.exports = {
   canActivateCreatureEffect(ctx) {
     const engine = ctx._engine;
     const pi = ctx.cardOwner;
-    const oi = pi === 0 ? 1 : 0;
+    const oi = engine.opponentOf(pi);
     const ps = engine.gs.players[pi];
     const ops = engine.gs.players[oi];
     if (!ps || !ops) return false;
@@ -38,7 +38,7 @@ module.exports = {
     const pi = ctx.cardOwner;
     const ps = engine.gs.players[pi];
     if (!ps) return false;
-    const oi = pi === 0 ? 1 : 0;
+    const oi = engine.opponentOf(pi);
     const ops = engine.gs.players[oi];
     if (!ops) return false;
     if (ps.handLocked || ops.handLocked) return false;

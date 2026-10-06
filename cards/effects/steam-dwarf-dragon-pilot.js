@@ -1,3 +1,4 @@
+const { isSeat } = require('./_opp');   // N-Spieler: gültiger Sitzindex
 // COST-DISCARD-CHANNEL: n/a — Kosten sind Opfer-Kreaturen, kein Handabwurf (v1041)
 // ═══════════════════════════════════════════
 //  CARD EFFECT: "Steam Dwarf Dragon Pilot"
@@ -264,7 +265,7 @@ module.exports = attachSteamEngine({
     const heroIdx = ctx.cardHeroIdx;
     // Styx 28.9.: geliehene Helden der Gegenspalte — physische Seite des
     // Zielhelden (fehlt → pi). Opfer zahlt `pi`.
-    const heroOwner = (ctx.cardHeroOwner === 0 || ctx.cardHeroOwner === 1) ? ctx.cardHeroOwner : pi;
+    const heroOwner = (isSeat(gs, ctx.cardHeroOwner)) ? ctx.cardHeroOwner : pi;
 
     // `_requestedBouncePlaceSlot` is only set when the player dropped
     // on an occupied slot — which for Dragon Pilot means the summoning

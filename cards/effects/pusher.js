@@ -126,7 +126,7 @@ module.exports = {
         || (inst.counters?.currentHp ?? 1) <= 0;
       if (!defeated) { engine.sync(); return; }
 
-      const oppIdx = pi === 0 ? 1 : 0;          // "your opponent"
+      const oppIdx = engine.opponentOf(pi);          // "your opponent"
       const oppPs = gs.players[oppIdx];
       if (!oppPs || !name) { engine.sync(); return; }
 
@@ -137,7 +137,7 @@ module.exports = {
       let guard = 0;
       // v1324: Boris darf den erzwungenen Abwurf aus der Hand ignorieren.
       const _anzahl = (oppPs.hand || []).filter(n => n === name).length;
-      if (_anzahl > 0 && await engine.borisVerzicht(oppIdx, _anzahl, { source: CARD_NAME, sourceOwner: 1 - oppIdx })) guard = 99;
+      if (_anzahl > 0 && await engine.borisVerzicht(oppIdx, _anzahl, { source: CARD_NAME, sourceOwner: pi })) guard = 99;
       while (guard++ < 40) {
         const idx = (oppPs.hand || []).indexOf(name);
         if (idx < 0) break;

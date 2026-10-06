@@ -60,6 +60,7 @@
 // ═══════════════════════════════════════════
 
 const { hasCardType } = require('./_hooks');
+const { opponentOfGs } = require('./_opp');
 
 const CARD_NAME = 'Powder Keg';
 const DEATH_DAMAGE = 150;
@@ -81,7 +82,7 @@ const DEATH_DAMAGE = 150;
  * single confirmed click.
  */
 function getOppPlacementTargets(gs, pi) {
-  const oppIdx = pi === 0 ? 1 : 0;
+  const oppIdx = opponentOfGs(gs, pi);
   const oppPs = gs.players[oppIdx];
   if (!oppPs) return [];
   const out = [];

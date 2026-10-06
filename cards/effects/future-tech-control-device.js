@@ -59,12 +59,12 @@ const BLITZ_ABSTAND_MS = 110;
  * Wirtsheld auf der FALSCHEN Seite: die Aktivierung fand ihren Helden
  * nicht, der Unterhalt feuerte am falschen Zugende. Beides blieb still.
  */
-function besitzer(inst) {
+function besitzer(engine, inst) {
   // Die Karte liegt IMMER auf der Gegenseite ihres Besitzers — die
   // Gastgeberseite (`inst.owner`) bestimmt ihn also eindeutig.
   // `originalOwner` waere die direkte Auskunft, FEHLT aber bei Karten,
   // die ein Puzzle vorbelegt hat (Als Befund 21.8.).
-  return inst.owner === 0 ? 1 : 0;
+  return engine.opponentOf(inst.owner);
 }
 
 /** Der Held, an dem diese Instanz haengt — auf der GASTGEBERSEITE. */
@@ -82,7 +82,7 @@ module.exports = {
     if (!inst || inst.zone !== 'support') return false;
     const engine = ctx._engine;
     // Nur der BESITZER aktiviert — er sitzt auf der anderen Seite.
-    const pi = besitzer(inst);
+    const pi = besitzer(engine, inst);
     if (engine.gs.activePlayer !== pi) return false;
     const held = wirtsheld(engine, inst);
     if (!held?.name || held.hp <= 0) return false;
@@ -94,7 +94,7 @@ module.exports = {
     const gs = engine.gs;
     const inst = ctx.card;
     if (!inst || inst.zone !== 'support') return false;
-    const pi = besitzer(inst);
+    const pi = besitzer(engine, inst);
     const oi = inst.owner;                        // Gastgeberseite
     const held = wirtsheld(engine, inst);
     if (!held?.name || held.hp <= 0) return false;
@@ -147,7 +147,7 @@ module.exports = {
       const gs = engine.gs;
       const inst = ctx.card;
       if (!inst || inst.zone !== 'support') return;
-      const pi = besitzer(inst);
+      const pi = besitzer(engine, inst);
       if (gs.activePlayer !== pi) return;          // nur SEINE Zugenden
 
       const ps = gs.players[pi];

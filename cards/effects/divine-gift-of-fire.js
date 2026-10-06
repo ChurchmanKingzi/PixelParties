@@ -95,6 +95,7 @@ module.exports = {
         type: 'playerPicker',
         title: 'Divine Gift of Fire',
         description: 'Choose a player. All targets they control are Burned.',
+        allowedPlayers: engine.gs.skillTest ? engine.gs.players.map((_, i) => i) : undefined,
         cancellable: true,
       });
 
@@ -103,7 +104,8 @@ module.exports = {
         return;
       }
       const targetPlayerIdx = pickerResult.playerIdx;
-      if (targetPlayerIdx === undefined || targetPlayerIdx < 0 || targetPlayerIdx > 1) return;
+      if (targetPlayerIdx === undefined || targetPlayerIdx < 0 || targetPlayerIdx >= engine.playerCount()) return;
+      engine.setFocusOpponent?.(pi, targetPlayerIdx);   // Skill Test: der Fokus-Gegner ist der gewählte Spieler
 
       // Use aoeHit with damage: 0 to collect targets and play animations
       const side = targetPlayerIdx === pi ? 'own' : 'enemy';

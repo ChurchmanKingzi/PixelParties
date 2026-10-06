@@ -1,3 +1,4 @@
+const { isSeat } = require('./_opp');   // N-Spieler: gültiger Sitzindex
 // ═══════════════════════════════════════════
 //  CARD EFFECT: "Bunny Bombs"
 //  Creature (Normal, Lv0, 10 HP, Summoning Magic)
@@ -57,7 +58,7 @@ function collectBoardTargets(engine, selfId) {
   const heroes = [];
   const creatures = [];
 
-  for (let pi = 0; pi < 2; pi++) {
+  for (let pi = 0; pi < engine.playerCount(); pi++) {
     const ps = gs.players[pi];
     for (let hi = 0; hi < (ps?.heroes || []).length; hi++) {
       const hero = ps.heroes[hi];
@@ -181,7 +182,7 @@ module.exports = {
       try {
         await engine.checkAllHeroesDead();
       } finally {
-        if (prevDrawLoser === 0 || prevDrawLoser === 1) gs._drawLoserIdx = prevDrawLoser;
+        if (isSeat(gs, prevDrawLoser)) gs._drawLoserIdx = prevDrawLoser;
         else delete gs._drawLoserIdx;
       }
       engine.sync();

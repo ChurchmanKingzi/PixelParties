@@ -30,7 +30,7 @@ const HOPT_PREFIX = 'bomblebee';
 // engine's immunity gate, matching the convention used by Bomb Arrow).
 function opponentTargets(engine, listenerOwner) {
   const gs = engine.gs;
-  const oi = listenerOwner === 0 ? 1 : 0;
+  const oi = engine.opponentOf(listenerOwner);
   const ops = gs.players[oi];
   if (!ops) return [];
 

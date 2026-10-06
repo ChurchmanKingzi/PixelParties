@@ -89,7 +89,7 @@ module.exports = {
       const gs      = engine.gs;
       const pi      = ctx.cardOwner;
       const heroIdx = ctx.cardHeroIdx;
-      const oppIdx  = pi === 0 ? 1 : 0;
+      const oppIdx  = engine.opponentOf(pi);
       const oppPs   = gs.players[oppIdx];
 
       // Must have > 1 card in hand

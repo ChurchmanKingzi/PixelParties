@@ -32,7 +32,7 @@ function checkArthorAscension(engine, pi, heroIdx, excludeInstId) {
   let hero = engine.gs.players[pi]?.heroes?.[heroIdx];
   let actualOwner = pi;
   if (!hero || hero.name !== BASE_ARTHOR) {
-    for (let p = 0; p < 2; p++) {
+    for (let p = 0; p < engine.playerCount(); p++) {
       const h = engine.gs.players[p]?.heroes?.[heroIdx];
       if (h?.name === BASE_ARTHOR) { hero = h; actualOwner = p; break; }
     }

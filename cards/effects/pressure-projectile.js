@@ -51,7 +51,7 @@ const ZERPLATZEN_MS = 330;    // bis zum Bersten in `pressure_shatter` (45 % von
 function areaZiele(engine) {
   const gs = engine.gs;
   const ziele = [];
-  for (let owner = 0; owner < 2; owner++) {
+  for (let owner = 0; owner < engine.playerCount(); owner++) {
     const arr = gs.areaZones?.[owner] || [];
     for (let platz = 0; platz < arr.length; platz++) {
       const name = arr[platz];

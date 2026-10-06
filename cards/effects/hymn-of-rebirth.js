@@ -18,7 +18,7 @@ const CARD_NAME = 'Hymn of Rebirth';
 
 function defeatedHeroTargets(engine) {
   const out = [];
-  for (let pi = 0; pi < 2; pi++) {
+  for (let pi = 0; pi < engine.playerCount(); pi++) {
     const ps = engine.gs.players[pi];
     for (let hi = 0; hi < (ps?.heroes || []).length; hi++) {
       const h = ps.heroes[hi];

@@ -79,7 +79,7 @@ module.exports = {
       if (attackLevel >= fightingLevel) return;
 
       // Must be at least 1 other valid target on the opponent's side
-      const oppIdx = pi === 0 ? 1 : 0;
+      const oppIdx = engine.opponentOf(pi);
       const firstTargetId = targets[0].id;
       let hasOtherTarget = false;
 

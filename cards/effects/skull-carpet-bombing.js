@@ -1,3 +1,4 @@
+const { isSeat } = require('./_opp');   // N-Spieler: gültiger Sitzindex
 // ═══════════════════════════════════════════
 //  CARD EFFECT: "Skull Carpet Bombing"
 //  Spell (Surprise, Lv1, Destruction Magic + Summoning Magic) — PP MBS1
@@ -68,7 +69,7 @@ function seitDiesemZug(engine, inst) {
  * und ueberleben damit richtig.
  */
 function gegnerFaellt(engine, pi) {
-  const oppIdx = pi === 0 ? 1 : 0;
+  const oppIdx = engine.opponentOf(pi);
   const lebend = (engine.gs.players[oppIdx]?.heroes || []).filter(h => h?.name && h.hp > 0).length;
   if (lebend === 0) return false;
   const tot = engine.projectAoeTargets(pi, { side: 'enemy', types: ['hero'] })
@@ -123,7 +124,7 @@ module.exports = {
       animDelay: 450,
     };
 
-    const oppIdx = pi === 0 ? 1 : 0;
+    const oppIdx = engine.opponentOf(pi);
     const vorherDrawLoser = gs._drawLoserIdx;
     gs._deferGameOverCheck = (gs._deferGameOverCheck || 0) + 1;
     try {
@@ -137,7 +138,7 @@ module.exports = {
     try {
       await engine.checkAllHeroesDead();
     } finally {
-      if (vorherDrawLoser === 0 || vorherDrawLoser === 1) gs._drawLoserIdx = vorherDrawLoser;
+      if (isSeat(gs, vorherDrawLoser)) gs._drawLoserIdx = vorherDrawLoser;
       else delete gs._drawLoserIdx;
     }
     if (gs.result) { engine.sync(); return null; }   // Spiel entschieden

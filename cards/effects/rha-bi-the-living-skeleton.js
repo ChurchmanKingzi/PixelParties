@@ -40,6 +40,7 @@
 //  Karte kommt auf SEINE Hand zurueck.
 // ═══════════════════════════════════════════
 
+const { opponentOfGs } = require('./_opp');
 const CARD_NAME = "Rha'Bi, the Living Skeleton";
 const KOSTEN    = 100;
 const SCHADEN   = 100;   // v1029 (Als Anpassung 12.9.; 200 → 150 → 100)
@@ -102,7 +103,7 @@ function freierSlot(engine, owner, heroIdx) {
  * freier Support Zone und ohne bereits liegende Karte aus dem Effekt.
  */
 function moeglicheZiele(engine, pi) {
-  const gegner = pi === 0 ? 1 : 0;
+  const gegner = opponentOfGs(engine?.gs, pi);
   // ★ RUNDE 1 (Als Befund 12.9.): der Gegner ist komplett immun gegen
   //   alles, was der Zugspieler tut. Der Effekt lief deshalb schon
   //   vorher ins Leere — aber der Knopf SAH aktivierbar aus. Eine leere

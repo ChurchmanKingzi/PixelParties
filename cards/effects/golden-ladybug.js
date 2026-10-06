@@ -227,7 +227,7 @@ module.exports = {
   // Gerrymander: die CPU waehlt fuer den Ladybug-Spieler. Stiehlt ihre
   // Abomination das Gold, ist „Gold" fuer sie die beste Wahl.
   cpuGerrymanderResponse(engine, cpuIdx, p) {
-    const opfer = cpuIdx === 0 ? 1 : 0;
+    const opfer = engine.opponentOf(cpuIdx);
     if ((p?.options || []).some(o => o.id === 'gold') && goldWuerdeUmgeleitet(engine, opfer)) return { optionId: 'gold' };
     return undefined;
   },

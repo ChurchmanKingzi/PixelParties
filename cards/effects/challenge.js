@@ -150,7 +150,7 @@ module.exports = {
       {
         id: 'redirect-source',
         cardName: attackerName,
-        owner: sourceCard?.controller ?? sourceCard?.owner ?? (pi === 0 ? 1 : 0),
+        owner: sourceCard?.controller ?? sourceCard?.owner ?? (engine.opponentOf(pi)),
         cardType: config.damageType === 'attack' ? 'Attack' : 'Spell',
         isInitialCard: true,
         negated: false,
@@ -178,7 +178,7 @@ module.exports = {
 
     // ── Play 💢 on the attacker and the Challenge hero ──
     // If the source is a creature (support zone), show on the creature's slot, not the hero
-    const attackerOwner = sourceCard?.controller ?? sourceCard?.owner ?? (pi === 0 ? 1 : 0);
+    const attackerOwner = sourceCard?.controller ?? sourceCard?.owner ?? (engine.opponentOf(pi));
     const attackerHeroIdx = sourceCard?.heroIdx ?? 0;
     const attackerZoneSlot = sourceCard?.zone === 'support' ? (sourceCard?.zoneSlot ?? -1) : -1;
     engine._broadcastEvent('play_zone_animation', {

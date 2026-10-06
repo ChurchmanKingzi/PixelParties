@@ -65,7 +65,7 @@ module.exports = {
       const pi = ctx.cardOwner;
 
       let zielBesitzer = -1;
-      for (let p = 0; p < 2; p++) {
+      for (let p = 0; p < engine.playerCount(); p++) {
         if ((gs.players[p]?.heroes || []).includes(ziel)) { zielBesitzer = p; break; }
       }
       if (zielBesitzer < 0) return;

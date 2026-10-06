@@ -1,3 +1,4 @@
+const { isSeat } = require('./_opp');   // N-Spieler: gültiger Sitzindex
 // ═══════════════════════════════════════════
 //  CARD EFFECT: "Suspicious Monster"
 //  Creature (Summoning Magic Lv1, 50 HP)
@@ -142,7 +143,7 @@ module.exports = {
       const req = ps._requestedBouncePlaceSlot;
       delete ps._requestedBouncePlaceSlot;
       // Styx 28.9.: geliehene Helden der Gegenspalte — `heroOwner` der Marke.
-      const side = (req.heroOwner === 0 || req.heroOwner === 1) ? req.heroOwner : pi;
+      const side = (isSeat(gs, req.heroOwner)) ? req.heroOwner : pi;
       const occ = findOccupant(engine, pi, req.heroIdx, req.slotIdx, side);
       if (occ) target = { heroIdx: req.heroIdx, slotIdx: req.slotIdx, owner: side, inst: occ };
     }
@@ -161,7 +162,7 @@ module.exports = {
         cancellable: true,
       });
       if (!picked) return false; // cancel → abort (card back to hand, Action kept)
-      const pickSide = (picked.owner === 0 || picked.owner === 1) ? picked.owner : pi;
+      const pickSide = (isSeat(gs, picked.owner)) ? picked.owner : pi;
       const occ = findOccupant(engine, pi, picked.heroIdx, picked.slotIdx, pickSide);
       if (!occ) return false;
       target = { heroIdx: picked.heroIdx, slotIdx: picked.slotIdx, owner: pickSide, inst: occ };

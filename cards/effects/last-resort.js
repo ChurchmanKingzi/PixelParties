@@ -1,3 +1,4 @@
+const { isSeat } = require('./_opp');   // N-Spieler: gültiger Sitzindex
 // ═══════════════════════════════════════════
 //  CARD EFFECT: „Last Resort"
 //  Spell (Destruction Magic Lv 3, PP …)
@@ -90,7 +91,7 @@ module.exports = {
       const engine = ctx._engine;
       const gs = engine.gs;
       const pi = ctx.cardOwner;
-      const oi = pi === 0 ? 1 : 0;
+      const oi = engine.opponentOf(pi);
       const heroIdx = ctx.cardHeroIdx;
       const ps = gs.players[pi];
       const heldSeite = ctx.cardHeroOwner ?? pi;   // Als Befund 29.9.: Brettseite des Nutzers
@@ -181,7 +182,7 @@ module.exports = {
       try {
         await engine.checkAllHeroesDead();
       } finally {
-        if (vorherigerVerlierer === 0 || vorherigerVerlierer === 1) gs._drawLoserIdx = vorherigerVerlierer;
+        if (isSeat(gs, vorherigerVerlierer)) gs._drawLoserIdx = vorherigerVerlierer;
         else delete gs._drawLoserIdx;
       }
 

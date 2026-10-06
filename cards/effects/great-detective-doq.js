@@ -109,7 +109,7 @@ function isOwnAttack(ctx, source) {
  *      on the verdict beat, then check the match.
  */
 async function runGuess(engine, pi, doqHeroIdx, doqSeite = pi) {   // Als Befund 29.9.: doqSeite = Brettseite von Doq
-  const oppIdx = pi === 0 ? 1 : 0;
+  const oppIdx = engine.opponentOf(pi);
   const ops = engine.gs.players[oppIdx];
   const hand = ops?.hand || [];
   if (hand.length === 0) return 0;

@@ -126,7 +126,7 @@ module.exports = {
     if (!hero || hero.hp <= 0) return false;
     engine.grantTempHeroAtk(chosen.physOwner, chosen.heroIdx, ATK_BONUS, {
       expiresAtTurn: gs.turn + 1,
-      expiresForPlayer: pi === 0 ? 1 : 0,
+      expiresForPlayer: engine.opponentOf(pi),
       source: CARD_NAME,
     });
 

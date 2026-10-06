@@ -72,7 +72,7 @@ function getFreeZones(ps) {
  * Filters by: level ≤ maxLevel, not targeting_immune, not control_immune.
  */
 function getEligibleCreatures(engine, pi, maxCreatureLevel) {
-  const oppIdx = pi === 0 ? 1 : 0;
+  const oppIdx = engine.opponentOf(pi);
   // Per-side non-damage shield (The Great Wall of Deri etc.).
   // Diplomacy is a non-damage targeting effect, so if opp controls
   // any shielder, NONE of opp's Creatures are valid targets —
@@ -147,7 +147,7 @@ module.exports = {
     const pi = ctx.cardOwner;
     const heroIdx = ctx.cardHeroIdx;
     const ps = gs.players[pi];
-    const oppIdx = pi === 0 ? 1 : 0;
+    const oppIdx = engine.opponentOf(pi);
 
     const cost = getCost(level);
     const maxLv = getMaxCreatureLevel(level);
@@ -241,7 +241,7 @@ module.exports = {
     // Apply negation until end of turn (same as Dark Gear)
     await engine.actionNegateCreature(inst, 'Diplomacy', {
       expiresAtTurn: gs.turn + 1,
-      expiresForPlayer: pi === 0 ? 1 : 0,
+      expiresForPlayer: engine.opponentOf(pi),
       selfInflicted: true,
       unpreventable: true,   // v1444: kann NICHT verhindert werden
     });

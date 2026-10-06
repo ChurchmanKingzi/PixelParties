@@ -76,7 +76,7 @@ function ownerHasAttachableHero(ps) {
 // so attaching to an opponent's Hero turns Dichotomy's halving into a
 // gift to the opponent's Burned targets. Intentional per spec.
 function anyPlayerHasAttachableHero(gs) {
-  for (let pi = 0; pi < 2; pi++) {
+  for (let pi = 0; pi < gs.players.length; pi++) {
     const ps = gs.players[pi];
     if (ps && ownerHasAttachableHero(ps)) return true;
   }
@@ -101,6 +101,7 @@ function isBurnTick(source) {
 }
 
 const { candidateHosts, attachmentHostsFor, attachToHero } = require('./_attachment-shared');
+const { opponentOfGs } = require('./_opp');
 
 module.exports = {
   requiresTarget: true,
@@ -108,9 +109,9 @@ module.exports = {
   activeIn: ['hand', 'support'],
 
   spellPlayCondition(gs, pi, engine) {
-    return candidateHosts(gs, pi, engine, { sides: [pi, pi === 0 ? 1 : 0] }).length > 0;
+    return candidateHosts(gs, pi, engine, { sides: [pi, opponentOfGs(gs, pi)] }).length > 0;
   },
-  attachmentHosts(gs, pi, engine) { return attachmentHostsFor(gs, pi, engine, { sides: [pi, pi === 0 ? 1 : 0] }); }, // v651: beide Seiten als Drop-Ziel
+  attachmentHosts(gs, pi, engine) { return attachmentHostsFor(gs, pi, engine, { sides: [pi, opponentOfGs(gs, pi)] }); }, // v651: beide Seiten als Drop-Ziel
 
   hooks: {
     onPlay: async (ctx) => {
@@ -133,7 +134,7 @@ module.exports = {
       // v650: Anlegen ueber den geteilten Vorgang — beide Seiten, Caster-
       // Held als Vorgabe (bisheriges Verhalten), Anti-Magic-Schutz inklusive.
       const res = await attachToHero(ctx, CARD_NAME, {
-        sides: [pi, pi === 0 ? 1 : 0], preferCaster: true,
+        sides: [pi, engine.opponentOf(pi)], preferCaster: true,
         description: 'Choose a Hero to attach Dichotomy of Luna and Tempeste to.',
         confirmLabel: '🌗 Attach!', confirmClass: 'btn-info', skipEnterHook: true,
       });

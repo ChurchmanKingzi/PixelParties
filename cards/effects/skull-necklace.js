@@ -1,3 +1,4 @@
+const { isSeat } = require('./_opp');   // N-Spieler: gültiger Sitzindex
 // COST-DISCARD-CHANNEL: n/a — Auszahlung BEIM Abgeworfenwerden, keine Kosten (v1041)
 // ═══════════════════════════════════════════
 //  CARD EFFECT: "Skull Necklace"
@@ -125,7 +126,7 @@ async function fireSkullDamage(ctx, deleted) {
   // Nur wenn die Ableitung nichts findet (`null` — etwa weil BEIDE
   // Spieler eine Karte dieses Namens fuehren), bleibt die alte
   // Naeherung ueber `gs.activePlayer` als letzter Rueckfall stehen.
-  const verursacher = (ctx.sourceOwner === 0 || ctx.sourceOwner === 1)
+  const verursacher = (isSeat(gs, ctx.sourceOwner))
     ? ctx.sourceOwner
     : (ctx.selfInflicted ? ownerIdx : null);
   const byOpponent = verursacher != null
@@ -145,7 +146,7 @@ async function fireSkullDamage(ctx, deleted) {
   // falls back to -1. `actionDealDamage` handles a -1 sourceHeroIdx
   // by attributing the damage to the card name only.
   const targets = [];
-  for (let pIdx = 0; pIdx < 2; pIdx++) {
+  for (let pIdx = 0; pIdx < engine.playerCount(); pIdx++) {
     const tps = gs.players[pIdx];
     for (let hi = 0; hi < (tps.heroes || []).length; hi++) {
       const hero = tps.heroes[hi];

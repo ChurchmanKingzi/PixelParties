@@ -42,7 +42,7 @@ module.exports = {
       const toPoison = []; // currently Stunned → receive Poison
       const toStun   = []; // currently Poisoned → receive Stun
 
-      for (let p = 0; p < 2; p++) {
+      for (let p = 0; p < engine.playerCount(); p++) {
         const ps = gs.players[p];
         if (!ps) continue;
         for (let hi = 0; hi < (ps.heroes || []).length; hi++) {

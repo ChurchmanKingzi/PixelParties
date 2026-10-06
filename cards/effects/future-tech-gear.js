@@ -110,7 +110,7 @@ async function ausloesen(ctx) {
       const engine = ctx._engine;
       const gs = engine.gs;
       const owner = ctx.cardOwner;
-      const oi = owner === 0 ? 1 : 0;
+      const oi = engine.opponentOf(owner);
 
       // Nur wenn der GEGNER etwas auf die Hand bekommen hat.
       if (ctx.playerIdx !== oi) return;

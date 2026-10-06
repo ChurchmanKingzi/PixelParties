@@ -49,6 +49,8 @@
 
 'use strict';
 
+const { opponentOfGs } = require('./_opp');
+
 const CARD_NAME = 'Market Crash';
 // Dauer des Herunterzaehlens. Auch die Wartezeit am Ende von onPlay,
 // damit der naechste Effekt nicht ueber die noch tickenden Zahlen faellt.
@@ -60,7 +62,7 @@ const CRASH_MS = 1500;
 /** Strikt mehr Gold als der Gegner? Die eine Auslegungsstelle. */
 function hasGoldLead(gs, pi) {
   const ps = gs?.players?.[pi];
-  const ops = gs?.players?.[pi === 0 ? 1 : 0];
+  const ops = gs?.players?.[opponentOfGs(gs, pi)];
   if (!ps || !ops) return false;
   return (ps.gold || 0) > (ops.gold || 0);
 }
@@ -125,7 +127,7 @@ module.exports = {
   cpuPlayVeto(engine, pi, heroIdx, ctx) {
     try {
       const gs = engine?.gs;
-      const ops = gs?.players?.[pi === 0 ? 1 : 0];
+      const ops = gs?.players?.[opponentOfGs(gs, pi)];
       if (!ops) return false;
 
       // HARTES Veto, nicht gelernt: steht der Gegner schon auf 0, kann
@@ -163,7 +165,7 @@ module.exports = {
       const engine = ctx._engine;
       const gs = engine.gs;
       const pi = ctx.cardOwner;
-      const oi = pi === 0 ? 1 : 0;
+      const oi = engine.opponentOf(pi);
       if (!gs?.players?.[pi] || !gs?.players?.[oi]) return;
 
       // Der Modus steht in den Stempeln, die doPlaySpell VOR dem onPlay
@@ -175,7 +177,7 @@ module.exports = {
       const vorherGegner = gs.players[oi].gold || 0;
 
       engine._broadcastEvent('play_gold_crash', {
-        amounts: [gs.players[0].gold || 0, gs.players[1].gold || 0],
+        amounts: gs.players.map(p => p.gold || 0),
         durationMs: CRASH_MS,
       });
 

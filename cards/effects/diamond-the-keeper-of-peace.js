@@ -99,7 +99,7 @@ module.exports = {
       // umsonst. Also nur mit lebender Diamond.
       if (hero.hp <= 0) return;
       // Collect entries where the source is the opponent
-      const oppIdx = pi === 0 ? 1 : 0;
+      const oppIdx = engine.opponentOf(pi);
       const opponentEntries = entries.filter(e =>
         !e.cancelled &&
         (e.inst.controller ?? e.inst.owner) === pi &&

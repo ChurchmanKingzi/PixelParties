@@ -12,6 +12,7 @@
 //  Animation: golden scale grows on the permanent.
 // ═══════════════════════════════════════════
 
+const { opponentOfGs } = require('./_opp');
 module.exports = {
   // ★★ v1182 — ENTKOPPELTE BILDER (CARD_API): wird die Karte NEGIERT,
   // laeuft ihr Effekt-Rumpf nie — die Engine spielt dann diese Bilder.
@@ -96,7 +97,7 @@ module.exports = {
 
     // Activator must have fewer cards than opponent
     const actPs = gs.players[activatorIdx];
-    const oppIdx = activatorIdx === 0 ? 1 : 0;
+    const oppIdx = opponentOfGs(gs, activatorIdx);
     const oppPs = gs.players[oppIdx];
     if (!actPs || !oppPs) return false;
     if ((actPs.hand || []).length >= (oppPs.hand || []).length) return false;
@@ -113,7 +114,7 @@ module.exports = {
   async onActivatePermanent(engine, activatorIdx, permOwner, perm) {
     const gs = engine.gs;
     const actPs = gs.players[activatorIdx];
-    const oppIdx = activatorIdx === 0 ? 1 : 0;
+    const oppIdx = engine.opponentOf(activatorIdx);
     const oppPs = gs.players[oppIdx];
     if (!actPs || !oppPs) return;
 

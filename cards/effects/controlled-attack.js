@@ -17,7 +17,7 @@ module.exports = {
       const gs = engine.gs;
       const pi = ctx.cardOwner;
       const heroIdx = ctx.cardHeroIdx;
-      const oppIdx = pi === 0 ? 1 : 0;
+      const oppIdx = engine.opponentOf(pi);
 
       // Prompt to choose an opponent's hero
       const target = await ctx.promptDamageTarget({

@@ -37,7 +37,7 @@ module.exports = {
 
       const engine = ctx._engine;
       const pi = ctx.cardOwner;
-      const oi = pi === 0 ? 1 : 0;
+      const oi = engine.opponentOf(pi);
       const ops = engine.gs.players[oi];
       if (!ops || (ops.hand || []).length === 0) return;
 

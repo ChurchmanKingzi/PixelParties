@@ -83,7 +83,7 @@ module.exports = {
 
       const engine = ctx._engine;
       const ps = engine.gs.players[pi];
-      const ops = engine.gs.players[pi === 0 ? 1 : 0];
+      const ops = engine.gs.players[engine.opponentOf(pi)];
       if (!ps || !ops) return;
 
       // „you MUST add 2 cards" — kein Ausstieg. Liegen wider Erwarten

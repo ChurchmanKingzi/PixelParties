@@ -112,7 +112,7 @@ function _getEligibleCreatures(gs, engine) {
   // die Falle war also kalt — jetzt ist sie ganz weg.
   try { cardDB = getCardDB(engine); } catch { return []; }
 
-  for (let pi = 0; pi < 2; pi++) {
+  for (let pi = 0; pi < gs.players.length; pi++) {
     const ps = gs.players[pi];
     if (!ps) continue;
     for (let hi = 0; hi < (ps.heroes || []).length; hi++) {

@@ -106,7 +106,7 @@ module.exports = {
       if (healedAmount <= 0) return;
 
       const damage = Math.min(healedAmount, 200);
-      const oi = pi === 0 ? 1 : 0;
+      const oi = engine.opponentOf(pi);
 
       // Prompt player to choose enemy target (cancellable)
       const target = await ctx.promptDamageTarget({

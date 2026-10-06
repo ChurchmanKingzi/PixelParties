@@ -240,7 +240,7 @@ async function runStellanEffect(ctx) {
   // Shuffle + opponent reveal — standard deck-search etiquette.
   engine.shuffleDeck(pi, 'main');
   engine._broadcastEvent('deck_search_add', { cardName: chosenName, playerIdx: pi });
-  const oi = pi === 0 ? 1 : 0;
+  const oi = engine.opponentOf(pi);
   await engine.promptGeneric(oi, {
     type: 'deckSearchReveal',
     cardName: chosenName,

@@ -109,7 +109,7 @@ function isOffensiveSpell(cd) {
 function activatorEligibleSpells(engine, pi) {
   const all = uniqueDeckSpells(engine, pi);
   const gs = engine.gs;
-  const oppIdx = pi === 0 ? 1 : 0;
+  const oppIdx = engine.opponentOf(pi);
   const cpuTurnOneShielded = pi === engine._cpuPlayerIdx
     && gs.firstTurnProtectedPlayer === oppIdx;
   if (!cpuTurnOneShielded) return all;
@@ -207,7 +207,7 @@ module.exports = {
     const gs = engine.gs;
     const pi = ctx.cardOwner;
     const ps = gs.players[pi];
-    const oppIdx = pi === 0 ? 1 : 0;
+    const oppIdx = engine.opponentOf(pi);
     const oppPs = gs.players[oppIdx];
     const heroIdx = ctx.cardHeroIdx;
     if (!ps || !oppPs) return false;

@@ -88,7 +88,7 @@ module.exports = {
       const hasCounters = changeCounterCardsOnSide(engine, turnPlayerIdx).length > 0;
       if (hasCounters) return;
 
-      const oppIdx = turnPlayerIdx === 0 ? 1 : 0;
+      const oppIdx = engine.opponentOf(turnPlayerIdx);
 
       // Step 1: turn player picks discard vs damage.
       const choices = [];

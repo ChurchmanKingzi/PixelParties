@@ -155,7 +155,7 @@ module.exports = {
 
       // Als Vorgabe 29.9.: „your opponent" relativ zum Ausloeser (Kontrolleur).
       const pi = ctx.surpriseController ?? ctx.surpriseOwner;
-      const oppIdx = pi === 0 ? 1 : 0;
+      const oppIdx = engine.opponentOf(pi);
       const gs = engine.gs;
       const cardDB = engine._getCardDB();
 

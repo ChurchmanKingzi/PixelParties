@@ -34,7 +34,7 @@ async function onDefeat(ctx) {
   if (!inst || inst.zone !== 'support') return;
   // Styx 28.9.: am uebernommenen Helden dient die Ausruestung dem Kontrolleur.
   const ctrl = ctx.cardController ?? inst.controller ?? inst.owner;
-  const oppIdx = ctrl === 0 ? 1 : 0;
+  const oppIdx = engine.opponentOf(ctrl);
   // Ziel gehoert dem Gegner?
   if (ctx.creature) {
     if ((ctx.creature.controller ?? ctx.creature.owner) !== oppIdx) return;

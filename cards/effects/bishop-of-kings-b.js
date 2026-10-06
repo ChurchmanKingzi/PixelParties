@@ -34,7 +34,7 @@ async function syncBishopNegation(engine, ignoreInstId) {
       i.name === CARD_NAME && i.zone === 'support' && i.id !== ignoreInstId
       && (i.controller ?? i.owner) === pi);
     const active = bishops.some(b => conditionHolds(engine, b));
-    const opp = 1 - pi;
+    const opp = engine.opponentOf(pi);
     for (const { physOwner, heroIdx, hero } of engine.heroesControlledBy(opp)) {
       if (!hero?.name || hero.hp <= 0) continue;
       const st = hero.statuses?.negated;

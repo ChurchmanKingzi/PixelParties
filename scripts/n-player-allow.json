@@ -1,0 +1,29 @@
+{
+  "cards/effects/_cpu.js": "Zwei-Spieler-Insel: CPU-Pilot/MCTS spielt nur das Normalspiel (Mensch gegen CPU), nicht den Skill Test",
+  "cards/effects/_deck-profile.js": "Zwei-Spieler-Insel: Deck-Profile/Training, nur Normalspiel",
+  "cards/effects/_decision-log.js": "Zwei-Spieler-Insel: Entscheidungs-Protokoll des Trainings, nur Normalspiel",
+  "cards/effects/_train-recorder.js": "Zwei-Spieler-Insel: Trainings-Aufzeichnung (PP_TRAIN), nur Normalspiel",
+  "cards/effects/_demo-recorder.js": "Zwei-Spieler-Insel: Demo-Aufzeichnung, nur Normalspiel",
+  "cards/effects/_sc-tracking.js": "Zwei-Spieler-Insel: Siegbedingungs-/Freischalt-Tracking (Normalspiel-Statistik)",
+  "cards/effects/_opp.js": "Die Hilfen selbst: `pi === 0 ? 1 : 0` ist hier die Normalspiel-Implementierung von opponentOfGs",
+  "cards/effects/_engine.js": {
+    "reason": "Spielende-Ableitung `winnerIdx/loserIdx = X === 0 ? 1 : 0` — im Mehrspielermodus ist „der andere“ kein Sieger/Verlierer (docs/n-player-todo.md)",
+    "max": 3
+  },
+  "cards/effects/_doom-clock-shared.js": {
+    "reason": "Doom Clock beendet das Spiel: `winnerIdx = byPi === 0 ? 1 : 0` — Mehrspieler-Wertung offen (docs/n-player-todo.md)",
+    "max": 1
+  },
+  "cards/effects/carris-the-time-keeper.js": {
+    "reason": "Siegbedingung: `winnerIdx = controller === 0 ? 1 : 0` — Mehrspieler-Wertung offen (docs/n-player-todo.md)",
+    "max": 1
+  },
+  "cards/effects/quetzahuitl-receiver-of-sacrifices.js": {
+    "reason": "Siegbedingung: `winnerIdx = pi === 0 ? 1 : 0` — Mehrspieler-Wertung offen (docs/n-player-todo.md)",
+    "max": 1
+  },
+  "cards/effects/the-golden-abomination.js": {
+    "reason": "Siegbedingung: `… gewinner === 0 ? 1 : 0` — Mehrspieler-Wertung offen (docs/n-player-todo.md)",
+    "max": 1
+  }
+}

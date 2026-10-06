@@ -55,6 +55,7 @@
 // ═══════════════════════════════════════════
 
 const { baseCardName } = require('./_hooks');
+const { opponentOfGs } = require('./_opp');
 
 const CARD_NAME = 'Pillar of Light';
 const HOPT_KEY = 'pillar-of-light';
@@ -112,7 +113,7 @@ module.exports = {
     if (promptData.type === 'cardNamePicker') {
       const gs = engine?.gs;
       const cpuIdx = gs?.players?.findIndex(p => p?.isCPU);
-      const oi = cpuIdx === 0 ? 1 : 0;
+      const oi = opponentOfGs(gs, cpuIdx);
       const deck = gs?.players?.[oi]?.mainDeck || [];
       if (deck.length === 0) return undefined;
       const zaehler = new Map();
@@ -130,7 +131,7 @@ module.exports = {
       const engine = ctx._engine;
       const gs = engine.gs;
       const pi = ctx.cardOwner;
-      const oi = pi === 0 ? 1 : 0;
+      const oi = engine.opponentOf(pi);
       const ps = gs.players[pi];
       const ops = gs.players[oi];
       if (!ps || !ops) { gs._spellCancelled = true; return; }

@@ -182,7 +182,7 @@ module.exports = {
     engine.sync();
 
     // Opponent reveal modal (standard tutor disclosure).
-    const oi = pi === 0 ? 1 : 0;
+    const oi = engine.opponentOf(pi);
     await engine._delay(300);
     await engine.promptGeneric(oi, {
       type: 'deckSearchReveal',

@@ -133,7 +133,7 @@ module.exports = {
     // bigger boards while the cards being discarded are cheap.
     if (type === 'forceDiscardCancellable') {
       const cpuIdx = engine._cpuPlayerIdx;
-      const oppIdx = cpuIdx === 0 ? 1 : 0;
+      const oppIdx = engine.opponentOf(cpuIdx);
       const opp = engine.gs.players[oppIdx];
       if (!opp) return undefined;
 

@@ -114,7 +114,7 @@ function _makeBorrowInst(realInst, borrowerIdx) {
  * activation level. Returns objects shaped for the option picker.
  */
 function _getBorrowableCreatures(engine, gs, pi, level) {
-  const oi = pi === 0 ? 1 : 0;
+  const oi = engine.opponentOf(pi);
   const ops = gs.players[oi];
   if (!ops) return [];
   const cardDB = engine._getCardDB();

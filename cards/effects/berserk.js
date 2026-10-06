@@ -61,6 +61,7 @@ function _countBerserksOnHero(engine, ownerIdx, heroIdx, excludeInstId = null) {
 }
 
 const { candidateHosts, attachToHero } = require('./_attachment-shared');
+const { opponentOfGs } = require('./_opp');
 
 module.exports = {
   // ★★ v1181 — ENTKOPPELTE ZAUBERBILDER (Al 17.9.): Wird der Zauber
@@ -84,7 +85,7 @@ module.exports = {
 
   // Need at least one Hero (any side) with a free Support slot.
   spellPlayCondition(gs, pi, engine) {
-    return candidateHosts(gs, pi, engine, { sides: [pi, pi === 0 ? 1 : 0] }).length > 0;
+    return candidateHosts(gs, pi, engine, { sides: [pi, opponentOfGs(gs, pi)] }).length > 0;
   },
   // ★★ v1145 (Al 17.9.): KEIN `attachmentHosts` mehr — gezogen wird wie
   // bei jedem Spell auf den WIRKER, die Zielwahl oeffnet `onPlay`
@@ -102,7 +103,7 @@ module.exports = {
       // Magic-Schutz des Wirts inklusive (blockiert → Karte in den
       // Discard des Casters, wie bisher).
       const res = await attachToHero(ctx, CARD_NAME, {
-        sides: [pi, pi === 0 ? 1 : 0],
+        sides: [pi, engine.opponentOf(pi)],
         ignoreDropHints: true,
         description: 'Attach Berserk to any Hero. That Hero can only Attack (max 2/turn) but gets one free additional Attack per turn.',
         confirmLabel: '😡 Attach!', confirmClass: 'btn-danger', skipEnterHook: true,

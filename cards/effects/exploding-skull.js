@@ -139,7 +139,7 @@ module.exports = {
       }
 
       const gs = engine.gs;
-      const oi = pi === 0 ? 1 : 0;
+      const oi = engine.opponentOf(pi);
 
       // Build the opp target list — every living Hero + every face-
       // up Creature in a support zone on opp's side. `getCreatureTargets`

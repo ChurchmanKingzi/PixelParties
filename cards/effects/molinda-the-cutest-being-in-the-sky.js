@@ -27,7 +27,7 @@ const CARD_NAME = ASCEND_TARGET;
 /** Gibt es beim Gegner ein uebernehmbares Ziel? */
 function stealableTargets(engine, pi) {
   const gs = engine.gs;
-  const opp = pi === 0 ? 1 : 0;
+  const opp = engine.opponentOf(pi);
   const ops = gs.players[opp];
   if (!ops) return 0;
   if (gs.firstTurnProtectedPlayer === opp) return 0;

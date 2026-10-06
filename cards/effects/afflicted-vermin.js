@@ -34,7 +34,7 @@ module.exports = {
   surpriseTrigger: (gs, ownerIdx, heroIdx, summonInfo, engine) => {
     let otherCreatureCount = 0;
     const summonedId = summonInfo?.cardInstance?.id;
-    for (let pi = 0; pi < 2; pi++) {
+    for (let pi = 0; pi < gs.players.length; pi++) {
       for (const t of engine.getCreatureTargets(pi)) {
         if (summonedId && t.cardInstance?.id === summonedId) continue;
         otherCreatureCount++;
@@ -59,7 +59,7 @@ module.exports = {
     // their Hero) and filters to actual Creatures including Artifact-
     // Creature hybrids. Vermin-specific filters layer on top.
     const targets = [];
-    for (let pIdx = 0; pIdx < 2; pIdx++) {
+    for (let pIdx = 0; pIdx < engine.playerCount(); pIdx++) {
       for (const t of engine.getCreatureTargets(pIdx)) {
         const inst = t.cardInstance;
         if (inst && summonedInstId && inst.id === summonedInstId) continue;

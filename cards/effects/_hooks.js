@@ -1,3 +1,4 @@
+const { isSeat } = require('./_opp');   // N-Spieler: gültiger Sitzindex
 // ═══════════════════════════════════════════
 //  HOOK POINTS & SPEED LEVELS
 //  Add new hooks freely — just fire them with
@@ -19,6 +20,9 @@ const HOOKS = {
   ON_BEFORE_HAND_DRAW: 'onBeforeHandDraw', // Fires before starting hands are drawn (Bill, etc.)
   ON_GAME_START:    'onGameStart',
   ON_TURN_START:    'onTurnStart',
+  // Skill Test (2–8 Spieler): einmal vor dem allerersten Zug der ersten Round, vor dem Start-Gold-Tick. Für Karten, die zu
+  // Spielbeginn einen Gegner wählen müssen (The Golden Abomination). Im Normalspiel wird er nie ausgelöst.
+  ON_SKILLTEST_START: 'onSkillTestStart',
   // ★ GANZ AM ANFANG DES ZUGES (v867) — VOR Statusablauf und VOR
   // Burn/Poison. `ON_TURN_START` feuert erst NACH dem Statusschaden;
   // fuer Effekte, die zu Zugbeginn etwas ZURUECKBRINGEN, ist das zu
@@ -910,7 +914,7 @@ function heroCanBeEquipped(hero) {
  */
 function heldSeite(gs, pi, heroIdx) {
   const w = gs?._wirkerSeite;
-  if (w && w.pi === pi && w.heroIdx === heroIdx && (w.heroOwner === 0 || w.heroOwner === 1)) return w.heroOwner;
+  if (w && w.pi === pi && w.heroIdx === heroIdx && (isSeat(gs, w.heroOwner))) return w.heroOwner;
   return pi;
 }
 

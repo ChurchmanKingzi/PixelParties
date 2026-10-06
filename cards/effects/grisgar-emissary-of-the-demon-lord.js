@@ -95,7 +95,7 @@ module.exports = {
       // At least 1 OTHER opponent-side target must exist — otherwise
       // the prompt has no answer and we'd just spin the recast for
       // nothing. Mirror Bartas's check exactly.
-      const oppIdx = pi === 0 ? 1 : 0;
+      const oppIdx = engine.opponentOf(pi);
       const firstTargetId = targets[0].id;
       let hasOtherTarget = false;
       // Kontrolle statt Seite (Styx 28.9.); IDs bleiben physisch.

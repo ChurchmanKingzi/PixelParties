@@ -43,7 +43,7 @@ const CARD_NAME = 'Decisive Defeat';
 
 function hostOpts(gs, pi) {
   // Beide Seiten — der Kartentext nennt keine.
-  return { sides: [0, 1], ownSideOnly: false };
+  return { sides: gs.players.map((_, i) => i), ownSideOnly: false };
 }
 
 module.exports = {
