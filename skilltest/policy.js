@@ -32,6 +32,10 @@ const DEFAULT_WEIGHTS = {
   friendlyFire: 1.0,        // 0 = nie eigene Ziele bei feindlichen Karten (1 = Standard-Vermeidung)
   learned: 1.0,             // Gewicht des gelernten Kartenwerts
   explore: 0.4,             // Neugier auf selten ausprobierte Karten (UCB)
+  // Aufbau (Vorbereitung):
+  keepCards: 4,             // so viele einsetzbare Handkarten behält der Bot, der Rest geht in den Recycler
+  heroHp: 1.0,              // Gewicht der Helden-HP bei der Heldenwahl
+  heroAtk: 2.0,             // Gewicht des Helden-ATK bei der Heldenwahl
 };
 
 function weightsOf(room, seat) {
@@ -290,16 +294,18 @@ function freeActions(room, seat, host) {
  * Basis für einen CPU-Sitz: Heroes nach Wert (HP/ATK + gelernter Kartenwert), Abilities/Support nach gelernter
  * Passung zum Hero, unbrauchbare Karten in den Recycler (mehr Gold, früherer Spielbeginn).
  */
-function prepareBase({ env, ps, room, idx, pool, noProfile }) {
+function prepareBase({ env, ps, room, idx, pool, noProfile, weights }) {
   const { buildWithRecycling } = require('./autoprep');
   const { CONFIG } = require('./config');
   const L = require('./learn/profile');
   const prof = noProfile ? null : profile();
+  const w = Object.assign({}, DEFAULT_WEIGHTS, weights || {});
   const cv = (n) => (prof ? L.meanOf(prof.cardValue[n]) : 0);
   const pv = (a, b) => (prof ? L.meanOf(prof.pairValue[a < b ? a + '|' + b : b + '|' + a]) : 0);
   return buildWithRecycling(env, ps, {
     pool, config: CONFIG,
-    heroScore: (n, c) => (c.hp || 0) + 2 * (c.atk || 0) + 150 * cv(n),
+    maxKeep: Math.max(0, Math.round(w.keepCards)),
+    heroScore: (n, c) => w.heroHp * (c.hp || 0) + w.heroAtk * (c.atk || 0) + 150 * cv(n),
     pairScore: (hero, card) => 2 * pv(hero, card),
     keepScore: (n) => 2 * cv(n),
   });

@@ -30462,7 +30462,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     const opponentIdx = this.opponentOf(equipOwnerIdx);
     const equipInfo = { equipOwner: equipOwnerIdx, equipHeroIdx, cardName: equipCard?.name, cardInstance: equipCard };
     const equipPlayerName = this.gs.players[equipOwnerIdx]?.username || 'Opponent';
-    return this._scanSurpriseEntriesForPlayer(opponentIdx, 'surpriseEquipTrigger', equipInfo, {
+    return this._scanSurprisesAgainst(equipOwnerIdx, 'surpriseEquipTrigger', equipInfo, {
       message: () => `${equipPlayerName} equipped ${equipCard?.name || 'a card'}!`,
       showCard: equipCard?.name,
     });
@@ -30575,6 +30575,20 @@ this._deathWatch = (this._deathWatchStack || []).length
     return (this._surpriseResolutionDepth || 0) >= 10;
   }
 
+  /**
+   * Surprise-Fenster GEGEN `actorIdx`: Normalspiel — nur der Gegner (wie bisher). Skill Test — alle anderen Sitze der
+   * Reihe nach (beginnend nach dem Ausloeser); die erste ausgeloeste Surprise beendet das Fenster.
+   */
+  async _scanSurprisesAgainst(actorIdx, triggerFlag, triggerInfo, promptConfig) {
+    if (!this.gs.skillTest) return this._scanSurpriseEntriesForPlayer(this.opponentOf(actorIdx), triggerFlag, triggerInfo, promptConfig);
+    const n = this.gs.players.length;
+    for (let k = 1; k < n; k++) {
+      const result = await this._scanSurpriseEntriesForPlayer((actorIdx + k) % n, triggerFlag, triggerInfo, promptConfig);
+      if (result) return result;
+    }
+    return null;
+  }
+
   async _scanSurpriseEntriesForPlayer(playerIdx, triggerFlag, triggerInfo, promptConfig) {
     const entries = this._getAllSurpriseEntries(playerIdx);
     this.gs._surprisePendingCount = (this.gs._surprisePendingCount || 0) + 1;
@@ -30663,7 +30677,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     const heroEffectInfo = { activatorIdx, heroIdx, effectName, heroOwner };
     const activatorName = this.gs.players[activatorIdx]?.username || 'Opponent';
     const effectHeroName = this.gs.players[heroOwner]?.heroes?.[heroIdx]?.name || 'a Hero';
-    return this._scanSurpriseEntriesForPlayer(opponentIdx, 'surpriseHeroEffectTrigger', heroEffectInfo, {
+    return this._scanSurprisesAgainst(activatorIdx, 'surpriseHeroEffectTrigger', heroEffectInfo, {
       message: () => `${activatorName}'s ${effectHeroName} activated its Hero Effect!`,
     });
   }
@@ -30680,7 +30694,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     };
     const attachPlayerName = this.gs.players[attachOwnerIdx]?.username || 'Opponent';
     const targetHeroName = this.gs.players[zoneOwnerIdx]?.heroes?.[attachHeroIdx]?.name || 'a Hero';
-    return this._scanSurpriseEntriesForPlayer(opponentIdx, 'surpriseAbilityTrigger', abilityInfo, {
+    return this._scanSurprisesAgainst(attachOwnerIdx, 'surpriseAbilityTrigger', abilityInfo, {
       message: () => `${attachPlayerName} attached ${attachCard?.name || 'an Ability'} to ${targetHeroName}!`,
       showCard: attachCard?.name,
     });
@@ -30719,7 +30733,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     };
     const activatorName = this.gs.players[activatorIdx]?.username || 'Opponent';
     const heroName = this.gs.players[heroOwner]?.heroes?.[heroIdx]?.name || 'a Hero';
-    return this._scanSurpriseEntriesForPlayer(opponentIdx, 'surpriseAbilityActivationTrigger', abilityInfo, {
+    return this._scanSurprisesAgainst(activatorIdx, 'surpriseAbilityActivationTrigger', abilityInfo, {
       message: () => `${activatorName}'s ${heroName} activated ${abilityName}!`,
       showCard: abilityName,
     });
@@ -30937,7 +30951,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     };
     const placerName = this.gs.players[placerIdx]?.username || 'Opponent';
     const wohin = zoneKind === 'area' ? 'an Area Zone' : 'a Support Zone';
-    return this._scanSurpriseEntriesForPlayer(opponentIdx, 'surprisePlacementTrigger', info, {
+    return this._scanSurprisesAgainst(placerIdx, 'surprisePlacementTrigger', info, {
       message: () => `${placerName} placed ${cardInstance.name} into ${wohin}!`,
       showCard: cardInstance.name,
     });
@@ -31101,7 +31115,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     const opponentIdx = this.opponentOf(activatorIdx);
     const activatorName = this.gs.players[activatorIdx]?.username || 'Opponent';
     const triggerInfo = { activatorIdx, amount };
-    return this._scanSurpriseEntriesForPlayer(opponentIdx, 'surpriseResourceGainTrigger', triggerInfo, {
+    return this._scanSurprisesAgainst(activatorIdx, 'surpriseResourceGainTrigger', triggerInfo, {
       message: () => `${activatorName} is about to gain ${amount} Gold!`,
       confirmLabel: '🪙 Activate Surprise!',
     });
@@ -31118,7 +31132,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     const opponentIdx = this.opponentOf(drawingPlayerIdx);
     const drawPlayerName = this.gs.players[drawingPlayerIdx]?.username || 'Opponent';
     const drawInfo = { drawingPlayer: drawingPlayerIdx, count: drawnCount, phase: this.gs.currentPhase };
-    return this._scanSurpriseEntriesForPlayer(opponentIdx, 'surpriseDrawTrigger', drawInfo, {
+    return this._scanSurprisesAgainst(drawingPlayerIdx, 'surpriseDrawTrigger', drawInfo, {
       message: () => `${drawPlayerName} drew ${drawnCount} card${drawnCount > 1 ? 's' : ''} outside the Resource Phase!`,
       confirmLabel: '🐪 Activate Surprise!',
     });
@@ -31154,7 +31168,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       drawingPlayer: drawingPlayerIdx,
       count, phase: this.gs.currentPhase,
     };
-    return this._scanSurpriseEntriesForPlayer(opponentIdx, 'surpriseBeforeOppDrawTrigger', drawInfo, {
+    return this._scanSurprisesAgainst(drawingPlayerIdx, 'surpriseBeforeOppDrawTrigger', drawInfo, {
       message: () => `${drawerName} is about to draw ${count} card${count > 1 ? 's' : ''}!`,
       confirmLabel: '🐛 Activate Surprise!',
     });
@@ -31182,7 +31196,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       searcher: searcherIdx,
       cardName, phase: this.gs.currentPhase,
     };
-    return this._scanSurpriseEntriesForPlayer(opponentIdx, 'surpriseBeforeOppDeckSearchTrigger', searchInfo, {
+    return this._scanSurprisesAgainst(searcherIdx, 'surpriseBeforeOppDeckSearchTrigger', searchInfo, {
       message: () => `${searcherName} is searching their deck for ${cardName}!`,
       confirmLabel: '🐛 Activate Surprise!',
     });

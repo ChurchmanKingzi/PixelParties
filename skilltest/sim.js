@@ -93,7 +93,7 @@ async function runGame(opts = {}) {
   }
   const bases = [];
   for (let i = 0; i < seats; i++) {
-    prep.players[i] = bot.prepareBase({ env, ps: prep.players[i], room, idx: i, pool, prep, noProfile: !!(opts.noProfileSeats && opts.noProfileSeats.includes(i)) });
+    prep.players[i] = bot.prepareBase({ env, ps: prep.players[i], room, idx: i, pool, prep, noProfile: !!(opts.noProfileSeats && opts.noProfileSeats.includes(i)), weights: opts.weights && opts.weights[i] });
     prep.players[i].ready = true;
     bases.push(JSON.parse(JSON.stringify(prep.players[i])));
   }

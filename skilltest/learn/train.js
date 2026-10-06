@@ -299,4 +299,21 @@ async function evaluate(opts = {}) {
   return { games: cnt, meanPlaceScore: cnt ? sum / cnt : 0, winRate: cnt ? wins / cnt : 0, persona: best && best.name, mode: opts.mode || 'full' };
 }
 
-module.exports = { WorkerPool, train, evaluate, learnFrom, baseFeatures, placeScore, seedPopulation, evolve, pickPersona, playOne, PLAY_VALUE_SCALE };
+/**
+ * Kompakte Fassung zum Einchecken/Ausliefern: seltene Beobachtungen fallen heraus, Mittelwerte werden gerundet.
+ * `minN`: Mindestzahl Beobachtungen je Eintrag.
+ */
+function exportCompact(profile, minN = 4) {
+  const keep = (table, n) => {
+    const out = {};
+    for (const [k, e] of Object.entries(table || {})) if (e.n >= n) out[k] = { n: e.n, sum: Math.round(e.sum * 1000) / 1000 };
+    return out;
+  };
+  return {
+    version: profile.version, games: profile.games, updated: profile.updated,
+    playValue: keep(profile.playValue, minN), cardValue: keep(profile.cardValue, minN), pairValue: keep(profile.pairValue, Math.max(minN, 6)),
+    personas: profile.personas, totals: profile.totals,
+  };
+}
+
+module.exports = { exportCompact, WorkerPool, train, evaluate, learnFrom, baseFeatures, placeScore, seedPopulation, evolve, pickPersona, playOne, PLAY_VALUE_SCALE };

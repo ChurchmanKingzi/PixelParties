@@ -1949,6 +1949,14 @@ Echte Zwei-Spieler-Logik (z. B. ein Layout mit genau zwei Slots) bekommt den Kom
 `scripts/n-player-allow.json`. Vorhandene Altlasten (Spielende, Lobby, Puzzle, feste
 `players[0]`/`players[1]`): `docs/n-player-todo.md`.
 
+**„Ist `x` ein gültiger Spielerindex?“** — nie `x === 0 || x === 1` schreiben, sondern
+`const { isSeat } = require('./_opp');` und `isSeat(gs, x)` bzw. `isSeat(engine, x)` / `isSeat(this, x)`
+(Normalspiel: exakt das alte Idiom, Skill Test: jeder Sitz am Tisch). Sonst fällt z. B. `heroOwner` für die Sitze 2–7 still auf
+den Wirker zurück und die Zielwahl trifft den falschen Helden. Das Skript `scripts/codemod-seat-check.js` stellt Altstellen um.
+
+**Surprise-Fenster gegen „den Gegner“:** `engine._scanSurprisesAgainst(actorIdx, flag, info, cfg)` — Normalspiel: nur der Gegner,
+Skill Test: alle anderen Sitze der Reihe nach.
+
 **Achtung bei „each opponent“-Karten:** `opponentOf` liefert EINEN Gegner. Trifft die Karte laut
 Kartentext **jeden** Gegner, gehört `engine.opponentsOf(pi)` hin — im Normalspiel ist das eine
 Liste mit einem Eintrag, im Skill Test alle anderen.

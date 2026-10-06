@@ -8,6 +8,7 @@
 //   node scripts/skilltest-train.js --games 300 --seats 3-6
 //   node scripts/skilltest-train.js --evaluate 60 --seats 4     # Vergleich: gelernt gegen Standard (--mode full|profile|persona)
 //   node scripts/skilltest-train.js --daemon --duty 0.25        # Dauerbetrieb (Hintergrundlernen), 25 % Rechenanteil
+//   node scripts/skilltest-train.js --export data/skilltest-profile.json --min-n 4   # kompaktes Profil zum Einchecken
 //   PP_ST_PROFILE=/pfad/profil.json …                           # anderes Profil
 const os = require('os');
 
@@ -23,6 +24,16 @@ if (seatsArg && seatsArg !== true) seats = String(seatsArg).includes('-') ? Stri
   if (arg('evaluate', null)) {
     const r = await evaluate({ games: Number(arg('evaluate', 50)), seats: typeof seats === 'number' ? seats : 4, mode: arg('mode', 'full'), workers: arg('workers', null) ? Number(arg('workers', 1)) : Math.max(1, Math.min(3, os.cpus().length - 1)) });
     console.log(`[skilltest-train] Vergleich [${r.mode}] (${r.games} Partien): Persona „${r.persona}“ gegen Standard-Bots ohne Profil — mittlere Platzierungsgüte ${r.meanPlaceScore.toFixed(3)} (0 = ausgeglichen), Siegquote ${(r.winRate * 100).toFixed(1)} %`);
+    process.exit(0);
+  }
+  if (arg('export', null)) {
+    // Kompaktes Profil schreiben (Standard: das gelernte Profil → data/skilltest-profile.json, ohne seltene Einträge).
+    const { exportCompact } = require('../skilltest/learn/train');
+    const profileMod = require('../skilltest/learn/profile');
+    const out = String(arg('export', 'data/skilltest-profile.json'));
+    const compact = exportCompact(profileMod.load(), Number(arg('min-n', 4)));
+    require('fs').writeFileSync(out, JSON.stringify(compact), { encoding: 'utf-8' });
+    console.log(`[skilltest-train] Profil exportiert: ${out} (${Math.round(JSON.stringify(compact).length / 1024)} KB, ${Object.keys(compact.cardValue).length} Karten, ${Object.keys(compact.pairValue).length} Paare, ${Object.keys(compact.playValue).length} Spielwerte)`);
     process.exit(0);
   }
   const daemon = !!arg('daemon', false);

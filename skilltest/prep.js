@@ -123,7 +123,14 @@ function botPrep(room, idx, env) {
   try {
     const { prepareBase } = require('./bot');
     if (typeof prepareBase === 'function') {
-      return prepareBase({ env, ps, room, idx, pool: prep.pool, rules: Rules, config: CONFIG });
+      // Der Spielstil (Persona) steht schon beim Aufbau fest und gilt dann auch im Kampf (battle.start).
+      let weights;
+      try {
+        const L = require('./learn/profile');
+        const per = L.samplePersona(L.get());
+        if (per) { weights = per.weights; (room.skillTest.botPersonas = room.skillTest.botPersonas || {})[idx] = per.weights; }
+      } catch { /* ohne Profil: Standard-Gewichte */ }
+      return prepareBase({ env, ps, room, idx, pool: prep.pool, rules: Rules, config: CONFIG, weights });
     }
   } catch (e) { if (e.code !== 'MODULE_NOT_FOUND') console.error('[skilltest] bot prepareBase', e); }
   return autoBuild(env, ps);

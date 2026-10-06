@@ -124,7 +124,9 @@ async function start(room, host, prep) {
     const L = require('./learn/profile');
     const prof = L.get();
     skillGs.botWeights = {};
+    const fromPrep = room.skillTest.botPersonas || {};
     for (const seat of skillGs.botSeats) {
+      if (fromPrep[seat]) { skillGs.botWeights[seat] = fromPrep[seat]; continue; }
       const per = L.samplePersona(prof);
       if (per) skillGs.botWeights[seat] = per.weights;
     }
