@@ -71,6 +71,16 @@ const { io } = require('socket.io-client');
       check('SC-Werte vorhanden', Array.isArray(over.sc) && over.sc.length === 4 && over.sc[over.winnerIdx] >= 5 * 3 + 5, over.sc);
       console.log('  Ende nach', over.rounds, 'Rounds, Sieger Sitz', over.winnerIdx, 'Plätze', JSON.stringify(over.placements), 'SC', JSON.stringify(over.sc), `(${passes}× gepasst)`);
     }
+    // Lookahead (Live-Standard): Die Suche simuliert nur im Verborgenen — Clients sehen nie einen Zustand aus einem Rollout.
+    const states = events.filter(e => e.ev === 'game_state' && e.a[0] && e.a[0].skillTest).map(e => e.a[0]);
+    let regress = 0, prevRound = 0, simSeen = 0;
+    for (const g of states) { if (g.skillTest.round < prevRound) regress++; prevRound = Math.max(prevRound, g.skillTest.round); if (g._stSimulating || (g.skillTest && g.skillTest.simulated)) simSeen++; }
+    check('Round-Zähler der empfangenen Zustände läuft nie rückwärts (keine Zustände aus Simulationen)', regress === 0, { regress, n: states.length });
+    check('Genau ein Spielende-Ereignis (simulierte Partien beenden nichts)', events.filter(e => e.ev === 'st_game_over').length === 1, events.filter(e => e.ev === 'st_game_over').length);
+    const log = srv.log();
+    const m = /Lookahead: (\d+) Suchen, (\d+) Rollouts/.exec(log);
+    check('CPU-Sitze haben im Live-Spiel mit Lookahead gesucht', !!m && +m[1] > 0 && +m[2] > 0, m && m[0]);
+    check('Keine Lookahead-Fehler im Server-Log', !/Lookahead:\s*(Error|TypeError)|\[skilltest\] Lookahead:/.test(log.replace(/Lookahead: \d+ Suchen/g, '')), (log.match(/\[skilltest\] Lookahead:[^\n]*/) || [])[0]);
     socket.close();
   } catch (e) { console.error(e); process.exitCode = 1; }
   if (process.env.ST_SHOW_LOG) console.log(srv.log().split('\n').filter(l => /skilltest|Error|Fehler/.test(l)).slice(-15).join('\n'));

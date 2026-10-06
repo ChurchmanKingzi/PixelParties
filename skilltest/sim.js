@@ -116,12 +116,16 @@ async function runGame(opts = {}) {
   await battle.start(room, host, prep);
   const gs = room.gameState, engine = room.engine, st = gs.skillTest;
   if (opts.record) st.record = true;
+  // Lookahead (skilltest/mcts.js): in der Simulation standardmäßig AUS (Training soll schnell sein); true | [Sitze] schaltet ihn an.
+  room.skillTest.mcts = opts.mcts === undefined ? false : opts.mcts;
+  if (opts.mctsCfg) room.skillTest.mctsCfg = opts.mctsCfg;
   if (opts.noProfileSeats) st.noProfile = [...opts.noProfileSeats];
   if (opts.weights) st.botWeights = Object.fromEntries(opts.weights.map((w, i) => [i, w]).filter(([, w]) => w));
   if (!opts.noFast) engine.enterFastMode();
 
   let guard = 0;
   const maxTurns = opts.maxTurns || 4000;
+  const wdMs = opts.watchdogMs || (opts.mcts ? 180000 : 8000);
   while (!gs.result && guard++ < maxTurns) {
     if (opts.humanSeat != null && gs.activePlayer === opts.humanSeat) {
       // Test-Mensch: passt seine Round (und beantwortet nie Prompts) — deckt hängende Fremd-Prompts auf.
@@ -130,8 +134,8 @@ async function runGame(opts = {}) {
     }
     const wd = setTimeout(() => {
       console.log('[sim] HÄNGT: aktiv', gs.activePlayer, 'busy', st.busy, 'pending', JSON.stringify(engine._pendingPrompt || engine._pendingGenericPrompt || null).slice(0, 400));
-    }, opts.watchdogMs || 8000);
-    await Promise.race([bot.takeTurn(room, gs.activePlayer, host), new Promise(r => setTimeout(r, (opts.watchdogMs || 8000) + 500))]);
+    }, wdMs);
+    await Promise.race([bot.takeTurn(room, gs.activePlayer, host), new Promise(r => setTimeout(r, wdMs + 500))]);
     clearTimeout(wd);
     if (st.busy) break;
   }

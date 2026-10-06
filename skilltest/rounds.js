@@ -381,7 +381,7 @@ async function act(room, pi, kind, params, fn, host) {
       'chain:', !!gs._chainResolvingLock, 'spellDepth:', gs._spellResolutionDepth || 0);
   }, 8000);
   try { ok = await fn(); }
-  catch (err) { console.error(`[skilltest] ${kind} threw:`, err && err.stack || err); }
+  catch (err) { if (!engine._inMctsSim) console.error(`[skilltest] ${kind} threw:`, err && err.stack || err); }
   clearTimeout(wd);
   if (engine._stFlushReactions) engine._stFlushReactions();      // Reaktionen dieser Aktion bewerten (Lernkanal)
   if (st.actToken !== token) { ecoLeave(st, ps, pi, eco); return ok; }     // vom Wächter aufgegeben (siehe battle.js startPromptWatchdog)

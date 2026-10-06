@@ -50,6 +50,23 @@ const CONFIG = {
   // gleichzeitig im Spiel („You win the game“-Fenster bleibt so klein). Leere Liste = keine Rotation.
   CARDINAL_BEASTS: ['Cardinal Beast Baihu', 'Cardinal Beast Qinglong', 'Cardinal Beast Xuanwu', 'Cardinal Beast Zhuque'],
 
+  // ── Lookahead (Monte-Carlo-Suche der Bots, skilltest/mcts.js) ───
+  // Vor einer verbrauchenden Aktion spielt der Bot die besten Kandidaten ein paar Mal probeweise durch (Schnappschuss der Engine →
+  // Aktion → die übrigen Sitze bis zum nächsten eigenen Zug mit der Standard-Policy → Stellung bewerten → zurück) und wählt den
+  // besten. Live-Spiele nutzen es standardmäßig; Training und Simulation nur mit `runGame({ mcts })` (sonst viel zu langsam).
+  MCTS: {
+    ENABLED: true,         // Bots im Live-Spiel suchen (PP_ST_MCTS=0 schaltet ab)
+    ROLLOUTS: 2,           // Rollouts je Kandidat (Grundwert; Persona-Gewicht `lookahead` skaliert ihn)
+    TOP_K: 5,              // höchstens so viele Kandidaten (nach Heuristik) werden gegeneinander simuliert
+    MAX_MS: 1200,          // Zeitbudget je Entscheidung (live; 0 = unbegrenzt, z. B. in Tests)
+    ROUNDS: 1,             // so oft kommt der Sitz in der Simulation wieder an die Reihe, bevor bewertet wird
+    MAX_SIM_TURNS: 60,     // Sicherheitsgrenze: simulierte Züge je Rollout
+    WIN_BONUS: 2500, LOSS_PENALTY: 2500, ELIM_BONUS: 450,   // Endwerte in Einheiten der Stellungsbewertung (policy.sideValue)
+    LEADER_BLEND: 0.35,    // Anteil des stärksten Gegners an der Bewertung der Gegner (Rest: Mittel) — wer führt, ist die Gefahr
+    FAIL_PENALTY: 60,      // eine Aktion, die gar nicht zählt (Zug nicht verbraucht), wird abgewertet
+    PRIOR_WEIGHT: 0.35,    // Gewicht der Heuristik-Rangfolge neben dem Simulationsergebnis
+  },
+
   // ── Belohnungen (SC) ───────────────────────────────────────────
   SC_PER_ROUND: 1,
   SC_PER_OUTLASTED_PLAYER: 5,

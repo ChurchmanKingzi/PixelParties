@@ -133,7 +133,12 @@ async function start(room, host, prep) {
   } catch (e) { console.error('[skilltest] Profil:', e && e.message); }
 
   // 2) Engine
-  const engine = new host.GameEngine(room, host.io, host.sendGameState, (r, winnerIdx, reason) => finishGame(r, winnerIdx, reason, host), host.sendSpectatorGameState);
+  // Im Lookahead (skilltest/mcts.js) endet eine simulierte Partie nur im Spielzustand: kein SC, keine Sendungen, kein Raumabbau.
+  const onOver = (r, winnerIdx, reason) => {
+    if (r.engine && r.engine._inMctsSim) { r.gameState.result = { winnerIdx, reason, simulated: true }; return undefined; }
+    return finishGame(r, winnerIdx, reason, host);
+  };
+  const engine = new host.GameEngine(room, host.io, host.sendGameState, onOver, host.sendSpectatorGameState);
   room.engine = engine;
   ext.installBotSeats(engine, (pi) => skillGs.botSeats.includes(pi));
   ext.installBotBrain(engine);
@@ -144,7 +149,10 @@ async function start(room, host, prep) {
   ext.installTurnEnd(engine, host);
   ext.installSnapshotGuard(engine);
   ext.installRunawayBreaker(engine);
-  engine._stOnTurn = (seat) => { if (skillGs.botSeats.includes(seat)) host.scheduleBotTurn(room, seat); armTurnTimer(room, host); };
+  engine._stOnTurn = (seat) => {
+    if (engine._inMctsSim) return;                // Lookahead: keine Bot-Planung, keine Timer
+    if (skillGs.botSeats.includes(seat)) host.scheduleBotTurn(room, seat); armTurnTimer(room, host);
+  };
   engine.init();
   ext.relaxRules(engine);
   applyPresetFixups(engine, cards);
@@ -285,7 +293,8 @@ async function finishGame(room, winnerIdx, reason, host) {
   if (st._timer) clearTimeout(st._timer);
   if (st._watch) clearInterval(st._watch);
   if (room.engine) { room.engine._aborted = false; }
-  console.log(`[skilltest] Raum ${room.id}: Ende nach ${st.round} Rounds, Sieger ${gs.players[winnerIdx].username} (${reason})`);
+  const ms = room.skillTest && room.skillTest.mctsStats;
+  console.log(`[skilltest] Raum ${room.id}: Ende nach ${st.round} Rounds, Sieger ${gs.players[winnerIdx].username} (${reason})${ms ? ` — Lookahead: ${ms.searches} Suchen, ${ms.rollouts} Rollouts, ${ms.ms} ms, ${ms.changed} Entscheidungen geändert` : ''}`);
   // SC an Menschen (Spieler-Vorgabe 6.10.): 1/Round + 5 je überlebtem Gegner + 5 für den Sieg.
   for (let seat = 0; seat < room.players.length; seat++) {
     const p = room.players[seat];

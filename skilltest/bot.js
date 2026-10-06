@@ -95,7 +95,7 @@ function flushReactions(room) {
  */
 function shapeReaction(engine, seat, promptData, r, ask) {
   const p = policy();
-  if (!promptData || !p.reactionVerdict || engine._inMctsSim) return r;
+  if (!promptData || !p.reactionVerdict) return r;
   const fireOrNot = (card) => {
     if (!p.reactionHeuristic(engine, seat, promptData, card)) return false;
     const fire = p.reactionVerdict(engine, seat, card);
@@ -127,7 +127,7 @@ function shapeReaction(engine, seat, promptData, r, ask) {
 /** Beobachtung für das Lernen festhalten (nur wenn der Raum aufzeichnet: Simulation/Training). */
 function record(room, seat, key, dv) {
   const st = room.gameState.skillTest;
-  if (!st.record || !key || !Number.isFinite(dv)) return;
+  if (!st.record || !key || !Number.isFinite(dv) || (room.engine && room.engine._inMctsSim)) return;
   (st.learnLog || (st.learnLog = [])).push({ seat, round: st.round, key, dv: Math.round(dv * 100) / 100 });
 }
 
@@ -136,7 +136,7 @@ async function takeTurn(room, seat, host, opts = {}) {
   const engine = room.engine, gs = room.gameState, st = gs && gs.skillTest;
   if (!st || gs.result || gs.activePlayer !== seat || st.busy) return false;
   const p = policy();
-  const measure = !!st.record && !!p.stateValue;
+  const measure = !!st.record && !!p.stateValue && !engine._inMctsSim;
 
   // A) Freie Spielzüge der Main Phase (Artifacts ausrüsten, Surprises legen): verbrauchen den Zug nicht.
   if (p.freeActions) {
@@ -155,8 +155,13 @@ async function takeTurn(room, seat, host, opts = {}) {
     }
   }
 
-  // B) Verbrauchende Aktionen (Zug gibt weiter), beste zuerst.
-  const candidates = p.rankActions(room, seat, host, opts) || [];
+  // B) Verbrauchende Aktionen (Zug gibt weiter), beste zuerst — bei aktivem Lookahead nach probeweisem Durchspielen neu geordnet.
+  let candidates = p.rankActions(room, seat, host, opts) || [];
+  if (candidates.length > 1 && require('./mcts').enabled(room, seat, opts)) {
+    try { candidates = await require('./mcts').rank(room, seat, host, candidates); }
+    catch (e) { console.error('[skilltest] Lookahead:', e && e.stack || e); }
+    if (gs.result || gs.activePlayer !== seat || st.busy) return true;            // der Zustand hat sich währenddessen geändert
+  }
   const round = st.round, turnsBefore = st.turnsTaken[seat] || 0;
   for (const action of candidates) {
     if (gs.result || gs.activePlayer !== seat) return true;

@@ -33,6 +33,7 @@ const DEFAULT_WEIGHTS = {
   abilityPlay: 1.0,         // Neigung, Abilities von der Hand an Helden zu legen (frei, einmal je Held und Round)
   abilityUse: 0.8,          // Neigung, aktive Ability-Effekte zu nutzen (kostet die Aktion des Helden)
   reactEager: 1.0,          // Neigung, Reaktionen (Hand, Surprise, Held) auszulösen, wenn die Karten-Heuristik sie erlaubt
+  lookahead: 1.0,           // Vielfaches der Rollouts des Lookaheads (skilltest/mcts.js); 0 = der Sitz sucht nie. Wird nicht evolviert.
   healBias: 1.0,            // wie stark Heilung/Buffs bei Verletzten bevorzugt werden
   friendlyFire: 1.0,        // 0 = nie eigene Ziele bei feindlichen Karten (1 = Standard-Vermeidung)
   learned: 1.0,             // Gewicht des gelernten Kartenwerts

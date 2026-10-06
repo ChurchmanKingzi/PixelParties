@@ -86,6 +86,7 @@ function isSeat(gsOrEngine, x) {
  * Skill Test: alle anderen Sitze (jeder soll die Karte sehen).
  */
 function emitToOpponentsGs(gs, io, pi, event, payload) {
+  if (gs && gs._stSimulating) return;                // Skill Test: Lookahead-Simulation sendet nichts an Clients
   for (const oi of (gs && gs.skillTest) ? opponentsOfGs(gs, pi) : [opponentOfGs(gs, pi)]) {
     const sid = gs.players[oi]?.socketId;
     if (sid) io.to(sid).emit(event, payload);

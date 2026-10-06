@@ -9873,7 +9873,7 @@ async function doPlayCreature(room, pi, { cardName, handIndex, heroIdx, zoneSlot
       });
       for (let i = 0; i < gs.players.length; i++) {
         const sid = gs.players[i]?.socketId;
-        if (sid) io.to(sid).emit('summon_effect', { owner: heroOwner, heroIdx, zoneSlot: actualZoneSlot, cardName });
+        if (sid && !room.engine?._inMctsSim) io.to(sid).emit('summon_effect', { owner: heroOwner, heroIdx, zoneSlot: actualZoneSlot, cardName });
       }
       sendToSpectators(room, 'summon_effect', { owner: heroOwner, heroIdx, zoneSlot: actualZoneSlot, cardName });
     }
@@ -10224,7 +10224,7 @@ async function doActivateAbility(room, pi, { heroIdx, zoneIdx, zoneKind, charmed
     const origHeroIdx = inst.heroIdx;
     for (let i = 0; i < gs.players.length; i++) {
       const sid = gs.players[i]?.socketId;
-      if (sid) io.to(sid).emit('ability_activated', { owner: heroOwner, heroIdx, zoneIdx, abilityName });
+      if (sid && !room.engine?._inMctsSim) io.to(sid).emit('ability_activated', { owner: heroOwner, heroIdx, zoneIdx, abilityName });
     }
     sendToSpectators(room, 'ability_activated', { owner: heroOwner, heroIdx, zoneIdx, abilityName });
 
@@ -11023,7 +11023,7 @@ async function doConfirmPotion(room, pi, { selectedIds }) {
   const broadcastPotionAnim = (animationType !== 'none') ? () => {
     for (let i = 0; i < gs.players.length; i++) {
       const sid = gs.players[i]?.socketId;
-      if (sid) io.to(sid).emit('potion_resolved', { destroyedIds: selectedIds, animationType });
+      if (sid && !room.engine?._inMctsSim) io.to(sid).emit('potion_resolved', { destroyedIds: selectedIds, animationType });
     }
     sendToSpectators(room, 'potion_resolved', { destroyedIds: selectedIds, animationType });
   } : null;
