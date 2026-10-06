@@ -31,7 +31,7 @@ B24 = [BOUNCE12[(k // 2) % 12] for k in range(24)]  # gemächlich: ein Federn je
 BLINK = {14: 'halb', 15: 'zu', 16: 'zu', 17: 'halb', 38: 'halb', 39: 'zu', 40: 'zu', 41: 'halb'}
 
 V_ = {
-    'peszet': dict(slug='peszet-the-plague-bringer', knee=21, pads=(14, 13, 3, 1)),
+    'peszet': dict(slug='pes-zet-the-plague-bringer', knee=21, pads=(14, 13, 3, 1)),
     'notandras': dict(slug='definitely-not-andras-the-human-weapon', knee=19, pads=(16, 18, 13, 15)),
     'megaandras': dict(slug='mega-weapon-andras', knee=19, pads=(8, 7, 3, 1), skin='Andras, the Human Weapon'),
     'champmizune': dict(slug='regional-champ-mizune', knee=17, pads=(6, 7, 3, 2), skin='Silent Water Mizune'),

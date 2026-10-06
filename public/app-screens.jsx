@@ -2393,7 +2393,7 @@ function PpIdleSprite({ name, box = 96, grey }) {
   const fenster = Math.round(box / scale);                       // Boxgröße in Sprite-Pixeln
   const bw = kern.x1 - kern.x0, bh = kern.y1 - kern.y0;
   const gesichtX = typeof m.faceX === 'number' ? m.faceX : kern.fx;
-  const gesichtY = kern.fy;
+  const gesichtY = typeof m.faceY === 'number' ? m.faceY : kern.fy;   // `faceY` (Gesichtsmitte) steht optional im Sheet-JSON, wie `faceX`
   const klemme = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
   // Ganzzahlige Fensterkanten, damit die Pixel scharf bleiben.
   const wx0 = Math.round(bw <= fenster ? kern.x0 - (fenster - bw) / 2 : klemme(gesichtX - fenster / 2, kern.x0, kern.x1 - fenster));
