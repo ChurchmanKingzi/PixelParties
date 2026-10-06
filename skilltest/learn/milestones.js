@@ -98,7 +98,11 @@ function buildSnapshot(profile, { final = false } = {}) {
   rows.sort((a, b) => b.v - a.v || b.vn - a.vn);
   rows.forEach((r, i) => { r.rank = i + 1; });
   const bench = (() => { try { const b = ranking.readBench({ max: 40 }).filter(x => !x.kind).pop(); return b ? { games: b.trainedGames, n: b.total.games, winRate: b.total.winRate, expected: b.total.expectedWinRate, z: b.total.z } : null; } catch { return null; } })();
-  return { games: profile.games || 0, t: Date.now(), final, bench, types: rk.types, rows };
+  // Typ-Mittel nur über die Karten der Liste (gesperrte/bildlose und zu selten ausgeteilte Karten zählen nicht mit).
+  const sums = {};
+  for (const r of rows) { const a = (sums[r.t] = sums[r.t] || { sum: 0, cards: 0 }); a.sum += r.v; a.cards++; }
+  const types = Object.fromEntries(Object.entries(sums).map(([t, a]) => [t, { mean: a.sum / a.cards, cards: a.cards }]));
+  return { games: profile.games || 0, t: Date.now(), final, bench, types, rows };
 }
 
 function readAll() {
