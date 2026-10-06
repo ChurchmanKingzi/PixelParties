@@ -571,7 +571,23 @@ function PuzzleCreator() {
    * genau einer Haelfte, und ein Wechsel zwischen beiden ist
    * ausgeschlossen (Als Regel 28.8.).
    */
-  const [dropGap, setDropGap] = useState(null);
+  const [dropGap, setDropGapRaw] = useState(null);
+  // ★ Ruckel-Fix (Als Verdacht 6.10.): `dragover` feuert im Takt der
+  // Maus, und jeder Aufruf legte ein NEUES `{ zone, idx }` an — React
+  // sieht darin nie „unveraendert" und rendert den ganzen Editor
+  // (Galerie, beide Haende, alle Zonen) bei JEDEM Ereignis neu, auch
+  // wenn die Luecke gar nicht gesprungen ist. Der Setter vergleicht
+  // deshalb am Inhalt und rennt nur bei einer echten Aenderung los.
+  // Der Ref haelt zugleich den aktuellen Wert fuer den Neigungs-Horcher
+  // (siehe unten) — der laeuft synchron NACH React und darf nicht auf
+  // den naechsten Render warten.
+  const dropGapRef = useRef(null);
+  const setDropGap = useCallback((neu) => {
+    const alt = dropGapRef.current;
+    if (alt === neu || (alt && neu && alt.zone === neu.zone && alt.idx === neu.idx)) return;
+    dropGapRef.current = neu;
+    setDropGapRaw(neu);
+  }, []);
   /**
    * ★ 28.8., Als Fehlerbericht: „jetzt kann ich Karten gar nicht mehr
    * draggen".
@@ -1004,7 +1020,18 @@ function PuzzleCreator() {
     const auf = (e) => {
       const x = e.clientX != null ? e.clientX
         : (e.touches && e.touches[0] ? e.touches[0].clientX : null);
-      if (x != null) window.applyHandTilt?.(document.querySelectorAll(reihe), x);
+      if (x == null) return;
+      // ★ Wie im Duell (app-board, v1217): beim Umsortieren treibt die
+      // LUECKE die Neigung, nicht die Mausmessung. Die Luecke verschiebt
+      // die Plaetze um eine Kartenbreite; wer deren Mitte misst, bekommt
+      // eine Rueckkopplung, und die Karten neben dem Zeiger zittern.
+      // Der Index steht im Anzeigeraum (gezogene Karte steckt noch in
+      // der Reihe) — dieselbe Umrechnung wie `gapPos` beim Rendern.
+      const luecke = dropGapRef.current;
+      const gapIndex = (luecke && luecke.zone === dragHandSource && dragHandIdx != null)
+        ? (luecke.idx >= dragHandIdx ? luecke.idx + 1 : luecke.idx)
+        : undefined;
+      window.applyHandTilt?.(document.querySelectorAll(reihe), x, { gapIndex });
     };
     document.addEventListener('dragover', auf);
     document.addEventListener('touchmove', auf, { passive: true });
@@ -1015,7 +1042,7 @@ function PuzzleCreator() {
       ziehRiegelLoesen();
       window.clearHandTilt?.(alle());
     };
-  }, [dragCardName, dragHandSource, ziehRiegelLoesen]);
+  }, [dragCardName, dragHandSource, dragHandIdx, ziehRiegelLoesen]);
 
   // ── Auto-save state to localStorage on every change ──
   useEffect(() => {
@@ -2027,7 +2054,11 @@ function PuzzleCreator() {
     }
     const ghost = document.createElement('div');
     ghost.id = 'pz-drag-ghost';
-    ghost.style.cssText = `position:fixed;left:${Math.round(e.clientX - hx)}px;top:${Math.round(e.clientY - hy)}px;width:${gb}px;height:${gh}px;border:2px solid var(--accent,#0ff);border-radius:4px;background:var(--bg3,#222);overflow:hidden;pointer-events:none;z-index:100000;box-sizing:border-box;box-shadow:0 4px 14px rgba(0,0,0,.55);`;
+    // ★ Ruckel-Fix (Als Verdacht 6.10.): die Karte wandert per
+    // `transform` (nur Compositor, kein Layout) statt per `left`/`top`.
+    // `will-change` legt sie auf eine eigene Ebene, damit der Schatten
+    // nicht bei jeder Bewegung neu gemalt wird.
+    ghost.style.cssText = `position:fixed;left:0;top:0;transform:translate(${Math.round(e.clientX - hx)}px,${Math.round(e.clientY - hy)}px);will-change:transform;width:${gb}px;height:${gh}px;border:2px solid var(--accent,#0ff);border-radius:4px;background:var(--bg3,#222);overflow:hidden;pointer-events:none;z-index:100000;box-sizing:border-box;box-shadow:0 4px 14px rgba(0,0,0,.55);`;
     const url = cardImageUrl(cardName);
     // ★ Ziehbild OHNE Nachladen: das Browser-Ziehbild wird im Moment von
     // `setDragImage` aufgenommen. Ein frisch erzeugtes <img> ist dann noch
@@ -2076,12 +2107,21 @@ function PuzzleCreator() {
     document.body.appendChild(leer);
     e.dataTransfer.setDragImage(leer, 0, 0);
     setTimeout(() => { try { document.body.removeChild(leer); } catch {} }, 0);
+    // `dragover` UND `drag` melden dieselbe Bewegung; geschrieben wird
+    // hoechstens einmal je Bild, im `requestAnimationFrame` — also NACH
+    // den Messungen der Ablage-Horcher im selben Ereignis. Ein Schreiben
+    // mitten im Ereignis liesse deren `getBoundingClientRect` jedes Mal
+    // ein frisches Layout erzwingen.
+    let px = 0, py = 0, rahmen = 0;
+    const setze = () => { rahmen = 0; ghost.style.transform = `translate(${px}px,${py}px)`; };
     const folge = (ev) => {
       if (!ev.clientX && !ev.clientY) return;          // Firefox: `drag` meldet 0/0
-      ghost.style.left = Math.round(ev.clientX - hx) + 'px';
-      ghost.style.top = Math.round(ev.clientY - hy) + 'px';
+      px = Math.round(ev.clientX - hx);
+      py = Math.round(ev.clientY - hy);
+      if (!rahmen) rahmen = requestAnimationFrame(setze);
     };
     const ende = () => {
+      if (rahmen) { cancelAnimationFrame(rahmen); rahmen = 0; }
       document.removeEventListener('dragover', folge, true);
       document.removeEventListener('drag', folge, true);
       document.removeEventListener('dragend', ende, true);
