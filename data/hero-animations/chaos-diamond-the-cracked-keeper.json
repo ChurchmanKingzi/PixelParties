@@ -7,5 +7,6 @@
   "frameMs": 80,
   "loop": true,
   "layout": "horizontal",
-  "faceX": 24
+  "faceX": 24,
+  "faceY": 13
 }

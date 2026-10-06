@@ -177,11 +177,11 @@ def main(path):
     one('nomu-of-the-dawn', g('Obito'))
     one('alien-invader-bartas', g('Bartas skin'))
     one('tharx-the-king-of-conquerors', g('Ebene #286'))
-    save_parts('sasza-the-snaka-adventurer', [('bow', g("Sas'Za #1")), ('body', near(g("Sas'Za"), 336, 143))])
+    save_parts('sas-za-the-snaka-adventurer', [('bow', g("Sas'Za #1")), ('body', near(g("Sas'Za"), 336, 143))])
     arms = g('Pesssst #4')                                # die zwei Schlangenarme, links und rechts
     xs = np.nonzero(arms[:, :, 3].any(0))[0]
     mid = (xs.min() + xs.max()) // 2
-    save_parts('peszet-the-plague-bringer', [('body', g('Pesssst')), ('arml', box(arms, 0, 0, mid, 10000)),
+    save_parts('pes-zet-the-plague-bringer', [('body', g('Pesssst')), ('arml', box(arms, 0, 0, mid, 10000)),
                                              ('armr', box(arms, mid, 0, 10000, 10000))])
     one('definitely-not-andras-the-human-weapon', g('Ascended Andras'))
     one('mega-weapon-andras', g('Mega-Andras'))

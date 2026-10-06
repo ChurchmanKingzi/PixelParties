@@ -36,7 +36,7 @@ V_ = {
     'sparrow': dict(slug='sparrow-the-bumbling-buffoon', pads=(3, 3, 4, 4)),
     'pinta': dict(slug='pinta-the-singing-ship', pads=(8, 8, 10, 1)),
     'quisto': dict(slug='don-quisto-the-gold-seeker', knee=19, pads=(2, 14, 10, 1)),
-    'sasza': dict(slug='sasza-the-snaka-adventurer', knee=17, pads=(3, 3, 3, 3)),
+    'sasza': dict(slug='sas-za-the-snaka-adventurer', knee=17, pads=(3, 3, 3, 3)),
     'bulwark': dict(slug='diamond-the-bulwark-of-peace', knee=38, pads=(4, 4, 6, 2)),
     'cecilia': dict(slug='rescued-damsel-cecilia', pads=(5, 12, 3, 7)),
     'corruptor': dict(slug='bloom-the-continent-corruptor', pads=(12, 12, 12, 8)),
