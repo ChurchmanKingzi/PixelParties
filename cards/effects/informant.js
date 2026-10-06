@@ -47,7 +47,7 @@
 const CARD_NAME = 'Informant';
 const PEEK = 5;
 
-function gegner(pi) { return pi === 0 ? 1 : 0; }
+function gegner(engine, pi) { return engine.opponentOf(pi); }
 
 module.exports = {
   activeIn: ['support'],
@@ -60,7 +60,7 @@ module.exports = {
     const engine = ctx._engine;
     const gs = engine.gs;
     const pi = ctx.cardOwner;
-    const oi = gegner(pi);
+    const oi = gegner(engine, pi);
     if (gs.firstTurnProtectedPlayer === oi) return false;
     return (gs.players[oi]?.mainDeck || []).length > 0;
   },
@@ -69,7 +69,7 @@ module.exports = {
     const engine = ctx._engine;
     const gs = engine.gs;
     const pi = ctx.cardOwner;
-    const oi = gegner(pi);
+    const oi = gegner(engine, pi);
     const ps = gs.players[pi];
     const ops = gs.players[oi];
     if (!ps || !ops) return false;

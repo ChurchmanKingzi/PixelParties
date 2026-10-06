@@ -428,7 +428,7 @@ async function _runModeC(engine, pi, oppPi) {
   }
 
   // v1324: Boris darf den erzwungenen Abwurf ignorieren.
-  if (await engine.borisVerzicht(oppPi, 1, { source: 'Kit, the Shark Researcher', sourceOwner: 1 - oppPi })) return;
+  if (await engine.borisVerzicht(oppPi, 1, { source: 'Kit, the Shark Researcher', sourceOwner: pi })) return;
   const randomIdx = Math.floor(Math.random() * ops.hand.length);
   const discardedName = ops.hand[randomIdx];
   await engine.actionDiscardHandCard(oppPi, discardedName, randomIdx, {

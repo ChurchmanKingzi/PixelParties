@@ -124,7 +124,7 @@ async function schattenschlag(ctx, opferName) {
   const abgeworfen = [];
   // v1324: Boris darf den erzwungenen Abwurf ignorieren.
   const _boris = (oppPs.hand || []).length > 0
-    && await engine.borisVerzicht(oppIdx, Math.min(DISCARD_COUNT, oppPs.hand.length), { source: CARD_NAME, sourceOwner: 1 - oppIdx });
+    && await engine.borisVerzicht(oppIdx, Math.min(DISCARD_COUNT, oppPs.hand.length), { source: CARD_NAME, sourceOwner: pi });
   for (let i = 0; i < (_boris ? 0 : DISCARD_COUNT); i++) {
     const hand = oppPs.hand || [];
     if (hand.length === 0) break;
