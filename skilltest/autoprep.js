@@ -71,6 +71,7 @@ function autoBuild(env, psIn, rng = Math.random, opts = {}) {
   // 2) Creatures / Equipment / Attachments in Support Zonen (Creatures zuerst).
   const supportPref = (n) => {
     const c = cards[n]; if (!c) return 9;
+    if (isReactionCard(c)) return 9;                                  // Reaktionskarten bleiben auf der Hand
     if (c.cardType === 'Creature' && c.subtype !== 'Surprise') return 0;
     if (c.subtype === 'Equipment') return 1;
     if (c.cardType === 'Artifact' && (c.subtype || '').includes('Creature')) return 0;
@@ -114,10 +115,19 @@ function autoBuild(env, psIn, rng = Math.random, opts = {}) {
   return ps;
 }
 
-/** Kann der Bot diese Handkarte im Kampf einsetzen? (Zauber/Angriffe, Artifacts, Creatures, Surprises) */
+/** Reaktionskarten (Hand-Reaktionen) — der Bot hält sie auf der Hand und löst sie aus, wenn ein Fenster aufgeht. */
+const isReactionCard = (c) => !!c && (c.subtype || '').toLowerCase() === 'reaction';
+
+/**
+ * Kann der Bot diese Handkarte im Kampf einsetzen? Zauber/Angriffe, Artifacts, Creatures, Surprises, Tränke,
+ * Hand-Abilities (an Helden legen, Stufe erhöhen) und Reaktionskarten.
+ */
 function usableInBattle(c) {
   if (!c) return false;
   const sub = (c.subtype || '').toLowerCase();
+  if (isReactionCard(c)) return ['Spell', 'Attack', 'Artifact', 'Creature', 'Potion'].includes(c.cardType);
+  if (c.cardType === 'Potion') return true;
+  if (c.cardType === 'Ability') return true;
   if (c.cardType === 'Spell' || c.cardType === 'Attack') return sub === 'normal' || sub === '' || sub === 'surprise';
   if (c.cardType === 'Artifact') return sub === 'equipment' || sub === 'normal';
   if (c.cardType === 'Creature') return sub === 'normal' || sub === 'surprise';
@@ -146,7 +156,7 @@ function buildWithRecycling(env, psIn, opts = {}) {
       const c = env.cards[n];
       if (Rules.HAND_ONLY_HEROES.includes(n)) return;           // Quetzahuitl bleibt auf der Hand (greift beim Fall des letzten Heroes ein)
       if (!usableInBattle(c)) { junk.push({ n, idx }); return; }
-      const typeBase = (c.cardType === 'Spell' || c.cardType === 'Attack') ? 3 : c.cardType === 'Artifact' ? 2 : 1;
+      const typeBase = isReactionCard(c) ? 2 : (c.cardType === 'Spell' || c.cardType === 'Attack') ? 3 : (c.cardType === 'Artifact' || c.cardType === 'Potion' || c.cardType === 'Ability') ? 2 : 1;
       keep.push({ n, idx, score: typeBase + keepScore(n) });
     });
     keep.sort((a, b) => b.score - a.score);

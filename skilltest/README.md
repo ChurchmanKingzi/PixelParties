@@ -95,6 +95,19 @@ Phasenende-Effekte → Zusatzaktions-Gewährungen verfallen). `advanceToPhase` i
 | The Golden Abomination | Zu Spielbeginn (Hook `onSkillTestStart`, vor dem Start-Gold-Tick) **wählt** der Besitzer einen lebenden Gegner (Spielerwahl; Bots: meistes Gold); nur dessen Gold in der Resource Phase wird umgelenkt. |
 | Cardinal Beast Baihu / Qinglong / Xuanwu / Zhuque | Alle legal, aber je Partie **fehlt ein zufälliges** davon im Pool (`CONFIG.CARDINAL_BEASTS`, `CardPool.banned`; die Vorbereitung zeigt es als `bannedCards`). So sind nie alle vier gleichzeitig im Spiel. |
 
+## Reaktionen der Bots
+
+Die Standard-CPU der Engine (`_cpu.js`) ist für zwei Spieler gebaut und im Modus nicht installiert; die Engine-Vorgabe lehnt jede
+freiwillige Frage ab. `bot.shapeReaction` (eingehängt von `engine-ext.installReactions`) beantwortet deshalb Reaktions-, Surprise-
+und „you may"-Fragen selbst. Kanäle in `policy.js`:
+
+1. **Karten-Heuristik** (Veto): `cpuResponse`/`cpuMeta.reactionHeuristic` der Karte, keine Negation eigener Karten, keine Kosten-Confirms
+   (`cpuMeta.confirmCostsResource`). Ob eine Reaktion überhaupt möglich ist, prüft die Engine (Bedingung, Kosten, Wirker, Sperren).
+2. **Persona** `reactEager` (0 … 2, per Liga entwickelt), dazu `potion`, `abilityPlay`, `abilityUse`.
+3. **Gelernt**: je Entscheidung wird die Stellungsänderung des Sitzes bis zum Ende der laufenden Aktion festgehalten
+   (`react-fire:<Karte>` / `react-hold:<Karte>` im Lernprotokoll → `playValue`); haben beide Arme genug Beobachtungen, entscheidet der Vergleich.
+4. **Neugier**: ohne Daten wird gelegentlich bewusst gehalten, damit der Vergleich überhaupt entsteht.
+
 ## Lern-Monitoring
 
 - **Benchmark** (`learn/train.js` `benchmark`, alle `benchEvery` Partien): Einzelspiele trainierte gegen untrainierte CPUs am selben Tisch,
@@ -115,9 +128,14 @@ Bot-Sitze, Timer. Client → Server: `st_attack`, `st_pass_round`, (Held-/Creatu
   Drag & Drop (Artifacts auf gegnerische Helden, Kreuz-Seiten-Karten) funktioniert nur auf den Gegner im Hauptfeld.
 - **Gesperrte Karten** (`docs/skilltest-illegal-cards.md`): Sofortsiege, Doom-Clock-Familie, Karten mit „beide Ablagen" und
   alle Future-Tech-Karten (sie brauchen eine gefüllte Ablage). Freigegeben mit Sonderregel: siehe „Karten mit Sonderregeln".
-- **Bots** nutzen noch keine Tränke und keine Hand-Abilities; Reaktionskarten spielen sie nicht aktiv.
-- **Reaktionsfenster** hängen meist am Besitzer des Ziels (N-Spieler-tauglich); einzelne Karten fragen noch „den Gegner" (Fokus bzw.
-  nächster lebender Sitz) statt alle Sitze der Reihe nach.
+- **Bots** trinken Tränke, legen Hand-Abilities an Helden (je Held einmal pro Round), aktivieren Ability-Effekte und lösen
+  Reaktionen/Surprises sowie freiwillige „you may"-Karteneffekte aus (siehe „Reaktionen der Bots"). Offen: Welche Karten der
+  Aufbau behält oder recycelt, folgt noch einer festen Regel (`autoprep.usableInBattle`) plus gelerntem Kartenwert.
+- **Reaktionsfenster**: Die Kette (`_runReactionWindow`) fragt im Modus alle noch nicht ausgeschiedenen Sitze der Reihe nach
+  (`_reactionCheckOrder`, zuletzt der aktive Sitz); Surprise-Fenster ebenso. Einzelne Hand-Fenster hängen am Besitzer des Ziels;
+  einzelne Karten fragen noch „den Gegner" (Fokus bzw. nächster lebender Sitz).
+- **Reaktionen und Zug des Helden**: Eine Reaktion ist unabhängig davon möglich, ob der Held in dieser Round noch einen Zug hat
+  (die Engine prüft nur Status, Level, Kosten und Kartenbedingungen) — sonst gelten die normalen Regeln und Einschränkungen.
 - **Rollouts/MCTS** der Normalspiel-CPU sind im Modus abgeschaltet (`mctsPickFromOptions` gibt die erste Option zurück).
 
 ## Regressionsschutz & Tests

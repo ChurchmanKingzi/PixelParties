@@ -152,6 +152,20 @@ function installPlayerChoice(engine) {
 }
 
 /**
+ * Reaktionen der Bots (Hand, Surprise, Held): Die Standard-CPU entscheidet nach Karten-Heuristik; hier kommen Persona,
+ * gelernter Wert und Neugier dazu (bot.shapeReaction). Am Ende jeder Aktion werden die vorgemerkten Entscheidungen bewertet.
+ */
+function installReactions(engine) {
+  const prev = engine._getCpuGenericResponse.bind(engine);
+  engine._getCpuGenericResponse = (promptData, seat) => {
+    const r = prev(promptData, seat);
+    try { return withCpuSeat(engine, seat, () => require('./bot').shapeReaction(engine, seat, promptData, r, prev)); }
+    catch (e) { console.error('[skilltest] Reaktionslogik:', e && e.message); return r; }
+  };
+  engine._stFlushReactions = () => { try { require('./bot').flushReactions(engine.room); } catch { /* Lernhilfe */ } };
+}
+
+/**
  * `engine.restore(snap)` ersetzt `gs.skillTest` durch eine KOPIE (die Identität geht verloren, nicht aufzählbare
  * Felder wie die Timer-Handles gehen mit). Der Rundentreiber, Wächter und Timer halten aber das lebende Objekt:
  * nach jedem Restore bekommt es die Werte der Kopie, bleibt selbst aber dasselbe Objekt.
@@ -194,4 +208,4 @@ function relaxRules(engine) {
   for (const ps of engine.gs.players) ps._noHandLimitUntilTurn = Infinity;
 }
 
-module.exports = { installRunawayBreaker, installSnapshotGuard, installPlayerChoice, installElimination, installMeter, installTurnEnd, installBotSeats, installBotBrain, relaxRules };
+module.exports = { installReactions, installRunawayBreaker, installSnapshotGuard, installPlayerChoice, installElimination, installMeter, installTurnEnd, installBotSeats, installBotBrain, relaxRules };

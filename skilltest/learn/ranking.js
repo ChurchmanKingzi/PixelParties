@@ -57,6 +57,7 @@ function cardOfKey(key) { const i = key.indexOf(':'); return i < 0 ? key : key.s
 function buildRanking(profile, history = []) {
   const play = {};                                        // Karte → { n, sum }
   for (const [k, e] of Object.entries(profile.playValue || {})) {
+    if (k.startsWith('react-hold:')) continue;      // „Reaktion bewusst gehalten": Vergleichsarm, kein Spielwert der Karte
     const nm = cardOfKey(k);
     const t = play[nm] || (play[nm] = { n: 0, sum: 0 });
     t.n += e.n; t.sum += e.sum;

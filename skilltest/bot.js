@@ -44,6 +44,86 @@ function choosePlayer(engine, seat, candidates, promptData) {
   return candidates[0];
 }
 
+// ── Reaktionen und freiwillige Karteneffekte ───────────────────────
+const CONFIRM_YES = { confirmed: true };
+
+/** Ist dieser Confirm eine Reaktions-/Surprise-Frage? */
+function isReactionPrompt(promptData) {
+  if (promptData.type !== 'confirm' || !promptData.cancellable) return false;
+  const title = promptData.showCardLeft || promptData.title;
+  if (promptData._handReactionWindow === true) return true;
+  if (!title) return false;
+  try {
+    const s = require('../cards/effects/_loader').loadCardEffect(title);
+    return !!(s && (s.isReaction || s.isSurprise || s.isHeroReaction) && (promptData.showCard || promptData.showCardLeft || /activate/i.test(promptData.confirmLabel || '')));
+  } catch { return false; }
+}
+
+/** Freiwilliger Karteneffekt („you may …"): eine Karte fragt, ob ihr Effekt ausgelöst werden soll. */
+function isOptionalEffectPrompt(promptData) {
+  return promptData.type === 'confirm' && promptData.cancellable === true && !!promptData.title
+    && (!!promptData.showCard || /activate/i.test(promptData.confirmLabel || ''));
+}
+
+/** Kostet ein „Ja" eine Ressource (Aktion, Gold, Karte)? Dann lehnt der Bot ohne eigene Karten-Antwort ab. */
+function confirmCostsResource(engine, seat, promptData) {
+  try {
+    const s = require('../cards/effects/_loader').loadCardEffect(promptData.title);
+    const c = s && s.cpuMeta && s.cpuMeta.confirmCostsResource;
+    return typeof c === 'function' ? c(engine, seat, promptData) === true : c === true;
+  } catch { return false; }
+}
+
+/** Reaktion für das Lernen vormerken: Stellungswert jetzt; am Ende der laufenden Aktion kommt die Differenz (flushReactions). */
+function noteReaction(engine, seat, cardName, fired) {
+  const st = engine.gs.skillTest, p = policy();
+  if (!st || !st.record || engine._inMctsSim || !p.stateValue) return;
+  (engine._stRx || (engine._stRx = [])).push({ seat, key: (fired ? 'react-fire:' : 'react-hold:') + cardName, v0: p.stateValue(engine, seat) });
+}
+function flushReactions(room) {
+  const engine = room && room.engine, list = engine && engine._stRx;
+  if (!list || !list.length) return;
+  engine._stRx = [];
+  const p = policy();
+  for (const r of list) record(room, r.seat, r.key, p.stateValue(engine, r.seat) - r.v0);
+}
+
+/**
+ * Antwort auf Reaktionen und freiwillige Karteneffekte. `r` ist die Engine-Vorgabe (lehnt jede freiwillige Frage ab,
+ * außer die Karte hat ein eigenes `cpuResponse`). Die Heuristik der Karte hat das Veto; Persona, gelernter Wert und
+ * Neugier (policy.reactionVerdict) entscheiden danach, ob gefeuert wird.
+ */
+function shapeReaction(engine, seat, promptData, r, ask) {
+  const p = policy();
+  if (!promptData || !p.reactionVerdict || engine._inMctsSim) return r;
+  const fireOrNot = (card) => {
+    if (!p.reactionHeuristic(engine, seat, promptData, card)) return false;
+    const fire = p.reactionVerdict(engine, seat, card);
+    noteReaction(engine, seat, card, fire);
+    return fire;
+  };
+  if (promptData.type === 'cardGallery' && promptData.title === 'Chain a Reaction?') {
+    const cards = promptData.cards || [];
+    for (const c of cards) {
+      if (fireOrNot(c.name)) return { cardName: c.name, source: c.source };
+    }
+    return null;
+  }
+  if (promptData.type !== 'confirm') return r;
+  if (isReactionPrompt(promptData)) return fireOrNot(promptData.showCardLeft || promptData.title) ? CONFIRM_YES : null;
+  if (isOptionalEffectPrompt(promptData)) {
+    if (p.saysYes(r)) return r;                                        // eigene Antwort der Karte
+    if (r !== null && r !== undefined) return r;
+    if (confirmCostsResource(engine, seat, promptData)) return null;
+    // Schutz vor Endlos-„darf erneut"-Schleifen derselben Karte innerhalb einer Aktion
+    const counts = engine._stPromptCounts || (engine._stPromptCounts = {});
+    const key = 'opt:' + seat + ':' + promptData.title;
+    if ((counts[key] = (counts[key] || 0) + 1) > 24) return null;
+    return CONFIRM_YES;
+  }
+  return r;
+}
+
 /** Beobachtung für das Lernen festhalten (nur wenn der Raum aufzeichnet: Simulation/Training). */
 function record(room, seat, key, dv) {
   const st = room.gameState.skillTest;
@@ -69,6 +149,7 @@ async function takeTurn(room, seat, host, opts = {}) {
       const v0 = measure ? p.stateValue(engine, seat) : 0;
       let ok = false;
       try { ok = await a.run(); } catch (e) { console.error('[skilltest bot] freie Aktion warf:', e && e.message); }
+      flushReactions(room);
       if (gs.result || gs.activePlayer !== seat) return true;
       if (ok && measure) record(room, seat, a.learnKey, p.stateValue(engine, seat) - v0);
     }
@@ -93,4 +174,4 @@ async function takeTurn(room, seat, host, opts = {}) {
   return false;
 }
 
-module.exports = { prepareBase, chooseTargets, choosePlayer, takeTurn };
+module.exports = { prepareBase, chooseTargets, choosePlayer, takeTurn, shapeReaction, flushReactions };

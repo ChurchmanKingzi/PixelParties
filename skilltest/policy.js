@@ -16,6 +16,7 @@
 const rounds = require('./rounds');
 const { getCardDB } = require('../cards/effects/_card-db');
 
+const profileMod = () => require('./learn/profile');
 const MAX_PROMPT_REPEATS = 24;     // so oft darf EINE Karte in einer Aktion denselben freiwilligen Ziel-Prompt stellen
 
 const DEFAULT_WEIGHTS = {
@@ -28,6 +29,10 @@ const DEFAULT_WEIGHTS = {
   spell: 1.0,               // Neigung, Handzauber/-angriffe zu spielen
   summon: 0.9,              // Neigung, Creatures zu beschwören
   equip: 1.0,               // Neigung, Artifacts auszurüsten (frei)
+  potion: 1.0,              // Neigung, Tränke zu trinken (frei)
+  abilityPlay: 1.0,         // Neigung, Abilities von der Hand an Helden zu legen (frei, einmal je Held und Round)
+  abilityUse: 0.8,          // Neigung, aktive Ability-Effekte zu nutzen (kostet die Aktion des Helden)
+  reactEager: 1.0,          // Neigung, Reaktionen (Hand, Surprise, Held) auszulösen, wenn die Karten-Heuristik sie erlaubt
   healBias: 1.0,            // wie stark Heilung/Buffs bei Verletzten bevorzugt werden
   friendlyFire: 1.0,        // 0 = nie eigene Ziele bei feindlichen Karten (1 = Standard-Vermeidung)
   learned: 1.0,             // Gewicht des gelernten Kartenwerts
@@ -228,6 +233,20 @@ function rankActions(room, seat, host) {
       run: () => rounds.act(room, seat, 'activate_hero_effect', params, () => host.doActivateHeroEffect(room, seat, params), host) });
   }
 
+  // Aktive Ability-Effekte (Aktionskosten): wie Hero-Effekte, aber der Held muss bereit sein (oder eine Zusatzaktion haben).
+  try {
+    gs.currentPhase = rounds.PHASE_ACTION;
+    const ready = new Set([...heroes, ...bonusHeroesFor(engine, seat, 'ability_activation')]);
+    const acts = rounds.withActive(engine, seat, () => engine.getActivatableAbilities(seat, { ownSideOnly: true })) || [];
+    for (const e of acts) {
+      if (!ready.has(e.heroIdx)) continue;
+      const params = { heroIdx: e.heroIdx, zoneIdx: e.zoneIdx, zoneKind: e.zoneKind || 'ability' };
+      const key = cardKey('ability', e.abilityName);
+      out.push({ score: w.abilityUse * 5 + learnedBonus(prof, w, key) + Math.random(), kind: 'ability', key,
+        run: () => rounds.act(room, seat, 'activate_ability', params, () => host.doActivateAbility(room, seat, params), host) });
+    }
+  } catch { /* keine aktivierbaren Abilities */ }
+
   // Handkarten: Zauber/Angriffe über bereite Heroes, Creatures in freie Zonen.
   (ps.hand || []).forEach((name, handIndex) => {
     const c = db[name];
@@ -263,8 +282,36 @@ function rankActions(room, seat, host) {
   return out.sort((a, b) => b.score - a.score);
 }
 
+const scriptOf = (name) => { try { return require('../cards/effects/_loader').loadCardEffect(name); } catch { return null; } };
+const attempt = (fn, dflt = false) => { try { return fn(); } catch { return dflt; } };
+
+/** Ist irgendeiner meiner Helden verletzt? (Heil-Tränke sind sonst verschwendet.) */
+function anyHeroHurt(ps) {
+  return (ps.heroes || []).some(h => h && h.name && h.hp > 0 && h.maxHp && h.hp < h.maxHp);
+}
+
+/** Trank trinken: bei Zielsitzung (`gs.potionTargeting`) Ziele wählen und bestätigen, sonst abbrechen. */
+async function usePotion(room, seat, host, params) {
+  const gs = room.gameState, engine = room.engine;
+  rounds.setPhaseFor(room, seat, 'use_potion', params);
+  const ok = await host.doUsePotion(room, seat, params);
+  if (!ok) return false;
+  const pt = gs.potionTargeting;
+  if (pt && pt.ownerIdx === seat && !pt.isEffectPrompt) {
+    const ids = chooseTargets(engine, seat, pt.validTargets || [], { ...(pt.config || {}), source: pt.potionName }, null);
+    let done = false;
+    if (ids.length) {
+      rounds.setPhaseFor(room, seat, 'confirm_potion', {});
+      done = await host.doConfirmPotion(room, seat, { selectedIds: ids });
+    }
+    if (!done) { gs.potionTargeting = null; engine.sync(); return false; }
+  }
+  return true;
+}
+
 /**
- * Freie Spielzüge der Main Phase (verbrauchen den Zug nicht): Artifacts ausrüsten, Surprises legen.
+ * Freie Spielzüge der Main Phase (verbrauchen den Zug nicht): Artifacts ausrüsten, Surprises legen,
+ * Tränke trinken, Abilities von der Hand an Helden legen.
  * Der Bot führt sie vor der eigentlichen Aktion aus. Jede Karte kommt nur einmal vor (einmalig im Spiel).
  */
 function freeActions(room, seat, host) {
@@ -294,6 +341,34 @@ function freeActions(room, seat, host) {
         out.push({ score: base - 1 + Math.random(), key: 'free:' + name, learnKey: key,
           run: () => { rounds.setPhaseFor(room, seat, 'play_artifact', params); return host.doPlayArtifact(room, seat, params); } });
       }
+    } else if (c.cardType === 'Potion' && host.doUsePotion) {
+      // Tränke: einmalig; Heilung/Buffs nur, wenn jemand verletzt ist. Reaktions-Tränke spielt die Reaktionslogik.
+      const script = scriptOf(name);
+      if (!script || !script.isPotion || script.isReaction) return;
+      if (attempt(() => engine.arePotionsLockedFor(seat))) return;
+      if (script.canActivate && !attempt(() => script.canActivate(gs, seat, engine))) return;
+      if (isBeneficial(name) && !anyHeroHurt(ps)) return;
+      const key = cardKey('potion', name);
+      const params = { cardName: name, handIndex };
+      out.push({ score: w.potion * 4 + learnedBonus(prof, w, key) + Math.random(), key: 'free:' + name, learnKey: key,
+        run: () => usePotion(room, seat, host, params) });
+    } else if (c.cardType === 'Ability' && host.doPlayAbility) {
+      // Hand-Abilities: an einen Helden mit freier Zone oder passendem Stapel (Stufe +1), je Held einmal pro Round.
+      const script = scriptOf(name);
+      if (script && script.ascendedHeroOnly) return;
+      for (const hi of alive) {
+        if (ps.abilityGivenThisTurn && ps.abilityGivenThisTurn[hi] && !((ps._bonusAbilityAttachments && ps._bonusAbilityAttachments[hi]) > 0)) continue;
+        const zone = attempt(() => engine.abilityZielZone(seat, hi, name), -1);
+        if (zone < 0) continue;
+        if (script && script.canAttachToHero && !attempt(() => script.canAttachToHero(gs, seat, hi, engine))) continue;
+        const stacks = (ps.abilityZones[hi] || []).some(z => (z || [])[0] === name);
+        const heroName = ps.heroes[hi].name;
+        const pair = prof ? profileMod().meanOf(prof.pairValue[heroName < name ? heroName + '|' + name : name + '|' + heroName]) : 0;
+        const key = cardKey('abilityPlay', name);
+        const params = { cardName: name, handIndex, heroIdx: hi, zoneSlot: zone };
+        out.push({ score: w.abilityPlay * 4 + (stacks ? 2 : 0) + 2 * pair + learnedBonus(prof, w, key) + Math.random(), key: 'free:ability:' + name + ':' + hi, learnKey: key,
+          run: () => { rounds.setPhaseFor(room, seat, 'play_ability', params); return host.doPlayAbility(room, seat, params); } });
+      }
     } else if ((c.cardType === 'Creature' || c.cardType === 'Spell' || c.cardType === 'Attack') && sub === 'surprise' && host.doPlaySurprise) {
       for (const hi of alive) {
         if ((ps.surpriseZones && ps.surpriseZones[hi] && ps.surpriseZones[hi].length)) continue;
@@ -304,6 +379,56 @@ function freeActions(room, seat, host) {
     }
   });
   return out.sort((a, b) => b.score - a.score);
+}
+
+// ── Reaktionen ─────────────────────────────────────────────────────
+// Die Standard-CPU der Engine (_cpu.js installCpuBrain) ist auf zwei Spieler gebaut und im Modus nicht installiert; die
+// Engine-Vorgabe lehnt jede freiwillige Frage ab. Deshalb entscheidet der Bot Reaktionen selbst. Kanäle:
+//   1. Karten-Heuristik (Veto): `cpuResponse` der Karte, `cpuMeta.reactionHeuristic`, keine Negation eigener Karten.
+//      Ob die Reaktion überhaupt möglich ist, prüft die Engine schon (`reactionCondition`, Kosten, Wirker, Sperren).
+//   2. Persona `reactEager` (Neigung 0 … 2)
+//   3. gelernt: Stellungsänderung des Sitzes bis zum Ende der laufenden Aktion, getrennt für „gefeuert" und „gehalten"
+//      (`react-fire:<Karte>` / `react-hold:<Karte>`); sobald beide Arme genug Beobachtungen haben, entscheidet der Vergleich
+//   4. Neugier: ohne Daten wird gelegentlich bewusst gehalten, damit der Vergleich überhaupt entsteht
+const RX_MIN_N = 6;
+
+const saysYes = (r) => r === true || !!(r && r.confirmed === true);
+
+/** Negations-Reaktion? („negate this spell/the effect …"; „cannot be negated" zählt nicht.) */
+function isNegation(cd) {
+  const t = ((cd && cd.effect) || '').toLowerCase();
+  if (!t) return false;
+  if (/(cannot|can ?not|may not|will not) be negated/.test(t) && !/negate (the|this|that)/.test(t)) return false;
+  return /negate (the|this|an|its) /i.test(t);
+}
+
+/** Karten-Heuristik für eine Reaktion: true = darf feuern, false = nicht (Veto). */
+function reactionHeuristic(engine, seat, promptData, cardName) {
+  const script = scriptOf(cardName);
+  if (script && typeof script.cpuResponse === 'function') {
+    const r = attempt(() => script.cpuResponse(engine, 'generic', promptData), undefined);
+    if (r !== undefined) return saysYes(r);
+  }
+  const hf = script && script.cpuMeta && script.cpuMeta.reactionHeuristic;
+  if (typeof hf === 'function') return !!attempt(() => hf(engine, promptData));
+  const cd = getCardDB()[cardName];
+  if (cd && isNegation(cd)) {
+    const src = engine._currentEffectSource;                                    // wer die Karte spielt, auf die reagiert wird
+    const owner = src && Number.isInteger(src.owner) ? src.owner : engine.gs.activePlayer;
+    return owner !== seat;                                                       // nie eigene Karten negieren
+  }
+  return true;
+}
+
+/** Soll die Reaktion `cardName` jetzt ausgelöst werden? (Die Heuristik hat bereits zugestimmt.) */
+function reactionVerdict(engine, seat, cardName) {
+  const room = engine.room, w = weightsOf(room, seat), prof = profile(room, seat);
+  const arm = (a) => prof && prof.playValue && prof.playValue['react-' + a + ':' + cardName];
+  const f = arm('fire'), h = arm('hold');
+  if (f && h && f.n >= RX_MIN_N && h.n >= RX_MIN_N) {
+    return (f.sum / f.n - h.sum / h.n) * w.learned + (w.reactEager - 1) * 0.5 >= 0;
+  }
+  return Math.random() < Math.max(0.1, Math.min(1, 0.2 + 0.6 * w.reactEager));
 }
 
 // ── Basisaufbau ────────────────────────────────────────────────────
@@ -331,5 +456,5 @@ function prepareBase({ env, ps, room, idx, pool, noProfile, weights }) {
 module.exports = {
   prepareBase,
   DEFAULT_WEIGHTS, weightsOf, chooseTargets, choosePlayer, rankActions, freeActions,
-  stateValue, sideValue, isBeneficial, cardKey,
+  stateValue, sideValue, isBeneficial, cardKey, reactionVerdict, reactionHeuristic, saysYes,
 };

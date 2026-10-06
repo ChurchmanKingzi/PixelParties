@@ -138,6 +138,7 @@ async function start(room, host, prep) {
   ext.installBotSeats(engine, (pi) => skillGs.botSeats.includes(pi));
   ext.installBotBrain(engine);
   ext.installPlayerChoice(engine);
+  ext.installReactions(engine);
   ext.installElimination(engine);
   ext.installMeter(engine);
   ext.installTurnEnd(engine, host);

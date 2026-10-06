@@ -361,7 +361,7 @@ async function act(room, pi, kind, params, fn, host) {
   const gs = room.gameState, engine = room.engine, st = gs && gs.skillTest;
   if (!st) return fn();
   if (st.phase !== 'battle' || gs.result) return false;
-  if (!CONSUMING_KINDS.has(kind)) return fn();
+  if (!CONSUMING_KINDS.has(kind)) { const r = await fn(); if (engine._stFlushReactions) engine._stFlushReactions(); return r; }
   if (gs.activePlayer !== pi || st.busy) return false;
 
   gs.currentPhase = requiredPhase(room, pi, kind, params);
@@ -383,6 +383,7 @@ async function act(room, pi, kind, params, fn, host) {
   try { ok = await fn(); }
   catch (err) { console.error(`[skilltest] ${kind} threw:`, err && err.stack || err); }
   clearTimeout(wd);
+  if (engine._stFlushReactions) engine._stFlushReactions();      // Reaktionen dieser Aktion bewerten (Lernkanal)
   if (st.actToken !== token) { ecoLeave(st, ps, pi, eco); return ok; }     // vom Wächter aufgegeben (siehe battle.js startPromptWatchdog)
   meter.active = false;
   st.busy = false;

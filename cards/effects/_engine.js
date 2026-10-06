@@ -36895,8 +36895,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     try {
     const chain = initialLink ? [initialLink] : [];
     const ap = this.gs.activePlayer;
-    const nonAp = this.opponentOf(ap);
-    const checkOrder = [nonAp, ap];
+    const checkOrder = this._reactionCheckOrder(ap);
 
     // Check for first reaction
     const found = await this._promptReactionsForChain(chain, checkOrder, eventDesc, hookName, hookCtx);
@@ -36919,6 +36918,21 @@ this._deathWatch = (this._deathWatchStack || []).length
       if (prevWindowLock) this.gs._chainResolvingLock = prevWindowLock;
       else delete this.gs._chainResolvingLock;
     }
+  }
+
+  /**
+   * Reihenfolge, in der Spieler auf eine Kette reagieren dürfen: erst die Nicht-Aktiven, zuletzt der Aktive.
+   * Normalspiel: [Gegner, Aktiver]. Skill Test (2–8 Spieler): alle übrigen, noch nicht ausgeschiedenen Sitze in
+   * Sitzreihenfolge nach dem aktiven Sitz, zuletzt der aktive.
+   */
+  _reactionCheckOrder(ap) {
+    const st = this.gs.skillTest;
+    if (!st) return [this.opponentOf(ap), ap];
+    const n = this.gs.players.length;
+    const out = [];
+    for (let k = 1; k < n; k++) { const s = (ap + k) % n; if (!st.eliminated.includes(s)) out.push(s); }
+    out.push(ap);
+    return out;
   }
 
   /**
