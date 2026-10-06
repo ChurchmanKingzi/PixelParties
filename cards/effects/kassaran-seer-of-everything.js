@@ -102,6 +102,9 @@ module.exports = {
       const hero = ctx.attachedHero || gs.players[ctx.cardHeroOwner ?? pi]?.heroes?.[ctx.cardHeroIdx];
       if (!hero?.name) return;
       if (deklariert(hero).length >= ANZAHL) return;   // z. B. im Puzzle vorgegeben
+      // Skill Test: kein Deck, also nie eine Ziehung/Kopie — die Pflicht-Abfrage der drei Namen wäre sinnlos
+      // (Menschen müssten drei Namen raten, CPU-Sitze liefen in den 5-s-Hook-Timeout).
+      if (gs.isSkillTest) return;
 
       const db = engine._getCardDB();
       const alle = Object.keys(db)
