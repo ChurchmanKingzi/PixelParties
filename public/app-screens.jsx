@@ -2309,6 +2309,7 @@ const PpIdleAnims = (() => {
  * mittig und werden (ganzzahlig) gleich groß in die Box eingepasst, egal wie viel
  * Leerraum der jeweilige Frame hat.
  */
+const PP_IDLE_SCALE = 3;
 const ppIdleBoxen = new Map();
 function ppIdleBox(m) {
   if (!ppIdleBoxen.has(m.sheetUrl)) {
@@ -2353,14 +2354,14 @@ function PpIdleSprite({ name, box = 96, grey }) {
     ppIdleBox(m).then(k => { if (lebt) setKern(k); });
     return () => { lebt = false; };
   }, [m && m.sheetUrl]);
-  const wrap = { width: box, height: box, display: 'flex', alignItems: 'center', justifyContent: 'center', filter: grey ? 'grayscale(.6) brightness(.85)' : undefined, opacity: grey ? .85 : 1 };
+  const wrap = { width: box, height: box, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', filter: grey ? 'grayscale(.6) brightness(.85)' : undefined, opacity: grey ? .85 : 1 };
   if (!m) return <div style={{ ...wrap, color: 'var(--text2)', fontSize: 10, textAlign: 'center' }}>{heroDisplayName(name)}</div>;
   if (!kern) return <div style={wrap} />;
   const fw = m.frameWidth, fh = m.frameHeight, n = m.frames;
   const vertikal = m.layout === 'vertical';
   const bw = kern.x1 - kern.x0, bh = kern.y1 - kern.y0;
-  const passt = box / Math.max(bw, bh);
-  const scale = passt >= 1 ? Math.floor(passt) : passt;   // zu große Figuren verkleinern statt abschneiden
+  // Überall dieselbe Pixelgröße: Figuren werden nicht eingepasst, Überstehendes wird abgeschnitten.
+  const scale = PP_IDLE_SCALE;
   const id = 'ppidle-' + PpIdleAnims.slug(name);
   const sx = kern.x0 * scale, sy = kern.y0 * scale;
   const ende = vertikal ? `-${sx}px -${sy + n * fh * scale}px` : `-${sx + n * fw * scale}px -${sy}px`;
@@ -2370,7 +2371,7 @@ function PpIdleSprite({ name, box = 96, grey }) {
     <div style={wrap}>
       <style>{css}</style>
       <div style={{
-        width: bw * scale, height: bh * scale, imageRendering: 'pixelated',
+        width: bw * scale, height: bh * scale, flexShrink: 0, imageRendering: 'pixelated',
         backgroundImage: `url("${m.sheetUrl}")`,
         backgroundSize: vertikal ? `${fw * scale}px ${n * fh * scale}px` : `${n * fw * scale}px ${fh * scale}px`,
         animation: `${id} ${dauer}ms steps(${n}) infinite`,
