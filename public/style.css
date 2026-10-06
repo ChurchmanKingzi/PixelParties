@@ -25274,15 +25274,18 @@ body.summon-pick .board-zone.board-zone-ability:not(.zone-drag-valid):not(.board
 .profile-right-col { gap: 20px; padding-right: 40px; padding-left: 34px; }
 
 .profile-identity-panel.pp-fenster-flach {
-  /* Nur so hoch wie der Inhalt — nicht bis zum Fensterboden gestreckt. */
-  flex: 0 0 auto;
+  /* Füllt die Spalte; diese ist (siehe `.profile-layout` unten) genau so hoch wie die rechte Spalte. */
+  flex: 1 1 auto;
   border-width: 3px;
   margin: 8px;
   box-shadow:
     0 0 0 2px var(--pp-kontur),
     inset 0 0 0 1px var(--pp-kontur),
     inset 0 0 30px color-mix(in srgb, var(--zier) 10%, transparent);
-  background: rgba(0, 0, 0, .18);
+  /* Derselbe Untergrund wie die Abschnitte rechts (sonst wirkt das Dithering anders gefärbt). */
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--zier) 7%, transparent), transparent 40%),
+    rgba(0, 0, 0, .28);
 }
 .profile-identity-panel.pp-fenster-flach::after { --eck-e: 2px; inset: 3px; }
 .profile-identity-panel.pp-fenster-flach::before { display: none; }
@@ -25300,3 +25303,8 @@ body.summon-pick .board-zone.board-zone-ability:not(.zone-drag-valid):not(.board
   .profile-section.pp-fenster { padding-left: 16px; padding-right: 16px; }
   .profile-right-col { padding-left: 14px !important; padding-right: 22px !important; gap: 16px; }
 }
+
+/* Profil-Raster: nur so hoch wie die höhere Spalte (die linke Box dehnt sich auf die Höhe der rechten);
+   die Spalte selbst hat keinen eigenen Untergrund mehr — das geditherte Fenster gehört nur der Box. */
+.profile-layout { flex: 0 1 auto; }
+.profile-identity-col { background: none; border-right: none; }
