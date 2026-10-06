@@ -67,6 +67,7 @@ const { sendMail } = require('./mailer');
 // v1289: oeffentliches Spielerprofil (Top-Players-Popup) — Schema, Deck-
 // Identitaet in game_history und die Route leben komplett in diesem Modul.
 const playerProfile = require('./player-profile');
+const skillTest = require('./skilltest');   // Modus „Skill Test" (Lobby, Vorbereitung, Rounds)
 
 /**
  * Enrich a puzzle-authored buffs object so each entry carries the
@@ -13730,6 +13731,12 @@ io.on('connection', (socket) => {
 
   socket.on('get_rooms', () => socket.emit('rooms', getRoomList()));
 
+  // Skill Test: CPU-Sitze hinzufügen/entfernen, Raum starten (Host).
+  skillTest.registerLobbyHandlers(socket, {
+    io, rooms, getUser: () => currentUser, sanitizeRoom, getRoomList,
+    startPrep: (room) => skillTest.startPrep(room, skillTestHost),
+  });
+
   // Re-sync this socket's cached identity from the DB after the user edits
   // their profile (e.g. a rename), so lobby/chat/new rooms made later in the
   // same connection use the fresh name without forcing a relog.
@@ -13744,7 +13751,7 @@ io.on('connection', (socket) => {
     }
   });
 
-  socket.on('create_room', async ({ type, playerPw, specPw, deckId, format, cubeDraft }) => {
+  socket.on('create_room', async ({ type, playerPw, specPw, deckId, format, cubeDraft, skillTest: skillTestRaw }) => {
     if (!currentUser) return;
     const fmt = [1, 3, 5].includes(format) ? format : 1;
     const roomId = uuidv4().substring(0, 8);
@@ -13792,11 +13799,13 @@ io.on('connection', (socket) => {
     }
 
     const isCubeDraft = !!cubeDraftConfig;
+    // Skill Test: bis zu 8 Sitze (Menschen + CPUs), kein eigenes Deck, immer unranked.
+    const skillTestConfig = (!isCubeDraft && skillTestRaw) ? skillTest.buildRoomConfig(skillTestRaw) : null;
     const room = {
       id: roomId,
       host: currentUser.username,
       hostId: currentUser.userId,
-      type: type || 'unranked',
+      type: skillTestConfig ? 'unranked' : (type || 'unranked'),
       format: isCubeDraft ? (cubeDraftConfig.prelimsBo) : fmt,
       // For cube draft, `winsNeeded` and `setScore` apply per individual
       // tournament match, not to the room. They get reset per match in M4.
@@ -13806,8 +13815,8 @@ io.on('connection', (socket) => {
       specPw: specPw || null,
       // Cube Draft rooms: capacity is 8 (vs the standard 2). Empty seats
       // get filled with bots at start. The host is always at seat 0.
-      maxPlayers: isCubeDraft ? 8 : 2,
-      players: [{ username: currentUser.username, userId: currentUser.userId, socketId: socket.id, deckId: isCubeDraft ? null : (deckId || null), isBot: false }],
+      maxPlayers: isCubeDraft ? 8 : (skillTestConfig ? 8 : 2),
+      players: [{ username: currentUser.username, userId: currentUser.userId, socketId: socket.id, deckId: (isCubeDraft || skillTestConfig) ? null : (deckId || null), isBot: false }],
       spectators: [],
       status: 'waiting',
       created: Date.now(),
@@ -13815,6 +13824,7 @@ io.on('connection', (socket) => {
       chatHistory: [],
       privateChatHistory: {},
       cubeDraft: cubeDraftConfig,
+      skillTest: skillTestConfig,
     };
     rooms.set(roomId, room);
     socket.join('room:' + roomId);
@@ -13891,10 +13901,15 @@ io.on('connection', (socket) => {
         if (room.playerPw && password !== room.playerPw) return socket.emit('join_error', 'Wrong password');
         // Cube Draft players don't bring their own deck — they draft
         // one from the host's cube, so deckId is intentionally null.
-        const isCubeDraftRoom = !!room.cubeDraft;
+        const isCubeDraftRoom = !!room.cubeDraft || !!room.skillTest;
+        // Skill Test: Sitze nur in der Lobby-Phase vergeben (danach Zuschauer).
+        if (room.skillTest && !skillTest.isLobbyPhase(room)) {
+          room.spectators.push({ username: currentUser.username, userId: currentUser.userId, socketId: socket.id, color: currentUser.color || '#888', avatar: currentUser.avatar || null });
+        } else {
         room.players.push({ username: currentUser.username, userId: currentUser.userId, socketId: socket.id, deckId: isCubeDraftRoom ? null : (deckId || null), isBot: false });
         const hs = room.players[0]?.socketId;
         if (hs) io.to(hs).emit('player_joined', { username: currentUser.username });
+        }
       }
     }
     socket.join('room:' + roomId);
@@ -13925,8 +13940,9 @@ io.on('connection', (socket) => {
     // Cube Draft rooms must still be in the lobby phase to accept new
     // seat joiners. Once drafting starts, the seat list is locked.
     if (room.cubeDraft && room.cubeDraft.phase !== 'lobby') return socket.emit('join_error', 'Draft already started');
+    if (room.skillTest && !skillTest.isLobbyPhase(room)) return socket.emit('join_error', 'Skill Test already started');
     room.spectators = room.spectators.filter(s => s.username !== currentUser.username);
-    const isCubeDraftRoom = !!room.cubeDraft;
+    const isCubeDraftRoom = !!room.cubeDraft || !!room.skillTest;
     room.players.push({ username: currentUser.username, userId: currentUser.userId, socketId: socket.id, deckId: isCubeDraftRoom ? null : (deckId || null), isBot: false });
     const hs = room.players[0]?.socketId;
     if (hs) io.to(hs).emit('player_joined', { username: currentUser.username });
@@ -13965,6 +13981,7 @@ io.on('connection', (socket) => {
     const room = rooms.get(roomId);
     if (!room || room.hostId !== currentUser.userId || room.players.length < 2) return;
     if (room.cubeDraft) return; // Cube Draft rooms use start_cube_draft
+    if (room.skillTest) return; // Skill Test rooms use st_start
     const activePlayer = Math.random() < 0.5 ? 0 : 1;
     await setupGameState(room);
     await startGameEngine(room, roomId, activePlayer);
@@ -18594,6 +18611,17 @@ function handleLeaveRoom(socket, roomId, user) {
     return;
   }
 
+  // ★ Skill Test NACH der Lobby (Vorbereitung, Kampf): Sitze bleiben bestehen,
+  // der Raum lebt weiter, solange ein Mensch online ist (Wiederverbinden per
+  // `auth`/`join_room`). Die Details (Auto-Ready, Auscheiden nach Karenzzeit)
+  // regelt das Modul selbst.
+  if (room.skillTest && !skillTest.isLobbyPhase(room)) {
+    skillTest.onSeatLeft(room, user, socket, skillTestHost);
+    io.to('room:' + roomId).emit('room_update', sanitizeRoom(room));
+    io.emit('rooms', getRoomList());
+    return;
+  }
+
   if (room.hostId === user.userId) {
     // Cube Draft rooms in the LOBBY phase: promote the next-joined human
     // to host instead of destroying the room. The cube itself was
@@ -18601,7 +18629,7 @@ function handleLeaveRoom(socket, roomId, user) {
     // original host's user_id and cube card list is loaded later from
     // that user's deck row), so the new host doesn't need to own a
     // legal cube — they just inherit the chair.
-    if (room.cubeDraft && room.cubeDraft.phase === 'lobby') {
+    if ((room.cubeDraft && room.cubeDraft.phase === 'lobby') || skillTest.isLobbyPhase(room)) {
       const remainingHumans = room.players.filter(p => p.userId !== user.userId && !p.isBot);
       if (remainingHumans.length > 0) {
         // First-joined remaining human becomes host. `room.players` is
@@ -18629,6 +18657,15 @@ function handleLeaveRoom(socket, roomId, user) {
   io.emit('rooms', getRoomList());
 }
 
+// Schnittstelle, über die die Skill-Test-Module (skilltest/*.js) an die
+// Server-Interna kommen, ohne server.js zu importieren (kein Zirkelbezug).
+const skillTestHost = {
+  io, rooms, activeGames,
+  get sanitizeRoom() { return sanitizeRoom; },
+  get getRoomList() { return getRoomList; },
+  destroyRoom: (id) => destroyRoom(id),
+};
+
 function getRoomList() {
   return Array.from(rooms.values())
     .filter(r => r.type !== 'puzzle')
@@ -18655,6 +18692,7 @@ function getRoomList() {
         phase: r.cubeDraft.phase,
         timerDisabled: !!r.cubeDraft.timerDisabled,
       } : null,
+      skillTest: skillTest.summary(r),
     }));
 }
 
@@ -18669,10 +18707,12 @@ function sanitizeRoom(room, forUser) {
     // occupies. Bot seats won't exist until the host hits Start —
     // before that, empty seats are simply absent from this list.
     seats: (room.maxPlayers || 2) > 2
-      ? Array.from({ length: room.maxPlayers || 2 }, (_, i) => {
-          const p = room.players[i];
-          return p ? { username: p.username, isBot: !!p.isBot, isHost: p.username === room.host } : null;
-        })
+      ? (room.skillTest
+          ? skillTest.seatsOf(room)
+          : Array.from({ length: room.maxPlayers || 2 }, (_, i) => {
+              const p = room.players[i];
+              return p ? { username: p.username, isBot: !!p.isBot, isHost: p.username === room.host } : null;
+            }))
       : undefined,
     spectators: room.spectators.map(s => s.username),
     status: room.status, created: room.created,
@@ -18688,6 +18728,7 @@ function sanitizeRoom(room, forUser) {
       thirdPlace: !!room.cubeDraft.thirdPlace,
       phase: room.cubeDraft.phase,
     } : null,
+    skillTest: skillTest.summary(room),
   };
 }
 

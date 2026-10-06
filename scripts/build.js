@@ -69,6 +69,7 @@ const ENTRIES = [
   'app-deckbuilder',
   'app-board',
   'app-campaign',
+  'app-skilltest',        // Modus „Skill Test" (Lobby, Vorbereitung, Kampfanzeige)
   'app-main',
 ];
 
