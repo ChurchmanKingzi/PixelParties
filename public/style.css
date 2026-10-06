@@ -25274,6 +25274,8 @@ body.summon-pick .board-zone.board-zone-ability:not(.zone-drag-valid):not(.board
 .profile-right-col { gap: 20px; padding-right: 40px; padding-left: 34px; }
 
 .profile-identity-panel.pp-fenster-flach {
+  /* Nur so hoch wie der Inhalt — nicht bis zum Fensterboden gestreckt. */
+  flex: 0 0 auto;
   border-width: 3px;
   margin: 8px;
   box-shadow:
