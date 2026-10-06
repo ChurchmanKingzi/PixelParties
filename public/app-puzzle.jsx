@@ -1756,6 +1756,8 @@ function PuzzleCreator() {
         ? getCard(ascensionMap[c.name]) || c
         : c;
       p.heroes[hi] = { name: c.name, hp: statSource.hp || 0, maxHp: statSource.hp || 0, atk: statSource.atk || 0, baseAtk: statSource.atk || 0, statuses: {} };
+      // Profil → Skins: der gewählte Skin wird beim Aufstellen automatisch übernommen (im Edit-Fenster änderbar).
+      if (user?.heroSkins?.[c.name]) p.heroes[hi].skin = user.heroSkins[c.name];
       p.abilityZones[hi] = [[], [], []];
       // For Ascended Heroes, use the base hero's starting abilities
       const abilitySource = c.cardType === 'Ascended Hero' && ascensionMap[c.name]
