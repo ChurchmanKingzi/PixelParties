@@ -556,6 +556,10 @@ function PuzzleCreator() {
   const [editHp, setEditHp] = useState('');
   const [editMaxHp, setEditMaxHp] = useState('');
   const [editAtk, setEditAtk] = useState('');
+  // Skins: Held-Skin für das Puzzle (nur freigeschaltete; wird beim Export/Test serverseitig geprüft).
+  const [editSkin, setEditSkin] = useState('');
+  const [ownedSkinIds, setOwnedSkinIds] = useState([]);
+  useEffect(() => { api('/shop/owned').then(d => setOwnedSkinIds(d.owned?.skin || [])).catch(() => {}); }, []);
   const [dragCardName, setDragCardName] = useState(null);
   const [dragHandIdx, setDragHandIdx] = useState(null);
   /**
@@ -2876,7 +2880,7 @@ function PuzzleCreator() {
       const h = p.heroes[hi]; if (!h) return;
       klangBeimOeffnen();
       setEditTarget({ si, zt, hi, slot });
-      setEditHp(String(h.hp)); setEditMaxHp(String(h.maxHp)); setEditAtk(String(h.atk));
+      setEditHp(String(h.hp)); setEditMaxHp(String(h.maxHp)); setEditAtk(String(h.atk)); setEditSkin(h.skin || '');
       // Hydrate statuses, collapsing Death Knight's Bound-with-source
       // into the cosmetic `silenced` toggle so the editor doesn't
       // surface both rows for the same effect.
@@ -3046,6 +3050,7 @@ function PuzzleCreator() {
     const { si, zt, hi, slot } = editTarget;
     if (zt === 'hero') updatePlayer(si, (p) => {
       if (p.heroes[hi]) {
+        if (editSkin) p.heroes[hi].skin = editSkin; else delete p.heroes[hi].skin;
         p.heroes[hi].hp = parseInt(editHp) || 0;
         p.heroes[hi].maxHp = parseInt(editMaxHp) || 0;
         p.heroes[hi].atk = parseInt(editAtk) || 0;
@@ -3255,7 +3260,7 @@ function PuzzleCreator() {
       return p;
     });
     setEditTarget(null);
-  }, [editTarget, editHp, editMaxHp, editAtk, editStatuses, editBuffs, editBiomancyLevel, editAttachedHero, editHeadCounter, editLinkedHeroSlot, editChangeCounter, editEvolutionCounter, editInvestCounter, editCeciliaDefeated, editDiamondLoss, editJeGetroffen, editBountyMark, editBalanceCounter, editApplause, editBunnyBombCounter, editDemonCounter, editSparkflyGifts, editAntiMagicLevel, updatePlayer, getCard, statusScopePasst]);
+  }, [editTarget, editSkin, editHp, editMaxHp, editAtk, editStatuses, editBuffs, editBiomancyLevel, editAttachedHero, editHeadCounter, editLinkedHeroSlot, editChangeCounter, editEvolutionCounter, editInvestCounter, editCeciliaDefeated, editDiamondLoss, editJeGetroffen, editBountyMark, editBalanceCounter, editApplause, editBunnyBombCounter, editDemonCounter, editSparkflyGifts, editAntiMagicLevel, updatePlayer, getCard, statusScopePasst]);
 
   const toggleHeroDead = useCallback(() => {
     if (!editTarget || editTarget.zt !== 'hero') return;
@@ -3816,7 +3821,7 @@ function PuzzleCreator() {
                 data-hero-zone="1" data-hero-idx={hi} data-hero-owner={isOpp ? 'opp' : 'me'}
                 {...zh('hero', si, hi, 0)}>
                 {hero ? <>
-                  <BoardCard cardName={hero.name} hp={hero.hp} maxHp={hero.maxHp} atk={hero.atk} hpPosition="hero" />
+                  <BoardCard cardName={hero.name} hp={hero.hp} maxHp={hero.maxHp} atk={hero.atk} hpPosition="hero" skins={hero.skin ? { [hero.name]: hero.skin } : undefined} />
                   {hero.statuses?.frozen && <FrozenOverlay />}
                   {(hero.statuses?.stunned || hero.statuses?.webbed) && <div className="status-stunned-overlay"><div className="stun-bolt s1" /><div className="stun-bolt s2" /><div className="stun-bolt s3" /></div>}
                   {hero.statuses?.negated && <NegatedOverlay />}
@@ -5567,6 +5572,21 @@ function PuzzleCreator() {
                     </label>
                   )}
                 </div>
+              );
+            })()}
+            {editTarget.zt === 'hero' && (() => {
+              const heroName = players[editTarget.si]?.heroes?.[editTarget.hi]?.name;
+              const opts = (window.SKINS_DB?.[heroName] || []).filter(sk => ownedSkinIds.includes(sk));
+              if (!opts.length) return null;
+              return (
+                <label style={{ display: 'block', marginBottom: 14 }}>
+                  <span style={{ fontSize: 10, color: 'var(--accent)', fontWeight: 700 }}>SKIN</span>
+                  <select className="input" value={editSkin} onChange={(e) => setEditSkin(e.target.value)}
+                    style={{ width: '100%', marginTop: 4 }}>
+                    <option value="">Base</option>
+                    {opts.map(sk => <option key={sk} value={sk}>{sk}</option>)}
+                  </select>
+                </label>
               );
             })()}
             {/* Equip-Artifact edit targets restrict the buff picker to

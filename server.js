@@ -116,6 +116,27 @@ const PROFILE_SECRET = process.env.PROFILE_SECRET || 'pxlParties_s3cret_k3y_2025
 const PUZZLE_SECRET = process.env.PUZZLE_SECRET || 'pxlParties_puzzl3_k3y_2025!';
 const profileImportUsed = new Set();
 
+// Puzzle-Skins: Helden-Slots dürfen `skin` tragen. Beim Test/Export bleiben nur Skins,
+// die zum Helden gehören UND dem Ersteller gehören — sonst wird der Skin entfernt.
+async function stripUnownedPuzzleSkins(userId, puzzleData) {
+  const rows = await db.all("SELECT item_id FROM user_shop_items WHERE user_id = ? AND item_type = 'skin'", [userId]);
+  const owned = new Set(rows.map(r => r.item_id));
+  for (const pl of (puzzleData?.players || [])) {
+    for (const h of (pl?.heroes || [])) {
+      if (!h || h.skin === undefined) continue;
+      if (!(h.name && typeof h.skin === 'string' && (SKINS_DATA[h.name] || []).includes(h.skin) && owned.has(h.skin))) delete h.skin;
+    }
+  }
+}
+// Beim Spielstart: Skin je Held in `deckSkins` übernehmen (gültige Zuordnung Held → Skin genügt).
+function puzzleDeckSkins(pz) {
+  const out = {};
+  for (const h of (pz?.heroes || [])) {
+    if (h && h.name && typeof h.skin === 'string' && (SKINS_DATA[h.name] || []).includes(h.skin)) out[h.name] = h.skin;
+  }
+  return out;
+}
+
 // ===== PUZZLE ENCRYPTION =====
 function encryptPuzzle(data) {
   const iv = crypto.randomBytes(16);
@@ -15713,7 +15734,7 @@ io.on('connection', (socket) => {
         creationZone: [...(pz.creationZone || [])],
         _oncePerGameUsed: new Set(),
         _resolvingCard: null,
-        deckSkins: {},
+        deckSkins: puzzleDeckSkins(pz),
       };
     };
 
@@ -16397,16 +16418,17 @@ io.on('connection', (socket) => {
     if (!currentUser) return;
     if (activeGames.has(currentUser.userId)) { socket.emit('puzzle_error', 'Already in a game'); return; }
     if (!puzzleData?.players?.[0] || !puzzleData?.players?.[1]) { socket.emit('puzzle_error', 'Invalid puzzle data'); return; }
-    createPuzzleGame(puzzleData).catch(err => {
+    stripUnownedPuzzleSkins(currentUser.userId, puzzleData).catch(() => {}).then(() => createPuzzleGame(puzzleData)).catch(err => {
       console.error('[Puzzle] start_puzzle error:', err.message, err.stack);
       socket.emit('puzzle_error', 'Failed to start puzzle: ' + err.message);
     });
   });
 
   // Export puzzle: encrypt server-side, send back to client for download
-  socket.on('export_puzzle', (puzzleData) => {
+  socket.on('export_puzzle', async (puzzleData) => {
     if (!currentUser) return;
     try {
+      await stripUnownedPuzzleSkins(currentUser.userId, puzzleData);
       const encrypted = encryptPuzzle(puzzleData);
       socket.emit('puzzle_exported', { data: encrypted });
     } catch (err) {
