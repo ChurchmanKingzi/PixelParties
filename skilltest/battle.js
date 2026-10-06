@@ -119,6 +119,16 @@ async function start(room, host, prep) {
     turnTimerSec: st.turnTimerDisabled ? 0 : st.turnTimerSec,
   };
   const skillGs = gs.skillTest;
+  // CPU-Sitze spielen mit einem gelernten Spielstil (Persona aus der Liga), falls ein Profil existiert.
+  try {
+    const L = require('./learn/profile');
+    const prof = L.get();
+    skillGs.botWeights = {};
+    for (const seat of skillGs.botSeats) {
+      const per = L.samplePersona(prof);
+      if (per) skillGs.botWeights[seat] = per.weights;
+    }
+  } catch (e) { console.error('[skilltest] Profil:', e && e.message); }
 
   // 2) Engine
   const engine = new host.GameEngine(room, host.io, host.sendGameState, (r, winnerIdx, reason) => finishGame(r, winnerIdx, reason, host), host.sendSpectatorGameState);
@@ -129,6 +139,7 @@ async function start(room, host, prep) {
   ext.installElimination(engine);
   ext.installMeter(engine);
   ext.installTurnEnd(engine, host);
+  ext.installSnapshotGuard(engine);
   engine._stOnTurn = (seat) => { if (skillGs.botSeats.includes(seat)) host.scheduleBotTurn(room, seat); armTurnTimer(room, host); };
   engine.init();
   ext.relaxRules(engine);

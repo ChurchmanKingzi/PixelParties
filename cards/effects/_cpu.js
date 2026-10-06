@@ -13983,7 +13983,8 @@ async function mctsPickFromOptions(engine, options, applyFn, opts = {}) {
   // the caller's heuristic ordering (if any) acts as the cheap default.
   // Same bypass for `_mctsKilledThisTurn` so post-overload pickers
   // don't take new snapshots that re-trip the cap.
-  if (engine._inMctsSim || engine._mctsKilledThisTurn) return options[0];
+  // Skill Test (N Spieler): keine Rollouts — sie wuerden den Rundentreiber und das Gegner-Modell (zwei Seiten) mitsimulieren.
+  if (engine._inMctsSim || engine._mctsKilledThisTurn || engine.gs?.skillTest) return options[0];
 
   const cpuIdx = engine._cpuPlayerIdx;
   const prevSilent = _cpuLogSilent;

@@ -126,9 +126,29 @@ function installPlayerChoice(engine) {
   };
 }
 
+/**
+ * `engine.restore(snap)` ersetzt `gs.skillTest` durch eine KOPIE (die Identität geht verloren, nicht aufzählbare
+ * Felder wie die Timer-Handles gehen mit). Der Rundentreiber, Wächter und Timer halten aber das lebende Objekt:
+ * nach jedem Restore bekommt es die Werte der Kopie, bleibt selbst aber dasselbe Objekt.
+ */
+function installSnapshotGuard(engine) {
+  const orig = engine.restore.bind(engine);
+  engine.restore = function (snap) {
+    const live = this.gs.skillTest;
+    const r = orig(snap);
+    const restored = this.gs.skillTest;
+    if (live && restored && restored !== live) {
+      for (const k of Object.keys(live)) if (!(k in restored)) delete live[k];
+      Object.assign(live, restored);
+      this.gs.skillTest = live;
+    }
+    return r;
+  };
+}
+
 /** Kein Handlimit, keine Deck-Out-Niederlage (es gibt keine Decks). */
 function relaxRules(engine) {
   for (const ps of engine.gs.players) ps._noHandLimitUntilTurn = Infinity;
 }
 
-module.exports = { installPlayerChoice, installElimination, installMeter, installTurnEnd, installBotSeats, installBotBrain, relaxRules };
+module.exports = { installSnapshotGuard, installPlayerChoice, installElimination, installMeter, installTurnEnd, installBotSeats, installBotBrain, relaxRules };

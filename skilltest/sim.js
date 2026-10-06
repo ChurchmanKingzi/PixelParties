@@ -93,7 +93,7 @@ async function runGame(opts = {}) {
   }
   const bases = [];
   for (let i = 0; i < seats; i++) {
-    prep.players[i] = bot.prepareBase({ env, ps: prep.players[i], room, idx: i, pool, prep });
+    prep.players[i] = bot.prepareBase({ env, ps: prep.players[i], room, idx: i, pool, prep, noProfile: !!(opts.noProfileSeats && opts.noProfileSeats.includes(i)) });
     prep.players[i].ready = true;
     bases.push(JSON.parse(JSON.stringify(prep.players[i])));
   }
@@ -109,6 +109,7 @@ async function runGame(opts = {}) {
   await battle.start(room, host, prep);
   const gs = room.gameState, engine = room.engine, st = gs.skillTest;
   if (opts.record) st.record = true;
+  if (opts.noProfileSeats) st.noProfile = [...opts.noProfileSeats];
   if (opts.weights) st.botWeights = Object.fromEntries(opts.weights.map((w, i) => [i, w]).filter(([, w]) => w));
   if (!opts.noFast) engine.enterFastMode();
 

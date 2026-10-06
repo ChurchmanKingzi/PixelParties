@@ -37,8 +37,13 @@ function weightsOf(room, seat) {
   return Object.assign({}, DEFAULT_WEIGHTS, (st.botWeights && st.botWeights[seat]) || {});
 }
 
-function profile() {
-  try { return require('./learn/profile').get(); } catch { return null; }
+/** Gelerntes Profil — `null` für Sitze, die ohne Profil spielen sollen (Vergleichsläufe, `st.noProfile`). */
+function profile(room, seat) {
+  try {
+    const st = room && room.gameState && room.gameState.skillTest;
+    if (st && st.noProfile && st.noProfile.includes(seat)) return null;
+    return require('./learn/profile').get();
+  } catch { return null; }
 }
 
 // ── Karten-Hilfen ──────────────────────────────────────────────────
@@ -170,7 +175,7 @@ function freeSupportSlots(ps, hi) {
 function rankActions(room, seat, host) {
   const engine = room.engine, gs = room.gameState, ps = gs.players[seat];
   const w = weightsOf(room, seat);
-  const prof = profile();
+  const prof = profile(room, seat);
   const db = getCardDB();
   const out = [];
   const heroes = rounds.heroActors(engine, seat);
@@ -236,7 +241,7 @@ function rankActions(room, seat, host) {
 function freeActions(room, seat, host) {
   const engine = room.engine, gs = room.gameState, ps = gs.players[seat];
   const w = weightsOf(room, seat);
-  const prof = profile();
+  const prof = profile(room, seat);
   const db = getCardDB();
   const out = [];
   const alive = (ps.heroes || []).map((h, hi) => (h && h.name && h.hp > 0 ? hi : -1)).filter(hi => hi >= 0);
@@ -277,11 +282,11 @@ function freeActions(room, seat, host) {
  * Basis für einen CPU-Sitz: Heroes nach Wert (HP/ATK + gelernter Kartenwert), Abilities/Support nach gelernter
  * Passung zum Hero, unbrauchbare Karten in den Recycler (mehr Gold, früherer Spielbeginn).
  */
-function prepareBase({ env, ps, room, idx, pool }) {
+function prepareBase({ env, ps, room, idx, pool, noProfile }) {
   const { buildWithRecycling } = require('./autoprep');
   const { CONFIG } = require('./config');
   const L = require('./learn/profile');
-  const prof = profile();
+  const prof = noProfile ? null : profile();
   const cv = (n) => (prof ? L.meanOf(prof.cardValue[n]) : 0);
   const pv = (a, b) => (prof ? L.meanOf(prof.pairValue[a < b ? a + '|' + b : b + '|' + a]) : 0);
   return buildWithRecycling(env, ps, {

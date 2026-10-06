@@ -13880,7 +13880,15 @@ io.on('connection', (socket) => {
       }
       socket.join('room:' + roomId);
       socket.emit('room_joined', sanitizeRoom(room, currentUser.username));
-      if (room.skillTest) skillTest.onRejoin(room, currentUser, socket, skillTestHost);
+      if (room.skillTest) {
+        skillTest.onRejoin(room, currentUser, socket, skillTestHost);
+        // Läuft schon ein Kampf: Spielzustand an den Wiederkehrenden (Sitz) bzw. Zuschauer schicken.
+        if (room.gameState) {
+          const spi = room.gameState.players.findIndex(ps => ps.userId === currentUser.userId);
+          if (spi >= 0) sendGameState(room, spi, { reconnected: true });
+          else sendSpectatorGameState(room);
+        }
+      }
       // Cube Draft: if the draft was suspended waiting on this seat
       // and ALL human seats now have a live socketId, resume.
       if (room.cubeDraft?.draftState?.suspended && isPlayer) {
@@ -21079,6 +21087,8 @@ initDatabase().then(async () => {
       console.log('[demo-recorder] deaktiviert (PP_DEMO_RECORD=0)');
     }
     console.log(`Pixel Parties TCG running on http://localhost:${PORT}`);
+    // Skill Test: passives Lernen der Bots im Hintergrund (nur mit PP_ST_TRAIN_BG; siehe skilltest/learn/background.js).
+    try { require('./skilltest/learn/background').start(); } catch (e) { console.error('[skilltest] Hintergrund-Lernen:', e && e.message); }
   });
 }).catch(err => {
   console.error('[DB] Failed to initialize database:', err);

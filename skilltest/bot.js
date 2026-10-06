@@ -16,9 +16,9 @@ let _policy = null;
 function policy() { return _policy || (_policy = require('./policy')); }
 
 /** Basisaufbau in der Vorbereitung. */
-function prepareBase({ env, ps, room, idx, pool }) {
+function prepareBase({ env, ps, room, idx, pool, noProfile }) {
   const p = policy();
-  if (p.prepareBase) return p.prepareBase({ env, ps, room, idx, pool });
+  if (p.prepareBase) return p.prepareBase({ env, ps, room, idx, pool, noProfile });
   return autoBuild(env, ps);
 }
 
