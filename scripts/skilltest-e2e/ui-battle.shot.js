@@ -39,6 +39,7 @@ const toolsDir = (process.env.NODE_PATH || '').split(path.delimiter).find(d => f
       await page.locator(`[data-st-card="${heroes[hi].replace(/"/g, '\\"')}"]`).dragTo(page.locator(`[data-st-zone="hero:${hi}:"]`));
       await sleep(300);
     }
+    if (process.env.ST_PICKER) await page.evaluate(() => { window.socket.on('game_state', (g) => { window.__lastGs = g; }); });
     await page.click('.st-ready-btn');
     await page.waitForSelector('.st-turn-panel', { timeout: 20000 });
     // Bildfolge der ersten Bot-Züge (ST_SEQ0): Anzeige folgt dem Geschehen, der Handelnde leuchtet, danach ergraut er
@@ -53,10 +54,6 @@ const toolsDir = (process.env.NODE_PATH || '').split(path.delimiter).find(d => f
     console.log('turn panel:', (await page.innerText('.st-turn-panel')).replace(/\n/g, ' | '));
     // Spielerwahl (ST_PICKER=1): ein vorgetäuschter Prompt wie bei Chain Lightning/Qinglong — der gezeigte Gegner muss markiert sein
     if (process.env.ST_PICKER) {
-      await page.evaluate(() => {
-        const sock = window.socket;
-        sock.on('game_state', (g) => { window.__lastGs = g; });
-      });
       await sleep(3000);
       const info = await page.evaluate(() => {
         const g = window.__lastGs; if (!g) return null;

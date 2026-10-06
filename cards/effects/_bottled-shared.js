@@ -23,6 +23,8 @@ async function runDiscardChain(engine, potionOwner, potionName) {
   // Skill Test (mehrere Gegner): der Spieler wählt, mit wem er die Kette spielt.
   if (gs.skillTest && engine._stChooseOpponent) await engine._stChooseOpponent(potionOwner, potionName, 'Choose the player you want to play the chain with.');
   const oppIdx = engine.opponentOf(potionOwner);
+  // Die Kette läuft zwischen dem Spieler und dem GEWÄHLTEN Gegner. (Normalspiel: wie immer `opponentOf`.)
+  const gegenueber = (p) => (gs.skillTest ? (p === potionOwner ? oppIdx : potionOwner) : engine.opponentOf(p));
 
   // Opponent goes first
   let currentPlayer = oppIdx;
@@ -43,7 +45,7 @@ async function runDiscardChain(engine, potionOwner, potionName) {
     // sonst reichten sie die Kette unbegrenzt hin und her, weil keiner
     // je etwas abwerfen muesste.
     {
-      const oppOf = engine.opponentOf(currentPlayer);
+      const oppOf = gegenueber(currentPlayer);
       const boris = loadCardEffect('Boris, the Guardian of Blackport');
       const beideHabenBoris = !!boris?.borisActive
         && boris.borisActive(engine, currentPlayer) && boris.borisActive(engine, oppOf);
@@ -129,7 +131,7 @@ async function runDiscardChain(engine, potionOwner, potionName) {
     }
 
     // Switch to other player
-    currentPlayer = engine.opponentOf(currentPlayer);
+    currentPlayer = gegenueber(currentPlayer);
   }
 }
 

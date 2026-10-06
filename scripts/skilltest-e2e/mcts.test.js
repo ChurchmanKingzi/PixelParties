@@ -38,14 +38,16 @@ function probe(room) {
   console.error = (...a) => { errors.push(a.join(' ').slice(0, 240)); };
   const games = +process.env.ST_GAMES || 12;
   let finished = 0, t0 = Date.now(), rollouts = 0;
+  const unfinished = [];
   for (let g = 0; g < games; g++) {
     const seats = 2 + (g % 5);                                  // 2 … 6 Sitze
     const r = await runGame({ seats, mcts: true, mctsCfg: { MAX_MS: 0, ROLLOUTS: 2, TOP_K: 4 }, record: true, returnRoom: true });
     if (r.winnerIdx != null && r.reason !== 'sim_turn_limit') finished++;
+    else unfinished.push({ game: g, seats, reason: r.reason, turns: r.turns, rounds: r.rounds, busy: !!r.room.gameState.skillTest.busy, active: r.room.gameState.activePlayer, prompt: JSON.stringify(r.room.engine._pendingPrompt || r.room.engine._pendingGenericPrompt || null).slice(0, 200) });
     rollouts += (r.room.skillTest.mctsStats || {}).rollouts || 0;
   }
   console.error = origErr; console.log = origLog;
-  check(`Alle ${games} Partien (2–6 Sitze) enden mit einem Sieger`, finished === games, { finished });
+  check(`Alle ${games} Partien (2–6 Sitze) enden mit einem Sieger`, finished === games, { finished, unfinished });
   check(`Suchen liefen (${searches}) und haben Rollouts gespielt (${rollouts})`, searches > 20 && rollouts > 50, { searches, rollouts });
   check('Die Suche ändert den Spielzustand nicht (Spielzustand, Kartenobjekte, Lernprotokoll, Flags)', mismatches === 0, firstDiff || { mismatches });
   check('Genau ein „Ende" je Partie — simulierte Partien beenden nichts', endLines.length === games, endLines.length);
