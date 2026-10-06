@@ -126,3 +126,23 @@
 /* Tooltip-Spalte rechts (wie im Puzzle-Editor) */
 .st-prep .board-tooltip { position: fixed; right: 8px; top: 70px; width: 270px; z-index: 50; pointer-events: none; }
 .st-prep .board-tooltip:empty { display: none; }
+
+/* ── Kampf: Turn-Panel (ersetzt den Phasen-Tracker) ─────────────────── */
+.st-turn-panel { display: flex; flex-direction: column; gap: 6px; align-items: stretch; min-width: 170px; padding: 8px 10px;
+  background: rgba(10,12,18,.72); border: 1px solid var(--bg4); border-radius: 6px; }
+.st-turn-panel.is-my-turn { border-color: #ffd84a; box-shadow: 0 0 18px rgba(255,216,74,.35); animation: stPulse 1.6s infinite; }
+.st-turn-round { font-size: 12px; color: var(--accent); text-align: center; letter-spacing: 2px; }
+.st-turn-row { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--text2); padding: 1px 4px; border-radius: 3px; }
+.st-turn-row.is-active { color: #ffe27a; background: rgba(255,216,74,.12); font-weight: 700; }
+.st-turn-row.is-me .st-turn-name { text-decoration: underline; }
+.st-turn-row.is-out { opacity: .45; text-decoration: line-through; }
+.st-turn-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 110px; }
+.st-turn-actors { font-size: 10px; letter-spacing: 1px; }
+.st-turn-yours { text-align: center; color: #ffd84a; font-size: 12px; }
+.st-pass-btn { font-size: 11px; }
+
+/* Akteure: bereite leuchten, erschöpfte sind ausgegraut */
+.board-zone-hero.st-actor-ready { box-shadow: 0 0 0 2px rgba(255,226,122,.9), 0 0 16px rgba(255,226,122,.55); cursor: pointer; }
+.board-zone-hero.st-actor-exhausted { filter: grayscale(.75) brightness(.72); }
+.st-hero-menu { display: flex; flex-direction: column; gap: 6px; min-width: 150px; }
+.st-menu-title { font-size: 10px; color: var(--accent); text-align: center; }

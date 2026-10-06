@@ -196,6 +196,19 @@ const GAMEPLAY_EVENTS = new Set([
 const isGameplayEvent = (e) => GAMEPLAY_EVENTS.has(e);
 function setPhaseFor(room, pi, event, params) { return require('./rounds').setPhaseFor(room, pi, event, params); }
 
+/** Öffentlicher Skill-Test-Zustand für die Clients (nur Sichtbares). */
+function publicState(gs) {
+  const st = gs && gs.skillTest;
+  if (!st) return null;
+  return {
+    round: st.round, order: st.order, starter: st.starter, turnSeat: st.turnSeat,
+    exhaustedHeroes: st.exhaustedHeroes, exhaustedCreatures: st.exhaustedCreatures, passed: st.passed,
+    eliminated: st.eliminated, botSeats: st.botSeats, phase: st.phase,
+    turnDeadline: st.turnDeadline || null, turnTimerSec: st.turnTimerSec || 0, serverNow: Date.now(),
+    busy: !!st.busy,
+  };
+}
+
 /** Zugwächter (siehe rounds.act). */
 function act(room, pi, kind, params, fn, host) { return require('./rounds').act(room, pi, kind, params, fn, host); }
 
@@ -241,7 +254,7 @@ function onSeatLeft(room, user, socket, host) {
 }
 
 module.exports = {
-  PHASES, startPrep, onSeatLeft, onRejoin, act, scheduleBotTurn, isGameplayEvent, setPhaseFor,
+  PHASES, startPrep, onSeatLeft, onRejoin, act, scheduleBotTurn, isGameplayEvent, setPhaseFor, publicState,
   buildRoomConfig, isSkillTestRoom, isLobbyPhase, summary, seatsOf,
   makeCpuSeat, registerLobbyHandlers,
 };

@@ -667,6 +667,69 @@ function SkillTestBattlePending({ lobby, leaveRoom }) {
   );
 }
 
+// ═══════════════════════════════════════════
+//  KAMPF — Turn-Panel und Hero-Menü (hängen im GameBoard)
+// ═══════════════════════════════════════════
+function StTurnPanel({ gameState, myIdx, isSpectator }) {
+  const st = gameState.skillTest;
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => { const t = setInterval(() => setNow(Date.now()), 500); return () => clearInterval(t); }, []);
+  const players = gameState.players;
+  const active = gameState.activePlayer;
+  const myTurn = !isSpectator && active === myIdx && !gameState.result;
+  const left = st.turnDeadline ? Math.max(0, st.turnDeadline - (now + (st.serverNow - Date.now()))) : null;
+  const order = st.order && st.order.length ? st.order : players.map((_, i) => i);
+  const readyHeroes = (seat) => (players[seat].heroes || []).filter((h, hi) => h && h.name && h.hp > 0 && !(st.exhaustedHeroes || {})[seat + ':' + hi]).length;
+  return (
+    <div className={'st-turn-panel' + (myTurn ? ' is-my-turn' : '')}>
+      <div className="st-turn-round orbit-font">ROUND {st.round}</div>
+      <div className="st-turn-list">
+        {order.map(seat => {
+          const p = players[seat];
+          const out = (st.eliminated || []).includes(seat);
+          return (
+            <div key={seat} className={'st-turn-row' + (seat === active ? ' is-active' : '') + (out ? ' is-out' : '') + (seat === myIdx ? ' is-me' : '')}>
+              <span className="st-turn-name">{seat === active ? '▶ ' : ''}{p.username}</span>
+              <span className="st-turn-actors" title="Heroes that can still act this round">{out ? '✖' : '⚔'.repeat(Math.min(3, readyHeroes(seat))) || '–'}</span>
+              {(st.passed || {})[seat] && <span className="st-turn-passed" title="Ended their round">⏹</span>}
+            </div>
+          );
+        })}
+      </div>
+      {myTurn && <div className="st-turn-yours orbit-font">YOUR TURN{left != null ? ` · ${Math.ceil(left / 1000)}s` : ''}</div>}
+      {myTurn && (
+        <button className="btn btn-danger st-pass-btn" disabled={!!st.busy}
+          title="Give up your remaining actors for this round"
+          onClick={() => socket.emit('st_pass_round', { roomId: gameState.roomId })}>
+          END MY ROUND ⏹
+        </button>
+      )}
+    </div>
+  );
+}
+
+// Menü nach Klick auf einen eigenen Hero mit aktivem Effekt: Effekt oder einfacher Angriff.
+function StHeroMenu({ menu, gameState, onClose }) {
+  const hero = gameState.players[gameState.myIndex].heroes[menu.heroIdx];
+  const effect = menu.effect || {};
+  const label = effect.effectName || effect.label || 'Use hero effect';
+  return (
+    <div className="st-menu-backdrop" onClick={onClose} onContextMenu={(e) => { e.preventDefault(); onClose(); }}>
+      <div className="st-menu st-hero-menu" style={{ left: menu.x, top: menu.y + 6 }} onClick={e => e.stopPropagation()}>
+        <div className="st-menu-title orbit-font">{hero && hero.name}</div>
+        <button className="btn btn-accent2" onClick={() => { socket.emit('activate_hero_effect', { roomId: gameState.roomId, heroIdx: menu.heroIdx, charmedOwner: effect.charmedOwner }); onClose(); }}>
+          ✨ {label}
+        </button>
+        <button className="btn" onClick={() => { socket.emit('st_attack', { roomId: gameState.roomId, heroIdx: menu.heroIdx }); onClose(); }}>
+          ⚔ Attack
+        </button>
+      </div>
+    </div>
+  );
+}
+
+window.StTurnPanel = StTurnPanel;
+window.StHeroMenu = StHeroMenu;
 window.SkillTestLobby = SkillTestLobby;
 window.SkillTestBattlePending = SkillTestBattlePending;
 window.SkillTestCreateOptions = SkillTestCreateOptions;

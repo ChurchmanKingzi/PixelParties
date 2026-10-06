@@ -32877,6 +32877,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   const creatureMoveSuppressRef = useRef({}); // { 'owner-heroIdx-slot': true } — suppress damage numbers when creature moves zones
   const [fightingAtkChanges, setFightingAtkChanges] = useState([]); // [{id, amount, owner, heroIdx}]
 
+  // Skill Test: Hero-Menü (Attack / aktiver Effekt) nach Klick auf einen eigenen Hero
+  const [stHeroMenu, setStHeroMenu] = useState(null);
+
   // End-turn confirmation
   const [askBeforeEndTurn, setAskBeforeEndTurn] = useState(() => localStorage.getItem('pp_ask_end_turn') !== '0');
   const [showEndTurnConfirm, setShowEndTurnConfirm] = useState(false);
@@ -43949,6 +43952,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             ? (gameState.effectPrompt.activatableHeroEffects || []).find(e => e.heroIdx === i)
             : null;
           const isHeroEffectActive = !!heroEffectEntry || !!heroActionEffectEntry;
+          // Skill Test: bereit (noch nicht erschöpft) / erschöpft — gilt für alle Spieler (Vorschau der Round).
+          const stOwner = isOpp ? oppIdx : myIdx;
+          const stExhausted = !!(gameState.skillTest && gameState.skillTest.exhaustedHeroes && gameState.skillTest.exhaustedHeroes[stOwner + ':' + i]);
+          const stHeroReady = !!(gameState.skillTest && hero?.name && hero.hp > 0 && !stExhausted && !hero.statuses?.frozen && !hero.statuses?.stunned);
           // v718: die DAUERHAFTE Uebernahme (Paraseed Control) fuehrt
           // bewusst KEINEN `charmed`-Status — der wuerde das Ausruesten
           // sperren, und ein dauerhaft uebernommener Held zaehlt wie ein
@@ -44091,6 +44098,16 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               }
             : isZonePickHero
             ? () => respondToPrompt({ heroIdx: i, slotIdx: zonePickHeroFirstSlot.get(i) })
+            : (gameState.skillTest && !isOpp && !isSpectator && isMyTurn && !result && stHeroReady && !isEffectLocked && !isValidHeroTarget && !heroActionEffectEntry)
+            // Skill Test: Klick auf einen eigenen, noch nicht erschöpften Hero → Menü bzw. direkter Angriff.
+            ? (e) => {
+                if (heroEffectEntry) {
+                  const r = e && e.currentTarget ? e.currentTarget.getBoundingClientRect() : { left: 200, bottom: 200, width: 0 };
+                  setStHeroMenu({ heroIdx: i, x: r.left + r.width / 2, y: r.bottom, effect: heroEffectEntry });
+                } else {
+                  socket.emit('st_attack', { roomId: gameState.roomId, heroIdx: i });
+                }
+              }
             : (isHeroEffectActive && (!isEffectLocked || heroActionEffectEntry) && !isValidHeroTarget)
             ? (heroActionEffectEntry
                 // Zusatzaktion: die Antwort geht an den offenen Prompt,
@@ -44117,7 +44134,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 <div key={'lpad-'+s} className="board-zone-spacer" />
               ))}
               <div className="board-zone-spacer" />
-              <div className={'board-zone board-zone-hero' + (hero?.name ? ' zone-has-card' : '') + (isDead ? ' board-zone-dead' : '') + ((abilityIneligible || equipIneligible || creatureIneligible || spellAttackIneligible || surpriseIneligible || ascensionIneligible || pickHeroDropIneligible || heroActionDimmed || additionalActionDimmed || attachPickHeroDim) ? ' board-zone-dead' : '') + (attachPickHeroDim ? ' attach-pick-dim' : '') + ((abilityTarget || equipTarget || spellTarget || surpriseTarget || ascensionTarget || pickHeroDropTarget || attachPickEligibleHero || isCsppHeroTarget || spellPickEntry) ? ' board-zone-play-target' : '') + (attachPickEligibleHero ? ' attach-pick-target' : '') + (isValidHeroTarget ? ' potion-target-valid' : '') + (isValidHeroTarget && accentGreenTargetIds.has(heroTargetId) ? ' potion-target-accent-green' : '') + (isIneligibleHeroTarget ? ' potion-target-ineligible' : '') + (isSelectedHeroTarget ? ' potion-target-selected' : '') + (oppTargetHighlight.includes(heroTargetId) ? ' opp-target-highlight' : '') + ((isHeroEffectActive || klickHeilungOffen) ? ' zone-hero-effect-active' : '') + (isCharmed ? ' hero-charmed' : '') + (isControlled ? ' hero-charmed' : '') + (isChainPickValid ? ' chain-pick-valid' : '') + (isChainPickSelected ? ' chain-pick-selected' : '') + (isZonePickHero ? ' zone-pick-target' : '') + ((allianzHover && allianzHover.some(a => a.owner === (isOpp ? oppIdx : myIdx) && a.heroIdx === i)) ? ' zone-alliance-linked' : '')}
+              <div className={'board-zone board-zone-hero' + (hero?.name ? ' zone-has-card' : '') + (isDead ? ' board-zone-dead' : '') + ((abilityIneligible || equipIneligible || creatureIneligible || spellAttackIneligible || surpriseIneligible || ascensionIneligible || pickHeroDropIneligible || heroActionDimmed || additionalActionDimmed || attachPickHeroDim) ? ' board-zone-dead' : '') + (attachPickHeroDim ? ' attach-pick-dim' : '') + ((abilityTarget || equipTarget || spellTarget || surpriseTarget || ascensionTarget || pickHeroDropTarget || attachPickEligibleHero || isCsppHeroTarget || spellPickEntry) ? ' board-zone-play-target' : '') + (attachPickEligibleHero ? ' attach-pick-target' : '') + (isValidHeroTarget ? ' potion-target-valid' : '') + (isValidHeroTarget && accentGreenTargetIds.has(heroTargetId) ? ' potion-target-accent-green' : '') + (isIneligibleHeroTarget ? ' potion-target-ineligible' : '') + (isSelectedHeroTarget ? ' potion-target-selected' : '') + (oppTargetHighlight.includes(heroTargetId) ? ' opp-target-highlight' : '') + ((isHeroEffectActive || klickHeilungOffen) ? ' zone-hero-effect-active' : '') + (stHeroReady ? ' st-actor-ready' : '') + (stExhausted && hero?.hp > 0 ? ' st-actor-exhausted' : '') + (isCharmed ? ' hero-charmed' : '') + (isControlled ? ' hero-charmed' : '') + (isChainPickValid ? ' chain-pick-valid' : '') + (isChainPickSelected ? ' chain-pick-selected' : '') + (isZonePickHero ? ' zone-pick-target' : '') + ((allianzHover && allianzHover.some(a => a.owner === (isOpp ? oppIdx : myIdx) && a.heroIdx === i)) ? ' zone-alliance-linked' : '')}
                 data-hero-zone="1" data-hero-idx={i} data-hero-owner={ownerLabel} data-hero-name={hero?.name || ''}
                 onClick={onHeroClick}
                 style={zsMerge('hero', { ...((isCsppHeroTarget || isHeroEffectActive || isValidHeroTarget || isChainPickValid || attachPickEligibleHero || isZonePickHero || spellPickEntry) ? { cursor: 'pointer' } : undefined), ...((isCharmed || isControlled) ? { '--charmed-color': charmedByColor || '#ff69b4' } : undefined) })}>
@@ -46559,6 +46576,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             }
             return (
           <div className="phase-column">
+            {gameState.skillTest && window.StTurnPanel ? <window.StTurnPanel gameState={gameState} myIdx={myIdx} isSpectator={isSpectator} /> : <>
             <div className="board-phase-tracker">
               {['Start Phase', 'Resource Phase', 'Main Phase 1', 'Action Phase', 'Main Phase 2', 'End Phase'].map((phase, i) => {
                 const isActive = currentPhase === i;
@@ -46607,6 +46625,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 </div>
               );
             })()}
+            </>}
           </div>
             );
           })()}
@@ -48710,6 +48729,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       })()}
 
       {/* End Turn confirmation */}
+      {stHeroMenu && window.StHeroMenu && <window.StHeroMenu menu={stHeroMenu} gameState={gameState} onClose={() => setStHeroMenu(null)} />}
       {showEndTurnConfirm && (
         <div className="modal-overlay" onClick={cancelEndTurn}>
           <div className="modal animate-in" onClick={e => e.stopPropagation()} style={{ maxWidth: 320, textAlign: 'center' }}>
