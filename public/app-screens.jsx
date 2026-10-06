@@ -3031,15 +3031,6 @@ function ProfileScreen() {
               <div style={{ textAlign: 'right', fontSize: 9, color: 'var(--text2)', marginTop: 2 }}>{defeatMsg.length}/80</div>
             </div>
 
-            {/* Profile Backup */}
-            <div style={{ borderTop: '1px solid var(--bg4)', margin: 'calc(var(--pv) * 1) 0', paddingTop: 'calc(var(--pv) * 1)' }}>
-              <div className="profile-section-label">PROFILE BACKUP</div>
-              {/* Export/Import buttons hidden — profile data now persists via Turso DB */}
-              <div style={{ fontSize: 9, color: 'var(--text2)', marginTop: 6, textAlign: 'center' }}>
-                Profile data is stored in the cloud and persists across updates.
-              </div>
-            </div>
-
             {/* Save button at bottom of identity panel */}
             <div style={{ marginTop: 'auto', paddingTop: 'calc(var(--pv) * 1.2)' }}>
               <button className="btn btn-success" style={{ width: '100%', padding: 'calc(var(--pv) * 1.3) 0', fontSize: 14 }} onClick={save} disabled={saving || !isDirty}>
@@ -3165,11 +3156,11 @@ function ProfileScreen() {
                 ) : (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 10, flex: 1 }}>
                     {topHeroes.map((h, i) => {
-                      const heroImg = getCardImage(h.name);
+                      const heroImg = (user.heroSkins && user.heroSkins[h.name]) ? skinImageUrl(user.heroSkins[h.name]) : getCardImage(h.name);
                       const medal = ['🥇', '🥈', '🥉'][i];
                       return (
                         <div key={h.name} className="profile-top-hero"
-                          onMouseEnter={() => { const c = CARDS_BY_NAME && CARDS_BY_NAME[h.name]; if (c) setHeroTip({ card: c, imageUrl: cardImageUrl(h.name) }); }}
+                          onMouseEnter={() => { const c = CARDS_BY_NAME && CARDS_BY_NAME[h.name]; if (c) setHeroTip({ card: c, imageUrl: cardImageUrl(h.name, user.heroSkins) }); }}
                           onMouseLeave={() => setHeroTip(null)}>
                           <div className="profile-top-hero-rank">{medal}</div>
                           <div className="profile-top-hero-card">
