@@ -26,6 +26,7 @@
 
 const { CONFIG } = require('./config');
 
+const PHASE_RESOURCE = 1;
 const PHASE_ACTION = 3;
 
 const stOf = (engine) => engine.gs.skillTest;
@@ -108,17 +109,28 @@ async function startRound(engine, host) {
   st.exhaustedHeroes = {};
   st.exhaustedCreatures = {};
   st.passed = {};
+  st.heroEco = {};            // je Held und Round: Aktionszähler (siehe ecoEnter) — Zusatzaktionen gelten pro Round und pro Held
+  st.actionPhaseOpen = {};    // Sitze, deren Action Phase in dieser Round schon begonnen hat (Phasenbeginn-Effekte nur einmal je Round)
   engine.log && engine.log('skilltest_round', { round: st.round, order: st.order });
 
   // `startTurn` setzt (im Skill-Test) alle Per-Turn-Zähler zurück, tickt Status-Schaden des
   // aktiven Spielers und feuert ON_TURN_START — ohne Resource-/Main-/Action-Kette.
+  if (st.round === 1) {
+    // Spielbeginn: Karten, die jetzt eine Wahl brauchen (Golden Abomination: welcher Gegner wird bestohlen), fragen hier —
+    // vor allen Zügen und vor dem Start-Gold-Tick.
+    gs.activePlayer = st.order[0];
+    try { await engine.runHooks('onSkillTestStart', { _skipReactionCheck: true }); } catch (e) { console.error('[skilltest] onSkillTestStart:', e && e.message); }
+  }
   for (const seat of st.order) {
     if (gs.result) return;
     gs.activePlayer = seat;
     await engine.startTurn();
     if (st.round === 1 && CONFIG.START_GOLD_TICK) {
-      // Resource-Tick am Spielbeginn (+4 plus Boni wie Wealth/Semi) — nur Round 1.
-      await engine.actionGainGold(seat, CONFIG.START_GOLD_TICK, { _isResourceGain: true });
+      // Resource-Tick am Spielbeginn (+4 plus Boni wie Wealth/Semi) — nur Round 1. Er läuft in der Resource Phase des
+      // Sitzes (Karten wie The Golden Abomination lenken Gold nur dort um).
+      gs.currentPhase = PHASE_RESOURCE;
+      try { await engine.actionGainGold(seat, CONFIG.START_GOLD_TICK, { _isResourceGain: true }); }
+      finally { gs.currentPhase = PHASE_ACTION; }
     }
   }
 }
@@ -132,6 +144,11 @@ async function endRound(engine) {
     if (gs.result) return;
     gs.activePlayer = seat;
     try {
+      if (st.actionPhaseOpen && st.actionPhaseOpen[seat]) {
+        // Ende der Action Phase dieses Sitzes: Zusatzaktions-Gewährungen verfallen, Marken werden geräumt.
+        await engine.runHooks(HOOKS.ON_PHASE_END, { phase: 'Action Phase', phaseIndex: 3 });
+        st.actionPhaseOpen[seat] = false;
+      }
       await engine.processStatusExpiry('END');
       await engine.runHooks(HOOKS.ON_PHASE_END, { phase: 'End Phase', phaseIndex: 5 });
       if (engine._flushSurpriseDrawChecks) await engine._flushSurpriseDrawChecks();
@@ -163,13 +180,19 @@ async function beginTurn(engine, seat) {
   st.turnSeat = seat;
   st.turnStartedAt = Date.now();
   const ps = gs.players[seat];
-  ps.heroesActedThisTurn = [];
-  ps._actionsPlayedThisPhase = 0;
-  ps.bonusActions = null;
-  ps._bonusMainActions = 0;
-  ps.comboLockHeroIdx = null;
-  if (ps.comboLockHeroOwner !== undefined) delete ps.comboLockHeroOwner;
-  try { await engine.runPhase(PHASE_ACTION); } catch (e) { console.error('[skilltest] runPhase(ACTION):', e.message); }
+  ps.heroesActedThisTurn = actedHeroesOf(st, seat);   // Round-Stand: wer in dieser Round schon gehandelt hat
+  ps._actionsPlayedThisPhase = 0;                      // neutral; im Zug zählt der Held (ecoEnter)
+  // Was im Normalspiel „pro Turn" ist, gilt hier pro Round: der Beginn der Action Phase (Phasenbeginn-Effekte,
+  // Reaktionsfenster „wenn die Action Phase des Gegners beginnt", Zusatzaktions-Vergabe) läuft nur beim
+  // ERSTEN Zug des Sitzes in dieser Round; spätere Züge derselben Round sind weitere Aktionen derselben Action Phase.
+  if (!st.actionPhaseOpen[seat]) {
+    st.actionPhaseOpen[seat] = true;
+    ps.bonusActions = null;
+    ps._bonusMainActions = 0;
+    ps.comboLockHeroIdx = null;
+    if (ps.comboLockHeroOwner !== undefined) delete ps.comboLockHeroOwner;
+    try { await engine.runPhase(PHASE_ACTION); } catch (e) { console.error('[skilltest] runPhase(ACTION):', e.message); }
+  }
   gs.currentPhase = PHASE_ACTION;
   try { gs.unactivatableArtifacts = engine.getUnactivatableArtifacts(seat); } catch { /* optional */ }
   if (typeof engine._stOnTurn === 'function') engine._stOnTurn(seat);
@@ -295,6 +318,44 @@ function creatureInstOf(engine, pi, params) {
     && c.heroIdx === params.heroIdx && c.zoneSlot === params.zoneSlot) || null;
 }
 
+// ── Aktionshaushalt je Held ─────────────────────────────────────────
+// Die Engine zählt Aktionen je SPIELER und Turn (`_actionsPlayedThisPhase`, `heroesActedThisTurn`): Aktion 1 der Action Phase,
+// danach das Zweite-Aktion-Fenster der Zusatzaktions-Gewährungen („Aktion 2"). Im Skill Test hat jeder HELD seine eigene
+// Action Phase pro Round: Hauptaktion (erschöpft ihn) und danach höchstens eine zweite Aktion (Gewährung). Damit alle
+// Engine-/Server-/Kartenprüfungen unverändert greifen, werden die beiden Zähler für die Dauer einer Aktion auf den Stand
+// des handelnden Helden gestellt und danach zurück auf den neutralen Round-Stand.
+
+/** Indizes der Helden dieses Sitzes, die in dieser Round ihre Hauptaktion verbraucht haben. */
+function actedHeroesOf(st, seat) {
+  const out = [];
+  for (const k of Object.keys(st.exhaustedHeroes || {})) {
+    const [s, h] = k.split(':');
+    if (Number(s) === seat) out.push(Number(h));
+  }
+  return out;
+}
+
+/** Zähler auf den handelnden Helden stellen. Gibt die Daten fürs Zurückstellen zurück. */
+function ecoEnter(st, ps, pi, kind, params) {
+  const hi = (kind === 'activate_creature_effect' || !params || params.heroIdx == null) ? null : params.heroIdx;
+  const key = hi == null ? null : heroKey(pi, hi);
+  const eco = key ? (st.heroEco[key] || (st.heroEco[key] = { played: 0, playedTurn: 0 })) : null;
+  ps._actionsPlayedThisPhase = eco ? eco.played : 0;
+  ps._actionsPlayedThisTurn = eco ? eco.playedTurn : 0;        // zählt (anders als die Phase) auch Main-Phase-Aktionen
+  ps.heroesActedThisTurn = key && st.exhaustedHeroes[key] ? [hi] : [];
+  return { hi, key, eco };
+}
+
+/** Zähler des Helden sichern, dann zurück auf den neutralen Round-Stand. */
+function ecoLeave(st, ps, pi, ctx) {
+  if (ctx.eco) { ctx.eco.played = ps._actionsPlayedThisPhase || 0; ctx.eco.playedTurn = ps._actionsPlayedThisTurn || 0; }
+  ps._actionsPlayedThisPhase = 0; ps._actionsPlayedThisTurn = 0;
+  // Neutraler Round-Stand: alle Helden, die in dieser Round gehandelt haben (der Zug des Helden steht dann in exhaustedHeroes).
+  const union = new Set(actedHeroesOf(st, pi));
+  for (const h of (ps.heroesActedThisTurn || [])) union.add(h);
+  ps.heroesActedThisTurn = [...union];
+}
+
 /** Läuft ein Handler fertig und gibt dann den Zug weiter, falls eine Aktion verbraucht wurde. */
 async function act(room, pi, kind, params, fn, host) {
   const gs = room.gameState, engine = room.engine, st = gs && gs.skillTest;
@@ -308,6 +369,7 @@ async function act(room, pi, kind, params, fn, host) {
   st._delays = 0; engine._stPromptCounts = {};      // Schrittbudget und Wiederholungszähler dieser Aktion (siehe installRunawayBreaker / policy.chooseTargets)
   const token = (st.actToken = (st.actToken || 0) + 1);
   const ps = gs.players[pi];
+  const eco = ecoEnter(st, ps, pi, kind, params);
   const actedBefore = (ps.heroesActedThisTurn || []).length;
   const hoptBefore = snapshotHopt(gs);
   const meter = engine._stMeter = { active: true, events: [] };
@@ -321,12 +383,13 @@ async function act(room, pi, kind, params, fn, host) {
   try { ok = await fn(); }
   catch (err) { console.error(`[skilltest] ${kind} threw:`, err && err.stack || err); }
   clearTimeout(wd);
-  if (st.actToken !== token) return ok;     // vom Wächter aufgegeben (siehe battle.js startPromptWatchdog)
+  if (st.actToken !== token) { ecoLeave(st, ps, pi, eco); return ok; }     // vom Wächter aufgegeben (siehe battle.js startPromptWatchdog)
   meter.active = false;
   st.busy = false;
 
-  if (gs.result) return ok;
   const acted = (ps.heroesActedThisTurn || []).slice(actedBefore);
+  const actedHeroes = acted.slice();
+  if (gs.result) { ecoLeave(st, ps, pi, eco); return ok; }
   const hopt = changedHopt(gs, hoptBefore);
   const ev = (n) => meter.events.some(e => e.name === n);
   let consumed = false;
@@ -337,9 +400,10 @@ async function act(room, pi, kind, params, fn, host) {
   } else if (kind === 'activate_creature_effect') {
     consumed = ev('afterCreatureEffect') || acted.length > 0 || hopt.some(k => k.startsWith('creature-effect:'));
   }
-  if (!consumed) return ok;
+  if (!consumed) { ecoLeave(st, ps, pi, eco); return ok; }
 
   for (const hi of acted) st.exhaustedHeroes[heroKey(pi, hi)] = true;
+  ecoLeave(st, ps, pi, eco);
   if (kind === 'activate_creature_effect') {
     const inst = creatureInstOf(engine, pi, params || {});
     if (inst) st.exhaustedCreatures[inst.id] = true;
@@ -385,7 +449,7 @@ async function passRound(room, pi, host) {
 }
 
 module.exports = {
-  act, playBaseAttack, passRound, CONSUMING_KINDS, METER_HOOKS, requiredPhase, setPhaseFor,
+  act, playBaseAttack, actedHeroesOf, passRound, CONSUMING_KINDS, METER_HOOKS, requiredPhase, setPhaseFor,
   roundOrder, nextStarter, heroKey, heroAlive, heroActors, creatureActors, hasActor, seatHasActor,
   seatAlive, livingSeats, withActive,
   startRound, endRound, beginTurn, advance, pickNextSeat, isIncapacitated,

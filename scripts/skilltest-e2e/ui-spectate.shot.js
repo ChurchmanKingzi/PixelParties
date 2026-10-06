@@ -35,7 +35,7 @@ const toolsDir = (process.env.NODE_PATH || '').split(path.delimiter).find(d => f
     await sleep(600);
     // Heroes platzieren
     const handNames = await page.evaluate(() => [...document.querySelectorAll('[data-st-card]')].map(e => e.getAttribute('data-st-card')));
-    const heroes = await page.evaluate((names) => names.filter(n => (window.CARDS_BY_NAME[n] || {}).cardType === 'Hero'), handNames);
+    const heroes = await page.evaluate((names) => names.filter(n => (window.CARDS_BY_NAME[n] || {}).cardType === 'Hero' && !/^(Zhigao|Quetzahuitl)/.test(n)), handNames);
     for (let hi = 0; hi < 3; hi++) {
       await page.locator(`[data-st-card="${heroes[hi].replace(/"/g, '\\"')}"]`).dragTo(page.locator(`[data-st-zone="hero:${hi}:"]`));
       await sleep(300);

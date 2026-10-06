@@ -1,7 +1,7 @@
 'use strict';
 // Zielwahl über Sitze hinweg: 1 Mensch + 3 CPUs. Der Mensch greift gezielt einen Helden auf Sitz 2 bzw. 3 an;
 // geprüft wird, dass GENAU dieser Held Schaden nimmt (Besitzer-Auflösung für Sitze ≥ 2).
-const { startServer, createAccount, check, sleep, finish, BASE } = require('./lib');
+const { boardHeroIdxs, startServer, createAccount, check, sleep, finish, BASE } = require('./lib');
 const { io } = require('socket.io-client');
 const cards = require('../../data/cards.json'); const db = {}; cards.forEach(c => db[c.name] = c);
 
@@ -26,8 +26,9 @@ const cards = require('../../data/cards.json'); const db = {}; cards.forEach(c =
     socket.emit('st_start', { roomId: room.id });
     let cur = await waitFor(() => last('st_prep_state'));
     socket.on('st_prep_state', (s) => { cur = s; });
-    for (const hi of [0, 1, 2]) {
-      const idx = cur.me.hand.findIndex(n => db[n].cardType === 'Hero');
+    const plan = boardHeroIdxs(db, cur.me.hand);
+    for (let hi = 0; hi < plan.length; hi++) {
+      const idx = plan[hi];
       socket.emit('st_prep_move', { roomId: room.id, move: { type: 'place', from: { kind: 'hand', idx }, to: { kind: 'hero', hi } } });
       await sleep(200);
     }

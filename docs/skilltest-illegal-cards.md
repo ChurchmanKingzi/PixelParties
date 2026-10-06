@@ -4,12 +4,8 @@
 > zur Freigabe einer Karte dort auf `true` setzen (Skript überschreibt nichts zurück).
 > Zusätzlich gesperrt per Regel: Divinity, Performance, Attack, Flying Island in the Sky, alle Ascended Heroes, alle Tokens.
 
-## Sofortiger Spielsieg („You win the game“): beendet die Partie für ALLE; im Skill Test gibt es dafür keine passende Wertung (Platzierung der Übrigen).
+## Sofortiger Spielsieg („You win the game“) ohne passende Wertung bei mehreren Spielern. (Die vier Cardinal Beasts sind NICHT gesperrt: je Partie fehlt eine zufällige von ihnen, siehe CONFIG.CARDINAL_BEASTS — so sind nie alle vier gleichzeitig im Spiel.)
 
-- Cardinal Beast Baihu
-- Cardinal Beast Qinglong
-- Cardinal Beast Xuanwu
-- Cardinal Beast Zhuque
 - The Final Trial
 - Carris, the Time Keeper
 
@@ -38,8 +34,34 @@
 - Guardian Beast Zhu
 - Mao, the Vengeful Guardian
 
-## Sieger/Verlierer-Ableitung als „der andere Spieler“ beim Ausscheiden bzw. Besitzer-Ableitung „Gegenseite des Wirts“ — braucht eine Regel für mehrere Gegner.
+## Alle Future-Tech-Karten (Archetyp „Future Tech“): sie brauchen eine gefüllte Ablage, um gut zu funktionieren — im Skill Test gibt es keine Decks und kaum Ablage.
 
-- Quetzahuitl, Receiver of Sacrifices
-- The Golden Abomination
+- Blueprints
+- Future Tech Barrage
+- Future Tech Battery
+- Future Tech Bazooka
+- Future Tech Bomb
 - Future Tech Control Device
+- Future Tech Copy Device
+- Future Tech Database
+- Future Tech Doomsday Bomb
+- Future Tech Doping
+- Future Tech Drone
+- Future Tech Escape Device
+- Future Tech Fists
+- Future Tech Gear
+- Future Tech Gun
+- Future Tech Gunslinger Riffel
+- Future Tech Jetpack
+- Future Tech Lamp
+- Future Tech Laser Cannon
+- Future Tech Magic Modifier
+- Future Tech Mech
+- Future Tech Organnon
+- Future Tech Potion Launcher
+- Future Tech Prototypes
+- Future Tech Weathercock
+- Iterative Testing
+- Misfire
+- Mysterious Core
+- The Core's Awakening

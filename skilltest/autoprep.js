@@ -144,6 +144,7 @@ function buildWithRecycling(env, psIn, opts = {}) {
     const keep = [], junk = [];
     ps.hand.forEach((n, idx) => {
       const c = env.cards[n];
+      if (Rules.HAND_ONLY_HEROES.includes(n)) return;           // Quetzahuitl bleibt auf der Hand (greift beim Fall des letzten Heroes ein)
       if (!usableInBattle(c)) { junk.push({ n, idx }); return; }
       const typeBase = (c.cardType === 'Spell' || c.cardType === 'Attack') ? 3 : c.cardType === 'Artifact' ? 2 : 1;
       keep.push({ n, idx, score: typeBase + keepScore(n) });

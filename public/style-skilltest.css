@@ -193,3 +193,5 @@
 .st-turn-out { margin-top: 6px; color: #ff6b81; font-size: 11px; text-align: center; letter-spacing: 1px; }
 
 .st-mini-stats { font-size: 10px; font-weight: 600; color: #cfe4ff; opacity: .9; white-space: nowrap; }
+/* Zusatzaktion: erschöpfter Held mit offener zweiter Aktion (bläuliches Leuchten statt Gelb) */
+.board-zone-hero.st-actor-bonus { box-shadow: 0 0 0 2px rgba(125,211,255,.95), 0 0 16px rgba(125,211,255,.55); cursor: pointer; }

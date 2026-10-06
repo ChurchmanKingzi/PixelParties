@@ -30,6 +30,10 @@
   'use strict';
 
   const ZHIGAO = 'Zhigao, the Heavenly Emperor';
+  // Heroes, die NIE als Brett-Hero aufgestellt werden dürfen: Quetzahuitl bleibt auf der Hand und greift erst ein, wenn dein
+  // letzter Hero außerhalb deines Zuges fällt. Er zählt deshalb nicht zu den Heroes, die das Brett füllen können
+  // (→ mindestens 4 Heroes insgesamt; pool.dealHand sorgt dafür, dass er nur in Händen mit ≥ 4 Heroes landet).
+  const HAND_ONLY_HEROES = ['Quetzahuitl, Receiver of Sacrifices'];
   // Helden, deren Support Zones Abilities aufnehmen (spiegelt engine.heroAcceptsAbilitiesInSupport).
   const ABILITY_SUPPORT_CARDS = ['Xal, the Animated Armor', 'Xalibur'];
   // Potions werden im Modus NICHT als Biomancy-Token auf die Basis gelegt.
@@ -91,7 +95,7 @@
   function zoneAccepts(env, ps, card, target) {
     const c = env.cards[card]; if (!c) return false;
     const { kind, hi } = target;
-    if (kind === 'hero') return c.cardType === 'Hero';
+    if (kind === 'hero') return c.cardType === 'Hero' && !HAND_ONLY_HEROES.includes(card);
     if (kind === 'ability') return c.cardType === 'Ability' && !!ps.heroes[hi];
     if (kind === 'support') {
       if (!ps.heroes[hi]) return false;
@@ -252,7 +256,7 @@
 
   function totalHeroes(env, ps) {
     let n = heroCount(ps);
-    for (const h of ps.hand) if (env.cards[h] && env.cards[h].cardType === 'Hero') n++;
+    for (const h of ps.hand) if (env.cards[h] && env.cards[h].cardType === 'Hero' && !HAND_ONLY_HEROES.includes(h)) n++;
     return n;
   }
 
@@ -361,7 +365,7 @@
   }
 
   return {
-    ZHIGAO, MAX_ABILITY_LEVEL, POTIONS_ON_BOARD,
+    ZHIGAO, HAND_ONLY_HEROES, MAX_ABILITY_LEVEL, POTIONS_ON_BOARD,
     emptyPlayer, clone,
     heroCount, requiredHeroes, boardFull, hasZhigao, totalHeroes, abilityLevel,
     zoneAccepts, canDrop, applyMove, readyProblem, abilityStacks, areaLimit, canPlaceAnotherArea,

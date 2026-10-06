@@ -78,4 +78,15 @@ function check(name, cond, info) {
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 function finish() { console.log(_fails ? `\n${_fails} Prüfung(en) FEHLGESCHLAGEN` : '\nAlles bestanden'); return _fails; }
 
-module.exports = { startServer, guestClient, createAccount, check, sleep, finish, BASE };
+/**
+ * Hand-Indizes der Heroes, die ein Test aufs Brett stellen soll (absteigend sortiert, damit das Entfernen aus der Hand die
+ * übrigen Indizes nicht verschiebt). Quetzahuitl darf nie aufs Brett; mit Zhigao stehen nur zwei Heroes.
+ */
+function boardHeroIdxs(db, hand) {
+  const heroes = hand.map((n, i) => ({ n, i })).filter(x => db[x.n] && db[x.n].cardType === 'Hero' && !/^Quetzahuitl/.test(x.n));
+  const normal = heroes.filter(x => !/^Zhigao/.test(x.n)), zhigao = heroes.filter(x => /^Zhigao/.test(x.n));
+  const pick = normal.length >= 3 ? normal.slice(0, 3) : (zhigao.length ? [zhigao[0], ...normal.slice(0, 1)] : normal);
+  return pick.map(x => x.i).sort((a, b) => b - a);
+}
+
+module.exports = { boardHeroIdxs, startServer, guestClient, createAccount, check, sleep, finish, BASE };

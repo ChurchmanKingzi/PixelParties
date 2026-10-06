@@ -9,6 +9,7 @@
 // ═══════════════════════════════════════════════════════════════════
 
 const { CONFIG, HARD_EXCLUDED_TYPES } = require('./config');
+const Rules = require('../public/skilltest-rules.js');
 
 /** In welchen Typ-Topf gehört diese Karte? (null = nicht im Pool) */
 function bucketOf(card) {
@@ -36,7 +37,18 @@ class CardPool {
       const b = bucketOf(c);
       if (b) this.buckets[b].push(c.name);
     }
+    // Rotation: von den Cardinal Beasts ist in dieser Partie eines gesperrt (zufällig), die übrigen bleiben im Pool.
+    this.banned = [];
+    const cb = (CONFIG.CARDINAL_BEASTS || []).filter(n => this.buckets.creature.includes(n));
+    if (cb.length >= 2) {
+      const ban = cb[Math.floor(this.rng() * cb.length)];
+      this.buckets.creature = this.buckets.creature.filter(n => n !== ban);
+      this.banned.push(ban);
+    }
   }
+
+  /** Eine Karte zurück in ihren Topf legen (z. B. wenn die Hand-Regeln sie nicht erlauben). */
+  give(bucket, name) { if (name) this.buckets[bucket].push(name); }
 
   remaining(bucket) {
     if (bucket) return this.buckets[bucket].length;
@@ -99,12 +111,34 @@ function sampleHandShape(rng = Math.random) {
   return shape;
 }
 
+/**
+ * `count` Heroes ziehen. Hand-only-Heroes (Quetzahuitl) zählen als Hero der Hand, aber das Brett braucht drei ANDERE:
+ * Er darf nur in eine Hand mit mindestens vier Heroes (und höchstens einer pro Hand) — sonst geht er zurück in den Pool.
+ */
+function takeHeroes(pool, count) {
+  const only = new Set(Rules.HAND_ONLY_HEROES);
+  const names = [], parked = [];
+  let hasOnly = false, missing = 0;
+  while (names.length < count) {
+    const name = pool.take('hero');
+    if (!name) { missing = count - names.length; break; }
+    if (only.has(name)) {
+      if (hasOnly || count < 4) { parked.push(name); continue; }
+      hasOnly = true;
+    }
+    names.push(name);
+  }
+  for (const n of parked) pool.give('hero', n);
+  return { names, missing };
+}
+
 /** Eine Startkarten-Hand aus dem Pool ziehen (Karten verlassen den Pool). */
 function dealHand(pool, rng = Math.random) {
   const shape = sampleHandShape(rng);
   const hand = [];
   let missing = 0;
   for (const b of BUCKETS) {
+    if (b === 'hero') { const r = takeHeroes(pool, shape.hero); hand.push(...r.names); missing += r.missing; continue; }
     for (let i = 0; i < shape[b]; i++) {
       const name = pool.take(b);
       if (name) hand.push(name); else missing++;

@@ -69,12 +69,23 @@ function installMeter(engine) {
 
 /** Jede Beendigung des Zuges (Ascension, Terror, `advanceToPhase(5)` …) läuft in den Round-Treiber. */
 function installTurnEnd(engine, host) {
+  // Effekte, die „den Zug beenden" (Terror, Aufstieg, Gate to the Armory …), beenden hier die ROUND des Sitzes:
+  // was im Normalspiel „pro Turn" gilt, gilt im Skill Test pro Round.
   engine.switchTurn = async function () {
     const gs = this.gs;
     if (gs.result || !gs.skillTest) return;
     const seat = gs.activePlayer;
     gs.skillTest.turnsTaken[seat] = (gs.skillTest.turnsTaken[seat] || 0) + 1;
+    gs.skillTest.passed[seat] = true;
     await rounds.advance(this, host, seat);
+  };
+  // Phasenwechsel durch den Spieler gibt es nicht: nach jeder Aktion ruft der Server `advanceToPhase(Main 2)`. Die Action
+  // Phase des Sitzes dauert die ganze Round (Zusatzaktionen, Gewährungen und Zähler bleiben bis zum Rundenende stehen,
+  // siehe rounds.js). Nur das Turn-Ende (Phase 5) läuft weiter durch.
+  const origAdvance = engine.advanceToPhase.bind(engine);
+  engine.advanceToPhase = async function (playerIdx, targetPhase, opts) {
+    if (this.gs.skillTest && targetPhase !== 5) return true;
+    return origAdvance(playerIdx, targetPhase, opts);
   };
 }
 
@@ -134,7 +145,7 @@ function installPlayerChoice(engine) {
   engine._getCpuGenericResponse = (promptData, promptedPlayerIdx) => withCpuSeat(engine, promptedPlayerIdx, () => {
     if (promptData && promptData.type === 'playerPicker') {
       const pool = (promptData.allowedPlayers && promptData.allowedPlayers.length) ? promptData.allowedPlayers : living(engine.gs, promptedPlayerIdx);
-      return { playerIdx: require('./bot').choosePlayer(engine, promptedPlayerIdx, pool) };
+      return { playerIdx: require('./bot').choosePlayer(engine, promptedPlayerIdx, pool, promptData) };
     }
     return baseGeneric(promptData, promptedPlayerIdx);
   });

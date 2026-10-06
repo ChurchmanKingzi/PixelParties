@@ -1,7 +1,7 @@
 'use strict';
 // Kampf-E2E über Sockets: 1 Mensch (passt jede Round) + 3 CPUs. Prüft N-Spieler-Zustand,
 // Round-Ablauf, Eliminierung und Spielende samt Platzierungen/SC.
-const { startServer, guestClient, createAccount, check, sleep, finish, BASE } = require('./lib');
+const { boardHeroIdxs, startServer, guestClient, createAccount, check, sleep, finish, BASE } = require('./lib');
 const { io } = require('socket.io-client');
 (async () => {
   const acc = await createAccount('BtlTest' + Date.now().toString(36));
@@ -28,13 +28,14 @@ const { io } = require('socket.io-client');
     // Heroes platzieren, bereit.
     let cur = prep;
     socket.on('st_prep_state', (s) => { cur = s; });
-    for (const hi of [0, 1, 2]) {
-      const idx = cur.me.hand.findIndex(n => db[n].cardType === 'Hero');
+    const plan = boardHeroIdxs(db, cur.me.hand);
+    for (let hi = 0; hi < plan.length; hi++) {
+      const idx = plan[hi];
       socket.emit('st_prep_move', { roomId: room.id, move: { type: 'place', from: { kind: 'hand', idx }, to: { kind: 'hero', hi } } });
       await sleep(250);
     }
     socket.emit('st_prep_ready', { roomId: room.id, ready: true });
-    const first = await waitFor(() => { const s = last('game_state'); return s && s.skillTest ? s : null; });
+    const first = await waitFor(() => { const s = last('game_state'); return s && s.skillTest && s.skillTest.round >= 1 ? s : null; });
     check('Spielzustand mit 4 Spielern', first && first.players.length === 4, first && first.players.length);
     check('skillTest-Zustand: Round 1, Reihenfolge 4 Sitze', first.skillTest.round === 1 && first.skillTest.order.length === 4, first.skillTest);
     await sleep(1500);

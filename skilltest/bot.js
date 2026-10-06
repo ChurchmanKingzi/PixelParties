@@ -33,7 +33,12 @@ function chooseTargets(engine, seat, validTargets, config, base) {
 }
 
 /** Spielerwahl (Flächenschaden, „choose a player"): Policy entscheidet. */
-function choosePlayer(engine, seat, candidates) {
+function choosePlayer(engine, seat, candidates, promptData) {
+  // The Golden Abomination: den Gegner mit dem meisten Gold wählen (nur sein Start-Gold-Tick wird umgelenkt, und nur bei Gold ≠ 0).
+  if (promptData && promptData.purpose === 'stealGold') {
+    const gold = (i) => (engine.gs.players[i] && engine.gs.players[i].gold) || 0;
+    return candidates.slice().sort((a, b) => gold(b) - gold(a))[0];
+  }
   const p = policy();
   if (p.choosePlayer) { const r = p.choosePlayer(engine, seat, candidates); if (r != null) return r; }
   return candidates[0];

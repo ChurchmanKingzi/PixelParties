@@ -22,6 +22,9 @@
 //  · Mehrere Abominationen: die erste lenkt um, die naechste sieht
 //    `ctx.cancelled` und tut nichts (kein doppeltes Gold).
 //  · Auftritt: `gold_steal_burst` (Muenzflug Gegner → Controller).
+//  · Skill Test (2–8 Spieler): „your opponent" ist mehrdeutig. Zu Spielbeginn (Hook `onSkillTestStart`, vor dem
+//    Start-Gold-Tick) WÄHLT der Controller einen lebenden Gegner (Spielerwahl; Bots nehmen den mit dem meisten Gold);
+//    nur dessen Gold wird umgelenkt (`inst._stTarget`). Bei nur einem Gegner entfällt die Frage.
 // ═══════════════════════════════════════════
 
 const { PHASES } = require('./_hooks');
@@ -34,20 +37,26 @@ const CARD_NAME = 'The Golden Abomination';
  * JETZT umlenken? Die eine Auslegungsstelle — auch fuer Karten, die vorab
  * wissen wollen, ob ihr Gold ankommt (Golden Ladybug, CPU-Wahl).
  */
-function stiehltGoldVon(engine, ctrl, gewinner) {
+function stiehltGoldVon(engine, ctrl, gewinner, inst) {
   const gs = engine?.gs;
   if (!gs || gewinner == null || ctrl == null) return false;
-  if (gewinner !== (opponentOfGs(gs, ctrl))) return false;
+  if (gs.skillTest) {
+    // Skill Test: das beim Spielbeginn gewählte Opfer dieser Abomination (ohne Wahl: kein Diebstahl).
+    if (!inst || inst._stTarget !== gewinner || gewinner === ctrl) return false;
+  } else if (gewinner !== (opponentOfGs(gs, ctrl))) return false;
   if (gs.currentPhase !== PHASES.RESOURCE || gs.activePlayer !== gewinner) return false;
   return (gs.players[gewinner]?.gold || 0) !== 0;       // „while their Gold is not 0"
 }
 
 /** Kontrolliert der Gegner von `gewinner` eine aktive Abomination, die gerade umlenkt? */
 function goldWuerdeUmgeleitet(engine, gewinner) {
-  const ctrl = gewinner === 0 ? 1 : 0;
-  return (engine?.cardInstances || []).some(c =>
-    c.name === CARD_NAME && c.zone === 'support' && (c.controller ?? c.owner) === ctrl
-    && engine.isCardEffectActive(c) && stiehltGoldVon(engine, ctrl, gewinner));
+  return (engine?.cardInstances || []).some(c => {
+    if (c.name !== CARD_NAME || c.zone !== 'support') return false;
+    const ctrl = c.controller ?? c.owner;
+    if (ctrl === gewinner) return false;
+    if (!engine.gs?.skillTest && ctrl !== (gewinner === 0 ? 1 : 0)) return false;
+    return engine.isCardEffectActive(c) && stiehltGoldVon(engine, ctrl, gewinner, c);
+  });
 }
 
 module.exports = {
@@ -56,12 +65,31 @@ module.exports = {
   goldWuerdeUmgeleitet,
 
   hooks: {
+    // Skill Test: einmal zu Spielbeginn den bestohlenen Gegner festlegen.
+    onSkillTestStart: async (ctx) => {
+      const engine = ctx._engine, gs = engine.gs, inst = ctx.card;
+      const ctrl = inst?.controller ?? inst?.owner;
+      if (!gs.skillTest || ctrl == null) return;
+      const cands = gs.players.map((_, i) => i).filter(i => i !== ctrl && (gs.players[i].heroes || []).some(h => h && h.name && h.hp > 0));
+      if (!cands.length) return;
+      let pick = cands[0];
+      if (cands.length > 1) {
+        const res = await engine.promptGeneric(ctrl, {
+          type: 'playerPicker', title: CARD_NAME, purpose: 'stealGold', cancellable: false, allowedPlayers: cands,
+          description: 'Choose an opponent: any Gold they gain during their Resource Phase (while their Gold is not 0) goes to you instead.',
+        });
+        if (res && Number.isInteger(res.playerIdx) && cands.includes(res.playerIdx)) pick = res.playerIdx;
+      }
+      inst._stTarget = pick;
+      engine.log('golden_abomination_target', { player: gs.players[ctrl]?.username, target: gs.players[pick]?.username });
+    },
+
     onResourceGain: async (ctx) => {
       if (ctx.cancelled) return;
       const engine = ctx._engine;
       const inst = ctx.card;
       const ctrl = inst?.controller ?? inst?.owner;
-      if (!stiehltGoldVon(engine, ctrl, ctx.playerIdx)) return;
+      if (!stiehltGoldVon(engine, ctrl, ctx.playerIdx, inst)) return;
       const gs = engine.gs;
       const oppIdx = ctx.playerIdx;
       const amount = ctx.amount || 0;

@@ -6482,10 +6482,11 @@ class GameEngine {
    * hat dort seine eigene Haupt-Aktion pro Round.
    */
   mainActionSpent(pi, heroIdx) {
-    const ps = this.gs.players[pi];
-    if ((ps?.heroesActedThisTurn?.length || 0) > 0) return true;
     const st = this.gs.skillTest;
-    return !!(st && heroIdx != null && st.exhaustedHeroes && st.exhaustedHeroes[pi + ':' + heroIdx]);
+    // Skill Test: jeder Hero hat seine eigene Hauptaktion je Round (siehe skilltest/rounds.js, Aktionshaushalt je Held).
+    if (st) return !!(heroIdx != null && st.exhaustedHeroes && st.exhaustedHeroes[pi + ':' + heroIdx]);
+    const ps = this.gs.players[pi];
+    return (ps?.heroesActedThisTurn?.length || 0) > 0;
   }
 
   /**
@@ -38903,10 +38904,21 @@ this._deathWatch = (this._deathWatchStack || []).length
    * Centralised so all consumers (UI listings, find-for-card lookups,
    * server-side ability/hero-effect consume loops) share one rule.
    */
-  _isSecondActionGrantAvailable(playerIdx, config) {
+  _isSecondActionGrantAvailable(playerIdx, config, heroIdx) {
     if (!config?.isSecondActionGrant) return true;
-    // Skill Test: Zusatzaktionen stehen im ganzen Zug bereit (ein Zug = eine Aktion, siehe skilltest/rounds.js).
-    if (this.gs.skillTest) return true;
+    // Skill Test: jeder Hero hat pro Round seine eigene Action Phase — „Aktion 2" ist dort das Fenster NACH seiner
+    // Hauptaktion (Zähler je Held in `st.heroEco`). Ohne Angabe eines Helden (Listen): irgendein lebender Hero steht bei Aktion 2.
+    if (this.gs.skillTest) {
+      const eco = this.gs.skillTest.heroEco || {};
+      const ok = (h) => {
+        const e = eco[playerIdx + ':' + h];
+        // `secondActionOfTurn` (Duigno): zusätzlich muss es die zweite Aktion des ZUGES dieses Helden sein.
+        return !!e && e.played === 1 && (!config.secondActionOfTurn || e.playedTurn === 1);
+      };
+      if (heroIdx != null) return ok(heroIdx);
+      const heroes = this.gs.players[playerIdx]?.heroes || [];
+      return heroes.some((h, hi) => h && h.name && h.hp > 0 && ok(hi));
+    }
     const ps = this.gs.players[playerIdx];
     if (!ps) return false;
     const isActionPhase = (this.gs.currentPhase || 0) === PHASES.ACTION;
@@ -39246,7 +39258,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         if (!config) continue;
         // Second-action grants are only available as the actual second
         // action of the Action Phase — see `_isSecondActionGrantAvailable`.
-        if (!this._isSecondActionGrantAvailable(playerIdx, config)) continue;
+        if (!this._isSecondActionGrantAvailable(playerIdx, config, heroIdx)) continue;
         // ★ v1004: Mission sperrt alle FREMDEN Zuschlaege.
         if (this.missionLockActive(playerIdx) && typeId !== MISSION_AA_TYPE) continue;
         // Hero-restricted: provider must be on the same hero as the spell caster
@@ -39652,7 +39664,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       for (const [typeId] of this._instAAEntries(inst)) {
         const config = this._additionalActionTypes[typeId];
         if (!config) continue;
-        if (!this._isSecondActionGrantAvailable(playerIdx, config)) continue;
+        if (!this._isSecondActionGrantAvailable(playerIdx, config, heroIdx)) continue;
         // Styx 28.9.: auch die SEITE des Helden muss passen (eigener und
         // geliehener Held koennen denselben Index haben).
         // Als Befund 29.9.: `counters._grantSeite` — Zusage fuer einen

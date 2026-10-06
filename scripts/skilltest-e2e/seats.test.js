@@ -1,7 +1,7 @@
 'use strict';
 // Sitzwechsel im Kampf: (1) Verbindung eines Menschen bricht ab → CPU übernimmt, (2) Aufgeben scheidet nur diesen Sitz aus.
 // 2 Menschen + 1 CPU.
-const { startServer, createAccount, check, sleep, finish, BASE } = require('./lib');
+const { boardHeroIdxs, startServer, createAccount, check, sleep, finish, BASE } = require('./lib');
 const { io } = require('socket.io-client');
 const cards = require('../../data/cards.json'); const db = {}; cards.forEach(c => db[c.name] = c);
 
@@ -28,8 +28,9 @@ const waitFor = async (pred, ms = 20000) => { const t0 = Date.now(); while (Date
 async function prepAndReady(c) {
   let cur = await waitFor(() => c.last('st_prep_state'));
   c.socket.on('st_prep_state', (s) => { cur = s; });
-  for (const hi of [0, 1, 2]) {
-    const idx = cur.me.hand.findIndex(n => db[n].cardType === 'Hero');
+  const plan = boardHeroIdxs(db, cur.me.hand);
+  for (let hi = 0; hi < plan.length; hi++) {
+    const idx = plan[hi];
     c.socket.emit('st_prep_move', { roomId: c.roomId, move: { type: 'place', from: { kind: 'hand', idx }, to: { kind: 'hero', hi } } });
     await sleep(250);
   }

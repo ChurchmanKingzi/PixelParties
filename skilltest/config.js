@@ -46,6 +46,10 @@ const CONFIG = {
   // Start-Gold: ein Resource-Tick am Spielbeginn (+4 plus Boni wie Wealth).
   START_GOLD_TICK: 4,
 
+  // Die vier Cardinal Beasts sind alle legal, aber je Partie fehlt EIN zufälliges davon (pool.js) — es sind nie alle vier
+  // gleichzeitig im Spiel („You win the game“-Fenster bleibt so klein). Leere Liste = keine Rotation.
+  CARDINAL_BEASTS: ['Cardinal Beast Baihu', 'Cardinal Beast Qinglong', 'Cardinal Beast Xuanwu', 'Cardinal Beast Zhuque'],
+
   // ── Belohnungen (SC) ───────────────────────────────────────────
   SC_PER_ROUND: 1,
   SC_PER_OUTLASTED_PLAYER: 5,

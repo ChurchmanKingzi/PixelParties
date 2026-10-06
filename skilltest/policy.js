@@ -183,6 +183,21 @@ function freeSupportSlots(ps, hi) {
   return out;
 }
 
+/** Erschöpfte, lebende Heroes (ohne Lähmung), die per Zusatzaktion (zweite Aktion einer Gewährung) noch handeln dürfen. */
+function bonusHeroesFor(engine, seat, category, cardName) {
+  const ps = engine.gs.players[seat];
+  const out = [];
+  (ps.heroes || []).forEach((h, hi) => {
+    if (!h || !h.name || h.hp <= 0 || !engine.gs.skillTest.exhaustedHeroes[seat + ':' + hi]) return;
+    if (rounds.isIncapacitated(h)) return;
+    try {
+      const found = cardName ? engine.findAdditionalActionForCard(seat, cardName, hi) : engine.findAdditionalActionForCategory(seat, category, hi);
+      if (found) out.push(hi);
+    } catch { /* keine Zusatzaktion */ }
+  });
+  return out;
+}
+
 /** Verbrauchende Aktionen: Basisangriff, Effekte, Handzauber, Beschwörungen — beste zuerst. */
 function rankActions(room, seat, host) {
   const engine = room.engine, gs = room.gameState, ps = gs.players[seat];
@@ -221,7 +236,9 @@ function rankActions(room, seat, host) {
     if ((c.cardType === 'Spell' || c.cardType === 'Attack') && (sub === 'normal' || sub === '')) {
       const key = cardKey('spell', name);
       const base = (c.cardType === 'Attack' ? w.aggression : w.spell) * 6;
-      for (const hi of castersFor(engine, seat, c)) {
+      const casters = castersFor(engine, seat, c);
+      for (const hi of bonusHeroesFor(engine, seat, null, name)) if (!casters.includes(hi) && engine.heroMeetsLevelReq(seat, hi, c)) casters.push(hi);   // Zusatzaktion
+      for (const hi of casters) {
         const params = { cardName: name, handIndex, heroIdx: hi };
         out.push({ score: base + learnedBonus(prof, w, key) + Math.random() * 1.5, kind: 'spell', key, card: name, hero: hi,
           run: () => rounds.act(room, seat, 'play_spell', params, () => host.doPlaySpell(room, seat, params), host) });
@@ -239,8 +256,8 @@ function rankActions(room, seat, host) {
     }
   });
 
-  for (const hi of heroes) {
-    out.push({ score: w.aggression * 6 + Math.random() * 2, kind: 'attack', key: cardKey('attack', 'Attack'),
+  for (const hi of [...heroes, ...bonusHeroesFor(engine, seat, 'attack')]) {
+    out.push({ score: w.aggression * 6 + Math.random() * 2 - (heroes.includes(hi) ? 0 : 0.5), kind: 'attack', key: cardKey('attack', 'Attack'),
       run: () => rounds.playBaseAttack(room, seat, hi, host) });
   }
   return out.sort((a, b) => b.score - a.score);

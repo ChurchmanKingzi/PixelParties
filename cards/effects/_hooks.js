@@ -20,6 +20,9 @@ const HOOKS = {
   ON_BEFORE_HAND_DRAW: 'onBeforeHandDraw', // Fires before starting hands are drawn (Bill, etc.)
   ON_GAME_START:    'onGameStart',
   ON_TURN_START:    'onTurnStart',
+  // Skill Test (2–8 Spieler): einmal vor dem allerersten Zug der ersten Round, vor dem Start-Gold-Tick. Für Karten, die zu
+  // Spielbeginn einen Gegner wählen müssen (The Golden Abomination). Im Normalspiel wird er nie ausgelöst.
+  ON_SKILLTEST_START: 'onSkillTestStart',
   // ★ GANZ AM ANFANG DES ZUGES (v867) — VOR Statusablauf und VOR
   // Burn/Poison. `ON_TURN_START` feuert erst NACH dem Statusschaden;
   // fuer Effekte, die zu Zugbeginn etwas ZURUECKBRINGEN, ist das zu

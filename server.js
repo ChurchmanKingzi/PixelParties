@@ -4970,7 +4970,7 @@ function sendGameState(room, playerIdx, extra) {
     turn: gs.turn, activePlayer: gs.activePlayer, currentPhase: gs.currentPhase || 0,
     result: gs.result || null, rematchRequests: gs.rematchRequests || [],
     isPuzzle: gs.isPuzzle || false,
-    skillTest: skillTest.publicState(gs),   // Skill Test: Round, Reihenfolge, erschöpfte Akteure …
+    skillTest: skillTest.publicState(gs, room.engine),   // Skill Test: Round, Reihenfolge, erschöpfte Akteure …
     isTutorial: gs.isTutorial || false,
     // Kampagnen-Duell: das Kampffeld blendet damit Deck-Auswahl und
     // Revanche aus und zeigt stattdessen "Weiter" (der Ausgang gehört
@@ -5805,7 +5805,7 @@ function sendSpectatorGameState(room) {
     turn: gs.turn, activePlayer: gs.activePlayer, currentPhase: gs.currentPhase || 0,
     result: gs.result || null, rematchRequests: gs.rematchRequests || [],
     isPuzzle: gs.isPuzzle || false,
-    skillTest: skillTest.publicState(gs),   // Skill Test: Round, Reihenfolge, erschöpfte Akteure …
+    skillTest: skillTest.publicState(gs, room.engine),   // Skill Test: Round, Reihenfolge, erschöpfte Akteure …
     isTutorial: gs.isTutorial || false,
     // Kampagnen-Duell: das Kampffeld blendet damit Deck-Auswahl und
     // Revanche aus und zeigt stattdessen "Weiter" (der Ausgang gehört

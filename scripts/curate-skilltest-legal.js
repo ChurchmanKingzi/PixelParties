@@ -12,16 +12,23 @@ const path = require('path');
 const FILE = path.join(__dirname, '..', 'data', 'cards.json');
 const DOC = path.join(__dirname, '..', 'docs', 'skilltest-illegal-cards.md');
 
+const cardsAll = JSON.parse(fs.readFileSync(FILE, { encoding: 'utf-8' }));
+const futureTech = cardsAll.filter(c => (c.archetype || '') === 'Future Tech').map(c => c.name);
+
+// Von Hand gesperrte Gruppen (Begründung → Karten).
 const GROUPS = [
-  { why: 'Sofortiger Spielsieg („You win the game“): beendet die Partie für ALLE; im Skill Test gibt es dafür keine passende Wertung (Platzierung der Übrigen).',
-    cards: ['Cardinal Beast Baihu', 'Cardinal Beast Qinglong', 'Cardinal Beast Xuanwu', 'Cardinal Beast Zhuque', 'The Final Trial', 'Carris, the Time Keeper'] },
+  { why: 'Sofortiger Spielsieg („You win the game“) ohne passende Wertung bei mehreren Spielern. (Die vier Cardinal Beasts sind NICHT gesperrt: je Partie fehlt eine zufällige von ihnen, siehe CONFIG.CARDINAL_BEASTS — so sind nie alle vier gleichzeitig im Spiel.)',
+    cards: ['The Final Trial', 'Carris, the Time Keeper'] },
   { why: 'Doom-Clock-Familie: leitet Sieger/Verlierer als „der andere Spieler“ ab (`winnerIdx = byPi === 0 ? 1 : 0`); mit mehr als zwei Sitzen ist der Verlierer nicht gleich „Spielende“.',
     cards: ['Doom Clock', 'Doom Prophecy', 'Basketskull', 'Ferocious Jaguar Warrior', 'Swift Eagle Warrior', 'Warrior of Teocuilatl'] },
   { why: 'Zählen/löschen aus BEIDEN Ablagen (`players[0]` / `players[1]`): mit mehr als zwei Sitzen unvollständig, die Auswahl über alle Ablagen braucht eine eigene Oberfläche.',
     cards: ['Guardian Beast Gou', 'Guardian Beast Hou', 'Guardian Beast Hu', 'Guardian Beast Ji', 'Guardian Beast Long', 'Guardian Beast Ma', 'Guardian Beast Niu', 'Guardian Beast She', 'Guardian Beast Shu', 'Guardian Beast Tu', 'Guardian Beast Yang', 'Guardian Beast Zhu', 'Mao, the Vengeful Guardian'] },
-  { why: 'Sieger/Verlierer-Ableitung als „der andere Spieler“ beim Ausscheiden bzw. Besitzer-Ableitung „Gegenseite des Wirts“ — braucht eine Regel für mehrere Gegner.',
-    cards: ['Quetzahuitl, Receiver of Sacrifices', 'The Golden Abomination', 'Future Tech Control Device'] },
+  { why: 'Alle Future-Tech-Karten (Archetyp „Future Tech“): sie brauchen eine gefüllte Ablage, um gut zu funktionieren — im Skill Test gibt es keine Decks und kaum Ablage.',
+    cards: futureTech },
 ];
+
+// Freigegeben (einmalig von Hand in cards.json auf true gesetzt, das Skript schreibt nie zurück): Quetzahuitl, The Golden Abomination
+// und die vier Cardinal Beasts (je Partie fehlt zufällig eines davon, siehe skilltest/config.js CARDINAL_BEASTS).
 
 let raw = fs.readFileSync(FILE, { encoding: 'utf-8' });
 const cards = JSON.parse(raw);

@@ -197,7 +197,22 @@ const isGameplayEvent = (e) => GAMEPLAY_EVENTS.has(e);
 function setPhaseFor(room, pi, event, params) { return require('./rounds').setPhaseFor(room, pi, event, params); }
 
 /** Öffentlicher Skill-Test-Zustand für die Clients (nur Sichtbares). */
-function publicState(gs) {
+/**
+ * Erschöpfte Helden, die jetzt noch eine Zusatzaktion (zweite Aktion einer Gewährung) für einen einfachen Angriff haben:
+ * „Sitz:Held"-Schlüssel. Die Oberfläche lässt sie anklicken, obwohl ihre Hauptaktion verbraucht ist.
+ */
+function bonusHeroesOf(gs, engine) {
+  const out = [];
+  if (!engine || !gs.skillTest || !gs.skillTest.heroEco) return out;
+  gs.players.forEach((ps, seat) => (ps.heroes || []).forEach((h, hi) => {
+    const key = seat + ':' + hi;
+    if (!h || !h.name || h.hp <= 0 || !gs.skillTest.exhaustedHeroes[key]) return;
+    try { if (engine.findAdditionalActionForCategory(seat, 'attack', hi)) out.push(key); } catch { /* optional */ }
+  }));
+  return out;
+}
+
+function publicState(gs, engine) {
   const st = gs && gs.skillTest;
   if (!st) return null;
   return {
@@ -206,6 +221,7 @@ function publicState(gs) {
     eliminated: st.eliminated, botSeats: st.botSeats, phase: st.phase,
     turnDeadline: st.turnDeadline || null, turnTimerSec: st.turnTimerSec || 0, serverNow: Date.now(),
     busy: !!st.busy,
+    bonusHeroes: bonusHeroesOf(gs, engine),
   };
 }
 

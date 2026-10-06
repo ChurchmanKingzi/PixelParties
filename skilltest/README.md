@@ -80,6 +80,28 @@ mit den Standard-Gewichten und der reinen Heuristik.
   Einzelziel-Karten dürfen alle gegnerischen Ziele treffen (die Zielwahl läuft über alle Gegner); Flächenkarten wählen
   EINEN Gegenspieler (`_stChooseAoePlayer`, wie bei Divine Gift of Fire).
 
+## Per Round statt per Turn
+
+Alles, was im Normalspiel „pro Turn" gilt, gilt hier **pro Round und Held** (`rounds.js`: `ecoEnter`/`ecoLeave`, `st.heroEco`):
+Hauptaktion und Zusatzaktionen zählen je Held, nicht je Spieler; die Action Phase eines Sitzes beginnt (Phasenbeginn-Effekte,
+Reaktionsfenster, Vergabe von Zusatzaktionen) nur bei seinem ersten Zug der Round und endet mit der Round (`endRound`,
+Phasenende-Effekte → Zusatzaktions-Gewährungen verfallen). `advanceToPhase` ist im Modus ein No-op (außer zur End Phase).
+
+## Karten mit Sonderregeln
+
+| Karte | Regel im Skill Test |
+| --- | --- |
+| Quetzahuitl, Receiver of Sacrifices | Bleibt auf der Hand und ist **nie** einer der drei Brett-Helden (`HAND_ONLY_HEROES` in `public/skilltest-rules.js`): Er zählt nicht zu den Brett-Helden, `pool.dealHand` teilt ihn nur Händen mit ≥ 4 Heroes zu, Bots recyceln ihn nicht. Fällt dein letzter Held in einem fremden Zug, steigt er herab; **fällt Quetzahuitl, scheidet sein Kontrolleur aus** (das Spiel endet nicht). |
+| The Golden Abomination | Zu Spielbeginn (Hook `onSkillTestStart`, vor dem Start-Gold-Tick) **wählt** der Besitzer einen lebenden Gegner (Spielerwahl; Bots: meistes Gold); nur dessen Gold in der Resource Phase wird umgelenkt. |
+| Cardinal Beast Baihu / Qinglong / Xuanwu / Zhuque | Alle legal, aber je Partie **fehlt ein zufälliges** davon im Pool (`CONFIG.CARDINAL_BEASTS`, `CardPool.banned`; die Vorbereitung zeigt es als `bannedCards`). So sind nie alle vier gleichzeitig im Spiel. |
+
+## Lern-Monitoring
+
+- **Benchmark** (`learn/train.js` `benchmark`, alle `benchEvery` Partien): Einzelspiele trainierte gegen untrainierte CPUs am selben Tisch,
+  Ergebnisse in `<profil>.bench.jsonl`; `GET /api/skilltest/benchmark`.
+- **Karten-Rangliste** (`learn/ranking.js`): nach „Wert ausgeteilt" sortierte Liste ALLER im Training gesehenen Karten, wird bei jedem
+  Speichern neu geschrieben; `GET /api/skilltest/ranking`, Seite `/skilltest-learning.html`, `node scripts/skilltest-report.js`.
+
 ## Zusätzliche Ereignisse
 
 Server → Client: `st_prep_*` (Vorbereitung), `st_game_over { winnerIdx, reason, placements, sc, rounds }`;
@@ -91,9 +113,8 @@ Bot-Sitze, Timer. Client → Server: `st_attack`, `st_pass_round`, (Held-/Creatu
 - **Brett:** ein Gegner steht groß im Hauptfeld (angeklickt/angepinnt oder der Spieler am Zug), alle übrigen als Mini-Kacheln
   (`.st-mini`, anklickbar über den Kopf bzw. die Zeilen des Turn-Panels). Ziele in Mini-Kacheln sind direkt anklickbar;
   Drag & Drop (Artifacts auf gegnerische Helden, Kreuz-Seiten-Karten) funktioniert nur auf den Gegner im Hauptfeld.
-- **Zusatzaktionen** sind pro Runde unbegrenzt verfügbar, soweit die Karte sie gewährt (die Engine zählt „einmal pro Zug" je
-  Round); die genaue „einmal pro Round und Held"-Regel ist noch nicht abgebildet.
-- **Gesperrte Karten** (`docs/skilltest-illegal-cards.md`): Sofortsiege, Doom-Clock-Familie, Karten mit „beide Ablagen" u. Ä.
+- **Gesperrte Karten** (`docs/skilltest-illegal-cards.md`): Sofortsiege, Doom-Clock-Familie, Karten mit „beide Ablagen" und
+  alle Future-Tech-Karten (sie brauchen eine gefüllte Ablage). Freigegeben mit Sonderregel: siehe „Karten mit Sonderregeln".
 - **Bots** nutzen noch keine Tränke und keine Hand-Abilities; Reaktionskarten spielen sie nicht aktiv.
 - **Reaktionsfenster** hängen meist am Besitzer des Ziels (N-Spieler-tauglich); einzelne Karten fragen noch „den Gegner" (Fokus bzw.
   nächster lebender Sitz) statt alle Sitze der Reihe nach.

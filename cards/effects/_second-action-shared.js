@@ -252,6 +252,9 @@ const secondActionHooks = {
     const gs = engine.gs;
     const ps = gs.players[ctx.cardOwner];
     if (!ps) return;
+    // Skill Test: jeder Hero hat seine eigene Action Phase — eine Aktion eines ANDEREN Helden berührt die Gewährung
+    // dieses Wirts weder (Aktion 1 → Phase offen halten) noch lässt sie sie verfallen.
+    if (gs.skillTest && ctx.heroIdx != null && inst.heroIdx != null && inst.heroIdx !== ctx.heroIdx) return;
     const actionsPlayed = ps._actionsPlayedThisPhase || 0;
 
     const saActive = secondActionTypeIds(engine, inst, true);

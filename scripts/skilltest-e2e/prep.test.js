@@ -1,5 +1,5 @@
 'use strict';
-const { startServer, guestClient, check, sleep, finish } = require('./lib');
+const { boardHeroIdxs, startServer, guestClient, check, sleep, finish } = require('./lib');
 const Rules = require('../../public/skilltest-rules.js');
 (async () => {
   const srv = await startServer();
@@ -26,16 +26,16 @@ const Rules = require('../../public/skilltest-rules.js');
 
     // Cards-DB für Typprüfung
     const cards = require('../../data/cards.json'); const db = {}; cards.forEach(c => db[c.name] = c);
-    const heroIdx = () => cur.me.hand.findIndex(n => db[n].cardType === 'Hero');
     let cur = sa;
+    const planA = boardHeroIdxs(db, cur.me.hand);
     A.socket.on('st_prep_state', (s) => { cur = s; });
-    A.emit('st_prep_move', { roomId: room.id, move: { type: 'place', from: { kind: 'hand', idx: heroIdx() }, to: { kind: 'hero', hi: 0 } } });
+    A.emit('st_prep_move', { roomId: room.id, move: { type: 'place', from: { kind: 'hand', idx: planA[0] }, to: { kind: 'hero', hi: 0 } } });
     await sleep(250);
     check('Hero platziert', !!cur.me.heroes[0], cur.me.heroes);
     check('Ready ohne volles Board abgelehnt', (A.emit('st_prep_ready', { roomId: room.id, ready: true }), true));
     await sleep(250);
     check('…weiterhin nicht ready', cur.me.ready === false);
-    for (const hi of [1, 2]) { A.emit('st_prep_move', { roomId: room.id, move: { type: 'place', from: { kind: 'hand', idx: heroIdx() }, to: { kind: 'hero', hi } } }); await sleep(200); }
+    for (let hi = 1; hi < planA.length; hi++) { A.emit('st_prep_move', { roomId: room.id, move: { type: 'place', from: { kind: 'hand', idx: planA[hi] }, to: { kind: 'hero', hi } } }); await sleep(200); }
     check('3 Heroes stehen', cur.me.heroes.filter(Boolean).length === 3, cur.me.heroes);
     // Ability auf Hero → Level 3
     const abIdx = cur.me.hand.findIndex(n => db[n].cardType === 'Ability');
@@ -86,10 +86,11 @@ const Rules = require('../../public/skilltest-rules.js');
 
     // B stellt nur Heroes auf und wird ready → Kampfstart
     let curB = sb; B.socket.on('st_prep_state', (s) => { curB = s; });
-    for (const hi of [0, 1, 2]) { B.emit('st_prep_move', { roomId: room.id, move: { type: 'place', from: { kind: 'hand', idx: curB.me.hand.findIndex(n => db[n].cardType === 'Hero') }, to: { kind: 'hero', hi } } }); await sleep(200); }
+    const planB = boardHeroIdxs(db, curB.me.hand);
+    for (let hi = 0; hi < planB.length; hi++) { B.emit('st_prep_move', { roomId: room.id, move: { type: 'place', from: { kind: 'hand', idx: planB[hi] }, to: { kind: 'hero', hi } } }); await sleep(200); }
     B.emit('st_prep_ready', { roomId: room.id, ready: true });
-    const gsA = await A.waitFor('game_state', g => g && g.skillTest, 15000);
-    check('Alle bereit → Kampf beginnt, Startspieler = meiste Recycler-Karten', gsA.skillTest.starter === 0, gsA.skillTest);
+    const gsA = await A.waitFor('game_state', g => g && g.skillTest && g.skillTest.round >= 1, 15000);
+    check('Alle bereit → Kampf beginnt, die Round-Reihenfolge beginnt beim Startspieler', gsA.skillTest.order[0] === gsA.skillTest.starter && gsA.skillTest.starter >= 0 && gsA.skillTest.starter < 4, gsA.skillTest);
     check('Start-Gold = 4 je recycelter Karte (+4 Tick)', gsA.players[0].gold >= 2 * 4, gsA.players[0].gold);
     [A, B].forEach(c => c.close());
   } catch (e) { console.error(e); process.exitCode = 1; }

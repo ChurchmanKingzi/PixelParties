@@ -355,7 +355,7 @@ function refundDivinity(engine, pi, source) {
 //  HERO-ZONE LISTENER — loss on defeat
 // ═══════════════════════════════════════════
 
-function handleLossOnDefeat(ctx) {
+async function handleLossOnDefeat(ctx) {
   // Only fire when THIS card's own hero is the one dying. With
   // `activeIn: ['hero']`, `ctx.attachedHero` is the hero in our
   // slot — if that's the hero in the KO event, Quetzahuitl just
@@ -367,6 +367,14 @@ function handleLossOnDefeat(ctx) {
   if (gs.result) return;
 
   const pi = ctx.cardOwner;
+  // Skill Test (2–8 Spieler): Es endet nicht das Spiel, sondern der Kontrolleur scheidet aus — jeder noch lebende
+  // Hero von ihm fällt mit, dann zieht die Eliminierungsprüfung des Modus (checkAllHeroesDead) die Folgen.
+  if (gs.skillTest) {
+    for (const h of gs.players[pi]?.heroes || []) if (h && h.name && h.hp > 0) h.hp = 0;
+    engine.log('quetzahuitl_defeated', { loser: gs.players[pi]?.username });
+    await engine.checkAllHeroesDead();
+    return;
+  }
   const winnerIdx = pi === 0 ? 1 : 0;
   engine.log('quetzahuitl_defeated', {
     loser: gs.players[pi]?.username,

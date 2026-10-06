@@ -55,6 +55,7 @@ function viewFor(room, idx) {
     deadlineAt: st.prepTimerDisabled ? null : prep.deadlineAt,
     recycleEvery: CONFIG.RECYCLE_EVERY,
     recycleGold: CONFIG.RECYCLE_GOLD,
+    bannedCards: prep.pool.banned || [],
     players: othersView(room),
   };
   if (idx == null || idx < 0) return { ...base, spectator: true };
