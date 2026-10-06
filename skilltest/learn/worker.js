@@ -18,6 +18,7 @@ const { runGame } = require('../sim');
 
 parentPort.on('message', async (job) => {
   try {
+    if (job.opts && job.opts.reloadProfile) require('./profile').reset();      // Vergleichsspiele sehen den frisch gespeicherten Stand
     const rec = await runGame(job.opts);
     delete rec.room;
     parentPort.postMessage({ id: job.id, ok: true, rec });

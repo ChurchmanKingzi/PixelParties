@@ -2382,6 +2382,38 @@ app.get('/api/leaderboard', async (req, res) => {
   }
 });
 
+// ===== SKILL TEST: Lernstand der Bots (öffentlich, nur lesend) =====
+// Kartenliste nach gelerntem Wert und Vergleichsspiele „trainiert gegen untrainiert" — beides schreibt der Trainer
+// (skilltest/learn/train.js, passiv mit PP_ST_TRAIN_BG) laufend fort. Seite: /skilltest-learning.html
+app.get('/api/skilltest/ranking', (req, res) => {
+  try {
+    const learn = require('./skilltest/learn/ranking');
+    const data = learn.readRanking();
+    let rows = data.rows || [];
+    const type = String(req.query.type || '').toLowerCase();
+    if (type) rows = rows.filter(r => String(r.type).toLowerCase() === type);
+    const q = String(req.query.q || '').toLowerCase();
+    if (q) rows = rows.filter(r => r.name.toLowerCase().includes(q));
+    const minN = parseInt(req.query.minN, 10) || 0;
+    if (minN) rows = rows.filter(r => r.valueN >= minN);
+    const limit = Math.min(5000, parseInt(req.query.limit, 10) || 5000);
+    res.json({ updated: data.updated, games: data.games, version: data.version, prior: data.prior, types: data.types,
+      historyPoints: data.historyPoints, total: (data.rows || []).length, rows: rows.slice(0, limit), status: learn.readStatus() });
+  } catch (err) {
+    console.error('[skilltest ranking] error:', err.message);
+    res.status(500).json({ error: 'Failed to load ranking' });
+  }
+});
+app.get('/api/skilltest/benchmark', (req, res) => {
+  try {
+    const learn = require('./skilltest/learn/ranking');
+    res.json({ status: learn.readStatus(), records: learn.readBench({ max: 400 }) });
+  } catch (err) {
+    console.error('[skilltest benchmark] error:', err.message);
+    res.status(500).json({ error: 'Failed to load benchmark' });
+  }
+});
+
 // ===== HERO STATS =====
 // Smoothing for the "top Heroes" ranking. We rank by a Bayesian-shrinkage
 // score rather than raw win-rate so a Hero played once and won (100%) does

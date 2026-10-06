@@ -86,16 +86,18 @@ async function runGame(opts = {}) {
   // Vorbereitung: Pool, Hände, Basisaufbau je Bot.
   const pool = new CardPool(cards);
   const prep = { pool, players: [], done: true };
+  const dealt = [];
   for (let i = 0; i < seats; i++) {
     const ps = Rules.emptyPlayer();
     ps.hand = dealHand(pool).hand;
+    dealt.push([...ps.hand]);
     prep.players.push(ps);
   }
   const bases = [];
   for (let i = 0; i < seats; i++) {
     prep.players[i] = bot.prepareBase({ env, ps: prep.players[i], room, idx: i, pool, prep, noProfile: !!(opts.noProfileSeats && opts.noProfileSeats.includes(i)), weights: opts.weights && opts.weights[i] });
     prep.players[i].ready = true;
-    bases.push(JSON.parse(JSON.stringify(prep.players[i])));
+    bases.push(Object.assign(JSON.parse(JSON.stringify(prep.players[i])), { dealt: dealt[i] }));
   }
   if (opts.mutatePrep) opts.mutatePrep(prep);   // Tests: Basen vor dem Kampf gezielt verändern
   if (opts.prepOnly) return { bases };

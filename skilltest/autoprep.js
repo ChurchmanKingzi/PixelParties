@@ -138,6 +138,7 @@ function buildWithRecycling(env, psIn, opts = {}) {
   const maxKeep = opts.maxKeep != null ? opts.maxKeep : 4;
   const build = (ps) => autoBuild(env, ps, rng, { heroScore: opts.heroScore, pairScore: opts.pairScore, ready: false });
   let ps = build(Rules.clone(psIn));
+  const ejectedAll = [], recycledAll = [];                    // für die Auswertung (Lernsystem): was kam aus dem Recycler, was ging hinein
   if (!pool || !config) { ps.ready = true; return ps; }
   for (let pass = 0; pass < 30; pass++) {
     const keep = [], junk = [];
@@ -152,18 +153,20 @@ function buildWithRecycling(env, psIn, opts = {}) {
     if (!list.length) break;
     let progressed = false;
     for (const { idx } of list) {
+      const name = ps.hand[idx];
       const res = Rules.applyMove(env, ps, { type: 'recycle', from: { kind: 'hand', idx } });
       if (!res.ok) continue;                                   // z. B. Hero bei nicht vollem Board
-      ps = res.ps; progressed = true;
+      ps = res.ps; progressed = true; recycledAll.push(name);
       if (ps.recycled % config.RECYCLE_EVERY === 0) {
         const ejected = pool.takeAny(config.RECYCLER_TYPE_WEIGHTS);
-        if (ejected) ps.hand.push(ejected);
+        if (ejected) { ps.hand.push(ejected); ejectedAll.push(ejected); }
       }
     }
     if (!progressed) break;
     ps = build(ps);                                            // Ausgeworfenes einsetzen
   }
   ps.ready = true;
+  ps.ejected = ejectedAll; ps.recycledCards = recycledAll;
   return ps;
 }
 

@@ -26,6 +26,8 @@ function SkillTestLobby({ lobby, user, leaveRoom, playerJoined, setPlayerJoined 
         <button className="btn btn-danger" onClick={leaveRoom}>{isHost ? 'CLOSE ROOM' : 'LEAVE'}</button>
         <h2 className="orbit-font" style={{ fontSize: 14, color: 'var(--accent)' }}>🎯 SKILL TEST LOBBY</h2>
         <span className="badge" style={{ background: 'rgba(0,240,255,.12)', color: 'var(--accent)' }}>2–8 PLAYERS</span>
+        <a className="btn" href="/skilltest-learning.html" target="_blank" rel="noopener" style={{ textDecoration: 'none', fontSize: 12 }}
+          title="What the CPUs have learned: card values and test games against untrained CPUs">📊 BOT LEARNING</a>
         <VolumeControl />
       </div>
       <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'auto' }} className="animate-in">

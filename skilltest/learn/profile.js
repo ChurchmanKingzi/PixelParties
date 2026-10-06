@@ -12,6 +12,8 @@
 //    playValue    Karte → { n, sum }   mittlerer Zuwachs der Stellungsbewertung nach dem Ausspielen
 //                                      (Kanal 1: „welche Karten bringen im Moment des Spielens etwas?")
 //    cardValue    Karte → { n, sum }   mittlere Platzierungsgüte, wenn die Karte im Basisaufbau stand
+//    dealtValue   Karte → { n, sum }   mittlere Platzierungsgüte, wenn die Karte ausgeteilt wurde (Starthand oder Recycler-Auswurf),
+//                                      egal ob sie später eingesetzt wurde — vergleichbar über ALLE Kartentypen (Kartenliste)
 //                                      (Kanal 2: Kartenwert für Aufbau/Recycling)
 //    pairValue    „A|B" → { n, sum }   dasselbe für Kartenpaare (Kombos, Held+Ability, Held+Creature)
 //    personas     [{ id, name, weights, fitness, games }]  Spielstil-Population (Kanal 3: Liga/ES)
@@ -29,7 +31,7 @@ const CHECK_EVERY_MS = 30 * 1000;
 let cache = null, loadedAt = 0, fileMtime = 0;
 
 function emptyProfile() {
-  return { version: 0, games: 0, updated: null, playValue: {}, cardValue: {}, pairValue: {}, personas: [], totals: { plays: 0, byPlayers: {} } };
+  return { version: 0, games: 0, updated: null, playValue: {}, cardValue: {}, dealtValue: {}, pairValue: {}, personas: [], totals: { plays: 0, byPlayers: {} } };
 }
 
 function readFile() {

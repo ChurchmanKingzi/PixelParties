@@ -28,6 +28,7 @@
 // ═══════════════════════════════════════════════════════════════════
 const profileMod = require('./profile');
 const personas = require('./personas');
+const ranking = require('./ranking');
 
 const PLAY_VALUE_SCALE = 40;      // 40 Punkte Stellungsgewinn = 1 Wertpunkt in der Policy
 const MIN_GAMES_FOR_EVOLUTION = 12;
@@ -121,6 +122,8 @@ function learnFrom(profile, game) {
     const sc = placeScore(place[seat] != null ? place[seat] : n, n);
     const f = baseFeatures(base);
     for (const c of f.cards) profileMod.addObs(profile.cardValue, c, sc);
+    if (!profile.dealtValue) profile.dealtValue = {};
+    for (const c of new Set([...(base.dealt || []), ...(base.ejected || [])])) profileMod.addObs(profile.dealtValue, c, sc);
     for (const k of f.pairs) profileMod.addObs(profile.pairValue, k, sc);
     const per = profile.personas.find(p => p.id === personaIds[seat]);
     if (per) { per.games++; per.scoreSum += sc; per.fitness = fitnessOf(per); }
@@ -222,6 +225,62 @@ async function playOne(profile, opts = {}, rng = Math.random, pool = null) {
   return { rec, n, personaIds: chosen.map(p => p.id) };
 }
 
+// ── Vergleichsspiele: trainiert gegen untrainiert ───────────────────
+function bestPersona(profile) {
+  return [...(profile.personas || [])].sort((a, b) => fitnessOf(b) - fitnessOf(a))[0] || null;
+}
+
+/**
+ * Einzelne Testspiele: EIN trainierter Sitz (Profil + beste Persona) gegen untrainierte Standard-Bots
+ * (Standard-Gewichte, ohne Profil) an Tischen mit 2, 3, 4 und 6 Sitzen. Jedes Spiel wird einzeln festgehalten;
+ * der Verlauf liegt in `<profil>.bench.jsonl` (ranking.readBench). Erwartung ohne Vorsprung: Siegquote 1/Sitze.
+ */
+async function benchmark(profile, pool, opts = {}) {
+  const rng = opts.rng || Math.random;
+  const best = bestPersona(profile);
+  const seatsList = opts.seatCounts || [2, 3, 4, 6];
+  const total = opts.games || 40;
+  const jobs = Array.from({ length: total }, (_, i) => { const n = seatsList[i % seatsList.length]; return { n, seat: Math.floor(rng() * n) }; });
+  const one = async (j) => {
+    const simOpts = {
+      seats: j.n, maxTurns: opts.maxTurns || 3000, reloadProfile: true,
+      weights: Array.from({ length: j.n }, (_, i) => (i === j.seat && best ? best.weights : null)),
+      noProfileSeats: Array.from({ length: j.n }, (_, i) => i).filter(i => i !== j.seat),
+    };
+    try {
+      const rec = pool ? await pool.run(simOpts) : await require('../sim').runGame(simOpts);
+      if (!rec || !rec.placements || rec.reason === 'sim_turn_limit') return null;
+      return { seats: j.n, seat: j.seat, place: rec.placements[j.seat], won: rec.winnerIdx === j.seat, rounds: rec.rounds, score: placeScore(rec.placements[j.seat], j.n) };
+    } catch { return null; }
+  };
+  const results = (await Promise.all(jobs.map(one))).filter(Boolean);
+  const agg = {};
+  for (const r of results) {
+    const a = agg[r.seats] || (agg[r.seats] = { seats: r.seats, games: 0, wins: 0, scoreSum: 0 });
+    a.games++; a.wins += r.won ? 1 : 0; a.scoreSum += r.score;
+  }
+  const bySeats = Object.values(agg).sort((a, b) => a.seats - b.seats).map(a => ({
+    seats: a.seats, games: a.games, wins: a.wins, winRate: a.wins / a.games, expectedWinRate: 1 / a.seats, meanPlaceScore: a.scoreSum / a.games,
+  }));
+  const wins = results.filter(r => r.won).length;
+  const expected = results.reduce((s, r) => s + 1 / r.seats, 0);
+  const variance = results.reduce((s, r) => s + (1 / r.seats) * (1 - 1 / r.seats), 0);
+  const rec = {
+    t: Date.now(), trainedGames: profile.games || 0, version: profile.version || 0, persona: best && best.name,
+    total: {
+      games: results.length, wins, winRate: results.length ? wins / results.length : 0,
+      expectedWinRate: results.length ? expected / results.length : 0,
+      edge: results.length ? (wins - expected) / results.length : 0,
+      z: variance > 0 ? (wins - expected) / Math.sqrt(variance) : 0,
+      meanPlaceScore: results.length ? results.reduce((s, r) => s + r.score, 0) / results.length : 0,
+    },
+    bySeats,
+    games: results.map(r => ({ seats: r.seats, seat: r.seat, place: r.place, won: r.won, rounds: r.rounds })),
+  };
+  ranking.appendBench(rec);
+  return rec;
+}
+
 /**
  * Trainieren. opts: { games, seats (Zahl oder [min,max]), evolveEvery, saveEvery, profile, onGame, shouldStop, dutyCycle, quiet }
  * Gibt das (gespeicherte) Profil zurück.
@@ -235,8 +294,23 @@ async function train(opts = {}) {
   const saveEvery = opts.saveEvery || 25;
   const workers = opts.workers == null ? 1 : opts.workers;
   const pool = workers > 0 ? new WorkerPool(workers, opts.gameTimeoutMs) : null;
-  let done = 0, failed = 0, started = 0;
+  const benchEvery = opts.benchEvery == null ? 300 : opts.benchEvery;      // 0 = keine Vergleichsspiele
+  const benchGames = opts.benchGames || 40;
+  const rankingEvery = opts.rankingEvery || 100;                           // Prüfpunkt für den Verlauf der Kartenwerte
+  let done = 0, failed = 0, started = 0, benchRunning = false, lastStatus = 0;
   const t0 = Date.now();
+
+  const runBench = async () => {
+    if (benchRunning || !benchEvery) return;
+    benchRunning = true;
+    try {
+      profileMod.save(profile);                                           // Worker sehen den aktuellen Stand
+      const rec = await benchmark(profile, pool, { games: benchGames, rng });
+      if (!opts.quiet) console.log(`[skilltest-train] Vergleich nach ${rec.trainedGames} Partien: Siegquote ${(rec.total.winRate * 100).toFixed(1)} % (Erwartung ${(rec.total.expectedWinRate * 100).toFixed(1)} %), z=${rec.total.z.toFixed(2)}`);
+    } catch (e) { if (!opts.quiet) console.error('[skilltest-train] Vergleich fehlgeschlagen:', e && e.message); }
+    finally { benchRunning = false; }
+  };
+  if (benchEvery && (profile.games || 0) === 0 && opts.benchAtStart !== false) await runBench();   // Ausgangspunkt: noch nichts gelernt
 
   const runner = async () => {
     while (started < total && !(opts.shouldStop && opts.shouldStop())) {
@@ -247,7 +321,9 @@ async function train(opts = {}) {
         if (game.rec && game.rec.placements) { learnFrom(profile, game); done++; } else failed++;
       } catch (e) { failed++; if (!opts.quiet) console.error('[skilltest-train] Partie fehlgeschlagen:', e && e.message); }
       if (done > 0 && done % evolveEvery === 0) evolve(profile, rng);
-      if (done > 0 && done % saveEvery === 0) { prune(profile); profileMod.save(profile); }
+      if (done > 0 && done % saveEvery === 0) { prune(profile); profileMod.save(profile); ranking.writeRanking(profile, { checkpoint: done % rankingEvery === 0 }); }
+      if (benchEvery && done > 0 && done % benchEvery === 0) await runBench();
+      if (Date.now() - lastStatus > 5000) { lastStatus = Date.now(); ranking.writeStatus({ pid: process.pid, startedAt: t0, session: done, failed, games: profile.games, ratePerMin: Math.round(done / Math.max(1, (Date.now() - t0) / 60000)) }); }
       if (opts.onGame) opts.onGame({ done, failed, profile });
       // Last begrenzen: nach jeder Partie so lange ruhen, dass der Rechenanteil `dutyCycle` bleibt.
       if (opts.dutyCycle && opts.dutyCycle > 0 && opts.dutyCycle < 1) {
@@ -260,6 +336,7 @@ async function train(opts = {}) {
   finally { if (pool) pool.close(); }
   prune(profile);
   profileMod.save(profile);
+  ranking.writeRanking(profile, { checkpoint: true });
   if (!opts.quiet) console.log(`[skilltest-train] ${done} Partien gelernt (${failed} verworfen) in ${Math.round((Date.now() - t0) / 1000)} s — Profil v${profile.version}, ${Object.keys(profile.playValue).length} Spielwerte, ${Object.keys(profile.cardValue).length} Kartenwerte, ${Object.keys(profile.pairValue).length} Paare`);
   return profile;
 }
@@ -311,9 +388,9 @@ function exportCompact(profile, minN = 4) {
   };
   return {
     version: profile.version, games: profile.games, updated: profile.updated,
-    playValue: keep(profile.playValue, minN), cardValue: keep(profile.cardValue, minN), pairValue: keep(profile.pairValue, Math.max(minN, 6)),
+    playValue: keep(profile.playValue, minN), cardValue: keep(profile.cardValue, minN), dealtValue: keep(profile.dealtValue, minN), pairValue: keep(profile.pairValue, Math.max(minN, 6)),
     personas: profile.personas, totals: profile.totals,
   };
 }
 
-module.exports = { exportCompact, WorkerPool, train, evaluate, learnFrom, baseFeatures, placeScore, seedPopulation, evolve, pickPersona, playOne, PLAY_VALUE_SCALE };
+module.exports = { benchmark, bestPersona, exportCompact, WorkerPool, train, evaluate, learnFrom, baseFeatures, placeScore, seedPopulation, evolve, pickPersona, playOne, PLAY_VALUE_SCALE };
