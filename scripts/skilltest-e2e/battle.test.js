@@ -34,6 +34,16 @@ const { io } = require('socket.io-client');
       socket.emit('st_prep_move', { roomId: room.id, move: { type: 'place', from: { kind: 'hand', idx }, to: { kind: 'hero', hi } } });
       await sleep(250);
     }
+    // Prompts an den Test-Menschen ablehnen (sonst blockiert ein Reaktionsfenster das Spiel).
+    socket.on('game_state', (g) => {
+      const ep = g.effectPrompt;
+      if (ep && ep.ownerIdx === g.myIndex) {
+        socket.emit('effect_prompt_response', { roomId: room.id, response: ep.type === 'confirm' ? { confirmed: false } : { cancelled: true }, promptId: ep.promptId });
+      }
+      // Zielwahl-Frage an den Test-Menschen mitten im Zug eines anderen Sitzes (Reaktion seines Helden, z. B. Madame Guillotine): ablehnen.
+      const pt = g.potionTargeting;
+      if (pt && pt.isEffectPrompt && pt.ownerIdx === g.myIndex && g.activePlayer !== g.myIndex) socket.emit('confirm_potion', { roomId: room.id, selectedIds: [] });
+    });
     socket.emit('st_prep_ready', { roomId: room.id, ready: true });
     const first = await waitFor(() => { const s = last('game_state'); return s && s.skillTest && s.skillTest.round >= 1 ? s : null; });
     check('Spielzustand mit 4 Spielern', first && first.players.length === 4, first && first.players.length);
@@ -43,13 +53,6 @@ const { io } = require('socket.io-client');
     check('Gold-Tick am Start (≥4)', afterTick.players[afterTick.myIndex].gold >= 4, afterTick.players[afterTick.myIndex].gold);
     check('Gegnerhände verdeckt', first.players.every((p, i) => i === first.myIndex || p.hand === undefined || p.hand.length === 0 || p.hand.every(h => !h || h === '?' || h.hidden) || true));
 
-    // Prompts an den Test-Menschen ablehnen (sonst blockiert ein Reaktionsfenster das Spiel).
-    socket.on('game_state', (g) => {
-      const ep = g.effectPrompt;
-      if (ep && ep.ownerIdx === g.myIndex) {
-        socket.emit('effect_prompt_response', { roomId: room.id, response: ep.type === 'confirm' ? { confirmed: false } : { cancelled: true }, promptId: ep.promptId });
-      }
-    });
     // Eigene Züge passen, bis das Spiel endet.
     let passes = 0, guard = 0;
     let stuckSince = 0, stuckKey = '';

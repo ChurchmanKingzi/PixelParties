@@ -33,6 +33,14 @@ const cards = require('../../data/cards.json'); const db = {}; cards.forEach(c =
       await sleep(200);
     }
     socket.emit('st_prep_ready', { roomId: room.id, ready: true });
+    // Fragt eine Karte den Test-Menschen etwas (Reaktion, „abwerfen oder Effekt nehmen" …), lehnt er ab — sonst wartet das Spiel ohne Zug-Timer ewig.
+    socket.on('game_state', (g) => {
+      const ep = g.effectPrompt;
+      if (ep && ep.ownerIdx === g.myIndex) socket.emit('effect_prompt_response', { roomId: room.id, response: ep.type === 'confirm' ? { confirmed: false } : { cancelled: true }, promptId: ep.promptId });
+      // Zielwahl-Frage an den Test-Menschen mitten im Zug eines anderen Sitzes (Reaktion seines Helden, z. B. Madame Guillotine): ablehnen.
+      const pt = g.potionTargeting;
+      if (pt && pt.isEffectPrompt && pt.ownerIdx === g.myIndex && g.activePlayer !== g.myIndex) socket.emit('confirm_potion', { roomId: room.id, selectedIds: [] });
+    });
     console.log('Zielwahl über Sitze');
     await waitFor(() => { const g = last('game_state'); return g && g.skillTest && g.skillTest.round >= 1 ? g : null; });
 
@@ -41,7 +49,7 @@ const cards = require('../../data/cards.json'); const db = {}; cards.forEach(c =
     for (const targetSeat of (process.env.TGT || '2,3,1').split(',').map(Number)) {
       // Auf den eigenen Zug warten
       const turn = await waitFor(() => { const g = last('game_state'); return g && !g.result && g.activePlayer === g.myIndex && !g.skillTest.busy && !g.effectPrompt && !g.potionTargeting ? g : null; }, 60000);
-      if (!turn) { const g = last('game_state'); console.log('  (kein eigener Zug mehr)', g && JSON.stringify({ r: g.skillTest.round, ap: g.activePlayer, me: g.myIndex, busy: g.skillTest.busy, ep: g.effectPrompt && g.effectPrompt.type, pt: !!g.potionTargeting, out: g.skillTest.eliminated, over: !!g.result, passed: g.skillTest.passed, heroes: g.players.map(p => p.heroes.filter(h => h.name && h.hp > 0).length) })); break; }
+      if (!turn) { const g = last('game_state'); console.log('  (kein eigener Zug mehr)', g && JSON.stringify({ r: g.skillTest.round, ap: g.activePlayer, me: g.myIndex, busy: g.skillTest.busy, ep: g.effectPrompt && g.effectPrompt.type, pt: g.potionTargeting && { owner: g.potionTargeting.ownerIdx, name: g.potionTargeting.potionName || g.potionTargeting.title || (g.potionTargeting.config && g.potionTargeting.config.title), effect: !!g.potionTargeting.isEffectPrompt, n: (g.potionTargeting.validTargets || []).length }, out: g.skillTest.eliminated, over: !!g.result, passed: g.skillTest.passed, heroes: g.players.map(p => p.heroes.filter(h => h.name && h.hp > 0).length) })); break; }
       if (targetSeat === turn.myIndex) continue;
       const seatTarget = targetSeat;
       const hi = turn.players[seatTarget].heroes.findIndex(h => h && h.name && h.hp > 0);
@@ -62,7 +70,16 @@ const cards = require('../../data/cards.json'); const db = {}; cards.forEach(c =
       socket.emit('confirm_potion', { roomId: room.id, selectedIds: [wantId.id] });
       // Bestätigungsschritt (Attack-Karte): ggf. confirm
       // Der Angriff läuft mit Animationspausen — auf die Auflösung warten (höchstens 8 s).
-      await waitFor(() => { const g = last('game_state'); return g && !g.potionTargeting && !g.skillTest.busy && hpOf(g, seatTarget, hi) < before ? g : null; }, 8000);
+      // Folgt eine weitere Zielwahl derselben Aktion (z. B. „darf erneut"), nimmt der Test das erste wählbare Ziel.
+      for (let again = 0; again < 4; again++) {
+        const done = await waitFor(() => { const g = last('game_state'); return g && !g.potionTargeting && !g.skillTest.busy && hpOf(g, seatTarget, hi) < before ? g : null; }, again === 0 ? 8000 : 3000);
+        if (done) break;
+        const g = last('game_state');
+        if (g && g.potionTargeting && g.potionTargeting.ownerIdx === g.myIndex) {
+          const next = (g.potionTargeting.validTargets || []).find(t => !t.ineligible);
+          socket.emit('confirm_potion', { roomId: room.id, selectedIds: next ? [next.id] : [] });
+        } else if (!g || !g.skillTest.busy) break;
+      }
       const g2 = last('game_state');
       const after = hpOf(g2, seatTarget, hi);
       const afterAll = g2.players.map((p, s) => p.heroes.map(h => h && h.hp));
@@ -78,7 +95,9 @@ const cards = require('../../data/cards.json'); const db = {}; cards.forEach(c =
       }
       if (after < before) hit++;
     }
-    check('Gezielte Treffer auf Helden anderer Sitze (≥ 2 von 3)', hit >= 2, { hit, tried });
+    // Bots lösen jetzt Reaktionen und Schutz aus, einzelne Treffer werden abgewehrt: Die Zielwahl gilt als bestanden, wenn jedes Ziel angeboten wurde
+    // (siehe oben) und mindestens ein Treffer landet.
+    check('Gezielte Treffer auf Helden anderer Sitze (mindestens 1 landet, Reaktionen können abwehren)', hit >= 1 && tried >= 2, { hit, tried });
     socket.close();
   } catch (e) { console.error(e); process.exitCode = 1; }
   if (process.env.ST_SHOW_LOG) console.log(srv.log().split('\n').filter(l => /skilltest|Error|Fehler/.test(l)).slice(-15).join('\n'));
