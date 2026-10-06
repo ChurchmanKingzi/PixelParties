@@ -14,7 +14,7 @@ const toolsDir = (process.env.NODE_PATH || '').split(path.delimiter).find(d => f
   const srv = await startServer();
   const browser = await chromium.launch({ headless: true });
   try {
-    const ctx = await browser.newContext({ viewport: { width: 1600, height: 900 } });
+    const ctx = await browser.newContext({ viewport: { width: +process.env.VW || 1600, height: +process.env.VH || 900 } });
     const r = await ctx.request.post(BASE + '/api/auth/login', { data: { username: acc.username, password: acc.password } });
     if (!r.ok()) throw new Error('login failed ' + r.status());
     if (toolsDir) {
@@ -46,6 +46,12 @@ const toolsDir = (process.env.NODE_PATH || '').split(path.delimiter).find(d => f
     await page.waitForSelector('.st-base', { timeout: 15000 });
     await sleep(1200);
     await page.screenshot({ path: out });
+    console.log('Maße:', JSON.stringify(await page.evaluate(() => {
+      const sc = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--board-scale')) || 1;
+      const r = (sel) => { const e = document.querySelector(sel); if (!e) return null; const b = e.getBoundingClientRect(); return { w: Math.round(b.width), h: Math.round(b.height), x: Math.round(b.left), y: Math.round(b.top), natW: Math.round(b.width / sc), natH: Math.round(b.height / sc) }; };
+      const pr = document.querySelector('.st-prep'); const cs = pr && getComputedStyle(pr); const m = document.querySelector('.st-main'); const mcs = m && getComputedStyle(m);
+      return { prep: pr && { h: pr.offsetHeight, sh: pr.scrollHeight, disp: cs.display, ch: cs.height, min: cs.minHeight }, mainCs: mcs && { flex: mcs.flex, minH: mcs.minHeight, h: mcs.height }, scale: sc, vw: innerWidth, vh: innerHeight, main: r('.st-main'), base: r('.st-base'), hand: r('.st-hand'), ready: r('.st-ready-zone'), players: r('.st-players'), recycler: r('.st-recycler') };
+    })));
     console.log('Screenshots:', out);
   } catch (e) { console.error(e); process.exitCode = 1; }
   await browser.close();

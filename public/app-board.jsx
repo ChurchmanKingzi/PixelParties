@@ -50488,6 +50488,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
 window.BoardCard = BoardCard;
 window.BoardZone = BoardZone;       // Skill Test (Vorbereitungs-Basis)
 window.AbilityStack = AbilityStack; // Skill Test (Vorbereitungs-Basis)
+window.HeroIdleSprite = HeroIdleSprite;   // Skill Test (Vorbereitungs-Basis: animierte Helden)
+window.HeroSpriteEbene = HeroSpriteEbene; // Skill Test
+window.HeroIdleAnims = HeroIdleAnims;     // Skill Test
 window.GameBoard = GameBoard;
 window.FrozenOverlay = FrozenOverlay;
 window.NegatedOverlay = NegatedOverlay;

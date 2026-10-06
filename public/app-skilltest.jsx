@@ -146,88 +146,136 @@ function SkillTestCreateOptions({ opts, setOpts }) {
 
 
 // ═══════════════════════════════════════════
-//  PIXEL-ART: RECYCLING-CONTAINER
-//  Programmatisch gemalt (kein Bild-Asset): kleine Pixel-Leinwand,
-//  hart hochskaliert. Zwei Zustände: Deckel zu / Deckel offen.
+//  PIXEL-ART-BAUSTEINE
+//  Gemalt wird in public/skilltest-art.js (kleine Leinwände, feste Paletten,
+//  Verläufe nur über Dithering); hier stehen die React-Hüllen.
 // ═══════════════════════════════════════════
-const _stArtCache = {};
-function stPixelArt(key, w, h, paint) {
-  if (_stArtCache[key]) return _stArtCache[key];
-  const cv = document.createElement('canvas');
-  cv.width = w; cv.height = h;
-  const g = cv.getContext('2d');
-  const px = (x, y, c) => { g.fillStyle = c; g.fillRect(x, y, 1, 1); };
-  const rect = (x, y, rw, rh, c) => { g.fillStyle = c; g.fillRect(x, y, rw, rh); };
-  paint({ px, rect, w, h });
-  return (_stArtCache[key] = cv.toDataURL('image/png'));
+
+/** Kerkerwand hinter der Vorbereitung: eine Pixel-Leinwand, hart hochskaliert. */
+function StWall() {
+  const ref = useRef(null);
+  useEffect(() => {
+    const A = window.SkillTestArt, cv = ref.current;
+    if (!A || !cv) return undefined;
+    let raf = 0;
+    const paint = () => { raf = 0; const P = 4; A.paintWall(cv, Math.ceil(window.innerWidth / P), Math.ceil(window.innerHeight / P), 11); };
+    const onResize = () => { if (!raf) raf = requestAnimationFrame(paint); };
+    paint();
+    window.addEventListener('resize', onResize);
+    return () => { window.removeEventListener('resize', onResize); if (raf) cancelAnimationFrame(raf); };
+  }, []);
+  return <canvas ref={ref} className="st-wall" aria-hidden="true" />;
 }
 
-function stRecyclerArt(open) {
-  return stPixelArt('recycler:' + (open ? 'open' : 'closed'), 56, 64, ({ px, rect }) => {
-    const OUT = '#0f2a1b', BODY = '#2f9e57', HI = '#52c97b', SH = '#1f6e3d', DK = '#16482a';
-    const LID = '#287a47', LIDHI = '#4cc27a', METAL = '#8a97a6', METALDK = '#5b6672', BLK = '#171b20', RUB = '#2b3138';
-    // Bodenschatten
-    for (let x = 6; x < 50; x++) { px(x, 60, 'rgba(0,0,0,.35)'); if (x > 9 && x < 47) px(x, 61, 'rgba(0,0,0,.25)'); }
-    // Korpus: leicht nach oben verbreitert
-    for (let y = 24; y < 56; y++) {
-      const inset = Math.floor((y - 24) / 10);        // 0..3
-      const x0 = 7 + inset, x1 = 48 - inset;
-      rect(x0, y, x1 - x0 + 1, 1, BODY);
-      px(x0, y, OUT); px(x1, y, OUT);
-      px(x0 + 1, y, HI); px(x0 + 2, y, HI);           // Licht links
-      px(x1 - 1, y, SH); px(x1 - 2, y, SH);           // Schatten rechts
-    }
-    rect(10, 55, 36, 1, OUT);                          // Unterkante
-    // senkrechte Rippen
-    for (const rx of [17, 24, 31, 38]) for (let y = 31; y < 54; y++) { px(rx, y, SH); px(rx + 1, y, HI); }
-    // Frontplatte mit Recycling-Zeichen
-    rect(15, 32, 26, 18, DK); rect(16, 33, 24, 16, '#e9f6ee'); rect(16, 33, 24, 1, '#ffffff');
-    rect(15, 32, 26, 1, OUT); rect(15, 49, 26, 1, OUT); rect(15, 32, 1, 18, OUT); rect(40, 32, 1, 18, OUT);
-    // Kreispfeile (Refresh-Symbol) mittig auf der Platte
-    const cx = 28, cy = 41;
-    for (let y = -6; y <= 6; y++) for (let x = -6; x <= 6; x++) {
-      const d = Math.sqrt(x * x + y * y), a = Math.atan2(y, x);
-      const ring = d > 3.2 && d < 5.4;
-      const gap1 = Math.abs(a - (-2.2)) < 0.42, gap2 = Math.abs(a - 0.94) < 0.42;
-      if (ring && !gap1 && !gap2) px(cx + x, cy + y, '#1f9f52');
-    }
-    // zwei Pfeilspitzen
-    [[22, 36, [[0, 0], [1, 0], [2, 0], [0, 1], [1, 1], [0, 2]]], [32, 46, [[2, 0], [1, 1], [2, 1], [0, 2], [1, 2], [2, 2]]]].forEach(([ax, ay, pts]) => pts.forEach(([dx, dy]) => px(ax + dx, ay + dy, '#127a3a')));
-    // Räder
-    for (const wx of [13, 38]) { rect(wx, 54, 6, 6, BLK); rect(wx + 1, 55, 4, 4, RUB); px(wx + 2, 56, METAL); px(wx + 3, 57, METALDK); }
-    // Einwurfschlitz (zeigt, wo Karten verschwinden)
-    rect(14, 25, 28, 3, OUT); rect(15, 26, 26, 1, '#050b08');
-    if (!open) {
-      // Deckel geschlossen
-      for (let y = 17; y < 25; y++) { const inset = y < 19 ? 2 : 0; rect(5 + inset, y, 46 - 2 * inset, 1, LID); px(5 + inset, y, OUT); px(50 - inset, y, OUT); }
-      rect(7, 17, 42, 1, OUT); rect(6, 19, 44, 1, LIDHI); rect(5, 24, 46, 1, OUT);
-      rect(22, 20, 12, 2, METAL); rect(22, 22, 12, 1, METALDK);   // Griff
-    } else {
-      // Deckel hochgeklappt (Scharnier hinten)
-      for (let i = 0; i < 9; i++) { rect(10 - i + 2, 14 - i, 36, 1, i % 2 ? LID : LIDHI); px(10 - i + 2, 14 - i, OUT); px(10 - i + 37, 14 - i, OUT); }
-      rect(11, 15, 34, 1, OUT);
-      rect(8, 22, 40, 2, OUT);                                       // Deckelkante vorn offen
-      rect(14, 18, 28, 4, '#07110c');                               // dunkle Öffnung
-    }
-    // Statuslämpchen
-    px(46, 28, open ? '#ffd84a' : '#4cff7c'); px(46, 29, open ? '#c99a14' : '#1d9c43');
-  });
+/** Hintergrund der Heimbasis (Dielen, Steinrahmen, Fackellicht) — füllt seinen Elternknoten, neu gemalt bei Größenänderung. */
+function StBoardBackdrop() {
+  const ref = useRef(null);
+  useEffect(() => {
+    const A = window.SkillTestArt, cv = ref.current;
+    if (!A || !cv || !cv.parentElement) return undefined;
+    const host = cv.parentElement;
+    let raf = 0, last = '';
+    const paint = () => {
+      raf = 0;
+      const sc = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--board-scale')) || 1;
+      const P = Math.max(2, Math.round(3 * sc));
+      const w = Math.max(60, Math.round(host.clientWidth / P)), h = Math.max(40, Math.round(host.clientHeight / P));
+      if (w + 'x' + h === last) return;
+      last = w + 'x' + h;
+      A.paintBoard(cv, w, h, [{ x: 13, y: 3 }, { x: w - 13, y: 3 }], 5);
+    };
+    const kick = () => { if (!raf) raf = requestAnimationFrame(paint); };
+    paint();
+    const ro = new ResizeObserver(kick); ro.observe(host);
+    return () => { ro.disconnect(); if (raf) cancelAnimationFrame(raf); };
+  }, []);
+  return <canvas ref={ref} className="st-board-backdrop" aria-hidden="true" />;
 }
 
-function RecyclerContainer({ count, open, nextAt, children }) {
+/** Wandfackel: Halterung, animierte Pixelflamme (6 Frames) und gedithertes Licht. */
+function StTorch({ side }) {
+  const A = window.SkillTestArt;
+  if (!A) return null;
+  const fl = A.torchFlame(), ho = A.torchHolder(), gl = A.torchGlow();
   return (
-    <div className={'st-recycler' + (open ? ' is-open' : '')} data-st-ziel="recycler" data-st-recycler="1">
+    <div className={'st-torch st-torch-' + side} aria-hidden="true">
+      <div className="st-torch-glow" style={{ backgroundImage: `url(${gl.url})` }} />
+      <div className="st-torch-flame" style={{ backgroundImage: `url(${fl.url})` }} />
+      <div className="st-torch-holder" style={{ backgroundImage: `url(${ho.url})` }} />
+    </div>
+  );
+}
+
+function StCoin({ className }) {
+  const A = window.SkillTestArt;
+  return <span className={'st-coin' + (className ? ' ' + className : '')} style={A ? { backgroundImage: `url(${A.coin()})` } : undefined} aria-hidden="true" />;
+}
+
+// Recycler: der Deckel ist sein Mund. `lid` 0 (zu) … 4 (weit offen); `chew` lässt den Korpus beim Kauen wackeln.
+function RecyclerContainer({ count, lid, chew, nextAt, artRef }) {
+  const A = window.SkillTestArt;
+  useEffect(() => {          // alle Deckelstellungen vorab dekodieren, damit der Wechsel nie aufblitzt
+    if (!A) return;
+    for (let i = 0; i < A.LID_FRAMES; i++) { const im = new Image(); im.src = A.recycler(i); if (im.decode) im.decode().catch(() => {}); }
+  }, []);
+  return (
+    <div className={'st-recycler' + (chew ? ' is-chewing' : '') + (lid > 0 ? ' is-open' : '')} data-st-ziel="recycler" data-st-recycler="1">
       <div className="st-recycler-art-wrap">
-        <div className="st-recycler-art" style={{ backgroundImage: `url(${stRecyclerArt(open)})` }} />
+        <div className="st-recycler-art" ref={artRef} style={A ? { backgroundImage: `url(${A.recycler(lid)})` } : undefined} />
         <div className="st-recycler-plate" title="Cards recycled so far">
           <span className="st-recycler-count">{count}</span>
         </div>
       </div>
       <div className="st-recycler-label orbit-font">RECYCLER</div>
       <div className="st-recycler-hint">{nextAt === 1 ? 'next card ejects a new one!' : `${nextAt} more → new card`}</div>
-      {children}
     </div>
   );
+}
+
+// ── Eigenes Ziehbild ──
+// Das native Ziehbild eines Hand-Elements nimmt bei gefächerten, einander überdeckenden Karten Teile der Nachbarn mit.
+// Deshalb (wie im Puzzle-Editor) bekommt der Browser nur ein unsichtbares 1×1-Bild; die Karte folgt dem Zeiger als gewöhnliches DOM-Element.
+function stDragGhost(e, cardName) {
+  const dt = e.dataTransfer;
+  if (!dt || !dt.setDragImage) return;
+  const q = e.currentTarget;
+  const sicht = (q && q.querySelector && q.querySelector('.pz-hand-card-inner')) || q;
+  const gb = sicht && sicht.offsetWidth > 0 ? Math.round(sicht.offsetWidth * 0.75) : 60;
+  const gh = sicht && sicht.offsetHeight > 0 ? Math.round(sicht.offsetHeight * 0.75) : 84;
+  const hx = gb / 2, hy = gh / 2;
+  const old = document.getElementById('st-drag-ghost'); if (old) old.remove();
+  const ghost = document.createElement('div');
+  ghost.id = 'st-drag-ghost'; ghost.className = 'st-drag-ghost';
+  ghost.style.width = gb + 'px'; ghost.style.height = gh + 'px';
+  ghost.style.transform = `translate(${Math.round(e.clientX - hx)}px,${Math.round(e.clientY - hy)}px)`;
+  const url = cardImageUrl(cardName);
+  if (url) { const img = document.createElement('img'); img.src = url; img.draggable = false; img.alt = ''; ghost.appendChild(img); }
+  else ghost.textContent = cardName;
+  document.body.appendChild(ghost);
+  const leer = document.createElement('div');
+  leer.style.cssText = 'position:absolute;top:-1000px;left:-1000px;width:1px;height:1px;opacity:0;';
+  document.body.appendChild(leer);
+  dt.setDragImage(leer, 0, 0);
+  setTimeout(() => { try { leer.remove(); } catch { /* weg */ } }, 0);
+  let raf = 0, x = 0, y = 0;
+  const setze = () => { raf = 0; ghost.style.transform = `translate(${x}px,${y}px)`; };
+  const folge = (ev) => {
+    if (!ev.clientX && !ev.clientY) return;                  // Firefox meldet bei `drag` 0/0
+    x = Math.round(ev.clientX - hx); y = Math.round(ev.clientY - hy);
+    if (!raf) raf = requestAnimationFrame(setze);
+  };
+  const ende = () => {
+    if (raf) { cancelAnimationFrame(raf); raf = 0; }
+    document.removeEventListener('dragover', folge, true);
+    document.removeEventListener('drag', folge, true);
+    document.removeEventListener('dragend', ende, true);
+    document.removeEventListener('drop', ende, true);
+    ghost.remove();
+  };
+  document.addEventListener('dragover', folge, true);
+  document.addEventListener('drag', folge, true);
+  document.addEventListener('dragend', ende, true);
+  document.addEventListener('drop', ende, true);
 }
 
 // ═══════════════════════════════════════════
@@ -243,18 +291,97 @@ const fmtTime = (ms) => { const s = Math.max(0, Math.ceil(ms / 1000)); return Ma
 const zoneKey = (t) => [t.kind, t.hi ?? '', t.slot ?? ''].join(':');
 const parseZoneKey = (k) => { const [kind, hi, slot] = k.split(':'); return { kind, hi: hi === '' ? undefined : +hi, slot: slot === '' ? undefined : +slot }; };
 
+// Startschätzung der Maße (bei --board-scale 1): Brett, Seitenspalten (links Spielerliste, rechts Recycler); die Feinabstimmung misst das DOM
+const ST_BOARD_W = 960, ST_SIDE_W = 230, ST_BOARD_H = 450;
+
 function SkillTestPrepScreen({ lobby, user, leaveRoom, notify }) {
   const R = window.SkillTestRules;
   const [view, setView] = useState(null);
   const [now, setNow] = useState(Date.now());
   const [drag, setDrag] = useState(null);           // { name, src }
   const [startMenu, setStartMenu] = useState(null); // { hi, slot, x, y }
-  const [fx, setFx] = useState(null);               // Recycler-Animation
-  const [binOpen, setBinOpen] = useState(false);
+  const [lid, setLid] = useState(0);                // Deckelstellung des Recyclers (0 zu … 4 weit offen)
+  const [chew, setChew] = useState(false);
+  const [hidden, setHidden] = useState(() => new Set());   // Karten, die noch aus dem Recycler zur Hand fliegen
+  const [popped, setPopped] = useState(null);                // gerade gelandete Karte (kurzes Aufploppen)
   const offsetRef = useRef(0);
-  const wrapRef = useRef(null);
+  const mainRef = useRef(null);
   const dragRef = useRef(null);
+  const flyRef = useRef(null);
+  const recArtRef = useRef(null);
+  const dropRef = useRef(null);                     // wo die zuletzt in den Recycler geworfene Karte losgelassen wurde
+  const fxTimers = useRef([]);
+  const lidTimers = useRef([]);
+  const dragOverRecycler = useRef(false);
   const { tooltipCard, showTooltip, hideTooltip } = useCardTooltip({ defaultSide: 'left' });
+  const heldenAnzeigen = user && user.display_heroes != null ? !!user.display_heroes : true;
+
+  const later = (list, ms, fn) => { const id = setTimeout(fn, ms); list.current.push(id); return id; };
+  const clearList = (list) => { list.current.forEach(clearTimeout); list.current = []; };
+
+  // ── Flug einer Karte (Fixed-Ebene über allem), per Web Animations ──
+  // a/b: { x, y } Mittelpunkte im Fenster; a.w/a.h = Kartenmaß am Start
+  const flyCard = (name, a, b, o) => {
+    const opt = { ms: 600, s0: 1, s1: 1, r0: 0, r1: 0, lift: 0, ease: 'cubic-bezier(.35,.6,.3,1)', fade: false, onDone: null, ...(o || {}) };
+    const layer = flyRef.current;
+    if (!layer || !layer.animate) { if (opt.onDone) opt.onDone(); return; }
+    const w = a.w || 60, h = a.h || 84;
+    const el = document.createElement('div');
+    el.className = 'st-fly-card';
+    el.style.width = w + 'px'; el.style.height = h + 'px';
+    const url = cardImageUrl(name);
+    if (url) { const img = document.createElement('img'); img.src = url; img.draggable = false; img.alt = ''; el.appendChild(img); }
+    else el.textContent = name;
+    layer.appendChild(el);
+    const tr = (p, s, r) => `translate(${Math.round(p.x - w / 2)}px,${Math.round(p.y - h / 2)}px) rotate(${r}deg) scale(${s})`;
+    const mid = { x: (a.x + b.x) / 2, y: Math.min(a.y, b.y) - opt.lift };
+    const frames = [{ transform: tr(a, opt.s0, opt.r0), opacity: 1 }];
+    if (opt.lift) frames.push({ transform: tr(mid, (opt.s0 + opt.s1) / 2 + 0.12, (opt.r0 + opt.r1) / 2), opacity: 1, offset: 0.5 });
+    frames.push({ transform: tr(b, opt.s1, opt.r1), opacity: opt.fade ? 0.2 : 1 });
+    const anim = el.animate(frames, { duration: opt.ms, easing: opt.ease, fill: 'forwards' });
+    const done = () => { el.remove(); if (opt.onDone) opt.onDone(); };
+    anim.onfinish = done;
+    anim.oncancel = done;
+  };
+
+  // Deckel nach Drehbuch bewegen: [[ms, stellung], …]
+  const runLid = (script) => {
+    clearList(lidTimers);
+    script.forEach(([ms, frame]) => { if (ms <= 0) setLid(frame); else later(lidTimers, ms, () => setLid(frame)); });
+  };
+
+  // ── Recycler: frisst die Karte (Deckel kaut), bei Auswurf spuckt er die neue aus und sie fliegt zur Hand ──
+  const playRecycle = (ev, st) => {
+    const art = recArtRef.current, ar = art && art.getBoundingClientRect();
+    const mouth = ar ? { x: ar.left + ar.width * 0.5, y: ar.top + ar.height * 0.42 } : { x: window.innerWidth - 150, y: window.innerHeight / 2 };
+    const drop = dropRef.current; dropRef.current = null;
+    const from = drop || { x: window.innerWidth / 2, y: window.innerHeight - 140, w: 64, h: 90 };
+    // 1) die gefressene Karte fliegt in den Mund, schrumpfend und kippend
+    const eaten = ev.card || (drop && drop.name);
+    if (eaten) flyCard(eaten, from, mouth, { ms: 360, s0: 1, s1: 0.18, r0: 0, r1: 24, ease: 'cubic-bezier(.5,0,.9,.6)', fade: true });
+    const script = [[0, 4], [330, 1], [400, 3], [470, 0]];
+    later(fxTimers, 300, () => setChew(true));
+    later(fxTimers, 760, () => setChew(false));
+    if (ev.ejected) {
+      // 2) Auswurf: Mund auf, Karte schießt heraus, fliegt im Bogen zur Hand
+      const name = ev.ejected;
+      setHidden(h => { const n = new Set(h); n.add(name); return n; });
+      script.push([760, 4], [1230, 2], [1330, 0]);
+      later(fxTimers, 820, () => {
+        const target = document.querySelector('.st-hand .pz-hand-card[data-st-card="' + name.replace(/"/g, '\\"') + '"]');
+        const unhide = () => { setHidden(h => { const n = new Set(h); n.delete(name); return n; }); setPopped(name); later(fxTimers, 360, () => setPopped(p => (p === name ? null : p))); };
+        if (!target) { unhide(); return; }
+        const tr = target.getBoundingClientRect();
+        const cw = (target.querySelector('.pz-hand-card-inner') || target).offsetWidth || 64;
+        const ch = (target.querySelector('.pz-hand-card-inner') || target).offsetHeight || 90;
+        const arH = ar ? ar.height : 200;
+        flyCard(name, { x: mouth.x, y: mouth.y - arH * 0.1, w: cw, h: ch },
+          { x: tr.left + tr.width / 2, y: tr.top + tr.height / 2 },
+          { ms: 760, s0: 0.35, s1: 1, r0: -14, r1: 0, lift: Math.max(120, arH * 0.7), ease: 'cubic-bezier(.3,.4,.35,1)', onDone: unhide });
+      });
+    }
+    runLid(script);
+  };
 
   // ── Verbindung ──
   useEffect(() => {
@@ -263,10 +390,7 @@ function SkillTestPrepScreen({ lobby, user, leaveRoom, notify }) {
       offsetRef.current = st.serverNow - Date.now();
       setView(prev => ({ ...(prev || {}), ...st }));
       if (st.event && st.event.type === 'recycle') {
-        setFx({ ...st.event, t: Date.now() });
-        setBinOpen(true);
-        setTimeout(() => setBinOpen(false), 520);
-        setTimeout(() => setFx(f => (f && Date.now() - f.t >= 1500 ? null : f)), 1600);
+        playRecycle(st.event, st);
         if (window.playSFX) window.playSFX(st.event.ejected ? 'ping' : 'discard', { dedupe: 80 });
       }
     };
@@ -275,23 +399,39 @@ function SkillTestPrepScreen({ lobby, user, leaveRoom, notify }) {
     socket.on('st_prep_error', onErr);
     socket.emit('st_prep_sync', { roomId: lobby.id });
     const tick = setInterval(() => setNow(Date.now()), 500);
-    return () => { socket.off('st_prep_state', onState); socket.off('st_prep_error', onErr); clearInterval(tick); };
+    return () => {
+      socket.off('st_prep_state', onState); socket.off('st_prep_error', onErr); clearInterval(tick);
+      clearList(fxTimers); clearList(lidTimers);
+    };
   }, [lobby.id]);
 
   // ── Brett-Skalierung (wie der Puzzle-Editor: globale --board-scale) ──
+  // Die Zonengröße hängt zusätzlich an Fensterbreiten-Stufen des Stylesheets; deshalb wird nicht gerechnet, sondern gemessen:
+  // Maßstab setzen, das Brett messen, nachziehen, bis es samt Seitenspalten in den Hauptbereich passt.
   useEffect(() => {
-    const el = wrapRef.current; if (!el) return;
+    const el = mainRef.current; if (!el) return undefined;
+    const root = document.documentElement;
     const apply = () => {
       const r = el.getBoundingClientRect();
       if (!r.width || !r.height) return;
-      const byW = r.width / 1180, byH = r.height / 520;
-      const sc = Math.max(0.55, Math.min(1.35, Math.min(byW, byH)));
-      document.documentElement.style.setProperty('--board-scale', sc.toFixed(3));
+      const clampSc = (v) => Math.max(0.5, Math.min(1.35, v));
+      let sc = clampSc(Math.min((r.width - 36) / (ST_BOARD_W + 2 * ST_SIDE_W), r.height / ST_BOARD_H));
+      for (let k = 0; k < 5; k++) {
+        root.style.setProperty('--board-scale', sc.toFixed(3));
+        const base = el.querySelector('.st-base');
+        if (!base || !base.offsetWidth) break;
+        const f = Math.min((r.width - 36 - 2 * ST_SIDE_W * sc) / base.offsetWidth, (r.height - 2) / base.offsetHeight);
+        if (Math.abs(f - 1) < 0.02 && f <= 1.0001) break;
+        sc = clampSc(sc * (1 + (f - 1) * 0.92));
+      }
+      // Handkarten: auf niedrigen Fenstern etwas kleiner, damit das Brett Platz behält
+      const hs = Math.max(0.9, Math.min(1.3, window.innerHeight / 700));
+      el.parentElement.style.setProperty('--hand-card-scale', hs.toFixed(2));
     };
     apply();
     const ro = new ResizeObserver(apply); ro.observe(el);
     window.addEventListener('resize', apply);
-    return () => { ro.disconnect(); window.removeEventListener('resize', apply); document.documentElement.style.setProperty('--board-scale', '1'); };
+    return () => { ro.disconnect(); window.removeEventListener('resize', apply); root.style.setProperty('--board-scale', '1'); };
   }, [!!view]);
 
   const ps = view && view.me;
@@ -310,6 +450,7 @@ function SkillTestPrepScreen({ lobby, user, leaveRoom, notify }) {
     hideTooltip();
     e.dataTransfer.effectAllowed = 'move';
     try { e.dataTransfer.setData('text/plain', name); } catch { /* ältere Browser */ }
+    stDragGhost(e, name);
     dragRef.current = { name, src };
     if (window.setHandDragFlag) window.setHandDragFlag(true);
     setTimeout(() => setDrag({ name, src }), 0);
@@ -318,6 +459,7 @@ function SkillTestPrepScreen({ lobby, user, leaveRoom, notify }) {
     dragRef.current = null; setDrag(null);
     if (window.setHandDragFlag) window.setHandDragFlag(false);
     clearTargetMark();
+    if (dragOverRecycler.current) { dragOverRecycler.current = false; if (!lidTimers.current.length) setLid(0); }
   };
   const clearTargetMark = () => {
     document.querySelectorAll('[data-st-target]').forEach(n => n.removeAttribute('data-st-target'));
@@ -365,19 +507,39 @@ function SkillTestPrepScreen({ lobby, user, leaveRoom, notify }) {
     e.preventDefault();
     const hit = findTarget(e.clientX, e.clientY);
     clearTargetMark();
-    if (hit) dispatchDrop(d, hit.t);
+    if (hit) dispatchDrop(d, hit.t, e);
     endDrag();
   };
-  const dispatchDrop = (d, t) => {
-    if (t.kind === 'recycler') send({ type: 'recycle', from: d.src });
+  const dispatchDrop = (d, t, e) => {
+    if (t.kind === 'recycler') {
+      const g = document.getElementById('st-drag-ghost');
+      const gr = g && g.getBoundingClientRect();
+      dropRef.current = { name: d.name, x: e ? e.clientX : window.innerWidth / 2, y: e ? e.clientY : window.innerHeight / 2, w: gr ? gr.width : 64, h: gr ? gr.height : 90 };
+      send({ type: 'recycle', from: d.src });
+    }
     else if (t.kind === 'hand') send({ type: 'unplace', from: d.src });
     else { send({ type: 'place', from: d.src, to: t }); if (window.playSFX) window.playSFX('placement'); }
   };
   // Hand & Recycler sind eigene Ziele (außerhalb des Brett-Wrappers)
   const dropOn = (kind) => ({
-    onDragOver: (e) => { if (dragRef.current && acceptsAt({ kind })) { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; e.currentTarget.setAttribute('data-st-target', '1'); } },
-    onDragLeave: (e) => { e.currentTarget.removeAttribute('data-st-target'); },
-    onDrop: (e) => { const d = dragRef.current; if (!d) return; e.preventDefault(); e.currentTarget.removeAttribute('data-st-target'); if (acceptsAt({ kind })) dispatchDrop(d, { kind }); endDrag(); },
+    onDragOver: (e) => {
+      if (dragRef.current && acceptsAt({ kind })) {
+        e.preventDefault(); e.dataTransfer.dropEffect = 'move'; e.currentTarget.setAttribute('data-st-target', '1');
+        if (kind === 'recycler' && !dragOverRecycler.current) { dragOverRecycler.current = true; clearList(lidTimers); setLid(3); }   // Mund auf, sobald eine Karte darüber schwebt
+      }
+    },
+    onDragLeave: (e) => {
+      e.currentTarget.removeAttribute('data-st-target');
+      if (kind === 'recycler' && dragOverRecycler.current) { dragOverRecycler.current = false; clearList(lidTimers); setLid(0); }
+    },
+    onDrop: (e) => {
+      const d = dragRef.current; if (!d) return;
+      e.preventDefault(); e.currentTarget.removeAttribute('data-st-target');
+      dragOverRecycler.current = false;
+      if (acceptsAt({ kind })) dispatchDrop(d, { kind }, e);
+      else if (kind === 'recycler') setLid(0);
+      endDrag();
+    },
   });
 
   // Glühen: alle passenden Zonen während des Ziehens
@@ -411,12 +573,13 @@ function SkillTestPrepScreen({ lobby, user, leaveRoom, notify }) {
 
   if (view && view.spectator) {
     return (
-      <div className="screen-full st-prep st-loading">
+      <div className="screen-full ui-noscale st-prep st-loading">
+        <StWall />
         <div className="top-bar"><button className="btn btn-danger" onClick={leaveRoom}>LEAVE</button><h2 className="orbit-font" style={{ fontSize: 14, color: 'var(--accent)' }}>🎯 SKILL TEST — PREPARATION</h2></div>
         <div className="st-chips" style={{ margin: 'auto', flexWrap: 'wrap', justifyContent: 'center', maxWidth: 700 }}>
           {view.players.map(p => (
             <span key={p.idx} className={'st-chip' + (p.ready ? ' is-ready' : '')}>
-              {p.persona ? <img src={cardImageUrl(p.persona.hero)} alt="" /> : <b>{p.isBot ? '🤖' : '⚔'}</b>}
+              {p.persona ? <img src={cardImageUrl(p.persona.hero)} alt="" /> : <b>{p.isBot ? 'CPU' : '♟'}</b>}
               <span>{p.username}</span><i>{p.ready ? '✓' : '…'}</i>
             </span>
           ))}
@@ -426,7 +589,7 @@ function SkillTestPrepScreen({ lobby, user, leaveRoom, notify }) {
   }
   if (!view || !ps) {
     return (
-      <div className="screen-full st-prep st-loading"><div className="orbit-font" style={{ margin: 'auto', fontSize: 16 }}>Preparing your base…</div></div>
+      <div className="screen-full ui-noscale st-prep st-loading"><StWall /><div className="orbit-font" style={{ margin: 'auto', fontSize: 16 }}>Preparing your base…</div></div>
     );
   }
 
@@ -444,12 +607,14 @@ function SkillTestPrepScreen({ lobby, user, leaveRoom, notify }) {
         const group = (
           <div key={hi} className="board-hero-group">
             <div className="board-zone-spacer" />
-            <div className="board-zone board-zone-hero" style={boardSkin('hero')}
+            <div className={'board-zone board-zone-hero' + (heroName ? ' zone-has-card' : '')} style={boardSkin('hero')}
               {...zoneProps({ kind: 'hero', hi }, heroName, { kind: 'hero', hi })}
               onMouseEnter={() => c && showTooltip(c, 'left')} onMouseLeave={hideTooltip}>
               {heroName
                 ? <BoardCard cardName={heroName} hp={c ? c.hp : undefined} maxHp={c ? c.hp : undefined} atk={c ? c.atk : undefined} hpPosition="hero" />
                 : <div className="board-zone-empty">Hero</div>}
+              {/* Animierter Held, der auf der Karte steht — dieselbe Figur wie im laufenden Spiel */}
+              {heroName && heldenAnzeigen && window.HeroIdleSprite && <window.HeroIdleSprite cardName={heroName} />}
             </div>
             <div className="board-zone board-zone-surprise" style={boardSkin('surprise')}
               {...zoneProps({ kind: 'surprise', hi }, ps.surpriseZones[hi], { kind: 'surprise', hi })}>
@@ -535,7 +700,7 @@ function SkillTestPrepScreen({ lobby, user, leaveRoom, notify }) {
     </div>
   );
 
-  // ── Hand ──
+  // ── Hand (rechts daneben: Gold, wie im Puzzle-Editor) ──
   const hand = ps.hand;
   const handEl = (
     <div className="pz-hand st-hand" {...dropOn('hand')} data-st-ziel="hand">
@@ -544,11 +709,12 @@ function SkillTestPrepScreen({ lobby, user, leaveRoom, notify }) {
         {hand.map((cardName, i) => {
           const img = cardImageUrl(cardName);
           const gezogen = drag && drag.src.kind === 'hand' && drag.src.idx === i;
+          const fan = window.handFanStyle ? window.handFanStyle(i, hand.length, { seite: 'me' }) : {};
           return (
             <div key={cardName + ':' + i}
               data-st-card={cardName}
-              className={'pz-hand-card' + (gezogen ? ' pz-hand-card-dragging' : '')}
-              style={window.handFanStyle ? window.handFanStyle(i, hand.length, { seite: 'me' }) : undefined}
+              className={'pz-hand-card' + (gezogen ? ' pz-hand-card-dragging' : '') + (popped === cardName ? ' st-hand-pop' : '')}
+              style={hidden.has(cardName) ? { ...fan, visibility: 'hidden' } : fan}
               draggable={!ps.ready}
               onDragStart={(e) => startDrag(e, cardName, { kind: 'hand', idx: i })}
               onDragEnd={endDrag}
@@ -563,16 +729,20 @@ function SkillTestPrepScreen({ lobby, user, leaveRoom, notify }) {
           );
         })}
       </div>
+      <div className="pz-hand-extras st-hand-extras" title={`Gold you take into the battle (${view.recycleGold} per recycled card)`}>
+        <div className="st-gold"><StCoin /><span className="st-gold-num">{view.gold}</span></div>
+        <div className="st-gold-lbl orbit-font">GOLD</div>
+      </div>
     </div>
   );
 
   return (
-    <div className="screen-full st-prep" onDragOver={(e) => { if (dragRef.current) e.preventDefault(); }} onDrop={() => { if (dragRef.current) endDrag(); }}>
+    <div className="screen-full ui-noscale st-prep" onDragOver={(e) => { if (dragRef.current) e.preventDefault(); }} onDrop={() => { if (dragRef.current) endDrag(); }}>
+      <StWall />
       <div className="top-bar st-topbar">
         <button className="btn btn-danger" onClick={leaveRoom}>LEAVE</button>
         <h2 className="orbit-font" style={{ fontSize: 14, color: 'var(--accent)' }}>🎯 SKILL TEST — PREPARATION</h2>
         {remaining != null && <span className={'badge st-timer' + (remaining < 30000 ? ' st-timer-low' : '')}>⏱ {fmtTime(remaining)}</span>}
-        <span className="badge" style={{ background: 'rgba(255,200,80,.14)', color: '#ffc850' }}>🪙 {view.gold} gold</span>
         <div style={{ flex: 1 }} />
         <VolumeControl />
       </div>
@@ -587,30 +757,40 @@ function SkillTestPrepScreen({ lobby, user, leaveRoom, notify }) {
         <div className="st-ready-sub orbit-font">
           {ps.ready ? `Waiting for the others… (${readyCount}/${view.players.length})` : (view.readyProblem || `${readyCount}/${view.players.length} ready`)}
         </div>
-        <div className="st-chips st-chips-row">
-          {view.players.map(p => (
-            <span key={p.idx} className={'st-chip' + (p.ready ? ' is-ready' : '') + (p.idx === view.you ? ' is-me' : '')} title={p.ready ? 'Ready' : 'Preparing…'}>
-              {p.persona ? <img src={cardImageUrl(p.persona.hero)} alt="" /> : <b>{p.isBot ? '🤖' : '⚔'}</b>}
-              <span>{p.username}</span><i>{p.ready ? '✓' : '…'}</i>
-            </span>
-          ))}
-        </div>
       </div>
 
-      <div className="st-main">
-        <div className="st-base-wrap" ref={wrapRef} onDragOver={onWrapDragOver} onDrop={onWrapDrop}>
+      <div className="st-main" ref={mainRef}>
+        <aside className="st-players">
+          <div className="st-players-title orbit-font">PLAYERS · {readyCount}/{view.players.length}</div>
+          {view.players.map(p => (
+            <div key={p.idx} className={'st-player' + (p.ready ? ' is-ready' : '') + (p.idx === view.you ? ' is-me' : '')} title={p.ready ? 'Ready' : 'Preparing…'}>
+              <span className="st-player-ava">{p.persona ? <img src={cardImageUrl(p.persona.hero)} alt="" /> : <b>{p.isBot ? 'CPU' : (p.username || '?').slice(0, 1).toUpperCase()}</b>}</span>
+              <span className="st-player-name">{p.username}</span>
+              <i className="st-player-state">{p.ready ? '✓' : '…'}</i>
+            </div>
+          ))}
+        </aside>
+
+        <div className="st-base-wrap" onDragOver={onWrapDragOver} onDrop={onWrapDrop}>
           <div className="st-base">
-            <div className="st-base-banner orbit-font">🏠 {user.username}'s Home Base</div>
-            <div className="board-player-side st-side">
-              {heroRow}{abilityRow}{supportRow}
+            <StBoardBackdrop />
+            <StTorch side="left" />
+            <StTorch side="right" />
+            <div className="st-base-banner orbit-font">{user.username}'s Home Base</div>
+            <div className="board-plane-clip st-plane-clip">
+              <div className="board-plane st-plane">
+                <div className="board-player-side st-side">
+                  {heroRow}{abilityRow}{supportRow}
+                </div>
+              </div>
+              <window.HeroSpriteEbene />
             </div>
           </div>
         </div>
+
         <div className="st-side-col">
           <div {...dropOn('recycler')}>
-            <RecyclerContainer count={ps.recycled} open={binOpen || (!!drag && !!acceptsAtSafe(acceptsAt, 'recycler'))} nextAt={nextAt}>
-              {fx && fx.ejected && <div className="st-eject" key={fx.t}><BoardCard cardName={fx.ejected} noTooltip /></div>}
-            </RecyclerContainer>
+            <RecyclerContainer count={ps.recycled} lid={lid} chew={chew} nextAt={nextAt} artRef={recArtRef} />
           </div>
         </div>
       </div>
@@ -625,11 +805,11 @@ function SkillTestPrepScreen({ lobby, user, leaveRoom, notify }) {
         </div>
       )}
 
+      <div className="st-fly-layer" ref={flyRef} aria-hidden="true" />
       <div className="board-tooltip">{tooltipCard && <CardTooltipContent card={tooltipCard} />}</div>
     </div>
   );
 }
-function acceptsAtSafe(fn, kind) { try { return fn({ kind }); } catch { return false; } }
 
 // Übergang Vorbereitung → Kampf (kurze Ansage, bis der erste Spielzustand eintrifft).
 function SkillTestBattlePending({ lobby, leaveRoom }) {
@@ -641,7 +821,7 @@ function SkillTestBattlePending({ lobby, leaveRoom }) {
   }, []);
   const starter = info && lobby.players[info.starter];
   return (
-    <div className="screen-full st-prep st-loading">
+    <div className="screen-full ui-noscale st-prep st-loading">
       <div className="top-bar"><button className="btn btn-danger" onClick={leaveRoom}>LEAVE</button></div>
       <div className="orbit-font" style={{ margin: 'auto', textAlign: 'center', fontSize: 18, lineHeight: 1.8 }}>
         ⚔️ The battle begins!
