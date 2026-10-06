@@ -72,9 +72,10 @@ async function runGame(opts = {}) {
   const seats = opts.seats || 4;
   const cards = getCardDB();
   const env = { cards, areaLimitOf: (n) => { try { const s = require('../cards/effects/_loader').loadCardEffect(n); return s && s.areaLimit; } catch { return undefined; } } };
+  const humanSeat = opts.humanSeat;
   const room = {
     id: 'sim-' + Math.random().toString(36).slice(2, 8), host: 'sim', hostId: 'sim', type: 'unranked',
-    players: Array.from({ length: seats }, (_, i) => ({ username: 'Bot ' + (i + 1), userId: 'cpu-sim:' + i, socketId: null, isBot: true, deckId: null })),
+    players: Array.from({ length: seats }, (_, i) => ({ username: 'Bot ' + (i + 1), userId: 'cpu-sim:' + i, socketId: null, isBot: i !== humanSeat, deckId: null })),
     spectators: [], status: 'playing', gameState: null,
     skillTest: { phase: 'prep', prepTimerDisabled: true, turnTimerDisabled: true, turnTimerSec: 0 },
   };
@@ -105,12 +106,22 @@ async function runGame(opts = {}) {
   await battle.start(room, host, prep);
   const gs = room.gameState, engine = room.engine, st = gs.skillTest;
   if (opts.weights) st.botWeights = Object.fromEntries(opts.weights.map((w, i) => [i, w]).filter(([, w]) => w));
-  engine.enterFastMode();
+  if (!opts.noFast) engine.enterFastMode();
 
   let guard = 0;
   const maxTurns = opts.maxTurns || 4000;
   while (!gs.result && guard++ < maxTurns) {
-    await bot.takeTurn(room, gs.activePlayer, host);
+    if (opts.humanSeat != null && gs.activePlayer === opts.humanSeat) {
+      // Test-Mensch: passt seine Round (und beantwortet nie Prompts) — deckt hängende Fremd-Prompts auf.
+      await require('./rounds').passRound(room, gs.activePlayer, host);
+      continue;
+    }
+    const wd = setTimeout(() => {
+      console.log('[sim] HÄNGT: aktiv', gs.activePlayer, 'busy', st.busy, 'pending', JSON.stringify(engine._pendingPrompt || engine._pendingGenericPrompt || null).slice(0, 400));
+    }, opts.watchdogMs || 8000);
+    await Promise.race([bot.takeTurn(room, gs.activePlayer, host), new Promise(r => setTimeout(r, (opts.watchdogMs || 8000) + 500))]);
+    clearTimeout(wd);
+    if (st.busy) break;
   }
   if (!gs.result) engine.onGameOver(room, battle.pickStarter ? 0 : 0, 'sim_turn_limit');
   return {

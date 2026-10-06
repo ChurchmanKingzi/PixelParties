@@ -158,6 +158,7 @@ async function beginTurn(engine, seat) {
   const gs = engine.gs, st = stOf(engine);
   gs.activePlayer = seat;
   gs.currentPhase = PHASE_ACTION;
+  if (gs.stFocus) delete gs.stFocus[seat];      // der Fokus-Gegner gilt nur für den einen Zug
   st.turnSeat = seat;
   st.turnStartedAt = Date.now();
   const ps = gs.players[seat];
@@ -303,13 +304,22 @@ async function act(room, pi, kind, params, fn, host) {
 
   gs.currentPhase = requiredPhase(room, pi, kind, params);
   st.busy = true;
+  const token = (st.actToken = (st.actToken || 0) + 1);
   const ps = gs.players[pi];
   const actedBefore = (ps.heroesActedThisTurn || []).length;
   const hoptBefore = snapshotHopt(gs);
   const meter = engine._stMeter = { active: true, events: [] };
   let ok = false;
+  // Diagnose: hängt eine Aktion (z. B. wartet ein Prompt auf einen Menschen), steht hier, worauf.
+  const wd = setTimeout(() => {
+    const pend = engine._pendingPrompt || engine._pendingGenericPrompt || gs.effectPrompt || null;
+    console.warn(`[skilltest] Aktion ${kind} von Sitz ${pi} hängt seit 8 s; wartet auf:`, JSON.stringify(pend && { type: pend.type, owner: pend.ownerIdx ?? pend.playerIdx, title: pend.title }) || 'unbekannt',
+      'chain:', !!gs._chainResolvingLock, 'spellDepth:', gs._spellResolutionDepth || 0);
+  }, 8000);
   try { ok = await fn(); }
   catch (err) { console.error(`[skilltest] ${kind} threw:`, err && err.stack || err); }
+  clearTimeout(wd);
+  if (st.actToken !== token) return ok;     // vom Wächter aufgegeben (siehe battle.js startPromptWatchdog)
   meter.active = false;
   st.busy = false;
 

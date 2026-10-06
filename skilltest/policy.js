@@ -55,6 +55,14 @@ function chooseTargets(engine, seat, validTargets, config, base) {
   return scored.slice(0, count).map(s => s.id);
 }
 
+/** Welchen Gegner trifft ein Flächenschaden? Standard: den mit den wenigsten Gesamt-HP (focusLeader>0: den stärksten). */
+function choosePlayer(engine, seat, candidates) {
+  const w = weightsOf(engine.room, seat);
+  const hpOf = (i) => (engine.gs.players[i].heroes || []).reduce((a, h) => a + (h && h.name && h.hp > 0 ? h.hp : 0), 0);
+  const sorted = [...candidates].sort((a, b) => hpOf(a) - hpOf(b));
+  return w.focusLeader > 0 ? sorted[sorted.length - 1] : sorted[0];
+}
+
 /** Mögliche Aktionen des Zuges, beste zuerst. */
 function rankActions(room, seat, host) {
   const engine = room.engine;
@@ -74,4 +82,4 @@ function rankActions(room, seat, host) {
   return out.sort((a, b) => b.score - a.score);
 }
 
-module.exports = { DEFAULT_WEIGHTS, chooseTargets, rankActions };
+module.exports = { DEFAULT_WEIGHTS, chooseTargets, choosePlayer, rankActions };

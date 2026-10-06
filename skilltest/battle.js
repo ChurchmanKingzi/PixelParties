@@ -125,6 +125,7 @@ async function start(room, host, prep) {
   room.engine = engine;
   ext.installBotSeats(engine, (pi) => skillGs.botSeats.includes(pi));
   ext.installBotBrain(engine);
+  ext.installPlayerChoice(engine);
   ext.installElimination(engine);
   ext.installMeter(engine);
   ext.installTurnEnd(engine, host);
@@ -145,6 +146,8 @@ async function start(room, host, prep) {
     for (let i = 0; i < ps.hand.length; i++) engine._autoRevealOnEnterHand && engine._autoRevealOnEnterHand(pi, i, ps.hand[i]);
   }
   try { require('../cards/effects/calm-diatribe').ensureCalmProviders(engine); } catch { /* optional */ }
+
+  startPromptWatchdog(room, host);
 
   // 4) Erste Round und erster Zug
   await rounds.startRound(engine, host);
@@ -168,6 +171,45 @@ function armTurnTimer(room, host) {
     // Zeit abgelaufen: der Bot-Verstand übernimmt den Zug (sonst blockiert ein Spieler alle anderen).
     host.scheduleBotTurn(room, seat, { forced: true });
   }, st.turnTimerSec * 1000 + 500);
+}
+
+// ── Hängende Prompts ───────────────────────────────────────────────
+// Wartet ein offener Prompt zu lange auf einen Menschen (Reaktionsfenster, Zielwahl …), blockiert er
+// alle anderen. Bei aktivem Zug-Timer wird er nach Ablauf mit der Standardantwort der CPU beantwortet
+// (freiwillige Prompts: ablehnen, Pflicht-Prompts: erste Option). Ohne Timer (Raum-Einstellung) wartet
+// das Spiel beliebig lange.
+function startPromptWatchdog(room, host) {
+  const gs = room.gameState, st = gs.skillTest;
+  const timed = !!st.turnTimerSec;                       // ohne Zug-Timer wartet das Spiel auf Menschen beliebig lange
+  const limitMs = (timed ? Math.max(st.turnTimerSec, 45) : 120) * 1000;
+  st._watch = setInterval(() => {
+    if (gs.result) return clearInterval(st._watch);
+    // Letzte Sicherung: eine Aktion, die weit über das Limit hinaus hängt (aus welchem Grund auch immer),
+    // wird aufgegeben, damit das Spiel weiterläuft.
+    if (st.busy) {
+      if (!st._busySeen || st._busySeen.token !== st.actToken) st._busySeen = { token: st.actToken, since: Date.now() };
+      else if (Date.now() - st._busySeen.since > limitMs + 30000 && (timed || st.botSeats.includes(gs.activePlayer))) {
+        console.warn(`[skilltest] Raum ${room.id}: Aktion von Sitz ${gs.activePlayer} aufgegeben (hängt > ${Math.round((limitMs + 30000) / 1000)} s)`);
+        const seat = gs.activePlayer;
+        st.actToken = (st.actToken || 0) + 1; st.busy = false; st._busySeen = null; gs.effectPrompt = null;
+        require('./rounds').passRound(room, seat, host).catch(() => {});
+        return;
+      }
+    } else st._busySeen = null;
+    const ep = gs.effectPrompt;
+    if (!ep) { st._promptSeen = null; return; }
+    if (!st._promptSeen || st._promptSeen.id !== ep.promptId) { st._promptSeen = { id: ep.promptId, since: Date.now() }; return; }
+    if (Date.now() - st._promptSeen.since < limitMs) return;
+    if (!timed && !st.botSeats.includes(ep.ownerIdx)) return;   // Mensch ohne Timer: warten
+    try {
+      const owner = ep.ownerIdx;
+      const resp = room.engine._getCpuGenericResponse(ep, owner);
+      console.warn(`[skilltest] Prompt ${ep.type} von Sitz ${owner} abgelaufen — Standardantwort`);
+      st._promptSeen = null;
+      room.engine.resolveGenericPrompt(resp === undefined ? null : resp, ep.promptId);
+    } catch (e) { console.error('[skilltest] Prompt-Watchdog:', e && e.message); }
+  }, 2000);
+  if (st._watch.unref) st._watch.unref();
 }
 
 // ── Spielende ──────────────────────────────────────────────────────
@@ -209,6 +251,7 @@ async function finishGame(room, winnerIdx, reason, host) {
   gs.result = { winnerIdx, reason, skillTest: { rounds: st.round, placements: place, sc } };
   st.phase = 'over'; room.skillTest.phase = 'over';
   if (st._timer) clearTimeout(st._timer);
+  if (st._watch) clearInterval(st._watch);
   if (room.engine) { room.engine._aborted = false; }
   console.log(`[skilltest] Raum ${room.id}: Ende nach ${st.round} Rounds, Sieger ${gs.players[winnerIdx].username} (${reason})`);
   // SC an Menschen (Spieler-Vorgabe 6.10.): 1/Round + 5 je überlebtem Gegner + 5 für den Sieg.

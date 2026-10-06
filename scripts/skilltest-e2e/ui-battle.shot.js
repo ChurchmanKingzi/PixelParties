@@ -53,7 +53,10 @@ const toolsDir = (process.env.NODE_PATH || '').split(path.delimiter).find(d => f
     console.log('nach Klick:', (await page.innerText('.st-turn-panel')).replace(/\n/g, ' | '));
     const target = page.locator('.board-zone-hero[data-hero-owner="opp"]').first();
     await target.click({ force: true });
-    await sleep(2500);
+    await sleep(800);
+    const confirmBtn = page.locator('button:has-text("ATTACK!")');
+    if (await confirmBtn.count()) await confirmBtn.first().click();
+    await sleep(4000);
     await page.screenshot({ path: out.replace('.png', '-after.png') });
     console.log('nach Ziel:', (await page.innerText('.st-turn-panel')).replace(/\n/g, ' | '));
     console.log('exhausted:', await page.locator('.st-actor-exhausted').count());

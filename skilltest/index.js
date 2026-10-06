@@ -216,7 +216,7 @@ function act(room, pi, kind, params, fn, host) { return require('./rounds').act(
 function scheduleBotTurn(room, seat, host, opts = {}) {
   const gs = room.gameState, st = gs && gs.skillTest;
   if (!st || gs.result) return;
-  const delay = opts.forced ? 50 : (opts.delayMs ?? 700);
+  const delay = opts.forced ? 50 : (opts.delayMs ?? parseInt(process.env.PP_ST_BOT_DELAY_MS || '700', 10));
   setTimeout(() => {
     if (!room.gameState || room.gameState.result || room.gameState.activePlayer !== seat) return;
     require('./bot').takeTurn(room, seat, host, opts).catch(err => console.error('[skilltest] Bot-Zug:', err && err.stack || err));

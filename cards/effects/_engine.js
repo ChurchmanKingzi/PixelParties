@@ -4911,7 +4911,7 @@ class GameEngine {
         };
 
         if (types.includes('hero')) {
-          if (side === 'enemy' || side === 'any') addHeroes(oppIdx);
+          if (side === 'enemy' || side === 'any') for (const _o of engine.opponentsOf(pi)) addHeroes(_o);   // alle Gegner (Skill Test); im Normalspiel genau einer
           if (side === 'my' || side === 'any') addHeroes(pi);
           // Add charmed opponent heroes to the caster's side
           if (side === 'my' || side === 'any') {
@@ -4929,7 +4929,7 @@ class GameEngine {
           }
         }
         if (types.includes('creature')) {
-          if (side === 'enemy' || side === 'any') addCreatures(oppIdx);
+          if (side === 'enemy' || side === 'any') for (const _o of engine.opponentsOf(pi)) addCreatures(_o);
           if (side === 'my' || side === 'any') addCreatures(pi);
         }
 
@@ -5493,7 +5493,7 @@ class GameEngine {
         };
 
         if (types.includes('hero')) {
-          if (side === 'enemy' || side === 'any') addHeroes(oppIdx);
+          if (side === 'enemy' || side === 'any') for (const _o of engine.opponentsOf(pi)) addHeroes(_o);   // alle Gegner (Skill Test); im Normalspiel genau einer
           if (side === 'my' || side === 'any') addHeroes(pi);
           if (side === 'my' || side === 'any') {
             const charmedOps2 = gs.players[oppIdx];
@@ -5510,7 +5510,7 @@ class GameEngine {
           }
         }
         if (types.includes('creature')) {
-          if (side === 'enemy' || side === 'any') addCreatures(oppIdx);
+          if (side === 'enemy' || side === 'any') for (const _o of engine.opponentsOf(pi)) addCreatures(_o);
           if (side === 'my' || side === 'any') addCreatures(pi);
         }
 
@@ -44608,6 +44608,10 @@ this._deathWatch = (this._deathWatchStack || []).length
   async actionAoeHit(cardInst, config = {}) {
     const gs = this.gs;
     const pi = cardInst.controller;
+    // Skill Test: ein Flächenschlag gegen „den Gegner" trifft EINEN gewählten Spieler (Fokus des Wirkers).
+    if (gs.skillTest && this._stChooseAoePlayer && (config.side === undefined || config.side === 'enemy')) {
+      await this._stChooseAoePlayer(pi, config, cardInst);
+    }
     const oppIdx = this.opponentOf(pi);
     const heroIdx = cardInst.heroIdx;
     const damage = config.damage || 0;

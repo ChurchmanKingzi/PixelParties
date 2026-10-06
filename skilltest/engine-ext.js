@@ -90,9 +90,45 @@ function installBotBrain(engine) {
   engine._getCpuTargetResponse = (validTargets, config = {}, pi) => bot.chooseTargets(engine, pi, validTargets, config, base);
 }
 
+/**
+ * Flächenschaden gegen „den Gegner": mit mehreren Gegnern wählt der Wirker EINEN Spieler,
+ * dessen Ziele getroffen werden (wie bei „Divine Gift of Fire"). Die Wahl wird zum Fokus
+ * des Wirkers (`gs.stFocus`), damit `opponentOf` danach denselben Spieler meint.
+ */
+function installPlayerChoice(engine) {
+  const living = (gs, pi) => gs.players.map((_, i) => i).filter(i => i !== pi
+    && (gs.players[i].heroes || []).some(h => h && h.name && h.hp > 0));
+  engine._stChooseAoePlayer = async function (pi, config, cardInst) {
+    const gs = this.gs;
+    const cands = living(gs, pi);
+    if (cands.length <= 1) { if (cands.length === 1) this.setFocusOpponent(pi, cands[0]); return; }
+    const title = (cardInst && cardInst.name) || config.sourceName || 'Choose a player';
+    const res = await this.promptGeneric(pi, {
+      type: 'playerPicker', title, description: 'Choose a player. All their targets are hit.',
+      allowedPlayers: cands, cancellable: false,
+    });
+    const idx = res && Number.isInteger(res.playerIdx) && cands.includes(res.playerIdx) ? res.playerIdx : cands[0];
+    this.setFocusOpponent(pi, idx);
+  };
+  engine.setFocusOpponent = function (pi, idx) {
+    const gs = this.gs;
+    if (!gs.skillTest) return;
+    (gs.stFocus || (gs.stFocus = {}))[pi] = idx;
+  };
+  // Bots beantworten die Spielerwahl über die Policy (schwächster bzw. stärkster Gegner).
+  const baseGeneric = engine._getCpuGenericResponse.bind(engine);
+  engine._getCpuGenericResponse = (promptData, promptedPlayerIdx) => {
+    if (promptData && promptData.type === 'playerPicker') {
+      const pool = (promptData.allowedPlayers && promptData.allowedPlayers.length) ? promptData.allowedPlayers : living(engine.gs, promptedPlayerIdx);
+      return { playerIdx: require('./bot').choosePlayer(engine, promptedPlayerIdx, pool) };
+    }
+    return baseGeneric(promptData, promptedPlayerIdx);
+  };
+}
+
 /** Kein Handlimit, keine Deck-Out-Niederlage (es gibt keine Decks). */
 function relaxRules(engine) {
   for (const ps of engine.gs.players) ps._noHandLimitUntilTurn = Infinity;
 }
 
-module.exports = { installElimination, installMeter, installTurnEnd, installBotSeats, installBotBrain, relaxRules };
+module.exports = { installPlayerChoice, installElimination, installMeter, installTurnEnd, installBotSeats, installBotBrain, relaxRules };

@@ -32,6 +32,13 @@ function chooseTargets(engine, seat, validTargets, config, base) {
   return base(validTargets, config, seat);
 }
 
+/** Spielerwahl (Flächenschaden, „choose a player"): Policy entscheidet. */
+function choosePlayer(engine, seat, candidates) {
+  const p = policy();
+  if (p.choosePlayer) { const r = p.choosePlayer(engine, seat, candidates); if (r != null) return r; }
+  return candidates[0];
+}
+
 /** Einen Zug spielen. Gibt zurück, ob eine Aktion verbraucht wurde. */
 async function takeTurn(room, seat, host, opts = {}) {
   const engine = room.engine, gs = room.gameState, st = gs && gs.skillTest;
@@ -50,4 +57,4 @@ async function takeTurn(room, seat, host, opts = {}) {
   return false;
 }
 
-module.exports = { prepareBase, chooseTargets, takeTurn };
+module.exports = { prepareBase, chooseTargets, choosePlayer, takeTurn };
