@@ -5462,6 +5462,161 @@ function WeissPfeil({ p }) {
   );
 }
 
+// ═══════════════════════════════════════════════════════════════════
+//  „Pressure Projectile" — Pixelart-Geschoss (`projectileShape: 'pressure'`)
+//
+//  Ein verdichteter Luftpfropfen mit Überschallkegel: hinter dem Kopf stehen
+//  nach vorn gewölbte Druckbögen (je älter, desto weiter, dünner und dunkler),
+//  um den Kopf kreisen zwei Luftwirbel-Pixel, dahinter bleiben Luftbläschen
+//  zurück. Am Ziel läuft eine Druckwelle aus (zwei Ringe, Speichen, Blitz).
+//  Alles prozedural auf einem kleinen Raster (Canvas, `image-rendering:
+//  pixelated`), 4×4-Bayer-Dithering statt Alphaverlauf — bleibt Pixelart.
+//  Eigene Zeichenschleife, keine Keyframes. Klänge: Start `elem_wind` (Handler),
+//  Einschlag aus der Komponente.
+// ═══════════════════════════════════════════════════════════════════
+const PP_DRUCK_FARBEN = ['#ffffff', '#e2f9ff', '#a8edff', '#63c8f6', '#3b90d9', '#2b5cab', '#1b3472']
+  .map(h => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)]);
+const PP_DRUCK_BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5].map(v => v / 16);
+
+/** Kleine Pixel-Leinwand: `put` setzt einen Pixel (mit Dithering bei a < 1), `kreis`/`ring` zeichnen Formen. */
+function ppDruckLeinwand(gw, gh) {
+  const buf = new Uint8ClampedArray(gw * gh * 4);
+  const put = (x, y, c, a = 1) => {
+    const X = Math.round(x), Y = Math.round(y);
+    if (X < 0 || Y < 0 || X >= gw || Y >= gh || a <= 0) return;
+    if (a < 1 && PP_DRUCK_BAYER[(Y & 3) * 4 + (X & 3)] >= a) return;
+    const f = PP_DRUCK_FARBEN[c];
+    const i = (Y * gw + X) * 4;
+    buf[i] = f[0]; buf[i + 1] = f[1]; buf[i + 2] = f[2]; buf[i + 3] = 255;
+  };
+  const kreis = (cx, cy, r, c, a = 1) => {
+    const R = Math.ceil(r);
+    for (let dy = -R; dy <= R; dy++) for (let dx = -R; dx <= R; dx++) {
+      if (dx * dx + dy * dy <= r * r) put(cx + dx, cy + dy, c, a);
+    }
+  };
+  const ring = (cx, cy, r, dick, c, a = 1) => {
+    const R = Math.ceil(r + dick);
+    for (let dy = -R; dy <= R; dy++) for (let dx = -R; dx <= R; dx++) {
+      if (Math.abs(Math.hypot(dx, dy) - r) <= dick / 2) put(cx + dx, cy + dy, c, a);
+    }
+  };
+  return { buf, put, kreis, ring, leeren: () => buf.fill(0) };
+}
+
+function DruckGeschoss({ p }) {
+  const s = 3;                                              // Bildschirmpixel je Rasterpixel
+  const pad = 78;
+  const x0 = Math.min(p.srcX, p.tgtX) - pad, y0 = Math.min(p.srcY, p.tgtY) - pad;
+  const bw = Math.abs(p.tgtX - p.srcX) + pad * 2, bh = Math.abs(p.tgtY - p.srcY) + pad * 2;
+  const gw = Math.ceil(bw / s), gh = Math.ceil(bh / s);
+  const dauer = p.dur || 380;
+  const NACH = 620;                                         // Länge der Druckwelle nach der Ankunft
+  const cvs = useRef(null);
+  useEffect(() => {
+    const el = cvs.current;
+    if (!el || window._playAnimations === false) return undefined;
+    const ctx = el.getContext('2d');
+    const img = ctx.createImageData(gw, gh);
+    const L = ppDruckLeinwand(gw, gh);
+    const Sx = (p.srcX - x0) / s, Sy = (p.srcY - y0) / s, Tx = (p.tgtX - x0) / s, Ty = (p.tgtY - y0) / s;
+    const dx = Tx - Sx, dy = Ty - Sy, len = Math.max(1, Math.hypot(dx, dy));
+    const ux = dx / len, uy = dy / len, nx = -uy, ny = ux;
+    const zufall = (n) => { const q = Math.sin(n * 127.1 + 4.7) * 43758.5453; return q - Math.floor(q); };
+    const bohnen = Array.from({ length: 16 }, (_, j) => ({ q: 0.05 + zufall(j + 1) * 0.9, quer: (zufall(j + 40) - 0.5) * 9 }));
+    const speichen = Array.from({ length: 12 }, (_, k) => ({ w: (k / 12) * Math.PI * 2 + zufall(k + 7) * 0.4, f: 0.7 + zufall(k + 20) * 0.5 }));
+    const zeichne = (t) => {
+      L.leeren();
+      const flug = Math.min(1, t / dauer);
+      const weg = len * Math.pow(flug, 1.7);                 // beschleunigt wie ein Druckstoß
+      const Hx = Sx + ux * weg, Hy = Sy + uy * weg;
+      // Mündungsring am Schützen
+      if (t < 160) {
+        const e = t / 160;
+        L.ring(Sx, Sy, 2 + e * 10, 1.6, e < 0.5 ? 0 : 2, 1 - e);
+        L.kreis(Sx, Sy, 3.2 * (1 - e), 0);
+      }
+      if (t <= dauer + 40) {
+        // Luftbläschen, die der Pfropfen zurücklässt
+        for (const b of bohnen) {
+          const q = b.q * len;
+          if (q > weg) continue;
+          const alter = Math.min(1, (weg - q) / (len * 0.55 + 20));
+          const quer = b.quer * (1 + alter * 1.2);
+          L.put(Sx + ux * q + nx * quer, Sy + uy * q + ny * quer, alter < 0.5 ? 2 : 3, 1 - alter);
+        }
+        // Druckbögen: nach vorn gewölbte Halbkreise, je älter desto größer, dünner, dunkler
+        for (let i = 6; i >= 1; i--) {
+          const dist = 9 * i;
+          if (weg < dist) continue;
+          const Ex = Hx - ux * dist, Ey = Hy - uy * dist;
+          const r = 3 + dist * 0.42;
+          const farbe = i <= 1 ? 0 : i <= 2 ? 1 : i <= 3 ? 2 : i <= 5 ? 3 : 4;
+          const a = Math.max(0.3, 1 - (i - 1) * 0.14);
+          const schritt = 0.6 / r;
+          for (let w = -1.15; w <= 1.15; w += schritt) {
+            const px = Ex + r * (Math.cos(w) * ux + Math.sin(w) * nx);
+            const py = Ey + r * (Math.cos(w) * uy + Math.sin(w) * ny);
+            L.put(px, py, farbe, a);
+            if (i <= 2) L.put(px - ux, py - uy, farbe + 1, a);   // vordere Bögen: 2 Pixel dick
+          }
+        }
+        // Kopf: dunkle Kontur, blaue Hülle, helle Mitte, weißer Kern
+        L.kreis(Hx, Hy, 4.1, 5);
+        L.kreis(Hx, Hy, 3.3, 3);
+        L.kreis(Hx, Hy, 2.4, 2);
+        L.kreis(Hx, Hy, 1.5, 1);
+        L.put(Hx, Hy, 0);
+        L.ring(Hx, Hy, 6.2 + Math.sin(t / 32) * 0.6, 1.1, 3, 0.55);   // Verdichtungshof
+        for (let j = 0; j < 2; j++) {
+          const w = t * 0.028 + j * Math.PI;
+          L.put(Hx + Math.cos(w) * 5.6, Hy + Math.sin(w) * 5.6, 0);
+          L.put(Hx + Math.cos(w - 0.35) * 5.6, Hy + Math.sin(w - 0.35) * 5.6, 2, 0.8);
+        }
+      }
+      // Druckwelle am Ziel
+      if (t > dauer) {
+        const e = Math.min(1, (t - dauer) / NACH);
+        if (e < 0.22) L.kreis(Tx, Ty, 11 * (1 - e / 0.22) + 2, 0);
+        L.ring(Tx, Ty, 3 + e * 36, 3.2 * (1 - e) + 1, e < 0.3 ? 1 : e < 0.6 ? 3 : 4, Math.max(0, 1 - e * 0.95));
+        if (e > 0.1) {
+          const e2 = (e - 0.1) / 0.9;
+          L.ring(Tx, Ty, 2 + e2 * 25, 1.7, 2, Math.max(0, 1 - e2));
+        }
+        for (const sp of speichen) {
+          const r0 = 4 + e * 30 * sp.f;
+          for (let k = 0; k < 3; k++) {
+            L.put(Tx + Math.cos(sp.w) * (r0 + k), Ty + Math.sin(sp.w) * (r0 + k), k === 2 ? 1 : 3, Math.max(0, 1 - e));
+          }
+        }
+      }
+      img.data.set(L.buf);
+      ctx.putImageData(img, 0, 0);
+    };
+    const t0 = performance.now();
+    let raf = 0, letzte = -1;
+    const schritt = (jetzt) => {
+      const t = jetzt - t0;
+      const fr = Math.floor(t / 30);                          // ~33 Bilder/s: ruhige Pixelart-Taktung
+      if (fr !== letzte) { letzte = fr; zeichne(t); }
+      if (t < dauer + NACH) raf = requestAnimationFrame(schritt);
+    };
+    raf = requestAnimationFrame(schritt);
+    const knall = setTimeout(() => {
+      if (!window.playSFX) return;
+      window.playSFX('heavy_impact', { rate: 1.3, volume: 1.2, dedupe: 0, category: null });
+      window.playSFX('ping', { rate: 0.6, volume: 0.9, dedupe: 0, category: null, delay: 40 });
+    }, dauer);
+    return () => { cancelAnimationFrame(raf); clearTimeout(knall); };
+  }, []);
+  return (
+    <div aria-hidden="true" style={{ position: 'fixed', left: x0, top: y0, pointerEvents: 'none', zIndex: 10200 }}>
+      <canvas ref={cvs} width={gw} height={gh}
+        style={{ width: gw * s, height: gh * s, imageRendering: 'pixelated', display: 'block', filter: 'drop-shadow(0 0 5px rgba(99,200,246,.7))' }} />
+    </div>
+  );
+}
+
 function SandStrahl({ p }) {
   const dx = p.tgtX - p.srcX, dy = p.tgtY - p.srcY;
   const laenge = Math.max(1, Math.hypot(dx, dy));
@@ -8705,6 +8860,95 @@ const ANIM_REGISTRY = {
         <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100, transform: 'translate(-50%, -50%)' }}>
           <canvas ref={cvs} width={gw} height={gh}
             style={{ width: gw * s, height: gh * s, imageRendering: 'pixelated', display: 'block', filter: 'drop-shadow(0 0 6px rgba(120,30,90,.55))' }} />
+        </div>
+      );
+    };
+  })(),
+  // Pressure Projectile: die abgeräumte Karte / Area wird zusammengepresst und zerplatzt (Pixelart, prozedural).
+  // 0–45 %: vier Druckrahmen schließen sich von den Kartenrändern nach innen, ein gedithert blauer Schleier legt sich auf
+  // die Karte, ab 30 % laufen Haarrisse von der Mitte aus. Bei 45 % Blitz + Druckring, 30 Splitter fliegen mit Schwerkraft
+  // auseinander und lösen sich gedithert auf. Eigene Zeichenschleife (keine Keyframes); Klang als Sequenz am Typ.
+  pressure_shatter: (function () {
+    const DAUER = 720, BERSTEN = 0.45;
+    return function PressureShatterEffect({ x, y, w, h }) {
+      const zw = Math.max(50, w || 90), zh = Math.max(60, h || 120);
+      const s = Math.max(2, Math.round(zw / 26));
+      const cw = Math.round(zw / s), ch = Math.round(zh / s), pad = 16;
+      const gw = cw + pad * 2, gh = ch + pad * 2;
+      const cvs = useRef(null);
+      useEffect(() => {
+        const el = cvs.current;
+        if (!el || window._playAnimations === false) return undefined;
+        const ctx = el.getContext('2d');
+        const img = ctx.createImageData(gw, gh);
+        const L = ppDruckLeinwand(gw, gh);
+        const zufall = (n) => { const q = Math.sin(n * 91.7 + 2.3) * 43758.5453; return q - Math.floor(q); };
+        const mx = gw / 2, my = gh / 2;
+        const splitter = Array.from({ length: 30 }, (_, j) => {
+          const w2 = zufall(j + 1) * Math.PI * 2, v = 14 + zufall(j + 50) * 30;
+          return { vx: Math.cos(w2) * v, vy: Math.sin(w2) * v * 0.8 - 6, c: 1 + (j % 4), g: zufall(j + 90) < 0.35 ? 2 : 1 };
+        });
+        const risse = [[-1, -1.3], [1, -0.7], [-0.5, 1.4], [1.2, 1], [0.1, -1.6]];
+        const zeichne = (k) => {
+          L.leeren();
+          if (k < BERSTEN) {
+            const e = k / BERSTEN, ee = e * e;
+            // Schleier auf der Karte
+            const dichte = 0.5 * ee;
+            for (let Y = 0; Y < ch; Y++) for (let X = 0; X < cw; X++) {
+              if (PP_DRUCK_BAYER[(Y & 3) * 4 + (X & 3)] < dichte) L.put(pad + X, pad + Y, e > 0.7 ? 4 : 5, 0.9);
+            }
+            // vier Druckrahmen: von außen nach innen
+            const eng = 1 - 0.2 * e;
+            const hx = (cw / 2) * eng, hy = (ch / 2) * eng;
+            const farbe = e < 0.5 ? 3 : e < 0.85 ? 2 : 0;
+            for (let X = -hx; X <= hx; X++) { L.put(mx + X, my - hy, farbe); L.put(mx + X, my + hy, farbe); }
+            for (let Y = -hy; Y <= hy; Y++) { L.put(mx - hx, my + Y, farbe); L.put(mx + hx, my + Y, farbe); }
+            // Druckpfeile in der Mitte jeder Seite
+            for (let i = 1; i <= 3; i++) {
+              const o = (hy + 1 + i) , p2 = (hx + 1 + i);
+              L.put(mx, my - o - 3 + i, 1, 0.8); L.put(mx, my + o + 3 - i, 1, 0.8);
+              L.put(mx - p2 - 3 + i, my, 1, 0.8); L.put(mx + p2 + 3 - i, my, 1, 0.8);
+            }
+            // Haarrisse
+            if (e > 0.55) {
+              const rl = (e - 0.55) / 0.45;
+              for (const [rx, ry] of risse) {
+                const n = Math.floor(rl * 14);
+                for (let q = 1; q <= n; q++) {
+                  const kink = Math.sin(q * 1.7 + rx * 5) * 1.2;
+                  L.put(mx + rx * q * 0.9 + kink * 0.5, my + ry * q * 0.9 + kink * 0.3, 0);
+                }
+              }
+            }
+          } else {
+            const e = (k - BERSTEN) / (1 - BERSTEN);
+            if (e < 0.2) L.kreis(mx, my, (Math.max(cw, ch) * 0.62) * (1 - e / 0.2) + 3, 0);
+            L.ring(mx, my, 4 + e * Math.max(cw, ch) * 0.95, 3 * (1 - e) + 1, e < 0.3 ? 1 : e < 0.6 ? 3 : 4, Math.max(0, 1 - e));
+            for (const sp of splitter) {
+              const px = mx + sp.vx * e, py = my + sp.vy * e + 26 * e * e;
+              const a = e < 0.6 ? 1 : Math.max(0, 1 - (e - 0.6) / 0.4);
+              for (let a2 = 0; a2 < sp.g; a2++) for (let b2 = 0; b2 < sp.g; b2++) L.put(px + a2, py + b2, sp.c, a);
+            }
+          }
+          img.data.set(L.buf);
+          ctx.putImageData(img, 0, 0);
+        };
+        const t0 = performance.now();
+        let raf = 0, letzte = -1;
+        const schritt = (jetzt) => {
+          const k = Math.min(1, (jetzt - t0) / DAUER);
+          const fr = Math.floor(k * 36);                       // ~50 Bilder/s
+          if (fr !== letzte) { letzte = fr; zeichne(fr / 36); }
+          if (k < 1) raf = requestAnimationFrame(schritt);
+        };
+        raf = requestAnimationFrame(schritt);
+        return () => cancelAnimationFrame(raf);
+      }, []);
+      return (
+        <div aria-hidden="true" style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100, transform: 'translate(-50%, -50%)' }}>
+          <canvas ref={cvs} width={gw} height={gh}
+            style={{ width: gw * s, height: gh * s, imageRendering: 'pixelated', display: 'block', filter: 'drop-shadow(0 0 5px rgba(99,200,246,.65))' }} />
         </div>
       );
     };
@@ -36667,7 +36911,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         dur,
       }]);
       // Surefire-Pfeil: Einschlagsblitz (≈ 380 ms) läuft nach der Ankunft weiter.
-      setTimeout(() => setProjectileAnims(prev => prev.filter(a => a.id !== id)), dur + (projectileShape === 'surefire' ? 700 : 200));
+      setTimeout(() => setProjectileAnims(prev => prev.filter(a => a.id !== id)), dur + (projectileShape === 'surefire' ? 700 : projectileShape === 'pressure' ? 800 : 200));
     };
     socket.on('play_projectile_animation', onProjectileAnimation);
     // ★ WEAPON STORM (v805, Als Vorgabe): eine Barrage aus 10-20
@@ -47802,6 +48046,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         <DunkelBlastStrahl key={p.id} p={p} />
       ) : p.projectileShape === 'surefire' ? (
         <WeissPfeil key={p.id} p={p} />
+      ) : p.projectileShape === 'pressure' ? (
+        <DruckGeschoss key={p.id} p={p} />
       ) : (
         <div key={p.id} className="projectile-anim" style={{
           left: p.srcX, top: p.srcY,
