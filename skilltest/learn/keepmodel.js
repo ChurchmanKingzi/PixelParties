@@ -238,11 +238,13 @@ function makeDecider(opts) {
       let worst = null;
       for (const e of removable) if (!worst || e.d < worst.d) worst = e;
       const remove = worst && (worst.d < 0 || alive.length > cap);            // unter 0, oder über der Obergrenze der Persona
+      // `d` = der Wert, den die Entscheidung der Karte gab (positiv: behalten, negativ: recyceln); erzwungene (erkundete) Fälle haben keinen.
+      const dOf = (e) => (Number.isFinite(e.d) ? Math.round(e.d * 1000) / 1000 : null);
       if (!remove) {
-        for (const e of ev) log[e.x.n] = { c: e.x.n, a: +1, f: e.f, x: e.x.forced ? 1 : 0 };
+        for (const e of ev) log[e.x.n] = { c: e.x.n, a: +1, f: e.f, x: e.x.forced ? 1 : 0, d: dOf(e) };
         break;
       }
-      log[worst.x.n] = { c: worst.x.n, a: -1, f: worst.f, x: worst.x.forced ? 1 : 0 };
+      log[worst.x.n] = { c: worst.x.n, a: -1, f: worst.f, x: worst.x.forced ? 1 : 0, d: dOf(worst) };
       recycle.push(worst.x.idx);
       alive = alive.filter(x => x !== worst.x);
     }

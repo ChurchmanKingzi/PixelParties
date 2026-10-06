@@ -129,7 +129,14 @@ function learnFrom(profile, game) {
     if (base.keepLog && base.keepLog.length) {
       const KM = require('./keepmodel');
       if (!profile.keepModel) profile.keepModel = KM.newModel();
-      for (const d of base.keepLog) KM.update(profile.keepModel, d.f, d.a, sc);
+      if (!profile.prepValue) profile.prepValue = {};
+      for (const d of base.keepLog) {
+        if (d.x !== 1 && Number.isFinite(d.d)) {                         // Bewertung der CPU beim Aufbau (ohne erkundete Fälle)
+          const e = profile.prepValue[d.c] || (profile.prepValue[d.c] = { n: 0, sum: 0, keep: 0 });
+          e.n++; e.sum += d.d; if (d.a === 1) e.keep++;
+        }
+        KM.update(profile.keepModel, d.f, d.a, sc);
+      }
     }
     const per = profile.personas.find(p => p.id === personaIds[seat]);
     if (per) { per.games++; per.scoreSum += sc; per.fitness = fitnessOf(per); }
@@ -370,6 +377,14 @@ async function train(opts = {}) {
   const mctsBenchGames = opts.mctsBenchGames || 40;
   const benchGames = opts.benchGames || 40;
   const rankingEvery = opts.rankingEvery || 100;                           // Prüfpunkt für den Verlauf der Kartenwerte
+  const milestoneEvery = opts.milestoneEvery || 0;                         // 0 = keine Meilenstein-Berichte (Kartenliste je N Partien, siehe learn/milestones.js)
+  let lastMilestone = Math.floor((profile.games || 0) / (milestoneEvery || 1));
+  const doMilestone = (final) => {
+    try {
+      const m = require('./milestones').writeMilestone(profile, { final });
+      if (m && !opts.quiet) console.log(`[skilltest-train] Meilenstein ${m.games} Partien: ${m.mdFile}`);
+    } catch (e) { console.error('[skilltest-train] Meilenstein-Bericht fehlgeschlagen (Lauf geht weiter):', e && e.stack || e); }
+  };
   let done = 0, failed = 0, started = 0, benchRunning = false, lastStatus = 0;
   const t0 = Date.now();
 
@@ -427,6 +442,7 @@ async function train(opts = {}) {
       try {
         if (done > 0 && done % evolveEvery === 0) evolve(profile, rng);
         if (done > 0 && done % saveEvery === 0) { prune(profile); profileMod.save(profile); ranking.writeRanking(profile, { checkpoint: done % rankingEvery === 0 }); checkpoint(); }
+        if (milestoneEvery && Math.floor(profile.games / milestoneEvery) > lastMilestone) { lastMilestone = Math.floor(profile.games / milestoneEvery); prune(profile); profileMod.save(profile); doMilestone(false); }
         if (benchEvery && done > 0 && done % benchEvery === 0) await runBench();
         if (mctsBenchEvery && done > 0 && done % mctsBenchEvery === 0) await runMctsBench();
       } catch (e) { console.error('[skilltest-train] Speichern/Auswertung fehlgeschlagen (Lauf geht weiter):', e && e.message); }
@@ -449,6 +465,7 @@ async function train(opts = {}) {
   prune(profile);
   profileMod.save(profile);
   ranking.writeRanking(profile, { checkpoint: true });
+  if (milestoneEvery && done > 0) doMilestone(true);                      // Abschlussbericht des Laufs
   if (!opts.quiet) console.log(`[skilltest-train] ${done} Partien gelernt (${failed} verworfen) in ${Math.round((Date.now() - t0) / 1000)} s — Profil v${profile.version}, ${Object.keys(profile.playValue).length} Spielwerte, ${Object.keys(profile.cardValue).length} Kartenwerte, ${Object.keys(profile.pairValue).length} Paare`);
   return profile;
 }
@@ -501,6 +518,7 @@ function exportCompact(profile, minN = 4) {
   return {
     version: profile.version, games: profile.games, updated: profile.updated,
     playValue: keep(profile.playValue, minN), cardValue: keep(profile.cardValue, minN), dealtValue: keep(profile.dealtValue, minN), pairValue: keep(profile.pairValue, Math.max(minN, 6)),
+    prepValue: Object.fromEntries(Object.entries(profile.prepValue || {}).filter(([, e]) => e.n >= minN).map(([k, e]) => [k, { n: e.n, sum: Math.round(e.sum * 1000) / 1000, keep: e.keep }])),
     keepModel: profile.keepModel ? require('./keepmodel').compact(profile.keepModel) : null,
     personas: profile.personas, totals: profile.totals,
   };

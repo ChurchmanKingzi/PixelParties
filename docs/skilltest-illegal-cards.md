@@ -34,6 +34,10 @@
 - Guardian Beast Zhu
 - Mao, the Vengeful Guardian
 
+## Curse: setzt die ATK des Ziels auf 0 — ein Held ohne Angriff kann in diesem Modus nichts mehr bewirken und führt zu unschönen, kaum lösbaren Lagen.
+
+- Curse
+
 ## Alle Future-Tech-Karten (Archetyp „Future Tech“): sie brauchen eine gefüllte Ablage, um gut zu funktionieren — im Skill Test gibt es keine Decks und kaum Ablage.
 
 - Blueprints

@@ -4784,7 +4784,7 @@
     "archetype": "",
     "setID": "PP SET01",
     "banned": "",
-    "skilltestLegal": true,
+    "skilltestLegal": false,
     "spellSchool1": "Decay Magic",
     "spellSchool2": "",
     "startingAbility1": "",
