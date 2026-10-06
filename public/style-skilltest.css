@@ -270,3 +270,9 @@
 .st-seat.is-empty .st-seat-name { color: var(--text2); }
 .st-seat-role { font-size: 9px; color: var(--text2); margin-top: auto; }
 .st-seat-remove { position: absolute; top: 2px; right: 2px; padding: 0 6px; font-size: 11px; line-height: 16px; z-index: 2; }
+
+/* Aus dem Nichts erschienene Karten (Idej Lords): grünlich leuchtender Rahmen + kurzes „Aufpoppen“; nur löschbar */
+.board-zone-support.st-spawned { box-shadow: 0 0 0 2px rgba(120,255,190,.8), 0 0 12px rgba(80,255,170,.45); cursor: not-allowed; }
+.board-zone-support.st-spawned .board-card { animation: stSpawnPop .5s steps(5) 1; }
+.board-zone-support.st-spawned::after { content: '✦'; position: absolute; top: 1px; left: 3px; font-size: 10px; line-height: 1; color: #9dffd0; text-shadow: 0 0 4px #1cd; pointer-events: none; z-index: 3; }
+@keyframes stSpawnPop { 0% { transform: scale(.2); opacity: 0; filter: brightness(3); } 70% { transform: scale(1.12); opacity: 1; filter: brightness(1.8); } 100% { transform: scale(1); filter: none; } }

@@ -42,6 +42,99 @@
 
 - Gorinthian War Counselor
 
+## Tri Ad und Tri Fecta (Puppet Mistress / Puppet Master): Tri Fecta spawnt zu Spielbeginn Puppet-Tokens in seine Support Zones (geteilter HP-Pool, sonst keine Karten dort erlaubt), Tri Ad darf kein Start-Hero sein und stapelt sich auf Tri Fecta — das ist im Skill Test nicht abgebildet (auf Wunsch aus dem Pool genommen).
+
+- Tri Ad, the Puppet Mistress
+- Tri Fecta, the Puppet Master
+
+## Reine Zieh-/Such-Karten: ihre einzigen Effekte sind Ziehen, Suchen, Tutoren oder „oberste Karten aufdecken und auf die Hand nehmen“. Der Skill Test hat kein Deck, die Karten wären wirkungslos (oder schaden, z. B. „Hand ablegen und gleich viele ziehen“). Erkannt über die Zieh-/Such-Sperren der Engine (`blockedByHandLock`, `blockedByDrawLock`, `blockedBySearchLock`) und über den Zieh-Block-Helfer (Wheels, Haste, …), von Hand geprüft. NICHT gesperrt: Karten, die auch etwas anderes bewirken, sowie reine Ablage-Rückholer (Shooting Star, Boomerang, Relic in the Sky, Magic Sapphire, Elixir of Mana, Shard of Chaos, Spontaneous Reappearance …) — die Ablage gibt es im Skill Test.
+
+- Alchemic Journal
+- Alchemy
+- Angry Cheese
+- Aurora Borealis
+- Bifab, Bridge to Coolness
+- Birthday Present
+- Brainstorming
+- Brilliant Idea
+- Cool Cheese
+- Cute Cheese
+- Cuteness Sensor
+- Divine Gift of Creation
+- Elixir of Quickness
+- Graveyard Gathering
+- Heart of Cards
+- Heart of the Mountain
+- Holy Cheese
+- Horn in a Bottle
+- Idol of Crestina
+- Magic Lamp
+- Magnetic Glove
+- Magnetic Potion
+- Mass Multiplication
+- Navigation
+- Nerdy Cheese
+- Perilous Journey
+- Philosopher's Stone
+- Potion of Greed
+- Sickly Cheese
+- Staff of the Teleporter
+- Staff of Uncontrollable Destruction
+- Tanuki Escape
+- Teleportal
+- The Sacred Jewel
+- The Sacred Mirror
+- Trial of Loyalty
+- Haste
+- Supply Chain
+- Voice in your Head
+- Wheels
+- Glimpse of the Future
+- Grasp the Future
+- Prophecy of Coolness
+- Cool Rescue
+- Pawn Sacrifice
+- Mystery Box
+- Glass of Marbles
+- Ice Sculpture Garden
+- Divine Gift of Balance
+- Divine Gift of Edge
+- Crushing Defeat
+- Unlikely Encounter
+- Spatial Crevice
+- Premonition
+- Inventing
+- Leadership
+- Creativity
+- Luck
+- Amazing Finding
+- Draw
+- Deepsea Treasure
+- Charm of Balance
+- Prayer
+- Smuggler's Pier
+- Wanted Poster
+- The Brewer's Blade
+- Bluff
+- Spider Silk Bridge
+- Cell Escape
+- Infiltration
+- Spice Mortar
+- Salute to the Fallen
+- Crystal Well
+- Pillar of Light
+- Tarleinn's Floating Island
+- Temple of Sacrifice
+- Snake Race Boat
+- Rain Viola
+- Lunatic Cycle - New Moon
+- Lunatic Cycle - Crescent Moon
+- Bow of the Hunt Goddess
+
+## Idej Projection: kann nur durch den Effekt der Idej Lords an einen Hero gehängt werden („by its own effect“). Im Skill Test spawnen die Lords ihre Projections jetzt beim Aufstellen selbst (siehe skilltest/README.md); als Handkarte wäre sie ein Fremdkörper.
+
+- Idej Projection
+
 ## Alle Future-Tech-Karten (Archetyp „Future Tech“): sie brauchen eine gefüllte Ablage, um gut zu funktionieren — im Skill Test gibt es keine Decks und kaum Ablage.
 
 - Blueprints

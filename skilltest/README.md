@@ -105,6 +105,10 @@ Sichtbar: Kartenliste (Spalte „Keep − recycle"), Paar- und Kontext-Tabellen 
   Feld `skilltestLegal` in `data/cards.json` (`true`/`false` je Karte). Neue Karten müssen es haben
   (`node scripts/set-skilltest-legal.js` ergänzt fehlende mit dem Standardwert; überschreibt nie).
   Vorerst gesperrte Karten und Gründe: `docs/skilltest-illegal-cards.md` (`scripts/curate-skilltest-legal.js`).
+  Zuletzt dazugekommen: **Tri Ad / Tri Fecta**, **Idej Projection** (kommt nur noch über die Lords) und alle **reinen Zieh-/Such-Karten**
+  (Wheels, Haste, Magnetic Potion, Elixir of Quickness, …). Erkennung: Zieh-/Such-Sperren der Engine (`blockedByHandLock`, `blockedByDrawLock`,
+  `blockedBySearchLock`, Zieh-Block-Helfer) plus Handprüfung des Kartentextes — Karten mit zusätzlichem Effekt und reine **Ablage-Rückholer**
+  (Shooting Star, Boomerang, …) bleiben im Pool, weil es im Modus eine Ablage gibt. `scripts/skilltest-e2e/idej.test.js` prüft die Liste.
 - **Kartenskripte** dürfen nie `pi === 0 ? 1 : 0` o. Ä. schreiben. Stattdessen:
   `engine.opponentOf(pi)` (EIN Gegner: Fokus bzw. nächster lebender Sitz), `engine.opponentsOf(pi)` (alle Gegner),
   `engine.playerCount()`. Im Normalspiel liefern sie bit-identisch das alte Verhalten. `node scripts/check-n-player.js`
@@ -130,6 +134,7 @@ Phasenende-Effekte → Zusatzaktions-Gewährungen verfallen). `advanceToPhase` i
 | --- | --- |
 | Quetzahuitl, Receiver of Sacrifices | Bleibt auf der Hand und ist **nie** einer der drei Brett-Helden (`HAND_ONLY_HEROES` in `public/skilltest-rules.js`): Er zählt nicht zu den Brett-Helden, `pool.dealHand` teilt ihn nur Händen mit ≥ 4 Heroes zu, Bots recyceln ihn nicht. Fällt dein letzter Held in einem fremden Zug, steigt er herab; **fällt Quetzahuitl, scheidet sein Kontrolleur aus** (das Spiel endet nicht). |
 | The Golden Abomination | Zu Spielbeginn (Hook `onSkillTestStart`, vor dem Start-Gold-Tick) **wählt** der Besitzer einen lebenden Gegner (Spielerwahl; Bots: meistes Gold); nur dessen Gold in der Resource Phase wird umgelenkt. |
+| Idej Lord Daiyo / Nobunakin / Shoguwana / Todugawin | Beim **Aufstellen** (Hand → Hero-Zone, auch per Tausch) erscheinen **aus dem Nichts** ihre Karten in den drei Support Zones: Daiyo 3× Idej Projection, Nobunakin 2× Projection + 1 Idej Blade, Shoguwana 1× Projection + 2 Blades, Todugawin 3 Blades (Blades zufällig, je Lord verschieden; `IDEJ_PACKAGES` in `public/skilltest-rules.js`). Eine belegte Zone weicht dafür zurück auf die Hand (freie zuerst). Verlässt der Lord das Brett (zurück auf die Hand, ersetzt), **verschwinden** die Karten; beim Hero-Tausch wandern sie mit. Sie lassen sich per **Rechtsklick löschen** (`deleteSpawned`) oder von einer Handkarte **überbauen**, aber weder auf die Hand nehmen, verschieben noch recyceln. Im Zustand der Basis markiert `spawned[hi][slot]` sie (grüner Rahmen + ✦ in der UI); im Kampf sind es gewöhnliche Support-Karten. Die Start-Suche der Lords (`onBeforeHandDraw`) bleibt wirkungslos (kein Deck, keine freie Zone). |
 | Cardinal Beast Baihu / Qinglong / Xuanwu / Zhuque | Alle legal, aber je Partie **fehlt ein zufälliges** davon im Pool (`CONFIG.CARDINAL_BEASTS`, `CardPool.banned`; die Vorbereitung zeigt es als `bannedCards`). So sind nie alle vier gleichzeitig im Spiel. |
 
 ## Reaktionen der Bots
@@ -184,10 +189,11 @@ Brettern, danach ergraut er) und `exhaustedSlots` (erschöpfte Creatures). Clien
 
 - `scripts/regress/compare.sh` vergleicht geseedete 2-Spieler-Normalspiele mit der eingecheckten Baseline —
   **muss nach jeder Engine-Änderung „unverändert" melden**.
+- `scripts/skilltest-e2e/idej.test.js` (headless): Idej-Spawn-Regeln, Pool-Sperren, Kampfstart mit erschienenen Karten.
 - `scripts/skilltest-e2e/*.test.js`: Lobby, Vorbereitung, Kampf, Sitzwechsel (CPU-Übernahme/Aufgeben), Zielwahl über Sitze (per Socket,
   brauchen `socket.io-client`, siehe `lib.js`) und `learn.test.js` (Lernsystem, headless); `ui-*.shot.js` (Playwright, Screenshots).
 - Headless: `node -e "require('./skilltest/sim').runGame({seats:4}).then(console.log)"` (mit `PP_ST_SIM=1`, siehe `sim-bridge.js`).
 
 ## Testschalter
 
-`PP_ST_BOT_DELAY_MS` (Denkpause der Bots, ms), `PP_ST_WATCH_MS` (Pause des Bots, nachdem die Anzeige auf sein Ziel gewechselt hat, Standard 900 ms), `PP_ST_SIM=1` (server.js exportiert nur die Handler, startet nicht).
+`PP_ST_BOT_DELAY_MS` (Denkpause der Bots, ms), `PP_ST_WATCH_MS` (Pause des Bots, nachdem die Anzeige auf sein Ziel gewechselt hat, Standard 900 ms), `PP_ST_SIM=1` (server.js exportiert nur die Handler, startet nicht), `PP_ST_TEST_HAND="Name1|Name2"` (legt dem ersten Menschen diese Karten zusätzlich auf die Hand — nur für UI-/E2E-Tests).

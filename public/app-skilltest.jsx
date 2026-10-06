@@ -683,9 +683,12 @@ function SkillTestPrepScreen({ lobby, user, leaveRoom, notify }) {
               const top = cards[0];
               const c = top && stCard(top);
               const isAb = c && c.cardType === 'Ability';
+              const spawned = !!(top && R.isSpawned(ps, hi, slot));   // aus dem Nichts erschienen (Idej Lord): nur löschen, nie aufnehmen/recyceln
               return (
-                <div key={slot} className="board-zone board-zone-support" style={boardSkin('support')}
-                  {...zoneProps({ kind: 'support', hi, slot }, top, { kind: 'support', hi, slot })}
+                <div key={slot} className={'board-zone board-zone-support' + (spawned ? ' st-spawned' : '')} style={boardSkin('support')}
+                  title={spawned ? 'Aus dem Nichts erschienen — Rechtsklick löscht die Karte (kein Recyceln)' : undefined}
+                  {...zoneProps({ kind: 'support', hi, slot }, top, spawned ? null : { kind: 'support', hi, slot },
+                    spawned ? () => send({ type: 'deleteSpawned', hi, slot }) : undefined)}
                   onMouseEnter={() => c && showTooltip(c, 'left')} onMouseLeave={hideTooltip}>
                   {cards.length
                     ? (isAb ? <AbilityStack cards={cards} /> : <BoardCard cardName={top} hp={c && c.hp ? c.hp : undefined} maxHp={c && c.hp ? c.hp : undefined} hpPosition={c && c.hp ? 'creature' : undefined} />)

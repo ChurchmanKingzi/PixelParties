@@ -95,6 +95,11 @@ async function start(room, host) {
     ps.hand = dealHand(pool).hand;
     return ps;
   });
+  // Testschalter (nur UI-/E2E-Tests): PP_ST_TEST_HAND="Name1|Name2" legt dem ersten Menschen diese Karten zusätzlich auf die Hand.
+  if (process.env.PP_ST_TEST_HAND) {
+    const human = room.players.findIndex(p => !p.isBot);
+    if (human >= 0) for (const n of process.env.PP_ST_TEST_HAND.split('|')) if (env.cards[n]) players[human].hand.push(n);
+  }
   const st = room.skillTest;
   const prep = {
     pool, players, startedAt: Date.now(), deadlineAt: null,
