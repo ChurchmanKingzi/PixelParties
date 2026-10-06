@@ -5064,7 +5064,10 @@ function sendGameState(room, playerIdx, extra) {
     cpuBgm: cpuBgmForRoom(room),
     // PvP: der gewählte Track des GEGNERS (Sitz gegenüber). Zuschauer bekommen
     // in sendSpectatorGameState den Track von Sitz 0.
-    oppBgm: room.type === 'singleplayer' ? null : (gs.players?.[1 - playerIdx]?.battleTrack || null),
+    oppBgm: (room.type === 'singleplayer' || gs.isSkillTest) ? null : (gs.players?.[1 - playerIdx]?.battleTrack || null),
+    // Skill Test (bis zu 8 Spieler, zufaellige Layouts): der Client waehlt zufaellig eine von fuenf Kampfmusiken
+    // (BGM_SETS in app-main.jsx). Setzt der Modus `gs.isSkillTest = true` (oder `gs.bgmSet = 'skilltest'`), laeuft sie.
+    isSkillTest: !!gs.isSkillTest, bgmSet: gs.bgmSet || (gs.isSkillTest ? 'skilltest' : null),
     setScore: room.setScore || [0, 0], format: room.format || 1, winsNeeded: room.winsNeeded || 1,
     // Compute fresh per-sync so per-turn gates (Deepsea `canSummon`,
     // etc.) flip to "blocked" the moment the first copy is summoned.
@@ -5897,7 +5900,8 @@ function sendSpectatorGameState(room) {
     cpuBgm: cpuBgmForRoom(room),
     // PvP: der gewählte Track des GEGNERS (Sitz gegenüber). Zuschauer bekommen
     // in sendSpectatorGameState den Track von Sitz 0.
-    oppBgm: room.type === 'singleplayer' ? null : (gs.players?.[0]?.battleTrack || null),
+    oppBgm: (room.type === 'singleplayer' || gs.isSkillTest) ? null : (gs.players?.[0]?.battleTrack || null),
+    isSkillTest: !!gs.isSkillTest, bgmSet: gs.bgmSet || (gs.isSkillTest ? 'skilltest' : null),
     setScore: room.setScore || [0, 0], format: room.format || 1, winsNeeded: room.winsNeeded || 1,
     summonBlocked: gs.summonBlocked || [],
     abilitySupportHeroes: [],

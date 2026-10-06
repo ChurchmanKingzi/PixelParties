@@ -63,6 +63,13 @@ HERO_TITLES = {
     'bubbles': ('Bubbles, the Bouncy Bunny', 'Big Bunny Bounce'),
 }
 
+# Skill Test (bis zu 8 Spieler, zufällige Layouts): fünf gleichwertige Kampfmusiken `bgm_skilltest1…5.ogg`,
+# je Partie zufällig gewählt (BGM_SETS in public/app-main.jsx). Der Modus muss nur `gs.isSkillTest = true` setzen.
+SKILLTEST_TITLES = {
+    'skilltest1': 'Eight-Way Scramble', 'skilltest2': 'Randomized Reality', 'skilltest3': 'Dice of Destiny',
+    'skilltest4': 'Last Seat Standing', 'skilltest5': 'Pandemonium Protocol',
+}
+
 if __name__ == '__main__':
     import json, os
     root = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..')
