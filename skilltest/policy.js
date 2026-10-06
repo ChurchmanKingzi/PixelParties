@@ -17,6 +17,7 @@ const rounds = require('./rounds');
 const { getCardDB } = require('../cards/effects/_card-db');
 
 const profileMod = () => require('./learn/profile');
+const FOCUS_BONUS = 40;             // Aufschlag für Ziele des vom Lookahead gewählten Gegners (größer als alle Heuristik-Unterschiede)
 const MAX_PROMPT_REPEATS = 24;     // so oft darf EINE Karte in einer Aktion denselben freiwilligen Ziel-Prompt stellen
 
 const DEFAULT_WEIGHTS = {
@@ -138,6 +139,8 @@ function chooseTargets(engine, seat, validTargets, config, base) {
   }
   const bene = cardName ? isBeneficial(cardName) : false;
   const st = engine.gs.skillTest;
+  const focus = engine._stFocus && engine._stFocus.by === seat ? engine._stFocus : null;
+  if (engine._stActing === seat && validTargets.some(t => (t.owner != null ? t.owner : seat) !== seat)) engine._stTargetPrompts = (engine._stTargetPrompts || 0) + 1;   // Zielwahl unter Gegnern kam vor
   const strength = (i) => (engine.gs.players[i].heroes || []).reduce((a, h) => a + (h && h.name && h.hp > 0 ? h.hp : 0), 0);
   const scored = validTargets.filter(t => !t.ineligible).map(t => {
     const ownerSeat = t.owner != null ? t.owner : seat;
@@ -160,6 +163,8 @@ function chooseTargets(engine, seat, validTargets, config, base) {
       }
     }
     if (t.type === 'hero') score += 2;
+    // Lookahead (mcts.js): „Fokus" auf die Ziele EINES Gegners — als Planvariante der Suche, nicht als Dauerregel
+    if (focus && ownerSeat === focus.seat && enemy && !bene) score += FOCUS_BONUS;
     return { id: t.id, score: score + Math.random() * 0.5 };
   }).sort((a, b) => b.score - a.score);
   const minNeeded = Math.max(config.cancellable ? 0 : 1, config.minRequired || 0);

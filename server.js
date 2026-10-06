@@ -2398,7 +2398,7 @@ app.get('/api/skilltest/ranking', (req, res) => {
     if (minN) rows = rows.filter(r => r.valueN >= minN);
     const limit = Math.min(5000, parseInt(req.query.limit, 10) || 5000);
     res.json({ updated: data.updated, games: data.games, version: data.version, prior: data.prior, types: data.types,
-      historyPoints: data.historyPoints, total: (data.rows || []).length, rows: rows.slice(0, limit), status: learn.readStatus() });
+      keepPairs: data.keepPairs || [], keepContext: data.keepContext || [], historyPoints: data.historyPoints, total: (data.rows || []).length, rows: rows.slice(0, limit), status: learn.readStatus() });
   } catch (err) {
     console.error('[skilltest ranking] error:', err.message);
     res.status(500).json({ error: 'Failed to load ranking' });

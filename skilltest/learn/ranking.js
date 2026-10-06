@@ -40,6 +40,7 @@ const files = () => ({
   history: baseOf() + '.ranking-history.jsonl',
   bench: baseOf() + '.bench.jsonl',
   status: baseOf() + '.status.json',
+  hangs: baseOf() + '.hangs.jsonl',
 });
 
 function cardInfo(name) {
@@ -204,6 +205,19 @@ function readBench({ max = 300, withGames = false } = {}) {
   } catch { return []; }
 }
 
+/** Hänger-Diagnose: eine Partie hat das Zeitlimit überschritten — die letzten Engine-Ereignisse stehen dabei (Datei bleibt unter ~2 MB). */
+function appendHang(rec) {
+  const f = files().hangs;
+  try {
+    fs.mkdirSync(path.dirname(f), { recursive: true });
+    fs.appendFileSync(f, JSON.stringify(rec) + '\n', { encoding: 'utf-8' });
+    if (fs.statSync(f).size > 2 * 1024 * 1024) {
+      const lines = fs.readFileSync(f, { encoding: 'utf-8' }).split('\n').filter(Boolean);
+      fs.writeFileSync(f, lines.slice(Math.floor(lines.length / 2)).join('\n') + '\n', { encoding: 'utf-8' });
+    }
+  } catch (e) { console.error('[skilltest-ranking] Hänger:', e && e.message); }
+}
+
 function writeStatus(st) {
   try { fs.writeFileSync(files().status, JSON.stringify({ ...st, t: Date.now() }), { encoding: 'utf-8' }); } catch { /* egal */ }
 }
@@ -211,4 +225,4 @@ function readStatus() {
   try { return JSON.parse(fs.readFileSync(files().status, { encoding: 'utf-8' })); } catch { return null; }
 }
 
-module.exports = { PRIOR, files, buildRanking, writeRanking, readRanking, appendHistory, readHistory, appendBench, readBench, writeStatus, readStatus };
+module.exports = { PRIOR, files, buildRanking, writeRanking, readRanking, appendHistory, readHistory, appendBench, readBench, appendHang, writeStatus, readStatus };

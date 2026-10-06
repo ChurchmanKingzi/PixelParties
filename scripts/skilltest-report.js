@@ -17,7 +17,8 @@ const arg = (name, def) => { const i = process.argv.indexOf('--' + name); return
 const pct = (x) => (x * 100).toFixed(1) + ' %';
 const sgn = (x, d = 3) => (x >= 0 ? '+' : '') + x.toFixed(d);
 
-const bench = ranking.readBench({ max: 200 });
+const benchAll = ranking.readBench({ max: 400 });
+const bench = benchAll.filter(r => !r.kind);
 const status = ranking.readStatus();
 console.log('═══ Vergleichsspiele: trainierte CPU gegen untrainierte CPUs ═══');
 if (status) console.log(`Trainer: PID ${status.pid}, ${status.games} Partien insgesamt (Sitzung: ${status.session}, ~${status.ratePerMin}/min), Lebenszeichen vor ${Math.round((Date.now() - status.t) / 1000)} s`);
@@ -32,6 +33,16 @@ else {
   console.log('\nLetzter Stand nach Tischgröße:');
   for (const b of last.bySeats) console.log(`  ${b.seats} Sitze: ${b.wins}/${b.games} gewonnen (${pct(b.winRate)}, Erwartung ${pct(b.expectedWinRate)}), Platzierungsgüte ${sgn(b.meanPlaceScore)}`);
   if (last.games) console.log(`  Einzelspiele des letzten Vergleichs: ${last.games.map(g => `${g.seats}P:${g.won ? 'S' : g.place + '.'}`).join(' ')}`);
+}
+
+const lookahead = benchAll.filter(r => r.kind === 'mcts');
+if (lookahead.length) {
+  console.log('\n═══ Lookahead (Suche) gegen denselben Agenten ohne Suche ═══');
+  console.log('Partien  Spiele  Siegquote  Erwartung  Vorsprung    z   Platzierungsgüte');
+  for (const r of lookahead) {
+    const t = r.total;
+    console.log(`${String(r.trainedGames).padStart(7)}  ${String(t.games).padStart(6)}  ${pct(t.winRate).padStart(9)}  ${pct(t.expectedWinRate).padStart(9)}  ${(sgn(t.edge * 100, 1) + ' pp').padStart(10)}  ${sgn(t.z, 1).padStart(5)}  ${sgn(t.meanPlaceScore).padStart(16)}`);
+  }
 }
 
 const data = ranking.readRanking();

@@ -149,22 +149,37 @@ function prune(profile, maxPairs = 150000) {
 // Jede Partie läuft in einem Worker-Thread: eine Karte mit Endlosschleife legt dann nur diesen Worker lahm — der Pool
 // beendet ihn nach `timeoutMs` und startet einen frischen. Mehrere Worker spielen parallel.
 class WorkerPool {
-  constructor(size, timeoutMs) {
+  constructor(size, timeoutMs, memMb) {
     this.size = Math.max(1, size | 0);
     this.timeoutMs = timeoutMs || 240000;
+    this.memMb = memMb || 2048;
     this.idle = [];            // bereite Worker
     this.waiting = [];         // wartende Aufträge
     this.nextId = 1;
     this.closed = false;
     this.count = 0;            // lebende Worker
+    this.hangs = 0;            // Zeitüberschreitungen (jede mit Ablaufspur in <profil>.hangs.jsonl)
+    this.durations = [];       // Dauer der letzten erfolgreichen Partien (ms) — daraus ergibt sich das wirksame Zeitlimit
   }
+
+  /** Wirksames Zeitlimit: ein Vielfaches der üblichen Partiedauer (90. Perzentil), mindestens 60 s, höchstens `timeoutMs`. */
+  _timeoutFor() {
+    if (this.durations.length < 20) return this.timeoutMs;
+    const sorted = [...this.durations].sort((a, b) => a - b);
+    const p90 = sorted[Math.floor(sorted.length * 0.9)];
+    return Math.min(this.timeoutMs, Math.max(60000, 12 * p90));
+  }
+  _noteDuration(ms) { this.durations.push(ms); if (this.durations.length > 200) this.durations.shift(); }
 
   _spawn() {
     const { Worker } = require('worker_threads');
-    const w = new Worker(require('path').join(__dirname, 'worker.js'), { resourceLimits: { maxOldGenerationSizeMb: 2048 } });
+    const w = new Worker(require('path').join(__dirname, 'worker.js'), { resourceLimits: { maxOldGenerationSizeMb: this.memMb } });
     this.count++;
     w._ready = false; w._pool = this;
-    w.on('message', (m) => { if (m && m.ready) { w._ready = true; this._dispatch(); } });
+    w.on('message', (m) => {
+      if (m && m.ready) { w._ready = true; this._dispatch(); }
+      else if (m && m.trace && w._job) { const t = w._job.trace || (w._job.trace = []); t.push(...m.trace); if (t.length > 80) t.splice(0, t.length - 80); }
+    });
     w.on('error', (e) => { if (w._job) { const j = w._job; w._job = null; clearTimeout(j.timer); j.reject(e); } });
     w.on('exit', () => {
       this.count--;
@@ -186,11 +201,17 @@ class WorkerPool {
       if (!w) break;
       const job = this.waiting.shift();
       w._job = job;
-      job.timer = setTimeout(() => { job.reject(new Error('Zeitüberschreitung')); w._job = null; w.terminate(); }, this.timeoutMs);
+      job.start = Date.now();
+      const limit = this._timeoutFor();
+      job.timer = setTimeout(() => {
+        this.hangs++;
+        try { ranking.appendHang({ t: Date.now(), limitMs: limit, seats: job.opts && job.opts.seats, mcts: job.opts && job.opts.mcts, weightsGiven: !!(job.opts && job.opts.weights), trace: job.trace || [] }); } catch { /* Diagnose darf nie stören */ }
+        job.reject(new Error('Zeitüberschreitung')); w._job = null; w.terminate();
+      }, limit);
       w.once('message', function onMsg(m) {
         if (!m || m.id !== job.id) { w.once('message', onMsg); return; }
         clearTimeout(job.timer); w._job = null;
-        if (m.ok) job.resolve(m.rec); else job.reject(new Error(m.error));
+        if (m.ok) { w._pool._noteDuration(Date.now() - job.start); job.resolve(m.rec); } else job.reject(new Error(m.error));
         w._pool._dispatch();
       });
       w.postMessage({ id: job.id, opts: job.opts });
@@ -289,7 +310,50 @@ async function benchmark(profile, pool, opts = {}) {
 }
 
 /**
- * Trainieren. opts: { games, seats (Zahl oder [min,max]), evolveEvery, saveEvery, profile, onGame, shouldStop, dutyCycle, quiet }
+ * Lookahead-Vergleich: Alle Sitze spielen mit Profil und bester Persona; EIN Sitz sucht zusätzlich mit dem Lookahead (skilltest/mcts.js),
+ * die übrigen nicht. So misst sich allein der Beitrag der Suche. Festgehalten wird wie beim Vergleich trainiert/untrainiert
+ * (`kind: 'mcts'` in <profil>.bench.jsonl); Erwartung ohne Vorsprung: Siegquote 1/Sitze.
+ */
+async function benchmarkLookahead(profile, pool, opts = {}) {
+  const rng = opts.rng || Math.random;
+  const best = bestPersona(profile);
+  const seatsList = opts.seatCounts || [2, 3, 4];
+  const total = opts.games || 40;
+  const jobs = Array.from({ length: total }, (_, i) => { const n = seatsList[i % seatsList.length]; return { n, seat: Math.floor(rng() * n) }; });
+  const one = async (j) => {
+    const simOpts = {
+      seats: j.n, maxTurns: opts.maxTurns || 3000, reloadProfile: true,
+      weights: Array.from({ length: j.n }, () => (best ? best.weights : null)),
+      mcts: [j.seat], mctsCfg: { MAX_MS: 0 },
+    };
+    try {
+      const rec = pool ? await pool.run(simOpts) : await require('../sim').runGame(simOpts);
+      if (!rec || !rec.placements || rec.reason === 'sim_turn_limit') return null;
+      return { seats: j.n, seat: j.seat, place: rec.placements[j.seat], won: rec.winnerIdx === j.seat, rounds: rec.rounds, score: placeScore(rec.placements[j.seat], j.n) };
+    } catch { return null; }
+  };
+  const results = (await Promise.all(jobs.map(one))).filter(Boolean);
+  const wins = results.filter(r => r.won).length;
+  const expected = results.reduce((s, r) => s + 1 / r.seats, 0);
+  const variance = results.reduce((s, r) => s + (1 / r.seats) * (1 - 1 / r.seats), 0);
+  const rec = {
+    kind: 'mcts', t: Date.now(), trainedGames: profile.games || 0, version: profile.version || 0, persona: best && best.name,
+    total: {
+      games: results.length, wins, winRate: results.length ? wins / results.length : 0,
+      expectedWinRate: results.length ? expected / results.length : 0,
+      edge: results.length ? (wins - expected) / results.length : 0,
+      z: variance > 0 ? (wins - expected) / Math.sqrt(variance) : 0,
+      meanPlaceScore: results.length ? results.reduce((s, r) => s + r.score, 0) / results.length : 0,
+    },
+  };
+  ranking.appendBench(rec);
+  return rec;
+}
+
+/**
+ * Trainieren. opts: { games, seats (Zahl oder [min,max]), evolveEvery, saveEvery, profile, onGame, shouldStop, dutyCycle, quiet,
+ *   workers, gameTimeoutMs, workerMemMb, benchEvery, benchGames, mctsBenchEvery, mctsBenchGames, progressEverySec, maxMinutes,
+ *   checkpointMinutes }
  * Gibt das (gespeicherte) Profil zurück.
  */
 async function train(opts = {}) {
@@ -300,8 +364,10 @@ async function train(opts = {}) {
   const evolveEvery = opts.evolveEvery || 150;
   const saveEvery = opts.saveEvery || 25;
   const workers = opts.workers == null ? 1 : opts.workers;
-  const pool = workers > 0 ? new WorkerPool(workers, opts.gameTimeoutMs) : null;
+  const pool = workers > 0 ? new WorkerPool(workers, opts.gameTimeoutMs, opts.workerMemMb) : null;
   const benchEvery = opts.benchEvery == null ? 300 : opts.benchEvery;      // 0 = keine Vergleichsspiele
+  const mctsBenchEvery = opts.mctsBenchEvery || 0;                         // 0 = keine Lookahead-Vergleiche (kosten viel Rechenzeit)
+  const mctsBenchGames = opts.mctsBenchGames || 40;
   const benchGames = opts.benchGames || 40;
   const rankingEvery = opts.rankingEvery || 100;                           // Prüfpunkt für den Verlauf der Kartenwerte
   let done = 0, failed = 0, started = 0, benchRunning = false, lastStatus = 0;
@@ -319,18 +385,57 @@ async function train(opts = {}) {
   };
   if (benchEvery && (profile.games || 0) === 0 && opts.benchAtStart !== false) await runBench();   // Ausgangspunkt: noch nichts gelernt
 
+  let mctsBenchRunning = false;
+  const runMctsBench = async () => {
+    if (mctsBenchRunning || !mctsBenchEvery) return;
+    mctsBenchRunning = true;
+    try {
+      profileMod.save(profile);
+      const rec = await benchmarkLookahead(profile, pool, { games: mctsBenchGames, rng });
+      if (!opts.quiet) console.log(`[skilltest-train] Lookahead-Vergleich nach ${rec.trainedGames} Partien: Siegquote ${(rec.total.winRate * 100).toFixed(1)} % (Erwartung ${(rec.total.expectedWinRate * 100).toFixed(1)} %), z=${rec.total.z.toFixed(2)}`);
+    } catch (e) { if (!opts.quiet) console.error('[skilltest-train] Lookahead-Vergleich fehlgeschlagen:', e && e.message); }
+    finally { mctsBenchRunning = false; }
+  };
+
+  // Sicherungen für lange Läufe: das Profil vor dem ersten Speichern ablegen (<profil>.bak) und alle `checkpointMinutes` eine Kopie
+  // (<profil>.ckpt-<Zeit>.json, die letzten 4 bleiben).
+  const fs = require('fs');
+  try { const f = profileMod.FILE(); if (fs.existsSync(f) && !fs.existsSync(f + '.bak')) fs.copyFileSync(f, f + '.bak'); } catch { /* egal */ }
+  let lastCkpt = Date.now();
+  const checkpoint = () => {
+    if (!opts.checkpointMinutes || Date.now() - lastCkpt < opts.checkpointMinutes * 60000) return;
+    lastCkpt = Date.now();
+    try {
+      const f = profileMod.FILE(), dir = require('path').dirname(f), base = require('path').basename(f, '.json');
+      fs.copyFileSync(f, require('path').join(dir, `${base}.ckpt-${new Date().toISOString().replace(/[:T]/g, '-').slice(0, 16)}.json`));
+      const old = fs.readdirSync(dir).filter(n => n.startsWith(base + '.ckpt-')).sort();
+      for (const n of old.slice(0, Math.max(0, old.length - 4))) fs.unlinkSync(require('path').join(dir, n));
+    } catch (e) { if (!opts.quiet) console.error('[skilltest-train] Sicherung fehlgeschlagen:', e && e.message); }
+  };
+  const overTime = () => !!opts.maxMinutes && Date.now() - t0 > opts.maxMinutes * 60000;
+  const stopNow = () => overTime() || !!(opts.shouldStop && opts.shouldStop());
+  let lastProgress = Date.now();
+
   const runner = async () => {
-    while (started < total && !(opts.shouldStop && opts.shouldStop())) {
+    while (started < total && !stopNow()) {
       started++;
       const g0 = Date.now();
       try {
         const game = await playOne(profile, opts, rng, pool);
         if (game.rec && game.rec.placements) { learnFrom(profile, game); done++; } else failed++;
       } catch (e) { failed++; if (!opts.quiet) console.error('[skilltest-train] Partie fehlgeschlagen:', e && e.message); }
-      if (done > 0 && done % evolveEvery === 0) evolve(profile, rng);
-      if (done > 0 && done % saveEvery === 0) { prune(profile); profileMod.save(profile); ranking.writeRanking(profile, { checkpoint: done % rankingEvery === 0 }); }
-      if (benchEvery && done > 0 && done % benchEvery === 0) await runBench();
-      if (Date.now() - lastStatus > 5000) { lastStatus = Date.now(); ranking.writeStatus({ pid: process.pid, startedAt: t0, session: done, failed, games: profile.games, ratePerMin: Math.round(done / Math.max(1, (Date.now() - t0) / 60000)) }); }
+      try {
+        if (done > 0 && done % evolveEvery === 0) evolve(profile, rng);
+        if (done > 0 && done % saveEvery === 0) { prune(profile); profileMod.save(profile); ranking.writeRanking(profile, { checkpoint: done % rankingEvery === 0 }); checkpoint(); }
+        if (benchEvery && done > 0 && done % benchEvery === 0) await runBench();
+        if (mctsBenchEvery && done > 0 && done % mctsBenchEvery === 0) await runMctsBench();
+      } catch (e) { console.error('[skilltest-train] Speichern/Auswertung fehlgeschlagen (Lauf geht weiter):', e && e.message); }
+      if (opts.progressEverySec && Date.now() - lastProgress > opts.progressEverySec * 1000) {
+        lastProgress = Date.now();
+        const mins = Math.max(0.01, (Date.now() - t0) / 60000);
+        console.log(`[skilltest-train] ${new Date().toISOString().slice(0, 19)}  Sitzung ${done} Partien (${Math.round(done / mins)}/min), gesamt ${profile.games}, verworfen ${failed}, Hänger ${pool ? pool.hangs : 0}, Profil v${profile.version}`);
+      }
+      if (Date.now() - lastStatus > 5000) { lastStatus = Date.now(); ranking.writeStatus({ pid: process.pid, startedAt: t0, session: done, failed, hangs: pool ? pool.hangs : 0, games: profile.games, ratePerMin: Math.round(done / Math.max(1, (Date.now() - t0) / 60000)) }); }
       if (opts.onGame) opts.onGame({ done, failed, profile });
       // Last begrenzen: nach jeder Partie so lange ruhen, dass der Rechenanteil `dutyCycle` bleibt.
       if (opts.dutyCycle && opts.dutyCycle > 0 && opts.dutyCycle < 1) {
@@ -401,4 +506,4 @@ function exportCompact(profile, minN = 4) {
   };
 }
 
-module.exports = { benchmark, bestPersona, exportCompact, WorkerPool, train, evaluate, learnFrom, baseFeatures, placeScore, seedPopulation, evolve, pickPersona, playOne, PLAY_VALUE_SCALE };
+module.exports = { benchmark, benchmarkLookahead, bestPersona, exportCompact, WorkerPool, train, evaluate, learnFrom, baseFeatures, placeScore, seedPopulation, evolve, pickPersona, playOne, PLAY_VALUE_SCALE };

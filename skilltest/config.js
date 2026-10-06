@@ -59,12 +59,17 @@ const CONFIG = {
     ROLLOUTS: 2,           // Rollouts je Kandidat (Grundwert; Persona-Gewicht `lookahead` skaliert ihn)
     TOP_K: 5,              // höchstens so viele Kandidaten (nach Heuristik) werden gegeneinander simuliert
     MAX_MS: 1200,          // Zeitbudget je Entscheidung (live; 0 = unbegrenzt, z. B. in Tests)
+    MAX_PARALLEL: 2,       // höchstens so viele Suchen zugleich im Prozess (viele Räume); weitere Entscheidungen fallen nach der Heuristik (0 = unbegrenzt)
     ROUNDS: 1,             // so oft kommt der Sitz in der Simulation wieder an die Reihe, bevor bewertet wird
     MAX_SIM_TURNS: 60,     // Sicherheitsgrenze: simulierte Züge je Rollout
     WIN_BONUS: 2500, LOSS_PENALTY: 2500, ELIM_BONUS: 450,   // Endwerte in Einheiten der Stellungsbewertung (policy.sideValue)
     LEADER_BLEND: 0.35,    // Anteil des stärksten Gegners an der Bewertung der Gegner (Rest: Mittel) — wer führt, ist die Gefahr
     FAIL_PENALTY: 60,      // eine Aktion, die gar nicht zählt (Zug nicht verbraucht), wird abgewertet
     PRIOR_WEIGHT: 0.35,    // Gewicht der Heuristik-Rangfolge neben dem Simulationsergebnis
+    FOCUS_SEATS: 3,        // so viele Gegner (die stärksten) werden als Ziel-Fokus probiert (Planvarianten: wen angreifen?); 0 = keine Zielvarianten
+    VARIATION_TOP: 3,      // …für die so vielen vordersten Kandidaten, die unter Gegnern ein Ziel wählen
+    FOCUS_PENALTY: 0.1,    // Fokus-Arme müssen die Standard-Zielwahl um so viele Streuungen schlagen
+    COMMON_RANDOM: true,   // gemeinsame Zufallszahlen: der k-te Rollout jedes Kandidaten nutzt denselben Zufallsstrom (weniger Rauschen im Vergleich)
   },
 
   // ── Belohnungen (SC) ───────────────────────────────────────────

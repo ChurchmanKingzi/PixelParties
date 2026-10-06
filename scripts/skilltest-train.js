@@ -6,6 +6,14 @@
 //   node scripts/skilltest-train.js --games 300 --seats 4       # nur 4er-Tische
 //   node scripts/skilltest-train.js --games 2000 --workers 3    # 3 Worker-Threads parallel (Standard: Kerne − 1, höchstens 3)
 //   node scripts/skilltest-train.js --games 300 --seats 3-6
+//   Lange Läufe auf einem Server (Beispiel):
+//     node scripts/skilltest-train.js --forever --hours 12 --workers 7 --seats 2-8 --bench-every 2000 --bench-games 80 --mcts-bench-every 6000
+//       --forever / --games 0   ohne Partiezahl, bis --hours/--minutes ablaufen oder Strg+C (speichert sauber)
+//       --workers N             Worker-Threads (Standard: Kerne − 1);  --worker-mem MB je Worker (Standard 1536)
+//       --game-timeout S        Obergrenze je Partie in s (Standard 240; wirksam: ≥ 60 s, ~12 × übliche Dauer);  Hänger → <profil>.hangs.jsonl
+//       --save-every N          Speichern alle N Partien (Standard 100);  --checkpoint-minutes M  Sicherungskopien (Standard 60, die letzten 4)
+//       --bench-every N         Vergleich trainiert gegen untrainiert alle N Partien (Standard 300);  --mcts-bench-every N  Lookahead-Vergleich (Standard aus)
+//       --progress S            Fortschrittszeile alle S s (Standard 60)
 //   node scripts/skilltest-train.js --evaluate 60 --seats 4     # Vergleich: gelernt gegen Standard (--mode full|profile|persona)
 //   node scripts/skilltest-train.js --daemon --duty 0.25        # Dauerbetrieb (Hintergrundlernen), 25 % Rechenanteil
 //   node scripts/skilltest-train.js --export data/skilltest-profile.json --min-n 4   # kompaktes Profil zum Einchecken
@@ -41,11 +49,22 @@ if (seatsArg && seatsArg !== true) seats = String(seatsArg).includes('-') ? Stri
   let stop = false;
   for (const sig of ['SIGTERM', 'SIGINT']) process.on(sig, () => { stop = true; });
   const duty = daemon ? Math.min(1, Math.max(0.02, Number(arg('duty', 0.25)) || 0.25)) : 0;
+  const num = (name, def) => { const v = arg(name, null); return v === null || v === true ? def : Number(v); };
+  const forever = !!arg('forever', false) || num('games', 100) === 0;
   await train({
-    games: daemon ? null : Number(arg('games', 100)),
+    games: daemon || forever ? null : num('games', 100),
     seats: seats || [2, 8],
     dutyCycle: duty,
-    workers: daemon ? 1 : (arg('workers', null) ? Number(arg('workers', 1)) : Math.max(1, Math.min(3, os.cpus().length - 1))),
+    // Auf einem Trainingsrechner: alle Kerne bis auf einen (Hauptprozess), sonst `--workers N`. Daemon (Hintergrundlernen im Server): 1.
+    workers: daemon ? 1 : num('workers', Math.max(1, os.cpus().length - 1)),
+    gameTimeoutMs: num('game-timeout', 240) * 1000,          // Obergrenze je Partie; wirksam ist ein Vielfaches der üblichen Dauer (mind. 60 s)
+    workerMemMb: num('worker-mem', 1536),
+    saveEvery: num('save-every', daemon ? 25 : 100),
+    benchEvery: num('bench-every', 300), benchGames: num('bench-games', 40),
+    mctsBenchEvery: num('mcts-bench-every', 0), mctsBenchGames: num('mcts-bench-games', 40),
+    progressEverySec: daemon ? 0 : num('progress', 60),
+    maxMinutes: num('hours', 0) * 60 || num('minutes', 0),
+    checkpointMinutes: num('checkpoint-minutes', daemon ? 0 : 60),
     quiet: !!daemon && !process.env.PP_ST_TRAIN_VERBOSE,
     shouldStop: () => stop,
   });

@@ -67,6 +67,12 @@
   </section>
 
   <section>
+    <h2>Lookahead (search) vs. the same agent without lookahead</h2>
+    <div class="hint">One seat additionally searches (tries its best candidate actions in a simulation of the game before choosing), all other seats play the same learned style without search. Without an edge the win rate equals 1 / players.</div>
+    <div class="scroll" style="max-height:260px"><table id="lookahead"></table></div>
+  </section>
+
+  <section>
     <h2>All cards by learned value</h2>
     <div class="hint">Value = mean placement score (+1 win … −1 last) of all games in which the card was dealt to a bot (starting hand or recycler), shrunk toward 0 for few observations.
       “Built” = the same for bases the card actually stood in, “Play” = average swing of the position evaluation when the card is played/activated, Δ = change since the last checkpoint. Updates continuously while training runs.</div>
@@ -105,7 +111,9 @@
   }
 
   function drawBench() {
-    const recs = (bench && bench.records) || [];
+    const all = (bench && bench.records) || [];
+    const recs = all.filter(r => !r.kind);                                   // trained vs. untrained (the lookahead comparisons have kind 'mcts')
+    drawLookahead(all.filter(r => r.kind === 'mcts'));
     const stats = $('benchStats'), tbl = $('benchTable'), svg = $('chart');
     if (!recs.length) {
       stats.innerHTML = '<div class="empty">No test games yet — they run automatically every 300 training games (and once before training starts).</div>';
@@ -160,6 +168,13 @@
         <td class="num">${r.valueN}</td><td class="num ${r.baseN ? cls(r.baseValue) : 'zero'}">${r.baseN ? sgn(r.baseValue) : '–'}</td>
         <td class="num ${r.playValue == null ? 'zero' : cls(r.playValue)}">${r.playValue == null ? '–' : sgn(r.playValue, 2)}</td>
         <td class="num ${cls(r.lift)}">${sgn(r.lift)}</td><td class="num ${r.keepEdge == null ? 'zero' : cls(r.keepEdge)}" title="${r.keepN} observations">${r.keepEdge == null ? '–' : sgn(r.keepEdge)}</td><td class="num ${r.delta == null ? 'zero' : cls(r.delta)}">${r.delta == null ? '' : sgn(r.delta)}</td><td>${spark(r.trend)}</td></tr>`).join('');
+  }
+
+  function drawLookahead(recs) {
+    const el = $('lookahead');
+    if (!recs.length) { el.innerHTML = '<tr><td class="zero">no lookahead comparisons yet — start the trainer with --mcts-bench-every N</td></tr>'; return; }
+    el.innerHTML = '<tr><th class="num">Training games</th><th class="num">Test games</th><th class="num">Win rate</th><th class="num">Expected</th><th class="num">Edge</th><th class="num">z</th><th class="num">Placement</th></tr>' +
+      recs.slice().reverse().slice(0, 40).map(r => `<tr><td class="num">${r.trainedGames}</td><td class="num">${r.total.games}</td><td class="num">${pct(r.total.winRate)}</td><td class="num">${pct(r.total.expectedWinRate)}</td><td class="num ${cls(r.total.edge)}">${(r.total.edge >= 0 ? '+' : '−') + Math.abs(r.total.edge * 100).toFixed(1)} pp</td><td class="num">${r.total.z.toFixed(1)}</td><td class="num ${cls(r.total.meanPlaceScore)}">${sgn(r.total.meanPlaceScore)}</td></tr>`).join('');
   }
 
   function drawKeep() {

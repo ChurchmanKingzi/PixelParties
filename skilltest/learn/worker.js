@@ -14,13 +14,27 @@ console.log = (...a) => {
   origLog(...a);
 };
 
+// Ablaufspur für die Hänger-Diagnose: die letzten Engine-Ereignisse und Prompts gehen gebündelt an den Trainer. Hängt eine Partie,
+// steht dort, womit sie sich zuletzt beschäftigt hat (der Trainer schreibt sie in <profil>.hangs.jsonl).
+const { GameEngine } = require('../../cards/effects/_engine');
+let buf = [];
+const flush = () => { if (buf.length) { try { parentPort.postMessage({ trace: buf }); } catch { /* egal */ } buf = []; } };
+const note = (s) => { buf.push(s); if (buf.length >= 20) flush(); };
+const brief = (d) => { try { return d == null ? '' : ' ' + JSON.stringify(d).slice(0, 140); } catch { return ''; } };
+const origEngineLog = GameEngine.prototype.log;
+GameEngine.prototype.log = function (name, data) { note(name + brief(data)); return origEngineLog.apply(this, arguments); };
+const origPrompt = GameEngine.prototype.promptGeneric;
+GameEngine.prototype.promptGeneric = function (pi, pd) { note('PROMPT seat ' + pi + ' ' + (pd && pd.type) + ' ' + (pd && (pd.title || ''))); return origPrompt.apply(this, arguments); };
+
 const { runGame } = require('../sim');
 
 parentPort.on('message', async (job) => {
   try {
     if (job.opts && job.opts.reloadProfile) require('./profile').reset();      // Vergleichsspiele sehen den frisch gespeicherten Stand
+    buf = [];
     const rec = await runGame(job.opts);
     delete rec.room;
+    flush();
     parentPort.postMessage({ id: job.id, ok: true, rec });
   } catch (e) {
     parentPort.postMessage({ id: job.id, ok: false, error: String((e && e.message) || e) });
