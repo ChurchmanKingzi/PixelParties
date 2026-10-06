@@ -15,6 +15,7 @@ const AUSLOESER_HOOKS = new Set([
 ]);
 const { handSizeWithoutResolving } = require('./_hand-resolve');   // v1288
 const { loadCardEffect } = require('./_loader');
+const { opponentOfGs, opponentsOfGs, playerCountGs } = require('./_opp');   // N-Spieler-Umbau
 const { gainedNames, heroScriptsOf, heroScriptOf, eigenesHeldenSkript } = require('./_gained-effects-shared');
 const { charges: ladungenLesen } = require('./_charges');
 const ScTracking = require('./_sc-tracking');   // v1381
@@ -1717,6 +1718,23 @@ class GameEngine {
     }
     this._fastMode = false;
   }
+
+  // ─── GEGNER / SPIELERZAHL (N Spieler, Skill Test) ───────────────────
+  // Dünne Hüllen um `_opp.js`. Normalspiel: `pi === 0 ? 1 : 0` bit-genau.
+  // Statt dieses Idioms nur noch diese Methoden benutzen (Lint:
+  // scripts/check-n-player.js).
+  // Spielstand-Felder des Skill Tests (setzt skilltest/*): `gs.skillTest`
+  // (true = Skill-Test-Partie, bis 8 Spieler) und `gs.stFocus[pi]` (der
+  // Fokus-Gegner von Spieler pi).
+
+  /** Der EINE Gegner von `pi` (Skill Test: Fokus bzw. nächster lebender Spieler). */
+  opponentOf(pi) { return opponentOfGs(this.gs, pi); }
+
+  /** ALLE Gegner von `pi` als Index-Liste (Normalspiel: genau einer). */
+  opponentsOf(pi) { return opponentsOfGs(this.gs, pi); }
+
+  /** Anzahl der Spieler am Tisch (Normalspiel: 2, Skill Test: bis 8). */
+  playerCount() { return playerCountGs(this.gs); }
 
   // ─── INITIALIZATION ───────────────────────
 
@@ -3844,6 +3862,8 @@ class GameEngine {
       // Internal
       _triggers: [],
       _engine: engine,
+      // Gegner-Index zentral (Skill Test: bis 8 Spieler) — nie `pi === 0 ? 1 : 0`.
+      opponentOf: (p) => engine.opponentOf(p),
 
       // ── Event modification (for "before" hooks) ──
       cancel() { hookCtx.cancelled = true; },
@@ -9361,7 +9381,7 @@ class GameEngine {
         const fn = loadCardEffect(name)?.discardHooks?.[hookName];
         if (typeof fn !== 'function') continue;
         if (this.gs.result) return;
-        try { await fn({ _engine: this, cardName: name, cardOwner: pi, ...extra }); }
+        try { await fn({ _engine: this, opponentOf: (p) => this.opponentOf(p), cardName: name, cardOwner: pi, ...extra }); }
         catch (err) { console.error(`[discardHooks] ${name}.${hookName} warf:`, err.message); }
       }
     }
@@ -12930,6 +12950,7 @@ class GameEngine {
       }
       await script.onBoardSentToDiscard({
         _engine: this,
+        opponentOf: (p) => this.opponentOf(p),
         cardOwner: ownerIdx,
         cardName,
         fromZone, fromHeroIdx, zoneSlot,
@@ -15004,6 +15025,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (!script?.beforeDelete) return false;
     const rescueCtx = {
       _engine: this,
+      opponentOf: (p) => this.opponentOf(p),
       cardName,
       cardOwner: originalOwner,
       fromZone: opts.fromZone || null,
@@ -32769,7 +32791,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     const script = loadCardEffect(inst.name);
     if (typeof script?.onRevive !== 'function') return;
     try {
-      await script.onRevive({ _engine: this, card: inst, cardOwner: inst.owner, cardController: inst.controller ?? inst.owner });
+      await script.onRevive({ _engine: this, opponentOf: (p) => this.opponentOf(p), card: inst, cardOwner: inst.owner, cardController: inst.controller ?? inst.owner });
     } catch (err) {
       console.error(`[onRevive] ${inst.name}:`, err.message);
     }
@@ -46493,6 +46515,7 @@ this._deathWatch = (this._deathWatchStack || []).length
           attachedHero: inst.heroIdx >= 0 ? this.gs.players[inst.owner]?.heroes?.[inst.heroIdx] : null,
           players: this.gs.players,
           _engine: this,
+          opponentOf: (p) => this.opponentOf(p),
           modifyAmount(delta) { hookCtx.amount += delta; },
           setAmount(val) { hookCtx.amount = val; },
         });
