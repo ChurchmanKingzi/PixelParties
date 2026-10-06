@@ -142,7 +142,10 @@ function writeMilestone(profile, { final = false } = {}) {
   const dir = dirOf();
   fs.mkdirSync(dir, { recursive: true });
   const cur = buildSnapshot(profile, { final });
-  const existing = readAll().filter(s => s.games !== cur.games);
+  const all = readAll();
+  // Zwischenstände von Neustarts (final) zählen nicht als Liste; sie verschwinden, sobald der nächste echte Meilenstein da ist.
+  if (!final) for (const s of all) if (s.final && s.games !== cur.games) for (const f of [`milestone-${s.games}.json`, `report-${s.games}.md`]) { try { fs.unlinkSync(path.join(dir, f)); } catch { /* weg */ } }
+  const existing = all.filter(s => s.games !== cur.games && !s.final);
   const before = existing.filter(s => s.games < cur.games);
   const prev = before.length ? before[before.length - 1] : null;
   const first = before.length ? before[0] : null;

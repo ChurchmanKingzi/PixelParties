@@ -228,6 +228,12 @@ async function advance(engine, host, afterSeat) {
     await startRound(engine, host);
     afterSeat = null;
     if (gs.result) return false;
+    // Sicherheitsnetz gegen Endlos-Partien (z. B. ein Sperr-Effekt, der den letzten Gegner dauerhaft schützt): nach MAX_ROUNDS entscheiden die
+    // meisten Heroes/HP. Echte Partien enden nach rund 6 Rounds (selten über 40).
+    if (CONFIG.MAX_ROUNDS && st.round > CONFIG.MAX_ROUNDS) {
+      engine.onGameOver(engine.room, resolveStalemateWinner(engine), 'round_limit');
+      return false;
+    }
     // Falls auch in der frischen Round niemand handeln kann (alle Sitze ohne Akteure), abbrechen.
     if (!st.order.some(s => seatHasActor(engine, s))) {
       if (!gs.result) engine.onGameOver(engine.room, resolveStalemateWinner(engine), 'no_actors');
@@ -241,6 +247,10 @@ async function advance(engine, host, afterSeat) {
 function resolveStalemateWinner(engine) {
   const living = livingSeats(engine);
   if (living.length === 1) return living[0];
+  if (!living.length) {                                   // alle gleichzeitig gefallen: wer zuletzt ausschied, gewinnt
+    const out = engine.gs.skillTest.eliminated;
+    return out.length ? out[out.length - 1] : 0;
+  }
   let best = -1, bestHp = -1;
   for (const s of living) {
     const hp = engine.gs.players[s].heroes.reduce((a, h) => a + (heroAlive(h) ? h.hp : 0), 0);

@@ -210,6 +210,12 @@ function bonusHeroesFor(engine, seat, category, cardName) {
   return out;
 }
 
+/**
+ * Creature-Effekte, die ein Bot nie auslöst: Sie sperren das eigene Ziel (Befund Nachttraining: „Gorinthian War Counselor" betäubt den
+ * letzten Gegner jede Round neu, und aller Schaden an ihm wird 0 — der Bot kann nie gewinnen, die Partie läuft endlos).
+ */
+const AVOID_CREATURE_EFFECTS = new Set(['Gorinthian War Counselor']);
+
 /** Verbrauchende Aktionen: Basisangriff, Effekte, Handzauber, Beschwörungen — beste zuerst. */
 function rankActions(room, seat, host) {
   const engine = room.engine, gs = room.gameState, ps = gs.players[seat];
@@ -222,6 +228,7 @@ function rankActions(room, seat, host) {
 
   for (const c of creatures) {
     if (c.canActivate === false) continue;
+    if (AVOID_CREATURE_EFFECTS.has(c.cardName)) continue;
     const params = { heroIdx: c.heroIdx, zoneSlot: c.zoneSlot, instId: c.instId ?? c.id };
     if (c.charmedOwner != null) params.charmedOwner = c.charmedOwner;
     const key = cardKey('creatureEffect', c.cardName || 'creature');

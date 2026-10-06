@@ -256,7 +256,7 @@ async function playOne(profile, opts = {}, rng = Math.random, pool = null) {
   const chosen = Array.from({ length: n }, () => pickPersona(profile, rng));
   const simOpts = { seats: n, weights: chosen.map(p => p.weights), record: true, maxTurns: opts.maxTurns || 3000, watchdogMs: opts.watchdogMs };
   const rec = pool ? await pool.run(simOpts) : await require('../sim').runGame(simOpts);
-  if (rec.reason === 'sim_turn_limit') rec.placements = null;      // nicht zu Ende gespielt: keine Wertung
+  if (rec.reason === 'sim_turn_limit' || rec.reason === 'round_limit') rec.placements = null;      // nicht zu Ende gespielt (Patt): keine Wertung
   return { rec, n, personaIds: chosen.map(p => p.id) };
 }
 
@@ -284,7 +284,7 @@ async function benchmark(profile, pool, opts = {}) {
     };
     try {
       const rec = pool ? await pool.run(simOpts) : await require('../sim').runGame(simOpts);
-      if (!rec || !rec.placements || rec.reason === 'sim_turn_limit') return null;
+      if (!rec || !rec.placements || (rec.reason === 'sim_turn_limit' || rec.reason === 'round_limit')) return null;
       return { seats: j.n, seat: j.seat, place: rec.placements[j.seat], won: rec.winnerIdx === j.seat, rounds: rec.rounds, score: placeScore(rec.placements[j.seat], j.n) };
     } catch { return null; }
   };
@@ -335,7 +335,7 @@ async function benchmarkLookahead(profile, pool, opts = {}) {
     };
     try {
       const rec = pool ? await pool.run(simOpts) : await require('../sim').runGame(simOpts);
-      if (!rec || !rec.placements || rec.reason === 'sim_turn_limit') return null;
+      if (!rec || !rec.placements || (rec.reason === 'sim_turn_limit' || rec.reason === 'round_limit')) return null;
       return { seats: j.n, seat: j.seat, place: rec.placements[j.seat], won: rec.winnerIdx === j.seat, rounds: rec.rounds, score: placeScore(rec.placements[j.seat], j.n) };
     } catch { return null; }
   };
@@ -495,7 +495,7 @@ async function evaluate(opts = {}) {
       };
       let rec = null;
       try { rec = pool ? await pool.run(simOpts) : await require('../sim').runGame(simOpts); } catch { rec = null; }
-      if (!rec || !rec.placements || rec.reason === 'sim_turn_limit') continue;
+      if (!rec || !rec.placements || (rec.reason === 'sim_turn_limit' || rec.reason === 'round_limit')) continue;
       sum += placeScore(rec.placements[seat], n); cnt++;
       if (rec.winnerIdx === seat) wins++;
     }

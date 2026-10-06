@@ -296,7 +296,7 @@ async function finishGame(room, winnerIdx, reason, host) {
   if (st._watch) clearInterval(st._watch);
   if (room.engine) { room.engine._aborted = false; }
   const ms = room.skillTest && room.skillTest.mctsStats;
-  console.log(`[skilltest] Raum ${room.id}: Ende nach ${st.round} Rounds, Sieger ${gs.players[winnerIdx].username} (${reason})${ms ? ` — Lookahead: ${ms.searches} Suchen, ${ms.rollouts} Rollouts, ${ms.ms} ms, ${ms.changed} Entscheidungen geändert` : ''}`);
+  console.log(`[skilltest] Raum ${room.id}: Ende nach ${st.round} Rounds, Sieger ${gs.players[winnerIdx] ? gs.players[winnerIdx].username : '–'} (${reason})${ms ? ` — Lookahead: ${ms.searches} Suchen, ${ms.rollouts} Rollouts, ${ms.ms} ms, ${ms.changed} Entscheidungen geändert` : ''}`);
   // SC an Menschen (Spieler-Vorgabe 6.10.): 1/Round + 5 je überlebtem Gegner + 5 für den Sieg.
   for (let seat = 0; seat < room.players.length; seat++) {
     const p = room.players[seat];
