@@ -13327,6 +13327,12 @@ body:has(.modal-overlay) .tooltip {
   opacity: 1;
   visibility: visible;
 }
+/* Der gehoverte Avatar samt Tooltip liegt über ALLEN anderen Avataren (sonst überdecken ihn die nachfolgenden
+   Kreise, die ebenfalls positioniert sind). */
+.profile-avatar-gallery-item:hover,
+.profile-avatar-gallery-item:focus-visible {
+  z-index: 50;
+}
 /* Platz unter der letzten Reihe, damit der Tooltip dort nicht abgeschnitten wird. */
 .profile-avatar-gallery { padding-bottom: 28px; }
 .profile-avatar-gallery-item:hover .profile-avatar-gallery-img {
