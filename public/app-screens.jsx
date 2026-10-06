@@ -2387,6 +2387,13 @@ function ProfileScreen() {
   const [standardAvatars, setStandardAvatars] = useState([]);
   const [ownedAvatars, setOwnedAvatars] = useState([]);
   const [avatarNames, setAvatarNames] = useState({}); // Gegner-Avatare tragen Namen (cpu-avatars.js)
+  // Namens-Tooltip der Avatar-Auswahl: schwebt als eigenes Element am Seitenrand (Portal), damit lange Namen an den
+  // Außenkanten nicht vom scrollbaren Rahmen der Auswahl abgeschnitten werden.
+  const [avatarTip, setAvatarTip] = useState(null); // { text, cx, top, above } | null
+  const avatarTipProps = (text) => {
+    const zeige = (e) => { const r = e.currentTarget.getBoundingClientRect(); setAvatarTip({ text, cx: r.left + r.width / 2, top: r.bottom + 4, above: r.top - 4 }); };
+    return { 'aria-label': text, onMouseEnter: zeige, onFocus: zeige, onMouseLeave: () => setAvatarTip(null), onBlur: () => setAvatarTip(null) };
+  };
 
   // Board gallery
   const [showBoardGallery, setShowBoardGallery] = useState(false);
@@ -3061,18 +3068,17 @@ function ProfileScreen() {
                   <h3 className="orbit-font" style={{ fontSize: 14, color: 'var(--accent)', flex: 1 }}>SELECT AVATAR</h3>
                   <button className="btn" style={{ padding: '4px 12px', fontSize: 10 }} onClick={() => setShowAvatarGallery(false)}>✕ CLOSE</button>
                 </div>
-                <div style={{ overflow: 'hidden auto', flex: 1 }}>
+                <div style={{ overflow: 'hidden auto', flex: 1 }} onScroll={() => setAvatarTip(null)}>
                   <div className="profile-avatar-gallery">
                     {/* Standard avatars (free) */}
                     {standardAvatars.map(file => {
                       const url = '/avatars/' + encodeURIComponent(file);
                       return (
                         <div key={file} className={'profile-avatar-gallery-item' + (avatar === url ? ' active' : '')} role="button" tabIndex={0}
-                          onClick={() => quickSaveAvatar(url)}>
+                          onClick={() => quickSaveAvatar(url)} {...avatarTipProps(ppCamelSpaces(file.replace(/\.[^.]+$/, '')))}>
                           <div className="profile-avatar-gallery-img">
                             <img src={url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                           </div>
-                          <div className="profile-cb-gallery-label">{ppCamelSpaces(file.replace(/\.[^.]+$/, ''))}</div>
                         </div>
                       );
                     })}
@@ -3081,15 +3087,15 @@ function ProfileScreen() {
                       const url = '/data/shop/avatars/' + encodeURIComponent(avatarId) + '.png';
                       return (
                         <div key={avatarId} className={'profile-avatar-gallery-item' + (avatar === url ? ' active' : '')} role="button" tabIndex={0}
-                          onClick={() => quickSaveAvatar(url)}>
+                          onClick={() => quickSaveAvatar(url)} {...avatarTipProps(avatarNames[avatarId] || ppCamelSpaces(avatarId))}>
                           <div className="profile-avatar-gallery-img">
                             <img src={url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                           </div>
-                          <div className="profile-cb-gallery-label">{avatarNames[avatarId] || ppCamelSpaces(avatarId)}</div>
                         </div>
                       );
                     })}
                   </div>
+                  {avatarTip && <PpFloatTip text={avatarTip.text} cx={avatarTip.cx} top={avatarTip.top} above={avatarTip.above} />}
                   {standardAvatars.length === 0 && ownedAvatars.length === 0 && (
                     <div style={{ textAlign: 'center', color: 'var(--text2)', fontSize: 11, marginTop: 12 }}>
                       Visit the Shop to unlock more avatars!
@@ -4620,6 +4626,24 @@ function ZufallsGegnerBild({ gegner, schnell, width = 240 }) {
       <RollenderWuerfel rollt={schnell} />
     </div>
   );
+}
+
+/** Schwebender Namens-Tooltip (Portal in <body>, position: fixed): bleibt innerhalb des Fensters und wird von keinem
+ *  scrollbaren Rahmen abgeschnitten. Liegt unter dem Auslöser, bei Platzmangel darüber. */
+function PpFloatTip({ text, cx, top, above }) {
+  const ref = useRef(null);
+  const [pos, setPos] = useState({ left: cx, top, vis: false });
+  React.useLayoutEffect(() => {
+    const el = ref.current; if (!el) return;
+    const w = el.offsetWidth, h = el.offsetHeight;
+    const vw = document.documentElement.clientWidth, vh = window.innerHeight;
+    const left = Math.min(Math.max(cx - w / 2, 8), Math.max(8, vw - w - 8));
+    const y = (top + h > vh - 8 && above - h >= 8) ? above - h : top;
+    setPos({ left, top: y, vis: true });
+  }, [text, cx, top, above]);
+  return ReactDOM.createPortal(
+    <div ref={ref} className="pp-float-tip" style={{ left: pos.left, top: pos.top, visibility: pos.vis ? 'visible' : 'hidden' }}>{text}</div>,
+    document.body);
 }
 
 function HeroArtCrop({ heroName, width = 160, skinName = null }) {
