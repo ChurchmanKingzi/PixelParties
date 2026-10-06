@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Vergleicht das aktuelle Normalspiel (2 Spieler, CPU gegen CPU, geseedet)
-# mit dem eingecheckten Referenzlauf `baseline-2p.jsonl` (Stand vor dem
-# Skill-Test-Umbau, Commit ff42ef5). Exit 0 = identisch.
+# mit dem eingecheckten Referenzlauf `baseline-2p.jsonl` (Stand von `main`
+# Commit ab35219, ohne den Skill-Test-Umbau; zuvor Commit ff42ef5). Exit 0 = identisch.
 #
 #   scripts/regress/compare.sh            # Seeds 7/11/23, je 3 Spiele (~8 min)
 set -uo pipefail
