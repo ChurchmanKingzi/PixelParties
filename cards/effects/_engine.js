@@ -6456,6 +6456,19 @@ class GameEngine {
 
   /** „The HP of the Hero … cannot be healed." */
   /**
+   * Ist die Haupt-Aktion dieses Spielers (mit diesem Hero) schon verbraucht?
+   * Normalspiel: irgendein Hero hat in diesem Zug gehandelt. Skill Test: zusätzlich
+   * ist der Hero für die laufende Round erschöpft (skilltest/rounds.js) — jeder Hero
+   * hat dort seine eigene Haupt-Aktion pro Round.
+   */
+  mainActionSpent(pi, heroIdx) {
+    const ps = this.gs.players[pi];
+    if ((ps?.heroesActedThisTurn?.length || 0) > 0) return true;
+    const st = this.gs.skillTest;
+    return !!(st && heroIdx != null && st.exhaustedHeroes && st.exhaustedHeroes[pi + ':' + heroIdx]);
+  }
+
+  /**
    * STEHT GERADE NOCH EINE NORMALE AKTION ZUR VERFUEGUNG? (v1098)
    *
    * Gebraucht von Karten mit Doppelnatur ("Forbidden Curse of Aging"),
@@ -10821,6 +10834,8 @@ class GameEngine {
 
       if (ps.mainDeck.length === 0) {
         this.log('deck_out', { player: ps.username });
+        // Skill Test: es gibt keine Decks — leeres Deck heißt nur „nichts zu ziehen", nie Niederlage.
+        if (this.gs.skillTest) return drawn;
         // Deck out = instant loss
         if (!this.gs.result && !this.gs._endGameLaeuft) {
           const winnerIdx = playerIdx === 0 ? 1 : 0;
@@ -19600,7 +19615,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         // ── Phase-aware action economy (single source of truth) ──
 
         // Action Phase: after a hero has already acted, cards need bonus action, inherent action, or additional action coverage
-        if (isActionPhase && heroActed) {
+        if (isActionPhase && (heroActed || this.mainActionSpent(playerIdx, hi))) {
           if (hasBonusMainAction) {
             // Generic bonus main action (Torchure, Dragon Pilot Lv1 sacrifice, etc.):
             // no hero restriction, no type restriction — any action card is playable.
@@ -22199,6 +22214,9 @@ this._deathWatch = (this._deathWatchStack || []).length
     await this.runHooks(HOOKS.ON_TURN_START, { turn: this.gs.turn, activePlayer: this.gs.activePlayer });
     try { await this._runPostChainActions(); } catch (err) { console.error('[Engine] Nach-Ketten-Aktionen (Zugbeginn):', err.message); }   // Circles of Hell: Loeschungen durch Zugbeginn-Effekte sofort anbieten
     this.sync();
+    // Skill Test: Zugbeginn-Effekte laufen je Spieler zu Beginn einer ROUND; die Phasen
+    // (Resource/Main/Action) steuert der Round-Treiber (skilltest/rounds.js), nicht diese Kette.
+    if (this.gs.skillTest) return;
     await this.runPhase(PHASES.START);
   }
 
@@ -23086,6 +23104,8 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (this.gs.firstTurnProtectedPlayer != null) {
       delete this.gs.firstTurnProtectedPlayer;
     }
+    // Skill Test: hier endet nur die Zugende-Abwicklung; Spielerwechsel macht der Round-Treiber.
+    if (this.gs.skillTest) return;
     this.gs.activePlayer = this.gs.activePlayer === 0 ? 1 : 0;
     this.gs.turn++;
 
@@ -23253,7 +23273,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // Action Phase (currentPhase 3). In MAIN1 it is a future phase
     // by MAIN2 it is spent or forfeit — either way not spendable here.
     const isActionPhase = (this.gs.currentPhase || 0) === 3;
-    if (isActionPhase && (ps.heroesActedThisTurn || []).length === 0) return true;
+    if (isActionPhase && !this.mainActionSpent(pi, heroIdx)) return true;
     if ((ps._bonusMainActions || 0) > 0) return true;
     if (cardName && this.findAdditionalActionForCard(pi, cardName, heroIdx)) return true;
     return false;
@@ -23272,7 +23292,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     const ps = this.gs.players[pi];
     if (!ps) return false;
     const isActionPhase = (this.gs.currentPhase || 0) === 3;
-    if (isActionPhase && (ps.heroesActedThisTurn || []).length === 0) {
+    if (isActionPhase && !this.mainActionSpent(pi, heroIdx)) {
       if (!ps.heroesActedThisTurn) ps.heroesActedThisTurn = [];
       if (!ps.heroesActedThisTurn.includes(heroIdx)) ps.heroesActedThisTurn.push(heroIdx);
       this.sync();
@@ -38853,6 +38873,8 @@ this._deathWatch = (this._deathWatchStack || []).length
    */
   _isSecondActionGrantAvailable(playerIdx, config) {
     if (!config?.isSecondActionGrant) return true;
+    // Skill Test: Zusatzaktionen stehen im ganzen Zug bereit (ein Zug = eine Aktion, siehe skilltest/rounds.js).
+    if (this.gs.skillTest) return true;
     const ps = this.gs.players[playerIdx];
     if (!ps) return false;
     const isActionPhase = (this.gs.currentPhase || 0) === PHASES.ACTION;
@@ -39848,7 +39870,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     const result = [];
     const currentPhase = this.gs.currentPhase;
     const isActionPhase = currentPhase === 3;
-    const isMainPhase = currentPhase === 2 || currentPhase === 4;
+    const isMainPhase = currentPhase === 2 || currentPhase === 4 || !!this.gs.skillTest; // Skill Test: freie Effekte jederzeit im Zug
 
     // Check if action is available (Action Phase or Additional Action with ability_activation)
     const hasAdditional = isMainPhase && this.hasAdditionalActionForCategory(playerIdx, 'ability_activation');
@@ -40446,7 +40468,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (!granted && this.gs.activePlayer !== playerIdx) return [];
     const result = [];
     const currentPhase = this.gs.currentPhase;
-    const isMainPhase = currentPhase === 2 || currentPhase === 4;
+    const isMainPhase = currentPhase === 2 || currentPhase === 4 || !!this.gs.skillTest; // Skill Test: freie Effekte jederzeit im Zug
     const isActionPhase = currentPhase === 3;
     if (!granted && !isMainPhase && !isActionPhase) return [];
     // Weakening Crystal's hero-effect lock is now applied as a real
@@ -40466,7 +40488,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         const actionsPlayed = ps._actionsPlayedThisPhase || 0;
         const hasBonus = this.bonusAktionFuer(playerIdx, heroIdx, heroOwner)
           || ((ps._bonusMainActions || 0) > 0 && actionsPlayed === 1);
-        const actionAlreadyUsed = (ps.heroesActedThisTurn?.length > 0) && !hasBonus;
+        const actionAlreadyUsed = this.mainActionSpent(playerIdx, heroIdx) && !hasBonus;
         if (!actionAlreadyUsed) return true;
         return !!this.findAdditionalActionForCategory(playerIdx, 'ability_activation', heroIdx, heroOwner);
       }
@@ -40883,7 +40905,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (!ps) return [];
     if (this.gs.activePlayer !== playerIdx) return [];
     const currentPhase = this.gs.currentPhase;
-    const isMainPhase = currentPhase === 2 || currentPhase === 4;
+    const isMainPhase = currentPhase === 2 || currentPhase === 4 || !!this.gs.skillTest; // Skill Test: freie Effekte jederzeit im Zug
     const isActionPhase = currentPhase === 3;
     if (!isMainPhase && !isActionPhase) return [];
 
@@ -41003,6 +41025,7 @@ this._deathWatch = (this._deathWatchStack || []).length
             && instCtrlForCD === playerIdx
             && this._isChillyDogActiveFor(playerIdx);
           const hasSummoningSickness = inst.turnPlayed === (this.gs.turn || 0)
+            && !this.gs.skillTest   // Skill Test: in der Round beschworene Creatures dürfen sofort handeln
             && !inst.counters?._hasHaste
             && !frozenChillyDogHasteLift;
 
@@ -41089,7 +41112,7 @@ this._deathWatch = (this._deathWatchStack || []).length
           if (!isMainPhase) continue;
         }
 
-        const hasSummoningSickness = inst.turnPlayed === (this.gs.turn || 0);
+        const hasSummoningSickness = inst.turnPlayed === (this.gs.turn || 0) && !this.gs.skillTest;
         const hoptKey = `creature-effect:${inst.id}`;
         const exhausted = this.gs.hoptUsed?.[hoptKey] === this.gs.turn;
         let canActivate = !exhausted && !hasSummoningSickness;
@@ -41141,7 +41164,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     const ps = gs.players[playerIdx];
     if (!ps) return [];
     if (gs.activePlayer !== playerIdx) return [];
-    const isMainPhase = gs.currentPhase === 2 || gs.currentPhase === 4;
+    const isMainPhase = gs.currentPhase === 2 || gs.currentPhase === 4 || !!this.gs.skillTest; // Skill Test: freie Effekte jederzeit im Zug
     if (!isMainPhase) return [];
     const result = [];
     for (let ownerPi = 0; ownerPi < 2; ownerPi++) {
@@ -41319,7 +41342,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (!ps) return [];
     if (this.gs.activePlayer !== playerIdx) return [];
     const currentPhase = this.gs.currentPhase;
-    const isMainPhase = currentPhase === 2 || currentPhase === 4;
+    const isMainPhase = currentPhase === 2 || currentPhase === 4 || !!this.gs.skillTest; // Skill Test: freie Effekte jederzeit im Zug
     if (!isMainPhase) return [];
 
     const result = [];
@@ -41431,7 +41454,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (this.gs.activePlayer !== playerIdx) return [];
     const result = [];
     const currentPhase = this.gs.currentPhase;
-    const isMainPhase = currentPhase === 2 || currentPhase === 4;
+    const isMainPhase = currentPhase === 2 || currentPhase === 4 || !!this.gs.skillTest; // Skill Test: freie Effekte jederzeit im Zug
     const isActionPhase = currentPhase === 3;
     // Chilly Dog (Mischief Militia) lifts the FROZEN-only silence on
     // free-activation Abilities (Inventing, Alchemy, Leadership, …)

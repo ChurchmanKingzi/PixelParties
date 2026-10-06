@@ -158,6 +158,25 @@ function registerLobbyHandlers(socket, deps) {
 
   // Vorbereitungsphase (Platzieren, Recyceln, Ready).
   require('./prep').registerHandlers(socket, { rooms, getUser, host: deps.host });
+
+  // Kampf: Basisangriff per Hero-Klick und „Round beenden".
+  const seatCtx = (roomId) => {
+    const user = getUser();
+    const room = user && rooms.get(roomId);
+    if (!room || !room.skillTest || !room.gameState || !room.gameState.skillTest) return null;
+    const seat = room.gameState.players.findIndex(p => p.userId === user.userId);
+    return seat < 0 ? null : { room, seat };
+  };
+  socket.on('st_attack', ({ roomId, heroIdx } = {}) => {
+    const c = seatCtx(roomId); if (!c) return;
+    require('./rounds').playBaseAttack(c.room, c.seat, heroIdx, deps.host)
+      .catch(err => console.error('[skilltest] st_attack:', err && err.message));
+  });
+  socket.on('st_pass_round', ({ roomId } = {}) => {
+    const c = seatCtx(roomId); if (!c) return;
+    require('./rounds').passRound(c.room, c.seat, deps.host)
+      .catch(err => console.error('[skilltest] st_pass_round:', err && err.message));
+  });
 }
 
 // ── Vorbereitung / Sitzverlust (Platzhalter bis prep.js steht) ─────
@@ -165,6 +184,30 @@ function registerLobbyHandlers(socket, deps) {
 async function startPrep(room, host) {
   const prep = require('./prep');
   return prep.start(room, host);
+}
+
+/** Spielereignisse, vor denen die Phase eingestellt wird (alle Handler mit Aktions-/Effektcharakter). */
+const GAMEPLAY_EVENTS = new Set([
+  'play_spell', 'play_creature', 'activate_ability', 'activate_hero_effect', 'activate_creature_effect', 'activate_area_effect',
+  'play_artifact', 'use_potion', 'confirm_potion', 'use_artifact_effect', 'activate_free_ability', 'activate_equip_effect',
+  'activate_discard_effect', 'activate_permanent', 'play_surprise', 'play_ability', 'summon_ushabti',
+  'play_from_coolness_stack', 'activate_hand_card', 'trigger_treacherous_crystal', 'ascend_hero',
+]);
+const isGameplayEvent = (e) => GAMEPLAY_EVENTS.has(e);
+function setPhaseFor(room, pi, event, params) { return require('./rounds').setPhaseFor(room, pi, event, params); }
+
+/** Zugwächter (siehe rounds.act). */
+function act(room, pi, kind, params, fn, host) { return require('./rounds').act(room, pi, kind, params, fn, host); }
+
+/** Einen Bot-Zug mit kurzer Denkpause einplanen. */
+function scheduleBotTurn(room, seat, host, opts = {}) {
+  const gs = room.gameState, st = gs && gs.skillTest;
+  if (!st || gs.result) return;
+  const delay = opts.forced ? 50 : (opts.delayMs ?? 700);
+  setTimeout(() => {
+    if (!room.gameState || room.gameState.result || room.gameState.activePlayer !== seat) return;
+    require('./bot').takeTurn(room, seat, host, opts).catch(err => console.error('[skilltest] Bot-Zug:', err && err.stack || err));
+  }, delay);
 }
 
 /** Wiederverbinden (auth/join_room): Sicht der aktuellen Phase erneut senden. */
@@ -198,7 +241,7 @@ function onSeatLeft(room, user, socket, host) {
 }
 
 module.exports = {
-  PHASES, startPrep, onSeatLeft, onRejoin,
+  PHASES, startPrep, onSeatLeft, onRejoin, act, scheduleBotTurn, isGameplayEvent, setPhaseFor,
   buildRoomConfig, isSkillTestRoom, isLobbyPhase, summary, seatsOf,
   makeCpuSeat, registerLobbyHandlers,
 };

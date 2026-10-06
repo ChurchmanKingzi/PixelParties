@@ -5119,6 +5119,7 @@ function sendGameState(room, playerIdx, extra) {
         const key = `${physicalSide}-${inst.heroIdx}-${inst.zoneSlot}`;
         const hasCounters = Object.keys(inst.counters).length > 0;
         const hasSummoningSickness = inst.turnPlayed === currentTurn
+          && !room.gameState?.skillTest   // Skill Test: kein Beschwörungs-Schlaf
           && !inst.counters?._hasHaste
           // Chilly Dog (Mischief Militia) lifts summoning sickness for
           // Frozen Creatures the same player controls — the haste
@@ -5835,6 +5836,7 @@ function sendSpectatorGameState(room) {
         const key = `${physicalSide}-${inst.heroIdx}-${inst.zoneSlot}`;
         const hasCounters = Object.keys(inst.counters).length > 0;
         const hasSummoningSickness = inst.turnPlayed === currentTurn
+          && !room.gameState?.skillTest   // Skill Test: kein Beschwörungs-Schlaf
           && !inst.counters?._hasHaste
           // Chilly Dog (Mischief Militia) lifts summoning sickness for
           // Frozen Creatures the same player controls — the haste
@@ -7755,7 +7757,7 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
     room.engine.bonusAktionFuer(pi, heroIdx, charmedOwner ?? pi)
     || ((ps._bonusMainActions || 0) > 0 && actionsPlayedThisPhase === 1)
   );
-  const actionAlreadyUsed = isActionPhase && (ps.heroesActedThisTurn?.length > 0) && !hasBonusAction;
+  const actionAlreadyUsed = isActionPhase && room.engine.mainActionSpent(pi, heroIdx) && !hasBonusAction;
   // Reaction-subtype Spells / Attacks / Creatures are exempt from the
   // action-economy machinery — they never consume an action slot, never
   // burn an additional-action provider, and never bump
@@ -8790,7 +8792,7 @@ async function doActivateCreatureEffect(room, pi, { heroIdx, zoneSlot, charmedOw
   // Frozen own-controlled Creature, mirroring the engine helper —
   // this catches puzzle-mode boards where Chilly Dog spawned
   // pre-frozen-sick allies without firing the haste-grant hook.
-  if (inst.turnPlayed === (gs.turn || 0) && !inst.counters?._hasHaste) {
+  if (inst.turnPlayed === (gs.turn || 0) && !gs.skillTest && !inst.counters?._hasHaste) {
     const ctrlForCD = inst.controller ?? inst.owner;
     const chillyDogLiftsSickness = inst.counters?.frozen
       && ctrlForCD === pi
@@ -9469,7 +9471,7 @@ async function doPlayCreature(room, pi, { cardName, handIndex, heroIdx, zoneSlot
     room.engine.bonusAktionFuer(pi, heroIdx, charmedOwner ?? pi)
     || ((ps._bonusMainActions || 0) > 0 && actionsPlayedThisPhase === 1)
   );
-  const actionAlreadyUsed = isActionPhase && (ps.heroesActedThisTurn?.length > 0) && !hasBonusAction;
+  const actionAlreadyUsed = isActionPhase && room.engine.mainActionSpent(pi, heroIdx) && !hasBonusAction;
   if ((isMainPhase || actionAlreadyUsed) && !usingAdditional && !isInherentAction && !isReactionSubtype) {
     // Feinaufschlüsselung: WARUM stand keine Aktion zur Verfügung?
     // Trennt "Main Phase ohne Grant" von "Aktion schon verbraucht"
@@ -10060,7 +10062,7 @@ async function doActivateAbility(room, pi, { heroIdx, zoneIdx, zoneKind, charmed
     || ((actingPs._bonusMainActions || 0) > 0 && actionsPlayedThisPhase === 1)
   );
   const actionAlreadyUsed = isActionPhase
-    && (actingPs.heroesActedThisTurn?.length > 0)
+    && room.engine.mainActionSpent(pi, heroIdx)
     && !hasBonusActionAlready;
   const needsAdditional = isMainPhase || actionAlreadyUsed;
   let consumedAdditionalInst = null;
@@ -10527,7 +10529,7 @@ async function doActivateHeroEffect(room, pi, { heroIdx, charmedOwner, chosenEff
         const actionsPlayed = actingPs._actionsPlayedThisPhase || 0;
         const hasBonus = room.engine.bonusAktionFuer(pi, heroIdx, charmedOwner ?? pi)
           || ((actingPs._bonusMainActions || 0) > 0 && actionsPlayed === 1);
-        const actionAlreadyUsed = (actingPs.heroesActedThisTurn?.length > 0) && !hasBonus;
+        const actionAlreadyUsed = room.engine.mainActionSpent(pi, heroIdx) && !hasBonus;
         if (actionAlreadyUsed) {
           // Action 2+ in Action Phase — needs a matching additional-
           // action provider, otherwise activation is illegal.
@@ -13676,6 +13678,20 @@ io.on('connection', (socket) => {
       sendGameStateErzwungen(room, pi);
     }, AKTION_VERWORFEN_NACH_MS);
   });
+  // Skill Test: vor jedem Spielereignis die zur Aktion passende Phase einstellen
+  // (Main für freie Effekte, Action für die Haupt-Aktion) — siehe skilltest/rounds.js.
+  socket.use(([event, params], next) => {
+    try {
+      if (currentUser && params && params.roomId && skillTest.isGameplayEvent(event)) {
+        const room = rooms.get(params.roomId);
+        if (room && room.skillTest && room.gameState) {
+          const pi = room.gameState.players.findIndex(ps => ps.userId === currentUser.userId);
+          if (pi >= 0) skillTest.setPhaseFor(room, pi, event, params);
+        }
+      }
+    } catch (e) { console.error('[skilltest] Phasen-Middleware:', e && e.message); }
+    next();
+  });
   const socketIP = getSocketIP(socket);
   social.onConnection(socket);
 
@@ -14466,6 +14482,7 @@ io.on('connection', (socket) => {
     if (!currentUser) return;
     const room = rooms.get(roomId);
     if (!room?.engine || !room.gameState) return;
+    if (room.skillTest) return; // Skill Test: Züge laufen über die Rounds
     const pi = room.gameState.players.findIndex(ps => ps.userId === currentUser.userId);
     if (pi < 0) return;
     if (targetPhase !== undefined) {
@@ -14607,7 +14624,7 @@ io.on('connection', (socket) => {
     // gesperrt (Als Befund 5.8., Spam-Klick).
     if (room.gameState._chainResolvingLock
         || room.gameState._forceDiscardLock === pi) return;
-    doActivateAbility(room, pi, params).catch(err => console.error('[activate_ability]', err.message)).finally(() => room.engine?._runPostChainActions?.());
+    stAct(room, pi, 'activate_ability', params, () => doActivateAbility(room, pi, params)).catch(err => console.error('[activate_ability]', err.message)).finally(() => room.engine?._runPostChainActions?.());
   });
 
   // Activate a free-activation ability (no action cost, Main Phase only)
@@ -14667,7 +14684,7 @@ io.on('connection', (socket) => {
     // gesperrt (Als Befund 5.8., Spam-Klick).
     if (room.gameState._chainResolvingLock
         || room.gameState._forceDiscardLock === pi) return;
-    doActivateHeroEffect(room, pi, params).catch(err => console.error('[activate_hero_effect]', err.message));
+    stAct(room, pi, 'activate_hero_effect', params, () => doActivateHeroEffect(room, pi, params)).catch(err => console.error('[activate_hero_effect]', err.message));
   });
 
   // ── ACTIVE CREATURE EFFECTS ──
@@ -14693,7 +14710,7 @@ io.on('connection', (socket) => {
     // gesperrt (Als Befund 5.8., Spam-Klick).
     if (room.gameState._chainResolvingLock
         || room.gameState._forceDiscardLock === pi) return;
-    doActivateCreatureEffect(room, pi, params).catch(err => console.error('[activate_creature_effect] error:', err.message));
+    stAct(room, pi, 'activate_creature_effect', params, () => doActivateCreatureEffect(room, pi, params)).catch(err => console.error('[activate_creature_effect] error:', err.message));
   });
 
   // Treacherous Crystal — explicit trigger emitted when the player
@@ -14819,7 +14836,7 @@ io.on('connection', (socket) => {
         };
       }
     }
-    doPlayCreature(room, pi, params)
+    stAct(room, pi, 'play_creature', params, () => doPlayCreature(room, pi, params))
       .catch(err => console.error('[play_creature] error:', err.message))
       .finally(() => {
         // Clear any stale cross-side hint — if the play was negated /
@@ -14844,7 +14861,7 @@ io.on('connection', (socket) => {
     if (!room?.gameState) return;
     const pi = room.gameState.players.findIndex(ps => ps.userId === currentUser.userId);
     if (pi < 0) return;
-    doPlaySpell(room, pi, params).catch(err => console.error('[play_spell] error:', err.message)).finally(() => room.engine?._runPostChainActions?.());
+    stAct(room, pi, 'play_spell', params, () => doPlaySpell(room, pi, params)).catch(err => console.error('[play_spell] error:', err.message)).finally(() => room.engine?._runPostChainActions?.());
   });
 
   // Play an artifact from hand
@@ -18673,11 +18690,22 @@ function handleLeaveRoom(socket, roomId, user) {
 // Schnittstelle, über die die Skill-Test-Module (skilltest/*.js) an die
 // Server-Interna kommen, ohne server.js zu importieren (kein Zirkelbezug).
 const skillTestHost = {
-  io, rooms, activeGames,
+  io, rooms, activeGames, db, GameEngine,
   get sanitizeRoom() { return sanitizeRoom; },
   get getRoomList() { return getRoomList; },
+  get setupGameState() { return setupGameState; },
+  get sendGameState() { return sendGameState; },
+  get sendSpectatorGameState() { return sendSpectatorGameState; },
+  get doPlaySpell() { return doPlaySpell; },
+  get doActivateCreatureEffect() { return doActivateCreatureEffect; },
+  get doActivateHeroEffect() { return doActivateHeroEffect; },
   destroyRoom: (id) => destroyRoom(id),
+  scheduleBotTurn: (room, seat, opts) => skillTest.scheduleBotTurn(room, seat, skillTestHost, opts),
 };
+// Zugwächter des Skill-Test-Modus um die normalen Aktions-Handler (in anderen Modi ein Durchgriff).
+function stAct(room, pi, kind, params, fn) {
+  return room.skillTest ? skillTest.act(room, pi, kind, params, fn, skillTestHost) : fn();
+}
 
 function getRoomList() {
   return Array.from(rooms.values())
@@ -20898,6 +20926,8 @@ if (process.env.PP_TRAIN) {
   runTrainingBatch()
     .then(() => process.exit(0))
     .catch(err => { console.error('[train] batch failed:', err); process.exit(1); });
+} else if (process.env.PP_ST_SIM === '1') {
+  // Skill-Test-Simulation (skilltest/sim.js): Modul nur laden, nichts starten.
 } else if (_nbEnv('PP_NETTEST', '') === '1') {
   // Bandbreiten-Messstand — wie der Trainingslauf ohne Datenbank und
   // ohne Socket-Server. Siehe den Block bei runNetBenchmark().
@@ -21027,3 +21057,6 @@ initDatabase().then(async () => {
   console.error('[DB] Failed to initialize database:', err);
   process.exit(1);
 });
+
+// Für die Headless-Simulation des Skill-Test-Modus (skilltest/sim-bridge.js; PP_ST_SIM=1).
+module.exports = { skillTestHandlers: { doPlaySpell, doActivateCreatureEffect, doActivateHeroEffect, setupGameState } };
