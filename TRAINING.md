@@ -357,6 +357,191 @@ Neue Protection-Karten: nur protMeta im Prompt + cpuResponse-Dreizeiler.
 7/7 Unit-Tests; Live-Beweis: 5 Entscheidungen/Spiel mit gemischten
 Armen in Idej Illusions.
 
+## Area-Abräumungs-Lernkanal (Form 7, Als Auftrag 6.10.)
+
+Anlass: Es gibt Situationen, Karten und ganze Decks, in denen es richtig
+ist, **eigene** Areas zu zerstören — Pressure Projectile, Hammer Skeleton
+und Excavator Bucket sind nur die ersten Karten, die es erlauben. Drei
+Gründe, alle lernbar statt hartverdrahtet. Zwei davon werden **gemessen**
+statt aus Karteneigenschaften geschätzt (Als Auftrag 6.10., 2. Runde:
+„die Approximationen reichen nicht"):
+
+| Grund | Tag | Quelle |
+|---|---|---|
+| die Area hilft dem Gegner auch / mehr | `net:opp++ · opp · 0 · own · own++` | **gemessen** (`nv`, s. u.): Eval mit Area minus Eval ohne Area, aus Sicht des Wählers; positiv = die Area hilft MIR |
+| | `fit:opp>own · eq · own>opp` | Näherung: Summe der Ability-Stufen in den Schulen der Area (`spellSchool1/2`) — bleibt als Hypothese neben der Messung, gilt auch ohne Messlauf |
+| man will eine ANDERE Area ausspielen | `hand:none · hand:stuck · swap:- · 0 · + · ++ · hand:ready` | eine Familie, die einander ausschließt: keine andere Area / nicht spielbar (kein Held kann sie jetzt wirken) / spielbar mit **gemessenem** Tauschwert (`sw`) / spielbar, ungemessen |
+| eigene Effekte triggern/skalieren beim Abräumen | `board:<Name>` (offen), `dpa:0/1-2/3+` | eigenes Brett (Helden, Support, Abilities); Areas in der eigenen Ablage |
+| Areas, die generell weg sollen | `Name@own` · `Name@opp` | Identität je Seite (das Profil gehört einem Deck — dort lernbar) |
+
+Dazu die Lage-Tags der anderen Formen (`st:*`) und `areas:own/opp:N`.
+
+**Die Messung (`measureAreaValues` in `_cpu.js`).** Das statische Eval kennt
+die Wirkung nur bei drei von 45 Areas (`cpuMeta`); ein Rollout spielt sie
+dagegen wirklich. Einmal je LIVE-Zug, am Zugbeginn (Main 1, außerhalb jeder
+Kartenauflösung — mitten in einem Prompt zu simulieren hieße, Zustand
+wegzusnapshotten, während die Karte schwebt), rechnet die CPU je Area auf dem
+Brett:
+
+- **Basis** — `snapshot → rolloutRestOfTurn → evaluateState → restore`, nichts verändert
+- **gesperrt** — Area per `removeArea` (ohne Schutzfenster) weg, Area-Karten der Hand aus der Hand genommen
+- **frei** — Area weg, Hand wie sie ist (nur, wenn eine andere Area spielbar auf der Hand liegt)
+
+`nv = Basis − gesperrt` (Nutzen der Area für mich), `sw = frei − gesperrt`
+(was die CPU durch das Nachlegen gewinnt — nach IHRER Bewertung; negativ, wenn
+Nachlegen schlechter wäre als gar nichts, ≈0, wenn sie die Karte nicht spielen würde). Ergebnis: `engine._areaNet = { turn, pi, nv, sw }`,
+Schlüssel `Name@own|opp`. Die Entscheidung selbst bleibt synchron und liest
+nur den Stempel (höchstens zwei Halbzüge alt); der Recorder schreibt ihn roh
+in die Zeile.
+
+Drei Dinge, die der Ende-zu-Ende-Lauf erzwungen hat (erste Fassung: Werte
+zwischen −51838 und +873, dazwischen die ±100000 der Spielende-Werte):
+
+1. **Gleicher Zufall für alle Läufe einer Wiederholung** (Seed je Wiederholung
+   und Zug, `Math.random` nur während des Laufs ersetzt) — ohne das misst man
+   das Würfeln, nicht die Area.
+2. **Gepaarte Differenzen, Median über `PP_AREA_NET_REPS` (3), gekappt auf
+   ±`PP_AREA_NET_KAPPE` (2000)** — robust gegen den Lauf, in dem zufällig ein
+   Held stirbt; 》entscheidet das Spiel im Horizont《 landet in der äußeren Stufe.
+3. **Skala gemessen, nicht angenommen:** echte Unterschiede lagen bei einigen
+   hundert bis wenigen tausend Eval-Punkten (Blood Rock eigen: +1125/+2192),
+   nicht bei HP-Größen. Stufen: ±120 / ±600 (`NV_GRENZEN`). Gemessene Tauschwerte streuen im
+   Lauf-zu-Lauf-Vergleich noch um einige hundert Punkte (−437 … +158 im Test);
+   deshalb bucketet der Trainer grob und verlangt das Welch-Gate.
+
+Während der Messung ist das Gelernte aus dem Eval ausgeblendet
+(`messZustand.blockLearned`), sonst flösse es in die Größe zurück, aus der es
+gelernt wird. Läuft nur, wenn eine Area liegt UND (Datensammlung des gepinnten
+Spielers ODER das Profil hat `net:*`/`swap:*`-Regeln). Kosten: je Zug
+`reps × (1 + Areas × (1 + [1]))` Rollouts mit `PP_AREA_NET_HORIZON` (2) Zügen —
+nur in Zügen mit Area auf dem Brett. Knöpfe: `PP_AREA_NET=0` (aus).
+
+**Drei Teile, ein gemeinsames Vokabular** (`cards/effects/_area-removal-shared.js`
+— Trainer und Laufzeit leiten die Tags aus DERSELBEN Funktion ab):
+
+- **Recorder** (`_decision-log.js`): steht bei einer Zielwahl eine Area zur
+  Wahl, schreibt die Zeile den ROHEN Kontext (`ar`: eigene/gegnerische
+  Areas, Area-Karten auf der Hand und welche davon spielbar sind (`hC`),
+  eigenes Brett, Schul-Stärken, Areas in der Ablage, gemessene `nv`/`sw`)
+  VOR der Antwort mit. Abgeleitet wird erst im Trainer.
+- **Trainer** (`scripts/decision-channels.js`, FORM 7): Einheit ist das Paar
+  (Entscheidung × angebotene Area), Kontrast 》diese Area abgeräumt《 gegen
+  》gar nichts abgeräumt《 (Zeilen, in denen statt ihrer eine andere Area
+  gewählt wurde, zählen nicht in ihren Nicht-gewählt-Arm — im Synthetik-
+  Test erbte sonst eine gegnerische Area das Delta einer eigenen). Gelernt
+  wird getrennt je Seite: Identität, Grundrate, additive Tag-Deltas mit
+  Welch-Gate (Floor 3,5 Punkte; offener Raum `board:` strenger, T ≥ 3).
+  Breiteres Prävalenzband (0,03–0,97), weil die Exploration die Wahlrate
+  festlegt. Zeilen mit gemischter Wahl (Ausrüstung ODER Area) zählen nicht.
+  Ausgabe: `profile.areaRemovalRules = { ident, base, tags }`.
+- **Laufzeit** (`_deck-profile.js`): `areaRemovalChoice` (Regel > Exploration
+  > kein Urteil) hängt in der CPU-Zielwahl vor dem Default-Picker, auch im
+  Rollout (ohne Exploration); `areaStandingValue` ist ein Eval-Term (nur
+  die gelernte Identität, halbiert, je Area ±10, Confidence-skaliert) —
+  ohne ihn sähe die Suche nie einen Nutzen im Abräumen, und die
+  Aktivierungs-Gates von Hammer Skeleton & Co. würden nie committen. Ohne
+  Training sind beide neutral (Altverhalten).
+
+**Warum die Exploration unverzichtbar ist:** Die CPU lehnt abbrechbare
+Area-Fragen per Default immer ab. Ohne bewusstes Abräumen gäbe es keinen
+》abgeräumt《-Arm, der Trainer sähe nur Nullen. In der Datensammlung
+(`PP_TRAIN=1`, nicht EVAL/AB, nur der gepinnte Spieler, nie im Rollout) wird
+mit `PP_AREA_EXPLORE` (Default 0,5; mit vorhandener Regel `PP_RULE_EXPLORE`)
+gleichmäßig aus 》ablehnen《 und allen angebotenen Areas gezogen.
+Exploriert wird nur bei REINEN Area-Fragen; gemischte Fragen entscheidet
+die Karte (Pressure Projectile ruft `areaRemovalChoice` selbst auf, wenn
+keine Ausrüstung im Angebot ist oder eine Regel existiert; ein gelernter
+Area-Wert ≥ 8 schlägt die Ausrüstung).
+
+**Neue Karte, die Areas abräumt:** nichts zu tun. Die Karte bietet ihre
+Areas als Ziele vom `type: 'area'` an (`areaTargetId`, `cardName`) und
+bleibt abbrechbar — Recorder, Exploration, Regel und Eval greifen von
+selbst. Karten mit eigenem `cpuResponse` für gemischte Fragen rufen
+`deckProfile.areaRemovalChoice` für den Area-Teil.
+
+**Prüfung (Synthetik, 900 Spiele mit eingebautem Signal):** gelernt wurden
+`Bar@opp`, `net:opp` +, `net:own++` −, `swap:++` + (die Hand-Familie zählt
+nicht doppelt); die gegnerische Seite blieb frei von Tag-Rauschen, und die
+Negativkontrolle (Ausgang reiner Zufall) erzeugte KEINE Regel.
+
+## Ability-Wertigkeit und „Compulsory Body Swap" (Form 8, Als Auftrag 6.10.)
+
+**Befund vorab:** Die Mechanismen, die Ability-Wertigkeiten bewerten und im
+Spiel mitlernen, gab es NICHT. Vorhanden waren nur (a) im Eval
+`15 × (eigene − gegnerische Ability-KARTEN)`, flach und mit toten Helden,
+plus `cpuMeta.engineValue` (Divinity 120/Stufe), (b) `abilityPriors` — sie
+lernen, WO eine Ability liegt, nicht, wie viel sie wert ist, und (c) keinerlei
+Nutzungszähler (das `actionLog` ist in Simulationen und im Self-Play-Fast-
+Mode leer). Alles Folgende ist neu; gemeinsames Modul:
+`cards/effects/_ability-worth-shared.js`.
+
+**Das Modell.** Wert einer Ability A in der Hand von Spieler P, je Stufe:
+`(base(A) · nutzung(P,A) + engineValue(A)) · mult(A)`, über die LEBENDEN Helden
+summiert; die Stufen derselben Ability auf mehreren Helden zählen nach Stufe
+absteigend mit ρ^j (ρ = 0,5).
+
+| Baustein | Quelle |
+|---|---|
+| `base` | 15 je Stufe (= der alte flache Wert) + **gelernte** Abweichung je Ability und Halter (`profile.abilityWorthRules`, Form 8), confidence-skaliert, auf 4…60 geklemmt |
+| `nutzung` | **dynamisch im laufenden Spiel:** `1 + γ·(1 − e^(−r/r0))`, `r` = Nutzungen/(eigene Züge+1). Gezählt in `engine.log` (vor dem Fast-Mode-Ausstieg, Rollouts zählen nicht): Casts zählen für JEDE Schule der Karte (`spellSchool1/2`), Aktivierungen für die Ability selbst. Die Nutzung des anderen Spielers zählt zu 50 % mit — sie ist Beweis für den Wert, auch wenn die Ability gerade woanders liegt |
+| Redundanz | je weiterer lebender Held mit derselben Ability ρ^j; Stapel auf EINEM Helden (Stufe 1→3) bleiben unberührt |
+| `mult` | Divinity ×3 (Vorgabe), gilt für den ganzen Wert inklusive `engineValue` |
+
+Casting-Schulen und Support-Abilities (Alchemy, Leadership, …) stehen auf
+derselben Skala. Was sie unterscheidet, sind gemessene Nutzung und gelernter
+Wert, keine von Hand gesetzte Rangfolge.
+
+**Eval.** Der flache Term ist ersetzt: `sideValue(ich) − sideValue(Gegner)`.
+Ohne Nutzung, ohne Profil und mit einem Helden je Ability entspricht das dem
+alten Wert (15/Stufe + engineValue); der Unterschied entsteht genau durch
+Nutzung, Redundanz, Divinity ×3, tote Helden (zählen nicht mehr) und das
+Gelernte. `PP_ABILITY_WORTH=0` stellt den alten Term wieder her (A/B),
+`PP_ABILITY_WORTH_LEARNED=0` blendet nur das Gelernte aus. **Nicht gemessen:**
+ob der neue Term die Spielstärke verändert — der Spiegel-A/B (`PP_TRAIN_AB`)
+kann ihn nicht trennen, weil der Schalter global ist; ein Vergleich braucht
+zwei Läufe (`PP_ABILITY_WORTH=0` gegen Standard) auf demselben Gegnerpool.
+Bestehende Profile wurden auf dem alten Eval kalibriert.
+
+**Compulsory Body Swap (CPU).** `swapGain` bewertet jedes Paar lebender Helden
+(auch eigen↔eigen, gegnerisch↔gegnerisch):
+`(Δ meine Abilities − Δ Abilities des Gegners) + (Δ Fit ich − Δ Fit Gegner) + Zusatz-Aktion`.
+
+- **Fit** = was die Karten in der Hand des NEUEN Besitzers mit dem neuen Satz
+  tun können (spielbar werden / bleiben, Kartenstufe × 25 in der Hand, ×12 im
+  Deck; beim Gegner statt des Decks seine bekannten Stapel). Das ist der Bonus
+  beim Stehlen UND der Malus, wenn dem Gegner eine Schule gegeben wird, die zu
+  seiner Hand besser passt als zu meiner — im Test fiel der Gewinn dadurch von
+  0 auf −150, das Paar wurde verworfen.
+- **Zusatz-Aktion** (+35): nur, wenn der Nutzer im Paar ist UND danach eine
+  Handkarte spielen kann.
+- `cpuPlayVeto`: kein Cast, wenn das beste Paar unter 25 Punkten bleibt.
+  `cpuResponse` wählt das beste Paar und lässt die Wahl sonst abbrechen.
+- Der Zielprompt ist jetzt abbrechbar (Regel für zielende Karten).
+- Das Eval braucht den Fit nicht: Handwert-Gate und Rollout sehen die geänderte
+  Spielbarkeit ohnehin. Im Ende-zu-Ende-Lauf stand die Paarwahl der CPU unter
+  den Body-Swap-Varianten der Suche an der Spitze (−540 gegen −697 … −2955).
+
+**Lernen (Form 8).** Der Recorder schreibt je Zuggrenze einen Ability-
+Schnappschuss beider Seiten (`abilitySnap`: Stufen der lebenden Helden je
+Ability, Nutzungsraten). Der Trainer nimmt je Spiel EINEN Schnappschuss aus
+der Mitte (Zug ≈ 8) — mehrere je Spiel wären keine unabhängigen Belege — und
+kontrastiert 》Ability von lebenden Helden gehalten《 gegen 》nicht gehalten《
+auf den Ausgang (Welch-Gate, Schrumpfung). Ergebnis `abilityWorthRules =
+{ own: {A: pts}, opp: {A: pts} }`; `opp` negativ = bedrohlich in Gegnerhand.
+Fehlt eine eigene Regel, gilt die gedämpfte Gegner-Regel (was ihm nützt und
+mir schadet, ist auch in meiner Hand etwas wert). In der Datensammlung wählt
+die CPU mit `PP_SWAP_EXPLORE` (0,3) ein zufälliges Paar. Synthetik-Test: die
+eingebaute Bedrohung (`Divinity` beim Gegner, −16,7) wurde gelernt, die
+Negativkontrolle (zufälliger Ausgang) erzeugte nichts.
+
+**Ehrliche Grenzen.** (1) `opp[A]` misst auch die Stärke der Decks, die A
+spielen — er ist ein Prior, den die gemessene Nutzung ergänzt, kein
+Naturgesetz. (2) `own[A]` ist nur lernbar, wo es Varianz gibt (ein Deck hält
+seine eigenen Abilities fast immer). (3) γ, r0, ρ, die Fit-Skalen und die
+35 Punkte der Zusatz-Aktion sind Setzungen, nicht gelernt (`DEFAULTS`).
+(4) Eine Ability, die keine Schule ist und passiv wirkt (Toughness, Wealth,
+Resistance), hat keine zählbare Nutzung und läuft über `base` allein.
+
 ## Deck-Telemetrie: PP_DECK_MONITOR=1
 
 Env-gated Ressourcen-Log am Ende jedes CPU-Zugs (in _cpu.js vor dem

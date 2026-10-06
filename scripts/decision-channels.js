@@ -1,6 +1,6 @@
 'use strict';
 // ═══════════════════════════════════════════════════════════════════
-//  DIE SECHS ENTSCHEIDUNGSFORMEN
+//  DIE ENTSCHEIDUNGSFORMEN (1-6, dazu Form 7: Area-Abraeumung, Form 8: Ability-Wertigkeit)
 //
 //  Lernt aus dem generischen `decisions`-Kanal (cards/effects/
 //  _decision-log.js). Eine eigene Datei, weil train-deck-profile.js mit
@@ -42,6 +42,12 @@
 //      Ergebnis steht erst nach dem Gegenzug fest. Der Recorder traegt
 //      es als `r.dEval` nach; hier wird es dem Sofort-Delta VORGEZOGEN.
 //
+//   7. AREA-ABRAEUMUNG (eigene UND gegnerische Areas) → Einheit ist das
+//      Paar (Entscheidung x angebotene Area); Identitaet je Seite plus
+//      additive Lage-Tags (Passung zum Gegner, andere Area auf der Hand,
+//      Karten, die auf Abraeumen reagieren). Siehe FORM 7 unten und
+//      cards/effects/_area-removal-shared.js.
+//
 //  ── EIN ENTWURFSGEWINN, DER BETONT GEHOERT ────────────────────────
 //  Die ZUSTANDS-TAGS werden HIER abgeleitet, nicht beim Aufzeichnen.
 //  Der Recorder schreibt den rohen Zustand (`z`: Zug, Phase, lebende
@@ -68,6 +74,8 @@ const POOL_MIN = 40;
 const SCALE = 120, LIMIT = 20;
 
 // ── Werkzeug ───────────────────────────────────────────────────────
+
+const areaShared = require('../cards/effects/_area-removal-shared.js');
 
 const mittel = (a) => (a.length ? a.reduce((s, x) => s + x, 0) / a.length : 0);
 const varianz = (a, m) => (a.length > 1
@@ -503,6 +511,172 @@ function buildDecisionChannels(spiele, opts = {}) {
     stat.pool = { zeilen: rows.length, quellen: Object.keys(poolFeatureRules).length };
   }
 
+  // ═════════════════════════════════════════════════════════════════
+  //  FORM 7 — AREA-ABRÄUMUNG (Als Auftrag 6.10.)
+  // ═════════════════════════════════════════════════════════════════
+  //  „Es gibt Situationen/Karten/ganze Decks, bei denen es sinnvoll ist,
+  //   EIGENE Areas zu zerstören."
+  //
+  //  EINHEIT ist das Paar (Entscheidung × angebotene Area): „wurde DIESE
+  //  Area abgeräumt?" gegen den Ausgang. Die Rechnung ist die von Form 2
+  //  (Verfügbarkeitskontrolle: nur echte Wahlen), aber mit zwei
+  //  Unterschieden, die den Kanal erst tragfähig machen:
+  //    • das ABLEHNEN gehört zur Wahl. Eine abbrechbare Frage hat immer
+  //      die Alternative 》nichts abräumen《; deren Zeilen stehen im
+  //      Nicht-gewählt-Arm — ohne sie gäbe es keine Grundrate.
+  //    • IDENTITÄT ist lernbar (`Name@own` / `Name@opp`): das Profil gehört
+  //      einem Deck, dort kommt jede Area oft genug vor — anders als bei
+  //      den offenen Pools (Form 5).
+  //
+  //  Gelernt wird getrennt für die EIGENE und die GEGNERISCHE Seite:
+  //    ident[Name@Seite]   — Area, die generell weg soll (oder bleiben soll)
+  //    base[Seite]         — Grundrate 》Area dieser Seite abräumen《
+  //    tags[Seite][Tag]    — situative Deltas, ADDITIV (nie gekreuzt), jedes
+  //                          mit eigenem Welch-Gate: Passung zum Gegner
+  //                          (`fit:*`), eine andere Area auf der Hand
+  //                          (`hand:none|stuck`, `swap:*`, `hand:ready`), gemessener Nutzen der Area (`net:*`), Karten, die auf
+  //                          Abräumen reagieren (`board:<Name>`, `dpa:*`),
+  //                          dazu die Lage (`st:*`).
+  //  Der offene Tag-Raum (`board:<Name>`) vergleicht viele Namen
+  //  und bekommen deshalb die strengere Schwelle.
+  //
+  //  Zeilen, bei denen NICHT-Areas gewählt wurden (gemischte Frage, z. B.
+  //  Pressure Projectile: Ausrüstung ODER Area), zählen nicht — dort
+  //  entschied die Moduswahl, nicht die Area.
+  // Prävalenzband: breiter als bei den übrigen Formen. Wie oft „abgeräumt"
+  // gewählt wird, legt hier die Exploration fest (PP_AREA_EXPLORE verteilt
+  // sie gleichmäßig auf Ablehnen und die Areas) — ein Tag, das nur selten
+  // gewählt wird, ist deshalb kein Mittelwert-Artefakt, sondern Absicht.
+  const AREA_PREV_LO = 0.03, AREA_PREV_HI = 0.97;
+  const areaRemovalRules = {};
+  {
+    const einheiten = [];
+    for (const r of nachArt('target')) {
+      const d = r.d;
+      if (!d.ar || !Array.isArray(d.zl)) continue;
+      const areas = d.zl.filter(k => k && k.k === 'area' && k.c && k.s);
+      if (!areas.length) continue;
+      if ((d.wz || []).some(k => k && k.k !== 'area')) continue;     // Moduswahl, nicht Areawahl
+      // Echte Wahl: Ablehnen möglich ODER mindestens zwei Ziele.
+      if (d.can !== 1 && d.zl.length < 2) continue;
+      const gewaehlt = new Set((d.wz || []).map(k => String(k.id)));
+      for (const k of areas) {
+        // ── Kontrast: 》diese Area abgeräumt《 gegen 》gar nichts abgeräumt《 ──
+        // Wurde statt dieser eine ANDERE Area gewählt, trägt die Zeile deren
+        // Wirkung im Ausgang — für diese Area wäre sie ein verfälschter
+        // Nicht-gewählt-Beleg (im Test: eine gegnerische Area erbte das
+        // Delta einer eigenen). Nur bei Pflichtwahl (kein Ablehnen möglich)
+        // ist 》eine andere《 die einzige Alternative und bleibt im Arm.
+        if (d.can === 1 && gewaehlt.size > 0 && !gewaehlt.has(String(k.id))) continue;
+        einheiten.push({
+          y: r.y, gi: r.gi, seite: k.s, key: `${k.c}@${k.s}`,
+          gew: gewaehlt.has(String(k.id)),
+          tags: r.tags.concat(areaShared.areaTags(d.ar, k.c, k.s, cardDB)),
+        });
+      }
+    }
+    const idRegeln = Object.create(null);
+    const baseRegeln = Object.create(null);
+    const tagRegeln = { own: Object.create(null), opp: Object.create(null) };
+
+    // Identität
+    {
+      const jeKey = Object.create(null);
+      for (const u of einheiten) (jeKey[u.key] = jeKey[u.key] || []).push(u);
+      for (const [key, us] of Object.entries(jeKey)) {
+        const ja = us.filter(u => u.gew), nein = us.filter(u => !u.gew);
+        const prev = us.length ? ja.length / us.length : 0;
+        if (prev > AREA_PREV_HI || prev < AREA_PREV_LO) continue;
+        const pts = kontrast(ja, nein);
+        if (pts !== null) idRegeln[key] = pts;
+      }
+    }
+    // Grundrate und situative Deltas je Seite
+    for (const seite of ['own', 'opp']) {
+      const us = einheiten.filter(u => u.seite === seite);
+      if (us.length < MIN_ARM * 2) continue;
+      // Ohne signifikante Grundrate gilt 0 — die Tags dürfen trotzdem tragen
+      // (der Fall 》meistens nein, aber MIT einer anderen Area auf der Hand
+      // ja《 hebt sich in der Grundrate auf; vgl. Form 1, 》nurBedingt《).
+      const basis = kontrast(us.filter(u => u.gew), us.filter(u => !u.gew)) || 0;
+      if (basis !== 0) baseRegeln[seite] = basis;
+      const alleTags = new Set();
+      for (const u of us) for (const t of u.tags) alleTags.add(t);
+      for (const tag of alleTags) {
+        const mit = us.filter(u => u.tags.includes(tag));
+        const prev = mit.length / us.length;
+        if (prev > AREA_PREV_HI || prev < AREA_PREV_LO) continue;
+        const lift = kontrast(mit.filter(u => u.gew), mit.filter(u => !u.gew),
+          areaShared.istOffen(tag) ? { tMin: 3.0 } : {});
+        if (lift === null) continue;
+        const delta = Math.round((lift - basis) * 10) / 10;
+        if (Math.abs(delta) >= 3.5) tagRegeln[seite][tag] = delta;
+      }
+    }
+    if (Object.keys(idRegeln).length) areaRemovalRules.ident = idRegeln;
+    if (Object.keys(baseRegeln).length) areaRemovalRules.base = baseRegeln;
+    const tr = {};
+    for (const seite of ['own', 'opp']) if (Object.keys(tagRegeln[seite]).length) tr[seite] = tagRegeln[seite];
+    if (Object.keys(tr).length) areaRemovalRules.tags = tr;
+    stat.area = { einheiten: einheiten.length, ident: Object.keys(idRegeln).length,
+      tagsOwn: Object.keys(tagRegeln.own).length, tagsOpp: Object.keys(tagRegeln.opp).length };
+  }
+
+  // ═════════════════════════════════════════════════════════════════
+  //  FORM 8 — ABILITY-WERTIGKEIT (Als Auftrag 6.10., Compulsory Body Swap)
+  // ═════════════════════════════════════════════════════════════════
+  //  Gelernt wird, wie viel eine Ability WERT ist — getrennt danach, wer sie
+  //  hält (`own` / `opp`), als Abweichung in Punkten vom Standardwert (15 je
+  //  Stufe, siehe _ability-worth-shared.js). Laufzeit: `baseFor`.
+  //
+  //  Einheit ist das SPIEL, nicht die Zeile: je Spiel EIN Schnappschuss aus
+  //  der Mitte (Zug ≈ 8, mindestens Zug 3, sonst der späteste), gegen den
+  //  Ausgang. Mehrere Schnappschüsse je Spiel wären keine unabhängigen
+  //  Belege, und frühe zeigen nur das Startdeck. Kontrast 》Ability gehalten
+  //  von LEBENDEN Helden《 gegen 》nicht gehalten《, über `kontrast` (Welch,
+  //  Schrumpfung, Klammer).
+  //    own[A]  Wert, wenn ICH A halte — nur lernbar, wo es Varianz gibt (Held
+  //            stirbt, Ability kommt später): ein Deck hält seine eigenen
+  //            Abilities praktisch immer.
+  //    opp[A]  Wert, wenn der GEGNER A hält (negativ = bedrohlich). Hier
+  //            variiert die Lage mit 37 Gegnerdecks — der Hauptstrom der Daten.
+  //  Ehrliche Grenze: opp[A] misst auch die Stärke der Decks, die A spielen
+  //  (Verwechslung mit dem Deck). Er ist deshalb ein Prior, den die in-game
+  //  gemessene Nutzung ergänzt, kein Naturgesetz.
+  const abilityWorthRules = {};
+  {
+    const rows = [];
+    for (let gi = 0; gi < spiele.length; gi++) {
+      const g = spiele[gi];
+      if (!Array.isArray(g.decisions) || (g.outcome !== 0 && g.outcome !== 1)) continue;
+      let best = null, bestAbstand = Infinity;
+      for (const d of g.decisions) {
+        if (d.a !== 'abilitySnap' || !d.ab) continue;
+        const t = (d.z && d.z.t) || 0;
+        if (t < 3) continue;
+        const abstand = Math.abs(t - 8);
+        if (abstand < bestAbstand) { best = d; bestAbstand = abstand; }
+      }
+      if (best) rows.push({ y: g.outcome, gi, o: best.ab.o || {}, p: best.ab.p || {} });
+    }
+    const own = {}, opp = {};
+    const namen = new Set();
+    for (const r of rows) { for (const a of Object.keys(r.o)) namen.add(a); for (const a of Object.keys(r.p)) namen.add(a); }
+    for (const A of namen) {
+      for (const [seite, ziel] of [['o', own], ['p', opp]]) {
+        const mit = rows.filter(r => (r[seite][A] || []).length > 0);
+        const ohne = rows.filter(r => !(r[seite][A] || []).length);
+        const prev = rows.length ? mit.length / rows.length : 0;
+        if (prev > PREV_HI || prev < PREV_LO) continue;
+        const pts = kontrast(mit, ohne);
+        if (pts !== null) ziel[A] = pts;
+      }
+    }
+    if (Object.keys(own).length) abilityWorthRules.own = own;
+    if (Object.keys(opp).length) abilityWorthRules.opp = opp;
+    stat.abil = { spiele: rows.length, own: Object.keys(own).length, opp: Object.keys(opp).length };
+  }
+
   // ── Bericht ──────────────────────────────────────────────────────
   log(`Entscheidungs-Kanaele: ${stat.zeilen} beschriftete Zeilen`);
   log(`  1 optIn (pro Karte):    ${stat.optIn.zeilen} Zeilen → ${stat.optIn.karten} Karten-Regeln`);
@@ -511,6 +685,9 @@ function buildDecisionChannels(spiele, opts = {}) {
   log(`  3 ordinal (Stufe):      ${stat.ordinal.zeilen} Zeilen → ${stat.ordinal.karten} Karten-Regeln`);
   log(`  4 set (Angebotswert):   ${stat.set.zeilen} Zeilen → ${stat.set.regeln} Quelle→Karte-Regeln`);
   log(`  5 pool (Merkmale):      ${stat.pool.zeilen} Zeilen → ${stat.pool.quellen} Quellen`);
+  log(`  8 ability (Wertigkeit): ${stat.abil.spiele} Spiele → ${stat.abil.own} eigene / ${stat.abil.opp} gegnerische Ability-Werte`);
+  log(`  7 area (Abräumung):     ${stat.area.einheiten} Paare → ${stat.area.ident} Identitäten, `
+    + `${stat.area.tagsOwn} Tags eigene / ${stat.area.tagsOpp} Tags gegnerische Seite`);
 
   const leer = (o) => Object.keys(o).length === 0;
   return {
@@ -520,6 +697,8 @@ function buildDecisionChannels(spiele, opts = {}) {
     ordinalRules: leer(ordinalRules) ? undefined : ordinalRules,
     setOfferRules: leer(setOfferRules) ? undefined : setOfferRules,
     poolFeatureRules: leer(poolFeatureRules) ? undefined : poolFeatureRules,
+    areaRemovalRules: leer(areaRemovalRules) ? undefined : areaRemovalRules,
+    abilityWorthRules: leer(abilityWorthRules) ? undefined : abilityWorthRules,
     decisionStats: stat,
   };
 }

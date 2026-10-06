@@ -2767,6 +2767,115 @@ function targetIntentBonus(engine, pi, cardName, ziel, config = {}) {
   } catch { return 0; }
 }
 
+// ═══════════════════════════════════════════════════════════════════
+//  FORM 7 — AREA-ABRÄUMUNG (Als Auftrag 6.10.)
+//
+//  „Es gibt Situationen/Karten/ganze Decks, bei denen es sinnvoll ist,
+//   EIGENE Areas zu zerstören."
+//
+//  Drei Teile, alle über dasselbe Vokabular (`_area-removal-shared.js`,
+//  Trainer und Laufzeit leiten die Tags aus DERSELBEN Funktion ab):
+//
+//   1. `areaRemovalChoice` — Entscheidung an einer Area-Frage:
+//        gelernte Regel  >  Exploration (nur Datensammlung)  >  null
+//      (null = kein Urteil, das Altverhalten bleibt: abbrechbar → ablehnen).
+//      Ohne die Exploration gäbe es nie einen 》abgeräumt《-Arm — die
+//      CPU lehnte jede abbrechbare Area-Frage ab, der Trainer sähe nur
+//      Nullen und könnte nichts lernen.
+//   2. `areaStandingValue` — Eval-Term: was ist eine stehende Area dem
+//      Brett wert? Ohne ihn sähe die Suche im Rollout nie einen Nutzen
+//      im Abräumen (Hammer Skeleton, Excavator Bucket, Pressure
+//      Projectile blieben ungenutzt) — vgl. `discardPileValue`.
+//   3. der Recorder (`_decision-log.js`) schreibt den Kontext roh mit.
+// ═══════════════════════════════════════════════════════════════════
+
+/** Punktwert, den das Profil dem Abräumen einer angebotenen Area gibt (roh, ohne Confidence). */
+function areaRemovalScore(prof, roh, name, seite, cardDB, stTags) {
+  const regeln = prof?.areaRemovalRules;
+  if (!regeln) return 0;
+  let s = (regeln.ident?.[`${name}@${seite}`] || 0) + (regeln.base?.[seite] || 0);
+  const tg = regeln.tags?.[seite];
+  if (tg) {
+    const shared = require('./_area-removal-shared');
+    for (const t of shared.areaTags(roh, name, seite, cardDB).concat(stTags || [])) s += tg[t] || 0;
+  }
+  return s;
+}
+
+/**
+ * @returns null | { ids: string[], explored: boolean, score: number }
+ *   ids = [] heißt 》nichts abräumen《 (nur bei abbrechbaren Fragen).
+ */
+function areaRemovalChoice(engine, pi, validTargets, config = {}) {
+  try {
+    const areas = (validTargets || []).filter(t => t && t.type === 'area' && !t.ineligible);
+    if (!areas.length) return null;
+    const nurAreas = (validTargets || []).every(t => !t || t.ineligible || t.type === 'area');
+    const kannAblehnen = !!config.cancellable;
+    const prof = profileFor(engine, pi);
+
+    // ── Exploration: nur Datensammlung, nur der gepinnte Spieler, nie im Rollout ──
+    // Gemischte Fragen (Ausrüstung ODER Area) entscheidet die Karte selbst.
+    const sammeln = isCollecting() && !engine._inMctsSim
+      && (engine._decisionPinned == null || engine._decisionPinned === pi);
+    if (sammeln && nurAreas) {
+      const eps = prof?.areaRemovalRules
+        ? parseFloat(process.env.PP_RULE_EXPLORE || '0.15')
+        : parseFloat(process.env.PP_AREA_EXPLORE || '0.5');
+      if (Math.random() < eps) {
+        const optionen = kannAblehnen ? [null, ...areas] : areas;
+        const w = optionen[Math.floor(Math.random() * optionen.length)];
+        return { ids: w ? [w.id] : [], explored: true, score: 0 };
+      }
+    }
+
+    if (!prof?.areaRemovalRules) return null;
+    const shared = require('./_area-removal-shared');
+    const db = engine._getCardDB ? engine._getCardDB() : {};
+    const roh = shared.rohKontext(engine, pi);
+    const st = decisionStateTags(engine, pi);
+    const conf = confidence(prof);
+    let best = null, bestS = -Infinity;
+    for (const t of areas) {
+      const seite = t.owner === pi ? 'own' : 'opp';
+      const sc = areaRemovalScore(prof, roh, t.cardName || t.name, seite, db, st) * conf;
+      if (sc > bestS) { bestS = sc; best = t; }
+    }
+    if (!best) return null;
+    if (bestS >= 3) return { ids: [best.id], explored: false, score: bestS };
+    if (!nurAreas) return null;                       // gemischte Frage: kein Urteil
+    if (kannAblehnen) return { ids: [], explored: false, score: bestS };
+    return { ids: [best.id], explored: false, score: bestS };   // Pflichtwahl: die schadloseste
+  } catch { return null; }
+}
+
+/**
+ * Eval-Term: Wert der stehenden Areas aus Sicht von `pi` (positiv = gut für `pi`).
+ * Nur der gelernte IDENTITÄTS-Anteil, halbiert und je Area auf ±10 geklemmt:
+ * der Kanal misst den Wert des ABRÄUMENS, der Stehwert ist sein Gegenstück.
+ * Ohne Training 0 — nichts am bestehenden Verhalten kippt.
+ */
+function areaStandingValue(engine, pi) {
+  try {
+    // Während der Messung (`measureAreaValues`) zählt das Gelernte nicht mit:
+    // sonst flösse es in die Größe zurück, aus der es gelernt wird.
+    if (require('./_area-removal-shared').messZustand.blockLearned > 0) return 0;
+    const prof = profileFor(engine, pi);
+    const ident = prof?.areaRemovalRules?.ident;
+    if (!ident) return 0;
+    const conf = confidence(prof);
+    let total = 0;
+    for (let owner = 0; owner < 2; owner++) {
+      const seite = owner === pi ? 'own' : 'opp';
+      for (const name of (engine.gs?.areaZones?.[owner] || [])) {
+        const r = ident[`${name}@${seite}`];
+        if (typeof r === 'number') total -= Math.max(-10, Math.min(10, r * conf * 0.5));
+      }
+    }
+    return total;
+  } catch { return 0; }
+}
+
 /**
  * FORM 3 — ORDINAL (》wie viel《). Liefert den Index der Option, die der
  * gelernten Zielstufe am naechsten kommt, oder null.
@@ -3413,5 +3522,9 @@ module.exports = {
   abilityCostDecision,
   abilityCostPick,
   noteAbilityCostChoice,
+  areaRemovalChoice,
+  areaStandingValue,
+  isCollecting,
+  profileConfidence: confidence,
   __getProfile: profileFor,
 };

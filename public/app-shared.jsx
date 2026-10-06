@@ -2825,6 +2825,12 @@ const ZONE_ANIM_SFX = {
     { name: 'heavy_impact',  opts: { rate: 0.45, volume: 1.8, delay: 2150 } },
     { name: 'status_remove', opts: { rate: 0.7, volume: 1.4, delay: 3300 } },
   ],
+  // Pressure Projectile (0,72 s): Luft pfeift, dumpfer Knall beim Zerplatzen (~330 ms), Karte fliegt weg.
+  pressure_shatter:       [
+    { name: 'elem_wind',     opts: { rate: 1.5, volume: 1.2, delay: 0 } },
+    { name: 'heavy_impact',  opts: { rate: 1.2, volume: 1.5, delay: 320 } },
+    { name: 'ping',          opts: { rate: 0.7, volume: 0.8, delay: 330 } },
+  ],
   // Acid / poison (poison has its own sound per user)
   acid_splash:             { name: 'elem_acid' },
   plague_smoke:            { name: 'poison' },

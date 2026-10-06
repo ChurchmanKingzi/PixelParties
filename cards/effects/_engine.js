@@ -47837,6 +47837,12 @@ this._deathWatch = (this._deathWatchStack || []).length
   // ─── LOGGING ──────────────────────────────
 
   log(type, data) {
+    // Ability-Nutzung zählen (Body-Swap-Wertigkeit, `_ability-worth-shared.js`):
+    // VOR dem Fast-Mode-Ausstieg, denn Self-Play läuft komplett im Fast Mode und
+    // das actionLog bliebe dort leer. Rollouts zählen nicht (`_inMctsSim`).
+    if (type === 'spell_played' || type === 'creature_summoned' || type === 'ability_activated') {
+      require('./_ability-worth-shared').noteUsage(this, type, data);
+    }
     if (this._fastMode) return; // Skip logging during simulations — huge perf win.
     const entry = { id: ++this.eventId, type, turn: this.gs.turn, phase: PHASE_NAMES[this.gs.currentPhase || 0], ...data };
     this.actionLog.push(entry);

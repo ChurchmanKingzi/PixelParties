@@ -559,6 +559,8 @@ async function runCpuTurn(engine, helpers) {
         bucket: deckProfile.standingBucketFromEval(engine, cpuIdx, ev),
       };
     } catch { engine._standingBucket = null; }
+    // Area-Werte messen (Nutzen der Area, Tauschwert) — siehe measureAreaValues.
+    await measureAreaValues(engine, helpers, cpuIdx);
     // DEBUG: force-add Yeeting on the CPU's 2nd LIVE turn. Live-only so
     // nested-rollout re-entries don't double-stamp. Tracked on the engine
     // (not the player state) so snapshot/restore inside MCTS doesn't
@@ -6841,8 +6843,17 @@ function installCpuBrain(engine) {
           }
         }
       }
+      // ── Area-Abräumung (Form 7) ───────────────────────────────────────
+      // Greift auch im Rollout (ohne Exploration): ohne gelernte Antwort
+      // lehnte die Suche jede abbrechbare Area-Frage ab und sähe nie, was
+      // das Abräumen bringt. `[]` ist eine gültige Antwort (nichts abräumen).
+      let areaPick = null;
+      if (cardPick === undefined && !scriptedPick) {
+        const _ar = deckProfile.areaRemovalChoice(engine, playerIdx, validTargets, config);
+        if (_ar) areaPick = _ar.ids;
+      }
       const picked = (cardPick !== undefined) ? cardPick
-        : (scriptedPick || priorPick || engine._getCpuTargetResponse(validTargets, config, playerIdx));
+        : (scriptedPick || areaPick || priorPick || engine._getCpuTargetResponse(validTargets, config, playerIdx));
       // Log-Stempel für den Recorder (record.targetPicks): die FINALE
       // Wahl, egal welcher Pfad sie traf — klassifiziert als Tags.
       try {
@@ -11687,6 +11698,13 @@ function evaluateState(engine, cpuIdx) {
     score -= deckProfile.discardPileValue(engine, oppIdx);
   } catch { /* defensiv */ }
 
+  // ── Gelernter Area-Stehwert (Form 7, Als Auftrag 6.10.) ─────────
+  // Was eine stehende Area dem Brett wert ist, kommt aus dem Wert des
+  // ABRÄUMENS (Identität je Seite). Ohne Training 0.
+  try {
+    score += deckProfile.areaStandingValue(engine, cpuIdx);
+  } catch { /* defensiv */ }
+
   // ── Once-per-game spend cost ────────────────────────────────────
   // Generic "this card carries a finite, high-impact effect that's
   // gone once fired" eval term. Cards opt in via:
@@ -11840,49 +11858,45 @@ function evaluateState(engine, cpuIdx) {
     else if (ownerSide === oppIdx) score -= s;
   }
 
-  // Ability totals — cumulative stacked abilities matter more than fresh ones.
-  let ownAb = 0, oppAb = 0;
-  for (let hi = 0; hi < 3; hi++) {
-    for (let z = 0; z < 3; z++) {
-      ownAb += (ps.abilityZones?.[hi]?.[z] || []).length;
-      oppAb += (opp.abilityZones?.[hi]?.[z] || []).length;
-    }
-  }
-  score += 15 * (ownAb - oppAb);
-
-  // ── Engine-tier ability bonus ────────────────────────────────────
-  // Some abilities are deck-defining "engines" — Divinity's free
-  // level coverage, future engine abilities of similar weight. Each
-  // such ability declares its magnitude on its script:
-  //
-  //    cpuMeta: { engineValue: 120 }
-  //
-  // The eval reads it generically. For each ability slot on each
-  // hero we look up the BASE ability's script (zone[0]) — that
-  // determines the engine identity, since Performance copies on top
-  // inherit the base's school. Stack size multiplies the bonus, so
-  // a Lv2 Divinity (or Divinity + Performance) is twice as valuable
-  // as a Lv1.
-  //
-  // Symmetric: opp engine stacks count negatively, so MCTS values
-  // stripping/disrupting an opp's engine ability proportionally.
-  const sumEngineValue = (pl) => {
-    let total = 0;
-    for (let hi = 0; hi < (pl.heroes || []).length; hi++) {
-      const zones = pl.abilityZones?.[hi] || [];
-      for (const slot of zones) {
-        if (!slot || slot.length === 0) continue;
-        // zone[0] is the BASE ability — that's what governs the
-        // engine identity. Performance copies stacked on top
-        // inherit the base's role.
-        const baseScript = loadCardEffect(slot[0]);
-        const engineValue = baseScript?.cpuMeta?.engineValue || 0;
-        if (engineValue > 0) total += engineValue * slot.length;
+  // ── Ability-Wertigkeit (Als Auftrag 6.10., `_ability-worth-shared.js`) ──────
+  // Vorher: 15 × (eigene − gegnerische Ability-KARTEN), flach, tote Helden
+  // mitgezählt, dazu `engineValue × Stapel`. Jetzt EIN Wert je Ability:
+  //   (gelernte Basis · Nutzung + engineValue) · mult(Divinity ×3),
+  // über die LEBENDEN Helden, weitere Helden mit derselben Ability mit ρ^j.
+  // Ohne Nutzung, ohne Profil und mit einem Helden je Ability entspricht das
+  // dem alten Wert (15 je Stufe + engineValue) — der Unterschied entsteht
+  // genau durch das, was der Auftrag verlangt. PP_ABILITY_WORTH=0 schaltet auf
+  // den alten flachen Term zurück (A/B-Messung).
+  if (process.env.PP_ABILITY_WORTH === '0') {
+    // Ability totals — cumulative stacked abilities matter more than fresh ones.
+    let ownAb = 0, oppAb = 0;
+    for (let hi = 0; hi < 3; hi++) {
+      for (let z = 0; z < 3; z++) {
+        ownAb += (ps.abilityZones?.[hi]?.[z] || []).length;
+        oppAb += (opp.abilityZones?.[hi]?.[z] || []).length;
       }
     }
-    return total;
-  };
-  score += sumEngineValue(ps) - sumEngineValue(opp);
+    score += 15 * (ownAb - oppAb);
+    const sumEngineValue = (pl) => {
+      let total = 0;
+      for (let hi = 0; hi < (pl.heroes || []).length; hi++) {
+        for (const slot of (pl.abilityZones?.[hi] || [])) {
+          if (!slot || slot.length === 0) continue;
+          const engineValue = loadCardEffect(slot[0])?.cpuMeta?.engineValue || 0;
+          if (engineValue > 0) total += engineValue * slot.length;
+        }
+      }
+      return total;
+    };
+    score += sumEngineValue(ps) - sumEngineValue(opp);
+  } else {
+    try {
+      const aw = require('./_ability-worth-shared');
+      const awParams = aw.paramsFor(engine, cpuIdx);
+      score += aw.sideValue(engine, cpuIdx, cpuIdx, null, awParams)
+             - aw.sideValue(engine, cpuIdx, oppIdx, null, awParams);
+    } catch { /* defensiv: ohne Wertung statt Abbruch */ }
+  }
 
   // ── Hero passive value ───────────────────────────────────────────
   // Heroes whose passive scales latent across many turns (Lilly's
@@ -14053,6 +14067,182 @@ async function mctsPickFromOptions(engine, options, applyFn, opts = {}) {
     if (horizonOverride !== null) _rolloutHorizon = prevHorizon;
   }
   return best;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  AREA-WERTE MESSEN (Lernkanal Area-Abräumung, Als Auftrag 6.10.)
+//
+//  Zwei Größen, die sich aus Karteneigenschaften nur ERRATEN ließen, misst
+//  die CPU mit ihrer eigenen Rollout-Suche:
+//
+//    nv  Nutzen der Area FÜR MICH   = E(mit Area) − E(Area weg, Handkarten-Areas gesperrt)
+//    sw  Tauschwert einer Hand-Area = E(Area weg, Hand-Areas frei)  − E(Area weg, gesperrt)
+//
+//  `E` = `evaluateState` nach `rolloutRestOfTurn` (eigener Zug + Horizont-
+//  Züge BEIDER Seiten). Das Eval kennt nur bei drei von 45 Areas deren Wirkung
+//  statisch (`cpuMeta`); der Rollout spielt sie dagegen wirklich. Im freien
+//  Lauf entscheidet die CPU selbst, ob sie eine Area aus der Hand nachlegt —
+//  `sw` ist also der Wert, den SIE dem Nachlegen gibt (nicht castbar = 0).
+//
+//  ★ ZEITPUNKT: einmal je LIVE-Zug am Zugbeginn (Main 1), außerhalb jeder
+//  Kartenauflösung. Mitten in einem Prompt zu simulieren hieße, Zustand
+//  wegzusnapshotten, während die Auflösung der Karte schwebt; die Entscheidung
+//  selbst bleibt dadurch synchron und liest nur den Stempel
+//  `engine._areaNet = { turn, pi, nv, sw }` (Schlüssel `Name@own|opp`).
+//
+//  Läuft nur, wenn eine Area auf dem Brett liegt UND (Datensammlung des
+//  gepinnten Spielers ODER das Profil hat `net:*`/`swap:*`-Regeln). Das
+//  Gelernte wird währenddessen aus dem Eval ausgeblendet (`messZustand`).
+//  Knöpfe: PP_AREA_NET=0 (aus), PP_AREA_NET_REPS (3), PP_AREA_NET_HORIZON (2).
+// ═══════════════════════════════════════════════════════════════════
+async function areaWhatIf(engine, helpers, cpuIdx, horizon, seed, applyFn) {
+  const shared = require('./_area-removal-shared');
+  // ── GLEICHE ZUFALLSZAHLEN FÜR ALLE LÄUFE EINER WIEDERHOLUNG ──────────
+  // Ein Vergleich „mit Area" gegen „ohne Area" ist nur dann ein Vergleich,
+  // wenn der Rollout-Zufall (Mischen, Gleichstände, ε des Rollout-Hirns)
+  // in beiden Läufen DERSELBE ist — sonst misst man vor allem das Würfeln.
+  // Gemessen (Ende-zu-Ende, 2 Spiele): ohne das schwankten die Werte
+  // zwischen −51838 und +873, dazwischen die ±100000 der Spielende-Werte.
+  // `Math.random` wird nur während des Laufs ersetzt und im `finally`
+  // zurückgegeben; alles hier ist synchron bis auf die awaits des
+  // Rollouts selbst, und `_inMctsSim` ist gesetzt — echte Züge laufen
+  // nicht parallel.
+  const realRandom = Math.random;
+  let st = (seed >>> 0) || 1;
+  Math.random = () => {            // mulberry32
+    st = (st + 0x6D2B79F5) >>> 0;
+    let t = st;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+  const prevHorizon = _rolloutHorizon;
+  const prevSilent = _cpuLogSilent;
+  const prevInSim = engine._inMctsSim;
+  const prevStart = engine._mctsRolloutStartT;
+  _rolloutHorizon = horizon;
+  engine._inMctsSim = true;
+  engine.enterFastMode();
+  _cpuLogSilent = true;
+  shared.messZustand.blockLearned++;
+  let score = null;
+  try {
+    engine._mctsRolloutStartT = Date.now();
+    const snap = engine.snapshot();
+    try {
+      const ok = await applyFn();
+      if (ok !== false) {
+        await rolloutRestOfTurn(engine, helpers);
+        score = evaluateState(engine, cpuIdx);
+      }
+    } finally {
+      engine.restore(snap);
+      resetPromptCycle(engine);
+    }
+  } catch (err) {
+    score = null;
+    if (err && err._mctsOverload) throw err;
+  } finally {
+    Math.random = realRandom;
+    shared.messZustand.blockLearned--;
+    engine._inMctsSim = prevInSim;
+    engine._mctsRolloutStartT = prevStart;
+    engine.exitFastMode();
+    _cpuLogSilent = prevSilent;
+    _rolloutHorizon = prevHorizon;
+  }
+  return Number.isFinite(score) ? score : null;
+}
+
+async function measureAreaValues(engine, helpers, cpuIdx) {
+  try {
+    if (process.env.PP_AREA_NET === '0' || engine._inMctsSim || engine._mctsKilledThisTurn) return;
+    const gs = engine.gs;
+    if (gs.currentPhase !== 2 || gs.activePlayer !== cpuIdx || gs.result) return;
+    if (!((gs.areaZones?.[0]?.length || 0) + (gs.areaZones?.[1]?.length || 0))) return;
+    const prof = deckProfile.__getProfile(engine, cpuIdx);
+    const regeln = prof?.areaRemovalRules?.tags;
+    const nutzt = !!regeln && Object.values(regeln).some(m =>
+      Object.keys(m).some(k => k.startsWith('net:') || k.startsWith('swap:')));
+    const sammeln = deckProfile.isCollecting()
+      && (engine._decisionPinned == null || engine._decisionPinned === cpuIdx);
+    if (!nutzt && !sammeln) return;
+
+    const shared = require('./_area-removal-shared');
+    const db = engine._getCardDB();
+    const reps = Math.max(1, parseInt(process.env.PP_AREA_NET_REPS || '3', 10) || 3);
+    const horizon = Math.max(1, parseInt(process.env.PP_AREA_NET_HORIZON || '2', 10) || 2);
+    // Je Wiederholung r laufen ALLE Varianten mit demselben Zufall (Seed r);
+    // verglichen wird gepaart, zusammengefasst per MEDIAN (robust gegen die
+    // Ausreißer, wenn ein Lauf zufällig einen Helden tötet), gekappt auf ±KAPPE.
+    const KAPPE = parseInt(process.env.PP_AREA_NET_KAPPE || '2000', 10) || 2000;
+    const kappe = (v) => Math.max(-KAPPE, Math.min(KAPPE, v));
+    const median = (a) => {
+      if (!a.length) return null;
+      const b = [...a].sort((x, y) => x - y);
+      const m = b.length >> 1;
+      return b.length % 2 ? b[m] : (b[m - 1] + b[m]) / 2;
+    };
+    const SEED = 7919 + 104729 * (gs.turn || 0);
+    const lauf = async (applyFn) => {
+      const w = [];
+      for (let r = 0; r < reps; r++) {
+        if (cpuPastDeadline(engine)) { w.push(null); continue; }
+        w.push(await areaWhatIf(engine, helpers, cpuIdx, horizon, SEED + r * 31, applyFn));
+      }
+      return w;                                  // Index = Wiederholung
+    };
+    const diff = (a, b) => {                     // gepaarte Differenz a − b, Median, gekappt
+      const d = [];
+      for (let r = 0; r < Math.min(a.length, b.length); r++) {
+        if (a[r] !== null && b[r] !== null) d.push(kappe(a[r] - b[r]));
+      }
+      const m = median(d);
+      return m === null ? null : Math.round(m);
+    };
+
+    const roh = shared.rohKontext(engine, cpuIdx);
+    const basis = await lauf(async () => true);
+    if (!basis.some(v => v !== null)) return;
+    const nv = {}, sw = {};
+    const gesehen = new Set();
+    for (let owner = 0; owner < 2; owner++) {
+      for (const name of [...(gs.areaZones?.[owner] || [])]) {
+        const seite = owner === cpuIdx ? 'own' : 'opp';
+        const key = `${name}@${seite}`;
+        if (gesehen.has(key)) continue;
+        gesehen.add(key);
+        if (cpuPastDeadline(engine)) break;
+        const entferne = async (handSperren) => {
+          const inst = engine.cardInstances.find(c => c.zone === 'area' && c.owner === owner && c.name === name);
+          if (!inst) return false;
+          if (handSperren) {
+            // Stapel-Schicht statt direktem Splice (CARD_API ★ KEIN DIREKTES SPLICEN);
+            // der Lauf wird per restore() zurückgenommen.
+            for (const hn of [...engine.gs.players[cpuIdx].hand]) {
+              if (shared.istAreaKarte(db[hn])) engine.takeFromPileSync(cpuIdx, 'hand', hn);
+            }
+          }
+          await engine.removeArea(inst, 'Area what-if', { skipProtection: true });
+          return true;
+        };
+        const gesperrt = await lauf(() => entferne(true));
+        const n = diff(basis, gesperrt);
+        if (n === null) continue;
+        nv[key] = n;
+        // Tauschwert nur, wenn überhaupt eine andere Area spielbar auf der Hand liegt.
+        const hatAndere = (roh.hC || []).some(x => x !== name);
+        if (hatAndere) {
+          const frei = await lauf(() => entferne(false));
+          sw[key] = diff(frei, gesperrt) ?? 0;
+        } else sw[key] = 0;
+      }
+    }
+    engine._areaNet = { turn: gs.turn, pi: cpuIdx, nv, sw };
+    cpuLog(`[area-net] ${JSON.stringify({ nv, sw, hand: roh.hA, spielbar: roh.hC })}`);
+  } catch (err) {
+    console.error('[CPU] measureAreaValues threw:', err && err.message);
+  }
 }
 
 // `computeGoldDemand` und `mctsOpponentGoldEconomy` sind ab 16.8.
