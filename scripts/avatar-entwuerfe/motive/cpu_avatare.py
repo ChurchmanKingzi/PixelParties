@@ -20,6 +20,12 @@ SHOP = os.path.join(ROOT, 'data', 'shop')
 UEB = os.path.join(SHOP, 'avatar-entwuerfe', 'cpu')
 
 
+# Per Augenschein geprüfte Grenzfälle: Szene stimmt, der Fehlerwert liegt knapp über N.MAX_ERR.
+AKZEPTIERT = {'Nao, the Barrier Priestess', 'Timeless King Zi', 'Andras, the Human Weapon', 'Mary Crestmas', 'Bomb Berserker Bartas'}
+# Treffer, die nur Hintergrund zeigen (keine Figur): kein Avatar.
+AUSGESCHLOSSEN = {'Argos, the Eye of the Cosmos'}
+
+
 def helden():
     out = []
     for g in gegner():
@@ -37,7 +43,10 @@ def main():
     os.makedirs(UEB, exist_ok=True)
     eintraege, benutzt, fehlt = [], set(), []
     for h in hs:
-        fr = N.frame(h['idx']) if h['idx'] is not None else None
+        if h['hero'] in AUSGESCHLOSSEN or h['idx'] is None:
+            fehlt.append((h['deck'], h['hero'])); continue
+        N.MAX_ERR = 0.04 if h['hero'] in AKZEPTIERT else 0.012
+        fr = N.frame(h['idx'])
         if fr is None:
             fehlt.append((h['deck'], h['hero'])); continue
         a, err, src = fr
@@ -46,7 +55,7 @@ def main():
         k = max(3, round(200 / side))
         im = Image.fromarray(a[:side, x0:x0 + side].astype('uint8')).resize((side * k, side * k), Image.NEAREST)
         pid = slug(h['hero'])
-        while pid in benutzt or os.path.exists(os.path.join(SHOP, 'avatars', pid + '.png')) and pid not in {e['id'] for e in eintraege}:
+        while pid in benutzt:       # zwei Gegner mit demselben Helden: zweite ID bekommt „-2“
             pid += '-2'
         benutzt.add(pid)
         im.save(os.path.join(SHOP, 'avatars', pid + '.png'))

@@ -1,0 +1,190 @@
+{
+ "avatars": [
+  {
+   "deckId": "sample-Heal Burn",
+   "id": "nao-the-barrier-priestess",
+   "name": "Nao, the Barrier Priestess",
+   "hero": "Nao, the Barrier Priestess"
+  },
+  {
+   "deckId": "sample-Structure Deck Bamboo Warrior",
+   "id": "xiong-the-bamboo-guardian",
+   "name": "Xiong, the Bamboo Guardian",
+   "hero": "Xiong, the Bamboo Guardian"
+  },
+  {
+   "deckId": "sample-Structure Deck Big Stomp",
+   "id": "kit-the-shark-researcher",
+   "name": "Kit, the Shark Researcher",
+   "hero": "Kit, the Shark Researcher"
+  },
+  {
+   "deckId": "sample-Structure Deck Bloody King Zi",
+   "id": "timeless-king-zi",
+   "name": "Timeless King Zi",
+   "hero": "Timeless King Zi"
+  },
+  {
+   "deckId": "sample-Structure Deck Boom Boom Kaboom",
+   "id": "andras-the-human-weapon",
+   "name": "Andras, the Human Weapon",
+   "hero": "Andras, the Human Weapon"
+  },
+  {
+   "deckId": "sample-Structure Deck Burning Inferno",
+   "id": "luna-pele-the-flame-dancer",
+   "name": "Luna Pele, the Flame Dancer",
+   "hero": "Luna Pele, the Flame Dancer"
+  },
+  {
+   "deckId": "sample-Structure Deck Cool Gang",
+   "id": "thorad-strength-of-coolness",
+   "name": "Thorad, Strength of Coolness",
+   "hero": "Thorad, Strength of Coolness"
+  },
+  {
+   "deckId": "sample-Structure Deck Crystal Gifts",
+   "id": "mary-crestmas",
+   "name": "Mary Crestmas",
+   "hero": "Mary Crestmas"
+  },
+  {
+   "deckId": "sample-Structure Deck Cute Commando",
+   "id": "cute-annoyance-mini",
+   "name": "Cute Annoyance Mini",
+   "hero": "Cute Annoyance Mini"
+  },
+  {
+   "deckId": "sample-Structure Deck Deepsea Terror",
+   "id": "siphem-the-deepsea-demon",
+   "name": "Siphem, the Deepsea Demon",
+   "hero": "Siphem, the Deepsea Demon"
+  },
+  {
+   "deckId": "sample-Structure Deck Elven Vanguard",
+   "id": "maya-the-nature-fairy",
+   "name": "Maya, the Nature Fairy",
+   "hero": "Maya, the Nature Fairy"
+  },
+  {
+   "deckId": "sample-Structure Deck Flying Sparks",
+   "id": "lilly-the-charming-infiltrator",
+   "name": "Lilly, the Charming Infiltrator",
+   "hero": "Lilly, the Charming Infiltrator"
+  },
+  {
+   "deckId": "sample-Structure Deck Gates to Hell",
+   "id": "silent-water-mizune",
+   "name": "Silent Water Mizune",
+   "hero": "Silent Water Mizune"
+  },
+  {
+   "deckId": "sample-Structure Deck Gather That Storm",
+   "id": "tarleinn-the-traveler",
+   "name": "Tarleinn the Traveler",
+   "hero": "Tarleinn the Traveler"
+  },
+  {
+   "deckId": "sample-Structure Deck Guardians of the Treasure Cave",
+   "id": "mao-the-vengeful-guardian",
+   "name": "Mao, the Vengeful Guardian",
+   "hero": "Mao, the Vengeful Guardian"
+  },
+  {
+   "deckId": "sample-Structure Deck Idej Illusions",
+   "id": "idej-lord-daiyo",
+   "name": "Idej Lord Daiyo",
+   "hero": "Idej Lord Daiyo"
+  },
+  {
+   "deckId": "sample-Structure Deck Join our Cult",
+   "id": "klaus-the-cult-leader",
+   "name": "Klaus, the Cult Leader",
+   "hero": "Klaus, the Cult Leader"
+  },
+  {
+   "deckId": "sample-Structure Deck Mans Best Friends",
+   "id": "orthos-the-loyal-guard-dog",
+   "name": "Orthos, the Loyal Guard Dog",
+   "hero": "Orthos, the Loyal Guard Dog"
+  },
+  {
+   "deckId": "sample-Structure Deck Morph and Kill",
+   "id": "waflav-the-metamorphing-monstrosity",
+   "name": "Waflav, the Metamorphing Monstrosity",
+   "hero": "Waflav, the Metamorphing Monstrosity"
+  },
+  {
+   "deckId": "sample-Structure Deck Null and Void",
+   "id": "null-the-mage-slayer",
+   "name": "Null, the Mage Slayer",
+   "hero": "Null, the Mage Slayer"
+  },
+  {
+   "deckId": "sample-Structure Deck One-Two-Punch",
+   "id": "ghuanjun-the-undead-martial-artist",
+   "name": "Ghuanjun, the Undead Martial Artist",
+   "hero": "Ghuanjun, the Undead Martial Artist"
+  },
+  {
+   "deckId": "sample-Structure Deck Parts of the Soul",
+   "id": "thep-the-court-scribe",
+   "name": "Thep, the Court Scribe",
+   "hero": "Thep, the Court Scribe"
+  },
+  {
+   "deckId": "sample-Structure Deck Pew-Pew",
+   "id": "bow-sniper-darge",
+   "name": "Bow Sniper Darge",
+   "hero": "Bow Sniper Darge"
+  },
+  {
+   "deckId": "sample-Structure Deck Sacrificial Demons",
+   "id": "calamitusk-the-chaorc-war-chief",
+   "name": "Calamitusk, the Chaorc War Chief",
+   "hero": "Calamitusk, the Chaorc War Chief"
+  },
+  {
+   "deckId": "sample-Structure Deck Shadows over Blackport",
+   "id": "arthor-the-king-of-blackport",
+   "name": "Arthor, the King of Blackport",
+   "hero": "Arthor, the King of Blackport"
+  },
+  {
+   "deckId": "sample-Structure Deck Slip n Slide",
+   "id": "hel-the-bound-specter",
+   "name": "Hel, the Bound Specter",
+   "hero": "Hel, the Bound Specter"
+  },
+  {
+   "deckId": "sample-Structure Deck Spell Industrialization",
+   "id": "victorica-the-eternal-empress",
+   "name": "Victorica, the Eternal Empress",
+   "hero": "Victorica, the Eternal Empress"
+  },
+  {
+   "deckId": "sample-Structure Deck Sun Fencer Frenzy",
+   "id": "taio-the-sun-fencer",
+   "name": "Taio, the Sun Fencer",
+   "hero": "Taio, the Sun Fencer"
+  },
+  {
+   "deckId": "sample-Structure Deck_ Grand Rebellion",
+   "id": "champion-the-stormbringer",
+   "name": "Champion, the Stormbringer",
+   "hero": "Champion, the Stormbringer"
+  },
+  {
+   "deckId": "sample-Suicide Bombers",
+   "id": "bomb-berserker-bartas",
+   "name": "Bomb Berserker Bartas",
+   "hero": "Bomb Berserker Bartas"
+  },
+  {
+   "deckId": "sample-Venom Swamp",
+   "id": "zsos-ssar-the-serpent-warlord",
+   "name": "Zsos'Ssar, the Serpent Warlord",
+   "hero": "Zsos'Ssar, the Serpent Warlord"
+  }
+ ]
+}
