@@ -464,6 +464,84 @@ selbst. Karten mit eigenem `cpuResponse` für gemischte Fragen rufen
 nicht doppelt); die gegnerische Seite blieb frei von Tag-Rauschen, und die
 Negativkontrolle (Ausgang reiner Zufall) erzeugte KEINE Regel.
 
+## Ability-Wertigkeit und „Compulsory Body Swap" (Form 8, Als Auftrag 6.10.)
+
+**Befund vorab:** Die Mechanismen, die Ability-Wertigkeiten bewerten und im
+Spiel mitlernen, gab es NICHT. Vorhanden waren nur (a) im Eval
+`15 × (eigene − gegnerische Ability-KARTEN)`, flach und mit toten Helden,
+plus `cpuMeta.engineValue` (Divinity 120/Stufe), (b) `abilityPriors` — sie
+lernen, WO eine Ability liegt, nicht, wie viel sie wert ist, und (c) keinerlei
+Nutzungszähler (das `actionLog` ist in Simulationen und im Self-Play-Fast-
+Mode leer). Alles Folgende ist neu; gemeinsames Modul:
+`cards/effects/_ability-worth-shared.js`.
+
+**Das Modell.** Wert einer Ability A in der Hand von Spieler P, je Stufe:
+`(base(A) · nutzung(P,A) + engineValue(A)) · mult(A)`, über die LEBENDEN Helden
+summiert; die Stufen derselben Ability auf mehreren Helden zählen nach Stufe
+absteigend mit ρ^j (ρ = 0,5).
+
+| Baustein | Quelle |
+|---|---|
+| `base` | 15 je Stufe (= der alte flache Wert) + **gelernte** Abweichung je Ability und Halter (`profile.abilityWorthRules`, Form 8), confidence-skaliert, auf 4…60 geklemmt |
+| `nutzung` | **dynamisch im laufenden Spiel:** `1 + γ·(1 − e^(−r/r0))`, `r` = Nutzungen/(eigene Züge+1). Gezählt in `engine.log` (vor dem Fast-Mode-Ausstieg, Rollouts zählen nicht): Casts zählen für JEDE Schule der Karte (`spellSchool1/2`), Aktivierungen für die Ability selbst. Die Nutzung des anderen Spielers zählt zu 50 % mit — sie ist Beweis für den Wert, auch wenn die Ability gerade woanders liegt |
+| Redundanz | je weiterer lebender Held mit derselben Ability ρ^j; Stapel auf EINEM Helden (Stufe 1→3) bleiben unberührt |
+| `mult` | Divinity ×3 (Vorgabe), gilt für den ganzen Wert inklusive `engineValue` |
+
+Casting-Schulen und Support-Abilities (Alchemy, Leadership, …) stehen auf
+derselben Skala. Was sie unterscheidet, sind gemessene Nutzung und gelernter
+Wert, keine von Hand gesetzte Rangfolge.
+
+**Eval.** Der flache Term ist ersetzt: `sideValue(ich) − sideValue(Gegner)`.
+Ohne Nutzung, ohne Profil und mit einem Helden je Ability entspricht das dem
+alten Wert (15/Stufe + engineValue); der Unterschied entsteht genau durch
+Nutzung, Redundanz, Divinity ×3, tote Helden (zählen nicht mehr) und das
+Gelernte. `PP_ABILITY_WORTH=0` stellt den alten Term wieder her (A/B),
+`PP_ABILITY_WORTH_LEARNED=0` blendet nur das Gelernte aus. **Nicht gemessen:**
+ob der neue Term die Spielstärke verändert — der Spiegel-A/B (`PP_TRAIN_AB`)
+kann ihn nicht trennen, weil der Schalter global ist; ein Vergleich braucht
+zwei Läufe (`PP_ABILITY_WORTH=0` gegen Standard) auf demselben Gegnerpool.
+Bestehende Profile wurden auf dem alten Eval kalibriert.
+
+**Compulsory Body Swap (CPU).** `swapGain` bewertet jedes Paar lebender Helden
+(auch eigen↔eigen, gegnerisch↔gegnerisch):
+`(Δ meine Abilities − Δ Abilities des Gegners) + (Δ Fit ich − Δ Fit Gegner) + Zusatz-Aktion`.
+
+- **Fit** = was die Karten in der Hand des NEUEN Besitzers mit dem neuen Satz
+  tun können (spielbar werden / bleiben, Kartenstufe × 25 in der Hand, ×12 im
+  Deck; beim Gegner statt des Decks seine bekannten Stapel). Das ist der Bonus
+  beim Stehlen UND der Malus, wenn dem Gegner eine Schule gegeben wird, die zu
+  seiner Hand besser passt als zu meiner — im Test fiel der Gewinn dadurch von
+  0 auf −150, das Paar wurde verworfen.
+- **Zusatz-Aktion** (+35): nur, wenn der Nutzer im Paar ist UND danach eine
+  Handkarte spielen kann.
+- `cpuPlayVeto`: kein Cast, wenn das beste Paar unter 25 Punkten bleibt.
+  `cpuResponse` wählt das beste Paar und lässt die Wahl sonst abbrechen.
+- Der Zielprompt ist jetzt abbrechbar (Regel für zielende Karten).
+- Das Eval braucht den Fit nicht: Handwert-Gate und Rollout sehen die geänderte
+  Spielbarkeit ohnehin. Im Ende-zu-Ende-Lauf stand die Paarwahl der CPU unter
+  den Body-Swap-Varianten der Suche an der Spitze (−540 gegen −697 … −2955).
+
+**Lernen (Form 8).** Der Recorder schreibt je Zuggrenze einen Ability-
+Schnappschuss beider Seiten (`abilitySnap`: Stufen der lebenden Helden je
+Ability, Nutzungsraten). Der Trainer nimmt je Spiel EINEN Schnappschuss aus
+der Mitte (Zug ≈ 8) — mehrere je Spiel wären keine unabhängigen Belege — und
+kontrastiert 》Ability von lebenden Helden gehalten《 gegen 》nicht gehalten《
+auf den Ausgang (Welch-Gate, Schrumpfung). Ergebnis `abilityWorthRules =
+{ own: {A: pts}, opp: {A: pts} }`; `opp` negativ = bedrohlich in Gegnerhand.
+Fehlt eine eigene Regel, gilt die gedämpfte Gegner-Regel (was ihm nützt und
+mir schadet, ist auch in meiner Hand etwas wert). In der Datensammlung wählt
+die CPU mit `PP_SWAP_EXPLORE` (0,3) ein zufälliges Paar. Synthetik-Test: die
+eingebaute Bedrohung (`Divinity` beim Gegner, −16,7) wurde gelernt, die
+Negativkontrolle (zufälliger Ausgang) erzeugte nichts.
+
+**Ehrliche Grenzen.** (1) `opp[A]` misst auch die Stärke der Decks, die A
+spielen — er ist ein Prior, den die gemessene Nutzung ergänzt, kein
+Naturgesetz. (2) `own[A]` ist nur lernbar, wo es Varianz gibt (ein Deck hält
+seine eigenen Abilities fast immer). (3) γ, r0, ρ, die Fit-Skalen und die
+35 Punkte der Zusatz-Aktion sind Setzungen, nicht gelernt (`DEFAULTS`).
+(4) Eine Ability, die keine Schule ist und passiv wirkt (Toughness, Wealth,
+Resistance), hat keine zählbare Nutzung und läuft über `base` allein.
+
 ## Deck-Telemetrie: PP_DECK_MONITOR=1
 
 Env-gated Ressourcen-Log am Ende jedes CPU-Zugs (in _cpu.js vor dem

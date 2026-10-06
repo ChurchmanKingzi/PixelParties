@@ -45,10 +45,55 @@
 //    Adventurousness) are not eligible. The
 //    helper also auto-skips when the user has
 //    nothing to play.
+//
+//  CPU-Handling (Als Auftrag 6.10.)
+//  ────────────────────────────────
+//  Die CPU tauscht die Abilities mit dem größten WERTIGKEITSDELTA — Details
+//  und Modell in `_ability-worth-shared.js`:
+//    • Wert je Ability = (gelernte Basis · Nutzung + engineValue) · mult,
+//      Nutzung dynamisch im laufenden Spiel gezählt, Divinity ×3, weitere
+//      lebende Helden mit derselben Ability zählen mit ρ^j weniger.
+//    • Gewinn eines Paares = Δ meine Abilities − Δ Abilities des Gegners
+//      + Fit (was die Karten in MEINER bzw. SEINER Hand mit dem neuen Satz
+//      anfangen können: Bonus beim Stehlen, Malus, wenn dem Gegner eine
+//      Schule gegeben wird, die ihm mehr nützt) + Zusatz-Aktion des Nutzers.
+//    • Gewählt wird unter ALLEN Paaren lebender Helden (auch eigen↔eigen und
+//      gegnerisch↔gegnerisch) — nicht nur 》mein schlechtester gegen seinen
+//      besten《. Liegt der beste Gewinn unter `MIN_GAIN`, wird die Karte gar
+//      nicht erst gespielt (`cpuPlayVeto`) bzw. die Wahl abgebrochen.
+//    • Gelernt wird die Wertigkeit je Ability (Trainer Form 8,
+//      `profile.abilityWorthRules`); in der Datensammlung wählt die CPU mit
+//      `PP_SWAP_EXPLORE` (0,3) zufällig ein anderes Paar, damit Konfigurationen
+//      entstehen, die sich sonst nie ergäben.
+//  Der Zielprompt ist abbrechbar (Regel: zielende Karten sind immer abbrechbar).
 // ═══════════════════════════════════════════
 
 const CARD_NAME = 'Compulsory Body Swap';
 const ANIM_MS   = 1000;
+const MIN_GAIN  = 25;   // darunter lohnt weder der Cast noch ein Tausch (Eval-Punkte)
+
+/**
+ * Welche Helden darf `pi` mit `casterHeroIdx` hier wählen? Spiegel der
+ * Zielwahl-Sperren (Erstrunden-Schutz, `blocksTargeting` wie Stealth).
+ */
+function heldWaehlbar(engine, pi, casterHeroIdx, h) {
+  try {
+    if (h.owner === pi) return true;
+    if (engine.gs.firstTurnProtectedPlayer === h.owner) return false;
+    const cd = engine._getCardDB()[CARD_NAME];
+    return !engine.heroBlocksTargeting(h.owner, h.heroIdx, {
+      sourceData: cd, cardName: CARD_NAME, chooserIdx: pi, chooserHeroIdx: casterHeroIdx ?? -1,
+    });
+  } catch { return true; }
+}
+
+function bestePaare(engine, pi, casterHeroIdx, okFn) {
+  const aw = require('./_ability-worth-shared');
+  return aw.rankSwaps(engine, pi, {
+    casterHeroIdx,
+    ok: (h) => heldWaehlbar(engine, pi, casterHeroIdx, h) && (!okFn || okFn(h)),
+  });
+}
 
 module.exports = {
   requiresTarget: true,
@@ -72,6 +117,46 @@ module.exports = {
       }
     }
     return false;
+  },
+
+  /**
+   * Kartenvertrag `cpuPlayVeto`: kein Cast, wenn kein Paar einen spürbaren
+   * Gewinn bringt (sonst verbrennt die CPU Karte und Aktion).
+   */
+  cpuPlayVeto(engine, pi, heroIdx /* , { additional } */) {
+    try {
+      const ranked = bestePaare(engine, pi, heroIdx);
+      return !ranked.length || ranked[0].gain < MIN_GAIN;
+    } catch { return false; }
+  },
+
+  /**
+   * CPU-Zielwahl: das Paar mit dem größten Wertigkeitsdelta. In der
+   * Datensammlung mit Wahrscheinlichkeit `PP_SWAP_EXPLORE` ein ZUFÄLLIGES
+   * Paar (nur gepinnter Spieler, nie im Rollout) — sonst entstünden
+   * Ability-Konfigurationen, aus denen der Trainer die Wertigkeit lernt, nur
+   * zufällig.
+   */
+  cpuResponse(engine, kind, promptData) {
+    if (kind !== 'effectTarget') return undefined;
+    const { validTargets, config, playerIdx } = promptData || {};
+    if (config?.title !== CARD_NAME || !Array.isArray(validTargets)) return undefined;
+    const waehlbar = new Set(validTargets.filter(t => t && !t.ineligible).map(t => `${t.owner}:${t.heroIdx}`));
+    const idVon = (h) => `hero-${h.owner}-${h.heroIdx}`;
+    const ranked = bestePaare(engine, playerIdx, config.casterHeroIdx,
+      (h) => waehlbar.has(`${h.owner}:${h.heroIdx}`));
+    if (!ranked.length) return config.cancellable ? [] : undefined;
+
+    const dp = require('./_deck-profile');
+    const sammeln = dp.isCollecting() && !engine._inMctsSim
+      && (engine._decisionPinned == null || engine._decisionPinned === playerIdx);
+    if (sammeln && Math.random() < (parseFloat(process.env.PP_SWAP_EXPLORE || '0.3') || 0)) {
+      const z = ranked[Math.floor(Math.random() * ranked.length)];
+      return [idVon(z.a), idVon(z.b)];
+    }
+    const best = ranked[0];
+    if (best.gain < MIN_GAIN) return config.cancellable ? [] : [idVon(best.a), idVon(best.b)];
+    return [idVon(best.a), idVon(best.b)];
   },
 
   hooks: {
@@ -107,7 +192,8 @@ module.exports = {
         description: 'Choose any 2 Heroes (any player) to swap all their Abilities.',
         confirmLabel: '🔄 Swap!',
         confirmClass: 'btn-info',
-        cancellable: false,
+        cancellable: true,                 // zielende Karten sind immer abbrechbar (Als Regel 23.9.)
+        casterHeroIdx: userHeroId,         // für die CPU-Paarwahl (Zusatz-Aktion des Nutzers)
         exclusiveTypes: false,
         minRequired: 2,
         maxTotal: 2,

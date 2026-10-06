@@ -3593,6 +3593,7 @@ function main() {
       setOfferRules: advModel.decisionChannels.setOfferRules,
       poolFeatureRules: advModel.decisionChannels.poolFeatureRules,
       areaRemovalRules: advModel.decisionChannels.areaRemovalRules,
+      abilityWorthRules: advModel.decisionChannels.abilityWorthRules,
     } : {}),
     // Gelernte Tutor-/Such-Präferenzen (Quelle→Karte).
     tutorPickRules: (advModel && advModel.tutorPickRules && Object.keys(advModel.tutorPickRules).length > 0)

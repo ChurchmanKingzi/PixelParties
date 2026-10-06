@@ -1,6 +1,6 @@
 'use strict';
 // ═══════════════════════════════════════════════════════════════════
-//  DIE ENTSCHEIDUNGSFORMEN (1-6, dazu Form 7: Area-Abraeumung)
+//  DIE ENTSCHEIDUNGSFORMEN (1-6, dazu Form 7: Area-Abraeumung, Form 8: Ability-Wertigkeit)
 //
 //  Lernt aus dem generischen `decisions`-Kanal (cards/effects/
 //  _decision-log.js). Eine eigene Datei, weil train-deck-profile.js mit
@@ -622,6 +622,61 @@ function buildDecisionChannels(spiele, opts = {}) {
       tagsOwn: Object.keys(tagRegeln.own).length, tagsOpp: Object.keys(tagRegeln.opp).length };
   }
 
+  // ═════════════════════════════════════════════════════════════════
+  //  FORM 8 — ABILITY-WERTIGKEIT (Als Auftrag 6.10., Compulsory Body Swap)
+  // ═════════════════════════════════════════════════════════════════
+  //  Gelernt wird, wie viel eine Ability WERT ist — getrennt danach, wer sie
+  //  hält (`own` / `opp`), als Abweichung in Punkten vom Standardwert (15 je
+  //  Stufe, siehe _ability-worth-shared.js). Laufzeit: `baseFor`.
+  //
+  //  Einheit ist das SPIEL, nicht die Zeile: je Spiel EIN Schnappschuss aus
+  //  der Mitte (Zug ≈ 8, mindestens Zug 3, sonst der späteste), gegen den
+  //  Ausgang. Mehrere Schnappschüsse je Spiel wären keine unabhängigen
+  //  Belege, und frühe zeigen nur das Startdeck. Kontrast 》Ability gehalten
+  //  von LEBENDEN Helden《 gegen 》nicht gehalten《, über `kontrast` (Welch,
+  //  Schrumpfung, Klammer).
+  //    own[A]  Wert, wenn ICH A halte — nur lernbar, wo es Varianz gibt (Held
+  //            stirbt, Ability kommt später): ein Deck hält seine eigenen
+  //            Abilities praktisch immer.
+  //    opp[A]  Wert, wenn der GEGNER A hält (negativ = bedrohlich). Hier
+  //            variiert die Lage mit 37 Gegnerdecks — der Hauptstrom der Daten.
+  //  Ehrliche Grenze: opp[A] misst auch die Stärke der Decks, die A spielen
+  //  (Verwechslung mit dem Deck). Er ist deshalb ein Prior, den die in-game
+  //  gemessene Nutzung ergänzt, kein Naturgesetz.
+  const abilityWorthRules = {};
+  {
+    const rows = [];
+    for (let gi = 0; gi < spiele.length; gi++) {
+      const g = spiele[gi];
+      if (!Array.isArray(g.decisions) || (g.outcome !== 0 && g.outcome !== 1)) continue;
+      let best = null, bestAbstand = Infinity;
+      for (const d of g.decisions) {
+        if (d.a !== 'abilitySnap' || !d.ab) continue;
+        const t = (d.z && d.z.t) || 0;
+        if (t < 3) continue;
+        const abstand = Math.abs(t - 8);
+        if (abstand < bestAbstand) { best = d; bestAbstand = abstand; }
+      }
+      if (best) rows.push({ y: g.outcome, gi, o: best.ab.o || {}, p: best.ab.p || {} });
+    }
+    const own = {}, opp = {};
+    const namen = new Set();
+    for (const r of rows) { for (const a of Object.keys(r.o)) namen.add(a); for (const a of Object.keys(r.p)) namen.add(a); }
+    for (const A of namen) {
+      for (const [seite, ziel] of [['o', own], ['p', opp]]) {
+        const mit = rows.filter(r => (r[seite][A] || []).length > 0);
+        const ohne = rows.filter(r => !(r[seite][A] || []).length);
+        const prev = rows.length ? mit.length / rows.length : 0;
+        if (prev > PREV_HI || prev < PREV_LO) continue;
+        const pts = kontrast(mit, ohne);
+        if (pts !== null) ziel[A] = pts;
+      }
+    }
+    if (Object.keys(own).length) abilityWorthRules.own = own;
+    if (Object.keys(opp).length) abilityWorthRules.opp = opp;
+    stat.abil = { spiele: rows.length, own: Object.keys(own).length, opp: Object.keys(opp).length };
+  }
+
   // ── Bericht ──────────────────────────────────────────────────────
   log(`Entscheidungs-Kanaele: ${stat.zeilen} beschriftete Zeilen`);
   log(`  1 optIn (pro Karte):    ${stat.optIn.zeilen} Zeilen → ${stat.optIn.karten} Karten-Regeln`);
@@ -630,6 +685,7 @@ function buildDecisionChannels(spiele, opts = {}) {
   log(`  3 ordinal (Stufe):      ${stat.ordinal.zeilen} Zeilen → ${stat.ordinal.karten} Karten-Regeln`);
   log(`  4 set (Angebotswert):   ${stat.set.zeilen} Zeilen → ${stat.set.regeln} Quelle→Karte-Regeln`);
   log(`  5 pool (Merkmale):      ${stat.pool.zeilen} Zeilen → ${stat.pool.quellen} Quellen`);
+  log(`  8 ability (Wertigkeit): ${stat.abil.spiele} Spiele → ${stat.abil.own} eigene / ${stat.abil.opp} gegnerische Ability-Werte`);
   log(`  7 area (Abräumung):     ${stat.area.einheiten} Paare → ${stat.area.ident} Identitäten, `
     + `${stat.area.tagsOwn} Tags eigene / ${stat.area.tagsOpp} Tags gegnerische Seite`);
 
@@ -642,6 +698,7 @@ function buildDecisionChannels(spiele, opts = {}) {
     setOfferRules: leer(setOfferRules) ? undefined : setOfferRules,
     poolFeatureRules: leer(poolFeatureRules) ? undefined : poolFeatureRules,
     areaRemovalRules: leer(areaRemovalRules) ? undefined : areaRemovalRules,
+    abilityWorthRules: leer(abilityWorthRules) ? undefined : abilityWorthRules,
     decisionStats: stat,
   };
 }

@@ -676,6 +676,16 @@ function attachTrainingRecorder(engine, { pinnedIdx, pinnedName, opponentName, f
       if (typeof engine._cpuEvaluateState !== 'function') return;
       if (lastEvalTurn >= 0) evalCurve[lastEvalTurn] = Math.round(engine._cpuEvaluateState(pinnedIdx));
       lastEvalTurn = t;
+      // ── Ability-Schnappschuss (Lernkanal Ability-Wertigkeit, Form 8) ──
+      // Je Zuggrenze die Ability-Lage BEIDER Seiten (Stufen der lebenden
+      // Helden je Ability + Nutzungsraten). Roh, wie alles im Entscheidungs-
+      // protokoll: der Trainer wählt den Zeitpunkt und die Schwellen.
+      try {
+        require('./_decision-log').notiere(engine, pinnedIdx, {
+          art: 'abilitySnap', karte: null, gewaehlt: null,
+          zusatz: { ab: require('./_ability-worth-shared').snapshot(engine, pinnedIdx) },
+        });
+      } catch { /* nie stören */ }
     } catch { /* Beobachter darf nie stören */ }
   };
 

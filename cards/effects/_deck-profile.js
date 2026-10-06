@@ -3525,5 +3525,6 @@ module.exports = {
   areaRemovalChoice,
   areaStandingValue,
   isCollecting,
+  profileConfidence: confidence,
   __getProfile: profileFor,
 };

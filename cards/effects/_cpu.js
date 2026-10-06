@@ -11858,49 +11858,45 @@ function evaluateState(engine, cpuIdx) {
     else if (ownerSide === oppIdx) score -= s;
   }
 
-  // Ability totals — cumulative stacked abilities matter more than fresh ones.
-  let ownAb = 0, oppAb = 0;
-  for (let hi = 0; hi < 3; hi++) {
-    for (let z = 0; z < 3; z++) {
-      ownAb += (ps.abilityZones?.[hi]?.[z] || []).length;
-      oppAb += (opp.abilityZones?.[hi]?.[z] || []).length;
-    }
-  }
-  score += 15 * (ownAb - oppAb);
-
-  // ── Engine-tier ability bonus ────────────────────────────────────
-  // Some abilities are deck-defining "engines" — Divinity's free
-  // level coverage, future engine abilities of similar weight. Each
-  // such ability declares its magnitude on its script:
-  //
-  //    cpuMeta: { engineValue: 120 }
-  //
-  // The eval reads it generically. For each ability slot on each
-  // hero we look up the BASE ability's script (zone[0]) — that
-  // determines the engine identity, since Performance copies on top
-  // inherit the base's school. Stack size multiplies the bonus, so
-  // a Lv2 Divinity (or Divinity + Performance) is twice as valuable
-  // as a Lv1.
-  //
-  // Symmetric: opp engine stacks count negatively, so MCTS values
-  // stripping/disrupting an opp's engine ability proportionally.
-  const sumEngineValue = (pl) => {
-    let total = 0;
-    for (let hi = 0; hi < (pl.heroes || []).length; hi++) {
-      const zones = pl.abilityZones?.[hi] || [];
-      for (const slot of zones) {
-        if (!slot || slot.length === 0) continue;
-        // zone[0] is the BASE ability — that's what governs the
-        // engine identity. Performance copies stacked on top
-        // inherit the base's role.
-        const baseScript = loadCardEffect(slot[0]);
-        const engineValue = baseScript?.cpuMeta?.engineValue || 0;
-        if (engineValue > 0) total += engineValue * slot.length;
+  // ── Ability-Wertigkeit (Als Auftrag 6.10., `_ability-worth-shared.js`) ──────
+  // Vorher: 15 × (eigene − gegnerische Ability-KARTEN), flach, tote Helden
+  // mitgezählt, dazu `engineValue × Stapel`. Jetzt EIN Wert je Ability:
+  //   (gelernte Basis · Nutzung + engineValue) · mult(Divinity ×3),
+  // über die LEBENDEN Helden, weitere Helden mit derselben Ability mit ρ^j.
+  // Ohne Nutzung, ohne Profil und mit einem Helden je Ability entspricht das
+  // dem alten Wert (15 je Stufe + engineValue) — der Unterschied entsteht
+  // genau durch das, was der Auftrag verlangt. PP_ABILITY_WORTH=0 schaltet auf
+  // den alten flachen Term zurück (A/B-Messung).
+  if (process.env.PP_ABILITY_WORTH === '0') {
+    // Ability totals — cumulative stacked abilities matter more than fresh ones.
+    let ownAb = 0, oppAb = 0;
+    for (let hi = 0; hi < 3; hi++) {
+      for (let z = 0; z < 3; z++) {
+        ownAb += (ps.abilityZones?.[hi]?.[z] || []).length;
+        oppAb += (opp.abilityZones?.[hi]?.[z] || []).length;
       }
     }
-    return total;
-  };
-  score += sumEngineValue(ps) - sumEngineValue(opp);
+    score += 15 * (ownAb - oppAb);
+    const sumEngineValue = (pl) => {
+      let total = 0;
+      for (let hi = 0; hi < (pl.heroes || []).length; hi++) {
+        for (const slot of (pl.abilityZones?.[hi] || [])) {
+          if (!slot || slot.length === 0) continue;
+          const engineValue = loadCardEffect(slot[0])?.cpuMeta?.engineValue || 0;
+          if (engineValue > 0) total += engineValue * slot.length;
+        }
+      }
+      return total;
+    };
+    score += sumEngineValue(ps) - sumEngineValue(opp);
+  } else {
+    try {
+      const aw = require('./_ability-worth-shared');
+      const awParams = aw.paramsFor(engine, cpuIdx);
+      score += aw.sideValue(engine, cpuIdx, cpuIdx, null, awParams)
+             - aw.sideValue(engine, cpuIdx, oppIdx, null, awParams);
+    } catch { /* defensiv: ohne Wertung statt Abbruch */ }
+  }
 
   // ── Hero passive value ───────────────────────────────────────────
   // Heroes whose passive scales latent across many turns (Lilly's
