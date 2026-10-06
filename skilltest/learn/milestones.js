@@ -41,10 +41,14 @@ function poolNames() {
   } catch { return null; }
 }
 
-/** Partner je Karte: Paare aus `pairValue` (Held+Ability/Creature, Ability+Creature einer Spalte, Held+Held), Vorsprung gegenüber dem Mittel der Einzelwerte. */
+/**
+ * Partner je Karte: Paare aus `pairValue` (Held+Ability/Creature, Ability+Creature einer Spalte, Held+Held). Verglichen wird das Ergebnis
+ * MIT dem Partner gegen das Ergebnis der Karte (und des Partners) OHNE den anderen — so fallen Paare heraus, die immer zusammen auftreten
+ * (Held und seine feste Start-Ability) und keinen Vergleich zulassen. Vorsprung = Mittel mit Partner minus das bessere der beiden
+ * Einzelergebnisse ohne den Partner; „klar" heißt Vorsprung ≥ PAIR_MIN_LIFT und z ≥ PAIR_MIN_Z.
+ */
 function partnersOf(profile) {
   const cm = profile.cardValue || {};
-  const mean = (n) => (cm[n] && cm[n].n ? cm[n].sum / cm[n].n : 0);
   const all = new Map();
   const push = (a, b, lift, n, z) => { const l = all.get(a) || []; l.push({ other: b, lift, n, z }); all.set(a, l); };
   for (const [key, e] of Object.entries(profile.pairValue || {})) {
@@ -52,8 +56,16 @@ function partnersOf(profile) {
     const i = key.indexOf('|');
     if (i < 0) continue;
     const a = key.slice(0, i), b = key.slice(i + 1);
-    const lift = e.sum / e.n - (mean(a) + mean(b)) / 2;
-    const z = lift / (PAIR_SD / Math.sqrt(e.n));
+    const ca = cm[a], cb = cm[b];
+    if (!ca || !cb) continue;
+    const nA = ca.n - e.n, nB = cb.n - e.n;                      // Beobachtungen ohne den jeweils anderen
+    if (nA < PAIR_MIN_N || nB < PAIR_MIN_N) continue;           // kein Vergleich möglich (fast immer zusammen)
+    const withMean = e.sum / e.n;
+    const meanA = (ca.sum - e.sum) / nA, meanB = (cb.sum - e.sum) / nB;
+    const lift = withMean - Math.max(meanA, meanB);
+    const nBase = meanA >= meanB ? nA : nB;
+    const se = PAIR_SD * Math.sqrt(1 / e.n + 1 / nBase);
+    const z = lift / se;
     push(a, b, lift, e.n, z); push(b, a, lift, e.n, z);
   }
   const out = new Map();
@@ -75,6 +87,7 @@ function buildSnapshot(profile, { final = false } = {}) {
     return {
       n: r.name, t: r.type,
       v: r3(r.value), vn: r.valueN,                                   // Wert (ausgeteilt) und Zahl der Austeilungen
+      pc: (r.type === 'Hero' || r.type === 'Creature') && r.dealtN >= 12 ? Math.round(Math.min(1, r.baseN / r.dealtN) * 1000) / 1000 : null,   // Aufgestellt: Anteil der Austeilungen, bei denen die CPU die Karte aufs Brett stellte
       b: r3(r.baseValue), bn: r.baseN,                                 // Aufbauwert (Karte stand in der Basis)
       p: p && p.n ? r3(p.sum / p.n) : null, pn: p ? p.n : 0,          // Aufbau-Bewertung der CPU (Behalten/Recyceln)
       k: p && p.n ? Math.round((p.keep / p.n) * 1000) / 1000 : null,  // Behalten-Quote
@@ -116,8 +129,8 @@ function renderMarkdown(cur, prev, first) {
   if (prev) L.push(`Vorliste: nach ${prev.games} Partien · Erste Liste: nach ${first.games} Partien`);
   if (cur.bench) L.push(`Vergleich trainiert gegen untrainierte Bots (letzter Stand, ${cur.bench.n} Spiele nach ${cur.bench.games} Partien): Siegquote ${(cur.bench.winRate * 100).toFixed(1)} % bei ${(cur.bench.expected * 100).toFixed(1)} % Erwartung, z = ${cur.bench.z.toFixed(2)}`);
   L.push('', '**Spalten.** *Wert*: mittlere Platzierungsgüte (+1 Sieg … −1 Letzter), wenn die Karte in der Vorbereitung ausgeteilt wurde (Starthand oder Recycler), zum Nullpunkt geschrumpft — der Wert, den die CPUs der Karte beim Aufbau geben; die Liste ist danach sortiert. ' +
-    '*Δ Vorliste / Δ Erste*: Änderung des Werts (in Klammern: Rangänderung, ↑ = aufgestiegen). *Aufbau-Bewertung*: Mittel des Werts, den die Behalten/Recyceln-Entscheidung der CPU der Karte gab (positiv = behalten, negativ = recyceln), darunter die Behalten-Quote. ' +
-    '*Gemeinsam stark mit*: Karten, mit denen sie auf dem Brett deutlich besser abschneidet als erwartet (Vorsprung gegenüber dem Mittel der Einzelwerte; nur bei klarem Befund: Vorsprung ≥ ' + PAIR_MIN_LIFT + ' und z ≥ ' + PAIR_MIN_Z + ', mindestens ' + PAIR_MIN_N + ' Basen).', '');
+    '*Δ Vorliste / Δ Erste*: Änderung des Werts (in Klammern: Rangänderung, ↑ = aufgestiegen). *Aufgestellt* (nur Helden und Creatures): Anteil der Austeilungen, bei denen die CPU die Karte aufs Brett gestellt hat. *Behalten/Recyceln (Rest)*: für Karten, die nach dem Aufbau übrig sind, der Mittelwert der Bewertung dieser Entscheidung (positiv = behalten, negativ = recyceln) und die Behalten-Quote; bei Helden betrifft das nur überzählige. ' +
+    '*Gemeinsam stark mit*: Karten, mit denen sie auf dem Brett deutlich besser abschneidet als erwartet (Ergebnis mit dem Partner minus das bessere Einzelergebnis ohne ihn; nur bei klarem Befund: Vorsprung ≥ ' + PAIR_MIN_LIFT + ' und z ≥ ' + PAIR_MIN_Z + ', mindestens ' + PAIR_MIN_N + ' Basen).', '');
 
   if (prev) {
     const moves = cur.rows.filter(r => P.has(r.n) && r.vn >= 40).map(r => ({ r, d: r.v - P.get(r.n).v }));
@@ -129,11 +142,11 @@ function renderMarkdown(cur, prev, first) {
   if (typeMean) L.push('Mittel je Kartentyp (Wert, Zahl der Karten): ' + typeMean, '');
 
   L.push('## Alle Karten, sortiert nach Wert', '');
-  L.push('| # | Karte | Typ | Wert | n | Δ Vorliste | Δ Erste | Aufbau-Bewertung | Behalten | Gemeinsam stark mit |', '|---:|---|---|---:|---:|---|---|---|---:|---|');
+  L.push('| # | Karte | Typ | Wert | n | Δ Vorliste | Δ Erste | Aufgestellt | Behalten/Recyceln (Rest) | Gemeinsam stark mit |', '|---:|---|---|---:|---:|---|---|---:|---|---|');
   for (const r of cur.rows) {
     const part = r.pr.length ? r.pr.map(([o, lift, n]) => `${o} (${fmt(lift, 2)}, n=${n})`).join('; ') : '';
-    const prep = r.p == null ? '–' : `${fmt(r.p, 2)} (n=${r.pn})`;
-    L.push(`| ${r.rank} | ${r.n.replace(/\|/g, '/')} | ${r.t} | ${fmt(r.v)} | ${r.vn} | ${prev ? deltaCell(r, P.get(r.n)) : '–'} | ${first && first !== cur ? deltaCell(r, F.get(r.n)) : '–'} | ${prep} | ${r.k == null ? '–' : Math.round(r.k * 100) + ' %'} | ${part.replace(/\|/g, '/')} |`);
+    const prep = r.p == null ? '–' : `${fmt(r.p, 2)} · ${Math.round(r.k * 100)} % behalten (n=${r.pn})`;
+    L.push(`| ${r.rank} | ${r.n.replace(/\|/g, '/')} | ${r.t} | ${fmt(r.v)} | ${r.vn} | ${prev ? deltaCell(r, P.get(r.n)) : '–'} | ${first && first !== cur ? deltaCell(r, F.get(r.n)) : '–'} | ${r.pc == null ? '–' : Math.round(r.pc * 100) + ' %'} | ${prep} | ${part.replace(/\|/g, '/')} |`);
   }
   return L.join('\n') + '\n';
 }
