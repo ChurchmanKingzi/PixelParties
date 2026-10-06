@@ -25,6 +25,8 @@ const GROUPS = [
     cards: ['Guardian Beast Gou', 'Guardian Beast Hou', 'Guardian Beast Hu', 'Guardian Beast Ji', 'Guardian Beast Long', 'Guardian Beast Ma', 'Guardian Beast Niu', 'Guardian Beast She', 'Guardian Beast Shu', 'Guardian Beast Tu', 'Guardian Beast Yang', 'Guardian Beast Zhu', 'Mao, the Vengeful Guardian'] },
   { why: 'Curse: setzt die ATK des Ziels auf 0 — ein Held ohne Angriff kann in diesem Modus nichts mehr bewirken und führt zu unschönen, kaum lösbaren Lagen.',
     cards: ['Curse'] },
+  { why: 'Gorinthian War Counselor: betäubt ein Ziel für 2 Turns und setzt allen Schaden an ihm auf 0; wird der Stun vor dem Ablauf erneuert (in Skill-Test-Rounds immer möglich), heilt das Ziel nie, und der eingebaute Schutz „Immune nach Ablauf des Stuns" greift nie — der letzte Gegner ist dauerhaft gesperrt, die Partie endet nie (Nachttraining, Seed 233).',
+    cards: ['Gorinthian War Counselor'] },
   { why: 'Alle Future-Tech-Karten (Archetyp „Future Tech“): sie brauchen eine gefüllte Ablage, um gut zu funktionieren — im Skill Test gibt es keine Decks und kaum Ablage.',
     cards: futureTech },
 ];

@@ -510,15 +510,20 @@ async function evaluate(opts = {}) {
  * `minN`: Mindestzahl Beobachtungen je Eintrag.
  */
 function exportCompact(profile, minN = 4) {
+  // Karten, die nicht (mehr) im Pool sind (später gesperrt), kommen nicht ins ausgelieferte Profil.
+  let inPool = null;
+  try { inPool = require('./milestones').poolNames(); } catch { /* ohne Filter */ }
+  const cardOf = (k) => { const i = k.indexOf(':'); return i < 0 ? k : k.slice(i + 1); };
+  const allowed = (k) => !inPool || k.split('|').every(part => inPool.has(cardOf(part)) || inPool.has(part));
   const keep = (table, n) => {
     const out = {};
-    for (const [k, e] of Object.entries(table || {})) if (e.n >= n) out[k] = { n: e.n, sum: Math.round(e.sum * 1000) / 1000 };
+    for (const [k, e] of Object.entries(table || {})) if (e.n >= n && allowed(k)) out[k] = { n: e.n, sum: Math.round(e.sum * 1000) / 1000 };
     return out;
   };
   return {
     version: profile.version, games: profile.games, updated: profile.updated,
     playValue: keep(profile.playValue, minN), cardValue: keep(profile.cardValue, minN), dealtValue: keep(profile.dealtValue, minN), pairValue: keep(profile.pairValue, Math.max(minN, 6)),
-    prepValue: Object.fromEntries(Object.entries(profile.prepValue || {}).filter(([, e]) => e.n >= minN).map(([k, e]) => [k, { n: e.n, sum: Math.round(e.sum * 1000) / 1000, keep: e.keep }])),
+    prepValue: Object.fromEntries(Object.entries(profile.prepValue || {}).filter(([k, e]) => e.n >= minN && allowed(k)).map(([k, e]) => [k, { n: e.n, sum: Math.round(e.sum * 1000) / 1000, keep: e.keep }])),
     keepModel: profile.keepModel ? require('./keepmodel').compact(profile.keepModel) : null,
     personas: profile.personas, totals: profile.totals,
   };

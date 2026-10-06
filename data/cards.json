@@ -10313,7 +10313,7 @@
     "archetype": "War Counselors",
     "setID": "PP MS1",
     "banned": "",
-    "skilltestLegal": true,
+    "skilltestLegal": false,
     "spellSchool1": "Summoning Magic",
     "spellSchool2": "",
     "startingAbility1": "",

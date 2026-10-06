@@ -31,6 +31,16 @@ const NEUTRAL = 0.004;         // Änderungen darunter gelten als „unveränder
 const dirOf = () => ranking.files().ranking.replace(/\.ranking\.json$/, '.milestones');
 const r3 = (x) => (x == null || !Number.isFinite(x) ? null : Math.round(x * 1000) / 1000);
 
+/** Namen aller Karten, die im Pool vorkommen können (gesperrte und bildlose Karten gehören nicht in die Liste); null, wenn nicht ermittelbar. */
+function poolNames() {
+  try {
+    const { getCardDB } = require('../../cards/effects/_card-db');
+    const { bucketOf, imageFilter } = require('../pool');
+    const db = getCardDB(), hasImg = imageFilter(db);
+    return new Set(Object.values(db).filter(c => bucketOf(c) && hasImg(c.name)).map(c => c.name));
+  } catch { return null; }
+}
+
 /** Partner je Karte: Paare aus `pairValue` (Held+Ability/Creature, Ability+Creature einer Spalte, Held+Held), Vorsprung gegenüber dem Mittel der Einzelwerte. */
 function partnersOf(profile) {
   const cm = profile.cardValue || {};
@@ -59,7 +69,8 @@ function buildSnapshot(profile, { final = false } = {}) {
   const rk = ranking.buildRanking(profile, []);
   const prep = profile.prepValue || {};
   const partners = partnersOf(profile);
-  const rows = rk.rows.filter(r => r.valueN >= MIN_VALUE_N).map(r => {
+  const inPool = poolNames();
+  const rows = rk.rows.filter(r => r.valueN >= MIN_VALUE_N && (!inPool || inPool.has(r.name))).map(r => {
     const p = prep[r.name];
     return {
       n: r.name, t: r.type,
@@ -156,4 +167,4 @@ function writeMilestone(profile, { final = false } = {}) {
   return { games: cur.games, mdFile, jsonFile };
 }
 
-module.exports = { writeMilestone, buildSnapshot, renderMarkdown, renderIndex, partnersOf, readAll, dirOf, MIN_VALUE_N };
+module.exports = { poolNames, writeMilestone, buildSnapshot, renderMarkdown, renderIndex, partnersOf, readAll, dirOf, MIN_VALUE_N };
