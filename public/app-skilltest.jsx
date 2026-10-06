@@ -670,7 +670,7 @@ function SkillTestBattlePending({ lobby, leaveRoom }) {
 // ═══════════════════════════════════════════
 //  KAMPF — Turn-Panel und Hero-Menü (hängen im GameBoard)
 // ═══════════════════════════════════════════
-function StTurnPanel({ gameState, myIdx, isSpectator }) {
+function StTurnPanel({ gameState, myIdx, isSpectator, focusSeat, onFocus }) {
   const st = gameState.skillTest;
   const [now, setNow] = useState(Date.now());
   useEffect(() => { const t = setInterval(() => setNow(Date.now()), 500); return () => clearInterval(t); }, []);
@@ -688,14 +688,19 @@ function StTurnPanel({ gameState, myIdx, isSpectator }) {
           const p = players[seat];
           const out = (st.eliminated || []).includes(seat);
           return (
-            <div key={seat} className={'st-turn-row' + (seat === active ? ' is-active' : '') + (out ? ' is-out' : '') + (seat === myIdx ? ' is-me' : '')}>
-              <span className="st-turn-name">{seat === active ? '▶ ' : ''}{p.username}</span>
+            <div key={seat} className={'st-turn-row' + (seat === active ? ' is-active' : '') + (out ? ' is-out' : '') + (seat === myIdx ? ' is-me' : '') + (seat === focusSeat ? ' is-focus' : '')}
+              onClick={onFocus && seat !== myIdx ? () => onFocus(seat) : undefined}
+              title={onFocus && seat !== myIdx ? 'Show this player\'s board' : undefined}>
+              <span className="st-turn-name">{seat === active ? '▶ ' : ''}{(st.botSeats || []).includes(seat) ? '🤖 ' : ''}{p.username}</span>
               <span className="st-turn-actors" title="Heroes that can still act this round">{out ? '✖' : '⚔'.repeat(Math.min(3, readyHeroes(seat))) || '–'}</span>
               {(st.passed || {})[seat] && <span className="st-turn-passed" title="Ended their round">⏹</span>}
             </div>
           );
         })}
       </div>
+      {!isSpectator && (st.eliminated || []).includes(myIdx) && !gameState.result && (
+        <div className="st-turn-out orbit-font">ELIMINATED — watching</div>
+      )}
       {myTurn && <div className="st-turn-yours orbit-font">YOUR TURN{left != null ? ` · ${Math.ceil(left / 1000)}s` : ''}</div>}
       {myTurn && (
         <button className="btn btn-danger st-pass-btn" disabled={!!st.busy}

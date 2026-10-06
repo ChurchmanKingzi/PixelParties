@@ -69,4 +69,16 @@ function playerCountGs(gs) {
   return Array.isArray(gs?.players) ? gs.players.length : 2;
 }
 
-module.exports = { opponentOfGs, opponentsOfGs, playerCountGs };
+/**
+ * Ein Ereignis an die Gegner von `pi` senden (Kartenenthüllung, Flug-Animation …).
+ * Normalspiel: nur der EINE Gegner — exakt das alte `io.to(oppSid).emit(...)`.
+ * Skill Test: alle anderen Sitze (jeder soll die Karte sehen).
+ */
+function emitToOpponentsGs(gs, io, pi, event, payload) {
+  for (const oi of (gs && gs.skillTest) ? opponentsOfGs(gs, pi) : [opponentOfGs(gs, pi)]) {
+    const sid = gs.players[oi]?.socketId;
+    if (sid) io.to(sid).emit(event, payload);
+  }
+}
+
+module.exports = { opponentOfGs, opponentsOfGs, playerCountGs, emitToOpponentsGs };

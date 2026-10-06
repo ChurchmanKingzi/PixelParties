@@ -42,30 +42,20 @@ const toolsDir = (process.env.NODE_PATH || '').split(path.delimiter).find(d => f
     await page.click('.st-ready-btn');
     await page.waitForSelector('.st-turn-panel', { timeout: 20000 });
     await sleep(2500);
+    // Mensch passt jede Round; die CPUs spielen. Ende abwarten.
+    const t0 = Date.now();
+    let rounds = 0;
+    while (Date.now() - t0 < 160000) {
+      if (await page.locator('.st-rank-row').count()) break;
+      const btn = page.locator('button:has-text("END MY ROUND")');
+      if (await btn.count() && !(await btn.first().isDisabled().catch(() => true))) { await btn.first().click().catch(() => {}); rounds++; }
+      await sleep(400);
+    }
+    await sleep(6000);
     await page.screenshot({ path: out });
-    console.log('turn panel:', (await page.innerText('.st-turn-panel')).replace(/\n/g, ' | '));
-    // Spielzug: eigenen bereiten Hero anklicken und einen gegnerischen Hero als Ziel wählen.
-    const mine = page.locator('.board-zone-hero.st-actor-ready[data-hero-owner="me"]').first();
-    console.log('bereite eigene Heroes:', await page.locator('.board-zone-hero.st-actor-ready[data-hero-owner="me"]').count());
-    await mine.click();
-    await sleep(1200);
-    await page.screenshot({ path: out.replace('.png', '-clicked.png') });
-    console.log('nach Klick:', (await page.innerText('.st-turn-panel')).replace(/\n/g, ' | '));
-    const target = process.env.ST_TARGET === 'mini'
-      ? page.locator('.st-mini .board-zone-hero[data-hero-owner^="mini"]').nth(1)
-      : page.locator('.board-zone-hero[data-hero-owner="opp"]').first();
-    console.log('Mini-Helden:', await page.locator('.st-mini .board-zone-hero').count());
-    await target.click({ force: true });
-    await sleep(800);
-    await page.screenshot({ path: out.replace('.png', '-picked.png') });
-    console.log('Bestätigen-Button:', await page.locator('button:has-text("ATTACK!")').count(), await page.locator('button:has-text("ATTACK!")').first().isDisabled().catch(() => 'n/a'));
-    const confirmBtn = page.locator('button:has-text("ATTACK!")');
-    if (await confirmBtn.count()) await confirmBtn.first().click();
-    await sleep(4000);
-    await page.screenshot({ path: out.replace('.png', '-after.png') });
-    console.log('nach Ziel:', (await page.innerText('.st-turn-panel')).replace(/\n/g, ' | '));
-    console.log('exhausted:', await page.locator('.st-actor-exhausted').count());
-    console.log('Fehler:', errors.length);
+    console.log('Rangliste:', (await page.locator('.st-ranking').innerText().catch(() => 'FEHLT')).replace(/\n/g, ' | '));
+    console.log('Titel/Overlay:', (await page.locator('.pp-cer-titel, .pp-cer-title').first().innerText().catch(() => '?')));
+    console.log('gepasst:', rounds, 'Fehler:', errors.length);
   } catch (e) { console.error(e); process.exitCode = 1; }
   await browser.close();
   srv.child.kill();

@@ -84,12 +84,13 @@ const Rules = require('../../public/skilltest-rules.js');
     A.emit('st_prep_ready', { roomId: room.id, ready: true });
     await sleep(200);
 
-    // B stellt nur Heroes auf und wird ready → Kampfstart (Platzhalter)
+    // B stellt nur Heroes auf und wird ready → Kampfstart
     let curB = sb; B.socket.on('st_prep_state', (s) => { curB = s; });
     for (const hi of [0, 1, 2]) { B.emit('st_prep_move', { roomId: room.id, move: { type: 'place', from: { kind: 'hand', idx: curB.me.hand.findIndex(n => db[n].cardType === 'Hero') }, to: { kind: 'hero', hi } } }); await sleep(200); }
     B.emit('st_prep_ready', { roomId: room.id, ready: true });
-    const pending = await A.waitFor('st_battle_pending', null, 6000);
-    check('Alle bereit → Kampf beginnt, Startspieler = meiste Recycler-Karten', pending.starter === 0 && pending.recycled[0] === 2, pending);
+    const gsA = await A.waitFor('game_state', g => g && g.skillTest, 15000);
+    check('Alle bereit → Kampf beginnt, Startspieler = meiste Recycler-Karten', gsA.skillTest.starter === 0, gsA.skillTest);
+    check('Start-Gold = 4 je recycelter Karte (+4 Tick)', gsA.players[0].gold >= 2 * 4, gsA.players[0].gold);
     [A, B].forEach(c => c.close());
   } catch (e) { console.error(e); process.exitCode = 1; }
   srv.child.kill();

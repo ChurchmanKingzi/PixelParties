@@ -63,6 +63,7 @@ function isIncapacitated(h) {
 /** Creatures mit aktivem Effekt, die jetzt (für diesen Sitz) aktivierbar sind. */
 function creatureActors(engine, seat) {
   const st = stOf(engine);
+  if ((st.surrendered || []).includes(seat)) return [];   // wer aufgegeben hat, handelt nicht mehr
   let list = [];
   try { list = engine.getActivatableCreatures(seat) || []; } catch (e) { list = []; }
   return list.filter(c => !st.exhaustedCreatures[c.instId ?? c.id]);

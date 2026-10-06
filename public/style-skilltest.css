@@ -146,3 +146,48 @@
 .board-zone-hero.st-actor-exhausted { filter: grayscale(.75) brightness(.72); }
 .st-hero-menu { display: flex; flex-direction: column; gap: 6px; min-width: 150px; }
 .st-menu-title { font-size: 10px; color: var(--accent); text-align: center; }
+
+/* ═══ Skill Test: Mini-Kacheln der übrigen Gegner (N-Spieler-Brett) ═══ */
+.st-mini-strip {
+  display: flex; flex-wrap: nowrap; gap: 8px; align-items: flex-start;
+  padding: 4px 6px; overflow-x: auto; overflow-y: hidden; flex: 0 0 auto;
+  max-height: 190px; scrollbar-width: thin;
+}
+.st-mini {
+  flex: 0 0 auto; position: relative; cursor: default;
+  border: 1px solid rgba(255,255,255,.14); border-radius: 6px; background: rgba(8,10,20,.55);
+  transition: transform .12s ease, border-color .12s ease;
+}
+.st-mini:hover { border-color: rgba(255,255,255,.5); transform: translateY(1px); }
+.st-mini-turn { border-color: #ffd34e; box-shadow: 0 0 10px rgba(255,211,78,.45); }
+.st-mini-out { opacity: .45; filter: grayscale(.8); }
+.st-mini-head {
+  display: flex; align-items: center; gap: 6px; padding: 1px 6px; font-size: 11px; font-weight: 700;
+  color: #fff; border-bottom: 2px solid #888; background: rgba(0,0,0,.45); border-radius: 5px 5px 0 0;
+}
+.st-mini-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 220px; }
+.st-mini-flag { color: #ffd34e; }
+.st-mini-head { cursor: pointer; }
+.st-mini-zoom { margin-left: auto; opacity: .7; }
+.st-mini-body { zoom: .4; pointer-events: auto; }
+.st-mini-body .board-row { transform: none; }
+
+.st-mini-main { display: flex; align-items: flex-start; gap: 4px; }
+.st-mini-area {
+  zoom: .4; position: relative; flex: 0 0 auto;
+  width: var(--zone-w, 68px); height: calc(var(--zone-h, 95px) + var(--area-stack-offset, 18px) * 2);
+  margin: 2px 4px 0 0;
+}
+
+/* ═══ Skill Test: Rangliste im Endbildschirm ═══ */
+.st-ranking { margin: 0 auto 14px; min-width: 320px; max-width: 460px; display: flex; flex-direction: column; gap: 3px; }
+.st-rank-row { display: flex; align-items: center; gap: 8px; padding: 4px 10px; background: rgba(0,0,0,.4); border-radius: 4px; font-size: 14px; color: #e8e8f2; }
+.st-rank-me { background: rgba(255,211,78,.18); outline: 1px solid rgba(255,211,78,.6); }
+.st-rank-place { width: 28px; font-weight: 800; color: #ffd34e; }
+.st-rank-dot { width: 10px; height: 10px; border-radius: 50%; flex: 0 0 auto; }
+.st-rank-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left; }
+.st-rank-sc { font-weight: 700; color: #7dff9d; }
+
+.st-turn-row[title] { cursor: pointer; }
+.st-turn-row.is-focus { box-shadow: inset 2px 0 0 #7dd3ff; }
+.st-turn-out { margin-top: 6px; color: #ff6b81; font-size: 11px; text-align: center; letter-spacing: 1px; }

@@ -235,11 +235,21 @@ function placementsOf(gs, winnerIdx) {
   return place;
 }
 
-function scFor(gs, seat, winnerIdx, place) {
+/** SC-Bestandteile eines Sitzes (für Anzeige und Summe). */
+function scParts(gs, seat, winnerIdx, place) {
   const st = gs.skillTest, n = gs.players.length;
   const survivedRounds = st.eliminatedRound[seat] != null ? st.eliminatedRound[seat] : st.round;
   const outlasted = n - place[seat];                 // so viele Spieler haben diesem Platz den Vortritt gelassen
-  return survivedRounds * CONFIG.SC_PER_ROUND + outlasted * CONFIG.SC_PER_OUTLASTED_PLAYER + (seat === winnerIdx ? CONFIG.SC_WIN_BONUS : 0);
+  return {
+    rounds: survivedRounds, roundsSc: survivedRounds * CONFIG.SC_PER_ROUND,
+    outlasted, outlastedSc: outlasted * CONFIG.SC_PER_OUTLASTED_PLAYER,
+    winSc: seat === winnerIdx ? CONFIG.SC_WIN_BONUS : 0,
+  };
+}
+
+function scFor(gs, seat, winnerIdx, place) {
+  const p = scParts(gs, seat, winnerIdx, place);
+  return p.roundsSc + p.outlastedSc + p.winSc;
 }
 
 async function finishGame(room, winnerIdx, reason, host) {
@@ -248,7 +258,8 @@ async function finishGame(room, winnerIdx, reason, host) {
   const st = gs.skillTest;
   const place = placementsOf(gs, winnerIdx);
   const sc = gs.players.map((_, seat) => scFor(gs, seat, winnerIdx, place));
-  gs.result = { winnerIdx, reason, skillTest: { rounds: st.round, placements: place, sc } };
+  const scDetail = gs.players.map((_, seat) => scParts(gs, seat, winnerIdx, place));
+  gs.result = { winnerIdx, reason, skillTest: { rounds: st.round, placements: place, sc, scDetail } };
   st.phase = 'over'; room.skillTest.phase = 'over';
   if (st._timer) clearTimeout(st._timer);
   if (st._watch) clearInterval(st._watch);
@@ -269,4 +280,58 @@ async function finishGame(room, winnerIdx, reason, host) {
   host.io.emit('rooms', host.getRoomList());
 }
 
-module.exports = { start, pickStarter, finishGame, placementsOf, armTurnTimer };
+// ── Sitzwechsel im Kampf ───────────────────────────────────────────
+
+/** Einen hängenden Prompt des Sitzes mit der CPU-Standardantwort auflösen. */
+function answerPromptAsCpu(room, seat) {
+  const gs = room.gameState, ep = gs && gs.effectPrompt;
+  if (!ep || ep.ownerIdx !== seat || !room.engine) return;
+  try {
+    const resp = room.engine._getCpuGenericResponse(ep, seat);
+    gs.skillTest._promptSeen = null;
+    room.engine.resolveGenericPrompt(resp === undefined ? null : resp, ep.promptId);
+  } catch (e) { console.error('[skilltest] Prompt-Übernahme:', e && e.message); }
+}
+
+/** Mensch weg (Verbindung weg / verlassen): die CPU übernimmt den Sitz. `permanent`: kommt nicht zurück. */
+function seatAway(room, seat, host, { permanent = false } = {}) {
+  const gs = room.gameState, st = gs && gs.skillTest;
+  if (!st || gs.result || seat < 0 || !gs.players[seat]) return;
+  if (!st.botSeats.includes(seat)) st.botSeats.push(seat);
+  gs.players[seat].disconnected = true;
+  if (permanent) {
+    gs.players[seat].left = true;
+    const uid = room.players[seat] && room.players[seat].userId;
+    if (uid) host.activeGames.delete(uid);
+  }
+  answerPromptAsCpu(room, seat);
+  if (gs.activePlayer === seat && !st.busy) host.scheduleBotTurn(room, seat, { forced: true });
+  if (room.engine) room.engine.sync();
+}
+
+/** Mensch zurück: er spielt wieder selbst (außer er hat den Raum endgültig verlassen). */
+function seatBack(room, seat, host) {
+  const gs = room.gameState, st = gs && gs.skillTest;
+  if (!st || gs.result || seat < 0 || !gs.players[seat]) return;
+  if (room.players[seat].isBot || gs.players[seat].left) return;
+  st.botSeats = st.botSeats.filter(s => s !== seat);
+  gs.players[seat].disconnected = false;
+  if (gs.activePlayer === seat) armTurnTimer(room, host);
+  if (room.engine) room.engine.sync();
+}
+
+/** Aufgeben: der Sitz scheidet sofort aus (Helden fallen, Creatures handeln nicht mehr). */
+async function surrender(room, seat, host) {
+  const gs = room.gameState, st = gs && gs.skillTest;
+  if (!st || gs.result || !gs.players[seat] || st.eliminated.includes(seat)) return;
+  (st.surrendered = st.surrendered || []).push(seat);
+  for (const h of gs.players[seat].heroes || []) if (h && h.name) h.hp = 0;
+  room.engine.log('skilltest_surrender', { seat, name: gs.players[seat].username });
+  answerPromptAsCpu(room, seat);
+  await room.engine.checkAllHeroesDead();
+  if (gs.result) return;
+  if (gs.activePlayer === seat && !st.busy) await rounds.passRound(room, seat, host);
+  else room.engine.sync();
+}
+
+module.exports = { start, pickStarter, finishGame, placementsOf, armTurnTimer, seatAway, seatBack, surrender };

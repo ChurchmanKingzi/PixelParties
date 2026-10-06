@@ -27776,9 +27776,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     const pending = this.gs._pendingCardReveal;
     if (!pending) return;
     delete this.gs._pendingCardReveal;
-    const oi = this.opponentOf(pending.ownerIdx);
-    const oppSid = this.gs.players[oi]?.socketId;
-    if (oppSid) this.io.to(oppSid).emit('card_reveal', { cardName: pending.cardName });
+    require('./_opp').emitToOpponentsGs(this.gs, this.io, pending.ownerIdx, 'card_reveal', { cardName: pending.cardName });
     if (this.room?.spectators) {
       for (const spec of this.room.spectators) {
         if (spec.socketId) this.io.to(spec.socketId).emit('card_reveal', { cardName: pending.cardName });
@@ -36293,9 +36291,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     }
 
     // Reveal card to opponent and spectators
-    const oi = this.opponentOf(steuerer);   // 29.9.: Gegner des Ausloesers
-    const oppSid = this.gs.players[oi]?.socketId;
-    if (oppSid) this.io.to(oppSid).emit('card_reveal', { cardName });
+    require('./_opp').emitToOpponentsGs(this.gs, this.io, steuerer, 'card_reveal', { cardName });   // 29.9.: Gegner des Ausloesers
     if (this.room?.spectators) {
       for (const spec of this.room.spectators) {
         if (spec.socketId) this.io.to(spec.socketId).emit('card_reveal', { cardName });

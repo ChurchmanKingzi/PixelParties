@@ -68,7 +68,7 @@ const { sendMail } = require('./mailer');
 // Identitaet in game_history und die Route leben komplett in diesem Modul.
 const playerProfile = require('./player-profile');
 const skillTest = require('./skilltest');   // Modus „Skill Test" (Lobby, Vorbereitung, Rounds)
-const { opponentOfGs, playerCountGs } = require('./cards/effects/_opp');
+const { opponentOfGs, playerCountGs, emitToOpponentsGs } = require('./cards/effects/_opp');
 
 /**
  * Enrich a puzzle-authored buffs object so each entry carries the
@@ -4047,6 +4047,7 @@ const rooms = new Map();
 function destroyRoom(roomId) {
   const _r = rooms.get(roomId);
   try { _r?.engine?.abort?.(); } catch { /* Abbau darf nie werfen */ }
+  try { if (_r?.skillTest) skillTest.dispose(_r); } catch { /* Abbau darf nie werfen */ }
   return rooms.delete(roomId);
 }
 const activeGames = new Map(); // userId -> roomId
@@ -6766,8 +6767,7 @@ function broadcastHandToBoard(room, ownerIdx, payload, forceOwnerAnim = false) {
   if (room.engine?._fastMode) return;
   if (!room?.gameState) return;
   const oppIdx = opponentOfGs(room.gameState, ownerIdx);
-  const oppSid = room.gameState.players[oppIdx]?.socketId;
-  if (oppSid) io.to(oppSid).emit('hand_to_board_fly', { ownerIdx, ...payload });
+  emitToOpponentsGs(room.gameState, io, ownerIdx, 'hand_to_board_fly', { ownerIdx, ...payload });
   sendToSpectators(room, 'hand_to_board_fly', { ownerIdx, ...payload });
   // Normally the owner sees their own drag animation, so we don't echo
   // the fly back to them. For click-placed plays there's no drag —
@@ -7312,8 +7312,7 @@ async function doPlayArtifact(room, pi, { cardName, handIndex, heroIdx, zoneSlot
 
     try {
       const oi = opponentOfGs(gs, pi);
-      const oppSid = gs.players[oi]?.socketId;
-      if (oppSid) io.to(oppSid).emit('card_reveal', { cardName });
+      emitToOpponentsGs(gs, io, pi, 'card_reveal', { cardName });
       sendToSpectators(room, 'card_reveal', { cardName });
       await room.engine._delay(100);
 
@@ -10661,8 +10660,7 @@ async function doActivatePermanent(room, pi, { permId, ownerIdx }) {
 
   try {
     const oi = opponentOfGs(gs, pi);
-    const oppSid = gs.players[oi]?.socketId;
-    if (oppSid) io.to(oppSid).emit('card_reveal', { cardName: perm.name });
+    emitToOpponentsGs(gs, io, pi, 'card_reveal', { cardName: perm.name });
     sendToSpectators(room, 'card_reveal', { cardName: perm.name });
     room.engine.log('permanent_activated', { card: perm.name, player: gs.players[pi].username });
     // v353: Auftritt — ein Permanent liegt am Brett, also `'board'`.
@@ -10964,8 +10962,7 @@ async function doConfirmPotion(room, pi, { selectedIds }) {
     });
   } else {
     room.engine.log('card_played', { player: ps.username, card: potionName, cardType, cost: goldCost || 0 });
-    const oppSid = gs.players[oi]?.socketId;
-    if (oppSid) io.to(oppSid).emit('card_reveal', { cardName: potionName });
+    emitToOpponentsGs(gs, io, pi, 'card_reveal', { cardName: potionName });
     sendToSpectators(room, 'card_reveal', { cardName: potionName });
     await room.engine._delay(100);
   }
@@ -11569,9 +11566,8 @@ async function doUsePotion(room, pi, { cardName, handIndex, fromCreation }) {
 
   try {
     const oi = opponentOfGs(gs, pi);
-    const oppSid = gs.players[oi]?.socketId;
     if (!script.deferBroadcast) {
-      if (oppSid) io.to(oppSid).emit('card_reveal', { cardName });
+      emitToOpponentsGs(gs, io, pi, 'card_reveal', { cardName });
       sendToSpectators(room, 'card_reveal', { cardName });
       await room.engine._delay(100);
     }
@@ -13749,8 +13745,13 @@ io.on('connection', (socket) => {
             if (room.chatHistory?.length || Object.keys(room.privateChatHistory || {}).length) {
               socket.emit('chat_history', { main: room.chatHistory || [], private: room.privateChatHistory || {} });
             }
-            const oi = pi === 0 ? 1 : 0;
-            sendGameState(room, oi);
+            if (room.skillTest) {
+              // Skill Test: der Mensch spielt seinen Sitz wieder selbst (die CPU hatte ihn übernommen).
+              skillTest.onRejoin(room, { userId: session.userId, username: session.username }, socket, skillTestHost);
+            } else {
+              const oi = pi === 0 ? 1 : 0;
+              sendGameState(room, oi);
+            }
             sendSpectatorGameState(room);
           }
         }
@@ -14331,6 +14332,24 @@ io.on('connection', (socket) => {
     if (!currentUser) return;
     const room = rooms.get(roomId); if (!room) return;
     const hadResult = !!room.gameState?.result;
+
+    // ★ Skill Test: Verlassen = Aufgeben (falls das Spiel läuft); der Raum lebt für die übrigen Spieler weiter
+    // und wird erst abgebaut, wenn kein Mensch mehr da ist.
+    if (room.skillTest && room.gameState) {
+      const spi = room.gameState.players.findIndex(ps => ps.userId === currentUser.userId);
+      if (spi >= 0 && !hadResult) await skillTest.surrender(room, spi, skillTestHost);
+      socket.leave('room:' + roomId);
+      activeGames.delete(currentUser.userId);
+      if (spi >= 0) {
+        room.gameState.players[spi].left = true;
+        if (room.players[spi]) room.players[spi].socketId = null;
+        room.gameState.players[spi].socketId = null;
+      }
+      const humansLeft = room.players.some((p, i) => !p.isBot && !room.gameState.players[i]?.left);
+      if (!humansLeft) cleanupRoom(roomId);
+      else { for (let i = 0; i < room.gameState.players.length; i++) sendGameState(room, i); sendSpectatorGameState(room); }
+      return;
+    }
 
     // If game is active and no result yet, surrendering ends the game
     if (room.gameState && !hadResult && room.status === 'playing') {
@@ -14925,8 +14944,7 @@ io.on('connection', (socket) => {
     const pi = room.gameState.players.findIndex(ps => ps.userId === currentUser.userId);
     if (pi < 0) return;
     const oi = opponentOfGs(room.gameState, pi);
-    const oppSid = room.gameState.players[oi]?.socketId;
-    if (oppSid) io.to(oppSid).emit('opponent_targeting', { selectedIds });
+    emitToOpponentsGs(room.gameState, io, pi, 'opponent_targeting', { selectedIds });
     sendToSpectators(room, 'opponent_targeting', { selectedIds });
   });
 
@@ -14944,8 +14962,7 @@ io.on('connection', (socket) => {
     else if (flipped.owner === 'opp') flipped.owner = 'me';
     if (flipped.type === 'hand-me') flipped.type = 'hand-opp';
     else if (flipped.type === 'hand-opp') flipped.type = 'hand-me';
-    const oppSid = room.gameState.players[oi]?.socketId;
-    if (oppSid) io.to(oppSid).emit('ping_card', { ping: flipped, color });
+    emitToOpponentsGs(room.gameState, io, pi, 'ping_card', { ping: flipped, color });
     // Spectators see from player 0's perspective — translate accordingly
     const specPing = pi === 0 ? { ...ping } : { ...flipped };
     sendToSpectators(room, 'ping_card', { ping: specPing, color });
@@ -15057,8 +15074,7 @@ io.on('connection', (socket) => {
     const pi = room.gameState.players.findIndex(ps => ps.userId === currentUser.userId);
     if (pi < 0) return;
     const oi = opponentOfGs(room.gameState, pi);
-    const oppSid = room.gameState.players[oi]?.socketId;
-    if (oppSid) io.to(oppSid).emit('opponent_pending_placement', { owner: pi, heroIdx, zoneSlot, cardName });
+    emitToOpponentsGs(room.gameState, io, pi, 'opponent_pending_placement', { owner: pi, heroIdx, zoneSlot, cardName });
     sendToSpectators(room, 'opponent_pending_placement', { owner: pi, heroIdx, zoneSlot, cardName });
   });
   socket.on('pending_placement_clear', ({ roomId }) => {
@@ -15068,8 +15084,7 @@ io.on('connection', (socket) => {
     const pi = room.gameState.players.findIndex(ps => ps.userId === currentUser.userId);
     if (pi < 0) return;
     const oi = opponentOfGs(room.gameState, pi);
-    const oppSid = room.gameState.players[oi]?.socketId;
-    if (oppSid) io.to(oppSid).emit('opponent_pending_placement', null);
+    emitToOpponentsGs(room.gameState, io, pi, 'opponent_pending_placement', null);
     sendToSpectators(room, 'opponent_pending_placement', null);
   });
 
@@ -15397,6 +15412,7 @@ io.on('connection', (socket) => {
     if (!room?.gameState || room.gameState.result) return;
     const pi = room.gameState.players.findIndex(ps => ps.userId === currentUser.userId);
     if (pi < 0) return;
+    if (room.skillTest) { await skillTest.surrender(room, pi, skillTestHost); return; }   // Skill Test: nur dieser Sitz scheidet aus
     const winnerIdx = pi === 0 ? 1 : 0;
     if (room.type === 'puzzle') { puzzleEndGame(room, winnerIdx, 'surrender'); return; }
     await endGame(room, winnerIdx, 'surrender');
@@ -15408,6 +15424,7 @@ io.on('connection', (socket) => {
     if (!room?.gameState) return;
     const pi = room.gameState.players.findIndex(ps => ps.userId === currentUser.userId);
     if (pi < 0) return;
+    if (room.skillTest) { await skillTest.surrender(room, pi, skillTestHost); return; }
     const winnerIdx = pi === 0 ? 1 : 0;
     // Satz beenden. Mitten im Spiel: das laufende Spiel zaehlt als Sieg des
     // Gegners und beendet den Satz; zwischen zwei Spielen: nur den Satz
@@ -18653,7 +18670,7 @@ function handleLeaveRoom(socket, roomId, user) {
   // `auth`/`join_room`). Die Details (Auto-Ready, Auscheiden nach Karenzzeit)
   // regelt das Modul selbst.
   if (room.skillTest && !skillTest.isLobbyPhase(room)) {
-    skillTest.onSeatLeft(room, user, socket, skillTestHost);
+    skillTest.onSeatLeft(room, user, socket, skillTestHost, { permanent: true });
     io.to('room:' + roomId).emit('room_update', sanitizeRoom(room));
     io.emit('rooms', getRoomList());
     return;

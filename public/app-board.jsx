@@ -556,11 +556,31 @@ function zonenBelegung(gs) {
   return m;
 }
 
+// ★ Skill Test (N Spieler): DOM-Besitzer-Etikett je Sitz. Im Normalspiel gilt
+// weiter nur 'me' / 'opp'. Im Skill Test mit >2 Sitzen steht EIN Gegner (der
+// Fokus) im Hauptfeld ('opp'); alle übrigen sitzen in Mini-Kacheln und tragen
+// 'mini<Sitz>'. `ST_FOCUS_SEAT` setzt GameBoard bei jedem Rendern.
+let ST_FOCUS_SEAT = null;
+function ownerLbl(pi, myIdx) {
+  if (pi === myIdx) return 'me';
+  if (ST_FOCUS_SEAT == null || !Number.isInteger(pi) || pi === ST_FOCUS_SEAT) return 'opp';
+  return 'mini' + pi;
+}
+/** Gehört das Etikett einem Gegner (Hauptfeld oder Mini-Kachel)? */
+function istGegnerLbl(l) { return l === 'opp' || (typeof l === 'string' && l.startsWith('mini')); }
+/** Sitz-Index zu einem Etikett ('me' → myIdx, 'opp' → Fokus, 'mini3' → 3). */
+function sitzVonLbl(l, myIdx, oppIdx) {
+  if (l === 'me') return myIdx;
+  if (l === 'opp') return oppIdx;
+  if (typeof l === 'string' && l.startsWith('mini')) return Number(l.slice(4));
+  return oppIdx;
+}
+
 /** Platzschluessel -> DOM-Selektor der zugehoerigen Zone. */
 function zonenSelektor(schluessel, myIdx) {
   const t = schluessel.split(':');
   const art = t[0];
-  const seite = Number(t[1]) === myIdx ? 'me' : 'opp';
+  const seite = ownerLbl(Number(t[1]), myIdx);
   if (art === 'h') return `[data-hero-zone][data-hero-owner="${seite}"][data-hero-idx="${t[2]}"]`;
   if (art === 'a') return `[data-ability-zone][data-ability-owner="${seite}"][data-ability-hero="${t[2]}"][data-ability-slot="${t[3]}"]`;
   if (art === 's') return `[data-support-zone][data-support-owner="${seite}"][data-support-hero="${t[2]}"][data-support-slot="${t[3]}"]`;
@@ -747,7 +767,7 @@ function GoldLossNumber({ amount, playerIdx, isMe }) {
 function LevelChangeNumber({ delta, owner, heroIdx, zoneSlot, myIdx }) {
   const [pos, setPos] = useState(null);
   useEffect(() => {
-    const ownerLabel = owner === myIdx ? 'me' : 'opp';
+    const ownerLabel = ownerLbl(owner, myIdx);
     const el = document.querySelector(`[data-support-zone][data-support-owner="${ownerLabel}"][data-support-hero="${heroIdx}"][data-support-slot="${zoneSlot}"]`);
     if (el) {
       const r = el.getBoundingClientRect();
@@ -768,7 +788,7 @@ function LevelChangeNumber({ delta, owner, heroIdx, zoneSlot, myIdx }) {
 function ToughnessHpNumber({ amount, owner, heroIdx, myIdx }) {
   const [pos, setPos] = useState(null);
   useEffect(() => {
-    const ownerLabel = owner === myIdx ? 'me' : 'opp';
+    const ownerLabel = ownerLbl(owner, myIdx);
     const el = document.querySelector(`[data-hero-zone][data-hero-owner="${ownerLabel}"][data-hero-idx="${heroIdx}"]`);
     if (el) {
       const r = el.getBoundingClientRect();
@@ -789,7 +809,7 @@ function ToughnessHpNumber({ amount, owner, heroIdx, myIdx }) {
 function FightingAtkNumber({ amount, owner, heroIdx, myIdx }) {
   const [pos, setPos] = useState(null);
   useEffect(() => {
-    const ownerLabel = owner === myIdx ? 'me' : 'opp';
+    const ownerLabel = ownerLbl(owner, myIdx);
     const el = document.querySelector(`[data-hero-zone][data-hero-owner="${ownerLabel}"][data-hero-idx="${heroIdx}"]`);
     if (el) {
       const r = el.getBoundingClientRect();
@@ -24878,7 +24898,7 @@ function ZielMarkenEbene({ marken, blitze, myIdx }) {
       for (const m of alle) {
         const k = schluessel(m);
         if (out[k]) continue;
-        const lbl = m.owner === myIdx ? 'me' : 'opp';
+        const lbl = ownerLbl(m.owner, myIdx);
         const el = m.type === 'hero'
           ? document.querySelector(`[data-hero-zone][data-hero-owner="${lbl}"][data-hero-idx="${m.heroIdx}"]`)
           : document.querySelector(`[data-support-zone][data-support-owner="${lbl}"][data-support-hero="${m.heroIdx}"][data-support-slot="${m.slotIdx}"]`);
@@ -26269,6 +26289,38 @@ function ppGameOverText(reason, ich, loserName, winnerName) {
 }
 
 // cpuProgress: { wins, unlocks: [{ kind, name, image }], theme: { name, wins, need }, sleeve: { name, wins, need } } — nur nach einem Sieg über eine CPU.
+// ★ Skill Test: Platz-Titel, SC-Posten und Rangliste des Endbildschirms.
+function stPlaceTitle(place) {
+  if (!place) return 'DEFEAT';
+  const suf = (place % 100 >= 11 && place % 100 <= 13) ? 'TH' : ({ 1: 'ST', 2: 'ND', 3: 'RD' }[place % 10] || 'TH');
+  return `${place}${suf} PLACE`;
+}
+function stRewards(res, seat) {
+  const d = res.scDetail?.[seat];
+  if (!d) return [];
+  const out = [];
+  if (d.roundsSc > 0) out.push({ id: 'st-rounds', title: `${d.rounds} round${d.rounds === 1 ? '' : 's'} survived`, amount: d.roundsSc, description: '1 SC per round' });
+  if (d.outlastedSc > 0) out.push({ id: 'st-outlast', title: `${d.outlasted} player${d.outlasted === 1 ? '' : 's'} outlasted`, amount: d.outlastedSc, description: '5 SC per player' });
+  if (d.winSc > 0) out.push({ id: 'st-win', title: 'Last one standing', amount: d.winSc, description: 'Victory bonus' });
+  return out;
+}
+function StRanking({ res, players, myIdx }) {
+  const rows = players.map((p, i) => ({ i, p, place: res.placements?.[i] ?? players.length, sc: res.sc?.[i] || 0 }))
+    .sort((a, b) => a.place - b.place || a.i - b.i);
+  return (
+    <div className="st-ranking">
+      {rows.map(r => (
+        <div key={r.i} className={'st-rank-row' + (r.i === myIdx ? ' st-rank-me' : '')}>
+          <span className="st-rank-place">{r.place}.</span>
+          <span className="st-rank-dot" style={{ background: r.p.color || '#888' }} />
+          <span className="st-rank-name">{r.p.username}</span>
+          <span className="st-rank-sc">{r.sc} SC</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function ResultCeremony({ won, spectator, title, subtitle, rewards, total, eloChanges, myName, oppName, extra, cpuProgress, children }) {
   const n = rewards.length;
   const ENDE = n + 1;
@@ -26698,7 +26750,23 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   const heldenDynamisch = heldenAnzeigen && (user?.dynamic_heroes == null ? true : !!user.dynamic_heroes);
   const isSpectator = gameState.isSpectator || false;
   const myIdx = gameState.myIndex;
-  const oppIdx = myIdx === 0 ? 1 : 0;
+  // ★ Skill Test (>2 Sitze): der Gegner im Hauptfeld ist der „Fokus" — angeklickt
+  // (angepinnt) oder, solange nichts angepinnt ist, der Sitz, der gerade am Zug
+  // ist, sonst der nächste lebende Sitz. Alle anderen Gegner: Mini-Kacheln.
+  const stInfo = gameState.skillTest || null;
+  const stMulti = !!stInfo && (gameState.players || []).length > 2;
+  const [stFocusPin, setStFocusPin] = useState(null);
+  const oppIdx = (() => {
+    if (!stMulti) return myIdx === 0 ? 1 : 0;
+    const ps = gameState.players, n = ps.length;
+    const lebt = (i) => (ps[i].heroes || []).some(h => h?.name && h.hp > 0);
+    if (Number.isInteger(stFocusPin) && stFocusPin !== myIdx && stFocusPin < n) return stFocusPin;
+    const dran = stInfo.turnSeat;
+    if (Number.isInteger(dran) && dran !== myIdx && dran < n) return dran;
+    for (let k = 1; k < n; k++) { const i = (myIdx + k) % n; if (lebt(i)) return i; }
+    return (myIdx + 1) % n;
+  })();
+  ST_FOCUS_SEAT = stMulti ? oppIdx : null;
   // Großer Karten-Auftritt (Terror). null = nichts zu zeigen.
   const [cardShowcase, setCardShowcase] = useState(null);
   // Gold-Crash-Anzeige ("Market Crash"). null = normal, sonst ein Array
@@ -26716,6 +26784,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   const gameSkins = useMemo(() => ({ ...(me.deckSkins || {}), ...(opp.deckSkins || {}) }), [me.deckSkins, opp.deckSkins]);
   const result = gameState.result;
   const iWon = result && result.winnerIdx === myIdx;
+  const stRes = (result && gameState.skillTest && result.skillTest) || null;
   const resultSfxPlayedRef = useRef(false);
   const oppLeft = opp.left || false;
   const oppDisconnected = opp.disconnected || false;
@@ -28192,7 +28261,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   // des betroffenen Spielers langsam und leicht lila (Klassen am body, Regeln in style.css).
   useEffect(() => {
     const f = gameState.fifthCircle;
-    const seite = f ? (f.affected === myIdx ? 'me' : 'opp') : null;
+    const seite = f ? (ownerLbl(f.affected, myIdx)) : null;
     document.body.classList.toggle('fifth-curse-me', seite === 'me');
     document.body.classList.toggle('fifth-curse-opp', seite === 'opp');
     return () => { document.body.classList.remove('fifth-curse-me', 'fifth-curse-opp'); };
@@ -32998,7 +33067,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     // detector is suppressed for this hero on the upcoming sync so
     // these explicit popups are the sole source of truth.
     const onKiaiHpSplit = ({ owner, heroIdx, damage, heal }) => {
-      const ownerLabel = owner === myIdx ? 'me' : 'opp';
+      const ownerLabel = ownerLbl(owner, myIdx);
       if (damage && damage > 0) {
         const dmgEntry = { id: Date.now() + Math.random(), amount: damage, ownerLabel, heroIdx };
         setDamageNumbers(prev => [...prev, dmgEntry]);
@@ -33044,7 +33113,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       // since it's gated on the visual.
       if (window._playAnimations === false) return;
       if (window.playSFXForZoneAnim) window.playSFXForZoneAnim(type, rest);
-      const ownerLabel = owner === myIdx ? 'me' : 'opp';
+      const ownerLabel = ownerLbl(owner, myIdx);
       // ── `zoneType: 'board'` — die ganze Kampfflaeche (v580) ─────────
       // Fuer Effekte, die NICHT an einer Zone haengen, sondern das
       // Brett als Ganzes treffen (Future Tech Doomsday Bomb: eine
@@ -33107,7 +33176,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           const extra = {};
           if (typeof rest.originHeroIdx === 'number' && rest.originHeroIdx >= 0
               && (rest.originOwner === 0 || rest.originOwner === 1)) {
-            const lbl = rest.originOwner === myIdx ? 'me' : 'opp';
+            const lbl = ownerLbl(rest.originOwner, myIdx);
             const held = document.querySelector(`[data-hero-zone][data-hero-owner="${lbl}"][data-hero-idx="${rest.originHeroIdx}"]`);
             if (held) {
               const q = held.getBoundingClientRect();
@@ -33125,7 +33194,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           if (Array.isArray(rest.targets) && rest.targets.length) {
             const punkte = [];
             for (const t of rest.targets) {
-              const lbl2 = t.owner === myIdx ? 'me' : 'opp';
+              const lbl2 = ownerLbl(t.owner, myIdx);
               const sel2 = (t.zoneSlot == null || t.zoneSlot < 0)
                 ? `[data-hero-zone][data-hero-owner="${lbl2}"][data-hero-idx="${t.heroIdx}"]`
                 : `[data-support-zone][data-support-owner="${lbl2}"][data-support-hero="${t.heroIdx}"][data-support-slot="${t.zoneSlot}"]`;
@@ -33217,7 +33286,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       const vonAufloesen = (ankerEl) => {
         const v = rest.von;
         if (!v || !ankerEl || (v.owner !== 0 && v.owner !== 1)) return null;
-        const lbl = v.owner === myIdx ? 'me' : 'opp';
+        const lbl = ownerLbl(v.owner, myIdx);
         const vSel = v.zoneType === 'surprise'
           ? `[data-surprise-zone][data-surprise-owner="${lbl}"][data-surprise-hero="${v.heroIdx}"]`
           : (v.zoneSlot != null && v.zoneSlot >= 0)
@@ -33260,7 +33329,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       // cue the player cares about, while still letting genuinely separate
       // ability activations play their own sound.
       if (window.playSFX) window.playSFX('ability_activate', { dedupe: 800 });
-      const ownerLabel = owner === myIdx ? 'me' : 'opp';
+      const ownerLabel = ownerLbl(owner, myIdx);
       // v773: Eine Ability kann in einer SUPPORT Zone liegen (Xal,
       // Xalibur). Ohne die Unterscheidung blitzte die Ability-Zone mit
       // DEMSELBEN Index auf — also die falsche Karte (Als Befund 5.9.).
@@ -33310,7 +33379,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     };
     const onTetherAnimation = ({ sources, targetOwner, targetHeroIdx, targetZoneSlot, duration, color, glow, sfx }) => {
       const zoneEl = (owner, heroIdx, zoneSlot) => {
-        const lab = owner === myIdx ? 'me' : 'opp';
+        const lab = ownerLbl(owner, myIdx);
         return (zoneSlot != null && zoneSlot >= 0)
           ? document.querySelector(`[data-support-zone][data-support-owner="${lab}"][data-support-hero="${heroIdx}"][data-support-slot="${zoneSlot}"]`)
           : document.querySelector(`[data-hero-zone][data-hero-owner="${lab}"][data-hero-idx="${heroIdx}"]`);
@@ -33352,8 +33421,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         if (bolt) window.playSFX('elem_lightning', { dedupe: 50, category: 'effect' });
         else window.playSFX('laser', { dedupe: 60, category: 'effect' });
       }
-      const srcLabel = sourceOwner === myIdx ? 'me' : 'opp';
-      const tgtLabel = targetOwner === myIdx ? 'me' : 'opp';
+      const srcLabel = ownerLbl(sourceOwner, myIdx);
+      const tgtLabel = ownerLbl(targetOwner, myIdx);
       // `sourceZoneType: 'ability'` laesst den Strahl an einer ABILITY-Zone
       // beginnen statt an einer Support Zone (16.8., Als Occultism-Report:
       // der Strahl startete an der geopferten Kreatur statt an der
@@ -33602,8 +33671,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     // source is either a specific hand index or the player's deck pile;
     // the destination is the host Creature's support zone slot.
     const onAttachHeroFly = ({ ownerIdx, source, handIndex, cardName, destOwner, destHeroIdx, destZoneSlot }) => {
-      const ownerLabel = ownerIdx === myIdx ? 'me' : 'opp';
-      const destLabel = destOwner === myIdx ? 'me' : 'opp';
+      const ownerLabel = ownerLbl(ownerIdx, myIdx);
+      const destLabel = ownerLbl(destOwner, myIdx);
       let sourceEl;
       if (source === 'hand') {
         // v911 (Als Befund 12.9.): `.game-hand` traf die FALSCHE Hand.
@@ -33695,9 +33764,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         // dieser Platz; sonst per Name — aber Handkarten nur, wenn der
         // Effekt dem EIGENEN Spieler gehoert (die CPU-Hydra darf meine
         // Handkopie nicht anzuenden).
-        const ownerLabel = typeof playerIdx === 'number' ? (playerIdx === myIdx ? 'me' : 'opp') : null;
+        const ownerLabel = typeof playerIdx === 'number' ? (ownerLbl(playerIdx, myIdx)) : null;
         // 29.9.: Brett-Platz auf der BRETTSEITE (geliehener Held steht drueben).
-        const brettLabel = typeof boardOwner === 'number' ? (boardOwner === myIdx ? 'me' : 'opp') : ownerLabel;
+        const brettLabel = typeof boardOwner === 'number' ? (ownerLbl(boardOwner, myIdx)) : ownerLabel;
         let nodes = null;
         if (brettLabel && zone === 'support' && heroIdx >= 0 && zoneSlot >= 0) {
           nodes = document.querySelectorAll(`[data-support-zone][data-support-owner="${brettLabel}"][data-support-hero="${heroIdx}"][data-support-slot="${zoneSlot}"]`);
@@ -33998,7 +34067,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       // screen doesn't flash 6 creatures simultaneously.
       for (let i = 0; i < (creatures || []).length; i++) {
         const c = creatures[i];
-        const ownerLabel = c.owner === myIdx ? 'me' : 'opp';
+        const ownerLabel = ownerLbl(c.owner, myIdx);
         const sel = `[data-support-zone][data-support-owner="${ownerLabel}"][data-support-hero="${c.heroIdx}"][data-support-slot="${c.zoneSlot}"]`;
         setTimeout(() => playAnimation('deepsea_spores_growth', sel, { duration: 1800 }), 200 + i * 120);
       }
@@ -34021,7 +34090,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     };
     socket.on('rain_of_spores_activated', onRainOfSporesActivated);
     const onNomuDraw = ({ playerIdx: drawPlayer }) => {
-      const ownerLabel = drawPlayer === myIdx ? 'me' : 'opp';
+      const ownerLabel = ownerLbl(drawPlayer, myIdx);
       const handEl = ownerLabel === 'me' ? document.querySelector('.hand-container')
         : document.querySelector('.board-row'); // fallback
       if (!handEl) return;
@@ -34064,7 +34133,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     socket.on('ability_block_flash', onAbilityBlockFlash);
     const onHeroAscension = ({ owner, heroIdx, oldHero, newHero }) => {
       setFormPreview(null);   // v1188: der echte Wechsel loest das Vorziehen ab
-      const ownerLabel = owner === myIdx ? 'me' : 'opp';
+      const ownerLabel = ownerLbl(owner, myIdx);
       const el = document.querySelector(`[data-hero-zone][data-hero-owner="${ownerLabel}"][data-hero-idx="${heroIdx}"]`);
       if (!el) return;
       const r = el.getBoundingClientRect();
@@ -34151,7 +34220,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     // `evolutionAnimation` und wartet die Dauer ab, bevor er weitermacht
     // — die Animation laeuft also nicht gegen den naechsten Sync an.
     const onEvolutionAnimation = ({ owner, heroIdx, fromHero, toHero, direction, duration }) => {
-      const ownerLabel = owner === myIdx ? 'me' : 'opp';
+      const ownerLabel = ownerLbl(owner, myIdx);
       const el = document.querySelector(`[data-hero-zone][data-hero-owner="${ownerLabel}"][data-hero-idx="${heroIdx}"]`);
       if (!el) return;
       const up = direction !== 'descend';
@@ -34220,7 +34289,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     };
     socket.on('play_evolution_animation', onEvolutionAnimation);
     const onWillyLeprechaun = ({ owner, heroIdx }) => {
-      const ownerLabel = owner === myIdx ? 'me' : 'opp';
+      const ownerLabel = ownerLbl(owner, myIdx);
       const el = document.querySelector(`[data-hero-zone][data-hero-owner="${ownerLabel}"][data-hero-idx="${heroIdx}"]`);
       if (!el) return;
       const r = el.getBoundingClientRect();
@@ -34259,8 +34328,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     };
     socket.on('willy_leprechaun', onWillyLeprechaun);
     const onAlleriaSpiderRedirect = ({ srcOwner, srcHeroIdx, tgtOwner, tgtHeroIdx, alleriaOwner, alleriaHeroIdx }) => {
-      const srcLabel = srcOwner === myIdx ? 'me' : 'opp';
-      const tgtLabel = tgtOwner === myIdx ? 'me' : 'opp';
+      const srcLabel = ownerLbl(srcOwner, myIdx);
+      const tgtLabel = ownerLbl(tgtOwner, myIdx);
       const srcEl = document.querySelector(`[data-hero-zone][data-hero-owner="${srcLabel}"][data-hero-idx="${srcHeroIdx}"]`);
       const tgtEl = document.querySelector(`[data-hero-zone][data-hero-owner="${tgtLabel}"][data-hero-idx="${tgtHeroIdx}"]`);
       if (!srcEl || !tgtEl) return;
@@ -34308,7 +34377,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     socket.on('alleria_spider_redirect', onAlleriaSpiderRedirect);
     const onDarkControl = ({ owner, heroIdx, zoneSlot }) => {
       if (window.playSFX) window.playSFX('elem_dark', { category: 'effect' });
-      const ownerLabel = owner === myIdx ? 'me' : 'opp';
+      const ownerLabel = ownerLbl(owner, myIdx);
       // Optional `zoneSlot` anchors the animation on a specific Support
       // Zone (Aligning Goals targets Creatures) instead of the host
       // Hero zone (Controlled Attack targets Heroes). Mirrors the
@@ -34368,7 +34437,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     // Flammen, fallende Glyphen und ein Abwaertssog.
     const onDarkRitual = ({ owner, heroIdx }) => {
       if (window.playSFX) window.playSFX('elem_dark', { category: 'effect' });
-      const ownerLabel = owner === myIdx ? 'me' : 'opp';
+      const ownerLabel = ownerLbl(owner, myIdx);
       const el = document.querySelector(`[data-hero-zone][data-hero-owner="${ownerLabel}"][data-hero-idx="${heroIdx}"]`);
       if (!el) return;
       const r = el.getBoundingClientRect();
@@ -34460,7 +34529,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       const _flug = flyMs || 800;
       if (window.playSFX) window.playSFX('whoosh', { category: 'effect' });
       const sel = (owner, hi, slot) => {
-        const lab = owner === myIdx ? 'me' : 'opp';
+        const lab = ownerLbl(owner, myIdx);
         return slot >= 0
           ? `[data-support-zone][data-support-owner="${lab}"][data-support-hero="${hi}"][data-support-slot="${slot}"]`
           : `[data-hero-zone][data-hero-owner="${lab}"][data-hero-idx="${hi}"]`;
@@ -34567,7 +34636,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     };
     socket.on('hunting_net', onHuntingNet);
     const onDeathClaimHold = ({ owner, heroIdx, zoneSlot, cardName }) => {
-      const lab = owner === myIdx ? 'me' : 'opp';
+      const lab = ownerLbl(owner, myIdx);
       const el = document.querySelector(`[data-support-zone][data-support-owner="${lab}"][data-support-hero="${heroIdx}"][data-support-slot="${zoneSlot}"]`);
       if (!el) return;
       const r = el.getBoundingClientRect();
@@ -34588,7 +34657,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     // Glied mit Heldennamen auftauchen.
     const onHeroEffectReaction = ({ owner, heroIdx }) => {
       if (window.playSFX) window.playSFX('ability_activate', { category: 'effect' });
-      const lab = owner === myIdx ? 'me' : 'opp';
+      const lab = ownerLbl(owner, myIdx);
       const el = document.querySelector(`[data-hero-zone][data-hero-owner="${lab}"][data-hero-idx="${heroIdx}"]`);
       if (!el) return;
       const r = el.getBoundingClientRect();
@@ -34607,7 +34676,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     socket.on('hero_effect_reaction', onHeroEffectReaction);
     const onBurningFingerSlash = ({ owner, heroIdx, zoneSlot }) => {
       if (window.playSFX) window.playSFX('slash', { category: 'effect' });
-      const ownerLabel = owner === myIdx ? 'me' : 'opp';
+      const ownerLabel = ownerLbl(owner, myIdx);
       const sel = zoneSlot >= 0
         ? `[data-support-zone][data-support-owner="${ownerLabel}"][data-support-hero="${heroIdx}"][data-support-slot="${zoneSlot}"]`
         : `[data-hero-zone][data-hero-owner="${ownerLabel}"][data-hero-idx="${heroIdx}"]`;
@@ -34655,7 +34724,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       // (~105ms in). Delay the hit so the sound lands on the impact frame
       // instead of during the wind-up.
       if (window.playSFX) window.playSFX('heavy_impact', { delay: 110, category: 'effect' });
-      const ownerLabel = owner === myIdx ? 'me' : 'opp';
+      const ownerLabel = ownerLbl(owner, myIdx);
       // Support zones use `data-support-*` (Creatures and Equipment
       // both render there); legacy `data-equip-*` selectors never
       // matched and silently swallowed every creature-targeted punch.
@@ -34713,7 +34782,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     // React-state slot-mask so the real card stays hidden across the
     // re-renders that happen mid-flight (damage application etc.).
     const onPusherFling = ({ owner, heroIdx, zoneSlot, cardName, duration }) => {
-      const ownerLabel = owner === myIdx ? 'me' : 'opp';
+      const ownerLabel = ownerLbl(owner, myIdx);
       const sel = `[data-support-zone][data-support-owner="${ownerLabel}"][data-support-hero="${heroIdx}"][data-support-slot="${zoneSlot}"]`;
       const el = document.querySelector(sel);
       if (!el) return;
@@ -34779,7 +34848,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     };
     socket.on('play_pusher_fling', onPusherFling);
     const onBaihuPetrify = ({ owner, heroIdx }) => {
-      const ownerLabel = owner === myIdx ? 'me' : 'opp';
+      const ownerLabel = ownerLbl(owner, myIdx);
       const el = document.querySelector(`[data-hero-zone][data-hero-owner="${ownerLabel}"][data-hero-idx="${heroIdx}"]`);
       if (!el) return;
       const r = el.getBoundingClientRect();
@@ -34826,8 +34895,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     socket.on('cardinal_beast_win', onCardinalBeastWin);
     const onQinglongLightning = ({ srcOwner, srcHeroIdx, srcZoneSlot, tgtOwner, tgtHeroIdx, tgtZoneSlot, step }) => {
       if (window.playSFX) window.playSFX('elem_lightning', { dedupe: 80, category: 'effect' });
-      const sLabel = srcOwner === myIdx ? 'me' : 'opp';
-      const tLabel = tgtOwner === myIdx ? 'me' : 'opp';
+      const sLabel = ownerLbl(srcOwner, myIdx);
+      const tLabel = ownerLbl(tgtOwner, myIdx);
       const srcSel = srcZoneSlot >= 0
         ? `[data-support-zone][data-support-owner="${sLabel}"][data-support-hero="${srcHeroIdx}"][data-support-slot="${srcZoneSlot}"]`
         : `[data-hero-zone][data-hero-owner="${sLabel}"][data-hero-idx="${srcHeroIdx}"]`;
@@ -34870,7 +34939,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     socket.on('qinglong_lightning', onQinglongLightning);
     const onRedLightningRain = ({ owner, heroIdx, zoneSlot }) => {
       if (window.playSFX) window.playSFX('elem_lightning', { dedupe: 80, category: 'effect' });
-      const ownerLabel = owner === myIdx ? 'me' : 'opp';
+      const ownerLabel = ownerLbl(owner, myIdx);
       const sel = zoneSlot >= 0
         ? `[data-support-zone][data-support-owner="${ownerLabel}"][data-support-hero="${heroIdx}"][data-support-slot="${zoneSlot}"]`
         : `[data-hero-zone][data-hero-owner="${ownerLabel}"][data-hero-idx="${heroIdx}"]`;
@@ -34945,7 +35014,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     socket.on('red_lightning_rain', onRedLightningRain);
     // ── Area card placement: big flashy descend + shockwave ──
     const onAreaDescend = ({ owner, cardName, fromPile }) => {
-      const ownerLabel = owner === myIdx ? 'me' : 'opp';
+      const ownerLabel = ownerLbl(owner, myIdx);
       const tgtEl = document.querySelector(`[data-area-zone][data-area-owner="${ownerLabel}"]`);
       if (!tgtEl) return;
       const tr = tgtEl.getBoundingClientRect();
@@ -35099,7 +35168,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     // `passMs`: Zeitpunkt, zu dem der LETZTE Eber die Area passiert hat (der Server laesst die
     // Area genau dann losfliegen); die Tiere laufen danach weiter aus dem Bild.
     const onMountainBoarsStampede = ({ owner, passMs }) => {
-      const ownerLabel = owner === myIdx ? 'me' : 'opp';
+      const ownerLabel = ownerLbl(owner, myIdx);
       const tgtEl = document.querySelector(`[data-area-zone][data-area-owner="${ownerLabel}"]`);
       if (!tgtEl) return;
       const tr = tgtEl.getBoundingClientRect();
@@ -35201,8 +35270,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     // Ziel-Zone abgeseilt. Reine DOM-/rAF-Animation (Schnur = gedrehtes Element zwischen Anker und Karte).
     const onFishingCatch = ({ owner, cardName, toOwner, toHeroIdx, toSlotIdx, durationMs }) => {
       if (window._playAnimations === false) return;
-      const ownerLabel = owner === myIdx ? 'me' : 'opp';
-      const toLabel = (toOwner ?? owner) === myIdx ? 'me' : 'opp';
+      const ownerLabel = ownerLbl(owner, myIdx);
+      const toLabel = ownerLbl((toOwner ?? owner), myIdx);
       const pileEl = document.querySelector(owner === myIdx ? '[data-my-discard]' : '[data-opp-discard]');
       const zoneEl = document.querySelector(`[data-support-zone][data-support-owner="${toLabel}"][data-support-hero="${toHeroIdx}"][data-support-slot="${toSlotIdx}"]`);
       if (!pileEl || !zoneEl) return;
@@ -35287,8 +35356,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         setTimeout(() => window.playSFX('orbital_laser', { rate: 0.8, volume: 1.2, category: null, dedupe: 300 }), 350);
         setTimeout(() => window.playSFX('heavy_impact', { rate: 0.6, volume: 1.2, category: null, dedupe: 300 }), 480);
       }
-      const srcLabel = sourceOwner === myIdx ? 'me' : 'opp';
-      const tgtLabel = targetOwner === myIdx ? 'me' : 'opp';
+      const srcLabel = ownerLbl(sourceOwner, myIdx);
+      const tgtLabel = ownerLbl(targetOwner, myIdx);
       const srcEl = document.querySelector(`[data-hero-zone][data-hero-owner="${srcLabel}"][data-hero-idx="${sourceHeroIdx}"]`);
       let tgtEl;
       if (targetZoneSlot != null && targetZoneSlot >= 0) {
@@ -35697,7 +35766,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     socket.on('big_gwen_clock_activation', onBigGwenClockActivation);
     const onBoulderFall = ({ owner, heroIdx, zoneSlot }) => {
       if (window.playSFX) window.playSFX('heavy_impact', { category: 'effect' });
-      const ownerLabel = owner === myIdx ? 'me' : 'opp';
+      const ownerLabel = ownerLbl(owner, myIdx);
       const sel = zoneSlot >= 0
         ? `[data-support-zone][data-support-owner="${ownerLabel}"][data-support-hero="${heroIdx}"][data-support-slot="${zoneSlot}"]`
         : `[data-hero-zone][data-hero-owner="${ownerLabel}"][data-hero-idx="${heroIdx}"]`;
@@ -35787,7 +35856,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     const onSlowDarkMagic = ({ ownerIdx }) => {
       if (window.playSFX) window.playSFX('elem_dark', { category: 'effect' });
       // Animate on the hand of the player who is discarding
-      const ownerLabel = ownerIdx === myIdx ? 'me' : 'opp';
+      const ownerLabel = ownerLbl(ownerIdx, myIdx);
       const handEl = document.querySelector(`.game-hand-${ownerLabel}`);
       if (!handEl) return;
       const r = handEl.getBoundingClientRect();
@@ -35836,7 +35905,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     };
     socket.on('slow_dark_magic', onSlowDarkMagic);
     const onCardEffectFlash = ({ owner, heroIdx, zoneSlot }) => {
-      const ownerLabel = owner === myIdx ? 'me' : 'opp';
+      const ownerLabel = ownerLbl(owner, myIdx);
       const sel = (zoneSlot != null && zoneSlot >= 0)
         ? `[data-support-zone][data-support-owner="${ownerLabel}"][data-support-hero="${heroIdx}"][data-support-slot="${zoneSlot}"]`
         : `[data-hero-zone][data-hero-owner="${ownerLabel}"][data-hero-idx="${heroIdx}"]`;
@@ -35931,7 +36000,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     socket.on('gold_steal_burst', onGoldStealBurst);
     const onJumpscareBox = ({ owner, heroIdx }) => {
       if (window.playSFX) window.playSFX('jumpscare', { category: 'effect' });
-      const ownerLabel = owner === myIdx ? 'me' : 'opp';
+      const ownerLabel = ownerLbl(owner, myIdx);
       const el = document.querySelector(`[data-hero-zone][data-hero-owner="${ownerLabel}"][data-hero-idx="${heroIdx}"]`);
       if (!el) return;
       const r = el.getBoundingClientRect();
@@ -35995,7 +36064,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     socket.on('jumpscare_box', onJumpscareBox);
     const onAntiMagicBubble = ({ owner, heroIdx }) => {
       if (window.playSFX) window.playSFX('negate');
-      const ownerLabel = owner === myIdx ? 'me' : 'opp';
+      const ownerLabel = ownerLbl(owner, myIdx);
       const el = document.querySelector(`[data-hero-zone][data-hero-owner="${ownerLabel}"][data-hero-idx="${heroIdx}"]`);
       if (!el) return;
       const r = el.getBoundingClientRect();
@@ -36025,7 +36094,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     socket.on('anti_magic_bubble', onAntiMagicBubble);
     const onFireshieldCorona = ({ owner, heroIdx }) => {
       if (window.playSFX) window.playSFX('elem_fire', { category: 'effect' });
-      const ownerLabel = owner === myIdx ? 'me' : 'opp';
+      const ownerLabel = ownerLbl(owner, myIdx);
       const el = document.querySelector(`[data-hero-zone][data-hero-owner="${ownerLabel}"][data-hero-idx="${heroIdx}"]`);
       if (!el) return;
       const r = el.getBoundingClientRect();
@@ -36112,8 +36181,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     // changing places.
     const onBodySwapSouls = ({ a, b, durationMs }) => {
       const dur = durationMs || 1000;
-      const labelA = a.owner === myIdx ? 'me' : 'opp';
-      const labelB = b.owner === myIdx ? 'me' : 'opp';
+      const labelA = ownerLbl(a.owner, myIdx);
+      const labelB = ownerLbl(b.owner, myIdx);
       const aEl = document.querySelector(`[data-hero-zone][data-hero-owner="${labelA}"][data-hero-idx="${a.heroIdx}"]`);
       const bEl = document.querySelector(`[data-hero-zone][data-hero-owner="${labelB}"][data-hero-idx="${b.heroIdx}"]`);
       if (!aEl || !bEl) return;
@@ -36302,7 +36371,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     // on the absorbing creature's slot.
     const onCreatureDamageFloater = ({ owner, heroIdx, zoneSlot, amount }) => {
       if (owner == null || heroIdx == null || zoneSlot == null) return;
-      const ownerLabel = owner === myIdx ? 'me' : 'opp';
+      const ownerLabel = ownerLbl(owner, myIdx);
       const entry = {
         id: Date.now() + Math.random(),
         amount: amount || 0,
@@ -36315,7 +36384,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     };
     socket.on('creature_damage_floater', onCreatureDamageFloater);
     const onSurpriseFlip = ({ owner, heroIdx, cardName, isBakhmSlot, bakhmZoneSlot, isCreature }) => {
-      const ownerLabel = owner === myIdx ? 'me' : 'opp';
+      const ownerLabel = ownerLbl(owner, myIdx);
       let el;
       if (isBakhmSlot && bakhmZoneSlot >= 0) {
         el = document.querySelector(`[data-support-zone][data-support-owner="${ownerLabel}"][data-support-hero="${heroIdx}"][data-support-slot="${bakhmZoneSlot}"]`);
@@ -36336,7 +36405,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     };
     socket.on('surprise_flip', onSurpriseFlip);
     const onSurpriseReset = ({ owner, heroIdx, cardName, isBakhmSlot, zoneSlot }) => {
-      const ownerLabel = owner === myIdx ? 'me' : 'opp';
+      const ownerLabel = ownerLbl(owner, myIdx);
       let el;
       if (isBakhmSlot && zoneSlot >= 0) {
         el = document.querySelector(`[data-support-zone][data-support-owner="${ownerLabel}"][data-support-hero="${heroIdx}"][data-support-slot="${zoneSlot}"]`);
@@ -36364,7 +36433,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       // Enthuellung unterwegs → das Bild wartet, bis sie gelandet ist.
       if ([...csVerdecktRef.current].some(k => k.startsWith(`${owner}-`))) {
         csWartendeBilderRef.current.push({
-          owner, permId, type, ownerLabel: owner === myIdx ? 'me' : 'opp',
+          owner, permId, type, ownerLabel: ownerLbl(owner, myIdx),
         });
         return;
       }
@@ -36374,7 +36443,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       // `revive`) galt nur fuer Zonen-Animationen. Jetzt derselbe Klang
       // wie in der Zone, der leise Auftakt bleibt als Fallback.
       if (window.playSFX) window.playSFX(type === 'holy_revival' ? 'revive' : 'ability_activate', { category: 'effect' });
-      const ownerLabel = owner === myIdx ? 'me' : 'opp';
+      const ownerLabel = ownerLbl(owner, myIdx);
       const el = document.querySelector(`[data-perm-id="${permId}"][data-perm-owner="${ownerLabel}"]`);
       if (el) playAnimation(type || 'holy_revival', el, { duration: 1200 });
     };
@@ -36679,8 +36748,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     socket.on('ability_zone_to_discard', onAbilityZoneToDiscard);
     const onRamAnimation = ({ sourceOwner, sourceHeroIdx, sourceZoneSlot, targetOwner, targetHeroIdx, targetZoneSlot, targetZoneType, targetPermId, cardName, duration, trailType }) => {
       if (window.playSFX) window.playSFX('attack_ram', { category: 'effect' });
-      const srcLabel = sourceOwner === myIdx ? 'me' : 'opp';
-      const tgtLabel = targetOwner === myIdx ? 'me' : 'opp';
+      const srcLabel = ownerLbl(sourceOwner, myIdx);
+      const tgtLabel = ownerLbl(targetOwner, myIdx);
       // If sourceZoneSlot is provided, originate from that support zone; otherwise from the hero zone.
       const srcEl = (sourceZoneSlot != null && sourceZoneSlot >= 0)
         ? document.querySelector(`[data-support-zone][data-support-owner="${srcLabel}"][data-support-hero="${sourceHeroIdx}"][data-support-slot="${sourceZoneSlot}"]`)
@@ -36752,8 +36821,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     // generic `play_ram_animation` which renders the card itself.
     const onTharxianCharge = ({ sourceOwner, sourceHeroIdx, targetOwner, targetHeroIdx, targetZoneSlot, duration }) => {
       if (window.playSFX) window.playSFX('attack_ram', { category: 'effect' });
-      const srcLabel = sourceOwner === myIdx ? 'me' : 'opp';
-      const tgtLabel = targetOwner === myIdx ? 'me' : 'opp';
+      const srcLabel = ownerLbl(sourceOwner, myIdx);
+      const tgtLabel = ownerLbl(targetOwner, myIdx);
       const srcEl = document.querySelector(`[data-surprise-zone][data-surprise-owner="${srcLabel}"][data-surprise-hero="${sourceHeroIdx}"]`);
       const tgtEl = (targetZoneSlot != null && targetZoneSlot >= 0)
         ? document.querySelector(`[data-support-zone][data-support-owner="${tgtLabel}"][data-support-hero="${targetHeroIdx}"][data-support-slot="${targetZoneSlot}"]`)
@@ -36788,8 +36857,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       if (window.playSFX) window.playSFX('placement');
       // Kadaver-Halter loesen — im selben Zug, in dem der Flug beginnt.
       releaseClaimHold(sourceOwner, sourceHeroIdx, sourceZoneSlot);
-      const srcLabel = sourceOwner === myIdx ? 'me' : 'opp';
-      const tgtLabel = targetOwner === myIdx ? 'me' : 'opp';
+      const srcLabel = ownerLbl(sourceOwner, myIdx);
+      const tgtLabel = ownerLbl(targetOwner, myIdx);
       // Zone resolution: `sourceZoneKind` / `targetZoneKind` may be
       // 'ability' to target the per-Hero Ability Zone DOM elements
       // (used by Slippery Pengu's ability-relocation animation).
@@ -36861,8 +36930,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       // `sfx` (v613): optionaler Klang statt des Standard-`projectile`
       // (Javelin Throw: Wind). Nur Namen aus dem Katalog.
       if (window.playSFX) window.playSFX(sfx || 'projectile', { category: 'effect' });
-      const srcLabel = sourceOwner === myIdx ? 'me' : 'opp';
-      const tgtLabel = targetOwner === myIdx ? 'me' : 'opp';
+      const srcLabel = ownerLbl(sourceOwner, myIdx);
+      const tgtLabel = ownerLbl(targetOwner, myIdx);
       const srcEl = (sourceZoneSlot != null && sourceZoneSlot >= 0)
         ? document.querySelector(`[data-support-zone][data-support-owner="${srcLabel}"][data-support-hero="${sourceHeroIdx}"][data-support-slot="${sourceZoneSlot}"]`)
         : document.querySelector(`[data-hero-zone][data-hero-owner="${srcLabel}"][data-hero-idx="${sourceHeroIdx}"]`);
@@ -36924,8 +36993,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     // Flug (240-320 ms), 40 ms versetzt, mit seitlichem Zittern um die
     // Fluglinie, damit es ein Strahl und keine Perlenkette wird.
     const onWeaponBarrage = ({ sourceOwner, sourceHeroIdx, targetOwner, targetHeroIdx, targetZoneSlot, count }) => {
-      const srcLabel = sourceOwner === myIdx ? 'me' : 'opp';
-      const tgtLabel = targetOwner === myIdx ? 'me' : 'opp';
+      const srcLabel = ownerLbl(sourceOwner, myIdx);
+      const tgtLabel = ownerLbl(targetOwner, myIdx);
       const srcEl = document.querySelector(`[data-hero-zone][data-hero-owner="${srcLabel}"][data-hero-idx="${sourceHeroIdx}"]`);
       const tgtEl = (targetZoneSlot != null && targetZoneSlot >= 0)
         ? document.querySelector(`[data-support-zone][data-support-owner="${tgtLabel}"][data-support-hero="${targetHeroIdx}"][data-support-slot="${targetZoneSlot}"]`)
@@ -36974,7 +37043,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     };
     socket.on('play_weapon_barrage', onWeaponBarrage);
     const onButterflyCloud = ({ sourceOwner, sourceHeroIdx, targets }) => {
-      const srcLabel = sourceOwner === myIdx ? 'me' : 'opp';
+      const srcLabel = ownerLbl(sourceOwner, myIdx);
       const srcEl = document.querySelector(`[data-hero-zone][data-hero-owner="${srcLabel}"][data-hero-idx="${sourceHeroIdx}"]`);
       if (!srcEl) return;
       const sr = srcEl.getBoundingClientRect();
@@ -36984,7 +37053,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       // Resolve target element positions
       const tgtPositions = [];
       for (const t of (targets || [])) {
-        const tLabel = t.owner === myIdx ? 'me' : 'opp';
+        const tLabel = ownerLbl(t.owner, myIdx);
         let el;
         if (t.type === 'creature' && t.zoneSlot != null) {
           el = document.querySelector(`[data-support-zone][data-support-owner="${tLabel}"][data-support-hero="${t.heroIdx}"][data-support-slot="${t.zoneSlot}"]`);
@@ -37089,7 +37158,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     };
     socket.on('butterfly_cloud_animation', onButterflyCloud);
     const onSmugCoinSave = ({ owner, heroIdx }) => {
-      const ownerLabel = owner === myIdx ? 'me' : 'opp';
+      const ownerLabel = ownerLbl(owner, myIdx);
       const heroEl = document.querySelector(`[data-hero-zone][data-hero-owner="${ownerLabel}"][data-hero-idx="${heroIdx}"]`);
       if (!heroEl) return;
       const hr = heroEl.getBoundingClientRect();
@@ -37337,7 +37406,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     const onYukiBlizzard = ({ targetIdx, intensity }) => {
       if (window._playAnimations === false) return;
       const stufe = Math.max(1, Math.min(4, intensity || 1));
-      const seite = targetIdx === myIdx ? 'me' : 'opp';
+      const seite = ownerLbl(targetIdx, myIdx);
       const els = document.querySelectorAll(
         `[data-hero-owner="${seite}"], [data-support-owner="${seite}"], [data-ability-owner="${seite}"], [data-surprise-owner="${seite}"]`);
       let l = Infinity, t = Infinity, r = -Infinity, b = -Infinity;
@@ -39345,7 +39414,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     // das naechste Rendern ersetzt das Element ohnehin.
     const onZoneFade = ({ owner, zones, durationMs, direction, sfx }) => {
       if (!Array.isArray(zones) || zones.length === 0) return;
-      const ow = owner === myIdx ? 'me' : 'opp';
+      const ow = ownerLbl(owner, myIdx);
       const ms = Math.max(100, durationMs || 1000);
       const rein = direction === 'in';
       // Ein Klang fuer den ganzen Vorgang, nicht je Zone.
@@ -39408,9 +39477,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     // fill), then catapults to the target. Hides the source slot for
     // the full animation so the original render doesn't show through.
     const onBrackleCatapult = ({ sourceOwner, sourceHeroIdx, sourceZoneSlot, brackleOwner, brackleHeroIdx, targetOwner, targetHeroIdx, targetZoneSlot, targetType, discardOwner, cardName, loadMs, holdMs, fireMs, impactMs, discardMs }) => {
-      const srcLabel     = sourceOwner === myIdx ? 'me' : 'opp';
-      const brackleLabel = brackleOwner === myIdx ? 'me' : 'opp';
-      const tgtLabel     = targetOwner === myIdx ? 'me' : 'opp';
+      const srcLabel     = ownerLbl(sourceOwner, myIdx);
+      const brackleLabel = ownerLbl(brackleOwner, myIdx);
+      const tgtLabel     = ownerLbl(targetOwner, myIdx);
       const discardLabel = discardOwner === myIdx ? 'my' : 'opp';
 
       const srcEl = document.querySelector(
@@ -39556,7 +39625,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     // Einschlag des abgewehrten Effekts sichtbar AUF ihr landet.
     const onChaorcWurf = (d) => {
       if (!d || !d.key) return;
-      const lbl = (o) => (o === myIdx ? 'me' : 'opp');
+      const lbl = (o) => (ownerLbl(o, myIdx));
       const spiel = (name, opts, at = 0) => setTimeout(() => { if (window.playSFX) window.playSFX(name, { ...opts, dedupe: 0 }); }, at);
       const zonenEl = (o, h, z) => ((z != null && z >= 0)
         ? document.querySelector(`[data-support-zone][data-support-owner="${lbl(o)}"][data-support-hero="${h}"][data-support-slot="${z}"]`)
@@ -40026,7 +40095,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           break;
         }
         case 'support': {
-          const ownerLabel = destination.owner === myIdx ? 'me' : 'opp';
+          const ownerLabel = ownerLbl(destination.owner, myIdx);
           destEl = document.querySelector(
             `[data-support-zone][data-support-owner="${ownerLabel}"][data-support-hero="${destination.heroIdx}"][data-support-slot="${destination.slotIdx}"]`,
           );
@@ -40035,7 +40104,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         case 'permanent': {
           // v1283: die Potion bleibt als Permanent auf dem Brett liegen —
           // der Flug geht zu ihrem Platz dort, nicht in die Loesch-Ablage.
-          const permLabel = destination.owner === myIdx ? 'me' : 'opp';
+          const permLabel = ownerLbl(destination.owner, myIdx);
           destEl = (destination.permId
             ? document.querySelector(`[data-perm-id="${destination.permId}"][data-perm-owner="${permLabel}"]`)
             : null)
@@ -40450,9 +40519,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     socket.on('deleted_to_discard_animation', onDeletedToDiscard);
 
     const onDeckToAbility = ({ owner, heroIdx, slotIdx, cardName, count, source, destOwner }) => {
-      const ownerLabel = owner === myIdx ? 'me' : 'opp';
+      const ownerLabel = ownerLbl(owner, myIdx);
       // 29.9.: Ziel-Zone eines geliehenen Helden liegt auf der anderen Seite.
-      const zielLabel = (destOwner ?? owner) === myIdx ? 'me' : 'opp';
+      const zielLabel = ownerLbl((destOwner ?? owner), myIdx);
       // 'hand' source flies cards out of the player's hand instead of
       // their deck pile (used by Ascension bonus when deck supply is
       // exhausted but hand still has copies).
@@ -40531,7 +40600,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     socket.on('deck_to_ability_animation', onDeckToAbility);
     const onPunchBox = ({ targetOwner, targetHeroIdx, targetZoneSlot }) => {
       if (window.playSFX) window.playSFX('heavy_impact', { category: 'effect' });
-      const tgtLabel = targetOwner === myIdx ? 'me' : 'opp';
+      const tgtLabel = ownerLbl(targetOwner, myIdx);
       let tgtEl;
       if (targetZoneSlot >= 0) {
         tgtEl = document.querySelector(`[data-support-zone][data-support-owner="${tgtLabel}"][data-support-hero="${targetHeroIdx}"][data-support-slot="${targetZoneSlot}"]`);
@@ -40636,7 +40705,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     };
     socket.on('punch_box_animation', onPunchBox);
     const onTearsOfCreation = ({ owner, targets }) => {
-      const ownerLabel = owner === myIdx ? 'me' : 'opp';
+      const ownerLabel = ownerLbl(owner, myIdx);
       const goldEl = document.querySelector(`[data-gold-player="${owner}"]`);
       if (!goldEl || !targets || targets.length === 0) return;
       const gr = goldEl.getBoundingClientRect();
@@ -40662,7 +40731,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       const perTarget = 25;
 
       for (const t of targets) {
-        const tLabel = t.owner === myIdx ? 'me' : 'opp';
+        const tLabel = ownerLbl(t.owner, myIdx);
         let srcEl;
         if (t.zoneSlot >= 0) {
           srcEl = document.querySelector(`[data-support-zone][data-support-owner="${tLabel}"][data-support-hero="${t.heroIdx}"][data-support-slot="${t.zoneSlot}"]`);
@@ -40703,7 +40772,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     const onHandSteal = ({ fromPlayer, toPlayer, indices, cardNames, count, duration, highlightMs: hlMs }) => {
       stealInProgressRef.current = true;
       const iAmVictim = fromPlayer === myIdx;
-      const fromLabel = fromPlayer === myIdx ? 'me' : 'opp';
+      const fromLabel = ownerLbl(fromPlayer, myIdx);
       const toLabel = fromPlayer === myIdx ? 'opp' : 'me';
       const dur = duration || 800;
       // Highlight phase duration — short by default so the flight
@@ -40847,7 +40916,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       // v618: `fadeMs`/`holdMs` optional — Chasing the Legend laesst die
       // Kreatur schneller verschwinden und nicht wieder auftauchen (sie
       // geht auf die Hand; die dann LEERE Zone wird nur wieder sichtbar).
-      const label = owner === myIdx ? 'me' : 'opp';
+      const label = ownerLbl(owner, myIdx);
       let el;
       if (zoneSlot !== undefined && zoneSlot >= 0) {
         el = document.querySelector(`[data-support-zone][data-support-owner="${label}"][data-support-hero="${heroIdx}"][data-support-slot="${zoneSlot}"]`);
@@ -40863,7 +40932,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     };
     socket.on('play_cloak_vanish', onCloakVanish);
     const onSkullBurst = ({ owner, heroIdx }) => {
-      const label = owner === myIdx ? 'me' : 'opp';
+      const label = ownerLbl(owner, myIdx);
       const el = document.querySelector(`[data-hero-zone][data-hero-owner="${label}"][data-hero-idx="${heroIdx}"]`);
       if (!el) return;
       const r = el.getBoundingClientRect();
@@ -40881,8 +40950,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     };
     socket.on('play_skull_burst', onSkullBurst);
     const onHealBeam = ({ phase, sourceOwner, sourceHeroIdx, sourceZoneSlot, targetOwner, targetHeroIdx, targetZoneSlot }) => {
-      const srcLabel = sourceOwner === myIdx ? 'me' : 'opp';
-      const tgtLabel = targetOwner === myIdx ? 'me' : 'opp';
+      const srcLabel = ownerLbl(sourceOwner, myIdx);
+      const tgtLabel = ownerLbl(targetOwner, myIdx);
       // Source: support slot if `sourceZoneSlot` is set (Wolflesia-style
       // Creature spell-cast — beam originates from her support slot),
       // otherwise the hero zone.
@@ -40922,7 +40991,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     // targets through `setCreatureHealNumbers`. Either path renders
     // the entry as plain "0" via the components' amount-aware label.
     const onHealZero = ({ owner, heroIdx, zoneSlot }) => {
-      const ownerLabel = owner === myIdx ? 'me' : 'opp';
+      const ownerLabel = ownerLbl(owner, myIdx);
       const id = Date.now() + Math.random();
       const entry = { id, amount: 0, ownerLabel, heroIdx, zoneSlot };
       if (zoneSlot == null || zoneSlot < 0) {
@@ -40942,7 +41011,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     // `setCreatureDamageNumbers`. Each component's amount-aware label
     // renders the entry as a plain "0".
     const onDamageZero = ({ owner, heroIdx, zoneSlot }) => {
-      const ownerLabel = owner === myIdx ? 'me' : 'opp';
+      const ownerLabel = ownerLbl(owner, myIdx);
       const id = Date.now() + Math.random();
       const entry = { id, amount: 0, ownerLabel, heroIdx, zoneSlot };
       if (zoneSlot == null || zoneSlot < 0) {
@@ -40977,7 +41046,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     };
     socket.on('ziel_marke_blitz', onZielMarkeBlitz);
     const onGuardianAngel = ({ owner, heroIdx }) => {
-      const label = owner === myIdx ? 'me' : 'opp';
+      const label = ownerLbl(owner, myIdx);
       const el = document.querySelector(`[data-hero-zone][data-hero-owner="${label}"][data-hero-idx="${heroIdx}"]`);
       if (!el) return;
       const r = el.getBoundingClientRect();
@@ -41707,7 +41776,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           const ownerPi = parseInt(parts[1]);
           const heroIdx = parseInt(parts[2]);
           const slotIdx = parseInt(parts[3]);
-          const ownerLabel = ownerPi === myIdx ? 'me' : 'opp';
+          const ownerLabel = ownerLbl(ownerPi, myIdx);
           let selector;
           if (type === 'ability') {
             selector = `[data-ability-zone][data-ability-owner="${ownerLabel}"][data-ability-hero="${heroIdx}"][data-ability-slot="${slotIdx}"]`;
@@ -42231,7 +42300,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       const p = gameState.players[pi];
       for (let hi = 0; hi < (p.heroes || []).length; hi++) {
         const h = p.heroes[hi];
-        if (h?.name) currentHp[`${pi}-${hi}`] = { name: h.name, hp: h.hp, owner: pi === myIdx ? 'me' : 'opp' };
+        if (h?.name) currentHp[`${pi}-${hi}`] = { name: h.name, hp: h.hp, owner: ownerLbl(pi, myIdx) };
       }
     }
     // Compare HP
@@ -42331,7 +42400,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         if (cur.hp < prev.hp) {
           const [ownerStr, heroIdxStr, slotStr] = key.split('-');
           const ownerIdx = parseInt(ownerStr);
-          const ownerLabel = ownerIdx === myIdx ? 'me' : 'opp';
+          const ownerLabel = ownerLbl(ownerIdx, myIdx);
           const heroIdx = parseInt(heroIdxStr);
           const zoneSlot = parseInt(slotStr);
           newCreatureDmg.push({
@@ -42357,7 +42426,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           newCreatureDmg.push({
             id: Date.now() + Math.random(),
             amount: prev.hp,
-            ownerLabel: ownerIdx === myIdx ? 'me' : 'opp',
+            ownerLabel: ownerLbl(ownerIdx, myIdx),
             heroIdx: parseInt(heroIdxStr),
             zoneSlot: parseInt(slotStr),
           });
@@ -42425,7 +42494,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       for (const [key, cur] of Object.entries(currentStatuses)) {
         const prev = prevStatusRef.current[key] || {};
         const [pi, hi] = key.split('-').map(Number);
-        const ownerLabel = pi === myIdx ? 'me' : 'opp';
+        const ownerLabel = ownerLbl(pi, myIdx);
         // Gained frozen → freeze animation
         if (cur.frozen && !prev.frozen) {
           const sel = `[data-hero-zone][data-hero-owner="${ownerLabel}"][data-hero-idx="${hi}"]`;
@@ -43692,13 +43761,21 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     />
   );
 
-  const renderPlayerSide = (p, isOpp) => {
+  // ★ Skill Test (N Spieler): `sideOwner` ist der Sitz, dessen Seite gezeichnet
+  // wird. `oppIdx`/`opp` werden darin ÜBERSCHRIEBEN, damit jede der ~40 inneren
+  // Referenzen (Ziel-IDs, Besitzer-Prüfungen) die jeweilige Kachel meint. Im
+  // Normalspiel ist `sideOwner` leer → unverändertes Verhalten.
+  const outerOppIdx = oppIdx;
+  const outerOpp = opp;
+  const renderPlayerSide = (p, isOpp, sideOwner) => {
+    const oppIdx = (isOpp && Number.isInteger(sideOwner)) ? sideOwner : outerOppIdx;
+    const opp = (isOpp && Number.isInteger(sideOwner)) ? gameState.players[sideOwner] : outerOpp;
     const heroes = p.heroes || [];
     const abZones = p.abilityZones || [];
     const supZones = p.supportZones || [];
     const surZones = p.surpriseZones || [];
     const islandCounts = p.islandZoneCount || [0, 0, 0];
-    const ownerLabel = isOpp ? 'opp' : 'me';
+    const ownerLabel = isOpp ? ((Number.isInteger(sideOwner) && sideOwner !== outerOppIdx) ? 'mini' + sideOwner : 'opp') : 'me';
 
     // Board skin: extract number from board ID (e.g. "board1" → "1")
     const boardNum = p.board ? p.board.replace(/\D/g, '') : null;
@@ -46576,7 +46653,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             }
             return (
           <div className="phase-column">
-            {gameState.skillTest && window.StTurnPanel ? <window.StTurnPanel gameState={gameState} myIdx={myIdx} isSpectator={isSpectator} /> : <>
+            {gameState.skillTest && window.StTurnPanel ? <window.StTurnPanel gameState={gameState} myIdx={myIdx} isSpectator={isSpectator} focusSeat={stMulti ? oppIdx : null} onFocus={stMulti ? setStFocusPin : null} /> : <>
             <div className="board-phase-tracker">
               {['Start Phase', 'Resource Phase', 'Main Phase 1', 'Action Phase', 'Main Phase 2', 'End Phase'].map((phase, i) => {
                 const isActive = currentPhase === i;
@@ -46668,6 +46745,40 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 past the last zone. The clip edge equals the projected
                 near-edge content width (the overhang padding reserves
                 exactly (f−1)/2 per side), so no visible content is cut. */}
+            {stMulti && (
+              <div className="st-mini-strip" data-st-strip="1">
+                {gameState.players.map((pl, k) => {
+                  if (k === myIdx || k === oppIdx) return null;
+                  const tot = (pl.heroes || []).every(h => !h?.name || h.hp <= 0);
+                  const amZug = stInfo.turnSeat === k;
+                  return (
+                    <div key={k} className={'st-mini' + (tot ? ' st-mini-out' : '') + (amZug ? ' st-mini-turn' : '')}
+                      data-st-seat={k}>
+                      <div className="st-mini-head" style={{ borderColor: pl.color || '#888' }}
+                        onClick={() => setStFocusPin(k)} title="Click to bring this player to the front">
+                        <span className="st-mini-name">{pl.username}</span>
+                        {amZug && <span className="st-mini-flag">▶</span>}
+                        {tot && <span className="st-mini-flag">☠</span>}
+                        <span className="st-mini-zoom">⤢</span>
+                      </div>
+                      <div className="st-mini-main">
+                        <div className="st-mini-body board-player-side board-side-opp">{renderPlayerSide(pl, true, k)}</div>
+                        {(gameState.areaZones?.[k] || []).length > 0 && (
+                          <div className="st-mini-area" data-area-zone="1" data-area-owner={'mini' + k}>
+                            <AreaStack cards={gameState.areaZones[k]}
+                              entries={(gameState.activatableAreas || []).filter(a => a.areaOwner === k)}
+                              onActivate={(areaName) => socket.emit('activate_area_effect', { roomId: gameState.roomId, areaOwner: k, areaName })}
+                              effectLocked={isEffectLocked}
+                              targeting={isTargeting ? { owner: k, validIds: validTargetIds, selectedIds: selectedSet, onToggle: togglePotionTarget } : null}
+                              charge={null} />
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
             <div className="board-plane-clip">
             {/* ── Atmosphere layer (moved INSIDE board-plane-clip) ────
                 BoardAmbiance + every area-card background overlay used
@@ -48265,7 +48376,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       {/* Additional Action icon tooltip */}
       {aaTooltipKey && (() => {
         const [ow, hi, sl] = aaTooltipKey.split('-');
-        const ownerLabel = parseInt(ow) === myIdx ? 'me' : 'opp';
+        const ownerLabel = ownerLbl(parseInt(ow), myIdx);
         const el = document.querySelector(`[data-support-owner="${ownerLabel}"][data-support-hero="${hi}"][data-support-slot="${sl}"] .additional-action-icon`);
         if (!el) return null;
         const r = el.getBoundingClientRect();
@@ -48863,8 +48974,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           <div className="orbit-font" style={{ fontSize: 13, color: 'var(--accent)', marginBottom: 8 }}>{ep.title || 'Choose a Player'}</div>
           {ep.description && <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 14 }}>{ep.description}</div>}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {[0, 1].map(pIdx => {
-              const p = pIdx === myIdx ? me : opp;
+            {(Array.isArray(ep.allowedPlayers) && ep.allowedPlayers.length ? ep.allowedPlayers : gameState.players.map((_, i) => i)).map(pIdx => {
+              const p = pIdx === myIdx ? me : (gameState.players[pIdx] || opp);
               const isMe = pIdx === myIdx;
               const clr = isMe ? 'var(--success)' : 'var(--danger)';
               return (
@@ -50251,8 +50362,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       {result && !result.isPuzzle && !showFirstChoice && (result.setOver || !result.format || result.format === 1) && !(result.format > 1) && (
         <ResultCeremony
           won={!!iWon} spectator={!!isSpectator}
-          title={isSpectator ? `${result.winnerName} WINS!` : (iWon ? 'VICTORY' : 'DEFEAT')}
-          subtitle={(() => { const r = result; const w = iWon; return (
+          title={isSpectator ? `${result.winnerName} WINS!` : (iWon ? 'VICTORY' : (stRes ? stPlaceTitle(stRes.placements?.[myIdx]) : 'DEFEAT'))}
+          subtitle={stRes ? `${stRes.rounds} round${stRes.rounds === 1 ? '' : 's'} played` : (() => { const r = result; const w = iWon; return (
             isSpectator ? (
               r.reason === 'disconnect_timeout' ? `${r.loserName} timed out` :
               r.reason === 'surrender' ? `${r.loserName} surrendered` :
@@ -50265,8 +50376,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               r.reason === 'all_heroes_dead' ? (w ? 'All enemy heroes defeated!' : 'All your heroes were defeated') :
               ppGameOverText(r.reason, w ? 'win' : 'lose', r.loserName, r.winnerName)
             )); })()}
-          rewards={(!isSpectator && scEarned && !user?.isGuest) ? (scEarned.rewards || []) : []}
-          total={(!isSpectator && scEarned && !user?.isGuest) ? (scEarned.total || 0) : 0}
+          rewards={stRes ? ((isSpectator || user?.isGuest) ? [] : stRewards(stRes, myIdx)) : ((!isSpectator && scEarned && !user?.isGuest) ? (scEarned.rewards || []) : [])}
+          total={stRes ? ((isSpectator || user?.isGuest) ? 0 : (stRes.sc?.[myIdx] || 0)) : ((!isSpectator && scEarned && !user?.isGuest) ? (scEarned.total || 0) : 0)}
           eloChanges={result.eloChanges || null}
           myName={user?.username}
           // v1471: derselbe Anzeigename wie in der Handleiste des Gegners
@@ -50277,7 +50388,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               : opp?.username}
           extra={(isSpectator || user?.isGuest) ? renderSCEarned() : null}
           cpuProgress={(!isSpectator && iWon && result.cpuProgress) ? result.cpuProgress : null}>
-            {!isSpectator && ((decks && decks.length > 0) || (sampleDecks || []).some(d => isDeckLegal(d).legal)) && (
+            {stRes && <StRanking res={stRes} players={gameState.players} myIdx={myIdx} />}
+            {!stRes && !isSpectator && ((decks && decks.length > 0) || (sampleDecks || []).some(d => isDeckLegal(d).legal)) && (
               <div style={{ marginBottom: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
                 <label style={{ fontSize: 14, color: 'var(--text2)', fontWeight: 600 }}>🃏 Deck:</label>
                 <select className="select" value={selectedDeck || ''} onChange={e => {
@@ -50303,7 +50415,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 Zeile eine feste Hoehe und setzt den Inhalt mittig
                 (style.css). Gilt auch fuer die Satz-Variante oben. */}
             <div className="ergebnis-knoepfe" style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
-              {isSpectator ? (
+              {(isSpectator || stRes) ? (
                 <button className="btn btn-danger" style={{ padding: '12px 32px', fontSize: 14 }} onClick={handleLeave}>LEAVE</button>
               ) : gameState.isCampaign ? (
                 // KAMPAGNEN-DUELL: der Ausgang gehoert der STORY. Kein

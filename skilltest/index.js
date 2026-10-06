@@ -219,6 +219,7 @@ function scheduleBotTurn(room, seat, host, opts = {}) {
   const delay = opts.forced ? 50 : (opts.delayMs ?? parseInt(process.env.PP_ST_BOT_DELAY_MS || '700', 10));
   setTimeout(() => {
     if (!room.gameState || room.gameState.result || room.gameState.activePlayer !== seat) return;
+    if (!opts.forced && !st.botSeats.includes(seat)) return;   // der Mensch ist zurück
     require('./bot').takeTurn(room, seat, host, opts).catch(err => console.error('[skilltest] Bot-Zug:', err && err.stack || err));
   }, delay);
 }
@@ -226,11 +227,16 @@ function scheduleBotTurn(room, seat, host, opts = {}) {
 /** Wiederverbinden (auth/join_room): Sicht der aktuellen Phase erneut senden. */
 function onRejoin(room, user, socket, host) {
   if (!room.skillTest) return;
+  if (room.gameState) {
+    const seat = room.players.findIndex(p => p.userId === user.userId && !p.isBot);
+    if (seat >= 0) require('./battle').seatBack(room, seat, host);
+    return;
+  }
   if (room.skillTest.phase === 'prep') require('./prep').onRejoin(room, user, socket, host);
 }
 
 /** Ein Mensch hat nach der Lobby die Verbindung/den Raum verlassen. */
-function onSeatLeft(room, user, socket, host) {
+function onSeatLeft(room, user, socket, host, opts = {}) {
   const seat = room.players.findIndex(p => p.userId === user.userId && !p.isBot);
   if (seat >= 0) {
     if (room.players[seat].socketId === socket.id) room.players[seat].socketId = null;
@@ -238,6 +244,10 @@ function onSeatLeft(room, user, socket, host) {
     room.spectators = room.spectators.filter(s => s.username !== user.username);
   }
   try { require('./prep').onSeatLeft?.(room, seat, host); } catch (e) { console.error('[skilltest] onSeatLeft', e); }
+  // Im Kampf: die CPU übernimmt den Sitz (bei Verbindungsverlust nur, bis der Mensch zurück ist).
+  if (seat >= 0 && room.gameState && !room.gameState.result) {
+    try { require('./battle').seatAway(room, seat, host, { permanent: !!opts.permanent }); } catch (e) { console.error('[skilltest] seatAway', e); }
+  }
   // Kein Mensch mehr online: Raum nach einer Karenzzeit aufräumen.
   if (!room.players.some(p => !p.isBot && p.socketId) && !room._verlassenTimer) {
     room._verlassenTimer = setTimeout(() => {
@@ -253,8 +263,20 @@ function onSeatLeft(room, user, socket, host) {
   }
 }
 
+/** Raum wird abgebaut: alle Timer des Moduls anhalten. */
+function dispose(room) {
+  const st = room.gameState && room.gameState.skillTest;
+  if (st) {
+    if (st._timer) clearTimeout(st._timer);
+    if (st._watch) clearInterval(st._watch);
+    st._timerToken = (st._timerToken || 0) + 1;
+  }
+  try { require('./prep').dispose?.(room); } catch { /* egal */ }
+}
+
 module.exports = {
+  dispose,
   PHASES, startPrep, onSeatLeft, onRejoin, act, scheduleBotTurn, isGameplayEvent, setPhaseFor, publicState,
   buildRoomConfig, isSkillTestRoom, isLobbyPhase, summary, seatsOf,
-  makeCpuSeat, registerLobbyHandlers,
+  makeCpuSeat, registerLobbyHandlers, surrender: (room, seat, host) => require('./battle').surrender(room, seat, host),
 };
