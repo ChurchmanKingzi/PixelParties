@@ -284,7 +284,7 @@ for b in range(8, 24):
 for b in range(16, 24): plan[b]['L'] |= {'lead2', 'counter'}
 # ── Break (24–27): Riser, Snare-Beschleunigung, Stopp ─────────────────────────────────────────────────
 P(24, 4, ch=lambda k: [VI, IV, V, V][k], lvl=0)
-for b in range(24, 28): plan[b]['L'] |= {'pad', 'arpA', 'riser'}
+for b in range(24, 28): plan[b]['L'] |= {'pad', 'arpA', 'arpB', 'riser', 'sub', 'brs'}; plan[b]['sub'] = 'long'
 # ── Drop (28–43): Reese-Wobble, voller Breakbeat ───────────────────────────────────────────────────────
 P(28, 16, ch=lambda k: PA[k % 8], lvl=3, dice=0.3, wob=True, hv=3)
 for b in range(28, 44):
@@ -368,7 +368,7 @@ for b in range(BARS):
     if 'brs' in L: L_brs(b, ch, sh, 70 + iv)
     if 'counter' in L: L_counter(b, ch, sh, 78 + iv)
     if 'tomfx' in L: L_tomfx(b, 92 + iv)
-    if 'pad' in L: L_pad(b, ch, sh, 40)
+    if 'pad' in L: L_pad(b, ch, sh, 40 if b not in range(24, 28) else 64)
     # Hook
     if Q['theme'] is not None:
         idx, stretch, who = Q['theme']

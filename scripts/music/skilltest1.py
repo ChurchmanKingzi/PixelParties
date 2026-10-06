@@ -117,6 +117,7 @@ def stutter(bar, t0, n, sp):
         if i == 0: A('brs', t, 0.2, voice(pc, 'M', 58)[1], 100, True)
 for bar, ws, we, t0, cnt, sp in STOPS:
     if t0 is not None: stutter(bar, t0, cnt, sp)
+    if we - ws >= 1.5: D(bar * 4 + ws - 0.25, CRASH, 96, 2.0, True)     # Becken klingt im Stopp aus (kein digitales Nichts)
 
 # ── Begleit-Bausteine ───────────────────────────────────────────────────────────────────────────────
 def sym_off(c, q):
@@ -240,7 +241,7 @@ def theme(inst, b0, tab=THEME, shift=0, vel=100, octave=0, start=0, leg=.92, shi
                 p = pn(name) + sh + 12 * octave
                 assert (p - KEY[b0 + k]) % 12 in SCALE, (inst, b0 + k, name, sh)
                 pc, q = chord_at(t)
-                ok = {(pc + i) % 12 for i in (*QUAL[q], 10, 2)}
+                ok = {(pc + i) % 12 for i in (*QUAL[q], 10, 2, *((11,) if q == 'M' else ()))}     # + Septime, None, große Septime über Dur
                 if t % 1 == 0 and p % 12 not in ok: warn.append((b0 + k, name))
                 A(inst, t, dur * leg, p, hv(vel))
             t += dur
