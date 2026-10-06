@@ -9,7 +9,7 @@ const { AuthScreen, MainMenu, ProfileScreen, ShopScreen, RulesScreen, PuzzleCrea
   MenuBackgroundParticles } = window;
 const { DeckBuilder } = window;
 const { GameBoard } = window;
-const { SkillTestLobby, SkillTestCreateOptions } = window;
+const { SkillTestLobby, SkillTestCreateOptions, SkillTestPrepScreen, SkillTestBattlePending } = window;
 let _pendingGameState = null;
 
 // ═══════════════════════════════════════════
@@ -1537,6 +1537,15 @@ function PlayScreen() {
   // === SKILL TEST LOBBY ===
   if (lobby && lobby.skillTest && lobby.skillTest.phase === 'lobby') {
     return <SkillTestLobby lobby={lobby} user={user} leaveRoom={leaveRoom} playerJoined={playerJoined} setPlayerJoined={setPlayerJoined} />;
+  }
+
+  // === SKILL TEST — VORBEREITUNG (Basis, Recycler, Ready) ===
+  if (lobby && lobby.skillTest && lobby.skillTest.phase === 'prep') {
+    return <SkillTestPrepScreen lobby={lobby} user={user} leaveRoom={leaveRoom} notify={notify} />;
+  }
+
+  if (lobby && lobby.skillTest && lobby.skillTest.phase === 'battle') {
+    return <SkillTestBattlePending lobby={lobby} leaveRoom={leaveRoom} />;
   }
 
   // === CUBE DRAFT LOBBY VIEW ===

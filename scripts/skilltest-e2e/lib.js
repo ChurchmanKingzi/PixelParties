@@ -56,6 +56,20 @@ async function guestClient(label) {
   };
 }
 
+// Echtes (nicht-Gast-)Konto direkt in der lokalen SQLite-DB anlegen. Gäste dürfen
+// nur gegen die CPU spielen — für Online-Räume braucht der UI-Test ein Konto.
+async function createAccount(username, password = 'test1234') {
+  const db = require('../../db');
+  const bcrypt = require('bcryptjs');
+  const { v4: uuidv4 } = require('uuid');
+  const id = uuidv4();
+  await db.run(
+    'INSERT OR IGNORE INTO users (id, username, password_hash, avatar, color, email, email_verified) VALUES (?, ?, ?, ?, ?, ?, 1)',
+    [id, username, bcrypt.hashSync(password, 10), null, '#00f0ff', username.toLowerCase() + '@test.local'],
+  );
+  return { username, password };
+}
+
 let _fails = 0;
 function check(name, cond, info) {
   if (cond) console.log('  ✓', name);
@@ -64,4 +78,4 @@ function check(name, cond, info) {
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 function finish() { console.log(_fails ? `\n${_fails} Prüfung(en) FEHLGESCHLAGEN` : '\nAlles bestanden'); return _fails; }
 
-module.exports = { startServer, guestClient, check, sleep, finish, BASE };
+module.exports = { startServer, guestClient, createAccount, check, sleep, finish, BASE };

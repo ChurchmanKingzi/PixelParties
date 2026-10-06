@@ -50347,6 +50347,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
 
 // ===== CROSS-FILE EXPORTS =====
 window.BoardCard = BoardCard;
+window.BoardZone = BoardZone;       // Skill Test (Vorbereitungs-Basis)
+window.AbilityStack = AbilityStack; // Skill Test (Vorbereitungs-Basis)
 window.GameBoard = GameBoard;
 window.FrozenOverlay = FrozenOverlay;
 window.NegatedOverlay = NegatedOverlay;
