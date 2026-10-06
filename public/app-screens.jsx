@@ -2331,7 +2331,34 @@ function ppIdleBox(m) {
             if (lx < x0) x0 = lx; if (lx >= x1) x1 = lx + 1;
             if (ly < y0) y0 = ly; if (ly >= y1) y1 = ly + 1;
           }
-          fertig(x1 > x0 && y1 > y0 ? { x0, y0, x1, y1 } : rueckfall);
+          if (!(x1 > x0 && y1 > y0)) return fertig(rueckfall);
+          // Gesichtsmitte aus Frame 0 (Ruhepose; über alle Frames würden springende
+          // Figuren wie Bubbles den Rahmen verzerren): Schwerpunkt der deckenden Pixel
+          // im obersten Drittel der Figur — Rückfall, falls das Sheet kein `faceX` hat.
+          let f0x0 = fw, f0y0 = fh, f0x1 = 0, f0y1 = 0;
+          const im0 = (x, y) => (vertikal ? (y < fh) : (x < fw));
+          for (let y = 0; y < (vertikal ? fh : h); y++) for (let x = 0; x < (vertikal ? w : fw); x++) {
+            if (d[(y * w + x) * 4 + 3] < 160) continue;
+            if (x < f0x0) f0x0 = x; if (x >= f0x1) f0x1 = x + 1;
+            if (y < f0y0) f0y0 = y; if (y >= f0y1) f0y1 = y + 1;
+          }
+          if (!(f0x1 > f0x0)) { f0x0 = x0; f0x1 = x1; f0y0 = y0; f0y1 = y1; }
+          // Kopfzeile: erste Zeile, die breit genug für einen Körper ist (≥ 25 % der breitesten
+          // Zeile, mind. 5 Pixel) — dünne Spitzen (Stäbe, Hörner, Flügelenden) zählen nicht als „oben".
+          const zeilen = [];
+          for (let y = f0y0; y < f0y1; y++) {
+            let z = 0;
+            for (let x = f0x0; x < f0x1; x++) if (d[(y * w + x) * 4 + 3] >= 160) z++;
+            zeilen.push(z);
+          }
+          const schwelle = Math.max(5, Math.max(...zeilen) * 0.25);
+          let kopfZ = f0y0;
+          for (let i = 0; i < zeilen.length; i++) { if (zeilen[i] >= schwelle) { kopfZ = f0y0 + i; break; } }
+          let sum = 0, cnt = 0;
+          for (let y = kopfZ; y < Math.min(f0y1, kopfZ + 8); y++) for (let x = f0x0; x < f0x1; x++) {
+            if (d[(y * w + x) * 4 + 3] >= 160) { sum += x + 0.5; cnt++; }
+          }
+          fertig({ x0, y0, x1, y1, fx: cnt ? sum / cnt : (f0x0 + f0x1) / 2, fy: kopfZ + 4 });
         } catch { fertig(rueckfall); }
       };
       img.onerror = () => fertig(rueckfall);
@@ -2359,19 +2386,32 @@ function PpIdleSprite({ name, box = 96, grey }) {
   if (!kern) return <div style={wrap} />;
   const fw = m.frameWidth, fh = m.frameHeight, n = m.frames;
   const vertikal = m.layout === 'vertical';
-  const bw = kern.x1 - kern.x0, bh = kern.y1 - kern.y0;
-  // Überall dieselbe Pixelgröße: Figuren werden nicht eingepasst, Überstehendes wird abgeschnitten.
+  // Überall dieselbe Pixelgröße. Passt die Figur nicht in die Box, wird auf das GESICHT
+  // zentriert (`faceX` aus dem Sheet bzw. Kopf-Schwerpunkt; senkrecht liegt der Kopf im oberen
+  // Drittel der Box) und der Rest abgeschnitten. Passt sie, steht sie in der Mitte.
   const scale = PP_IDLE_SCALE;
-  const id = 'ppidle-' + PpIdleAnims.slug(name);
-  const sx = kern.x0 * scale, sy = kern.y0 * scale;
+  const fenster = Math.round(box / scale);                       // Boxgröße in Sprite-Pixeln
+  const bw = kern.x1 - kern.x0, bh = kern.y1 - kern.y0;
+  const gesichtX = typeof m.faceX === 'number' ? m.faceX : kern.fx;
+  const gesichtY = kern.fy;
+  const klemme = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+  // Ganzzahlige Fensterkanten, damit die Pixel scharf bleiben.
+  const wx0 = Math.round(bw <= fenster ? kern.x0 - (fenster - bw) / 2 : klemme(gesichtX - fenster / 2, kern.x0, kern.x1 - fenster));
+  const wy0 = Math.round(bh <= fenster ? kern.y0 - (fenster - bh) / 2 : klemme(gesichtY - fenster * 0.33, kern.y0, kern.y1 - fenster));
+  const vx0 = Math.max(wx0, kern.x0), vx1 = Math.min(wx0 + fenster, kern.x1);
+  const vy0 = Math.max(wy0, kern.y0), vy1 = Math.min(wy0 + fenster, kern.y1);
+  const id = 'ppidle-' + PpIdleAnims.slug(name) + '-' + Math.round(vx0) + '-' + Math.round(vy0);
+  const sx = vx0 * scale, sy = vy0 * scale;
   const ende = vertikal ? `-${sx}px -${sy + n * fh * scale}px` : `-${sx + n * fw * scale}px -${sy}px`;
   const css = `@keyframes ${id} { from { background-position: -${sx}px -${sy}px; } to { background-position: ${ende}; } }`;
   const dauer = Math.max(1, n * (m.frameMs || 90));
   return (
-    <div style={wrap}>
+    <div style={{ ...wrap, position: 'relative', display: 'block' }}>
       <style>{css}</style>
       <div style={{
-        width: bw * scale, height: bh * scale, flexShrink: 0, imageRendering: 'pixelated',
+        position: 'absolute', left: (vx0 - wx0) * scale, top: (vy0 - wy0) * scale,
+        width: (vx1 - vx0) * scale, height: (vy1 - vy0) * scale, imageRendering: 'pixelated',
+        backgroundRepeat: 'no-repeat',
         backgroundImage: `url("${m.sheetUrl}")`,
         backgroundSize: vertikal ? `${fw * scale}px ${n * fh * scale}px` : `${n * fw * scale}px ${fh * scale}px`,
         animation: `${id} ${dauer}ms steps(${n}) infinite`,
