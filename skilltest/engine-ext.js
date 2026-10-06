@@ -33,22 +33,32 @@ function installElimination(engine) {
       const teleported = (ps._teleportedAway || 0) > 0;
       if (!hasSuspender && !teleported) newly.push(pi);
     }
-    if (!newly.length) return;
+    // Quetzahuitl: Wessen Quetzahuitl gefallen ist, scheidet in jedem Fall ZUERST aus (unabhängig von Schutz-Permanents/Teleport);
+    // wer gleichzeitig mit ihm fällt, scheidet danach gemeinsam aus (teilt sich den Platz). Siehe quetzahuitl-receiver-of-sacrifices.js.
+    const firstOut = (gs._quetzaLosers || []).filter(pi => !st.eliminated.includes(pi));
+    gs._quetzaLosers = [];
+    const rest = newly.filter(pi => !firstOut.includes(pi));
+    if (!firstOut.length && !rest.length) return;
 
-    for (const pi of newly) {
-      st.eliminated.push(pi);
-      st.eliminatedRound[pi] = st.round;
-      st.eliminatedWith[pi] = newly.length;     // gleichzeitig Ausgeschiedene teilen sich den Platz
-      this.log('skilltest_eliminated', { seat: pi, name: gs.players[pi].username, round: st.round });
-    }
+    const eliminate = (group) => {
+      for (const pi of group) {
+        st.eliminated.push(pi);
+        st.eliminatedRound[pi] = st.round;
+        st.eliminatedWith[pi] = group.length;     // gleichzeitig Ausgeschiedene teilen sich den Platz
+        this.log('skilltest_eliminated', { seat: pi, name: gs.players[pi].username, round: st.round });
+      }
+    };
+    eliminate(firstOut);
+    eliminate(rest);
     const alive = gs.players.map((_, i) => i).filter(i => !st.eliminated.includes(i));
     if (alive.length <= 1) {
       // Letzter Überlebender gewinnt; fallen die letzten gleichzeitig, entscheidet ein Hinweis (Bunny Bombs) oder der Zufall.
       let winner = alive[0];
       if (winner == null) {
+        const pool = rest.length ? rest : firstOut;
         const hint = gs._drawLoserIdx;
-        const cands = newly.filter(i => i !== hint);
-        winner = (cands.length ? cands : newly)[Math.floor(Math.random() * (cands.length || newly.length))];
+        const cands = pool.filter(i => i !== hint);
+        winner = (cands.length ? cands : pool)[Math.floor(Math.random() * (cands.length || pool.length))];
       }
       if (this.onGameOver) this.onGameOver(this.room, winner, 'last_standing');
       return;

@@ -100,6 +100,26 @@ const ABOM = 'The Golden Abomination';
   check('Genau dessen Start-Gold-Tick wurde umgeleitet', stealEv.length === 1 && stealEv[0].data.from === gs.players[2].username, stealEv.map(e => e.data));
   void goldStart;
 
+  console.log('Quetzahuitl: Besitzer scheidet zuerst aus, auch bei Gleichstand');
+  for (const variant of ['alleGleichzeitig', 'nurBesitzerUndEiner']) {
+    const o = await runGame({ seats: 3, setupOnly: true });
+    const e = o.engine, g = o.gs, st = o.st;
+    e._fastMode = true;
+    // Seat 0 hat Quetzahuitl verloren; Seat 1 (und bei „alle" auch Seat 2) fällt im selben Augenblick
+    g._quetzaLosers = [0];
+    const dead = variant === 'alleGleichzeitig' ? [0, 1, 2] : [0, 1];
+    for (const seat of dead) g.players[seat].heroes.forEach(h => { if (h && h.name) h.hp = 0; });
+    if (variant === 'nurBesitzerUndEiner') { /* Seat 2 lebt */ }
+    await e.checkAllHeroesDead();
+    check(`[${variant}] Der Besitzer steht als Erster in der Ausscheide-Liste`, st.eliminated[0] === 0, st.eliminated);
+    if (variant === 'alleGleichzeitig') {
+      check(`[${variant}] Die übrigen fallen gemeinsam danach aus und einer von ihnen gewinnt`, g.result && [1, 2].includes(g.result.winnerIdx) && st.eliminatedWith[1] === 2 && st.eliminatedWith[2] === 2, { res: g.result && g.result.winnerIdx, w: st.eliminatedWith });
+      check(`[${variant}] Der Besitzer wird Letzter`, g.result && g.result.skillTest.placements[0] === 3, g.result && g.result.skillTest.placements);
+    } else {
+      check(`[${variant}] Seat 2 gewinnt, Besitzer wird Letzter, Seat 1 Zweiter`, g.result && g.result.winnerIdx === 2 && g.result.skillTest.placements[0] === 3 && g.result.skillTest.placements[1] === 2, g.result && g.result.skillTest.placements);
+    }
+  }
+
   console.log('Quetzahuitl im Kampf');
   let arrivals = 0, defeats = 0, defeatThenEliminated = 0, finished = 0, noWinner = 0;
   for (let g = 0; g < 40; g++) {
