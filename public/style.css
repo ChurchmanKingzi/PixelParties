@@ -13300,6 +13300,35 @@ body:has(.modal-overlay) .tooltip {
 .profile-avatar-gallery-item:hover {
   transform: scale(1.05);
 }
+/* Der Name eines Avatars erscheint nur beim Hovern (als Tooltip unter dem Kreis), damit sich lange Namen
+   in der dichten Auswahl nicht überlappen. Der Tooltip nimmt keinen Platz im Raster ein. */
+.profile-avatar-gallery-item { position: relative; }
+.profile-avatar-gallery-item .profile-cb-gallery-label {
+  position: absolute;
+  left: 50%;
+  top: 100%;
+  transform: translateX(-50%);
+  margin-top: 2px;
+  padding: 2px 8px;
+  white-space: nowrap;
+  color: var(--text);
+  background: var(--bg3);
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+  box-shadow: 0 2px 8px rgba(0,0,0,.6);
+  z-index: 10;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity .12s;
+}
+.profile-avatar-gallery-item:hover .profile-cb-gallery-label,
+.profile-avatar-gallery-item:focus-visible .profile-cb-gallery-label {
+  opacity: 1;
+  visibility: visible;
+}
+/* Platz unter der letzten Reihe, damit der Tooltip dort nicht abgeschnitten wird. */
+.profile-avatar-gallery { padding-bottom: 28px; }
 .profile-avatar-gallery-item:hover .profile-avatar-gallery-img {
   border-color: var(--accent);
   box-shadow: 0 2px 12px rgba(0,0,0,.5);
