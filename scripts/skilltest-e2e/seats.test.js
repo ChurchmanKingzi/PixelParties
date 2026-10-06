@@ -39,7 +39,9 @@ async function prepAndReady(c) {
 
 async function setup(label) {
   const a = await client(label + 'A'), b = await client(label + 'B');
-  a.socket.emit('create_room', { skillTest: { prepTimerDisabled: true, turnTimerDisabled: true } });
+  // Zug-Timer an (kürzester Wert): Fragt eine Karte den Test-Menschen etwas (z. B. „Slippery Movement" zu Zugbeginn), beantwortet der Wächter
+  // den Prompt nach Ablauf mit der CPU-Vorgabe — sonst hinge das Spiel, weil der Test-Mensch nie antwortet.
+  a.socket.emit('create_room', { skillTest: { prepTimerDisabled: true, turnTimerDisabled: false, turnTimerSec: 15 } });
   const room = await waitFor(() => a.last('room_joined'));
   a.roomId = b.roomId = room.id;
   b.socket.emit('join_room', { roomId: room.id });
