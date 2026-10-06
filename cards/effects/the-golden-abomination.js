@@ -25,6 +25,7 @@
 // ═══════════════════════════════════════════
 
 const { PHASES } = require('./_hooks');
+const { opponentOfGs } = require('./_opp');
 
 const CARD_NAME = 'The Golden Abomination';
 
@@ -36,7 +37,7 @@ const CARD_NAME = 'The Golden Abomination';
 function stiehltGoldVon(engine, ctrl, gewinner) {
   const gs = engine?.gs;
   if (!gs || gewinner == null || ctrl == null) return false;
-  if (gewinner !== (ctrl === 0 ? 1 : 0)) return false;
+  if (gewinner !== (opponentOfGs(gs, ctrl))) return false;
   if (gs.currentPhase !== PHASES.RESOURCE || gs.activePlayer !== gewinner) return false;
   return (gs.players[gewinner]?.gold || 0) !== 0;       // „while their Gold is not 0"
 }

@@ -38,7 +38,7 @@ module.exports = {
     if (!hero?.name || hero.hp <= 0) return false;
     const ps = gs.players[pi];
     if (!ps || ps.handLocked) return false;
-    const oi = pi === 0 ? 1 : 0;
+    const oi = engine.opponentOf(pi);
     // Turn-1 protection: peeking / taking from a shielded opp's deck
     // is blocked. Same rule applies in onFreeActivate as a defensive
     // re-check in case the activation reached the engine despite the
@@ -57,7 +57,7 @@ module.exports = {
     const ps = gs.players[pi];
     const hero = gs.players[ctx.cardHeroOwner ?? pi]?.heroes?.[heroIdx];   // Styx 28.9.: Brettseite
     if (!hero?.name) return false;
-    const oi = pi === 0 ? 1 : 0;
+    const oi = engine.opponentOf(pi);
     if (gs.firstTurnProtectedPlayer === oi) return false;
     const ops = gs.players[oi];
     if (!ops || (ops.mainDeck || []).length === 0) return false;

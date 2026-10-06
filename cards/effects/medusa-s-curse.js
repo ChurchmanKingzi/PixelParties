@@ -41,7 +41,7 @@ module.exports = {
       const engine = ctx._engine;
       const gs = ctx.gameState;
       const pi = ctx.cardOwner;
-      const oppIdx = pi === 0 ? 1 : 0;
+      const oppIdx = engine.opponentOf(pi);
       const opp = gs.players[oppIdx];
       const cardDB = engine._getCardDB();
 

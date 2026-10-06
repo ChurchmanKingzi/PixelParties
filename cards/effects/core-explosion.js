@@ -107,7 +107,7 @@ module.exports = {
     if (!gs.hoptUsed) gs.hoptUsed = {};
     gs.hoptUsed[sperre(pi)] = gs.turn;
 
-    const oppIdx = pi === 0 ? 1 : 0;
+    const oppIdx = engine.opponentOf(pi);
     const level = levelVon(engine, deathInfo);
     const schaden = schadenFuer(level);
     const wirker = typeof casterIdx === 'number' ? casterIdx : -1;

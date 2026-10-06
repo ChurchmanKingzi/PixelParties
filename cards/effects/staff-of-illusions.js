@@ -75,7 +75,7 @@ module.exports = {
     const cardDB = engine._getCardDB();
 
     // Reveal the card to the opponent now
-    const oppIdx = pi === 0 ? 1 : 0;
+    const oppIdx = engine.opponentOf(pi);
     const oppSid = gs.players[oppIdx]?.socketId;
     if (oppSid) engine.io.to(oppSid).emit('card_reveal', { cardName: CARD_NAME });
     await engine._delay(100);

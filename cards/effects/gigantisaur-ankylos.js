@@ -36,7 +36,7 @@ module.exports = {
     if (!ps) return false;
     if ((ps.hand?.length || 0) < 1) return false;
     // Must have at least one opp-controlled target (Hero or Creature).
-    const oi = ctx.cardOwner === 0 ? 1 : 0;
+    const oi = engine.opponentOf(ctx.cardOwner);
     const ops = engine.gs.players[oi];
     if (!ops) return false;
     // Kontrolle statt Seite (Styx 28.9.)
@@ -77,7 +77,7 @@ module.exports = {
     }
 
     // Build opp-controlled target list (Heroes + face-up Creatures).
-    const oi = pi === 0 ? 1 : 0;
+    const oi = engine.opponentOf(pi);
     const target = await ctx.promptDamageTarget({
       side: 'enemy',
       types: ['hero', 'creature'],

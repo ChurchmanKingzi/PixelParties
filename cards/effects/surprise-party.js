@@ -185,7 +185,7 @@ module.exports = {
         const lvl = cardDB[gefunden]?.level ?? 0;
         const diff = Math.max(0, lvl - stufe);
         if (diff > 0) {
-          const oi = pi === 0 ? 1 : 0;
+          const oi = engine.opponentOf(pi);
           const anzahl = diff * PRO_STUFE;
           await engine.actionDrawCardsAnimated(oi, anzahl);
           engine.log('surprise_party_payment', {

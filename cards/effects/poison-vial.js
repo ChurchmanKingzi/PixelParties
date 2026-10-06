@@ -17,7 +17,7 @@ module.exports = {
   getValidTargets(gs, playerIdx, engine) {
     const targets = [];
     const pvCardDB = engine ? engine._getCardDB() : {};
-    for (let pi = 0; pi < 2; pi++) {
+    for (let pi = 0; pi < gs.players.length; pi++) {
       const ps = gs.players[pi];
       for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
         const hero = ps.heroes[hi];

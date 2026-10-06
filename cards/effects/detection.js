@@ -36,6 +36,7 @@
 // ═══════════════════════════════════════════
 
 const { ZONES } = require('./_hooks');
+const { opponentOfGs } = require('./_opp');
 
 const CARD_NAME = 'Detection';
 const DRAW_PER_REMOVED = 2;
@@ -112,7 +113,7 @@ module.exports = {
 
   spellPlayCondition(gs, pi, engine) {
     if (!engine) return false;
-    const oppIdx = pi === 0 ? 1 : 0;
+    const oppIdx = opponentOfGs(gs, pi);
     return _getOppSurprises(engine, oppIdx).length > 0;
   },
 
@@ -121,7 +122,7 @@ module.exports = {
       const engine = ctx._engine;
       const gs = engine.gs;
       const pi = ctx.cardOwner;
-      const oppIdx = pi === 0 ? 1 : 0;
+      const oppIdx = engine.opponentOf(pi);
       const ps = gs.players[pi];
       const ops = gs.players[oppIdx];
       if (!ps || !ops) { gs._spellCancelled = true; return; }

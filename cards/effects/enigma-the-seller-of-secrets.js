@@ -49,7 +49,7 @@ module.exports = {
     const pi = ctx.cardOwner;
     const ps = gs.players[pi];
     if (!ps || ps.handLocked) return false;
-    const oi = pi === 0 ? 1 : 0;
+    const oi = engine.opponentOf(pi);
     // Turn-1 protection: opp's deck is shielded from any effect that
     // peeks / touches the top while protection is active. Mirrors
     // Thieving / Charme Lv2 / etc. — gates here AND in onHeroEffect
@@ -64,7 +64,7 @@ module.exports = {
     const engine = ctx._engine;
     const gs = engine.gs;
     const pi = ctx.cardOwner;
-    const oi = pi === 0 ? 1 : 0;
+    const oi = engine.opponentOf(pi);
     const ps = gs.players[pi];
     const ops = gs.players[oi];
     if (!ps || !ops || ps.handLocked) return false;

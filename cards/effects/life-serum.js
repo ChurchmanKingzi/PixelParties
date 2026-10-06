@@ -38,7 +38,7 @@ module.exports = {
 
   canActivate(gs, playerIdx) {
     // Es muss irgendetwas auf dem Brett liegen, das HP hat.
-    for (let pi = 0; pi < 2; pi++) {
+    for (let pi = 0; pi < gs.players.length; pi++) {
       for (const hero of (gs.players[pi]?.heroes || [])) {
         if (hero?.name && hero.hp > 0) return true;
       }
@@ -49,7 +49,7 @@ module.exports = {
   getValidTargets(gs, playerIdx, engine) {
     if (!engine) return [];
     const targets = [];
-    for (let pi = 0; pi < 2; pi++) {
+    for (let pi = 0; pi < gs.players.length; pi++) {
       // `getHeroTargets` filtert bereits auf lebende Helden;
       // `getCreatureTargets` laeuft ueber jede Support Zone und haelt
       // Artefakt-Kreatur-Mischlinge (Powder Keg & Co.) drin.

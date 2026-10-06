@@ -73,7 +73,7 @@ function hatEffekt(name) {
 
 /** Waehlbare Gegnerhelden. */
 function kandidaten(engine, pi) {
-  const oi = pi === 0 ? 1 : 0;
+  const oi = engine.opponentOf(pi);
   const eigene = eigeneHeldennamen(engine, pi);
   const schon = engine.gs.players[pi]?._dangerousKnowledgeGained;
   const out = [];

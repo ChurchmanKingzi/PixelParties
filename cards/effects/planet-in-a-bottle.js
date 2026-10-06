@@ -139,7 +139,7 @@ module.exports = {
     const chosenSource = chosenEntry.source;
 
     // ── Step 2: All decisions made — reveal the potion card to opponent NOW ──
-    const oi = pi === 0 ? 1 : 0;
+    const oi = engine.opponentOf(pi);
     const oppSid = gs.players[oi]?.socketId;
     if (oppSid && engine.io) {
       engine.io.to(oppSid).emit('card_reveal', { cardName: 'Planet in a Bottle' });

@@ -45,7 +45,7 @@ const GOLD_COST = 5;
  *     can't try to re-steal the same Creature.
  */
 function _getEligibleTargets(engine, pi) {
-  const oppIdx = pi === 0 ? 1 : 0;
+  const oppIdx = engine.opponentOf(pi);
   return engine.getCreatureTargets(oppIdx).filter(t => {
     const inst = t.cardInstance;
     if (inst && inst.stolenBy != null) return false;

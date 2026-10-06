@@ -64,7 +64,7 @@ module.exports = {
 
       // Must be THIS ability's hero that was damaged
       let tgtPi = -1, tgtHi = -1;
-      for (let p = 0; p < 2; p++) {
+      for (let p = 0; p < engine.playerCount(); p++) {
         for (let h = 0; h < (gs.players[p]?.heroes || []).length; h++) {
           if (gs.players[p].heroes[h] === target) { tgtPi = p; tgtHi = h; break; }
         }

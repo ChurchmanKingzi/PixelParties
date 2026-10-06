@@ -25,7 +25,7 @@ module.exports = {
     const hoptKey = `acid-vial:${playerIdx}`;
     if (gs.hoptUsed?.[hoptKey] === gs.turn) return false;
     // At least one targetable hero must exist (not turn-1 protected)
-    for (let pi = 0; pi < 2; pi++) {
+    for (let pi = 0; pi < gs.players.length; pi++) {
       if (gs.firstTurnProtectedPlayer === pi) continue;
       for (const hero of (gs.players[pi]?.heroes || [])) {
         if (hero?.name && hero.hp > 0) return true;
@@ -45,7 +45,7 @@ module.exports = {
     // of their Hero) and filters by `hasCardType(cd, 'Creature')`,
     // which keeps Artifact-Creature hybrids (Powder Keg, Pollution
     // Spewer, …) included.
-    for (let pi = 0; pi < 2; pi++) {
+    for (let pi = 0; pi < gs.players.length; pi++) {
       if (gs.firstTurnProtectedPlayer !== pi) {
         targets.push(...engine.getHeroTargets(pi));
       }

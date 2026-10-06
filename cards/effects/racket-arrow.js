@@ -28,7 +28,7 @@ const CARD_NAME = 'Racket Arrow';
  *  the fizzle happens inside `returnSupportCreatureToHand` (absolute
  *  `_cardinalImmune` guard). */
 function opponentCreatureTargets(engine, pi) {
-  const oppIdx = pi === 0 ? 1 : 0;
+  const oppIdx = engine.opponentOf(pi);
   const cardDB = engine._getCardDB();
   const out = [];
   for (const inst of engine.cardInstances) {

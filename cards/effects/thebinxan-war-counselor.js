@@ -112,7 +112,7 @@ module.exports = {
     const card = findThebinxan(engine);
     if (!card) return undefined;
     const owner = card.controller ?? card.owner;
-    const declarer = owner === 0 ? 1 : 0;                // die CPU wird gefragt
+    const declarer = engine.opponentOf(owner);                // die CPU wird gefragt
 
     let known = { hand: {}, deck: {} };
     try { known = engine.knownOpponentCards(declarer) || known; } catch { /* Beiwerk */ }
@@ -159,7 +159,7 @@ module.exports = {
     const engine = ctx._engine;
     const gs = engine.gs;
     const pi = ctx.cardOwner;
-    const oppIdx = pi === 0 ? 1 : 0;
+    const oppIdx = engine.opponentOf(pi);
     const inst = ctx.card;
     const ps = gs.players[pi];
     const opp = gs.players[oppIdx];

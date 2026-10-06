@@ -48,7 +48,7 @@ function pickActivatingHero(engine, pi, cardData) {
   // kontrolliert (auch geliehene), eigene Spalte zuerst. Rueckgabe
   // { seite, heroIdx } oder null.
   const kandidaten = [];
-  for (const seite of [pi, pi === 0 ? 1 : 0]) {
+  for (const seite of [pi, engine.opponentOf(pi)]) {
     for (let hi = 0; hi < (engine.gs.players[seite]?.heroes || []).length; hi++) {
       if (engine.surpriseKontrolleur(seite, hi) === pi) kandidaten.push({ seite, hi });
     }
@@ -167,7 +167,7 @@ module.exports = {
       const sourceInfo = {
         telekinesis: true,
         forcedByCard: CARD_NAME,
-        activatorIdx: owner === 0 ? 1 : 0,
+        activatorIdx: engine.opponentOf(owner),
       };
 
       // Cute Spider counts as the Surprise's SOURCE — any retaliation

@@ -193,7 +193,7 @@ module.exports = {
     });
 
     // ── Opponent-side deck-search reveal modal ──
-    const oi = pi === 0 ? 1 : 0;
+    const oi = engine.opponentOf(pi);
     await engine.promptGeneric(oi, {
       type: 'deckSearchReveal',
       cardName: chosenName,

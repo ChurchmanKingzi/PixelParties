@@ -184,7 +184,7 @@ module.exports = {
       if (!slipperyOnMoveGate(ctx)) return;
       const engine = ctx._engine;
       const pi = ctx.cardOwner;
-      const oppIdx = pi === 0 ? 1 : 0;
+      const oppIdx = engine.opponentOf(pi);
       const ps = engine.gs.players[pi];
       if (!ps) return;
       const pengueInst = ctx.card;

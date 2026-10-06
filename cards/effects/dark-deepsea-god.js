@@ -130,7 +130,7 @@ async function _fireAoEAsSource(engine, pi, sourceInst, isCopy) {
     });
     return;
   }
-  const oi = pi === 0 ? 1 : 0;
+  const oi = engine.opponentOf(pi);
   const ops = gs.players[oi];
   if (!ops) return;
   const cardDB = engine._getCardDB();

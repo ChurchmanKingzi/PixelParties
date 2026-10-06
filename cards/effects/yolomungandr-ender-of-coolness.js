@@ -74,7 +74,7 @@ module.exports = {
       if (ctx.activePlayer !== ctx.cardOwner) return;
       const engine = ctx._engine;
       const pi = ctx.cardOwner;
-      const oi = pi === 0 ? 1 : 0;
+      const oi = engine.opponentOf(pi);
       const stackSize = engine.getCoolnessStackSize(pi);
       if (stackSize <= 0) return;
 
@@ -93,7 +93,7 @@ module.exports = {
 async function fireGroupChoice(ctx, damage, postPromptReveal = false) {
   const engine = ctx._engine;
   const pi = ctx.cardOwner;
-  const oppIdx = pi === 0 ? 1 : 0;
+  const oppIdx = engine.opponentOf(pi);
   const oppPs = engine.gs.players[oppIdx];
   if (!oppPs) return;
 

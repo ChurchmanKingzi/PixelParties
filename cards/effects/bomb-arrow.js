@@ -27,7 +27,7 @@ const BOMB_DAMAGE = 100;
  *  Cardinal-immune creatures remain legal targets per the card text —
  *  the 100 damage fizzles at the engine's immunity gate. */
 function opponentCreatureTargets(engine, pi) {
-  const oppIdx = pi === 0 ? 1 : 0;
+  const oppIdx = engine.opponentOf(pi);
   const cardDB = engine._getCardDB();
   const out = [];
   for (const inst of engine.cardInstances) {

@@ -27,7 +27,7 @@ const DAMAGE = 20;
 const ANIM = 'poison_skulls';
 
 function meatTargets(engine, pi) {
-  const oppIdx = pi === 0 ? 1 : 0;
+  const oppIdx = engine.opponentOf(pi);
   const sides = engine.borisHidesOpponentSide?.(pi) ? [pi] : [pi, oppIdx];
   const out = [];
   for (const side of sides) {

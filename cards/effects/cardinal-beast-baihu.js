@@ -17,7 +17,7 @@ module.exports = {
     const vt = payload?.validTargets || [];
     if (vt.length === 0) return undefined;
     const pi = payload.playerIdx;
-    const oi = pi === 0 ? 1 : 0;
+    const oi = engine.opponentOf(pi);
     const enemyHeroes = vt.filter(t => String(t.id || t).startsWith('hero-' + oi));
     const pick = enemyHeroes[0] || vt[0];
     return [typeof pick === 'object' ? pick.id : pick];
@@ -47,7 +47,7 @@ module.exports = {
     const gs = engine.gs;
     // Styx 28.9.: „you" = Kontrolleur (seitenfremd beschworen: cardOwner ≠ owner).
     const pi = ctx.cardOwner;
-    const oppIdx = pi === 0 ? 1 : 0;
+    const oppIdx = engine.opponentOf(pi);
 
     // Target: any opponent's hero or creature
     const targets = [];

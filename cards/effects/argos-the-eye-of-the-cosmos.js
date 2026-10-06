@@ -140,7 +140,7 @@ module.exports = {
       const hero = gs.players[feld]?.heroes?.[ctx.cardHeroIdx];
       if (!hero?.name || hero.hp <= 0) return;
 
-      const oppIdx = pi === 0 ? 1 : 0;
+      const oppIdx = engine.opponentOf(pi);
       const oppHandSize = (gs.players[oppIdx]?.hand || []).length;
 
       if (ctx.isMyTurn) {

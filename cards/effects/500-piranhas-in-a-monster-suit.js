@@ -61,7 +61,7 @@ function _stampHopt(gs, pi) {
 
 /** Opp Creature targets that can actually be defeated (no Cardinal / omni / steal-immortal). */
 function _validVictims(engine, pi) {
-  const oi = pi === 0 ? 1 : 0;
+  const oi = engine.opponentOf(pi);
   const cardDB = engine._getCardDB();
   const out = [];
   for (const inst of engine.cardInstances) {
@@ -149,7 +149,7 @@ module.exports = {
     if (!victim?.cardInstance) return false;
 
     const targetInst = victim.cardInstance;
-    const oi = pi === 0 ? 1 : 0;
+    const oi = engine.opponentOf(pi);
     const destHi = targetInst.heroIdx;
     const destSlot = targetInst.zoneSlot;
     const ops = gs.players[oi];

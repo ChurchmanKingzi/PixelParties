@@ -140,7 +140,7 @@ module.exports = {
       // status-apply micro-steps; this up-front burst telegraphs
       // the spell's full board reach before any individual status
       // animation starts.
-      for (let p = 0; p < 2; p++) {
+      for (let p = 0; p < engine.playerCount(); p++) {
         const ps = gs.players[p];
         for (let hi = 0; hi < (ps?.heroes || []).length; hi++) {
           const hero = ps.heroes[hi];
@@ -184,7 +184,7 @@ module.exports = {
       // Anti-Magic Spell-protection (`magic_immune` level >= 2) is the
       // ONE immunity the engine doesn't gate at status-apply time, so
       // we filter it locally before calling.
-      for (let p = 0; p < 2; p++) {
+      for (let p = 0; p < engine.playerCount(); p++) {
         const ps = gs.players[p];
         for (let hi = 0; hi < (ps?.heroes || []).length; hi++) {
           const hero = ps.heroes[hi];

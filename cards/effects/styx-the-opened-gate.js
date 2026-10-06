@@ -65,11 +65,11 @@ const BONUS_KARTEN = 2;
 /** Besiegte Helden, die Styx gerade zurueckholen darf. */
 function wiederbelebbareHelden(engine, pi) {
   const gs = engine.gs;
-  const oi = pi === 0 ? 1 : 0;
+  const oi = engine.opponentOf(pi);
   const gegnerVerborgen = engine.borisHidesOpponentSide(pi)
     || gs.firstTurnProtectedPlayer === oi;
   const ziele = [];
-  for (let p = 0; p < 2; p++) {
+  for (let p = 0; p < engine.playerCount(); p++) {
     const heroes = gs.players[p]?.heroes || [];
     for (let hi = 0; hi < heroes.length; hi++) {
       const h = heroes[hi];

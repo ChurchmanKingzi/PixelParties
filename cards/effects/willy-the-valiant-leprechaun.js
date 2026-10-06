@@ -72,7 +72,7 @@ module.exports = {
       hero._willyEffectUsed = true;
 
       const ps = gs.players[pi];
-      const oppIdx = pi === 0 ? 1 : 0;
+      const oppIdx = engine.opponentOf(pi);
 
       // Reveal Willy to opponent
       const oppSid = gs.players[oppIdx]?.socketId;

@@ -191,7 +191,7 @@ module.exports = {
 
     // Reveal modal to opponent (standard deck-search etiquette).
     await engine._delay(300);
-    const oi = pi === 0 ? 1 : 0;
+    const oi = engine.opponentOf(pi);
     await engine.promptGeneric(oi, {
       type: 'deckSearchReveal',
       cardName: loyalName,

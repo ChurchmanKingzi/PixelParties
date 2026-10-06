@@ -96,7 +96,7 @@ async function schattenschlag(ctx, opferName) {
   const engine = ctx._engine;
   const gs = engine.gs;
   const pi = ctx.cardOwner;
-  const oppIdx = pi === 0 ? 1 : 0;
+  const oppIdx = engine.opponentOf(pi);
   const oppPs = gs.players[oppIdx];
   if (!oppPs || !(oppPs.hand || []).length) return;
 
@@ -124,7 +124,7 @@ async function schattenschlag(ctx, opferName) {
   const abgeworfen = [];
   // v1324: Boris darf den erzwungenen Abwurf ignorieren.
   const _boris = (oppPs.hand || []).length > 0
-    && await engine.borisVerzicht(oppIdx, Math.min(DISCARD_COUNT, oppPs.hand.length), { source: CARD_NAME, sourceOwner: 1 - oppIdx });
+    && await engine.borisVerzicht(oppIdx, Math.min(DISCARD_COUNT, oppPs.hand.length), { source: CARD_NAME, sourceOwner: pi });
   for (let i = 0; i < (_boris ? 0 : DISCARD_COUNT); i++) {
     const hand = oppPs.hand || [];
     if (hand.length === 0) break;
@@ -158,7 +158,7 @@ module.exports = {
       if (!istDieserHeld(ctx)) return;
       const engine = ctx._engine;
       const pi = ctx.cardOwner;
-      const oppIdx = pi === 0 ? 1 : 0;
+      const oppIdx = engine.opponentOf(pi);
       const hero = ctx.hero;
       if (!hero?.name) return;
       // „your opponent controls" — der gefallene Held muss auf der

@@ -33,7 +33,7 @@ function allBoardTargets(engine) {
   const gs = engine.gs;
   const cardDB = engine._getCardDB();
   const out = [];
-  for (let owner = 0; owner < 2; owner++) {
+  for (let owner = 0; owner < engine.playerCount(); owner++) {
     const ps = gs.players[owner];
     for (let hi = 0; hi < (ps?.heroes || []).length; hi++) {
       const h = ps.heroes[hi];

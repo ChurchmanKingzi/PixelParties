@@ -124,7 +124,7 @@ module.exports = {
       const engine = ctx._engine;
       const gs = ctx.gameState;
       const pi = ctx.cardOwner;
-      const oi = pi === 0 ? 1 : 0;
+      const oi = engine.opponentOf(pi);
       const oppPs = gs.players[oi];
       if (!oppPs) return;
 

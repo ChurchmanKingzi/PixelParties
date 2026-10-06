@@ -18,6 +18,7 @@ const { loadCardEffect } = require('./_loader');
 // ★ v1196: das Uebernahme-Verfahren liegt im gemeinsamen Modul —
 // „Charme" Lv3, „Love Shot" und „Golden Apple" lesen dieselben Schritte.
 const { temporaereKontrolle } = require('./_charm-shared');
+const { opponentOfGs } = require('./_opp');
 
 module.exports = {
   // BORIS-SPERRE (Klausel 1): holt Karten des Gegners auf die eigene Seite
@@ -131,7 +132,7 @@ module.exports = {
     const hero = gs.players[feld]?.heroes?.[heroIdx];
     if (!hero?.name || hero.hp <= 0) return false;
 
-    const oi = pi === 0 ? 1 : 0;
+    const oi = engine.opponentOf(pi);
     const ops = gs.players[oi];
     const isActionPhase = gs.currentPhase === 3;
     const isMainPhase = gs.currentPhase === 2 || gs.currentPhase === 4;
@@ -176,7 +177,7 @@ module.exports = {
     const hero = gs.players[feld]?.heroes?.[heroIdx];
     if (!hero?.name) return false;
 
-    const oi = pi === 0 ? 1 : 0;
+    const oi = engine.opponentOf(pi);
     const ops = gs.players[oi];
 
     if (level >= 3) {
@@ -194,7 +195,7 @@ module.exports = {
 // ═══════════════════════════════════════════
 
 function _getOpponentActivatableAbilities(gs, pi, engine) {
-  const oi = pi === 0 ? 1 : 0;
+  const oi = opponentOfGs(gs, pi);
   const ops = gs.players[oi];
   const results = [];
 

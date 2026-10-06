@@ -54,7 +54,7 @@ function areaCount(gs) {
 /** Alle Ziele, die der Gegner kontrolliert — Helden UND Kreaturen. */
 function gegnerZiele(engine, pi) {
   const gs = engine.gs;
-  const oppIdx = pi === 0 ? 1 : 0;
+  const oppIdx = engine.opponentOf(pi);
   const ziele = [];
   for (let p = 0; p < (gs.players || []).length; p++) {
     const ps = gs.players[p];

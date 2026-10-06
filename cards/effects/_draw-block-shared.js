@@ -1,4 +1,6 @@
 'use strict';
+
+const { opponentOfGs } = require('./_opp');
 // ═══════════════════════════════════════════════════════════════════
 //  ZIEH-SPERRE — die eine Auslegungsstelle für "Tuscan Artist"
 //
@@ -55,7 +57,7 @@ const MAX_BLOCKED = 3;
  * ohne Hook läuft.
  */
 function blockerAufDemBrett(engine, playerIdx) {
-  const gegnerIdx = playerIdx === 0 ? 1 : 0;
+  const gegnerIdx = opponentOfGs(engine?.gs, playerIdx);
   for (const inst of (engine?.cardInstances || [])) {
     if (inst.name !== BLOCKER_NAME) continue;
     if (inst.zone !== 'support') continue;

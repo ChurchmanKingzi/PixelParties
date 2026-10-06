@@ -27,6 +27,7 @@
 //  this card."
 // ═══════════════════════════════════════════
 
+const { opponentOfGs } = require('./_opp');
 const CARD_NAME = 'Weird Doll';
 
 module.exports = {
@@ -167,7 +168,7 @@ module.exports = {
  */
 function _enumerateControlledAbilities(gs, pi, engine) {
   const out = [];
-  const oi  = pi === 0 ? 1 : 0;
+  const oi  = opponentOfGs(gs, pi);
 
   const myPs = gs.players[pi];
   if (myPs) {

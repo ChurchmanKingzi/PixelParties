@@ -27,7 +27,7 @@ module.exports = {
   surpriseHeroEffectTrigger: true,
 
   canTelekinesisActivate(engine, ownerIdx) {
-    const oppIdx = ownerIdx === 0 ? 1 : 0;
+    const oppIdx = engine.opponentOf(ownerIdx);
     const oppPs = engine.gs.players[oppIdx];
     if (!oppPs) return false;
     for (let hi = 0; hi < (oppPs.heroes || []).length; hi++) {
@@ -72,7 +72,7 @@ module.exports = {
     const engine = ctx._engine;
     const gs = engine.gs;
     const pi = ctx.cardOwner;
-    const actIdx = sourceInfo.telekinesis ? (pi === 0 ? 1 : 0) : sourceInfo.activatorIdx;
+    const actIdx = sourceInfo.telekinesis ? (engine.opponentOf(pi)) : sourceInfo.activatorIdx;
     const actPs = gs.players[actIdx];
 
     // Build targets: opponent heroes with free support zone and no Mummy Token

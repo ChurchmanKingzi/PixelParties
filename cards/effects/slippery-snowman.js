@@ -61,7 +61,7 @@ module.exports = {
       if (!slipperyOnMoveGate(ctx)) return;
       const engine = ctx._engine;
       const pi = ctx.cardOwner;
-      const oi = pi === 0 ? 1 : 0;
+      const oi = engine.opponentOf(pi);
       const oppPs = engine.gs.players[oi];
       if (!oppPs) return;
       // Gate clause from the card text: opp must have zero Frozen

@@ -132,7 +132,7 @@ module.exports = {
       // Locate the damaged hero's pi/heroIdx by physical column.
       const gs = engine.gs;
       let tgtPi = -1, tgtHi = -1;
-      for (let p = 0; p < 2; p++) {
+      for (let p = 0; p < engine.playerCount(); p++) {
         const heroes = gs.players[p]?.heroes || [];
         for (let h = 0; h < heroes.length; h++) {
           if (heroes[h] === target) { tgtPi = p; tgtHi = h; break; }

@@ -75,7 +75,7 @@ module.exports = {
     const mode = result?.optionId || 'atk';
 
     // Apply to every living Hero on BOTH sides (symmetric by design).
-    for (let p = 0; p < 2; p++) {
+    for (let p = 0; p < engine.playerCount(); p++) {
       const heroes = gs.players[p]?.heroes || [];
       for (let hi = 0; hi < heroes.length; hi++) {
         const hero = heroes[hi];

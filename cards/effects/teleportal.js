@@ -182,7 +182,7 @@ module.exports = {
       inst.counters._teleportalUntil = faelligIn;
 
       // Beide Seiten sehen die Karte — „openly".
-      const oi = pi === 0 ? 1 : 0;
+      const oi = engine.opponentOf(pi);
       const oppSid = gs.players[oi]?.socketId;
       if (oppSid && engine.io) {
         engine.io.to(oppSid).emit('card_reveal', { cardName: name });

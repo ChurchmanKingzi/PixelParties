@@ -145,7 +145,7 @@ async function fireSkullDamage(ctx, deleted) {
   // falls back to -1. `actionDealDamage` handles a -1 sourceHeroIdx
   // by attributing the damage to the card name only.
   const targets = [];
-  for (let pIdx = 0; pIdx < 2; pIdx++) {
+  for (let pIdx = 0; pIdx < engine.playerCount(); pIdx++) {
     const tps = gs.players[pIdx];
     for (let hi = 0; hi < (tps.heroes || []).length; hi++) {
       const hero = tps.heroes[hi];

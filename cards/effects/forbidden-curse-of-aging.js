@@ -82,7 +82,7 @@ function zielIstGratis(gs, wirtPi, wirtHi) {
  * beschraenkt, die eine Bedingung erfuellen (Regel ②).
  */
 function hostOpts(gs, pi, heroIdx, engine) {
-  const basis = { sides: [0, 1], ownSideOnly: false };
+  const basis = { sides: gs.players.map((_, i) => i), ownSideOnly: false };
   if (!gs || !engine) return basis;
   if (engine.hasPayableActionFor?.(pi, CARD_NAME, heroIdx)) return basis;
   return { ...basis, heroFilter: (hero, hi, side) => zielIstGratis(gs, side, hi) };
@@ -114,7 +114,7 @@ module.exports = {
   inherentAction(gs, pi, heroIdx, engine) {
     if (!engine) return false;
     return attachmentHostsFor(gs, pi, engine, {
-      sides: [0, 1],
+      sides: gs.players.map((_, i) => i),
       heroFilter: (hero, hi, side) => zielIstGratis(gs, side, hi),
     }).length > 0;
   },
@@ -151,7 +151,7 @@ module.exports = {
       const rueckfall = !!engine.hasPayableActionFor?.(ctx.cardOwner, CARD_NAME, ctx.cardHeroIdx);
       const gratis = (hero, hi, side) => zielIstGratis(gs, side, hi);
       const res = await attachToHero(ctx, CARD_NAME, {
-        sides: [0, 1],
+        sides: engine.gs.players.map((_, i) => i),
         heroAccent: (hero, hi, side) => (gratis(hero, hi, side) ? 'green' : null),
         heroDim: rueckfall ? null : (hero, hi, side) => !gratis(hero, hi, side),
         ignoreDropHints: true,

@@ -36,7 +36,7 @@ module.exports = {
       const hero = ctx.attachedHero || ps?.heroes?.[heroIdx];   // v1364: geliehener Held (Love Shot, Charme) — physische Seite
       if (!hero?.name || hero.hp <= 0) return;
 
-      const oppIdx = pi === 0 ? 1 : 0;
+      const oppIdx = engine.opponentOf(pi);
       const oppPs = gs.players[oppIdx];
       const cardDB = engine._getCardDB();
 

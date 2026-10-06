@@ -56,7 +56,7 @@ const MAX_AUFNAHMEN = 3;
  * Besitzer plus Namensvergleich.
  */
 function lageVon(gs, hero) {
-  for (let pi = 0; pi < 2; pi++) {
+  for (let pi = 0; pi < gs.players.length; pi++) {
     const hi = (gs.players[pi]?.heroes || []).indexOf(hero);
     if (hi >= 0) return { pi, hi };
   }

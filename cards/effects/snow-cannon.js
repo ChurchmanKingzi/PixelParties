@@ -7,6 +7,7 @@
 // ═══════════════════════════════════════════
 
 const { hasCardType } = require('./_hooks');
+const { opponentOfGs } = require('./_opp');
 
 module.exports = {
   isTargetingArtifact: true,
@@ -24,7 +25,7 @@ module.exports = {
   // Verhalten mit Helden, statt zu werfen.
   getValidTargets(gs, playerIdx, engine) {
     const targets = [];
-    const oppIdx = playerIdx === 0 ? 1 : 0;
+    const oppIdx = opponentOfGs(gs, playerIdx);
     // Kontrolle statt Seite (Styx 28.9.): alle Helden, die der Gegner
     // kontrolliert (wie engine.heroSideOf) — Ziel-IDs bleiben physisch.
     for (let po = 0; po < (gs.players || []).length; po++) {

@@ -139,7 +139,7 @@ module.exports = {
       engine.shuffleDeck(pi);
       engine.sync();
 
-      const oi = pi === 0 ? 1 : 0;
+      const oi = engine.opponentOf(pi);
       await engine.promptGeneric(oi, {
         type: 'deckSearchReveal',
         searchToHand: true,   // v1119: Suche AUF DIE HAND

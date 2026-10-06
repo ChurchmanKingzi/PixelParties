@@ -93,7 +93,7 @@ module.exports = {
   resolve: async (engine, pi) => {
     const gs = engine.gs;
     const ps = gs.players[pi];
-    const oppIdx = pi === 0 ? 1 : 0;
+    const oppIdx = engine.opponentOf(pi);
     const oppPs  = gs.players[oppIdx];
     if (!ps || !oppPs) return { cancelled: true };
     if ((ps.mainDeck?.length || 0) < REVEAL_COUNT) return { cancelled: true };

@@ -79,7 +79,7 @@ module.exports = {
     if (!ps._oncePerGameUsed) ps._oncePerGameUsed = new Set();
     ps._oncePerGameUsed.add('elixirOfImmortality');
 
-    const oi = pi === 0 ? 1 : 0;
+    const oi = engine.opponentOf(pi);
     const oppSid = engine.gs.players[oi]?.socketId;
     if (oppSid && engine.io) {
       engine.io.to(oppSid).emit('card_reveal', { cardName: 'Elixir of Immortality' });

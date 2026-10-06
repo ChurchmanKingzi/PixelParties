@@ -60,7 +60,7 @@ module.exports = {
       const engine = ctx._engine;
       const gs = engine.gs;
       const pi = ctx.cardOwner;
-      const oppIdx = pi === 0 ? 1 : 0;
+      const oppIdx = engine.opponentOf(pi);
 
       // Clown is the only eligible creature target for the opponent's
       // targeting effects until the end of their next turn.

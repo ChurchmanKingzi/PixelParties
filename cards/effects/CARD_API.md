@@ -1918,6 +1918,41 @@ Weg nehmen (Galerie → `summonZonesFor` → `summonFromPile`).
 dem Brett als andere Namen zählt, exportiert die Aliasse — der Pilot
 trägt kein Archetyp-Wissen.
 
+## ★ GEGNER-INDEX NIE HART VERDRAHTEN (N-Spieler-Umbau — MANDATORY)
+
+**Gegner-Index nie als `pi === 0 ? 1 : 0` schreiben — `engine.opponentOf(pi)` / `engine.opponentsOf(pi)`;
+für Karten, die in Skill Test (bis 8 Spieler) laufen sollen.** Das Idiom trägt nur bis zwei Spieler.
+Der Skill Test hat bis zu 8; dort hängt „der Gegner“ am Fokus des Spielers (`gs.stFocus`) bzw. am
+nächsten lebenden Spieler. Im Normalspiel liefern die Helfer exakt dasselbe wie das alte Idiom
+(`cards/effects/_opp.js`, abgesichert durch `scripts/regress/compare.sh`).
+
+| Statt | Schreibe | Wann |
+|---|---|---|
+| `pi === 0 ? 1 : 0`, `1 - pi` | `engine.opponentOf(pi)` | „der Gegner“, EIN Spieler (Ziel, Zielwahl, „target opponent“) |
+| `[pi === 0 ? 1 : 0]` | `engine.opponentsOf(pi)` | „jeder Gegner“ — Liste aller Gegner |
+| `for (…; p < 2; …)` über Spieler | `p < engine.playerCount()` | alle Spieler am Tisch |
+| `[0, 1]` als Spielerliste | `engine.gs.players.map((_, i) => i)` | alle Spieler inkl. Wirker |
+
+Wo es herkommt (erste passende Form nehmen):
+
+* **in `GameEngine`-Methoden** — `this.opponentOf(pi)`
+* **im Kartenskript, `engine` im Gültigkeitsbereich** — `engine.opponentOf(pi)`
+* **im Hook-Kontext** — `ctx.opponentOf(pi)` oder `ctx._engine.opponentOf(pi)`
+* **nur der Spielzustand `gs` da** (reine Hilfsfunktion ohne Engine) —
+  `const { opponentOfGs } = require('./_opp');` und `opponentOfGs(gs, pi)`; ebenso
+  `opponentsOfGs(gs, pi)` und `playerCountGs(gs)`
+
+**Der Lint hält das ein:** `node scripts/check-n-player.js` meldet jedes Zwei-Spieler-Idiom
+(`=== 0 ? 1 : 0`, `1 - pi`, `(pi + 1) % 2`, `i < 2` über Spieler, `[0, 1]`) und endet mit Code 1.
+Echte Zwei-Spieler-Logik (z. B. ein Layout mit genau zwei Slots) bekommt den Kommentar
+`// n-player-ok: <Grund>` in dieselbe oder die Zeile davor. Die CPU-/Trainings-Dateien stehen in
+`scripts/n-player-allow.json`. Vorhandene Altlasten (Spielende, Lobby, Puzzle, feste
+`players[0]`/`players[1]`): `docs/n-player-todo.md`.
+
+**Achtung bei „each opponent“-Karten:** `opponentOf` liefert EINEN Gegner. Trifft die Karte laut
+Kartentext **jeden** Gegner, gehört `engine.opponentsOf(pi)` hin — im Normalspiel ist das eine
+Liste mit einem Eintrag, im Skill Test alle anderen.
+
 ## Quick Start
 
 ```js
@@ -2443,7 +2478,7 @@ an explicit short-circuit at the top of your target-eligibility
 helper:
 
 ```js
-const oppIdx = pi === 0 ? 1 : 0;
+const oppIdx = engine.opponentOf(pi);
 // Per-side non-damage shield (The Great Wall of Deri etc.). Card is
 // non-damage, so opp's protected Creatures are unreachable — short-
 // circuit so the card is correctly grayed out in hand instead of

@@ -68,7 +68,7 @@ module.exports = {
       const ps       = gs.players[pi];
       if (!ps) { gs._spellCancelled = true; return; }
 
-      const oppIdx = pi === 0 ? 1 : 0;
+      const oppIdx = engine.opponentOf(pi);
       const oppPs  = gs.players[oppIdx];
       if (!oppPs) { gs._spellCancelled = true; return; }
 

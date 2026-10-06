@@ -98,7 +98,7 @@ module.exports = {
       inst.counters = inst.counters || {};
       inst.counters._bombMiteFired = true;
 
-      const oi = pi === 0 ? 1 : 0;
+      const oi = engine.opponentOf(pi);
       await engine.showTriggeredEffect(CARD_NAME, { playerIdx: pi });
 
       // ── Erst in die Ablage, dann zuenden ────────────────────────
@@ -126,7 +126,7 @@ module.exports = {
       if (inst.counters?._bombMiteBackfired) return;
       const engine = ctx._engine;
       const pi = inst.controller ?? inst.owner;
-      const oi = pi === 0 ? 1 : 0;
+      const oi = engine.opponentOf(pi);
 
       // „by an OPPONENT's card or effect": ohne Quelle oder mit eigener
       // Quelle passiert nichts.

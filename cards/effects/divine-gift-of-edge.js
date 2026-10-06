@@ -100,7 +100,7 @@ async function doSideDeckPick(engine, pi, { cancellable }) {
   // every search effect uses. The reveal is one-time: dismissing it
   // closes the modal and the card is no longer face-up to the
   // opponent (no permanent reveal flag is set).
-  const oi = pi === 0 ? 1 : 0;
+  const oi = engine.opponentOf(pi);
   await engine.promptGeneric(oi, {
     type: 'deckSearchReveal',
     cardName: chosen,

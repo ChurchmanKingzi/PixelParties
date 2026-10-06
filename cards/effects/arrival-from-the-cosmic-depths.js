@@ -54,6 +54,7 @@ const {
   COSMIC_DEPTHS_CREATURES, isCosmicCard,
   canSummonInvaderViaSource,
 } = require('./_cosmic-shared');
+const { opponentOfGs } = require('./_opp');
 
 const CARD_NAME = 'Arrival from the Cosmic Depths';
 const HOPT_PREFIX = 'arrival-from-the-cosmic-depths';
@@ -203,7 +204,7 @@ module.exports = {
     if (!engine) return true;
     if (hoptUsed(gs, pi)) return false;
     // First half needs a free zone on opp's side (any Hero, even dead).
-    if (oppFreeSlots(engine, pi === 0 ? 1 : 0).length === 0) return false;
+    if (oppFreeSlots(engine, opponentOfGs(gs, pi)).length === 0) return false;
     // Second half needs an eligible (first, summonable upgrade) pair —
     // an upgrade is "summonable" only if some own Hero can host the
     // normal summon (alive, not frozen/stunned/bound, meets level
@@ -218,7 +219,7 @@ module.exports = {
       const engine = ctx._engine;
       const gs = engine.gs;
       const pi = ctx.cardOwner;
-      const oi = pi === 0 ? 1 : 0;
+      const oi = engine.opponentOf(pi);
       const ps = gs.players[pi];
       if (!ps) return;
       if (hoptUsed(gs, pi)) return;

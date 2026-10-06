@@ -111,7 +111,7 @@ async function tryTutor(ctx) {
   // Prefer own pile; fall back to opponent's. Card names are unique
   // per copy in a pile, so as long as the gallery offered the name,
   // at least one of the piles still has it.
-  const oi = pi === 0 ? 1 : 0;
+  const oi = ctx._engine.opponentOf(pi);
   const fromOwner = (gs.players[pi]?.discardPile || []).includes(picked.cardName)
     ? pi
     : (gs.players[oi]?.discardPile || []).includes(picked.cardName) ? oi : -1;

@@ -32,7 +32,7 @@ function findBaseMolinda(engine, pi, heroIdx) {
   let actualOwner = pi;
   if (!hero || hero.name !== BASE_MOLINDA) {
     hero = null;
-    for (let p = 0; p < 2; p++) {
+    for (let p = 0; p < engine.playerCount(); p++) {
       const h = engine.gs.players[p]?.heroes?.[heroIdx];
       if (h?.name === BASE_MOLINDA) { hero = h; actualOwner = p; break; }
     }

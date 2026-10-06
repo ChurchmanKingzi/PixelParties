@@ -71,7 +71,7 @@ module.exports = {
    */
   async resolve(engine, pi) {
     const gs = engine.gs;
-    const oi = pi === 0 ? 1 : 0;
+    const oi = engine.opponentOf(pi);
     const ps = gs.players[pi];
     const helden = lebendeHelden(ps);
 

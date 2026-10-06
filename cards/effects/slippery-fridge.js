@@ -98,7 +98,7 @@ module.exports = {
     // Ziel-Filter sie im Picker anschließend entfernt hätte: Karte
     // gespielt, Gold weg, leerer Picker.
     const ftProtected = gs.firstTurnProtectedPlayer;
-    for (let pIdx = 0; pIdx < 2; pIdx++) {
+    for (let pIdx = 0; pIdx < gs.players.length; pIdx++) {
       if (ftProtected != null && pIdx === ftProtected && pi !== ftProtected) continue;
       const ps = gs.players[pIdx];
       for (let hi = 0; hi < (ps.heroes || []).length; hi++) {

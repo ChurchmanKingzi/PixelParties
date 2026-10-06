@@ -268,7 +268,7 @@ function makeCrusaderArtifact(spec) {
       const pi = ctx.cardOwner ?? (inst.controller ?? inst.owner);
       const feld = ctx.cardHeroOwner ?? (inst.controller ?? inst.owner);
       const heroIdx = inst.heroIdx;
-      const oppIdx = pi === 0 ? 1 : 0;
+      const oppIdx = engine.opponentOf(pi);
 
       const target = await ctx.promptDamageTarget({
         side: 'any',

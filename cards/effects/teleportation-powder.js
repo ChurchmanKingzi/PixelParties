@@ -60,6 +60,7 @@
 // ═══════════════════════════════════════════
 
 const { hasCardType } = require('./_hooks');
+const { opponentOfGs } = require('./_opp');
 
 const CARD_NAME = 'Teleportation Powder';
 const BLENDE_MS = 1000;
@@ -105,14 +106,14 @@ module.exports = {
   // „Choose an undefeated Hero YOUR OPPONENT controls" — vorher stand
   // dort „any … on the board", eigene Helden waren also waehlbar.
   canActivate(gs, playerIdx) {
-    const oi = playerIdx === 0 ? 1 : 0;
+    const oi = opponentOfGs(gs, playerIdx);
     if (gs.firstTurnProtectedPlayer === oi) return false;   // Runde-1-Schutz
     return (gs.players[oi]?.heroes || []).some(h => h?.name && h.hp > 0);
   },
 
   getValidTargets(gs, playerIdx, engine) {
     if (!engine) return [];
-    const oi = playerIdx === 0 ? 1 : 0;
+    const oi = opponentOfGs(gs, playerIdx);
     // Der Erstrunden-Schutz gilt weiterhin: in Runde 1 ist der Gegner
     // unantastbar — und damit gibt es gar kein Ziel mehr.
     if (gs.firstTurnProtectedPlayer === oi) return [];

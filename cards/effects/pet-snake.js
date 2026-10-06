@@ -60,7 +60,7 @@ module.exports = {
 
     // Every Poisoned target on the board, either side.
     const targets = [];
-    for (let p = 0; p < 2; p++) {
+    for (let p = 0; p < engine.playerCount(); p++) {
       const ps = gs.players[p];
       if (!ps) continue;
       for (let hi = 0; hi < (ps.heroes || []).length; hi++) {

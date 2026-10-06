@@ -425,7 +425,7 @@ function cpuShouldDescend(engine, pi, heroIdx) {
 function collectBoardTargets(engine) {
   const gs = engine.gs;
   const targets = [];
-  for (let p = 0; p < 2; p++) {
+  for (let p = 0; p < engine.playerCount(); p++) {
     const ps = gs.players[p];
     if (!ps) continue;
     for (let hi = 0; hi < (ps.heroes || []).length; hi++) {

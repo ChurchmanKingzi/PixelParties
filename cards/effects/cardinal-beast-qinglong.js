@@ -31,7 +31,7 @@ module.exports = {
     const gs = engine.gs;
     // Styx 28.9.: „you" = Kontrolleur (seitenfremd beschworen: cardOwner ≠ owner).
     const pi = ctx.cardOwner;
-    const oppIdx = pi === 0 ? 1 : 0;
+    const oppIdx = engine.opponentOf(pi);
     const heroIdx = ctx.cardHeroIdx;
     const zoneSlot = ctx.cardZoneSlot;
     const cardDB = engine._getCardDB();

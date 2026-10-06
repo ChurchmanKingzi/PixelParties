@@ -82,7 +82,7 @@ module.exports = {
       let expired = false;
 
       // Remove from heroes
-      for (let tpi = 0; tpi < 2; tpi++) {
+      for (let tpi = 0; tpi < engine.playerCount(); tpi++) {
         const ps = gs.players[tpi];
         for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
           const hero = ps.heroes[hi];
@@ -165,7 +165,7 @@ module.exports = {
       engine._broadcastEvent('play_zone_animation', { type: 'electric_strike', owner: feld, heroIdx, zoneSlot: -1 });
       await engine._delay(300);
 
-      const oppIdx = pi === 0 ? 1 : 0;
+      const oppIdx = engine.opponentOf(pi);
       // Kontrolle statt Seite (Styx 28.9.): alle anderen Helden, die `pi` kontrolliert.
       for (const { hero: otherHero } of engine.heroesControlledBy(pi)) {
         if (otherHero === hero) continue;
@@ -224,7 +224,7 @@ module.exports = {
       const engine = ctx._engine;
       const gs = engine.gs;
       const pi = ctx.cardOwner;
-      const oppIdx = pi === 0 ? 1 : 0;
+      const oppIdx = engine.opponentOf(pi);
       const target = ctx.target;
       if (!target || target.hp === undefined) return;
       if (target.buffs?.immortal) return;
@@ -265,7 +265,7 @@ module.exports = {
       const engine = ctx._engine;
       const gs = engine.gs;
       const pi = ctx.cardOwner; // Effective controller (auto-resolved)
-      const oppIdx = pi === 0 ? 1 : 0;
+      const oppIdx = engine.opponentOf(pi);
       const heroIdx = ctx.cardHeroIdx;
       const feld = ctx.cardHeroOwner ?? pi;   // Styx 28.9.: Brettseite
       for (const e of ctx.entries) {

@@ -39,6 +39,7 @@
 //  independent of the per-zone animation system.
 // ═══════════════════════════════════════════
 
+const { opponentOfGs } = require('./_opp');
 const CARD_NAME = 'Flashbang';
 
 // Per-instance counter keys
@@ -70,7 +71,7 @@ module.exports = {
   // dann greift wieder die normale Bewertung, die ihn liegen lässt.
   cpuMeta: {
     alwaysCommit: (engine, pi) => {
-      const oppIdx = pi === 0 ? 1 : 0;
+      const oppIdx = opponentOfGs(engine?.gs, pi);
       return !engine?.gs?.players?.[oppIdx]?._flashbangedDebuff;
     },
   },
@@ -82,13 +83,13 @@ module.exports = {
   // erst in seinem naechsten Zug zuendet. Vorher war Flashbang in Runde 1
   // spielbar und umging den Schutz.
   canActivate(gs, pi) {
-    const oppIdx = pi === 0 ? 1 : 0;
+    const oppIdx = opponentOfGs(gs, pi);
     return gs.firstTurnProtectedPlayer !== oppIdx;
   },
 
   resolve: async (engine, pi) => {
     const gs = engine.gs;
-    const oppIdx = pi === 0 ? 1 : 0;
+    const oppIdx = engine.opponentOf(pi);
     const oppPs = gs.players[oppIdx];
     const ps    = gs.players[pi];
     if (!oppPs || !ps) return;

@@ -204,7 +204,7 @@ module.exports = {
       // Styx 28.9.: „dieser Held" = Brettseite + Index (geliehener Held).
       if (!ctx._engine.quelleIstHeld(src, ctx.cardHeroOwner ?? ctx.cardOwner, ctx.cardHeroIdx)) return;
 
-      const oppIdx = ctx.cardOwner === 0 ? 1 : 0;
+      const oppIdx = ctx._engine.opponentOf(ctx.cardOwner);
       const targets = Array.isArray(ctx.target)
         ? ctx.target
         : (ctx.target ? [ctx.target] : []);
@@ -225,7 +225,7 @@ module.exports = {
       if (ctx.heroIdx !== ctx.cardHeroIdx) return;
       // Styx 28.9.: gleicher Index reicht nicht — gleiche Brettseite (geliehener Held).
       if ((ctx.heroOwner ?? ctx.casterIdx) !== (ctx.cardHeroOwner ?? ctx.cardOwner)) return;
-      const oppIdx = ctx.cardOwner === 0 ? 1 : 0;
+      const oppIdx = ctx._engine.opponentOf(ctx.cardOwner);
       const dmg = ctx.damageTargets || [];
       if (dmg.some(t => _zielSeite(ctx._engine, t) === oppIdx)) {
         await _selfDiscard(ctx, 'spell_targeted_opp');
@@ -246,7 +246,7 @@ module.exports = {
       // Styx 28.9.: „dieser Held" = Brettseite + Index (geliehener Held).
       if (!ctx._engine.quelleIstHeld(ctx.source, ctx.cardHeroOwner ?? ctx.cardOwner, ctx.cardHeroIdx)) return;
       if ((ctx.amount || 0) <= 0) return;
-      const oppIdx = ctx.cardOwner === 0 ? 1 : 0;
+      const oppIdx = ctx._engine.opponentOf(ctx.cardOwner);
       // `ctx.target` here is the damaged Hero object — locate its owner.
       const engine = ctx._engine;
       const tgtOwner = engine._findHeroOwner ? engine._findHeroOwner(ctx.target) : -1;
@@ -263,7 +263,7 @@ module.exports = {
      */
     afterCreatureDamageBatch: async (ctx) => {
       if (ctx.card.zone !== 'support') return;
-      const oppIdx = ctx.cardOwner === 0 ? 1 : 0;
+      const oppIdx = ctx._engine.opponentOf(ctx.cardOwner);
       for (const e of (ctx.entries || [])) {
         if (!e || e.cancelled) continue;
         if ((e.amount || 0) <= 0) continue;

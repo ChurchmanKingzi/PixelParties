@@ -226,7 +226,7 @@ module.exports = {
    */
   cpuShouldUseHeroEffect(engine, pi) {
     try {
-      const opp = pi === 0 ? 1 : 0;
+      const opp = engine.opponentOf(pi);
       return destroyableTargets(engine, pi).some(t => t.owner === opp);
     } catch { return true; }
   },

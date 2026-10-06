@@ -134,7 +134,7 @@ module.exports = {
     const pi = ctx._activator ?? ctx.cardOwner;
     const ps = engine.gs.players[pi];
     if (!ps) return false;
-    const oi = pi === 0 ? 1 : 0;
+    const oi = engine.opponentOf(pi);
     const ops = engine.gs.players[oi];
     if (!ops || ops.handLocked) return false;
     if (ps.handLocked) return false;

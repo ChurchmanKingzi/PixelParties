@@ -36,6 +36,7 @@
 // ═══════════════════════════════════════════
 
 const { temporaereKontrolle, uebernehmbareHelden } = require('./_charm-shared');
+const { opponentOfGs } = require('./_opp');
 
 const CARD_NAME = 'Golden Apple';
 
@@ -43,13 +44,13 @@ module.exports = {
   isTargetingArtifact: true,
 
   canActivate(gs, pi) {
-    const oi = pi === 0 ? 1 : 0;
+    const oi = opponentOfGs(gs, pi);
     if (gs.firstTurnProtectedPlayer === oi) return false;   // nichts zu waehlen
     return uebernehmbareHelden(gs, oi).length > 0;
   },
 
   getValidTargets(gs, pi) {
-    const oi = pi === 0 ? 1 : 0;
+    const oi = opponentOfGs(gs, pi);
     return uebernehmbareHelden(gs, oi).map(h => ({
       id: `hero-${oi}-${h.heroIdx}`,
       type: 'hero', owner: oi, heroIdx: h.heroIdx, cardName: h.heroName,
@@ -126,7 +127,7 @@ module.exports = {
     const ziele = payload?.validTargets || [];
     if (ziele.length === 0) return undefined;
     const pi = payload.playerIdx;
-    const oi = pi === 0 ? 1 : 0;
+    const oi = engine.opponentOf(pi);
     let bestes = ziele[0], bestATK = -1;
     for (const t of ziele) {
       const h = engine.gs.players[oi]?.heroes?.[t.heroIdx];

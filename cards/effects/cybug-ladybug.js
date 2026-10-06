@@ -55,7 +55,7 @@ const FUEL_CARD = 'Magic Amethyst';
  */
 function alleAbilities(engine) {
   const out = [];
-  for (let p = 0; p < 2; p++) {
+  for (let p = 0; p < engine.playerCount(); p++) {
     for (const eintrag of (engine.getAbilityTargets?.(p) || [])) out.push(eintrag);
   }
   return out;

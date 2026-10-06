@@ -45,7 +45,7 @@ module.exports = {
       // Build target list: every face-up Hero (alive) + Creature on the
       // board that is not currently Frozen and can receive the status.
       const candidates = [];
-      for (let pIdx = 0; pIdx < 2; pIdx++) {
+      for (let pIdx = 0; pIdx < engine.playerCount(); pIdx++) {
         const ps = engine.gs.players[pIdx];
         if (!ps) continue;
         for (let hi = 0; hi < (ps.heroes || []).length; hi++) {

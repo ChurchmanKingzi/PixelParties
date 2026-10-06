@@ -178,7 +178,7 @@ module.exports = {
     }
 
     // ── Add retrieved cards to hand + stream to opponent ──
-    const oi = pi === 0 ? 1 : 0;
+    const oi = engine.opponentOf(pi);
     const oppSid = gs.players[oi]?.socketId;
 
     for (const cn of retrievedCards) {

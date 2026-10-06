@@ -66,7 +66,7 @@ function controlledCreatures(engine, pi) {
  * hier kam.
  */
 function resyncShield(engine, pi, selfId) {
-  const oppIdx = pi === 0 ? 1 : 0;
+  const oppIdx = engine.opponentOf(pi);
   const shouldHave = new Set(
     controlledWarCounselors(engine, pi)
       .filter((inst) => inst.id !== selfId)
@@ -120,7 +120,7 @@ module.exports = {
   canActivateCreatureEffect(ctx) {
     const engine = ctx._engine;
     const pi = ctx.cardOwner;
-    const oppIdx = pi === 0 ? 1 : 0;
+    const oppIdx = engine.opponentOf(pi);
     const mine = controlledCreatures(engine, pi).length;
     const theirs = controlledCreatures(engine, oppIdx).length;
     return theirs > mine;
@@ -130,7 +130,7 @@ module.exports = {
     const engine = ctx._engine;
     const gs = engine.gs;
     const pi = ctx.cardOwner;
-    const oppIdx = pi === 0 ? 1 : 0;
+    const oppIdx = engine.opponentOf(pi);
     const inst = ctx.card;
 
     const mine = controlledCreatures(engine, pi).length;

@@ -28,7 +28,7 @@ module.exports = {
 
   canActivateCreatureEffect(ctx) {
     const engine = ctx._engine;
-    const oi = ctx.cardOwner === 0 ? 1 : 0;
+    const oi = engine.opponentOf(ctx.cardOwner);
     // Need at least one opp creature on board.
     return engine.cardInstances.some(c =>
       c.zone === 'support' && (c.controller ?? c.owner) === oi,
@@ -103,7 +103,7 @@ module.exports = {
       if (stillAlive) break;
 
       // Stop the chain if there are no remaining opp creatures to hit.
-      const oi = pi === 0 ? 1 : 0;
+      const oi = engine.opponentOf(pi);
       const remaining = engine.cardInstances.some(c =>
         c.zone === 'support' && (c.controller ?? c.owner) === oi,
       );

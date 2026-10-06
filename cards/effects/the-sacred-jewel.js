@@ -45,7 +45,7 @@ module.exports = {
     const gs = engine.gs;
     const ps = gs.players[pi];
     if (!ps) return { cancelled: true };
-    const oi = 1 - pi;
+    const oi = engine.opponentOf(pi);
 
     const choice = await engine.promptGeneric(pi, {
       type: 'confirm',

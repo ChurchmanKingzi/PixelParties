@@ -31,7 +31,7 @@ module.exports = {
   },
 
   resolve: async (engine, pi) => {
-    const oi = pi === 0 ? 1 : 0;
+    const oi = engine.opponentOf(pi);
 
     // Main effect: opponent picks a card from THEIR hand to discard.
     await engine.actionPromptForceDiscard(oi, 1, {

@@ -93,7 +93,7 @@ function collectTargets(engine, pi, casterHeroIdx) {
   const gs = engine.gs;
   const cardDB = engine._getCardDB();
   const targets = [];
-  for (let tpi = 0; tpi < 2; tpi++) {
+  for (let tpi = 0; tpi < engine.playerCount(); tpi++) {
     const ps = gs.players[tpi];
     if (!ps) continue;
     // Heroes

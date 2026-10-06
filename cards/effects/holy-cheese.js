@@ -58,7 +58,7 @@ module.exports = {
   async resolve(engine, pi) {
     const ps = engine.gs.players[pi];
     if (!ps) return;
-    const oi = pi === 0 ? 1 : 0;
+    const oi = engine.opponentOf(pi);
 
     // ── Step 1: Deck search for a Support Magic Spell ──
     const cardDB = engine._getCardDB();

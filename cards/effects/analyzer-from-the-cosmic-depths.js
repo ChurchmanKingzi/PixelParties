@@ -75,7 +75,7 @@ function stampHopt(gs, key, instId) {
  */
 function allFreeSupportSlotsBothSides(engine) {
   const out = [];
-  for (let pi = 0; pi < 2; pi++) {
+  for (let pi = 0; pi < engine.playerCount(); pi++) {
     const ps = engine.gs.players[pi];
     if (!ps) continue;
     for (let hi = 0; hi < (ps.heroes || []).length; hi++) {

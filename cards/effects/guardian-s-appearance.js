@@ -121,7 +121,7 @@ module.exports = {
 
       // Step 4: optional mill — 3 from a chosen deck. The opponent's
       // deck is also a valid target; "either player's deck" per text.
-      const oi = pi === 0 ? 1 : 0;
+      const oi = engine.opponentOf(pi);
       const millOpts = [];
       if ((ps.mainDeck?.length || 0) > 0) millOpts.push({ id: 'self', label: 'Mill top 3 of YOUR deck' });
       if ((gs.players[oi]?.mainDeck?.length || 0) > 0) millOpts.push({ id: 'opp', label: "Mill top 3 of OPPONENT'S deck" });

@@ -57,7 +57,7 @@ function collectBoardTargets(engine, selfId) {
   const heroes = [];
   const creatures = [];
 
-  for (let pi = 0; pi < 2; pi++) {
+  for (let pi = 0; pi < engine.playerCount(); pi++) {
     const ps = gs.players[pi];
     for (let hi = 0; hi < (ps?.heroes || []).length; hi++) {
       const hero = ps.heroes[hi];

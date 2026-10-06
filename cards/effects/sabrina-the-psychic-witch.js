@@ -227,7 +227,7 @@ module.exports = {
     // Telekinesis / Cute Spider so Mummy Maker Machine's "opp side"
     // logic resolves correctly. `forcedByCard` is purely informational
     // for any future debugging / display hook.
-    const oppIdx = pi === 0 ? 1 : 0;
+    const oppIdx = engine.opponentOf(pi);
     const sourceInfo = {
       telekinesis: true,
       forcedByCard: CARD_NAME,

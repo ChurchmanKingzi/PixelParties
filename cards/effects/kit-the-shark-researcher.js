@@ -142,7 +142,7 @@ module.exports = {
       const kit = ctx.attachedHero;
       if (!kit?.name || kit.hp <= 0) return;
 
-      const oppPi = pi === 0 ? 1 : 0;
+      const oppPi = engine.opponentOf(pi);
       const ops   = gs.players[oppPi];
       if (!ops) return;
 
@@ -428,7 +428,7 @@ async function _runModeC(engine, pi, oppPi) {
   }
 
   // v1324: Boris darf den erzwungenen Abwurf ignorieren.
-  if (await engine.borisVerzicht(oppPi, 1, { source: 'Kit, the Shark Researcher', sourceOwner: 1 - oppPi })) return;
+  if (await engine.borisVerzicht(oppPi, 1, { source: 'Kit, the Shark Researcher', sourceOwner: pi })) return;
   const randomIdx = Math.floor(Math.random() * ops.hand.length);
   const discardedName = ops.hand[randomIdx];
   await engine.actionDiscardHandCard(oppPi, discardedName, randomIdx, {

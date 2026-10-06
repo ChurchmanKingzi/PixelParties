@@ -28,6 +28,7 @@
 // ═══════════════════════════════════════════
 
 const { placePollutionTokens, countFreeZones } = require('./_pollution-shared');
+const { opponentOfGs } = require('./_opp');
 
 /**
  * For a hero object, return the card data that holds its "starting abilities".
@@ -124,7 +125,7 @@ module.exports = {
   // fizzles at runtime, which is a valid outcome for a board-wipe effect).
   spellPlayCondition(gs, pi, engine) {
     if (!engine) return true; // Can't compute without engine; permissive fallback.
-    const oppIdx = pi === 0 ? 1 : 0;
+    const oppIdx = opponentOfGs(gs, pi);
     const oppRemovable = collectRemovableAbilities(engine, oppIdx);
     if (oppRemovable.length === 0) return true;
     return oppRemovable.length <= countFreeZones(gs, pi);
@@ -135,7 +136,7 @@ module.exports = {
       const engine = ctx._engine;
       const gs = ctx.gameState;
       const pi = ctx.cardOwner;
-      const oppIdx = pi === 0 ? 1 : 0;
+      const oppIdx = engine.opponentOf(pi);
 
       const myRemovable  = collectRemovableAbilities(engine, pi);
       const oppRemovable = collectRemovableAbilities(engine, oppIdx);

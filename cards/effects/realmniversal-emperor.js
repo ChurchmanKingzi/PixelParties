@@ -70,7 +70,7 @@ const HOPT_KEY  = 'realmniversal-emperor';
 /** Lebende Helden, die der Gegner dieser Seite kontrolliert. */
 function gegnerischeHelden(engine, pi) {
   const gs = engine.gs;
-  const oi = pi === 0 ? 1 : 0;
+  const oi = engine.opponentOf(pi);
   const out = [];
   for (let tpi = 0; tpi < (gs.players || []).length; tpi++) {
     const ps = gs.players[tpi];

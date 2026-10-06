@@ -71,7 +71,7 @@ module.exports = {
       if (!engine.claimHOPT('codumbus', pi)) return;
       await engine.showTriggeredEffect(CARD_NAME);
 
-      const oi = pi === 0 ? 1 : 0;
+      const oi = engine.opponentOf(pi);
       const choice = await engine.promptGeneric(oi, {
         type: 'optionPicker',
         title: CARD_NAME,

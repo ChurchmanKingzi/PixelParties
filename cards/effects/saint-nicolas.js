@@ -324,7 +324,7 @@ module.exports = {
 
       const userPi = ctx.potionOwner;
       if (userPi == null || userPi < 0) return;
-      const tgtPi = userPi === 0 ? 1 : 0;
+      const tgtPi = engine.opponentOf(userPi);
       const tgtPs = engine.gs.players[tgtPi];
       if (!tgtPs) return;
       if (tgtPs.handLocked) return;

@@ -36,7 +36,7 @@
 const CARD_NAME = 'Plant Golem';
 
 function oppFreeZones(engine, pi) {
-  const oppIdx = pi === 0 ? 1 : 0;
+  const oppIdx = engine.opponentOf(pi);
   const ops = engine.gs.players[oppIdx];
   const out = [];
   for (let hi = 0; hi < (ops?.heroes || []).length; hi++) {
@@ -99,7 +99,7 @@ module.exports = {
       const engine = ctx._engine;
       const gs = engine.gs;
       const pi = ctx.cardOwner;
-      const oppIdx = pi === 0 ? 1 : 0;
+      const oppIdx = engine.opponentOf(pi);
       if ((inst.controller ?? inst.owner) === oppIdx) return; // liegt schon beim Gegner
 
       // Ziel: Server-Hinweis (Drag aufs Gegnerbrett) oder Abfrage.

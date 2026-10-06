@@ -234,7 +234,7 @@ module.exports = {
       await engine._activateSurprise(surpriseSeite, surpriseHeroIdx, surpriseCardName, {
         telekinesis: true,
         forcedByCard: CARD_NAME,
-        activatorIdx: pi === 0 ? 1 : 0,
+        activatorIdx: engine.opponentOf(pi),
       }, script);
     } finally {
       if (prevCasterCreature === undefined) delete engine.gs._spellCasterCreature;

@@ -7,6 +7,7 @@
 //  Hard once per turn.
 // ═══════════════════════════════════════════
 
+const { opponentOfGs } = require('./_opp');
 const CARD_NAME = 'Book of Doom';
 const DAMAGE_PER_TARGET = 50;
 
@@ -24,7 +25,7 @@ module.exports = {
 
   getValidTargets(gs, pi, engine) {
     if (!engine) return [];
-    const oppIdx = pi === 0 ? 1 : 0;
+    const oppIdx = opponentOfGs(gs, pi);
     // Both sides — the player can target any hero or creature on the board
     const ownHeroes = engine.getHeroTargets(pi);
     const ownCreatures = engine.getCreatureTargets(pi);

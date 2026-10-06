@@ -40,6 +40,7 @@
 //    ihm, nicht beim Wirkenden.
 // ═══════════════════════════════════════════
 
+const { opponentOfGs } = require('./_opp');
 const CARD_NAME = 'Spice Mortar';
 const TIEFE = 10;
 const REVEAL_TAKT = 190;      // Staffelung je Karte, gleich der Client-Animation
@@ -56,7 +57,7 @@ module.exports = {
   canActivate(gs, pi) {
     const ps = gs.players[pi];
     if (!ps || ps.handLocked) return false;
-    const oi = pi === 0 ? 1 : 0;
+    const oi = opponentOfGs(gs, pi);
     if (gs.firstTurnProtectedPlayer === oi) return false;
     return (gs.players[oi]?.mainDeck || []).length > 0;
   },
@@ -80,7 +81,7 @@ module.exports = {
 
   resolve: async (engine, pi) => {
     const gs = engine.gs;
-    const oi = pi === 0 ? 1 : 0;
+    const oi = engine.opponentOf(pi);
     const ps = gs.players[pi];
     const ops = gs.players[oi];
     if (!ps || !ops) return false;

@@ -62,7 +62,7 @@ function karteSchonGezaehlt(engine, inst) {
 /** Laeuft der Zug des Gegners, und ist der Ausloeser der Gegner? */
 function gegnerHandelt(ctx, spieler) {
   const pi = ctx.cardOwner;
-  const opp = pi === 0 ? 1 : 0;
+  const opp = ctx._engine.opponentOf(pi);
   return ctx._engine.gs.activePlayer === opp && spieler === opp;
 }
 
@@ -70,7 +70,7 @@ async function fallbeil(ctx, anlass) {
   const engine = ctx._engine;
   const gs = engine.gs;
   const pi = ctx.cardOwner;
-  const opp = pi === 0 ? 1 : 0;
+  const opp = engine.opponentOf(pi);
   if (gs.result) return;
   // v1375: Abilities eines temporaer gesteuerten Helden sind unberuehrbar
   // (Love-Shot-Errata) — sie stehen gar nicht erst zur Wahl.

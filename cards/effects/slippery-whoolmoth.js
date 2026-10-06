@@ -92,7 +92,7 @@ module.exports = {
       const engine = ctx._engine;
       const pi = ctx.cardOwner;
       const heroIdx = ctx.cardHeroIdx;
-      const oppIdx = pi === 0 ? 1 : 0;
+      const oppIdx = engine.opponentOf(pi);
 
       // Pre-check: any legal target on the opposite column? If neither
       // the opposite Hero (alive) nor any Creature in their Support

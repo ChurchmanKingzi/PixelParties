@@ -97,7 +97,7 @@ module.exports = {
     const engine = ctx._engine;
     const gs = engine.gs;
     const pi = ctx.cardOwner;
-    const opp = pi === 0 ? 1 : 0;
+    const opp = engine.opponentOf(pi);
     const ps = gs.players[pi];
     const inst = ctx.card;
     // Glanz VOR dem Prompt, ohne Wartezeit (v705/v707).

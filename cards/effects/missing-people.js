@@ -36,6 +36,7 @@
 // ═══════════════════════════════════════════
 
 const { hasCardType } = require('./_hooks');
+const { opponentOfGs } = require('./_opp');
 
 const CARD_NAME = 'Missing People';
 const BLENDE_MS = 700;
@@ -48,7 +49,7 @@ function hatAbgeworfen(gs, pi) {
 
 /** Alle Creatures, die der Gegner KONTROLLIERT. */
 function gegnerCreatures(engine, pi) {
-  const oi = pi === 0 ? 1 : 0;
+  const oi = engine.opponentOf(pi);
   const cardDB = engine._getCardDB();
   const out = [];
   for (const inst of engine.cardInstances) {
@@ -68,11 +69,11 @@ module.exports = {
   // ^ Tagged for Blinded gating — siehe cards/effects/_hooks.js.
 
   /** „this counts as an additional Action" — nur mit Gegner-Abwurf. */
-  inherentAction: (gs, playerIdx) => hatAbgeworfen(gs, playerIdx === 0 ? 1 : 0),
+  inherentAction: (gs, playerIdx) => hatAbgeworfen(gs, opponentOfGs(gs, playerIdx)),
 
   spellPlayCondition(gs, playerIdx, engine) {
     if (!engine) return true;
-    const oi = playerIdx === 0 ? 1 : 0;
+    const oi = opponentOfGs(gs, playerIdx);
     if (gs.firstTurnProtectedPlayer === oi) return false;
     return gegnerCreatures(engine, playerIdx).length > 0;
   },
@@ -83,7 +84,7 @@ module.exports = {
       const engine = ctx._engine;
       const gs = engine.gs;
       const pi = ctx.cardOwner;
-      const oi = pi === 0 ? 1 : 0;
+      const oi = engine.opponentOf(pi);
       if (gs.firstTurnProtectedPlayer === oi) return;
 
       const kandidaten = gegnerCreatures(engine, pi);

@@ -88,7 +88,7 @@ module.exports = {
     const inst = engine.handZugangSync(ps, gewaehlt, { source: CARD_NAME });
     // „reveal it": beiden zeigen, der Gegner bekommt die Such-Aufdeckung.
     engine._broadcastEvent('card_reveal', { cardName: gewaehlt, playerIdx: pi });
-    const oi = pi === 0 ? 1 : 0;
+    const oi = engine.opponentOf(pi);
     engine.noteKnownCard?.(oi, gewaehlt, 'hand');
     engine.log('philosophers_stone', { player: ps.username, card: CARD_NAME, target: gewaehlt });
     await engine.runHooks('onCardAddedToHand', {

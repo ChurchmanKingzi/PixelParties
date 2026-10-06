@@ -91,7 +91,7 @@ module.exports = {
 
     // ── 2. Optional Creature bounce ──
     const targets = [];
-    for (let p = 0; p < 2; p++) {
+    for (let p = 0; p < engine.playerCount(); p++) {
       for (const t of engine.getCreatureTargets(p)) {
         const inst = t.cardInstance;
         if (!inst) continue;

@@ -57,6 +57,7 @@
 
 const { getCleansableStatuses } = require('./_hooks');
 const { candidateHosts, pickAttachmentHost, placeAttachment } = require('./_attachment-shared');
+const { opponentOfGs } = require('./_opp');
 
 const CARD_NAME = 'Curse';
 const STATUS_NAME = 'cursed';
@@ -103,7 +104,7 @@ function _heroQualifiesForCurse(engine, hero, ownerIdx, heroIdx) {
  *  by the post-target reclassification in onPlay. */
 function _anyHeroQualifies(engine) {
   const gs = engine.gs;
-  for (let p = 0; p < 2; p++) {
+  for (let p = 0; p < engine.playerCount(); p++) {
     const ps = gs.players[p];
     for (let hi = 0; hi < (ps?.heroes || []).length; hi++) {
       if (_heroQualifiesForCurse(engine, ps.heroes[hi], p, hi)) return true;
@@ -164,7 +165,7 @@ module.exports = {
   // Need at least one Hero (any side) with a free Support slot to
   // physically attach to.
   spellPlayCondition(gs, pi, engine) {
-    return candidateHosts(gs, pi, engine, { sides: [pi, pi === 0 ? 1 : 0] }).length > 0;
+    return candidateHosts(gs, pi, engine, { sides: [pi, opponentOfGs(gs, pi)] }).length > 0;
   },
   // ★★ v1145 (Al 17.9.): KEIN `attachmentHosts` mehr — gezogen wird wie
   // bei jedem Spell auf den WIRKER, die Zielwahl oeffnet `onPlay`
@@ -208,7 +209,7 @@ module.exports = {
       // inhaerenten Zusatz-Einsatz qualifizieren. Keine Kandidaten bei
       // der Aufloesung → Curse verpufft (Discard, kein Refund) — die
       // Nutzerspezifikation von einst; `_spellCancelled` bleibt also aus.
-      const sides = [pi, pi === 0 ? 1 : 0];
+      const sides = [pi, engine.opponentOf(pi)];
       const heroFilter = (hero, hi, side) => weiteZiele || _heroQualifiesForCurse(engine, hero, side, hi);
       if (candidateHosts(gs, pi, engine, { sides, heroFilter }).length === 0) {
         engine.log('curse_fizzle', { player: gs.players[pi]?.username, reason: weiteZiele ? 'no_free_support_slots' : 'no_qualifying_targets_at_resolve' });

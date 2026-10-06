@@ -54,7 +54,7 @@ function kreaturenIn(engine, liste) {
  * Merkmal: physisch in seiner Spalte, `originalOwner` aber bei mir.
  */
 function zurueckholbare(engine, pi) {
-  const oppIdx = pi === 0 ? 1 : 0;
+  const oppIdx = engine.opponentOf(pi);
   const out = [];
   for (const inst of (engine.cardInstances || [])) {
     if (inst.zone !== 'support') continue;

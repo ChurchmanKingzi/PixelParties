@@ -123,7 +123,7 @@ function markGuardianBeastSummoned(gs, pi) {
  */
 function buildBothDiscardEntries(engine) {
   const entries = [];
-  for (let pi = 0; pi < 2; pi++) {
+  for (let pi = 0; pi < engine.playerCount(); pi++) {
     const ps = engine.gs?.players?.[pi];
     if (!ps) continue;
     const dp = ps.discardPile || [];
@@ -153,7 +153,7 @@ function buildBothDiscardEntries(engine) {
  */
 function buildDiscardGallery(engine, activatorIdx) {
   const out = [];
-  for (let pi = 0; pi < 2; pi++) {
+  for (let pi = 0; pi < engine.playerCount(); pi++) {
     const ps = engine.gs?.players?.[pi];
     if (!ps) continue;
     const dp = ps.discardPile || [];
@@ -206,7 +206,7 @@ async function deleteSelectedDiscardCards(engine, picks, sourceName) {
   // Per-pile name buckets so we can fire one batch animation per
   // owner after the splices. Animation order matches splice order.
   const animByOwner = [[], []];
-  for (let pi = 0; pi < 2; pi++) {
+  for (let pi = 0; pi < engine.playerCount(); pi++) {
     const ps = engine.gs?.players?.[pi];
     if (!ps?.discardPile) continue;
     // Splice from highest index downward.
@@ -238,7 +238,7 @@ async function deleteSelectedDiscardCards(engine, picks, sourceName) {
   // pile). Card images chain with a small per-card delay so deleting
   // multiple feels like a wave. Single broadcast per side keeps the
   // timing tight when picks span both piles.
-  for (let pi = 0; pi < 2; pi++) {
+  for (let pi = 0; pi < engine.playerCount(); pi++) {
     if (animByOwner[pi].length === 0) continue;
     engine._broadcastEvent('discard_to_deleted_animation', {
       owner: pi,
@@ -465,7 +465,7 @@ async function deleteTopOfOwnDiscard(engine, pi, count, sourceName) {
 function buildAllBoardTargets(engine, opts = {}) {
   const cardDB = engine._getCardDB();
   const out = [];
-  for (let p = 0; p < 2; p++) {
+  for (let p = 0; p < engine.playerCount(); p++) {
     const ps = engine.gs.players[p];
     if (!ps) continue;
     for (let hi = 0; hi < (ps.heroes || []).length; hi++) {

@@ -34,7 +34,7 @@ const { STATUS_EFFECTS, getCleansableStatuses } = require('./_hooks');
 function getValidTargets(gs, engine, excludeHeroKey) {
   const negKeys = getCleansableStatuses();
   const targets = [];
-  for (let pi = 0; pi < 2; pi++) {
+  for (let pi = 0; pi < gs.players.length; pi++) {
     for (const t of engine.getHeroTargets(pi)) {
       if (excludeHeroKey && `${t.owner}-${t.heroIdx}` === excludeHeroKey) continue;
       const hero = gs.players[t.owner]?.heroes?.[t.heroIdx];
@@ -164,7 +164,7 @@ module.exports = {
   spellPlayCondition(gs, pi) {
     // Proactive: need at least 1 valid target (no engine access here, optimistic check)
     const negKeys = getCleansableStatuses();
-    for (let phi = 0; phi < 2; phi++) {
+    for (let phi = 0; phi < gs.players.length; phi++) {
       const ps = gs.players[phi];
       for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
         const hero = ps.heroes[hi];

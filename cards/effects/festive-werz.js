@@ -59,7 +59,7 @@ module.exports = {
       if (!inst || inst.zone !== 'support') return;   // nur beim Beschwoeren
 
       const pi = inst.controller ?? inst.owner;
-      const oppIdx = pi === 0 ? 1 : 0;
+      const oppIdx = engine.opponentOf(pi);
       const ps = gs.players[pi];
       const ops = gs.players[oppIdx];
       if (!ps || !ops) return;

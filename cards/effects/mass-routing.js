@@ -154,19 +154,19 @@ module.exports = {
       }
 
       // ── ② Einmal je betroffenem Deck mischen (s. Kopf) ──────────
-      for (let p = 0; p < 2; p++) {
+      for (let p = 0; p < engine.playerCount(); p++) {
         if (proSpieler[p] > 0) engine.shuffleDeck(p);
       }
       engine.log('mass_routing', {
         player: ps.username, maxLevel,
         shuffled: proSpieler[0] + proSpieler[1],
-        mine: proSpieler[pi], theirs: proSpieler[pi === 0 ? 1 : 0],
+        mine: proSpieler[pi], theirs: proSpieler[engine.opponentOf(pi)],
       });
       engine.sync();
 
       // ── ③ Je zurueckgemischter EIGENER Kreatur eine Karte ───────
       // Reihenfolge: erst der Spieler dieser Karte, dann der Gegner.
-      const reihenfolge = [pi, pi === 0 ? 1 : 0];
+      const reihenfolge = [pi, engine.opponentOf(pi)];
       for (const p of reihenfolge) {
         if (proSpieler[p] > 0) await engine.actionDrawCards(p, proSpieler[p]);
       }

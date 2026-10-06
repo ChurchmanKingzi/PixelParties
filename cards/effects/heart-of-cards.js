@@ -67,7 +67,7 @@ module.exports = {
   async resolve(engine, pi) {
     const gs = engine.gs;
     const ps = gs.players[pi];
-    const oi = pi === 0 ? 1 : 0;
+    const oi = engine.opponentOf(pi);
     if (!ps || schonGespielt(gs, pi) || (ps.mainDeck || []).length === 0) return { cancelled: true };
 
     // ① Ansage — abbrechbar, dann ist nichts verbraucht.

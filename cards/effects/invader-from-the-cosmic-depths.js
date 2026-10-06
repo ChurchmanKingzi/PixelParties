@@ -67,7 +67,7 @@ function countOwnInvaders(engine, pi) {
  */
 function allFreeSupportSlotsBothSides(engine) {
   const out = [];
-  for (let pi = 0; pi < 2; pi++) {
+  for (let pi = 0; pi < engine.playerCount(); pi++) {
     const ps = engine.gs.players[pi];
     if (!ps) continue;
     for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
@@ -305,7 +305,7 @@ module.exports = {
 
     // Step 2: pick the target.
     const targets = [];
-    for (let pIdx = 0; pIdx < 2; pIdx++) {
+    for (let pIdx = 0; pIdx < engine.playerCount(); pIdx++) {
       const p = gs.players[pIdx];
       for (let hi = 0; hi < (p?.heroes || []).length; hi++) {
         const h = p.heroes[hi];

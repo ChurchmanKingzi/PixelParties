@@ -66,7 +66,7 @@ module.exports = {
       if (ctx.isMyTurn) return;                       // nur am Ende des GEGNERzuges
 
       const pi = ctx.cardOwner;
-      const oi = pi === 0 ? 1 : 0;
+      const oi = engine.opponentOf(pi);
       const gs = engine.gs;
       const heroIdx = inst.heroIdx;
 
