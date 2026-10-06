@@ -13696,6 +13696,12 @@ io.on('connection', (socket) => {
       const activeRoomId = activeGames.get(session.userId);
       if (activeRoomId) {
         const room = rooms.get(activeRoomId);
+        if (room?.skillTest && !room.gameState) {
+          // Skill Test in der Vorbereitung: zurück in den Raum, Basis neu senden.
+          socket.join('room:' + activeRoomId);
+          socket.emit('room_joined', sanitizeRoom(room, session.username));
+          skillTest.onRejoin(room, { userId: session.userId, username: session.username }, socket, skillTestHost);
+        }
         if (room?.gameState) {
           const t = disconnectTimers.get(session.userId);
           if (t) { clearTimeout(t); disconnectTimers.delete(session.userId); }
@@ -13734,6 +13740,7 @@ io.on('connection', (socket) => {
   // Skill Test: CPU-Sitze hinzufügen/entfernen, Raum starten (Host).
   skillTest.registerLobbyHandlers(socket, {
     io, rooms, getUser: () => currentUser, sanitizeRoom, getRoomList,
+    host: skillTestHost,
     startPrep: (room) => skillTest.startPrep(room, skillTestHost),
   });
 
@@ -13849,6 +13856,7 @@ io.on('connection', (socket) => {
       }
       socket.join('room:' + roomId);
       socket.emit('room_joined', sanitizeRoom(room, currentUser.username));
+      if (room.skillTest) skillTest.onRejoin(room, currentUser, socket, skillTestHost);
       // Cube Draft: if the draft was suspended waiting on this seat
       // and ALL human seats now have a live socketId, resume.
       if (room.cubeDraft?.draftState?.suspended && isPlayer) {
@@ -18502,6 +18510,11 @@ io.on('connection', (socket) => {
     if (activeRoomId) {
       const room = rooms.get(activeRoomId);
       if (room?.gameState && !room.gameState.result) {
+        // Skill Test: eigener Verbindungsverlust-Ablauf (kein Zwei-Spieler-Forfait).
+        if (room.skillTest) {
+          skillTest.onSeatLeft(room, currentUser, socket, skillTestHost);
+          return;
+        }
         // Puzzle rooms: preserve existing immediate cleanup.
         if (room.type === 'puzzle') {
           activeGames.delete(currentUser.userId);

@@ -155,6 +155,9 @@ function registerLobbyHandlers(socket, deps) {
       io.to('room:' + room.id).emit('join_error', 'Skill Test konnte nicht gestartet werden.');
     }
   });
+
+  // Vorbereitungsphase (Platzieren, Recyceln, Ready).
+  require('./prep').registerHandlers(socket, { rooms, getUser, host: deps.host });
 }
 
 // ── Vorbereitung / Sitzverlust (Platzhalter bis prep.js steht) ─────
@@ -162,6 +165,12 @@ function registerLobbyHandlers(socket, deps) {
 async function startPrep(room, host) {
   const prep = require('./prep');
   return prep.start(room, host);
+}
+
+/** Wiederverbinden (auth/join_room): Sicht der aktuellen Phase erneut senden. */
+function onRejoin(room, user, socket, host) {
+  if (!room.skillTest) return;
+  if (room.skillTest.phase === 'prep') require('./prep').onRejoin(room, user, socket, host);
 }
 
 /** Ein Mensch hat nach der Lobby die Verbindung/den Raum verlassen. */
@@ -189,7 +198,7 @@ function onSeatLeft(room, user, socket, host) {
 }
 
 module.exports = {
-  PHASES, startPrep, onSeatLeft,
+  PHASES, startPrep, onSeatLeft, onRejoin,
   buildRoomConfig, isSkillTestRoom, isLobbyPhase, summary, seatsOf,
   makeCpuSeat, registerLobbyHandlers,
 };
