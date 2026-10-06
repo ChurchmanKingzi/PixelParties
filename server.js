@@ -1187,6 +1187,19 @@ async function initDatabase() {
     } catch (err) { console.error('[Shop] Avatar-Umbenennung', oldId, '->', newId, 'fehlgeschlagen:', err.message); }
   }
 
+  // Standard-Avatare (public/avatars/) heißen ebenfalls nicht mehr "avatarN" (data/standard-avatar-renames.json):
+  // getragene Avatare und noch offene Anmeldungen auf den neuen Pfad umschreiben (idempotent).
+  let stdRenames = {};
+  try { stdRenames = JSON.parse(fs.readFileSync(path.join(__dirname, 'data', 'standard-avatar-renames.json'), 'utf-8')); }
+  catch (err) { if (err.code !== 'ENOENT') console.error('[Avatar] standard-avatar-renames.json unlesbar:', err.message); }
+  for (const [oldId, newId] of Object.entries(stdRenames)) {
+    if (!oldId || !newId || oldId === newId) continue;
+    for (const table of ['users', 'pending_signups']) {
+      try { await db.run(`UPDATE ${table} SET avatar = ? WHERE avatar = ?`, ['/avatars/' + newId + '.png', '/avatars/' + oldId + '.png']); }
+      catch (err) { console.error('[Avatar] Umbenennung', table, oldId, '->', newId, 'fehlgeschlagen:', err.message); }
+    }
+  }
+
   // Ausgerüstete Shop-Avatare/-Sleeves, deren Datei entfernt wurde, zurücksetzen (idempotent).
   for (const [col, sub] of [['avatar', 'avatars'], ['cardback', 'sleeves']]) {
     try {
@@ -1933,6 +1946,10 @@ app.get('/api/auth/me', authMiddleware, async (req, res) => {
 // weder in der Besitzliste noch als Ausrüstung im Profil oder im Spiel. Die Käufe bleiben in
 // der Datenbank, nur die Anzeige filtert gegen die Dateien auf der Platte (30 s zwischengespeichert).
 const _shopIdCache = {};
+/** CamelCase-ID → Anzeigename mit Leerzeichen ("SmugEvil" → "Smug Evil", "FTGunslinger" → "FT Gunslinger"). */
+function avatarDisplayName(id) {
+  return String(id).replace(/([a-z0-9])([A-Z])/g, '$1 $2').replace(/([A-Z]+)([A-Z][a-z])/g, '$1 $2').replace(/([A-Za-z])(\d)/g, '$1 $2');
+}
 function shopIds(subdir) {
   const c = _shopIdCache[subdir]; const now = Date.now();
   if (c && now - c.t < 30000) return c.ids;
@@ -3769,7 +3786,7 @@ app.get('/api/shop/owned', authMiddleware, async (req, res) => {
   owned.board = owned.board.filter(id => shopIds('boards').has(id));
   const names = {
     sleeve: Object.fromEntries(owned.sleeve.map(id => [id, cpuSleeves.nameOf(id) || sleeveDisplayName(id)])),
-    avatar: Object.fromEntries(owned.avatar.map(id => [id, cpuAvatars.nameOf(id)]).filter(([, n]) => n)),
+    avatar: Object.fromEntries(owned.avatar.map(id => [id, cpuAvatars.nameOf(id) || avatarDisplayName(id)])),
   };
   res.json({ owned, names });
 });

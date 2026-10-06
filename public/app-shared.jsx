@@ -8549,3 +8549,9 @@ window.setTapTooltip = setTapTooltip;
 window.istDoppelKarte = istDoppelKarte;
 window.doppelFilterMoeglich = doppelFilterMoeglich;
 window.doppelFilterAnwenden = doppelFilterAnwenden;
+
+// CamelCase-Namen (Avatare) mit Leerzeichen anzeigen: "SmugEvil" -> "Smug Evil", "FTGunslinger" -> "FT Gunslinger".
+// Entspricht avatarDisplayName() in server.js.
+function ppCamelSpaces(s) {
+  return String(s == null ? '' : s).replace(/([a-z0-9])([A-Z])/g, '$1 $2').replace(/([A-Z]+)([A-Z][a-z])/g, '$1 $2').replace(/([A-Za-z])(\d)/g, '$1 $2');
+}
