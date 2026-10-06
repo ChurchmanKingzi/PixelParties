@@ -2386,6 +2386,7 @@ function ProfileScreen() {
   const [showAvatarGallery, setShowAvatarGallery] = useState(false);
   const [standardAvatars, setStandardAvatars] = useState([]);
   const [ownedAvatars, setOwnedAvatars] = useState([]);
+  const [avatarNames, setAvatarNames] = useState({}); // Gegner-Avatare tragen Namen (cpu-avatars.js)
 
   // Board gallery
   const [showBoardGallery, setShowBoardGallery] = useState(false);
@@ -2434,6 +2435,7 @@ function ProfileScreen() {
     api('/profile/standard-avatars').then(d => setStandardAvatars(d.avatars || [])).catch(() => {});
     api('/shop/owned').then(d => {
       setOwnedAvatars(d.owned?.avatar || []);
+      setAvatarNames(d.names?.avatar || {});
       setOwnedSleeves(d.owned?.sleeve || []);
       setSleeveNames(d.names?.sleeve || {});
       setOwnedBoards(d.owned?.board || []);
@@ -3083,7 +3085,7 @@ function ProfileScreen() {
                           <div className="profile-avatar-gallery-img">
                             <img src={url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                           </div>
-                          <div className="profile-cb-gallery-label">{avatarId}</div>
+                          <div className="profile-cb-gallery-label">{avatarNames[avatarId] || avatarId}</div>
                         </div>
                       );
                     })}
@@ -3352,6 +3354,8 @@ function ShopScreen() {
   const [structureCatalog, setStructureCatalog] = useState(null); // { decks, price, randomPrice, defaultDeckId }
   // Gegner-Sleeves (cpu-sleeves.js): nicht käuflich, fünf Siege gegen die CPU schalten sie frei.
   const [cpuSleeves, setCpuSleeves] = useState({ need: 5, sleeves: [] });
+  // Gegner-Avatare (cpu-avatars.js): nicht käuflich, der erste Sieg gegen die CPU schaltet das Portrait frei.
+  const [cpuAvatars, setCpuAvatars] = useState({ need: 1, avatars: [] });
   const [loading, setLoading] = useState(true);
   const [buying, setBuying] = useState(false);
   const [tab, setTab] = useState('skins');
@@ -3385,16 +3389,18 @@ function ShopScreen() {
   useEffect(() => {
     (async () => {
       try {
-        const [catData, ownData, structData, cpuData] = await Promise.all([
+        const [catData, ownData, structData, cpuData, cpuAvData] = await Promise.all([
           api('/shop/catalog'),
           api('/shop/owned'),
           api('/shop/structure-decks'),
           api('/shop/cpu-sleeves').catch(() => null),
+          api('/shop/cpu-avatars').catch(() => null),
         ]);
         setCatalog(catData);
         setOwned(ownData.owned);
         setStructureCatalog(structData);
         if (cpuData) setCpuSleeves(cpuData);
+        if (cpuAvData) setCpuAvatars(cpuAvData);
       } catch (e) { notify(e.message, 'error'); }
       setLoading(false);
     })();
@@ -3738,6 +3744,52 @@ function ShopScreen() {
     );
   };
 
+  const renderCpuAvatars = () => {
+    const list = cpuAvatars.avatars || [];
+    if (list.length === 0) return <div className="shop-empty">No opponent avatars available yet</div>;
+    const need = cpuAvatars.need || 1;
+    const earned = list.filter(it => it.unlocked).length;
+    return (
+      <React.Fragment>
+        <div className="shop-random-wrap">
+          <div className="shop-cpu-sleeves-intro">🏆 Every CPU opponent has a portrait. Defeat an opponent {need === 1 ? 'once' : need + ' times'} to claim it as your avatar!</div>
+          <span className="shop-random-hint">{earned} / {list.length} earned</span>
+        </div>
+        <div className="shop-grid">
+          {list.map(item => {
+            const isOwned = item.unlocked;
+            const equipped = isOwned && isEquipped('avatar', item.id);
+            const hidden = !isOwned && !item.opponentKnown;
+            return (
+              <div key={item.id} className={'shop-item shop-avatar-item shop-cpu-sleeve' + (isOwned ? ' shop-owned' : ' shop-unowned-skin') + (equipped ? ' shop-equipped' : '') + (hidden ? ' shop-cpu-sleeve-hidden' : '')}
+                onClick={() => isOwned && !equipped && equipItem('avatar', item.id)}>
+                <span className="shop-item-zier" aria-hidden="true" />
+                <div className="shop-item-img-wrap">
+                  <img src={'/data/shop/avatars/' + encodeURIComponent(item.file)} draggable={false}
+                    className={isOwned ? '' : 'shop-skin-locked'} />
+                  {equipped ? <div className="shop-owned-badge shop-equipped-badge">EQUIPPED</div>
+                    : isOwned ? <div className="shop-owned-badge">OWNED</div> : (
+                      <div className="shop-lock-overlay">
+                        <span className="shop-lock-badge" aria-label="Locked">🔒</span>
+                      </div>
+                    )}
+                </div>
+                <div className="shop-item-name" title={hidden ? '???' : item.name}>{hidden ? '???' : item.name}</div>
+                {!isOwned && (
+                  <div className="shop-cpu-progress" title={hidden ? 'Unlock this opponent in Singleplayer first' : 'Defeat ' + (item.middleHero || item.opponent) + ' ' + need + ' time' + (need === 1 ? '' : 's')}>
+                    <div className="shop-cpu-progress-label">{hidden ? 'Unknown opponent' : 'vs. ' + (item.middleHero || item.opponent)}</div>
+                    <div className="shop-cpu-progress-bar"><span style={{ width: Math.round(100 * item.wins / need) + '%' }} /></div>
+                    <div className="shop-cpu-progress-count">{item.wins} / {need} {need === 1 ? 'win' : 'wins'}</div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </React.Fragment>
+    );
+  };
+
   const renderSkinGrid = () => {
     if ((catalog.skins || []).length === 0) return <div className="shop-empty">No skins available yet</div>;
     const allOwned = ownedSet.skin;
@@ -3883,6 +3935,7 @@ function ShopScreen() {
     { id: 'avatars', label: '👤 Avatars', count: (catalog.avatars || []).length },
     { id: 'sleeves', label: '🃏 Sleeves', count: (catalog.sleeves || []).length },
     { id: 'cpuSleeves', label: '🏆 Opponent Sleeves', count: (cpuSleeves.sleeves || []).length },
+    { id: 'cpuAvatars', label: '🏆 Opponent Avatars', count: (cpuAvatars.avatars || []).length },
     { id: 'boards', label: '🎮 Boards', count: (catalog.boards || []).length },
     { id: 'structures', label: '📜 Structure Decks', count: (structureCatalog?.decks || []).length },
   ];
@@ -3944,6 +3997,7 @@ function ShopScreen() {
         {tab === 'avatars' && renderItemGrid(catalog.avatars || [], 'avatar', '/data/shop/avatars/')}
         {tab === 'sleeves' && renderItemGrid(catalog.sleeves || [], 'sleeve', '/data/shop/sleeves/')}
         {tab === 'cpuSleeves' && renderCpuSleeves()}
+        {tab === 'cpuAvatars' && renderCpuAvatars()}
         {tab === 'boards' && renderItemGrid(catalog.boards || [], 'board', '/data/shop/boards/')}
         {tab === 'structures' && renderStructureDecks()}
       </div>

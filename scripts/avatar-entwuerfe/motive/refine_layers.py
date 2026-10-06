@@ -12,6 +12,13 @@ from picks import PICKS
 
 todo = {}
 best = {int(k): tuple(v) for k, v in N.REF.items()}      # schon berechnete Karten behalten
+extra = [int(x) for x in os.environ.get('REFINE_EXTRA', '').split(',') if x.strip()]   # z. B. die Helden der CPU-Gegner
+for i in extra:
+    if i in best or str(i) not in N.LOC:
+        continue
+    for rank, (sc, m, f, idx, name, x, y) in enumerate(N.LOC[str(i)][:3]):
+        if sc <= 0.02:
+            todo.setdefault(f, []).append((i, m, x, y, rank))
 for pid, card, *_ in PICKS:
     i = N.IDX[N.norm(card)]
     if i in best:
