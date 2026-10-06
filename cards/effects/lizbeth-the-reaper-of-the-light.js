@@ -98,7 +98,7 @@ function lizbethActiveBorrower(ctx) {
  *  (capable hosts only — dead / frozen / stunned / negated opponents
  *  contribute nothing). */
 function maxOpponentAbilityLevel(engine, pi, abilityName) {
-  const oi = pi === 0 ? 1 : 0;
+  const oi = engine.opponentOf(pi);
   if (!engine.gs.players[oi]) return 0;
   let max = 0;
   // Kontrolle statt Seite (Styx 28.9.): Helden, die der Gegner
@@ -152,7 +152,7 @@ function recomputeFighting(ctx) {
   let desiredDelta = 0;
   if (isMyTurn && canAct) {
     const ownTotal = fightingTotalForHero(engine, feld, heroIdx);
-    const oi = pi === 0 ? 1 : 0;
+    const oi = engine.opponentOf(pi);
     let oppHighest = 0;
     // Kontrolle statt Seite (Styx 28.9.): Fighting der Helden, die der
     // Gegner KONTROLLIERT (Instanzen physisch beim Besitzer).

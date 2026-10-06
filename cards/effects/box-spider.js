@@ -111,7 +111,7 @@ module.exports = {
       // still empty when the flying card leaves the deck — the
       // engine.sync() after the hook fires lands the card visibly.
       const ownerSid = gs.players[owner]?.socketId;
-      const oppSid = gs.players[1 - owner]?.socketId;
+      const oppSid = gs.players[engine.opponentOf(owner)]?.socketId;
       const basePayload = {
         owner, cardName: chosenName,
         from: 'deck', to: 'surprise',

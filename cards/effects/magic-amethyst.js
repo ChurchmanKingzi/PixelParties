@@ -14,6 +14,7 @@
 // ═══════════════════════════════════════════
 
 const { canPlayMagicGem, maybeKeepGemInHand } = require('./_magic-gem-shared');
+const { opponentOfGs } = require('./_opp');
 
 const CARD_NAME = 'Magic Amethyst';
 
@@ -74,7 +75,7 @@ module.exports = {
   cpuMeta: {
     alwaysCommit: (engine, pi) => {
       try {
-        const oppIdx = pi === 0 ? 1 : 0;
+        const oppIdx = engine.opponentOf(pi);
         const oppPs = engine.gs?.players?.[oppIdx];
         if (!oppPs) return false;
         for (let hi = 0; hi < (oppPs.heroes || []).length; hi++) {
@@ -96,7 +97,7 @@ module.exports = {
   canActivate(gs, pi) {
     if (!canPlayMagicGem(gs, pi, CARD_NAME)) return false;
     // Need at least one opp hero with at least one ability to discard.
-    const oi = pi === 0 ? 1 : 0;
+    const oi = opponentOfGs(gs, pi);
     const ops = gs.players[oi];
     if (!ops) return false;
     for (let hi = 0; hi < (ops.heroes || []).length; hi++) {
@@ -108,7 +109,7 @@ module.exports = {
   },
 
   getValidTargets(gs, pi) {
-    const oi = pi === 0 ? 1 : 0;
+    const oi = opponentOfGs(gs, pi);
     const ops = gs.players[oi];
     const out = [];
     for (let hi = 0; hi < (ops?.heroes || []).length; hi++) {

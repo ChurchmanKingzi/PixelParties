@@ -191,7 +191,7 @@ module.exports = {
 
       let placed = 0;
       for (const c of chosen) {
-        const dests = equipDestinations(engine, pi, c.name, { sides: [0, 1] });
+        const dests = equipDestinations(engine, pi, c.name, { sides: engine.gs.players.map((_, i) => i) });
         if (dests.length === 0) continue;
         const zoneTargets = dests.map(d => ({ id: `equip-${d.side}-${d.heroIdx}-${d.slotIdx}`, type: 'equip', owner: d.side, heroIdx: d.heroIdx, slotIdx: d.slotIdx, cardName: '' }));
         let dest = dests[0];

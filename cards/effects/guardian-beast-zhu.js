@@ -63,7 +63,7 @@ module.exports = {
     const gs = engine.gs;
     if (gs[ONCE_PER_GAME_KEY]?.[pi]) return false; // once per game per player
     const ownDp = gs.players[pi]?.discardPile || [];
-    const oppDp = gs.players[pi === 0 ? 1 : 0]?.discardPile || [];
+    const oppDp = gs.players[engine.opponentOf(pi)]?.discardPile || [];
     if (ownDp.length < PER_PILE_COST || oppDp.length < PER_PILE_COST) return false;
     if (ctx.card?.turnPlayed === (gs.turn || 0)) return false; // not the summon turn
     // Need at least 3 different-named Guardian Beast Creatures among
@@ -78,7 +78,7 @@ module.exports = {
     const engine = ctx._engine;
     const gs = engine.gs;
     const pi = ctx.cardOwner;
-    const oi = pi === 0 ? 1 : 0;
+    const oi = engine.opponentOf(pi);
 
     // ── Step 1: pick the 8 from each pile ────────────────────────
     // We use TWO separate prompts (own pile, then opp pile) so the

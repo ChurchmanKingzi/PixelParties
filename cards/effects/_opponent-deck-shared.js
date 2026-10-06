@@ -44,7 +44,7 @@
  */
 async function takeTopFromOpponentDeck(engine, pi, opts = {}) {
   const gs = engine.gs;
-  const oi = pi === 0 ? 1 : 0;
+  const oi = engine.opponentOf(pi);
   const ps = gs.players[pi];
   const ops = gs.players[oi];
   if (!ps || !ops) return null;

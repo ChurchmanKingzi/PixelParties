@@ -112,7 +112,7 @@ module.exports = {
       {
         id: 'redirect-source',
         cardName: attackerName,
-        owner: sourceCard?.controller ?? sourceCard?.owner ?? (pi === 0 ? 1 : 0),
+        owner: sourceCard?.controller ?? sourceCard?.owner ?? (engine.opponentOf(pi)),
         cardType: config.damageType === 'attack' ? 'Attack' : 'Spell',
         isInitialCard: true,
         negated: false,

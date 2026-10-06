@@ -32,7 +32,7 @@ module.exports = {
     onPlay: async (ctx) => {
       const engine = ctx._engine;
       const pi = ctx.cardOwner;
-      const oppIdx = pi === 0 ? 1 : 0;
+      const oppIdx = engine.opponentOf(pi);
       const ps = ctx.players[pi];
       const heroIdx = ctx.cardHeroIdx;
       const hero = ctx.attachedHero || ps.heroes?.[heroIdx];   // Als Befund 29.9.: Brettseite des Wirkers

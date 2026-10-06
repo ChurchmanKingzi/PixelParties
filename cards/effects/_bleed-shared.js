@@ -99,7 +99,7 @@ function collectPlayerTargets(engine, pi, opts = {}) {
 
 /** Blutet irgendein Ziel auf dem Brett? */
 function anyTargetBleeding(engine) {
-  return [0, 1].some(pi => collectPlayerTargets(engine, pi).some(t => isTargetBleeding(engine, t)));
+  return engine.gs.players.map((_, i) => i).some(pi => collectPlayerTargets(engine, pi).some(t => isTargetBleeding(engine, t)));
 }
 
 // `heroFightingLevel` liegt seit v778 in `_hooks.js` — „wie hoch ist

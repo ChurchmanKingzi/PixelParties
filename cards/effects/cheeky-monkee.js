@@ -39,7 +39,7 @@ const DAMAGE = 80;
 function alleBrettZiele(engine) {
   const { hasCardType } = require('./_hooks');
   const ziele = [];
-  for (let pi = 0; pi < 2; pi++) {
+  for (let pi = 0; pi < engine.playerCount(); pi++) {
     const heroes = engine.gs.players[pi]?.heroes || [];
     for (let hi = 0; hi < heroes.length; hi++) {
       const hero = heroes[hi];

@@ -84,7 +84,8 @@ function countUsableHealSources(engine, pi) {
 }
 
 const { candidateHosts, pickAttachmentHost, placeAttachment } = require('./_attachment-shared');
-const { heldSeite } = require('./_hooks');   // Als Befund 29.9.: Brettseite geliehener Helden
+const { heldSeite } = require('./_hooks');
+const { opponentOfGs } = require('./_opp');   // Als Befund 29.9.: Brettseite geliehener Helden
 const CARD_NAME = 'Overheal Shock';
 
 module.exports = {
@@ -158,7 +159,7 @@ module.exports = {
   // (`ignoreDropHints`). Mit dem Vertrag wurde der Held, auf den man zog,
   // sofort zum Ziel, und einen Wirker liess der Ziehweg nicht waehlen.
   spellPlayCondition(gs, pi, engine) {
-    const oi = pi === 0 ? 1 : 0;
+    const oi = opponentOfGs(gs, pi);
     if (gs.firstTurnProtectedPlayer != null && oi === gs.firstTurnProtectedPlayer) return false;
     const ops = gs.players[oi];
     const heroFilter = (h, hi) => !h.statuses?.healReversed
@@ -241,7 +242,7 @@ module.exports = {
 
         const attacker = (typeof hr.appliedBy === 'number')
           ? hr.appliedBy
-          : (ownerIdx === 0 ? 1 : 0);
+          : (engine.opponentOf(ownerIdx));
         const sources = countUsableHealSources(engine, attacker);
         if (sources <= 0) return 0;
 
@@ -268,7 +269,7 @@ module.exports = {
       const pi = ctx.cardOwner;
       const ps = gs.players[pi];
       const heroIdx = ctx.cardHeroIdx;
-      const oi = pi === 0 ? 1 : 0;
+      const oi = engine.opponentOf(pi);
       const ops = gs.players[oi];
 
       // ── Build targets: opponent heroes + their free support zones ──

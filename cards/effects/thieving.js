@@ -30,7 +30,7 @@ module.exports = {
   canFreeActivate(ctx) {
     const gs = ctx._engine.gs;
     const pi = ctx.cardOwner;
-    const oi = pi === 0 ? 1 : 0;
+    const oi = ctx._engine.opponentOf(pi);
     if (gs.firstTurnProtectedPlayer === oi) return false;
     const ops = gs.players[oi];
     return !!(ops && (ops.gold || 0) > 0);

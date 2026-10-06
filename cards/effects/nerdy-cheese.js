@@ -59,7 +59,7 @@ module.exports = {
   async resolve(engine, pi) {
     const ps = engine.gs.players[pi];
     if (!ps) return;
-    const oi = pi === 0 ? 1 : 0;
+    const oi = engine.opponentOf(pi);
 
     // Gallery of all distinct Magic Arts Spell names in the deck with counts
     const cardDB = engine._getCardDB();

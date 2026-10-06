@@ -58,7 +58,7 @@ module.exports = {
       });
       if (!target) return;
 
-      const oppIdx = pi === 0 ? 1 : 0;
+      const oppIdx = engine.opponentOf(pi);
       if (target.type === 'hero') {
         const th = gs.players[target.owner]?.heroes?.[target.heroIdx];
         if (!th?.name || th.hp <= 0) return;

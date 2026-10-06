@@ -125,14 +125,14 @@ async function applyBuff(engine, pi, inst, promptCtxShim) {
   // _cardinalImmune's guard in actionRemoveCreatureBuff.
   await engine.actionAddCreatureBuff(inst, 'golden_wings', {
     expiresAtTurn: gs.turn + 1,
-    expiresForPlayer: 1 - gs.activePlayer, // end of current half-turn, whichever side we're on
+    expiresForPlayer: engine.opponentOf(gs.activePlayer), // end of current half-turn, whichever side we're on
     expiresForceClear: true,
     source: 'Golden Wings',
     clearCountersOnExpire: ['_cardinalImmune', 'untargetable_by_opponent', 'untargetable_by_opponent_pi'],
   });
   inst.counters._cardinalImmune = true;
   inst.counters.untargetable_by_opponent = 1;
-  inst.counters.untargetable_by_opponent_pi = 1 - pi;
+  inst.counters.untargetable_by_opponent_pi = engine.opponentOf(pi);
 
   engine.log('golden_wings', { player: ps.username, creature: inst.name });
   engine.sync();

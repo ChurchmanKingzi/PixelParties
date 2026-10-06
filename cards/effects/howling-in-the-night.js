@@ -33,6 +33,7 @@
 //  `addHeroStatus` nicht selbst, deshalb hier).
 // ═══════════════════════════════════════════
 
+const { opponentOfGs } = require('./_opp');
 const CARD_NAME = 'Howling in the Night';
 const STATUS = 'frightened';
 
@@ -48,7 +49,7 @@ module.exports = {
 
   /** Ohne einen erreichbaren gegnerischen Helden bewirkt die Karte nichts. */
   spellPlayCondition(gs, playerIdx) {
-    const oi = playerIdx === 0 ? 1 : 0;
+    const oi = opponentOfGs(gs, playerIdx);
     if (gs.firstTurnProtectedPlayer === oi) return false;
     return (gs.players[oi]?.heroes || []).some(h => h?.name && h.hp > 0);
   },
@@ -59,7 +60,7 @@ module.exports = {
       const engine = ctx._engine;
       const gs = engine.gs;
       const pi = ctx.cardOwner;
-      const oi = pi === 0 ? 1 : 0;
+      const oi = engine.opponentOf(pi);
       if (gs.firstTurnProtectedPlayer === oi) return;
 
       // Bis zum Beginn des naechsten eigenen Zuges (siehe Kopf).

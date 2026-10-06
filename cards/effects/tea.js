@@ -40,7 +40,7 @@ function getOwnStatusedTargets(gs, pi, engine) {
 
   // Kontrolle statt Seite (Styx 28.9.): „a target you control" — Helden
   // beider Spalten, sofern `pi` sie kontrolliert (Ziel bleibt physisch).
-  const heroes = [0, 1].flatMap(p => engine.getHeroTargets(p)).filter(t => {
+  const heroes = gs.players.map((_, i) => i).flatMap(p => engine.getHeroTargets(p)).filter(t => {
     const hero = gs.players[t.owner].heroes[t.heroIdx];
     if (engine.heroSideOf(t.owner, hero) !== pi) return false;
     return hero.statuses && negKeys.some(k => hero.statuses[k]);
@@ -97,7 +97,7 @@ function getSecondTargets(gs, engine, firstTarget, removedStatuses, poisonStacks
   // freien Platz hat, kommt als neuer Traeger nicht in Frage.
   const brauchtPlatz = anhaengselStatus.length > 0;
   const targets = [];
-  for (let pi = 0; pi < 2; pi++) {
+  for (let pi = 0; pi < gs.players.length; pi++) {
     // Heroes
     for (const t of engine.getHeroTargets(pi)) {
       if (t.id === firstTarget.id) continue;

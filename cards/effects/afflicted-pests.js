@@ -47,7 +47,7 @@ module.exports = {
 
     // Build targets: all non-Creature, non-Token cards in ANY support zone (both sides)
     const targets = [];
-    for (let pIdx = 0; pIdx < 2; pIdx++) {
+    for (let pIdx = 0; pIdx < engine.playerCount(); pIdx++) {
       const ps = gs.players[pIdx];
       for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
         if (!ps.heroes[hi]?.name) continue;

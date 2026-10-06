@@ -42,7 +42,7 @@ module.exports = {
       const gs = engine.gs;
       const zieher = ctx.playerIdx;
       if (zieher !== 0 && zieher !== 1) return;
-      const fragender = zieher === 0 ? 1 : 0;
+      const fragender = engine.opponentOf(zieher);
       if (gs._eighthCircleResolving) return;
       const anzahl = ctx.amount;
       if (!(anzahl > 0)) return;

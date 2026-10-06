@@ -97,7 +97,7 @@ module.exports = {
       const gs = engine.gs;
       const pi = ctx.cardOwner;
       const heroIdx = ctx.cardHeroIdx;
-      const oi = pi === 0 ? 1 : 0;
+      const oi = engine.opponentOf(pi);
       const ps = gs.players[pi];
       const ops = gs.players[oi];
       if (!ps || !ops) return;

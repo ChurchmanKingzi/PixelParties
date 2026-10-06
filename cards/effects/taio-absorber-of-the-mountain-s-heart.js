@@ -254,7 +254,7 @@ async function _castAsAdditionalAction(engine, pi, heroIdx, picked, feld = pi) {
     engine._broadcastEvent('deck_search_add', { cardName, playerIdx: pi });
     engine.shuffleDeck(pi, 'main');
     // Reveal to opp — standard etiquette for deck-search casts.
-    const oi = pi === 0 ? 1 : 0;
+    const oi = engine.opponentOf(pi);
     try {
       await engine.promptGeneric(oi, {
         type: 'deckSearchReveal',

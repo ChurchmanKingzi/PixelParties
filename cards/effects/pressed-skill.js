@@ -208,7 +208,7 @@ module.exports = {
     // Deck-search reveal etiquette — let the opponent see what was
     // pulled from the deck (mirrors Sacrifice to Divinity / Premonition).
     if (source === 'deck') {
-      const oi = pi === 0 ? 1 : 0;
+      const oi = engine.opponentOf(pi);
       await engine.promptGeneric(oi, {
         type: 'deckSearchReveal',
         cardName: abilityName,

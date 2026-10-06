@@ -224,7 +224,7 @@ module.exports = {
       if (!zone) continue; // Back → re-pick creature
 
       // All decisions finalized — broadcast card to opponent NOW
-      const oi = pi === 0 ? 1 : 0;
+      const oi = engine.opponentOf(pi);
       const oppSid = gs.players[oi]?.socketId;
       if (oppSid && engine.io) {
         engine.io.to(oppSid).emit('card_reveal', { cardName: 'Monster in a Bottle' });

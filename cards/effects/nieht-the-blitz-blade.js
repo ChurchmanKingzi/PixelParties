@@ -120,7 +120,7 @@ module.exports = {
       if (!hero?.name || hero.hp <= 0) return;
 
       // ── Effect 1: Draw 1 on hit-exactly-1-opp-target ──
-      const oppIdx = pi === 0 ? 1 : 0;
+      const oppIdx = engine.opponentOf(pi);
       // Kontrolle statt Seite (Styx 28.9.): Helden zaehlen fuer ihren Kontrolleur.
       const zielSeite = target.type === 'hero'
         ? engine.heroSideOf(target.owner, gs.players[target.owner]?.heroes?.[target.heroIdx])

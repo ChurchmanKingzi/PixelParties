@@ -25,7 +25,7 @@ module.exports = {
   requiresTarget: true,
 
   canActivateCreatureEffect(ctx) {
-    const oi = ctx.cardOwner === 0 ? 1 : 0;
+    const oi = ctx._engine.opponentOf(ctx.cardOwner);
     const engine = ctx._engine;
     const oppPs = engine.gs.players[oi];
     if (!oppPs) return false;

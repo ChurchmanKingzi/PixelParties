@@ -28,6 +28,7 @@
 // ═══════════════════════════════════════════
 
 const { hasNumericCreatureLevel } = require('./_hooks');
+const { opponentOfGs } = require('./_opp');
 
 const BASE_COST = 5;
 
@@ -83,7 +84,7 @@ function hasOpponentCreatures(engine, playerIdx) {
  * Filtered by affordability (gold >= level × BASE_COST).
  */
 function getStealableCreatures(engine, playerIdx) {
-  const oppIdx = playerIdx === 0 ? 1 : 0;
+  const oppIdx = engine.opponentOf(playerIdx);
   // Per-side non-damage shield (The Great Wall of Deri etc.). Dark
   // Gear is a non-damage targeting effect, so if opp controls any
   // shielder, NONE of opp's Creatures are valid targets — short-
@@ -136,7 +137,7 @@ module.exports = {
     const eng = engine || gs._engineRef;
     if (!eng) {
       // Fallback: check basic conditions without engine
-      const oppIdx = pi === 0 ? 1 : 0;
+      const oppIdx = opponentOfGs(gs, pi);
       const oppPs = gs.players[oppIdx];
       let hasOppCreatures = false;
       for (let hi = 0; hi < (oppPs?.heroes || []).length; hi++) {
@@ -185,7 +186,7 @@ module.exports = {
 
     const gs = engine.gs;
     const ps = gs.players[pi];
-    const oppIdx = pi === 0 ? 1 : 0;
+    const oppIdx = engine.opponentOf(pi);
     const oppPs = gs.players[oppIdx];
     const cardDB = engine._getCardDB();
     // Match the effective-card-data lookup used in `getStealableCreatures`
@@ -278,7 +279,7 @@ module.exports = {
     // ── Apply un-removable effect negation ──
     await engine.actionNegateCreature(inst, 'Dark Gear', {
       expiresAtTurn: gs.turn + 1,
-      expiresForPlayer: pi === 0 ? 1 : 0, // expires at start of OPPONENT's next turn (= end of this turn cycle)
+      expiresForPlayer: engine.opponentOf(pi), // expires at start of OPPONENT's next turn (= end of this turn cycle)
       selfInflicted: true,
       unpreventable: true,   // v1444: kann NICHT verhindert werden
     });

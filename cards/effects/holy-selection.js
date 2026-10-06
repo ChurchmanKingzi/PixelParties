@@ -71,7 +71,7 @@ function _heroHasNecromancy(ps, heroIdx) {
 function _collectTargets(engine, gs) {
   const heroTargets = [];
   const creatureTargets = [];
-  for (let tpi = 0; tpi < 2; tpi++) {
+  for (let tpi = 0; tpi < engine.playerCount(); tpi++) {
     const ps = gs.players[tpi];
     if (!ps) continue;
     for (let hi = 0; hi < (ps.heroes || []).length; hi++) {

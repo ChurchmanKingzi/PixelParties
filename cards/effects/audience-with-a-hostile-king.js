@@ -37,7 +37,7 @@ const RITUAL_MS = 1150;   // Laenge der dunklen-Magie-Animation im Client
 
 /** Lebende Ascended Heroes des Gegners. */
 function zulaessigeZiele(engine, pi) {
-  const oppIdx = pi === 0 ? 1 : 0;
+  const oppIdx = engine.opponentOf(pi);
   const cardDB = engine._getCardDB();
   return engine.getHeroTargets(oppIdx)
     .filter(t => cardDB[t.cardName]?.cardType === 'Ascended Hero');

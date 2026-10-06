@@ -57,7 +57,7 @@ const GRUNDSCHADEN = 50;
  */
 function schaden(engine) {
   let summe = GRUNDSCHADEN;
-  for (let pi = 0; pi < 2; pi++) {
+  for (let pi = 0; pi < engine.playerCount(); pi++) {
     for (const inst of ifritsOf(engine, pi)) {
       summe += loadCardEffect(inst.name)?.armageddonBonus || 0;
     }
@@ -80,7 +80,7 @@ function zaehleKreaturen(engine, p) {
   // Die Instanz dient nur zur Bestimmung des Kontrolleurs; fehlt sie
   // (Batch-Umbau, s.o.), gilt die Seite.
   let n = 0;
-  for (let seite = 0; seite < 2; seite++) {
+  for (let seite = 0; seite < engine.playerCount(); seite++) {
     const ps = engine.gs.players[seite];
     (ps?.supportZones || []).forEach((zonen, hi) => (zonen || []).forEach((slot, si) => {
       const name = (slot || [])[0];
@@ -150,7 +150,7 @@ module.exports = {
       // ── ① Alles einsammeln, BEVOR etwas faellt ───────────────────
       const helden = [];
       const kreaturen = [];
-      for (let p = 0; p < 2; p++) {
+      for (let p = 0; p < engine.playerCount(); p++) {
         const sp = gs.players[p];
         for (let hi = 0; hi < (sp?.heroes || []).length; hi++) {
           const hero = sp.heroes[hi];
@@ -244,8 +244,8 @@ module.exports = {
       // hinter seiner Ifrit —, entscheidet die normale Regel, und die
       // Engine kommt hier ohnehin nie in den Unentschieden-Zweig.
       const meine = zaehleKreaturen(engine, pi);
-      const seine = zaehleKreaturen(engine, pi === 0 ? 1 : 0);
-      const oppIdx = pi === 0 ? 1 : 0;
+      const seine = zaehleKreaturen(engine, engine.opponentOf(pi));
+      const oppIdx = engine.opponentOf(pi);
       // „the player controlling the MOST Creatures wins" / „if this
       // results in a DRAW, YOU lose" → bei Gleichstand ist der Wirker
       // der Verlierer.

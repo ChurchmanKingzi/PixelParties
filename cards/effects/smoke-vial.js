@@ -33,6 +33,7 @@
 //  blocks are honoured by addHeroStatus).
 // ═══════════════════════════════════════════
 
+const { opponentOfGs } = require('./_opp');
 // Score-Bonus je Gegner-Held, der durch diesen Wurf NEU geblendet wird.
 // Die Gate-Grundschwelle ist MCTS_ACTIVATION_GATE_THRESHOLD = 3, ein
 // Ziel hebt die Karte also spürbar über die Standard-Hürde, ohne sie zu
@@ -54,7 +55,7 @@ const BLIND_BONUS_PER_TARGET = 8;
  */
 function blindImpact(engine, pi, helpers) {
   const gs = engine?.gs;
-  const oi = pi === 0 ? 1 : 0;
+  const oi = opponentOfGs(gs, pi);
   const heroes = gs?.players?.[oi]?.heroes || [];
   const immune = typeof helpers?.isTargetImmune === 'function'
     ? helpers.isTargetImmune
@@ -113,7 +114,7 @@ module.exports = {
   },
 
   canActivate(gs, pi) {
-    const oi = pi === 0 ? 1 : 0;
+    const oi = opponentOfGs(gs, pi);
     // Kontrolle statt Seite (Styx 28.9.) — wie engine.heroSideOf.
     return (gs.players || []).some((ps, p) => (ps?.heroes || []).some(h =>
       h?.name && h.hp > 0 && (h.charmedBy ?? h.permaControlBy ?? p) === oi));
@@ -121,7 +122,7 @@ module.exports = {
 
   async resolve(engine, pi) {
     const gs = engine.gs;
-    const oi = pi === 0 ? 1 : 0;
+    const oi = engine.opponentOf(pi);
     const oppPs = gs.players[oi];
     if (!oppPs) return;
 

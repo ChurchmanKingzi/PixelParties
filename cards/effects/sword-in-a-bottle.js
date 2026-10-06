@@ -29,6 +29,7 @@
 //  in `resolve` am Punkt ohne Rueckkehr.
 // ═══════════════════════════════════════════
 
+const { opponentOfGs } = require('./_opp');
 const CARD_NAME = 'Sword in a Bottle';
 const HOPT_KEY  = 'sword-in-a-bottle';
 
@@ -89,7 +90,7 @@ module.exports = {
   canActivate(gs, playerIdx) {
     if (schonGespielt(gs, playerIdx)) return false;
     if (angreifer(gs, playerIdx).length === 0) return false;
-    const gegner = playerIdx === 0 ? 1 : 0;
+    const gegner = opponentOfGs(gs, playerIdx);
     // Runde 1: der Gegner ist gegen alles immun — dann gibt es kein
     // legales Opfer und der Trank bleibt grau, statt ins Leere zu laufen.
     if (gs?.firstTurnProtectedPlayer === gegner) return false;
@@ -103,7 +104,7 @@ module.exports = {
 
   getValidTargets(gs, playerIdx, engine) {
     if (!engine) return [];
-    const gegner = playerIdx === 0 ? 1 : 0;
+    const gegner = opponentOfGs(gs, playerIdx);
     const ziele = [];
     // Kontrolle statt Seite (Styx 28.9.): Helden beider Spalten, sortiert
     // nach Kontrolleur. KONTROLLIERTE Helden = die moeglichen Angreifer,

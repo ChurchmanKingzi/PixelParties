@@ -47,7 +47,7 @@ module.exports = {
       const engine = ctx._engine;
       const gs = engine.gs;
       const pi = ctx.cardOwner;
-      const opp = pi === 0 ? 1 : 0;
+      const opp = engine.opponentOf(pi);
       const src = ctx.source;
       const srcOwner = src?.heroOwner ?? src?.controller ?? src?.owner ?? -1;
       // `isAttackSpellOrCreatureSource` liest `cardName`/`cardInstance` —

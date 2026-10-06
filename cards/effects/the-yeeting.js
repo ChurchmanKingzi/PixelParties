@@ -429,7 +429,7 @@ function _scoreEnemyCard(engine, target) {
 }
 
 function _hasNonHeroCards(gs) {
-  for (let p = 0; p < 2; p++) {
+  for (let p = 0; p < gs.players.length; p++) {
     const ps = gs.players[p];
     for (let hi = 0; hi < 3; hi++) {
       for (let si = 0; si < (ps.supportZones?.[hi] || []).length; si++) {
@@ -447,7 +447,7 @@ function _hasNonHeroCards(gs) {
     }
   }
   if (gs.areaZones) {
-    for (let p = 0; p < 2; p++) {
+    for (let p = 0; p < gs.players.length; p++) {
       if ((gs.areaZones[p] || []).length > 0) return true;
     }
   }

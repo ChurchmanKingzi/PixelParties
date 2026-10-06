@@ -36,7 +36,7 @@ module.exports = {
       const pi     = ctx.cardOwner;
 
       // Must be the opponent's deck being milled
-      if (ctx.playerIdx !== (pi === 0 ? 1 : 0)) return;
+      if (ctx.playerIdx !== (engine.opponentOf(pi))) return;
 
       // Prevent Jean's own bonus mill from re-triggering Jean
       if (ctx._jeanTriggered) return;

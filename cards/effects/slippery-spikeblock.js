@@ -39,7 +39,7 @@ module.exports = {
       if (!slipperyOnMoveGate(ctx)) return;
       const engine = ctx._engine;
       const pi = ctx.cardOwner;
-      const oi = pi === 0 ? 1 : 0;
+      const oi = engine.opponentOf(pi);
       const oppPs = engine.gs.players[oi];
       const myHeroIdx = ctx.card.heroIdx;
       const oppHero = oppPs?.heroes?.[myHeroIdx];

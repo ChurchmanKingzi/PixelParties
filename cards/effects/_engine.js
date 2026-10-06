@@ -307,7 +307,7 @@ function _applyForcesTargetingFilter(engine, targets, casterPi) {
   // Hero taunters (buffs.forcesTargeting on the hero object) — used by
   // the puzzle editor to author a taunting Hero.
   const heroForcers = [];
-  for (let pi = 0; pi < 2; pi++) {
+  for (let pi = 0; pi < engine.playerCount(); pi++) {
     if (pi === casterPi) continue;
     const ps = gs.players[pi];
     if (!ps) continue;
@@ -2020,7 +2020,7 @@ class GameEngine {
       // Single-pick from the OPPONENT's hand (Letter of Misinformations).
       // The CPU just takes the first eligible slot — `eligibleIndices`
       // already excludes Letter copies that the script forbids picking.
-      const oppPi = promptPi === 0 ? 1 : 0;
+      const oppPi = this.opponentOf(promptPi);
       const ops = this.gs.players[oppPi];
       if (!ops || !ops.hand || ops.hand.length === 0) return null;
       const eligible = promptData.eligibleIndices;
@@ -2184,7 +2184,7 @@ class GameEngine {
       ScTracking.startHp(this.gs._scTracking, this.gs.players);   // v1383: Overhealed
     }
 
-    for (let pi = 0; pi < 2; pi++) {
+    for (let pi = 0; pi < this.playerCount(); pi++) {
       const ps = this.gs.players[pi];
 
       // Heroes
@@ -2459,7 +2459,7 @@ class GameEngine {
       { key: 'creationZone', zone: ZONES.CREATION },
     ];
 
-    for (let pi = 0; pi < 2; pi++) {
+    for (let pi = 0; pi < this.playerCount(); pi++) {
       const ps = this.gs.players[pi];
       if (!ps) continue;
       for (const { key, zone } of pilesToCheck) {
@@ -4699,7 +4699,7 @@ class GameEngine {
         return gs.players[effectiveController]?.heroes || [];
       },
       getEnemyHeroes() {
-        const oppIdx = effectiveController === 0 ? 1 : 0;
+        const oppIdx = engine.opponentOf(effectiveController);
         return gs.players[oppIdx]?.heroes || [];
       },
 
@@ -4724,7 +4724,7 @@ class GameEngine {
        */
       async promptDamageTarget(config = {}) {
         const pi = effectiveController;
-        const oppIdx = pi === 0 ? 1 : 0;
+        const oppIdx = engine.opponentOf(pi);
         const targets = [];
 
         // ── Forced auto-target (one-shot) ──
@@ -5426,7 +5426,7 @@ class GameEngine {
        */
       async promptMultiTarget(config = {}) {
         const pi = effectiveController;
-        const oppIdx = pi === 0 ? 1 : 0;
+        const oppIdx = engine.opponentOf(pi);
         const targets = [];
         // Same alias normalization as promptDamageTarget — accept 'own'
         // for 'my' and 'both' for 'any' so callers don't have to know
@@ -5906,7 +5906,7 @@ class GameEngine {
 
   /** Parse shorthand filter strings like "enemySupports", "myHand", etc. */
   _parseFilterShorthand(shorthand, card) {
-    const oppIdx = card.controller === 0 ? 1 : 0;
+    const oppIdx = this.opponentOf(card.controller);
     switch (shorthand) {
       case 'mySupports':    return { controller: card.controller, zone: ZONES.SUPPORT };
       case 'enemySupports': return { controller: oppIdx, zone: ZONES.SUPPORT };
@@ -5961,7 +5961,7 @@ class GameEngine {
    * Chain building ends when both players pass consecutively.
    */
   async _buildChain(initiatorIdx) {
-    let priorityPlayer = initiatorIdx === 0 ? 1 : 0; // Opponent gets first response
+    let priorityPlayer = this.opponentOf(initiatorIdx); // Opponent gets first response
     let passCount = 0;
 
     while (passCount < 2) {
@@ -5971,7 +5971,7 @@ class GameEngine {
       if (legalResponses.length === 0) {
         // No legal responses — auto-pass
         passCount++;
-        priorityPlayer = priorityPlayer === 0 ? 1 : 0;
+        priorityPlayer = this.opponentOf(priorityPlayer);
         continue;
       }
 
@@ -5998,7 +5998,7 @@ class GameEngine {
         passCount = 0; // Reset — other player gets to respond
       }
 
-      priorityPlayer = priorityPlayer === 0 ? 1 : 0;
+      priorityPlayer = this.opponentOf(priorityPlayer);
     }
   }
 
@@ -6882,7 +6882,7 @@ class GameEngine {
    * Kette.
    */
   async _offerHeroCounterToHandReaction(reactorOwner, { cardName, cardType, goldCost }) {
-    const gegner = reactorOwner === 0 ? 1 : 0;
+    const gegner = this.opponentOf(reactorOwner);
     const gps = this.gs.players[gegner];
     if (!gps) return null;
     const link = {
@@ -7004,7 +7004,7 @@ class GameEngine {
       && aktBesitzer != null && (akt.owner == null || akt.owner === aktBesitzer)
       && (akt.turn == null || akt.turn === this.gs?.turn);
     if (eigenerEinsatz) {
-      this._broadcastEvent('card_reveal', payload, { toPlayers: [aktBesitzer === 0 ? 1 : 0] });
+      this._broadcastEvent('card_reveal', payload, { toPlayers: [this.opponentOf(aktBesitzer)] });
     } else {
       this._broadcastEvent('card_reveal', payload);
     }
@@ -7214,7 +7214,7 @@ class GameEngine {
       if (this._getCardDB()[sourceCardName]?.cardType !== 'Spell') return false;
 
       let owner = -1, heroIdx = -1;
-      for (let pi = 0; pi < 2; pi++) {
+      for (let pi = 0; pi < this.playerCount(); pi++) {
         const hi = (this.gs.players[pi]?.heroes || []).indexOf(target);
         if (hi >= 0) { owner = pi; heroIdx = hi; break; }
       }
@@ -8701,7 +8701,7 @@ class GameEngine {
     const srcOwner = source?.owner ?? source?.controller ?? -1;
     if (srcOwner >= 0 && this.gs.players[srcOwner]?.damageLocked) {
       let targetOwner = -1;
-      for (let pi = 0; pi < 2; pi++) {
+      for (let pi = 0; pi < this.playerCount(); pi++) {
         if ((this.gs.players[pi]?.heroes || []).includes(target)) { targetOwner = pi; break; }
       }
       if (targetOwner >= 0 && targetOwner !== srcOwner) {
@@ -8715,7 +8715,7 @@ class GameEngine {
     // Einzelinstanzen (Rha'Bi) bleiben also unberuehrt.
     if ((this._multiHitScope?.total || 0) >= 2 && hookCtx.amount > 0) {
       let zielBesitzer = -1;
-      for (let pi = 0; pi < 2; pi++) {
+      for (let pi = 0; pi < this.playerCount(); pi++) {
         if ((this.gs.players[pi]?.heroes || []).includes(target)) { zielBesitzer = pi; break; }
       }
       if (zielBesitzer >= 0) {
@@ -8995,7 +8995,7 @@ class GameEngine {
       // nur echter Schaden > 0 und nur mit Verursacher — Status-Ticks
       // (Burn/Poison, ohne Besitzer) zaehlen nicht (Als Ruling 1.9.).
       if (this.gs.players[srcOwner]) this.gs.players[srcOwner].dealtDamageAnyTarget = true;
-      for (let pi = 0; pi < 2; pi++) {
+      for (let pi = 0; pi < this.playerCount(); pi++) {
         if (pi !== srcOwner && (this.gs.players[pi]?.heroes || []).includes(target)) {
           this.gs.players[srcOwner].dealtDamageToOpponent = true;
           break;
@@ -9131,7 +9131,7 @@ class GameEngine {
       // Track dealt-damage for SC / opponent tracking (mirrors actionDealDamage).
       if (dealt > 0 && sourceOwner >= 0) {
         if (this.gs.players[sourceOwner]) this.gs.players[sourceOwner].dealtDamageAnyTarget = true;   // v1271
-        for (let pi = 0; pi < 2; pi++) {
+        for (let pi = 0; pi < this.playerCount(); pi++) {
           if (pi !== sourceOwner && (this.gs.players[pi]?.heroes || []).includes(target)) {
             this.gs.players[sourceOwner].dealtDamageToOpponent = true;
             break;
@@ -9899,7 +9899,7 @@ class GameEngine {
     // "heal becomes damage" effect can reuse the same status to plug
     // into this gate.
     let targetPi = -1, targetHi = -1;
-    for (let p = 0; p < 2; p++) {
+    for (let p = 0; p < this.playerCount(); p++) {
       for (let h = 0; h < (this.gs.players[p]?.heroes || []).length; h++) {
         if (this.gs.players[p].heroes[h] === target) { targetPi = p; targetHi = h; break; }
       }
@@ -10484,7 +10484,7 @@ class GameEngine {
   async revealSearchedCards(playerIdx, cardNames, title) {
     if (!cardNames || cardNames.length === 0) return;
     const ps = this.gs.players[playerIdx];
-    const oppIdx = playerIdx === 0 ? 1 : 0;
+    const oppIdx = this.opponentOf(playerIdx);
     const searcherName = ps?.username || 'Opponent';
 
     for (const cardName of cardNames) {
@@ -11290,7 +11290,7 @@ class GameEngine {
     const name = typeof opts.source === 'string' ? opts.source : opts.source?.name;
     if (!name) return null;
     const besitzer = new Set();
-    for (let pi = 0; pi < 2; pi++) {
+    for (let pi = 0; pi < this.playerCount(); pi++) {
       const ps = this.gs?.players?.[pi];
       if (!ps) continue;
       if ((ps.heroes || []).some(h => h?.name === name)) { besitzer.add(pi); continue; }
@@ -11642,7 +11642,7 @@ class GameEngine {
       const ps = this.gs.players[pi];
       const revealed = ps?._revealedHandIndices;
       if (!revealed) continue;
-      const observer = pi === 0 ? 1 : 0;
+      const observer = this.opponentOf(pi);
       for (const key of Object.keys(revealed)) {
         if (!revealed[key]) continue;
         const name = (ps.hand || [])[Number(key)];
@@ -11665,7 +11665,7 @@ class GameEngine {
    */
   knownOpponentCards(observerIdx) {
     const bag = this.gs._cardKnowledge?.[observerIdx] || { hand: {}, deck: {} };
-    const oppIdx = observerIdx === 0 ? 1 : 0;
+    const oppIdx = this.opponentOf(observerIdx);
     const handSize = (this.gs.players?.[oppIdx]?.hand || []).length;
     const hand = {};
     let used = 0;
@@ -12699,7 +12699,7 @@ class GameEngine {
             if (claim.negate) {
               await this.actionNegateCreature(neu, claim.by || null, {
                 expiresAtTurn: this.gs.turn + 1,
-                expiresForPlayer: claim.owner === 0 ? 1 : 0,
+                expiresForPlayer: this.opponentOf(claim.owner),
                 selfInflicted: true,
               });
             }
@@ -12766,7 +12766,7 @@ class GameEngine {
   zugIndexVon(pi, k) {
     const t = this.gs.turn || 1;
     const aktiv = this.gs.activePlayer;
-    const starter = (t % 2 === 1) ? aktiv : (aktiv === 0 ? 1 : 0);
+    const starter = (t % 2 === 1) ? aktiv : (this.opponentOf(aktiv));
     return starter === pi ? 2 * k - 1 : 2 * k;
   }
 
@@ -16107,7 +16107,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // Ein erzwungener Abwurf kommt per Definition von der Gegenseite,
     // sofern der Aufrufer nichts anderes sagt (`selfInflicted` fuer
     // Kosten, `sourceOwner` fuer die genaue Quelle).
-    const forceBy = opts.sourceOwner != null ? opts.sourceOwner : (playerIdx === 0 ? 1 : 0);
+    const forceBy = opts.sourceOwner != null ? opts.sourceOwner : (this.opponentOf(playerIdx));
     if (!opts.selfInflicted && await this.checkHandInteractionReaction(
           playerIdx, 'discard',
           { byPi: forceBy, count, sourceName: opts.sourceName || opts.source })) {
@@ -17516,7 +17516,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     let expired = false;
 
     // Hero buffs
-    for (let pi = 0; pi < 2; pi++) {
+    for (let pi = 0; pi < this.playerCount(); pi++) {
       const ps = this.gs.players[pi];
       for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
         const hero = ps.heroes[hi];
@@ -17536,7 +17536,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // buffs. Treated as non-early (ATK has no status-damage interplay),
     // so they expire in the normal / legacy passes only.
     if (filterEarly !== true) {
-      for (let pi = 0; pi < 2; pi++) {
+      for (let pi = 0; pi < this.playerCount(); pi++) {
         const ps = this.gs.players[pi];
         for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
           const hero = ps.heroes[hi];
@@ -17601,7 +17601,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // Hero STATUS expiry — any status carrying expiresAtTurn/expiresForPlayer
     // (e.g. 'nulled' from Null Zone). Uses the same turn/player keying as
     // the buff system so one caller site handles everything.
-    for (let pi = 0; pi < 2; pi++) {
+    for (let pi = 0; pi < this.playerCount(); pi++) {
       const ps = this.gs.players[pi];
       for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
         const hero = ps.heroes[hi];
@@ -17882,7 +17882,7 @@ this._deathWatch = (this._deathWatchStack || []).length
 
   /** Alle Helden beider Seiten abgleichen (Aura kommt/geht). */
   syncAlleAtkAuren() {
-    for (let pi = 0; pi < 2; pi++) {
+    for (let pi = 0; pi < this.playerCount(); pi++) {
       const heroes = this.gs.players?.[pi]?.heroes || [];
       for (let hi = 0; hi < heroes.length; hi++) this._syncHeroAtkAura(heroes[hi], pi, hi);
     }
@@ -18342,7 +18342,7 @@ this._deathWatch = (this._deathWatchStack || []).length
   // ═══════════════════════════════════════════════════════════════
   async ohneGegnerReaktion(pi, fn) {
     const vorher = this._reaktionsSperre;
-    this._reaktionsSperre = { von: pi, gegen: pi === 0 ? 1 : 0 };
+    this._reaktionsSperre = { von: pi, gegen: this.opponentOf(pi) };
     try { return await fn(); } finally { this._reaktionsSperre = vorher; }
   }
 
@@ -18864,7 +18864,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     const sourceOwner = sourceCard?.controller ?? sourceCard?.owner ?? -1;
     const info = { ...opts, sourceOwner };
     const targetOwners = [...new Set(targetedHeroes.map(t => t.owner))];
-    const order = [...targetOwners, ...[0, 1].filter(i => !targetOwners.includes(i))];
+    const order = [...targetOwners, ...this.gs.players.map((_, i) => i).filter(i => !targetOwners.includes(i))];
     for (const pi of order) {
       if (this._reaktionGesperrt(pi)) continue;   // v1293 Reaktionssperre
       for (const inst of [...this.cardInstances]) {
@@ -19677,7 +19677,7 @@ this._deathWatch = (this._deathWatchStack || []).length
 
     // ── Charmed opponent heroes ──
     const charmed = {};
-    const oppIdx = 1 - playerIdx;
+    const oppIdx = this.opponentOf(playerIdx);
     const oppPs = gs.players[oppIdx];
     if (oppPs) {
       for (let hi = 0; hi < (oppPs.heroes || []).length; hi++) {
@@ -19886,7 +19886,7 @@ this._deathWatch = (this._deathWatchStack || []).length
   getCrossSidePlayableArtifacts(playerIdx) {
     const ps = this.gs.players[playerIdx];
     if (!ps) return [];
-    const oppIdx = playerIdx === 0 ? 1 : 0;
+    const oppIdx = this.opponentOf(playerIdx);
     const oppPs = this.gs.players[oppIdx];
     if (!oppPs) return [];
     // Need at least one opp Hero with a free Support Zone for ANY
@@ -20030,7 +20030,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       }
       return false;
     };
-    const oppIdx = playerIdx === 0 ? 1 : 0;
+    const oppIdx = this.opponentOf(playerIdx);
     if (!sideHasHost(ps) && !sideHasHost(this.gs.players[oppIdx])) return [];
 
     const cardDB = this._getCardDB();
@@ -21643,7 +21643,7 @@ this._deathWatch = (this._deathWatchStack || []).length
   async runStartingHandWindow() {
     if (this._inMctsSim || this.gs.result) return;
     const erster = this.gs.activePlayer === 1 ? 1 : 0;
-    for (const pi of [erster, erster === 0 ? 1 : 0]) {
+    for (const pi of [erster, this.opponentOf(erster)]) {
       const ps = this.gs.players[pi];
       if (!ps) continue;
       for (let k = 0; k < (ps.hand || []).length; k++) this.markStartingCounted(pi, k);
@@ -21801,7 +21801,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // so hand cards need to be registered here. In puzzle/single-player mode,
     // hands are pre-populated and already tracked by init() — skip to avoid duplicates.
     if (!this.isPuzzle) {
-      for (let pi = 0; pi < 2; pi++) {
+      for (let pi = 0; pi < this.playerCount(); pi++) {
         const ps = this.gs.players[pi];
         for (const cardName of (ps.hand || [])) {
           this._trackCard(cardName, pi, ZONES.HAND);
@@ -21813,7 +21813,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // (blocks ALL damage, ALL status effects, discard, mill — everything)
     // Skipped in puzzle mode — the whole point is to kill the opponent in one turn.
     if (!this.isPuzzle) {
-      const oppIdx = this.gs.activePlayer === 0 ? 1 : 0;
+      const oppIdx = this.opponentOf(this.gs.activePlayer);
       this.gs.firstTurnProtectedPlayer = oppIdx;
       const oppPs = this.gs.players[oppIdx];
       if (oppPs) {
@@ -22474,7 +22474,7 @@ this._deathWatch = (this._deathWatchStack || []).length
    */
   async _processForceKills() {
     let killed = false;
-    for (let pi = 0; pi < 2; pi++) {
+    for (let pi = 0; pi < this.playerCount(); pi++) {
       const ps = this.gs.players[pi];
       for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
         const hero = ps.heroes[hi];
@@ -23030,7 +23030,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // Before declaring failure, simulate the opponent's start-of-turn status damage
     // (burn/poison) — it should be possible to win via lingering status effects.
     if (this._cpuPlayerIdx >= 0) {
-      const nextPlayer = this.gs.activePlayer === 0 ? 1 : 0;
+      const nextPlayer = this.opponentOf(this.gs.activePlayer);
       if (this.isPuzzle && nextPlayer === this._cpuPlayerIdx) {
         // Guardian Beast Zhu's skip-next-turn flag short-circuits the
         // entire CPU "turn" — no status damage, no ON_TURN_START hooks,
@@ -23056,7 +23056,7 @@ this._deathWatch = (this._deathWatchStack || []).length
           // Hand back to the human and start their fresh turn —
           // currentPhase resets to START via `startTurn()`, status
           // damage / hooks fire, and the puzzle continues.
-          this.gs.activePlayer = this._cpuPlayerIdx === 0 ? 1 : 0;
+          this.gs.activePlayer = this.opponentOf(this._cpuPlayerIdx);
           this.gs.turn++;
           await this.startTurn();
           this.sync();
@@ -23108,7 +23108,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (this.gs.firstTurnProtectedPlayer != null) {
       delete this.gs.firstTurnProtectedPlayer;
     }
-    this.gs.activePlayer = this.gs.activePlayer === 0 ? 1 : 0;
+    this.gs.activePlayer = this.opponentOf(this.gs.activePlayer);
     this.gs.turn++;
 
     // Guardian Beast Zhu's "skip your opponent's next turn". Checked
@@ -23355,7 +23355,7 @@ this._deathWatch = (this._deathWatchStack || []).length
    */
   hasRequiredTargetKind(playerIdx, kinds) {
     const liste = Array.isArray(kinds) ? kinds : [kinds];
-    const oppIdx = playerIdx === 0 ? 1 : 0;
+    const oppIdx = this.opponentOf(playerIdx);
     const cardDB = this._getCardDB();
     const zaehleCreatures = (seite) => {
       let n = 0;
@@ -24186,7 +24186,7 @@ this._deathWatch = (this._deathWatchStack || []).length
   async actionStealGold(pi, requested, opts = {}) {
     const gs = this.gs;
     const ps = gs.players[pi];
-    const oi = pi === 0 ? 1 : 0;
+    const oi = this.opponentOf(pi);
     const ops = gs.players[oi];
     const source = opts.sourceName || 'Gold Steal';
     if (!ps || !ops) return { stolen: 0, fizzled: true };
@@ -24281,7 +24281,7 @@ this._deathWatch = (this._deathWatchStack || []).length
   async actionStealFromHand(pi, opts = {}) {
     const gs = this.gs;
     const ps = gs.players[pi];
-    const oppIdx = pi === 0 ? 1 : 0;
+    const oppIdx = this.opponentOf(pi);
     const oppPs = gs.players[oppIdx];
     if (!ps || !oppPs) return { stolen: [], cancelled: false, fizzled: true };
 
@@ -24502,7 +24502,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (opts.reveal !== false) {
       const delay = opts.revealDelayMs != null ? opts.revealDelayMs : 500;
       if (delay > 0) await this._delay(delay);
-      const oi = pi === 0 ? 1 : 0;
+      const oi = this.opponentOf(pi);
       await this.promptGeneric(oi, {
         type: 'deckSearchReveal',
         cardName, searcherName: ps.username,
@@ -24537,7 +24537,7 @@ this._deathWatch = (this._deathWatchStack || []).length
    */
   async _checkOppDeckSearchInterceptors(searcherIdx, cardName, opts = {}) {
     if (this._inDeckSearchIntercept || this._fastMode) return false;
-    const holder = searcherIdx === 0 ? 1 : 0;
+    const holder = this.opponentOf(searcherIdx);
     const heroes = this.gs.players[holder]?.heroes || [];
     for (let hi = 0; hi < heroes.length; hi++) {
       const hero = heroes[hi];
@@ -24750,7 +24750,7 @@ this._deathWatch = (this._deathWatchStack || []).length
   async actionTransferCardToOppHand(fromPi, handIdx, opts = {}) {
     const fromPs = this.gs.players[fromPi];
     if (!fromPs) return false;
-    const toPi = fromPi === 0 ? 1 : 0;
+    const toPi = this.opponentOf(fromPi);
     const toPs = this.gs.players[toPi];
     if (!toPs) return false;
     if (handIdx < 0 || handIdx >= (fromPs.hand?.length || 0)) return false;
@@ -27756,7 +27756,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     const pending = this.gs._pendingCardReveal;
     if (!pending) return;
     delete this.gs._pendingCardReveal;
-    const oi = pending.ownerIdx === 0 ? 1 : 0;
+    const oi = this.opponentOf(pending.ownerIdx);
     const oppSid = this.gs.players[oi]?.socketId;
     if (oppSid) this.io.to(oppSid).emit('card_reveal', { cardName: pending.cardName });
     if (this.room?.spectators) {
@@ -27858,7 +27858,7 @@ this._deathWatch = (this._deathWatchStack || []).length
 
     let threshold = Infinity;
     let sourceName = null;
-    for (let pi = 0; pi < 2; pi++) {
+    for (let pi = 0; pi < this.playerCount(); pi++) {
       const ps = this.gs.players[pi];
       if (!ps) continue;
       for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
@@ -27993,7 +27993,7 @@ this._deathWatch = (this._deathWatchStack || []).length
    * Engine geht die Instanzen durch, Karte deklariert nur eine Fahne.
    */
   _opponentBlocksShuffleBack(pi) {
-    const gegner = pi === 0 ? 1 : 0;
+    const gegner = this.opponentOf(pi);
     const ops = this.gs.players[gegner];
     if (!ops) return false;
     for (const hero of (ops.heroes || [])) {
@@ -28045,7 +28045,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     const ps = this.gs.players[pi];
     if (!ps) return false;
     if (ps.potionLocked) return true;
-    const gegner = pi === 0 ? 1 : 0;
+    const gegner = this.opponentOf(pi);
     for (const inst of (this.cardInstances || [])) {
       if (inst.zone !== 'support' || inst.faceDown) continue;
       if ((inst.controller ?? inst.owner) !== gegner) continue;
@@ -28660,7 +28660,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       }
 
       // Reveal to other player + spectators
-      const otherIdx = targetOwnerIdx === 0 ? 1 : 0;
+      const otherIdx = this.opponentOf(targetOwnerIdx);
       const otherSid = this.gs.players[otherIdx]?.socketId;
       if (otherSid) this.io.to(otherSid).emit('card_reveal', { cardName });
       if (this.room?.spectators) {
@@ -28744,7 +28744,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       if (!result?.redirectTo) continue;
 
       // Reveal hero card
-      const otherIdx = targetOwnerIdx === 0 ? 1 : 0;
+      const otherIdx = this.opponentOf(targetOwnerIdx);
       const otherSid = this.gs.players[otherIdx]?.socketId;
       if (otherSid) this.io.to(otherSid).emit('card_reveal', { cardName: hero.name });
       if (this.room?.spectators) {
@@ -28855,7 +28855,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // jeweiliger Kontrolleur) plus Zonen geliehener Helden der Gegenseite,
     // die der Zielbesitzer kontrolliert. `seite` = Brettseite der Zone.
     const _umleitZonen = [];
-    for (const seite of [targetOwnerIdx, targetOwnerIdx === 0 ? 1 : 0]) {
+    for (const seite of [targetOwnerIdx, this.opponentOf(targetOwnerIdx)]) {
       const zps = this.gs.players[seite];
       for (let shi = 0; shi < (zps?.heroes || []).length; shi++) {
         if (seite !== targetOwnerIdx && this.surpriseKontrolleur(seite, shi) !== targetOwnerIdx) continue;
@@ -29668,7 +29668,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (!mode) return null;
 
     // Find an active Gerrymander on the OPPOSITE side from promptedPi.
-    const oppIdx = promptedPi === 0 ? 1 : 0;
+    const oppIdx = this.opponentOf(promptedPi);
     const gerry = this._findActiveGerrymander(oppIdx);
     if (!gerry) return null;
 
@@ -29925,7 +29925,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // Seite wird einfach ausgeblendet, aber der Effekt ist, sofern es
     // legale Ziele gibt, auf der eigenen Seite nutzbar."
     if (!script.stealsOpponentCards && !script.takesControlOfTargets) return -1;
-    const oppIdx = playerIdx === 0 ? 1 : 0;
+    const oppIdx = this.opponentOf(playerIdx);
     const boris = loadCardEffect('Boris, the Guardian of Blackport');
     if (!boris?.borisHeroIdx) return -1;
     return boris.borisHeroIdx(this, oppIdx);
@@ -29958,7 +29958,7 @@ this._deathWatch = (this._deathWatchStack || []).length
    * unspielbar, ohne dass Boris sie ausdruecklich sperrt.
    */
   borisHidesOpponentSide(playerIdx) {
-    const oppIdx = playerIdx === 0 ? 1 : 0;
+    const oppIdx = this.opponentOf(playerIdx);
     const boris = loadCardEffect('Boris, the Guardian of Blackport');
     return !!boris?.borisActive && boris.borisActive(this, oppIdx);
   }
@@ -29989,7 +29989,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       }
     }
     return {
-      cards, abilities, heroIdx, owner: playerIdx === 0 ? 1 : 0,
+      cards, abilities, heroIdx, owner: this.opponentOf(playerIdx),
       active: this.borisHidesOpponentSide(playerIdx),
     };
   }
@@ -30441,7 +30441,7 @@ this._deathWatch = (this._deathWatchStack || []).length
 
   async _checkSurpriseOnEquip(equipOwnerIdx, equipHeroIdx, equipCard) {
     if (this._surpriseNestingBlocked()) return null;
-    const opponentIdx = equipOwnerIdx === 0 ? 1 : 0;
+    const opponentIdx = this.opponentOf(equipOwnerIdx);
     const equipInfo = { equipOwner: equipOwnerIdx, equipHeroIdx, cardName: equipCard?.name, cardInstance: equipCard };
     const equipPlayerName = this.gs.players[equipOwnerIdx]?.username || 'Opponent';
     return this._scanSurpriseEntriesForPlayer(opponentIdx, 'surpriseEquipTrigger', equipInfo, {
@@ -30487,7 +30487,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     const entries = [];
 
     // Regular surprise zones
-    for (const seite of [playerIdx, playerIdx === 0 ? 1 : 0]) {
+    for (const seite of [playerIdx, this.opponentOf(playerIdx)]) {
       const sps = this.gs.players[seite];
       if (!sps) continue;
       for (let heroIdx = 0; heroIdx < (sps.heroes || []).length; heroIdx++) {
@@ -30640,7 +30640,7 @@ this._deathWatch = (this._deathWatchStack || []).length
 
   async _checkSurpriseOnHeroEffect(activatorIdx, heroIdx, effectName, heroOwner = activatorIdx) {
     if (this._surpriseNestingBlocked()) return null;
-    const opponentIdx = activatorIdx === 0 ? 1 : 0;
+    const opponentIdx = this.opponentOf(activatorIdx);
     // Styx 28.9.: `heroOwner` = Brettseite des Helden (uebernommen: Gegenseite).
     const heroEffectInfo = { activatorIdx, heroIdx, effectName, heroOwner };
     const activatorName = this.gs.players[activatorIdx]?.username || 'Opponent';
@@ -30652,7 +30652,7 @@ this._deathWatch = (this._deathWatchStack || []).length
 
   async _checkSurpriseOnAbility(attachOwnerIdx, attachHeroIdx, attachCard, zoneOwnerIdx = attachOwnerIdx) {
     if (this._surpriseNestingBlocked()) return null;
-    const opponentIdx = attachOwnerIdx === 0 ? 1 : 0;
+    const opponentIdx = this.opponentOf(attachOwnerIdx);
     // Styx 28.9.: `attachOwner` = wer anlegt (Kontrolleur), `zoneOwner` =
     // Brettseite des Helden, an dem die Ability liegt. Beim Anlegen an einen
     // uebernommenen Helden verschieden.
@@ -30689,7 +30689,7 @@ this._deathWatch = (this._deathWatchStack || []).length
    */
   async _checkSurpriseOnAbilityActivation(activatorIdx, heroIdx, zoneIdx, abilityName, heroOwner = activatorIdx) {
     if (this._surpriseNestingBlocked()) return null;
-    const opponentIdx = activatorIdx === 0 ? 1 : 0;
+    const opponentIdx = this.opponentOf(activatorIdx);
     // Styx 28.9.: `heroOwner` = Brettseite des Helden (uebernommen: Gegenseite);
     // Stufe und Heldenname kommen von dort, nicht von der Aktivierer-Seite.
     const abilityInfo = {
@@ -30905,7 +30905,7 @@ this._deathWatch = (this._deathWatchStack || []).length
   async _checkSurpriseOnPlacement(placerIdx, cardInstance, zoneKind) {
     if (this._surpriseNestingBlocked()) return null;
     if (!cardInstance || placerIdx == null || placerIdx < 0) return null;
-    const opponentIdx = placerIdx === 0 ? 1 : 0;
+    const opponentIdx = this.opponentOf(placerIdx);
     const cd = this._getCardDB()[cardInstance.name];
     const info = {
       placerIdx,
@@ -30940,7 +30940,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     const summonInfo = { summonerIdx, cardName: summonedCard?.name, cardInstance: summonedCard, heroIdx: summonedCard?.heroIdx };
     const summonerName = this.gs.players[summonerIdx]?.username || 'A player';
     // Summon triggers can fire for EITHER player's surprises
-    for (let checkPlayer = 0; checkPlayer < 2; checkPlayer++) {
+    for (let checkPlayer = 0; checkPlayer < this.playerCount(); checkPlayer++) {
       const result = await this._scanSurpriseEntriesForPlayer(checkPlayer, 'surpriseSummonTrigger', summonInfo, {
         message: () => `${summonerName} summoned ${summonedCard?.name || 'a Creature'}!`,
         showCard: summonedCard?.name,
@@ -30993,7 +30993,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       isMove: !!extras.isMove, isPlacement: !!extras.isPlacement,
     };
     const zoneHeroName = this.gs.players[zoneOwner]?.heroes?.[heroIdx]?.name || 'a Hero';
-    for (let checkPlayer = 0; checkPlayer < 2; checkPlayer++) {
+    for (let checkPlayer = 0; checkPlayer < this.playerCount(); checkPlayer++) {
       const result = await this._scanSurpriseEntriesForPlayer(checkPlayer, 'surpriseCreatureEnterSupportTrigger', info, {
         message: () => `${enterCard.name} entered ${zoneHeroName}'s Support Zone!`,
         showCard: enterCard.name,
@@ -31080,7 +31080,7 @@ this._deathWatch = (this._deathWatchStack || []).length
   async _checkSurpriseOnResourceGain(activatorIdx, amount) {
     if (this._surpriseNestingBlocked()) return null;
     if (!(amount > 0)) return null;
-    const opponentIdx = activatorIdx === 0 ? 1 : 0;
+    const opponentIdx = this.opponentOf(activatorIdx);
     const activatorName = this.gs.players[activatorIdx]?.username || 'Opponent';
     const triggerInfo = { activatorIdx, amount };
     return this._scanSurpriseEntriesForPlayer(opponentIdx, 'surpriseResourceGainTrigger', triggerInfo, {
@@ -31097,7 +31097,7 @@ this._deathWatch = (this._deathWatchStack || []).length
    */
   async _checkSurpriseOnDraw(drawingPlayerIdx, drawnCount) {
     if (this._surpriseNestingBlocked()) return null;
-    const opponentIdx = drawingPlayerIdx === 0 ? 1 : 0;
+    const opponentIdx = this.opponentOf(drawingPlayerIdx);
     const drawPlayerName = this.gs.players[drawingPlayerIdx]?.username || 'Opponent';
     const drawInfo = { drawingPlayer: drawingPlayerIdx, count: drawnCount, phase: this.gs.currentPhase };
     return this._scanSurpriseEntriesForPlayer(opponentIdx, 'surpriseDrawTrigger', drawInfo, {
@@ -31130,7 +31130,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // worst case is the brain undervalues a future Cybug-CENTIPEDE
     // Mitzieher, which is preferable to the brain hanging.
     if (this._inMctsSim || this._fastMode) return null;
-    const opponentIdx = drawingPlayerIdx === 0 ? 1 : 0;
+    const opponentIdx = this.opponentOf(drawingPlayerIdx);
     const drawerName = this.gs.players[drawingPlayerIdx]?.username || 'Opponent';
     const drawInfo = {
       drawingPlayer: drawingPlayerIdx,
@@ -31158,7 +31158,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // Same MCTS / fast-mode skip as `_checkSurpriseBeforeOppDraw` —
     // see that helper for the rationale.
     if (this._inMctsSim || this._fastMode) return null;
-    const opponentIdx = searcherIdx === 0 ? 1 : 0;
+    const opponentIdx = this.opponentOf(searcherIdx);
     const searcherName = this.gs.players[searcherIdx]?.username || 'Opponent';
     const searchInfo = {
       searcher: searcherIdx,
@@ -31203,7 +31203,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // Scan BOTH players — a Surprise may want to fire on either side's
     // turn end (Spider Silk Bridge fires only on opp's). The script's
     // `surpriseTurnEndTrigger` is responsible for filtering.
-    for (let pi = 0; pi < 2; pi++) {
+    for (let pi = 0; pi < this.playerCount(); pi++) {
       const ps = this.gs.players[pi];
       if (!ps) continue;
       const result = await this._scanSurpriseEntriesForPlayer(pi, 'surpriseTurnEndTrigger', info, {
@@ -31672,7 +31672,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (targetHeroIdx < 0) return NULL_RESULT;
     const targetOwner = this.heroSideOf(zielPhys, target);
 
-    const pi = targetOwner === 0 ? 1 : 0;
+    const pi = this.opponentOf(targetOwner);
     const ps = this.gs.players[pi];
     if (!ps) return NULL_RESULT;
     if (this.gs.firstTurnProtectedPlayer === pi) return NULL_RESULT;
@@ -31990,7 +31990,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     source = this._rewriteSourceForCreatureCaster(source);
 
     const targetOwner = creatureInst.controller ?? creatureInst.owner;
-    const pi = targetOwner === 0 ? 1 : 0;
+    const pi = this.opponentOf(targetOwner);
     const ps = this.gs.players[pi];
     if (!ps) return NULL_RESULT;
     if (this.gs.firstTurnProtectedPlayer === pi) return NULL_RESULT;
@@ -32155,7 +32155,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // das ausdruecklich erlauben (`preDefeatAnySide`). `info` traegt die
     // Todesart (`isSacrifice`, `istZerstoerung`) an Bedingung/Aufloesung.
     if (await this._preDefeatFensterSeite(herr, false, creatureInst, source, amount, type, info)) return true;
-    return this._preDefeatFensterSeite(herr === 0 ? 1 : 0, true, creatureInst, source, amount, type, info);
+    return this._preDefeatFensterSeite(this.opponentOf(herr), true, creatureInst, source, amount, type, info);
   }
 
   async _preDefeatFensterSeite(ownerIdx, nurAnySide, creatureInst, source, amount, type, info = {}) {
@@ -32437,7 +32437,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (this._inCreaturesDefeatedReaction) return;
     if (this.isDarkOceanActive() && this._currentEffectSourceIsCreature()) return;
     const allCards = this._getCardDB();
-    for (let ownerIdx = 0; ownerIdx < 2; ownerIdx++) {
+    for (let ownerIdx = 0; ownerIdx < this.playerCount(); ownerIdx++) {
       const defeated = liste.filter(d => (d.controller ?? d.owner) === ownerIdx);
       if (defeated.length === 0) continue;
       const ps = this.gs.players[ownerIdx];
@@ -32927,7 +32927,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     //    `firesForOpponentDefeat`, and ONLY when that opponent is a
     //    HUMAN. CPUs are deliberately never offered the opponent-defeat
     //    trigger (they would just self-damage — see Corpse Explosion).
-    const _adOppIdx = targetOwner === 0 ? 1 : 0;
+    const _adOppIdx = this.opponentOf(targetOwner);
     const _adCheckOrder = [targetOwner];
     if (!this.isCpuPlayer(_adOppIdx)) _adCheckOrder.push(_adOppIdx);
 
@@ -33145,7 +33145,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     //    `firesForOpponentDefeat`, and ONLY when that opponent is a
     //    HUMAN. CPUs are deliberately never offered the opponent-defeat
     //    trigger (they would just self-damage — see Corpse Explosion).
-    const _ocOppIdx = defeatedControllerIdx === 0 ? 1 : 0;
+    const _ocOppIdx = this.opponentOf(defeatedControllerIdx);
     const _ocCheckOrder = [defeatedControllerIdx];
     if (!this.isCpuPlayer(_ocOppIdx)) _ocCheckOrder.push(_ocOppIdx);
 
@@ -33667,19 +33667,19 @@ this._deathWatch = (this._deathWatchStack || []).length
         this._batchWindowStats.calls++;
         if (entries.length >= 2) {
           this._batchWindowStats.ge2++;
-          for (const p of [0, 1]) {
+          for (const p of this.gs.players.map((_, i) => i)) {
             if (entries.filter(e => !e.cancelled && e.inst && e.inst.owner === p).length >= 2) this._batchWindowStats.ge2own[p]++;
           }
         }
       }
       if (process.env.PP_TRAIN_VERBOSE && !this._inMctsSim && entries && entries.length > 0) {
-        const own = [0, 1].map(p => entries.filter(e => !e.cancelled && e.inst && e.inst.owner === p).length);
+        const own = this.gs.players.map((_, i) => i).map(p => entries.filter(e => !e.cancelled && e.inst && e.inst.owner === p).length);
         console.log(`[CPU]   [batch-window] ${entries.length} entries (p0:${own[0]} p1:${own[1]})${entries.length < 2 ? ' — zu klein, Fenster bleibt zu' : ''}`);
       }
     } catch { /* nie stören */ }
     if (!entries || entries.length < 2) return;
 
-    for (let pi = 0; pi < 2; pi++) {
+    for (let pi = 0; pi < this.playerCount(); pi++) {
       // Count entries that would actually deal damage to pi's side —
       // immune / pre-cancelled entries don't count toward "would take
       // damage" semantically.
@@ -34041,7 +34041,7 @@ this._deathWatch = (this._deathWatchStack || []).length
   async _checkOppActionPhaseHandReactions(activePlayerIdx) {
     if (this._inOppActionPhaseReaction) return;
 
-    const reactorIdx = activePlayerIdx === 0 ? 1 : 0;
+    const reactorIdx = this.opponentOf(activePlayerIdx);
     const ps = this.gs.players[reactorIdx];
     if (!ps) return;
 
@@ -35049,7 +35049,7 @@ this._deathWatch = (this._deathWatchStack || []).length
 
     // Check both players, defender (targeted player) first
     const targetOwners = [...new Set(targetedHeroes.map(t => t.owner))];
-    const checkOrder = [...targetOwners, ...([0, 1].filter(i => !targetOwners.includes(i)))];
+    const checkOrder = [...targetOwners, ...(this.gs.players.map((_, i) => i).filter(i => !targetOwners.includes(i)))];
 
     for (const pi of checkOrder) {
       const ps = this.gs.players[pi];
@@ -36273,7 +36273,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     }
 
     // Reveal card to opponent and spectators
-    const oi = steuerer === 0 ? 1 : 0;   // 29.9.: Gegner des Ausloesers
+    const oi = this.opponentOf(steuerer);   // 29.9.: Gegner des Ausloesers
     const oppSid = this.gs.players[oi]?.socketId;
     if (oppSid) this.io.to(oppSid).emit('card_reveal', { cardName });
     if (this.room?.spectators) {
@@ -36864,7 +36864,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     try {
     const chain = initialLink ? [initialLink] : [];
     const ap = this.gs.activePlayer;
-    const nonAp = ap === 0 ? 1 : 0;
+    const nonAp = this.opponentOf(ap);
     const checkOrder = [nonAp, ap];
 
     // Check for first reaction
@@ -37787,7 +37787,7 @@ this._deathWatch = (this._deathWatchStack || []).length
    */
   async _meldeNegation({ negatedOwner, negatorOwner, cardName, kind, negatedByCard }) {
     if (!Number.isInteger(negatedOwner)) return;
-    const negator = Number.isInteger(negatorOwner) ? negatorOwner : 1 - negatedOwner;
+    const negator = Number.isInteger(negatorOwner) ? negatorOwner : this.opponentOf(negatedOwner);
     if (negator === negatedOwner) return;
     await this.runHooks(HOOKS.ON_NEGATION_DEALT, {
       negatorOwner: negator, negatedOwner, negatedCardName: cardName, kind, negatedByCard, _skipReactionCheck: true,
@@ -37821,7 +37821,7 @@ this._deathWatch = (this._deathWatchStack || []).length
 
   /** Haelt der Gegner von `playerIdx` eine Handkarte, die auf Platzierungen reagiert? */
   _placementReactorHeld(playerIdx) {
-    const opp = this.gs.players[playerIdx === 0 ? 1 : 0];
+    const opp = this.gs.players[this.opponentOf(playerIdx)];
     if (!opp) return false;
     const traegt = (n) => !!loadCardEffect(n)?.reactsToPlacement;
     if ((opp.hand || []).some(traegt)) return true;
@@ -38589,7 +38589,7 @@ this._deathWatch = (this._deathWatchStack || []).length
    */
   revealToOpponent(pi, cardName, opts = {}) {
     if (!cardName) return;
-    const oi = pi === 0 ? 1 : 0;
+    const oi = this.opponentOf(pi);
     // ★ v1308 (Als Vorgabe 23.9.): das Zeigen ist fuer BEIDE sichtbar —
     // die Karte hebt sich aus der Hand, wird in der Mitte praesentiert
     // (beim Gegner umgedreht) und kehrt zurueck (`hand_card_present`).
@@ -39960,7 +39960,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (opts.ownSideOnly) return result;
 
     // Also check charmed opponent heroes (Charme Lv3)
-    const oi = playerIdx === 0 ? 1 : 0;
+    const oi = this.opponentOf(playerIdx);
     const ops = this.gs.players[oi];
     if (ops) {
       for (let hi = 0; hi < (ops.heroes || []).length; hi++) {
@@ -40206,7 +40206,7 @@ this._deathWatch = (this._deathWatchStack || []).length
   isHeroEffectBlockedByGraceShield(script, playerIdx) {
     if (!script?.heroEffectHarmfulOnly) return false;
     if (playerIdx == null || playerIdx < 0) return false;
-    const opp = playerIdx === 0 ? 1 : 0;
+    const opp = this.opponentOf(playerIdx);
     return this.gs?.firstTurnProtectedPlayer === opp;
   }
 
@@ -40663,7 +40663,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // markiert, obwohl der Server annahm): dieselbe Phasen-/Aktionsregel
     // wie im Eigenzweig. Der Server bucht die Aktion eines geliehenen
     // Helden bereits wie bei Zaubern (`doActivateHeroEffect`).
-    const oi = playerIdx === 0 ? 1 : 0;
+    const oi = this.opponentOf(playerIdx);
     const ops = this.gs.players[oi];
     const _fremdPhaseOk = (hero, hi, script) => {
       if (typeof script.onHeroEffect !== 'function') return false;   // v1166 wie im Eigenzweig
@@ -41063,7 +41063,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // `inst.stolenBy` (Deepsea Succubus, Cute Conversion, Treacherous
     // Crystal) und werden gleich darunter eingesammelt. Nur die
     // Mitnahme ueber den HELDEN ist weg.
-    const oi = playerIdx === 0 ? 1 : 0;
+    const oi = this.opponentOf(playerIdx);
     void oi;
 
     // Creatures we've temporarily stolen (Deepsea Succubus, Treacherous
@@ -41166,7 +41166,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     const isMainPhase = gs.currentPhase === 2 || gs.currentPhase === 4;
     if (!isMainPhase) return [];
     const result = [];
-    for (let ownerPi = 0; ownerPi < 2; ownerPi++) {
+    for (let ownerPi = 0; ownerPi < this.playerCount(); ownerPi++) {
       const areaNames = gs.areaZones?.[ownerPi] || [];
       for (const areaName of areaNames) {
         const script = loadCardEffect(areaName);
@@ -41296,7 +41296,7 @@ this._deathWatch = (this._deathWatchStack || []).length
    * `placesOnOpponentBoard` am Skript und `inst.owner === playerIdx`.
    */
   getActivatableEquipsCrossSide(playerIdx) {
-    const oi = playerIdx === 0 ? 1 : 0;
+    const oi = this.opponentOf(playerIdx);
     const ops = this.gs.players[oi];
     const out = [];
     if (!ops) return out;
@@ -41396,7 +41396,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // ★ Cross-Side (v565): eigene Ausruestung, die auf der GEGNERSEITE
     // liegt (Future Tech Control Device). `owner: oi` sagt der
     // Oberflaeche, in WESSEN Zonen die Karte steht.
-    const oi = playerIdx === 0 ? 1 : 0;
+    const oi = this.opponentOf(playerIdx);
     for (const e of this.getActivatableEquipsCrossSide(playerIdx)) {
       result.push({
         owner: oi, heroIdx: e.heroIdx, zoneSlot: e.zoneSlot,
@@ -41422,7 +41422,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (currentPhase !== 2 && currentPhase !== 3 && currentPhase !== 4) return [];
 
     const result = [];
-    for (let pOwner = 0; pOwner < 2; pOwner++) {
+    for (let pOwner = 0; pOwner < this.playerCount(); pOwner++) {
       const ps = this.gs.players[pOwner];
       if (!ps) continue;
       for (const perm of (ps.permanents || [])) {
@@ -41548,7 +41548,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     }
 
     // Also check charmed opponent heroes (Charme Lv3)
-    const oi = playerIdx === 0 ? 1 : 0;
+    const oi = this.opponentOf(playerIdx);
     const ops = this.gs.players[oi];
     if (ops) {
       for (let hi = 0; hi < (ops.heroes || []).length; hi++) {
@@ -42018,7 +42018,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     if ((this.gs.activePlayer ?? -1) !== kontrolleur) return [];
     if (!this._heroCanAct(playerIdx, heroIdx)) return [];
     if (!this._heroBorrowsAbilities(playerIdx, heroIdx, mode)) return [];
-    const oppIdx = kontrolleur === 0 ? 1 : 0;
+    const oppIdx = this.opponentOf(kontrolleur);
     if (!this.gs.players[oppIdx]) return [];
     const out = [];
     for (const { physOwner, heroIdx: hi } of this.heroesControlledBy(oppIdx)) {
@@ -44014,7 +44014,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // Cheat Chair) enden am Ende GENAU des Zuges, in dem sie entstanden
     // (`armedTurn`) — egal, wessen Zug es ist; darum fuer BEIDE Seiten.
     if (phaseName === 'END') {
-      for (let spi = 0; spi < 2; spi++) {
+      for (let spi = 0; spi < this.playerCount(); spi++) {
         const sps = this.gs.players[spi];
         for (let hi = 0; hi < (sps?.heroes || []).length; hi++) {
           const st = sps.heroes[hi]?.statuses;
@@ -44429,9 +44429,9 @@ this._deathWatch = (this._deathWatchStack || []).length
    * Reine Leseoperationen, kein Schaden, keine Hooks.
    */
   aoeTargetPlayers(pi, config = {}) {
-    const oppIdx = pi === 0 ? 1 : 0;
+    const oppIdx = this.opponentOf(pi);
     if (config.side === 'own') return [pi];
-    if (config.side === 'both') return [0, 1];
+    if (config.side === 'both') return this.gs.players.map((_, i) => i);
     return [oppIdx];   // 'enemy' und der Default
   }
 
@@ -44585,7 +44585,7 @@ this._deathWatch = (this._deathWatchStack || []).length
   async actionAoeHit(cardInst, config = {}) {
     const gs = this.gs;
     const pi = cardInst.controller;
-    const oppIdx = pi === 0 ? 1 : 0;
+    const oppIdx = this.opponentOf(pi);
     const heroIdx = cardInst.heroIdx;
     const damage = config.damage || 0;
     const damageType = config.damageType || 'other';
@@ -46584,7 +46584,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       hero.statuses = {};
     }
 
-    for (let pi = 0; pi < 2; pi++) {
+    for (let pi = 0; pi < this.playerCount(); pi++) {
       const ps = this.gs.players[pi];
       const hi = ps.heroes.findIndex(h => h === hero);
       if (hi < 0) continue;
@@ -47288,7 +47288,7 @@ this._deathWatch = (this._deathWatchStack || []).length
 
     // Beide Seiten ERST bewerten, dann entscheiden.
     const wiped = [false, false];
-    for (let pi = 0; pi < 2; pi++) {
+    for (let pi = 0; pi < this.playerCount(); pi++) {
       const ps = this.gs.players[pi];
       // ── KONTROLLE statt Spalte (v718, Als Ruling 4.9.) ─────────────
       // Ein dauerhaft uebernommener Held zaehlt fuer seinen neuen
@@ -47353,7 +47353,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       return;
     }
 
-    for (let pi = 0; pi < 2; pi++) {
+    for (let pi = 0; pi < this.playerCount(); pi++) {
       const ps = this.gs.players[pi];
       if (wiped[pi]) {
         const winnerIdx = pi === 0 ? 1 : 0;
@@ -47624,12 +47624,12 @@ this._deathWatch = (this._deathWatchStack || []).length
 
   _buildValidTargets(playerIdx, type, filter) {
     const targets = [];
-    const oppIdx = playerIdx === 0 ? 1 : 0;
+    const oppIdx = this.opponentOf(playerIdx);
 
     switch (type) {
       case 'hero':
       case 'anyHero':
-        for (let pi = 0; pi < 2; pi++) {
+        for (let pi = 0; pi < this.playerCount(); pi++) {
           for (let hi = 0; hi < (this.gs.players[pi]?.heroes || []).length; hi++) {
             const h = this.gs.players[pi].heroes[hi];
             if (h.name && h.hp > 0) targets.push({ id: `hero-${pi}-${hi}`, type: 'hero', playerIdx: pi, heroIdx: hi, ...h });
@@ -47673,7 +47673,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       controller: l.controller,
       speed: l.speed,
     }));
-    for (let i = 0; i < 2; i++) {
+    for (let i = 0; i < this.playerCount(); i++) {
       const sid = this.gs.players[i]?.socketId;
       if (sid) this.io.to(sid).emit('chain_update', { chain: chainData });
     }
@@ -47841,7 +47841,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // Zuschauer bekommen weiterhin alles: sie sind unbeteiligt und
     // sollen das Spiel vollstaendig sehen.
     const onlyPlayers = Array.isArray(opts?.toPlayers) ? opts.toPlayers : null;
-    for (let i = 0; i < 2; i++) {
+    for (let i = 0; i < this.playerCount(); i++) {
       if (onlyPlayers && !onlyPlayers.includes(i)) continue;
       const sid = this.gs.players[i]?.socketId;
       if (sid) this.io.to(sid).emit(event, outData);
@@ -47919,7 +47919,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // `room.spectators` and would crash post-teardown.
     if (!this.room) return;
     if (this.sendGameState) {
-      for (let i = 0; i < 2; i++) {
+      for (let i = 0; i < this.playerCount(); i++) {
         this.sendGameState(this.room, i);
       }
     }
@@ -48701,7 +48701,7 @@ this._deathWatch = (this._deathWatchStack || []).length
   getFremdAufstiegZiele(playerIdx) {
     const gs = this.gs;
     const ps = gs.players[playerIdx];
-    const oi = playerIdx === 0 ? 1 : 0;
+    const oi = this.opponentOf(playerIdx);
     const ops = gs.players[oi];
     if (!ps || !ops || gs.activePlayer !== playerIdx) return {};
     const helden = [];
@@ -48994,7 +48994,7 @@ this._deathWatch = (this._deathWatchStack || []).length
 
   /** Find which player owns a hero object. */
   _findHeroOwner(hero) {
-    for (let pi = 0; pi < 2; pi++) {
+    for (let pi = 0; pi < this.playerCount(); pi++) {
       if ((this.gs.players[pi]?.heroes || []).includes(hero)) return pi;
     }
     return -1;

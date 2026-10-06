@@ -107,7 +107,7 @@ module.exports = {
     engine.shuffleDeck(activator);
 
     // Reveal the chosen card to opponent (opponent confirms)
-    const oppIdx = activator === 0 ? 1 : 0;
+    const oppIdx = engine.opponentOf(activator);
     engine._broadcastEvent('card_reveal', { cardName: chosenName });
     engine.sync();
     await engine._delay(500);

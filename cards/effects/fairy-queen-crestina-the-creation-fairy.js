@@ -170,7 +170,7 @@ module.exports = {
 
       // Step 2: Opponent picks 1 of the 3. Reveal Crestina to the opp's
       // socket so they see what's prompting them.
-      const oppIdx = pi === 0 ? 1 : 0;
+      const oppIdx = engine.opponentOf(pi);
       const oppPs  = gs.players[oppIdx];
       const oppSid = oppPs?.socketId;
       if (oppSid && engine.io) {

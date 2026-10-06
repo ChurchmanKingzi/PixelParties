@@ -35,6 +35,7 @@
 //  KEIN `heroEffectActionCost` (★-Regel 7.9.).
 // ═══════════════════════════════════════════
 
+const { opponentOfGs } = require('./_opp');
 const CARD_NAME = 'Vena, the Bounty Huntress';
 const GOLD_COST = 5;
 const BOUNTY_DAMAGE = 150;
@@ -43,7 +44,7 @@ const BOUNTY_DAMAGE = 150;
 
 /** Der von `pi`s Vena markierte Held, oder null. */
 function bountyFinden(engine, pi) {
-  const gegner = pi === 0 ? 1 : 0;
+  const gegner = opponentOfGs(engine?.gs, pi);
   const helden = engine?.gs?.players?.[gegner]?.heroes || [];
   for (let hi = 0; hi < helden.length; hi++) {
     const h = helden[hi];
@@ -67,7 +68,7 @@ function bountyMarkieren(engine, pi, owner, heroIdx) {
 
 /** Lebende gegnerische Helden als Zielobjekte. */
 function zieleSammeln(engine, pi) {
-  const gegner = pi === 0 ? 1 : 0;
+  const gegner = opponentOfGs(engine?.gs, pi);
   const helden = engine?.gs?.players?.[gegner]?.heroes || [];
   const out = [];
   for (let hi = 0; hi < helden.length; hi++) {

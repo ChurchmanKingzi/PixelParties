@@ -344,7 +344,7 @@ function heroFromSource(engine, source) {
  *  { kind, owner, heroIdx, slotIdx?, inst? } descriptor. */
 function resolveTargetLocation(engine, target) {
   // Hero
-  for (let p = 0; p < 2; p++) {
+  for (let p = 0; p < engine.playerCount(); p++) {
     const ps = engine.gs.players[p];
     if (!ps) continue;
     for (let hi = 0; hi < (ps.heroes || []).length; hi++) {

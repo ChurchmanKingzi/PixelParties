@@ -29,7 +29,7 @@ const GLOBAL_BURN_CAP = 3;
 /** Count currently-Burned heroes + creatures across the whole board. */
 function countBurnedTargets(engine) {
   let n = 0;
-  for (let p = 0; p < 2; p++) {
+  for (let p = 0; p < engine.playerCount(); p++) {
     const ps = engine.gs.players[p];
     for (const h of ps?.heroes || []) {
       if (!h?.name || h.hp <= 0) continue;

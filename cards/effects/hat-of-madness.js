@@ -72,7 +72,7 @@ module.exports = {
       if (!istAktion) return;
 
       const ps = gs.players[seite];
-      const oi = seite === 0 ? 1 : 0;
+      const oi = engine.opponentOf(seite);
       const ops = gs.players[oi];
       if (!ps || !ops) return;
       if (!(ps.hand || []).length) return;               // leere Hand: nichts zu geben

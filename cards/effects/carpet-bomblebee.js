@@ -22,7 +22,7 @@ async function runOpponentDeathPayload(engine, inst, opts = {}) {
   const gs = engine.gs;
   const pi = inst.controller ?? inst.owner;
   const heroIdx = inst.heroIdx;
-  const oi = pi === 0 ? 1 : 0;
+  const oi = engine.opponentOf(pi);
 
   const hoptKey = `${HOPT_PREFIX}:${inst.id}`;
   if (!opts.bypassHopt) {

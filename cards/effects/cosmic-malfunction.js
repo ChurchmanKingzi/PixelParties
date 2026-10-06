@@ -68,7 +68,7 @@ module.exports = {
    */
   async cdMovementReactionResolve(engine, victimOwnerPi, victim, source, effectType) {
     const gs = engine.gs;
-    const oppIdx = victimOwnerPi === 0 ? 1 : 0;
+    const oppIdx = engine.opponentOf(victimOwnerPi);
     const oppPs = gs.players[oppIdx];
 
     // Apply the same-turn name lock to the opponent. Reuses the

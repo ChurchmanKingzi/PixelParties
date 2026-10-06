@@ -28,7 +28,7 @@ module.exports = {
   },
 
   resolve: async (engine, pi) => {
-    const oi = pi === 0 ? 1 : 0;
+    const oi = engine.opponentOf(pi);
 
     // Top-N → discard. actionMillCards already handles deck-out
     // gracefully (mills at most ps.mainDeck.length) AND honors

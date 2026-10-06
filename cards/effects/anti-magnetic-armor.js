@@ -70,7 +70,7 @@ module.exports = {
     if (eligible.length === 0) return null;
 
     // Der GEGNER (Quelle des Effekts) waehlt das neue Ziel.
-    const oppIdx = sourceCard?.controller ?? sourceCard?.owner ?? (ownerIdx === 0 ? 1 : 0);
+    const oppIdx = sourceCard?.controller ?? sourceCard?.owner ?? (engine.opponentOf(ownerIdx));
     // Auftritt der Ruestung vor der Wahl — der Waehlende soll sehen, warum.
     await engine.showTriggeredEffect(CARD_NAME, { playerIdx: ownerIdx });
 

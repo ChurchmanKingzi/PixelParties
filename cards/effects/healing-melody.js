@@ -119,7 +119,7 @@ module.exports = {
       }
 
       // Also include charmed opponent heroes (and their creatures)
-      const oi = pi === 0 ? 1 : 0;
+      const oi = engine.opponentOf(pi);
       const ops = gs.players[oi];
       for (let hi = 0; hi < (ops.heroes || []).length; hi++) {
         const h = ops.heroes[hi];

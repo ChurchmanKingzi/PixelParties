@@ -13,6 +13,7 @@
 //  Condition: opponent must have 2+ cards in hand.
 // ═══════════════════════════════════════════
 
+const { opponentOfGs } = require('./_opp');
 module.exports = {
   // BORIS-SPERRE (Klausel 1): holt Karten des Gegners auf die eigene Seite
   // Solange der Gegner einen wirksamen Boris hat, ist diese Karte
@@ -36,7 +37,7 @@ module.exports = {
     if (koCtx.killerOwner === koCtx.heroOwner) return false;
 
     // Opponent must have 2+ cards in hand
-    const oppIdx = pi === 0 ? 1 : 0;
+    const oppIdx = opponentOfGs(gs, pi);
     const oppPs = gs.players[oppIdx];
     if (!oppPs || (oppPs.hand || []).length < 2) return false;
 
@@ -63,7 +64,7 @@ module.exports = {
    */
   resolve: async (engine, pi) => {
     const gs = engine.gs;
-    const oppIdx = pi === 0 ? 1 : 0;
+    const oppIdx = engine.opponentOf(pi);
     const oppPs = gs.players[oppIdx];
     if (!oppPs || (oppPs.hand || []).length < 2) return;
 

@@ -170,7 +170,7 @@ async function offerAttach(ctx) {
     });
 
     engine.shuffleDeck(pi, 'main');
-    const oi = pi === 0 ? 1 : 0;
+    const oi = engine.opponentOf(pi);
     await engine.promptGeneric(oi, {
       type: 'deckSearchReveal',
       cardName: chosenAbility,

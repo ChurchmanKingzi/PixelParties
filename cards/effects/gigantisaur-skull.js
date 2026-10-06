@@ -48,7 +48,7 @@ function _allFreezeableCreatureTargets(engine) {
   // stay selectable so the application-side fizzles silently rather
   // than the picker hiding them).
   const out = [];
-  for (let pi = 0; pi < 2; pi++) {
+  for (let pi = 0; pi < engine.playerCount(); pi++) {
     for (const t of engine.getCreatureTargets(pi)) {
       const inst = t.cardInstance;
       if (!inst) continue;
@@ -118,7 +118,7 @@ module.exports = {
       // No engine — optimistic fallback: as long as ANY support slot is
       // occupied by something, assume the play might work. Real filter
       // runs in getValidTargets at picker time.
-      for (let phi = 0; phi < 2; phi++) {
+      for (let phi = 0; phi < gs.players.length; phi++) {
         const ps = gs.players[phi];
         if (!ps) continue;
         for (let hi = 0; hi < (ps.heroes || []).length; hi++) {

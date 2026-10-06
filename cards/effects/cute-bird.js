@@ -153,7 +153,7 @@ module.exports = {
       }
 
       // Reveal the searched card to the opponent (gallery animation).
-      const oi = pi === 0 ? 1 : 0;
+      const oi = engine.opponentOf(pi);
       await engine.promptGeneric(oi, {
         type: 'deckSearchReveal',
         cardName: TUTOR_TARGET,

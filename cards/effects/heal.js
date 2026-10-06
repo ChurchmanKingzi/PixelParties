@@ -77,7 +77,7 @@ module.exports = {
       if (naoCaster ? cur <= base : cur < max) return false;
     }
     // (c) healReversed-Gegner (Heilung = Schaden)
-    const oi = pi === 0 ? 1 : 0;
+    const oi = engine.opponentOf(pi);
     for (const { hero: hh } of engine.heroesControlledBy(oi)) {
       if (hh?.name && hh.hp > 0 && hh.statuses?.healReversed) return false;
     }

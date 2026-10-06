@@ -117,7 +117,7 @@ module.exports = {
       // Activate the surprise with telekinesis sourceInfo
       const sourceInfo = {
         telekinesis: true,
-        activatorIdx: pi === 0 ? 1 : 0, // "opponent" for Mummy Maker Machine compatibility
+        activatorIdx: engine.opponentOf(pi), // "opponent" for Mummy Maker Machine compatibility
       };
 
       const isBakhmSlot = target.isBakhmSlot || false;

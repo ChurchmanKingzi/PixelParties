@@ -140,7 +140,7 @@ module.exports = {
       const gs = ctx.gameState;
       const pi = ctx.cardOwner;
       const heroIdx = ctx.cardHeroIdx;
-      const oppIdx = pi === 0 ? 1 : 0;
+      const oppIdx = engine.opponentOf(pi);
 
       // ── Step 1: Determine enhanced mode BEFORE targeting ──
       // Must check before promptDamageTarget, which fires the pending play log

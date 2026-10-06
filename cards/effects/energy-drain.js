@@ -90,7 +90,7 @@ module.exports = {
       const BLASEN_ABSTAND_MS = 130;   // Versatz innerhalb eines Stroms
       const BLASEN_FLUGZEIT_MS = 1500; // langsam, wie gewuenscht
 
-      const oi = pi === 0 ? 1 : 0;
+      const oi = engine.opponentOf(pi);
       const quellen = [];
       // Kontrolle statt Seite (Styx 28.9.) — Blasen nur aus dem, was
       // aoeHit (side 'enemy') auch trifft; `owner` = physische Spalte.

@@ -12,6 +12,7 @@
 // ═══════════════════════════════════════════
 
 const { candidateHosts, attachmentHostsFor, attachToHero } = require('./_attachment-shared');
+const { opponentOfGs } = require('./_opp');
 const CARD_NAME = 'Guardian Angel';
 
 module.exports = {
@@ -50,9 +51,9 @@ module.exports = {
   },
 
   spellPlayCondition(gs, pi, engine) {
-    return candidateHosts(gs, pi, engine, { sides: [pi, pi === 0 ? 1 : 0] }).length > 0;
+    return candidateHosts(gs, pi, engine, { sides: [pi, opponentOfGs(gs, pi)] }).length > 0;
   },
-  attachmentHosts(gs, pi, engine) { return attachmentHostsFor(gs, pi, engine, { sides: [pi, pi === 0 ? 1 : 0] }); }, // v651: beide Seiten als Drop-Ziel
+  attachmentHosts(gs, pi, engine) { return attachmentHostsFor(gs, pi, engine, { sides: [pi, opponentOfGs(gs, pi)] }); }, // v651: beide Seiten als Drop-Ziel
   hooks: {
     onPlay: async (ctx) => {
       if (ctx.cardZone !== 'hand' || ctx.playedCard?.id !== ctx.card.id) return;
@@ -62,7 +63,7 @@ module.exports = {
       const ps = gs.players[pi];
       // v650: Anlegen ueber den geteilten Vorgang (beide Seiten, Anti-Magic).
       const res = await attachToHero(ctx, CARD_NAME, {
-        sides: [pi, pi === 0 ? 1 : 0],
+        sides: [pi, engine.opponentOf(pi)],
         description: 'Choose a Hero to protect with a Guardian Angel.',
         confirmLabel: '👼 Bless!', skipEnterHook: true,
       });
@@ -102,7 +103,7 @@ module.exports = {
 
       // Find which player/hero this is
       let heroPi = -1, heroHi = -1;
-      for (let p = 0; p < 2; p++) {
+      for (let p = 0; p < engine.playerCount(); p++) {
         for (let h = 0; h < (gs.players[p]?.heroes || []).length; h++) {
           if (gs.players[p].heroes[h] === hero) { heroPi = p; heroHi = h; break; }
         }

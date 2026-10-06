@@ -43,6 +43,7 @@
 
 const { hasCardType } = require('./_hooks');
 const { candidateHosts, attachmentHostsFor, pickAttachmentHost, placeAttachment } = require('./_attachment-shared');
+const { opponentOfGs } = require('./_opp');
 
 const CARD_NAME = 'Anti Magic';
 const MAX_LEVEL = 3;
@@ -124,9 +125,9 @@ module.exports = {
 
   // Need at least 1 Hero (any side) with a free Support Zone.
   spellPlayCondition(gs, pi, engine) {
-    return candidateHosts(gs, pi, engine, { sides: [pi, pi === 0 ? 1 : 0] }).length > 0;
+    return candidateHosts(gs, pi, engine, { sides: [pi, opponentOfGs(gs, pi)] }).length > 0;
   },
-  attachmentHosts(gs, pi, engine) { return attachmentHostsFor(gs, pi, engine, { sides: [pi, pi === 0 ? 1 : 0] }); }, // v651: beide Seiten als Drop-Ziel
+  attachmentHosts(gs, pi, engine) { return attachmentHostsFor(gs, pi, engine, { sides: [pi, opponentOfGs(gs, pi)] }); }, // v651: beide Seiten als Drop-Ziel
 
   hooks: {
     onPlay: async (ctx) => {
@@ -138,7 +139,7 @@ module.exports = {
       const casterHeroIdx = ctx.cardHeroIdx;
       // v650: Wirt ueber den geteilten Anlege-Vorgang (beide Seiten).
       const host = await pickAttachmentHost(ctx, CARD_NAME, {
-        sides: [pi, pi === 0 ? 1 : 0],
+        sides: [pi, engine.opponentOf(pi)],
         description: 'Attach Anti Magic to a Hero. That Hero becomes immune to other Spells up to your Support Magic level.',
         confirmLabel: '🛡️ Attach!', confirmClass: 'btn-info',
       });

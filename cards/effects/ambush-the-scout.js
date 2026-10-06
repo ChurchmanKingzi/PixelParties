@@ -69,7 +69,7 @@ module.exports = {
 
   resolve: async (engine, pi) => {
     const gs = engine.gs;
-    const oppIdx = pi === 0 ? 1 : 0;
+    const oppIdx = engine.opponentOf(pi);
     const h = engine._pendingHandInteraction;
 
     // 1) "Negate that effect." — der auslösende Effekt liest das

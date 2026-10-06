@@ -96,7 +96,7 @@ async function schattenschlag(ctx, opferName) {
   const engine = ctx._engine;
   const gs = engine.gs;
   const pi = ctx.cardOwner;
-  const oppIdx = pi === 0 ? 1 : 0;
+  const oppIdx = engine.opponentOf(pi);
   const oppPs = gs.players[oppIdx];
   if (!oppPs || !(oppPs.hand || []).length) return;
 
@@ -158,7 +158,7 @@ module.exports = {
       if (!istDieserHeld(ctx)) return;
       const engine = ctx._engine;
       const pi = ctx.cardOwner;
-      const oppIdx = pi === 0 ? 1 : 0;
+      const oppIdx = engine.opponentOf(pi);
       const hero = ctx.hero;
       if (!hero?.name) return;
       // „your opponent controls" — der gefallene Held muss auf der

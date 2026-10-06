@@ -64,7 +64,7 @@ module.exports = {
     // Buff expires at the START of opp's next turn — i.e. the moment
     // the caster's current turn ends. Cloud Pillow uses gs.turn+2 for
     // "caster's next turn"; we want one tick earlier.
-    const oi = pi === 0 ? 1 : 0;
+    const oi = engine.opponentOf(pi);
     await engine.actionAddBuff(hero, target.owner, target.heroIdx, 'cold_strike', {
       sourceOwner: pi,   // v1067: Quelle ist Pflicht (siehe _affected-shared)
       expiresAtTurn: gs.turn + 1,

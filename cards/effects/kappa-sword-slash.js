@@ -180,7 +180,7 @@ module.exports = {
       // area at a time" gilt seit „Spatial Crevice" nicht mehr; die
       // unteren Areas waren dadurch unauswaehlbar.
       const areaTargets = [];
-      for (let aoi = 0; aoi < 2; aoi++) {
+      for (let aoi = 0; aoi < engine.playerCount(); aoi++) {
         const arr = gs.areaZones?.[aoi] || [];
         for (let platz = 0; platz < arr.length; platz++) {
           const name = arr[platz];

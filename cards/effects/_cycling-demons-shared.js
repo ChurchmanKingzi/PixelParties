@@ -139,7 +139,7 @@ async function bonusFreezeOppHero(ctx, engine, pi) {
 // Herbithorn Demon — take a card from ANY discard pile to your hand.
 async function bonusGrabFromAnyDiscard(ctx, engine, pi) {
   const gs = engine.gs;
-  const oppIdx = pi === 0 ? 1 : 0;
+  const oppIdx = engine.opponentOf(pi);
   // Gallery entries from BOTH discard piles. `source: 'discard'` is the
   // canonical value the gallery renderer styles (purple "DISCARD" badge);
   // the description tells the player it spans any pile. De-dup by name so
@@ -255,7 +255,7 @@ async function bonusGrabFromAnyDiscard(ctx, engine, pi) {
 
 // Bouldor Demon — opponent discards 2 cards of their choice.
 async function bonusOppDiscards2(ctx, engine, pi) {
-  const oppIdx = pi === 0 ? 1 : 0;
+  const oppIdx = engine.opponentOf(pi);
   const opp = engine.gs.players[oppIdx];
   if (!opp || (opp.hand || []).length === 0) return;
   const confirmed = await engine.promptGeneric(pi, {

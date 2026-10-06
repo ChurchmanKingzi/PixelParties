@@ -224,7 +224,7 @@ module.exports = {
       });
 
       // Reveal to opponent (symmetry with other deck-search spells)
-      const oi = pi === 0 ? 1 : 0;
+      const oi = engine.opponentOf(pi);
       await engine.promptGeneric(oi, {
         type: 'deckSearchReveal',
         cardName: creatureName,

@@ -89,7 +89,7 @@ module.exports = {
    */
   canActivateCreatureEffect(ctx) {
     const engine = ctx._engine;
-    const oi = ctx.cardOwner === 0 ? 1 : 0;
+    const oi = engine.opponentOf(ctx.cardOwner);
     return (gegnerHelden(engine, oi).length + engine.getCreatureTargets(oi).length) > 0;
   },
 
@@ -97,7 +97,7 @@ module.exports = {
     const engine = ctx._engine;
     const gs = engine.gs;
     const pi = ctx.cardOwner;
-    const oi = pi === 0 ? 1 : 0;
+    const oi = engine.opponentOf(pi);
 
     const ziele = [...gegnerHelden(engine, oi), ...engine.getCreatureTargets(oi)];
     if (ziele.length === 0) return false;

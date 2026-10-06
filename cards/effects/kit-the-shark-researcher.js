@@ -142,7 +142,7 @@ module.exports = {
       const kit = ctx.attachedHero;
       if (!kit?.name || kit.hp <= 0) return;
 
-      const oppPi = pi === 0 ? 1 : 0;
+      const oppPi = engine.opponentOf(pi);
       const ops   = gs.players[oppPi];
       if (!ops) return;
 

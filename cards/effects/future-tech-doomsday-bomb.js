@@ -119,7 +119,7 @@ module.exports = {
       // Der Träger — bei einer Ausrüstung auf fremder Seite ist das
       // NICHT `inst.owner` (Powder-Keg-Modell).
       const besitzer = inst.originalOwner ?? inst.owner;
-      const gegner = besitzer === 0 ? 1 : 0;
+      const gegner = engine.opponentOf(besitzer);
 
       // Nur die Attacke des AUSGERUESTETEN Helden.
       const q = ctx.source;

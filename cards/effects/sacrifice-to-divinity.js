@@ -203,7 +203,7 @@ module.exports = {
         engine._broadcastEvent('deck_search_add', { cardName: DIVINITY, playerIdx: pi });
         engine.shuffleDeck(pi, 'main');
         // Standard deck-search reveal etiquette: notify opponent.
-        const oi = pi === 0 ? 1 : 0;
+        const oi = engine.opponentOf(pi);
         await engine.promptGeneric(oi, {
           type: 'deckSearchReveal',
           cardName: DIVINITY,

@@ -126,7 +126,7 @@ module.exports = {
         || (inst.counters?.currentHp ?? 1) <= 0;
       if (!defeated) { engine.sync(); return; }
 
-      const oppIdx = pi === 0 ? 1 : 0;          // "your opponent"
+      const oppIdx = engine.opponentOf(pi);          // "your opponent"
       const oppPs = gs.players[oppIdx];
       if (!oppPs || !name) { engine.sync(); return; }
 

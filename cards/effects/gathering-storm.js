@@ -205,7 +205,7 @@ module.exports = {
       const engine = ctx._engine;
       const gs     = engine.gs;
       const ownerIdx = ctx.cardOwner;
-      const oppIdx   = ownerIdx === 0 ? 1 : 0;
+      const oppIdx   = engine.opponentOf(ownerIdx);
 
       // Only fires when the opponent is the active player (their turn start).
       if (gs.activePlayer !== oppIdx) return;

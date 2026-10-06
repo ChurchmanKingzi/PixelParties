@@ -108,7 +108,7 @@ module.exports = {
     // Aktivierung lohnt, wenn mindestens eine gegnerische Creature am
     // AoE stirbt oder mindestens zwei getroffen werden.
     const cpuIdx = engine._cpuPlayerIdx;
-    const oppIdx = cpuIdx === 0 ? 1 : 0;
+    const oppIdx = engine.opponentOf(cpuIdx);
     const heroIdx = promptData._hostHeroIdx ?? -1;
     if (heroIdx < 0) return { confirmed: true };
     const ziele = creaturesUnderHero(engine, oppIdx, heroIdx);
@@ -120,7 +120,7 @@ module.exports = {
   async onSurpriseActivate(ctx, sourceInfo) {
     const engine = ctx._engine;
     const pi = ctx.cardOwner;
-    const zoneOwner = sourceInfo?.zoneOwner ?? sourceInfo?.summonerIdx ?? (pi === 0 ? 1 : 0);
+    const zoneOwner = sourceInfo?.zoneOwner ?? sourceInfo?.summonerIdx ?? (engine.opponentOf(pi));
     const heroIdx = sourceInfo?.heroIdx ?? -1;
     if (heroIdx < 0) return null;
 

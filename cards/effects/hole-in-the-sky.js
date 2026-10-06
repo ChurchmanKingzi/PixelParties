@@ -41,6 +41,7 @@
 //     nach allen Abwehr-Fenstern.
 // ═══════════════════════════════════════════
 const { hasCardType } = require('./_hooks');
+const { opponentOfGs } = require('./_opp');
 
 const CARD_NAME = 'Hole in the Sky';
 const SCHADEN = 999;
@@ -81,7 +82,7 @@ module.exports = {
   /** „While both players control at least 1 Creature …" */
   inherentAction(gs, pi, _heroIdx, engine) {
     if (!engine) return false;
-    return kreaturenVon(engine, pi) > 0 && kreaturenVon(engine, pi === 0 ? 1 : 0) > 0;
+    return kreaturenVon(engine, pi) > 0 && kreaturenVon(engine, opponentOfGs(gs, pi)) > 0;
   },
 
   /**
@@ -91,7 +92,7 @@ module.exports = {
    */
   cpuPlayVeto(engine, pi) {
     try {
-      const opp = pi === 0 ? 1 : 0;
+      const opp = engine.opponentOf(pi);
       const gegner = engine.gs?.firstTurnProtectedPlayer === opp ? 0 : seitenWert(engine, opp);
       const eigen = seitenWert(engine, pi);
       return gegner <= 0 || gegner <= eigen;

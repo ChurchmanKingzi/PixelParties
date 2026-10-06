@@ -69,7 +69,7 @@ function getValidTargets(gs, engine) {
   if (!engine) return [];
   const negKeys = getCleansableStatuses();
   const targets = [];
-  for (let p = 0; p < 2; p++) {
+  for (let p = 0; p < gs.players.length; p++) {
     for (const t of engine.getHeroTargets(p)) {
       const hero = gs.players[p]?.heroes?.[t.heroIdx];
       if (!hero?.statuses) continue;
@@ -103,7 +103,7 @@ module.exports = {
   spellPlayCondition(gs, pi, engine) {
     if (engine) return getValidTargets(gs, engine).length > 0;
     const negKeys = getCleansableStatuses();
-    for (let p = 0; p < 2; p++) {
+    for (let p = 0; p < gs.players.length; p++) {
       const ps = gs.players[p];
       if (!ps) continue;
       for (let hi = 0; hi < (ps.heroes || []).length; hi++) {

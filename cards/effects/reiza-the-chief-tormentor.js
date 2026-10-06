@@ -173,7 +173,7 @@ module.exports = {
       if (!ctx.hardOncePerTurn('reiza_second_action')) return;
 
       // Condition: ALL living opponent targets must be Poisoned
-      const oppIdx = pi === 0 ? 1 : 0;
+      const oppIdx = engine.opponentOf(pi);
       if (!allOpponentTargetsPoisoned(gs, oppIdx, engine)) return;
 
       // Register and grant the additional action. `isSecondActionGrant`

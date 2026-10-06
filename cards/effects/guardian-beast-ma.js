@@ -31,14 +31,14 @@ module.exports = {
   canActivateCreatureEffect(ctx) {
     const engine = ctx._engine;
     const myDeck = engine.gs.players[ctx.cardOwner]?.mainDeck?.length || 0;
-    const oppDeck = engine.gs.players[ctx.cardOwner === 0 ? 1 : 0]?.mainDeck?.length || 0;
+    const oppDeck = engine.gs.players[engine.opponentOf(ctx.cardOwner)]?.mainDeck?.length || 0;
     return (myDeck + oppDeck) > 0;
   },
 
   async onCreatureEffect(ctx) {
     const engine = ctx._engine;
     const pi = ctx.cardOwner;
-    const oi = pi === 0 ? 1 : 0;
+    const oi = engine.opponentOf(pi);
     const myDeckLen = engine.gs.players[pi]?.mainDeck?.length || 0;
     const oppDeckLen = engine.gs.players[oi]?.mainDeck?.length || 0;
     const cap = Math.min(MAX_MILL, Math.max(myDeckLen, oppDeckLen));

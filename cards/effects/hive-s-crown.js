@@ -302,7 +302,7 @@ module.exports = {
         return true;
       }
       // Reveal to opponent — standard deck-search reveal etiquette.
-      const oi = pi === 0 ? 1 : 0;
+      const oi = engine.opponentOf(pi);
       engine._broadcastEvent('card_reveal', { cardName: QUEEN_NAME });
       await engine.promptGeneric(oi, {
         type: 'deckSearchReveal',

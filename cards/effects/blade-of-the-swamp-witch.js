@@ -65,7 +65,7 @@ module.exports = {
       if (target.hp === undefined || !target.statuses) return;
 
       // Find the target hero's player/heroIdx
-      for (let tpi = 0; tpi < 2; tpi++) {
+      for (let tpi = 0; tpi < engine.playerCount(); tpi++) {
         const tps = gs.players[tpi];
         for (let thi = 0; thi < (tps.heroes || []).length; thi++) {
           if (tps.heroes[thi] !== target) continue;

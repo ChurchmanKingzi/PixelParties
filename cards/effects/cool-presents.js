@@ -105,7 +105,7 @@ module.exports = {
   async resolve(engine, pi, selectedIds, validTargets) {
     const gs = engine.gs;
     const ps = gs.players[pi];
-    const oi = pi === 0 ? 1 : 0;
+    const oi = engine.opponentOf(pi);
     const ops = gs.players[oi];
     if (!ps || !ops) return { cancelled: true };
     if (ops.handLocked) return { cancelled: true };

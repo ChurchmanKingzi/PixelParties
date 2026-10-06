@@ -36,7 +36,7 @@ const POISON_STACKS = 2;
 function buildPoisonTargets(engine) {
   const gs = engine.gs;
   const targets = [];
-  for (let pIdx = 0; pIdx < 2; pIdx++) {
+  for (let pIdx = 0; pIdx < engine.playerCount(); pIdx++) {
     const pState = gs.players[pIdx];
     for (let hi = 0; hi < (pState.heroes || []).length; hi++) {
       const h = pState.heroes[hi];

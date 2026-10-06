@@ -45,7 +45,7 @@ module.exports = {
     if (!engine) return [];
     const eigene = new Set(meineGolems(engine, pi).map(c => c.id));
     const out = [];
-    for (let p = 0; p < 2; p++) {
+    for (let p = 0; p < gs.players.length; p++) {
       if (gs.firstTurnProtectedPlayer !== p) out.push(...engine.getHeroTargets(p));
       out.push(...engine.getCreatureTargets(p).filter(t => !eigene.has(t.cardInstance?.id)));
     }

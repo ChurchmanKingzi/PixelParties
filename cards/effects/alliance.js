@@ -48,6 +48,7 @@
 
 const { hasCardType, hasSpellSchool } = require('./_hooks');
 const { attachmentHostsFor, attachToHero } = require('./_attachment-shared');
+const { opponentOfGs } = require('./_opp');
 
 const CARD_NAME = 'Alliance';
 
@@ -98,7 +99,7 @@ function andereZieleVorhanden(engine, a, b, info) {
 
   const gs = engine.gs;
   const cardDB = engine._getCardDB();
-  for (let pi = 0; pi < 2; pi++) {
+  for (let pi = 0; pi < engine.playerCount(); pi++) {
     const ps = gs.players[pi];
     for (let hi = 0; hi < (ps?.heroes || []).length; hi++) {
       const h = ps.heroes[hi];
@@ -157,7 +158,7 @@ module.exports = {
     if (!engine) return true;
     if (attachmentHostsFor(gs, playerIdx, engine).length === 0) return false;
     // Es muss einen waehlbaren gegnerischen Helden geben.
-    const oi = playerIdx === 0 ? 1 : 0;
+    const oi = opponentOfGs(gs, playerIdx);
     if (gs.firstTurnProtectedPlayer === oi) return false;
     // Kontrolle statt Seite (Styx 28.9.)
     return engine.heroesControlledBy(oi).some(({ hero: h }) => h?.name && h.hp > 0);
@@ -204,7 +205,7 @@ module.exports = {
       const engine = ctx._engine;
       const gs = engine.gs;
       const pi = ctx.cardOwner;
-      const oi = pi === 0 ? 1 : 0;
+      const oi = engine.opponentOf(pi);
 
       // „Attach this card to the user" — nur der Wirker-Held.
       const res = await attachToHero(ctx, CARD_NAME, {

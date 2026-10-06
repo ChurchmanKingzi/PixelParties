@@ -37,6 +37,7 @@
 // ═══════════════════════════════════════════
 
 const { kohtaAscensionMet } = require('./_kohta-shared');
+const { opponentOfGs } = require('./_opp');
 
 const CARD_NAME = 'Kohta, Master of Super-Killing';
 const HOPT_KEY  = 'kohta-super-kill';
@@ -88,7 +89,7 @@ module.exports = {
     if (hartGesperrt(engine, pi)) return false;
     // Lohnt sich immer, solange der Gegner ueberhaupt etwas auf dem
     // Brett hat — ein garantierter Kill ohne Schadensrechnung.
-    const gegner = pi === 0 ? 1 : 0;
+    const gegner = opponentOfGs(engine?.gs, pi);
     const ps = engine?.gs?.players?.[gegner];
     if (!ps) return false;
     if ((ps.heroes || []).some(h => h?.name && h.hp > 0)) return true;

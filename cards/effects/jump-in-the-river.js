@@ -192,7 +192,7 @@ async function doJumpCascade(engine, pi) {
     if (inst) engine._untrackCard(inst.id);
 
     // Reveal card to opponent + spectators
-    const oppIdx = pi === 0 ? 1 : 0;
+    const oppIdx = engine.opponentOf(pi);
     const oppSid = gs.players[oppIdx]?.socketId;
     if (oppSid) engine.io.to(oppSid).emit('card_reveal', { cardName: 'Jump in the River' });
     if (engine.room.spectators) {

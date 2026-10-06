@@ -185,7 +185,7 @@ function kopierKosten(engine, pi, name) {
  */
 function equipPlaetze(engine, pi, name, sk) {
   const gs = engine.gs;
-  const seite = sk?.placesOnOpponentBoard ? (pi === 0 ? 1 : 0) : pi;
+  const seite = sk?.placesOnOpponentBoard ? (engine.opponentOf(pi)) : pi;
   const ps = gs.players[seite];
   const out = [];
   if (!ps) return out;

@@ -73,10 +73,10 @@ module.exports = {
       if (!(count > 0)) return undefined;
       const gs = engine.gs;
       let pi = engine._cpuPlayerIdx;
-      for (let i = 0; i < 2; i++) {
+      for (let i = 0; i < engine.playerCount(); i++) {
         if ((gs.players[i]?.heroes || []).some(h => h?.name === CARD_NAME)) { pi = i; break; }
       }
-      const opp = 1 - pi;
+      const opp = engine.opponentOf(pi);
       const DB = engine._getCardDB();
       const targets = [];
       for (const h of (gs.players[opp]?.heroes || [])) {

@@ -381,7 +381,7 @@ module.exports = {
       // Shuffle post-search, and reveal the pick to the opponent — standard
       // deck-search-reveal etiquette (same as Elven Druid / Elven Rider).
       engine.shuffleDeck(pi, 'main');
-      const oi = pi === 0 ? 1 : 0;
+      const oi = engine.opponentOf(pi);
       await engine.promptGeneric(oi, {
         type: 'deckSearchReveal',
         cardName: chosenAbility,

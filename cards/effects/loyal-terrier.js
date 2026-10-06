@@ -125,7 +125,7 @@ module.exports = {
 
       // Need at least one opp target. No prompt if there's nothing
       // to hit (matches the UX from Bamboo Staff / Bone Dog).
-      const oi = pi === 0 ? 1 : 0;
+      const oi = engine.opponentOf(pi);
       const oppPs = gs.players[oi];
       if (!oppPs) return;
       const hasOppTarget = (() => {

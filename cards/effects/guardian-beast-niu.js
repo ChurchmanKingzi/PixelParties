@@ -127,7 +127,7 @@ module.exports = {
     const newStacks = (existing?.stacks || 0) + 1;
     // Expire at the START of the opponent's next turn (= functional
     // "end of THIS turn" — buff doesn't survive into a fresh own turn).
-    const oi = pi === 0 ? 1 : 0;
+    const oi = engine.opponentOf(pi);
     await engine.actionAddBuff(buffHero, buffOwner, buffHeroIdx, BUFF_NAME, {
       sourceOwner: pi,   // v1067: Quelle ist Pflicht (siehe _affected-shared)
       totalDamage: newTotal,

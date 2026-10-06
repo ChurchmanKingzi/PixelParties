@@ -112,7 +112,7 @@ module.exports = {
 
       engine.log('final_trial_win', {
         player: ps.username,
-        loser: gs.players[pi === 0 ? 1 : 0]?.username,
+        loser: gs.players[engine.opponentOf(pi)]?.username,
       });
       engine._broadcastEvent('play_zone_animation', {
         type: 'holy_revival', owner: pi, heroIdx: -1, zoneSlot: -1,

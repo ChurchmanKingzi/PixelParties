@@ -20,7 +20,7 @@
 const CARD_NAME = 'Instant Cryo Stasis';
 
 function freezbareCreatures(engine, pi) {
-  const oi = pi === 0 ? 1 : 0;
+  const oi = engine.opponentOf(pi);
   return engine.getCreatureTargets(oi).filter(t => t.cardInstance && !t.cardInstance.counters?.frozen);
 }
 

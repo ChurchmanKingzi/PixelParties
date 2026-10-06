@@ -161,7 +161,7 @@ module.exports = {
     const target = validTargets.find(t => t.id === selectedIds[0]);
     if (!target) return false;
 
-    const oi = pi === 0 ? 1 : 0;
+    const oi = engine.opponentOf(pi);
     const gs = engine.gs;
     const ps = gs.players[pi];
 

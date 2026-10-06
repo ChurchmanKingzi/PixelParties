@@ -36,6 +36,7 @@
 //    langsam groesser und durchsichtiger werden.
 // ═══════════════════════════════════════════
 
+const { opponentOfGs } = require('./_opp');
 const CARD_NAME = 'Cute Conversion';
 
 /** Kreaturen des Gegners, die man sich holen kann. */
@@ -95,14 +96,14 @@ module.exports = {
   },
 
   spellPlayCondition: (gs, pi, engine) =>
-    (engine ? beuteliste(engine, pi === 0 ? 1 : 0).length > 0 : true),
+    (engine ? beuteliste(engine, opponentOfGs(gs, pi)).length > 0 : true),
 
   hooks: {
     onPlay: async (ctx) => {
       const engine = ctx._engine;
       const gs = engine.gs;
       const pi = ctx.cardOwner;
-      const oi = pi === 0 ? 1 : 0;
+      const oi = engine.opponentOf(pi);
 
       const beute = beuteliste(engine, oi);
       if (beute.length === 0) { gs._spellCancelled = true; return; }

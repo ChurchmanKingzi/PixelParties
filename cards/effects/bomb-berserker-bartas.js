@@ -77,7 +77,7 @@ module.exports = {
       if (spellLevel >= dmLevel) return;
 
       // Check there's at least 1 OTHER valid target on the opponent's side
-      const oppIdx = pi === 0 ? 1 : 0;
+      const oppIdx = engine.opponentOf(pi);
       const firstTargetId = targets[0].id;
       let hasOtherTarget = false;
       // Kontrolle statt Seite (Styx 28.9.); IDs bleiben physisch.

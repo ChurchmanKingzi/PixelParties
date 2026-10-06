@@ -40,14 +40,14 @@ module.exports = {
 
   canActivateCreatureEffect(ctx) {
     const engine = ctx._engine;
-    const oi = ctx.cardOwner === 0 ? 1 : 0;
+    const oi = engine.opponentOf(ctx.cardOwner);
     return (engine.gs.players[oi]?.deletedPile?.length || 0) >= 1;
   },
 
   async onCreatureEffect(ctx) {
     const engine = ctx._engine;
     const pi = ctx.cardOwner;
-    const oi = pi === 0 ? 1 : 0;
+    const oi = engine.opponentOf(pi);
     const ops = engine.gs.players[oi];
     if (!ops?.deletedPile?.length) return false;
 

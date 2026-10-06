@@ -13,6 +13,7 @@
 // ═══════════════════════════════════════════
 
 const { canPlayMagicGem, maybeKeepGemInHand } = require('./_magic-gem-shared');
+const { opponentOfGs } = require('./_opp');
 
 const CARD_NAME = 'Magic Ruby';
 const STUN_DURATION = 1;
@@ -25,13 +26,13 @@ module.exports = {
     if (!canPlayMagicGem(gs, pi, CARD_NAME)) return false;
     // Need at least one alive opponent hero. Existing immunities are
     // checked by the standard status-application gate at apply time.
-    const oi = pi === 0 ? 1 : 0;
+    const oi = opponentOfGs(gs, pi);
     const ops = gs.players[oi];
     return (ops?.heroes || []).some(h => h?.name && h.hp > 0);
   },
 
   getValidTargets(gs, pi) {
-    const oi = pi === 0 ? 1 : 0;
+    const oi = opponentOfGs(gs, pi);
     const ops = gs.players[oi];
     const out = [];
     for (let hi = 0; hi < (ops?.heroes || []).length; hi++) {

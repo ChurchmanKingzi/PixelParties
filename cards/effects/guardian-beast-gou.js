@@ -318,7 +318,7 @@ module.exports = {
           buff.grants = filtered;
         }
       };
-      for (let p = 0; p < 2; p++) {
+      for (let p = 0; p < engine.playerCount(); p++) {
         const ps = gs.players[p];
         for (const h of ps?.heroes || []) {
           if (h && typeof h === 'object') sweep(h);

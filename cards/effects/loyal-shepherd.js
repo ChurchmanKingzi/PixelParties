@@ -232,7 +232,7 @@ module.exports = {
 
       // Reveal to opponent.
       await engine._delay(300);
-      const oi = pi === 0 ? 1 : 0;
+      const oi = engine.opponentOf(pi);
       await engine.promptGeneric(oi, {
         type: 'deckSearchReveal',
         cardName: replacementName,

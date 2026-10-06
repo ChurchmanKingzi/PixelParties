@@ -136,7 +136,7 @@ module.exports = {
     });
     await engine._delay(600);
 
-    const nextPlayer = gs.activePlayer === 0 ? 1 : 0;
+    const nextPlayer = engine.opponentOf(gs.activePlayer);
     await engine.actionAddBuff(target, zielSeite, targetHeroIdx, 'cloudy', {
       sourceOwner: pi,   // v1067: Quelle ist Pflicht (siehe _affected-shared)
       expiresAtTurn: gs.turn + 1,
@@ -185,7 +185,7 @@ module.exports = {
       });
       await engine._delay(450);
       // Cloudy buff: expires at end of this turn (start of next player's turn).
-      const nextPlayer = engine.gs.activePlayer === 0 ? 1 : 0;
+      const nextPlayer = engine.opponentOf(engine.gs.activePlayer);
       await engine.actionAddBuff(target, tgtOwner, tgtHi, 'cloudy', {
         // v1067: Quelle ist Pflicht (siehe _affected-shared). In diesem
         // Hook gibt es kein `pi` — der Wirker ist der Besitzer der Flasche.

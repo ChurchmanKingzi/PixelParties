@@ -44,7 +44,7 @@ function hoptUsed(engine, pi) {
  * Stamps `t.level` / `t.cost` on each returned target.
  */
 function getCapturableCreatures(engine, pi) {
-  const oppIdx = pi === 0 ? 1 : 0;
+  const oppIdx = engine.opponentOf(pi);
   const ps = engine.gs.players[pi];
   if (!ps) return [];
   const gold = ps.gold || 0;

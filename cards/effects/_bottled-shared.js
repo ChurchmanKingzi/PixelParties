@@ -20,7 +20,7 @@ const { loadCardEffect } = require('./_loader');
  */
 async function runDiscardChain(engine, potionOwner, potionName) {
   const gs = engine.gs;
-  const oppIdx = potionOwner === 0 ? 1 : 0;
+  const oppIdx = engine.opponentOf(potionOwner);
 
   // Opponent goes first
   let currentPlayer = oppIdx;
@@ -41,7 +41,7 @@ async function runDiscardChain(engine, potionOwner, potionName) {
     // sonst reichten sie die Kette unbegrenzt hin und her, weil keiner
     // je etwas abwerfen muesste.
     {
-      const oppOf = currentPlayer === 0 ? 1 : 0;
+      const oppOf = engine.opponentOf(currentPlayer);
       const boris = loadCardEffect('Boris, the Guardian of Blackport');
       const beideHabenBoris = !!boris?.borisActive
         && boris.borisActive(engine, currentPlayer) && boris.borisActive(engine, oppOf);
@@ -127,7 +127,7 @@ async function runDiscardChain(engine, potionOwner, potionName) {
     }
 
     // Switch to other player
-    currentPlayer = currentPlayer === 0 ? 1 : 0;
+    currentPlayer = engine.opponentOf(currentPlayer);
   }
 }
 

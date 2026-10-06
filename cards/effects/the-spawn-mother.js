@@ -45,6 +45,7 @@
 // ═══════════════════════════════════════════
 
 const { hasCardType } = require('./_hooks');
+const { opponentOfGs } = require('./_opp');
 
 const CARD_NAME = 'The Spawn Mother';
 const AOE_DAMAGE = 100;
@@ -66,7 +67,7 @@ function _allOpponentHeroTargets(gs, pi) {
   // Kontrolle statt Seite (Styx 28.9.): „all Heroes your opponent
   // CONTROLS" — beide Spalten, nach Kontrolleur (wie `heroSideOf`);
   // `owner` bleibt die physische Spalte.
-  const oi = pi === 0 ? 1 : 0;
+  const oi = opponentOfGs(gs, pi);
   const out = [];
   for (let p = 0; p < (gs.players || []).length; p++) {
     const heroes = gs.players[p]?.heroes || [];
@@ -102,7 +103,7 @@ function _allBoardCreatures(engine, excludeInstId) {
 
 function _allBoardHeroes(gs) {
   const out = [];
-  for (let pi = 0; pi < 2; pi++) {
+  for (let pi = 0; pi < gs.players.length; pi++) {
     const ps = gs.players[pi];
     if (!ps) continue;
     for (let hi = 0; hi < (ps.heroes || []).length; hi++) {

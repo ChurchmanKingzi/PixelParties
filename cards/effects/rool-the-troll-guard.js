@@ -56,7 +56,7 @@ async function verdoppeln(engine, geber, roolBesitzer) {
     ? !!geber.hero.buffs?.[BUFF]
     : !!geber.inst.counters?.buffs?.[BUFF];
   if (schonDa) return;
-  const gegner = roolBesitzer === 0 ? 1 : 0;
+  const gegner = engine.opponentOf(roolBesitzer);
   // „Ende deines naechsten Zuges": naechster Zug des Rool-Kontrolleurs, Ablauf am Beginn des Zuges danach.
   const meinNaechster = gs.activePlayer === roolBesitzer ? gs.turn + 2 : gs.turn + 1;
   const opts = { expiresAtTurn: meinNaechster + 1, expiresForPlayer: gegner, source: CARD_NAME, sourceOwner: roolBesitzer };

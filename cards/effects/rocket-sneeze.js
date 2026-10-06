@@ -74,7 +74,7 @@ module.exports = {
   async oppPreDamageResolve(engine, pi, _target, _targetHeroIdx, source, amount, type) {
     _markPrompted(engine.gs, pi);
     const gs = engine.gs;
-    const oi = pi === 0 ? 1 : 0; // target's controller side
+    const oi = engine.opponentOf(pi); // target's controller side
     await _spreadDamage(engine, pi, oi, source, amount, type);
     engine.log('rocket_sneeze_redirect', {
       player: gs.players[pi]?.username, amount, type, source: source?.name,
