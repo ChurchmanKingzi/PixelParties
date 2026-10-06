@@ -2908,7 +2908,7 @@ function ProfileScreen() {
 
         {/* ═══ LEFT COLUMN — PLAYER IDENTITY ═══ */}
         <div className="profile-identity-col">
-          <div className="profile-identity-panel">
+          <div className="profile-identity-panel pp-fenster pp-fenster-flach">
 
             {/* Avatar frame */}
             <div className="profile-hero-area">
@@ -3045,7 +3045,7 @@ function ProfileScreen() {
         <div className="profile-right-col">
 
           {/* Combined: Sleeve + Battle Record + Name Color + Top Heroes */}
-          <div className="profile-section profile-section-wide" style={{ flex: 'none' }}>
+          <div className="profile-section profile-section-wide pp-fenster" style={{ flex: 'none' }}>
             <div style={{ display: 'flex', gap: 28, alignItems: 'stretch' }}>
 
               {/* Sleeve — large preview */}
@@ -3399,7 +3399,7 @@ function ProfileScreen() {
               (drei Spalten) — sonst passt das Profil nicht auf einen Bildschirm. */}
           <div className="profile-zweispaltig">
           {/* Settings */}
-          <div className="profile-section profile-section-wide">
+          <div className="profile-section profile-section-wide pp-fenster">
             <div className="profile-section-label">SETTINGS</div>
             <div className="profile-schalter-spalte">
               <ProfilSchalter an={playAnimations} onToggle={togglePlayAnimations}
@@ -3424,7 +3424,7 @@ function ProfileScreen() {
           </div>
 
           {/* Change Password */}
-          <div className="profile-section profile-section-wide">
+          <div className="profile-section profile-section-wide pp-fenster">
             <div className="profile-section-label">CHANGE PASSWORD</div>
             <div className="profile-passwort-spalte">
               <input className="input" type="password" placeholder="Current password" value={oldPw}
@@ -3442,7 +3442,7 @@ function ProfileScreen() {
           </div>
 
           {/* Email & recovery */}
-          <div className="profile-section profile-section-wide">
+          <div className="profile-section profile-section-wide pp-fenster">
             <div className="profile-section-label">EMAIL &amp; RECOVERY</div>
             {user.email && !emailEditing ? (
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
