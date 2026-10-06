@@ -3072,7 +3072,7 @@ function ProfileScreen() {
                           <div className="profile-avatar-gallery-img">
                             <img src={url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                           </div>
-                          <div className="profile-cb-gallery-label">{file.replace(/\.[^.]+$/, '')}</div>
+                          <div className="profile-cb-gallery-label">{ppCamelSpaces(file.replace(/\.[^.]+$/, ''))}</div>
                         </div>
                       );
                     })}
@@ -3085,7 +3085,7 @@ function ProfileScreen() {
                           <div className="profile-avatar-gallery-img">
                             <img src={url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                           </div>
-                          <div className="profile-cb-gallery-label">{avatarNames[avatarId] || avatarId}</div>
+                          <div className="profile-cb-gallery-label">{avatarNames[avatarId] || ppCamelSpaces(avatarId)}</div>
                         </div>
                       );
                     })}
