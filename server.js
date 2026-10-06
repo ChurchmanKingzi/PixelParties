@@ -1172,6 +1172,21 @@ async function initDatabase() {
     } catch (err) { console.error('[Shop] Sleeve-Migration', e.formerId, '->', e.id, 'fehlgeschlagen:', err.message); }
   }
 
+  // Avatare, die früher "avatarN" hießen, tragen jetzt Namen (data/shop/avatar-renames.json: { "avatar1": "Birb", … }).
+  // Gekaufte und ausgerüstete Avatare auf die neue ID umschreiben — idempotent, läuft bei jedem Start ohne Wirkung
+  // weiter. MUSS vor der Bereinigung unten laufen, sonst würden getragene Avatare mit altem Pfad zurückgesetzt.
+  let avatarRenames = {};
+  try { avatarRenames = JSON.parse(fs.readFileSync(path.join(__dirname, 'data', 'shop', 'avatar-renames.json'), 'utf-8')); }
+  catch (err) { if (err.code !== 'ENOENT') console.error('[Shop] avatar-renames.json unlesbar:', err.message); }
+  for (const [oldId, newId] of Object.entries(avatarRenames)) {
+    if (!oldId || !newId || oldId === newId) continue;
+    try {
+      await db.run("UPDATE OR IGNORE user_shop_items SET item_id = ? WHERE item_type = 'avatar' AND item_id = ?", [newId, oldId]);
+      await db.run("DELETE FROM user_shop_items WHERE item_type = 'avatar' AND item_id = ?", [oldId]);
+      await db.run('UPDATE users SET avatar = ? WHERE avatar = ?', ['/data/shop/avatars/' + newId + '.png', '/data/shop/avatars/' + oldId + '.png']);
+    } catch (err) { console.error('[Shop] Avatar-Umbenennung', oldId, '->', newId, 'fehlgeschlagen:', err.message); }
+  }
+
   // Ausgerüstete Shop-Avatare/-Sleeves, deren Datei entfernt wurde, zurücksetzen (idempotent).
   for (const [col, sub] of [['avatar', 'avatars'], ['cardback', 'sleeves']]) {
     try {
