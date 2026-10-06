@@ -6,7 +6,7 @@
 //   node scripts/skilltest-train.js --games 300 --seats 4       # nur 4er-Tische
 //   node scripts/skilltest-train.js --games 2000 --workers 3    # 3 Worker-Threads parallel (Standard: Kerne − 1, höchstens 3)
 //   node scripts/skilltest-train.js --games 300 --seats 3-6
-//   node scripts/skilltest-train.js --evaluate 60 --seats 4     # Vergleich: gelernt gegen Standard
+//   node scripts/skilltest-train.js --evaluate 60 --seats 4     # Vergleich: gelernt gegen Standard (--mode full|profile|persona)
 //   node scripts/skilltest-train.js --daemon --duty 0.25        # Dauerbetrieb (Hintergrundlernen), 25 % Rechenanteil
 //   PP_ST_PROFILE=/pfad/profil.json …                           # anderes Profil
 const os = require('os');
@@ -21,8 +21,8 @@ if (seatsArg && seatsArg !== true) seats = String(seatsArg).includes('-') ? Stri
   if (!process.env.NODE_ENV) process.env.NODE_ENV = 'production';
   const { train, evaluate } = require('../skilltest/learn/train');
   if (arg('evaluate', null)) {
-    const r = await evaluate({ games: Number(arg('evaluate', 50)), seats: typeof seats === 'number' ? seats : 4 });
-    console.log(`[skilltest-train] Vergleich (${r.games} Partien): Persona „${r.persona}“ mit Profil gegen Standard-Bots ohne Profil — mittlere Platzierungsgüte ${r.meanPlaceScore.toFixed(3)} (0 = ausgeglichen), Siegquote ${(r.winRate * 100).toFixed(1)} %`);
+    const r = await evaluate({ games: Number(arg('evaluate', 50)), seats: typeof seats === 'number' ? seats : 4, mode: arg('mode', 'full'), workers: arg('workers', null) ? Number(arg('workers', 1)) : Math.max(1, Math.min(3, os.cpus().length - 1)) });
+    console.log(`[skilltest-train] Vergleich [${r.mode}] (${r.games} Partien): Persona „${r.persona}“ gegen Standard-Bots ohne Profil — mittlere Platzierungsgüte ${r.meanPlaceScore.toFixed(3)} (0 = ausgeglichen), Siegquote ${(r.winRate * 100).toFixed(1)} %`);
     process.exit(0);
   }
   const daemon = !!arg('daemon', false);

@@ -11,7 +11,7 @@ const toolsDir = (process.env.NODE_PATH || '').split(path.delimiter).find(d => f
   const srv = await startServer();
   const browser = await chromium.launch({ headless: true });
   try {
-    const ctx = await browser.newContext({ viewport: { width: 1700, height: 950 } });
+    const ctx = await browser.newContext({ viewport: { width: parseInt(process.env.ST_W || '1700', 10), height: parseInt(process.env.ST_H || '950', 10) } });
     await ctx.request.post(BASE + '/api/auth/login', { data: { username: acc.username, password: acc.password } });
     if (toolsDir) {
       await ctx.route(/unpkg\.com\/react@18\/umd\/react\.production\.min\.js/, r => r.fulfill({ contentType: 'application/javascript', body: fs.readFileSync(path.join(toolsDir, 'react/umd/react.production.min.js')) }));

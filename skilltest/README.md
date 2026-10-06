@@ -86,11 +86,25 @@ Server → Client: `st_prep_*` (Vorbereitung), `st_game_over { winnerIdx, reason
 `gameState.skillTest` (`publicState`): Round, Reihenfolge, Startspieler, Zugsitz, erschöpfte Helden/Creatures, Ausgeschiedene,
 Bot-Sitze, Timer. Client → Server: `st_attack`, `st_pass_round`, (Held-/Creature-Effekte laufen über die normalen Handler).
 
+## Bekannte Grenzen (Stand jetzt)
+
+- **Brett:** ein Gegner steht groß im Hauptfeld (angeklickt/angepinnt oder der Spieler am Zug), alle übrigen als Mini-Kacheln
+  (`.st-mini`, anklickbar über den Kopf bzw. die Zeilen des Turn-Panels). Ziele in Mini-Kacheln sind direkt anklickbar;
+  Drag & Drop (Artifacts auf gegnerische Helden, Kreuz-Seiten-Karten) funktioniert nur auf den Gegner im Hauptfeld.
+- **Zusatzaktionen** sind pro Runde unbegrenzt verfügbar, soweit die Karte sie gewährt (die Engine zählt „einmal pro Zug" je
+  Round); die genaue „einmal pro Round und Held"-Regel ist noch nicht abgebildet.
+- **Gesperrte Karten** (`docs/skilltest-illegal-cards.md`): Sofortsiege, Doom-Clock-Familie, Karten mit „beide Ablagen" u. Ä.
+- **Bots** nutzen noch keine Tränke und keine Hand-Abilities; Reaktionskarten spielen sie nicht aktiv.
+- **Reaktionsfenster** hängen meist am Besitzer des Ziels (N-Spieler-tauglich); einzelne Karten fragen noch „den Gegner" (Fokus bzw.
+  nächster lebender Sitz) statt alle Sitze der Reihe nach.
+- **Rollouts/MCTS** der Normalspiel-CPU sind im Modus abgeschaltet (`mctsPickFromOptions` gibt die erste Option zurück).
+
 ## Regressionsschutz & Tests
 
 - `scripts/regress/compare.sh` vergleicht geseedete 2-Spieler-Normalspiele mit der eingecheckten Baseline —
   **muss nach jeder Engine-Änderung „unverändert" melden**.
-- `scripts/skilltest-e2e/*.test.js` (Lobby, Vorbereitung, Kampf per Socket), `ui-*.shot.js` (Playwright, Screenshots).
+- `scripts/skilltest-e2e/*.test.js`: Lobby, Vorbereitung, Kampf, Sitzwechsel (CPU-Übernahme/Aufgeben), Zielwahl über Sitze (per Socket,
+  brauchen `socket.io-client`, siehe `lib.js`) und `learn.test.js` (Lernsystem, headless); `ui-*.shot.js` (Playwright, Screenshots).
 - Headless: `node -e "require('./skilltest/sim').runGame({seats:4}).then(console.log)"` (mit `PP_ST_SIM=1`, siehe `sim-bridge.js`).
 
 ## Testschalter

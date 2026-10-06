@@ -281,10 +281,11 @@ async function evaluate(opts = {}) {
       started++;
       const n = typeof opts.seats === 'number' ? opts.seats : 4;
       const seat = Math.floor(rng() * n);
+      const mode = opts.mode || 'full';          // 'full' = Profil + beste Persona, 'profile' = nur Profil, 'persona' = nur beste Persona
       const simOpts = {
         seats: n, maxTurns: opts.maxTurns || 3000,
-        weights: Array.from({ length: n }, (_, i) => (i === seat && best ? best.weights : null)),
-        noProfileSeats: Array.from({ length: n }, (_, i) => i).filter(i => i !== seat),
+        weights: Array.from({ length: n }, (_, i) => (i === seat && best && mode !== 'profile' ? best.weights : null)),
+        noProfileSeats: Array.from({ length: n }, (_, i) => i).filter(i => i !== seat || mode === 'persona'),
       };
       let rec = null;
       try { rec = pool ? await pool.run(simOpts) : await require('../sim').runGame(simOpts); } catch { rec = null; }
@@ -295,7 +296,7 @@ async function evaluate(opts = {}) {
   };
   try { await Promise.all(Array.from({ length: Math.max(1, workers) }, runner)); }
   finally { if (pool) pool.close(); }
-  return { games: cnt, meanPlaceScore: cnt ? sum / cnt : 0, winRate: cnt ? wins / cnt : 0, persona: best && best.name };
+  return { games: cnt, meanPlaceScore: cnt ? sum / cnt : 0, winRate: cnt ? wins / cnt : 0, persona: best && best.name, mode: opts.mode || 'full' };
 }
 
 module.exports = { WorkerPool, train, evaluate, learnFrom, baseFeatures, placeScore, seedPopulation, evolve, pickPersona, playOne, PLAY_VALUE_SCALE };

@@ -9056,7 +9056,7 @@ async function doActivateCreatureEffect(room, pi, { heroIdx, zoneSlot, charmedOw
     await room.engine._flushSurpriseDrawChecks();
     await room.engine._executeDeferredSurprises();
   } catch (err) {
-    console.error('[Engine] doActivateCreatureEffect error:', err.message);
+    console.error('[Engine] doActivateCreatureEffect error:', err.message, '\n' + String(err.stack || '').split('\n').slice(1, 4).join('\n'));
   }
   for (let i = 0; i < roomPlayerCount(room); i++) sendGameState(room, i); sendSpectatorGameState(room);
   return true;
