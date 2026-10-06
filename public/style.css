@@ -13286,6 +13286,9 @@ body:has(.modal-overlay) .tooltip {
   flex-wrap: wrap;
   gap: 12px;
   justify-content: center;
+  /* Puffer für den Hover-Zoom (scale 1.05 ≈ 2 px je Seite): Transformationen zählen zum scrollbaren Bereich. Ohne
+     diesen Rand reichte schon der Zoom der untersten Reihe, um im Rahmen eine Scrollbar auszulösen. */
+  padding: 6px;
 }
 .profile-avatar-gallery-item {
   cursor: pointer;

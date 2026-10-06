@@ -2678,8 +2678,10 @@ function ProfileScreen() {
 
             {/* Avatar frame */}
             <div className="profile-hero-area">
-              <div className="profile-avatar-frame" style={{ borderColor: rank.color, boxShadow: `0 0 20px ${rank.glow}, 0 0 40px ${rank.glow}, inset 0 0 15px ${rank.glow}`, cursor: 'pointer' }}
-                onClick={() => setShowAvatarGallery(true)}>
+              {/* role="button": der globale Klick-Sound (app-shared.jsx) hört auf Knöpfe und [role="button"] */}
+              <div className="profile-avatar-frame" role="button" tabIndex={0} aria-label="Change avatar" style={{ borderColor: rank.color, boxShadow: `0 0 20px ${rank.glow}, 0 0 40px ${rank.glow}, inset 0 0 15px ${rank.glow}`, cursor: 'pointer' }}
+                onClick={() => setShowAvatarGallery(true)}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setShowAvatarGallery(true); } }}>
                 <div className="profile-avatar-inner">
                   {avatar
                     ? <img src={avatar} style={{ width: '100%', height: '100%', objectFit: 'cover', imageRendering: 'pixelated' }} />
