@@ -534,7 +534,7 @@ function buildDecisionChannels(spiele, opts = {}) {
   //    tags[Seite][Tag]    — situative Deltas, ADDITIV (nie gekreuzt), jedes
   //                          mit eigenem Welch-Gate: Passung zum Gegner
   //                          (`fit:*`), eine andere Area auf der Hand
-  //                          (`hand:other`/`hand:none`), Karten, die auf
+  //                          (`hand:none|stuck`, `swap:*`, `hand:ready`), gemessener Nutzen der Area (`net:*`), Karten, die auf
   //                          Abräumen reagieren (`board:<Name>`, `dpa:*`),
   //                          dazu die Lage (`st:*`).
   //  Der offene Tag-Raum (`board:<Name>`) vergleicht viele Namen
@@ -610,7 +610,7 @@ function buildDecisionChannels(spiele, opts = {}) {
           areaShared.istOffen(tag) ? { tMin: 3.0 } : {});
         if (lift === null) continue;
         const delta = Math.round((lift - basis) * 10) / 10;
-        if (Math.abs(delta) >= 2.5) tagRegeln[seite][tag] = delta;
+        if (Math.abs(delta) >= 3.5) tagRegeln[seite][tag] = delta;
       }
     }
     if (Object.keys(idRegeln).length) areaRemovalRules.ident = idRegeln;

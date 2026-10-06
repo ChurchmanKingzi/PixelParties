@@ -362,33 +362,77 @@ Armen in Idej Illusions.
 Anlass: Es gibt Situationen, Karten und ganze Decks, in denen es richtig
 ist, **eigene** Areas zu zerstören — Pressure Projectile, Hammer Skeleton
 und Excavator Bucket sind nur die ersten Karten, die es erlauben. Drei
-Gründe, alle lernbar statt hartverdrahtet:
+Gründe, alle lernbar statt hartverdrahtet. Zwei davon werden **gemessen**
+statt aus Karteneigenschaften geschätzt (Als Auftrag 6.10., 2. Runde:
+„die Approximationen reichen nicht"):
 
 | Grund | Tag | Quelle |
 |---|---|---|
-| die Area hilft dem Gegner auch / mehr | `fit:opp>own` · `fit:eq` · `fit:own>opp` | Summe der Ability-Stufen in den Schulen der Area (`spellSchool1/2`), beide Seiten |
-| man will eine ANDERE Area ausspielen | `hand:other` · `hand:none` | Area-Karten auf der eigenen Hand (ohne die angebotene selbst) |
+| die Area hilft dem Gegner auch / mehr | `net:opp++ · opp · 0 · own · own++` | **gemessen** (`nv`, s. u.): Eval mit Area minus Eval ohne Area, aus Sicht des Wählers; positiv = die Area hilft MIR |
+| | `fit:opp>own · eq · own>opp` | Näherung: Summe der Ability-Stufen in den Schulen der Area (`spellSchool1/2`) — bleibt als Hypothese neben der Messung, gilt auch ohne Messlauf |
+| man will eine ANDERE Area ausspielen | `hand:none · hand:stuck · swap:- · 0 · + · ++ · hand:ready` | eine Familie, die einander ausschließt: keine andere Area / nicht spielbar (kein Held kann sie jetzt wirken) / spielbar mit **gemessenem** Tauschwert (`sw`) / spielbar, ungemessen |
 | eigene Effekte triggern/skalieren beim Abräumen | `board:<Name>` (offen), `dpa:0/1-2/3+` | eigenes Brett (Helden, Support, Abilities); Areas in der eigenen Ablage |
 | Areas, die generell weg sollen | `Name@own` · `Name@opp` | Identität je Seite (das Profil gehört einem Deck — dort lernbar) |
 
 Dazu die Lage-Tags der anderen Formen (`st:*`) und `areas:own/opp:N`.
+
+**Die Messung (`measureAreaValues` in `_cpu.js`).** Das statische Eval kennt
+die Wirkung nur bei drei von 45 Areas (`cpuMeta`); ein Rollout spielt sie
+dagegen wirklich. Einmal je LIVE-Zug, am Zugbeginn (Main 1, außerhalb jeder
+Kartenauflösung — mitten in einem Prompt zu simulieren hieße, Zustand
+wegzusnapshotten, während die Karte schwebt), rechnet die CPU je Area auf dem
+Brett:
+
+- **Basis** — `snapshot → rolloutRestOfTurn → evaluateState → restore`, nichts verändert
+- **gesperrt** — Area per `removeArea` (ohne Schutzfenster) weg, Area-Karten der Hand aus der Hand genommen
+- **frei** — Area weg, Hand wie sie ist (nur, wenn eine andere Area spielbar auf der Hand liegt)
+
+`nv = Basis − gesperrt` (Nutzen der Area für mich), `sw = frei − gesperrt`
+(was die CPU durch das Nachlegen gewinnt — nach IHRER Bewertung; negativ, wenn
+Nachlegen schlechter wäre als gar nichts, ≈0, wenn sie die Karte nicht spielen würde). Ergebnis: `engine._areaNet = { turn, pi, nv, sw }`,
+Schlüssel `Name@own|opp`. Die Entscheidung selbst bleibt synchron und liest
+nur den Stempel (höchstens zwei Halbzüge alt); der Recorder schreibt ihn roh
+in die Zeile.
+
+Drei Dinge, die der Ende-zu-Ende-Lauf erzwungen hat (erste Fassung: Werte
+zwischen −51838 und +873, dazwischen die ±100000 der Spielende-Werte):
+
+1. **Gleicher Zufall für alle Läufe einer Wiederholung** (Seed je Wiederholung
+   und Zug, `Math.random` nur während des Laufs ersetzt) — ohne das misst man
+   das Würfeln, nicht die Area.
+2. **Gepaarte Differenzen, Median über `PP_AREA_NET_REPS` (3), gekappt auf
+   ±`PP_AREA_NET_KAPPE` (2000)** — robust gegen den Lauf, in dem zufällig ein
+   Held stirbt; 》entscheidet das Spiel im Horizont《 landet in der äußeren Stufe.
+3. **Skala gemessen, nicht angenommen:** echte Unterschiede lagen bei einigen
+   hundert bis wenigen tausend Eval-Punkten (Blood Rock eigen: +1125/+2192),
+   nicht bei HP-Größen. Stufen: ±120 / ±600 (`NV_GRENZEN`). Gemessene Tauschwerte streuen im
+   Lauf-zu-Lauf-Vergleich noch um einige hundert Punkte (−437 … +158 im Test);
+   deshalb bucketet der Trainer grob und verlangt das Welch-Gate.
+
+Während der Messung ist das Gelernte aus dem Eval ausgeblendet
+(`messZustand.blockLearned`), sonst flösse es in die Größe zurück, aus der es
+gelernt wird. Läuft nur, wenn eine Area liegt UND (Datensammlung des gepinnten
+Spielers ODER das Profil hat `net:*`/`swap:*`-Regeln). Kosten: je Zug
+`reps × (1 + Areas × (1 + [1]))` Rollouts mit `PP_AREA_NET_HORIZON` (2) Zügen —
+nur in Zügen mit Area auf dem Brett. Knöpfe: `PP_AREA_NET=0` (aus).
 
 **Drei Teile, ein gemeinsames Vokabular** (`cards/effects/_area-removal-shared.js`
 — Trainer und Laufzeit leiten die Tags aus DERSELBEN Funktion ab):
 
 - **Recorder** (`_decision-log.js`): steht bei einer Zielwahl eine Area zur
   Wahl, schreibt die Zeile den ROHEN Kontext (`ar`: eigene/gegnerische
-  Areas, Area-Karten auf der Hand, eigenes Brett, Schul-Stärken, Areas in
-  der Ablage) VOR der Antwort mit. Abgeleitet wird erst im Trainer.
+  Areas, Area-Karten auf der Hand und welche davon spielbar sind (`hC`),
+  eigenes Brett, Schul-Stärken, Areas in der Ablage, gemessene `nv`/`sw`)
+  VOR der Antwort mit. Abgeleitet wird erst im Trainer.
 - **Trainer** (`scripts/decision-channels.js`, FORM 7): Einheit ist das Paar
   (Entscheidung × angebotene Area), Kontrast 》diese Area abgeräumt《 gegen
   》gar nichts abgeräumt《 (Zeilen, in denen statt ihrer eine andere Area
   gewählt wurde, zählen nicht in ihren Nicht-gewählt-Arm — im Synthetik-
   Test erbte sonst eine gegnerische Area das Delta einer eigenen). Gelernt
   wird getrennt je Seite: Identität, Grundrate, additive Tag-Deltas mit
-  Welch-Gate (offener Raum `board:` strenger, T ≥ 3). Breiteres
-  Prävalenzband (0,03–0,97), weil die Exploration die Wahlrate festlegt.
-  Zeilen mit gemischter Wahl (Ausrüstung ODER Area) zählen nicht.
+  Welch-Gate (Floor 3,5 Punkte; offener Raum `board:` strenger, T ≥ 3).
+  Breiteres Prävalenzband (0,03–0,97), weil die Exploration die Wahlrate
+  festlegt. Zeilen mit gemischter Wahl (Ausrüstung ODER Area) zählen nicht.
   Ausgabe: `profile.areaRemovalRules = { ident, base, tags }`.
 - **Laufzeit** (`_deck-profile.js`): `areaRemovalChoice` (Regel > Exploration
   > kein Urteil) hängt in der CPU-Zielwahl vor dem Default-Picker, auch im
@@ -416,8 +460,8 @@ selbst. Karten mit eigenem `cpuResponse` für gemischte Fragen rufen
 `deckProfile.areaRemovalChoice` für den Area-Teil.
 
 **Prüfung (Synthetik, 900 Spiele mit eingebautem Signal):** gelernt wurden
-`Foo@own`, `Bar@opp`, `hand:other` +, `hand:none` −, `board:Trigger Card` +;
-die gegnerische Seite blieb frei von Tag-Rauschen, und die
+`Bar@opp`, `net:opp` +, `net:own++` −, `swap:++` + (die Hand-Familie zählt
+nicht doppelt); die gegnerische Seite blieb frei von Tag-Rauschen, und die
 Negativkontrolle (Ausgang reiner Zufall) erzeugte KEINE Regel.
 
 ## Deck-Telemetrie: PP_DECK_MONITOR=1

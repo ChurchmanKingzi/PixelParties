@@ -2857,6 +2857,9 @@ function areaRemovalChoice(engine, pi, validTargets, config = {}) {
  */
 function areaStandingValue(engine, pi) {
   try {
+    // Während der Messung (`measureAreaValues`) zählt das Gelernte nicht mit:
+    // sonst flösse es in die Größe zurück, aus der es gelernt wird.
+    if (require('./_area-removal-shared').messZustand.blockLearned > 0) return 0;
     const prof = profileFor(engine, pi);
     const ident = prof?.areaRemovalRules?.ident;
     if (!ident) return 0;
@@ -3521,5 +3524,6 @@ module.exports = {
   noteAbilityCostChoice,
   areaRemovalChoice,
   areaStandingValue,
+  isCollecting,
   __getProfile: profileFor,
 };
