@@ -984,7 +984,38 @@ function PuzzleCreator() {
   // geloest — dann hat der Browser den Hover neu bewertet. Die Frist
   // ist nur der Notnagel fuer den Fall, dass der Zeiger stehen bleibt.
   const riegelLoeser = useRef(null);
+  // ★★ Fehlerbericht 6.10.: „Handkarten lassen sich nicht draggen — genau
+  // dann nicht, wenn eine Karte links der gewollten ueber dem Zeiger
+  // liegt." Gemessen (Chromium, Zaehlung nach jedem Teilschritt des
+  // `dragstart`): die Quellkarte liegt bis zum Setzen des Riegels unter
+  // dem Druckpunkt — und danach nicht mehr.
+  //
+  // Ursache: Der Riegel schaltet das Aufpoppen aus
+  // (`:not([data-pp-dragging]) … :hover`). Eine gehoverte Karte ist 1,42x
+  // gross und `z-index: 60`; in einer vollen Hand deckt sie die Streifen
+  // ihrer linken Nachbarn ab. Faellt sie beim Setzen des Riegels in die
+  // Ruhelage zurueck, liegt unter dem Druckpunkt die NACHBARIN. Und
+  // Chromium prueft nach dem `dragstart`-Ereignis, ob die gezogene Karte
+  // noch unter dem Druckpunkt liegt — wenn nicht, bricht es den Zug sofort
+  // ab (`dragend` unmittelbar nach `dragstart`): die Karte bleibt liegen.
+  //
+  // Dieselbe Falle wie beim Verstecken der Quellkarte (siehe `ziehLaeuft`),
+  // und dieselbe Loesung: erst im NAECHSTEN Tick, wenn die Pruefung durch
+  // ist. Bestand seit v1215; im Duell gibt es kein HTML5-Drag, dort tritt
+  // es nicht auf.
+  const riegelTimer = useRef(null);
+  const riegelSpaeter = useCallback(() => {
+    clearTimeout(riegelTimer.current);
+    riegelTimer.current = setTimeout(() => {
+      riegelTimer.current = null;
+      window.setHandDragFlag?.(true);
+    }, 0);
+  }, []);
   const ziehRiegelLoesen = useCallback(() => {
+    // Ein noch ausstehendes Setzen darf einen schon beendeten Zug nicht
+    // nachtraeglich verriegeln.
+    clearTimeout(riegelTimer.current);
+    riegelTimer.current = null;
     if (riegelLoeser.current) riegelLoeser.current();
     let erledigt = false;
     const aus = () => {
@@ -1035,7 +1066,7 @@ function PuzzleCreator() {
     //
     // Gesetzt wird hier deshalb nur noch — geloest ausschliesslich
     // ueber `ziehRiegelLoesen`.
-    if (dragCardName != null) window.setHandDragFlag?.(true);
+    if (dragCardName != null) riegelSpaeter();
     if (dragCardName == null || !reihe) { window.clearHandTilt?.(alle()); return undefined; }
     const auf = (e) => {
       const x = e.clientX != null ? e.clientX
@@ -1062,7 +1093,7 @@ function PuzzleCreator() {
       ziehRiegelLoesen();
       window.clearHandTilt?.(alle());
     };
-  }, [dragCardName, dragHandSource, dragHandIdx, ziehRiegelLoesen]);
+  }, [dragCardName, dragHandSource, dragHandIdx, ziehRiegelLoesen, riegelSpaeter]);
 
   // ── Auto-save state to localStorage on every change ──
   useEffect(() => {
@@ -1997,17 +2028,47 @@ function PuzzleCreator() {
   }, [getCard, players, akzeptiertAbilities, areaZones]);
 
   // ── Drag ──
+  // Aufraeumer fuer den Box-Klang des laufenden Zuges (siehe `onDragStart`).
+  const boxKlangRef = useRef(null);
   const onDragStart = useCallback((e, cardName, handIdx, source, handSource) => {
-    // ★★ v1215: Hover-Riegel sofort, nicht erst ueber den Effekt
-    // (siehe app-board, derselbe Befund).
-    window.setHandDragFlag?.(true);
+    // ★★ v1215: Hover-Riegel fruehzeitig, nicht erst ueber den Effekt
+    // (siehe app-board, derselbe Befund) — aber NICHT mehr im
+    // `dragstart` selbst, sondern im naechsten Tick: siehe `riegelSpaeter`.
+    riegelSpaeter();
     setDragCardName(cardName); setDragHandIdx(handIdx); setDragSource(source || null); setDragHandSource(handSource || null);
     // Erst im naechsten Tick verstecken — siehe `ziehLaeuft`.
     setZiehLaeuft(false);
     setTimeout(() => setZiehLaeuft(true), 0);
     hideTooltip(); // dismiss tooltip during drag
     e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', '');
-  }, []);
+    // ★ Als Vorgabe 6.10.: eine FRISCHE Karte aus der Box (Galerie), die
+    // beim Loslassen nirgends landet, verschwand lautlos. Hand- und
+    // Brettkarten bleiben dann einfach liegen, die Box-Karte dagegen geht
+    // zurueck ins Nichts — das bekommt denselben Klang wie das Entfernen
+    // per Rechtsklick (`discard`). „Landet nirgends" heisst: es kam kein
+    // `drop` an (der feuert nur, wenn ein Ziel den Zug angenommen hat);
+    // Escape zaehlt ebenso. Beide Horcher gehen am Zugende wieder ab.
+    if (boxKlangRef.current) boxKlangRef.current();
+    if (handIdx == null && !source && !handSource) {
+      let gelandet = false;
+      const sahDrop = () => { gelandet = true; };
+      const ende = () => {
+        document.removeEventListener('drop', sahDrop, true);
+        document.removeEventListener('dragend', ende, true);
+        boxKlangRef.current = null;
+        if (!gelandet && window.playSFX) window.playSFX('discard', { dedupe: 60 });
+      };
+      document.addEventListener('drop', sahDrop, true);
+      document.addEventListener('dragend', ende, true);
+      // Falls `dragend` nie ankommt (Quelle aus dem DOM): beim naechsten
+      // Zug still abraeumen, ohne Klang.
+      boxKlangRef.current = () => {
+        document.removeEventListener('drop', sahDrop, true);
+        document.removeEventListener('dragend', ende, true);
+        boxKlangRef.current = null;
+      };
+    }
+  }, [riegelSpaeter]);
   /**
    * Override the native HTML5 drag image with a fixed-size card preview.
    * Without this, the browser auto-generates the drag ghost from the
