@@ -912,6 +912,9 @@ async function initDatabase() {
   try { await db.execute("ALTER TABLE users ADD COLUMN board TEXT DEFAULT NULL"); } catch {}
   // Gewählter Battle-Track (battle-tracks.js): 'battle<N>' oder Slug eines CPU-Themas; NULL = Standard.
   try { await db.execute("ALTER TABLE users ADD COLUMN battle_track TEXT DEFAULT NULL"); } catch {}
+  // Profil → Skins: gewählter Skin je Held ({ Heldenkarte: Skinname }). Gilt als
+  // Standard für jedes Deck, das für diesen Helden keinen eigenen Skin gesetzt hat.
+  try { await db.execute("ALTER TABLE users ADD COLUMN hero_skins TEXT DEFAULT '{}'"); } catch {}
   try { await db.execute("ALTER TABLE users ADD COLUMN hide_tutorial INTEGER DEFAULT 0"); } catch {}
   try { await db.execute("ALTER TABLE users ADD COLUMN play_animations INTEGER DEFAULT 1"); } catch {}
   // v1463: animierte Helden auf dem Brett (Display Heroes) und ihr
@@ -1967,8 +1970,14 @@ function liveShopRef(url, subdir) {
   return shopIds(subdir).has(id) ? url : null;
 }
 
+function parseHeroSkins(raw) {
+  try {
+    const o = JSON.parse(raw || '{}');
+    return (o && typeof o === 'object' && !Array.isArray(o)) ? o : {};
+  } catch { return {}; }
+}
 function sanitizeUser(u) {
-  return { id: u.id, username: u.username, elo: u.elo, eloCube: u.elo_cube == null ? 1000 : u.elo_cube, color: u.color, avatar: liveShopRef(u.avatar, 'avatars'), cardback: liveShopRef(u.cardback, 'sleeves'), board: u.board || null, battleTrack: u.battle_track || null, bio: u.bio || '', victoryMsg: u.victory_msg || '', defeatMsg: u.defeat_msg || '', wins: u.wins || 0, losses: u.losses || 0, sc: u.sc || 0, created_at: u.created_at, hide_tutorial: u.hide_tutorial || 0, play_animations: u.play_animations == null ? 1 : (u.play_animations ? 1 : 0), display_heroes: u.display_heroes == null ? 1 : (u.display_heroes ? 1 : 0), dynamic_heroes: (u.display_heroes === 0) ? 0 : (u.dynamic_heroes == null ? 1 : (u.dynamic_heroes ? 1 : 0)), defaultSampleDeckId: u.default_sample_deck_id || null, email: u.email || null, emailVerified: !!u.email_verified, isGuest: !!u.is_guest };
+  return { id: u.id, username: u.username, elo: u.elo, eloCube: u.elo_cube == null ? 1000 : u.elo_cube, color: u.color, avatar: liveShopRef(u.avatar, 'avatars'), cardback: liveShopRef(u.cardback, 'sleeves'), board: u.board || null, battleTrack: u.battle_track || null, heroSkins: parseHeroSkins(u.hero_skins), bio: u.bio || '', victoryMsg: u.victory_msg || '', defeatMsg: u.defeat_msg || '', wins: u.wins || 0, losses: u.losses || 0, sc: u.sc || 0, created_at: u.created_at, hide_tutorial: u.hide_tutorial || 0, play_animations: u.play_animations == null ? 1 : (u.play_animations ? 1 : 0), display_heroes: u.display_heroes == null ? 1 : (u.display_heroes ? 1 : 0), dynamic_heroes: (u.display_heroes === 0) ? 0 : (u.dynamic_heroes == null ? 1 : (u.dynamic_heroes ? 1 : 0)), defaultSampleDeckId: u.default_sample_deck_id || null, email: u.email || null, emailVerified: !!u.email_verified, isGuest: !!u.is_guest };
 }
 
 // ===== PROFILE ROUTES =====
@@ -2039,6 +2048,21 @@ app.put('/api/profile', authMiddleware, async (req, res) => {
       return res.status(403).json({ error: 'This avatar is not unlocked yet.' });
     }
   }
+  // Skins je Held (Profil → Skins): nur Skins, die zum Helden gehören UND dem Spieler gehören.
+  let heroSkinsClean;
+  if (b.heroSkins !== undefined) {
+    const wanted = (b.heroSkins && typeof b.heroSkins === 'object' && !Array.isArray(b.heroSkins)) ? b.heroSkins : {};
+    const ownedRows = await db.all("SELECT item_id FROM user_shop_items WHERE user_id = ? AND item_type = 'skin'", [req.user.userId]);
+    const ownedSkins = new Set(ownedRows.map(r => r.item_id));
+    heroSkinsClean = {};
+    for (const [hero, skin] of Object.entries(wanted)) {
+      if (!skin) continue;
+      if (!(SKINS_DATA[hero] || []).includes(skin) || !ownedSkins.has(skin)) {
+        return res.status(403).json({ error: 'This skin is not unlocked.' });
+      }
+      heroSkinsClean[hero] = skin;
+    }
+  }
   // Update only the fields the client actually sent, so single-field
   // quick-saves (avatar, sleeve, …) never clobber the others.
   const sets = [];
@@ -2049,6 +2073,7 @@ app.put('/api/profile', authMiddleware, async (req, res) => {
   if (b.cardback !== undefined)   { sets.push('cardback = ?');    vals.push(b.cardback || null); }
   if (b.bio !== undefined)        { sets.push('bio = ?');         vals.push((b.bio || '').slice(0, 200)); }
   if (b.board !== undefined)      { sets.push('board = ?');       vals.push(b.board || null); }
+  if (heroSkinsClean !== undefined) { sets.push('hero_skins = ?'); vals.push(JSON.stringify(heroSkinsClean)); }
   if (b.battleTrack !== undefined){ sets.push('battle_track = ?'); vals.push(b.battleTrack ? String(b.battleTrack).toLowerCase() : null); }
   if (b.victoryMsg !== undefined) { sets.push('victory_msg = ?'); vals.push(String(b.victoryMsg || '').slice(0, MESSAGE_MAX_LEN)); }
   if (b.defeatMsg !== undefined)  { sets.push('defeat_msg = ?');  vals.push(String(b.defeatMsg || '').slice(0, MESSAGE_MAX_LEN)); }
@@ -3588,6 +3613,17 @@ app.get('/api/shop/structure-decks', authMiddleware, async (req, res) => {
     defaultDeckId,
   });
 });
+
+// Profil-Skins als Standard: Skin je Held aus dem Profil, soweit das Deck keinen eigenen setzt.
+async function withProfileHeroSkins(userId, deck) {
+  if (!deck || !userId) return deck;
+  try {
+    const row = await db.get('SELECT hero_skins FROM users WHERE id = ?', [userId]);
+    const mine = parseHeroSkins(row?.hero_skins);
+    if (!Object.keys(mine).length) return deck;
+    return { ...deck, skins: { ...mine, ...(deck.skins || {}) } };
+  } catch { return deck; }
+}
 
 // ===== SKINS =====
 let SKINS_DATA = {};
@@ -13467,6 +13503,8 @@ async function setupGameState(room) {
         }
       }
 
+      deck = await withProfileHeroSkins(p.userId, deck);
+
       // Save original deck state at match start (for side-deck reset)
       if (!room._originalDecks) room._originalDecks = [{}, {}];
       room._originalDecks[idx] = JSON.parse(JSON.stringify({
@@ -16516,6 +16554,7 @@ io.on('connection', (socket) => {
       playerDeck = await fetchDeck(playerDeckId, { label: 'player' });
       cpuDeck = await fetchDeck(cpuDeckId, { allowUnownedStructure: true, label: 'cpu' });
       if (!playerDeck) { socket.emit('cpu_battle_error', 'Your deck is not available'); return; }
+      playerDeck = await withProfileHeroSkins(currentUser.userId, playerDeck);
       if (!cpuDeck) { socket.emit('cpu_battle_error', 'CPU deck is not available'); return; }
 
       // Opponents are unlock-gated. The gallery only surfaces unlocked ones,

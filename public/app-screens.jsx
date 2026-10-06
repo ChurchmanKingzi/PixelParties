@@ -2281,6 +2281,137 @@ function ProfilSchalter({ an, gesperrt, onToggle, label, tipp, zeigeTipp, verste
   );
 }
 
+// ═══════════════════════════════════════════
+//  PROFIL → SKINS
+//  Zwei Untermenüs: (1) alle Helden als Idle-Animation, Helden mit freigeschaltetem
+//  Skin vorn, der Rest leicht ausgegraut, je Gruppe alphabetisch nach dem Namen
+//  OHNE Titel (`heroDisplayName`); gezeigt wird die Basis-Figur oder der aktuell
+//  gewählte Skin. (2) Klick auf einen Helden mit Skins → Basis oder beliebig viele
+//  freigeschaltete Skins. Die Auswahl liegt im Profil (`heroSkins`) und gilt als
+//  Standard für alle Decks ohne eigenen Skin für diesen Helden.
+// ═══════════════════════════════════════════
+const PpIdleAnims = (() => {
+  let liste = null, laedt = null;
+  const slug = (n) => String(n || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+  const ladeListe = () => {
+    if (!laedt) laedt = fetch('/api/hero-animations', { credentials: 'same-origin' })
+      .then(r => (r.ok ? r.json() : null))
+      .then(d => { liste = (d && d.animations) || {}; return liste; })
+      .catch(() => { laedt = null; return {}; });
+    return laedt;
+  };
+  return { slug, ladeListe, meta: (name) => (liste ? liste[slug(name)] || null : null) };
+})();
+
+/** Idle-Animation per CSS (steps) — billig genug für ein ganzes Heldenraster. */
+function PpIdleSprite({ name, box = 96, grey }) {
+  const [, tick] = useState(0);
+  useEffect(() => { let lebt = true; PpIdleAnims.ladeListe().then(() => { if (lebt) tick(n => n + 1); }); return () => { lebt = false; }; }, []);
+  const m = PpIdleAnims.meta(name);
+  const wrap = { width: box, height: box, display: 'flex', alignItems: 'flex-end', justifyContent: 'center', filter: grey ? 'grayscale(.6) brightness(.85)' : undefined, opacity: grey ? .85 : 1 };
+  if (!m) return <div style={{ ...wrap, alignItems: 'center', color: 'var(--text2)', fontSize: 10, textAlign: 'center' }}>{heroDisplayName(name)}</div>;
+  const fw = m.frameWidth, fh = m.frameHeight, n = m.frames;
+  const vertikal = m.layout === 'vertical';
+  const scale = Math.max(1, Math.floor(Math.min(box / fw, box / fh)));
+  const id = 'ppidle-' + PpIdleAnims.slug(name);
+  const ende = vertikal ? `0 -${n * fh * scale}px` : `-${n * fw * scale}px 0`;
+  const css = `@keyframes ${id} { from { background-position: 0 0; } to { background-position: ${ende}; } }`;
+  const dauer = Math.max(1, n * (m.frameMs || 90));
+  return (
+    <div style={wrap}>
+      <style>{css}</style>
+      <div style={{
+        width: fw * scale, height: fh * scale, imageRendering: 'pixelated',
+        backgroundImage: `url("${m.sheetUrl}")`,
+        backgroundSize: vertikal ? `${fw * scale}px ${n * fh * scale}px` : `${n * fw * scale}px ${fh * scale}px`,
+        animation: `${id} ${dauer}ms steps(${n}) infinite`,
+      }} />
+    </div>
+  );
+}
+
+function ProfileSkinMenus({ ownedSkins, selected, onSelect, onClose }) {
+  const [hero, setHero] = useState(null);   // Held, dessen Skins gerade gewählt werden
+  const heroes = useMemo(() => {
+    const own = new Set(ownedSkins);
+    const alle = (ALL_CARDS || []).filter(c => c.cardType === 'Hero');
+    const mitSkin = (c) => (SKINS_DB[c.name] || []).some(sk => own.has(sk));
+    const cmp = (a, b) => heroDisplayName(a.name).localeCompare(heroDisplayName(b.name)) || a.name.localeCompare(b.name);
+    return [...alle.filter(mitSkin).sort(cmp), ...alle.filter(c => !mitSkin(c)).sort(cmp)];
+  }, [ownedSkins]);
+  const hatSkins = (name) => (SKINS_DB[name] || []).filter(sk => ownedSkins.includes(sk));
+
+  useEffect(() => {
+    const esc = (e) => {
+      if (e.key !== 'Escape') return;
+      e.stopImmediatePropagation();
+      if (hero) setHero(null); else onClose();
+    };
+    window.addEventListener('keydown', esc, true);
+    return () => window.removeEventListener('keydown', esc, true);
+  }, [hero, onClose]);
+
+  const fenster = (titel, zurueck, inhalt, z) => (
+    <div className="modal-overlay" style={{ zIndex: z }} onClick={e => { if (e.target === e.currentTarget) zurueck(); }}>
+      <div className="modal" style={{ maxWidth: 760, width: '92vw', maxHeight: '82vh', display: 'flex', flexDirection: 'column' }}>
+        <div style={{ display: 'flex', alignItems: 'center', marginBottom: 14 }}>
+          <h3 className="orbit-font" style={{ fontSize: 14, color: 'var(--accent)', flex: 1 }}>{titel}</h3>
+          <button className="btn" style={{ padding: '4px 12px', fontSize: 10 }} onClick={zurueck}>{hero && z > 1000 ? '← BACK' : '✕ CLOSE'}</button>
+        </div>
+        <div style={{ overflowY: 'auto', flex: 1 }}>{inhalt}</div>
+      </div>
+    </div>
+  );
+
+  const hauptmenue = fenster('SKINS', onClose, (
+    <>
+      <div style={{ fontSize: 11, color: 'var(--text2)', textAlign: 'center', marginBottom: 12 }}>
+        Pick a Hero to choose which skin they wear. Heroes with unlocked skins come first.
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(112px, 1fr))', gap: 10, padding: 4 }}>
+        {heroes.map(c => {
+          const eigene = hatSkins(c.name);
+          const aktiv = selected[c.name] && eigene.includes(selected[c.name]) ? selected[c.name] : null;
+          const anzeige = aktiv || c.name;
+          return (
+            <div key={c.name} role="button" tabIndex={0}
+              className={'profile-cb-gallery-item' + (aktiv ? ' active' : '')}
+              style={{ alignItems: 'center', cursor: eigene.length ? 'pointer' : 'default', padding: 6 }}
+              onClick={() => { if (eigene.length) setHero(c.name); }}
+              onKeyDown={(e) => { if ((e.key === 'Enter' || e.key === ' ') && eigene.length) { e.preventDefault(); setHero(c.name); } }}
+              title={c.name}>
+              <PpIdleSprite name={anzeige} box={96} grey={!eigene.length} />
+              <div className="profile-cb-gallery-label" style={{ opacity: eigene.length ? 1 : .7 }}>{heroDisplayName(c.name)}</div>
+            </div>
+          );
+        })}
+      </div>
+    </>
+  ), 1000);
+
+  if (!hero) return hauptmenue;
+  const optionen = [null, ...hatSkins(hero)];
+  const aktuell = selected[hero] || null;
+  return (
+    <>
+      {hauptmenue}
+      {fenster('SKIN — ' + heroDisplayName(hero).toUpperCase(), () => setHero(null), (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: 10, padding: 4 }}>
+          {optionen.map(sk => (
+            <div key={sk || 'base'} role="button" tabIndex={0}
+              className={'profile-cb-gallery-item' + ((aktuell || null) === sk ? ' active' : '')}
+              style={{ alignItems: 'center', padding: 6 }}
+              onClick={() => onSelect(hero, sk)}>
+              <PpIdleSprite name={sk || hero} box={112} />
+              <div className="profile-cb-gallery-label">{sk || 'Base'}</div>
+            </div>
+          ))}
+        </div>
+      ), 1100)}
+    </>
+  );
+}
+
 function ProfileScreen() {
   const { user, setUser, setScreen, notify, setBgmMode } = useContext(AppContext);
   const [color, setColor] = useState(user.color || '#00f0ff');
@@ -2363,7 +2494,8 @@ function ProfileScreen() {
     setPreviewTrack(id);
     if (setBgmMode) setBgmMode('battle:' + id);
   };
-  const closeTrackGallery = () => { stopTrackPreview(); setShowTrackGallery(false); };
+  // Das Vorhören läuft beim Schließen weiter (bis man es manuell ändert oder das Profil verlässt).
+  const closeTrackGallery = () => { setShowTrackGallery(false); };
   const selectBattleTrack = async (id) => {
     try {
       const data = await api('/profile', { method: 'PUT', body: JSON.stringify({ battleTrack: id }) });
@@ -2402,6 +2534,9 @@ function ProfileScreen() {
 
   // Top heroes
   const [topHeroes, setTopHeroes] = useState([]);
+  const [showSkinMenu, setShowSkinMenu] = useState(false);
+  const [ownedSkinIds, setOwnedSkinIds] = useState([]);
+  const [heroTip, setHeroTip] = useState(null);   // { card, imageUrl } der gehoverten Top-Heldenkarte
 
   // Play Animations toggle. The flag is stored as 0/1 on the user
   // record, with `null`/missing treated as enabled. The battle client
@@ -2446,8 +2581,17 @@ function ProfileScreen() {
       setOwnedSleeves(d.owned?.sleeve || []);
       setSleeveNames(d.names?.sleeve || {});
       setOwnedBoards(d.owned?.board || []);
+      setOwnedSkinIds(d.owned?.skin || []);
     }).catch(() => {});
   }, []);
+  const selectHeroSkin = async (hero, skin) => {
+    const next = { ...(user.heroSkins || {}) };
+    if (skin) next[hero] = skin; else delete next[hero];
+    try {
+      const data = await api('/profile', { method: 'PUT', body: JSON.stringify({ heroSkins: next }) });
+      setUser(data.user);
+    } catch (e) { notify(e.message, 'error'); }
+  };
 
   // Intercept Escape to close gallery modals
   useEffect(() => {
@@ -2881,6 +3025,20 @@ function ProfileScreen() {
                   </div>
                 </div>
 
+                {/* Skins */}
+                <div style={{ paddingTop: 14, paddingBottom: 14, borderBottom: '1px solid var(--bg4)', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <div className="profile-section-label">SKINS</div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <div style={{ fontSize: 13, color: 'var(--text)', fontWeight: 600, flex: 1 }}>
+                      {'🎨 ' + Object.keys(user.heroSkins || {}).length + ' Hero' + (Object.keys(user.heroSkins || {}).length === 1 ? '' : 'es') + ' skinned'}
+                    </div>
+                    <button className="btn" style={{ padding: '6px 16px', fontSize: 11 }}
+                      onClick={() => setShowSkinMenu(true)}>
+                      CHANGE
+                    </button>
+                  </div>
+                </div>
+
                 {/* Board info */}
                 <div style={{ paddingTop: 14, flex: 1, display: 'flex', flexDirection: 'column', gap: 6 }}>
                   <div className="profile-section-label">BOARD</div>
@@ -2903,6 +3061,9 @@ function ProfileScreen() {
               </div>
 
               {/* Right: Top Heroes */}
+              {heroTip && window.CardSideTooltip && ReactDOM.createPortal(
+                <div className="ppf-tip-host"><window.CardSideTooltip card={heroTip.card} imgUrl={heroTip.imageUrl} /></div>,
+                document.body)}
               <div className="profile-heroes-col" style={{ borderLeft: '1px solid var(--bg4)', paddingLeft: 24, display: 'flex', flexDirection: 'column', flex: 1, minWidth: 140 }}>
                 <div className="profile-section-label">TOP HEROES</div>
                 {topHeroes.length === 0 ? (
@@ -2917,7 +3078,9 @@ function ProfileScreen() {
                       const heroImg = getCardImage(h.name);
                       const medal = ['🥇', '🥈', '🥉'][i];
                       return (
-                        <div key={h.name} className="profile-top-hero">
+                        <div key={h.name} className="profile-top-hero"
+                          onMouseEnter={() => { const c = CARDS_BY_NAME && CARDS_BY_NAME[h.name]; if (c) setHeroTip({ card: c, imageUrl: cardImageUrl(h.name) }); }}
+                          onMouseLeave={() => setHeroTip(null)}>
                           <div className="profile-top-hero-rank">{medal}</div>
                           <div className="profile-top-hero-card">
                             {heroImg
@@ -3016,6 +3179,11 @@ function ProfileScreen() {
           })()}
 
           {/* Sleeve Gallery Modal */}
+          {showSkinMenu && (
+            <ProfileSkinMenus ownedSkins={ownedSkinIds} selected={user.heroSkins || {}}
+              onSelect={selectHeroSkin} onClose={() => setShowSkinMenu(false)} />
+          )}
+
           {showSleeveGallery && (
             <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) setShowSleeveGallery(false); }}>
               <div className="modal" style={{ maxWidth: 620, width: '90vw', maxHeight: '80vh', display: 'flex', flexDirection: 'column' }}>
