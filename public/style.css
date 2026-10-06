@@ -1479,10 +1479,25 @@ select optgroup {
    Zug (Zeiger betritt/verlaesst die Zone), waehrend der Bewegung wird
    nichts gerechnet und nichts gemessen. */
 .pp-drop-aktiv,
-[data-pp-drop] {
+[data-pp-drop],
+.pz-hand-cards[data-pz-ziel-an][data-pz-glow="hand"] {
   box-shadow: 0 0 14px color-mix(in srgb, var(--player-color) 45%, transparent) inset;
   transition: box-shadow .12s ease-out;
 }
+/* ── LEUCHTEN DER ABLAGEZONE IM PUZZLE-EDITOR ──────────────────────
+   Vorher Inline-Stil, gesteuert ueber React-State — jeder Zonenwechsel
+   kostete einen Voll-Render des Editors. Jetzt setzt `setDragOverZone`
+   (app-puzzle) nur das Attribut `data-pz-ziel-an` am DOM; die Optik
+   steht hier. `!important`, weil der Inline-Stil vorher jede
+   Stylesheet-Regel (`.board-zone:hover` & Co.) uebertrumpft hat.
+   Ohne `data-pz-glow`: cyanfarbener Schein (Brettzonen, Stapel). */
+[data-pz-ziel-an]:not([data-pz-glow="hand"]) {
+  box-shadow: 0 0 14px rgba(0, 240, 255, .5) !important;
+}
+[data-pz-zone][data-pz-ziel-an] { z-index: 5 !important; }
+[data-pz-ziel-an][data-pz-glow="blau"]       { box-shadow: 0 0 14px rgba(120, 210, 255, .7) !important; }
+[data-pz-ziel-an][data-pz-glow="gold"]       { box-shadow: 0 0 14px rgba(230, 190, 90, .7) !important; }
+[data-pz-ziel-an][data-pz-glow="gold-innen"] { box-shadow: 0 0 14px rgba(230, 190, 90, .45) inset !important; }
 /* ★★ v1256 (Als Befund 19.9.: „die Drop-Zone der eigenen Hand ist
    deutlich zu hoch, die Support Zones sind vollständig davon
    bedeckt"). Die Handreihe ist durch ihr Polster gut eine Kartenhöhe

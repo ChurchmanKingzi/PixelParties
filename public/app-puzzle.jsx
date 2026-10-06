@@ -607,7 +607,27 @@ function PuzzleCreator() {
 
   const [dragHandSource, setDragHandSource] = useState(null); // 'hand' or 'oppHand'
   const [dragSource, setDragSource] = useState(null);
-  const [dragOverZone, setDragOverZone] = useState(null);
+  // ★ Ruckel-Fix (Als Verdacht 6.10., Messung: ein Zonenwechsel kostete
+  // einen Voll-Render des ganzen Editors — rund 1400 Elemente, Galerie
+  // und beide Haende eingeschlossen). Das Leuchten der Ablagezone ist
+  // reine Optik und steuert nichts, also kein State mehr: ein Ref
+  // merkt sich die Zone, und das Attribut `data-pz-ziel-an` wandert
+  // direkt am DOM von der alten zur neuen. Das Aussehen steht in
+  // style.css (`[data-pz-ziel-an]`); jede Zone sagt dort selbst, wie sie
+  // leuchtet (`data-pz-glow`) und unter welcher Kennung sie gemeint ist
+  // (`data-pz-ziel`; Brettzonen nehmen ihr `data-pz-zone`).
+  // Der Name bleibt, damit die rund 40 Aufrufer unveraendert laufen.
+  const dragOverZoneRef = useRef(null);
+  const setDragOverZone = useCallback((key) => {
+    const neu = key || null;
+    if (dragOverZoneRef.current === neu) return;
+    dragOverZoneRef.current = neu;
+    for (const el of document.querySelectorAll('[data-pz-ziel-an]')) el.removeAttribute('data-pz-ziel-an');
+    if (neu == null) return;
+    for (const el of document.querySelectorAll(`[data-pz-zone="${neu}"], [data-pz-ziel~="${neu}"]`)) {
+      el.setAttribute('data-pz-ziel-an', '');
+    }
+  }, []);
   const [viewPile, setViewPile] = useState(null);
   // Suchtext der Stapel-Ansicht (Als Vorgabe 17.8.: die Deck-Ansicht im
   // Puzzle-Mode hatte keine Suchleiste). Wird beim Oeffnen/Schliessen
@@ -3595,8 +3615,10 @@ function PuzzleCreator() {
       } : undefined,
     };
   };
+  // Das Leuchten waehrend eines Zuges sitzt nicht mehr hier, sondern am
+  // DOM (siehe `setDragOverZone`) — die Magnetsuche liefert ohnehin nur
+  // Zonen, die die Karte annehmen. Hier bleibt die Antipp-Markierung.
   const hl = (zt, si, hi, slot) => {
-    if (dragOverZone === `${si}-${zt}-${hi}-${slot}` && dragCardName && canDrop(dragCardName, zt, si, hi, slot)) return { boxShadow: '0 0 14px rgba(0,240,255,.5)', zIndex: 5 };
     if (mobileSelected && canDrop(mobileSelected.cardName, zt, si, hi, slot)) return { boxShadow: '0 0 10px rgba(0,240,255,.3)', borderColor: 'var(--accent)' };
     return undefined;
   };
@@ -3665,8 +3687,8 @@ function PuzzleCreator() {
         // Datenanker des Duells suchen Fluege per `querySelector`, und
         // der Editor soll dort nie ein Ziel sein.
         <div key={key} className={'board-zone board-zone-' + d.typ + (isOpp && d.verdeckt ? ' pz-stapel-gegner' : '')}
-          style={{ ...zs(d.stil), cursor: inhalt.length ? 'pointer' : undefined,
-            ...(dragOverZone === d.marke + '-' + si ? { boxShadow: '0 0 14px rgba(0,240,255,.5)' } : {}) }}
+          data-pz-ziel={d.marke + '-' + si}
+          style={{ ...zs(d.stil), cursor: inhalt.length ? 'pointer' : undefined }}
           onClick={() => inhalt.length > 0
             && (d.nurEditor ? setViewPile({ si, key }) : oeffneStapel({ si, key }))}
           onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; setDragOverZone(d.marke + '-' + si); }}
@@ -3785,7 +3807,7 @@ function PuzzleCreator() {
               {/* Permanents column so it doesn't push the permanents down. */}
               {hi === 2 && (areaZones[si] || []).includes('Wowhalla, the Hall of the Cool') && (
                 <div style={{ position: 'absolute', left: '100%', ...spiegelOben(0), marginLeft: 'calc(8px * var(--board-scale))' }}>
-                  <div className="board-zone" style={{ width: 'calc(50px * var(--board-scale))', height: 'calc(70px * var(--board-scale))', borderColor: 'rgba(120,210,255,.6)', background: 'rgba(120,210,255,.08)', cursor: (p.coolnessStack || []).length > 0 ? 'pointer' : undefined, position: 'relative', ...(dragOverZone === 'coolness-' + si ? { boxShadow: '0 0 14px rgba(120,210,255,.7)' } : {}) }}
+                  <div className="board-zone" style={{ width: 'calc(50px * var(--board-scale))', height: 'calc(70px * var(--board-scale))', borderColor: 'rgba(120,210,255,.6)', background: 'rgba(120,210,255,.08)', cursor: (p.coolnessStack || []).length > 0 ? 'pointer' : undefined, position: 'relative' }} data-pz-ziel={'coolness-' + si} data-pz-glow="blau"
                     onClick={() => (p.coolnessStack || []).length > 0 && oeffneStapel({ si, key: 'coolnessStack' })}
                     onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; setDragOverZone('coolness-' + si); }}
                     onDragLeave={() => setDragOverZone(null)}
@@ -3806,7 +3828,7 @@ function PuzzleCreator() {
               {/* sie das Feld verlassen hat (Als Ruling 4).               */}
               {hi === 2 && (
                 <div style={{ position: 'absolute', left: '100%', ...spiegelOben('calc(78px * var(--board-scale))'), marginLeft: 'calc(8px * var(--board-scale))' }}>
-                  <div className="board-zone" style={{ width: 'calc(50px * var(--board-scale))', height: 'calc(70px * var(--board-scale))', borderColor: 'rgba(230,190,90,.6)', background: 'rgba(230,190,90,.08)', cursor: (p.creationZone || []).length > 0 ? 'pointer' : undefined, position: 'relative', ...(dragOverZone === 'creation-' + si ? { boxShadow: '0 0 14px rgba(230,190,90,.7)' } : {}) }}
+                  <div className="board-zone" style={{ width: 'calc(50px * var(--board-scale))', height: 'calc(70px * var(--board-scale))', borderColor: 'rgba(230,190,90,.6)', background: 'rgba(230,190,90,.08)', cursor: (p.creationZone || []).length > 0 ? 'pointer' : undefined, position: 'relative' }} data-pz-ziel={'creation-' + si} data-pz-glow="gold"
                     onClick={() => (p.creationZone || []).length > 0 && oeffneStapel({ si, key: 'creationZone' })}
                     // ★ v1427: Rechtsklick entfernt die oberste Karte — wie
                     // in der Vorrats-Reihe der Handleiste. Fuer alle weiteren
@@ -4272,7 +4294,7 @@ function PuzzleCreator() {
             onDrop={handleOppHandDrop}>
             <PzAmbiance variant="hand" />
             <span className="pz-hand-label orbit-font">OPP HAND ({oppHand.length})</span>
-            <div className={'pz-hand-cards' + ((dragOverZone === 'oppHand' || dragOverZone === 'hand:oppHand') ? ' pp-drop-aktiv' : '')} data-pz-hand="oppHand"
+            <div className="pz-hand-cards" data-pz-hand="oppHand" data-pz-ziel="oppHand hand:oppHand" data-pz-glow="hand"
               style={{ '--hand-max-lift': window.handFanMaxLift?.(oppHand.length, { seite: 'opp' }) ?? 0 }}>
               {oppHand.map((cardName, i) => {
                 const img = cardImageUrl(cardName);
@@ -4334,8 +4356,7 @@ function PuzzleCreator() {
                 }}
                 onDrop={(e) => { e.stopPropagation(); handleOppCreationDrop(e); }}>
                 <span className="pz-hand-label orbit-font">CREATION ({(players[1].creationZone || []).length})</span>
-                <div className="pz-hand-cards" data-pz-hand="oppCreationZone"
-                  style={dragOverZone === 'oppCreation' ? { boxShadow: '0 0 14px rgba(230,190,90,.45) inset' } : undefined}>
+                <div className="pz-hand-cards" data-pz-hand="oppCreationZone" data-pz-ziel="oppCreation" data-pz-glow="gold-innen">
                   {(players[1].creationZone || []).map((cardName, i) => {
                     const img = cardImageUrl(cardName);
                     const gapPos = dropGap?.zone === 'oppCreation'
@@ -4568,7 +4589,7 @@ function PuzzleCreator() {
         onDrop={handleHandDrop}>
         <PzAmbiance variant="hand" />
         <span className="pz-hand-label orbit-font">HAND ({hand.length})</span>
-        <div className={'pz-hand-cards' + ((dragOverZone === 'hand' || dragOverZone === 'hand:hand') ? ' pp-drop-aktiv' : '')} data-pz-hand="hand"
+        <div className="pz-hand-cards" data-pz-hand="hand" data-pz-ziel="hand hand:hand" data-pz-glow="hand"
           style={{ '--hand-max-lift': window.handFanMaxLift?.(hand.length) ?? 0 }}>
           {hand.map((cardName, i) => {
             const img = cardImageUrl(cardName);
@@ -4649,8 +4670,7 @@ function PuzzleCreator() {
             }}
             onDrop={(e) => { e.stopPropagation(); handleCreationDrop(e); }}>
             <span className="pz-hand-label orbit-font">CREATION ({(players[0].creationZone || []).length})</span>
-            <div className="pz-hand-cards" data-pz-hand="creationZone"
-              style={dragOverZone === 'creation' ? { boxShadow: '0 0 14px rgba(230,190,90,.45) inset' } : undefined}>
+            <div className="pz-hand-cards" data-pz-hand="creationZone" data-pz-ziel="creation" data-pz-glow="gold-innen">
               {(players[0].creationZone || []).map((cardName, i) => {
                 const img = cardImageUrl(cardName);
                 // Siehe Hand: Umrechnung zwischen den beiden Index-Raeumen.
