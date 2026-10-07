@@ -24,8 +24,8 @@ const { startServer, guestClient, check, sleep, finish } = require('./lib');
     await sleep(400);
     const upd = A.last('room_update');
     const cpus = upd.seats.filter(s => s && s.isBot);
-    check('3 CPU-Sitze mit Hero-Persona', cpus.length === 3 && cpus.every(c => c.persona?.hero), upd.seats);
-    check('Persona-Namen unterschiedlich', new Set(cpus.map(c => c.username)).size === 3);
+    check('3 CPU-Sitze, anonym (kein Hero, kein Bild — die Lobby zeigt Fragezeichen)', cpus.length === 3 && cpus.every(c => !c.persona && !c.hero), upd.seats);
+    check('CPU-Namen „CPU n“, eindeutig', new Set(cpus.map(c => c.username)).size === 3 && cpus.every(c => /^CPU \d+$/.test(c.username)), cpus.map(c => c.username));
 
     B.emit('st_add_cpu', { roomId: room.id });
     await sleep(200);

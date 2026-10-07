@@ -94,6 +94,29 @@ function applyPresetFixups(engine, cards) {
   }
 }
 
+/**
+ * CPU-Sitze bekommen erst jetzt ihr Gesicht: Name (nur der reine Heldenname, ohne Titel) und Bild (die Oberfläche zeigt das
+ * Portrait des mittleren Heroes, siehe `portraetHeld` im Client) gehören zum selben Hero. In Lobby und Vorbereitung hießen sie „CPU n“.
+ * Namen bleiben eindeutig (Protokoll und Siegerliste suchen Spieler über den Namen): Doppelte bekommen „ 2“, „ 3“ …
+ */
+function nameBots(room, gs) {
+  const { heroShortName } = require('./hero-name');
+  const used = new Set(room.players.filter(p => !p.isBot).map(p => p.username));
+  room.players.forEach((p, seat) => {
+    if (!p.isBot) return;
+    const heroes = (gs.players[seat] && gs.players[seat].heroes) || [];
+    const hero = (heroes[1] && heroes[1].name) || (heroes.find(h => h && h.name) || {}).name;
+    if (!hero) return;
+    const base = heroShortName(hero);
+    let name = base, k = 1;
+    while (used.has(name)) name = base + ' ' + (++k);
+    used.add(name);
+    p.username = name;
+    p.heroName = hero;
+    gs.players[seat].username = name;
+  });
+}
+
 async function start(room, host, prep) {
   const cards = getCardDB();
   const n = room.players.length;
@@ -106,6 +129,7 @@ async function start(room, host, prep) {
   const gs = room.gameState;
   gs.areaZones = Array.from({ length: n }, () => []);
   applyBoards(gs, prep, cards);
+  nameBots(room, gs);
   gs.turn = 0; gs.activePlayer = starter; gs.currentPhase = 0;
   gs.awaitingFirstChoice = false; gs.mulliganPending = false; delete gs.mulliganDecisions;
   gs.isSkillTest = true;                                     // Client: zufällige Kampfmusik des Modus (BGM_SETS, gs.bgmSet)

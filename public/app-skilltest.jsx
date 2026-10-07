@@ -11,6 +11,37 @@ const ST_MAX_SEATS = 8;
 // ── Lobby ──────────────────────────────────────────────────────────
 // 8-Sitz-Raster wie die Cube-Lobby, aber: CPU-Sitze per Knopf (mit
 // zufälliger Hero-Persona), kein Deck nötig, Start ab 2 Sitzen.
+// ── Anonyme CPU-Sitze: schwarze Kachel mit Pixelart-Fragezeichen ────
+// Bis zum Kampfbeginn haben CPU-Sitze weder Namen noch Gesicht (erst im Spiel: Name und Bild ihres mittleren Heroes).
+const ST_UNKNOWN_GLYPH = [
+  '..XXXXXX..',
+  '.XXXXXXXX.',
+  'XXX....XXX',
+  'XX......XX',
+  '........XX',
+  '.......XXX',
+  '.....XXXX.',
+  '....XXXX..',
+  '....XX....',
+  '..........',
+  '....XX....',
+  '....XX....',
+];
+function StUnknownTile() {
+  const rects = [];
+  ST_UNKNOWN_GLYPH.forEach((row, y) => [...row].forEach((c, x) => { if (c === 'X') rects.push([x, y]); }));
+  // Viewbox 14×16: Fragezeichen (10×12) mittig, 1 Pixel Schlagschatten nach rechts unten.
+  return (
+    <span className="st-unknown" aria-label="Unknown CPU" title="CPU — shows its middle hero once the battle starts">
+      <svg viewBox="0 0 14 16" shapeRendering="crispEdges" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
+        <rect x="0" y="0" width="14" height="16" fill="#050507" />
+        {rects.map(([x, y]) => <rect key={'s' + x + ',' + y} x={x + 2} y={y + 2} width="1" height="1" fill="#2b2650" />)}
+        {rects.map(([x, y]) => <rect key={'f' + x + ',' + y} x={x + 1} y={y + 1} width="1" height="1" fill={y < 6 ? '#9d90f2' : '#7d70d6'} />)}
+      </svg>
+    </span>
+  );
+}
+
 function SkillTestLobby({ lobby, user, leaveRoom, playerJoined, setPlayerJoined }) {
   const isHost = lobby.host === user.username;
   const seats = lobby.seats || [];
@@ -41,7 +72,6 @@ function SkillTestLobby({ lobby, user, leaveRoom, playerJoined, setPlayerJoined 
           <div className="st-lobby-grid">
             {Array.from({ length: ST_MAX_SEATS }).map((_, i) => {
               const seat = seats[i] || null;
-              const heroArt = seat?.persona?.hero ? cardImageUrl(seat.persona.hero) : null;
               const kind = !seat ? 'is-empty' : seat.isHost ? 'is-host' : seat.isBot ? 'is-cpu' : 'is-player';
               return (
                 <div key={i} className={'st-seat ' + kind}>
@@ -50,8 +80,8 @@ function SkillTestLobby({ lobby, user, leaveRoom, playerJoined, setPlayerJoined 
                       onClick={() => socket.emit('st_remove_cpu', { roomId: lobby.id, username: seat.username })}>✕</button>
                   )}
                   <div className="st-seat-art">
-                    {heroArt
-                      ? <img src={heroArt} alt="" draggable={false} />
+                    {seat && seat.isBot
+                      ? <StUnknownTile />
                       : <span>{seat ? (seat.isHost ? '👑' : '⚔️') : `${i + 1}`}</span>}
                   </div>
                   <div className="st-seat-name" title={seat ? seat.username : undefined}>{seat ? seat.username : 'Open Seat'}</div>
@@ -612,7 +642,7 @@ function SkillTestPrepScreen({ lobby, user, leaveRoom, notify }) {
         <div className="st-chips" style={{ margin: 'auto', flexWrap: 'wrap', justifyContent: 'center', maxWidth: 700 }}>
           {view.players.map(p => (
             <span key={p.idx} className={'st-chip' + (p.ready ? ' is-ready' : '')}>
-              {p.persona ? <img src={cardImageUrl(p.persona.hero)} alt="" /> : <b>{p.isBot ? 'CPU' : '♟'}</b>}
+              {p.isBot ? <StUnknownTile /> : <b>♟</b>}
               <span>{p.username}</span><i>{p.ready ? '✓' : '…'}</i>
             </span>
           ))}
@@ -800,7 +830,7 @@ function SkillTestPrepScreen({ lobby, user, leaveRoom, notify }) {
           <div className="st-players-title orbit-font">PLAYERS · {readyCount}/{view.players.length}</div>
           {view.players.map(p => (
             <div key={p.idx} className={'st-player' + (p.ready ? ' is-ready' : '') + (p.idx === view.you ? ' is-me' : '')} title={p.ready ? 'Ready' : 'Preparing…'}>
-              <span className="st-player-ava">{p.persona ? <img src={cardImageUrl(p.persona.hero)} alt="" /> : <b>{p.isBot ? 'CPU' : (p.username || '?').slice(0, 1).toUpperCase()}</b>}</span>
+              <span className="st-player-ava">{p.isBot ? <StUnknownTile /> : <b>{(p.username || '?').slice(0, 1).toUpperCase()}</b>}</span>
               <span className="st-player-name">{p.username}</span>
               <i className="st-player-state">{p.ready ? '✓' : '…'}</i>
             </div>

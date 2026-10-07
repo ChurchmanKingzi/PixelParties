@@ -15,8 +15,11 @@
 //  Der Treiber sitzt NEBEN der Engine: `startGame`/`startTurn`/
 //  `switchTurn` werden nie aufgerufen; stattdessen ruft er die
 //  Einzelteile der Engine selbst (siehe engine._stReset…/_stRun…).
-//  `gs.turn` ist die ROUND-Nummer — dadurch gilt jedes „einmal pro Turn"
-//  der Karten automatisch „einmal pro Round".
+//  `gs.turn` ist an die ROUND gekoppelt (`roundTurn`) — dadurch gilt jedes „einmal pro Turn"
+//  der Karten automatisch „einmal pro Round". Es zählt 2 je Round (1, 3, 5 …): Kartentexte rechnen in
+//  Spielerzügen („bis zum Ende des nächsten gegnerischen Zuges" = gs.turn + 2). Mit einem Zähler, der je
+//  Round nur 1 weiterrückt, hielte jede solche Frist eine volle Round zu lang; mit 2 je Round trifft „+2" die
+//  nächste Round, und alle befristeten Effekte betreffen genau den Rest der laufenden Round.
 //
 //  Zustand (JSON-sicher) in `gs.skillTest`:
 //    round, starter, order[], exhaustedHeroes{ "seat:hi": true },
@@ -30,6 +33,8 @@ const PHASE_RESOURCE = 1;
 const PHASE_ACTION = 3;
 
 const stOf = (engine) => engine.gs.skillTest;
+/** `gs.turn` einer Round: 2 je Round (siehe Kopfkommentar). Round 1 → 1, damit Erstzug-Regeln („Turn 1") weiter greifen. */
+const roundTurn = (round) => Math.max(0, 2 * round - 1);
 const seatCount = (engine) => engine.gs.players.length;
 
 // ── Reihenfolge ────────────────────────────────────────────────────
@@ -103,7 +108,7 @@ function livingSeats(engine) {
 async function startRound(engine, host) {
   const gs = engine.gs, st = stOf(engine), n = seatCount(engine);
   st.round += 1;
-  gs.turn = st.round;
+  gs.turn = roundTurn(st.round);
   st.starter = st.round === 1 ? st.firstStarter : nextStarter(n, st.starter);
   st.order = roundOrder(n, st.starter);
   st.exhaustedHeroes = {};
@@ -516,6 +521,6 @@ module.exports = {
   act, playBaseAttack, actedHeroesOf, passRound, skipWithCreature, setWatch, CONSUMING_KINDS, METER_HOOKS, requiredPhase, setPhaseFor,
   roundOrder, nextStarter, heroKey, heroAlive, heroActors, creatureActors, hasActor, seatHasActor,
   seatAlive, livingSeats, withActive,
-  startRound, endRound, beginTurn, advance, pickNextSeat, isIncapacitated,
+  startRound, endRound, beginTurn, advance, pickNextSeat, isIncapacitated, roundTurn,
   PHASE_ACTION,
 };

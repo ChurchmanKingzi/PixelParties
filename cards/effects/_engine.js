@@ -17522,6 +17522,18 @@ this._deathWatch = (this._deathWatchStack || []).length
   }
 
   /**
+   * Ist ein befristeter Eintrag (`expiresAtTurn` / `expiresForPlayer`) jetzt faellig?
+   * Normalspiel: genau im benannten Zug des benannten Spielers. Skill Test: `gs.turn` zaehlt dort 2 je Round
+   * (skilltest/rounds.js `roundTurn`), damit „+2" (der naechste eigene Zug) die NAECHSTE Round trifft statt der
+   * uebernaechsten; ungerade Fristen („+1", „+3") liegen zwischen zwei Round-Werten und sind deshalb ab dann faellig (`<=`).
+   */
+  _ablaufFaellig(expiresAtTurn, expiresForPlayer, currentTurn, activePlayer) {
+    if (expiresForPlayer !== activePlayer) return false;
+    if (this.gs.skillTest) return typeof expiresAtTurn === 'number' && expiresAtTurn <= currentTurn;
+    return expiresAtTurn === currentTurn;
+  }
+
+  /**
    * Process buff expiry at the start of a turn.
    * Removes buffs whose expiresAtTurn matches the current turn
    * and expiresForPlayer matches the active player.
@@ -17544,7 +17556,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         const hero = ps.heroes[hi];
         if (!hero?.buffs) continue;
         for (const [buffName, buffData] of Object.entries(hero.buffs)) {
-          if (buffData.expiresAtTurn !== currentTurn || buffData.expiresForPlayer !== activePlayer) continue;
+          if (!this._ablaufFaellig(buffData.expiresAtTurn, buffData.expiresForPlayer, currentTurn, activePlayer)) continue;
           if (filterEarly === true && !buffData.expiresBeforeStatusDamage) continue;
           if (filterEarly === false && buffData.expiresBeforeStatusDamage) continue;
           await this.actionRemoveBuff(hero, pi, hi, buffName);
@@ -17565,7 +17577,7 @@ this._deathWatch = (this._deathWatchStack || []).length
           if (!Array.isArray(hero?._tempAtkGrants) || hero._tempAtkGrants.length === 0) continue;
           const keep = [];
           for (const g of hero._tempAtkGrants) {
-            if (g.expiresAtTurn === currentTurn && g.expiresForPlayer === activePlayer) {
+            if (this._ablaufFaellig(g.expiresAtTurn, g.expiresForPlayer, currentTurn, activePlayer)) {
               // ★ v1087: war eine WORTGLEICHE Nachbildung des Trichters
               // — beide Zweige tun exakt das, was `_applyHeroAtkDelta`
               // ohnehin tut (Zwischenspeicher bei Fluch, sonst sichtbar
@@ -17586,7 +17598,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     for (const inst of this.cardInstances) {
       if (inst.zone !== ZONES.SUPPORT || !inst.counters?.buffs) continue;
       for (const [buffName, buffData] of Object.entries(inst.counters.buffs)) {
-        if (buffData.expiresAtTurn !== currentTurn || buffData.expiresForPlayer !== activePlayer) continue;
+        if (!this._ablaufFaellig(buffData.expiresAtTurn, buffData.expiresForPlayer, currentTurn, activePlayer)) continue;
         if (filterEarly === true && !buffData.expiresBeforeStatusDamage) continue;
         if (filterEarly === false && buffData.expiresBeforeStatusDamage) continue;
         // Snapshot the post-cleanse-immunity flag BEFORE the buff is
@@ -17630,7 +17642,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         if (!hero?.statuses) continue;
         for (const [statusName, statusData] of Object.entries(hero.statuses)) {
           if (!statusData || typeof statusData !== 'object') continue;
-          if (statusData.expiresAtTurn !== currentTurn || statusData.expiresForPlayer !== activePlayer) continue;
+          if (!this._ablaufFaellig(statusData.expiresAtTurn, statusData.expiresForPlayer, currentTurn, activePlayer)) continue;
           if (filterEarly === true && !statusData.expiresBeforeStatusDamage) continue;
           if (filterEarly === false && statusData.expiresBeforeStatusDamage) continue;
           await this.removeHeroStatus(pi, hi, statusName);

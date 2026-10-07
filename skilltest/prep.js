@@ -40,7 +40,6 @@ function othersView(room) {
     idx,
     username: p.username,
     isBot: !!p.isBot,
-    persona: p.persona ? { hero: p.persona.hero } : null,
     ready: !!prep.players[idx].ready,
     connected: p.isBot || !!p.socketId,
   }));

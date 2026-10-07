@@ -148,6 +148,21 @@ Hauptaktion und Zusatzaktionen zählen je Held, nicht je Spieler; die Action Pha
 Reaktionsfenster, Vergabe von Zusatzaktionen) nur bei seinem ersten Zug der Round und endet mit der Round (`endRound`,
 Phasenende-Effekte → Zusatzaktions-Gewährungen verfallen). `advanceToPhase` ist im Modus ein No-op (außer zur End Phase).
 
+### Fristen: `gs.turn` zählt 2 je Round
+
+Kartentexte rechnen in Spielerzügen („bis zum Ende des nächsten gegnerischen Zuges" = `gs.turn + 2`, „bis zum Ende dieses Zuges" = `+1`).
+Damit solche Fristen im Modus **genau den Rest der laufenden Round** treffen (nicht eine Round länger), steht `gs.turn` in Round R auf
+`2R − 1` (`rounds.js` `roundTurn`; Round 1 → 1, 2 → 3, …) — eine Round ist so ein Spielerzug-Paar des Normalspiels. Folge:
+`+1` und `+2` laufen zu Beginn der nächsten Round ab, `+3`/`+4` eine Round später. Ungerade Fristen liegen zwischen zwei Round-Werten; die
+Ablauf-Sweeps (`engine._ablaufFaellig`) prüfen im Modus deshalb `<=` statt `===` (Normalspiel unverändert). Anzeigen nennen die Round
+(`gameState.skillTest.round`), nicht `gs.turn`. Test: `scripts/skilltest-e2e/duration.test.js` (Pink Sky über die Rundengrenze, +1/+2/+3).
+
+### CPU-Sitze: anonym bis zum Kampfbeginn
+
+In Lobby und Vorbereitung heißen CPU-Sitze „CPU n" und erscheinen als schwarze Pixelart-Kachel mit Fragezeichen (`StUnknownTile`).
+Erst `battle.js nameBots` gibt ihnen beim Kampfstart Namen und Aussehen ihres mittleren Heroes (nur der reine Name, `hero-name.js`;
+das Portrait zeigt die Oberfläche als Bildausschnitt des mittleren Heroes). Test: `hero-name.test.js` (Server-/Client-Kurznamen gleich).
+
 ## Karten mit Sonderregeln
 
 | Karte | Regel im Skill Test |

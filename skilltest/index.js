@@ -16,7 +16,6 @@
 // ═══════════════════════════════════════════════════════════════════
 
 const { CONFIG } = require('./config');
-const { getCardDB } = require('../cards/effects/_card-db');
 
 const PHASES = ['lobby', 'prep', 'battle', 'over'];
 
@@ -63,7 +62,7 @@ function summary(room) {
   };
 }
 
-/** Sitzliste für die Lobby (inkl. CPU-Personas). */
+/** Sitzliste für die Lobby. CPU-Sitze bleiben bis zum Kampfbeginn anonym (Name „CPU n“, im Client eine Fragezeichen-Kachel). */
 function seatsOf(room) {
   const cap = room.maxPlayers || CONFIG.MAX_PLAYERS;
   return Array.from({ length: cap }, (_, i) => {
@@ -73,38 +72,32 @@ function seatsOf(room) {
       username: p.username,
       isBot: !!p.isBot,
       isHost: p.username === room.host,
-      persona: p.persona ? { hero: p.persona.hero } : null,
     };
   });
 }
 
 // ── CPU-Sitze ──────────────────────────────────────────────────────
 
-/** Alle Hero-Namen, die als CPU-Persona taugen (reiner Flavor; nur Heroes mit Bild in ./cards). */
-function personaHeroNames() {
-  const db = getCardDB();
-  const hasImage = require('./pool').imageFilter(db);
-  return Object.values(db).filter(c => c.cardType === 'Hero' && hasImage(c.name)).map(c => c.name);
-}
-
-function pickPersona(room) {
+/** Nächster freier Anzeigename „CPU n“ im Raum. */
+function nextCpuName(room) {
   const taken = new Set(room.players.map(p => p.username));
-  const free = personaHeroNames().filter(n => !taken.has(n));
-  if (!free.length) return null;
-  return free[Math.floor(Math.random() * free.length)];
+  let n = 1;
+  while (taken.has('CPU ' + n)) n++;
+  return 'CPU ' + n;
 }
 
 let _cpuSeq = 0;
+/**
+ * CPU-Sitz. Bis zum Kampfbeginn hat er KEIN Gesicht: Name „CPU n“, kein Hero. Erst wenn sein Brett steht, nimmt er
+ * Namen und Aussehen seines mittleren Heroes an (battle.js `nameBots`) — vorher wüsste man nie, welcher Name zu welchem Bild gehört.
+ */
 function makeCpuSeat(room) {
-  const hero = pickPersona(room);
-  if (!hero) return null;
   return {
-    username: hero,
+    username: nextCpuName(room),
     userId: `cpu-st:${room.id}:${++_cpuSeq}`,
     socketId: null,
     deckId: null,
     isBot: true,
-    persona: { hero },
   };
 }
 

@@ -26383,7 +26383,10 @@ function ResultCeremony({ won, spectator, title, subtitle, rewards, total, eloCh
       wirt.appendChild(klon);
     }
   }, []);
-  const buchstaben = String(title).split('');
+  // Titel wortweise: ein Wort bricht nie auseinander, die Zeile darf am Leerzeichen umbrechen; die Schriftgröße
+  // richtet sich nach Gesamtlänge und längstem Wort (siehe `.pp-cer-titel`) — „2ND PLACE" wurde am Rand abgeschnitten.
+  const titelWoerter = String(title).split(' ');
+  const titelLaengstes = Math.max(1, ...titelWoerter.map(w => [...w].length));
   // ★ v1400 (Al 25.9.): Münzregen im Sieg-Bildschirm — SC-Sprites fallen,
   // drehen sich und funkeln. Einmal ausgewürfelt (useMemo), sonst sprängen
   // die Münzen bei jedem Zählerschritt an neue Plätze.
@@ -26423,10 +26426,18 @@ function ResultCeremony({ won, spectator, title, subtitle, rewards, total, eloCh
         </div>
       )}
       <div className="pp-cer-inhalt" onClick={e => e.stopPropagation()}>
-        <div className="pp-cer-titel pixel-font" style={{ color: farbe }}>
-          {buchstaben.map((b, i) => (
-            <span key={i} className="pp-cer-buchstabe" style={{ animationDelay: (i * 55) + 'ms' }}>{b === ' ' ? '\u00a0' : b}</span>
-          ))}
+        <div className="pp-cer-titel pixel-font" style={{ color: farbe, '--cer-n': Math.max(1, [...String(title)].length), '--cer-w': titelLaengstes }}>
+          {(() => {
+            let i = 0;
+            return titelWoerter.map((w, wi) => (
+              <React.Fragment key={wi}>
+                {wi > 0 && ' '}
+                <span className="pp-cer-wort">
+                  {[...w].map((b) => <span key={i} className="pp-cer-buchstabe" style={{ animationDelay: ((i++) * 55) + 'ms' }}>{b}</span>)}
+                </span>
+              </React.Fragment>
+            ));
+          })()}
         </div>
         {subtitle && <div className={'pp-cer-unter' + (/^(💀|☠️)/.test(subtitle) ? ' pp-cer-unter-grund' : '')}>{subtitle}</div>}
         {cpuProgress && cpuProgress.wins > 0 && (
@@ -43230,7 +43241,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     /** Render a status/buff name in its color, capitalized */
     const styledStatus = (s) => <strong style={{ color: statusColor(s) }}>{capStatus(s)}</strong>;
     try {
-      if (t === 'turn_start') { const p = playerByName(entry.username); return <span className="log-info">── Turn {entry.turn} ({pName(p.name, p.color)}) ──</span>; }
+      // Skill Test: gs.turn zählt 2 je Round (skilltest/rounds.js `roundTurn`) — das Protokoll nennt die Round.
+      if (t === 'turn_start') { const p = playerByName(entry.username); return <span className="log-info">── {gameState.skillTest ? `Round ${Math.ceil((entry.turn || 1) / 2)}` : `Turn ${entry.turn}`} ({pName(p.name, p.color)}) ──</span>; }
       if (t === 'spell_played') {
         const p = playerByName(entry.player);
         const verb = entry.type === 'Attack' || (entry.cardType || entry.type2) === 'Attack' ? 'used' : 'played';
@@ -46649,14 +46661,16 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 nicht; `key` startet den kurzen Pop bei jedem Zugwechsel. */}
             <div className="board-util-mid">
               {(gameState.turn || 0) > 0 && (() => {
+                // Skill Test: gs.turn zählt 2 je Round — angezeigt wird die Round (stInfo.round).
+                const zaehlerWert = stInfo ? (stInfo.round || 1) : gameState.turn;
                 const amZug = activePlayer === myIdx ? me : opp;
                 const farbe = amZug.color || (activePlayer === myIdx ? '#00f0ff' : '#ff5577');
                 return (
-                  <div key={gameState.turn} className="board-round-counter" style={{ '--runde-farbe': farbe }}>
+                  <div key={stInfo ? zaehlerWert + ':' + activePlayer : gameState.turn} className="board-round-counter" style={{ '--runde-farbe': farbe }}>
                     {/* v1473 (Als Vorgabe 28.9.): gezaehlt wird jeder Zug beider
                         Spieler — die Beschriftung heisst deshalb „TURN", nicht „ROUND". */}
-                    <span className="board-round-counter-label">TURN</span>
-                    <span className="board-round-counter-zahl">{gameState.turn}</span>
+                    <span className="board-round-counter-label">{stInfo ? 'ROUND' : 'TURN'}</span>
+                    <span className="board-round-counter-zahl">{zaehlerWert}</span>
                   </div>
                 );
               })()}
