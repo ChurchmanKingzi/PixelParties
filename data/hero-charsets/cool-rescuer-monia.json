@@ -1,0 +1,13 @@
+{
+  "hero": "Cool Rescuer Monia",
+  "sheet": "cool-rescuer-monia.png",
+  "format": "rpgmaker2003-charset",
+  "frameWidth": 24,
+  "frameHeight": 32,
+  "rows": ["up", "right", "down", "left"],
+  "framesPerRow": 3,
+  "sequence": [0, 1, 2, 1],
+  "frameMs": 180,
+  "hovering": true,
+  "generator": "scripts/charsets/monia_charset.py"
+}
