@@ -33,6 +33,9 @@ const CONFIG = {
   // ── Recycler ───────────────────────────────────────────────────
   RECYCLE_EVERY: 2,          // nach jeder 2. eingeworfenen Karte kommt eine neue
   RECYCLE_GOLD: 4,           // +Gold je eingeworfener Karte
+  // Heldenpartner (Nutzer 7.10.): Karten, die GARANTIERT mit dem Hero auf der Hand liegen, zusätzlich zu den Spells, die sein Text namentlich nennt
+  // (Luna → Firewall, Sol Rym → Chain Lightning …, siehe hand-rules.js).
+  HERO_PARTNERS: { 'Cute Princess Mary': ['Cute Phoenix'] },
   // Typ-Gewichte für die Recycler-Ausgabe. `null` = reiner Zufall über
   // den verbleibenden Pool (Spieler-Vorgabe: „zufällige neue Karte").
   RECYCLER_TYPE_WEIGHTS: null,

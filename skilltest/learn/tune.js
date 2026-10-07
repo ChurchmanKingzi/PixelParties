@@ -33,11 +33,13 @@ function tableFor(seed, opts = {}) {
  * Die Persona eines Sitzes zu einem Seed (wie im Live-Spiel: aus der Population des Profils gezogen, bessere öfter) — hier aus dem Seed
  * abgeleitet, damit Fokus-Sitz UND Gegner in beiden Varianten dieselben Spielstile haben. `null` ohne Profil.
  */
-function personaFor(seed, seat) {
+function personaFor(seed, seat, raw) {
   const L = require('./profile');
   const rnd = mulberry32(((seed * 2654435761) ^ (seat * 40503 + 0x51ed270b)) >>> 0);
   const per = L.samplePersona(L.get(), rnd);
-  return per ? per.weights : null;
+  if (!per) return null;
+  // Standard: wie im Live-Spiel, mit der ausgelieferten Zielwahl (policy.shipped); `raw` = die Persona unverändert (Vergleiche mit dem Stand davor).
+  return raw ? per.weights : require('../policy').shipped(per.weights);
 }
 
 /** Ein Partieauftrag (für WorkerPool.run / runGame) zu Seed und Variante. */
@@ -53,7 +55,7 @@ function jobFor(seed, variant, opts = {}) {
   const weights = Array.from({ length: t.seats }, (_, i) => {
     const focal = i === t.seat;
     if (variant.persona) {
-      const base = personaFor(seed, i) || {};
+      const base = personaFor(seed, i, variant.persona === 'raw') || {};
       const over = focal ? variant.weights : variant.oppWeights;
       return Object.assign({}, base, over ? battleOnly(over) : {});
     }

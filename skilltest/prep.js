@@ -91,7 +91,7 @@ async function start(room, host) {
   const pool = new CardPool(env.cards);
   const players = room.players.map(() => {
     const ps = Rules.emptyPlayer();
-    ps.hand = dealHand(pool).hand;
+    ps.hand = dealHand(pool, undefined, { cards: env.cards, ps }).hand;
     return ps;
   });
   // Testschalter (nur UI-/E2E-Tests): PP_ST_TEST_HAND="Name1|Name2" legt dem ersten Menschen diese Karten zusätzlich auf die Hand.
@@ -133,7 +133,7 @@ function botPrep(room, idx, env) {
       try {
         const L = require('./learn/profile');
         const per = L.samplePersona(L.get());
-        if (per) { weights = per.weights; (room.skillTest.botPersonas = room.skillTest.botPersonas || {})[idx] = per.weights; }
+        if (per) { weights = require('./policy').shipped(per.weights); (room.skillTest.botPersonas = room.skillTest.botPersonas || {})[idx] = weights; }
       } catch { /* ohne Profil: Standard-Gewichte */ }
       return prepareBase({ env, ps, room, idx, pool: prep.pool, rules: Rules, config: CONFIG, weights });
     }
@@ -156,19 +156,22 @@ function handleMove(room, idx, move, host) {
     return;
   }
   const next = res.ps;
-  let ejected = null;
+  let ejected = null, extras = [];
   if (move.type === 'recycle') {
     // Jede RECYCLE_EVERY-te Karte löst einen Auswurf aus einer zufälligen, nie gesehenen Karte aus.
+    // Der Recycler-Inhalt wandert zu Spielbeginn in die Ablage (battle.js applyBoards).
+    next.recycledCards = [...(next.recycledCards || []), res.recycledCard];
     if (next.recycled % CONFIG.RECYCLE_EVERY === 0) {
-      ejected = prep.pool.takeAny(CONFIG.RECYCLER_TYPE_WEIGHTS);
-      if (ejected) next.hand.push(ejected);
+      // Spells passend zu den Schulen der Heroes auf dem Brett; ein Hero bringt seine Partner mit (hand-rules.js).
+      const r = require('./hand-rules').eject({ pool: prep.pool, cards: env.cards, ps: next, weights: CONFIG.RECYCLER_TYPE_WEIGHTS });
+      ejected = r.ejected; extras = r.extras;
     }
   }
   prep.players[idx] = next;
   const p = room.players[idx];
   sendTo(room, host, p.socketId, 'st_prep_state', {
     ...viewFor(room, idx),
-    event: move.type === 'recycle' ? { type: 'recycle', card: res.recycledCard, ejected } : null,
+    event: move.type === 'recycle' ? { type: 'recycle', card: res.recycledCard, ejected, extras } : null,
   });
 }
 

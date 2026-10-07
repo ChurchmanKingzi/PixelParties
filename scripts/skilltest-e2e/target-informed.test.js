@@ -22,7 +22,9 @@ const check = (name, cond, info) => { if (cond) console.log('  ✓', name); else
   const targets = [];
   for (const s of [1, 2]) gs.players[s].heroes.forEach((h, hi) => { if (h && h.name) targets.push({ id: `hero-${s}-${hi}`, type: 'hero', owner: s, heroIdx: hi, cardName: h.name }); });
   const cfg = { title: 'Attack', cancellable: false, maxTotal: 1 };
-  const pick = (weights) => { st.botWeights = { [seat]: weights }; st.acting = { seat, hi: 0 }; gs.players[seat].heroes[0].atk = 100; return policy.chooseTargets(engine, seat, targets, cfg, null)[0]; };
+  // Neutrale Ausgangswerte (vor der Auslieferung der neuen Zielwahl in DEFAULT_WEIGHTS): jede Prüfung schaltet genau ihren Aufschlag ein.
+  const NEUTRAL = { tgtModel: 0, lowestHp: 1, killBonus: 2, focusLeader: 0, tHero: 0, tTempo: 0, tThreat: 0, tElim: 0, tOverkill: 0, tStick: 0, sAtk: 0, cLow: 0, cKill: 0, aDmg: 0, aKill: 0, aHeal: 0 };
+  const pick = (weights) => { st.botWeights = { [seat]: { ...NEUTRAL, ...weights } }; st.acting = { seat, hi: 0 }; gs.players[seat].heroes[0].atk = 100; return policy.chooseTargets(engine, seat, targets, cfg, null)[0]; };
 
   console.log('HP-bewusste Wahl');
   const picks0 = new Set(); for (let i = 0; i < 12; i++) picks0.add(pick({ tgtModel: 0 }));
@@ -54,7 +56,7 @@ const check = (name, cond, info) => { if (cond) console.log('  ✓', name); else
 
   console.log('Heil-/Buff-Karten bleiben unberührt');
   const own = [{ id: 'hero-0-0', type: 'hero', owner: 0, heroIdx: 0, cardName: 'X' }, { id: 'hero-1-0', type: 'hero', owner: 1, heroIdx: 0, cardName: 'Held A' }];
-  st.botWeights = { [seat]: { tgtModel: 1 } };
+  st.botWeights = { [seat]: { ...NEUTRAL, tgtModel: 1 } };
   check('Heilung geht an einen eigenen Helden', policy.chooseTargets(engine, seat, own, { title: 'Healing Potion', cancellable: false, maxTotal: 1 }, null)[0] === 'hero-0-0');
 
   console.log(fails ? `\n✗ ${fails} Fehler` : '\n✓ Zielwahl-Tests grün');

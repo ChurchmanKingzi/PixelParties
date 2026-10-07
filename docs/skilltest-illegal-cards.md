@@ -188,6 +188,178 @@
 
 - Idej Projection
 
+## Bottom-100-Auswertung (docs/skilltest-bottom100.md), vom Nutzer am 7.10. aussortiert: schwache Standalone-Karten ohne brauchbare Wirkung im Modus. Behalten wurden Flame Arrow, Cardinal Beast Baihu, Moonlight Butterfly, Greatmaw Shark, Soul Shard Sekhem, Deepsea Werewolf, Fireball, Iceage und Forbidden Curse of Aging.
+
+- 500 Piranhas in a Monster Suit
+- Paraseed
+- Golden Exploding Skull
+- Stowaway
+- Plant Golem
+- Jumpscare
+- Dream Dust
+- Market Crash
+- The Stormblade
+- Magic Mirror
+- Afflicted Vermin
+- Soul Shard Ren
+- Ellie, the Class President
+- The Fourth Circle of Hell
+- Tuscan Prisoner
+- Slippery Pengu
+- Adventurousness
+- Shapeshift
+- Cosmic Malfunction
+- Bamboo Staff
+- Cottage at the Forest's Edge
+- Elven Forager
+- Wowhalla, the Hall of the Cool
+
+## Alle Karten, die den Coolness Stack ausdrücklich referenzieren (Nutzer 7.10.): der Skill Test hat keinen Coolness Stack.
+
+- Freshya, Beauty of Coolness
+- Hipdall, Protector of Coolness
+- Lolki, Trickstar of Coolness
+- Phatnir, Prototype of Coolness
+- Swagdri, Forger of Coolness
+- The Nornstellar, Foretellers of Coolness
+- Thorad, Strength of Coolness
+- Thrysh, Robber of Coolness
+- Wildur, the Shining Coolness
+- Wowkyrie, Bringer of Coolness
+- Yolomungandr, Ender of Coolness
+
+## Crystals (Nutzer 7.10.): Artefakte, die nur als aufgedeckte Handkarte wirken und beim Ausspielen nichts tun.
+
+- Mana Absorbing Crystal
+- Weakening Crystal
+- Distracting Crystal
+- Rusting Crystal
+- Treacherous Crystal
+
+## Debt-O-Tron (Nutzer 7.10.): brauchen negatives Gold bzw. erlauben das Ausspielen ohne Gold — im Modus nicht erreichbar.
+
+- Debt-O-Tron Damage Fees
+- Debt-O-Tron Model Backup Duplicator
+- Debt-O-Tron Model Loan Shredder
+- Debt-O-Tron Model Missing Parts
+- Debt-O-Tron Model Money Printer
+- Debt-O-Tron Model Scrap Plow
+
+## Reine Discard-Karten (Nutzer 7.10.): „This card has no effect when you play it from your hand“, wirken nur beim Abwerfen.
+
+- Skull Necklace
+- Letter of Misinformations
+
+## Sparkflies (Nutzer 7.10.): die Königin ist nur über Hive's Crown beschwörbar, der Rest hängt an ihr bzw. an Deck-Suche.
+
+- Hive's Crown
+- Sparkfly Architect
+- Sparkfly Attendant
+- Sparkfly Queen
+- Sparkfly Worker
+
+## Monkees (Nutzer 7.10.): bis auf Cheeky Monkee (macht Schaden) gesperrt — sie hängen an Gold-Gewinn-Ereignissen.
+
+- Golden Bananas
+- Nimble Monkee
+- Resilient Monkee
+- Criminal Monkee
+- Non-Fungible Monkee
+
+## Crusader-Waffen (Nutzer 7.10.): nur für Cecilia ausrüstbar.
+
+- Crusader's Arm-Cannon
+- Crusader's Cutlass
+- Crusader's Flintlock
+- Crusader's Hookshot
+
+## Lunatic (Nutzer 7.10.): Hawk und Golem raus; die Cycle-Kette (New Moon → Crescent → Half → Gibbous → Full) ist ohne die bereits gesperrten New/Crescent Moon (Suchen / Mulligan) nicht mehr spielbar.
+
+- Lunatic Hawk
+- Lunatic Golem
+- Lunatic Cycle - Half Moon
+- Lunatic Cycle - Gibbous Moon
+- Lunatic Cycle - Full Moon
+
+## Archetyp „of Kings“ (Chess), komplett inklusive beider Kasperovs (Nutzer 7.10.).
+
+- Bishop of Kings [B]
+- Bishop of Kings [W]
+- Board of Kings
+- Castling
+- Kasperov, the King of Kings [B]
+- Kasperov, the King of Kings [W]
+- Knight of Kings [W]
+- Knight of Kings [B]
+- Pawn Chain
+- Pawn of Kings [B]
+- Pawn of Kings [W]
+- Queen of Kings [B]
+- Queen of Kings [W]
+- Rook of Kings [B]
+- Rook of Kings [W]
+
+## Reaktionen mit extrem engen, seltenen oder unwahrscheinlichen Bedingungen (Nutzer 7.10., nach eigenem Ermessen): hängen an bestimmten Karten/Archetypen, am Deck, an Surprises, Freeze, Ascend, Heldenstufen oder Sonderlagen, die im Skill Test praktisch nie eintreten.
+
+- Arrow Slit
+- Bomblebee Cluster
+- Burning Fuse
+- Chaorc Interception
+- Cosmic Manipulation
+- Paraseed Control
+- Paraseed Zombie
+- Rebelliokai Courtly Kirin
+- Idej Projector
+- Elven Rider
+- Old Couple
+- First Contact
+- Wendy, the Shy Girl
+- Deepsea Encounter
+- Deepsea Spores
+- Homecoming
+- No Retreat!
+- Troop Annihilation
+- Anti Intruder System
+- Local Idol
+- Boots of Hermes
+- See through the Ruse
+- Teleport
+- Front Soldier
+- Cute Camera
+- Sinister Idol
+- Blessing of the Sun
+- Balloons
+- Unguarded Gate
+- Cheat Chair
+- Fans in High Positions
+- Accidental Dodge
+- Test Flight
+- Anti Magic Shield
+- Stubborn Getaway
+- REVENGE!!!
+- Drowned Remains
+- Strong Shield
+- Homerun!
+- Sculpture Guards
+- Sculpture Theft
+- The Melting
+- Trample Sounds in the Forest
+- Triumphant Return
+- Very Special Prisoner
+- Rescue Mission
+- Explosion Toss
+- Gigantisaur Skull
+- Ambush the Scout
+- Control Monitors
+- Vampire on Fire
+- Furious Anger
+- Point-Blank Annihilation
+- Dream World Switcheroo
+- Flesh-Eating Swarm Trap
+- Party Crasher
+- Inverted Levitation
+- Enhanced Guard Dog
+
 ## Alle Future-Tech-Karten (Archetyp „Future Tech“): sie brauchen eine gefüllte Ablage, um gut zu funktionieren — im Skill Test gibt es keine Decks und kaum Ablage.
 
 - Blueprints

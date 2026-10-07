@@ -46,6 +46,8 @@ function applyBoards(gs, prep, cards) {
     p.supportZones = pick3(ps.supportZones, () => [[], [], []]).map(col => col.map(z => [...z]));
     p.surpriseZones = pick3(ps.surpriseZones, () => null).map(z => (z ? [z] : []));
     p.hand = [...ps.hand];
+    // Der eigene Recycler-Inhalt landet zu Spielbeginn in der eigenen Ablage (Wiederbelebung, Cute Phoenix …).
+    p.discardPile = [...(ps.recycledCards || [])];
     p.mainDeck = []; p.potionDeck = []; p.sideDeck = [];
     p.gold = ps.recycled * CONFIG.RECYCLE_GOLD;
     // Heroes: Werte direkt aus der Kartendatenbank (wie setupGameState).
@@ -153,7 +155,7 @@ async function start(room, host, prep) {
     for (const seat of skillGs.botSeats) {
       if (fromPrep[seat]) { skillGs.botWeights[seat] = fromPrep[seat]; continue; }
       const per = L.samplePersona(prof);
-      if (per) skillGs.botWeights[seat] = per.weights;
+      if (per) skillGs.botWeights[seat] = require('./policy').shipped(per.weights);
     }
   } catch (e) { console.error('[skilltest] Profil:', e && e.message); }
 

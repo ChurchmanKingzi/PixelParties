@@ -281,7 +281,7 @@ function pickSeatCount(opts, rng) {
 async function playOne(profile, opts = {}, rng = Math.random, pool = null) {
   const n = pickSeatCount(opts, rng);
   const chosen = Array.from({ length: n }, () => pickPersona(profile, rng));
-  const simOpts = { seats: n, weights: chosen.map(p => p.weights), record: true, maxTurns: opts.maxTurns || 3000, watchdogMs: opts.watchdogMs };
+  const simOpts = { seats: n, weights: chosen.map(p => require('../policy').shipped(p.weights)), record: true, maxTurns: opts.maxTurns || 3000, watchdogMs: opts.watchdogMs };
   const rec = pool ? await pool.run(simOpts) : await require('../sim').runGame(simOpts);
   if (rec.reason === 'sim_turn_limit' || rec.reason === 'round_limit') rec.placements = null;      // nicht zu Ende gespielt (Patt): keine Wertung
   return { rec, n, personaIds: chosen.map(p => p.id) };

@@ -114,7 +114,7 @@ async function _runGame(opts = {}) {
   const dealt = [];
   for (let i = 0; i < seats; i++) {
     const ps = Rules.emptyPlayer();
-    ps.hand = dealHand(pool).hand;
+    ps.hand = dealHand(pool, undefined, { cards, ps }).hand;
     dealt.push([...ps.hand]);
     prep.players.push(ps);
   }

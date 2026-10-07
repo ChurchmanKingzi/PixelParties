@@ -136,9 +136,12 @@ function usableInBattle(c) {
   if (isReactionCard(c)) return ['Spell', 'Attack', 'Artifact', 'Creature', 'Potion'].includes(c.cardType);
   if (c.cardType === 'Potion') return true;
   if (c.cardType === 'Ability') return true;
-  if (c.cardType === 'Spell' || c.cardType === 'Attack') return sub === 'normal' || sub === '' || sub === 'surprise';
-  if (c.cardType === 'Artifact') return sub === 'equipment' || sub === 'normal';
-  if (c.cardType === 'Creature') return sub === 'normal' || sub === 'surprise';
+  // Areas und Attachments setzt der Aufbau aufs Brett, Surprises in die Surprise Zone, Artifact-Creatures wie Creatures in die Support Zones —
+  // all das ist im Kampf einsetzbar. Creatures OHNE Untertyp (die vier Cardinal Beasts, Stufe 5) gelten ebenso: Der Aufbau stellt sie ohne Stufenprüfung
+  // aufs Brett; als „unbrauchbar“ gewertet wurden sie bisher fast immer recycelt (Nutzer 7.10.: „die CPU hat nicht erkannt, dass sie sie spielen darf“).
+  if (c.cardType === 'Spell' || c.cardType === 'Attack') return ['normal', '', 'surprise', 'area', 'attachment'].includes(sub);
+  if (c.cardType === 'Artifact') return ['equipment', 'normal', 'creature', 'surprise', ''].includes(sub);
+  if (c.cardType === 'Creature') return ['normal', 'surprise', ''].includes(sub);
   return false;
 }
 
@@ -189,8 +192,9 @@ function buildWithRecycling(env, psIn, opts = {}) {
       if (lastLog[name]) recycleLog[name] = lastLog[name];
       ps = res.ps; progressed = true; recycledAll.push(name);
       if (ps.recycled % config.RECYCLE_EVERY === 0) {
-        const ejected = pool.takeAny(config.RECYCLER_TYPE_WEIGHTS);
-        if (ejected) { ps.hand.push(ejected); ejectedAll.push(ejected); }
+        // Spells passend zu den Schulen der Heroes auf dem Brett; ein Hero bringt seine Partner mit (hand-rules.js).
+        const r = require('./hand-rules').eject({ pool, cards: env.cards, ps, weights: config.RECYCLER_TYPE_WEIGHTS, rng });
+        if (r.ejected) ejectedAll.push(r.ejected, ...r.extras);
       }
     }
     if (!progressed) break;
