@@ -10,7 +10,9 @@ JEDER Tentakelarm bewegt sich einzeln:
   Spitzen). Jeder Arm hat seine eigene Phase, Frequenz und Stärke, und ist an Körper und Verzweigungen fest.
 * Der Arm schwingt quer zu seiner Richtung, als Welle, die zur freien Spitze hinausläuft (peitschend);
   Arme, die an beiden Enden festsitzen, wölben sich in der Mitte.
-* Die Klingen sitzen starr an ihrer Spitze und schwingen als Ganzes mit (ganzzahlige Verschiebung).
+* Die Klingen sitzen starr an ihrer Armspitze und schwingen als Ganzes mit.
+* Dazu schlägt jede Klinge einmal pro Loop zu (versetzt): kurz ausholen, in drei Frames durchziehen, zurückkehren —
+  wie das Schwert bei Toras, mit Schwungspur: Nachbilder der Klinge (heller Stahl, verblassend) bleiben drei Frames hängen.
 * Das weiße Monsterauge glimmt; ab und zu blitzt der Stahl einer Klinge auf.
 Aufruf (aus scripts/hero-animations):  python3 parasyte.py final 90
 """
@@ -20,13 +22,13 @@ from PIL import Image
 import numpy as np
 import cv2
 from anim_common import rgb, save_outputs, sparkle_pixels
-from flap_common import fill_pinholes
+from flap_common import fill_pinholes, rotate_part
 
 SRC = np.array(Image.open('src/parasytic-shapeshifter.png').convert('RGBA')).astype(int)
 SH, SW = SRC.shape[:2]
 N = 48
-PL = PR = 7
-PT, PB = 7, 6
+PAD = 28                                          # beim Rendern großzügiger Rand; am Ende auf den Inhalt zugeschnitten
+PL = PR = PT = PB = PAD
 H, W = SH + PT + PB, SW + PL + PR
 OPAQUE = SRC[:, :, 3] > 0
 
@@ -253,7 +255,8 @@ for c in sorted({o for o in _owner.values()}):
     for pt in pts:
         m[pt[1], pt[0]] = True
     lk = min(LEAVES, key=lambda k: min((SK_LIST[k][0] - q[0]) ** 2 + (SK_LIST[k][1] - q[1]) ** 2 for q in _clusters[c]))
-    BLADE_PARTS.append(dict(mask=m, sk=int(lk), name=f'b{c}',
+    piv = (float(np.mean([q[0] for q in _clusters[c]])), float(np.mean([q[1] for q in _clusters[c]])))   # Klingenbasis = Drehpunkt
+    BLADE_PARTS.append(dict(mask=m, sk=int(lk), piv=piv, name=f'b{c}',
                             hi=next((pt for pt in pts if tuple(SRC[pt[1], pt[0], :3]) == (255, 255, 255)), None)))
 GLINT_START = [6, 14, 22, 30, 38, 43]       # in Frame 0 blitzt nichts (Ruhepose = Sprite)
 
@@ -273,15 +276,72 @@ def _orig_holes():
 ORIG_HOLES = _orig_holes()
 
 
+# ── Hiebe der Klingen (wie Toras' Schwert) ───────────────────────────────────
+SLASH_T = 14                                                # Länge eines Hiebs in Frames
+SLASH_AMP = 1.15                                            # Schlagwinkel (rad)
+_cx, _cy = SW * 0.5, SH * 0.5
+_order = sorted(range(len(BLADE_PARTS)), key=lambda k: math.atan2(BLADE_PARTS[k]['piv'][1] - _cy, BLADE_PARTS[k]['piv'][0] - _cx))
+for rank, k in enumerate(_order):                           # reihum versetzt; Drehsinn im Wechsel
+    BLADE_PARTS[k]['start'] = 2 + rank * ((N - 4 - SLASH_T) // max(1, len(BLADE_PARTS) - 1))
+    BLADE_PARTS[k]['sign'] = 1 if rank % 2 == 0 else -1
+
+
+def _ease(x):
+    x = min(1.0, max(0.0, x))
+    return x * x * (3 - 2 * x)
+
+
+def swing_angle(bp, i):
+    """Winkel der Klinge im Frame i (rad): ausholen, durchziehen, kurz halten, zurück."""
+    t = (i - bp['start']) % N
+    if t >= SLASH_T:
+        return 0.0
+    sg = bp['sign']
+    S = SLASH_AMP * sg
+    if t < 3:
+        return -0.45 * sg * _ease((t + 1) / 3)
+    if t < 6:
+        return -0.45 * sg + (S + 0.45 * sg) * (0.4, 0.8, 1.0)[t - 3]
+    if t == 6:
+        return S + 0.1 * sg
+    return S * (1 - _ease((t - 6) / 8.0))
+
+
+AFTER = [('e6ebf0', 235), ('c4ccd4', 190), ('a2adb8', 140), ('7f8b98', 95)]   # Nachbilder: jung -> alt
+
+
+def blade_layer(s, bp, ang, shift):
+    return rotate_part(s, bp['mask'], bp['piv'], ang, (H, W), (PL + shift[0], PT + shift[1]))
+
+
+def afterimages(out, s, bp, shift, i):
+    """Schwungspur: die Klinge in den Winkeln der letzten Frames (und dazwischen), nach hinten verblassend."""
+    ghost = np.zeros((H, W, 4), int)
+    for k in range(len(AFTER) - 1, -1, -1):                 # alt zuerst, jung überschreibt
+        a_hi, a_lo = swing_angle(bp, i - k), swing_angle(bp, i - k - 1)
+        diff = abs(a_hi - a_lo)
+        if diff < 0.22:                                      # nur beim schnellen Durchziehen
+            continue
+        n = max(2, int(diff / 0.1) + 1)
+        c = rgb(AFTER[k][0])
+        for j in range(n):
+            a = a_lo + (a_hi - a_lo) * (j + 0.5) / n
+            m = blade_layer(s, bp, a, shift)[:, :, 3] > 0
+            ghost[m] = (c[0], c[1], c[2], AFTER[k][1])
+    put = (ghost[:, :, 3] > 0) & (out[:, :, 3] == 0)
+    out[put] = ghost[put]
+
+
 def frame(i):
     s = SRC.copy()
     glow = rgb(['ffffff', 'eef8ff', 'd4eaff', 'eef8ff'][((i + 1) // 2) % 4])          # Monsterauge glimmt
     for x, y in EYE:
         s[y, x] = glow
     out = np.zeros((H, W, 4), int)
+    off = arm_offsets(i)
+    shifts = [(int(round(off[bp['sk']][0])), int(round(off[bp['sk']][1]))) for bp in BLADE_PARTS]
     for y, x in zip(*np.nonzero(HUMAN)):                                              # Mensch: fest
         out[y + PT, x + PL] = s[y, x]
-    off = arm_offsets(i)
     TM = FLESH & ~BLADE
     for (qx, qy), k in FIELD.items():                                                 # Stränge: rückwärts abtasten
         dx, dy = off[k]
@@ -291,29 +351,57 @@ def frame(i):
             if kp is not None and not _verwandt(ARM_OF[k], ARM_OF[kp]):             # nie Pixel eines fremden Arms greifen
                 continue
             out[qy + PT, qx + PL] = s[py, px]
-    shifts = []
-    for bp in BLADE_PARTS:                                                            # Klingen: starr mit der Spitze
-        dx, dy = off[bp['sk']]
-        sx, sy = int(round(dx)), int(round(dy))
-        shifts.append((sx, sy))
-        for y, x in zip(*np.nonzero(bp['mask'])):
-            out[y + sy + PT, x + sx + PL] = s[y, x]
+    for bp, sh in zip(BLADE_PARTS, shifts):                                           # Klingen: mit der Spitze, im Hieb gedreht
+        ang = swing_angle(bp, i)
+        if ang == 0.0:
+            for y, x in zip(*np.nonzero(bp['mask'])):
+                out[y + sh[1] + PT, x + sh[0] + PL] = s[y, x]
+        else:
+            lay = blade_layer(s, bp, ang, sh)
+            m = lay[:, :, 3] > 0
+            out[m] = lay[m]
     before = out[:, :, 3] > 0
     fill_pinholes(out)
     out[ORIG_HOLES & ~before] = 0                                                     # Lücken des Sprites bleiben Lücken
+    for bp, sh in zip(BLADE_PARTS, shifts):                                           # Schwungspur nur auf leeren Pixeln
+        afterimages(out, s, bp, sh, i)
     for bp, (sx, sy), start in zip(BLADE_PARTS, shifts, GLINT_START):                 # Stahl blitzt auf
         if bp['hi'] is None:
             continue
         gx, gy = bp['hi']
+        ang = swing_angle(bp, i)
+        if ang:                                                                       # Glanzpunkt dreht mit
+            ca, sa = math.cos(ang), math.sin(ang)
+            rx, ry = gx - bp['piv'][0], gy - bp['piv'][1]
+            gx, gy = int(round(bp['piv'][0] + rx * ca - ry * sa)), int(round(bp['piv'][1] + rx * sa + ry * ca))
         for (px, py), c in sparkle_pixels(i, N, [(gx + sx + PL, gy + sy + PT, start)], rgb('e8f4ff'), rgb('ffffff')).items():
             if 0 < px < W - 1 and 0 < py < H - 1:
                 out[py, px] = c
     return out
 
 
+FACE_X, FOOT_Y = 42.5, 56.0       # Gesichtsmitte / Standlinie im Sprite
+
+
+def crop_frames(frames):
+    """Alle Frames auf die Vereinigung ihrer Inhalte zuschneiden (2 px Rand)."""
+    ys = [np.nonzero(f[:, :, 3] > 0)[0] for f in frames]
+    xs = [np.nonzero(f[:, :, 3] > 0)[1] for f in frames]
+    y0, y1 = min(a.min() for a in ys) - 2, max(a.max() for a in ys) + 3
+    x0, x1 = min(a.min() for a in xs) - 2, max(a.max() for a in xs) + 3
+    pads = dict(padTop=int(PT - y0), padLeft=int(PL - x0), padRight=int(x1 - (PL + SW)), padBottom=int(y1 - (PT + SH)))
+    return [f[y0:y1, x0:x1] for f in frames], pads
+
+
 if __name__ == '__main__':
     tag = sys.argv[1] if len(sys.argv) > 1 else 'v'
-    print(f'{len(ARMS)} Arme (laengste: {sorted((len(a["path"]) for a in ARMS), reverse=True)[:8]}), {len(BLADE_PARTS)} Klingen, Auge: {EYE}')
+    print(f'{len(ARMS)} Arme, {len(BLADE_PARTS)} Klingen (Hiebstart: {[bp["start"] for bp in BLADE_PARTS]})')
     frames = [frame(i) for i in range(N)]
+    frames, pads = crop_frames(frames)
     ms = int(sys.argv[2]) if len(sys.argv) > 2 and sys.argv[2].isdigit() else 90
     save_outputs(f'parasyte_idle_{tag}', frames, ms, scale=6, check_edges=True)
+    h, w = frames[0].shape[:2]
+    meta = {"hero": "Parasytic ???", "sheet": "parasytic.png", "frameWidth": w, "frameHeight": h, "frames": N, "frameMs": ms,
+            "loop": True, "layout": "horizontal", "skinOf": "???, the Shapeshifter", **pads,
+            "faceX": pads['padLeft'] + FACE_X, "footY": pads['padTop'] + FOOT_Y}
+    print('JSON:', meta)
