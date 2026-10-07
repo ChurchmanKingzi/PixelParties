@@ -727,7 +727,7 @@ function DeckBuilder() {
         : { label: 'Make this the cover card', icon: '⭐', color: '#ffd700', action: () => setCoverCard(cardName) },
     ];
     if (hasSkins) {
-      const availOpts = ownedSkins ? SKINS_DB[cardName].filter(s => ownedSkins.has(s)) : SKINS_DB[cardName];
+      const availOpts = ownedSkins ? SKINS_DB[cardName].filter(s => ownedSkins.has(s)) : SKINS_DB[cardName].filter(s => !window.UNLOCKABLE_SKINS.has(s));
       if (availOpts.length > 0) {
         items.push({ label: 'Select skin', icon: '🎨', color: 'var(--accent)', action: () => setSkinGallery({ cardName, options: availOpts }) });
       }
@@ -1650,7 +1650,7 @@ function DeckBuilder() {
                           : { label: 'Make this the cover card', icon: '⭐', color: '#ffd700', action: () => setCoverCard(item.card) },
                       ];
                       if (hasSkins) {
-                        const availOpts = ownedSkins ? SKINS_DB[item.card].filter(s => ownedSkins.has(s)) : SKINS_DB[item.card];
+                        const availOpts = ownedSkins ? SKINS_DB[item.card].filter(s => ownedSkins.has(s)) : SKINS_DB[item.card].filter(s => !window.UNLOCKABLE_SKINS.has(s));
                         if (availOpts.length > 0) {
                           menuItems.push({ label: 'Select skin', icon: '🎨', color: 'var(--accent)', action: () => setSkinGallery({ cardName: item.card, options: availOpts }) });
                         }

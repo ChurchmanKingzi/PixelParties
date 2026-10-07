@@ -303,6 +303,9 @@ async function finishGame(room, winnerIdx, reason, host) {
     try { await host.db.run('UPDATE users SET sc = sc + ? WHERE id = ?', [sc[seat], p.userId]); }
     catch (e) { console.error('[skilltest] SC-Vergabe fehlgeschlagen:', e.message); }
   }
+  // Ein Mensch (kein Bot) hat gewonnen: datumsabhaengige Freischaltungen (31.10.-Skin) pruefen.
+  const wp = room.players[winnerIdx];
+  if (wp && !wp.isBot && wp.userId && host.onHumanWon) host.onHumanWon(wp.userId);
   for (let i = 0; i < gs.players.length; i++) host.sendGameState(room, i);
   host.sendSpectatorGameState(room);
   host.io.to('room:' + room.id).emit('st_game_over', { winnerIdx, reason, placements: place, sc, rounds: st.round });

@@ -3698,6 +3698,7 @@ window.SPELL_SCHOOLS = [];
 window.STARTING_ABILITIES = [];
 window.ARCHETYPES = [];
 window.SKINS_DB = {}; // cardName → [skinName, ...]
+window.UNLOCKABLE_SKINS = new Set(); // Skins, die nur ueber Ereignisse frei werden (Server: /api/skins)
 
 // ═══════════════════════════════════════════
 //  HAND-LIMIT MODIFIER REGISTRY
@@ -3985,6 +3986,7 @@ async function loadCardDB() {
     const skData = await skRes.json();
     for (const k of Object.keys(window.SKINS_DB)) delete window.SKINS_DB[k];
     Object.assign(window.SKINS_DB, skData.skins || {});
+    window.UNLOCKABLE_SKINS = new Set(skData.unlockable || []);   // nicht im Shop; nur ueber Freischaltungen
   } catch {
     for (const k of Object.keys(window.SKINS_DB)) delete window.SKINS_DB[k];
   }

@@ -428,6 +428,10 @@ Variante ohne Krone/Flügel), Hintergründe/Auren der Karte gehören nicht zum S
   Name der Hero-Karte. (Das Brett lädt Animationen bisher nur über den
   Hero-Namen – Skin-Sheets werden dort erst angezeigt, wenn es den Skin
   berücksichtigt.)
+  **Freischaltbare Skins** (nicht im Shop) liegen mit ihrem Kartenbild in
+  `cards/skins/unlockable/`; Sheet/JSON/`skins.json` sind wie bei jedem
+  Skin. Wodurch sie frei werden, steht in `unlockable-skins.js` (`RULES`),
+  geprüft von `node scripts/check-unlockable-skins.js`.
 * **`faceX`** (Pflicht für neue Sheets): waagrechte Mitte des **Gesichts** in
   Frame-Pixeln, gemessen von der linken Frame-Kante (Kommazahlen erlaubt,
   z. B. `12.5`). Auf dem Brett steht das Gesicht genau über der Kartenmitte –

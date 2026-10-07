@@ -633,7 +633,7 @@ app.use((req, res, next) => {
 //  beschraenkt.
 // ───────────────────────────────────────────────────────────────
 const SKINS_DIR = path.join(CARDS_DIR, 'skins');
-const UNLOCKABLE_SKINS_DIR = path.join(SKINS_DIR, 'unlockable');
+const UNLOCKABLE_SKINS_DIR = path.join(SKINS_DIR, 'unlockable');   // = unlockable-skins.js UNLOCKABLE_DIR
 app.use((req, res, next) => {
   if (!req.path.startsWith('/cards/skins/')) return next();
   let name;
@@ -2963,6 +2963,18 @@ app.put('/api/decks/:id', authMiddleware, async (req, res) => {
 
   if (isDefault) await db.run('UPDATE decks SET is_default = 0 WHERE user_id = ?', [req.user.userId]);
 
+  // Freischaltbare Skins, die dem Spieler (noch) nicht gehoeren, kommen nicht ins Deck.
+  let skinsClean = skins;
+  if (skins && typeof skins === 'object' && !Array.isArray(skins)) {
+    const lock = unlockableSkinNames();
+    if (Object.values(skins).some(v => lock.has(v))) {
+      const ownedRows = await db.all("SELECT item_id FROM user_shop_items WHERE user_id = ? AND item_type = 'skin'", [req.user.userId]);
+      const owned = new Set(ownedRows.map(r => r.item_id));
+      skinsClean = {};
+      for (const [hero, skin] of Object.entries(skins)) if (!lock.has(skin) || owned.has(skin)) skinsClean[hero] = skin;
+    }
+  }
+
   await db.run('UPDATE decks SET name=?, main_deck=?, heroes=?, potion_deck=?, side_deck=?, is_default=?, cover_card=?, skins=?, updated_at=unixepoch() WHERE id=? AND user_id=?', [
     name || deckRow.name,
     JSON.stringify(mainDeck || JSON.parse(deckRow.main_deck)),
@@ -2971,7 +2983,7 @@ app.put('/api/decks/:id', authMiddleware, async (req, res) => {
     JSON.stringify(sideDeck || JSON.parse(deckRow.side_deck)),
     isDefault ? 1 : (isDefault === false ? 0 : deckRow.is_default),
     coverCard !== undefined ? (coverCard || '') : (deckRow.cover_card || ''),
-    skins !== undefined ? JSON.stringify(skins) : (deckRow.skins || '{}'),
+    skinsClean !== undefined ? JSON.stringify(skinsClean) : (deckRow.skins || '{}'),
     req.params.id, req.user.userId
   ]);
 
@@ -3710,7 +3722,8 @@ async function withProfileHeroSkins(userId, deck) {
 // ===== SKINS =====
 let SKINS_DATA = {};
 try { SKINS_DATA = JSON.parse(fs.readFileSync(path.join(__dirname, 'data', 'skins.json'), 'utf-8')); } catch {}
-app.get('/api/skins', (req, res) => res.json({ skins: SKINS_DATA }));
+// `unlockable`: Skins, die nicht im Shop stehen, sondern ueber Ereignisse freigeschaltet werden (cards/skins/unlockable/).
+app.get('/api/skins', (req, res) => res.json({ skins: SKINS_DATA, unlockable: [...unlockableSkinNames()] }));
 
 // ===== HELDEN-IDLE-ANIMATIONEN =====
 // ★ v1450: Verzeichnis der Spritesheets in `data/hero-animations/`
@@ -3821,36 +3834,19 @@ function scanSkinFiles() {
 
 // ===== FREISCHALTBARE SKINS =====
 // Bilder in `cards/skins/unlockable/`: nicht kaeuflich, nicht von CPUs/Bots traegbar, sondern nur ueber
-// Ereignisse freizuschalten (siehe `grantUnlockableSkin`). Die Zuordnung Held → Skin steht wie bei allen
-// Skins in `data/skins.json`.
-function unlockableSkinNames() {
-  try {
-    return new Set(fs.readdirSync(UNLOCKABLE_SKINS_DIR)
-      .filter(f => IMAGE_EXTS.has(path.extname(f).toLowerCase()))
-      .map(f => path.basename(f, path.extname(f))));
-  } catch { return new Set(); }
-}
-function isUnlockableSkin(skinName) { return unlockableSkinNames().has(skinName); }
+// Ereignisse freizuschalten (Regeln und reine Logik: unlockable-skins.js).
+const unlockableSkins = require('./unlockable-skins');
+const { TUTORIAL_SKIN, HALLOWEEN_SKIN } = unlockableSkins;
+const unlockableSkinNames = () => unlockableSkins.unlockableSkinNames();
+const isUnlockableSkin = (skinName) => unlockableSkins.isUnlockableSkin(skinName);
+const withoutUnlockableSkins = (skins) => unlockableSkins.withoutUnlockableSkins(skins);
+const heroOfSkin = (skinName) => unlockableSkins.heroOfSkin(SKINS_DATA, skinName);
 
 /** Skins, die der SHOP anbieten darf (und die CPUs wuerfeln duerfen): Bilder der obersten Ebene, OHNE alles Freischaltbare. */
 function shopSkinNames() {
   const lock = unlockableSkinNames();
   return new Set(scanSkinFiles().map(f => path.basename(f, path.extname(f))).filter(n => !lock.has(n)));
 }
-
-/** Held, zu dem ein Skin gehoert (aus data/skins.json) — null, wenn unbekannt. */
-function heroOfSkin(skinName) {
-  for (const [hero, list] of Object.entries(SKINS_DATA)) if ((list || []).includes(skinName)) return hero;
-  return null;
-}
-
-// Wodurch welcher freischaltbare Skin frei wird (Namen wie in data/skins.json / als Bilddatei):
-const UNLOCKABLE_SKIN_RULES = {
-  'Bills Worst Nightmare': 'tutorial',   // Tutorial geschafft
-  'Dr. Heinz N. Stein': 'halloween',     // am 31.10. (lokale Uhr des Spielers) irgendeine Partie gewonnen
-};
-const HALLOWEEN_SKIN = 'Dr. Heinz N. Stein';
-const TUTORIAL_SKIN = 'Bills Worst Nightmare';
 
 /** Schickt ein Socket-Ereignis an alle Verbindungen eines Spielers. */
 function emitToUser(userId, event, payload) {
@@ -3866,7 +3862,7 @@ function emitToUser(userId, event, payload) {
  * Fremde Namen (Shop-Skins, unbekannte) werden abgewiesen: diese Funktion ist nur fuer `unlockable/`.
  */
 async function grantUnlockableSkin(userId, skinName) {
-  if (!userId || !UNLOCKABLE_SKIN_RULES[skinName] || !isUnlockableSkin(skinName)) return false;
+  if (!userId || !unlockableSkins.RULES[skinName] || !isUnlockableSkin(skinName)) return false;
   const heroName = heroOfSkin(skinName);
   if (!heroName) return false;
   const fresh = await unlockCpuSkin(userId, skinName);
@@ -3875,30 +3871,43 @@ async function grantUnlockableSkin(userId, skinName) {
 }
 
 // ── Uhr des Spielers (31.10.-Skin) ──
-// „Am 31.10. seiner eigenen Zeit (lokale PC-Uhr)“: nur der Client kennt die. Er meldet beim Verbinden und
-// danach regelmaessig `{ now: Date.now(), tz: getTimezoneOffset() }`; der Server merkt sich den Abstand zur
-// eigenen Uhr, so stimmt das Datum auch Stunden nach der Meldung (Mitternachts-Wechsel).
-const clientClocks = new Map();   // userId -> { skew (ms: Client-Uhr minus Server-Uhr), tz (Minuten, wie getTimezoneOffset) }
+// Der Client meldet beim Anmelden und danach regelmaessig seine lokale PC-Uhr (siehe unlockable-skins.js).
+const clientClocks = new Map();   // userId -> { skew, tz }
 function noteClientClock(userId, data) {
-  const now = Number(data && data.now), tz = Number(data && data.tz);
-  if (!userId || !Number.isFinite(now) || !Number.isFinite(tz) || Math.abs(tz) > 14 * 60) return;
-  clientClocks.set(userId, { skew: now - Date.now(), tz });
+  const c = unlockableSkins.parseClientClock(data);
+  if (userId && c) clientClocks.set(userId, c);
 }
-/** Lokales Datum des Spielers { month (1-12), day } nach seiner Uhr — null, wenn er keine gemeldet hat. */
-function userLocalDate(userId) {
-  const c = clientClocks.get(userId);
-  if (!c) return null;
-  const d = new Date(Date.now() + c.skew - c.tz * 60000);   // UTC-Getter liefern dann die lokale Wandzeit
-  return { month: d.getUTCMonth() + 1, day: d.getUTCDate() };
+/** Lokales Datum des Spielers { month, day } nach seiner Uhr — null, wenn er keine gemeldet hat. */
+function userLocalDate(userId) { return unlockableSkins.localDate(clientClocks.get(userId)); }
+
+/**
+ * „Tutorial geschafft“ = alle Tutorial-Stufen geloest (Stufe N ist erst nach N-1 spielbar, die letzte
+ * schliesst es also ab). Schaltet dann den Tutorial-Skin frei; auch fuer Spieler, die das Tutorial schon
+ * vor diesem Feature geschafft haben (Aufruf auch beim Anmelden, dann mit etwas Verzoegerung, damit
+ * das Popup des Clients schon lauscht).
+ */
+async function grantTutorialSkinIfDone(userId, delayMs = 0) {
+  try {
+    if (!userId || !isUnlockableSkin(TUTORIAL_SKIN)) return false;
+    const ids = unlockableSkins.allTutorialIds();
+    if (!ids.length) return false;
+    const rows = await db.all('SELECT puzzle_id FROM puzzle_completions WHERE user_id = ?', [userId]);
+    const done = new Set(rows.map(r => r.puzzle_id));
+    if (!ids.every(id => done.has(id))) return false;
+    if (!delayMs) return await grantUnlockableSkin(userId, TUTORIAL_SKIN);
+    const owned = await db.get("SELECT id FROM user_shop_items WHERE user_id = ? AND item_type = 'skin' AND item_id = ?", [userId, TUTORIAL_SKIN]);
+    if (owned) return false;
+    setTimeout(() => { grantUnlockableSkin(userId, TUTORIAL_SKIN).catch(() => {}); }, delayMs);
+    return true;
+  } catch (err) { console.error('[unlockable skin] Tutorial-Pruefung fehlgeschlagen:', err.message); return false; }
 }
 
 /** Ein Mensch hat eine Partie gewonnen (egal welcher Modus): loest datumsabhaengige Freischaltungen aus. */
 async function onHumanWonGame(userId) {
   try {
     if (!userId) return;
-    const ld = userLocalDate(userId);
-    if (ld && ld.month === 10 && ld.day === 31) await grantUnlockableSkin(userId, HALLOWEEN_SKIN);
-  } catch (err) { console.error('[unlockable skin] Siegesprüfung fehlgeschlagen:', err.message); }
+    if (unlockableSkins.isHalloween(userLocalDate(userId))) await grantUnlockableSkin(userId, HALLOWEEN_SKIN);
+  } catch (err) { console.error('[unlockable skin] Siegespruefung fehlgeschlagen:', err.message); }
 }
 
 // Build flat list of all skin IDs from skins.json that have images on disk
@@ -6251,6 +6260,7 @@ async function endGame(room, winnerIdx, reason, opts = {}) {
   // Always track wins/losses and hero stats per round
   // (nicht bei `nurSatzende`: das letzte Spiel ist schon gebucht)
   if (!nurSatzende) await db.run('UPDATE users SET wins = wins + 1 WHERE id = ?', [winner.userId]);
+  if (!nurSatzende) onHumanWonGame(winner.userId);   // 31.10.-Skin (PvP unranked/ranked, Draft)
   if (!nurSatzende) await db.run('UPDATE users SET losses = losses + 1 WHERE id = ?', [loser.userId]);
   for (const ps of (nurSatzende ? [] : [winner, loser])) {
     const won = ps === winner;
@@ -6611,6 +6621,8 @@ async function puzzleEndGame(room, winnerIdx, reason) {
           );
           console.log(`[Tutorial] ${winner.username} cleared ${puzzleId}`);
         }
+        // Alle Stufen geschafft? -> Tutorial-Skin freischalten (mit Freischalt-Animation).
+        await grantTutorialSkinIfDone(userId);
       } catch (err) {
         console.error('[Tutorial] completion tracking error:', err.message);
       }
@@ -6650,6 +6662,7 @@ function endCpuBattle(room, winnerIdx, reason) {
   if (room.engine?._fastMode) return;
 
   room.status = 'finished';
+  if (winnerIdx === 0) onHumanWonGame(room.players?.[0]?.userId);   // 31.10.-Skin (Sieg gegen die CPU)
 
   // Record per-opponent W/L for the human player so the singleplayer
   // gallery can show their record vs this deck. Only counts when a human
@@ -13992,6 +14005,7 @@ io.on('connection', (socket) => {
       currentUser = { ...session, ip: socketIP };
       socket.data.userId = session.userId;
       socket.emit('auth_ok', session);
+      grantTutorialSkinIfDone(session.userId, 4000);   // wer das Tutorial schon geschafft hat, bekommt den Skin nachtraeglich
       social.onAuth(socket, session);
       // Reconnect to active game
       const activeRoomId = activeGames.get(session.userId);
@@ -15958,7 +15972,8 @@ io.on('connection', (socket) => {
         creationZone: [...(pz.creationZone || [])],
         _oncePerGameUsed: new Set(),
         _resolvingCard: null,
-        deckSkins: puzzleDeckSkins(pz),
+        // Die CPU-Seite traegt NIEMALS freischaltbare Skins.
+        deckSkins: String(userId).startsWith('cpu-') ? withoutUnlockableSkins(puzzleDeckSkins(pz)) : puzzleDeckSkins(pz),
       };
     };
 
@@ -16821,6 +16836,7 @@ io.on('connection', (socket) => {
     // Kampagnen-Duelle sind ausgenommen (feste Gegner mit eigener Story).
     const cpuSnapshot = snapshotDeck(cpuDeck);
     const cpuSkin = campaign ? null : rollCpuSkin(cpuDeck);
+    cpuSnapshot.skins = withoutUnlockableSkins(cpuSnapshot.skins);   // CPUs tragen NIEMALS freischaltbare Skins
     if (cpuSkin) cpuSnapshot.skins = { ...(cpuSnapshot.skins || {}), [cpuSkin.heroName]: cpuSkin.skinName };
 
     const roomId = 'sp-' + uuidv4().substring(0, 8);
@@ -17025,6 +17041,7 @@ io.on('connection', (socket) => {
     // Duellergebnis an den Client.
     if (room.engine?._fastMode) return;
     room.status = 'finished';
+    if (winnerIdx === 0) onHumanWonGame(room.players?.[0]?.userId);   // 31.10.-Skin (Kampagnenduell gewonnen)
     const sid = room.players?.[0]?.socketId;
     if (sid) io.to(sid).emit('campaign_duel_result', {
       duelId: gs._campaignDuelId || null,
@@ -17248,7 +17265,7 @@ io.on('connection', (socket) => {
     const snapshotDeck = (d) => JSON.parse(JSON.stringify({
       mainDeck: d.mainDeck || [], heroes: d.heroes || [],
       potionDeck: d.potionDeck || [], sideDeck: d.sideDeck || [],
-      skins: d.skins || {},
+      skins: withoutUnlockableSkins(d.skins),   // CPU gegen CPU: nie freischaltbare Skins
     }));
     const deckNames = [deckA.name || 'Unnamed', deckB.name || 'Unnamed'];
     const roomId = 'sp-test-' + uuidv4().substring(0, 8);
@@ -18426,7 +18443,7 @@ io.on('connection', (socket) => {
       const snapshotDeck = (d) => JSON.parse(JSON.stringify({
         mainDeck: d.mainDeck || [], heroes: d.heroes || [],
         potionDeck: d.potionDeck || [], sideDeck: d.sideDeck || [],
-        skins: d.skins || {},
+        skins: withoutUnlockableSkins(d.skins),   // CPU gegen CPU: nie freischaltbare Skins
       }));
 
       const roomId = 'cvc-' + uuidv4().substring(0, 8);
@@ -19023,6 +19040,7 @@ const skillTestHost = {
   get doPlayAbility() { return doPlayAbility; },
   get doActivateAbility() { return doActivateAbility; },
   destroyRoom: (id) => destroyRoom(id),
+  onHumanWon: (userId) => onHumanWonGame(userId),   // 31.10.-Skin: ein Mensch hat die Skill-Test-Partie gewonnen
   scheduleBotTurn: (room, seat, opts) => skillTest.scheduleBotTurn(room, seat, skillTestHost, opts),
 };
 // Zugwächter des Skill-Test-Modus um die normalen Aktions-Handler (in anderen Modi ein Durchgriff).
@@ -19130,7 +19148,7 @@ function _trainHeapLimitMB() {
 async function runHeadlessTrainingGame(pinnedDeck, oppDeck, pinnedIdx, gameOpts = {}) {  const snapshotDeck = (d) => JSON.parse(JSON.stringify({
     mainDeck: d.mainDeck || [], heroes: d.heroes || [],
     potionDeck: d.potionDeck || [], sideDeck: d.sideDeck || [],
-    skins: d.skins || {},
+    skins: withoutUnlockableSkins(d.skins),   // Training: nie freischaltbare Skins
   }));
   const decks = pinnedIdx === 0 ? [pinnedDeck, oppDeck] : [oppDeck, pinnedDeck];
   const roomId = 'train-' + uuidv4().substring(0, 8);
@@ -19912,7 +19930,7 @@ function _makeNetProbe() {
 async function runNetBenchmarkGame(deckA, deckB, cfg, haken = {}) {
   const snapshotDeck = (d) => JSON.parse(JSON.stringify({
     mainDeck: d.mainDeck || [], heroes: d.heroes || [],
-    potionDeck: d.potionDeck || [], sideDeck: d.sideDeck || [], skins: d.skins || {},
+    potionDeck: d.potionDeck || [], sideDeck: d.sideDeck || [], skins: withoutUnlockableSkins(d.skins),
   }));
   const roomId = 'netbench-' + uuidv4().substring(0, 8);
   const zuschauer = [];
