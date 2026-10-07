@@ -1,17 +1,17 @@
 {
   "hero": "Parasytic ???",
   "sheet": "parasytic.png",
-  "frameWidth": 83,
-  "frameHeight": 79,
+  "frameWidth": 86,
+  "frameHeight": 78,
   "frames": 48,
   "frameMs": 90,
   "loop": true,
   "layout": "horizontal",
   "skinOf": "???, the Shapeshifter",
   "padTop": 7,
-  "padLeft": 2,
-  "padRight": 6,
-  "padBottom": 4,
-  "faceX": 45.5,
+  "padLeft": 6,
+  "padRight": 5,
+  "padBottom": 3,
+  "faceX": 49.5,
   "footY": 61.0
 }

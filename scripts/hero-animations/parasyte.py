@@ -138,7 +138,9 @@ _rng = np.random.RandomState(11)
 for a in ARMS:                                              # eigene Phase, Frequenz (Perioden pro Loop), Stärke und Richtung je Arm
     L = len(a['path'])
     a['phase'] = float(_rng.uniform(0, 2 * math.pi))
-    a['cycles'] = int(_rng.choice([1, 2, 3], p=[0.35, 0.4, 0.25]))
+    a['cycles'] = int(_rng.choice([2, 3, 4], p=[0.3, 0.4, 0.3]))
+    a['cycles2'] = a['cycles'] + int(_rng.choice([1, 2]))                  # zweite, schnellere Welle: nie ein ruhiger Moment
+    a['phase2'] = float(_rng.uniform(0, 2 * math.pi))
     a['amp'] = float(np.clip(0.14 * L + 1.0, 0.0, 4.2)) if L >= 4 else 0.0
     a['dir'] = 1 if _rng.rand() < 0.5 else -1
 
@@ -184,10 +186,12 @@ def arm_offsets(i):
             base = off[a['fork']]
         L = len(a['path'])
         w = 2 * math.pi * a['cycles'] * i / N
+        w2 = 2 * math.pi * a['cycles2'] * i / N
         for idx, k in enumerate(a['path']):
             u = idx / max(1, L - 1)
             f = u ** 1.15
             wave = math.sin(w - 0.3 * idx + a['phase']) - math.sin(-0.3 * idx + a['phase'])
+            wave += 0.5 * (math.sin(w2 - 0.45 * idx + a['phase2']) - math.sin(-0.45 * idx + a['phase2']))
             tx, ty = SK_TAN[k]
             g = a['amp'] * f * wave * 0.5 * a['dir']
             off[k] = (base[0] - ty * g, base[1] + tx * g)
