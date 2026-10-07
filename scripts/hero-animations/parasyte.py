@@ -456,7 +456,7 @@ def frame(i):
     return out
 
 
-FACE_X, FOOT_Y = 43.5, 54.0       # Gesichtsmitte / Standlinie im Sprite
+FACE_X, FACE_Y, FOOT_Y = 43.5, 31.0, 50.0       # Gesichtsmitte / Standlinie (Unterkante des Menschen) im Sprite
 
 
 def crop_frames(frames):
@@ -479,5 +479,5 @@ if __name__ == '__main__':
     h, w = frames[0].shape[:2]
     meta = {"hero": "Parasytic ???", "sheet": "parasytic.png", "frameWidth": w, "frameHeight": h, "frames": N, "frameMs": ms,
             "loop": True, "layout": "horizontal", "skinOf": "???, the Shapeshifter", **pads,
-            "faceX": pads['padLeft'] + FACE_X, "footY": pads['padTop'] + FOOT_Y}
+            "faceX": pads['padLeft'] + FACE_X, "faceY": pads['padTop'] + FACE_Y, "footY": pads['padTop'] + FOOT_Y}
     print('JSON:', meta)
