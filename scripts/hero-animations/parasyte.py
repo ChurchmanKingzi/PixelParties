@@ -27,6 +27,8 @@ from flap_common import fill_pinholes, rotate_part
 SRC = np.array(Image.open('src/parasytic-shapeshifter.png').convert('RGBA')).astype(int)
 SH, SW = SRC.shape[:2]
 N = 48
+K2 = 0.45
+SLEW = 0.7
 PAD = 28                                          # beim Rendern großzügiger Rand; am Ende auf den Inhalt zugeschnitten
 PL = PR = PT = PB = PAD
 H, W = SH + PT + PB, SW + PL + PR
@@ -49,7 +51,7 @@ def classify():
         p = SRC[y, x]
         if _near(p, FLESH_PAL):
             flesh[y, x] = True
-        elif _near(p, STEEL_PAL):
+        elif _near(p, STEEL_PAL, 8):
             steel[y, x] = True
     # Stahl nur als zusammenhängende Klinge (>= 8 px); kleine weiße Reste (Auge, Glanz) gehören nicht dazu
     n, lab = cv2.connectedComponents(steel.astype(np.uint8), connectivity=8)
@@ -187,13 +189,19 @@ def arm_offsets(i):
         L = len(a['path'])
         w = 2 * math.pi * a['cycles'] * i / N
         w2 = 2 * math.pi * a['cycles2'] * i / N
+        gs = []
         for idx, k in enumerate(a['path']):
             u = idx / max(1, L - 1)
             f = u ** 1.15
             wave = math.sin(w - 0.3 * idx + a['phase']) - math.sin(-0.3 * idx + a['phase'])
-            wave += 0.5 * (math.sin(w2 - 0.45 * idx + a['phase2']) - math.sin(-0.45 * idx + a['phase2']))
+            wave += 0.5 * (math.sin(w2 - K2 * idx + a['phase2']) - math.sin(-K2 * idx + a['phase2']))
+            g = a['amp'] * a.get('boost', 1.0) * f * wave * 0.5 * a['dir']
+            if gs:                                                  # Nachbarpixel dürfen sich um höchstens SLEW px gegeneinander verschieben -> Strang reißt nie
+                g = min(gs[-1] + SLEW, max(gs[-1] - SLEW, g))
+            gs.append(g)
+        for idx, k in enumerate(a['path']):
             tx, ty = SK_TAN[k]
-            g = a['amp'] * f * wave * 0.5 * a['dir']
+            g = gs[idx]
             off[k] = (base[0] - ty * g, base[1] + tx * g)
         done.add(ai)
 
@@ -262,6 +270,8 @@ for c in sorted({o for o in _owner.values()}):
     piv = (float(np.mean([q[0] for q in _clusters[c]])), float(np.mean([q[1] for q in _clusters[c]])))   # Klingenbasis = Drehpunkt
     BLADE_PARTS.append(dict(mask=m, sk=int(lk), piv=piv, name=f'b{c}',
                             hi=next((pt for pt in pts if tuple(SRC[pt[1], pt[0], :3]) == (255, 255, 255)), None)))
+for _bp in BLADE_PARTS:                                     # Arme mit Klinge schlackern kräftiger
+    ARMS[ARM_OF[_bp['sk']]]['boost'] = 1.5
 GLINT_START = [6, 14, 22, 30, 38, 43]       # in Frame 0 blitzt nichts (Ruhepose = Sprite)
 
 # Monsterauge: weiße Pixel im Fleisch, die nicht zur Klinge gehören
@@ -335,6 +345,18 @@ def swing_angle(bp, i):
 AFTER = [('e6ebf0', 235), ('c4ccd4', 190), ('a2adb8', 140), ('7f8b98', 95)]   # Nachbilder: jung -> alt
 
 
+def wobble(bp, i):
+    """Eigenes Schlackern der Klinge um ihre Basis (rad); in Frame 0 genau 0."""
+    w = 2 * math.pi * bp['wc'] * i / N
+    return bp['wamp'] * (math.sin(w + bp['wph']) - math.sin(bp['wph'])) + 0.5 * bp['wamp'] * (math.sin(2 * w + 1.7 * bp['wph']) - math.sin(1.7 * bp['wph']))
+
+
+for _k, _bp in enumerate(BLADE_PARTS):
+    _bp['wc'] = [2, 3, 3, 2, 4, 3][_k % 6]
+    _bp['wph'] = 1.3 * _k + 0.4
+    _bp['wamp'] = 0.32
+
+
 def blade_layer(s, bp, ang, shift):
     return rotate_part(s, bp['mask'], bp['piv'], ang, (H, W), (PL + shift[0], PT + shift[1]))
 
@@ -350,11 +372,39 @@ def afterimages(out, s, bp, shift, i):
         n = max(2, int(diff / 0.1) + 1)
         c = rgb(AFTER[k][0])
         for j in range(n):
-            a = a_lo + (a_hi - a_lo) * (j + 0.5) / n
+            a = a_lo + (a_hi - a_lo) * (j + 0.5) / n + wobble(bp, i - k)
             m = blade_layer(s, bp, a, shift)[:, :, 3] > 0
             ghost[m] = (c[0], c[1], c[2], AFTER[k][1])
     put = (ghost[:, :, 3] > 0) & (out[:, :, 3] == 0)
     out[put] = ghost[put]
+
+
+def _line(p, q):
+    (x0, y0), (x1, y1) = p, q
+    n = max(abs(x1 - x0), abs(y1 - y0))
+    return [(int(round(x0 + (x1 - x0) * t / n)), int(round(y0 + (y1 - y0) * t / n))) for t in range(1, n)] if n > 1 else []
+
+
+def bridge_strands(out, s, off):
+    """Wo ein Strang beim Schlackern auseinanderklafft (Nachbarn > 1 px entfernt), Lücke mit Strangfarbe samt Kontur schließen."""
+    bridges = []
+    for a in ARMS:
+        path = a['path']
+        for j in range(len(path) - 1):
+            k0, k1 = path[j], path[j + 1]
+            p = (int(round(SK_LIST[k0][0] + off[k0][0])), int(round(SK_LIST[k0][1] + off[k0][1])))
+            q = (int(round(SK_LIST[k1][0] + off[k1][0])), int(round(SK_LIST[k1][1] + off[k1][1])))
+            for (x, y) in _line(p, q):
+                bridges.append((x, y, tuple(SRC[SK_LIST[k0][1], SK_LIST[k0][0], :3])))
+    for x, y, c in bridges:
+        yy, xx = y + PT, x + PL
+        if out[yy, xx, 3] == 0:
+            out[yy, xx] = (c[0], c[1], c[2], 255)
+    for x, y, c in bridges:                                                           # Kontur um die Brücke
+        for dy, dx in ((-1, 0), (1, 0), (0, -1), (0, 1)):
+            yy, xx = y + PT + dy, x + PL + dx
+            if out[yy, xx, 3] == 0:
+                out[yy, xx] = (OUTLINE_COL[0], OUTLINE_COL[1], OUTLINE_COL[2], 255)
 
 
 def frame(i):
@@ -376,8 +426,9 @@ def frame(i):
             if kp is not None and not _verwandt(ARM_OF[k], ARM_OF[kp]):             # nie Pixel eines fremden Arms greifen
                 continue
             out[qy + PT, qx + PL] = s[py, px]
+    bridge_strands(out, s, off)
     for bp, sh in zip(BLADE_PARTS, shifts):                                           # Klingen: mit der Spitze, im Hieb gedreht
-        ang = swing_angle(bp, i)
+        ang = swing_angle(bp, i) + wobble(bp, i)
         if ang == 0.0:
             for y, x in zip(*np.nonzero(bp['mask'])):
                 out[y + sh[1] + PT, x + sh[0] + PL] = s[y, x]
@@ -394,7 +445,7 @@ def frame(i):
         if bp['hi'] is None:
             continue
         gx, gy = bp['hi']
-        ang = swing_angle(bp, i)
+        ang = swing_angle(bp, i) + wobble(bp, i)
         if ang:                                                                       # Glanzpunkt dreht mit
             ca, sa = math.cos(ang), math.sin(ang)
             rx, ry = gx - bp['piv'][0], gy - bp['piv'][1]
