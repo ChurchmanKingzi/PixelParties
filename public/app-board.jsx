@@ -26383,10 +26383,6 @@ function ResultCeremony({ won, spectator, title, subtitle, rewards, total, eloCh
       wirt.appendChild(klon);
     }
   }, []);
-  // Titel wortweise: ein Wort bricht nie auseinander, die Zeile darf am Leerzeichen umbrechen; die Schriftgröße
-  // richtet sich nach Gesamtlänge und längstem Wort (siehe `.pp-cer-titel`) — „2ND PLACE" wurde am Rand abgeschnitten.
-  const titelWoerter = String(title).split(' ');
-  const titelLaengstes = Math.max(1, ...titelWoerter.map(w => [...w].length));
   // ★ v1400 (Al 25.9.): Münzregen im Sieg-Bildschirm — SC-Sprites fallen,
   // drehen sich und funkeln. Einmal ausgewürfelt (useMemo), sonst sprängen
   // die Münzen bei jedem Zählerschritt an neue Plätze.
@@ -26425,20 +26421,14 @@ function ResultCeremony({ won, spectator, title, subtitle, rewards, total, eloCh
           ))}
         </div>
       )}
-      <div className="pp-cer-inhalt" onClick={e => e.stopPropagation()}>
-        <div className="pp-cer-titel pixel-font" style={{ color: farbe, '--cer-n': Math.max(1, [...String(title)].length), '--cer-w': titelLaengstes }}>
-          {(() => {
-            let i = 0;
-            return titelWoerter.map((w, wi) => (
-              <React.Fragment key={wi}>
-                {wi > 0 && ' '}
-                <span className="pp-cer-wort">
-                  {[...w].map((b) => <span key={i} className="pp-cer-buchstabe" style={{ animationDelay: ((i++) * 55) + 'ms' }}>{b}</span>)}
-                </span>
-              </React.Fragment>
-            ));
-          })()}
+      {/* Der Titel steht OHNE Umbruch und ohne Beschneidung über der Spalte: er darf breiter werden als der Inhalt (max. 640 px) darunter. */}
+      <div className="pp-cer-spalte">
+        <div className="pp-cer-titel pixel-font" style={{ color: farbe, '--cer-n': Math.max(1, [...String(title)].length) }}>
+          {[...String(title)].map((b, i) => (
+            <span key={i} className="pp-cer-buchstabe" style={{ animationDelay: (i * 55) + 'ms' }}>{b === ' ' ? '\u00a0' : b}</span>
+          ))}
         </div>
+      <div className="pp-cer-inhalt" onClick={e => e.stopPropagation()}>
         {subtitle && <div className={'pp-cer-unter' + (/^(💀|☠️)/.test(subtitle) ? ' pp-cer-unter-grund' : '')}>{subtitle}</div>}
         {cpuProgress && cpuProgress.wins > 0 && (
           <div className="pp-cer-sieg">
@@ -26508,6 +26498,7 @@ function ResultCeremony({ won, spectator, title, subtitle, rewards, total, eloCh
         )}
         {fertig && <div className="pp-cer-fade">{children}</div>}
         {!fertig && <div className="pp-cer-hinweis">click to skip</div>}
+      </div>
       </div>
     </div>
   );

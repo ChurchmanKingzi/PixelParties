@@ -29,10 +29,37 @@ function tableFor(seed, opts = {}) {
   return { seats: n, seat: Math.floor(rnd() * n) };
 }
 
+/**
+ * Die Persona eines Sitzes zu einem Seed (wie im Live-Spiel: aus der Population des Profils gezogen, bessere öfter) — hier aus dem Seed
+ * abgeleitet, damit Fokus-Sitz UND Gegner in beiden Varianten dieselben Spielstile haben. `null` ohne Profil.
+ */
+function personaFor(seed, seat) {
+  const L = require('./profile');
+  const rnd = mulberry32(((seed * 2654435761) ^ (seat * 40503 + 0x51ed270b)) >>> 0);
+  const per = L.samplePersona(L.get(), rnd);
+  return per ? per.weights : null;
+}
+
 /** Ein Partieauftrag (für WorkerPool.run / runGame) zu Seed und Variante. */
 function jobFor(seed, variant, opts = {}) {
   const t = tableFor(seed, opts);
-  const weights = Array.from({ length: t.seats }, (_, i) => (i === t.seat ? battleOnly(variant.weights) : null));
+  // Fokus-Sitz: `variant.weights`; alle anderen: `variant.oppWeights` (Standard: keine = Standard-Policy). So lässt sich auch prüfen, ob die Standard-Policy
+  // gegen eine Gegnerschaft aus dem Kandidaten verliert (der Kandidat also nicht nur gegen die Standard-Bots gewinnt).
+  //
+  // `variant.persona`: Persona-Basis wie im Live-Spiel. Der Fokus-Sitz spielt SEINE Persona (aus dem Seed), `variant.weights` überschreibt nur
+  // die Kampfgewichte darauf (der Aufbau bleibt der der Persona, die Paarung bleibt erhalten); jeder Gegner spielt ebenfalls seine Persona
+  // (aus dem Seed), `variant.oppWeights` überschreibt auch dort nur Kampfgewichte („was, wenn wir das an alle CPUs ausliefern?").
+  // Ohne `persona` gilt die alte Messung: Fokus-Sitz = Standardgewichte, Gegner = zufällige Live-Personas.
+  const weights = Array.from({ length: t.seats }, (_, i) => {
+    const focal = i === t.seat;
+    if (variant.persona) {
+      const base = personaFor(seed, i) || {};
+      const over = focal ? variant.weights : variant.oppWeights;
+      return Object.assign({}, base, over ? battleOnly(over) : {});
+    }
+    if (focal) return battleOnly(variant.weights);
+    return variant.oppWeights ? battleOnly(variant.oppWeights) : null;
+  });
   const job = {
     seats: t.seats, seed, weights, maxTurns: opts.maxTurns || 1200,
     mcts: variant.mcts ? [t.seat] : false,
@@ -108,4 +135,4 @@ function bySeats(results) {
   return [...m.values()].sort((a, b) => a.seats - b.seats).map(a => ({ ...a, winRate: a.wins / a.games, expected: 1 / a.seats }));
 }
 
-module.exports = { PREP_KEYS, battleOnly, tableFor, jobFor, runVariant, summarize, compare, bySeats, placeScore };
+module.exports = { PREP_KEYS, battleOnly, tableFor, personaFor, jobFor, runVariant, summarize, compare, bySeats, placeScore };
