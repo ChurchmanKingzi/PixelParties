@@ -144,6 +144,7 @@ async function start(room, host, prep) {
   ext.installBotSeats(engine, (pi) => skillGs.botSeats.includes(pi));
   ext.installBotBrain(engine);
   ext.installPlayerChoice(engine);
+  ext.installTargetWatch(engine);
   ext.installReactions(engine);
   ext.installElimination(engine);
   ext.installMeter(engine);
@@ -221,7 +222,7 @@ function startPromptWatchdog(room, host) {
       else if (Date.now() - st._busySeen.since > limitMs + 30000 && (timed || st.botSeats.includes(gs.activePlayer))) {
         console.warn(`[skilltest] Raum ${room.id}: Aktion von Sitz ${gs.activePlayer} aufgegeben (hängt > ${Math.round((limitMs + 30000) / 1000)} s)`);
         const seat = gs.activePlayer;
-        st.actToken = (st.actToken || 0) + 1; st.busy = false; st._busySeen = null; gs.effectPrompt = null;
+        st.actToken = (st.actToken || 0) + 1; st.busy = false; st.acting = null; st._busySeen = null; gs.effectPrompt = null;
         require('./rounds').passRound(room, seat, host).catch(() => {});
         return;
       }
@@ -295,7 +296,7 @@ async function finishGame(room, winnerIdx, reason, host) {
   if (st._watch) clearInterval(st._watch);
   if (room.engine) { room.engine._aborted = false; }
   const ms = room.skillTest && room.skillTest.mctsStats;
-  console.log(`[skilltest] Raum ${room.id}: Ende nach ${st.round} Rounds, Sieger ${gs.players[winnerIdx].username} (${reason})${ms ? ` — Lookahead: ${ms.searches} Suchen, ${ms.rollouts} Rollouts, ${ms.ms} ms, ${ms.changed} Entscheidungen geändert` : ''}`);
+  console.log(`[skilltest] Raum ${room.id}: Ende nach ${st.round} Rounds, Sieger ${gs.players[winnerIdx] ? gs.players[winnerIdx].username : '–'} (${reason})${ms ? ` — Lookahead: ${ms.searches} Suchen, ${ms.rollouts} Rollouts, ${ms.ms} ms, ${ms.changed} Entscheidungen geändert` : ''}`);
   // SC an Menschen (Spieler-Vorgabe 6.10.): 1/Round + 5 je überlebtem Gegner + 5 für den Sieg.
   for (let seat = 0; seat < room.players.length; seat++) {
     const p = room.players[seat];

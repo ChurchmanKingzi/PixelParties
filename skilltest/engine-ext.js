@@ -33,22 +33,32 @@ function installElimination(engine) {
       const teleported = (ps._teleportedAway || 0) > 0;
       if (!hasSuspender && !teleported) newly.push(pi);
     }
-    if (!newly.length) return;
+    // Quetzahuitl: Wessen Quetzahuitl gefallen ist, scheidet in jedem Fall ZUERST aus (unabhängig von Schutz-Permanents/Teleport);
+    // wer gleichzeitig mit ihm fällt, scheidet danach gemeinsam aus (teilt sich den Platz). Siehe quetzahuitl-receiver-of-sacrifices.js.
+    const firstOut = (gs._quetzaLosers || []).filter(pi => !st.eliminated.includes(pi));
+    gs._quetzaLosers = [];
+    const rest = newly.filter(pi => !firstOut.includes(pi));
+    if (!firstOut.length && !rest.length) return;
 
-    for (const pi of newly) {
-      st.eliminated.push(pi);
-      st.eliminatedRound[pi] = st.round;
-      st.eliminatedWith[pi] = newly.length;     // gleichzeitig Ausgeschiedene teilen sich den Platz
-      this.log('skilltest_eliminated', { seat: pi, name: gs.players[pi].username, round: st.round });
-    }
+    const eliminate = (group) => {
+      for (const pi of group) {
+        st.eliminated.push(pi);
+        st.eliminatedRound[pi] = st.round;
+        st.eliminatedWith[pi] = group.length;     // gleichzeitig Ausgeschiedene teilen sich den Platz
+        this.log('skilltest_eliminated', { seat: pi, name: gs.players[pi].username, round: st.round });
+      }
+    };
+    eliminate(firstOut);
+    eliminate(rest);
     const alive = gs.players.map((_, i) => i).filter(i => !st.eliminated.includes(i));
     if (alive.length <= 1) {
       // Letzter Überlebender gewinnt; fallen die letzten gleichzeitig, entscheidet ein Hinweis (Bunny Bombs) oder der Zufall.
       let winner = alive[0];
       if (winner == null) {
+        const pool = rest.length ? rest : firstOut;
         const hint = gs._drawLoserIdx;
-        const cands = newly.filter(i => i !== hint);
-        winner = (cands.length ? cands : newly)[Math.floor(Math.random() * (cands.length || newly.length))];
+        const cands = pool.filter(i => i !== hint);
+        winner = (cands.length ? cands : pool)[Math.floor(Math.random() * (cands.length || pool.length))];
       }
       if (this.onGameOver) this.onGameOver(this.room, winner, 'last_standing');
       return;
@@ -115,6 +125,37 @@ function installBotBrain(engine) {
   engine._getCpuTargetResponse = (validTargets, config = {}, pi) => withCpuSeat(engine, pi, () => bot.chooseTargets(engine, pi, validTargets, config, base));
 }
 
+// ── Die Anzeige folgt dem Geschehen ─────────────────────────────────
+// Wählt ein Wirker Ziele bei einem anderen Spieler, zeigen die Clients dessen Brett, BEVOR die Karte wirkt (Hinweis
+// `skillTest.watch`). Handelt ein Bot, wartet er kurz, damit man den Wechsel sieht; ein Mensch wartet nicht auf sich selbst.
+const WATCH_PAUSE_MS = () => parseInt(process.env.PP_ST_WATCH_MS || '900', 10);
+
+function announceWatch(engine, actor, target) {
+  const st = engine.gs && engine.gs.skillTest;
+  if (!st || engine._fastMode || engine._inMctsSim) return null;
+  if (target == null || target === actor) return null;
+  if (st.watch && st.watch.actor === actor && st.watch.target === target) return null;   // schon dort (derselbe Zug)
+  rounds.setWatch(engine, actor, target);
+  engine.sync();
+  return (st.botSeats || []).includes(actor) ? engine._delay(WATCH_PAUSE_MS()) : null;
+}
+
+/** Zielwahl abschließen: vorher die Anzeige auf den Besitzer des (ersten) gewählten Ziels stellen. */
+function installTargetWatch(engine) {
+  const orig = engine._zielwahlAbschliessen && engine._zielwahlAbschliessen.bind(engine);
+  if (!orig) return;
+  engine._zielwahlAbschliessen = async function (playerIdx, validTargets, config, picked) {
+    try {
+      const ids = Array.isArray(picked) ? picked : (picked && picked.selectedIds) || [];
+      const first = ids.length ? (validTargets || []).find(t => t && ids.includes(t.id)) : null;
+      const owner = first && Number.isInteger(first.owner) ? first.owner : null;
+      const wait = owner != null ? announceWatch(this, playerIdx, owner) : null;
+      if (wait) await wait;
+    } catch { /* reine Anzeigehilfe */ }
+    return orig(playerIdx, validTargets, config, picked);
+  };
+}
+
 /**
  * Flächenschaden gegen „den Gegner": mit mehreren Gegnern wählt der Wirker EINEN Spieler,
  * dessen Ziele getroffen werden (wie bei „Divine Gift of Fire"). Die Wahl wird zum Fokus
@@ -126,19 +167,39 @@ function installPlayerChoice(engine) {
   engine._stChooseAoePlayer = async function (pi, config, cardInst) {
     const gs = this.gs;
     const cands = living(gs, pi);
-    if (cands.length <= 1) { if (cands.length === 1) this.setFocusOpponent(pi, cands[0]); return; }
+    if (cands.length <= 1) { if (cands.length === 1) await this.setFocusOpponent(pi, cands[0]); return; }
     const title = (cardInst && cardInst.name) || config.sourceName || 'Choose a player';
     const res = await this.promptGeneric(pi, {
       type: 'playerPicker', title, description: 'Choose a player. All their targets are hit.',
       allowedPlayers: cands, cancellable: false,
     });
     const idx = res && Number.isInteger(res.playerIdx) && cands.includes(res.playerIdx) ? res.playerIdx : cands[0];
-    this.setFocusOpponent(pi, idx);
+    await this.setFocusOpponent(pi, idx);
   };
   engine.setFocusOpponent = function (pi, idx) {
     const gs = this.gs;
     if (!gs.skillTest) return;
     (gs.stFocus || (gs.stFocus = {}))[pi] = idx;
+    return announceWatch(this, pi, idx);                // die Anzeige wechselt auf diesen Spieler, bevor die Karte wirkt (Bots warten kurz)
+  };
+  /**
+   * Karten, die „den Gegner" als Ganzes meinen (Chain Lightning, Cardinal Beast Qinglong, die Bottled-Kette …), fragen den
+   * Menschen bei mehreren lebenden Gegnern, wen er treffen will; Bots entscheiden über die Policy. Der Gewählte wird zum
+   * Fokus des Wirkers, `opponentOf` meint danach genau ihn. Gibt den gewählten Sitz zurück.
+   */
+  engine._stChooseOpponent = async function (pi, title, description) {
+    const gs = this.gs;
+    if (!gs.skillTest) return this.opponentOf(pi);
+    const cands = living(gs, pi);
+    if (cands.length <= 1) { if (cands.length === 1) await this.setFocusOpponent(pi, cands[0]); return this.opponentOf(pi); }
+    const res = await this.promptGeneric(pi, {
+      type: 'playerPicker', title: title || 'Choose a player',
+      description: description || 'Choose the player you want to target.',
+      allowedPlayers: cands, cancellable: false,
+    });
+    const idx = res && Number.isInteger(res.playerIdx) && cands.includes(res.playerIdx) ? res.playerIdx : cands[0];
+    await this.setFocusOpponent(pi, idx);
+    return idx;
   };
   // Bots beantworten die Spielerwahl über die Policy (schwächster bzw. stärkster Gegner).
   const baseGeneric = engine._getCpuGenericResponse.bind(engine);
@@ -197,6 +258,11 @@ function installRunawayBreaker(engine) {
     const st = engine.gs && engine.gs.skillTest;
     if (st && st.busy && ++st._delays > MAX_DELAYS_PER_ACTION) {
       st._delays = -1e9;                                    // nur einmal werfen
+      // Diagnose für die Fehlersuche (selten): welche Karte/Prompts treiben die Schleife? Aufrufkette und Prompt-Zähler der Aktion.
+      try {
+        const frames = (new Error().stack || '').split('\n').slice(2, 14).map(l => l.trim().replace(/^at /, '').replace(/\(?\/home\/user\/PixelParties\//, '(')).filter(l => !/node:internal/.test(l));
+        console.error('[ST_RUNAWAY] Aktion von Sitz ' + engine.gs.activePlayer + ' (Round ' + st.round + '), Prompts: ' + JSON.stringify(engine._stPromptCounts || {}) + '\n   ' + frames.join('\n   '));
+      } catch { /* Diagnose darf nie stören */ }
       throw new Error('ST_RUNAWAY: die Aktion überschreitet ihr Schrittbudget (Endlosschleife einer Karte?)');
     }
     return orig(ms);
@@ -208,4 +274,4 @@ function relaxRules(engine) {
   for (const ps of engine.gs.players) ps._noHandLimitUntilTurn = Infinity;
 }
 
-module.exports = { installReactions, installRunawayBreaker, installSnapshotGuard, installPlayerChoice, installElimination, installMeter, installTurnEnd, installBotSeats, installBotBrain, relaxRules };
+module.exports = { installReactions, installRunawayBreaker, installSnapshotGuard, installPlayerChoice, installTargetWatch, installElimination, installMeter, installTurnEnd, installBotSeats, installBotBrain, relaxRules };

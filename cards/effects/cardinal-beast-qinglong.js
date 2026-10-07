@@ -31,6 +31,8 @@ module.exports = {
     const gs = engine.gs;
     // Styx 28.9.: „you" = Kontrolleur (seitenfremd beschworen: cardOwner ≠ owner).
     const pi = ctx.cardOwner;
+    // Skill Test (mehrere Gegner): der Wirker wählt, wen er trifft.
+    if (gs.skillTest && engine._stChooseOpponent) await engine._stChooseOpponent(pi, 'Cardinal Beast Qinglong', 'Choose the player you want to strike with the lightning.');
     const oppIdx = engine.opponentOf(pi);
     const heroIdx = ctx.cardHeroIdx;
     const zoneSlot = ctx.cardZoneSlot;

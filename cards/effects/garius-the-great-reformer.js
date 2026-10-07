@@ -114,6 +114,10 @@ function _buildReplacementGallery(engine, pi, heroIdx, maxLevel, excludeName, se
     if (excludeName && baseCardName(cn) === baseCardName(excludeName)) continue;   // v876
     const cd = cardDB[cn];
     if (!cd || !isOwnSideSummonableCreature(cd, cn)) continue;
+    // Dieselbe Eignung wie die Pruefung nach der Wahl (`isPileCreature`): Artifact-Creatures (Debt-O-Tron-Modelle,
+    // Pollution Spewer) laesst die Engine hier nicht setzen — als Galerie-Eintrag waeren sie nicht waehlbar
+    // (CPU-Spieler liefen endlos zurueck zur Opferwahl) bzw. koennten ein Opfer ohne Ersatz kosten.
+    if (!isPileCreature(cd)) continue;
     if (hasCardType(cd, 'Token') || cd.subtype === 'Token') continue;
     const effLvl = engine.effectiveCardLevel(cd, pi);
     if (effLvl > maxLevel) continue;

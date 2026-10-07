@@ -14,6 +14,19 @@
 const CARD_NAME = 'Skeleton Reaper';
 const DAMAGE = 50;
 
+/**
+ * Aktuelle HP einer Kreatur. `counters.currentHp` wird erst beim ersten Schaden gesetzt —
+ * eine frische Kreatur hat nur `maxHp`. Wer hier `currentHp || 0` liest, hielte jede
+ * unversehrte Kreatur für tot (und die „erneut"-Kette liefe bei storniertem Schlag endlos).
+ */
+function hpOf(engine, inst) {
+  const c = inst.counters || {};
+  if (c.currentHp != null) return c.currentHp;
+  if (c.maxHp != null) return c.maxHp;
+  const cd = engine.getEffectiveCardData?.(inst) || engine._getCardDB?.()[inst.name];
+  return cd?.hp ?? 0;
+}
+
 module.exports = {
   // ★★ v1182 — ENTKOPPELTE BILDER (CARD_API): wird die Karte NEGIERT,
   // laeuft ihr Effekt-Rumpf nie — die Engine spielt dann diese Bilder.
@@ -71,7 +84,7 @@ module.exports = {
       // case the heavy lethal cut would over-promise the outcome — but
       // creature negation is rare enough that the cinematic-on-likely-
       // kill payoff outweighs that edge case.
-      const isLethal = (inst.counters?.currentHp || 0) <= DAMAGE;
+      const isLethal = hpOf(engine, inst) <= DAMAGE;
       engine._broadcastEvent('play_zone_animation', {
         type: 'crescent_reap',
         owner: inst.owner,
@@ -88,18 +101,20 @@ module.exports = {
       // dwell to read as "doom is coming" before the kill finishes.
       await engine._delay(isLethal ? 700 : 320);
 
-      await engine.actionDealCreatureDamage(
+      const hit = await engine.actionDealCreatureDamage(
         sourceCoord, inst, DAMAGE, 'creature',
         { sourceOwner: pi, canBeNegated: true },
       );
       firedAtLeastOnce = true;
       engine.sync();
+      // Storniert (Dark Ocean, Spectral Armor …): kein Schaden, also kein Kill — die Kette endet.
+      if (hit && hit.cancelled) break;
 
       // The damage batch routes lethal damage through actionDestroyCard,
       // which untracks the instance. If it's gone (or HP <= 0), the
       // kill counts and we offer another fire. Otherwise stop.
       const stillAlive = engine.cardInstances.some(c => c.id === inst.id)
-        && (inst.counters?.currentHp || 0) > 0;
+        && hpOf(engine, inst) > 0;
       if (stillAlive) break;
 
       // Stop the chain if there are no remaining opp creatures to hit.

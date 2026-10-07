@@ -29,6 +29,9 @@ const MU = 0.06;               // Lernrate (Anteil des Fehlers, der je Beobachtu
 const PRIOR = 0.2;             // Stärke der festen Vorgabe (in Einheiten der Platzierungsgüte)
 const PRIOR_K = 30;            // Beobachtungen der Karte, bei denen die Vorgabe auf die Hälfte gefallen ist
 const MAX_PAIRS_PER_CARD = 14; // Mitspieler, mit denen eine Karte Paarmerkmale bildet (Hand zuerst, dann Abilities, Creatures/Ausrüstung, Helden)
+const NOT_USABLE = 2.5;        // Gewicht der Vorgabe für Karten, die kein Held auf dem Brett wirken kann (gegen +1 für brauchbare)
+const USAGE_W = 0.5;           // Stärke des gelernten Nutzungsanteils (Platzierungsgüte je Prozentpunkt Abstand zum Durchschnitt des Typs)
+const USAGE_K = 8;             // Beobachtungen einer Karte, bei denen ihre eigene Nutzungsrate die des Typs/der Klasse aufwiegt
 const MAX_FEATURES = 60000;    // Obergrenze der Merkmale im Modell (beschnitten wird erst über dem 1,5-Fachen, damit neue Paare erst wachsen können)
 
 function newModel() { return { v: 1, n: 0, b: 0, u: {}, w: {} }; }
@@ -50,15 +53,15 @@ const schoolsOf = (c) => {
  */
 function buildContext(env, ps, hand) {
   const cards = env.cards;
-  const board = [], schoolLv = [];
+  const board = [], schoolLv = [], abFree = [];
   let freeSupport = 0;
   (ps.heroes || []).forEach((h, hi) => {
-    schoolLv[hi] = null;
+    schoolLv[hi] = null; abFree[hi] = 0;
     if (!h) return;
     board.push(h);
     schoolLv[hi] = {};
     for (const z of (ps.abilityZones[hi] || [])) {
-      if (!z) continue;
+      if (!z) { abFree[hi]++; continue; }
       schoolLv[hi][z.n] = (schoolLv[hi][z.n] || 0) + Rules.abilityLevel(z);
       board.push(z.n);
     }
@@ -79,7 +82,7 @@ function buildContext(env, ps, hand) {
   }
   const handAbilities = {};
   for (const n of hand) { const c = cards[n]; if (c && c.cardType === 'Ability') handAbilities[n] = (handAbilities[n] || 0) + 1; }
-  return { board, hand, schoolLv, freeSupport, arch, schoolNeed, handAbilities, recycled: ps.recycled || 0 };
+  return { board, hand, schoolLv, abFree, freeSupport, arch, schoolNeed, handAbilities, recycled: ps.recycled || 0 };
 }
 
 /** Kleinste Lücke zwischen verlangter Stufe und den Schul-Stufen eines Helden auf dem Brett (0 = sofort spielbar). */
@@ -94,6 +97,30 @@ function levelGap(c, ctx) {
     if (best == null || gap < best) best = gap;
   }
   return best == null ? 9 : best;
+}
+
+/**
+ * Nutzbarkeit einer Handkarte mit dem aktuellen Brett (Spielregel, nicht gelernt):
+ *   'now'   ein Held auf dem Brett kann sie sofort wirken/beschwören (Stufenanforderung erfüllt; ohne Anforderung immer)
+ *   'hand'  erst mit Abilities, die noch auf der Hand liegen
+ *   'no'    kein Held erreicht die Stufe — im Kampf bliebe die Karte tot auf der Hand
+ *   null    Kartentyp ohne Stufenanforderung (Artifact, Potion …)
+ * Abilities: 'now', wenn ein Held sie aufnehmen kann (freie Zone oder Stufe < 3), sonst 'no'.
+ */
+function usability(env, name, ctx) {
+  const c = env.cards[name];
+  if (!c) return null;
+  if (c.cardType === 'Ability') {
+    let ok = false;
+    ctx.schoolLv.forEach((lv, hi) => { if (lv && ((lv[name] || 0) > 0 ? lv[name] < Rules.MAX_ABILITY_LEVEL : ctx.abFree[hi] > 0)) ok = true; });
+    return ok ? 'now' : 'no';
+  }
+  if (c.cardType !== 'Spell' && c.cardType !== 'Attack' && c.cardType !== 'Creature') return null;
+  const gap = levelGap(c, ctx);
+  if (gap == null) return 'now';
+  if (gap === 0) return 'now';
+  const handClose = schoolsOf(c).reduce((a, s) => a + (ctx.handAbilities[s] || 0) * Rules.MAX_ABILITY_LEVEL, 0);   // jede Hand-Ability bringt eine Schule auf Stufe 3
+  return gap <= handClose ? 'hand' : 'no';
 }
 
 /** Merkmale einer Karte im Kontext (ohne die Karte selbst als Mitspieler). */
@@ -116,6 +143,9 @@ function featuresFor(env, name, ctx) {
     f.push('fit:' + tk + ':' + Math.min(3, gap), 'fit:' + name + ':' + Math.min(3, gap));
     if (gap > 0) f.push('fitH:' + tk + ':' + Math.min(3, closable), 'fitH:' + name + ':' + Math.min(3, closable));
   }
+  // Nutzbarkeit mit dem Brett (Spiel-Regel): sofort / erst mit Hand-Abilities / gar nicht — die Gewichte lernen, was „unbrauchbar" kostet.
+  const use = usability(env, name, ctx);
+  if (use) f.push('use:' + tk + ':' + use, 'use:' + name + ':' + use);
   // Ability: wie viel Stufe liegt schon auf dem Brett, wie viele Karten brauchen diese Schule?
   if (c.cardType === 'Ability') {
     let have = 0; for (const lv of ctx.schoolLv) if (lv && (lv[name] || 0) > have) have = lv[name];
@@ -153,11 +183,32 @@ function edge(model, feats) {
   return 2 * s;
 }
 
-/** Feste Vorgabe (brauchbar → behalten), die mit den Beobachtungen der Karte verschwindet. */
-function prior(model, name, usable) {
+/**
+ * Feste Vorgabe (brauchbar → behalten), die mit den Beobachtungen der Karte verschwindet. `use` ist die Nutzbarkeit mit dem Brett
+ * (usability): eine Karte, die kein Held wirken kann, ist deutlich weniger wert; eine, die erst mit Hand-Abilities geht, nur wenig.
+ */
+function prior(model, name, usable, use) {
   const e = model.w['c:' + name];
   const n = e ? e[1] : 0;
-  return (usable ? PRIOR : -PRIOR) * PRIOR_K / (PRIOR_K + n);
+  // Eine Karte, die kein Held je wirken kann, bleibt tot auf der Hand: diese Vorgabe verblasst NICHT mit den Beobachtungen (Regel, nicht Schätzung).
+  if (usable && use === 'no') return -NOT_USABLE * PRIOR;
+  let base = usable ? PRIOR : -PRIOR;
+  if (usable && use === 'hand') base = 0.25 * PRIOR;
+  return base * PRIOR_K / (PRIOR_K + n);
+}
+
+/**
+ * Gelernte Nutzung: Anteil der behaltenen Exemplare, die im Kampf tatsächlich gespielt wurden (profile.usage, je Karte, und
+ * profile.usageClass nach Typ und Nutzbarkeit), gegen den Durchschnitt des Typs. Wer behalten wird und nie zum Zug kommt, ist nichts wert.
+ */
+function usagePrior(usage, usageClass, name, type, use) {
+  if (!usage || !usageClass) return 0;
+  const rate = (e) => (e && e.n > 0 ? e.sum / e.n : null);
+  const shrink = (e, base, k) => (e && e.n > 0 ? (e.sum + k * base) / (e.n + k) : base);
+  const baseAll = shrink(usageClass['*:' + type], 0.4, 10);
+  const cls = shrink(usageClass[type + ':' + (use || '-')], baseAll, 10);
+  const p = shrink(usage[name], cls, USAGE_K);
+  return USAGE_W * (p - baseAll);
 }
 
 /** Eine Beobachtung lernen: Merkmale `feats`, Arm a (+1 behalten, −1 recycelt), Ergebnis y (Platzierungsgüte). */
@@ -197,14 +248,15 @@ function compact(model) {
 /**
  * Entscheider für den Aufbau: bekommt die Basis (Brett + Hand) und gibt zurück, welche Handkarten recycelt werden.
  *
- * opts: { env, model, usable(card) → bool, protect(name) → bool, maxKeep, bias, explore (0 … 1), rng }
+ * opts: { env, model, usable(card) → bool, protect(name) → bool, maxKeep, bias, explore (0 … 1), rng, usage, usageClass }
+ *  • `usage`/`usageClass`: gelernte Nutzung behaltener Karten im Kampf (profile.usage / profile.usageClass), siehe usagePrior.
  *  • Die Karte mit dem schlechtesten Wert (Kontrast + Vorgabe + Bias) fliegt zuerst; danach wird der Kontext neu bewertet
  *    (fehlt ein Partner, sinkt der Wert der anderen) — bis keine Karte mehr unter 0 liegt.
  *  • `maxKeep` begrenzt, wie viele Karten höchstens auf der Hand bleiben (Persona).
  *  • `explore` = Wahrscheinlichkeit, eine Karte gegen die Entscheidung zu behandeln (nur im Training), damit beide Arme
  *    vergleichbare Beobachtungen bekommen.
- * Rückgabe: { recycle: [Handindex …], log: [{ c, a, f, x }] } — `log` hält je Karte die letzte Bewertung (a = Entscheidung,
- * x = 1, wenn die Entscheidung erzwungen/erkundet war).
+ * Rückgabe: { recycle: [Handindex …], log: [{ c, a, f, x, d, u }] } — `log` hält je Karte die letzte Bewertung (a = Entscheidung,
+ * x = 1, wenn die Entscheidung erzwungen/erkundet war, u = Nutzbarkeit mit dem Brett: now | hand | no | null).
  */
 function makeDecider(opts) {
   const { env, model, usable } = opts;
@@ -227,9 +279,10 @@ function makeDecider(opts) {
       const ctx = buildContext(env, ps, hand);
       return alive.map(x => {
         const f = featuresFor(env, x.n, ctx);
+        const use = usability(env, x.n, ctx);
         const d = x.forced === 'keep' ? Infinity : x.forced === 'recycle' ? -Infinity
-          : edge(model, f) + prior(model, x.n, usable(cards[x.n])) + (opts.bias || 0);
-        return { x, f, d };
+          : edge(model, f) + prior(model, x.n, usable(cards[x.n]), use) + usagePrior(opts.usage, opts.usageClass, x.n, cards[x.n] && cards[x.n].cardType, use) + (opts.bias || 0);
+        return { x, f, d, use };
       });
     };
     for (let guard = 0; guard < 60 && alive.length; guard++) {
@@ -238,11 +291,13 @@ function makeDecider(opts) {
       let worst = null;
       for (const e of removable) if (!worst || e.d < worst.d) worst = e;
       const remove = worst && (worst.d < 0 || alive.length > cap);            // unter 0, oder über der Obergrenze der Persona
+      // `d` = der Wert, den die Entscheidung der Karte gab (positiv: behalten, negativ: recyceln); erzwungene (erkundete) Fälle haben keinen.
+      const dOf = (e) => (Number.isFinite(e.d) ? Math.round(e.d * 1000) / 1000 : null);
       if (!remove) {
-        for (const e of ev) log[e.x.n] = { c: e.x.n, a: +1, f: e.f, x: e.x.forced ? 1 : 0 };
+        for (const e of ev) log[e.x.n] = { c: e.x.n, a: +1, f: e.f, x: e.x.forced ? 1 : 0, d: dOf(e), u: e.use };
         break;
       }
-      log[worst.x.n] = { c: worst.x.n, a: -1, f: worst.f, x: worst.x.forced ? 1 : 0 };
+      log[worst.x.n] = { c: worst.x.n, a: -1, f: worst.f, x: worst.x.forced ? 1 : 0, d: dOf(worst), u: worst.use };
       recycle.push(worst.x.idx);
       alive = alive.filter(x => x !== worst.x);
     }
@@ -250,4 +305,4 @@ function makeDecider(opts) {
   };
 }
 
-module.exports = { newModel, buildContext, featuresFor, edge, prior, update, prune, compact, makeDecider, levelGap, MAX_FEATURES };
+module.exports = { newModel, buildContext, featuresFor, edge, prior, usagePrior, usability, update, prune, compact, makeDecider, levelGap, MAX_FEATURES };

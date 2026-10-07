@@ -107,6 +107,32 @@ function pickPersona(profile, rng = Math.random) {
   return profileMod.samplePersona(profile, rng) || pop[0];
 }
 
+// ── Nutzung behaltener Karten ──────────────────────────────────────
+const USAGE_TYPES = new Set(['Spell', 'Attack', 'Creature', 'Artifact', 'Potion', 'Ability']);
+
+/**
+ * Wurde eine behaltene Handkarte im Kampf auch gespielt? `profile.usage[Karte]` zählt behaltene Exemplare und gespielte (n, sum), `profile.usageClass`
+ * dasselbe je Typ und Nutzbarkeit beim Aufbau (`Spell:now`, `Spell:no` …) sowie je Typ (`*:Spell`). Daraus liest der Behalten/Recyceln-Entscheider
+ * (keepmodel.usagePrior), welche Karten tatsächlich zum Zug kommen. Reaktionen/Surprises zählen nicht (sie werden nicht als Zug „gespielt").
+ */
+function learnUsage(profile, keepLog, learnLog, seat) {
+  const db = require('../../cards/effects/_card-db').getCardDB();
+  const played = new Set();
+  for (const l of learnLog || []) if (l.seat === seat && l.key) played.add(l.key.slice(l.key.indexOf(':') + 1));
+  if (!profile.usage) profile.usage = {};
+  if (!profile.usageClass) profile.usageClass = {};
+  for (const d of keepLog) {
+    if (d.a !== 1) continue;                                             // nur behaltene Karten
+    const c = db[d.c];
+    const sub = c && (c.subtype || '').toLowerCase();
+    if (!c || !USAGE_TYPES.has(c.cardType) || !(sub === 'normal' || sub === '' || sub === 'equipment' || sub === 'area' || sub === 'attachment' || sub === 'creature')) continue;
+    const used = played.has(d.c) ? 1 : 0;
+    profileMod.addObs(profile.usage, d.c, used);
+    profileMod.addObs(profile.usageClass, c.cardType + ':' + (d.u || '-'), used);
+    profileMod.addObs(profile.usageClass, '*:' + c.cardType, used);
+  }
+}
+
 // ── Lernen aus einer Partie ────────────────────────────────────────
 function learnFrom(profile, game) {
   const { rec, n, personaIds } = game;
@@ -129,7 +155,15 @@ function learnFrom(profile, game) {
     if (base.keepLog && base.keepLog.length) {
       const KM = require('./keepmodel');
       if (!profile.keepModel) profile.keepModel = KM.newModel();
-      for (const d of base.keepLog) KM.update(profile.keepModel, d.f, d.a, sc);
+      if (!profile.prepValue) profile.prepValue = {};
+      for (const d of base.keepLog) {
+        if (d.x !== 1 && Number.isFinite(d.d)) {                         // Bewertung der CPU beim Aufbau (ohne erkundete Fälle)
+          const e = profile.prepValue[d.c] || (profile.prepValue[d.c] = { n: 0, sum: 0, keep: 0 });
+          e.n++; e.sum += d.d; if (d.a === 1) e.keep++;
+        }
+        KM.update(profile.keepModel, d.f, d.a, sc);
+      }
+      learnUsage(profile, base.keepLog, rec.learnLog, seat);
     }
     const per = profile.personas.find(p => p.id === personaIds[seat]);
     if (per) { per.games++; per.scoreSum += sc; per.fitness = fitnessOf(per); }
@@ -249,7 +283,7 @@ async function playOne(profile, opts = {}, rng = Math.random, pool = null) {
   const chosen = Array.from({ length: n }, () => pickPersona(profile, rng));
   const simOpts = { seats: n, weights: chosen.map(p => p.weights), record: true, maxTurns: opts.maxTurns || 3000, watchdogMs: opts.watchdogMs };
   const rec = pool ? await pool.run(simOpts) : await require('../sim').runGame(simOpts);
-  if (rec.reason === 'sim_turn_limit') rec.placements = null;      // nicht zu Ende gespielt: keine Wertung
+  if (rec.reason === 'sim_turn_limit' || rec.reason === 'round_limit') rec.placements = null;      // nicht zu Ende gespielt (Patt): keine Wertung
   return { rec, n, personaIds: chosen.map(p => p.id) };
 }
 
@@ -277,7 +311,7 @@ async function benchmark(profile, pool, opts = {}) {
     };
     try {
       const rec = pool ? await pool.run(simOpts) : await require('../sim').runGame(simOpts);
-      if (!rec || !rec.placements || rec.reason === 'sim_turn_limit') return null;
+      if (!rec || !rec.placements || (rec.reason === 'sim_turn_limit' || rec.reason === 'round_limit')) return null;
       return { seats: j.n, seat: j.seat, place: rec.placements[j.seat], won: rec.winnerIdx === j.seat, rounds: rec.rounds, score: placeScore(rec.placements[j.seat], j.n) };
     } catch { return null; }
   };
@@ -328,7 +362,7 @@ async function benchmarkLookahead(profile, pool, opts = {}) {
     };
     try {
       const rec = pool ? await pool.run(simOpts) : await require('../sim').runGame(simOpts);
-      if (!rec || !rec.placements || rec.reason === 'sim_turn_limit') return null;
+      if (!rec || !rec.placements || (rec.reason === 'sim_turn_limit' || rec.reason === 'round_limit')) return null;
       return { seats: j.n, seat: j.seat, place: rec.placements[j.seat], won: rec.winnerIdx === j.seat, rounds: rec.rounds, score: placeScore(rec.placements[j.seat], j.n) };
     } catch { return null; }
   };
@@ -370,6 +404,14 @@ async function train(opts = {}) {
   const mctsBenchGames = opts.mctsBenchGames || 40;
   const benchGames = opts.benchGames || 40;
   const rankingEvery = opts.rankingEvery || 100;                           // Prüfpunkt für den Verlauf der Kartenwerte
+  const milestoneEvery = opts.milestoneEvery || 0;                         // 0 = keine Meilenstein-Berichte (Kartenliste je N Partien, siehe learn/milestones.js)
+  let lastMilestone = Math.floor((profile.games || 0) / (milestoneEvery || 1));
+  const doMilestone = (final) => {
+    try {
+      const m = require('./milestones').writeMilestone(profile, { final });
+      if (m && !opts.quiet) console.log(`[skilltest-train] Meilenstein ${m.games} Partien: ${m.mdFile}`);
+    } catch (e) { console.error('[skilltest-train] Meilenstein-Bericht fehlgeschlagen (Lauf geht weiter):', e && e.stack || e); }
+  };
   let done = 0, failed = 0, started = 0, benchRunning = false, lastStatus = 0;
   const t0 = Date.now();
 
@@ -422,11 +464,17 @@ async function train(opts = {}) {
       const g0 = Date.now();
       try {
         const game = await playOne(profile, opts, rng, pool);
-        if (game.rec && game.rec.placements) { learnFrom(profile, game); done++; } else failed++;
+        if (game.rec && game.rec.placements) { learnFrom(profile, game); done++; }
+        else {
+          failed++;
+          // Ursache festhalten (Rundenlimit-Patt? hängende Aktion?): eine Zeile je verworfene Partie in <profil>.discards.jsonl.
+          if (game.rec && game.rec.diag) { try { fs.appendFileSync(ranking.files().discards, JSON.stringify(Object.assign({ t: Date.now(), games: profile.games }, game.rec.diag)) + '\n', { encoding: 'utf-8' }); } catch { /* Diagnose darf nie stören */ } }
+        }
       } catch (e) { failed++; if (!opts.quiet) console.error('[skilltest-train] Partie fehlgeschlagen:', e && e.message); }
       try {
         if (done > 0 && done % evolveEvery === 0) evolve(profile, rng);
         if (done > 0 && done % saveEvery === 0) { prune(profile); profileMod.save(profile); ranking.writeRanking(profile, { checkpoint: done % rankingEvery === 0 }); checkpoint(); }
+        if (milestoneEvery && Math.floor(profile.games / milestoneEvery) > lastMilestone) { lastMilestone = Math.floor(profile.games / milestoneEvery); prune(profile); profileMod.save(profile); doMilestone(false); }
         if (benchEvery && done > 0 && done % benchEvery === 0) await runBench();
         if (mctsBenchEvery && done > 0 && done % mctsBenchEvery === 0) await runMctsBench();
       } catch (e) { console.error('[skilltest-train] Speichern/Auswertung fehlgeschlagen (Lauf geht weiter):', e && e.message); }
@@ -449,6 +497,7 @@ async function train(opts = {}) {
   prune(profile);
   profileMod.save(profile);
   ranking.writeRanking(profile, { checkpoint: true });
+  if (milestoneEvery && done > 0) doMilestone(true);                      // Abschlussbericht des Laufs
   if (!opts.quiet) console.log(`[skilltest-train] ${done} Partien gelernt (${failed} verworfen) in ${Math.round((Date.now() - t0) / 1000)} s — Profil v${profile.version}, ${Object.keys(profile.playValue).length} Spielwerte, ${Object.keys(profile.cardValue).length} Kartenwerte, ${Object.keys(profile.pairValue).length} Paare`);
   return profile;
 }
@@ -478,7 +527,7 @@ async function evaluate(opts = {}) {
       };
       let rec = null;
       try { rec = pool ? await pool.run(simOpts) : await require('../sim').runGame(simOpts); } catch { rec = null; }
-      if (!rec || !rec.placements || rec.reason === 'sim_turn_limit') continue;
+      if (!rec || !rec.placements || (rec.reason === 'sim_turn_limit' || rec.reason === 'round_limit')) continue;
       sum += placeScore(rec.placements[seat], n); cnt++;
       if (rec.winnerIdx === seat) wins++;
     }
@@ -493,17 +542,24 @@ async function evaluate(opts = {}) {
  * `minN`: Mindestzahl Beobachtungen je Eintrag.
  */
 function exportCompact(profile, minN = 4) {
+  // Karten, die nicht (mehr) im Pool sind (später gesperrt), kommen nicht ins ausgelieferte Profil.
+  let inPool = null;
+  try { inPool = require('./milestones').poolNames(); } catch { /* ohne Filter */ }
+  const cardOf = (k) => { const i = k.indexOf(':'); return i < 0 ? k : k.slice(i + 1); };
+  const allowed = (k) => !inPool || k.split('|').every(part => inPool.has(cardOf(part)) || inPool.has(part));
   const keep = (table, n) => {
     const out = {};
-    for (const [k, e] of Object.entries(table || {})) if (e.n >= n) out[k] = { n: e.n, sum: Math.round(e.sum * 1000) / 1000 };
+    for (const [k, e] of Object.entries(table || {})) if (e.n >= n && allowed(k)) out[k] = { n: e.n, sum: Math.round(e.sum * 1000) / 1000 };
     return out;
   };
   return {
     version: profile.version, games: profile.games, updated: profile.updated,
     playValue: keep(profile.playValue, minN), cardValue: keep(profile.cardValue, minN), dealtValue: keep(profile.dealtValue, minN), pairValue: keep(profile.pairValue, Math.max(minN, 6)),
+    prepValue: Object.fromEntries(Object.entries(profile.prepValue || {}).filter(([k, e]) => e.n >= minN && allowed(k)).map(([k, e]) => [k, { n: e.n, sum: Math.round(e.sum * 1000) / 1000, keep: e.keep }])),
     keepModel: profile.keepModel ? require('./keepmodel').compact(profile.keepModel) : null,
+    usage: keep(profile.usage, minN), usageClass: profile.usageClass || {},
     personas: profile.personas, totals: profile.totals,
   };
 }
 
-module.exports = { benchmark, benchmarkLookahead, bestPersona, exportCompact, WorkerPool, train, evaluate, learnFrom, baseFeatures, placeScore, seedPopulation, evolve, pickPersona, playOne, PLAY_VALUE_SCALE };
+module.exports = { benchmark, benchmarkLookahead, bestPersona, exportCompact, WorkerPool, train, evaluate, learnFrom, learnUsage, baseFeatures, placeScore, seedPopulation, evolve, pickPersona, playOne, PLAY_VALUE_SCALE };

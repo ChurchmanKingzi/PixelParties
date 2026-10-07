@@ -1,0 +1,5 @@
+# Live-Dateien des laufenden Nachttrainings (Profil, Sicherungen, Logs) bleiben außerhalb von Git;
+# Berichte und Zwischenstände werden von Hand nach docs/skilltest-night/ kopiert und dort eingecheckt.
+*
+!.gitignore
+!run.sh

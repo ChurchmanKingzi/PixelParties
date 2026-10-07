@@ -14,6 +14,8 @@
 //       --save-every N          Speichern alle N Partien (Standard 100);  --checkpoint-minutes M  Sicherungskopien (Standard 60, die letzten 4)
 //       --bench-every N         Vergleich trainiert gegen untrainiert alle N Partien (Standard 300);  --mcts-bench-every N  Lookahead-Vergleich (Standard aus)
 //       --progress S            Fortschrittszeile alle S s (Standard 60)
+//       --max-turns N           Zuggrenze je Partie (Standard 3000; echte Partien enden nach ~100 Zügen, p99 ≈ 240) — Pattpartien kosten sonst unnötig Zeit
+//       --milestone-every N     alle N Partien eine Kartenliste schreiben (Prep-Wert, Veränderung zur Vorliste und zur ersten Liste, Partner): <profil>.milestones/
 //   node scripts/skilltest-train.js --evaluate 60 --seats 4     # Vergleich: gelernt gegen Standard (--mode full|profile|persona)
 //   node scripts/skilltest-train.js --daemon --duty 0.25        # Dauerbetrieb (Hintergrundlernen), 25 % Rechenanteil
 //   node scripts/skilltest-train.js --export data/skilltest-profile.json --min-n 4   # kompaktes Profil zum Einchecken
@@ -59,9 +61,11 @@ if (seatsArg && seatsArg !== true) seats = String(seatsArg).includes('-') ? Stri
     workers: daemon ? 1 : num('workers', Math.max(1, os.cpus().length - 1)),
     gameTimeoutMs: num('game-timeout', 240) * 1000,          // Obergrenze je Partie; wirksam ist ein Vielfaches der üblichen Dauer (mind. 60 s)
     workerMemMb: num('worker-mem', 1536),
+    maxTurns: num('max-turns', 3000),                         // Obergrenze der Züge je Partie (Patt-Schutz); über dem Wert zählt die Partie nicht
     saveEvery: num('save-every', daemon ? 25 : 100),
     benchEvery: num('bench-every', 300), benchGames: num('bench-games', 40),
     mctsBenchEvery: num('mcts-bench-every', 0), mctsBenchGames: num('mcts-bench-games', 40),
+    milestoneEvery: num('milestone-every', 0),               // Kartenliste samt Veränderungen und Partnern je N Partien (<profil>.milestones/)
     progressEverySec: daemon ? 0 : num('progress', 60),
     maxMinutes: num('hours', 0) * 60 || num('minutes', 0),
     checkpointMinutes: num('checkpoint-minutes', daemon ? 0 : 60),

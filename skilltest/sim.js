@@ -61,6 +61,7 @@ function simHost(roomBox) {
     get doPlaySpell() { return roomBox.doPlaySpell; },
     get doPlayCreature() { return roomBox.doPlayCreature; },
     get doPlayArtifact() { return roomBox.doPlayArtifact; },
+    get doUseArtifactEffect() { return roomBox.doUseArtifactEffect; },
     get doPlaySurprise() { return roomBox.doPlaySurprise; },
     get doActivateCreatureEffect() { return roomBox.doActivateCreatureEffect; },
     get doActivateHeroEffect() { return roomBox.doActivateHeroEffect; },
@@ -122,6 +123,7 @@ async function runGame(opts = {}) {
   if (opts.noProfileSeats) st.noProfile = [...opts.noProfileSeats];
   if (opts.weights) st.botWeights = Object.fromEntries(opts.weights.map((w, i) => [i, w]).filter(([, w]) => w));
   if (!opts.noFast) engine.enterFastMode();
+  if (opts.setupOnly) return { room, host, engine, gs, st };       // Tests: Spiel steht, noch nichts gespielt
 
   let guard = 0;
   const maxTurns = opts.maxTurns || 4000;
@@ -143,6 +145,16 @@ async function runGame(opts = {}) {
   return {
     winnerIdx: gs.result && gs.result.winnerIdx, reason: gs.result && gs.result.reason,
     rounds: st.round, turns: guard, placements: gs.result && gs.result.skillTest && gs.result.skillTest.placements,
+    // Diagnose für verworfene Partien (ohne Platzierungen): Zustand der Sitze am Ende — Patt, hängende Aktion oder Sonstiges (siehe train.js → <profil>.discards.jsonl).
+    diag: ((gs.result && gs.result.skillTest && gs.result.skillTest.placements) && !['sim_turn_limit', 'round_limit'].includes(gs.result && gs.result.reason)) ? undefined : {
+      seats: gs.players.length, turns: guard, rounds: st.round, busy: !!st.busy, reason: gs.result && gs.result.reason, activePlayer: gs.activePlayer,
+      eliminated: [...st.eliminated],
+      board: gs.players.map((p, i) => ({
+        seat: i,
+        heroes: (p.heroes || []).filter(h => h && h.name && h.hp > 0).map(h => h.name + ':' + h.hp + (h.statuses && Object.keys(h.statuses).filter(k => h.statuses[k]).length ? '[' + Object.keys(h.statuses).filter(k => h.statuses[k]).join(',') + ']' : '')),
+        creatures: engine.cardInstances.filter(c => c.zone === 'support' && (c.controller ?? c.owner) === i).length,
+      })),
+    },
     bases, ms: Date.now() - t0, eliminated: [...st.eliminated],
     room: opts.returnRoom ? room : undefined,
     learnLog: st.learnLog || [], recycled: st.recycled, firstStarter: st.firstStarter,

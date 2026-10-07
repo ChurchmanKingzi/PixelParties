@@ -26390,6 +26390,10 @@ this._deathWatch = (this._deathWatchStack || []).length
 
     const cancellable = spec.cancellable !== false;
     let picked = null;
+    // CPU/Schnellmodus: Eine deterministische Auswahl, die die Bedingung verfehlt, wiederholt sich endlos (Skill Test: Steam Dwarf Dragon Pilot,
+    // Nachttraining) — nach drei Fehlversuchen zählt es als Abbruch (nur im Skill Test; Menschen werden unbegrenzt neu gefragt).
+    let _cpuFehl = 0;
+    const _cpuGibtAuf = () => cancellable && this.gs.isSkillTest && (this.isCpuPlayer(pi) || this._inMctsSim || this._fastMode) && ++_cpuFehl >= 3;
     while (true) {
       const ids = await this.promptEffectTarget(pi, targets, {
         title: spec.title || `${ctx.cardName} — Sacrifice`,
@@ -26436,25 +26440,25 @@ this._deathWatch = (this._deathWatchStack || []).length
           .find(t => t && extraIds.has(t.id));
         if (extra) return { extraPicked: extra };
       }
-      if (!ids || ids.length < spec.minCount) continue;
+      if (!ids || ids.length < spec.minCount) { if (_cpuGibtAuf()) { this.log('sacrifice_cancelled', { card: ctx.cardName, player: this.gs.players[pi]?.username, cpuGaveUp: true }); return false; } continue; }
       const chosen = ids.map(id => targets.find(t => t.id === id)).filter(Boolean);
-      if (chosen.length < spec.minCount) continue;
+      if (chosen.length < spec.minCount) { if (_cpuGibtAuf()) { this.log('sacrifice_cancelled', { card: ctx.cardName, player: this.gs.players[pi]?.username, cpuGaveUp: true }); return false; } continue; }
       if (spec.minMaxHp) {
         const sumMax = chosen.reduce((s, t) => s + (t._meta.maxHp || 0), 0);
-        if (sumMax < spec.minMaxHp) continue;
+        if (sumMax < spec.minMaxHp) { if (_cpuGibtAuf()) { this.log('sacrifice_cancelled', { card: ctx.cardName, player: this.gs.players[pi]?.username, cpuGaveUp: true }); return false; } continue; }
       }
       if (spec.minSumLevel) {
         const sumLvl = chosen.reduce((s, t) => s + (t._meta.level || 0), 0);
-        if (sumLvl < spec.minSumLevel) continue;
+        if (sumLvl < spec.minSumLevel) { if (_cpuGibtAuf()) { this.log('sacrifice_cancelled', { card: ctx.cardName, player: this.gs.players[pi]?.username, cpuGaveUp: true }); return false; } continue; }
       }
       // Required tributes must all be part of the chosen subset.
       if (spec.requiredInstIds && spec.requiredInstIds.length > 0) {
         const chosenIds = new Set(chosen.map(t => t.cardInstance?.id));
-        if (!spec.requiredInstIds.every(id => chosenIds.has(id))) continue;
+        if (!spec.requiredInstIds.every(id => chosenIds.has(id))) { if (_cpuGibtAuf()) { this.log('sacrifice_cancelled', { card: ctx.cardName, player: this.gs.players[pi]?.username, cpuGaveUp: true }); return false; } continue; }
       }
       // "Must include ≥1 from Hero" constraint.
       if (spec.mustIncludeFromHeroIdx != null) {
-        if (!chosen.some(t => t.cardInstance && this._vomPflichtHelden(t.cardInstance, spec))) continue;
+        if (!chosen.some(t => t.cardInstance && this._vomPflichtHelden(t.cardInstance, spec))) { if (_cpuGibtAuf()) { this.log('sacrifice_cancelled', { card: ctx.cardName, player: this.gs.players[pi]?.username, cpuGaveUp: true }); return false; } continue; }
       }
       picked = chosen;
       break;
@@ -30129,7 +30133,7 @@ this._deathWatch = (this._deathWatchStack || []).length
   isDarkOceanActive() {
     const z = this.gs?.areaZones;
     if (!z) return false;
-    return (z[0] || []).includes('Dark Ocean') || (z[1] || []).includes('Dark Ocean');
+    return z.some(a => (a || []).includes('Dark Ocean'));   // alle Sitze (Skill Test: 2–8)
   }
 
   /**

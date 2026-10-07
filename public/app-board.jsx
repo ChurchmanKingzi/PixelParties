@@ -26758,6 +26758,16 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   const stInfo = gameState.skillTest || null;
   const stMulti = !!stInfo && (gameState.players || []).length > 2;
   const [stFocusPin, setStFocusPin] = useState(null);
+  // ★ Die Anzeige folgt dem Geschehen: Beginnt ein Gegner seinen Zug, zeigt das Hauptfeld sein Brett; wählt ein Wirker Ziele bei
+  // einem Dritten, wechselt es auf dessen Brett, BEVOR die Karte wirkt. Zielt der Wirker auf MICH (mein Brett steht ohnehin
+  // unten), bleibt der Wirker oben sichtbar. Der Server meldet beides als `skillTest.watch` ({ n, actor, target }).
+  const stWatch = stInfo && stInfo.watch;
+  useEffect(() => {
+    if (!stWatch || !stMulti) return;
+    const seat = (Number.isInteger(stWatch.target) && stWatch.target !== myIdx) ? stWatch.target
+      : ((Number.isInteger(stWatch.actor) && stWatch.actor !== myIdx) ? stWatch.actor : null);
+    if (seat != null) setStFocusPin(seat);
+  }, [stWatch ? stWatch.n : null]);
   const oppIdx = (() => {
     if (!stMulti) return myIdx === 0 ? 1 : 0;
     const ps = gameState.players, n = ps.length;
@@ -43769,6 +43779,14 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   // Normalspiel ist `sideOwner` leer → unverändertes Verhalten.
   const outerOppIdx = oppIdx;
   const outerOpp = opp;
+  // Skill Test: handelnde Kreatur leuchtet, erschöpfte ist ausgegraut (Helden: siehe `stActing`/`stExhausted` weiter unten).
+  const stCreatureCls = (owner, hi, slot) => {
+    const sk = gameState.skillTest;
+    if (!sk) return '';
+    const a = sk.acting;
+    if (a && a.creature && a.seat === owner && a.hi === hi && a.slot === slot) return ' st-actor-acting';
+    return (sk.exhaustedSlots || []).includes(owner + ':' + hi + ':' + slot) ? ' st-creature-exhausted' : '';
+  };
   const renderPlayerSide = (p, isOpp, sideOwner) => {
     const oppIdx = (isOpp && Number.isInteger(sideOwner)) ? sideOwner : outerOppIdx;
     const opp = (isOpp && Number.isInteger(sideOwner)) ? gameState.players[sideOwner] : outerOpp;
@@ -44037,6 +44055,11 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           // Zusatzaktion: ein erschöpfter Held mit offener zweiter Aktion (Gewährung) darf noch einmal angreifen.
           const stBonus = !!(gameState.skillTest && stExhausted && (gameState.skillTest.bonusHeroes || []).includes(stOwner + ':' + i));
           const stHeroReady = !!(gameState.skillTest && hero?.name && hero.hp > 0 && (!stExhausted || stBonus) && !hero.statuses?.frozen && !hero.statuses?.stunned);
+          // Der Akteur, der gerade handelt: leuchtet auf jedem Brett, bis seine Aktion vorbei ist; danach ergraut er (erschöpft).
+          const stActing = !!(gameState.skillTest && gameState.skillTest.acting && !gameState.skillTest.acting.creature
+            && gameState.skillTest.acting.seat === stOwner && gameState.skillTest.acting.hi === i && hero?.name && hero.hp > 0);
+          // „Bereit"-Leuchten nur für den Spieler am Zug (nur seine Akteure kommen als Nächstes dran); bei allen anderen bleibt die Karte ruhig.
+          const stReadyGlow = stHeroReady && !stActing && gameState.activePlayer === stOwner;
           // v718: die DAUERHAFTE Uebernahme (Paraseed Control) fuehrt
           // bewusst KEINEN `charmed`-Status — der wuerde das Ausruesten
           // sperren, und ein dauerhaft uebernommener Held zaehlt wie ein
@@ -44215,7 +44238,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 <div key={'lpad-'+s} className="board-zone-spacer" />
               ))}
               <div className="board-zone-spacer" />
-              <div className={'board-zone board-zone-hero' + (hero?.name ? ' zone-has-card' : '') + (isDead ? ' board-zone-dead' : '') + ((abilityIneligible || equipIneligible || creatureIneligible || spellAttackIneligible || surpriseIneligible || ascensionIneligible || pickHeroDropIneligible || heroActionDimmed || additionalActionDimmed || attachPickHeroDim) ? ' board-zone-dead' : '') + (attachPickHeroDim ? ' attach-pick-dim' : '') + ((abilityTarget || equipTarget || spellTarget || surpriseTarget || ascensionTarget || pickHeroDropTarget || attachPickEligibleHero || isCsppHeroTarget || spellPickEntry) ? ' board-zone-play-target' : '') + (attachPickEligibleHero ? ' attach-pick-target' : '') + (isValidHeroTarget ? ' potion-target-valid' : '') + (isValidHeroTarget && accentGreenTargetIds.has(heroTargetId) ? ' potion-target-accent-green' : '') + (isIneligibleHeroTarget ? ' potion-target-ineligible' : '') + (isSelectedHeroTarget ? ' potion-target-selected' : '') + (oppTargetHighlight.includes(heroTargetId) ? ' opp-target-highlight' : '') + ((isHeroEffectActive || klickHeilungOffen) ? ' zone-hero-effect-active' : '') + (stHeroReady && !stBonus ? ' st-actor-ready' : '') + (stBonus ? ' st-actor-bonus' : '') + (stExhausted && !stBonus && hero?.hp > 0 ? ' st-actor-exhausted' : '') + (isCharmed ? ' hero-charmed' : '') + (isControlled ? ' hero-charmed' : '') + (isChainPickValid ? ' chain-pick-valid' : '') + (isChainPickSelected ? ' chain-pick-selected' : '') + (isZonePickHero ? ' zone-pick-target' : '') + ((allianzHover && allianzHover.some(a => a.owner === (isOpp ? oppIdx : myIdx) && a.heroIdx === i)) ? ' zone-alliance-linked' : '')}
+              <div className={'board-zone board-zone-hero' + (hero?.name ? ' zone-has-card' : '') + (isDead ? ' board-zone-dead' : '') + ((abilityIneligible || equipIneligible || creatureIneligible || spellAttackIneligible || surpriseIneligible || ascensionIneligible || pickHeroDropIneligible || heroActionDimmed || additionalActionDimmed || attachPickHeroDim) ? ' board-zone-dead' : '') + (attachPickHeroDim ? ' attach-pick-dim' : '') + ((abilityTarget || equipTarget || spellTarget || surpriseTarget || ascensionTarget || pickHeroDropTarget || attachPickEligibleHero || isCsppHeroTarget || spellPickEntry) ? ' board-zone-play-target' : '') + (attachPickEligibleHero ? ' attach-pick-target' : '') + (isValidHeroTarget ? ' potion-target-valid' : '') + (isValidHeroTarget && accentGreenTargetIds.has(heroTargetId) ? ' potion-target-accent-green' : '') + (isIneligibleHeroTarget ? ' potion-target-ineligible' : '') + (isSelectedHeroTarget ? ' potion-target-selected' : '') + (oppTargetHighlight.includes(heroTargetId) ? ' opp-target-highlight' : '') + ((isHeroEffectActive || klickHeilungOffen) ? ' zone-hero-effect-active' : '') + (stReadyGlow && !stBonus ? ' st-actor-ready' : '') + (stBonus && !stActing ? ' st-actor-bonus' : '') + (stActing ? ' st-actor-acting' : '') + (stExhausted && !stBonus && !stActing && hero?.hp > 0 ? ' st-actor-exhausted' : '') + (isCharmed ? ' hero-charmed' : '') + (isControlled ? ' hero-charmed' : '') + (isChainPickValid ? ' chain-pick-valid' : '') + (isChainPickSelected ? ' chain-pick-selected' : '') + (isZonePickHero ? ' zone-pick-target' : '') + ((allianzHover && allianzHover.some(a => a.owner === (isOpp ? oppIdx : myIdx) && a.heroIdx === i)) ? ' zone-alliance-linked' : '')}
                 data-hero-zone="1" data-hero-idx={i} data-hero-owner={ownerLabel} data-hero-name={hero?.name || ''}
                 onClick={onHeroClick}
                 style={zsMerge('hero', { ...((isCsppHeroTarget || isHeroEffectActive || isValidHeroTarget || isChainPickValid || attachPickEligibleHero || isZonePickHero || spellPickEntry) ? { cursor: 'pointer' } : undefined), ...((isCharmed || isControlled) ? { '--charmed-color': charmedByColor || '#ff69b4' } : undefined) })}>
@@ -44329,6 +44352,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     // Ausgegraut wie die Heldenzone selbst (Zone traegt `board-zone-dead` bzw. wird bei der Klick-Wahl abgedunkelt):
                     // die Figur lebt in einer eigenen Ebene und bekommt den Filter der Zone nicht mit.
                     abgeblendet={!!(abilityIneligible || equipIneligible || creatureIneligible || spellAttackIneligible || surpriseIneligible || ascensionIneligible || pickHeroDropIneligible || heroActionDimmed || additionalActionDimmed || attachPickHeroDim
+                      || (stExhausted && !stBonus && !stActing)
                       || (summonPickAktiv && !(abilityTarget || equipTarget || spellTarget || surpriseTarget || ascensionTarget || pickHeroDropTarget || attachPickEligibleHero || isCsppHeroTarget || spellPickEntry)))} />
                 )}
                 {/* v1462: mit animierter Figur (`figurDa`) übernimmt die Figur
@@ -45575,7 +45599,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 || brackleSourceHidden.has(`${pi}-${i}-${z}`)
                 || pusherFlungHidden.has(`${pi}-${i}-${z}`);
               return (
-                <div key={z} className={'board-zone board-zone-support' + (cards.length > 0 ? ' zone-has-card' : '') + ((gameState.creatureCounters || {})[`${pi}-${i}-${z}`]?._zoneAura === 'necro_flicker' ? ' board-zone-aura' : '') + (isIsland ? ' board-zone-island' : '') + ((isPlayTarget || isAutoTarget) ? ' board-zone-play-target' : '') + (isValidEquipTarget ? ' potion-target-valid' : '') + (isValidEquipTarget && equipTargetIds.some(id => accentGreenTargetIds.has(id)) ? ' potion-target-accent-green' : '') + (isValidEquipTarget && pt?.config?.autoConfirm ? ' borrow-pick-target' : '') + (isIneligibleEquipTarget ? ' potion-target-ineligible' : '') + (isSelectedEquipTarget ? ' potion-target-selected' : '') + (isEquipExploding ? ' zone-exploding' : '') + (isSummonGlow ? ' zone-summon-glow' : '') + (equipTargetIds.some(id => oppTargetHighlight.includes(id)) ? ' opp-target-highlight' : '') + (isZonePickTarget ? ' zone-pick-target' : '') + (isAbilitySupportTarget ? ' board-zone-play-target' : '') + (supportAbilityEntry ? ' zone-ability-activatable' : '') + (abilityFlash && abilityFlash.zoneKind === 'support' && abilityFlash.owner === (isOpp ? oppIdx : myIdx) && abilityFlash.heroIdx === i && abilityFlash.zoneIdx === z ? ' zone-ability-activated' : '') + (istSupportAbility && (isDead || isFrozenOrStunnedSup) ? ' board-zone-dead' : '') + ((isDragValidZoneAny || isCsppEmptySlot || isSummonPickZone) ? ' zone-drag-valid' : '') + (isDragInvalidZone ? (cards.length > 0 ? ' board-zone-dead' : ' zone-drag-invalid') : '') + ((isBouncePlaceTarget || isPendingBounceTarget) ? ' zone-bounce-place-target' : '') + (isProviderZone ? ' zone-provider-highlight' : '') + (isProviderSelectionActive && !isProviderZone ? ' zone-provider-dimmed' : '') + ((isHeroActionZoneDimmed && !isCsppEmptySlot) ? ' zone-drag-invalid' : '') + (isCreatureActivatable ? ' zone-creature-activatable' : '') + (isCreatureActivatable && istArtefaktKreatur ? ' zone-artifact-creature' : '') + (isEquipActivatable ? ' zone-equip-activatable' : '') + (isEquipActivatable && equipEffectEntry?.crossSide ? ' zone-equip-crossside' : '') + (isBakhmSurpriseActive ? ' surprise-drop-active' : isBakhmSurpriseTarget ? ' surprise-drop-eligible' : '') + (isSkatesCreature ? ' zone-skates-creature' : '') + (isSkatesCreatureSelected ? ' zone-skates-selected' : '') + (isSkatesDest ? ' zone-skates-dest' : '') + (isSlipperyCreature ? ' zone-slippery-creature' : '') + (isSlipperyCreatureSelected ? ' zone-slippery-selected' : '') + (isSlipperyDest ? ' zone-slippery-dest' : '') + (isSlipperySwap ? ' zone-slippery-dest' : '') + (isChainPickCreatureValid ? ' chain-pick-valid' : '') + (isChainPickCreatureSelected ? ' chain-pick-selected' : '') + (isStolen ? ' hero-charmed' : '')}
+                <div key={z} className={'board-zone board-zone-support' + (cards.length > 0 ? ' zone-has-card' : '') + ((gameState.creatureCounters || {})[`${pi}-${i}-${z}`]?._zoneAura === 'necro_flicker' ? ' board-zone-aura' : '') + (isIsland ? ' board-zone-island' : '') + ((isPlayTarget || isAutoTarget) ? ' board-zone-play-target' : '') + (isValidEquipTarget ? ' potion-target-valid' : '') + (isValidEquipTarget && equipTargetIds.some(id => accentGreenTargetIds.has(id)) ? ' potion-target-accent-green' : '') + (isValidEquipTarget && pt?.config?.autoConfirm ? ' borrow-pick-target' : '') + (isIneligibleEquipTarget ? ' potion-target-ineligible' : '') + (isSelectedEquipTarget ? ' potion-target-selected' : '') + (isEquipExploding ? ' zone-exploding' : '') + (isSummonGlow ? ' zone-summon-glow' : '') + (equipTargetIds.some(id => oppTargetHighlight.includes(id)) ? ' opp-target-highlight' : '') + (isZonePickTarget ? ' zone-pick-target' : '') + (isAbilitySupportTarget ? ' board-zone-play-target' : '') + (supportAbilityEntry ? ' zone-ability-activatable' : '') + (abilityFlash && abilityFlash.zoneKind === 'support' && abilityFlash.owner === (isOpp ? oppIdx : myIdx) && abilityFlash.heroIdx === i && abilityFlash.zoneIdx === z ? ' zone-ability-activated' : '') + (istSupportAbility && (isDead || isFrozenOrStunnedSup) ? ' board-zone-dead' : '') + ((isDragValidZoneAny || isCsppEmptySlot || isSummonPickZone) ? ' zone-drag-valid' : '') + (isDragInvalidZone ? (cards.length > 0 ? ' board-zone-dead' : ' zone-drag-invalid') : '') + ((isBouncePlaceTarget || isPendingBounceTarget) ? ' zone-bounce-place-target' : '') + (isProviderZone ? ' zone-provider-highlight' : '') + (isProviderSelectionActive && !isProviderZone ? ' zone-provider-dimmed' : '') + ((isHeroActionZoneDimmed && !isCsppEmptySlot) ? ' zone-drag-invalid' : '') + (isCreatureActivatable ? ' zone-creature-activatable' : '') + (isCreatureActivatable && istArtefaktKreatur ? ' zone-artifact-creature' : '') + (isEquipActivatable ? ' zone-equip-activatable' : '') + (isEquipActivatable && equipEffectEntry?.crossSide ? ' zone-equip-crossside' : '') + (isBakhmSurpriseActive ? ' surprise-drop-active' : isBakhmSurpriseTarget ? ' surprise-drop-eligible' : '') + (isSkatesCreature ? ' zone-skates-creature' : '') + (isSkatesCreatureSelected ? ' zone-skates-selected' : '') + (isSkatesDest ? ' zone-skates-dest' : '') + (isSlipperyCreature ? ' zone-slippery-creature' : '') + (isSlipperyCreatureSelected ? ' zone-slippery-selected' : '') + (isSlipperyDest ? ' zone-slippery-dest' : '') + (isSlipperySwap ? ' zone-slippery-dest' : '') + (isChainPickCreatureValid ? ' chain-pick-valid' : '') + (isChainPickCreatureSelected ? ' chain-pick-selected' : '') + (isStolen ? ' hero-charmed' : '') + stCreatureCls(pi, i, z)}
                   data-support-zone="1" data-support-hero={i} data-support-slot={z} data-support-owner={ownerLabel} data-support-island={isIsland ? 'true' : 'false'} data-card-name={cards[0] || ''}
                   data-versiegelt={ppVerwahrung(gameState.players?.[pi], i, 'support', z).versiegelt ? '1' : undefined}
                   onClick={supportAbilityEntry ? () => {
@@ -48985,13 +49009,17 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               const p = pIdx === myIdx ? me : (gameState.players[pIdx] || opp);
               const isMe = pIdx === myIdx;
               const clr = isMe ? 'var(--success)' : 'var(--danger)';
+              // Skill Test: der Gegner, dessen Brett gerade im Hauptfeld steht, ist markiert; mit dem Zeiger darüber schaltet das Hauptfeld um.
+              const stGezeigt = stMulti && !isMe && pIdx === oppIdx;
               return (
-                <button key={pIdx} className="btn" style={{ padding: '12px 18px', fontSize: 13, borderColor: clr, color: clr, display: 'flex', alignItems: 'center', gap: 12 }}
+                <button key={pIdx} className={'btn' + (stGezeigt ? ' st-picker-viewed' : '')} style={{ padding: '12px 18px', fontSize: 13, borderColor: clr, color: clr, display: 'flex', alignItems: 'center', gap: 12 }}
+                  onMouseEnter={stMulti && !isMe ? () => setStFocusPin(pIdx) : undefined}
                   onClick={() => respondToPrompt({ playerIdx: pIdx })}>
                   {p.avatar && <img src={p.avatar} alt="" style={{ width: 32, height: 32, borderRadius: '50%', objectFit: 'cover' }} />}
                   <div>
                     <div style={{ fontWeight: 700 }}>{p.username}{isMe ? ' (you)' : ''}</div>
                   </div>
+                  {stGezeigt && <span className="st-picker-badge" title="This player's board is on screen">ON SCREEN</span>}
                 </button>
               );
             })}
@@ -50488,6 +50516,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
 window.BoardCard = BoardCard;
 window.BoardZone = BoardZone;       // Skill Test (Vorbereitungs-Basis)
 window.AbilityStack = AbilityStack; // Skill Test (Vorbereitungs-Basis)
+window.HeroIdleSprite = HeroIdleSprite;   // Skill Test (Vorbereitungs-Basis: animierte Helden)
+window.HeroSpriteEbene = HeroSpriteEbene; // Skill Test
+window.HeroIdleAnims = HeroIdleAnims;     // Skill Test
 window.GameBoard = GameBoard;
 window.FrozenOverlay = FrozenOverlay;
 window.NegatedOverlay = NegatedOverlay;

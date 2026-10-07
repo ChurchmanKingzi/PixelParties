@@ -2634,35 +2634,11 @@ function strippedKey(name) {
 const nameByStripped = {};
 getCardArray().forEach(c => { nameByStripped[strippedKey(c.name)] = c.name; });
 
+// Die Zuordnung „Karte → Bilddatei" liegt in card-images.js (gleiche Quelle nutzt der Skill Test für seinen Kartenpool).
+// Farbvarianten (v818): „Queen of Kings [B]" / „[W]" liegen als `Queen of Kings.png` / `Queen of Kings.1.png` auf der Platte.
 app.get('/api/cards/available', async (req, res) => {
-  const cardsDir = path.join(__dirname, 'cards');
   try {
-    const files = fs.readdirSync(cardsDir);
-    // Map: actual card name (with commas) → filename for image URLs
-    const available = {};
-    files
-      .filter(f => IMAGE_EXTS.has(path.extname(f).toLowerCase()))
-      .forEach(f => {
-        const stem = path.basename(f, path.extname(f));
-        const realName = nameByStripped[strippedKey(stem)] || stem;
-        available[realName] = f;
-      });
-    // ── Farbvarianten (v818, Al 6.9.): „Queen of Kings [B]" und
-    // „Queen of Kings [W]" sind in der Datenbank zwei Zeilen, auf der
-    // Platte aber `Queen of Kings.png` (schwarz) und `Queen of Kings.1.png`
-    // (weiss). Erster Fall, in dem Dateinamen systematisch von den
-    // DB-Namen abweichen — deshalb die Zuordnung hier, nicht per Umbenennen.
-    const byStem = {};
-    files.filter(f => IMAGE_EXTS.has(path.extname(f).toLowerCase()))
-      .forEach(f => { byStem[strippedKey(path.basename(f, path.extname(f)))] = f; });
-    for (const c of getCardArray()) {
-      const m = /^(.*?)\s*\[(B|W)\]$/.exec(c.name);
-      if (!m) continue;
-      const stem = m[2] === 'B' ? m[1] : `${m[1]}.1`;
-      const f = byStem[strippedKey(stem)];
-      if (f) available[c.name] = f;
-    }
-    res.json({ available });
+    res.json({ available: require('./card-images').availableImageMap(getCardArray()) });
   } catch {
     res.json({ available: {} });
   }
@@ -4403,6 +4379,14 @@ const {
 // auch wenn der Raum gerade keinen gameState hat).
 function roomPlayerCount(room) { return playerCountGs(room && room.gameState); }
 
+/**
+ * Skill Test: Der Basisangriff spielt kurz eine virtuelle „Attack"-Karte aus der Hand (rounds.playBaseAttack). Sie ist
+ * immer die letzte Handkarte und gehört nicht in die Ansicht der Clients. Außerhalb des Skill Tests: dieselbe Hand.
+ */
+function stSichtHand(gs, pi, hand) {
+  return gs && gs.skillTest && gs.skillTest.virtualAttack === pi ? hand.slice(0, -1) : hand;
+}
+
 function sendGameState(room, playerIdx, extra) {
   if (room.engine?._fastMode) return; // Silent during MCTS simulations.
   // ── STILLGELEGTE ENGINE SENDET NICHTS MEHR ────────────────────────
@@ -4596,7 +4580,7 @@ function sendGameState(room, playerIdx, extra) {
       // redacted client-side state).
       hand: (pi === playerIdx
              || (room.type === 'singleplayer' && DEBUG_REVEAL_NPC_HAND)
-             || room.type === 'puzzle') ? ps.hand : [], handCount: ps.hand.length,
+             || room.type === 'puzzle') ? stSichtHand(gs, pi, ps.hand) : [], handCount: stSichtHand(gs, pi, ps.hand).length,
       revealedHandCards: pi !== playerIdx ? (() => {
         // SINGLEPLAYER debug reveal: show every card in the CPU's hand.
         // The client renders `revealedHandCards` as face-up tiles, so
@@ -5784,7 +5768,7 @@ function sendSpectatorGameState(room) {
       // CPU-vs-CPU spectator view reveals both hands so the watcher can
       // see every CPU decision in context. Normal spectator view keeps
       // hands hidden (fairness for real-player matches).
-      hand: room.type === 'cpu_vs_cpu' ? ps.hand : [], handCount: ps.hand.length,
+      hand: room.type === 'cpu_vs_cpu' ? ps.hand : [], handCount: stSichtHand(gs, spi, ps.hand).length,
       revealedHandCards: room.type === 'cpu_vs_cpu'
         ? ps.hand.map((name, index) => ({ index, name }))
         : [],
@@ -18901,6 +18885,7 @@ const skillTestHost = {
   get doPlaySpell() { return doPlaySpell; },
   get doPlayCreature() { return doPlayCreature; },
   get doPlayArtifact() { return doPlayArtifact; },
+  get doUseArtifactEffect() { return doUseArtifactEffect; },
   get doPlaySurprise() { return doPlaySurprise; },
   get doActivateCreatureEffect() { return doActivateCreatureEffect; },
   get doActivateHeroEffect() { return doActivateHeroEffect; },
@@ -21270,4 +21255,4 @@ initDatabase().then(async () => {
 });
 
 // Für die Headless-Simulation des Skill-Test-Modus (skilltest/sim-bridge.js; PP_ST_SIM=1).
-module.exports = { skillTestHandlers: { doPlaySpell, doPlayCreature, doPlayArtifact, doPlaySurprise, doActivateCreatureEffect, doActivateHeroEffect, doUsePotion, doConfirmPotion, doPlayAbility, doActivateAbility, setupGameState } };
+module.exports = { skillTestHandlers: { doPlaySpell, doPlayCreature, doPlayArtifact, doUseArtifactEffect, doPlaySurprise, doActivateCreatureEffect, doActivateHeroEffect, doUsePotion, doConfirmPotion, doPlayAbility, doActivateAbility, setupGameState } };

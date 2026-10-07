@@ -10,15 +10,19 @@
 //    hand            string[]                    Handkarten (Reihenfolge zählt)
 //    heroes          (string|null)[3]            Hero-Zonen
 //    abilityZones    [3][3] of null | { n, s, c }
-//                      n = Name, s = Anzahl START-Einträge (Level), c = Handkarte darauf
+//                      n = Name, s = Anzahl START-Einträge (Level; im Skill Test immer START_ABILITY_LEVEL = 3), c = Handkarte darauf
 //                      Stapelhöhe (Level) = c ? 3 : s      (Hand-Ability levelt auf 3)
 //    supportZones    [3][3] of string[]          je Zone ein Stapel (meist 1 Karte)
 //    surpriseZones   (string|null)[3]
 //    areaZone        string[]                    Area-Karten (Limit: areaLimitOf)
+//    spawned         [3][3] of boolean           Support-Zone enthält eine „aus dem Nichts“ erschienene Karte
+//                                                (Idej Lords, siehe IDEJ_PACKAGES): nicht aufnehmbar, nicht
+//                                                recycelbar — nur löschen oder überbauen; verschwindet mit dem Hero
 //    recycled        number                      Karten im Recycler
 //    ready           boolean
 //
-//  `env` (vom Aufrufer): { cards: { [name]: kartendaten }, areaLimitOf(name) -> number|undefined }
+//  `env` (vom Aufrufer): { cards: { [name]: kartendaten }, areaLimitOf(name) -> number|undefined,
+//                          random?: () => number }   (random: Auswahl der Idej Blades; Standard Math.random)
 //
 //  ERWEITERN: neue Platzierungsregeln gehören in `zoneAccepts` (Typen)
 //  oder in die Konstanten ganz oben — nirgends sonst.
@@ -39,6 +43,21 @@
   // Potions werden im Modus NICHT als Biomancy-Token auf die Basis gelegt.
   const POTIONS_ON_BOARD = false;
   const MAX_ABILITY_LEVEL = 3;
+  // Start-Abilities der Heroes beginnen im Skill Test auf der HÖCHSTEN Stufe (im Normalspiel Stufe 1, bei doppelter Start-Ability 2):
+  // ohne Deck und mit nur 18 Karten bliebe sonst ein Großteil der Zauber/Angriffe auf der Hand unbrauchbar.
+  const START_ABILITY_LEVEL = 3;
+  // Idej Lords: beim Aufstellen erscheinen ihre „zugehörigen Karten“ aus dem Nichts in den Support Zones des Heroes
+  // (im echten Spiel sucht der Lord sie zu Spielbeginn aus dem Deck — der Skill Test hat kein Deck). `proj` = Idej Projection,
+  // `blade` = Idej Blade (zufällig, je Lord verschieden). Verlässt der Lord das Brett, verschwinden sie.
+  const IDEJ_PROJECTION = 'Idej Projection';
+  const IDEJ_BLADES = ['Idej Blade - Gensui', 'Idej Blade - Hakai', 'Idej Blade - Manabi', 'Idej Blade - Naosu'];
+  const IDEJ_PACKAGES = {
+    'Idej Lord Daiyo':     { proj: 3, blade: 0 },
+    'Idej Lord Nobunakin': { proj: 2, blade: 1 },
+    'Idej Lord Shoguwana': { proj: 1, blade: 2 },
+    'Idej Lord Todugawin': { proj: 0, blade: 3 },
+  };
+  const SPAWNED_ONLY_DELETE = 'Diese Karte ist aus dem Nichts erschienen — sie lässt sich nur löschen (Rechtsklick) oder überbauen, nicht aufnehmen oder recyceln.';
 
   const sameCopyFamily = (n, base) => !!n && (n === base || n.startsWith(base + ' ('));
 
@@ -50,9 +69,46 @@
       supportZones: [[[], [], []], [[], [], []], [[], [], []]],
       surpriseZones: [null, null, null],
       areaZone: [],
+      spawned: [[false, false, false], [false, false, false], [false, false, false]],
       recycled: 0,
       ready: false,
     };
+  }
+
+  /** Ältere Zustände ohne `spawned` auffüllen (auf einer Kopie aufrufen). */
+  function ensureSpawned(ps) {
+    if (!Array.isArray(ps.spawned)) ps.spawned = [[false, false, false], [false, false, false], [false, false, false]];
+    return ps;
+  }
+  const isSpawned = (ps, hi, slot) => !!(ps.spawned && ps.spawned[hi] && ps.spawned[hi][slot]);
+
+  /** Alle aus dem Nichts erschienenen Karten dieser Spalte entfernen (sie gehen NICHT auf die Hand). */
+  function despawn(ps, hi) {
+    ensureSpawned(ps);
+    for (let z = 0; z < 3; z++) {
+      if (!ps.spawned[hi][z]) continue;
+      ps.supportZones[hi][z] = [];
+      ps.spawned[hi][z] = false;
+    }
+  }
+
+  /** Das Paket eines Idej Lords in die Support Zones der Spalte legen (freie Zonen zuerst, sonst weicht eine Handkarte zurück auf die Hand). */
+  function spawnFor(env, ps, hi, heroName) {
+    const pack = IDEJ_PACKAGES[heroName];
+    if (!pack) return;
+    ensureSpawned(ps);
+    const rnd = (env && env.random) || Math.random;
+    const blades = IDEJ_BLADES.map(n => ({ n, k: rnd() })).sort((a, b) => a.k - b.k).slice(0, pack.blade).map(x => x.n);
+    const names = [...Array(pack.proj).fill(IDEJ_PROJECTION), ...blades];
+    // Reihenfolge der Zonen: erst die leeren, dann besetzte (deren Karte kehrt auf die Hand zurück).
+    const order = [0, 1, 2].sort((a, b) => ((ps.supportZones[hi][a].length ? 1 : 0) - (ps.supportZones[hi][b].length ? 1 : 0)) || (a - b));
+    const slots = order.slice(0, names.length).sort((a, b) => a - b);
+    slots.forEach((slot, i) => {
+      const st = ps.supportZones[hi][slot];
+      if (st.length) ps.hand.push(st[0]);
+      ps.supportZones[hi][slot] = [names[i]];
+      ps.spawned[hi][slot] = true;
+    });
   }
 
   const clone = (o) => JSON.parse(JSON.stringify(o));
@@ -124,7 +180,9 @@
       case 'hero': {
         const name = ps.heroes[src.hi];
         if (!name) return { error: 'Hier steht kein Hero.' };
-        // Die ganze Spalte verlässt das Feld: Hand-Abilities, Support- und Surprise-Karten kehren zurück.
+        // Die ganze Spalte verlässt das Feld: Hand-Abilities, Support- und Surprise-Karten kehren zurück
+        // (aus dem Nichts erschienene Karten verschwinden dagegen).
+        despawn(ps, src.hi);
         for (let z = 0; z < 3; z++) {
           const az = ps.abilityZones[src.hi][z];
           if (az && az.c) ps.hand.push(az.n);
@@ -147,6 +205,7 @@
       case 'support': {
         const st = ps.supportZones[src.hi][src.slot];
         if (!st.length) return { error: 'Zone ist leer.' };
+        if (isSpawned(ps, src.hi, src.slot)) return { error: SPAWNED_ONLY_DELETE };
         // Ein Ability-Stapel (Xal) ist EINE Karte auf Level 3 — es kehrt nur ein Exemplar zurück.
         ps.supportZones[src.hi][src.slot] = [];
         return { name: st[0] };
@@ -173,10 +232,11 @@
     const a1 = c && c.startingAbility1 || '';
     const a2 = c && c.startingAbility2 || '';
     const Z = ps.abilityZones[hi];
-    if (a1 && a2 && a1 === a2) Z[1] = { n: a1, s: 2, c: false };
-    else if (a1 && !a2) Z[1] = { n: a1, s: 1, c: false };
-    else if (!a1 && a2) Z[1] = { n: a2, s: 1, c: false };
-    else { if (a1) Z[0] = { n: a1, s: 1, c: false }; if (a2) Z[1] = { n: a2, s: 1, c: false }; }
+    const S = START_ABILITY_LEVEL;
+    if (a1 && a2 && a1 === a2) Z[1] = { n: a1, s: S, c: false };
+    else if (a1 && !a2) Z[1] = { n: a1, s: S, c: false };
+    else if (!a1 && a2) Z[1] = { n: a2, s: S, c: false };
+    else { if (a1) Z[0] = { n: a1, s: S, c: false }; if (a2) Z[1] = { n: a2, s: S, c: false }; }
   }
 
   /** Karte an ein Ziel legen. Verdrängte Karten gehen auf die Hand. */
@@ -189,7 +249,9 @@
       case 'hero': {
         const old = ps.heroes[hi];
         if (old) {
-          // Tausch: Hand-Abilities des alten Heroes kehren zurück, seine Start-Abilities verfallen.
+          // Tausch: Hand-Abilities des alten Heroes kehren zurück, seine Start-Abilities verfallen,
+          // aus dem Nichts erschienene Karten (alter Idej Lord) verschwinden.
+          despawn(ps, hi);
           for (let z = 0; z < 3; z++) {
             const az = ps.abilityZones[hi][z];
             if (az && az.c) ps.hand.push(az.n);
@@ -199,13 +261,16 @@
         }
         ps.heroes[hi] = name;
         installStartAbilities(env, ps, hi, name);
+        spawnFor(env, ps, hi, name);
         return { ok: true, ps };
       }
       case 'ability': {
+        // Jede Ability liegt je Hero nur einmal; die Stufen stapeln sich in EINER Zone (auch auf einer Start-Ability, die schon Stufe 3 hat).
+        if (ps.abilityZones[hi].some((q, i) => i !== slot && q && q.n === name)) return fail('Dieser Hero hat die Ability schon — lege sie auf ihre Zone, um die Stufe zu erhöhen.');
         const z = ps.abilityZones[hi][slot];
         if (z) {
           if (z.n === name) {
-            if (z.c) return fail('Maximales Level erreicht.');
+            if (abilityLevel(z) >= MAX_ABILITY_LEVEL) return fail('Maximales Level erreicht.');
             z.c = true;
           } else if (z.s > 0) {
             return fail('Start-Abilities sind fest.');
@@ -225,7 +290,8 @@
           st.push(name);
           return { ok: true, ps };
         }
-        if (st.length) ps.hand.push(st[0]);
+        if (st.length && !isSpawned(ps, hi, slot)) ps.hand.push(st[0]);   // eine erschienene Karte wird überbaut und ist weg
+        ensureSpawned(ps).spawned[hi][slot] = false;
         ps.supportZones[hi][slot] = c.cardType === 'Ability' ? Array(MAX_ABILITY_LEVEL).fill(name) : [name];
         return { ok: true, ps };
       }
@@ -269,9 +335,16 @@
    * Ergebnis: { ok, ps, reason, recycledCard? }.
    */
   function applyMove(env, psIn, move) {
-    const ps = clone(psIn);
+    const ps = ensureSpawned(clone(psIn));
     if (ps.ready) return fail('Du bist bereit — nimm das Ready zurück, um etwas zu ändern.');
     switch (move && move.type) {
+      case 'deleteSpawned': {
+        // Rechtsklick auf eine aus dem Nichts erschienene Karte: löschen (nicht auf die Hand, nicht in den Recycler).
+        if (!ps.supportZones[move.hi] || !isSpawned(ps, move.hi, move.slot)) return fail('Hier liegt keine aus dem Nichts erschienene Karte.');
+        ps.supportZones[move.hi][move.slot] = [];
+        ps.spawned[move.hi][move.slot] = false;
+        return { ok: true, ps };
+      }
       case 'removeStart': {
         const z = ps.abilityZones[move.hi] && ps.abilityZones[move.hi][move.slot];
         if (!z || !z.s) return fail('Hier gibt es keine Start-Ability.');
@@ -311,7 +384,7 @@
         if (from.kind === 'hero' && to.kind === 'hero') {
           if (from.hi === to.hi || !ps.heroes[from.hi]) return fail('Ungültig.');
           const a = from.hi, b = to.hi;
-          for (const key of ['heroes', 'abilityZones', 'supportZones', 'surpriseZones']) {
+          for (const key of ['heroes', 'abilityZones', 'supportZones', 'surpriseZones', 'spawned']) {
             const t = ps[key][a]; ps[key][a] = ps[key][b]; ps[key][b] = t;
           }
           return { ok: true, ps };
@@ -336,9 +409,10 @@
     if (!zoneAccepts(env, ps, cardName, target)) return false;
     const { kind, hi, slot } = target;
     if (kind === 'ability') {
+      if (ps.abilityZones[hi].some((q, i) => i !== slot && q && q.n === cardName)) return false;
       const z = ps.abilityZones[hi][slot];
       if (z && z.n !== cardName && z.s > 0) return false;
-      if (z && z.n === cardName && z.c) return false;
+      if (z && z.n === cardName && abilityLevel(z) >= MAX_ABILITY_LEVEL) return false;
     }
     if (kind === 'area') {
       if (ps.areaZone.includes(cardName)) return false;
@@ -365,10 +439,10 @@
   }
 
   return {
-    ZHIGAO, HAND_ONLY_HEROES, MAX_ABILITY_LEVEL, POTIONS_ON_BOARD,
+    ZHIGAO, HAND_ONLY_HEROES, MAX_ABILITY_LEVEL, START_ABILITY_LEVEL, POTIONS_ON_BOARD,
     emptyPlayer, clone,
     heroCount, requiredHeroes, boardFull, hasZhigao, totalHeroes, abilityLevel,
     zoneAccepts, canDrop, applyMove, readyProblem, abilityStacks, areaLimit, canPlaceAnotherArea,
-    installStartAbilities,
+    installStartAbilities, isSpawned, IDEJ_PACKAGES, IDEJ_PROJECTION, IDEJ_BLADES,
   };
 }));

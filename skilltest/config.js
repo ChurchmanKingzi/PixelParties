@@ -72,6 +72,9 @@ const CONFIG = {
     COMMON_RANDOM: true,   // gemeinsame Zufallszahlen: der k-te Rollout jedes Kandidaten nutzt denselben Zufallsstrom (weniger Rauschen im Vergleich)
   },
 
+  // Sicherheitsnetz: nach so vielen Rounds endet die Partie (die meisten Heroes/HP gewinnen). 0 = aus.
+  MAX_ROUNDS: 150,
+
   // ── Belohnungen (SC) ───────────────────────────────────────────
   SC_PER_ROUND: 1,
   SC_PER_OUTLASTED_PLAYER: 5,

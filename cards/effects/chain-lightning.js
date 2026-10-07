@@ -22,6 +22,8 @@ module.exports = {
       const gs = ctx.gameState;
       const pi = ctx.cardOwner;
       const heroIdx = ctx.cardHeroIdx;
+      // Skill Test (mehrere Gegner): der Wirker wählt, wen er trifft.
+      if (gs.skillTest && engine._stChooseOpponent) await engine._stChooseOpponent(pi, 'Chain Lightning', 'Choose the player you want to strike with the lightning.');
       const oppIdx = engine.opponentOf(pi);
       const cardDB = engine._getCardDB();
       const damages = [200, 150, 100];

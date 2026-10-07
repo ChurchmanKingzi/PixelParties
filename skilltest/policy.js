@@ -115,12 +115,48 @@ function learnedBonus(prof, w, key) {
 }
 
 // ── Zielwahl ───────────────────────────────────────────────────────
+/**
+ * Opferwahl der Engine (`resolveSacrificeCost`): unter allen Teilmengen, die Anzahl, Mindest-Max-HP, Mindest-Level und die Pflicht
+ * „mindestens ein Opfer von Hero X" erfüllen, die mit den geringsten Kosten (Max-HP + Level). Keine gültige → [] (die Engine bricht ab).
+ * Ohne diese Regel wählte die allgemeine Zielwahl irgendwelche Kreaturen, die Engine fragte endlos neu (Dragon Pilot, Nachttraining).
+ */
+function chooseTribute(cands, config, seat) {
+  const meta = (t) => t._meta || {};
+  const list = cands.slice(0, 14);
+  const minCount = Math.max(1, config.minRequired || 1), maxCount = config.maxTotal != null ? config.maxTotal : list.length;
+  const owner = config.mustIncludeFromHeroOwner != null ? config.mustIncludeFromHeroOwner : seat;
+  const fromHero = (t) => config.mustIncludeFromHeroIdx != null && (t.heroIdx ?? (t.cardInstance && t.cardInstance.heroIdx)) === config.mustIncludeFromHeroIdx
+    && ((t.owner ?? (t.cardInstance && (t.cardInstance.controller ?? t.cardInstance.owner))) ?? seat) === owner;
+  let best = null, bestCost = Infinity;
+  for (let mask = 1; mask < (1 << list.length); mask++) {
+    let n = 0, hp = 0, lvl = 0, cost = 0, must = config.mustIncludeFromHeroIdx == null;
+    for (let i = 0; i < list.length; i++) {
+      if (!(mask & (1 << i))) continue;
+      n++; const m = meta(list[i]); hp += m.maxHp || 0; lvl += m.level || 0; cost += (m.maxHp || 0) + 60 * (m.level || 0);
+      if (!must && fromHero(list[i])) must = true;
+    }
+    if (n < minCount || n > maxCount || !must) continue;
+    if (config.minSumMaxHp && hp < config.minSumMaxHp) continue;
+    if (config.minSumLevel && lvl < config.minSumLevel) continue;
+    if (cost < bestCost) { bestCost = cost; best = mask; }
+  }
+  if (best == null) return [];
+  return list.filter((_, i) => best & (1 << i)).map(t => t.id);
+}
+
 /** Zielwahl: Gegner (Seiten ≥ 0 außer dem eigenen Sitz), niedrige HP, tödliche Treffer; Heil-/Buff-Karten wählen eigene Ziele. */
 function chooseTargets(engine, seat, validTargets, config, base) {
   if (!validTargets || !validTargets.length) return [];
   const w = weightsOf(engine.room, seat);
   // Eigene Karten-Antworten (cpuResponse) haben Vorrang: sie kennen die Regel der Karte.
   const cardName = config.source || config.title;
+  // Freiwillige „erneut"-Prompts: nach einigen Wiederholungen derselben Karte in EINER Aktion abbrechen (verhindert Endlosschleifen) — noch VOR der Karten-Antwort,
+  // sonst umgeht eine `cpuResponse` den Schutz (Garius: Opferwahl immer gültig, Galerie-Abbruch führt zurück zur Opferwahl).
+  if (cardName && config.cancellable) {
+    const counts = engine._stPromptCounts || (engine._stPromptCounts = {});
+    const key = seat + ':' + cardName;
+    if ((counts[key] = (counts[key] || 0) + 1) > MAX_PROMPT_REPEATS) return [];
+  }
   if (cardName) {
     try {
       const { loadCardEffect } = require('../cards/effects/_loader');
@@ -131,11 +167,10 @@ function chooseTargets(engine, seat, validTargets, config, base) {
       }
     } catch { /* weiter mit der Heuristik */ }
   }
-  // Freiwillige „erneut"-Prompts: nach einigen Wiederholungen derselben Karte in EINER Aktion abbrechen (verhindert Endlosschleifen).
-  if (cardName && config.cancellable) {
-    const counts = engine._stPromptCounts || (engine._stPromptCounts = {});
-    const key = seat + ':' + cardName;
-    if ((counts[key] = (counts[key] || 0) + 1) > MAX_PROMPT_REPEATS) return [];
+  // Opferwahl mit Bedingungen (Mindest-Max-HP, Mindest-Level, „mindestens ein Opfer von Hero X"): eine gültige, möglichst billige Teilmenge wählen.
+  if (config.minSumMaxHp || config.minSumLevel || config.mustIncludeFromHeroIdx != null) {
+    const tribute = chooseTribute(validTargets.filter(t => !t.ineligible), config, seat);
+    if (tribute) return tribute;
   }
   const bene = cardName ? isBeneficial(cardName) : false;
   const st = engine.gs.skillTest;
@@ -259,13 +294,14 @@ function rankActions(room, seat, host) {
     const c = db[name];
     if (!c) return;
     const sub = (c.subtype || '').toLowerCase();
-    if ((c.cardType === 'Spell' || c.cardType === 'Attack') && (sub === 'normal' || sub === '')) {
+    if ((c.cardType === 'Spell' || c.cardType === 'Attack') && (sub === 'normal' || sub === '' || sub === 'area' || sub === 'attachment')) {
       const key = cardKey('spell', name);
       const base = (c.cardType === 'Attack' ? w.aggression : w.spell) * 6;
       const casters = castersFor(engine, seat, c);
       for (const hi of bonusHeroesFor(engine, seat, null, name)) if (!casters.includes(hi) && engine.heroMeetsLevelReq(seat, hi, c)) casters.push(hi);   // Zusatzaktion
       for (const hi of casters) {
         const params = { cardName: name, handIndex, heroIdx: hi };
+        if (sub === 'attachment') params.attachHeroIdx = hi;                 // Anhänger-Zauber: an den Wirker (die Karte fragt sonst selbst nach dem Ziel)
         out.push({ score: base + learnedBonus(prof, w, key) + Math.random() * 1.5, kind: 'spell', key, card: name, hero: hi,
           run: () => rounds.act(room, seat, 'play_spell', params, () => host.doPlaySpell(room, seat, params), host) });
       }
@@ -317,6 +353,29 @@ async function usePotion(room, seat, host, params) {
 }
 
 /**
+ * Normale Artifacts (und Artifact-Creatures mit Zielwahl) laufen im Server über `doUseArtifactEffect`, nicht über `doPlayArtifact`
+ * (das lehnt sie ab). Wie bei Tränken bleibt danach gegebenenfalls eine Zielwahl offen (`gs.potionTargeting`), die hier beantwortet wird.
+ * Bis zum Nachttraining vom 7.10. rief der Bot für diese Karten (Artifact/Normal: 71 im Pool) `doPlayArtifact` auf — jede Wahl scheiterte still.
+ */
+async function useArtifactEffect(room, seat, host, params) {
+  const gs = room.gameState, engine = room.engine;
+  rounds.setPhaseFor(room, seat, 'play_artifact', params);
+  const ok = await host.doUseArtifactEffect(room, seat, params);
+  if (!ok) return false;
+  const pt = gs.potionTargeting;
+  if (pt && pt.ownerIdx === seat && !pt.isEffectPrompt) {
+    const ids = chooseTargets(engine, seat, pt.validTargets || [], { ...(pt.config || {}), source: pt.potionName || params.cardName }, null);
+    let done = false;
+    if (ids.length) {
+      rounds.setPhaseFor(room, seat, 'confirm_potion', {});
+      done = await host.doConfirmPotion(room, seat, { selectedIds: ids });
+    }
+    if (!done) { gs.potionTargeting = null; engine.sync(); return false; }
+  }
+  return true;
+}
+
+/**
  * Freie Spielzüge der Main Phase (verbrauchen den Zug nicht): Artifacts ausrüsten, Surprises legen,
  * Tränke trinken, Abilities von der Hand an Helden legen.
  * Der Bot führt sie vor der eigentlichen Aktion aus. Jede Karte kommt nur einmal vor (einmalig im Spiel).
@@ -343,10 +402,34 @@ function freeActions(room, seat, host) {
           out.push({ score: base - (ps.heroes[hi].hp > 0 ? 0 : 5) + Math.random(), key: 'free:' + name + ':' + hi, learnKey: key,
             run: () => { rounds.setPhaseFor(room, seat, 'play_artifact', params); return host.doPlayArtifact(room, seat, params); } });
         }
-      } else {
-        const params = { cardName: name, handIndex, heroIdx: alive[0] };
+      } else if (host.doUseArtifactEffect) {
+        // Normale Artifacts: Wirkung über doUseArtifactEffect (nicht doPlayArtifact, das sie ablehnt). Spielbarkeit wie beim CPU-Gehirn der
+        // Engine (_cpu.js planArtifactPlay): Skript-Gate, Hand-Sperre, Zielwahl oder resolve vorhanden.
+        const script = scriptOf(name);
+        if (!script || script.isReaction && !script.proactivePlay) return;
+        if (script.canActivate && !attempt(() => script.canActivate(gs, seat, engine))) return;
+        if (script.blockedByHandLock && ps.handLocked) return;
+        if (!(script.getValidTargets && script.targetingConfig) && !script.resolve) return;
+        if (typeof script.cpuShouldPlay === 'function' && !attempt(() => script.cpuShouldPlay(engine, seat), true)) return;
+        const params = { cardName: name, handIndex };
         out.push({ score: base - 1 + Math.random(), key: 'free:' + name, learnKey: key,
-          run: () => { rounds.setPhaseFor(room, seat, 'play_artifact', params); return host.doPlayArtifact(room, seat, params); } });
+          run: () => useArtifactEffect(room, seat, host, params) });
+      }
+    } else if (c.cardType === 'Artifact' && sub.split('/').some(t => t.trim() === 'creature') && host.doPlayArtifact) {
+      // Artifact-Creatures: ohne Zielwahl in eine freie Support Zone (doPlayArtifact), mit Zielwahl über doUseArtifactEffect.
+      const script = scriptOf(name);
+      const key = cardKey('equip', name);
+      const base = w.summon * 4 + learnedBonus(prof, w, key);
+      if (script && script.isTargetingArtifact && host.doUseArtifactEffect) {
+        out.push({ score: base - 1 + Math.random(), key: 'free:' + name, learnKey: key, run: () => useArtifactEffect(room, seat, host, { cardName: name, handIndex }) });
+      } else {
+        for (const hi of alive) {
+          const free = freeSupportSlots(ps, hi);
+          if (!free.length) continue;
+          const params = { cardName: name, handIndex, heroIdx: hi, zoneSlot: free[0] };
+          out.push({ score: base + Math.random(), key: 'free:' + name + ':' + hi, learnKey: key,
+            run: () => { rounds.setPhaseFor(room, seat, 'play_artifact', params); return host.doPlayArtifact(room, seat, params); } });
+        }
       }
     } else if (c.cardType === 'Potion' && host.doUsePotion) {
       // Tränke: einmalig; Heilung/Buffs nur, wenn jemand verletzt ist. Reaktions-Tränke spielt die Reaktionslogik.
@@ -439,6 +522,29 @@ function reactionVerdict(engine, seat, cardName) {
 }
 
 // ── Basisaufbau ────────────────────────────────────────────────────
+const CAST_BONUS = 45;     // Heldenwert je Zauber/Angriff aus der Starthand, den dieser Hero mit seinen Start-Abilities (Stufe 3) sofort wirken kann
+
+/**
+ * Wie viele Zauber/Angriffe der Hand kann dieser Hero mit seinen Start-Abilities (Stufe 3) wirken? Ohne Schule oder Stufe 0 zählt halb
+ * (jeder Hero kann sie), Karten mit zwei Schulen brauchen die Stufen beider zusammen (wie `keepmodel.levelGap`).
+ */
+function castableInHand(cards, hand, hero) {
+  const Rules = require('../public/skilltest-rules.js');
+  const have = new Set([hero.startingAbility1, hero.startingAbility2].filter(Boolean));
+  let n = 0;
+  for (const name of hand || []) {
+    const x = cards[name];
+    if (!x || (x.cardType !== 'Spell' && x.cardType !== 'Attack')) continue;
+    const sub = (x.subtype || '').toLowerCase();
+    if (sub !== '' && sub !== 'normal') continue;
+    const schools = [x.spellSchool1, x.spellSchool2].filter(Boolean);
+    if (!(x.level > 0) || !schools.length) { n += 0.5; continue; }
+    const lv = schools.filter(sc => have.has(sc)).length * Rules.MAX_ABILITY_LEVEL;
+    if (lv >= x.level) n++;
+  }
+  return n;
+}
+
 /**
  * Basis für einen CPU-Sitz: Heroes nach Wert (HP/ATK + gelernter Kartenwert), Abilities/Support nach gelernter
  * Passung zum Hero, unbrauchbare Karten in den Recycler (mehr Gold, früherer Spielbeginn).
@@ -458,19 +564,20 @@ function prepareBase({ env, ps, room, idx, pool, noProfile, weights, record }) {
   const decide = KM.makeDecider({
     env, model: (prof && prof.keepModel) || KM.newModel(),
     usable: usableInBattle, protect: (n) => Rules.HAND_ONLY_HEROES.includes(n),
+    usage: prof && prof.usage, usageClass: prof && prof.usageClass,
     maxKeep: Math.max(0, Math.round(w.keepCards)), bias: w.keepBias, explore: record ? Math.min(0.3, 0.25 * w.explore) : 0,
   });
   return buildWithRecycling(env, ps, {
     pool, config: CONFIG, decide, record,
     maxKeep: Math.max(0, Math.round(w.keepCards)),
-    heroScore: (n, c) => w.heroHp * (c.hp || 0) + w.heroAtk * (c.atk || 0) + 150 * cv(n),
+    heroScore: (n, c) => w.heroHp * (c.hp || 0) + w.heroAtk * (c.atk || 0) + 150 * cv(n) + CAST_BONUS * w.spell * castableInHand(env.cards, ps.hand, c),
     pairScore: (hero, card) => 2 * pv(hero, card),
     keepScore: (n) => 2 * cv(n),
   });
 }
 
 module.exports = {
-  prepareBase,
-  DEFAULT_WEIGHTS, weightsOf, chooseTargets, choosePlayer, rankActions, freeActions,
+  prepareBase, castableInHand, useArtifactEffect,
+  DEFAULT_WEIGHTS, weightsOf, chooseTargets, chooseTribute, choosePlayer, rankActions, freeActions,
   stateValue, sideValue, isBeneficial, cardKey, reactionVerdict, reactionHeuristic, saysYes,
 };

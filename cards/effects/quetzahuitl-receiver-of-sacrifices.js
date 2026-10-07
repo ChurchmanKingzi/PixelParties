@@ -370,6 +370,8 @@ async function handleLossOnDefeat(ctx) {
   // Skill Test (2–8 Spieler): Es endet nicht das Spiel, sondern der Kontrolleur scheidet aus — jeder noch lebende
   // Hero von ihm fällt mit, dann zieht die Eliminierungsprüfung des Modus (checkAllHeroesDead) die Folgen.
   if (gs.skillTest) {
+    // Der Kontrolleur scheidet zuerst aus, auch wenn im selben Augenblick andere ausscheiden (checkAllHeroesDead wertet `_quetzaLosers` aus).
+    (gs._quetzaLosers || (gs._quetzaLosers = [])).push(pi);
     for (const h of gs.players[pi]?.heroes || []) if (h && h.name && h.hp > 0) h.hp = 0;
     engine.log('quetzahuitl_defeated', { loser: gs.players[pi]?.username });
     await engine.checkAllHeroesDead();

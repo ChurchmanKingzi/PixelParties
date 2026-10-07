@@ -57,11 +57,19 @@ function autoBuild(env, psIn, rng = Math.random, opts = {}) {
     const order = [0, 1, 2].filter(hi => ps.heroes[hi]);
     // Beste Passung zuerst, bei Gleichstand der Hero mit den wenigsten Ability-Zonen.
     const abName = ps.hand[idx];
-    order.sort((a, b) => (pairScore(ps.heroes[b], abName) - pairScore(ps.heroes[a], abName))
+    // Start-Abilities stehen auf Stufe 3: dort bringt dieselbe Ability von der Hand nichts mehr; Heroes ohne sie (oder mit niedrigerer Stufe) zuerst.
+    const levelOn = (hi) => { const z = ps.abilityZones[hi].find(q => q && q.n === abName); return z ? Rules.abilityLevel(z) : 0; };
+    order.sort((a, b) => ((levelOn(a) >= Rules.MAX_ABILITY_LEVEL ? 1 : 0) - (levelOn(b) >= Rules.MAX_ABILITY_LEVEL ? 1 : 0))
+      || (pairScore(ps.heroes[b], abName) - pairScore(ps.heroes[a], abName))
       || (ps.abilityZones[a].filter(Boolean).length - ps.abilityZones[b].filter(Boolean).length));
     for (const hi of order) {
-      for (let slot = 0; slot < 3 && !done; slot++) {
-        if (!ps.abilityZones[hi][slot]) done = place(idx, { kind: 'ability', hi, slot });
+      if (levelOn(hi) >= Rules.MAX_ABILITY_LEVEL) continue;
+      // liegt die Ability schon auf dem Hero, wird ihre Zone angesteuert (Stufe +), sonst die erste freie
+      const own = ps.abilityZones[hi].findIndex(q => q && q.n === abName);
+      const slots = own >= 0 ? [own] : [0, 1, 2];
+      for (const slot of slots) {
+        if (done) break;
+        if (own >= 0 || !ps.abilityZones[hi][slot]) done = place(idx, { kind: 'ability', hi, slot });
       }
       if (done) break;
     }
