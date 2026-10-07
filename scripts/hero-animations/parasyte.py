@@ -11,7 +11,7 @@ JEDER Tentakelarm bewegt sich einzeln:
 * Der Arm schwingt quer zu seiner Richtung, als Welle, die zur freien Spitze hinausläuft (peitschend);
   Arme, die an beiden Enden festsitzen, wölben sich in der Mitte.
 * Die Klingen sitzen starr an ihrer Armspitze und schwingen als Ganzes mit.
-* Dazu schlägt jede Klinge einmal pro Loop zu (versetzt): kurz ausholen, in drei Frames durchziehen, zurückkehren —
+* Dazu schlägt jede Klinge mehrmals pro Loop zu (2-4x, teils gleichzeitig): kurz ausholen, in drei Frames durchziehen, zurückkehren —
   wie das Schwert bei Toras, mit Schwungspur: Nachbilder der Klinge (heller Stahl, verblassend) bleiben drei Frames hängen.
 * Das weiße Monsterauge glimmt; ab und zu blitzt der Stahl einer Klinge auf.
 Aufruf (aus scripts/hero-animations):  python3 parasyte.py final 90
@@ -277,10 +277,14 @@ ORIG_HOLES = _orig_holes()
 
 
 # ── Hiebe der Klingen (wie Toras' Schwert) ───────────────────────────────────
-SLASH_T = 14                                                # Länge eines Hiebs in Frames
+SLASH_T = 10                                                # Länge eines Hiebs in Frames (kurz: es wird oft zugeschlagen)
 SLASH_AMP = 1.15                                            # Schlagwinkel (rad)
+PERIODS = [16, 16, 12, 24, 16, 24]                          # Abstand zwischen zwei Hieben je Klinge (teilt 48 -> 3x/4x/2x pro Loop)
+STARTS = [2, 2, 1, 6, 5, 12]                                # Hiebstart in der Periode; gleiche Werte = gleichzeitig. Frame 0 bleibt Ruhe
 _cx, _cy = SW * 0.5, SH * 0.5
 _order = sorted(range(len(BLADE_PARTS)), key=lambda k: math.atan2(BLADE_PARTS[k]['piv'][1] - _cy, BLADE_PARTS[k]['piv'][0] - _cx))
+
+
 def _lead_sign(bp):
     """+1/-1: Drehsinn, bei dem die GEBOGENE (konvexe) Seite der Klinge vorangeht.
     Sehne Basis -> Spitze; der Schwerpunkt der Klinge liegt zur konvexen Seite hin neben der Sehne."""
@@ -298,7 +302,8 @@ def _lead_sign(bp):
 
 
 for rank, k in enumerate(_order):                           # reihum versetzt; konvexe Seite immer voran
-    BLADE_PARTS[k]['start'] = 2 + rank * ((N - 4 - SLASH_T) // max(1, len(BLADE_PARTS) - 1))
+    BLADE_PARTS[k]['start'] = STARTS[rank % len(STARTS)]
+    BLADE_PARTS[k]['period'] = PERIODS[rank % len(PERIODS)]
     BLADE_PARTS[k]['sign'] = _lead_sign(BLADE_PARTS[k])
 
 
@@ -308,19 +313,19 @@ def _ease(x):
 
 
 def swing_angle(bp, i):
-    """Winkel der Klinge im Frame i (rad): ausholen, durchziehen, kurz halten, zurück."""
-    t = (i - bp['start']) % N
+    """Winkel der Klinge im Frame i (rad): ausholen, durchziehen, kurz halten, zurück — alle `period` Frames."""
+    t = (i - bp['start']) % bp['period']
     if t >= SLASH_T:
         return 0.0
     sg = bp['sign']
     S = SLASH_AMP * sg
-    if t < 3:
-        return -0.45 * sg * _ease((t + 1) / 3)
-    if t < 6:
-        return -0.45 * sg + (S + 0.45 * sg) * (0.4, 0.8, 1.0)[t - 3]
-    if t == 6:
+    if t < 2:
+        return -0.45 * sg * _ease((t + 1) / 2)
+    if t < 5:
+        return -0.45 * sg + (S + 0.45 * sg) * (0.4, 0.8, 1.0)[t - 2]
+    if t == 5:
         return S + 0.1 * sg
-    return S * (1 - _ease((t - 6) / 8.0))
+    return S * (1 - _ease((t - 5) / 5.0))
 
 
 AFTER = [('e6ebf0', 235), ('c4ccd4', 190), ('a2adb8', 140), ('7f8b98', 95)]   # Nachbilder: jung -> alt
@@ -336,7 +341,7 @@ def afterimages(out, s, bp, shift, i):
     for k in range(len(AFTER) - 1, -1, -1):                 # alt zuerst, jung überschreibt
         a_hi, a_lo = swing_angle(bp, i - k), swing_angle(bp, i - k - 1)
         diff = abs(a_hi - a_lo)
-        if diff < 0.22:                                      # nur beim schnellen Durchziehen
+        if diff < 0.22 or abs(a_hi) < abs(a_lo):             # nur beim schnellen Durchziehen nach vorn (nicht beim Zurückgehen)
             continue
         n = max(2, int(diff / 0.1) + 1)
         c = rgb(AFTER[k][0])
@@ -411,7 +416,7 @@ def crop_frames(frames):
 
 if __name__ == '__main__':
     tag = sys.argv[1] if len(sys.argv) > 1 else 'v'
-    print(f'{len(ARMS)} Arme, {len(BLADE_PARTS)} Klingen (Hiebstart: {[bp["start"] for bp in BLADE_PARTS]})')
+    print(f'{len(ARMS)} Arme, {len(BLADE_PARTS)} Klingen (Hiebstart: {[(bp["start"], bp["period"]) for bp in BLADE_PARTS]})')
     frames = [frame(i) for i in range(N)]
     frames, pads = crop_frames(frames)
     ms = int(sys.argv[2]) if len(sys.argv) > 2 and sys.argv[2].isdigit() else 90
