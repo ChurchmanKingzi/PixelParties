@@ -9,6 +9,7 @@
 //     --seeds N      Anzahl Seeds (Partien je Variante);  --from S  erster Seed
 //     --seat-counts  Liste, z. B. 3,4,6 (Standard 2–8)
 //     --workers N    Worker-Threads;  --out datei.json  Ergebnis speichern
+//     --cache ordner Einzelergebnisse je Variante speichern/wiederverwenden (Reihen überstehen Abbrüche)
 const arg = (name, def) => { const i = process.argv.indexOf('--' + name); return i >= 0 ? (process.argv[i + 1] && !process.argv[i + 1].startsWith('--') ? process.argv[i + 1] : true) : def; };
 (async () => {
   process.env.PP_ST_SIM = '1';
@@ -25,9 +26,22 @@ const arg = (name, def) => { const i = process.argv.indexOf('--' + name); return
   const Bs = Array.isArray(B) ? B : [B];
   let ra; const rbs = [];
   try {
-    ra = await T.runVariant(pool, A, seeds, opts);
+    // --cache <Ordner>: jedes Ergebnis (je Variante und Seed-Satz) wird einzeln gespeichert und beim nächsten Aufruf wiederverwendet — lange Reihen
+    // überstehen so Abbrüche (Neustart der Maschine): derselbe Befehl läuft einfach weiter.
+    const cacheDir = arg('cache', null) && arg('cache') !== true ? String(arg('cache')) : null;
+    const fsx = require('fs'), cryptox = require('crypto');
+    if (cacheDir) fsx.mkdirSync(cacheDir, { recursive: true });
+    const cached = async (v) => {
+      if (!cacheDir) return T.runVariant(pool, v, seeds, opts);
+      const f = require('path').join(cacheDir, cryptox.createHash('sha1').update(JSON.stringify([v, from, n, seatCounts, process.env.PP_ST_PROFILE || ''])).digest('hex').slice(0, 16) + '.json');
+      if (fsx.existsSync(f)) { console.error(`[tune] aus dem Cache: ${f.slice(-21)}`); return JSON.parse(fsx.readFileSync(f, { encoding: 'utf-8' })); }
+      const r = await T.runVariant(pool, v, seeds, opts);
+      fsx.writeFileSync(f + '.tmp', JSON.stringify(r), { encoding: 'utf-8' }); fsx.renameSync(f + '.tmp', f);
+      return r;
+    };
+    ra = await cached(A);
     console.error(`[tune] A fertig (${Math.round((Date.now() - t0) / 1000)} s)`);
-    for (const b of Bs) { rbs.push(await T.runVariant(pool, b, seeds, opts)); console.error(`[tune] B${rbs.length} fertig (${Math.round((Date.now() - t0) / 1000)} s)`); }
+    for (const b of Bs) { rbs.push(await cached(b)); console.error(`[tune] B${rbs.length} fertig (${Math.round((Date.now() - t0) / 1000)} s)`); }
   } finally { pool.close(); }
   const pct = (x) => (x * 100).toFixed(1) + ' %';
   const sa = T.summarize(ra);
