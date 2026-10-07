@@ -281,9 +281,25 @@ SLASH_T = 14                                                # Länge eines Hiebs
 SLASH_AMP = 1.15                                            # Schlagwinkel (rad)
 _cx, _cy = SW * 0.5, SH * 0.5
 _order = sorted(range(len(BLADE_PARTS)), key=lambda k: math.atan2(BLADE_PARTS[k]['piv'][1] - _cy, BLADE_PARTS[k]['piv'][0] - _cx))
-for rank, k in enumerate(_order):                           # reihum versetzt; Drehsinn im Wechsel
+def _lead_sign(bp):
+    """+1/-1: Drehsinn, bei dem die GEBOGENE (konvexe) Seite der Klinge vorangeht.
+    Sehne Basis -> Spitze; der Schwerpunkt der Klinge liegt zur konvexen Seite hin neben der Sehne."""
+    ys, xs = np.nonzero(bp['mask'])
+    px, py = bp['piv']
+    r = np.hypot(xs - px, ys - py)
+    t = int(r.argmax())
+    dx, dy = xs[t] - px, ys[t] - py
+    n = math.hypot(dx, dy) or 1.0
+    dx, dy = dx / n, dy / n
+    cx, cy = xs.mean() - px, ys.mean() - py
+    along = cx * dx + cy * dy
+    sx, sy = cx - along * dx, cy - along * dy                    # Versatz des Schwerpunkts quer zur Sehne = konvexe Seite
+    return 1 if (sx * -dy + sy * dx) > 0 else -1                  # Bewegungsrichtung bei positivem Winkel (Uhrzeigersinn): (-dy, dx)
+
+
+for rank, k in enumerate(_order):                           # reihum versetzt; konvexe Seite immer voran
     BLADE_PARTS[k]['start'] = 2 + rank * ((N - 4 - SLASH_T) // max(1, len(BLADE_PARTS) - 1))
-    BLADE_PARTS[k]['sign'] = 1 if rank % 2 == 0 else -1
+    BLADE_PARTS[k]['sign'] = _lead_sign(BLADE_PARTS[k])
 
 
 def _ease(x):
@@ -380,7 +396,7 @@ def frame(i):
     return out
 
 
-FACE_X, FOOT_Y = 42.5, 56.0       # Gesichtsmitte / Standlinie im Sprite
+FACE_X, FOOT_Y = 43.5, 54.0       # Gesichtsmitte / Standlinie im Sprite
 
 
 def crop_frames(frames):
