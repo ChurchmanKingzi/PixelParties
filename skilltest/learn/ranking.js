@@ -41,6 +41,7 @@ const files = () => ({
   bench: baseOf() + '.bench.jsonl',
   status: baseOf() + '.status.json',
   hangs: baseOf() + '.hangs.jsonl',
+  discards: baseOf() + '.discards.jsonl',
 });
 
 function cardInfo(name) {

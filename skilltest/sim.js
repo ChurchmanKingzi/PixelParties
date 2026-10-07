@@ -145,6 +145,16 @@ async function runGame(opts = {}) {
   return {
     winnerIdx: gs.result && gs.result.winnerIdx, reason: gs.result && gs.result.reason,
     rounds: st.round, turns: guard, placements: gs.result && gs.result.skillTest && gs.result.skillTest.placements,
+    // Diagnose für verworfene Partien (ohne Platzierungen): Zustand der Sitze am Ende — Patt, hängende Aktion oder Sonstiges (siehe train.js → <profil>.discards.jsonl).
+    diag: ((gs.result && gs.result.skillTest && gs.result.skillTest.placements) && !['sim_turn_limit', 'round_limit'].includes(gs.result && gs.result.reason)) ? undefined : {
+      seats: gs.players.length, turns: guard, rounds: st.round, busy: !!st.busy, reason: gs.result && gs.result.reason, activePlayer: gs.activePlayer,
+      eliminated: [...st.eliminated],
+      board: gs.players.map((p, i) => ({
+        seat: i,
+        heroes: (p.heroes || []).filter(h => h && h.name && h.hp > 0).map(h => h.name + ':' + h.hp + (h.statuses && Object.keys(h.statuses).filter(k => h.statuses[k]).length ? '[' + Object.keys(h.statuses).filter(k => h.statuses[k]).join(',') + ']' : '')),
+        creatures: engine.cardInstances.filter(c => c.zone === 'support' && (c.controller ?? c.owner) === i).length,
+      })),
+    },
     bases, ms: Date.now() - t0, eliminated: [...st.eliminated],
     room: opts.returnRoom ? room : undefined,
     learnLog: st.learnLog || [], recycled: st.recycled, firstStarter: st.firstStarter,

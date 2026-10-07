@@ -464,7 +464,12 @@ async function train(opts = {}) {
       const g0 = Date.now();
       try {
         const game = await playOne(profile, opts, rng, pool);
-        if (game.rec && game.rec.placements) { learnFrom(profile, game); done++; } else failed++;
+        if (game.rec && game.rec.placements) { learnFrom(profile, game); done++; }
+        else {
+          failed++;
+          // Ursache festhalten (Rundenlimit-Patt? hängende Aktion?): eine Zeile je verworfene Partie in <profil>.discards.jsonl.
+          if (game.rec && game.rec.diag) { try { fs.appendFileSync(ranking.files().discards, JSON.stringify(Object.assign({ t: Date.now(), games: profile.games }, game.rec.diag)) + '\n', { encoding: 'utf-8' }); } catch { /* Diagnose darf nie stören */ } }
+        }
       } catch (e) { failed++; if (!opts.quiet) console.error('[skilltest-train] Partie fehlgeschlagen:', e && e.message); }
       try {
         if (done > 0 && done % evolveEvery === 0) evolve(profile, rng);
