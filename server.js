@@ -18885,6 +18885,7 @@ const skillTestHost = {
   get doPlaySpell() { return doPlaySpell; },
   get doPlayCreature() { return doPlayCreature; },
   get doPlayArtifact() { return doPlayArtifact; },
+  get doUseArtifactEffect() { return doUseArtifactEffect; },
   get doPlaySurprise() { return doPlaySurprise; },
   get doActivateCreatureEffect() { return doActivateCreatureEffect; },
   get doActivateHeroEffect() { return doActivateHeroEffect; },
@@ -21254,4 +21255,4 @@ initDatabase().then(async () => {
 });
 
 // Für die Headless-Simulation des Skill-Test-Modus (skilltest/sim-bridge.js; PP_ST_SIM=1).
-module.exports = { skillTestHandlers: { doPlaySpell, doPlayCreature, doPlayArtifact, doPlaySurprise, doActivateCreatureEffect, doActivateHeroEffect, doUsePotion, doConfirmPotion, doPlayAbility, doActivateAbility, setupGameState } };
+module.exports = { skillTestHandlers: { doPlaySpell, doPlayCreature, doPlayArtifact, doUseArtifactEffect, doPlaySurprise, doActivateCreatureEffect, doActivateHeroEffect, doUsePotion, doConfirmPotion, doPlayAbility, doActivateAbility, setupGameState } };

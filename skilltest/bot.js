@@ -96,6 +96,13 @@ function flushReactions(room) {
 function shapeReaction(engine, seat, promptData, r, ask) {
   const p = policy();
   if (!promptData || !p.reactionVerdict) return r;
+  // Schleifenschutz für abbrechbare Prompts: Dieselbe Frage derselben Karte kommt in EINER Aktion über 40-mal (z. B. Difficulty Lever:
+  // „Zurück"-Schleife Galerie → Held → Zauber, Nachttraining 7.10.) → Bot bricht ab. Zähler werden je Aktion zurückgesetzt (rounds.js).
+  if (promptData.cancellable && promptData.title && promptData.type !== 'confirm') {
+    const counts = engine._stPromptCounts || (engine._stPromptCounts = {});
+    const key = 'gen:' + seat + ':' + promptData.type + ':' + promptData.title;
+    if ((counts[key] = (counts[key] || 0) + 1) > 40) return null;
+  }
   const fireOrNot = (card) => {
     if (!p.reactionHeuristic(engine, seat, promptData, card)) return false;
     const fire = p.reactionVerdict(engine, seat, card);

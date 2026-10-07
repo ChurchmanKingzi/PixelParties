@@ -293,13 +293,14 @@ function rankActions(room, seat, host) {
     const c = db[name];
     if (!c) return;
     const sub = (c.subtype || '').toLowerCase();
-    if ((c.cardType === 'Spell' || c.cardType === 'Attack') && (sub === 'normal' || sub === '')) {
+    if ((c.cardType === 'Spell' || c.cardType === 'Attack') && (sub === 'normal' || sub === '' || sub === 'area' || sub === 'attachment')) {
       const key = cardKey('spell', name);
       const base = (c.cardType === 'Attack' ? w.aggression : w.spell) * 6;
       const casters = castersFor(engine, seat, c);
       for (const hi of bonusHeroesFor(engine, seat, null, name)) if (!casters.includes(hi) && engine.heroMeetsLevelReq(seat, hi, c)) casters.push(hi);   // Zusatzaktion
       for (const hi of casters) {
         const params = { cardName: name, handIndex, heroIdx: hi };
+        if (sub === 'attachment') params.attachHeroIdx = hi;                 // Anhänger-Zauber: an den Wirker (die Karte fragt sonst selbst nach dem Ziel)
         out.push({ score: base + learnedBonus(prof, w, key) + Math.random() * 1.5, kind: 'spell', key, card: name, hero: hi,
           run: () => rounds.act(room, seat, 'play_spell', params, () => host.doPlaySpell(room, seat, params), host) });
       }
@@ -351,6 +352,29 @@ async function usePotion(room, seat, host, params) {
 }
 
 /**
+ * Normale Artifacts (und Artifact-Creatures mit Zielwahl) laufen im Server über `doUseArtifactEffect`, nicht über `doPlayArtifact`
+ * (das lehnt sie ab). Wie bei Tränken bleibt danach gegebenenfalls eine Zielwahl offen (`gs.potionTargeting`), die hier beantwortet wird.
+ * Bis zum Nachttraining vom 7.10. rief der Bot für diese Karten (Artifact/Normal: 71 im Pool) `doPlayArtifact` auf — jede Wahl scheiterte still.
+ */
+async function useArtifactEffect(room, seat, host, params) {
+  const gs = room.gameState, engine = room.engine;
+  rounds.setPhaseFor(room, seat, 'play_artifact', params);
+  const ok = await host.doUseArtifactEffect(room, seat, params);
+  if (!ok) return false;
+  const pt = gs.potionTargeting;
+  if (pt && pt.ownerIdx === seat && !pt.isEffectPrompt) {
+    const ids = chooseTargets(engine, seat, pt.validTargets || [], { ...(pt.config || {}), source: pt.potionName || params.cardName }, null);
+    let done = false;
+    if (ids.length) {
+      rounds.setPhaseFor(room, seat, 'confirm_potion', {});
+      done = await host.doConfirmPotion(room, seat, { selectedIds: ids });
+    }
+    if (!done) { gs.potionTargeting = null; engine.sync(); return false; }
+  }
+  return true;
+}
+
+/**
  * Freie Spielzüge der Main Phase (verbrauchen den Zug nicht): Artifacts ausrüsten, Surprises legen,
  * Tränke trinken, Abilities von der Hand an Helden legen.
  * Der Bot führt sie vor der eigentlichen Aktion aus. Jede Karte kommt nur einmal vor (einmalig im Spiel).
@@ -377,10 +401,34 @@ function freeActions(room, seat, host) {
           out.push({ score: base - (ps.heroes[hi].hp > 0 ? 0 : 5) + Math.random(), key: 'free:' + name + ':' + hi, learnKey: key,
             run: () => { rounds.setPhaseFor(room, seat, 'play_artifact', params); return host.doPlayArtifact(room, seat, params); } });
         }
-      } else {
-        const params = { cardName: name, handIndex, heroIdx: alive[0] };
+      } else if (host.doUseArtifactEffect) {
+        // Normale Artifacts: Wirkung über doUseArtifactEffect (nicht doPlayArtifact, das sie ablehnt). Spielbarkeit wie beim CPU-Gehirn der
+        // Engine (_cpu.js planArtifactPlay): Skript-Gate, Hand-Sperre, Zielwahl oder resolve vorhanden.
+        const script = scriptOf(name);
+        if (!script || script.isReaction && !script.proactivePlay) return;
+        if (script.canActivate && !attempt(() => script.canActivate(gs, seat, engine))) return;
+        if (script.blockedByHandLock && ps.handLocked) return;
+        if (!(script.getValidTargets && script.targetingConfig) && !script.resolve) return;
+        if (typeof script.cpuShouldPlay === 'function' && !attempt(() => script.cpuShouldPlay(engine, seat), true)) return;
+        const params = { cardName: name, handIndex };
         out.push({ score: base - 1 + Math.random(), key: 'free:' + name, learnKey: key,
-          run: () => { rounds.setPhaseFor(room, seat, 'play_artifact', params); return host.doPlayArtifact(room, seat, params); } });
+          run: () => useArtifactEffect(room, seat, host, params) });
+      }
+    } else if (c.cardType === 'Artifact' && sub.split('/').some(t => t.trim() === 'creature') && host.doPlayArtifact) {
+      // Artifact-Creatures: ohne Zielwahl in eine freie Support Zone (doPlayArtifact), mit Zielwahl über doUseArtifactEffect.
+      const script = scriptOf(name);
+      const key = cardKey('equip', name);
+      const base = w.summon * 4 + learnedBonus(prof, w, key);
+      if (script && script.isTargetingArtifact && host.doUseArtifactEffect) {
+        out.push({ score: base - 1 + Math.random(), key: 'free:' + name, learnKey: key, run: () => useArtifactEffect(room, seat, host, { cardName: name, handIndex }) });
+      } else {
+        for (const hi of alive) {
+          const free = freeSupportSlots(ps, hi);
+          if (!free.length) continue;
+          const params = { cardName: name, handIndex, heroIdx: hi, zoneSlot: free[0] };
+          out.push({ score: base + Math.random(), key: 'free:' + name + ':' + hi, learnKey: key,
+            run: () => { rounds.setPhaseFor(room, seat, 'play_artifact', params); return host.doPlayArtifact(room, seat, params); } });
+        }
       }
     } else if (c.cardType === 'Potion' && host.doUsePotion) {
       // Tränke: einmalig; Heilung/Buffs nur, wenn jemand verletzt ist. Reaktions-Tränke spielt die Reaktionslogik.
@@ -528,7 +576,7 @@ function prepareBase({ env, ps, room, idx, pool, noProfile, weights, record }) {
 }
 
 module.exports = {
-  prepareBase, castableInHand,
+  prepareBase, castableInHand, useArtifactEffect,
   DEFAULT_WEIGHTS, weightsOf, chooseTargets, chooseTribute, choosePlayer, rankActions, freeActions,
   stateValue, sideValue, isBeneficial, cardKey, reactionVerdict, reactionHeuristic, saysYes,
 };

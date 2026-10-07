@@ -61,6 +61,7 @@ function simHost(roomBox) {
     get doPlaySpell() { return roomBox.doPlaySpell; },
     get doPlayCreature() { return roomBox.doPlayCreature; },
     get doPlayArtifact() { return roomBox.doPlayArtifact; },
+    get doUseArtifactEffect() { return roomBox.doUseArtifactEffect; },
     get doPlaySurprise() { return roomBox.doPlaySurprise; },
     get doActivateCreatureEffect() { return roomBox.doActivateCreatureEffect; },
     get doActivateHeroEffect() { return roomBox.doActivateHeroEffect; },

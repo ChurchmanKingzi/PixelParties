@@ -125,7 +125,7 @@ function learnUsage(profile, keepLog, learnLog, seat) {
     if (d.a !== 1) continue;                                             // nur behaltene Karten
     const c = db[d.c];
     const sub = c && (c.subtype || '').toLowerCase();
-    if (!c || !USAGE_TYPES.has(c.cardType) || !(sub === 'normal' || sub === '' || sub === 'equipment')) continue;
+    if (!c || !USAGE_TYPES.has(c.cardType) || !(sub === 'normal' || sub === '' || sub === 'equipment' || sub === 'area' || sub === 'attachment' || sub === 'creature')) continue;
     const used = played.has(d.c) ? 1 : 0;
     profileMod.addObs(profile.usage, d.c, used);
     profileMod.addObs(profile.usageClass, c.cardType + ':' + (d.u || '-'), used);

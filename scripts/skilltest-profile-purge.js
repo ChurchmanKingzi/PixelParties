@@ -3,15 +3,17 @@
 // Entfernt gelernte Werte zu bestimmten Karten aus einem Skill-Test-Profil — für den Fall, dass sich die Regeln einer Karte im
 // Modus ändern (z. B. Idej Lords spawnen ihre Karten jetzt selbst) und das bisher Gelernte nicht mehr stimmt.
 //
-//   node scripts/skilltest-profile-purge.js <profil.json> <Muster> [--dry]
+//   node scripts/skilltest-profile-purge.js <profil.json> <Muster> [--dry] [--drop-class Schlüssel,Schlüssel]
 //
 // <Muster> ist ein regulärer Ausdruck (ohne Schrägstriche) gegen die Schlüssel, z. B. "Idej". Betroffen: playValue, cardValue,
-// dealtValue, prepValue, pairValue (Schlüssel „A|B") sowie keepModel.u / keepModel.w. Der Trainer darf nicht laufen (Statusdatei
+// dealtValue, prepValue, usage, pairValue (Schlüssel „A|B") sowie keepModel.u / keepModel.w. `--drop-class` löscht außerdem die
+// genannten Einträge von usageClass (z. B. `Artifact:-,*:Artifact`). Der Trainer darf nicht laufen (Statusdatei
 // <profil>.status.json mit lebender PID → Abbruch). Vor dem Schreiben entsteht <profil>.bak-purge.
 const fs = require('fs');
 const path = require('path');
 
-const [file, pattern] = process.argv.slice(2).filter(a => !a.startsWith('--'));
+const dropArg = process.argv.indexOf('--drop-class');
+const [file, pattern] = process.argv.slice(2).filter((a, i, arr) => !a.startsWith('--') && !(dropArg > 1 && arr[i - 1] === '--drop-class'));
 const dry = process.argv.includes('--dry');
 if (!file || !pattern) { console.error('Aufruf: node scripts/skilltest-profile-purge.js <profil.json> <Muster> [--dry]'); process.exit(2); }
 const re = new RegExp(pattern);
@@ -30,7 +32,9 @@ const prune = (obj, label) => {
   for (const k of Object.keys(obj)) if (re.test(k)) { delete obj[k]; n++; }
   removed[label] = n;
 };
-for (const section of ['playValue', 'cardValue', 'dealtValue', 'prepValue', 'pairValue']) prune(profile[section], section);
+for (const section of ['playValue', 'cardValue', 'dealtValue', 'prepValue', 'usage', 'pairValue']) prune(profile[section], section);
+const dropIdx = process.argv.indexOf('--drop-class');
+if (dropIdx > 0 && profile.usageClass) { let n = 0; for (const k of String(process.argv[dropIdx + 1] || '').split(',')) if (k in profile.usageClass) { delete profile.usageClass[k]; n++; } removed.usageClass = n; }
 if (profile.keepModel) { prune(profile.keepModel.u, 'keepModel.u'); prune(profile.keepModel.w, 'keepModel.w'); }
 console.log((dry ? '[Probelauf] würde entfernen: ' : 'Entfernt: ') + JSON.stringify(removed));
 if (dry) process.exit(0);
