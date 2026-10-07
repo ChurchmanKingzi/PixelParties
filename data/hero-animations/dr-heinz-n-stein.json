@@ -2,7 +2,7 @@
   "hero": "Dr. Heinz N. Stein",
   "sheet": "dr-heinz-n-stein.png",
   "frameWidth": 34,
-  "frameHeight": 33,
+  "frameHeight": 32,
   "frames": 48,
   "frameMs": 90,
   "loop": true,
@@ -12,5 +12,5 @@
   "padLeft": 6,
   "padRight": 6,
   "padBottom": 2,
-  "faceX": 16.5
+  "faceX": 17.0
 }

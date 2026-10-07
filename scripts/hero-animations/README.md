@@ -167,7 +167,7 @@ kopiert, daneben liegt eine JSON-Datei mit den Metadaten. Die erzeugten
 | `gn.py` | `final 90 waflav` | `waflav_idle_final_sheet.png` | `thunderstruck-waflav` |
 | `gn.py` | `final 90 heinz` | `heinz_idle_final_sheet.png` | `visionary-genius-heinz` |
 | `gn.py` | `final 90 madheinz` | `madheinz_idle_final_sheet.png` | `mad-scientist-heinz` (Skin) |
-| `dr_stein.py` (+ `dr_stein_sprite.py`) | `final 90` | `stein_idle_final_sheet.png` | `dr-heinz-n-stein` (Skin) |
+| `dr_stein.py` | `final 90` | `stein_idle_final_sheet.png` | `dr-heinz-n-stein` (Skin) |
 | `gn.py` | `final 90 ralzish` | `ralzish_idle_final_sheet.png` | `wall-breaker-general-ralzish` |
 | `gn.py` | `final 90 blueralzish` | `blueralzish_idle_final_sheet.png` | `blue-ralzish` (Skin) |
 | `gn.py` | `final 90 pixmarck` | `pixmarck_idle_final_sheet.png` | `von-pixmarck-the-iron-chancellor` |

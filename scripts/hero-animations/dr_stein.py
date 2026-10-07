@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """Idle-Animation für den Skin „Dr. Heinz N. Stein“ (Frankensteins Monster) von Visionary Genius Heinz.
 
-Sprite: src/dr-heinz-n-stein.png (dr_stein_sprite.py). Frame 0 ist die Ruhepose.
+Sprite: src/dr-heinz-n-stein.png (vom Nutzer gezeichnet, 22x25). Frame 0 ist die Ruhepose.
 * Federn wie bei Heinz (die Füße bleiben stehen), schweres, langsames Blinzeln (zweimal pro Loop).
 * Die Nackenbolzen laden sich auf: sie glühen im Takt blau-weiß, dazu zucken kleine Blitzbögen von
   den Bolzen nach außen (jedes Mal in neuer Zickzack-Form, nie über dem Gesicht).
@@ -18,17 +18,17 @@ from anim_common import rgb, save_outputs, BOUNCE12, draw_bounce
 
 SRC = np.array(Image.open('src/dr-heinz-n-stein.png').convert('RGBA')).astype(int)
 SH, SW = SRC.shape[:2]
-KNEE = 21
+KNEE = 20
 PL, PR, PT, PB = 6, 6, 5, 2
 H, W = SH + PT + PB, SW + PL + PR
 N = 48
 BLINK = {14: 'halb', 15: 'zu', 16: 'zu', 17: 'halb', 38: 'halb', 39: 'zu', 40: 'zu', 41: 'halb'}
-EYES = [(8, 10), (9, 10), (12, 10), (13, 10)]
+EYES = [(8, 8), (9, 8), (12, 8), (13, 8)]
 LID, SHUT = rgb('49633b'), rgb('10150e')
-BOLTS = {(x, y) for y in (13, 14) for x in range(SW)
+BOLTS = {(x, y) for y in (12, 13) for x in range(SW)
          if SRC[y, x, 3] and tuple(SRC[y, x, :3]) in ((0xb9, 0xbf, 0xc8), (0xee, 0xf1, 0xf4), (0x6b, 0x70, 0x79))}
-TIPS = [(4, 13), (17, 13)]                      # Bolzenspitzen (links/rechts), von dort gehen die Blitze aus
-HANDS = [(1, 18), (20, 18)]
+TIPS = [(4, 12), (17, 12)]                      # Bolzenspitzen (links/rechts), von dort gehen die Blitze aus
+HANDS = [(1, 17), (20, 17)]
 ELEC = [rgb(h) for h in ('1f6bff', '5cc8ff', 'b8f0ff', 'ffffff')]     # Rand -> Kern
 
 
@@ -86,7 +86,7 @@ def bolt(out, pix, fade=1.0):
 
 def charge(i):
     """Aufladung der Bolzen 0..1 (Puls alle 12 Frames) und Stromschlag-Phase (0 = keiner)."""
-    f = max(0.0, math.sin(2 * math.pi * (i - 4) / 12)) ** 2
+    f = max(0.0, math.sin(2 * math.pi * (i - 6) / 12)) ** 2
     shock = {10: 0.35, 11: 1.0, 12: 0.7, 13: 0.3, 34: 0.35, 35: 1.0, 36: 0.7, 37: 0.3}.get(i, 0.0)
     return f, shock
 
@@ -99,7 +99,7 @@ def frame(i):
             s[y, x] = rgb('49633b') if st == 'halb' else rgb('10150e')
     f, shock = charge(i)
     for x, y in BOLTS:                               # Bolzen laden sich blau-weiß auf
-        s[y, x] = tint(s[y, x], (0x9f, 0xe8, 0xff), 0.15 + 0.7 * f)
+        s[y, x] = tint(s[y, x], (0x9f, 0xe8, 0xff), 0.75 * f)
     if shock:                                        # Stromschlag: die ganze Figur blitzt auf
         for y, x in zip(*np.nonzero(s[:, :, 3])):
             if tuple(s[y, x, :3]) != (0, 0, 0):
