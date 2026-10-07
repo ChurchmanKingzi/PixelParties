@@ -148,6 +148,7 @@ kopiert, daneben liegt eine JSON-Datei mit den Metadaten. Die erzeugten
 | `deepsea.py` | `final 90 tryse` | `tryse_idle_final_sheet.png` | `tryse-the-shadow-slayer` |
 | `toras.py` | `final` | `toras_idle_final_sheet.png` | `toras-master-of-all-weapons` |
 | `deri.py` | `final 90 shapeshifter` | `shapeshifter_idle_final_sheet.png` | `the-shapeshifter` |
+| `parasyte.py` (+ `parasyte_sprite.py`) | `final 90` | `parasyte_idle_final_sheet.png` | `parasytic` (Skin „Parasytic ???“) |
 | `deri.py` | `final 90 robber` | `robber_idle_final_sheet.png` | `the-throne-robber` |
 | `deri.py` | `final 90 darge` | `darge_idle_final_sheet.png` | `bow-sniper-darge` |
 | `deri.py` | `final 90 jean` | `jean_idle_final_sheet.png` | `jean-the-pillaging-knight` |
@@ -428,6 +429,10 @@ Variante ohne Krone/Flügel), Hintergründe/Auren der Karte gehören nicht zum S
   Name der Hero-Karte. (Das Brett lädt Animationen bisher nur über den
   Hero-Namen – Skin-Sheets werden dort erst angezeigt, wenn es den Skin
   berücksichtigt.)
+  **Freischaltbare Skins** (nicht im Shop) liegen mit ihrem Kartenbild in
+  `cards/skins/unlockable/`; Sheet/JSON/`skins.json` sind wie bei jedem
+  Skin. Wodurch sie frei werden, steht in `unlockable-skins.js` (`RULES`),
+  geprüft von `node scripts/check-unlockable-skins.js`.
 * **`faceX`** (Pflicht für neue Sheets): waagrechte Mitte des **Gesichts** in
   Frame-Pixeln, gemessen von der linken Frame-Kante (Kommazahlen erlaubt,
   z. B. `12.5`). Auf dem Brett steht das Gesicht genau über der Kartenmitte –
