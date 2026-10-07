@@ -14,11 +14,12 @@ import random
 import sys
 from PIL import Image
 import numpy as np
-from anim_common import rgb, save_outputs, BOUNCE12, draw_bounce
+from anim_common import rgb, save_outputs, BOUNCE12
 
 SRC = np.array(Image.open('src/dr-heinz-n-stein.png').convert('RGBA')).astype(int)
 SH, SW = SRC.shape[:2]
 KNEE = 20
+TORSO = (4, 17)                     # Spalten des Rumpfs (ohne Arme/Hände) – nur hier wird beim Federn die Nahtzeile gedehnt
 PL, PR, PT, PB = 6, 6, 5, 2
 H, W = SH + PT + PB, SW + PL + PR
 N = 48
@@ -91,6 +92,22 @@ def charge(i):
     return f, shock
 
 
+def bounce_draw(out, s, b, knee, oy, ox):
+    """Federn: Zeilen oberhalb von knee um b Pixel verschieben (die Füße bleiben stehen). Beim Strecken
+    (b < 0) wird nur im Rumpf die Zeile über dem Knie gedehnt; Hände und Arme (Spalten außerhalb des Rumpfs)
+    werden nie gedehnt, ihre Konturen bleiben 1 px dünn."""
+    sh, sw = s.shape[:2]
+    for y in range(sh):
+        for x in range(sw):
+            if s[y, x, 3]:
+                out[y + oy + (b if y < knee else 0), x + ox] = s[y, x]
+    if b < 0:
+        y = knee - 1
+        for x in range(TORSO[0], TORSO[1] + 1):
+            if s[y, x, 3] and not out[y + oy, x + ox, 3]:
+                out[y + oy, x + ox] = s[y, x]
+
+
 def frame(i):
     s = SRC.copy()
     st = BLINK.get(i)
@@ -107,7 +124,7 @@ def frame(i):
     out = np.zeros((H, W, 4), int)
     b = BOUNCE12[i % 12]
     ox = PL + ((1, -1, 1, 0)[[10, 11, 12, 13, 34, 35, 36, 37].index(i) % 4] if shock else 0)
-    draw_bounce(out, s, b, KNEE, PT, ox)
+    bounce_draw(out, s, b, KNEE, PT, ox)
     # Blitzbögen von den Bolzen (immer ein paar, beim Stromschlag mehr und länger)
     rng = random.Random(1000 + i // 2)
     n_arcs = 0
