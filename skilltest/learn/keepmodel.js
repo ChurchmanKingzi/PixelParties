@@ -190,9 +190,10 @@ function edge(model, feats) {
 function prior(model, name, usable, use) {
   const e = model.w['c:' + name];
   const n = e ? e[1] : 0;
+  // Eine Karte, die kein Held je wirken kann, bleibt tot auf der Hand: diese Vorgabe verblasst NICHT mit den Beobachtungen (Regel, nicht Schätzung).
+  if (usable && use === 'no') return -NOT_USABLE * PRIOR;
   let base = usable ? PRIOR : -PRIOR;
-  if (usable && use === 'no') base = -NOT_USABLE * PRIOR;
-  else if (usable && use === 'hand') base = 0.25 * PRIOR;
+  if (usable && use === 'hand') base = 0.25 * PRIOR;
   return base * PRIOR_K / (PRIOR_K + n);
 }
 

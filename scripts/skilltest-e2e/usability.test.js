@@ -79,6 +79,8 @@ console.log('Nutzbarkeit (Brett-bewusst)');
   const usableFn = (c) => !!c;
   const pNow = KM.prior(model, own.name, true, 'now'), pNo = KM.prior(model, foreign.name, true, 'no');
   check('Vorgabe: nutzbar positiv, nicht nutzbar deutlich negativ', pNow > 0 && pNo < 0 && Math.abs(pNo) > pNow, [pNow, pNo]);
+  const heavy = KM.newModel(); heavy.w['c:' + foreign.name] = [0, 100000]; heavy.w['c:' + own.name] = [0, 100000];
+  check('…die Vorgabe „nicht nutzbar" verblasst nicht mit vielen Beobachtungen (die für nutzbare schon)', KM.prior(heavy, foreign.name, true, 'no') === pNo && KM.prior(heavy, own.name, true, 'now') < 0.01, [KM.prior(heavy, foreign.name, true, 'no'), KM.prior(heavy, own.name, true, 'now')]);
   const decide = KM.makeDecider({ env, model, usable: usableFn, maxKeep: 5 });
   const res = decide(ps);
   const recycled = res.recycle.map(i => ps.hand[i]);
