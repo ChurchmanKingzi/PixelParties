@@ -123,6 +123,11 @@ Sichtbar: Kartenliste (Spalte „Keep − recycle"), Paar- und Kontext-Tabellen 
   (Wheels, Haste, Magnetic Potion, Elixir of Quickness, …). Erkennung: Zieh-/Such-Sperren der Engine (`blockedByHandLock`, `blockedByDrawLock`,
   `blockedBySearchLock`, Zieh-Block-Helfer) plus Handprüfung des Kartentextes — Karten mit zusätzlichem Effekt und reine **Ablage-Rückholer**
   (Shooting Star, Boomerang, …) bleiben im Pool, weil es im Modus eine Ablage gibt. `scripts/skilltest-e2e/idej.test.js` prüft die Liste.
+  Nach dem Nachttraining (Nutzung 0 % bei Dutzenden bis Hunderten behaltener Exemplare, dann Ursache geprüft) kamen **26 Karten** dazu, deren
+  Wirkung im Modus nicht eintreten kann: Coolness-Stack-Karten (der Stack bleibt immer leer: String of Fine, Glorious Rebirth, Coolness Overcharge,
+  Modnir, Swellpnir, Ragnarock), Deckbau-Regelkarten (Secret Spices, Secret Spice Jar, The Sacred Blade), Deck-Karten (Surprise Party, Overcharge,
+  Ladder to the Sky, …) und Karten für Ascended Heroes (Audience with a hostile King, Open Invitation). Karten, die bei passender Lage funktionieren
+  (Spontaneous Reappearance, Kirin Firebreath, Tengu Windstorm, Liberation, Shapeshift …), bleiben — ihre geringe Nutzung kommt aus den Bot-Prioritäten.
 - **Kartenskripte** dürfen nie `pi === 0 ? 1 : 0` o. Ä. schreiben. Stattdessen:
   `engine.opponentOf(pi)` (EIN Gegner: Fokus bzw. nächster lebender Sitz), `engine.opponentsOf(pi)` (alle Gegner),
   `engine.playerCount()`. Im Normalspiel liefern sie bit-identisch das alte Verhalten. `node scripts/check-n-player.js`

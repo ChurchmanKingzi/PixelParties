@@ -131,6 +131,44 @@
 - Lunatic Cycle - Crescent Moon
 - Bow of the Hunt Goddess
 
+## Coolness-Stack-Karten: wirken nur aus dem Coolness Stack („This card has no effect, unless you play it from your Coolness Stack“) oder verlangen dessen Inhalt. Der Skill Test hat keinen Coolness Stack (in 6 Probepartien an allen 24 Sitzen immer leer) — die Karten sind unspielbar (Nachttraining: 0 % Nutzung bei 80–165 behaltenen Exemplaren je Karte).
+
+- Coolness Overcharge
+- Glorious Rebirth
+- String of Fine
+- Modnir, Hammer of Coolness
+- Swellpnir, Mount of Coolness
+- Ragnarock
+
+## Deckbau-Regelkarten („Für je 2 Exemplare in deinem Deck darf dein Deck …“, „Hast du 4 Exemplare in deinem Deck …“): ihre einzige Wirkung ist eine Deckbau-Regel; der Skill Test hat kein Deck.
+
+- Secret Blue Spice
+- Secret Golden Spice
+- Secret Green Spice
+- Secret Red Spice
+- Secret Spice Jar
+- The Sacred Blade
+
+## Karten, deren Wirkung aus dem Deck kommt (Suchen, Aufdecken, Karte aus dem Deck ausrüsten/beschwören): der Skill Test hat kein Deck, die Karten sind wirkungslos oder kosten nur (Opfer, Zugende). In den Probepartien nie erfolgreich ausspielbar, im Nachttraining 0–2 % Nutzung.
+
+- Arrival from the Cosmic Depths
+- Create Illusion
+- Living Illusion
+- Surprise Party
+- Overcharge
+- Ladder to the Sky
+- Treasure Hunter's Backpack
+- The Eye of Ren
+- Muscle Training
+- Lesson in the Arts
+- Kitsune Transformation
+- Ultimate Weapon Experiment
+
+## Karten für Ascended Heroes (im Skill Test gesperrt): ohne Ascended Hero auf dem Brett oder in der Hand haben sie kein Ziel.
+
+- Audience with a hostile King
+- Open Invitation
+
 ## Idej Projection: kann nur durch den Effekt der Idej Lords an einen Hero gehängt werden („by its own effect“). Im Skill Test spawnen die Lords ihre Projections jetzt beim Aufstellen selbst (siehe skilltest/README.md); als Handkarte wäre sie ein Fremdkörper.
 
 - Idej Projection
