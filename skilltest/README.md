@@ -160,6 +160,12 @@ Phasenende-Effekte → Zusatzaktions-Gewährungen verfallen). `advanceToPhase` i
   Policy (`chooseTribute`) die billigste gültige Teilmenge (Anzahl, Mindest-Max-HP, Mindest-Level, Pflicht-Hero), und die Engine wertet
   drei ungültige CPU-Antworten im Skill Test als Abbruch (Menschen werden unbegrenzt neu gefragt). Test: `sacrifice.test.js`.
 - Freiwillige „erneut"-Prompts (Skeleton Reaper …) brechen Bots nach `MAX_PROMPT_REPEATS` ab (`policy.chooseTargets`).
+- **Skeleton Reaper über Spirit of the Forbidden Grimoire** (Fund aus dem Nachttraining, ≈ 0,5 % der Partien nach Einführung der Kreatur-Effekte
+  im Bot): Der Spirit führt den geliehenen Effekt *nicht abbrechbar* aus (`_forceNonCancellable`), der Wiederholungsschutz der Policy greift dort
+  also nicht. Unter **Dark Ocean** wird jeder Reaper-Schlag storniert; weil `counters.currentHp` erst beim ersten Schaden gesetzt wird
+  (frische Kreaturen haben nur `maxHp`), hielt der Reaper die unversehrte Kreatur für „besiegt" und feuerte endlos weiter. Behoben im Skript
+  (`hpOf` statt `currentHp || 0`, Abbruch bei stornierter Wirkung). Außerdem prüfte `isDarkOceanActive` nur die Area-Zonen von Sitz 0 und 1 —
+  jetzt alle Sitze. Test: `reaper.test.js`.
 
 ## Reaktionen der Bots
 

@@ -30133,7 +30133,7 @@ this._deathWatch = (this._deathWatchStack || []).length
   isDarkOceanActive() {
     const z = this.gs?.areaZones;
     if (!z) return false;
-    return (z[0] || []).includes('Dark Ocean') || (z[1] || []).includes('Dark Ocean');
+    return z.some(a => (a || []).includes('Dark Ocean'));   // alle Sitze (Skill Test: 2–8)
   }
 
   /**
