@@ -150,6 +150,13 @@ function chooseTargets(engine, seat, validTargets, config, base) {
   const w = weightsOf(engine.room, seat);
   // Eigene Karten-Antworten (cpuResponse) haben Vorrang: sie kennen die Regel der Karte.
   const cardName = config.source || config.title;
+  // Freiwillige „erneut"-Prompts: nach einigen Wiederholungen derselben Karte in EINER Aktion abbrechen (verhindert Endlosschleifen) — noch VOR der Karten-Antwort,
+  // sonst umgeht eine `cpuResponse` den Schutz (Garius: Opferwahl immer gültig, Galerie-Abbruch führt zurück zur Opferwahl).
+  if (cardName && config.cancellable) {
+    const counts = engine._stPromptCounts || (engine._stPromptCounts = {});
+    const key = seat + ':' + cardName;
+    if ((counts[key] = (counts[key] || 0) + 1) > MAX_PROMPT_REPEATS) return [];
+  }
   if (cardName) {
     try {
       const { loadCardEffect } = require('../cards/effects/_loader');
@@ -159,12 +166,6 @@ function chooseTargets(engine, seat, validTargets, config, base) {
         if (r !== undefined) return r;
       }
     } catch { /* weiter mit der Heuristik */ }
-  }
-  // Freiwillige „erneut"-Prompts: nach einigen Wiederholungen derselben Karte in EINER Aktion abbrechen (verhindert Endlosschleifen).
-  if (cardName && config.cancellable) {
-    const counts = engine._stPromptCounts || (engine._stPromptCounts = {});
-    const key = seat + ':' + cardName;
-    if ((counts[key] = (counts[key] || 0) + 1) > MAX_PROMPT_REPEATS) return [];
   }
   // Opferwahl mit Bedingungen (Mindest-Max-HP, Mindest-Level, „mindestens ein Opfer von Hero X"): eine gültige, möglichst billige Teilmenge wählen.
   if (config.minSumMaxHp || config.minSumLevel || config.mustIncludeFromHeroIdx != null) {

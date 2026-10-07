@@ -166,6 +166,10 @@ Phasenende-Effekte → Zusatzaktions-Gewährungen verfallen). `advanceToPhase` i
   (frische Kreaturen haben nur `maxHp`), hielt der Reaper die unversehrte Kreatur für „besiegt" und feuerte endlos weiter. Behoben im Skript
   (`hpOf` statt `currentHp || 0`, Abbruch bei stornierter Wirkung). Außerdem prüfte `isDarkOceanActive` nur die Area-Zonen von Sitz 0 und 1 —
   jetzt alle Sitze. Test: `reaper.test.js`.
+- **Garius, the Great Reformer** (Fund aus dem Nachttraining, ≈ 0,5 % der Partien): Die Galerie der Deck-Kreaturen ließ Artifact-Creatures
+  (Debt-O-Tron-Modelle, Pollution Spewer) zu, die anschließende Prüfung (`isPileCreature`) lehnte sie ab, und die Engine kann sie auf diesem Weg
+  nicht setzen — der Effekt sprang zurück zur Opferwahl, der Bot wählte dasselbe wieder. Behoben im Skript (Galerie nutzt dieselbe Eignung); zusätzlich
+  zählt der Prompt-Wiederholungsschutz der Policy jetzt *vor* der Antwort einer Karten-`cpuResponse` (vorher umging sie ihn). Test: `garius.test.js`.
 
 ## Reaktionen der Bots
 
