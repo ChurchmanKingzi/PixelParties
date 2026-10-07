@@ -456,7 +456,7 @@ def frame(i):
     return out
 
 
-FACE_X, FACE_Y, FOOT_Y = 43.5, 31.0, 50.0       # Gesichtsmitte / Standlinie (Unterkante des Menschen) im Sprite
+FACE_X, FACE_Y, FOOT_Y = 43.5, 25.0, 50.0       # Gesichtsmitte / Standlinie (Unterkante des Menschen) im Sprite
 
 
 def crop_frames(frames):
