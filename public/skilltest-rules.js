@@ -10,7 +10,7 @@
 //    hand            string[]                    Handkarten (Reihenfolge zählt)
 //    heroes          (string|null)[3]            Hero-Zonen
 //    abilityZones    [3][3] of null | { n, s, c }
-//                      n = Name, s = Anzahl START-Einträge (Level), c = Handkarte darauf
+//                      n = Name, s = Anzahl START-Einträge (Level; im Skill Test immer START_ABILITY_LEVEL = 3), c = Handkarte darauf
 //                      Stapelhöhe (Level) = c ? 3 : s      (Hand-Ability levelt auf 3)
 //    supportZones    [3][3] of string[]          je Zone ein Stapel (meist 1 Karte)
 //    surpriseZones   (string|null)[3]
@@ -43,6 +43,9 @@
   // Potions werden im Modus NICHT als Biomancy-Token auf die Basis gelegt.
   const POTIONS_ON_BOARD = false;
   const MAX_ABILITY_LEVEL = 3;
+  // Start-Abilities der Heroes beginnen im Skill Test auf der HÖCHSTEN Stufe (im Normalspiel Stufe 1, bei doppelter Start-Ability 2):
+  // ohne Deck und mit nur 18 Karten bliebe sonst ein Großteil der Zauber/Angriffe auf der Hand unbrauchbar.
+  const START_ABILITY_LEVEL = 3;
   // Idej Lords: beim Aufstellen erscheinen ihre „zugehörigen Karten“ aus dem Nichts in den Support Zones des Heroes
   // (im echten Spiel sucht der Lord sie zu Spielbeginn aus dem Deck — der Skill Test hat kein Deck). `proj` = Idej Projection,
   // `blade` = Idej Blade (zufällig, je Lord verschieden). Verlässt der Lord das Brett, verschwinden sie.
@@ -229,10 +232,11 @@
     const a1 = c && c.startingAbility1 || '';
     const a2 = c && c.startingAbility2 || '';
     const Z = ps.abilityZones[hi];
-    if (a1 && a2 && a1 === a2) Z[1] = { n: a1, s: 2, c: false };
-    else if (a1 && !a2) Z[1] = { n: a1, s: 1, c: false };
-    else if (!a1 && a2) Z[1] = { n: a2, s: 1, c: false };
-    else { if (a1) Z[0] = { n: a1, s: 1, c: false }; if (a2) Z[1] = { n: a2, s: 1, c: false }; }
+    const S = START_ABILITY_LEVEL;
+    if (a1 && a2 && a1 === a2) Z[1] = { n: a1, s: S, c: false };
+    else if (a1 && !a2) Z[1] = { n: a1, s: S, c: false };
+    else if (!a1 && a2) Z[1] = { n: a2, s: S, c: false };
+    else { if (a1) Z[0] = { n: a1, s: S, c: false }; if (a2) Z[1] = { n: a2, s: S, c: false }; }
   }
 
   /** Karte an ein Ziel legen. Verdrängte Karten gehen auf die Hand. */
@@ -261,10 +265,12 @@
         return { ok: true, ps };
       }
       case 'ability': {
+        // Jede Ability liegt je Hero nur einmal; die Stufen stapeln sich in EINER Zone (auch auf einer Start-Ability, die schon Stufe 3 hat).
+        if (ps.abilityZones[hi].some((q, i) => i !== slot && q && q.n === name)) return fail('Dieser Hero hat die Ability schon — lege sie auf ihre Zone, um die Stufe zu erhöhen.');
         const z = ps.abilityZones[hi][slot];
         if (z) {
           if (z.n === name) {
-            if (z.c) return fail('Maximales Level erreicht.');
+            if (abilityLevel(z) >= MAX_ABILITY_LEVEL) return fail('Maximales Level erreicht.');
             z.c = true;
           } else if (z.s > 0) {
             return fail('Start-Abilities sind fest.');
@@ -403,9 +409,10 @@
     if (!zoneAccepts(env, ps, cardName, target)) return false;
     const { kind, hi, slot } = target;
     if (kind === 'ability') {
+      if (ps.abilityZones[hi].some((q, i) => i !== slot && q && q.n === cardName)) return false;
       const z = ps.abilityZones[hi][slot];
       if (z && z.n !== cardName && z.s > 0) return false;
-      if (z && z.n === cardName && z.c) return false;
+      if (z && z.n === cardName && abilityLevel(z) >= MAX_ABILITY_LEVEL) return false;
     }
     if (kind === 'area') {
       if (ps.areaZone.includes(cardName)) return false;
@@ -432,7 +439,7 @@
   }
 
   return {
-    ZHIGAO, HAND_ONLY_HEROES, MAX_ABILITY_LEVEL, POTIONS_ON_BOARD,
+    ZHIGAO, HAND_ONLY_HEROES, MAX_ABILITY_LEVEL, START_ABILITY_LEVEL, POTIONS_ON_BOARD,
     emptyPlayer, clone,
     heroCount, requiredHeroes, boardFull, hasZhigao, totalHeroes, abilityLevel,
     zoneAccepts, canDrop, applyMove, readyProblem, abilityStacks, areaLimit, canPlaceAnotherArea,

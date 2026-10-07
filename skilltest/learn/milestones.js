@@ -80,6 +80,7 @@ function partnersOf(profile) {
 function buildSnapshot(profile, { final = false } = {}) {
   const rk = ranking.buildRanking(profile, []);
   const prep = profile.prepValue || {};
+  const usage = profile.usage || {};
   const partners = partnersOf(profile);
   const inPool = poolNames();
   const rows = rk.rows.filter(r => r.valueN >= MIN_VALUE_N && (!inPool || inPool.has(r.name))).map(r => {
@@ -93,6 +94,8 @@ function buildSnapshot(profile, { final = false } = {}) {
       k: p && p.n ? Math.round((p.keep / p.n) * 1000) / 1000 : null,  // Behalten-Quote
       ke: r.keepEdge, pl: r3(r.playValue), pln: r.playN,
       pr: partners.get(r.name) || [],
+      us: usage[r.name] && usage[r.name].n >= 5 ? Math.round((usage[r.name].sum / usage[r.name].n) * 1000) / 1000 : null,   // Anteil der behaltenen Exemplare, die im Kampf gespielt wurden
+      usn: usage[r.name] ? usage[r.name].n : 0,
     };
   });
   rows.sort((a, b) => b.v - a.v || b.vn - a.vn);
@@ -102,7 +105,9 @@ function buildSnapshot(profile, { final = false } = {}) {
   const sums = {};
   for (const r of rows) { const a = (sums[r.t] = sums[r.t] || { sum: 0, cards: 0 }); a.sum += r.v; a.cards++; }
   const types = Object.fromEntries(Object.entries(sums).map(([t, a]) => [t, { mean: a.sum / a.cards, cards: a.cards }]));
-  return { games: profile.games || 0, t: Date.now(), final, bench, types, rows };
+  // Nutzbarkeit behaltener Karten (Aufbau) gegen tatsächliche Nutzung im Kampf: je Typ und Klasse (now/hand/no)
+  const cls = Object.fromEntries(Object.entries(profile.usageClass || {}).filter(([, e]) => e.n >= 20).map(([k, e]) => [k, { n: e.n, rate: Math.round((e.sum / e.n) * 1000) / 1000 }]));
+  return { games: profile.games || 0, t: Date.now(), final, bench, types, usageClass: cls, rows };
 }
 
 function readAll() {
@@ -134,7 +139,7 @@ function renderMarkdown(cur, prev, first) {
   if (cur.bench) L.push(`Vergleich trainiert gegen untrainierte Bots (letzter Stand, ${cur.bench.n} Spiele nach ${cur.bench.games} Partien): Siegquote ${(cur.bench.winRate * 100).toFixed(1)} % bei ${(cur.bench.expected * 100).toFixed(1)} % Erwartung, z = ${cur.bench.z.toFixed(2)}`);
   L.push('', '**Spalten.** *Wert*: mittlere Platzierungsgüte (+1 Sieg … −1 Letzter), wenn die Karte in der Vorbereitung ausgeteilt wurde (Starthand oder Recycler), zum Nullpunkt geschrumpft — der Wert, den die CPUs der Karte beim Aufbau geben; die Liste ist danach sortiert. ' +
     '*Δ Vorliste / Δ Erste*: Änderung des Werts (in Klammern: Rangänderung, ↑ = aufgestiegen). *Aufgestellt* (nur Helden und Creatures): Anteil der Austeilungen, bei denen die CPU die Karte aufs Brett gestellt hat. *Behalten/Recyceln (Rest)*: für Karten, die nach dem Aufbau übrig sind, der Mittelwert der Bewertung dieser Entscheidung (positiv = behalten, negativ = recyceln) und die Behalten-Quote; bei Helden betrifft das nur überzählige. ' +
-    '*Gemeinsam stark mit*: Karten, mit denen sie auf dem Brett deutlich besser abschneidet als erwartet (Ergebnis mit dem Partner minus das bessere Einzelergebnis ohne ihn; nur bei klarem Befund: Vorsprung ≥ ' + PAIR_MIN_LIFT + ' und z ≥ ' + PAIR_MIN_Z + ', mindestens ' + PAIR_MIN_N + ' Basen).', '');
+    '*Genutzt*: Anteil der behaltenen Exemplare (Karte blieb nach dem Aufbau auf der Hand), die im Kampf mindestens einmal gespielt wurden. *Gemeinsam stark mit*: Karten, mit denen sie auf dem Brett deutlich besser abschneidet als erwartet (Ergebnis mit dem Partner minus das bessere Einzelergebnis ohne ihn; nur bei klarem Befund: Vorsprung ≥ ' + PAIR_MIN_LIFT + ' und z ≥ ' + PAIR_MIN_Z + ', mindestens ' + PAIR_MIN_N + ' Basen).', '');
 
   if (prev) {
     const moves = cur.rows.filter(r => P.has(r.n) && r.vn >= 40).map(r => ({ r, d: r.v - P.get(r.n).v }));
@@ -145,12 +150,20 @@ function renderMarkdown(cur, prev, first) {
   const typeMean = Object.entries(cur.types || {}).map(([t, a]) => `${t} ${fmt(a.mean)} (${a.cards})`).join(' · ');
   if (typeMean) L.push('Mittel je Kartentyp (Wert, Zahl der Karten): ' + typeMean, '');
 
+  const uc = cur.usageClass || {};
+  const usageLines = ['Spell', 'Attack', 'Creature', 'Ability'].map(t => {
+    const part = (k, label) => (uc[t + ':' + k] ? `${label} ${Math.round(uc[t + ':' + k].rate * 100)} % gespielt (n=${uc[t + ':' + k].n})` : null);
+    const parts = [part('now', 'sofort nutzbar'), part('hand', 'erst mit Hand-Abilities'), part('no', 'nicht nutzbar'), part('-', 'ohne Anforderung')].filter(Boolean);
+    return parts.length ? `- ${t}: ${parts.join(' · ')}` : null;
+  }).filter(Boolean);
+  if (usageLines.length) L.push('**Behaltene Karten: Nutzbarkeit beim Aufbau und tatsächliche Nutzung im Kampf** (Anteil der behaltenen Exemplare, die mindestens einmal gespielt wurden):', '', ...usageLines, '');
+
   L.push('## Alle Karten, sortiert nach Wert', '');
-  L.push('| # | Karte | Typ | Wert | n | Δ Vorliste | Δ Erste | Aufgestellt | Behalten/Recyceln (Rest) | Gemeinsam stark mit |', '|---:|---|---|---:|---:|---|---|---:|---|---|');
+  L.push('| # | Karte | Typ | Wert | n | Δ Vorliste | Δ Erste | Aufgestellt | Behalten/Recyceln (Rest) | Genutzt | Gemeinsam stark mit |', '|---:|---|---|---:|---:|---|---|---:|---|---:|---|');
   for (const r of cur.rows) {
     const part = r.pr.length ? r.pr.map(([o, lift, n]) => `${o} (${fmt(lift, 2)}, n=${n})`).join('; ') : '';
     const prep = r.p == null ? '–' : `${fmt(r.p, 2)} · ${Math.round(r.k * 100)} % behalten (n=${r.pn})`;
-    L.push(`| ${r.rank} | ${r.n.replace(/\|/g, '/')} | ${r.t} | ${fmt(r.v)} | ${r.vn} | ${prev ? deltaCell(r, P.get(r.n)) : '–'} | ${first && first !== cur ? deltaCell(r, F.get(r.n)) : '–'} | ${r.pc == null ? '–' : Math.round(r.pc * 100) + ' %'} | ${prep} | ${part.replace(/\|/g, '/')} |`);
+    L.push(`| ${r.rank} | ${r.n.replace(/\|/g, '/')} | ${r.t} | ${fmt(r.v)} | ${r.vn} | ${prev ? deltaCell(r, P.get(r.n)) : '–'} | ${first && first !== cur ? deltaCell(r, F.get(r.n)) : '–'} | ${r.pc == null ? '–' : Math.round(r.pc * 100) + ' %'} | ${prep} | ${r.us == null ? '–' : Math.round(r.us * 100) + ' % (n=' + r.usn + ')'} | ${part.replace(/\|/g, '/')} |`);
   }
   return L.join('\n') + '\n';
 }

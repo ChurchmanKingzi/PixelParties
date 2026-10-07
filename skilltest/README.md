@@ -13,7 +13,9 @@ markierte Skill-Test-Zweige (`gs.skillTest`).
 2. **Vorbereitung** (`prep.js`, `pool.js`, Regeln in `public/skilltest-rules.js`): Jeder Spieler bekommt 18 Karten
    (3–5 Helden, 1–5 Abilities, 4–12 Creatures, Rest Artifacts/Potions/Attacks/Spells; nie Ascended) aus einem
    gemeinsamen Pool — jede Karte existiert im ganzen Spiel nur einmal. Platziert wird frei (kein Level, keine Kosten),
-   Abilities steigen automatisch auf Stufe 3. Der Recycler wirft jede 2. eingeworfene Karte als zufällige neue Karte
+   Abilities steigen automatisch auf Stufe 3. **Start-Abilities der Heroes beginnen ebenfalls auf Stufe 3** (`START_ABILITY_LEVEL` in
+   `public/skilltest-rules.js`; im Normalspiel Stufe 1): ein Hero mit Destruction Magic wirkt so gleich alle Destruction-Zauber bis Stufe 3.
+   Jede Ability liegt je Hero nur einmal (die Stufen stapeln sich in einer Zone); dieselbe Ability von der Hand auf eine Stufe-3-Zone ist gesperrt. Der Recycler wirft jede 2. eingeworfene Karte als zufällige neue Karte
    aus (Helden nur, solange das Brett voll ist). **Ready!** schließt die Vorbereitung ab. Timer: Zahlenfeld je Timer, **0 = aus**
    (`buildRoomConfig`; die alten Flaggen `prepTimerDisabled`/`turnTimerDisabled` gelten weiter).
    Die Regeln (`applyMove`, `canDrop`, …) sind rein und laufen auf Server **und** Client.
@@ -70,6 +72,18 @@ PP_ST_TRAIN_BG=0.1 node server.js                            # … mit 10 % Rech
 Der Hintergrundprozess (`learn/background.js`) spielt unablässig CPU-Partien mit 2–8 Sitzen, ruht zwischen den Partien
 (Rechenanteil einstellbar) und schreibt das Profil fort; der Server liest es alle ~30 s nach. Ohne Profil spielen die Bots
 mit den Standard-Gewichten und der reinen Heuristik.
+
+### Nutzbarkeit behaltener Karten
+
+Beim Behalten/Recyceln zählt, ob die Karte im Kampf überhaupt zum Zug kommt:
+- **Nutzbarkeit mit dem Brett** (`keepmodel.usability`, Spielregel): Zauber/Angriffe/Creatures sind `now` (ein Held erreicht die Stufe), `hand` (erst mit
+  Abilities, die noch auf der Hand liegen) oder `no` (kein Held erreicht sie, die Karte bliebe tot); Abilities `now`, wenn ein Held sie aufnehmen kann.
+  Die Klasse geht als Merkmal (`use:…`) ins Modell und als Vorgabe in den Wert (`no` stark negativ, `hand` schwach positiv). Gegen die Engine
+  (`heroMeetsLevelReq`) geprüft: jede als `now` eingestufte Karte war dort wirkbar.
+- **Tatsächliche Nutzung** (`train.learnUsage`): je behaltener Karte wird gezählt, ob sie im Kampf mindestens einmal gespielt wurde — je Karte
+  (`profile.usage`) und je Typ/Klasse (`profile.usageClass`: `Spell:now`, `Spell:no`, `*:Spell` …). `keepmodel.usagePrior` macht daraus eine Vorgabe
+  (Nutzungsrate der Karte gegen den Durchschnitt ihres Typs): was behalten wird und nie gespielt wird, ist nichts wert. Die Kartenlisten zeigen die
+  Spalte „Genutzt" und eine Zusammenfassung nach Klasse.
 
 ### Behalten oder recyceln (`learn/keepmodel.js`)
 
@@ -199,6 +213,7 @@ Brettern, danach ergraut er) und `exhaustedSlots` (erschöpfte Creatures). Clien
 
 - `scripts/regress/compare.sh` vergleicht geseedete 2-Spieler-Normalspiele mit der eingecheckten Baseline —
   **muss nach jeder Engine-Änderung „unverändert" melden**.
+- `scripts/skilltest-e2e/usability.test.js` (headless): Start-Abilities Stufe 3, Ability-Regeln, Nutzbarkeit/Nutzung beim Behalten.
 - `scripts/skilltest-e2e/sacrifice.test.js` (headless): Opferwahl der CPU, keine ST_RUNAWAY-Schleife; `start-hooks.test.js`: Spielbeginn-Abfragen (Kassaran).
 - `scripts/skilltest-e2e/idej.test.js` (headless): Idej-Spawn-Regeln, Pool-Sperren, Kampfstart mit erschienenen Karten.
 - `scripts/skilltest-e2e/*.test.js`: Lobby, Vorbereitung, Kampf, Sitzwechsel (CPU-Übernahme/Aufgeben), Zielwahl über Sitze (per Socket,

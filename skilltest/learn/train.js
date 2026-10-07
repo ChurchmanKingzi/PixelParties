@@ -107,6 +107,32 @@ function pickPersona(profile, rng = Math.random) {
   return profileMod.samplePersona(profile, rng) || pop[0];
 }
 
+// ── Nutzung behaltener Karten ──────────────────────────────────────
+const USAGE_TYPES = new Set(['Spell', 'Attack', 'Creature', 'Artifact', 'Potion', 'Ability']);
+
+/**
+ * Wurde eine behaltene Handkarte im Kampf auch gespielt? `profile.usage[Karte]` zählt behaltene Exemplare und gespielte (n, sum), `profile.usageClass`
+ * dasselbe je Typ und Nutzbarkeit beim Aufbau (`Spell:now`, `Spell:no` …) sowie je Typ (`*:Spell`). Daraus liest der Behalten/Recyceln-Entscheider
+ * (keepmodel.usagePrior), welche Karten tatsächlich zum Zug kommen. Reaktionen/Surprises zählen nicht (sie werden nicht als Zug „gespielt").
+ */
+function learnUsage(profile, keepLog, learnLog, seat) {
+  const db = require('../../cards/effects/_card-db').getCardDB();
+  const played = new Set();
+  for (const l of learnLog || []) if (l.seat === seat && l.key) played.add(l.key.slice(l.key.indexOf(':') + 1));
+  if (!profile.usage) profile.usage = {};
+  if (!profile.usageClass) profile.usageClass = {};
+  for (const d of keepLog) {
+    if (d.a !== 1) continue;                                             // nur behaltene Karten
+    const c = db[d.c];
+    const sub = c && (c.subtype || '').toLowerCase();
+    if (!c || !USAGE_TYPES.has(c.cardType) || !(sub === 'normal' || sub === '' || sub === 'equipment')) continue;
+    const used = played.has(d.c) ? 1 : 0;
+    profileMod.addObs(profile.usage, d.c, used);
+    profileMod.addObs(profile.usageClass, c.cardType + ':' + (d.u || '-'), used);
+    profileMod.addObs(profile.usageClass, '*:' + c.cardType, used);
+  }
+}
+
 // ── Lernen aus einer Partie ────────────────────────────────────────
 function learnFrom(profile, game) {
   const { rec, n, personaIds } = game;
@@ -137,6 +163,7 @@ function learnFrom(profile, game) {
         }
         KM.update(profile.keepModel, d.f, d.a, sc);
       }
+      learnUsage(profile, base.keepLog, rec.learnLog, seat);
     }
     const per = profile.personas.find(p => p.id === personaIds[seat]);
     if (per) { per.games++; per.scoreSum += sc; per.fitness = fitnessOf(per); }
@@ -525,8 +552,9 @@ function exportCompact(profile, minN = 4) {
     playValue: keep(profile.playValue, minN), cardValue: keep(profile.cardValue, minN), dealtValue: keep(profile.dealtValue, minN), pairValue: keep(profile.pairValue, Math.max(minN, 6)),
     prepValue: Object.fromEntries(Object.entries(profile.prepValue || {}).filter(([k, e]) => e.n >= minN && allowed(k)).map(([k, e]) => [k, { n: e.n, sum: Math.round(e.sum * 1000) / 1000, keep: e.keep }])),
     keepModel: profile.keepModel ? require('./keepmodel').compact(profile.keepModel) : null,
+    usage: keep(profile.usage, minN), usageClass: profile.usageClass || {},
     personas: profile.personas, totals: profile.totals,
   };
 }
 
-module.exports = { benchmark, benchmarkLookahead, bestPersona, exportCompact, WorkerPool, train, evaluate, learnFrom, baseFeatures, placeScore, seedPopulation, evolve, pickPersona, playOne, PLAY_VALUE_SCALE };
+module.exports = { benchmark, benchmarkLookahead, bestPersona, exportCompact, WorkerPool, train, evaluate, learnFrom, learnUsage, baseFeatures, placeScore, seedPopulation, evolve, pickPersona, playOne, PLAY_VALUE_SCALE };

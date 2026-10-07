@@ -492,6 +492,7 @@ function prepareBase({ env, ps, room, idx, pool, noProfile, weights, record }) {
   const decide = KM.makeDecider({
     env, model: (prof && prof.keepModel) || KM.newModel(),
     usable: usableInBattle, protect: (n) => Rules.HAND_ONLY_HEROES.includes(n),
+    usage: prof && prof.usage, usageClass: prof && prof.usageClass,
     maxKeep: Math.max(0, Math.round(w.keepCards)), bias: w.keepBias, explore: record ? Math.min(0.3, 0.25 * w.explore) : 0,
   });
   return buildWithRecycling(env, ps, {

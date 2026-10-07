@@ -16,6 +16,8 @@
 //                                      egal ob sie später eingesetzt wurde — vergleichbar über ALLE Kartentypen (Kartenliste)
 //                                      (Kanal 2: Kartenwert für Aufbau/Recycling)
 //    pairValue    „A|B" → { n, sum }   dasselbe für Kartenpaare (Kombos, Held+Ability, Held+Creature)
+//    usage        Karte → { n, sum }   behaltene Exemplare und wie viele davon im Kampf gespielt wurden (sum); usageClass: dasselbe je Typ und
+//                 Nutzbarkeit beim Aufbau (`Spell:now`, `Spell:hand`, `Spell:no`) und je Typ (`*:Spell`) — Grundlage der Nutzungs-Vorgabe beim Behalten
 //    prepValue    Karte → { n, sum, keep }  Bewertung beim Aufbau: Mittel (sum / n) des Werts, den die Behalten/Recyceln-Entscheidung der Karte
 //                                      gegeben hat (positiv: behalten, negativ: recyceln; ohne erkundete Fälle), keep = Anzahl „behalten“
 //    keepModel    Behalten/Recyceln mit Kontext (restliche Hand + Brett), siehe learn/keepmodel.js
@@ -34,7 +36,7 @@ const CHECK_EVERY_MS = 30 * 1000;
 let cache = null, loadedAt = 0, fileMtime = 0;
 
 function emptyProfile() {
-  return { version: 0, games: 0, updated: null, playValue: {}, cardValue: {}, dealtValue: {}, pairValue: {}, prepValue: {}, keepModel: null, personas: [], totals: { plays: 0, byPlayers: {} } };
+  return { version: 0, games: 0, updated: null, playValue: {}, cardValue: {}, dealtValue: {}, pairValue: {}, prepValue: {}, usage: {}, usageClass: {}, keepModel: null, personas: [], totals: { plays: 0, byPlayers: {} } };
 }
 
 function readFile() {

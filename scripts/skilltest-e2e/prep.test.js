@@ -38,7 +38,7 @@ const Rules = require('../../public/skilltest-rules.js');
     for (let hi = 1; hi < planA.length; hi++) { A.emit('st_prep_move', { roomId: room.id, move: { type: 'place', from: { kind: 'hand', idx: planA[hi] }, to: { kind: 'hero', hi } } }); await sleep(200); }
     check('3 Heroes stehen', cur.me.heroes.filter(Boolean).length === 3, cur.me.heroes);
     // Ability auf Hero → Level 3
-    const abIdx = cur.me.hand.findIndex(n => db[n].cardType === 'Ability');
+    const abIdx = cur.me.hand.findIndex(n => db[n].cardType === 'Ability' && !cur.me.abilityZones[0].some(z => z && z.n === n));   // eine Ability, die der Hero noch nicht hat (Start-Abilities stehen auf Stufe 3)
     if (abIdx >= 0) {
       const free = cur.me.abilityZones[0].findIndex(z => !z);
       A.emit('st_prep_move', { roomId: room.id, move: { type: 'place', from: { kind: 'hand', idx: abIdx }, to: { kind: 'ability', hi: 0, slot: free } } });
