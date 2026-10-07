@@ -3670,6 +3670,18 @@ socket.on('connect', () => {
   _socketWarVerbunden = true;
 });
 
+// ═══ UHR DES SPIELERS (31.10.-Skin) ═══════════════════════════════════════
+// „Am 31.10. seiner eigenen Zeit (lokale PC-Uhr)“: nur der Browser kennt sie. Nach jeder
+// (Re-)Authentifizierung, alle zehn Minuten und beim Zurueckkehren in den Tab melden wir
+// Uhrzeit und Zeitzonen-Versatz; der Server rechnet daraus das lokale Datum des Spielers aus
+// (siehe `noteClientClock` / `userLocalDate` in server.js).
+function sendClientClock() {
+  try { socket.emit('client_clock', { now: Date.now(), tz: new Date().getTimezoneOffset() }); } catch { /* nur Komfort */ }
+}
+socket.on('auth_ok', sendClientClock);
+setInterval(() => { if (window.AUTH_TOKEN) sendClientClock(); }, 10 * 60 * 1000);
+document.addEventListener('visibilitychange', () => { if (!document.hidden && window.AUTH_TOKEN) sendClientClock(); });
+
 // Handle session superseded by another tab
 socket.on('superseded', ({ reason }) => {
   document.body.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;height:100vh;background:#1a1a2e;color:#fff;font-family:sans-serif;text-align:center;padding:20px"><div><h2 style="color:#ff6644">⚠️ Session Taken Over</h2><p style="color:#aaa;max-width:400px">${reason || 'This session was opened in another tab.'}</p><button onclick="location.reload()" style="margin-top:16px;padding:10px 24px;background:#4488ff;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:16px">Reload</button></div></div>`;

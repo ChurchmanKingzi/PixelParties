@@ -621,6 +621,33 @@ app.use((req, res, next) => {
 });
 
 // ───────────────────────────────────────────────────────────────
+//  FREISCHALTBARE SKINS: Bilder in `cards/skins/unlockable/`
+//
+//  Diese Skins stehen NICHT im Shop (siehe `scanSkinFiles`), sondern
+//  werden ueber Ereignisse freigeschaltet (Tutorial, 31.10. …). Die
+//  Clients bauen alle Skin-Bild-URLs als `/cards/skins/<Name>.png`.
+//  Damit sie unveraendert funktionieren, wird eine Anfrage, deren Datei
+//  nur im Unterordner liegt, dorthin umgeschrieben — VOR den beiden
+//  Auslieferungsschichten (gzip + express.static). Der Name darf kein
+//  Pfadtrenner sein, so bleibt die Umschreibung auf den einen Ordner
+//  beschraenkt.
+// ───────────────────────────────────────────────────────────────
+const SKINS_DIR = path.join(CARDS_DIR, 'skins');
+const UNLOCKABLE_SKINS_DIR = path.join(SKINS_DIR, 'unlockable');
+app.use((req, res, next) => {
+  if (!req.path.startsWith('/cards/skins/')) return next();
+  let name;
+  try { name = decodeURIComponent(req.path.slice('/cards/skins/'.length)); } catch { return next(); }
+  if (!name || /[\\/]|\.\./.test(name)) return next();
+  try {
+    if (fs.existsSync(path.join(SKINS_DIR, name)) || !fs.existsSync(path.join(UNLOCKABLE_SKINS_DIR, name))) return next();
+  } catch { return next(); }
+  const q = req.url.indexOf('?');
+  req.url = '/cards/skins/unlockable/' + encodeURIComponent(name) + (q >= 0 ? req.url.slice(q) : '');
+  next();
+});
+
+// ───────────────────────────────────────────────────────────────
 //  On-the-fly gzip for compressible static assets (zero-dep).
 //  Compresses .js/.json/.css/.svg/.map from public, /data and
 //  /cards. Results are cached in memory keyed by file mtime, so
@@ -3736,8 +3763,9 @@ function rollCpuSkin(cpuDeck) {
   const middle = cpuDeck?.heroes?.[1];
   const heroName = typeof middle === 'string' ? middle : (middle?.hero || middle?.name || null);
   if (!heroName) return null;
-  const skinFiles = new Set(scanSkinFiles().map(f => path.basename(f, path.extname(f))));
-  const pool = (SKINS_DATA[heroName] || []).filter(n => skinFiles.has(n));
+  // NIEMALS freischaltbare Skins: die CPU zieht nur aus dem Shop-Bestand.
+  const skinFiles = shopSkinNames();
+  const pool = (SKINS_DATA[heroName] || []).filter(n => skinFiles.has(n) && !isUnlockableSkin(n));
   if (!pool.length) return null;
   return { heroName, skinName: pool[Math.floor(Math.random() * pool.length)] };
 }
@@ -3783,7 +3811,7 @@ function scanShopDir(subdir) {
   } catch { return []; }
 }
 
-// Scan skins directory
+// Scan skins directory (nur die oberste Ebene — `unlockable/` ist ein Ordner und faellt durch den Filter)
 function scanSkinFiles() {
   const dir = path.join(__dirname, 'cards', 'skins');
   try {
@@ -3791,9 +3819,91 @@ function scanSkinFiles() {
   } catch { return []; }
 }
 
+// ===== FREISCHALTBARE SKINS =====
+// Bilder in `cards/skins/unlockable/`: nicht kaeuflich, nicht von CPUs/Bots traegbar, sondern nur ueber
+// Ereignisse freizuschalten (siehe `grantUnlockableSkin`). Die Zuordnung Held → Skin steht wie bei allen
+// Skins in `data/skins.json`.
+function unlockableSkinNames() {
+  try {
+    return new Set(fs.readdirSync(UNLOCKABLE_SKINS_DIR)
+      .filter(f => IMAGE_EXTS.has(path.extname(f).toLowerCase()))
+      .map(f => path.basename(f, path.extname(f))));
+  } catch { return new Set(); }
+}
+function isUnlockableSkin(skinName) { return unlockableSkinNames().has(skinName); }
+
+/** Skins, die der SHOP anbieten darf (und die CPUs wuerfeln duerfen): Bilder der obersten Ebene, OHNE alles Freischaltbare. */
+function shopSkinNames() {
+  const lock = unlockableSkinNames();
+  return new Set(scanSkinFiles().map(f => path.basename(f, path.extname(f))).filter(n => !lock.has(n)));
+}
+
+/** Held, zu dem ein Skin gehoert (aus data/skins.json) — null, wenn unbekannt. */
+function heroOfSkin(skinName) {
+  for (const [hero, list] of Object.entries(SKINS_DATA)) if ((list || []).includes(skinName)) return hero;
+  return null;
+}
+
+// Wodurch welcher freischaltbare Skin frei wird (Namen wie in data/skins.json / als Bilddatei):
+const UNLOCKABLE_SKIN_RULES = {
+  'Bills Worst Nightmare': 'tutorial',   // Tutorial geschafft
+  'Dr. Heinz N. Stein': 'halloween',     // am 31.10. (lokale Uhr des Spielers) irgendeine Partie gewonnen
+};
+const HALLOWEEN_SKIN = 'Dr. Heinz N. Stein';
+const TUTORIAL_SKIN = 'Bills Worst Nightmare';
+
+/** Schickt ein Socket-Ereignis an alle Verbindungen eines Spielers. */
+function emitToUser(userId, event, payload) {
+  if (!userId) return;
+  for (const sk of io.sockets.sockets.values()) {
+    if (sk.data && sk.data.userId === userId) sk.emit(event, payload);
+  }
+}
+
+/**
+ * Schaltet einen FREISCHALTBAREN Skin frei (falls noch nicht im Besitz) und zeigt die Freischalt-Animation
+ * (Socket-Ereignis `skin_unlocked`, wie nach Skin-CPU-Spielen). Liefert true, wenn er neu freigeschaltet wurde.
+ * Fremde Namen (Shop-Skins, unbekannte) werden abgewiesen: diese Funktion ist nur fuer `unlockable/`.
+ */
+async function grantUnlockableSkin(userId, skinName) {
+  if (!userId || !UNLOCKABLE_SKIN_RULES[skinName] || !isUnlockableSkin(skinName)) return false;
+  const heroName = heroOfSkin(skinName);
+  if (!heroName) return false;
+  const fresh = await unlockCpuSkin(userId, skinName);
+  if (fresh) emitToUser(userId, 'skin_unlocked', { skinName, heroName });
+  return fresh;
+}
+
+// ── Uhr des Spielers (31.10.-Skin) ──
+// „Am 31.10. seiner eigenen Zeit (lokale PC-Uhr)“: nur der Client kennt die. Er meldet beim Verbinden und
+// danach regelmaessig `{ now: Date.now(), tz: getTimezoneOffset() }`; der Server merkt sich den Abstand zur
+// eigenen Uhr, so stimmt das Datum auch Stunden nach der Meldung (Mitternachts-Wechsel).
+const clientClocks = new Map();   // userId -> { skew (ms: Client-Uhr minus Server-Uhr), tz (Minuten, wie getTimezoneOffset) }
+function noteClientClock(userId, data) {
+  const now = Number(data && data.now), tz = Number(data && data.tz);
+  if (!userId || !Number.isFinite(now) || !Number.isFinite(tz) || Math.abs(tz) > 14 * 60) return;
+  clientClocks.set(userId, { skew: now - Date.now(), tz });
+}
+/** Lokales Datum des Spielers { month (1-12), day } nach seiner Uhr — null, wenn er keine gemeldet hat. */
+function userLocalDate(userId) {
+  const c = clientClocks.get(userId);
+  if (!c) return null;
+  const d = new Date(Date.now() + c.skew - c.tz * 60000);   // UTC-Getter liefern dann die lokale Wandzeit
+  return { month: d.getUTCMonth() + 1, day: d.getUTCDate() };
+}
+
+/** Ein Mensch hat eine Partie gewonnen (egal welcher Modus): loest datumsabhaengige Freischaltungen aus. */
+async function onHumanWonGame(userId) {
+  try {
+    if (!userId) return;
+    const ld = userLocalDate(userId);
+    if (ld && ld.month === 10 && ld.day === 31) await grantUnlockableSkin(userId, HALLOWEEN_SKIN);
+  } catch (err) { console.error('[unlockable skin] Siegesprüfung fehlgeschlagen:', err.message); }
+}
+
 // Build flat list of all skin IDs from skins.json that have images on disk
 function getAvailableSkins() {
-  const skinFiles = new Set(scanSkinFiles().map(f => path.basename(f, path.extname(f))));
+  const skinFiles = shopSkinNames();
   // Only include skins for heroes whose card images exist in ./cards
   const cardsDir = path.join(__dirname, 'cards');
   let heroFiles = [];
@@ -3841,7 +3951,7 @@ app.get('/api/shop/catalog', (req, res) => {
     return nameByStripped[strippedKey(stem)] || stem;
   }));
 
-  const skinFiles = new Set(scanSkinFiles().map(f => path.basename(f, path.extname(f))));
+  const skinFiles = shopSkinNames();
   const skins = [];
   for (const [heroName, skinNames] of Object.entries(SKINS_DATA)) {
     if (!heroSet.has(heroName)) continue;
@@ -3913,7 +4023,7 @@ app.post('/api/shop/buy', authMiddleware, async (req, res) => {
 
   // Verify item exists
   if (itemType === 'skin') {
-    const skinFiles = new Set(scanSkinFiles().map(f => path.basename(f, path.extname(f))));
+    const skinFiles = shopSkinNames();
     if (!skinFiles.has(itemId)) return res.status(404).json({ error: 'Skin not found' });
   } else {
     const subdir = itemType === 'avatar' ? 'avatars' : itemType === 'sleeve' ? 'sleeves' : 'boards';
@@ -13873,10 +13983,14 @@ io.on('connection', (socket) => {
     if (DEBUG_TOOLS_ENABLED) socket.on(ereignis, handler);
   };
 
+  // Uhr des Spielers (lokale PC-Zeit) fuer datumsabhaengige Freischaltungen (siehe `userLocalDate`).
+  socket.on('client_clock', (data) => { if (currentUser) noteClientClock(currentUser.userId, data); });
+
   socket.on('auth', (token) => {
     const session = sessions.get(token);
     if (session) {
       currentUser = { ...session, ip: socketIP };
+      socket.data.userId = session.userId;
       socket.emit('auth_ok', session);
       social.onAuth(socket, session);
       // Reconnect to active game
