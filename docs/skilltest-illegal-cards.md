@@ -176,6 +176,14 @@
 - Sid, the King of Thieves
 - Kassaran, Seer of Everything
 
+## Anti Magic Enchantment: Anhänger-Zauber, der „sofort beim Ausrüsten eines Artifacts durch einen Pollution Token“ gespielt werden muss und sonst nichts bewirkt — im Skill Test praktisch nie spielbar (Nachttraining: 0 % Nutzung bei 52 behaltenen Exemplaren). Auf Wunsch aus dem Pool genommen.
+
+- Anti Magic Enchantment
+
+## Hat of Madness: „Whenever the equipped Hero performs an Action, its controller must add a card from their hand to their opponent's hand“ — mit mehr als zwei Sitzen gibt es nicht DEN Gegner, an den die Karte geht. Auf Wunsch aus dem Pool genommen.
+
+- Hat of Madness
+
 ## Idej Projection: kann nur durch den Effekt der Idej Lords an einen Hero gehängt werden („by its own effect“). Im Skill Test spawnen die Lords ihre Projections jetzt beim Aufstellen selbst (siehe skilltest/README.md); als Handkarte wäre sie ein Fremdkörper.
 
 - Idej Projection

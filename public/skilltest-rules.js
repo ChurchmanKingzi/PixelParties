@@ -438,11 +438,61 @@
     return ps.abilityZones.map(row => row.map(z => (z ? Array(abilityLevel(z)).fill(z.n) : [])));
   }
 
+  // ── Klänge des Aufbaus ───────────────────────────────────────────
+  // Die Oberfläche vertont Zustandswechsel des EIGENEN Aufbaus (nicht die Absicht beim Loslassen): nur was der Server angenommen hat,
+  // macht ein Geräusch. Recycler-Züge (`recycled` steigt) vertont der Recycler selbst, siehe app-skilltest.jsx.
+
+  /** Zählwerte, an denen sich Klänge ablesen lassen. */
+  function soundCounts(ps) {
+    const c = { heroes: 0, abilityLevels: 0, support: 0, spawned: 0, surprise: 0, area: 0, hand: 0, recycled: 0, ready: false, heroOrder: '' };
+    if (!ps) return c;
+    c.heroOrder = (ps.heroes || []).map(h => h || '').join('|');
+    c.heroes = (ps.heroes || []).filter(Boolean).length;
+    for (const row of ps.abilityZones || []) for (const z of row) if (z) c.abilityLevels += abilityLevel(z);
+    (ps.supportZones || []).forEach((row, hi) => row.forEach((zone, slot) => {
+      const n = (zone || []).length;
+      if (isSpawned(ps, hi, slot)) c.spawned += n; else c.support += n;
+    }));
+    c.surprise = (ps.surpriseZones || []).filter(Boolean).length;
+    c.area = (ps.areaZone || []).length;
+    c.hand = (ps.hand || []).length;
+    c.recycled = ps.recycled || 0;
+    c.ready = !!ps.ready;
+    return c;
+  }
+
+  /**
+   * Klänge für den Übergang `prev` → `next` des eigenen Aufbaus: [[Name, { volume?, rate?, delay? }], …]; leer = still.
+   * Namen sind Dateien aus public/sounds.
+   */
+  function prepSounds(prev, next) {
+    if (!prev || !next) return [];
+    const a = soundCounts(prev), b = soundCounts(next);
+    if (b.recycled !== a.recycled) return [];
+    const out = [];
+    if (b.ready !== a.ready) out.push(b.ready ? ['buff', { volume: 0.9 }] : ['status_remove', { volume: 0.7 }]);
+    const boardNow = b.heroes + b.abilityLevels + b.support + b.surprise + b.area;
+    const boardBefore = a.heroes + a.abilityLevels + a.support + a.surprise + a.area;
+    if (b.heroes > a.heroes) out.push(['summon', { volume: 0.8 }]);
+    else if (b.heroes === a.heroes && b.heroOrder !== a.heroOrder && b.heroes > 0) out.push(['shuffle', { rate: 1.25, volume: 0.8 }]);
+    if (b.abilityLevels > a.abilityLevels) out.push(['ability_activate', { volume: 0.55 }]);
+    if (b.support > a.support) out.push(['placement', {}]);
+    if (b.surprise > a.surprise) out.push(['placement', { rate: 0.8, volume: 0.9 }]);
+    if (b.area > a.area) out.push(['heavy_impact', { volume: 0.5 }]);
+    if (b.spawned > a.spawned) out.push(['reveal', { delay: b.heroes > a.heroes ? 160 : 0, volume: 0.9 }]);
+    if (b.spawned < a.spawned && b.heroes >= a.heroes) out.push(['creature_destroyed', { volume: 0.6 }]);   // Rechtsklick auf eine erschienene Karte
+    if (boardNow < boardBefore) {
+      if (b.hand > a.hand) out.push(['draw', { rate: 1.25, volume: 0.85 }]);          // zurück auf die Hand
+      else out.push(['discard', { rate: 1.15, volume: 0.8 }]);                         // entfernt (z. B. Start-Ability)
+    }
+    return out;
+  }
+
   return {
     ZHIGAO, HAND_ONLY_HEROES, MAX_ABILITY_LEVEL, START_ABILITY_LEVEL, POTIONS_ON_BOARD,
     emptyPlayer, clone,
     heroCount, requiredHeroes, boardFull, hasZhigao, totalHeroes, abilityLevel,
-    zoneAccepts, canDrop, applyMove, readyProblem, abilityStacks, areaLimit, canPlaceAnotherArea,
+    zoneAccepts, canDrop, applyMove, readyProblem, abilityStacks, areaLimit, canPlaceAnotherArea, soundCounts, prepSounds,
     installStartAbilities, isSpawned, IDEJ_PACKAGES, IDEJ_PROJECTION, IDEJ_BLADES,
   };
 }));

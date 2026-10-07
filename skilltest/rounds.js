@@ -488,8 +488,32 @@ async function passRound(room, pi, host) {
   return true;
 }
 
+/**
+ * Klick auf eine eigene Kreatur OHNE aktiven Effekt: sie gilt als benutzt (ergraut bis zur nächsten Round) und der Zug geht weiter —
+ * wie jede andere Aktion, nur ohne Wirkung. Kreaturen mit aktivem Effekt laufen über `activate_creature_effect`.
+ */
+async function skipWithCreature(room, pi, params, host) {
+  const gs = room.gameState, engine = room.engine, st = gs.skillTest;
+  if (!st || st.phase !== 'battle' || gs.result || gs.activePlayer !== pi || st.busy) return false;
+  const { heroIdx, zoneSlot, charmedOwner } = params || {};
+  if (charmedOwner != null || !Number.isInteger(heroIdx) || !Number.isInteger(zoneSlot)) return false;
+  const inst = engine.cardInstances.find(c => c.zone === 'support' && c.owner === pi && (c.controller ?? c.owner) === pi && c.heroIdx === heroIdx && c.zoneSlot === zoneSlot);
+  if (!inst) return false;
+  const cd = engine._getCardDB()[inst.name];
+  if (!cd || cd.cardType !== 'Creature') return false;
+  let script = null;
+  try { script = require('../cards/effects/_loader').loadCardEffect((inst.counters && inst.counters._effectOverride) || inst.name); } catch { script = null; }
+  if (script && script.onCreatureEffect) return false;                   // hat einen aktiven Effekt: den spielt man, statt auszusetzen
+  if (st.exhaustedCreatures[inst.id]) return false;                      // schon benutzt
+  st.exhaustedCreatures[inst.id] = true;
+  st.turnsTaken[pi] = (st.turnsTaken[pi] || 0) + 1;
+  engine.log && engine.log('skilltest_turn', { seat: pi, kind: 'creature_skip', round: st.round });
+  await advance(engine, host, pi);
+  return true;
+}
+
 module.exports = {
-  act, playBaseAttack, actedHeroesOf, passRound, setWatch, CONSUMING_KINDS, METER_HOOKS, requiredPhase, setPhaseFor,
+  act, playBaseAttack, actedHeroesOf, passRound, skipWithCreature, setWatch, CONSUMING_KINDS, METER_HOOKS, requiredPhase, setPhaseFor,
   roundOrder, nextStarter, heroKey, heroAlive, heroActors, creatureActors, hasActor, seatHasActor,
   seatAlive, livingSeats, withActive,
   startRound, endRound, beginTurn, advance, pickNextSeat, isIncapacitated,

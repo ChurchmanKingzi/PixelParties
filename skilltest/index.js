@@ -182,6 +182,11 @@ function registerLobbyHandlers(socket, deps) {
     require('./rounds').playBaseAttack(c.room, c.seat, heroIdx, deps.host)
       .catch(err => console.error('[skilltest] st_attack:', err && err.message));
   });
+  socket.on('st_creature_skip', ({ roomId, heroIdx, zoneSlot, charmedOwner } = {}) => {
+    const c = seatCtx(roomId); if (!c) return;
+    require('./rounds').skipWithCreature(c.room, c.seat, { heroIdx, zoneSlot, charmedOwner }, deps.host)
+      .catch(err => console.error('[skilltest] st_creature_skip:', err && err.message));
+  });
   socket.on('st_pass_round', ({ roomId } = {}) => {
     const c = seatCtx(roomId); if (!c) return;
     require('./rounds').passRound(c.room, c.seat, deps.host)

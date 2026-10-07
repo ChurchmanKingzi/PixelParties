@@ -294,6 +294,27 @@ const parseZoneKey = (k) => { const [kind, hi, slot] = k.split(':'); return { ki
 // Startschätzung der Maße (bei --board-scale 1): Brett, Seitenspalten (links Spielerliste, rechts Recycler); die Feinabstimmung misst das DOM
 const ST_BOARD_W = 960, ST_SIDE_W = 230, ST_BOARD_H = 450;
 
+// ── Klänge des Aufbaus ──
+// Klang einer Aufbau-Handlung (Dateien aus public/sounds; Lautstärke regelt der Effektregler). `dedupe: 0`: jeder Aufruf spielt.
+const stSfx = (name, o) => { if (window.playSFX) window.playSFX(name, { dedupe: 0, category: null, ...(o || {}) }); };
+
+// Der Recycler in Zeitlupe vertont (passt zu den Zeiten in `playRecycle`): Karte saust in den Mund (0), Deckel schnappt zu (300–330),
+// er kaut (420, 560), das Gold klimpert (700); bei einem Auswurf öffnet sich der Mund (780), die neue Karte schießt heraus (800)
+// und landet nach ihrem Flug in der Hand (1580).
+function stRecycleSounds(ev) {
+  stSfx('shuffle', { rate: 0.9, volume: 0.8 });
+  stSfx('discard', { delay: 300, volume: 1 });
+  stSfx('placement', { delay: 330, rate: 0.55, volume: 0.9 });
+  stSfx('heavy_impact', { delay: 420, rate: 1.7, volume: 0.3 });
+  stSfx('heavy_impact', { delay: 560, rate: 1.5, volume: 0.28 });
+  stSfx('gold_gain', { delay: 700, volume: 0.9 });
+  if (ev && ev.ejected) {
+    stSfx('summon', { delay: 780, rate: 1.4, volume: 0.8 });
+    stSfx('ping', { delay: 800, rate: 1.3, volume: 0.9 });
+    stSfx('draw', { delay: 1580, volume: 1 });
+  }
+}
+
 function SkillTestPrepScreen({ lobby, user, leaveRoom, notify }) {
   const R = window.SkillTestRules;
   const [view, setView] = useState(null);
@@ -391,7 +412,7 @@ function SkillTestPrepScreen({ lobby, user, leaveRoom, notify }) {
       setView(prev => ({ ...(prev || {}), ...st }));
       if (st.event && st.event.type === 'recycle') {
         playRecycle(st.event, st);
-        if (window.playSFX) window.playSFX(st.event.ejected ? 'ping' : 'discard', { dedupe: 80 });
+        stRecycleSounds(st.event);
       }
     };
     const onErr = (e) => { notify && notify(e.reason || 'Not allowed', 'error'); if (window.playSFX) window.playSFX('ui_cancel', { volume: 1.0 }); };
@@ -435,6 +456,17 @@ function SkillTestPrepScreen({ lobby, user, leaveRoom, notify }) {
   }, [!!view]);
 
   const ps = view && view.me;
+
+  // Was der Server angenommen hat, macht ein Geräusch (Platzieren, Zurücklegen, Heldentausch, erschienene Karten, Bereit …) —
+  // nicht schon das Loslassen: abgelehnte Züge bleiben still (dort kommt der Fehlerton). Recycler-Züge vertont `stRecycleSounds`.
+  const prevPsRef = useRef(null);
+  useEffect(() => {
+    if (!ps) return;
+    const prev = prevPsRef.current;
+    prevPsRef.current = ps;
+    if (!R || !R.prepSounds) return;
+    for (const [name, o] of R.prepSounds(prev, ps)) stSfx(name, o);
+  }, [ps]);
   const env = useMemo(stEnv, []);
   const boardSkin = useCallback((zoneType) => {
     const boardId = user && user.board;
@@ -451,6 +483,7 @@ function SkillTestPrepScreen({ lobby, user, leaveRoom, notify }) {
     e.dataTransfer.effectAllowed = 'move';
     try { e.dataTransfer.setData('text/plain', name); } catch { /* ältere Browser */ }
     stDragGhost(e, name);
+    stSfx('draw', { volume: 0.4, rate: 1.5, dedupe: 60 });          // Karte aufgenommen
     dragRef.current = { name, src };
     if (window.setHandDragFlag) window.setHandDragFlag(true);
     setTimeout(() => setDrag({ name, src }), 0);
@@ -518,19 +551,19 @@ function SkillTestPrepScreen({ lobby, user, leaveRoom, notify }) {
       send({ type: 'recycle', from: d.src });
     }
     else if (t.kind === 'hand') send({ type: 'unplace', from: d.src });
-    else { send({ type: 'place', from: d.src, to: t }); if (window.playSFX) window.playSFX('placement'); }
+    else send({ type: 'place', from: d.src, to: t });
   };
   // Hand & Recycler sind eigene Ziele (außerhalb des Brett-Wrappers)
   const dropOn = (kind) => ({
     onDragOver: (e) => {
       if (dragRef.current && acceptsAt({ kind })) {
         e.preventDefault(); e.dataTransfer.dropEffect = 'move'; e.currentTarget.setAttribute('data-st-target', '1');
-        if (kind === 'recycler' && !dragOverRecycler.current) { dragOverRecycler.current = true; clearList(lidTimers); setLid(3); }   // Mund auf, sobald eine Karte darüber schwebt
+        if (kind === 'recycler' && !dragOverRecycler.current) { dragOverRecycler.current = true; clearList(lidTimers); setLid(3); stSfx('shuffle', { rate: 0.55, volume: 0.7, dedupe: 150 }); }   // Mund auf, sobald eine Karte darüber schwebt
       }
     },
     onDragLeave: (e) => {
       e.currentTarget.removeAttribute('data-st-target');
-      if (kind === 'recycler' && dragOverRecycler.current) { dragOverRecycler.current = false; clearList(lidTimers); setLid(0); }
+      if (kind === 'recycler' && dragOverRecycler.current) { dragOverRecycler.current = false; clearList(lidTimers); setLid(0); stSfx('placement', { rate: 0.6, volume: 0.35, dedupe: 150 }); }
     },
     onDrop: (e) => {
       const d = dragRef.current; if (!d) return;
@@ -844,7 +877,12 @@ function StTurnPanel({ gameState, myIdx, isSpectator, focusSeat, onFocus }) {
   const players = gameState.players;
   const active = gameState.activePlayer;
   const myTurn = !isSpectator && active === myIdx && !gameState.result;
-  const left = st.turnDeadline ? Math.max(0, st.turnDeadline - (now + (st.serverNow - Date.now()))) : null;
+  // Server-Uhr: beim Eintreffen eines neuen Zustands (neues `serverNow`) einmal merken, wie die Client-Uhr dazu steht, und von dort weiterzählen.
+  // (Früher wurde `Date.now()` bei JEDEM Neuzeichnen neu abgezogen — die Differenz blieb dadurch bei ~90 s stehen und sprang nur um den 500-ms-Takt.)
+  const clockRef = useRef({ serverNow: null, at: 0 });
+  if (clockRef.current.serverNow !== st.serverNow) clockRef.current = { serverNow: st.serverNow, at: Date.now() };
+  const serverNowEst = st.serverNow + (Math.max(now, Date.now()) - clockRef.current.at);
+  const left = st.turnDeadline ? Math.max(0, st.turnDeadline - serverNowEst) : null;
   const order = st.order && st.order.length ? st.order : players.map((_, i) => i);
   const readyHeroes = (seat) => (players[seat].heroes || []).filter((h, hi) => h && h.name && h.hp > 0 && !(st.exhaustedHeroes || {})[seat + ':' + hi]).length;
   return (

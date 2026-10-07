@@ -77,6 +77,26 @@ function simHost(roomBox) {
  * @param {object} opts  { seats = 4, weights?: Array<object|null>, maxTurns = 4000, prepOnly?: bool, quiet?: bool }
  */
 async function runGame(opts = {}) {
+  // Reproduzierbare Partie: `opts.seed` ersetzt `Math.random` für die Dauer EINER Partie durch einen geseedeten Generator (Austeilung, Aufbau,
+  // Policy-Rauschen, Engine). Nur eine Partie gleichzeitig je Thread (die Worker des Trainings spielen nacheinander).
+  if (opts.seed == null) return _runGame(opts);
+  const realRandom = Math.random;
+  Math.random = mulberry32(opts.seed);
+  try { return await _runGame(opts); } finally { Math.random = realRandom; }
+}
+
+/** Kleiner geseedeter Zufallsgenerator (mulberry32). */
+function mulberry32(seed) {
+  let a = seed >>> 0;
+  return function () {
+    a = (a + 0x6D2B79F5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+async function _runGame(opts = {}) {
   const seats = opts.seats || 4;
   const cards = getCardDB();
   const env = { cards, areaLimitOf: (n) => { try { const s = require('../cards/effects/_loader').loadCardEffect(n); return s && s.areaLimit; } catch { return undefined; } } };
@@ -161,4 +181,4 @@ async function runGame(opts = {}) {
   };
 }
 
-module.exports = { runGame, skeletonPlayer };
+module.exports = { runGame, skeletonPlayer, mulberry32 };

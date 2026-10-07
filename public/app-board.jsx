@@ -45489,6 +45489,11 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 c.heroIdx === i && c.zoneSlot === z && ((!isOpp && !c.charmedOwner) || (isOpp && c.charmedOwner === pi))
               );
               const isCreatureActivatable = creatureEffectEntry?.canActivate === true;
+              // Skill Test: eigene Kreatur OHNE aktiven Effekt — ein Klick benutzt sie (ergraut) und gibt den Zug weiter.
+              const stCanSkipWith = !!(gameState.skillTest && !isOpp && !isSpectator && isMyTurn && !result && !gameState.skillTest.busy
+                && cards.length > 0 && !creatureEffectEntry && !(gameState.skillTest.eliminated || []).includes(myIdx)
+                && (window.CARDS_BY_NAME[cards[0]] || {}).cardType === 'Creature'
+                && !(gameState.skillTest.exhaustedSlots || []).includes(pi + ':' + i + ':' + z));
               // Geteilte Zone? Der Server schickt die Kopien einzeln in
               // `supportStacks`, Schluessel wie bei `creatureCounters`.
               const stackHere = (gameState.supportStacks || {})[`${pi}-${i}-${z}`];
@@ -45692,6 +45697,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     socket.emit('activate_creature_effect', { roomId: gameState.roomId, heroIdx: i, zoneSlot: z, charmedOwner: creatureEffectEntry?.charmedOwner });
                   } : (isEquipActivatable && !isEffectLocked) ? () => {
                     socket.emit('activate_equip_effect', { roomId: gameState.roomId, heroIdx: i, zoneSlot: z });
+                  } : stCanSkipWith ? () => {
+                    // Skill Test: eine Kreatur ohne aktiven Effekt anklicken = benutzt (ergraut), der Zug geht weiter
+                    if (window.playSFX) window.playSFX('ui_click');
+                    socket.emit('st_creature_skip', { roomId: gameState.roomId, heroIdx: i, zoneSlot: z });
                   } : isProviderZone ? () => {
                     const provider = pendingAdditionalPlay.providers.find(p => p.heroIdx === i && p.zoneSlot === z);
                     if (provider) {
@@ -45705,7 +45714,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     }
                   } : isZonePickTarget ? () => respondToPrompt({ owner: pi, heroIdx: i, slotIdx: z }) : isValidEquipTarget ? () => equipTargetIds.forEach(id => togglePotionTarget(id)) : undefined}
                   style={zsMerge('support', {
-                    ...((isCsppEmptySlot || isSummonPickZone || isValidEquipTarget || isZonePickTarget || isProviderZone || isCreatureActivatable || isEquipActivatable || isSkatesCreature || isSkatesDest || isSlipperyCreature || isSlipperyDest || isChainPickCreatureValid) ? { cursor: 'pointer' } : undefined),
+                    ...((isCsppEmptySlot || isSummonPickZone || isValidEquipTarget || isZonePickTarget || isProviderZone || isCreatureActivatable || isEquipActivatable || isSkatesCreature || isSkatesDest || isSlipperyCreature || isSlipperyDest || isChainPickCreatureValid || stCanSkipWith) ? { cursor: 'pointer' } : undefined),
                     ...(isStolen && stolenColor ? { '--charmed-color': stolenColor } : undefined),
                   })}
                   ref={(el) => {
