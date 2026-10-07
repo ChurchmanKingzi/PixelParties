@@ -137,6 +137,16 @@ Phasenende-Effekte → Zusatzaktions-Gewährungen verfallen). `advanceToPhase` i
 | Idej Lord Daiyo / Nobunakin / Shoguwana / Todugawin | Beim **Aufstellen** (Hand → Hero-Zone, auch per Tausch) erscheinen **aus dem Nichts** ihre Karten in den drei Support Zones: Daiyo 3× Idej Projection, Nobunakin 2× Projection + 1 Idej Blade, Shoguwana 1× Projection + 2 Blades, Todugawin 3 Blades (Blades zufällig, je Lord verschieden; `IDEJ_PACKAGES` in `public/skilltest-rules.js`). Eine belegte Zone weicht dafür zurück auf die Hand (freie zuerst). Verlässt der Lord das Brett (zurück auf die Hand, ersetzt), **verschwinden** die Karten; beim Hero-Tausch wandern sie mit. Sie lassen sich per **Rechtsklick löschen** (`deleteSpawned`) oder von einer Handkarte **überbauen**, aber weder auf die Hand nehmen, verschieben noch recyceln. Im Zustand der Basis markiert `spawned[hi][slot]` sie (grüner Rahmen + ✦ in der UI); im Kampf sind es gewöhnliche Support-Karten. Die Start-Suche der Lords (`onBeforeHandDraw`) bleibt wirkungslos (kein Deck, keine freie Zone). |
 | Cardinal Beast Baihu / Qinglong / Xuanwu / Zhuque | Alle legal, aber je Partie **fehlt ein zufälliges** davon im Pool (`CONFIG.CARDINAL_BEASTS`, `CardPool.banned`; die Vorbereitung zeigt es als `bannedCards`). So sind nie alle vier gleichzeitig im Spiel. |
 
+## Endlosschleifen und Hänger
+
+- **Schrittbudget** (`engine-ext.js` `installRunawayBreaker`): Jede Animationspause einer Aktion zählt; über 6 000 wird die Aktion mit
+  `ST_RUNAWAY` beendet. Beim Abbruch erscheint `[ST_RUNAWAY] …` im Log mit Prompt-Zählern und Aufrufkette — daran ist die Karte erkennbar.
+- **Opferwahl** (Fund aus dem Nachttraining: Steam Dwarf Dragon Pilot, ≈ 0,02 % der Partien): Die allgemeine Zielwahl wählte für
+  „opfere Kreaturen mit zusammen ≥ 300 Max-HP" irgendwelche Kreaturen, und `resolveSacrificeCost` fragte endlos neu. Jetzt wählt die
+  Policy (`chooseTribute`) die billigste gültige Teilmenge (Anzahl, Mindest-Max-HP, Mindest-Level, Pflicht-Hero), und die Engine wertet
+  drei ungültige CPU-Antworten im Skill Test als Abbruch (Menschen werden unbegrenzt neu gefragt). Test: `sacrifice.test.js`.
+- Freiwillige „erneut"-Prompts (Skeleton Reaper …) brechen Bots nach `MAX_PROMPT_REPEATS` ab (`policy.chooseTargets`).
+
 ## Reaktionen der Bots
 
 Die Standard-CPU der Engine (`_cpu.js`) ist für zwei Spieler gebaut und im Modus nicht installiert; die Engine-Vorgabe lehnt jede
@@ -189,6 +199,7 @@ Brettern, danach ergraut er) und `exhaustedSlots` (erschöpfte Creatures). Clien
 
 - `scripts/regress/compare.sh` vergleicht geseedete 2-Spieler-Normalspiele mit der eingecheckten Baseline —
   **muss nach jeder Engine-Änderung „unverändert" melden**.
+- `scripts/skilltest-e2e/sacrifice.test.js` (headless): Opferwahl der CPU, keine ST_RUNAWAY-Schleife; `start-hooks.test.js`: Spielbeginn-Abfragen (Kassaran).
 - `scripts/skilltest-e2e/idej.test.js` (headless): Idej-Spawn-Regeln, Pool-Sperren, Kampfstart mit erschienenen Karten.
 - `scripts/skilltest-e2e/*.test.js`: Lobby, Vorbereitung, Kampf, Sitzwechsel (CPU-Übernahme/Aufgeben), Zielwahl über Sitze (per Socket,
   brauchen `socket.io-client`, siehe `lib.js`) und `learn.test.js` (Lernsystem, headless); `ui-*.shot.js` (Playwright, Screenshots).

@@ -258,6 +258,11 @@ function installRunawayBreaker(engine) {
     const st = engine.gs && engine.gs.skillTest;
     if (st && st.busy && ++st._delays > MAX_DELAYS_PER_ACTION) {
       st._delays = -1e9;                                    // nur einmal werfen
+      // Diagnose für die Fehlersuche (selten): welche Karte/Prompts treiben die Schleife? Aufrufkette und Prompt-Zähler der Aktion.
+      try {
+        const frames = (new Error().stack || '').split('\n').slice(2, 14).map(l => l.trim().replace(/^at /, '').replace(/\(?\/home\/user\/PixelParties\//, '(')).filter(l => !/node:internal/.test(l));
+        console.error('[ST_RUNAWAY] Aktion von Sitz ' + engine.gs.activePlayer + ' (Round ' + st.round + '), Prompts: ' + JSON.stringify(engine._stPromptCounts || {}) + '\n   ' + frames.join('\n   '));
+      } catch { /* Diagnose darf nie stören */ }
       throw new Error('ST_RUNAWAY: die Aktion überschreitet ihr Schrittbudget (Endlosschleife einer Karte?)');
     }
     return orig(ms);

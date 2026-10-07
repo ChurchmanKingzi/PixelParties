@@ -115,6 +115,35 @@ function learnedBonus(prof, w, key) {
 }
 
 // ── Zielwahl ───────────────────────────────────────────────────────
+/**
+ * Opferwahl der Engine (`resolveSacrificeCost`): unter allen Teilmengen, die Anzahl, Mindest-Max-HP, Mindest-Level und die Pflicht
+ * „mindestens ein Opfer von Hero X" erfüllen, die mit den geringsten Kosten (Max-HP + Level). Keine gültige → [] (die Engine bricht ab).
+ * Ohne diese Regel wählte die allgemeine Zielwahl irgendwelche Kreaturen, die Engine fragte endlos neu (Dragon Pilot, Nachttraining).
+ */
+function chooseTribute(cands, config, seat) {
+  const meta = (t) => t._meta || {};
+  const list = cands.slice(0, 14);
+  const minCount = Math.max(1, config.minRequired || 1), maxCount = config.maxTotal != null ? config.maxTotal : list.length;
+  const owner = config.mustIncludeFromHeroOwner != null ? config.mustIncludeFromHeroOwner : seat;
+  const fromHero = (t) => config.mustIncludeFromHeroIdx != null && (t.heroIdx ?? (t.cardInstance && t.cardInstance.heroIdx)) === config.mustIncludeFromHeroIdx
+    && ((t.owner ?? (t.cardInstance && (t.cardInstance.controller ?? t.cardInstance.owner))) ?? seat) === owner;
+  let best = null, bestCost = Infinity;
+  for (let mask = 1; mask < (1 << list.length); mask++) {
+    let n = 0, hp = 0, lvl = 0, cost = 0, must = config.mustIncludeFromHeroIdx == null;
+    for (let i = 0; i < list.length; i++) {
+      if (!(mask & (1 << i))) continue;
+      n++; const m = meta(list[i]); hp += m.maxHp || 0; lvl += m.level || 0; cost += (m.maxHp || 0) + 60 * (m.level || 0);
+      if (!must && fromHero(list[i])) must = true;
+    }
+    if (n < minCount || n > maxCount || !must) continue;
+    if (config.minSumMaxHp && hp < config.minSumMaxHp) continue;
+    if (config.minSumLevel && lvl < config.minSumLevel) continue;
+    if (cost < bestCost) { bestCost = cost; best = mask; }
+  }
+  if (best == null) return [];
+  return list.filter((_, i) => best & (1 << i)).map(t => t.id);
+}
+
 /** Zielwahl: Gegner (Seiten ≥ 0 außer dem eigenen Sitz), niedrige HP, tödliche Treffer; Heil-/Buff-Karten wählen eigene Ziele. */
 function chooseTargets(engine, seat, validTargets, config, base) {
   if (!validTargets || !validTargets.length) return [];
@@ -136,6 +165,11 @@ function chooseTargets(engine, seat, validTargets, config, base) {
     const counts = engine._stPromptCounts || (engine._stPromptCounts = {});
     const key = seat + ':' + cardName;
     if ((counts[key] = (counts[key] || 0) + 1) > MAX_PROMPT_REPEATS) return [];
+  }
+  // Opferwahl mit Bedingungen (Mindest-Max-HP, Mindest-Level, „mindestens ein Opfer von Hero X"): eine gültige, möglichst billige Teilmenge wählen.
+  if (config.minSumMaxHp || config.minSumLevel || config.mustIncludeFromHeroIdx != null) {
+    const tribute = chooseTribute(validTargets.filter(t => !t.ineligible), config, seat);
+    if (tribute) return tribute;
   }
   const bene = cardName ? isBeneficial(cardName) : false;
   const st = engine.gs.skillTest;
@@ -471,6 +505,6 @@ function prepareBase({ env, ps, room, idx, pool, noProfile, weights, record }) {
 
 module.exports = {
   prepareBase,
-  DEFAULT_WEIGHTS, weightsOf, chooseTargets, choosePlayer, rankActions, freeActions,
+  DEFAULT_WEIGHTS, weightsOf, chooseTargets, chooseTribute, choosePlayer, rankActions, freeActions,
   stateValue, sideValue, isBeneficial, cardKey, reactionVerdict, reactionHeuristic, saysYes,
 };
