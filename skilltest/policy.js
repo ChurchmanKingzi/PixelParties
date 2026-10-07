@@ -473,6 +473,29 @@ function reactionVerdict(engine, seat, cardName) {
 }
 
 // ── Basisaufbau ────────────────────────────────────────────────────
+const CAST_BONUS = 45;     // Heldenwert je Zauber/Angriff aus der Starthand, den dieser Hero mit seinen Start-Abilities (Stufe 3) sofort wirken kann
+
+/**
+ * Wie viele Zauber/Angriffe der Hand kann dieser Hero mit seinen Start-Abilities (Stufe 3) wirken? Ohne Schule oder Stufe 0 zählt halb
+ * (jeder Hero kann sie), Karten mit zwei Schulen brauchen die Stufen beider zusammen (wie `keepmodel.levelGap`).
+ */
+function castableInHand(cards, hand, hero) {
+  const Rules = require('../public/skilltest-rules.js');
+  const have = new Set([hero.startingAbility1, hero.startingAbility2].filter(Boolean));
+  let n = 0;
+  for (const name of hand || []) {
+    const x = cards[name];
+    if (!x || (x.cardType !== 'Spell' && x.cardType !== 'Attack')) continue;
+    const sub = (x.subtype || '').toLowerCase();
+    if (sub !== '' && sub !== 'normal') continue;
+    const schools = [x.spellSchool1, x.spellSchool2].filter(Boolean);
+    if (!(x.level > 0) || !schools.length) { n += 0.5; continue; }
+    const lv = schools.filter(sc => have.has(sc)).length * Rules.MAX_ABILITY_LEVEL;
+    if (lv >= x.level) n++;
+  }
+  return n;
+}
+
 /**
  * Basis für einen CPU-Sitz: Heroes nach Wert (HP/ATK + gelernter Kartenwert), Abilities/Support nach gelernter
  * Passung zum Hero, unbrauchbare Karten in den Recycler (mehr Gold, früherer Spielbeginn).
@@ -498,14 +521,14 @@ function prepareBase({ env, ps, room, idx, pool, noProfile, weights, record }) {
   return buildWithRecycling(env, ps, {
     pool, config: CONFIG, decide, record,
     maxKeep: Math.max(0, Math.round(w.keepCards)),
-    heroScore: (n, c) => w.heroHp * (c.hp || 0) + w.heroAtk * (c.atk || 0) + 150 * cv(n),
+    heroScore: (n, c) => w.heroHp * (c.hp || 0) + w.heroAtk * (c.atk || 0) + 150 * cv(n) + CAST_BONUS * w.spell * castableInHand(env.cards, ps.hand, c),
     pairScore: (hero, card) => 2 * pv(hero, card),
     keepScore: (n) => 2 * cv(n),
   });
 }
 
 module.exports = {
-  prepareBase,
+  prepareBase, castableInHand,
   DEFAULT_WEIGHTS, weightsOf, chooseTargets, chooseTribute, choosePlayer, rankActions, freeActions,
   stateValue, sideValue, isBeneficial, cardKey, reactionVerdict, reactionHeuristic, saysYes,
 };

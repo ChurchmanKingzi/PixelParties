@@ -103,5 +103,15 @@ console.log('Nutzbarkeit (Brett-bewusst)');
   const dOwn = res2.log.find(e => e.c === own.name);
   check('Eine nutzbare, aber nie gespielte Karte verliert dadurch an Wert', dOwn && dOwn.d < res.log.find(e => e.c === own.name).d, [dOwn && dOwn.d, res.log.find(e => e.c === own.name).d]);
 }
+console.log('Heldenwahl nach wirkbaren Zaubern der Hand');
+{
+  const policy = require('../../skilltest/policy');
+  const destruction = heroes.find(h => [h.startingAbility1, h.startingAbility2].includes('Destruction Magic'));
+  const other = heroes.find(h => ![h.startingAbility1, h.startingAbility2].includes('Destruction Magic') && ![h.startingAbility1, h.startingAbility2].includes('Magic Arts'));
+  const hand = ['Armageddon', 'Calm Diatribe'];
+  check('Hero mit Destruction Magic wirkt Armageddon (Lv3) aus der Hand, ein fremder Hero nicht',
+    policy.castableInHand(cards, hand, destruction) >= 1 && policy.castableInHand(cards, hand, other) < 1, [policy.castableInHand(cards, hand, destruction), policy.castableInHand(cards, hand, other)]);
+  check('Karten ohne Stufe zählen halb, Fremdkarten (Potion) nicht', policy.castableInHand(cards, ['Healing Potion'], destruction) === 0);
+}
 console.log(fails ? `\n✗ ${fails} Fehler` : '\n✓ Nutzbarkeits-Tests grün');
 process.exit(fails ? 1 : 0);
