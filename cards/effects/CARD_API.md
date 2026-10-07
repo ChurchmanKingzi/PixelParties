@@ -2937,7 +2937,15 @@ Defined in `_hooks.js`. Use with `ctx.addStatus()` / `ctx.removeStatus()`.
 | `immune` | ❌ | 🛡️ | — |
 | `shielded` | ❌ | ✨ | — |
 
-### Applying creature statuses
+### Keine Erneuerung von Betäubung und Frost (Regel)
+
+Hat ein Held `stunned` oder `frozen` bereits, **ersetzt ein neuer Auftrag den laufenden Status nicht** — ein 1-Runden-Stun wird nicht gegen einen
+frischen 2+-Runden-Stun getauscht, die Laufzeit beginnt nicht von vorn (`addHeroStatus` und `actionAddStatus`: Log `status_blocked`, Grund
+`already_active`). Kreaturen erneuern ohnehin nicht (`applyCreatureStatus` gibt bei vorhandenem Status `false` zurück). Soll eine Karte ausdrücklich
+erneuern dürfen, übergibt sie `{ renew: true }`. Gezielte Verlängerungen (Gon, Frost-Verlängerung in `_frost-shared.js`) schreiben die Laufzeit selbst
+und sind nicht betroffen. Test: `scripts/skilltest-e2e/status-renewal.test.js`.
+
+### Applying creature statuses### Applying creature statuses
 
 `engine.applyCreatureStatus(inst, statusName, opts)` is the **single** chokepoint every creature-status applier must use. Direct `inst.counters.<status> = 1` writes are forbidden in new card scripts — they bypass `canApplyCreatureStatus` (immunity gate) and skip the `ON_STATUS_APPLIED` hook fire, which would silently break Bear Rider's hand-level recompute, Chilly Wizard's status mirror, Colored Snow's reaction trigger, and any future creature-status-aware Creature.
 

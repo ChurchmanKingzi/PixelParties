@@ -16792,6 +16792,12 @@ this._deathWatch = (this._deathWatchStack || []).length
       }
     }
 
+    // Keine Erneuerung eines laufenden Stun/Frost (siehe `_statusErneuerungGesperrt`).
+    if (this._statusErneuerungGesperrt(target, statusName, opts)) {
+      this.log('status_blocked', { target: target.name || this._heroLabel(target), status: statusName, reason: 'already_active' });
+      return false;
+    }
+
     // v1399: ein bestehendes Gift behaelt den Verursacher des ERSTEN Stapels.
     const _vorher = target.statuses[statusName];
     target.statuses[statusName] = { ...opts, appliedTurn: this.gs.turn };
@@ -43752,6 +43758,19 @@ this._deathWatch = (this._deathWatchStack || []).length
     return require('./_ability-verwahrung-shared').versiegelt(this.gs, playerIdx, heroIdx, 'support', slotIdx);
   }
 
+  /**
+   * ★ Keine Erneuerung von Betäubung/Frost: Hat ein Held `stunned`/`frozen` schon, ersetzt ein neuer Auftrag den laufenden Status
+   * NICHT (ein 1-Runden-Stun wird nicht gegen einen frischen 2+-Runden-Stun getauscht, die Laufzeit beginnt nicht von vorn).
+   * Ausnahme nur, wenn die Karte es ausdrücklich verlangt (`opts.renew === true`). Verlängerungen, die einen Status gezielt
+   * verlängern (z. B. Frost-Verlängerung in `_frost-shared.js`), schreiben die Laufzeit selbst und laufen nicht über diesen Weg.
+   * Kreaturen erneuern ohnehin nicht (`applyCreatureStatus`: bestehender Status → `false`).
+   */
+  _statusErneuerungGesperrt(target, statusName, opts = {}) {
+    if (statusName !== 'stunned' && statusName !== 'frozen') return false;
+    if (opts.renew === true) return false;
+    return !!(target && target.statuses && target.statuses[statusName]);
+  }
+
   async addHeroStatus(playerIdx, heroIdx, statusName, opts = {}) {
     const hero = this.gs.players[playerIdx]?.heroes?.[heroIdx];
     if (!hero || !hero.name) return;
@@ -43949,6 +43968,12 @@ this._deathWatch = (this._deathWatchStack || []).length
         playBlockedAnim();
         return;
       }
+    }
+
+    // Keine Erneuerung eines laufenden Stun/Frost (siehe `_statusErneuerungGesperrt`).
+    if (this._statusErneuerungGesperrt(hero, statusName, opts)) {
+      this.log('status_blocked', { target: hero.name, status: statusName, reason: 'already_active' });
+      return;
     }
 
     // Poison stacking: if already poisoned, add/set stacks

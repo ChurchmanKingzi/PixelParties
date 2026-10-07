@@ -169,6 +169,13 @@
 - Audience with a hostile King
 - Open Invitation
 
+## Helden mit Spielbeginn-Effekt vor dem Ziehen der Starthand („At the start of the game, before both players draw their starting hands …“): Bill (Artifacts aus dem Deck ausrüsten), Hel (Artifact aus dem Deck ausrüsten), Sid (Deck des Gegners ansehen), Kassaran (drei Kartennamen erklären). Der Skill Test hat weder Deck noch Starthand-Ziehen — auf Wunsch aus dem Pool genommen. (Die Idej Lords haben denselben Text, bekommen ihre Karten aber über die Spawn-Regel.)
+
+- Bill, the Angry Auctioneer
+- Hel, the Bound Specter
+- Sid, the King of Thieves
+- Kassaran, Seer of Everything
+
 ## Idej Projection: kann nur durch den Effekt der Idej Lords an einen Hero gehängt werden („by its own effect“). Im Skill Test spawnen die Lords ihre Projections jetzt beim Aufstellen selbst (siehe skilltest/README.md); als Handkarte wäre sie ein Fremdkörper.
 
 - Idej Projection

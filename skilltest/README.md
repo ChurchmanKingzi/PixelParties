@@ -128,6 +128,7 @@ Sichtbar: Kartenliste (Spalte „Keep − recycle"), Paar- und Kontext-Tabellen 
   Modnir, Swellpnir, Ragnarock), Deckbau-Regelkarten (Secret Spices, Secret Spice Jar, The Sacred Blade), Deck-Karten (Surprise Party, Overcharge,
   Ladder to the Sky, …) und Karten für Ascended Heroes (Audience with a hostile King, Open Invitation). Karten, die bei passender Lage funktionieren
   (Spontaneous Reappearance, Kirin Firebreath, Tengu Windstorm, Liberation, Shapeshift …), bleiben — ihre geringe Nutzung kommt aus den Bot-Prioritäten.
+  Ebenfalls gesperrt: **Bill, Hel, Sid und Kassaran** (Spielbeginn-Effekte vor dem Ziehen der Starthand brauchen ein Deck).
 - **Kartenskripte** dürfen nie `pi === 0 ? 1 : 0` o. Ä. schreiben. Stattdessen:
   `engine.opponentOf(pi)` (EIN Gegner: Fokus bzw. nächster lebender Sitz), `engine.opponentsOf(pi)` (alle Gegner),
   `engine.playerCount()`. Im Normalspiel liefern sie bit-identisch das alte Verhalten. `node scripts/check-n-player.js`

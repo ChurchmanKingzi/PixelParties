@@ -54,6 +54,8 @@ const GROUPS = [
     cards: ['Arrival from the Cosmic Depths', 'Create Illusion', 'Living Illusion', 'Surprise Party', 'Overcharge', 'Ladder to the Sky', "Treasure Hunter's Backpack", 'The Eye of Ren', 'Muscle Training', 'Lesson in the Arts', 'Kitsune Transformation', 'Ultimate Weapon Experiment'] },
   { why: 'Karten für Ascended Heroes (im Skill Test gesperrt): ohne Ascended Hero auf dem Brett oder in der Hand haben sie kein Ziel.',
     cards: ['Audience with a hostile King', 'Open Invitation'] },
+  { why: 'Helden mit Spielbeginn-Effekt vor dem Ziehen der Starthand („At the start of the game, before both players draw their starting hands …“): Bill (Artifacts aus dem Deck ausrüsten), Hel (Artifact aus dem Deck ausrüsten), Sid (Deck des Gegners ansehen), Kassaran (drei Kartennamen erklären). Der Skill Test hat weder Deck noch Starthand-Ziehen — auf Wunsch aus dem Pool genommen. (Die Idej Lords haben denselben Text, bekommen ihre Karten aber über die Spawn-Regel.)',
+    cards: ['Bill, the Angry Auctioneer', 'Hel, the Bound Specter', 'Sid, the King of Thieves', 'Kassaran, Seer of Everything'] },
   { why: 'Idej Projection: kann nur durch den Effekt der Idej Lords an einen Hero gehängt werden („by its own effect“). Im Skill Test spawnen die Lords ihre Projections jetzt beim Aufstellen selbst (siehe skilltest/README.md); als Handkarte wäre sie ein Fremdkörper.',
     cards: ['Idej Projection'] },
   { why: 'Alle Future-Tech-Karten (Archetyp „Future Tech“): sie brauchen eine gefüllte Ablage, um gut zu funktionieren — im Skill Test gibt es keine Decks und kaum Ablage.',
