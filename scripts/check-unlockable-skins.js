@@ -54,7 +54,7 @@ const rohkopien = [...server.matchAll(/skins:\s*d\.skins\s*\|\|\s*\{\}/g)].lengt
 ok(rohkopien === 1, `${rohkopien} Deckkopien übernehmen d.skins ungefiltert (erlaubt: genau 1, die geteilte in createCpuBattle, deren CPU-Seite danach gefiltert wird)`);
 ok(/cpuSnapshot\.skins\s*=\s*withoutUnlockableSkins\(cpuSnapshot\.skins\)/.test(server), 'createCpuBattle filtert die Skins der CPU-Seite nicht');
 ok(/deckSkins:\s*String\(userId\)\.startsWith\('cpu-'\)\s*\?\s*withoutUnlockableSkins/.test(server), 'Puzzle: die CPU-Seite filtert freischaltbare Skins nicht');
-ok(/pool\s*=\s*\(SKINS_DATA\[heroName\]\s*\|\|\s*\[\]\)\.filter\(n\s*=>\s*skinFiles\.has\(n\)\s*&&\s*!isUnlockableSkin\(n\)\)/.test(server), 'rollCpuSkin filtert freischaltbare Skins nicht');
+ok(/pool\s*=\s*\(SKINS_DATA\[heroName\]\s*\|\|\s*\[\]\)\.filter\(n\s*=>\s*skinHasImage\(n,\s*skinFiles\)\s*&&\s*!isUnlockableSkin\(n\)\)/.test(server), 'rollCpuSkin filtert freischaltbare Skins nicht');
 for (const aufruf of ['onHumanWonGame(winner.userId)', "onHumanWonGame(room.players?.[0]?.userId)", 'grantTutorialSkinIfDone(userId)']) {
   ok(server.includes(aufruf), `server.js: Freischalt-Aufruf fehlt: ${aufruf}`);
 }

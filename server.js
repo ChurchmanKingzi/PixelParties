@@ -639,11 +639,22 @@ app.use((req, res, next) => {
   let name;
   try { name = decodeURIComponent(req.path.slice('/cards/skins/'.length)); } catch { return next(); }
   if (!name || /[\\/]|\.\./.test(name)) return next();
+  // Reihenfolge: Datei so, wie angefragt, in skins/ (dann passt alles) → so in unlockable/ → ohne
+  // Sonderzeichen („Parasytic ???“ → „Parasytic.png“, wie bei Heldenkarten wie „???, the Shapeshifter“;
+  // Windows erlaubt kein „?“ im Dateinamen) in skins/ → ohne Sonderzeichen in unlockable/.
+  const ext = path.extname(name);
+  const flach = strippedKey(path.basename(name, ext)) + ext;
+  const ziele = [['', name], ['unlockable/', name], ['', flach], ['unlockable/', flach]];
+  let ziel = null;
   try {
-    if (fs.existsSync(path.join(SKINS_DIR, name)) || !fs.existsSync(path.join(UNLOCKABLE_SKINS_DIR, name))) return next();
+    for (const [unter, datei] of ziele) {
+      if (datei === ext) continue;
+      if (fs.existsSync(path.join(SKINS_DIR, unter, datei))) { ziel = [unter, datei]; break; }
+    }
   } catch { return next(); }
+  if (!ziel || (ziel[0] === '' && ziel[1] === name)) return next();
   const q = req.url.indexOf('?');
-  req.url = '/cards/skins/unlockable/' + encodeURIComponent(name) + (q >= 0 ? req.url.slice(q) : '');
+  req.url = '/cards/skins/' + ziel[0] + encodeURIComponent(ziel[1]) + (q >= 0 ? req.url.slice(q) : '');
   next();
 });
 
@@ -3778,7 +3789,7 @@ function rollCpuSkin(cpuDeck) {
   if (!heroName) return null;
   // NIEMALS freischaltbare Skins: die CPU zieht nur aus dem Shop-Bestand.
   const skinFiles = shopSkinNames();
-  const pool = (SKINS_DATA[heroName] || []).filter(n => skinFiles.has(n) && !isUnlockableSkin(n));
+  const pool = (SKINS_DATA[heroName] || []).filter(n => skinHasImage(n, skinFiles) && !isUnlockableSkin(n));
   if (!pool.length) return null;
   return { heroName, skinName: pool[Math.floor(Math.random() * pool.length)] };
 }
@@ -3841,6 +3852,16 @@ const unlockableSkinNames = () => unlockableSkins.unlockableSkinNames();
 const isUnlockableSkin = (skinName) => unlockableSkins.isUnlockableSkin(skinName);
 const withoutUnlockableSkins = (skins) => unlockableSkins.withoutUnlockableSkins(skins);
 const heroOfSkin = (skinName) => unlockableSkins.heroOfSkin(SKINS_DATA, skinName);
+
+/**
+ * Gibt es ein Kartenbild zu diesem Skin? Der Dateiname darf ohne Sonderzeichen sein (Windows erlaubt z. B. kein „?“):
+ * „Parasytic ???“ findet „Parasytic.png“ — dieselbe Regel wie bei Heldenkarten („???, the Shapeshifter“ → „the Shapeshifter.png“).
+ */
+function skinHasImage(skinName, stems) {
+  if (stems.has(skinName)) return true;
+  const flach = strippedKey(skinName);
+  return !!flach && stems.has(flach);
+}
 
 /** Skins, die der SHOP anbieten darf (und die CPUs wuerfeln duerfen): Bilder der obersten Ebene, OHNE alles Freischaltbare. */
 function shopSkinNames() {
@@ -3928,7 +3949,7 @@ function getAvailableSkins() {
   for (const [heroName, skinNames] of Object.entries(SKINS_DATA)) {
     if (!heroSet.has(heroName)) continue;
     for (const skinName of skinNames) {
-      if (skinFiles.has(skinName)) {
+      if (skinHasImage(skinName, skinFiles)) {
         result.push({ heroName, skinName });
       }
     }
@@ -3965,7 +3986,7 @@ app.get('/api/shop/catalog', (req, res) => {
   for (const [heroName, skinNames] of Object.entries(SKINS_DATA)) {
     if (!heroSet.has(heroName)) continue;
     for (const skinName of skinNames) {
-      if (skinFiles.has(skinName)) {
+      if (skinHasImage(skinName, skinFiles)) {
         skins.push({ id: skinName, heroName, skinName });
       }
     }
@@ -4033,7 +4054,7 @@ app.post('/api/shop/buy', authMiddleware, async (req, res) => {
   // Verify item exists
   if (itemType === 'skin') {
     const skinFiles = shopSkinNames();
-    if (!skinFiles.has(itemId)) return res.status(404).json({ error: 'Skin not found' });
+    if (!skinHasImage(itemId, skinFiles) || !heroOfSkin(itemId)) return res.status(404).json({ error: 'Skin not found' });
   } else {
     const subdir = itemType === 'avatar' ? 'avatars' : itemType === 'sleeve' ? 'sleeves' : 'boards';
     const files = scanShopDir(subdir).map(f => path.basename(f, path.extname(f)));
