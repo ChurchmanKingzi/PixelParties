@@ -50,7 +50,6 @@
 ## Reine Zieh-/Such-Karten: ihre einzigen Effekte sind Ziehen, Suchen, Tutoren oder „oberste Karten aufdecken und auf die Hand nehmen“. Der Skill Test hat kein Deck, die Karten wären wirkungslos (oder schaden, z. B. „Hand ablegen und gleich viele ziehen“). Erkannt über die Zieh-/Such-Sperren der Engine (`blockedByHandLock`, `blockedByDrawLock`, `blockedBySearchLock`) und über den Zieh-Block-Helfer (Wheels, Haste, …), von Hand geprüft. NICHT gesperrt: Karten, die auch etwas anderes bewirken, sowie reine Ablage-Rückholer (Shooting Star, Boomerang, Relic in the Sky, Magic Sapphire, Elixir of Mana, Shard of Chaos, Spontaneous Reappearance …) — die Ablage gibt es im Skill Test.
 
 - Alchemic Journal
-- Alchemy
 - Angry Cheese
 - Aurora Borealis
 - Bifab, Bridge to Coolness
@@ -61,12 +60,9 @@
 - Cute Cheese
 - Cuteness Sensor
 - Divine Gift of Creation
-- Elixir of Quickness
 - Graveyard Gathering
 - Heart of Cards
-- Heart of the Mountain
 - Holy Cheese
-- Horn in a Bottle
 - Idol of Crestina
 - Magic Lamp
 - Magnetic Glove
@@ -78,17 +74,12 @@
 - Philosopher's Stone
 - Potion of Greed
 - Sickly Cheese
-- Staff of the Teleporter
-- Staff of Uncontrollable Destruction
 - Tanuki Escape
 - Teleportal
 - The Sacred Jewel
 - The Sacred Mirror
 - Trial of Loyalty
-- Haste
-- Supply Chain
 - Voice in your Head
-- Wheels
 - Glimpse of the Future
 - Grasp the Future
 - Prophecy of Coolness
@@ -96,7 +87,6 @@
 - Pawn Sacrifice
 - Mystery Box
 - Glass of Marbles
-- Ice Sculpture Garden
 - Divine Gift of Balance
 - Divine Gift of Edge
 - Crushing Defeat
@@ -104,8 +94,6 @@
 - Spatial Crevice
 - Premonition
 - Inventing
-- Leadership
-- Creativity
 - Luck
 - Amazing Finding
 - Draw
@@ -113,9 +101,6 @@
 - Charm of Balance
 - Prayer
 - Smuggler's Pier
-- Wanted Poster
-- The Brewer's Blade
-- Bluff
 - Spider Silk Bridge
 - Cell Escape
 - Infiltration
@@ -128,7 +113,6 @@
 - Snake Race Boat
 - Rain Viola
 - Lunatic Cycle - New Moon
-- Lunatic Cycle - Crescent Moon
 - Bow of the Hunt Goddess
 
 ## Coolness-Stack-Karten: wirken nur aus dem Coolness Stack („This card has no effect, unless you play it from your Coolness Stack“) oder verlangen dessen Inhalt. Der Skill Test hat keinen Coolness Stack (in 6 Probepartien an allen 24 Sitzen immer leer) — die Karten sind unspielbar (Nachttraining: 0 % Nutzung bei 80–165 behaltenen Exemplaren je Karte).

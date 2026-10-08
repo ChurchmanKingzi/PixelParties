@@ -11415,6 +11415,20 @@ class GameEngine {
    * Draw cards from a player's Potion Deck. Triggers surprise draw checks
    * (e.g. Pure Advantage Camel) just like regular draws.
    */
+  /**
+   * Ist das Deck (`'main'` | `'potion'`) leer? Im Skill Test sind die Decks im Ruhezustand leer und es wird von außerhalb des Spiels gezogen
+   * (skilltest/engine-ext.js installDraws) — „leer“ heißt dort: im Pool liegt nichts Ziehbares mehr. Normalspiel: Länge 0.
+   */
+  deckLeer(playerIdx, kind = 'main') {
+    const ps = this.gs.players[playerIdx];
+    const deck = kind === 'potion' ? (ps?.potionDeck || []) : (ps?.mainDeck || []);
+    if (!this.gs.skillTest) return deck.length === 0;
+    if (deck.length > 0) return false;
+    const pool = this.room?.skillTest?.pool;
+    if (!pool) return true;
+    return pool.listWhere((n, b) => kind === 'potion' ? b === 'potion' : (b !== 'hero' && b !== 'potion')).length === 0;
+  }
+
   async actionDrawFromPotionDeck(playerIdx, count) {
     const ps = this.gs.players[playerIdx];
     if (!ps) return [];

@@ -95,6 +95,27 @@ class CardPool {
     return name;
   }
 
+  /** Alle Karten (Namen) des Pools, die `pred(name, bucket)` erfüllen — Töpfe `buckets` (Standard: alle). */
+  listWhere(pred, buckets) {
+    const out = [];
+    for (const b of (buckets || BUCKETS)) for (const n of this.buckets[b] || []) if (pred(n, b)) out.push([b, n]);
+    return out;
+  }
+
+  /** Eine zufällige Karte (gleichverteilt über alle passenden) NEHMEN; null, wenn keine passt. Für Ziehen/Mulligan im Kampf („von außerhalb des Spiels“). */
+  takeRandom(pred, buckets) {
+    const c = this.listWhere(pred, buckets);
+    if (!c.length) return null;
+    const [b, n] = c[Math.floor(this.rng() * c.length)];
+    return this.takeNamed(n) && n;
+  }
+
+  /** Wie `takeRandom`, aber ohne die Karte zu entnehmen (Lookahead-Simulationen dürfen den Pool nicht verändern). */
+  peekRandom(pred, buckets) {
+    const c = this.listWhere(pred, buckets);
+    return c.length ? c[Math.floor(this.rng() * c.length)][1] : null;
+  }
+
   /** Eine Karte zurück in ihren Topf legen (z. B. wenn die Hand-Regeln sie nicht erlauben). */
   give(bucket, name) { if (name) this.buckets[bucket].push(name); }
 

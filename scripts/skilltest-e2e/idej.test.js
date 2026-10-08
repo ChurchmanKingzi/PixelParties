@@ -113,17 +113,21 @@ console.log('Zustände ohne `spawned` (ältere Basen) laufen weiter');
 console.log('Pool: gesperrte Karten kommen nicht vor');
 {
   const MUST_BE_OUT = ['Tri Ad, the Puppet Mistress', 'Tri Fecta, the Puppet Master', 'Idej Projection',
-    'Wheels', 'Magnetic Potion', 'Elixir of Quickness', 'Haste', 'Supply Chain', 'Magnetic Glove', 'Brilliant Idea', 'The Sacred Jewel', 'Alchemy', 'Navigation', 'Leadership', 'Luck'];
+    'Magnetic Potion', 'Magnetic Glove', 'Brilliant Idea', 'The Sacred Jewel', 'Navigation', 'Luck'];            // Suchen/Tutoren bleiben draußen
+  // Seit 8.10. wieder im Pool: reine Draw- und Mulligan-Karten (Ziehen von außerhalb des Spiels, engine-ext.js installDraws)
+  const NOW_IN = ['Wheels', 'Elixir of Quickness', 'Haste', 'Supply Chain', 'Alchemy', 'Leadership', 'Horn in a Bottle', 'Staff of the Teleporter', 'Heart of the Mountain'];
   const MUST_STAY = ['Shooting Star', 'Boomerang', 'Elixir of Recovery', 'Pressed Skill', "Rainbow's Arrow", 'Spider Dance', 'Idej Blade - Hakai', 'Idej Lord Daiyo', 'Idej Sword - Kunagi'];
   const all = new Set();
   const pool = new CardPool(cards);
   for (const b of Object.keys(pool.buckets)) for (const n of pool.buckets[b]) all.add(n);
   check('Gesperrte Karten sind nicht im Pool', MUST_BE_OUT.every(n => !all.has(n)), MUST_BE_OUT.filter(n => all.has(n)));
+  check('Reine Draw-/Mulligan-Karten sind wieder im Pool', NOW_IN.every(n => all.has(n)), NOW_IN.filter(n => !all.has(n)));
   check('Karten mit eigenem Effekt (Ablage-Rückholer u. a.) bleiben im Pool', MUST_STAY.every(n => all.has(n)), MUST_STAY.filter(n => !all.has(n)));
   const flagged = ['blockedByHandLock', 'blockedByDrawLock', 'blockedBySearchLock'];
   const { loadCardEffect } = require('../../cards/effects/_loader');
   const KEEP_BY_HAND = new Set(['Cleansing of the Land', 'Elixir of Recovery', 'Pressed Skill', "Rainbow's Arrow", 'Spider Dance',   // geflaggt, aber mit echtem Zusatzeffekt von Hand geprüft
-    'Boomerang', 'Shard of Chaos', 'Elixir of Mana', 'Debt-O-Tron Model Backup Duplicator']);                  // Ablage-Rückholer (die Ablage gibt es im Skill Test) bzw. Kreatur-Artefakt
+    'Boomerang', 'Shard of Chaos', 'Elixir of Mana', 'Debt-O-Tron Model Backup Duplicator',
+    ...NOW_IN, 'Staff of Uncontrollable Destruction']);                  // Ablage-Rückholer (die Ablage gibt es im Skill Test) bzw. Kreatur-Artefakt
   const leftovers = [...all].filter(n => { const c = cards[n]; if (!c || c.cardType === 'Creature' || c.cardType === 'Hero') return false; let s; try { s = loadCardEffect(n); } catch { return false; } return s && flagged.some(f => s[f]) && !KEEP_BY_HAND.has(n); });
   check('Kein Nicht-Kreatur-Karte mit Zieh-/Such-Sperr-Flag steckt unbesehen im Pool', leftovers.length === 0, leftovers);
 }

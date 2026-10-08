@@ -163,6 +163,30 @@ In Lobby und Vorbereitung heißen CPU-Sitze „CPU n" und erscheinen als schwarz
 Erst `battle.js nameBots` gibt ihnen beim Kampfstart Namen und Aussehen ihres mittleren Heroes (nur der reine Name, `hero-name.js`;
 das Portrait zeigt die Oberfläche als Bildausschnitt des mittleren Heroes). Test: `hero-name.test.js` (Server-/Client-Kurznamen gleich).
 
+### Hand-Garantien und Recycler (`hand-rules.js`)
+
+- **Heldenpartner:** Nennt ein Hero einen Spell im Text (Luna → Firewall, Sol Rym → Chain Lightning, Damus → Armageddon, Natas → The Master's Plan) oder steht er in
+  `CONFIG.HERO_PARTNERS` (Mary → Cute Phoenix, Baaliel → Horned Demon, Damus → Ifrit, Arthor → The White Eye), liegt der Partner garantiert mit ihm auf der Hand.
+  `CONFIG.HERO_RANDOM_PARTNERS`: Tsu'Ki bringt 1–3 verschiedene Lunatic-Ausrüstungen mit. Partner sind im Pool **reserviert** (`CardPool.reserved`): andere Spieler
+  und der Recycler bekommen sie nie.
+- **Nie mehr als 18 Karten:** Reicht der Platz nicht, fliegen zufällige andere Karten (keine Heroes, keine garantierten) zurück in den Pool.
+- **Spell Schools** (Magic Arts, Decay, Support, Destruction; nicht Summoning): Spells dieser Schulen mit Gesamtlevel 1–5 (zufällig) in der Starthand; hat ein Hero zwei
+  verschiedene Schulen, zusätzlich je Schule ein Lv-3-Spell (wirkungsvollster von dreien nach gelerntem Kartenwert). Garantien greifen je Hero/Schule einmal.
+- **Recycler:** Spells nur aus Schulen der Board-Heroes (falls möglich); der Inhalt wandert zu Spielbeginn in die eigene Ablage (`recycledCards`, auch für Bots).
+
+### Ziehen und Mulligan (`engine-ext.js installDraws`)
+
+Keine Decks, aber Ziehen funktioniert: vor dem Ziehen erscheinen X **zufällige neue Karten** (aus dem Rest des Pools, `room.skillTest.pool`) im Deck bzw. Potion Deck und
+fliegen mit den normalen Animationen zur Hand. Heroes sind ausgeschlossen, das Potion Deck gibt nur Potions, das Deck nie; Spell-School-Abilities nur, wenn der Spieler sie
+nicht schon hat. Mulligan: die zurückgemischten Karten fliegen sichtbar zum Deck und mischen; X neue Karten ersetzen sie (die alten gehen in den Pool zurück und können
+wiederkommen). Im Lookahead wird der Pool nur gelesen. Reine Draw- und Mulligan-Karten (Alchemy, Wheels, Haste, Leadership, Horn in a Bottle, Staff of the Teleporter …) sind
+im Pool; Karten, die suchen (Tutoren), bleiben gesperrt. Tests: `draws.test.js`, `draw-cards.test.js`.
+
+### Dream Lander
+
+Creatures mit `attachableHeroes` (Goff, Clausss, Smugbeth, Vullary, Wolflesia, Stellin, Antonia) starten mit dem Hero angelegt — beim Ausspielen im Kampf und wenn sie schon im
+Aufbau stehen (`engine._stAutoAttachHero`). Test: `dream-lander.test.js`. Logan (`logan.test.js`): Auszahlung am Rundenende je Sitz; CPU-Sitze investieren und zahlen aus.
+
 ## Karten mit Sonderregeln
 
 | Karte | Regel im Skill Test |

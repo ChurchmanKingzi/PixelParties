@@ -137,6 +137,7 @@ async function start(room, host, prep) {
   gs.isSkillTest = true;                                     // Client: zufällige Kampfmusik des Modus (BGM_SETS, gs.bgmSet)
   const st = room.skillTest;
   st.phase = 'battle';
+  st.pool = prep.pool;            // Ziehen und Mulligan im Kampf nehmen Karten „von außerhalb des Spiels“ aus dem Rest des Pools (engine-ext.js installDraws)
   st.starter = starter;
   gs.skillTest = {
     phase: 'battle', round: 0, firstStarter: starter, starter, order: [], turnSeat: null,
@@ -169,6 +170,7 @@ async function start(room, host, prep) {
   room.engine = engine;
   ext.installBotSeats(engine, (pi) => skillGs.botSeats.includes(pi));
   ext.installBotBrain(engine);
+  ext.installDraws(engine);
   ext.installPlayerChoice(engine);
   ext.installTargetWatch(engine);
   ext.installReactions(engine);

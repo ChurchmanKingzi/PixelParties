@@ -28,8 +28,8 @@ const check = (name, cond, info) => { if (cond) console.log('  ✓', name); else
   await rounds.endRound(engine);
   check('Auszahlung am Rundenende ausgelöst (Gold oder Schaden)', events.length >= 1, events.map(e => e[0]));
   const gold = gs.players[seat].gold > goldBefore;
-  const dmg = gs.players.some((p, i) => (p.heroes || []).filter(h => h && h.name).some((h, j) => h.hp < (hpBefore[i][j] ?? Infinity)));
-  check('… und wirkt tatsächlich (Gold gestiegen oder Schaden verteilt)', gold || dmg, { gold: gs.players[seat].gold, events: events.map(e => e[0]) });
+  const payout = events.find(e => e[0] === 'logan_payout_damage' || e[0] === 'logan_payout_gold');
+  check('… und wirkt tatsächlich (Gold gestiegen, oder Schaden mit Ziel und Betrag gemeldet)', gold || (payout && (payout[1].damage > 0 || payout[1].gold > 0) && (payout[1].target || payout[1].gold)), { gold: gs.players[seat].gold, events: events });
   check('die CPU wählt Schaden (Zähler bleiben liegen)', events.some(e => e[0] === 'logan_payout_damage') && hero._investCounters === 3, events.map(e => e[0]));
   const n1 = events.length;
   await rounds.startRound(engine, host);

@@ -274,4 +274,104 @@ function relaxRules(engine) {
   for (const ps of engine.gs.players) ps._noHandLimitUntilTurn = Infinity;
 }
 
-module.exports = { installReactions, installRunawayBreaker, installSnapshotGuard, installPlayerChoice, installTargetWatch, installElimination, installMeter, installTurnEnd, installBotSeats, installBotBrain, relaxRules };
+// ── Ziehen und Mulligan: Karten „von außerhalb des Spiels“ ───────────────────────────────────────────────────────
+// Der Modus hat keine Decks; Ziehen und Mulligan (Alchemy, Wheels, Haste, Leadership, Horn in a Bottle …) funktionieren trotzdem:
+//  • Ziehen: vor dem Ziehen erscheinen X Karten im Deck (bzw. Potion Deck) und fliegen mit den normalen Animationen zur Hand. Es sind ZUFÄLLIGE NEUE
+//    Karten aus dem Pool — nicht in Rotation (nicht in einer Hand, auf einem Brett oder in einer Ablage), Heroes ausgeschlossen. Aus dem Potion Deck
+//    kommen immer Potions, aus dem Deck nie. Spell-School-Abilities kommen nicht, wenn der Spieler sie schon auf dem Brett hat; andere Abilities schon.
+//  • Mulligan: die zurückgemischten Karten fliegen sichtbar zum Deck, das Deck mischt (normale Animation) — dann ersetzen X neue Zufallskarten sie
+//    (die zurückgemischten gehen in den Pool zurück und können theoretisch wiederkommen), und es werden genau diese gezogen.
+// Im Lookahead (_inMctsSim) wird der Pool nur gelesen, nie verändert.
+const SPELL_SCHOOL_ABILITIES = ['Magic Arts', 'Decay Magic', 'Support Magic', 'Destruction Magic', 'Summoning Magic'];
+
+function stPool(engine) { return engine.room && engine.room.skillTest && engine.room.skillTest.pool || null; }
+
+/** Spell-School-Abilities, die dieser Spieler schon hat (Start-Abilities seiner Heroes oder angelegt). */
+function schoolsOnBoard(engine, pi) {
+  const cards = engine._getCardDB(), ps = engine.gs.players[pi], out = new Set();
+  for (const h of (ps && ps.heroes) || []) { const c = h && h.name && cards[h.name]; if (c) for (const a of [c.startingAbility1, c.startingAbility2]) if (SPELL_SCHOOL_ABILITIES.includes(a)) out.add(a); }
+  for (const col of (ps && ps.abilityZones) || []) for (const z of col || []) for (const n of (z || [])) if (SPELL_SCHOOL_ABILITIES.includes(n)) out.add(n);
+  return out;
+}
+
+function stNewCard(engine, pi, kind) {
+  const pool = stPool(engine);
+  if (!pool) return null;
+  const cards = engine._getCardDB();
+  const have = kind === 'main' ? schoolsOnBoard(engine, pi) : null;
+  const pred = (n, b) => {
+    if (kind === 'potion') return b === 'potion';
+    if (b === 'hero' || b === 'potion') return false;
+    if (b === 'ability' && have && have.has(n)) return false;          // Spell-School-Abilities nur, wenn der Spieler sie noch nicht hat
+    return !!cards[n];
+  };
+  return engine._inMctsSim ? pool.peekRandom(pred) : pool.takeRandom(pred);
+}
+
+function stGiveBack(engine, name) {
+  const pool = stPool(engine);
+  if (!pool || engine._inMctsSim || !name) return;
+  const b = require('./pool').bucketOf(engine._getCardDB()[name]);
+  if (b) pool.give(b, name);
+}
+
+/** Das Deck (Haupt- oder Potion Deck) auf mindestens `count` neue Karten bringen; liegt schon etwas darin, bleibt es. */
+function stFillDeck(engine, pi, kind, count) {
+  const ps = engine.gs.players[pi];
+  if (!ps || !engine.gs.skillTest) return 0;
+  const deck = kind === 'potion' ? (ps.potionDeck = ps.potionDeck || []) : (ps.mainDeck = ps.mainDeck || []);
+  let added = 0;
+  while (deck.length < count) { const n = stNewCard(engine, pi, kind); if (!n) break; deck.push(n); added++; }
+  return added;
+}
+
+/** Übrige Karten aus dem Deck zurück in den Pool: im Ruhezustand sind die Decks leer. */
+function stClearDeck(engine, pi, kind) {
+  const ps = engine.gs.players[pi];
+  if (!ps) return;
+  const deck = kind === 'potion' ? ps.potionDeck : ps.mainDeck;
+  if (!deck || !deck.length) return;
+  for (const n of deck.splice(0, deck.length)) stGiveBack(engine, n);
+  if (kind !== 'potion') ps.deckTopVisible = [];
+}
+
+function installDraws(engine) {
+  const origDraw = engine.actionDrawCards.bind(engine);
+  engine.actionDrawCards = async function (pi, count, opts = {}) {
+    if (!this.gs.skillTest || opts._isResourceDraw) return origDraw(pi, count, opts);
+    const added = stFillDeck(this, pi, 'main', count);
+    if (added > 0 && !this._inMctsSim && !this._fastMode) { this.sync(); await this._delay(250); }       // die Karten erscheinen kurz im Deck …
+    try { return await origDraw(pi, count, opts); }                                                      // … und fliegen zur Hand
+    finally { stClearDeck(this, pi, 'main'); }
+  };
+
+  const origPotion = engine.actionDrawFromPotionDeck.bind(engine);
+  engine.actionDrawFromPotionDeck = async function (pi, count) {
+    if (!this.gs.skillTest) return origPotion(pi, count);
+    const added = stFillDeck(this, pi, 'potion', count);
+    if (added > 0 && !this._inMctsSim && !this._fastMode) { this.sync(); await this._delay(250); }
+    try { return await origPotion(pi, count); }
+    finally { stClearDeck(this, pi, 'potion'); }
+  };
+
+  const origMulligan = engine.actionMulliganCards.bind(engine);
+  engine.actionMulliganCards = async function (pi, names, handIdx) {
+    const res = await origMulligan(pi, names, handIdx);              // Karten fliegen zum Deck, das Deck mischt (normale Animation)
+    if (this.gs.skillTest) {
+      // Neue Karten ersetzen die zurückgemischten; die alten gehen in den Pool zurück (und können wiederkommen)
+      this.gs.players.forEach((p, i) => {
+        for (const kind of ['main', 'potion']) {
+          const deck = kind === 'potion' ? p.potionDeck : p.mainDeck;
+          if (!deck || !deck.length) continue;
+          const k = deck.length;
+          stClearDeck(this, i, kind);
+          stFillDeck(this, i, kind, k);
+        }
+      });
+      this.sync();
+    }
+    return res;
+  };
+}
+
+module.exports = { installReactions, installRunawayBreaker, installSnapshotGuard, installPlayerChoice, installTargetWatch, installElimination, installMeter, installTurnEnd, installBotSeats, installBotBrain, relaxRules, installDraws, stFillDeck, stClearDeck, stNewCard };
