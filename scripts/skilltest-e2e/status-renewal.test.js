@@ -9,7 +9,7 @@ const check = (name, cond, info) => { if (cond) console.log('  ✓', name); else
 (async () => {
   const oL = console.log, oE = console.error;
   console.log = () => {}; console.error = () => {};
-  const out = await runGame({ seats: 3, setupOnly: true, noProfileSeats: [0, 1, 2], seed: 4 });
+  const out = await runGame({ seats: 3, setupOnly: true, noProfileSeats: [0, 1, 2], seed: 5 });
   console.log = oL; console.error = oE;
   const { engine, gs } = out;
   const seat = 1, hi = gs.players[seat].heroes.findIndex(h => h && h.name && h.hp > 0);

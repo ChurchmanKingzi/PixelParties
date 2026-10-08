@@ -46,6 +46,9 @@
   // Start-Abilities der Heroes beginnen im Skill Test auf der HÖCHSTEN Stufe (im Normalspiel Stufe 1, bei doppelter Start-Ability 2):
   // ohne Deck und mit nur 18 Karten bliebe sonst ein Großteil der Zauber/Angriffe auf der Hand unbrauchbar.
   const START_ABILITY_LEVEL = 3;
+  // Start-Abilities, die im Skill Test NICHT aufs Brett kommen (8.10.: Pillage ist Mill — der Skill Test hat kein Deck; die Karte ist gesperrt).
+  // Der Hero behält seine übrige Start-Ability; ein Hero mit nur dieser Ability beginnt ohne.
+  const NO_START_ABILITIES = ['Pillage'];
   // Idej Lords: beim Aufstellen erscheinen ihre „zugehörigen Karten“ aus dem Nichts in den Support Zones des Heroes
   // (im echten Spiel sucht der Lord sie zu Spielbeginn aus dem Deck — der Skill Test hat kein Deck). `proj` = Idej Projection,
   // `blade` = Idej Blade (zufällig, je Lord verschieden). Verlässt der Lord das Brett, verschwinden sie.
@@ -226,11 +229,16 @@
     }
   }
 
+  /** Start-Ability 1 oder 2 einer Heldenkarte, wie sie im Skill Test aufs Brett kommt ('' = keine; gesperrte Abilities fehlen). */
+  function startAbilityOf(card, n) {
+    const a = card && card['startingAbility' + n] || '';
+    return NO_START_ABILITIES.includes(a) ? '' : a;
+  }
+
   /** Startfähigkeiten eines Heroes in seine Ability-Zonen legen (wie das echte Spiel). */
   function installStartAbilities(env, ps, hi, heroName) {
     const c = env.cards[heroName];
-    const a1 = c && c.startingAbility1 || '';
-    const a2 = c && c.startingAbility2 || '';
+    const a1 = startAbilityOf(c, 1), a2 = startAbilityOf(c, 2);
     const Z = ps.abilityZones[hi];
     const S = START_ABILITY_LEVEL;
     if (a1 && a2 && a1 === a2) Z[1] = { n: a1, s: S, c: false };
@@ -493,6 +501,6 @@
     emptyPlayer, clone,
     heroCount, requiredHeroes, boardFull, hasZhigao, totalHeroes, abilityLevel,
     zoneAccepts, canDrop, applyMove, readyProblem, abilityStacks, areaLimit, canPlaceAnotherArea, soundCounts, prepSounds,
-    installStartAbilities, isSpawned, IDEJ_PACKAGES, IDEJ_PROJECTION, IDEJ_BLADES,
+    installStartAbilities, startAbilityOf, NO_START_ABILITIES, isSpawned, IDEJ_PACKAGES, IDEJ_PROJECTION, IDEJ_BLADES,
   };
 }));

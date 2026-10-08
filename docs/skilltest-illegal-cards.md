@@ -413,7 +413,7 @@
 - Spider Dance
 - The Cosmic Depths
 
-## Reine Mill-Karten (Nutzer 8.10.): ihr Effekt ist ausschließlich, Karten vom Deck in die Ablage zu schicken (Pillage, Dead Guardian, Magic Emerald, Gravedigger's Shovel, Sky Shaman, Cute Nerd Magenta, Jean, Cute Cat, Gravedigger). Der Skill Test hat kein Deck. NICHT gesperrt: Karten, die nur nebenbei mill’en (Deepsea Skeleton, Guardian's Appearance, Soul Shard Shut, Codumbus) und Trade (löscht oberste Karten nur als Preis für Gold).
+## Reine Mill-Karten (Nutzer 8.10.): ihr Effekt ist ausschließlich, Karten vom Deck in die Ablage zu schicken (Pillage, Dead Guardian, Magic Emerald, Gravedigger's Shovel, Sky Shaman, Cute Nerd Magenta, Jean, Cute Cat, Gravedigger). Der Skill Test hat kein Deck. NICHT gesperrt: Karten, die nur nebenbei mill’en (Deepsea Skeleton, Soul Shard Shut, Codumbus; Guardian's Appearance kam danach doch raus, siehe unten) und Trade (löscht oberste Karten nur als Preis für Gold).
 
 - Pillage
 - Dead Guardian
@@ -449,6 +449,27 @@
 ## Festive Werz (Nutzer 8.10.): zahlt „deinem Gegner“ Gold — mit mehreren Gegnern gibt es nicht DEN Gegner.
 
 - Festive Werz
+
+## Guardian's Appearance (Nutzer 8.10.): setzt ein Guardian-Beast-Creature von der Hand und schickt die obersten 3 Deck-Karten in die Ablage — der Mill-Teil ist im Skill Test wirkungslos.
+
+- Guardian's Appearance
+
+## „Choose X from your deck“, die de facto nur ein Search sind (Nutzer 8.10.): Der Effekt der Karte besteht allein darin, eine gewählte Karte aus dem DECK zu holen (auf die Hand, ins Spiel, unter eine Creature …); der Skill Test hat kein Deck. Creatures/Spells: Ancient Guardian Statue (Spell aus dem Deck vor sich legen), Begin the Race! (Lv-0-Creatures aus dem Deck), Create Secret Room (Karte aus dem Deck in die Surprise Zone), Elven Druid (Elven-Creature aus dem Deck beschwören), Loyal Rottweiler (Loyal-Creature aus dem Deck), Monster Nest (Creature aus dem Deck aufsetzen), Unholy Combination (Creature aus dem Deck für ein Opfer), Cute Bird (Cute Phoenix aus dem Deck). Heroes, deren Effekt nur das ist: Legendary Explorer Dajan (Artifact aus dem Deck spielen), Friedhelm (Attack/Spell aus dem Deck benutzen), Timeless King Zi (3 Spells aus dem Deck aufdecken), Kit, the Shark Researcher (Creature aus dem Deck aufdecken/holen), Cecilia (Karten aus dem Deck spielen/holen). Ability: Trapping (Surprise aus dem Deck ins Spiel). NICHT gesperrt: Karten mit Hand-/Ablage-Alternative oder weiterem Effekt (Gate to the Armory, Cleansing of the Land, Call for Help, Staff of Illusions, Divine Gift of the Deepsea, Planet in a Bottle, Pressed Skill, Training, Wise Village Elder, Search for the Leader, Steam Dwarf Engineer, Red Dragoneer, Chaorc Friendly Fireballer, Cooldin, Calamitusk, Barker, Reality Crack, Stellan/Stellin und die „unter diese Creature legen“-Creatures, Sentient Bomb Golems, Infinitely Reproducing Slime, Metamorphosis of Serket, Dream World Portal, Sacrifice to Divinity, The Weather Orchestra, Atta, Maho, Koperniko).
+
+- Ancient Guardian Statue
+- Begin the Race!
+- Create Secret Room
+- Elven Druid
+- Loyal Rottweiler
+- Monster Nest
+- Unholy Combination
+- Cute Bird
+- Legendary Explorer Dajan
+- Friedhelm, the Misled Avenger
+- Timeless King Zi
+- Kit, the Shark Researcher
+- Cecilia, the Harrowing Crusader
+- Trapping
 
 ## Alle Future-Tech-Karten (Archetyp „Future Tech“): sie brauchen eine gefüllte Ablage, um gut zu funktionieren — im Skill Test gibt es keine Decks und kaum Ablage.
 

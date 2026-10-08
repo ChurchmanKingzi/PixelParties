@@ -713,7 +713,7 @@ const CAST_BONUS = 45;     // Heldenwert je Zauber/Angriff aus der Starthand, de
  */
 function castableInHand(cards, hand, hero) {
   const Rules = require('../public/skilltest-rules.js');
-  const have = new Set([hero.startingAbility1, hero.startingAbility2].filter(Boolean));
+  const have = new Set([Rules.startAbilityOf(hero, 1), Rules.startAbilityOf(hero, 2)].filter(Boolean));
   let n = 0;
   for (const name of hand || []) {
     const x = cards[name];

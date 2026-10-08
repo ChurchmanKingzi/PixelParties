@@ -182,7 +182,11 @@ Sichtbar: Kartenliste (Spalte „Keep − recycle"), Paar- und Kontext-Tabellen 
   The Egg of God, Garius, Alex, Madaga, Monsieur Pete, Sabrina … — 34 Karten; die Idej Lords bleiben, ihr Paket kommt über die Spawn-Regel), alle **reinen Mill-Karten**
   (Pillage, Dead Guardian, Magic Emerald, Gravedigger's Shovel, Sky Shaman, Cute Nerd Magenta, Jean, Cute Cat, Gravedigger), alle **Paraseed-Karten** (Greenhouse) und das
   **Tanuki-Paket** (Rebelliokai Timid Tanuki, Tanuki Escape), die fünf **Cycling Demons** (Bouldor, Herbithorn, Hydrogen, Infernous, Serpentous), **Sandy Blob** und
-  **Festive Werz**. Begründungen und Ausnahmen: `docs/skilltest-illegal-cards.md`.
+  **Festive Werz**, **Guardian's Appearance** (Mill-Teil wirkungslos) und die **Choose-X-Karten, die de facto nur ein Search sind** (Ancient Guardian Statue, Begin the Race!,
+  Create Secret Room, Elven Druid, Loyal Rottweiler, Monster Nest, Unholy Combination, Cute Bird; die Heroes Legendary Explorer Dajan, Friedhelm, Timeless King Zi, Kit, Cecilia; die Ability Trapping).
+  Karten mit Hand-/Ablage-Alternative oder weiterem Effekt bleiben. Begründungen und Ausnahmen: `docs/skilltest-illegal-cards.md`.
+  **Pillage als Start-Ability** erscheint nicht mehr auf dem Brett (`Rules.NO_START_ABILITIES` in `public/skilltest-rules.js`): Gobbo beginnt nur mit Fighting, Codumbus mit Luck,
+  Rool mit Wealth. Andere gesperrte Deck-Abilities (Luck, Navigation, Inventing, Premonition, Infiltration, Trapping …) erscheinen als Start-Ability weiterhin — Eintrag in der Liste genügt.
   *Ruling 8.10. (Pollution):* „…in your free Support Zones" zählt die freien Zonen **gefallener** Heroes mit (Pyroblast mit nur einem lebenden Hero ohne freie Zone ist
   möglich); Acid Rain („one of their Heroes' free Support Zones") bleibt bei den lebenden (`cards/effects/_pollution-shared.js`, Option `aliveOnly`).
   Ebenfalls gesperrt: **Bill, Hel, Sid und Kassaran** (Spielbeginn-Effekte vor dem Ziehen der Starthand brauchen ein Deck).

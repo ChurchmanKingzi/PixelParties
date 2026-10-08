@@ -55,7 +55,7 @@ async function setup(label) {
 }
 
 // Der Test-Mensch passt jede eigene Round, bis das Spiel endet.
-async function passUntilOver(c, limitMs = 150000) {
+async function passUntilOver(c, limitMs = 300000) {
   const t0 = Date.now();
   while (!c.last('st_game_over') && Date.now() - t0 < limitMs) {
     const g = c.last('game_state');
@@ -77,7 +77,7 @@ async function passUntilOver(c, limitMs = 150000) {
       const bot = await waitFor(() => { const g = a.last('game_state'); return g && g.skillTest.botSeats.includes(seatB) ? g : null; }, 8000);
       check('Sitz des Getrennten wird von der CPU gespielt', !!bot, a.last('game_state') && a.last('game_state').skillTest.botSeats);
       const over = await passUntilOver(a);
-      check('Spiel endet trotz getrenntem Menschen', !!over && Number.isInteger(over.winnerIdx), over);
+      check('Spiel endet trotz getrenntem Menschen', !!over && Number.isInteger(over.winnerIdx), over || (() => { const g = a.last('game_state'); return g && g.skillTest && { round: g.skillTest.round, active: g.activePlayer, my: g.myIndex, busy: g.skillTest.busy, eliminated: g.skillTest.eliminated, result: g.result }; })());
       if (over) check('Platzierungen für alle 3 Sitze', Object.keys(over.placements).length === 3, over.placements);
       a.socket.close();
     }

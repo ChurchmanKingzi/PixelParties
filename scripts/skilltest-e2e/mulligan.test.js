@@ -119,20 +119,25 @@ const prompt = (title, extra = {}) => Object.assign({ type: 'handPick', title, d
   check('Ohne klaren Vorsprung vor der Vorgabe (weak) bleibt es bei der Vorgabe (kein Rauschen lernen)', M.learnedArm(tie, plan, ['skip', 'weak']) === null);
   check('Vorgabe: schwache Karten zurück, sonst nichts', M.priorArm({}, ['skip', 'weak']) === 'weak' && M.priorArm({}, ['skip']) === 'skip');
 
+  // Die Szenen gehören dem Test: eine Leadership-Start-Ability des Heroes (je nach Tisch) würde die Hand schon vor Horn/Leadership zurückmischen
+  const stripLeadership = (ps) => { for (const row of ps.abilityZones) for (let z = 0; z < row.length; z++) if (row[z] && row[z].n === 'Leadership') row[z] = null; };
+
   console.log('Ablauf im Spiel (Bot mit Horn in a Bottle und drei toten Karten)');
   console.log = () => {}; console.error = () => {};
   const g = await runGame({ seats: 3, setupOnly: true, noProfileSeats: [0, 1, 2], seed: 61, mullMode: { 0: 'weak' }, record: true,
-    mutatePrep: (prep) => { prep.players[0].hand = [...dead, 'Horn in a Bottle']; } });      // die Hand gehört dem Test: sonst zieht eine andere Karte dazwischen
+    mutatePrep: (prep) => { stripLeadership(prep.players[0]); prep.players[0].hand = [...dead, 'Horn in a Bottle']; } });      // die Hand gehört dem Test: sonst zieht eine andere Karte dazwischen
   console.log = oL; console.error = oE;
   const gp = g.gs.players[0], pool = g.room.skillTest.pool;
-  const handBefore = [...gp.hand], poolBefore = pool.remaining();
+  const handBefore = [...gp.hand];
+  let poolBefore = pool.remaining();
   const deadIn = dead.filter(n => gp.hand.includes(n)).length;
   check('Vorbereitung: tote Karten und Horn liegen auf der Hand', deadIn === 3 && gp.hand.includes('Horn in a Bottle'), handBefore);
   let guard = 0;
   while (g.gs.activePlayer !== 0 && guard++ < 6) await bot.takeTurn(g.room, g.gs.activePlayer, g.host);
+  poolBefore = pool.remaining();                 // erst jetzt: die Züge der anderen Sitze (Alchemy-Tränke u. a.) ziehen ebenfalls aus dem Pool
   await bot.takeTurn(g.room, 0, g.host);
   const stillDead = dead.filter(n => gp.hand.includes(n)).length;
-  const log = (g.gs.skillTest.mullLog || []).find(m => m.src === 'Horn in a Bottle');
+  const log = (g.gs.skillTest.mullLog || []).find(m => m.seat === 0 && m.src === 'Horn in a Bottle');
   check('Der Bot hat Horn in a Bottle ausgespielt (Entscheidung „weak“ protokolliert)', !!log && log.arm === 'weak' && log.nw >= 3, g.gs.skillTest.mullLog);
   check('Die toten Karten sind aus der Hand', stillDead === 0 || stillDead < deadIn, { stillDead, hand: gp.hand });
   check('Horn ist verbraucht', !gp.hand.includes('Horn in a Bottle'));
@@ -142,14 +147,14 @@ const prompt = (title, extra = {}) => Object.assign({ type: 'handPick', title, d
   console.log('Ablauf im Spiel (Bot mit Leadership Lv3 auf dem Brett)');
   console.log = () => {}; console.error = () => {};
   const g2 = await runGame({ seats: 3, setupOnly: true, noProfileSeats: [0, 1, 2], seed: 61, mullMode: { 0: 'weak' }, record: true,
-    mutatePrep: (prep) => { prep.players[0].hand = [...dead]; prep.players[0].abilityZones[0][0] = { n: 'Leadership', s: 0, c: true }; } });
+    mutatePrep: (prep) => { stripLeadership(prep.players[0]); prep.players[0].hand = [...dead]; prep.players[0].abilityZones[0][0] = { n: 'Leadership', s: 0, c: true }; } });
   console.log = oL; console.error = oE;
   const g2p = g2.gs.players[0];
   check('Leadership liegt als Lv3-Ability auf dem Brett', g2p.abilityZones[0][0] && g2p.abilityZones[0][0].length === 3 && g2p.abilityZones[0][0][0] === 'Leadership', g2p.abilityZones[0][0]);
   guard = 0;
   while (g2.gs.activePlayer !== 0 && guard++ < 6) await bot.takeTurn(g2.room, g2.gs.activePlayer, g2.host);
   await bot.takeTurn(g2.room, 0, g2.host);
-  const log2 = (g2.gs.skillTest.mullLog || []).find(m => /^Leadership/.test(m.src));
+  const log2 = (g2.gs.skillTest.mullLog || []).find(m => m.seat === 0 && /^Leadership/.test(m.src));
   check('Der Bot nutzt Leadership (Entscheidung „weak“, 3 schwache Karten, Bonus-Zug)', !!log2 && log2.arm === 'weak' && log2.nw === 3 && log2.bonus === 1, g2.gs.skillTest.mullLog);
   check('Die toten Karten sind weg, die Hand hat Ersatz plus Bonus (3 + 1; der Bot darf danach schon neue Karten gespielt haben: eine freie Ausrüstung und die Zug-Aktion)', dead.every(n => !g2p.hand.includes(n)) && g2p.hand.length >= 2 && g2p.hand.length <= 4, g2p.hand);
   void Rules; void host; void room; void gs; void st;

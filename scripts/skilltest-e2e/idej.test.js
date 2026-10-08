@@ -118,7 +118,10 @@ console.log('Pool: gesperrte Karten kommen nicht vor');
     'Pillage', 'Dead Guardian', 'Magic Emerald', "Gravedigger's Shovel", 'Gravedigger', 'Jean, the Pillaging Knight',       // 8.10.: reine Mill-Karten
     'Paraseed Greenhouse',                                                                                                   // 8.10.: alle Paraseed-Karten
     'Rebelliokai Timid Tanuki', 'Tanuki Escape',
-    'Bouldor Demon', 'Herbithorn Demon', 'Hydrogen Demon', 'Infernous Demon', 'Serpentous Demon', 'Sandy Blob', 'Festive Werz'];   // 8.10.: Cycling Demons, Sandy Blob, Festive Werz                                                                            // 8.10.: Tanuki                                                                                                  // 8.10.: alle Paraseed-Karten
+    'Bouldor Demon', 'Herbithorn Demon', 'Hydrogen Demon', 'Infernous Demon', 'Serpentous Demon', 'Sandy Blob', 'Festive Werz',   // 8.10.: Cycling Demons, Sandy Blob, Festive Werz
+    "Guardian's Appearance",                                                                                                  // 8.10. (später): Mill-Teil wirkungslos
+    'Ancient Guardian Statue', 'Begin the Race!', 'Create Secret Room', 'Elven Druid', 'Loyal Rottweiler', 'Monster Nest', 'Unholy Combination', 'Cute Bird',
+    'Legendary Explorer Dajan', 'Friedhelm, the Misled Avenger', 'Timeless King Zi', 'Kit, the Shark Researcher', 'Cecilia, the Harrowing Crusader', 'Trapping'];   // 8.10.: Choose-X, die de facto nur Searches sind
   const STAY_AFTER_SEARCH_BAN = ['Idej Lord Daiyo', 'Idej Lord Nobunakin', 'Idej Lord Shoguwana', 'Idej Lord Todugawin', 'Krates, the Smartass', 'Koperniko, the Stargazer', 'Cats of the Pharaoh', 'Trade', 'Deepsea Skeleton'];
   // Seit 8.10. wieder im Pool: reine Draw- und Mulligan-Karten (Ziehen von außerhalb des Spiels, engine-ext.js installDraws)
   const NOW_IN = ['Wheels', 'Elixir of Quickness', 'Haste', 'Supply Chain', 'Alchemy', 'Leadership', 'Horn in a Bottle', 'Staff of the Teleporter', 'Heart of the Mountain'];

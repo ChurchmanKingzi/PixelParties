@@ -30,7 +30,7 @@ function pseudoDeck(ps, cards) {
     mainDeck: [], potionDeck: [], sideDeck: [], skins: {},
     heroes: usedColumns(ps).map(hi => {
       const c = cards[ps.heroes[hi]] || {};
-      return { hero: ps.heroes[hi], ability1: c.startingAbility1 || null, ability2: c.startingAbility2 || null };
+      return { hero: ps.heroes[hi], ability1: Rules.startAbilityOf(c, 1) || null, ability2: Rules.startAbilityOf(c, 2) || null };
     }),
   };
 }
