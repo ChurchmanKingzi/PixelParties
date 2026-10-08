@@ -191,6 +191,8 @@ Ziel: **fließend statt Schnitt.** Die Welt wird nicht „weggeblendet“, sonde
 
 ### 10.6 Audio 🟨
 
+*Stand v0.8 (Prototyp): Web Audio, alles prozedural ohne Dateien. SFX je Ereignis (Abschuss nach Flugbahn und Geschossart, Einschlag nach Art und Radius, Tod, Bruch, Rang, Heilung, Wellenhorn), UI-Klänge, sechs generative Stücke (Menü G-lydisch 100 BPM, Aufbau A-mixolydisch 106, Kampf D-dorisch 138 mit steigender Spannung, Zeitstopp D-lydisch 66 mit Tiefpass, Sieg- und Niederlagen-Stinger), Raumklang aus der Kartenposition, Polyphonie- und Ratenbegrenzung. Noch offen: Live-Stems mit Chaos-Ebene, Brabbel-Stimmen, Kommentator, Kern-Explosion.*
+
 - **Musik:** Chiptune/FM mit **Live-Stems** (Bass, Schlagzeug, Lead, Chaos-Ebene). Die Chaos-Ebene schaltet sich bei vielen Einheiten und Beschuss zu. **Zeitstopp:** Tiefpass, die Percussion fällt weg, ein Uhr-Ticken legt sich darunter; beim Auftauen kommen die Stems zurück.
 - **SFX:** Einschläge nach Material (Holz knackt, Stein knirscht, Pudding macht *bloing*, Metall *dong*), Rang-Aufstieg als kleines Arpeggio.
 - **Stimmen:** Jede Einheit hat eine **Brabbel-Stimme** (Gibberish-Synth, Tonhöhe nach Größe), die bei Angriff, Rückzug und Tod ertönt. Kein Sprachtext nötig.

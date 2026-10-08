@@ -22,8 +22,12 @@ const rr = (p: SfxParams, a: number, b: number): number => a + (b - a) * p.r();
 // ---------------------------------------------------------------- kleine Bausteine
 
 /** Sinus-Wumms mit Tonhöhenabfall */
-const thump = (v: Voice, f: number, f2: number, dur: number, g: number, at = 0, glide?: number) =>
-  v.tone({ f, f2, dur, g, at, glide: glide ?? dur * 0.6 });
+const thump = (v: Voice, f: number, f2: number, dur: number, g: number, at = 0, glide?: number) => {
+  const gl = glide ?? dur * 0.6;
+  v.tone({ f, f2, dur, g, at, glide: gl });
+  // Oberton-Schicht, damit der Schlag auch auf kleinen Lautsprechern (ohne Tiefbass) trägt
+  v.tone({ type: 'triangle', f: f * 2, f2: f2 * 2, dur: dur * 0.6, g: g * 0.38, at, glide: gl * 0.8 });
+};
 /** Rauschstoß mit fallendem Tiefpass */
 const puff = (v: Voice, f0: number, f1: number, dur: number, g: number, at = 0, color: 'white' | 'pink' | 'brown' = 'white') =>
   v.noise({ color, filt: 'lowpass', f: [f0, f1], dur, g, at, q: 0.6, a: 0.004 });
@@ -56,10 +60,10 @@ export const SFX = {
   },
   'shot.catapult': (v, p) => {
     const k = p.k, s = p.s;
-    v.noise({ filt: 'bandpass', f: [2200, 700], q: 2.5, dur: 0.07, g: 0.6, a: 0.001 }); // Holzschlag
-    v.tone({ type: 'triangle', f: 260 * k, f2: 120 * k, dur: 0.3, g: 0.45, lp: 1500 }); // Arm schwingt aus
-    thump(v, 95 * k, 52 * k, 0.24 + 0.08 * s, 0.6);
-    v.tone({ f: 430 * k, f2: 190 * k, dur: 0.2, at: 0.03, g: 0.22, vib: [26, 90] }); // Federboing
+    v.noise({ filt: 'bandpass', f: [2600, 800], q: 2.5, dur: 0.08, g: 1.0, a: 0.001 }); // Holzschlag
+    v.tone({ type: 'triangle', f: 330 * k, f2: 150 * k, dur: 0.34, g: 0.6, lp: 2400 }); // Arm schwingt aus
+    thump(v, 105 * k, 58 * k, 0.2 + 0.06 * s, 0.4);
+    v.tone({ f: 520 * k, f2: 230 * k, dur: 0.24, at: 0.03, g: 0.3, vib: [26, 90] }); // Federboing
     v.noise({ filt: 'bandpass', f: [500, 1700], q: 1.5, a: 0.06, dur: 0.3, g: 0.16, at: 0.05 }); // Seilschwung
   },
   'shot.lob': (v, p) => {
@@ -77,8 +81,8 @@ export const SFX = {
     thump(v, 120 * k, 70 * k, 0.1, 0.3);
   },
   'shot.dig': (v, p) => {
-    thump(v, 75 * p.k, 40 * p.k, 0.34, 0.65);
-    v.noise({ color: 'brown', filt: 'lowpass', f: [450, 200], dur: 0.5, g: 0.55, a: 0.02 });
+    thump(v, 70 * p.k, 34 * p.k, 0.4, 0.7);
+    v.noise({ color: 'brown', filt: 'lowpass', f: [380, 140], dur: 0.75, g: 0.7, a: 0.03 });
     for (let i = 0; i < 4; i++) clack(v, rr(p, 500, 1200), 0.05 + i * 0.07 + rr(p, 0, 0.03), 0.16, 0.04, 2);
   },
   'shot.fire': (v, p) => {
@@ -324,8 +328,8 @@ export const SFX = {
     const n = 6 + Math.floor(p.r() * 3);
     for (let i = 0; i < n; i++) {
       const at = i * 0.035 + rr(p, 0, 0.02);
-      clack(v, rr(p, 900, 2600), at, 0.32 - i * 0.02, 0.03, 5);
-      v.tone({ type: 'triangle', f: rr(p, 500, 1100) * p.k, dur: 0.03, g: 0.05, at });
+      clack(v, rr(p, 900, 2600), at, 0.95 - i * 0.05, 0.03, 3);
+      v.tone({ type: 'triangle', f: rr(p, 500, 1100) * p.k, dur: 0.035, g: 0.14, at });
     }
     puff(v, 1500, 300, 0.12, 0.12, 0.02);
   },
@@ -510,10 +514,10 @@ export const SFX = {
     crack(v, 0.08, 0, 4000, 0.012);
   },
   'ui.hover': (v, p) => {
-    v.tone({ type: 'triangle', f: 1900 * p.k, dur: 0.028, g: 0.06, a: 0.003, lp: 5000 });
+    v.tone({ type: 'triangle', f: 1900 * p.k, dur: 0.03, g: 0.15, a: 0.003, lp: 5000 });
   },
   'ui.card': (v, p) => {
-    v.noise({ filt: 'bandpass', f: [1700, 5200], q: 0.9, a: 0.015, dur: 0.1, g: 0.22 });
+    v.noise({ filt: 'bandpass', f: [1700, 5200], q: 0.9, a: 0.015, dur: 0.1, g: 0.4 });
     v.tone({ type: 'triangle', f: 1000 * p.k, dur: 0.03, g: 0.08, at: 0.07 });
   },
   'ui.play': (v, p) => {
@@ -529,8 +533,8 @@ export const SFX = {
   },
   'ui.rotate': (v, p) => {
     for (let i = 0; i < 3; i++) {
-      clack(v, 2600, i * 0.032, 0.2, 0.015, 4);
-      v.tone({ type: 'triangle', f: (560 + i * 70) * p.k, dur: 0.02, g: 0.05, at: i * 0.032 });
+      clack(v, 2600, i * 0.032, 0.45, 0.015, 3);
+      v.tone({ type: 'triangle', f: (560 + i * 70) * p.k, dur: 0.022, g: 0.12, at: i * 0.032 });
     }
   },
   'ui.tab': (v, p) => {
@@ -557,10 +561,10 @@ export const SFX = {
   'ui.speed': (v, p) => {
     v.tone({ type: 'triangle', f: 1400 * p.k, dur: 0.03, g: 0.12, a: 0.002 });
     v.tone({ type: 'triangle', f: 1900 * p.k, dur: 0.035, g: 0.12, at: 0.04, a: 0.002 });
-    v.noise({ filt: 'bandpass', f: [1000, 3000], q: 1, dur: 0.1, g: 0.07, at: 0.01 });
+    v.noise({ filt: 'bandpass', f: [1000, 3000], q: 1, dur: 0.1, g: 0.14, at: 0.01 });
   },
   'ui.draw': (v, p) => {
-    v.noise({ filt: 'bandpass', f: [900, 3500], q: 0.9, a: 0.03, dur: 0.15, g: 0.26 });
+    v.noise({ filt: 'bandpass', f: [900, 3500], q: 0.9, a: 0.03, dur: 0.15, g: 0.45 });
     v.tone({ type: 'triangle', f: 1500 * p.k, f2: 2200 * p.k, dur: 0.06, g: 0.1, at: 0.1 });
   },
   'ui.reroll': (v, p) => {

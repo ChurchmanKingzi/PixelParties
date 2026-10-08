@@ -34,6 +34,7 @@ Die Grafiken kommen aus der Pixel-Werkstatt (`../art`): `export_game_units.py`, 
 | Kontingent | Troop-Karten anklicken; ist es voll, den zu ersetzenden Eintrag in der Seitenleiste anklicken; Wachzone und Zielpriorität pro Eintrag |
 | Kamera | Mausrad zoomt, Ziehen verschiebt, F = ganze Karte |
 | Tempo | ⏸, 1×, 2×, 4×, 8× (Tasten Leertaste, 1–4) |
+| Ton | Lautsprecher-Knopf in der Kopfleiste (Klick = stumm, Überfahren = Regler für Master, Musik, SFX), Taste M; Einstellungen bleiben gespeichert |
 | Untersuchen | Einheit oder Gebäude anklicken; Artillerie zeigt ihre Reichweite |
 
 ## Aufbau
@@ -51,6 +52,7 @@ src/sim/      deterministische Simulation (30 Hz, seedbasiert, keine Browser-Abh
   unitfx.ts       Fähigkeiten der Einheitenkarten;  artfx.ts  Artillerie-Zusatzwirkungen
   draw.ts, commands.ts, match.ts, bot.ts   Ziehen, Befehle, Spielablauf, Bot
 src/render/   PixiJS-Darstellung (Atlanten, Bastionen, Einheiten, Geschosse, Effekte, Kamera)
+src/audio/    prozedurale SFX und Musik per Web Audio, keine Dateien (siehe src/audio/README.md); Selbsttest: node tools/audiotest.mjs
 src/ui/       DOM-Oberfläche (Menü, Loadout, Tray, Seitenleiste, HUD, Inspektor); keywords.ts = Glossar-Tooltips und große Kartenvorschau
 tools/        headless.ts (Bot-Sim), build_game_data (../tools), embed.mjs, playtest.mjs
 ```
@@ -67,6 +69,7 @@ Die Karten sind datengetrieben: `src/data/cards.gen.json` entsteht aus den Katal
 - Einheiten-Fernangriffe und Turmschüsse treffen sofort; nur Artillerie fliegt als echtes Geschoss.
 - **Nicht umgesetzt:** Rank-3-Talente, Fraktions-Kerne und Welt-Launen, Chaos-Karten, Dragon Egg (BC-03), Red Button (BC-09), Rutschen und Eilgang-Richtung (BU-07), Fallensteller (UZ-10), Nebel/Sichtverdeckung beim Aufbau (beide Bastionen sind immer sichtbar).
 - Zeitgeber im Prototyp: Aufbau 180 s, Zeitstopp 60 s (im Menü wählbar, GDD: 120 s / 25 s).
+- **Ton:** SFX zu fast allen Ereignissen (20 Abschussfamilien, 13 Einschläge, Tod, Bruch, Rang, Heilung, Wellenhorn) und sechs Musikstücke (Menü, Aufbau, Kampf, Zeitstopp, Sieg, Niederlage) werden zur Laufzeit synthetisiert. Pegel und Charakter sind gemessen, aber nicht nach Gehör abgenommen: bitte Rückmeldung zu Lautstärke und Musikgeschmack.
 - Einheiten tragen eine Umrandung und einen Fußring in der Teamfarbe (P1 rot, P2 türkis); beim Herauszoomen wird die Umrandung dicker.
 
 ## Bot-Statistik (24 Partien, Seeds 100–123, Layout v0.2)

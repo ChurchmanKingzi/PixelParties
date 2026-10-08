@@ -12,16 +12,17 @@ export type NoteFn = (r: Rack, f: number, dur: number, v: number) => void;
 export const INST: Record<InstId, NoteFn> = {
   // ---------------- Schlagwerk (f wird nur bei Tom/Holzblock/Pauke als Tonhöhe genutzt)
   kick: (r, _f, _d, v) => {
-    r.tone({ f: 155, f2: 46, glide: 0.11, dur: 0.3, g: 0.95 * v });
+    r.tone({ f: 155, f2: 46, glide: 0.11, dur: 0.3, g: 0.8 * v });
+    r.tone({ type: 'triangle', f: 310, f2: 100, glide: 0.07, dur: 0.12, g: 0.18 * v });
     r.noise({ filt: 'bandpass', f: [2500, 1200], q: 1, dur: 0.012, g: 0.2 * v, a: 0.001 });
   },
   snare: (r, _f, _d, v) => {
-    r.noise({ filt: 'bandpass', f: 1900, q: 0.7, dur: 0.17, g: 0.55 * v, a: 0.001 });
-    r.tone({ type: 'triangle', f: 200, f2: 150, dur: 0.1, g: 0.35 * v });
+    r.noise({ filt: 'bandpass', f: 1900, q: 0.7, dur: 0.17, g: 0.85 * v, a: 0.001 });
+    r.tone({ type: 'triangle', f: 200, f2: 150, dur: 0.1, g: 0.4 * v });
     r.noise({ filt: 'highpass', f: 5200, dur: 0.07, g: 0.14 * v, a: 0.001 });
   },
   hat: (r, _f, _d, v) => {
-    r.noise({ filt: 'highpass', f: 7500, dur: 0.035, g: 0.22 * v, a: 0.001 });
+    r.noise({ filt: 'highpass', f: 7500, dur: 0.035, g: 0.3 * v, a: 0.001 });
   },
   ohat: (r, _f, _d, v) => {
     r.noise({ filt: 'highpass', f: 6500, dur: 0.22, g: 0.18 * v, a: 0.002 });
@@ -59,71 +60,71 @@ export const INST: Record<InstId, NoteFn> = {
   /** Chiptune-Lead: Rechteck + schmale Pulswelle, weicher Tiefpass, spätes Vibrato */
   chip: (r, f, d, v) => {
     const o = { dur: d, a: 0.006, d: 0.08, s: 0.62, r: 0.07, lp: 3200 as number | [number, number], q: 0.8 };
-    r.tone({ ...o, type: 'square', f, g: 0.2 * v, vib: d > 0.3 ? [5.5, 10, 0.2] : undefined });
-    r.tone({ ...o, type: 'pulse', duty: 0.25, f, g: 0.14 * v, det: 6 });
+    r.tone({ ...o, type: 'square', f, g: 0.4 * v, vib: d > 0.3 ? [5.5, 10, 0.2] : undefined });
+    r.tone({ ...o, type: 'pulse', duty: 0.25, f, g: 0.28 * v, det: 6 });
   },
   /** gezupfte Melodie: Dreieck, Tiefpass fällt (hell -> dunkel) */
   pluck: (r, f, d, v) => {
     const dur = Math.min(1.1, 0.35 + d * 0.5);
-    r.tone({ type: 'triangle', f, dur, g: 0.5 * v, lp: [Math.min(9000, 2200 + 3500 * v + f * 1.5), Math.max(500, f * 1.3)], lpT: 0.28, a: 0.003 });
-    r.tone({ f: f * 2, dur: 0.18, g: 0.07 * v, a: 0.002 });
+    r.tone({ type: 'triangle', f, dur, g: 0.75 * v, lp: [Math.min(9000, 2200 + 3500 * v + f * 1.5), Math.max(500, f * 1.3)], lpT: 0.28, a: 0.003 });
+    r.tone({ f: f * 2, dur: 0.18, g: 0.1 * v, a: 0.002 });
   },
   /** Glockenspiel/Spieluhr: Sinus mit unharmonischen Obertönen */
   bell: (r, f, d, v) => {
     const dur = Math.min(1.8, 0.7 + d * 0.3);
-    r.tone({ f, dur, g: 0.33 * v, a: 0.002 });
-    r.tone({ f: f * 2.01, dur: dur * 0.5, g: 0.1 * v, a: 0.002 });
+    r.tone({ f, dur, g: 0.45 * v, a: 0.002 });
+    r.tone({ f: f * 2.01, dur: dur * 0.5, g: 0.13 * v, a: 0.002 });
     r.tone({ f: f * 4.07, dur: dur * 0.22, g: 0.04 * v, a: 0.002 });
     r.noise({ filt: 'highpass', f: 6000, dur: 0.02, g: 0.05 * v, a: 0.001 });
   },
   /** Flächenklang: zwei verstimmte Sägezähne + Dreieck, langsamer Einsatz, dunkler Tiefpass */
   pad: (r, f, d, v) => {
     const o = { dur: d, a: Math.min(0.6, d * 0.3), d: 0.4, s: 0.85, r: Math.min(1.1, 0.4 + d * 0.15), lp: [520, 1500] as [number, number], lpT: Math.min(1.2, d * 0.5), q: 0.5 };
-    r.tone({ ...o, type: 'sawtooth', f, g: 0.07 * v, det: -9 });
-    r.tone({ ...o, type: 'sawtooth', f, g: 0.07 * v, det: 9 });
-    r.tone({ ...o, type: 'triangle', f: f * 0.5, g: 0.11 * v });
+    r.tone({ ...o, type: 'sawtooth', f, g: 0.1 * v, det: -9 });
+    r.tone({ ...o, type: 'sawtooth', f, g: 0.1 * v, det: 9 });
+    r.tone({ ...o, type: 'triangle', f: f * 0.5, g: 0.14 * v });
   },
   /** gezupfter Bass (Kampf): Säge mit fallendem Tiefpass + Sub-Sinus */
   bass: (r, f, d, v) => {
     const dur = Math.min(0.5, d + 0.08);
-    r.tone({ type: 'sawtooth', f, dur, g: 0.33 * v, lp: [950, 230], lpT: 0.13, q: 1.4, a: 0.004 });
-    r.tone({ f, dur, g: 0.42 * v, a: 0.004 });
+    r.tone({ type: 'sawtooth', f, dur, g: 0.3 * v, lp: [1100, 240], lpT: 0.13, q: 1.4, a: 0.004 });
+    r.tone({ f, dur, g: 0.28 * v, a: 0.004 });
   },
   /** weicher Dreieck-Bass (Aufbau, Menü, Pause) */
   tbass: (r, f, d, v) => {
-    r.tone({ type: 'triangle', f, dur: d, g: 0.5 * v, a: 0.012, d: 0.08, s: 0.75, r: 0.09, lp: 900 });
-    r.tone({ f, dur: d, g: 0.2 * v, a: 0.012, d: 0.08, s: 0.75, r: 0.09 });
+    r.tone({ type: 'triangle', f, dur: d, g: 0.42 * v, a: 0.012, d: 0.08, s: 0.75, r: 0.09, lp: 1100 });
+    r.tone({ f, dur: d, g: 0.12 * v, a: 0.012, d: 0.08, s: 0.75, r: 0.09 });
   },
   /** kurzer Akkordstoß */
   stab: (r, f, d, v) => {
-    r.tone({ type: 'square', f, dur: Math.min(0.24, d + 0.05), g: 0.12 * v, lp: [3400, 1100], lpT: 0.12, a: 0.003 });
+    r.tone({ type: 'square', f, dur: Math.min(0.24, d + 0.05), g: 0.2 * v, lp: [3400, 1100], lpT: 0.12, a: 0.003 });
   },
   /** Arpeggio-Ton: Dreieck + Pulswelle, kurz */
   arp: (r, f, _d, v) => {
-    r.tone({ type: 'triangle', f, dur: 0.28, g: 0.28 * v, lp: [4200, 1500], lpT: 0.2, a: 0.003 });
-    r.tone({ type: 'pulse', duty: 0.25, f, dur: 0.14, g: 0.07 * v, lp: 3000, a: 0.003 });
+    r.tone({ type: 'triangle', f, dur: 0.28, g: 0.6 * v, lp: [4200, 1500], lpT: 0.2, a: 0.003 });
+    r.tone({ type: 'pulse', duty: 0.25, f, dur: 0.14, g: 0.14 * v, lp: 3000, a: 0.003 });
   },
   /** Blech: zwei verstimmte Sägezähne, Tiefpass öffnet im Anschlag */
   brass: (r, f, d, v) => {
     const o = { dur: d, a: 0.035, d: 0.1, s: 0.78, r: 0.12, lp: [700, 2800] as [number, number], lpT: 0.11, q: 0.9 };
-    r.tone({ ...o, type: 'sawtooth', f, g: 0.13 * v, det: -6, vib: d > 0.5 ? [5.2, 14, 0.25] : undefined });
-    r.tone({ ...o, type: 'sawtooth', f, g: 0.13 * v, det: 6 });
+    r.tone({ ...o, type: 'sawtooth', f, g: 0.24 * v, det: -6, vib: d > 0.5 ? [5.2, 14, 0.25] : undefined });
+    r.tone({ ...o, type: 'sawtooth', f, g: 0.24 * v, det: 6 });
   },
   /** Pfeifen (Aufbau-Melodie): Sinus mit Vibrato */
   whistle: (r, f, d, v) => {
-    r.tone({ f, dur: d, g: 0.34 * v, a: 0.03, d: 0.05, s: 0.85, r: 0.08, vib: [5.5, 16, 0.12] });
+    r.tone({ f, dur: d, g: 0.4 * v, a: 0.03, d: 0.05, s: 0.85, r: 0.08, vib: [5.5, 16, 0.12] });
     r.tone({ f: f * 2, dur: d, g: 0.04 * v, a: 0.03, d: 0.05, s: 0.85, r: 0.08 });
   },
   /** Begleit-Orgel (Aufbau): Rechteck, dunkel */
   organ: (r, f, d, v) => {
-    r.tone({ type: 'square', f, dur: Math.min(d, 0.4), g: 0.1 * v, a: 0.008, d: 0.04, s: 0.9, r: 0.05, lp: 1700 });
-    r.tone({ f: f * 2, dur: Math.min(d, 0.4), g: 0.04 * v, a: 0.008, d: 0.04, s: 0.9, r: 0.05 });
+    r.tone({ type: 'square', f, dur: Math.min(d, 0.4), g: 0.17 * v, a: 0.008, d: 0.04, s: 0.9, r: 0.05, lp: 1700 });
+    r.tone({ f: f * 2, dur: Math.min(d, 0.4), g: 0.06 * v, a: 0.008, d: 0.04, s: 0.9, r: 0.05 });
   },
   /** Niederlage: gedämpftes Blech, Tiefpass schließt sich ("seufzt") */
   sigh: (r, f, d, v) => {
     const o = { dur: d, a: 0.08, d: 0.2, s: 0.7, r: 0.4, lp: [2400, 380] as [number, number], lpT: d + 0.3, q: 1 };
-    r.tone({ ...o, type: 'sawtooth', f, g: 0.14 * v, det: -8, vib: [4.8, 22, 0.3] });
-    r.tone({ ...o, type: 'sawtooth', f, g: 0.14 * v, det: 8 });
+    r.tone({ ...o, type: 'sawtooth', f, g: 0.2 * v, det: -8, vib: [4.8, 22, 0.3] });
+    r.tone({ ...o, type: 'sawtooth', f, g: 0.2 * v, det: 8 });
   },
 };
 

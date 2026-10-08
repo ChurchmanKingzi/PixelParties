@@ -284,7 +284,7 @@ function composeMenu(): Piece {
   }
   return makePiece('menu', sc, {
     bpm: 100, swing: 0, loopStart: 4 * 16, echoSteps: 3, echoFb: 0.38, echoLp: 2600, bright: 9500,
-    mix: { pluck: { g: 1, pan: 0.15 }, arp: { g: 0.9, pan: -0.3 }, pad: { g: 0.9 }, tbass: { g: 0.95 } },
+    mix: { pluck: { g: 1, pan: 0.15 }, arp: { g: 0.9, pan: -0.3 }, pad: { g: 0.9 }, tbass: { g: 1.25 } },
   });
 }
 
@@ -353,7 +353,7 @@ function composeBuild(): Piece {
   }
   return makePiece('build', sc, {
     bpm: 106, swing: 0.6, loopStart: 0, echoSteps: 3, echoFb: 0.3, echoLp: 2500, bright: 10000,
-    mix: { whistle: { g: 0.95 }, tbass: { g: 1 }, organ: { g: 0.9 } },
+    mix: { whistle: { g: 0.95 }, tbass: { g: 1.5 }, organ: { g: 0.9 } },
   });
 }
 

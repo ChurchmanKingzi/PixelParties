@@ -8,6 +8,7 @@ import { modCenter, wallMid } from '../sim/combat';
 import type { Module, Projectile, SimEvent, Unit, Wall } from '../sim/types';
 import { K_EMPTY, K_ROOM, K_YARD } from '../sim/types';
 import { ci, type World } from '../sim/world';
+import { audio } from '../audio/audio';
 import { GameAssets, type Frame } from './assets';
 
 const W_PX = MAP_W * CELL, H_PX = MAP_H * CELL;
@@ -667,6 +668,7 @@ export class Scene {
   }
 
   private handleEvent(e: SimEvent) {
+    audio.onEvent(e);
     switch (e.t) {
       case 'shot': {
         // kurze Sichtlinie für Nahkampf-Fernangriffe und Türme

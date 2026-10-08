@@ -16,6 +16,8 @@ import { ci, type World } from '../sim/world';
 import { GameAssets } from '../render/assets';
 import { Scene, type Ghost } from '../render/scene';
 import { $, assetUrl, clear, el, fmtTime, put, save, store } from './dom';
+import { audio } from '../audio/audio';
+import { createAudioControls } from '../audio/controls';
 import { attachCardTip, closeCardTip, installKeywordTips, kwSpan, kwStatus, kwText } from './keywords';
 
 interface Settings { buildSec: number; pauseSec: number; bars: boolean; nums: boolean; speed: number; seed: number }
@@ -62,6 +64,7 @@ export class Game {
     await g.scene.init(g.assets);
     g.scene.onFeed = (msg, team) => g.pushFeed(msg, team);
     installKeywordTips();
+    g.bindAudio();
     g.buildTop();
     g.bindPointer();
     g.bindKeys();
@@ -70,6 +73,22 @@ export class Game {
     g.showMenu();
     g.app.ticker.add(() => g.frame());
     return g;
+  }
+
+  /** Ton: Entsperren bei der ersten Geste, Klicklaute für Schaltflächen, Taste M */
+  bindAudio() {
+    const unlock = () => audio.unlock();
+    window.addEventListener('pointerdown', unlock);
+    window.addEventListener('keydown', unlock);
+    document.addEventListener('click', (e) => {
+      const b = (e.target as Element | null)?.closest?.('button') as HTMLButtonElement | null;
+      if (!b || b.disabled || b.closest('.bbau-wrap')) return;
+      if (b.dataset.snd) audio.ui(b.dataset.snd as 'draw' | 'reroll');
+      else if (b.id === 'bPause') audio.ui('pause');
+      else if (b.id.startsWith('sp')) audio.ui('speed');
+      else audio.ui(b.classList.contains('primary') ? 'confirm' : 'click');
+    });
+    audio.setViewer(this.human);
   }
 
   onResize() {
@@ -127,6 +146,7 @@ export class Game {
     );
     $('overlay').classList.add('show');
     this.scene?.focusAll(true);
+    audio.setMood('menu');
   }
 
   startMatch(mode: 'play' | 'watch') {
@@ -136,6 +156,7 @@ export class Game {
     this.feed = [];
     this.lastPhase = '';
     this.endShown = false;
+    audio.setViewer(this.human);
     this.speed = this.settings.speed;
     this.paused = false;
     this.scene.showBars = this.settings.bars;
@@ -168,6 +189,7 @@ export class Game {
     if (this.deadline !== null && (w.phase === 'build' || w.phase === 'pause') && Date.now() > this.deadline) this.timeUp();
     if (w.phase !== this.lastPhase) this.onPhase(w.phase);
     this.scene.update(w);
+    this.audioSync(w);
     this.updateTop();
     this.sideT += dtReal;
     if (this.sideT > 0.25 || this.dirty) { this.sideT = 0; this.renderSide(); }
@@ -178,6 +200,7 @@ export class Game {
   onPhase(phase: string) {
     const w = this.world;
     this.lastPhase = phase;
+    if (phase !== 'over') this.moodFor(phase);
     $('stage').classList.toggle('frozen', phase === 'pause');
     this.armed = null; this.yardMode = false; this.replaceCard = null;
     this.scene.setGhost(null);
@@ -211,6 +234,24 @@ export class Game {
       this.applyFocus();
     }
     this.dirty = true;
+  }
+
+  private audioSpeed = -1;
+  private audioTick = 0;
+
+  /** Tempo der Musik (Pause = gedämpft) und Hörerposition = Kameramitte */
+  audioSync(w: World) {
+    const sp = w.phase === 'battle' && !this.paused ? this.speed : w.phase === 'battle' ? 0 : 1;
+    if (sp !== this.audioSpeed) { this.audioSpeed = sp; audio.setSpeed(sp); }
+    if (++this.audioTick % 15 === 0) {
+      const c = this.scene.cam;
+      audio.setListener(((this.scene.viewW / 2 - c.x) / c.s) / CELL, ((this.scene.viewH / 2 - c.y) / c.s) / CELL);
+    }
+  }
+
+  /** Musik je Spielphase */
+  moodFor(phase: string) {
+    audio.setMood(phase === 'battle' ? 'battle' : phase === 'pause' ? 'pause' : phase === 'build' ? 'build' : phase === 'loadout' ? 'menu' : 'off');
   }
 
   timeUp() {
@@ -256,7 +297,7 @@ export class Game {
         grid,
         el('div', { class: 'row' },
           el('button', { class: 'primary', disabled: !ok, onclick: () => { this.match!.keepLoadout(h, this.loadSel.map((i) => p.hand[i])); $('overlay').classList.remove('show'); this.dirty = true; } }, 'Keep these 7'),
-          el('button', { disabled: p.mulligan <= 0, onclick: () => { this.match!.mulligan(h); this.loadSel = []; render(); } }, `Mulligan (${p.mulligan})`),
+          el('button', { 'data-snd': 'draw', disabled: p.mulligan <= 0, onclick: () => { this.match!.mulligan(h); this.loadSel = []; render(); } }, `Mulligan (${p.mulligan})`),
           el('button', { onclick: () => { this.loadSel = []; const keep = botChoose(w, h, p.hand, 7); const pool = p.hand.slice(); for (const id of keep) { const i = pool.indexOf(id); if (i >= 0) { this.loadSel.push(i); pool[i] = ''; } } render(); } }, 'Suggest'),
         ),
       );
@@ -278,11 +319,12 @@ export class Game {
       el('button', { id: 'bPause', onclick: () => { this.paused = !this.paused; this.dirty = true; } }, '⏸'),
       ...[1, 2, 4, 8].map((s) => el('button', { id: 'sp' + s, onclick: () => { this.speed = s; this.settings.speed = s; save('settings', this.settings); } }, s + '×')),
     );
-    const tog = el('div', { class: 'row', style: 'gap:4px' },
+    const tog = el('div', { class: 'row', style: 'gap:4px;align-items:center' },
       el('button', { id: 'tBars', title: 'HP bars', onclick: () => { this.scene.showBars = !this.scene.showBars; this.settings.bars = this.scene.showBars; save('settings', this.settings); } }, 'bars'),
       el('button', { id: 'tNums', title: 'Damage numbers', onclick: () => { this.scene.showNumbers = !this.scene.showNumbers; this.settings.nums = this.scene.showNumbers; save('settings', this.settings); } }, 'numbers'),
       el('button', { title: 'Fit map (F)', onclick: () => { this.focusMode = 'all'; this.applyFocus(); } }, 'fit'),
       el('button', { onclick: () => this.showMenu() }, 'menu'),
+      createAudioControls(),
     );
     top.append(
       el('div', { class: 'grp' }, el('span', { class: 'lbl', style: 'color:var(--p1)' }, 'P1 core'), b0.d, c0.d),
@@ -508,7 +550,7 @@ export class Game {
       });
       tray.append(el('div', { class: 'grp' },
         el('button', { class: 'primary', disabled: this.pickSel.length === 0, onclick: () => { this.match!.keepPause(h, this.pickSel.map((i) => p.hand[Number(i)])); this.pickSel = []; this.dirty = true; } }, 'Keep selected'),
-        el('button', { disabled: p.rerolls <= 0, onclick: () => { this.match!.reroll(h); this.pickSel = []; this.dirty = true; } }, `Reroll (${p.rerolls})`),
+        el('button', { 'data-snd': 'reroll', disabled: p.rerolls <= 0, onclick: () => { this.match!.reroll(h); this.pickSel = []; this.dirty = true; } }, `Reroll (${p.rerolls})`),
         el('button', { onclick: () => { const keep = botChoose(w, h, p.hand, n); const pool = p.hand.slice(); this.pickSel = []; for (const id of keep) { const i = pool.indexOf(id); if (i >= 0) { this.pickSel.push(String(i)); pool[i] = ''; } } this.dirty = true; } }, 'Suggest'),
       ));
       return;
@@ -558,20 +600,20 @@ export class Game {
         return;
       }
       const r = this.match!.cmd({ t: 'play', p: h, card: id });
-      if (!r.ok) toast(r.reason);
+      if (!r.ok) fail(r.reason);
       this.dirty = true;
       return;
     }
     const def = BUILDINGS[id];
     if (findOwnModule(w, h, id) && def.kind !== 'wall' && def.kind !== 'gate') {
       const r = this.match!.cmd({ t: 'play', p: h, card: id, upgrade: true });
-      toast(r.ok ? 'Upgraded to a higher star rank' : r.reason);
+      if (r.ok) { audio.ui('play'); toast('Upgraded to a higher star rank'); } else fail(r.reason);
       this.dirty = true;
       return;
     }
     if (def.kind === 'gate') {
       const r = this.match!.cmd({ t: 'play', p: h, card: id });
-      toast(r.ok ? 'Gate replaced' : r.reason);
+      if (r.ok) { audio.ui('play'); toast('Gate replaced'); } else fail(r.reason);
       this.dirty = true;
       return;
     }
@@ -584,7 +626,7 @@ export class Game {
   doReplace(idx: number) {
     if (!this.replaceCard) return;
     const r = this.match!.cmd({ t: 'play', p: this.human!, card: this.replaceCard, replace: idx });
-    if (!r.ok) toast(r.reason);
+    if (!r.ok) fail(r.reason);
     this.replaceCard = null;
     hudMsg('');
     this.dirty = true;
@@ -592,7 +634,7 @@ export class Game {
 
   pickUp(id: number) {
     const r = this.match!.cmd({ t: 'pickup', p: this.human!, moduleId: id });
-    if (!r.ok) toast(r.reason); else { toast('Building picked up: place it again from your hand'); this.selected = null; this.scene.selected = null; }
+    if (!r.ok) fail(r.reason); else { toast('Building picked up: place it again from your hand'); this.selected = null; this.scene.selected = null; }
     this.dirty = true;
   }
 
@@ -649,7 +691,8 @@ export class Game {
     window.addEventListener('keydown', (e) => {
       if ((e.target as HTMLElement)?.tagName === 'INPUT' || (e.target as HTMLElement)?.tagName === 'SELECT') return;
       if (e.key === 'r' || e.key === 'R') this.rotate();
-      else if (e.key === 'Escape') { this.armed = null; this.yardMode = false; this.replaceCard = null; hudMsg(''); this.scene.setGhost(null); this.dirty = true; }
+      else if (e.key === 'm' || e.key === 'M') audio.toggleMute();
+      else if (e.key === 'Escape') { if (this.armed || this.yardMode || this.replaceCard) audio.ui('cancel'); this.armed = null; this.yardMode = false; this.replaceCard = null; hudMsg(''); this.scene.setGhost(null); this.dirty = true; }
       else if (e.key === 'f' || e.key === 'F') { this.focusMode = 'all'; this.applyFocus(); }
       else if (e.key === ' ') { e.preventDefault(); if (this.match?.world.phase === 'battle') { this.paused = !this.paused; } }
       else if (e.key === '1' || e.key === '2' || e.key === '3' || e.key === '4') { this.speed = [1, 2, 4, 8][Number(e.key) - 1]; }
@@ -663,7 +706,7 @@ export class Game {
   }
 
   rotate() {
-    if (this.armed) { this.armed.rot = (this.armed.rot + 1) % 2; this.refreshGhost(); }
+    if (this.armed) { this.armed.rot = (this.armed.rot + 1) % 2; this.refreshGhost(); audio.ui('rotate'); }
   }
 
   /** Gebäude in der Hand, dessen Grundriss sich durch Drehen ändert (nicht quadratisch, kein Turm/Mauer) */
@@ -741,7 +784,7 @@ export class Game {
     if (h !== null && (w.phase === 'build' || w.phase === 'pause')) {
       if (this.yardMode) {
         const r = m.cmd({ t: 'yard', p: h, x: cx, y: cy });
-        if (!r.ok) toast(r.reason);
+        if (!r.ok) fail(r.reason);
         this.dirty = true;
         this.refreshGhost();
         return;
@@ -759,7 +802,8 @@ export class Game {
           const cols = rot % 2 ? def.rows : def.cols, rows = rot % 2 ? def.cols : def.rows;
           r = m.cmd({ t: 'play', p: h, card, x: cx - Math.floor(cols / 2), y: cy - Math.floor(rows / 2), rot });
         }
-        if (!r.ok) { toast(r.reason); return; }
+        if (!r.ok) { fail(r.reason); return; }
+        audio.ui('play');
         this.armed = null;
         hudMsg('');
         this.scene.setGhost(null);
@@ -841,6 +885,7 @@ export class Game {
       ),
     );
     $('overlay').classList.add('show');
+    audio.setMood(this.human === null || w.winner === this.human ? 'victory' : w.winner === -1 || w.winner === null ? 'pause' : 'defeat');
   }
 }
 
@@ -880,12 +925,19 @@ function cardEl(id: string, o: { big?: boolean; sel?: boolean; dim?: boolean; ba
     el('img', { src: assetUrl(`cards/${id}.png`), alt: d?.name ?? id, draggable: false }),
     o.badge ? el('div', { class: 'badge' }, o.badge) : null);
   if (o.w) c.style.width = o.w + 'px';
-  if (o.onClick) c.addEventListener('click', o.onClick);
+  if (o.onClick) c.addEventListener('click', () => { audio.ui('card'); o.onClick!(); });
+  c.addEventListener('mouseenter', () => audio.ui('hover'));
   attachCardTip(c, id, o.preview ? 'above' : 'side');
   return c;
 }
 
 let toastT = 0;
+/** Fehlschlag: Hinweis und tiefer Ablehnungston */
+function fail(msg: string) {
+  audio.ui('invalid');
+  toast(msg);
+}
+
 export function toast(msg: string) {
   const t = $('toast');
   t.textContent = msg;
