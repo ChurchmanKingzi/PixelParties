@@ -22543,6 +22543,11 @@ this._deathWatch = (this._deathWatchStack || []).length
   _delay(ms) {
     if (this._aborted) return Promise.resolve();
     if (this._fastMode) return Promise.resolve();
+    // „Die Engine arbeitet noch": der Server zaehlt eine Aktion nur als stillschweigend
+    // verworfen (`action_rejected`), wenn nach 2 s kein neuer Zustand kam UND die
+    // Engine bis dahin nichts mehr getan hat (server.js, `AKTION_VERWORFEN_NACH_MS`).
+    // Aufstieg & Co. halten den Sync bewusst zurueck (Anzeige-Verzoegerungen).
+    this._aktivBis = Math.max(this._aktivBis || 0, Date.now() + ms + 400);
     return new Promise(resolve => setTimeout(resolve, ms));
   }
 
@@ -47906,6 +47911,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // could trip the 5s "no progress" timeout even though the hook is
     // healthy and just waiting on visual pacing.
     this._hookProgressTick = (this._hookProgressTick || 0) + 1;
+    this._aktivBis = Math.max(this._aktivBis || 0, Date.now() + 1500);   // s. `_delay`
     // ★ Bilder-Protokoll (Als Befund 3.10., „Animation spielt nach der Negation noch einmal"): was die
     // laufende Aufloesung schon gezeigt hat, damit `spielZauberBilder` es bei einer Negation NICHT
     // ein zweites Mal abspielt (siehe `_schonGezeigt`).
