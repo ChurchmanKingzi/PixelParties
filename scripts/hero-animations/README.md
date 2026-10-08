@@ -154,7 +154,7 @@ kopiert, daneben liegt eine JSON-Datei mit den Metadaten. Die erzeugten
 | `deri.py` | `final 90 darge` | `darge_idle_final_sheet.png` | `bow-sniper-darge` |
 | `deri.py` | `final 90 jean` | `jean_idle_final_sheet.png` | `jean-the-pillaging-knight` |
 | `deri.py` | `final 90 layn` | `layn_idle_final_sheet.png` | `layn-defender-of-deri` |
-| `deri.py` | `final 90 summoner` | `summoner_idle_final_sheet.png` | `layn-summonr-of-weapons` (Skin) |
+| `deri.py` | `final 90 summoner` | `summoner_idle_final_sheet.png` | `layn-summoner-of-weapons` (Skin) |
 | `deri.py` | `final 90 ascended` | `ascended_idle_final_sheet.png` | `layn-master-of-deri-s-relic` |
 | `deri.py` | `final 90 tharx` | `tharx_idle_final_sheet.png` | `tharx-the-never-losing-general` |
 | `gn.py` | `final 90 andras` | `andras_idle_final_sheet.png` | `andras-the-human-weapon` |

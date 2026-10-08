@@ -67,5 +67,5 @@ Schlüssel `skin/<Skinname>`; der Name muss in `data/skins.json` stehen.
   Die alten PNGs stehen weiter in der Git-Historie (`git log -- cards`), falls ein Offline-Werkzeug
   sie braucht (`scripts/hero-animations`, `scripts/sleeve-entwuerfe`, `scripts/avatar-entwuerfe`,
   `scripts/sharpen_card_art.py`).
-* Umschalter zum Ausprobieren: `CardRender.OPT` (z. B. `OPT.silverRim = true` bringt den silbernen
-  Rahmen der Seltenheit „rare" zurück).
+* Umschalter zum Ausprobieren: `CardRender.OPT` (z. B. `OPT.silverRim = false` blendet den silbernen
+  Rahmen der Seltenheit „rare" aus).

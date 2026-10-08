@@ -5130,5 +5130,9 @@
 "Rook of Kings [W]": {
 "id": "Rook_of_Kings_1",
 "kind": "a"
+},
+"skin/Layn Summoner of Weapons": {
+"id": "Layn_Summoner_of_Weapons",
+"kind": "a"
 }
 }
