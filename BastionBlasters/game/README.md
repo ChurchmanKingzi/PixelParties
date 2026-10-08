@@ -69,6 +69,6 @@ Die Karten sind datengetrieben: `src/data/cards.gen.json` entsteht aus den Katal
 - Zeitgeber im Prototyp: Aufbau 180 s, Zeitstopp 60 s (im Menü wählbar, GDD: 120 s / 25 s).
 - Einheiten tragen eine Umrandung und einen Fußring in der Teamfarbe (P1 rot, P2 türkis); beim Herauszoomen wird die Umrandung dicker.
 
-## Erste Bot-Statistik (24 Partien, Seeds 100–123)
+## Bot-Statistik (24 Partien, Seeds 100–123, Layout v0.2)
 
-P1 13 : P2 11 (symmetrisch), mittlere Matchlänge 11,7 min (Ziel 10–16), Siege durch Eroberung : Zerstörung = 18 : 6. Die Eroberung ist mit zufälligem Bot-Aufbau zu leicht; Stellschrauben: Eroberungsrate, Kernkammer-Größe, Artillerie-Schaden und -Takt, Heilquellen-Kapazität (GDD §12).
+P1 10 : P2 14 (symmetrisch im Rahmen der Streuung), mittlere Matchlänge 12,8 min (Ziel 10–16), Siege durch Eroberung : Zerstörung = 19 : 5. Zwei Partien enden schon nach ca. 2 min durch Eroberung, wenn ein zufälliger Bot-Aufbau keinen Verteidiger stellt. Die Eroberung ist weiterhin zu leicht; Stellschrauben: Eroberungsrate, Kernkammer-Größe, Artillerie-Schaden und -Takt, Heilquellen-Kapazität (GDD §12). (Vorher, Kernhof an der Front: 18 : 6, 11,7 min.)

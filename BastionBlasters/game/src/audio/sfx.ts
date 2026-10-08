@@ -619,7 +619,7 @@ export interface SfxStart extends VoiceOpts {
 /** Baut die Stimme für ein Rezept und startet sie zur Audio-Zeit t. Ohne Seed: Zufallsvariation, mit Seed: deterministisch. */
 export function startSfx(ac: BaseAudioContext, dest: AudioNode, reverb: AudioNode | null, name: SfxName, t: number, o: SfxStart = {}): Voice {
   const meta = META[name];
-  const rng = o.seed !== undefined ? mulberry32(o.seed) : Math.random;
+  const rng = o.rng ?? (o.seed !== undefined ? mulberry32(o.seed) : Math.random);
   const voice = new Voice(ac, dest, reverb, t, {
     gain: (o.gain ?? 1) * meta.vol,
     pan: o.pan,
