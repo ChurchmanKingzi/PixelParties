@@ -328,6 +328,9 @@ const ST_BOARD_W = 960, ST_SIDE_W = 230, ST_BOARD_H = 450;
 // Klang einer Aufbau-Handlung (Dateien aus public/sounds; Lautstärke regelt der Effektregler). `dedupe: 0`: jeder Aufruf spielt.
 const stSfx = (name, o) => { if (window.playSFX) window.playSFX(name, { dedupe: 0, category: null, ...(o || {}) }); };
 
+// Abstand (ms), in dem der Recycler die mitgebrachten Karten eines ausgespuckten Heroes nacheinander hinterherschießt
+const ST_EXTRA_GAP = 380;
+
 // Der Recycler in Zeitlupe vertont (passt zu den Zeiten in `playRecycle`): Karte saust in den Mund (0), Deckel schnappt zu (300–330),
 // er kaut (420, 560), das Gold klimpert (700); bei einem Auswurf öffnet sich der Mund (780), die neue Karte schießt heraus (800)
 // und landet nach ihrem Flug in der Hand (1580).
@@ -342,6 +345,12 @@ function stRecycleSounds(ev) {
     stSfx('summon', { delay: 780, rate: 1.4, volume: 0.8 });
     stSfx('ping', { delay: 800, rate: 1.3, volume: 0.9 });
     stSfx('draw', { delay: 1580, volume: 1 });
+    // Bringt der Hero weitere Karten mit (Partner …), spuckt der Recycler sie nacheinander hinterher aus
+    (ev.extras || []).forEach((_, i) => {
+      const t = (i + 1) * ST_EXTRA_GAP;
+      stSfx('ping', { delay: 800 + t, rate: 1.3 + 0.08 * (i + 1), volume: 0.8 });
+      stSfx('draw', { delay: 1580 + t, volume: 0.9 });
+    });
   }
 }
 
@@ -353,7 +362,7 @@ function SkillTestPrepScreen({ lobby, user, leaveRoom, notify }) {
   const [startMenu, setStartMenu] = useState(null); // { hi, slot, x, y }
   const [lid, setLid] = useState(0);                // Deckelstellung des Recyclers (0 zu … 4 weit offen)
   const [chew, setChew] = useState(false);
-  const [hidden, setHidden] = useState(() => new Set());   // Karten, die noch aus dem Recycler zur Hand fliegen
+  const [hidden, setHidden] = useState(() => new Map());   // Karten (Name → Anzahl), die noch aus dem Recycler zur Hand fliegen
   const [popped, setPopped] = useState(null);                // gerade gelandete Karte (kurzes Aufploppen)
   const offsetRef = useRef(0);
   const mainRef = useRef(null);
@@ -414,21 +423,32 @@ function SkillTestPrepScreen({ lobby, user, leaveRoom, notify }) {
     later(fxTimers, 300, () => setChew(true));
     later(fxTimers, 760, () => setChew(false));
     if (ev.ejected) {
-      // 2) Auswurf: Mund auf, Karte schießt heraus, fliegt im Bogen zur Hand
-      const name = ev.ejected;
-      setHidden(h => { const n = new Set(h); n.add(name); return n; });
-      script.push([760, 4], [1230, 2], [1330, 0]);
-      later(fxTimers, 820, () => {
-        const target = document.querySelector('.st-hand .pz-hand-card[data-st-card="' + name.replace(/"/g, '\\"') + '"]');
-        const unhide = () => { setHidden(h => { const n = new Set(h); n.delete(name); return n; }); setPopped(name); later(fxTimers, 360, () => setPopped(p => (p === name ? null : p))); };
-        if (!target) { unhide(); return; }
-        const tr = target.getBoundingClientRect();
-        const cw = (target.querySelector('.pz-hand-card-inner') || target).offsetWidth || 64;
-        const ch = (target.querySelector('.pz-hand-card-inner') || target).offsetHeight || 90;
-        const arH = ar ? ar.height : 200;
-        flyCard(name, { x: mouth.x, y: mouth.y - arH * 0.1, w: cw, h: ch },
-          { x: tr.left + tr.width / 2, y: tr.top + tr.height / 2 },
-          { ms: 760, s0: 0.35, s1: 1, r0: -14, r1: 0, lift: Math.max(120, arH * 0.7), ease: 'cubic-bezier(.3,.4,.35,1)', onDone: unhide });
+      // 2) Auswurf: Mund auf, Karte schießt heraus, fliegt im Bogen zur Hand — die mitgebrachten Karten (Partner …) folgen nacheinander
+      const names = [ev.ejected, ...(ev.extras || [])];
+      const pending = {};                                   // Name → Exemplare, die noch nicht abgeflogen sind
+      names.forEach(n => { pending[n] = (pending[n] || 0) + 1; });
+      setHidden(h => { const m = new Map(h); names.forEach(n => m.set(n, (m.get(n) || 0) + 1)); return m; });
+      const lastLaunch = 820 + (names.length - 1) * ST_EXTRA_GAP;
+      script.push([760, 4], [lastLaunch + 410, 2], [lastLaunch + 510, 0]);
+      names.forEach((name, k) => {
+        later(fxTimers, 820 + k * ST_EXTRA_GAP, () => {
+          const unhide = () => {
+            setHidden(h => { const m = new Map(h); const c = (m.get(name) || 0) - 1; if (c > 0) m.set(name, c); else m.delete(name); return m; });
+            setPopped(name); later(fxTimers, 360, () => setPopped(p => (p === name ? null : p)));
+          };
+          // bei gleichnamigen Karten in der Hand: die ausgespuckten sind die letzten Exemplare — das nächste noch nicht gelandete nehmen
+          const all = document.querySelectorAll('.st-hand .pz-hand-card[data-st-card="' + name.replace(/"/g, '\\"') + '"]');
+          const target = all[Math.max(0, all.length - pending[name])];
+          pending[name]--;
+          if (!target) { unhide(); return; }
+          const tr = target.getBoundingClientRect();
+          const cw = (target.querySelector('.pz-hand-card-inner') || target).offsetWidth || 64;
+          const ch = (target.querySelector('.pz-hand-card-inner') || target).offsetHeight || 90;
+          const arH = ar ? ar.height : 200;
+          flyCard(name, { x: mouth.x, y: mouth.y - arH * 0.1, w: cw, h: ch },
+            { x: tr.left + tr.width / 2, y: tr.top + tr.height / 2 },
+            { ms: 760, s0: 0.35, s1: 1, r0: -14 + 5 * k, r1: 0, lift: Math.max(120, arH * 0.7) + 24 * k, ease: 'cubic-bezier(.3,.4,.35,1)', onDone: unhide });
+        });
       });
     }
     runLid(script);
@@ -768,19 +788,23 @@ function SkillTestPrepScreen({ lobby, user, leaveRoom, notify }) {
 
   // ── Hand (rechts daneben: Gold, wie im Puzzle-Editor) ──
   const hand = ps.hand;
+  // noch fliegende Karten: von hinten je Name so viele Exemplare ausblenden, wie unterwegs sind
+  const hiddenIdx = new Set();
+  hidden.forEach((cnt, name) => { let c = cnt; for (let i = hand.length - 1; i >= 0 && c > 0; i--) if (hand[i] === name && !hiddenIdx.has(i)) { hiddenIdx.add(i); c--; } });
   const handEl = (
     <div className="pz-hand st-hand" {...dropOn('hand')} data-st-ziel="hand">
       <span className="pz-hand-label orbit-font">HAND ({hand.length})</span>
       <div className="pz-hand-cards" style={{ '--hand-max-lift': window.handFanMaxLift ? window.handFanMaxLift(hand.length) : 0 }}>
         {hand.map((cardName, i) => {
           const img = cardImageUrl(cardName);
+          const verborgen = hiddenIdx.has(i);
           const gezogen = drag && drag.src.kind === 'hand' && drag.src.idx === i;
           const fan = window.handFanStyle ? window.handFanStyle(i, hand.length, { seite: 'me' }) : {};
           return (
             <div key={cardName + ':' + i}
               data-st-card={cardName}
               className={'pz-hand-card' + (gezogen ? ' pz-hand-card-dragging' : '') + (popped === cardName ? ' st-hand-pop' : '')}
-              style={hidden.has(cardName) ? { ...fan, visibility: 'hidden' } : fan}
+              style={verborgen ? { ...fan, visibility: 'hidden' } : fan}
               draggable={!ps.ready}
               onDragStart={(e) => startDrag(e, cardName, { kind: 'hand', idx: i })}
               onDragEnd={endDrag}

@@ -30,18 +30,21 @@ const POLLUTION_TOKEN = 'Pollution Token';
 /**
  * Count the free Support Zones for a player.
  * A zone is "free" if its sub-array is empty (no card occupying it).
- * Only counts zones belonging to alive heroes.
+ * Zones of DEFEATED heroes count too: the Pollution cards say "your free Support
+ * Zones" and do not restrict them to living Heroes (Als Befund 8.10., Pyroblast
+ * mit nur toten Heroes ohne freie Zone). Acid Rain ("one of their Heroes' free
+ * Support Zones") bleibt bei den lebenden Heroes: `opts.aliveOnly`.
  * @param {object} gs - Game state
  * @param {number} playerIdx
  * @returns {number}
  */
-function countFreeZones(gs, playerIdx) {
+function countFreeZones(gs, playerIdx, opts = {}) {
   const ps = gs.players[playerIdx];
   if (!ps) return 0;
   let count = 0;
   for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
     const hero = ps.heroes[hi];
-    if (!hero?.name || hero.hp <= 0) continue;
+    if (!hero?.name || (opts.aliveOnly && hero.hp <= 0)) continue;
     for (let si = 0; si < 3; si++) {
       const slot = (ps.supportZones[hi] || [])[si] || [];
       if (slot.length === 0) count++;
@@ -54,8 +57,8 @@ function countFreeZones(gs, playerIdx) {
  * Quick boolean — does this player have at least one free Support Zone?
  * Use in spellPlayCondition to pre-validate token-placing spells.
  */
-function hasFreeZone(gs, playerIdx) {
-  return countFreeZones(gs, playerIdx) > 0;
+function hasFreeZone(gs, playerIdx, opts = {}) {
+  return countFreeZones(gs, playerIdx, opts) > 0;
 }
 
 /**
@@ -67,13 +70,13 @@ function hasFreeZone(gs, playerIdx) {
  * @param {number} playerIdx
  * @returns {Array<{ heroIdx: number, slotIdx: number, label: string }>}
  */
-function getFreeZones(gs, playerIdx) {
+function getFreeZones(gs, playerIdx, opts = {}) {
   const ps = gs.players[playerIdx];
   if (!ps) return [];
   const zones = [];
   for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
     const hero = ps.heroes[hi];
-    if (!hero?.name || hero.hp <= 0) continue;
+    if (!hero?.name || (opts.aliveOnly && hero.hp <= 0)) continue;
     for (let si = 0; si < 3; si++) {
       const slot = (ps.supportZones[hi] || [])[si] || [];
       if (slot.length === 0) {
@@ -108,6 +111,7 @@ function getFreeZones(gs, playerIdx) {
  * @param {number} count - How many tokens to attempt to place
  * @param {string} sourceName - Source card name for logging (e.g. 'Pyroblast')
  * @param {object} [opts]
+ * @param {boolean} [opts.aliveOnly] - only zones of living Heroes (Acid Rain)
  * @param {object} [opts.promptCtx] - ctx for prompting (pass the ctx from the
  *   firing card; required for promptZonePick to route correctly)
  * @returns {Promise<{ placed: number, insts: CardInstance[] }>}
@@ -126,11 +130,12 @@ async function placePollutionTokens(engine, playerIdx, count, sourceName, opts =
   // auto-place each token in the first available slot. No choice would be
   // meaningful — placement order is the only degree of freedom, and forcing
   // N manual picks just to fill every slot is pure busywork.
-  const initialFreeCount = getFreeZones(gs, playerIdx).length;
+  const zoneOpts = { aliveOnly: !!opts.aliveOnly };
+  const initialFreeCount = getFreeZones(gs, playerIdx, zoneOpts).length;
   const autoFillAll = count >= initialFreeCount;
 
   for (let t = 0; t < count; t++) {
-    const freeZones = getFreeZones(gs, playerIdx);
+    const freeZones = getFreeZones(gs, playerIdx, zoneOpts);
     if (freeZones.length === 0) break;
 
     let chosenZone;

@@ -21,10 +21,14 @@ markierte Skill-Test-Zweige (`gs.skillTest`).
    Die Regeln (`applyMove`, `canDrop`, …) sind rein und laufen auf Server **und** Client.
 3. **Kampf** (`battle.js`): Aus den Basen wird ein normaler `gameState` samt `GameEngine` gebaut. Startspieler ist, wer
    die meisten Karten recycelt hat (Gleichstand: Zufall); die Reihenfolge rotiert je Round rückwärts.
-4. **Rounds/Turns** (`rounds.js`): Ein Zug = eine Aktion eines *Akteurs* (bereiter Held oder Creature mit aktivem Effekt).
-   Held anklicken = Basisangriff (die Karte „Attack"), Held-Effekt → Menü (Effekt oder Attack). Erschöpfte Akteure sind
-   ausgegraut. Zusatzaktionen/Boni kosten den *Spieler* den Zug, nicht den Helden. Spieler ohne Akteure werden
-   übersprungen; die Round endet, wenn niemand mehr einen Akteur hat.
+4. **Rounds/Turns** (`rounds.js`): Ein Zug = eine Aktion eines *Akteurs* (bereiter Held, Creature mit **nutzbarem** aktiven Effekt oder
+   ungenutzter aktiver Hero-Effekt). Held anklicken = Basisangriff (die Karte „Attack"), Held-Effekt → Menü (Effekt oder Attack). Erschöpfte Akteure sind
+   ausgegraut. Zusatzaktionen/Boni kosten den *Spieler* den Zug, nicht den Helden. **Kein Zug ohne mögliche Aktion:** Spieler ohne Akteur werden
+   automatisch übersprungen (Protokoll: `skilltest_no_actions`, einmal je Sitz und Round) — auch wenn nur noch Creatures übrig sind, deren Effekt gerade
+   nicht geht (kein legales Ziel, Kartenbedingung nicht erfüllt: `getActivatableCreatures` meldet `canActivate: false`). Wird später in der Round
+   wieder etwas möglich (ein Ziel taucht auf), bekommt der Sitz wieder einen Zug. Ein aktiver Hero-Effekt (Broghan …) kostet den Zug, aber nicht den
+   Helden und zählt deshalb als eigene Aktion — er verfällt nicht, wenn alle Helden schon gehandelt haben. Die Round endet, wenn niemand mehr einen
+   Akteur hat; hat in drei frischen Rounds in Folge niemand einen (alle betäubt/gefroren, nichts nutzbar), endet die Partie als Patt (`no_actors`).
 5. **Ende** (`battle.js` `finishGame`): Wer alle Helden verliert, scheidet aus (Creatures handeln weiter). Letzter
    Überlebender gewinnt. SC: 1 je Round + 5 je ausgestochenem Spieler + 5 für den Sieg (`config.js`).
 
@@ -174,6 +178,13 @@ Sichtbar: Kartenliste (Spalte „Keep − recycle"), Paar- und Kontext-Tabellen 
   Modnir, Swellpnir, Ragnarock), Deckbau-Regelkarten (Secret Spices, Secret Spice Jar, The Sacred Blade), Deck-Karten (Surprise Party, Overcharge,
   Ladder to the Sky, …) und Karten für Ascended Heroes (Audience with a hostile King, Open Invitation). Karten, die bei passender Lage funktionieren
   (Spontaneous Reappearance, Kirin Firebreath, Tengu Windstorm, Liberation, Shapeshift …), bleiben — ihre geringe Nutzung kommt aus den Bot-Prioritäten.
+  Am 8.10. kamen auf Wunsch dazu: alle **Search-Karten** (Effekt ist ausdrücklich ein Suchen im Deck: Spider Dance, Masterpiece, die zehn Harpyformer, Hell Fox, Pinaxolotl,
+  The Egg of God, Garius, Alex, Madaga, Monsieur Pete, Sabrina … — 34 Karten; die Idej Lords bleiben, ihr Paket kommt über die Spawn-Regel), alle **reinen Mill-Karten**
+  (Pillage, Dead Guardian, Magic Emerald, Gravedigger's Shovel, Sky Shaman, Cute Nerd Magenta, Jean, Cute Cat, Gravedigger), alle **Paraseed-Karten** (Greenhouse) und das
+  **Tanuki-Paket** (Rebelliokai Timid Tanuki, Tanuki Escape), die fünf **Cycling Demons** (Bouldor, Herbithorn, Hydrogen, Infernous, Serpentous), **Sandy Blob** und
+  **Festive Werz**. Begründungen und Ausnahmen: `docs/skilltest-illegal-cards.md`.
+  *Ruling 8.10. (Pollution):* „…in your free Support Zones" zählt die freien Zonen **gefallener** Heroes mit (Pyroblast mit nur einem lebenden Hero ohne freie Zone ist
+  möglich); Acid Rain („one of their Heroes' free Support Zones") bleibt bei den lebenden (`cards/effects/_pollution-shared.js`, Option `aliveOnly`).
   Ebenfalls gesperrt: **Bill, Hel, Sid und Kassaran** (Spielbeginn-Effekte vor dem Ziehen der Starthand brauchen ein Deck).
 - **Kartenskripte** dürfen nie `pi === 0 ? 1 : 0` o. Ä. schreiben. Stattdessen:
   `engine.opponentOf(pi)` (EIN Gegner: Fokus bzw. nächster lebender Sitz), `engine.opponentsOf(pi)` (alle Gegner),
@@ -303,6 +314,12 @@ Brettern, danach ergraut er) und `exhaustedSlots` (erschöpfte Creatures). Clien
   Reaktionen/Surprises sowie freiwillige „you may"-Karteneffekte aus (siehe „Reaktionen der Bots"). Offen: Welche Karten der
   Aufbau behält oder recycelt, wird gelernt (mit Kontext der restlichen Hand, siehe „Behalten oder recyceln"); gelernt wird erst im
   Training — ein älteres Profil kennt Tränke, Reaktionen und Abilities auf der Hand noch nicht.
+- **Aktive Hero-Effekte der Bots** (Broghan, Jenny, Alice, Tharx …): Ein Hero-Effekt kostet den Zug, aber nicht den Helden. Bis 8.10. stand er in der Rangliste der Aktionen
+  mit ≈ 4 Punkten weit hinter jedem Basisangriff (≈ 7–8) und zählte nicht als Akteur: Hatten alle Helden gehandelt, verfiel er bis zur nächsten Round. Folge:
+  Broghan (500 Schaden jede Round) feuerte in 114 Rounds nur 9-mal. Jetzt zählt ein ungenutzter Hero-Effekt als Aktion (`rounds.heroEffectActors`) und trägt
+  den Aufschlag `heroEffectEdge` (5, `policy.js`) — Broghan feuert in ≈ 90 % der Rounds, in denen er lebt. Gepaarte Messung (600 Paare, 2–8 Sitze, Standard-Policy):
+  Siegquote mit/ohne Aufschlag **+0,2 Punkte** (McNemar-z 0,2; nur 25 von 600 Partien unterscheiden sich) — kein messbarer Unterschied. Das Profil der Nacht vom 7./8.10. kennt
+  Hero-Effekte nur aus der alten, seltenen Nutzung.
 - **Reaktionsfenster**: Die Kette (`_runReactionWindow`) fragt im Modus alle noch nicht ausgeschiedenen Sitze der Reihe nach
   (`_reactionCheckOrder`, zuletzt der aktive Sitz); Surprise-Fenster ebenso. Einzelne Hand-Fenster hängen am Besitzer des Ziels;
   einzelne Karten fragen noch „den Gegner" (Fokus bzw. nächster lebender Sitz).

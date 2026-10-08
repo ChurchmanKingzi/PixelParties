@@ -151,7 +151,7 @@ const prompt = (title, extra = {}) => Object.assign({ type: 'handPick', title, d
   await bot.takeTurn(g2.room, 0, g2.host);
   const log2 = (g2.gs.skillTest.mullLog || []).find(m => /^Leadership/.test(m.src));
   check('Der Bot nutzt Leadership (Entscheidung „weak“, 3 schwache Karten, Bonus-Zug)', !!log2 && log2.arm === 'weak' && log2.nw === 3 && log2.bonus === 1, g2.gs.skillTest.mullLog);
-  check('Die toten Karten sind weg, die Hand hat Ersatz plus Bonus (3 + 1; der Bot darf danach schon eine neue Karte gespielt haben)', dead.every(n => !g2p.hand.includes(n)) && g2p.hand.length >= 3 && g2p.hand.length <= 4, g2p.hand);
+  check('Die toten Karten sind weg, die Hand hat Ersatz plus Bonus (3 + 1; der Bot darf danach schon neue Karten gespielt haben: eine freie Ausrüstung und die Zug-Aktion)', dead.every(n => !g2p.hand.includes(n)) && g2p.hand.length >= 2 && g2p.hand.length <= 4, g2p.hand);
   void Rules; void host; void room; void gs; void st;
 
   console.log(fails ? `\n✗ ${fails} Fehler` : '\n✓ Mulligan-Tests grün');

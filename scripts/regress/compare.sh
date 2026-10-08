@@ -2,6 +2,9 @@
 # Vergleicht das aktuelle Normalspiel (2 Spieler, CPU gegen CPU, geseedet)
 # mit dem eingecheckten Referenzlauf `baseline-2p.jsonl` (Stand von `main`
 # Commit ab35219, ohne den Skill-Test-Umbau; zuvor Commit ff42ef5). Exit 0 = identisch.
+# Die drei Spiele zu Seed 11 sind seit dem 8.10. neu erzeugt: Ruling „Pollution Tokens zählen die freien Zonen GEFALLENER Heroes mit“
+# (cards/effects/_pollution-shared.js) — ohne diese Änderung waren sie bit-identisch zur alten Baseline (geprüft); die Lookahead-Suche
+# der CPUs spielt Pollution-Karten früh mit durch.
 #
 #   scripts/regress/compare.sh            # Seeds 7/11/23, je 3 Spiele (~8 min)
 set -uo pipefail

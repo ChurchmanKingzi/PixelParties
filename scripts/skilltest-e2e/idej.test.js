@@ -113,10 +113,16 @@ console.log('Zustände ohne `spawned` (ältere Basen) laufen weiter');
 console.log('Pool: gesperrte Karten kommen nicht vor');
 {
   const MUST_BE_OUT = ['Tri Ad, the Puppet Mistress', 'Tri Fecta, the Puppet Master', 'Idej Projection',
-    'Magnetic Potion', 'Magnetic Glove', 'Brilliant Idea', 'The Sacred Jewel', 'Navigation', 'Luck'];            // Suchen/Tutoren bleiben draußen
+    'Magnetic Potion', 'Magnetic Glove', 'Brilliant Idea', 'The Sacred Jewel', 'Navigation', 'Luck',             // Suchen/Tutoren bleiben draußen
+    'Spider Dance', 'Masterpiece', 'Hell Fox', 'Pinaxolotl', 'Cute Dog', 'Garius, the Great Reformer', 'Ska Harpyformer',      // 8.10.: Search-Karten (Nutzer)
+    'Pillage', 'Dead Guardian', 'Magic Emerald', "Gravedigger's Shovel", 'Gravedigger', 'Jean, the Pillaging Knight',       // 8.10.: reine Mill-Karten
+    'Paraseed Greenhouse',                                                                                                   // 8.10.: alle Paraseed-Karten
+    'Rebelliokai Timid Tanuki', 'Tanuki Escape',
+    'Bouldor Demon', 'Herbithorn Demon', 'Hydrogen Demon', 'Infernous Demon', 'Serpentous Demon', 'Sandy Blob', 'Festive Werz'];   // 8.10.: Cycling Demons, Sandy Blob, Festive Werz                                                                            // 8.10.: Tanuki                                                                                                  // 8.10.: alle Paraseed-Karten
+  const STAY_AFTER_SEARCH_BAN = ['Idej Lord Daiyo', 'Idej Lord Nobunakin', 'Idej Lord Shoguwana', 'Idej Lord Todugawin', 'Krates, the Smartass', 'Koperniko, the Stargazer', 'Cats of the Pharaoh', 'Trade', 'Deepsea Skeleton'];
   // Seit 8.10. wieder im Pool: reine Draw- und Mulligan-Karten (Ziehen von außerhalb des Spiels, engine-ext.js installDraws)
   const NOW_IN = ['Wheels', 'Elixir of Quickness', 'Haste', 'Supply Chain', 'Alchemy', 'Leadership', 'Horn in a Bottle', 'Staff of the Teleporter', 'Heart of the Mountain'];
-  const MUST_STAY = ['Shooting Star', 'Boomerang', 'Elixir of Recovery', 'Pressed Skill', "Rainbow's Arrow", 'Spider Dance', 'Idej Blade - Hakai', 'Idej Lord Daiyo', 'Idej Sword - Kunagi'];
+  const MUST_STAY = ['Shooting Star', 'Boomerang', 'Elixir of Recovery', 'Pressed Skill', "Rainbow's Arrow", 'Idej Blade - Hakai', 'Idej Lord Daiyo', 'Idej Sword - Kunagi', ...STAY_AFTER_SEARCH_BAN];
   const all = new Set();
   const pool = new CardPool(cards);
   for (const b of Object.keys(pool.buckets)) for (const n of pool.buckets[b]) all.add(n);
@@ -125,11 +131,16 @@ console.log('Pool: gesperrte Karten kommen nicht vor');
   check('Karten mit eigenem Effekt (Ablage-Rückholer u. a.) bleiben im Pool', MUST_STAY.every(n => all.has(n)), MUST_STAY.filter(n => !all.has(n)));
   const flagged = ['blockedByHandLock', 'blockedByDrawLock', 'blockedBySearchLock'];
   const { loadCardEffect } = require('../../cards/effects/_loader');
-  const KEEP_BY_HAND = new Set(['Cleansing of the Land', 'Elixir of Recovery', 'Pressed Skill', "Rainbow's Arrow", 'Spider Dance',   // geflaggt, aber mit echtem Zusatzeffekt von Hand geprüft
+  const KEEP_BY_HAND = new Set(['Cleansing of the Land', 'Elixir of Recovery', 'Pressed Skill', "Rainbow's Arrow",   // geflaggt, aber mit echtem Zusatzeffekt von Hand geprüft
     'Boomerang', 'Shard of Chaos', 'Elixir of Mana', 'Debt-O-Tron Model Backup Duplicator',
     ...NOW_IN, 'Staff of Uncontrollable Destruction']);                  // Ablage-Rückholer (die Ablage gibt es im Skill Test) bzw. Kreatur-Artefakt
   const leftovers = [...all].filter(n => { const c = cards[n]; if (!c || c.cardType === 'Creature' || c.cardType === 'Hero') return false; let s; try { s = loadCardEffect(n); } catch { return false; } return s && flagged.some(f => s[f]) && !KEEP_BY_HAND.has(n); });
   check('Kein Nicht-Kreatur-Karte mit Zieh-/Such-Sperr-Flag steckt unbesehen im Pool', leftovers.length === 0, leftovers);
+  // 8.10. (Nutzer): keine Karte im Pool, deren Effekt ausdrücklich im Deck sucht — außer den Idej Lords (Spawn-Regel) und Karten, die Suchen nur einschränken/verändern
+  const searchers = [...all].filter(n => cards[n] && /\bsearch(es|ed|ing)?\b/i.test(cards[n].effect || '') && !STAY_AFTER_SEARCH_BAN.includes(n) && n !== 'Cybug BEE');
+  check('Keine Karte mit „search“ im Effekttext im Pool (außer den ausdrücklichen Ausnahmen)', searchers.length === 0, searchers);
+  const paraseed = [...all].filter(n => /paraseed/i.test(n) || /paraseed/i.test((cards[n] && cards[n].archetype) || ''));
+  check('Keine Paraseed-Karte im Pool', paraseed.length === 0, paraseed);
 }
 
 console.log('Kampfstart: erschienene Karten sind echte Support-Karten der Engine');
@@ -137,7 +148,7 @@ console.log('Kampfstart: erschienene Karten sind echte Support-Karten der Engine
   try {
     const { runGame } = require('../../skilltest/sim');
     const out = await runGame({
-      seats: 3, setupOnly: true, noFast: false,
+      seats: 3, setupOnly: true, noFast: false, seed: 12,        // fester Tisch: ein Hero mit Start-Effekt in der Spalte würde die erschienenen Karten verändern
       mutatePrep: (prep) => {
         const ps = prep.players[0];
         ps.ready = false;
