@@ -26771,6 +26771,62 @@ function ppSendePromptAntwort(gameState, response) {
   return true;
 }
 
+// ── Finale des letzten Tutorials: Feuerwerk ─────────────────────────
+// Nach dem Epilog von Tutorial 7: mehrere Raketen steigen auf und platzen in
+// bunten Funkenkugeln (Als Vorgabe: „eine Feuerwerk-Animation und ein
+// langsamer Fadeout — Tutorial ist geschafft!"). Die Salven sind ueber
+// `FINALE_FEUERWERK_MS` verteilt; danach blendet das Ergebnis-Overlay langsam
+// aus (`FINALE_AUSBLENDEN_MS`) und verlaesst das Tutorial.
+const FINALE_FEUERWERK_MS = 8500;
+const FINALE_AUSBLENDEN_MS = 3200;
+const FINALE_FARBEN = ['#ffd700', '#ff3366', '#33ff88', '#44aaff', '#ff8800', '#cc44ff', '#00f0ff', '#ffffff'];
+function TutorialFinaleFeuerwerk() {
+  const salven = useMemo(() => {
+    const anzahlSalven = 17;
+    return Array.from({ length: anzahlSalven }, (_, i) => {
+      const anzahl = ppFxN(28);
+      const radius = 95 + Math.random() * 80;
+      return {
+        // Zeitpunkt des Starts (s): gleichmaessig ueber die Dauer, leicht verwackelt.
+        zeit: 0.15 + i * ((FINALE_FEUERWERK_MS / 1000 - 2.4) / anzahlSalven) + Math.random() * 0.25,
+        x: 10 + Math.random() * 80, y: 13 + Math.random() * 38,
+        farbe: FINALE_FARBEN[(i * 3 + Math.floor(Math.random() * 3)) % FINALE_FARBEN.length],
+        teile: Array.from({ length: anzahl }, (_, k) => {
+          const w = (k / anzahl) * Math.PI * 2 + Math.random() * 0.18;
+          const r = radius * (0.62 + Math.random() * 0.38);
+          return { dx: Math.cos(w) * r, dy: Math.sin(w) * r };
+        }),
+      };
+    });
+  }, []);
+  useEffect(() => {
+    if (!window.playSFX) return undefined;
+    const timer = [];
+    for (const sv of salven) {
+      timer.push(setTimeout(() => window.playSFX('projectile', { volume: 0.4, rate: 1.25 + Math.random() * 0.4, dedupe: 0 }), sv.zeit * 1000));
+      timer.push(setTimeout(() => window.playSFX('elem_fire', { volume: 0.45, rate: 0.8 + Math.random() * 0.5, dedupe: 0 }), (sv.zeit + 0.7) * 1000));
+    }
+    return () => timer.forEach(clearTimeout);
+  }, [salven]);
+  if (window._playAnimations === false) return null;
+  return (
+    <div className="finale-feuerwerk">
+      {salven.map((sv, i) => (
+        <React.Fragment key={i}>
+          <div className="finale-rakete" style={{ left: sv.x + '%', '--fwf-ziel': sv.y + '%', animationDelay: sv.zeit + 's' }} />
+          <div className="finale-blitz" style={{ left: sv.x + '%', top: sv.y + '%', '--fw-color': sv.farbe, animationDelay: (sv.zeit + 0.7) + 's' }} />
+          {sv.teile.map((t, k) => (
+            <div key={k} className="finale-teil" style={{
+              left: sv.x + '%', top: sv.y + '%', '--dx': t.dx + 'px', '--dy': t.dy + 'px',
+              '--fw-color': sv.farbe, animationDelay: (sv.zeit + 0.7) + 's',
+            }} />
+          ))}
+        </React.Fragment>
+      ))}
+    </div>
+  );
+}
+
 function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck, setSelectedDeck, cubeMatchInfo }) {
   useHoverDurchSchleier();   // v1270: Tooltips durch den Dialog-Schleier
   const { user, setUser, notify, setBgmMode } = useContext(AppContext);
@@ -42005,8 +42061,16 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     };
   }, []);
 
+  // Letztes Tutorial geschafft? Dann folgt dem Epilog das Finale (Feuerwerk,
+  // langsames Ausblenden) und erst danach der Tutorial-Skin.
+  const finaleErfolg = !!(result && result.isPuzzle && result.isTutorial && result.puzzleResult === 'success'
+    && (window.TUTORIAL_SCRIPTS || {})[window._currentTutorialNum]?.isFinalTutorial);
+  const [finaleSchwarz, setFinaleSchwarz] = useState(false);
+  const finaleTimerRef = useRef(0);
   const handleLeave = () => {
     showTextBox(null);
+    // Auch beim vorzeitigen Verlassen: der Server prueft selbst, ob alle Stufen geschafft sind.
+    if (finaleErfolg) socket.emit('tutorial_finale_done');
     if (window.stopSFX) { window.stopSFX('victory'); window.stopSFX('defeat'); }
     if (isSpectator) {
       socket.emit('leave_room', { roomId: gameState.roomId });
@@ -42080,10 +42144,28 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   };
   const handleResultLeave = useCallback(() => {
     if (resultFading) return;
+    // Finale: statt des kurzen Abgangs blendet eine schwarze Ebene langsam ein.
+    // Die Fanfare laeuft dabei weiter und endet erst mit dem Verlassen.
+    if (finaleErfolg) {
+      if (finaleTimerRef.current) return;
+      setFinaleSchwarz(true);
+      finaleTimerRef.current = setTimeout(() => { finaleTimerRef.current = 0; handleLeave(); }, FINALE_AUSBLENDEN_MS);
+      return;
+    }
     if (window.stopSFX) { window.stopSFX('victory'); window.stopSFX('defeat'); }
     setResultFading(true);
     setTimeout(() => { setResultFading(false); handleLeave(); }, 800);
-  }, [resultFading, handleLeave]);
+  }, [resultFading, handleLeave, finaleErfolg]);
+
+  // Finale: nach dem Feuerwerk von selbst ausblenden und das Tutorial verlassen.
+  const handleResultLeaveRef = useRef(handleResultLeave);
+  handleResultLeaveRef.current = handleResultLeave;
+  useEffect(() => {
+    if (!finaleErfolg || tutorialOutroPending) return undefined;
+    const t = setTimeout(() => handleResultLeaveRef.current(), FINALE_FEUERWERK_MS);
+    return () => clearTimeout(t);
+  }, [finaleErfolg, tutorialOutroPending]);
+  useEffect(() => () => { if (finaleTimerRef.current) clearTimeout(finaleTimerRef.current); }, []);
 
   // Keyboard shortcuts on game-over screen: Escape=Leave, Enter/Space=Rematch
   const showGameOver = result && (result.setOver || !result.format || result.format === 1 || (result.format > 1 && result.setOver));
@@ -50484,21 +50566,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         return (
         <div className={'modal-overlay result-overlay-fade' + (resultFading ? ' result-overlay-fading' : '')}
           style={{ background: 'rgba(0,0,0,.85)' }}>
-          {finalTutorialCleared && (
-            <div className="set-fireworks">
-              {Array.from({ length: ppFxN(60) }).map((_, i) => (
-                <div key={i} className="firework-particle firework-big" style={{
-                  '--fw-x': (Math.random() * 400 - 200) + 'px',
-                  '--fw-y': (Math.random() * -400 - 80) + 'px',
-                  '--fw-color': ['#ffd700','#ff3366','#33ff88','#44aaff','#ff8800','#cc44ff','#ff6b00','#00f0ff'][i % 8],
-                  '--fw-delay': (Math.random() * 2.5) + 's',
-                  '--fw-dur': (1.2 + Math.random() * 0.8) + 's',
-                  left: (12 + Math.random() * 76) + '%',
-                  top: (22 + Math.random() * 46) + '%',
-                }} />
-              ))}
-            </div>
-          )}
+          {finalTutorialCleared && <TutorialFinaleFeuerwerk />}
+          {finaleSchwarz && <div className="finale-schwarz" />}
           <div className="animate-in" style={{ textAlign: 'center', position: 'relative', zIndex: 2 }}>
             {result.puzzleResult === 'success' ? (
               <>
@@ -50533,7 +50602,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             )}
             {result.puzzleResult === 'success' ? (
               <button className="btn" style={{ padding: '12px 32px', fontSize: 14, borderColor: '#ffd700', color: '#ffd700' }} onClick={handleResultLeave}>
-                {result.isTutorial ? '← RETURN TO TUTORIAL' : '← RETURN TO PUZZLE'}
+                {finalTutorialCleared ? '→ CONTINUE' : result.isTutorial ? '← RETURN TO TUTORIAL' : '← RETURN TO PUZZLE'}
               </button>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10, alignItems: 'center' }}>

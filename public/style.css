@@ -12639,6 +12639,76 @@ body:has(.modal-overlay) .tooltip {
   box-shadow: 0 0 14px var(--fw-color), 0 0 28px var(--fw-color), 0 0 48px var(--fw-color);
 }
 
+/* ── Finale des letzten Tutorials (TutorialFinaleFeuerwerk, app-board.jsx) ──
+   Raketen steigen auf, platzen in Funkenkugeln; danach blendet eine schwarze
+   Ebene langsam ein (`finale-schwarz`), dann verlaesst das Spiel das Tutorial. */
+.finale-feuerwerk {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 1;
+}
+.finale-rakete {
+  position: absolute;
+  top: 102%;
+  width: 4px;
+  height: 28px;
+  margin-left: -2px;
+  border-radius: 2px;
+  background: linear-gradient(to top, rgba(255,200,90,0), #ffe9a0 65%, #fff);
+  box-shadow: 0 0 10px #ffd070, 0 0 20px rgba(255,180,60,.6);
+  opacity: 0;
+  animation: finaleRakete .7s cubic-bezier(.3,.6,.5,1) both;
+}
+@keyframes finaleRakete {
+  0%   { top: 102%; opacity: 0; }
+  6%   { opacity: 1; }
+  88%  { opacity: 1; }
+  100% { top: var(--fwf-ziel); opacity: 0; }
+}
+.finale-blitz {
+  position: absolute;
+  width: 150px;
+  height: 150px;
+  margin: -75px 0 0 -75px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255,255,255,.95) 0%, var(--fw-color) 28%, rgba(0,0,0,0) 68%);
+  opacity: 0;
+  animation: finaleBlitz .5s ease-out both;
+}
+@keyframes finaleBlitz {
+  0%   { transform: scale(.2); opacity: 0; }
+  8%   { opacity: .95; }
+  100% { transform: scale(1.5); opacity: 0; }
+}
+.finale-teil {
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  margin: -3px 0 0 -3px;
+  border-radius: 50%;
+  background: var(--fw-color);
+  box-shadow: 0 0 8px var(--fw-color), 0 0 18px var(--fw-color);
+  opacity: 0;
+  animation: finaleTeil 1.75s cubic-bezier(.15,.7,.3,1) both;
+}
+@keyframes finaleTeil {
+  0%   { transform: translate(0, 0) scale(1.4); opacity: 0; }
+  4%   { opacity: 1; }
+  65%  { opacity: .9; }
+  100% { transform: translate(var(--dx), calc(var(--dy) + 80px)) scale(.15); opacity: 0; }
+}
+.finale-schwarz {
+  position: absolute;
+  inset: 0;
+  background: #000;
+  opacity: 0;
+  z-index: 5;
+  animation: finaleAusblenden 3.2s ease-in forwards;
+}
+@keyframes finaleAusblenden { to { opacity: 1; } }
+
 @keyframes fireworkBurst {
   0%   { transform: translate(0, 0) scale(1); opacity: 1; }
   20%  { opacity: 1; }

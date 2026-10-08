@@ -8870,29 +8870,37 @@ const TUTORIAL_SCRIPTS = {
     ],
     };
   })(),
-  7: {
-    // Antonia alone again, left side, permanent. `isFinalTutorial: true`
-    // makes the victory overlay (app-board.jsx) swap in the "TUTORIAL
-    // CLEARED!" banner + big fireworks when this tutorial resolves.
+  7: (() => {
+    const BEATO = '[data-hero-zone][data-hero-owner="me"][data-hero-name^="Beato"]';
+    const DECK = '[data-my-deck="1"]';
+    // Antonia steht wieder allein links, durchgehend. Alle Texte wackeln.
+    const A = (text, extra) => ({ text, speakerName: 'Antonia', nameColor: '#ff4444', shakeText: true, ...extra });
+    return {
     opts: { speaker: '/Antonia.png', speakerName: 'Antonia' },
+    // Letztes Tutorial: nach dem Epilog Feuerwerk und langsames Ausblenden
+    // (app-board.jsx, Ergebnis-Overlay); erst danach wird der Skin freigeschaltet.
     isFinalTutorial: true,
     intro: [
-      { text: 'Khekhekhe, welcome back! I was looking forward to this *a lot*~', speakerName: 'Antonia', nameColor: '#ff4444', shakeText: true },
-      { text: 'No more paw-holding - you can look at your cards, look at your deck, make smart decisions.', speakerName: 'Antonia', nameColor: '#ff4444', shakeText: true },
-      { text: "You're a clever little minion, aren't ya?!", speakerName: 'Antonia', nameColor: '#ff4444', shakeText: true },
-      { text: 'Imma be *ever so gracious* and give ya 3 hints tho: **Ascension is key**.', speakerName: 'Antonia', nameColor: '#ff4444', shakeText: true },
-      { text: 'And **Ascension immediately ends ya turn!**', speakerName: 'Antonia', nameColor: '#ff4444', shakeText: true },
-      { text: 'When ya Ascend a Hero, it gets a nice little bonus *before ending the turn*! Ya should really check out what it can get ya!', speakerName: 'Antonia', nameColor: '#ff4444', shakeText: true },
-      { text: 'Now get started already before I die of old age, khekhe!', speakerName: 'Antonia', nameColor: '#ff4444', shakeText: true },
+      A('Khehehe - dere ya are!'),
+      A('Alrighty, lackey!\nWanna get promoted to full-fledged **minion**?'),
+      A('Den get ready!'),
+      A("Ya know - some Heroes can {purple:**Ascend**} - just like ya're tryin' to do right now!"),
+      A('Dey have different kinds of **conditions** to do dat, different strong effects as payoffs - and grant ya different **bonuses when Ascending**.'),
+      // ── Highlight: Beato ──
+      A('See dat **Beato**?', { highlights: [BEATO] }),
+      A("She's one of dose Heroes dat can Ascend!", { highlights: [BEATO] }),
+      // ── Highlight: das eigene Deck ──
+      A("Check out ya deck - ya'll need de cards in dere, and it'll show ya exactly how to get her Ascended!", { highlights: [DECK] }),
+      A("Now - find out how to win dis lil' puzzle, will ya?!", { highlights: [DECK] }),
     ],
     outro: [
-      { text: 'Eeeexcellent job, my cute minion!', speakerName: 'Antonia', nameColor: '#ff4444', shakeText: true },
-      { text: 'The GRRRRREAT Antonia graciously accepts you as Her personal subordinate!', speakerName: 'Antonia', nameColor: '#ff4444', shakeText: true },
-      { text: "Aren't you a lucky little thing!", speakerName: 'Antonia', nameColor: '#ff4444', shakeText: true },
-      { text: 'Now go! Go and earn tons of beautiful {#ffd700:**Smug Coins**} to spend in my Shop!', speakerName: 'Antonia', nameColor: '#ff4444', shakeText: true },
-      { text: "I'll see you dere!", speakerName: 'Antonia', nameColor: '#ff4444', shakeText: true, exitLeft: true },
+      A("Daaaat's it, dat's a good lil' minion!"),
+      A("Alrighty - as promised, ya're now my *official* minion!"),
+      A("Dat means ya're now **allowed** to use my Golds in games, earn **delicious, delicious** {#ffd700:**Smug Coins**} with games, and bring 'em to me in my {#ffd700:**Shop**}!"),
+      A("And don't worry about de Golds - it aaaaaall finds its way back to the GRRRRREAT Antonia again anyway, khehehehehe!"),
     ],
-  },
+    };
+  })(),
 };
 
 window.canCardTypeEnterSection = canCardTypeEnterSection;
