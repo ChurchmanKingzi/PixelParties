@@ -8828,43 +8828,48 @@ const TUTORIAL_SCRIPTS = {
     ],
     };
   })(),
-  6: {
-    // Antonia is the sole speaker and lives on the LEFT side throughout —
-    // no enter / exit animation, no Monia Bot involvement. Per-line
-    // `speakerName` + `nameColor` still set so the red name label shows
-    // (the sticky-name lookup reads them off each page).
+  6: (() => {
+    const CASTLE = '.game-hand-me [data-card-name="Deepsea Castle"]';
+    // Antonia ist die einzige Sprecherin und steht durchgehend LINKS — kein
+    // Auftritt, kein Abgang, kein Monia Bot. Name und Farbe stehen an jeder
+    // Seite (der Namenslauf liest sie von den Seiten), alle Texte wackeln.
+    const A = (text, extra) => ({ text, speakerName: 'Antonia', nameColor: '#ff4444', shakeText: true, ...extra });
+    // Ab „Now - look-see ..." bis zum Ende der Einleitung: Deepsea Castle.
+    const AC = (text) => A(text, { highlights: [CASTLE] });
+    return {
     opts: { speaker: '/Antonia.png', speakerName: 'Antonia' },
     intro: [
-      { text: "Khekhekhe! Welcome to the GRRRREAT Antonia's lair!", speakerName: 'Antonia', nameColor: '#ff4444', shakeText: true },
-      { text: 'Or ... my {red:**Area**} you could say.', speakerName: 'Antonia', nameColor: '#ff4444', shakeText: true },
-      { text: "Areas are mighty useful! They come as Spells, Attacks, maybe even Creatures. Not sure, didn't check.", speakerName: 'Antonia', nameColor: '#ff4444', shakeText: true },
-      { text: "Don't care too much either - what am I, your database or somethin'? Khekhe!", speakerName: 'Antonia', nameColor: '#ff4444', shakeText: true },
-      { text: 'The important thing is: Areas can be super useful once you transform the battlefield with them!', speakerName: 'Antonia', nameColor: '#ff4444', shakeText: true },
-      { text: 'Just look at that {green:**Deepsea Castle**} in ya hand!', speakerName: 'Antonia', nameColor: '#ff4444', shakeText: true,
-        highlights: [
-          { selector: '.game-hand-me [data-card-name="Deepsea Castle"]', pulse: true },
-        ] },
-      { text: 'Lets ya swap out one of ya Creatures on board for one in hand.', speakerName: 'Antonia', nameColor: '#ff4444', shakeText: true,
-        highlights: [
-          { selector: '.game-hand-me [data-card-name="Deepsea Castle"]', pulse: true },
-        ] },
-      { text: 'Mighty convenient if your Creatures do stuff when summoned!', speakerName: 'Antonia', nameColor: '#ff4444', shakeText: true,
-        highlights: [
-          { selector: '.game-hand-me [data-card-name="Deepsea Castle"]', pulse: true },
-        ] },
-      { text: 'And unlike lame-ass *Creatures*, Areas can activate their effects immediately! So convenient!', speakerName: 'Antonia', nameColor: '#ff4444', shakeText: true },
-      { text: 'The GRRRREAT Antonia has mercifully set this up as a simple little puzzle for ya.', speakerName: 'Antonia', nameColor: '#ff4444', shakeText: true },
-      { text: "Go solve it and show me your gratitude by learnin' somethin', will ya?!", speakerName: 'Antonia', nameColor: '#ff4444', shakeText: true },
+      A("Khehehehe!\nWelcome to the GRRRRREAT Antonia's lair!"),
+      A('Or ... my {red:**Area**}, you could say!'),
+      A("Areas do be mighty useful, y'know?\nThey can be Spells, Attacks, even Artifacts!"),
+      A("Y'know what makes them **great**?"),
+      A('They give ya some bonus **every single turn**, beeg payoff for ya investment!'),
+      A("Dey work right away, even the turn ya play 'em - much more reliable dan dose *Creatures*!"),
+      A('Dey transform the entire battlefield!\nImagine it as *teleporting ya opponent to ya lair*!'),
+      A('Simple enough for ya pea brain, eh?'),
+      A("Of course, dat means ya opponent can also use 'em."),
+      A('Even better, right?'),
+      A('Means double de power since it affects double de players!'),
+      // ── Highlight: Deepsea Castle in der Hand ──
+      AC('Now - look-see at that {green:**Deepsea Castle**} in ya hand!'),
+      AC('Lets ya swap out one of ya Creatures on board for one in hand.'),
+      AC('Mighty convenient for stuff that activates when summoned.'),
+      AC("Or if you just get tired of one of your Creatures' stupid faces, khehehe!"),
+      AC('The GRRRRREAT Antonia has *mercifully* set up her lair for ya as an easy little puzzle.'),
+      AC("Go solve it and show me ya gratitude by learnin' somethin', will ya?!"),
     ],
     outro: [
-      { text: 'About time, khekhe! Fell asleep at least twice while you were trying to figure dis out.', speakerName: 'Antonia', nameColor: '#ff4444', shakeText: true },
-      { text: 'My jetpack barely has any fuel left, can ya imagine?!', speakerName: 'Antonia', nameColor: '#ff4444', shakeText: true },
-      { text: 'Buuuuut now ya know what Areas are and can do the absolute basics of simple puzzle solving and combo play.', speakerName: 'Antonia', nameColor: '#ff4444', shakeText: true },
-      { text: "Ya {purple:**Ascended**} to the mental level of a six-year-old. Ya wouldn't believe how proud I am of your *progress*!", speakerName: 'Antonia', nameColor: '#ff4444', shakeText: true },
-      { text: 'Imma see you next time for a REAL test. To see if that {purple:**Ascension**} of yours is da real deal and I can let ya out into the wild.', speakerName: 'Antonia', nameColor: '#ff4444', shakeText: true },
-      { text: 'As my loyal subject, khekhe! Still owe me ungodly amounts of da Gold!', speakerName: 'Antonia', nameColor: '#ff4444', shakeText: true, exitLeft: true },
+      A('About time, khehehe!'),
+      A('Fell asleep at least twice while ya were slamming ya head into dis puzzle!'),
+      A('But did ya see? How ya gots transported **deep under da sea**?\nPretty neat, eh?'),
+      A('Ya praise and eternal gratitude for dis showcase do be appreciated!'),
+      A("Anyways - now dat ya got all dis and solved my puzzle, I think it's about time for a **real test**!"),
+      A("Get ready, minion - next time, the GRRRRREAT Antonia will have somethin' *difficult* for ya!"),
+      A("Somethin' to make ya {purple:**Ascend**}, khehehehe!"),
+      A("Let's see if ya can promote yaself to a *full-fledged minion*!"),
     ],
-  },
+    };
+  })(),
   7: {
     // Antonia alone again, left side, permanent. `isFinalTutorial: true`
     // makes the victory overlay (app-board.jsx) swap in the "TUTORIAL
