@@ -21,13 +21,17 @@ export interface AidLevel {
   repair: number;
   /** Verstärkung: Sturmtruppen und Verteidiger bekommen so viel mehr Soll und Nachschub je Eintrag */
   surge: number;
+  /** Schadensminderung gegen Bauteile, Mauern und Kern (Befestigung) */
+  shield: number;
+  /** Mehrschaden der eigenen Artillerie (Gegenfeuer) */
+  arty: number;
 }
 
 export const AID: AidLevel[] = [
-  { from: 0, keep: 0, reroll: 0, tier: 0, rebuild: 0, xp: 0, repair: 0, surge: 0 },
-  { from: 0.12, keep: 1, reroll: 0, tier: 0, rebuild: 1, xp: 0.15, repair: 0.08, surge: 0 },
-  { from: 0.25, keep: 1, reroll: 1, tier: 1, rebuild: 2, xp: 0.3, repair: 0.15, surge: 1 },
-  { from: 0.4, keep: 2, reroll: 1, tier: 2, rebuild: 3, xp: 0.5, repair: 0.25, surge: 2 },
+  { from: 0, keep: 0, reroll: 0, tier: 0, rebuild: 0, xp: 0, repair: 0, surge: 0, shield: 0, arty: 0 },
+  { from: 0.12, keep: 1, reroll: 0, tier: 0, rebuild: 1, xp: 0.15, repair: 0.08, surge: 0, shield: 0.1, arty: 0.1 },
+  { from: 0.25, keep: 1, reroll: 1, tier: 1, rebuild: 2, xp: 0.3, repair: 0.15, surge: 1, shield: 0.2, arty: 0.2 },
+  { from: 0.4, keep: 2, reroll: 1, tier: 2, rebuild: 3, xp: 0.5, repair: 0.25, surge: 2, shield: 0.35, arty: 0.35 },
 ];
 
 /** Zustand der Bastion 0..1: Kern (45 %), Bauwerk (45 %), kein Eroberungsdruck (10 %) */

@@ -4,6 +4,7 @@ import { DT, MAT_MULT, TPS, type DType, type Team } from './constants';
 import { destroyModule } from './bastion';
 import { BUILDINGS, buildingDef } from './data';
 import { artMods, onModuleDestroyed } from './bfx';
+import { aidOf } from './catchup';
 import { ART_FX } from './artfx';
 import { unitFx } from './fx';
 import { traceLine, type LosHit } from './nav';
@@ -32,7 +33,7 @@ export function wallMult(w: Wall, dtype: DType): number {
 
 export function hurtWall(world: World, w: Wall, amount: number, dtype: DType, src: Unit | null): number {
   if (w.door || w.hp <= 0 || amount <= 0) return 0;
-  const dmg = Math.min(w.hp, amount * wallMult(w, dtype));
+  const dmg = Math.min(w.hp, amount * wallMult(w, dtype) * (1 - aidOf(world, w.owner).shield));
   w.hp -= dmg;
   if (src) {
     gainXp(world, src, 0.08 * dmg);
@@ -56,7 +57,7 @@ export function moduleMult(m: Module, dtype: DType): number {
 
 export function hurtModule(world: World, m: Module, amount: number, dtype: DType, src: Unit | null, srcTeam?: Team): number {
   if (m.destroyed || amount <= 0) return 0;
-  let dmg = amount * moduleMult(m, dtype);
+  let dmg = amount * moduleMult(m, dtype) * (1 - aidOf(world, m.owner).shield);
   if (m.card === 'BC-09') dmg *= 1;
   dmg = Math.min(m.hp, dmg);
   m.hp -= dmg;
@@ -393,8 +394,9 @@ export function fireArtillery(world: World, u: Unit, def: UnitDef, tgt: ArtTarge
   const dtype = (def.dtype === 'R' ? 'W' : def.dtype ?? 'W') as DType;
   const rankM = u.mods.dmgDealt;
   const madness = 1 + world.madness;
-  const structDmg = (def.structDmg ?? 0) * rankM * am.struct * madness;
-  const personDmg = (def.personDmg ?? 0) * rankM * madness;
+  const aidArt = 1 + aidOf(world, u.team).arty; // Aufholhilfe: Gegenfeuer
+  const structDmg = (def.structDmg ?? 0) * rankM * am.struct * madness * aidArt;
+  const personDmg = (def.personDmg ?? 0) * rankM * madness * aidArt;
   const d = dist(sp.x, sp.y, tgt.x, tgt.y);
   const count = traj === 'scatter' ? def.count ?? 1 : 1;
   const bombs = def.id === 'UA-14' ? 2 : 1;
