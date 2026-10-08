@@ -5,6 +5,7 @@ import {
   SPAWN_STAGGER_S, TPS, UNIT_LIMIT, WAVE_GAP_S, type Team,
 } from './constants';
 import { BUILDINGS, LINE_ROOM, UNITS } from './data';
+import { aidOf } from './catchup';
 import { chamberBox, healOccupants, homeAnchor, inChamber, jitterSpot, postPos, zoneAnchor, gateInner } from './ai';
 import { applySpawnBuffs, healSpecOf, modEff, moduleActive, bonusQuota } from './bfx';
 import { hurtModule, modCenter, igniteModule, rainOver } from './combat';
@@ -239,6 +240,7 @@ export function entryStats(world: World, team: Team, idx: number) {
   if (e.star >= 2) { S = Math.round(S * (e.star >= 3 ? 2 : 1.5)); N += 1; }
   if (d.cat === 'defender' || d.cat === 'civilian') S += bonusQuota(world, team, 'soll');
   if (d.cat === 'assault') N += bonusQuota(world, team, 'nachschub');
+  if (d.cat === 'assault' || d.cat === 'defender') { const sg = aidOf(world, team).surge; S += sg; N += sg; }
   return { S, N };
 }
 

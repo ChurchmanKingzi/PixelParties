@@ -129,6 +129,12 @@ export class Match {
     w.pauseNo++;
     // Aufholhilfe: Rückstand messen und die Stufe bis zum nächsten Zeitstopp festhalten
     for (const t of [0, 1] as Team[]) w.aidLevel[t] = aidLevelFor(deficit(w, t));
+    for (const t of [0, 1] as Team[]) {
+      const rep = aidOf(w, t).repair;
+      if (rep <= 0) continue;
+      for (const m of w.modules.values()) if (m.owner === t && !m.destroyed) m.hp = Math.min(m.maxHp, m.hp + m.maxHp * rep);
+      for (const wl of w.walls.values()) if (wl.owner === t && !wl.door && wl.hp > 0) wl.hp = Math.min(wl.maxHp, wl.hp + wl.maxHp * rep);
+    }
     for (const p of w.players) {
       p.hand = drawPause(w, p.team, 5);
       p.kept = [];

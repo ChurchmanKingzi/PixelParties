@@ -517,7 +517,7 @@ export class Game {
     const pct = (v: number) => `${Math.round(v * 100)}%`;
     const bar = (v: number, col: string) => el('div', { class: 'meter', style: 'margin:1px 0' }, el('i', { class: 'on', style: `flex:none;width:${Math.round(v * 100)}%;background:${col}` }));
     const help = lvl > 0
-      ? `Aid level ${lvl} until the next time stop: keep ${A.keep > 0 ? '+' + A.keep : 'the usual'} card${A.keep > 1 ? 's' : ''}${A.reroll ? `, +${A.reroll} reroll` : ''}${A.tier ? ', better cards' : ''}, ${A.rebuild} free ruin rebuild${A.rebuild > 1 ? 's' : ''}, +${Math.round(A.xp * 100)}% XP for all units.`
+      ? `Aid level ${lvl} until the next time stop: keep ${A.keep > 0 ? '+' + A.keep : 'the usual'} card${A.keep > 1 ? 's' : ''}${A.reroll ? `, +${A.reroll} reroll` : ''}${A.tier ? ', better cards' : ''}, ${A.rebuild} free ruin rebuild${A.rebuild > 1 ? 's' : ''}, +${Math.round(A.xp * 100)}% XP for all units, +${Math.round(A.repair * 100)}% HP repaired${A.surge ? `, +${A.surge} troops per entry` : ''}.`
       : 'You are not behind. If your core and buildings fall behind the enemy\'s, you get help at the next time stop.';
     const live = AID.reduce((acc, a, i) => (d >= a.from ? i : acc), 0);
     const preview = live > lvl ? ` Right now you are ${pct(d)} behind: the next time stop gives level ${live}.` : live < lvl ? ' You have caught up a bit; the aid ends at the next time stop.' : '';
