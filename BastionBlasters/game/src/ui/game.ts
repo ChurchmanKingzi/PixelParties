@@ -6,11 +6,12 @@ import { BUILDINGS, UNITS, isBuilding } from '../sim/data';
 import { botChoose, botPlay } from '../sim/bot';
 import { checkRoom, checkTower, checkWallCard, checkYardBuilding, checkYardCell, findOwnModule, footprint, wallRun } from '../sim/bastion';
 import { entryStats, freeSlotCount, operatingDegree, citizenLimit, lineActive } from '../sim/systems';
-import { SLOT_MAX, contingentSlots, keepCount, modEff, slotBreakdown, unitRooms } from '../sim/bfx';
+import { CIV_SLOT_MAX, SLOT_MAX, civilianSlots, contingentSlots, keepCount, modEff, poolCap, poolOf, poolUsed, slotBreakdown, unitRooms } from '../sim/bfx';
 import { unitFx } from '../sim/fx';
 import { buildingImpl } from '../sim/impl';
 import { modCenter } from '../sim/combat';
 import { unitActivity } from '../sim/ai';
+import { AID, deficit, standing } from '../sim/catchup';
 import { Match } from '../sim/match';
 import type { Module, Unit } from '../sim/types';
 import { ci, type World } from '../sim/world';
@@ -234,7 +235,10 @@ export class Game {
         this.focusMode = 'plot';
         this.scene.gridTeam = this.human;
         if (this.settings.pauseSec) this.deadline = Date.now() + this.settings.pauseSec * 1000;
-        hudMsg('TIME STOP: pick the cards you keep, then place them. Unplayed cards are lost.');
+        const lv = w.aidLevel[this.human], aid = AID[lv];
+        hudMsg(lv > 0
+          ? `TIME STOP with COMEBACK AID level ${lv}: you keep ${keepCount(w, this.human)} of 5 cards, ${aid.reroll ? '+' + aid.reroll + ' reroll, ' : ''}${aid.tier ? 'better cards, ' : ''}${aid.rebuild} free rebuild${aid.rebuild > 1 ? 's' : ''}: click a ruin (green outline), then Rebuild.`
+          : 'TIME STOP: pick the cards you keep, then place them. Unplayed cards are lost.');
       } else this.focusMode = 'all';
       this.applyFocus();
     }
@@ -368,7 +372,8 @@ export class Game {
     } else if (w.phase === 'loadout') { lb.textContent = 'loadout'; ph.textContent = 'choose your cards'; } else { lb.textContent = 'match over'; ph.textContent = ''; }
     const h = this.human ?? 0;
     const cnt = (t: number) => w.units.filter((u) => !u.dead && u.team === t && u.cat !== 'citizen').length;
-    $('txtInfo').textContent = `units ${cnt(0)} : ${cnt(1)} · ops ${(operatingDegree(w, h as Team) * 100).toFixed(0)}% · citizens ${w.units.filter((u) => !u.dead && u.team === h && u.cat === 'citizen').length}/${citizenLimit(w, h as Team)}${w.madness > 0 ? ' · MADNESS +' + (w.madness * 100).toFixed(0) + '%' : ''}`;
+    $('txtInfo').title = 'units = living troops P1 : P2 · ops = staffed posts · citizens = workers / limit · aid = comeback aid level (you are behind)';
+    $('txtInfo').textContent = `units ${cnt(0)} : ${cnt(1)} · ops ${(operatingDegree(w, h as Team) * 100).toFixed(0)}% · citizens ${w.units.filter((u) => !u.dead && u.team === h && u.cat === 'citizen').length}/${citizenLimit(w, h as Team)}${w.aidLevel[h] > 0 ? ' · aid L' + w.aidLevel[h] : ''}${w.madness > 0 ? ' · MADNESS +' + (w.madness * 100).toFixed(0) + '%' : ''}`;
     for (const s of [1, 2, 4, 8]) $('sp' + s).classList.toggle('on', this.speed === s && !this.paused);
     $('bPause').classList.toggle('on', this.paused);
     $('tBars').classList.toggle('on', this.scene.showBars);
@@ -440,7 +445,11 @@ export class Game {
         ),
         def ? el('div', { class: 'hint', style: 'margin-top:4px' }, ...kwText(`${stripMd(def.rules || def.effectText)} [${buildingImpl(mod.card) === 'full' ? 'effects implemented' : buildingImpl(mod.card) === 'partial' ? 'effects partly implemented' : 'stats only'}]`)) : null,
       );
-      if (this.human === mod.owner && (w.phase === 'pause' || w.phase === 'build') && mod.kind !== 'core') {
+      if (this.human === mod.owner && mod.destroyed && mod.kind !== 'core') {
+        const pl = w.players[mod.owner];
+        box.append(el('button', { class: 'primary', style: 'margin-top:6px', disabled: w.phase !== 'pause' || pl.rebuilds <= 0, onclick: () => this.rebuild(mod.id) },
+          w.phase !== 'pause' ? 'Rebuild for free (at the next time stop)' : pl.rebuilds > 0 ? `Rebuild for free (${pl.rebuilds} left)` : 'No free rebuilds left'));
+      } else if (this.human === mod.owner && !mod.destroyed && (w.phase === 'pause' || w.phase === 'build') && mod.kind !== 'core') {
         const pl = w.players[mod.owner];
         box.append(el('button', { style: 'margin-top:6px', disabled: w.phase === 'pause' && pl.moveBudget <= 0, onclick: () => this.pickUp(mod.id) }, w.phase === 'pause' ? `Pick up and move (${pl.moveBudget} left)` : 'Pick up and move'));
       }
@@ -482,20 +491,49 @@ export class Game {
         el('div', { class: 'cards' }, mini('BU-01')),
       ),
       el('div', {},
-        el('div', { class: 'row2' }, el('b', {}, 'Contingent slots'), el('span', {}, `${p.contingent.length} / ${slots}`)),
-        meter(p.contingent.length, slots),
-        el('div', { class: 'how' }, `Every troop card you play takes one slot (playing one when full replaces an entry). You get ${sb.base} slots, +1 at every time stop (now +${sb.stops}), and half a slot for each unit room you have built (Barracks, Arcanum, Menagerie ...): ${sb.rooms} room${sb.rooms === 1 ? '' : 's'} = +${sb.roomSlots}${sb.rooms % 2 ? ', one more room completes the next slot' : ''}. ${next}`),
+        el('div', { class: 'row2' }, el('b', {}, 'Combat slots'), el('span', {}, `${poolUsed(w, h, 'combat')} / ${slots}`)),
+        meter(poolUsed(w, h, 'combat'), slots),
+        el('div', { class: 'how' }, `Every artillery, assault or defender card you play takes one slot (playing one when full replaces an entry). You get ${sb.base} slots, +1 at every time stop (now +${sb.stops}), and half a slot for each unit room you have built (Barracks, Arcanum, Menagerie ...): ${sb.rooms} room${sb.rooms === 1 ? '' : 's'} = +${sb.roomSlots}${sb.rooms % 2 ? ', one more room completes the next slot' : ''}. ${next}`),
         el('div', { class: 'cards' }, ...roomCards.map(mini)),
+      ),
+      this.aidBlock(w),
+      el('div', {},
+        el('div', { class: 'row2' }, el('b', {}, 'Civilian slots'), el('span', {}, `${poolUsed(w, h, 'civ')} / ${civilianSlots(w, h)}`)),
+        meter(poolUsed(w, h, 'civ'), civilianSlots(w, h)),
+        el('div', { class: 'how' }, `Healers, builders, cooks and other civilians have their own slots, so they never compete with combat troops. You get 2, and one more at every time stop (max ${CIV_SLOT_MAX}) without building anything.`),
       ),
     );
     return box;
+  }
+
+  /** Aufholhilfe: Stand der beiden Bastionen und was der Rückstand an Hilfe bringt */
+  aidBlock(w: World): HTMLElement {
+    const h = this.human!;
+    const o: Team = h === 0 ? 1 : 0;
+    const lvl = w.aidLevel[h];
+    const A = AID[lvl];
+    const mine = standing(w, h), theirs = standing(w, o);
+    const d = deficit(w, h);
+    const pct = (v: number) => `${Math.round(v * 100)}%`;
+    const bar = (v: number, col: string) => el('div', { class: 'meter', style: 'margin:1px 0' }, el('i', { class: 'on', style: `flex:none;width:${Math.round(v * 100)}%;background:${col}` }));
+    const help = lvl > 0
+      ? `Aid level ${lvl} until the next time stop: keep ${A.keep > 0 ? '+' + A.keep : 'the usual'} card${A.keep > 1 ? 's' : ''}${A.reroll ? `, +${A.reroll} reroll` : ''}${A.tier ? ', better cards' : ''}, ${A.rebuild} free ruin rebuild${A.rebuild > 1 ? 's' : ''}, +${Math.round(A.xp * 100)}% XP for all units.`
+      : 'You are not behind. If your core and buildings fall behind the enemy\'s, you get help at the next time stop.';
+    const live = AID.reduce((acc, a, i) => (d >= a.from ? i : acc), 0);
+    const preview = live > lvl ? ` Right now you are ${pct(d)} behind: the next time stop gives level ${live}.` : live < lvl ? ' You have caught up a bit; the aid ends at the next time stop.' : '';
+    return el('div', {},
+      el('div', { class: 'row2' }, el('b', {}, 'Comeback aid'), el('span', {}, lvl > 0 ? `level ${lvl}` : 'none')),
+      el('div', { class: 'how' }, `Bastion health (core and buildings): you ${pct(mine)}`), bar(mine, 'var(--p' + (h + 1) + ')'),
+      el('div', { class: 'how' }, `enemy ${pct(theirs)}`), bar(theirs, 'var(--p' + (o + 1) + ')'),
+      el('div', { class: 'how' }, help + preview),
+    );
   }
 
   contingentPanel(w: World): HTMLElement {
     const h = this.human!;
     const p = w.players[h];
     p.slotsMax = contingentSlots(w, h);
-    const box = el('div', { class: 'panel' }, el('h3', {}, `Contingent ${p.contingent.length}/${p.slotsMax}`));
+    const box = el('div', { class: 'panel' }, el('h3', {}, `Contingent · combat ${poolUsed(w, h, 'combat')}/${poolCap(w, h, 'combat')} · civilians ${poolUsed(w, h, 'civ')}/${poolCap(w, h, 'civ')}`));
     const editable = w.phase === 'build' || w.phase === 'pause';
     if (!p.contingent.length) box.append(el('div', { class: 'hint' }, 'Empty. Play troop cards from your hand.'));
     p.contingent.forEach((e, idx) => {
@@ -512,7 +550,8 @@ export class Game {
       if (d.cat === 'artillery') {
         sel.push(el('select', { onchange: (ev: Event) => { this.match!.cmd({ t: 'prio', p: h, idx, prio: (ev.target as HTMLSelectElement).value as Priority }); } }, ...PRIORITIES.map((z) => el('option', { value: z, selected: e.prio === z }, PRIORITY_LABEL[z]))));
       }
-      const row = el('div', { class: 'ent' + (this.replaceCard ? ' replace' : ''), onclick: () => { if (this.replaceCard) this.doReplace(idx); } },
+      const canReplace = !!this.replaceCard && poolOf(this.replaceCard) === poolOf(e.card);
+      const row = el('div', { class: 'ent' + (canReplace ? ' replace' : ''), onclick: () => { if (canReplace) this.doReplace(idx); } },
         el('div', { class: 'th' }, el('img', { src: assetUrl(`cards/${e.card}.png`) })),
         el('div', {},
           el('div', {}, `${d.name} ${'★'.repeat(e.star)}`),
@@ -616,11 +655,12 @@ export class Game {
     if (!isBuilding(id)) {
       const p = w.players[h];
       const have = p.contingent.some((e) => e.card === id);
+      const pool = poolOf(id);
       p.slotsMax = contingentSlots(w, h);
-      if (!have && p.contingent.length >= p.slotsMax) {
+      if (!have && poolUsed(w, h, pool) >= poolCap(w, h, pool)) {
         this.replaceCard = id;
         this.armed = null;
-        hudMsg('Contingent is full: click the entry in the side panel that this troop should replace.');
+        hudMsg(pool === 'civ' ? 'All civilian slots are full: click the civilian in the side panel that this one should replace.' : 'All combat slots are full: click the combat troop in the side panel that this one should replace.');
         this.dirty = true;
         return;
       }
@@ -654,6 +694,12 @@ export class Game {
     if (!r.ok) fail(r.reason);
     this.replaceCard = null;
     hudMsg('');
+    this.dirty = true;
+  }
+
+  rebuild(id: number) {
+    const r = this.match!.cmd({ t: 'rebuild', p: this.human!, moduleId: id });
+    if (!r.ok) fail(r.reason); else { audio.ui('play'); toast('Ruin rebuilt (half HP, back in 3 s)'); }
     this.dirty = true;
   }
 

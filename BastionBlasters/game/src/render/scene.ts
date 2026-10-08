@@ -606,6 +606,14 @@ export class Scene {
       g.rect(mid.x * CELL - 8, mid.y * CELL - 12, 16, 3).fill({ color: 0x000000, alpha: 0.7 });
       g.rect(mid.x * CELL - 8, mid.y * CELL - 12, 16 * f, 2).fill({ color: f > 0.5 ? 0x62d26f : f > 0.25 ? 0xe5c14a : 0xe5534b });
     }
+    // Aufholhilfe: Ruinen, die kostenlos wiederaufgebaut werden dürfen, pulsieren grün
+    if (world.phase === 'pause' && this.gridTeam !== null && world.players[this.gridTeam].rebuilds > 0) {
+      const pulse2 = 0.5 + 0.5 * Math.sin(now / 200);
+      for (const m of world.modules.values()) {
+        if (m.owner !== this.gridTeam || !m.destroyed || m.kind === 'core') continue;
+        g.rect(m.x0 * CELL - 2, m.y0 * CELL - 2, m.cols * CELL + 4, m.rows * CELL + 4).stroke({ width: 3, color: 0x62d26f, alpha: 0.5 + 0.5 * pulse2 });
+      }
+    }
     // Eroberung der Kernkammer: Kammerrahmen, Fortschrittsbogen in der Farbe der Eindringlinge, Beschriftung
     for (const t of [0, 1] as Team[]) {
       const c = world.modules.get(world.coreMod[t]);

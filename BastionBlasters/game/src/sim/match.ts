@@ -2,6 +2,7 @@
 
 import { CORE_HP, YARD_PER_PAUSE, YARD_START_CELLS, type Team } from './constants';
 import { createBastion } from './bastion';
+import { aidLevelFor, aidOf, deficit } from './catchup';
 import { botChoose, botPlay } from './bot';
 import { contingentSlots, keepCount } from './bfx';
 import { applyCmd, type Cmd, type Res } from './commands';
@@ -22,7 +23,7 @@ export interface MatchOpts {
 export function newPlayer(team: Team, isBot: boolean): Player {
   return {
     team, isBot, hand: [], kept: [], played: [], keepCount: 7, rerolls: 0, mulligan: 1, contingent: [], slotsMax: 5, yardBudget: 0,
-    moveBudget: 0, ready: false, draws: 0, coreSkillReady: true, owned: [], quota: 0, found: [],
+    moveBudget: 0, ready: false, draws: 0, coreSkillReady: true, owned: [], quota: 0, found: [], rebuilds: 0,
   };
 }
 
@@ -126,13 +127,16 @@ export class Match {
     const w = this.world;
     this.pauseBegun = true;
     w.pauseNo++;
+    // Aufholhilfe: Rückstand messen und die Stufe bis zum nächsten Zeitstopp festhalten
+    for (const t of [0, 1] as Team[]) w.aidLevel[t] = aidLevelFor(deficit(w, t));
     for (const p of w.players) {
       p.hand = drawPause(w, p.team, 5);
       p.kept = [];
       p.found = [];
       p.played = [];
       p.keepCount = keepCount(w, p.team);
-      p.rerolls = 1;
+      p.rerolls = 1 + aidOf(w, p.team).reroll;
+      p.rebuilds = aidOf(w, p.team).rebuild;
       p.yardBudget = YARD_PER_PAUSE;
       p.moveBudget = 1;
       p.ready = false;

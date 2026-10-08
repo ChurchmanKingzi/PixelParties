@@ -6,7 +6,7 @@ import {
   placeYardBuilding, placeYardCell, removeModule, upgradeModule, rebuildWalls,
 } from './bastion';
 import { BUILDINGS, UNITS, isBuilding } from './data';
-import { contingentSlots } from './bfx';
+import { poolCap, poolOf, poolUsed } from './bfx';
 import type { EdgeDir } from './types';
 import type { World } from './world';
 import { TPS } from './constants';
@@ -17,6 +17,7 @@ export type Cmd =
   | { t: 'zone'; p: Team; idx: number; zone: Zone }
   | { t: 'prio'; p: Team; idx: number; prio: Priority }
   | { t: 'pickup'; p: Team; moduleId: number }
+  | { t: 'rebuild'; p: Team; moduleId: number }
   | { t: 'ready'; p: Team };
 
 export type Res = { ok: true } | { ok: false; reason: string };
@@ -55,12 +56,29 @@ export function applyCmd(world: World, c: Cmd): Res {
       if (pl.moveBudget <= 0 && world.phase === 'pause') return fail('You may move only one building per pause');
       const m = world.modules.get(c.moduleId);
       if (!m || m.owner !== c.p) return fail('Not yours');
+      if (m.destroyed) return fail('A ruin cannot be picked up: rebuild it for free (time stop) or build over it');
       const card = removeModule(world, c.p, c.moduleId);
       if (!card) return fail(m.kind === 'core' ? 'Cannot pick that up' : 'Other rooms connect through it — pick those up first');
       if (world.phase === 'pause') pl.moveBudget--;
       pl.kept.push(card);
       const i = pl.played.indexOf(card);
       if (i >= 0) pl.played.splice(i, 1);
+      return { ok: true };
+    }
+    case 'rebuild': {
+      if (world.phase !== 'pause') return fail('Ruins can be rebuilt during a time stop');
+      const m = world.modules.get(c.moduleId);
+      if (!m || m.owner !== c.p || !m.destroyed || m.kind === 'core') return fail('That is not a ruin of yours');
+      if (pl.rebuilds <= 0) return fail('No free rebuilds left (you get them when you are behind)');
+      pl.rebuilds--;
+      m.destroyed = false;
+      m.burning = 0;
+      m.hp = m.maxHp * 0.5;
+      m.s.half = 1;
+      m.buildEnd = world.tick + 3 * TPS;
+      for (const cell of m.cells) world.rubble[cell] = 0;
+      rebuildWalls(world, c.p);
+      world.feed(`P${c.p + 1} rebuilds ${m.card === 'CORE' ? 'the core' : BUILDINGS[m.card]?.name ?? 'a building'} for free`, c.p);
       return { ok: true };
     }
     case 'play': {
@@ -124,7 +142,8 @@ function playTroop(world: World, c: Extract<Cmd, { t: 'play' }>, card: string): 
   const p = c.p;
   const pl = world.players[p];
   const def = UNITS[card];
-  pl.slotsMax = contingentSlots(world, p);
+  const pool = poolOf(card);
+  pl.slotsMax = poolCap(world, p, 'combat');
   const existing = pl.contingent.findIndex((e) => e.card === card);
   if (existing >= 0) {
     const e = pl.contingent[existing];
@@ -133,13 +152,16 @@ function playTroop(world: World, c: Extract<Cmd, { t: 'play' }>, card: string): 
     consume(world, p, card);
     return { ok: true };
   }
-  if (pl.contingent.length < pl.slotsMax) {
+  if (poolUsed(world, p, pool) < poolCap(world, p, pool)) {
     pl.contingent.push({ card, star: 1, zone: def.zone ?? 'middle', prio: defaultPrio(card), alive: [] });
     consume(world, p, card);
     return { ok: true };
   }
-  if (c.replace === undefined || !pl.contingent[c.replace]) return fail('Contingent is full: choose a card to replace');
-  pl.contingent[c.replace] = { card, star: 1, zone: def.zone ?? 'middle', prio: defaultPrio(card), alive: [] };
+  const kind = pool === 'civ' ? 'civilian' : 'combat';
+  const target = c.replace === undefined ? undefined : pl.contingent[c.replace];
+  if (!target) return fail(`All ${kind} slots are full: choose a ${kind} entry to replace`);
+  if (poolOf(target.card) !== pool) return fail(`Choose a ${kind} entry to replace (civilians and combat troops have separate slots)`);
+  pl.contingent[c.replace!] = { card, star: 1, zone: def.zone ?? 'middle', prio: defaultPrio(card), alive: [] };
   consume(world, p, card);
   return { ok: true };
 }

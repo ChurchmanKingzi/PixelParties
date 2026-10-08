@@ -6,7 +6,7 @@ import {
 } from './bastion';
 import { BUILDINGS, LINE_ROOM, UNITS, isBuilding } from './data';
 import { applyCmd } from './commands';
-import { contingentSlots } from './bfx';
+import { poolCap, poolOf, poolUsed } from './bfx';
 import type { World } from './world';
 import { ci } from './world';
 import { K_YARD } from './types';
@@ -206,6 +206,21 @@ function prioFor(card: string): Priority {
   return 'surgeon';
 }
 
+/** Kostenlose Wiederaufbauten (Aufholhilfe): erst Plattformen mit Geschützplätzen, dann Heilung, Türme, der Rest nach Stufe */
+function botRebuild(world: World, team: Team) {
+  const p = world.players[team];
+  const value = (m: { card: string }) => {
+    const d = BUILDINGS[m.card];
+    if (!d) return 0;
+    return (d.group === 'Platforms' && d.gunSlots > 0 ? 100 : d.group === 'Healing' ? 80 : d.kind === 'tower' ? 60 : d.group === 'Unlock' ? 50 : 20) + d.tier;
+  };
+  const ruins = [...world.modules.values()].filter((m) => m.owner === team && m.destroyed && m.kind !== 'core').sort((a, b) => value(b) - value(a));
+  for (const m of ruins) {
+    if (p.rebuilds <= 0) break;
+    applyCmd(world, { t: 'rebuild', p: team, moduleId: m.id });
+  }
+}
+
 /**
  * Labyrinth im Zufahrtsgang: Raum-Riegel quer über den Gang, daneben ein Umweg aus Hofzellen (abwechselnd oben und unten).
  * Der Weg vom Tor zum Kern wird dadurch deutlich länger; die Platzierungsprüfung sorgt dafür, dass er offen bleibt.
@@ -256,6 +271,7 @@ function buildMaze(world: World, team: Team) {
 export function botPlay(world: World, team: Team) {
   const p = world.players[team];
   if (world.pauseNo === 0) buildMaze(world, team);
+  if (world.phase === 'pause') botRebuild(world, team);
   const order = (id: string): number => {
     if (!isBuilding(id)) return 90;
     const b = BUILDINGS[id];
@@ -271,12 +287,12 @@ export function botPlay(world: World, team: Team) {
   for (const card of cards) {
     if (!p.kept.includes(card)) continue;
     if (!isBuilding(card)) {
-      const before = p.contingent.length;
-      const full = before >= contingentSlots(world, team) && !p.contingent.some((e) => e.card === card);
+      const pool = poolOf(card);
+      const full = poolUsed(world, team, pool) >= poolCap(world, team, pool) && !p.contingent.some((e) => e.card === card);
       if (full) {
-        // schwächsten Eintrag ersetzen, falls die neue Karte besser ist
+        // schwächsten Eintrag desselben Pools ersetzen, falls die neue Karte besser ist
         let wi = -1, ws = 1e9;
-        p.contingent.forEach((e, i) => { const s = cardScore(e.card); if (s < ws) { ws = s; wi = i; } });
+        p.contingent.forEach((e, i) => { if (poolOf(e.card) !== pool) return; const s = cardScore(e.card); if (s < ws) { ws = s; wi = i; } });
         if (wi >= 0 && cardScore(card) > ws + 0.5) applyCmd(world, { t: 'play', p: team, card, replace: wi });
       } else applyCmd(world, { t: 'play', p: team, card });
       continue;

@@ -4,6 +4,7 @@ import {
   ARMOR_MULT, BERSERK_DMG, CITIZEN_HP, DT, MAP_H, MAP_W, RANK_XP, STATUS_DEFAULT_S, TPS, type DType, type Team,
 } from './constants';
 import { UNITS } from './data';
+import { aidOf } from './catchup';
 import { unitFx } from './fx';
 import { deathSaves, onUnitFell } from './bfx';
 import type { Mods, Status, StatusId, Unit, UnitDef } from './types';
@@ -152,7 +153,7 @@ export function gainXp(world: World, u: Unit, amount: number, silent = false) {
   if (amount <= 0 || u.dead) return;
   if (u.team >= 0) {
     const acad = academyBonus(world, u.team);
-    amount *= acad;
+    amount *= acad * (1 + aidOf(world, u.team).xp);
   }
   u.xp += amount;
   while (u.rank < 5 && u.xp >= RANK_XP[u.rank + 1]) {

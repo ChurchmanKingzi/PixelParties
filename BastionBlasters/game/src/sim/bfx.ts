@@ -2,6 +2,7 @@
 
 import { DT, PLOT, TPS, type DType, type Team } from './constants';
 import { BUILDINGS, UNITS } from './data';
+import { aidOf } from './catchup';
 import { effScale } from './bastion';
 import { healOccupants, homeAnchor, jitterSpot, gateInner } from './ai';
 import { hurtModule, hurtWall, igniteModule, knockback, modCenter, enemyVisible, wallMid } from './combat';
@@ -278,11 +279,30 @@ export function slotBreakdown(world: World, team: Team): { base: number; stops: 
   return { base: SLOT_BASE, stops: world.pauseNo, rooms, roomSlots, total };
 }
 
+/** Kampfplätze (Artillerie, Sturm, Verteidiger) */
 export function contingentSlots(world: World, team: Team): number {
   return slotBreakdown(world, team).total;
 }
+
+/** Zivilisten haben einen eigenen Pool, der passiv mit jedem Zeitstopp wächst, damit sie nicht gegen Kampftruppen verlieren */
+export const CIV_SLOT_BASE = 2;
+export const CIV_SLOT_MAX = 8;
+export type Pool = 'combat' | 'civ';
+export function poolOf(card: string): Pool {
+  return UNITS[card]?.cat === 'civilian' ? 'civ' : 'combat';
+}
+export function civilianSlots(world: World, team: Team): number {
+  void team;
+  return Math.min(CIV_SLOT_MAX, CIV_SLOT_BASE + world.pauseNo);
+}
+export function poolCap(world: World, team: Team, pool: Pool): number {
+  return pool === 'civ' ? civilianSlots(world, team) : contingentSlots(world, team);
+}
+export function poolUsed(world: World, team: Team, pool: Pool): number {
+  return world.players[team].contingent.filter((e) => poolOf(e.card) === pool).length;
+}
 export function keepCount(world: World, team: Team): number {
-  return active(world, team, 'BU-11') ? 4 : 3;
+  return (active(world, team, 'BU-11') ? 4 : 3) + aidOf(world, team).keep;
 }
 export function pauseBonusSeconds(world: World): number {
   return active(world, 0, 'BU-11') || active(world, 1, 'BU-11') ? 10 : 0;

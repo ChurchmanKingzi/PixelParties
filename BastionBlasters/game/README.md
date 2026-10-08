@@ -1,4 +1,4 @@
-# Bastion Blasters — Kampf-Prototyp (v0.3)
+# Bastion Blasters — Kampf-Prototyp (v0.4)
 
 Spielbarer Prototyp des Kerns: Loadout (10/7), Erstaufbau, automatische Schlacht, Zeitstopp alle zwei Wellen mit frischer 5/3-Hand, beide Siegbedingungen (Kern zerstört oder Kernkammer erobert). Mensch gegen Bot oder Bot gegen Bot zum Zuschauen. TypeScript, Vite und PixiJS; die Simulation ist deterministisch und läuft ohne Browser in Node.
 
@@ -67,6 +67,8 @@ Die Karten sind datengetrieben: `src/data/cards.gen.json` entsteht aus den Katal
 - Ein Standardkern, **keine Fraktions-Kerne**, keine Kern-Fähigkeit, kein Kern-Anbau.
 - **Zeitstopps:** Der Kampfabschnitt vor dem n-ten Zeitstopp hat 2 + n Wellen (40 s Abstand), die Abschnitte werden also immer länger. Wahnsinn ab 11:00, Himmelsriss ab 16:00.
 - **Kontingent:** 5 Plätze, +1 je Zeitstopp, +½ je gebautem Einheiten-Raum (Freischalt-Gruppe), höchstens 16.
+- **Zivilisten-Pool:** 2 eigene Plätze für Zivilisten, +1 mit jedem Zeitstopp (max. 8); sie konkurrieren nicht mehr mit den Kampfplätzen. Ersetzen nur innerhalb des Pools.
+- **Aufholhilfe (Comeback aid):** Beim Zeitstopp wird der Zustand beider Bastionen (Kern, Bauwerk, Eroberungsdruck) verglichen. Wer zurückliegt, bekommt je nach Abstand (ab 12 %, 25 %, 40 %): mehr behaltene Karten, Neuwurf, bessere Karten, 1–3 kostenlose Ruinen-Wiederaufbauten (grün umrandet, Inspektor → Rebuild) und +15–50 % XP. Anzeige in „Capacity“. Ruinen lassen sich nicht mehr aufnehmen.
 - **Fundament:** 12 kostenlose Bau-Karten zum Start (7 Räume, 2 Fallen, 2 Türme, 1 frei), unverbaute verfallen. Räume und Türme dürfen schlichte Hofzellen überbauen, solange der Weg Tor → Kernkammer offen bleibt. Mauerbruch kostet im Wegfinder 6 + HP/12, Angreifer folgen also eher dem Labyrinth.
 - **Eroberung:** 1,5 %/s je Eindringling in der Kammer (max. 6), Abbau 3 %/s; Eindringlinge ohne Ziel zertrümmern den Kern; Verteidiger in der Kammer sperren die Eroberung.
 - **Layout:** Kernhof (6 × 6) hinten im Baugrund, ein 8 Zellen langer Zufahrtsgang (1 Zelle breit) führt zum Haupttor an der Front. Davor und daneben ist freier Baugrund für Räume, Türme und Hofzellen.

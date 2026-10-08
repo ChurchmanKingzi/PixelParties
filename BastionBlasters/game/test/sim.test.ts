@@ -4,6 +4,10 @@ import { checkRoom, checkTower, gateConnected, placeRoom, placeTower, placeYardC
 import { contingentSlots, slotBreakdown } from '../src/sim/bfx';
 import { drawFoundation } from '../src/sim/draw';
 import { wavesPerSegment } from '../src/sim/constants';
+import { applyCmd } from '../src/sim/commands';
+import { civilianSlots, keepCount } from '../src/sim/bfx';
+import { AID, aidLevelFor, deficit, standing } from '../src/sim/catchup';
+import { destroyModule } from '../src/sim/bastion';
 import { CHAMBER, GATE_CELL } from '../src/sim/constants';
 import { ci } from '../src/sim/world';
 import { K_YARD } from '../src/sim/types';
@@ -131,5 +135,77 @@ describe('v0.9 rules', () => {
     expect(checkTower(w, 0, 'BT-01', 13, 13).ok).toBe(true);
     expect(placeTower(w, 0, 'BT-01', 13, 13)).not.toBeNull();
     expect(gateConnected(w, 0)).toBe(true);
+  });
+});
+
+describe('civilian slots', () => {
+  it('keep their own pool that grows with every time stop and never competes with combat troops', () => {
+    const w = new Match({ seed: 4, bots: [true, true] }).world;
+    w.phase = 'build';
+    const p = w.players[0];
+    p.contingent = [];
+    p.kept = ['US-01', 'US-02', 'US-03', 'US-04', 'US-05', 'UZ-01', 'UZ-02', 'UZ-03', 'UZ-04'];
+    expect(civilianSlots(w, 0)).toBe(2);
+    // fünf Kampftruppen füllen den Kampfpool, die Zivilisten haben trotzdem Platz
+    for (const id of ['US-01', 'US-02', 'US-03', 'US-04', 'US-05']) expect(applyCmd(w, { t: 'play', p: 0, card: id }).ok).toBe(true);
+    expect(applyCmd(w, { t: 'play', p: 0, card: 'UZ-01' }).ok).toBe(true);
+    expect(applyCmd(w, { t: 'play', p: 0, card: 'UZ-02' }).ok).toBe(true);
+    // dritter Zivilist: Pool voll
+    expect(applyCmd(w, { t: 'play', p: 0, card: 'UZ-03' }).ok).toBe(false);
+    // Ersetzen nur innerhalb des Pools
+    const combatIdx = p.contingent.findIndex((e) => e.card === 'US-01');
+    expect(applyCmd(w, { t: 'play', p: 0, card: 'UZ-03', replace: combatIdx }).ok).toBe(false);
+    // mit dem nächsten Zeitstopp wächst der Pool passiv
+    w.pauseNo = 1;
+    expect(civilianSlots(w, 0)).toBe(3);
+    expect(applyCmd(w, { t: 'play', p: 0, card: 'UZ-03' }).ok).toBe(true);
+  });
+});
+
+describe('comeback aid', () => {
+  it('measures the standing of both bastions and grades the deficit', () => {
+    const w = new Match({ seed: 6, bots: [true, true] }).world;
+    expect(deficit(w, 0)).toBe(0);
+    expect(deficit(w, 1)).toBe(0);
+    // Spieler 1 verliert Gebäude und Kern-HP
+    const a = placeRoom(w, 0, 'BP-02', 10, 14, 0)!;
+    const b = placeRoom(w, 0, 'BH-01', 14, 14, 0)!;
+    destroyModule(w, a);
+    destroyModule(w, b);
+    w.modules.get(w.coreMod[0])!.hp = 2500;
+    expect(standing(w, 0)).toBeLessThan(standing(w, 1));
+    const d = deficit(w, 0);
+    expect(d).toBeGreaterThan(0.2);
+    expect(deficit(w, 1)).toBe(0);
+    expect(aidLevelFor(d)).toBeGreaterThanOrEqual(2);
+    expect(aidLevelFor(0)).toBe(0);
+    expect(AID.length).toBe(4);
+  });
+
+  it('gives the trailing player extra kept cards and free rebuilds of ruins at the time stop', () => {
+    const m = new Match({ seed: 6, bots: [false, true] });
+    const w = m.world;
+    w.phase = 'build';
+    const a = placeRoom(w, 0, 'BP-02', 10, 14, 0)!;
+    destroyModule(w, a);
+    w.modules.get(w.coreMod[0])!.hp = 1500;
+    m.beginPause();
+    expect(w.aidLevel[0]).toBeGreaterThanOrEqual(2);
+    expect(w.aidLevel[1]).toBe(0);
+    expect(w.players[0].keepCount).toBe(keepCount(w, 0));
+    expect(w.players[0].keepCount).toBeGreaterThanOrEqual(4);
+    expect(w.players[0].rebuilds).toBeGreaterThanOrEqual(2);
+    w.phase = 'pause';
+    // Ruine kostenlos wiederherstellen
+    const r = applyCmd(w, { t: 'rebuild', p: 0, moduleId: a.id });
+    expect(r.ok).toBe(true);
+    expect(a.destroyed).toBe(false);
+    expect(a.hp).toBeCloseTo(a.maxHp * 0.5, 0);
+    // Gegner-Ruinen und Kerne nicht
+    expect(applyCmd(w, { t: 'rebuild', p: 0, moduleId: w.coreMod[0] }).ok).toBe(false);
+    expect(applyCmd(w, { t: 'rebuild', p: 0, moduleId: a.id }).ok).toBe(false);
+    // Ruinen lassen sich nicht aufnehmen
+    destroyModule(w, a);
+    expect(applyCmd(w, { t: 'pickup', p: 0, moduleId: a.id }).ok).toBe(false);
   });
 });

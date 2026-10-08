@@ -1,6 +1,6 @@
 # Bastion Blasters — Game Design Document
 
-**Teil 2: Präsentation, Technik, Balancing, Roadmap** · Version 0.9 · Entwurf zur Abnahme
+**Teil 2: Präsentation, Technik, Balancing, Roadmap** · Version 1.0 · Entwurf zur Abnahme
 
 Teil 1 (Regeln und Systeme): [`GDD.md`](GDD.md) · Kataloge: [`katalog/01-gebaeude.md`](katalog/01-gebaeude.md) · [`katalog/02-einheiten.md`](katalog/02-einheiten.md) · [`katalog/03-kerne-und-weltlaunen.md`](katalog/03-kerne-und-weltlaunen.md)
 
@@ -460,6 +460,9 @@ Alle Startwerte zum Ausprobieren; diese Tabelle soll später als Datei (z. B. `t
 | `SKY_RIP_START` | Himmelsriss (1 % Kern-HP/s) | 16:00 | – |
 | `SEGMENT_WAVES_BASE` / `_STEP` / `_MAX` | Wellen je Kampfabschnitt | 2 / +1 je Zeitstopp / 9 | – |
 | `SLOT_BASE` / `UNIT_ROOM_SLOT` / `SLOT_MAX` | Kontingent-Plätze | 5 (+1 je Zeitstopp) / ½ je Einheiten-Raum / 16 | – |
+| `AID[1..3].from` | Aufholhilfe ab Rückstand | 0,12 / 0,25 / 0,40 | 0,08–0,6 |
+| `AID[].keep` / `reroll` / `tier` / `rebuild` / `xp` | Aufholhilfe je Stufe | 1/0/0/1/15 %, 1/1/1/2/30 %, 2/1/2/3/50 % | – |
+| `CIV_SLOT_BASE` / `CIV_SLOT_MAX` | Zivilisten-Plätze | 2 (+1 je Zeitstopp) / 8 | – |
 | `CONQUEST_PER_UNIT` / `_DECAY` | Eroberung | 1,5 %/s je Eindringling / −3 %/s | – |
 | `FOUNDATION` | Fundament-Karten zum Start | 7 Räume, 2 Fallen, 2 Türme, 1 frei | – |
 
@@ -525,6 +528,7 @@ Neue Effekt-Bausteine entstehen nur, wenn mehrere Karten sie brauchen. Alles and
 | **0.7** | **Kampf-Prototyp** (`game/`, TypeScript, Vite, PixiJS): deterministische Simulation mit allen vier Truppenkategorien, sieben Flugbahnen, Auto-Mauern auf Kanten, A*, Personal, Heilung und Rückzug, Eroberung, XP und Ränge, Wellen, Zeitstopp, Ziehen 10/7 und 5/3, Bot; Browser-Oberfläche mit Loadout, Bauphase, Kontingent und Inspektor; als Einzeldatei-Artifact veröffentlicht. Vom Auftraggeber bestätigt: GDD bleibt deutsch (Q23), interne Annahmen der Kartentexte (Fed +15 %, Hardened, Knockback, Doppelbombe, Masonry als Referenzkarte) gelten. |
 | **0.8** | **Rückmeldung aus dem ersten Spieltest** (Prototyp): **Kernhof nach hinten** mit 8 Zellen langem **Zufahrtsgang** zum Haupttor (§4.1, Hof-Erweiterung 16 statt 12); **Räume dürfen an Räume anbauen** (Türen zu Nachbarräumen, Raumketten und Labyrinthe); **Glossar-Tooltips** (Begriffe im Text, Statusnamen und Kartenbilder erklären sich beim Überfahren; die Kartenrenderer exportieren dafür Begriffsfelder `art/out/cards_hotspots.json`); **große Kartenvorschau**, Handkarten wachsen beim Überfahren, Mausrad dreht Gebäude in der Hand; **Einheiten in Teamfarbe umrandet** mit Fußring; **Kapazitätsanzeige** (Bürger-Limit, Kontingent-Plätze und wie man sie erweitert); **Ton**: prozedurale SFX und Musik (§10.6, Web Audio, keine Dateien). |
 | **0.9** | **Zweite Spielrunde** (Prototyp): **Kampfabschnitte wachsen** (2, 3, 4 … Wellen zwischen den Zeitstopps); **Kontingent** 5 Plätze, +1 je Zeitstopp, ½ Platz je Einheiten-Raum (kein Spezialgebäude mehr nötig); **Fundament-Hand** (12 kostenlose Räume, Fallen, Türme zum Start); **Räume und Türme dürfen den Hof überbauen** (Labyrinth im Zufahrtsgang), Mauerbruch kostet im Wegfinder deutlich mehr; Bots bauen Labyrinthe und stellen einen Verteidiger in die Kernkammer; **Eroberung langsamer** (1,5 %/s je Eindringling) und Eindringlinge **zertrümmern den Kernkristall**; im Spiel sichtbar: Eroberungsring mit Beschriftung (Fortschritt, Rate, Sperrer), Zielstrich und Zeile „Doing“ je Einheit, Feedmeldungen; Wahnsinn ab 11:00, Himmelsriss ab 16:00 mit Tie-Break. |
+| **1.0** | **Dritte Spielrunde:** **Zivilisten-Pool** (2 Plätze, +1 je Zeitstopp, getrennt von den Kampfplätzen); **Aufholmechanismen** (GDD §8.1): Zustand der Bastion messen, bei Rückstand mehr behalten, Neuwurf, bessere Karten, kostenloser Wiederaufbau von Ruinen und mehr XP; Ruinen lassen sich nicht mehr aufnehmen; Bot-Sim misst die Comeback-Quote und vergleicht mit/ohne Hilfe. Antwort auf die Frage „gibt es Catch-up im GDD?“: bis v0.9 nur je Einheit wirkende Anti-Snowball-Regeln, kein Mechanismus für den Spieler im Rückstand. |
 
 ---
 

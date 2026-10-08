@@ -289,4 +289,6 @@ export interface Player {
   quota: number;
   /** Fundament-Karten dieser Bauphase (kostenlose Zusatzkarten, stecken auch in `kept`) */
   found: string[];
+  /** kostenlose Ruinen-Wiederaufbauten in diesem Zeitstopp (Aufholhilfe) */
+  rebuilds: number;
 }

@@ -1,6 +1,6 @@
 # Bastion Blasters — Game Design Document
 
-**Teil 1: Spieldesign** · Version 0.9 · Entwurf zur Abnahme · Perspektive: **Draufsicht** · Kerne = **Fraktionen** · Bastionen **modular**, große Karte
+**Teil 1: Spieldesign** · Version 1.0 · Entwurf zur Abnahme · Perspektive: **Draufsicht** · Kerne = **Fraktionen** · Bastionen **modular**, große Karte
 
 Teil 2 (Präsentation, Technik, Roadmap, offene Fragen): [`GDD-Praesentation-Technik.md`](GDD-Praesentation-Technik.md)
 Kataloge: [`katalog/01-gebaeude.md`](katalog/01-gebaeude.md) · [`katalog/02-einheiten.md`](katalog/02-einheiten.md) · [`katalog/03-kerne-und-weltlaunen.md`](katalog/03-kerne-und-weltlaunen.md)
@@ -365,6 +365,7 @@ Tier-Zahl · Sterne (★) · Sprite · Name · Kategorie/Linie · Kernwerte (HP,
 ### 5.6 Kontingent, Soll & Nachschub 🟦/🟨
 
 - Das **Kontingent** ist die Armee-Leiste. **Plätze (v0.9):** ⚙ **5** zum Start, **+1 mit jedem Zeitstopp** (die Armeen werden immer größer und vielseitiger), dazu **½ Platz je gebautem Einheiten-Raum** (Freischalt-Räume: Kaserne, Arkanum, Menagerie, …; zwei Räume = +1 Platz). Höchstens ⚙ 16. Kein einzelnes Gebäude ist mehr nötig, um das Kontingent zu erweitern.
+- **Zivilisten haben einen eigenen Pool (v1.0):** ⚙ **2 Zivilisten-Plätze** zum Start, **+1 mit jedem Zeitstopp** (höchstens 8). Sie konkurrieren nicht mehr mit Artillerie, Sturm und Verteidigern um die Kampfplätze; Ersetzen geht nur innerhalb desselben Pools. Vorher kamen Zivilisten praktisch nie ins Kontingent, weil jede Kampftruppe wertvoller wirkte.
 - Jede Truppen-Karte im Kontingent hat zwei Zahlen: **Soll (S)** = Zielstärke (wie viele gleichzeitig leben sollen) und **Nachschub (N)** = wie viele pro Welle nachgeliefert werden.
 - **Kontinuierliches Nachspawnen 🟦:** Zu jeder Welle fordert jede Karte `min(N, S − lebend)` Einheiten an (nie Verlust des Kontingents, nie „ausgehende“ Truppen). Sie spawnen gestaffelt (⚙ 0,4 s Abstand).
 - **Duplikat-Upgrade ★:** Zweite Kopie → **★2** (S × 1,5, N + 1), dritte → **★3** (S × 2, N + 1). Zwei Karten derselben Art belegen keinen zweiten Platz.
@@ -610,7 +611,27 @@ Kern-HP ⚙ 5000. Er wird nur durch Artillerie, Chaos-Effekte und Welt-Ereigniss
 - **Sichtbarkeit 🟨:** Rangabzeichen über der Einheit, ab R2 Details am Sprite (Narben, Wimpel, Federbusch), ab R4 Glühen, R5 eigener Name/Titel („Gerd der Unverdauliche“) über zufälligen Namensbausteinen.
 - **Rang-Aufstieg** heilt 25 % der Max-HP (Konfetti-Pixel, Mini-Hitstop).
 - **Rückzug lohnt sich 🟦:** Wer überlebt, verliert nichts. Der Verlust bei Tod ist der Rang, nicht das Kontingent.
-- **Anti-Snowball** 🟨: Zeit-XP ist gedeckelt, Rang-Differenz-Bonus hilft Unterlegenen, Todesmut ohne Heilquelle erzeugt Gegen-Dynamik, Wahnsinn (§3.7) beendet Patts.
+- **Anti-Snowball** 🟨: Zeit-XP ist gedeckelt, Rang-Differenz-Bonus hilft Unterlegenen, Todesmut ohne Heilquelle erzeugt Gegen-Dynamik, Wahnsinn (§3.7) beendet Patts. *Diese Regeln wirken je Einheit oder gar nicht auf den Rückstand eines Spielers. Einen echten Aufholmechanismus gab es bis v0.9 nicht; er steht jetzt in §8.1.*
+
+### 8.1 Aufholmechanismen 🟦 (v1.0)
+
+**Warum:** Ein Rückstand verstärkt sich selbst. Zerstörte Plattformen nehmen die Geschützplätze (die Artillerie darauf stirbt), zerstörte Heilquellen nehmen den Rückzug, und beide Spieler ziehen immer gleich viele Karten, egal wie der Stand ist. Wer zurückliegt, hatte keinen Weg zurück.
+
+**Messung:** Beim Beginn jedes Zeitstopps wird der **Zustand der Bastion** jedes Spielers berechnet: `Zustand = 0,45 × Kern-HP + 0,45 × Bauwerk (HP aller stehenden Bauteile ÷ Max-HP aller je gebauten) + 0,10 × (1 − Eroberungsdruck)`. **Rückstand** = Zustand des Gegners − eigener Zustand (mindestens 0). Gemessen wird nur der Bestand, nicht die Spielleistung; wer vorn liegt, wird nicht bestraft.
+
+**Hilfe** bis zum nächsten Zeitstopp (⚙ Stufen `AID`, Anzeige im Spiel unter „Comeback aid“):
+
+| Stufe | Rückstand ab | Behalten | Neuwurf | Ziehgewichte | Freier Wiederaufbau | XP aller Einheiten |
+|---|---|---|---|---|---|---|
+| 0 | – | 3 | 1 | normal | 0 | – |
+| 1 | 0,12 | +1 | +0 | normal | 1 | +15 % |
+| 2 | 0,25 | +1 | +1 | wie 1 Zeitstopp später | 2 | +30 % |
+| 3 | 0,40 | +2 | +1 | wie 2 Zeitstopps später | 3 | +50 % |
+
+- **Freier Wiederaufbau:** Im Zeitstopp darf der Spieler zerstörte Bauteile (Ruinen, grün umrandet) ohne Karte wiederherstellen: **50 % HP, 3 s Bauzeit**, Rang und Platz bleiben. Ruinen lassen sich nicht mehr aufnehmen (das gab vorher heimlich die Karte zurück).
+- Das Ziel ist eine **Comeback-Chance ≥ 25 %** (§12.1). Die Bot-Sim misst sie (`comeback:` am Ende von `npm run sim`) und vergleicht mit `BB_NOAID=1` ohne Hilfe.
+
+**Weitere Stützen:** Eigener **Zivilisten-Pool** (§5.6), Kontingent wächst mit jedem Zeitstopp, Fundament-Karten zum Start, Trostpflaster, Todesmut, Rang-Differenz-XP.
 
 ---
 

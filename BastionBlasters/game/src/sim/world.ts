@@ -53,6 +53,8 @@ export class World {
   waveInCycle = 0; // Wellen, die in diesem Kampfabschnitt schon gespawnt sind
   nextWaveTick = 0;
   pauseNo = 0;
+  /** Aufholstufe je Spieler, beim Zeitstopp festgehalten (catchup.ts) */
+  aidLevel: [number, number] = [0, 0];
   spawnQueue: { team: Team; entry: number; at: number; wave: number }[] = [];
   citizenTimer: [number, number] = [0, 0];
   pendingPause = false;

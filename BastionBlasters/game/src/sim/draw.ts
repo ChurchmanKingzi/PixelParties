@@ -3,6 +3,7 @@
 import { tierWeights, type Team } from './constants';
 import { BUILDINGS, NEVER_DRAWN, UNITS, LINE_ROOM, isBuilding } from './data';
 import { buildingImpl } from './impl';
+import { aidOf } from './catchup';
 import type { World } from './world';
 
 const BY_TIER: string[][] = [[], [], [], []];
@@ -77,7 +78,7 @@ export function drawLoadout(world: World, team: Team): string[] {
 
 /** Frische Hand für den Zeitstopp: mindestens 1 Bau-Karte und 1 Truppe */
 export function drawPause(world: World, team: Team, n = 5): string[] {
-  const idx = world.pauseNo;
+  const idx = world.pauseNo + aidOf(world, team).tier; // Rückstand: Ziehgewichte, als wäre das Spiel weiter
   const hand: string[] = [];
   for (let i = 0; i < n; i++) hand.push(pickOne(world, team, idx));
   if (!hand.some(isBuilding)) hand[n - 1] = pickOne(world, team, idx, isBuilding);
