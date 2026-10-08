@@ -184,6 +184,8 @@ async function start(room, host, prep) {
   engine.init();
   ext.relaxRules(engine);
   applyPresetFixups(engine, cards);
+  // Dream Lander, die schon im Aufbau auf dem Brett stehen, beginnen mit angelegtem Hero (wie beim Ausspielen im Kampf, engine._stAutoAttachHero).
+  for (const inst of engine.cardInstances.slice()) if (inst.zone === 'support') engine._stAutoAttachHero(inst);
 
   host.io.to('room:' + room.id).emit('game_started', host.sanitizeRoom(room));
   host.io.emit('rooms', host.getRoomList());

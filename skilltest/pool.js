@@ -50,6 +50,14 @@ class CardPool {
       const b = bucketOf(c);
       if (b && hasImage(c.name)) { this.buckets[b].push(c.name); this.names.add(c.name); }
     }
+    // Partnerkarten von Heroes (hand-rules.js: Luna → Firewall, Mary → Cute Phoenix, Tsu'Ki → Lunatic-Ausrüstungen …) sind reserviert, solange ihr Hero im
+    // Pool ist: sie kommen NUR zusammen mit ihrem Hero (`takeNamed`), nie in die Hand eines anderen Spielers und nie aus dem Recycler.
+    this.reserved = new Set();
+    {
+      const HR = require('./hand-rules');
+      for (const hero of this.buckets.hero) for (const p of HR.partnersOf(cardDB, hero)) if (this.names.has(p)) this.reserved.add(p);
+      for (const b of BUCKETS) this.buckets[b] = this.buckets[b].filter(n => !this.reserved.has(n));
+    }
     // Rotation: von den Cardinal Beasts ist in dieser Partie eines gesperrt (zufällig), die übrigen bleiben im Pool.
     this.banned = [];
     const cb = (CONFIG.CARDINAL_BEASTS || []).filter(n => this.buckets.creature.includes(n));
@@ -65,6 +73,7 @@ class CardPool {
 
   /** Genau diese Karte aus dem Pool nehmen (null, wenn sie schon vergeben ist). */
   takeNamed(name) {
+    if (this.reserved.has(name)) { this.reserved.delete(name); return name; }
     for (const b of BUCKETS) {
       const arr = this.buckets[b];
       const i = arr.indexOf(name);

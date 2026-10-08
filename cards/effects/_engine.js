@@ -14451,6 +14451,27 @@ this._deathWatch = (this._deathWatchStack || []).length
     }
   }
 
+  /**
+   * Skill Test (Nutzer 8.10.): Creatures, die per Effekt einen bestimmten Hero an sich anlegen (Dream Lander: `attachableHeroes`), starten mit diesem Hero
+   * bereits angelegt — ohne dass der Hero in Hand oder Deck liegen muss (der Modus hat kein Deck). Der Bonus der Creature (`onAttachHero`, z. B. +200 HP)
+   * greift sofort. Im Normalspiel tut die Funktion nichts.
+   */
+  _stAutoAttachHero(inst) {
+    if (!this.gs.skillTest || !inst || inst.zone !== 'support' || inst.counters?.attachedHero) return false;
+    const script = loadCardEffect(inst.name);
+    const heroes = script && script.attachableHeroes;
+    if (!Array.isArray(heroes) || heroes.length === 0) return false;
+    const heroName = heroes[0];
+    if (!inst.counters) inst.counters = {};
+    inst.counters.attachedHero = heroName;
+    if (typeof script.onAttachHero === 'function') {
+      try { script.onAttachHero(this, this._createContext(inst, { heroName, source: 'Skill Test' })); }
+      catch (err) { console.error(`[attachHero] ${inst.name}.onAttachHero (Skill Test) threw:`, err.message); }
+    }
+    this.log('hero_attached_to_creature', { hero: heroName, creature: inst.name, from: 'skill_test', player: this.gs.players[inst.owner]?.username, by: 'Skill Test' });
+    return true;
+  }
+
   summonCreature(cardName, playerIdx, heroIdx, zoneSlot = -1, opts = {}) {
     this._trailWrite('summon', { cardName, note: `p${playerIdx}/h${heroIdx}` });
     const placeResult = this.safePlaceInSupport(cardName, playerIdx, heroIdx, zoneSlot, { coverNested: !!opts.coverNested, controller: opts.controller });
@@ -14468,6 +14489,9 @@ this._deathWatch = (this._deathWatchStack || []).length
 
     // Enforce summoning sickness — belt-and-suspenders with _trackCard
     inst.turnPlayed = this.gs.turn || 0;
+
+    // Skill Test: Dream Lander kommen mit ihrem Hero bereits angelegt ins Spiel.
+    this._stAutoAttachHero(inst);
 
     // Propagate guardian immunity to newly summoned creatures
     this._syncGuardianImmunity(inst, playerIdx);

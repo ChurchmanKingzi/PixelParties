@@ -222,7 +222,6 @@
 - Phatnir, Prototype of Coolness
 - Swagdri, Forger of Coolness
 - The Nornstellar, Foretellers of Coolness
-- Thorad, Strength of Coolness
 - Thrysh, Robber of Coolness
 - Wildur, the Shining Coolness
 - Wowkyrie, Bringer of Coolness
@@ -273,13 +272,10 @@
 - Crusader's Flintlock
 - Crusader's Hookshot
 
-## Lunatic (Nutzer 7.10.): Hawk und Golem raus; die Cycle-Kette (New Moon → Crescent → Half → Gibbous → Full) ist ohne die bereits gesperrten New/Crescent Moon (Suchen / Mulligan) nicht mehr spielbar.
+## Lunatic (Nutzer 7.10.): Hawk und Golem raus. Half/Gibbous/Full Moon sind wieder frei (8.10.): in der Vorbereitung lassen sie sich bedingungslos ausrüsten, auch ohne die gesperrten New/Crescent Moon.
 
 - Lunatic Hawk
 - Lunatic Golem
-- Lunatic Cycle - Half Moon
-- Lunatic Cycle - Gibbous Moon
-- Lunatic Cycle - Full Moon
 
 ## Archetyp „of Kings“ (Chess), komplett inklusive beider Kasperovs (Nutzer 7.10.).
 
@@ -298,6 +294,42 @@
 - Queen of Kings [W]
 - Rook of Kings [B]
 - Rook of Kings [W]
+
+## Alles mit Ascension (Nutzer 8.10.): Ascended Heroes sind im Skill Test gesperrt, diese Karten setzen einen Ascended Hero voraus oder lösen eine Ascension aus.
+
+- Disgruntled Forest Warden
+- Divine Awakening
+- Smugness
+- Trident Spirit - Hammer Absorbed
+
+## Dragsparov, the King of Dragons: hat keinen Karteneffekt-Skript (kein Anlegen möglich) und sein Partner Kasperov ist mit „of Kings“ gesperrt.
+
+- Dragsparov, the King of Dragons
+
+## Bloom, the Maniacal Botanist (Nutzer 8.10.): lebt von Paraseed, einer rein schädlichen Karte, die man dem Gegner geben müsste — im Skill Test kaum spielbar.
+
+- Bloom, the Maniacal Botanist
+
+## Hell Circles (Nutzer 8.10.): die „Circles of Hell“-Kette aus Areas wird im Skill Test nicht gebraucht.
+
+- The First Circle of Hell
+- The Second Circle of Hell
+- The Third Circle of Hell
+- The Fifth Circle of Hell
+- The Sixth Circle of Hell
+- The Seventh Circle of Hell
+- The Eighth Circle of Hell
+
+## Bonded Companions (Nutzer 8.10.).
+
+- Bonded Companion Humby
+- Bonded Companion Mellvy
+- Bonded Companion Orphy
+- Bonded Companion Thuly
+
+## Chaos-Diamond, the Cracked Keeper (Nutzer 8.10.).
+
+- Chaos-Diamond, the Cracked Keeper
 
 ## Reaktionen mit extrem engen, seltenen oder unwahrscheinlichen Bedingungen (Nutzer 7.10., nach eigenem Ermessen): hängen an bestimmten Karten/Archetypen, am Deck, an Surprises, Freeze, Ascend, Heldenstufen oder Sonderlagen, die im Skill Test praktisch nie eintreten.
 

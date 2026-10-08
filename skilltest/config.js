@@ -35,7 +35,15 @@ const CONFIG = {
   RECYCLE_GOLD: 4,           // +Gold je eingeworfener Karte
   // Heldenpartner (Nutzer 7.10.): Karten, die GARANTIERT mit dem Hero auf der Hand liegen, zusätzlich zu den Spells, die sein Text namentlich nennt
   // (Luna → Firewall, Sol Rym → Chain Lightning …, siehe hand-rules.js).
-  HERO_PARTNERS: { 'Cute Princess Mary': ['Cute Phoenix'] },
+  HERO_PARTNERS: {
+    'Cute Princess Mary': ['Cute Phoenix'],
+    'Baaliel, the Demon General': ['Horned Demon'],
+    'Damus, the Prophet of Apocalypse': ['Ifrit'],
+    'Arthor, the King of Blackport': ['The White Eye'],
+  },
+  // Zufällige Partner: der Held bringt `count` [min, max] verschiedene Karten aus `from` mit (Tsu'Ki: 1–3 Lunatic-Ausrüstungen). `from` leer = alle legalen
+  // Karten, deren Name mit `prefix` beginnt.
+  HERO_RANDOM_PARTNERS: { "Tsu'Ki, the Lunatic Princess": { prefix: 'Lunatic Cycle', count: [1, 3] } },
   // Typ-Gewichte für die Recycler-Ausgabe. `null` = reiner Zufall über
   // den verbleibenden Pool (Spieler-Vorgabe: „zufällige neue Karte").
   RECYCLER_TYPE_WEIGHTS: null,
