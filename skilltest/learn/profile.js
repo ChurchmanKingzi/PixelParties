@@ -21,6 +21,9 @@
 //    prepValue    Karte → { n, sum, keep }  Bewertung beim Aufbau: Mittel (sum / n) des Werts, den die Behalten/Recyceln-Entscheidung der Karte
 //                                      gegeben hat (positiv: behalten, negativ: recyceln; ohne erkundete Fälle), keep = Anzahl „behalten“
 //    keepModel    Behalten/Recyceln mit Kontext (restliche Hand + Brett), siehe learn/keepmodel.js
+//    mull, mullX  Mulligan-Kanal „Wann Mulligans durchführen?“ (skilltest/mulligan.js): „Eimer|Arm“ → { n, sum } mit der mittleren Platzierungsgüte des
+//                 Sitzes nach dieser Entscheidung. Eimer = Zahl schwacher Handkarten, Bonus-Zug, Phase; Arme skip | weak | more. `mullX` zählt nur
+//                 ERKUNDETE (zufällig gewählte) Entscheidungen — nur dort ist der Vergleich der Arme fair; `mull` alle (Beobachtung).
 //    personas     [{ id, name, weights, fitness, games }]  Spielstil-Population (Kanal 3: Liga/ES)
 //    totals       Zähler (Aktionen, Spiele je Spielerzahl …)
 //
@@ -36,7 +39,7 @@ const CHECK_EVERY_MS = 30 * 1000;
 let cache = null, loadedAt = 0, fileMtime = 0;
 
 function emptyProfile() {
-  return { version: 0, games: 0, updated: null, playValue: {}, cardValue: {}, dealtValue: {}, pairValue: {}, prepValue: {}, usage: {}, usageClass: {}, keepModel: null, personas: [], totals: { plays: 0, byPlayers: {} } };
+  return { version: 0, games: 0, updated: null, playValue: {}, cardValue: {}, dealtValue: {}, pairValue: {}, prepValue: {}, usage: {}, usageClass: {}, mull: {}, mullX: {}, keepModel: null, personas: [], totals: { plays: 0, byPlayers: {} } };
 }
 
 function readFile() {

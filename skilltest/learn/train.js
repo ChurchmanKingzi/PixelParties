@@ -144,6 +144,8 @@ function learnFrom(profile, game) {
     profileMod.addObs(profile.playValue, l.key, l.dv / PLAY_VALUE_SCALE);
     profile.totals.plays++;
   }
+  // Kanal „Wann Mulligans durchführen?“: Ergebnis des Sitzes je Mulligan-Entscheidung (mulligan.js)
+  if (rec.mullLog && rec.mullLog.length) require('../mulligan').learn(profile, rec.mullLog, (seat) => placeScore(place[seat] != null ? place[seat] : n, n));
   (rec.bases || []).forEach((base, seat) => {
     const sc = placeScore(place[seat] != null ? place[seat] : n, n);
     const f = baseFeatures(base);
@@ -278,10 +280,22 @@ function pickSeatCount(opts, rng) {
   return bag[Math.floor(rng() * bag.length)];
 }
 
+// Mulligan-Quellen, die ohne Ability-Platz von der Hand wirken. Der Kanal „Wann Mulligans?“ (mulligan.js) bräuchte sonst Zehntausende Partien,
+// bis eine Quelle zufällig auf einer Hand liegt — im Training bekommt darum ein Teil der Sitze eine Quelle zusätzlich auf die Kampfhand
+// (nach dem Aufbau; nur Training, nie im Live-Spiel).
+const MULL_SOURCES = ['Horn in a Bottle', 'Staff of the Teleporter'];
+const MULL_BOOST = 0.3;
+
 async function playOne(profile, opts = {}, rng = Math.random, pool = null) {
   const n = pickSeatCount(opts, rng);
   const chosen = Array.from({ length: n }, () => pickPersona(profile, rng));
   const simOpts = { seats: n, weights: chosen.map(p => require('../policy').shipped(p.weights)), record: true, maxTurns: opts.maxTurns || 3000, watchdogMs: opts.watchdogMs };
+  const boost = opts.mullBoost != null ? opts.mullBoost : MULL_BOOST;
+  if (boost > 0) {
+    const forceHand = {};
+    for (let i = 0; i < n; i++) if (rng() < boost) forceHand[i] = [MULL_SOURCES[Math.floor(rng() * MULL_SOURCES.length)]];
+    if (Object.keys(forceHand).length) simOpts.forceHand = forceHand;
+  }
   const rec = pool ? await pool.run(simOpts) : await require('../sim').runGame(simOpts);
   if (rec.reason === 'sim_turn_limit' || rec.reason === 'round_limit') rec.placements = null;      // nicht zu Ende gespielt (Patt): keine Wertung
   return { rec, n, personaIds: chosen.map(p => p.id) };
@@ -558,6 +572,7 @@ function exportCompact(profile, minN = 4) {
     prepValue: Object.fromEntries(Object.entries(profile.prepValue || {}).filter(([k, e]) => e.n >= minN && allowed(k)).map(([k, e]) => [k, { n: e.n, sum: Math.round(e.sum * 1000) / 1000, keep: e.keep }])),
     keepModel: profile.keepModel ? require('./keepmodel').compact(profile.keepModel) : null,
     usage: keep(profile.usage, minN), usageClass: profile.usageClass || {},
+    mull: profile.mull || {}, mullX: profile.mullX || {},
     personas: profile.personas, totals: profile.totals,
   };
 }

@@ -85,3 +85,18 @@ if (data.keepContext && data.keepContext.length) {
     }
   }
 }
+
+// „Wann Mulligans durchführen?" (skilltest/mulligan.js): erkundete Entscheidungen je Kontext-Eimer und Arm
+try {
+  const prof = require('../skilltest/learn/profile').load();
+  const keys = Object.keys(prof.mullX || {});
+  if (keys.length) {
+    console.log('\n═══ Mulligan-Kanal „Wann Mulligans durchführen?" (Platzierungsgüte nach der Entscheidung; nur erkundete Fälle) ═══');
+    console.log('Eimer = Zahl schwacher Handkarten (w0–w3), b = Bonus-Zug, p0/p1/p2 = frühe/mittlere/späte Round; Arme: skip = nichts tun, weak = schwache Karten zurück, more = auch Grenzfälle');
+    const buckets = [...new Set(keys.map(k => k.split('|')[0]))].sort();
+    for (const b of buckets) {
+      const cell = (a) => { const e = prof.mullX[b + '|' + a]; return e && e.n ? `${sgn(e.sum / e.n, 2)} (n=${e.n})` : '–'; };
+      console.log(`  ${b.padEnd(8)}  skip ${cell('skip').padEnd(16)} weak ${cell('weak').padEnd(16)} more ${cell('more')}`);
+    }
+  }
+} catch { /* ohne Profil */ }

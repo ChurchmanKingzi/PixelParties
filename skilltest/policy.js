@@ -33,6 +33,8 @@ const DEFAULT_WEIGHTS = {
   potion: 1.0,              // Neigung, Tränke zu trinken (frei)
   abilityPlay: 1.0,         // Neigung, Abilities von der Hand an Helden zu legen (frei, einmal je Held und Round)
   abilityUse: 0.8,          // Neigung, aktive Ability-Effekte zu nutzen (kostet die Aktion des Helden)
+  freeAbility: 1.0,         // Neigung, FREIE Ability-Effekte zu nutzen (Leadership, Alchemy, Charme …); 0 = nie (Vergleichsmessung; bis 8.10. liefen sie nie)
+  drawValue: Number.isFinite(parseFloat(process.env.PP_ST_DRAW_VALUE)) ? parseFloat(process.env.PP_ST_DRAW_VALUE) : 20,   // Wert einer gezogenen Karte in Punkten der Stellungsbewertung (siehe sideValue)
   reactEager: 1.0,          // Neigung, Reaktionen (Hand, Surprise, Held) auszulösen, wenn die Karten-Heuristik sie erlaubt
   lookahead: 1.0,           // Vielfaches der Rollouts des Lookaheads (skilltest/mcts.js); 0 = der Sitz sucht nie. Wird nicht evolviert.
   healBias: 1.0,            // wie stark Heilung/Buffs bei Verletzten bevorzugt werden
@@ -101,8 +103,28 @@ function isBeneficial(cardName) {
   return v;
 }
 
-/** Stellungswert eines Sitzes: Heroes, Creatures, Gold. Grundlage der gelernten Spielwerte. */
-function sideValue(engine, seat) {
+// ── Ziehen ist immer etwas wert ────────────────────────────────────
+// Eine gezogene Karte ändert die Stellung (Helden, Creatures, Gold) nicht — ohne eigenen Wert sähen Draw-Karten für das Lernen und den
+// Lookahead wertlos aus und würden nie gespielt. Darum zählt jede gezogene Karte (netto: Mulligan ersetzt nur, siehe engine-ext.installDraws)
+// als Stellungsgewinn. Maßstab: eine durchschnittliche Kartenwirkung bringt ~30–40 Punkte (Spielwerte des Profils, PLAY_VALUE_SCALE 40),
+// eine gezogene Karte braucht noch eine Aktion zum Spielen → rund die Hälfte. Per Umgebungsvariable für Messreihen verstellbar.
+const DRAW_VALUE_DEFAULT = 20;
+const drawValue = () => { const v = parseFloat(process.env.PP_ST_DRAW_VALUE); return Number.isFinite(v) ? v : DRAW_VALUE_DEFAULT; };
+/** Grundwert des Ziehens für die Bewertung DIESES Sitzes: sein Kampfgewicht `drawValue` (Messreihen), sonst der Standard. */
+function drawValueOf(engine, seat) {
+  const st = engine && engine.gs && engine.gs.skillTest, w = st && st.botWeights && st.botWeights[seat];
+  return w && Number.isFinite(w.drawValue) ? w.drawValue : drawValue();
+}
+/** Wie viele Karten zieht diese Karte beim Spielen ungefähr (netto)? Nur für die Vorgabe vor den ersten Beobachtungen. */
+const DRAW_COUNT = { 'Haste': 3, 'Supply Chain': 2, 'Wheels': 2, 'Elixir of Quickness': 3, 'Heart of the Mountain': 2, 'Alchemy': 1,
+  'Horn in a Bottle': 1, 'Staff of Uncontrollable Destruction': 1, 'Ice Sculpture Garden': 1, 'Rainbow\'s Arrow': 2 };
+const PLAY_SCALE = 40;                                      // = learn/train.js PLAY_VALUE_SCALE (Punkte Stellungsgewinn je Wertpunkt der Policy)
+const DRAW_PRIOR_K = 5;                                     // so viele Beobachtungen wiegt die Vorgabe
+/** Vorgabe (Wertpunkte der Policy) für Karten, die Karten ziehen; 0 für alle anderen. */
+function drawPrior(cardName, dv) { const n = DRAW_COUNT[cardName]; return n ? n * (dv != null ? dv : drawValue()) / PLAY_SCALE : 0; }
+
+/** Stellungswert eines Sitzes: Heroes, Creatures, Gold, gezogene Karten. Grundlage der gelernten Spielwerte. */
+function sideValue(engine, seat, dv) {
   const gs = engine.gs, ps = gs.players[seat];
   if (!ps) return 0;
   const db = getCardDB();
@@ -116,27 +138,28 @@ function sideValue(engine, seat) {
     v += 0.6 * hp;
   }
   v += 0.2 * (ps.gold || 0);
+  v += (dv != null ? dv : drawValue()) * (ps._stDrawn || 0);
   return v;
 }
 
 /** Relative Stellung: eigener Wert minus Mittel der lebenden Gegner (ausgeschiedene zählen nicht). */
 function stateValue(engine, seat) {
-  const gs = engine.gs, st = gs.skillTest;
+  const gs = engine.gs, st = gs.skillTest, dv = drawValueOf(engine, seat);
   const others = gs.players.map((_, i) => i).filter(i => i !== seat && !(st && st.eliminated.includes(i)));
-  const mean = others.length ? others.reduce((a, i) => a + sideValue(engine, i), 0) / others.length : 0;
-  return sideValue(engine, seat) - mean;
+  const mean = others.length ? others.reduce((a, i) => a + sideValue(engine, i, dv), 0) / others.length : 0;
+  return sideValue(engine, seat, dv) - mean;
 }
 
 /** Schlüssel für gelernte Aktionswerte. */
 function cardKey(kind, name) { return kind + ':' + name; }
 
 /** Gelernter Bonus + Neugier für einen Aktionsschlüssel. */
-function learnedBonus(prof, w, key) {
-  if (!prof) return w.explore * 1.0;
+function learnedBonus(prof, w, key, prior = 0) {
+  if (!prof) return w.explore * 1.0 + prior;
   const e = prof.playValue && prof.playValue[key];
   const n = e ? e.n : 0;
   const total = (prof.totals && prof.totals.plays) || 0;
-  const mean = n > 0 ? e.sum / n : 0;
+  const mean = ((n > 0 ? e.sum : 0) + DRAW_PRIOR_K * prior) / (n + (prior ? DRAW_PRIOR_K : 0) || 1);
   const ucb = total > 0 ? Math.sqrt(2 * Math.log(total + 1) / (n + 1)) : 1;
   return w.learned * Math.max(-4, Math.min(4, mean)) + w.explore * Math.min(2, ucb);
 }
@@ -399,7 +422,7 @@ function rankActions(room, seat, host) {
       if (!ready.has(e.heroIdx)) continue;
       const params = { heroIdx: e.heroIdx, zoneIdx: e.zoneIdx, zoneKind: e.zoneKind || 'ability' };
       const key = cardKey('ability', e.abilityName);
-      out.push({ score: w.abilityUse * 5 + learnedBonus(prof, w, key) + Math.random(), kind: 'ability', key,
+      out.push({ score: w.abilityUse * 5 + learnedBonus(prof, w, key, drawPrior(e.abilityName, w.drawValue)) + Math.random(), kind: 'ability', key,
         run: () => rounds.act(room, seat, 'activate_ability', params, () => host.doActivateAbility(room, seat, params), host) });
     }
   } catch { /* keine aktivierbaren Abilities */ }
@@ -418,7 +441,7 @@ function rankActions(room, seat, host) {
         const params = { cardName: name, handIndex, heroIdx: hi };
         if (sub === 'attachment') params.attachHeroIdx = hi;                 // Anhänger-Zauber: an den Wirker (die Karte fragt sonst selbst nach dem Ziel)
         const sBonus = actionBonus(engine, seat, w, estimateDamage(engine, name, ps.heroes[hi] && ps.heroes[hi].atk), isBeneficial(name));
-        out.push({ score: base + learnedBonus(prof, w, key) + Math.random() * 1.5 + sBonus, kind: 'spell', key, card: name, hero: hi,
+        out.push({ score: base + learnedBonus(prof, w, key, drawPrior(name, w.drawValue)) + Math.random() * 1.5 + sBonus, kind: 'spell', key, card: name, hero: hi,
           run: () => rounds.act(room, seat, 'play_spell', params, () => host.doPlaySpell(room, seat, params), host) });
       }
     } else if (c.cardType === 'Creature' && sub === 'normal' && host.doPlayCreature) {
@@ -510,7 +533,7 @@ function freeActions(room, seat, host) {
     const sub = (c.subtype || '').toLowerCase();
     if (c.cardType === 'Artifact' && (sub === 'equipment' || sub === 'normal') && host.doPlayArtifact) {
       const key = cardKey('equip', name);
-      const base = w.equip * 4 + learnedBonus(prof, w, key);
+      const base = w.equip * 4 + learnedBonus(prof, w, key, drawPrior(name, w.drawValue));
       if (sub === 'equipment') {
         for (const hi of alive) {
           const free = freeSupportSlots(ps, hi);
@@ -557,7 +580,7 @@ function freeActions(room, seat, host) {
       if (isBeneficial(name) && !anyHeroHurt(ps)) return;
       const key = cardKey('potion', name);
       const params = { cardName: name, handIndex };
-      out.push({ score: w.potion * 4 + learnedBonus(prof, w, key) + Math.random(), key: 'free:' + name, learnKey: key,
+      out.push({ score: w.potion * 4 + learnedBonus(prof, w, key, drawPrior(name, w.drawValue)) + Math.random(), key: 'free:' + name, learnKey: key,
         run: () => usePotion(room, seat, host, params) });
     } else if (c.cardType === 'Ability' && host.doPlayAbility) {
       // Hand-Abilities: an einen Helden mit freier Zone oder passendem Stapel (Stufe +1), je Held einmal pro Round.
@@ -585,7 +608,45 @@ function freeActions(room, seat, host) {
       }
     }
   });
+  for (const a of freeAbilityActions(room, seat, host, w, prof)) out.push(a);
   return out.sort((a, b) => b.score - a.score);
+}
+
+/**
+ * Freie Ability-Effekte (Leadership, Alchemy, Training, Necromancy, Trapping, Charme, Diplomacy, Thieving, Trade …): kosten keine Aktion und gelten
+ * einmal je Name und Round. Sie liefen bei Bots bisher NIE (kein Weg in `skillTestHandlers`) — Helden mit solchen Start-Abilities spielten ohne
+ * ihren Effekt. Spiegelt die Standard-CPU der Engine (_cpu.js activateFreeAbilities): stärkste Kopie je Name, Zieh-Sperre, `cpuMeta.shouldActivateNow`.
+ * Ob es sich lohnt, lernt der Bot wie bei allen anderen Aktionen (`playValue` unter `freeAbility:<Name>`, Neugier, gezogene Karten zählen).
+ */
+function freeAbilityActions(room, seat, host, w, prof) {
+  const engine = room.engine, gs = room.gameState, ps = gs.players[seat], out = [];
+  if (!host.doActivateFreeAbility || !(w.freeAbility > 0)) return out;
+  const entries = attempt(() => engine.getFreeActivatableAbilities(seat), []) || [];
+  const best = new Map();
+  for (const e of entries) {
+    if (!e.canActivate || e.exhausted || e.charmedOwner != null || e.borrowedFromOwner != null) continue;
+    const prev = best.get(e.abilityName);
+    if (!prev || e.level > prev.level) best.set(e.abilityName, e);
+  }
+  for (const [name, e] of best) {
+    const script = scriptOf(name);
+    if (!script || !script.onFreeActivate) continue;
+    if (ps.handLocked || ps.drawLocked) {
+      const skip = script.cpuSkipActivationWhenDrawLocked;
+      if (typeof skip === 'function' ? attempt(() => skip(e.level)) : !!skip) continue;       // Zieh-Ability unter Zieh-Sperre: Gold wäre verschwendet
+    }
+    if (script.cpuMeta && typeof script.cpuMeta.shouldActivateNow === 'function' && !attempt(() => script.cpuMeta.shouldActivateNow(engine, seat), true)) continue;
+    const key = cardKey('freeAbility', name);
+    const params = { heroIdx: e.heroIdx, zoneIdx: e.zoneIdx, zoneKind: e.zoneKind };
+    const hoptKey = `free-ability:${name}:${seat}`;
+    out.push({ score: w.abilityUse * 4 + learnedBonus(prof, w, key, drawPrior(name, w.drawValue)) + Math.random(), key: 'free:fability:' + name, learnKey: key,
+      run: async () => {
+        rounds.setPhaseFor(room, seat, 'activate_free_ability', params);
+        const ok = await host.doActivateFreeAbility(room, seat, params);
+        return !!ok && attempt(() => engine.didActivationFire(hoptKey), true);
+      } });
+  }
+  return out;
 }
 
 // ── Reaktionen ─────────────────────────────────────────────────────
@@ -696,5 +757,5 @@ function prepareBase({ env, ps, room, idx, pool, noProfile, weights, record }) {
 module.exports = {
   prepareBase, castableInHand, useArtifactEffect,
   DEFAULT_WEIGHTS, SHIPPED_TARGETING, shipped, weightsOf, chooseTargets, chooseTribute, choosePlayer, rankActions, freeActions,
-  stateValue, sideValue, isBeneficial, cardKey, reactionVerdict, reactionHeuristic, saysYes, targetInfo, estimateDamage,
+  stateValue, sideValue, drawValue, drawValueOf, drawPrior, isBeneficial, cardKey, reactionVerdict, reactionHeuristic, saysYes, targetInfo, estimateDamage,
 };

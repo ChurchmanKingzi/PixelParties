@@ -227,6 +227,40 @@ function installReactions(engine) {
 }
 
 /**
+ * Auswahl-Abfragen bestimmter Zauber (Karten aus der Ablage zurückholen, Kartennamen ansagen, Artifact suchen): die Standard-CPU lehnt sie ab,
+ * der Zauber fiele in sich zusammen. `skilltest/prompts.js` beantwortet genau die dort gelisteten Abfragen.
+ */
+function installPrompts(engine) {
+  const prev = engine._getCpuGenericResponse.bind(engine);
+  engine._getCpuGenericResponse = (promptData, seat) => {
+    const P = require('./prompts');
+    if (engine.gs && engine.gs.skillTest && P.handles(promptData)) {
+      try {
+        const r = withCpuSeat(engine, seat, () => P.answer(engine, seat, promptData));
+        if (r !== undefined) return r;
+      } catch (e) { console.error('[skilltest] Auswahl-Antwort:', e && e.stack || e); }
+    }
+    return prev(promptData, seat);
+  };
+}
+
+/**
+ * Mulligan-Prompts der Bots (Leadership, Horn in a Bottle, Staff of the Teleporter, Crescent Moon): `skilltest/mulligan.js` entscheidet,
+ * welche Handkarten zurückgemischt werden — oder ob gar nicht (gelernter Kanal „Wann Mulligans?“). Die Standard-CPU lehnt abbrechbare Prompts ab.
+ */
+function installMulligan(engine) {
+  const prev = engine._getCpuGenericResponse.bind(engine);
+  engine._getCpuGenericResponse = (promptData, seat) => {
+    const M = require('./mulligan');
+    if (engine.gs && engine.gs.skillTest && M.isMulliganPrompt(promptData)) {
+      try { return withCpuSeat(engine, seat, () => M.respond(engine, seat, promptData)); }
+      catch (e) { console.error('[skilltest] Mulligan-Logik:', e && e.stack || e); return null; }
+    }
+    return prev(promptData, seat);
+  };
+}
+
+/**
  * `engine.restore(snap)` ersetzt `gs.skillTest` durch eine KOPIE (die Identität geht verloren, nicht aufzählbare
  * Felder wie die Timer-Handles gehen mit). Der Rundentreiber, Wächter und Timer halten aber das lebende Objekt:
  * nach jedem Restore bekommt es die Werte der Kopie, bleibt selbst aber dasselbe Objekt.
@@ -335,14 +369,27 @@ function stClearDeck(engine, pi, kind) {
   if (kind !== 'potion') ps.deckTopVisible = [];
 }
 
+/**
+ * Gezogene Karten zählen als Stellungsgewinn (policy.sideValue: „Ziehen ist immer etwas wert“). `ps._stDrawn` ist der Zähler je Sitz;
+ * Mulligan-Karten ersetzen nur (siehe unten: das Nachziehen derselben Anzahl wird gegengerechnet), ein Bonus-Zug (Horn in a Bottle,
+ * Leadership Lv3, Staff bei ganzer Hand) bleibt übrig.
+ */
+function tallyDraw(engine, pi, n) {
+  const ps = engine.gs.players[pi];
+  if (ps && n) ps._stDrawn = (ps._stDrawn || 0) + n;
+}
+
 function installDraws(engine) {
   const origDraw = engine.actionDrawCards.bind(engine);
   engine.actionDrawCards = async function (pi, count, opts = {}) {
     if (!this.gs.skillTest || opts._isResourceDraw) return origDraw(pi, count, opts);
     const added = stFillDeck(this, pi, 'main', count);
     if (added > 0 && !this._inMctsSim && !this._fastMode) { this.sync(); await this._delay(250); }       // die Karten erscheinen kurz im Deck …
-    try { return await origDraw(pi, count, opts); }                                                      // … und fliegen zur Hand
-    finally { stClearDeck(this, pi, 'main'); }
+    try {
+      const drawn = await origDraw(pi, count, opts);                                                     // … und fliegen zur Hand
+      tallyDraw(this, pi, Array.isArray(drawn) ? drawn.length : 0);
+      return drawn;
+    } finally { stClearDeck(this, pi, 'main'); }
   };
 
   const origPotion = engine.actionDrawFromPotionDeck.bind(engine);
@@ -350,13 +397,18 @@ function installDraws(engine) {
     if (!this.gs.skillTest) return origPotion(pi, count);
     const added = stFillDeck(this, pi, 'potion', count);
     if (added > 0 && !this._inMctsSim && !this._fastMode) { this.sync(); await this._delay(250); }
-    try { return await origPotion(pi, count); }
-    finally { stClearDeck(this, pi, 'potion'); }
+    try {
+      const drawn = await origPotion(pi, count);
+      tallyDraw(this, pi, Array.isArray(drawn) ? drawn.length : 0);
+      return drawn;
+    } finally { stClearDeck(this, pi, 'potion'); }
   };
 
   const origMulligan = engine.actionMulliganCards.bind(engine);
   engine.actionMulliganCards = async function (pi, names, handIdx) {
     const res = await origMulligan(pi, names, handIdx);              // Karten fliegen zum Deck, das Deck mischt (normale Animation)
+    // Das Nachziehen der zurückgemischten Karten (Hauptdeck: über actionDrawCards) ist kein Gewinn — Gegenrechnung; Tränke kommen am Draw vorbei zurück.
+    if (this.gs.skillTest && res) tallyDraw(this, pi, -Math.max(0, (res.totalReturned || 0) - (res.potionCount || 0)));
     if (this.gs.skillTest) {
       // Neue Karten ersetzen die zurückgemischten; die alten gehen in den Pool zurück (und können wiederkommen)
       this.gs.players.forEach((p, i) => {
@@ -374,4 +426,4 @@ function installDraws(engine) {
   };
 }
 
-module.exports = { installReactions, installRunawayBreaker, installSnapshotGuard, installPlayerChoice, installTargetWatch, installElimination, installMeter, installTurnEnd, installBotSeats, installBotBrain, relaxRules, installDraws, stFillDeck, stClearDeck, stNewCard };
+module.exports = { installPrompts, installMulligan, installReactions, installRunawayBreaker, installSnapshotGuard, installPlayerChoice, installTargetWatch, installElimination, installMeter, installTurnEnd, installBotSeats, installBotBrain, relaxRules, installDraws, stFillDeck, stClearDeck, stNewCard };

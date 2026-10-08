@@ -19047,6 +19047,7 @@ const skillTestHost = {
   get doConfirmPotion() { return doConfirmPotion; },
   get doPlayAbility() { return doPlayAbility; },
   get doActivateAbility() { return doActivateAbility; },
+  get doActivateFreeAbility() { return doActivateFreeAbility; },
   destroyRoom: (id) => destroyRoom(id),
   onHumanWon: (userId) => onHumanWonGame(userId),   // 31.10.-Skin: ein Mensch hat die Skill-Test-Partie gewonnen
   scheduleBotTurn: (room, seat, opts) => skillTest.scheduleBotTurn(room, seat, skillTestHost, opts),
@@ -21410,4 +21411,4 @@ initDatabase().then(async () => {
 });
 
 // Für die Headless-Simulation des Skill-Test-Modus (skilltest/sim-bridge.js; PP_ST_SIM=1).
-module.exports = { skillTestHandlers: { doPlaySpell, doPlayCreature, doPlayArtifact, doUseArtifactEffect, doPlaySurprise, doActivateCreatureEffect, doActivateHeroEffect, doUsePotion, doConfirmPotion, doPlayAbility, doActivateAbility, setupGameState } };
+module.exports = { skillTestHandlers: { doPlaySpell, doPlayCreature, doPlayArtifact, doUseArtifactEffect, doPlaySurprise, doActivateCreatureEffect, doActivateHeroEffect, doUsePotion, doConfirmPotion, doPlayAbility, doActivateAbility, doActivateFreeAbility, setupGameState } };
