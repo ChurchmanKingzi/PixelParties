@@ -25,7 +25,10 @@ Benötigt Python 3 mit `Pillow` und `numpy`. Für Beschriftungen in den Planungs
 | `assets_buildings.py` | Bauteil-Sprites der ersten Karten: Pfeilturm, Puddingwand, Fallgrube, Feldlazarett |
 | `pixfont.py` | Pixelfont „Schlamassia 5 × 7“ (Umlaute, ß, Satzzeichen), `draw_text`, Rich-Text mit kluger Fettschrift (`draw_rich`), Zeilenumbruch |
 | `cardicons.py` | 7-px-Symbole für Kartenwerte (Herz, Schwert, Uhr, …) |
-| `cards_art.py` | Bildfenster der Karten (144 × 96, nativ): Dioramen für Einheiten und Bauteile |
+| `cards_art.py` | Bildfenster der Karten (144 × 96, nativ): Hilfsfunktionen (`ground_world`, `unit_at`, `prop_at`, `finish`, `mini_castle` mit Raum-Themes), Registry `ART` mit `@card_art('ID')`, Platzhalter für Karten ohne Bild, Dioramen der ersten 17 Karten |
+| `pack_*.py` | **Illustrations-Packs:** je ein Modul (plus Hilfsmodule) mit den Sprites und Dioramen einer Kartengruppe; werden vom Kartenrenderer automatisch importiert und tragen ihre Bilder in `ART` ein |
+| `packtool.py` | Prüft ein Pack (Größe 144 × 96, nur Master-Palette, deterministisch), schreibt Kontaktbogen `out/packs/<pack>.png` und Einzelbilder ×4 |
+| `ART_GUIDE.md` | Regeln und Spickzettel für das Zeichnen von Karten-Illustrationen (Palette, Perspektive, Größenklassen, Raum-Themes, Qualitätsmaßstab) |
 | `cards.py` | **Kartenrenderer** (160 × 224): Rahmen, Namensband, abgeleitete Typzeile, Werteleiste, Effektbox mit automatisch fetten Glossarbegriffen, `RANK 3`-Abzeichen, Flavor, Übersicht |
 | `cardback.py` | **Kartenrücken:** großes goldenes Logo (3-fach vergrößerter Pixelfont mit Verlauf, Kontur, Schatten), Zinnenband, Schnörkel, Ecken, Medaillon mit Kernkristall |
 | `styleprobe.py` | Zusammenbau: Karte 56 × 28 Zellen, zwei Burgen, Landschaft, Einheiten, Projektile, Zielschatten; Kontaktbögen, Atlas, Animation, Planungsansicht |
@@ -52,11 +55,13 @@ Benötigt Python 3 mit `Pillow` und `numpy`. Für Beschriftungen in den Planungs
 ```bash
 python3 tools/export_cards.py        # Kataloge -> daten/cards.json (aus dem Ordner BastionBlasters/)
 python3 tools/lint_card_text.py      # Nomenklatur prüfen (muss OK melden)
+python3 tools/check_catalogs.py      # Design-Dokumente prüfen (Spalten, englische Namen, Summen)
 python3 tools/build_nomenclature.py  # NOMENCLATURE.md aus daten/keywords.json neu erzeugen
-cd art && python3 -I cards.py        # -> out/cards/*.png, out/cards_overview.png, out/card_back.png
+cd art && python3 -I cards.py        # -> out/cards/*.png (alle 154), out/cards_overview.png, out/card_back.png
+cd art && python3 -I packtool.py pack_<name>   # ein Illustrations-Pack prüfen und als Kontaktbogen ansehen
 ```
 
-Neue Karte: Eintrag in `daten/card_text.json` (`stats`, `rules`, `talent`, `flavor`; Typzeile und Kopfzeile werden aus den Katalogdaten abgeleitet), Bildfenster in `cards_art.py` ergänzen, Linter und Renderer laufen lassen. Regeltext und Talent zusammen höchstens 5 Zeilen, Flavor höchstens 2; der Renderer warnt bei Überlänge. Glossarbegriffe nie von Hand fett setzen.
+Neue Karte: Eintrag in `daten/card_text.json` (`stats`, `rules`, `talent`, `flavor`; Typzeile und Kopfzeile werden aus den Katalogdaten abgeleitet), Bildfenster als `@card_art('ID')` in einem `pack_*.py` ergänzen (Anleitung: `ART_GUIDE.md`), Linter und Renderer laufen lassen. Regeltext und Talent zusammen höchstens 6 Zeilen (5 sind die Norm; bei 6 Zeilen hat der Flavor nur eine Zeile), Namensband höchstens 136 px; der Renderer und der Linter warnen bei Überlänge. Glossarbegriffe nie von Hand fett setzen. Karten ohne eingetragenes Bild zeigen ein Platzhalterbild (violetter Boden, Fragezeichen).
 
 ## Regeln der Werkstatt
 
@@ -73,8 +78,8 @@ Neue Karte: Eintrag in `daten/card_text.json` (`stats`, `rules`, `talent`, `flav
 
 Im ASCII-Grundriss (y von oben) steht `h` für Hof, `C` für den 2 × 2-Kern, `T` für eine Turmzelle und ein Buchstabe je Raum-Modul (`K` Krankenstation, `S` Schmiede, `W` Wohnhaus, `B` Kaserne, `Z` Zinnenplattform). Gleiche Buchstaben, die sich berühren, bilden ein Modul. Tore sind `(x, y, Seite)` mit Seite `N`, `E`, `S`, `W`. Beispiel siehe `P1_ROWS` und `P2_ROWS` in `styleprobe.py`; Wände und Türen entstehen automatisch.
 
-## Nächste Schritte
+## Stand und nächste Schritte
 
-1. Stilprobe v0.3 sichten und freigeben (Perspektive, Gesichter, Kürbis, Landschaft, Kartengröße).
-2. P0-Karten als Batch (18 Bauteile, 19 Einheiten) mit den freigegebenen Bausteinen.
-3. Effekte (Explosion, Zeitstopp-Frost, Zielschatten-Animation), UI-Rahmen und Karten.
+- Alle **154 Karten** (77 Bauteile, 77 Einheiten) sind angelegt: Texte in `daten/card_text.json`, Illustrationen in den `pack_*.py`. Einheiten, die neu hinzugekommen sind, besitzen vorerst nur ein Ruhebild (`idle`); Animationen (Gehen, Angriff, Tod) folgen mit dem Kampf-Greybox.
+- Noch ohne Karten: die 12 Kerne und die 8 Chaos-/Weltlaunen-Karten aus Katalog 03.
+- Offen: Effekte (Explosion, Zeitstopp-Frost, Zielschatten-Animation), UI-Rahmen, Atlas aller Einheiten-Animationen für die Engine.
