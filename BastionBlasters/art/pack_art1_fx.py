@@ -150,9 +150,9 @@ def shout_bubble(f=0):
     poly(c, [(9, 17), (3, 27), (16, 20)], 'bone', lo=4, hi=5)
     for k in range(3):
         x = 11 + k * 7
-        c.rect(x, 4, x + 2, 13, 'coal', 1)
-        c.rect(x, 4, x, 13, 'coal', 2)
-        c.rect(x, 16, x + 2, 18, 'coal', 1)
+        c.rect(x, 3, x + 2, 11, 'fire', 2)
+        c.rect(x, 3, x, 11, 'fire', 3)
+        c.rect(x, 14, x + 2, 16, 'fire', 2)
     c.outline(dark=0, lit=1)
     return c
 

@@ -208,6 +208,8 @@ def trophy_banner():
     c.line(12, 15, 3, 5, 'wood', 4)
     ellipse(c, 3.5, 5.5, 2.6, 2.6, 'coal', lo=0, hi=3)
     c.put_ramp(12, 5, 'metal', 5)
+    c.put_ramp(2, 4, 'metal', 4)
+    c.put_ramp(3, 3, 'metal', 3)
     c.rect(7, 10, 8, 11, 'gold', 5)
     c.outline()
     return c
@@ -426,5 +428,20 @@ def broom():
         vline(c, x, 22, 30, 'dirt', 2)
     hline(c, 2, 8, 20, 'wood', 1)
     hline(c, 2, 8, 21, 'wood', 2)
+    c.outline()
+    return c
+
+
+def coin_pile():
+    """Muenzhaufen mit Edelstein (22 x 12): Beute"""
+    c = Canvas(22, 12)
+    ellipse(c, 11, 8, 9.4, 3.8, 'gold', lo=2, hi=5, ambient=0.3)
+    ellipse(c, 11, 5.5, 6.2, 3.0, 'gold', lo=2, hi=5, ambient=0.3)
+    ellipse(c, 11, 3.5, 3.2, 2.0, 'gold', lo=3, hi=5, ambient=0.4)
+    for (x, y) in ((6, 7), (9, 6), (13, 8), (16, 8), (11, 4), (4, 9), (18, 9)):
+        c.put_ramp(x, y, 'gold', 2)
+        c.put_ramp(x + 1, y, 'gold', 5)
+    ellipse(c, 15, 4, 1.8, 1.8, 'leaf', lo=2, hi=5)
+    c.put_ramp(14, 3, 'bone', 5)
     c.outline()
     return c

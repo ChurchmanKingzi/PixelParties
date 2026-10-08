@@ -242,6 +242,9 @@ def _art_ua08():
     for (x, y) in ((100, 56), (126, 50), (132, 64)):
         put_px(w, x, y, 'coal', 1, 9300)
         put_px(w, x + 1, y, 'purple', 2, 9300)
+    for (x, y) in ((tx + 8, ty + 2), (tx + 28, ty + 4), (tx + 18, ty - 2)):               # Blendung: Sternchen
+        for (dx, dy, i) in ((0, 0, 5), (-1, 0, 4), (1, 0, 4), (0, -1, 4), (0, 1, 4)):
+            put_px(w, x + dx, y + dy, 'gold', i, 9400)
     return finish(w)
 
 
@@ -383,7 +386,7 @@ def _art_ua12():
 @card_art('UA-13')
 def _art_ua13():
     w = ground_world('purple', 4)
-    for (sp, x, y) in ((giant_mushroom(3, 'purple'), 132, 44), (rock(1), 16, 40), (rock(2), 130, 94)):
+    for (sp, x, y) in ((giant_mushroom(3, 'purple'), 132, 44), (rock(1), 16, 40)):
         prop_at(w, sp, x, y)
     spr = spr_frog_catapult('fire')
     unit_at(w, spr, 38, 86, sh=(24, 4))

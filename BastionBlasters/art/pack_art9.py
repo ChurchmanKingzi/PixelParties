@@ -109,6 +109,7 @@ def furnish_trophy(ctx):
     draw_prop(ctx, HL.stuffed_bear(), 8, 8)
     draw_prop(ctx, HL.trophy_cup(14), W - 8 - 16, 20)
     draw_prop(ctx, HL.trophy_cup(12), 32, 30)
+    draw_prop(ctx, HL.coin_pile(), W - 30, 36)
 
 
 THEME_TROPHY = {'floor': floor_cobble(5, base='bone', tone=(2, 3), mortar=1, hi=4), 'furnish': furnish_trophy, 'low': False}
@@ -256,7 +257,7 @@ def _art_bw11():
     eye = {'tl': (hx0 + 6, hy0 + 1), 'tr': (hx0 + hm.w - 7, hy0 + 1), 'bl': (hx0 + 6, hy0 + 25), 'br': (hx0 + hm.w - 7, hy0 + 25)}
     # drei Gnome an Seilen
     g1, g2, g3 = TC.gnome('pull', 'teamA'), TC.gnome('pull', 'leaf', 'dirt', 'cloth'), TC.gnome('pull', 'gold', 'bone', 'sky')
-    hands = [(46 + ox, 47 + oy), (53 + ox, 77 + oy), (97 + ox, 64 + oy)]
+    hands = [(46 + ox, 46 + oy), (53 + ox, 71 + oy), (97 + ox, 64 + oy)]
     _gnome_at(world, g1, hands[0])
     _gnome_at(world, g2, hands[1])
     _gnome_at(world, g3, hands[2], flip=True)
