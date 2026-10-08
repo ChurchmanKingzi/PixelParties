@@ -45079,10 +45079,14 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 const isFlashing = abilityFlash && abilityFlash.zoneKind !== 'support'
                   && abilityFlash.owner === (isOpp ? oppIdx : myIdx) && abilityFlash.heroIdx === i && abilityFlash.zoneIdx === z;
                 const isBlocking = abilityBlockFlash && abilityBlockFlash.owner === (isOpp ? oppIdx : myIdx) && abilityBlockFlash.heroIdx === i && abilityBlockFlash.zoneIdx === z;
-                // Friendship highlight: ability has an available additional action with eligible hand cards
-                const isFriendshipActive = !isOpp && cards.includes('Friendship') && (gameState.additionalActions || []).some(aa =>
-                  aa.typeId.startsWith('friendship_support') && aa.eligibleHandCards.length > 0 && aa.providers.some(p => p.heroIdx === i)
+                // Friendship ist rein passiv (nicht anklickbar) — daher KEIN aktiver
+                // Rahmen. Stattdessen: Herz, solange die Bonus-Aktion dieses Helden
+                // noch verfuegbar ist, und ausgegraut, sobald die Ladung verbraucht ist.
+                const isFriendshipBonus = !isOpp && isMyTurn && cards.includes('Friendship') && (gameState.additionalActions || []).some(aa =>
+                  aa.typeId.startsWith('friendship_support') && aa.providers.some(p => p.heroIdx === i)
                 );
+                const isFriendshipSpent = !isOpp && cards.includes('Friendship') && !isFriendshipBonus
+                  && (gameState.additionalActionsSpent || []).some(aa => aa.typeId.startsWith('friendship_support') && aa.heroIdx === i);
                 // Slippery Pengu Ability-move highlights — source set
                 // is all eligible Ability Zones on the user's own side
                 // (`!isOpp` gate); destination set is per-selected-
@@ -45168,7 +45172,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     } : (isValidPotionTarget ? () => togglePotionTarget(abTargetId) : undefined);
                 return (
                   <div key={z}
-                    className={'board-zone board-zone-ability' + (cards.length > 0 ? ' zone-has-card' : '') + (heroIneligible || isDead || isFrozenOrStunned ? ' board-zone-dead' : '') + (isAbTarget || attachPickZoneValid ? ' board-zone-play-target' : '') + (attachPickZoneValid ? ' attach-pick-target' : '') + (isValidPotionTarget ? ' potion-target-valid' : '') + (isValidPotionTarget && pt?.config?.autoConfirm ? ' borrow-pick-target' : '') + (isSelectedPotionTarget ? ' potion-target-selected' : '') + (isExploding ? ' zone-exploding' : '') + (oppTargetHighlight.includes(abTargetId) ? ' opp-target-highlight' : '') + (canActivate && !isFreeActivatable ? ' zone-ability-activatable' : '') + (isFreeActivatable ? ' zone-ability-free-activatable' : '') + (isFriendshipActive ? ' zone-friendship-active' : '') + (isFlashing ? ' zone-ability-activated' : '') + (isBlocking ? ' zone-ability-blocked' : '') + (isBorisBlockedAbility ? ' zone-ability-boris-blocked' : '') + (isPengueSrc && !isPengueDestActive ? ' zone-pengue-src' : '') + (isPengueSrcSelected ? ' zone-pengue-selected' : '') + (isPengueDestActive ? ' zone-pengue-dest' : '')}
+                    className={'board-zone board-zone-ability' + (cards.length > 0 ? ' zone-has-card' : '') + (heroIneligible || isDead || isFrozenOrStunned ? ' board-zone-dead' : '') + (isAbTarget || attachPickZoneValid ? ' board-zone-play-target' : '') + (attachPickZoneValid ? ' attach-pick-target' : '') + (isValidPotionTarget ? ' potion-target-valid' : '') + (isValidPotionTarget && pt?.config?.autoConfirm ? ' borrow-pick-target' : '') + (isSelectedPotionTarget ? ' potion-target-selected' : '') + (isExploding ? ' zone-exploding' : '') + (oppTargetHighlight.includes(abTargetId) ? ' opp-target-highlight' : '') + (canActivate && !isFreeActivatable ? ' zone-ability-activatable' : '') + (isFreeActivatable ? ' zone-ability-free-activatable' : '') + (isFriendshipBonus ? ' zone-friendship-bonus' : '') + (isFriendshipSpent ? ' zone-friendship-spent' : '') + (isFlashing ? ' zone-ability-activated' : '') + (isBlocking ? ' zone-ability-blocked' : '') + (isBorisBlockedAbility ? ' zone-ability-boris-blocked' : '') + (isPengueSrc && !isPengueDestActive ? ' zone-pengue-src' : '') + (isPengueSrcSelected ? ' zone-pengue-selected' : '') + (isPengueDestActive ? ' zone-pengue-dest' : '')}
                     data-ability-zone="1" data-ability-hero={i} data-ability-slot={z} data-ability-owner={ownerLabel} data-card-name={cards[0] || ''}
                     data-versiegelt={ppVerwahrung(gameState.players?.[pi], i, 'ability', z).versiegelt ? '1' : undefined}
                     data-bounce-hiding={bounceOutgoingHidden.has(`ab-${pi}-${i}-${z}`) ? 'true' : undefined}
