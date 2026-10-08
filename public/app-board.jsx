@@ -288,7 +288,7 @@ function applyCrystalCostMods(me, cardName, baseCost) {
   return baseCost * 2;
 }
 
-function BoardCard({ cardName, faceDown, flipped, label, hp, maxHp, atk, hpPosition, style, noTooltip, skins, tooltipCardOverride, inheritedEffects, copiedHeroes, revealTooltipWhenFaceDown, abilities, effectiveLevel, stampBonus, showLevelBadge, children }) {
+function BoardCard({ cardName, faceDown, flipped, label, hp, maxHp, atk, hpPosition, style, noTooltip, skins, tooltipCardOverride, inheritedEffects, copiedHeroes, revealTooltipWhenFaceDown, abilities, orbs, effectiveLevel, stampBonus, showLevelBadge, children }) {
   const card = faceDown ? null : CARDS_BY_NAME[cardName];
   const imgUrl = card ? cardImageUrl(card.name, skins) : null;
   // A caller (e.g. Biomancy Token in the puzzle builder) can override what
@@ -319,7 +319,8 @@ function BoardCard({ cardName, faceDown, flipped, label, hp, maxHp, atk, hpPosit
   const tooltipTarget = (() => {
     if (!tooltipBase) return null;
     const hasLiveAbilities = Array.isArray(abilities) && abilities.length > 0;
-    if (hp == null && maxHp == null && atk == null && effectiveLevel == null && (!inheritedEffects || inheritedEffects.length === 0) && (!copiedHeroes || copiedHeroes.length === 0) && !hasLiveAbilities) return tooltipBase;
+    const hasLiveOrbs = Array.isArray(orbs) && orbs.length > 0;
+    if (hp == null && maxHp == null && atk == null && effectiveLevel == null && (!inheritedEffects || inheritedEffects.length === 0) && (!copiedHeroes || copiedHeroes.length === 0) && !hasLiveAbilities && !hasLiveOrbs) return tooltipBase;
     return {
       ...tooltipBase,
       _liveHp:    hp    != null ? hp    : tooltipBase._liveHp,
@@ -347,6 +348,8 @@ function BoardCard({ cardName, faceDown, flipped, label, hp, maxHp, atk, hpPosit
       // cards.json `startingAbility1/2` only for off-board card
       // previews where the live stack isn't available.
       _liveAbilities: hasLiveAbilities ? abilities : tooltipBase._liveAbilities,
+      // Beato: gesammelte Ascension-Orbs (s. CardTooltipContent).
+      _liveOrbs: hasLiveOrbs ? orbs : tooltipBase._liveOrbs,
     };
   })();
 
@@ -44325,39 +44328,35 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     // im vorhandenen „Inherited Effects"-Block darunter.
                     const _kopiert = Array.isArray(hero.gainedEffectNames) ? hero.gainedEffectNames : [];
                     // ── Ascension Orbs (Beato) ──
-                    // ★ Als Befund 8.10.: Die Orbs lagen als GESCHWISTER ueber der
-                    // Karte. Jede Orb unter dem Zeiger beendete damit den Hover der
-                    // Karte — der Karten-Tooltip verschwand genau dort, wo die Orbs
-                    // liegen. Jetzt sind sie KINDER der Karte (`children`): die Karte
-                    // bleibt "gehovert", ihr Tooltip bleibt stehen, und die Orbs
-                    // zeigen zusaetzlich ihren eigenen Hinweis.
+                    // ★ Als Befund 8.10.: Auf den Orbs fehlte der Karten-Tooltip. Die
+                    // Orbs sind deshalb reine Anzeige (`pointer-events: none`, CSS):
+                    // ein Hover genau auf einem Orb-Platz — leer oder voll — ist ein
+                    // ganz normaler Hover der Karte. Welche Schulen schon gesammelt
+                    // sind, steht im Karten-Tooltip (`orbs` -> `_liveOrbs`).
                     const orbsEl = (hero.ascensionOrbs && (
-                        <div className="ascension-orbs-container"
-                          onMouseEnter={e => showGameTooltip(e, hero.ascensionReady ? 'All schools collected — ready to Ascend!' : 'Collect all spell school orbs to Ascend')}
-                          onMouseLeave={hideGameTooltip}>
-                          {hero.ascensionOrbs.map((orb, oi) => {
-                            const count = hero.ascensionOrbs.length;
-                            const angle = (oi / count) * 2 * Math.PI - Math.PI / 2;
-                            const radius = 22;
-                            const cx = 50 + Math.cos(angle) * radius;
-                            const cy = 50 + Math.sin(angle) * radius;
-                            return (
-                              <div key={oi} className={'ascension-orb' + (orb.collected ? ' ascension-orb-collected' : '')}
-                                style={{
-                                  left: cx + '%', top: cy + '%',
-                                  background: orb.collected ? orb.color : 'rgba(60,60,60,.7)',
-                                  boxShadow: orb.collected ? `0 0 8px ${orb.color}, 0 0 16px ${orb.color}55` : 'none',
-                                }}
-                                onMouseEnter={e => { e.stopPropagation(); showGameTooltip(e, `${orb.school}${orb.collected ? ' ✓' : ''}`); }}
-                                onMouseLeave={hideGameTooltip}
-                              />
-                            );
-                          })}
-                        </div>
+                      <div className="ascension-orbs-container">
+                        {hero.ascensionOrbs.map((orb, oi) => {
+                          const count = hero.ascensionOrbs.length;
+                          const angle = (oi / count) * 2 * Math.PI - Math.PI / 2;
+                          const radius = 22;
+                          const cx = 50 + Math.cos(angle) * radius;
+                          const cy = 50 + Math.sin(angle) * radius;
+                          return (
+                            <div key={oi} className={'ascension-orb' + (orb.collected ? ' ascension-orb-collected' : '')}
+                              style={{
+                                left: cx + '%', top: cy + '%',
+                                background: orb.collected ? orb.color : 'rgba(60,60,60,.7)',
+                                boxShadow: orb.collected ? `0 0 8px ${orb.color}, 0 0 16px ${orb.color}55` : 'none',
+                              }}
+                            />
+                          );
+                        })}
+                      </div>
                     ));
                     const heroCardProps = {
                       hp: hero.hp, maxHp: hero.maxHp, atk: hero.atk, hpPosition: 'hero',
                       children: orbsEl || undefined,
+                      orbs: hero.ascensionOrbs,
                       skins: p.deckSkins ? { ...gameSkins, ...p.deckSkins } : gameSkins, abilities: p.abilityZones?.[i],
                       copiedHeroes: _kopiert,
                       inheritedEffects: _kopiert

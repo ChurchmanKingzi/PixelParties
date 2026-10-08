@@ -11834,8 +11834,9 @@ body:has(.modal-overlay) .tooltip {
   border-radius: 50%;
   border: 1.5px solid rgba(255,255,255,.35);
   transform: translate(-50%, -50%);
-  pointer-events: auto;
-  cursor: url("/cursor-arrow.png?v=4") 2 2, default;
+  /* Reine Anzeige: der Zeiger geht durch auf die Karte, damit deren Tooltip
+     auch genau ueber einem Orb-Platz erscheint (Als Befund 8.10.). */
+  pointer-events: none;
   transition: background .4s, box-shadow .4s, transform .3s;
 }
 .ascension-orb-collected {
