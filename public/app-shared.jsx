@@ -6622,6 +6622,64 @@ const CROSS_SIDE_BADGE = {
     + 'permanently controlled by its summoner.',
 };
 
+/**
+ * Hover-Helfer fuer alles, was AUF einer Karte liegt und einen eigenen Text-
+ * Tooltip zeigt (Status-Abzeichen, Poison-Stapelzahl): haelt den grossen
+ * Karten-Tooltip oben. Die Teile liegen als Geschwister ueber der Karte —
+ * jeder Wechsel Karte <-> Teil erzeugt ein Verlassen-Ereignis der Karte, das
+ * ihren Tooltip loeschen wuerde. Deshalb Sperre + erneutes Setzen.
+ */
+function ppStatusHover(cardName) {
+  // Keep the big board-card tooltip up while hovering a status badge. Badges
+  // are positioned just outside the card's bounds (left: -2px), so moving
+  // onto one normally fires the card's mouseLeave and hides the preview.
+  // Re-asserting the tooltip here, plus clearing it on badge leave, keeps
+  // the two tooltips (status-description and card-preview) in sync.
+  // v880: Bevorzugt den zuletzt gezeigten REICHEN Tooltip derselben
+  // Karte (`_boardTooltipLast`, gesetzt von `setBoardTooltip`) — der
+  // traegt aktuelle HP, ATK und die tatsaechlich angelegten Abilities.
+  // Die statische Kartenliste ist nur der Rueckfall.
+  const tooltipCard = () => {
+    const letzte = window._boardTooltipLast;
+    if (letzte && cardName && letzte.name === cardName) return letzte;
+    return cardName && window.CARDS_BY_NAME ? window.CARDS_BY_NAME[cardName] : null;
+  };
+  // ── Stand nach dem Rueckbau (v885) ───────────────────────────────
+  // Beim Hovern eines Abzeichens wird der Karten-Tooltip neu gesetzt —
+  // mit dem REICHEN Stand (aktuelle Werte, echte Abilities); das ist die
+  // Reparatur aus v880 und bleibt. Beim Verlassen wird sofort geraeumt,
+  // wie vor den Reparaturversuchen.
+  //
+  // NICHT GELOEST: an der Naht zwischen Karte und Abzeichen kann der
+  // Tooltip verschwinden — das `mouseLeave` der darunterliegenden Karte
+  // trifft ein, ohne dass ein `mouseEnter` folgt. Drei Anlaeufe (Sperre,
+  // groessere Trefferflaeche, aufgeschobenes Ausblenden) haben es nicht
+  // behoben; der letzte machte den Tooltip spuerbar klebrig und wurde
+  // auf Als Wunsch zurueckgebaut. Wer es erneut versucht: die Abzeichen
+  // sind ein GESCHWISTER der Karte, das ueber ihr liegt — solange das so
+  // ist, erzeugt jeder Wechsel ein Verlassen-Ereignis. Die Loesung
+  // duerfte in der Struktur liegen (Abzeichen als KIND der Karte
+  // rendern), nicht im Ereignis-Timing.
+  const showBoardTip = () => {
+    window._boardTooltipLock?.(true);
+    const t = tooltipCard();
+    if (t) window._boardTooltipSetter?.(t);
+  };
+  const hideBoardTip = () => {
+    window._boardTooltipLock?.(false);
+    if (tooltipCard()) window._boardTooltipSetter?.(null);
+  };
+  return { showBoardTip, hideBoardTip };
+}
+window.ppStatusHover = ppStatusHover;
+
+/** Tooltip-Text des Poison-Abzeichens. Auch die Stapelzahl auf der Karte
+ *  (`PoisonedOverlay` in app-board) zeigt genau diesen Text beim Hover. */
+function poisonTooltipText(stacks, perStack, isUnhealable) {
+  return `${isUnhealable ? 'Unhealable ' : ''}Poisoned: Takes ${perStack * stacks} damage at the start of each of its owner's turns.${isUnhealable ? ' Cannot be removed.' : ''}`;
+}
+window.poisonTooltipText = poisonTooltipText;
+
 function StatusBadges({ statuses, counters, buffs, isHero, player, cardName, isOpponentSide }) {
   const badges = [];
   const s = statuses || {};
@@ -6741,7 +6799,7 @@ function StatusBadges({ statuses, counters, buffs, isHero, player, cardName, isO
     const stacks = s.poisoned?.stacks || c.poisonStacks || c.poisoned || 1;
     const perStack = player?.poisonDamagePerStack || 30;
     const isUnhealable = s.poisoned?.unhealable || c.poisonedUnhealable;
-    badges.push({ key: 'poisoned', icon: isUnhealable ? '💀' : '☠️', tooltip: `${isUnhealable ? 'Unhealable ' : ''}Poisoned: Takes ${perStack * stacks} damage at the start of each of its owner's turns.${isUnhealable ? ' Cannot be removed.' : ''}`, className: isUnhealable ? 'status-unhealable' : '' });
+    badges.push({ key: 'poisoned', icon: isUnhealable ? '💀' : '☠️', tooltip: poisonTooltipText(stacks, perStack, isUnhealable), className: isUnhealable ? 'status-unhealable' : '' });
   }
   if (s.negated || c.negated) {
     // Skeleton Death Knight applies negated with a `_dkSilenced`
@@ -7027,45 +7085,8 @@ function StatusBadges({ statuses, counters, buffs, isHero, player, cardName, isO
     });
   }
   if (badges.length === 0) return null;
-  // Keep the big board-card tooltip up while hovering a status badge. Badges
-  // are positioned just outside the card's bounds (left: -2px), so moving
-  // onto one normally fires the card's mouseLeave and hides the preview.
-  // Re-asserting the tooltip here, plus clearing it on badge leave, keeps
-  // the two tooltips (status-description and card-preview) in sync.
-  // v880: Bevorzugt den zuletzt gezeigten REICHEN Tooltip derselben
-  // Karte (`_boardTooltipLast`, gesetzt von `setBoardTooltip`) — der
-  // traegt aktuelle HP, ATK und die tatsaechlich angelegten Abilities.
-  // Die statische Kartenliste ist nur der Rueckfall.
-  const tooltipCard = () => {
-    const letzte = window._boardTooltipLast;
-    if (letzte && cardName && letzte.name === cardName) return letzte;
-    return cardName && window.CARDS_BY_NAME ? window.CARDS_BY_NAME[cardName] : null;
-  };
-  // ── Stand nach dem Rueckbau (v885) ───────────────────────────────
-  // Beim Hovern eines Abzeichens wird der Karten-Tooltip neu gesetzt —
-  // mit dem REICHEN Stand (aktuelle Werte, echte Abilities); das ist die
-  // Reparatur aus v880 und bleibt. Beim Verlassen wird sofort geraeumt,
-  // wie vor den Reparaturversuchen.
-  //
-  // NICHT GELOEST: an der Naht zwischen Karte und Abzeichen kann der
-  // Tooltip verschwinden — das `mouseLeave` der darunterliegenden Karte
-  // trifft ein, ohne dass ein `mouseEnter` folgt. Drei Anlaeufe (Sperre,
-  // groessere Trefferflaeche, aufgeschobenes Ausblenden) haben es nicht
-  // behoben; der letzte machte den Tooltip spuerbar klebrig und wurde
-  // auf Als Wunsch zurueckgebaut. Wer es erneut versucht: die Abzeichen
-  // sind ein GESCHWISTER der Karte, das ueber ihr liegt — solange das so
-  // ist, erzeugt jeder Wechsel ein Verlassen-Ereignis. Die Loesung
-  // duerfte in der Struktur liegen (Abzeichen als KIND der Karte
-  // rendern), nicht im Ereignis-Timing.
-  const showBoardTip = () => {
-    window._boardTooltipLock?.(true);
-    const t = tooltipCard();
-    if (t) window._boardTooltipSetter?.(t);
-  };
-  const hideBoardTip = () => {
-    window._boardTooltipLock?.(false);
-    if (tooltipCard()) window._boardTooltipSetter?.(null);
-  };
+  // Karten-Tooltip waehrend des Hovers oben halten (s. `ppStatusHover`).
+  const { showBoardTip, hideBoardTip } = ppStatusHover(cardName);
   return (
     <div className="status-badges-row">
       {badges.map(b => (
