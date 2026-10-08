@@ -48,7 +48,7 @@ Dazu je Variante:
              Arme bewegen sich (Roboterarme heben und senken sich, beim Skin
              pendeln Unterarme und Hände). Die Kabel unten enden abgerissen.
              Roboter: die Augen glimmen; Skin: blinzelt.
-* orthos / contractorthos: die Flammen auf den Köpfen lodern, beide Köpfe blinzeln, dazu
+* orthos:    die Flammen auf den Köpfen lodern, beide Köpfe blinzeln, dazu
              leichtes Squash-and-Stretch in der Senkrechten (unten fest).
 * luna:      schwebt auf und ab (um sie steigt Glut auf), schlägt mit den gelben Flügelchen, ihr Körper
              wiegt sich, die Haare wehen sacht, sie blinzelt; die rote Kontur
@@ -104,7 +104,6 @@ V_ = {
     'nero': dict(slug='nero-zira-the-mastermind', part='body', hang=6, pads=(3, 3, 3, 4)),
     'normalnero': dict(slug='normal-nero-zira', hang=1, pads=(3, 3, 3, 4)),
     'orthos': dict(slug='orthos-the-loyal-guard-dog', pads=(3, 3, 5, 2)),
-    'contractorthos': dict(slug='contract-bound-orthos', pads=(3, 3, 5, 2)),     # Skin „Contract-bound Orthos“ (Kyubey)
     'luna': dict(slug='luna-the-flame-fairy', pads=(6, 6, 7, 4)),
     'tsuki': dict(slug='tsu-ki-the-lunatic-princess', part='body', pads=(7, 7, 7, 7)),
 }
@@ -302,13 +301,6 @@ if V == 'orthos':
     FLAME_M = (SRC[:, :, 3] > 0) & (_ys <= 10) & (SRC[:, :, 0] > SRC[:, :, 2] + 40)
     FL_DIST = (10.0 - _ys).astype(float)
     EYES = [(3, 14), (6, 14), (11, 13), (14, 13)]
-    NECK_Y = 17
-if V == 'contractorthos':                                       # Flammen = rote Palette in den oberen Zeilen (Ohren sind rosa/weiß)
-    _fp = {(0x5a, 0, 0), (0xa0, 0, 0), (0xd8, 0x08, 0x08), (0xff, 0x28, 0x28)}
-    FLAME_M = (SRC[:, :, 3] > 0) & (_ys <= 9) & np.array([[tuple(SRC[y, x, :3]) in _fp for x in range(SW)] for y in range(SH)])
-    FL_DIST = (10.0 - _ys).astype(float)
-    EYES = [(2, 12), (6, 12), (2, 13), (6, 13), (11, 12), (15, 12), (11, 13), (15, 13)]
-    NECK_Y = 16
 if V == 'waflav':
     WINGS = load('wings')
     _b = load('bolt')
@@ -478,17 +470,14 @@ def frame(i):
         if st == 'zu':
             for x in list(range(22, 26)) + list(range(34, 38)):
                 s[16, x] = BLACK
-    if V in ('orthos', 'contractorthos'):
+    if V == 'orthos':
         fl = fire(np.where(FLAME_M[:, :, None], s, 0), i, FL_DIST)
         s[FLAME_M] = 0
         m = fl[:, :, 3] > 0
         s[m] = fl[m]
-        if st and V == 'orthos':
+        if st:
             for x, y in EYES:
                 s[y, x] = rgb('424242') if st == 'zu' else rgb('5a1010')
-        elif st:                                                # Kyubey blinzelt: Augen zu = Fell mit dunklem Lidstrich
-            for x, y in EYES:
-                s[y, x] = rgb('f6f8f8') if (st == 'zu' and y == 12) else (rgb('0e0e0e') if st == 'zu' else rgb('d9e4e5'))
 
     # ---------------- Variantenweise zeichnen ----------------
     if V == 'andras':
@@ -676,10 +665,10 @@ def frame(i):
             m = wl[:, :, 3] > 0
             out[m] = wl[m]
 
-    elif V in ('orthos', 'contractorthos'):
+    elif V == 'orthos':
         # Squash-and-Stretch nur am Körper (unter den Köpfen), die Köpfe samt
         # Flammen sitzen oben drauf und fahren mit
-        NECK, base = NECK_Y, SH - 1
+        NECK, base = 17, SH - 1
         sy = 1 + 0.12 * math.sin(2 * math.pi * i / 24)
         top_new = base - (base - NECK) * sy                # neue Lage der Halslinie
         shift = int(round(top_new - NECK))
