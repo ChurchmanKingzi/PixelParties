@@ -6622,6 +6622,64 @@ const CROSS_SIDE_BADGE = {
     + 'permanently controlled by its summoner.',
 };
 
+/**
+ * Hover-Helfer fuer alles, was AUF einer Karte liegt und einen eigenen Text-
+ * Tooltip zeigt (Status-Abzeichen, Poison-Stapelzahl): haelt den grossen
+ * Karten-Tooltip oben. Die Teile liegen als Geschwister ueber der Karte —
+ * jeder Wechsel Karte <-> Teil erzeugt ein Verlassen-Ereignis der Karte, das
+ * ihren Tooltip loeschen wuerde. Deshalb Sperre + erneutes Setzen.
+ */
+function ppStatusHover(cardName) {
+  // Keep the big board-card tooltip up while hovering a status badge. Badges
+  // are positioned just outside the card's bounds (left: -2px), so moving
+  // onto one normally fires the card's mouseLeave and hides the preview.
+  // Re-asserting the tooltip here, plus clearing it on badge leave, keeps
+  // the two tooltips (status-description and card-preview) in sync.
+  // v880: Bevorzugt den zuletzt gezeigten REICHEN Tooltip derselben
+  // Karte (`_boardTooltipLast`, gesetzt von `setBoardTooltip`) — der
+  // traegt aktuelle HP, ATK und die tatsaechlich angelegten Abilities.
+  // Die statische Kartenliste ist nur der Rueckfall.
+  const tooltipCard = () => {
+    const letzte = window._boardTooltipLast;
+    if (letzte && cardName && letzte.name === cardName) return letzte;
+    return cardName && window.CARDS_BY_NAME ? window.CARDS_BY_NAME[cardName] : null;
+  };
+  // ── Stand nach dem Rueckbau (v885) ───────────────────────────────
+  // Beim Hovern eines Abzeichens wird der Karten-Tooltip neu gesetzt —
+  // mit dem REICHEN Stand (aktuelle Werte, echte Abilities); das ist die
+  // Reparatur aus v880 und bleibt. Beim Verlassen wird sofort geraeumt,
+  // wie vor den Reparaturversuchen.
+  //
+  // NICHT GELOEST: an der Naht zwischen Karte und Abzeichen kann der
+  // Tooltip verschwinden — das `mouseLeave` der darunterliegenden Karte
+  // trifft ein, ohne dass ein `mouseEnter` folgt. Drei Anlaeufe (Sperre,
+  // groessere Trefferflaeche, aufgeschobenes Ausblenden) haben es nicht
+  // behoben; der letzte machte den Tooltip spuerbar klebrig und wurde
+  // auf Als Wunsch zurueckgebaut. Wer es erneut versucht: die Abzeichen
+  // sind ein GESCHWISTER der Karte, das ueber ihr liegt — solange das so
+  // ist, erzeugt jeder Wechsel ein Verlassen-Ereignis. Die Loesung
+  // duerfte in der Struktur liegen (Abzeichen als KIND der Karte
+  // rendern), nicht im Ereignis-Timing.
+  const showBoardTip = () => {
+    window._boardTooltipLock?.(true);
+    const t = tooltipCard();
+    if (t) window._boardTooltipSetter?.(t);
+  };
+  const hideBoardTip = () => {
+    window._boardTooltipLock?.(false);
+    if (tooltipCard()) window._boardTooltipSetter?.(null);
+  };
+  return { showBoardTip, hideBoardTip };
+}
+window.ppStatusHover = ppStatusHover;
+
+/** Tooltip-Text des Poison-Abzeichens. Auch die Stapelzahl auf der Karte
+ *  (`PoisonedOverlay` in app-board) zeigt genau diesen Text beim Hover. */
+function poisonTooltipText(stacks, perStack, isUnhealable) {
+  return `${isUnhealable ? 'Unhealable ' : ''}Poisoned: Takes ${perStack * stacks} damage at the start of each of its owner's turns.${isUnhealable ? ' Cannot be removed.' : ''}`;
+}
+window.poisonTooltipText = poisonTooltipText;
+
 function StatusBadges({ statuses, counters, buffs, isHero, player, cardName, isOpponentSide }) {
   const badges = [];
   const s = statuses || {};
@@ -6741,7 +6799,7 @@ function StatusBadges({ statuses, counters, buffs, isHero, player, cardName, isO
     const stacks = s.poisoned?.stacks || c.poisonStacks || c.poisoned || 1;
     const perStack = player?.poisonDamagePerStack || 30;
     const isUnhealable = s.poisoned?.unhealable || c.poisonedUnhealable;
-    badges.push({ key: 'poisoned', icon: isUnhealable ? '💀' : '☠️', tooltip: `${isUnhealable ? 'Unhealable ' : ''}Poisoned: Takes ${perStack * stacks} damage at the start of each of its owner's turns.${isUnhealable ? ' Cannot be removed.' : ''}`, className: isUnhealable ? 'status-unhealable' : '' });
+    badges.push({ key: 'poisoned', icon: isUnhealable ? '💀' : '☠️', tooltip: poisonTooltipText(stacks, perStack, isUnhealable), className: isUnhealable ? 'status-unhealable' : '' });
   }
   if (s.negated || c.negated) {
     // Skeleton Death Knight applies negated with a `_dkSilenced`
@@ -7027,45 +7085,8 @@ function StatusBadges({ statuses, counters, buffs, isHero, player, cardName, isO
     });
   }
   if (badges.length === 0) return null;
-  // Keep the big board-card tooltip up while hovering a status badge. Badges
-  // are positioned just outside the card's bounds (left: -2px), so moving
-  // onto one normally fires the card's mouseLeave and hides the preview.
-  // Re-asserting the tooltip here, plus clearing it on badge leave, keeps
-  // the two tooltips (status-description and card-preview) in sync.
-  // v880: Bevorzugt den zuletzt gezeigten REICHEN Tooltip derselben
-  // Karte (`_boardTooltipLast`, gesetzt von `setBoardTooltip`) — der
-  // traegt aktuelle HP, ATK und die tatsaechlich angelegten Abilities.
-  // Die statische Kartenliste ist nur der Rueckfall.
-  const tooltipCard = () => {
-    const letzte = window._boardTooltipLast;
-    if (letzte && cardName && letzte.name === cardName) return letzte;
-    return cardName && window.CARDS_BY_NAME ? window.CARDS_BY_NAME[cardName] : null;
-  };
-  // ── Stand nach dem Rueckbau (v885) ───────────────────────────────
-  // Beim Hovern eines Abzeichens wird der Karten-Tooltip neu gesetzt —
-  // mit dem REICHEN Stand (aktuelle Werte, echte Abilities); das ist die
-  // Reparatur aus v880 und bleibt. Beim Verlassen wird sofort geraeumt,
-  // wie vor den Reparaturversuchen.
-  //
-  // NICHT GELOEST: an der Naht zwischen Karte und Abzeichen kann der
-  // Tooltip verschwinden — das `mouseLeave` der darunterliegenden Karte
-  // trifft ein, ohne dass ein `mouseEnter` folgt. Drei Anlaeufe (Sperre,
-  // groessere Trefferflaeche, aufgeschobenes Ausblenden) haben es nicht
-  // behoben; der letzte machte den Tooltip spuerbar klebrig und wurde
-  // auf Als Wunsch zurueckgebaut. Wer es erneut versucht: die Abzeichen
-  // sind ein GESCHWISTER der Karte, das ueber ihr liegt — solange das so
-  // ist, erzeugt jeder Wechsel ein Verlassen-Ereignis. Die Loesung
-  // duerfte in der Struktur liegen (Abzeichen als KIND der Karte
-  // rendern), nicht im Ereignis-Timing.
-  const showBoardTip = () => {
-    window._boardTooltipLock?.(true);
-    const t = tooltipCard();
-    if (t) window._boardTooltipSetter?.(t);
-  };
-  const hideBoardTip = () => {
-    window._boardTooltipLock?.(false);
-    if (tooltipCard()) window._boardTooltipSetter?.(null);
-  };
+  // Karten-Tooltip waehrend des Hovers oben halten (s. `ppStatusHover`).
+  const { showBoardTip, hideBoardTip } = ppStatusHover(cardName);
   return (
     <div className="status-badges-row">
       {badges.map(b => (
@@ -7285,6 +7306,22 @@ function CardTooltipContent({ card, children, imageUrl }) {
         {card.cardType !== 'Creature' && (card.spellSchool1 || card.spellSchool2) &&
           <div style={{ fontSize: 14, color: 'var(--text2)', marginBottom: 8 }}>{[card.spellSchool1, card.spellSchool2].filter(Boolean).join(' · ')}</div>}
         {card.effect && <div style={{ fontSize: 14, marginTop: 4, lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>{card.effect}</div>}
+        {/* Ascension-Orbs (Beato): welche Zauberschulen schon gesammelt sind.
+            Steht im Karten-Tooltip statt in eigenen Orb-Tooltips — die Orbs
+            auf der Karte nehmen den Zeiger nicht mehr an, ein Hover genau
+            darauf ist also ein ganz normaler Hover der Karte. */}
+        {Array.isArray(card._liveOrbs) && card._liveOrbs.length > 0 && (
+          <div style={{ marginTop: 8, fontSize: 13, lineHeight: 1.55 }}>
+            <div style={{ color: 'var(--text2)', fontWeight: 700 }}>
+              {card._liveOrbs.every(o => o.collected) ? 'All Spell Schools collected — ready to Ascend!' : 'Collect all Spell School orbs to Ascend'}
+            </div>
+            {card._liveOrbs.map(o => (
+              <div key={o.school} style={{ color: o.collected ? o.color : 'var(--text2)' }}>
+                {o.collected ? '●' : '○'} {o.school}{o.collected ? ' ✓' : ''}
+              </div>
+            ))}
+          </div>
+        )}
         {/* Inherited effects (Sparkfly Queen's gifts from sacrificed
             Sparkflies — and any future card that populates
             `_inheritedEffects` on its instance counters). Rendered as a
@@ -7658,15 +7695,17 @@ function tutorialStartsWithAntonia(num) {
 // ── Tutorial-Gegner (Als Vorgabe 26.9.) ─────────────────────────────
 // Der CPU-Gegner im Tutorial heisst serverseitig schlicht "CPU" und hat
 // keinen Avatar. Angezeigt wird stattdessen immer Monia Bot ODER Antonia:
-//   • zu Beginn eines Durchgangs die, die im Skript ZUERST spricht,
-//   • nach jeder Gespraechsszene die, die darin MEHR gesprochen hat.
-// „Mehr gesprochen" zaehlt Buchstaben und Ziffern des sichtbaren Texts —
-// ein „..." ist also kein Redeanteil. Gleichstand laesst den bisherigen
-// Gegner stehen. Wie `_antoniaPresent` ein sequenzuebergreifender Zustand
+//   • Monia Bot, solange Antonia nicht die Position LINKS der Textbox
+//     eingenommen hat — auch wenn Antonia rechts auftritt und redet,
+//   • Antonia, sobald sie dort steht (T5-Epilog: im Augenblick des Tackles,
+//     das Monia verdraengt; ab T6 steht sie von Anfang an links).
+// Wie `_antoniaPresent` ein sequenzuebergreifender Zustand
 // mit Mini-Abo, weil Textbox (app-shared) und Brett (app-board) ihn
 // getrennt lesen und schreiben.
+// Beide tragen die Gegnerfarbe (`NICHT_MENSCH_FARBE` im Server, #ff4444):
+// die Textbox soll in der Farbe der Gegnerseite stehen, nicht in Cyan.
 const TUTORIAL_GEGNER = {
-  monia:   { key: 'monia',   name: 'Monia Bot', avatar: '/MoniaBot.png', color: '#00f0ff' },
+  monia:   { key: 'monia',   name: 'Monia Bot', avatar: '/MoniaBot.png', color: '#ff4444' },
   antonia: { key: 'antonia', name: 'Antonia',   avatar: ANTONIA_PORTRAIT, color: '#ff4444' },
 };
 const MONIA_PORTRAIT = '/MoniaBot.png';
@@ -7676,7 +7715,7 @@ const MONIA_PORTRAIT = '/MoniaBot.png';
  *  der Sprechername („Jetpack Raccoon" ist Antonia vor ihrer Enthuellung). */
 function tutorialSprecherDerSeite(opts, page) {
   const rechts = (page?.side || 'left') === 'right';
-  const portraet = rechts ? opts?.rightSpeaker : (opts?.speaker || MONIA_PORTRAIT);
+  const portraet = (!rechts && page?.portrait) || (rechts ? opts?.rightSpeaker : (opts?.speaker || MONIA_PORTRAIT));
   if (portraet === ANTONIA_PORTRAIT) return 'antonia';
   if (portraet === MONIA_PORTRAIT) return 'monia';
   const name = String(page?.speakerName || (rechts ? opts?.rightSpeakerName : opts?.speakerName) || '');
@@ -7685,38 +7724,11 @@ function tutorialSprecherDerSeite(opts, page) {
   return null;
 }
 
-function tutorialSeitenText(page) {
-  const raw = typeof page === 'string' ? page : (page?.text || '');
-  return parseInlineMarkdown(raw).plainText;
-}
-
-/** Wer von beiden hat in dieser Szene mehr gesprochen? null bei Gleichstand. */
-function tutorialMehrGesprochen(opts, pages) {
-  const anteil = { monia: 0, antonia: 0 };
-  for (const p of (pages || [])) {
-    const wer = tutorialSprecherDerSeite(opts, p);
-    if (!wer) continue;
-    anteil[wer] += (tutorialSeitenText(p).match(/[\p{L}\p{N}]/gu) || []).length;
-  }
-  if (anteil.monia === anteil.antonia) return null;
-  return anteil.monia > anteil.antonia ? 'monia' : 'antonia';
-}
-
-/** Wer bekommt in diesem Tutorial den ersten Text? (Intro, sonst Outro.) */
+/** Wer ist beim Start eines Durchgangs der Gegner? Antonia nur, wenn sie
+ *  von Anfang an LINKS steht (`opts.speaker`), sonst Monia Bot. */
 function tutorialErsterSprecher(num) {
-  const script = TUTORIAL_SCRIPTS[num];
-  if (!script) return 'monia';
-  const opts = { speaker: MONIA_PORTRAIT, speakerName: 'Monia Bot', ...(script.opts || {}) };
-  for (const teil of [script.intro, script.outro]) {
-    const seiten = Array.isArray(teil) ? teil : (teil ? [{ text: teil }] : []);
-    for (const p of seiten) {
-      // Ein reines „..." ist noch kein Text — wer zuerst WORTE bekommt.
-      if (!/[\p{L}\p{N}]/u.test(tutorialSeitenText(p))) continue;
-      const wer = tutorialSprecherDerSeite(opts, p);
-      if (wer) return wer;
-    }
-  }
-  return 'monia';
+  const links = (TUTORIAL_SCRIPTS[num]?.opts || {}).speaker;
+  return links === ANTONIA_PORTRAIT ? 'antonia' : 'monia';
 }
 
 let _tutorialGegner = null;
@@ -7736,6 +7748,36 @@ function useTutorialGegner() {
     return () => { _tutorialGegnerSubs.delete(setKey); };
   }, []);
   return key ? TUTORIAL_GEGNER[key] : null;
+}
+
+// ── Tutorial: Helden-Figuren erst nach dem Gespraech ────────────────
+// Solange im Tutorial die Einleitung laeuft, stehen die animierten
+// Helden-Figuren (`HeroIdleSprite`) noch nicht auf den Karten. Sobald
+// der Text durch ist, werden sie eingeblendet und steigen mit ihrer
+// normalen Auftritts-Animation aus den Karten auf.
+// Gesperrt wird VOR dem Brettaufbau (`startTutorialAttempt` in
+// app-screens), damit die Figuren nicht einen Augenblick aufblitzen;
+// freigegeben wird, wenn die letzte Seite der Einleitung geschlossen
+// wird (Textbox), beim Verlassen und bei einem Fehler. Wie
+// `_tutorialGegner` ein Mini-Abo, weil Textbox (app-shared), Ablauf
+// (app-screens) und Brett (app-board) den Zustand getrennt lesen und
+// schreiben.
+let _tutorialFigurenGesperrt = false;
+const _tutorialFigurenSubs = new Set();
+function setTutorialFigurenGesperrt(v) {
+  const val = !!v;
+  if (_tutorialFigurenGesperrt === val) return;
+  _tutorialFigurenGesperrt = val;
+  for (const fn of _tutorialFigurenSubs) { try { fn(val); } catch {} }
+}
+function useTutorialFigurenGesperrt() {
+  const [gesperrt, setGesperrt] = useState(_tutorialFigurenGesperrt);
+  useEffect(() => {
+    _tutorialFigurenSubs.add(setGesperrt);
+    setGesperrt(_tutorialFigurenGesperrt);
+    return () => { _tutorialFigurenSubs.delete(setGesperrt); };
+  }, []);
+  return gesperrt;
 }
 
 // ── Sprecherfarben der Textbox ──────────────────────────────────────
@@ -7872,6 +7914,11 @@ function measureHighlight(el) {
   };
 }
 
+// Tackle-Szene (s. TextBox): Flugzeit bis zum Einschlag und Vorlauf, nach dem
+// der Text der Seite zu tippen beginnt.
+const TACKLE_FLUG_MS = 700;
+const TACKLE_VORLAUF_MS = 1300;
+
 function TextBox() {
   const [opts, setOpts] = useState(null);
   const [pages, setPages] = useState([]);
@@ -7888,9 +7935,15 @@ function TextBox() {
   const [leftVisible, setLeftVisible] = useState(true);
   const [leftExiting, setLeftExiting] = useState(false);
   const [fading, setFading] = useState(false);
+  // Tackle-Szene (Tutorial 5, Epilog): `tackleAus` wird im Augenblick des
+  // Einschlags wahr — erst dann tauscht das linke Portraet auf Antonia.
+  // `vorlaufRef` sperrt das Weiterklicken, solange die Szene laeuft.
+  const [tackleAus, setTackleAus] = useState(false);
+  const vorlaufRef = useRef(false);
   const timerRef = useRef(null);
   const parsedRef = useRef({ segments: [], plainText: '' });
   const bodyRef = useRef(null);
+  const sizerRef = useRef(null);
   const onShowFiredRef = useRef(new Set());
 
   useEffect(() => { _textBoxSetter = setOpts; return () => { _textBoxSetter = null; }; }, []);
@@ -7906,7 +7959,7 @@ function TextBox() {
   }, []);
 
   useLayoutEffect(() => {
-    if (!opts) { setPages([]); setPageIdx(0); setCharCount(0); setDone(false); setHighlightRects([]); setRightVisible(false); setRightExiting(false); setLeftVisible(true); setLeftExiting(false); setFading(false); onShowFiredRef.current = new Set(); return; }
+    if (!opts) { setPages([]); setPageIdx(0); setCharCount(0); setDone(false); setHighlightRects([]); setRightVisible(false); setRightExiting(false); setLeftVisible(true); setLeftExiting(false); setFading(false); setTackleAus(false); onShowFiredRef.current = new Set(); return; }
 
     // Linke Dauer-Rolle: sie steht ab der ersten Seite da, es gibt kein
     // `enterLeft`, an dem man haengen koennte.
@@ -7975,16 +8028,121 @@ function TextBox() {
       page.onShow();
     }
 
-    let i = 0;
     const len = parsed.plainText.length;
-    const speed = (opts && opts.speed) || 25;
-    timerRef.current = setInterval(() => {
-      i++;
-      if (i >= len) { setCharCount(len); setDone(true); clearInterval(timerRef.current); }
-      else setCharCount(i);
-    }, speed);
-    return () => clearInterval(timerRef.current);
+    // ★ Als Vorgabe 8.10.: „etwa doppelt so schnell" — 12 statt 25 ms je
+    // Zeichen. Nach der VERSTRICHENEN Zeit gezaehlt statt nach Takten: hakt
+    // der Browser kurz (Brettaufbau, Animationen), holt der Text auf, statt
+    // jeden verpassten Takt als Pause stehen zu lassen.
+    const speed = (opts && opts.speed) || 12;
+    const tippen = () => {
+      vorlaufRef.current = false;
+      const t0 = performance.now();
+      timerRef.current = setInterval(() => {
+        const n = Math.floor((performance.now() - t0) / speed) + 1;
+        if (n >= len) { setCharCount(len); setDone(true); clearInterval(timerRef.current); }
+        else setCharCount(n);
+      }, Math.min(speed, 16));
+    };
+    // Seiten mit Tackle-Szene tippen erst, wenn die Szene gelaufen ist.
+    let vorT = null;
+    setTackleAus(false);
+    if (page?.tackle) { vorlaufRef.current = true; vorT = setTimeout(tippen, TACKLE_VORLAUF_MS); }
+    else tippen();
+    return () => { clearInterval(timerRef.current); if (vorT) clearTimeout(vorT); vorlaufRef.current = false; };
   }, [pages, pageIdx]);
+
+  // ── Tackle-Szene (Tutorial 5, Epilog) ────────────────────────────
+  // „Antonia fliegt von rechts ueber die Textbox, rammt Monia Bot und wirft
+  // sie aus dem Bild; Antonia steht danach links, wo Monia stand."
+  // Die Flieger sind feste Elemente im Overlay (nicht in der Textbox, die
+  // abschneidet) und laufen per Web Animations API: Antonia 650 ms von
+  // ausserhalb des Bildschirms auf das linke Portraet, beim Einschlag fliegt
+  // Monias Portraetrahmen drehend aus dem Bild, die Box wackelt, ein Blitz
+  // leuchtet — und das Portraet in der Box wird Antonia.
+  useEffect(() => {
+    const page = pages[pageIdx];
+    if (!page?.tackle) return undefined;
+    const overlay = document.querySelector('.textbox-overlay');
+    const frame = document.querySelector('.textbox-portrait-left .textbox-portrait-frame');
+    const box = document.querySelector('.textbox');
+    if (!overlay || !frame) { setTackleAus(true); return undefined; }
+    // Antonia betritt die Buehne: die Musik wechselt.
+    setAntoniaPresent(true);
+    const r = frame.getBoundingClientRect();
+    const angelegt = [];
+    const timers = [];
+    const fest = (el, extra) => {
+      Object.assign(el.style, { position: 'fixed', left: '0px', top: '0px', pointerEvents: 'none', zIndex: 90500, ...extra });
+      overlay.appendChild(el); angelegt.push(el); return el;
+    };
+    const mx = r.left + r.width / 2, my = r.top + r.height / 2;
+    const flieger = document.createElement('img');
+    flieger.src = ANTONIA_PORTRAIT; flieger.draggable = false;
+    fest(flieger, { width: '104px', height: '104px', imageRendering: 'pixelated', filter: 'drop-shadow(3px 3px 0 rgba(0,0,0,.55))' });
+    // Die Textbox sitzt am oberen Bildrand — der Flug bleibt auf Hoehe des Portraets.
+    const startX = window.innerWidth + 60, zielX = mx - 52, y0 = my - 52 - 8, y1 = my - 52;
+    if (window.playSFX) window.playSFX('attack_ram', { dedupe: 100 });
+    flieger.animate([
+      { transform: `translate(${startX}px, ${y0}px) rotate(12deg) scale(1)` },
+      { transform: `translate(${(startX + zielX) / 2}px, ${y0 + 10}px) rotate(-8deg) scale(1.25)`, offset: 0.55 },
+      { transform: `translate(${zielX}px, ${y1}px) rotate(-16deg) scale(1.1)` },
+    ], { duration: TACKLE_FLUG_MS, easing: 'cubic-bezier(.25,.15,.8,.75)', fill: 'forwards' });
+    timers.push(setTimeout(() => {
+      // Einschlag
+      flieger.remove();
+      if (window.playSFX) window.playSFX('heavy_impact', { dedupe: 100 });
+      setTackleAus(true);
+      // Antonia steht jetzt links: erst DANN wird sie zum Gegner.
+      if (window._currentTutorialNum) setTutorialGegner('antonia');
+      // Monias Portraetrahmen fliegt aus dem Bild (nach oben links).
+      const wurf = frame.cloneNode(true);
+      wurf.style.setProperty('--tb-seite', getComputedStyle(frame).getPropertyValue('--tb-seite') || '#ff4444');
+      fest(wurf, { left: r.left + 'px', top: r.top + 'px', width: r.width + 'px', height: r.height + 'px', margin: '0' });
+      wurf.animate([
+        { transform: 'translate(0,0) rotate(0deg) scale(1)', opacity: 1 },
+        { transform: `translate(${-(r.left + 320)}px, ${-(r.top + 460)}px) rotate(-1000deg) scale(.45)`, opacity: 1 },
+      ], { duration: 1000, easing: 'cubic-bezier(.2,.7,.4,1)', fill: 'forwards' });
+      // Blitz am Einschlagpunkt
+      const blitz = document.createElement('div');
+      fest(blitz, { left: (mx - 90) + 'px', top: (my - 90) + 'px', width: '180px', height: '180px', borderRadius: '50%',
+        background: 'radial-gradient(circle, rgba(255,255,255,.95) 0%, rgba(255,210,120,.7) 35%, rgba(255,120,60,0) 70%)' });
+      blitz.animate([{ transform: 'scale(.2)', opacity: 1 }, { transform: 'scale(1.7)', opacity: 0 }], { duration: 380, easing: 'ease-out', fill: 'forwards' });
+      // Die Box wackelt.
+      if (box) box.animate([
+        { transform: 'translateX(0)' }, { transform: 'translateX(-12px)' }, { transform: 'translateX(9px)' },
+        { transform: 'translateX(-5px)' }, { transform: 'translateX(0)' },
+      ], { duration: 340, easing: 'ease-out' });
+    }, TACKLE_FLUG_MS));
+    return () => { timers.forEach(clearTimeout); angelegt.forEach(el => el.remove()); };
+  }, [pages, pageIdx]);
+
+  // Box waechst mit langen Seiten. Die Standardbox fasst drei Zeilen; eine
+  // Seite mit mehr (Zeilenumbrueche im Skript, lange Saetze) wurde bisher
+  // unten abgeschnitten. Gemessen wird an einer unsichtbaren Kopie des
+  // GANZEN Seitentexts (`.textbox-sizer`, gleiche Auszeichnung, gleiche
+  // Breite) — nicht am Tipptext, der erst waehrend des Tippens waechst.
+  // Die Spalte streckt sich auf die Hoehe der Box (CSS `min-height`), ihre
+  // Hoehe ohne Zutun ist also das, was die Box ohnehin hat.
+  // Seitenzaehler und Weiter-Pfeil sitzen am unteren Rand (ca. 28 px hoch);
+  // der Text darf sie nicht beruehren — dafuer 26 px Zuschlag auf den Text-
+  // bedarf (gemessen: 18 liess null Luft zwischen letzter Zeile und Zaehler).
+  // Passt alles, bleibt die Box unveraendert.
+  useLayoutEffect(() => {
+    const body = bodyRef.current, sizer = sizerRef.current;
+    if (!body || !sizer || !pages.length) return undefined;
+    const anpassen = () => {
+      body.style.height = '';
+      const noetig = sizer.offsetHeight + 26;
+      if (noetig > body.clientHeight) body.style.height = Math.ceil(noetig) + 'px';
+    };
+    anpassen();
+    window.addEventListener('resize', anpassen);
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(anpassen).catch(() => {});
+    return () => {
+      window.removeEventListener('resize', anpassen);
+      body.style.height = '';
+    };
+  }, [pages, pageIdx, opts]);
 
   // Highlights
   useEffect(() => {
@@ -7993,25 +8151,86 @@ function TextBox() {
     const hl = page?.highlights;
     if (!hl || !hl.length) { setHighlightRects([]); return; }
     const rects = [];
+    const aufraeumen = [];
     for (const h of hl) {
       const sel = typeof h === 'string' ? h : h.selector;
-      const pulse = typeof h === 'object' && h.pulse;
+      // Gehighlightete Karten pulsieren immer leicht; `pulse: false` schaltet das ab.
+      const pulse = typeof h === 'object' ? h.pulse !== false : true;
       if (!sel) continue;
       document.querySelectorAll(sel).forEach(treffer => {
+        // Die Klone der Vorseite tragen dieselben data-Attribute und stehen
+        // noch im Overlay, wenn die neue Seite misst — ohne diesen Filter
+        // sammelten sich bei gleichem Selektor auf Folgeseiten immer mehr
+        // Highlights an (Seite 6: 3 statt 2, Seite 10: 5 statt 2).
+        if (treffer.closest('.textbox-overlay')) return;
         const el = highlightZiel(treffer);
         const m = measureHighlight(el);
         const box = m.flat ? m.rect : m.local;
         // Handkarten: die Stapelfolge des Faechers (linke Karte ueber der
         // rechten, `--fan-z`) gilt auch fuer ihre Highlights.
         const z = parseInt(getComputedStyle(el).zIndex, 10);
-        if (box.width > 0 && box.height > 0) rects.push({ ...m, pulse, handkarte: el !== treffer, stapel: Number.isFinite(z) ? z : 0, html: el.outerHTML });
+        // Massstab des Originals mitnehmen. Der Klon steht im Overlay, nicht
+        // mehr in seinem Umfeld: Die Phasenspalte setzt ein eigenes
+        // `--board-scale` (.85 des Brettmassstabs), im Overlay gilt das
+        // globale — der Klon der Phasenleiste bekam dadurch groessere
+        // Schrift und Abstaende als sein Original und lag verzerrt darueber.
+        // Nur abweichende Werte werden gesetzt, alles andere bleibt wie es war.
+        const vars = {};
+        const ovStil = getComputedStyle(document.querySelector('.textbox-overlay') || document.body);
+        const elStil = getComputedStyle(el);
+        for (const n of ['--board-scale', '--board-font']) {
+          const eigen = elStil.getPropertyValue(n).trim();
+          if (eigen && eigen !== ovStil.getPropertyValue(n).trim()) vars[n] = eigen;
+        }
+        if (!(box.width > 0 && box.height > 0)) return;
+        // `an: [Selektoren]`: Teile INNERHALB des Ziels, die im Klon „an" bleiben
+        // (`data-tb-an`, CSS) — der Rest wird ausgegraut. So liegt die ganze
+        // Phasenleiste ueber dem Schleier und nur die genannten Kaesten leuchten.
+        let html = el.outerHTML;
+        const an = typeof h === 'object' && Array.isArray(h.an) ? h.an : null;
+        if (an && an.length) {
+          const kopie = el.cloneNode(true);
+          an.forEach(a => kopie.querySelectorAll(a).forEach(n => n.setAttribute('data-tb-an', '1')));
+          html = kopie.outerHTML;
+        }
+        const basis = { pulse, vars, handkarte: el !== treffer, stapel: Number.isFinite(z) ? z : 0, html, ziel: el };
+        rects.push({ ...m, ...basis });
+        // ── Hover auf einer gehighlighteten HANDKARTE ──
+        // Hebt sich die echte Karte unter dem Zeiger, soll die Highlight-
+        // Version selbst gross werden — nicht darunter noch eine zweite,
+        // normal vergroesserte Karte auftauchen. Die echte Karte bleibt
+        // deshalb beim Hover unsichtbar (`data-tb-hover`, CSS) und der
+        // Klon folgt ihrer Lage und Groesse Bild fuer Bild, auch im
+        // Uebergang beim Heben und Absenken.
+        if (basis.handkarte) {
+          let raf = 0, drauf = false, bis = 0;
+          const folgen = () => {
+            raf = 0;
+            const m2 = measureHighlight(el);
+            setHighlightRects(prev => prev.map(r => (r.ziel === el ? { ...m2, ...basis, hover: drauf } : r)));
+            if (drauf || performance.now() < bis) raf = requestAnimationFrame(folgen);
+            else el.removeAttribute('data-tb-hover');
+          };
+          const rein = () => { drauf = true; el.setAttribute('data-tb-hover', '1'); if (!raf) raf = requestAnimationFrame(folgen); };
+          // Nach dem Verlassen noch kurz nachfuehren (Absenk-Uebergang .16 s).
+          const raus = () => { drauf = false; bis = performance.now() + 300; if (!raf) raf = requestAnimationFrame(folgen); };
+          el.addEventListener('mouseenter', rein);
+          el.addEventListener('mouseleave', raus);
+          aufraeumen.push(() => {
+            el.removeEventListener('mouseenter', rein);
+            el.removeEventListener('mouseleave', raus);
+            if (raf) cancelAnimationFrame(raf);
+            el.removeAttribute('data-tb-hover');
+          });
+        }
       });
     }
     setHighlightRects(rects);
+    return () => { aufraeumen.forEach(f => f()); };
   }, [pages, pageIdx]);
 
   const handleAdvance = useCallback(() => {
-    if (!opts || fading) return;
+    if (!opts || fading || vorlaufRef.current) return;
     if (window.playSFX) window.playSFX('ui_click', { dedupe: 80, volume: 0.5 });
     if (!done) {
       clearInterval(timerRef.current);
@@ -8057,11 +8276,10 @@ function TextBox() {
           setTimeout(() => setAntoniaPresent(false), 600);
         }
       }
-      // Szene zu Ende: im Tutorial wird, wer mehr gesprochen hat, zum
-      // angezeigten Gegner (s. `setTutorialGegner`).
       if (window._currentTutorialNum) {
-        const wer = tutorialMehrGesprochen(opts, pages);
-        if (wer) setTutorialGegner(wer);
+        // Der Text ist durch: die Helden-Figuren steigen aus den Karten
+        // (waehrend die Textbox noch ausblendet, nicht erst danach).
+        setTutorialFigurenGesperrt(false);
       }
       // Fade out then dismiss
       setFading(true);
@@ -8120,8 +8338,8 @@ function TextBox() {
   // side is currently talking. This lets tutorials introduce Antonia as
   // "Jetpack Raccoon" and later switch to "Antonia" without the label
   // flashing back to opts.rightSpeakerName whenever Monia interjects.
-  const findLastName = (isRight) => {
-    for (let i = pageIdx; i >= 0; i--) {
+  const findLastName = (isRight, ab = pageIdx) => {
+    for (let i = ab; i >= 0; i--) {
       const p = pages[i];
       const pSide = p?.side || 'left';
       if ((pSide === 'right') !== isRight) continue;
@@ -8129,7 +8347,18 @@ function TextBox() {
     }
     return null;
   };
-  const leftSticky = findLastName(false);
+  // Tackle-Seite: bis zum Einschlag gilt noch alles von der Seite davor
+  // (Monias Portraet, Name und Farbe), erst dann das neue.
+  const tackleVor = !!page?.tackle && !tackleAus;
+  const leftSticky = findLastName(false, tackleVor ? pageIdx - 1 : pageIdx);
+  // Linkes Portraet: das letzte `portrait` einer linken Seite, sonst der Sprecher.
+  const linksPortrait = (() => {
+    for (let i = tackleVor ? pageIdx - 1 : pageIdx; i >= 0; i--) {
+      const q = pages[i];
+      if (q?.portrait && (q.side || 'left') === 'left') return q.portrait;
+    }
+    return opts.speaker;
+  })();
   const rightSticky = findLastName(true);
   const leftName = leftSticky?.name || opts.speakerName;
   const rightName = rightSticky?.name || opts.rightSpeakerName;
@@ -8164,7 +8393,7 @@ function TextBox() {
                   width: h.rect.width, height: h.rect.height, pointerEvents: 'none' }
               : { position: 'absolute', left: h.local.left, top: h.local.top,
                   width: h.local.width, height: h.local.height, pointerEvents: 'none' }}>
-            <div className="textbox-highlight-clone" dangerouslySetInnerHTML={{ __html: h.html }} />
+            <div className="textbox-highlight-clone" style={h.vars} dangerouslySetInnerHTML={{ __html: h.html }} />
           </div>
         );
         // Gedrehtes Ziel / Handkarte: Drehung und Skalierung sitzen auf
@@ -8177,7 +8406,7 @@ function TextBox() {
             left: h.rect.left, top: h.rect.top,
             width: h.rect.width, height: h.rect.height,
             transform: `rotate(${h.drehung || 0}deg) scale(${h.skala || 1})`,
-            pointerEvents: 'none', zIndex: 90001 + h.stapel,
+            pointerEvents: 'none', zIndex: 90001 + h.stapel + (h.hover ? 1000 : 0),
           }}>{inner}</div>
         );
         if (h.flat) return <div key={i} style={{ display: 'contents' }}>{inner}</div>;
@@ -8208,14 +8437,19 @@ function TextBox() {
       <div className="textbox pp-fenster" style={farbStil}>
         {opts.speaker && leftVisible && (
           <div className={'textbox-portrait textbox-portrait-left' + (hasRight && activeSide !== 'left' ? ' textbox-portrait-inactive' : '') + (leftExiting ? ' textbox-portrait-exit-left' : '')}>
-            <div className="textbox-portrait-frame">
-              <img src={opts.speaker} alt={opts.speakerName || ''} draggable={false} />
+            <div className={'textbox-portrait-frame' + (page?.tackle && tackleAus ? ' textbox-portrait-ankunft' : '')}>
+              <img src={linksPortrait} alt={leftName || ''} draggable={false} />
               {[...Array(8)].map((_, i) => <span key={i} className="textbox-sparkle" style={{ animationDelay: (i * 0.35) + 's', top: [10,60,5,50,30,65,15,45][i] + '%', left: [5,70,55,10,80,35,90,60][i] + '%' }} />)}
             </div>
             {leftName && <span className="textbox-speaker-name">{leftName}</span>}
           </div>
         )}
         <div className="textbox-body" ref={bodyRef}>
+          {/* Unsichtbare Kopie des ganzen Seitentexts — nur zum Messen
+              (s. `useLayoutEffect` „Box waechst mit langen Seiten"). */}
+          <div className="textbox-sizer" ref={sizerRef} aria-hidden="true">
+            <span className="textbox-text">{(() => { const s = parseInlineMarkdown((typeof page === 'string' ? page : page?.text) || ''); return renderMarkdownSlice(s.segments, s.plainText.length); })()}</span>
+          </div>
           <span className="textbox-text">{(() => { const els = renderMarkdownSlice(parsedRef.current.segments, charCount); return page?.shakeText ? applyShake(els) : els; })()}</span>
           {done && <span className={'textbox-advance' + (isLastPage ? ' textbox-advance-ende' : '')} aria-label={isLastPage ? 'Close' : 'Next'} />}
           {pages.length > 1 && (
@@ -8243,204 +8477,357 @@ function TextBox() {
 //  TUTORIAL SCRIPTS — Intro/outro dialogue for each tutorial stage
 //  Keyed by tutorial number (1, 2, 3...)
 // ═══════════════════════════════════════════════════════════════
+/**
+ * Zaehlt die ATK-Anzeige eines Helden ueber `dauer` ms von `von` auf `nach`
+ * hoch (Tutorial 3: Willys Boost auf 9999). Der Server setzt den Wert sofort;
+ * hier steigt nur die ANZEIGE sichtbar an. Geschrieben wird direkt in den
+ * Textknoten der Zahl (`nodeValue`) — React haelt eine Referenz darauf und
+ * aktualisiert ihn weiter, ein `textContent` haette ihn ersetzt. Der Selektor
+ * trifft auch den Highlight-Klon im Overlay, der sonst den alten Wert zeigte.
+ */
+function zaehleAtkHoch(heldSelektor, von, nach, dauer) {
+  const t0 = performance.now();
+  const schritt = () => {
+    const t = Math.min(1, (performance.now() - t0) / dauer);
+    const wert = Math.round(von + (nach - von) * (1 - Math.pow(1 - t, 2.2)));
+    document.querySelectorAll(heldSelektor + ' .board-card-atk-num').forEach(el => {
+      const tn = el.firstChild;
+      if (tn && tn.nodeType === 3) tn.nodeValue = String(wert);
+      el.classList.toggle('atk-zaehlt', t < 1);
+    });
+    if (t < 1) requestAnimationFrame(schritt);
+  };
+  requestAnimationFrame(schritt);
+}
+
+/** Tutorial 3: Antonias „Gefallen" — Willy bekommt 9999 ATK (Server), die
+ *  Anzeige zaehlt ueber ~1,6 s hoch. */
+function tutorial3WillyBoost() {
+  const sel = '[data-hero-owner="me"][data-hero-name*="Willy"]';
+  const el = document.querySelector(sel + ' .board-card-atk-num');
+  const von = el ? (parseInt(el.textContent, 10) || 0) : 0;
+  socket.emit('tutorial_modify', { type: 'tutorial3_boost' });
+  zaehleAtkHoch(sel, von, 9999, 1600);
+}
+
 const TUTORIAL_SCRIPTS = {
   1: {
+    // Phasenwechsel von Hand nur von Main 1 in die Action Phase — und erst mit
+    // Destruction Magic 3 an Ida (s. Board).
+    nurActionPhase: true,
+    // Regieanweisungen des Skripts: ein Highlight gilt ab der Seite, vor
+    // der es steht, bis zur naechsten Anweisung. Highlights pulsieren
+    // standardmaessig leicht (s. TextBox).
     intro: [
       { text: 'Heya! Welcome to the battlefield!' },
-      { text: "To win a game of Pixel Parties, you must defeat all your opponent's Heroes by dropping their HP to 0!",
-        highlights: ['[data-hero-owner="opp"][data-hero-name="Beato, the Butterfly Witch"]'] },
-      { text: 'To do that, you can use {red:**Attacks**} or {red:**Spells**} to deal direct damage with your own Heroes, or summon {red:**Creatures**} to do the job for you.',
-        highlights: ['.game-hand-me [data-card-name="Magic Hammer"]'] },
-      { text: "Let's try hitting the opponent's {purple:*Beato*} with your big, strong {red:*Magic Hammer*} Spell!",
+      { text: "I'm Monia Bot, the coolest Bot there is, beep-boop!\nI'll show you the ropes and make you a Pixel-Powerhouse!" },
+      { text: "Let's start with the basics:\nTo win a game of Pixel Parties, you must defeat all of your opponent's Heroes!" },
+      { text: 'To do that, you deal damage to them until their HP drop to 0. You usually use {red:**Attacks, Spells**} **and** {green:**Creatures**} for that!' },
+      // ── Highlight: Beato und Magic Hammer ──
+      { text: "Let's try hitting my {purple:**Beato**} with the big, strong {red:**Magic Hammer**} Spell in your hand!",
         highlights: [
-          { selector: '[data-hero-owner="opp"][data-hero-name="Beato, the Butterfly Witch"]', pulse: true },
-          { selector: '.game-hand-me [data-card-name="Magic Hammer"]', pulse: true },
+          '[data-hero-owner="opp"][data-hero-name="Beato, the Butterfly Witch"]',
+          '.game-hand-me [data-card-name="Magic Hammer"]',
         ] },
-      { text: "But ... your {red:*Ida*} currently can't use that Spell.",
-        highlights: ['[data-hero-owner="me"][data-hero-name="Ida, the Adept of Destruction"]'] },
-      { text: "Its level is too high for her!" },
-      { text: 'To use an Attack or Spell or summon a Creature with a Hero, it needs the correct {#88ccee:**Ability**} at an appropriate level first.' },
-      { text: 'For Magic Hammer, that Ability is {#88ccee:**Destruction Magic**}, which Ida currently has 2 copies of attached to her.',
+      { text: 'Well ... that would be **amazing**, beep-boop - but your Hero {purple:**Ida**} cannot use Magic Hammer yet.\nIts level is too high for her!',
         highlights: [
+          '[data-hero-owner="opp"][data-hero-name="Beato, the Butterfly Witch"]',
+          '.game-hand-me [data-card-name="Magic Hammer"]',
+        ] },
+      // ── Highlight: Magic Hammer und Destruction Magic (auf Ida) ──
+      { text: "See the number **3** on your Magic Hammer? That's its level. So you need a Hero that can use Spells with level 3!",
+        highlights: [
+          '.game-hand-me [data-card-name="Magic Hammer"]',
           '[data-ability-owner="me"][data-card-name="Destruction Magic"]',
         ] },
-      { text: "So her Destruction Magic is at {red:**level 2**}. But Magic Hammer is a {red:**level 3**} Spell! Ida needs one more Destruction Magic!" },
-      { text: 'Attach it to her from your hand, then go into the Action Phase to actually cast your Spell with her and defeat Beato!',
+      { text: 'And see your Ida? She has {#88ccee:**Destruction Magic**}, so she CAN use **Destruction Spells** like Magic Hammer - but her Ability is only at level 2. She only has 2 copies of it attached to her.',
         highlights: [
-          '[data-hero-owner="me"][data-hero-name="Ida, the Adept of Destruction"]',
-          '.game-hand-me .hand-slot',
-          '[data-phase-name="Action Phase"]',
+          '.game-hand-me [data-card-name="Magic Hammer"]',
+          '[data-ability-owner="me"][data-card-name="Destruction Magic"]',
+        ] },
+      { text: 'To be able to use a level 3 Spell like Magic Hammer, she needs a third copy!\nGood thing you have just that in your hand, beep-boop!',
+        highlights: [
+          '.game-hand-me [data-card-name="Magic Hammer"]',
+          '[data-ability-owner="me"][data-card-name="Destruction Magic"]',
+        ] },
+      // ── Highlight: Destruction Magic in der Hand (Magic Hammer faellt weg) ──
+      { text: 'Okay - time to hammer that Beato!\nAttach the third Destruction Magic from your hand to your Ida!',
+        highlights: [
+          '.game-hand-me [data-card-name="Destruction Magic"]',
+          '[data-ability-owner="me"][data-card-name="Destruction Magic"]',
+        ] },
+      // ── Highlight: komplette Phasenleiste, nur die Action Phase „an" ──
+      { text: 'Then, go to your **Action Phase** and drag your Magic Hammer onto the Hero that should cast it - your Ida!\nClick on your target - Beato - and watch her get squished!',
+        highlights: [
+          { selector: '.board-phase-tracker', an: ['[data-phase-name="Action Phase"]'] },
         ] },
     ],
     outro: [
       { text: 'Excellent job, beep-boop!' },
-      { text: 'To use Attacks or Spells or summon Creatures, you need to spend {red:**Actions**}.' },
-      { text: 'That is done during the {red:**Action Phase**} - but you only get one Action per Action Phase, so use it wisely!' },
+      { text: 'To use Attacks or Spells, or to summon Creatures, you need to spend **Actions**.\nDuring your Action Phase, you only get one of those per turn - so spend it wisely, beep-boop!' },
+      { text: 'How you choose to spend your Actions will decide your entire game!' },
+      { text: "Alrighty - you've mastered how Spells are cast, how Abilities are stacked and how to win - pretty good progress, beep-boop!" },
+      { text: 'Meet me again for Lesson 2!' },
     ],
   },
   2: {
+    // Regieanweisungen wie in Tutorial 1: ein Highlight gilt ab der Seite,
+    // vor der es steht, bis zur naechsten Anweisung.
     intro: [
-      { text: 'Heya!' },
-      { text: "In a real game, just defeating one Hero won't be enough - there's three of them for you to get rid of!" },
-      { text: "Doing so with a single Spell will be very difficult, but {green:**Creatures**} can be used to deal lots of damage to multiple targets!" },
-      { text: "Here, the {green:**Cosmic Skeletons**} can each deal 150 damage to a target.",
+      { text: 'Heya! Welcome back, beep-boop!' },
+      { text: "Last time, you only had to squish a single Hero. But in a real game, that won't be enough - there's **three of them** to get rid of!" },
+      { text: "With just a single Spell, taking out multiple Heroes won't be easy.\nBut {green:**Creatures**} can be used to spread lots of damage between different targets!" },
+      // ── Highlight: die Cosmic Skeletons ──
+      { text: 'Look at your board.\nYour {green:**Cosmic Skeletons**} can each deal **150 damage** to one target.',
         highlights: [
-          { selector: '[data-support-owner="me"][data-card-name="Cosmic Skeleton"]', pulse: true },
+          '[data-support-owner="me"][data-card-name="Cosmic Skeleton"]',
         ] },
-      { text: "Let's go send them onto the enemy Heroes and turn them into burnt spots on the ground, beep-boop!" },
-      { text: 'To activate a Creature\'s active effect, just click on it during either {red:**Main Phase**}!',
+      // ── Highlight: die gegnerischen Helden ──
+      { text: 'And look at my Heroes - all three of them are already weakened and only have **150 HP left**!',
         highlights: [
-          '[data-phase-name="Main Phase 1"]',
-          '[data-phase-name="Main Phase 2"]',
+          '[data-hero-owner="opp"][data-hero-name]',
+        ] },
+      { text: "A perfect setup - let's go!\nSend your Skeletons against my Heroes and turn them into charred spots on the ground, beep-boop!",
+        highlights: [
+          '[data-hero-owner="opp"][data-hero-name]',
+        ] },
+      // ── Highlight: komplette Phasenleiste, beide Main Phases „an" ──
+      { text: "To activate a Creature's active effect, just click on it during either of your **Main Phases**!",
+        highlights: [
+          { selector: '.board-phase-tracker', an: ['[data-phase-name="Main Phase 1"]', '[data-phase-name="Main Phase 2"]'] },
         ] },
     ],
     outro: [
-      { text: "Cool!" },
-      { text: "The big upside of Creatures is that they can use their active effects every single turn." },
-      { text: "So if you didn't win already - next turn, there'd be even more pain and lasers in your opponent's future!" },
-      { text: "But the big downside is that Creatures cannot use their active effects the turn that they are summoned." },
-      { text: "These Cosmic Skeletons already survived from a previous turn - you'll have to find ways to keep yours alive!" },
+      { text: 'Cool!' },
+      { text: 'The great thing about Creatures is that they can use their effects again and again, every turn!' },
+      { text: 'So your Skeletons will be a constant source of damage!' },
+      { text: "If you hadn't already won - you could just try again next turn! More pain, more **lasers**!" },
+      { text: 'But the big **downside** of Creatures is that they cannot activate their active effects the turn you summon them.' },
+      { text: "These Skeletons? They already survived a full turn, otherwise they wouldn't be usable!\nSo you'll need to find ways to keep your fragile little Creatures alive!" },
+      { text: 'You got all that?\nGreat!' },
+      { text: 'See you next lesson, beep-boop!' },
     ],
   },
-  3: {
+  3: (() => {
+    // Antonia (rechts): als „Jetpack Raccoon" gefuehrt, bis sie sich in
+    // Tutorial 5 vorstellt; ALLE ihre Texte wackeln (`shakeText`).
+    const A = (text, extra) => ({ text, side: 'right', speakerName: 'Jetpack Raccoon', nameColor: '#ff4444', shakeText: true, ...extra });
+    // Monia im Epilog: ausgebremst, daher Silber statt Rot.
+    const M = (text) => ({ text, speakerName: 'Monia Bot', nameColor: 'silver' });
+    return {
     opts: { rightSpeaker: '/Antonia.png', rightSpeakerName: 'Antonia' },
+    // Phasenwechsel von Hand nur von Main 1 in die Action Phase (s. Board).
+    nurActionPhase: true,
     intro: [
-      { text: 'Heya, welcome back to the battlefield!' },
-      { text: "{green:**Creatures**} are great for spreading damage, but there's more efficient ways to deal with a single strong target!",
+      { text: 'Heya!\nWelcome back to the battlefield!' },
+      { text: "{green:**Creatures**} are great for spreading damage, but there are more efficient ways to deal with individual powerful targets!" },
+      { text: 'Just look at-' },
+      // ── Antonia tritt auf, die Musik wechselt (`enterRight`) ──
+      A('Khekeke! You wants da **damage**?', { enterRight: true }),
+      A('I gots da **damages** for ya!'),
+      A("Listen, kiddo!\nDa real **big damages** aren't done with Blah-Blah-Spells or Who-Cares-Creatures, ya hear me?"),
+      A("{red:**Attacks!**}\nDat's what it's all abouts, ya get me?!"),
+      A("Can't go wrong with da **BEEG BONK** for da beeg damages, right?"),
+      // ── Highlight Willy; sein Angriffswert steigt ueber ~1,6 s auf
+      //    9999, dazu der Buff-Klang (kommt vom Server-Log `atk_grant`) ──
+      A("Dere ya go - I've done ya a little somethin' of a favor, ya see?\nYour eternal gratitudes are appreciated, kheke!", {
+        onShow: () => tutorial3WillyBoost(),
         highlights: [
-          { selector: '[data-hero-owner="opp"][data-hero-name*="Fiona"]', pulse: true },
-        ] },
-      { text: 'Just look at -', enterRight: true },
-      { text: 'Khekhekhe! You want da damage?', side: 'right', speakerName: 'Jetpack Raccoon', nameColor: '#ff4444', shakeText: true },
-      { text: 'I got da damages for ya!', side: 'right', speakerName: 'Jetpack Raccoon', nameColor: '#ff4444', shakeText: true },
-      { text: "Listen, kiddo! Da real **big** damages aren't done with Blah-Blah-Spells or Who-Cares-Creatures!", side: 'right', speakerName: 'Jetpack Raccoon', nameColor: '#ff4444', shakeText: true },
-      { text: "{red:**Attacks!**}\nDat's what it's all about, ya get me?!", side: 'right', speakerName: 'Jetpack Raccoon', nameColor: '#ff4444', shakeText: true },
-      // Der Boost (Sound + Stat-Aenderung + Highlight) sitzt auf DIESER
-      // Seite, nicht mehr auf der "Dere"-Seite darunter: Al will Highlight
-      // und Update zeitgleich mit dem Sound sehen, also BEVOR Antonia den
-      // Gefallen ankuendigt. Vorher lief alles erst mit ihrer Ansage los,
-      // wodurch der Stat-Sprung dem Text hinterherhinkte.
-      { text: "Can't go wrong with da BONK for **big** damages, right?", side: 'right', speakerName: 'Jetpack Raccoon', nameColor: '#ff4444', shakeText: true,
-        onShow: () => {
-          socket.emit('tutorial_modify', { type: 'tutorial3_boost' });
-          const el = document.querySelector('[data-hero-owner="me"][data-hero-name*="Willy"]');
-          if (el) { el.classList.add('tutorial-boost-anim'); setTimeout(() => el.classList.remove('tutorial-boost-anim'), 2500); }
-        },
+          '[data-hero-owner="me"][data-hero-name*="Willy"]',
+        ] }),
+      A("Attacks do more ouchie de higher your Hero's **BONK stat** is.\nDis lil' boost I gave ya will help him hit **real hard!**", {
         highlights: [
-          { selector: '[data-hero-owner="me"][data-hero-name*="Willy"]', pulse: true },
-        ] },
-      // KEIN Highlight mehr: der Boost samt Hervorhebung ist auf der Seite
-      // davor passiert, hier waere es nur eine zweite pulsierende Schicht
-      // ueber derselben Karte.
-      { text: "Dere - I've done ya a little somethin' of a favor, ya see?", side: 'right', speakerName: 'Jetpack Raccoon', nameColor: '#ff4444', shakeText: true },
-      { text: "Attacks do harder BONKs when your Heroes got higher BONK stats, so dis lil' boost'll help you hit real hard!", side: 'right', speakerName: 'Jetpack Raccoon', nameColor: '#ff4444', shakeText: true,
+          '[data-hero-owner="me"][data-hero-name*="Willy"]',
+        ] }),
+      // ── Willy bleibt gehighlightet, dazu das frisch angelegte Fighting ──
+      A("Ya already know how to use da Spells, right?\nAttacks work the same way, just with da good ol' **Fighting** Ability instead of some boring nerd stuff like a Spell School!", {
         highlights: [
-          { selector: '[data-hero-owner="me"][data-hero-name*="Willy"]', pulse: true },
-          { selector: '[data-ability-owner="me"][data-card-name="Fighting"]', pulse: true },
-        ] },
-      { text: "Now use dat {red:**Attack**} in your hand to break some bones or somethin'!", side: 'right', speakerName: 'Jetpack Raccoon', nameColor: '#ff4444', shakeText: true,
+          '[data-hero-owner="me"][data-hero-name*="Willy"]',
+          '[data-ability-owner="me"][data-card-name="Fighting"]',
+        ] }),
+      // ── Highlight Hammer Throw ──
+      A("Now use dat {red:**Attack**} in ya hand to break some bonez.\nOr all of dem, khehe!", {
         highlights: [
-          '.game-hand-me .hand-slot',
-        ] },
-      { text: '...' },
-      { text: "But that's not even...!" },
+          '.game-hand-me [data-card-name="Hammer Throw"]',
+        ] }),
+      // Das Hammer-Throw-Highlight haelt bis zum Ende der Einleitung.
+      { text: '...', highlights: ['.game-hand-me [data-card-name="Hammer Throw"]'] },
+      { text: 'What?', highlights: ['.game-hand-me [data-card-name="Hammer Throw"]'] },
+      { text: 'But - that wasn\'t even necessary-!', highlights: ['.game-hand-me [data-card-name="Hammer Throw"]'] },
     ],
     outro: [
-      { text: "Not bad, eh? Dat poor princess'll feel dat one for a while, khekhe...!", side: 'right', speakerName: 'Jetpack Raccoon', nameColor: '#ff4444', enterRight: true, shakeText: true },
-      { text: "Or ... not feel it at all anymore, being *dead* an' all.", side: 'right', speakerName: 'Jetpack Raccoon', nameColor: '#ff4444', shakeText: true },
-      { text: "Khekhekhekhe, you're fun to bozz around, Imma be back for ya later!", side: 'right', speakerName: 'Jetpack Raccoon', nameColor: '#ff4444', exitRight: true, shakeText: true },
-      { text: '... you could have...', speakerName: 'Monia Bot', nameColor: 'silver' },
-      { text: "... this wasn't even...!", speakerName: 'Monia Bot', nameColor: 'silver' },
-      { text: '...', speakerName: 'Monia Bot', nameColor: 'silver' },
-      { text: 'Okay. Attacks. Big strong. See you next lesson.', speakerName: 'Monia Bot', nameColor: 'silver' },
+      A('Khehehe, nice show!', { enterRight: true }),
+      A("Not bad, eh? Felt dat satisfyin' **CRUNCH**?\nDat poor princess'll feel dat one for a while!"),
+      A("Or ... not feel it, being *dead* 'n' all.\nKhekekekeke!"),
+      A("Hey? You're one fun lil' minion to bozz around!\nImma be back for ya later!"),
+      A('See ya, khekeke!', { exitRight: true }),
+      M('... what...? What *was*...?\nYou - you could have just...'),
+      M("This really wasn't even necessary...!"),
+      M('...'),
+      M('Okay. Fine.\n{red:**Attacks**}. Big strong.\nWhatever that *stupid* raccoon said.'),
+      M('...'),
+      M('See you next lesson.'),
     ],
-  },
-  5: {
+    };
+  })(),
+  4: (() => {
+    const REIZA = '[data-hero-owner="me"][data-hero-name*="Reiza"]';
+    const MEDEA = '[data-hero-owner="me"][data-hero-name*="Medea"]';
+    const GIFT = '.game-hand-me [data-card-name="Divine Gift of Fire"]';
+    const QUICK = '.game-hand-me [data-card-name="Quick Attack"]';
+    const BLOW = '.game-hand-me [data-card-name="Blow of the Venom Snake"]';
+    const GEGNER = '[data-hero-owner="opp"][data-hero-name]';
+    return {
+    // Kein `nurActionPhase`: die Statusschaeden ticken erst am Zugende, das
+    // Tutorial braucht also den manuellen Phasenwechsel bis ans Ende.
+    // Regieanweisungen: ein Highlight gilt ab der Seite, vor der es steht,
+    // bis zur naechsten Anweisung.
+    intro: [
+      { text: '...' },
+      { text: 'Is ... is that raccoon gone?' },
+      { text: '...' },
+      { text: 'Okay. Good.' },
+      { text: '...' },
+      { text: 'Ahem.' },
+      { text: 'Heya! Welcome back!' },
+      { text: "What I was **trying** to say last time was that this *thing's* interference really was not necessary.",
+        onShow: () => { socket.emit('tutorial_modify', { type: 'tutorial4_suppress_reiza' }); } },
+      { text: 'With the cards you had access to, you were fully capable of winning that game on your own!' },
+      { text: "Not purely with the damage of your Attack - but with **status effects**.\nLet's look at those properly here." },
+      // ── Highlight: Reiza ──
+      { text: 'Your Hero {purple:**Reiza**} applies {purple:**Poison**} and {yellow:**Stun**} to whatever she hits.',
+        highlights: [REIZA] },
+      { text: "Stun, as well as {#88ddff:**Freeze**}, prevents a target from taking Actions. You can use it to control your opponent's options.",
+        highlights: [REIZA] },
+      { text: 'And Poison is 30 bonus damage every turn.',
+        highlights: [REIZA] },
+      // ── Highlight: Medea ──
+      { text: 'And look - your Hero {purple:**Medea**} **doubles** any Poison damage your opponent suffers!',
+        highlights: [MEDEA] },
+      { text: '**Poison** comes in **Stacks**, so each individual Stack is now 60 damage thanks to Medea!',
+        highlights: [MEDEA] },
+      { text: "And that's not your *only* source of status damage!",
+        highlights: [MEDEA] },
+      // ── Highlight: Divine Gift of Fire ──
+      { text: 'With your {red:**Divine Gift of Fire**}, you can also apply a {orange:**Burn**} effect - which is another flat 60 damage each turn!',
+        highlights: [GIFT] },
+      // ── Highlight: Quick Attack und Gift of Fire ──
+      { text: 'Also - see these two cards?\nThey can both be used as **additional Actions**!',
+        highlights: [QUICK, GIFT] },
+      { text: 'That means you can use them **outside your Action Phase**, without spending your Action on them - for free!',
+        highlights: [QUICK, GIFT] },
+      // ── Highlight: Reiza ──
+      { text: 'And since {red:**Quick Attack**} is an Attack - it will trigger your Reiza...',
+        highlights: [REIZA] },
+      // ── Highlight: Blow of the Venom Snake ──
+      { text: '... and count as a previous Attack for your {red:**Blow of the Venom Snake**}!',
+        highlights: [BLOW] },
+      // ── Highlight: Monias drei Helden ──
+      { text: 'With all that, you should have plenty of status and Attack damage available to beat my poor Heroes.',
+        highlights: [GEGNER] },
+      { text: 'Good luck, beep-boop!',
+        highlights: [GEGNER] },
+    ],
+    outro: [
+      { text: 'Perfect, beep-boop!' },
+      { text: 'You can use {yellow:**Stun**}, {#88ddff:**Freeze**} and other inhibiting status effects to slow your opponent down, while {purple:**Poison**} and {orange:**Burn**} whittle them down!' },
+      { text: 'With one caveat:\nAfter an inhibiting status effect runs out on a target, it becomes **immune** to further non-damaging status effects for 1 turn!' },
+      { text: 'You have to time your status effects properly if you want to truly control the flow of the battle!' },
+      { text: 'You got that?\nNice!' },
+      { text: 'See you next lesson!' },
+    ],
+    };
+  })(),
+  5: (() => {
+    const BOOK = '.game-hand-me [data-card-name="Book of Doom"]';
+    const HOWITZER = '.game-hand-me [data-card-name="Lifeforce Howitzer"]';
+    const ALCHEMY = '[data-ability-owner="me"][data-card-name="Alchemy"]';
+    // Alle Karten auf dem Brett (Helden, Abilities, Creatures ... — `zone-has-card`)
+    // und in der eigenen Hand.
+    const ALLE_KARTEN = ['.zone-has-card', '.game-hand-me [data-card-name]'];
+    // Antonia (rechts), alle Texte wackeln. Bis zu ihrer Vorstellung heisst
+    // sie „Jetpack Raccoon", danach „Antonia".
+    const A = (text, extra) => ({ text, side: 'right', speakerName: 'Antonia', nameColor: '#ff4444', shakeText: true, ...extra });
+    const AJ = (text, extra) => A(text, { speakerName: 'Jetpack Raccoon', ...extra });
+    // Antonia im Epilog: LINKS, an Monias Stelle, nachdem sie sie umgerannt hat.
+    const AL = (text, extra) => ({ text, portrait: ANTONIA_PORTRAIT, speakerName: 'Antonia', nameColor: '#ff4444', shakeText: true, ...extra });
+    return {
     opts: { rightSpeaker: '/Antonia.png', rightSpeakerName: 'Antonia' },
+    // Kein `nurActionPhase`: das Raetsel handelt vom Gold-Einkommen — das
+    // fliesst in der Resource Phase, also braucht es den Zugwechsel.
+    // Regieanweisungen: ein Highlight gilt ab der Seite, vor der es steht,
+    // bis zur naechsten Anweisung.
     intro: [
-      { text: 'Heya, welcome back! This time, let me tell you a bit about {#ffd700:**Gold**}.' },
-      // Textboxes 2–4: still called "Jetpack Raccoon" — she hasn't revealed
-      // her real name yet.
-      { text: 'KHEKHEKHE - GOLD?! I LOVE Gold! Wheah?!', side: 'right', speakerName: 'Jetpack Raccoon', nameColor: '#ff4444', enterRight: true, shakeText: true },
+      { text: 'Heya!\nWelcome back!' },
+      { text: "So far, we've looked at different ways for your Heroes to deal damage or summon Creatures to do that for you." },
+      // ── Highlight: Book of Doom und Lifeforce Howitzer ──
+      { text: 'However, there are also other ways.\n{#ffd700:**Artifacts**} are cards that you play by spending **Gold**...',
+        highlights: [BOOK, HOWITZER] },
+      // ── Antonia tritt rechts auf, die Musik wechselt, alle Highlights aus ──
+      AJ("**GOLDS???**\nWhere's de Gold?\nI wants itttt!", { enterRight: true }),
       { text: '...' },
-      { text: 'Again? What even **are** you?!' },
-      // Textbox 5: Antonia drops the alias — her portrait label flips to
-      // "Antonia" from this page on (and sticks, thanks to the sticky
-      // name logic).
-      { text: 'Khekhekhe - I am the GRRRRREAT Antonia! If you have Gold, it actually belongs to me!', side: 'right', speakerName: 'Antonia', nameColor: '#ff4444', shakeText: true },
-      { text: '... is that so?' },
-      { text: 'Aye! But the GRRRREAT Antonia is nothing if not **generous**!', side: 'right', speakerName: 'Antonia', nameColor: '#ff4444', shakeText: true },
-      { text: "Oi, amateur! Dere! Take some of dis pocket change I gots lyin' around!", side: 'right', speakerName: 'Antonia', nameColor: '#ff4444', shakeText: true,
-        onShow: () => {
-          socket.emit('tutorial_modify', { type: 'tutorial5_gold' });
-        } },
-      { text: 'Gold is resource - Gold is POWAH! With dis, just go murk dem enemies khekhekhe!', side: 'right', speakerName: 'Antonia', nameColor: '#ff4444', shakeText: true },
-      { text: 'See de number on dose Artifact cards?', side: 'right', speakerName: 'Antonia', nameColor: '#ff4444', shakeText: true,
-        highlights: [
-          { selector: '.game-hand-me [data-card-type="Artifact"]', pulse: true },
-        ] },
-      { text: "It's dere Cost! Pay dat much Gold to use de Artifact! Easy, right?", side: 'right', speakerName: 'Antonia', nameColor: '#ff4444', shakeText: true,
-        highlights: [
-          { selector: '.game-hand-me [data-card-type="Artifact"]', pulse: true },
-        ] },
-      { text: 'Some other effects are also greedy and want my hard-earned Golds!', side: 'right', speakerName: 'Antonia', nameColor: '#ff4444', shakeText: true,
-        highlights: [
-          { selector: '[data-ability-owner="me"][data-card-name="Alchemy"]', pulse: true },
-        ] },
-      { text: 'But just dis once, you are allowed to spend as much as you can khekhe!', side: 'right', speakerName: 'Antonia', nameColor: '#ff4444', shakeText: true },
-      { text: "But ... that's... there's no learning when you just give out..." },
+      { text: "Oh.\nIt's *you* again.\nThat raccoon." },
+      A('Youse can call Antonia the **GRRRRREAT Antonia!**\nPleasure\'s all yours!'),
+      { text: '... if you say so.' },
+      A("So! What's dis about **Golds**?"),
+      // ── Highlight: Alchemy ──
+      { text: '**Gold** is earned every turn. You can spend it on Artifacts or **certain active effects**, like...',
+        highlights: [ALCHEMY] },
+      A("'Earned'? Whatever would you *mean* by dat?"),
+      { text: '... you gain **4 Gold** during your **Resource Phase** each turn, along with drawing a card. You can save that up between turns to-' },
+      A('No wayyyy...!\nIs dat where **my Golds** keep disappearing to???'),
+      { text: '... *your* Gold?' },
+      A('Of course!\n**All Golds dere is belongs to the GRRRRREAT Antonia!**'),
+      A('So **you** be de one stealing from **my** vault???'),
+      { text: '...' },
+      A('Khehehe, I finally caught dem thieves red-handed, how nice!'),
+      A('But worry not - for the GRRRRREAT Antonia is nothing if not *merciful*, khehe!'),
+      A('Youse can **keep spending MY Golds** in your little games.'),
+      A("You just ... **owe me a big ol' loan.**"),
+      A('Sounds fair?\nKhehehe, I know it does!'),
+      A('...'),
+      A("And what's dis?"),
+      // ── Highlight: ALLE Karten auf dem Brett und in der Hand, bis zum „..." ──
+      A("Some kinda puzzle or somethin'?", { highlights: ALLE_KARTEN }),
+      A("You tryin' to learn how to spend *my Golds*?", { highlights: ALLE_KARTEN }),
+      A('...'),
+      A("Well, dis one really isn't too hard.\nJust **find how you gain Golds in this setup.**"),
+      // ── Highlight: Book of Doom, Howitzer UND Alchemy ──
+      A("And don't forget that ya can spend Golds not just on **Artifacts**, but some effects too.",
+        { highlights: [BOOK, HOWITZER, ALCHEMY] }),
+      A('Well - try not to spend *all* my Golds at once.', { highlights: [BOOK, HOWITZER, ALCHEMY] }),
+      // ── Antonia geht rechts ab (`exitRight`), danach keine Highlights mehr ──
+      A("I'll see ya around ... to collect the debt, khehehehehe!", { highlights: [BOOK, HOWITZER, ALCHEMY], exitRight: true }),
+      { text: '...' },
+      { text: '...' },
+      { text: "... at least this time, it didn't ruin the setup by giving you infinite Gold or some nonsense." },
+      { text: 'Okay...' },
+      { text: "Well, you heard the raccoon.\nUmmm ... 'Antonia'." },
+      { text: 'Try to defeat my Heroes using your Gold!' },
+      { text: 'Good luck, beep-boop!' },
     ],
     outro: [
-      { text: 'Khekhe, good job! You be a GRRRREAT waster of my Golds! Now you owe me khekhe!', side: 'right', speakerName: 'Antonia', nameColor: '#ff4444', enterRight: true, exitRight: true, shakeText: true },
       { text: '...' },
-      { text: "Seriously, you didn't NEED that extra Gold, all the necessary resources were already..." },
-      { text: 'Welp. Looks like you have a raccoon loan now.' },
-      { text: 'See you next time beep-boop.' },
-    ],
-  },
-  4: {
-    intro: [
-      { text: '...' },
-      { text: '... is ... that raccoon gone?' },
+      { text: 'Does it ... *stay* away?' },
       { text: '...' },
       { text: 'Good.' },
-      { text: '...', speed: 80 },
-      { text: 'Heya! Welcome back!' },
-      { text: "What I was **trying** to say last time was that thing's interference wasn't even necessary.",
-        onShow: () => { socket.emit('tutorial_modify', { type: 'tutorial4_suppress_reiza' }); } },
-      { text: "There are a few status effects in this game that can help you win." },
-      { text: "{#88ddff:**Freeze**} and {yellow:**Stun**} are the most common to stop your opponent." },
-      { text: "But if one wears off naturally, its target becomes {silver:**immune**} to those effects for a turn!" },
-      { text: "And {purple:**Poison**} and {orange:**Burn**} are used to weaken targets - or even finish them off!" },
-      { text: "{orange:**Burn**} is {orange:**60**} damage a turn, {purple:**Poison**} {purple:**30**} ... but it {purple:**stacks**}!" },
-      { text: "Your Hero {purple:**Medea**} even **doubles** any Poison damage dealt to your opponent!",
-        highlights: [
-          { selector: '[data-hero-owner="me"][data-hero-name*="Medea"]', pulse: true },
-        ] },
-      { text: "So! See your Hero {purple:**Reiza**}?",
-        highlights: [
-          { selector: '[data-hero-owner="me"][data-hero-name*="Reiza"]', pulse: true },
-        ] },
-      { text: "She Stuns AND Poisons anything she hits with an Attack!",
-        highlights: [
-          { selector: '[data-hero-owner="me"][data-hero-name*="Reiza"]', pulse: true },
-        ] },
-      { text: "And the cards in your hand? More than enough status damage to defeat all enemy Heroes!",
-        highlights: [
-          '.game-hand-me .hand-slot',
-          '[data-hero-owner="opp"]',
-        ] },
-      { text: "And see that {silver:**Quick Attack**}? That thing can be used as an {red:**additional Action**}!",
-        highlights: [
-          { selector: '.game-hand-me [data-card-name="Quick Attack"]', pulse: true },
-        ] },
-      { text: "So you can use it even outside your {red:**Action Phase**}! You can use it and **not** use up your one main Action per turn!" },
-      { text: 'Go ahead - apply as much status as you can and make the enemy Heroes succumb to it, beep-boop!' },
+      { text: 'So!\nYou did it! Great job, beep-boop!' },
+      { text: 'As you can see, **Gold** can be an excellent way to apply damage, along with many other things! It can even be worth inflicting your own Hero with Poison!' },
+      // ── Highlight: Alchemy ──
+      { text: 'And **Alchemy** and the {#a0703c:**Potions**} it provides can be incredibly valuable cards as well!',
+        highlights: [ALCHEMY] },
+      { text: "I feel like you're really starting to get a hang of things!\nNext time-",
+        highlights: [ALCHEMY] },
+      // ── Antonia fliegt von rechts ueber die Textbox, rammt Monia Bot und
+      //    wirft sie aus dem Bild; danach steht sie links (`tackle`, `portrait`) ──
+      AL('Khehehehe!', { tackle: true }),
+      AL('Good job!'),
+      AL('Me be very proud of ya!'),
+      AL('Now, the GRRRRREAT Antonia will take you under her wing.\nRejoice, khehehehehe!'),
+      AL("Come - I'll take you to my **lair**, khehehehe!"),
     ],
-    outro: [
-      { text: "Perfect! You can use {yellow:**Stun**}, {#88ddff:**Freeze**} and other inhibiting effects to slow your opponent down while {purple:**Poison**} and {orange:**Burn**} whittle them down!" },
-    ],
-  },
+    };
+  })(),
   6: {
     // Antonia is the sole speaker and lives on the LEFT side throughout —
     // no enter / exit animation, no Monia Bot involvement. Per-line
@@ -8565,6 +8952,9 @@ window.tutorialStartsWithAntonia = tutorialStartsWithAntonia;
 window.setTutorialGegner = setTutorialGegner;
 window.useTutorialGegner = useTutorialGegner;
 window.tutorialErsterSprecher = tutorialErsterSprecher;
+// Tutorial: Helden-Figuren erst nach dem Gespraech (s. `setTutorialFigurenGesperrt`).
+window.setTutorialFigurenGesperrt = setTutorialFigurenGesperrt;
+window.useTutorialFigurenGesperrt = useTutorialFigurenGesperrt;
 // v809: bisher nur ueber die zufaellige Sichtbarkeit oberster
 // Deklarationen zwischen den Bundles erreichbar. Ausdruecklich
 // weiterreichen, damit die Abhaengigkeit sichtbar und pruefbar ist.

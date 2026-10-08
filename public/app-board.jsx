@@ -288,7 +288,7 @@ function applyCrystalCostMods(me, cardName, baseCost) {
   return baseCost * 2;
 }
 
-function BoardCard({ cardName, faceDown, flipped, label, hp, maxHp, atk, hpPosition, style, noTooltip, skins, tooltipCardOverride, inheritedEffects, copiedHeroes, revealTooltipWhenFaceDown, abilities, effectiveLevel, stampBonus, showLevelBadge, children }) {
+function BoardCard({ cardName, faceDown, flipped, label, hp, maxHp, atk, hpPosition, style, noTooltip, skins, tooltipCardOverride, inheritedEffects, copiedHeroes, revealTooltipWhenFaceDown, abilities, orbs, effectiveLevel, stampBonus, showLevelBadge, children }) {
   const card = faceDown ? null : CARDS_BY_NAME[cardName];
   const imgUrl = card ? cardImageUrl(card.name, skins) : null;
   // A caller (e.g. Biomancy Token in the puzzle builder) can override what
@@ -319,7 +319,8 @@ function BoardCard({ cardName, faceDown, flipped, label, hp, maxHp, atk, hpPosit
   const tooltipTarget = (() => {
     if (!tooltipBase) return null;
     const hasLiveAbilities = Array.isArray(abilities) && abilities.length > 0;
-    if (hp == null && maxHp == null && atk == null && effectiveLevel == null && (!inheritedEffects || inheritedEffects.length === 0) && (!copiedHeroes || copiedHeroes.length === 0) && !hasLiveAbilities) return tooltipBase;
+    const hasLiveOrbs = Array.isArray(orbs) && orbs.length > 0;
+    if (hp == null && maxHp == null && atk == null && effectiveLevel == null && (!inheritedEffects || inheritedEffects.length === 0) && (!copiedHeroes || copiedHeroes.length === 0) && !hasLiveAbilities && !hasLiveOrbs) return tooltipBase;
     return {
       ...tooltipBase,
       _liveHp:    hp    != null ? hp    : tooltipBase._liveHp,
@@ -347,6 +348,8 @@ function BoardCard({ cardName, faceDown, flipped, label, hp, maxHp, atk, hpPosit
       // cards.json `startingAbility1/2` only for off-board card
       // previews where the live stack isn't available.
       _liveAbilities: hasLiveAbilities ? abilities : tooltipBase._liveAbilities,
+      // Beato: gesammelte Ascension-Orbs (s. CardTooltipContent).
+      _liveOrbs: hasLiveOrbs ? orbs : tooltipBase._liveOrbs,
     };
   })();
 
@@ -2852,6 +2855,25 @@ function HeroStatusPartikel({ effekte, kern, s, mitteX, fw, fh, saat }) {
   );
 }
 
+/**
+ * Quetscht eine Heldenzone UND die animierte Figur darauf — gleicher Effekt,
+ * gleiche Dauer. Die Figur lebt in einer eigenen Ebene und bekommt die
+ * Klasse der Zone nicht mit, deshalb setzt das Attribut `data-squash` an
+ * ihrem Platz dieselbe Bewegung (CSS: `.hero-idle-platz[data-squash]`).
+ * Als Attribut statt Klasse, damit ein Neu-Rendern es nicht wegraeumt.
+ * Hat die Zone keine Figur (Held ohne Spritesheet, Kreatur), bleibt es bei
+ * der Zonenklasse.
+ */
+function ppZonenSquash(zone, klasse, ms) {
+  zone.classList.add(klasse);
+  const platz = zone._ppFigurPlatz;
+  if (platz) platz.setAttribute('data-squash', '1');
+  setTimeout(() => {
+    zone.classList.remove(klasse);
+    if (platz) platz.removeAttribute('data-squash');
+  }, ms);
+}
+
 // Eine Idle-Animation, die auf dem oberen Kartendrittel einer Heldenzone
 // steht. In der Zone selbst liegt nur ein unsichtbarer Anker; die Figur
 // wird in die Sprite-Ebene portiert und folgt der Zone dort (Lage,
@@ -2898,6 +2920,8 @@ function HeroIdleSprite({ cardName, angehalten, versteinert, eingefroren, effekt
     const cv = canvasRef.current, platz = platzRef.current, anker = ankerRef.current;
     if (!eintrag || !ebene || !cv || !platz || !anker) return;
     const zone = anker.parentElement;
+    // Die Zone kennt ihre Figur (`ppZonenSquash` quetscht beide gemeinsam).
+    zone._ppFigurPlatz = platz;
     const ctx = cv.getContext('2d');
     const { meta, img } = eintrag;
     const fw = meta.frameWidth, fh = meta.frameHeight;
@@ -3082,6 +3106,7 @@ function HeroIdleSprite({ cardName, angehalten, versteinert, eingefroren, effekt
     } catch { ro = null; }
     return () => {
       abmelden();
+      if (zone._ppFigurPlatz === platz) delete zone._ppFigurPlatz;
       if (ro) ro.disconnect();
       zone.removeEventListener('mouseenter', hoverMelden);
       zone.removeEventListener('mouseleave', hoverMelden);
@@ -6160,7 +6185,18 @@ function BleedingOverlay({ ticking }) {
   );
 }
 
-function PoisonedOverlay({ stacks, nurZahl }) {
+function PoisonedOverlay({ stacks, nurZahl, hinweis, karte }) {
+  // ★ Als Vorgabe 9.10.: Die Stapelzahl zeigt beim Hover denselben Tooltip wie
+  // das Poison-Abzeichen (`hinweis`, Text aus `poisonTooltipText`) und haelt
+  // dabei den Karten-Tooltip oben (`ppStatusHover`, wie die Abzeichen).
+  const hover = hinweis && window.ppStatusHover ? (() => {
+    const { showBoardTip, hideBoardTip } = window.ppStatusHover(karte);
+    return {
+      onMouseEnter: e => { showGameTooltip(e, hinweis); showBoardTip(); },
+      onMouseLeave: () => { hideGameTooltip(); hideBoardTip(); },
+    };
+  })() : null;
+  const zahl = <div className={'poison-stack-count' + (hover ? ' poison-stack-count-hover' : '')} {...hover}>{stacks}</div>;
   // v1462: steht eine animierte Figur auf der Karte, zeigt sie das Gift
   // (Tönung + Schädel) — die Karte behält nur die Stapelzahl.
   const bubbles = useMemo(() => nurZahl ? [] : Array.from({ length: ppFxN(8) }, () => ({
@@ -6172,7 +6208,7 @@ function PoisonedOverlay({ stacks, nurZahl }) {
   })), []);
   if (nurZahl) {
     return stacks >= 1
-      ? <div className="status-poisoned-zahl"><div className="poison-stack-count">{stacks}</div></div>
+      ? <div className="status-poisoned-zahl">{zahl}</div>
       : null;
   }
   return (
@@ -6183,7 +6219,7 @@ function PoisonedOverlay({ stacks, nurZahl }) {
           animationDelay: b.delay + 's', animationDuration: b.dur + 's',
         }}>☠️</span>
       ))}
-      {stacks >= 1 && <div className="poison-stack-count">{stacks}</div>}
+      {stacks >= 1 && zahl}
     </div>
   );
 }
@@ -16956,10 +16992,7 @@ const ANIM_REGISTRY = {
             const d = Math.abs(cx - x) + Math.abs(cy - y);
             if (d < bestDist) { bestDist = d; best = el; }
           });
-          if (best && bestDist < 80) {
-            best.classList.add('magic-hammer-squashed');
-            setTimeout(() => best.classList.remove('magic-hammer-squashed'), 650);
-          }
+          if (best && bestDist < 80) ppZonenSquash(best, 'magic-hammer-squashed', 650);
         }, 330);
         return () => clearTimeout(timer);
       }, []);
@@ -17022,10 +17055,7 @@ const ANIM_REGISTRY = {
             const d = Math.abs(r.left + r.width / 2 - x) + Math.abs(r.top + r.height / 2 - y);
             if (d < bestDist) { bestDist = d; best = el; }
           });
-          if (best && bestDist < 80) {
-            best.classList.add('magic-hammer-squashed');
-            setTimeout(() => best.classList.remove('magic-hammer-squashed'), 550);
-          }
+          if (best && bestDist < 80) ppZonenSquash(best, 'magic-hammer-squashed', 550);
         }, 300);
         return () => clearTimeout(timer);
       }, []);
@@ -26966,6 +26996,27 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   const tutorialGegnerDaten = (window.useTutorialGegner || (() => null))();
   const tutorialGegner = gameState?.isTutorial ? tutorialGegnerDaten : null;
 
+  // ── Tutorial: Helden-Figuren erst nach dem Gespraech ──
+  // Solange die Einleitung laeuft, stehen die animierten Figuren noch nicht
+  // auf den Karten (`setTutorialFigurenGesperrt` in app-shared). Fallen sie
+  // weg, werden die `HeroIdleSprite` neu gemountet und spielen ihre
+  // Auftritts-Animation — die Figuren steigen aus den Karten.
+  const tutorialFigurenGesperrt = (window.useTutorialFigurenGesperrt || (() => false))();
+  const heldenFigurenZeigen = heldenAnzeigen && !(gameState?.isTutorial && tutorialFigurenGesperrt);
+  // Die Sheets schon waehrend des Gespraechs laden, damit die Figuren beim
+  // Aufsteigen nicht erst noch auf ihr Bild warten.
+  useEffect(() => {
+    if (!heldenAnzeigen || !gameState?.isTutorial || !tutorialFigurenGesperrt) return;
+    for (const sp of (gameState.players || [])) {
+      for (const h of (sp?.heroes || [])) {
+        if (!h?.name) continue;
+        HeroIdleAnims.hole(HeroIdleAnims.slug(h.name));
+        const skin = sp.deckSkins?.[h.name];
+        if (skin) HeroIdleAnims.hole(HeroIdleAnims.slug(skin));
+      }
+    }
+  }, [heldenAnzeigen, gameState?.isTutorial, gameState?.roomId, tutorialFigurenGesperrt]);
+
   // ── Tutorial outro: show textbox before victory screen ──
   const [tutorialOutroPending, setTutorialOutroPending] = useState(false);
   const [resultFading, setResultFading] = useState(false);
@@ -32968,15 +33019,49 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   const [showEndTurnConfirm, setShowEndTurnConfirm] = useState(false);
   const pendingEndTurnRef = useRef(null); // stores the target phase for deferred advance
 
+  // ── Tutorial: kein Phasenwechsel von Hand ──
+  // Skripte mit `nurActionPhase` (Tutorial 1 und 3) erlauben nur den Sprung
+  // in die Action Phase (3). In Tutorial 1 zusaetzlich erst, wenn Ida
+  // Destruction Magic auf Stufe 3 angelegt hat. Gilt fuer alle Wege
+  // (Phasenleiste, Next Phase, End Turn, Leertaste), weil sie alle ueber
+  // `tryAdvancePhase` laufen; die Knoepfe sperren sich zusaetzlich optisch.
+  const tutorialPhasensperre = !!(gameState.isTutorial && (window.TUTORIAL_SCRIPTS || {})[window._currentTutorialNum]?.nurActionPhase);
+  const tutorial1DestructionMagic = (() => {
+    if (!tutorialPhasensperre || window._currentTutorialNum !== 1) return 0;
+    const idaIdx = me.heroes.findIndex(h => h?.name && h.name.startsWith('Ida'));
+    if (idaIdx < 0) return 0;
+    return (me.abilityZones[idaIdx] || []).flat().filter(n => n === 'Destruction Magic').length;
+  })();
+  const tutorialSprungOk = window._currentTutorialNum !== 1 || tutorial1DestructionMagic >= 3;
+  const tutorialPhaseErlaubt = (ziel) => !tutorialPhasensperre || (ziel === 3 && tutorialSprungOk);
+
+  // ★ Als Befund 8.10. („This Action is not possible right now" mitten im
+  // Tutorial, nicht reproduzierbar): Ein Doppelklick auf einen Phasenkasten
+  // (oder Klick + Leertaste) schickt `advance_phase` zweimal mit demselben
+  // Ziel. Der Server fuehrt das erste aus; das zweite ist dann ungueltig
+  // (Phase schon erreicht), wird still verworfen — und der Verwerfungs-
+  // Waechter meldet es nach 2 s als Fehler, obwohl alles geklappt hat.
+  // Derselbe Wunsch innerhalb von 1 s wird deshalb gar nicht erst gesendet.
+  const letzterPhasenWunsch = useRef({ ziel: -1, zeit: 0 });
+  const phasenWunschDoppelt = (ziel) => {
+    const jetzt = Date.now();
+    const l = letzterPhasenWunsch.current;
+    if (l.ziel === ziel && jetzt - l.zeit < 1000) return true;
+    letzterPhasenWunsch.current = { ziel, zeit: jetzt };
+    return false;
+  };
+
   // Shared phase advance with optional end-turn confirmation
   const tryAdvancePhase = useCallback((targetPhase) => {
+    if (tutorialPhasensperre && !(targetPhase === 3 && tutorialSprungOk)) return;
+    if (phasenWunschDoppelt(targetPhase)) return;
     if (targetPhase === 5 && askBeforeEndTurn) {
       pendingEndTurnRef.current = targetPhase;
       setShowEndTurnConfirm(true);
     } else {
       socket.emit('advance_phase', { roomId: gameState.roomId, targetPhase });
     }
-  }, [askBeforeEndTurn, gameState.roomId]);
+  }, [askBeforeEndTurn, gameState.roomId, tutorialPhasensperre, tutorialSprungOk]);
 
   const confirmEndTurn = useCallback(() => {
     const target = pendingEndTurnRef.current;
@@ -32988,6 +33073,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   const cancelEndTurn = useCallback(() => {
     pendingEndTurnRef.current = null;
     setShowEndTurnConfirm(false);
+    // Abbrechen: ein sofortiger neuer Klick auf End Turn ist ein neuer Wunsch.
+    letzterPhasenWunsch.current = { ziel: -1, zeit: 0 };
   }, []);
 
   // Listen for opponent card reveal
@@ -41757,6 +41844,14 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   // (Komet) kosten auf einer kalten Seite Hunderte Millisekunden — der Komet kam dann spaeter als die
   // Schadenszahlen. Einmal kurz UNSICHTBAR (opacity 0, volle Masse) eingehaengt, liegen die Bilder im
   // Zwischenspeicher, bevor der erste echte Zauber faellt.
+  //
+  // Im Tutorial frueher (150 statt 1200 ms): Das Vorwaermen blockiert den
+  // Browser gut eine halbe bis ganze Sekunde, und die Tutorial-Textbox
+  // beginnt 600 ms nach dem Brettaufbau zu tippen — bei 1200 ms fror der
+  // Text mitten in „Heya! Welcome to the ba…" ein. Jetzt ist die Arbeit
+  // erledigt, bevor die Textbox erscheint (ihr Timer wartet den Block ab),
+  // und das Tippen laeuft ungestoert.
+  const vorwaermVerzoegerung = gameState.isTutorial ? 150 : 1200;
   useEffect(() => {
     if (window._playAnimations === false) return undefined;
     const t = setTimeout(() => {
@@ -41767,7 +41862,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           _gemountet: () => setTimeout(() => setGameAnims(p => p.filter(a => a.id !== id)), 300),
         }]);
       }
-    }, 1200);
+    }, vorwaermVerzoegerung);
     return () => clearTimeout(t);
   }, []);
 
@@ -44094,7 +44189,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           // Ohne Sheet fuer den Skin faellt es auf den Basis-Helden zurueck.
           const _figurSkin = figurBasisName ? p?.deckSkins?.[figurBasisName] : null;
           const figurName = (_figurSkin && HeroIdleAnims.hatAnimation(_figurSkin)) ? _figurSkin : figurBasisName;
-          const figurDa = !!(heldenAnzeigen && hero?.name && !isDead && !isRamming && HeroIdleAnims.hatAnimation(figurName));
+          const figurDa = !!(heldenFigurenZeigen && hero?.name && !isDead && !isRamming && HeroIdleAnims.hatAnimation(figurName));
           // Chain target pick
           const isChainPickValid = chainPickValidIds.has(heroTargetId);
           const isChainPickSelected = chainPickSelectedIds.has(heroTargetId);
@@ -44261,8 +44356,36 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     // Die Namen stehen oben im Tooltip, die vollen Texte
                     // im vorhandenen „Inherited Effects"-Block darunter.
                     const _kopiert = Array.isArray(hero.gainedEffectNames) ? hero.gainedEffectNames : [];
+                    // ── Ascension Orbs (Beato) ──
+                    // ★ Als Befund 8.10.: Auf den Orbs fehlte der Karten-Tooltip. Die
+                    // Orbs sind deshalb reine Anzeige (`pointer-events: none`, CSS):
+                    // ein Hover genau auf einem Orb-Platz — leer oder voll — ist ein
+                    // ganz normaler Hover der Karte. Welche Schulen schon gesammelt
+                    // sind, steht im Karten-Tooltip (`orbs` -> `_liveOrbs`).
+                    const orbsEl = (hero.ascensionOrbs && (
+                      <div className="ascension-orbs-container">
+                        {hero.ascensionOrbs.map((orb, oi) => {
+                          const count = hero.ascensionOrbs.length;
+                          const angle = (oi / count) * 2 * Math.PI - Math.PI / 2;
+                          const radius = 22;
+                          const cx = 50 + Math.cos(angle) * radius;
+                          const cy = 50 + Math.sin(angle) * radius;
+                          return (
+                            <div key={oi} className={'ascension-orb' + (orb.collected ? ' ascension-orb-collected' : '')}
+                              style={{
+                                left: cx + '%', top: cy + '%',
+                                background: orb.collected ? orb.color : 'rgba(60,60,60,.7)',
+                                boxShadow: orb.collected ? `0 0 8px ${orb.color}, 0 0 16px ${orb.color}55` : 'none',
+                              }}
+                            />
+                          );
+                        })}
+                      </div>
+                    ));
                     const heroCardProps = {
                       hp: hero.hp, maxHp: hero.maxHp, atk: hero.atk, hpPosition: 'hero',
+                      children: orbsEl || undefined,
+                      orbs: hero.ascensionOrbs,
                       skins: p.deckSkins ? { ...gameSkins, ...p.deckSkins } : gameSkins, abilities: p.abilityZones?.[i],
                       copiedHeroes: _kopiert,
                       inheritedEffects: _kopiert
@@ -44328,7 +44451,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     Gelähmt (Frozen/Stunned/Webbed) → Frame steht still;
                     versteinert → zusätzlich Steinoptik. Name wie auf der
                     Karte (vorgezogene Gestalt, Shapeshifter-Kopie). */}
-                {heldenAnzeigen && hero?.name && !isDead && !isRamming && (
+                {heldenFigurenZeigen && hero?.name && !isDead && !isRamming && (
                   <HeroIdleSprite
                     cardName={figurName}
                     eingeklappt={heldenDynamisch && (isTargeting || !!chainPickData)}
@@ -44370,7 +44493,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 {hero?.name && !figurDa && isNegated && !isNegated._byWeakeningCrystal && <NegatedOverlay />}
                 {hero?.name && !figurDa && isBurned && <BurnedOverlay ticking={burnTickingHeroes.includes(`${pi}-${i}`)} />}
                 {hero?.name && !figurDa && isBleeding && <BleedingOverlay ticking={bleedTickingHeroes.includes(`${pi}-${i}`)} />}
-                {hero?.name && isPoisoned && <PoisonedOverlay stacks={isPoisoned.stacks || 1} nurZahl={figurDa} />}
+                {hero?.name && isPoisoned && <PoisonedOverlay stacks={isPoisoned.stacks || 1} nurZahl={figurDa}
+                  hinweis={window.poisonTooltipText ? window.poisonTooltipText(isPoisoned.stacks || 1, p?.poisonDamagePerStack || 30, isPoisoned.unhealable) : null}
+                  karte={hero.name} />}
                 {hero?.name && !figurDa && isHealReversed && <HealReversedOverlay />}
                 {hero?.name && !figurDa && isBerserked && <BerserkedOverlay />}
                 {hero?.name && hasLightBall && <LightBallAura />}
@@ -44677,31 +44802,6 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     </div>
                   );
                 })()}
-                {/* ── Ascension Orbs ── */}
-                {hero?.name && hero.ascensionOrbs && (
-                  <div className="ascension-orbs-container"
-                    onMouseEnter={e => showGameTooltip(e, hero.ascensionReady ? 'All schools collected — ready to Ascend!' : 'Collect all spell school orbs to Ascend')}
-                    onMouseLeave={hideGameTooltip}>
-                    {hero.ascensionOrbs.map((orb, oi) => {
-                      const count = hero.ascensionOrbs.length;
-                      const angle = (oi / count) * 2 * Math.PI - Math.PI / 2;
-                      const radius = 22;
-                      const cx = 50 + Math.cos(angle) * radius;
-                      const cy = 50 + Math.sin(angle) * radius;
-                      return (
-                        <div key={oi} className={'ascension-orb' + (orb.collected ? ' ascension-orb-collected' : '')}
-                          style={{
-                            left: cx + '%', top: cy + '%',
-                            background: orb.collected ? orb.color : 'rgba(60,60,60,.7)',
-                            boxShadow: orb.collected ? `0 0 8px ${orb.color}, 0 0 16px ${orb.color}55` : 'none',
-                          }}
-                          onMouseEnter={e => { e.stopPropagation(); showGameTooltip(e, `${orb.school}${orb.collected ? ' ✓' : ''}`); }}
-                          onMouseLeave={hideGameTooltip}
-                        />
-                      );
-                    })}
-                  </div>
-                )}
                 {/* ── Ascension drag highlight ── */}
                 {/* v673: der pickHandCard-Drag auf eine Heldenzone nutzt
                     denselben Schein — aus Spielersicht ist es derselbe
@@ -44979,10 +45079,14 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 const isFlashing = abilityFlash && abilityFlash.zoneKind !== 'support'
                   && abilityFlash.owner === (isOpp ? oppIdx : myIdx) && abilityFlash.heroIdx === i && abilityFlash.zoneIdx === z;
                 const isBlocking = abilityBlockFlash && abilityBlockFlash.owner === (isOpp ? oppIdx : myIdx) && abilityBlockFlash.heroIdx === i && abilityBlockFlash.zoneIdx === z;
-                // Friendship highlight: ability has an available additional action with eligible hand cards
-                const isFriendshipActive = !isOpp && cards.includes('Friendship') && (gameState.additionalActions || []).some(aa =>
-                  aa.typeId.startsWith('friendship_support') && aa.eligibleHandCards.length > 0 && aa.providers.some(p => p.heroIdx === i)
+                // Friendship ist rein passiv (nicht anklickbar) — daher KEIN aktiver
+                // Rahmen. Stattdessen: Herz, solange die Bonus-Aktion dieses Helden
+                // noch verfuegbar ist, und ausgegraut, sobald die Ladung verbraucht ist.
+                const isFriendshipBonus = !isOpp && isMyTurn && cards.includes('Friendship') && (gameState.additionalActions || []).some(aa =>
+                  aa.typeId.startsWith('friendship_support') && aa.providers.some(p => p.heroIdx === i)
                 );
+                const isFriendshipSpent = !isOpp && cards.includes('Friendship') && !isFriendshipBonus
+                  && (gameState.additionalActionsSpent || []).some(aa => aa.typeId.startsWith('friendship_support') && aa.heroIdx === i);
                 // Slippery Pengu Ability-move highlights — source set
                 // is all eligible Ability Zones on the user's own side
                 // (`!isOpp` gate); destination set is per-selected-
@@ -45068,7 +45172,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     } : (isValidPotionTarget ? () => togglePotionTarget(abTargetId) : undefined);
                 return (
                   <div key={z}
-                    className={'board-zone board-zone-ability' + (cards.length > 0 ? ' zone-has-card' : '') + (heroIneligible || isDead || isFrozenOrStunned ? ' board-zone-dead' : '') + (isAbTarget || attachPickZoneValid ? ' board-zone-play-target' : '') + (attachPickZoneValid ? ' attach-pick-target' : '') + (isValidPotionTarget ? ' potion-target-valid' : '') + (isValidPotionTarget && pt?.config?.autoConfirm ? ' borrow-pick-target' : '') + (isSelectedPotionTarget ? ' potion-target-selected' : '') + (isExploding ? ' zone-exploding' : '') + (oppTargetHighlight.includes(abTargetId) ? ' opp-target-highlight' : '') + (canActivate && !isFreeActivatable ? ' zone-ability-activatable' : '') + (isFreeActivatable ? ' zone-ability-free-activatable' : '') + (isFriendshipActive ? ' zone-friendship-active' : '') + (isFlashing ? ' zone-ability-activated' : '') + (isBlocking ? ' zone-ability-blocked' : '') + (isBorisBlockedAbility ? ' zone-ability-boris-blocked' : '') + (isPengueSrc && !isPengueDestActive ? ' zone-pengue-src' : '') + (isPengueSrcSelected ? ' zone-pengue-selected' : '') + (isPengueDestActive ? ' zone-pengue-dest' : '')}
+                    className={'board-zone board-zone-ability' + (cards.length > 0 ? ' zone-has-card' : '') + (heroIneligible || isDead || isFrozenOrStunned ? ' board-zone-dead' : '') + (isAbTarget || attachPickZoneValid ? ' board-zone-play-target' : '') + (attachPickZoneValid ? ' attach-pick-target' : '') + (isValidPotionTarget ? ' potion-target-valid' : '') + (isValidPotionTarget && pt?.config?.autoConfirm ? ' borrow-pick-target' : '') + (isSelectedPotionTarget ? ' potion-target-selected' : '') + (isExploding ? ' zone-exploding' : '') + (oppTargetHighlight.includes(abTargetId) ? ' opp-target-highlight' : '') + (canActivate && !isFreeActivatable ? ' zone-ability-activatable' : '') + (isFreeActivatable ? ' zone-ability-free-activatable' : '') + (isFriendshipBonus ? ' zone-friendship-bonus' : '') + (isFriendshipSpent ? ' zone-friendship-spent' : '') + (isFlashing ? ' zone-ability-activated' : '') + (isBlocking ? ' zone-ability-blocked' : '') + (isBorisBlockedAbility ? ' zone-ability-boris-blocked' : '') + (isPengueSrc && !isPengueDestActive ? ' zone-pengue-src' : '') + (isPengueSrcSelected ? ' zone-pengue-selected' : '') + (isPengueDestActive ? ' zone-pengue-dest' : '')}
                     data-ability-zone="1" data-ability-hero={i} data-ability-slot={z} data-ability-owner={ownerLabel} data-card-name={cards[0] || ''}
                     data-versiegelt={ppVerwahrung(gameState.players?.[pi], i, 'ability', z).versiegelt ? '1' : undefined}
                     data-bounce-hiding={bounceOutgoingHidden.has(`ab-${pi}-${i}-${z}`) ? 'true' : undefined}
@@ -46253,7 +46357,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     {cc?.frozen ? <FrozenOverlay /> : null}
                     {cc?._zoneAura === 'necro_flicker' ? <NecroFlickerAura /> : null}
                     {(cc?.negated || cc?.nulled) ? <NegatedOverlay /> : null}
-                    {cc?.poisoned ? <PoisonedOverlay stacks={cc.poisonStacks || 1} /> : null}
+                    {cc?.poisoned ? <PoisonedOverlay stacks={cc.poisonStacks || 1}
+                      hinweis={window.poisonTooltipText ? window.poisonTooltipText(cc.poisonStacks || 1, p?.poisonDamagePerStack || 30, cc.poisonedUnhealable) : null}
+                      karte={cards[cards.length-1]} /> : null}
                     {/* v1143: ohne Handliste, siehe Heldenreihe */}
                     {cc ? <StatusBadges counters={cc} isHero={false} player={p} cardName={cards[cards.length-1]} /> : null}
                     {/* v704 (Puppets): Luck (Laki) / Preserve (Vinny) Counter */}
@@ -46681,33 +46787,22 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           </div>
 
           {/* Phase tracker — positioned absolutely, left edge */}
-          {/* Tutorial phase lock: block advancement until conditions met */}
-          {(() => {
-            let tutorialPhaseLocked = false;
-            if (gameState.isTutorial && window._currentTutorialNum === 1) {
-              // Lock until Ida has Destruction Magic at level 3
-              const idaIdx = me.heroes.findIndex(h => h?.name && h.name.startsWith('Ida'));
-              if (idaIdx >= 0) {
-                const abSlots = me.abilityZones[idaIdx] || [];
-                const dmCount = abSlots.flat().filter(n => n === 'Destruction Magic').length;
-                if (dmCount < 3) tutorialPhaseLocked = true;
-              } else { tutorialPhaseLocked = true; }
-            }
-            return (
+          {/* Tutorial (nurActionPhase): Phasenwechsel gesperrt, nur die Action Phase
+              ist erlaubt — siehe `tutorialPhaseErlaubt`. */}
           <div className="phase-column">
             {gameState.skillTest && window.StTurnPanel ? <window.StTurnPanel gameState={gameState} myIdx={myIdx} isSpectator={isSpectator} focusSeat={stMulti ? oppIdx : null} onFocus={stMulti ? setStFocusPin : null} /> : <>
             <div className="board-phase-tracker">
               {['Start Phase', 'Resource Phase', 'Main Phase 1', 'Action Phase', 'Main Phase 2', 'End Phase'].map((phase, i) => {
                 const isActive = currentPhase === i;
                 const spellResolving = (gameState._spellResolutionDepth || 0) > 0;
-                const canClick = !tutorialPhaseLocked && isMyTurn && !result && !gameState.effectPrompt && !gameState.potionTargeting && !gameState.mulliganPending && !gameState.heroEffectPending && !spellHeroPick && !pendingAdditionalPlay && !pendingAbilityActivation && !showSurrender && !showEndTurnConfirm && !spellResolving && (
+                const canClick = tutorialPhaseErlaubt(i) && isMyTurn && !result && !gameState.effectPrompt && !gameState.potionTargeting && !gameState.mulliganPending && !gameState.heroEffectPending && !spellHeroPick && !pendingAdditionalPlay && !pendingAbilityActivation && !showSurrender && !showEndTurnConfirm && !spellResolving && (
                   (currentPhase === 2 && (i === 3 || i === 5)) ||
                   (currentPhase === 3 && (i === 4 || i === 5)) ||
                   (currentPhase === 4 && i === 5)
                 );
                 return (
                   <div key={i}
-                    className={'board-phase-item' + (isActive ? ' active' : '') + (canClick ? ' clickable' : '')}
+                    className={'board-phase-item' + (isActive ? ' active' : '') + (canClick ? ' clickable' : '') + (canClick && tutorialPhasensperre && i === 3 ? ' phase-item-hinweis' : '')}
                     data-phase-name={phase}
                     style={isActive ? { borderColor: phaseColor, boxShadow: `0 0 10px ${phaseColor}44` } : undefined}
                     onClick={() => { if (canClick) tryAdvancePhase(i); }}>
@@ -46722,16 +46817,18 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               // Ida's target prompt), phase advance is refused. Greying out
               // the buttons here avoids the confusing silent reject.
               const spellResolving = (gameState._spellResolutionDepth || 0) > 0;
-              const canAdvance = !tutorialPhaseLocked && isMyTurn && !result && !gameState.effectPrompt && !gameState.potionTargeting && !gameState.mulliganPending && !gameState.heroEffectPending && !spellHeroPick && !pendingAdditionalPlay && !pendingAbilityActivation && !showSurrender && !showEndTurnConfirm && !spellResolving && currentPhase >= 2 && currentPhase <= 4;
+              const canAdvance = isMyTurn && !result && !gameState.effectPrompt && !gameState.potionTargeting && !gameState.mulliganPending && !gameState.heroEffectPending && !spellHeroPick && !pendingAdditionalPlay && !pendingAbilityActivation && !showSurrender && !showEndTurnConfirm && !spellResolving && currentPhase >= 2 && currentPhase <= 4;
               const nextMap = { 2: 3, 3: 4, 4: 5 };
+              const canNext = canAdvance && tutorialPhaseErlaubt(nextMap[currentPhase]);
+              const canEnd = canAdvance && tutorialPhaseErlaubt(5);
               return (
                 <div className="phase-buttons-row">
-                  <button className="btn phase-btn" disabled={!canAdvance}
-                    onClick={() => canAdvance && tryAdvancePhase(nextMap[currentPhase])}>
+                  <button className="btn phase-btn" disabled={!canNext}
+                    onClick={() => canNext && tryAdvancePhase(nextMap[currentPhase])}>
                     Next Phase ▸
                   </button>
-                  <button className="btn btn-danger phase-btn" disabled={!canAdvance}
-                    onClick={() => canAdvance && tryAdvancePhase(5)}>
+                  <button className="btn btn-danger phase-btn" disabled={!canEnd}
+                    onClick={() => canEnd && tryAdvancePhase(5)}>
                     End Turn ⏹
                   </button>
                   <label className="phase-end-check">
@@ -46746,8 +46843,6 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             })()}
             </>}
           </div>
-            );
-          })()}
 
           {/* v788 (Als Befund 5.9.): der `board-center-spacer` ist HIER
               ENTFERNT. Er war ein reiner Symmetrie-Platzhalter fuer die

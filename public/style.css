@@ -4185,6 +4185,9 @@ body:has(.anim-backdrop) .pp-bg-particles { display: none; }
 }
 /* v1462: nur die Stapelzahl, wenn eine animierte Figur das Gift zeigt */
 .status-poisoned-zahl { position: absolute; inset: 0; z-index: 5; pointer-events: none; }
+/* Die Stapelzahl nimmt den Zeiger an (Tooltip wie am Poison-Abzeichen). Klicks und
+   Drops gehen als Nachkomme der Zone trotzdem an die Heldenzone weiter. */
+.poison-stack-count.poison-stack-count-hover { pointer-events: auto; cursor: default; }
 .poison-stack-count {
   position: absolute;
   top: 50%;
@@ -4455,14 +4458,12 @@ body:has(.anim-backdrop) .pp-bg-particles { display: none; }
   box-shadow: none !important;
 }
 
-/* Friendship additional action available — very prominent green pulse */
-.zone-friendship-active {
-  border-color: rgba(80,255,140,1) !important;
-  box-shadow: 0 0 18px rgba(80,255,140,.8), 0 0 36px rgba(40,200,100,.5), 0 0 54px rgba(40,200,100,.2), inset 0 0 12px rgba(80,255,140,.3) !important;
-  animation: friendshipPulse 0.8s ease-in-out infinite !important;
+/* Friendship ist passiv: kein aktiver Rahmen, nur ein Herz als Hinweis „Bonus-Aktion noch verfuegbar“;
+   ist die Ladung verbraucht, wird die Ability ausgegraut. */
+.zone-friendship-bonus {
   position: relative;
 }
-.zone-friendship-active::after {
+.zone-friendship-bonus::after {
   content: '💚';
   position: absolute;
   top: -8px;
@@ -4472,9 +4473,9 @@ body:has(.anim-backdrop) .pp-bg-particles { display: none; }
   animation: friendshipBounce 0.6s ease-in-out infinite alternate;
   z-index: 10;
 }
-@keyframes friendshipPulse {
-  0%, 100% { box-shadow: 0 0 18px rgba(80,255,140,.8), 0 0 36px rgba(40,200,100,.5), 0 0 54px rgba(40,200,100,.2), inset 0 0 12px rgba(80,255,140,.3); border-color: rgba(80,255,140,1); }
-  50% { box-shadow: 0 0 28px rgba(80,255,140,1), 0 0 50px rgba(40,200,100,.7), 0 0 70px rgba(40,200,100,.3), inset 0 0 20px rgba(80,255,140,.5); border-color: rgba(140,255,200,1); }
+.zone-friendship-spent {
+  opacity: 0.45 !important;
+  filter: saturate(0.15) brightness(0.7) !important;
 }
 @keyframes friendshipBounce {
   0% { transform: translateY(0) scale(1); }
@@ -6656,6 +6657,20 @@ body.pp-dragging-card.pp-dragging-card.pp-dragging-card * {
   cursor: pointer;
   color: rgba(255,255,255,.7);
   border-style: dashed;
+}
+/* Tutorial 1: sobald die Action Phase freigeschaltet ist, leuchtet und
+   pulsiert ihr Kasten — dort soll man hinklicken. */
+.board-phase-item.phase-item-hinweis {
+  position: relative;
+  z-index: 1;
+  color: #fff;
+  background: rgba(0,240,255,.18);
+  border: 1px solid rgb(0,240,255);
+  animation: phase-hinweis-puls 1.4s ease-in-out infinite;
+}
+@keyframes phase-hinweis-puls {
+  0%, 100% { transform: scale(1); box-shadow: 0 0 10px rgba(0,240,255,.6), 0 0 20px rgba(0,240,255,.25); }
+  50%      { transform: scale(1.08); box-shadow: 0 0 18px rgba(0,240,255,.85), 0 0 32px rgba(0,240,255,.4); }
 }
 .board-phase-item.clickable:hover {
   color: #fff;
@@ -10729,6 +10744,14 @@ body:has(.modal-overlay) .tooltip {
   transform-origin: center bottom !important;
 }
 
+/* Dasselbe fuer die animierte Figur auf der Zone (Magic Hammer, Shattering
+   Strike — `ppZonenSquash` in app-board.jsx). Die Figur wird an den Fuessen
+   gequetscht (`.hero-idle-holo` hat dort seinen Drehpunkt), genau wie die
+   Karte an ihrer Unterkante. Eingeklappt (Hover/Zielwahl) bleibt sie weg. */
+.hero-idle-platz[data-squash]:not(.hero-idle-weg) .hero-idle-holo {
+  animation: hammerSquash .65s ease-out forwards !important;
+}
+
 @keyframes hammerSquash {
   0%   { transform: scaleY(1)    scaleX(1); }
   12%  { transform: scaleY(.12)  scaleX(1.3); }
@@ -11820,8 +11843,9 @@ body:has(.modal-overlay) .tooltip {
   border-radius: 50%;
   border: 1.5px solid rgba(255,255,255,.35);
   transform: translate(-50%, -50%);
-  pointer-events: auto;
-  cursor: url("/cursor-arrow.png?v=4") 2 2, default;
+  /* Reine Anzeige: der Zeiger geht durch auf die Karte, damit deren Tooltip
+     auch genau ueber einem Orb-Platz erscheint (Als Befund 8.10.). */
+  pointer-events: none;
   transition: background .4s, box-shadow .4s, transform .3s;
 }
 .ascension-orb-collected {
@@ -15121,6 +15145,20 @@ body:has(.modal-overlay) .tooltip {
 /* ═══════════════════════════════════════════════════════════════
    TEXTBOX — Dialogue overlay with typewriter effect
    ═══════════════════════════════════════════════════════════════ */
+/* Der gemeinsame Puls-Takt aller Highlights: EINE animierte Eigenschaft auf
+   dem Overlay, die alle Klone erben (`--tb-puls`, 0 → 1 → 0). Jeder Klon
+   leitet Groesse und Schein daraus ab — damit pulsieren mehrere Highlights
+   zwangslaeufig im Gleichtakt, egal wann welcher Klon eingehaengt wurde
+   (eigene Animationen je Klon liefen je nach Einhaengezeit versetzt). */
+@property --tb-puls {
+  syntax: '<number>';
+  inherits: true;
+  initial-value: 0;
+}
+@keyframes textbox-puls-takt {
+  0%, 100% { --tb-puls: 0; }
+  50%      { --tb-puls: 1; }
+}
 .textbox-overlay {
   position: fixed;
   inset: 0;
@@ -15131,11 +15169,11 @@ body:has(.modal-overlay) .tooltip {
   padding-top: 18px;
   background: rgba(0,0,0,.45);
   pointer-events: none;
-  animation: textbox-fade-in .25s ease-out;
+  animation: textbox-fade-in .25s ease-out, textbox-puls-takt 1.4s ease-in-out infinite;
 }
 @keyframes textbox-fade-in { from { opacity: 0; } to { opacity: 1; } }
 .textbox-fading {
-  animation: textbox-fade-out 1s ease-in forwards;
+  animation: textbox-fade-out 1s ease-in forwards, textbox-puls-takt 1.4s ease-in-out infinite;
   pointer-events: none !important;
 }
 @keyframes textbox-fade-out { from { opacity: 1; } to { opacity: 0; } }
@@ -15160,7 +15198,7 @@ body:has(.textbox-overlay) .tooltip {
    Dieselbe Rahmensprache wie die Menue-Fenster (`.pp-fenster`: Licht-
    kante, Doppelring, Eck-Schnoerkel, harter Schatten), aber in der
    Farbe des GERADE SPRECHENDEN (`--tb-farbe`, inline aus der Textbox;
-   Monia cyan, Antonia rot, Kampagne ueber `speakerColor`). Jede
+   Monia und Antonia in der Gegnerfarbe Rot, Kampagne ueber `speakerColor`). Jede
    Portraetseite traegt ihre eigene Farbe (`--tb-links` / `--tb-rechts`)
    fuer Portraetrahmen und Namensschild. Beim Sprecherwechsel blendet
    der Rahmen ueber — dafuer ist `--tb-farbe` als Farbe registriert,
@@ -15203,7 +15241,10 @@ body:has(.textbox-overlay) .tooltip {
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
+  /* Oben angeheftet, nicht zentriert: waechst die Box mit einer langen
+     Seite, bleibt das Portraet an seiner Stelle (in der Standardhoehe
+     fuellt es die Spalte ohnehin, dort aendert sich nichts). */
+  justify-content: flex-start;
   gap: 9px;
   padding: 12px 10px 10px;
   background:
@@ -15219,6 +15260,15 @@ body:has(.textbox-overlay) .tooltip {
   border-left: 3px solid color-mix(in srgb, var(--tb-farbe) 70%, #000);
   box-shadow: -2px 0 0 var(--pp-kontur);
   animation: textbox-portrait-enter .5s ease-out;
+}
+/* Antonia tritt nach dem Tackle an Monias Stelle: Ankunfts-Aufleuchten. */
+.textbox-portrait-ankunft {
+  animation: textbox-portrait-ankunft .5s ease-out;
+}
+@keyframes textbox-portrait-ankunft {
+  0%   { transform: scale(1.5); filter: brightness(3); }
+  60%  { transform: scale(.94); filter: brightness(1.5); }
+  100% { transform: scale(1);   filter: none; }
 }
 /* Wer gerade schweigt, tritt zurueck: entsaettigt und abgedunkelt. */
 .textbox-portrait-inactive {
@@ -15320,11 +15370,26 @@ body:has(.textbox-overlay) .tooltip {
   display: flex;
   align-items: flex-start;
   padding: 16px 22px 10px;
-  height: 116px;
+  /* Mindesthoehe statt fester Hoehe: die Spalte streckt sich auf die Hoehe
+     der Box (die Portraet-Spalte bestimmt sie), damit Seitenzaehler und
+     Weiter-Pfeil — am unteren Rand verankert — wirklich UNTEN stehen und
+     nicht mitten ueber der dritten Textzeile (Als Befund 9.10.). */
+  min-height: 116px;
   position: relative;
   overflow: hidden;
   /* Feine Zeilenstruktur wie auf einem alten Bildschirm. */
   background: repeating-linear-gradient(180deg, rgba(255,255,255,.022) 0 2px, transparent 2px 4px);
+}
+/* Unsichtbare Kopie des ganzen Seitentexts: gleiche Breite und gleicher
+   Innenabstand wie die Box, damit sich daran die noetige Hoehe ablesen
+   laesst (siehe TextBox in app-shared.jsx). */
+.textbox-sizer {
+  position: absolute;
+  left: 0; right: 0; top: 0;
+  padding: inherit;
+  box-sizing: border-box;
+  visibility: hidden;
+  pointer-events: none;
 }
 .textbox-text {
   font-family: 'Pixel Intv', 'Press Start 2P', monospace;
@@ -15336,12 +15401,13 @@ body:has(.textbox-overlay) .tooltip {
   width: 100%;
   text-shadow: 2px 2px 0 rgba(0, 0, 0, .7);
 }
+/* Fett und kursiv bleiben in der normalen Textfarbe (Weiss), wie der Rest
+   des Textes (Als Vorgabe 8.10.) — vorher Cyan bzw. Gelb. Farbige
+   Woerter kommen weiter ueber `{farbe:…}` im Skript. */
 .textbox-text strong {
-  color: var(--accent);
   font-weight: 700;
 }
 .textbox-text em {
-  color: #ffcc66;
   font-style: italic;
 }
 /* Shake text — each character bobs independently */
@@ -15363,6 +15429,11 @@ body:has(.textbox-overlay) .tooltip {
 .textbox-text .textbox-tilde {
   display: inline-block;
   transform: translateY(0.45em);
+}
+/* Tutorial 3: waehrend die ATK-Anzeige auf 9999 hochzaehlt, leuchtet sie. */
+.board-card-atk-num.atk-zaehlt {
+  color: #ffd34d !important;
+  text-shadow: 0 0 6px #ffae00, 0 0 12px rgba(255, 174, 0, .6);
 }
 /* Tutorial boost — card grows dramatically */
 .tutorial-boost-anim {
@@ -15458,6 +15529,24 @@ body:has(.textbox-overlay) .tooltip {
 .textbox-highlight-clone *::after {
   display: none !important;
 }
+/* Phasenleiste im Highlight (Tutorial 1 Textbox 11, Tutorial 2 Textbox 7):
+   die ganze Leiste liegt ueber dem Schleier und pulsiert, aber nur die im
+   Skript genannten Kaesten sind „an" (`an: [...]`, Attribut `data-tb-an`) —
+   alle anderen sind ausgegraut (auch die aktuelle Phase; `!important`
+   schlaegt den Inline-Rahmen der aktiven). */
+.textbox-highlight-clone .board-phase-item {
+  color: rgba(255,255,255,.3);
+  background: rgba(255,255,255,.02);
+  border: 1px solid rgba(255,255,255,.1) !important;
+  box-shadow: none !important;
+  text-shadow: none;
+}
+.textbox-highlight-clone .board-phase-item[data-tb-an] {
+  color: #fff;
+  background: rgba(0,240,255,.2);
+  border: 1px solid rgb(0,240,255) !important;
+  box-shadow: 0 0 10px rgba(0,240,255,.6) !important;
+}
 /* Der Klon steht ausserhalb seines Kontexts — Groessenregeln wie die
    der Handkarten (`.game-hand … > .board-card`) greifen dort nicht.
    Der Kasten ist bereits exakt so gross wie das Original, die Karte
@@ -15465,6 +15554,15 @@ body:has(.textbox-overlay) .tooltip {
 .textbox-highlight-clone > .board-card {
   width: 100%;
   height: 100%;
+}
+/* Zeiger auf einer gehighlighteten Handkarte: die ECHTE Karte (samt Rand,
+   Schein und Level-Plakette) bleibt unsichtbar — an ihrer Stelle waechst
+   der Highlight-Klon mit (TextBox, `data-tb-hover`). Per `opacity`, nicht
+   `visibility`: das Element muss den Zeiger weiter annehmen, sonst
+   ginge der Hover sofort wieder verloren und die Karte flackerte. */
+[data-tb-hover],
+[data-tb-hover] + .hand-badge-layer {
+  opacity: 0 !important;
 }
 /* Handkarten (Als Befund 26.9.): Umrandung wie beim Hover in der Hand —
    harte 2-px-Kante direkt auf dem Kartenrand, eckig wie die Karte
@@ -15478,14 +15576,16 @@ body:has(.textbox-overlay) .tooltip {
   0%, 100% { box-shadow: 0 0 16px rgba(0,240,255,.6), 0 0 30px rgba(0,240,255,.25); }
   50%      { box-shadow: 0 0 24px rgba(0,240,255,.8), 0 0 40px rgba(0,240,255,.4); }
 }
+/* Jedes Highlight pulsiert leicht (TextBox setzt `.textbox-highlight-pulse`):
+   ein paar Prozent Groesse und ein atmender Schein — beides aus dem
+   gemeinsamen Takt `--tb-puls` des Overlays, also immer synchron. */
 .textbox-highlight-pulse {
-  animation: textbox-hl-pulse 1s ease-in-out infinite;
+  animation: none;
+  transform: scale(calc(1 + .035 * var(--tb-puls)));
+  box-shadow:
+    0 0 calc(16px + 10px * var(--tb-puls)) rgba(0,240,255, calc(.6 + .2 * var(--tb-puls))),
+    0 0 calc(30px + 12px * var(--tb-puls)) rgba(0,240,255, calc(.25 + .15 * var(--tb-puls)));
 }
-@keyframes textbox-hl-pulse {
-  0%, 100% { transform: scale(1); box-shadow: 0 0 16px rgba(0,240,255,.6), 0 0 30px rgba(0,240,255,.25); }
-  50%      { transform: scale(1.06); box-shadow: 0 0 28px rgba(0,240,255,.8), 0 0 44px rgba(0,240,255,.4); }
-}
-
 /* ── Responsive ── */
 @media (max-height: 500px) {
   .textbox-overlay { padding-top: 6px; }
@@ -15494,7 +15594,7 @@ body:has(.textbox-overlay) .tooltip {
   .textbox-portrait-frame { width: 56px; height: 56px; }
   .textbox-sparkle { width: 4px; height: 4px; }
   .textbox-speaker-name { font-size: 7px; letter-spacing: 1px; padding: 3px 4px 2px; }
-  .textbox-body { padding: 10px 14px 6px; height: 80px; }
+  .textbox-body { padding: 10px 14px 6px; min-height: 80px; }
   .textbox-text { font-size: 14px; }
 }
 
@@ -19354,9 +19454,9 @@ img, .card-tooltip-img img { image-rendering: pixelated; }
      Hauptthread-Frames erzwingt — und der Blitz-/Schwert-Hopser fallen
      weg. Im eigenen Zug leuchten ALLE aktivierbaren Zonen zugleich. */
   .zone-ability-activatable, .zone-creature-activatable, .zone-equip-activatable,
-  .zone-friendship-active, .zone-hero-effect-active,
+  .zone-hero-effect-active,
   .zone-ability-activatable::after, .zone-creature-activatable::after, .zone-equip-activatable::after,
-  .zone-friendship-active::after, .zone-hero-effect-active::after { animation: none !important; }
+  .zone-friendship-bonus::after, .zone-hero-effect-active::after { animation: none !important; }
   /* `html` davor: der Pixel-Baukasten (app-shared, `abzeichenExtra`) haengt
      zur Laufzeit ein Stylesheet NACH dieses ein und setzt `.buff-icon`
      wieder auf einen Stufenpuls — gleiche Spezifitaet, spaeter, gewinnt. */
@@ -23741,7 +23841,9 @@ body.pp-dialog-offen .foil-diamond-rare:not(.modal-overlay *):not(.card-tooltip 
   pointer-events: auto;
 }
 .first-choice-panel.panel-zielwahl[data-durchsicht] {
-  opacity: .25;
+  /* ★ Als Vorgabe 8.10.: „die Transparenz ist da aktuell zu stark" —
+     vorher .25, jetzt etwas deckender. */
+  opacity: .45;
 }
 /* ★ v1488 (Als Vorgabe 29.9.: Box überall verschiebbar, wo sie deckend
    ist und kein Knopf unter dem Zeiger liegt): Das Skript setzt
@@ -24931,7 +25033,7 @@ body.fifth-curse-opp [data-support-zone].zone-has-card[data-support-owner="opp"]
 .zone-ability-free-activatable::after,
 .zone-creature-activatable::after,
 .zone-equip-activatable::after,
-.zone-friendship-active::after,
+.zone-friendship-bonus::after,
 .zone-permanent-activatable::after {
   pointer-events: none;
 }

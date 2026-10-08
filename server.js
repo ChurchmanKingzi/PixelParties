@@ -5441,6 +5441,7 @@ function sendGameState(room, playerIdx, extra) {
     })() : {},
     supportStacks: buildSupportStacks(room),
     additionalActions: room.engine ? room.engine.getAdditionalActions(playerIdx) : [],
+    additionalActionsSpent: room.engine ? room.engine.getSpentAdditionalActions(playerIdx) : [],
     // Per-card level reductions contributed by board-wide `reduceCardLevel`
     // hooks (Elven Forager, …). Map of cardName → non-negative reduction.
     // Client subtracts this from the card's raw level before running the
@@ -6160,6 +6161,7 @@ function sendSpectatorGameState(room) {
     })() : {},
     supportStacks: buildSupportStacks(room),
     additionalActions: [],
+    additionalActionsSpent: [],
     inherentActionCards: [],
     inherentActionHeroes: {},
     unactivatableArtifacts: [],
