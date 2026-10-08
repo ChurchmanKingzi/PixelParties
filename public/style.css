@@ -15346,7 +15346,11 @@ body:has(.textbox-overlay) .tooltip {
   display: flex;
   align-items: flex-start;
   padding: 16px 22px 10px;
-  height: 116px;
+  /* Mindesthoehe statt fester Hoehe: die Spalte streckt sich auf die Hoehe
+     der Box (die Portraet-Spalte bestimmt sie), damit Seitenzaehler und
+     Weiter-Pfeil — am unteren Rand verankert — wirklich UNTEN stehen und
+     nicht mitten ueber der dritten Textzeile (Als Befund 9.10.). */
+  min-height: 116px;
   position: relative;
   overflow: hidden;
   /* Feine Zeilenstruktur wie auf einem alten Bildschirm. */
@@ -15560,7 +15564,7 @@ body:has(.textbox-overlay) .tooltip {
   .textbox-portrait-frame { width: 56px; height: 56px; }
   .textbox-sparkle { width: 4px; height: 4px; }
   .textbox-speaker-name { font-size: 7px; letter-spacing: 1px; padding: 3px 4px 2px; }
-  .textbox-body { padding: 10px 14px 6px; height: 80px; }
+  .textbox-body { padding: 10px 14px 6px; min-height: 80px; }
   .textbox-text { font-size: 14px; }
 }
 
