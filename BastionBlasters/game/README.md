@@ -80,6 +80,8 @@ Die Karten sind datengetrieben: `src/data/cards.gen.json` entsteht aus den Katal
 - **Ton:** SFX zu fast allen Ereignissen (20 Abschussfamilien, 13 Einschläge, Tod, Bruch, Rang, Heilung, Wellenhorn) und sechs Musikstücke (Menü, Aufbau, Kampf, Zeitstopp, Sieg, Niederlage) werden zur Laufzeit synthetisiert. Pegel und Charakter sind gemessen, aber nicht nach Gehör abgenommen: bitte Rückmeldung zu Lautstärke und Musikgeschmack.
 - Einheiten tragen eine Umrandung und einen Fußring in der Teamfarbe (P1 rot, P2 türkis); beim Herauszoomen wird die Umrandung dicker.
 
-## Bot-Statistik (24 Partien, Seeds 100–123, v0.3)
+## Bot-Statistik (v0.4)
 
-P1 11 : P2 13 (symmetrisch im Rahmen der Streuung), mittlere Matchlänge 14,2 min (Ziel 10–16), Siege durch Zerstörung : Eroberung = 17 : 7, kein Remis. Die Bots bauen jetzt ein Labyrinth (Riegel mit Umweg im Zufahrtsgang, Fallen, Türme) und stellen einen Verteidiger in die Kernkammer. Rund die Hälfte der „Zerstörung“-Siege fällt erst in den Himmelsriss (ab 16:00): Die Bot-Angriffe kommen tröpfchenweise im Labyrinth zum Erliegen, ein menschlicher Spieler sollte schneller durchbrechen. Stellschrauben: Eroberungsrate, Labyrinth-Bau der Bots, Wegkosten für Mauerbruch, Artillerie-Reichweite zum Kern (GDD §12).
+Je 30 Partien mit den Seeds 200–229 und 300–329, Bot gegen Bot, Matchlänge ca. 14–16,5 min (Ziel 10–16), keine Remis.
+
+**Comeback-Quote** (wer bei ca. 60 % der Spielzeit hinten lag, Rückstand ≥ 12 %, gewinnt trotzdem; GDD-Ziel ≥ 25 %): **ohne Aufholhilfe 0 von 48 (0 %)**, mit der endgültigen Aufholhilfe **4 von 38 (≈ 11 %)** (25 % in den Seeds 200–229, 0 % in 300–329); frühere, schwächere Stufen: 3/19, 1/16, 0/21. Das Ziel ist also noch nicht erreicht. Die Aufholhilfe wirkt, aber schwach: Die Bots nutzen sie nur zum Teil, und die meisten Partien enden im Himmelsriss, den der Führende nach Druck und Schaden gewinnt. Vergleich selbst messen: `npm run sim -- --seed 200 --games 30` (mit Hilfe) gegen `BB_NOAID=1 npm run sim -- --seed 200 --games 30` (ohne). Stellschrauben: `AID` in `src/sim/catchup.ts` (Schwellen und Stufenwerte), Eroberungsrate, Artillerie-Reichweite zum Kern.
