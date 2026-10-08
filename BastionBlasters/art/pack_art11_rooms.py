@@ -353,7 +353,7 @@ def furnish_office(ctx):
     ctx.floor_deco(rug(38, 12, 'teamA'), X0 + 4, Y0 + 38)
     ctx.prop(spr_clerk(), X0 + 12, Y0 + 5)
     ctx.prop(office_desk(), X0 + 2, Y0 + 14)
-    ctx.prop(spr_parrot(), X0 + 40, Y0 + 16)
+    ctx.prop(spr_parrot(), X0 + 40, Y0 + 16, flip=True)
 
 
 def _plank_floor(seed, tone):

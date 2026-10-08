@@ -332,3 +332,69 @@ def spore_cloud(w, h, seed=1, ramp='leaf'):
             if idx >= 0:
                 c.put_ramp(x, y, ramp, idx)
     return c
+
+
+# --------------------------------------------------------------------------- Kulissen für die Dioramen
+
+
+def cactus(seed=1):
+    c = Canvas(20, 32)
+    thick_line(c, 10, 30, 10, 4, 6.0, 'leaf', lo=1, hi=4)
+    thick_line(c, 10, 20, 3, 19, 3.6, 'leaf', lo=1, hi=4)
+    thick_line(c, 3, 19, 3, 11, 3.6, 'leaf', lo=1, hi=4)
+    thick_line(c, 10, 15, 17, 14, 3.6, 'leaf', lo=2, hi=4)
+    thick_line(c, 17, 14, 17, 7, 3.6, 'leaf', lo=2, hi=5)
+    for (x, y) in ((8, 8), (8, 14), (9, 22), (3, 14), (17, 10), (12, 26)):
+        c.put_ramp(x, y, 'leaf', 5)
+    c.put_ramp(10, 3, 'fire', 4)
+    c.put_ramp(11, 3, 'fire', 3)
+    c.outline()
+    return c
+
+
+def tombstone(kind=0):
+    c = Canvas(16, 22)
+    round_rect(c, 2, 4, 13, 20, 'stone', lo=1, hi=4, radius=4)
+    c.rect(2, 18, 13, 20, 'stone', 1)
+    if kind == 0:
+        c.rect(7, 7, 8, 14, 'stone', 0)
+        c.rect(5, 9, 10, 10, 'stone', 0)
+    else:
+        for (x, y) in ((5, 8), (7, 9), (9, 8), (6, 12), (8, 12), (10, 13)):
+            c.put_ramp(x, y, 'stone', 0)
+    for (x, y) in ((4, 5), (5, 4), (11, 15)):
+        c.put_ramp(x, y, 'grass', 3)
+    c.outline()
+    return c
+
+
+def dead_tree(seed=1):
+    c = Canvas(40, 56)
+    rnd = random.Random(seed)
+    thick_line(c, 20, 54, 20, 22, 6.0, 'wood', lo=0, hi=3)
+    for (x0, y0, x1, y1, w_) in ((20, 34, 8, 22, 3.4), (20, 28, 33, 16, 3.4), (8, 22, 4, 10, 2.4), (33, 16, 37, 5, 2.2), (20, 24, 18, 6, 2.6), (14, 27, 9, 30, 2.0)):
+        thick_line(c, x0, y0, x1, y1, w_, 'wood', lo=0, hi=3)
+    c.outline()
+    return c
+
+
+def crack_lines(world, pts, key=9000, ramp='coal', idx=1):
+    """Riss als Linienzug (Welt)"""
+    for (a, b) in zip(pts[:-1], pts[1:]):
+        n = int(max(abs(b[0] - a[0]), abs(b[1] - a[1]))) + 1
+        for k in range(n + 1):
+            t = k / float(n)
+            put_px(world, a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, ramp, idx, key)
+
+
+def dirt_mound(w=14, h=7, seed=1):
+    """aufgeworfener Erdhügel (Maulwurfshügel), von oben-vorn gesehen"""
+    c = Canvas(w, h + 2)
+    ellipse(c, w / 2.0, h / 2.0 + 1, w / 2.0 - 0.6, h / 2.0, 'dirt', lo=1, hi=5, ambient=0.2)
+    rnd = random.Random(seed)
+    for _ in range(max(2, w // 4)):
+        x, y = rnd.randint(2, w - 3), rnd.randint(1, h - 1)
+        if c.alpha(x, y):
+            c.put_ramp(x, y, 'dirt', rnd.choice([1, 2]))
+    c.outline()
+    return c

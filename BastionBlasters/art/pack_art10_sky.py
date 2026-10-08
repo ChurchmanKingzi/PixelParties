@@ -53,7 +53,7 @@ def observatory_tower(team='teamA'):
         for x in range(cx - 7, cx + 7):
             d = math.hypot(x + 0.5 - cx, y + 0.5 - 53.5)
             if d <= 6.6:
-                c.put_ramp(x, y, 'ice' if d > 5.6 else 'purple', 4 if d > 5.6 else (1 if x + y < cx + 100 else 2))
+                c.put_ramp(x, y, 'bone' if d > 5.6 else 'ice', 4 if d > 5.6 else (2 if (x + y) % 5 else 1))
     for (x, y) in ((cx - 3, 50), (cx, 52), (cx + 3, 51), (cx - 2, 56), (cx + 2, 56), (cx + 4, 54), (cx - 4, 54)):
         c.put_ramp(x, y, 'gold', 5)
     c.line(cx - 3, 50, cx, 52, 'gold', 3)
@@ -127,25 +127,25 @@ def observatory_tower(team='teamA'):
 
 
 def moon_face():
-    """Mond-Sichel mit Gesicht, schaut nach links (guckt zurueck), 20 x 22"""
-    c = Canvas(20, 22)
-    cx, cy, R = 11.0, 11.0, 9.6
-    for y in range(22):
-        for x in range(20):
+    """Mond-Sichel mit Gesicht, schaut nach links (guckt zurueck), 24 x 26"""
+    c = Canvas(24, 26)
+    cx, cy, R = 13.0, 13.0, 11.6
+    for y in range(26):
+        for x in range(24):
             d = math.hypot(x + 0.5 - cx, y + 0.5 - cy)
-            d2 = math.hypot(x + 0.5 - (cx - 5.2), y + 0.5 - (cy - 1.0))
-            if d <= R and d2 > 8.6:
+            d2 = math.hypot(x + 0.5 - (cx - 6.4), y + 0.5 - (cy - 1.2))
+            if d <= R and d2 > 10.4:
                 u = (x + 0.5 - (cx - R)) / (2 * R)
-                c.put_ramp(x, y, 'bone', quant(0.5 + 0.55 * (u) - 0.2 * (y - 3) / 18.0 + 0.1, 2, 5, x, y))
-    # Gesicht auf der Sichel (Auge, Nase, Laecheln), Blick nach links
-    c.rect(10, 8, 11, 9, 'coal', 1)
-    c.put_ramp(10, 8, 'bone', 5)
-    c.put_ramp(8, 12, 'bone', 2)
-    c.put_ramp(8, 13, 'bone', 2)
-    for (x, y) in ((8, 16), (9, 17), (10, 17), (11, 17)):
+                c.put_ramp(x, y, 'bone', quant(0.45 + 0.6 * u - 0.25 * (y - 2) / 22.0 + 0.12, 2, 5, x, y))
+    # Gesicht auf der Sichel: Auge (gross, schaut nach links), Nase, Laecheln
+    c.rect(11, 9, 13, 11, 'coal', 1)
+    c.put_ramp(11, 9, 'bone', 5)
+    c.rect(11, 8, 14, 8, 'bone', 2)
+    c.rect(10, 14, 11, 15, 'bone', 2)
+    for (x, y) in ((10, 19), (11, 20), (12, 20), (13, 20), (14, 19)):
         c.put_ramp(x, y, 'coal', 1)
-    c.put_ramp(11, 14, 'skin', 4)
-    c.put_ramp(12, 14, 'skin', 3)
+    c.rect(13, 16, 14, 16, 'skin', 4)
+    c.rect(14, 15, 15, 15, 'skin', 3)
     c.outline()
     return c
 
@@ -282,14 +282,14 @@ def rain_mortar():
 
 def floating_island(team='teamA'):
     """Felsinsel mit Zinnenmauer, zwei Tuermen, Teich und Kanonen; Unterseite als haengender Fels mit Kristallen. 124 x 92"""
-    W, H = 124, 92
+    W, H = 124, 86
     c = Canvas(W, H)
     rnd = random.Random(21)
     cx = 62
     # ---------------- Felsunterseite (haengender Kegel)
     def edge(x):                      # Tiefe der Felsunterkante in Abhaengigkeit von x
         t = abs(x - cx) / 58.0
-        base = 40 + 48 * (1 - t ** 1.15)
+        base = 40 + 40 * (1 - t ** 1.15)
         wob = 4 * math.sin(x * 0.55) + 3 * math.sin(x * 1.3 + 1.0)
         return base + wob * (0.4 + 0.6 * (1 - t))
     for x in range(4, 120):
@@ -316,16 +316,11 @@ def floating_island(team='teamA'):
             c.put_ramp(x, 41, 'leaf', 3)
             c.put_ramp(x, 42, 'leaf', 2)
     # Kristalle an der Unterseite
-    for (x, y, h_, ramp) in ((44, 74, 9, 'ice'), (52, 80, 12, 'purple'), (74, 78, 10, 'ice'), (62, 84, 8, 'purple'), (84, 68, 8, 'ice')):
+    for (x, y, h_, ramp) in ((46, 66, 8, 'ice'), (54, 72, 11, 'purple'), (74, 70, 9, 'ice'), (64, 76, 8, 'purple'), (86, 60, 7, 'ice')):
         poly(c, [(x - 2, y), (x + 2, y), (x + 1, y + h_), (x - 1, y + h_ + 1)], ramp, lo=2, hi=5)
         c.put_ramp(x - 1, y + 1, ramp, 5)
     # ---------------- Oberflaeche: Gras-Plateau (Ellipse)
     ellipse(c, cx, 36, 59, 9, 'grass', lo=1, hi=4, ambient=0.32, flatness=0.5)
-    # Teich (links)
-    ellipse(c, 24, 36, 11, 4.2, 'sky', lo=1, hi=4, ambient=0.3, flatness=0.3)
-    for x in range(15, 34):
-        if x % 3 == 0:
-            c.put_ramp(x, 36, 'sky', 5)
     # Zinnenmauer (Vorderseite, Suedansicht)
     wx0, wx1, wy0, wy1 = 30, 94, 28, 40
     for y in range(wy0, wy1 + 1):
@@ -403,34 +398,37 @@ def floating_island(team='teamA'):
     return c
 
 
-def upward_waterfall(h=64, w=10, phase=0):
-    """Wasserfall, der nach oben fliesst: Wasserband mit aufwaerts gerichteten Schraegstreifen, oben Nebelwolke. Fuss unten"""
-    c = Canvas(w + 18, h + 12)
-    cx = (w + 18) // 2
-    # Wasserband
-    for y in range(10, h + 10):
-        t = (y - 10) / float(h)                # 0 oben .. 1 unten
-        half = w / 2.0 * (0.8 + 0.5 * (1 - t))
-        wob = 1.5 * math.sin(y / 5.0 + phase)
+def upward_waterfall(h=34, w=14, phase=0):
+    """Wasserfall, der nach oben fliesst: Wasserband mit aufwaerts laufenden Schaumstreifen, unten Gischt, oben Nebelwolke. Fuss unten"""
+    cwid = w + 20
+    c = Canvas(cwid, h + 14)
+    cx = cwid // 2
+    for y in range(8, h + 12):
+        t = (y - 8) / float(h + 4)                # 0 oben .. 1 unten
+        half = w / 2.0 * (0.62 + 0.5 * t)
+        wob = 1.2 * math.sin(y / 4.0 + phase)
         for x in range(int(cx - half + wob), int(cx + half + wob) + 1):
             u = (x - (cx - half + wob)) / (2 * half + 0.01)
-            idx = 3 if u < 0.25 else (2 if u < 0.7 else 1)
+            idx = 4 if u < 0.2 else (3 if u < 0.6 else 2)
             if (x + y // 2) % 4 == 0:
-                idx = min(5, idx + 2)
-            elif ((x + y) % 7) == 0:
-                idx = max(1, idx - 1)
+                idx = min(5, idx + 1)
+            if ((x * 3 + y) % 9) == 0:
+                idx = 5
             c.put_ramp(x, y, 'ice', idx)
-        # Schaumstreifen laufen nach oben (schraeg nach links oben)
-        if y % 6 == 0:
+        if y % 5 == 0:
             xs = int(cx - half + wob + 1)
-            c.put_ramp(xs, y, 'ice', 5)
-            c.put_ramp(xs + 1, y - 1, 'ice', 5)
-    # Aufwaerts-Gischt: Tropfen, die nach oben spritzen
-    for (dx, y) in ((-9, 44), (8, 30), (-7, 22), (9, 50), (-10, 12), (7, 14)):
-        c.put_ramp(cx + dx, y, 'ice', 5)
-        c.put_ramp(cx + dx, y + 1, 'ice', 3)
+            c.put_ramp(xs, y, 'bone', 5)
+            c.put_ramp(xs + 1, y - 1, 'bone', 5)
+            c.put_ramp(xs + 2, y - 2, 'bone', 4)
+    # Aufwaerts-Gischt
+    for (dx, y) in ((-9, 30), (10, 22), (-8, 14), (11, 32), (-11, 22), (9, 12)):
+        c.put_ramp(cx + dx, y, 'bone', 5)
+        c.put_ramp(cx + dx, y + 1, 'ice', 4)
+    # Gischt am Fuss
+    for (dx, dy, i) in ((-8, 0, 4), (-6, -1, 5), (7, -1, 5), (9, 0, 4), (-4, 0, 5), (5, 0, 4)):
+        c.put_ramp(cx + dx, h + 12 + dy, 'bone', i)
     # Wolke oben
-    for (x, y, rx, ry) in ((cx - 6, 7, 6, 4), (cx + 5, 6, 7, 4), (cx, 3, 6, 3.4)):
+    for (x, y, rx, ry) in ((cx - 7, 6, 6, 4), (cx + 6, 5, 7, 4), (cx, 3, 6, 3.4)):
         ellipse(c, x, y, rx, ry, 'fur', lo=2, hi=5, ambient=0.3)
     c.outline()
     return c

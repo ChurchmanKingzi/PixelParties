@@ -223,22 +223,18 @@ def mini_bat(flap=0):
 
 
 def smoke_blob(c, cx, cy, r, ramp='stone'):
-    """Rauchballen mit durchscheinendem Rand (Schachbrett): Kern 4, Rand 3, Saum 2"""
+    """Rauchballen mit durchscheinendem Rand (Schachbrett): Kern 4/3, Rand 3 im Schachbrett"""
     for y in range(int(cy - r - 1), int(cy + r + 2)):
         for x in range(int(cx - r - 1), int(cx + r + 2)):
             d = math.hypot(x + 0.5 - cx, (y + 0.5 - cy) * 1.1) / r
             if d > 1.0:
                 continue
-            if d < 0.55:
-                idx = 4 if (x + y) % 2 == 0 or d < 0.35 else 3
-            elif d < 0.8:
-                idx = 3 if (x + y) % 2 == 0 else -1
+            if d < 0.62:
+                idx = 4 if (x + 0.5 < cx + r * 0.15 or y + 0.5 < cy) else 3
             else:
-                idx = 2 if (x + y) % 2 == 0 else -1
-            if idx >= 0 and not (idx == 4 and x + 0.5 > cx + r * 0.2 and y + 0.5 > cy):
+                idx = 3 if (x + y) % 2 == 0 else -1
+            if idx >= 0:
                 c.put_ramp(x, y, ramp, idx)
-            elif idx >= 0:
-                c.put_ramp(x, y, ramp, 3)
 
 
 def smoke_sprite(h=30, w=16, seed=1, n=4, r0=2.4):

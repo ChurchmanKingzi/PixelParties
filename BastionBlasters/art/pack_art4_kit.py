@@ -206,14 +206,14 @@ def a4_wheel():
 # =========================================================================== Wurzeln
 
 def a4_root_grip(front=False, seed=1):
-    """Wurzelgriff: Wurzelranken umschlingen ein Ziel; front=False: hintere Ranken, front=True: vordere Ranken (quer vor dem Ziel).
-    42 x 40, Fusspunkt unten mittig."""
-    c = Canvas(42, 40)
+    """Wurzelgriff: Wurzelranken umschlingen ein Ziel; front=False: hintere Ranken, front=True: vordere Ranken (quer vor den Beinen des Ziels).
+    38 x 34, Fusspunkt unten mittig."""
+    c = Canvas(38, 34)
     rnd = random.Random(seed + (7 if front else 0))
     if front:
-        specs = [((3, 37), (12, 24), (24, 22), (34, 12)), ((39, 37), (30, 27), (18, 26), (8, 16))]
+        specs = [((2, 31), (10, 22), (22, 25), (31, 14)), ((35, 31), (28, 25), (16, 24), (6, 16))]
     else:
-        specs = [((10, 38), (3, 24), (8, 10), (18, 4)), ((33, 38), (40, 22), (34, 10), (24, 5))]
+        specs = [((9, 32), (1, 22), (5, 10), (14, 3)), ((30, 32), (37, 20), (32, 9), (23, 3))]
     for k, (p0, p1, p2, p3) in enumerate(specs):
         pts = []
         n = 14
@@ -223,25 +223,68 @@ def a4_root_grip(front=False, seed=1):
             y = (1 - t) ** 3 * p0[1] + 3 * (1 - t) ** 2 * t * p1[1] + 3 * (1 - t) * t * t * p2[1] + t ** 3 * p3[1]
             pts.append((x, y))
         for i in range(n):
-            w = 5.6 - 3.4 * (i / n)
+            w = 5.2 - 3.0 * (i / n)
             lo_, hi_ = (1, 4) if (k + (1 if front else 0)) % 2 == 0 else (0, 3)
             thick_line(c, pts[i][0], pts[i][1], pts[i + 1][0], pts[i + 1][1], w, 'wood', lo=lo_, hi=hi_)
-        # Rindenfurchen
         for i in range(2, n - 2, 3):
             x, y = int(pts[i][0]), int(pts[i][1])
             if c.alpha(x, y):
                 c.put_ramp(x, y, 'wood', 0)
-        # Blatt an der Spitze + Dornen
+        # Blaetter an der Spitze + Dornen
         tx, ty = pts[-1]
-        ellipse(c, tx, ty, 2.2, 1.8, 'leaf', lo=2, hi=5)
+        ellipse(c, tx, ty, 2.4, 2.0, 'leaf', lo=2, hi=5)
         c.put_ramp(int(tx) - 1, int(ty) - 1, 'leaf', 5)
+        ellipse(c, tx + (3 if k == 0 else -3), ty + 2, 1.8, 1.4, 'leaf', lo=2, hi=4)
         for i in (4, 8):
             x, y = int(pts[i][0]), int(pts[i][1])
             c.put_ramp(x + (1 if k else -1), y - 2, 'wood', 4)
-    # Erdkrumen am Fuss
-    for kx in range(8):
-        x = 3 + kx * 5 + rnd.randint(0, 1)
-        c.put_ramp(x, 38 + (kx % 2), 'dirt', 2 + (kx % 3))
+    for kx in range(7):
+        x = 2 + kx * 5 + rnd.randint(0, 1)
+        c.put_ramp(x, 32 + (kx % 2), 'dirt', 2 + (kx % 3))
+    c.outline()
+    return c
+
+
+def a4_boulder():
+    """grosser Felsbrocken (faellt herab), 22 x 21"""
+    c = Canvas(22, 21)
+    ellipse(c, 11, 10.5, 9.6, 9.2, 'stone', lo=1, hi=5, ambient=0.15)
+    for (x, y) in ((7, 6), (8, 6), (7, 7), (9, 5)):
+        c.put_ramp(x, y, 'stone', 5)
+    for (x, y) in ((13, 12), (14, 13), (15, 14), (12, 15), (13, 15), (16, 8), (16, 9)):
+        c.put_ramp(x, y, 'coal', 2)
+    c.line(11, 3, 13, 8, 'stone', 1)
+    c.line(13, 8, 11, 12, 'stone', 1)
+    c.outline()
+    return c
+
+
+def a4_heat_glow(world, cx, cy, rx, ry, seed=1):
+    """gluehender Boden (Dither aus Feuerfarben) unter dem Feueratem"""
+    for y in range(int(cy - ry - 1), int(cy + ry + 2)):
+        for x in range(int(cx - rx - 1), int(cx + rx + 2)):
+            d = ((x + 0.5 - cx) / rx) ** 2 + ((y + 0.5 - cy) / ry) ** 2
+            if d > 1.0:
+                continue
+            n = texture_noise(x, y, seed)
+            L = (1.0 - d) * 1.1 + (n - 0.5) * 0.5
+            if L > 0.75 and (x + y) % 2 == 0:
+                a4_ground_put(world, x, y, 'fire', 3)
+            elif L > 0.5 and (x + y) % 2 == 0:
+                a4_ground_put(world, x, y, 'fire', 2)
+            elif L > 0.3 and (x % 2 == 0 and y % 2 == 0):
+                a4_ground_put(world, x, y, 'fire', 1)
+
+
+def a4_ice_cluster(seed=1):
+    """Eiskristall-Gruppe am Boden, 20 x 18 (mehrere Spitzen, nicht handfoermig)"""
+    c = Canvas(20, 18)
+    poly(c, [(2, 17), (4, 9), (7, 17)], 'ice', lo=1, hi=4)
+    poly(c, [(6, 17), (10, 2), (14, 17)], 'ice', lo=2, hi=5)
+    poly(c, [(12, 17), (16, 7), (19, 17)], 'ice', lo=1, hi=4)
+    c.line(9, 6, 10, 15, 'ice', 5)
+    c.put_ramp(4, 12, 'ice', 5)
+    c.put_ramp(16, 11, 'ice', 5)
     c.outline()
     return c
 

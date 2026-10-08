@@ -209,7 +209,7 @@ def giant_hammer(HW=50, H=84):
 
 def gnome(pose='pull', hat='teamA', beard='bone', coat='ice', seed=0):
     """Gnom (24 x 30, blickt nach rechts). pose: pull (lehnt sich zurueck, haelt Seil) | work (Schraubenschluessel)."""
-    c = Canvas(26, 30)
+    c = Canvas(32 if pose == 'shovel' else 26, 30)
     lean = 3 if pose == 'pull' else 0
     # Stiefel + Beine
     hipx, hipy = 12 - lean // 2, 21
@@ -234,6 +234,14 @@ def gnome(pose='pull', hat='teamA', beard='bone', coat='ice', seed=0):
         thick_line(c, sx, sy, hx, hy, 2.8, 'skin', lo=2, hi=5)
         c.rect(hx, hy - 1, hx + 1, hy + 1, 'skin', 5)
         thick_line(c, sx - 2, sy + 1, hx - 4, hy + 3, 2.8, 'skin', lo=1, hi=4)
+    elif pose == 'shovel':
+        hx, hy = 18, 18
+        # Schaufelstiel (schraeg nach unten), Blatt mit Ladung am Boden
+        thick_line(c, hx - 5, hy - 2, hx + 7, hy + 9, 1.8, 'wood', lo=2, hi=4)
+        poly(c, [(hx + 5, hy + 9), (hx + 11, hy + 8), (hx + 12, hy + 11), (hx + 7, hy + 12)], 'metal', lo=1, hi=5)
+        ellipse(c, hx + 9, hy + 7, 3.0, 2.4, 'dirt', lo=0, hi=2)
+        thick_line(c, sx, sy, hx, hy, 2.8, 'skin', lo=2, hi=5)
+        thick_line(c, sx - 2, sy + 1, hx - 5, hy - 2, 2.8, 'skin', lo=1, hi=4)
     else:
         hx, hy = 19, 17
         thick_line(c, sx, sy, hx, hy, 2.8, 'skin', lo=2, hi=5)

@@ -170,14 +170,14 @@ def _bat(c, cx, cy, s, ph, mono=False):
 
 
 def spr_bloodsucker_swarm(anim='idle', f=0):
-    c = Canvas(60, 42)
+    c = Canvas(68, 48)
     p = f % 3
     # kleine Fledermaeuse hinten, grosse mit Monokel vorn
-    _bat(c, 10, 11, 0.62, (p + 1) % 3)
-    _bat(c, 49, 8, 0.7, (p + 2) % 3, mono=True)
-    _bat(c, 9, 32, 0.8, (p + 2) % 3)
-    _bat(c, 50, 31, 0.62, p)
-    _bat(c, 30, 21, 1.05, p, mono=True)
+    _bat(c, 11, 12, 0.66, (p + 1) % 3)
+    _bat(c, 56, 9, 0.8, (p + 2) % 3, mono=True)
+    _bat(c, 10, 37, 0.9, (p + 2) % 3)
+    _bat(c, 58, 36, 0.7, p)
+    _bat(c, 34, 24, 1.28, p, mono=True)
     c.outline()
     return c
 

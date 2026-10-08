@@ -76,6 +76,7 @@ def _art_uz08():
     wspark(w, 94, 60, 'gold', big=True)
     wspark(w, 122, 62, 'gold')
     wspark(w, 96, 74, 'gold')
+    confetti(w, random.Random(8), 22, box=(60, 34, 134, 72))
     return finish(w)
 
 

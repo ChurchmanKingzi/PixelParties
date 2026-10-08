@@ -37,12 +37,14 @@ def recolor(cv, fn):
     return out
 
 
-def dither_cut(cv, phase=0):
-    """Schachbrett-Loecher (Tarnung / Schimmer): jedes zweite Pixel wird durchsichtig"""
+def dither_cut(cv, phase=0, keep_edge=True):
+    """Schachbrett-Loecher (Tarnung / Schimmer): jedes zweite Innenpixel wird durchsichtig, der Rand bleibt stehen"""
     out = cv.copy()
     for y in range(cv.h):
         for x in range(cv.w):
             if (x + y) % 2 == phase:
+                if keep_edge and not all(cv.alpha(x + dx, y + dy) for (dx, dy) in ((1, 0), (-1, 0), (0, 1), (0, -1))):
+                    continue
                 out.clear_pixel(x, y)
     return out
 

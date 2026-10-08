@@ -408,7 +408,7 @@ def dissolve_sprite(spr, rng, x_start, strength=1.0):
                 continue
             t = min(1.0, (x - x_start) / float(spr.w - x_start))
             if rng.random() < (0.15 + 0.85 * t) * strength:
-                if rng.random() < 0.5:
+                if rng.random() < 0.75:
                     parts.append((x, y, t))
             else:
                 out.px[y, x] = spr.px[y, x]
@@ -422,10 +422,6 @@ def bandaged_skeleton(f=2):
     # Kinn-Kopf-Verband
     for (x, y) in ((13, 10), (13, 11), (13, 12), (13, 13), (13, 14), (14, 15), (15, 15), (16, 15), (17, 15), (18, 15), (19, 15), (20, 15), (21, 14), (21, 13), (21, 12), (21, 11), (21, 10)):
         c.put_ramp(x, y, 'bone', 5 if (x + y) % 2 else 4)
-    c.put_ramp(14, 11, 'leaf', 3)
-    c.put_ramp(14, 12, 'leaf', 3)
-    c.put_ramp(13, 11, 'leaf', 4)
-    c.put_ramp(15, 11, 'leaf', 3)
     # Verband am Arm und Rumpf
     for (x, y) in ((11, 18), (12, 19), (13, 18), (11, 20), (12, 21), (13, 20), (14, 22), (15, 22)):
         c.put_ramp(x, y, 'bone', 5)

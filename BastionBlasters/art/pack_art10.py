@@ -7,6 +7,8 @@ from pack_art10_kit import *
 from pack_art10_ship import *
 from pack_art10_holy import *
 from pack_art10_work import *
+from pack_art10_sky import *
+from pack_art10_yard import *
 
 
 def _room(letter, theme, seed, rows=None, ground='grass', crop=(8, 6), size=(160, 160)):
@@ -117,3 +119,60 @@ def _art_bu03():
     prop_at(world, brick_pile(), 66, 80)
     prop_at(world, bush(2), 190, 140)
     return finish(crop_world(world, 56, 6))
+
+
+@card_art('BP-03')
+def _art_bp03():
+    rows = [".....", ".hhh.", ".hTh.", ".hhh.", "....."]
+    world = ground_world('grass', 3, 160, 160)
+    c, out = mini_castle(rows, 0, 0, world, tw=observatory_tower())
+    # Mond guckt zurueck, Sterne, Sterngucker
+    world.draw(moon_face(), 104, 10, 9000)
+    for (x, y) in ((100, 14), (124, 36), (96, 30), (128, 12)):
+        world_sparkle(world, x, y, 'gold')
+    unit_at(world, astronomer(), 106, 94, sh=(6, 2))
+    for (sp, x, y) in ((bush(2), 140, 140), (rock(1), 14, 148)):
+        prop_at(world, sp, x, y)
+    return finish(crop_world(world, 8, 8))
+
+
+@card_art('BP-04')
+def _art_bp04():
+    rows = [".....", ".hhh.", ".hhT.", ".hhh.", "....."]
+    world = ground_world('grass', 4, 192, 160)
+    c, out = mini_castle(rows, 0, 0, world, tw=cloud_anchor_tower())
+    # Schatten der Wolke auf dem Hof
+    shadow(world, 118, 90, 30, 7)
+    ox, oy = 112 - 36, 99 - 84 + 1
+    world.draw(rain_cannon(), ox + 22 - 8, oy + 15 - 16, 9000)
+    world.draw(rain_mortar(), ox + 50 - 8, oy + 15 - 18, 9000)
+    for (sp, x, y) in ((bush(2), 172, 140), (rock(1), 14, 148)):
+        prop_at(world, sp, x, y)
+    return finish(crop_world(world, 40, 6))
+
+
+@card_art('BP-05')
+def _art_bp05():
+    world = ground_world('cobble', 5)
+    bk = bunker()
+    bx, by = 72 - 36, 80 - 70 + 1
+    shadow(world, 76, 79, 36, 5)
+    world.draw(bk, bx, by, 80)
+    world.draw(garden_gnome(), bx + 38, by + 6, 81)
+    world.draw(smoke_puff(), bx + 50, by + 56, 85)
+    for (sp, x, y) in ((barrel(), 16, 38), (crate(), 128, 40), (crate(), 126, 86)):
+        prop_at(world, sp, x, y)
+    return finish(world)
+
+
+@card_art('BP-06')
+def _art_bp06():
+    world = ground_world('grass', 6)
+    shadow(world, 74, 80, 52, 11)
+    wf = upward_waterfall()
+    world.draw(wf, 72 - wf.w // 2, 40 - wf.h + 12, 20)
+    isl = floating_island()
+    world.draw(isl, 10, 2, 40)
+    for (sp, x, y) in ((bush(2), 130, 90), (rock(1), 14, 90)):
+        prop_at(world, sp, x, y)
+    return finish(world)

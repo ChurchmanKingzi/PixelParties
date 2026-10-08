@@ -259,10 +259,11 @@ def spr_tick_tock_trooper(anim='idle', f=0):
     c.line(20, 10 + bob, 20, 6 + bob, 'coal', 1)             # grosser Zeiger
     c.line(20, 10 + bob, 23, 12 + bob, 'coal', 1)            # kleiner Zeiger
     c.put_ramp(20, 10 + bob, 'fire', 3)
-    for (bx, d) in ((13.5, -1), (24.5, 1)):
-        ellipse(c, bx, 3.4 + bob, 2.9, 2.7, 'gold', lo=2, hi=5, clip=lambda x, y: y <= 4 + bob)
-        c.put_ramp(int(bx), 1 + bob, 'gold', 5)
-    c.rect(18, 1 + bob, 20, 2 + bob, 'metal', 3)
+    for (bx, by, sgn) in ((13.6, 5.6, -1), (24.8, 5.6, 1)):
+        ellipse(c, bx, by + bob, 3.3, 3.3, 'metal', lo=2, hi=5, ambient=0.3,
+                clip=lambda x, y, bx=bx, by=by, sgn=sgn: sgn * (x + 0.5 - bx) + (y + 0.5 - by - bob) <= 0.6)
+    c.rect(18, 1 + bob, 20, 3 + bob, 'gold', 3)
+    c.put_ramp(19, bob, 'gold', 5)
     for k, (x, y) in enumerate(((19, 0), (19, -1), (20, -2))):
         pass
     c.outline()

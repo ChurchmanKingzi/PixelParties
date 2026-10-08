@@ -371,17 +371,17 @@ def _art_us18():
     for (sp, x, y) in ((gravestone(0), 18, 42), (gravestone(1), 128, 50), (dead_tree(1), 112, 38), (gravestone(0), 130, 92),
                        (gravestone(1), 14, 92), (gravestone(0), 30, 66)):
         prop_at(w, sp, x, y)
-    sx, sy = 44, 14
-    unit_at(w, citizen('cloth', 0), 74, 86, sh=(5, 2))
+    sx, sy = 40, 12
+    unit_at(w, citizen('cloth', 0), 74, 88, sh=(5, 2))
     # Schatten der Fledermaeuse auf dem Boden
-    for (bx, rx) in ((54, 6), (93, 5), (53, 6), (94, 5), (74, 9)):
+    for (bx, rx) in ((51, 6), (96, 6), (50, 7), (98, 5), (74, 11)):
         shadow(w, bx, 86 + (bx % 3) * 2 - 2, rx, 2)
     sw = spr_bloodsucker_swarm(f=1)
     w.draw(sw, sx, sy, 400)
     # Lebensraub: rote Tropfen steigen vom Buerger zum Schwarm
     for k in range(8):
-        _blood_drop(w, 73 + int(3 * math.sin(k * 1.3)), 74 - k * 5 + (k % 2), big=(k % 3 == 0))
-    for (x, y) in ((60, 62), (88, 58), (56, 40)):
+        _blood_drop(w, 73 + int(3 * math.sin(k * 1.3)), 76 - k * 5 + (k % 2), big=(k % 3 == 0))
+    for (x, y) in ((60, 64), (88, 60), (56, 46)):
         _blood_drop(w, x, y)
     return finish(w)
 

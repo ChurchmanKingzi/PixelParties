@@ -42,6 +42,9 @@ def _art_bu08():
     prop_at(world, signpost(), 36, 66)
     prop_at(world, rack(), 148, 60)
     prop_at(world, barrel(), 142, 92)
+    # Papagei ruft den Rekruten an (Schallbogen)
+    for (dx, dy, i) in ((0, 0, 5), (-1, 1, 4), (-1, 2, 4), (0, 3, 5), (-4, -2, 4), (-5, -1, 3), (-5, 1, 3), (-5, 3, 3), (-4, 5, 4)):
+        px_at(world, 103 + dx, 52 + dy, 'gold', i, 9000)
     return finish(crop_world(world, 24, 6))
 
 
@@ -134,26 +137,30 @@ def _art_bu07():
 def _art_bu09():
     w = ground_world('cobble', 11)
     pt = portal_sprite()
-    px0, py_foot = 82, 82
+    px0, py_foot = 96, 82
     shadow(w, px0 + 2, py_foot - 4, 30, 5)
     w.draw(pt, px0 - pt.w // 2, py_foot - pt.h + 1, py_foot)
     # Wirbel-Leuchten: Boden rund ums Portal etwas heller
-    lighten_disc(w, px0, py_foot - 6, 26, 1, ring=0.5)
+    lighten_disc(w, px0, py_foot - 6, 28, 1, ring=0.5)
     # verletztes Skelett loest sich auf und strudelt ins Portal
     rng = random.Random(5)
-    sk, parts = dissolve_sprite(bandaged_skeleton(2), rng, 12, 1.15)
-    sx, sy = 36, 90
+    sk, parts = dissolve_sprite(bandaged_skeleton(2), rng, 18, 0.95)
+    sx, sy = 42, 88
     w.draw(sk, sx - sk.w // 2, sy - sk.h + 1, sy)
     tx, ty = px0 - 4, py_foot - 34
     for (x, y, t) in parts:
         wx, wy = sx - sk.w // 2 + x, sy - sk.h + 1 + y
-        f = 0.12 + 0.8 * t
-        qx, qy = wx + (tx - wx) * f, wy + (ty - wy) * f - 5 * math.sin(f * math.pi)
-        px_at(w, int(qx), int(qy), 'ice' if rng.random() < 0.5 else 'bone', 5 if rng.random() < 0.6 else 4, 9000)
-    for (x, y) in ((62, 46), (74, 34), (96, 30)):
+        f = 0.10 + 0.85 * t
+        qx, qy = wx + (tx - wx) * f, wy + (ty - wy) * f - 7 * math.sin(f * math.pi)
+        qx, qy = int(qx), int(qy)
+        px_at(w, qx, qy, 'bone' if rng.random() < 0.5 else 'ice', 5, 9000)
+        px_at(w, qx - 1, qy, 'purple', 4, 9000)
+        if rng.random() < 0.4:
+            px_at(w, qx + 1, qy, 'ice', 4, 9000)
+    for (x, y) in ((64, 50), (76, 40), (112, 24)):
         star(w, x, y, 'ice', False)
-    prop_at(w, portal_sign(), 30, 54)
-    for (sp, x, y) in ((barrel(), 128, 28), (crate(), 16, 90)):
+    prop_at(w, portal_sign(), 30, 52)
+    for (sp, x, y) in ((barrel(), 130, 24), (crate(), 134, 92)):
         prop_at(w, sp, x, y)
     return finish(w)
 
