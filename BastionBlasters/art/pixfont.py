@@ -158,17 +158,17 @@ def _build():
 GLYPHS = _build()
 
 
-def text_width(s: str, bold=False) -> int:
+def text_width(s: str, bold=False, spacing=1) -> int:
     w = 0
     for ch in s:
         g = GLYPHS.get(ch)
         if g is None:
             g = GLYPHS['?']
-        w += g.shape[1] + 1
-    return max(0, w - 1) + (1 if bold else 0)
+        w += g.shape[1] + spacing
+    return max(0, w - spacing) + (1 if bold else 0)
 
 
-def draw_text(px: np.ndarray, x: int, y: int, s: str, color, bold=False, shadow=None, outline=None):
+def draw_text(px: np.ndarray, x: int, y: int, s: str, color, bold=False, shadow=None, outline=None, spacing=1):
     """Zeichnet Text auf ein RGBA/RGB-Pixel-Array. (x, y) = linke obere Ecke der Versalien."""
     def put(ox, oy, col):
         cx = x + ox
@@ -183,7 +183,7 @@ def draw_text(px: np.ndarray, x: int, y: int, s: str, color, bold=False, shadow=
                     px[Y, X, :3] = col
                     if px.shape[2] == 4:
                         px[Y, X, 3] = 255
-            cx += g.shape[1] + 1
+            cx += g.shape[1] + spacing
 
     if outline is not None:
         for dx in (-1, 0, 1):
@@ -217,3 +217,87 @@ def wrap(s: str, max_w: int):
     if cur:
         lines.append(cur)
     return lines
+
+
+# --------------------------------------------------------------------------- Rich-Text (fette Schlüsselwörter)
+
+
+def _glyph(ch):
+    g = GLYPHS.get(ch)
+    return GLYPHS['?'] if g is None else g
+
+
+def rich_width(segs, spacing=1) -> int:
+    """Breite einer Liste (Text, fett?). Fette Zeichen sind 1 px breiter (Doppelanschlag)."""
+    w = 0
+    for text, b in segs:
+        for ch in text:
+            w += _glyph(ch).shape[1] + spacing + (1 if b else 0)
+    return max(0, w - spacing)
+
+
+def draw_rich(px: np.ndarray, x: int, y: int, segs, color, spacing=1):
+    """Zeichnet Abschnitte (Text, fett?) ab (x, y) = Oberkante der Versalien."""
+    cx = x
+    for text, b in segs:
+        for ch in text:
+            g = _glyph(ch)
+            ys, xs = np.nonzero(g)
+            pts = [(yy, xx) for yy, xx in zip(ys, xs)]
+            if b:                       # "kluges" Fett: Strich nach rechts verdicken, aber 1-px-Lücken erhalten (m, w, e ...)
+                w_ = g.shape[1]
+                for yy, xx in zip(ys, xs):
+                    right_free = xx + 1 >= w_ or not g[yy, xx + 1]
+                    gap_stays = xx + 2 >= w_ or not g[yy, xx + 2]
+                    if right_free and gap_stays:
+                        pts.append((yy, xx + 1))
+            for yy, xx in pts:
+                X, Y = cx + xx, y - CAP_TOP + yy
+                if 0 <= X < px.shape[1] and 0 <= Y < px.shape[0]:
+                    px[Y, X, :3] = color
+                    if px.shape[2] == 4:
+                        px[Y, X, 3] = 255
+            cx += g.shape[1] + spacing + (1 if b else 0)
+    return cx - x
+
+
+def wrap_rich(segs, first_w: int, width: int, spacing=1):
+    """Zeilenumbruch für (Text, fett?)-Abschnitte; erste Zeile darf schmaler sein (Abzeichen davor)."""
+    chars = [(ch, b) for text, b in segs for ch in text]
+    words, cur = [], []
+    for ch, b in chars:
+        if ch == ' ':
+            if cur:
+                words.append(cur)
+            cur = []
+        else:
+            cur.append((ch, b))
+    if cur:
+        words.append(cur)
+
+    def wlen(word):
+        return sum(_glyph(ch).shape[1] + spacing + (1 if b else 0) for ch, b in word)
+
+    space = _glyph(' ').shape[1] + spacing
+    lines, line, lw = [], [], 0
+    for word in words:
+        limit = first_w if not lines else width
+        add = wlen(word) if not line else space + wlen(word)
+        if line and lw + add - spacing > limit:
+            lines.append(line)
+            line, lw = word[:], wlen(word)
+        else:
+            line = (line + [(' ', False)] if line else []) + word
+            lw += add
+    if line:
+        lines.append(line)
+    out = []
+    for ln in lines:                                   # zurück zu Abschnitten
+        segs_out = []
+        for ch, b in ln:
+            if segs_out and segs_out[-1][1] == b:
+                segs_out[-1] = (segs_out[-1][0] + ch, b)
+            else:
+                segs_out.append((ch, b))
+        out.append(segs_out)
+    return out

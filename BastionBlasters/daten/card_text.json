@@ -1,0 +1,300 @@
+{
+ "UA-01": {
+  "stats": [
+   [
+    "heart",
+    "70 FLS"
+   ],
+   [
+    "sword",
+    "60/18"
+   ],
+   [
+    "clock",
+    "7"
+   ],
+   [
+    "target",
+    "34"
+   ]
+  ],
+  "rules": "Splash 1.",
+  "talent": "**Double Throw**: Every 4th shot fires twice.",
+  "flavor": "It wobbles. It works."
+ },
+ "US-01": {
+  "stats": [
+   [
+    "heart",
+    "45 BON"
+   ],
+   [
+    "sword",
+    "8"
+   ],
+   [
+    "clock",
+    "1.0"
+   ],
+   [
+    "boot",
+    "1.5"
+   ]
+  ],
+  "rules": "",
+  "talent": "**Rattle Head**: Revives once after 4s with 30% HP.",
+  "flavor": "There was soup in the pot once. Now it is armor."
+ },
+ "US-02": {
+  "stats": [
+   [
+    "heart",
+    "30 FLS"
+   ],
+   [
+    "sword",
+    "6"
+   ],
+   [
+    "clock",
+    "0.7"
+   ],
+   [
+    "boot",
+    "2.2"
+   ]
+  ],
+  "rules": "On kill (Civilian): +15 XP. Heals 10 HP.",
+  "talent": "**Pickpocket**: On kill, +15% speed for 8s.",
+  "flavor": "The sack is only empty for show."
+ },
+ "US-03": {
+  "stats": [
+   [
+    "heart",
+    "25 FLS"
+   ],
+   [
+    "sword_fire",
+    "60"
+   ],
+   [
+    "target",
+    "1"
+   ],
+   [
+    "boot",
+    "2.2"
+   ]
+  ],
+  "rules": "Detonates: 60 Fire damage, radius 1, Structure ×2.",
+  "talent": "**Pumpkin Seeds**: 30 Fire damage to adjacent cells.",
+  "flavor": "Heads up. Fuse too."
+ },
+ "US-06": {
+  "stats": [
+   [
+    "heart",
+    "110 FLS"
+   ],
+   [
+    "sword_ice",
+    "12"
+   ],
+   [
+    "clock",
+    "1.1"
+   ],
+   [
+    "boot",
+    "1.5/3"
+   ]
+  ],
+  "rules": "**Slide Attack** (3-cell run-up): Knockback 2 cells, Stunned 1s.",
+  "talent": "**Ice Trail**: Enemies on the trail get −20% speed.",
+  "flavor": "Belly first is also a plan."
+ },
+ "UV-01": {
+  "stats": [
+   [
+    "heart",
+    "190 ARM"
+   ],
+   [
+    "sword",
+    "10"
+   ],
+   [
+    "clock",
+    "1.0"
+   ]
+  ],
+  "rules": "Block: −30% damage from the front.",
+  "talent": "**Pan Whirl**: Every 6s hits all adjacent enemies.",
+  "flavor": "The fried-egg crest is serious business."
+ },
+ "UZ-01": {
+  "stats": [
+   [
+    "heart",
+    "35"
+   ],
+   [
+    "plus",
+    "8/s"
+   ],
+   [
+    "target",
+    "4"
+   ]
+  ],
+  "rules": "Heals the most wounded ally within 4 cells for 8 HP/s. Healing Source.",
+  "talent": "**Double Cauldron**: Heals 2 targets.",
+  "flavor": "The soup helps. Don't ask with what."
+ },
+ "UZ-02": {
+  "stats": [
+   [
+    "heart",
+    "40"
+   ],
+   [
+    "wall",
+    "12/s"
+   ]
+  ],
+  "rules": "Repairs buildings for 12 HP/s. Rebuilds Rubble in 13s.",
+  "talent": "**Quick Mortar**: +50% repair speed.",
+  "flavor": "Mortar is a lifestyle."
+ },
+ "BH-01": {
+  "stats": [
+   [
+    "heart",
+    "300 Wood"
+   ],
+   [
+    "plus",
+    "3×6 HP/s"
+   ]
+  ],
+  "rules": "3 Treatment Slots, 6 HP/s each. Healing Source. Flammable.",
+  "flavor": "The thermometer is also the flag."
+ },
+ "BW-01": {
+  "stats": [
+   [
+    "heart",
+    "350 Metal"
+   ]
+  ],
+  "rules": "Newly spawned Assault and Defender units gain Hardened.",
+  "flavor": "The furnace grins. That is normal."
+ },
+ "BU-01": {
+  "stats": [
+   [
+    "heart",
+    "300 Wood"
+   ],
+   [
+    "person",
+    "+3"
+   ]
+  ],
+  "rules": "+3 Citizen cap. Citizens respawn every 4s instead of 5s. Flammable.",
+  "flavor": "The dog snores. So does everyone else."
+ },
+ "BF-01": {
+  "stats": [
+   [
+    "heart",
+    "400 Stone"
+   ],
+   [
+    "person",
+    "+1"
+   ]
+  ],
+  "rules": "Unlocks the Weapons line. +1 Roster slot.",
+  "flavor": "The tuba plays reveille. With burps."
+ },
+ "BP-01": {
+  "stats": [
+   [
+    "heart",
+    "350 Stone"
+   ],
+   [
+    "cannon",
+    "2"
+   ]
+  ],
+  "rules": "2 Gun Slots. Artillery on it takes −25% Splash damage.",
+  "flavor": "The merlons have faces. They look stern."
+ },
+ "BT-01": {
+  "stats": [
+   [
+    "heart",
+    "300 Wood"
+   ],
+   [
+    "sword",
+    "12"
+   ],
+   [
+    "clock",
+    "1.2"
+   ],
+   [
+    "target",
+    "7"
+   ]
+  ],
+  "rules": "Shoots enemy units. +50% damage vs Fleeing units. Flammable.",
+  "flavor": "The archer waves. It is part of the job."
+ },
+ "BS-02": {
+  "stats": [
+   [
+    "heart",
+    "260/seg"
+   ],
+   [
+    "wall",
+    "≤4"
+   ]
+  ],
+  "rules": "Replaces up to 4 wall segments. Splash damage does not pass through. Attackers get −20% speed. Fire damage taken ×1.3.",
+  "flavor": "A cherry on top. That is tactics."
+ },
+ "BS-06": {
+  "stats": [
+   [
+    "heart",
+    "200 Stone"
+   ],
+   [
+    "sword",
+    "60"
+   ]
+  ],
+  "rules": "The first 2 enemies each wave fall in: 60 Impact damage, Stunned 4s. Does not affect Flying or Spirit units.",
+  "flavor": "“Please don't,” the sign said."
+ },
+ "BH-02": {
+  "stats": [
+   [
+    "heart",
+    "180 Wood"
+   ],
+   [
+    "plus",
+    "8 HP/s"
+   ]
+  ],
+  "rules": "1 Treatment Slot, 8 HP/s. Healing Source. Flammable.",
+  "flavor": "The accordion is the alarm."
+ }
+}

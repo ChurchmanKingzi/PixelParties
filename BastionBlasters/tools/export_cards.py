@@ -17,6 +17,21 @@ CATS = {'BS': 'Strukturen', 'BT': 'Türme', 'BH': 'Heilung', 'BW': 'Werkstätten
 UNIT_KIND = {'UA': 'artillerie', 'US': 'sturm', 'UV': 'verteidiger', 'UZ': 'zivilist'}
 
 
+KEYWORDS = json.load(open(os.path.join(ROOT, 'daten', 'keywords.json'), encoding='utf-8'))
+
+
+def term(kind: str, de: str) -> str:
+    """Deutscher Designbegriff -> englischer Spielbegriff (Quelle: daten/keywords.json)"""
+    de = re.sub(r'\s*\(.*\)\s*$', '', de).strip()      # Zusätze wie "(Leine ×1,5)" gehören nicht zum Begriff
+    for k in KEYWORDS:
+        if k['kind'] == kind and k['de'].lower() == de.lower():
+            return k['en']
+    raise KeyError(f'{kind}: {de!r} fehlt in keywords.json')
+
+
+ARMOR_DE = {'F': 'Fleisch', 'P': 'Panzer', 'G': 'Geist', 'K': 'Knochen', 'Pu': 'Pudding'}
+
+
 def clean(s: str) -> str:
     return re.sub(r'\*\*', '', s).strip()
 
@@ -53,7 +68,10 @@ def building(r):
     third = r.get('Effekt') or r.get('Schaltet frei') or r.get('Geschützplätze') or ''
     fourth = r.get('Regeln / Tags') or r.get('Zusatzeffekt') or r.get('Besonderheit') or ''
     d = {
-        'id': cid, 'name': clean(r['Name']), 'kategorie': 'bau', 'gruppe': CATS[cid[:2]],
+        'id': cid, 'name': clean(r['Name']), 'name_en': clean(r['Name (EN)']), 'kategorie': 'bau', 'gruppe': CATS[cid[:2]],
+        'category_en': 'Building', 'group_en': term('group', CATS[cid[:2]]),
+        'build_type_en': term('build_type', {'raum': 'Raum', 'hof': 'Hof', 'turm': 'Turm', 'wand': 'Wand', 'tor': 'Tor'}[bauart]),
+        'material_en': term('material', mat.strip()),
         'bauart': bauart, 'masse': masse or None, 'tier': ROMAN[r['T']],
         'material': mat.strip(), 'hp': num(hp), 'hp_text': hp.strip(),
         'posten': num(r['⚙']) if r['⚙'] not in ('–', '-') else 0,
@@ -69,21 +87,26 @@ def unit(r):
     kind = UNIT_KIND[cid[:2]]
     linie, _, t = r['Linie · T'].partition('·')
     soll, _, nach = r['S/N'].partition('/')
-    d = {'id': cid, 'name': clean(r['Name']), 'kategorie': kind, 'linie': linie.strip(), 'tier': ROMAN[t.strip()],
+    d = {'id': cid, 'name': clean(r['Name']), 'name_en': clean(r['Name (EN)']), 'kategorie': kind,
+         'category_en': term('card_type', {'artillerie': 'Artillerie', 'sturm': 'Sturm', 'verteidiger': 'Verteidiger', 'zivilist': 'Zivilist'}[kind]),
+         'line_en': term('line', linie), 'linie': linie.strip(), 'tier': ROMAN[t.strip()],
          'soll': int(soll), 'nachschub': int(nach), 'talent_r3': clean(r['Talent R3']), 'look': clean(r['Look'])}
     hp_rk = r['HP · RK'] if 'HP · RK' in r else r['HP']
     d['hp'] = num(hp_rk)
     if '·' in hp_rk:
-        d['ruestung'] = hp_rk.split('·', 1)[1].strip()
+        d['ruestung'] = hp_rk.split('·', 1)[1].strip().split(' ')[0]
+        d['armor_en'] = term('armor', ARMOR_DE[d['ruestung']])
     if kind == 'artillerie':
         bahn, _, rw = r['Flugbahn · Reichw.'].partition('·')
-        d.update({'gp': r['GP'] if r['GP'] == 'Luft' else num(r['GP']), 'flugbahn': bahn.strip(), 'reichweite': num(rw),
+        d.update({'gp': r['GP'] if r['GP'] == 'Luft' else num(r['GP']), 'flugbahn': bahn.strip(), 'trajectory_en': term('trajectory', bahn),
+                  'reichweite': num(rw),
                   'schaden_takt': r['Schaden (Struktur / Person) · Takt'], 'besonderheit': clean(r['Besonderheit'])})
     elif kind == 'sturm':
-        d.update({'angriff': r['Angriff · Reichweite'], 'tempo': r['Tempo'], 'doktrin': r['Doktrin'],
+        d.update({'angriff': r['Angriff · Reichweite'], 'tempo': r['Tempo'], 'doktrin': r['Doktrin'], 'doctrine_en': term('doctrine', r['Doktrin']),
                   'besonderheit': clean(r['Besonderheit'])})
     elif kind == 'verteidiger':
-        d.update({'angriff': r['Angriff · Reichweite'], 'zone': r['Standardzone'], 'besonderheit': clean(r['Besonderheit'])})
+        d.update({'angriff': r['Angriff · Reichweite'], 'zone': r['Standardzone'], 'zone_en': term('zone', r['Standardzone']),
+                  'besonderheit': clean(r['Besonderheit'])})
     else:
         d.update({'funktion': clean(r['Funktion'])})
     return d

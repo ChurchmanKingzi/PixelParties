@@ -23,10 +23,11 @@ Benötigt Python 3 mit `Pillow` und `numpy`. Für Beschriftungen in den Planungs
 | `assets_units.py` | Einheiten mit Animationen (Skelett, Goblin, Rutsch-Bär, Büttel, Hexe, Katapult, Kürbis-Bomber in 3/4-Ansicht, Bau-Gnom, Bürger, Rangabzeichen) |
 | `scenekit.py` | Gemeinsame Szenen-Helfer: Team-Swap, Bodenschatten, Zielschatten |
 | `assets_buildings.py` | Bauteil-Sprites der ersten Karten: Pfeilturm, Puddingwand, Fallgrube, Feldlazarett |
-| `pixfont.py` | Pixelfont „Schlamassia 5 × 7“ (Umlaute, ß, Satzzeichen), `draw_text`, Zeilenumbruch |
+| `pixfont.py` | Pixelfont „Schlamassia 5 × 7“ (Umlaute, ß, Satzzeichen), `draw_text`, Rich-Text mit kluger Fettschrift (`draw_rich`), Zeilenumbruch |
 | `cardicons.py` | 7-px-Symbole für Kartenwerte (Herz, Schwert, Uhr, …) |
 | `cards_art.py` | Bildfenster der Karten (144 × 96, nativ): Dioramen für Einheiten und Bauteile |
-| `cards.py` | **Kartenrenderer** (160 × 224): Rahmen, Namensband, Werteleiste, Texte, Kartenrücken, Übersicht |
+| `cards.py` | **Kartenrenderer** (160 × 224): Rahmen, Namensband, abgeleitete Typzeile, Werteleiste, Effektbox mit automatisch fetten Glossarbegriffen, `RANK 3`-Abzeichen, Flavor, Übersicht |
+| `cardback.py` | **Kartenrücken:** großes goldenes Logo (3-fach vergrößerter Pixelfont mit Verlauf, Kontur, Schatten), Zinnenband, Schnörkel, Ecken, Medaillon mit Kernkristall |
 | `styleprobe.py` | Zusammenbau: Karte 56 × 28 Zellen, zwei Burgen, Landschaft, Einheiten, Projektile, Zielschatten; Kontaktbögen, Atlas, Animation, Planungsansicht |
 
 ## Ausgabe (`out/`)
@@ -43,17 +44,19 @@ Benötigt Python 3 mit `Pillow` und `numpy`. Für Beschriftungen in den Planungs
 | `umgebung.png` | Boden, Mauer-Texturen (Oberseite, hoch, niedrig), Tore, Türme beider Teams, Kern, Katapult |
 | `palette.png` | die 20 Rampen der Master-Palette |
 | `sprites/*.png` + `atlas.json` | Spritesheets je Einheit, Frame-Größe und Animations-Tags für die Engine |
-| `karten/*.png`, `karten_uebersicht.png`, `kartenruecken.png` | **Erste 17 Karten** (8 Einheiten, 9 Bauteile) einzeln in 160 × 224 und als Übersicht (×2); `*_x3.png` = ×3-Ansichten |
+| `cards/*.png`, `cards_overview.png`, `card_back.png` | **Erste 17 Karten** (8 Einheiten, 9 Bauteile) einzeln in 160 × 224 und als Übersicht (×2); `*_x3.png` = ×3-Ansichten |
 | `bericht.txt` | Weltmaße, Farbzählung je Sprite und insgesamt |
 
 ## Karten erzeugen
 
 ```bash
-python3 tools/export_cards.py     # Kataloge -> daten/cards.json (aus dem Ordner BastionBlasters/)
-cd art && python3 -I cards.py     # -> out/karten/*.png, out/karten_uebersicht.png, out/kartenruecken.png
+python3 tools/export_cards.py        # Kataloge -> daten/cards.json (aus dem Ordner BastionBlasters/)
+python3 tools/lint_card_text.py      # Nomenklatur prüfen (muss OK melden)
+python3 tools/build_nomenclature.py  # NOMENCLATURE.md aus daten/keywords.json neu erzeugen
+cd art && python3 -I cards.py        # -> out/cards/*.png, out/cards_overview.png, out/card_back.png
 ```
 
-Neue Karte: Eintrag in `daten/kartentexte.json` (typ, rechts, stats, regel, zeile2, flavor), Bildfenster in `cards_art.py` ergänzen, rendern. Der Renderer warnt bei zu langen Texten (Regeltext max. 3 Zeilen, mit Zusatzzeile; sonst 4).
+Neue Karte: Eintrag in `daten/card_text.json` (`stats`, `rules`, `talent`, `flavor`; Typzeile und Kopfzeile werden aus den Katalogdaten abgeleitet), Bildfenster in `cards_art.py` ergänzen, Linter und Renderer laufen lassen. Regeltext und Talent zusammen höchstens 5 Zeilen, Flavor höchstens 2; der Renderer warnt bei Überlänge. Glossarbegriffe nie von Hand fett setzen.
 
 ## Regeln der Werkstatt
 

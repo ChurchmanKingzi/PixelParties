@@ -21,7 +21,7 @@ _COL = {
 }
 
 ICONS = {
-    'herz': [
+    'heart': [
         ".kk.kk.",
         "kppRRRk",
         "kpRRRRk",
@@ -30,7 +30,7 @@ ICONS = {
         "..krk..",
         "...k...",
     ],
-    'schwert': [
+    'sword': [
         "....kwk",
         "...kwhk",
         "k.kshk.",
@@ -39,7 +39,7 @@ ICONS = {
         "kbkk...",
         "kBk....",
     ],
-    'uhr': [
+    'clock': [
         "..kkk..",
         ".kyyyk.",
         "kyykyyk",
@@ -48,7 +48,7 @@ ICONS = {
         ".kyyyk.",
         "..kkk..",
     ],
-    'ziel': [
+    'target': [
         "..kkk..",
         ".kooOk.",
         "kokkkOk",
@@ -57,7 +57,7 @@ ICONS = {
         ".kooOk.",
         "..kkk..",
     ],
-    'stiefel': [
+    'boot': [
         ".kkk...",
         ".kyk...",
         ".kyk...",
@@ -75,7 +75,7 @@ ICONS = {
         ".kRrRk.",
         ".kk.kk.",
     ],
-    'nachschub': [
+    'reinforce': [
         "...k...",
         "..klk..",
         ".kmmlk.",
@@ -84,7 +84,7 @@ ICONS = {
         "..klk..",
         "..kkk..",
     ],
-    'stern': [
+    'star': [
         "...k...",
         "..kyk..",
         "kkkygkk",
@@ -93,7 +93,7 @@ ICONS = {
         ".kygGk.",
         "..k.k..",
     ],
-    'stern_leer': [
+    'star_empty': [
         "...k...",
         "..knk..",
         "kkknNkk",
@@ -102,7 +102,7 @@ ICONS = {
         ".knNNk.",
         "..k.k..",
     ],
-    'raum': [
+    'room': [
         "...kk..",
         "..kRRk.",
         ".kRRRRk",
@@ -111,7 +111,7 @@ ICONS = {
         ".kbkbk.",
         ".kkkkk.",
     ],
-    'turm': [
+    'tower': [
         "k.k.k.k",
         "kkkkkkk",
         ".knnNk.",
@@ -120,7 +120,7 @@ ICONS = {
         ".knnNk.",
         "kkkkkkk",
     ],
-    'hof': [
+    'yard': [
         ".......",
         "..l.l..",
         ".lLllL.",
@@ -129,7 +129,7 @@ ICONS = {
         "kkkkkkk",
         ".......",
     ],
-    'wand': [
+    'wall': [
         "kkkkkkk",
         "knnknnk",
         "kkkkkkk",
@@ -147,7 +147,7 @@ ICONS = {
         "..klk..",
         "..kkk..",
     ],
-    'kanone': [
+    'cannon': [
         ".......",
         "..kkkk.",
         "kkSsssk",
@@ -157,6 +157,12 @@ ICONS = {
         ".kkkk..",
     ],
 }
+
+
+# Schwert-Varianten: die Klingenfarbe zeigt die Schadensart (Impact = Stahl)
+_BLADE = {'fire': ('o', 'q'), 'ice': ('c', 'i'), 'lightning': ('g', 'y'), 'poison': ('l', 'm'), 'arcane': ('u', 'v')}
+for _name, (_mid, _light) in _BLADE.items():
+    ICONS['sword_' + _name] = [r.replace('s', _mid).replace('h', _light) for r in ICONS['sword']]
 
 
 def _color(ch):

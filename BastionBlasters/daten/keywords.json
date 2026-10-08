@@ -1,0 +1,974 @@
+[
+ {
+  "en": "Artillery",
+  "de": "Artillerie",
+  "kind": "card_type",
+  "bold": true,
+  "def": "Stands on Gun Slots of its own bastion and shoots the enemy bastion."
+ },
+ {
+  "en": "Assault",
+  "de": "Sturm",
+  "kind": "card_type",
+  "bold": true,
+  "def": "Runs to the enemy bastion, kills Civilians and Citizens, occupies the Core Chamber."
+ },
+ {
+  "en": "Defender",
+  "de": "Verteidiger",
+  "kind": "card_type",
+  "bold": true,
+  "def": "Stays inside its own bastion. Blocks Conquest while alive in the Core Chamber."
+ },
+ {
+  "en": "Civilian",
+  "de": "Zivilist",
+  "kind": "card_type",
+  "bold": true,
+  "def": "Stays inside its own bastion and supports: heals, repairs, buffs."
+ },
+ {
+  "en": "Building",
+  "de": "Bauteil",
+  "kind": "card_type",
+  "bold": true,
+  "def": "A card that is placed on the plot."
+ },
+ {
+  "en": "Room",
+  "de": "Raum",
+  "kind": "build_type",
+  "bold": true,
+  "def": "Module of at least 2 cells depth with walls and a door."
+ },
+ {
+  "en": "Yard",
+  "de": "Hof",
+  "kind": "build_type",
+  "bold": true,
+  "def": "Building on yard cells: no walls, no door, open to all units; less HP."
+ },
+ {
+  "en": "Tower",
+  "de": "Turm",
+  "kind": "build_type",
+  "bold": true,
+  "def": "Solid 1×1 cell at the outer edge, a corner, or in the yard."
+ },
+ {
+  "en": "Wall",
+  "de": "Wand",
+  "kind": "build_type",
+  "bold": true,
+  "def": "Wall segments on cell edges. Blocks movement and Line of Fire."
+ },
+ {
+  "en": "Gate",
+  "de": "Tor",
+  "kind": "build_type",
+  "bold": true,
+  "def": "Opening in an outer edge. Open for allies, closed for enemies."
+ },
+ {
+  "en": "Defense",
+  "de": "Strukturen",
+  "kind": "group",
+  "bold": false,
+  "def": "Building group (catalog heading)."
+ },
+ {
+  "en": "Turrets",
+  "de": "Türme",
+  "kind": "group",
+  "bold": false,
+  "def": "Building group (catalog heading)."
+ },
+ {
+  "en": "Healing",
+  "de": "Heilung",
+  "kind": "group",
+  "bold": false,
+  "def": "Building group (catalog heading)."
+ },
+ {
+  "en": "Workshops",
+  "de": "Werkstätten",
+  "kind": "group",
+  "bold": false,
+  "def": "Building group (catalog heading)."
+ },
+ {
+  "en": "Unlock",
+  "de": "Freischalt-Räume",
+  "kind": "group",
+  "bold": false,
+  "def": "Building group (catalog heading)."
+ },
+ {
+  "en": "Platforms",
+  "de": "Plattformen",
+  "kind": "group",
+  "bold": false,
+  "def": "Building group (catalog heading)."
+ },
+ {
+  "en": "Utility",
+  "de": "Utility",
+  "kind": "group",
+  "bold": false,
+  "def": "Building group (catalog heading)."
+ },
+ {
+  "en": "Countermeasures",
+  "de": "Abwehr",
+  "kind": "group",
+  "bold": false,
+  "def": "Building group (catalog heading)."
+ },
+ {
+  "en": "Chaos",
+  "de": "Chaos",
+  "kind": "group",
+  "bold": false,
+  "def": "Building group (catalog heading)."
+ },
+ {
+  "en": "Basic",
+  "de": "Basis",
+  "kind": "line",
+  "bold": true,
+  "def": "Unlock line. Basic is always available; every other line needs its Unlock Room."
+ },
+ {
+  "en": "Weapons",
+  "de": "Waffen",
+  "kind": "line",
+  "bold": true,
+  "def": "Unlock line. Basic is always available; every other line needs its Unlock Room."
+ },
+ {
+  "en": "Arcane",
+  "de": "Arkan",
+  "kind": "line",
+  "bold": true,
+  "def": "Unlock line. Basic is always available; every other line needs its Unlock Room."
+ },
+ {
+  "en": "Beast",
+  "de": "Tier",
+  "kind": "line",
+  "bold": true,
+  "def": "Unlock line. Basic is always available; every other line needs its Unlock Room."
+ },
+ {
+  "en": "Tech",
+  "de": "Technik",
+  "kind": "line",
+  "bold": true,
+  "def": "Unlock line. Basic is always available; every other line needs its Unlock Room."
+ },
+ {
+  "en": "Crypt",
+  "de": "Gruft",
+  "kind": "line",
+  "bold": true,
+  "def": "Unlock line. Basic is always available; every other line needs its Unlock Room."
+ },
+ {
+  "en": "Frost",
+  "de": "Frost",
+  "kind": "line",
+  "bold": true,
+  "def": "Unlock line. Basic is always available; every other line needs its Unlock Room."
+ },
+ {
+  "en": "Flora",
+  "de": "Flora",
+  "kind": "line",
+  "bold": true,
+  "def": "Unlock line. Basic is always available; every other line needs its Unlock Room."
+ },
+ {
+  "en": "Air",
+  "de": "Luft",
+  "kind": "line",
+  "bold": true,
+  "def": "Unlock line. Basic is always available; every other line needs its Unlock Room."
+ },
+ {
+  "en": "Blessing",
+  "de": "Segen",
+  "kind": "line",
+  "bold": true,
+  "def": "Unlock line. Basic is always available; every other line needs its Unlock Room."
+ },
+ {
+  "en": "Chaos",
+  "de": "Chaos",
+  "kind": "line",
+  "bold": true,
+  "def": "Unlock line. Basic is always available; every other line needs its Unlock Room."
+ },
+ {
+  "en": "Flat",
+  "de": "Flach",
+  "kind": "trajectory",
+  "bold": true,
+  "def": "Needs a free Line of Fire. Hits the first solid obstacle on the line."
+ },
+ {
+  "en": "Arc",
+  "de": "Bogen",
+  "kind": "trajectory",
+  "bold": true,
+  "def": "Hits any cell in range. Spread applies. Shows a Target Marker 1.2s before impact."
+ },
+ {
+  "en": "Vertical",
+  "de": "Senkrecht",
+  "kind": "trajectory",
+  "bold": true,
+  "def": "Like Arc, but Target Marker 2.0s and small spread. Cannot be intercepted by nets."
+ },
+ {
+  "en": "Piercing",
+  "de": "Durchschlag",
+  "kind": "trajectory",
+  "bold": true,
+  "def": "Flat. Continues through 2–5 solid obstacles, −20% damage per obstacle."
+ },
+ {
+  "en": "Underground",
+  "de": "Untergrund",
+  "kind": "trajectory",
+  "bold": true,
+  "def": "Any cell. Damages buildings only. Ignores domes, nets and mirrors. Warning: 0.8s rumble."
+ },
+ {
+  "en": "Scatter",
+  "de": "Streu",
+  "kind": "trajectory",
+  "bold": true,
+  "def": "N small hits on random cells in a 3×3 area."
+ },
+ {
+  "en": "Aerial",
+  "de": "Luft",
+  "kind": "trajectory",
+  "bold": true,
+  "def": "Like Arc, fired from the air. The shooter can be attacked."
+ },
+ {
+  "en": "Impact",
+  "de": "Wucht",
+  "kind": "damage",
+  "bold": false,
+  "def": "Damage type.",
+  "abbr": "IMP"
+ },
+ {
+  "en": "Fire",
+  "de": "Feuer",
+  "kind": "damage",
+  "bold": false,
+  "def": "Damage type.",
+  "abbr": "FIR"
+ },
+ {
+  "en": "Ice",
+  "de": "Eis",
+  "kind": "damage",
+  "bold": false,
+  "def": "Damage type.",
+  "abbr": "ICE"
+ },
+ {
+  "en": "Lightning",
+  "de": "Blitz",
+  "kind": "damage",
+  "bold": false,
+  "def": "Damage type.",
+  "abbr": "LTN"
+ },
+ {
+  "en": "Poison",
+  "de": "Gift",
+  "kind": "damage",
+  "bold": false,
+  "def": "Damage type.",
+  "abbr": "PSN"
+ },
+ {
+  "en": "Arcane",
+  "de": "Arkan",
+  "kind": "damage",
+  "bold": false,
+  "def": "Damage type.",
+  "abbr": "ARC"
+ },
+ {
+  "en": "Flesh",
+  "de": "Fleisch",
+  "kind": "armor",
+  "bold": false,
+  "def": "Armor class of a unit (damage multipliers: see GDD §7.3).",
+  "abbr": "FLS"
+ },
+ {
+  "en": "Armor",
+  "de": "Panzer",
+  "kind": "armor",
+  "bold": false,
+  "def": "Armor class of a unit (damage multipliers: see GDD §7.3).",
+  "abbr": "ARM"
+ },
+ {
+  "en": "Spirit",
+  "de": "Geist",
+  "kind": "armor",
+  "bold": false,
+  "def": "Armor class of a unit (damage multipliers: see GDD §7.3).",
+  "abbr": "SPR"
+ },
+ {
+  "en": "Bone",
+  "de": "Knochen",
+  "kind": "armor",
+  "bold": false,
+  "def": "Armor class of a unit (damage multipliers: see GDD §7.3).",
+  "abbr": "BON"
+ },
+ {
+  "en": "Pudding",
+  "de": "Pudding",
+  "kind": "armor",
+  "bold": false,
+  "def": "Armor class of a unit (damage multipliers: see GDD §7.3).",
+  "abbr": "PUD"
+ },
+ {
+  "en": "Wood",
+  "de": "Holz",
+  "kind": "material",
+  "bold": false,
+  "def": "Building material (damage multipliers: see GDD §7.3)."
+ },
+ {
+  "en": "Stone",
+  "de": "Stein",
+  "kind": "material",
+  "bold": false,
+  "def": "Building material (damage multipliers: see GDD §7.3)."
+ },
+ {
+  "en": "Metal",
+  "de": "Metall",
+  "kind": "material",
+  "bold": false,
+  "def": "Building material (damage multipliers: see GDD §7.3)."
+ },
+ {
+  "en": "Crystal",
+  "de": "Kristall",
+  "kind": "material",
+  "bold": false,
+  "def": "Building material (damage multipliers: see GDD §7.3)."
+ },
+ {
+  "en": "Organic",
+  "de": "Organisch",
+  "kind": "material",
+  "bold": false,
+  "def": "Building material (damage multipliers: see GDD §7.3)."
+ },
+ {
+  "en": "Ice",
+  "de": "Eis",
+  "kind": "material",
+  "bold": false,
+  "def": "Building material (damage multipliers: see GDD §7.3)."
+ },
+ {
+  "en": "Pudding",
+  "de": "Pudding",
+  "kind": "material",
+  "bold": false,
+  "def": "Building material (damage multipliers: see GDD §7.3)."
+ },
+ {
+  "en": "Hunter",
+  "de": "Jäger",
+  "kind": "doctrine",
+  "bold": true,
+  "def": "Prefers Civilians, then Defenders, then everything else."
+ },
+ {
+  "en": "Breaker",
+  "de": "Brecher",
+  "kind": "doctrine",
+  "bold": true,
+  "def": "Attacks gates, walls and rooms (Structure ×1.0)."
+ },
+ {
+  "en": "Conqueror",
+  "de": "Eroberer",
+  "kind": "doctrine",
+  "bold": true,
+  "def": "Runs the shortest path to the Core Chamber and occupies it. Fights only when blocked."
+ },
+ {
+  "en": "Looter",
+  "de": "Plünderer",
+  "kind": "doctrine",
+  "bold": true,
+  "def": "Is distracted by Loot. Otherwise acts as Hunter."
+ },
+ {
+  "en": "Bomber",
+  "de": "Sprenger",
+  "kind": "doctrine",
+  "bold": true,
+  "def": "Runs to the most expensive building and Detonates."
+ },
+ {
+  "en": "Gate",
+  "de": "Tor",
+  "kind": "zone",
+  "bold": true,
+  "def": "Guard zone: the gate."
+ },
+ {
+  "en": "Patrol",
+  "de": "Mitte",
+  "kind": "zone",
+  "bold": true,
+  "def": "Guard zone: roams the yard."
+ },
+ {
+  "en": "Core",
+  "de": "Kernkammer",
+  "kind": "zone",
+  "bold": true,
+  "def": "Guard zone: the Core Chamber."
+ },
+ {
+  "en": "Precision",
+  "de": "Chirurg",
+  "kind": "priority",
+  "bold": true,
+  "def": "Targets the cell with the highest function value."
+ },
+ {
+  "en": "Breach",
+  "de": "Brecher",
+  "kind": "priority",
+  "bold": true,
+  "def": "Targets the cell that opens Line of Fire fastest."
+ },
+ {
+  "en": "Core Hunt",
+  "de": "Kernjagd",
+  "kind": "priority",
+  "bold": true,
+  "def": "Targets the Core when reachable, else the cell that exposes it fastest."
+ },
+ {
+  "en": "Counter-Battery",
+  "de": "Waffenjäger",
+  "kind": "priority",
+  "bold": true,
+  "def": "Targets platforms, towers and shields."
+ },
+ {
+  "en": "Spray",
+  "de": "Streuer",
+  "kind": "priority",
+  "bold": true,
+  "def": "Targets random cells in range."
+ },
+ {
+  "en": "Burning",
+  "de": "Brennen",
+  "kind": "status",
+  "bold": true,
+  "def": "Takes 3 Fire damage/s. Spreads to adjacent flammable buildings. Buildings lose 10 HP/s.",
+  "duration": "5s"
+ },
+ {
+  "en": "Chilled",
+  "de": "Eisig",
+  "kind": "status",
+  "bold": true,
+  "def": "−30% speed and attack speed.",
+  "duration": "4s"
+ },
+ {
+  "en": "Frozen",
+  "de": "Eingefroren",
+  "kind": "status",
+  "bold": true,
+  "def": "Unit: Stunned. Building: effect ×0.5.",
+  "duration": "2–5s"
+ },
+ {
+  "en": "Slimed",
+  "de": "Schleim",
+  "kind": "status",
+  "bold": true,
+  "def": "−25% speed.",
+  "duration": "4s"
+ },
+ {
+  "en": "Poisoned",
+  "de": "Vergiftet",
+  "kind": "status",
+  "bold": true,
+  "def": "Takes 4 Poison damage/s, ignores armor class. Healing −50%.",
+  "duration": "6s"
+ },
+ {
+  "en": "Stunned",
+  "de": "Betäubt",
+  "kind": "status",
+  "bold": true,
+  "def": "Cannot act.",
+  "duration": "1–4s"
+ },
+ {
+  "en": "Confused",
+  "de": "Verwirrt",
+  "kind": "status",
+  "bold": true,
+  "def": "Moves and targets randomly.",
+  "duration": "3s"
+ },
+ {
+  "en": "Feared",
+  "de": "Furcht",
+  "kind": "status",
+  "bold": true,
+  "def": "Flees from the source.",
+  "duration": "2–4s"
+ },
+ {
+  "en": "Rooted",
+  "de": "Festgehalten",
+  "kind": "status",
+  "bold": true,
+  "def": "Cannot move. Can attack.",
+  "duration": "2s"
+ },
+ {
+  "en": "Frogged",
+  "de": "Frosch",
+  "kind": "status",
+  "bold": true,
+  "def": "Transformed: HP and attack greatly reduced, no abilities. A Frogged Civilian leaves its post.",
+  "duration": "3–6s"
+ },
+ {
+  "en": "Dancing",
+  "de": "Tanzend",
+  "kind": "status",
+  "bold": true,
+  "def": "Cannot attack.",
+  "duration": "2s"
+ },
+ {
+  "en": "Blinded",
+  "de": "Geblendet",
+  "kind": "status",
+  "bold": true,
+  "def": "Spread ×2.",
+  "duration": "8s"
+ },
+ {
+  "en": "Shorted",
+  "de": "Kurzgeschlossen",
+  "kind": "status",
+  "bold": true,
+  "def": "Building: 0% effect.",
+  "duration": "3s"
+ },
+ {
+  "en": "Wet",
+  "de": "Nass",
+  "kind": "status",
+  "bold": true,
+  "def": "−10% speed. Lightning damage taken ×1.5. Cannot be Burning.",
+  "duration": "while raining"
+ },
+ {
+  "en": "Blessed",
+  "de": "Gesegnet",
+  "kind": "status",
+  "bold": true,
+  "def": "Absorbs the next damage (up to 40).",
+  "duration": "15s"
+ },
+ {
+  "en": "Hardened",
+  "de": "Gehärtet",
+  "kind": "status",
+  "bold": true,
+  "def": "+12% max HP, +10% Impact damage.",
+  "duration": "permanent"
+ },
+ {
+  "en": "Fed",
+  "de": "Satt",
+  "kind": "status",
+  "bold": true,
+  "def": "+15% max HP.",
+  "duration": "40s"
+ },
+ {
+  "en": "Spurred",
+  "de": "Angespornt",
+  "kind": "status",
+  "bold": true,
+  "def": "+15% attack speed.",
+  "duration": "while in aura"
+ },
+ {
+  "en": "Cursed",
+  "de": "Verflucht",
+  "kind": "status",
+  "bold": true,
+  "def": "−25% damage dealt.",
+  "duration": "8s"
+ },
+ {
+  "en": "Invisible",
+  "de": "Unsichtbar",
+  "kind": "status",
+  "bold": true,
+  "def": "Cannot be targeted unless adjacent or revealed.",
+  "duration": "variable"
+ },
+ {
+  "en": "Swallowed",
+  "de": "Verschluckt",
+  "kind": "status",
+  "bold": true,
+  "def": "Removed from the field. Cannot act.",
+  "duration": "5s"
+ },
+ {
+  "en": "Floating",
+  "de": "Schwebend",
+  "kind": "status",
+  "bold": true,
+  "def": "−50% speed. Cannot attack. Falls afterwards.",
+  "duration": "3s"
+ },
+ {
+  "en": "Rune Skin",
+  "de": "Runenhaut",
+  "kind": "status",
+  "bold": true,
+  "def": "Ignores the first Stun, Fear or Confusion. +20% Arcane resistance.",
+  "duration": "permanent"
+ },
+ {
+  "en": "Healing Source",
+  "de": "Heilquelle",
+  "kind": "keyword",
+  "bold": true,
+  "def": "Counts for the Retreat rule: a staffed healing building or a living healer."
+ },
+ {
+  "en": "Treatment Slot",
+  "de": "Behandlungsplatz",
+  "kind": "keyword",
+  "bold": true,
+  "def": "Slot in a Healing Source that holds one wounded unit."
+ },
+ {
+  "en": "Retreat",
+  "de": "Rückzug",
+  "kind": "keyword",
+  "bold": true,
+  "def": "Assault units below 50% HP run to the nearest Healing Source if one exists."
+ },
+ {
+  "en": "Fleeing",
+  "de": "Fliehend",
+  "kind": "keyword",
+  "bold": true,
+  "def": "+30% speed. Does not attack. Targeted first by towers and Assault units."
+ },
+ {
+  "en": "Last Stand",
+  "de": "Todesmut",
+  "kind": "keyword",
+  "bold": true,
+  "def": "No Healing Source: fights to the death, +15% damage."
+ },
+ {
+  "en": "Flying",
+  "de": "Flieger",
+  "kind": "keyword",
+  "bold": true,
+  "def": "Crosses walls and traps. Hit by Flat shots only from towers with anti-air."
+ },
+ {
+  "en": "Loot",
+  "de": "Beute",
+  "kind": "keyword",
+  "bold": true,
+  "def": "Distracts Looters."
+ },
+ {
+  "en": "Block",
+  "de": "Block",
+  "kind": "keyword",
+  "bold": true,
+  "def": "Reduces damage taken from the front."
+ },
+ {
+  "en": "Splash",
+  "de": "Splash",
+  "kind": "keyword",
+  "bold": true,
+  "def": "Damages cells within the radius: 50% structure damage; units in the impact room take full damage."
+ },
+ {
+  "en": "Detonate",
+  "de": "Explodieren",
+  "kind": "keyword",
+  "bold": true,
+  "def": "Dies and deals its explosion damage.",
+  "forms": [
+   "Detonate",
+   "Detonates",
+   "Detonated"
+  ]
+ },
+ {
+  "en": "Structure",
+  "de": "Strukturfaktor",
+  "kind": "keyword",
+  "bold": true,
+  "def": "Damage multiplier against buildings. Default: Assault ×0.4, Breaker ×1.0, Defender and Civilian ×0.",
+  "forms": [
+   "Structure"
+  ]
+ },
+ {
+  "en": "Gun Slot",
+  "de": "Geschützplatz",
+  "kind": "keyword",
+  "bold": true,
+  "def": "Platform slot that holds one Artillery unit. A unit needs 1–4 slots."
+ },
+ {
+  "en": "Target Marker",
+  "de": "Zielschatten",
+  "kind": "keyword",
+  "bold": true,
+  "def": "Ground marker that shows an Arc or Vertical impact. Units in the radius flee."
+ },
+ {
+  "en": "Line of Fire",
+  "de": "Schusslinie",
+  "kind": "keyword",
+  "bold": true,
+  "def": "Straight line from shooter to target cell without enemy solid cells or wall segments."
+ },
+ {
+  "en": "Spread",
+  "de": "Streuung",
+  "kind": "keyword",
+  "bold": true,
+  "def": "Random offset of Arc and Vertical shots: 0.4 + 0.04 × distance cells."
+ },
+ {
+  "en": "Rubble",
+  "de": "Trümmer",
+  "kind": "keyword",
+  "bold": true,
+  "def": "Destroyed building or wall: walkable, −30% speed, no function, no cover."
+ },
+ {
+  "en": "Breach",
+  "de": "Bresche",
+  "kind": "keyword",
+  "bold": true,
+  "def": "Destroyed outer wall segment. Acts as an additional entrance."
+ },
+ {
+  "en": "Crew",
+  "de": "Posten",
+  "kind": "keyword",
+  "bold": true,
+  "def": "Staff a building needs to work. Effect scales with filled posts. 0 filled posts: Abandoned."
+ },
+ {
+  "en": "Abandoned",
+  "de": "Verwaist",
+  "kind": "keyword",
+  "bold": true,
+  "def": "A building without crew: 0% effect."
+ },
+ {
+  "en": "Citizen",
+  "de": "Bürger",
+  "kind": "keyword",
+  "bold": true,
+  "def": "Free basic worker. HP 25. Fills open posts automatically."
+ },
+ {
+  "en": "Squad",
+  "de": "Soll",
+  "kind": "keyword",
+  "bold": true,
+  "def": "Target number of living units of a card."
+ },
+ {
+  "en": "Reinforce",
+  "de": "Nachschub",
+  "kind": "keyword",
+  "bold": true,
+  "def": "Units added per wave until the Squad is full."
+ },
+ {
+  "en": "Roster",
+  "de": "Kontingent",
+  "kind": "keyword",
+  "bold": true,
+  "def": "The troop cards a player has deployed (5 slots, up to 8)."
+ },
+ {
+  "en": "Rank",
+  "de": "Rang",
+  "kind": "keyword",
+  "bold": true,
+  "def": "Experience level of a unit: Recruit, Private, Veteran, Elite, Hero, Legend."
+ },
+ {
+  "en": "Talent",
+  "de": "Talent",
+  "kind": "keyword",
+  "bold": true,
+  "def": "Special ability unlocked at Rank 3 (Elite)."
+ },
+ {
+  "en": "Core",
+  "de": "Kern",
+  "kind": "keyword",
+  "bold": true,
+  "def": "Center of a bastion. At 0 HP its owner loses."
+ },
+ {
+  "en": "Core Chamber",
+  "de": "Kernkammer",
+  "kind": "keyword",
+  "bold": true,
+  "def": "2×2 room around the Core. Conquest happens here."
+ },
+ {
+  "en": "Core Yard",
+  "de": "Kernhof",
+  "kind": "keyword",
+  "bold": true,
+  "def": "6×6 starting yard around the Core."
+ },
+ {
+  "en": "Inner Yard",
+  "de": "Innenhof",
+  "kind": "keyword",
+  "bold": true,
+  "def": "Yard reachable only through room doors: yard buildings there are protected."
+ },
+ {
+  "en": "Outer Yard",
+  "de": "Außenhof",
+  "kind": "keyword",
+  "bold": true,
+  "def": "Yard reachable from the gate or a Breach without passing a door."
+ },
+ {
+  "en": "Conquest",
+  "de": "Eroberung",
+  "kind": "keyword",
+  "bold": true,
+  "def": "Win condition: the Conquest Bar of the Core Chamber reaches 100%."
+ },
+ {
+  "en": "Timestop",
+  "de": "Zeitstopp",
+  "kind": "keyword",
+  "bold": true,
+  "def": "Pause after every 2 waves for drawing and building."
+ },
+ {
+  "en": "Wave",
+  "de": "Welle",
+  "kind": "keyword",
+  "bold": true,
+  "def": "Spawn event of all deployed troop cards."
+ },
+ {
+  "en": "Flammable",
+  "de": "Leicht entflammbar",
+  "kind": "keyword",
+  "bold": true,
+  "def": "Catches Burning from Fire damage and spreads it."
+ },
+ {
+  "en": "Explosive",
+  "de": "Sprengstoff",
+  "kind": "keyword",
+  "bold": true,
+  "def": "Explodes when destroyed."
+ },
+ {
+  "en": "Recruit",
+  "de": "Rekrut",
+  "kind": "rank",
+  "bold": false,
+  "def": "Rank at 0 XP. –.",
+  "xp": 0
+ },
+ {
+  "en": "Private",
+  "de": "Gefreiter",
+  "kind": "rank",
+  "bold": false,
+  "def": "Rank at 50 XP. +10% HP and damage.",
+  "xp": 50
+ },
+ {
+  "en": "Veteran",
+  "de": "Veteran",
+  "kind": "rank",
+  "bold": false,
+  "def": "Rank at 140 XP. +20%.",
+  "xp": 140
+ },
+ {
+  "en": "Elite",
+  "de": "Elite",
+  "kind": "rank",
+  "bold": false,
+  "def": "Rank at 300 XP. +30% and Talent.",
+  "xp": 300
+ },
+ {
+  "en": "Hero",
+  "de": "Held",
+  "kind": "rank",
+  "bold": false,
+  "def": "Rank at 540 XP. +40%.",
+  "xp": 540
+ },
+ {
+  "en": "Legend",
+  "de": "Legende",
+  "kind": "rank",
+  "bold": false,
+  "def": "Rank at 900 XP. +50% and aura (+8% damage within 3 cells).",
+  "xp": 900
+ }
+]

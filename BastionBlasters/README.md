@@ -4,7 +4,7 @@ Pixelart-Duell zweier verrückter Festungen in schräger Draufsicht: Fraktions-K
 
 > **Eigenständiges Projekt.** Dieser Ordner hat nichts mit dem Spiel zu tun, in dessen Repository er gerade liegt. Er berührt keine Dateien außerhalb von `BastionBlasters/` und lässt sich unverändert in ein eigenes Repository kopieren.
 
-**Stand:** GDD **v0.4** (modulare Bastionen, große Karte, Hof-Bauteile) mit Kartenkatalogen, Pixelart-Stilprobe und **ersten 17 Karten**. Noch kein Spielcode. Tech-Stack entschieden: Web (TypeScript, Vite, PixiJS).
+**Stand:** GDD **v0.5** (modulare Bastionen, große Karte, Hof-Bauteile) mit Kartenkatalogen, Pixelart-Stilprobe und **ersten 17 Karten**. Noch kein Spielcode. Tech-Stack entschieden: Web (TypeScript, Vite, PixiJS).
 
 ## Dateien
 
@@ -14,7 +14,9 @@ Pixelart-Duell zweier verrückter Festungen in schräger Draufsicht: Fraktions-K
 | [`GDD-Praesentation-Technik.md`](GDD-Praesentation-Technik.md) | **Teil 2:** 16-Bit-Pixelart-Richtlinien (Dithering, Palette), Regie des Zeitstopp-Übergangs, UI-Wireframes, Audio, Technik-Vergleich, Balancing, Roadmap, Risiken, Fragen und Entscheidungen, Glossar, Tuning-Tabelle, Datenformat, Entscheidungsprotokoll. |
 | [`katalog/01-gebaeude.md`](katalog/01-gebaeude.md) | **77 Bauteile** als Module, Turmzellen, Objekte und Wandkarten (Mauern, Türme, Heilung, Werkstätten, Freischalt-Räume, Plattformen, Utility, Abwehr, Chaos). |
 | [`katalog/02-einheiten.md`](katalog/02-einheiten.md) | **77 Einheiten:** 18 Artillerie, 23 Sturm, 17 Verteidiger, 19 Zivilisten. |
-| [`daten/`](daten) | **Maschinenlesbare Daten:** `cards.json` (alle 154 Karten, erzeugt aus den Katalogen mit `tools/export_cards.py`) und `kartentexte.json` (Kartentexte der ersten Karten). |
+| [`NOMENCLATURE.md`](NOMENCLATURE.md) | **Strenge Nomenklatur (englisch):** Spielbegriffe, Regeltext-Grammatik, Zahlenformate, Kartenaufbau. Erzeugt aus `daten/keywords.json`. |
+| [`daten/`](daten) | **Maschinenlesbare Daten:** `cards.json` (alle 154 Karten, erzeugt aus den Katalogen mit `tools/export_cards.py`), `keywords.json` (Glossar), `card_text.json` (englische Kartentexte der ersten 17 Karten). |
+| [`tools/`](tools) | Export (`export_cards.py`), Glossar-Helfer, **Linter** für die Nomenklatur (`lint_card_text.py`), Generator für `NOMENCLATURE.md`, Prüfung der Design-Dokumente (`check_catalogs.py`). |
 | [`art/`](art) | **Pixel-Werkstatt:** Python-Code für alle Grafiken, Kartenrenderer; Ergebnisse in `art/out/` (Szenen, Einheiten, `karten/`). |
 | [`katalog/03-kerne-und-weltlaunen.md`](katalog/03-kerne-und-weltlaunen.md) | **12 Fraktions-Kerne** in 4 Archetypen, 13 Welt-Launen, 8 Chaos-Karten, 6 Baustile. |
 
@@ -34,7 +36,7 @@ Pixelart-Duell zweier verrückter Festungen in schräger Draufsicht: Fraktions-K
 ## Wie geht es weiter?
 
 1. Restliche **Fragen** in Teil 2 §14 beantworten (alle haben einen Default, mit dem ich weiterarbeite).
-2. **M1 — Pixel-Werkstatt & Stilprobe:** Pipeline für 16-Bit-Pixelart; die **Stilprobe v0.3** (große Karte, zwei modulare Burgen, Landschaft, Einheiten) und die **ersten 17 Karten** (`art/out/karten_uebersicht.png`) liegen zur Freigabe vor (siehe `art/README.md`).
+2. **M1 — Pixel-Werkstatt & Stilprobe:** Pipeline für 16-Bit-Pixelart; die **Stilprobe v0.3** (große Karte, zwei modulare Burgen, Landschaft, Einheiten) und die **ersten 17 Karten** (`art/out/cards_overview.png`) liegen zur Freigabe vor (siehe `art/README.md`).
 3. **M2 — Kampf-Greybox:** Bot-gegen-Bot-Partie mit Platzhalter-Grafik (Roadmap: Teil 2 §13.2).
 
 Legende im Dokument: 🟦 aus dem Grobkonzept · 🟨 Ergänzung/Vorschlag (streichbar) · ❓ offene Frage · ✔ entschieden · ⚙ Tuning-Wert.

@@ -1,6 +1,6 @@
 # Bastion Blasters — Game Design Document
 
-**Teil 1: Spieldesign** · Version 0.4 · Entwurf zur Abnahme · Perspektive: **Draufsicht** · Kerne = **Fraktionen** · Bastionen **modular**, große Karte
+**Teil 1: Spieldesign** · Version 0.5 · Entwurf zur Abnahme · Perspektive: **Draufsicht** · Kerne = **Fraktionen** · Bastionen **modular**, große Karte
 
 Teil 2 (Präsentation, Technik, Roadmap, offene Fragen): [`GDD-Praesentation-Technik.md`](GDD-Praesentation-Technik.md)
 Kataloge: [`katalog/01-gebaeude.md`](katalog/01-gebaeude.md) · [`katalog/02-einheiten.md`](katalog/02-einheiten.md) · [`katalog/03-kerne-und-weltlaunen.md`](katalog/03-kerne-und-weltlaunen.md)
@@ -17,7 +17,7 @@ Kataloge: [`katalog/01-gebaeude.md`](katalog/01-gebaeude.md) · [`katalog/02-ein
 | ⚙ | **Tuning-Wert.** Startwert zum Ausprobieren, keine Wahrheit. Alle Werte stehen gesammelt in Teil 2, Anhang A. |
 | P0 / P1 / P2 | Priorität: **P0** = muss in den ersten Prototyp, **P1** = Vertical Slice, **P2** = später. |
 
-**Sprachregel:** Alle Spielbegriffe sind deutsch und fest (siehe Glossar, Teil 2 §15). „Festung“ und „Bastion“ meinen dasselbe; im Spiel heißt sie **Bastion**.
+**Sprachregel (v0.5):** Das **Spiel ist englisch**: Kartennamen, Regeltexte, Schlüsselwörter und UI. Es gilt die strenge Nomenklatur in [`NOMENCLATURE.md`](NOMENCLATURE.md) (erzeugt aus `daten/keywords.json`). Diese Design-Dokumente bleiben deutsch und nennen den deutschen Designbegriff; die Zuordnung zum englischen Spielbegriff steht in der Nomenklatur (Spalte „Design term (DE)“) und im Katalog (Spalte „Name (EN)“). „Festung“ und „Bastion“ meinen dasselbe; im Spiel heißt sie **Bastion**.
 
 ---
 
@@ -547,7 +547,7 @@ Schadensarten: **Wucht (W), Feuer (F), Eis (E), Blitz (B), Gift (G), Arkan (A)**
 | **Kurzgeschlossen** | Bauteil: 0 % Wirkung. | 3 s |
 | **Nass** | −10 % Tempo, Blitz × 1,5, Brennen unmöglich. | solange Regen |
 | **Gesegnet** | Absorbiert den nächsten Schaden (bis 40). | 15 s |
-| **Gehärtet / Satt / Angespornt** | +Rüstung / +Max-HP / +Angriffstempo. | variabel |
+| **Gehärtet / Satt / Angespornt** | Gehärtet (Hardened): +12 % Max-HP, +10 % Wucht · Satt (Fed): +15 % Max-HP · Angespornt (Spurred): +15 % Angriffstempo. Maßgeblich ist [`NOMENCLATURE.md`](NOMENCLATURE.md). | permanent / 40 s / in Aura |
 
 ### 7.5 Türme 🟦/🟨
 

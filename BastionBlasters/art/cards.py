@@ -1,6 +1,9 @@
-"""Kartenrenderer: 160 x 224 px, nativ im Pixelraster, Daten aus daten/cards.json + daten/kartentexte.json.
+"""Kartenrenderer: 160 x 224 px, nativ im Pixelraster.
 
-Aufruf (aus art/):  python3 -I cards.py      -> out/karten/*.png, out/karten_uebersicht.png, out/kartenruecken.png
+Daten: daten/cards.json (aus den Katalogen exportiert), daten/card_text.json (englische Kartentexte),
+daten/keywords.json (Glossar, strenge Nomenklatur: Glossarbegriffe werden automatisch fett gesetzt).
+
+Aufruf (aus art/):  python3 -I cards.py      -> out/cards/*.png, out/cards_overview.png, out/card_back.png
 """
 from __future__ import annotations
 
@@ -11,20 +14,35 @@ import sys
 import numpy as np
 from PIL import Image
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-
-from pixl import *
-from pixfont import draw_text, text_width, wrap
-from cardicons import blit_icon, icon_canvas
-
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.join(HERE, '..')
+sys.path.insert(0, HERE)
+sys.path.insert(0, os.path.join(ROOT, 'tools'))
+
+from pixl import *
+from pixfont import draw_text, text_width, draw_rich, rich_width, wrap_rich
+from cardicons import blit_icon
+import glossary
+
 OUT = os.path.join(HERE, 'out')
 
 CARD_W, CARD_H = 160, 224
 ROMAN = {1: 'I', 2: 'II', 3: 'III', 4: 'IV'}
 CAT_RAMP = {'artillerie': 'fire', 'sturm': 'gold', 'verteidiger': 'ice', 'zivilist': 'leaf', 'bau': 'purple'}
 TIER_RAMP = {1: 'stone', 2: 'leaf', 3: 'ice', 4: 'gold'}
+
+# --- Layout (y-Koordinaten; Texte werden an der Oberkante der Versalien positioniert)
+ART_Y0, ART_H = 19, 86                 # Bildfenster 144 x 86
+FRAME_Y0, FRAME_Y1 = 17, 106
+BANNER_Y0, BANNER_Y1 = 108, 121
+TYPE_Y = 125
+STRIP_Y0, STRIP_Y1 = 133, 146
+STRIP_TEXT_Y = 136
+EFFECT_Y = 149
+EFFECT_MAX_LINES = 5
+DIVIDER_Y = 198
+FLAVOR_Y = (202, 211)
+TEXT_X, TEXT_W = 8, 144
 
 
 def C(ramp, i):
@@ -42,10 +60,9 @@ def dot(img, x, y, col):
         img[y, x, 3] = 255
 
 
-def shape_mask(w, h, r=3):
+def shape_mask(w, h):
     m = np.ones((h, w), bool)
-    cut = {0: 3, 1: 1, 2: 1} if r == 3 else {0: 1}
-    for y, n in cut.items():
+    for y, n in {0: 3, 1: 1, 2: 1}.items():
         m[y, :n] = False
         m[y, w - n:] = False
         m[h - 1 - y, :n] = False
@@ -54,7 +71,7 @@ def shape_mask(w, h, r=3):
 
 
 def card_frame(ramp):
-    """Rahmen mit Bevel, Pergament-Innenfläche; liefert (img, mask)"""
+    """Rahmen mit Bevel und Pergament-Innenfläche; liefert (Bild, Maske)"""
     img = np.zeros((CARD_H, CARD_W, 4), np.uint8)
     m = shape_mask(CARD_W, CARD_H)
     ys, xs = np.nonzero(m)
@@ -68,12 +85,10 @@ def card_frame(ramp):
         if d == 2:
             idx = 3
         dot(img, x, y, C(ramp, idx))
-    # Außenkontur: Maskenpixel mit Nachbarn außerhalb
     pad = np.pad(m, 1, constant_values=False)
     for y, x in zip(ys, xs):
         if not (pad[y, x + 1] and pad[y + 2, x + 1] and pad[y + 1, x] and pad[y + 1, x + 2]):
             dot(img, x, y, INK)
-    # Pergament
     bone = RAMPS['bone']
     for y in range(3, CARD_H - 3):
         for x in range(3, CARD_W - 3):
@@ -85,27 +100,23 @@ def card_frame(ramp):
             if (x + y) % 2 == 0 and (x * 5 + y * 3) % 17 < 2:
                 col = bone[5]
             dot(img, x, y, col)
-    # innere Tintenlinie
     for x in range(4, CARD_W - 4):
         dot(img, x, 3, INK)
         dot(img, x, CARD_H - 4, INK)
     for y in range(4, CARD_H - 4):
         dot(img, 3, y, INK)
         dot(img, CARD_W - 4, y, INK)
-    # Pergament-Innenfläche nach innen versetzen (Linie liegt auf Rand)
     return img, m
 
 
 def draw_pill(img, x, y, w, h, ramp):
     for yy in range(y, y + h):
         for xx in range(x, x + w):
-            corner = (xx in (x, x + w - 1)) and (yy in (y, y + h - 1))
-            if corner:
+            if (xx in (x, x + w - 1)) and (yy in (y, y + h - 1)):
                 continue
             lit = (yy - y) <= 1 or (xx - x) <= 0
             low = (yy - y) >= h - 2
-            idx = 5 if lit else (1 if low else 3)
-            dot(img, xx, yy, C(ramp, idx))
+            dot(img, xx, yy, C(ramp, 5 if lit else (1 if low else 3)))
     for xx in range(x + 1, x + w - 1):
         dot(img, xx, y - 1, INK)
         dot(img, xx, y + h, INK)
@@ -114,7 +125,7 @@ def draw_pill(img, x, y, w, h, ramp):
         dot(img, x + w, yy, INK)
 
 
-def draw_banner(img, ramp, y0=118, y1=131):
+def draw_banner(img, ramp, y0, y1):
     """Namensband mit zwei abgesetzten Schwänzen (über den Kartenrand hinaus)"""
     ty0 = y0 + 2
     for (xa, xb) in ((1, 8), (151, 158)):
@@ -122,12 +133,10 @@ def draw_banner(img, ramp, y0=118, y1=131):
             for x in range(xa, xb + 1):
                 edge = y in (ty0, y1) or x in (xa, xb)
                 dot(img, x, y, INK if edge else C(ramp, 1 if (x + y) % 2 else 2))
-    # Kerben (Schwalbenschwanz) an den äußeren Enden
     for k in range(3):
         for (x, sgn) in ((1, 1), (158, -1)):
             dot(img, x + sgn * k, (ty0 + y1) // 2 - 1 + k, INK)
             dot(img, x + sgn * k, (ty0 + y1) // 2 + 1 - k, INK)
-    # Band
     for y in range(y0, y1 + 1):
         for x in range(6, 154):
             if y in (y0, y1) or x in (6, 153):
@@ -140,149 +149,152 @@ def draw_banner(img, ramp, y0=118, y1=131):
                 dot(img, x, y, C(ramp, 4 if (x * 3 + y * 7) % 11 == 0 else 3))
 
 
-def items_width(items):
-    w = 0
-    for ic, t in items:
-        w += 7 + 1 + text_width(t) + 4
-    return max(0, w - 4)
-
-
-def draw_items_right(img, items, x_right, y_icon, text_col, plus=True):
+def draw_items_right(img, items, x_right, y, text_col):
+    """Symbol-Wert-Paare rechtsbündig (Reinforce bekommt ein Plus)"""
     x = x_right
     for ic, t in reversed(items):
-        label = ('+' + t) if (ic == 'nachschub' and plus) else t
-        tw = text_width(label)
-        x -= tw
-        draw_text(img, x, y_icon, label, text_col)
+        label = ('+' + t) if ic == 'reinforce' else t
+        x -= text_width(label)
+        draw_text(img, x, y, label, text_col)
         x -= 1 + 7
-        blit_icon(img, ic, x, y_icon)
+        blit_icon(img, ic, x, y)
         x -= 4
+
+
+# --------------------------------------------------------------------------- Karteninhalte aus den Daten ableiten
+
+
+def type_line(card):
+    cat = card['kategorie']
+    if cat == 'bau':
+        bt = card['build_type_en'].upper()
+        size = card.get('masse')
+        head = f'{bt} {size}' if size else bt
+        return f"{head} · {card['group_en']}"
+    parts = [card['category_en'].upper(), card['line_en']]
+    extra = card.get('trajectory_en') or card.get('doctrine_en') or card.get('zone_en')
+    if extra:
+        parts.append(extra)
+    return ' · '.join(parts)
+
+
+def header_items(card):
+    items = []
+    if card['kategorie'] == 'bau':
+        if card.get('geschuetzplaetze'):
+            items.append(('cannon', str(card['geschuetzplaetze'])))
+        if card.get('posten'):
+            items.append(('person', str(card['posten'])))
+        return items
+    if card['kategorie'] == 'artillerie' and isinstance(card.get('gp'), int):
+        items.append(('cannon', str(card['gp'])))
+    items.append(('person', str(card['soll'])))
+    items.append(('reinforce', str(card['nachschub'])))
+    return items
+
+
+def balanced_two_lines(text):
+    """Flavor: Einzeiler bleibt einzeilig, sonst auf zwei möglichst gleich lange Zeilen verteilen"""
+    one = wrap_rich([(text, False)], TEXT_W, TEXT_W)
+    if len(one) <= 1:
+        return one
+    words = text.split(' ')
+    best = None
+    for k in range(1, len(words)):
+        a, b = ' '.join(words[:k]), ' '.join(words[k:])
+        w = max(text_width(a), text_width(b))
+        if best is None or w < best[0]:
+            best = (w, a, b)
+    return [[(best[1], False)], [(best[2], False)]]
+
+
+def effect_blocks(tx):
+    """Regeltext und Talent als Zeilenblöcke: [(Abzeichen oder None, Abschnittsliste)]"""
+    blocks = []
+    if tx.get('rules'):
+        blocks.append((None, glossary.segments(tx['rules'])))
+    if tx.get('talent'):
+        blocks.append(('RANK 3', glossary.segments(tx['talent'])))
+    return blocks
 
 
 def render_card(card: dict, tx: dict, art: Image.Image) -> Image.Image:
     cat = card['kategorie']
     ramp = CAT_RAMP[cat]
     img, mask = card_frame(ramp)
-    # --- Kopfzeile
+    # --- Kopfzeile: Tier, ID, Squad/Reinforce/Crew, Sterne
     tier = card['tier']
     roman = ROMAN[tier]
     pw = text_width(roman) + 8
     draw_pill(img, 6, 4, pw, 12, TIER_RAMP[tier])
     draw_text(img, 10, 7, roman, WHITE, shadow=INK)
     draw_text(img, 6 + pw + 5, 7, card['id'], C('stone', 2))
-    stars = tx.get('sterne', 1)
+    draw_items_right(img, header_items(card), 122, 7, INK)
     for k in range(3):
-        blit_icon(img, 'stern' if k < stars else 'stern_leer', 127 + k * 8, 5)
+        blit_icon(img, 'star' if k < tx.get('stars', 1) else 'star_empty', 127 + k * 8, 5)
     # --- Bildfenster
-    rect(img, 6, 17, 153, 116, INK)
+    rect(img, 6, FRAME_Y0, 153, FRAME_Y1, INK)
     for x in range(7, 153):
-        dot(img, x, 18, C(ramp, 5))
-        dot(img, x, 115, C(ramp, 1))
-    for y in range(18, 116):
+        dot(img, x, FRAME_Y0 + 1, C(ramp, 5))
+        dot(img, x, FRAME_Y1 - 1, C(ramp, 1))
+    for y in range(FRAME_Y0 + 1, FRAME_Y1):
         dot(img, 7, y, C(ramp, 4))
         dot(img, 152, y, C(ramp, 2))
     a = np.array(art.convert('RGBA'))
-    img[19:19 + a.shape[0], 8:8 + a.shape[1]] = a
-    # --- Banner mit Namen
-    draw_banner(img, ramp)
-    name = card['name']
-    nw = text_width(name)
-    draw_text(img, (CARD_W - nw) // 2, 122, name, WHITE, outline=INK)
-    # --- Typzeile
-    draw_text(img, 8, 135, tx['typ'], C(ramp, 1), bold=False)
-    draw_items_right(img, tx.get('rechts', []), 122, 7, INK)
-    # --- Werteleiste
-    for y in range(143, 157):
+    top = (a.shape[0] - ART_H) // 2
+    a = a[top:top + ART_H]
+    img[ART_Y0:ART_Y0 + ART_H, 8:8 + a.shape[1]] = a
+    # --- Namensband
+    draw_banner(img, ramp, BANNER_Y0, BANNER_Y1)
+    name = card['name_en']
+    draw_text(img, (CARD_W - text_width(name)) // 2, BANNER_Y0 + 4, name, WHITE, outline=INK)
+    # --- Typzeile und Werteleiste
+    draw_text(img, TEXT_X, TYPE_Y, type_line(card), C(ramp, 1))
+    for y in range(STRIP_Y0, STRIP_Y1 + 1):
         for x in range(8, 152):
-            dot(img, x, y, C('stone', 0) if y not in (143, 156) else C('stone', 1))
+            dot(img, x, y, C('stone', 1) if y in (STRIP_Y0, STRIP_Y1) else C('stone', 0))
     stats = tx.get('stats', [])
     total = sum(7 + 2 + text_width(t) for _, t in stats)
-    gap = (136 - total) / max(1, len(stats) - 1) if len(stats) > 1 else 0
-    gap = min(gap, 16)
-    x = 12.0 if len(stats) > 1 else 14
-    if len(stats) > 1:
-        x = 8 + (144 - (total + gap * (len(stats) - 1))) / 2
+    gap = min(16, (136 - total) / (len(stats) - 1)) if len(stats) > 1 else 0
+    x = 8 + (144 - (total + gap * max(0, len(stats) - 1))) / 2
+    if gap < 3 and len(stats) > 1:
+        print(f'WARNUNG: Werteleiste sehr eng: {card["id"]} (Lücke {gap:.1f})', file=sys.stderr)
     for ic, t in stats:
-        blit_icon(img, ic, int(round(x)), 146)
-        draw_text(img, int(round(x)) + 9, 146, t, WHITE)
+        blit_icon(img, ic, int(round(x)), STRIP_TEXT_Y)
+        draw_text(img, int(round(x)) + 9, STRIP_TEXT_Y, t, WHITE)
         x += 7 + 2 + text_width(t) + gap
-    # --- Regeltext (3 Zeilen; 4, wenn es keine Zusatzzeile gibt)
-    z = tx.get('zeile2')
-    lines = wrap(tx['regel'], 144)
-    limit = 3 if z else 4
-    if len(lines) > limit:
-        print('WARNUNG: Regeltext zu lang:', card['id'], len(lines), file=sys.stderr)
-    for k, line in enumerate(lines[:limit]):
-        draw_text(img, 8, 158 + 9 * k, line, INK)
-    # --- Zusatzzeile (Talent / Hinweis)
-    if z:
-        warn = z['badge'] == '!'
-        bw = text_width(z['badge']) + 6
-        draw_pill(img, 8, 185, bw, 11, 'fire' if warn else 'gold')
-        draw_text(img, 11 + (1 if warn else 0), 187, z['badge'], WHITE if warn else INK)
-        draw_text(img, 8 + bw + 4, 187, z['text'], C(ramp, 1))
-        if text_width(z['text']) + bw + 12 > 144:
-            print('WARNUNG: Zusatzzeile zu lang:', card['id'], file=sys.stderr)
-    # --- Trennlinie und Flavor
+    # --- Effektbox: nur mechanischer Text (Flavor steht unter der Trennlinie)
+    y = EFFECT_Y
+    nlines = 0
+    for k, (badge, segs) in enumerate(effect_blocks(tx)):
+        if badge:
+            bw = text_width(badge) + 7
+            if k > 0:
+                y += 2
+            draw_pill(img, TEXT_X, y - 2, bw, 11, 'gold')
+            draw_text(img, TEXT_X + 4, y, badge, INK)
+            lines = wrap_rich(segs, TEXT_W - bw - 4, TEXT_W)
+        else:
+            bw = 0
+            lines = wrap_rich(segs, TEXT_W, TEXT_W)
+        for i, ln in enumerate(lines):
+            x0 = TEXT_X + (bw + 4 if (badge and i == 0) else 0)
+            draw_rich(img, x0, y, ln, INK)
+            y += 9
+            nlines += 1
+    if nlines > EFFECT_MAX_LINES:
+        print(f'WARNUNG: Effekttext zu lang: {card["id"]} ({nlines} Zeilen)', file=sys.stderr)
+    # --- Flavor
     for x in range(8, 152):
         if x % 2 == 0:
-            dot(img, x, 198, C('bone', 2))
-    fl = wrap(tx['flavor'], 144)
+            dot(img, x, DIVIDER_Y, C('bone', 2))
+    fl = balanced_two_lines(tx['flavor'])
     if len(fl) > 2:
-        print('WARNUNG: Flavor zu lang:', card['id'], file=sys.stderr)
-    for k, line in enumerate(fl[:2]):
-        draw_text(img, (CARD_W - text_width(line)) // 2, 202 + 9 * k, line, C('stone', 1))
-    out = Image.fromarray(img, 'RGBA')
-    # Ecken freistellen
-    a = np.array(out)
-    a[~mask, 3] = 0
-    return Image.fromarray(a, 'RGBA')
-
-
-def render_back() -> Image.Image:
-    """Kartenrücken: Gitter aus Rauten (Dither), Kernkristall im Medaillon, Titel"""
-    ramp = 'purple'
-    img, mask = card_frame(ramp)
-    # Innenfläche neu: dunkles Violett mit Rautengitter
-    for y in range(4, CARD_H - 4):
-        for x in range(4, CARD_W - 4):
-            u = (x + y) % 16
-            v = (x - y) % 16
-            line = u in (0, 1) or v in (0, 1)
-            col = C(ramp, 2 if line else 1)
-            if line and (x + y) % 2:
-                col = C(ramp, 3)
-            dot(img, x, y, col)
-    for x in range(4, CARD_W - 4):
-        dot(img, x, 3, INK)
-        dot(img, x, CARD_H - 4, INK)
-    for y in range(4, CARD_H - 4):
-        dot(img, 3, y, INK)
-        dot(img, CARD_W - 4, y, INK)
-    # Medaillon
-    cx, cy, r = 80, 112, 38
-    for y in range(cy - r - 2, cy + r + 3):
-        for x in range(cx - r - 2, cx + r + 3):
-            d = np.hypot(x + 0.5 - cx, y + 0.5 - cy)
-            if d <= r + 1.5:
-                col = INK if d > r - 0.5 else (C('gold', 5) if d > r - 2 and x + y < cx + cy else (C('gold', 2) if d > r - 2 else C('purple', 0)))
-                if d <= r - 3:
-                    col = C('purple', 0) if ((x + y) % 2 or d < 20) else C('purple', 1)
-                dot(img, x, y, col)
-    from assets_env import core
-    cr = core(glow='purple')
-    arr = np.array(cr.to_image())
-    sub = arr[2:78, :]
-    h, w = sub.shape[:2]
-    x0, y0 = cx - w // 2, cy - h // 2 + 2
-    m = sub[:, :, 3] > 0
-    reg = img[y0:y0 + h, x0:x0 + w]
-    reg[m] = sub[m]
-    t1, t2 = 'BASTION', 'BLASTERS'
-    draw_text(img, (CARD_W - text_width(t1, True)) // 2, 20, t1, C('gold', 5), bold=True, outline=INK)
-    draw_text(img, (CARD_W - text_width(t2, True)) // 2, 32, t2, C('gold', 5), bold=True, outline=INK)
-    for k in range(3):
-        blit_icon(img, 'stern', 68 + k * 8, 200)
+        print(f'WARNUNG: Flavor zu lang: {card["id"]}', file=sys.stderr)
+    first = FLAVOR_Y[0] if len(fl) > 1 else (FLAVOR_Y[0] + FLAVOR_Y[1]) // 2
+    for k, ln in enumerate(fl[:2]):
+        w = rich_width(ln)
+        draw_rich(img, (CARD_W - w) // 2, first + 9 * k, ln, C('stone', 1))
     out = np.array(Image.fromarray(img, 'RGBA'))
     out[~mask, 3] = 0
     return Image.fromarray(out, 'RGBA')
@@ -290,9 +302,10 @@ def render_back() -> Image.Image:
 
 def main():
     cards = {c['id']: c for c in json.load(open(os.path.join(ROOT, 'daten', 'cards.json'), encoding='utf-8'))}
-    texts = json.load(open(os.path.join(ROOT, 'daten', 'kartentexte.json'), encoding='utf-8'))
+    texts = json.load(open(os.path.join(ROOT, 'daten', 'card_text.json'), encoding='utf-8'))
     import cards_art
-    outdir = os.path.join(OUT, 'karten')
+    import cardback
+    outdir = os.path.join(OUT, 'cards')
     os.makedirs(outdir, exist_ok=True)
     rendered = []
     for cid in texts:
@@ -304,20 +317,21 @@ def main():
             print(f'WARNUNG: {cid} nutzt {bad} Farben außerhalb der Master-Palette', file=sys.stderr)
         im.save(os.path.join(outdir, f'{cid}.png'))
         rendered.append((cid, im))
-    back = render_back()
-    back.save(os.path.join(OUT, 'kartenruecken.png'))
+    back = cardback.render_back()
+    if palette_violations(back):
+        print('WARNUNG: Kartenrücken nutzt Farben außerhalb der Master-Palette', file=sys.stderr)
+    back.save(os.path.join(OUT, 'card_back.png'))
     cols = 6
     rows = (len(rendered) + cols - 1) // cols
     sc, pad = 2, 12
     sheet_img = Image.new('RGBA', (cols * (CARD_W * sc + pad) + pad, rows * (CARD_H * sc + pad) + pad), hexrgb('#2b2540') + (255,))
     for k, (cid, im) in enumerate(rendered):
-        x = pad + (k % cols) * (CARD_W * sc + pad)
-        y = pad + (k // cols) * (CARD_H * sc + pad)
-        sheet_img.alpha_composite(upscale(im, sc), (x, y))
-    sheet_img.save(os.path.join(OUT, 'karten_uebersicht.png'))
-    for cid in ('UA-01', 'US-06', 'BH-01', 'BS-06'):
+        sheet_img.alpha_composite(upscale(im, sc), (pad + (k % cols) * (CARD_W * sc + pad), pad + (k // cols) * (CARD_H * sc + pad)))
+    sheet_img.save(os.path.join(OUT, 'cards_overview.png'))
+    for cid in ('UA-01', 'US-06', 'BH-01', 'BS-02'):
         upscale(dict(rendered)[cid], 3).save(os.path.join(outdir, f'{cid}_x3.png'))
-    print(len(rendered), 'Karten gerendert')
+    upscale(back, 3).save(os.path.join(outdir, 'back_x3.png'))
+    print(len(rendered), 'cards rendered')
 
 
 if __name__ == '__main__':

@@ -1,6 +1,6 @@
 # Bastion Blasters — Game Design Document
 
-**Teil 2: Präsentation, Technik, Balancing, Roadmap** · Version 0.4 · Entwurf zur Abnahme
+**Teil 2: Präsentation, Technik, Balancing, Roadmap** · Version 0.5 · Entwurf zur Abnahme
 
 Teil 1 (Regeln und Systeme): [`GDD.md`](GDD.md) · Kataloge: [`katalog/01-gebaeude.md`](katalog/01-gebaeude.md) · [`katalog/02-einheiten.md`](katalog/02-einheiten.md) · [`katalog/03-kerne-und-weltlaunen.md`](katalog/03-kerne-und-weltlaunen.md)
 
@@ -159,30 +159,33 @@ Ziel: **fließend statt Schnitt.** Die Welt wird nicht „weggeblendet“, sonde
 - **Warnungen** (nicht verbietend): „Offene Kante (keine Mauer)“ bei zerstörten Segmenten, „Modul vom Tor abgeschnitten“, „Kein Heiler vorhanden“, „Keine Geschützplätze“, „Pulverkammer neben Wohnhaus“.
 - **Planungsansicht** 🟨: Taste **P** blendet **Reichweitenringe** (Kurz/Mittel/Weit/Extrem) und die **Baugrund-Raster** ein, wie `art/out/szene_baugrund.png` (Beispiel in der Stilprobe).
 
-**Karten-Layout** (v0.4, umgesetzt in `art/cards.py`; 160 × 224 px, nativ im Pixelraster, ohne Hochskalieren):
+**Karten-Layout** (v0.5, umgesetzt in `art/cards.py`; 160 × 224 px, nativ im Pixelraster, ohne Hochskalieren). Alle Kartentexte sind **englisch** und folgen der strengen Nomenklatur ([`NOMENCLATURE.md`](NOMENCLATURE.md)).
 
 ```
 ┌──────────────────────────────┐
-│ [II] US-06    ◉3 ↑+2   ★☆☆  │  Kopfzeile: Tier-Plakette, ID, Soll (Person) und Nachschub (Pfeil),
-│ ┌──────────────────────────┐ │  bei Artillerie zusätzlich Geschützplätze; Sterne = ★-Rang
-│ │  Bildfenster 144 × 96    │ │  Bildfenster: kleines Diorama in Spielgrafik (1x), keine Vergrößerung
-│ │  (Diorama der Spielwelt) │ │
+│ [II] US-06    ◉3 ↑+2   ★☆☆  │  Kopfzeile: Tier-Plakette, ID, Squad (Person), Reinforce (Pfeil),
+│ ┌──────────────────────────┐ │  bei Artillery zusätzlich Gun Slots; Gebäude: Crew; Sterne = ★-Rang
+│ │  Bildfenster 144 × 86    │ │  Diorama in Spielgrafik (1x), keine Vergrößerung
 │ └──────────────────────────┘ │
-│ ══════ Rutsch-Bär ═══════════│  Namensband in der Kategoriefarbe
-│ STURM · Frost · Jäger        │  Typzeile: Kategorie · Linie · Doktrin (Bauteile: Bauart, Maß, Gruppe)
-│ ♥110 F  ⚔12 E  ◷1,1  ↳1,5/3 │  Werteleiste: HP·Rüstungsklasse, Schaden, Takt (s), Tempo (Zellen/s)
-│ Regeltext, bis zu 3 Zeilen   │  (4 Zeilen, wenn es keine Zusatzzeile gibt)
-│ [R3] Talent  /  [!] Hinweis  │  Zusatzzeile: Talent ab Rang 3 (gold) oder Warnhinweis (rot)
+│ ══════ Sliding Bear ═════════│  Namensband in der Kategoriefarbe
+│ ASSAULT · Frost · Hunter     │  Typzeile, aus den Daten abgeleitet
+│ ♥110 FLS ⚔12 ◷1.1  ↳1.5/3   │  Werteleiste: HP + Armor, Schaden (Klingenfarbe = Schadensart), Takt, Tempo
+│ Slide Attack (3-cell         │  Effektbox, höchstens 5 Zeilen: nur mechanischer Text,
+│ run-up): Knockback 2 cells,  │  Glossarbegriffe automatisch fett, Fähigkeitsnamen fett
+│ Stunned 1s.                  │
+│ [RANK 3] Ice Trail: …        │  Rank-3-Talent hinter goldenem Abzeichen
 │ ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄ │
-│ „Flavor-Zeile in 1–2 Zeilen“ │
+│ Belly first is also a plan.  │  Flavor (1–2 Zeilen), nie in der Effektbox
 └──────────────────────────────┘
 ```
 
-- **Rahmenfarben:** Artillerie **Feuer-Rot/Orange** · Sturm **Bernstein** · Verteidiger **Blau** · Zivilist **Grün** · Bau **Violett** (nicht die Teamfarbe Karmin, damit Karten teamneutral bleiben). **Tier-Plakette:** I Stein, II Grün, III Blau, IV Gold.
-- **Schrift:** eigener **Pixelfont „Schlamassia 5 × 7“** (`art/pixfont.py`, mit Umlauten, ß, Minus, Anführungszeichen), Versalhöhe 7 px, Zeilenabstand 9 px, ca. 26 Zeichen je Zeile.
-- **Symbole** (7 px, `art/cardicons.py`): Herz = HP, Schwert = Schaden, Uhr = Takt in Sekunden, Fadenkreuz = Reichweite/Radius, Stiefel = Tempo in Zellen/s, Person = Soll bzw. Posten, grüner Pfeil = Nachschub je Welle, Kanone = Geschützplätze, Plus = Heilung, Mauer = Reparatur.
-- **Textquellen:** Name, Tier, Werte kommen aus `daten/cards.json` (exportiert aus den Katalogen), Kartentext, Werteleiste und Flavor aus `daten/kartentexte.json` (von Hand gesetzt, Textlimits werden beim Rendern geprüft).
-- **Kartenrücken:** violettes Rautengitter, Kernkristall im Medaillon, Titel.
+- **Rank 3** bedeutet: Die Einheit hat **Rang 3 („Elite“, 300 XP)** erreicht und schaltet ihr **Talent** frei (GDD §8). Das Abzeichen heißt auf der Karte deshalb ausgeschrieben `RANK 3`.
+- **Nomenklatur (streng):** Ein Konzept, ein Begriff. Regeltext ist mechanisch (Auslöser → Bedingung → Wirkung → Limit), ohne Ausschmückung; Humor gehört in Namen, Flavor und Grafik. Standardverhalten (Flugbahn, Doktrin, Wachzone, Linie) steht nur im Glossar, nie auf der Karte. Erinnerungstexte erscheinen im Tooltip, nicht auf der Karte. Der Linter `tools/lint_card_text.py` prüft Zahlenformate (`4s`, `30%`, `−20%`, `1.2`), verbotene Wörter, Großschreibung (nur Glossarbegriffe) und Fettdruck.
+- **Rahmenfarben:** Artillery **Feuer-Rot/Orange** · Assault **Bernstein** · Defender **Blau** · Civilian **Grün** · Building **Violett** (nicht die Teamfarbe Karmin, damit Karten teamneutral bleiben). **Tier-Plakette:** I Stein, II Grün, III Blau, IV Gold.
+- **Schrift:** eigener **Pixelfont „Schlamassia 5 × 7“** (`art/pixfont.py`: Umlaute, ß, Minus, Anführungszeichen), Versalhöhe 7 px, Zeilenabstand 9 px, ca. 25 Zeichen je Zeile; Fettdruck als „kluger“ Doppelanschlag, der 1-px-Lücken (m, w) erhält.
+- **Symbole** (7 px, `art/cardicons.py`): heart = HP, sword = Schaden (Klinge Stahl = Impact, orange = Fire, blau = Ice, gelb = Lightning, grün = Poison, violett = Arcane), clock = Takt in Sekunden, target = Reichweite/Radius, boot = Tempo in Zellen/s, person = Squad bzw. Crew, grüner Pfeil = Reinforce, cannon = Gun Slots, plus = Heilung, wall = Reparatur.
+- **Textquellen:** Name (EN), Tier, Typzeile und Kopfzeile werden aus `daten/cards.json` abgeleitet (Export aus den Katalogen), Werteleiste, Regeltext, Talent und Flavor stehen in `daten/card_text.json`, die Begriffe in `daten/keywords.json`.
+- **Kartenrücken:** violettes Rautengitter mit Strahlenkranz, großes goldenes Logo „BASTION BLASTERS“ (3-fach vergrößerter Pixelfont, Verlauf, Kontur, Schatten), Zinnenband, Zierleisten, Schnörkel, Ecken mit Edelsteinen und der Kernkristall im Medaillon; kein Text außer dem Logo.
 
 **Barrierefreiheit** 🟨: Farbenblind-Modus (Kategorien und Teams zusätzlich über Muster und Symbole), Regler für Screenshake, Zeitstopp-Blitz und Dither-Intensität, große Schrift (Pixelfont in zwei Größen), wählbare Spielgeschwindigkeit in Einzelspieler-Partien, Tastaturkürzel (Leertaste = Bereit, R = Reroll, Tab = Gegner-Info).
 
@@ -338,6 +341,8 @@ Begründung: Entscheidend ist, dass ich die Pixelgrafik selbst erzeuge und das S
 ---
 
 ## 15. Glossar
+
+> Die englischen Spielbegriffe und ihre strenge Verwendung stehen in [`NOMENCLATURE.md`](NOMENCLATURE.md). Dieses Glossar erklärt die deutschen Designbegriffe.
 
 | Begriff | Bedeutung |
 |---|---|
@@ -506,8 +511,9 @@ Neue Effekt-Bausteine entstehen nur, wenn mehrere Karten sie brauchen. Alles and
 |---|---|
 | **0.1** | Erster Entwurf aus dem Grobkonzept: Regeln, Systeme, Kataloge (Bauteile, Einheiten, Kerne, Welt-Launen), Präsentation, Technik, Roadmap, offene Fragen. |
 | **0.2** | Antworten auf die offenen Fragen eingearbeitet: **Draufsicht** statt Querschnitt (Raster, Ringmauer, Schusslinie, Zielschatten, Tags, Wegfindung neu), **Ziehregel** 10/7 + frische 5/3, **16-Bit-Pixelart von Claude** (Pixel-Werkstatt, RGB555), **12 Fraktions-Kerne** in 4 Archetypen, Technik-Vergleich, neue Meilensteine. |
-| **0.4** | Zweite Rückmeldung: Gesichter von Goblin, Eisbär, Hexe und Gnom weiter vereinfacht; **Tech-Stack bestätigt**; **Hof-Bauteile** (Bauart je Bauteil einzeln, zugänglicher und fragiler, Innenhof geschützt); **alle Einheiten passen durch jede Tür**; erste Karten (Kartenlayout, Pixelfont, Datenexport). |
 | **0.3** | Rückmeldung zur Stilprobe eingearbeitet: **konsistente Perspektive** (Südansicht, dünne Kantenwände, Tiefenpuffer), **modulare Bastion** (Baugrund 16 × 16, Kernhof, Module ≥ 2 tief, Auto-Mauern, Hof-Erweiterung, Wandkarten, Seitentore) statt 6 × 6 + Ringmauer + Erweiterungen, **größere Karte** (56 × 28 Zellen, 1920 × 1080), Reichweiten 26 / 34 / 42 / 50, Katalog 01 neu vermessen (Module / Objekte / Türme / Kanten), **vereinfachte Gesichter**, **Kürbis in 3/4-Ansicht**, reichere Landschaft, Planungsansicht mit Reichweitenringen. |
+| **0.4** | Zweite Rückmeldung: Gesichter von Goblin, Eisbär, Hexe und Gnom weiter vereinfacht; **Tech-Stack bestätigt**; **Hof-Bauteile** (Bauart je Bauteil einzeln, zugänglicher und fragiler, Innenhof geschützt); **alle Einheiten passen durch jede Tür**; erste Karten (Kartenlayout, Pixelfont, Datenexport). |
+| **0.5** | Dritte Rückmeldung: **Spielsprache Englisch**, **strenge Nomenklatur** (`NOMENCLATURE.md`, `daten/keywords.json`, Linter, englische Namen für alle 154 Karten), Regeltext nur mechanisch mit automatisch fetten Schlüsselwörtern, Flavor getrennt von der Effektbox, **Rank-3-Abzeichen** ausgeschrieben, Kartenrücken neu (großes Logo), Effektbox auf 5 Zeilen (Bildfenster 144 × 86). |
 
 ---
 
@@ -526,3 +532,5 @@ Neue Effekt-Bausteine entstehen nur, wenn mehrere Karten sie brauchen. Alles and
 | 2026-10-08 | **Gesichter vereinfacht, Kürbis schaut schräg nach vorn.** | Regel „Silhouette vor Gesicht“ in §10.1; Kontaktbogen zeigt Gesichter in Nahaufnahme. |
 | 2026-10-08 | **Tech-Stack bestätigt:** Web (TypeScript, Vite, PixiJS). | Sim headless in Node, Karten als JSON (`daten/cards.json`, aus den Katalogen exportiert), Pixel-Werkstatt bleibt Python und liefert PNG + Atlas. |
 | 2026-10-08 | **Hof-Bauteile, Bauart je Bauteil einzeln** (nicht nach Größe); zugänglicher und fragiler, außer im Innenhof. **Alle Einheiten passen durch jede Tür.** | Katalog 01: 39 Räume, 20 Hof-Bauteile, 13 Turmzellen, 4 Wand, 1 Tor (neu zugeordnet); HP einiger Hof-Karten gesenkt; Pfadfindung kennt Außen-/Innenhof (für Zielwahl und Fallen). |
+| 2026-10-08 | **Spielsprache Englisch, strenge Nomenklatur.** Ein Konzept, ein Begriff; Regeltext mechanisch; Glossarbegriffe automatisch fett; Standardverhalten nur im Glossar. | `NOMENCLATURE.md` (erzeugt aus `daten/keywords.json`), `tools/lint_card_text.py`, Katalogspalte „Name (EN)“ für alle 154 Karten, Kartentexte in `daten/card_text.json`; Design-Dokumente bleiben deutsch. |
+| 2026-10-08 | **Flavor gehört nie in die Effektbox.** Rein beschreibende Sätze („Billiger Massenstürmer“) entfallen oder wandern in die Flavor-Zeile. | Vanilla-Einheiten haben eine leere Effektbox bis auf das Rank-3-Talent. |
