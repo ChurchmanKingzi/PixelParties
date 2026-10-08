@@ -84,8 +84,10 @@ const ABOM = 'The Golden Abomination';
   const abomPrep = (prep) => {
     // Seat 0 hat die Abomination; Seat 2 hat am meisten Gold (recycelt am meisten) → Bot-Wahl muss auf Seat 2 fallen.
     const p0 = prep.players[0];
-    for (const hi of [0, 1, 2]) for (const s of [0, 1, 2]) if (!p0.supportZones[hi][s].length) { p0.supportZones[hi][s] = [ABOM]; return afterPlace(prep); }
-    p0.supportZones[0][0] = [ABOM]; afterPlace(prep);
+    // Nur in Spalten mit Hero (bei nur 2 Heroes gibt es eine leere Spalte, deren Karten nicht in den Kampf kommen)
+    for (const hi of [0, 1, 2]) for (const s of [0, 1, 2]) if (p0.heroes[hi] && !p0.supportZones[hi][s].length) { p0.supportZones[hi][s] = [ABOM]; return afterPlace(prep); }
+    const hi0 = p0.heroes.findIndex(Boolean);
+    p0.supportZones[hi0][0] = [ABOM]; afterPlace(prep);
   };
   function afterPlace(prep) { prep.players[1].recycled = 1; prep.players[2].recycled = 9; prep.players[3].recycled = 2; prep.players[0].recycled = 0; }
   const goldStart = [];
@@ -94,7 +96,9 @@ const ABOM = 'The Golden Abomination';
   const targetEv = events.filter(e => e.name === 'golden_abomination_target' && e.room === r1.room.id);
   const stealEv = events.filter(e => e.name === 'golden_abomination' && e.room === r1.room.id);
   const inst = r1.room.engine.cardInstances.find(c => c.name === ABOM);
-  goldTarget = inst && inst._stTarget;
+  // Die Wahl steht im Protokoll (die Karte selbst kann in den ersten Zügen durch Flächenschaden gefallen sein)
+  const chosen = targetEv[0] && gs.players.findIndex(p => p.username === targetEv[0].data.target);
+  goldTarget = inst && inst._stTarget != null ? inst._stTarget : (chosen >= 0 ? chosen : null);
   check('Die Abomination hat zu Spielbeginn einen Gegner gewählt', goldTarget != null && goldTarget !== 0, { goldTarget, targetEv: targetEv.length });
   check('Der Bot wählt den Gegner mit dem meisten Gold (Seat 2)', goldTarget === 2, { goldTarget });
   check('Genau dessen Start-Gold-Tick wurde umgeleitet', stealEv.length === 1 && stealEv[0].data.from === gs.players[2].username, stealEv.map(e => e.data));
