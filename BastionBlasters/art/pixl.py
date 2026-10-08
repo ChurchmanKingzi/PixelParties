@@ -12,6 +12,16 @@ import math
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 
+
+def label_font(size=11):
+    """TTF mit Umlauten für Beschriftungen (nur Annotationen, nie Spielgrafik); Fallback: PIL-Standardfont"""
+    for path in ('/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf', '/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf'):
+        try:
+            return ImageFont.truetype(path, size)
+        except OSError:
+            pass
+    return ImageFont.load_default()
+
 # --------------------------------------------------------------------------- Farben
 
 
@@ -96,13 +106,17 @@ class Canvas:
     def blit(self, other: 'Canvas', ox=0, oy=0, flip=False):
         src = other.px[:, ::-1] if flip else other.px
         sr = other.rid[:, ::-1] if flip else other.rid
-        for y in range(other.h):
-            for x in range(other.w):
-                if src[y, x, 3] > 0:
-                    tx, ty = ox + x, oy + y
-                    if self.inb(tx, ty):
-                        self.px[ty, tx] = src[y, x]
-                        self.rid[ty, tx] = sr[y, x]
+        h, w = src.shape[:2]
+        x0, y0 = max(0, ox), max(0, oy)
+        x1, y1 = min(self.w, ox + w), min(self.h, oy + h)
+        if x1 <= x0 or y1 <= y0:
+            return
+        sx0, sy0 = x0 - ox, y0 - oy
+        sub = src[sy0:sy0 + (y1 - y0), sx0:sx0 + (x1 - x0)]
+        subr = sr[sy0:sy0 + (y1 - y0), sx0:sx0 + (x1 - x0)]
+        m = sub[:, :, 3] > 0
+        self.px[y0:y1, x0:x1][m] = sub[m]
+        self.rid[y0:y1, x0:x1][m] = subr[m]
 
     def copy(self):
         c = Canvas(self.w, self.h)
@@ -366,7 +380,7 @@ def sheet(entries, cols, cell_w, cell_h, scale=4, bg='#2b2540', label=True, pad=
     H = rows * (cell_h * scale + pad + (label_h if label else 0)) + pad
     img = Image.new('RGBA', (W, H), hexrgb(bg) + (255,))
     d = ImageDraw.Draw(img)
-    font = ImageFont.load_default()
+    font = label_font(11)
     for i, (name, cv) in enumerate(entries):
         r, cidx = divmod(i, cols)
         ox = pad + cidx * (cell_w * scale + pad)
@@ -378,3 +392,40 @@ def sheet(entries, cols, cell_w, cell_h, scale=4, bg='#2b2540', label=True, pad=
         if label:
             d.text((ox, oy + cell_h * scale + 2), name, fill=(235, 230, 245, 255), font=font)
     return img
+
+
+
+# --------------------------------------------------------------------------- Szene mit Tiefenpuffer
+
+
+class World:
+    """Pixelgenaue Szene mit Tiefenpuffer: Objekte mit größerem Schlüssel (Fußpunkt-y) liegen davor."""
+
+    def __init__(self, w, h):
+        self.w, self.h = w, h
+        self.px = np.zeros((h, w, 4), np.uint8)
+        self.px[:, :, 3] = 255
+        self.depth = np.full((h, w), -100, np.int32)
+
+    def copy(self):
+        c = World(self.w, self.h)
+        c.px = self.px.copy()
+        c.depth = self.depth.copy()
+        return c
+
+    def draw(self, sprite: 'Canvas', x, y, key, flip=False):
+        src = sprite.px[:, ::-1] if flip else sprite.px
+        h, w = src.shape[:2]
+        x0, y0 = max(0, int(x)), max(0, int(y))
+        x1, y1 = min(self.w, int(x) + w), min(self.h, int(y) + h)
+        if x1 <= x0 or y1 <= y0:
+            return
+        sx0, sy0 = x0 - int(x), y0 - int(y)
+        sub = src[sy0:sy0 + (y1 - y0), sx0:sx0 + (x1 - x0)]
+        dep = self.depth[y0:y1, x0:x1]
+        m = (sub[:, :, 3] > 0) & (dep <= key)
+        self.px[y0:y1, x0:x1][m] = sub[m]
+        dep[m] = key
+
+    def image(self):
+        return Image.fromarray(self.px, 'RGBA')

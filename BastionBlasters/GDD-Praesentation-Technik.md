@@ -1,6 +1,6 @@
 # Bastion Blasters — Game Design Document
 
-**Teil 2: Präsentation, Technik, Balancing, Roadmap** · Version 0.2 · Entwurf zur Abnahme
+**Teil 2: Präsentation, Technik, Balancing, Roadmap** · Version 0.3 · Entwurf zur Abnahme
 
 Teil 1 (Regeln und Systeme): [`GDD.md`](GDD.md) · Kataloge: [`katalog/01-gebaeude.md`](katalog/01-gebaeude.md) · [`katalog/02-einheiten.md`](katalog/02-einheiten.md) · [`katalog/03-kerne-und-weltlaunen.md`](katalog/03-kerne-und-weltlaunen.md)
 
@@ -13,13 +13,21 @@ Legende wie in Teil 1: 🟦 aus deinem Konzept · 🟨 meine Ergänzung · ❓ o
 ### 10.1 Pixel-Art-Richtlinien (16-Bit) 🟦/🟨 ✔ entschieden: Claude erstellt alle Grafiken
 
 **Perspektive und Look**
-- **Schräge Draufsicht (3/4)** wie in 16-Bit-Rollenspielen: Der Boden wird von oben gezeigt, Wände und Gebäude zeigen ihre Vorderseite (8–16 px Höhe über dem Zellenfeld). Dächer sind abgenommen, man blickt in jeden Raum. Türme ragen über ihre Zelle hinaus und werfen einen Schatten nach unten rechts.
+- **Schräge Draufsicht (3/4)** mit **einer einzigen, durchgehenden Regel** (v0.3, nach Feedback zur Stilprobe: „die Perspektive der Burgen ergibt nicht wirklich Sinn“):
+  1. **Boden = reine Draufsicht** auf dem 32-px-Raster.
+  2. **Alles Hohe** (Wände, Türme, Kern, Bäume) steht mit seinem **Fußabdruck** auf dem Boden und wird als **Südansicht** nach oben gezeichnet; Bildhöhe = Bauhöhe, Fußpunkt = Unterkante der Südseite. Es gibt **nur Südseiten** (keine Ost-/Westflächen).
+  3. **Wände sind dünn (8 px)** und stehen auf den Zellkanten. Höhen: Nordwand/Innenwand **22 px**, Südwand/Plattformbrüstung **10 px** (aufgeschnittenes Modell, damit man hineinsieht), Seitenwand **20 px** (neben Seitentoren 10 px), Torbogen 24 px, Torpfeiler 34 px, Turm 66 px.
+  4. **Tiefenpuffer-Rendering:** Jedes Sprite-Pixel trägt einen Tiefenschlüssel (Fußpunkt-y); Wände werden **pro Fußabdruck-Pixel** nach oben extrudiert. Dadurch verdecken sich Wand, Einheit und Möbel immer korrekt, und Einheiten laufen **hinter** der Nordwand durch.
+  5. **Schatten sind Teil der Szene**, nicht der Sprites: Schachbrett-Dither nach unten rechts, an Wandfüßen und unter Bäumen.
+  Dächer sind abgenommen, man blickt in jeden Raum. Räume sind mindestens 2 Zellen tief, damit zwischen Nord- und Südwand sichtbarer Boden bleibt.
 - **Einheiten:** 3/4-Seitenansicht mit **zwei Blickrichtungen** (rechts gezeichnet, links gespiegelt); Bewegung nach oben und unten nutzt dieselben Frames mit leichter Neigung. Zusätzlich eine **Frontpose** (für Karten und Idle in der Pause). Das hält den Zeichenaufwand klein.
 - **Look:** SNES/Mega-Drive-Stil: kräftige Farbrampen, Selbst-Outlines, bewusstes Dithering, glänzende Highlights, 4–6 Töne pro Fläche, comichafte Proportionen (große Köpfe, übertriebene Werkzeuge).
+- **Gesichter bewusst einfach** (v0.3): 1–2 Pixel pro Auge, kein Mund mit Zähnen, keine Wimpern. Erkennbar wird eine Figur an **Silhouette, Hut und Werkzeug**, nicht am Gesicht. Ausnahme: Kürbis-Bomber und Katapult („Augen“ sind dort Teil des Witzes).
+- **Kürbis-Bomber** schaut **schräg nach vorn** (3/4-Drehung: Rippen als Meridiane, Gesicht zur Blickseite verschoben, rechtes Auge verkürzt, Stiel zeigt nach vorn).
 
 **Raster und Auflösung**
-- **Interne Auflösung 960 × 540**, nur **ganzzahlig skaliert** (×2 = 1920 × 1080, ×3 = 2880 × 1620). Reste als Letterbox, nie gestreckt.
-- **Zelle = 32 × 32 px.** Bastion bis 8 Zellen breit · Niemandsland ≈ 12 Zellen · Bastion bis 8 Zellen = ≈ 28 Zellen = 896 px.
+- **Interne Auflösung 1920 × 1080**, nur **ganzzahlig skaliert** (×1 Full-HD, ×2 = 3840 × 2160). Reste als Letterbox, nie gestreckt. Kamerazoom im Zeitstopp ×2 per Nearest-Neighbor.
+- **Zelle = 32 × 32 px.** **Karte 56 × 28 Zellen = 1792 × 896 px** (ganz sichtbar, Rest des Bildes für HUD): Baugrund je Spieler **16 × 16 Zellen** (512 × 512 px), dazwischen **20 Zellen** Niemandsland (640 px). Die Karte ist damit ≈ 4× so groß wie die Stilprobe v0.2 (20 × 9 Zellen).
 - **Sprite-Größenklassen:** **S** 16 × 16 (Bürger, Goblins, Frösche) · **M** 32 × 32 (Standard) · **L** 48 × 48 (Bären, Trolle, Golems) · **XL** 64 × 64 bis 96 × 96 (Riesen, Dicke Berta, Zeppelin). Bauteile füllen ihre Zellen (2 × 2 = 64 × 64) plus bis zu 16 px Überstand nach oben.
 
 **16-Bit-Disziplin (Palette)**
@@ -44,7 +52,9 @@ Legende wie in Teil 1: 🟦 aus deinem Konzept · 🟨 meine Ergänzung · ❓ o
 - Zerstörung: Zellen brechen in 3–5 Teile (Schutt, Holz, Fahnenfetzen), nicht in Zufallspixel. **Zielschatten** sind pulsierende Dither-Kreise am Boden.
 
 **Welt**
-- Bodenkacheln (Gras, Erde, Pflaster, Schlamm) mit Dither-Übergängen, Dekoration (Hüte, Knochen, Pilze, ein Schuh). Das Biom (GDD §2) bestimmt Farbstimmung und Details.
+- **Organischer Boden** statt Kachelmuster (v0.3): Wiese aus mehreren Grünrampen (Rauschfelder, quantisiert, Schachbrett-Dither an den Übergängen), Trampelpfade (Erde, Kieseln), Teiche mit Sandufer und Wellen-Dither, dazu Bodendekor (Blümchen, Halme, Kiesel).
+- **Kulissen-Objekte** (Tiefenpuffer-sortiert, Schatten darunter): Rundbäume, Kirschbäume, Kiefern, Büsche mit Beeren, Felsen, **Riesenpilze**, Zäune, Wegweiser, Seerosen, Gummienten. Dichter **Randwald** rahmt die Karte; die Mitte bleibt offen und lesbar. Das Biom (GDD §2) bestimmt Farbstimmung und Objektmix.
+- **Lesbarkeits-Regel:** Kulissen stehen **nie auf Bauland** und nur selten auf den Hauptwegen; die Wege zwischen den Bastionen bleiben als helle Bänder erkennbar.
 - **Kulisse statt Parallax:** Schatten ziehender Wolken wandern über den Boden, schwebende Inseln am Bildrand, der Himmelsriss als Lichtstreif.
 
 **Lesbarkeit (Regeln für jede neue Karte)**
@@ -62,7 +72,7 @@ Legende wie in Teil 1: 🟦 aus deinem Konzept · 🟨 meine Ergänzung · ❓ o
 
 ### 10.2 Kamera & Regie in der Schlacht 🟨
 
-- **Standard:** feste Weitaufnahme, beide Bastionen und das Feld.
+- **Standard:** feste Weitaufnahme, ganze Karte (1792 × 896 px) mit beiden Baugründen und dem Feld.
 - **Fokus-Blitze** (abschaltbar, P1): Bresche, Rang-Aufstieg zur Legende, Kern unter 20 %, Eroberung über 60 % → 0,4 s sanfter Zoom ×1,5 und Zeitlupe ×0,5.
 - **Info-Panel:** Klick auf eine Einheit zeigt Name, Rang, XP-Balken, HP, Zustand („Rückzug“, „Todesmut“, „Festgehalten“…). Hover auf einem Bauteil zeigt Zustand, Posten, HP.
 - **Ereignisfeed** (klein, rechts unten): „Gerd der Unverdauliche hat Rang 3 erreicht.“, „Krankenstation zerstört!“, „Bürger-Hut gefunden.“
@@ -124,27 +134,30 @@ Ziel: **fließend statt Schnitt.** Die Welt wird nicht „weggeblendet“, sonde
 - **Kontingent-Leiste:** je Karte lebend/Soll, ★-Rang, Durchschnittsrang der lebenden Einheiten.
 - **Kern-Fähigkeit** unten rechts mit Abklingzeit.
 
-**Bastion-Screen** (Wireframe, Draufsicht):
+**Bastion-Screen** (Wireframe, Draufsicht, modular):
 
 ```
 ┌──────────────────────────────────────────────────────────────────────────────────────┐
 │ ⏳ 0:18        ZEITSTOPP — Ausbau        Pause 3                 [✔ Bereit] Gegner: ✔  │
 ├────────────────┬─────────────────────────────────────────────────────────────────────┤
-│ KONTINGENT     │        ▓▓ ▓▓ ▓▓ ▓▓ ▓▓ ▓▓                                            │
-│ ▢ UA-01 ★1     │        ▓▓  ·  ·  ·  ·  ▓▓      Grundriss der Bastion                │
-│ ▢ US-01 ★2     │        ▓▓  · [KERN] ·  TOR     Hover = Vorschau + Nachbarschaft     │
-│ ▢ UV-01 ★1     │        ▓▓  · [KERN] ·  TOR     R = drehen · L = Schusslinien        │
-│ ▢ UZ-01 ★1     │        ▓▓  ·  ·  ·  ·  ▓▓      Rechtsklick = Info                   │
-│ ▢ (frei)       │        ▓▓ ▓▓ ▓▓ ▓▓ ▓▓ ▓▓                                            │
-│ Befehle ▾      │   (Die eingefrorene Schlacht bleibt als dunkles Diorama dahinter)   │
+│ KONTINGENT     │   ┌ Baugrund 16×16 (Raster nur im Baumodus sichtbar) ─────────┐      │
+│ ▢ UA-01 ★1     │   │ ·  ·  ┌─K─K─K─┬─S─S─S─┐ ·  ·                               │      │
+│ ▢ US-01 ★2     │   │ ·  ·  └───────┴───┬───┘ ·  ·    Module liegen an Hof/Kern    │      │
+│ ▢ UV-01 ★1     │   │ ·  ┌ Kernhof 6×6 ──┴──┐ ·  ·    Hover = Vorschau + Nachbarn │      │
+│ ▢ UZ-01 ★1     │   │ ·  │ h  h  [KERN] h  h  ▶ Tor    R = drehen · L = Schusslinien │      │
+│ ▢ (frei)       │   │ ·  └──────────────────┘ ·  ·    Hof-Erweiterung: 4 von 6    │      │
+│ Befehle ▾      │   └───────────────────────────────────────────────────────────┘      │
+│                │   (Die eingefrorene Schlacht bleibt als dunkles Diorama dahinter)   │
 ├────────────────┴─────────────────────────────────────────────────────────────────────┤
 │ DEINE HAND (frisch): [Karte] [Karte] [Karte] [Karte] [Karte]   behalten 3 · Reroll 1  │
 └──────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
 - **Ziehen-Phase:** 5 Karten offen, 3 anklicken (Rest wird ausgegraut).
-- **Platzierung:** Ghost-Sprite folgt der Maus, **R dreht** das Bauteil; gültige Zellen leuchten, ungültige sind schraffiert; Synergie-Nachbarn werden grün/rot markiert; ein Tooltip nennt Posten und Effekt.
-- **Warnungen** (nicht verbietend): „Lücke in der Ringmauer“, „Raum vom Tor abgeschnitten“, „Kein Heiler vorhanden“, „Keine Geschützplätze“, „Pulverkammer neben Wohnhaus“.
+- **Platzierung:** Ghost-Sprite folgt der Maus, **R dreht** das Modul; es rastet an **gültigen Kanten** (Hof, Kernhof, Module) ein, ungültige Stellen sind schraffiert; die **Mauersegmente** erscheinen sofort in der Vorschau; Synergie-Nachbarn werden grün/rot markiert; ein Tooltip nennt Posten und Effekt. **Hofzellen** malt man mit gedrückter Maustaste (Zähler „Hof-Erweiterung 4 von 6“).
+- **Wandkarten:** Nach dem Ausspielen leuchten die wählbaren Kanten auf; **bis zu 4 zusammenhängende Segmente** anklicken.
+- **Warnungen** (nicht verbietend): „Offene Kante (keine Mauer)“ bei zerstörten Segmenten, „Modul vom Tor abgeschnitten“, „Kein Heiler vorhanden“, „Keine Geschützplätze“, „Pulverkammer neben Wohnhaus“.
+- **Planungsansicht** 🟨: Taste **P** blendet **Reichweitenringe** (Kurz/Mittel/Weit/Extrem) und die **Baugrund-Raster** ein, wie `art/out/szene_baugrund.png` (Beispiel in der Stilprobe).
 
 **Karten-Layout** (160 × 224 px, gleiches Pixelraster):
 
@@ -196,7 +209,7 @@ Begründung: Entscheidend ist, dass ich die Pixelgrafik selbst erzeuge und das S
 - **Befehlslog + Seed = Replay.** Daraus entstehen Replays, Debugging, Fehlersuche und später Online-Synchronisation (Lockstep).
 - **Datengetrieben:** Karten stehen in JSON/YAML (siehe Anhang B). Fähigkeiten sind Bausteine (**Trigger → Bedingung → Effekt**); im Code stehen nur die Verhaltens-Archetypen (Doktrinen, Zonen, Flugbahnen).
 - **Systeme** (in fester Reihenfolge pro Tick): Spawn · Navigation · Targeting · Combat · Projectile (Schusslinie, Streuung) · Status · XP/Rang · Staffing (Personal) · Healing/Retreat · Conquest · Win-Check. Danach Darstellung (Kamera, FX, UI).
-- **Wegfindung:** **A\* auf dem Zellenraster** (8 Richtungen, kein Ecken-Schneiden) für Bastion und Feld; Hindernisse haben Zerstörungskosten (HP/100). Gedränge im Feld über weiche Abstoßung. Sonderfälle: Flieger, Geister, Wühler (eigene Regeln). Dank Draufsicht entfällt der aufwendige Raumgraph mit Etagen; das Hauptrisiko des Querschnitts ist damit weg.
+- **Wegfindung:** **A\* auf dem Zellenraster** (8 Richtungen, kein Ecken-Schneiden) für Bastion und Feld; **Mauern liegen auf Zellkanten** (Kante gesperrt, Tür/Tor offen), Turmzellen und Kern sind gesperrte Zellen; Hindernisse haben Zerstörungskosten (HP/100). Gedränge im Feld über weiche Abstoßung. Sonderfälle: Flieger, Geister, Wühler (eigene Regeln). Dank Draufsicht entfällt der aufwendige Raumgraph mit Etagen; das Hauptrisiko des Querschnitts ist damit weg.
 - **Zeitstopp:** Sim-Tick pausiert, die Darstellung läuft weiter. Eingaben schreiben in eine Befehlswarteschlange (Bauteile, Kontingent, Befehle), die beim Auftauen deterministisch angewendet wird.
 - **Determinismus:** Fließkomma-Abweichungen vermeiden (Fixed-Point oder konsequent gleiche Rechenreihenfolge), damit Replays und Online-Lockstep funktionieren.
 - **Performance-Budget:** 40 Einheiten pro Seite + Geschosse + Partikel unter 16 ms/Frame auf einem Mittelklasse-Laptop. Partikellimit ⚙ 500, Sprite-Atlas, Object Pooling.
@@ -241,13 +254,13 @@ Begründung: Entscheidend ist, dass ich die Pixelgrafik selbst erzeuge und das S
 
 ### 13.1 MVP (P0) — ein spielbarer Kern
 
-- Ein Kern (KE-00), Raster 6 × 6 (ohne Erweiterungen), Ringmauer, Tor, Bürger.
+- Ein Kern (KE-00), **Kernhof 6 × 6 auf Baugrund 16 × 16**, automatische Mauersegmente, Haupttor, Module (2 × 2, 3 × 2, 3 × 3) mit Türen, Hof-Erweiterung, Bürger. Karte 56 × 28 Zellen.
 - **18 Bauteile** (Katalog 01, Liste „P0“) und **19 Truppen** (Katalog 02, Liste „P0“).
 - Phase 1 + Kampfzyklus + Zeitstopp mit einfacher Kamerafahrt (noch ohne Dither-Effekte).
 - Simulation: Spawn/Nachschub, Navigation (A* auf dem Raster), Artillerie (Flach + Bogen, Schusslinie, Zielschatten), Sturmtruppen (Jäger, Brecher, Eroberer, Plünderer, Sprenger), Rückzug und Heilung, Verteidiger-Zonen, Personal/Bürger, Eroberung, Kern-HP, XP und Ränge (ohne Talente), beide Siegbedingungen.
 - Platzhalter-Grafik (später die Pixelart aus der Pixel-Werkstatt), Debug-Overlay (Zellen, Pfade, Exposition, XP), einfacher Bot-Gegner.
 
-**P1:** Erweiterungen des Rasters, Fraktions-Kerne, restliche Linien und Karten, Kern-Fähigkeiten, Talente, Statuseffekte komplett, Materialien/Rüstungsmatrix, Zeitstopp-Regie in Pixelart, Explosion, UI-Skin, Audio.
+**P1:** Wandkarten und Tor-Karten, Hof-Erweiterung je Pause (im MVP fester Satz), Fraktions-Kerne, restliche Linien und Karten, Kern-Fähigkeiten, Talente, Statuseffekte komplett, Materialien/Rüstungsmatrix, Zeitstopp-Regie in Pixelart, Explosion, UI-Skin, Audio.
 **P2:** Welt-Launen, Chaos-Karten, Baustile, Biom-Wechsel, Kommentator, Signaturkarten, Online-Modus.
 
 ### 13.2 Meilensteine
@@ -255,13 +268,13 @@ Begründung: Entscheidend ist, dass ich die Pixelgrafik selbst erzeuge und das S
 | # | Meilenstein | Ergebnis („Definition of Done“) |
 |---|---|---|
 | **M0** | Entscheidungen & Daten | Offene Fragen aus §14 beantwortet; Kataloge als JSON/YAML exportiert; Tuning-Tabelle als Datei. |
-| **M1** | Pixel-Werkstatt & Stilprobe | Code-Pipeline für 16-Bit-Pixelart (Rampen, Shading, Dither, Outline, Palette-Prüfung); Stilprobe mit Kontaktbogen, ersten Bauteilen, Einheiten und einer Szenen-Montage; **deine Freigabe des Stils.** *Stand: Stilprobe liegt in `art/out/` vor und wartet auf deine Freigabe.* |
+| **M1** | Pixel-Werkstatt & Stilprobe | Code-Pipeline für 16-Bit-Pixelart (Rampen, Shading, Dither, Outline, Palette-Prüfung); Stilprobe mit Kontaktbogen, ersten Bauteilen, Einheiten und einer Szenen-Montage; **deine Freigabe des Stils.** *Stand: Stilprobe **v0.3** (große Karte, modulare Burgen mit korrekter Perspektive, vereinfachte Gesichter, Kürbis in 3/4-Ansicht, reichere Landschaft) liegt in `art/out/` vor und wartet auf deine Freigabe.* |
 | **M2** | Kampf-Greybox | 2D-Feld und Bastion-Raster mit Platzhalterquadraten; Einheiten spawnen, laufen, kämpfen; eine **komplette Bot-gegen-Bot-Partie** läuft bis zum Sieg und ist als Replay abspielbar. |
-| **M3** | Bastion-Builder | Drag & Drop auf dem Raster mit Drehen, Tags, Nachbarschaft, Validierung. Ein Mensch kann eine Bastion bauen. |
+| **M3** | Bastion-Builder | Module an Kanten anlegen, Drehen, Auto-Mauern und Türen, Hof-Erweiterung, Tags, Nachbarschaft, Validierung. Ein Mensch kann eine Bastion bauen. |
 | **M4** | Karten-Loop & Zeitstopp | Kern-Wahl, Loadout 10/7, frische 5/3-Hand, Kontingent, Pausenablauf mit einfacher Kamerafahrt. Eine **komplette Partie ist spielbar** (Mensch vs. Bot). |
 | **M5** | Rollen vertiefen | Rückzug/Heilung, Personal, Eroberung, XP/Ränge laufen vollständig; erster Balance-Pass mit Bot-Sims. |
 | **M6** | Vertical Slice (Art) | 1 Baustil, 10 voll animierte Einheiten, Dither-Zeitstopp, Kern-Explosion, UI-Skin; ein 3-minütiges Video, das schon „nach dem Spiel“ aussieht. |
-| **M7** | Content-Welle 1 | Alle P0- und P1-Karten, die ersten Fraktions-Kerne, Rasterweiterungen; Balance-Pass 2. |
+| **M7** | Content-Welle 1 | Alle P0- und P1-Karten, die ersten Fraktions-Kerne, Wand- und Tor-Karten; Balance-Pass 2. |
 | **M8** | Content-Welle 2 & Polish | Restliche Karten und Kerne, Welt-Launen, Audio, Menüs, Barrierefreiheit. |
 | **M9** | Mehrspieler | Lokal (Split) und, falls gewünscht, Online. |
 
@@ -274,7 +287,8 @@ Begründung: Entscheidend ist, dass ich die Pixelgrafik selbst erzeuge und das S
 | **XP-Snowball** | Zeit-XP-Deckel (nur bis Rang 2), Rangdifferenz-Bonus, Todesmut ohne Heilung, Wahnsinn. |
 | **Unlesbares Chaos** | Silhouettenregeln, Statusicons, Einheitenlimit 40, Fokus-Highlight, Ereignisfeed. |
 | **Wegfindung und Gedränge** | A* auf dem Zellenraster, Hindernisse mit Kosten, weiche Abstoßung im Feld, Debug-Overlay. |
-| **Labyrinth-Verstopfung** (Mauerwerk ist kostenlos) | Wegkosten berücksichtigen Zerstörungsaufwand, Mauern haben HP, Türme und Verteidiger sind der Gegenpol; notfalls Mauerwerk-Limit pro Pause. |
+| **Labyrinth-Verstopfung** (Hof-Erweiterung und Mauerwerk sind kostenlos) | Wegkosten berücksichtigen Zerstörungsaufwand, Mauern haben HP, Türme und Verteidiger sind der Gegenpol; notfalls Limit der Hofzellen pro Pause. |
+| **Perspektiv-Fehler in Grafik und Regeln** (v0.3: Seitentor wird von der Seitenwand verdeckt) | Eine Regel (§10.1), Tiefenpuffer-Renderer, Seitentore als volle Zellendurchlässe, Kontaktbogen als Pflichtprüfung für jede neue Bauart. |
 | **Pixelart-Qualität und -Umfang** (alles von Claude) | Stilprobe vor Massenproduktion, Bausteine und Recolor-Basen, Review am Kontaktbogen, Schlüsselmotive mit Handarbeit. |
 | **Pixel-Art-Aufwand (150+ Karten)** | Platzhalter zuerst, Vertical Slice, Recolor-Basen für verwandte Einheiten, 2 Blickrichtungen statt 4, Tier IV zuletzt. |
 | **Zeitstopp-Übergang ruckelt** | Sim und Darstellung trennen, Nearest-Neighbor, pixelgenau in Ruhe. |
@@ -306,8 +320,12 @@ Begründung: Entscheidend ist, dass ich die Pixelgrafik selbst erzeuge und das S
 | **Q14** | Name „Bastion Blasters“: Marken-/Namensprüfung? | ❓ **Offen** (ich habe nichts geprüft). |
 | **Q15** | Kern-Wahl frei und verdeckt aus allen 12, oder 3 zufällig angeboten? | ❓ Default: **frei**, Zufallsmodus optional. |
 | **Q16** | Ungespielte, behaltene Karten verfallen. Mit Trostpflaster (4 % Reparatur je Karte)? | ❓ Default: **ja.** |
-| **Q17** | Mauerwerk bleibt kostenlos und unbegrenzt (Labyrinthe)? | ❓ Default: **ja**, mit Beobachtung (Risiko in §13.3). |
+| **Q17** | Mauerwerk setzt sich automatisch und kostenlos an alle Außen- und Modulkanten; dazu Hof-Erweiterung (Labyrinthe)? | ❓ Default: **ja**, mit Beobachtung (Risiko in §13.3). |
 | **Q18** | Einheiten mit zwei Blickrichtungen (rechts/links gespiegelt) statt vier? | ❓ Default: **ja** (spart Zeichenaufwand). |
+| **Q19** | Karte 56 × 28 Zellen, Baugrund 16 × 16, Niemandsland 20 Zellen, Reichweiten 26 / 34 / 42 / 50? | ✔ **größere Karte entschieden** (Feedback). ❓ Exakte Maße Default: **wie vorgeschlagen.** |
+| **Q20** | Hof-Erweiterung: 12 Zellen im Erstaufbau, danach 6 je Zeitstopp, kostenlos? | ❓ Default: **ja** (⚙ `HOF_START` / `HOF_PER_PAUSE`). |
+| **Q21** | Große Einheiten (L/XL) und Türen: Türöffnung (14 px) ist nur optisch, Einheiten laufen kantenweise hindurch? | ❓ Default: **ja** (keine Größenbeschränkung, sonst zu viele Sonderfälle). |
+| **Q22** | Kleine Bauteile (Feldlazarett, Fallgrube, Alarmglocke, Brunnen u. a.) sind **Objekte** auf Hofzellen, keine Räume? | ❓ Default: **ja** (20 Objekte, Katalog 01). |
 
 ---
 
@@ -318,11 +336,12 @@ Begründung: Entscheidend ist, dass ich die Pixelgrafik selbst erzeuge und das S
 | **Abstempeln** | Neue Bauteile werden nach der Pause aus der Blaupause in echte Gebäude verwandelt. |
 | **Alarm** | Zustand, wenn Eindringlinge in der Bastion sind; verdoppelt die Leine der Verteidiger. |
 | **Artillerie** | Truppen auf Geschützplätzen, die die gegnerische Bastion beschießen. |
-| **Bastion** | Die Festung eines Spielers (Grundriss-Raster mit Ringmauer und Kern). |
+| **Bastion** | Die Festung eines Spielers: modularer Grundriss aus Kernhof, Hof, Modulen, Türmen und Mauern. |
+| **Baugrund** | Fläche von 16 × 16 Zellen, auf der ein Spieler bauen darf. |
 | **Behandlungsplatz** | Platz in einer Heilquelle, den ein verwundeter Sturmtrupp belegt. |
 | **Beute** | Gebäude, die Plünderer ablenken (Schatztruhe, Wunschbrunnen, Trophäenhalle). |
 | **Blaupause** | Darstellung eines neu gelegten Bauteils während der Pause. |
-| **Bresche** | Zerstörte Außenzelle, die als zusätzlicher Eingang dient. |
+| **Bresche** | Zerstörtes Mauersegment an der Außenkante, das als zusätzlicher Eingang dient. |
 | **Bürger** | Standard-Zivilisten ohne Karte, die Posten besetzen. |
 | **Doktrin** | Zielverhalten einer Sturmtruppe (Jäger, Brecher, Eroberer, Plünderer, Sprenger). |
 | **Eindringling** | Feindliche Sturmtruppe innerhalb der Bastion. |
@@ -330,18 +349,23 @@ Begründung: Entscheidend ist, dass ich die Pixelgrafik selbst erzeuge und das S
 | **Geschützplatz (GP)** | Platz auf einer Plattform, den Artillerie benötigt. |
 | **Fraktion / Kern** | Der Kern, den man wählt, bestimmt Passive, aktive Fähigkeit, Linien-Affinitäten und Schwäche (Archetyp: Belagerer, Stürmer, Bollwerk, Tüftler). |
 | **Heilquelle** | Alles, was für die Rückzugsregel zählt (Heilgebäude, Heiler, Aura-Heilung). |
-| **Innenhof** | Leere, begehbare Zelle im Inneren der Bastion. |
+| **Hof-Erweiterung** | Kostenlose Hofzellen, die der Spieler im Erstaufbau (12) und je Zeitstopp (6) anlegt. |
+| **Hof / Innenhof** | Leere, begehbare Zelle der Bastion. Zwischen Hofzellen steht keine Wand. |
 | **Kern** | Zentrum der Bastion; fällt er, wird der Besitzer besiegt. |
 | **Kern-Anbau** | Kostenloser Freischalt-Raum der Hauptlinie des Kerns (★2). |
+| **Kernhof** | Start-Hof 6 × 6 um den Kern. |
 | **Kernkammer** | 2 × 2 Raum um den Kern; Ort der Eroberung. |
 | **Kontingent** | Armee-Leiste aus Truppen-Karten (5–8 Plätze). |
 | **Linie** | Truppen-Gruppe, die ein Freischalt-Raum freigibt (Waffen, Arkan, Tier, …). |
 | **Nachschub (N)** | Wie viele Einheiten einer Karte pro Welle nachgeliefert werden. |
-| **Niemandsland** | Streifen zwischen den Bastionen. |
+| **Mauersegment** | 32 px langes, 8 px dünnes Wandstück auf einer Zellkante; entsteht automatisch (⚙ 300 HP). |
+| **Modul** | Raum aus ≥ 2 × 2 zusammenhängenden Zellen, der an Hof/Kern/Modul angrenzt. |
+| **Niemandsland** | Feld zwischen den Baugründen (20 Zellen). |
+| **Objekt** | Kleines Bauteil (1 × 1 bis 3 × 1) auf Hofzellen, ohne eigene Wände (Fallen, Brunnen, Lafetten). |
 | **Panikraum** | Raum, in dem Zivilisten unangreifbar sind. |
 | **Posten** | Arbeitsplatz in einem Raum, der Personal braucht. |
 | **Rang** | Erfahrungsstufe R0–R5 einer Einheit. |
-| **Ringmauer** | Äußerste Zellenreihe der Bastion, kostenlos mit Mauerwerk gefüllt. |
+| **Turmzelle** | Massive 1 × 1-Zelle eines Turms an der Außenkante; wird nicht von Wänden umschlossen. |
 | **Rückzug** | Verhalten einer Sturmtruppe unter 50 % HP, wenn eine Heilquelle existiert. |
 | **Schusslinie** | Gerade Linie vom Schützen zur Zielzelle, ohne andere feste Zelle des Gegners; Voraussetzung für Flach-Geschosse. |
 | **Soll (S)** | Zielstärke einer Truppen-Karte. |
@@ -377,15 +401,19 @@ Alle Startwerte zum Ausprobieren; diese Tabelle soll später als Datei (z. B. `t
 | `REROLLS` | Rerolls je Pause | 1 | 0–2 |
 | `KNOWN_FACES_PCT` | Anteil Kopien bekannter Karten beim Ziehen | 20 % | 10–30 % |
 | `KONTINGENT_START` / `_MAX` | Truppenplätze | 5 / 8 | – |
-| `GRID_START` | Baugrund zu Beginn (inkl. Ringmauer) | 6×6 | – |
-| `GRID_EXPANSIONS` | Erweiterungen (Pausen 2, 4, 6), max. je Seite | 3, je Seite max. 2 | – |
-| `GATE_SIZE` | Tor | 1×2 | – |
+| `WORLD_CELLS` | Karte (1792 × 896 px) | 56 × 28 | – |
+| `GRID_PLOT` | Baugrund je Spieler | 16 × 16 | 14–18 |
+| `KERNHOF` | Start-Hof um den Kern | 6 × 6 | – |
+| `HOF_START` / `HOF_PER_PAUSE` | Kostenlose Hofzellen im Erstaufbau / je Zeitstopp | 12 / 6 | 8–16 / 3–10 |
+| `MODULE_MIN_DEPTH` | Mindesttiefe von Raum-Modulen | 2 Zellen | fest |
+| `WALL_T` / `DOOR_W` | Wanddicke / Türbreite (px) | 8 / 14 | – |
+| `GATE_SIZE` | Haupttor | 1 Zelle | – |
 | `CORNER_TOWER_BONUS` | Eckturm: Reichweite / HP | +1 / +10 % | – |
 | `SHELL_SPREAD_BASE` / `_PER_CELL` | Streuung von Bogen/Senkrecht (Zellen) | 0,4 / 0,04 | – |
 | `TELEGRAPH_BOGEN_S` / `_SENKRECHT_S` | Zielschatten vor dem Einschlag | 1,2 / 2,0 | – |
-| `FIELD_GAP_CELLS` | Niemandsland | 12 | 10–14 |
+| `FIELD_GAP_CELLS` | Niemandsland (Front zu Front) | 20 | 16–24 |
 | `CORE_HP` / `CORE_REGEN` | Kern | 5000 / 2 HP/s | 3500–7000 |
-| `GATE_HP` / `WALL_HP` | Tor / Mauerwerk | 500 / 400 | – |
+| `GATE_HP` / `WALL_SEG_HP` | Tor / Mauerwerk je Segment | 500 / 300 | 200–450 |
 | `BUERGER_HP` | Bürger | 25 | – |
 | `BUERGER_BASE_CAP` / `_PER_HOUSE` | Bürger-Limit | 4 / +3 | – |
 | `BUERGER_RESPAWN_S` | Nachwuchs | 5 | 3–8 |
@@ -409,7 +437,7 @@ Alle Startwerte zum Ausprobieren; diese Tabelle soll später als Datei (z. B. `t
 | `RANK5_AURA` | Ruhmesaura R5 | +8 % Schaden, Radius 3 | – |
 | `BUILD_TIME_AFTER_PAUSE_S` | Bauzeit neuer Bauteile | 3 | – |
 | `REBUILD_WORK_RATIO` | Wiederaufbau-Arbeit | 40 % der Max-HP | 30–60 % |
-| `RANGE_ARTILLERY` | Kurz / Mittel / Weit / Extrem | 14 / 18 / 22 / 26 | – |
+| `RANGE_ARTILLERY` | Kurz / Mittel / Weit / Extrem (Zellen) | 26 / 34 / 42 / 50 | – |
 | `PROJECTILE_FLIGHT_S` | Flugzeit | 1,0–2,2 | – |
 | `MADNESS_START` / `_STEP` | Wahnsinn | 14:00 / alle 30 s +10 % | – |
 | `SKY_RIP_START` | Himmelsriss (1 % Kern-HP/s) | 20:00 | – |
@@ -469,6 +497,7 @@ Neue Effekt-Bausteine entstehen nur, wenn mehrere Karten sie brauchen. Alles and
 |---|---|
 | **0.1** | Erster Entwurf aus dem Grobkonzept: Regeln, Systeme, Kataloge (Bauteile, Einheiten, Kerne, Welt-Launen), Präsentation, Technik, Roadmap, offene Fragen. |
 | **0.2** | Antworten auf die offenen Fragen eingearbeitet: **Draufsicht** statt Querschnitt (Raster, Ringmauer, Schusslinie, Zielschatten, Tags, Wegfindung neu), **Ziehregel** 10/7 + frische 5/3, **16-Bit-Pixelart von Claude** (Pixel-Werkstatt, RGB555), **12 Fraktions-Kerne** in 4 Archetypen, Technik-Vergleich, neue Meilensteine. |
+| **0.3** | Rückmeldung zur Stilprobe eingearbeitet: **konsistente Perspektive** (Südansicht, dünne Kantenwände, Tiefenpuffer), **modulare Bastion** (Baugrund 16 × 16, Kernhof, Module ≥ 2 tief, Auto-Mauern, Hof-Erweiterung, Wandkarten, Seitentore) statt 6 × 6 + Ringmauer + Erweiterungen, **größere Karte** (56 × 28 Zellen, 1920 × 1080), Reichweiten 26 / 34 / 42 / 50, Katalog 01 neu vermessen (Module / Objekte / Türme / Kanten), **vereinfachte Gesichter**, **Kürbis in 3/4-Ansicht**, reichere Landschaft, Planungsansicht mit Reichweitenringen. |
 
 ---
 
@@ -481,3 +510,7 @@ Neue Effekt-Bausteine entstehen nur, wenn mehrere Karten sie brauchen. Alles and
 | 2026-10-08 | **Pixelart komplett von Claude, 16-Bit-Stil.** | Pixel-Werkstatt (Code-Pipeline), RGB555, Master-Palette mit 122 Farben (statt harter 16-Farben-Grenze je Sprite), Stilprobe vor Massenproduktion. |
 | 2026-10-08 | **Kerne sind Fraktionen.** | 12 Kerne in 4 Archetypen mit Passive, Aktive, Linien-Affinität, Kern-Anbau, Schwäche (Katalog 03). |
 | 2026-10-08 | **Tech-Stack:** Empfehlung Web (TypeScript), Godot als zweite Wahl, Unity nicht. | Bestätigung ausstehend (Q7). |
+| 2026-10-08 | **Perspektive als eine durchgehende Regel:** Boden Draufsicht, Hohes als Südansicht, dünne Wände auf Zellkanten, Tiefenpuffer. | Räume ≥ 2 Zellen tief; Seitentore als volle Zellendurchlässe (sonst verdeckt die Seitenwand die Öffnung); Pflichtprüfung am Kontaktbogen. |
+| 2026-10-08 | **Bastionen sind modular statt Quadrate.** Baugrund 16 × 16, Kernhof 6 × 6, Module ≥ 2 tief, Mauern automatisch auf Kanten, Hof-Erweiterung 12 + 6 je Pause. | GDD §4 neu, Katalog 01 neu vermessen (23 Module 3×2, 11 Module 3×3, 8 Module 2×2, 10 Türme, 20 Objekte, 3 Wandkarten, 1 Tor-Karte), Tags auf Kanten umgestellt, Wegfindung mit Kantenkosten. |
+| 2026-10-08 | **Größere Karte:** 56 × 28 Zellen, Niemandsland 20 Zellen, Reichweiten 26 / 34 / 42 / 50. | Längere Laufwege (Welle braucht ≈ 13 s bis zur Front), Kern erst mit Mittel-Geschützen erreichbar, Platz für Kulisse und Wege. |
+| 2026-10-08 | **Gesichter vereinfacht, Kürbis schaut schräg nach vorn.** | Regel „Silhouette vor Gesicht“ in §10.1; Kontaktbogen zeigt Gesichter in Nahaufnahme. |

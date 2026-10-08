@@ -1,4 +1,4 @@
-"""Stilprobe: erzeugt Kontaktbögen, Spritesheets, Atlas, Szenen-Montage und Animation.
+"""Stilprobe v0.3: große Welt (56 x 28 Zellen), zwei modulare Burgen, reiche Landschaft.
 
 Aufruf:  python3 -I styleprobe.py        (aus dem Ordner art/ heraus)
 Ausgabe: art/out/
@@ -13,15 +13,52 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
+import numpy as np
+
 from pixl import *
 from assets_env import *
+from assets_props import *
 from assets_units import *
+from castle import *
+from landscape import *
 
 OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'out')
 os.makedirs(OUT, exist_ok=True)
 os.makedirs(os.path.join(OUT, 'sprites'), exist_ok=True)
 
-CELL = 32
+WC, HC = 56, 28
+W, H = WC * CELL, HC * CELL
+
+# --------------------------------------------------------------------------- Burg-Layouts (ASCII, y von oben)
+
+P1_ROWS = [
+    "................",
+    "......KKKSSS....",
+    "......KKKSSS....",
+    "...hhhhhhhhh....",
+    "...hhhhhhhhhT...",
+    "...WWWhhCChhhh..",
+    "...WWWhhCChhhh..",
+    "...hhhhhhhhhT...",
+    "...hhhhhhhhh....",
+    "......ZZZBBB....",
+    "......ZZZBBB....",
+    "................",
+]
+P2_ROWS = [
+    "................",
+    ".......SSSKKK...",
+    ".......SSSKKK...",
+    ".....Thhhhhh....",
+    "....hhhhhhhhZZZ.",
+    "....hhhhCChhZZZ.",
+    "....hhhhCChhBBB.",
+    "....hhhhhhhhBBB.",
+    ".....Thhhhhh....",
+    ".......WWW......",
+    ".......WWW......",
+    "................",
+]
 
 
 # --------------------------------------------------------------------------- Helfer
@@ -40,310 +77,426 @@ def swap_team(cv: Canvas, src='teamA', dst='teamB'):
     return out
 
 
-def ground_shadow(scene: Canvas, cx, cy, rx, ry):
-    """Schachbrett-Schatten (keine Alpha-Mischung)"""
-    for y in range(int(cy - ry - 1), int(cy + ry + 2)):
-        for x in range(int(cx - rx - 1), int(cx + rx + 2)):
-            dx = (x + 0.5 - cx) / rx
-            dy = (y + 0.5 - cy) / ry
-            d = dx * dx + dy * dy
-            if d <= 1.0 and scene.inb(x, y):
-                if d < 0.5 or (x + y) % 2 == 0:
-                    scene.px[y, x, :3] = (scene.px[y, x, :3] * 0.55).astype('uint8')
-                    scene.px[y, x, :3] = [q555(tuple(int(v) for v in scene.px[y, x, :3]))[i] for i in range(3)]
+_SWAP_CACHE = {}
 
 
-def zielschatten(scene: Canvas, cx, cy, r, phase=0):
-    """pulsierender Dither-Kreis am Boden (Telegraph eines Einschlags)"""
+def swapped(cv, key):
+    if key not in _SWAP_CACHE:
+        _SWAP_CACHE[key] = swap_team(cv)
+    return _SWAP_CACHE[key]
+
+
+def darken_ground(world: World, mask_fn, factor=0.58):
+    """Schachbrett-Schatten nur auf Bodenpixeln (depth < -40)"""
+    pass
+
+
+def shadow(world: World, cx, cy, rx, ry):
+    x0, x1 = int(cx - rx - 1), int(cx + rx + 2)
+    y0, y1 = int(cy - ry - 1), int(cy + ry + 2)
+    x0, y0 = max(0, x0), max(0, y0)
+    x1, y1 = min(world.w, x1), min(world.h, y1)
+    if x1 <= x0 or y1 <= y0:
+        return
+    Y, X = np.mgrid[y0:y1, x0:x1]
+    d = ((X + 0.5 - cx) / rx) ** 2 + ((Y + 0.5 - cy) / ry) ** 2
+    m = (d <= 1.0) & ((d < 0.5) | ((X + Y) % 2 == 0)) & (world.depth[y0:y1, x0:x1] < -40)
+    sub = world.px[y0:y1, x0:x1, :3]
+    col = (sub.astype(np.float32) * 0.58).astype(np.uint8)
+    q = col >> 3
+    col = (q << 3) | (q >> 2)
+    sub[m] = col[m]
+
+
+def zielschatten(world: World, cx, cy, r, phase=0):
     rr = r * (1.0 - 0.06 * (phase % 4))
-    for y in range(int(cy - r - 2), int(cy + r + 3)):
-        for x in range(int(cx - r - 2), int(cx + r + 3)):
-            d = math.hypot(x + 0.5 - cx, y + 0.5 - cy)
-            if not scene.inb(x, y):
-                continue
-            if abs(d - rr) < 1.3:
-                scene.put_ramp(x, y, 'fire', 5 if (x + y) % 2 == 0 else 4)
-            elif d < rr - 1.3:
-                if (x % 3 == 0 and y % 3 == 0) or ((x + y) % 2 == 0 and d > rr * 0.75):
-                    scene.put_ramp(x, y, 'fire', 2)
-            if d < 2.2:
-                scene.put_ramp(x, y, 'fire', 5)
-
-
-def deco_rock(seed=1):
-    c = Canvas(14, 12)
-    ellipse(c, 7, 7, 5.6, 4.2, 'stone', lo=1, hi=5)
-    c.put_ramp(5, 5, 'stone', 5)
-    c.outline()
-    return c
-
-
-def deco_mushroom():
-    c = Canvas(12, 12)
-    c.rect(5, 6, 6, 10, 'bone', 4)
-    c.put_ramp(6, 7, 'bone', 3)
-    ellipse(c, 6, 5, 5, 3.5, 'teamA', lo=2, hi=5, clip=lambda x, y: y <= 6)
-    for (x, y) in [(4, 3), (7, 4), (9, 5)]:
-        c.put_ramp(x, y, 'bone', 5)
-    c.outline()
-    return c
-
-
-def deco_hat():
-    c = Canvas(16, 12)
-    ellipse(c, 8, 8, 7, 2.2, 'purple', lo=1, hi=4)
-    poly(c, [(5, 8), (11, 8), (9, 2), (12, 1)], 'purple', lo=1, hi=4)
-    c.rect(5, 6, 10, 6, 'gold', 3)
-    c.outline()
-    return c
-
-
-def deco_bones():
-    c = Canvas(16, 8)
-    thick_line(c, 2, 4, 12, 3, 2, 'bone', lo=2, hi=5)
-    ellipse(c, 2, 4, 1.8, 1.8, 'bone', lo=3, hi=5)
-    ellipse(c, 12, 3, 1.8, 1.8, 'bone', lo=3, hi=5)
-    c.outline()
-    return c
+    x0, x1 = max(0, int(cx - r - 3)), min(world.w, int(cx + r + 4))
+    y0, y1 = max(0, int(cy - r - 3)), min(world.h, int(cy + r + 4))
+    Y, X = np.mgrid[y0:y1, x0:x1]
+    d = np.hypot(X + 0.5 - cx, Y + 0.5 - cy)
+    ground = world.depth[y0:y1, x0:x1] < -40
+    ring = (np.abs(d - rr) < 1.3) & ground
+    chk = ((X + Y) % 2 == 0)
+    inner = (d < rr - 1.3) & ground & (((X % 3 == 0) & (Y % 3 == 0)) | (chk & (d > rr * 0.75)))
+    center = (d < 2.2) & ground
+    sub = world.px[y0:y1, x0:x1, :3]
+    fire = np.array(RAMPS['fire'], np.uint8)
+    sub[ring & chk] = fire[5]
+    sub[ring & ~chk] = fire[4]
+    sub[inner] = fire[2]
+    sub[center] = fire[5]
 
 
 def stone_projectile():
-    c = Canvas(10, 10)
-    ellipse(c, 5, 5, 3.8, 3.8, 'stone', lo=1, hi=5)
-    c.put_ramp(3, 3, 'stone', 5)
+    c = Canvas(14, 14)
+    ellipse(c, 7, 7, 5.6, 5.6, 'stone', lo=0, hi=5)
+    for (x, y) in ((5, 4), (6, 4), (5, 5)):
+        c.put_ramp(x, y, 'bone', 5)
+    c.put_ramp(9, 9, 'coal', 2)
+    c.put_ramp(8, 10, 'coal', 2)
     c.outline()
     return c
 
 
-# --------------------------------------------------------------------------- Bastion zusammenbauen
+def trail_dot(k, n_total=12):
+    """Schweifpartikel k = 1 (am Geschoss, Feuer) ... n_total (hinten, Rauch)"""
+    q = k / float(n_total)
+    r = max(1.3, 3.6 - 2.6 * q)
+    n = int(r * 2 + 3)
+    c = Canvas(n, n)
+    mid = n / 2.0
+    if q < 0.2:
+        ramp, idx = 'fire', 5
+    elif q < 0.4:
+        ramp, idx = 'fire', 4
+    elif q < 0.75:
+        ramp, idx = 'bone', 5
+    else:
+        ramp, idx = 'stone', 4
+    ellipse(c, mid, mid, r, r, ramp, lo=max(1, idx - 2), hi=idx)
+    return c
 
 
-class Scene:
-    def __init__(self, w_cells, h_cells):
-        self.w, self.h = w_cells * CELL, h_cells * CELL
-        self.ground = Canvas(self.w, self.h)
-        self.objs = []     # (sortkey, sprite, x, y, flip)
-        self.shadows = []  # (cx, cy, rx, ry)
-
-    def add(self, key, sprite, x, y, flip=False):
-        self.objs.append((key, sprite, int(x), int(y), flip))
-
-    def render(self, fx=None):
-        sc = self.ground.copy()
-        for (cx, cy, rx, ry) in self.shadows:
-            ground_shadow(sc, cx, cy, rx, ry)
-        if fx:
-            fx(sc)
-        for (key, sprite, x, y, flip) in sorted(self.objs, key=lambda o: o[0]):
-            sc.blit(sprite, x, y, flip=flip)
-        return sc
+# --------------------------------------------------------------------------- Welt (statischer Teil)
 
 
-def build_fortress(scene: Scene, ox, oy, mirror=False, team='teamA', seed=0, gate_rows=(2, 3)):
-    """6x6-Bastion (inkl. Ringmauer) ab Zelle (ox,oy). Front rechts (mirror=False) bzw. links (mirror=True)."""
-    N = 6
-    H = WALL_H
-    kinds = {(rx, ry): 'floor' for ry in range(N) for rx in range(N)}
-    for i in range(N):
-        for (rx, ry) in ((i, 0), (i, N - 1), (0, i), (N - 1, i)):
-            kinds[(rx, ry)] = 'wall'
-    for k in range(2, 4):
-        for j in range(2, 4):
-            kinds[(j, k)] = 'core'
-    for gy in gate_rows:
-        kinds[(N - 1, gy)] = 'gate'
-    kinds[(N - 1, 0)] = 'tower'
-    kinds[(N - 1, N - 1)] = 'tower'
-    # Zinnenkranz (Südmauer, 2 Zellen) mit Geschützplätzen
-    kinds[(1, N - 1)] = 'zinnen'
-    kinds[(2, N - 1)] = 'zinnen2'
-    # Räume in der Nordreihe des Innenhofs (Rückwand ersetzt die Mauer-Vorderseite)
-    kinds[(1, 1)] = 'room_a'
-    kinds[(2, 1)] = 'room_a2'
-    kinds[(3, 1)] = 'room_b'
-    kinds[(4, 1)] = 'room_b2'
-
-    floor_tiles = [tile_cobble(2 + s_ * 10, base='dirt', tone=(3, 4), mortar=2, hi=5) for s_ in range(3)]
-    walls = [wall_block(4 + s_) for s_ in range(3)]
-    walls_top = [wall_top_only(4 + s_) for s_ in range(3)]
-    tw = tower(team)
-    gt = gate(team)
-    cr = core(ring_team=team)
-    ra = extend_room(room_krankenstation(team), lambda: tile_planks(7, 64, tone=(3, 4, 4)))
-    rb = extend_room(room_schmiede(), lambda: tile_cobble(9, 64, tone=(1, 2), mortar=0, hi=3))
-    zn = platform_zinnen(team)
-
-    def R(rx, ry):
-        return (N - 1 - rx, ry) if mirror else (rx, ry)
-
-    def px(rx, ry):
-        ax, ay = R(rx, ry)
-        return (ox + ax) * CELL, (oy + ay) * CELL
-
-    def is_tall(rx, ry):
-        return (0 <= rx < N and 0 <= ry < N) and kinds[(rx, ry)] in ('wall', 'tower', 'zinnen', 'zinnen2', 'gate', 'room_a', 'room_a2', 'room_b', 'room_b2')
-
-    # Boden
-    for ry in range(N):
-        for rx in range(N):
-            x, y = px(rx, ry)
-            scene.ground.blit(floor_tiles[(rx * 7 + ry * 3 + seed) % 3], x, y)
-    # Objekte
-    for ry in range(N):
-        for rx in range(N):
-            k = kinds[(rx, ry)]
-            x, y = px(rx, ry)
-            key = y + CELL - 1
-            if k == 'wall':
-                spr = walls_top[(rx + ry) % 3] if is_tall(rx, ry + 1) else walls[(rx + ry) % 3]
-                scene.add(key, spr, x, y - H, flip=mirror)
-            elif k == 'tower':
-                scene.add(key + 1, tw, x + 16 - tw.w // 2, y + CELL - 3 - 66)
-            elif k == 'gate':
-                if gate_rows[0] == ry:
-                    scene.add(key + CELL, gt, x, y, flip=mirror)
-            elif k == 'zinnen':
-                ax = x if not mirror else px(rx + 1, ry)[0]
-                scene.add(key, zn, ax, y - H, flip=mirror)
-            elif k == 'room_a':
-                ax = x if not mirror else px(rx + 1, ry)[0]
-                scene.add(key, ra, ax, y - H, flip=mirror)
-            elif k == 'room_b':
-                ax = x if not mirror else px(rx + 1, ry)[0]
-                scene.add(key, rb, ax, y - H, flip=mirror)
-            elif k == 'core' and (rx, ry) == (2, 2):
-                cx_ = (ox + (2 if not mirror else N - 1 - 3)) * CELL
-                cy_ = (oy + 2) * CELL
-                scene.add(cy_ + 2 * CELL, cr, cx_ + CELL - 32, cy_ + CELL - 66)
-    return kinds
+class Build:
+    pass
 
 
-# --------------------------------------------------------------------------- Szene
+def build_static():
+    B = Build()
+    rng = random.Random(7)
+    B.castles = [
+        Castle(P1_ROWS, 4, 8, 'teamA', gates=[(13, 5, 'E')], name='P1'),
+        Castle(P2_ROWS, 34, 8, 'teamB', gates=[(4, 5, 'W'), (6, 8, 'S')], name='P2'),
+    ]
+    # Wege und Teiche
+    main_path = [(576, 432), (690, 424), (800, 440), (900, 436), (1010, 428), (1120, 438), (1216, 432)]
+    paths = [
+        (main_path, 40),
+        ([(900, 436), (905, 360), (880, 280), (870, 215)], 26),
+        ([(900, 436), (890, 540), (840, 640), (760, 740)], 26),
+        ([(1296, 556), (1290, 640), (1220, 730), (1100, 800)], 28),
+    ]
+    ponds = [(896, 150, 150, 58), (700, 790, 112, 46)]
+    G, water, pathm = make_ground(W, H, 11, paths, ponds)
+    avoid = water | pathm
+    rr = random.Random(5)
+    scatter_ground_decals(G, rr, 1700, avoid)
+    world = World(W, H)
+    world.px[:, :, :3] = G
+    world.depth[:] = -100
+    B.world = world
+    B.water, B.pathm = water, pathm
+    B.paths, B.ponds = paths, ponds
+
+    # Böden und Wände
+    tiles = FloorTiles()
+    tex = Textures()
+    fp = np.zeros((H, W), bool)
+    kd = np.zeros((H, W), np.uint8)
+    ht = np.zeros((H, W), np.uint8)
+    for c in B.castles:
+        c.paint_floors(world, tiles)
+        c.paint_gates(world)
+        c.add_walls(fp, kd, ht)
+    wall_shadows(world, fp)
+    B.fp = fp
+
+    props = {'bed': bed(), 'bunk': bunk(), 'anvil': anvil(), 'barrel': barrel(), 'trough': trough(),
+             'crate': crate(), 'rack': rack(), 'herb_table': herb_table(), 'chest': chest(), 'plant': plant(),
+             'rug': rug(36, 20), 'window': window(), 'banner_cross': banner_cross(), 'crest': crest(),
+             'forge_decor': forge_decor()}
+    props_b = dict(props)
+    props_b['bed'] = swap_team(props['bed'])
+    props_b['bunk'] = swap_team(props['bunk'])
+    props_b['rug'] = rug(36, 20, 'teamB')
+    props_b['crest'] = crest('teamB')
+    B.platforms = []
+    for c in B.castles:
+        tw = tower(c.team)
+        cr = core(ring_team=c.team)
+        out = c.place_objects(world, tw, cr, props if c.team == 'teamA' else props_b)
+        B.platforms.append(out['platforms'])
+    draw_walls(world, fp, kd, ht, tex)
+
+    # Kulissen
+    allow = np.ones((H, W), bool)
+    for c in B.castles:
+        xs = [p[0] for p in c.cells]
+        ys = [p[1] for p in c.cells]
+        x0, x1 = (c.ox + min(xs)) * CELL - 56, (c.ox + max(xs) + 1) * CELL + 56
+        y0, y1 = (c.oy + min(ys)) * CELL - 70, (c.oy + max(ys) + 1) * CELL + 40
+        allow[max(0, y0):y1, max(0, x0):x1] = False
+    allow &= ~avoid
+    allow[:, :30] = True
+    placed = []
+
+    def free(x, y, d):
+        if not (0 <= x < W and 0 <= y < H) or not allow[int(y), int(x)]:
+            return False
+        for (px_, py_, dd) in placed:
+            if (px_ - x) ** 2 + (py_ - y) ** 2 < (max(d, dd)) ** 2:
+                return False
+        return True
+
+    trees = [tree_round(s, 'leaf') for s in range(4)] + [tree_round(s + 9, 'grass') for s in range(2)]
+    pines = [tree_pine(s) for s in range(3)]
+    blossoms = [tree_blossom(s) for s in range(2)]
+    bushes = [bush(s, berries=(s % 2 == 0)) for s in range(4)]
+    rocks_s = [rock(s) for s in range(3)]
+    rock_b = rock(5, big=True)
+    mush = [giant_mushroom(1, 'fire'), giant_mushroom(2, 'teamA')]
+    objs = []
+
+    def put(spr, x, y, flip=False):
+        objs.append((spr, x, y, flip))
+        placed.append((x, y, spr.w * 0.5))
+
+    # Randwald oben und unten, links und rechts
+    for x in range(14, W - 10, 34):
+        fy = rng.randint(76, 112)
+        s = rng.choice(trees + pines + trees + blossoms)
+        put(s, x + rng.randint(-8, 8), fy)
+    for x in range(10, W - 10, 38):
+        fy = rng.randint(H - 36, H - 6)
+        s = rng.choice(trees + pines + trees)
+        put(s, x + rng.randint(-8, 8), fy)
+    for y in range(150, H - 100, 52):
+        put(rng.choice(trees + pines), rng.randint(12, 40), y + rng.randint(-8, 8))
+        put(rng.choice(trees + pines), W - rng.randint(12, 40), y + rng.randint(-8, 8))
+    # verstreute Bäume, Büsche, Steine, Pilze
+    def scatter(lst, n, d, y_lo=120, y_hi=H - 70, tries=6000):
+        cnt = 0
+        for _ in range(tries):
+            if cnt >= n:
+                break
+            x, y = rng.randint(30, W - 30), rng.randint(y_lo, y_hi)
+            if free(x, y, d):
+                put(rng.choice(lst), x, y, flip=rng.random() < 0.5)
+                cnt += 1
+    scatter(trees + pines + blossoms, 26, 62)
+    scatter(bushes, 46, 34)
+    scatter(rocks_s, 24, 30)
+    scatter([rock_b], 7, 44)
+    scatter(mush, 12, 52)
+    # Zäune und Wegweiser
+    fenc = fence(3)
+    for (fx_, fy_) in ((772, 478), (772 + 100, 478), (1010, 478), (1010 + 100, 478)):
+        objs.append((fence(3), fx_ - 2, fy_ - 20, False))
+    sp = signpost()
+    for (sx_, sy_) in ((930, 480), (1250, 600), (610, 466)):
+        objs.append((sp, sx_ - 13, sy_ - 33, False))
+
+    # Teich-Details
+    lil = [lily(s) for s in range(4)]
+    for (cx, cy, rx, ry) in ponds:
+        for k in range(7):
+            ang = rng.random() * 6.283
+            rad = rng.random() * 0.6
+            lx, ly = cx + math.cos(ang) * rx * rad, cy + math.sin(ang) * ry * rad
+            objs.append((rng.choice(lil), lx - 7, ly - 4, False))
+    objs.append((duck(), ponds[0][0] + 20, ponds[0][1] - 6, False))
+    objs.append((duck(), ponds[1][0] - 26, ponds[1][1] + 4, True))
+
+    for (spr, x, y, flip) in objs:
+        if spr.h > 40:                # Baum/Pilz: (x, y) = Fußpunkt
+            shadow(world, x + 4, y - 3, spr.w * 0.34, 4)
+            world.draw(spr, int(x - spr.w // 2), int(y - spr.h + 1), int(y), flip)
+        elif spr.w > 60:
+            world.draw(spr, int(x), int(y), int(y) + spr.h, flip)
+        else:
+            if spr.h <= 24 and spr.w <= 42 and (spr.w, spr.h) not in ((14, 8),):
+                shadow(world, x + 3, y - 2, spr.w * 0.34, 3)
+            # kleinere Objekte sind mit (x, y) = Fußpunkt oder linke obere Ecke angegeben
+            if spr in lil or spr.h in (8, 14):
+                world.draw(spr, int(x), int(y), int(y) - 60, flip)       # Teich-Details knapp über dem Boden
+            elif spr.h >= 30:
+                world.draw(spr, int(x), int(y), int(y) + spr.h, flip)
+            else:
+                world.draw(spr, int(x - spr.w // 2), int(y - spr.h + 1), int(y), flip)
+    return B
 
 
-def make_scene(t=0, animated=False):
-    sc = Scene(20, 9)
-    # Wiese
-    for cy in range(9):
-        for cx in range(20):
-            sc.ground.blit(tile_grass((cx * 5 + cy * 3) % 4 + 1), cx * CELL, cy * CELL)
-    # Weg zwischen den Toren (Erde mit unregelmäßiger Kante)
-    for y in range(3 * CELL + 2, 5 * CELL - 2):
-        for x in range(6 * CELL, 14 * CELL + 8):
-            edge_top = 3 * CELL + 2 + 3 * value_noise(x % 32, 7, 32, 3)
-            edge_bot = 5 * CELL - 3 - 3 * value_noise(x % 32, 9, 32, 5)
-            if edge_top <= y <= edge_bot:
-                n = texture_noise(x // 2, y // 2, 8)
-                idx = 3 if n < 0.55 else 2
-                if abs(y - edge_top) < 1.5 or abs(y - edge_bot) < 1.5:
-                    idx = 2 if (x + y) % 2 else 3
-                sc.ground.put_ramp(x, y, 'dirt', idx)
-    build_fortress(sc, 1, 1, mirror=False, team='teamA', seed=0)
-    build_fortress(sc, 13, 1, mirror=True, team='teamB', seed=1)
+# --------------------------------------------------------------------------- dynamischer Teil
 
-    def unit(spr, feet_x, feet_y, flip=False, sh=(9, 3), team_swap_to=None, rank=0, head=0, key=None):
-        cv = spr if team_swap_to is None else swap_team(spr, 'teamA', team_swap_to)
-        sc.shadows.append((feet_x, feet_y - 1, sh[0], sh[1]))
-        sc.add(feet_y if key is None else key, cv, feet_x - cv.w // 2, feet_y - cv.h + 1, flip=flip)
+
+def draw_dynamic(B, t=0, animated=False):
+    world = B.world.copy()
+    f4, f3, f2 = t % 4, t % 3, t % 2
+    items = []
+
+    def unit(spr, fx, fy, flip=False, sh=(9, 3), swap=None, rank=0, head=0, key=None):
+        cv = spr if swap is None else swapped(spr, swap)
+        shadow(world, fx, fy - 1, sh[0], sh[1])
+        items.append((fy if key is None else key, cv, fx - cv.w // 2, fy - cv.h + 1, flip))
         if rank:
             bd = rank_badge(rank)
             top = int(cv.px[:, :, 3].any(axis=1).argmax())
-            sc.add(feet_y + 500, bd, feet_x - bd.w // 2 + head, feet_y - cv.h + top - bd.h + 1)
-
-    f4, f3, f2 = t % 4, t % 3, t % 2
-    fa = lambda a, b: (a if not animated else a)
-
-    # --- innen (P1): Bastion von x=32..224, y=32..224
-    unit(guard('idle', f2), 178, 126, sh=(9, 3))
-    unit(witch('stir', f4), 82, 156, sh=(14, 3))
-    unit(builder('work', f3), 176, 156, sh=(8, 3))
-    # --- innen (P2, gespiegelt, Teamfarbe getauscht)
-    unit(guard('idle', (t + 1) % 2), 462, 126, flip=True, sh=(9, 3), team_swap_to='teamB')
-    unit(builder('work', (t + 1) % 3), 462, 156, flip=True, sh=(8, 3), team_swap_to='teamB')
-    # --- Katapult auf dem Zinnenkranz der Südmauer
-    cat = catapult('fire', (t // 2) % 3) if animated else catapult('load', 0)
-    sc.add(7 * CELL + 6, cat, 72, 6 * CELL - WALL_H + 22 - 42)
-    # Bürger (Personal) in den Räumen und im Hof
-    unit(citizen('cloth', f2), 98, 92, sh=(5, 2), key=140)
-    unit(citizen('dirt', (t + 1) % 2), 168, 92, sh=(5, 2), key=140)
-    unit(citizen('cloth', (t + 1) % 2), 130, 176, sh=(5, 2))
-    unit(citizen('cloth', f2), 528, 92, flip=True, sh=(5, 2), team_swap_to='teamB', key=140)
-    unit(citizen('dirt', (t + 1) % 2), 552, 176, flip=True, sh=(5, 2))
+            items.append((fy + 500, bd, fx - bd.w // 2 + head, fy - cv.h + top - bd.h + 1, False))
 
     def loop(x0, L, v):
         return x0 + (t * v) % L if animated else x0
-    unit(skeleton('walk', f4), loop(240, 160, 10), 140, sh=(8, 3), rank=2)
-    unit(goblin('walk', f4), loop(236, 192, 12), 186, sh=(8, 3), rank=1)
-    unit(pumpkin('run', f4), loop(250, 144, 9), 226, sh=(8, 3))
-    unit(bear('slide', f3), loop(260, 96, 6) if animated else 316, 206, sh=(20, 4), rank=3, head=13)
+
+    # --- Bastion P1 (innen)
+    unit(guard('idle', f2), 548, 440, sh=(9, 3))
+    unit(builder('work', f3), 524, 472, sh=(8, 3))
+    unit(witch('stir', f4), 352, 470, sh=(14, 3))
+    for (cx, cy, kind, k) in ((350, 338, 'cloth', 0), (392, 334, 'dirt', 1), (470, 340, 'cloth', 0), (268, 466, 'dirt', 1), (330, 392, 'cloth', 1)):
+        unit(citizen(kind, (t + k) % 2), cx, cy, sh=(5, 2), key=cy + 200 if cy < 360 else None)
+    # --- Bastion P2 (innen, gespiegelt, Teamfarbe getauscht)
+    unit(guard('idle', (t + 1) % 2), 1252, 440, flip=True, sh=(9, 3), swap='guard')
+    unit(builder('work', (t + 1) % 3), 1236, 476, flip=True, sh=(8, 3), swap='builder')
+    for (cx, cy, kind, k) in ((1350, 336, 'cloth', 0), (1452, 332, 'dirt', 1), (1360, 590, 'cloth', 1), (1520, 484, 'dirt', 0)):
+        unit(swapped(citizen(kind, (t + k) % 2), 'cit' + kind + str((t + k) % 2)), cx, cy, flip=True, sh=(5, 2), key=cy + 200 if cy < 360 else None)
+    # --- Katapulte auf den Plattformen
+    cat1 = catapult('fire', (t // 2) % 3) if animated else catapult('load', 0)
+    px1, py1 = B.platforms[0][0]
+    unit(cat1, px1, py1 + 4, sh=(20, 4))
+    cat2 = catapult('load', 0)
+    px2, py2 = B.platforms[1][0]
+    unit(swapped(cat2, 'cat2'), px2, py2 + 4, flip=True, sh=(20, 4))
+    # --- Niemandsland: P1 stürmt nach rechts
+    unit(skeleton('walk', f4), loop(640, 240, 15), 424, sh=(8, 3), rank=2)
+    unit(skeleton('walk', (t + 2) % 4), loop(610, 240, 15), 462, sh=(8, 3))
+    unit(goblin('walk', (t + 1) % 4), loop(650, 288, 18), 510, sh=(8, 3), rank=1)
+    unit(goblin('walk', f4), loop(600, 288, 18), 388, sh=(8, 3))
+    unit(pumpkin('run', f4), loop(620, 192, 12), 566, sh=(8, 3))
+    unit(bear('slide', f3), loop(700, 192, 12) if animated else 780, 534, sh=(20, 4), rank=3, head=13)
     # --- Scharmützel in der Mitte
-    unit(skeleton('attack', f3), 336, 130, sh=(8, 3))
-    unit(skeleton('idle', f2), 368, 130, flip=True, sh=(8, 3))
-    unit(goblin('attack', f3), 384, 166, flip=True, sh=(8, 3), team_swap_to='teamB')
-    # --- Deko
-    sc.add(236, deco_rock(), 330, 236)
-    sc.add(262, deco_mushroom(), 292, 258)
-    sc.add(112, deco_hat(), 262, 106)
-    sc.add(236, deco_bones(), 400, 214)
-    sc.add(250, deco_mushroom(), 210, 262)
+    unit(skeleton('attack', f3), 936, 440, sh=(8, 3), rank=1)
+    unit(skeleton('idle', f2), 982, 440, flip=True, sh=(8, 3))
+    unit(goblin('attack', f3), 1004, 478, flip=True, sh=(8, 3), swap='gob')
+    unit(goblin('attack', (t + 1) % 3), 900, 470, sh=(8, 3))
+    # --- P2 stürmt nach links
+    unit(skeleton('walk', (t + 1) % 4), 1180 - (t * 15) % 240 if animated else 1120, 420, flip=True, sh=(8, 3))
+    unit(bear('slide', f3), 1170 - (t * 12) % 192 if animated else 1070, 548, flip=True, sh=(20, 4), swap='bear', rank=2, head=-13)
+    unit(pumpkin('run', (t + 2) % 4), 1190 - (t * 12) % 192 if animated else 1150, 480, flip=True, sh=(8, 3))
+    unit(goblin('walk', (t + 3) % 4), 1160 - (t * 18) % 288 if animated else 1110, 388, flip=True, sh=(8, 3), swap='gob2')
 
-    # --- Zielschatten und Projektil
-    tx, ty = 15 * CELL + 6, 4 * CELL
+    # --- Zielschatten und Projektile
+    core2 = (1376, 448)
+    zielschatten(world, core2[0], core2[1] + 8, 46, phase=t)
+    zielschatten(world, 440, 566, 34, phase=t + 2)
+    prog = (t % 16) / 15.0 if animated else 0.46
+    p0 = (px1, py1 - 40)
+    p1 = (core2[0], core2[1] - 4)
 
-    def fx(scn):
-        zielschatten(scn, tx, ty, 26, phase=t)
-    prog = (t % 16) / 15.0 if animated else 0.5
-    px0, py0 = 3 * CELL, 6 * CELL - 24
-    px1, py1 = tx, ty - 6
-    def pos(pr):
-        return (px0 + (px1 - px0) * pr, py0 + (py1 - py0) * pr - 4 * 70 * pr * (1 - pr))
-    sx, sy = pos(prog)
-    for k in range(1, 9):
-        tx_, ty_ = pos(max(0.0, prog - k * 0.03))
-        sc.add(900 + k, _dot(k), tx_ - 1, ty_ - 1)
-    sc.add(1000, stone_projectile(), sx - 5, sy - 5)
-    sc.shadows.append((sx, py0 + (py1 - py0) * prog + 4, 5, 2))
-    return sc, fx
+    def pos(a, b, pr, hgt):
+        return (a[0] + (b[0] - a[0]) * pr, a[1] + (b[1] - a[1]) * pr - 4 * hgt * pr * (1 - pr))
+    sx, sy = pos(p0, p1, prog, 180)
+    for k in range(1, 13):
+        tx_, ty_ = pos(p0, p1, max(0.0, prog - k * 0.012), 180)
+        td = trail_dot(k)
+        items.append((9100 - k, td, tx_ - td.w / 2, ty_ - td.h / 2, False))
+    items.append((9100, stone_projectile(), sx - 7, sy - 7, False))
+    shadow(world, sx, p0[1] + (p1[1] - p0[1]) * prog + 40, 5, 2)
+    q0 = (px2, py2 - 40)
+    q1 = (440, 556)
+    prog2 = ((t + 6) % 16) / 15.0 if animated else 0.72
+    sx2, sy2 = pos(q0, q1, prog2, 150)
+    for k in range(1, 13):
+        tx_, ty_ = pos(q0, q1, max(0.0, prog2 - k * 0.012), 150)
+        td = trail_dot(k)
+        items.append((9100 - k, td, tx_ - td.w / 2, ty_ - td.h / 2, False))
+    items.append((9100, stone_projectile(), sx2 - 7, sy2 - 7, False))
+
+    for (key, spr, x, y, flip) in items:
+        world.draw(spr, int(x), int(y), int(key), flip)
+    return world
 
 
-def _dot(k):
-    c = Canvas(3, 3)
-    c.put_ramp(1, 1, 'bone', 5 if k % 2 else 4)
-    if k < 4:
-        c.put_ramp(0, 1, 'bone', 4)
-        c.put_ramp(2, 1, 'bone', 4)
-        c.put_ramp(1, 0, 'bone', 4)
-        c.put_ramp(1, 2, 'bone', 4)
-    return c
+
+def overlay_baugrund(B, im):
+    """Planungsansicht: Baugrund (16 x 16), freie Zellen, Reichweitenringe der Artillerie"""
+    base = im.convert('RGBA')
+    lay = Image.new('RGBA', base.size, (0, 0, 0, 0))
+    d = ImageDraw.Draw(lay)
+    font = label_font(11)
+    plots = [(2, 6), (38, 6)]
+    for (pxc, pyc), c in zip(plots, B.castles):
+        occupied = {(c.ox + x, c.oy + y) for (x, y) in c.cells}
+        for yy in range(pyc, pyc + 16):
+            for xx in range(pxc, pxc + 16):
+                x0, y0 = xx * CELL, yy * CELL
+                if (xx, yy) not in occupied:
+                    d.rectangle([x0, y0, x0 + CELL - 1, y0 + CELL - 1], fill=(255, 255, 255, 34))
+                d.rectangle([x0, y0, x0 + CELL - 1, y0 + CELL - 1], outline=(255, 255, 255, 70))
+        d.rectangle([pxc * CELL, pyc * CELL, (pxc + 16) * CELL - 1, (pyc + 16) * CELL - 1], outline=(255, 214, 74, 255), width=3)
+        d.text((pxc * CELL + 8, pyc * CELL - 14), 'Baugrund 16 x 16 Zellen', fill=(255, 240, 160, 255), font=font)
+    px1, py1 = B.platforms[0][0]
+    cols = [(120, 255, 160), (90, 220, 255), (255, 190, 90)]
+    rings = (('Kurz', 26), ('Mittel', 34), ('Weit', 42))
+    for (name, cells), col in zip(rings, cols):
+        r = cells * CELL
+        n = int(6.2832 * r / 2)
+        for k in range(n):
+            if k % 8 >= 5:
+                continue
+            a = 6.2832 * k / n
+            x, y = px1 + math.cos(a) * r, py1 + math.sin(a) * r
+            if 0 <= x < base.width and 0 <= y < base.height:
+                d.rectangle([x - 1, y - 1, x + 1, y + 1], fill=col + (255,))
+        ly = 26
+        lx = px1 + math.sqrt(max(0.0, r * r - (py1 - ly) ** 2))
+        if lx < base.width - 130:
+            d.rectangle([lx - 4, ly - 3, lx + 112, ly + 14], fill=(20, 16, 40, 225))
+            d.text((lx, ly - 1), f'{name} {cells} Zellen', fill=col + (255,), font=font)
+    d.ellipse([px1 - 5, py1 - 5, px1 + 5, py1 + 5], fill=(255, 255, 255, 255), outline=(20, 16, 40, 255))
+    d.rectangle([14, 14, 392, 98], fill=(20, 16, 40, 225))
+    d.text((24, 20), 'Planungsansicht: Reichweiten ab Katapult-Plattform (weißer Punkt)', fill=(255, 255, 255, 255), font=font)
+    d.text((24, 38), 'Kurz 26: erreicht den Feindkern (30 Zellen) noch nicht', fill=cols[0] + (255,), font=font)
+    d.text((24, 54), 'Mittel 34: trifft Kern und Kernhof', fill=cols[1] + (255,), font=font)
+    d.text((24, 70), 'Weit 42: bis zum hinteren Rand des Feindgrunds', fill=cols[2] + (255,), font=font)
+    d.text((24, 84), 'Extrem 50: deckt die gesamte Karte ab', fill=(255, 130, 130, 255), font=font)
+    base.alpha_composite(lay)
+    return base.convert('RGB')
 
 
 # --------------------------------------------------------------------------- Export
 
 
 def main():
-    # 1) Palette
-    names = RAMP_NAMES
-    sw = Canvas(6 * 10, len(names) * 10 + 0)
-    for j, n in enumerate(names):
+    # Palette
+    sw = Canvas(6 * 10, len(RAMP_NAMES) * 10)
+    for j, n in enumerate(RAMP_NAMES):
         for i, col in enumerate(RAMPS[n]):
             for y in range(10):
                 for x in range(10):
                     sw.put(i * 10 + x, j * 10 + y, col)
-    pal = upscale(sw.to_image(), 3)
-    d = ImageDraw.Draw(pal)
-    pal.save(os.path.join(OUT, 'palette.png'))
+    upscale(sw.to_image(), 3).save(os.path.join(OUT, 'palette.png'))
 
-    # 2) Umgebung
+    # Umgebung/Wände
+    tex = Textures()
+    def tile_canvas(arr):
+        c = Canvas(arr.shape[1], arr.shape[0])
+        c.px[:, :, :3] = arr
+        c.px[:, :, 3] = 255
+        return c
     env = [
-        ('Gras', tile_grass(1)), ('Pflaster (Innenhof)', tile_cobble(2, base='dirt', tone=(3, 4), mortar=2, hi=5)), ('Pflaster (Mauerkappe)', tile_cobble(24, base='stone', tone=(3, 4), mortar=2, hi=5)), ('Dielen', tile_planks(3)),
-        ('Mauerblock (Ring)', wall_block(4)), ('Mauer, Süden verdeckt', wall_top_only(4)),
-        ('Wehrturm', tower('teamA')), ('Wehrturm Team B', tower('teamB')), ('Tor (1x2)', gate('teamA')),
-        ('Kern (2x2)', core()), ('Krankenstation', room_krankenstation()),
-        ('Schmiede', room_schmiede()), ('Zinnenkranz', platform_zinnen()),
+        ('Gras', tile_grass(1)), ('Hof-Pflaster', tile_cobble(2, base='dirt', tone=(3, 4), mortar=2, hi=5)),
+        ('Dielen', tile_planks(3)), ('Mauer: Oberseite', tile_canvas(tex.tops[K_WALL])),
+        ('Mauer hoch (22)', tile_canvas(tex.fronts[(H_TALL, K_WALL)])), ('Mauer niedrig (10)', tile_canvas(tex.fronts[(H_LOW, K_WALL)])),
+        ('Tor Süd (24)', tile_canvas(tex.fronts[(H_GATE, K_GATE_H)])), ('Schwelle (Seitentor)', tile_canvas(tex.tops[K_GATE_H])),
+        ('Wehrturm A', tower('teamA')), ('Wehrturm B', tower('teamB')), ('Kern (2x2)', core()),
+        ('Katapult', catapult('load', 0)),
     ]
     sheet(env, 4, 64, 84, scale=4).save(os.path.join(OUT, 'umgebung.png'))
 
-    # 3) Einheiten: Spritesheets + Atlas + Kontaktbogen
+    P = [('Bett', bed()), ('Etagenbett', bunk()), ('Amboss', anvil()), ('Fass', barrel()), ('Trog', trough()),
+         ('Kiste', crate()), ('Waffenständer', rack()), ('Kräutertisch', herb_table()), ('Truhe', chest()),
+         ('Pflanze', plant()), ('Fenster', window()), ('Banner', banner_cross()), ('Wappen', crest()), ('Esse', forge_decor()),
+         ('Teppich', rug(36, 20))]
+    sheet(P, 8, 40, 36, scale=5).save(os.path.join(OUT, 'moebel.png'))
+
+    L = [('Rundbaum', tree_round(1)), ('Rundbaum 2', tree_round(2, 'grass')), ('Kirschbaum', tree_blossom(2)), ('Kiefer', tree_pine(1)),
+         ('Busch', bush(1, True)), ('Busch 2', bush(2)), ('Stein', rock(1)), ('Fels', rock(5, True)),
+         ('Riesenpilz', giant_mushroom(1)), ('Riesenpilz 2', giant_mushroom(2, 'teamA')), ('Zaun', fence(2)),
+         ('Wegweiser', signpost()), ('Seerose', lily(1)), ('Gummiente', duck())]
+    sheet(L, 7, 56, 72, scale=3).save(os.path.join(OUT, 'landschaft.png'))
+
+    # Einheiten
     atlas = {}
     strips = []
     all_colors = set()
@@ -370,15 +523,13 @@ def main():
         strips.append((name, frames))
     with open(os.path.join(OUT, 'atlas.json'), 'w', encoding='utf-8') as fh:
         json.dump(atlas, fh, ensure_ascii=False, indent=2)
-
-    scale = 5
-    pad = 6
-    W = max(sum(cv.w for cv in fr) * scale + pad * (len(fr) + 1) for _, fr in strips)
-    H = sum(max(cv.h for cv in fr) * scale + pad + 14 for _, fr in strips) + pad
-    img = Image.new('RGBA', (W, H), hexrgb('#383250') + (255,))
+    scale, pad = 5, 6
+    Wd = max(sum(cv.w for cv in fr) * scale + pad * (len(fr) + 1) for _, fr in strips)
+    Hd = sum(max(cv.h for cv in fr) * scale + pad + 14 for _, fr in strips) + pad
+    img = Image.new('RGBA', (Wd, Hd), hexrgb('#383250') + (255,))
     dr = ImageDraw.Draw(img)
+    font = label_font(11)
     y = pad
-    font = ImageFont.load_default()
     for name, fr in strips:
         dr.text((pad, y), f'{name}   ({per_sprite[name]} Farben)', fill=(240, 235, 250, 255), font=font)
         y += 14
@@ -389,27 +540,32 @@ def main():
         y += max(cv.h for cv in fr) * scale + pad
     img.save(os.path.join(OUT, 'einheiten.png'))
 
-    # 4) Szene (statisch) in 1x und 3x
-    sc, fx = make_scene(0, animated=False)
-    cv = sc.render(fx)
-    im = cv.to_image()
+    # Welt
+    B = build_static()
+    world = draw_dynamic(B, 0, animated=False)
+    im = world.image()
     im.save(os.path.join(OUT, 'szene_1x.png'))
-    upscale(im, 3).save(os.path.join(OUT, 'szene_3x.png'))
+    # Nahaufnahme der Burg P1 (x3)
+    crop = im.crop((200, 250, 640, 690))
+    upscale(crop, 3).save(os.path.join(OUT, 'szene_nahaufnahme_p1.png'))
+    overlay_baugrund(B, im).save(os.path.join(OUT, 'szene_baugrund.png'))
+    crop2 = im.crop((1180, 250, 1620, 690))
+    upscale(crop2, 3).save(os.path.join(OUT, 'szene_nahaufnahme_p2.png'))
 
-    # 5) Animation (16 Bilder, nahtlos)
+    # Animation (Ausschnitt 960x540, 16 Bilder, nahtlos)
     frames = []
     for t in range(16):
-        sc, fx = make_scene(t, animated=True)
-        frames.append(upscale(sc.render(fx).to_image(), 2).convert('RGB'))
+        w = draw_dynamic(B, t, animated=True)
+        frames.append(w.image().crop((520, 250, 1480, 790)).convert('RGB'))
     frames[0].save(os.path.join(OUT, 'szene_animation.gif'), save_all=True, append_images=frames[1:],
                    duration=110, loop=0, disposal=2)
 
-    # 6) Bericht
     with open(os.path.join(OUT, 'bericht.txt'), 'w', encoding='utf-8') as fh:
+        fh.write(f'Welt: {WC} x {HC} Zellen = {W} x {H} px\n')
         fh.write(f'Gesamtfarben aller Einheiten: {len(all_colors)} (Master-Palette: {sum(len(v) for v in RAMPS.values()) + 2})\n')
         for k, v in per_sprite.items():
             fh.write(f'{k}: {v} Farben\n')
-    print('fertig; Farben gesamt:', len(all_colors), per_sprite)
+    print('fertig; Farben gesamt:', len(all_colors))
 
 
 if __name__ == '__main__':

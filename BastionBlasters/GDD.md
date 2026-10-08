@@ -1,6 +1,6 @@
 # Bastion Blasters — Game Design Document
 
-**Teil 1: Spieldesign** · Version 0.2 · Entwurf zur Abnahme · Perspektive: **Draufsicht** · Kerne = **Fraktionen**
+**Teil 1: Spieldesign** · Version 0.3 · Entwurf zur Abnahme · Perspektive: **Draufsicht** · Kerne = **Fraktionen** · Bastionen **modular**, große Karte
 
 Teil 2 (Präsentation, Technik, Roadmap, offene Fragen): [`GDD-Praesentation-Technik.md`](GDD-Praesentation-Technik.md)
 Kataloge: [`katalog/01-gebaeude.md`](katalog/01-gebaeude.md) · [`katalog/02-einheiten.md`](katalog/02-einheiten.md) · [`katalog/03-kerne-und-weltlaunen.md`](katalog/03-kerne-und-weltlaunen.md)
@@ -39,7 +39,7 @@ Kataloge: [`katalog/01-gebaeude.md`](katalog/01-gebaeude.md) · [`katalog/02-ein
 ### 1.3 Was das Spiel besonders macht 🟨
 
 - **Zwei Siegwege erzwingen Vorbereitung auf beides.** Zerstörung (Artillerie bricht den Kern auf) gegen Eroberung (Sturmtruppen besetzen die Kernkammer). Verteidiger helfen *nur* gegen Eroberung, Mauern und Reparatur *nur* gegen Zerstörung.
-- **Die Bastion ist ein lebender Grundriss.** Zerstörte Zellen werden zu Breschen und öffnen neue Wege; mit Mauerwerk baut man Labyrinthe, die Eindringlinge in Fallen und Verteidiger treiben. Ausgeschaltete Räume erkennt man sofort (Spinnweben, kein Licht, Personal weg).
+- **Die Bastion ist ein lebender Grundriss.** Zerstörte Zellen werden zu Breschen und öffnen neue Wege; mit Modulen, Höfen und Mauern baut man Grundrisse mit Gängen, Vorhöfen und Sackgassen, die Eindringlinge in Fallen und Verteidiger treiben. Ausgeschaltete Räume erkennt man sofort (Spinnweben, kein Licht, Personal weg).
 - **XP + Rückzug als Kernschleife.** Wer sein Heil-Netz schützt und seine Truppen rotiert, bekommt Elite-Einheiten. Wer es zerstört, zwingt den Gegner in Todesmut-Selbstmordangriffe.
 - **Wellenpause als Draft-Moment.** Kein Menü-Tabu: Man sieht die eingefrorene Schlacht, während man die nächste Karte legt.
 
@@ -48,7 +48,8 @@ Kataloge: [`katalog/01-gebaeude.md`](katalog/01-gebaeude.md) · [`katalog/02-ein
 | Punkt | Annahme (Default) |
 |---|---|
 | Spieler | 2. Die Regeln sind für beide gleich; Asymmetrie entsteht über den gewählten **Fraktions-Kern** (§9.1) und die gezogenen Karten. |
-| Perspektive | **Schräge Draufsicht** (3/4-Ansicht wie in 16-Bit-Rollenspielen), Dächer abgenommen. ✔ entschieden |
+| Perspektive | **Schräge Draufsicht** (3/4-Ansicht wie in 16-Bit-Rollenspielen), Dächer abgenommen; Regeln für die Darstellung in §4.1. ✔ entschieden |
+| Kartengröße | **56 × 28 Zellen** (1792 × 896 px) in 1920 × 1080 internem Bild; je Spieler ein **Baugrund 16 × 16**, dazwischen **20 Zellen** Niemandsland, dazu Randwald, Teiche, Wege (Teil 2 §10.1). Längere Laufwege, mehr Reichweitenspielraum, Platz zum Anbauen. ✔ entschieden (v0.3) |
 | Kunststil | **16-Bit-Pixelart**, komplett von Claude erstellt (Teil 2 §10.1). ✔ entschieden |
 | Steuerung | Maus (Drag & Drop für Karten). Während der Schlacht gibt es **keine** Befehle außer der Kern-Fähigkeit 🟨. |
 | Plattform | Browser/Desktop, 16:9. |
@@ -90,12 +91,12 @@ Kataloge: [`katalog/01-gebaeude.md`](katalog/01-gebaeude.md) · [`katalog/02-ein
 2. **Loadout ziehen** 🟦: Jeder Spieler zieht **10 Karten** (gemischt aus Bau- und Truppen-Karten; Tier-Gewichte §5.2, Linien-Gewichte vom Kern) und **behält 7**. ✔ entschieden
    - **Garantien** 🟨 *unter den 10 gezogenen Karten*: mindestens 3 Bau-Karten, 1 Heilquelle, 1 Plattform und 1 Truppe je Kategorie (Artillerie, Sturm, Verteidiger, Zivilist). Jede gezogene Truppen-Karte ist **spielbar**: Sie gehört zur Linie *Basis*, zu den Linien des Kerns oder zu einem Freischalt-Raum, der ebenfalls unter den 10 Karten liegt.
    - **Mulligan** 🟨: einmal alle 10 neu ziehen.
-3. **Kostenlose Grundausstattung:** Kern, Kern-Anbau, Tor, Ringmauer, 4 Bürger (§4.6), unbegrenzt Mauerwerk (BS-01).
+3. **Kostenlose Grundausstattung:** Kernhof 6 × 6 mit Kern, Kern-Anbau, Haupttor, 4 Bürger (§4.6). Mauerwerk setzt sich **automatisch** an jede Außen- und Modulkante (§4.1).
 
 ### 3.3 Phase 1 — Erstaufbau 🟦
 
 Beide Spieler arbeiten **gleichzeitig und verdeckt** (Fog: man sieht die gegnerische Bastion erst, wenn der Kampf beginnt) in ihrem **Bastion-Screen**:
-- Bau-Karten per Drag & Drop in das Raster legen, mit **R** oder Rechtsklick drehen (§4).
+- Bau-Karten per Drag & Drop an die Bastion **anlegen** (Baugrund-Raster, §4.1), mit **R** oder Rechtsklick drehen.
 - Truppen-Karten ins **Kontingent** legen (5 Plätze, §5.6). Für jede Verteidiger-Karte eine Wachzone wählen; für jede Artillerie-Karte eine Zielpriorität (§5.7).
 - Timer ⚙ **120 s**; „Bereit“ beendet vorzeitig. Wer fertig ist, sieht nur ein „✔ Bereit“ beim Gegner.
 - Beim Start des Kampfes folgt die **Enthüllung**: Die Kamera zieht auf die Weitaufnahme, beide Bastionen werden mit Hammerschlag-Welle „abgestempelt“ (Teil 2 §10.3).
@@ -141,8 +142,8 @@ Ab ⚙ **14:00** beginnt der **Wahnsinn**: Alle 30 s steigen Artillerieschaden +
 
 ### 3.8 Beispielpartie (zum Mitdenken) 🟨
 
-- **0:00** Spieler A wählt das **Rudelherz** (Tier/Waffen), Spieler B das **Frostherz** (Frost/Tier). Beide ziehen 10 Karten und behalten 7. A behält Zinnenkranz, Krankenstation, Pfeilturm, Rumpel-Katapult, Topfhelm-Skelett, Reitgans-Goblin und Bratpfannen-Büttel. Das Katapult kommt auf den Zinnenkranz in der Rückecke (hinter der eigenen Mauer), die Krankenstation direkt hinter das Tor, der Pfeilturm ersetzt als Torturm ein Stück der Ringmauer. Seine Menagerie (Kern-Anbau) steht schon.
-- **0:10** B baut auf Frost: Rutsch-Bär, Eiszapfen-Mörser, Gloop-Turm, die Eisgrotte (Kern-Anbau) ist schon da. Mit Mauerwerk schließt er eine Lücke im Ring und baut einen Zickzackgang vor die Kernkammer.
+- **0:00** Spieler A wählt das **Rudelherz** (Tier/Waffen), Spieler B das **Frostherz** (Frost/Tier). Beide ziehen 10 Karten und behalten 7. A behält Zinnenkranz, Krankenstation, Pfeilturm, Rumpel-Katapult, Topfhelm-Skelett, Reitgans-Goblin und Bratpfannen-Büttel. Das Katapult kommt auf den Zinnenkranz, den A hinten an den Kernhof anbaut (hinter der eigenen Mauer), die Krankenstation (3 × 2) direkt neben das Tor, der Pfeilturm flankiert als Torturm das Haupttor. Seine Menagerie (Kern-Anbau) steht schon.
+- **0:10** B baut auf Frost: Rutsch-Bär, Eiszapfen-Mörser, Gloop-Turm, die Eisgrotte (Kern-Anbau) ist schon da. Mit seiner Hof-Erweiterung zieht er einen schmalen Gang mit zwei Knicks vor die Kernkammer, sodass Eindringlinge lange an seinem Gloop-Turm vorbeilaufen.
 - **0:20** Welle 1: Skelette und Goblins laufen los. As Goblins stürzen sich auf Bs Bürger, Bs Gloop-Turm trifft einen Goblin, der mit 40 % HP zur eigenen Krankenstation zurückläuft und geheilt als Gefreiter wiederkommt.
 - **1:00** Welle 2 ist gespawnt, **Zeitstopp:** Die Schlacht gefriert. A bekommt eine frische Hand: Löschteich, Zahnklempner, Sternwarte, Arkanum, Wunschbrunnen. Er behält Sternwarte, Zahnklempner und Wunschbrunnen und legt alle drei sofort; Löschteich und Arkanum wandern zurück in den Pool.
 - **… 6:30** Bs Rutsch-Bären haben Rang 3, As Krankenstation ist zerstört. Seine verletzten Skelette kämpfen jetzt bis zum Tod. A baut in der Pause ein Feldlazarett, das ab Welle 11 wirkt.
@@ -152,51 +153,78 @@ Ab ⚙ **14:00** beginnt der **Wahnsinn**: Alle 30 s steigen Artillerieschaden +
 
 ## 4. Die Bastion
 
-### 4.1 Grundriss & Raster 🟦/🟨
+### 4.1 Baugrund, Raster & Module 🟦/🟨 (v0.3: modular erweiterbar)
 
-Die Bastion ist ein **Grundriss** auf einem Zellenraster, gesehen aus einer **schrägen Draufsicht** (3/4-Ansicht wie in 16-Bit-Rollenspielen: Boden von oben, Wände zeigen ihre Vorderseite). Dächer sind abgenommen, man sieht in jeden Raum. **1 Zelle = 32 × 32 px.**
+Die Bastion ist **keine feste Form**, sondern ein **Grundriss auf einem Zellenraster** (**1 Zelle = 32 × 32 px**), der aus **Modulen** wächst: Hofzellen, Räumen, Türmen. Jede Bastion bekommt dadurch ihre eigene Silhouette (L, T, U, mit Vorhof, Gang oder Innenhof).
+
+**Darstellung (verbindlich für Grafik und Regeln)** 🟨 ✔ entschieden nach der Stilprobe
+
+- **Boden:** reine Draufsicht auf dem 32-px-Raster.
+- **Hohe Dinge** (Mauern, Türme, Kern) stehen mit ihrem **Fußabdruck** auf dem Raster und werden als **Südansicht** nach oben gezeichnet (Bildhöhe = Bauhöhe). Sichtbar ist immer nur die **Südseite**: Ein Objekt verdeckt den Boden *nördlich* von sich, nie südlich.
+- Folge: Die **Nordwand** eines Raums zeigt ihre Innenseite (Fenster, Banner, Kamin) und ist hoch (22 px). Die **Südwand** ist niedrig (10 px, wie ein aufgeschnittenes Modell), damit man in jeden Raum sieht. **Seitenwände** sind dünne Kanten (20 px), neben Seitentoren niedrig (10 px). Türme sind rund, 66 px hoch.
+- **Wände sind dünn (8 px)** und stehen **auf den Kanten** zwischen Zellen, nicht in Zellen. Alles Innere bleibt nutzbar, und jede Zelle hat vier Kanten, die Wand, Tür oder Tor sein können.
 
 ```
-      Rücken ◀─────────────────▶ Front (zum Gegner)
-         x0    x1    x2    x3    x4    x5
-  y0    ▓▓    ▓▓    ▓▓    ▓▓    ▓▓    ▓▓        ▓▓ = Ringmauer (kostenlos, ersetzbar)
-  y1    ▓▓     ·     ·     ·     ·    ▓▓         · = Innenhof (leer, begehbar)
-  y2    ▓▓     ·    KERN  KERN   ·    TOR        TOR = Tor (1×2)
-  y3    ▓▓     ·    KERN  KERN   ·    TOR
-  y4    ▓▓     ·     ·     ·     ·    ▓▓
-  y5    ▓▓    ▓▓    ▓▓    ▓▓    ▓▓    ▓▓
-   Erweiterungen: Nord = Reihe über y0 · Süd = Reihe unter y5 · Front = Spalte rechts von x5 · Rücken = Spalte links von x0
+   Beispiel P1 (16 × 12 Zellen Ausschnitt, y von oben):      h Hof · C Kern · T Turm
+                                                             K Krankenstation · S Schmiede
+   . . . . . . . . . . . . . . . .                           W Wohnhaus · B Kaserne
+   . . . . . . K K K S S S . . . .                           Z Zinnenplattform (Geschützplätze)
+   . . . . . . K K K S S S . . . .                           Kanten zwischen verschiedenen Modulen
+   . . . h h h h h h h h h . . . .                           und zum Draußen = Mauer (automatisch).
+   . . . h h h h h h h h h T . . .                           Tor (13,5,Ost): offener Durchlass
+   . . . W W W h h C C h h h h . .                           zwischen den Türmen (12,4) und (12,7).
+   . . . W W W h h C C h h h h . .
+   . . . h h h h h h h h h T . . .
+   . . . h h h h h h h h h . . . .
+   . . . . . . Z Z Z B B B . . . .
+   . . . . . . Z Z Z B B B . . . .
 ```
 
-- **Baugrund:** Start **6 × 6** Zellen inklusive **Ringmauer** (die äußerste Reihe rundherum). Der **Kern** (2 × 2) sitzt fest in der Mitte (x2–3, y2–3).
-- **Ringmauer:** Zu Beginn kostenlos mit Mauerwerk (BS-01) gefüllt. Das **Tor** (1 × 2, ⚙ 500 HP) sitzt in der Mitte der Frontseite. Jede Ringzelle darf durch ein anderes Bauteil ersetzt werden (Türme, Plattformen, Räume); es wird dann Teil der Mauer.
-- **Innenhof:** Leere Zellen im Inneren sind **Innenhof**: begehbar, ohne Funktion, ohne Deckung. Wer den Ring nicht schließt, lässt Eindringlinge herein; der Editor warnt vor Lücken und bietet **Auto-Ringmauer** an.
-- **Freie Startzellen:** 6 × 6 = 36 − 4 (Kern) − 2 (Tor) = **30**. Mauerwerk ist unbegrenzt (ein Bauteil je Zelle).
-- **Labyrinthe 🟨:** Weil Mauerwerk kostenlos ist, kann man Wege verlängern, Zickzackgänge bauen und Eindringlinge an Fallen, Türmen und Verteidigern vorbeiführen. Gegenspieler: Wege sind nicht heilig (Eindringlinge brechen das schwächste Hindernis) und eigenes Personal und Heiler müssen ihre Posten erreichen.
-- **Erweiterungen** 🟨: Zu den Zeitstopps **2, 4 und 6** wählt jeder Spieler **eine von vier Seiten**: **Nord, Süd, Front** oder **Rücken**; die Bastion wächst dort um eine Reihe/Spalte (jede Seite max. 2 ×). Das Tor wandert bei einer Front-Erweiterung mit nach außen (die alte Torstelle wird offener Durchgang). Neue Außenreihen sind zunächst offen; Auto-Ringmauer schließt sie. Der Kern behält seine Position und sitzt danach nicht mehr mittig → jede Bastion bekommt eine eigene Form. Maximal 8 × 9 Zellen.
-- **Niemandsland:** Zwischen den Bastionen liegt ein 2D-Feld (⚙ ≈ 12 Zellen breit, ≈ 14 Zellen hoch). Die Bastionen sind vertikal zentriert. Einheiten bewegen sich frei in 2D (weiche Abstoßung gegen Gedränge), nicht auf einer Linie. Flanken und Umwege sind möglich.
-- **Spieler 2** ist gespiegelt (blickt nach links). Der Bastion-Screen zeigt immer die **Weltansicht**, damit Orientierung in Schlacht und Aufbau identisch bleibt.
-- **Weltmaße** (Orientierung ⚙): Bastion bis 8 Zellen breit, Niemandsland ≈ 12 → ≈ 28 Zellen = 896 px, ≈ 14 Zellen = 448 px Höhe; passt in ein 960 × 540-Bild mit Platz für HUD.
+**Baugrund und Start**
+- Jeder Spieler hat einen **Baugrund von 16 × 16 Zellen** (⚙ `GRID_PLOT`), P1 links, P2 rechts (gespiegelt). Dazwischen liegen **20 Zellen Niemandsland** (⚙ `FIELD_GAP_CELLS`). Was nicht bebaut ist, bleibt Wiese; im Baumodus erscheint der Baugrund als Raster.
+- **Start:** **Kernhof 6 × 6** (Hof, begehbar) mit dem **Kern (2 × 2)** in der Mitte, **Haupttor** in der Frontkante und der **Kern-Anbau** des gewählten Fraktions-Kerns (§9.1) als erstes Raum-Modul (3 × 2) an einer Außenkante des Hofs. **32 Hofzellen** sind frei (36 − 4 Kern).
+- Der Kernhof liegt an der **Frontkante** des Baugrunds, vertikal mittig: Nach hinten bleiben ≈ 10 Zellen, nach oben und unten je ≈ 5 Zellen Platz zum Anbauen. Die Bastion wächst also vor allem nach hinten und zu den Seiten, die Front bleibt kompakt.
+
+**Module** 🟦/🟨
+- **Raum-Module** belegen **zusammenhängende Zellen**, mindestens **2 Zellen tief** (Möbel, Personal und Tür brauchen Platz). Größen: **2 × 2**, **3 × 2**, **3 × 3**, selten 4 × 2 oder 4 × 3 (Katalog 01). Drehbar (**R**, 90°-Schritte).
+- **Anlegen:** Ein Modul muss mit mindestens **einer Kante** an Hof, Kernhof oder ein bestehendes Modul grenzen („zusammenhängend“) und im eigenen Baugrund liegen. Kein Modul darf in die Mitte eines anderen ragen.
+- **Tür:** Jedes Modul erhält automatisch eine **Tür** (14 px) in der Mitte der ersten Kante zu Hof/Kern (Reihenfolge Süd, Ost, West, Nord); im Editor per Klick auf eine andere Kante verlegbar 🟨. Module sind untereinander nur über Hof und Türen verbunden.
+- **Hof-Erweiterung** 🟨: Im Erstaufbau darf jeder Spieler **kostenlos bis zu 12**, zu jedem Zeitstopp **bis zu 6 zusammenhängende Hofzellen** anlegen (⚙ `HOF_START` / `HOF_PER_PAUSE`), z. B. Gänge, Vorhöfe, Innenhöfe, Zickzackwege. Hofzellen sind begehbar, ohne Funktion; **Hof ↔ Hof hat keine Wand**.
+- **Turmzellen:** **Türme** (1 × 1) stehen auf einer Zelle an der Außenkante oder in einer Ecke (oder frei im Hof). Sie sind **massive Zellen**: Einheiten laufen nicht durch, und sie werden nicht von Wänden umschlossen. Sie überragen die Mauer.
+- **Geschützplätze:** Plattform-Module (Z) haben ihre Geschützplätze innerhalb der Fläche; sie stehen **tiefer** (Brüstung 10 px), damit Geschütze über den Rand feuern können.
+
+**Mauern und Tore**
+- **Mauerwerk automatisch:** An jeder Kante, die zwischen **Zelle und Draußen** oder zwischen **zwei verschiedenen Modulen** liegt, steht ein **Mauersegment** (⚙ 300 HP, 32 px lang, Material Stein, kostenlos, BS-01). Mauern folgen dem Grundriss; Ein- und Ausbuchtungen sind erlaubt.
+- **Wandkarten** (BS-Linie): **verbessern bis zu 4 zusammenhängende Segmente** (z. B. Puddingwand, Panzermauer) oder legen **Zinnen/Fallgatter** darauf. Welche Segmente, bestimmt man im Editor durch Anklicken von Kanten.
+- **Haupttor:** Durchlass in der Frontkante des Kernhofs (offen für Freunde, für Feinde gesperrt, ⚙ 500 HP). Weitere **Tor-Karten** setzen Tore auf beliebige Außenkanten. **Seitentore (Ost/West)** sind offene Durchlässe mit Holzschwelle (zwischen zwei Torwehren), **Nord/Süd-Tore** zeigen Flügeltüren mit Eisenbändern.
+- **Hinweis zur Perspektive:** Wegen der Südansicht verdeckt eine Seitenwand ihre Öffnung, wenn die Öffnung schmaler als die Wandhöhe ist. Deshalb sind Seitentore ein *voller* Zellendurchlass (32 px) und die Wand daneben niedrig.
+
+**Tags (Platzierung)** 🟨: **[Außen]** Modul berührt mindestens eine Außenkante · **[Innen]** Modul ist komplett von Hof/Modulen umgeben · **[Front]** hat Außenkante zur Seite des Gegners · **[Ecke]** liegt an einer vorspringenden Ecke der Silhouette. **Ecktürme** überblicken zwei Seiten (+1 Reichweite, +10 % HP).
+
+- **Labyrinthe und Fallen** 🟨: Mit Hof-Erweiterungen lassen sich Wege verlängern und Eindringlinge an Fallen, Türmen und Verteidigern vorbeiführen. Gegenspieler: Wege sind nicht heilig (Eindringlinge brechen das schwächste Hindernis), und eigenes Personal und Heiler müssen ihre Posten erreichen.
+- **Niemandsland:** Zwischen den Baugründen liegt ein **2D-Feld** mit Wegen, Teichen, Wald und Pilzen (Teil 2 §10.1). Einheiten laufen frei in 2D (weiche Abstoßung gegen Gedränge), nicht auf einer Linie; Wege sind nur **optisch** (⚙ im Prototyp ohne Tempoeffekt), Teiche sind Hindernisse. Flanken und Umwege sind möglich.
+- **Spieler 2** ist gespiegelt. Der Bastion-Screen zeigt immer die **Weltansicht**, damit Orientierung in Schlacht und Aufbau gleich bleibt (Kamera zoomt auf den eigenen Baugrund).
+- **Weltmaße:** 56 × 28 Zellen = 1792 × 896 px innerhalb eines 1920 × 1080-Bildes (Rest für HUD). Baugrund-Abstand 20 Zellen: P1-Front bei x = 18, P2-Front bei x = 38.
 
 ### 4.2 Bauteil-Arten 🟦/🟨
 
 | Art | Eigenschaft | Beispiele |
 |---|---|---|
 | **Raum** | Begehbar. Einheiten laufen durch und arbeiten darin. Hat meist eine Funktion. | Krankenstation, Schmiede, Kaserne, Kernkammer |
-| **Mauer** | **Fest**, nicht begehbar. Blockiert Wege und Schusslinien, absorbiert Beschuss. | Mauerwerk, Puddingwand, Panzermauer |
-| **Turm** | 1 × 1, steht **in der Ringmauer** und überragt sie optisch (Zinne, langer Schatten). Beschießt Feinde auf dem Feld und in der Nähe. | Pfeilturm, Zauberturm |
+| **Mauer** | **Kantensegment** (8 px dünn, 32 px lang), nicht begehbar. Blockiert Wege und Schusslinien, absorbiert Beschuss. Mauerwerk entsteht automatisch (§4.1), Karten verbessern bis zu 4 Segmente. | Mauerwerk, Puddingwand, Panzermauer |
+| **Turm** | 1 × 1, massive **Turmzelle** an Außenkante oder Ecke; überragt die Mauer optisch (Zinne, langer Schatten). Beschießt Feinde auf dem Feld und in der Nähe. | Pfeilturm, Zauberturm |
 | **Plattform** | Liefert **Geschützplätze** für Artillerie. | Zinnenkranz, Sternwarte |
 
-**Größen:** 1 × 1, 2 × 1, 3 × 1 (Eilgang), 2 × 2. Alle **drehbar** in 90°-Schritten (R oder Rechtsklick). Gerichtete Bauteile (Rutschbahn, Fallgatter-Tor, Fangnetz) haben eine Blickrichtung.
+**Größen** (Raum-Module, mindestens 2 Zellen tief): **2 × 2** (klein), **3 × 2** (Standard), **3 × 3** (groß), vereinzelt 4 × 2. Türme 1 × 1. Wandkarten wirken auf 1–4 Kantensegmente. Alle **drehbar** in 90°-Schritten (R oder Rechtsklick). Gerichtete Bauteile (Rutschbahn, Fallgatter-Tor, Fangnetz) haben eine Blickrichtung.
 
 **Platzierungs-Tags** (stehen auf der Karte):
 
 | Tag | Bedingung |
 |---|---|
-| **[Außen]** | Ringzelle (äußerste Reihe oder Spalte der freigeschalteten Fläche). |
-| **[Innen]** | Keine Ringzelle. |
-| **[Front]** | Ringzelle der Frontseite (zum Gegner). |
-| **[Ecke]** | Eckzelle des Rings. **Ecktürme** überblicken zwei Seiten: +1 Reichweite, +10 % HP. |
+| **[Außen]** | Modul oder Turm berührt mindestens eine Außenkante der Bastion. |
+| **[Innen]** | Modul ist ganz von Hof und anderen Modulen umgeben. |
+| **[Front]** | Hat eine Außenkante auf der Seite des Gegners. |
+| **[Ecke]** | Liegt an einer vorspringenden Ecke der Silhouette. **Ecktürme** überblicken zwei Seiten: +1 Reichweite, +10 % HP. |
 
 Jedes Bauteil hat: **Tier**, **Material** (bestimmt Resistenzen, §7.3), **HP**, **Posten** ⚙ (benötigtes Personal, §4.6), **Effekt**, **Tags** (für Nachbarschaft), optional **Linie** (§5.3).
 
@@ -210,12 +238,12 @@ Jedes Bauteil hat: **Tier**, **Material** (bestimmt Resistenzen, §7.3), **HP**,
 
 ### 4.4 Tor, Wege, Trümmer, Breschen 🟨 (P0)
 
-- **Wegfindung:** 8-Richtungs-Wegfindung auf dem Raster (kein Ecken-Schneiden). **Mauern und Kern blockieren**; Räume, Innenhof und Trümmer sind begehbar. Das Tor ist für Freunde offen, für Feinde geschlossen.
+- **Wegfindung:** 8-Richtungs-Wegfindung auf dem Raster (kein Ecken-Schneiden). Zellen sind begehbar, **Kantensegmente mit Mauer** und **Turmzellen und Kern** blockieren; **Türen** sind offen, das **Haupttor** ist für Freunde offen und für Feinde geschlossen (andere Tore wie vom Spieler eingestellt, Standard: Freunde).
 - **Kosten:** Strecke + Zerstörungsaufwand für blockierende Mauern/Tor (HP/100) + Abschreckung durch bekannte Fallen. Eindringlinge nehmen den billigsten Weg; ist keiner frei, brechen sie das schwächste Hindernis.
-- **Tor:** Standardeingang (1 × 2, ⚙ 500 HP, Holz). **Feinde müssen es zerstören** oder einen anderen Weg finden.
-- **Trümmer:** Eine zerstörte Zelle (egal welche) wird zum **Trümmerfeld**: begehbar (−30 % Tempo), ohne Funktion, ohne Deckung, durchlässig für Schusslinien. Sie kann von einem Bau-Gnom **wiederaufgebaut** (§4.7) oder in der Pause überbaut werden.
-- **Bresche:** Ein Trümmerfeld in der Ringmauer ist ein **zusätzlicher Eingang**. Artillerie öffnet also Wege für Sturmtruppen.
-- **Sonderwege:** Geister gehen durch Mauern, Wühl-Gnome tauchen im Innenhof hinter der Ringmauer auf, Flieger überqueren Mauern, **Rutschbahn** und **Eilgang** verändern Laufgeschwindigkeit und -richtung (Katalog 01).
+- **Tor:** Standardeingang (1 Zelle breit, ⚙ 500 HP, Holz). **Feinde müssen es zerstören** oder einen anderen Weg finden.
+- **Trümmer:** Ein zerstörtes Bauteil (Raum, Turm) bzw. ein zerstörtes Mauersegment wird zum **Trümmerfeld**: begehbar (−30 % Tempo), ohne Funktion, ohne Deckung, durchlässig für Schusslinien. Sie kann von einem Bau-Gnom **wiederaufgebaut** (§4.7) oder in der Pause überbaut werden.
+- **Bresche:** Ein zerstörtes Mauersegment an der Außenkante ist ein **zusätzlicher Eingang**. Artillerie öffnet also Wege für Sturmtruppen.
+- **Sonderwege:** Geister gehen durch Mauern, Wühl-Gnome tauchen im Hof hinter der Außenmauer auf, Flieger überqueren Mauern, **Rutschbahn** und **Eilgang** verändern Laufgeschwindigkeit und -richtung (Katalog 01).
 - **Isolierte Räume:** Ist ein Raum vom Kern oder Tor abgeschnitten, erreicht ihn kein Personal → er bleibt verwaist. Der Editor warnt (kein Verbot).
 
 ### 4.5 Zustände eines Bauteils 🟦/🟨
@@ -256,7 +284,7 @@ Wer dieselbe Bau-Karte erneut zieht, kann sie **auf das bereits stehende Bauteil
 
 ### 4.10 Umbau in der Pause 🟨
 
-Pro Pause darf jeder Spieler **1 Bauteil verschieben** (kostenlos). Wer weiter umbaut, **reißt ab**: das Bauteil ist verloren (Karte weg). Mauerwerk darf jederzeit frei gesetzt und entfernt werden. Zerstörte Bauteile (Trümmer) dürfen kostenlos überbaut werden.
+Pro Pause darf jeder Spieler **1 Bauteil verschieben** (kostenlos). Wer weiter umbaut, **reißt ab**: das Bauteil ist verloren (Karte weg). Hofzellen darf man jederzeit frei anlegen (im Rahmen der Hof-Erweiterung, §4.1) und bis zur Hälfte der vorhandenen Fläche abtragen, solange kein Modul abgeschnitten wird. Zerstörte Bauteile (Trümmer) dürfen kostenlos überbaut werden. **Verschieben** bedeutet: Modul aufnehmen und an einer gültigen Kante neu anlegen.
 
 ---
 
@@ -361,7 +389,7 @@ Keine Echtzeit-Befehle, aber eine kleine Planungsebene pro Karte:
 | **HP** | Lebenspunkte bei Rang 0. |
 | **Rüstungsklasse** | **Fleisch**, **Panzer**, **Geist**, **Knochen**, **Pudding** (Resistenzmatrix §7.3). |
 | **Angriff** | Schaden pro Treffer / Takt in Sekunden / Reichweite. |
-| **Reichweite** | **Nah** ≤ 1 Zelle · **Kurz** 3 · **Mittel** 5 · **Weit** 8 · bei Artillerie in Zellen (14–26). |
+| **Reichweite** | **Nah** ≤ 1 Zelle · **Kurz** 3 · **Mittel** 5 · **Weit** 8 · bei Artillerie in Zellen (26–50, §6.4). |
 | **Tempo** | **kriechend** 0,8 · **langsam** 1,0 · **normal** 1,5 · **flink** 2,2 · **rasend** 3,0 (Zellen/s). |
 | **Strukturfaktor** | Multiplikator auf Schaden gegen Bauteile. Sturm Standard **×0,4**, *Brecher* ×1,0, Verteidiger/Zivilisten ×0. |
 | **Soll / Nachschub** | Siehe §5.6. |
@@ -389,7 +417,7 @@ Keine Echtzeit-Befehle, aber eine kleine Planungsebene pro Karte:
 | **Streu** | N kleine Treffer auf zufällige Zellen in einem 3 × 3-Zielgebiet. | – | Fledermäuse, Splitter |
 | **Luft** | Wie Bogen, aus der Luft; der Schütze ist angreifbar. | mittel | Brummzeppelin |
 
-**Reichweiten** (gemessen vom Geschützplatz zur Zielzelle): Kurz 14 · Mittel 18 · Weit 22 · Extrem 26 Zellen. Beispiel: Zwischen zwei Startbastionen liegen ≈ 12 Zellen Niemandsland. Aus der Frontreihe erreicht Reichweite 14 nur die gegnerische Ringmauer und eine Reihe dahinter, die **Kernkammer liegt auf ≈ 15–16**, die ganze Bastion auf 18. Frühe Artillerie (Reichweite 14–16) kann den Kern also nicht erreichen; dafür braucht es Mittel-/Weit-Geschütze oder die **Sternwarte** (+2).
+**Reichweiten** (gemessen vom Geschützplatz zur Zielzelle, v0.3 für die große Karte): **Kurz 26 · Mittel 34 · Weit 42 · Extrem 50 Zellen.** Die Baugründe liegen 20 Zellen auseinander (Front zu Front), die **Kernkammern ≈ 30 Zellen**, die gegnerische Bastion reicht bis ≈ 40 Zellen. Aus der Frontreihe erreicht **Kurz (26)** die gegnerische Front und die ersten Räume dahinter, die **Kernkammer liegt auf ≈ 28–32**, die ganze Bastion auf ≈ 36–40. Frühe Artillerie (Kurz) kann den Kern also nicht erreichen; dafür braucht es **Mittel-/Weit-Geschütze** oder die **Sternwarte** (+4). **Extrem (50)** deckt die gesamte Karte ab. Die Planungsansicht `art/out/szene_baugrund.png` zeigt die Ringe ab einem Katapult-Platz.
 
 **Zielwahl:** Aus den **erreichbaren** Zellen (Flach/Durchschlag: mit freier Schusslinie; Bogen/Senkrecht/Untergrund/Luft: alle in Reichweite) wählt die Einheit nach ihrer **Zielpriorität**:
 
@@ -455,11 +483,11 @@ Fixed-Timestep-Simulation (⚙ 30 Ticks/s). Einheiten wählen Ziele nach Doktrin
 
 ### 7.2 Beschuss-Geometrie: Schusslinie, Streuung, Zielschatten 🟨 (P0)
 
-Das ist das **Herzstück** der Zerstörung. Jede Zelle ist **fest** (Mauer, Raum, Kern, Turm), **offen** (Innenhof, leer) oder **Trümmer** (offen, aber langsam begehbar).
+Das ist das **Herzstück** der Zerstörung. Zellen sind **fest** (Raum-Modul, Kern, Turmzelle), **offen** (Hof, leer) oder **Trümmer** (offen, aber langsam begehbar). Zusätzlich blockieren **Mauersegmente** auf den Zellkanten die Schusslinie.
 
-- **Schusslinie:** Eine Zelle ist für Flach-Geschosse **sichtbar**, wenn die gerade Linie vom Schützen zur Zielzelle keine *andere feste Zelle des Gegners* berührt. Das Geschoss trifft die erste feste Zelle auf der Linie. **Eigene Zellen blockieren nicht**: Schützen stehen auf Plattformen und feuern über die eigene Mauer.
+- **Schusslinie:** Eine Zelle ist für Flach-Geschosse **sichtbar**, wenn die gerade Linie vom Schützen zur Zielzelle keine *andere feste Zelle und kein Mauersegment des Gegners* berührt. Das Geschoss trifft das erste feste Hindernis auf der Linie (Mauersegment oder Zelle). **Eigene Zellen blockieren nicht**: Schützen stehen auf Plattformen und feuern über die eigene Mauer.
 - **Bogen/Senkrecht/Luft:** Brauchen keine Schusslinie. Das Geschoss kommt von oben und landet auf der Zielzelle plus **Streuung** ⚙ `0,4 + 0,04 × Entfernung` Zellen (bei 15 Zellen Abstand ≈ 1 Zelle). Der **Zielschatten** zeigt Zielort und Radius schon ⚙ 1,2 s (Bogen) bzw. 2,0 s (Senkrecht) vor dem Einschlag, für beide Spieler.
-- **Durchschlag** zählt feste Zellen entlang der Linie und verliert 20 % Schaden pro durchquerter Zelle.
+- **Durchschlag** zählt feste Zellen und Mauersegmente entlang der Linie und verliert 20 % Schaden pro durchquertem Hindernis.
 - **Untergrund:** Ziel beliebig, trifft nur Bauteile; Kuppel, Netz und Spiegel greifen nicht.
 - **Schaden an einer Zelle** wirkt auf das Bauteil, das sie belegt. Mehrzellige Bauteile haben **einen** HP-Pool; jede ihrer Zellen leitet Treffer dorthin.
 - **Splash (Radius r):** Nachbarzellen in Radius r erhalten 50 % Strukturschaden. **Personenschaden** trifft alle Einheiten im Einschlagraum voll und in Nachbarräumen zu 60 %.
@@ -516,7 +544,7 @@ Schadensarten: **Wucht (W), Feuer (F), Eis (E), Blitz (B), Gift (G), Arkan (A)**
 
 ### 7.5 Türme 🟦/🟨
 
-Türme (Katalog 01, BT) stehen in der Ringmauer, schießen **auf Feinde im Feld und in Reichweite** (also auch Eindringlinge in der Nähe), nicht auf Bauteile. Sie benötigen **Personal** (1 Posten) und verhindern so, dass Sturmtruppen ungehindert über das Feld rennen. Ihre Reichweite ist bewusst kurz (5–8 Zellen), sie decken nur den vorderen Teil des Niemandslands.
+Türme (Katalog 01, BT) stehen als Turmzellen an der Außenkante, schießen **auf Feinde im Feld und in Reichweite** (also auch Eindringlinge in der Nähe), nicht auf Bauteile. Sie benötigen **Personal** (1 Posten) und verhindern so, dass Sturmtruppen ungehindert über das Feld rennen. Ihre Reichweite ist bewusst kurz (5–8 Zellen), sie decken nur den vorderen Teil des Niemandslands.
 
 ### 7.6 Besetzung & Eroberung 🟦/🟨 (P0)
 

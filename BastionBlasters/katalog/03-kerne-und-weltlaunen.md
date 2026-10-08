@@ -1,6 +1,6 @@
 # Katalog 03 — Kerne, Welt-Launen, Chaos-Karten, Baustile
 
-Teil des [GDD](../GDD.md), Stand v0.2. Alles hier ist 🟨 **Ergänzung / Vorschlag** und streichbar. Der Kern des Spiels funktioniert auch mit einem einzigen Standardkern (KE-00). Alle Werte sind ⚙ Startwerte.
+Teil des [GDD](../GDD.md), Stand v0.3. Alles hier ist 🟨 **Ergänzung / Vorschlag** und streichbar. Der Kern des Spiels funktioniert auch mit einem einzigen Standardkern (KE-00). Alle Werte sind ⚙ Startwerte.
 
 **Bestand:** 12 Fraktions-Kerne (+ Standardkern) · 13 Welt-Launen (inkl. „Ruhiger Tag“) · 8 Chaos-Karten · 6 Baustile.
 
@@ -15,7 +15,7 @@ Der Kern ist zugleich die **Fraktion** des Spielers (GDD §9.1). Er legt fest, *
 | Baustein | Bedeutung |
 |---|---|
 | **Archetyp** | Belagerer · Stürmer · Bollwerk · Tüftler (siehe unten). |
-| **Hauptlinie + Kern-Anbau** | Die Hauptlinie ist vom Start an freigeschaltet. Der passende Freischalt-Raum steht **kostenlos als Kern-Anbau in ★2-Qualität** in der Bastion (frei verschiebbar beim Erstaufbau). Karten dieser Linie werden ×2 häufiger gezogen. |
+| **Hauptlinie + Kern-Anbau** | Die Hauptlinie ist vom Start an freigeschaltet. Der passende Freischalt-Raum steht **kostenlos als Kern-Anbau in ★2-Qualität** in der Bastion (als Modul an einer Außenkante des Kernhofs, beim Erstaufbau frei verschiebbar). Karten dieser Linie werden ×2 häufiger gezogen. |
 | **Nebenlinie** | Karten dieser Linie werden ×1,5 häufiger gezogen; der Freischalt-Raum muss gebaut werden. |
 | **Passive** | Wirkt immer. |
 | **Aktive Fähigkeit** | Ein Klick in der Schlacht, danach Abklingzeit. Der einzige Echtzeit-Eingriff. Die Abklingzeit läuft nur im Kampf, nicht in der Pause. |
@@ -60,7 +60,7 @@ Der Kern ist zugleich die **Fraktion** des Spielers (GDD §9.1). Er legt fest, *
 | KE-03 | **Kosmisches Gespür:** Arkan- und Senkrecht-Schaden +20 %; eigener Zielschatten 0,5 s kürzer. | **Meteorschauer** (90 s): 5 Meteore (je 100 Arkan, Radius 1) auf zufällige gegnerische Zellen innerhalb von 6 s. | **Sternenstaub im Mörtel:** Eigenes Mauerwerk −15 % HP. | Funkelnder Kristall, um den kleine Sterne kreisen. |
 | KE-04 | **Frostpfad:** Eigene Sturmtruppen +10 % Tempo auf dem Feld; Feinde in ihrer Nähe −10 % Tempo. | **Kältewelle** (85 s): Alle Feinde im Feld **Eisig** und 2 s **Eingefroren**; eigene Sturmtruppen +25 % Tempo (6 s). | **Kalte Hände:** Heilquellen −20 % Heilrate. | Eiskristall, Schneeflocken pulsieren im Takt. |
 | KE-05 | **Wiedergänger:** Gefallene eigene Sturmtruppen stehen mit 15 % Chance als Skelett (10 s, 50 % HP) neben der Leiche auf, auch auf dem Feld. | **Gespensterheulen** (80 s): Alle Feinde in der Bastion fliehen 4 s (**Furcht**). | **Lichtscheu:** Heilgebäude −25 % Wirkung. | Leuchtender Kürbis, aus dem Geister aufsteigen. |
-| KE-06 | **Rudelgeist:** Tier-Truppen +15 % HP; Sturmtruppen mit mindestens 3 Verbündeten im Umkreis 3 schlagen +10 % härter zu. | **Jagdruf** (70 s): 8 s lang alle Sturmtruppen +30 % Tempo und +20 % Schaden; sie **ignorieren den Rückzug**. | **Laut:** Artillerie-Reichweite −2. | Schlagendes Herz mit Fell und Zähnen. |
+| KE-06 | **Rudelgeist:** Tier-Truppen +15 % HP; Sturmtruppen mit mindestens 3 Verbündeten im Umkreis 3 schlagen +10 % härter zu. | **Jagdruf** (70 s): 8 s lang alle Sturmtruppen +30 % Tempo und +20 % Schaden; sie **ignorieren den Rückzug**. | **Laut:** Artillerie-Reichweite −4. | Schlagendes Herz mit Fell und Zähnen. |
 | KE-07 | **Unverrückbar:** Kern-HP +25 %, Mauern +15 % HP, Verteidiger +10 % HP. | **Bollwerk** (90 s): 8 s lang −50 % Schaden an Bauteilen und Verteidigern; Reparatur +15 %. | **Schwere Stiefel:** Eigene Sturmtruppen −10 % Tempo. | Grauer Fels mit Schnarchblasen. |
 | KE-08 | **Wachsende Festung:** Alle Bauteile regenerieren 1 HP/s; Heilquellen +15 % Heilrate. | **Wurzelschlag** (80 s): Alle Eindringlinge in der Bastion sind 3 s **Festgehalten** und erleiden 25 Gift. | **Holz brennt:** Feuerschaden gegen eigene Bauteile +25 %. | Herz mit Wurzeln und einer kleinen Blüte. |
 | KE-09 | **Heiterkeit:** Verteidiger und Zivilisten beginnen jede Welle **Gesegnet** (40); Eroberungsfortschritt in der eigenen Kernkammer −25 %. | **Heiliger Schein** (85 s): Alle Freunde in der Bastion heilen 30 % und verlieren alle Debuffs. | **Gnade statt Wucht:** Artillerie −10 % Schaden. | Weich leuchtendes Herz mit Heiligenschein. |
@@ -80,7 +80,7 @@ Optionale Match-Modifikatoren. Eine Laune wird zufällig gewählt (oder vorab vo
 |---|---|---|---|---|
 | WL-00 | **Ruhiger Tag** | – | – | Blauer Himmel, eine einzige, sehr zufriedene Wolke (Turnier-/Trainingsmodus). |
 | WL-01 | **Froschregen** | Brennen erlischt nach 2 s (alle). Blitz ×1,25 (Nass). | Alle 45 s: 3 zufällige Einheiten werden 4 s zu Fröschen. | Regen aus winzigen Fröschen, platsch. |
-| WL-02 | **Käsemond** | Reichweite aller Artillerie +3. | Alle 60 s **Mondschmaus:** Alle Einheiten heilen 5 % Max-HP. | Tiefhängender gelber Mond mit Löchern; Mäuse klettern daran. |
+| WL-02 | **Käsemond** | Reichweite aller Artillerie +6. | Alle 60 s **Mondschmaus:** Alle Einheiten heilen 5 % Max-HP. | Tiefhängender gelber Mond mit Löchern; Mäuse klettern daran. |
 | WL-03 | **Schwerkraft-Schluckauf** | – | Alle 40 s 3 s Schwerelosigkeit: Einheiten schweben (greifen nicht an), Geschosse fliegen gerade (Flugzeit ×0,7). | Staubkörner treiben aufwärts. |
 | WL-04 | **Wandernde Nebelbank** | Streuung aller Artillerie ×1,5; Turmreichweite −2. | – | Rosa Nebel, im Dunst klingen Kuhglocken. |
 | WL-05 | **Zuckerwatte-Wind** | Wind schiebt Geschosse eine Zelle seitlich (Richtung wechselt alle 30 s). Pudding-Bauteile erleiden ×0,8 Schaden. | – | Ziehende Zuckerwattewolken, klebrige Windfahnen. |
