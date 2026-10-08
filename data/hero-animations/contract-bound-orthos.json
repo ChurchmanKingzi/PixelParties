@@ -1,8 +1,8 @@
 {
   "hero": "Contract-bound Orthos",
   "sheet": "contract-bound-orthos.png",
-  "frameWidth": 36,
-  "frameHeight": 43,
+  "frameWidth": 30,
+  "frameHeight": 33,
   "frames": 48,
   "frameMs": 90,
   "loop": true,
@@ -12,6 +12,6 @@
   "padLeft": 4,
   "padRight": 4,
   "padBottom": 2,
-  "faceX": 16.0,
-  "footY": 40.0
+  "faceX": 13.5,
+  "footY": 30.0
 }
