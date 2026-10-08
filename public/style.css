@@ -4458,14 +4458,12 @@ body:has(.anim-backdrop) .pp-bg-particles { display: none; }
   box-shadow: none !important;
 }
 
-/* Friendship additional action available — very prominent green pulse */
-.zone-friendship-active {
-  border-color: rgba(80,255,140,1) !important;
-  box-shadow: 0 0 18px rgba(80,255,140,.8), 0 0 36px rgba(40,200,100,.5), 0 0 54px rgba(40,200,100,.2), inset 0 0 12px rgba(80,255,140,.3) !important;
-  animation: friendshipPulse 0.8s ease-in-out infinite !important;
+/* Friendship ist passiv: kein aktiver Rahmen, nur ein Herz als Hinweis „Bonus-Aktion noch verfuegbar“;
+   ist die Ladung verbraucht, wird die Ability ausgegraut. */
+.zone-friendship-bonus {
   position: relative;
 }
-.zone-friendship-active::after {
+.zone-friendship-bonus::after {
   content: '💚';
   position: absolute;
   top: -8px;
@@ -4475,9 +4473,9 @@ body:has(.anim-backdrop) .pp-bg-particles { display: none; }
   animation: friendshipBounce 0.6s ease-in-out infinite alternate;
   z-index: 10;
 }
-@keyframes friendshipPulse {
-  0%, 100% { box-shadow: 0 0 18px rgba(80,255,140,.8), 0 0 36px rgba(40,200,100,.5), 0 0 54px rgba(40,200,100,.2), inset 0 0 12px rgba(80,255,140,.3); border-color: rgba(80,255,140,1); }
-  50% { box-shadow: 0 0 28px rgba(80,255,140,1), 0 0 50px rgba(40,200,100,.7), 0 0 70px rgba(40,200,100,.3), inset 0 0 20px rgba(80,255,140,.5); border-color: rgba(140,255,200,1); }
+.zone-friendship-spent {
+  opacity: 0.45 !important;
+  filter: saturate(0.15) brightness(0.7) !important;
 }
 @keyframes friendshipBounce {
   0% { transform: translateY(0) scale(1); }
@@ -19456,9 +19454,9 @@ img, .card-tooltip-img img { image-rendering: pixelated; }
      Hauptthread-Frames erzwingt — und der Blitz-/Schwert-Hopser fallen
      weg. Im eigenen Zug leuchten ALLE aktivierbaren Zonen zugleich. */
   .zone-ability-activatable, .zone-creature-activatable, .zone-equip-activatable,
-  .zone-friendship-active, .zone-hero-effect-active,
+  .zone-hero-effect-active,
   .zone-ability-activatable::after, .zone-creature-activatable::after, .zone-equip-activatable::after,
-  .zone-friendship-active::after, .zone-hero-effect-active::after { animation: none !important; }
+  .zone-friendship-bonus::after, .zone-hero-effect-active::after { animation: none !important; }
   /* `html` davor: der Pixel-Baukasten (app-shared, `abzeichenExtra`) haengt
      zur Laufzeit ein Stylesheet NACH dieses ein und setzt `.buff-icon`
      wieder auf einen Stufenpuls — gleiche Spezifitaet, spaeter, gewinnt. */
@@ -25035,7 +25033,7 @@ body.fifth-curse-opp [data-support-zone].zone-has-card[data-support-owner="opp"]
 .zone-ability-free-activatable::after,
 .zone-creature-activatable::after,
 .zone-equip-activatable::after,
-.zone-friendship-active::after,
+.zone-friendship-bonus::after,
 .zone-permanent-activatable::after {
   pointer-events: none;
 }

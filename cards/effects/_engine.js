@@ -39056,6 +39056,26 @@ this._deathWatch = (this._deathWatchStack || []).length
   }
 
   /**
+   * Bereits VERBRAUCHTE Zusatz-Aktionen (Grant gesetzt und auf 0 gesunken)
+   * — der Client graut damit z. B. Friendship aus, sobald die Ladung weg
+   * ist. `getAdditionalActions` listet nur, was noch verfuegbar ist; ohne
+   * diese Liste waeren "noch nie gewaehrt" und "schon benutzt" nicht
+   * zu unterscheiden.
+   * Returns array of { typeId, cardName, heroIdx }.
+   */
+  getSpentAdditionalActions(playerIdx) {
+    const out = [];
+    for (const inst of this.cardInstances) {
+      const g = inst.counters?.aaGrants;
+      if (!g || !this._zusatzAnbieterVon(inst, playerIdx)) continue;
+      for (const [typeId, v] of Object.entries(g)) {
+        if (v === 0 && this._additionalActionTypes[typeId]) out.push({ typeId, cardName: inst.name, heroIdx: inst.heroIdx });
+      }
+    }
+    return out;
+  }
+
+  /**
    * Consume one additional action of the given type for a player.
    * If providerCardId is specified, consume that specific provider.
    * Otherwise, consume the first available.

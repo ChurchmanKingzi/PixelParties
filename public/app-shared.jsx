@@ -7695,11 +7695,11 @@ function tutorialStartsWithAntonia(num) {
 // ── Tutorial-Gegner (Als Vorgabe 26.9.) ─────────────────────────────
 // Der CPU-Gegner im Tutorial heisst serverseitig schlicht "CPU" und hat
 // keinen Avatar. Angezeigt wird stattdessen immer Monia Bot ODER Antonia:
-//   • zu Beginn eines Durchgangs die, die im Skript ZUERST spricht,
-//   • nach jeder Gespraechsszene die, die darin MEHR gesprochen hat.
-// „Mehr gesprochen" zaehlt Buchstaben und Ziffern des sichtbaren Texts —
-// ein „..." ist also kein Redeanteil. Gleichstand laesst den bisherigen
-// Gegner stehen. Wie `_antoniaPresent` ein sequenzuebergreifender Zustand
+//   • Monia Bot, solange Antonia nicht die Position LINKS der Textbox
+//     eingenommen hat — auch wenn Antonia rechts auftritt und redet,
+//   • Antonia, sobald sie dort steht (T5-Epilog: im Augenblick des Tackles,
+//     das Monia verdraengt; ab T6 steht sie von Anfang an links).
+// Wie `_antoniaPresent` ein sequenzuebergreifender Zustand
 // mit Mini-Abo, weil Textbox (app-shared) und Brett (app-board) ihn
 // getrennt lesen und schreiben.
 // Beide tragen die Gegnerfarbe (`NICHT_MENSCH_FARBE` im Server, #ff4444):
@@ -7724,38 +7724,11 @@ function tutorialSprecherDerSeite(opts, page) {
   return null;
 }
 
-function tutorialSeitenText(page) {
-  const raw = typeof page === 'string' ? page : (page?.text || '');
-  return parseInlineMarkdown(raw).plainText;
-}
-
-/** Wer von beiden hat in dieser Szene mehr gesprochen? null bei Gleichstand. */
-function tutorialMehrGesprochen(opts, pages) {
-  const anteil = { monia: 0, antonia: 0 };
-  for (const p of (pages || [])) {
-    const wer = tutorialSprecherDerSeite(opts, p);
-    if (!wer) continue;
-    anteil[wer] += (tutorialSeitenText(p).match(/[\p{L}\p{N}]/gu) || []).length;
-  }
-  if (anteil.monia === anteil.antonia) return null;
-  return anteil.monia > anteil.antonia ? 'monia' : 'antonia';
-}
-
-/** Wer bekommt in diesem Tutorial den ersten Text? (Intro, sonst Outro.) */
+/** Wer ist beim Start eines Durchgangs der Gegner? Antonia nur, wenn sie
+ *  von Anfang an LINKS steht (`opts.speaker`), sonst Monia Bot. */
 function tutorialErsterSprecher(num) {
-  const script = TUTORIAL_SCRIPTS[num];
-  if (!script) return 'monia';
-  const opts = { speaker: MONIA_PORTRAIT, speakerName: 'Monia Bot', ...(script.opts || {}) };
-  for (const teil of [script.intro, script.outro]) {
-    const seiten = Array.isArray(teil) ? teil : (teil ? [{ text: teil }] : []);
-    for (const p of seiten) {
-      // Ein reines „..." ist noch kein Text — wer zuerst WORTE bekommt.
-      if (!/[\p{L}\p{N}]/u.test(tutorialSeitenText(p))) continue;
-      const wer = tutorialSprecherDerSeite(opts, p);
-      if (wer) return wer;
-    }
-  }
-  return 'monia';
+  const links = (TUTORIAL_SCRIPTS[num]?.opts || {}).speaker;
+  return links === ANTONIA_PORTRAIT ? 'antonia' : 'monia';
 }
 
 let _tutorialGegner = null;
@@ -8119,6 +8092,8 @@ function TextBox() {
       flieger.remove();
       if (window.playSFX) window.playSFX('heavy_impact', { dedupe: 100 });
       setTackleAus(true);
+      // Antonia steht jetzt links: erst DANN wird sie zum Gegner.
+      if (window._currentTutorialNum) setTutorialGegner('antonia');
       // Monias Portraetrahmen fliegt aus dem Bild (nach oben links).
       const wurf = frame.cloneNode(true);
       wurf.style.setProperty('--tb-seite', getComputedStyle(frame).getPropertyValue('--tb-seite') || '#ff4444');
@@ -8301,11 +8276,7 @@ function TextBox() {
           setTimeout(() => setAntoniaPresent(false), 600);
         }
       }
-      // Szene zu Ende: im Tutorial wird, wer mehr gesprochen hat, zum
-      // angezeigten Gegner (s. `setTutorialGegner`).
       if (window._currentTutorialNum) {
-        const wer = tutorialMehrGesprochen(opts, pages);
-        if (wer) setTutorialGegner(wer);
         // Der Text ist durch: die Helden-Figuren steigen aus den Karten
         // (waehrend die Textbox noch ausblendet, nicht erst danach).
         setTutorialFigurenGesperrt(false);
@@ -8771,6 +8742,9 @@ const TUTORIAL_SCRIPTS = {
     const BOOK = '.game-hand-me [data-card-name="Book of Doom"]';
     const HOWITZER = '.game-hand-me [data-card-name="Lifeforce Howitzer"]';
     const ALCHEMY = '[data-ability-owner="me"][data-card-name="Alchemy"]';
+    // Alle Karten auf dem Brett (Helden, Abilities, Creatures ... — `zone-has-card`)
+    // und in der eigenen Hand.
+    const ALLE_KARTEN = ['.zone-has-card', '.game-hand-me [data-card-name]'];
     // Antonia (rechts), alle Texte wackeln. Bis zu ihrer Vorstellung heisst
     // sie „Jetpack Raccoon", danach „Antonia".
     const A = (text, extra) => ({ text, side: 'right', speakerName: 'Antonia', nameColor: '#ff4444', shakeText: true, ...extra });
@@ -8808,13 +8782,14 @@ const TUTORIAL_SCRIPTS = {
       { text: '...' },
       A('Khehehe, I finally caught dem thieves red-handed, how nice!'),
       A('But worry not - for the GRRRRREAT Antonia is nothing if not *merciful*, khehe!'),
-      A('Youse can **keep spending MY Golds** in your games.'),
+      A('Youse can **keep spending MY Golds** in your little games.'),
       A("You just ... **owe me a big ol' loan.**"),
       A('Sounds fair?\nKhehehe, I know it does!'),
       A('...'),
       A("And what's dis?"),
-      A("Some kinda puzzle or somethin'?"),
-      A("You tryin' to learn how to spend *my Golds*?"),
+      // ── Highlight: ALLE Karten auf dem Brett und in der Hand, bis zum „..." ──
+      A("Some kinda puzzle or somethin'?", { highlights: ALLE_KARTEN }),
+      A("You tryin' to learn how to spend *my Golds*?", { highlights: ALLE_KARTEN }),
       A('...'),
       A("Well, dis one really isn't too hard.\nJust **find how you gain Golds in this setup.**"),
       // ── Highlight: Book of Doom, Howitzer UND Alchemy ──
@@ -8839,7 +8814,7 @@ const TUTORIAL_SCRIPTS = {
       { text: 'So!\nYou did it! Great job, beep-boop!' },
       { text: 'As you can see, **Gold** can be an excellent way to apply damage, along with many other things! It can even be worth inflicting your own Hero with Poison!' },
       // ── Highlight: Alchemy ──
-      { text: 'And **Alchemy** and the **Potions** it provides can be incredibly valuable cards as well!',
+      { text: 'And **Alchemy** and the {#a0703c:**Potions**} it provides can be incredibly valuable cards as well!',
         highlights: [ALCHEMY] },
       { text: "I feel like you're really starting to get a hang of things!\nNext time-",
         highlights: [ALCHEMY] },
@@ -8849,6 +8824,7 @@ const TUTORIAL_SCRIPTS = {
       AL('Good job!'),
       AL('Me be very proud of ya!'),
       AL('Now, the GRRRRREAT Antonia will take you under her wing.\nRejoice, khehehehehe!'),
+      AL("Come - I'll take you to my **lair**, khehehehe!"),
     ],
     };
   })(),
