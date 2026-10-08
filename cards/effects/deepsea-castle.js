@@ -142,6 +142,9 @@ module.exports = {
       title: CARD_NAME,
       description: 'Pick one of your own Creatures to swap OUT.',
       cancellable: true,
+      // Es wird eine KARTE gewaehlt, nicht ein Platz: ein Klick auf den Helden
+      // darf nicht stillschweigend dessen linkeste waehlen (s. promptZonePick).
+      heroShortcut: false,
     });
     if (!picked) return false;
     const chosenInst = pickable.find(i =>

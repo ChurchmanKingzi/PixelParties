@@ -100,6 +100,9 @@ module.exports = {
         title: CARD_NAME,
         description: 'Choose a Pollution Token to consume and summon Pollution Piranha in its place.',
         cancellable: false,
+        // Es wird eine KARTE gewaehlt, nicht ein Platz: ein Klick auf den Helden
+        // darf nicht stillschweigend dessen linkeste waehlen (s. promptZonePick).
+        heroShortcut: false,
       });
       if (!picked) return false;
       chosen = pool.find(inst =>

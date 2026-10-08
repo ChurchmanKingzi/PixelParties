@@ -309,6 +309,9 @@ async function removePollutionTokens(engine, playerIdx, count, sourceName, opts 
         title: `${sourceName} — Remove Pollution`,
         description: `Pick Pollution Token ${i + 1}/${toRemoveCount} to remove.`,
         cancellable: false,
+        // Es wird eine KARTE gewaehlt, nicht ein Platz: ein Klick auf den Helden
+        // darf nicht stillschweigend dessen linkeste waehlen (s. promptZonePick).
+        heroShortcut: false,
       });
       const pickedInstIdx = picked
         ? remaining.findIndex(inst => inst.heroIdx === picked.heroIdx && inst.zoneSlot === picked.slotIdx

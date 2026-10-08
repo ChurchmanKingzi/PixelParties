@@ -110,6 +110,9 @@ module.exports = {
         title: CARD_NAME,
         description: 'Choose a Creature summoned by this Hero\'s Necromancy to send to the discard pile.',
         cancellable: true,
+        // Es wird eine KARTE gewaehlt, nicht ein Platz: ein Klick auf den Helden
+        // darf nicht stillschweigend dessen linkeste waehlen (s. promptZonePick).
+        heroShortcut: false,
       });
       if (!pick) return false;   // abgebrochen: nichts verbraucht
       ziel = opfer.find(i => i.zoneSlot === pick.slotIdx && i.heroIdx === (pick.heroIdx ?? hi));

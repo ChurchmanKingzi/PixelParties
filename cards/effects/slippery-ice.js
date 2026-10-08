@@ -254,6 +254,9 @@ module.exports = {
           ? `Pick another Creature to move, or cancel to stop (${moved} moved so far).`
           : 'Pick a Creature to move onto an adjacent Hero.',
         cancellable: true,
+        // Es wird eine KARTE gewaehlt, nicht ein Platz: ein Klick auf den Helden
+        // darf nicht stillschweigend dessen linkeste waehlen (s. promptZonePick).
+        heroShortcut: false,
       });
       if (!src) break;
 

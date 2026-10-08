@@ -509,6 +509,9 @@ async function tryBouncePlace(ctx) {
       description: `Bounce a Deepsea Creature to place ${cardName} into its Support Zone?`,
       confirmLabel: '🌊 Bounce & Place',
       cancellable: true,
+      // Es wird eine KARTE gewaehlt, nicht ein Platz: ein Klick auf den Helden
+      // darf nicht stillschweigend dessen linkeste waehlen (s. promptZonePick).
+      heroShortcut: false,
     });
 
     if (!picked) {
