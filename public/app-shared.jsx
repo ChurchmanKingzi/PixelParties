@@ -8058,16 +8058,35 @@ function TextBox() {
     const rects = [];
     for (const h of hl) {
       const sel = typeof h === 'string' ? h : h.selector;
-      const pulse = typeof h === 'object' && h.pulse;
+      // Gehighlightete Karten pulsieren immer leicht; `pulse: false` schaltet das ab.
+      const pulse = typeof h === 'object' ? h.pulse !== false : true;
       if (!sel) continue;
       document.querySelectorAll(sel).forEach(treffer => {
+        // Die Klone der Vorseite tragen dieselben data-Attribute und stehen
+        // noch im Overlay, wenn die neue Seite misst — ohne diesen Filter
+        // sammelten sich bei gleichem Selektor auf Folgeseiten immer mehr
+        // Highlights an (Seite 6: 3 statt 2, Seite 10: 5 statt 2).
+        if (treffer.closest('.textbox-overlay')) return;
         const el = highlightZiel(treffer);
         const m = measureHighlight(el);
         const box = m.flat ? m.rect : m.local;
         // Handkarten: die Stapelfolge des Faechers (linke Karte ueber der
         // rechten, `--fan-z`) gilt auch fuer ihre Highlights.
         const z = parseInt(getComputedStyle(el).zIndex, 10);
-        if (box.width > 0 && box.height > 0) rects.push({ ...m, pulse, handkarte: el !== treffer, stapel: Number.isFinite(z) ? z : 0, html: el.outerHTML });
+        // Massstab des Originals mitnehmen. Der Klon steht im Overlay, nicht
+        // mehr in seinem Umfeld: Die Phasenspalte setzt ein eigenes
+        // `--board-scale` (.85 des Brettmassstabs), im Overlay gilt das
+        // globale — der Klon der Phasenleiste bekam dadurch groessere
+        // Schrift und Abstaende als sein Original und lag verzerrt darueber.
+        // Nur abweichende Werte werden gesetzt, alles andere bleibt wie es war.
+        const vars = {};
+        const ovStil = getComputedStyle(document.querySelector('.textbox-overlay') || document.body);
+        const elStil = getComputedStyle(el);
+        for (const n of ['--board-scale', '--board-font']) {
+          const eigen = elStil.getPropertyValue(n).trim();
+          if (eigen && eigen !== ovStil.getPropertyValue(n).trim()) vars[n] = eigen;
+        }
+        if (box.width > 0 && box.height > 0) rects.push({ ...m, pulse, vars, handkarte: el !== treffer, stapel: Number.isFinite(z) ? z : 0, html: el.outerHTML });
       });
     }
     setHighlightRects(rects);
@@ -8230,7 +8249,7 @@ function TextBox() {
                   width: h.rect.width, height: h.rect.height, pointerEvents: 'none' }
               : { position: 'absolute', left: h.local.left, top: h.local.top,
                   width: h.local.width, height: h.local.height, pointerEvents: 'none' }}>
-            <div className="textbox-highlight-clone" dangerouslySetInnerHTML={{ __html: h.html }} />
+            <div className="textbox-highlight-clone" style={h.vars} dangerouslySetInnerHTML={{ __html: h.html }} />
           </div>
         );
         // Gedrehtes Ziel / Handkarte: Drehung und Skalierung sitzen auf
@@ -8317,30 +8336,30 @@ function TextBox() {
 const TUTORIAL_SCRIPTS = {
   1: {
     // Regieanweisungen des Skripts: ein Highlight gilt ab der Seite, vor
-    // der es steht, bis zur naechsten Anweisung. `pulse` nur auf der Seite,
-    // auf der es zum ersten Mal erscheint.
+    // der es steht, bis zur naechsten Anweisung. Highlights pulsieren
+    // standardmaessig leicht (s. TextBox).
     intro: [
       { text: 'Heya! Welcome to the battlefield!' },
       { text: "I'm Monia Bot, the coolest Bot there is, beep-boop!\nI'll show you the ropes and make you a Pixel-Powerhouse!" },
       { text: "Let's start with the basics:\nTo win a game of Pixel Parties, you must defeat all of your opponent's Heroes!" },
       // „and" bleibt in der normalen Textfarbe (sonst waere fetter Text Cyan).
-      { text: 'To do that, you deal damage to them until their HP drop to 0.\nYou usually use {red:**Attacks, Spells**} {var(--text):**and**} {green:**Creatures**} for that!' },
+      { text: 'To do that, you deal damage to them until their HP drop to 0. You usually use {red:**Attacks, Spells**} {var(--text):**and**} {green:**Creatures**} for that!' },
       // ── Highlight: Beato und Magic Hammer ──
       { text: "Let's try hitting my {purple:**Beato**} with the big, strong {red:**Magic Hammer**} Spell in your hand!",
         highlights: [
-          { selector: '[data-hero-owner="opp"][data-hero-name="Beato, the Butterfly Witch"]', pulse: true },
-          { selector: '.game-hand-me [data-card-name="Magic Hammer"]', pulse: true },
+          '[data-hero-owner="opp"][data-hero-name="Beato, the Butterfly Witch"]',
+          '.game-hand-me [data-card-name="Magic Hammer"]',
         ] },
       { text: 'Well ... that would be **amazing**, beep-boop - but your Hero {purple:**Ida**} cannot use Magic Hammer yet.\nIts level is too high for her!',
         highlights: [
           '[data-hero-owner="opp"][data-hero-name="Beato, the Butterfly Witch"]',
           '.game-hand-me [data-card-name="Magic Hammer"]',
         ] },
-      // ── Highlight: Magic Hammer und Destruction Magic ──
+      // ── Highlight: Magic Hammer und Destruction Magic (auf Ida) ──
       { text: "See the number **3** on your Magic Hammer? That's its level. So you need a Hero that can use Spells with level 3!",
         highlights: [
-          { selector: '.game-hand-me [data-card-name="Magic Hammer"]', pulse: true },
-          { selector: '[data-ability-owner="me"][data-card-name="Destruction Magic"]', pulse: true },
+          '.game-hand-me [data-card-name="Magic Hammer"]',
+          '[data-ability-owner="me"][data-card-name="Destruction Magic"]',
         ] },
       { text: 'And see your Ida? She has {#88ccee:**Destruction Magic**}, so she CAN use **Destruction Spells** like Magic Hammer - but her Ability is only at level 2. She only has 2 copies of it attached to her.',
         highlights: [
@@ -8352,15 +8371,16 @@ const TUTORIAL_SCRIPTS = {
           '.game-hand-me [data-card-name="Magic Hammer"]',
           '[data-ability-owner="me"][data-card-name="Destruction Magic"]',
         ] },
+      // ── Highlight: Destruction Magic in der Hand (Magic Hammer faellt weg) ──
       { text: 'Okay - time to hammer that Beato!\nAttach the third Destruction Magic from your hand to your Ida!',
         highlights: [
-          '.game-hand-me [data-card-name="Magic Hammer"]',
+          '.game-hand-me [data-card-name="Destruction Magic"]',
           '[data-ability-owner="me"][data-card-name="Destruction Magic"]',
         ] },
-      // ── Highlight: Action-Phase-Button ──
+      // ── Highlight: komplette Phasenleiste ──
       { text: 'Then, go to your **Action Phase** and drag your Magic Hammer onto the Hero that should cast it - your Ida!\nClick on your target - Beato - and watch her get squished!',
         highlights: [
-          { selector: '[data-phase-name="Action Phase"]', pulse: true },
+          '.board-phase-tracker',
         ] },
     ],
     outro: [

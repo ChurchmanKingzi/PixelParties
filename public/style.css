@@ -15469,6 +15469,14 @@ body:has(.textbox-overlay) .tooltip {
 .textbox-highlight-clone *::after {
   display: none !important;
 }
+/* Phasenleiste im Highlight: die Beschriftungen sind im Original gedimmt
+   (40 % Weiss) — ueber dem Schleier sollen alle sechs klar lesbar sein. */
+.textbox-highlight-clone .board-phase-item {
+  color: rgba(255,255,255,.92);
+  background: rgba(255,255,255,.1);
+  border-color: rgba(255,255,255,.3);
+}
+.textbox-highlight-clone .board-phase-item.active { background: rgba(255,255,255,.18); }
 /* Der Klon steht ausserhalb seines Kontexts — Groessenregeln wie die
    der Handkarten (`.game-hand … > .board-card`) greifen dort nicht.
    Der Kasten ist bereits exakt so gross wie das Original, die Karte
@@ -15490,11 +15498,13 @@ body:has(.textbox-overlay) .tooltip {
   50%      { box-shadow: 0 0 24px rgba(0,240,255,.8), 0 0 40px rgba(0,240,255,.4); }
 }
 .textbox-highlight-pulse {
-  animation: textbox-hl-pulse 1s ease-in-out infinite;
+  animation: textbox-hl-pulse 1.4s ease-in-out infinite;
 }
+/* Jedes Highlight pulsiert (TextBox setzt `.textbox-highlight-pulse`),
+   darum bewusst leicht: ein paar Prozent Groesse, ruhiger Takt. */
 @keyframes textbox-hl-pulse {
   0%, 100% { transform: scale(1); box-shadow: 0 0 16px rgba(0,240,255,.6), 0 0 30px rgba(0,240,255,.25); }
-  50%      { transform: scale(1.06); box-shadow: 0 0 28px rgba(0,240,255,.8), 0 0 44px rgba(0,240,255,.4); }
+  50%      { transform: scale(1.035); box-shadow: 0 0 26px rgba(0,240,255,.8), 0 0 42px rgba(0,240,255,.4); }
 }
 
 /* ── Responsive ── */
