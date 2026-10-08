@@ -89,11 +89,11 @@ def _art_ua03():
     # Mündungsfeuer + Qualm + Streuschuss (Kügelchen fächern auf)
     burst(w, mx + 5, my, 'fire', 10, 7, 4)
     w.draw(smoke_sprite(26, 14, 4, 3), mx - 2, my - 24, 9000)
-    for k in range(17):                                   # Streuschuss: Kügelchen fächern kegelförmig auf
-        d = 13 + k * 2.4
-        off = ((k * 7) % 9 - 4) / 4.0 * d * 0.30
+    for k in range(13):                                   # Streuschuss: Kügelchen fächern kegelförmig auf
+        d = 12 + k * 3.7
+        off = ((k * 5) % 7 - 3) / 3.0 * d * 0.26
         x, y = mx + 6 + d, my + 2 + d * 0.10 + off
-        pl = pellet(4 if k < 9 else 3)
+        pl = pellet(4 if k < 7 else 3)
         w.draw(pl, int(x - pl.w // 2), int(y - pl.h // 2), 9000)
     for (x, y) in ((96, 52), (98, 56), (97, 60), (95, 48), (100, 50)):
         burst(w, x, y, 'gold', 5, 3, x + y)

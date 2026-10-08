@@ -128,10 +128,10 @@ def penguin_clerk(f=0):
     ellipse(c, 11.5, 22.5, 5.4, 8.2, 'bone', lo=3, hi=5)
     # Kopf
     ellipse(c, 11, 10, 7.4, 6.6, 'coal', lo=0, hi=3, ambient=0.2)
-    c.rect(6, 9, 8, 11, 'bone', 5)
-    c.rect(13, 9, 15, 11, 'bone', 5)
-    c.rect(7, 10, 8, 11, 'coal', 1)
-    c.rect(13, 10, 14, 11, 'coal', 1)
+    c.rect(7, 10, 8, 11, 'bone', 5)
+    c.rect(13, 10, 14, 11, 'bone', 5)
+    c.put_ramp(8, 11, 'coal', 0)
+    c.put_ramp(13, 11, 'coal', 0)
     poly(c, [(9, 12), (14, 12), (11.5, 16)], 'gold', lo=3, hi=5)
     # Fliege
     poly(c, [(7, 17), (11, 18.5), (7, 20)], 'teamA', lo=2, hi=4)
