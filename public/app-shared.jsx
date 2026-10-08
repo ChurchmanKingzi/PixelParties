@@ -8056,6 +8056,7 @@ function TextBox() {
     const hl = page?.highlights;
     if (!hl || !hl.length) { setHighlightRects([]); return; }
     const rects = [];
+    const aufraeumen = [];
     for (const h of hl) {
       const sel = typeof h === 'string' ? h : h.selector;
       // Gehighlightete Karten pulsieren immer leicht; `pulse: false` schaltet das ab.
@@ -8086,10 +8087,41 @@ function TextBox() {
           const eigen = elStil.getPropertyValue(n).trim();
           if (eigen && eigen !== ovStil.getPropertyValue(n).trim()) vars[n] = eigen;
         }
-        if (box.width > 0 && box.height > 0) rects.push({ ...m, pulse, vars, handkarte: el !== treffer, stapel: Number.isFinite(z) ? z : 0, html: el.outerHTML });
+        if (!(box.width > 0 && box.height > 0)) return;
+        const basis = { pulse, vars, handkarte: el !== treffer, stapel: Number.isFinite(z) ? z : 0, html: el.outerHTML, ziel: el };
+        rects.push({ ...m, ...basis });
+        // ── Hover auf einer gehighlighteten HANDKARTE ──
+        // Hebt sich die echte Karte unter dem Zeiger, soll die Highlight-
+        // Version selbst gross werden — nicht darunter noch eine zweite,
+        // normal vergroesserte Karte auftauchen. Die echte Karte bleibt
+        // deshalb beim Hover unsichtbar (`data-tb-hover`, CSS) und der
+        // Klon folgt ihrer Lage und Groesse Bild fuer Bild, auch im
+        // Uebergang beim Heben und Absenken.
+        if (basis.handkarte) {
+          let raf = 0, drauf = false, bis = 0;
+          const folgen = () => {
+            raf = 0;
+            const m2 = measureHighlight(el);
+            setHighlightRects(prev => prev.map(r => (r.ziel === el ? { ...m2, ...basis, hover: drauf } : r)));
+            if (drauf || performance.now() < bis) raf = requestAnimationFrame(folgen);
+            else el.removeAttribute('data-tb-hover');
+          };
+          const rein = () => { drauf = true; el.setAttribute('data-tb-hover', '1'); if (!raf) raf = requestAnimationFrame(folgen); };
+          // Nach dem Verlassen noch kurz nachfuehren (Absenk-Uebergang .16 s).
+          const raus = () => { drauf = false; bis = performance.now() + 300; if (!raf) raf = requestAnimationFrame(folgen); };
+          el.addEventListener('mouseenter', rein);
+          el.addEventListener('mouseleave', raus);
+          aufraeumen.push(() => {
+            el.removeEventListener('mouseenter', rein);
+            el.removeEventListener('mouseleave', raus);
+            if (raf) cancelAnimationFrame(raf);
+            el.removeAttribute('data-tb-hover');
+          });
+        }
       });
     }
     setHighlightRects(rects);
+    return () => { aufraeumen.forEach(f => f()); };
   }, [pages, pageIdx]);
 
   const handleAdvance = useCallback(() => {
@@ -8262,7 +8294,7 @@ function TextBox() {
             left: h.rect.left, top: h.rect.top,
             width: h.rect.width, height: h.rect.height,
             transform: `rotate(${h.drehung || 0}deg) scale(${h.skala || 1})`,
-            pointerEvents: 'none', zIndex: 90001 + h.stapel,
+            pointerEvents: 'none', zIndex: 90001 + h.stapel + (h.hover ? 1000 : 0),
           }}>{inner}</div>
         );
         if (h.flat) return <div key={i} style={{ display: 'contents' }}>{inner}</div>;
