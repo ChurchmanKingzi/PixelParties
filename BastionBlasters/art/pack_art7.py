@@ -282,20 +282,20 @@ def _art_bs05():
     for (sp, x, y) in ((barrel(), 16, 34), (crate(), 128, 36)):
         prop_at(w, sp, x, y)
     strip = spike_strip()
-    sx, sy = 74, 66                                         # Fußpunkt (Mitte unten) der Stachelflur
+    sx, sy = 72, 74                                         # Fußpunkt (Mitte unten) der Stachelflur
     shadow(w, sx + 1, sy - 1, 15, 3)
-    # Gegner läuft darüber: Stacheln stehen vor seinen Füßen
-    unit_at(w, skeleton('walk', 0), sx + 1, sy - 5, sh=(8, 2))
     w.draw(strip, sx - strip.w // 2, sy - strip.h + 1, sy)
-    # Autsch-Funken und Tempo-Bremse (kurze Striche hinter ihm)
-    burst(w, sx - 4, sy - 36, False, 'gold')
-    burst(w, sx + 12, sy - 32, False, 'bone')
-    sweat(w, sx + 9, sy - 38)
+    # Gegner tritt auf die Spitzen: hüpft mit Autsch-Funken, Schweiß, Tempo-Bremse (Striche hinter ihm)
+    sk = skeleton('walk', 0)
+    w.draw(sk, sx + 3 - sk.w // 2, sy - 27 - sk.h + 1, 9000 + sy)
+    burst(w, sx - 6, sy - 56, False, 'gold')
+    burst(w, sx + 16, sy - 54, False, 'bone')
+    sweat(w, sx + 14, sy - 46)
     for k in range(3):
-        wline(w, sx - 22 - k * 2, sy - 18 + k * 4, sx - 16 - k * 2, sy - 18 + k * 4, 'bone', 4 - (k % 2), 9000)
-    # wartender Zweiter
-    unit_at(w, skeleton('idle', 1), 28, 84, sh=(8, 3))
-    unit_at(w, goblin('walk', 2), 118, 82, flip=True, sh=(8, 3))
+        wline(w, sx - 28 - k * 2, sy - 38 + k * 4, sx - 20 - k * 2, sy - 38 + k * 4, 'bone', 4 - (k % 2), 9000)
+    # wartende Zweite
+    unit_at(w, skeleton('idle', 1), 26, 84, sh=(8, 3))
+    unit_at(w, goblin('walk', 2), 120, 84, flip=True, sh=(8, 3))
     return finish(w)
 
 
@@ -306,20 +306,23 @@ def _art_bs05():
 def _art_bs08():
     w = ground_world('cobble', 7)
     maze = revolving_maze()
-    mx, my = 40, 30                                         # linke obere Ecke
+    mx, my = 40, 26                                         # linke obere Ecke
     foot = my + maze.h - 1
     shadow(w, mx + 32, foot - 1, 36, 4)
     w.draw(maze, mx, my, foot)
-    # Verwirrter Gegner torkelt in der Trommel, Sterne kreisen
+    # verwirrter Gegner torkelt am Eingang, Sterne kreisen, wirre Laufspur auf dem Pflaster
     g = goblin('walk', 1)
-    unit_at(w, g, mx + 14, foot - 3, flip=False, sh=(8, 2))
-    w.draw(g, 0, 0, 0) if False else None
-    dizzy(w, mx + 16, foot - 31, 8, 3, 3, 0.6, 9200)
+    gx, gy = 30, 84
+    shadow(w, gx, gy - 1, 9, 3)
+    w.draw(g, gx - g.w // 2, gy - g.h + 1, 9000 + gy)
+    dizzy(w, gx, gy - 31, 9, 3, 3, 0.6, 9500)
+    for k in range(14):
+        a = k * 0.55
+        wpx(w, gx + 18 + math.cos(a) * (3 + k * 0.7), gy - 4 + math.sin(a) * (2 + k * 0.4), 'bone', 4, 4000)
     # einsamer Hut auf dem Boden
-    w.draw(hat(), mx + 52, foot - 9, 9000)
-    # zweiter Gegner kommt von rechts
-    unit_at(w, skeleton('walk', 2), 118, 84, flip=True, sh=(8, 3))
-    unit_at(w, citizen('cloth', 0), 20, 82, sh=(5, 2))
+    w.draw(hat(), mx + 58, foot - 10, 9000)
+    # zweiter Gegner kommt von rechts (vorsichtig)
+    unit_at(w, skeleton('walk', 2), 120, 80, flip=True, sh=(8, 3))
     for (sp, x, y) in ((barrel(), 16, 34), (crate(), 128, 34)):
         prop_at(w, sp, x, y)
     return finish(w)
@@ -513,20 +516,28 @@ def _art_bt04():
         t.shadow(x, y, (8, 3))
     # Strahl: lila Mantel (Dither), Kern hell, durchschlägt alle drei; Zirp-Wellen als Bögen
     for (x, y) in _beam_pts(eye, far):
-        for dy in (-2, -1, 0, 1, 2):
-            if abs(dy) == 2 and int(x + y) % 2:
+        for dy in (-3, -2, -1, 0, 1, 2, 3):
+            if abs(dy) == 3 and int(x + y) % 2:
                 continue
-            ramp, idx = ('purple', 3) if abs(dy) == 2 else (('purple', 5) if abs(dy) == 1 else ('bone', 5))
+            if abs(dy) == 3:
+                ramp, idx = 'purple', 3
+            elif abs(dy) == 2:
+                ramp, idx = 'purple', 4
+            elif abs(dy) == 1:
+                ramp, idx = 'purple', 5
+            else:
+                ramp, idx = 'bone', 5
             t.px(x, y + dy, ramp, idx, 5000)
     ang = math.atan2(far[1] - eye[1], far[0] - eye[0])
     for k in range(5):
         d = 14 + k * 13
         cx, cy = eye[0] + math.cos(ang) * d, eye[1] + math.sin(ang) * d
-        for a in range(-60, 61, 12):
+        for a in range(-55, 56, 8):
             aa = ang + math.radians(a)
-            px_ = cx + math.cos(aa) * (5 + k * 0.6)
-            py_ = cy + math.sin(aa) * (5 + k * 0.6)
-            t.px(px_, py_, 'purple', 5 if k % 2 else 4, 5000)
+            px_ = cx + math.cos(aa) * (6 + k * 0.7)
+            py_ = cy + math.sin(aa) * (6 + k * 0.7)
+            t.px(px_, py_, 'purple', 5, 5002)
+            t.px(px_ + 1, py_, 'purple', 3, 5002)
     for (x, y) in targets:
         t.unit(skeleton('idle', 0 if x != 110 else 1), x, y, flip=True, top=True, shade=False)
     for (x, y) in targets:
@@ -541,7 +552,7 @@ def _art_bt04():
 @card_art('BT-05')
 def _art_bt05():
     t = TW('grass', 7, hornet_tower())
-    for (sp, x, y) in ((tree_round(1), 136, 44), (bush(1), 12, 56), (rock(1), 16, 90), (bush(3, True), 76, 94)):
+    for (sp, x, y) in ((tree_round(1), 136, 44), (bush(1), 12, 56), (rock(1), 16, 90), (bush(3, True), 96, 96)):
         t.prop(sp, x, y)
     nest = (58, 57)
     sk = (118, 85)
@@ -549,16 +560,16 @@ def _art_bt05():
     # Flugspuren der Hornissen
     for (a, b) in (((nest[0] + 6, nest[1] - 2), (82, 46)), ((nest[0] + 6, nest[1]), (96, 62)), ((nest[0] + 6, nest[1] + 2), (110, 56))):
         t.line(a[0], a[1], b[0], b[1], 'bone', 4, 5000, dash=2)
-    t.sprite(hornet(0), 88, 44, 9100)
-    t.sprite(hornet(1), 102, 62, 9100)
-    t.sprite(hornet(0), 114, 56, 9100)
+    t.sprite(hornet(0), 86, 42, 9100)
+    t.sprite(hornet(1), 100, 62, 9100)
+    t.sprite(hornet(0), 128, 52, 9100)
     # Gegner wird gepiekst: Sterne
     t.unit(skeleton('idle', 1), sk[0], sk[1], flip=True, top=True, shade=False)
     t.burst(112, 70, False, 'gold')
     t.burst(124, 66, False, 'fire')
     t.px(104, 69, 'bone', 5)
     t.px(105, 70, 'bone', 4)
-    t.unit(citizen('cloth', 0), 20, 82, sh=(5, 2))
+    t.line(112, 56, 124, 54, 'bone', 4, 5000, dash=2)
     return t.done()
 
 
@@ -568,10 +579,10 @@ def _art_bt05():
 @card_art('BT-06')
 def _art_bt06():
     t = TW('mud', 9, storm_spike())
-    for (sp, x, y) in ((rock(2), 14, 90), (bush(2), 136, 48)):
+    for (sp, x, y) in ((rock(2), 14, 90), (bush(2), 138, 40)):
         t.prop(sp, x, y)
     cloud = (58, 30)
-    A, B, C = (96, 82), (122, 76), (126, 91)
+    A, B, C = (92, 80), (122, 72), (112, 91)
     for (x, y) in (A, B, C):
         t.shadow(x, y, (8, 3))
     # Blitz: Wolke -> A, dann Kettenblitz A -> B -> C
@@ -607,7 +618,7 @@ def _art_bt07():
     for (sp, x, y) in ((bush(1), 136, 54), (rock(1), 14, 90), (bush(2), 16, 56)):
         t.prop(sp, x, y)
     # Flieger (Fledermäuse) und ihre Schatten auf dem Boden
-    bat1, bat2 = (118, 30), (98, 14)
+    bat1, bat2 = (116, 34), (132, 14)
     t.shadow(bat1[0], 82, (8, 2))
     t.shadow(bat2[0], 70, (7, 2))
     t.sprite(bat(0), bat2[0], bat2[1], 9000)
