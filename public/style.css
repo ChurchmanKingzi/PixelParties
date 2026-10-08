@@ -15406,6 +15406,11 @@ body:has(.textbox-overlay) .tooltip {
   display: inline-block;
   transform: translateY(0.45em);
 }
+/* Tutorial 3: waehrend die ATK-Anzeige auf 9999 hochzaehlt, leuchtet sie. */
+.board-card-atk-num.atk-zaehlt {
+  color: #ffd34d !important;
+  text-shadow: 0 0 6px #ffae00, 0 0 12px rgba(255, 174, 0, .6);
+}
 /* Tutorial boost — card grows dramatically */
 .tutorial-boost-anim {
   animation: tutorial-card-grow 2s ease-out !important;
