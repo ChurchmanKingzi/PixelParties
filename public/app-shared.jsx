@@ -7285,6 +7285,22 @@ function CardTooltipContent({ card, children, imageUrl }) {
         {card.cardType !== 'Creature' && (card.spellSchool1 || card.spellSchool2) &&
           <div style={{ fontSize: 14, color: 'var(--text2)', marginBottom: 8 }}>{[card.spellSchool1, card.spellSchool2].filter(Boolean).join(' · ')}</div>}
         {card.effect && <div style={{ fontSize: 14, marginTop: 4, lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>{card.effect}</div>}
+        {/* Ascension-Orbs (Beato): welche Zauberschulen schon gesammelt sind.
+            Steht im Karten-Tooltip statt in eigenen Orb-Tooltips — die Orbs
+            auf der Karte nehmen den Zeiger nicht mehr an, ein Hover genau
+            darauf ist also ein ganz normaler Hover der Karte. */}
+        {Array.isArray(card._liveOrbs) && card._liveOrbs.length > 0 && (
+          <div style={{ marginTop: 8, fontSize: 13, lineHeight: 1.55 }}>
+            <div style={{ color: 'var(--text2)', fontWeight: 700 }}>
+              {card._liveOrbs.every(o => o.collected) ? 'All schools collected — ready to Ascend!' : 'Collect all spell school orbs to Ascend'}
+            </div>
+            {card._liveOrbs.map(o => (
+              <div key={o.school} style={{ color: o.collected ? o.color : 'var(--text2)' }}>
+                {o.collected ? '●' : '○'} {o.school}{o.collected ? ' ✓' : ''}
+              </div>
+            ))}
+          </div>
+        )}
         {/* Inherited effects (Sparkfly Queen's gifts from sacrificed
             Sparkflies — and any future card that populates
             `_inheritedEffects` on its instance counters). Rendered as a
@@ -8008,14 +8024,18 @@ function TextBox() {
       page.onShow();
     }
 
-    let i = 0;
     const len = parsed.plainText.length;
-    const speed = (opts && opts.speed) || 25;
+    // ★ Als Vorgabe 8.10.: „etwa doppelt so schnell" — 12 statt 25 ms je
+    // Zeichen. Nach der VERSTRICHENEN Zeit gezaehlt statt nach Takten: hakt
+    // der Browser kurz (Brettaufbau, Animationen), holt der Text auf, statt
+    // jeden verpassten Takt als Pause stehen zu lassen.
+    const speed = (opts && opts.speed) || 12;
+    const t0 = performance.now();
     timerRef.current = setInterval(() => {
-      i++;
-      if (i >= len) { setCharCount(len); setDone(true); clearInterval(timerRef.current); }
-      else setCharCount(i);
-    }, speed);
+      const n = Math.floor((performance.now() - t0) / speed) + 1;
+      if (n >= len) { setCharCount(len); setDone(true); clearInterval(timerRef.current); }
+      else setCharCount(n);
+    }, Math.min(speed, 16));
     return () => clearInterval(timerRef.current);
   }, [pages, pageIdx]);
 
