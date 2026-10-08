@@ -640,11 +640,11 @@ def _art_bt07():
 
 @card_art('BT-08')
 def _art_bt08():
-    t = TW('dark', 11, confusion_beacon(), y0=10)
+    t = TW('dark', 11, confusion_beacon())
     for (sp, x, y) in ((rock(2), 14, 90), (bush(2), 136, 54)):
         t.prop(sp, x, y)
-    apex = (60, 31)
-    ang0 = math.radians(32)
+    apex = (60, 28)
+    ang0 = math.radians(33)
     half = math.radians(15)
     L = 110
     pA = (apex[0] + math.cos(ang0 - half) * L, apex[1] + math.sin(ang0 - half) * L)
