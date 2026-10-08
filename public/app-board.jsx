@@ -32989,15 +32989,30 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   const [showEndTurnConfirm, setShowEndTurnConfirm] = useState(false);
   const pendingEndTurnRef = useRef(null); // stores the target phase for deferred advance
 
+  // ── Tutorial 1: kein Phasenwechsel ──
+  // Einzige Ausnahme: zur Action Phase (3) — und die erst, wenn Ida
+  // Destruction Magic auf Stufe 3 angelegt hat. Gilt fuer alle Wege
+  // (Phasenleiste, Next Phase, End Turn, Leertaste), weil sie alle ueber
+  // `tryAdvancePhase` laufen; die Knoepfe sperren sich zusaetzlich optisch.
+  const tutorial1Phasensperre = !!(gameState.isTutorial && window._currentTutorialNum === 1);
+  const tutorial1DestructionMagic = (() => {
+    if (!tutorial1Phasensperre) return 0;
+    const idaIdx = me.heroes.findIndex(h => h?.name && h.name.startsWith('Ida'));
+    if (idaIdx < 0) return 0;
+    return (me.abilityZones[idaIdx] || []).flat().filter(n => n === 'Destruction Magic').length;
+  })();
+  const tutorialPhaseErlaubt = (ziel) => !tutorial1Phasensperre || (ziel === 3 && tutorial1DestructionMagic >= 3);
+
   // Shared phase advance with optional end-turn confirmation
   const tryAdvancePhase = useCallback((targetPhase) => {
+    if (tutorial1Phasensperre && !(targetPhase === 3 && tutorial1DestructionMagic >= 3)) return;
     if (targetPhase === 5 && askBeforeEndTurn) {
       pendingEndTurnRef.current = targetPhase;
       setShowEndTurnConfirm(true);
     } else {
       socket.emit('advance_phase', { roomId: gameState.roomId, targetPhase });
     }
-  }, [askBeforeEndTurn, gameState.roomId]);
+  }, [askBeforeEndTurn, gameState.roomId, tutorial1Phasensperre, tutorial1DestructionMagic]);
 
   const confirmEndTurn = useCallback(() => {
     const target = pendingEndTurnRef.current;
@@ -46702,26 +46717,15 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           </div>
 
           {/* Phase tracker — positioned absolutely, left edge */}
-          {/* Tutorial phase lock: block advancement until conditions met */}
-          {(() => {
-            let tutorialPhaseLocked = false;
-            if (gameState.isTutorial && window._currentTutorialNum === 1) {
-              // Lock until Ida has Destruction Magic at level 3
-              const idaIdx = me.heroes.findIndex(h => h?.name && h.name.startsWith('Ida'));
-              if (idaIdx >= 0) {
-                const abSlots = me.abilityZones[idaIdx] || [];
-                const dmCount = abSlots.flat().filter(n => n === 'Destruction Magic').length;
-                if (dmCount < 3) tutorialPhaseLocked = true;
-              } else { tutorialPhaseLocked = true; }
-            }
-            return (
+          {/* Tutorial 1: Phasenwechsel gesperrt, nur die Action Phase ist
+              (mit Destruction Magic 3) erlaubt — siehe `tutorialPhaseErlaubt`. */}
           <div className="phase-column">
             {gameState.skillTest && window.StTurnPanel ? <window.StTurnPanel gameState={gameState} myIdx={myIdx} isSpectator={isSpectator} focusSeat={stMulti ? oppIdx : null} onFocus={stMulti ? setStFocusPin : null} /> : <>
             <div className="board-phase-tracker">
               {['Start Phase', 'Resource Phase', 'Main Phase 1', 'Action Phase', 'Main Phase 2', 'End Phase'].map((phase, i) => {
                 const isActive = currentPhase === i;
                 const spellResolving = (gameState._spellResolutionDepth || 0) > 0;
-                const canClick = !tutorialPhaseLocked && isMyTurn && !result && !gameState.effectPrompt && !gameState.potionTargeting && !gameState.mulliganPending && !gameState.heroEffectPending && !spellHeroPick && !pendingAdditionalPlay && !pendingAbilityActivation && !showSurrender && !showEndTurnConfirm && !spellResolving && (
+                const canClick = tutorialPhaseErlaubt(i) && isMyTurn && !result && !gameState.effectPrompt && !gameState.potionTargeting && !gameState.mulliganPending && !gameState.heroEffectPending && !spellHeroPick && !pendingAdditionalPlay && !pendingAbilityActivation && !showSurrender && !showEndTurnConfirm && !spellResolving && (
                   (currentPhase === 2 && (i === 3 || i === 5)) ||
                   (currentPhase === 3 && (i === 4 || i === 5)) ||
                   (currentPhase === 4 && i === 5)
@@ -46743,16 +46747,18 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               // Ida's target prompt), phase advance is refused. Greying out
               // the buttons here avoids the confusing silent reject.
               const spellResolving = (gameState._spellResolutionDepth || 0) > 0;
-              const canAdvance = !tutorialPhaseLocked && isMyTurn && !result && !gameState.effectPrompt && !gameState.potionTargeting && !gameState.mulliganPending && !gameState.heroEffectPending && !spellHeroPick && !pendingAdditionalPlay && !pendingAbilityActivation && !showSurrender && !showEndTurnConfirm && !spellResolving && currentPhase >= 2 && currentPhase <= 4;
+              const canAdvance = isMyTurn && !result && !gameState.effectPrompt && !gameState.potionTargeting && !gameState.mulliganPending && !gameState.heroEffectPending && !spellHeroPick && !pendingAdditionalPlay && !pendingAbilityActivation && !showSurrender && !showEndTurnConfirm && !spellResolving && currentPhase >= 2 && currentPhase <= 4;
               const nextMap = { 2: 3, 3: 4, 4: 5 };
+              const canNext = canAdvance && tutorialPhaseErlaubt(nextMap[currentPhase]);
+              const canEnd = canAdvance && tutorialPhaseErlaubt(5);
               return (
                 <div className="phase-buttons-row">
-                  <button className="btn phase-btn" disabled={!canAdvance}
-                    onClick={() => canAdvance && tryAdvancePhase(nextMap[currentPhase])}>
+                  <button className="btn phase-btn" disabled={!canNext}
+                    onClick={() => canNext && tryAdvancePhase(nextMap[currentPhase])}>
                     Next Phase ▸
                   </button>
-                  <button className="btn btn-danger phase-btn" disabled={!canAdvance}
-                    onClick={() => canAdvance && tryAdvancePhase(5)}>
+                  <button className="btn btn-danger phase-btn" disabled={!canEnd}
+                    onClick={() => canEnd && tryAdvancePhase(5)}>
                     End Turn ⏹
                   </button>
                   <label className="phase-end-check">
@@ -46767,8 +46773,6 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             })()}
             </>}
           </div>
-            );
-          })()}
 
           {/* v788 (Als Befund 5.9.): der `board-center-spacer` ist HIER
               ENTFERNT. Er war ein reiner Symmetrie-Platzhalter fuer die
