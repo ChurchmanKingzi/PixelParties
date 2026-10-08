@@ -26,6 +26,7 @@ const DEFAULT_WEIGHTS = {
   killBonus: 1.0,           // Vorliebe für tödliche Treffer
   focusLeader: 1.5,         // >0: stärkste Gegner bevorzugen; <0: Schwache
   heroEffect: 0.6,          // Neigung, aktive Hero-Effekte zu nutzen
+  heroEffectEdge: 5,        // Aufschlag auf Hero-Effekte (kosten den Zug, nicht den Hero; Basisangriff ≈ 7–8). 0 = wie bis 8.10., als sie kaum zum Zug kamen
   creatureEffect: 0.8,      // Neigung, Creature-Effekte zu nutzen
   spell: 1.5,               // Neigung, Handzauber/-angriffe zu spielen (ausgeliefert: 1,5 — zweimal gemessen +1,2…1,7 Punkte Siegquote)
   summon: 0.9,              // Neigung, Creatures zu beschwören
@@ -408,8 +409,12 @@ function rankActions(room, seat, host) {
   for (const e of heroEffects) {
     if (e.equippedCard) continue;                              // Ausrüstungs-Effekte: vorerst nicht
     const params = { heroIdx: e.heroIdx };
+    if (e.charmedOwner != null) params.charmedOwner = e.charmedOwner;      // geliehener Hero (Charme, Controlled Attack): sonst würde der eigene Hero gleichen Platzes angesprochen
     const key = cardKey('heroEffect', e.heroName);
-    out.push({ score: w.heroEffect * 5 + learnedBonus(prof, w, key) + Math.random(), kind: 'heroEffect', key,
+    // Ein Hero-Effekt erschöpft den Hero nicht: nutzt man ihn zusätzlich, geht keine andere Aktion verloren. Bis 8.10. stand er mit 3 Punkten
+    // weit hinter jedem Angriff (≈ 7–8) und kam kaum zum Zug (Broghan: 9 Einsätze in 114 Rounds); mit `heroEffectEdge` liegt er knapp über dem Basisangriff.
+    // Was der Effekt tatsächlich bringt, drückt der gelernte Bonus aus (negativ gelernte Effekte fallen zurück).
+    out.push({ score: w.heroEffect * 5 + w.heroEffectEdge + learnedBonus(prof, w, key) + Math.random(), kind: 'heroEffect', key,
       run: () => rounds.act(room, seat, 'activate_hero_effect', params, () => host.doActivateHeroEffect(room, seat, params), host) });
   }
 

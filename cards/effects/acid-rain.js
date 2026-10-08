@@ -108,7 +108,7 @@ module.exports = {
       const spellStillInHand = turnPs._resolvingCard ? 1 : 0;
       const effectiveHandSize = (turnPs.hand || []).length - spellStillInHand;
       const canDelete = effectiveHandSize >= 2;
-      const canPlaceToken = countFreeZones(gs, turnPlayer) > 0;
+      const canPlaceToken = countFreeZones(gs, turnPlayer, { aliveOnly: true }) > 0;      // „one of their Heroes' free Support Zones“: lebende Heroes
 
       if (!canDelete && !canPlaceToken) {
         engine.log('acid_rain_fizzle', {
@@ -146,7 +146,7 @@ module.exports = {
             cancellable: cfg?.cancellable !== false,
           }),
         };
-        await placePollutionTokens(engine, turnPlayer, 1, 'Acid Rain', { promptCtx: promptCtxShim });
+        await placePollutionTokens(engine, turnPlayer, 1, 'Acid Rain', { promptCtx: promptCtxShim, aliveOnly: true });
       } else {
         await engine.actionPromptForceDiscard(turnPlayer, 2, {
           title: 'Acid Rain — Delete 2 Cards',

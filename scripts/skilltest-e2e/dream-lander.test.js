@@ -8,7 +8,7 @@ const check = (name, cond, info) => { if (cond) console.log('  ✓', name); else
 
 (async () => {
   const oL = console.log, oE = console.error; console.log = () => {}; console.error = () => {};
-  const out = await runGame({ seats: 3, setupOnly: true, noProfileSeats: [0, 1, 2], seed: 52,
+  const out = await runGame({ seats: 3, setupOnly: true, noProfileSeats: [0, 1, 2], seed: 53,
     mutatePrep: (prep) => { prep.players[1].supportZones[0][0] = ['Goff, the Burnbringer']; } });
   console.log = oL; console.error = oE;
   const { gs, engine } = out;
