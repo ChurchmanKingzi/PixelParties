@@ -137,7 +137,8 @@ const ABOM = 'The Golden Abomination';
     if (res.winnerIdx == null) noWinner++;
     const mine = events.filter(e => e.room === res.room.id);
     if (mine.some(e => e.name === 'quetzahuitl_arrival')) arrivals++;
-    if (mine.some(e => e.name === 'quetzahuitl_defeated')) {
+    // Nur der Fall von Seat 0 (Besitzer des Test-Quetzahuitl) zählt: in seltenen Partien hat auch ein anderer Sitz ein Exemplar (Aufbau/Recycler)
+    if (mine.some(e => e.name === 'quetzahuitl_defeated' && e.data && e.data.loser === res.room.gameState.players[0].username)) {
       defeats++;
       if (res.eliminated.includes(0)) defeatThenEliminated++;
     }

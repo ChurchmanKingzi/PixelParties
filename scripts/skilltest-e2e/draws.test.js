@@ -27,10 +27,17 @@ const check = (name, cond, info) => { if (cond) console.log('  ✓', name); else
   check('neue Karten: vorher in keiner Hand und in keiner Ablage', names.every(n => !inGame.has(n)), names);
   check('Pool ist um genau 3 kleiner', pool.remaining() === before.pool - 3, { vorher: before.pool, nachher: pool.remaining() });
   check('Deck liegt danach leer', ps.mainDeck.length === 0 && ps.potionDeck.length === 0, { main: ps.mainDeck.length, potion: ps.potionDeck.length });
+  check('Zähler gezogener Karten: 3', ps._stDrawn === 3, ps._stDrawn);
+  const pol = require('../../skilltest/policy');
+  const v0 = pol.sideValue(engine, seat);
+  ps._stDrawn += 1;
+  check('Eine gezogene Karte erhöht den Stellungswert um den Grundwert des Ziehens', Math.abs(pol.sideValue(engine, seat) - v0 - pol.drawValue()) < 1e-9, [v0, pol.sideValue(engine, seat), pol.drawValue()]);
+  ps._stDrawn -= 1;
 
   console.log('Potion Deck');
   const pd = await engine.actionDrawFromPotionDeck(seat, 2);
   check('2 Potions gezogen', pd.length === 2 && pd.every(n => cards[n].cardType === 'Potion'), pd);
+  check('…und mitgezählt (5)', ps._stDrawn === 5, ps._stDrawn);
   check('Potion Deck danach leer', ps.potionDeck.length === 0);
 
   console.log('Mulligan');
@@ -46,6 +53,7 @@ const check = (name, cond, info) => { if (cond) console.log('  ✓', name); else
   await engine.actionDrawCards(seat, ps.mainDeck.length);
   for (const n of ps.potionDeck.splice(0)) engine.handZugangSync(ps, n, { von: 'rueckgabe', ohneInstanz: true });
   check('nachgezogen: die Hand ist wieder so groß wie vor dem Mulligan', ps.hand.length === before.hand + 3 + 2, { hand: ps.hand.length });
+  check('Mulligan ist netto kein Gewinn: Zähler bleibt bei 5 (Nachziehen der Hauptdeck-Karten wird gegengerechnet)', ps._stDrawn === 5, ps._stDrawn);
   check('Decks wieder leer', ps.mainDeck.length === 0 && ps.potionDeck.length === 0);
 
   console.log('Spell-School-Abilities');

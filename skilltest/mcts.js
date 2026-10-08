@@ -53,9 +53,10 @@ function enabled(room, seat, opts = {}) {
 function relativeValue(engine, seat, cfg) {
   const gs = engine.gs, st = gs.skillTest, p = policy();
   const others = gs.players.map((_, i) => i).filter(i => i !== seat && !st.eliminated.includes(i));
-  const own = p.sideValue(engine, seat);
+  const dv = p.drawValueOf(engine, seat);
+  const own = p.sideValue(engine, seat, dv);
   if (!others.length) return own;
-  const vals = others.map(i => p.sideValue(engine, i));
+  const vals = others.map(i => p.sideValue(engine, i, dv));
   const mean = vals.reduce((a, b) => a + b, 0) / vals.length;
   return own - ((1 - cfg.LEADER_BLEND) * mean + cfg.LEADER_BLEND * Math.max(...vals));
 }

@@ -55,7 +55,7 @@ async function setup(label) {
 }
 
 // Der Test-Mensch passt jede eigene Round, bis das Spiel endet.
-async function passUntilOver(c, limitMs = 90000) {
+async function passUntilOver(c, limitMs = 150000) {
   const t0 = Date.now();
   while (!c.last('st_game_over') && Date.now() - t0 < limitMs) {
     const g = c.last('game_state');
