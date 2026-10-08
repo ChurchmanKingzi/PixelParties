@@ -6185,7 +6185,18 @@ function BleedingOverlay({ ticking }) {
   );
 }
 
-function PoisonedOverlay({ stacks, nurZahl }) {
+function PoisonedOverlay({ stacks, nurZahl, hinweis, karte }) {
+  // ★ Als Vorgabe 9.10.: Die Stapelzahl zeigt beim Hover denselben Tooltip wie
+  // das Poison-Abzeichen (`hinweis`, Text aus `poisonTooltipText`) und haelt
+  // dabei den Karten-Tooltip oben (`ppStatusHover`, wie die Abzeichen).
+  const hover = hinweis && window.ppStatusHover ? (() => {
+    const { showBoardTip, hideBoardTip } = window.ppStatusHover(karte);
+    return {
+      onMouseEnter: e => { showGameTooltip(e, hinweis); showBoardTip(); },
+      onMouseLeave: () => { hideGameTooltip(); hideBoardTip(); },
+    };
+  })() : null;
+  const zahl = <div className={'poison-stack-count' + (hover ? ' poison-stack-count-hover' : '')} {...hover}>{stacks}</div>;
   // v1462: steht eine animierte Figur auf der Karte, zeigt sie das Gift
   // (Tönung + Schädel) — die Karte behält nur die Stapelzahl.
   const bubbles = useMemo(() => nurZahl ? [] : Array.from({ length: ppFxN(8) }, () => ({
@@ -6197,7 +6208,7 @@ function PoisonedOverlay({ stacks, nurZahl }) {
   })), []);
   if (nurZahl) {
     return stacks >= 1
-      ? <div className="status-poisoned-zahl"><div className="poison-stack-count">{stacks}</div></div>
+      ? <div className="status-poisoned-zahl">{zahl}</div>
       : null;
   }
   return (
@@ -6208,7 +6219,7 @@ function PoisonedOverlay({ stacks, nurZahl }) {
           animationDelay: b.delay + 's', animationDuration: b.dur + 's',
         }}>☠️</span>
       ))}
-      {stacks >= 1 && <div className="poison-stack-count">{stacks}</div>}
+      {stacks >= 1 && zahl}
     </div>
   );
 }
@@ -44482,7 +44493,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 {hero?.name && !figurDa && isNegated && !isNegated._byWeakeningCrystal && <NegatedOverlay />}
                 {hero?.name && !figurDa && isBurned && <BurnedOverlay ticking={burnTickingHeroes.includes(`${pi}-${i}`)} />}
                 {hero?.name && !figurDa && isBleeding && <BleedingOverlay ticking={bleedTickingHeroes.includes(`${pi}-${i}`)} />}
-                {hero?.name && isPoisoned && <PoisonedOverlay stacks={isPoisoned.stacks || 1} nurZahl={figurDa} />}
+                {hero?.name && isPoisoned && <PoisonedOverlay stacks={isPoisoned.stacks || 1} nurZahl={figurDa}
+                  hinweis={window.poisonTooltipText ? window.poisonTooltipText(isPoisoned.stacks || 1, p?.poisonDamagePerStack || 30, isPoisoned.unhealable) : null}
+                  karte={hero.name} />}
                 {hero?.name && !figurDa && isHealReversed && <HealReversedOverlay />}
                 {hero?.name && !figurDa && isBerserked && <BerserkedOverlay />}
                 {hero?.name && hasLightBall && <LightBallAura />}
@@ -46340,7 +46353,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     {cc?.frozen ? <FrozenOverlay /> : null}
                     {cc?._zoneAura === 'necro_flicker' ? <NecroFlickerAura /> : null}
                     {(cc?.negated || cc?.nulled) ? <NegatedOverlay /> : null}
-                    {cc?.poisoned ? <PoisonedOverlay stacks={cc.poisonStacks || 1} /> : null}
+                    {cc?.poisoned ? <PoisonedOverlay stacks={cc.poisonStacks || 1}
+                      hinweis={window.poisonTooltipText ? window.poisonTooltipText(cc.poisonStacks || 1, p?.poisonDamagePerStack || 30, cc.poisonedUnhealable) : null}
+                      karte={cards[cards.length-1]} /> : null}
                     {/* v1143: ohne Handliste, siehe Heldenreihe */}
                     {cc ? <StatusBadges counters={cc} isHero={false} player={p} cardName={cards[cards.length-1]} /> : null}
                     {/* v704 (Puppets): Luck (Laki) / Preserve (Vinny) Counter */}

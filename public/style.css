@@ -4185,6 +4185,9 @@ body:has(.anim-backdrop) .pp-bg-particles { display: none; }
 }
 /* v1462: nur die Stapelzahl, wenn eine animierte Figur das Gift zeigt */
 .status-poisoned-zahl { position: absolute; inset: 0; z-index: 5; pointer-events: none; }
+/* Die Stapelzahl nimmt den Zeiger an (Tooltip wie am Poison-Abzeichen). Klicks und
+   Drops gehen als Nachkomme der Zone trotzdem an die Heldenzone weiter. */
+.poison-stack-count.poison-stack-count-hover { pointer-events: auto; cursor: default; }
 .poison-stack-count {
   position: absolute;
   top: 50%;
