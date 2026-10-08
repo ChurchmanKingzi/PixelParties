@@ -119,10 +119,11 @@ button.on { background: var(--accent2); color: #08201e; }
 #kwtip .kt-k { font-size: 9px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
 #kwtip .kt-d { font-weight: 400; }
 .kt-t { color: var(--muted); font-size: 11px; font-weight: 400; }
-#cardtip { position: fixed; z-index: 300; display: none; gap: 8px; align-items: flex-start; filter: drop-shadow(0 8px 16px rgba(0,0,0,.55)); }
+/* Die Vorschau fängt keine Klicks ab (darunter liegen Karten und Schaltflächen); nur die Begriffsfelder reagieren */
+#cardtip { position: fixed; z-index: 300; display: none; gap: 8px; align-items: flex-start; filter: drop-shadow(0 8px 16px rgba(0,0,0,.55)); pointer-events: none; }
 #cardtip .ct-face { position: relative; flex: 0 0 auto; border: 3px solid var(--line); background: #000; }
 #cardtip img { display: block; width: 100%; height: 100%; image-rendering: pixelated; }
-#cardtip .hs { position: absolute; cursor: help; border-bottom: 2px dotted rgba(255, 215, 90, .0); }
+#cardtip .hs { position: absolute; cursor: help; pointer-events: auto; }
 #cardtip .hs:hover { background: rgba(255, 220, 100, .28); outline: 2px solid var(--gold); }
 #cardtip .ct-kw { flex: 0 0 auto; overflow: auto; background: var(--panel); border: 3px solid var(--line); padding: 8px 10px; font-size: 12px; }
 #cardtip .ct-kw h4 { margin: 0 0 6px; font-size: 10px; text-transform: uppercase; letter-spacing: .1em; color: var(--muted); }
