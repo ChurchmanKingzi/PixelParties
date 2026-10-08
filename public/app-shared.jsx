@@ -8417,13 +8417,13 @@ function zaehleAtkHoch(heldSelektor, von, nach, dauer) {
 }
 
 /** Tutorial 3: Antonias „Gefallen" — Willy bekommt 9999 ATK (Server), die
- *  Anzeige zaehlt ueber ~3 s hoch. */
+ *  Anzeige zaehlt ueber ~1,6 s hoch. */
 function tutorial3WillyBoost() {
   const sel = '[data-hero-owner="me"][data-hero-name*="Willy"]';
   const el = document.querySelector(sel + ' .board-card-atk-num');
   const von = el ? (parseInt(el.textContent, 10) || 0) : 0;
   socket.emit('tutorial_modify', { type: 'tutorial3_boost' });
-  zaehleAtkHoch(sel, von, 9999, 3200);
+  zaehleAtkHoch(sel, von, 9999, 1600);
 }
 
 const TUTORIAL_SCRIPTS = {
@@ -8544,7 +8544,7 @@ const TUTORIAL_SCRIPTS = {
       A("Listen, kiddo!\nDa real **big damages** aren't done with Blah-Blah-Spells or Who-Cares-Creatures, ya hear me?"),
       A("{red:**Attacks!**}\nDat's what it's all abouts, ya get me?!"),
       A("Can't go wrong with da **BEEG BONK** for da beeg damages, right?"),
-      // ── Highlight Willy; sein Angriffswert steigt ueber einige Sekunden auf
+      // ── Highlight Willy; sein Angriffswert steigt ueber ~1,6 s auf
       //    9999, dazu der Buff-Klang (kommt vom Server-Log `atk_grant`) ──
       A("Dere ya go - I've done ya a little somethin' of a favor, ya see?\nYour eternal gratitudes are appreciated, kheke!", {
         onShow: () => tutorial3WillyBoost(),
@@ -8554,6 +8554,12 @@ const TUTORIAL_SCRIPTS = {
       A("Attacks do more ouchie de higher your Hero's **BONK stat** is.\nDis lil' boost I gave ya will help him hit **real hard!**", {
         highlights: [
           '[data-hero-owner="me"][data-hero-name*="Willy"]',
+        ] }),
+      // ── Willy bleibt gehighlightet, dazu das frisch angelegte Fighting ──
+      A("Ya already know how to use da Spells, right?\nAttacks work the same way, just with da good ol' **Fighting** Ability instead of some boring nerd stuff like a Spell School!", {
+        highlights: [
+          '[data-hero-owner="me"][data-hero-name*="Willy"]',
+          '[data-ability-owner="me"][data-card-name="Fighting"]',
         ] }),
       // ── Highlight Hammer Throw ──
       A("Now use dat {red:**Attack**} in ya hand to break some bonez.\nOr all of dem, khehe!", {
