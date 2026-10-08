@@ -545,20 +545,20 @@ def gull(f=0):
 
 
 def confusion_beacon():
-    """Leuchtfeuer der Verwirrung: rot-weißer Leuchtturm, Regenbogen-Kristall in der Laterne, Möwe als Wetterfahne (44 x 80)"""
-    c = Canvas(44, 80)
+    """Leuchtfeuer der Verwirrung: rot-weißer Leuchtturm, Regenbogen-Kristall in der Laterne, Möwe als Wetterfahne (44 x 76)"""
+    c = Canvas(44, 76)
     cx = 21.5
     # Sockel
-    for y in range(70, 79):
+    for y in range(70, 75):
         for x in range(7, 37):
             u = (x - 7) / 29.0
-            idx = quant(0.85 - 0.5 * u - 0.1 * ((y - 70) / 8.0), 1, 4, x, y)
+            idx = quant(0.85 - 0.5 * u - 0.1 * ((y - 70) / 4.0), 1, 4, x, y)
             if (x + (y // 3) * 5) % 9 == 0:
                 idx = 1
             c.put_ramp(x, y, 'stone', idx)
     for x in range(7, 37):
         c.put_ramp(x, 70, 'stone', 5)
-        c.put_ramp(x, 78, 'stone', 0)
+        c.put_ramp(x, 74, 'stone', 0)
     # Turmkörper: Kegelstumpf mit Streifen
     y_top, y_bot = 36, 69
     for y in range(y_top, y_bot + 1):

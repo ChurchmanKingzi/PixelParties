@@ -260,9 +260,9 @@ def _art_bs07():
     # Fallstriche und Staub aus dem Sturz
     for x in (60, 68, 76, 84):
         wline(w, x, foot - 22, x, foot - 17, 'bone', 4, 9000, dash=2)
-    for (x, y, sz) in ((46, foot - 22, 5), (98, foot - 24, 5)):
-        c = puff(sz * 2 + 2, sz + 3, x, 'stone', 3, 5)
-        w.draw(c, x - c.w // 2, y - c.h // 2, 9000)
+    for (x, y) in ((54, foot - 18), (57, foot - 24), (90, foot - 20), (93, foot - 26), (88, foot - 12)):
+        wpx(w, x, y, 'stone', 5, 9000)
+        wpx(w, x + 1, y, 'stone', 4, 9000)
     for (sp, x, y) in ((barrel(), 14, 40), (crate(), 130, 40)):
         prop_at(w, sp, x, y)
     for (sp, x, y) in ((bush(2), 18, 90), (rock(1), 124, 90)):
