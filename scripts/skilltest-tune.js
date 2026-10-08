@@ -4,7 +4,10 @@
 //
 //   node scripts/skilltest-tune.js --a '{}' --b '{"weights":{"focusLeader":-1}}' --seeds 400 --from 1000 --workers 4
 //   node scripts/skilltest-tune.js --a '{}' --b '{"mcts":true}' --seeds 100 --seat-counts 3,4
-//     --a / --b      Variante als JSON: { weights?: {…Kampfgewichte}, mcts?: bool, mctsCfg?: {…} }   (Standard: {} = Standard-Policy)
+//     --a / --b      Variante als JSON: { weights?: {…Kampfgewichte}, mcts?: bool, mctsCfg?: {…}, persona?: true|'raw' }   (Standard: {} = Standard-Policy)
+//                    Messungen zum Ziehen/Mulligan: weights.drawValue (Wert einer gezogenen Karte, Standard 20), weights.freeAbility (0 = freie Ability-Effekte nie
+//                    nutzen), forceHand: ["Horn in a Bottle"] (Karten auf die Hand des Fokus-Sitzes), forceAbility: "Leadership" (Ability aufs Brett),
+//                    mullMode: "skip"|"weak"|"more" (Mulligan-Arm des Fokus-Sitzes erzwingen)
 //                    --b darf eine LISTE von Varianten sein ([{…},{…}]): A läuft einmal, jede B-Variante wird gepaart gegen A verglichen.
 //     --seeds N      Anzahl Seeds (Partien je Variante);  --from S  erster Seed
 //     --seat-counts  Liste, z. B. 3,4,6 (Standard 2–8)

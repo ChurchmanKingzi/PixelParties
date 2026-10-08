@@ -67,6 +67,10 @@ function jobFor(seed, variant, opts = {}) {
     mcts: variant.mcts ? [t.seat] : false,
   };
   if (variant.mctsCfg) job.mctsCfg = variant.mctsCfg;
+  // Mulligan-Messungen (scripts/skilltest-mulligan.js): dem Fokus-Sitz eine Quelle geben (Karten auf die Hand, Ability aufs Brett) und seinen Arm erzwingen.
+  if (variant.forceHand && variant.forceHand.length) job.forceHand = { [t.seat]: variant.forceHand };
+  if (variant.forceAbility) job.forceAbility = { [t.seat]: variant.forceAbility };
+  if (variant.mullMode) job.mullMode = { [t.seat]: variant.mullMode };
   if (opts.noProfile) job.noProfileSeats = Array.from({ length: t.seats }, (_, i) => i);
   return { job, table: t };
 }

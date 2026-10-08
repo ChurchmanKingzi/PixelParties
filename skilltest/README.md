@@ -52,7 +52,7 @@ Hero-/Creature-Effekte, Handzauber, Beschwörungen (verbrauchen den Zug) sowie A
 (`policy.prepareBase`, `autoprep.buildWithRecycling`) wählt der Bot Heroes nach Wert, verteilt Abilities/Support nach
 gelernter Passung und wirft alles Unbrauchbare in den Recycler (Gold, früherer Spielbeginn).
 
-Gelernt wird per **Selbstspiel** (headless, 2–8 Sitze gemischt, `learn/train.js`) in **vier Kanälen**, alle in einer Datei
+Gelernt wird per **Selbstspiel** (headless, 2–8 Sitze gemischt, `learn/train.js`) in **fünf Kanälen**, alle in einer Datei
 (`data/skilltest-profile.json`, per `PP_ST_PROFILE` umlenkbar, atomar gespeichert, `version` zählt hoch):
 
 | Kanal | Inhalt | Wird genutzt für |
@@ -60,6 +60,7 @@ Gelernt wird per **Selbstspiel** (headless, 2–8 Sitze gemischt, `learn/train.j
 | `playValue` | mittlerer Zuwachs der Stellungsbewertung nach dem Ausspielen einer Karte/Aktion | Reihenfolge der Aktionen, Zauber-Timing; mit UCB-Neugier für selten Gespieltes |
 | `cardValue` / `pairValue` | mittlere Platzierungsgüte von Basen mit dieser Karte bzw. diesem Paar (Held+Ability/Creature, Ability+Creature, Held+Held) | Heldenwahl, Ability-/Support-Verteilung, was recycelt wird |
 | `keepModel` | Behalten oder recyceln, **mit der restlichen Hand und dem Brett als Kontext** (siehe unten) | Welche übrigen Karten im Kampf auf der Hand bleiben, welche in den Recycler gehen |
+| `mull` / `mullX` | **„Wann Mulligans durchführen?“** (`mulligan.js`): Platzierungsgüte nach der Entscheidung je Kontext-Eimer und Arm (`skip` / `weak` / `more`); `mullX` zählt nur erkundete (zufällig gewählte) Entscheidungen | Ob und wie viel der Bot mit Leadership, Horn in a Bottle, Staff of the Teleporter, Crescent Moon zurückmischt (siehe unten) |
 | `personas` | Population von Gewichtsvektoren (Aggression, Zielwahl, Fokus auf den Führenden, Effekt-/Zauber-Neigung …); Liga mit Selektion, Kreuzung, Mutation | Spielstil je CPU-Sitz (beim Kampfstart nach Fitness gezogen) |
 
 ```bash
@@ -72,6 +73,51 @@ PP_ST_TRAIN_BG=0.1 node server.js                            # … mit 10 % Rech
 Der Hintergrundprozess (`learn/background.js`) spielt unablässig CPU-Partien mit 2–8 Sitzen, ruht zwischen den Partien
 (Rechenanteil einstellbar) und schreibt das Profil fort; der Server liest es alle ~30 s nach. Ohne Profil spielen die Bots
 mit den Standard-Gewichten und der reinen Heuristik.
+
+### Lernlauf vom 8.10.
+
+Frischer Lauf mit dem Stand nach dem Merge von PR #436 (11 705 Partien): Ergebnisse, Messungen und die neue Top-Liste in `docs/skilltest-night-2/` und `docs/skilltest-top-cards.md`.
+
+### Ziehen ist immer etwas wert
+
+Eine gezogene Karte verändert Helden, Creatures und Gold nicht — für das Lernen (`playValue` = Stellungsgewinn nach dem Ausspielen) und den Lookahead
+sähen Draw-Karten sonst wertlos aus. Darum zählt jede **gezogene Karte** als Stellungsgewinn (`policy.sideValue`, Grundwert `drawValue` = 20 Punkte, per
+`PP_ST_DRAW_VALUE` für Messreihen verstellbar; eine durchschnittliche Kartenwirkung bringt 30–40, eine gezogene Karte braucht noch eine Aktion).
+`engine-ext.installDraws` führt den Zähler `ps._stDrawn`; ein Mulligan ersetzt nur (das Nachziehen derselben Anzahl wird gegengerechnet), ein Bonus-Zug
+bleibt Gewinn. Vor den ersten Beobachtungen gilt für Draw-Karten (Haste, Supply Chain, Wheels, Elixir of Quickness, Heart of the Mountain, Alchemy …)
+eine Vorgabe in der Aktionsreihenfolge (`policy.drawPrior`), die nach 5 Beobachtungen zur Hälfte verblasst.
+
+### Mulligan der Bots — der Kanal „Wann Mulligans durchführen?“ (`mulligan.js`)
+
+Leadership, Horn in a Bottle, Staff of the Teleporter und Crescent Moon fragen mit einem `handPick`-Prompt, welche Handkarten zurück ins Deck gemischt
+werden (im Modus kommen ebenso viele **zufällige neue** Karten nach). Die Standard-CPU lehnt jede abbrechbare Frage ab — diese Karten lagen bei Bots tot.
+
+- **Welche Karten?** Dieselbe Bewertung wie beim Behalten/Recyceln im Aufbau (`keepmodel`: Modell + Vorgabe + gelernte Nutzung, Kontext = restliche Hand
+  und Brett). Was dort „recyceln“ hieße, ist **schwach**; Heroes in der Hand bleiben.
+- **Ob und wie viel?** Drei Arme: `skip` (nichts tun, die Karte bleibt liegen), `weak` (alle schwachen Karten zurück; ohne schwache Karte zieht ein Bonus-Zug —
+  Horn +1, Leadership Lv3 +1 — trotzdem), `more` (zusätzlich Grenzfälle `d < 0,08`). Kontext („Eimer“): Zahl der schwachen Karten (0 … 3+), Bonus-Zug,
+  Phase der Partie (Round ≤ 2 / ≤ 5 / später). Gelernt wird aus dem Ergebnis des Sitzes, **nur aus erkundeten Entscheidungen** (im Training spielt der Bot
+  mit Wahrscheinlichkeit 0,5 einen zufälligen Arm): nur dort ist die Armwahl unabhängig von der Stärke der Hand. Ohne genug Daten (30 je Arm im feinen,
+  15 im groben Eimer) oder ohne klaren Vorsprung vor der Vorgabe (0,04 Platzierungsgüte) gilt die Vorgabe `weak`, sonst `skip` — die Beobachtungen einer
+  Partie hängen zusammen und der Unterschied der Arme ist meist winzig, so wird kein Rauschen gelernt.
+- **Trainings-Gerüst:** Damit der Kanal Daten bekommt, erhält im Training jeder dritte Sitz (`MULL_BOOST` 0,3) Horn in a Bottle oder Staff of the Teleporter
+  zusätzlich auf die Kampfhand (nach dem Aufbau; nie im Live-Spiel).
+- **Messung:** `node scripts/skilltest-tune.js --a '{"persona":true,"forceHand":["Horn in a Bottle"],"mullMode":"skip"}' --b '[{…"mullMode":"weak"},{…"mullMode":"more"}]'`
+  (gepaart, siehe `learn/tune.js`: `forceHand`, `forceAbility`, `mullMode` gelten für den Fokus-Sitz).
+
+### Freie Ability-Effekte der Bots
+
+Abilities mit `freeActivation` (Leadership, Alchemy, Charme, Diplomacy, Infiltration, Inventing, Necromancy, Occultism, Pillage, Premonition, Singing,
+Terror, Thieving, Trade, Training, Trapping) kosten keine Aktion und gelten einmal je Name und Round. Bots haben sie bis zum 8.10. **nie** benutzt
+(`doActivateFreeAbility` fehlte in `skillTestHandlers`/Host) — Helden mit solchen Start-Abilities spielten ohne ihren Effekt. `policy.freeAbilityActions` führt sie
+jetzt aus (stärkste Kopie je Name, Zieh-Sperre, `cpuMeta.shouldActivateNow`); gelernt wird unter `freeAbility:<Name>`.
+
+### Auswahl-Abfragen bestimmter Zauber (`prompts.js`)
+
+Zauber, deren Wirkung eine Auswahl verlangt, scheiterten bei Bots nach dem Ausspielen, weil die Abfrage (abbrechbar) abgelehnt wurde: Spontaneous Reappearance
+(0 von 161 Versuchen), Spreading Rumor (0/126), Gate to the Armory (0/118), Accusation (1/67), Raise the Minions! (0/72). `prompts.js` beantwortet genau diese
+Abfragen (Kartenname ansagen: der bei den Gegnern häufigste; Karte/Karten aus Ablage oder Deck wählen: nach gelerntem Wert). Danach: 13/17, 10/11, 9/69, 8/8, 4/61.
+Der Rest der Fehlversuche sind echte unerfüllte Bedingungen („Delete 1 … aus deiner Ablage“, „nur von einem betäubten Helden“ …).
 
 ### Nutzbarkeit behaltener Karten
 

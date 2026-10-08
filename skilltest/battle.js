@@ -174,6 +174,8 @@ async function start(room, host, prep) {
   ext.installPlayerChoice(engine);
   ext.installTargetWatch(engine);
   ext.installReactions(engine);
+  ext.installMulligan(engine);                  // Mulligan-Prompts der Bots (mulligan.js)
+  ext.installPrompts(engine);                   // Auswahl-Abfragen bestimmter Zauber (prompts.js)
   ext.installElimination(engine);
   ext.installMeter(engine);
   ext.installTurnEnd(engine, host);

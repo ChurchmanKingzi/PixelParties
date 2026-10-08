@@ -69,6 +69,7 @@ function simHost(roomBox) {
   get doConfirmPotion() { return roomBox.doConfirmPotion; },
   get doPlayAbility() { return roomBox.doPlayAbility; },
   get doActivateAbility() { return roomBox.doActivateAbility; },
+  get doActivateFreeAbility() { return roomBox.doActivateFreeAbility; },
   };
 }
 
@@ -124,6 +125,19 @@ async function _runGame(opts = {}) {
     prep.players[i].ready = true;
     bases.push(Object.assign(JSON.parse(JSON.stringify(prep.players[i])), { dealt: dealt[i] }));
   }
+  // Messläufe/Training: Karten gezielt auf die Hand eines Sitzes legen (nach dem Aufbau, ohne den Pool zu berühren), z. B. Mulligan-Quellen.
+  if (opts.forceHand) for (const [seat, names] of Object.entries(opts.forceHand)) if (prep.players[seat]) prep.players[seat].hand.push(...names);
+  // …oder eine Ability (Stufe 3) in eine freie Ability-Zone eines Helden des Sitzes legen, z. B. Leadership.
+  if (opts.forceAbility) for (const [seat, name] of Object.entries(opts.forceAbility)) {
+    const ps = prep.players[seat];
+    if (!ps) continue;
+    for (let hi = 0; hi < 3; hi++) {
+      if (!ps.heroes[hi]) continue;
+      if (ps.abilityZones[hi].some(z => z && z.n === name)) break;
+      const zi = ps.abilityZones[hi].findIndex(z => !z);
+      if (zi >= 0) { ps.abilityZones[hi][zi] = { n: name, s: 0, c: true }; break; }
+    }
+  }
   if (opts.mutatePrep) opts.mutatePrep(prep);   // Tests: Basen vor dem Kampf gezielt verändern
   if (opts.prepOnly) return { bases };
 
@@ -141,6 +155,7 @@ async function _runGame(opts = {}) {
   room.skillTest.mcts = opts.mcts === undefined ? false : opts.mcts;
   if (opts.mctsCfg) room.skillTest.mctsCfg = opts.mctsCfg;
   if (opts.noProfileSeats) st.noProfile = [...opts.noProfileSeats];
+  if (opts.mullMode) st.mullMode = Object.assign({}, opts.mullMode);       // Messung: Mulligan-Arm je Sitz erzwingen (skip | weak | more), siehe mulligan.js
   if (opts.weights) st.botWeights = Object.fromEntries(opts.weights.map((w, i) => [i, w]).filter(([, w]) => w));
   if (!opts.noFast) engine.enterFastMode();
   if (opts.setupOnly) return { room, host, engine, gs, st };       // Tests: Spiel steht, noch nichts gespielt
@@ -177,7 +192,7 @@ async function _runGame(opts = {}) {
     },
     bases, ms: Date.now() - t0, eliminated: [...st.eliminated],
     room: opts.returnRoom ? room : undefined,
-    learnLog: st.learnLog || [], recycled: st.recycled, firstStarter: st.firstStarter,
+    learnLog: st.learnLog || [], mullLog: st.mullLog || [], recycled: st.recycled, firstStarter: st.firstStarter,
   };
 }
 
