@@ -74,6 +74,10 @@ Der Hintergrundprozess (`learn/background.js`) spielt unablässig CPU-Partien mi
 (Rechenanteil einstellbar) und schreibt das Profil fort; der Server liest es alle ~30 s nach. Ohne Profil spielen die Bots
 mit den Standard-Gewichten und der reinen Heuristik.
 
+### Lernlauf vom 8.10.
+
+Frischer Lauf mit dem Stand nach dem Merge von PR #436 (11 705 Partien): Ergebnisse, Messungen und die neue Top-Liste in `docs/skilltest-night-2/` und `docs/skilltest-top-cards.md`.
+
 ### Ziehen ist immer etwas wert
 
 Eine gezogene Karte verändert Helden, Creatures und Gold nicht — für das Lernen (`playValue` = Stellungsgewinn nach dem Ausspielen) und den Lookahead
@@ -93,8 +97,9 @@ werden (im Modus kommen ebenso viele **zufällige neue** Karten nach). Die Stand
 - **Ob und wie viel?** Drei Arme: `skip` (nichts tun, die Karte bleibt liegen), `weak` (alle schwachen Karten zurück; ohne schwache Karte zieht ein Bonus-Zug —
   Horn +1, Leadership Lv3 +1 — trotzdem), `more` (zusätzlich Grenzfälle `d < 0,08`). Kontext („Eimer“): Zahl der schwachen Karten (0 … 3+), Bonus-Zug,
   Phase der Partie (Round ≤ 2 / ≤ 5 / später). Gelernt wird aus dem Ergebnis des Sitzes, **nur aus erkundeten Entscheidungen** (im Training spielt der Bot
-  mit Wahrscheinlichkeit 0,5 einen zufälligen Arm): nur dort ist die Armwahl unabhängig von der Stärke der Hand. Ohne genug Daten (8 je Arm im feinen,
-  4 im groben Eimer) gilt die Vorgabe `weak`, sonst `skip`.
+  mit Wahrscheinlichkeit 0,5 einen zufälligen Arm): nur dort ist die Armwahl unabhängig von der Stärke der Hand. Ohne genug Daten (30 je Arm im feinen,
+  15 im groben Eimer) oder ohne klaren Vorsprung vor der Vorgabe (0,04 Platzierungsgüte) gilt die Vorgabe `weak`, sonst `skip` — die Beobachtungen einer
+  Partie hängen zusammen und der Unterschied der Arme ist meist winzig, so wird kein Rauschen gelernt.
 - **Trainings-Gerüst:** Damit der Kanal Daten bekommt, erhält im Training jeder dritte Sitz (`MULL_BOOST` 0,3) Horn in a Bottle oder Staff of the Teleporter
   zusätzlich auf die Kampfhand (nach dem Aufbau; nie im Live-Spiel).
 - **Messung:** `node scripts/skilltest-tune.js --a '{"persona":true,"forceHand":["Horn in a Bottle"],"mullMode":"skip"}' --b '[{…"mullMode":"weak"},{…"mullMode":"more"}]'`

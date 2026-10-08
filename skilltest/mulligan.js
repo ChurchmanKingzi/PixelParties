@@ -17,7 +17,7 @@
 //     Der Kontext („Eimer“) ist: Zahl der schwachen Karten (0 … 3+), Bonus-Zug ja/nein, Phase der Partie (frühe/mittlere/späte Round).
 //     Gelernt wird aus dem Ergebnis des Sitzes (Platzierungsgüte, +1 … −1), und zwar nur aus ERKUNDETEN Entscheidungen (im Training spielt der Bot
 //     mit Wahrscheinlichkeit `EXPLORE` einen zufälligen Arm): nur dort ist die Armwahl unabhängig von der Stärke der Hand, der Vergleich also fair
-//     (`profile.mullX`). Ohne genug Daten gilt die Vorgabe: schwache Karten zurück (weak), sonst nichts tun.
+//     (`profile.mullX`). Ohne genug Daten oder ohne klaren Vorsprung vor der Vorgabe gilt sie: schwache Karten zurück (weak), sonst nichts tun.
 //
 //  Dieselbe Entscheidung gilt je Sitz, Round und Karte nur einmal (der Bot fragt dieselbe Quelle in einer Round mehrmals, ein Zufallsarm
 //  würde sonst jedes Mal neu gewürfelt und mehrfach gezählt).
@@ -29,8 +29,10 @@ const { getCardDB } = require('../cards/effects/_card-db');
 const ARMS = ['skip', 'weak', 'more'];
 const MORE_MARGIN = 0.08;          // Grenzfälle: Wert (Platzierungsgüte) unter dieser Schwelle fliegen im Arm „more“ mit raus
 const EXPLORE = 0.5;               // Training: Anteil der Entscheidungen, die ein zufälliger Arm trifft (Messung)
-const MIN_N = 8;                   // so viele erkundete Beobachtungen braucht jeder Arm, bevor der Vergleich entscheidet
-const POOL_MIN_N = 4;              // …im gröberen Eimer (nur Zahl der schwachen Karten)
+const MIN_N = 30;                  // so viele erkundete Beobachtungen braucht jeder Arm, bevor der Vergleich entscheidet
+const POOL_MIN_N = 15;             // …im gröberen Eimer (nur Zahl der schwachen Karten)
+const LEARN_MARGIN = 0.04;         // ein anderer Arm als die Vorgabe muss sie um so viel (Platzierungsgüte) übertreffen — Beobachtungen einer Partie hängen zusammen,
+                                   // der Unterschied zweier Arme ist meist winzig (Messung 8.10.: unter 3 Punkte Siegquote); ohne klaren Vorsprung bleibt die Vorgabe
 
 const profileMod = () => require('./learn/profile');
 
@@ -126,11 +128,13 @@ function meanOf(e) { return e && e.n > 0 ? e.sum / e.n : null; }
 function learnedArm(prof, plan, arms) {
   const tab = prof && prof.mullX;
   if (!tab) return null;
+  const pri = priorArm(plan, arms);
   for (const [key, minN] of [[plan.bucket, MIN_N], [plan.coarse, POOL_MIN_N]]) {
     // Vergleich nur, wenn jeder verfügbare Arm genug Beobachtungen hat
     if (!arms.every(a => (tab[key + '|' + a] || { n: 0 }).n >= minN)) continue;
     let best = null, bestV = -Infinity;
     for (const a of arms) { const v = meanOf(tab[key + '|' + a]); if (v > bestV) { bestV = v; best = a; } }
+    if (best && best !== pri && bestV - meanOf(tab[key + '|' + pri]) < LEARN_MARGIN) return null;      // kein klarer Vorsprung vor der Vorgabe
     if (best) return best;
   }
   return null;
@@ -190,4 +194,4 @@ function learn(profile, mullLog, scoreOf) {
   }
 }
 
-module.exports = { isMulliganPrompt, respond, learn, learnedArm, priorArm, planFor, keepValues, battleForm, armsAvailable, indicesFor, ARMS, MORE_MARGIN, EXPLORE, MIN_N };
+module.exports = { isMulliganPrompt, respond, learn, learnedArm, priorArm, planFor, keepValues, battleForm, armsAvailable, indicesFor, ARMS, MORE_MARGIN, EXPLORE, MIN_N, POOL_MIN_N, LEARN_MARGIN };

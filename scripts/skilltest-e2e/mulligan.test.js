@@ -89,15 +89,15 @@ const prompt = (title, extra = {}) => Object.assign({ type: 'handPick', title, d
   console.log('Lernkanal');
   const prof = { mullX: {}, mull: {} };
   const rows = [];
-  for (let i = 0; i < 12; i++) { rows.push({ seat: 0, b: 'w2p1', c: 'w2', arm: 'weak', x: 1 }); rows.push({ seat: 0, b: 'w2p1', c: 'w2', arm: 'skip', x: 1 }); }
+  for (let i = 0; i < M.MIN_N; i++) { rows.push({ seat: 0, b: 'w2p1', c: 'w2', arm: 'weak', x: 1 }); rows.push({ seat: 0, b: 'w2p1', c: 'w2', arm: 'skip', x: 1 }); }
   const scores = { weak: 0.4, skip: -0.2 };
   let k = 0;
   for (const m of rows) { const sc = scores[m.arm]; M.learn(prof, [m], () => sc); k++; }
-  check('Beobachtungen landen in mull und (erkundet) in mullX, je Eimer und gröber', prof.mullX['w2p1|weak'].n === 12 && prof.mullX['w2|skip'].n === 12 && prof.mull['w2p1|skip'].n === 12, Object.keys(prof.mullX));
+  check('Beobachtungen landen in mull und (erkundet) in mullX, je Eimer und gröber', prof.mullX['w2p1|weak'].n === M.MIN_N && prof.mullX['w2|skip'].n === M.MIN_N && prof.mull['w2p1|skip'].n === M.MIN_N, Object.keys(prof.mullX));
   M.learn(prof, [{ seat: 0, b: 'w2p1', c: 'w2', arm: 'weak', x: 0 }], () => -1);
-  check('nicht erkundete Entscheidungen zählen nur in mull', prof.mull['w2p1|weak'].n === 13 && prof.mullX['w2p1|weak'].n === 12);
+  check('nicht erkundete Entscheidungen zählen nur in mull', prof.mull['w2p1|weak'].n === M.MIN_N + 1 && prof.mullX['w2p1|weak'].n === M.MIN_N);
   M.learn(prof, [{ seat: 0, b: 'w2p1', c: 'w2', arm: 'weak', x: 1, forced: 1 }], () => -1);
-  check('erzwungene Arme (Messläufe) lernen nicht', prof.mull['w2p1|weak'].n === 13);
+  check('erzwungene Arme (Messläufe) lernen nicht', prof.mull['w2p1|weak'].n === M.MIN_N + 1);
 
   // Anbindung an das Lernen (learn/train.js learnFrom): Platz 1 von 3 → Güte +1, Platz 3 → −1
   const T = require('../../skilltest/learn/train'), LP = require('../../skilltest/learn/profile');
@@ -109,12 +109,14 @@ const prompt = (title, extra = {}) => Object.assign({ type: 'handPick', title, d
 
   // Entscheidung aus gelernten Werten
   const plan = { bucket: 'w2p1', coarse: 'w2' }, arms = ['skip', 'weak', 'more'];
-  check('Vergleich aus 12 erkundeten Beobachtungen je Arm: der bessere Arm (weak) gewinnt', M.learnedArm({ mullX: prof.mullX }, plan, ['skip', 'weak']) === 'weak');
+  check('Vergleich aus genug erkundeten Beobachtungen je Arm: der deutlich bessere Arm (weak) gewinnt', M.learnedArm({ mullX: prof.mullX }, plan, ['skip', 'weak']) === 'weak');
   check('Fehlt ein Arm im Vergleich (more hat keine Daten), entscheidet nichts → Vorgabe', M.learnedArm({ mullX: prof.mullX }, plan, arms) === null);
   const thin = { mullX: { 'w2p1|weak': { n: 3, sum: 3 }, 'w2p1|skip': { n: 3, sum: -3 } } };
   check('Zu wenig Daten (3 je Arm): keine gelernte Wahl', M.learnedArm(thin, plan, ['skip', 'weak']) === null);
-  const coarseOnly = { mullX: { 'w2|weak': { n: 6, sum: -3 }, 'w2|skip': { n: 6, sum: 3 } } };
+  const coarseOnly = { mullX: { 'w2|weak': { n: M.POOL_MIN_N, sum: -0.5 * M.POOL_MIN_N }, 'w2|skip': { n: M.POOL_MIN_N, sum: 0.5 * M.POOL_MIN_N } } };
   check('Gröberer Eimer (nur Zahl der schwachen Karten) springt ein, wenn der feine zu dünn ist', M.learnedArm(coarseOnly, plan, ['skip', 'weak']) === 'skip');
+  const tie = { mullX: { 'w2p1|weak': { n: M.MIN_N, sum: 0.10 * M.MIN_N }, 'w2p1|skip': { n: M.MIN_N, sum: 0.11 * M.MIN_N } } };
+  check('Ohne klaren Vorsprung vor der Vorgabe (weak) bleibt es bei der Vorgabe (kein Rauschen lernen)', M.learnedArm(tie, plan, ['skip', 'weak']) === null);
   check('Vorgabe: schwache Karten zurück, sonst nichts', M.priorArm({}, ['skip', 'weak']) === 'weak' && M.priorArm({}, ['skip']) === 'skip');
 
   console.log('Ablauf im Spiel (Bot mit Horn in a Bottle und drei toten Karten)');
