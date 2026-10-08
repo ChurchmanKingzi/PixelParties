@@ -1,6 +1,6 @@
 # Bastion Blasters — Game Design Document
 
-**Teil 2: Präsentation, Technik, Balancing, Roadmap** · Version 0.5 · Entwurf zur Abnahme
+**Teil 2: Präsentation, Technik, Balancing, Roadmap** · Version 0.6 · Entwurf zur Abnahme
 
 Teil 1 (Regeln und Systeme): [`GDD.md`](GDD.md) · Kataloge: [`katalog/01-gebaeude.md`](katalog/01-gebaeude.md) · [`katalog/02-einheiten.md`](katalog/02-einheiten.md) · [`katalog/03-kerne-und-weltlaunen.md`](katalog/03-kerne-und-weltlaunen.md)
 
@@ -159,7 +159,7 @@ Ziel: **fließend statt Schnitt.** Die Welt wird nicht „weggeblendet“, sonde
 - **Warnungen** (nicht verbietend): „Offene Kante (keine Mauer)“ bei zerstörten Segmenten, „Modul vom Tor abgeschnitten“, „Kein Heiler vorhanden“, „Keine Geschützplätze“, „Pulverkammer neben Wohnhaus“.
 - **Planungsansicht** 🟨: Taste **P** blendet **Reichweitenringe** (Kurz/Mittel/Weit/Extrem) und die **Baugrund-Raster** ein, wie `art/out/szene_baugrund.png` (Beispiel in der Stilprobe).
 
-**Karten-Layout** (v0.5, umgesetzt in `art/cards.py`; 160 × 224 px, nativ im Pixelraster, ohne Hochskalieren). Alle Kartentexte sind **englisch** und folgen der strengen Nomenklatur ([`NOMENCLATURE.md`](NOMENCLATURE.md)).
+**Karten-Layout** (v0.6, umgesetzt in `art/cards.py`; 160 × 224 px, nativ im Pixelraster, ohne Hochskalieren). Alle Kartentexte sind **englisch** und folgen der strengen Nomenklatur ([`NOMENCLATURE.md`](NOMENCLATURE.md)).
 
 ```
 ┌──────────────────────────────┐
@@ -170,17 +170,17 @@ Ziel: **fließend statt Schnitt.** Die Welt wird nicht „weggeblendet“, sonde
 │ ══════ Sliding Bear ═════════│  Namensband in der Kategoriefarbe
 │ ASSAULT · Frost · Hunter     │  Typzeile, aus den Daten abgeleitet
 │ ♥110 FLS ⚔12 ◷1.1  ↳1.5/3   │  Werteleiste: HP + Armor, Schaden (Klingenfarbe = Schadensart), Takt, Tempo
-│ Slide Attack (3-cell         │  Effektbox, höchstens 5 Zeilen: nur mechanischer Text,
+│ Slide Attack (3-cell         │  Effektbox, höchstens 6 Zeilen (5 = Norm): nur mechanischer Text,
 │ run-up): Knockback 2 cells,  │  Glossarbegriffe automatisch fett, Fähigkeitsnamen fett
 │ Stunned 1s.                  │
 │ [RANK 3] Ice Trail: …        │  Rank-3-Talent hinter goldenem Abzeichen
 │ ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄ │
-│ Belly first is also a plan.  │  Flavor (1–2 Zeilen), nie in der Effektbox
+│ Belly first is also a plan.  │  Flavor (1–2 Zeilen; 1 Zeile bei 6 Effektzeilen), nie in der Effektbox
 └──────────────────────────────┘
 ```
 
 - **Rank 3** bedeutet: Die Einheit hat **Rang 3 („Elite“, 300 XP)** erreicht und schaltet ihr **Talent** frei (GDD §8). Das Abzeichen heißt auf der Karte deshalb ausgeschrieben `RANK 3`.
-- **Nomenklatur (streng):** Ein Konzept, ein Begriff. Regeltext ist mechanisch (Auslöser → Bedingung → Wirkung → Limit), ohne Ausschmückung; Humor gehört in Namen, Flavor und Grafik. Standardverhalten (Flugbahn, Doktrin, Wachzone, Linie) steht nur im Glossar, nie auf der Karte. Erinnerungstexte erscheinen im Tooltip, nicht auf der Karte. Der Linter `tools/lint_card_text.py` prüft Zahlenformate (`4s`, `30%`, `−20%`, `1.2`), verbotene Wörter, Großschreibung (nur Glossarbegriffe) und Fettdruck.
+- **Nomenklatur (streng):** Ein Konzept, ein Begriff. Regeltext ist mechanisch (Auslöser → Bedingung → Wirkung → Limit), ohne Ausschmückung; Humor gehört in Namen, Flavor und Grafik. Standardverhalten (Flugbahn, Doktrin, Wachzone, Linie) steht nur im Glossar, nie auf der Karte. Erinnerungstexte erscheinen im Tooltip, nicht auf der Karte. Der Linter `tools/lint_card_text.py` prüft Zahlenformate (`4s`, `30%`, `−20%`, `1.2`), verbotene Wörter, Großschreibung (nur Glossarbegriffe), Fettdruck, Fähigkeitsnamen, die Namensbreite (höchstens 136 px) und die Breite der Typzeile (die Trennpunkte rücken bei Bedarf automatisch enger zusammen).
 - **Rahmenfarben:** Artillery **Feuer-Rot/Orange** · Assault **Bernstein** · Defender **Blau** · Civilian **Grün** · Building **Violett** (nicht die Teamfarbe Karmin, damit Karten teamneutral bleiben). **Tier-Plakette:** I Stein, II Grün, III Blau, IV Gold.
 - **Schrift:** eigener **Pixelfont „Schlamassia 5 × 7“** (`art/pixfont.py`: Umlaute, ß, Minus, Anführungszeichen), Versalhöhe 7 px, Zeilenabstand 9 px, ca. 25 Zeichen je Zeile; Fettdruck als „kluger“ Doppelanschlag, der 1-px-Lücken (m, w) erhält.
 - **Symbole** (7 px, `art/cardicons.py`): heart = HP, sword = Schaden (Klinge Stahl = Impact, orange = Fire, blau = Ice, gelb = Lightning, grün = Poison, violett = Arcane), clock = Takt in Sekunden, target = Reichweite/Radius, boot = Tempo in Zellen/s, person = Squad bzw. Crew, grüner Pfeil = Reinforce, cannon = Gun Slots, plus = Heilung, wall = Reparatur.
@@ -337,6 +337,7 @@ Begründung: Entscheidend ist, dass ich die Pixelgrafik selbst erzeuge und das S
 | **Q20** | Hof-Erweiterung: 12 Zellen im Erstaufbau, danach 6 je Zeitstopp, kostenlos? | ❓ Default: **ja** (⚙ `HOF_START` / `HOF_PER_PAUSE`). |
 | **Q21** | Große Einheiten (L/XL) und Türen | ✔ **Alle Einheiten dürfen durch jede Tür**; die 14 px sind nur Optik. |
 | **Q22** | Bauteile auf Hofzellen statt in Räumen | ✔ **Ja, je Bauteil einzeln entschieden** (nicht nach Größe). Hof-Bauteile sind leichter zugänglich (außer im Innenhof) und leichter zerstörbar (GDD §4.1, Katalog 01). |
+| **Q23** | Design-Dokumente (`GDD*.md`, Kataloge) ebenfalls ins Englische übersetzen? | ❓ Default: **nein, vorerst deutsch** (Übersetzung ist mit einer Tabelle „Design-Begriff (DE) → Spielbegriff (EN)“ in `NOMENCLATURE.md` abgedeckt); Entscheidung vor dem Code-Start. |
 
 ---
 
@@ -514,6 +515,7 @@ Neue Effekt-Bausteine entstehen nur, wenn mehrere Karten sie brauchen. Alles and
 | **0.3** | Rückmeldung zur Stilprobe eingearbeitet: **konsistente Perspektive** (Südansicht, dünne Kantenwände, Tiefenpuffer), **modulare Bastion** (Baugrund 16 × 16, Kernhof, Module ≥ 2 tief, Auto-Mauern, Hof-Erweiterung, Wandkarten, Seitentore) statt 6 × 6 + Ringmauer + Erweiterungen, **größere Karte** (56 × 28 Zellen, 1920 × 1080), Reichweiten 26 / 34 / 42 / 50, Katalog 01 neu vermessen (Module / Objekte / Türme / Kanten), **vereinfachte Gesichter**, **Kürbis in 3/4-Ansicht**, reichere Landschaft, Planungsansicht mit Reichweitenringen. |
 | **0.4** | Zweite Rückmeldung: Gesichter von Goblin, Eisbär, Hexe und Gnom weiter vereinfacht; **Tech-Stack bestätigt**; **Hof-Bauteile** (Bauart je Bauteil einzeln, zugänglicher und fragiler, Innenhof geschützt); **alle Einheiten passen durch jede Tür**; erste Karten (Kartenlayout, Pixelfont, Datenexport). |
 | **0.5** | Dritte Rückmeldung: **Spielsprache Englisch**, **strenge Nomenklatur** (`NOMENCLATURE.md`, `daten/keywords.json`, Linter, englische Namen für alle 154 Karten), Regeltext nur mechanisch mit automatisch fetten Schlüsselwörtern, Flavor getrennt von der Effektbox, **Rank-3-Abzeichen** ausgeschrieben, Kartenrücken neu (großes Logo), Effektbox auf 5 Zeilen (Bildfenster 144 × 86). |
+| **0.6** | **Alle 154 Karten angelegt** (77 Bauteile, 77 Einheiten): englische Texte in `daten/card_text.json`, Illustrationen als Code in zwölf Packs (`art/pack_*.py`, Anleitung `art/ART_GUIDE.md`, Prüfung mit `art/packtool.py`), Renderer mit Platzhalterbild, 6 Effektzeilen, automatisch verdichteter Typzeile und Kontaktbögen je Gruppe (`art/sheets.py`). Glossar auf **140 Begriffe** erweitert (u. a. Knockback, Taunt, Lifesteal, Alarm, Leash, Aura, Burrowed, Chaos-born); Flugbahn **Underground → Burrowing**; Linter prüft Fähigkeitsnamen, Namens- und Typzeilenbreite. Beim Texten vereinheitlicht: **Fed** gibt überall +15 % (statt +20 % beim Eintopf-Koch), **Hardened** ist definiert, BS-01 Masonry ist eine reine Referenzkarte (wird nie gezogen). |
 
 ---
 
@@ -534,3 +536,5 @@ Neue Effekt-Bausteine entstehen nur, wenn mehrere Karten sie brauchen. Alles and
 | 2026-10-08 | **Hof-Bauteile, Bauart je Bauteil einzeln** (nicht nach Größe); zugänglicher und fragiler, außer im Innenhof. **Alle Einheiten passen durch jede Tür.** | Katalog 01: 39 Räume, 20 Hof-Bauteile, 13 Turmzellen, 4 Wand, 1 Tor (neu zugeordnet); HP einiger Hof-Karten gesenkt; Pfadfindung kennt Außen-/Innenhof (für Zielwahl und Fallen). |
 | 2026-10-08 | **Spielsprache Englisch, strenge Nomenklatur.** Ein Konzept, ein Begriff; Regeltext mechanisch; Glossarbegriffe automatisch fett; Standardverhalten nur im Glossar. | `NOMENCLATURE.md` (erzeugt aus `daten/keywords.json`), `tools/lint_card_text.py`, Katalogspalte „Name (EN)“ für alle 154 Karten, Kartentexte in `daten/card_text.json`; Design-Dokumente bleiben deutsch. |
 | 2026-10-08 | **Flavor gehört nie in die Effektbox.** Rein beschreibende Sätze („Billiger Massenstürmer“) entfallen oder wandern in die Flavor-Zeile. | Vanilla-Einheiten haben eine leere Effektbox bis auf das Rank-3-Talent. |
+| 2026-10-08 | **Alle 154 Karten sind angelegt.** Illustrationen entstehen als Code in Packs (je eine Kartengruppe), geprüft auf Größe 144 × 96, Master-Palette und Determinismus. | Neue Einheiten haben vorerst nur ein Ruhebild (`idle`); Animationen (Gehen, Angriff, Tod) folgen mit dem Kampf-Greybox. Kerne (Katalog 03) und Chaos-/Weltlaunen-Karten haben noch keine Karten. |
+| 2026-10-08 | **Typzeile darf nie überlaufen:** Trennpunkte rücken automatisch enger zusammen; reicht das nicht, warnen Renderer und Linter. Flugbahn **Underground** heißt **Burrowing** (passt zum Status Burrowed). | Kein Karteninhalt wurde gekürzt; die Namen der Spielbegriffe bleiben die einzige Quelle (`daten/keywords.json`). |

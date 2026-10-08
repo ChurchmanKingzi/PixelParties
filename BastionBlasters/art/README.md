@@ -28,6 +28,7 @@ Benötigt Python 3 mit `Pillow` und `numpy`. Für Beschriftungen in den Planungs
 | `cards_art.py` | Bildfenster der Karten (144 × 96, nativ): Hilfsfunktionen (`ground_world`, `unit_at`, `prop_at`, `finish`, `mini_castle` mit Raum-Themes), Registry `ART` mit `@card_art('ID')`, Platzhalter für Karten ohne Bild, Dioramen der ersten 17 Karten |
 | `pack_*.py` | **Illustrations-Packs:** je ein Modul (plus Hilfsmodule) mit den Sprites und Dioramen einer Kartengruppe; werden vom Kartenrenderer automatisch importiert und tragen ihre Bilder in `ART` ein |
 | `packtool.py` | Prüft ein Pack (Größe 144 × 96, nur Master-Palette, deterministisch), schreibt Kontaktbogen `out/packs/<pack>.png` und Einzelbilder ×4 |
+| `sheets.py` | Kontaktbögen der fertigen Karten je Gruppe (×2): `out/sheets/*.png` (Artillery, Assault, Defenders, Civilians, vier Bauteil-Gruppen) |
 | `ART_GUIDE.md` | Regeln und Spickzettel für das Zeichnen von Karten-Illustrationen (Palette, Perspektive, Größenklassen, Raum-Themes, Qualitätsmaßstab) |
 | `cards.py` | **Kartenrenderer** (160 × 224): Rahmen, Namensband, abgeleitete Typzeile, Werteleiste, Effektbox mit automatisch fetten Glossarbegriffen, `RANK 3`-Abzeichen, Flavor, Übersicht |
 | `cardback.py` | **Kartenrücken:** großes goldenes Logo (3-fach vergrößerter Pixelfont mit Verlauf, Kontur, Schatten), Zinnenband, Schnörkel, Ecken, Medaillon mit Kernkristall |
@@ -58,10 +59,11 @@ python3 tools/lint_card_text.py      # Nomenklatur prüfen (muss OK melden)
 python3 tools/check_catalogs.py      # Design-Dokumente prüfen (Spalten, englische Namen, Summen)
 python3 tools/build_nomenclature.py  # NOMENCLATURE.md aus daten/keywords.json neu erzeugen
 cd art && python3 -I cards.py        # -> out/cards/*.png (alle 154), out/cards_overview.png, out/card_back.png
+cd art && python3 -I sheets.py       # -> out/sheets/*.png (Kontaktbögen je Gruppe)
 cd art && python3 -I packtool.py pack_<name>   # ein Illustrations-Pack prüfen und als Kontaktbogen ansehen
 ```
 
-Neue Karte: Eintrag in `daten/card_text.json` (`stats`, `rules`, `talent`, `flavor`; Typzeile und Kopfzeile werden aus den Katalogdaten abgeleitet), Bildfenster als `@card_art('ID')` in einem `pack_*.py` ergänzen (Anleitung: `ART_GUIDE.md`), Linter und Renderer laufen lassen. Regeltext und Talent zusammen höchstens 6 Zeilen (5 sind die Norm; bei 6 Zeilen hat der Flavor nur eine Zeile), Namensband höchstens 136 px; der Renderer und der Linter warnen bei Überlänge. Glossarbegriffe nie von Hand fett setzen. Karten ohne eingetragenes Bild zeigen ein Platzhalterbild (violetter Boden, Fragezeichen).
+Neue Karte: Eintrag in `daten/card_text.json` (`stats`, `rules`, `talent`, `flavor`; Typzeile und Kopfzeile werden aus den Katalogdaten abgeleitet), Bildfenster als `@card_art('ID')` in einem `pack_*.py` ergänzen (Anleitung: `ART_GUIDE.md`), Linter und Renderer laufen lassen. Regeltext und Talent zusammen höchstens 6 Zeilen (5 sind die Norm; bei 6 Zeilen hat der Flavor nur eine Zeile), Namensband höchstens 136 px, Typzeile höchstens 144 px (die Trennpunkte rücken bei Bedarf enger zusammen); der Renderer und der Linter warnen bei Überlänge. Glossarbegriffe nie von Hand fett setzen. Karten ohne eingetragenes Bild zeigen ein Platzhalterbild (violetter Boden, Fragezeichen).
 
 ## Regeln der Werkstatt
 

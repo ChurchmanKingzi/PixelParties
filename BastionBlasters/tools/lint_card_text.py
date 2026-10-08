@@ -130,6 +130,11 @@ def main():
         w = text_width(c['name_en'])
         if w > 136:
             problems.append(f"{cid}: Name \"{c['name_en']}\" ist {w} px breit (höchstens 136)")
+    # Typzeile muss (notfalls mit engen Trennern) in die Textbreite passen
+    import cards as card_renderer
+    for cid, c in CARDS.items():
+        if card_renderer.type_line_gap(c) is None:
+            problems.append(f"{cid}: Typzeile \"{card_renderer.type_line(c)}\" ist zu breit")
     kinds = {k['kind'] for k in glossary.KEYWORDS}
     ens = [(k['kind'], k['en']) for k in glossary.KEYWORDS]
     if len(ens) != len(set(ens)):

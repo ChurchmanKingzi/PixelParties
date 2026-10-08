@@ -2552,7 +2552,7 @@
     "3"
    ]
   ],
-  "rules": "Once per wave: Fully heals the most wounded ally, +60 XP. Repairs buildings within 3 cells 15%. Healing Source.",
+  "rules": "Once per wave: Fully heals the most wounded ally, +60 XP. Buildings within 3 cells: +15% HP. Healing Source.",
   "flavor": "It was in the soup.",
   "talent": "**Lead to Gold**: +1 Citizen each time."
  }

@@ -164,18 +164,51 @@ def draw_items_right(img, items, x_right, y, text_col):
 # --------------------------------------------------------------------------- Karteninhalte aus den Daten ableiten
 
 
-def type_line(card):
+def type_parts(card):
+    """Teile der Typzeile; type_line() und draw_type_line() bauen darauf auf"""
     cat = card['kategorie']
     if cat == 'bau':
         bt = card['build_type_en'].upper()
         size = card.get('masse')
-        head = f'{bt} {size}' if size else bt
-        return f"{head} · {card['group_en']}"
+        return [f'{bt} {size}' if size else bt, card['group_en']]
     parts = [card['category_en'].upper(), card['line_en']]
     extra = card.get('trajectory_en') or card.get('doctrine_en') or card.get('zone_en')
     if extra:
         parts.append(extra)
-    return ' · '.join(parts)
+    return parts
+
+
+def type_line(card):
+    return ' · '.join(type_parts(card))
+
+
+SEP_GAPS = (4, 2)     # Abstand links und rechts vom Trennpunkt; die engere Stufe nur, wenn die Zeile sonst nicht passt
+
+
+def type_line_gap(card):
+    """größte Trennerlücke, bei der die Typzeile in die Textbreite passt (None = passt auch eng nicht)"""
+    parts = type_parts(card)
+    base = sum(text_width(t) for t in parts)
+    for gap in SEP_GAPS:
+        if base + (len(parts) - 1) * (2 * gap + 1) <= TEXT_W:
+            return gap
+    return None
+
+
+def draw_type_line(img, ramp, card):
+    parts = type_parts(card)
+    gap = type_line_gap(card)
+    if gap is None:
+        gap = SEP_GAPS[-1]
+        print(f'WARNUNG: Typzeile zu breit: {card["id"]} ({type_line(card)})', file=sys.stderr)
+    x = TEXT_X
+    for i, t in enumerate(parts):
+        if i:
+            x += gap
+            draw_text(img, x, TYPE_Y, '·', C(ramp, 1))
+            x += 1 + gap
+        draw_text(img, x, TYPE_Y, t, C(ramp, 1))
+        x += text_width(t)
 
 
 def header_items(card):
@@ -249,7 +282,7 @@ def render_card(card: dict, tx: dict, art: Image.Image) -> Image.Image:
     name = card['name_en']
     draw_text(img, (CARD_W - text_width(name)) // 2, BANNER_Y0 + 4, name, WHITE, outline=INK)
     # --- Typzeile und Werteleiste
-    draw_text(img, TEXT_X, TYPE_Y, type_line(card), C(ramp, 1))
+    draw_type_line(img, ramp, card)
     for y in range(STRIP_Y0, STRIP_Y1 + 1):
         for x in range(8, 152):
             dot(img, x, y, C('stone', 1) if y in (STRIP_Y0, STRIP_Y1) else C('stone', 0))

@@ -73,7 +73,7 @@ weak, massive, incredibly, extremely, also, simply, just, basically, greatly.*
 1. **Header:** tier plaque (I–IV), ID, then Gun Slots (cannon) / Squad (person) / Reinforce (arrow, written `+N`) or Crew (person) for buildings, then the star rank.
 2. **Art window:** 144 × 86 diorama in game graphics.
 3. **Name band:** English card name in Title Case, hyphenated compounds, at most 136 px wide (about 26 characters; the linter measures it).
-4. **Type line, derived from data:** `CARD TYPE · Line · Trajectory | Doctrine | Guard zone` for units, `BUILD TYPE size · Group` for buildings.
+4. **Type line, derived from data:** `CARD TYPE · Line · Trajectory | Doctrine | Guard zone` for units, `BUILD TYPE size · Group` for buildings. At most 144 px wide; the separators tighten automatically when needed, and the linter fails if it still does not fit.
 5. **Stat strip, in this order:** heart = HP (+ armor class abbreviation for units, + material for buildings), sword = damage (blade color = damage type), clock = attack interval in seconds, target = range or radius, boot = speed in cells per second.
 6. **Effect box:** at most 6 lines (5 are the norm; with 6 lines the flavor shrinks to one line). First the rules text, then the **Rank 3 Talent** behind the gold `RANK 3` badge (the Talent is unlocked when the unit reaches Rank 3, "Elite", at 300 XP).
 7. **Flavor line:** at most 2 lines (1 line when the effect box has 6), below the dotted divider, never bold, never mechanical.
@@ -163,7 +163,7 @@ How an Artillery shot travels. Shown in the type line of Artillery cards.
 | **Arc** | Bogen | Hits any cell in range. Spread applies. Shows a Target Marker 1.2s before impact. |
 | **Vertical** | Senkrecht | Like Arc, but Target Marker 2.0s and small spread. Cannot be intercepted by nets. |
 | **Piercing** | Durchschlag | Flat. Continues through 2–5 solid obstacles, −20% damage per obstacle. |
-| **Underground** | Untergrund | Any cell. Damages buildings only. Ignores domes, nets and mirrors. Warning: 0.8s rumble. |
+| **Burrowing** | Untergrund | Any cell. Damages buildings only. Ignores domes, nets and mirrors. Warning: 0.8s rumble. |
 | **Scatter** | Streu | N small hits on random cells in a 3×3 area. |
 | **Aerial** | Luft | Like Arc, fired from the air. The shooter can be attacked. |
 

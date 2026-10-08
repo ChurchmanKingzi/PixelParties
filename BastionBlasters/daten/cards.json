@@ -1893,7 +1893,7 @@
   "armor_en": "Armor",
   "gp": 1,
   "flugbahn": "Untergrund",
-  "trajectory_en": "Underground",
+  "trajectory_en": "Burrowing",
   "reichweite": 38,
   "schaden_takt": "80 W / 15 W · 9 s",
   "besonderheit": "Bohrgeschoss: beliebige Zielzelle, trifft nur Bauteile (kein Personenschaden), ignoriert Kuppel, Netz und Spiegel; Warnung nur als Rumpeln (0,8 s)."

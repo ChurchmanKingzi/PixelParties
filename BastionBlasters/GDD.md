@@ -1,6 +1,6 @@
 # Bastion Blasters — Game Design Document
 
-**Teil 1: Spieldesign** · Version 0.5 · Entwurf zur Abnahme · Perspektive: **Draufsicht** · Kerne = **Fraktionen** · Bastionen **modular**, große Karte
+**Teil 1: Spieldesign** · Version 0.6 · Entwurf zur Abnahme · Perspektive: **Draufsicht** · Kerne = **Fraktionen** · Bastionen **modular**, große Karte
 
 Teil 2 (Präsentation, Technik, Roadmap, offene Fragen): [`GDD-Praesentation-Technik.md`](GDD-Praesentation-Technik.md)
 Kataloge: [`katalog/01-gebaeude.md`](katalog/01-gebaeude.md) · [`katalog/02-einheiten.md`](katalog/02-einheiten.md) · [`katalog/03-kerne-und-weltlaunen.md`](katalog/03-kerne-und-weltlaunen.md)
