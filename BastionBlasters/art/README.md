@@ -21,6 +21,12 @@ Benötigt Python 3 mit `Pillow` und `numpy`. Für Beschriftungen in den Planungs
 | `assets_env.py` | Bodenkacheln (Gras, Pflaster, Dielen), Wehrturm, Kern |
 | `assets_props.py` | Möbel und Wanddeko: Bett, Etagenbett, Amboss, Fass, Trog, Kiste, Waffenständer, Kräutertisch, Truhe, Pflanze, Teppich, Fenster, Banner, Wappen, Esse |
 | `assets_units.py` | Einheiten mit Animationen (Skelett, Goblin, Rutsch-Bär, Büttel, Hexe, Katapult, Kürbis-Bomber in 3/4-Ansicht, Bau-Gnom, Bürger, Rangabzeichen) |
+| `scenekit.py` | Gemeinsame Szenen-Helfer: Team-Swap, Bodenschatten, Zielschatten |
+| `assets_buildings.py` | Bauteil-Sprites der ersten Karten: Pfeilturm, Puddingwand, Fallgrube, Feldlazarett |
+| `pixfont.py` | Pixelfont „Schlamassia 5 × 7“ (Umlaute, ß, Satzzeichen), `draw_text`, Zeilenumbruch |
+| `cardicons.py` | 7-px-Symbole für Kartenwerte (Herz, Schwert, Uhr, …) |
+| `cards_art.py` | Bildfenster der Karten (144 × 96, nativ): Dioramen für Einheiten und Bauteile |
+| `cards.py` | **Kartenrenderer** (160 × 224): Rahmen, Namensband, Werteleiste, Texte, Kartenrücken, Übersicht |
 | `styleprobe.py` | Zusammenbau: Karte 56 × 28 Zellen, zwei Burgen, Landschaft, Einheiten, Projektile, Zielschatten; Kontaktbögen, Atlas, Animation, Planungsansicht |
 
 ## Ausgabe (`out/`)
@@ -37,7 +43,17 @@ Benötigt Python 3 mit `Pillow` und `numpy`. Für Beschriftungen in den Planungs
 | `umgebung.png` | Boden, Mauer-Texturen (Oberseite, hoch, niedrig), Tore, Türme beider Teams, Kern, Katapult |
 | `palette.png` | die 20 Rampen der Master-Palette |
 | `sprites/*.png` + `atlas.json` | Spritesheets je Einheit, Frame-Größe und Animations-Tags für die Engine |
+| `karten/*.png`, `karten_uebersicht.png`, `kartenruecken.png` | **Erste 17 Karten** (8 Einheiten, 9 Bauteile) einzeln in 160 × 224 und als Übersicht (×2); `*_x3.png` = ×3-Ansichten |
 | `bericht.txt` | Weltmaße, Farbzählung je Sprite und insgesamt |
+
+## Karten erzeugen
+
+```bash
+python3 tools/export_cards.py     # Kataloge -> daten/cards.json (aus dem Ordner BastionBlasters/)
+cd art && python3 -I cards.py     # -> out/karten/*.png, out/karten_uebersicht.png, out/kartenruecken.png
+```
+
+Neue Karte: Eintrag in `daten/kartentexte.json` (typ, rechts, stats, regel, zeile2, flavor), Bildfenster in `cards_art.py` ergänzen, rendern. Der Renderer warnt bei zu langen Texten (Regeltext max. 3 Zeilen, mit Zusatzzeile; sonst 4).
 
 ## Regeln der Werkstatt
 

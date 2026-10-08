@@ -1,10 +1,10 @@
 Welt: 56 x 28 Zellen = 1792 x 896 px
-Gesamtfarben aller Einheiten: 99 (Master-Palette: 122)
+Gesamtfarben aller Einheiten: 95 (Master-Palette: 122)
 US-01 Topfhelm-Skelett: 19 Farben
-US-02 Beute-Goblin: 35 Farben
-US-06 Rutsch-Bär: 34 Farben
+US-02 Beute-Goblin: 33 Farben
+US-06 Rutsch-Bär: 25 Farben
 UV-01 Bratpfannen-Büttel: 34 Farben
 UZ-01 Kräuterhexe: 41 Farben
 UA-01 Rumpel-Katapult: 29 Farben
 US-03 Kürbis-Bomber: 31 Farben
-UZ-02 Bau-Gnom: 41 Farben
+UZ-02 Bau-Gnom: 42 Farben

@@ -361,7 +361,7 @@ class Castle:
         for (x, y), ch in self.cells.items():
             X, Y = (self.ox + x) * CELL, (self.oy + y) * CELL
             if ch == 'T':
-                world.draw(tw, X + CELL // 2 - tw.w // 2, Y + CELL - 3 - 66, Y + CELL)
+                world.draw(tw, X + CELL // 2 - tw.w // 2, Y + CELL + 3 - tw.h, Y + CELL)
         # Kern: 2x2 Zellen 'C' (obere linke Zelle bestimmen)
         cs = sorted(p for p, ch in self.cells.items() if ch == 'C')
         if cs:
@@ -472,10 +472,7 @@ def wall_shadows(world: World, fp, dx=7, dy=6):
     chk = ((xx + yy) % 2 == 0)
     ground = world.depth < -40
     m = sh & chk & ground
-    rgb = world.px[:, :, :3].astype(np.float32)
-    rgb[m] *= 0.62
-    q = (rgb.astype(np.uint8) >> 3)
-    world.px[:, :, :3][m] = ((q << 3) | (q >> 2))[m]
+    world.px[:, :, :3][m] = darken_palette(world.px[:, :, :3][m], 2)
 
 
 def draw_walls(world: World, fp, kd, ht, tex: Textures):

@@ -366,6 +366,51 @@ def poly(c: Canvas, pts, ramp, lo=1, hi=4, bias=0.0, ambient=0.0, flat=None, dit
                 c.put(x, y, RAMPS[ramp][idx], rid)
 
 
+# --------------------------------------------------------------------------- Palette-treues Abdunkeln
+
+_DARK_CACHE = {}
+
+
+def _code(c):
+    return (int(c[0]) << 16) | (int(c[1]) << 8) | int(c[2])
+
+
+def darken_palette(rgb: np.ndarray, steps: int = 1) -> np.ndarray:
+    """Dunkelt Pixel um `steps` Rampenstufen ab und bleibt dabei in der Master-Palette
+    (statt Farben zu multiplizieren, die dann außerhalb der 122 Farben liegen). rgb: uint8 (..., 3)."""
+    if 'lut' not in _DARK_CACHE:
+        where = {}
+        for name, ramp in RAMPS.items():
+            for i, c in enumerate(ramp):
+                where.setdefault(_code(c), (name, i))
+        _DARK_CACHE['lut'] = where
+    where = _DARK_CACHE['lut']
+    flat = rgb.reshape(-1, 3)
+    codes = (flat[:, 0].astype(np.uint32) << 16) | (flat[:, 1].astype(np.uint32) << 8) | flat[:, 2].astype(np.uint32)
+    uniq, inv = np.unique(codes, return_inverse=True)
+    mapped = np.zeros((len(uniq), 3), np.uint8)
+    pal_codes = np.array(list(where.keys()), np.int64)
+    for k, u in enumerate(uniq):
+        u = int(u)
+        if u not in where:                      # Farbe außerhalb der Palette: nächste Palettenfarbe suchen
+            r, g, b = (u >> 16) & 255, (u >> 8) & 255, u & 255
+            pr, pg, pb = (pal_codes >> 16) & 255, (pal_codes >> 8) & 255, pal_codes & 255
+            d = (pr - r) ** 2 + (pg - g) ** 2 + (pb - b) ** 2
+            u = int(pal_codes[int(np.argmin(d))])
+        name, i = where[u]
+        mapped[k] = RAMPS[name][max(0, i - steps)]
+    return mapped[inv.reshape(-1)].reshape(rgb.shape)
+
+
+def palette_violations(img: Image.Image) -> int:
+    """Anzahl der Farben im Bild (nur deckende Pixel), die nicht in der Master-Palette liegen"""
+    pal = {_code(c) for r in RAMPS.values() for c in r} | {_code(INK), _code(WHITE)}
+    a = np.array(img.convert('RGBA'))
+    px = a[a[:, :, 3] > 0][:, :3].astype(np.uint32)
+    codes = np.unique((px[:, 0] << 16) | (px[:, 1] << 8) | px[:, 2])
+    return int(sum(1 for c in codes if int(c) not in pal))
+
+
 # --------------------------------------------------------------------------- Ausgabe
 
 

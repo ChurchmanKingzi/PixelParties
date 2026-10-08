@@ -1,6 +1,6 @@
 # Bastion Blasters — Game Design Document
 
-**Teil 1: Spieldesign** · Version 0.3 · Entwurf zur Abnahme · Perspektive: **Draufsicht** · Kerne = **Fraktionen** · Bastionen **modular**, große Karte
+**Teil 1: Spieldesign** · Version 0.4 · Entwurf zur Abnahme · Perspektive: **Draufsicht** · Kerne = **Fraktionen** · Bastionen **modular**, große Karte
 
 Teil 2 (Präsentation, Technik, Roadmap, offene Fragen): [`GDD-Praesentation-Technik.md`](GDD-Praesentation-Technik.md)
 Kataloge: [`katalog/01-gebaeude.md`](katalog/01-gebaeude.md) · [`katalog/02-einheiten.md`](katalog/02-einheiten.md) · [`katalog/03-kerne-und-weltlaunen.md`](katalog/03-kerne-und-weltlaunen.md)
@@ -188,7 +188,12 @@ Die Bastion ist **keine feste Form**, sondern ein **Grundriss auf einem Zellenra
 **Module** 🟦/🟨
 - **Raum-Module** belegen **zusammenhängende Zellen**, mindestens **2 Zellen tief** (Möbel, Personal und Tür brauchen Platz). Größen: **2 × 2**, **3 × 2**, **3 × 3**, selten 4 × 2 oder 4 × 3 (Katalog 01). Drehbar (**R**, 90°-Schritte).
 - **Anlegen:** Ein Modul muss mit mindestens **einer Kante** an Hof, Kernhof oder ein bestehendes Modul grenzen („zusammenhängend“) und im eigenen Baugrund liegen. Kein Modul darf in die Mitte eines anderen ragen.
-- **Tür:** Jedes Modul erhält automatisch eine **Tür** (14 px) in der Mitte der ersten Kante zu Hof/Kern (Reihenfolge Süd, Ost, West, Nord); im Editor per Klick auf eine andere Kante verlegbar 🟨. Module sind untereinander nur über Hof und Türen verbunden.
+- **Tür:** Jedes Modul erhält automatisch eine **Tür** (14 px) in der Mitte der ersten Kante zu Hof/Kern (Reihenfolge Süd, Ost, West, Nord); im Editor per Klick auf eine andere Kante verlegbar 🟨. Module sind untereinander nur über Hof und Türen verbunden. **Alle Einheiten passen durch jede Tür**, auch Bären und Katapulte ✔; die 14 px sind nur Optik, im Spiel zählt die Kante als offen.
+- **Hof-Bauteile** 🟦/🟨 ✔ entschieden: Bauteile dürfen auch **auf Hofzellen statt in Räumen** stehen. **Welche Karte welche Bauart hat, ist je Bauteil einzeln festgelegt** (Katalog 01, Spalte „Größe“: Raum, Hof, Turm, Wand, Tor), nicht nach Größe. Ein Hof-Bauteil belegt 1 × 1 bis 3 × 2 Hofzellen, hat **keine eigenen Wände und keine Tür**. Folgen:
+  - **Leichter zugänglich:** Es liegt im Laufweg; Eindringlinge laufen direkt hin, Einheiten benutzen es ohne Tür, und Splash trifft es ohne Wandschutz.
+  - **Leichter zerstörbar:** Die HP der Hof-Karten sind dafür niedrig angesetzt (≈ −30 % gegenüber Räumen derselben Stufe, je Karte einzeln).
+  - **Ausnahme Innenhof:** Hofzellen, die man **nur durch Türen von Modulen** erreicht (ringsum von Modulen und Mauern umschlossen), sind vom Tor und von Breschen aus nicht direkt zugänglich. Dort gelten Hof-Bauteile als **geschützt** (kein Zugänglichkeitsmalus; die niedrigen HP bleiben). Hofzellen, die man ohne Tür vom Tor oder einer Bresche erreicht, heißen **Außenhof**.
+  - Typische Hof-Bauteile: Fallen (Stachelflur, Fallgrube), Zelte und Gärten (Feldlazarett, Heilpilz-Garten), Brunnen, Drillplatz, Glocken, Rutschbahn, Lafetten. Typische Räume: alles, was Personal und Schutz braucht (Krankenstation, Schmiede, Kaserne, Wohnhaus).
 - **Hof-Erweiterung** 🟨: Im Erstaufbau darf jeder Spieler **kostenlos bis zu 12**, zu jedem Zeitstopp **bis zu 6 zusammenhängende Hofzellen** anlegen (⚙ `HOF_START` / `HOF_PER_PAUSE`), z. B. Gänge, Vorhöfe, Innenhöfe, Zickzackwege. Hofzellen sind begehbar, ohne Funktion; **Hof ↔ Hof hat keine Wand**.
 - **Turmzellen:** **Türme** (1 × 1) stehen auf einer Zelle an der Außenkante oder in einer Ecke (oder frei im Hof). Sie sind **massive Zellen**: Einheiten laufen nicht durch, und sie werden nicht von Wänden umschlossen. Sie überragen die Mauer.
 - **Geschützplätze:** Plattform-Module (Z) haben ihre Geschützplätze innerhalb der Fläche; sie stehen **tiefer** (Brüstung 10 px), damit Geschütze über den Rand feuern können.
@@ -214,8 +219,9 @@ Die Bastion ist **keine feste Form**, sondern ein **Grundriss auf einem Zellenra
 | **Mauer** | **Kantensegment** (8 px dünn, 32 px lang), nicht begehbar. Blockiert Wege und Schusslinien, absorbiert Beschuss. Mauerwerk entsteht automatisch (§4.1), Karten verbessern bis zu 4 Segmente. | Mauerwerk, Puddingwand, Panzermauer |
 | **Turm** | 1 × 1, massive **Turmzelle** an Außenkante oder Ecke; überragt die Mauer optisch (Zinne, langer Schatten). Beschießt Feinde auf dem Feld und in der Nähe. | Pfeilturm, Zauberturm |
 | **Plattform** | Liefert **Geschützplätze** für Artillerie. | Zinnenkranz, Sternwarte |
+| **Hof-Bauteil** | Steht auf **Hofzellen ohne Wände**. Frei zugänglich, fragiler; im **Innenhof** geschützt (§4.1). Bauart je Karte festgelegt. | Fallgrube, Feldlazarett, Brunnen der ewigen Jugend |
 
-**Größen** (Raum-Module, mindestens 2 Zellen tief): **2 × 2** (klein), **3 × 2** (Standard), **3 × 3** (groß), vereinzelt 4 × 2. Türme 1 × 1. Wandkarten wirken auf 1–4 Kantensegmente. Alle **drehbar** in 90°-Schritten (R oder Rechtsklick). Gerichtete Bauteile (Rutschbahn, Fallgatter-Tor, Fangnetz) haben eine Blickrichtung.
+**Größen** (Räume mindestens 2 Zellen tief): **2 × 2** (klein), **3 × 2** (Standard), **3 × 3** (groß), vereinzelt 4 × 2. **Hof-Bauteile** 1 × 1 bis 3 × 2, **Türme** 1 × 1. Die **Bauart** (Raum, Hof, Turm, Wand, Tor) legt jede Karte einzeln fest. Wandkarten wirken auf 1–4 Kantensegmente. Alle **drehbar** in 90°-Schritten (R oder Rechtsklick). Gerichtete Bauteile (Rutschbahn, Fallgatter-Tor, Fangnetz) haben eine Blickrichtung.
 
 **Platzierungs-Tags** (stehen auf der Karte):
 
@@ -224,6 +230,7 @@ Die Bastion ist **keine feste Form**, sondern ein **Grundriss auf einem Zellenra
 | **[Außen]** | Modul oder Turm berührt mindestens eine Außenkante der Bastion. |
 | **[Innen]** | Modul ist ganz von Hof und anderen Modulen umgeben. |
 | **[Front]** | Hat eine Außenkante auf der Seite des Gegners. |
+| **[Hof]** / **[Innenhof]** | Hof-Bauteil im Außenhof bzw. geschützt im Innenhof (erlaubte Lage wird je Karte angegeben). |
 | **[Ecke]** | Liegt an einer vorspringenden Ecke der Silhouette. **Ecktürme** überblicken zwei Seiten: +1 Reichweite, +10 % HP. |
 
 Jedes Bauteil hat: **Tier**, **Material** (bestimmt Resistenzen, §7.3), **HP**, **Posten** ⚙ (benötigtes Personal, §4.6), **Effekt**, **Tags** (für Nachbarschaft), optional **Linie** (§5.3).

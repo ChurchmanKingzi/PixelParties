@@ -113,18 +113,17 @@ def goblin(anim='walk', f=0):
     c.rect(ax, ay - 1, ax + 3, ay, 'metal', 4)
     c.put_ramp(ax + 4, ay - 1, 'metal', 5)
     c.put_ramp(ax - 1, ay, 'wood', 3)
-    # Kopf: große Silhouette, Gesicht nur Auge + Mund
-    ellipse(c, 17.5, 11 + bob, 6.6, 5.6, 'goblin', lo=2, hi=5)
+    # Kopf: große Silhouette, Gesicht nur Auge + Mundstrich (v0.3: keine Schnauzenkugel, kein Zahn)
+    ellipse(c, 17.5, 11 + bob, 6.8, 5.8, 'goblin', lo=2, hi=5)
     poly(c, [(12, 9 + bob), (3, 5 + bob), (11, 14 + bob)], 'goblin', lo=1, hi=4)
     poly(c, [(22, 7 + bob), (28, 3 + bob), (24, 12 + bob)], 'goblin', lo=2, hi=5)
     c.put_ramp(5, 6 + bob, 'skin', 3)
     c.put_ramp(6, 7 + bob, 'skin', 2)
-    ellipse(c, 23.5, 12 + bob, 2.2, 1.8, 'goblin', lo=3, hi=5)
-    c.rect(20, 9 + bob, 21, 10 + bob, 'gold', 5)
-    c.put_ramp(21, 10 + bob, 'coal', 1)
-    for x in range(19, 24):
-        c.put_ramp(x, 14 + bob, 'coal', 1)
-    c.put_ramp(21, 15 + bob, 'bone', 5)
+    c.rect(20, 9 + bob, 21, 10 + bob, 'coal', 1)          # ein Auge, 2 x 2
+    c.put_ramp(20, 9 + bob, 'bone', 5)                   # Glanzpunkt
+    c.put_ramp(24, 12 + bob, 'goblin', 1)                # Nasenloch
+    for x in range(20, 24):
+        c.put_ramp(x, 14 + bob, 'goblin', 1)             # Mundstrich
     c.outline()
     return c
 
@@ -186,11 +185,8 @@ def bear(anim='slide', f=0):
     ellipse(c, 44.5, 9.5 + bob, 3.2, 3.2, 'fur', lo=3, hi=5)
     c.put_ramp(35, 10 + bob, 'skin', 3)
     c.put_ramp(44, 9 + bob, 'skin', 3)
-    for x in range(32, 38):
-        c.put_ramp(x, 15 + bob, 'coal', 2)
-    ellipse(c, 44.5, 16 + bob, 4.8, 4.2, 'metal', lo=1, hi=4)
-    ellipse(c, 44.5, 16 + bob, 3.4, 3.0, 'sky', lo=2, hi=5)
-    c.put_ramp(45, 16 + bob, 'coal', 1)
+    c.rect(46, 17 + bob, 47, 18 + bob, 'coal', 1)         # Perlenauge, 2 x 2 (v0.3: keine Schneebrille)
+    c.put_ramp(46, 17 + bob, 'bone', 5)
     c.outline()
     return c
 
@@ -294,7 +290,7 @@ def witch(anim='stir', f=0):
     c.put_ramp(hand[0], hand[1] + bob, 'skin', 4)
     # Kopf: Nase als Silhouette, ein Auge
     ellipse(c, 12.5, 11 + bob, 4.2, 3.9, 'skin', lo=2, hi=5)
-    poly(c, [(15, 11 + bob), (19, 13 + bob), (15, 14 + bob)], 'skin', lo=3, hi=5)
+    poly(c, [(15, 11 + bob), (17.5, 12.5 + bob), (15, 13.5 + bob)], 'skin', lo=3, hi=5)
     c.put_ramp(14, 10 + bob, 'coal', 1)
     for y in range(11, 17):
         c.put_ramp(8, y + bob, 'bone', 3)
@@ -466,7 +462,7 @@ def builder(anim='work', f=0):
     # Kopf: Nase als roter Knubbel, ein Auge
     ellipse(c, 16, 10 + bob, 5.2, 4.6, 'skin', lo=2, hi=5)
     c.rect(18, 8 + bob, 18, 9 + bob, 'coal', 1)
-    ellipse(c, 21.5, 11 + bob, 2.0, 1.8, 'skin', lo=3, hi=5)
+    ellipse(c, 21.2, 11 + bob, 1.7, 1.5, 'skin', lo=3, hi=5)
     c.put_ramp(21, 11 + bob, 'fire', 4)
     poly(c, [(10, 8 + bob), (22, 8 + bob), (19, 0 + bob), (24, -2 + bob), (14, 1 + bob)], 'teamA', lo=1, hi=4)
     for x in range(10, 23):

@@ -21,6 +21,7 @@ from assets_props import *
 from assets_units import *
 from castle import *
 from landscape import *
+from scenekit import *
 
 OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'out')
 os.makedirs(OUT, exist_ok=True)
@@ -64,19 +65,6 @@ P2_ROWS = [
 # --------------------------------------------------------------------------- Helfer
 
 
-def swap_team(cv: Canvas, src='teamA', dst='teamB'):
-    out = cv.copy()
-    m = {RAMPS[src][i]: RAMPS[dst][i] for i in range(len(RAMPS[src]))}
-    for y in range(cv.h):
-        for x in range(cv.w):
-            if out.px[y, x, 3]:
-                col = tuple(int(v) for v in out.px[y, x, :3])
-                if col in m:
-                    out.px[y, x, :3] = m[col]
-                    out.rid[y, x] = RAMP_ID[dst]
-    return out
-
-
 _SWAP_CACHE = {}
 
 
@@ -84,47 +72,6 @@ def swapped(cv, key):
     if key not in _SWAP_CACHE:
         _SWAP_CACHE[key] = swap_team(cv)
     return _SWAP_CACHE[key]
-
-
-def darken_ground(world: World, mask_fn, factor=0.58):
-    """Schachbrett-Schatten nur auf Bodenpixeln (depth < -40)"""
-    pass
-
-
-def shadow(world: World, cx, cy, rx, ry):
-    x0, x1 = int(cx - rx - 1), int(cx + rx + 2)
-    y0, y1 = int(cy - ry - 1), int(cy + ry + 2)
-    x0, y0 = max(0, x0), max(0, y0)
-    x1, y1 = min(world.w, x1), min(world.h, y1)
-    if x1 <= x0 or y1 <= y0:
-        return
-    Y, X = np.mgrid[y0:y1, x0:x1]
-    d = ((X + 0.5 - cx) / rx) ** 2 + ((Y + 0.5 - cy) / ry) ** 2
-    m = (d <= 1.0) & ((d < 0.5) | ((X + Y) % 2 == 0)) & (world.depth[y0:y1, x0:x1] < -40)
-    sub = world.px[y0:y1, x0:x1, :3]
-    col = (sub.astype(np.float32) * 0.58).astype(np.uint8)
-    q = col >> 3
-    col = (q << 3) | (q >> 2)
-    sub[m] = col[m]
-
-
-def zielschatten(world: World, cx, cy, r, phase=0):
-    rr = r * (1.0 - 0.06 * (phase % 4))
-    x0, x1 = max(0, int(cx - r - 3)), min(world.w, int(cx + r + 4))
-    y0, y1 = max(0, int(cy - r - 3)), min(world.h, int(cy + r + 4))
-    Y, X = np.mgrid[y0:y1, x0:x1]
-    d = np.hypot(X + 0.5 - cx, Y + 0.5 - cy)
-    ground = world.depth[y0:y1, x0:x1] < -40
-    ring = (np.abs(d - rr) < 1.3) & ground
-    chk = ((X + Y) % 2 == 0)
-    inner = (d < rr - 1.3) & ground & (((X % 3 == 0) & (Y % 3 == 0)) | (chk & (d > rr * 0.75)))
-    center = (d < 2.2) & ground
-    sub = world.px[y0:y1, x0:x1, :3]
-    fire = np.array(RAMPS['fire'], np.uint8)
-    sub[ring & chk] = fire[5]
-    sub[ring & ~chk] = fire[4]
-    sub[inner] = fire[2]
-    sub[center] = fire[5]
 
 
 def stone_projectile():
@@ -544,6 +491,9 @@ def main():
     B = build_static()
     world = draw_dynamic(B, 0, animated=False)
     im = world.image()
+    bad = palette_violations(im)
+    if bad:
+        print(f'WARNUNG: Szene nutzt {bad} Farben außerhalb der Master-Palette', file=sys.stderr)
     im.save(os.path.join(OUT, 'szene_1x.png'))
     # Nahaufnahme der Burg P1 (x3)
     crop = im.crop((200, 250, 640, 690))

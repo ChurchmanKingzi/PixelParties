@@ -1,6 +1,6 @@
 # Bastion Blasters — Game Design Document
 
-**Teil 2: Präsentation, Technik, Balancing, Roadmap** · Version 0.3 · Entwurf zur Abnahme
+**Teil 2: Präsentation, Technik, Balancing, Roadmap** · Version 0.4 · Entwurf zur Abnahme
 
 Teil 1 (Regeln und Systeme): [`GDD.md`](GDD.md) · Kataloge: [`katalog/01-gebaeude.md`](katalog/01-gebaeude.md) · [`katalog/02-einheiten.md`](katalog/02-einheiten.md) · [`katalog/03-kerne-und-weltlaunen.md`](katalog/03-kerne-und-weltlaunen.md)
 
@@ -32,7 +32,7 @@ Legende wie in Teil 1: 🟦 aus deinem Konzept · 🟨 meine Ergänzung · ❓ o
 
 **16-Bit-Disziplin (Palette)**
 - Farbraum **RGB555** (32 Stufen je Kanal, wie beim SNES).
-- **Master-Palette mit 122 Farben:** 20 **Farbrampen** zu je 6 Tönen (Hue-Shift: Schatten kühler und violetter, Licht wärmer und gelber, nie nur dunkler) plus Tinte und Weiß. **Jede Grafik darf nur Farben daraus verwenden.** Die Stilprobe nutzt 99 davon.
+- **Master-Palette mit 122 Farben:** 20 **Farbrampen** zu je 6 Tönen (Hue-Shift: Schatten kühler und violetter, Licht wärmer und gelber, nie nur dunkler) plus Tinte und Weiß. **Jede Grafik darf nur Farben daraus verwenden** (die Pipeline prüft das bei Szenen und Karten: `palette_violations`). Schatten und Vignetten dunkeln per **Rampenstufe** ab (`darken_palette`), nie durch Multiplizieren. Die Einheiten der Stilprobe nutzen 95 Farben, die ganze Szene 118.
 - **Pro Sprite typischerweise 20–40 Farben** (Stilprobe: 22–42). Die harte SNES-Grenze von 16 Farben pro Sprite wird **bewusst nicht erzwungen**: Mit ihr ließen sich Selbst-Outlines, Dithering und mehrere Materialien je Figur kaum mehr zeigen. Der 16-Bit-Look entsteht aus der geschlossenen Palette, dem Schachbrett-Dithering, den farbigen Outlines und den kräftigen Rampen.
 - Rampen: Stein · Holz · Gras · Erde · Goblin-Grün · Haut · Knochen · Metall · Gold · Feuer · Eis · Magie-Violett · Fell · Blatt · Schleim · Kohle · Himmel · Stoff · **Team P1** (Karmin/Gold) · **Team P2** (Türkis).
 - **Teamfarben per Palette-Swap:** Teamfarbige Pixel stehen in der Team-Rampe und werden zur Laufzeit 1:1 gegen die andere Team-Rampe getauscht (Index für Index). Eine Grafik, zwei Teams. Die Stilprobe tut genau das (P2 in Türkis).
@@ -159,22 +159,30 @@ Ziel: **fließend statt Schnitt.** Die Welt wird nicht „weggeblendet“, sonde
 - **Warnungen** (nicht verbietend): „Offene Kante (keine Mauer)“ bei zerstörten Segmenten, „Modul vom Tor abgeschnitten“, „Kein Heiler vorhanden“, „Keine Geschützplätze“, „Pulverkammer neben Wohnhaus“.
 - **Planungsansicht** 🟨: Taste **P** blendet **Reichweitenringe** (Kurz/Mittel/Weit/Extrem) und die **Baugrund-Raster** ein, wie `art/out/szene_baugrund.png` (Beispiel in der Stilprobe).
 
-**Karten-Layout** (160 × 224 px, gleiches Pixelraster):
+**Karten-Layout** (v0.4, umgesetzt in `art/cards.py`; 160 × 224 px, nativ im Pixelraster, ohne Hochskalieren):
 
 ```
-┌──────────────────┐
-│ T II        ★☆☆  │   Tier + Sterne
-│ ┌──────────────┐ │
-│ │   (Sprite)   │ │   Rahmenfarbe nach Kategorie:
-│ │   64 × 64    │ │   Artillerie karmin · Sturm bernstein ·
-│ └──────────────┘ │   Verteidiger blau · Zivilist grün ·
-│ Rumpel-Katapult  │   Bau steingrau/violett
-│ ARTILLERIE·Basis │
-│ ❤ 70 ⚔ 60/18 ⏱ 7s│
-│ „Er wackelt. Es  │   Flavor-Zeile
-│  funktioniert.“  │
-└──────────────────┘
+┌──────────────────────────────┐
+│ [II] US-06    ◉3 ↑+2   ★☆☆  │  Kopfzeile: Tier-Plakette, ID, Soll (Person) und Nachschub (Pfeil),
+│ ┌──────────────────────────┐ │  bei Artillerie zusätzlich Geschützplätze; Sterne = ★-Rang
+│ │  Bildfenster 144 × 96    │ │  Bildfenster: kleines Diorama in Spielgrafik (1x), keine Vergrößerung
+│ │  (Diorama der Spielwelt) │ │
+│ └──────────────────────────┘ │
+│ ══════ Rutsch-Bär ═══════════│  Namensband in der Kategoriefarbe
+│ STURM · Frost · Jäger        │  Typzeile: Kategorie · Linie · Doktrin (Bauteile: Bauart, Maß, Gruppe)
+│ ♥110 F  ⚔12 E  ◷1,1  ↳1,5/3 │  Werteleiste: HP·Rüstungsklasse, Schaden, Takt (s), Tempo (Zellen/s)
+│ Regeltext, bis zu 3 Zeilen   │  (4 Zeilen, wenn es keine Zusatzzeile gibt)
+│ [R3] Talent  /  [!] Hinweis  │  Zusatzzeile: Talent ab Rang 3 (gold) oder Warnhinweis (rot)
+│ ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄ │
+│ „Flavor-Zeile in 1–2 Zeilen“ │
+└──────────────────────────────┘
 ```
+
+- **Rahmenfarben:** Artillerie **Feuer-Rot/Orange** · Sturm **Bernstein** · Verteidiger **Blau** · Zivilist **Grün** · Bau **Violett** (nicht die Teamfarbe Karmin, damit Karten teamneutral bleiben). **Tier-Plakette:** I Stein, II Grün, III Blau, IV Gold.
+- **Schrift:** eigener **Pixelfont „Schlamassia 5 × 7“** (`art/pixfont.py`, mit Umlauten, ß, Minus, Anführungszeichen), Versalhöhe 7 px, Zeilenabstand 9 px, ca. 26 Zeichen je Zeile.
+- **Symbole** (7 px, `art/cardicons.py`): Herz = HP, Schwert = Schaden, Uhr = Takt in Sekunden, Fadenkreuz = Reichweite/Radius, Stiefel = Tempo in Zellen/s, Person = Soll bzw. Posten, grüner Pfeil = Nachschub je Welle, Kanone = Geschützplätze, Plus = Heilung, Mauer = Reparatur.
+- **Textquellen:** Name, Tier, Werte kommen aus `daten/cards.json` (exportiert aus den Katalogen), Kartentext, Werteleiste und Flavor aus `daten/kartentexte.json` (von Hand gesetzt, Textlimits werden beim Rendern geprüft).
+- **Kartenrücken:** violettes Rautengitter, Kernkristall im Medaillon, Titel.
 
 **Barrierefreiheit** 🟨: Farbenblind-Modus (Kategorien und Teams zusätzlich über Muster und Symbole), Regler für Screenshake, Zeitstopp-Blitz und Dither-Intensität, große Schrift (Pixelfont in zwei Größen), wählbare Spielgeschwindigkeit in Einzelspieler-Partien, Tastaturkürzel (Leertaste = Bereit, R = Reroll, Tab = Gegner-Info).
 
@@ -190,7 +198,7 @@ Ziel: **fließend statt Schnitt.** Die Welt wird nicht „weggeblendet“, sonde
 
 ## 11. Technische Leitplanken 🟨
 
-**Empfehlung** (❓ Q7): **Web-Spiel mit TypeScript, Vite und PixiJS** (oder reinem Canvas), pixelgenau über Ganzzahl-Skalierung und `image-rendering: pixelated`, plus ein Post-Processing-Shader für Dither und Palette.
+**Entscheidung** (✔ Q7, bestätigt): **Web-Spiel mit TypeScript, Vite und PixiJS** (oder reinem Canvas), pixelgenau über Ganzzahl-Skalierung und `image-rendering: pixelated`, plus ein Post-Processing-Shader für Dither und Palette.
 
 | Kriterium | Web (TypeScript) | Godot 4 | Unity |
 |---|---|---|---|
@@ -268,7 +276,7 @@ Begründung: Entscheidend ist, dass ich die Pixelgrafik selbst erzeuge und das S
 | # | Meilenstein | Ergebnis („Definition of Done“) |
 |---|---|---|
 | **M0** | Entscheidungen & Daten | Offene Fragen aus §14 beantwortet; Kataloge als JSON/YAML exportiert; Tuning-Tabelle als Datei. |
-| **M1** | Pixel-Werkstatt & Stilprobe | Code-Pipeline für 16-Bit-Pixelart (Rampen, Shading, Dither, Outline, Palette-Prüfung); Stilprobe mit Kontaktbogen, ersten Bauteilen, Einheiten und einer Szenen-Montage; **deine Freigabe des Stils.** *Stand: Stilprobe **v0.3** (große Karte, modulare Burgen mit korrekter Perspektive, vereinfachte Gesichter, Kürbis in 3/4-Ansicht, reichere Landschaft) liegt in `art/out/` vor und wartet auf deine Freigabe.* |
+| **M1** | Pixel-Werkstatt & Stilprobe | Code-Pipeline für 16-Bit-Pixelart (Rampen, Shading, Dither, Outline, Palette-Prüfung); Stilprobe mit Kontaktbogen, ersten Bauteilen, Einheiten und einer Szenen-Montage; **deine Freigabe des Stils.** *Stand: Stilprobe **v0.3** (große Karte, modulare Burgen, vereinfachte Gesichter, Kürbis in 3/4-Ansicht, reichere Landschaft) und die **ersten 17 Karten** (Layout, Pixelfont, Dioramen, Kartenrücken) liegen in `art/out/` vor und warten auf deine Freigabe.* |
 | **M2** | Kampf-Greybox | 2D-Feld und Bastion-Raster mit Platzhalterquadraten; Einheiten spawnen, laufen, kämpfen; eine **komplette Bot-gegen-Bot-Partie** läuft bis zum Sieg und ist als Replay abspielbar. |
 | **M3** | Bastion-Builder | Module an Kanten anlegen, Drehen, Auto-Mauern und Türen, Hof-Erweiterung, Tags, Nachbarschaft, Validierung. Ein Mensch kann eine Bastion bauen. |
 | **M4** | Karten-Loop & Zeitstopp | Kern-Wahl, Loadout 10/7, frische 5/3-Hand, Kontingent, Pausenablauf mit einfacher Kamerafahrt. Eine **komplette Partie ist spielbar** (Mensch vs. Bot). |
@@ -310,7 +318,7 @@ Begründung: Entscheidend ist, dass ich die Pixelgrafik selbst erzeuge und das S
 | **Q4** | Ziehregel | ✔ **Start 10/7, danach jede Pause eine komplett frische 5/3-Hand** (GDD §5.5). |
 | **Q5** | Eroberungs-Ende anders als Explosion (Palette-Swap statt Knall)? | ❓ Default: **ja.** |
 | **Q6** | Matchlänge 10–16 min? | ❓ Default: **ja.** |
-| **Q7** | Tech-Stack | ❓ Empfehlung: **Web (TypeScript + PixiJS)**, siehe §11. Godot 4 als zweite Wahl, Unity nicht. |
+| **Q7** | Tech-Stack | ✔ **Web (TypeScript + Vite + PixiJS)**, siehe §11. Godot 4 und Unity entfallen. |
 | **Q8** | Woher kommt die Pixelgrafik? | ✔ **Komplett von Claude, 16-Bit-Stil** (§10.1). |
 | **Q9** | Sprache: Deutsch zuerst, aber i18n-fähig? | ❓ Default: **ja.** |
 | **Q10** | Fraktionen oder Kerne als Asymmetrie? | ✔ **Kerne sind Fraktionen** (GDD §9.1, Katalog 03). |
@@ -324,8 +332,8 @@ Begründung: Entscheidend ist, dass ich die Pixelgrafik selbst erzeuge und das S
 | **Q18** | Einheiten mit zwei Blickrichtungen (rechts/links gespiegelt) statt vier? | ❓ Default: **ja** (spart Zeichenaufwand). |
 | **Q19** | Karte 56 × 28 Zellen, Baugrund 16 × 16, Niemandsland 20 Zellen, Reichweiten 26 / 34 / 42 / 50? | ✔ **größere Karte entschieden** (Feedback). ❓ Exakte Maße Default: **wie vorgeschlagen.** |
 | **Q20** | Hof-Erweiterung: 12 Zellen im Erstaufbau, danach 6 je Zeitstopp, kostenlos? | ❓ Default: **ja** (⚙ `HOF_START` / `HOF_PER_PAUSE`). |
-| **Q21** | Große Einheiten (L/XL) und Türen: Türöffnung (14 px) ist nur optisch, Einheiten laufen kantenweise hindurch? | ❓ Default: **ja** (keine Größenbeschränkung, sonst zu viele Sonderfälle). |
-| **Q22** | Kleine Bauteile (Feldlazarett, Fallgrube, Alarmglocke, Brunnen u. a.) sind **Objekte** auf Hofzellen, keine Räume? | ❓ Default: **ja** (20 Objekte, Katalog 01). |
+| **Q21** | Große Einheiten (L/XL) und Türen | ✔ **Alle Einheiten dürfen durch jede Tür**; die 14 px sind nur Optik. |
+| **Q22** | Bauteile auf Hofzellen statt in Räumen | ✔ **Ja, je Bauteil einzeln entschieden** (nicht nach Größe). Hof-Bauteile sind leichter zugänglich (außer im Innenhof) und leichter zerstörbar (GDD §4.1, Katalog 01). |
 
 ---
 
@@ -361,7 +369,8 @@ Begründung: Entscheidend ist, dass ich die Pixelgrafik selbst erzeuge und das S
 | **Mauersegment** | 32 px langes, 8 px dünnes Wandstück auf einer Zellkante; entsteht automatisch (⚙ 300 HP). |
 | **Modul** | Raum aus ≥ 2 × 2 zusammenhängenden Zellen, der an Hof/Kern/Modul angrenzt. |
 | **Niemandsland** | Feld zwischen den Baugründen (20 Zellen). |
-| **Objekt** | Kleines Bauteil (1 × 1 bis 3 × 1) auf Hofzellen, ohne eigene Wände (Fallen, Brunnen, Lafetten). |
+| **Hof-Bauteil** | Bauteil auf Hofzellen ohne eigene Wände (Fallen, Zelte, Brunnen, Lafetten); frei zugänglich, fragiler, im Innenhof geschützt. |
+| **Außenhof / Innenhof** | Außenhof: Hof, der ohne Tür vom Tor oder einer Bresche erreichbar ist. Innenhof: Hof, den man nur durch Türen von Modulen erreicht. |
 | **Panikraum** | Raum, in dem Zivilisten unangreifbar sind. |
 | **Posten** | Arbeitsplatz in einem Raum, der Personal braucht. |
 | **Rang** | Erfahrungsstufe R0–R5 einer Einheit. |
@@ -497,6 +506,7 @@ Neue Effekt-Bausteine entstehen nur, wenn mehrere Karten sie brauchen. Alles and
 |---|---|
 | **0.1** | Erster Entwurf aus dem Grobkonzept: Regeln, Systeme, Kataloge (Bauteile, Einheiten, Kerne, Welt-Launen), Präsentation, Technik, Roadmap, offene Fragen. |
 | **0.2** | Antworten auf die offenen Fragen eingearbeitet: **Draufsicht** statt Querschnitt (Raster, Ringmauer, Schusslinie, Zielschatten, Tags, Wegfindung neu), **Ziehregel** 10/7 + frische 5/3, **16-Bit-Pixelart von Claude** (Pixel-Werkstatt, RGB555), **12 Fraktions-Kerne** in 4 Archetypen, Technik-Vergleich, neue Meilensteine. |
+| **0.4** | Zweite Rückmeldung: Gesichter von Goblin, Eisbär, Hexe und Gnom weiter vereinfacht; **Tech-Stack bestätigt**; **Hof-Bauteile** (Bauart je Bauteil einzeln, zugänglicher und fragiler, Innenhof geschützt); **alle Einheiten passen durch jede Tür**; erste Karten (Kartenlayout, Pixelfont, Datenexport). |
 | **0.3** | Rückmeldung zur Stilprobe eingearbeitet: **konsistente Perspektive** (Südansicht, dünne Kantenwände, Tiefenpuffer), **modulare Bastion** (Baugrund 16 × 16, Kernhof, Module ≥ 2 tief, Auto-Mauern, Hof-Erweiterung, Wandkarten, Seitentore) statt 6 × 6 + Ringmauer + Erweiterungen, **größere Karte** (56 × 28 Zellen, 1920 × 1080), Reichweiten 26 / 34 / 42 / 50, Katalog 01 neu vermessen (Module / Objekte / Türme / Kanten), **vereinfachte Gesichter**, **Kürbis in 3/4-Ansicht**, reichere Landschaft, Planungsansicht mit Reichweitenringen. |
 
 ---
@@ -514,3 +524,5 @@ Neue Effekt-Bausteine entstehen nur, wenn mehrere Karten sie brauchen. Alles and
 | 2026-10-08 | **Bastionen sind modular statt Quadrate.** Baugrund 16 × 16, Kernhof 6 × 6, Module ≥ 2 tief, Mauern automatisch auf Kanten, Hof-Erweiterung 12 + 6 je Pause. | GDD §4 neu, Katalog 01 neu vermessen (23 Module 3×2, 11 Module 3×3, 8 Module 2×2, 10 Türme, 20 Objekte, 3 Wandkarten, 1 Tor-Karte), Tags auf Kanten umgestellt, Wegfindung mit Kantenkosten. |
 | 2026-10-08 | **Größere Karte:** 56 × 28 Zellen, Niemandsland 20 Zellen, Reichweiten 26 / 34 / 42 / 50. | Längere Laufwege (Welle braucht ≈ 13 s bis zur Front), Kern erst mit Mittel-Geschützen erreichbar, Platz für Kulisse und Wege. |
 | 2026-10-08 | **Gesichter vereinfacht, Kürbis schaut schräg nach vorn.** | Regel „Silhouette vor Gesicht“ in §10.1; Kontaktbogen zeigt Gesichter in Nahaufnahme. |
+| 2026-10-08 | **Tech-Stack bestätigt:** Web (TypeScript, Vite, PixiJS). | Sim headless in Node, Karten als JSON (`daten/cards.json`, aus den Katalogen exportiert), Pixel-Werkstatt bleibt Python und liefert PNG + Atlas. |
+| 2026-10-08 | **Hof-Bauteile, Bauart je Bauteil einzeln** (nicht nach Größe); zugänglicher und fragiler, außer im Innenhof. **Alle Einheiten passen durch jede Tür.** | Katalog 01: 39 Räume, 20 Hof-Bauteile, 13 Turmzellen, 4 Wand, 1 Tor (neu zugeordnet); HP einiger Hof-Karten gesenkt; Pfadfindung kennt Außen-/Innenhof (für Zielwahl und Fallen). |
