@@ -78,6 +78,6 @@ Die Karten sind datengetrieben: `src/data/cards.gen.json` entsteht aus den Katal
 - **Ton:** SFX zu fast allen Ereignissen (20 Abschussfamilien, 13 Einschläge, Tod, Bruch, Rang, Heilung, Wellenhorn) und sechs Musikstücke (Menü, Aufbau, Kampf, Zeitstopp, Sieg, Niederlage) werden zur Laufzeit synthetisiert. Pegel und Charakter sind gemessen, aber nicht nach Gehör abgenommen: bitte Rückmeldung zu Lautstärke und Musikgeschmack.
 - Einheiten tragen eine Umrandung und einen Fußring in der Teamfarbe (P1 rot, P2 türkis); beim Herauszoomen wird die Umrandung dicker.
 
-## Bot-Statistik (24 Partien, Seeds 100–123, Layout v0.2)
+## Bot-Statistik (24 Partien, Seeds 100–123, v0.3)
 
-P1 10 : P2 14 (symmetrisch im Rahmen der Streuung), mittlere Matchlänge 12,8 min (Ziel 10–16), Siege durch Eroberung : Zerstörung = 19 : 5. Zwei Partien enden schon nach ca. 2 min durch Eroberung, wenn ein zufälliger Bot-Aufbau keinen Verteidiger stellt. Die Eroberung ist weiterhin zu leicht; Stellschrauben: Eroberungsrate, Kernkammer-Größe, Artillerie-Schaden und -Takt, Heilquellen-Kapazität (GDD §12). (Vorher, Kernhof an der Front: 18 : 6, 11,7 min.)
+P1 11 : P2 13 (symmetrisch im Rahmen der Streuung), mittlere Matchlänge 14,2 min (Ziel 10–16), Siege durch Zerstörung : Eroberung = 17 : 7, kein Remis. Die Bots bauen jetzt ein Labyrinth (Riegel mit Umweg im Zufahrtsgang, Fallen, Türme) und stellen einen Verteidiger in die Kernkammer. Rund die Hälfte der „Zerstörung“-Siege fällt erst in den Himmelsriss (ab 16:00): Die Bot-Angriffe kommen tröpfchenweise im Labyrinth zum Erliegen, ein menschlicher Spieler sollte schneller durchbrechen. Stellschrauben: Eroberungsrate, Labyrinth-Bau der Bots, Wegkosten für Mauerbruch, Artillerie-Reichweite zum Kern (GDD §12).
