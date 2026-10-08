@@ -13953,6 +13953,8 @@ const AKTIONS_EREIGNISSE = new Set([
 // verworfen gilt. Grosszuegig: manche Karten haengen vor dem ersten Zustand
 // eine Anzeige-Verzoegerung vor.
 const AKTION_VERWORFEN_NACH_MS = 2000;
+// Laeuft die Engine nach der Frist noch, wird nachgesehen — hoechstens so lange.
+const AKTION_PRUEFUNG_MAX_MS = 30000;
 
 io.on('connection', (socket) => {
   let currentUser = null;
@@ -13973,13 +13975,28 @@ io.on('connection', (socket) => {
     const pi = room.gameState.players.findIndex(ps => ps.userId === currentUser.userId);
     if (pi < 0) return;
     const zaehler0 = room._stateSeq || 0;
-    setTimeout(() => {
+    const start = Date.now();
+    const pruefen = () => {
       if (rooms.get(room.id) !== room) return;
       const gs = room.gameState;
       if (!gs || gs.result || (room._stateSeq || 0) !== zaehler0) return;
+      // ★ Die Engine arbeitet erkennbar noch an der Aktion (Anzeige-Verzoegerungen,
+      // Reaktionsfenster, offene Abfrage): das ist KEINE verworfene Aktion, nur eine
+      // langsame. Der Aufstieg haelt den Sync fuer seine Animation fast eine Sekunde
+      // zurueck, der erste neue Zustand kam dadurch nach >2 s — falscher Alarm
+      // „That action isn't possible right now", obwohl alles lief. Spaeter erneut
+      // nachsehen; erst wenn die Engine ruht UND kein Zustand kam, gilt sie als verworfen.
+      const eng = room.engine;
+      const aktivBis = Math.max((eng && eng._aktivBis) || 0,
+        (eng && typeof eng._isMidPromptOrEffect === 'function' && eng._isMidPromptOrEffect()) ? Date.now() + 500 : 0);
+      if (aktivBis > Date.now() && Date.now() - start < AKTION_PRUEFUNG_MAX_MS) {
+        setTimeout(pruefen, Math.max(150, aktivBis - Date.now() + 50));
+        return;
+      }
       socket.emit('action_rejected', { action: event });
       sendGameStateErzwungen(room, pi);
-    }, AKTION_VERWORFEN_NACH_MS);
+    };
+    setTimeout(pruefen, AKTION_VERWORFEN_NACH_MS);
   });
   // Skill Test: vor jedem Spielereignis die zur Aktion passende Phase einstellen
   // (Main für freie Effekte, Action für die Haupt-Aktion) — siehe skilltest/rounds.js.
