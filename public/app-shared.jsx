@@ -8551,7 +8551,7 @@ const TUTORIAL_SCRIPTS = {
         highlights: [
           '[data-hero-owner="me"][data-hero-name*="Willy"]',
         ] }),
-      A("Attacks do more ouchie de higher your Hero's **BONK stat** is.\nDis lil' boost'll help ya hit **real hard**!", {
+      A("Attacks do more ouchie de higher your Hero's **BONK stat** is.\nDis lil' boost I gave ya will help him hit **real hard!**", {
         highlights: [
           '[data-hero-owner="me"][data-hero-name*="Willy"]',
         ] }),
