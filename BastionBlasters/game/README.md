@@ -1,4 +1,4 @@
-# Bastion Blasters — Kampf-Prototyp (v0.2)
+# Bastion Blasters — Kampf-Prototyp (v0.3)
 
 Spielbarer Prototyp des Kerns: Loadout (10/7), Erstaufbau, automatische Schlacht, Zeitstopp alle zwei Wellen mit frischer 5/3-Hand, beide Siegbedingungen (Kern zerstört oder Kernkammer erobert). Mensch gegen Bot oder Bot gegen Bot zum Zuschauen. TypeScript, Vite und PixiJS; die Simulation ist deterministisch und läuft ohne Browser in Node.
 
@@ -28,7 +28,9 @@ Die Grafiken kommen aus der Pixel-Werkstatt (`../art`): `export_game_units.py`, 
 | Bauteil drehen | Mausrad (solange ein nicht quadratisches Gebäude in der Hand ist), R oder Rechtsklick; Esc bricht ab |
 | Mauerkarten | Maus nahe an eine Mauer, bis zu 4 zusammenhängende Segmente werden markiert |
 | Hof erweitern | „+ Courtyard cell“, dann leere Zellen neben dem Hof anklicken (16 im Erstaufbau, 6 je Zeitstopp) |
-| Kapazität | Seitenleiste „Capacity“: Bürger-Limit und Kontingent-Plätze, wie man sie erweitert (Dwelling, Barracks, Zeitstopps), mit den passenden Karten zum Überfahren |
+| Kapazität | Seitenleiste „Capacity“: Bürger-Limit (Dwelling +3) und Kontingent-Plätze (5, +1 je Zeitstopp, +½ je Einheiten-Raum) mit Aufschlüsselung |
+| Fundament | In der Bauphase gibt es 12 kostenlose Zusatz-Bau-Karten (Tab „Foundation“ im Tray): Räume, Fallen, Türme für das Labyrinth zum Kern |
+| Untersuchen | Zeile „Doing“ im Inspektor sagt, was die Einheit tut; ein gelber Zielstrich zeigt ihr Ziel; der Eroberungsring über der Kernkammer zeigt Fortschritt, Rate und wer sperrt |
 | Umbau | Bauteil anklicken, „Pick up and move“ (im Zeitstopp ein Bauteil) |
 | Duplikat | Karte einer schon stehenden Bau-Karte spielen wertet sie auf (★) |
 | Kontingent | Troop-Karten anklicken; ist es voll, den zu ersetzenden Eintrag in der Seitenleiste anklicken; Wachzone und Zielpriorität pro Eintrag |
@@ -63,6 +65,10 @@ Die Karten sind datengetrieben: `src/data/cards.gen.json` entsteht aus den Katal
 
 - **Kernkammer = 4 × 4 Zellen** (Kern plus Ring von einer Zelle) im Kernhof; GDD nennt 2 × 2. Dort wird erobert, dort stehen Verteidiger der Zone „Core Chamber“.
 - Ein Standardkern, **keine Fraktions-Kerne**, keine Kern-Fähigkeit, kein Kern-Anbau.
+- **Zeitstopps:** Der Kampfabschnitt vor dem n-ten Zeitstopp hat 2 + n Wellen (40 s Abstand), die Abschnitte werden also immer länger. Wahnsinn ab 11:00, Himmelsriss ab 16:00.
+- **Kontingent:** 5 Plätze, +1 je Zeitstopp, +½ je gebautem Einheiten-Raum (Freischalt-Gruppe), höchstens 16.
+- **Fundament:** 12 kostenlose Bau-Karten zum Start (7 Räume, 2 Fallen, 2 Türme, 1 frei), unverbaute verfallen. Räume und Türme dürfen schlichte Hofzellen überbauen, solange der Weg Tor → Kernkammer offen bleibt. Mauerbruch kostet im Wegfinder 6 + HP/12, Angreifer folgen also eher dem Labyrinth.
+- **Eroberung:** 1,5 %/s je Eindringling in der Kammer (max. 6), Abbau 3 %/s; Eindringlinge ohne Ziel zertrümmern den Kern; Verteidiger in der Kammer sperren die Eroberung.
 - **Layout:** Kernhof (6 × 6) hinten im Baugrund, ein 8 Zellen langer Zufahrtsgang (1 Zelle breit) führt zum Haupttor an der Front. Davor und daneben ist freier Baugrund für Räume, Türme und Hofzellen.
 - Räume müssen mit mindestens einer Kante an den Hof **oder an einen angeschlossenen Raum** grenzen; die Tür liegt zum Hof, sonst zum Nachbarraum (Reihenfolge Süd, Ost, West, Nord). Ein Raum, an dem andere hängen, lässt sich erst aufnehmen, wenn diese weg sind.
 - Wandkarten wirken auf bis zu 4 zusammenhängende Segmente (ab der angeklickten Kante). Das Tor wird durch BS-07 ersetzt.

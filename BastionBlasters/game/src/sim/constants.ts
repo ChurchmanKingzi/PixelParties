@@ -54,6 +54,13 @@ export const CITIZEN_LIMIT_PER_HOME = 3;
 export const CITIZEN_REGEN_S = 5;
 
 export const WAVE_GAP_S = 40;
+/** Wellen je Kampfabschnitt: 2 vor dem ersten Zeitstopp, danach jedes Mal eine mehr (die Abschnitte werden immer länger) */
+export const SEGMENT_WAVES_BASE = 2;
+export const SEGMENT_WAVES_STEP = 1;
+export const SEGMENT_WAVES_MAX = 9;
+export function wavesPerSegment(pauseNo: number): number {
+  return Math.min(SEGMENT_WAVES_MAX, SEGMENT_WAVES_BASE + SEGMENT_WAVES_STEP * Math.max(0, pauseNo));
+}
 export const SPAWN_STAGGER_S = 0.4;
 export const UNIT_LIMIT = 40;
 export const BUILD_TIME_S = 120;
@@ -66,8 +73,13 @@ export const HEAL_TO_HP = 0.9;
 export const QUEUE_MAX_S = 6;
 export const BERSERK_DMG = 1.15;
 
-export const MADNESS_START_S = 14 * 60;
-export const MADNESS_END_S = 20 * 60;
+/** Eroberung der Kernkammer: je Eindringling in der Kammer (höchstens 6) so viele Prozent pro Sekunde; ohne Eindringlinge verfällt sie */
+export const CONQUEST_PER_UNIT = 1.5;
+export const CONQUEST_MAX_UNITS = 6;
+export const CONQUEST_DECAY = 3;
+
+export const MADNESS_START_S = 11 * 60;
+export const MADNESS_END_S = 16 * 60;
 
 export type DType = 'W' | 'F' | 'E' | 'B' | 'G' | 'A';
 export type Armor = 'flesh' | 'plate' | 'spirit' | 'bone' | 'pudding';

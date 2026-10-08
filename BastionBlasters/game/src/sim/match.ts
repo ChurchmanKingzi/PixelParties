@@ -5,7 +5,7 @@ import { createBastion } from './bastion';
 import { botChoose, botPlay } from './bot';
 import { contingentSlots, keepCount } from './bfx';
 import { applyCmd, type Cmd, type Res } from './commands';
-import { drawLoadout, drawPause } from './draw';
+import { drawFoundation, drawLoadout, drawPause } from './draw';
 import { step } from './step';
 import type { Player } from './types';
 import { createUnit } from './units';
@@ -22,7 +22,7 @@ export interface MatchOpts {
 export function newPlayer(team: Team, isBot: boolean): Player {
   return {
     team, isBot, hand: [], kept: [], played: [], keepCount: 7, rerolls: 0, mulligan: 1, contingent: [], slotsMax: 5, yardBudget: 0,
-    moveBudget: 0, ready: false, draws: 0, coreSkillReady: true, owned: [], quota: 0,
+    moveBudget: 0, ready: false, draws: 0, coreSkillReady: true, owned: [], quota: 0, found: [],
   };
 }
 
@@ -91,6 +91,9 @@ export class Match {
       p.moveBudget = 1;
       p.slotsMax = contingentSlots(w, p.team);
       p.rerolls = 0;
+      // Fundament: kostenlose Zusatzkarten (viele Räume, Fallen, Türme) für das Labyrinth zum Kern
+      p.found = drawFoundation(w, p.team, p.kept);
+      p.kept.push(...p.found);
     }
     for (const p of w.players) if (p.isBot) { botPlay(w, p.team); applyCmd(w, { t: 'ready', p: p.team }); }
     this.checkReady();
@@ -115,7 +118,7 @@ export class Match {
     w.battleTick = 0;
     w.nextWaveTick = w.tick;
     w.waveInCycle = 0;
-    for (const p of w.players) { p.ready = false; p.slotsMax = contingentSlots(w, p.team); }
+    for (const p of w.players) { p.ready = false; p.slotsMax = contingentSlots(w, p.team); p.kept = []; p.found = []; }
   }
 
   // ---- Zeitstopp
@@ -126,6 +129,7 @@ export class Match {
     for (const p of w.players) {
       p.hand = drawPause(w, p.team, 5);
       p.kept = [];
+      p.found = [];
       p.played = [];
       p.keepCount = keepCount(w, p.team);
       p.rerolls = 1;

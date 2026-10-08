@@ -6,6 +6,7 @@ import {
 } from './bastion';
 import { BUILDINGS, LINE_ROOM, UNITS, isBuilding } from './data';
 import { applyCmd } from './commands';
+import { contingentSlots } from './bfx';
 import type { World } from './world';
 import { ci } from './world';
 import { K_YARD } from './types';
@@ -205,9 +206,56 @@ function prioFor(card: string): Priority {
   return 'surgeon';
 }
 
+/**
+ * Labyrinth im Zufahrtsgang: Raum-Riegel quer über den Gang, daneben ein Umweg aus Hofzellen (abwechselnd oben und unten).
+ * Der Weg vom Tor zum Kern wird dadurch deutlich länger; die Platzierungsprüfung sorgt dafür, dass er offen bleibt.
+ * Alles in Koordinaten von Spieler 1; Spieler 2 wird an der Kartenmitte gespiegelt.
+ */
+function buildMaze(world: World, team: Team) {
+  const p = world.players[team];
+  const mx = (x: number) => (team === 0 ? x : 55 - x);
+  const corridorY = 13;
+  const cand = p.kept.filter((id) => {
+    const d = BUILDINGS[id];
+    return d?.kind === 'room' && d.group !== 'Platforms' && d.group !== 'Healing' && d.group !== 'Unlock' && Math.min(d.cols, d.rows) >= 2;
+  }).sort((a, b) => cardScore(a) - cardScore(b)); // schwächere Räume als Riegel, wertvolle bleiben frei
+  let xb = 11;
+  let side = world.rng.chance(0.5) ? 'N' : 'S';
+  for (const id of cand) {
+    const d = BUILDINGS[id];
+    // Grundriss: möglichst 2 breit und 3 hoch, sonst 2 hoch
+    const opts = [{ rot: 0, cols: d.cols, rows: d.rows }, { rot: 1, cols: d.rows, rows: d.cols }].filter((o) => o.cols <= 3 && o.rows >= 2 && o.rows <= 3);
+    opts.sort((a, b) => (a.cols - b.cols) || (b.rows - a.rows));
+    const o = opts.find((q) => xb + q.cols <= 16);
+    if (!o) continue;
+    // Zeilen des Riegels: er deckt die Gangzeile ab; die Umweg-Zeile liegt direkt daneben
+    let y0: number;
+    if (o.rows === 3) y0 = corridorY - 1;
+    else y0 = side === 'N' ? corridorY : corridorY - 1;
+    const detourY = side === 'N' ? y0 - 1 : y0 + o.rows;
+    const cells: [number, number][] = [];
+    const dir = side === 'N' ? -1 : 1;
+    for (let y = corridorY + dir; y !== detourY + dir; y += dir) cells.push([xb - 1, y]);       // links hoch/runter
+    for (let x = xb; x <= xb + o.cols; x++) cells.push([x, detourY]);                            // oben/unten entlang
+    for (let y = detourY - dir; y !== corridorY; y -= dir) cells.push([xb + o.cols, y]);         // rechts zurück zum Gang
+    let ok = true;
+    for (const [x, y] of cells) {
+      if (world.kind[ci(mx(x), y)] === K_YARD) continue;
+      if (!applyCmd(world, { t: 'yard', p: team, x: mx(x), y }).ok) { ok = false; break; }
+    }
+    if (!ok) continue;
+    const ox = team === 0 ? xb : 55 - (xb + o.cols - 1);
+    if (applyCmd(world, { t: 'play', p: team, card: id, x: ox, y: y0, rot: o.rot }).ok) {
+      xb += o.cols + 2;
+      side = side === 'N' ? 'S' : 'N';
+    }
+  }
+}
+
 /** Alle behaltenen Karten spielen */
 export function botPlay(world: World, team: Team) {
   const p = world.players[team];
+  if (world.pauseNo === 0) buildMaze(world, team);
   const order = (id: string): number => {
     if (!isBuilding(id)) return 90;
     const b = BUILDINGS[id];
@@ -224,7 +272,7 @@ export function botPlay(world: World, team: Team) {
     if (!p.kept.includes(card)) continue;
     if (!isBuilding(card)) {
       const before = p.contingent.length;
-      const full = before >= p.slotsMax && !p.contingent.some((e) => e.card === card);
+      const full = before >= contingentSlots(world, team) && !p.contingent.some((e) => e.card === card);
       if (full) {
         // schwächsten Eintrag ersetzen, falls die neue Karte besser ist
         let wi = -1, ws = 1e9;
@@ -245,6 +293,14 @@ export function botPlay(world: World, team: Team) {
       case 'gate': applyCmd(world, { t: 'play', p: team, card }); break;
     }
   }
+  // Verteidiger verteilen: der erste hält die Kernkammer (sperrt die Eroberung), der zweite die Mitte, der Rest das Tor
+  let di = 0;
+  p.contingent.forEach((e, i) => {
+    if (UNITS[e.card]?.cat !== 'defender') return;
+    const z = di === 0 ? 'core' : di === 1 ? 'middle' : 'gate';
+    di++;
+    if (e.zone !== z) applyCmd(world, { t: 'zone', p: team, idx: i, zone: z });
+  });
   // Artillerie-Prioritäten
   p.contingent.forEach((e, i) => { const pr = prioFor(e.card); if (e.prio !== pr) applyCmd(world, { t: 'prio', p: team, idx: i, prio: pr }); });
   void inPlot; void ci; void K_YARD;

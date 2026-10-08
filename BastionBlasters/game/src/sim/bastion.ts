@@ -140,13 +140,21 @@ function pickDoor(world: World, m: Module, accept: (x: number, y: number) => boo
 /**
  * Türen aller Räume eines Spielers. Räume am Hof öffnen sich zum Hof, weitere Räume zu einem schon angeschlossenen
  * Nachbarraum – so entstehen Ketten und Labyrinthe. null = abgeschlossener Raum (kein Zugang außer durch Mauern).
- * `skip`: Raum, der gedanklich entfernt wird (Umbau-Prüfung).
+ * `skip`: Raum, der gedanklich entfernt wird (Umbau-Prüfung); seine überbauten Hofzellen werden wieder Hof.
+ * `virtual`: Raum, der gedanklich dazukommt (Platzierungsprüfung); seine Zellen zählen nicht mehr als Hof.
+ * `blocked`: Hofzellen, die gedanklich überbaut werden (Turm).
  */
-export function computeDoors(world: World, p: Team, skip = 0): Map<number, Door | null> {
+export function computeDoors(world: World, p: Team, opts: { skip?: number; virtual?: Module; blocked?: Set<number> } = {}): Map<number, Door | null> {
+  const skip = opts.skip ?? 0, virt = opts.virtual;
   const rooms = [...world.modules.values()].filter((m) => m.owner === p && m.kind === 'room' && m.id !== skip).sort((a, b) => a.id - b.id);
+  if (virt) rooms.push(virt);
   const out = new Map<number, Door | null>();
+  const under = new Set(skip ? world.modules.get(skip)?.under ?? [] : []);
+  const vcells = new Set(virt?.cells ?? []);
   const yardAt = (x: number, y: number) => {
     const i = ci(x, y);
+    if (vcells.has(i) || opts.blocked?.has(i)) return false;
+    if (under.has(i)) return true;
     return world.isOwned(x, y, p) && world.kind[i] === K_YARD && !(skip && world.mod[i] === skip);
   };
   const linked = new Set<number>(); // Zellen schon angeschlossener Räume
@@ -205,32 +213,6 @@ export function createBastion(world: World, p: Team) {
 
 // ------------------------------------------------------------------ Anbauten prüfen und setzen
 
-function touchesYard(world: World, p: Team, cells: [number, number][]): boolean {
-  const own = new Set(cells.map(([x, y]) => ci(x, y)));
-  for (const [x, y] of cells) {
-    for (const [dx, dy] of DIRS) {
-      const nx = x + dx, ny = y + dy;
-      if (!inMap(nx, ny) || own.has(ci(nx, ny))) continue;
-      if (world.isOwned(nx, ny, p) && world.kind[ci(nx, ny)] === K_YARD) return true;
-    }
-  }
-  return false;
-}
-
-/** Das Feld grenzt an einen Raum, der schon eine Tür hat (also angeschlossen ist) */
-function touchesConnectedRoom(world: World, p: Team, cells: [number, number][]): boolean {
-  const own = new Set(cells.map(([x, y]) => ci(x, y)));
-  for (const [x, y] of cells) {
-    for (const [dx, dy] of DIRS) {
-      const nx = x + dx, ny = y + dy;
-      if (!inMap(nx, ny) || own.has(ci(nx, ny)) || !world.isOwned(nx, ny, p)) continue;
-      const m = world.modules.get(world.mod[ci(nx, ny)]);
-      if (m && m.kind === 'room' && m.door) return true;
-    }
-  }
-  return false;
-}
-
 function touchesBastion(world: World, p: Team, x: number, y: number): boolean {
   for (const [dx, dy] of DIRS) {
     const nx = x + dx, ny = y + dy;
@@ -247,21 +229,27 @@ function cellFree(world: World, p: Team, x: number, y: number): boolean {
   return !!m && m.destroyed && m.kind !== 'core';
 }
 
-export function gateConnected(world: World, p: Team): boolean {
+/**
+ * Tor und Kernkammer hängen über Hofzellen zusammen (Räume sind Sackgassen mit nur einer Tür, Türme, Kern und
+ * überbaute Zellen sperren). `excluded`: Zellen, die gedanklich überbaut werden (Platzierungsprüfung).
+ */
+export function gateConnected(world: World, p: Team, excluded?: Set<number>): boolean {
   const g = GATE_CELL[p];
-  const sx = g.x, sy = g.y;
-  if (!world.isOwned(sx, sy, p) || world.solid(sx, sy)) return false;
-  const seen = new Set<number>([ci(sx, sy)]);
-  const q: number[][] = [[sx, sy]];
+  const walk = (x: number, y: number) => {
+    if (!inMap(x, y)) return false;
+    const i = ci(x, y);
+    return world.owner[i] === p && world.kind[i] === K_YARD && !excluded?.has(i);
+  };
+  if (!walk(g.x, g.y)) return false;
+  const seen = new Set<number>([ci(g.x, g.y)]);
+  const q: number[][] = [[g.x, g.y]];
   const ch = CHAMBER[p];
   while (q.length) {
     const [x, y] = q.pop()!;
     if (x >= ch.x0 && x < ch.x1 && y >= ch.y0 && y < ch.y1) return true;
     for (const [dx, dy] of DIRS) {
       const nx = x + dx, ny = y + dy;
-      if (!inMap(nx, ny) || !world.isOwned(nx, ny, p) || world.solid(nx, ny) || seen.has(ci(nx, ny))) continue;
-      const w = world.edgeBetween(x, y, nx, ny);
-      if (w && !w.door && !w.gate && w.hp > 0) continue;
+      if (!walk(nx, ny) || seen.has(ci(nx, ny))) continue;
       seen.add(ci(nx, ny));
       q.push([nx, ny]);
     }
@@ -273,15 +261,33 @@ export function checkRoom(world: World, p: Team, card: string, x: number, y: num
   const def = buildingDef(card);
   if (def.kind !== 'room') return no('Not a room card');
   const fp = footprint(def, x, y, rot);
+  const ch = CHAMBER[p], g = GATE_CELL[p];
+  const over = new Set<number>(); // schlichte Hofzellen, die der Raum überbauen würde
   for (const [cx, cy] of fp.cells) {
     if (!inPlot(p, cx, cy)) return no('Outside your building plot');
-    if (!cellFree(world, p, cx, cy)) return no('Cells are occupied');
+    if (cellFree(world, p, cx, cy)) continue;
+    const i = ci(cx, cy);
+    if (world.kind[i] === K_YARD && !world.mod[i] && world.owner[i] === p) {
+      if (cx >= ch.x0 && cx < ch.x1 && cy >= ch.y0 && cy < ch.y1) return no('The core chamber stays open');
+      if (cx === g.x && cy === g.y) return no('Do not block the gate');
+      over.add(i);
+      continue;
+    }
+    return no('Cells are occupied');
   }
-  if (touchesYard(world, p, fp.cells) || touchesConnectedRoom(world, p, fp.cells)) return OK;
-  // erklären, was fehlt: gar kein Anschluss oder nur gesperrte Seiten (Turm, Kern, abgeschlossener Raum)
-  let touching = false;
-  for (const [cx, cy] of fp.cells) if (touchesBastion(world, p, cx, cy)) touching = true;
-  return no(touching ? 'No open side: a room needs a door to the courtyard or to a connected room' : 'Build next to your courtyard or any connected building');
+  if (over.size && !gateConnected(world, p, over)) return no('Would block the path from the gate to the core');
+  // Tür: zum Hof oder zu einem angeschlossenen Nachbarraum; bestehende Räume dürfen ihre Tür nicht verlieren
+  const virt = { id: -1, owner: p, cells: fp.cells.map(([cx, cy]) => ci(cx, cy)), x0: x, y0: y, cols: fp.cols, rows: fp.rows, door: null } as unknown as Module;
+  const doors = computeDoors(world, p, { virtual: virt });
+  if (!doors.get(-1)) {
+    let touching = false;
+    for (const [cx, cy] of fp.cells) if (touchesBastion(world, p, cx, cy)) touching = true;
+    return no(touching ? 'No open side: a room needs a door to the courtyard or to a connected room' : 'Build next to your courtyard or any connected building');
+  }
+  for (const m of world.modules.values()) {
+    if (m.owner === p && m.kind === 'room' && m.door && doors.get(m.id) === null) return no('That would cut off another room from the courtyard');
+  }
+  return OK;
 }
 
 export function checkYardBuilding(world: World, p: Team, card: string, x: number, y: number, rot: number): Check {
@@ -310,15 +316,15 @@ export function checkTower(world: World, p: Team, card: string, x: number, y: nu
   if (world.kind[i] === K_YARD && !world.mod[i]) {
     const g = GATE_CELL[p];
     if (x === g.x && y === g.y) return no('Do not block the gate');
+    const ch = CHAMBER[p];
+    if (x >= ch.x0 && x < ch.x1 && y >= ch.y0 && y < ch.y1) return no('The core chamber stays open');
     // Verbindung Tor -> Kernkammer darf nicht abreißen
-    const saved = world.kind[i];
-    world.kind[i] = K_TOWER;
-    const mid = world.mod[i];
-    world.mod[i] = -1; // nicht zerstört => massiv
-    const okc = gateConnected(world, p);
-    world.kind[i] = saved;
-    world.mod[i] = mid;
-    return okc ? OK : no('Would block the path from the gate to the core');
+    if (!gateConnected(world, p, new Set([i]))) return no('Would block the path from the gate to the core');
+    const after = computeDoors(world, p, { blocked: new Set([i]) });
+    for (const m of world.modules.values()) {
+      if (m.owner === p && m.kind === 'room' && m.door && after.get(m.id) === null) return no('That would cut off a room from the courtyard');
+    }
+    return OK;
   }
   return no('Cells are occupied');
 }
@@ -349,21 +355,25 @@ function removeDestroyedAt(world: World, cells: [number, number][]) {
 function removeModuleCells(world: World, id: number) {
   const m = world.modules.get(id);
   if (!m) return;
+  const under = new Set(m.under ?? []);
   for (const c of m.cells) {
     world.mod[c] = 0;
     world.rubble[c] = 0;
-    world.kind[c] = m.kind === 'yard' ? K_YARD : K_EMPTY;
-    if (m.kind !== 'yard') world.owner[c] = -1;
+    if (m.kind === 'yard' || under.has(c)) { world.kind[c] = K_YARD; continue; }
+    world.kind[c] = K_EMPTY;
+    world.owner[c] = -1;
   }
   world.modules.delete(id);
 }
 
 function addModule(world: World, p: Team, def: BuildingDef, fp: ReturnType<typeof footprint>, x: number, y: number, kind: Module['kind'], cellKind: number, star: number): Module {
+  const under = fp.cells.map(([cx, cy]) => ci(cx, cy)).filter((i) => world.kind[i] === K_YARD && !world.mod[i] && world.owner[i] === p);
   const m: Module = {
     id: world.id(), owner: p, card: def.id, kind, cells: [], x0: x, y0: y, cols: fp.cols, rows: fp.rows,
     hp: def.hp, maxHp: def.hp, material: def.material, destroyed: false, star, buildEnd: 0, posts: def.posts, staffed: 0, door: null,
     slots: [], burning: 0, frozen: 0, shortCircuit: 0, s: {},
   };
+  if (under.length && kind !== 'yard') m.under = under;
   for (const [cx, cy] of fp.cells) {
     const i = ci(cx, cy);
     world.kind[i] = cellKind;
@@ -532,7 +542,7 @@ export function upgradeModule(world: World, p: Team, card: string): boolean {
 
 /** Nach dem Entfernen des Raums `id` bliebe kein bisher angeschlossener Raum ohne Tür zurück */
 export function dependentsOk(world: World, p: Team, id: number): boolean {
-  const after = computeDoors(world, p, id);
+  const after = computeDoors(world, p, { skip: id });
   for (const m of world.modules.values()) {
     if (m.owner !== p || m.kind !== 'room' || m.id === id) continue;
     if (m.door && after.get(m.id) === null) return false;

@@ -1,15 +1,16 @@
 // Spielsteuerung und Oberfläche: Menü, Loadout, Bauphase, Kampf-HUD, Zeitstopp, Inspektor
 
 import { Application } from 'pixi.js';
-import { CELL, DT, PLOT, PRIORITIES, PRIORITY_LABEL, ZONES, ZONE_LABEL, RANK_NAMES, RANK_XP, type Priority, type Team, type Zone } from '../sim/constants';
+import { CELL, DT, PLOT, WAVE_GAP_S, wavesPerSegment, PRIORITIES, PRIORITY_LABEL, ZONES, ZONE_LABEL, RANK_NAMES, RANK_XP, type Priority, type Team, type Zone } from '../sim/constants';
 import { BUILDINGS, UNITS, isBuilding } from '../sim/data';
 import { botChoose, botPlay } from '../sim/bot';
 import { checkRoom, checkTower, checkWallCard, checkYardBuilding, checkYardCell, findOwnModule, footprint, wallRun } from '../sim/bastion';
 import { entryStats, freeSlotCount, operatingDegree, citizenLimit, lineActive } from '../sim/systems';
-import { contingentSlots, keepCount, modEff } from '../sim/bfx';
+import { SLOT_MAX, contingentSlots, keepCount, modEff, slotBreakdown, unitRooms } from '../sim/bfx';
 import { unitFx } from '../sim/fx';
 import { buildingImpl } from '../sim/impl';
 import { modCenter } from '../sim/combat';
+import { unitActivity } from '../sim/ai';
 import { Match } from '../sim/match';
 import type { Module, Unit } from '../sim/types';
 import { ci, type World } from '../sim/world';
@@ -42,6 +43,8 @@ export class Game {
   // Bauen
   armed: { card: string; rot: number } | null = null;
   yardMode = false;
+  trayTab: 'found' | 'hand' = 'found';
+  trayTabAuto = true;
   replaceCard: string | null = null;
   ghostKey = '';
   hover: { cx: number; cy: number; wx: number; wy: number } | null = null;
@@ -212,12 +215,14 @@ export class Game {
       if (this.human === null) { /* Zuschauer: Bots haben schon gewählt */ }
       else this.showLoadout();
     } else if (phase === 'build') {
+      this.trayTab = 'found';
+      this.trayTabAuto = true;
       $('overlay').classList.remove('show');
       this.focusMode = 'plot';
       if (this.human !== null) {
         this.scene.gridTeam = this.human;
         if (this.settings.buildSec) this.deadline = Date.now() + this.settings.buildSec * 1000;
-        hudMsg('Build phase: pick a card below and place it next to your courtyard or any connected building: build corridors and mazes in front of the core. Mouse wheel or right click rotates. Press Ready when done.');
+        hudMsg('Build phase: you got 12 free Foundation cards (tab below) on top of your hand. Build a maze of rooms, traps and towers between the gate and your core. Rooms may attach to rooms and even cover courtyard cells, as long as a path from the gate to the core stays open. Mouse wheel or right click rotates.');
       } else this.focusMode = 'all';
       this.applyFocus();
     } else if (phase === 'battle') {
@@ -293,7 +298,7 @@ export class Game {
       const ok = this.loadSel.length === 7;
       box.append(
         el('h2', {}, `Loadout: keep 7 of your 10 cards (${this.loadSel.length}/7)`),
-        el('div', { class: 'hint' }, 'Buildings go on your plot, troops go into your contingent. Artillery needs a platform (Battlement Ring, Gun Deck, Observatory ...) and troops of other lines need their unlock room (Barracks, Arcanum ...).'),
+        el('div', { class: 'hint' }, 'After you keep 7, you also receive 12 free Foundation cards (rooms, traps, towers) to build a maze to your core. Buildings go on your plot, troops go into your contingent. Artillery needs a platform (Battlement Ring, Gun Deck, Observatory ...) and troops of other lines need their unlock room (Barracks, Arcanum ...).'),
         grid,
         el('div', { class: 'row' },
           el('button', { class: 'primary', disabled: !ok, onclick: () => { this.match!.keepLoadout(h, this.loadSel.map((i) => p.hand[i])); $('overlay').classList.remove('show'); this.dirty = true; } }, 'Keep these 7'),
@@ -351,7 +356,9 @@ export class Game {
     const nextWave = Math.max(0, (w.nextWaveTick - w.tick) / 30);
     if (w.phase === 'battle') {
       lb.textContent = `time ${fmtTime(w.battleTime)} · wave ${w.waveNo}`;
-      ph.textContent = w.pendingPause ? 'TIME STOP incoming' : `next wave ${nextWave.toFixed(0)}s${w.waveInCycle === 1 ? '' : ''}`;
+      const left = wavesPerSegment(w.pauseNo) - w.waveInCycle; // noch zu spawnende Wellen dieses Abschnitts
+      const toStop = nextWave + Math.max(0, left - 1) * WAVE_GAP_S + 2;
+      ph.textContent = w.pendingPause ? 'TIME STOP incoming' : `next wave ${nextWave.toFixed(0)}s · time stop in ~${fmtTime(toStop)} (after wave ${w.waveNo + left})`;
     } else if (w.phase === 'pause') {
       lb.textContent = `pause ${w.pauseNo}`;
       ph.textContent = this.deadline ? `time left ${fmtTime((this.deadline - Date.now()) / 1000)}` : 'plan your bastion';
@@ -409,7 +416,7 @@ export class Game {
             el('b', {}, 'Team'), el('span', { style: `color:var(--p${u.team + 1})` }, `P${u.team + 1}`),
             el('b', {}, 'HP'), el('span', {}, `${Math.round(u.hp)} / ${u.maxHp}`),
             el('b', {}, 'Rank'), el('span', {}, `${RANK_NAMES[u.rank]} (${Math.round(u.xp)}/${next} XP)`),
-            el('b', {}, 'State'), el('span', {}, u.state + (u.berserk ? ' (berserk)' : '')),
+            el('b', {}, 'Doing'), el('span', {}, unitActivity(w, u).text),
             el('b', {}, 'Status'), statusSpan(u),
           ),
         ),
@@ -445,7 +452,9 @@ export class Game {
   capacityPanel(w: World): HTMLElement {
     const h = this.human!;
     const p = w.players[h];
-    const slots = Math.max(p.slotsMax, contingentSlots(w, h));
+    const sb = slotBreakdown(w, h);
+    const slots = sb.total;
+    p.slotsMax = slots;
     const citizens = w.units.filter((u) => !u.dead && u.team === h && u.cat === 'citizen').length;
     const limit = citizenLimit(w, h);
     let need = 0, have = 0;
@@ -460,8 +469,10 @@ export class Game {
       attachCardTip(c, id, 'side');
       return c;
     };
-    const barracks = mine('BF-01') > 0;
-    const nextSlot = !barracks ? 'Build a Barracks for +1.' : w.pauseNo < 3 ? 'The next slot comes with time stop 3.' : w.pauseNo < 6 ? 'The next slot comes with time stop 6.' : 'You have all slots.';
+    const have2 = new Set<string>([...unitRooms(w, h).map((m) => m.card), ...p.kept.filter((id) => BUILDINGS[id]?.group === 'Unlock')]);
+    const roomCards = [...have2].slice(0, 3);
+    if (!roomCards.length) roomCards.push('BF-01');
+    const next = sb.total >= SLOT_MAX ? 'You have reached the maximum.' : 'The next slot arrives with the next time stop.';
     const box = el('div', { class: 'panel cap' }, el('h3', {}, 'Capacity'));
     box.append(
       el('div', {},
@@ -473,8 +484,8 @@ export class Game {
       el('div', {},
         el('div', { class: 'row2' }, el('b', {}, 'Contingent slots'), el('span', {}, `${p.contingent.length} / ${slots}`)),
         meter(p.contingent.length, slots),
-        el('div', { class: 'how' }, `Every troop card you play takes one slot (playing one when full replaces an entry). Slots: 5, +1 with a Barracks, +1 from time stop 3 and +1 from time stop 6 (max 8). ${nextSlot}`),
-        el('div', { class: 'cards' }, mini('BF-01')),
+        el('div', { class: 'how' }, `Every troop card you play takes one slot (playing one when full replaces an entry). You get ${sb.base} slots, +1 at every time stop (now +${sb.stops}), and half a slot for each unit room you have built (Barracks, Arcanum, Menagerie ...): ${sb.rooms} room${sb.rooms === 1 ? '' : 's'} = +${sb.roomSlots}${sb.rooms % 2 ? ', one more room completes the next slot' : ''}. ${next}`),
+        el('div', { class: 'cards' }, ...roomCards.map(mini)),
       ),
     );
     return box;
@@ -483,7 +494,7 @@ export class Game {
   contingentPanel(w: World): HTMLElement {
     const h = this.human!;
     const p = w.players[h];
-    p.slotsMax = Math.max(p.slotsMax, 5);
+    p.slotsMax = contingentSlots(w, h);
     const box = el('div', { class: 'panel' }, el('h3', {}, `Contingent ${p.contingent.length}/${p.slotsMax}`));
     const editable = w.phase === 'build' || w.phase === 'pause';
     if (!p.contingent.length) box.append(el('div', { class: 'hint' }, 'Empty. Play troop cards from your hand.'));
@@ -555,13 +566,27 @@ export class Game {
       ));
       return;
     }
-    // Karten spielen
-    if (p.kept.length) {
-      for (const id of p.kept) {
+    // Karten spielen; in der Bauphase getrennt in Fundament (kostenlos) und Hand
+    const foundLeft = p.kept.filter((id) => p.found.includes(id));
+    const handLeft = p.kept.filter((id) => !p.found.includes(id));
+    if (!foundLeft.length && this.trayTab === 'found') this.trayTab = 'hand';
+    if (!handLeft.length && foundLeft.length && this.trayTab === 'hand' && w.phase === 'build' && this.trayTabAuto) this.trayTab = 'found';
+    const shown = foundLeft.length ? (this.trayTab === 'found' ? foundLeft : handLeft) : p.kept;
+    if (foundLeft.length) {
+      const tab = (key: 'found' | 'hand', label: string, n: number, tip: string) => el('button', { class: this.trayTab === key ? 'on' : '', title: tip, onclick: () => { this.trayTab = key; this.trayTabAuto = false; this.dirty = true; } }, `${label} (${n})`);
+      tray.append(el('div', { class: 'grp tabs' },
+        el('span', { class: 'lbl' }, 'Your cards'),
+        tab('found', 'Foundation', foundLeft.length, 'Free extra building cards for the first build phase: rooms, traps, towers. Unplayed cards are lost when the battle starts.'),
+        tab('hand', 'Hand', handLeft.length, 'The cards you kept from your opening draw: troops and key buildings.'),
+      ));
+    }
+    if (shown.length) {
+      for (const id of shown) {
         const b = isBuilding(id);
         const dup = b && !!findOwnModule(w, h, id);
         tray.append(cardEl(id, {
           preview: true,
+          w: shown.length > 8 ? 98 : undefined,
           sel: this.armed?.card === id || this.replaceCard === id,
           badge: dup ? 'upgrade ★' : undefined,
           onClick: () => this.clickCard(id),
@@ -591,7 +616,7 @@ export class Game {
     if (!isBuilding(id)) {
       const p = w.players[h];
       const have = p.contingent.some((e) => e.card === id);
-      p.slotsMax = Math.max(p.slotsMax, 5);
+      p.slotsMax = contingentSlots(w, h);
       if (!have && p.contingent.length >= p.slotsMax) {
         this.replaceCard = id;
         this.armed = null;

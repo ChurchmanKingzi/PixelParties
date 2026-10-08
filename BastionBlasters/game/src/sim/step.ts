@@ -1,7 +1,7 @@
 // Ein Simulationsschritt (30 Hz). Reihenfolge laut GDD 11: Spawn, Navigation, Targeting, Kampf, Geschosse, Status, XP, Personal, Heilung, Eroberung, Sieg.
 
 import './unitfx';
-import { TPS, WAVE_GAP_S, type Team } from './constants';
+import { TPS, WAVE_GAP_S, wavesPerSegment, type Team } from './constants';
 import { unitStep } from './ai';
 import { buildingsTick, modEff } from './bfx';
 import { projectileStep } from './combat';
@@ -49,8 +49,8 @@ export function step(world: World) {
   // Wellenplan
   if (!world.pendingPause && world.tick >= world.nextWaveTick) {
     spawnWave(world);
-    if (world.waveInCycle === 0) {
-      world.waveInCycle = 1;
+    world.waveInCycle++;
+    if (world.waveInCycle < wavesPerSegment(world.pauseNo)) {
       world.nextWaveTick = world.tick + WAVE_GAP_S * TPS;
     } else {
       world.waveInCycle = 0;

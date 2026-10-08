@@ -2,6 +2,7 @@
 
 import { tierWeights, type Team } from './constants';
 import { BUILDINGS, NEVER_DRAWN, UNITS, LINE_ROOM, isBuilding } from './data';
+import { buildingImpl } from './impl';
 import type { World } from './world';
 
 const BY_TIER: string[][] = [[], [], [], []];
@@ -82,4 +83,30 @@ export function drawPause(world: World, team: Team, n = 5): string[] {
   if (!hand.some(isBuilding)) hand[n - 1] = pickOne(world, team, idx, isBuilding);
   if (!hand.some((id) => !isBuilding(id))) hand[0] = pickOne(world, team, idx, (id) => !isBuilding(id));
   return hand;
+}
+
+// ------------------------------------------------------------------ Fundament
+
+/** Kostenlose Zusatzkarten zum Start: viel Baumaterial für Räume, Fallen und Türme, damit ein echtes Labyrinth entsteht */
+export const FOUNDATION = { rooms: 7, traps: 2, towers: 2, free: 1 };
+const TRAP_IDS = ['BS-05', 'BS-06', 'BS-08', 'BA-03'];
+
+/** Zusatzkarten für den Erstaufbau (nur Bauteile, Tier I und II, ohne doppelte Karten und ohne Karten der Loadout-Hand) */
+export function drawFoundation(world: World, team: Team, taken: string[]): string[] {
+  const out: string[] = [];
+  const used = new Set<string>(taken);
+  const usable = (id: string) => !used.has(id) && buildingImpl(id) !== 'stats';
+  const pool = (pred: (id: string) => boolean) => BY_TIER.flat().filter((id) => isBuilding(id) && BUILDINGS[id].tier <= 2 && usable(id) && pred(id));
+  const pickFrom = (ids: string[]): void => {
+    if (!ids.length) return;
+    const id = world.rng.weighted(ids, (c) => 1 + (BUILDINGS[c].tier === 1 ? 0.5 : 0)) ?? ids[0];
+    out.push(id);
+    used.add(id);
+  };
+  void team;
+  for (let i = 0; i < FOUNDATION.traps; i++) pickFrom(pool((id) => TRAP_IDS.includes(id)));
+  for (let i = 0; i < FOUNDATION.towers; i++) pickFrom(pool((id) => BUILDINGS[id].kind === 'tower' && BUILDINGS[id].group === 'Turrets'));
+  for (let i = 0; i < FOUNDATION.rooms; i++) pickFrom(pool((id) => BUILDINGS[id].kind === 'room'));
+  for (let i = 0; i < FOUNDATION.free; i++) pickFrom(pool((id) => ['room', 'yard', 'tower'].includes(BUILDINGS[id].kind)));
+  return out;
 }

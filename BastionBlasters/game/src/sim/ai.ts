@@ -1,9 +1,9 @@
 // Verhalten der Einheiten pro Tick: Ziele, Bewegung, Rückzug, Wachzonen, Zivilisten, Bürger
 
 import {
-  CHAMBER, DT, GATE_CELL, MAP_W, MAP_H, QUEUE_MAX_S, RETREAT_HP, TPS, type DType, type Team, type Zone,
+  CHAMBER, DT, GATE_CELL, MAP_W, MAP_H, QUEUE_MAX_S, RETREAT_HP, TPS, ZONE_LABEL, type DType, type Team, type Zone,
 } from './constants';
-import { UNITS } from './data';
+import { BUILDINGS, UNITS } from './data';
 import {
   artilleryStep, attackStruct, attackUnit, canHitUnit, enemyVisible, hurtModule, hurtWall, modCenter, wallMid,
 } from './combat';
@@ -324,6 +324,14 @@ export function assaultStep(world: World, u: Unit) {
     }
     approachUnit(world, u, t);
     return;
+  }
+  if (u.tstruct) {
+    if (attackStructureStep(world, u, def, melee, range)) return;
+  }
+  // Angekommen: ohne Gegner in Reichweite den Kernkristall zertrümmern
+  if (!u.tgt && !u.tstruct && inChamber(enemy, u.x, u.y)) {
+    const core = world.coreMod[enemy];
+    if (core && !world.modules.get(core)?.destroyed) u.tstruct = { kind: 'module', id: core };
   }
   if (u.tstruct) {
     if (attackStructureStep(world, u, def, melee, range)) return;
@@ -866,3 +874,53 @@ export function citizenStep(world: World, u: Unit) {
 }
 
 export { healOccupants as _ho, K_YARD, ci, addStatus, canCross, cellOf, crossCost, hurtWall, TPS, UNITS };
+
+// ------------------------------------------------------------------ Was tut die Einheit gerade? (Inspektor, Zielstrich)
+
+export interface Activity { text: string; target?: { x: number; y: number } }
+
+/** Lesbare Beschreibung der aktuellen Tätigkeit, dazu der Zielpunkt für den Zielstrich in der Darstellung */
+export function unitActivity(world: World, u: Unit): Activity {
+  const enemy = enemyOf(u.team);
+  const name = (o: Unit) => (o.cid === 'citizen' ? 'a citizen' : UNITS[o.cid]?.name ?? o.cid);
+  if (u.state === 'swallowed') return { text: 'swallowed' };
+  if (u.state === 'burrow') return { text: 'tunnelling under the walls' };
+  if (u.rt.phase === 'go') return { text: 'retreating to a healing source' };
+  if (u.rt.phase === 'wait') return { text: 'queueing for treatment' };
+  if (u.rt.phase === 'heal') return { text: 'being healed' };
+  if (u.berserk && u.state === 'attack') return { text: 'fighting on in berserk (no healing source left)' };
+  if (u.cat === 'artillery') {
+    if (!u.slot) return { text: 'waiting for a gun slot' };
+    return { text: u.state === 'attack' || u.inCombat > world.tick - 90 ? 'firing at the enemy bastion' : 'looking for a target in range' };
+  }
+  if (u.cat === 'citizen') {
+    const m = u.post ? world.modules.get(u.post) : undefined;
+    return { text: m && !m.destroyed ? `working at ${BUILDINGS[m.card]?.name ?? 'a post'}` : 'waiting for a post' };
+  }
+  const t = u.tgt ? world.byId.get(u.tgt) : undefined;
+  if (t && !t.dead) return { text: `${u.state === 'attack' ? 'attacking' : 'closing in on'} ${name(t)}`, target: { x: t.x, y: t.y } };
+  if (u.tstruct) {
+    if (u.tstruct.kind === 'wall') {
+      const w = world.walls.get(u.tstruct.id);
+      if (w) return { text: u.state === 'attack' ? (w.gate ? 'breaking the gate' : 'breaking through a wall') : 'heading for a wall to break', target: wallMid(w) };
+    } else {
+      const m = world.modules.get(u.tstruct.id);
+      if (m) {
+        const c = modCenter(m);
+        if (m.kind === 'core') return { text: u.state === 'attack' ? 'smashing the core crystal' : 'closing in on the core crystal', target: c };
+        return { text: `${u.state === 'attack' ? 'attacking' : 'heading for'} ${BUILDINGS[m.card]?.name ?? 'a building'}`, target: c };
+      }
+    }
+  }
+  if (u.cat === 'assault') {
+    if (inChamber(enemy, u.x, u.y)) {
+      const info = world.conqInfo[enemy];
+      return { text: info.locked ? `in the core chamber, conquest blocked by ${info.lockedBy}` : `conquering the core chamber (+${info.rate.toFixed(0)}%/s)` };
+    }
+    return { text: u.state === 'move' ? 'marching to the enemy core chamber' : 'looking for a way in' };
+  }
+  if (u.cat === 'defender') {
+    return { text: u.state === 'attack' ? 'defending' : `guarding the ${ZONE_LABEL[u.zone] ?? u.zone}` };
+  }
+  return { text: u.state === 'idle' ? 'idling' : u.state };
+}

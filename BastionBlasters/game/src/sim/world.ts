@@ -40,13 +40,17 @@ export class World {
 
   players: [Player, Player];
   conquest: [number, number] = [0, 0];
+  /** Stand der Eroberung je verteidigter Kammer: Eindringlinge drin, gesperrt (durch wen), Rate in %/s */
+  conqInfo: { n: number; locked: boolean; lockedBy: string; rate: number; state: number; milestone: number }[] = [
+    { n: 0, locked: false, lockedBy: '', rate: 0, state: 0, milestone: 0 }, { n: 0, locked: false, lockedBy: '', rate: 0, state: 0, milestone: 0 },
+  ];
   winner: Team | -1 | null = null;
   winType: '' | 'core' | 'conquest' | 'time' | 'draw' = '';
 
   // Zeitplan
   battleTick = 0; // Ticks der laufenden Schlacht (ohne Pausen)
   waveNo = 0; // gespawnte Wellen
-  waveInCycle = 0; // 0: nächste Welle ist A, 1: nächste ist B
+  waveInCycle = 0; // Wellen, die in diesem Kampfabschnitt schon gespawnt sind
   nextWaveTick = 0;
   pauseNo = 0;
   spawnQueue: { team: Team; entry: number; at: number; wave: number }[] = [];

@@ -1,7 +1,7 @@
 // Systeme: Personal (Bürger), Heilquellen, Eroberung, Gebiete, Wellen, Spawns, Bauteil-Zustände, Sieg
 
 import {
-  CITIZEN_LIMIT_BASE, CITIZEN_LIMIT_PER_HOME, CITIZEN_REGEN_S, CORE_REGEN, DT, MADNESS_END_S, MADNESS_START_S,
+  CITIZEN_LIMIT_BASE, CITIZEN_LIMIT_PER_HOME, CITIZEN_REGEN_S, CONQUEST_DECAY, CONQUEST_MAX_UNITS, CONQUEST_PER_UNIT, CORE_REGEN, DT, MADNESS_END_S, MADNESS_START_S,
   SPAWN_STAGGER_S, TPS, UNIT_LIMIT, WAVE_GAP_S, type Team,
 } from './constants';
 import { BUILDINGS, LINE_ROOM, UNITS } from './data';
@@ -117,26 +117,36 @@ export function operatingDegree(world: World, team: Team): number {
 export function conquestStep(world: World) {
   for (const defender of [0, 1] as Team[]) {
     const inv: Team = defender === 0 ? 1 : 0;
+    const info = world.conqInfo[defender];
     let n = 0;
-    let locked = false;
+    let lockedBy = '';
     let half = 1;
     for (const u of world.units) {
       if (u.dead) continue;
-      if (u.team === inv && u.cat === 'assault' && inChamber(defender, u.x, u.y) && u.state !== 'burrow' && u.state !== 'swallowed' && u.rt.phase === 'none') {
-        n += u.cid === 'US-04' ? 1 : 1;
-      }
+      if (u.team === inv && u.cat === 'assault' && inChamber(defender, u.x, u.y) && u.state !== 'burrow' && u.state !== 'swallowed' && u.rt.phase === 'none') n++;
       if (u.team === defender) {
-        if (u.cat === 'defender' && inChamber(defender, u.x, u.y) && u.state !== 'swallowed') locked = true;
-        if (u.cid === 'UV-16') locked = true; // Letztes Aufgebot: Eroberung vollständig gesperrt
+        if (u.cat === 'defender' && inChamber(defender, u.x, u.y) && u.state !== 'swallowed') lockedBy = lockedBy || (UNITS[u.cid]?.name ?? 'a defender');
+        if (u.cid === 'UV-16') lockedBy = lockedBy || 'Last Stand'; // Letztes Aufgebot: Eroberung vollständig gesperrt
         if (u.cid === 'UV-13' && inChamber(defender, u.x, u.y)) half = 0.5;
       }
     }
-    n = Math.min(5, n);
-    if (n > 0) {
-      if (!locked) world.conquest[defender] = Math.min(100, world.conquest[defender] + (4 + 2 * (n - 1)) * half * (1 + world.madness) * DT);
-    } else {
-      world.conquest[defender] = Math.max(0, world.conquest[defender] - 6 * DT);
+    n = Math.min(CONQUEST_MAX_UNITS, n);
+    const locked = lockedBy !== '';
+    const rate = n > 0 && !locked ? CONQUEST_PER_UNIT * n * half * (1 + world.madness) : 0;
+    info.n = n; info.locked = locked; info.lockedBy = lockedBy; info.rate = rate;
+    if (rate > 0) world.conquest[defender] = Math.min(100, world.conquest[defender] + rate * DT);
+    else if (n === 0) world.conquest[defender] = Math.max(0, world.conquest[defender] - CONQUEST_DECAY * DT);
+    // Meldungen im Ereignisfeed: wer erobert, wer sperrt, Zwischenstände
+    const state = n === 0 ? 0 : locked ? 2 : 1;
+    if (state !== info.state) {
+      if (state === 1) world.feed(`P${inv + 1} troops are in the core chamber of P${defender + 1}: conquering ${rate.toFixed(0)}%/s`, inv);
+      else if (state === 2) world.feed(`Conquest blocked: ${lockedBy} holds the core chamber of P${defender + 1}. Kill it to conquer; idle invaders smash the core`, inv);
+      info.state = state;
     }
+    const c = world.conquest[defender];
+    const ms = c >= 75 ? 75 : c >= 50 ? 50 : c >= 25 ? 25 : 0;
+    if (ms > info.milestone) world.feed(`Conquest of P${defender + 1}'s core chamber: ${ms}%`, inv);
+    info.milestone = c < 5 ? 0 : Math.max(info.milestone, ms);
   }
 }
 
@@ -192,7 +202,8 @@ export function coreStep(world: World) {
   if (bt > MADNESS_END_S) {
     for (const t of [0, 1] as Team[]) {
       const c = world.modules.get(world.coreMod[t])!;
-      c.hp -= c.maxHp * 0.01 * DT;
+      // Wer unter mehr Eroberungsdruck steht, verliert den Kern zuerst (kein Remis bei gleichem Stand)
+      c.hp -= c.maxHp * 0.01 * DT * (1 + world.conquest[t] / 100 + world.stats.dmgStruct[t === 0 ? 1 : 0] * 1e-6);
     }
   }
 }

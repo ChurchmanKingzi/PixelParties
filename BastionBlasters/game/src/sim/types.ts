@@ -150,6 +150,8 @@ export interface Module {
   frozen: number;
   shortCircuit: number;
   s: Record<string, number>; // Laufzeit-Zustand der Effekte
+  /** Zellen, die vor dem Bau schlichter Hof waren (Raum oder Turm überbaut den Hof); sie werden beim Aufnehmen wieder Hof */
+  under?: number[];
 }
 
 export interface Cell { x: number; y: number }
@@ -285,4 +287,6 @@ export interface Player {
   /** Karten, die im Spiel sind (Bau + Truppe), für ★ und "bekannte Gesichter" */
   owned: string[];
   quota: number;
+  /** Fundament-Karten dieser Bauphase (kostenlose Zusatzkarten, stecken auch in `kept`) */
+  found: string[];
 }

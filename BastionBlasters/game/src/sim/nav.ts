@@ -16,15 +16,22 @@ export interface Box { x0: number; y0: number; x1: number; y1: number } // Zelle
 
 const SQ2 = Math.SQRT2;
 
+/**
+ * Wegkosten für das Durchbrechen einer Mauer: Das Aufbrechen dauert Sekunden bis Minuten, deshalb nehmen Angreifer
+ * lieber einen Umweg von bis zu etwa 30 Zellen durch ein Labyrinth, als eine 300-HP-Mauer einzureißen.
+ */
+export const BREACH_BASE = 6;
+export const BREACH_PER_HP = 1 / 12;
+
 /** Kosten für das Überschreiten einer Kante: 0 frei, Infinity gesperrt */
 export function crossCost(world: World, w: Wall | null, o: NavOpts): number {
   if (!w || w.door || w.hp <= 0) return 0;
   if (o.ghost) return 0;
   if (w.gate) {
     if (w.owner === o.team) return w.closedUntil && world.tick < w.closedUntil ? Infinity : 0;
-    return o.breakWalls ? 2 + w.hp / 60 : Infinity;
+    return o.breakWalls ? BREACH_BASE + w.hp * BREACH_PER_HP : Infinity;
   }
-  if (w.owner !== o.team && o.breakWalls) return 2 + w.hp / 60;
+  if (w.owner !== o.team && o.breakWalls) return BREACH_BASE + w.hp * BREACH_PER_HP;
   return Infinity;
 }
 

@@ -1,6 +1,6 @@
 # Bastion Blasters — Game Design Document
 
-**Teil 2: Präsentation, Technik, Balancing, Roadmap** · Version 0.8 · Entwurf zur Abnahme
+**Teil 2: Präsentation, Technik, Balancing, Roadmap** · Version 0.9 · Entwurf zur Abnahme
 
 Teil 1 (Regeln und Systeme): [`GDD.md`](GDD.md) · Kataloge: [`katalog/01-gebaeude.md`](katalog/01-gebaeude.md) · [`katalog/02-einheiten.md`](katalog/02-einheiten.md) · [`katalog/03-kerne-und-weltlaunen.md`](katalog/03-kerne-und-weltlaunen.md)
 
@@ -393,7 +393,7 @@ Begründung: Entscheidend ist, dass ich die Pixelgrafik selbst erzeuge und das S
 | **Verwaist** | Raum ohne Personal (0 % Wirkung). |
 | **Welle** | Spawn-Ereignis aller Kontingent-Karten. |
 | **Welt-Laune** | Optionales globales Match-Wetter mit Regeländerung. |
-| **Wahnsinn** | Eskalation ab Minute 14 gegen Patts. |
+| **Wahnsinn** | Eskalation ab Minute 11 gegen Patts. |
 | **Zeitstopp** | Pause nach jeder 2. Welle, in der gezogen und gebaut wird. |
 | **Zelle** | Feld des Rasters, 32 × 32 px. |
 | **Zielschatten** | Markierung am Boden, die einen Bogen-/Senkrecht-Einschlag 1,2–2,0 s vorher ankündigt. |
@@ -456,8 +456,12 @@ Alle Startwerte zum Ausprobieren; diese Tabelle soll später als Datei (z. B. `t
 | `REBUILD_WORK_RATIO` | Wiederaufbau-Arbeit | 40 % der Max-HP | 30–60 % |
 | `RANGE_ARTILLERY` | Kurz / Mittel / Weit / Extrem (Zellen) | 26 / 34 / 42 / 50 | – |
 | `PROJECTILE_FLIGHT_S` | Flugzeit | 1,0–2,2 | – |
-| `MADNESS_START` / `_STEP` | Wahnsinn | 14:00 / alle 30 s +10 % | – |
-| `SKY_RIP_START` | Himmelsriss (1 % Kern-HP/s) | 20:00 | – |
+| `MADNESS_START` / `_STEP` | Wahnsinn | 11:00 / alle 30 s +10 % | – |
+| `SKY_RIP_START` | Himmelsriss (1 % Kern-HP/s) | 16:00 | – |
+| `SEGMENT_WAVES_BASE` / `_STEP` / `_MAX` | Wellen je Kampfabschnitt | 2 / +1 je Zeitstopp / 9 | – |
+| `SLOT_BASE` / `UNIT_ROOM_SLOT` / `SLOT_MAX` | Kontingent-Plätze | 5 (+1 je Zeitstopp) / ½ je Einheiten-Raum / 16 | – |
+| `CONQUEST_PER_UNIT` / `_DECAY` | Eroberung | 1,5 %/s je Eindringling / −3 %/s | – |
+| `FOUNDATION` | Fundament-Karten zum Start | 7 Räume, 2 Fallen, 2 Türme, 1 frei | – |
 
 ---
 
@@ -520,6 +524,7 @@ Neue Effekt-Bausteine entstehen nur, wenn mehrere Karten sie brauchen. Alles and
 | **0.6** | **Alle 154 Karten angelegt** (77 Bauteile, 77 Einheiten): englische Texte in `daten/card_text.json`, Illustrationen als Code in zwölf Packs (`art/pack_*.py`, Anleitung `art/ART_GUIDE.md`, Prüfung mit `art/packtool.py`), Renderer mit Platzhalterbild, 6 Effektzeilen, automatisch verdichteter Typzeile und Kontaktbögen je Gruppe (`art/sheets.py`). Glossar auf **140 Begriffe** erweitert (u. a. Knockback, Taunt, Lifesteal, Alarm, Leash, Aura, Burrowed, Chaos-born); Flugbahn **Underground → Burrowing**; Linter prüft Fähigkeitsnamen, Namens- und Typzeilenbreite. Beim Texten vereinheitlicht: **Fed** gibt überall +15 % (statt +20 % beim Eintopf-Koch), **Hardened** ist definiert, BS-01 Masonry ist eine reine Referenzkarte (wird nie gezogen). |
 | **0.7** | **Kampf-Prototyp** (`game/`, TypeScript, Vite, PixiJS): deterministische Simulation mit allen vier Truppenkategorien, sieben Flugbahnen, Auto-Mauern auf Kanten, A*, Personal, Heilung und Rückzug, Eroberung, XP und Ränge, Wellen, Zeitstopp, Ziehen 10/7 und 5/3, Bot; Browser-Oberfläche mit Loadout, Bauphase, Kontingent und Inspektor; als Einzeldatei-Artifact veröffentlicht. Vom Auftraggeber bestätigt: GDD bleibt deutsch (Q23), interne Annahmen der Kartentexte (Fed +15 %, Hardened, Knockback, Doppelbombe, Masonry als Referenzkarte) gelten. |
 | **0.8** | **Rückmeldung aus dem ersten Spieltest** (Prototyp): **Kernhof nach hinten** mit 8 Zellen langem **Zufahrtsgang** zum Haupttor (§4.1, Hof-Erweiterung 16 statt 12); **Räume dürfen an Räume anbauen** (Türen zu Nachbarräumen, Raumketten und Labyrinthe); **Glossar-Tooltips** (Begriffe im Text, Statusnamen und Kartenbilder erklären sich beim Überfahren; die Kartenrenderer exportieren dafür Begriffsfelder `art/out/cards_hotspots.json`); **große Kartenvorschau**, Handkarten wachsen beim Überfahren, Mausrad dreht Gebäude in der Hand; **Einheiten in Teamfarbe umrandet** mit Fußring; **Kapazitätsanzeige** (Bürger-Limit, Kontingent-Plätze und wie man sie erweitert); **Ton**: prozedurale SFX und Musik (§10.6, Web Audio, keine Dateien). |
+| **0.9** | **Zweite Spielrunde** (Prototyp): **Kampfabschnitte wachsen** (2, 3, 4 … Wellen zwischen den Zeitstopps); **Kontingent** 5 Plätze, +1 je Zeitstopp, ½ Platz je Einheiten-Raum (kein Spezialgebäude mehr nötig); **Fundament-Hand** (12 kostenlose Räume, Fallen, Türme zum Start); **Räume und Türme dürfen den Hof überbauen** (Labyrinth im Zufahrtsgang), Mauerbruch kostet im Wegfinder deutlich mehr; Bots bauen Labyrinthe und stellen einen Verteidiger in die Kernkammer; **Eroberung langsamer** (1,5 %/s je Eindringling) und Eindringlinge **zertrümmern den Kernkristall**; im Spiel sichtbar: Eroberungsring mit Beschriftung (Fortschritt, Rate, Sperrer), Zielstrich und Zeile „Doing“ je Einheit, Feedmeldungen; Wahnsinn ab 11:00, Himmelsriss ab 16:00 mit Tie-Break. |
 
 ---
 

@@ -1,6 +1,6 @@
 # Bastion Blasters — Game Design Document
 
-**Teil 1: Spieldesign** · Version 0.8 · Entwurf zur Abnahme · Perspektive: **Draufsicht** · Kerne = **Fraktionen** · Bastionen **modular**, große Karte
+**Teil 1: Spieldesign** · Version 0.9 · Entwurf zur Abnahme · Perspektive: **Draufsicht** · Kerne = **Fraktionen** · Bastionen **modular**, große Karte
 
 Teil 2 (Präsentation, Technik, Roadmap, offene Fragen): [`GDD-Praesentation-Technik.md`](GDD-Praesentation-Technik.md)
 Kataloge: [`katalog/01-gebaeude.md`](katalog/01-gebaeude.md) · [`katalog/02-einheiten.md`](katalog/02-einheiten.md) · [`katalog/03-kerne-und-weltlaunen.md`](katalog/03-kerne-und-weltlaunen.md)
@@ -97,15 +97,17 @@ Kataloge: [`katalog/01-gebaeude.md`](katalog/01-gebaeude.md) · [`katalog/02-ein
 
 Beide Spieler arbeiten **gleichzeitig und verdeckt** (Fog: man sieht die gegnerische Bastion erst, wenn der Kampf beginnt) in ihrem **Bastion-Screen**:
 - Bau-Karten per Drag & Drop an die Bastion **anlegen** (Baugrund-Raster, §4.1), mit **R** oder Rechtsklick drehen.
+- **Fundament (v0.9):** Zusätzlich zur Hand erhält jeder Spieler **12 kostenlose Bau-Karten** (⚙ 7 Räume, 2 Fallen, 2 Türme, 1 frei; Tier I–II, keine Doppelten): genug Material für ein echtes **Labyrinth** zwischen Tor und Kern. Unverbaute Fundament-Karten verfallen mit dem Kampfbeginn.
 - Truppen-Karten ins **Kontingent** legen (5 Plätze, §5.6). Für jede Verteidiger-Karte eine Wachzone wählen; für jede Artillerie-Karte eine Zielpriorität (§5.7).
 - Timer ⚙ **120 s**; „Bereit“ beendet vorzeitig. Wer fertig ist, sieht nur ein „✔ Bereit“ beim Gegner.
 - Beim Start des Kampfes folgt die **Enthüllung**: Die Kamera zieht auf die Weitaufnahme, beide Bastionen werden mit Hammerschlag-Welle „abgestempelt“ (Teil 2 §10.3).
 
 ### 3.4 Phase 2 — Kampfzyklus 🟦
 
-- **Welle 1** spawnt sofort beim Kampfbeginn. **Welle 2** folgt nach ⚙ **40 s**. Danach: **Zeitstopp**.
-- Nach der Pause spawnt die nächste Welle **sofort** (damit neue Truppen direkt eingreifen), die darauffolgende wieder nach 40 s, dann Zeitstopp usw.
-- Ein **Zyklus** = 2 Wellen + 1 Pause. Bei 40 s Wellenabstand und 25 s Pause rechnen wir mit rund **9–11 Zyklen** pro Partie.
+- **Welle 1** spawnt sofort beim Kampfbeginn, jede weitere nach ⚙ **40 s**. Nach der letzten Welle des Abschnitts folgt der **Zeitstopp**.
+- **Die Abschnitte werden länger (v0.9):** Vor dem ersten Zeitstopp laufen ⚙ **2 Wellen**, vor dem zweiten 3, dann 4, 5, 6 … (`SEGMENT_WAVES_BASE` = 2, `_STEP` = +1 je Zeitstopp, max. 9). Die Zeit zwischen den Zeitstopps wächst also von rund 40 s auf mehrere Minuten, die Armeen wachsen mit (§5.6).
+- Nach der Pause spawnt die nächste Welle **sofort** (damit neue Truppen direkt eingreifen).
+- Bei 40 s Wellenabstand rechnen wir mit rund **5–7 Zeitstopps** pro Partie (Prototyp: Wahnsinn ab 11:00, Himmelsriss ab 16:00).
 - **Während der Schlacht** läuft alles automatisch (Autobattler): Artillerie schießt, Sturmtruppen stürmen, Verteidiger wehren ab, Zivilisten tun Nützliches. Der einzige direkte Eingriff ist die **Kern-Fähigkeit** 🟨 (§9.1).
 
 ### 3.5 Der Zeitstopp (Pause) 🟦
@@ -138,7 +140,7 @@ Es gewinnt, wer zuerst **eine** der beiden Bedingungen erfüllt:
 
 ### 3.7 Der Wahnsinn (Anti-Patt) 🟨 P1
 
-Ab ⚙ **14:00** beginnt der **Wahnsinn**: Alle 30 s steigen Artillerieschaden +10 %, Eroberungstempo +10 % und Welt-Launen-Ausbrüche werden häufiger. Bei ⚙ **20:00** zerreißt der „Himmelsriss“, beide Kerne verlieren 1 % Max-HP pro Sekunde. Garantiert ein Ende.
+Ab ⚙ **11:00** (v0.9, vorher 14:00) beginnt der **Wahnsinn**: Alle 30 s steigen Artillerieschaden +10 %, Eroberungstempo +10 % und Welt-Launen-Ausbrüche werden häufiger. Bei ⚙ **16:00** (vorher 20:00) zerreißt der „Himmelsriss“, beide Kerne verlieren 1 % Max-HP pro Sekunde; wer unter mehr Eroberungsdruck steht, verliert schneller (kein Remis bei gleichem Stand). Garantiert ein Ende.
 
 ### 3.8 Beispielpartie (zum Mitdenken) 🟨
 
@@ -351,6 +353,8 @@ Tier-Zahl · Sterne (★) · Sprite · Name · Kategorie/Linie · Kernwerte (HP,
 - **Spielbeginn:** **10 ziehen, 7 behalten** (§3.2).
 - **Jeder Zeitstopp:** eine **komplett frische Hand**: **5 ziehen, 3 behalten**. Es gibt **keine** Hand, die man aufspart: Alle drei behaltenen Karten müssen **in dieser Pause gespielt werden, ungespielte verfallen**. Zurück in den Pool wandern auch die zwei nicht behaltenen Karten.
 - **Trostpflaster** 🟨: Jede behaltene, aber nicht gespielte Karte repariert die Bastion um ⚙ 4 % (Bauschutt wird verwertet). Damit lohnt sich auch eine Karte, für die gerade kein Platz ist.
+- **Hof überbauen (v0.9):** Räume und Türme dürfen schlichte Hofzellen (auch im Zufahrtsgang) überbauen, solange ein Weg aus Hofzellen vom Tor zur Kernkammer offen bleibt und kein Raum seine Tür verliert. So lassen sich Riegel quer über den Gang setzen und per Hof-Erweiterung Umwege anlegen: ein Labyrinth. Beim Aufnehmen wird die Zelle wieder Hof.
+- **Mauern brechen kostet Weg (v0.9):** Angreifer rechnen das Durchbrechen einer 300-HP-Mauer wie einen Umweg von rund 30 Zellen (6 + HP/12), sie folgen also lieber dem Labyrinth.
 - **Überbauen 🟨:** Wer keinen Platz hat, darf ein Bauteil **überbauen** (das alte geht verloren, Trümmer sind kostenlos überbaubar) oder eine Truppen-Karte gegen ein Kontingent-Element tauschen.
 - **Garantie:** In den 5 Karten sind mindestens 1 Bau-Karte und 1 Truppen-Karte.
 - **„Bekannte Gesichter“** 🟨: 20 % der gezogenen Karten sind Kopien von Karten, die man bereits besitzt (auf dem Raster oder im Kontingent). Das macht ★-Upgrades und größere Kontingente erreichbar.
@@ -360,7 +364,7 @@ Tier-Zahl · Sterne (★) · Sprite · Name · Kategorie/Linie · Kernwerte (HP,
 
 ### 5.6 Kontingent, Soll & Nachschub 🟦/🟨
 
-- Das **Kontingent** ist die Armee-Leiste. Start: ⚙ **5 Plätze**, +1 durch Kaserne (BF-01), +1 zum Zeitstopp 3 und 6, **max 8**.
+- Das **Kontingent** ist die Armee-Leiste. **Plätze (v0.9):** ⚙ **5** zum Start, **+1 mit jedem Zeitstopp** (die Armeen werden immer größer und vielseitiger), dazu **½ Platz je gebautem Einheiten-Raum** (Freischalt-Räume: Kaserne, Arkanum, Menagerie, …; zwei Räume = +1 Platz). Höchstens ⚙ 16. Kein einzelnes Gebäude ist mehr nötig, um das Kontingent zu erweitern.
 - Jede Truppen-Karte im Kontingent hat zwei Zahlen: **Soll (S)** = Zielstärke (wie viele gleichzeitig leben sollen) und **Nachschub (N)** = wie viele pro Welle nachgeliefert werden.
 - **Kontinuierliches Nachspawnen 🟦:** Zu jeder Welle fordert jede Karte `min(N, S − lebend)` Einheiten an (nie Verlust des Kontingents, nie „ausgehende“ Truppen). Sie spawnen gestaffelt (⚙ 0,4 s Abstand).
 - **Duplikat-Upgrade ★:** Zweite Kopie → **★2** (S × 1,5, N + 1), dritte → **★3** (S × 2, N + 1). Zwei Karten derselben Art belegen keinen zweiten Platz.
@@ -556,9 +560,10 @@ Türme (Katalog 01, BT) stehen als Turmzellen an der Außenkante, schießen **au
 ### 7.6 Besetzung & Eroberung 🟦/🟨 (P0)
 
 - **Besetzung** zählt Feinde (Sturmtruppen) *lebend in der Kernkammer*; Goblin-Kanonenfutter zählt halb.
-- **Fortschritt** der Eroberungsleiste: `Rate = (4 + 2 × (n − 1)) %/s`, ⚙ max 5 Eindringlinge. Beispiel: 3 Eindringlinge → 8 %/s → 100 % in ca. 12,5 s.
+- **Fortschritt** der Eroberungsleiste: `Rate = 1,5 %/s × n` (v0.9, vorher 4 + 2 × (n − 1)), ⚙ max 6 Eindringlinge. Beispiel: 3 Eindringlinge → 4,5 %/s → 100 % in rund 22 s; ein einzelner Eindringling braucht über eine Minute.
 - **Gesperrt**, solange ein lebender Verteidiger (oder Kern-Hüter) der Bastion in der Kernkammer steht. Der Fortschritt wird dann nicht abgebaut.
-- **Abbau:** Ohne Eindringlinge sinkt die Leiste um ⚙ 6 %/s.
+- **Abbau:** Ohne Eindringlinge sinkt die Leiste um ⚙ 3 %/s.
+- **Kernkristall zertrümmern (v0.9):** Eindringlinge in der Kernkammer, die kein Ziel mehr haben, schlagen auf den Kern ein (volle Wucht, mindestens Strukturfaktor 1). So gibt es auch dann Fortschritt, wenn Verteidiger die Eroberung sperren (zum Beispiel Nahkämpfer gegen Flieger). Die Anzeige im Spiel zeigt Fortschritt, Rate und wer sperrt.
 - **Bei 100 % gewinnt der Eroberer sofort.**
 - Segensauren und Kern-Fähigkeiten verlangsamen/sperren (Katalog).
 

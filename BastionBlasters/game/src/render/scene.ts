@@ -5,6 +5,7 @@ import { Application, Container, Graphics, Sprite, Text, type Texture } from 'pi
 import { CELL, MAP_H, MAP_W, PLOT, TPS, type Team } from '../sim/constants';
 import { BUILDINGS, UNITS } from '../sim/data';
 import { modCenter, wallMid } from '../sim/combat';
+import { chamberBox, unitActivity } from '../sim/ai';
 import type { Module, Projectile, SimEvent, Unit, Wall } from '../sim/types';
 import { K_EMPTY, K_ROOM, K_YARD } from '../sim/types';
 import { ci, type World } from '../sim/world';
@@ -66,6 +67,7 @@ export class Scene {
   ghostG = new Graphics();
   ghostSpr: Sprite | null = null;
   views = new Map<number, UnitView>();
+  conqLabels: Text[] = [];
   fx: Fx[] = [];
   sig = '';
   coreSprites: (Sprite | null)[] = [null, null];
@@ -92,6 +94,14 @@ export class Scene {
     this.objects.sortableChildren = true;
     this.root.addChild(this.bg, this.floors, this.dynWorld, this.groundFx, this.objects, this.fxLayer, this.overlay, this.textLayer);
     this.overlay.addChild(this.gridG, this.ghostG, this.dyn);
+    for (const t of [0, 1]) {
+      const l = new Text({ text: '', style: { fontFamily: 'monospace', fontSize: 11, fontWeight: 'bold', fill: '#ffffff', stroke: { color: '#000000', width: 3 } } });
+      l.anchor.set(0.5, 1);
+      l.visible = false;
+      l.zIndex = 9500;
+      this.conqLabels[t] = l;
+      this.textLayer.addChild(l);
+    }
     this.app.stage.addChild(this.root);
     // Bäume als eigene Sprites (Einheiten laufen dahinter)
     const trees = a.bgInfo.trees ?? [];
@@ -596,21 +606,51 @@ export class Scene {
       g.rect(mid.x * CELL - 8, mid.y * CELL - 12, 16, 3).fill({ color: 0x000000, alpha: 0.7 });
       g.rect(mid.x * CELL - 8, mid.y * CELL - 12, 16 * f, 2).fill({ color: f > 0.5 ? 0x62d26f : f > 0.25 ? 0xe5c14a : 0xe5534b });
     }
-    // Eroberungs-/Kern-Marker
+    // Eroberung der Kernkammer: Kammerrahmen, Fortschrittsbogen in der Farbe der Eindringlinge, Beschriftung
     for (const t of [0, 1] as Team[]) {
       const c = world.modules.get(world.coreMod[t]);
-      if (!c) continue;
-      if (world.conquest[t] > 0) {
-        const cx = (c.x0 + 1) * CELL, cy = (c.y0 + 1) * CELL;
-        g.circle(cx, cy, 2.4 * CELL).stroke({ width: 2, color: TEAM_COL[t === 0 ? 1 : 0], alpha: 0.4 + world.conquest[t] / 200 });
+      const label = this.conqLabels[t];
+      const info = world.conqInfo[t];
+      if (!c || (world.conquest[t] <= 0.05 && info.n === 0)) { label.visible = false; continue; }
+      const cb = chamberBox(t);
+      const x0 = cb.x0 * CELL, y0 = cb.y0 * CELL, w = (cb.x1 - cb.x0 + 1) * CELL, h = (cb.y1 - cb.y0 + 1) * CELL;
+      const col = TEAM_GLOW[t === 0 ? 1 : 0];
+      const pulse = 0.5 + 0.5 * Math.sin(now / 160);
+      g.rect(x0, y0, w, h).fill({ color: col, alpha: info.n > 0 ? 0.08 + 0.06 * pulse : 0.04 }).stroke({ width: 2, color: info.locked ? 0xe5c14a : col, alpha: 0.9 });
+      const cx = x0 + w / 2, cy = y0 + h / 2;
+      const r = 3.1 * CELL;
+      g.circle(cx, cy, r).stroke({ width: 4, color: 0x000000, alpha: 0.55 });
+      const frac = Math.min(1, world.conquest[t] / 100);
+      if (frac > 0.003) {
+        g.moveTo(cx + r, cy);
+        g.arc(cx, cy, r, 0, Math.PI * 2 * frac).stroke({ width: 4, color: col, alpha: 0.95 });
       }
+      if (info.locked) g.circle(cx, cy, r + 5).stroke({ width: 2, color: 0xe5c14a, alpha: 0.5 + 0.4 * pulse });
+      label.visible = true;
+      label.text = info.locked ? `CONQUEST ${world.conquest[t].toFixed(0)}% · BLOCKED by ${info.lockedBy}` : info.n > 0 ? `CONQUEST ${world.conquest[t].toFixed(0)}% · +${info.rate.toFixed(0)}%/s` : `conquest fading ${world.conquest[t].toFixed(0)}%`;
+      label.position.set(cx, y0 - 14);
     }
     // Auswahl
     const sel = this.selected;
     if (sel) {
       if (sel.kind === 'unit') {
         const u = world.byId.get(sel.id);
-        if (u && !u.dead) g.ellipse(u.x * CELL, u.y * CELL - 1, 13, 7).stroke({ width: 2, color: 0xffffff, alpha: 0.9 });
+        if (u && !u.dead) {
+          g.ellipse(u.x * CELL, u.y * CELL - 1, 13, 7).stroke({ width: 2, color: 0xffffff, alpha: 0.9 });
+          // Zielstrich: was die Einheit gerade angreift oder ansteuert
+          const act = unitActivity(world, u);
+          if (act.target) {
+            const ax = u.x * CELL, ay = u.y * CELL - 8, bx = act.target.x * CELL, by = act.target.y * CELL;
+            const len = Math.hypot(bx - ax, by - ay);
+            const dash = 7;
+            for (let d = (now / 40) % (dash * 2); d < len; d += dash * 2) {
+              const k0 = d / len, k1 = Math.min(1, (d + dash) / len);
+              g.moveTo(ax + (bx - ax) * k0, ay + (by - ay) * k0).lineTo(ax + (bx - ax) * k1, ay + (by - ay) * k1);
+            }
+            g.stroke({ width: 2, color: 0xffd34a, alpha: 0.9 });
+            g.circle(bx, by, 6).stroke({ width: 2, color: 0xffd34a, alpha: 0.9 });
+          }
+        }
       } else if (sel.kind === 'module') {
         const m = world.modules.get(sel.id);
         if (m) g.rect(m.x0 * CELL - 1, m.y0 * CELL - 1, m.cols * CELL + 2, m.rows * CELL + 2).stroke({ width: 2, color: 0xffffff, alpha: 0.9 });

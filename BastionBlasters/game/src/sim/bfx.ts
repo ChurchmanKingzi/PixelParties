@@ -258,12 +258,28 @@ export function bonusQuota(world: World, team: Team, kind: 'soll' | 'nachschub')
   if (kind === 'nachschub') return active(world, team, 'BU-08') ? 1 : 0;
   return active(world, team, 'BU-10') ? 1 : 0;
 }
+/** Kontingent-Plätze: Grundplätze, +1 mit jedem Zeitstopp, dazu ein halber Platz je Einheiten-Raum (Unlock-Gruppe) */
+export const SLOT_BASE = 5;
+export const SLOT_MAX = 16;
+export const UNIT_ROOM_SLOT = 0.5;
+
+export function unitRooms(world: World, team: Team): Module[] {
+  const out: Module[] = [];
+  for (const m of world.modules.values()) {
+    if (m.owner === team && m.kind === 'room' && BUILDINGS[m.card]?.group === 'Unlock' && !m.destroyed && m.buildEnd <= world.tick) out.push(m);
+  }
+  return out;
+}
+
+export function slotBreakdown(world: World, team: Team): { base: number; stops: number; rooms: number; roomSlots: number; total: number } {
+  const rooms = unitRooms(world, team).length;
+  const roomSlots = Math.floor(rooms * UNIT_ROOM_SLOT + 1e-9);
+  const total = Math.min(SLOT_MAX, SLOT_BASE + world.pauseNo + roomSlots);
+  return { base: SLOT_BASE, stops: world.pauseNo, rooms, roomSlots, total };
+}
+
 export function contingentSlots(world: World, team: Team): number {
-  let n = 5;
-  if (active(world, team, 'BF-01')) n++;
-  if (world.pauseNo >= 3) n++;
-  if (world.pauseNo >= 6) n++;
-  return Math.min(8, n);
+  return slotBreakdown(world, team).total;
 }
 export function keepCount(world: World, team: Team): number {
   return active(world, team, 'BU-11') ? 4 : 3;

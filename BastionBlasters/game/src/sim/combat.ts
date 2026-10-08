@@ -235,7 +235,9 @@ export function attackStruct(world: World, u: Unit, tgt: NonNullable<Unit['tstru
   u.inCombat = world.tick;
   if (u.invisible) u.invisible = false;
   const dtype = pickType(world, def);
-  const sf = (def.structFactor ?? 0.4) * (fx.structBonus ?? 1);
+  const coreHit = tgt.kind === 'module' && world.modules.get(tgt.id)?.kind === 'core';
+  // Der Kernkristall zerbricht unter dem Hammer der Eindringlinge: volle Wucht statt Bauteil-Faktor
+  const sf = (coreHit ? Math.max(1, def.structFactor ?? 0.4) : (def.structFactor ?? 0.4)) * (fx.structBonus ?? 1);
   const base = (u.s.dmgOverride ?? def.dmg ?? 0) * u.mods.dmgDealt * sf * (def.hits ?? 1);
   if (tgt.kind === 'wall') {
     const w = world.walls.get(tgt.id);
@@ -245,7 +247,10 @@ export function attackStruct(world: World, u: Unit, tgt: NonNullable<Unit['tstru
     }
   } else if (tgt.kind === 'module') {
     const m = world.modules.get(tgt.id);
-    if (m) hurtModule(world, m, base, dtype, u);
+    if (m) {
+      const dealt = hurtModule(world, m, base, dtype, u);
+      if (coreHit && dealt > 0) world.emit({ t: 'hit', x: u.x, y: u.y - 0.4, dmg: Math.round(dealt), team: m.owner });
+    }
   }
 }
 
