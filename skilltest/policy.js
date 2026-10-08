@@ -27,7 +27,7 @@ const DEFAULT_WEIGHTS = {
   focusLeader: 1.5,         // >0: stärkste Gegner bevorzugen; <0: Schwache
   heroEffect: 0.6,          // Neigung, aktive Hero-Effekte zu nutzen
   creatureEffect: 0.8,      // Neigung, Creature-Effekte zu nutzen
-  spell: 1.0,               // Neigung, Handzauber/-angriffe zu spielen
+  spell: 1.5,               // Neigung, Handzauber/-angriffe zu spielen (ausgeliefert: 1,5 — zweimal gemessen +1,2…1,7 Punkte Siegquote)
   summon: 0.9,              // Neigung, Creatures zu beschwören
   equip: 1.0,               // Neigung, Artifacts auszurüsten (frei)
   potion: 1.0,              // Neigung, Tränke zu trinken (frei)
@@ -69,7 +69,7 @@ const DEFAULT_WEIGHTS = {
  * mindestens ebenbürtig (+1,7 Punkte). Die gelernten Personas überschreiben diese Werte NICHT mehr (`shipped`): ihre Zielwahl war auf Platzierung
  * gezüchtet, nicht auf Sieg, und neigte zu „Schwächste zuerst“ (lowestHp Ø 1,46).
  */
-const SHIPPED_TARGETING = { tgtModel: 1, lowestHp: 0, killBonus: 1, focusLeader: 1.5, tThreat: 4, aKill: 3, aDmg: 1, sAtk: 3 };
+const SHIPPED_TARGETING = { tgtModel: 1, lowestHp: 0, killBonus: 1, focusLeader: 1.5, tThreat: 4, aKill: 3, aDmg: 1, sAtk: 3, spell: 1.5 };
 /** Gewichte einer Persona mit der ausgelieferten Zielwahl (für CPU-Sitze im Live-Spiel und in der Simulation). */
 function shipped(w) { return Object.assign({}, w, SHIPPED_TARGETING); }
 

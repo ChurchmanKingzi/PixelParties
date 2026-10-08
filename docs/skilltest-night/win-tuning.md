@@ -30,3 +30,19 @@ Varianten in diesem Feld: `focusLeader 0` ±0,0; `focusLeader −1` +1,5; `tThre
 - `policy.js`: `DEFAULT_WEIGHTS` tragen die Werte; `shipped(w)` überschreibt sie in Persona-Gewichten (Live-CPUs in `battle.js`/`prep.js`, Simulation, Training).
 - Die Lookahead-Suche (MCTS) brachte auf diesem Stand keinen messbaren Gewinn bei 4–12-facher Rechenzeit und bleibt unverändert.
 - Weitere Dimensionen (Aggression, Zauber, Beschwörung, Effekte, Ability-Nutzung) werden als Nächstes auf dieser Basis einzeln gepaart geprüft.
+
+## Weitere Kampfgewichte (Koordinatenanstieg auf der ausgelieferten Persona-Basis)
+Persona + ausgelieferte Zielwahl als Basis, je Gewicht zwei Werte, 480 Paare (Seeds 22000), Siegquote Basis 25,6 %:
+
+| Gewicht → Wert | Δ Punkte | z |
+|---|---|---|
+| learned 1,6 | +1,9 | 2,06 |
+| spell 1,5 | +1,7 | 1,63 |
+| learned 0,3 / creatureEffect 0,6 / creatureEffect 1,4 / aggression 0,6 / heroEffect 0,6 | +1,0 … +0,4 | ≤ 1,0 |
+| aggression 1,5 / heroEffect 1,4 / abilityUse 1,6 / reactEager 0,5 und 1,6 | −0,8 … −0,2 | ≥ −1,6 |
+| summon, equip, abilityUse 0,5, healBias, abilityPlay, potion (je zwei Werte) | ±0,0 … +0,2 | ≤ 1,0 (fast keine abweichenden Partien) |
+
+Nichts erreicht bei 24 Vergleichen eine belastbare Signifikanz. Nachprüfung der zwei besten auf frischen Seeds (600 Paare, Seeds 23000, Basis 22,8 %):
+`learned 1,6` +0,2 (z 0,2) — **nicht bestätigt**; `spell 1,5` +1,2 (z 1,7), beide Läufe zusammen 28 gegen 13 abweichende Partien (z ≈ 2,3) — **bestätigt, klein**.
+Ausgeliefert wird nur `spell 1,5` (`SHIPPED_TARGETING.spell`, mit den Hand-Garantien für Spells liegen mehr Zauber auf der Hand). Die übrigen Gewichte bleiben:
+Aggression, Effekte, Beschwörung, Ausrüstung und Tränke sind in dieser Umgebung nicht der Hebel — der große Gewinn war die Zielwahl.

@@ -174,7 +174,7 @@ function isNameEligibleForLearning(engine, ps, pi, heroIdx, name, requireMagicAr
   // Forbidden Zone needs a free area zone, …).
   if (typeof script?.spellPlayCondition === 'function') {
     try {
-      if (!script.spellPlayCondition(engine.gs, pi)) return false;
+      if (!script.spellPlayCondition(engine.gs, pi, engine)) return false;
     } catch (err) {
       console.error(`[Learning] spellPlayCondition for ${name}:`, err.message);
       return false;
