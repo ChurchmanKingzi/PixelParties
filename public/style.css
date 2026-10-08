@@ -10743,6 +10743,14 @@ body:has(.modal-overlay) .tooltip {
   transform-origin: center bottom !important;
 }
 
+/* Dasselbe fuer die animierte Figur auf der Zone (Magic Hammer, Shattering
+   Strike — `ppZonenSquash` in app-board.jsx). Die Figur wird an den Fuessen
+   gequetscht (`.hero-idle-holo` hat dort seinen Drehpunkt), genau wie die
+   Karte an ihrer Unterkante. Eingeklappt (Hover/Zielwahl) bleibt sie weg. */
+.hero-idle-platz[data-squash]:not(.hero-idle-weg) .hero-idle-holo {
+  animation: hammerSquash .65s ease-out forwards !important;
+}
+
 @keyframes hammerSquash {
   0%   { transform: scaleY(1)    scaleX(1); }
   12%  { transform: scaleY(.12)  scaleX(1.3); }
