@@ -355,17 +355,18 @@ def ghostly(spr, ramp='fur'):
 
 
 def smiling_bolt():
-    """lächelnder Blitz (Figur), 11 x 17: dicker Zickzack mit zwei Augen und Lächeln"""
-    c = Canvas(11, 17)
-    body = [(5, 0), (9, 0), (7, 6), (10, 6), (3, 16), (5, 9), (2, 9)]
-    poly(c, body, 'gold', lo=3, hi=5, flat=None)
-    for (x, y) in ((4, 3), (7, 3)):
-        c.put_ramp(x, y, 'coal', 0)
-    for (x, y) in ((4, 5), (5, 6), (6, 6), (7, 5)):
-        pass
-    c.put_ramp(4, 4, 'coal', 1)
-    c.put_ramp(7, 4, 'coal', 1)
-    c.put_ramp(5, 5, 'coal', 1)
-    c.put_ramp(6, 5, 'coal', 1)
+    """lächelnder Blitz (Figur), 14 x 21: dicker Zickzack mit zwei Augen und Lächeln"""
+    c = Canvas(14, 21)
+    body = [(3, 0), (12, 0), (9, 9), (13, 9), (4, 20), (6, 12), (1, 12)]
+    poly(c, body, 'gold', lo=3, hi=5)
+    for x in range(4, 11):
+        c.put_ramp(x, 0, 'gold', 5)
+    c.rect(5, 3, 5, 4, 'coal', 0)
+    c.rect(9, 3, 9, 4, 'coal', 0)
+    c.put_ramp(5, 7, 'coal', 1)
+    c.put_ramp(6, 8, 'coal', 1)
+    c.put_ramp(7, 8, 'coal', 1)
+    c.put_ramp(8, 8, 'coal', 1)
+    c.put_ramp(9, 7, 'coal', 1)
     c.outline()
     return c

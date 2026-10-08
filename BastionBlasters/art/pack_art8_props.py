@@ -1182,14 +1182,27 @@ def hanging_lantern():
 
 
 def sack_pile():
-    c = Canvas(18, 16)
-    ellipse(c, 9, 10, 8, 5.5, 'bone', lo=2, hi=4)
-    ellipse(c, 6, 6, 4.5, 4.5, 'bone', lo=2, hi=5)
-    c.put_ramp(6, 2, 'bone', 5)
-    c.rect(5, 0, 7, 1, 'bone', 3)
-    c.put_ramp(6, 7, 'coal', 2)
-    c.put_ramp(7, 8, 'coal', 2)
+    """Jutesack, oben zugebunden (18 x 18)"""
+    c = Canvas(18, 18)
+    ellipse(c, 9, 12, 7.6, 5.4, 'dirt', lo=2, hi=5)
+    ellipse(c, 9, 8, 5.4, 5.0, 'dirt', lo=2, hi=5)
+    c.rect(7, 3, 11, 4, 'dirt', 3)
+    c.rect(6, 5, 12, 5, 'wood', 2)
+    c.put_ramp(7, 2, 'dirt', 4)
+    c.put_ramp(10, 2, 'dirt', 3)
+    c.put_ramp(6, 10, 'dirt', 1)
+    c.put_ramp(7, 11, 'dirt', 1)
+    c.put_ramp(12, 13, 'coal', 2)
+    c.put_ramp(13, 14, 'coal', 1)
     c.outline()
+    return c
+
+
+def smoke_wisp(n=0):
+    """Rauchwölkchen (grau, Dither)"""
+    c = Canvas(14 + 4 * n, 12 + 2 * n)
+    dither_blob(c, 5 + 2 * n, 6 + n, 4.2 + n, 3.2 + n * 0.6, 'stone', hi=4, lo=3)
+    dither_blob(c, 9 + 3 * n, 4 + n, 3.4 + n * 0.6, 2.8 + n * 0.4, 'stone', hi=5, lo=3)
     return c
 
 
@@ -1251,9 +1264,9 @@ def spark_fountain(col_cycle=FW_COLORS, seed=3, h=44, w=44):
     rnd = random.Random(seed)
     cx = w // 2
     base = h - 3
-    for k in range(120):
-        vx = rnd.uniform(-1.0, 1.0) * 10.5
-        vy = rnd.uniform(17.0, 33.0)
+    for k in range(240):
+        vx = rnd.uniform(-1.0, 1.0) * 12.0
+        vy = rnd.uniform(17.0, 34.0)
         t = rnd.uniform(0.08, 1.0)
         x = cx + vx * t * 1.5
         y = base - vy * t * 1.55 + 22.0 * t * t * 1.1
@@ -1266,8 +1279,8 @@ def spark_fountain(col_cycle=FW_COLORS, seed=3, h=44, w=44):
         c.put_ramp(xi - (1 if vx > 0 else -1) if t > 0.3 else xi, yi + 1, col, 4)
         if rnd.random() < 0.45:
             c.put_ramp(xi, yi + 2, col, 3)
-        if k % 5 == 0:
-            for (dx, dy) in ((1, 0), (-1, 0), (0, -1)):
+        if k % 3 == 0:
+            for (dx, dy) in ((1, 0), (-1, 0), (0, -1), (0, 1)):
                 c.put_ramp(xi + dx, yi + dy, col, 4)
     # heller Kern, Düse
     for y in range(h - 9, h - 1):

@@ -48,17 +48,21 @@ def observatory_tower(team='teamA'):
     poly(c, [(cx - 4, 78), (cx + 4, 78), (cx + 4, 70), (cx, 66), (cx - 4, 70)], 'wood', lo=1, hi=4)
     c.rect(cx, 67, cx, 78, 'wood', 0)
     c.put_ramp(cx + 2, 74, 'gold', 5)
-    # Sternkarte (Scheibe an der Wand)
+    # Sternkarte: dunkle Scheibe mit goldenem Stern und Goldrand
     for y in range(47, 60):
         for x in range(cx - 7, cx + 7):
             d = math.hypot(x + 0.5 - cx, y + 0.5 - 53.5)
             if d <= 6.6:
-                c.put_ramp(x, y, 'bone' if d > 5.6 else 'ice', 4 if d > 5.6 else (2 if (x + y) % 5 else 1))
-    for (x, y) in ((cx - 3, 50), (cx, 52), (cx + 3, 51), (cx - 2, 56), (cx + 2, 56), (cx + 4, 54), (cx - 4, 54)):
-        c.put_ramp(x, y, 'gold', 5)
-    c.line(cx - 3, 50, cx, 52, 'gold', 3)
-    c.line(cx, 52, cx + 3, 51, 'gold', 3)
-    c.line(cx - 2, 56, cx + 2, 56, 'gold', 3)
+                if d > 5.4:
+                    c.put_ramp(x, y, 'gold', 4 if x + y < cx + 52 else 2)
+                else:
+                    c.put_ramp(x, y, 'purple', 1 if (x + y) % 2 else 2)
+    for k in range(-4, 5):
+        c.put_ramp(cx, 53 + k, 'gold', 5 if abs(k) < 3 else 4)
+        c.put_ramp(cx + k, 53, 'gold', 5 if abs(k) < 3 else 4)
+    for (dx, dy) in ((-2, -2), (2, -2), (-2, 2), (2, 2)):
+        c.put_ramp(cx + dx, 53 + dy, 'gold', 4)
+    c.put_ramp(cx, 53, 'bone', 5)
     # --- Trommel y 30..46
     dx0, dx1 = cx - 12, cx + 11
     for y in range(31, 47):

@@ -34,7 +34,7 @@ THEME_ARMORY = {'floor': floor_slab(31, (2, 3), 1, 4), 'furnish': furnish_armory
 
 @card_art('BW-02')
 def _art_bw02():
-    world, c, out, geom = build_room('A', THEME_ARMORY, 3, 2, seed=2)
+    world, c, out, geom = build_room('A', THEME_ARMORY, 3, 2, seed=7)
     MX, MY, MW, MH = geom
     # Kicher-Striche neben den Helmen
     for cx in (MX + 18, MX + 48, MX + 78):
@@ -65,7 +65,7 @@ THEME_POWDER = {'floor': floor_dark_planks(), 'furnish': furnish_powder, 'low': 
 
 @card_art('BW-03')
 def _art_bw03():
-    world, c, out, geom = build_room('P', THEME_POWDER, 2, 2, seed=3)
+    world, c, out, geom = build_room('P', THEME_POWDER, 2, 2, seed=1)
     MX, MY, MW, MH = geom
     g = powder_gnome()
     _feet(world, g, MX + 46, MY + 49, flip=True)
@@ -74,6 +74,8 @@ def _art_bw03():
     for (dx, dy) in ((22, 6), (24, 4), (26, 2), (30, 5), (32, 6)):
         wpix(world, MX + dx, MY + dy + 2, 'coal', 3)
     wdraw(world, ember_spark('gold'), MX + 33, MY + 40)
+    wdraw(world, smoke_wisp(0), MX + 26, MY + 6)
+    wdraw(world, smoke_wisp(1), MX + 20, MY - 6)
     prop_at(world, bush(1), MX - 20, MY + 24)
     prop_at(world, rock(2), MX + MW + 22, MY + 66)
     prop_at(world, bush(3, True), MX + MW + 20, MY + 24)
@@ -85,14 +87,14 @@ def _art_bw03():
 
 def furnish_fireworks(ctx):
     X0, Y0, W, H = ctx.X0, ctx.Y0, ctx.W, ctx.H
-    ctx.decor(banner_rocket(), X0 + 14)
-    ctx.decor(firecracker_string(), X0 + 44)
-    ctx.floor_deco(scorch_mark(22, 9), X0 + 20, Y0 + 36)
-    ctx.floor_deco(scorch_mark(16, 7), X0 + 6, Y0 + 40)
-    ctx.prop(rocket_rack(), X0 + 3, Y0 + 12)
-    ctx.prop(firework_fountain('fire'), X0 + 26, Y0 + 28)
-    for (x, col) in ((X0 + 46, 'ice'), (X0 + 52, 'leaf')):
-        ctx.prop(rocket(col, 24), x, Y0 + 12)
+    ctx.decor(banner_rocket(), X0 + 12)
+    ctx.decor(firecracker_string(), X0 + 42)
+    ctx.floor_deco(scorch_mark(22, 9), X0 + 16, Y0 + 38)
+    ctx.floor_deco(scorch_mark(16, 7), X0 + 36, Y0 + 42)
+    ctx.prop(rocket_rack(), X0 + 3, Y0 + 10)
+    ctx.prop(firework_fountain('fire'), X0 + 30, Y0 + 30)
+    for (x, col) in ((X0 + 48, 'ice'), (X0 + 54, 'leaf')):
+        ctx.prop(rocket(col, 22), x, Y0 + 6)
 
 
 THEME_FIREWORKS = {'floor': floor_planks_light(), 'furnish': furnish_fireworks, 'low': False}
@@ -100,14 +102,14 @@ THEME_FIREWORKS = {'floor': floor_planks_light(), 'furnish': furnish_fireworks, 
 
 @card_art('BW-04')
 def _art_bw04():
-    world, c, out, geom = build_room('F', THEME_FIREWORKS, 2, 2, seed=4)
+    world, c, out, geom = build_room('F', THEME_FIREWORKS, 2, 2, seed=12)
     MX, MY, MW, MH = geom
-    # Funkenfontäne in fünf Farben aus dem Böller
+    # Funkenfontäne in fünf Farben aus dem Böller (hinter dem Feuerwerker)
     sf = spark_fountain(seed=4)
-    world.draw(sf, MX + 32 - sf.w // 2, MY + 28 + 2 - sf.h + 2, 9000)
+    world.draw(sf, MX + 34 - sf.w // 2, MY + 31 - sf.h + 4, MY + 44)
     # Feuerwerker rechts (blickt zur Fontäne)
-    _feet(world, fireworks_worker(), MX + 50, MY + 48, flip=True)
-    for (x, y, col) in ((MX + 10, MY + 6, 'gold'), (MX + 56, MY + 2, 'leaf'), (MX + 28, MY - 2, 'purple')):
+    _feet(world, fireworks_worker(), MX + 54, MY + 49, flip=True)
+    for (x, y, col) in ((MX + 10, MY + 4, 'gold'), (MX + 56, MY + 0, 'leaf'), (MX + 24, MY - 4, 'purple')):
         spark(world, x, y, col)
     prop_at(world, bush(2), MX - 20, MY + 24)
     prop_at(world, rock(1), MX + MW + 22, MY + 68)
@@ -133,12 +135,12 @@ THEME_FOUNDRY = {'floor': floor_sand(), 'furnish': furnish_foundry, 'low': False
 
 @card_art('BW-05')
 def _art_bw05():
-    world, c, out, geom = build_room('G', THEME_FOUNDRY, 3, 2, seed=5)
+    world, c, out, geom = build_room('G', THEME_FOUNDRY, 3, 2, seed=3)
     MX, MY, MW, MH = geom
     # Rohre trocknen auf der Wäscheleine (Leine zwischen den Pfosten)
     world.draw(drying_cannon(1), MX + 64, MY + 6, 9000)
     world.draw(drying_cannon(0), MX + 60, MY + 26, 9000)
-    _feet(world, foundry_worker(), MX + 10, MY + 48)
+    _feet(world, foundry_worker(), MX + 14, MY + 48)
     prop_at(world, bush(2), MX - 18, MY + 74)
     prop_at(world, rock(1), MX + MW + 16, MY + 70)
     return _fin(world, geom)
@@ -150,10 +152,8 @@ def _art_bw05():
 def furnish_runes(ctx):
     X0, Y0, W, H = ctx.X0, ctx.Y0, ctx.W, ctx.H
     ctx.decor(stone_tablet_decor(), X0 + 18)
-    ctx.decor(crystal_cluster(), X0 + 52)
-    ctx.prop(rune_press(), X0 + 4, Y0 + 2)
-    ctx.prop(paper_stack(), X0 + 24, Y0 + 36)
-    ctx.prop(ink_pot(), X0 + 44, Y0 + 12)
+    ctx.decor(crystal_cluster('ice'), X0 + 50)
+    ctx.prop(rune_press(), X0 + 4, Y0 + 0)
 
 
 THEME_RUNES = {'floor': floor_rune(), 'furnish': furnish_runes, 'low': False}
@@ -161,11 +161,16 @@ THEME_RUNES = {'floor': floor_rune(), 'furnish': furnish_runes, 'low': False}
 
 @card_art('BW-06')
 def _art_bw06():
-    world, c, out, geom = build_room('R', THEME_RUNES, 2, 2, seed=6)
+    world, c, out, geom = build_room('R', THEME_RUNES, 2, 2, seed=8)
     MX, MY, MW, MH = geom
-    tint_glow(world, MX + 24, MY + 40, 26, 10, 'purple', 3)
+    tint_glow(world, MX + 24, MY + 44, 24, 8, 'purple', 3)
     ap = rune_apprentice()
-    _feet(world, ap, MX + 44, MY + 48, flip=True)
+    _feet(world, ap, MX + 50, MY + 49, key=MY + 70, flip=True)
+    # leuchtende Runen steigen aus der Presse auf
+    for (dx, dy, k) in ((14, 10, 1), (22, 2, 3), (28, 16, 0)):
+        wdraw(world, rune_glyph(k, 'purple', 3), MX + dx + 1, MY + dy + 1, 8990)
+        wdraw(world, rune_glyph(k, 'purple', 5), MX + dx, MY + dy)
+    wdraw(world, star_burst('purple', 4), MX + 22, MY + 25)
     prop_at(world, bush(1), MX - 20, MY + 24)
     prop_at(world, rock(2), MX + MW + 22, MY + 66)
     prop_at(world, bush(3, True), MX + MW + 20, MY + 24)

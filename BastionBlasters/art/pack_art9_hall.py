@@ -282,14 +282,15 @@ def cauldron_big():
     return c
 
 
-def stirring_spoon(f=0):
+def stirring_spoon(f=0, ln=14):
     """Riesenkochlöffel, rührt von allein (20 x 34): Kelle unten (im Trank), Griff mit Öse schräg nach oben rechts"""
     c = Canvas(20, 34)
-    thick_line(c, 5, 29, 15, 7, 2.4, 'wood', lo=2, hi=5)
-    ellipse(c, 4.5, 29.5, 3.6, 2.4, 'wood', lo=2, hi=5)
-    ellipse(c, 15.5, 4.5, 2.4, 3.0, 'wood', lo=2, hi=5)
-    c.put_ramp(15, 4, 'wood', 0)
-    c.put_ramp(16, 5, 'wood', 0)
+    ex, ey = 5 + int(round(ln * 0.5)), 29 - ln
+    thick_line(c, 5, 29, ex, ey, 2.6, 'wood', lo=2, hi=5)
+    ellipse(c, 4.5, 29.5, 3.8, 2.5, 'wood', lo=2, hi=5)
+    ellipse(c, ex + 0.5, ey - 2.0, 2.4, 3.0, 'wood', lo=2, hi=5)
+    c.put_ramp(ex, ey - 2, 'wood', 0)
+    c.put_ramp(ex + 1, ey - 1, 'wood', 0)
     c.outline()
     return c
 

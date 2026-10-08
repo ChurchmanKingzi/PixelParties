@@ -308,19 +308,19 @@ def furnish_gundeck(ctx):
     # Schanzkleid statt Steinwaenden
     wd.draw(bulwark_front(W - 8, 19), X0 + 4, Y0 - 4 - 10 + 1, Y0 + 4)
     side = bulwark_side(H + 22)
-    wd.draw(side, X0 - 4, Y0 - 4 - 10 + 1, 98)
-    wd.draw(side, X0 + W - 4, Y0 - 4 - 10 + 1, 98)
+    wd.draw(side, X0 - 4, Y0 - 4 - 10 + 1, 120)
+    wd.draw(side, X0 + W - 4, Y0 - 4 - 10 + 1, 120)
     sy = Y0 + H - 4 - 10 + 1
     for (x0, x1) in ((X0 - 4, cx - 8), (cx + 8, X0 + W + 4)):
         wd.draw(bulwark_front(x1 - x0, 18, shield_gap=22), x0, sy, 120)
     # drei Geschuetzplaetze in einer Reihe
     pad = gun_pad()
-    py_ = Y0 + 41
+    py_ = Y0 + 42
     centers = [(X0 + 22, py_), (cx, py_), (X0 + W - 22, py_)]
     for (px_, pyy) in centers:
         ctx.floor_deco(pad, px_ - 12, pyy - 12)
         ctx.platform(px_, pyy)
-    ctx.prop(ship_mast(), cx - 17, Y0 + 22 - 43)
+    ctx.prop(ship_mast(), cx - 17, Y0 + 25 - 43)
     ctx.prop(ship_cannon(), centers[0][0] - 17, py_ + 6 - 21)
     ctx.prop(ball_pile(), X0 + W - 26, Y0 + 5)
     ctx.prop(barrel_small(), X0 + 6, Y0 + 7)

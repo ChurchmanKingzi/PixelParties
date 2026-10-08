@@ -357,3 +357,312 @@ def _art_bs09():
     for (sp, x, y) in ((barrel(), 16, 34), (crate(), 128, 34)):
         prop_at(w, sp, x, y)
     return finish(w)
+
+
+# --------------------------------------------------------------------------- Türme: gemeinsamer Aufbau
+
+
+class TW:
+    """Turm-Szene in Fensterkoordinaten (144 x 96): kleine Burg mit Turmzelle 'T', Turmmitte bei x = 56, fertig beschnitten.
+    Die Welt ist 240 x 160, das Fenster beginnt bei (56, y0)."""
+
+    def __init__(self, ground, seed, tw, y0=14, rows=None):
+        self.x0, self.y0 = 56, y0
+        self.world = ground_world(ground, seed, 240, 160)
+        rows = rows or [".....", ".hhT.", "....."]
+        mini_castle(rows, 0, 1, self.world, tw=tw)
+
+    def X(self, x):
+        return int(x + self.x0)
+
+    def Y(self, y):
+        return int(y + self.y0)
+
+    def shadow(self, x, y, sh=(9, 3)):
+        shadow(self.world, self.X(x), self.Y(y) - 1, sh[0], sh[1])
+
+    def unit(self, spr, x, y, flip=False, top=False, sh=(9, 3), shade=True):
+        """Einheit mit Fußpunkt (x, y); top=True: liegt über allen Strahlen/Effekten (Schlüssel 9000 + y)"""
+        if shade:
+            self.shadow(x, y, sh)
+        key = 9000 + int(y) if top else self.Y(y)
+        self.world.draw(spr, self.X(x) - spr.w // 2, self.Y(y) - spr.h + 1, key, flip)
+
+    def prop(self, spr, x, y, flip=False):
+        prop_at(self.world, spr, self.X(x), self.Y(y), flip)
+
+    def sprite(self, spr, x, y, key=9100, flip=False):
+        """freies Sprite mit Mittelpunkt (x, y)"""
+        self.world.draw(spr, self.X(x) - spr.w // 2, self.Y(y) - spr.h // 2, key, flip)
+
+    def px(self, x, y, ramp, idx, key=9000):
+        wpx(self.world, self.X(x), self.Y(y), ramp, idx, key)
+
+    def line(self, x0, y0, x1, y1, ramp, idx, key=9000, dash=0):
+        wline(self.world, self.X(x0), self.Y(y0), self.X(x1), self.Y(y1), ramp, idx, key, dash)
+
+    def disc(self, x, y, r, ramp, idx, key=9000, chk=False):
+        wdisc(self.world, self.X(x), self.Y(y), r, ramp, idx, key, chk)
+
+    def burst(self, x, y, big=False, ramp='gold'):
+        burst(self.world, self.X(x), self.Y(y), big, ramp)
+
+    def poly_fill(self, pts, colors, key=5000):
+        wp = [(self.X(px_), self.Y(py_)) for (px_, py_) in pts]
+        dither_fill(self.world, wp, colors, key)
+
+    def done(self):
+        return finish(crop_world(self.world, self.x0, self.y0))
+
+
+def _puddle(w, x, y, rx, ry, ramp='slime'):
+    c = Canvas(int(rx * 2 + 4), int(ry * 2 + 4))
+    ellipse(c, c.w / 2.0, c.h / 2.0, rx, ry, ramp, lo=1, hi=4, ambient=0.3)
+    c.outline()
+    w.world.draw(c, w.X(x) - c.w // 2, w.Y(y) - c.h // 2, -45)
+
+
+# --------------------------------------------------------------------------- BT-02 Gloop Tower
+
+
+@card_art('BT-02')
+def _art_bt02():
+    t = TW('grass', 3, gloop_tower())
+    for (sp, x, y) in ((bush(2), 128, 52), (rock(2), 14, 90), (tree_pine(1), 138, 36)):
+        t.prop(sp, x, y)
+    # Schleimbälle fliegen in hohem Bogen auf den Gegner
+    p0, p1 = (78, 25), (112, 66)
+    pts = parabola(p0, p1, 12, 12)
+    for k in (3, 6, 9):
+        t.sprite(gloop_ball(), pts[k][0], pts[k][1])
+    for k in (1, 2, 4, 5, 7, 8):
+        t.disc(pts[k][0], pts[k][1], 1, 'slime', 4 if k % 2 else 3)
+    # Gegner: verschleimt, steht in der Pfütze
+    _puddle(t, 112, 85, 14, 3.5)
+    sk = splotches(skeleton('idle', 1), [(14, 16, 3), (20, 22, 2.4), (11, 24, 2), (16, 5, 2.2)], 'slime', 4)
+    t.unit(sk, 112, 84, flip=True, top=True)
+    drip = [(104, 70), (121, 73), (108, 76)]
+    for (x, y) in drip:
+        t.px(x, y, 'slime', 4)
+        t.px(x, y + 1, 'slime', 3)
+    t.burst(111, 62, False, 'slime')
+    t.unit(skeleton('walk', 2), 92, 91, flip=True, sh=(8, 3))
+    return t.done()
+
+
+# --------------------------------------------------------------------------- BT-03 Frost Flue
+
+
+@card_art('BT-03')
+def _art_bt03():
+    t = TW('grass', 4, frost_flue())
+    for (sp, x, y) in ((tree_pine(0), 136, 40), (rock(1), 16, 90), (bush(1), 12, 52)):
+        t.prop(sp, x, y)
+    apex = (63, 22)
+    BAYER = [[0, 8, 2, 10], [12, 4, 14, 6], [3, 11, 1, 9], [15, 7, 13, 5]]
+
+    def col(x, y):
+        wx, wy = x - t.x0, y - t.y0
+        d = math.hypot(wx - apex[0], wy - apex[1])
+        dens = max(0.18, 1.0 - d / 95.0)                       # dichter nahe der Esse
+        if BAYER[y % 4][x % 4] / 16.0 > dens:
+            return None
+        if d < 30:
+            return ('fur', 5)
+        if d < 58:
+            return ('ice', 5) if (x // 2 + y // 2) % 3 else ('fur', 5)
+        return ('ice', 4)
+
+    t.unit(skeleton('idle', 0), 112, 80, shade=True)         # Schatten zuerst, Kegel darüber
+    t.poly_fill([apex, (143, 50), (112, 97)], col, 5000)
+    rnd = random.Random(5)
+    for _ in range(22):
+        x, y = rnd.randint(70, 138), rnd.randint(30, 92)
+        wx, wy = x - apex[0], y - apex[1]
+        if wy > wx * 0.36 and wy < wx * 1.95:
+            t.sprite(star_sprite('ice'), x, y, 5100)
+    # eingefrorener Gegner (Eisblock-Tönung) und Eisplitter
+    frozen = tint_ramp(skeleton('idle', 0), 'ice')
+    t.unit(frozen, 112, 80, top=True, shade=False)
+    for (x, y, hh) in ((98, 82, 7), (103, 86, 5), (124, 83, 6), (128, 78, 4)):
+        for k in range(hh):
+            t.px(x, y - k, 'ice', 5 if k > hh - 3 else 4)
+            t.px(x + 1, y - k, 'ice', 3)
+    t.unit(skeleton('walk', 1), 86, 91, flip=True, top=True, sh=(8, 3))
+    t.line(80, 82, 84, 82, 'ice', 5, 9400)
+    return t.done()
+
+
+# --------------------------------------------------------------------------- BT-04 Chirp Spire
+
+
+def _beam_pts(p0, p1, step=1.0):
+    n = int(max(abs(p1[0] - p0[0]), abs(p1[1] - p0[1])) / step)
+    return [(p0[0] + (p1[0] - p0[0]) * k / n, p0[1] + (p1[1] - p0[1]) * k / n) for k in range(n + 1)]
+
+
+@card_art('BT-04')
+def _art_bt04():
+    t = TW('grass', 6, chirp_spire())
+    for (sp, x, y) in ((tree_round(2), 134, 42), (bush(2, True), 12, 56), (rock(2), 14, 90)):
+        t.prop(sp, x, y)
+    eye = (62, 57)
+    far = (140, 83)
+    targets = [(92, 79), (110, 85), (128, 91)]
+    for (x, y) in targets:
+        t.shadow(x, y, (8, 3))
+    # Strahl: lila Mantel (Dither), Kern hell, durchschlägt alle drei; Zirp-Wellen als Bögen
+    for (x, y) in _beam_pts(eye, far):
+        for dy in (-2, -1, 0, 1, 2):
+            if abs(dy) == 2 and int(x + y) % 2:
+                continue
+            ramp, idx = ('purple', 3) if abs(dy) == 2 else (('purple', 5) if abs(dy) == 1 else ('bone', 5))
+            t.px(x, y + dy, ramp, idx, 5000)
+    ang = math.atan2(far[1] - eye[1], far[0] - eye[0])
+    for k in range(5):
+        d = 14 + k * 13
+        cx, cy = eye[0] + math.cos(ang) * d, eye[1] + math.sin(ang) * d
+        for a in range(-60, 61, 12):
+            aa = ang + math.radians(a)
+            px_ = cx + math.cos(aa) * (5 + k * 0.6)
+            py_ = cy + math.sin(aa) * (5 + k * 0.6)
+            t.px(px_, py_, 'purple', 5 if k % 2 else 4, 5000)
+    for (x, y) in targets:
+        t.unit(skeleton('idle', 0 if x != 110 else 1), x, y, flip=True, top=True, shade=False)
+    for (x, y) in targets:
+        t.burst(x, y - 13, False, 'purple')
+        t.burst(x - 7, y - 24 if x != 92 else y - 26, False, 'bone')
+    return t.done()
+
+
+# --------------------------------------------------------------------------- BT-05 Hornet Tower
+
+
+@card_art('BT-05')
+def _art_bt05():
+    t = TW('grass', 7, hornet_tower())
+    for (sp, x, y) in ((tree_round(1), 136, 44), (bush(1), 12, 56), (rock(1), 16, 90), (bush(3, True), 76, 94)):
+        t.prop(sp, x, y)
+    nest = (58, 57)
+    sk = (118, 85)
+    t.shadow(sk[0], sk[1], (8, 3))
+    # Flugspuren der Hornissen
+    for (a, b) in (((nest[0] + 6, nest[1] - 2), (82, 46)), ((nest[0] + 6, nest[1]), (96, 62)), ((nest[0] + 6, nest[1] + 2), (110, 56))):
+        t.line(a[0], a[1], b[0], b[1], 'bone', 4, 5000, dash=2)
+    t.sprite(hornet(0), 88, 44, 9100)
+    t.sprite(hornet(1), 102, 62, 9100)
+    t.sprite(hornet(0), 114, 56, 9100)
+    # Gegner wird gepiekst: Sterne
+    t.unit(skeleton('idle', 1), sk[0], sk[1], flip=True, top=True, shade=False)
+    t.burst(112, 70, False, 'gold')
+    t.burst(124, 66, False, 'fire')
+    t.px(104, 69, 'bone', 5)
+    t.px(105, 70, 'bone', 4)
+    t.unit(citizen('cloth', 0), 20, 82, sh=(5, 2))
+    return t.done()
+
+
+# --------------------------------------------------------------------------- BT-06 Storm Spike
+
+
+@card_art('BT-06')
+def _art_bt06():
+    t = TW('mud', 9, storm_spike())
+    for (sp, x, y) in ((rock(2), 14, 90), (bush(2), 136, 48)):
+        t.prop(sp, x, y)
+    cloud = (58, 30)
+    A, B, C = (96, 82), (122, 76), (126, 91)
+    for (x, y) in (A, B, C):
+        t.shadow(x, y, (8, 3))
+    # Blitz: Wolke -> A, dann Kettenblitz A -> B -> C
+    main = zigzag(cloud[0], cloud[1], A[0], A[1] - 14, 7, 5, 3)
+    chain1 = zigzag(A[0], A[1] - 14, B[0], B[1] - 14, 4, 3, 5)
+    chain2 = zigzag(B[0], B[1] - 14, C[0], C[1] - 14, 3, 3, 8)
+    for pts in (main, chain1, chain2):
+        for (a, b) in zip(pts, pts[1:]):
+            t.line(a[0], a[1], b[0], b[1], 'gold', 4, 5000)
+            t.line(a[0] + 1, a[1], b[0] + 1, b[1], 'gold', 3, 5000)
+            t.line(a[0], a[1], b[0], b[1], 'bone', 5, 5001)
+    t.unit(skeleton('idle', 0), A[0], A[1], flip=True, top=True, shade=False)
+    t.unit(goblin('idle', 1), B[0], B[1], flip=True, top=True, shade=False)
+    t.unit(skeleton('walk', 3), C[0], C[1], flip=True, top=True, shade=False)
+    for (x, y) in (A, B, C):
+        t.burst(x, y - 14, True, 'gold')
+    # lächelnder Blitz-Kopf mitten im Hauptblitz
+    t.sprite(smiling_bolt(), 74, 44, 9500)
+    # Regen
+    rnd = random.Random(12)
+    for _ in range(26):
+        x, y = rnd.randint(4, 140), rnd.randint(6, 92)
+        t.line(x, y, x - 2, y + 4, 'ice', 3 if (x + y) % 2 else 4, 4000)
+    return t.done()
+
+
+# --------------------------------------------------------------------------- BT-07 Pelican Flak Nest
+
+
+@card_art('BT-07')
+def _art_bt07():
+    t = TW('sand', 10, pelican_nest())
+    for (sp, x, y) in ((bush(1), 136, 54), (rock(1), 14, 90), (bush(2), 16, 56)):
+        t.prop(sp, x, y)
+    # Flieger (Fledermäuse) und ihre Schatten auf dem Boden
+    bat1, bat2 = (118, 30), (98, 14)
+    t.shadow(bat1[0], 82, (8, 2))
+    t.shadow(bat2[0], 70, (7, 2))
+    t.sprite(bat(0), bat2[0], bat2[1], 9000)
+    t.sprite(bat(1), bat1[0], bat1[1], 9000)
+    # Fische fliegen im Bogen vom Schnabel auf die Fledermaus
+    p0, p1 = (80, 24), (bat1[0] - 8, bat1[1] + 2)
+    pts = parabola(p0, p1, 16, 10)
+    t.sprite(fish(), pts[3][0], pts[3][1], 9100)
+    t.sprite(fish(), pts[7][0], pts[7][1], 9100)
+    for k in (1, 2, 5, 6, 9):
+        t.px(pts[k][0], pts[k][1], 'ice', 5, 9000)
+    t.burst(bat1[0] - 4, bat1[1] + 6, True, 'gold')
+    t.burst(bat1[0] + 12, bat1[1] - 6, False, 'bone')
+    # Bodengegner gehen unbehelligt vorbei
+    t.unit(skeleton('walk', 2), 112, 90, flip=True)
+    return t.done()
+
+
+# --------------------------------------------------------------------------- BT-08 Confusion Beacon
+
+
+@card_art('BT-08')
+def _art_bt08():
+    t = TW('dark', 11, confusion_beacon(), y0=10)
+    for (sp, x, y) in ((rock(2), 14, 90), (bush(2), 136, 54)):
+        t.prop(sp, x, y)
+    apex = (60, 31)
+    ang0 = math.radians(32)
+    half = math.radians(15)
+    L = 110
+    pA = (apex[0] + math.cos(ang0 - half) * L, apex[1] + math.sin(ang0 - half) * L)
+    pB = (apex[0] + math.cos(ang0 + half) * L, apex[1] + math.sin(ang0 + half) * L)
+    foes = [(104, 78), (126, 88)]
+    ghost = (86, 86)
+    for (x, y) in foes + [ghost]:
+        t.shadow(x, y, (8, 3))
+
+    def col(x, y):
+        wx, wy = x - t.x0, y - t.y0
+        a = math.atan2(wy - apex[1], wx - apex[0])
+        u = (a - (ang0 - half)) / (2 * half)
+        if u < 0 or u > 1:
+            return None
+        band = min(4, int(u * 5))
+        ramp, idx = RAINBOW[band]
+        d = math.hypot(wx - apex[0], wy - apex[1])
+        if (x + y) % 2 == 0 or d < 14:
+            return (ramp, idx)
+        return (ramp, idx - 1) if (x // 2 + y) % 3 == 0 else None
+
+    t.poly_fill([apex, pA, pB], col, 5000)
+    # Unsichtbarer wird enttarnt (Geisterfassung), zwei Verwirrte mit kreisenden Sternen
+    t.unit(ghostly(skeleton('idle', 1)), ghost[0], ghost[1], flip=True, top=True, shade=False)
+    t.unit(skeleton('walk', 0), foes[0][0], foes[0][1], flip=True, top=True, shade=False)
+    t.unit(goblin('walk', 2), foes[1][0], foes[1][1], flip=True, top=True, shade=False)
+    for (x, y, ph) in ((foes[0][0], foes[0][1] - 29, 0.4), (foes[1][0], foes[1][1] - 29, 2.0)):
+        dizzy(t.world, t.X(x), t.Y(y), 8, 3, 3, ph, 9500)
+    return t.done()

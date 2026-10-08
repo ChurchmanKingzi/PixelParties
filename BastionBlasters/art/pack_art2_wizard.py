@@ -52,11 +52,11 @@ def spr_star_wizard(anim='idle', f=0):
     thick_line(c, 10, 22, 7, 30, 3.4, 'ice', lo=1, hi=3)
     c.put_ramp(7, 31, 'skin', 3)
     c.put_ramp(8, 31, 'skin', 2)
-    thick_line(c, 25, 22, 31, 16 + bob, 3.4, 'ice', lo=2, hi=4)
-    ellipse(c, 32, 15.5 + bob, 1.9, 1.9, 'skin', lo=2, hi=5)
-    thick_line(c, 32, 17 + bob, 34, 6 + bob, 1.4, 'wood', lo=2, hi=4)
+    thick_line(c, 25, 22, 30, 17 + bob, 3.4, 'ice', lo=2, hi=4)
+    ellipse(c, 31, 16.5 + bob, 1.9, 1.9, 'skin', lo=2, hi=5)
+    thick_line(c, 31, 18 + bob, 33, 7 + bob, 1.4, 'wood', lo=2, hi=4)
     # Stern am Stab
-    sx, sy = 34, 4 + bob
+    sx, sy = 33, 5 + bob
     ellipse(c, sx, sy, 2.6, 2.6, 'gold', lo=3, hi=5, ambient=0.5)
     for (dx, dy) in ((0, -4), (0, 4), (4, 0), (-4, 0)):
         c.put_ramp(sx + dx, sy + dy, 'gold', 4)

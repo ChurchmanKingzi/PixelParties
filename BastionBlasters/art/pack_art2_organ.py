@@ -64,8 +64,8 @@ def spr_sky_organ(anim='idle', f=0):
     for dx in range(-4, 5):
         c.put_ramp(hx + dx, hy + (0 if abs(dx) < 3 else 1), 'gold', 5 if abs(dx) < 2 else 4)
     # Wolkenbank unten (unter dem Spieltisch)
-    for (bx, by, rx, ry, lo, hi) in ((7, 51, 9, 5, 2, 5), (20, 52, 11, 5, 2, 5), (35, 52, 12, 5, 2, 5), (48, 51, 9, 5, 2, 5),
-                                      (28, 50, 19, 5, 3, 5), (13, 49, 8, 4, 3, 5), (44, 49, 9, 4, 3, 5)):
+    for (bx, by, rx, ry, lo, hi) in ((9, 51, 7.5, 4.5, 2, 5), (20, 52, 10, 4.5, 2, 5), (35, 52, 11, 4.5, 2, 5), (46, 51, 7.5, 4.5, 2, 5),
+                                      (28, 50, 17, 4.5, 3, 5), (14, 49, 7, 4, 3, 5), (42, 49, 8, 4, 3, 5)):
         ellipse(c, bx, by, rx, ry, 'fur', lo=lo, hi=hi, ambient=0.3)
     # Husten: dunkle Wolken ueber der verbogenen Pfeife
     tx = 38 + 2 + 1

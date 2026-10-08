@@ -37,18 +37,20 @@ def cage(kind='bear', seed=1):
         ellipse(c, 16 + o, 19, 6.2, 5.2, 'fur', lo=2, hi=5)
         ellipse(c, 16 + o, 21, 3.0, 2.2, 'fur', lo=4, hi=5)
         c.rect(12 + o, 17, 13 + o, 18, 'coal', 1)
-        c.rect(19 + o, 17, 20 + o, 18, 'coal', 1)
+        c.rect(20 + o, 17, 21 + o, 18, 'coal', 1)
         c.rect(15 + o, 20, 17 + o, 21, 'coal', 1)
         c.put_ramp(9 + o, 16, 'skin', 3)
         c.put_ramp(23 + o, 16, 'skin', 3)
         hline(c, 11 + o, 21 + o, 25, 'teamA', 3)
         hline(c, 11 + o, 21 + o, 26, 'teamA', 2)
     elif kind == 'eyes':
-        for (x, y) in ((11, 17), (12, 17), (19, 17), (20, 17), (11, 18), (12, 18), (19, 18), (20, 18)):
-            c.put_ramp(x + o, y, 'gold', 5 if y == 17 else 4)
-        c.put_ramp(12 + o, 17, 'coal', 0)
-        c.put_ramp(20 + o, 17, 'coal', 0)
-        for x in (13, 15, 17):
+        for (x, y) in ((12, 16), (13, 16), (12, 17), (13, 17), (12, 18), (13, 18), (20, 16), (21, 16), (20, 17), (21, 17), (20, 18), (21, 18)):
+            c.put_ramp(x + o, y, 'gold', 5 if y == 16 else 4)
+        c.put_ramp(13 + o, 17, 'coal', 0)
+        c.put_ramp(21 + o, 17, 'coal', 0)
+        c.put_ramp(13 + o, 18, 'coal', 0)
+        c.put_ramp(21 + o, 18, 'coal', 0)
+        for x in (12, 14, 16, 18, 20):
             c.put_ramp(x + o, 24, 'bone', 5)
             c.put_ramp(x + o, 25, 'bone', 4)
     else:
@@ -58,7 +60,7 @@ def cage(kind='bear', seed=1):
         ellipse(c, 16 + o, 18.5, 6.4, 5.0, 'stone', lo=2, hi=5)
         ellipse(c, 16 + o, 21, 3.6, 2.8, 'bone', lo=3, hi=5)
         c.rect(12 + o, 17, 13 + o, 17, 'goblin', 5)
-        c.rect(19 + o, 17, 20 + o, 17, 'goblin', 5)
+        c.rect(20 + o, 17, 21 + o, 17, 'goblin', 5)
         c.rect(15 + o, 20, 17 + o, 21, 'coal', 1)
         c.put_ramp(16 + o, 23, 'fire', 4)
         c.put_ramp(16 + o, 24, 'fire', 3)

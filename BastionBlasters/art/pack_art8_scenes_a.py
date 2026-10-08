@@ -96,7 +96,7 @@ THEME_NEST = {'floor': floor_ember(), 'furnish': furnish_nest, 'low': False}
 
 @card_art('BH-07')
 def _art_bh07():
-    world, c, out, geom = build_room('N', THEME_NEST, 3, 3, seed=9)
+    world, c, out, geom = build_room('N', THEME_NEST, 3, 3, seed=1)
     MX, MY, MW, MH = geom
     nx, ny = MX + (MW - 76) // 2, MY + 6
     tint_glow(world, MX + MW // 2, ny + 46, 44, 16, 'fire', 2)

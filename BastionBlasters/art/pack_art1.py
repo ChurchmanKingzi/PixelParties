@@ -89,13 +89,12 @@ def _art_ua03():
     # Mündungsfeuer + Qualm + Streuschuss (Kügelchen fächern auf)
     burst(w, mx + 5, my, 'fire', 10, 7, 4)
     w.draw(smoke_sprite(26, 14, 4, 3), mx - 2, my - 24, 9000)
-    rnd = random.Random(7)
-    for k in range(26):
-        a = math.radians(rnd.uniform(-9, 9) + 6)
-        d = rnd.uniform(10, 52)
-        x, y = mx + 8 + math.cos(a) * d, my + 2 + math.sin(a) * d
-        dot_world(w, x, y, 'coal', 1, 2, 9000)
-        put_px(w, x, y, 'bone', 4, 9001)
+    for k in range(17):                                   # Streuschuss: Kügelchen fächern kegelförmig auf
+        d = 13 + k * 2.4
+        off = ((k * 7) % 9 - 4) / 4.0 * d * 0.30
+        x, y = mx + 6 + d, my + 2 + d * 0.10 + off
+        pl = pellet(4 if k < 9 else 3)
+        w.draw(pl, int(x - pl.w // 2), int(y - pl.h // 2), 9000)
     for (x, y) in ((96, 52), (98, 56), (97, 60), (95, 48), (100, 50)):
         burst(w, x, y, 'gold', 5, 3, x + y)
     return finish(w)
@@ -164,8 +163,8 @@ def _art_ua06():
     ox, oy = _origin(spr, 40, 88)
     fx_, fy_ = ox + 36, oy + 27                              # Trichtermitte
     # weitere Zapfen fliegen senkrecht hoch / fallen auf das Ziel
-    for (x, y0, y1) in ((fx_ - 6, fy_ - 30, fy_ - 46), (fx_ + 8, fy_ - 36, fy_ - 54)):
-        icicle_at(w, x, y0 + 8, x + 1, y1, 4, 9000)
+    for (x, y0, y1) in ((fx_ - 6, fy_ - 24, fy_ - 46), (fx_ + 8, fy_ - 28, fy_ - 54), (fx_ + 22, fy_ - 20, fy_ - 38)):
+        icicle_at(w, x, y0, x + 1, y1, 6, 9000)
     zielschatten(w, 112, 78, 17, 1)
     # Frostfläche auf dem Boden am Ziel
     for y in range(60, 94):
@@ -176,8 +175,8 @@ def _art_ua06():
     zielschatten(w, 112, 78, 17, 1)
     for (x, y, h) in ((100, 82, 14), (110, 86, 18), (122, 82, 13), (116, 74, 10)):
         w.draw(icicle_shape(h, 5), x - 2, y - h + 1, y)
-    for (x0, y0, x1, y1) in ((104, 24, 107, 56), (118, 18, 120, 52), (126, 30, 125, 60)):
-        icicle_at(w, x0, y0, x1, y1, 4, 9000)
+    for (x0, y0, x1, y1) in ((104, 14, 107, 54), (118, 8, 120, 50), (127, 22, 125, 58)):
+        icicle_at(w, x0, y0, x1, y1, 6, 9000)
     for (x, y) in ((107, 60), (120, 56), (112, 68), (126, 64)):
         burst(w, x, y, 'ice', 6, 4, x)
     return finish(w)
@@ -258,16 +257,18 @@ def _art_ua09():
     shadow(w, 42, 86, 17, 3)
     w.draw(spr, 6, 18, 60)                                   # schwebt über dem Boden
     # Zielgebiet 3x3: mehrere Zielmarken, Fledermäuse stürzen darauf
-    zones = ((100, 66, 6), (124, 62, 6), (112, 80, 6), (88, 84, 5), (130, 84, 5))
+    zones = ((98, 66, 6), (124, 60, 6), (110, 84, 6), (134, 80, 5))
     for (x, y, r) in zones:
         zielschatten(w, x, y, r, 1)
     for k, (x, y, r) in enumerate(zones):
         b = bat_spr(k % 2, big=(k % 2 == 0))
-        bx, by = x + 1, y - 13 - (k % 2) * 4
+        bx, by = x - 4, y - 14
         put(w, b, bx, by, 9100)
         for j in range(1, 4):
-            put_px(w, bx - j * 2, by - 2 + j * 2, 'purple', 4, 9000)
-    unit_at(w, citizen('cloth', 1), 118, 74, flip=True, sh=(5, 2))
+            put_px(w, bx - 8 + j * 2, by - 6 + j * 3, 'purple', 4, 9000)
+    for (x, y, fl) in ((84, 48, 0), (84, 70, 1), (70, 60, 0)):
+        put(w, mini_bat(fl), x, y, 9050)
+    unit_at(w, citizen('cloth', 1), 114, 72, flip=True, sh=(5, 2))
     return finish(w)
 
 
@@ -277,16 +278,16 @@ def _art_ua09():
 @card_art('UA-10')
 def _art_ua10():
     w = ground_world('planks', 5)
-    for (sp, x, y) in ((barrel(), 14, 34), (rack(), 132, 32), (crate(), 16, 94)):
+    for (sp, x, y) in ((barrel(), 14, 34), (rack(), 132, 32), (crate(), 134, 92)):
         prop_at(w, sp, x, y)
-    spr = spr_nailboard_ballista()
+    spr = spr_nailboard_ballista('fire')
     unit_at(w, spr, 34, 86, sh=(26, 4))
     ox, oy = _origin(spr, 34, 86)
     by = oy + 20                                              # Höhe des geladenen Bolzens
-    zielschatten(w, 102, 84, 17, 1)
+    zielschatten(w, 86, 82, 15, 1)
     # drei Barrikaden (Zellen) hintereinander: Einschussloch wird kleiner (-20 % je Zelle)
     fy = by + 28
-    for k, (x, hole) in enumerate(((78, 4.2), (99, 3.2), (120, 2.2))):
+    for k, (x, hole) in enumerate(((64, 4.2), (86, 3.4), (108, 2.6))):
         bar = barricade(hole)
         prop_at(w, bar, x, fy)
         hy = fy - bar.h + 1 + bar.h // 3 + 1
@@ -296,9 +297,9 @@ def _art_ua10():
         burst(w, x + 11, hy, 'gold', 6, 4, x)
     hy = fy - 38 + 1 + 38 // 3 + 1
     bolt = proj_bolt()
-    put(w, bolt, 104, hy, 9200)
+    put(w, bolt, 122, hy, 9200)
     for k in range(7):
-        put_px(w, 60 - k * 3, hy, 'bone', 3 if k > 3 else 5, 9100)
+        put_px(w, 100 - k * 3, hy, 'bone', 3 if k > 3 else 5, 9100)
     return finish(w)
 
 
@@ -308,7 +309,7 @@ def _art_ua10():
 @card_art('UA-11')
 def _art_ua11():
     w = ground_world('slab', 4)
-    for (sp, x, y) in ((anvil(), 16, 36), (barrel(), 132, 34), (crate(), 16, 94)):
+    for (sp, x, y) in ((anvil(), 16, 36), (barrel(), 132, 34), (crate(), 132, 92)):
         prop_at(w, sp, x, y)
     spr = spr_coil_witch()
     unit_at(w, spr, 30, 88, sh=(15, 4))
@@ -330,4 +331,73 @@ def _art_ua11():
     for (x, y) in ((86, 54), (122, 58), (72, 76), (110, 78)):                 # Funken (Kurzschluss)
         put_px(w, x, y, 'gold', 5, 9800)
         put_px(w, x + 1, y + 1, 'ice', 5, 9800)
+    return finish(w)
+
+
+# =========================================================================== UA-12 Maulwurf-Mörser
+
+
+@card_art('UA-12')
+def _art_ua12():
+    w = ground_world('dirt', 3)
+    for (sp, x, y) in ((rock(2), 16, 40), (bush(1), 132, 34), (crate(), 14, 92)):
+        prop_at(w, sp, x, y)
+    spr = spr_mole_mortar()
+    unit_at(w, spr, 34, 80, sh=(18, 4))
+    # Rumpeln am Mörser: Erschütterungslinien
+    for (x0, y0, x1, y1) in ((48, 82, 53, 84), (50, 78, 55, 79), (14, 82, 9, 84)):
+        w.draw(Canvas(1, 1), x0, y0, 0)
+        for t in range(6):
+            put_px(w, x0 + (x1 - x0) * t / 5.0, y0 + (y1 - y0) * t / 5.0, 'dirt', 5, 9000)
+    # unterirdische Bohrspur: Erdhügel von der Kanone zur Mauer, werden niedriger
+    xs = (62, 72, 83, 94, 104)
+    for k, x in enumerate(xs):
+        y = 80 - k * 1.6
+        m = dirt_mound(16 - k, 7 - k // 2, k + 2)
+        shadow(w, x + 1, y + 1, 7, 2)
+        w.draw(m, int(x - m.w // 2), int(y - m.h + 1), int(y) + 20)
+    # Mauer als Ziel (Bauteil) mit Riss, darunter das aufbrechende Bohrloch
+    wall = stone_wall_piece(40, 24)
+    shadow(w, 124, 68, 24, 3)
+    w.draw(wall, 104, 66 - wall.h + 1, 66)
+    crack_lines(w, [(118, 40), (120, 46), (117, 51), (121, 57), (119, 64)], 9000)
+    crack_lines(w, [(132, 44), (129, 50), (133, 56)], 9000)
+    crack_lines(w, [(120, 46), (126, 47)], 9000)
+    zielschatten(w, 120, 78, 14, 1)
+    hole = Canvas(20, 8)
+    ellipse(hole, 10, 4, 9.5, 3.6, 'dirt', lo=1, hi=4)
+    ellipse(hole, 10, 4.4, 7, 2.4, 'coal', lo=0, hi=1)
+    hole.outline()
+    w.draw(hole, 110, 72, 70)
+    dr = drill_proj()
+    w.draw(dr, 114, 56, 9000)
+    for (x, y) in ((106, 66), (126, 64), (130, 72), (108, 76), (118, 52), (112, 60), (124, 58)):
+        put_px(w, x, y, 'dirt', 5, 9100)
+        put_px(w, x + 1, y + 1, 'dirt', 3, 9100)
+    return finish(w)
+
+
+# =========================================================================== UA-13 Frosch-Katapult
+
+
+@card_art('UA-13')
+def _art_ua13():
+    w = ground_world('purple', 4)
+    for (sp, x, y) in ((giant_mushroom(3, 'purple'), 132, 44), (rock(1), 16, 40), (rock(2), 130, 94)):
+        prop_at(w, sp, x, y)
+    spr = spr_frog_catapult('fire')
+    unit_at(w, spr, 38, 86, sh=(24, 4))
+    ox, oy = _origin(spr, 38, 86)
+    sx, sy = ox + 60, oy + 20                                  # Zungenspitze
+    pts = arc_pts(sx + 6, sy - 2, 106, 76, 40, 14)
+    trail(w, pts[1:6], 'slime', 1, 2, 5, 3)
+    put(w, slime_ball(), pts[7][0], pts[7][1], 9100)
+    zielschatten(w, 106, 78, 16, 1)
+    # Verwandlung: Frösche hüpfen am Ziel, ein Bürger wird gerade zum Frosch
+    unit_at(w, citizen('cloth', 0), 96, 80, sh=(5, 2))
+    w.draw(mini_frog(0, 0), 108, 72, 90)
+    w.draw(mini_frog(1, 5), 118, 60, 91)
+    w.draw(mini_frog(0, 0), 120, 82, 92)
+    for (x, y, c_) in ((100, 66, 'slime'), (112, 62, 'gold'), (118, 74, 'slime'), (128, 70, 'gold'), (94, 70, 'gold'), (104, 58, 'slime')):
+        burst(w, x, y, c_, 5, 3, x + y, 9500)
     return finish(w)

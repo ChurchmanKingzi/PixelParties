@@ -60,9 +60,10 @@ def _art_bf09():
     for (x, y, hair, hi_) in ((46, 80, 'wood', 2), (58, 81, 'fire', 3), (101, 80, 'dirt', 3), (112, 81, 'bone', 4)):
         world.draw(head_back(hair, hi_), x, y, 140)
     unit_at(world, nun(), 80, 98, sh=(7, 2))
-    world.draw(halo_disc(), 100, 84, 9000)
-    for (x, y) in ((96, 84), (97, 86)):
+    world.draw(halo_disc(), 99, 72, 9000)
+    for (x, y) in ((94, 74), (96, 75), (92, 73)):
         world.px[y, x, :3] = RAMPS['gold'][4]
+        world.depth[y, x] = 9000
     world_sparkle(world, 80, 40)
     for (sp, x, y) in ((bush(2), 140, 140), (rock(1), 14, 148)):
         prop_at(world, sp, x, y)
@@ -149,7 +150,7 @@ def _art_bp04():
     world.draw(rain_mortar(), ox + 50 - 8, oy + 15 - 23, 9000)
     for (sp, x, y) in ((bush(2), 172, 150), (rock(1), 168, 90)):
         prop_at(world, sp, x, y)
-    return finish(crop_world(world, 40, 41))
+    return finish(crop_world(world, 40, 38))
 
 
 @card_art('BP-05')
@@ -196,8 +197,55 @@ def _art_bu04():
     world.draw(arcs, 0, 0, 9000)
     # markierter Eindringling und fliehender Buerger
     unit_at(world, goblin('walk', 1), 126, 74, flip=True)
-    world.draw(mark_arrow(), 122, 36, 9000)
+    world.draw(mark_arrow(), 121, 31, 9000)
     unit_at(world, citizen('cloth', 0), 16, 82, flip=True, sh=(5, 2))
-    for (sp, x, y) in ((barrel(), 16, 38), (crate(), 128, 90)):
+    for (sp, x, y) in ((barrel(), 16, 38), (crate(), 134, 92)):
         prop_at(world, sp, x, y)
     return finish(world)
+
+
+# --------------------------------------------------------------------------- Figuren (Namen im Stil der Einheiten-Sprites)
+
+
+def spr_troll(anim='idle', f=0):
+    return troll()
+
+
+def spr_pirate_gnome(anim='idle', f=0):
+    return pirate_gnome()
+
+
+def spr_pilot_gnome(anim='idle', f=0):
+    return pilot_gnome()
+
+
+def spr_blessing_nun(anim='idle', f=0):
+    return nun()
+
+
+def spr_juggler_clown(anim='idle', f=0):
+    return clown()
+
+
+def spr_tiny_frog(anim='idle', f=0):
+    return frog_small()
+
+
+def spr_fixer_gnome(anim='idle', f=0):
+    return fixer_gnome()
+
+
+def spr_stargazer(anim='idle', f=0):
+    return astronomer()
+
+
+def spr_garden_gnome(anim='idle', f=0):
+    return garden_gnome()
+
+
+def spr_bell_gnome(anim='idle', f=0):
+    return bell_gnome()
+
+
+def spr_humming_zeppelin(anim='idle', f=0):
+    return zeppelin()

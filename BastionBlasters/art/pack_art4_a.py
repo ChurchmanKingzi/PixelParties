@@ -6,6 +6,7 @@ import math
 import random
 
 from pixl import *
+from pack_art4_kit import a4_seal
 
 
 def _ring(c, cx, cy, r_out, r_in, ramp, lo, hi, ambient=0.3):
@@ -104,8 +105,7 @@ def spr_owl_gargoyle(anim='idle', f=0):
     # Moos am Rand
     for (x, y, i) in ((9, 28, 3), (10, 29, 2), (30, 30, 3), (29, 31, 2), (17, 34, 3), (16, 35, 2)):
         c.put_ramp(x, y, 'leaf', i)
-    c.outline()
-    return c
+    return a4_seal(c)
 
 
 # =========================================================================== UV-03 Schleimschnecke
@@ -157,8 +157,7 @@ def spr_slime_snail(anim='idle', f=0):
         c.put_ramp(x, y, 'slime', 5)
     for (x, y) in ((42, 18), (43, 18), (44, 18), (30, 31)):
         c.put_ramp(x, y, 'bone', 5)
-    c.outline()
-    return c
+    return a4_seal(c)
 
 
 # =========================================================================== UV-04 Schildkroeten-Zwerge
@@ -254,8 +253,7 @@ def spr_turtle_dwarves(anim='idle', f=0):
     bob = [0, -1][f % 2] if anim == 'idle' else 0
     _turtle_dwarf(c, 44, 29 + bob, 12, 12, 'bone', flag=True)
     _turtle_dwarf(c, 17, 37, 13, 13, 'fire')
-    c.outline()
-    return c
+    return a4_seal(c)
 
 
 # =========================================================================== UV-05 Tuersteher-Troll
@@ -355,8 +353,7 @@ def spr_bouncer_troll(anim='idle', f=0, skin='purple'):
     # Ohrhoerer-Kabel
     for k in range(7):
         c.put_ramp(33, 13 + k + bob, 'metal', 4 if k % 2 else 3)
-    c.outline()
-    return c
+    return a4_seal(c)
 
 
 # =========================================================================== UV-06 Ton-Golem
@@ -474,8 +471,7 @@ def spr_clay_golem(anim='idle', f=0, clay='wood'):
         x, y = rnd.randint(8, 48), rnd.randint(24, 54)
         if c.alpha(x, y) and c.rid[y, x] == RAMP_ID[clay]:
             c.put_ramp(x, y, clay, 1 if rnd.random() < 0.6 else 4)
-    c.outline()
-    return c
+    return a4_seal(c)
 
 
 def _loop(c, cx, cy, rx_out, ry_out, thick, ramp, lo, hi):

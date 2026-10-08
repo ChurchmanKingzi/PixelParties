@@ -255,11 +255,11 @@ def spr_squid_cannon(anim='idle', f=0):
     return c
 
 
-# =========================================================================== UA-09 Fledermaus-Hexe (XL, 70 x 52)
+# =========================================================================== UA-09 Fledermaus-Hexe (XL, 64 x 52)
 
 
 def spr_bat_witch(anim='idle', f=0):
-    c = Canvas(70, 52)
+    c = Canvas(64, 52)
     Y = 9
     bob = [0, -1][f % 2] if anim == 'idle' else 0
     Yb = Y + bob
@@ -312,12 +312,12 @@ def spr_bat_witch(anim='idle', f=0):
         c.put_ramp(x, 3 + Yb, 'teamA', 3 if x % 2 else 2)
     c.rect(27, 2 + Yb, 28, 4 + Yb, 'gold', 4)
     # Fledermausschwarm aus der Hand: rote Augen, Mini-Zähne
-    for (bx, by, fl, big) in ((54, 4, 0, True), (61, 14, 1, False)):
+    for (bx, by, fl, big) in ((52, 4, 0, True), (55, 17, 1, False)):
         b = bat_spr(fl if (f % 2 == 0) else 1 - fl, outline=False, big=big)
         c.blit(b, bx - b.w // 2, by + Y - b.h // 2)
-    for (x, y, fl) in ((46, 22, 0), (64, 24, 1), (66, 4, 0)):
+    for (x, y, fl) in ((46, 24, 0), (61, 26, 1), (61, 3, 0)):
         c.blit(mini_bat((f + fl) % 2), x - 3, y + Y - 2)
-    for (x, y) in ((47, 9), (50, 14), (46, 14), (58, 18)):
+    for (x, y) in ((47, 9), (50, 14), (46, 14), (55, 11)):
         c.put_ramp(x, y + Y, 'purple', 4)
     c.outline()
     return c

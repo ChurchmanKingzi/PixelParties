@@ -6,6 +6,7 @@ import math
 import random
 
 from pixl import *
+from pack_art4_kit import a4_seal
 from pack_art4_a import _ring, _loop, _crack
 
 
@@ -19,20 +20,20 @@ def _twig(c, pts, w, ramp='wood', lo=1, hi=4):
 
 def spr_root_ent(anim='idle', f=0):
     """Alter Baum auf Wurzelfuessen: Moosbart, Astarme, Laubkrone, Vogelnest mit Vogel"""
-    c = Canvas(64, 66)
+    c = Canvas(64, 62)
     sway = [0, 1][f % 2] if anim == 'idle' else 0
     rnd = random.Random(21)
     # Wurzelfuesse
-    for (x1, y1, w) in ((9, 63, 5.0), (20, 65, 5.0), (38, 65, 5.4), (52, 62, 4.6)):
-        _twig(c, [(30, 54), ((30 + x1) // 2, 60), (x1, y1)], w, lo=1, hi=4)
+    for (x1, y1, w) in ((9, 59, 5.0), (20, 61, 5.0), (38, 61, 5.4), (52, 58, 4.6)):
+        _twig(c, [(30, 50), ((30 + x1) // 2, 56), (x1, y1)], w, lo=1, hi=4)
     # linker Arm (hinten): haengender Ast mit Wurzelhand
-    _twig(c, [(19, 30), (11, 37), (9, 49)], 6.0, lo=0, hi=3)
-    for (x, y) in ((6, 55), (9, 56), (12, 55)):
-        thick_line(c, 9, 50, x, y, 2.4, 'wood', lo=0, hi=3)
+    _twig(c, [(19, 30), (11, 37), (9, 45)], 6.0, lo=0, hi=3)
+    for (x, y) in ((6, 51), (9, 52), (12, 51)):
+        thick_line(c, 9, 46, x, y, 2.4, 'wood', lo=0, hi=3)
     # Stamm
-    for y in range(20, 60):
-        t = (y - 20) / 40.0
-        half = 10.5 + 3.2 * math.sin(t * math.pi * 0.9) + (3.0 if y > 52 else 0)
+    for y in range(20, 56):
+        t = (y - 20) / 36.0
+        half = 10.5 + 3.2 * math.sin(t * math.pi * 0.9) + (3.0 if y > 49 else 0)
         cxm = 29.5
         for x in range(int(cxm - half), int(cxm + half) + 1):
             u = (x - (cxm - half)) / (2 * half + 1)
@@ -42,7 +43,7 @@ def spr_root_ent(anim='idle', f=0):
                 idx = max(0, idx - 1)
             c.put_ramp(x, y, 'wood', idx)
     # Astloecher
-    for (kx, ky, r) in ((22, 46, 2.4), (36, 51, 2.0), (25, 56, 1.8)):
+    for (kx, ky, r) in ((22, 44, 2.4), (36, 48, 2.0), (25, 52, 1.8)):
         ellipse(c, kx, ky, r, r * 1.2, 'wood', lo=0, hi=2)
     # rechter Arm (vorn): kraeftiger Ast nach rechts, Wurzelfinger
     _twig(c, [(40, 29), (49, 33), (55, 40)], 7.0, lo=1, hi=4)
@@ -119,8 +120,7 @@ def spr_root_ent(anim='idle', f=0):
     c.put_ramp(nx + 2, ny - 5, 'coal', 1)
     c.put_ramp(nx + 1, ny - 1, 'fire', 4)
     c.put_ramp(nx + 2, ny - 1, 'fire', 3)
-    c.outline()
-    return c
+    return a4_seal(c)
 
 
 # =========================================================================== UV-08 Leere Ruestung
@@ -128,20 +128,20 @@ def spr_root_ent(anim='idle', f=0):
 
 def spr_empty_armor(anim='idle', f=0):
     """Hohle Plattenruestung mit Hellebarde: Luecken am Hals und an den Handgelenken, Licht im Visier, Federbusch + Wappenrock in Teamfarbe"""
-    c = Canvas(54, 58)
+    c = Canvas(54, 56)
     bob = [0, -1][f % 2] if anim == 'idle' else 0
     flick = [0, 1][f % 2]
     # Hellebarden-Schaft (hinter den Handschuhen)
-    c.rect(43, 5, 44, 56, 'wood', 3)
-    c.rect(43, 5, 43, 56, 'wood', 4)
-    c.rect(44, 5, 44, 56, 'wood', 2)
+    c.rect(43, 5, 44, 54, 'wood', 3)
+    c.rect(43, 5, 43, 54, 'wood', 4)
+    c.rect(44, 5, 44, 54, 'wood', 2)
     # Beine: Beinschienen mit Knieschutz (leicht schwebend)
     for (x0, x1, lo_, hi_) in ((10, 19, 0, 3), (25, 34, 1, 4)):
-        round_rect(c, x0, 41, x1, 51, 'metal', lo=lo_, hi=min(5, hi_ + 1), radius=2)
+        round_rect(c, x0, 41, x1, 49, 'metal', lo=lo_, hi=min(5, hi_ + 1), radius=2)
         ellipse(c, (x0 + x1) / 2.0 + 0.5, 41, 5.0, 3.6, 'metal', lo=lo_ + 1, hi=5)
-        c.rect(x0 + 1, 50, x1 - 1, 50, 'metal', 1)
-        round_rect(c, x0 - 1, 52, x1 + 2, 57, 'metal', lo=lo_, hi=min(5, hi_ + 2), radius=2)
-        c.put_ramp(x0 + 1, 53, 'metal', 5)
+        c.rect(x0 + 1, 48, x1 - 1, 48, 'metal', 1)
+        round_rect(c, x0 - 1, 50, x1 + 2, 55, 'metal', lo=lo_, hi=min(5, hi_ + 2), radius=2)
+        c.put_ramp(x0 + 1, 51, 'metal', 5)
     # dunkle Leere zwischen Knie und Rock
     c.rect(11, 37, 33, 39, 'coal', 0)
     # Rumpf: Kuerass
@@ -212,7 +212,7 @@ def spr_empty_armor(anim='idle', f=0):
         c.put_ramp(45 + k // 2, 20 + k, 'teamA', 4 if k < 2 else 3)
     # Koerper nach unten schieben, damit Platz fuer den schwebenden Helm + Federbusch bleibt
     body = c
-    c = Canvas(54, 63)
+    c = Canvas(54, 61)
     c.blit(body, 0, 5)
     # Schaft nach oben verlaengern + Spitze
     c.rect(43, 3, 44, 11, 'wood', 3)
@@ -257,8 +257,7 @@ def spr_empty_armor(anim='idle', f=0):
             c.put_ramp(x, y + 3, 'teamA', 1)
         if k > 10 and k % 2 == 0:
             c.put_ramp(x - 1, y + 3 + flick, 'teamA', 2)
-    c.outline()
-    return c
+    return a4_seal(c)
 
 
 # =========================================================================== UV-09 Dreikoepfiger Pudel
@@ -356,8 +355,7 @@ def spr_three_headed_poodle(anim='idle', f=0):
     _poodle_head(c, 15, 15 + dy, 'sleepy', 21)
     _poodle_head(c, 28, 8 + dy, 'bark', 22)
     _poodle_head(c, 43, 17 + dy, 'tongue', 23)
-    c.outline()
-    return c
+    return a4_seal(c)
 
 
 # =========================================================================== UV-10 Gletscher-Greis
@@ -369,41 +367,41 @@ def _shard(c, pts, ramp='ice', lo=2, hi=5):
 
 def spr_glacier_elder(anim='idle', f=0):
     """Eisriese, alt und gebueckt: Strickmuetze (Teamfarbe) mit Bommel, Eisbart mit Zapfen, Hausschuhe, Gehstock"""
-    c = Canvas(66, 68)
+    c = Canvas(66, 62)
     bob = [0, -1][f % 2] if anim == 'idle' else 0
     # Gehstock (hinten rechts): Holz mit Kruecke
-    c.rect(58, 36, 59, 67, 'wood', 3)
-    c.rect(58, 36, 58, 67, 'wood', 4)
-    c.rect(59, 36, 59, 67, 'wood', 2)
+    c.rect(58, 36, 59, 61, 'wood', 3)
+    c.rect(58, 36, 58, 61, 'wood', 4)
+    c.rect(59, 36, 59, 61, 'wood', 2)
     thick_line(c, 59, 36, 55, 33, 2.4, 'wood', lo=2, hi=4)
     c.put_ramp(55, 33, 'wood', 5)
     # Beine (Eissaeulen)
     for (x0, x1, lo_, hi_) in ((13, 26, 1, 4), (36, 49, 2, 5)):
-        round_rect(c, x0, 42, x1, 61, 'ice', lo=lo_, hi=hi_, radius=3)
+        round_rect(c, x0, 42, x1, 55, 'ice', lo=lo_, hi=hi_, radius=3)
         for k in range(4):
-            c.put_ramp(x0 + 3 + k, 48 + k * 2, 'ice', 5)
-        c.put_ramp(x0 + 6, 54, 'ice', 0)
-        c.put_ramp(x0 + 7, 55, 'ice', 0)
-        c.put_ramp(x0 + 7, 56, 'ice', 0)
+            c.put_ramp(x0 + 3 + k, 45 + k * 2, 'ice', 5)
+        c.put_ramp(x0 + 6, 49, 'ice', 0)
+        c.put_ramp(x0 + 7, 50, 'ice', 0)
+        c.put_ramp(x0 + 7, 51, 'ice', 0)
     # Hausschuhe: flauschige Pantoffeln mit Fellkragen
     for (x0, x1, lo_, hi_) in ((7, 30, 1, 4), (32, 55, 2, 5)):
-        round_rect(c, x0, 59, x1, 67, 'cloth', lo=lo_ + 1, hi=min(5, hi_ + 1), radius=3)
-        ellipse(c, x1 - 4, 63, 6.0, 4.6, 'cloth', lo=lo_ + 1, hi=min(5, hi_ + 1))
+        round_rect(c, x0, 53, x1, 61, 'cloth', lo=lo_ + 1, hi=min(5, hi_ + 1), radius=3)
+        ellipse(c, x1 - 4, 57, 6.0, 4.6, 'cloth', lo=lo_ + 1, hi=min(5, hi_ + 1))
         # Fellkragen oben
         for x in range(x0 + 5, x1 - 4):
-            c.put_ramp(x, 59, 'bone', 5 if x % 3 else 4)
-            c.put_ramp(x, 60, 'bone', 4 if x % 2 else 3)
+            c.put_ramp(x, 53, 'bone', 5 if x % 3 else 4)
+            c.put_ramp(x, 54, 'bone', 4 if x % 2 else 3)
             if x % 4 == 0:
-                c.put_ramp(x, 58, 'bone', 4)
+                c.put_ramp(x, 52, 'bone', 4)
         for x in range(x0 + 2, x1 - 2):
-            c.put_ramp(x, 67, 'cloth', 0)
+            c.put_ramp(x, 61, 'cloth', 0)
         # Bommel
-        ellipse(c, x1 - 7, 61, 2.4, 2.2, 'teamA', lo=2, hi=5)
+        ellipse(c, x1 - 7, 55, 2.4, 2.2, 'teamA', lo=2, hi=5)
     # linker Arm (hinten, haengend)
     thick_line(c, 12, 28 + bob, 7, 48, 10.0, 'ice', lo=0, hi=3)
-    ellipse(c, 7, 51, 6.0, 5.4, 'ice', lo=1, hi=4)
+    ellipse(c, 7, 50, 6.0, 5.4, 'ice', lo=1, hi=4)
     for x in (4, 7, 10):
-        c.put_ramp(x, 55, 'ice', 0)
+        c.put_ramp(x, 54, 'ice', 0)
     # Rumpf: kristalliner Block mit Facetten
     poly(c, [(9, 27 + bob), (20, 19 + bob), (45, 19 + bob), (57, 28 + bob), (52, 46), (15, 46)], 'ice', lo=1, hi=4)
     poly(c, [(20, 19 + bob), (45, 19 + bob), (38, 30 + bob), (23, 29 + bob)], 'ice', flat=4)
@@ -427,6 +425,13 @@ def spr_glacier_elder(anim='idle', f=0):
     ellipse(c, 57, 42 + bob, 5.0, 4.6, 'ice', lo=2, hi=5)
     for k in range(3):
         c.put_ramp(54 + k * 3, 45 + bob, 'ice', 1)
+    # Eisfacetten auf den Armen
+    c.line(55, 31 + bob, 57, 37 + bob, 'ice', 5)
+    c.line(52, 36 + bob, 55, 40 + bob, 'ice', 1)
+    c.line(4, 38, 6, 44, 'ice', 5)
+    c.line(9, 33, 8, 41, 'ice', 1)
+    for (x, y) in ((6, 47), (7, 47), (56, 43), (57, 43)):
+        c.put_ramp(x, y + (bob if x > 50 else 0), 'ice', 5)
     # Schal (Teamfarbe) mit Streifen
     for x in range(21, 46):
         for k in range(4):
@@ -497,8 +502,7 @@ def spr_glacier_elder(anim='idle', f=0):
     ellipse(c, 15, 14 + bob, 3.6, 3.4, 'bone', lo=3, hi=5)
     for (x, y) in ((14, 13), (16, 13), (15, 15)):
         c.put_ramp(x, y + bob, 'bone', 5)
-    c.outline()
-    return c
+    return a4_seal(c)
 
 
 # =========================================================================== UV-11 Salamander-Waechter
@@ -524,11 +528,11 @@ def spr_salamander_warden(anim='idle', f=0):
     breath = anim == 'breath'
     bob = [0, -1][f % 2] if anim == 'idle' else 0
     # Schwanz: dick, nach hinten auslaufend, Spitze glueht
-    thick_line(c, 18, 28, 8, 33, 9.0, 'coal', lo=0, hi=3)
-    thick_line(c, 8, 33, 3, 27, 6.0, 'coal', lo=1, hi=3)
-    thick_line(c, 3, 27, 4, 19, 3.6, 'coal', lo=1, hi=3)
-    ellipse(c, 4, 17, 2.4, 2.6, 'fire', lo=3, hi=5)
-    c.put_ramp(4, 16, 'gold', 5)
+    thick_line(c, 18, 28, 11, 33, 9.0, 'coal', lo=0, hi=3)
+    thick_line(c, 11, 33, 8, 27, 6.0, 'coal', lo=1, hi=3)
+    thick_line(c, 8, 27, 9, 19, 3.6, 'coal', lo=1, hi=3)
+    ellipse(c, 9, 17, 2.4, 2.6, 'fire', lo=3, hi=5)
+    c.put_ramp(9, 16, 'gold', 5)
     # hintere Beine (links), dunkler
     for lx in (14, 21):
         thick_line(c, lx, 31, lx - 1, 41, 6.0, 'coal', lo=0, hi=3)
@@ -565,7 +569,7 @@ def spr_salamander_warden(anim='idle', f=0):
     _lava(c, [(43, 33), (44, 38)])
     # Hals + Kopf: breiter, flacher Echsenkopf mit Stirnwulst
     thick_line(c, 42, 25 + bob, 50, 21 + bob, 11.0, 'coal', lo=1, hi=4)
-    hx, hy = 52, 21 + bob
+    hx, hy = 51, 21 + bob
     ellipse(c, hx, hy, 9.0, 7.0, 'coal', lo=1, hi=4, ambient=0.2)
     ellipse(c, hx + 8.0, hy + 1.5, 7.2, 4.4, 'coal', lo=1, hi=4, ambient=0.25)
     jaw_open = 5 if breath else 0
@@ -625,5 +629,4 @@ def spr_salamander_warden(anim='idle', f=0):
     c.rect(capx + 4, capy - 2, capx + 6, capy, 'gold', 4)
     c.put_ramp(capx + 4, capy - 2, 'gold', 5)
     c.put_ramp(capx + 5, capy - 1, 'gold', 2)
-    c.outline()
-    return c
+    return a4_seal(c)

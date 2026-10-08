@@ -75,10 +75,11 @@ def light_beam(world, cx, y0, y1, w0=8, w1=18, key=8500):
                 _put(world, x, y, 'sky', 5, key)
 
 
-def dust(world, cx, cy, r, ramp='dirt', lo=3, hi=5, seed=1, key=8000):
+def dust(world, cx, cy, r, ramp='dirt', lo=3, hi=5, seed=1, key=8000, outline=True):
     c = Canvas(int(r * 2 + 6), int(r * 1.6 + 6))
     puff(c, c.w / 2, c.h / 2, r, ramp, lo, hi, seed)
-    c.outline(dark=max(0, lo - 1), lit=hi)
+    if outline:
+        c.outline(dark=max(0, lo - 1), lit=hi)
     world.draw(c, int(cx - c.w / 2), int(cy - c.h / 2), key)
 
 

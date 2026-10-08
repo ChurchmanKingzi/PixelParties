@@ -433,3 +433,18 @@ def barricade(hole=3.5, h=38):
             c.put_ramp(9 + dx, cy + dy, 'wood', 5)
     c.outline()
     return c
+
+
+def pellet(size=4):
+    """Schrotkugel (dunkle Kugel mit Glanzpunkt), 3x3 oder 4x4"""
+    c = Canvas(size, size)
+    if size >= 4:
+        for (x, y) in ((1, 0), (2, 0), (0, 1), (1, 1), (2, 1), (3, 1), (0, 2), (1, 2), (2, 2), (3, 2), (1, 3), (2, 3)):
+            c.put_ramp(x, y, 'coal', 1)
+        c.put_ramp(1, 1, 'metal', 4)
+        c.put_ramp(2, 3, 'coal', 0)
+    else:
+        for (x, y) in ((1, 0), (0, 1), (1, 1), (2, 1), (1, 2)):
+            c.put_ramp(x, y, 'coal', 1)
+        c.put_ramp(1, 1, 'metal', 4)
+    return c

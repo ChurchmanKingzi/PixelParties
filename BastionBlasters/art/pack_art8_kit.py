@@ -303,7 +303,7 @@ def floor_sand(seed=29):
 
 
 def floor_rune(seed=31):
-    """dunkle Violett-Fliesen mit eingeritzten Zeichen"""
+    """dunkle Steinfliesen mit eingeritzten, violett leuchtenden Zeichen"""
     c = Canvas(32, 32)
     for ty in range(2):
         for tx in range(2):
@@ -318,7 +318,7 @@ def floor_rune(seed=31):
                         idx = 1 if (x + y) % 7 else 2
                         if texture_noise(X, Y, seed) > 0.88:
                             idx = 2
-                    c.put_ramp(X, Y, 'purple', idx)
+                    c.put_ramp(X, Y, 'stone', idx)
     glyphs = [(8, 8, 'sun'), (24, 8, 'dia'), (8, 24, 'zig'), (24, 24, 'bar')]
     for (gx, gy, g) in glyphs:
         if g == 'sun':
@@ -330,5 +330,5 @@ def floor_rune(seed=31):
         else:
             pts = [(-2, -2), (-2, -1), (-2, 0), (-2, 1), (-2, 2), (2, -2), (2, -1), (2, 0), (2, 1), (2, 2), (0, -1), (0, 0), (0, 1)]
         for (dx, dy) in pts:
-            c.put_ramp(gx + dx, gy + dy, 'purple', 3)
+            c.put_ramp(gx + dx, gy + dy, 'purple', 4)
     return tile_rgb(c)

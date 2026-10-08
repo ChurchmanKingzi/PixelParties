@@ -77,6 +77,13 @@ def bunker(team='teamA'):
     # Dachluke
     ellipse(c, 24.5, 28, 5.2, 2.4, 'metal', lo=1, hi=4)
     c.rect(23, 27, 26, 27, 'metal', 5)
+    # Periskop-Rohr auf dem Dach
+    c.rect(13, 16, 15, 25, 'metal', 3)
+    c.rect(13, 16, 13, 25, 'metal', 5)
+    c.rect(15, 16, 15, 25, 'metal', 1)
+    c.rect(13, 14, 19, 16, 'metal', 3)
+    c.rect(13, 14, 19, 14, 'metal', 5)
+    c.rect(17, 15, 19, 15, 'ice', 4)
     # Grasbueschel (Tarnung) auf dem Dach
     for (gx, gy) in ((12, 26), (15, 28), (50, 25), (57, 28), (59, 26), (35, 29)):
         c.put_ramp(gx, gy, 'leaf', 4)
@@ -227,4 +234,5 @@ def sound_arcs(c, cx, cy, side=1, n=3):
         for a in range(-38, 39, 3):
             x = cx + side * math.cos(math.radians(a)) * r
             y = cy + math.sin(math.radians(a)) * r
-            c.put_ramp(int(round(x)), int(round(y)), 'bone', 5 if k == 0 else (4 if k == 1 else 3))
+            c.put_ramp(int(round(x)), int(round(y)), 'bone', 5 if k < 2 else 4)
+            c.put_ramp(int(round(x)), int(round(y)) + 1, 'bone', 3)

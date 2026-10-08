@@ -12,7 +12,7 @@ def spr_crossbow_frog(anim='idle', f=0):
     dy = 0 if hop else 3
     # ---- Hinterbeine
     if hop:
-        legs = (((11, 25), (2, 30), 0), ((13, 26), (5, 32), 1))
+        legs = (((11, 25), (5, 30), 0), ((13, 26), (7, 32), 1))
         for (hip, foot, near) in legs:
             thick_line(c, hip[0], hip[1], foot[0], foot[1], 3.4, 'goblin', lo=1 + near, hi=3 + near)
             ellipse(c, hip[0], hip[1], 4.2, 3.6, 'goblin', lo=1 + near, hi=4 + near, ambient=0.3)
@@ -40,9 +40,9 @@ def spr_crossbow_frog(anim='idle', f=0):
     c.put_ramp(29, ay + 7, 'metal', 4)
     c.line(29, ay - 8, 24, ay - 1, 'bone', 4)                               # Sehne
     c.line(29, ay + 7, 24, ay - 1, 'bone', 3)
-    c.line(24, ay - 2, 34, ay - 2, 'metal', 4)                              # Bolzen
-    c.put_ramp(34, ay - 2, 'bone', 5)
-    c.put_ramp(35, ay - 2, 'bone', 4)
+    c.line(24, ay - 2, 33, ay - 2, 'metal', 4)                              # Bolzen
+    c.put_ramp(33, ay - 2, 'bone', 5)
+    c.put_ramp(34, ay - 2, 'bone', 4)
     c.put_ramp(24, ay - 3, 'teamA', 4)
     c.put_ramp(25, ay - 3, 'teamA', 3)
     ellipse(c, 22.5, ay + 0.2, 2.0, 1.8, 'goblin', lo=3, hi=5)              # Hand

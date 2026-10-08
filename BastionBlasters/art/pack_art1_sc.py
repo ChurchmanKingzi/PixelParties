@@ -41,21 +41,23 @@ def spr_nailboard_ballista(anim='idle', f=0):
     for (x, y) in ((40, 3), (40, 43)):
         c.rect(x - 1, y - 1, x + 1, y + 1, 'metal', 4)
     thick_line(c, 49, 17, 49, 29, 3.6, 'metal', lo=1, hi=3)           # Eisenbeschlag am Griff
-    nock = (20, 26)
+    loaded = anim != 'fire'
+    nock = (20, 26) if loaded else (40, 23)
     c.line(40, 3, nock[0], nock[1], 'bone', 4)
     c.line(40, 43, nock[0], nock[1], 'bone', 3)
-    # --- Bolzen: heller Schaft, Eisenspitze, Federn, Schleife
-    thick_line(c, 18, 25.5, 56, 18, 2.6, 'wood', lo=3, hi=5)
-    poly(c, [(54, 14.5), (54, 21.5), (63, 17.5)], 'metal', lo=2, hi=5)
-    for (dx, dy) in ((0, -2), (1, -3), (0, 3), (1, 4)):
-        c.put_ramp(17 + dx, 25 + dy, 'bone', 4)
-    # Schleife (Teamfarbe): zwei Schlaufen + Knoten + Bänder
-    poly(c, [(46, 18), (41, 14), (41, 22), (46, 20)], 'teamA', lo=2, hi=5)
-    poly(c, [(47, 18), (52, 14), (52, 22), (47, 20)], 'teamA', lo=1, hi=4)
-    c.rect(45, 17, 48, 20, 'teamA', 4)
-    c.put_ramp(46, 17, 'teamA', 5)
-    c.line(46, 21, 44, 27, 'teamA', 3)
-    c.line(48, 21, 50, 27, 'teamA', 2)
+    # --- Bolzen: heller Schaft, Eisenspitze, Federn, Schleife (nur wenn geladen)
+    if loaded:
+        thick_line(c, 18, 25.5, 56, 18, 2.6, 'wood', lo=3, hi=5)
+        poly(c, [(54, 14.5), (54, 21.5), (63, 17.5)], 'metal', lo=2, hi=5)
+        for (dx, dy) in ((0, -2), (1, -3), (0, 3), (1, 4)):
+            c.put_ramp(17 + dx, 25 + dy, 'bone', 4)
+        # Schleife (Teamfarbe): zwei Schlaufen + Knoten + Bänder
+        poly(c, [(46, 18), (41, 14), (41, 22), (46, 20)], 'teamA', lo=2, hi=5)
+        poly(c, [(47, 18), (52, 14), (52, 22), (47, 20)], 'teamA', lo=1, hi=4)
+        c.rect(45, 17, 48, 20, 'teamA', 4)
+        c.put_ramp(46, 17, 'teamA', 5)
+        c.line(46, 21, 44, 27, 'teamA', 3)
+        c.line(48, 21, 50, 27, 'teamA', 2)
     # --- Kettenrad hinten mit Kette und Kurbel
     ellipse(c, 11, 27, 7.2, 7.2, 'metal', lo=1, hi=4)
     for k in range(10):
@@ -282,15 +284,23 @@ def spr_frog_catapult(anim='idle', f=0):
         ellipse(c, ex + 1.2, ey + 0.4, 3.0, 3.0, 'bone', lo=4, hi=5)
         c.rect(int(ex + 1.5), int(ey), int(ex + 2.5), int(ey + 1), 'coal', 0)
     # --- Zunge = Wurfarm: aus dem Maul in weitem Bogen nach oben-rechts, Klebeball an der Spitze
-    tp = [(41, 27), (47, 25 + wob), (52, 19), (55, 11 - wob)]
+    if anim == 'fire':                                    # Zunge nach vorn geschnalzt, Kugel ist weg
+        tp = [(41, 27), (47, 25), (53, 22), (59, 20)]
+    else:
+        tp = [(41, 27), (47, 25 + wob), (52, 19), (55, 11 - wob)]
     for (a, b, w_) in ((tp[0], tp[1], 4.0), (tp[1], tp[2], 3.4), (tp[2], tp[3], 3.0)):
         thick_line(c, a[0], a[1], b[0], b[1], w_, 'skin', lo=2, hi=4)
-    for (x, y) in ((44, 25), (49, 22), (53, 15)):
+    for (x, y) in ((44, 25), (49, 23), (54, 21)):
         c.put_ramp(x, y, 'skin', 5)
-    ellipse(c, 56, 7 - wob, 4.6, 4.6, 'slime', lo=1, hi=5)
-    for (dx, dy) in ((-1, -2), (1, 1)):
-        c.put_ramp(56 + dx, 7 - wob + dy, 'bone', 5)
-    c.put_ramp(58, 9 - wob, 'slime', 0)
+    if anim == 'fire':
+        ellipse(c, 60, 20, 1.8, 1.8, 'skin', lo=3, hi=5)
+        for (x, y) in ((59, 24), (61, 23), (60, 26)):
+            c.put_ramp(x, y, 'slime', 4)
+    else:
+        ellipse(c, 56, 7 - wob, 4.6, 4.6, 'slime', lo=1, hi=5)
+        for (dx, dy) in ((-1, -2), (1, 1)):
+            c.put_ramp(56 + dx, 7 - wob + dy, 'bone', 5)
+        c.put_ramp(58, 9 - wob, 'slime', 0)
     # Räder vorn
     for wx in (14, 47):
         wheel2(c, wx, 44, 5.8, 'wood', 'metal', 6, wx)

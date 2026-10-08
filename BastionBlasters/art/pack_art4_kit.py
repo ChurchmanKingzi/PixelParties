@@ -19,6 +19,20 @@ def _tex():
     return _CACHE['tex']
 
 
+def a4_seal(c, pad=1):
+    """Sprite abschliessen: 1 px Rand anlegen (damit die Sel-Out-Kontur auch an Leinwandkanten nicht abgeschnitten wird),
+    outline() und auf den Inhalt zuschneiden (Unterkante = Fusspunkt)."""
+    big = Canvas(c.w + 2 * pad, c.h + 2 * pad)
+    big.blit(c, pad, pad)
+    big.outline()
+    ys, xs = np.nonzero(big.px[:, :, 3] > 0)
+    x0, x1, y0, y1 = int(xs.min()), int(xs.max()), int(ys.min()), int(ys.max())
+    out = Canvas(x1 - x0 + 1, y1 - y0 + 1)
+    out.px[:] = big.px[y0:y1 + 1, x0:x1 + 1]
+    out.rid[:] = big.rid[y0:y1 + 1, x0:x1 + 1]
+    return out
+
+
 def a4_ground_put(world, x, y, ramp, idx):
     """Pixel nur auf Boden (nicht auf Sprites) setzen"""
     if 0 <= x < world.w and 0 <= y < world.h and world.depth[y, x] < -40:

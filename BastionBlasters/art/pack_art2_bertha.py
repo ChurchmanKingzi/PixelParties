@@ -4,38 +4,38 @@ from __future__ import annotations
 from pixl import *
 from pack_art2_kit import *
 
-S = -5                                                # Rumpf nach links, damit das Rohr Platz hat
+S = -2                                                # Rumpf nach links, damit das Rohr Platz hat
 
 
 def spr_big_bertha(anim='idle', f=0):
     c = Canvas(64, 52)
     ty = 43                                           # Mitte der Raupe
     # ---- Raupenband (Kapsel) mit Profilstollen
-    belt = m_ellipse(c, 9 + S, ty, 7, 7) | m_ellipse(c, 53 + S, ty, 7, 7)
-    belt |= m_poly(c, [(9 + S, ty - 7), (53 + S, ty - 7), (53 + S, ty + 7), (9 + S, ty + 7)])
+    belt = m_ellipse(c, 9 + S, ty, 7, 7) | m_ellipse(c, 48 + S, ty, 7, 7)
+    belt |= m_poly(c, [(9 + S, ty - 7), (48 + S, ty - 7), (48 + S, ty + 7), (9 + S, ty + 7)])
     shade_mask(c, belt, 'coal', 1, 3, r=3, passes=2, strength=6.0, ambient=0.4)
     for x in range(0, 62):
         if x % 3 == 0:
             for y in (ty - 7, ty + 7, ty - 6, ty + 6):
                 if belt[y, x]:
                     c.put_ramp(x, y, 'coal', 4 if y < ty else 0)
-    for wx, r in ((9, 4.6), (18, 3.4), (26, 3.4), (34, 3.4), (42, 3.4), (53, 4.6)):
+    for wx, r in ((9, 4.6), (17, 3.4), (25, 3.4), (32, 3.4), (39, 3.4), (48, 4.6)):
         ellipse(c, wx + S, ty + 1, r, r, 'metal', lo=1, hi=4, ambient=0.3)
         c.put_ramp(wx + S, ty + 1, 'gold', 4)
     # ---- Rumpf mit schraeger Front und Teamband
-    hull = m_poly(c, [(6 + S, 38), (6 + S, 31), (12 + S, 27), (47 + S, 27), (57 + S, 33), (57 + S, 38)])
+    hull = m_poly(c, [(6 + S, 38), (6 + S, 31), (12 + S, 27), (42 + S, 27), (52 + S, 33), (52 + S, 38)])
     shade_mask(c, hull, 'metal', 1, 4, r=3, passes=2, strength=5.0, ambient=0.34)
     for x in range(0, 64):
         if hull[34, x]:
             c.put_ramp(x, 34, 'teamA', 3 if x % 4 else 4)
             if hull[35, x]:
                 c.put_ramp(x, 35, 'teamA', 2)
-    for x in range(5, 52, 4):
+    for x in range(4, 50, 4):
         if hull[30, x]:
             c.put_ramp(x, 30, 'metal', 5)
         if hull[37, x]:
             c.put_ramp(x, 37, 'metal', 5)
-    for x in (17 + S, 40 + S):
+    for x in (17 + S, 36 + S):
         for y in range(29, 34):
             if hull[y, x]:
                 c.put_ramp(x, y, 'metal', 0)
@@ -76,7 +76,7 @@ def spr_big_bertha(anim='idle', f=0):
     c.rect(hx + 5, 14, hx + 6, 16, 'gold', 4)
     c.put_ramp(hx + 5, 15, 'coal', 1)
     # ---- Schnurrbart unter der Muendung (Handlebar mit hochgezwirbelten Spitzen)
-    mx, my = 54, 19
+    mx, my = 52, 19
     segs = (((mx, my - 1), (mx - 4, my + 1), 4.0), ((mx - 4, my + 1), (mx - 8, my + 1), 3.4), ((mx - 8, my + 1), (mx - 10, my - 2), 2.4),
             ((mx, my - 1), (mx + 3, my + 1), 4.0), ((mx + 3, my + 1), (mx + 6, my + 1), 3.2), ((mx + 6, my + 1), (mx + 8, my - 2), 2.4))
     for (a, b, w) in segs:

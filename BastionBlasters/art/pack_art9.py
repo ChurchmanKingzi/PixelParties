@@ -140,15 +140,22 @@ THEME_KITCHEN = {'floor': floor_checker(('coal', 2), ('cloth', 1)), 'furnish': f
 def _art_bw10():
     world, X0, Y0, out = room_world('H', THEME_KITCHEN, '3x2', 'grass', 3)
     cx, cy = X0 + 30 + 18, Y0 + 8        # Kessel: Mitte der Oberflaeche ~ (cx, cy + 8)
-    sp = HL.stirring_spoon()
+    sp = HL.stirring_spoon(0, 15)
     world.draw(sp, cx - 6, cy - 22, 9000)
     # Dampf in Totenkopfform
-    world.draw(HL.skull_steam(0), cx - 9, cy - 36, 9000)
+    world.draw(HL.skull_steam(0), cx - 14, cy - 29, 9000)
+    # Dampfschwaden vom Trank zum Totenkopf
+    for k in range(5):
+        yy = cy + 3 - k * 3
+        xx = cx - 7 + int(round(2 * math.sin(k * 1.3)))
+        for (dx, dy) in ((0, 0), (1, 0), (2, 0), (0, 1), (1, 1)):
+            if (dx + dy + k) % 2 == 0 or k < 2:
+                wput(world, xx + dx, yy + dy, 'bone', 4 if k % 2 == 0 else 3)
     # Wirbel im Trank
     for (dx, dy, i) in ((-6, 7, 5), (-7, 8, 5), (-5, 9, 4), (4, 11, 5), (5, 10, 5), (6, 9, 4)):
         wput(world, cx + dx, cy + dy, 'slime', i)
     # Bewegungsstriche am Loeffel
-    for (dx, dy) in ((9, -14), (10, -13), (11, -11), (12, -9)):
+    for (dx, dy) in ((10, -4), (11, -3), (12, -1), (11, 1), (9, 3)):
         wput(world, cx + dx, cy + dy, 'bone', 5)
     return finish(window_of(world))
 
@@ -281,7 +288,7 @@ def _art_bf04():
     ox, oy = 8, 6
     # Dampf aus dem Kamin des Kessels
     bx, by = X0 + 5 + 28, Y0 - 8
-    for k, (dx, dy, f, sz) in enumerate(((0, -9, 0, 1), (4, -19, 2, 2), (10, -28, 4, 2))):
+    for k, (dx, dy, f, sz) in enumerate(((0, -13, 0, 1), (9, -12, 2, 1), (19, -9, 4, 1))):
         world.draw(TC.steam_puff(f, sz), bx + dx - 4, by + dy, 9000)
     unit_at(world, TC.gnome('work', 'metal', 'fire'), X0 + 24, Y0 + 62, sh=(9, 3))
     return finish(window_of(world))
@@ -331,8 +338,7 @@ def furnish_menagerie(ctx):
     draw_floor(ctx, BE.straw_patch(36, 20, 1), 28, 38)
     draw_prop(ctx, BE.hay_bale(), 6, 40)
     draw_prop(ctx, BE.hay_bale(22, 14), 10, 52)
-    draw_prop(ctx, BE.feed_sack(), W - 20, 38)
-    draw_prop(ctx, trough(), W - 34, 54)
+    draw_prop(ctx, BE.feed_sack(), W - 17, 38)
 
 
 THEME_MENAGERIE = {'floor': floor_noise('dirt', 2, 3, 7, [('dirt', 4, 12), ('dirt', 1, 10), ('gold', 3, 10)]), 'furnish': furnish_menagerie, 'low': False}
@@ -342,7 +348,7 @@ THEME_MENAGERIE = {'floor': floor_noise('dirt', 2, 3, 7, [('dirt', 4, 12), ('dir
 def _art_bf03():
     world, X0, Y0, out = room_world('G', THEME_MENAGERIE, '3x3', 'grass', 6)
     ox, oy = 8, 6
-    cx, cy = 56 + ox, 88 + oy                  # Gnom (Fussstelle in Fensterkoordinaten 56, 88)
+    cx, cy = 70 + ox, 88 + oy                  # Gnom (Fussstelle in Fensterkoordinaten 70, 88)
     unit_at(world, TC.gnome('shovel', 'leaf', 'dirt', 'cloth'), cx, cy, sh=(10, 3))
     prop_at(world, BE.manure_pile(), cx + 21, cy - 1)
     BE.stink_lines(world, cx + 21, cy - 12, 14)
